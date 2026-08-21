@@ -33,6 +33,16 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
 - **Direktes Schreiben** Wenn du eine Datei bearbeitest, schreibe die Änderung direkt in die Datei. Verzichte auf die Anzeige des vollständigen Codes im Chat.
 - **Kontext-Fokus** Antworte direkt auf die Aufgabe. Erkläre nur kurz die Logik, wenn es für das Verständnis der Änderung notwendig ist.
 
+## Gedankenstrich-Regel (Nutzer-Anweisung 2026-08-21)
+
+- Lange Striche (Gedankenstriche, d.h. die Zeichen U+2014 und U+2013)
+  sind im CHAT weiterhin erlaubt, in DOKUMENTEN und Repo-Dateien
+  (README, STATUS, Preregs, docs/, Kommentare) nicht mehr.
+- Ersatz je nach Kontext: Komma, Doppelpunkt, Semikolon oder Klammern.
+  Zahlenbereiche bekommen den einfachen Bindestrich (z.B. 10-273).
+- Bestand wird bei Gelegenheit mit-migriert (README ist am 2026-08-21
+  bereinigt), keine Grossaktion ueber alle Altdateien.
+
 ## Dateinamen-Konvention (Nutzer-Anweisung 2026-08-13)
 
 - **Neue Dateien und Verzeichnisse werden IMMER englisch benannt** (Code,

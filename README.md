@@ -8,16 +8,16 @@
 AlphaZero-style neural networks on a two-player tile-drafting and
 dome-building board game with hidden information.
 
-> **⚠️ Disclaimer — credit where credit is due:** This is a non-commercial
+> **⚠️ Disclaimer (credit where credit is due):** This is a non-commercial
 > learning and research project: a private digital reimplementation of the
 > **_Azul Duel_** ruleset (game design by Michael Kiesling, © Plan B Games /
 > Next Move Games), written from scratch to serve as a training environment
-> for reinforcement learning. **The game design is not mine** — only the
+> for reinforcement learning. **The game design is not mine**; only the
 > engine, the neural network and the training pipeline are. This project is
 > not affiliated with, endorsed by, or connected to the publisher in any way,
 > and it contains none of their artwork, rulebook text, or other assets; all
 > trademarks belong to their respective owners. It is no substitute for the
-> physical game — if you enjoy it, buy the original.
+> physical game: if you enjoy it, buy the original.
 
 ---
 
@@ -25,66 +25,66 @@ dome-building board game with hidden information.
 
 Champion: **`v21_2d_brierbest`**, Elo **1215** (95% CI [1170, 1259]),
 anchored at Heuristic@150 (dyn. ~330 sims) = 1000 (`tools/elo_tracker.py
-report`) — the first champion produced by pure corpus scaling (same recipe,
+report`), the first champion produced by pure corpus scaling (same recipe,
 +40% window from a stronger generator). The ladder was **re-anchored on
 2026-08-21**: a fix to the round-5 solver's move ordering changed every
 game with a round-5 share, so the old register (champion at 1358 on a
-longer ladder) moved to `archive/elo_history_pre_r5fix.csv` — Elo values
+longer ladder) moved to `archive/elo_history_pre_r5fix.csv`; Elo values
 are not comparable across that boundary. The value head predicts a win
 *probability* (WDL era, task #34); display probabilities are Platt-calibrated
 per champion.
 
 Current campaign: teaching the net to see **scoring plates**. The
 ownership *consumer* strand (an ownership head steering the search) was
-measured to exhaustion and closed — every variant came out neutral or
+measured to exhaustion and closed: every variant came out neutral or
 negative in the paired arena. What remains open and is running now: an
-**asymmetric self-play curriculum** — exactly one side per game gets a
-rule-guided plate builder, so the value head sees plate building as a
-win signal for the first time
-(`evaluations/PREREG_asymmetric_curriculum.md`) — and oracle-derived
+**asymmetric self-play curriculum**, in which exactly one side per game
+gets a rule-guided plate builder, so the value head sees plate building
+as a win signal for the first time
+(`evaluations/PREREG_asymmetric_curriculum.md`), and oracle-derived
 **policy supervision** as the last untried strand. Full history, all
 measurements and the standing methodology rules:
 [`evaluations/STATUS.md`](evaluations/STATUS.md); rendered process diagrams:
 [`evaluations/diagrams.txt`](evaluations/diagrams.txt) (`game_flow`,
-`net_search`, `value_target`, `window_generation`, `selfplay_training` — render via
+`net_search`, `value_target`, `window_generation`, `selfplay_training`; render via
 `python evaluations/render_diagrams.py`).
 
 ## Engine Core in Brief
 
-- **Rust search** (`engine/src/net_mcts.rs`): Gumbel AlphaZero (Gumbel-Top-m
-  + Sequential Halving at the root), deterministic in arena/server, sampled
-    in self-play (τ = 1 throughout — annealing was measured and brought no
-    gain). Root width follows the budget: `m = clamp(round(sims/16), 4, 16)`,
-    i.e. 16 at 400/600 sims and 9 at 150 sims (measured strength-neutral).
-    The legacy PUCT path is still available behind `USE_GUMBEL_SEARCH`.
-- **Network** (`engine/py/neural_net.py`): 2D encoder (`Mosaic2DNet`) —
+- **Rust search** (`engine/src/net_mcts.rs`): Gumbel AlphaZero (Gumbel-Top-m Sequential Halving at the root), deterministic in arena/server, sampled
+  in self-play (τ = 1 throughout; annealing was measured and brought no
+  gain). Root width follows the budget: `m = clamp(round(sims/16), 4, 16)`,
+  i.e. 16 at 400/600 sims and 9 at 150 sims (measured strength-neutral).
+  The legacy PUCT path is still available behind `USE_GUMBEL_SEARCH`.
+
+- **Network** (`engine/py/neural_net.py`): 2D encoder (`Mosaic2DNet`):
   conv branch over 76 binary 6x6 planes + flat branch over 708 features,
   fused into a 512-wide trunk. Heads: policy (406 actions), value
   (WDL: two logits -> P(win)), moon order, own points, opponent points,
   ownership, and optionally `endgame_margin` (auxiliary target: the
   round-5 solver's root value, recorded free of charge from self-play
-  records — a budget-limited expectiminimax value with exact leaf
+  records; a budget-limited expectiminimax value with exact leaf
   scoring, not an exact minimax value). Aux heads are training signal
-  only — the search never reads them.
-- **Value target**: `VALUE_SCHEMA_VERSION=20` — `values_wdl` is a TD blend
+  only; the search never reads them.
+- **Value target**: `VALUE_SCHEMA_VERSION=20`. `values_wdl` is a TD blend
   (`TD_LAMBDA=0.5`) of the bootstrap win probability at the next round
   transition and the actual game outcome. Bootstraps from pre-WDL
   generators are Platt-destretched first (A=0.0051, B=1.9269) so that old
   and new corpora carry the same semantics. The raw outcome is kept
   separately (`wdl_outcome`) and yields the **Brier score**, the only
-  cross-arm comparable value metric — it also selects the checkpoint
+  cross-arm comparable value metric; it also selects the checkpoint
   (`_brierbest`, re-validated in the arena).
 - **Cache**: HDF5, planes and legal-move masks bit-packed (1 bit per field),
-  ~2.7 KB per state — a 4.8 M-state window fits in ~13 GB.
+  ~2.7 KB per state; a 4.8 M-state window fits in ~13 GB.
 - **Floor shaping** (`FLOOR_SHAPING_WEIGHT=0.3`, override
   `MOSAIC_FLOOR_SHAPING_W`): exact leaf-value additive against
   floor-penalty spirals; re-validated in the WDL era (0.15/0.6 sweep: H0).
   Plate shaping and value shrinkage were disproved and stay off.
-- **Round 5**: Expectiminimax (`engine/src/round5.rs`) — alpha-beta over
+- **Round 5**: Expectiminimax (`engine/src/round5.rs`): alpha-beta over
   the decision nodes plus chance nodes where the four fresh, still-hidden
   bonus chips get revealed (`MOSAIC_R5_CHANCE_NODES`, default on since
   2026-08-10). No network decisions in round-5 drafting, but the round is
-  *not* full-information, and the search is *not* exact — exact is the
+  *not* full-information, and the search is *not* exact; exact is the
   leaf evaluation (optimal tiling plus plate scoring under a fixed dome
   grid; the node budget is 200). Its values feed training: the round-4
   bootstrap uses `round5::exact_round5_outcome`, and the optional
@@ -97,13 +97,13 @@ measurements and the standing methodology rules:
 
 ## The Generation Cycle (Training Pipeline)
 
-The heart of the project — how the next candidate generation is produced
+The heart of the project: how the next candidate generation is produced
 from the reigning champion. Every step has a written pre-registration in
 `evaluations/PREREG_*.md`: design **and** decision rule are fixed *before*
 the run, so a result cannot be reinterpreted afterwards.
 
 1. **Self-play in two classes** (generator = reigning champion). Policy
-   targets are expensive, value targets are cheap — so they are bought
+   targets are expensive, value targets are cheap, so they are bought
    separately:
    
    ```bash
@@ -115,13 +115,15 @@ the run, so a result cannot be reinterpreted afterwards.
    
    The swarm costs ~2.5x less per game; the value target (bootstrap +
    outcome) is robust to the smaller search budget, whereas the policy
-   target is not — hence the split.
+   target is not; hence the split.
+
 2. **Replay window with generation rotation** (~29,000 games): the new base
    class plus a seed-determined subset of older generations as additional
    policy carriers (`data/policy_carrier_manifest_v21.json`, whose content
    enters the cache key), plus all older swarm material as masked
    value-only data. Each generation ages one step; the oldest rotates out.
    Backup/legacy-rule corpora are never mixed back in.
+
 3. **Training** (warm start from the champion):
    
    ```bash
@@ -132,19 +134,23 @@ the run, so a result cannot be reinterpreted afterwards.
    the shipped checkpoint is the best Brier, not the best combined loss.
    `MOSAIC_DATA_EXCLUDE` pins the window while other generation runs are
    still writing to `data/` (the cache key depends on the file list).
-4. **Offline diagnosis** — with an explicit resolution limit. On the policy
+
+4. **Offline diagnosis**, with an explicit resolution limit. On the policy
    side, `tools/offline_diagnosis.py --frozen` reports the two *arena-
    validated* predictors (prior mass on the oracle top-3, Kendall tau vs.
    oracle Q; correct direction in 7 of 7 decided pairs). On the value side
    there is **no** validated offline predictor: gaps below ~0.015 predicted
    the arena outcome in 0 of 4 cases, so the arena decides.
-5. **Gating**: `tools/paired_gating.py` — paired seed blocks, swapped
+
+5. **Gating**: `tools/paired_gating.py` with paired seed blocks, swapped
    boards, Bernoulli SPRT (`H1: p1=0.65`), cap 200 pairs. An early stop
    below ~150 pairs only counts after a fresh-seed replication (a false
    positive taught us that). Only `ACCEPT_H1` promotes.
+
 6. **Promotion & bookkeeping**: `tools/set_champion.py` (server default for
    human games), `tools/elo_tracker.py add` (Bradley-Terry over the whole
-   match graph, cadre names only — never file names).
+   match graph, cadre names only, never file names).
+
 7. **Mandatory diagnostics on the winner**: Platt calibration
    (`tools/platt_fit.py`), round-5 plate sensitivity
    (`tools/r5_value_calibration.py`), Brier on a frozen legacy measurement
@@ -154,7 +160,7 @@ the run, so a result cannot be reinterpreted afterwards.
 A failed gating does **not** trigger more self-play games ("no top-up
 valve"): a candidate that only wins with additional data is not evidence
 for the change under test. Instead its measured components go into the
-recipe for the next generation — this is how the `endgame_margin` head
+recipe for the next generation; this is how the `endgame_margin` head
 entered the standard recipe despite a drawn arena result.
 
 ## Directory Convention
@@ -163,7 +169,7 @@ the project's directory mantra: root executes, `tools/` measures, `evaluations/`
 
 ```text
 📦 mosaic-AI/
-├── 📂 engine/       # Rust crate (mosaic_rust) — game/search/self-play, PyO3 bindings
+├── 📂 engine/       # Rust crate (mosaic_rust): game/search/self-play, PyO3 bindings
 │   └── 📂 py/       # neural_net.py (MosaicNet, MosaicDataset, value target)
 ├── 📂 evaluations/  # STATUS.md, elo_history.csv, arena_trends.csv, eval JSONs/reports
 ├── 📂 data/         # Self-play output (.pkl) + run manifests, data/archive_*/ = retired
@@ -193,7 +199,7 @@ This produces `dist/Mosaic-AI/` (onedir: exe + engine + web UI + the
 current reference net + `engine_manual.md`) and zips it to
 `dist/Mosaic-AI_<version>_<date>.zip`. Prerequisite: the installed
 `mosaic_rust` wheel must be current (the bundle packages the wheel from
-site-packages, not from source) — rebuild it first after any engine
+site-packages, not from source); rebuild it first after any engine
 change.
 
 ### `evaluations/` at a Glance
@@ -210,37 +216,37 @@ tool (`tools/analyze_game_log.py`).
 
 ### `tools/`
 
-| Script                              | Purpose                                                                                                                           |
-| ----------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `analyze_game_log.py`               | Analyzes human-vs-AI logs (`static/log/`): parser + replay cross-validation + oracle evaluation of every move, report as Markdown |
-| `arena.py`                          | Round-robin/anchor matches (heuristic configurations and network-vs-heuristic), Rust engine, SPRT                                 |
-| `arena_trends.py`                   | Appends a row (avg. score, floor penalty) to `evaluations/arena_trends.csv` per arena/gating run                                  |
-| `build_frozen_eval_set.py`          | Builds the frozen, cross-generation eval set (`frozen_eval_set.pkl`)                                                              |
-| `build_frozen_oracle_labels.py`     | Labels the frozen set via deep network search (oracle reference for `oracle_metrics.py`)                                          |
-| `build_release.py`                  | Builds the PyInstaller Windows bundle + ZIP for end users                                                                         |
-| `diagnosis.py`                      | Sanity check of the training data (zero mask, policy leak, policy sharpness)                                                      |
-| `elo_tracker.py`                    | Bradley-Terry Elo bookkeeping over `evaluations/elo_history.csv` (pure evaluation, does not run matches)                          |
-| `extract_kat2_examples.py`          | Extracts example states for "floor penalty despite alternative" cases from self-play data                                         |
-| `git_tree.py`                       | Prints a cleaned-up project directory tree                                                                                        |
-| `hybrid_paired_arena.py`            | Paired arena runner for hybrid search (priors from network A, leaf values from network B)                                         |
-| `model_info.py`                     | Shows metadata of a saved model checkpoint                                                                                        |
-| `offline_diagnosis.py`               | Value validation R² overall + per round, policy top-1/top-3, `--frozen` for cross-generation comparison                           |
-| `oracle_metrics.py`                 | Offline metrics of candidate networks against the oracle labels + rank correlation with Elo                                       |
-| `paired_arena_arm_worker.py`        | Single-arm worker for paired A/Bs (thin CLI wrapper around `net_arena_match`)                                                     |
-| `paired_arena_env_ab.py`            | Generic paired A/B over runtime `MOSAIC_*` knobs (one worker process per arm, shared seeds, McNemar) — the standard instrument, also drives the Elo-ladder edges |
-| `paired_arena_ismcts.py`            | Paired A/B: single vs. multiple determinization (ISMCTS)                                                                          |
-| `paired_arena_round5.py`            | Paired A/B for the round-5 budget switch (time vs. node budget)                                                                   |
-| `paired_arena_shrink_ab.py`         | Paired A/B for the value shrinkage constant (orchestrator)                                                                        |
-| `paired_arena_shrink_arm_worker.py` | Single-arm worker for the value shrinkage A/B (network vs. network)                                                               |
-| `paired_arena_speedbundle.py`       | Paired A/B for the search speed bundle (inference batching, Gumbel depth fixes)                                                   |
-| `paired_gating.py`                  | Standard gating tool: paired seeds/swapped boards, SPRT (`p1=0.65`), sign test                                                    |
-| `platt_fit.py`                      | Fits the per-champion Platt calibration for displayed win probabilities                                                           |
-| `r5_value_calibration.py`           | Round-5 plate sensitivity of the value head (mandatory post-promotion diagnostic)                                                 |
-| `rtv_redundancy_report.py`          | Offline analysis: does `round_transition_value` still carry independent information over `bootstrap_value`?                       |
-| `selfplay_diversity_report.py`      | Opening/trajectory diversity in the self-play corpus (collapse check)                                                             |
-| `set_champion.py`                   | Sets `models/champion.txt` — the server default for human games                                                                   |
-| `t36_curve_eval.py`                 | Brier score on a frozen legacy measurement set (cross-generation comparison)                                                      |
-| `probes/` (26 scripts)              | Focused one-question measurement probes, each tied to a `PREREG_*.md`                                                             |
+| Script                              | Purpose                                                                                                                                                          |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `analyze_game_log.py`               | Analyzes human-vs-AI logs (`static/log/`): parser + replay cross-validation + oracle evaluation of every move, report as Markdown                                |
+| `arena.py`                          | Round-robin/anchor matches (heuristic configurations and network-vs-heuristic), Rust engine, SPRT                                                                |
+| `arena_trends.py`                   | Appends a row (avg. score, floor penalty) to `evaluations/arena_trends.csv` per arena/gating run                                                                 |
+| `build_frozen_eval_set.py`          | Builds the frozen, cross-generation eval set (`frozen_eval_set.pkl`)                                                                                             |
+| `build_frozen_oracle_labels.py`     | Labels the frozen set via deep network search (oracle reference for `oracle_metrics.py`)                                                                         |
+| `build_release.py`                  | Builds the PyInstaller Windows bundle + ZIP for end users                                                                                                        |
+| `diagnosis.py`                      | Sanity check of the training data (zero mask, policy leak, policy sharpness)                                                                                     |
+| `elo_tracker.py`                    | Bradley-Terry Elo bookkeeping over `evaluations/elo_history.csv` (pure evaluation, does not run matches)                                                         |
+| `extract_kat2_examples.py`          | Extracts example states for "floor penalty despite alternative" cases from self-play data                                                                        |
+| `git_tree.py`                       | Prints a cleaned-up project directory tree                                                                                                                       |
+| `hybrid_paired_arena.py`            | Paired arena runner for hybrid search (priors from network A, leaf values from network B)                                                                        |
+| `model_info.py`                     | Shows metadata of a saved model checkpoint                                                                                                                       |
+| `offline_diagnosis.py`              | Value validation R² overall + per round, policy top-1/top-3, `--frozen` for cross-generation comparison                                                          |
+| `oracle_metrics.py`                 | Offline metrics of candidate networks against the oracle labels + rank correlation with Elo                                                                      |
+| `paired_arena_arm_worker.py`        | Single-arm worker for paired A/Bs (thin CLI wrapper around `net_arena_match`)                                                                                    |
+| `paired_arena_env_ab.py`            | Generic paired A/B over runtime `MOSAIC_*` knobs (one worker process per arm, shared seeds, McNemar); the standard instrument, also drives the Elo-ladder edges |
+| `paired_arena_ismcts.py`            | Paired A/B: single vs. multiple determinization (ISMCTS)                                                                                                         |
+| `paired_arena_round5.py`            | Paired A/B for the round-5 budget switch (time vs. node budget)                                                                                                  |
+| `paired_arena_shrink_ab.py`         | Paired A/B for the value shrinkage constant (orchestrator)                                                                                                       |
+| `paired_arena_shrink_arm_worker.py` | Single-arm worker for the value shrinkage A/B (network vs. network)                                                                                              |
+| `paired_arena_speedbundle.py`       | Paired A/B for the search speed bundle (inference batching, Gumbel depth fixes)                                                                                  |
+| `paired_gating.py`                  | Standard gating tool: paired seeds/swapped boards, SPRT (`p1=0.65`), sign test                                                                                   |
+| `platt_fit.py`                      | Fits the per-champion Platt calibration for displayed win probabilities                                                                                          |
+| `r5_value_calibration.py`           | Round-5 plate sensitivity of the value head (mandatory post-promotion diagnostic)                                                                                |
+| `rtv_redundancy_report.py`          | Offline analysis: does `round_transition_value` still carry independent information over `bootstrap_value`?                                                      |
+| `selfplay_diversity_report.py`      | Opening/trajectory diversity in the self-play corpus (collapse check)                                                                                            |
+| `set_champion.py`                   | Sets `models/champion.txt`, the server default for human games                                                                                                  |
+| `t36_curve_eval.py`                 | Brier score on a frozen legacy measurement set (cross-generation comparison)                                                                                     |
+| `probes/` (26 scripts)              | Focused one-question measurement probes, each tied to a `PREREG_*.md`                                                                                            |
 
 ---
 
@@ -253,7 +259,7 @@ python server.py
 
 Difficulty levels: `easy` plays the heuristic; `medium`/`hard`/`expert`
 all point dynamically at the reigning champion from `models/champion.txt`
-and differ only in simulation count (60/150/400 — `server.py`'s
+and differ only in simulation count (60/150/400; `server.py`'s
 `DIFFICULTY_PRESETS`). The AI debugger (`/debug`) shows a value-head
 breakdown (raw value, points forecast, win %, blended utility, floor shift)
 as well as a granular Gumbel trace (top-m candidates, Sequential Halving
@@ -271,7 +277,7 @@ A daily, non-destructive OneDrive mirror of the repo runs as a scheduled
 task. In addition, `train.py` automatically writes a named model snapshot
 after every training run to
 `<OneDrive>\Backups\mosaic-AI\models_snapshots\` (event-driven, introduced
-after the model loss on 2026-07-24 — fails silently with a warning if the
+after the model loss on 2026-07-24; fails silently with a warning if the
 `OneDrive` environment variable is missing, but does not abort training
 itself).
 
@@ -285,25 +291,25 @@ itself).
 planes (76×6×6) → [Conv3×3(48) → BN → ReLU] ×2 → flatten ─┐
 state  (708)    → Linear(512) → BN → ReLU ────────────────┴→ concat
     → Fusion: Linear(512) → BN → ReLU → Linear(512) → ReLU
-       ┌→ Policy Head:      Linear(256) → ReLU → Linear(406)  — action logits
-       ├→ Value Head (WDL): Linear(64)  → ReLU → Linear(2)    — logits → P(win)
-       ├→ Moon-Order Head:  Linear(32)  → ReLU → Linear(5)    — Plackett-Luce scores
+       ┌→ Policy Head:      Linear(256) → ReLU → Linear(406)  (action logits)
+       ├→ Value Head (WDL): Linear(64)  → ReLU → Linear(2)    (logits → P(win))
+       ├→ Moon-Order Head:  Linear(32)  → ReLU → Linear(5)    (Plackett-Luce scores)
        ├→ Points Heads:     own + opponent score forecast (aux, Tanh)
-       ├→ Ownership Head:   Linear(128) → ReLU → Linear(72)   — 2×36 fields (aux)
-       └→ Endgame Head:     round-5 minimax margin (aux, Tanh)
+       ├→ Ownership Head:   Linear(128) → ReLU → Linear(72)   (2×36 fields, aux)
+       └→ Endgame Head:     round-5 solver root margin (aux, Tanh)
 ```
 
 The champion ONNX export (`alphazero_v21_2d_brierbest.onnx`, verified)
 carries two inputs (`planes`, `state`) and eight outputs (`policy`,
 `value`, `moon`, `points`, `ownership`, `value_wdl_logits`, `opp_points`,
-`endgame_margin`). Aux heads are training signal only — the search reads
+`endgame_margin`). Aux heads are training signal only; the search reads
 none of them. The legacy flat `MosaicNet` (708 → 3×512 trunk, Tanh value)
 remains loadable: the input layout is detected from the model file
 (`detect_layout`, `engine/src/net.rs`), never assumed.
 
 ### State Tensor (708 Features)
 
-Source of truth: `engine/src/features.rs` ↔ `state_to_tensor` — global
+Source of truth: `engine/src/features.rs` ↔ `state_to_tensor`; global
 state, active scoring plates (Wertungsplatten), factories, both player
 boards in ego perspective, both 3×3 dome grids, moon/dome stacks, hidden
 information as masks/shares.
@@ -314,13 +320,13 @@ information as masks/shares.
 | ---------------------- | ------- | ------------------------------------------------------- |
 | pass                   | 0       | No legal move                                           |
 | end_tiling             | 1       | End tiling phase                                        |
-| stone                  | 10–273  | Take tiles: factory × color × target row                |
-| tiling                 | 274–327 | Place tile: pattern row × slot                          |
-| choose_dome_slot       | 328–354 | Dome placement stage 1: display tile × slot             |
-| choose_draw_stack_slot | 355–390 | Draw-stack placement stage 1: drawn tile × slot         |
-| choose_dome_rotation   | 391–394 | Dome placement stage 2: rotation (shared by both paths) |
-| use_chips              | 395–400 | Complete a pattern row using a bonus chip               |
-| bonus_chip             | 401–404 | Take a revealed bonus chip                              |
+| stone                  | 10-273  | Take tiles: factory × color × target row                |
+| tiling                 | 274-327 | Place tile: pattern row × slot                          |
+| choose_dome_slot       | 328-354 | Dome placement stage 1: display tile × slot             |
+| choose_draw_stack_slot | 355-390 | Draw-stack placement stage 1: drawn tile × slot         |
+| choose_dome_rotation   | 391-394 | Dome placement stage 2: rotation (shared by both paths) |
+| use_chips              | 395-400 | Complete a pattern row using a bonus chip               |
+| bonus_chip             | 401-404 | Take a revealed bonus chip                              |
 | dome_stack_peek        | 405     | Pay 1 point, draw a hidden plate (repeatable)           |
 
 ---
