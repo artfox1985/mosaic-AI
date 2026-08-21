@@ -61,9 +61,11 @@ measurements and the standing methodology rules:
   conv branch over 76 binary 6x6 planes + flat branch over 708 features,
   fused into a 512-wide trunk. Heads: policy (406 actions), value
   (WDL: two logits -> P(win)), moon order, own points, opponent points,
-  ownership, and optionally `endgame_margin` (the exact round-5 minimax
-  value as an auxiliary target). Aux heads are training signal only — the
-  search never reads them.
+  ownership, and optionally `endgame_margin` (auxiliary target: the
+  round-5 solver's root value, recorded free of charge from self-play
+  records — a budget-limited expectiminimax value with exact leaf
+  scoring, not an exact minimax value). Aux heads are training signal
+  only — the search never reads them.
 - **Value target**: `VALUE_SCHEMA_VERSION=20` — `values_wdl` is a TD blend
   (`TD_LAMBDA=0.5`) of the bootstrap win probability at the next round
   transition and the actual game outcome. Bootstraps from pre-WDL
