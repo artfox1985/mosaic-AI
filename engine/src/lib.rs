@@ -1369,7 +1369,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
 mod contract_stamp_tests {
     use super::*;
 
-    /// A2-Golden-Waechter (`evaluations/DESIGN_conventions_as_checks.md`
+    /// A2-Golden-Waechter (`docs/DESIGN_conventions_as_checks.md`
     /// Abschnitt "A2"): haelt den HEUTIGEN Vertragshash als Literal fest.
     /// Aendert sich `INPUT_SIZE`, `NUM_PLANES_CHANNELS`, `NUM_ACTIONS` ODER
     /// die in `contract_canonical_string` nachgebildete ONNX-Kopf-

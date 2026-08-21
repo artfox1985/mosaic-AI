@@ -1,4 +1,4 @@
-# Heuristik-Anker-Verhaltenstest-Fixture v1 (A4, evaluations/DESIGN_conventions_as_checks.md)
+# Heuristik-Anker-Verhaltenstest-Fixture v1 (A4, docs/DESIGN_conventions_as_checks.md)
 # rustc: rustc 1.96.0 (ac68faa20 2026-05-25)
 # Datum: 2026-08-09
 # Begruendung: EINFRIEREN, NICHT REPARIEREN -- haelt fest, was die Heuristik HEUTE

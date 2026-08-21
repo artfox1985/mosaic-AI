@@ -1,7 +1,7 @@
 """
 tools/check_conventions.py -- Konventions-Linter (Baustein A5).
 
-Siehe evaluations/DESIGN_conventions_as_checks.md, Abschnitt
+Siehe docs/DESIGN_conventions_as_checks.md, Abschnitt
 "A5 Konventions-Linter" fuer die Herleitung. Laeuft im `pre-commit`-Haken
 (tools/hooks/pre-commit), Budget < 3 s -- daher NUR textnahe Pruefungen:
 keine Compilierung, kein Netz, keine Korpus-/Modell-Dateien.
@@ -531,7 +531,7 @@ def warn_silent_test_skips(staged_only: bool, staged_files: set[str]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Konventions-Linter (A5) -- siehe evaluations/DESIGN_conventions_as_checks.md"
+        description="Konventions-Linter (A5) -- siehe docs/DESIGN_conventions_as_checks.md"
     )
     parser.add_argument("--staged", action="store_true", help="nur gestagte Dateien pruefen (Hook-Modus)")
     parser.add_argument(
