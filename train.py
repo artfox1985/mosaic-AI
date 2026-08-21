@@ -498,8 +498,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "ranking_loss_weight": ranking_loss_weight,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
     }
-    write_train_manifest(version_name, _cli_args, corpus_composition(all_files), _run_timestamp,
-                          policy_carriers=policy_carrier_report(all_files, _SELFPLAY_FILENAME_RE))
+    # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
+    # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf
+    # --extra-data-dir-Dateien -- das Manifest dokumentierte bis hierher die
+    # ungefilterte Liste und damit ein Fenster, das nie trainiert wird
+    # (Vorfall v21-asymS: asymN als Bestandteil gelistet, obwohl vom Loader
+    # ausgeschlossen). Der Datenfluss (Split auf all_files) bleibt unberuehrt.
+    _manifest_files = all_files
+    if _excl:
+        _manifest_files = [f for f in all_files if not _re.search(_excl, _os.path.basename(f))]
+    write_train_manifest(version_name, _cli_args, corpus_composition(_manifest_files), _run_timestamp,
+                          policy_carriers=policy_carrier_report(_manifest_files, _SELFPLAY_FILENAME_RE))
 
     val_files = []
     train_files = None  # None == MosaicDataset laedt wie bisher den ganzen Ordner
