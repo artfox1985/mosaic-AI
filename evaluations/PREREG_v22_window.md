@@ -15,6 +15,16 @@ der juengste Value-Posten ist eine bewusste Nutzer-Entscheidung (siehe
 > ist festgehalten, damit er nicht neu diskutiert werden muss, wenn der
 > Zeitpunkt kommt.
 
+> **WECKER VOR DER ERSTEN v22-PARTIE (nachgetragen 2026-08-21, Nutzer-
+> Freigabe):** `PREREG_bootstrap_horizon.md` ist NUR am Generierungsstart
+> ausfuehrbar (Horizont steckt in den Records, nicht im Cache-Key).
+> VOR der ersten v22-Self-Play-Partie: deren Stufe 1 fahren (Doppel-Label
+> Horizont 2+3 in denselben Record schreiben, Kostengate <= +25 %).
+> Wird das uebersehen, ist die Frage wieder eine volle Generation
+> verschoben -- dasselbe Vergiss-Muster wie bei
+> `PREREG_chance_nodes.md` Entscheidungsregel 4 (zweimal passiert).
+> Am Fensterzuschnitt selbst aendert das NICHTS.
+
 ## Fenster (29.450 Partien, 2.945 Dateien -- identische Form wie v21)
 
 | Klasse | Quelle | Partien | Dateien | Sims | Policy |

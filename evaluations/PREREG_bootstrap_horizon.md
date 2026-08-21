@@ -9,7 +9,8 @@ Horizont nur beim Erzeugen neuer Partien ueberhaupt aenderbar ist.
 ## Warum der Horizont nur JETZT aenderbar ist
 
 `BOOTSTRAP_HORIZON_ROUNDS = 2` liegt in
-`engine/src/round_transition_deep.rs:153`, ist also **engine-seitig** und
+`engine/src/round_transition_deep.rs:168` (Stand 2026-08-21; bei
+Registrierung Zeile 153), ist also **engine-seitig** und
 wird beim Self-Play in die Records geschrieben. Er steckt **nicht** im
 Cache-Schluessel (`str(files)+INPUT_SIZE+NUM_ACTIONS+VALUE_SCHEMA_VERSION+
 POLICY_TARGET_SHARPEN_EXPONENT+TD_LAMBDA+...`) -- zwei Konsequenzen:
@@ -101,3 +102,26 @@ Block-Ebene, Fruehstopp-Replikationsregel).
   Arena verwarf es 30:70, λ=0,5 bleibt).
 - Keine Aenderung am v22-Fenster-Zuschnitt selbst (`PREREG_v22_window.md`
   bleibt gueltig; dieses Dokument ergaenzt nur eine Label-Option).
+
+## Nachtrag 2026-08-21: zwei Umstaende haben sich veraendert, die Prereg bleibt scharf
+
+1. **Regel 3 der Stufe 1 ist erstmals realistisch fuehrbar.** Der
+   Paritaets-Nachweis (Horizont-2-Feld bit-identisch zum Einzel-Rollout)
+   waere an den Task-#71-Wall-Clock-Not-Deckeln in
+   `round_transition_deep.rs` gescheitert -- genau die Divergenzquelle,
+   die das Async-Gate-B aufgedeckt hat. Seit
+   `PREREG_deterministic_labels.md` (ENTSCHIEDEN 2026-08-14: Not-Deckel
+   degradieren deterministisch, 1956/1956 Records byte-identisch unter
+   kuenstlichem CPU-Stress) ist dieser Blocker weg.
+2. **Die Verduennungsrechnung ist beim Aufgreifen NEU zu rechnen.** Die
+   ~34 % behandelte Value-Labels beziehen sich auf den Fensterstand vom
+   08.08.; seitdem sind der Ownership-Korpus (8.000) und der Asym-Korpus
+   (16.000) mit Horizont-2-Labels entstanden, und die round5-Fix-Grenze
+   (c83fb35) schneidet zusaetzlich durch die Label-Semantik der
+   Altbestaende. Der Vorbehalt "H0 ist ein schwacher Beleg" wird dadurch
+   eher staerker.
+
+Der Ausfuehrungszeitpunkt ist unveraendert der v22-Generierungsstart --
+und der liegt laut Fahrplan NACH dem plattenbewussten Modell (erst
+Lehr-Korpora/Asym-Curriculum, dann Self-Plays). Ein Wecker dafuer steht
+jetzt direkt im Halde-Kasten von `PREREG_v22_window.md`.
