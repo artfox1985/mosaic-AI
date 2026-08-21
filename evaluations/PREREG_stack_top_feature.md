@@ -188,3 +188,9 @@ und bekommt bei Bedarf eine eigene Stufe.
 (Nutzer-Entscheid 2026-08-20). Nicht eingeplant, kein Vorrang vor der
 laufenden v21-Task-Queue. Wird es angegangen, gilt die Reihenfolge
 par.5 -> par.6 -> par.7 ohne Abkuerzung.
+
+**Paket-Hinweis (Nutzer 2026-08-21):** gemeinsam mit dem geparkten Rest
+von `PREREG_chance_nodes.md` (Teil B1 `MOSAIC_STACK_DRAW_CHANCE` +
+Teil A1) zu heben — dieselbe blinde Zone am Kuppelstapel, zwei Seiten:
+dieses Merkmal gibt dem NETZ die oberste Rueckseite, B1 gibt der SUCHE
+die korrekte Ein-Schritt-Erwartung am Peek.
