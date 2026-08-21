@@ -1,4 +1,7 @@
-# Stand 2026-08-09 (WDL-Aera, Champion v21_2d_brierbest, Elo 1358).
+# Stand 2026-08-21 (WDL-Aera, Champion v21_2d_brierbest, Elo 1215 auf der
+# NEU VERANKERTEN Leiter -- round5-Fix c83fb35, Alt-Register mit Elo 1358
+# in archive/elo_history_pre_r5fix.csv, ueber die Fix-Grenze nicht
+# vergleichbar; PREREG_round5_minfix_elo_reset.md par.5).
 # Rendern: python evaluations/render_diagrams.py [name] [--format png]
 # Farbcode: blau = Netz/Modell, gruen = exakt/verifiziert, orange = Suche/
 # Daten-Pipeline, violett = Ergebnis/Artefakt, grau = Regelwerk.
@@ -55,7 +58,7 @@ digraph NetzSuche {
 digraph ValueZiel {
     rankdir=TB;
     fontname="Helvetica";
-    label="Value-Ziel-Konstruktion (Task #34, Cache-Schema 17-19)";
+    label="Value-Ziel-Konstruktion (Task #34, Cache-Schema 17-20;\n20 aendert nur das Punkte-Kopf-Ziel: rein own, Epsilon-Term entfallen)";
     labelloc=t; fontsize=13;
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
