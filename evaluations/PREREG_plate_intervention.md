@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Hebt ein Endgame-/Wertungsplatten-Aux-Kopf die R5-Plattenkalibrierung, und schlaegt er den Champion in der Arena? | Beleg: Eigener Ergebnis-Abschnitt in der Datei ("ARENA-ERGEBNIS: H0"); Kopf wird Trainings-Upgrade, Champion unveraendert -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Hebt ein Endgame-/Wertungsplatten-Aux-Kopf die R5-Plattenkalibrierung, und schlaegt er den Champion in der Arena? | Beleg: Eigener Ergebnis-Abschnitt in der Datei ("ARENA-ERGEBNIS: H0"); Kopf wird Trainings-Upgrade, Champion unveraendert. Stichworte: das hier IST die Prereg des `endgame_margin`-Kopfs (`--endgame-head`, Cache-Schema 18) -- Gating 97:103 (H0, p=0,76), Uebernahme ins Standardrezept war der vorregistrierte H0-Zweig -->
 
 # Vorregistrierung: Wertungsplatten-/Endspiel-Zonen-Intervention (Aux-Kopf)
 
