@@ -113,13 +113,18 @@ Block-Ebene, Fruehstopp-Replikationsregel).
    `PREREG_deterministic_labels.md` (ENTSCHIEDEN 2026-08-14: Not-Deckel
    degradieren deterministisch, 1956/1956 Records byte-identisch unter
    kuenstlichem CPU-Stress) ist dieser Blocker weg.
-2. **Die Verduennungsrechnung ist beim Aufgreifen NEU zu rechnen.** Die
-   ~34 % behandelte Value-Labels beziehen sich auf den Fensterstand vom
-   08.08.; seitdem sind der Ownership-Korpus (8.000) und der Asym-Korpus
-   (16.000) mit Horizont-2-Labels entstanden, und die round5-Fix-Grenze
-   (c83fb35) schneidet zusaetzlich durch die Label-Semantik der
-   Altbestaende. Der Vorbehalt "H0 ist ein schwacher Beleg" wird dadurch
-   eher staerker.
+2. **Die Verduennungsrechnung haengt an EINER offenen Zuschnitts-Frage
+   (praezisiert nach Nutzer-Rueckfrage 2026-08-21).** Bleibt das
+   v22-Fenster exakt der registrierte Zuschnitt (nur wdl-Rotations-
+   klassen), gilt ~34 % unveraendert -- die seit dem 08.08. entstandenen
+   Lehr-Korpora (Ownership 8.000, Asym 16.000) tauchen darin nicht auf.
+   NUR falls das heutige Asym-Arm-Rezept (par.9 dort: v21-Fenster PLUS
+   Lehr-Korpus) bis zum v22-Training uebertragen wird, waechst der
+   Value-Nenner und der behandelte Anteil faellt Richtung ~20 % -- dann
+   wird der Vorbehalt "H0 ist ein schwacher Beleg" entsprechend
+   staerker. Die round5-Fix-Grenze konfundiert den A/B dagegen NICHT
+   (Altpartien liegen in beiden Armen identisch); sie macht die
+   Alt-Labels nur heterogener, als gemeinsames Rauschen beider Arme.
 
 Der Ausfuehrungszeitpunkt ist unveraendert der v22-Generierungsstart --
 und der liegt laut Fahrplan NACH dem plattenbewussten Modell (erst
