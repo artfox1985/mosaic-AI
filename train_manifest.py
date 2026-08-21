@@ -145,11 +145,23 @@ def corpus_composition(all_files: list[str]) -> list[dict]:
 
     composition = []
     for prefix, entries in groups.items():
-        entries.sort(key=lambda e: (e[0], e[1]))  # (Zeitstempel, dann g) aufsteigend
+        # Reihenfolgefreie Schaetzung (Fix 2026-08-21): die alte
+        # Lauf-Neustart-Heuristik (g faellt => neuer Lauf) scheiterte, sobald
+        # zwei Laeufe desselben Praefixes an der Grenze denselben
+        # MINUTEN-Zeitstempel teilten -- der (dt, g)-Sort mischte dann
+        # Lauf-Ende und Lauf-Anfang und zaehlte ein Lauf-Ende doppelt
+        # (Vorfall v21_asymN: 11990 statt 8000). Stattdessen: je DISTINKTEM
+        # g-Wert zaehlt die Spanne zum naechstkleineren g so oft, wie
+        # Dateien diesen g-Wert tragen -- exakt fuer beliebig viele
+        # sequenzielle Laeufe mit gleicher Datei-Granularitaet, und fuer den
+        # Einzellauf identisch zu max(g).
+        counts: dict[int, int] = {}
+        for _dt_key, g in entries:
+            counts[g] = counts.get(g, 0) + 1
         total_games = 0
         prev_g = 0
-        for _dt_key, g in entries:
-            total_games += g if g <= prev_g else g - prev_g
+        for g in sorted(counts):
+            total_games += (g - prev_g) * counts[g]
             prev_g = g
         composition.append({"prefix": prefix, "files": len(entries), "games": total_games})
     composition.sort(key=lambda c: -c["files"])
