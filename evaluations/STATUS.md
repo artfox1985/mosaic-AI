@@ -229,6 +229,18 @@ Reihung v19 < v20 < v21 haelt** (Nebenbefund dort: auf den Anker-Kanten
 allein laege v19 numerisch ueber v20; die n=400-Direktkanten wiegen das).
 Der Asym-Korpus laeuft seit 00:30 (Block S1). Schritt 3/4 offen.
 
+**FORTSCHRITT-NACHTRAG (2026-08-21 Abend):** Schritt 3 ist zur Haelfte
+durch. Korpus fertig 18:43 (16.000 Partien, 0 unvollstaendige);
+**par.5-Sperre BESTANDEN: +31,3 pp** (Zwangsseite 34,6 % gegen frei
+3,3 % auf 8.000 S-Partien); Siegquote der Zwangsseite protokolliert
+(45,7 % gesamt, 47,5 % bei aktiver k1-Platte; erste unkonfundierte
+6a(B)-Zahl: Zwangsbau kostet ~4 pp). **Training Arm S laeuft** (Warm
+Start Champion, Standardrezept, epochs 20, seed 2, Fenster b18-Regex
+plus asymN-Ausschluss, Traeger-Manifest asymS 800/800 policy-tragend,
+an der Cache-Zeile verifiziert: 2638 Dateien geladen); Arm N folgt
+sequenziell. Details und eine Doku-Falle (Trainings-Manifest listet die
+VOR-Filter-Zusammensetzung) in `PREREG_asymmetric_curriculum.md` par.12.
+
 **AUFTRAG, in dieser Reihenfolge (nichts davon wurde in der alten Sitzung
 begonnen):**
 

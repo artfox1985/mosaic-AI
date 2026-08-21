@@ -321,3 +321,44 @@ Festlegungen vor dem Start (Preflight 2026-08-20 bestanden: Seitenwahl
   unveraendert auf dem fertigen Korpus).
 - Lauf in der Nutzer-Shell mit tee-Log (`logs/asym_corpus_<datum>.log`),
   Ueberwachung ueber Log + Dateizahl + Prozessliste.
+
+## par.12 ERGEBNIS DER ABNAHME UND par.5-SPERRE (2026-08-21, Korpus fertig 18:43)
+
+Log faktisch `logs/nacht_20260820.log` (gemeinsames Nachtlauf-Log statt
+des in par.11 genannten Namens). Alle Zahlen an den Artefakten geprueft:
+
+- **Vollstaendigkeit BESTANDEN**: 1.600 pkl-Dateien (800 S / 800 N), jede
+  mit exakt 10 game_ids, 16.000 Partien, 0 unvollstaendige. Seitenwahl
+  4032/3968 (50,4/49,6). Greif-Statistik Zwangsseite: min 8, Median 18,
+  max 35, KEINE Partie ohne Greifer.
+- **Fruehwarn-Gate nach S1** (04:16): +31,4 pp (34,6 % gegen 3,2 %),
+  Kette lief weiter.
+- **par.5-SPERRE BESTANDEN** (verbindlich, GESAMT-Korpus S, 8.000
+  Partien, 0 ohne Log-Zuordnung): k1-Rate Zwangsseite **34,6 %**, freie
+  Seite **3,3 %**, Differenz **+31,3 pp** >= 20 pp
+  (`tools/probes/asym_early_rate_check.py --abbruch-pp 20`, Exit 0).
+  Zur Erwartungstabelle in par.5: beide Raten liegen UNTER den
+  Alt-Welt-Bezugswerten (~42 %/~13 % aus DOSSIER 6a(C)); die Bezugswerte
+  stammen aus anderem Regime und Vor-Fix-Engine, fuer die Sperre traegt
+  allein die Differenz. Die 30-%-Gegenstandslosigkeits-Schwelle
+  (Zwangsseite < 30 %) ist NICHT gerissen (34,6 %).
+- **Siegquote der Zwangsseite, protokolliert und NICHT getunt** (erste
+  unkonfundierte 6a(B)-Zahl): **45,7 %** gesamt (3658/8000), **47,5 %**
+  bei aktiver k1-Platte (1398/2942, k1 = ID 1, scoring.rs:43).
+  Erzwungener Spaltenbau kostet im Selbstspiel also ~4 pp Siegquote.
+  Fuer den Lernmechanismus (Korrelation Brettmerkmal/Ausgang) ist das
+  unschaedlich; ein Nachziehen der Bauer-Staerke findet NICHT statt.
+
+**par.9 Schritt 5 gestartet** (beide Arme sequenziell, identisches
+Rezept/Seed): Warm Start `v21_2d_brierbest`, lr 5e-5 + Cosine,
+`--epochs 20` (echtes Annealing, T_max-Fussnote beachtet), 2d/wdl/
+opp-points/endgame, nortv, `--seed 2`, `--extra-data-dir
+data/asym_corpus`. Fenster gepinnt: b18-Regex plus Ausschluss des jeweils
+ANDEREN Arms; Traeger-Manifeste `data/policy_carrier_manifest_asym{S,N}.
+json` (v21-Traeger plus jeweiliger Korpus policy-tragend, 800/800;
+Traeger gesamt 1380). An der Cache-Zeile verifiziert (Arm S): Root-Filter
+800/2945, Lade-Filter 733/3371 (asymN raus), geladen 2638 Dateien.
+**Doku-Falle**: das automatische Trainings-Manifest listet die
+Zusammensetzung VOR dem Lade-Filter (asymN faelschlich enthalten, mit
+falscher Spielzahl) -- fuer die Fenster-Wahrheit gilt die Cache-Zeile im
+Log, nicht das Manifest.
