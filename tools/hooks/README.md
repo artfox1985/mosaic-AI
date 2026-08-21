@@ -54,9 +54,21 @@ absolute Pfade und den Nutzernamen in neuen Dateien. Bisher stand dort nur ein
 Pruefbefehl zum Selbstausfuehren -- ein Handgriff, den man vergisst. Jetzt
 bricht der Haken den Push ab, wenn im **gepushten Stand** (nicht im Working
 Tree) eine hinzugefuegte oder geaenderte Datei ein Nutzerpfad-Muster enthaelt:
-`X:\Users\`, `/c/Users/`, `OneDrive\Documents|Backups` sowie der Nutzername
-aus der Umgebung (`$USERNAME`/`$USER`, deshalb steht kein konkreter Name im
-Skript).
+ein absoluter Pfad in ein Nutzerverzeichnis (Windows- wie Git-Bash-
+Schreibweise), ein OneDrive-Pfad in den Dokumente- oder Backups-Ordner, sowie
+der Nutzername aus der Umgebung (`$USERNAME`/`$USER`, deshalb steht kein
+konkreter Name im Skript).
+
+**Das Muster selbst steht nur an einer Stelle: `PRIVACY_PAT` in `pre-push`.**
+Dort ist es ein Regex mit Zeichenklassen und trifft sich deshalb nicht selbst.
+Wer es in eine Doku WOERTLICH ausschreibt, macht genau diese Datei zum
+Dauerblocker -- beim Bau ist das zweimal passiert (in einem Kommentar in
+`pre-push` und in `evaluations/STATUS.md`). Gegenprobe fuer neue Doku:
+
+```sh
+PAT="$(sed -n "s/^PRIVACY_PAT='\(.*\)'\$/\1/p" tools/hooks/pre-push)"
+git grep -I -l -E -e "$PAT" HEAD -- .
+```
 
 Nur `A/C/M/R`-Dateien des Push-Bereichs -- die Historie wird laut CLAUDE.md
 NICHT umgeschrieben, Alt-Treffer duerfen also nicht blockieren. `CLAUDE.md`
