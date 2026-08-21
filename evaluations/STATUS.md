@@ -386,6 +386,29 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
 
 ## GELTENDE REGELN (kompakt)
 
+- **NEUER PUSH-BLOCKER seit 2026-08-21 (79de9fa): Rechnerstruktur im
+  `pre-push`-Haken.** Wenn ein Push abbricht mit „RECHNERSTRUKTUR in
+  gepushten Dateien", ist das kein Defekt, sondern der Waechter: eine
+  hinzugefuegte/geaenderte Datei im Push-Bereich enthaelt `X:\Users\`,
+  `/c/Users/`, `OneDrive\Documents|Backups` oder den Nutzernamen aus der
+  Umgebung. Das setzt CLAUDE.md („Oeffentliches Repo: keine
+  Rechnerstruktur", 2026-08-17) durch, das bisher nur ein Pruefbefehl zum
+  Selbstausfuehren war. Geprueft wird der GEPUSHTE Stand (nicht der Working
+  Tree) und nur A/C/M/R -- die Historie wird nicht umgeschrieben, Alt-Treffer
+  blockieren nicht. `CLAUDE.md` ist ausgenommen. Richtige Antwort: Pfad aus
+  der Umgebung beziehen (`MOSAIC_PYTHON_DIR`, `MOSAIC_BACKUP_DIR`,
+  `MOSAIC_MODELS_DIR`). Nur bei echtem Fehlalarm `git push --no-verify`.
+  Kosten < 1 s (gemessen 0,44 s ueber 10 Commits), laeuft VOR der
+  `engine/src`-Weiche, also auch bei reinen Doku-Pushes. Details:
+  `tools/hooks/README.md`.
+
+  Gleicher Zug: `.git/hooks/pre-push` (tote Alt-Kopie ohne den
+  `cygpath`-Fix) geloescht -- aktiv ist ausschliesslich `tools/hooks/` via
+  `core.hooksPath`. Und die Golden-Waechter **A1-A4 sind gebaut** (geprueft
+  2026-08-21: A2 `engine/src/lib.rs:583`, A3 `engine/src/features.rs:1375`,
+  A4 `engine/src/mcts.rs:1271` ff.); die Hook-README behauptete bis dahin
+  das Gegenteil.
+
 - **Seed-Skala der Arena bei n=400 (gemessen 2026-08-09)**: dieselbe
   Konfiguration (k=1, Champion@600 vs Heuristik@150dyn) ergab **76,0%**
   mit Basis-Seed 20260820 und **81,75%** mit 20260828 -- **5,75
