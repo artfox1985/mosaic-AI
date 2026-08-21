@@ -4,9 +4,19 @@
 versioniert. Diese Skripte liegen deshalb in `tools/hooks/` (reviewbar wie
 normaler Code) und werden per `core.hooksPath` aktiviert.
 
-Herleitung, Zeitbudgets und die Abgrenzung zu den (noch nicht gebauten)
-Golden-Waechtern A1-A4: `evaluations/DESIGN_conventions_as_checks.md`,
+Herleitung und Zeitbudgets: `evaluations/DESIGN_conventions_as_checks.md`,
 Abschnitt "Entscheid: LOKALER GIT-HOOK".
+
+Die Golden-Waechter A1-A4 aus dem Design-Dokument sind **gebaut** (Stand
+2026-08-21 geprueft) und laufen als Teil von `cargo test --release`, also im
+`pre-push`-Haken:
+
+| | Waechter | Fundstelle |
+|---|---|---|
+| A1 | Testbestand als Regressionsnetz | `cargo test --release` (483 Tests) |
+| A2 | Laufzeit-Vertragsstempel | `engine/src/lib.rs:583`, exponiert in `engine_config_json()` |
+| A3 | Feature-Golden-Hash | `engine/src/features.rs:1375` (`feature_golden_hash_matches_fixture`) |
+| A4 | Heuristik-Anker-Verhaltenstest | `engine/src/mcts.rs:1271` ff., 200 Simulationen gegen Fixture |
 
 ## Aktivierung
 
@@ -28,13 +38,37 @@ bei Exit != 0 ab. Prueft nur die gestagten Dateien:
 2. Doku-Sprachkonvention (README.md englisch, STATUS.md/history.md deutsch)
 3. Keine neuen `#NN`-Task-Nummern (gegen `evaluations/TASK_NUMBER_REGISTRY.md`)
 4. Prereg-Index-Konsistenz (`evaluations/PREREG_*.md` <-> `PREREG_INDEX.md`)
+5. Stille Test-Skips (`warn_silent_test_skips`) -- **nur Warnung, kein
+   Commit-Blocker.** Sucht fruehe `return` direkt hinter einer
+   Voraussetzungs-Pruefung: ein stiller Skip besteht leer-gruen und prueft
+   nichts. Die Heuristik ist grob, Nicht-Test-Treffer sind zu ignorieren.
 
 **Budget: < 3 s.** Keine Compilierung, kein Netz, keine Korpus-/Modelldateien.
 
-## `pre-push` -- Golden-Waechter, bedingt
+## `pre-push` -- zwei Pruefungen
+
+### 1. Rechnerstruktur-Waechter (laeuft IMMER)
+
+Das Repo ist oeffentlich; CLAUDE.md (Nutzer-Entscheid 2026-08-17) verbietet
+absolute Pfade und den Nutzernamen in neuen Dateien. Bisher stand dort nur ein
+Pruefbefehl zum Selbstausfuehren -- ein Handgriff, den man vergisst. Jetzt
+bricht der Haken den Push ab, wenn im **gepushten Stand** (nicht im Working
+Tree) eine hinzugefuegte oder geaenderte Datei ein Nutzerpfad-Muster enthaelt:
+`X:\Users\`, `/c/Users/`, `OneDrive\Documents|Backups` sowie der Nutzername
+aus der Umgebung (`$USERNAME`/`$USER`, deshalb steht kein konkreter Name im
+Skript).
+
+Nur `A/C/M/R`-Dateien des Push-Bereichs -- die Historie wird laut CLAUDE.md
+NICHT umgeschrieben, Alt-Treffer duerfen also nicht blockieren. `CLAUDE.md`
+selbst ist ausgenommen, dort steht der Pruefbefehl im Text.
+
+**Budget: < 1 s** (gemessen 0,44 s ueber 10 Commits).
+
+### 2. Golden-Waechter, bedingt
 
 Prueft, ob im zu pushenden Bereich `engine/src/` geaendert wurde. Wenn nein:
-sofortiger Durchlass. Wenn ja: `cargo test --release` in `engine/`.
+sofortiger Durchlass. Wenn ja: `cargo test --release` in `engine/` (A1-A4,
+siehe Tabelle oben).
 
 **Budget: < 90 s**, aber nur wenn `engine/src/` betroffen ist -- sonst < 1 s.
 
