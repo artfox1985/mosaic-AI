@@ -18,7 +18,7 @@ digraph Spielablauf {
     R1 [label="Runde 1-4: Drafting\nGumbel-Suche mit Netz-Priors\n(600 Sims Self-Play / 400 Arena)", fillcolor="#cfe2ff"];
     T  [label="Tiling (Rundenende)\nDFS-Solver ueber Punkte-Kandidaten,\nAuswahl = Punkte x P(Sieg)\n(#37 arena-bestaetigt 2026-08-08)", fillcolor="#d9f2d9"];
     U  [label="Rundenuebergang\nFabrik-Neubefuellung (Zufallsknoten)\n-> TD-Bootstrap-Label", fillcolor="#ffe5b4"];
-    R5 [label="Runde 5\nEXAKTE Alpha-Beta-Suche\n(kein Netz, volle Information)", fillcolor="#d9f2d9"];
+    R5 [label="Runde 5\nExpectiminimax (kein Netz):\nAlpha-Beta + Zufallsknoten fuer\n4 frische verdeckte Bonuschips;\nEXAKT ist die Blattwertung,\nnicht die Suche (Budget 200)", fillcolor="#d9f2d9"];
     T5 [label="Tiling Runde 5\nexakte Endwertung mitmaximiert", fillcolor="#d9f2d9"];
     E  [label="Endwertung\n3 aktive Wertungsplatten\n(Linien / Ecken / Spezialfelder ...)", fillcolor="#f0f0f0"];
 

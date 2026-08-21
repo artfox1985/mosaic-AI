@@ -78,10 +78,15 @@ measurements and the standing methodology rules:
   `MOSAIC_FLOOR_SHAPING_W`): exact leaf-value additive against
   floor-penalty spirals; re-validated in the WDL era (0.15/0.6 sweep: H0).
   Plate shaping and value shrinkage were disproved and stay off.
-- **Round 5**: exact alpha-beta search (`engine/src/round5.rs`) — no network
-  decisions once no hidden information remains. Its exact values also feed
-  training: the round-4 bootstrap uses `round5::exact_round5_outcome`, and
-  the optional `endgame_margin` head distils the round-5 root value.
+- **Round 5**: Expectiminimax (`engine/src/round5.rs`) — alpha-beta over
+  the decision nodes plus chance nodes where the four fresh, still-hidden
+  bonus chips get revealed (`MOSAIC_R5_CHANCE_NODES`, default on since
+  2026-08-10). No network decisions in round-5 drafting, but the round is
+  *not* full-information, and the search is *not* exact — exact is the
+  leaf evaluation (optimal tiling plus plate scoring under a fixed dome
+  grid; the node budget is 200). Its values feed training: the round-4
+  bootstrap uses `round5::exact_round5_outcome`, and the optional
+  `endgame_margin` head distils the round-5 root value.
 - **Runtime knobs**: every experimental lever is an `MOSAIC_*` environment
   variable whose default reproduces the previous behaviour bit-for-bit
   (verified by a hash probe before use). Currently all of them are inert
