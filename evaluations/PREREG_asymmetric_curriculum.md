@@ -432,6 +432,53 @@ Lastklasse -- der Neustart war ueberkonservativ, aber regelkonform.)
   (gepaarter Geschwister-Vergleich S- gegen N-Netz auf denselben
   Stellungen) -- sie steht als naechster Schritt aus.
 
+## par.15 TEILFRAGE B GEMESSEN (2026-08-22) + GESAMTVERDIKT
+
+Instrument NEU (`tools/probes/asym_value_sibling_check.py`, Artefakt
+`evaluations/asym_value_sibling_check.json`): identische Stellungsbasis
+fuer beide Netze (der bestehende Nachfolger-Dump
+`probe_sibling_succ_k1_w1.0.json`, 40 Runde-2-Stellungen aus
+Champion-Suchlaeufen), je Kandidat rohes Value-Kopf-Urteil
+(ONNX-Ausgang 'value', ego-kodiert, Zieher-Vorzeichen per
+Nullsummen-Flip wie net_leaf_eval) gegen den k1-Puffer-Fortschritt des
+Ziehenden (`reach_buffer_columns`, wie in der Praedikat-Sonde);
+Kendall-Tau je Stellung, gepaarte Differenz.
+
+| Groesse | Wert |
+|---|---|
+| auswertbare Stellungen | 33 |
+| Tau S (Value ~ k1-Puffer) | **-0,077** |
+| Tau N | **-0,185** |
+| Differenz S-N | +0,107 (sd 0,72, t +0,86) |
+| Vorzeichen S besser / N besser / gleich | 17 / 8 / 8, p(Vorzeichentest) 0,108 |
+
+Keine vorregistrierte Schwelle (par.6 verlangt nur den Ausweis);
+Kaveats: nur 33 Runde-2-Stellungen, Positionsauswahl aus
+Champion-Laeufen, roher Value-Kopf statt Such-Blend.
+
+**GESAMTVERDIKT des Curriculums (par.7-Regel plus Teilfrage B):**
+
+1. **MISSERFOLG als "kein Signal"** -- Nullarm-k1-Rate 12,2 % (=
+   Grundrate), und der Value-Kopf ordnet Geschwister auch mechanisch
+   nicht nach Spaltenfortschritt (Tau S -0,08; nur ein schwacher,
+   nicht signifikanter Richtungshinweis gegenueber N). Arena und
+   Mechanik-Sonde konvergieren: es wurde nichts Suchwirksames gelernt,
+   und auch kein starkes, nur verdecktes Zustandssignal.
+2. **Kein Staerkepreis** (Kriterium 2 erfuellt; S 199/407 gg. N
+   205/407, n.s.).
+3. Vorregistrierte Grenzen: 7(1) ist damit NICHT widerlegt (par.4(2));
+   moeglich bleibt, dass die Brettmerkmale den Fortschritt nicht
+   tragend abbilden -- das waere aber ein anderes Projekt (Merkmals-/
+   Zielseite), nicht dieses Curriculum in dieser Form.
+4. **Die par.4-Gegenmessungen (Slot-Verteilung, Platzierungspunkte
+   ohne k1-Treffer) entfallen begruendet**: sie dienen der
+   ATTRIBUTION eines Effekts, und es gibt keinen Effekt zu
+   attribuieren.
+5. Damit ist der im par.7-Umfeld registrierte Wertekopf-Weg
+   durchgemessen; offen bleibt laut STATUS die **Policy-Seite**
+   (orakel-abgeleitete Supervision) als letzter Strang. Umfang und
+   Reihenfolge sind Nutzer-Entscheid.
+
 **par.9 Schritt 5 gestartet** (beide Arme sequenziell, identisches
 Rezept/Seed): Warm Start `v21_2d_brierbest`, lr 5e-5 + Cosine,
 `--epochs 20` (echtes Annealing, T_max-Fussnote beachtet), 2d/wdl/
