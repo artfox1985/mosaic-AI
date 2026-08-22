@@ -479,6 +479,30 @@ Champion-Laeufen, roher Value-Kopf statt Such-Blend.
    (orakel-abgeleitete Supervision) als letzter Strang. Umfang und
    Reihenfolge sind Nutzer-Entscheid.
 
+## par.16 NEBENFUND (2026-08-22, planungstragend): das S-Training WAR bereits Verhaltens-Klonen -- und es druckte sich nicht aus
+
+Am Code verifiziert bei der Vorpruefung des Policy-Zuschnitts: greift
+der Bauer, zeichnet das Self-Play SEINEN Zug als One-Hot-Policy-Ziel
+auf (prob 1.0, keine Suche; self_play.rs:1396-1398), und diese Schritte
+sind im Cache voll policy-gueltig (pol_w=1.0: Drafting-Phase, kein
+Start-Schritt, asymS-Dateien 800/800 Traeger, kein
+policy_target_valid-Feld ohne PCR; neural_net.py:1814-1834). Bei median
+18 Greifern je Zwangspartie enthielt das S-Training damit geschaetzt
+~144.000 Klon-Ziele "bau die Spalte" (Schaetzung aus der
+Greif-Statistik par.12). Ergebnis trotzdem: Nullarm-Baurate =
+Grundrate (par.14).
+
+Das ist der ZWEITE Null-Befund dieser Mechanik (Block H: Destillation
+der Bauer-Korpora liess die Zielkriterien ebenfalls unbewegt) und
+passt zum registrierten Kernbefund des Anlasses: der Prior bietet den
+Bauzug laengst dominant an (4,91x), ueberstimmt wird er vom
+Wert-Backup. **Folgerung fuer den Policy-Zuschnitt: naives
+Policy-Klonen ist zweifach vorbelastet; der gemessene Engpass ist die
+Ununterscheidbarkeit des Regimes (widerspruechliche Ziele auf
+denselben Brettmerkmalen) plus das Wert-Veto in der Suche.** Der
+daraus geschnittene Nachfolger: `PREREG_uvfa_plate_regime.md` (Regime
+als Netz-EINGABE).
+
 **par.9 Schritt 5 gestartet** (beide Arme sequenziell, identisches
 Rezept/Seed): Warm Start `v21_2d_brierbest`, lr 5e-5 + Cosine,
 `--epochs 20` (echtes Annealing, T_max-Fussnote beachtet), 2d/wdl/
