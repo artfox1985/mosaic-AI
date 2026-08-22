@@ -71,6 +71,20 @@ danach zugeschnitten werden.
   ~0,018 in den 2026-08-Trainings) auf der r5_value_calibration-Skala
   bereits die Steigung liefert, die dem Value-Kopf fehlt -- dann waere
   ER der Kandidat fuer den spaeteren Blend-Arm, ohne neues Training.
+- **Erweiterung (Nutzer 2026-08-22): der Pruefschritt wird ein
+  VIERER-VERGLEICH statt einer Einzelpruefung.** Fuer R5 stehen im Netz
+  bereit: (1) endgame_margin (Solver-Destillat), (2) points MINUS
+  opp_points (direkte Margen-Prognose in Punkten, R² ~0,52/0,51),
+  (3) Ownership-Karte -> erwartete Plattenpunkte je Kriterium (die
+  E_k-Maschinerie des Verbraucher-Strangs existiert; als STAERKE-Hebel
+  tot, aber R5 ist der Ort, wo die Karte am berechenbarsten ist --
+  direkter Angriff auf den verhungerten Platten-Kanal), (4) der
+  Value-Kopf selbst. Offline auf R5-Zustaenden gegen exakte
+  Solver-Grundwahrheit, gleiche Kalibrier-Skala, bester Kopf wird
+  Blend-Kandidat. PRUEFPUNKT vorab: der amtierende Champion lief mit
+  OWNERSHIP_WEIGHT=0 -- ob sein Ownership-Ausgang trainiert ist oder
+  nur die b-Serie brauchbare Karten liefert, ist VOR dem Vergleich zu
+  klaeren (Regel 0).
 
 ## par.4 OFFEN (Nutzer, beim Aufgreifen)
 
