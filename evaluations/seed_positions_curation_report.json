@@ -1,0 +1,58 @@
+{
+ "quelle": {
+  "dateien": 800,
+  "partien_mit_kandidat": 7797,
+  "step_stride": 2,
+  "seed": 20260822
+ },
+ "kandidaten_je_stratum (je Partie 1)": {
+  "r2_p3": 90,
+  "r2_p4": 9,
+  "r2_p5": 0,
+  "r3_p3": 1119,
+  "r3_p4": 1838,
+  "r3_p5": 783,
+  "r4_p3": 567,
+  "r4_p4": 1435,
+  "r4_p5": 1956
+ },
+ "auswahl_gesamt": 1500,
+ "auswahl_je_stratum": {
+  "r2_p3": 90,
+  "r2_p4": 9,
+  "r3_p3": 233,
+  "r3_p4": 276,
+  "r3_p5": 205,
+  "r4_p3": 183,
+  "r4_p4": 239,
+  "r4_p5": 265
+ },
+ "k1_aktiv_in_auswahl": 567,
+ "restlaenge_frac": {
+  "mean": 0.43565904416784307,
+  "median": 0.45569620253164556,
+  "min": 0.1949685534591195,
+  "max": 0.806060606060606
+ },
+ "kostenrechnung": {
+  "annahme_durchsatz_vollpartien_pro_s": [
+   0.21,
+   0.29
+  ],
+  "kommentar": "Seed-Partie ~ Vollpartie x restlaenge_frac.mean; Stunden je k",
+  "stunden_bei_k": {
+   "4": [
+    2.5,
+    3.5
+   ],
+   "6": [
+    3.8,
+    5.2
+   ],
+   "8": [
+    5.0,
+    6.9
+   ]
+  }
+ }
+}
