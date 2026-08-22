@@ -369,6 +369,31 @@ beide exklusiv). Belege: `paired_arena_env_reach_conj_smoke1/2.json`
 (unter Last, abweichend) gegen `reach_smoke1/3/4.json` (exklusiv,
 identisch).
 
+**KALIBRIERUNGS-SMOKE EINGETAKTET (Nutzer 2026-08-22, Vorab-Regel VOR
+der Messung):** Die strenge Fassung ("gar nichts parallel") wird an der
+leichtesten Lastklasse kalibriert. Aufbau: derselbe 8-Partien-Smoke
+zweimal EXKLUSIV (Basislinie, muss byte-identisch sein, sonst Abbruch),
+dann zweimal unter definierter Ein-Kern-Nebenlast (Endlosschleife, die
+Asym-Pickles laedt -- exakt die Lastklasse des Vorfalls vom 2026-08-22,
+der einen Arena-Neustart kostete). Regel: alle vier byte-identisch =>
+leichte Single-Thread-IO-Jobs (keine Suchlaeufe, kein Training) sind
+kuenftig neben Arena-Messungen erlaubt; irgendeine Abweichung => die
+strenge Regel bleibt. Ergebnis wird hier nachgetragen.
+
+**ZIELBILD NOT-DECKEL (Nutzer-Entscheid 2026-08-22, Bauplan, nichts
+gebaut):** Wanduhr-Deckel sollen Ergebnisse nie mehr VERAENDERN
+koennen. Zwei Schichten: (1) alles Algorithmische bekommt
+deterministische ARBEITS-Deckel (Knoten/Samples/Tiefe, Vorbild
+round5-NODE_BUDGET) -- byte-identisch unter jeder Last; (2) die Wanduhr
+bleibt nur als aeusserster Wachhund gegen echte Haenger und darf
+ausschliesslich TOETEN und als ungueltig markieren (Partie wird
+nachproduziert bzw. das Seed-PAAR faellt aus gepaarten Messungen),
+nie beschneiden-und-weiterlaufen; jedes Feuern mit Deckel-Name im
+Ergebnis-JSON gezaehlt. Nebeneffekt: wuerde auch die sync/async-
+Trainingsziel-Divergenz (Async-Gate-B-Rest) aufloesen. Gebaut wird
+erst, wenn der Smoke oder ein Vorfall zeigt, dass ein Deckel bindet;
+erster Schritt waere dann Deckel-Telemetrie zur Taeter-Identifikation.
+
 ---
 
 *(Abgeschlossen und nach `../archive/history.md` verschoben: PARTIE-REPLAY IST EXAKT (`PREREG_action_id_logging.md`), erledigt 2026-08-18. Kapitel "Ownership-/Zielwechsel-Kampagne v21-b18..b24 und Begleitbefunde (2026-08-16 bis 2026-08-20)".)*
