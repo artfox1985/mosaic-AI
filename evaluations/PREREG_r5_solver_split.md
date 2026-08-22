@@ -61,6 +61,16 @@ danach zugeschnitten werden.
   Ausgangs-Kalibrierung (Platt je Runde statt global), Nutzung des
   vorhandenen endgame_margin-Kopfs als KALIBRIER-Referenz (nicht als
   Such-Input). Auswahl + Vorabregeln beim Zuschnitt.
+- **Erster Pruefschritt (Nutzer-Einsicht 2026-08-22):** die R5-Schwaeche
+  ist ein KANAL-Problem (Platten-Varianz fehlt in den Daten, Bonus-
+  Nichtlinearitaet, kein Selektionsdruck weil die Suche den Kopf in R5
+  nie fragt), kein Schwierigkeits-Problem -- R5 hat zugleich die
+  billigste exakte Supervision des Spiels (den Solver). Deshalb VOR
+  jedem Trainings-Eingriff messen, ob der vorhandene
+  `endgame_margin`-Kopf (destilliert den Solver-Wurzelwert, Val-MSE
+  ~0,018 in den 2026-08-Trainings) auf der r5_value_calibration-Skala
+  bereits die Steigung liefert, die dem Value-Kopf fehlt -- dann waere
+  ER der Kandidat fuer den spaeteren Blend-Arm, ohne neues Training.
 
 ## par.4 OFFEN (Nutzer, beim Aufgreifen)
 
