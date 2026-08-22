@@ -158,7 +158,8 @@ def _chunk_timeout_secs(n_games: int, threads: int, sims: int, has_model: bool) 
 
 def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix,
                       add_root_noise, deterministic, record_rtv, pcr_full_prob,
-                      pcr_cheap_sims, tau_argmax_from_move, queue, progress_path, heartbeat_path):
+                      pcr_cheap_sims, tau_argmax_from_move, queue, progress_path,
+                      heartbeat_path, seed_positions=None, seed_positions_offset=0):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -188,6 +189,7 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                 record_rtv=record_rtv,
                 pcr_full_prob=pcr_full_prob, pcr_cheap_sims=pcr_cheap_sims,
                 progress_path=progress_path, heartbeat_path=heartbeat_path,
+                seed_positions_path=seed_positions, seed_positions_offset=seed_positions_offset,
             )
         elif mode == "mcts" and model:
             raw = mr.self_play_games_with_net_labels(
@@ -249,7 +251,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           add_root_noise, deterministic, record_rtv, timeout_secs,
                           progress_path, heartbeat_path,
                           pcr_full_prob=None, pcr_cheap_sims=150,
-                          tau_argmax_from_move=0) -> str | None:
+                          tau_argmax_from_move=0, seed_positions=None,
+                          seed_positions_offset=0) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -264,7 +267,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
         args=(mode, model, n, simulations, c_puct, seed, threads, prefix,
               add_root_noise, deterministic, record_rtv, pcr_full_prob,
               pcr_cheap_sims, tau_argmax_from_move, queue,
-              str(progress_path), str(heartbeat_path)),
+              str(progress_path), str(heartbeat_path),
+              seed_positions, seed_positions_offset),
     )
     proc.start()
     t_start = time.time()
@@ -427,7 +431,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   add_root_noise: bool = True, deterministic: bool = False,
                   record_rtv: bool = False,
                   pcr_full_prob: float | None = None, pcr_cheap_sims: int = 150,
-                  tau_argmax_from_move: int = 0):
+                  tau_argmax_from_move: int = 0, seed_positions: str = None):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -538,7 +542,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
               f"(Sims: {simulations} | Threads: {threads or 'alle Kerne'} | "
               f"Chunk: {chunk} | {per_file} Spiele/Datei | Chunk-Hänger-Timeout {timeout_secs}s)")
 
-    def make_chunk(n, chunk_idx):
+    def make_chunk(n, chunk_idx, pos_offset=0):
         # Task #71: je Chunk-VERSUCH eigene Zwischendateien (chunk_idx macht
         # den Pfad pro Versuch eindeutig) -- Rust schreibt hier den
         # Einzelspiel-Flush (JSONL) + Herzschlag hinein, der Supervisor kann
@@ -551,6 +555,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             progress_path, heartbeat_path,
             pcr_full_prob=pcr_full_prob, pcr_cheap_sims=pcr_cheap_sims,
             tau_argmax_from_move=tau_argmax_from_move,
+            seed_positions=seed_positions, seed_positions_offset=pos_offset,
         )
         return raw, progress_path, heartbeat_path
 
@@ -590,7 +595,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
 
         while done < num_games:
             n = min(chunk, num_games - done)
-            raw, progress_path, heartbeat_path = make_chunk(n, chunk_idx)
+            # Seeding: pos_offset=done haelt die Stellungs-Zuordnung global.
+            raw, progress_path, heartbeat_path = make_chunk(n, chunk_idx, pos_offset=done)
             chunk_idx += 1  # Seed für den nächsten Versuch (auch bei Retry) ändert sich immer.
             if raw is None:
                 # Chunk gehängt/getötet -- Task #71: statt den GESAMTEN Chunk zu
@@ -703,6 +709,9 @@ if __name__ == "__main__":
                         help="Spiele pro .pkl-Datei (Standard 10, entkoppelt von --chunk)")
     parser.add_argument("--seed", type=int, default=None,
                         help="Basis-Seed (für reproduzierbare Läufe). Standard: zufällig.")
+    parser.add_argument("--seed-positions", dest="seed_positions", default=None,
+                        help="JSONL kuratierter Startstellungen (PREREG_start_position_seeding.md); "
+                             "nur --mode network.")
     parser.add_argument("--depth", type=int, default=0,
                         help="(Kompatibilität; ignoriert — Rust bewertet Blätter exakt per Tiling-Solver)")
     parser.add_argument("--pcr-full-prob", dest="pcr_full_prob", type=float, default=None,
@@ -751,6 +760,11 @@ if __name__ == "__main__":
         _resolved_pcr_full_prob = 0.0
         _resolved_pcr_cheap_sims = args.sims
 
+    if args.seed_positions and args.mode != "network":
+        raise SystemExit("❌ --seed-positions: nur --mode network.")
+    if args.seed_positions and not os.path.exists(args.seed_positions):
+        raise SystemExit(f"❌ --seed-positions fehlt: {args.seed_positions}")
+
     generate_data(
         mode=args.mode,
         num_games=args.games,
@@ -769,4 +783,5 @@ if __name__ == "__main__":
         pcr_full_prob=_resolved_pcr_full_prob,
         pcr_cheap_sims=_resolved_pcr_cheap_sims,
         tau_argmax_from_move=args.tau_argmax_from_move,
+        seed_positions=args.seed_positions,
     )

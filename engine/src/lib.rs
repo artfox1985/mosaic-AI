@@ -347,7 +347,7 @@ fn net_vs_net_arena_match_hybrid(
 /// (KataGo-Groessenordnung fuer eine guenstige Suche) wirkt NUR, wenn
 /// `pcr_full_prob` gesetzt ist.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false, record_rtv=false, progress_path=None, heartbeat_path=None, pcr_full_prob=None, pcr_cheap_sims=150))]
+#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false, record_rtv=false, progress_path=None, heartbeat_path=None, pcr_full_prob=None, pcr_cheap_sims=150, seed_positions_path=None, seed_positions_offset=0))]
 #[allow(clippy::too_many_arguments)]
 fn net_self_play_games(
     py: Python<'_>,
@@ -365,12 +365,28 @@ fn net_self_play_games(
     heartbeat_path: Option<String>,
     pcr_full_prob: Option<f64>,
     pcr_cheap_sims: u32,
+    seed_positions_path: Option<String>,
+    seed_positions_offset: usize,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
+    // Startpositions-Seeding (PREREG_start_position_seeding.md par.3):
+    // JSONL-Datei hier lesen, Zeilen an run_net_self_play reichen (das
+    // Parsen + die Fail-fast-Validierung passieren dort). None = Bestand.
+    let seed_positions = match seed_positions_path {
+        None => None,
+        Some(p) => Some(
+            std::fs::read_to_string(&p)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("{p}: {e}")))?
+                .lines()
+                .map(str::to_string)
+                .collect::<Vec<_>>(),
+        ),
+    };
     py.detach(move || {
         crate::self_play::run_net_self_play(
             &model_path, n_games, base_sims, c_puct, seed, num_threads, &prefix, add_root_noise, deterministic,
             record_rtv, progress_path.as_deref(), heartbeat_path.as_deref(), pcr_full_prob, pcr_cheap_sims,
+            seed_positions, seed_positions_offset,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)

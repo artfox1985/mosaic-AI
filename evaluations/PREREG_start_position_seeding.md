@@ -98,11 +98,22 @@ Default aus = byte-identisch.
 - Das Wanduhr-/Exklusiv-Regelwerk und die Fenster-Pinning-Regeln
   gelten unveraendert.
 
-## par.6 OFFENE NUTZER-ENTSCHEIDE
+## par.6 NUTZER-ENTSCHEIDE (gefallen 2026-08-22, "nimm deine Vorschlaege")
 
-1. Umfaenge (Stellungszahl, k, Korpusgroesse) nach der Kostenrechnung
-   beim Start (Durchsatz-Referenz: 0,21-0,29 Partien/s je nach Arm,
-   par.12 Asym).
-2. Kontrollarm-Wahl (frisches Kontroll-Training vs. vorhandener
-   v21-asymN).
-3. Schwellen-Bestaetigung (uebernommen aus Asym-par.7) und Startzeitpunkt.
+1. **k=6**: 9.000 Partien (~3,8-5,2 h) auf den 1.500 Stellungen
+   (Zuordnung: Partie i -> Stellung i mod 1500, zyklisch -- ergibt bei
+   Abbruch die Stall-Regel-freundliche Gleichverteilung).
+2. **Kontrollarm: der vorhandene v21-asymN** (gleiches Fenster bis auf
+   den Korpus; ein frisches Kontroll-Training entfaellt).
+3. **Schwellen: Asym-par.7 uebernommen** (k1-Rate auf k1-aktiven
+   Partien >= 30 % Ziel / >= 22 % Signal bei keinem signifikanten
+   Siegverlust; 407 Kampagnen-Seeds, Brettwechsel-Pflicht).
+
+**Zuschnitts-Detail zu par.3, VOR dem Bau geaendert:** statt des dort
+skizzierten Record-Felds `seeded_from` wird die Zuordnung als
+**Log-Zeile** geschrieben (`[seed_position] game_id=... idx=...`),
+exakt dem Greif-Zaehler-Praezedenzfall folgend (Record-Schema hat
+mehrere Python-Konsumenten; der Seeding-Korpus liegt ohnehin in einem
+EIGENEN Ordner, jede Partie dort ist per Konstruktion geseedet -- ein
+Per-Step-Feld waere redundant). Die Log-Zeilen werden wie die
+Zwangsseiten-Map als Datei neben dem Korpus gesichert.

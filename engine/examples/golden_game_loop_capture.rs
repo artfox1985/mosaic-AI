@@ -121,7 +121,7 @@ fn main() {
             "p4" => {
                 let out = run_net_self_play(
                     &model, n_games, 60, DEFAULT_C_PUCT, GOLDEN_SEED, 1, "golden_p4", true, false,
-                    rtv, None, None, None, 0,
+                    rtv, None, None, None, 0, None, 0,
                 )
                 .expect("run_net_self_play fehlgeschlagen");
                 write_out(&outdir, "p4", &out);
