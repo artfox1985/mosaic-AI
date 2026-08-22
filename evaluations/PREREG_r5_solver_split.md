@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird der R5-Loeser in einen EINGEFRORENEN Anker-Loeser (Heuristik) und einen frei entwickelbaren Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 gut kalibrieren (Steigungs-Metrik der R5-Kalibrierung)? | Beleg: ENTWURF 2026-08-22, Nutzer-Entscheid ("dann machen wir einen eigenen solver fuer den heuristik anker. und schauen dass wir den value kopf gut kalibrieren fuer runde 5."), nichts gebaut. Anlass: 200-Knoten-Beschneidung als moegliche Schwachstelle; jede R5-Verbesserung wuerde sonst den Anker mitverschieben (Leiter-Reset-Falle, gerade erst bezahlt). -->
+<!-- STATUS: OFFEN | Frage: Wird der R5-Loeser in einen EINGEFRORENEN Anker-Loeser (Heuristik) und einen frei entwickelbaren Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 gut kalibrieren (Steigungs-Metrik der R5-Kalibrierung)? | Beleg: ENTWURF 2026-08-22, Nutzer-Entscheid ("dann machen wir einen eigenen solver fuer den heuristik anker. und schauen dass wir den value kopf gut kalibrieren fuer runde 5."), nichts gebaut; Vorarbeiten par.2a (Bau-Kartierung) und par.3a (Pruefpunkt: Champion-Ownership UNTRAINIERT) am 2026-08-22 erledigt. Anlass: 200-Knoten-Beschneidung als moegliche Schwachstelle; jede R5-Verbesserung wuerde sonst den Anker mitverschieben (Leiter-Reset-Falle, gerade erst bezahlt). -->
 
 # PREREG-SKELETT: R5-Loeser-Trennung (Anker eingefroren) + R5-Value-Kalibrierung
 
@@ -47,6 +47,34 @@ danach zugeschnitten werden.
 - Doppelpflege-Kosten sind der bewusste Preis; der Anker-Loeser
   bekommt einen NICHT-ANFASSEN-Kopfkommentar mit Verweis hierher.
 
+### par.2a NACHTRAG: Bau-Vorbereitung (2026-08-22, Kartierung am Code, NICHTS gebaut; parallel zur laufenden Seeding-Generierung, reine Lesearbeit)
+
+- **round5.rs HEAD == c83fb35** (git log: c83fb35 ist der letzte Commit,
+  der die Datei anfasst). Eine heute gezogene Kopie waere also exakt die
+  c83fb35-Semantik, auf der die frische Elo-Leiter steht.
+- **Heuristik-Pfad (wuerde auf `round5_anchor` umgehaengt): genau drei
+  Einstiege**, alle in mcts.rs -- Zeile 746 (`root_child_stats`), 777
+  und 796; genutzt werden dort nur `applies`, `choose_action` und
+  `choose_action_with_analysis`. Ordnungstest der Fundstelle:
+  mcts.rs:1438.
+- **Netz-Pfad (bliebe auf round5.rs)**: net_mcts.rs 4732/4778/4819/
+  4884/5064 (alle hinter `net_solver_enabled`) plus 5550/5559
+  (Orakel-/Deadline-Vergleich).
+- **Alle uebrigen Konsumenten sind netz-/selfplay-seitig** und blieben
+  am entwickelbaren Loeser: `exact_round5_outcome` (round_transition
+  .rs/_deep.rs, self_play.rs:2914), `player_total_exact` (tiling_
+  solver.rs). mcts.rs nutzt davon nichts (Grep ueber engine/src,
+  2026-08-22) -- der Trennschnitt ist also klein und scharf.
+- **Env-Knopf-Bestand**: `round5::net_solver_enabled` (round5.rs:180,
+  OnceLock auf `MOSAIC_R5_NET_SOLVER`, Default AN) gatet nur den
+  NETZ-Pfad; die drei mcts.rs-Einstiege sind ungegatet. Nach der
+  Trennung waere der Anker-Pfad knopffrei fest verdrahtet (par.2-Regel
+  "keine Env-Knoepfe fuer Seitigkeit").
+- **Nicht parallel fahrbar**: Abnahme (Suite, Paritaets-Hash, Wheel neu)
+  braucht Mehrkern-Bau und Testlaeufe -- fruehester Slot nach Ende der
+  laufenden Korpus-Generierung. Baubeginn bleibt Nutzer-Entscheid
+  (par.4 Punkt 1).
+
 ## par.3 Teil B: R5-Value-Kalibrierung (Ziel-Skizze)
 
 - **Metrik ist registriert und existiert**: die Steigung der
@@ -85,6 +113,54 @@ danach zugeschnitten werden.
   OWNERSHIP_WEIGHT=0 -- ob sein Ownership-Ausgang trainiert ist oder
   nur die b-Serie brauchbare Karten liefert, ist VOR dem Vergleich zu
   klaeren (Regel 0).
+
+### par.3a NACHTRAG: PRUEFPUNKT GEKLAERT (2026-08-22, reine Datei-/Historienpruefung parallel zur Seeding-Generierung)
+
+**Der Ownership-Ausgang des amtierenden Champions
+(alphazero_v21_2d_brierbest) ist UNTRAINIERT.** Beweiskette:
+
+1. Der ONNX-Graph HAT den Ausgang (`ownership` in der Output-Liste;
+   onnx-Graph-Parse 2026-08-22).
+2. Sein Trainings-Manifest (`manifest_train_v21_2d_20260809_004805.
+   json`) traegt `ownership_weight: null` -> config-Default greift
+   (train.py:622).
+3. Der Default ist seit Einfuehrung des Kopfes durchgehend **0.0**
+   (config.py:79; git -S findet nur 3b21674/2026-07-28 und
+   104488f/2026-08-10, beide Staende 0.0). Bei 0.0 fliesst kein
+   own_loss (train.py:1085ff).
+4. Die gesamte Warm-Start-Linie lief ebenso mit `null` -> 0.0:
+   v19_2d (<- v18_2d), v19_2d_opp, v20_2d_opp (Manifeste gelesen,
+   2026-08-22). Der Kopf hat also NIE einen Gradienten gesehen; der
+   Ausgang ist durchgeschleppte Zufallsinitialisierung.
+
+**Folgerung fuer den Vierer-Vergleich:** Arm (3) braucht die Karte
+eines b-Serie-/own_w-Modells (b18-b24: own_w 1.0-2.0; own_w01-w1:
+0.1-1.0; alle Manifeste gelesen). Deren TRAEGER-Status (ownership-
+tragendes Korpus, bekannte Maskierungs-Falle) ist beim Zuschnitt je
+Kandidat einzeln zu pruefen. Arm (4) "Value-Kopf selbst" und Arme
+(1)/(2) sind vom Befund unberuehrt.
+
+### par.3b VORHANDENE KOPF-VERDRAHTUNGEN AM TILING-SOLVER (Nachtrag 2026-08-22, am Code verifiziert -- Kontext fuer Teil B, KEIN R5-Thema)
+
+Zur Abgrenzung (Nutzer-Frage): das Tiling in R5 braucht keinen Kopf
+(der Loeser maximiert die exakte Endwertung mit); die Kopf-Frage im
+Tiling ist eine R1-4-Frage. Dort ist aber mehr verdrahtet, als live
+wirkt (self_play.rs:928ff, docs/knobs.md:49-52):
+
+| Eingang | Stand |
+|---|---|
+| Value-Kopf (P(Sieg) des End-Tiling-Zustands, #37-Stichentscheid) | AKTIV in Produktion (einziger live wirkende Netz-Input) |
+| Points-Kopf | verdrahtet (Nutzer-Auftrag 2026-08-12), Knopf Default 0,0 |
+| Ownership-Karte (marginale Feldwerte, `MOSAIC_OWNERSHIP_TILING_W`) | verdrahtet (Verbraucher-Strang), Default 0 nach dem Kampagnen-Null |
+| Plattenterm exakte Endwertung (`MOSAIC_TILING_PLATTEN_W/_GEW`, ohne Netz) | verdrahtet, Default 0 |
+
+Einordnung: die Ownership-Tiling-Kopplung fiel in der R1-4-STAERKE-
+Arena mit dem Verbraucher-Strang -- das sagt nichts ueber die Karte
+als R5-BEWERTER (Teil-B-Vierer-Vergleich). Kroent der Vergleich die
+Ownership->E_k-Schiene, existiert die Tiling-Seite dafuer bereits
+fertig gebaut; nach par.3a-Befund kaemen die Karten dann aus der
+b-Serie (Champion-Ausgang untrainiert) bzw. aus einem kuenftig wieder
+ownership-tragend trainierten Netz.
 
 ## par.4 OFFEN (Nutzer, beim Aufgreifen)
 
