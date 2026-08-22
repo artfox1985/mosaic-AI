@@ -229,6 +229,19 @@ Reihung v19 < v20 < v21 haelt** (Nebenbefund dort: auf den Anker-Kanten
 allein laege v19 numerisch ueber v20; die n=400-Direktkanten wiegen das).
 Der Asym-Korpus laeuft seit 00:30 (Block S1). Schritt 3/4 offen.
 
+**FORTSCHRITT-NACHTRAG 2 (2026-08-22): Schritt 3 KOMPLETT, Schritt 4
+Arena-Teil GEMESSEN -- KEIN SIGNAL.** Beide Arme trainiert (par.13),
+Nullarm-Arena auf den 407 Kampagnen-Seeds inkl. Brettwechsel gefahren
+(par.14): **k1-Rate des Lehr-Arms 12,2 % (Swap 12,8 %) = exakt die alte
+Grundrate, unter der 22-%-Signalschwelle -> par.7-Verdikt "kein
+Signal"; aber KEIN Siegverlust** (S 199/407 gegen N 205/407, Block-t
+-0,53). Vorregistrierte Einordnung: widerlegt 7(1) nicht
+(Ego-Perspektive); Teilfrage B (Geschwister-Vergleich S- gegen N-Netz)
+steht aus und entscheidet "nichts gelernt" gegen "gelernt, aber nicht
+suchwirksam". Nebenbei: Exklusiv-Regel per Kalibrierungs-Smoke
+gelockert (Fallen-Sektion), cargo test 464/0, A4-Abdeckungsluecke
+dokumentiert (Fixture v2 beauftragt).
+
 **FORTSCHRITT-NACHTRAG (2026-08-21 Abend):** Schritt 3 ist zur Haelfte
 durch. Korpus fertig 18:43 (16.000 Partien, 0 unvollstaendige);
 **par.5-Sperre BESTANDEN: +31,3 pp** (Zwangsseite 34,6 % gegen frei
