@@ -379,6 +379,12 @@ der einen Arena-Neustart kostete). Regel: alle vier byte-identisch =>
 leichte Single-Thread-IO-Jobs (keine Suchlaeufe, kein Training) sind
 kuenftig neben Arena-Messungen erlaubt; irgendeine Abweichung => die
 strenge Regel bleibt. Ergebnis wird hier nachgetragen.
+**ERGEBNIS (2026-08-22): BESTANDEN -- alle 4 Laeufe byte-identisch**
+(SHA256 8837a35b... ueber cal_smoke_a1/a2/b1/b2; Stoerlast = Endlos-
+Pickle-Loader, PID-kontrolliert). Damit gilt die kalibrierte Fassung:
+Single-Thread-IO parallel zu Arena-Messungen erlaubt, Suchlaeufe/
+Training/Mehrkern-Last weiterhin verboten. Der Not-Deckel-Umbau
+(Zielbild unten) bleibt Vorrat ohne Dringlichkeit.
 
 **ZIELBILD NOT-DECKEL (Nutzer-Entscheid 2026-08-22, Bauplan, nichts
 gebaut):** Wanduhr-Deckel sollen Ergebnisse nie mehr VERAENDERN
