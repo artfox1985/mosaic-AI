@@ -28,6 +28,13 @@ Gleichgewicht. Die Report-Option "Q-Skalierung temperieren" ist
 zusaetzlich hauseigen vorbelastet: c_scale 0,3 senkte den absoluten
 Score beider Seiten um ~13 % (Task-#18-Gegenprobe). Sie wird deshalb
 NICHT gemessen; dieser Absatz ist ihre dokumentierte Schliessung.
+**Aera-Nachmessung (2026-08-22, Nutzer-Rueckfrage):** die Kalibrierung
+wurde auf v21_2d_brierbest wiederholt
+(`evaluations/gumbel_scale_calibration_v21.json`, 216 Stellungen @400):
+q wiegt das **1,47-Fache** des Priors (v18-Aera: 1,23), je Runde
+1,30-1,46 (R4: 2,92), Gleichgewicht laege bei c_scale~0,68. Die
+Schliessung ist damit auf der aktuellen Aera bestaetigt: kein
+Faktor-14-Ungleichgewicht, Temperieren ist nicht der Hebel.
 
 ## par.2 Baustein 1: Stellungssatz
 
