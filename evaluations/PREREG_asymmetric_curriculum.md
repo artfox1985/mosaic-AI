@@ -380,6 +380,28 @@ Ziehchance 3/8), der Bauer lief in ALLEN. Drei Gruende:
    (die .or_else-Kette kennt keine Plattenbedingung) und haette die
    Zwangsstichprobe je Klasse verkleinert.
 
+## par.13 TRAININGSERGEBNIS + MESSAUFBAU (2026-08-22 frueh, VOR den Arena-Ergebnissen festgehalten)
+
+- **Beide Arme trainiert** (identisches Rezept, seed 2, Fenster an der
+  Cache-Zeile verifiziert: je 2638 Dateien, Traeger 1380 mit 800/800
+  des jeweiligen Korpus): Arm S Early Stop 19/20 (best Ep. 11,
+  brierbest Ep. 6, Brier 0,1842), Arm N Early Stop 15/20 (best Ep. 5,
+  brierbest Ep. 2, Brier 0,1852). ONNX-Exporte + Snapshots liegen.
+- **Checkpoint-Wahl fuer die par.6/par.7-Messungen: `_best` beider
+  Arme.** Begruendung VOR der ersten Partie: die Kampagnen-Praezedenz
+  (N/S/T+S-Arena, z. B. `paired_arena_env_reach2_ts_b24.json`) lief mit
+  `v21-b24_best`; gleiche Regel fuer beide Arme, keine nachtraegliche
+  Checkpoint-Selektion nach Ergebnis.
+- **Seeds: exakt die 407 Kampagnen-Seeds** (aus dem b24-Artefakt
+  extrahiert nach `evaluations/seeds_asym_407.txt`) -- par.7 verlangt
+  den S/N-Vergleich "auf denselben Seeds", und so bleiben die Zahlen
+  zusaetzlich zur b18/b24-Reihe einordbar.
+- **Drei Laeufe, sequenziell und exklusiv** (Instrument
+  `paired_arena_env_ab.py`, Null-Knopf-Muster, 400/400 Sims,
+  `--log-games` fuer die k1-Raten aus DENSELBEN Partien):
+  (1) S_best gegen Champion, (2) N_best gegen Champion,
+  (3) Brettwechsel des S-Arms (vertauschte --model/--model-b).
+
 **par.9 Schritt 5 gestartet** (beide Arme sequenziell, identisches
 Rezept/Seed): Warm Start `v21_2d_brierbest`, lr 5e-5 + Cosine,
 `--epochs 20` (echtes Annealing, T_max-Fussnote beachtet), 2d/wdl/
