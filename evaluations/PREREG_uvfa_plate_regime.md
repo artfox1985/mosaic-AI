@@ -24,6 +24,16 @@ Vier Befunde, alle registriert, zusammen ergeben sie die Diagnose:
    und "bau nicht" ist "bau nicht", weil die freie Seite plus das
    restliche Fenster die Mehrheit stellt.
 
+**Warum weiter k1 und nicht der Spezialfelder-Posten (Nutzer-
+Priorisierung 2026-08-22):** die -11,7 Punkte der Spezialfelder gelten
+NUR bei aktiver Platte 6 (3/8-Chance); der Spaltenwert liegt dagegen
+BEDINGUNGSLOS im Spielfluss (21 Platzierungspunkte je voller Spalte in
+jeder Partie), plus 7 bei aktiver k1-Platte, plus die registrierte
+k5-Verstaerkung (Eckplatten = aeussere Spaltenpaare, k5 und k1 nicht
+wechselseitig ausgeschlossen, staerkste Bauer-Uebernahme +4,86;
+PREREG_provocation par.20). k1 bleibt damit der fundamentale Hebel
+dieser Prereg; das geparkte stack_top/B1-Paket bleibt nachrangig.
+
 Befund 4 ist der einzige, der einen unversuchten, gezielten Hebel hat:
 **mach das Regime zur Eingabe.** Genau das ist die UVFA-Idee aus
 DOSSIER_ownership_head Abschnitt 8; par.8 der Asym-Prereg hat das
