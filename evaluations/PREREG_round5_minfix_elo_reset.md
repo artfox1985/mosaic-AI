@@ -82,7 +82,15 @@ Exklusiv-Regel gilt (keine Nebenlast).
   Stichprobe zufaellig identisch. Determinismus der Fix-Engine: 2x8
   byte-identisch. Die Paritaets-Basislinie bleibt formal 8c6684ff; die
   Abdeckungsluecke der Probe ist als eigener niedriger Befund
-  protokolliert.
+  protokolliert. **Nachtrag 2026-08-22 (Nutzer-Frage): dieselbe
+  Abdeckungsluecke gilt fuer den A4-Anker-Verhaltenstest** -- sein
+  Korpus besteht aus Drafting-Zustaenden (mcts.rs::a4_anchor_corpus)
+  und erreicht die R5-Pfade ebenfalls nicht; deshalb blieb die Fixture
+  beim Fix unveraendert gruen. Das Anker-Verhalten in Runde 5 ist
+  stattdessen durch die neu gefochtenen Anker-Kanten dieser Prereg
+  abgedeckt. Beauftragt: Fixture v2 mit einem Runde-5-Zustand, der das
+  NACH-Fix-Verhalten einfriert (Umsetzung nach Abschluss der laufenden
+  Arena-Messungen, wegen Compile-Lastspike).
 
 
 ## par.5 ERGEBNIS DER NEUVERANKERUNG (registriert 2026-08-21)
