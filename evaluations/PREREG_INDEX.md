@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 73 Dateien = 7 OFFEN + 59 ENTSCHIEDEN + 7 UEBERHOLT.**
+**Stand (automatisch generiert): 74 Dateien = 8 OFFEN + 59 ENTSCHIEDEN + 7 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (7)
+## OFFEN (8)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -92,6 +92,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_plate_policy_supervision.md` | Laesst sich "dieser Zug baut die Spalte" als AKTIONS-Signal aus dem Zustand lernen -- und weiss der Ownership-Kopf es schon, ohne dass es die Zugwahl erreicht? | offen, nichts gebaut. Anlass: zwei externe Durchsichten 2026-08-18 plus die vier geschlossenen Wege am Verbraucher. |
 | `PREREG_round5_minfix_elo_reset.md` | Wird die Min-Knoten-Zugsortierung in round5.rs und round_transition_deep.rs hart gefixt, und wie wird die dadurch entwertete Elo-Leiter neu verankert (v21/v20/v19 + Anker)? | Nutzer-Entscheid 2026-08-20 ("du kannst ihn jetzt schon fixen und dann faehrst du die arena games mit v21, v20 und v19. die alte elo leiter kannst ins archiv werfen"). Fix-Grundlage: PREREG_implementation_review_unprimed par.7 Befund 1. |
 | `PREREG_stack_top_feature.md` | Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | nichts gebaut. Anlass: Nutzer-Frage 2026-08-20 nach der GUI-Aenderung am Stapel-Dialog (Commit 94b9090); Ziel ist Sichtgleichheit, nicht ein Staerkegewinn. Prioritaet: geparkt, Arbeitskreis "Spaeter" wie Task #38. |
+| `PREREG_uvfa_plate_regime.md` | Lernt das Netz SELEKTIVEN Plattenbau, wenn das Bau-Regime als NETZ-EINGABE konditioniert wird (UVFA-Muster: Zwangsseite=1/frei=0 auf dem vorhandenen Asym-Korpus), statt als unsichtbarer Kontext -- und wird das Flag zur Spielzeit ein tragfaehiger Stil-Regler? | ENTWURF 2026-08-22, nichts gebaut. Anlass: Asym-Kampagne durchgemessen (par.14/15: kein Signal, kein Schaden) PLUS Klon-Befund par.16 (One-Hot-Klonen war implizit im S-Training, druckte sich nicht aus). Primaerarm UVFA; Alternative Orakel-Action-Labels (gedaempft); Begleitoption Ownership-Gewicht (zweifach vorbelastet). Baustein-Abhaengigkeit: additiver Input-Mechanismus aus PREREG_stack_top_feature.md par.6 Punkt 2. |
 | `PREREG_v22_window.md` | Wie wird das v22-Trainingsfenster zugeschnitten (Zwei-Klassen-Rotation, 29.450 Partien, stationaere Rotationsregel ab v22)? | OFFEN, angelegt 2026-08-08 als reines Design-Dokument auf Halde (Nutzer-Entscheid 2026-08-08 im Kasten am Dateianfang: kein v22-Self-Play vor Abarbeitung der v21-Task-Queue); Zuschnitt fixiert, damit er nicht neu diskutiert werden muss. Bisher bewusst nicht im Index gefuehrt, seit der Generator-Umstellung mit aufgenommen. |
 
 ## ENTSCHIEDEN (59)
