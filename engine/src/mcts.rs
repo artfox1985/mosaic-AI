@@ -1371,4 +1371,87 @@ mod tests {
             );
         }
     }
+
+    // ── A4-v2: Runde-5-Zustand (Nutzer-Auftrag 2026-08-22) ──────────────
+    //
+    // Friert das NACH-Fix-Verhalten des R5-Expectiminimax ein (round5-
+    // Min-Knoten-Fix c83fb35, `PREREG_round5_minfix_elo_reset.md` par.4
+    // Nachtrag): das v1-Korpus besteht nur aus Drafting-Zustaenden und
+    // erreicht die R5-Pfade nicht. Eigene Fixture-Datei v2 -- v1 bleibt
+    // unveraendert eingefroren. Baurezept bewusst UNABHAENGIG vom
+    // verwandten `round5.rs::tests::rich_round5_state` dupliziert (der ist
+    // testmodul-privat, und eine geteilte Quelle wuerde beide Anker
+    // aneinander koppeln).
+
+    fn a4_round5_state() -> GameState {
+        use crate::dome::build_dome_tile_pool;
+        use crate::tile::TileColor::*;
+        let mut rng = StdRng::seed_from_u64(66);
+        let mut s = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        s.round_number = 5;
+        s.phase = Phase::Drafting;
+        for p in s.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        // Plattenrelevanter Satz: Spalten (1), Ecken (5), Spezialfelder (6).
+        s.scoring_tile_ids = vec![1, 5, 6];
+        let pool = build_dome_tile_pool();
+        let mut tid = 600;
+        for (pi, fill_seed) in [(0usize, 7166u64), (1usize, 7266u64)] {
+            let mut frng = StdRng::seed_from_u64(fill_seed);
+            for r in 0..3 {
+                for c in 0..3 {
+                    let mut t = pool[frng.random_range(0..pool.len())].clone();
+                    t.tile_id = tid;
+                    tid += 1;
+                    for si in 0..4 {
+                        // ~55% vorbefuellt (Muster rich_round5_state): echte
+                        // Platzierungen moeglich, aber offene Felder bleiben.
+                        if frng.random_range(0..100) < 55 {
+                            t.spaces[si].placed_color = t.spaces[si].required_color;
+                        }
+                    }
+                    let _ = s.players[pi].dome_grid.place_dome_tile(t, r, c);
+                }
+            }
+        }
+        s.players[0].pattern_lines[1].add_tiles(&[Blau, Blau]);
+        s.players[0].pattern_lines[3].add_tiles(&[Rot, Rot]);
+        s.players[1].pattern_lines[2].add_tiles(&[Gelb, Gelb, Gelb]);
+        s
+    }
+
+    /// **Pflicht-Golden-Test v2.** Wie `heuristic_anchor_choices_match_
+    /// fixture`, aber fuer den Runde-5-Zweig (`round5::applies` ->
+    /// Expectiminimax statt PUCT-Baum). Haelt die NACH-Fix-Basislinie
+    /// (c83fb35) fest -- eine Abweichung heisst, der R5-Loeser waehlt
+    /// anders, und der Elo-Anker verschiebt sich mit.
+    #[test]
+    fn heuristic_anchor_r5_choice_matches_fixture_v2() {
+        let fixture = include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/anchor_behaviour_v2.txt"
+        ));
+        let expected = parse_anchor_fixture(fixture);
+        let state = a4_round5_state();
+        assert!(
+            crate::round5::applies(&state),
+            "A4-v2-Zustand muss den R5-Loeser treffen"
+        );
+        // Die R5-Wahl ist solver-deterministisch; Sims/RNG sind nur die
+        // Harness-Parameter des v1-Vertrags.
+        let mut rng = StdRng::seed_from_u64(606);
+        let chosen = search_drafting_action(&state, A4_ANCHOR_SIMULATIONS, DEFAULT_C, &mut rng)
+            .expect("state_r5_66: Heuristik lieferte keinen Zug");
+        let got = action_to_dict(&chosen).to_string();
+        let want = expected
+            .get("state_r5_66")
+            .expect("A4-v2-Fixture hat keine Zeile fuer 'state_r5_66'");
+        assert_eq!(
+            &got, want,
+            "A4-v2 (R5-Expectiminimax, Nach-Fix-Basislinie c83fb35) weicht ab: got={got} \
+             want={want} -- gleiche Regel wie v1: beabsichtigte Aenderungen mit neu \
+             erzeugtem Fixture und Commit-Begruendung, nie stillschweigend."
+        );
+    }
 }

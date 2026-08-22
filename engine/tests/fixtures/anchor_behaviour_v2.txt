@@ -1,0 +1,4 @@
+# A4-v2 Heuristik-Anker-Fixture (Runde-5-Expectiminimax, Nach-Fix-Basislinie c83fb35)
+# Erzeugt 2026-08-22, PREREG_round5_minfix_elo_reset.md par.4 Nachtrag.
+# Format: label<TAB>action_json (wie anchor_behaviour_v1.txt)
+state_r5_66	{"color":"türkis","factory_id":null,"moon_order":[],"row":0,"source":"LARGE_FACTORY_SUN","type":"stone"}
