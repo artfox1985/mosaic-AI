@@ -63,7 +63,24 @@ k1-aktiv 567/1500 (37,8 % ~ 3/8). Restlaenge ab Startpunkt: Mittel
 
 ## par.3 Baustein 2: Engine-Faehigkeit "Start ab Stellung"
 
-Self-Play kann heute nur ab Spielbeginn starten (setup_new_game).
+**ERGEBNIS BAUSTEIN 2 (2026-08-22, gebaut + abgenommen):** additiver
+Pfad `--seed-positions` (self_play.py -> net_self_play_games ->
+run_net_self_play mit globalem Stellungs-Offset gegen die
+Chunk-Wiederholungs-Falle; unified_game_loop startet am
+deserialisierten Zustand). Zuordnung als [seed_position]-Logzeile.
+Abnahme: Suite 466/0 (neuer Determinismus-/Terminierungs-Test);
+Paritaets-Hash 8c6684ff... HAELT (Default aus = byte-identisch);
+Netz-Smoke 2x4 Partien ab echten Korpus-Stellungen BYTE-IDENTISCH
+(SHA256 gleich, Startrunde 2, alle bis Runde 5 + Winner-Stempel).
+**Echter Nebenbefund dabei (gefixt):** json_to_state untertreibt
+`dome_tiles_placed_this_round` (can_place_dome-Ableitung 0|2) -- der
+geseedete Spieler durfte eine Kuppel zu viel beginnen und
+execute_dome_move riss am Token-Verbrauch. Korrektur
+(tokens==Kuppeln-Invariante) bewusst NUR im Seeding-Pfad
+(`seed_state_fixup`), damit Paritaetssonde/Frozen-Set-Basislinien
+unberuehrt bleiben; fuer Peek-Historien konservativ-legal.
+
+Urspruenglicher Planungstext: Self-Play kann heute nur ab Spielbeginn starten (setup_new_game).
 Noetig: ein additiver Pfad, der eine serialisierte Stellung als
 Partie-Start laedt (Roundtrip existiert: Serializer + replay-exakte
 Zustaende), Seeds/Manifest wie gehabt, Kennzeichnung der Records
