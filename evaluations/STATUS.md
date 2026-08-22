@@ -241,9 +241,34 @@ S -0,08 gegen N -0,19 auf 33 gepaarten Stellungen -- kein
 substanzielles Zustandssignal, nur ein schwacher, nicht signifikanter
 Richtungshinweis (p=0,108). GESAMTVERDIKT: das asymmetrische
 Curriculum hat in dieser Form nichts Suchwirksames gelehrt, bei null
-Staerkekosten. Der Wertekopf-Weg ist damit durchgemessen; offen
-bleibt die POLICY-Seite (orakel-abgeleitete Supervision) als letzter
-registrierter Strang -- Umfang/Reihenfolge Nutzer-Entscheid.** Nebenbei: Exklusiv-Regel per Kalibrierungs-Smoke
+Staerkekosten.**
+
+**DER NEUE ZUSCHNITT (Nutzer-Freigabe 2026-08-22, nach zwei externen
+Opus-Recherchen `RESEARCH_plate_intent_external` +
+`RESEARCH_search_alternatives_external` und par.16-Klon-Befund):**
+
+1. **Primaerarm: Startpositions-Seeding**
+   (`PREREG_start_position_seeding.md`) -- Self-Play startet ab
+   halbfertigen Spalten-Stellungen aus dem Asym-Korpus und spielt FREI
+   weiter (on-policy-Wertdaten; KataGo-startPoses-Muster). Behebt die
+   Off-Policy-Diagnose des Asym-Nulls. **Der Asym-Korpus bleibt dafuer
+   lokal.**
+2. **Parallel, Such-Hebel: Implicit-Minimax-Backup-Knopf**
+   (`PREREG_implicit_minimax_backup.md`, alpha~0,2, Default 0).
+3. **Folge-/Kombinationsarm: UVFA-Regime-Eingabe**
+   (`PREREG_uvfa_plate_regime.md`, jetzt mit Conditioning-Dropout +
+   Leakage-Waechter, par.8 dort).
+4. **Geschlossen ohne Messung** (Koordinator-Verifikation am Code):
+   die Recherche-Option "Q-Skalierung temperieren" -- die
+   mctx-Faktor-14-Rechnung gilt fuer unsere Engine nicht
+   (GUMBEL_C_SCALE=1,0; Task-#18-Kalibrierung misst sigma(q):ln(prior)
+   ~1,2:1), und c_scale-Senkung ist hauseigen vorbelastet (-13 %
+   Score, Task-#18-Gegenprobe). Ebenso bleiben Suchparadigmen-Wechsel
+   aus (beide Recherchen: kein Beleg-Fall fuer AB-Umbau; additive
+   Hebel zuerst).
+
+Umfaenge/Schwellen je Prereg sind Nutzer-Entscheide vor Baubeginn;
+gebaut ist noch nichts. Nebenbei: Exklusiv-Regel per Kalibrierungs-Smoke
 gelockert (Fallen-Sektion), cargo test 464/0, A4-Abdeckungsluecke
 dokumentiert (Fixture v2 beauftragt).
 

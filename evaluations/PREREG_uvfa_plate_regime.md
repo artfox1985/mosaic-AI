@@ -114,3 +114,30 @@ an den Asym-Armen), Arena 2 Laeufe a ~50 min plus Regressions-Tor.
    Kuerzungs-Baustein; gemeinsamer Bau spart den Mechanismus-Aufwand).
 3. Bestaetigung der Erfolgsregel par.3 (uebernommen aus Asym-par.7)
    oder Anpassung VOR dem ersten Bau-Commit.
+
+## par.8 ROLLE IM GESAMT-ZUSCHNITT + RECHERCHE-ERGAENZUNGEN (2026-08-22)
+
+**Einordnung nach Nutzer-Freigabe der Reihenfolge:** UVFA ist jetzt
+KOMBINATIONS-/FOLGEARM hinter dem Startpositions-Seeding
+(`PREREG_start_position_seeding.md`, Primaerarm: erzeugt die fehlenden
+Wertdaten on-policy); parallel laeuft der Such-Hebel
+`PREREG_implicit_minimax_backup.md`. Nie zwei Hebel im selben Mess-Arm
+einfuehren.
+
+**Zwei Pflicht-Ergaenzungen aus der externen Recherche**
+(RESEARCH_plate_intent_external F3, Agenten-Befunde mit Quellen):
+
+1. **Conditioning-Dropout mit Guidance-Skala**: das Flag wird im
+   Training stochastisch maskiert (Dropout-Anteil beim Bau festlegen),
+   damit zur Spielzeit eine SKALIERBARE Differenz (guidance) statt
+   einer blossen Reproduktion der Trainingsverteilung entsteht -- sonst
+   reproduziert Flag=1 nur die 34,6-%-Zwangsverteilung samt ihrer
+   45,7-%-Siegquote.
+2. **Leakage-Waechter am Value-Kopf**: vorab pruefen, dass das Flag
+   nicht als billiger Sieg-Prädiktor missbraucht wird (Value-Differenz
+   Flag 0/1 auf identischen Stellungen ausweisen, Grenzwert beim Bau
+   festlegen).
+
+Praezedenz-Referenz aus der Recherche: AZ_db-One-Hot-Konditionierung
+(+29,6 bis +50,3 Elo bei exakt 400 Sims), AlphaStar-z, KataGo-Regel-/
+Komi-Inputkanaele.
