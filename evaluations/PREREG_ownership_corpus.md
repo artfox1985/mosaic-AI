@@ -404,6 +404,17 @@ deckt, lokale Kopie weg) erst, wenn BEIDE Bedingungen erfüllt sind:
 
 Lokale Löschung dann wie immer nur mit pfadgenauer Freigabe (Löschverbot).
 
+**ARCHIVIERT (Nutzer-Entscheid 2026-08-22):** Bedingung 2 ist durch die
+endgueltige Schliessung des Ownership-Verbraucher-Strangs (STATUS
+2026-08-20, alle Formen negativ) unerfuellbar geworden; der Nutzer hat
+die Klausel damit fuer ueberholt erklaert. Begleitbefunde zum Zeitpunkt:
+kein aktives Training referenziert den Korpus mehr (Asym-Fenster an den
+Cache-Zeilen geprueft, OWNERSHIP_WEIGHT=0.0 im Standardrezept), seine
+R4/R5-Labels liegen VOR der round5-Fix-Grenze (c83fb35), und der
+Asym-Korpus (16.000 Partien, Fix-Engine) ist der frische Nachfolger.
+Backup-Abdeckung vom Nutzer bestaetigt; Entfernung des lokalen Ordners
+`data/ownership_corpus/` durch den Nutzer selbst.
+
 Kein Stärke-Training: kein Gating, kein Champion-Anspruch, keine
 Elo-Interpretation der beteiligten Konfigurationen. Die Bauer-Knöpfe bleiben
 Diagnose-Werkzeuge (nie im Gating); ihre Partien tragen Brett-Fakten-Labels
