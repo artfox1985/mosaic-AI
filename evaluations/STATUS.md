@@ -201,7 +201,75 @@ par.13) — damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
 
 ---
 
-## UEBERGABE AN DIE NAECHSTE SITZUNG (angelegt 2026-08-20 Nacht — ZUERST LESEN)
+## UEBERGABE AN DIE NAECHSTE SITZUNG (angelegt 2026-08-22 — ZUERST LESEN; ersetzt die 20.08.-Uebergabe darunter, die vollstaendig ABGEARBEITET ist)
+
+**WO WIR STEHEN (alles committed, ~8 Commits vor origin/main -- NIE
+pushen ohne Anweisung; der Nutzer pusht selbst zwischendurch):**
+
+1. **Asym-Curriculum KOMPLETT durchgemessen (par.12-16 der Prereg):**
+   Sperre bestanden (+31,3 pp), beide Arme trainiert, Nullarm-Arena auf
+   den 407 Kampagnen-Seeds inkl. Brettwechsel: **kein Signal** (k1-Rate
+   12,2 % = Grundrate, Teilfrage-B-Tau S -0,08 vs N -0,19 n.s.), kein
+   Siegverlust. par.16: die Bauer-Zuege waren als One-Hot-Policy-Ziele
+   im Training (implizites Behavior-Cloning) und drueckten sich nicht
+   aus -- zweiter Null-Befund dieser Mechanik.
+2. **Neuer Zuschnitt nach zwei externen Opus-Recherchen**
+   (`RESEARCH_plate_intent_external_2026-08-22.md`,
+   `RESEARCH_search_alternatives_external_2026-08-22.md`; beide sagen:
+   kein Suchparadigmen-Wechsel, additive Hebel): **Primaerarm
+   Startpositions-Seeding** (`PREREG_start_position_seeding.md`),
+   parallel `PREREG_implicit_minimax_backup.md` (Env-Knopf, ungebaut),
+   Folgearm `PREREG_uvfa_plate_regime.md` (par.8: Conditioning-Dropout
+   + Leakage-Waechter Pflicht). Q-Skalierungs-Option GESCHLOSSEN
+   (Aera-Nachmessung `gumbel_scale_calibration_v21.json`: q:prior 1,47,
+   kein mctx-Faktor-14).
+3. **Seeding-Bausteine 1+2 FERTIG und abgenommen:** 1.500 kuratierte
+   Stellungen (`data/seed_positions/seed_positions_v1.jsonl`,
+   `tools/seed_position_curation.py`, Bericht in par.2) und die
+   Engine-Faehigkeit `--seed-positions` (Suite 466/0, Paritaets-Hash
+   8c6684ff HAELT, Netz-Smoke 2x4 byte-identisch, par.3-Ergebnis).
+   Dabei gefixter Roundtrip-Befund: `seed_state_fixup` (nur im
+   Seeding-Pfad; json_to_state NICHT angefasst -- Basislinien-Schutz).
+   Das installierte Wheel traegt die Faehigkeit bereits.
+
+**NAECHSTER SCHRITT (wartet NUR auf Nutzer-"Start"):** Baustein 3/4 --
+Generierung 9.000 Partien (par.6-Entscheide GEFALLEN: k=6, Kontrollarm
+= vorhandener v21-asymN_best, Schwellen = Asym-par.7):
+
+    $env:MOSAIC_DATA_DIR = "data/seed_corpus"   # eigener Ordner = Sperre
+    python -u self_play.py --mode network --model models/alphazero_v21_2d_brierbest.onnx `
+      --games 9000 --sims 200 --version v21_seedk1 --threads 8 `
+      --seed 20260824 --seed-positions data/seed_positions/seed_positions_v1.jsonl
+
+    (tee-Log Pflicht: die [seed_position]-Zeilen sind die einzige
+    Stellungs-Zuordnung; danach wie beim Asym-Korpus als Map-Datei
+    neben den Korpus sichern. Dauer ~3,8-5,2 h.)
+
+Danach: Training (Standardrezept, Warm Start Champion, epochs 20,
+seed 2, Fenster = b18-Regex + Seeding-Korpus policy-tragend, eigenes
+Traeger-Manifest nach dem asymS-Muster, Cache-Zeile verifizieren!) ->
+Arena gegen Champion auf `evaluations/seeds_asym_407.txt` (S-Muster:
+_best-Checkpoint, --log-games, Brettwechsel-Pflicht) -> k1-Raten aus
+den Endwertungs-Zeilen (Instrument-Muster: par.14 Asym) ->
+par.7-Verdikt. Sonde `tools/probes/asym_value_sibling_check.py` laeuft
+zusaetzlich (Modellpfade dort anpassen).
+
+**STEHENDE REGELN (unveraendert + neu kalibriert):** Regel 0; Arena
+exklusiv, ABER seit dem Kalibrierungs-Smoke (Fallen-Sektion) sind
+Single-Thread-IO-Jobs parallel erlaubt (Suchlaeufe/Training weiterhin
+nicht); Score-Analysen auf Block-Ebene; nie loeschen ohne pfadgenaue
+Freigabe; Trainings waehrend Generierung nur mit MOSAIC_DATA_EXCLUDE.
+
+**OFFENE NUTZER-PUNKTE:** (a) night_run_20260820.ps1 loescht der Nutzer
+selbst; (b) logs/nacht_20260820.log darf weg (Zwangsseiten-Map ist
+extrahiert: data/asym_corpus/zwangsseiten_map.txt); (c) Asym-Korpus
+bleibt lokal (Trainingsinput fuer Seeding/UVFA); (d) Ownership-Korpus
+entfernt der Nutzer (5b-Abschluss registriert); (e) UVFA-par.7- und
+Minimax-Knopf-Entscheide stehen aus, stack_top/B1-Paket geparkt.
+
+---
+
+## UEBERGABE VOM 2026-08-20 (ABGEARBEITET -- nur noch Historie, Details in den Fortschritts-Nachtraegen unten)
 
 **Kontext-Wechsel per Nutzer-Entscheid; diese Sektion ist der komplette
 Auftrag der naechsten Sitzung. In der Nacht laufen zwei Ketten in der
