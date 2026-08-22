@@ -267,6 +267,16 @@ bleibt lokal (Trainingsinput fuer Seeding/UVFA); (d) Ownership-Korpus
 entfernt der Nutzer (5b-Abschluss registriert); (e) UVFA-par.7- und
 Minimax-Knopf-Entscheide stehen aus, stack_top/B1-Paket geparkt.
 
+**NEUER NUTZER-ENTSCHEID (2026-08-22, kurz vor der Uebergabe,
+registriert in `PREREG_r5_solver_split.md`):** der R5-Loeser wird
+getrennt -- EIGENER, EINGEFRORENER Loeser fuer den Heuristik-Anker
+(Leiter-Schutz), der Netz-Loeser darf sich danach entwickeln
+(Budget/Policy-Sortierung/spaeter Value-Korrekturterm, je per-Agent
+verdrahtet, nie per Env-Knopf); dazu das Ziel, den Value-Kopf fuer
+Runde 5 GUT ZU KALIBRIEREN (Metrik: r5_value_calibration-Steigung,
+heute 0,06-0,09; Zuschnitt nach dem Seeding-Verdikt). Reihenfolge
+gegen die Seeding-Kette entscheidet der Nutzer beim Aufgreifen.
+
 ---
 
 ## UEBERGABE VOM 2026-08-20 (ABGEARBEITET -- nur noch Historie, Details in den Fortschritts-Nachtraegen unten)
