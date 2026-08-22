@@ -402,6 +402,36 @@ Ziehchance 3/8), der Bauer lief in ALLEN. Drei Gruende:
   (1) S_best gegen Champion, (2) N_best gegen Champion,
   (3) Brettwechsel des S-Arms (vertauschte --model/--model-b).
 
+## par.14 ARENA-ERGEBNIS TEILFRAGE C (2026-08-22): KEIN SIGNAL, kein Siegverlust
+
+Artefakte `paired_arena_env_asym_nullarm_{s,n,s_swap}.json`; k1-Raten
+aus den Endwertungs-Zeilen der Partie-Logs ("Vertikale Reihen: X Pkt",
+Schwelle >= 7 = mindestens eine Spalte), je Lauf dieselben 156
+k1-aktiven Partien -- exakt der DOSSIER-6(C)-Nenner, die Zahlen sind
+direkt vergleichbar. (Zwischenfall protokolliert: Lauf 2 wurde einmal
+neu gestartet, weil eine Pickle-Ladelast parallel lief; der
+Kalibrierungs-Smoke ergab spaeter 4x byte-identisch unter genau dieser
+Lastklasse -- der Neustart war ueberkonservativ, aber regelkonform.)
+
+| Groesse | S (Lehr-Arm) | N (Kontrolle) |
+|---|---|---|
+| k1-Rate eigene Seite (k1-aktiv) | **19/156 = 12,2 %** (Brettwechsel: 20/156 = 12,8 %) | 15/156 = 9,6 % |
+| Champion-Gegenseite | 12/156 = 7,7 % | 14/156 = 9,0 % |
+| Siege gegen Champion | 199/407 (Swap 184/407) | 205/407 |
+
+- **VERDIKT nach par.7 (woertlich): MISSERFOLG als "kein Signal"** --
+  12,2 % liegt unter der 22-%-Signalschwelle und exakt auf der
+  registrierten Grundrate (heute 13 % = 20/156). Der Brettwechsel
+  bestaetigt (12,8 %).
+- **Kriterium 2 waere erfuellt gewesen**: kein signifikanter
+  Siegverlust gegen N auf denselben Seeds (McNemar diskordant 97:103,
+  p=0,72; Block-Ebene nB=17 a 25, Block-t = -0,53).
+- **Vorregistrierte Einordnung gilt**: das Nullresultat widerlegt 7(1)
+  NICHT (par.4(2), Ego-Perspektive). Die Trennung "nichts gelernt"
+  gegen "gelernt, aber nicht suchwirksam" leistet allein Teilfrage B
+  (gepaarter Geschwister-Vergleich S- gegen N-Netz auf denselben
+  Stellungen) -- sie steht als naechster Schritt aus.
+
 **par.9 Schritt 5 gestartet** (beide Arme sequenziell, identisches
 Rezept/Seed): Warm Start `v21_2d_brierbest`, lr 5e-5 + Cosine,
 `--epochs 20` (echtes Annealing, T_max-Fussnote beachtet), 2d/wdl/
