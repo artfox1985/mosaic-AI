@@ -236,9 +236,14 @@ Nullarm-Arena auf den 407 Kampagnen-Seeds inkl. Brettwechsel gefahren
 Grundrate, unter der 22-%-Signalschwelle -> par.7-Verdikt "kein
 Signal"; aber KEIN Siegverlust** (S 199/407 gegen N 205/407, Block-t
 -0,53). Vorregistrierte Einordnung: widerlegt 7(1) nicht
-(Ego-Perspektive); Teilfrage B (Geschwister-Vergleich S- gegen N-Netz)
-steht aus und entscheidet "nichts gelernt" gegen "gelernt, aber nicht
-suchwirksam". Nebenbei: Exklusiv-Regel per Kalibrierungs-Smoke
+(Ego-Perspektive). **Teilfrage B ebenfalls GEMESSEN (par.15): Tau
+S -0,08 gegen N -0,19 auf 33 gepaarten Stellungen -- kein
+substanzielles Zustandssignal, nur ein schwacher, nicht signifikanter
+Richtungshinweis (p=0,108). GESAMTVERDIKT: das asymmetrische
+Curriculum hat in dieser Form nichts Suchwirksames gelehrt, bei null
+Staerkekosten. Der Wertekopf-Weg ist damit durchgemessen; offen
+bleibt die POLICY-Seite (orakel-abgeleitete Supervision) als letzter
+registrierter Strang -- Umfang/Reihenfolge Nutzer-Entscheid.** Nebenbei: Exklusiv-Regel per Kalibrierungs-Smoke
 gelockert (Fallen-Sektion), cargo test 464/0, A4-Abdeckungsluecke
 dokumentiert (Fixture v2 beauftragt).
 
