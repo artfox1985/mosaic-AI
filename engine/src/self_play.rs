@@ -1173,6 +1173,27 @@ fn bauer_drafting_vorzug(state: &GameState) -> Option<Action> {
         .or_else(|| crate::plate_builder::dome_vorzug(state))
 }
 
+/// Nach-Korrektur fuer Seeding-Startzustaende (PREREG_start_position_seeding
+/// par.3, Befund 2026-08-22): `json_to_state` rekonstruiert
+/// `dome_tiles_placed_this_round` aus dem abgeleiteten `can_place_dome`-Bool
+/// als 0 oder 2 -- bei einer bereits gelegten Kuppel (echter Zaehler 1)
+/// UNTERTREIBT das, der geseedete Spieler darf eine Kuppel zu viel beginnen
+/// und `execute_dome_move` reisst dann am Token-Verbrauch
+/// (`use_player_token`, board.rs:366). Fix BEWUSST nur hier und nicht in
+/// `json_to_state`: an dessen Bestandsverhalten haengen Paritaetssonde und
+/// Frozen-Set-Messungen (Basislinien-Schutz). Wiederhergestellt wird die
+/// Engine-Selbstspiel-Invariante tokens == gelegte Kuppeln (Peeks kommen im
+/// Netz-Selbstspiel praktisch nicht vor, Review-Befund 3: 0 Peeks in 56
+/// Partien; falls doch, ist die Korrektur konservativ-legal, nie zu locker).
+fn seed_state_fixup(st: &mut GameState) {
+    for p in st.players.iter_mut() {
+        if p.dome_tiles_placed_this_round == 0 {
+            p.dome_tiles_placed_this_round =
+                p.player_tokens_used.min(crate::board::DOME_TILES_PER_ROUND);
+        }
+    }
+}
+
 /// `MOSAIC_ASYM_VORZUG` -- Baustein 1, `PREREG_asymmetric_curriculum.md` par.3
 /// (Arm S, "asymmetrisches Self-Play"). Default **0/aus** = Bestandsverhalten:
 /// `play_net_self_play_game` gibt weiterhin BEIDEN Seiten `vorzug: true`
@@ -1497,6 +1518,13 @@ struct GameLoopConfig<'a> {
     /// Rayon-Zugriff auf denselben Zaehler), gleiche Wahl wie `PARTIE_GEWICHT`
     /// in net_mcts.rs.
     vorzug_greift: Option<&'a std::cell::Cell<[u64; 2]>>,
+    /// Startpositions-Seeding (`PREREG_start_position_seeding.md` par.3):
+    /// `Some(state)` -> die Partie beginnt an DIESEM (bereits
+    /// deserialisierten) Zustand statt bei `Game::start`;
+    /// `scoring_ids`/`names`/`first_player` der Schleife werden dann
+    /// ignoriert, sie stecken im Zustand. `None` (alle Bestandsaufrufer)
+    /// = byte-identisches Bestandsverhalten.
+    start_state: Option<GameState>,
 }
 
 /// Ausgabe der vereinheitlichten Schleife (je [`LoopMode`]-Variante).
@@ -1516,9 +1544,15 @@ fn unified_game_loop<R: Rng + ?Sized>(
     names: [String; 2],
     first_player: usize,
     rng: &mut R,
-    cfg: GameLoopConfig<'_>,
+    mut cfg: GameLoopConfig<'_>,
 ) -> LoopOutput {
-    let mut game = Game::start(names, first_player, scoring_ids, rng);
+    let mut game = match cfg.start_state.take() {
+        // Seeding (par.3): der Zustand ist vollstaendig (inkl.
+        // scoring_tile_ids/current_player); `Game` ist ein reiner
+        // Zustands-Traeger (game.rs:669), kein weiterer Setup noetig.
+        Some(state) => Game { state },
+        None => Game::start(names, first_player, scoring_ids, rng),
+    };
     let mut records: Vec<Map<String, Value>> = Vec::new();
     // Rundenübergangs-Trainingsziel (siehe round_transition.rs): je Runde N
     // ein per Chance-Node-Sampling gemitteltes Blattwert-Paar, gespeichert
@@ -1649,8 +1683,16 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         // Heuristik-Seiten: dieselbe Fehler-Maskierungs-Familie
                         // wie 80f3698 -- `chosen` stammt aus `drafting_actions`,
                         // ein `Err` waere ein Engine-Bug.
-                        game.apply_drafting(&d.chosen)
-                            .unwrap_or_else(|e| panic!("apply_drafting fehlgeschlagen: {e}"));
+                        game.apply_drafting(&d.chosen).unwrap_or_else(|e| {
+                            let pl = &game.state.players[game.state.current_player];
+                            panic!(
+                                "apply_drafting fehlgeschlagen: {e} | chosen={:?} runde={} cur={} \
+                                 tokens={} dome_placed={} pending_draw={}",
+                                d.chosen, game.state.round_number, game.state.current_player,
+                                pl.player_tokens_used, pl.dome_tiles_placed_this_round,
+                                game.state.pending_stack_draw.len()
+                            )
+                        });
                     }
                     // Rundenübergangs-Labels (rtv/bootstrap) -- nur Self-Play-
                     // Pfade mit Netz. `round_before < NUM_ROUNDS` ist BUGFIX,
@@ -1935,6 +1977,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
         mode: LoopMode::Records { game_id },
         players: [player, player],
         vorzug_greift: None,
+        start_state: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -2290,6 +2333,7 @@ fn play_net_game<R: Rng + ?Sized>(
         mode: LoopMode::Summary { log_games },
         players,
         vorzug_greift: None,
+        start_state: None,
     };
     let mut result = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -2423,6 +2467,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
             },
         ],
         vorzug_greift: None,
+        start_state: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -3025,6 +3070,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // Deklaration unten) baut jeder echte Drafting-Entscheid daraus einen
     // EIGENEN Such-RNG statt weiterhin den Partie-`rng` zu verbrauchen.
     game_seed: u64,
+    // Startpositions-Seeding (PREREG_start_position_seeding.md par.3):
+    // `None` = Bestandsverhalten (Partie ab `Game::start`).
+    start_state: Option<GameState>,
 ) -> Vec<Value> {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // EIN NetSelfPlayAgent fuer beide Seiten (beide Seiten SIND das Netz),
@@ -3093,6 +3141,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         mode: LoopMode::Records { game_id },
         players: [player0, player1],
         vorzug_greift: if asym { Some(&greif_counter) } else { None },
+        start_state,
     };
     let out = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -3193,7 +3242,50 @@ pub fn run_net_self_play(
     heartbeat_path: Option<&str>,
     pcr_full_prob: Option<f64>,
     pcr_cheap_sims: u32,
+    // Startpositions-Seeding (PREREG_start_position_seeding.md par.3):
+    // JSONL-Zeilen des kuratierten Stellungssatzes (je Zeile ein Objekt mit
+    // `state` + `game_id` als Quell-Kennung). `None` = Bestandsverhalten.
+    // Zuordnung Partie i -> Stellung (offset+i) mod n (par.6: zyklisch,
+    // damit ein Teil-Lauf gleichverteilt bleibt und die Stall-Regel
+    // greift). `seed_positions_offset` traegt den GLOBALEN Partiezaehler
+    // des Aufrufers: self_play.py fuehrt Laeufe in Chunks aus (je Chunk
+    // ein frischer Prozess, i zaehlt dort ab 0) -- ohne Offset saehe jeder
+    // Chunk dieselben ersten Stellungen.
+    seed_positions: Option<Vec<String>>,
+    seed_positions_offset: usize,
 ) -> Result<String, String> {
+    let seed_positions: Option<Vec<(String, Value)>> = match seed_positions {
+        None => None,
+        Some(lines) => {
+            let mut v: Vec<(String, Value)> = Vec::new();
+            for (ln, line) in lines.iter().enumerate() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') {
+                    continue;
+                }
+                let val: Value = serde_json::from_str(line)
+                    .map_err(|e| format!("Seed-Positions-Zeile {}: {e}", ln + 1))?;
+                let source = val.get("game_id").and_then(|x| x.as_str()).unwrap_or("?").to_string();
+                let state = val
+                    .get("state")
+                    .cloned()
+                    .ok_or_else(|| format!("Seed-Positions-Zeile {}: kein 'state'-Feld", ln + 1))?;
+                v.push((source, state));
+            }
+            if v.is_empty() {
+                return Err("Seed-Positions-Datei ohne verwertbare Eintraege".into());
+            }
+            // Fail-fast VOR dem Lauf: jede Stellung muss deserialisierbar
+            // sein -- ein Fehler mitten im Rayon-Lauf wuerde sonst nur als
+            // leeres Einzelspiel auffallen.
+            let mut check_rng = StdRng::seed_from_u64(0xC0FFEE);
+            for (i, (src, val)) in v.iter().enumerate() {
+                crate::serialize::json_to_state(val, &mut check_rng)
+                    .map_err(|e| format!("Seed-Position {i} ({src}) nicht ladbar: {e}"))?;
+            }
+            Some(v)
+        }
+    };
     let net = std::sync::Arc::new(Net::load_auto(model_path).map_err(|e| e.to_string())?);
     // Weg V (Verschraenkung, `net_batcher.rs`): registriert EINMAL je Lauf
     // einen Sammel-Faden fuer dieses `Arc<Net>`, FALLS
@@ -3225,8 +3317,40 @@ pub fn run_net_self_play(
     let play = |i: usize| -> Vec<Value> {
         let partie_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
         let mut rng = StdRng::seed_from_u64(partie_seed);
-        let ids = sample_valid_scoring_ids(3, &mut rng);
-        let first = rng.random_range(0..2usize);
+        // Seeding-Zweig (par.3): Stellung statt Frischstart. `json_to_state`
+        // verbraucht den Partie-RNG fuer die Neumischung der VERDECKTEN
+        // Sammlungen (serialize.rs:873ff) -- dieselbe Stellung bekommt so je
+        // Partie andere verdeckte Zuege, deterministisch je partie_seed.
+        let (ids, first, start_state) = match &seed_positions {
+            Some(list) => {
+                let idx = (seed_positions_offset + i) % list.len();
+                let (source, val) = &list[idx];
+                match crate::serialize::json_to_state(val, &mut rng) {
+                    Ok(mut st) => {
+                        seed_state_fixup(&mut st);
+                        let ids = st.scoring_tile_ids.clone();
+                        let first = st.current_player;
+                        eprintln!(
+                            "[seed_position] game_id={prefix}_g{} seed={partie_seed} idx={idx} source={source}",
+                            i + 1
+                        );
+                        (ids, first, Some(st))
+                    }
+                    Err(e) => {
+                        // Vorab-Validierung hat alle Stellungen geprueft --
+                        // hier zu landen waere ein Programmfehler; Partie
+                        // leer verwerfen statt den Lauf zu reissen.
+                        eprintln!("[seed_position] FEHLER idx={idx} ({source}): {e}");
+                        return Vec::new();
+                    }
+                }
+            }
+            None => {
+                let ids = sample_valid_scoring_ids(3, &mut rng);
+                let first = rng.random_range(0..2usize);
+                (ids, first, None)
+            }
+        };
         let names = ["Netz".to_string(), "Netz".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
         let net = std::sync::Arc::clone(&net);
@@ -3279,7 +3403,7 @@ pub fn run_net_self_play(
                     play_net_self_play_game(
                         &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise,
                         deterministic, record_rtv, Some(&move_counter_thread), pcr_full_prob, pcr_cheap_sims,
-                        partie_seed,
+                        partie_seed, start_state,
                     )
                 },
             )
@@ -4770,6 +4894,77 @@ pub(crate) mod tests {
         }
     }
 
+    /// Startpositions-Seeding (PREREG_start_position_seeding.md par.3):
+    /// die vereinheitlichte Schleife muss ab einem deserialisierten
+    /// MITTELSPIEL-Zustand starten, die Partie zu Ende spielen und dabei
+    /// deterministisch bleiben. Netzfrei (Heuristik-Agenten) -- die
+    /// Netz-Verdrahtung darueber ist reines Parameter-Durchreichen; der
+    /// End-zu-End-Beweis mit Netz ist der registrierte Smoke vor der
+    /// ersten Generierung.
+    #[test]
+    fn unified_loop_starts_from_seeded_state_and_terminates() {
+        let mut rng = StdRng::seed_from_u64(321);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let recs = play_one_game(
+            40, SELF_PLAY_C, ids, ["P0".into(), "P1".into()], 0, "seedsrc_g1",
+            &mut rng, None, false, None, 321,
+        );
+        let mid = recs
+            .iter()
+            .skip(recs.len() / 2)
+            .find(|r| r["state"]["phase"] == "drafting")
+            .expect("kein Drafting-Zustand in der zweiten Haelfte der Quellpartie");
+        let start_round = {
+            let mut probe_rng = StdRng::seed_from_u64(654);
+            crate::serialize::json_to_state(&mid["state"], &mut probe_rng)
+                .expect("json_to_state")
+                .round_number
+        };
+        assert!(start_round >= 2, "Mittelspiel-Zustand erwartet, Runde war {start_round}");
+
+        let run = |seed: u64| -> String {
+            let mut r = StdRng::seed_from_u64(seed);
+            let mut st_rng = StdRng::seed_from_u64(654);
+            let mut state = crate::serialize::json_to_state(&mid["state"], &mut st_rng).unwrap();
+            seed_state_fixup(&mut state);
+            let agent = HeuristicSelfPlayAgent { base_sims: 40, c: SELF_PLAY_C };
+            let player = PlayerLoopConfig {
+                agent: &agent,
+                tiling_net: None,
+                apply_via_chosen_action: false,
+                column_build_trace: false,
+            };
+            let cfg = GameLoopConfig {
+                timeout_secs: 600,
+                seed_from_steps: false,
+                game_seed: seed,
+                move_heartbeat: None,
+                labels: None,
+                mode: LoopMode::Records { game_id: "seeded_g1" },
+                players: [player, player],
+                vorzug_greift: None,
+                start_state: Some(state),
+            };
+            match unified_game_loop(vec![], ["A".into(), "B".into()], 0, &mut r, cfg) {
+                LoopOutput::Records(out) => serde_json::to_string(&out).unwrap(),
+                LoopOutput::Summary(_) => unreachable!("Records-Modus konfiguriert"),
+            }
+        };
+        let a = run(777);
+        let b = run(777);
+        assert_eq!(a, b, "Seeded-Lauf muss bei gleichem Seed byte-identisch sein");
+        let out: Vec<Value> = serde_json::from_str(&a).unwrap();
+        assert!(!out.is_empty(), "Seeded-Partie muss Records erzeugen");
+        assert!(
+            out.iter().all(|r| r["state"]["round"].as_u64().unwrap() >= start_round as u64),
+            "kein Record darf VOR der Startrunde liegen"
+        );
+        assert!(
+            out.last().unwrap().get("winner").is_some(),
+            "Partie muss zu Ende gespielt und gestempelt sein"
+        );
+    }
+
     #[test]
     fn play_one_game_terminates_with_records() {
         let mut rng = StdRng::seed_from_u64(123);
@@ -5314,7 +5509,7 @@ pub(crate) mod tests {
             let names = ["Netz".to_string(), "Netz".to_string()];
             play_net_self_play_game(
                 net, 60, crate::net_mcts::DEFAULT_C_PUCT, ids, names, 0, "gate_b_repro", &mut rng,
-                true, false, true, None, None, 0, seed,
+                true, false, true, None, None, 0, seed, None,
             )
         }
 
@@ -5543,7 +5738,7 @@ pub(crate) mod tests {
         // (1) PCR AUS -- Default (pcr_full_prob=None): kein neues Feld.
         let off_a = run_net_self_play(
             model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "pcrtest", true, false,
-            false, None, None, None, 150,
+            false, None, None, None, 150, None, 0,
         )
         .expect("PCR-AUS-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
         let off_games: Vec<Value> = serde_json::from_str(&off_a).unwrap();
@@ -5570,7 +5765,7 @@ pub(crate) mod tests {
         // Kurzschluss-Records fehl (live beobachtet, 2026-08-02).
         let full = run_net_self_play(
             model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "pcrtest", true, false,
-            false, None, None, Some(1.0), 20,
+            false, None, None, Some(1.0), 20, None, 0,
         )
         .expect("PCR p=1.0-Lauf sollte gelingen");
         let full_games: Vec<Value> = serde_json::from_str(&full).unwrap();
@@ -5605,7 +5800,7 @@ pub(crate) mod tests {
         // Entscheid.
         let cheap = run_net_self_play(
             model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "pcrtest", true, false,
-            false, None, None, Some(0.0), 20,
+            false, None, None, Some(0.0), 20, None, 0,
         )
         .expect("PCR p=0.0-Lauf sollte gelingen");
         let cheap_games: Vec<Value> = serde_json::from_str(&cheap).unwrap();
@@ -5697,7 +5892,7 @@ pub(crate) mod tests {
         let base_sims = 40u32;
         let out = run_net_self_play(
             model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "rootchildqtest", true,
-            false, false, None, None, None, 150,
+            false, false, None, None, None, 150, None, 0,
         )
         .expect("Self-Play-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
         let games: Vec<Value> = serde_json::from_str(&out).unwrap();
