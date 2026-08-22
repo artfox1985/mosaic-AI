@@ -48,6 +48,19 @@ Faktor-14-Ungleichgewicht, Temperieren ist nicht der Hebel.
   Fortschritt x aktive Platten), analog Deckungs-Bericht des
   Ownership-Korpus.
 
+**ERGEBNIS BAUSTEIN 1 (2026-08-22, `tools/seed_position_curation.py`;
+Python-Spaltenzaehlung gegen die Engine verifiziert, 500/500
+identisch):** 7.797/8.000 Zwangspartien mit Kandidat; Auswahl 1.500
+Stellungen (`data/seed_positions/seed_positions_v1.jsonl`, Seed
+20260822, hoechstens eine je Partie), Bericht
+`evaluations/seed_positions_curation_report.json`. Verteilung: R2
+duenn (90/9/0 fuer p3/p4/p5 -- vollstaendig uebernommen,
+dokumentierte Schieflage), R3/R4 quotiert 183-276 je Stratum;
+k1-aktiv 567/1500 (37,8 % ~ 3/8). Restlaenge ab Startpunkt: Mittel
+43,6 % einer Vollpartie. **Kostenrechnung fuer par.6** (Durchsatz
+0,21-0,29 Vollpartien/s): k=4 -> 6.000 Partien in 2,5-3,5 h; k=6 ->
+9.000 in 3,8-5,2 h; k=8 -> 12.000 in 5,0-6,9 h.
+
 ## par.3 Baustein 2: Engine-Faehigkeit "Start ab Stellung"
 
 Self-Play kann heute nur ab Spielbeginn starten (setup_new_game).
