@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = zwei Arme auf identischen Partien via doppelt geschriebener Labels -->
+<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 (Label-Diagnose ohne Training, Nutzer-Freigabe) registriert und beauftragt -->
 
 # Vorregistrierung: Bootstrap-Horizont (2 vs 3) -- Option fuer den v22-Zuschnitt
 
@@ -130,3 +130,68 @@ Der Ausfuehrungszeitpunkt ist unveraendert der v22-Generierungsstart --
 und der liegt laut Fahrplan NACH dem plattenbewussten Modell (erst
 Lehr-Korpora/Asym-Curriculum, dann Self-Plays). Ein Wecker dafuer steht
 jetzt direkt im Halde-Kasten von `PREREG_v22_window.md`.
+
+## Nachtrag 2026-08-23: neuer Anlass (Vollendungs-Strukturbefund) + Nutzer-Vorschlag rundenabhaengiger Horizont
+
+**Neuer Anlass, der dieser Prereg deutlich mehr Gewicht gibt** (Kette in
+evaluations/STATUS.md, STAND 2026-08-23, mit Artefakten): der Champion
+vollendet keine Brett-Spalten (0,10/Partie, plattenunabhaengig; 0,55
+Hoehe-5-Spalten je Partie bleiben stehen), meidet die langen
+Musterreihen 5/6 FLACH ueber alle Runden -- waehrend das
+Heuristik-Selfplay (der Abstammungs-Lehrer) spaet auf lange Reihen
+umschwenkt. Der Bias ist also NICHT geerbt, sondern im Training
+verloren gegangen. Verdachtspunkt (Herleitung, ungemessen): die
+verzoegerte Auszahlung frueher Langreihen-Investitionen faellt aus dem
+Kredit-Horizont der Value-Ziele.
+
+**Code-Praezisierung dazu (2026-08-23 verifiziert):** der Horizont
+schneidet zum NETZ-Leaf-Eval ab (Modulkommentar zu
+BOOTSTRAP_HORIZON_ROUNDS: "bevor per net_leaf_eval direkt bewertet
+wird, statt bis zum echten Spielende zu rekursieren"); der Uebergang
+R4->R5 laeuft bereits ueber den EXAKTEN Freebie
+(self_play.rs:2898, exact_round5_outcome), Runde 5 wird nicht
+gelabelt. Folge: SPAETE Ziele reichen faktisch schon ans echte Ende;
+die Beschneidung beisst FRUEH -- R1/R2-Ziele enden nach zwei Runden im
+Netz-Eval von R3/R4, und genau dort muesste die Auszahlung frueher
+Reihe-5/6-Fuetterung durch einen Value-Kopf, der Spaltenwert nie
+gelernt hat (Sibling-/Kalibrierungs-Befunde).
+
+**Nutzer-Vorschlag (2026-08-23, "der bootstrap horizon kann ja mit
+jeder runde kleiner werden"):** rundenabhaengiger Horizont als
+dritter Arm-Kandidat -- praktisch gelesen als "Ziele reichen immer
+bis zu einem festen ANKER-Zeitpunkt (z. B. Runde-5-Start mit exaktem
+Freebie) statt fester Tiefe": R1 saehe dann 4 Runden weit, R3 zwei --
+der Horizont schrumpft je Runde, und KEIN Ziel endet mehr in einem
+Netz-Eval mitten im Spiel. Passt in den bestehenden Zuschnitt (beide
+-- bzw. dann drei -- Labels beim v22-Self-Play mitschreiben, Stufe-1-
+Kostengate gilt je zusaetzlichem Rollout; die tiefen fruehen Rollouts
+sind der Kostentreiber und genau das, was Stufe 1 beziffern muss).
+Arm-Auswahl (2v3 vs. rundenabhaengig vs. beides) = Nutzer-Entscheid
+beim v22-Start; diese Prereg bleibt der registrierte Ort dafuer.
+
+## Stufe 0 (NEU, Nutzer-Freigabe 2026-08-23 "im kleinen testen/debuggen"): Label-Diagnose OHNE Training
+
+Vor jedem v22-Commitment eine reine Diagnose-Sonde, kein Korpus, kein
+Training:
+
+1. **Bau (additiv):** eine Probe-Funktion, die fuer einen uebergebenen
+   Zustand BEIDE Label-Varianten berechnet -- (a) Bestand: Horizont 2,
+   Abschluss per net_leaf_eval; (b) Anker-Variante: Rollout bis zum
+   Runde-5-Start, Abschluss per exact_round5_outcome-Freebie. KEINE
+   Aenderung an Records/Cache/Selbstspiel-Pfad; eigenes Werkzeug nach
+   Sonden-Muster.
+2. **Messung:** 200-300 Zustaende aus VORHANDENEN fertigen Partien
+   (Arena-/Korpus-Records; echter Endausgang bekannt), stratifiziert
+   nach Runde (Schwerpunkt R1-R2) und Spalten-/Langreihen-Fortschritt.
+   Ausgewiesen: (i) Label-Divergenz nach Runde x Fortschritt, (ii)
+   Korrelation beider Varianten mit dem ECHTEN Endresultat, gesamt und
+   auf den kritischen Zellen (frueh + hoher Fortschritt), (iii)
+   Rechenzeit je Anker-Label (Kostengate-Vorschau: der tiefe fruehe
+   Rollout ist der Treiber).
+3. **Lesart VORAB:** die Anker-Variante qualifiziert sich fuer einen
+   v22-Arm, wenn sie auf den kritischen fruehen Zustaenden besser mit
+   dem Endresultat korreliert UND die Kosten je Label ein
+   Stufe-1-Bestehen plausibel machen; andernfalls ist der
+   Kredit-Horizont-Verdacht geschwaecht und der klassische 2v3-Arm
+   bleibt allein. Start nach Abschluss des laufenden
+   Welle-3-Engine-Bauslots (Cargo-/Lastkonflikt vermeiden).
