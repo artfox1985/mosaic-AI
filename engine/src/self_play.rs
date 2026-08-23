@@ -33,7 +33,7 @@ use crate::mcts::{dynamic_sims, player_total, root_child_stats, search_drafting_
 use crate::net::Net;
 use crate::net_mcts::{
     net_effective_sims, net_root_child_stats, net_search_drafting_action,
-    net_search_drafting_action_hybrid,
+    net_search_drafting_action_hybrid, SearchConfig,
 };
 use crate::moves::{Action, DrawFromStackMove, Move, PlaceAction, TakeAction, TakeSource};
 use crate::round_end::{
@@ -1090,7 +1090,7 @@ fn warne_unbrauchbaren_ownership_kopf_einmal(len: usize) {
     });
 }
 
-fn resolve_tiling_step(state: &GameState, pi: usize, net: Option<&Net>) -> TilingStep {
+pub(crate) fn resolve_tiling_step(state: &GameState, pi: usize, net: Option<&Net>) -> TilingStep {
     match net {
         Some(n) => {
             // Ownership-Pol Teil 2: EINMAL je Zug, VOR der Kandidatenschleife.
@@ -1347,6 +1347,12 @@ struct NetArenaAgent<'n> {
     base_sims: u32,
     c_puct: f64,
     vorzug: bool,
+    /// PREREG_agent_encapsulation.md par.3/par.4 (Welle 1, Pilot): pro-Seite
+    /// Suchkonfiguration (Welle 1: nur `implicit_minimax_alpha`). Aufloesung
+    /// Spec-Datei -> `SearchConfig` bzw. `None` -> `SearchConfig::from_env()`
+    /// passiert BEIM AUFRUFER (`play_net_game`/`play_net_vs_net_game`), hier
+    /// liegt nur noch der fertige Wert.
+    search_config: crate::net_mcts::SearchConfig,
 }
 
 impl DraftingAgent for NetArenaAgent<'_> {
@@ -1357,17 +1363,45 @@ impl DraftingAgent for NetArenaAgent<'_> {
         search_rng: &mut StdRng,
         _move_number: u64,
     ) -> DraftingDecision {
-        if actions.len() == 1 {
-            return DraftingDecision::plain(actions[0].clone());
-        }
-        let vorzug_kandidat = if self.vorzug { bauer_drafting_vorzug(state) } else { None };
-        let s = net_effective_sims(self.base_sims, actions.len());
-        let chosen = vorzug_kandidat
-            .clone()
-            .or_else(|| net_search_drafting_action(self.net, state, s, self.c_puct, false, search_rng))
-            .unwrap_or_else(|| actions[0].clone());
+        let vorzug_kandidat = if actions.len() == 1 {
+            None
+        } else if self.vorzug {
+            bauer_drafting_vorzug(state)
+        } else {
+            None
+        };
+        let chosen = net_arena_choose_action(
+            self.net, state, actions, search_rng, self.base_sims, self.c_puct, self.vorzug, &self.search_config,
+        );
         DraftingDecision { vorzug: vorzug_kandidat, ..DraftingDecision::plain(chosen) }
     }
+}
+
+/// PREREG_agent_encapsulation.md par.8 (Welle 3): DIE Auswahl-Logik hinter
+/// `NetArenaAgent::decide`, als eigenstaendige Funktion -- damit sie sowohl
+/// von der Live-Schleife (`unified_game_loop`) als auch von
+/// `RefereeGame::drafting_decide_and_apply_inprocess` (`referee.rs`) mit
+/// GARANTIERT identischem Verhalten aufgerufen wird (keine zweite Kopie der
+/// Bauer-Vorzug/Ein-Aktion-Kurzschluss/Sims-Skalierungs-Logik). Reiner
+/// Auszug, KEIN Verhaltensunterschied zum bisherigen `decide`-Koerper.
+pub(crate) fn net_arena_choose_action(
+    net: &Net,
+    state: &GameState,
+    actions: &[Action],
+    search_rng: &mut StdRng,
+    base_sims: u32,
+    c_puct: f64,
+    vorzug: bool,
+    search_config: &SearchConfig,
+) -> Action {
+    if actions.len() == 1 {
+        return actions[0].clone();
+    }
+    let vorzug_kandidat = if vorzug { bauer_drafting_vorzug(state) } else { None };
+    let s = net_effective_sims(base_sims, actions.len());
+    vorzug_kandidat
+        .or_else(|| net_search_drafting_action(net, state, s, c_puct, false, search_rng, search_config))
+        .unwrap_or_else(|| actions[0].clone())
 }
 
 /// Netz-Suche des Produktions-Self-Plays: Policy-Targets (Gumbel completed-Q),
@@ -1391,6 +1425,11 @@ struct NetSelfPlayAgent<'n> {
     pcr_full_prob: Option<f64>,
     pcr_cheap_sims: u32,
     vorzug: bool,
+    /// PREREG_agent_encapsulation.md par.3/par.4 (Welle 1, Pilot): siehe
+    /// `NetArenaAgent`s gleichnamiges Feld -- Self-Play (item 3 der Prereg-
+    /// Spezifikation) nutzt EIN Spec fuer beide Seiten (beide Seiten SIND
+    /// dasselbe Netz).
+    search_config: crate::net_mcts::SearchConfig,
 }
 
 impl DraftingAgent for NetSelfPlayAgent<'_> {
@@ -1425,7 +1464,7 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
                 crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
                     net_drafting_policy(
                         self.net, state, actions, effective_sims, self.c_puct, search_rng,
-                        self.add_root_noise, self.deterministic, move_number,
+                        self.add_root_noise, self.deterministic, move_number, &self.search_config,
                     )
                 })
             })
@@ -2297,6 +2336,10 @@ fn play_net_game<R: Rng + ?Sized>(
     // Log-Vec, kein Zusatzaufwand).
     game_seed: u64,
     log_games: bool,
+    // PREREG_agent_encapsulation.md par.3/par.4 (Welle 1, Pilot): pro-Seite
+    // Suchkonfiguration NUR der Netz-Seite -- die Heuristik-Gegenseite bleibt
+    // spec-frei (par.6a Entscheid 3, Heuristik-Anker eingefroren).
+    search_config: crate::net_mcts::SearchConfig,
 ) -> Value {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // Netz-Seite = `NetArenaAgent` MIT Vorzug (EINSEITIG -- die Heuristik-
@@ -2308,7 +2351,7 @@ fn play_net_game<R: Rng + ?Sized>(
     // Elo-Verankerungs-/Gating-Pfad einen ANDEREN Spieler als den, der
     // tatsaechlich gated/trainiert wird; die Heuristik-Seite bleibt bewusst
     // ohne Netz). Spaltenbau-Trace nur Netz-Seite (Nutzer 2026-08-13).
-    let net_agent = NetArenaAgent { net, base_sims: net_sims, c_puct, vorzug: true };
+    let net_agent = NetArenaAgent { net, base_sims: net_sims, c_puct, vorzug: true, search_config };
     let heur_agent = HeuristicArenaAgent { base_sims: heur_sims, c };
     let net_player = PlayerLoopConfig {
         agent: &net_agent,
@@ -2374,6 +2417,11 @@ pub fn run_net_arena_match(
     c_puct: f64,
     log_games: bool,
     seeds: Option<Vec<u64>>,
+    // PREREG_agent_encapsulation.md par.3/par.4 (Welle 1, Pilot): pro-Seite
+    // Suchkonfiguration der Netz-Seite -- Aufloesung Spec-Datei/`None` ->
+    // `SearchConfig` passiert in `lib.rs` (Python-Grenze), hier liegt nur
+    // noch der fertige Wert.
+    search_config: crate::net_mcts::SearchConfig,
 ) -> Result<String, String> {
     let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
@@ -2401,6 +2449,7 @@ pub fn run_net_arena_match(
         let names = ["Netz".to_string(), "Heuristik".to_string()];
         let result = play_net_game(
             &net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng, game_seed, log_games,
+            search_config,
         );
         crate::plate_builder::set_partie_seed(None);
         result
@@ -2436,6 +2485,12 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     // Siehe Kommentar an `play_net_game`s gleichnamigen Parametern.
     game_seed: u64,
     log_games: bool,
+    // PREREG_agent_encapsulation.md par.3/par.4 (Welle 1, Pilot): EIGENE
+    // Suchkonfiguration je Seite -- genau der Messnutzen, den der bisherige
+    // prozessweite OnceLock nicht liefern konnte (Anlass 2, par.1): Champion
+    // (eingefroren) gegen Champion+alpha im SELBEN Prozess.
+    search_config_a: crate::net_mcts::SearchConfig,
+    search_config_b: crate::net_mcts::SearchConfig,
 ) -> Value {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // BEIDE Seiten `NetArenaAgent` MIT Vorzug (BEIDSEITIG -- Prereg §3.4,
@@ -2443,8 +2498,10 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
     // Brett (Task #20: Board 0 = `net_a`, Board 1 = `net_b`, dieselbe
     // Zuordnung wie beim Drafting), sequenzielle Stapel-Zieh-Aufloesung
     // (`apply_chosen_action`) beidseitig, kein Spaltenbau-Trace (Bestand).
-    let agent_a = NetArenaAgent { net: net_a, base_sims: sims_a, c_puct: c_puct_a, vorzug: true };
-    let agent_b = NetArenaAgent { net: net_b, base_sims: sims_b, c_puct: c_puct_b, vorzug: true };
+    let agent_a =
+        NetArenaAgent { net: net_a, base_sims: sims_a, c_puct: c_puct_a, vorzug: true, search_config: search_config_a };
+    let agent_b =
+        NetArenaAgent { net: net_b, base_sims: sims_b, c_puct: c_puct_b, vorzug: true, search_config: search_config_b };
     let cfg = GameLoopConfig {
         timeout_secs: net_game_timeout_secs(sims_a.max(sims_b)),
         seed_from_steps: true,
@@ -2495,6 +2552,11 @@ pub fn run_net_vs_net_arena(
     c_puct_b: f64,
     log_games: bool,
     seeds: Option<Vec<u64>>,
+    // PREREG_agent_encapsulation.md par.3/par.4 (Welle 1, Pilot): siehe
+    // `play_net_vs_net_game`s gleichnamige Parameter. Aufloesung Spec-Datei/
+    // `None` -> `SearchConfig` passiert in `lib.rs` (Python-Grenze).
+    search_config_a: crate::net_mcts::SearchConfig,
+    search_config_b: crate::net_mcts::SearchConfig,
 ) -> Result<String, String> {
     let net_a = std::sync::Arc::new(Net::load_auto(model_a).map_err(|e| e.to_string())?);
     let net_b = std::sync::Arc::new(Net::load_auto(model_b).map_err(|e| e.to_string())?);
@@ -2513,7 +2575,7 @@ pub fn run_net_vs_net_arena(
         let names = ["NetzA".to_string(), "NetzB".to_string()];
         let result = play_net_vs_net_game(
             &net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, ids, names, first, &mut rng, game_seed,
-            log_games,
+            log_games, search_config_a, search_config_b,
         );
         crate::plate_builder::set_partie_seed(None);
         result
@@ -2603,8 +2665,13 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                         actions[0].clone()
                     } else if pi == hybrid_board {
                         let s = net_effective_sims(sims_hybrid, actions.len());
+                        // Diagnose-Werkzeug (Task #88, kein Arena-/Self-Play-Pfad,
+                        // siehe Modulkommentar) -- AUSSERHALB des Wave-1-Scopes von
+                        // PREREG_agent_encapsulation.md, liest daher wie bisher aus
+                        // der Umgebung (jetzt ueber `SearchConfig::from_env()`).
                         net_search_drafting_action_hybrid(
                             hybrid_policy, hybrid_value, &game.state, s, c_puct_hybrid, false, rng,
+                            &crate::net_mcts::SearchConfig::from_env(),
                         )
                         .unwrap_or_else(|| actions[0].clone())
                     } else {
@@ -2612,7 +2679,12 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                         crate::provocation::vorzugszug(&game.state)
                             .or_else(|| crate::plate_builder::drafting_vorzug(&game.state))
                             .or_else(|| crate::plate_builder::dome_vorzug(&game.state))
-                            .or_else(|| net_search_drafting_action(plain_net, &game.state, s, c_puct_plain, false, rng))
+                            .or_else(|| {
+                                net_search_drafting_action(
+                                    plain_net, &game.state, s, c_puct_plain, false, rng,
+                                    &crate::net_mcts::SearchConfig::from_env(),
+                                )
+                            })
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     apply_chosen_action(&mut game, chosen)
@@ -2768,10 +2840,12 @@ fn net_drafting_policy<R: Rng + ?Sized>(
     add_root_noise: bool,
     deterministic: bool,
     move_number: u64,
+    search_config: &crate::net_mcts::SearchConfig,
 ) -> (Action, Vec<Value>, Option<f64>, Vec<f64>) {
     let sims = net_effective_sims(base_sims, actions.len());
-    let (stats, completed_q_policy, root_q, root_child_q) =
-        crate::net_mcts::net_root_child_stats_and_policy(net, state, sims, c_puct, add_root_noise, rng);
+    let (stats, completed_q_policy, root_q, root_child_q) = crate::net_mcts::net_root_child_stats_and_policy(
+        net, state, sims, c_puct, add_root_noise, rng, search_config,
+    );
     let total: f64 = stats.iter().map(|(_, v, _)| *v as f64).sum();
     if stats.is_empty() || !(total > 0.0) {
         // BUGFIX (2026-08-02): dieser Fallback (leere/nutzlose `stats` -- der
@@ -3073,6 +3147,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // Startpositions-Seeding (PREREG_start_position_seeding.md par.3):
     // `None` = Bestandsverhalten (Partie ab `Game::start`).
     start_state: Option<GameState>,
+    // PREREG_agent_encapsulation.md par.3/par.4 Punkt 4: EIN Spec fuer beide
+    // Seiten (beide Seiten SIND dasselbe Netz).
+    search_config: crate::net_mcts::SearchConfig,
 ) -> Vec<Value> {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // EIN NetSelfPlayAgent fuer beide Seiten (beide Seiten SIND das Netz),
@@ -3105,6 +3182,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         pcr_full_prob,
         pcr_cheap_sims,
         vorzug: vorzug_p0,
+        search_config,
     };
     let agent1 = NetSelfPlayAgent {
         net,
@@ -3115,6 +3193,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         pcr_full_prob,
         pcr_cheap_sims,
         vorzug: vorzug_p1,
+        search_config,
     };
     let player0 = PlayerLoopConfig {
         agent: &agent0,
@@ -3253,6 +3332,10 @@ pub fn run_net_self_play(
     // Chunk dieselben ersten Stellungen.
     seed_positions: Option<Vec<String>>,
     seed_positions_offset: usize,
+    // PREREG_agent_encapsulation.md par.3/par.4 Punkt 4: EIN Spec fuer beide
+    // Seiten (beide Seiten SIND dasselbe Netz) -- Aufloesung Spec-Datei/
+    // `None` -> `SearchConfig` passiert in `lib.rs` (Python-Grenze).
+    search_config: crate::net_mcts::SearchConfig,
 ) -> Result<String, String> {
     let seed_positions: Option<Vec<(String, Value)>> = match seed_positions {
         None => None,
@@ -3403,7 +3486,7 @@ pub fn run_net_self_play(
                     play_net_self_play_game(
                         &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise,
                         deterministic, record_rtv, Some(&move_counter_thread), pcr_full_prob, pcr_cheap_sims,
-                        partie_seed, start_state,
+                        partie_seed, start_state, search_config,
                     )
                 },
             )
@@ -3720,6 +3803,7 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                             // (siehe `net_drafting_policy`s `move_number`-Doku).
                             let (a, _, _, _) = net_drafting_policy(
                                 net, &g.state, &actions, base_sims, c_puct, rng, false, true, 0,
+                                &SearchConfig::from_env(),
                             );
                             a
                         };
@@ -3812,7 +3896,10 @@ fn stage3_choose_action<R: Rng + ?Sized>(
     // Kandidaten-Vorauswahl: guenstige Suche (wie Stufe 1), Top-K nach Besuchen
     // -- nicht ALLE Legalzuege ausrollen, das waere zu teuer.
     let sims = net_effective_sims(shortlist_sims, actions.len());
-    let mut stats = net_root_child_stats(net, state, sims, c_puct, false, rng);
+    // Diagnose-Werkzeug (Stufe-3-Rollout-Shortlisting, siehe Funktionskommentar)
+    // -- AUSSERHALB des Wave-1-Scopes von PREREG_agent_encapsulation.md, liest
+    // daher wie bisher aus der Umgebung (jetzt ueber `SearchConfig::from_env()`).
+    let mut stats = net_root_child_stats(net, state, sims, c_puct, false, rng, &SearchConfig::from_env());
     stats.sort_by(|a, b| b.1.cmp(&a.1)); // absteigend nach Besuchen
     if stats.is_empty() {
         return actions[0].clone();
@@ -3904,7 +3991,11 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                         crate::provocation::vorzugszug(&game.state)
                             .or_else(|| crate::plate_builder::drafting_vorzug(&game.state))
                             .or_else(|| crate::plate_builder::dome_vorzug(&game.state))
-                            .or_else(|| net_search_drafting_action(net, &game.state, s, c_puct, false, rng))
+                            .or_else(|| {
+                                net_search_drafting_action(
+                                    net, &game.state, s, c_puct, false, rng, &SearchConfig::from_env(),
+                                )
+                            })
                             .unwrap_or_else(|| actions[0].clone())
                     };
                     apply_chosen_action(&mut game, chosen)
@@ -4161,7 +4252,9 @@ pub fn sibling_ranking_diagnostic(
                             break;
                         }
                         let s = net_effective_sims(walk_sims, actions.len());
-                        match net_search_drafting_action(&net, &game.state, s, 1.5, false, &mut rng_game) {
+                        match net_search_drafting_action(
+                            &net, &game.state, s, 1.5, false, &mut rng_game, &SearchConfig::from_env(),
+                        ) {
                             Some(act) => {
                                 apply_chosen_action(&mut game, act)?;
                             }
@@ -4275,8 +4368,9 @@ pub fn draw_stack_peek_impact_diagnostic(
                             *peek_offered.entry(round).or_insert(0) += 1;
                         }
                         let s = net_effective_sims(walk_sims, actions.len());
-                        let chosen = match net_search_drafting_action(&net, &game.state, s, 1.5, false, &mut rng_game)
-                        {
+                        let chosen = match net_search_drafting_action(
+                            &net, &game.state, s, 1.5, false, &mut rng_game, &SearchConfig::from_env(),
+                        ) {
                             Some(act) => act,
                             None => break,
                         };
@@ -5212,9 +5306,15 @@ pub(crate) mod tests {
 
         let seed = 13_579u64;
         let n_games = 3usize;
-        let raw_a = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false, None)
+        let raw_a = run_net_vs_net_arena(
+            model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT,
+            crate::net_mcts::DEFAULT_C_PUCT, false, None, SearchConfig::from_env(), SearchConfig::from_env(),
+        )
             .expect("Arena-Lauf A sollte gelingen (Checkpoint existiert laut Vorab-Check)");
-        let raw_b = run_net_vs_net_arena(model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false, None)
+        let raw_b = run_net_vs_net_arena(
+            model_path, model_path, 8, 8, n_games, seed, 1, crate::net_mcts::DEFAULT_C_PUCT,
+            crate::net_mcts::DEFAULT_C_PUCT, false, None, SearchConfig::from_env(), SearchConfig::from_env(),
+        )
             .expect("Arena-Lauf B sollte gelingen");
         assert_eq!(
             raw_a, raw_b,
@@ -5226,7 +5326,10 @@ pub(crate) mod tests {
         // (indirekter Beleg -- ein einzelnes Spiel bei n_games=1 mit Seed S
         // muss IDENTISCH zum ersten Spiel eines n_games=3-Laufs mit Basis-Seed
         // S sein, weil beide `i=0` denselben abgeleiteten Seed ergeben).
-        let raw_single = run_net_vs_net_arena(model_path, model_path, 8, 8, 1, seed, 1, crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false, None)
+        let raw_single = run_net_vs_net_arena(
+            model_path, model_path, 8, 8, 1, seed, 1, crate::net_mcts::DEFAULT_C_PUCT,
+            crate::net_mcts::DEFAULT_C_PUCT, false, None, SearchConfig::from_env(), SearchConfig::from_env(),
+        )
             .expect("Einzelspiel-Lauf sollte gelingen");
         let games_a: Vec<Value> = serde_json::from_str(&raw_a).unwrap();
         let games_single: Vec<Value> = serde_json::from_str(&raw_single).unwrap();
@@ -5274,7 +5377,7 @@ pub(crate) mod tests {
         // n_games=99 ist absichtlich falsch und muss ignoriert werden.
         let raw = run_net_arena_match(
             model_path, 8, 8, 99, 0, 1, crate::mcts::DEFAULT_C,
-            crate::net_mcts::DEFAULT_C_PUCT, false, Some(seeds.clone()),
+            crate::net_mcts::DEFAULT_C_PUCT, false, Some(seeds.clone()), SearchConfig::from_env(),
         )
         .expect("Arena-Lauf mit expliziter Seed-Liste sollte gelingen");
         let games: Vec<Value> = serde_json::from_str(&raw).unwrap();
@@ -5305,7 +5408,7 @@ pub(crate) mod tests {
         let raw_vs = run_net_vs_net_arena(
             model_path, model_path, 8, 8, 99, 0, 1,
             crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false,
-            Some(seeds.clone()),
+            Some(seeds.clone()), SearchConfig::from_env(), SearchConfig::from_env(),
         )
         .expect("Netz-vs-Netz-Lauf mit expliziter Seed-Liste sollte gelingen");
         let games_vs: Vec<Value> = serde_json::from_str(&raw_vs).unwrap();
@@ -5509,7 +5612,7 @@ pub(crate) mod tests {
             let names = ["Netz".to_string(), "Netz".to_string()];
             play_net_self_play_game(
                 net, 60, crate::net_mcts::DEFAULT_C_PUCT, ids, names, 0, "gate_b_repro", &mut rng,
-                true, false, true, None, None, 0, seed, None,
+                true, false, true, None, None, 0, seed, None, crate::net_mcts::SearchConfig::from_env(),
             )
         }
 
@@ -5601,6 +5704,7 @@ pub(crate) mod tests {
         let plain = run_net_vs_net_arena(
             model_path, model_path, 8, 8, n_games, seed, 1,
             crate::net_mcts::DEFAULT_C_PUCT, crate::net_mcts::DEFAULT_C_PUCT, false, None,
+            SearchConfig::from_env(), SearchConfig::from_env(),
         )
         .expect("Plain-Arena-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
         let hybrid = run_net_vs_net_arena_hybrid(
@@ -5738,7 +5842,7 @@ pub(crate) mod tests {
         // (1) PCR AUS -- Default (pcr_full_prob=None): kein neues Feld.
         let off_a = run_net_self_play(
             model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "pcrtest", true, false,
-            false, None, None, None, 150, None, 0,
+            false, None, None, None, 150, None, 0, SearchConfig::from_env(),
         )
         .expect("PCR-AUS-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
         let off_games: Vec<Value> = serde_json::from_str(&off_a).unwrap();
@@ -5765,7 +5869,7 @@ pub(crate) mod tests {
         // Kurzschluss-Records fehl (live beobachtet, 2026-08-02).
         let full = run_net_self_play(
             model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "pcrtest", true, false,
-            false, None, None, Some(1.0), 20, None, 0,
+            false, None, None, Some(1.0), 20, None, 0, SearchConfig::from_env(),
         )
         .expect("PCR p=1.0-Lauf sollte gelingen");
         let full_games: Vec<Value> = serde_json::from_str(&full).unwrap();
@@ -5800,7 +5904,7 @@ pub(crate) mod tests {
         // Entscheid.
         let cheap = run_net_self_play(
             model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "pcrtest", true, false,
-            false, None, None, Some(0.0), 20, None, 0,
+            false, None, None, Some(0.0), 20, None, 0, SearchConfig::from_env(),
         )
         .expect("PCR p=0.0-Lauf sollte gelingen");
         let cheap_games: Vec<Value> = serde_json::from_str(&cheap).unwrap();
@@ -5892,7 +5996,7 @@ pub(crate) mod tests {
         let base_sims = 40u32;
         let out = run_net_self_play(
             model_path, n_games, base_sims, crate::net_mcts::DEFAULT_C_PUCT, seed, 1, "rootchildqtest", true,
-            false, false, None, None, None, 150, None, 0,
+            false, false, None, None, None, 150, None, 0, SearchConfig::from_env(),
         )
         .expect("Self-Play-Lauf sollte gelingen (Checkpoint existiert laut Vorab-Check)");
         let games: Vec<Value> = serde_json::from_str(&out).unwrap();

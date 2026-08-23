@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 77 Knoepfe (46 aktiv, 23 diagnose, 7 tot, 1 geplant).
+Stand: 78 Knoepfe (47 aktiv, 23 diagnose, 7 tot, 1 geplant).
 
 | Knopf | Default | Status | Zweck | Beleg |
 |---|---|---|---|---|
@@ -36,6 +36,7 @@ Stand: 77 Knoepfe (46 aktiv, 23 diagnose, 7 tot, 1 geplant).
 | `MOSAIC_DENIAL_MIN_VISIT_FRAC` | 0.5 | aktiv | Mindest-Besuchsanteil f des E3b-Besuchs-Gates (net_mcts.rs:2579) | PREREG_denial_tiebreak.md |
 | `MOSAIC_COLOR_DENIAL_PROBE_Z` | 0.0 (aus) | diagnose | z-Schwelle des Stoerfenster-ZAEHLMODUS -- zaehlt nur, aendert die gespielte Aktion nicht (net_mcts.rs, color_denial_probe_with) | PREREG_opponent_disruption_v2.md par.5.2 |
 | `MOSAIC_COLOR_DENIAL_PROBE_MIN_VISIT_FRAC` | 0.5 | diagnose | Mindest-Besuchsanteil des Stoerfenster-Zaehlmodus (net_mcts.rs, color_denial_probe_min_visit_frac) | PREREG_opponent_disruption_v2.md par.5.2 |
+| `MOSAIC_IMPLICIT_MINIMAX_A` | 0.0 (aus) | aktiv | Mischgewicht alpha der Implicit-Minimax-Backups (Baier/Winands): Selektions-Q der Tiefe-≥1-Gumbel-Auswahl wird (1-alpha)*Q_MC + alpha*v_IM, v_IM per Minimax ueber besuchte Kinder rueckpropagiert. Welle-1-Pilot der Agenten-Kapselung (PREREG_agent_encapsulation.md): liest ueber SearchConfig::from_env() (net_mcts.rs) statt eines prozessglobalen OnceLock -- der Knopf bleibt die Default-Quelle, pro-Seite ueberschreibbar per Spec-Datei (models/<name>.spec.json) an net_arena_match/net_vs_net_arena_match/net_self_play_games | PREREG_implicit_minimax_backup.md par.1; PREREG_agent_encapsulation.md par.4 |
 | `MOSAIC_R5_CHANCE_NODES` | an (=0 Altverhalten) | aktiv | Zufallsknoten fuer verdeckte Bonuschips im R5-Loeser, scharf seit 2026-08-10 (round5.rs:159) | PREREG_chance_nodes.md |
 | `MOSAIC_R5_NET_SOLVER` | an (=0 Gegenprobe Netz) | aktiv | Netzpfad nutzt in Runde 5 den exakten Loeser statt des Netz-Blattwerts (round5.rs:183) | PREREG_chance_nodes.md Teil E |
 | `MOSAIC_R5_NODE_BUDGET` | 200 | aktiv | Knotenbudget je R5-Entscheidung (round5.rs:199, NODE_BUDGET round5.rs:88) | PREREG_chance_nodes.md |

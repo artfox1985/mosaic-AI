@@ -29,6 +29,7 @@ pub mod plate_builder;
 pub mod profiling;
 pub mod provocation;
 pub mod py;
+pub mod referee;
 pub mod round5;
 pub mod round5_anchor;
 pub mod round_end;
@@ -218,6 +219,21 @@ fn value_noise_floor_diagnostic(
     .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
+/// PREREG_agent_encapsulation.md par.3/par.4/par.6a (Welle 1, Pilot):
+/// loest den optionalen `spec`-Pfad (JSON-Datei, Schema
+/// `{"implicit_minimax_alpha": <Zahl>}`, `models/<name>.spec.json`) zu einer
+/// `SearchConfig` auf. `None` -> `SearchConfig::from_env()`
+/// (Bestandsverhalten, byte-identisch). Unbekannte Felder/fehlende Datei/
+/// fehlendes Feld sind ein harter Fehler (siehe `SearchConfig::from_spec_file`).
+pub(crate) fn resolve_search_config(spec: Option<String>) -> PyResult<crate::net_mcts::SearchConfig> {
+    match spec {
+        None => Ok(crate::net_mcts::SearchConfig::from_env()),
+        Some(path) => {
+            crate::net_mcts::SearchConfig::from_spec_file(&path).map_err(pyo3::exceptions::PyValueError::new_err)
+        }
+    }
+}
+
 /// Arena-Match Netz vs. Heuristik-MCTS (Netz auf Brett 0). Lädt das ONNX-Netz
 /// einmal, spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[netz,heur], winner, steps, total_floor, floor_per_round}]` zurück.
@@ -232,8 +248,13 @@ fn value_noise_floor_diagnostic(
 /// `self_play::run_net_arena_match`-Dokumentation -- gesetzt, spielt Partie
 /// `i` exakt `seeds[i]` (statt der abgeleiteten Formel) und `n_games` folgt
 /// der Listenlänge. `None` (Default) = Bestandsverhalten, byte-identisch.
+/// `spec` (PREREG_agent_encapsulation.md par.3/par.4, Welle 1): optionaler
+/// Pfad zu einer Such-Spec-Datei (`models/<name>.spec.json`) NUR fuer die
+/// Netz-Seite -- die Heuristik-Seite bleibt spec-frei (par.6a Entscheid 3,
+/// Anker eingefroren). `None` (Default) = `SearchConfig::from_env()`,
+/// byte-identisches Bestandsverhalten.
 #[pyfunction]
-#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, log_games=false, seeds=None))]
+#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, log_games=false, seeds=None, spec=None))]
 #[allow(clippy::too_many_arguments)]
 fn net_arena_match(
     py: Python<'_>,
@@ -247,11 +268,14 @@ fn net_arena_match(
     c_puct: f64,
     log_games: bool,
     seeds: Option<Vec<u64>>,
+    spec: Option<String>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
+    let search_config = resolve_search_config(spec)?;
     py.detach(move || {
         crate::self_play::run_net_arena_match(
             &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, log_games, seeds,
+            search_config,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -265,8 +289,15 @@ fn net_arena_match(
 /// `seeds`: siehe `net_arena_match`-Dokumentation, identisches Muster (nutzt
 /// denselben Seed-Ableitungspfad wie dort, siehe
 /// `self_play::run_net_vs_net_arena`-Dokumentation).
+/// `spec_a`/`spec_b` (PREREG_agent_encapsulation.md par.3/par.4, Welle 1,
+/// PILOT): optionale Pfade zu Such-Spec-Dateien (`models/<name>.spec.json`),
+/// UNABHAENGIG je Seite -- genau der Messnutzen, den der bisherige
+/// prozessweite `MOSAIC_IMPLICIT_MINIMAX_A`-OnceLock nicht liefern konnte
+/// (par.1 Anlass 2): Champion (eingefroren) gegen Champion+alpha im SELBEN
+/// Prozess, NETZ-GEGEN-NETZ. `None` je Seite = `SearchConfig::from_env()`,
+/// byte-identisches Bestandsverhalten.
 #[pyfunction]
-#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5, log_games=false, seeds=None))]
+#[pyo3(signature = (model_a, model_b, sims_a=200, sims_b=200, n_games=50, seed=None, num_threads=1, c_puct_a=1.5, c_puct_b=1.5, log_games=false, seeds=None, spec_a=None, spec_b=None))]
 #[allow(clippy::too_many_arguments)]
 fn net_vs_net_arena_match(
     py: Python<'_>,
@@ -281,11 +312,16 @@ fn net_vs_net_arena_match(
     c_puct_b: f64,
     log_games: bool,
     seeds: Option<Vec<u64>>,
+    spec_a: Option<String>,
+    spec_b: Option<String>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
+    let search_config_a = resolve_search_config(spec_a)?;
+    let search_config_b = resolve_search_config(spec_b)?;
     py.detach(move || {
         crate::self_play::run_net_vs_net_arena(
             &model_a, &model_b, sims_a, sims_b, n_games, seed, num_threads, c_puct_a, c_puct_b, log_games, seeds,
+            search_config_a, search_config_b,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -347,8 +383,12 @@ fn net_vs_net_arena_match_hybrid(
 /// (kein neuer RNG-Verbrauch, kein neues JSON-Feld). `pcr_cheap_sims=150`
 /// (KataGo-Groessenordnung fuer eine guenstige Suche) wirkt NUR, wenn
 /// `pcr_full_prob` gesetzt ist.
+/// `spec` (PREREG_agent_encapsulation.md par.3/par.4, Punkt 4, Welle 1):
+/// optionaler Pfad zu einer Such-Spec-Datei, EIN Spec fuer beide Seiten
+/// (beide Seiten SIND dasselbe Netz). `None` (Default) =
+/// `SearchConfig::from_env()`, byte-identisches Bestandsverhalten.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false, record_rtv=false, progress_path=None, heartbeat_path=None, pcr_full_prob=None, pcr_cheap_sims=150, seed_positions_path=None, seed_positions_offset=0))]
+#[pyo3(signature = (model_path, n_games, base_sims=400, c_puct=1.5, seed=None, num_threads=0, prefix="netgen".to_string(), add_root_noise=true, deterministic=false, record_rtv=false, progress_path=None, heartbeat_path=None, pcr_full_prob=None, pcr_cheap_sims=150, seed_positions_path=None, seed_positions_offset=0, spec=None))]
 #[allow(clippy::too_many_arguments)]
 fn net_self_play_games(
     py: Python<'_>,
@@ -368,8 +408,10 @@ fn net_self_play_games(
     pcr_cheap_sims: u32,
     seed_positions_path: Option<String>,
     seed_positions_offset: usize,
+    spec: Option<String>,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
+    let search_config = resolve_search_config(spec)?;
     // Startpositions-Seeding (PREREG_start_position_seeding.md par.3):
     // JSONL-Datei hier lesen, Zeilen an run_net_self_play reichen (das
     // Parsen + die Fail-fast-Validierung passieren dort). None = Bestand.
@@ -387,7 +429,7 @@ fn net_self_play_games(
         crate::self_play::run_net_self_play(
             &model_path, n_games, base_sims, c_puct, seed, num_threads, &prefix, add_root_noise, deterministic,
             record_rtv, progress_path.as_deref(), heartbeat_path.as_deref(), pcr_full_prob, pcr_cheap_sims,
-            seed_positions, seed_positions_offset,
+            seed_positions, seed_positions_offset, search_config,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -898,6 +940,69 @@ fn net_search_state_json_trace(
     Ok(analysis.to_string())
 }
 
+/// PREREG_agent_encapsulation.md par.8 (Welle 3): DIE Entscheidungsfunktion
+/// des gefrorenen Worker-Prozesses -- "Stellung rein, Zug raus". Nimmt einen
+/// extern gespeicherten Zustand (Schema wie `net_search_state_json`, siehe
+/// dortige Doku) UND EINEN EXPLIZITEN Seed (kein `None`-Zufall: der Referee
+/// gibt `RefereeGame::pending_search_seed()` vor, damit Such-RNG-Ableitung
+/// mit dem In-Process-Pfad denselben `derive_search_seed(game_seed, steps)`-
+/// Ursprung teilt), ruft `self_play::net_arena_choose_action` -- GENAU die
+/// Funktion, die auch `NetArenaAgent::decide` (die echte Arena-/Referee-
+/// In-Process-Seite) verwendet, keine zweite Auswahl-Logik -- und gibt die
+/// gewaehlte Aktion im `serialize::action_to_dict`-Schema zurueck (== dem
+/// Schema, gegen das `RefereeGame::drafting_apply_external` matcht).
+///
+/// NUR fuer Drafting-Entscheidungen (harter Fehler sonst) -- Start-
+/// platzierung und Tiling loest der Referee-Prozess selbst auf
+/// (`RefereeGame::advance_to_decision`), nicht der Worker (par.8:
+/// "Regel-Autoritaet" bleibt bei der aktuellen Engine).
+///
+/// KERNBEWEIS-FIX (PREREG_agent_encapsulation.md par.8a, behoben 2026-08-23):
+/// `referee::choose_drafting_action_json` rekonstruiert den Zustand ueber
+/// `serialize::json_to_state` mit einem EIGENEN, domain-getrennten
+/// Rekonstruktions-RNG (`seed ^ RECON_DISTINGUISHER`) -- der Such-RNG (`rng`
+/// in `net_arena_choose_action`) startet danach FRISCH aus `seed`, also
+/// byte-identisch zum In-Process-Pfad (`RefereeGame::
+/// drafting_decide_and_apply_inprocess`, der ganz ohne Rekonstruktion
+/// auskommt). Vorher teilten sich Rekonstruktion und Suche einen RNG-Strom,
+/// die Suche startete vorbelastet (Kernbeweis vor dem Fix ROT, siehe dortiger
+/// Befund in `PREREG_agent_encapsulation.md` par.8a).
+///
+/// `value`: roher Netz-Wert (Value-Kopf, EIN Forward-Pass auf dem
+/// VOR-Zug-Zustand) -- KEIN durchsuchtes Root-Q, rein informativ.
+#[pyfunction]
+#[pyo3(signature = (state_json, model_path, sims, c_puct, seed, spec=None))]
+fn net_arena_choice_state_json(
+    state_json: String,
+    model_path: String,
+    sims: u32,
+    c_puct: f64,
+    seed: u64,
+    spec: Option<String>,
+) -> PyResult<String> {
+    // EINMALIGES Laden (kein Cache) -- fuer Stapelaufrufe (z.B. beim Bau von
+    // `golden_probe.json`) ausreichend. Der WORKER-Prozess (viele Zuege
+    // hintereinander) nutzt stattdessen `referee::FrozenWorkerEngine`
+    // (Modell+Spec EINMAL geladen, siehe dortiger Performance-Kommentar) --
+    // dieselbe Auswahl-Logik (`referee::choose_drafting_action_json`), keine
+    // zweite Kopie.
+    let net = crate::net::Net::load_auto(&model_path)
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
+    let search_config = resolve_search_config(spec)?;
+    let action = crate::referee::choose_drafting_action_json(&net, &search_config, &state_json, sims, c_puct, seed)?;
+    // `value` bewusst NICHT ueber einen zusaetzlichen `net.eval`-Aufruf: der
+    // globale `features::state_to_features`-Helfer liefert IMMER das flache
+    // 708er-Legacy-Layout (siehe `PyGame::features`-Dokumentation), waehrend
+    // 2D-Modelle (u.a. v21_2d_brierbest) ein Modell-eigenes Layout erwarten
+    // -- ein Fehlversuch hat das GEMESSEN (Panic "range end index 2736 out
+    // of range for slice of length 708" beim Aufbau von golden_probe.json,
+    // 2026-08-23). `value` bleibt deshalb bis auf Weiteres `null`
+    // (rein informatives Feld, siehe Doku oben -- der Referee validiert nur
+    // `action`).
+    let value: Option<f32> = None;
+    Ok(json!({ "action": action, "value": value }).to_string())
+}
+
 /// Wertungsplatten-Endwertung für einen extern gespeicherten Zustand (z.B.
 /// ein Self-Play-Record `state`-Feld, `json.dumps(record["state"])`) --
 /// reine additive Lesefunktion für die Wertungsplatten-Diagnose (2026-07-26,
@@ -1378,7 +1483,10 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(wertung_shaping_e_json, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_reset, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_json, m)?)?;
+    m.add_function(wrap_pyfunction!(net_arena_choice_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
+    m.add_class::<crate::referee::RefereeGame>()?;
+    m.add_class::<crate::referee::FrozenWorkerEngine>()?;
     Ok(())
 }
 
