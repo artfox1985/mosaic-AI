@@ -13,7 +13,10 @@ ist die Trennung der letzten Gabelung.
    `tools/probes/column_completion_legality_probe.py`): in **0 von 160**
    stehengelassenen Hoehe-5-Faellen existierte im Restfenster eine legale
    Platzierung, die die Spalte vollendet haette. Der Champion verpasst
-   nichts am Ende.
+   nichts am Ende. **Wichtig fuer par.1a: 128 dieser 160 Faelle stammen aus
+   NETZ-GEGEN-NETZ-Partien** (nur 18 bzw. 14 aus dem Heuristik-Lauf), und
+   die Quote ist in jeder Gruppe 0 -- der Befund steht also bereits unter
+   der strengen Gegnerbedingung.
 2. **Die Reihenpraeferenz ist flach.** Der Champion zieht 55,5-56,1 % seiner
    Draft-Ziele auf die kurzen Musterreihen 1-3 und meidet 5/6 (12-13 %),
    **ohne jede Spaetrunden-Anpassung**. Der Heuristik-Lehrer macht das
@@ -131,9 +134,42 @@ Vorab festgelegte Lesart:
   die Gegnerspezifitaet des k1-Effekts anderswo begruendet, und die
   Schlupf-Hypothese bleibt.
 
-Diese Frage ist ab sofort die **primaere** dieses Zuschnitts. Die
-urspruengliche Locus-Frage laeuft als sekundaere mit -- sie kostet auf
-denselben Artefakten nichts extra.
+### par.3b ERGEBNIS (2026-08-24): Konkurrenz-Hypothese NICHT gestuetzt, Test unterversorgt
+
+Der Test war billiger als registriert -- die Zusammensetzung liegt je
+Gruppe fertig im Artefakt (`column_completion_legality_probe.json`, Feld
+`blockadegruende` je Tabellenzeile). Kein neuer Lauf, keine neue Sonde,
+reine Arithmetik auf vorhandenen Daten. Gerechnet 2026-08-24:
+
+| Gruppe | n | Musterreihe nicht voll | Spezialfeld | keine Farbe |
+|---|---|---|---|---|
+| `champion_netvnet` / Champion | 128 | **51,6 %** (66) | 26,6 % (34) | 21,9 % (28) |
+| `imm_a02` / Champion | 18 | **72,2 %** (13) | 16,7 % (3) | 11,1 % (2) |
+| `imm_a02` / Heuristik | 14 | 57,1 % (8) | 28,6 % (4) | 14,3 % (2) |
+
+**Verdikt: keiner der beiden vorregistrierten Zweige trifft zu, und das ist
+so zu berichten.** Der Anteil ist netz-gegen-netz nicht hoeher, sondern
+**20,7 pp NIEDRIGER** -- also gegen die Richtung der Konkurrenz-Hypothese.
+Signifikant ist er aber nicht (z=+1,81, zweiseitig p~0,07), und das
+95-%-Band der kleinen Gruppe allein ist ±20,7 pp, also so breit wie der
+Effekt selbst.
+
+**Konkurrenz-Hypothese damit nicht gestuetzt.** Sie ist nicht widerlegt --
+dafuer traegt n=18 nicht --, aber sie hat kein Argument mehr. Die
+Schlupf-Hypothese bleibt als einzige stehen und ist ungetestet.
+
+**Konstruktionsfehler, offen benannt:** der Diskriminator haengt an den
+Heuristik-Gruppen, und die haben n=18 und n=14. Das haette ich vor dem
+Registrieren am Artefakt nachsehen koennen und muessen; der Hinweis kam von
+der Parallelsitzung. Wer die Frage ernsthaft entscheiden will, braucht mehr
+Gap-Ereignisse auf der Heuristik-Seite (mehr Partien gegen die Heuristik,
+geloggt) oder einen anderen Diskriminator -- nicht dieselbe Rechnung noch
+einmal.
+
+Diese Frage war ab par.1a die **primaere** dieses Zuschnitts und ist damit
+so weit beantwortet, wie die Daten es zulassen. Die urspruengliche
+Locus-Frage laeuft als sekundaere mit -- sie kostet auf denselben
+Artefakten nichts extra.
 
 ## par.4 Arme
 
