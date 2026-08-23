@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird die Min-Knoten-Zugsortierung in round5.rs und round_transition_deep.rs hart gefixt, und wie wird die dadurch entwertete Elo-Leiter neu verankert (v21/v20/v19 + Anker)? | Beleg: Nutzer-Entscheid 2026-08-20 ("du kannst ihn jetzt schon fixen und dann faehrst du die arena games mit v21, v20 und v19. die alte elo leiter kannst ins archiv werfen"). Fix-Grundlage: PREREG_implementation_review_unprimed par.7 Befund 1. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Min-Knoten-Zugsortierung in round5.rs und round_transition_deep.rs hart gefixt, und wie wird die dadurch entwertete Elo-Leiter neu verankert (v21/v20/v19 + Anker)? | Beleg: par.4 Fix gebaut (Suite 464/0), par.5 Leiter neu verankert (2026-08-21): v21 1215 [1170, 1259], v20 1186, v19 1136, Anker 1000; Reihung v19 < v20 < v21 haelt. Fix-Grundlage: PREREG_implementation_review_unprimed par.7 Befund 1. -->
 
 # PREREG: round5-Min-Knoten-Fix + Neuverankerung der Elo-Leiter
 
