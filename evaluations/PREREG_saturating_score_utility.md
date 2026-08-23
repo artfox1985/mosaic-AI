@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score, integriert ueber die Score-Verteilung) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die vorhandene lineare Mischung gescheitert ist? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht ERGAENZT. Ausarbeitung liegt in research_value_head_alternatives_DRAFT.md Idee 1.1, war aber nie vorregistriert. Empirischer Anker: Task #12 Block 2, Marge +2,25 bei 151:149. Neu: Tor par.3a (entscheidet offline zwischen "Punkte-Term fast konstant" und "fast kollinear zu wr" -- die Entwurfs-Diagnose setzte voraus, dass die Kopf-Ausgabe tanh(own/50) schaetzt, was fuer ~83 % der Trainingszeilen wegen des TD-Blends nicht gilt) sowie zwei Bau-Blocker, beide am 2026-08-23 per Nutzer-Entscheid geschlossen: par.4a -> SKALENWECHSEL der ganzen Blattbewertung auf [-1,1] (Bau-Umfang in par.4b kartiert; geschriebene Korpus-Felder bleiben auf [0,1], sonst still gemischtskaliges Fenster ueber 2945 Bestandsdateien), und par.6.1 -> eigener ADDITIVER Margen-Kopf mit eigener Skala MARGIN_SCALE = std(D), ohne rtv/TD-Zweig (par.6a; damit entfaellt die Zwei-Kopf-Subtraktion und opp_points bleibt Hilfsziel). Reihenfolge: PREREG_score_correlation.md (liefert Var(D)), dann Tor par.3a, dann Bau -->
+<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score, integriert ueber die Score-Verteilung) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die vorhandene lineare Mischung gescheitert ist? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht ERGAENZT. Ausarbeitung liegt in research_value_head_alternatives_DRAFT.md Idee 1.1, war aber nie vorregistriert. Empirischer Anker: Task #12 Block 2, Marge +2,25 bei 151:149. Neu: Tor par.3a (entscheidet offline zwischen "Punkte-Term fast konstant" und "fast kollinear zu wr" -- die Entwurfs-Diagnose setzte voraus, dass die Kopf-Ausgabe tanh(own/50) schaetzt, was fuer ~83 % der Trainingszeilen wegen des TD-Blends nicht gilt) sowie zwei Bau-Blocker, beide am 2026-08-23 per Nutzer-Entscheid geschlossen: par.4a -> SKALENWECHSEL der ganzen Blattbewertung auf [-1,1] (Bau-Umfang in par.4b kartiert; geschriebene Korpus-Felder bleiben auf [0,1], sonst still gemischtskaliges Fenster ueber 2945 Bestandsdateien), und par.6.1 -> eigener ADDITIVER Margen-Kopf ohne rtv/TD-Zweig, mit eigener Skala MARGIN_SCALE = 20 (par.6a; damit entfaellt die Zwei-Kopf-Subtraktion und opp_points bleibt Hilfsziel). Die 20 ist eine REFERENZSETZUNG wie VALUE_SCALE = 50, nicht aus Self-Play abgeleitet -- Beleg: neun Mensch-gegen-v21-Partien in static/log, RMS-Marge ~21, Median der Betragsmarge 17. Reihenfolge: Tor par.3a, dann Bau -->
 
 # Vorregistrierung: Gesaettigte, re-zentrierte Score-Utility
 
@@ -363,26 +363,62 @@ fein in der Mitte.
 `denormalize_score`. Sie zu drehen wuerde den Elo-Anker mitverschieben. Das
 ist kein Abwaegungspunkt.
 
-### Woher die Zahl kommt (vorab festgelegt, nicht geraten)
+### Woher die Zahl kommt: Referenz, NICHT Self-Play-Streuung
 
-`MARGIN_SCALE = std(D)` mit `D = own_total − opp_total` ueber abgeschlossene
-Partien des Trainingsfensters, ungeclampt. Begruendung: das legt ±1 Sigma
-auf |tanh| ≈ 0,76 und ±2 Sigma auf ≈ 0,96 -- die Datenmasse liegt im steilen
-Bereich, die Ausreisser saettigen. In Self-Play ist `D` um null symmetrisch
-(beide Seiten dasselbe Netz), ein Versatz ist also nicht noetig.
+**`MARGIN_SCALE = 20`, festgelegt und eingefroren (Nutzer-Entscheid
+2026-08-23).**
 
-**Diese Zahl wird nicht hier erhoben.** `PREREG_score_correlation.md` par.3
-Punkt 2 berechnet `Var(D)` bereits als Teil seines eigenen Programms.
-Damit ist jene Prereg von einem Nachbar-Zuschnitt zu einer
-**Bau-Voraussetzung** dieses Zuschnitts geworden; sie ist billig (reine
-Korpus-Auswertung) und laeuft ohnehin zuerst. `MARGIN_SCALE` wird auf zwei
-signifikante Stellen gerundet und dann **eingefroren** -- eine spaetere
-Nachjustierung waere ein neuer Arm, kein Detail.
+Ein erster Entwurf dieses Abschnitts hatte `MARGIN_SCALE = std(D)` ueber den
+Self-Play-Korpus vorgeschlagen. **Das war der falsche Typ von Regel**, und
+zwar aus einem Grund, den das Projekt an genau dieser Stelle schon einmal
+entschieden hat. `neural_net.py:502-509` zu `VALUE_SCALE`, woertlich:
 
-Bis diese Messung vorliegt, gilt: eine Schaetzung des Zahlenwerts steht
-hier ausdruecklich NICHT. Die Groessenordnung "deutlich unter 50" ist die
-Einschaetzung des Nutzers und der Anlass dieses Abschnitts, sie ist
-**ungeprueft** und geht in keine Rechnung.
+> NICHT aus aktuellen Spieldaten abgeleitet (Heuristik und Netz spielen
+> beide noch schwach -- jede aus dieser Verteilung abgeleitete Skala wuerde
+> nur die aktuelle Schwaeche festschreiben, nicht das echte Punktepotenzial
+> des Spiels). Stattdessen an einem groben menschlichen Referenzwert
+> kalibriert.
+
+Dieselbe Falle steht als eigene Projektregel: eine Skala nie gegen die
+Verteilung heutiger Netze eichen, wenn genau deren Verhalten das Ziel ist.
+Self-Play-Margen stammen aus zwei plattenblinden Netzen; eine daraus
+abgeleitete Skala schriebe die heutige Schwaeche fest.
+
+**Referenzabgleich (gemessen 2026-08-23, `static/log`):** neun
+abgeschlossene Mensch-gegen-Netz-Partien, alle gegen `v21_2d_brierbest` bei
+400 Sims.
+
+| Kennzahl | Wert |
+|---|---|
+| Margen | +38, +29, +24, +23, +17, +11, +6, +2, 0 |
+| Mittel | +16,7 |
+| Median \|Marge\| | 17,0 |
+| Standardabweichung | 12,9 |
+| RMS-Marge | ~21 |
+
+Bei `MARGIN_SCALE = 20` spannt diese Verteilung `tanh` von 0,10 (Marge 2)
+bis 0,96 (Marge 38); die RMS-Marge liegt bei `tanh(21/20) = 0,78`, also
+genau im steilen Bereich. Bei 50 laege alles zwischen 0,04 und 0,64 -- die
+obere Haelfte des Wertebereichs bliebe ungenutzt.
+
+**Caveat, ausdruecklich:** dieser Referenzsatz ist EINSEITIG. Der Mensch
+gewinnt acht der neun Partien, eine endet gleich; die Streuung 12,9 ist also
+Streuung um +16,7 und nicht um null. Die tragende Kennzahl ist deshalb die
+RMS-Marge, nicht die Standardabweichung. n=9 ist klein. Die Zahl 20 ist
+damit **eine Referenzsetzung mit Groessenordnungs-Beleg**, keine geschaetzte
+Verteilungskonstante -- genau wie die 50 bei `VALUE_SCALE`, und sie ist als
+solche zu behandeln.
+
+**Wiedervorlage, nicht Nachjustierung:** wenn ein plattenbewusster Champion
+existiert, aendert sich die Margenverteilung. Dann ist `MARGIN_SCALE` neu zu
+PRUEFEN -- aber wieder gegen eine Referenz guten Spiels, nicht gegen die
+dann aktuelle Netzverteilung. Eine Nachjustierung waehrend eines laufenden
+Zuschnitts ist ein neuer Arm, kein Detail.
+
+**`Var(D)` aus `PREREG_score_correlation.md` par.3.2 bleibt eine
+GEGENPROBE**, nicht die Quelle. Weicht die Self-Play-Streuung stark von der
+Referenz ab, ist das ein eigener Befund ueber den Abstand zwischen
+Netzspiel und gutem Spiel -- und kein Anlass, die Skala zu drehen.
 
 ### Was noch offen bleibt
 
@@ -481,9 +517,9 @@ stehen hier nur als Merkposten.
   oder Skalenwechsel. Aendert, was gemessen wird.
 - ~~**[Riegel par.6.1]** Woher `x` kommt~~ -- **entschieden 2026-08-23:**
   eigener additiver Margen-Kopf, siehe par.6a.
-- `MARGIN_SCALE`: die Regel steht (`std(D)`), die Zahl kommt aus
-  `PREREG_score_correlation.md` par.3.2. Bis dahin ist sie offen, aber
-  nicht mehr frei.
+- ~~`MARGIN_SCALE`~~ -- **entschieden 2026-08-23: 20**, als Referenzsetzung
+  wie `VALUE_SCALE = 50`, mit Groessenordnungs-Beleg aus neun
+  Mensch-gegen-v21-Partien. Siehe par.6a.
 - `m_max`, die Klammerung vor dem `atanh`.
 - `b`, die Breite der arctan-Saettigung, in Punkten. **Nicht dasselbe wie
   `MARGIN_SCALE`**: `MARGIN_SCALE` bestimmt, wie gut der Kopf die Marge
@@ -501,12 +537,12 @@ stehen hier nur als Merkposten.
   `PREREG_aggression_remapping.md`**: die widerlegte lineare Familie. Diese
   Prereg eroeffnet sie nicht wieder; sie baut einen strukturell anderen Term
   und benennt in par.3, warum der alte scheitern musste.
-- **`PREREG_score_correlation.md`**: seit dem Entscheid vom 2026-08-23
-  **keine Nachbarprereg mehr, sondern eine Bau-Voraussetzung**. Sie liefert
-  `Var(D)` (par.3.2) und damit `MARGIN_SCALE` fuer den Margen-Kopf aus
-  par.6a. Ihre eigene Frage (Notwendigkeit eines Differenzkopfes) bleibt
-  davon unberuehrt; das ist ein Nebenprodukt ihrer Rechnung, kein neues
-  Programm. Reihenfolge: score_correlation, dann par.3a, dann Bau.
+- **`PREREG_score_correlation.md`**: unabhaengig, wie urspruenglich. Ihr
+  `Var(D)` (par.3.2) ist fuer den Margen-Kopf eine **Gegenprobe** zur
+  Referenzsetzung `MARGIN_SCALE = 20`, nicht deren Quelle -- ein
+  Zwischenstand vom 2026-08-23 hatte sie kurzzeitig zur Bau-Voraussetzung
+  gemacht, das ist mit dem Skalen-Entscheid hinfaellig. Reihenfolge also
+  wieder: Tor par.3a, dann Bau; `score_correlation` laeuft parallel.
 - **`research_value_head_alternatives_DRAFT.md` Idee 1.1**: die Quelle
   dieses Zuschnitts. Der Beitrag hier ist par.3 (Re-Zentrierung statt
   Saettigung als eigentlicher Mechanismus, mit der Empfindlichkeitsrechnung),
