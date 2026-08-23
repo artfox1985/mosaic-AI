@@ -1,0 +1,163 @@
+{
+  "champion_vs_heuristik_arm0": {
+    "Heuristik": {
+      "n_partien": 407,
+      "strafpunkte_je_partie": 19.587,
+      "strafpunkte_median": 19,
+      "straf_ziele_je_partie": 3.958,
+      "straf_ziele_median": 3,
+      "straf_ziel_steine_je_partie": 6.378,
+      "straf_ziel_steine_median": 6,
+      "ueberlauf_steine_je_partie": 1.776,
+      "ueberlauf_steine_median": 2,
+      "strafrunden_je_partie": 3.808,
+      "strafrunden_median": 4,
+      "draft_zuege_je_partie": 33.354,
+      "draft_zuege_median": 33
+    },
+    "Champion": {
+      "n_partien": 407,
+      "strafpunkte_je_partie": 16.909,
+      "strafpunkte_median": 16,
+      "straf_ziele_je_partie": 2.088,
+      "straf_ziele_median": 2,
+      "straf_ziel_steine_je_partie": 2.88,
+      "straf_ziel_steine_median": 2,
+      "ueberlauf_steine_je_partie": 2.211,
+      "ueberlauf_steine_median": 2,
+      "strafrunden_je_partie": 4.246,
+      "strafrunden_median": 4,
+      "draft_zuege_je_partie": 32.317,
+      "draft_zuege_median": 32
+    },
+    "_gepaart_Champion_minus_Heuristik": {
+      "strafpunkte": {
+        "n_paare": 407,
+        "mittel": -2.678,
+        "sd": 13.314,
+        "se": 0.66,
+        "t": -4.06
+      },
+      "straf_ziele": {
+        "n_paare": 407,
+        "mittel": -1.87,
+        "sd": 3.125,
+        "se": 0.155,
+        "t": -12.07
+      },
+      "straf_ziel_steine": {
+        "n_paare": 407,
+        "mittel": -3.499,
+        "sd": 5.592,
+        "se": 0.277,
+        "t": -12.62
+      },
+      "ueberlauf_steine": {
+        "n_paare": 407,
+        "mittel": 0.435,
+        "sd": 2.107,
+        "se": 0.104,
+        "t": 4.16
+      },
+      "strafrunden": {
+        "n_paare": 407,
+        "mittel": 0.437,
+        "sd": 1.466,
+        "se": 0.073,
+        "t": 6.02
+      }
+    }
+  },
+  "champion_vs_heuristik_arm0.2": {
+    "Heuristik": {
+      "n_partien": 407,
+      "strafpunkte_je_partie": 19.528,
+      "strafpunkte_median": 19,
+      "straf_ziele_je_partie": 3.855,
+      "straf_ziele_median": 4,
+      "straf_ziel_steine_je_partie": 6.199,
+      "straf_ziel_steine_median": 5,
+      "ueberlauf_steine_je_partie": 1.776,
+      "ueberlauf_steine_median": 2,
+      "strafrunden_je_partie": 3.762,
+      "strafrunden_median": 4,
+      "draft_zuege_je_partie": 33.361,
+      "draft_zuege_median": 33
+    },
+    "Champion": {
+      "n_partien": 407,
+      "strafpunkte_je_partie": 16.079,
+      "strafpunkte_median": 15,
+      "straf_ziele_je_partie": 1.98,
+      "straf_ziele_median": 2,
+      "straf_ziel_steine_je_partie": 2.713,
+      "straf_ziel_steine_median": 2,
+      "ueberlauf_steine_je_partie": 2.069,
+      "ueberlauf_steine_median": 2,
+      "strafrunden_je_partie": 4.233,
+      "strafrunden_median": 4,
+      "draft_zuege_je_partie": 32.489,
+      "draft_zuege_median": 33
+    },
+    "_gepaart_Champion_minus_Heuristik": {
+      "strafpunkte": {
+        "n_paare": 407,
+        "mittel": -3.45,
+        "sd": 13.546,
+        "se": 0.671,
+        "t": -5.14
+      },
+      "straf_ziele": {
+        "n_paare": 407,
+        "mittel": -1.875,
+        "sd": 2.899,
+        "se": 0.144,
+        "t": -13.05
+      },
+      "straf_ziel_steine": {
+        "n_paare": 407,
+        "mittel": -3.486,
+        "sd": 5.173,
+        "se": 0.256,
+        "t": -13.6
+      },
+      "ueberlauf_steine": {
+        "n_paare": 407,
+        "mittel": 0.292,
+        "sd": 2.092,
+        "se": 0.104,
+        "t": 2.82
+      },
+      "strafrunden": {
+        "n_paare": 407,
+        "mittel": 0.472,
+        "sd": 1.482,
+        "se": 0.073,
+        "t": 6.42
+      }
+    }
+  },
+  "champion_selfplay_both_sides": {
+    "Champion": {
+      "n_partien": 407,
+      "strafpunkte_je_partie": 18.931,
+      "strafpunkte_median": 18,
+      "straf_ziele_je_partie": 2.843,
+      "straf_ziele_median": 3,
+      "straf_ziel_steine_je_partie": 3.88,
+      "straf_ziel_steine_median": 3,
+      "ueberlauf_steine_je_partie": 2.693,
+      "ueberlauf_steine_median": 2,
+      "strafrunden_je_partie": 4.172,
+      "strafrunden_median": 4,
+      "draft_zuege_je_partie": 32.892,
+      "draft_zuege_median": 33
+    }
+  },
+  "_meta": {
+    "frage": "Meidet der Champion die Strafleiste staerker als der Heuristik-Lehrer? Wenn ja, ist Straf-Aversion ein Kandidat fuer die flache Kurzreihen-Praeferenz (Reihen-Sonde).",
+    "quelle_gepaart": "paired_arena_env_imm_a02.json -- beide Seiten in DENSELBEN Partien auf denselben Seeds",
+    "ebene": "Block-Ebene (je Partie), nicht je Zug",
+    "caveat": "Die Heuristik spielt hier GEGEN ein Netz, nicht gegen sich selbst. Ihr Strafverhalten kann davon abhaengen; der Vergleich ist bedingungsgleich, aber nicht kontextfrei."
+  }
+}

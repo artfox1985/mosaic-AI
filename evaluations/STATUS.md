@@ -258,6 +258,40 @@ aus dem Kredit-Horizont des Trainings (TD_LAMBDA 0,5,
 bootstrap_horizon 2 Runden) -- als Verdachtspunkt notiert, nicht
 gemessen.
 
+**STRAF-AVERSION ALS ERKLAERUNG DER KURZREIHEN-PRAEFERENZ: GEMESSEN UND
+GESCHWAECHT (2026-08-23 spaet, `tools/probes/penalty_track_probe.py`,
+Artefakt `penalty_track_probe.json`).** Gepaart ueber 407 IDENTISCHE
+Partien aus `paired_arena_env_imm_a02.json` (Champion und Heuristik
+spielen dieselben Seeds, kein Aera- oder Gegnerversatz), Block-Ebene je
+Partie. Arm alpha=0, der 0,2-Arm laeuft gleich:
+
+| Kennzahl je Partie | Champion | Heuristik | Diff | t |
+|---|---|---|---|---|
+| Strafpunkte | 16,91 | 19,59 | −2,68 | −4,06 |
+| abgeladene Steine (Ziel = Strafleiste) | 2,88 | 6,38 | **−3,50** | **−12,62** |
+| Ueberlauf-Steine | 2,21 | 1,78 | **+0,43** | **+4,16** |
+| Runden mit Strafe | 4,25 | 3,81 | **+0,44** | **+6,02** |
+| Steine auf der Leiste gesamt | 5,09 | 8,15 | | |
+
+**Die Aversion ist belegt, aber sie erklaert die Reihenwahl NICHT -- die
+Richtung stimmt nicht.** Kurze Musterreihen (Kapazitaet 1-3) laufen bei
+gleicher Entnahme LEICHTER ueber als lange (5-6). Wer Ueberlaufrisiko
+meidet, waehlt lange Reihen. Der Champion waehlt kurze und hat
+folgerichtig MEHR Ueberlauf, nicht weniger. Ein risikogetriebener
+Kurzreihen-Bias haette das umgekehrte Vorzeichen. (Die Kausalkette
+Reihenlaenge -> Ueberlauf ist eine Herleitung aus der Kapazitaetsregel,
+nicht selbst gemessen -- die Entnahmegroessen je Seite sind nicht
+erhoben.)
+
+**Was stattdessen herausfaellt, als eigener Befund:** der Champion meidet
+die AKTION "-> Strafleiste" massiv (Steine mehr als halbiert, groesste
+Einzelbewegung der Tabelle), nicht aber die KONSEQUENZ "Steine auf der
+Leiste" -- er kassiert sogar in MEHR Runden ueberhaupt eine Strafe.
+Beide Wege enden auf derselben Leiste (engine_manual Z.110-113) und
+zahlen dieselbe progressive Skala −1/−2/−3/−4 je Slot, gedeckelt bei
+vier (Z.161). Der Mechanismus dahinter ist NICHT gemessen; als
+Verdachtspunkt notiert.
+
 **Abgenommen und aktiv: die R5-Loeser-Trennung.** `round5_anchor.rs` ist
 eingefroren und in allen drei Sucheinstiegen verdrahtet (geprueft
 2026-08-23: `engine/src/mcts.rs:746`, `:777`, `:796`, Modul
