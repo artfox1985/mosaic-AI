@@ -292,6 +292,14 @@ zahlen dieselbe progressive Skala −1/−2/−3/−4 je Slot, gedeckelt bei
 vier (Z.161). Der Mechanismus dahinter ist NICHT gemessen; als
 Verdachtspunkt notiert.
 
+**Nachtrag 2026-08-24:** der Primaervergleich dieser Sonde stammt
+vollstaendig aus `imm_a02`, also gegen die HEURISTIK. Seit dem
+Paritaets-Befund (k1-Effekt gegnerspezifisch) steht er damit unter
+Gegnerspezifitaets-Verdacht. Die Gegenprobe liegt bereit und kostet nichts:
+`imm_netvnet` plus `_swap` tragen dasselbe Netz beidseitig mit
+verschiedenen per-Seite-Specs; die Sonde trennt seit b60d0d0 nach
+NetzA/NetzB. Noch nicht gefahren (Betriebsruhe).
+
 **Abgenommen und aktiv: die R5-Loeser-Trennung.** `round5_anchor.rs` ist
 eingefroren und in allen drei Sucheinstiegen verdrahtet (geprueft
 2026-08-23: `engine/src/mcts.rs:746`, `:777`, `:796`, Modul
@@ -339,12 +347,19 @@ gegen die Heuristik, nicht gegen einen gleich starken Gegner. Registriert
 in `PREREG_agent_encapsulation.md` par.6b und
 `PREREG_implicit_minimax_backup.md` par.2c.
 
-**Folge fuer die Messkultur, ueber diesen Fall hinaus:** jede
-Verhaltensmessung gegen die Heuristik steht ab jetzt unter dem Verdacht,
-gegnerspezifisch zu sein. Das betrifft die Reihen-Sonde, die Straf-Sonde
-und die Legalitaets-Stufe gleichermassen -- alle drei sind bisher
-ueberwiegend an Heuristik-Partien erhoben. Der billige Gegentest liegt in
-denselben Artefakten und ist als par.3a registriert.
+**Folge fuer die Messkultur, ueber diesen Fall hinaus:** eine
+Verhaltensmessung gegen die HEURISTIK steht ab jetzt unter dem Verdacht,
+gegnerspezifisch zu sein. **Welche Sonde das trifft, ist am Artefakt zu
+pruefen und nicht zu vermuten** -- ein erster Anlauf dieses Absatzes
+behauptete pauschal, alle drei Sonden seien "ueberwiegend an
+Heuristik-Partien erhoben", und das war fuer die wichtigste davon falsch
+(Korrektur der Parallelsitzung, am Artefakt nachgezaehlt 2026-08-24):
+
+| Sonde | Herkunft der tragenden Zahl | Verdacht trifft? |
+|---|---|---|
+| **Legalitaets-Stufe** | **128 von 160 Faellen aus champion_netvnet**, 18 imm_a02-Champion, 14 imm_a02-Heuristik; `n_legal_moeglich_aber_nicht_gespielt = 0` in JEDER Zeile | **NEIN** -- bereits unter der strengen Bedingung erhoben, das 0/160 haelt |
+| Reihen-Sonde | vier Kontexte, drei mit eindeutiger Champion-Seite (55,5 / 56,1 / 55,3 %), einer (netvnet) mischt alpha und frozen und wird neu gerechnet | teilweise |
+| Straf-Sonde | Primaervergleich stammt vollstaendig aus `imm_a02`, also gegen die Heuristik | **JA** |
 
 **Vorbedingungen, vor Schritt 5 zu pruefen (nicht optional):**
 
