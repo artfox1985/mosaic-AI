@@ -274,6 +274,35 @@ unabhaengig vom Tor par.3a. Er darf davor gebaut werden. Gebaut wird er aber
 NICHT waehrend einer laufenden Arena (Nebenlast verstuemmelt Partien, und
 ein Wheel-Neubau tauscht die Engine unter der Messung).
 
+### par.4c Verhaeltnis zur Agenten-Kapselung (Nutzer-Hinweis 2026-08-23)
+
+`PREREG_agent_encapsulation.md` baut `AgentSpec`: Modell plus Such- und
+Blattwert-Konfiguration, pro Seite instanziiert. Das laeuft in einer anderen
+Sitzung. Drei Konsequenzen fuer diesen Zuschnitt, damit sich die beiden
+Arbeiten nicht in die Quere kommen.
+
+1. **Gleicher Hotspot.** `net_mcts.rs` traegt laut jener Prereg par.2
+   32 OnceLock-Statics und ist der Hauptschauplatz der Migration. Drei der
+   fuenf Stellen aus par.4b liegen dort (`:2229`, `:453`, `:418/431`).
+   Der Skalenwechsel wird deshalb **nicht parallel zu einer laufenden
+   Migrationswelle** gebaut. Reihenfolge ist Nutzer-Entscheid, nicht meiner.
+2. **Die neuen Knoepfe gehoeren in die Spec, nicht ins Global.** `c_score`,
+   `b`, `m_max` und der Ein/Aus-Schalter der Utility sind
+   Blattwert-Konfiguration und damit genau das, was `AgentSpec` buendeln
+   soll. Wird dieser Zuschnitt NACH der Kapselung gebaut, entstehen sie
+   direkt dort; davor als OnceLock nach dem `#30`-Muster, mit dem
+   ausdruecklichen Vermerk, dass sie zu migrieren sind. Damit faellt auch
+   Waechter 6 (par.10, verschiedene `c_score` in Self-Play und Live-Spiel)
+   natuerlich in die Spec-Form.
+3. **Die [−1,1]-Skala ist KEIN Knopf, sondern ein Vertrag.** Sie darf nicht
+   in die `AgentSpec`. Beide Seiten einer Partie und jeder Knoten desselben
+   Baumes muessen dieselbe Blattwertskala haben, sonst sind Q-Werte nicht
+   mehr vergleichbar. Sie gehoert damit in dieselbe Klasse wie
+   `NUM_ACTIONS`, `INPUT_SIZE` und `POLICY_MASS_CUTOFF`, die jene Prereg
+   par.2 ausdruecklich global belaesst. Dasselbe gilt fuer `MARGIN_SCALE`
+   aus par.6a: das ist eine Ziel-Definitionskonstante wie `VALUE_SCALE`,
+   kein Verhaltensknopf.
+
 ## par.5 Das fehlende Stueck: eine Streuung
 
 Wir haben den Erwartungswert. Eine Streuung existiert im Netz **nirgends**
