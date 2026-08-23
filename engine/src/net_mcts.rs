@@ -327,6 +327,80 @@ pub(crate) fn value_cal_b() -> f64 {
     *VALUE_CAL_B.get_or_init(|| read_f64_env("MOSAIC_VALUE_CAL_B", 1.0))
 }
 
+// ── PREREG_implicit_minimax_backup.md par.1: Implicit-Minimax-Backup-Knopf
+// (Baier/Winands). PREREG_agent_encapsulation.md par.3/par.4 (Welle 1, Pilot):
+// dieser Knopf ist der ERSTE, der aus dem prozessglobalen OnceLock-Env-Cache
+// in die pro-Seite instanziierte `SearchConfig` migriert wurde -- die
+// Selektion (`gumbel_select_child`) liest ab jetzt AUSSCHLIESSLICH das
+// Config-Feld, kein OnceLock mehr im Suchpfad.
+
+/// Konfiguration EINER Suchseite (Welle 1 der Agenten-Kapselung). Buendelt
+/// Knopfwerte, die frueher prozessglobal galten, aber PRO SEITE
+/// unterschiedlich gesetzt werden sollen -- angedockt an die bestehenden
+/// Pro-Seite-Objekte (`self_play::NetArenaAgent`/`NetSelfPlayAgent`).
+/// Welle 1 traegt GENAU EIN Feld, den Pilot-Knopf `MOSAIC_IMPLICIT_MINIMAX_A`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SearchConfig {
+    /// Mischgewicht `alpha` fuer die Selektions-Q-Beimischung des implizit-
+    /// minimax-propagierten Werts (PREREG_implicit_minimax_backup.md par.1,
+    /// `mix_q_with_implicit_minimax`). Default `0.0` (keine Beimischung).
+    pub implicit_minimax_alpha: f64,
+}
+
+impl SearchConfig {
+    /// Liest den heutigen Env-Knopf `MOSAIC_IMPLICIT_MINIMAX_A` (dieselbe
+    /// Parse-Regel wie der fruehere OnceLock-Getter: `read_f64_env`,
+    /// Default `0.0`).
+    ///
+    /// WICHTIG -- Unterschied zum fruaheren `implicit_minimax_alpha()`-
+    /// Getter: dessen OnceLock-Cache war VERHALTENSTEIL, nicht nur
+    /// Performance-Optimierung -- einmal initialisiert, blieb der Wert fuer
+    /// den Rest des PROZESSES fix, selbst wenn zwei Seiten (Netz-vs-Netz)
+    /// unterschiedliche Werte haben sollten -- genau das war Anlass 2 in
+    /// PREREG_agent_encapsulation.md par.1 (Knopf nicht Netz-gegen-Netz
+    /// messbar). `from_env()` cacht dagegen NICHTS und liest bei JEDEM
+    /// Aufruf frisch aus der Umgebung. Das ist unproblematisch, weil diese
+    /// Funktion je Partie-Einstieg (Agent-Konstruktion) GENAU EINMAL
+    /// aufgerufen wird, nicht pro Suchknoten -- ein `Default`-Trait-Impl,
+    /// das intern `from_env()` aufriefe, waere dagegen FALSCH: es wuerde den
+    /// Eindruck erwecken, `SearchConfig::default()` sei ein reiner,
+    /// env-unabhaengiger Wert.
+    pub fn from_env() -> Self {
+        Self { implicit_minimax_alpha: read_f64_env("MOSAIC_IMPLICIT_MINIMAX_A", 0.0) }
+    }
+
+    /// Laedt eine Spec-Datei (`models/<name>.spec.json`,
+    /// PREREG_agent_encapsulation.md par.6a Entscheid 2). Schema Welle 1:
+    /// `{"implicit_minimax_alpha": <Zahl>}` -- GENAU dieses eine Feld, PFLICHT
+    /// (kein Default-Fallback auf die Umgebung: eine Spec-Datei soll das
+    /// Suchverhalten VOLLSTAENDIG und reproduzierbar festlegen). Unbekannte
+    /// Felder sind ein HARTER FEHLER (kein stilles Ignorieren -- sonst
+    /// maskiert ein Tippfehler eine ganze Messung).
+    pub fn from_spec_file(path: &str) -> Result<Self, String> {
+        let text = std::fs::read_to_string(path)
+            .map_err(|e| format!("Spec-Datei {path} nicht lesbar: {e}"))?;
+        let value: Value = serde_json::from_str(&text)
+            .map_err(|e| format!("Spec-Datei {path}: ungueltiges JSON: {e}"))?;
+        let obj = value
+            .as_object()
+            .ok_or_else(|| format!("Spec-Datei {path}: JSON-Wurzel muss ein Objekt sein"))?;
+        const KNOWN_FIELDS: &[&str] = &["implicit_minimax_alpha"];
+        for key in obj.keys() {
+            if !KNOWN_FIELDS.contains(&key.as_str()) {
+                return Err(format!(
+                    "Spec-Datei {path}: unbekanntes Feld '{key}' (bekannt: {KNOWN_FIELDS:?})"
+                ));
+            }
+        }
+        let implicit_minimax_alpha = obj
+            .get("implicit_minimax_alpha")
+            .ok_or_else(|| format!("Spec-Datei {path}: Feld 'implicit_minimax_alpha' fehlt"))?
+            .as_f64()
+            .ok_or_else(|| format!("Spec-Datei {path}: 'implicit_minimax_alpha' ist keine Zahl"))?;
+        Ok(Self { implicit_minimax_alpha })
+    }
+}
+
 /// Clamp-Epsilon fuer die Logit-Transformation -- verhindert `ln(0/1)` bzw.
 /// `ln(x/0)` (±∞) an den Raendern des `[0,1]`-Win-Prob-Bereichs.
 const VALUE_CAL_EPS: f64 = 1e-6;
@@ -763,11 +837,14 @@ fn build_determinized_forest<R: Rng + ?Sized>(
     add_root_noise: bool,
     n: usize,
     rng: &mut R,
+    search_config: &SearchConfig,
 ) -> Vec<Vec<Node>> {
     split_sims_across_worlds(sims, n)
         .into_iter()
         .map(|world_sims| {
-            build_net_tree(net_policy, net_value, state, world_sims, c_puct, add_root_noise, rng, None, None)
+            build_net_tree(
+                net_policy, net_value, state, world_sims, c_puct, add_root_noise, rng, None, None, search_config,
+            )
         })
         .collect()
 }
@@ -2032,6 +2109,18 @@ struct Node {
     /// nur, wenn der Netz-Aufruf selbst keinen Value zurückgab (Fallback-Pfad
     /// bei Eval-Fehler).
     raw_value: Option<f32>,
+    /// PREREG_implicit_minimax_backup.md par.1 (Baier/Winands Implicit
+    /// Minimax Backups): implizit-minimax-propagierter Wert JE SPIELER
+    /// (gleiche Indizierung wie `leaf_value`, NICHT dieselbe Perspektiv-
+    /// Konvention wie `value`/`visits` -- siehe `update_im_value_backup`-
+    /// Doku). Bei Knotenerzeugung = `leaf_value` (Blatt/Neuexpansion-Fall,
+    /// "v_IM = Netz-Value des Knotens"), danach bei jedem Backprop per
+    /// Minimax ueber die besuchten Kinder aktualisiert -- IMMER mitgefuehrt,
+    /// unabhaengig vom `MOSAIC_IMPLICIT_MINIMAX_A`-Knopf (reine Arithmetik,
+    /// kein Netz-/RNG-Zugriff). Erst die Selektion (`gumbel_select_child`)
+    /// entscheidet per `alpha`, ob dieser Wert das Ergebnis ueberhaupt
+    /// beeinflusst.
+    im_value: [f64; 2],
 }
 
 impl crate::search_common::SearchNode for Node {
@@ -2772,6 +2861,11 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
         // hier zusätzlich abgelegt statt verworfen, exakt dasselbe Muster wie
         // `points_forecast`/`opp_points_forecast` (kein Zusatz-Forward-Pass).
         raw_value: value.first().copied(),
+        // PREREG_implicit_minimax_backup.md par.1: Blatt/Neuexpansion-Fall
+        // ("v_IM = Netz-Value des Knotens") -- exakt derselbe Wert wie
+        // `leaf_value`, spaeter per Backprop von `update_im_value_backup`
+        // ueberschrieben, sobald es besuchte Kinder gibt.
+        im_value: leaf_value,
     }
 }
 
@@ -3081,6 +3175,113 @@ fn completed_q_per_candidate(nodes: &[Node], nid: usize) -> Vec<(f64, f64)> {
     out
 }
 
+// ── PREREG_implicit_minimax_backup.md par.1: Implicit-Minimax-Backups
+// (Baier/Winands) -- additiver Backup-/Selektionspfad, siehe `Node::im_value`-
+// Doku fuer die Perspektiv-Konvention.
+
+/// Reine Mischformel `Q = (1-alpha)*Q_MC + alpha*v_IM` (PREREG par.1). Kein
+/// Env-/Node-Zugriff -- direkt testbar, gleiches Trennungsmuster wie
+/// `calibrate_win_prob_with`. Early-Out bei `alpha==0.0` (Default): gibt
+/// `q_mc` UNVERAENDERT zurueck, byte-identisches Bestandsverhalten (keine
+/// Rundungsdifferenz durch die Mischrechnung selbst).
+pub(crate) fn mix_q_with_implicit_minimax(q_mc: f64, v_im: f64, alpha: f64) -> f64 {
+    if alpha == 0.0 {
+        return q_mc;
+    }
+    (1.0 - alpha) * q_mc + alpha * v_im
+}
+
+/// Backup-Kern (PREREG par.1): aktualisiert `nodes[nid].im_value` per
+/// Minimax ueber die BESUCHTEN Kinder von `nid`, aus der Sicht des an `nid`
+/// ziehenden Spielers (`nodes[nid].state.current_player`). Kinder von `nid`
+/// teilen sich per Konstruktion GENAU diese Perspektive als ihr eigenes
+/// `player_who_acted` (derselbe Grund, aus dem `completed_q_per_candidate`s
+/// Kinder-Q-Werte ohne Vorzeichenwechsel vergleichbar sind) -- deshalb reicht
+/// ein direkter Index `im_value[mover]` je Kind, KEINE Negation wie bei
+/// alternierendem Negamax. Minimax = der Zieher waehlt das fuer sich selbst
+/// beste besuchte Kind; DESSEN VOLLER `im_value`-Vektor (beide Spieler) wird
+/// uebernommen -- nicht nur die eigene Komponente, denn die Wahl legt fest,
+/// welcher Zweig ueberhaupt weitergespielt wird, und damit AUCH den Wert des
+/// Gegners. Ohne besuchte Kinder (frischer Blattknoten): unveraendert, bleibt
+/// der bei der Knotenerzeugung gesetzte `leaf_value`-Wert stehen ("Blatt/
+/// Neuexpansion: v_IM = Netz-Value des Knotens", PREREG par.1). Reine
+/// Arithmetik, kein Netz-/RNG-Zugriff -- wird daher IMMER mitgefuehrt,
+/// unabhaengig vom `MOSAIC_IMPLICIT_MINIMAX_A`-Knopf (siehe `backprop_path`).
+fn update_im_value_backup(nodes: &mut [Node], nid: usize) {
+    let mover = nodes[nid].state.current_player;
+    let mut best: Option<[f64; 2]> = None;
+    let mut best_score = f64::NEG_INFINITY;
+    for &c in &nodes[nid].children {
+        if nodes[c].visits == 0 {
+            continue;
+        }
+        let score = nodes[c].im_value[mover];
+        if score > best_score {
+            best_score = score;
+            best = Some(nodes[c].im_value);
+        }
+    }
+    if let Some(v) = best {
+        nodes[nid].im_value = v;
+    }
+}
+
+/// Gemeinsamer Backprop-Kern der drei (vormals duplizierten) Backprop-
+/// Stellen in `build_gumbel_tree_inner` (`descend_and_backprop` + beide
+/// `visit_candidate!`-Zweige): aktualisiert `visits`/`value` (Bestands-
+/// verhalten, UNVERAENDERT -- byte-identische Rechenreihenfolge wie vorher)
+/// UND -- additiv, PREREG_implicit_minimax_backup.md par.1 -- `im_value`
+/// entlang desselben Pfads von `leaf_nid` bis zur Wurzel. `update_im_value_
+/// backup` laeuft fuer JEDEN Knoten NACH dessen `visits`/`value`-Update, aber
+/// noch INNERHALB derselben Schleifeniteration -- alle Geschwister-Kinder
+/// weiter unten im Baum haben ihren `im_value` zu diesem Zeitpunkt bereits
+/// aus fruaheren Besuchen (oder eben JETZT, auf demselben Pfad) korrekt
+/// gesetzt.
+fn backprop_path(nodes: &mut [Node], leaf_nid: usize) {
+    let value = nodes[leaf_nid].leaf_value;
+    let mut cur = Some(leaf_nid);
+    while let Some(i) = cur {
+        nodes[i].visits += 1;
+        nodes[i].value += value[nodes[i].player_who_acted];
+        update_im_value_backup(nodes, i);
+        cur = nodes[i].parent;
+    }
+}
+
+/// Wie [`completed_q_per_candidate`], aber die Q-Komponente besuchter Kinder
+/// wird per `alpha` mit `im_value` gemischt (`mix_q_with_implicit_minimax`,
+/// PREREG par.1). NUR fuer die Tiefe-≥1-Selektion (`gumbel_select_child`) --
+/// bewusst NICHT als Ersatz fuer `completed_q_per_candidate` selbst, dessen
+/// bestehende Aufrufstellen (`root_completed_q_policy`/`root_completed_q_raw`
+/// -- die nach aussen gegebenen Policy-Targets -- sowie die Wurzel-Tie-
+/// Break-Sonden) UNVERAENDERT bleiben (minimal-invasive Designentscheidung,
+/// siehe Abnahmebericht: Mischung wirkt nur auf die interne Suchselektion,
+/// nie auf trainingsrelevante Ausgaben). Unbesuchte Kandidaten bekommen wie
+/// bisher `v_mix` OHNE Mischung -- kein `im_value` vorhanden, da noch nicht
+/// expandiert. Bei `alpha==0.0` liefert `mix_q_with_implicit_minimax` fuer
+/// jedes besuchte Kind exakt `q_mc` zurueck -- Ergebnis dann zahlengleich zu
+/// `completed_q_per_candidate` (siehe Paritaetstest).
+fn completed_q_per_candidate_mixed(nodes: &[Node], nid: usize, alpha: f64) -> Vec<(f64, f64)> {
+    let vmix = v_mix(nodes, nid);
+    let mover = nodes[nid].state.current_player;
+    let mut out: Vec<(f64, f64)> =
+        Vec::with_capacity(nodes[nid].children.len() + nodes[nid].untried.len());
+    for &c in &nodes[nid].children {
+        let prior = nodes[c].prior as f64;
+        let q = if nodes[c].visits > 0 {
+            let q_mc = nodes[c].value / nodes[c].visits as f64;
+            mix_q_with_implicit_minimax(q_mc, nodes[c].im_value[mover], alpha)
+        } else {
+            vmix
+        };
+        out.push((prior, q));
+    }
+    for (_, prior) in &nodes[nid].untried {
+        out.push((*prior as f64, vmix));
+    }
+    out
+}
+
 /// Softmax über `f64`-Scores (eigene Kopie statt `net::softmax`, das auf
 /// `f32` arbeitet -- Gumbel-Score-Summen (Log-Prior + σ(Q)) profitieren von
 /// der zusätzlichen Präzision).
@@ -3102,6 +3303,21 @@ fn softmax_f64(scores: &[f64]) -> Vec<f64> {
 fn improved_policy(nodes: &[Node], nid: usize) -> Vec<f64> {
     let max_n = nodes[nid].children.iter().map(|&c| nodes[c].visits).max().unwrap_or(0);
     let cq = completed_q_per_candidate(nodes, nid);
+    let scores: Vec<f64> =
+        cq.iter().map(|&(p, q)| p.max(1e-9).ln() + gumbel_sigma(q, max_n)).collect();
+    softmax_f64(&scores)
+}
+
+/// Wie [`improved_policy`], aber ueber `completed_q_per_candidate_mixed`
+/// (PREREG_implicit_minimax_backup.md par.1) statt der ungemischten
+/// `completed_q_per_candidate` -- NUR fuer `gumbel_select_child` (Tiefe-≥1-
+/// Selektion), siehe dortige Doku fuer die minimal-invasive Scope-
+/// Entscheidung. Bei `alpha==0.0` zahlengleich zu `improved_policy` (die
+/// Mischformel selbst ist dann ein Early-Out, siehe `mix_q_with_implicit_
+/// minimax`).
+fn improved_policy_mixed(nodes: &[Node], nid: usize, alpha: f64) -> Vec<f64> {
+    let max_n = nodes[nid].children.iter().map(|&c| nodes[c].visits).max().unwrap_or(0);
+    let cq = completed_q_per_candidate_mixed(nodes, nid, alpha);
     let scores: Vec<f64> =
         cq.iter().map(|&(p, q)| p.max(1e-9).ln() + gumbel_sigma(q, max_n)).collect();
     softmax_f64(&scores)
@@ -3170,8 +3386,20 @@ fn best_root_child(nodes: &[Node], children: &[usize]) -> Option<usize> {
 /// bei Offset `idx - children.len()` in `nodes[nid].untried` -- der Aufrufer
 /// entscheidet anhand dieses Index, ob deszendiert oder on-demand expandiert
 /// wird.
-fn gumbel_select_child(nodes: &[Node], nid: usize) -> usize {
-    let policy = improved_policy(nodes, nid);
+///
+/// PREREG_implicit_minimax_backup.md par.1: EINZIGE Stelle, an der die
+/// Implicit-Minimax-Beimischung wirkt (`MOSAIC_IMPLICIT_MINIMAX_A` ueber
+/// `search_config.implicit_minimax_alpha`, PREREG_agent_encapsulation.md
+/// par.4 Punkt 4, Pilot-Migration) -- bei `alpha==0.0` (Default) exakt der
+/// ungemischte `improved_policy`-Aufruf von vorher, kein zusaetzlicher
+/// Rechenpfad (Byte-Identitaet).
+fn gumbel_select_child(nodes: &[Node], nid: usize, search_config: &SearchConfig) -> usize {
+    let alpha = search_config.implicit_minimax_alpha;
+    let policy = if alpha == 0.0 {
+        improved_policy(nodes, nid)
+    } else {
+        improved_policy_mixed(nodes, nid, alpha)
+    };
     let n_children = nodes[nid].children.len();
     let sum_n: f64 = nodes[nid].children.iter().map(|&c| nodes[c].visits as f64).sum();
     let mut best = 0usize;
@@ -4097,8 +4325,11 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
     add_root_noise: bool,
     rng: &mut R,
     trace: Option<&mut GumbelTrace>,
+    search_config: &SearchConfig,
 ) -> Vec<Node> {
-    build_gumbel_tree_inner(net_policy, net_value, state, sims, add_root_noise, rng, trace, BATCH_ROOT_EXPANSION)
+    build_gumbel_tree_inner(
+        net_policy, net_value, state, sims, add_root_noise, rng, trace, BATCH_ROOT_EXPANSION, search_config,
+    )
 }
 
 /// Eigentliche Implementierung von [`build_gumbel_tree`], mit
@@ -4109,8 +4340,11 @@ fn build_gumbel_tree<R: Rng + ?Sized>(
 /// BEIDE Pfade (batched/unbatcht) mit IDENTISCHEM Seed direkt gegeneinander
 /// vergleichen, ohne die Konstante zur Testlaufzeit umschalten zu muessen
 /// (waere bei einem `const` ohnehin nicht moeglich). `build_gumbel_tree`
-/// selbst bleibt die STABILE, unveraenderte Aufrufstellen-Signatur -- reicht
-/// nur `BATCH_ROOT_EXPANSION`s aktuellen (Default `false`) Wert durch.
+/// selbst bleibt die STABILE Aufrufstellen-Signatur -- reicht nur
+/// `BATCH_ROOT_EXPANSION`s aktuellen (Default `false`) Wert durch.
+/// `search_config` (PREREG_agent_encapsulation.md par.4 Punkt 4, Pilot-
+/// Migration): einzige Konsument-Stelle ist `gumbel_select_child` ueber
+/// `descend_and_backprop`, siehe dort.
 fn build_gumbel_tree_inner<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
@@ -4120,6 +4354,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
     rng: &mut R,
     mut trace: Option<&mut GumbelTrace>,
     batch_root_expansion: bool,
+    search_config: &SearchConfig,
 ) -> Vec<Node> {
     let mut root_state = state.clone();
     root_state.log.clear();
@@ -4152,6 +4387,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
         nodes: &mut Vec<Node>,
         start_nid: usize,
         rng: &mut R,
+        search_config: &SearchConfig,
     ) {
         let mut nid = start_nid;
         let mut expansion_failed = false;
@@ -4163,7 +4399,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                 break; // defensiv: sollte an einem Nicht-Terminal-Knoten nie vorkommen
             }
             let n_children = nodes[nid].children.len();
-            let idx = gumbel_select_child(nodes, nid);
+            let idx = gumbel_select_child(nodes, nid, search_config);
             if idx < n_children {
                 nid = nodes[nid].children[idx];
                 continue;
@@ -4196,13 +4432,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
         if expansion_failed {
             return;
         }
-        let value = nodes[nid].leaf_value;
-        let mut cur = Some(nid);
-        while let Some(i) = cur {
-            nodes[i].visits += 1;
-            nodes[i].value += value[nodes[i].player_who_acted];
-            cur = nodes[i].parent;
-        }
+        backprop_path(nodes, nid);
     }
 
     let n_root = nodes[0].untried.len();
@@ -4290,7 +4520,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
             let ci = $ci;
             match candidate_node[ci] {
                 Some(cid) if nodes[cid].visits > 0 => {
-                    descend_and_backprop(net_policy, net_value, &mut nodes, cid, rng)
+                    descend_and_backprop(net_policy, net_value, &mut nodes, cid, rng, search_config)
                 }
                 Some(cid) => {
                     // Perf-Auftrag (2026-08-02): per `batched_expand_root_candidates`
@@ -4301,13 +4531,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                     // zweiter Netz-Eval (identische Backprop-Logik wie im
                     // `None`-Zweig unten, ohne die dortige vorangehende
                     // Netz-/Expansionsarbeit, die schon erledigt ist).
-                    let value = nodes[cid].leaf_value;
-                    let mut cur = Some(cid);
-                    while let Some(i) = cur {
-                        nodes[i].visits += 1;
-                        nodes[i].value += value[nodes[i].player_who_acted];
-                        cur = nodes[i].parent;
-                    }
+                    backprop_path(&mut nodes, cid);
                 }
                 None => {
                     let (act, prior, _g) = candidates[ci].clone();
@@ -4327,13 +4551,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                         nodes.push(child);
                         nodes[0].children.push(cid);
                         candidate_node[ci] = Some(cid);
-                        let value = nodes[cid].leaf_value;
-                        let mut cur = Some(cid);
-                        while let Some(i) = cur {
-                            nodes[i].visits += 1;
-                            nodes[i].value += value[nodes[i].player_who_acted];
-                            cur = nodes[i].parent;
-                        }
+                        backprop_path(&mut nodes, cid);
                     }
                     // Fehlgeschlagenes apply_drafting: `candidate_node[ci]`
                     // bleibt `None` -- der Kandidat faellt bei der naechsten
@@ -4526,7 +4744,10 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
 /// bei `USE_GUMBEL_SEARCH=false` (PUCT-Legacy-Pfad) bleibt `trace` ungenutzt,
 /// PUCT hat keinen strukturierten Trace (nur den bestehenden Text-`log`).
 /// ALLE Produktions-Aufrufstellen (Self-Play/Arena) übergeben `None` --
-/// byte-identisch zum Vor-Task-#95-Verhalten.
+/// byte-identisch zum Vor-Task-#95-Verhalten. `search_config`
+/// (PREREG_agent_encapsulation.md par.4 Punkt 4): nur im Gumbel-Pfad
+/// wirksam (`gumbel_select_child`) -- der PUCT-Legacy-Pfad unten liest ihn
+/// gar nicht, `best_puct` kennt keine Implicit-Minimax-Beimischung.
 fn build_net_tree<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
@@ -4537,12 +4758,13 @@ fn build_net_tree<R: Rng + ?Sized>(
     rng: &mut R,
     mut log: Option<&mut Vec<String>>,
     trace: Option<&mut GumbelTrace>,
+    search_config: &SearchConfig,
 ) -> Vec<Node> {
     if USE_GUMBEL_SEARCH {
         if let Some(l) = log.as_deref_mut() {
             l.push("  GUMBEL-SUCHE (kein granularer Text-Sim-Trace -- strukturierter Trace siehe `gumbel_trace`-Feld, falls angefordert)".to_string());
         }
-        return build_gumbel_tree(net_policy, net_value, state, sims, add_root_noise, rng, trace);
+        return build_gumbel_tree(net_policy, net_value, state, sims, add_root_noise, rng, trace, search_config);
     }
     let names = [state.players[0].name.as_str(), state.players[1].name.as_str()];
     let mut root_state = state.clone();
@@ -4713,6 +4935,9 @@ fn build_net_tree<R: Rng + ?Sized>(
 
 /// Beste Drafting-Aktion per Netz-PUCT (meistbesuchtes Wurzelkind). None außerhalb
 /// der Drafting-Phase. `add_root_noise` nur im Self-Play aktivieren.
+/// `search_config` (PREREG_agent_encapsulation.md par.3/par.4): pro-Seite-
+/// Suchkonfiguration (Welle 1: nur `implicit_minimax_alpha`), vom Aufrufer
+/// (typischerweise `self_play::NetArenaAgent`) durchgereicht.
 pub fn net_search_drafting_action<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -4720,6 +4945,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     c_puct: f64,
     add_root_noise: bool,
     rng: &mut R,
+    search_config: &SearchConfig,
 ) -> Option<Action> {
     if state.phase != Phase::Drafting {
         return None;
@@ -4737,7 +4963,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     // erhalten, `k=1` (Default) ist weiterhin byte-identisch.
     let k = num_determinizations();
     if k <= 1 {
-        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
+        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None, search_config);
         let best = select_final_root_child(&nodes)?;
         return nodes[best].action.clone();
     }
@@ -4746,7 +4972,7 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     // `average_completed_q_policy`-Kommentar), nicht mehr
     // `select_final_root_child` auf einem Einzelbaum -- letzteres hätte
     // keinen sinnvollen "einen" Baum mehr, über den es entscheiden könnte.
-    let forest = build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng);
+    let forest = build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng, search_config);
     average_completed_q_policy(&forest)
         .into_iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
@@ -4771,6 +4997,7 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
     c_puct: f64,
     add_root_noise: bool,
     rng: &mut R,
+    search_config: &SearchConfig,
 ) -> Option<Action> {
     if state.phase != Phase::Drafting {
         return None;
@@ -4780,7 +5007,9 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
     }
     let k = num_determinizations();
     if k <= 1 {
-        let nodes = build_net_tree(net_policy, Some(net_value), state, sims, c_puct, add_root_noise, rng, None, None);
+        let nodes = build_net_tree(
+            net_policy, Some(net_value), state, sims, c_puct, add_root_noise, rng, None, None, search_config,
+        );
         let best = select_final_root_child(&nodes)?;
         return nodes[best].action.clone();
     }
@@ -4793,6 +5022,7 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
         add_root_noise,
         k,
         rng,
+        search_config,
     );
     average_completed_q_policy(&forest)
         .into_iter()
@@ -4808,6 +5038,7 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     c_puct: f64,
     add_root_noise: bool,
     rng: &mut R,
+    search_config: &SearchConfig,
 ) -> Vec<(Action, u32, f64)> {
     if state.phase != Phase::Drafting {
         return Vec::new();
@@ -4827,7 +5058,7 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
     // (`self_play::alphabeta_choose_action`s Shortlisting), nicht einer der
     // drei in Task #65 benannten Haupt-Sucheinstiege (Arena/Self-Play-Ziel/
     // Debug-UI) -- bleibt unverändert Einzelwelt.
-    let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
+    let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None, search_config);
     root_child_stats_from_nodes(&nodes)
 }
 
@@ -4877,6 +5108,7 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     c_puct: f64,
     add_root_noise: bool,
     rng: &mut R,
+    search_config: &SearchConfig,
 ) -> (Vec<(Action, u32, f64)>, Vec<(Action, f64)>, Option<f64>, Vec<(Action, f64)>) {
     if state.phase != Phase::Drafting {
         return (Vec::new(), Vec::new(), None, Vec::new());
@@ -4927,7 +5159,8 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     }
     let k = num_determinizations();
     if k <= 1 {
-        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None);
+        let nodes =
+            build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None, search_config);
         let root_visits = nodes[0].visits.max(1) as f64;
         let root_q = Some(nodes[0].value / root_visits);
         return (
@@ -4944,7 +5177,8 @@ pub fn net_root_child_stats_and_policy<R: Rng + ?Sized>(
     // folgt demselben Summen-Muster wie `aggregate_root_child_stats`
     // (Σvalue/Σvisits über die Welten, NICHT das arithmetische Mittel der
     // Pro-Welt-Quotienten).
-    let forest = build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng);
+    let forest =
+        build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng, search_config);
     let (visits_sum, value_sum) = forest.iter().fold((0.0f64, 0.0f64), |(vs, vals), nodes| {
         (vs + nodes[0].visits as f64, vals + nodes[0].value)
     });
@@ -5064,10 +5298,19 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
         return crate::round5::choose_action_with_analysis(state);
     }
+    // Debug-UI-/Mensch-vs-Netz-Einstieg (py.rs, kein Arena-/Self-Play-Pfad):
+    // AUSSERHALB des Wave-1-Scopes von PREREG_agent_encapsulation.md (keine
+    // Pro-Seite-Spec dafuer vorgesehen) -- liest die Suchkonfiguration daher
+    // wie bisher aus der Umgebung, jetzt aber ueber `SearchConfig::from_env()`
+    // statt dem entfernten OnceLock-Getter (gleiches Ergebnis, kein
+    // Verhaltensunterschied).
+    let search_config = SearchConfig::from_env();
     let k = num_determinizations();
     if k <= 1 {
         let mut trace = if collect_trace { Some(GumbelTrace::default()) } else { None };
-        let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, log, trace.as_mut());
+        let nodes = build_net_tree(
+            net, None, state, sims, c_puct, add_root_noise, rng, log, trace.as_mut(), &search_config,
+        );
         return net_search_with_tree_from_nodes(state, sims, &nodes, trace.as_ref());
     }
     // ISMCTS-Mehrfach-Determinisierung: kein granularer Sim-für-Sim-Trace je
@@ -5080,7 +5323,8 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     if let Some(l) = log.as_deref_mut() {
         l.push(format!("  ISMCTS: {k} Determinisierungen (kein granularer Sim-Trace je Welt)"));
     }
-    let forest = build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng);
+    let forest =
+        build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng, &search_config);
     net_search_with_tree_from_forest(state, sims, &forest)
 }
 
@@ -5557,7 +5801,9 @@ mod tests {
                     None => break,
                 };
                 let solver = crate::round5::choose_action(&state);
-                let nodes = build_net_tree(&net, None, &state, SIMS, C_PUCT, false, &mut rng, None, None);
+                let nodes = build_net_tree(
+                    &net, None, &state, SIMS, C_PUCT, false, &mut rng, None, None, &SearchConfig::from_env(),
+                );
                 let net_choice = select_final_root_child(&nodes).and_then(|b| nodes[b].action.clone());
 
                 total += 1;
@@ -5893,6 +6139,9 @@ mod tests {
             points_forecast: None,
             opp_points_forecast: None,
             raw_value: None,
+            // Default deckungsgleich mit `leaf_value` (Blatt-Fall) -- Tests,
+            // die `im_value` explizit brauchen, setzen es nach dem Aufruf.
+            im_value: [0.0, 0.0],
         }
     }
 
@@ -5963,6 +6212,128 @@ mod tests {
         assert!((cq[1].1 - vmix).abs() < 1e-12, "unbesucht #1 bekommt v_mix");
         assert!((cq[2].1 - vmix).abs() < 1e-12, "unbesucht #2 bekommt v_mix");
         assert!((cq[1].1 - cq[2].1).abs() < 1e-12, "alle unbesuchten Kandidaten teilen denselben v_mix");
+    }
+
+    // ── PREREG_implicit_minimax_backup.md par.1: Implicit-Minimax-Backups ──
+
+    #[test]
+    fn mix_q_with_implicit_minimax_is_identity_at_alpha_zero() {
+        // Abnahmekriterium: alpha=0.0 muss q_mc BYTE-IDENTISCH zurueckgeben
+        // (exakter Vergleich, keine Epsilon-Toleranz).
+        assert_eq!(mix_q_with_implicit_minimax(0.37, 0.91, 0.0), 0.37);
+        assert_eq!(mix_q_with_implicit_minimax(0.0, 1.0, 0.0), 0.0);
+    }
+
+    #[test]
+    fn mix_q_with_implicit_minimax_blends_at_nonzero_alpha() {
+        // alpha=0.5: Q = 0.5*q_mc + 0.5*v_im -- Hand-Rechnung.
+        let got = mix_q_with_implicit_minimax(0.2, 0.8, 0.5);
+        assert!((got - 0.5).abs() < 1e-12, "got={got}, erwartet 0.5");
+    }
+
+    #[test]
+    fn update_im_value_backup_picks_the_movers_best_visited_child_full_vector() {
+        // Wurzel zieht Spieler 0 (mover). Zwei besuchte Kinder mit
+        // unterschiedlichem im_value[0] -- die Wurzel muss den VOLLEN Vektor
+        // des fuer Spieler 0 besseren Kindes uebernehmen (nicht nur die
+        // eigene Komponente, siehe `update_im_value_backup`-Doku: der Zug
+        // legt beide Spielerwerte fest, nicht nur den des Ziehers).
+        let root = gumbel_test_node(0.0, 0, 0.0, 0);
+        let mut child_a = gumbel_test_node(0.5, 1, 0.0, 1);
+        child_a.im_value = [0.2, 0.8];
+        let mut child_b = gumbel_test_node(0.5, 1, 0.0, 1);
+        child_b.im_value = [0.9, 0.1];
+        let mut nodes = vec![root, child_a, child_b];
+        nodes[0].children.push(1);
+        nodes[0].children.push(2);
+        update_im_value_backup(&mut nodes, 0);
+        assert_eq!(nodes[0].im_value, [0.9, 0.1], "Spieler 0 (Zieher an der Wurzel) waehlt Kind B (0.9 > 0.2)");
+    }
+
+    #[test]
+    fn update_im_value_backup_ignores_unvisited_children() {
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.im_value = [0.5, 0.5];
+        let mut child_unvisited = gumbel_test_node(0.5, 0, 0.0, 1); // visits=0
+        child_unvisited.im_value = [0.99, 0.01]; // waere fuer Spieler 0 die beste Wahl -- darf NICHT zaehlen
+        let mut nodes = vec![root, child_unvisited];
+        nodes[0].children.push(1);
+        update_im_value_backup(&mut nodes, 0);
+        assert_eq!(
+            nodes[0].im_value,
+            [0.5, 0.5],
+            "unbesuchtes Kind darf den Minimax nicht beeinflussen -- Wurzelwert bleibt der Blattwert"
+        );
+    }
+
+    #[test]
+    fn backprop_path_updates_visits_value_and_im_value_together() {
+        // End-zu-Ende-Test des additiven Backup-Kerns: EIN Aufruf muss
+        // Bestandsverhalten (`visits`/`value`) UND die neue `im_value`-
+        // Fortpflanzung entlang desselben Pfads leisten. Bestandskonvention
+        // (unveraendert, siehe `backprop_path`): `value` ist der Blattwert
+        // DES BESUCHTEN BLATTS (hier: `child`), NICHT der jeweils eigene
+        // `leaf_value` jedes Vorfahrenknotens -- root.leaf_value bleibt daher
+        // in dieser Rechnung ungenutzt (nur fuer root's EIGENE Knotenerzeugung
+        // relevant, hier irrelevant, siehe Kommentar unten).
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0); // player_who_acted default 0
+        root.leaf_value = [0.9, 0.1]; // bewusst ANDERS als child, um die Bestandskonvention zu belegen
+        root.im_value = [0.9, 0.1];
+        let mut child = gumbel_test_node(0.5, 0, 0.0, 1);
+        child.player_who_acted = 0; // root's Mover hat diesen Zug gewaehlt
+        child.leaf_value = [0.3, 0.7];
+        child.im_value = [0.3, 0.7];
+        let mut nodes = vec![root, child];
+        nodes[0].children.push(1);
+        nodes[1].parent = Some(0); // gumbel_test_node setzt parent immer auf None
+        backprop_path(&mut nodes, 1);
+        assert_eq!(nodes[1].visits, 1);
+        assert!((nodes[1].value - 0.3).abs() < 1e-12, "Kind-Backprop: value[player_who_acted=0]=0.3");
+        assert_eq!(nodes[1].im_value, [0.3, 0.7], "Blatt ohne eigene Kinder: im_value bleibt der Blattwert");
+        assert_eq!(nodes[0].visits, 1);
+        assert!(
+            (nodes[0].value - 0.3).abs() < 1e-12,
+            "Wurzel-Backprop verwendet DES BLATTS leaf_value[player_who_acted=0]=0.3, NICHT root.leaf_value"
+        );
+        assert_eq!(
+            nodes[0].im_value,
+            [0.3, 0.7],
+            "Wurzel hat genau ein besuchtes Kind -- dessen im_value wird trivial uebernommen"
+        );
+    }
+
+    #[test]
+    fn completed_q_per_candidate_mixed_matches_plain_at_alpha_zero() {
+        // Abnahmekriterium 4b (Byte-/Ergebnis-Identitaet bei alpha=0).
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.leaf_value = [0.5, 0.5];
+        let mut child_a = gumbel_test_node(0.6, 4, 2.4, 1); // Q_MC=0.6
+        child_a.im_value = [0.99, 0.01]; // deutlich abweichend -- darf bei alpha=0 NICHT wirken
+        let mut nodes = vec![root, child_a];
+        nodes[0].children.push(1);
+        nodes[0].untried.push((Action::Pass, 0.1));
+        let plain = completed_q_per_candidate(&nodes, 0);
+        let mixed = completed_q_per_candidate_mixed(&nodes, 0, 0.0);
+        assert_eq!(plain, mixed, "alpha=0.0 muss byte-identisch zur ungemischten Funktion sein");
+    }
+
+    #[test]
+    fn completed_q_per_candidate_mixed_differs_from_plain_at_nonzero_alpha() {
+        // Abnahmekriterium 4a (Wirkungsnachweis): bei alpha=0.5 UND
+        // im_value != Q_MC muss sich die gemischte Selektions-Q sichtbar vom
+        // reinen Q_MC unterscheiden.
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0); // Wurzel-Mover = Spieler 0
+        root.leaf_value = [0.5, 0.5];
+        let mut child_a = gumbel_test_node(0.6, 4, 2.4, 1); // Q_MC=0.6
+        child_a.im_value = [0.9, 0.1]; // Perspektive Spieler 0 (Wurzel-Mover): 0.9
+        let mut nodes = vec![root, child_a];
+        nodes[0].children.push(1);
+        let plain = completed_q_per_candidate(&nodes, 0);
+        let mixed = completed_q_per_candidate_mixed(&nodes, 0, 0.5);
+        assert!((plain[0].1 - 0.6).abs() < 1e-12);
+        let expected_mixed = 0.5 * 0.6 + 0.5 * 0.9;
+        assert!((mixed[0].1 - expected_mixed).abs() < 1e-12, "mixed={} expected={}", mixed[0].1, expected_mixed);
+        assert!((mixed[0].1 - plain[0].1).abs() > 1e-9, "Mischung muss die Selektions-Q sichtbar veraendern");
     }
 
     // ── PREREG_denial_tiebreak.md (Task E3): Perspektiv-Logik ───────────────
@@ -6394,11 +6765,112 @@ mod tests {
         nodes[0].children.push(1);
         nodes[0].untried.push((Action::Pass, 0.65)); // deutlich hoeherer Prior, N=0
 
-        let idx = gumbel_select_child(&nodes, 0);
+        let idx = gumbel_select_child(&nodes, 0, &SearchConfig::from_env());
         assert_eq!(
             idx, 1,
             "Kombi-Index 1 (= der einzige untried-Kandidat, nach 1 Kind) haette gewaehlt werden muessen, war {idx}"
         );
+    }
+
+    /// PREREG_agent_encapsulation.md par.4 Punkt 4 (Pilot-Migration): der
+    /// KRONZEUGE-Test, der mit dem alten prozessweiten OnceLock unmoeglich
+    /// war (siehe Kommentar an `read_f64_env_implicit_minimax_a_default_and_
+    /// parsing` oben) -- ZWEI `SearchConfig`-Werte mit unterschiedlichem
+    /// `implicit_minimax_alpha` liefern im SELBEN Prozess, auf DEMSELBEN
+    /// Knotensatz, unterschiedliche `gumbel_select_child`-Ergebnisse. Baut
+    /// eine Situation, in der die Implicit-Minimax-Beimischung tatsaechlich
+    /// etwas aendert: ein besuchtes Kind mit hohem `value/visits`, aber
+    /// niedrigem `im_value` (die Minimax-Rueckpropagation "weiss" bereits,
+    /// dass der Zweig fuer den Zieher schlecht endet) -- bei `alpha=0` zaehlt
+    /// nur `value/visits`, bei hohem `alpha` dominiert `im_value`.
+    #[test]
+    fn search_config_with_different_alpha_in_same_process_yields_different_selection() {
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.leaf_value = [0.5, 0.5];
+        // Kind A: hoher MC-Q (0.9), aber niedriger im_value (0.1) -- Minimax
+        // hat den Zweig schon als schlecht erkannt.
+        let mut child_a = gumbel_test_node(0.5, 10, 9.0, 1); // Q = 9/10 = 0.9
+        child_a.im_value = [0.1, 0.9];
+        // Kind B: niedriger MC-Q (0.5), aber hoher im_value (0.9).
+        let mut child_b = gumbel_test_node(0.5, 10, 5.0, 1); // Q = 5/10 = 0.5
+        child_b.im_value = [0.9, 0.1];
+        let mut nodes = vec![root, child_a, child_b];
+        nodes[0].children.push(1);
+        nodes[0].children.push(2);
+
+        let cfg_off = SearchConfig { implicit_minimax_alpha: 0.0 };
+        let cfg_on = SearchConfig { implicit_minimax_alpha: 1.0 };
+        let idx_off = gumbel_select_child(&nodes, 0, &cfg_off);
+        let idx_on = gumbel_select_child(&nodes, 0, &cfg_on);
+        assert_ne!(
+            idx_off, idx_on,
+            "zwei SearchConfig-Werte im selben Prozess muessen unterschiedliche Selektion ergeben \
+             (idx_off={idx_off} idx_on={idx_on}) -- genau das war mit dem alten OnceLock nicht pruefbar"
+        );
+    }
+
+    // `SearchConfig::from_env()` liest den ECHTEN Produktions-Env-Namen
+    // (`MOSAIC_IMPLICIT_MINIMAX_A`, anders als `read_f64_env_*`-Tests, die
+    // bewusst synthetische Namen nutzen) UND cacht NICHTS mehr (siehe
+    // `SearchConfig::from_env`-Doku) -- ein Mutex serialisiert die beiden
+    // folgenden Tests untereinander, gleiches Kompromiss-Muster wie
+    // `DENIAL_TIEBREAK_TEST_LOCK`/`AGGRESSION_TEST_LOCK`.
+    static SEARCH_CONFIG_ENV_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Abnahme (a): Default-Pfad -- `MOSAIC_IMPLICIT_MINIMAX_A` ungesetzt
+    /// ergibt `alpha=0.0`.
+    #[test]
+    fn search_config_from_env_defaults_to_zero_alpha() {
+        let _guard = SEARCH_CONFIG_ENV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        std::env::remove_var("MOSAIC_IMPLICIT_MINIMAX_A");
+        let cfg = SearchConfig::from_env();
+        assert_eq!(cfg.implicit_minimax_alpha, 0.0);
+    }
+
+    /// `from_env()` liest wirklich frisch (kein Cache) -- gesetzter Knopf
+    /// wirkt sofort, im selben Prozess.
+    #[test]
+    fn search_config_from_env_reads_set_value() {
+        let _guard = SEARCH_CONFIG_ENV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let name = "MOSAIC_IMPLICIT_MINIMAX_A";
+        let prev = std::env::var(name).ok();
+        std::env::set_var(name, "0.3");
+        let cfg = SearchConfig::from_env();
+        assert_eq!(cfg.implicit_minimax_alpha, 0.3);
+        match prev {
+            Some(v) => std::env::set_var(name, v),
+            None => std::env::remove_var(name),
+        }
+    }
+
+    /// Abnahme (c): gueltige Spec-Datei -- exakt das dokumentierte Schema.
+    #[test]
+    fn search_config_from_spec_file_parses_valid_file() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_valid_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2}"#).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltige Spec-Datei muss parsen");
+        assert_eq!(cfg.implicit_minimax_alpha, 0.2);
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// Abnahme (c): unbekanntes Feld ist ein harter Fehler (kein stilles
+    /// Ignorieren -- sonst maskiert ein Tippfehler eine ganze Messung).
+    #[test]
+    fn search_config_from_spec_file_rejects_unknown_field() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_unknown_field_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "tpyo_feld": 1.0}"#).unwrap();
+        let result = SearchConfig::from_spec_file(path.to_str().unwrap());
+        assert!(result.is_err(), "unbekanntes Feld muss einen Fehler ergeben, nicht still ignoriert werden");
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// Abnahme (c): fehlende Datei ist ein Fehler.
+    #[test]
+    fn search_config_from_spec_file_rejects_missing_file() {
+        let result = SearchConfig::from_spec_file("does_not_exist_mosaic_spec_probe.json");
+        assert!(result.is_err(), "fehlende Spec-Datei muss einen Fehler ergeben");
     }
 
     #[test]
@@ -6685,7 +7157,9 @@ mod tests {
         let sims = 400u32;
         let mut rng = StdRng::seed_from_u64(4242);
         let t0 = Instant::now();
-        let nodes = build_net_tree(&net, None, &state, sims, 1.5, false, &mut rng, None, None);
+        let nodes = build_net_tree(
+            &net, None, &state, sims, 1.5, false, &mut rng, None, None, &SearchConfig::from_env(),
+        );
         let total = t0.elapsed().as_secs_f64();
         let n_nodes = nodes.len() as f64;
 
@@ -6811,11 +7285,13 @@ mod tests {
 
         let sims = 400u32; // Produktions-Standard -- ergibt m_prime=GUMBEL_TOP_M=16, deckt den vollen eval_batch-Bereich ab.
         let mut rng_unbatched = StdRng::seed_from_u64(555_555);
-        let nodes_unbatched =
-            build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng_unbatched, None, false);
+        let nodes_unbatched = build_gumbel_tree_inner(
+            &net, None, &state, sims, false, &mut rng_unbatched, None, false, &SearchConfig::from_env(),
+        );
         let mut rng_batched = StdRng::seed_from_u64(555_555);
-        let nodes_batched =
-            build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng_batched, None, true);
+        let nodes_batched = build_gumbel_tree_inner(
+            &net, None, &state, sims, false, &mut rng_batched, None, true, &SearchConfig::from_env(),
+        );
 
         assert_eq!(
             nodes_unbatched[0].visits, nodes_batched[0].visits,
@@ -6892,8 +7368,12 @@ mod tests {
 
         for i in 0..WARMUP {
             let mut rng = StdRng::seed_from_u64(i as u64);
-            let _ = build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng, None, false);
-            let _ = build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng, None, true);
+            let _ = build_gumbel_tree_inner(
+                &net, None, &state, sims, false, &mut rng, None, false, &SearchConfig::from_env(),
+            );
+            let _ = build_gumbel_tree_inner(
+                &net, None, &state, sims, false, &mut rng, None, true, &SearchConfig::from_env(),
+            );
         }
 
         let mut times_off = Vec::with_capacity(RUNS);
@@ -6901,12 +7381,16 @@ mod tests {
         for i in 0..RUNS {
             let mut rng_off = StdRng::seed_from_u64(1000 + i as u64);
             let t = std::time::Instant::now();
-            let _ = build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng_off, None, false);
+            let _ = build_gumbel_tree_inner(
+                &net, None, &state, sims, false, &mut rng_off, None, false, &SearchConfig::from_env(),
+            );
             times_off.push(t.elapsed().as_secs_f64() * 1000.0);
 
             let mut rng_on = StdRng::seed_from_u64(1000 + i as u64);
             let t = std::time::Instant::now();
-            let _ = build_gumbel_tree_inner(&net, None, &state, sims, false, &mut rng_on, None, true);
+            let _ = build_gumbel_tree_inner(
+                &net, None, &state, sims, false, &mut rng_on, None, true, &SearchConfig::from_env(),
+            );
             times_on.push(t.elapsed().as_secs_f64() * 1000.0);
         }
         let median = |v: &mut Vec<f64>| -> f64 {
@@ -6936,12 +7420,16 @@ mod tests {
         let state = random_drafting_state(1, 10, &mut rng_state).expect("Testzustand sollte auswertbar sein");
 
         let mut rng_a = StdRng::seed_from_u64(999);
-        let nodes = build_net_tree(&net, None, &state, 8, DEFAULT_C_PUCT, false, &mut rng_a, None, None);
+        let nodes = build_net_tree(
+            &net, None, &state, 8, DEFAULT_C_PUCT, false, &mut rng_a, None, None, &SearchConfig::from_env(),
+        );
         let direct_stats = root_child_stats_from_nodes(&nodes);
         let direct_policy = root_completed_q_policy(&nodes);
 
         let mut rng_b = StdRng::seed_from_u64(999);
-        let forest = build_determinized_forest(&net, None, &state, 8, DEFAULT_C_PUCT, false, 1, &mut rng_b);
+        let forest = build_determinized_forest(
+            &net, None, &state, 8, DEFAULT_C_PUCT, false, 1, &mut rng_b, &SearchConfig::from_env(),
+        );
         assert_eq!(forest.len(), 1, "n=1 sollte genau einen Baum liefern");
         let forest_stats = aggregate_root_child_stats(&forest);
         let forest_policy = average_completed_q_policy(&forest);
@@ -6977,7 +7465,9 @@ mod tests {
             "Testvoraussetzung: genug Platten im verdeckten Stapel fuer eine aussagekraeftige Mischung"
         );
 
-        let forest = build_determinized_forest(&net, None, &state, 6, DEFAULT_C_PUCT, false, 3, &mut rng);
+        let forest = build_determinized_forest(
+            &net, None, &state, 6, DEFAULT_C_PUCT, false, 3, &mut rng, &SearchConfig::from_env(),
+        );
         assert_eq!(forest.len(), 3);
         let pools: Vec<Vec<usize>> = forest
             .iter()
@@ -7005,8 +7495,10 @@ mod tests {
             let Some(state) = random_drafting_state(gi, 12, &mut setup_rng) else { continue };
             for &sims in &[8u32, 24] {
                 let mut rng_plain = StdRng::seed_from_u64(1000 + gi);
-                let nodes_plain =
-                    build_net_tree(&net, None, &state, sims, DEFAULT_C_PUCT, false, &mut rng_plain, None, None);
+                let nodes_plain = build_net_tree(
+                    &net, None, &state, sims, DEFAULT_C_PUCT, false, &mut rng_plain, None, None,
+                    &SearchConfig::from_env(),
+                );
                 let stats_plain = root_child_stats_from_nodes(&nodes_plain);
                 let policy_plain = root_completed_q_policy(&nodes_plain);
                 let action_plain =
@@ -7023,6 +7515,7 @@ mod tests {
                     &mut rng_hybrid,
                     None,
                     None,
+                    &SearchConfig::from_env(),
                 );
                 let stats_hybrid = root_child_stats_from_nodes(&nodes_hybrid);
                 let policy_hybrid = root_completed_q_policy(&nodes_hybrid);
@@ -7074,8 +7567,10 @@ mod tests {
             let Some(state) = random_drafting_state(gi, 12, &mut setup_rng) else { continue };
             for &sims in &[8u32, 24] {
                 let mut rng_plain = StdRng::seed_from_u64(2000 + gi);
-                let nodes_plain =
-                    build_net_tree(&net, None, &state, sims, DEFAULT_C_PUCT, false, &mut rng_plain, None, None);
+                let nodes_plain = build_net_tree(
+                    &net, None, &state, sims, DEFAULT_C_PUCT, false, &mut rng_plain, None, None,
+                    &SearchConfig::from_env(),
+                );
 
                 let mut rng_traced = StdRng::seed_from_u64(2000 + gi);
                 let mut trace = GumbelTrace::default();
@@ -7089,6 +7584,7 @@ mod tests {
                     &mut rng_traced,
                     None,
                     Some(&mut trace),
+                    &SearchConfig::from_env(),
                 );
 
                 assert_eq!(
@@ -7494,12 +7990,16 @@ mod tests {
         for gi in 0..4u64 {
             let Some(state) = random_drafting_state(gi, 12, &mut setup_rng) else { continue };
             let mut rng_a = StdRng::seed_from_u64(2000 + gi);
-            let nodes_a = build_net_tree(&net, None, &state, 16, DEFAULT_C_PUCT, false, &mut rng_a, None, None);
+            let nodes_a = build_net_tree(
+                &net, None, &state, 16, DEFAULT_C_PUCT, false, &mut rng_a, None, None, &SearchConfig::from_env(),
+            );
             let stats_a = root_child_stats_from_nodes(&nodes_a);
             let policy_a = root_completed_q_policy(&nodes_a);
 
             let mut rng_b = StdRng::seed_from_u64(2000 + gi);
-            let nodes_b = build_net_tree(&net, None, &state, 16, DEFAULT_C_PUCT, false, &mut rng_b, None, None);
+            let nodes_b = build_net_tree(
+                &net, None, &state, 16, DEFAULT_C_PUCT, false, &mut rng_b, None, None, &SearchConfig::from_env(),
+            );
             let stats_b = root_child_stats_from_nodes(&nodes_b);
             let policy_b = root_completed_q_policy(&nodes_b);
 
@@ -8586,6 +9086,29 @@ mod tests {
         std::env::set_var(name_b, "nope");
         assert_eq!(read_f64_env(name_b, 1.0), 1.0);
         std::env::remove_var(name_b);
+    }
+
+    /// PREREG_implicit_minimax_backup.md par.1: gleiches Muster wie die
+    /// `read_f64_env_value_cal_*`-Tests oben -- reiner `read_f64_env`-
+    /// Vertragstest mit synthetischem Namen. HISTORISCHE ANMERKUNG: frueher
+    /// stand hier ein Hinweis, dass die prozessweit gecachte OnceLock-
+    /// Variante nicht mit wechselnden Werten im selben Testprozess pruefbar
+    /// war -- genau DAS war Anlass 2 fuer die Migration nach `SearchConfig`
+    /// (PREREG_agent_encapsulation.md par.1/par.4 Punkt 4). Der Kronzeuge
+    /// dafuer ist jetzt
+    /// `search_config_with_different_alpha_in_same_process_yields_different_selection`
+    /// oben (zwei `SearchConfig`-Werte, ein Prozess, unterschiedliche
+    /// Selektion). Die reinen Mischformeln selbst bleiben zusaetzlich ueber
+    /// `mix_q_with_implicit_minimax`/`completed_q_per_candidate_mixed`
+    /// getestet (etabliertes Trennungsmuster von `calibrate_win_prob_with`).
+    #[test]
+    fn read_f64_env_implicit_minimax_a_default_and_parsing() {
+        let name = "MOSAIC_TEST_ENV_IMPLICIT_MINIMAX_A_1";
+        std::env::remove_var(name);
+        assert_eq!(read_f64_env(name, 0.0), 0.0);
+        std::env::set_var(name, "0.2");
+        assert_eq!(read_f64_env(name, 0.0), 0.2);
+        std::env::remove_var(name);
     }
 
     // ── Task #30 x Task #28 Interaktion: Korrektur wirkt auf `wr`, NICHT auf
