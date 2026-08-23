@@ -74,7 +74,8 @@ def champion_model() -> str:
 def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int,
             n_games: int, seed: int, block_size: int, threads: int,
             log_games: bool = False, seeds: list[int] | None = None,
-            model_b: str | None = None, sims_b: int | None = None) -> list[dict]:
+            model_b: str | None = None, sims_b: int | None = None,
+            spec_a: str | None = None, spec_b: str | None = None) -> list[dict]:
     """`env_name` darf mehrere komma-getrennte Var-Namen tragen; `value`
     dann entsprechend viele komma-getrennte Werte (Aggressions-
     Neukartierung: W und LAMBDA je Arm gemeinsam gesetzt).
@@ -119,6 +120,11 @@ def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int
             cmd += ["--model-b", model_b]
             if sims_b is not None:
                 cmd += ["--sims-b", str(sims_b)]
+            # 2026-08-23 (Agenten-Kapselung Welle 1): per-Seite Spec-JSON.
+            if spec_a is not None:
+                cmd += ["--spec-a", spec_a]
+            if spec_b is not None:
+                cmd += ["--spec-b", spec_b]
         if seeds is not None:
             # BLOCKWEISE Teilliste, nicht ein neu abgeleiteter Basis-Seed --
             # das ist die delikate Stelle: mit einer expliziten Liste gibt es
@@ -200,6 +206,12 @@ def main() -> None:
     ap.add_argument("--log-games", action="store_true",
                     help="Partie-Logs mitschreiben, damit die Verhaltenszahlen "
                          "aus DENSELBEN Partien kommen wie die Siegquote")
+    # 2026-08-23 (PREREG_agent_encapsulation.md par.4a): per-Seite
+    # SearchConfig-Specs fuer den Netz-gegen-Netz-Modus (--model-b).
+    ap.add_argument("--spec-a", type=str, default=None,
+                    help="Spec-JSON fuer Brett 0 (nur mit --model-b)")
+    ap.add_argument("--spec-b", type=str, default=None,
+                    help="Spec-JSON fuer Brett 1 (nur mit --model-b)")
     args = ap.parse_args()
 
     if args.control not in args.arms:
@@ -217,12 +229,14 @@ def main() -> None:
                              args.heur_sims, args.n_games, args.seed,
                              args.block_size, args.threads,
                              log_games=args.log_games, seeds=seeds,
-                             model_b=args.model_b, sims_b=args.sims_b)
+                             model_b=args.model_b, sims_b=args.sims_b,
+                             spec_a=args.spec_a, spec_b=args.spec_b)
 
     out = {
         "env_name": args.env_name, "arms": args.arms, "control": args.control,
         "model": model, "model_b": args.model_b,
         "sims_b": args.sims_b if args.model_b else None,
+        "spec_a": args.spec_a, "spec_b": args.spec_b,
         "net_sims": args.net_sims, "heur_sims": args.heur_sims,
         "n_games": n_games, "base_seed": args.seed,
         "seeds": seeds,
