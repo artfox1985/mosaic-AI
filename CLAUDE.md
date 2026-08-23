@@ -69,6 +69,39 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
   beim Commit). Gilt auch fuer Agenten-Auftraege: die Regel gehoert in
   jeden Prompt, der Prereg-Registrierungen schreibt.
 
+## Standard-Kennzahlen jedes Messberichts (Nutzer-Anweisung 2026-08-23)
+
+**Zusaetzlich** zu dem, was die jeweilige Prereg verlangt, will der Nutzer in
+JEDEM Messbericht (Arena, Sonde, Gating, Self-Play-Abnahme) diese sechs
+Kennzahlen sehen – je Seite und, wo sinnvoll, als Differenz zwischen den Armen:
+
+1. **Reihenauslastung** – wie weit die Musterreihen/Brett-Zeilen gefuellt
+   werden (Verteilung der Zugziele und Fuellstaende, nicht nur Vollendungen).
+2. **Spaltenauslastung** – volle Spalten, maximale Spaltenhoehe, Teilspalten
+   (>= 3 / >= 4) je Partie.
+3. **Strafleistenauslastung** – wie oft und wie stark die Strafleiste bedient
+   wird (Ueberlaeufe, Strafpunkte).
+4. **Erreichte Punkte je Wertungsplatte** – aufgeschluesselt je aktivem
+   Kriterium, nicht nur k1.
+5. **Eigene Punkte** – absolutes Score-Niveau (Task-#18-Lehre: die Siegquote
+   allein verdeckt Niveau-Verschiebungen).
+6. **Margin zum Gegner** – Punktedifferenz, nicht nur Sieg/Niederlage.
+
+Warum: die Kampagne hat mehrfach Effekte erst ueber diese Randgroessen
+verstanden (Gegner-Spezifitaet des Minimax-Knopfs, der Vollendungs-Engpass,
+die Reihen-Praeferenz). Sie kosten nichts extra, wenn die Partien ohnehin mit
+`--log-games` laufen.
+
+**Vorhandene Quellen (erst pruefen, dann bauen):** `tools/analyze_game_log.py`
+(Regexe fuer Reihe/Strafleiste-Ziele, Ueberlauf, Endwertung),
+`tools/plate_points_from_arena.py` (Punkte je Kriterium),
+`tools/probes/column_build_structural_probe.py` und
+`column_completion_gap_probe.py` (Spaltenauslastung, Vollendungsluecken),
+`tools/probes/row_preference_probe.py` (Reihenwahl); Punkte/Margin stehen in
+den Arena-Artefakten (`scores`, plus `scores_unclamped` in Self-Play-Records).
+Fehlt eine Groesse im konkreten Kontext, wird sie ergaenzt oder ihr Fehlen im
+Bericht begruendet – stilles Weglassen ist ein Regelbruch.
+
 ## Dateinamen-Konvention (Nutzer-Anweisung 2026-08-13)
 
 - **Neue Dateien und Verzeichnisse werden IMMER englisch benannt** (Code,

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird der R5-Loeser in einen EINGEFRORENEN Anker-Loeser (Heuristik) und einen frei entwickelbaren Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 gut kalibrieren (Steigungs-Metrik der R5-Kalibrierung)? | Beleg: ENTWURF 2026-08-22, Nutzer-Entscheid ("dann machen wir einen eigenen solver fuer den heuristik anker. und schauen dass wir den value kopf gut kalibrieren fuer runde 5."), nichts gebaut; Vorarbeiten par.2a (Bau-Kartierung) und par.3a (Pruefpunkt: Champion-Ownership UNTRAINIERT) am 2026-08-22 erledigt; par.2b/2c: Teil A GEBAUT und ABGENOMMEN (2026-08-23: Suite 484/0, Paritaets-Hash 8c6684ff haelt vor/nach Wheel-Neubau, Wheel installiert) -- der Anker-Loeser ist aktiv und eingefroren. Teil B offen; Arm-3-Vorklaerung par.3c ERLEDIGT (Karten-Lieferant: v21-b18 empfohlen, Ownership-Ziele kennen keine Traeger-Maskierung); neuer Anlass: Strukturbefund Spalten-Vollendung (STATUS 2026-08-23). Anlass: 200-Knoten-Beschneidung als moegliche Schwachstelle; jede R5-Verbesserung wuerde sonst den Anker mitverschieben (Leiter-Reset-Falle, gerade erst bezahlt). -->
+<!-- STATUS: OFFEN | Frage: Wird der R5-Loeser in einen EINGEFRORENEN Anker-Loeser (Heuristik) und einen frei entwickelbaren Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 gut kalibrieren (Steigungs-Metrik der R5-Kalibrierung)? | Beleg: ENTWURF 2026-08-22, Nutzer-Entscheid ("dann machen wir einen eigenen solver fuer den heuristik anker. und schauen dass wir den value kopf gut kalibrieren fuer runde 5."), nichts gebaut; Vorarbeiten par.2a (Bau-Kartierung) und par.3a (Pruefpunkt: Champion-Ownership UNTRAINIERT) am 2026-08-22 erledigt; par.2b/2c: Teil A GEBAUT und ABGENOMMEN (2026-08-23: Suite 484/0, Paritaets-Hash 8c6684ff haelt vor/nach Wheel-Neubau, Wheel installiert) -- der Anker-Loeser ist aktiv und eingefroren. Teil B: Vierer-Vergleich GEMESSEN und ENTSCHIEDEN (par.3e, 2026-08-23): Value-Kopf gewinnt (Tau 0,762 k1-aktiv), alle drei Kandidaten signifikant schlechter -> BLEND-WEG GESCHLOSSEN, Teil B nur noch ueber Trainings-Eingriffe; Praezisierung: die R5-Schwaeche ist PLATTEN-Daempfung, nicht Gesamtwert; Arm-3-Vorklaerung par.3c ERLEDIGT (Karten-Lieferant: v21-b18 empfohlen, Ownership-Ziele kennen keine Traeger-Maskierung); neuer Anlass: Strukturbefund Spalten-Vollendung (STATUS 2026-08-23). Anlass: 200-Knoten-Beschneidung als moegliche Schwachstelle; jede R5-Verbesserung wuerde sonst den Anker mitverschieben (Leiter-Reset-Falle, gerade erst bezahlt). -->
 
 # PREREG-SKELETT: R5-Loeser-Trennung (Anker eingefroren) + R5-Value-Kalibrierung
 
@@ -231,6 +231,74 @@ ownership-tragend trainierten Netz.
   Partie bleiben stehen, Erreichen zu 78 % in R4/R5) macht Teil B
   dringlicher: die Vollendungsentscheidungen fallen genau in die
   Runden der schlechtesten Value-Kalibrierung.
+
+### par.3d VORABREGELN VIERER-VERGLEICH (registriert 2026-08-23 VOR dem Lauf; Ausfuehrung nach Stufe 0 der Horizont-Frage)
+
+- **Stellungsstichprobe:** ~200 Runde-5-Startzustaende aus fertigen
+  Partien vorhandener Korpora/Artefakte (pkl-Records mit voller
+  Information), stratifiziert nach Punktedifferenz-Terzilen und
+  k1-Plattenlage (k1-aktive Teilmenge separat ausgewiesen, Ziel
+  >= 60 Zustaende). Stichproben-Seed und Quelldateien im Artefakt
+  protokollieren.
+- **Grundwahrheit:** exakter Solver-Wurzelwert je Zustand (Marge aus
+  Netz-Loeser-Pfad round5.rs; NICHT der Anker -- der bleibt
+  unangetastet).
+- **Vier Koepfe, alle auf denselben Zustaenden:** (1) endgame_margin
+  des Champions; (2) points MINUS opp_points des Champions; (3)
+  E_k-Plattenpunkte aus der Ownership-Karte von v21-b18 (par.3c;
+  MOSAIC_OWNERSHIP_CONJ=1 Pflicht); (4) Value-Kopf des Champions
+  (WDL-Erwartungswert). Je Kopf: Rangkorrelation (Kendall-Tau) zur
+  Solver-Marge und Steigung der linearen Kennlinie
+  (r5_value_calibration-Muster; Kennlinien-Caveat 0,316 beachten).
+- **Lesart VORAB:** primaeres Kriterium ist Tau auf der k1-aktiven
+  Teilmenge; Blend-Kandidat wird nur ein Kopf, der den Value-Kopf
+  dort KLAR schlaegt (gepaarte Differenz, Vorzeichentest p < 0,05).
+  Schlaegt keiner den Value-Kopf, ist der Blend-Weg fuer Teil B
+  geschlossen und es bleiben Trainings-Eingriffe (R5-Gewichtung,
+  Platt je Runde) -- auch das waere ein registrierfaehiges Ergebnis.
+- **Legalitaets-Stufe der Vollendungs-Sonde** (gleiches Lastfenster,
+  danach): je Hoehe-5-Fall aus column_completion_gap_probe per Engine
+  pruefen, ob im Restfenster eine legale Vollendung existierte
+  (Kachelverfuegbarkeit/Platzierbarkeit); ausgewiesen wird die
+  ECHTE verpasste Quote (legal moeglich und nicht gespielt) je Seite.
+  QUARANTAENE-Vorgabe: Zustandsrekonstruktion ausschliesslich ueber
+  den replay-exakten Pfad (PREREG_action_id_logging), NIE ueber den
+  Referee-/Worker-Pfad -- der traegt bis zum gruenen Kernbeweis
+  (Kapselungs-Prereg par.8d) keine Messungen.
+
+### par.3e ERGEBNIS VIERER-VERGLEICH + VERDIKT (2026-08-23; Agent, Zahlen vom Koordinator am Artefakt `evaluations/r5_four_head_comparison.json` nachgemessen)
+
+200 R5-Startzustaende (70 k1-aktiv), Grundwahrheit = exakte
+Solver-Wurzelmarge ueber den NETZ-Loeserpfad (ab_value):
+
+| Kopf | Tau gesamt | Tau k1-aktiv | Steigung k1-aktiv |
+|---|---|---|---|
+| endgame_margin | 0,745 | 0,735 | 0,263 |
+| points - opp_points | 0,748 | 0,737 | 1,131 |
+| E_k-Marge (b18, Konjunktion) | 0,364 | **0,278** | 0,099 |
+| **Value-Kopf (WDL)** | **0,761** | **0,762** | 0,874 |
+
+**VERDIKT nach par.3d-Lesart: der Blend-Weg ist GESCHLOSSEN.** Kein
+Kandidat schlaegt den Value-Kopf auf dem primaeren Kriterium; alle drei
+sind im gepaarten Vorzeichentest SIGNIFIKANT SCHLECHTER (endgame_margin
+14:56, p=4,3e-7; points-opp 22:48, p=0,0025; E_k 16:54, p=5,9e-6).
+Teil B laeuft damit ueber Trainings-Eingriffe (R5-Sample-Gewichtung,
+Platt je Runde), nicht ueber einen Blend.
+
+**WICHTIGE PRAEZISIERUNG von par.1 Punkt 2:** der Value-Kopf ist in
+Runde 5 NICHT allgemein schwach -- er ordnet die Solver-Marge sehr gut
+(Tau 0,76) und ist auf der Gesamtwert-Skala fast richtig geeicht
+(Steigung 0,87-0,89). Die registrierten 0,06-0,09 sind die
+PLATTEN-Steigung: der Kopf sieht den Gesamtwert, aber nicht den
+Platten-/Spaltenanteil darin. Kuenftige Formulierungen muessen das
+trennen.
+
+**Nebenbefund zum Ownership-Kanal:** die E_k-Marge aus der b18-Karte
+ist der mit Abstand SCHWAECHSTE Kopf (Tau 0,278, Steigung 0,099) --
+und das im Konjunktionspfad, hart gegatet (Funktion bricht bei
+<140-breitem Kopf ab, statt in die Produktform zurueckzufallen). Der
+Plattenkanal traegt also auch dort nichts, wo er am berechenbarsten
+sein sollte (par.3-Erwartung widerlegt).
 
 ## par.4 OFFEN (Nutzer, beim Aufgreifen)
 

@@ -2972,7 +2972,13 @@ fn root_child_q_field(root_child_q: &[f64]) -> Option<Value> {
 /// Runde 4->5: exakter Freebie (`round5::exact_round5_outcome`, kein Netz-
 /// Rauschen). Runde 1-3: rekursive `continue_through_round{2,3,4}`-Ketten aus
 /// `round_transition_deep.rs`, additive (nicht kombinatorische) Kosten.
-fn sample_round_transition_for_round<R: Rng + ?Sized>(
+///
+/// `pub(crate)` (statt privat) NUR wegen `PREREG_bootstrap_horizon.md`
+/// Stufe 0 (2026-08-23): `lib.rs::bootstrap_horizon_stage0_probe_json`
+/// nutzt exakt diese Funktion als "Anker"-Label-Pfad wieder (kein
+/// Python-Reimplement der rtv-Rekursionskette) -- sonst unveraendert,
+/// keine Verhaltensaenderung an bestehenden Aufrufstellen.
+pub(crate) fn sample_round_transition_for_round<R: Rng + ?Sized>(
     round_before: u32,
     pre: &crate::round_transition::PreChanceState,
     net: &Net,

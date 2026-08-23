@@ -1210,6 +1210,76 @@ fn wertung_shaping_e_json(state_json: String, player: usize, seed: Option<u64>) 
     .to_string())
 }
 
+/// Aufgabe 2026-08-23 (Vierer-Vergleich R5-Loeser-Kalibrierung,
+/// `PREREG_r5_solver_split.md` par.3d): wertet die E_k-Plattenpunkte
+/// (`scoring::expected_plate_points_conj`) fuer BEIDE Spieler aus einem
+/// EXTERN (Torch, ausserhalb der Suche) berechneten rohen Ownership-Kopf-
+/// Ausgang aus -- reine Formel-Auswertung, kein Netz-Forward-Pass und keine
+/// Suche hier. Existiert additiv NEBEN `apply_ownership_shaping_full`
+/// (net_mcts.rs), weil dort nur der GESHAPTE Suchwert (tanh-gedaempfter
+/// Shift) rauskommt, nicht die rohen E_k selbst -- fuer den Vierer-Vergleich
+/// wird aber der rohe erwartete Punktestand je Kriterium gebraucht.
+///
+/// `ownership` muss 140 breit sein (2*(36 Feldwahrsch. + 34 Konjunktions-
+/// Atome), siehe `net_mcts.rs::apply_ownership_shaping_full`-Kommentar zur
+/// Vektor-Aufteilung) -- ein schmalerer Kopf ist hier ein HARTER Fehler
+/// (kein stiller Produktform-Rueckfall wie im Suchpfad): der Aufruf-Kontext
+/// braucht Gewissheit, dass der Konjunktionspfad tatsaechlich griff, nicht
+/// nur "griff, falls der Kopf breit genug war".
+///
+/// Layout (identisch zu `apply_ownership_shaping_full`): `ownership[0:36]`
+/// = p_own des ZIEHENDEN Spielers (`state.current_player`), `[36:72]` =
+/// p_own des anderen, `[72:106]` = p_conj des ziehenden, `[106:140]` =
+/// p_conj des anderen. `player` im Rueckgabe-JSON ist der ABSOLUTE
+/// Spielerindex (0/1), nicht "ego/gegner".
+#[pyfunction]
+fn ownership_ek_plate_points_json(state_json: String, ownership: Vec<f64>) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    let mut rng = StdRng::seed_from_u64(0);
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+
+    let need = 2 * (crate::scoring::OWNERSHIP_FIELDS + crate::scoring::CONJUNCTION_ATOMS);
+    if ownership.len() < need {
+        return Err(PyValueError::new_err(format!(
+            "ownership ist {} breit, braucht >= {need} fuer den Konjunktionspfad -- \
+             kein stiller Rueckfall in dieser Sonde (anders als im Suchpfad)",
+            ownership.len()
+        )));
+    }
+
+    let mut e_per_player: Vec<Vec<f64>> = Vec::with_capacity(2);
+    for i in 0..2usize {
+        let base = if i == state.current_player { 0 } else { crate::scoring::OWNERSHIP_FIELDS };
+        let mut p_own = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
+        for (f, slot) in p_own.iter_mut().enumerate() {
+            *slot = crate::net_mcts::sigmoid(ownership[base + f]);
+        }
+        let cbase = 2 * crate::scoring::OWNERSHIP_FIELDS
+            + if i == state.current_player { 0 } else { crate::scoring::CONJUNCTION_ATOMS };
+        let mut p_conj = [0.0f64; crate::scoring::CONJUNCTION_ATOMS];
+        for (a, slot) in p_conj.iter_mut().enumerate() {
+            *slot = crate::net_mcts::sigmoid(ownership[cbase + a]);
+        }
+        let e = crate::scoring::expected_plate_points_conj(
+            &state.players[i], &p_own, &p_conj, &state.scoring_tile_ids,
+        );
+        e_per_player.push(e.to_vec());
+    }
+
+    Ok(serde_json::json!({
+        "current_player": state.current_player,
+        "active_tile_ids": state.scoring_tile_ids.iter().map(|&id| id as u64).collect::<Vec<_>>(),
+        "e_k_player0": e_per_player[0],
+        "e_k_player1": e_per_player[1],
+    })
+    .to_string())
+}
+
 /// Statischer Wertungsplatten-Katalog für die Auswahl-UI (Port von
 /// `/api/scoring_tiles`): `{tiles:[{id,name,description,emoji,excludes}],
 /// exclusive_pairs:[[a,b],…]}`. Braucht keinen Spielzustand.
@@ -1455,6 +1525,104 @@ fn autoplay_to_round5_and_resample_json(
     Ok(out.to_string())
 }
 
+/// `PREREG_bootstrap_horizon.md`, "Stufe 0" (2026-08-23, Nutzer-Freigabe
+/// "im kleinen testen/debuggen"): reine Label-Diagnose ohne Training, ohne
+/// Aenderung an Records/Cache/Selbstspiel-Pfad. Berechnet fuer EINEN
+/// uebergebenen Zustand BEIDE Value-Label-Varianten und gibt zusaetzlich
+/// die Rechenzeit je Variante zurueck:
+///
+/// - **Bestand** (a): `round_transition_deep::bootstrap_value_after_rounds`
+///   mit dem produktiven `BOOTSTRAP_HORIZON_ROUNDS`-Wert (Horizont 2,
+///   Abschluss per `net_leaf_eval`) -- exakt derselbe Aufruf wie
+///   `self_play.rs`s Bootstrap-Label-Pfad (`play_net_self_play_game`).
+/// - **Anker** (b): `self_play::sample_round_transition_for_round` --
+///   exakt derselbe Aufruf wie `self_play.rs`s "rtv"
+///   (`round_transition_value`)-Label-Pfad: rekursive
+///   `continue_through_round{2,3,4}`-Kette bis zum Runde-5-Freebie
+///   (`round5::exact_round5_outcome`, exakt); fuer `round_before==4`
+///   (Uebergang 4->5) ist das bereits der Freebie selbst, kein Netz-
+///   Rollout noetig.
+///
+/// KEINE Python-Reimplementation der Label-Logik -- beide Zweige rufen die
+/// echten, in `self_play.rs`/`round_transition_deep.rs` produktiv
+/// genutzten Funktionen unveraendert auf (nur `sample_round_transition_for_round`
+/// wurde dafuer von privat auf `pub(crate)` gehoben, siehe dortiger
+/// Kommentar -- keine Verhaltensaenderung).
+///
+/// `state_json` muss ein Zustand in Phase `Tiling` sein (irgendein Schritt
+/// INNERHALB der Rundenend-Tiling-Phase genuegt -- `resolve_to_pre_chance`
+/// loest den Rest deterministisch auf, siehe dortige Doku/Tests: das
+/// Ergebnis haengt nicht vom genauen Tiling-Unterschritt ab). `round_before`
+/// wird aus `state.round_number` gelesen (1..=4 sinnvoll -- Runde 5 hat
+/// keinen weiteren Rundenuebergang, siehe Aufrufer-Bedingung in
+/// `self_play.rs`).
+///
+/// Rueckgabe (JSON-Objekt):
+/// ```json
+/// {
+///   "round_before": <u32>,
+///   "bootstrap_value": [p0, p1],
+///   "bootstrap_time_ms": <f64>,
+///   "anchor_value": [p0, p1],
+///   "anchor_time_ms": <f64>
+/// }
+/// ```
+/// `pN` = Gewinnwahrscheinlichkeit aus Sicht von Spieler N (wie
+/// `net_leaf_eval`/`exact_round5_outcome`, [0,1]-Skala).
+#[pyfunction]
+#[pyo3(signature = (state_json, model_path, seed=None))]
+fn bootstrap_horizon_stage0_probe_json(
+    state_json: String,
+    model_path: String,
+    seed: Option<u64>,
+) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    use std::time::Instant;
+
+    let seed = seed.unwrap_or_else(rand::random);
+    let mut rng = StdRng::seed_from_u64(seed);
+
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    let round_before = state.round_number;
+
+    let pre = crate::round_transition::resolve_to_pre_chance(&state).ok_or_else(|| {
+        PyValueError::new_err(
+            "Zustand ist nicht in Phase::Tiling (oder Rundenende-Aufloesung fehlgeschlagen) -- \
+             resolve_to_pre_chance lieferte None",
+        )
+    })?;
+
+    let net = crate::net::Net::load_auto(&model_path)
+        .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
+
+    let t0 = Instant::now();
+    let bootstrap_value = crate::round_transition_deep::bootstrap_value_after_rounds(
+        &pre,
+        &net,
+        crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+        &mut rng,
+    );
+    let bootstrap_time_ms = t0.elapsed().as_secs_f64() * 1000.0;
+
+    let t1 = Instant::now();
+    let anchor_value =
+        crate::self_play::sample_round_transition_for_round(round_before, &pre, &net, &mut rng);
+    let anchor_time_ms = t1.elapsed().as_secs_f64() * 1000.0;
+
+    let out = json!({
+        "round_before": round_before,
+        "bootstrap_value": bootstrap_value,
+        "bootstrap_time_ms": bootstrap_time_ms,
+        "anchor_value": anchor_value,
+        "anchor_time_ms": anchor_time_ms,
+    });
+    Ok(out.to_string())
+}
+
 #[pymodule]
 fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
@@ -1490,9 +1658,11 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(advance_after_tiling_json, m)?)?;
     m.add_function(wrap_pyfunction!(resample_round_transition_json, m)?)?;
     m.add_function(wrap_pyfunction!(autoplay_to_round5_and_resample_json, m)?)?;
+    m.add_function(wrap_pyfunction!(bootstrap_horizon_stage0_probe_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(plate_completability_json, m)?)?;
     m.add_function(wrap_pyfunction!(wertung_shaping_e_json, m)?)?;
+    m.add_function(wrap_pyfunction!(ownership_ek_plate_points_json, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_reset, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_choice_state_json, m)?)?;

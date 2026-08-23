@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 (Label-Diagnose ohne Training, Nutzer-Freigabe) registriert und beauftragt -->
+<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht -->
 
 # Vorregistrierung: Bootstrap-Horizont (2 vs 3) -- Option fuer den v22-Zuschnitt
 
@@ -195,3 +195,46 @@ Training:
    Kredit-Horizont-Verdacht geschwaecht und der klassische 2v3-Arm
    bleibt allein. Start nach Abschluss des laufenden
    Welle-3-Engine-Bauslots (Cargo-/Lastkonflikt vermeiden).
+
+### Stufe 0 ERGEBNIS + VERDIKT (2026-08-23; Agent, alle tragenden Zahlen vom Koordinator am Artefakt nachgemessen)
+
+**VERDIKT nach der vorregistrierten Lesart: die Anker-Variante
+QUALIFIZIERT SICH NICHT. Beide Bedingungen verfehlt.**
+
+- **Kritische Zellen (Hauptmetrik, R1-2 x hoher Fortschritt, n=130):**
+  Anker **0,282** gegen Bestand **0,363** (Pearson; Spearman
+  gleichlaufend) -- der Anker ist dort SCHLECHTER, nicht besser.
+- **Kosten:** 4.734 ms gegen 235 ms je Label = **Faktor 20,1** (Median
+  4.476/208). Die Stufe-1-Schwelle (<= +25 % Self-Play-Zeit) ist damit
+  ausser Reichweite.
+- Gegenlaeufig und ehrlich ausgewiesen: GESAMT ist der Anker besser
+  (0,419 gegen 0,386, n=480), ebenso auf der sekundaeren
+  Punktemargen-Skala. Deutung (HERLEITUNG, ungemessen): der
+  Anker-Rollout ist eine STICHPROBE des Rundenuebergangs, keine
+  Bewertung -- ueber vier Runden akkumuliert Sampling-Varianz, was
+  gerade die langen fruehen Rollouts (die kritischen Zellen) trifft,
+  waehrend der Bias-Vorteil im Mittel sichtbar bleibt.
+- **Struktur-Befund des Scouts (am Code, wichtig):** die Anker-Variante
+  ist KEIN Neubau, sondern strukturell die vorhandene rtv-Kette
+  (sample_round_transition_for_round, self_play.rs:2975ff; R4->R5 per
+  exact_round5_outcome). bootstrap_value_after_rounds endet dagegen
+  IMMER in net_leaf_eval (round_transition_deep.rs:852) -- ein
+  groesserer Horizont allein waere nie in den Freebie gelaufen.
+- **Historische Konsistenz (nachgeprueft, archive/history.md Task #80,
+  Z.2255ff):** dort schon registriert, dass rtv schwaecher mit dem
+  echten Ausgang korreliert als das billigere bootstrap und ~83 % der
+  Suchkosten trug; v13_nortv wurde Champion, nachdem rtv aus dem
+  Value-Ziel fiel. Stufe 0 reproduziert das auf den kritischen Zellen
+  und beziffert den Preis erstmals je Label. (Nuance: gesamt faellt
+  Stufe 0 anders aus als der Task-#80-Satz -- andere Metrik/Aera,
+  nicht als glatte Bestaetigung lesen.)
+- **Folge fuer die Prereg:** der Anker-/rundenabhaengige Arm ist damit
+  fuer den v22-Zuschnitt GESCHLOSSEN (nicht neu vorschlagen ohne neues
+  Regime). Der klassische 2-gegen-3-Arm bleibt unberuehrt offen. Der
+  Kredit-Horizont-Verdacht als Erklaerung der Vollendungsschwaeche ist
+  GESCHWAECHT: tiefere Ziele allein machen die Labels auf genau den
+  Zustaenden nicht besser, an denen der Spaltenbau entschieden wird.
+- Restpunkt: die Fortschritts-Definition der Stichprobe (max col_fill
+  ueber beide Spieler, am ersten Tiling-Record der FOLGERUNDE
+  gemessen) ist eine markierte Annahme des Agenten, nicht
+  vorregistriert.

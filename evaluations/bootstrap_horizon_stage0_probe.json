@@ -1,0 +1,6213 @@
+{
+ "prereg": "evaluations/PREREG_bootstrap_horizon.md, Stufe 0",
+ "modell": "alphazero_v21_2d_brierbest.onnx",
+ "korpus_glob": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\data\\selfplay_v20wdl_*.pkl",
+ "dateien_gescannt": 120,
+ "seed": 20260823,
+ "annahmen_markiert": [
+  "Fortschritt = max(col_fill) UEBER BEIDE SPIELER (nicht in der Prereg festgelegt)",
+  "Korrelation primaer BINAER (Label vs. hat-Spieler-i-gewonnen), gepoolt ueber beide Spielerperspektiven -- entspricht der Trainingsverwendung dieser [0,1]-Labels",
+  "Punktemarge-Korrelation (Differenz-Label vs. echte Marge) ist SEKUNDAER/zusaetzlich, nicht in der Prereg gefordert"
+ ],
+ "pool_groessen_je_zelle": {
+  "r1_high_k1=False": 14,
+  "r1_high_k1=True": 7,
+  "r1_low_k1=False": 754,
+  "r1_low_k1=True": 425,
+  "r2_high_k1=False": 500,
+  "r2_high_k1=True": 287,
+  "r2_low_k1=False": 268,
+  "r2_low_k1=True": 145,
+  "r3_high_k1=False": 737,
+  "r3_high_k1=True": 416,
+  "r3_low_k1=False": 31,
+  "r3_low_k1=True": 16
+ },
+ "stichprobe": {
+  "ziel_je_runde": {
+   "1": 90,
+   "2": 90,
+   "3": 60
+  },
+  "n_zustaende_ausgewaehlt": 240,
+  "n_zustaende_erfolgreich_gelabelt": 240,
+  "je_runde": {
+   "r1": 90,
+   "r2": 90,
+   "r3": 60
+  },
+  "je_runde_x_fortschritt": {
+   "r1_low": 69,
+   "r1_high": 21,
+   "r2_low": 46,
+   "r2_high": 44,
+   "r3_low": 30,
+   "r3_high": 30
+  },
+  "k1_aktiv_in_auswahl": 109
+ },
+ "divergenz_landkarte_runde_x_fortschritt": {
+  "r1_low": {
+   "n": 138,
+   "mean_abs_diff": 0.12781848680723693,
+   "median_abs_diff": 0.11494314068215467,
+   "max_abs_diff": 0.40062415348598335
+  },
+  "r1_high": {
+   "n": 42,
+   "mean_abs_diff": 0.18868664902994692,
+   "median_abs_diff": 0.17842297827967962,
+   "max_abs_diff": 0.4803586581183705
+  },
+  "r2_low": {
+   "n": 92,
+   "mean_abs_diff": 0.17098707919146627,
+   "median_abs_diff": 0.1621486680687451,
+   "max_abs_diff": 0.44610304863264816
+  },
+  "r2_high": {
+   "n": 88,
+   "mean_abs_diff": 0.1749269754938473,
+   "median_abs_diff": 0.18654655065409087,
+   "max_abs_diff": 0.3772636898997922
+  },
+  "r3_low": {
+   "n": 60,
+   "mean_abs_diff": 0.25661361131189575,
+   "median_abs_diff": 0.2834402645108284,
+   "max_abs_diff": 0.572964440870737
+  },
+  "r3_high": {
+   "n": 60,
+   "mean_abs_diff": 0.27547732032727684,
+   "median_abs_diff": 0.3151144180280979,
+   "max_abs_diff": 0.5965544980551847
+  }
+ },
+ "korrelation_mit_echtem_ergebnis": {
+  "gesamt": {
+   "bootstrap_vs_ergebnis": {
+    "n": 480,
+    "pearson": 0.3859479791352122,
+    "spearman": 0.38288629850023886
+   },
+   "anchor_vs_ergebnis": {
+    "n": 480,
+    "pearson": 0.4185618578202689,
+    "spearman": 0.41987288038630605
+   }
+  },
+  "kritische_zellen_r1_r2_hoher_fortschritt": {
+   "bootstrap_vs_ergebnis": {
+    "n": 130,
+    "pearson": 0.3627737274476345,
+    "spearman": 0.36302399260890156
+   },
+   "anchor_vs_ergebnis": {
+    "n": 130,
+    "pearson": 0.2822753114150148,
+    "spearman": 0.28103099597222136
+   }
+  }
+ },
+ "korrelation_mit_punktemarge_sekundaer": {
+  "gesamt": {
+   "bootstrap_diff_vs_punktemarge": {
+    "n": 240,
+    "pearson": 0.39985674541289556,
+    "spearman": 0.418080243497821
+   },
+   "anchor_diff_vs_punktemarge": {
+    "n": 240,
+    "pearson": 0.46585595494583454,
+    "spearman": 0.4708177659517674
+   }
+  },
+  "kritische_zellen_r1_r2_hoher_fortschritt": {
+   "bootstrap_diff_vs_punktemarge": {
+    "n": 65,
+    "pearson": 0.41511984456123696,
+    "spearman": 0.4553843470333276
+   },
+   "anchor_diff_vs_punktemarge": {
+    "n": 65,
+    "pearson": 0.4023846307935584,
+    "spearman": 0.4079152243843933
+   }
+  }
+ },
+ "rechenzeit_je_label": {
+  "gesamt": {
+   "bootstrap_time_ms": {
+    "n": 240,
+    "mean_ms": 235.22110333333333,
+    "median_ms": 208.4631,
+    "min_ms": 115.1198,
+    "max_ms": 780.5839
+   },
+   "anchor_time_ms": {
+    "n": 240,
+    "mean_ms": 4733.757770833334,
+    "median_ms": 4475.85915,
+    "min_ms": 2469.6090000000004,
+    "max_ms": 12269.6288
+   }
+  },
+  "je_runde": {
+   "r1": {
+    "bootstrap_time_ms": {
+     "n": 90,
+     "mean_ms": 197.76493,
+     "median_ms": 189.8183,
+     "min_ms": 119.2078,
+     "max_ms": 370.71070000000003
+    },
+    "anchor_time_ms": {
+     "n": 90,
+     "mean_ms": 3949.14653,
+     "median_ms": 3912.9919,
+     "min_ms": 2469.6090000000004,
+     "max_ms": 6455.6694
+    }
+   },
+   "r2": {
+    "bootstrap_time_ms": {
+     "n": 90,
+     "mean_ms": 264.29041,
+     "median_ms": 237.03935,
+     "min_ms": 137.3416,
+     "max_ms": 625.9087
+    },
+    "anchor_time_ms": {
+     "n": 90,
+     "mean_ms": 5312.928765555555,
+     "median_ms": 4940.38255,
+     "min_ms": 3114.3573,
+     "max_ms": 12269.6288
+    }
+   },
+   "r3": {
+    "bootstrap_time_ms": {
+     "n": 60,
+     "mean_ms": 247.80140333333333,
+     "median_ms": 207.54610000000002,
+     "min_ms": 115.1198,
+     "max_ms": 780.5839
+    },
+    "anchor_time_ms": {
+     "n": 60,
+     "mean_ms": 5041.91814,
+     "median_ms": 4566.5978,
+     "min_ms": 2709.2811,
+     "max_ms": 10988.1154
+    }
+   }
+  }
+ },
+ "kostengate_vorschau": {
+  "kommentar": "Grobe Vorschau, KEIN Stufe-1-Ersatz (dort: 50-Partien-Wallclock-A/B, ganze Self-Play-Partie inkl. Drafting-Suche, nicht nur das Label). Hier nur das Verhaeltnis der reinen Label-Rechenzeit je Rundenuebergang.",
+  "anchor_ist_x_mal_teurer_als_bootstrap": 20.124715443261465
+ },
+ "raw_results": [
+  {
+   "game_id": "v20wdl_20260808_142811_c82_g3",
+   "source_file": "selfplay_v20wdl_20260808_1650_g830.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    55,
+    17
+   ],
+   "seed": 20260823000,
+   "anchor_time_ms": 6209.2942,
+   "anchor_value": [
+    0.48261773348697024,
+    0.5173822665130298
+   ],
+   "bootstrap_time_ms": 303.6218,
+   "bootstrap_value": [
+    0.5873628854751587,
+    0.4462205767631531
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c112_g5",
+   "source_file": "selfplay_v20wdl_20260808_1744_g1130.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    25,
+    48
+   ],
+   "seed": 20260823001,
+   "anchor_time_ms": 3543.3759999999997,
+   "anchor_value": [
+    0.3173477408453765,
+    0.6826522591546236
+   ],
+   "bootstrap_time_ms": 208.05589999999998,
+   "bootstrap_value": [
+    0.24602967500686646,
+    0.7560148239135742
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c359_g6",
+   "source_file": "selfplay_v20wdl_20260808_2358_g3600.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    46,
+    24
+   ],
+   "seed": 20260823002,
+   "anchor_time_ms": 3755.0013,
+   "anchor_value": [
+    0.5774638461495563,
+    0.42253615385044374
+   ],
+   "bootstrap_time_ms": 209.1172,
+   "bootstrap_value": [
+    0.6121094226837158,
+    0.6601709127426147
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c49_g3",
+   "source_file": "selfplay_v20wdl_20260808_1552_g500.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    10,
+    22
+   ],
+   "seed": 20260823003,
+   "anchor_time_ms": 3295.6172,
+   "anchor_value": [
+    0.4631014321742545,
+    0.5368985678257455
+   ],
+   "bootstrap_time_ms": 216.8501,
+   "bootstrap_value": [
+    0.5948445200920105,
+    0.4939379394054413
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c371_g4",
+   "source_file": "selfplay_v20wdl_20260809_0012_g3720.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    11
+   ],
+   "seed": 20260823004,
+   "anchor_time_ms": 3665.4981,
+   "anchor_value": [
+    0.3770004741211746,
+    0.6229995258788253
+   ],
+   "bootstrap_time_ms": 191.9028,
+   "bootstrap_value": [
+    0.37841784954071045,
+    0.7398474812507629
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c231_g3",
+   "source_file": "selfplay_v20wdl_20260808_2108_g2320.pkl",
+   "round": 2,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    49,
+    41
+   ],
+   "seed": 20260823005,
+   "anchor_time_ms": 7166.515600000001,
+   "anchor_value": [
+    0.5457119093795614,
+    0.4542880906204387
+   ],
+   "bootstrap_time_ms": 625.9087,
+   "bootstrap_value": [
+    0.4095742702484131,
+    0.5593287348747253
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c276_g2",
+   "source_file": "selfplay_v20wdl_20260808_2212_g2770.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    42,
+    27
+   ],
+   "seed": 20260823006,
+   "anchor_time_ms": 6395.2916000000005,
+   "anchor_value": [
+    0.48981760251891915,
+    0.5101823974810809
+   ],
+   "bootstrap_time_ms": 226.6763,
+   "bootstrap_value": [
+    0.5632003545761108,
+    0.6125269532203674
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c350_g1",
+   "source_file": "selfplay_v20wdl_20260808_2347_g3510.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    33,
+    69
+   ],
+   "seed": 20260823007,
+   "anchor_time_ms": 3352.8324000000002,
+   "anchor_value": [
+    0.5049693292989048,
+    0.4950306707010952
+   ],
+   "bootstrap_time_ms": 246.9816,
+   "bootstrap_value": [
+    0.7119134664535522,
+    0.33304691314697266
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c395_g7",
+   "source_file": "selfplay_v20wdl_20260809_0041_g3960.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    30,
+    36
+   ],
+   "seed": 20260823008,
+   "anchor_time_ms": 5432.7601,
+   "anchor_value": [
+    0.45785196974218323,
+    0.5421480302578168
+   ],
+   "bootstrap_time_ms": 199.13639999999998,
+   "bootstrap_value": [
+    0.4330843687057495,
+    0.4601428210735321
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c26_g7",
+   "source_file": "selfplay_v20wdl_20260808_1514_g270.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    20,
+    17
+   ],
+   "seed": 20260823009,
+   "anchor_time_ms": 6206.381399999999,
+   "anchor_value": [
+    0.483920323189894,
+    0.5160796768101059
+   ],
+   "bootstrap_time_ms": 191.89139999999998,
+   "bootstrap_value": [
+    0.38705694675445557,
+    0.8201600313186646
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c173_g10",
+   "source_file": "selfplay_v20wdl_20260808_1932_g1740.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    55,
+    20
+   ],
+   "seed": 20260823010,
+   "anchor_time_ms": 3681.2217,
+   "anchor_value": [
+    0.5622578079226282,
+    0.43774219207737175
+   ],
+   "bootstrap_time_ms": 189.2819,
+   "bootstrap_value": [
+    0.6719983816146851,
+    0.4343567490577698
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c183_g1",
+   "source_file": "selfplay_v20wdl_20260808_1949_g1840.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    12,
+    28
+   ],
+   "seed": 20260823011,
+   "anchor_time_ms": 4800.9891,
+   "anchor_value": [
+    0.6449430235866208,
+    0.35505697641337913
+   ],
+   "bootstrap_time_ms": 221.1913,
+   "bootstrap_value": [
+    0.2676793336868286,
+    0.6588895320892334
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c285_g6",
+   "source_file": "selfplay_v20wdl_20260808_2224_g2860.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    17,
+    32
+   ],
+   "seed": 20260823012,
+   "anchor_time_ms": 3583.9165,
+   "anchor_value": [
+    0.44349628273919833,
+    0.5565037172608017
+   ],
+   "bootstrap_time_ms": 144.7484,
+   "bootstrap_value": [
+    0.3695324957370758,
+    0.851690948009491
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c376_g10",
+   "source_file": "selfplay_v20wdl_20260809_0018_g3770.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    19,
+    19
+   ],
+   "seed": 20260823013,
+   "anchor_time_ms": 7510.3953,
+   "anchor_value": [
+    0.43542876596132246,
+    0.5645712340386776
+   ],
+   "bootstrap_time_ms": 249.5906,
+   "bootstrap_value": [
+    0.9318393468856812,
+    0.4844769239425659
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c363_g5",
+   "source_file": "selfplay_v20wdl_20260809_0003_g3640.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    25,
+    18
+   ],
+   "seed": 20260823014,
+   "anchor_time_ms": 5601.3189,
+   "anchor_value": [
+    0.5717504855460009,
+    0.428249514453999
+   ],
+   "bootstrap_time_ms": 210.8312,
+   "bootstrap_value": [
+    0.6356121301651001,
+    0.554582953453064
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c103_g3",
+   "source_file": "selfplay_v20wdl_20260808_1728_g1040.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    15,
+    29
+   ],
+   "seed": 20260823015,
+   "anchor_time_ms": 4296.491,
+   "anchor_value": [
+    0.3195539657503993,
+    0.6804460342496007
+   ],
+   "bootstrap_time_ms": 177.6722,
+   "bootstrap_value": [
+    0.7179643511772156,
+    0.6401332020759583
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c303_g9",
+   "source_file": "selfplay_v20wdl_20260808_2250_g3040.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    28
+   ],
+   "seed": 20260823016,
+   "anchor_time_ms": 3671.2075999999997,
+   "anchor_value": [
+    0.4418916866118538,
+    0.5581083133881461
+   ],
+   "bootstrap_time_ms": 186.1854,
+   "bootstrap_value": [
+    0.32909926772117615,
+    0.7214263081550598
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c309_g3",
+   "source_file": "selfplay_v20wdl_20260808_2258_g3100.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    12,
+    16
+   ],
+   "seed": 20260823017,
+   "anchor_time_ms": 4734.4719,
+   "anchor_value": [
+    0.5815099263950902,
+    0.4184900736049098
+   ],
+   "bootstrap_time_ms": 243.5908,
+   "bootstrap_value": [
+    0.7739372849464417,
+    0.5241237878799438
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c223_g6",
+   "source_file": "selfplay_v20wdl_20260808_2058_g2240.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    22,
+    2
+   ],
+   "seed": 20260823018,
+   "anchor_time_ms": 4461.8655,
+   "anchor_value": [
+    0.27593300426696943,
+    0.7240669957330306
+   ],
+   "bootstrap_time_ms": 290.7541,
+   "bootstrap_value": [
+    0.2675316333770752,
+    0.6816495060920715
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c222_g8",
+   "source_file": "selfplay_v20wdl_20260808_2056_g2230.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    36,
+    39
+   ],
+   "seed": 20260823019,
+   "anchor_time_ms": 3598.0858,
+   "anchor_value": [
+    0.22491332806878536,
+    0.7750866719312147
+   ],
+   "bootstrap_time_ms": 265.2595,
+   "bootstrap_value": [
+    0.39550191164016724,
+    0.7219842672348022
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c35_g5",
+   "source_file": "selfplay_v20wdl_20260808_1529_g360.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    20,
+    20
+   ],
+   "seed": 20260823020,
+   "anchor_time_ms": 4815.526099999999,
+   "anchor_value": [
+    0.527051563972514,
+    0.47294843602748604
+   ],
+   "bootstrap_time_ms": 197.7855,
+   "bootstrap_value": [
+    0.8797188401222229,
+    0.2159593105316162
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c232_g7",
+   "source_file": "selfplay_v20wdl_20260808_2109_g2330.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    37,
+    41
+   ],
+   "seed": 20260823021,
+   "anchor_time_ms": 3934.7219,
+   "anchor_value": [
+    0.37903986623982,
+    0.6209601337601799
+   ],
+   "bootstrap_time_ms": 182.5574,
+   "bootstrap_value": [
+    0.17757242918014526,
+    0.8348342180252075
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c233_g4",
+   "source_file": "selfplay_v20wdl_20260808_2110_g2340.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    9,
+    15
+   ],
+   "seed": 20260823022,
+   "anchor_time_ms": 6159.011600000001,
+   "anchor_value": [
+    0.45155019817160635,
+    0.5484498018283936
+   ],
+   "bootstrap_time_ms": 305.3634,
+   "bootstrap_value": [
+    0.17031624913215637,
+    0.9683531522750854
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c186_g2",
+   "source_file": "selfplay_v20wdl_20260808_1955_g1870.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    20,
+    23
+   ],
+   "seed": 20260823023,
+   "anchor_time_ms": 5555.977000000001,
+   "anchor_value": [
+    0.5028451166454432,
+    0.49715488335455676
+   ],
+   "bootstrap_time_ms": 396.3082,
+   "bootstrap_value": [
+    0.9729987978935242,
+    0.2595573961734772
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c7_g1",
+   "source_file": "selfplay_v20wdl_20260808_1442_g80.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    12
+   ],
+   "seed": 20260823024,
+   "anchor_time_ms": 5785.9533,
+   "anchor_value": [
+    0.48933727458945375,
+    0.5106627254105462
+   ],
+   "bootstrap_time_ms": 378.096,
+   "bootstrap_value": [
+    0.21673572063446045,
+    0.7990977168083191
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c302_g8",
+   "source_file": "selfplay_v20wdl_20260808_2248_g3030.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    16,
+    33
+   ],
+   "seed": 20260823025,
+   "anchor_time_ms": 5538.5168,
+   "anchor_value": [
+    0.26602992382546364,
+    0.7339700761745364
+   ],
+   "bootstrap_time_ms": 254.31930000000003,
+   "bootstrap_value": [
+    0.38768476247787476,
+    0.7314169406890869
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c56_g7",
+   "source_file": "selfplay_v20wdl_20260808_1605_g570.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    10,
+    22
+   ],
+   "seed": 20260823026,
+   "anchor_time_ms": 4007.8144,
+   "anchor_value": [
+    0.5986741025866938,
+    0.4013258974133061
+   ],
+   "bootstrap_time_ms": 370.71070000000003,
+   "bootstrap_value": [
+    0.4789508581161499,
+    0.6053446531295776
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c114_g5",
+   "source_file": "selfplay_v20wdl_20260808_1747_g1150.pkl",
+   "round": 2,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    41,
+    34
+   ],
+   "seed": 20260823027,
+   "anchor_time_ms": 4738.1072,
+   "anchor_value": [
+    0.48193489721718735,
+    0.5180651027828127
+   ],
+   "bootstrap_time_ms": 312.4768,
+   "bootstrap_value": [
+    0.22554701566696167,
+    0.6266080737113953
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c262_g9",
+   "source_file": "selfplay_v20wdl_20260808_2152_g2630.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    26,
+    45
+   ],
+   "seed": 20260823028,
+   "anchor_time_ms": 6442.9105,
+   "anchor_value": [
+    0.47271509077681617,
+    0.5272849092231838
+   ],
+   "bootstrap_time_ms": 216.3156,
+   "bootstrap_value": [
+    0.5677998661994934,
+    0.6113532781600952
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c352_g2",
+   "source_file": "selfplay_v20wdl_20260808_2349_g3530.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    18,
+    21
+   ],
+   "seed": 20260823029,
+   "anchor_time_ms": 7527.1606,
+   "anchor_value": [
+    0.42582559287252975,
+    0.5741744071274703
+   ],
+   "bootstrap_time_ms": 314.36449999999996,
+   "bootstrap_value": [
+    0.8401647210121155,
+    0.666948676109314
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c135_g5",
+   "source_file": "selfplay_v20wdl_20260808_1825_g1360.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    51,
+    32
+   ],
+   "seed": 20260823030,
+   "anchor_time_ms": 5389.8422,
+   "anchor_value": [
+    0.5571185527047711,
+    0.442881447295229
+   ],
+   "bootstrap_time_ms": 315.8163,
+   "bootstrap_value": [
+    0.9168452620506287,
+    0.384295791387558
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c142_g2",
+   "source_file": "selfplay_v20wdl_20260808_1837_g1430.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    27,
+    24
+   ],
+   "seed": 20260823031,
+   "anchor_time_ms": 4415.8984,
+   "anchor_value": [
+    0.38322575869301484,
+    0.616774241306985
+   ],
+   "bootstrap_time_ms": 279.7108,
+   "bootstrap_value": [
+    0.9797802567481995,
+    0.03593409061431885
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c314_g2",
+   "source_file": "selfplay_v20wdl_20260808_2304_g3150.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    10
+   ],
+   "seed": 20260823032,
+   "anchor_time_ms": 5417.2669,
+   "anchor_value": [
+    0.31008649343775485,
+    0.6899135065622451
+   ],
+   "bootstrap_time_ms": 206.2219,
+   "bootstrap_value": [
+    0.10994267463684082,
+    0.8604001402854919
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c65_g3",
+   "source_file": "selfplay_v20wdl_20260808_1620_g660.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    23,
+    4
+   ],
+   "seed": 20260823033,
+   "anchor_time_ms": 7231.200000000001,
+   "anchor_value": [
+    0.5033600332946292,
+    0.4966399667053708
+   ],
+   "bootstrap_time_ms": 339.4385,
+   "bootstrap_value": [
+    0.24413850903511047,
+    0.7598809003829956
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c232_g4",
+   "source_file": "selfplay_v20wdl_20260808_2109_g2330.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    23,
+    33
+   ],
+   "seed": 20260823034,
+   "anchor_time_ms": 4809.120199999999,
+   "anchor_value": [
+    0.43807430507057027,
+    0.5619256949294298
+   ],
+   "bootstrap_time_ms": 265.0873,
+   "bootstrap_value": [
+    0.24829518795013428,
+    0.8263483047485352
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c222_g2",
+   "source_file": "selfplay_v20wdl_20260808_2056_g2230.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    8,
+    28
+   ],
+   "seed": 20260823035,
+   "anchor_time_ms": 4662.2476,
+   "anchor_value": [
+    0.5966258254075854,
+    0.40337417459241476
+   ],
+   "bootstrap_time_ms": 325.26460000000003,
+   "bootstrap_value": [
+    0.4608859717845917,
+    0.6013906598091125
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c283_g1",
+   "source_file": "selfplay_v20wdl_20260808_2222_g2840.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    19,
+    32
+   ],
+   "seed": 20260823036,
+   "anchor_time_ms": 5552.3923,
+   "anchor_value": [
+    0.501597490591394,
+    0.49840250940860586
+   ],
+   "bootstrap_time_ms": 291.0226,
+   "bootstrap_value": [
+    0.3640424311161041,
+    0.6766721606254578
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c92_g8",
+   "source_file": "selfplay_v20wdl_20260808_1707_g930.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    5,
+    10
+   ],
+   "seed": 20260823037,
+   "anchor_time_ms": 4826.5702,
+   "anchor_value": [
+    0.4880410292132495,
+    0.5119589707867506
+   ],
+   "bootstrap_time_ms": 253.3165,
+   "bootstrap_value": [
+    0.3139946460723877,
+    0.7329872250556946
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c300_g9",
+   "source_file": "selfplay_v20wdl_20260808_2245_g3010.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    40,
+    26
+   ],
+   "seed": 20260823038,
+   "anchor_time_ms": 3092.0675,
+   "anchor_value": [
+    0.6442844243720172,
+    0.3557155756279829
+   ],
+   "bootstrap_time_ms": 203.18900000000002,
+   "bootstrap_value": [
+    0.6246567368507385,
+    0.4897920489311218
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c14_g10",
+   "source_file": "selfplay_v20wdl_20260808_1454_g150.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    12,
+    20
+   ],
+   "seed": 20260823039,
+   "anchor_time_ms": 3833.3281,
+   "anchor_value": [
+    0.5922731805116322,
+    0.40772681948836775
+   ],
+   "bootstrap_time_ms": 179.9624,
+   "bootstrap_value": [
+    0.623573899269104,
+    0.4284110367298126
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c323_g3",
+   "source_file": "selfplay_v20wdl_20260808_2315_g3240.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    13,
+    15
+   ],
+   "seed": 20260823040,
+   "anchor_time_ms": 4950.920499999999,
+   "anchor_value": [
+    0.5203475389812289,
+    0.4796524610187711
+   ],
+   "bootstrap_time_ms": 187.24099999999999,
+   "bootstrap_value": [
+    0.498523473739624,
+    0.5849766135215759
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c308_g9",
+   "source_file": "selfplay_v20wdl_20260808_2256_g3090.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    24,
+    16
+   ],
+   "seed": 20260823041,
+   "anchor_time_ms": 4127.266,
+   "anchor_value": [
+    0.23121024581011762,
+    0.7687897541898824
+   ],
+   "bootstrap_time_ms": 167.3204,
+   "bootstrap_value": [
+    0.255754292011261,
+    0.6652737855911255
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c262_g5",
+   "source_file": "selfplay_v20wdl_20260808_2152_g2630.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    27,
+    27
+   ],
+   "seed": 20260823042,
+   "anchor_time_ms": 6307.6369,
+   "anchor_value": [
+    0.35348781528453743,
+    0.6465121847154626
+   ],
+   "bootstrap_time_ms": 552.4657,
+   "bootstrap_value": [
+    0.11187577247619629,
+    0.9712887406349182
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c157_g2",
+   "source_file": "selfplay_v20wdl_20260808_1904_g1580.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    5,
+    23
+   ],
+   "seed": 20260823043,
+   "anchor_time_ms": 4106.79,
+   "anchor_value": [
+    0.4928031578244284,
+    0.5071968421755716
+   ],
+   "bootstrap_time_ms": 343.5684,
+   "bootstrap_value": [
+    0.744392991065979,
+    0.23623979091644287
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c372_g5",
+   "source_file": "selfplay_v20wdl_20260809_0013_g3730.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    36,
+    22
+   ],
+   "seed": 20260823044,
+   "anchor_time_ms": 3056.6070999999997,
+   "anchor_value": [
+    0.41869223328101307,
+    0.5813077667189869
+   ],
+   "bootstrap_time_ms": 170.18820000000002,
+   "bootstrap_value": [
+    0.8990508913993835,
+    0.22908198833465576
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c142_g1",
+   "source_file": "selfplay_v20wdl_20260808_1837_g1430.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    3,
+    31
+   ],
+   "seed": 20260823045,
+   "anchor_time_ms": 3576.1355999999996,
+   "anchor_value": [
+    0.3089894387268064,
+    0.6910105612731937
+   ],
+   "bootstrap_time_ms": 166.451,
+   "bootstrap_value": [
+    0.016352951526641846,
+    0.9380682706832886
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c195_g10",
+   "source_file": "selfplay_v20wdl_20260808_2011_g1960.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    14,
+    0
+   ],
+   "seed": 20260823046,
+   "anchor_time_ms": 6784.5544,
+   "anchor_value": [
+    0.49246446864461857,
+    0.5075355313553814
+   ],
+   "bootstrap_time_ms": 271.1645,
+   "bootstrap_value": [
+    0.5897927284240723,
+    0.4434933364391327
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c325_g7",
+   "source_file": "selfplay_v20wdl_20260808_2317_g3260.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    32,
+    19
+   ],
+   "seed": 20260823047,
+   "anchor_time_ms": 4498.8236,
+   "anchor_value": [
+    0.5407784235768742,
+    0.4592215764231258
+   ],
+   "bootstrap_time_ms": 175.81040000000002,
+   "bootstrap_value": [
+    0.5981365442276001,
+    0.45694974064826965
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c134_g3",
+   "source_file": "selfplay_v20wdl_20260808_1823_g1350.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    47,
+    39
+   ],
+   "seed": 20260823048,
+   "anchor_time_ms": 4720.1425,
+   "anchor_value": [
+    0.5044102610239166,
+    0.4955897389760834
+   ],
+   "bootstrap_time_ms": 138.2417,
+   "bootstrap_value": [
+    0.4907980263233185,
+    0.7901638746261597
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c76_g1",
+   "source_file": "selfplay_v20wdl_20260808_1640_g770.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    21,
+    39
+   ],
+   "seed": 20260823049,
+   "anchor_time_ms": 4162.9119,
+   "anchor_value": [
+    0.23777693780802028,
+    0.7622230621919796
+   ],
+   "bootstrap_time_ms": 189.43380000000002,
+   "bootstrap_value": [
+    0.18637898564338684,
+    0.6653968691825867
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c376_g9",
+   "source_file": "selfplay_v20wdl_20260809_0018_g3770.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    19,
+    22
+   ],
+   "seed": 20260823050,
+   "anchor_time_ms": 4383.6672,
+   "anchor_value": [
+    0.3437558270916886,
+    0.6562441729083113
+   ],
+   "bootstrap_time_ms": 150.54809999999998,
+   "bootstrap_value": [
+    0.2809715270996094,
+    0.608552873134613
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c152_g6",
+   "source_file": "selfplay_v20wdl_20260808_1855_g1530.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    10,
+    25
+   ],
+   "seed": 20260823051,
+   "anchor_time_ms": 3816.0798,
+   "anchor_value": [
+    0.36687171028125887,
+    0.6331282897187411
+   ],
+   "bootstrap_time_ms": 221.0317,
+   "bootstrap_value": [
+    0.12033075094223022,
+    0.9625791907310486
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c325_g4",
+   "source_file": "selfplay_v20wdl_20260808_2317_g3260.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    42,
+    29
+   ],
+   "seed": 20260823052,
+   "anchor_time_ms": 5410.477,
+   "anchor_value": [
+    0.39793534728781377,
+    0.6020646527121862
+   ],
+   "bootstrap_time_ms": 187.3406,
+   "bootstrap_value": [
+    0.6443348526954651,
+    0.3882710635662079
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c359_g8",
+   "source_file": "selfplay_v20wdl_20260808_2358_g3600.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    5,
+    16
+   ],
+   "seed": 20260823053,
+   "anchor_time_ms": 4781.472299999999,
+   "anchor_value": [
+    0.42923352915818197,
+    0.5707664708418181
+   ],
+   "bootstrap_time_ms": 258.9015,
+   "bootstrap_value": [
+    0.0473494827747345,
+    0.9869053959846497
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c120_g4",
+   "source_file": "selfplay_v20wdl_20260808_1758_g1210.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    13
+   ],
+   "seed": 20260823054,
+   "anchor_time_ms": 4018.2805000000003,
+   "anchor_value": [
+    0.49026069292773927,
+    0.5097393070722607
+   ],
+   "bootstrap_time_ms": 263.5147,
+   "bootstrap_value": [
+    0.523613691329956,
+    0.5051410794258118
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c232_g1",
+   "source_file": "selfplay_v20wdl_20260808_2109_g2330.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    8,
+    0
+   ],
+   "seed": 20260823055,
+   "anchor_time_ms": 4704.8433,
+   "anchor_value": [
+    0.3638788378881733,
+    0.6361211621118268
+   ],
+   "bootstrap_time_ms": 377.8707,
+   "bootstrap_value": [
+    0.45128315687179565,
+    0.6079615354537964
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c383_g2",
+   "source_file": "selfplay_v20wdl_20260809_0027_g3840.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    19,
+    18
+   ],
+   "seed": 20260823056,
+   "anchor_time_ms": 4525.747899999999,
+   "anchor_value": [
+    0.5107051774323157,
+    0.4892948225676844
+   ],
+   "bootstrap_time_ms": 237.7108,
+   "bootstrap_value": [
+    0.6284600496292114,
+    0.37055811285972595
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c195_g1",
+   "source_file": "selfplay_v20wdl_20260808_2011_g1960.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    45,
+    16
+   ],
+   "seed": 20260823057,
+   "anchor_time_ms": 6261.6305,
+   "anchor_value": [
+    0.6972571922687015,
+    0.30274280773129847
+   ],
+   "bootstrap_time_ms": 378.2467,
+   "bootstrap_value": [
+    0.3133702874183655,
+    0.5306651592254639
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c149_g3",
+   "source_file": "selfplay_v20wdl_20260808_1849_g1500.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    21,
+    14
+   ],
+   "seed": 20260823058,
+   "anchor_time_ms": 4984.955400000001,
+   "anchor_value": [
+    0.573596729741779,
+    0.4264032702582211
+   ],
+   "bootstrap_time_ms": 193.76080000000002,
+   "bootstrap_value": [
+    0.7455984950065613,
+    0.5765181183815002
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c15_g7",
+   "source_file": "selfplay_v20wdl_20260808_1455_g160.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    35,
+    45
+   ],
+   "seed": 20260823059,
+   "anchor_time_ms": 4416.479200000001,
+   "anchor_value": [
+    0.5545823091834728,
+    0.44541769081652716
+   ],
+   "bootstrap_time_ms": 221.9925,
+   "bootstrap_value": [
+    0.4817458391189575,
+    0.6711118221282959
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c397_g9",
+   "source_file": "selfplay_v20wdl_20260809_0044_g3980.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    28,
+    39
+   ],
+   "seed": 20260823060,
+   "anchor_time_ms": 4040.3751999999995,
+   "anchor_value": [
+    0.47905455242390793,
+    0.5209454475760921
+   ],
+   "bootstrap_time_ms": 164.12560000000002,
+   "bootstrap_value": [
+    0.43459683656692505,
+    0.5763944387435913
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c262_g10",
+   "source_file": "selfplay_v20wdl_20260808_2152_g2630.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    49,
+    28
+   ],
+   "seed": 20260823061,
+   "anchor_time_ms": 6005.6227,
+   "anchor_value": [
+    0.6883111849696845,
+    0.3116888150303155
+   ],
+   "bootstrap_time_ms": 311.5037,
+   "bootstrap_value": [
+    0.9751564860343933,
+    0.08476823568344116
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c143_g3",
+   "source_file": "selfplay_v20wdl_20260808_1839_g1440.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    8,
+    14
+   ],
+   "seed": 20260823062,
+   "anchor_time_ms": 4273.066400000001,
+   "anchor_value": [
+    0.5329973676449098,
+    0.4670026323550902
+   ],
+   "bootstrap_time_ms": 221.8631,
+   "bootstrap_value": [
+    0.3964850902557373,
+    0.6766448616981506
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c314_g5",
+   "source_file": "selfplay_v20wdl_20260808_2304_g3150.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    21,
+    0
+   ],
+   "seed": 20260823063,
+   "anchor_time_ms": 5330.7436,
+   "anchor_value": [
+    0.5721425324888075,
+    0.4278574675111924
+   ],
+   "bootstrap_time_ms": 189.9403,
+   "bootstrap_value": [
+    0.7559837102890015,
+    0.2519758939743042
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c250_g7",
+   "source_file": "selfplay_v20wdl_20260808_2133_g2510.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    57,
+    39
+   ],
+   "seed": 20260823064,
+   "anchor_time_ms": 4326.0231,
+   "anchor_value": [
+    0.34130988513531946,
+    0.6586901148646805
+   ],
+   "bootstrap_time_ms": 152.45909999999998,
+   "bootstrap_value": [
+    0.5732541680335999,
+    0.450243204832077
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c114_g1",
+   "source_file": "selfplay_v20wdl_20260808_1747_g1150.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    1,
+    0
+   ],
+   "seed": 20260823065,
+   "anchor_time_ms": 12269.6288,
+   "anchor_value": [
+    0.4794714702277164,
+    0.5205285297722836
+   ],
+   "bootstrap_time_ms": 424.03479999999996,
+   "bootstrap_value": [
+    0.6571070551872253,
+    0.32482221722602844
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c163_g6",
+   "source_file": "selfplay_v20wdl_20260808_1914_g1640.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    9,
+    9
+   ],
+   "seed": 20260823066,
+   "anchor_time_ms": 5435.488600000001,
+   "anchor_value": [
+    0.5606275279899133,
+    0.4393724720100867
+   ],
+   "bootstrap_time_ms": 265.6449,
+   "bootstrap_value": [
+    0.7595195770263672,
+    0.1593509316444397
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c222_g10",
+   "source_file": "selfplay_v20wdl_20260808_2056_g2230.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    35,
+    23
+   ],
+   "seed": 20260823067,
+   "anchor_time_ms": 6169.8864,
+   "anchor_value": [
+    0.4250048307570131,
+    0.5749951692429868
+   ],
+   "bootstrap_time_ms": 402.5784,
+   "bootstrap_value": [
+    0.610351026058197,
+    0.27078431844711304
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c272_g3",
+   "source_file": "selfplay_v20wdl_20260808_2207_g2730.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    1
+   ],
+   "seed": 20260823068,
+   "anchor_time_ms": 6044.9594,
+   "anchor_value": [
+    0.6114599117931002,
+    0.38854008820689984
+   ],
+   "bootstrap_time_ms": 271.8308,
+   "bootstrap_value": [
+    0.5168417096138,
+    0.5388848185539246
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c372_g6",
+   "source_file": "selfplay_v20wdl_20260809_0013_g3730.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    22
+   ],
+   "seed": 20260823069,
+   "anchor_time_ms": 8179.2383,
+   "anchor_value": [
+    0.2690987803079631,
+    0.7309012196920369
+   ],
+   "bootstrap_time_ms": 504.31800000000004,
+   "bootstrap_value": [
+    0.05057254433631897,
+    0.9297237992286682
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c199_g9",
+   "source_file": "selfplay_v20wdl_20260808_2018_g2000.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    6
+   ],
+   "seed": 20260823070,
+   "anchor_time_ms": 5329.4751,
+   "anchor_value": [
+    0.384519805644058,
+    0.615480194355942
+   ],
+   "bootstrap_time_ms": 288.6547,
+   "bootstrap_value": [
+    0.17962700128555298,
+    0.7858737111091614
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c395_g9",
+   "source_file": "selfplay_v20wdl_20260809_0041_g3960.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    24,
+    24
+   ],
+   "seed": 20260823071,
+   "anchor_time_ms": 5310.5394,
+   "anchor_value": [
+    0.43600051454667155,
+    0.5639994854533285
+   ],
+   "bootstrap_time_ms": 345.8132,
+   "bootstrap_value": [
+    0.8174319863319397,
+    0.7538219094276428
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c7_g4",
+   "source_file": "selfplay_v20wdl_20260808_1442_g80.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    22,
+    28
+   ],
+   "seed": 20260823072,
+   "anchor_time_ms": 4813.0783,
+   "anchor_value": [
+    0.582152860094898,
+    0.4178471399051021
+   ],
+   "bootstrap_time_ms": 173.5448,
+   "bootstrap_value": [
+    0.32642093300819397,
+    0.747098445892334
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c86_g6",
+   "source_file": "selfplay_v20wdl_20260808_1657_g870.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    18,
+    8
+   ],
+   "seed": 20260823073,
+   "anchor_time_ms": 4783.1836,
+   "anchor_value": [
+    0.349564760250788,
+    0.6504352397492119
+   ],
+   "bootstrap_time_ms": 279.9982,
+   "bootstrap_value": [
+    0.5183476805686951,
+    0.5538318753242493
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c339_g10",
+   "source_file": "selfplay_v20wdl_20260808_2334_g3400.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    17,
+    22
+   ],
+   "seed": 20260823074,
+   "anchor_time_ms": 4650.702,
+   "anchor_value": [
+    0.36556571126245413,
+    0.6344342887375459
+   ],
+   "bootstrap_time_ms": 188.6181,
+   "bootstrap_value": [
+    0.01353543996810913,
+    0.9468364119529724
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c130_g7",
+   "source_file": "selfplay_v20wdl_20260808_1816_g1310.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    18,
+    20
+   ],
+   "seed": 20260823075,
+   "anchor_time_ms": 4043.7116,
+   "anchor_value": [
+    0.5797668931607428,
+    0.4202331068392572
+   ],
+   "bootstrap_time_ms": 137.44809999999998,
+   "bootstrap_value": [
+    0.5935314297676086,
+    0.44714826345443726
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c17_g1",
+   "source_file": "selfplay_v20wdl_20260808_1458_g180.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    10,
+    7
+   ],
+   "seed": 20260823076,
+   "anchor_time_ms": 3725.4486,
+   "anchor_value": [
+    0.5995461165506896,
+    0.40045388344931043
+   ],
+   "bootstrap_time_ms": 197.6227,
+   "bootstrap_value": [
+    0.7281390428543091,
+    0.26741746068000793
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c143_g1",
+   "source_file": "selfplay_v20wdl_20260808_1839_g1440.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    25,
+    14
+   ],
+   "seed": 20260823077,
+   "anchor_time_ms": 4228.645399999999,
+   "anchor_value": [
+    0.5500497182114757,
+    0.44995028178852425
+   ],
+   "bootstrap_time_ms": 242.9064,
+   "bootstrap_value": [
+    0.6029865741729736,
+    0.5311597585678101
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c142_g7",
+   "source_file": "selfplay_v20wdl_20260808_1837_g1430.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    30,
+    43
+   ],
+   "seed": 20260823078,
+   "anchor_time_ms": 3459.3343999999997,
+   "anchor_value": [
+    0.37993035787229146,
+    0.6200696421277085
+   ],
+   "bootstrap_time_ms": 194.7344,
+   "bootstrap_value": [
+    0.2018040418624878,
+    0.8939443230628967
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c86_g8",
+   "source_file": "selfplay_v20wdl_20260808_1657_g870.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    21,
+    0
+   ],
+   "seed": 20260823079,
+   "anchor_time_ms": 5192.4702,
+   "anchor_value": [
+    0.5852415624015868,
+    0.41475843759841324
+   ],
+   "bootstrap_time_ms": 284.8929,
+   "bootstrap_value": [
+    0.757583737373352,
+    0.2270115315914154
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c386_g10",
+   "source_file": "selfplay_v20wdl_20260809_0031_g3870.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    43,
+    6
+   ],
+   "seed": 20260823080,
+   "anchor_time_ms": 5811.4229000000005,
+   "anchor_value": [
+    0.625244296083449,
+    0.3747557039165509
+   ],
+   "bootstrap_time_ms": 182.1333,
+   "bootstrap_value": [
+    0.7997714281082153,
+    0.09162983298301697
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c64_g8",
+   "source_file": "selfplay_v20wdl_20260808_1619_g650.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    15,
+    8
+   ],
+   "seed": 20260823081,
+   "anchor_time_ms": 3138.6894,
+   "anchor_value": [
+    0.6804752683482814,
+    0.31952473165171874
+   ],
+   "bootstrap_time_ms": 168.6515,
+   "bootstrap_value": [
+    0.9873456358909607,
+    0.01284375786781311
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c130_g3",
+   "source_file": "selfplay_v20wdl_20260808_1816_g1310.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    37,
+    28
+   ],
+   "seed": 20260823082,
+   "anchor_time_ms": 5070.3117999999995,
+   "anchor_value": [
+    0.40695579048778463,
+    0.5930442095122154
+   ],
+   "bootstrap_time_ms": 209.33599999999998,
+   "bootstrap_value": [
+    0.38331860303878784,
+    0.7113298773765564
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c216_g1",
+   "source_file": "selfplay_v20wdl_20260808_2049_g2170.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    20
+   ],
+   "seed": 20260823083,
+   "anchor_time_ms": 4744.4001,
+   "anchor_value": [
+    0.4530214979847458,
+    0.5469785020152542
+   ],
+   "bootstrap_time_ms": 147.6131,
+   "bootstrap_value": [
+    0.6210117340087891,
+    0.5975208878517151
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c86_g8",
+   "source_file": "selfplay_v20wdl_20260808_1657_g870.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    21,
+    0
+   ],
+   "seed": 20260823084,
+   "anchor_time_ms": 5558.7766,
+   "anchor_value": [
+    0.5993527083943486,
+    0.4006472916056514
+   ],
+   "bootstrap_time_ms": 195.08800000000002,
+   "bootstrap_value": [
+    0.6714124083518982,
+    0.4379873275756836
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c371_g6",
+   "source_file": "selfplay_v20wdl_20260809_0012_g3720.pkl",
+   "round": 2,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    40,
+    31
+   ],
+   "seed": 20260823085,
+   "anchor_time_ms": 3390.6730000000002,
+   "anchor_value": [
+    0.6739517739196136,
+    0.3260482260803864
+   ],
+   "bootstrap_time_ms": 162.69310000000002,
+   "bootstrap_value": [
+    0.9027717113494873,
+    0.1982089877128601
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c100_g6",
+   "source_file": "selfplay_v20wdl_20260808_1722_g1010.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    9,
+    36
+   ],
+   "seed": 20260823086,
+   "anchor_time_ms": 6359.429300000001,
+   "anchor_value": [
+    0.3900596540503161,
+    0.6099403459496839
+   ],
+   "bootstrap_time_ms": 200.9714,
+   "bootstrap_value": [
+    0.2967253029346466,
+    0.8442084193229675
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c130_g2",
+   "source_file": "selfplay_v20wdl_20260808_1816_g1310.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    44,
+    9
+   ],
+   "seed": 20260823087,
+   "anchor_time_ms": 5439.9321,
+   "anchor_value": [
+    0.5934733343847145,
+    0.4065266656152855
+   ],
+   "bootstrap_time_ms": 218.98080000000002,
+   "bootstrap_value": [
+    0.7578256130218506,
+    0.21707570552825928
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c44_g7",
+   "source_file": "selfplay_v20wdl_20260808_1543_g450.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    12,
+    9
+   ],
+   "seed": 20260823088,
+   "anchor_time_ms": 4078.6118,
+   "anchor_value": [
+    0.64641224719219,
+    0.3535877528078099
+   ],
+   "bootstrap_time_ms": 190.8642,
+   "bootstrap_value": [
+    0.8741369247436523,
+    0.1474941372871399
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c77_g6",
+   "source_file": "selfplay_v20wdl_20260808_1641_g780.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    31,
+    38
+   ],
+   "seed": 20260823089,
+   "anchor_time_ms": 4024.82,
+   "anchor_value": [
+    0.3117270033502101,
+    0.6882729966497898
+   ],
+   "bootstrap_time_ms": 233.6174,
+   "bootstrap_value": [
+    0.018397778272628784,
+    0.9930629134178162
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c123_g6",
+   "source_file": "selfplay_v20wdl_20260808_1803_g1240.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    20,
+    29
+   ],
+   "seed": 20260823090,
+   "anchor_time_ms": 3366.9883,
+   "anchor_value": [
+    0.4546295957869464,
+    0.5453704042130536
+   ],
+   "bootstrap_time_ms": 162.9712,
+   "bootstrap_value": [
+    0.3939675986766815,
+    0.8746973872184753
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c152_g3",
+   "source_file": "selfplay_v20wdl_20260808_1855_g1530.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    20,
+    30
+   ],
+   "seed": 20260823091,
+   "anchor_time_ms": 3242.9798,
+   "anchor_value": [
+    0.5657264681531456,
+    0.43427353184685435
+   ],
+   "bootstrap_time_ms": 171.839,
+   "bootstrap_value": [
+    0.6324184536933899,
+    0.5554970502853394
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c245_g8",
+   "source_file": "selfplay_v20wdl_20260808_2126_g2460.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    22,
+    21
+   ],
+   "seed": 20260823092,
+   "anchor_time_ms": 4875.659,
+   "anchor_value": [
+    0.3876113228295639,
+    0.6123886771704361
+   ],
+   "bootstrap_time_ms": 262.8984,
+   "bootstrap_value": [
+    0.004884570837020874,
+    0.9856491088867188
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c17_g5",
+   "source_file": "selfplay_v20wdl_20260808_1458_g180.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    25,
+    17
+   ],
+   "seed": 20260823093,
+   "anchor_time_ms": 3597.4803,
+   "anchor_value": [
+    0.6344779136425376,
+    0.3655220863574624
+   ],
+   "bootstrap_time_ms": 203.8267,
+   "bootstrap_value": [
+    0.46628570556640625,
+    0.660528838634491
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c145_g9",
+   "source_file": "selfplay_v20wdl_20260808_1842_g1460.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    22,
+    7
+   ],
+   "seed": 20260823094,
+   "anchor_time_ms": 5572.3448,
+   "anchor_value": [
+    0.3740231306998516,
+    0.6259768693001484
+   ],
+   "bootstrap_time_ms": 215.7037,
+   "bootstrap_value": [
+    0.5006643533706665,
+    0.4310879111289978
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c54_g10",
+   "source_file": "selfplay_v20wdl_20260808_1601_g550.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    47,
+    31
+   ],
+   "seed": 20260823095,
+   "anchor_time_ms": 3078.2232,
+   "anchor_value": [
+    0.3990920422123904,
+    0.6009079577876096
+   ],
+   "bootstrap_time_ms": 150.54049999999998,
+   "bootstrap_value": [
+    0.7813525199890137,
+    0.3634614646434784
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c103_g10",
+   "source_file": "selfplay_v20wdl_20260808_1728_g1040.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    38,
+    19
+   ],
+   "seed": 20260823096,
+   "anchor_time_ms": 3442.6438,
+   "anchor_value": [
+    0.523305815100499,
+    0.476694184899501
+   ],
+   "bootstrap_time_ms": 186.9008,
+   "bootstrap_value": [
+    0.7319515347480774,
+    0.32000020146369934
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c352_g10",
+   "source_file": "selfplay_v20wdl_20260808_2349_g3530.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    19,
+    18
+   ],
+   "seed": 20260823097,
+   "anchor_time_ms": 4378.3013,
+   "anchor_value": [
+    0.5771798288400394,
+    0.42282017115996073
+   ],
+   "bootstrap_time_ms": 259.10339999999997,
+   "bootstrap_value": [
+    0.9192671775817871,
+    0.07265987992286682
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c201_g3",
+   "source_file": "selfplay_v20wdl_20260808_2021_g2020.pkl",
+   "round": 1,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    19,
+    30
+   ],
+   "seed": 20260823098,
+   "anchor_time_ms": 2899.9042,
+   "anchor_value": [
+    0.4163419955720491,
+    0.5836580044279509
+   ],
+   "bootstrap_time_ms": 171.1636,
+   "bootstrap_value": [
+    0.2951291501522064,
+    0.8711287975311279
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c232_g9",
+   "source_file": "selfplay_v20wdl_20260808_2109_g2330.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    25,
+    34
+   ],
+   "seed": 20260823099,
+   "anchor_time_ms": 3891.2619,
+   "anchor_value": [
+    0.4977313421295969,
+    0.5022686578704032
+   ],
+   "bootstrap_time_ms": 119.2078,
+   "bootstrap_value": [
+    0.46703827381134033,
+    0.48913073539733887
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c230_g1",
+   "source_file": "selfplay_v20wdl_20260808_2107_g2310.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    19,
+    59
+   ],
+   "seed": 20260823100,
+   "anchor_time_ms": 2849.2047000000002,
+   "anchor_value": [
+    0.2678829132330381,
+    0.732117086766962
+   ],
+   "bootstrap_time_ms": 118.29050000000001,
+   "bootstrap_value": [
+    0.0860762894153595,
+    0.8589189648628235
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c222_g8",
+   "source_file": "selfplay_v20wdl_20260808_2056_g2230.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    36,
+    39
+   ],
+   "seed": 20260823101,
+   "anchor_time_ms": 5327.5872,
+   "anchor_value": [
+    0.4668843133514287,
+    0.5331156866485712
+   ],
+   "bootstrap_time_ms": 559.8365,
+   "bootstrap_value": [
+    0.22697114944458008,
+    0.7779384851455688
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c216_g9",
+   "source_file": "selfplay_v20wdl_20260808_2049_g2170.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    25,
+    22
+   ],
+   "seed": 20260823102,
+   "anchor_time_ms": 3114.3573,
+   "anchor_value": [
+    0.4839381588430014,
+    0.5160618411569986
+   ],
+   "bootstrap_time_ms": 178.1788,
+   "bootstrap_value": [
+    0.3325292766094208,
+    0.6520612835884094
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c64_g10",
+   "source_file": "selfplay_v20wdl_20260808_1619_g650.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    42,
+    29
+   ],
+   "seed": 20260823103,
+   "anchor_time_ms": 3313.3608,
+   "anchor_value": [
+    0.6338126999054601,
+    0.36618730009453987
+   ],
+   "bootstrap_time_ms": 164.41639999999998,
+   "bootstrap_value": [
+    0.9809123277664185,
+    0.007173269987106323
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c285_g4",
+   "source_file": "selfplay_v20wdl_20260808_2224_g2860.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    11,
+    34
+   ],
+   "seed": 20260823104,
+   "anchor_time_ms": 4820.3068,
+   "anchor_value": [
+    0.44364302934662164,
+    0.5563569706533784
+   ],
+   "bootstrap_time_ms": 180.20620000000002,
+   "bootstrap_value": [
+    0.37633028626441956,
+    0.7706059217453003
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c366_g3",
+   "source_file": "selfplay_v20wdl_20260809_0006_g3670.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    36,
+    36
+   ],
+   "seed": 20260823105,
+   "anchor_time_ms": 3917.461,
+   "anchor_value": [
+    0.49158661753635274,
+    0.5084133824636472
+   ],
+   "bootstrap_time_ms": 152.1017,
+   "bootstrap_value": [
+    0.34911084175109863,
+    0.8472127914428711
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c262_g10",
+   "source_file": "selfplay_v20wdl_20260808_2152_g2630.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    49,
+    28
+   ],
+   "seed": 20260823106,
+   "anchor_time_ms": 4085.2983,
+   "anchor_value": [
+    0.6692126268406099,
+    0.3307873731593901
+   ],
+   "bootstrap_time_ms": 212.7386,
+   "bootstrap_value": [
+    0.8342741131782532,
+    0.2511555254459381
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c359_g10",
+   "source_file": "selfplay_v20wdl_20260808_2358_g3600.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    53,
+    34
+   ],
+   "seed": 20260823107,
+   "anchor_time_ms": 2575.6360000000004,
+   "anchor_value": [
+    0.5965837149935549,
+    0.4034162850064451
+   ],
+   "bootstrap_time_ms": 133.2354,
+   "bootstrap_value": [
+    0.610420286655426,
+    0.4778694808483124
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c110_g1",
+   "source_file": "selfplay_v20wdl_20260808_1740_g1110.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    32,
+    25
+   ],
+   "seed": 20260823108,
+   "anchor_time_ms": 2780.2093999999997,
+   "anchor_value": [
+    0.46345333954411033,
+    0.5365466604558897
+   ],
+   "bootstrap_time_ms": 147.53459999999998,
+   "bootstrap_value": [
+    0.6081664562225342,
+    0.5039888620376587
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c366_g3",
+   "source_file": "selfplay_v20wdl_20260809_0006_g3670.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    36,
+    36
+   ],
+   "seed": 20260823109,
+   "anchor_time_ms": 3898.0552,
+   "anchor_value": [
+    0.4246378010239179,
+    0.5753621989760822
+   ],
+   "bootstrap_time_ms": 171.10629999999998,
+   "bootstrap_value": [
+    0.4124634563922882,
+    0.612550675868988
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c285_g5",
+   "source_file": "selfplay_v20wdl_20260808_2224_g2860.pkl",
+   "round": 3,
+   "progress": 5,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    60,
+    50
+   ],
+   "seed": 20260823110,
+   "anchor_time_ms": 3057.6798,
+   "anchor_value": [
+    0.5629572569597221,
+    0.4370427430402779
+   ],
+   "bootstrap_time_ms": 173.45499999999998,
+   "bootstrap_value": [
+    0.8959292769432068,
+    0.08357864618301392
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c363_g9",
+   "source_file": "selfplay_v20wdl_20260809_0003_g3640.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    26,
+    19
+   ],
+   "seed": 20260823111,
+   "anchor_time_ms": 3639.1109,
+   "anchor_value": [
+    0.47234897090095124,
+    0.5276510290990488
+   ],
+   "bootstrap_time_ms": 172.5032,
+   "bootstrap_value": [
+    0.20959621667861938,
+    0.8788933157920837
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c54_g10",
+   "source_file": "selfplay_v20wdl_20260808_1601_g550.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    47,
+    31
+   ],
+   "seed": 20260823112,
+   "anchor_time_ms": 6439.0843,
+   "anchor_value": [
+    0.4891642776109887,
+    0.5108357223890113
+   ],
+   "bootstrap_time_ms": 178.439,
+   "bootstrap_value": [
+    0.560928463935852,
+    0.4552193582057953
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c44_g1",
+   "source_file": "selfplay_v20wdl_20260808_1543_g450.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    49,
+    18
+   ],
+   "seed": 20260823113,
+   "anchor_time_ms": 4946.3727,
+   "anchor_value": [
+    0.7577421416464168,
+    0.2422578583535832
+   ],
+   "bootstrap_time_ms": 236.3679,
+   "bootstrap_value": [
+    0.9030838012695312,
+    0.13214519619941711
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c216_g4",
+   "source_file": "selfplay_v20wdl_20260808_2049_g2170.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    17,
+    26
+   ],
+   "seed": 20260823114,
+   "anchor_time_ms": 3820.3196999999996,
+   "anchor_value": [
+    0.5059514505721253,
+    0.49404854942787463
+   ],
+   "bootstrap_time_ms": 272.6742,
+   "bootstrap_value": [
+    0.7804384827613831,
+    0.33315762877464294
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c348_g5",
+   "source_file": "selfplay_v20wdl_20260808_2345_g3490.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    11,
+    0
+   ],
+   "seed": 20260823115,
+   "anchor_time_ms": 8595.7809,
+   "anchor_value": [
+    0.5606636739207406,
+    0.4393363260792595
+   ],
+   "bootstrap_time_ms": 261.5435,
+   "bootstrap_value": [
+    0.9021552801132202,
+    0.010958462953567505
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c302_g4",
+   "source_file": "selfplay_v20wdl_20260808_2248_g3030.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    9,
+    0
+   ],
+   "seed": 20260823116,
+   "anchor_time_ms": 5016.334,
+   "anchor_value": [
+    0.4752519903921659,
+    0.5247480096078342
+   ],
+   "bootstrap_time_ms": 209.5995,
+   "bootstrap_value": [
+    0.5276390910148621,
+    0.6065388321876526
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c56_g9",
+   "source_file": "selfplay_v20wdl_20260808_1605_g570.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    31,
+    16
+   ],
+   "seed": 20260823117,
+   "anchor_time_ms": 4763.5235,
+   "anchor_value": [
+    0.6458161339742254,
+    0.3541838660257746
+   ],
+   "bootstrap_time_ms": 312.3269,
+   "bootstrap_value": [
+    0.9739160537719727,
+    0.02437642216682434
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c54_g5",
+   "source_file": "selfplay_v20wdl_20260808_1601_g550.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    52,
+    49
+   ],
+   "seed": 20260823118,
+   "anchor_time_ms": 4333.1909,
+   "anchor_value": [
+    0.6446986443670055,
+    0.3553013556329945
+   ],
+   "bootstrap_time_ms": 182.4905,
+   "bootstrap_value": [
+    0.5316603183746338,
+    0.563227653503418
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c276_g9",
+   "source_file": "selfplay_v20wdl_20260808_2212_g2770.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    18,
+    23
+   ],
+   "seed": 20260823119,
+   "anchor_time_ms": 4582.8347,
+   "anchor_value": [
+    0.47222185663861355,
+    0.5277781433613865
+   ],
+   "bootstrap_time_ms": 282.93780000000004,
+   "bootstrap_value": [
+    0.3663252592086792,
+    0.6154388189315796
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c134_g5",
+   "source_file": "selfplay_v20wdl_20260808_1823_g1350.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    5,
+    9
+   ],
+   "seed": 20260823120,
+   "anchor_time_ms": 3471.2496,
+   "anchor_value": [
+    0.4172957982105109,
+    0.582704201789489
+   ],
+   "bootstrap_time_ms": 189.2354,
+   "bootstrap_value": [
+    0.9584622383117676,
+    0.1346638798713684
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c129_g2",
+   "source_file": "selfplay_v20wdl_20260808_1814_g1300.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    15,
+    19
+   ],
+   "seed": 20260823121,
+   "anchor_time_ms": 4526.988600000001,
+   "anchor_value": [
+    0.522756957638445,
+    0.477243042361555
+   ],
+   "bootstrap_time_ms": 200.6843,
+   "bootstrap_value": [
+    0.2912718653678894,
+    0.8295746445655823
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c325_g6",
+   "source_file": "selfplay_v20wdl_20260808_2317_g3260.pkl",
+   "round": 2,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    29,
+    35
+   ],
+   "seed": 20260823122,
+   "anchor_time_ms": 4881.7182,
+   "anchor_value": [
+    0.3199401437842601,
+    0.6800598562157399
+   ],
+   "bootstrap_time_ms": 362.7128,
+   "bootstrap_value": [
+    0.05955877900123596,
+    0.9047234654426575
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c175_g8",
+   "source_file": "selfplay_v20wdl_20260808_1935_g1760.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    15,
+    13
+   ],
+   "seed": 20260823123,
+   "anchor_time_ms": 3550.3197,
+   "anchor_value": [
+    0.40919175802328667,
+    0.5908082419767134
+   ],
+   "bootstrap_time_ms": 182.7434,
+   "bootstrap_value": [
+    0.6167815923690796,
+    0.5379678010940552
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c114_g10",
+   "source_file": "selfplay_v20wdl_20260808_1747_g1150.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    25,
+    23
+   ],
+   "seed": 20260823124,
+   "anchor_time_ms": 5279.2808,
+   "anchor_value": [
+    0.4375218799830022,
+    0.5624781200169978
+   ],
+   "bootstrap_time_ms": 334.15889999999996,
+   "bootstrap_value": [
+    0.3598672151565552,
+    0.7102438807487488
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c15_g8",
+   "source_file": "selfplay_v20wdl_20260808_1455_g160.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    6,
+    47
+   ],
+   "seed": 20260823125,
+   "anchor_time_ms": 4077.9474999999998,
+   "anchor_value": [
+    0.5092106172009297,
+    0.49078938279907025
+   ],
+   "bootstrap_time_ms": 162.41920000000002,
+   "bootstrap_value": [
+    0.5329405069351196,
+    0.6344212293624878
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c35_g3",
+   "source_file": "selfplay_v20wdl_20260808_1529_g360.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    21,
+    19
+   ],
+   "seed": 20260823126,
+   "anchor_time_ms": 3232.8241000000003,
+   "anchor_value": [
+    0.6175914667249279,
+    0.3824085332750721
+   ],
+   "bootstrap_time_ms": 183.07119999999998,
+   "bootstrap_value": [
+    0.6481248140335083,
+    0.7575130462646484
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c77_g8",
+   "source_file": "selfplay_v20wdl_20260808_1641_g780.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    5,
+    3
+   ],
+   "seed": 20260823127,
+   "anchor_time_ms": 5857.3951,
+   "anchor_value": [
+    0.4501448554226399,
+    0.5498551445773601
+   ],
+   "bootstrap_time_ms": 165.4688,
+   "bootstrap_value": [
+    0.5281874537467957,
+    0.4067942202091217
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c86_g2",
+   "source_file": "selfplay_v20wdl_20260808_1657_g870.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    3,
+    19
+   ],
+   "seed": 20260823128,
+   "anchor_time_ms": 4607.261399999999,
+   "anchor_value": [
+    0.40869685027692837,
+    0.5913031497230716
+   ],
+   "bootstrap_time_ms": 178.9125,
+   "bootstrap_value": [
+    0.22314167022705078,
+    0.8615156412124634
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c374_g8",
+   "source_file": "selfplay_v20wdl_20260809_0016_g3750.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    34,
+    12
+   ],
+   "seed": 20260823129,
+   "anchor_time_ms": 6137.7366,
+   "anchor_value": [
+    0.5117288334955523,
+    0.4882711665044477
+   ],
+   "bootstrap_time_ms": 178.95620000000002,
+   "bootstrap_value": [
+    0.734947681427002,
+    0.23387742042541504
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c216_g6",
+   "source_file": "selfplay_v20wdl_20260808_2049_g2170.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    39,
+    25
+   ],
+   "seed": 20260823130,
+   "anchor_time_ms": 4761.539,
+   "anchor_value": [
+    0.47780762991992515,
+    0.5221923700800748
+   ],
+   "bootstrap_time_ms": 137.67180000000002,
+   "bootstrap_value": [
+    0.5008068680763245,
+    0.5841149687767029
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c92_g1",
+   "source_file": "selfplay_v20wdl_20260808_1707_g930.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    22,
+    18
+   ],
+   "seed": 20260823131,
+   "anchor_time_ms": 3190.8262999999997,
+   "anchor_value": [
+    0.6833313310444453,
+    0.31666866895555473
+   ],
+   "bootstrap_time_ms": 137.84650000000002,
+   "bootstrap_value": [
+    0.7165693640708923,
+    0.4015063941478729
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c210_g3",
+   "source_file": "selfplay_v20wdl_20260808_2038_g2110.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    65,
+    25
+   ],
+   "seed": 20260823132,
+   "anchor_time_ms": 4708.4316,
+   "anchor_value": [
+    0.5506978247887421,
+    0.449302175211258
+   ],
+   "bootstrap_time_ms": 323.55289999999997,
+   "bootstrap_value": [
+    0.5337109565734863,
+    0.4807450771331787
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c26_g8",
+   "source_file": "selfplay_v20wdl_20260808_1514_g270.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    54,
+    11
+   ],
+   "seed": 20260823133,
+   "anchor_time_ms": 3326.5729,
+   "anchor_value": [
+    0.618569911722138,
+    0.38143008827786196
+   ],
+   "bootstrap_time_ms": 137.6343,
+   "bootstrap_value": [
+    0.6337047815322876,
+    0.3334976136684418
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c152_g7",
+   "source_file": "selfplay_v20wdl_20260808_1855_g1530.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    35,
+    2
+   ],
+   "seed": 20260823134,
+   "anchor_time_ms": 5596.3278,
+   "anchor_value": [
+    0.5907270937553586,
+    0.4092729062446414
+   ],
+   "bootstrap_time_ms": 182.3601,
+   "bootstrap_value": [
+    0.8470818996429443,
+    0.21972453594207764
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c395_g6",
+   "source_file": "selfplay_v20wdl_20260809_0041_g3960.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    10,
+    3
+   ],
+   "seed": 20260823135,
+   "anchor_time_ms": 3719.8453000000004,
+   "anchor_value": [
+    0.3987616113721486,
+    0.6012383886278514
+   ],
+   "bootstrap_time_ms": 163.78789999999998,
+   "bootstrap_value": [
+    0.03390255570411682,
+    0.9350400567054749
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c123_g9",
+   "source_file": "selfplay_v20wdl_20260808_1803_g1240.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    11,
+    23
+   ],
+   "seed": 20260823136,
+   "anchor_time_ms": 4428.2837,
+   "anchor_value": [
+    0.3172173379799229,
+    0.6827826620200771
+   ],
+   "bootstrap_time_ms": 226.8539,
+   "bootstrap_value": [
+    0.3672231435775757,
+    0.8193120360374451
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c135_g2",
+   "source_file": "selfplay_v20wdl_20260808_1825_g1360.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    1,
+    7
+   ],
+   "seed": 20260823137,
+   "anchor_time_ms": 4620.1562,
+   "anchor_value": [
+    0.550577771971729,
+    0.44942222802827103
+   ],
+   "bootstrap_time_ms": 276.4641,
+   "bootstrap_value": [
+    0.2055509090423584,
+    0.8955252766609192
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c49_g2",
+   "source_file": "selfplay_v20wdl_20260808_1552_g500.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    7
+   ],
+   "seed": 20260823138,
+   "anchor_time_ms": 4008.0951000000005,
+   "anchor_value": [
+    0.4148114242015557,
+    0.5851885757984443
+   ],
+   "bootstrap_time_ms": 174.0401,
+   "bootstrap_value": [
+    0.19014835357666016,
+    0.6436888575553894
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c363_g3",
+   "source_file": "selfplay_v20wdl_20260809_0003_g3640.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    16,
+    19
+   ],
+   "seed": 20260823139,
+   "anchor_time_ms": 3489.9525000000003,
+   "anchor_value": [
+    0.5258409834946799,
+    0.47415901650532016
+   ],
+   "bootstrap_time_ms": 187.2603,
+   "bootstrap_value": [
+    0.15949565172195435,
+    0.8656038641929626
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c222_g6",
+   "source_file": "selfplay_v20wdl_20260808_2056_g2230.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    29,
+    22
+   ],
+   "seed": 20260823140,
+   "anchor_time_ms": 4188.4341,
+   "anchor_value": [
+    0.5286400528844047,
+    0.47135994711559526
+   ],
+   "bootstrap_time_ms": 240.5862,
+   "bootstrap_value": [
+    0.5011935830116272,
+    0.5833858251571655
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c356_g9",
+   "source_file": "selfplay_v20wdl_20260808_2354_g3570.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    11,
+    18
+   ],
+   "seed": 20260823141,
+   "anchor_time_ms": 5312.8982000000005,
+   "anchor_value": [
+    0.3947559599213037,
+    0.6052440400786963
+   ],
+   "bootstrap_time_ms": 168.7219,
+   "bootstrap_value": [
+    0.06639480590820312,
+    0.9361171722412109
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c291_g10",
+   "source_file": "selfplay_v20wdl_20260808_2232_g2920.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    31,
+    0
+   ],
+   "seed": 20260823142,
+   "anchor_time_ms": 2717.362,
+   "anchor_value": [
+    0.40876963683399864,
+    0.5912303631660014
+   ],
+   "bootstrap_time_ms": 159.5306,
+   "bootstrap_value": [
+    0.42280182242393494,
+    0.7724144458770752
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c323_g3",
+   "source_file": "selfplay_v20wdl_20260808_2315_g3240.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    13,
+    15
+   ],
+   "seed": 20260823143,
+   "anchor_time_ms": 4422.9686,
+   "anchor_value": [
+    0.3555744111374757,
+    0.6444255888625243
+   ],
+   "bootstrap_time_ms": 148.9918,
+   "bootstrap_value": [
+    0.2766011655330658,
+    0.6316012144088745
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c82_g8",
+   "source_file": "selfplay_v20wdl_20260808_1650_g830.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    35,
+    19
+   ],
+   "seed": 20260823144,
+   "anchor_time_ms": 3263.0232,
+   "anchor_value": [
+    0.42570548989151796,
+    0.574294510108482
+   ],
+   "bootstrap_time_ms": 159.9353,
+   "bootstrap_value": [
+    0.7511444091796875,
+    0.5229495167732239
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c123_g4",
+   "source_file": "selfplay_v20wdl_20260808_1803_g1240.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    50,
+    30
+   ],
+   "seed": 20260823145,
+   "anchor_time_ms": 6468.7734,
+   "anchor_value": [
+    0.554643786638973,
+    0.44535621336102704
+   ],
+   "bootstrap_time_ms": 275.9955,
+   "bootstrap_value": [
+    0.8298806548118591,
+    0.18449538946151733
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c302_g6",
+   "source_file": "selfplay_v20wdl_20260808_2248_g3030.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    32,
+    29
+   ],
+   "seed": 20260823146,
+   "anchor_time_ms": 5343.3838,
+   "anchor_value": [
+    0.40719119679086285,
+    0.5928088032091372
+   ],
+   "bootstrap_time_ms": 190.35469999999998,
+   "bootstrap_value": [
+    0.6958873867988586,
+    0.4397520124912262
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c232_g8",
+   "source_file": "selfplay_v20wdl_20260808_2109_g2330.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    9,
+    13
+   ],
+   "seed": 20260823147,
+   "anchor_time_ms": 2974.4047,
+   "anchor_value": [
+    0.6426539100428539,
+    0.3573460899571463
+   ],
+   "bootstrap_time_ms": 158.6447,
+   "bootstrap_value": [
+    0.6078156232833862,
+    0.3624988794326782
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c188_g8",
+   "source_file": "selfplay_v20wdl_20260808_1958_g1890.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    11,
+    0
+   ],
+   "seed": 20260823148,
+   "anchor_time_ms": 2592.8617000000004,
+   "anchor_value": [
+    0.4775815022101936,
+    0.5224184977898064
+   ],
+   "bootstrap_time_ms": 133.9724,
+   "bootstrap_value": [
+    0.11926785111427307,
+    0.7855564951896667
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c302_g5",
+   "source_file": "selfplay_v20wdl_20260808_2248_g3030.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    27,
+    38
+   ],
+   "seed": 20260823149,
+   "anchor_time_ms": 2901.1496,
+   "anchor_value": [
+    0.45787876030229296,
+    0.5421212396977071
+   ],
+   "bootstrap_time_ms": 115.1198,
+   "bootstrap_value": [
+    0.18808430433273315,
+    0.785773754119873
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c339_g10",
+   "source_file": "selfplay_v20wdl_20260808_2334_g3400.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    17,
+    22
+   ],
+   "seed": 20260823150,
+   "anchor_time_ms": 2957.1128,
+   "anchor_value": [
+    0.3627228261225383,
+    0.6372771738774616
+   ],
+   "bootstrap_time_ms": 219.7426,
+   "bootstrap_value": [
+    0.5904197096824646,
+    0.44778573513031006
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c110_g3",
+   "source_file": "selfplay_v20wdl_20260808_1740_g1110.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    23,
+    38
+   ],
+   "seed": 20260823151,
+   "anchor_time_ms": 3792.1781,
+   "anchor_value": [
+    0.3244531044478666,
+    0.6755468955521334
+   ],
+   "bootstrap_time_ms": 160.7627,
+   "bootstrap_value": [
+    0.8808958530426025,
+    0.10258245468139648
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c90_g3",
+   "source_file": "selfplay_v20wdl_20260808_1704_g910.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    9,
+    42
+   ],
+   "seed": 20260823152,
+   "anchor_time_ms": 3464.4781,
+   "anchor_value": [
+    0.4215611060502037,
+    0.5784388939497963
+   ],
+   "bootstrap_time_ms": 141.8666,
+   "bootstrap_value": [
+    0.7326209545135498,
+    0.43439751863479614
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c49_g7",
+   "source_file": "selfplay_v20wdl_20260808_1552_g500.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    33,
+    22
+   ],
+   "seed": 20260823153,
+   "anchor_time_ms": 4385.170300000001,
+   "anchor_value": [
+    0.5518708901178955,
+    0.4481291098821045
+   ],
+   "bootstrap_time_ms": 163.7026,
+   "bootstrap_value": [
+    0.7605313658714294,
+    0.2568751573562622
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c233_g8",
+   "source_file": "selfplay_v20wdl_20260808_2110_g2340.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    24,
+    8
+   ],
+   "seed": 20260823154,
+   "anchor_time_ms": 4949.2595,
+   "anchor_value": [
+    0.5068337889271586,
+    0.4931662110728414
+   ],
+   "bootstrap_time_ms": 174.566,
+   "bootstrap_value": [
+    0.21559998393058777,
+    0.7519420385360718
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c15_g2",
+   "source_file": "selfplay_v20wdl_20260808_1455_g160.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    12,
+    24
+   ],
+   "seed": 20260823155,
+   "anchor_time_ms": 4826.7924,
+   "anchor_value": [
+    0.36718846417993933,
+    0.6328115358200608
+   ],
+   "bootstrap_time_ms": 166.5248,
+   "bootstrap_value": [
+    0.016562223434448242,
+    0.9831135272979736
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c173_g9",
+   "source_file": "selfplay_v20wdl_20260808_1932_g1740.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    16,
+    21
+   ],
+   "seed": 20260823156,
+   "anchor_time_ms": 4251.2719,
+   "anchor_value": [
+    0.4089801074996477,
+    0.5910198925003523
+   ],
+   "bootstrap_time_ms": 182.51999999999998,
+   "bootstrap_value": [
+    0.49659737944602966,
+    0.8282437324523926
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c233_g9",
+   "source_file": "selfplay_v20wdl_20260808_2110_g2340.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    22,
+    15
+   ],
+   "seed": 20260823157,
+   "anchor_time_ms": 7964.5849,
+   "anchor_value": [
+    0.43687796143502644,
+    0.5631220385649736
+   ],
+   "bootstrap_time_ms": 582.419,
+   "bootstrap_value": [
+    0.24817460775375366,
+    0.8811923861503601
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c383_g5",
+   "source_file": "selfplay_v20wdl_20260809_0027_g3840.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    35,
+    50
+   ],
+   "seed": 20260823158,
+   "anchor_time_ms": 3855.6474,
+   "anchor_value": [
+    0.3066728736250701,
+    0.6933271263749299
+   ],
+   "bootstrap_time_ms": 228.73940000000002,
+   "bootstrap_value": [
+    0.7072970271110535,
+    0.5571652054786682
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c383_g3",
+   "source_file": "selfplay_v20wdl_20260809_0027_g3840.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    35,
+    27
+   ],
+   "seed": 20260823159,
+   "anchor_time_ms": 4490.1794,
+   "anchor_value": [
+    0.393915071508151,
+    0.606084928491849
+   ],
+   "bootstrap_time_ms": 194.14120000000003,
+   "bootstrap_value": [
+    0.20090225338935852,
+    0.7276815176010132
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c352_g3",
+   "source_file": "selfplay_v20wdl_20260808_2349_g3530.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    45,
+    13
+   ],
+   "seed": 20260823160,
+   "anchor_time_ms": 4604.4555,
+   "anchor_value": [
+    0.6783407133425939,
+    0.3216592866574061
+   ],
+   "bootstrap_time_ms": 327.8242,
+   "bootstrap_value": [
+    0.9969195127487183,
+    0.001264333724975586
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c309_g1",
+   "source_file": "selfplay_v20wdl_20260808_2258_g3100.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    45,
+    26
+   ],
+   "seed": 20260823161,
+   "anchor_time_ms": 3886.7802,
+   "anchor_value": [
+    0.7218594010874679,
+    0.278140598912532
+   ],
+   "bootstrap_time_ms": 137.3416,
+   "bootstrap_value": [
+    0.9596133828163147,
+    0.06013914942741394
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c135_g1",
+   "source_file": "selfplay_v20wdl_20260808_1825_g1360.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    23,
+    33
+   ],
+   "seed": 20260823162,
+   "anchor_time_ms": 4197.651699999999,
+   "anchor_value": [
+    0.3665769916939763,
+    0.6334230083060237
+   ],
+   "bootstrap_time_ms": 147.1891,
+   "bootstrap_value": [
+    0.6490592360496521,
+    0.5103141069412231
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c154_g3",
+   "source_file": "selfplay_v20wdl_20260808_1858_g1550.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    30,
+    21
+   ],
+   "seed": 20260823163,
+   "anchor_time_ms": 3908.3664000000003,
+   "anchor_value": [
+    0.6162125535962794,
+    0.38378744640372064
+   ],
+   "bootstrap_time_ms": 162.1336,
+   "bootstrap_value": [
+    0.9270256757736206,
+    0.2172231674194336
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c195_g5",
+   "source_file": "selfplay_v20wdl_20260808_2011_g1960.pkl",
+   "round": 2,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    35,
+    38
+   ],
+   "seed": 20260823164,
+   "anchor_time_ms": 3551.5167,
+   "anchor_value": [
+    0.3964488825522901,
+    0.6035511174477098
+   ],
+   "bootstrap_time_ms": 187.3681,
+   "bootstrap_value": [
+    0.31402039527893066,
+    0.8392284512519836
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c113_g6",
+   "source_file": "selfplay_v20wdl_20260808_1745_g1140.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    42,
+    27
+   ],
+   "seed": 20260823165,
+   "anchor_time_ms": 2709.2811,
+   "anchor_value": [
+    0.578827325398515,
+    0.421172674601485
+   ],
+   "bootstrap_time_ms": 159.1196,
+   "bootstrap_value": [
+    0.9652876257896423,
+    0.48054563999176025
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c194_g5",
+   "source_file": "selfplay_v20wdl_20260808_2009_g1950.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    26,
+    14
+   ],
+   "seed": 20260823166,
+   "anchor_time_ms": 5572.8594,
+   "anchor_value": [
+    0.7292792384282716,
+    0.2707207615717284
+   ],
+   "bootstrap_time_ms": 179.9965,
+   "bootstrap_value": [
+    0.6332531571388245,
+    0.5642428994178772
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c207_g9",
+   "source_file": "selfplay_v20wdl_20260808_2032_g2080.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    16,
+    36
+   ],
+   "seed": 20260823167,
+   "anchor_time_ms": 3632.7826,
+   "anchor_value": [
+    0.34166050994938946,
+    0.6583394900506105
+   ],
+   "bootstrap_time_ms": 152.7501,
+   "bootstrap_value": [
+    0.6093317270278931,
+    0.3386114835739136
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c372_g8",
+   "source_file": "selfplay_v20wdl_20260809_0013_g3730.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    13,
+    23
+   ],
+   "seed": 20260823168,
+   "anchor_time_ms": 7326.326,
+   "anchor_value": [
+    0.49335542382235387,
+    0.5066445761776461
+   ],
+   "bootstrap_time_ms": 373.8417,
+   "bootstrap_value": [
+    0.5639912486076355,
+    0.1699729561805725
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c230_g3",
+   "source_file": "selfplay_v20wdl_20260808_2107_g2310.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    11,
+    46
+   ],
+   "seed": 20260823169,
+   "anchor_time_ms": 6024.4326,
+   "anchor_value": [
+    0.40419857861371195,
+    0.5958014213862881
+   ],
+   "bootstrap_time_ms": 416.4801,
+   "bootstrap_value": [
+    0.629165768623352,
+    0.386147677898407
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c300_g7",
+   "source_file": "selfplay_v20wdl_20260808_2245_g3010.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    26,
+    4
+   ],
+   "seed": 20260823170,
+   "anchor_time_ms": 8067.972900000001,
+   "anchor_value": [
+    0.5447643252612427,
+    0.45523567473875715
+   ],
+   "bootstrap_time_ms": 259.42019999999997,
+   "bootstrap_value": [
+    0.9205740690231323,
+    0.12007960677146912
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c352_g4",
+   "source_file": "selfplay_v20wdl_20260808_2349_g3530.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    27,
+    16
+   ],
+   "seed": 20260823171,
+   "anchor_time_ms": 3697.1447,
+   "anchor_value": [
+    0.5621904346798148,
+    0.4378095653201853
+   ],
+   "bootstrap_time_ms": 236.3741,
+   "bootstrap_value": [
+    0.4243609607219696,
+    0.5067234039306641
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c64_g3",
+   "source_file": "selfplay_v20wdl_20260808_1619_g650.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    38,
+    26
+   ],
+   "seed": 20260823172,
+   "anchor_time_ms": 4800.2865,
+   "anchor_value": [
+    0.6424432282437955,
+    0.3575567717562045
+   ],
+   "bootstrap_time_ms": 241.6782,
+   "bootstrap_value": [
+    0.8270823359489441,
+    0.3002922832965851
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c56_g6",
+   "source_file": "selfplay_v20wdl_20260808_1605_g570.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    19,
+    24
+   ],
+   "seed": 20260823173,
+   "anchor_time_ms": 3561.6547,
+   "anchor_value": [
+    0.6726005131619808,
+    0.3273994868380192
+   ],
+   "bootstrap_time_ms": 217.70829999999998,
+   "bootstrap_value": [
+    0.7982534766197205,
+    0.32110172510147095
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c302_g7",
+   "source_file": "selfplay_v20wdl_20260808_2248_g3030.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    40,
+    38
+   ],
+   "seed": 20260823174,
+   "anchor_time_ms": 5329.509800000001,
+   "anchor_value": [
+    0.7880467636367591,
+    0.21195323636324104
+   ],
+   "bootstrap_time_ms": 246.2551,
+   "bootstrap_value": [
+    0.9818645715713501,
+    0.048546820878982544
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c113_g9",
+   "source_file": "selfplay_v20wdl_20260808_1745_g1140.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    23,
+    40
+   ],
+   "seed": 20260823175,
+   "anchor_time_ms": 5223.1512999999995,
+   "anchor_value": [
+    0.37112659959569194,
+    0.628873400404308
+   ],
+   "bootstrap_time_ms": 253.6812,
+   "bootstrap_value": [
+    0.7990758419036865,
+    0.27535295486450195
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c154_g8",
+   "source_file": "selfplay_v20wdl_20260808_1858_g1550.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    33,
+    26
+   ],
+   "seed": 20260823176,
+   "anchor_time_ms": 7309.7898,
+   "anchor_value": [
+    0.5289792235713168,
+    0.47102077642868323
+   ],
+   "bootstrap_time_ms": 387.27709999999996,
+   "bootstrap_value": [
+    0.3376448452472687,
+    0.821150541305542
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c359_g2",
+   "source_file": "selfplay_v20wdl_20260808_2358_g3600.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    14,
+    12
+   ],
+   "seed": 20260823177,
+   "anchor_time_ms": 4180.903200000001,
+   "anchor_value": [
+    0.4737083385625702,
+    0.5262916614374298
+   ],
+   "bootstrap_time_ms": 139.40640000000002,
+   "bootstrap_value": [
+    0.38800638914108276,
+    0.7789540886878967
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c173_g8",
+   "source_file": "selfplay_v20wdl_20260808_1932_g1740.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    0,
+    7
+   ],
+   "seed": 20260823178,
+   "anchor_time_ms": 9833.704000000002,
+   "anchor_value": [
+    0.45329859714331994,
+    0.5467014028566801
+   ],
+   "bootstrap_time_ms": 772.323,
+   "bootstrap_value": [
+    0.7968785166740417,
+    0.5121496319770813
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c76_g10",
+   "source_file": "selfplay_v20wdl_20260808_1640_g770.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    16,
+    58
+   ],
+   "seed": 20260823179,
+   "anchor_time_ms": 3470.7149,
+   "anchor_value": [
+    0.2736518694952557,
+    0.7263481305047443
+   ],
+   "bootstrap_time_ms": 179.94760000000002,
+   "bootstrap_value": [
+    0.32505401968955994,
+    0.8245845437049866
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c348_g2",
+   "source_file": "selfplay_v20wdl_20260808_2345_g3490.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    18,
+    19
+   ],
+   "seed": 20260823180,
+   "anchor_time_ms": 5122.440100000001,
+   "anchor_value": [
+    0.42625140015042906,
+    0.5737485998495709
+   ],
+   "bootstrap_time_ms": 237.39669999999998,
+   "bootstrap_value": [
+    0.33644524216651917,
+    0.7564610242843628
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c397_g6",
+   "source_file": "selfplay_v20wdl_20260809_0044_g3980.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    22,
+    14
+   ],
+   "seed": 20260823181,
+   "anchor_time_ms": 2485.296,
+   "anchor_value": [
+    0.6890530086860013,
+    0.3109469913139986
+   ],
+   "bootstrap_time_ms": 126.44579999999999,
+   "bootstrap_value": [
+    0.4489800035953522,
+    0.7659165859222412
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c175_g3",
+   "source_file": "selfplay_v20wdl_20260808_1935_g1760.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    17,
+    10
+   ],
+   "seed": 20260823182,
+   "anchor_time_ms": 3145.3253999999997,
+   "anchor_value": [
+    0.7070788078529716,
+    0.29292119214702855
+   ],
+   "bootstrap_time_ms": 171.4851,
+   "bootstrap_value": [
+    0.7613315582275391,
+    0.20469200611114502
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c287_g1",
+   "source_file": "selfplay_v20wdl_20260808_2227_g2880.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    20,
+    33
+   ],
+   "seed": 20260823183,
+   "anchor_time_ms": 6407.41,
+   "anchor_value": [
+    0.5025863115753681,
+    0.4974136884246319
+   ],
+   "bootstrap_time_ms": 195.5627,
+   "bootstrap_value": [
+    0.8478087186813354,
+    0.4381900727748871
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c11_g4",
+   "source_file": "selfplay_v20wdl_20260808_1448_g120.pkl",
+   "round": 1,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    14,
+    49
+   ],
+   "seed": 20260823184,
+   "anchor_time_ms": 3399.2231,
+   "anchor_value": [
+    0.42081382814434376,
+    0.5791861718556561
+   ],
+   "bootstrap_time_ms": 175.0943,
+   "bootstrap_value": [
+    0.42736855149269104,
+    0.5698407292366028
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c371_g7",
+   "source_file": "selfplay_v20wdl_20260809_0012_g3720.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    3,
+    23
+   ],
+   "seed": 20260823185,
+   "anchor_time_ms": 3747.7373,
+   "anchor_value": [
+    0.43205991196070376,
+    0.5679400880392963
+   ],
+   "bootstrap_time_ms": 170.8159,
+   "bootstrap_value": [
+    0.9476293921470642,
+    0.37165936827659607
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c41_g3",
+   "source_file": "selfplay_v20wdl_20260808_1538_g420.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    37,
+    21
+   ],
+   "seed": 20260823186,
+   "anchor_time_ms": 4996.3761,
+   "anchor_value": [
+    0.4624008350001063,
+    0.5375991649998937
+   ],
+   "bootstrap_time_ms": 269.5941,
+   "bootstrap_value": [
+    0.6996374726295471,
+    0.10992524027824402
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c64_g2",
+   "source_file": "selfplay_v20wdl_20260808_1619_g650.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    28,
+    21
+   ],
+   "seed": 20260823187,
+   "anchor_time_ms": 2649.7028,
+   "anchor_value": [
+    0.4341317219326368,
+    0.5658682780673632
+   ],
+   "bootstrap_time_ms": 164.9226,
+   "bootstrap_value": [
+    0.21149608492851257,
+    0.8668012619018555
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c307_g2",
+   "source_file": "selfplay_v20wdl_20260808_2255_g3080.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    19,
+    35
+   ],
+   "seed": 20260823188,
+   "anchor_time_ms": 5933.5985,
+   "anchor_value": [
+    0.4275450440943827,
+    0.5724549559056172
+   ],
+   "bootstrap_time_ms": 245.9828,
+   "bootstrap_value": [
+    0.16565972566604614,
+    0.6331589818000793
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c262_g4",
+   "source_file": "selfplay_v20wdl_20260808_2152_g2630.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    27,
+    16
+   ],
+   "seed": 20260823189,
+   "anchor_time_ms": 4489.8528,
+   "anchor_value": [
+    0.5452260511577434,
+    0.4547739488422566
+   ],
+   "bootstrap_time_ms": 253.45810000000003,
+   "bootstrap_value": [
+    0.3856560289859772,
+    0.7819777727127075
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c135_g10",
+   "source_file": "selfplay_v20wdl_20260808_1825_g1360.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    38,
+    42
+   ],
+   "seed": 20260823190,
+   "anchor_time_ms": 3907.7399,
+   "anchor_value": [
+    0.5453307694536293,
+    0.45466923054637065
+   ],
+   "bootstrap_time_ms": 201.2123,
+   "bootstrap_value": [
+    0.558538019657135,
+    0.5328854322433472
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c163_g7",
+   "source_file": "selfplay_v20wdl_20260808_1914_g1640.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    28,
+    62
+   ],
+   "seed": 20260823191,
+   "anchor_time_ms": 3998.2178,
+   "anchor_value": [
+    0.34850347175647495,
+    0.6514965282435252
+   ],
+   "bootstrap_time_ms": 145.8354,
+   "bootstrap_value": [
+    0.7225446701049805,
+    0.4575884938240051
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c154_g8",
+   "source_file": "selfplay_v20wdl_20260808_1858_g1550.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    33,
+    26
+   ],
+   "seed": 20260823192,
+   "anchor_time_ms": 2771.7259,
+   "anchor_value": [
+    0.5614909231544657,
+    0.4385090768455343
+   ],
+   "bootstrap_time_ms": 169.6147,
+   "bootstrap_value": [
+    0.7259760499000549,
+    0.5116349458694458
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c250_g6",
+   "source_file": "selfplay_v20wdl_20260808_2133_g2510.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    27,
+    18
+   ],
+   "seed": 20260823193,
+   "anchor_time_ms": 4233.7232,
+   "anchor_value": [
+    0.5341148339702215,
+    0.46588516602977853
+   ],
+   "bootstrap_time_ms": 186.5182,
+   "bootstrap_value": [
+    0.46697813272476196,
+    0.6956740617752075
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c229_g2",
+   "source_file": "selfplay_v20wdl_20260808_2105_g2300.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    60,
+    20
+   ],
+   "seed": 20260823194,
+   "anchor_time_ms": 3117.962,
+   "anchor_value": [
+    0.6025271136190192,
+    0.39747288638098077
+   ],
+   "bootstrap_time_ms": 170.33,
+   "bootstrap_value": [
+    0.6187102794647217,
+    0.26908421516418457
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c54_g1",
+   "source_file": "selfplay_v20wdl_20260808_1601_g550.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    34,
+    29
+   ],
+   "seed": 20260823195,
+   "anchor_time_ms": 2545.1852000000003,
+   "anchor_value": [
+    0.41511119896635074,
+    0.5848888010336493
+   ],
+   "bootstrap_time_ms": 180.2348,
+   "bootstrap_value": [
+    0.45477429032325745,
+    0.7740853428840637
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c307_g6",
+   "source_file": "selfplay_v20wdl_20260808_2255_g3080.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    31,
+    40
+   ],
+   "seed": 20260823196,
+   "anchor_time_ms": 5940.189399999999,
+   "anchor_value": [
+    0.675174436557577,
+    0.32482556344242286
+   ],
+   "bootstrap_time_ms": 416.59639999999996,
+   "bootstrap_value": [
+    0.8884941935539246,
+    0.32978203892707825
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c307_g2",
+   "source_file": "selfplay_v20wdl_20260808_2255_g3080.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    19,
+    35
+   ],
+   "seed": 20260823197,
+   "anchor_time_ms": 3843.4934,
+   "anchor_value": [
+    0.40610373168304775,
+    0.5938962683169524
+   ],
+   "bootstrap_time_ms": 156.97820000000002,
+   "bootstrap_value": [
+    0.06321385502815247,
+    0.9252352118492126
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c103_g1",
+   "source_file": "selfplay_v20wdl_20260808_1728_g1040.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    20,
+    65
+   ],
+   "seed": 20260823198,
+   "anchor_time_ms": 2475.6969,
+   "anchor_value": [
+    0.3639618099192905,
+    0.6360381900807095
+   ],
+   "bootstrap_time_ms": 144.5901,
+   "bootstrap_value": [
+    0.3713369369506836,
+    0.7734822034835815
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c108_g6",
+   "source_file": "selfplay_v20wdl_20260808_1736_g1090.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    32,
+    9
+   ],
+   "seed": 20260823199,
+   "anchor_time_ms": 3988.6727,
+   "anchor_value": [
+    0.4626421084923064,
+    0.5373578915076935
+   ],
+   "bootstrap_time_ms": 142.91400000000002,
+   "bootstrap_value": [
+    0.667639970779419,
+    0.3388274013996124
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c308_g3",
+   "source_file": "selfplay_v20wdl_20260808_2256_g3090.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    32,
+    17
+   ],
+   "seed": 20260823200,
+   "anchor_time_ms": 6557.0043,
+   "anchor_value": [
+    0.6396654474347147,
+    0.36033455256528557
+   ],
+   "bootstrap_time_ms": 208.87030000000001,
+   "bootstrap_value": [
+    0.9846540093421936,
+    0.0073178112506866455
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c216_g5",
+   "source_file": "selfplay_v20wdl_20260808_2049_g2170.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    39,
+    21
+   ],
+   "seed": 20260823201,
+   "anchor_time_ms": 3050.768,
+   "anchor_value": [
+    0.4995812945687929,
+    0.500418705431207
+   ],
+   "bootstrap_time_ms": 225.72320000000002,
+   "bootstrap_value": [
+    0.7152608633041382,
+    0.37418389320373535
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c76_g1",
+   "source_file": "selfplay_v20wdl_20260808_1640_g770.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    21,
+    39
+   ],
+   "seed": 20260823202,
+   "anchor_time_ms": 4067.7506000000003,
+   "anchor_value": [
+    0.31559721317413253,
+    0.6844027868258674
+   ],
+   "bootstrap_time_ms": 169.2781,
+   "bootstrap_value": [
+    0.3639686405658722,
+    0.9739184379577637
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c372_g2",
+   "source_file": "selfplay_v20wdl_20260809_0013_g3730.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    23,
+    24
+   ],
+   "seed": 20260823203,
+   "anchor_time_ms": 3889.9407,
+   "anchor_value": [
+    0.367329655517219,
+    0.6326703444827808
+   ],
+   "bootstrap_time_ms": 150.8475,
+   "bootstrap_value": [
+    0.4152669608592987,
+    0.7031331062316895
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c68_g7",
+   "source_file": "selfplay_v20wdl_20260808_1626_g690.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    29,
+    20
+   ],
+   "seed": 20260823204,
+   "anchor_time_ms": 3919.7005000000004,
+   "anchor_value": [
+    0.5945365831608889,
+    0.405463416839111
+   ],
+   "bootstrap_time_ms": 292.52909999999997,
+   "bootstrap_value": [
+    0.8508486747741699,
+    0.18514090776443481
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c183_g4",
+   "source_file": "selfplay_v20wdl_20260808_1949_g1840.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    25,
+    17
+   ],
+   "seed": 20260823205,
+   "anchor_time_ms": 4009.4197999999997,
+   "anchor_value": [
+    0.44237622596160203,
+    0.557623774038398
+   ],
+   "bootstrap_time_ms": 178.9941,
+   "bootstrap_value": [
+    0.7881117463111877,
+    0.26393839716911316
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c110_g2",
+   "source_file": "selfplay_v20wdl_20260808_1740_g1110.pkl",
+   "round": 2,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    19,
+    34
+   ],
+   "seed": 20260823206,
+   "anchor_time_ms": 4072.7281,
+   "anchor_value": [
+    0.704035140837491,
+    0.2959648591625091
+   ],
+   "bootstrap_time_ms": 346.24379999999996,
+   "bootstrap_value": [
+    0.7522867918014526,
+    0.18895277380943298
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c108_g10",
+   "source_file": "selfplay_v20wdl_20260808_1736_g1090.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    38,
+    12
+   ],
+   "seed": 20260823207,
+   "anchor_time_ms": 5502.2398,
+   "anchor_value": [
+    0.5198260701477274,
+    0.4801739298522726
+   ],
+   "bootstrap_time_ms": 209.1114,
+   "bootstrap_value": [
+    0.5040664672851562,
+    0.5901407599449158
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c352_g1",
+   "source_file": "selfplay_v20wdl_20260808_2349_g3530.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    13,
+    2
+   ],
+   "seed": 20260823208,
+   "anchor_time_ms": 2469.6090000000004,
+   "anchor_value": [
+    0.6124255694922838,
+    0.38757443050771634
+   ],
+   "bootstrap_time_ms": 134.8971,
+   "bootstrap_value": [
+    0.8185514211654663,
+    0.4537240266799927
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c366_g6",
+   "source_file": "selfplay_v20wdl_20260809_0006_g3670.pkl",
+   "round": 3,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    29,
+    41
+   ],
+   "seed": 20260823209,
+   "anchor_time_ms": 10988.1154,
+   "anchor_value": [
+    0.3221302788272154,
+    0.6778697211727847
+   ],
+   "bootstrap_time_ms": 780.5839,
+   "bootstrap_value": [
+    0.4477626383304596,
+    0.6516731977462769
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c50_g8",
+   "source_file": "selfplay_v20wdl_20260808_1554_g510.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    42,
+    15
+   ],
+   "seed": 20260823210,
+   "anchor_time_ms": 3229.4644,
+   "anchor_value": [
+    0.7262104729665235,
+    0.2737895270334765
+   ],
+   "bootstrap_time_ms": 125.9642,
+   "bootstrap_value": [
+    0.9156203866004944,
+    0.11669933795928955
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c199_g1",
+   "source_file": "selfplay_v20wdl_20260808_2018_g2000.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    24,
+    25
+   ],
+   "seed": 20260823211,
+   "anchor_time_ms": 3004.5777,
+   "anchor_value": [
+    0.3460521744307947,
+    0.6539478255692053
+   ],
+   "bootstrap_time_ms": 174.8507,
+   "bootstrap_value": [
+    0.2150564193725586,
+    0.7157614231109619
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c373_g1",
+   "source_file": "selfplay_v20wdl_20260809_0015_g3740.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    30,
+    62
+   ],
+   "seed": 20260823212,
+   "anchor_time_ms": 3222.9887000000003,
+   "anchor_value": [
+    0.4560605693244142,
+    0.5439394306755858
+   ],
+   "bootstrap_time_ms": 206.15339999999998,
+   "bootstrap_value": [
+    0.26799753308296204,
+    0.8719117641448975
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c395_g3",
+   "source_file": "selfplay_v20wdl_20260809_0041_g3960.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    26,
+    33
+   ],
+   "seed": 20260823213,
+   "anchor_time_ms": 4759.9429,
+   "anchor_value": [
+    0.535450440117729,
+    0.4645495598822709
+   ],
+   "bootstrap_time_ms": 222.2081,
+   "bootstrap_value": [
+    0.36702969670295715,
+    0.6777403950691223
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c222_g7",
+   "source_file": "selfplay_v20wdl_20260808_2056_g2230.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    41,
+    44
+   ],
+   "seed": 20260823214,
+   "anchor_time_ms": 4054.0841,
+   "anchor_value": [
+    0.4361542434420762,
+    0.5638457565579238
+   ],
+   "bootstrap_time_ms": 224.09699999999998,
+   "bootstrap_value": [
+    0.40264618396759033,
+    0.6604010462760925
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c64_g5",
+   "source_file": "selfplay_v20wdl_20260808_1619_g650.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    19,
+    1
+   ],
+   "seed": 20260823215,
+   "anchor_time_ms": 9801.9379,
+   "anchor_value": [
+    0.5707705246597974,
+    0.4292294753402025
+   ],
+   "bootstrap_time_ms": 359.36620000000005,
+   "bootstrap_value": [
+    0.8737591505050659,
+    0.4197345972061157
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c173_g5",
+   "source_file": "selfplay_v20wdl_20260808_1932_g1740.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    40,
+    16
+   ],
+   "seed": 20260823216,
+   "anchor_time_ms": 4031.5594,
+   "anchor_value": [
+    0.6760775124092318,
+    0.32392248759076814
+   ],
+   "bootstrap_time_ms": 237.6045,
+   "bootstrap_value": [
+    0.8184588551521301,
+    0.3014460504055023
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c350_g5",
+   "source_file": "selfplay_v20wdl_20260808_2347_g3510.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    33,
+    26
+   ],
+   "seed": 20260823217,
+   "anchor_time_ms": 7248.622,
+   "anchor_value": [
+    0.5577522018798069,
+    0.44224779812019305
+   ],
+   "bootstrap_time_ms": 449.9697,
+   "bootstrap_value": [
+    0.678061842918396,
+    0.5866538882255554
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c275_g2",
+   "source_file": "selfplay_v20wdl_20260808_2211_g2760.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    23,
+    41
+   ],
+   "seed": 20260823218,
+   "anchor_time_ms": 7837.7121,
+   "anchor_value": [
+    0.45437894772043913,
+    0.5456210522795609
+   ],
+   "bootstrap_time_ms": 311.3328,
+   "bootstrap_value": [
+    0.7912251949310303,
+    0.7701248526573181
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c307_g10",
+   "source_file": "selfplay_v20wdl_20260808_2255_g3080.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    44,
+    40
+   ],
+   "seed": 20260823219,
+   "anchor_time_ms": 7086.0081,
+   "anchor_value": [
+    0.5605739429005541,
+    0.43942605709944593
+   ],
+   "bootstrap_time_ms": 350.8108,
+   "bootstrap_value": [
+    0.6889349818229675,
+    0.5151695609092712
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c316_g8",
+   "source_file": "selfplay_v20wdl_20260808_2307_g3170.pkl",
+   "round": 2,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    2,
+    32
+   ],
+   "seed": 20260823220,
+   "anchor_time_ms": 6128.0479000000005,
+   "anchor_value": [
+    0.39711762213833246,
+    0.6028823778616675
+   ],
+   "bootstrap_time_ms": 353.1383,
+   "bootstrap_value": [
+    0.4361414313316345,
+    0.7463821172714233
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c275_g10",
+   "source_file": "selfplay_v20wdl_20260808_2211_g2760.pkl",
+   "round": 1,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    25,
+    33
+   ],
+   "seed": 20260823221,
+   "anchor_time_ms": 4501.1534,
+   "anchor_value": [
+    0.4126159496076328,
+    0.5873840503923672
+   ],
+   "bootstrap_time_ms": 288.87190000000004,
+   "bootstrap_value": [
+    0.6927449703216553,
+    0.39460986852645874
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c233_g1",
+   "source_file": "selfplay_v20wdl_20260808_2110_g2340.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    25,
+    33
+   ],
+   "seed": 20260823222,
+   "anchor_time_ms": 6455.6694,
+   "anchor_value": [
+    0.5178532374420859,
+    0.4821467625579141
+   ],
+   "bootstrap_time_ms": 209.60490000000001,
+   "bootstrap_value": [
+    0.651675820350647,
+    0.4879341125488281
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c26_g2",
+   "source_file": "selfplay_v20wdl_20260808_1514_g270.pkl",
+   "round": 1,
+   "progress": 1,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    25,
+    0
+   ],
+   "seed": 20260823223,
+   "anchor_time_ms": 6038.8329,
+   "anchor_value": [
+    0.5127111751017399,
+    0.4872888248982601
+   ],
+   "bootstrap_time_ms": 286.2391,
+   "bootstrap_value": [
+    0.4835742712020874,
+    0.556130588054657
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c157_g3",
+   "source_file": "selfplay_v20wdl_20260808_1904_g1580.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    30,
+    33
+   ],
+   "seed": 20260823224,
+   "anchor_time_ms": 4271.3859,
+   "anchor_value": [
+    0.34101261774058356,
+    0.6589873822594166
+   ],
+   "bootstrap_time_ms": 200.8005,
+   "bootstrap_value": [
+    0.6422826051712036,
+    0.7815631031990051
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c86_g9",
+   "source_file": "selfplay_v20wdl_20260808_1657_g870.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    30,
+    47
+   ],
+   "seed": 20260823225,
+   "anchor_time_ms": 4934.3924,
+   "anchor_value": [
+    0.5154315954968047,
+    0.4845684045031953
+   ],
+   "bootstrap_time_ms": 222.1476,
+   "bootstrap_value": [
+    0.5683720707893372,
+    0.45065319538116455
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c303_g6",
+   "source_file": "selfplay_v20wdl_20260808_2250_g3040.pkl",
+   "round": 2,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    28,
+    11
+   ],
+   "seed": 20260823226,
+   "anchor_time_ms": 4635.2265,
+   "anchor_value": [
+    0.637670718171836,
+    0.36232928182816404
+   ],
+   "bootstrap_time_ms": 213.9976,
+   "bootstrap_value": [
+    0.871179461479187,
+    0.3464963138103485
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c291_g5",
+   "source_file": "selfplay_v20wdl_20260808_2232_g2920.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    15,
+    3
+   ],
+   "seed": 20260823227,
+   "anchor_time_ms": 8625.1849,
+   "anchor_value": [
+    0.481322254030675,
+    0.518677745969325
+   ],
+   "bootstrap_time_ms": 385.06309999999996,
+   "bootstrap_value": [
+    0.4735657274723053,
+    0.6552237272262573
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c316_g3",
+   "source_file": "selfplay_v20wdl_20260808_2307_g3170.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    21,
+    21
+   ],
+   "seed": 20260823228,
+   "anchor_time_ms": 4334.9202,
+   "anchor_value": [
+    0.4901900150717615,
+    0.5098099849282385
+   ],
+   "bootstrap_time_ms": 219.2494,
+   "bootstrap_value": [
+    0.6807177066802979,
+    0.34849658608436584
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c108_g8",
+   "source_file": "selfplay_v20wdl_20260808_1736_g1090.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    23,
+    36
+   ],
+   "seed": 20260823229,
+   "anchor_time_ms": 4240.1834,
+   "anchor_value": [
+    0.5315245521838996,
+    0.46847544781610034
+   ],
+   "bootstrap_time_ms": 252.2168,
+   "bootstrap_value": [
+    0.40422505140304565,
+    0.5777352452278137
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c64_g7",
+   "source_file": "selfplay_v20wdl_20260808_1619_g650.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 0,
+   "real_scores": [
+    47,
+    36
+   ],
+   "seed": 20260823230,
+   "anchor_time_ms": 5595.3514000000005,
+   "anchor_value": [
+    0.49224102949877385,
+    0.5077589705012261
+   ],
+   "bootstrap_time_ms": 329.2073,
+   "bootstrap_value": [
+    0.7045440077781677,
+    0.35349005460739136
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c293_g4",
+   "source_file": "selfplay_v20wdl_20260808_2235_g2940.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    24,
+    28
+   ],
+   "seed": 20260823231,
+   "anchor_time_ms": 4528.7401,
+   "anchor_value": [
+    0.43955882620947123,
+    0.5604411737905288
+   ],
+   "bootstrap_time_ms": 244.2286,
+   "bootstrap_value": [
+    0.1539122462272644,
+    0.773916482925415
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c103_g8",
+   "source_file": "selfplay_v20wdl_20260808_1728_g1040.pkl",
+   "round": 3,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    24,
+    20
+   ],
+   "seed": 20260823232,
+   "anchor_time_ms": 8563.2684,
+   "anchor_value": [
+    0.4639107581690732,
+    0.5360892418309268
+   ],
+   "bootstrap_time_ms": 348.6148,
+   "bootstrap_value": [
+    0.8003901839256287,
+    0.32694751024246216
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c186_g10",
+   "source_file": "selfplay_v20wdl_20260808_1955_g1870.pkl",
+   "round": 3,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    16,
+    32
+   ],
+   "seed": 20260823233,
+   "anchor_time_ms": 5722.2992,
+   "anchor_value": [
+    0.3789208528773431,
+    0.6210791471226569
+   ],
+   "bootstrap_time_ms": 353.648,
+   "bootstrap_value": [
+    0.12646156549453735,
+    0.98111492395401
+   ],
+   "round_before": 3
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c120_g3",
+   "source_file": "selfplay_v20wdl_20260808_1758_g1210.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    21,
+    69
+   ],
+   "seed": 20260823234,
+   "anchor_time_ms": 4351.2663,
+   "anchor_value": [
+    0.36271094134717874,
+    0.6372890586528213
+   ],
+   "bootstrap_time_ms": 165.9835,
+   "bootstrap_value": [
+    0.13605260848999023,
+    0.8493626713752747
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c14_g2",
+   "source_file": "selfplay_v20wdl_20260808_1454_g150.pkl",
+   "round": 2,
+   "progress": 4,
+   "progress_bucket": "high",
+   "k1_active": true,
+   "real_winner": 0,
+   "real_scores": [
+    20,
+    0
+   ],
+   "seed": 20260823235,
+   "anchor_time_ms": 5958.492899999999,
+   "anchor_value": [
+    0.5477885663562303,
+    0.4522114336437698
+   ],
+   "bootstrap_time_ms": 234.744,
+   "bootstrap_value": [
+    0.7555315494537354,
+    0.3897550702095032
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c186_g8",
+   "source_file": "selfplay_v20wdl_20260808_1955_g1870.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": true,
+   "real_winner": 1,
+   "real_scores": [
+    25,
+    29
+   ],
+   "seed": 20260823236,
+   "anchor_time_ms": 4663.341,
+   "anchor_value": [
+    0.4039409770668293,
+    0.5960590229331707
+   ],
+   "bootstrap_time_ms": 247.6844,
+   "bootstrap_value": [
+    0.6161870360374451,
+    0.39092063903808594
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c14_g7",
+   "source_file": "selfplay_v20wdl_20260808_1454_g150.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    8,
+    39
+   ],
+   "seed": 20260823237,
+   "anchor_time_ms": 3658.1633,
+   "anchor_value": [
+    0.4825169950726872,
+    0.5174830049273128
+   ],
+   "bootstrap_time_ms": 212.657,
+   "bootstrap_value": [
+    0.4726006090641022,
+    0.5336504578590393
+   ],
+   "round_before": 1
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c163_g4",
+   "source_file": "selfplay_v20wdl_20260808_1914_g1640.pkl",
+   "round": 2,
+   "progress": 3,
+   "progress_bucket": "high",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    28,
+    34
+   ],
+   "seed": 20260823238,
+   "anchor_time_ms": 7143.5839000000005,
+   "anchor_value": [
+    0.5106221656327288,
+    0.4893778343672712
+   ],
+   "bootstrap_time_ms": 332.7973,
+   "bootstrap_value": [
+    0.7065895199775696,
+    0.4203348755836487
+   ],
+   "round_before": 2
+  },
+  {
+   "game_id": "v20wdl_20260808_142811_c50_g1",
+   "source_file": "selfplay_v20wdl_20260808_1554_g510.pkl",
+   "round": 1,
+   "progress": 2,
+   "progress_bucket": "low",
+   "k1_active": false,
+   "real_winner": 1,
+   "real_scores": [
+    15,
+    18
+   ],
+   "seed": 20260823239,
+   "anchor_time_ms": 4520.8811000000005,
+   "anchor_value": [
+    0.5928268276160501,
+    0.4071731723839499
+   ],
+   "bootstrap_time_ms": 240.36769999999999,
+   "bootstrap_value": [
+    0.5101487040519714,
+    0.6895825266838074
+   ],
+   "round_before": 1
+  }
+ ]
+}
