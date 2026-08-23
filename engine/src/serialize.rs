@@ -9,6 +9,7 @@
 
 use rand::seq::SliceRandom;
 use rand::Rng;
+use rand::SeedableRng;
 use serde_json::{json, Map, Value};
 
 use crate::board::{DomeGrid, PatternLine, PlayerBoard, DOME_TILES_PER_ROUND};
@@ -982,6 +983,258 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// Welle 3 Fork A (PREREG_agent_encapsulation.md par.8b, Nutzer-Entscheid
+// 2026-08-23): state_to_json_exact / json_to_state_exact
+// ═══════════════════════════════════════════════════════════════════════════
+//
+// Kernbeweis-Diagnose (par.8b): `json_to_state` rekonstruiert die verdeckten
+// Sammlungen (Kategorie 1 oben) nur aus Zählern/Masken und würfelt die
+// REIHENFOLGE per RNG neu -- korrekt für die Fälle, wo `json_to_state` einen
+// extern GESPEICHERTEN Schnappschuss (z.B. `frozen_eval_set.pkl`) rekonstruiert,
+// bei dem die exakte Reihenfolge gar nicht festgehalten wurde. Der Referee-/
+// Worker-Pfad (`referee.rs`) serialisiert dagegen einen LIVE `GameState` --
+// hier IST die exakte Ordnung bekannt, und sie ist nachweislich
+// verhaltensrelevant, nicht nur Zieraufwand:
+//   - `Bag::draw` (supply.rs) entnimmt `tiles.drain(..k)` -- direkt von vorn,
+//     Reihenfolge bestimmt die nächsten gezogenen Farben.
+//   - `dome_tile_pool.remove(0)` (game.rs, mehrere Stellen) zieht ebenso
+//     direkt von vorn.
+//   - `net_mcts::determinize_hidden_information` mischt `dome_tile_pool` UND
+//     `bonus_chip_pool` an der Suchwurzel per `slice::shuffle` NEU -- die
+//     Fisher-Yates-Swap-INDIZES hängen nur an RNG-Strom+Länge, das
+//     ERGEBNIS aber zusätzlich an der Eingangsreihenfolge (dieselbe
+//     Swap-Sequenz auf unterschiedlichen Startanordnungen liefert
+//     unterschiedliche Endanordnungen). Bei byte-identischem Such-RNG
+//     (seit par.8a) bräuchte es also zusätzlich exakt dieselbe
+//     Eingangsreihenfolge, um dasselbe Suchergebnis zu erreichen.
+//   - `Bag::refill_from_tower` (supply.rs) macht `self.tiles.extend(tower)`
+//     GEFOLGT von `self.tiles.shuffle(rng)` -- aus demselben Grund hängt das
+//     Ergebnis auch an `tower.tiles`s Reihenfolge, obwohl der Turm selbst nie
+//     direkt gezogen wird (Ersteinschätzung "Turm-Ordnung ist irrelevant,
+//     weil ohnehin komplett geleert+neu gemischt" war deshalb FALSCH -- der
+//     Reshuffle ist ordnungsABHÄNGIG, keine Kanonisierung).
+//
+// Deshalb: additive, NUR vom Referee-/Worker-Pfad konsumierte Serialisierung
+// mit den vier exakten Reihenfolgen zusätzlich zu den bestehenden Zähler-/
+// Masken-Feldern. `state_to_json` bleibt dafür BYTE-UNVERÄNDERT (siehe
+// Grep-Beleg im Abnahmebericht: Debug-UI/`PyGame`/Trainings-Exporte laufen
+// weiterhin über die alte Funktion), `json_to_state` bleibt ebenfalls
+// UNANGETASTET (Basislinien-Schutz, Präzedenz `self_play::seed_state_fixup`)
+// -- `json_to_state_exact` ruft sie nur auf und überschreibt danach gezielt
+// die vier Felder.
+
+/// Additive Variante von [`state_to_json`]: identischer Output PLUS vier
+/// zusätzliche Top-Level-Felder mit der EXAKTEN Reihenfolge der verdeckten
+/// Sammlungen (s.o. Modul-Kommentar für die Begründung, warum das
+/// verhaltensrelevant ist). NUR für `referee::RefereeGame::state_json`
+/// gedacht -- verdeckte Ordnung ist verstecktes Wissen und darf bestehende
+/// Konsumenten (Debug-UI/`PyGame::state_json`, Trainings-/Diagnose-Exporte)
+/// nie erreichen.
+pub fn state_to_json_exact(state: &GameState, scoring_confirmed: bool) -> Value {
+    let mut v = state_to_json(state, scoring_confirmed);
+    let obj = v.as_object_mut().expect("state_to_json liefert immer ein JSON-Objekt");
+    obj.insert(
+        "bag_order_exact".to_string(),
+        json!(state.bag.tiles.iter().map(|c| c.value()).collect::<Vec<_>>()),
+    );
+    obj.insert(
+        "tower_order_exact".to_string(),
+        json!(state.tower.tiles.iter().map(|c| c.value()).collect::<Vec<_>>()),
+    );
+    obj.insert(
+        "dome_pool_order_exact".to_string(),
+        json!(state.dome_tile_pool.iter().map(|t| t.tile_id).collect::<Vec<_>>()),
+    );
+    obj.insert(
+        "bonus_chip_pool_order_exact".to_string(),
+        json!(state.bonus_chip_pool.iter().map(|c| c.chip_id).collect::<Vec<_>>()),
+    );
+    v
+}
+
+fn get_usize_arr(v: &Value, key: &str) -> Result<Vec<usize>, String> {
+    get_arr(v, key)?
+        .iter()
+        .map(|x| x.as_u64().map(|n| n as usize).ok_or_else(|| json_err(key)))
+        .collect()
+}
+
+/// Umkehrung von [`state_to_json_exact`]. Baut wie `json_to_state` einen
+/// `GameState`, überschreibt danach aber die vier verdeckten Sammlungen mit
+/// der exakt geordneten Fassung aus dem JSON -- PFLICHT, harter Fehler bei
+/// Fehlen (kein stiller Rückfall auf die Zähler-Rekonstruktion, Bau-Vorgabe
+/// par.8b). Der intern erzeugte RNG treibt in `json_to_state` nur noch die
+/// gleich darauf überschriebene Erstmischung -- jeder deterministische RNG
+/// reicht dafür, ein fester Seed genügt (der frühere, domain-getrennte
+/// Rekonstruktions-RNG aus par.8a/referee.rs, `RECON_DISTINGUISHER`, entfällt
+/// dadurch ersatzlos -- weniger bewegliche Teile, siehe referee.rs).
+pub fn json_to_state_exact(v: &Value) -> Result<GameState, String> {
+    let mut discard_rng = rand::rngs::StdRng::seed_from_u64(0);
+    let mut state = json_to_state(v, &mut discard_rng)?;
+
+    let dome_catalog = crate::dome::build_dome_tile_pool();
+    let dome_order = get_usize_arr(v, "dome_pool_order_exact")?;
+    state.dome_tile_pool = dome_order
+        .iter()
+        .map(|&id| {
+            dome_catalog
+                .get(id)
+                .cloned()
+                .ok_or_else(|| format!("json_to_state_exact: unbekannte dome_pool_order_exact tile_id {id}"))
+        })
+        .collect::<Result<_, _>>()?;
+
+    let chip_catalog = crate::dome::build_bonus_chip_pool();
+    let chip_order = get_usize_arr(v, "bonus_chip_pool_order_exact")?;
+    state.bonus_chip_pool = chip_order
+        .iter()
+        .map(|&id| {
+            chip_catalog
+                .get(id)
+                .cloned()
+                .ok_or_else(|| format!("json_to_state_exact: unbekannte bonus_chip_pool_order_exact chip_id {id}"))
+        })
+        .collect::<Result<_, _>>()?;
+
+    state.bag.tiles = colors_from_json_array(
+        v.get("bag_order_exact").ok_or_else(|| json_err("bag_order_exact"))?,
+    )?;
+    state.tower.tiles = colors_from_json_array(
+        v.get("tower_order_exact").ok_or_else(|| json_err("tower_order_exact"))?,
+    )?;
+
+    // Defensiver Konsistenz-Check gegen die schon bestehenden Zähler-/
+    // Maskenfelder (billig, faengt einen inkonsistent gebauten Producer
+    // frueh statt spaeter mitten in der Suche).
+    let bag_count = get_u64(v, "bag_count")? as usize;
+    if state.bag.tiles.len() != bag_count {
+        return Err(format!(
+            "json_to_state_exact: bag_order_exact hat {} Eintraege, bag_count sagt {bag_count}",
+            state.bag.tiles.len()
+        ));
+    }
+    let dome_stack_count = get_u64(v, "dome_stack_count")? as usize;
+    if state.dome_tile_pool.len() != dome_stack_count {
+        return Err(format!(
+            "json_to_state_exact: dome_pool_order_exact hat {} Eintraege, dome_stack_count sagt {dome_stack_count}",
+            state.dome_tile_pool.len()
+        ));
+    }
+
+    Ok(state)
+}
+
+#[cfg(test)]
+mod json_to_state_exact_tests {
+    use super::*;
+    use crate::game::{drafting_actions, Game, TilingMove};
+    use crate::state::NUM_ROUNDS;
+    use rand::rngs::StdRng;
+    use rand::RngExt as _;
+    use rand::SeedableRng;
+
+    fn names() -> [String; 2] {
+        ["Alpha".into(), "Beta".into()]
+    }
+
+    /// Roundtrip-Kern (par.8b, Bau-Vorgabe 4a): state → json_exact →
+    /// json_to_state_exact muss FELDGLEICH sein -- inklusive der vier
+    /// exakten Reihenfolgen (direkter Struct-Vergleich, nicht nur JSON-
+    /// Vergleich, damit ein zufällig gleich aussehendes JSON keine Lücke
+    /// verdeckt).
+    fn assert_roundtrip_exact(state: &GameState, label: &str) {
+        let json1 = state_to_json_exact(state, true);
+        let rebuilt =
+            json_to_state_exact(&json1).unwrap_or_else(|e| panic!("{label}: json_to_state_exact fehlgeschlagen: {e}"));
+
+        assert_eq!(state.bag.tiles, rebuilt.bag.tiles, "{label}: bag.tiles weicht ab");
+        assert_eq!(state.tower.tiles, rebuilt.tower.tiles, "{label}: tower.tiles weicht ab");
+        assert_eq!(
+            state.dome_tile_pool.iter().map(|t| t.tile_id).collect::<Vec<_>>(),
+            rebuilt.dome_tile_pool.iter().map(|t| t.tile_id).collect::<Vec<_>>(),
+            "{label}: dome_tile_pool-Reihenfolge weicht ab"
+        );
+        assert_eq!(
+            state.bonus_chip_pool.iter().map(|c| c.chip_id).collect::<Vec<_>>(),
+            rebuilt.bonus_chip_pool.iter().map(|c| c.chip_id).collect::<Vec<_>>(),
+            "{label}: bonus_chip_pool-Reihenfolge weicht ab"
+        );
+
+        // Der Rest des Zustands bleibt an dieselben, bereits per
+        // json_to_state_tests::diff_allowing_known_gaps dokumentierten
+        // Lücken gebunden (estimated_score bei nicht-leeren bonus_chips,
+        // first_player_next_round) -- hier über den bestehenden Vergleicher
+        // der Schwesterngruppe geprüft.
+        let json2 = state_to_json_exact(&rebuilt, true);
+        let mut mismatches = Vec::new();
+        json_to_state_tests::diff_allowing_known_gaps(&json1, &json2, "", &mut mismatches);
+        assert!(mismatches.is_empty(), "{label}: Roundtrip-JSON weicht ab:\n{}", mismatches.join("\n"));
+    }
+
+    #[test]
+    fn roundtrip_exact_fresh_game_start_placement() {
+        let mut rng = StdRng::seed_from_u64(31);
+        let state = crate::state::setup_new_game(names(), 0, &mut rng);
+        assert_roundtrip_exact(&state, "frischer Spielstart (start_placement)");
+    }
+
+    #[test]
+    fn roundtrip_exact_random_walk_multi_round() {
+        let seed = 3101u64;
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut game = Game::start(names(), 0, crate::scoring::sample_valid_scoring_ids(3, &mut rng), &mut rng);
+        for pi in [1usize, 0usize] {
+            let (tile_id, r, c, rot) = crate::self_play::choose_start_placement(&game.state, pi).unwrap();
+            crate::game::apply_start_placement(&mut game.state, pi, tile_id, r, c, rot).unwrap();
+        }
+        let mut n_checked = 0usize;
+        let mut n_pending_checked = 0usize;
+        let mut steps = 0u32;
+        const MAX_STEPS: u32 = 4000;
+        while game.state.round_number < NUM_ROUNDS && steps < MAX_STEPS {
+            steps += 1;
+            match game.state.phase {
+                Phase::Drafting => {
+                    let actions = drafting_actions(&game.state);
+                    if actions.is_empty() {
+                        break;
+                    }
+                    let is_pending = game.state.pending_dome_choice.is_some()
+                        || !game.state.pending_stack_draw.is_empty();
+                    assert_roundtrip_exact(&game.state, &format!("random_walk Schritt {steps} (drafting)"));
+                    n_checked += 1;
+                    if is_pending {
+                        n_pending_checked += 1;
+                    }
+                    let idx = rng.random_range(0..actions.len());
+                    game.apply_drafting(&actions[idx]).unwrap_or_else(|e| {
+                        panic!("random_walk Schritt {steps}: apply_drafting fehlgeschlagen: {e}")
+                    });
+                }
+                Phase::Tiling => {
+                    for pi in 0..2 {
+                        loop {
+                            let acts = game.valid_tiling_actions(pi);
+                            let Some(a) = acts.first().copied() else { break };
+                            game.apply_single_tiling(pi, &a).unwrap_or_else(|e| {
+                                panic!("random_walk Tiling-Platzierung fehlgeschlagen: {e}")
+                            });
+                        }
+                        game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut rng).unwrap_or_else(|e| {
+                            panic!("random_walk EndTiling fehlgeschlagen: {e}")
+                        });
+                    }
+                }
+                _ => break,
+            }
+        }
+        assert!(steps < MAX_STEPS, "random_walk: MAX_STEPS erreicht, vermutlich Endlos-Schleife");
+        assert!(n_checked > 20, "erwartet viele geprüfte Drafting-Zustände, war {n_checked}");
+        assert!(n_pending_checked > 0, "erwartet mind. 1 PendingDomeChoice-/Stapel-Zwischenzustand, war {n_pending_checked}");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // Wertungsplatten-Diagnose (2026-07-26): end_scoring_from_state
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -1177,7 +1430,7 @@ mod json_to_state_tests {
     /// gebliebenen `tiled_max_row`-Wert NUR, wenn der Spieler einen nicht
     /// verbrauchten Bonuschip hält (sonst früher Return, siehe dortiger
     /// Kommentar). JEDE andere Abweichung bleibt ein harter Fehler.
-    fn diff_allowing_known_gaps(a: &Value, b: &Value, path: &str, mismatches: &mut Vec<String>) {
+    pub(super) fn diff_allowing_known_gaps(a: &Value, b: &Value, path: &str, mismatches: &mut Vec<String>) {
         match (a, b) {
             (Value::Object(oa), Value::Object(ob)) => {
                 let is_player_obj = oa.contains_key("estimated_score") && oa.contains_key("bonus_chips");

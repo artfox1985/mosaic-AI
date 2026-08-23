@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Welle 3 gebaut; Fork A umgesetzt (par.8c: exakte Ordnungsuebergabe steht, Suite 500/0), Kernbeweis-Rest = vorbestehender Zweistufen-Seed-Bug im Worker-Pfad (isoliert, Fix laeuft); Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- Frage bleibt OFFEN. -->
+<!-- STATUS: OFFEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Welle 3 gebaut; Fork A umgesetzt (par.8c: exakte Ordnungsuebergabe steht, Suite 500/0), Kernbeweis-Rest strukturell isoliert (par.8d: Stapel-Zweig der Kuppelwahl nicht im Worker-Protokoll; Zuschnitt = per-Entscheidung-Protokoll + pending-Zustand im exact-JSON, Bau naechste Sitzung); Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- Frage bleibt OFFEN. -->
 
 # PREREG-SKELETT: Agenten-Kapselung (AgentSpec statt Prozess-Global)
 
@@ -383,3 +383,34 @@ weist "nicht versioniert" aus -- Kandidat fuer den Handshake-Ausbau).
   belegte Bug-Klassen (RNG-Vorbelastung, verdeckte Ordnung,
   Stufen-Seed) -- der Beweis-Mechanismus tut exakt, wofuer er gebaut
   wurde.
+
+### par.8d ZWEISTUFEN-SEED-FIX KORREKT, ABER UNZUREICHEND -- STRUKTURELLE URSACHE ISOLIERT (2026-08-23 spaet; Agent, Vier-Typen-Befund vom Koordinator an moves.rs:105-127 nachgeprueft)
+
+- Fix wie spezifiziert umgesetzt (rot_seed als harter zweiter
+  Parameter, pending_rotation_search_seed mit belegter
+  steps-Arithmetik; Suite 500/0, Paritaets-Hash haelt, Golden 10/10
+  mit neuer Probe inkl. Stapel-Sonde, 6-Partien-Echtlauf fehlerfrei,
+  Wheel wave3d ueberall installiert + archiviert).
+- **KERNBEWEIS WEITER ROT -- jetzt mit der strukturellen Wurzel:** die
+  Kuppelwahl kennt VIER Aktionstypen (moves.rs:105-127, nachgeprueft):
+  neben ChooseDomeSlot/ChooseDomeRotation auch DrawStackPeek/
+  ChooseDrawStackSlot -- die STAPEL-Variante mit beliebig langer
+  Entscheidungskette VOR der Rotation. choose_drafting_action_json
+  modelliert nur den Display-Zweig als atomare Slot+Rotation-Antwort;
+  bei seed 910001 nimmt die Referenz nach 117 identischen Zeilen den
+  Stapel-Pfad, der Referee den Display-Pfad (Top-Level-Divergenz);
+  seed 910002 zeigt trotz Fix reine Rotations-Divergenz (konsistent
+  damit, dass die steps-Arithmetik bei variabler Kettenlaenge
+  verrutscht). Agenten-Vermutung (ungeprueft markiert): zusaetzlich
+  moegliche Rundreise-Luecke im exact-Pfad.
+- **NAECHSTER SCHRITT (Koordinator-Zuschnitt, Bau in der naechsten
+  Sitzung):** die atomare Kompression AUFGEBEN -- das Protokoll wird
+  echt PER-ENTSCHEIDUNG (der Referee fragt je Einzelentscheidung,
+  auch Peek-/Slot-/Rotationsschritte einzeln, jeweils mit
+  pending_search_seed); dafuer muss der pending-Kuppel-Zwischenzustand
+  in state_to_json_exact/json_to_state_exact ADDITIV serialisierbar
+  werden (die Kompression war der Behelf fuer genau diese Luecke,
+  par.8a-Bug 1). Danach entfaellt rot_seed wieder. Kernbeweis-
+  Wiederholung als Abnahme; Stopp-Disziplin unveraendert.
+- Nebenpunkt: manifest.json des Artefakts referenziert noch
+  wave3c/alte Golden-Quelle -- beim naechsten Bau nachziehen.
