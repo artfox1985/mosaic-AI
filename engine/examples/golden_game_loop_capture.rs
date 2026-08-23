@@ -83,7 +83,7 @@ fn main() {
         "Golden-Capture: seed={GOLDEN_SEED} games={n_games} rtv={rtv} model={model}\npaths={paths:?}"
     );
 
-    use mosaic_rust::net_mcts::DEFAULT_C_PUCT;
+    use mosaic_rust::net_mcts::{SearchConfig, DEFAULT_C_PUCT};
     use mosaic_rust::self_play::{
         run_net_arena_match, run_net_self_play, run_net_vs_net_arena, run_self_play,
         run_self_play_with_net_labels, SELF_PLAY_C,
@@ -106,6 +106,7 @@ fn main() {
             "p2" => {
                 let out = run_net_arena_match(
                     &model, 24, 24, n_games, GOLDEN_SEED, 1, SELF_PLAY_C, DEFAULT_C_PUCT, true, None,
+                    SearchConfig::from_env(),
                 )
                 .expect("run_net_arena_match fehlgeschlagen");
                 write_out(&outdir, "p2", &out);
@@ -113,7 +114,7 @@ fn main() {
             "p3" => {
                 let out = run_net_vs_net_arena(
                     &model, &model, 24, 24, n_games, GOLDEN_SEED, 1, DEFAULT_C_PUCT, DEFAULT_C_PUCT,
-                    true, None,
+                    true, None, SearchConfig::from_env(), SearchConfig::from_env(),
                 )
                 .expect("run_net_vs_net_arena fehlgeschlagen");
                 write_out(&outdir, "p3", &out);
@@ -121,7 +122,7 @@ fn main() {
             "p4" => {
                 let out = run_net_self_play(
                     &model, n_games, 60, DEFAULT_C_PUCT, GOLDEN_SEED, 1, "golden_p4", true, false,
-                    rtv, None, None, None, 0, None, 0,
+                    rtv, None, None, None, 0, None, 0, SearchConfig::from_env(),
                 )
                 .expect("run_net_self_play fehlgeschlagen");
                 write_out(&outdir, "p4", &out);

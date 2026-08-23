@@ -84,6 +84,33 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
 - **Fehlerbehandlung** Implementiere defensive Programmierung für alle Benutzer- und KI-Eingaben.
 - **KI-Gegner** Priorisiere Lesbarkeit und Wartbarkeit der Heuristiken gegenüber komplexen, schwer debugbaren Optimierungen.
 
+## Push scheitert am pre-push-Hook: examples/ und benches/ (wiederkehrend)
+
+Der pre-push-Hook laeuft `cargo test --release`, und das kompiliert **auch
+`engine/examples/*.rs` und `engine/benches/*.rs`**. Ein Signaturwechsel an
+einem oeffentlichen `run_*`- oder `net_search_*`-Einstieg bricht darum den
+Push, obwohl `cargo build` und der Wheel-Build gruen waren.
+
+**Regel: Wer eine oeffentliche Engine-Signatur aendert, sucht im SELBEN Zug
+alle Aufrufer in `engine/examples/` und `engine/benches/` und zieht sie nach.**
+Pruefbefehl vor dem Push (aus `engine/`):
+
+```
+cargo test --release --no-run
+```
+
+Fuer neue Pflichtparameter, die Bestandsverhalten erhalten sollen, ist in den
+Beispielen `SearchConfig::from_env()` der richtige Wert (net_mcts.rs:368: kein
+Cache, byte-identisch zum frueheren Env-Getter) – nicht `default()`.
+
+**Zweite Stolperfalle beim selben Befehl:** `cargo test --release` bricht mit
+`STATUS_DLL_NOT_FOUND` (0xc0000135) ab, wenn die Python-DLL nicht im PATH ist.
+Vorher in der Shell voranstellen:
+
+```
+$env:PATH = "$(python -c 'import sys,os;print(os.path.dirname(sys.executable))');" + $env:PATH
+```
+
 ## Worktrees & git-crypt (Stolperfalle)
 
 `git worktree add` scheitert in diesem Repo am git-crypt-Smudge-Filter

@@ -537,6 +537,12 @@ fn negamax(
 /// die rohe Punkte-Differenz -- damit `round_transition_value`s
 /// Downstream-Verbraucher (self_play.rs-Stempelung, neural_net.py-Rescaling)
 /// unverändert bleiben können.
+// Im EINGEFRORENEN Anker ungenutzt: `round_transition_value` haengt am
+// Netz-Loeser (`round5.rs`), dessen gleichnamige Funktion samt Tests die
+// aktive ist. Bleibt hier stehen, weil dieses Modul die c83fb35-Semantik
+// eins zu eins konserviert (Modulkopf: einfrieren, nicht reparieren) --
+// entfernt wuerde der Anker vom Original abweichen.
+#[allow(dead_code)]
 pub(crate) fn exact_round5_outcome(state: &GameState) -> [f64; 2] {
     let diff = outcome_diff(state, Instant::now() + TIME_BUDGET);
     [crate::mcts::normalize_score(diff), crate::mcts::normalize_score(-diff)]
@@ -546,6 +552,7 @@ pub(crate) fn exact_round5_outcome(state: &GameState) -> [f64; 2] {
 /// ausgelagert, damit der Determinismus-Test unten (Task-#71-Muster) belegen
 /// kann, dass das Ergebnis NICHT von der Deadline abhängt, solange sie nicht
 /// greift (`NODE_BUDGET` ist der bindende Cutoff).
+#[allow(dead_code)] // nur von `exact_round5_outcome` gerufen, siehe dort
 fn outcome_diff(state: &GameState, deadline: Instant) -> f64 {
     let mut node_count: u64 = 0;
     negamax(state, MAX_DEPTH.saturating_sub(1), f64::NEG_INFINITY, f64::INFINITY, 0, &mut node_count, node_budget(), deadline, chance_nodes_enabled())
