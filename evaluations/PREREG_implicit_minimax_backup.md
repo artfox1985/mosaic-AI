@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: GEBAUT + ABGENOMMEN 2026-08-23 (par.1a: Suite 492/0, Paritaets-Hash haelt, Knopf registriert); ERFOLG nach vorregistrierter Lesart (par.2b, 2026-08-23): kein Staerkeverlust (304 vs 296/407 n.s.), Score-Level SIGNIFIKANT +2,77 (Block-t +3,83), k1 9,0 % -> 16,0 % (+7,0 pp, p=0,090 knapp n.s., groesste je gemessene Netz-Bewegung). Folgeschritte (alpha-Sweep, Self-Play-Einsatz) = Nutzer-Entscheid. Paralleler Such-Hebel des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); Quelle: RESEARCH_search_alternatives_external S4/S6 Option O1 (Baier/Winands-Linie, in Brettspielen belegt, Netz unveraendert). -->
+<!-- STATUS: OFFEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: GEBAUT + ABGENOMMEN 2026-08-23 (par.1a: Suite 492/0, Paritaets-Hash haelt, Knopf registriert); ERFOLG nach vorregistrierter Lesart (par.2b, 2026-08-23): kein Staerkeverlust (304 vs 296/407 n.s.), Score-Level SIGNIFIKANT +2,77 (Block-t +3,83), k1 9,0 % -> 16,0 % (+7,0 pp, p=0,090 knapp n.s., groesste je gemessene Netz-Bewegung). ABER par.2c (Netz-gegen-Netz via Kapselung): Paritaet, k1-Effekt gegnerspezifisch, uebertraegt sich nicht; Self-Play-Einsatz bleibt Kandidat mit gedaempfter Erwartung. Paralleler Such-Hebel des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); Quelle: RESEARCH_search_alternatives_external S4/S6 Option O1 (Baier/Winands-Linie, in Brettspielen belegt, Netz unveraendert). -->
 
 # PREREG-SKELETT: Implicit-Minimax-Backup als Laufzeit-Knopf
 
@@ -114,6 +114,17 @@ in getrennten Prozessen, gepaart je Spielindex:
   (prozessweiter Knopf, beide Seiten saehen ihn). Konsequenzen
   (alpha-Sweep, Knopf im Self-Play der naechsten Generation,
   Kombination mit Seeding-Daten) sind Nutzer-Entscheide.
+
+### par.2c NACHTRAG NETZ-GEGEN-NETZ (2026-08-23, via Agenten-Kapselung Welle 1; Details PREREG_agent_encapsulation.md par.6b)
+
+Die erste Netz-gegen-Netz-Messung (alpha=0,2 gegen frozen, 407 Seeds
++ Brettwechsel) zeigt PARITAET (400/814) und ein vollstaendiges
+Verschwinden des k1-Effekts (9,6 % beidseitig, identische Zaehler).
+**Der par.2b-Befund ist damit als GEGNERSPEZIFISCH eingeordnet**
+(Ausnutzung der Heuristik, kein Verhaltensgewinn gegen gleich starke
+Gegner). par.2b bleibt als Messung gueltig; seine Verallgemeinerung
+ist widerlegt. Self-Play-Einsatz bleibt Kandidat (beidseitiger Knopf
+= Datenverteilungs-Frage), Erwartung gedaempft.
 
 ## par.3 Grenzen
 

@@ -1,0 +1,648 @@
+{
+  "knob": "MOSAIC_IMPLICIT_MINIMAX_A",
+  "arms": [
+    "0",
+    "0.2"
+  ],
+  "control_arm": "0",
+  "model": "models/alphazero_v21_2d_brierbest.onnx",
+  "n_games": 30,
+  "net_sims": 400,
+  "heur_sims": 150,
+  "threads": 10,
+  "seeds": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
+  ],
+  "runtime_s": 143.73897099494934,
+  "divergenz": {
+    "partien_mit_abweichung": 30,
+    "anteil": 1.0,
+    "erste_abweichung_log_index": {
+      "n": 30,
+      "mean": 57.0,
+      "sd": 52.29030370985586,
+      "se": 9.54685962689471,
+      "t": 5.970549712433583,
+      "median": 35.5,
+      "min": 5.0,
+      "max": 205.0
+    }
+  },
+  "punktversatz_netz_alle_partien": {
+    "n": 30,
+    "mean": 3.2333333333333334,
+    "sd": 14.469190414959913,
+    "se": 2.641700659703693,
+    "t": 1.223959013469755,
+    "median": 1.5,
+    "min": -21,
+    "max": 35
+  },
+  "punktversatz_heuristik_alle_partien": {
+    "n": 30,
+    "mean": -0.3,
+    "sd": 19.72946335149365,
+    "se": 3.6020907083615157,
+    "t": -0.0832849653962382,
+    "median": -1.5,
+    "min": -50,
+    "max": 52
+  },
+  "punktversatz_netz_nur_abweichende": {
+    "n": 30,
+    "mean": 3.2333333333333334,
+    "sd": 14.469190414959913,
+    "se": 2.641700659703693,
+    "t": 1.223959013469755,
+    "median": 1.5,
+    "min": -21,
+    "max": 35
+  },
+  "punktversatz_heuristik_nur_abweichende": {
+    "n": 30,
+    "mean": -0.3,
+    "sd": 19.72946335149365,
+    "se": 3.6020907083615157,
+    "t": -0.0832849653962382,
+    "median": -1.5,
+    "min": -50,
+    "max": 52
+  },
+  "sieg_delta": {
+    "netz_siege_aus": 23,
+    "netz_siege_an": 27,
+    "delta": 4,
+    "partien_mit_sieg_wechsel": 4
+  },
+  "per_game": [
+    {
+      "seed": 1,
+      "diverged": true,
+      "first_diff_log_index": 33,
+      "scores_off": [
+        66,
+        56
+      ],
+      "scores_on": [
+        54,
+        46
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 173,
+      "steps_on": 169
+    },
+    {
+      "seed": 2,
+      "diverged": true,
+      "first_diff_log_index": 118,
+      "scores_off": [
+        52,
+        26
+      ],
+      "scores_on": [
+        43,
+        1
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 172,
+      "steps_on": 171
+    },
+    {
+      "seed": 3,
+      "diverged": true,
+      "first_diff_log_index": 9,
+      "scores_off": [
+        71,
+        38
+      ],
+      "scores_on": [
+        79,
+        49
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 174,
+      "steps_on": 181
+    },
+    {
+      "seed": 4,
+      "diverged": true,
+      "first_diff_log_index": 96,
+      "scores_off": [
+        58,
+        72
+      ],
+      "scores_on": [
+        58,
+        61
+      ],
+      "winner_off": 1,
+      "winner_on": 1,
+      "winner_flipped": false,
+      "steps_off": 179,
+      "steps_on": 173
+    },
+    {
+      "seed": 5,
+      "diverged": true,
+      "first_diff_log_index": 135,
+      "scores_off": [
+        58,
+        41
+      ],
+      "scores_on": [
+        62,
+        39
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 170,
+      "steps_on": 174
+    },
+    {
+      "seed": 6,
+      "diverged": true,
+      "first_diff_log_index": 38,
+      "scores_off": [
+        63,
+        30
+      ],
+      "scores_on": [
+        68,
+        37
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 169,
+      "steps_on": 170
+    },
+    {
+      "seed": 7,
+      "diverged": true,
+      "first_diff_log_index": 74,
+      "scores_off": [
+        52,
+        25
+      ],
+      "scores_on": [
+        48,
+        41
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 164,
+      "steps_on": 162
+    },
+    {
+      "seed": 8,
+      "diverged": true,
+      "first_diff_log_index": 28,
+      "scores_off": [
+        53,
+        19
+      ],
+      "scores_on": [
+        40,
+        32
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 176,
+      "steps_on": 183
+    },
+    {
+      "seed": 9,
+      "diverged": true,
+      "first_diff_log_index": 61,
+      "scores_off": [
+        62,
+        29
+      ],
+      "scores_on": [
+        59,
+        30
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 170,
+      "steps_on": 169
+    },
+    {
+      "seed": 10,
+      "diverged": true,
+      "first_diff_log_index": 177,
+      "scores_off": [
+        41,
+        27
+      ],
+      "scores_on": [
+        42,
+        38
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 174,
+      "steps_on": 181
+    },
+    {
+      "seed": 11,
+      "diverged": true,
+      "first_diff_log_index": 10,
+      "scores_off": [
+        44,
+        8
+      ],
+      "scores_on": [
+        68,
+        60
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 159,
+      "steps_on": 170
+    },
+    {
+      "seed": 12,
+      "diverged": true,
+      "first_diff_log_index": 14,
+      "scores_off": [
+        25,
+        32
+      ],
+      "scores_on": [
+        22,
+        11
+      ],
+      "winner_off": 1,
+      "winner_on": 0,
+      "winner_flipped": true,
+      "steps_off": 168,
+      "steps_on": 180
+    },
+    {
+      "seed": 13,
+      "diverged": true,
+      "first_diff_log_index": 73,
+      "scores_off": [
+        60,
+        32
+      ],
+      "scores_on": [
+        64,
+        27
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 174,
+      "steps_on": 167
+    },
+    {
+      "seed": 14,
+      "diverged": true,
+      "first_diff_log_index": 68,
+      "scores_off": [
+        42,
+        56
+      ],
+      "scores_on": [
+        65,
+        45
+      ],
+      "winner_off": 1,
+      "winner_on": 0,
+      "winner_flipped": true,
+      "steps_off": 166,
+      "steps_on": 175
+    },
+    {
+      "seed": 15,
+      "diverged": true,
+      "first_diff_log_index": 39,
+      "scores_off": [
+        68,
+        30
+      ],
+      "scores_on": [
+        47,
+        28
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 177,
+      "steps_on": 176
+    },
+    {
+      "seed": 16,
+      "diverged": true,
+      "first_diff_log_index": 205,
+      "scores_off": [
+        67,
+        37
+      ],
+      "scores_on": [
+        66,
+        33
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 171,
+      "steps_on": 173
+    },
+    {
+      "seed": 17,
+      "diverged": true,
+      "first_diff_log_index": 13,
+      "scores_off": [
+        67,
+        27
+      ],
+      "scores_on": [
+        72,
+        54
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 166,
+      "steps_on": 169
+    },
+    {
+      "seed": 18,
+      "diverged": true,
+      "first_diff_log_index": 5,
+      "scores_off": [
+        52,
+        46
+      ],
+      "scores_on": [
+        86,
+        56
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 176,
+      "steps_on": 165
+    },
+    {
+      "seed": 19,
+      "diverged": true,
+      "first_diff_log_index": 24,
+      "scores_off": [
+        51,
+        44
+      ],
+      "scores_on": [
+        53,
+        43
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 175,
+      "steps_on": 166
+    },
+    {
+      "seed": 20,
+      "diverged": true,
+      "first_diff_log_index": 5,
+      "scores_off": [
+        9,
+        19
+      ],
+      "scores_on": [
+        33,
+        19
+      ],
+      "winner_off": 1,
+      "winner_on": 0,
+      "winner_flipped": true,
+      "steps_off": 164,
+      "steps_on": 174
+    },
+    {
+      "seed": 21,
+      "diverged": true,
+      "first_diff_log_index": 10,
+      "scores_off": [
+        21,
+        48
+      ],
+      "scores_on": [
+        56,
+        46
+      ],
+      "winner_off": 1,
+      "winner_on": 0,
+      "winner_flipped": true,
+      "steps_off": 172,
+      "steps_on": 178
+    },
+    {
+      "seed": 22,
+      "diverged": true,
+      "first_diff_log_index": 28,
+      "scores_off": [
+        28,
+        33
+      ],
+      "scores_on": [
+        37,
+        38
+      ],
+      "winner_off": 1,
+      "winner_on": 1,
+      "winner_flipped": false,
+      "steps_off": 180,
+      "steps_on": 180
+    },
+    {
+      "seed": 23,
+      "diverged": true,
+      "first_diff_log_index": 107,
+      "scores_off": [
+        22,
+        60
+      ],
+      "scores_on": [
+        24,
+        27
+      ],
+      "winner_off": 1,
+      "winner_on": 1,
+      "winner_flipped": false,
+      "steps_off": 175,
+      "steps_on": 172
+    },
+    {
+      "seed": 24,
+      "diverged": true,
+      "first_diff_log_index": 95,
+      "scores_off": [
+        52,
+        12
+      ],
+      "scores_on": [
+        37,
+        24
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 187,
+      "steps_on": 168
+    },
+    {
+      "seed": 25,
+      "diverged": true,
+      "first_diff_log_index": 13,
+      "scores_off": [
+        58,
+        45
+      ],
+      "scores_on": [
+        57,
+        42
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 176,
+      "steps_on": 179
+    },
+    {
+      "seed": 26,
+      "diverged": true,
+      "first_diff_log_index": 14,
+      "scores_off": [
+        69,
+        50
+      ],
+      "scores_on": [
+        48,
+        0
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 178,
+      "steps_on": 178
+    },
+    {
+      "seed": 27,
+      "diverged": true,
+      "first_diff_log_index": 79,
+      "scores_off": [
+        74,
+        52
+      ],
+      "scores_on": [
+        73,
+        28
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 169,
+      "steps_on": 167
+    },
+    {
+      "seed": 28,
+      "diverged": true,
+      "first_diff_log_index": 26,
+      "scores_off": [
+        64,
+        29
+      ],
+      "scores_on": [
+        60,
+        33
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 170,
+      "steps_on": 168
+    },
+    {
+      "seed": 29,
+      "diverged": true,
+      "first_diff_log_index": 87,
+      "scores_off": [
+        28,
+        14
+      ],
+      "scores_on": [
+        51,
+        48
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 176,
+      "steps_on": 177
+    },
+    {
+      "seed": 30,
+      "diverged": true,
+      "first_diff_log_index": 26,
+      "scores_off": [
+        60,
+        39
+      ],
+      "scores_on": [
+        62,
+        31
+      ],
+      "winner_off": 0,
+      "winner_on": 0,
+      "winner_flipped": false,
+      "steps_off": 174,
+      "steps_on": 167
+    }
+  ]
+}
