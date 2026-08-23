@@ -68,13 +68,28 @@ entstanden. Alle drei lieferten echte Befunde — und keiner davon brachte k1 vo
 **WAVE3D-AUSGANG IST FESTGESTELLT UND ALS par.8d REGISTRIERT** (noch
 in dieser Sitzung): Fix korrekt, Kernbeweis weiter rot, strukturelle
 Wurzel isoliert -- der STAPEL-Zweig der Kuppelwahl (vier Aktionstypen,
-moves.rs:105-127) ist im Worker-Protokoll nicht modelliert. **Erster
-Schritt der naechsten Sitzung: der par.8d-Zuschnitt** -- atomare
-Kompression aufgeben, Protokoll echt per-Entscheidung (inkl. Peek-
-Kette), pending-Kuppel-Zwischenzustand additiv ins exact-JSON,
-rot_seed entfaellt wieder; Kernbeweis-Wiederholung als Abnahme.
-STOPP-Disziplin beibehalten (par.8a-8d: vier Runden, vier real
-isolierte Ursachen).
+moves.rs:105-127) ist im Worker-Protokoll nicht modelliert. **STUFE 0 IST ENTSCHIEDEN (2026-08-23 spaet, PREREG_bootstrap_horizon
+"Stufe 0 ERGEBNIS + VERDIKT"): die Anker-Variante qualifiziert sich
+NICHT** -- auf den kritischen fruehen Zustaenden korreliert sie
+SCHLECHTER mit dem echten Ausgang (0,282 gg. 0,363) und kostet je
+Label Faktor 20,1 (4.734 ms gg. 235 ms). Anker-/rundenabhaengiger Arm
+GESCHLOSSEN (strukturell = die alte rtv-Kette, die schon in Task #80
+und beim v13_nortv-Championwechsel negativ auffiel); der klassische
+2-gegen-3-Arm bleibt offen. **Der Kredit-Horizont als Erklaerung der
+Vollendungsschwaeche ist damit GESCHWAECHT** -- tiefere Ziele allein
+heben die Label-Qualitaet genau dort nicht, wo der Spaltenbau
+entschieden wird. Naechster Schritt der Kette ist damit der
+Vierer-Vergleich (par.3d) plus Legalitaets-Stufe.
+
+**REIHENFOLGE UMGETAKTET (Nutzer 2026-08-23 spaet): die zwei
+MESS-Schritte zuerst** -- (1) Stufe 0 Horizont-Frage ERLEDIGT, (2)
+Vierer-Vergleich + Legalitaets-Stufe; der par.8d-Zuschnitt (atomare
+Kompression aufgeben, Protokoll per-Entscheidung inkl. Peek-Kette,
+pending-Kuppel-Zustand additiv ins exact-JSON, rot_seed entfaellt;
+Kernbeweis-Wiederholung als Abnahme, STOPP-Disziplin) folgt DANACH.
+Lastfenster beachten: waehrend Mosaic-AI.exe (Server-Partien des
+Nutzers) laeuft, keine Engine-Builds/-Messungen -- ein Waechter
+meldet das Prozessende.
 
 **DANACH DIE EINGETAKTETE PIPELINE (Nutzer-Freigaben liegen ALLE vor,
 nichts mehr rueckfragen):**
@@ -198,6 +213,29 @@ Vollendungs-Sonde** (Engine-Gegenpruefung: war die fehlende Zelle je
 Hoehe-5-Fall legal belegbar; Erweiterung von
 column_completion_gap_probe). Sequenziell fahren, Lastdisziplin wie
 gehabt.
+
+**LEGALITAETS-STUFE (2026-08-23 spaet): DIE VOLLENDUNGEN WAREN NIE
+MOEGLICH -- 0 von 160 geprueften Faellen.** Engine-Gegenpruefung ueber
+den replay-exakten Pfad (`tools/probes/column_completion_legality_probe
+.py`, Artefakt gleichnamig; Positivkontrolle 4/4 bestanden, 0
+unklassifizierte Faelle, Replay-Quote 185/223): in KEINEM der
+stehengelassenen Hoehe-5-Faelle existierte im Restfenster eine legale
+Platzierung, die die Spalte vollendet haette. Blockadegruende:
+**Musterreihe noch nicht voll 87/160 (54 %)**, Zielfeld ist
+Spezialfeld (nur ueber Sibling-Slot) 41, keine passende Farbe
+verfuegbar 32.
+
+**DAMIT IST DIE URSACHENKETTE GESCHLOSSEN -- und die Deutung des
+Strukturbefunds KORRIGIERT:** der Champion "verpasst" die Vollendung
+nicht am Ende; die noetigen Kacheln kommen nie aufs Brett. Der Engpass
+liegt UPSTREAM in der ZUFUEHRUNG (Draft-/Reihenwahl Runden vorher),
+nicht in der Endplatzierung -- der groesste Blockadeposten ist exakt
+das, was die Reihen-Sonde misst (lange Musterreihen bleiben unvoll).
+Konsequenz fuer jeden kuenftigen Zuschnitt: Hebel muessen an der
+DRAFT-/Reihenwahl ansetzen (welche Musterreihe wird gefuettert,
+Zeitpunkt), nicht an Vollendungs-Shaping oder Endspiel-Bewertung. Die
+0,55 Hoehe-5-Spalten je Partie bleiben die richtige Verlust-Bezifferung,
+aber sie sind ein SYMPTOM-Mass.
 
 **Ursachen-Sonde Reihenwahl (Nutzer-Hypothese "auf Reihen getrimmt,
 weil die Heuristik so spielt"; `tools/probes/row_preference_probe.py`,

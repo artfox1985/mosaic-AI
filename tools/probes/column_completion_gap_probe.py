@@ -175,6 +175,12 @@ def hoehe5_ereignisse(sequenz: list[dict]) -> list[dict]:
         ergebnisse.append({
             "spalte": col,
             "runde": ev["runde"],
+            # rein additiv (Auftrag 2026-08-23, column_completion_legality_probe.py):
+            # Index INS sequenz-Array, an dem Hoehe 5 erreicht wurde -- vorher nur
+            # intern fuer die Fenster-Berechnung genutzt, jetzt auch nach aussen
+            # gereicht, damit ein Verbraucher den exakten Entscheidungspunkt
+            # wiederfinden kann. Bestehende Leser ignorieren das Zusatzfeld.
+            "aktionsindex": ev["aktionsindex"],
             "gelegenheitsfenster_eigene_zuege": fenster,
             # finaler Fuellstand nach ALLEN Aktionen (Schleife oben ist
             # bereits durchgelaufen, `fill` traegt den Endstand):
