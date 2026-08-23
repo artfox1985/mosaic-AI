@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- Frage bleibt OFFEN. -->
+<!-- STATUS: OFFEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Welle 3 gebaut; Fork A umgesetzt (par.8c: exakte Ordnungsuebergabe steht, Suite 500/0), Kernbeweis-Rest = vorbestehender Zweistufen-Seed-Bug im Worker-Pfad (isoliert, Fix laeuft); Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- Frage bleibt OFFEN. -->
 
 # PREREG-SKELETT: Agenten-Kapselung (AgentSpec statt Prozess-Global)
 
@@ -279,3 +279,107 @@ von der Engine geladenes Artefakt konserviert (Nutzer-Formulierung:
   Wheel (models/frozen_wheels/mosaic_rust_searchconfig_wave1_20260823
   .whl) ist ueber die Paritaets-Kette 8c6684ff byte-identisch zur
   R5-Fix-Aera, auf der v21s Elo 1215 gemessen ist.
+
+### par.8a WELLE 3 GEBAUT -- ABNAHME 4/5, KERNBEWEIS-STOPP (2026-08-23; Agent, Diagnose vom Koordinator am Code nachgeprueft)
+
+**Bestanden:** statischer Handshake (gruen auf echtem Artefakt,
+VERWEIGERT bei manipuliertem contract_hash, --force-cross-era mit
+Warnung); Golden-Selbsttest 10/10; 20-Partien-Echtlauf ohne
+Protokollfehler (0 illegale Aktionen; Worker-Overhead ~16 %,
+0,108 s je Worker-Aufruf inkl. IPC); Suite 498/0, Paritaets-Hash
+8c6684ff und gepinnter contract_hash a169ebf0 halten durchgehend.
+Artefakt models/frozen_champions/v21_2d_brierbest/ komplett (Modell,
+Spec, Manifest, Golden-Probe, Provenienz-Wheel Wave 1, venv mit
+Wave-3-Wheel -- verhaltensgleich per Suite+Paritaet+contract_hash).
+Zwei echte Protokollbugs im Bau gefunden und im NEUEN Pfad behoben
+(pending_dome_choice via atomare Aktions-Rueckgabe; moon_order-
+Permutationen Multiset- statt Exakt-Match). Neue additive Bausteine:
+engine/src/referee.rs (RefereeGame, FrozenWorkerEngine),
+net_arena_choose_action als geteilte Auswahlfunktion,
+net_arena_choice_state_json.
+
+**KERNBEWEIS ROT (Stopp-Befund, nicht verdeckt):** Referee-Partien
+sind NICHT byte-identisch zum In-Process-Lauf (8/8 Partien weichen ab,
+Erstabweichung exakt an der ersten Worker-Entscheidung). Ursache am
+Code bestaetigt (serialize.rs:864-949): json_to_state mischt die
+verdeckten Sammlungen mit dem UEBERGEBENEN RNG neu, derselbe Strom
+treibt danach die Suche -- In-Process startet mit unbelastetem
+Such-RNG; bei determinize_root_hidden_info=true veraendert das die
+Zugwahl. **Koordinator-Entscheid: Fix im NEUEN Pfad (getrennter,
+deterministisch abgeleiteter Rekonstruktions-RNG im Worker/Referee;
+json_to_state selbst bleibt unangetastet -- Basislinien-Schutz wie
+seed_state_fixup), danach Kernbeweis-Wiederholung.** Faellt er dann
+immer noch rot aus, haengt die Determinisierung an der verdeckten
+REIHENFOLGE statt nur an Zaehlern+Seed -- dann ist exakte
+Zustandsuebergabe eine eigene Registrierung.
+Artefakte evaluations/frozen_kernbeweis_{reference,referee}.json.
+Nebenbefunde: Worker-value-Feld null (2D-Layout-Panic, informativ,
+ungenutzt); kein state_schema_version-Symbol im Quellstand (Manifest
+weist "nicht versioniert" aus -- Kandidat fuer den Handshake-Ausbau).
+
+### par.8b KERNBEWEIS-FIX: TEILERFOLG, REIHENFOLGE-DIAGNOSE BESTAETIGT (2026-08-23; Agent, Paritaet vom Koordinator nachgemessen)
+
+- Fix wie entschieden umgesetzt: getrennter Rekonstruktions-RNG NUR in
+  referee.rs (RECON_DISTINGUISHER-Ableitung, Z.78f; json_to_state und
+  alle uebrigen Aufrufstellen unangetastet); Such-RNG-Ableitung jetzt
+  byte-gleich zum In-Process-Pfad (derive_search_seed, am Code
+  belegt). Suite 498/0, Paritaets-Hash 8c6684ff haelt (Koordinator
+  nachgemessen), Wheel wave3b gebaut/installiert/archiviert,
+  Golden-Probe korrekt NEU erzeugt (1/10 Sonden aenderte sich --
+  konsistent mit dem behobenen Fehler), 8 Partien ohne
+  Protokollfehler.
+- **Kernbeweis BLEIBT ROT, aber die Diagnose ist jetzt scharf:**
+  Erstabweichung wanderte von der ERSTEN Worker-Entscheidung auf
+  Zug ~53 (52 byte-identische Log-Zeilen) -- die verbleibende
+  Divergenz haengt an der VERDECKTEN REIHENFOLGE (state_json traegt
+  nur Farbzaehler fuer Beutel/Turm; die rekonstruierte Ordnung weicht
+  von der Live-Ordnung ab und wird tief im Suchhorizont
+  verhaltenswirksam). Per Eskalationsregel nicht weitergefixt.
+- **OFFENER FORK (Nutzer-Entscheid):** (A) exakte Zustandsuebergabe:
+  state_json ADDITIV um die geordneten verdeckten Sammlungen
+  erweitern, konsumiert NUR im Referee-/Worker-Pfad
+  (seed_state_fixup-Muster; Paritaets-Basislinie unberuehrt) -> echte
+  Byte-Identitaet erreichbar; ODER (B) statistische Aequivalenz als
+  Freeze-Garantie akzeptieren (der Worker spielt DENSELBEN Champion,
+  aber nicht dieselbe Partie-Replik) und den Kernbeweis entsprechend
+  umregistrieren. Koordinator-Empfehlung: (A) -- der Sinn des Freeze
+  ist Verhaltens-Konservierung, und nur Byte-Identitaet ist billig
+  beweisbar. **NUTZER-ENTSCHEID 2026-08-23: FORK A ("mach das").**
+  Bau-Vorgabe: die exakten verdeckten Reihenfolgen werden von einer
+  NEUEN Serializer-Variante emittiert (nicht vom Default-state_json:
+  verdeckte Ordnung ist versteckte Information und darf bestehende
+  Konsumenten wie die Debug-UI nicht erreichen) und NUR im
+  Referee-/Worker-Pfad konsumiert (Pflichtfelder dort, harter Fehler
+  bei Fehlen); json_to_state und Default-Serialisierung unangetastet.
+
+### par.8c FORK A GEBAUT -- REIHENFOLGE-THESE BESTAETIGT, NEUE (VORBESTEHENDE) URSACHE ISOLIERT (2026-08-23; Agent, Kernpunkte vom Koordinator am Code nachgeprueft)
+
+- **Exakte Zustandsuebergabe steht:** state_to_json_exact/
+  json_to_state_exact (serialize.rs, additiv) mit vier
+  Ordnungsfeldern (bag/tower/dome_pool/bonus_chip_pool) --
+  Zusatzbefund: auch die TURM-Ordnung ist verhaltensrelevant
+  (refill_from_tower: shuffle-Ergebnis haengt an der
+  Eingangsreihenfolge). Emitter/Konsument NUR im Referee-Pfad
+  (Grep-belegt), Default-Serialisierung unberuehrt, Paritaets-Hash
+  haelt, Suite 500/0 (2 neue Roundtrip-Tests), Rekonstruktions-RNG
+  aus par.8b entfaellt. Golden-Probe-Quelle musste wechseln
+  (frozen_eval_set traegt die Pflichtfelder nicht und wird hart
+  abgelehnt -- gewolltes Verhalten): 10 frische RefereeGame-Sonden,
+  Selbsttest 10/10; 6-Partien-Echtlauf fehlerfrei; Wheel wave3c
+  gebaut/installiert/archiviert.
+- **KERNBEWEIS WEITER ROT -- aber mit NEUER, isolierter, VORBESTEHENDER
+  Ursache** (Koordinator am Code nachgeprueft, referee.rs:86-104 gegen
+  :349): die zweistufige Kuppel-Entscheidung (ChooseDomeSlot ->
+  ChooseDomeRotation) laeuft im Worker-Pfad auf EINEM RNG-Strom,
+  waehrend der In-Process-Pfad je Entscheidungsstufe einen frischen
+  derive_search_seed(game_seed, steps) zieht (Rotationsstufe =
+  steps+1). Beleg: 76 identische Log-Zeilen, dann Rotation 0 vs 270
+  bei gleicher Kachel/Slot-Wahl (seed 910001). Wahrscheinlich die
+  eigentliche Ursache der par.8a/8b-Restdivergenz.
+- **Koordinator-Entscheid: Fix im Worker-Protokoll** -- der Request
+  traegt kuenftig ZWEI Seeds (Entscheidung + Rotationsstufe,
+  RefereeGame liefert pending-Ableitungen fuer beide); danach
+  Kernbeweis-Wiederholung. Drei Fix-Runden, drei reale, je einzeln
+  belegte Bug-Klassen (RNG-Vorbelastung, verdeckte Ordnung,
+  Stufen-Seed) -- der Beweis-Mechanismus tut exakt, wofuer er gebaut
+  wurde.

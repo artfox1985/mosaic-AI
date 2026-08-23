@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird der R5-Loeser in einen EINGEFRORENEN Anker-Loeser (Heuristik) und einen frei entwickelbaren Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 gut kalibrieren (Steigungs-Metrik der R5-Kalibrierung)? | Beleg: ENTWURF 2026-08-22, Nutzer-Entscheid ("dann machen wir einen eigenen solver fuer den heuristik anker. und schauen dass wir den value kopf gut kalibrieren fuer runde 5."), nichts gebaut; Vorarbeiten par.2a (Bau-Kartierung) und par.3a (Pruefpunkt: Champion-Ownership UNTRAINIERT) am 2026-08-22 erledigt; par.2b/2c: Teil A GEBAUT und ABGENOMMEN (2026-08-23: Suite 484/0, Paritaets-Hash 8c6684ff haelt vor/nach Wheel-Neubau, Wheel installiert) -- der Anker-Loeser ist aktiv und eingefroren. Teil B (par.3, Vierer-Vergleich) offen, Zuschnitt nach Seeding-Ausgang. Anlass: 200-Knoten-Beschneidung als moegliche Schwachstelle; jede R5-Verbesserung wuerde sonst den Anker mitverschieben (Leiter-Reset-Falle, gerade erst bezahlt). -->
+<!-- STATUS: OFFEN | Frage: Wird der R5-Loeser in einen EINGEFRORENEN Anker-Loeser (Heuristik) und einen frei entwickelbaren Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 gut kalibrieren (Steigungs-Metrik der R5-Kalibrierung)? | Beleg: ENTWURF 2026-08-22, Nutzer-Entscheid ("dann machen wir einen eigenen solver fuer den heuristik anker. und schauen dass wir den value kopf gut kalibrieren fuer runde 5."), nichts gebaut; Vorarbeiten par.2a (Bau-Kartierung) und par.3a (Pruefpunkt: Champion-Ownership UNTRAINIERT) am 2026-08-22 erledigt; par.2b/2c: Teil A GEBAUT und ABGENOMMEN (2026-08-23: Suite 484/0, Paritaets-Hash 8c6684ff haelt vor/nach Wheel-Neubau, Wheel installiert) -- der Anker-Loeser ist aktiv und eingefroren. Teil B offen; Arm-3-Vorklaerung par.3c ERLEDIGT (Karten-Lieferant: v21-b18 empfohlen, Ownership-Ziele kennen keine Traeger-Maskierung); neuer Anlass: Strukturbefund Spalten-Vollendung (STATUS 2026-08-23). Anlass: 200-Knoten-Beschneidung als moegliche Schwachstelle; jede R5-Verbesserung wuerde sonst den Anker mitverschieben (Leiter-Reset-Falle, gerade erst bezahlt). -->
 
 # PREREG-SKELETT: R5-Loeser-Trennung (Anker eingefroren) + R5-Value-Kalibrierung
 
@@ -199,6 +199,38 @@ Ownership->E_k-Schiene, existiert die Tiling-Seite dafuer bereits
 fertig gebaut; nach par.3a-Befund kaemen die Karten dann aus der
 b-Serie (Champion-Ausgang untrainiert) bzw. aus einem kuenftig wieder
 ownership-tragend trainierten Netz.
+
+### par.3c ARM-3-VORKLAERUNG: KARTEN-LIEFERANT (2026-08-23, Agenten-Recherche, Kernpunkte vom Koordinator an Manifest und neural_net.py nachgeprueft)
+
+- **Ownership-Ziele kennen KEINE Traeger-Maskierung:** Labels entstehen
+  je abgeschlossener Partie aus dem letzten Record
+  (neural_net.py:1008ff, _final_ownership_by_game) fuer ALLE geladenen
+  Dateien; die Sieben-Laeufe-Falle war reine POLICY-Maskierung
+  ("Value-, Punkte- und Ownership-Ziele liefen normal durch",
+  archive/history.md). Alle vier geprueften Kandidaten (b18, b22, b24,
+  own_w1) trainierten den Kopf also unmaskiert mit Gewicht 1,0 und
+  Konjunktionskopf (140 Ziele).
+- **Empfohlener Lieferant: v21-b18** (Manifest nachgeprueft:
+  ownership_weight 1.0, conjunction_head true, Warm Start direkt vom
+  Champion, KEIN Frozen Trunk, Ownership-Korpus als extra_data_dir).
+  Gegenkandidaten je einzeln vorbelastet: b22 = Frozen-Trunk-Weg
+  registriert NEGATIV (schlechterer Own-Val); b24 = Reach-Relabeling
+  der Spalten-Atome, Zielwechsel registriert NICHT-ERFOLG; own_w1 =
+  einer der policy-maskierten Laeufe (fuer die Karte egal, als
+  Gesamt-Checkpoint Altlast). Alternative mit bestem gemessenem
+  Own-Val: v21-b19 (0,2994; Manifest hier NICHT gelesen -- vor
+  Verwendung pruefen).
+- **Einsatz-Pflichten:** MOSAIC_OWNERSHIP_CONJ=1 (sonst Produktform-
+  Rueckfall, net_mcts.rs:1909ff); und der Praezedenz-Caveat der
+  Feld-Kopf-Messung 2026-08-18 (gemessen an b19): auch ein korrekt
+  trainierter Kopf "sieht die Absicht kaum" -- fuer den
+  Vierer-Vergleich zaehlt aber zunaechst nur die R5-KALIBRIER-Skala
+  gegen exakte Solver-Grundwahrheit, nicht die Absichts-Frage.
+- **Neuer Anlass-Kontext:** der Strukturbefund vom 2026-08-23
+  (STATUS: Champion vollendet keine Spalten, 0,55 Hoehe-5-Spalten je
+  Partie bleiben stehen, Erreichen zu 78 % in R4/R5) macht Teil B
+  dringlicher: die Vollendungsentscheidungen fallen genau in die
+  Runden der schlechtesten Value-Kalibrierung.
 
 ## par.4 OFFEN (Nutzer, beim Aufgreifen)
 

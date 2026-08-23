@@ -63,6 +63,69 @@ entstanden. Alle drei lieferten echte Befunde — und keiner davon brachte k1 vo
 
 ---
 
+## UEBERGABE AN DIE NAECHSTE SITZUNG (2026-08-23 Abend -- ZUERST LESEN; Kapselungs-/Vollendungs-Strang. Die PARALLELE Sitzung des Nutzers fuehrt den Margen-Kopf-Strang: deren Preregs und archive/history.md NICHT anfassen)
+
+**IN-FLIGHT beim Sitzungsende:** der Zweistufen-Seed-Fix (wave3d) der
+Welle 3 -- ein Agent fuhr die Kernbeweis-Wiederholung, die ERSTE
+Partie zeigte bereits wieder eine Abweichung (vermutlich vierte
+Divergenzquelle ODER Fix unvollstaendig). **Erster Schritt der
+naechsten Sitzung:** Ausgang feststellen -- entweder aus dem
+Agenten-Abschlussbericht (falls im Kontext) oder REPRODUZIERBAR aus
+den Artefakten: `evaluations/frozen_kernbeweis_reference_wave3d*.json`
+gegen `..._referee_wave3d*.json` (bzw. wave3c-Paare als Vorlage) --
+Log-Zeilen paarweise diffen, Erstabweichung lokalisieren, dann am Code
+verifizieren (Muster: par.8a-8c der Kapselungs-Prereg, jede Runde hat
+eine reale Bug-Klasse isoliert: RNG-Vorbelastung -> verdeckte Ordnung
+-> Stufen-Seed). Ergebnis als par.8d registrieren (Kopf + Index,
+CLAUDE.md-Regel). STOPP-DisziPLIN beibehalten: lokalisieren,
+registrieren, EIN eng umrissener Fix je Runde.
+
+**DANACH DIE EINGETAKTETE PIPELINE (Nutzer-Freigaben liegen ALLE vor,
+nichts mehr rueckfragen):**
+
+1. **Stufe 0 Horizont-Frage** (`PREREG_bootstrap_horizon.md`, Abschnitt
+   "Stufe 0", komplett vorregistriert inkl. Lesart): Probe-Funktion
+   beide Label-Varianten (Horizont-2/net_leaf_eval vs. Anker bis
+   R5-Freebie) auf 200-300 stratifizierten Zustaenden aus fertigen
+   Partien; Divergenz-Landkarte, Korrelation gegen ECHTE Endresultate,
+   Kosten je Anker-Label.
+2. **R5-Teil-B-Vierer-Vergleich** (`PREREG_r5_solver_split.md` par.3;
+   Arm 3 = v21-b18 mit MOSAIC_OWNERSHIP_CONJ=1, Vorklaerung par.3c;
+   VOR dem Lauf Vorabregeln/Stellungsstichprobe registrieren) UND
+   **Legalitaets-Stufe der Vollendungs-Sonde** (Engine-Gegenpruefung
+   je Hoehe-5-Fall: war die fehlende Zelle legal belegbar; Basis
+   `tools/probes/column_completion_gap_probe.py`). Sequenziell.
+
+**HEUTE ABGESCHLOSSEN (Details in den Sektionen darunter + Preregs):**
+Seeding-Zyklus (kein k1-Signal, ERSTES positives Sibling-Signal
+p=0,017), R5-Anker-Trennung aktiv, Minimax-Knopf komplett gemessen
+(Heuristik-Erfolg gegnerspezifisch, Netz-gegen-Netz Paritaet),
+Kapselung Welle 1 abgenommen (SearchConfig, Specs, erste
+Netz-gegen-Netz-Knopfmessung), Welle 3 gebaut (Freeze-Artefakt v21,
+Worker/Referee, Handshake+Golden-Selbsttest; NUR der Kernbeweis noch
+rot, s. o.), Strukturbefund Spalten-Vollendung + Reihenwahl-Sonde,
+Doku-Sweep + Kopf-Pflege-Regel in CLAUDE.md.
+
+**ARBEITSBAUM (18 Commits vor origin, NIE pushen):** uncommitted sind
+(a) Fork-A/wave3d-Engine-Staende (serialize.rs, referee.rs, lib.rs,
+frozen_champion_worker.py, frozen_referee_match.py) -- committen erst
+nach gruenem Kernbeweis oder Koordinator-Entscheid; (b) Prereg-/
+STATUS-Registrierungen des Abends und die vier Sonden-Artefakte
+(column_build/completion, row_preference, kernbeweis_wave3c) --
+committbar als Doku-/Befund-Commit; (c) AGENTEN-MUELL im Repo-Root
+(out*.txt, log_last.txt, log_sample.txt, mid_info.txt) -- NICHT ohne
+pfadgenaue Freigabe loeschen, dem Nutzer zur Loeschung listen.
+models/frozen_champions/ + frozen_wheels/ (wave1-3d) bleiben lokal.
+
+**LAST-/BETRIEBSREGELN dieser Straenge:** Kernbeweis-/byte-Identitaets-
+Laeufe EXKLUSIV (Suchlast-Partien verfaelschen sie); waehrend
+Agenten-Wheel-Installationen keine Server-Partien (DLL-Lock); der
+Nutzer wartet auf Freigabe fuer Server-Partien -- nach Abschluss des
+wave3d-Zyklus explizit freigeben (Engine ist paritaets-identisch,
+nur Timing war der Blocker). Orchestrierungs-Regel beachten:
+Koordinator delegiert, prueft tragende Zahlen selbst nach, schreibt
+nur Verdikte/Registrierungen.
+
 ## STAND JETZT (2026-08-23)
 
 **Champion unveraendert:** `v21_2d_brierbest`, Elo **1215** [1170, 1259] auf
@@ -88,6 +151,78 @@ denen der Asym-Arm nicht signifikant war (`seedk1_value_sibling_check.json`).
 Diagnose „die Suche fragt den Kopf zu selten" (`PREREG_r5_solver_split.md`
 par.3) und macht den Such-Hebel zum naechsten Kandidaten, nicht das naechste
 Ziel-Experiment.
+
+**NEUER STRUKTURBEFUND (2026-08-23, Nutzer-Beobachtung, per Sonde
+verifiziert): der Champion VOLLENDET keine Spalten -- plattenunabhaengig.**
+Rekonstruktion der End-Brettstaende aus den Arena-Logs
+(`tools/probes/column_build_structural_probe.py`, Korrektheitsbeweis:
+7 x volle Spalten == Vertikale-Reihen-Punkte auf allen 1.560
+k1-aktiven Partieseiten, 0 Abweichungen; Artefakt
+`evaluations/column_build_structural_probe.json`): volle Spalten je
+Partie 0,096 (k1 aktiv) gegen 0,100 (k1 INAKTIV) -- die Platte
+aendert beim Champion NICHTS, waehrend Heuristik (0,090->0,131) und
+seedk1 (0,100->0,141) sichtbar reagieren. Dabei ist die BAU-Faehigkeit
+da: max. Spaltenhoehe im Mittel 4,66/6, ~2 Spalten je Partie auf
+Hoehe >= 4; in 1.628 Champion-Partieseiten NIE mehr als eine volle
+Spalte. **Der Engpass ist die VOLLENDUNG (letzte 1-2 Zellen), nicht
+der Bau -- eine strukturelle Schwaeche unabhaengig vom Plattenblick.**
+Einordnung: passt zur R5-Value-Schwaeche (Vollendungen fallen in die
+spaeten Runden, wo der Kopf am schlechtesten kalibriert ist,
+R5-Prereg par.1) und erklaert, warum plattenseitige Hebel null
+blieben: sie zielten auf den Verstaerker (7 Pkt), nicht auf die Basis
+(Platzierungsfluss der letzten Zellen). Folgezuschnitt =
+Nutzer-Entscheid.
+
+**Vertiefung (Vollendungsluecken-Sonde, gleicher Tag;
+`tools/probes/column_completion_gap_probe.py`, Konsistenzpruefung
+4.070 Seiten / 0 Abweichungen, Artefakt
+`column_completion_gap_probe.json`):** der Champion laesst **0,55
+Spalten je Partie exakt auf Hoehe 5 stehen** und vollendet nur
+15,2 %/14,9 % (k1 inaktiv/aktiv) der erreichten Hoehe-5-Spalten --
+wieder plattenunabhaengig. Das Erreichen konzentriert sich auf
+Runde 4/5 (78 %), und im Mittel bleiben danach noch ~3,3 eigene
+Legezuege (Median 3, bei Nicht-Vollendung kaum weniger): **am
+Gelegenheits-FENSTER liegt es nicht.** WICHTIGE GRENZE der Sonde
+(ausgewiesen): LEGALITAET je Einzelfall (passende Kachel/Farbe
+verfuegbar?) ist ohne Engine ungeprueft -- die Legalitaets-Stufe
+folgt nach dem Welle-3-Abschluss als Engine-Gegenpruefung. Bis dahin
+gilt: 0,55 knapp verpasste Spalten je Partie sind die praezise
+bezifferte Obergrenze des liegengelassenen Postens (bis ~7 Pkt
+Wertung + Platzierungsrest je Partie).
+
+**EINGETAKTETE PIPELINE (Nutzer 2026-08-23, "takte das nach stufe 0
+horizont frage ein") -- Reihenfolge fest, Abarbeitung dieser Sitzung/
+Uebergabe:** (1) Welle-3-Fork-A abschliessen (exakte Zustandsuebergabe,
+laeuft); (2) **Stufe 0 der Horizont-Frage** (Label-Diagnose ohne
+Training, PREREG_bootstrap_horizon Stufe 0); (3) danach BEIDE
+freigegeben: **R5-Teil-B-Vierer-Vergleich** (PREREG_r5_solver_split
+par.3, Arm 3 = v21-b18 mit MOSAIC_OWNERSHIP_CONJ=1 laut par.3c;
+Vorabregeln vor dem Lauf registrieren) und **Legalitaets-Stufe der
+Vollendungs-Sonde** (Engine-Gegenpruefung: war die fehlende Zelle je
+Hoehe-5-Fall legal belegbar; Erweiterung von
+column_completion_gap_probe). Sequenziell fahren, Lastdisziplin wie
+gehabt.
+
+**Ursachen-Sonde Reihenwahl (Nutzer-Hypothese "auf Reihen getrimmt,
+weil die Heuristik so spielt"; `tools/probes/row_preference_probe.py`,
+Artefakt `row_preference_probe.json`): Praeferenz BESTAETIGT,
+Abstammungs-These WIDERLEGT.** Der Champion zieht in vier Kontexten
+konsistent 55,5-56,1 % seiner Draft-Ziele auf die kurzen Musterreihen
+1-3 und meidet Reihe 5/6 (12-13 %) -- FLACH ueber alle Runden, ohne
+Spaetrunden-Anpassung. Das Heuristik-SELFPLAY (der Abstammungs-
+Lehrer; data/holdout heur-Arm, am Manifest verifiziert: mode mcts,
+kein Plattenbau) spielt dagegen spaet genau umgekehrt: Kurz-Anteil
+faellt von 46,0 % (R1-2) auf 33,4 % (R4-5), Reihe 6 wird dort mit
+19,1 % am HAEUFIGSTEN gezogen. Der Bias ist also NICHT geerbt --
+der Lehrer "weiss" strukturell, dass spaete lange Reihen zu fuellen
+sind. Regelkopplung (engine_manual Z.125-131): Musterreihe N speist
+Brett-Zeile N; Spalten-Vollendung BRAUCHT vollendete Reihen 5/6 --
+die Spaetrunden-Meidung genau dieser Reihen IST der Mechanismus der
+0,55 stehengelassenen Hoehe-5-Spalten. Ungeprueft-markierte
+Herleitung zur Ursache: verzoegerte Auszahlung langer Reihen faellt
+aus dem Kredit-Horizont des Trainings (TD_LAMBDA 0,5,
+bootstrap_horizon 2 Runden) -- als Verdachtspunkt notiert, nicht
+gemessen.
 
 **Abgenommen und aktiv: die R5-Loeser-Trennung.** `round5_anchor.rs` ist
 eingefroren und in allen drei Sucheinstiegen verdrahtet (geprueft
