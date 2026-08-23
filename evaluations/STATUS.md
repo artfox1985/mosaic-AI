@@ -307,6 +307,28 @@ Nutzer-Auftrag: einakten, noch nicht starten. Reihenfolge nach Ressource
 sortiert -- erst alles, was OHNE Arena laeuft (und dabei drei Straenge
 schliessen KANN), dann die Arena-Bloecke exklusiv und sequenziell.
 
+**BETRIEBSSPERRE (Stand 2026-08-24 ~01:20, Meldung der Parallelsitzung):**
+dort laeuft die Byte-Identitaets-Diagnose des Kernbeweises. Bis zu deren
+Signal laeuft aus diesem Strang **gar nichts** -- keine Engine-Builds, keine
+Wheel-Installation, keine Arena-, Such- oder Netz-Forward-Laeufe, und auch
+die reinen Korpus-Auswertungen (Schritte 1-2) nicht: auch die erzeugen
+CPU-Last, und die Diagnose haengt an Deadline-Pfaden
+(`sample_round_transition_value` bricht unter Last auf den Kurzpfad um).
+**Damit sind ALLE acht Schritte blockiert, nicht nur die Arena-Bloecke.**
+
+Gesperrte Dateien der Parallelsitzung, unberuehrt zu lassen:
+`engine/src/referee.rs`, `serialize.rs`, `lib.rs`,
+`tools/frozen_champion_worker.py`, `tools/frozen_referee_match.py`,
+`models/frozen_champions/**`, `models/frozen_wheels/**`,
+`PREREG_agent_encapsulation.md`. Frei: `archive/history.md` und die eigenen
+Preregs. `engine/src/net_mcts.rs` ist seit dffa916 wieder sauber.
+
+**Offene Zustaendigkeitsfrage:** Schritt 5 IST die par.6a-Messung der
+Parallelsitzung. Wer sie faehrt, ist noch nicht geklaert -- angefragt. Wer
+sie faehrt, faehrt sie bitte MIT `--log-games`, sonst ist das Artefakt fuer
+Schritt 6 und 7 wertlos (Praezedenzfall: das Task-A-Artefakt traegt 2x400
+Partien und 0 Logs).
+
 **Vorbedingungen, vor Schritt 5 zu pruefen (nicht optional):**
 
 - **Engine-Stabilitaet.** Das installierte Wheel stammt vom 2026-08-24
