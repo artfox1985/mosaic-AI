@@ -301,6 +301,50 @@ Wheel-Neubau, Suite 484/0 (`logs/cargo_suite_r5split_20260823.log`,
 R5-Weiterentwicklung immun** – der Netz-Loeser darf sich entwickeln, ohne
 den Anker zu entwerten.
 
+## NACHT-FAHRPLAN 2026-08-23/24 (eingetaktet, NICHT gestartet)
+
+Nutzer-Auftrag: einakten, noch nicht starten. Reihenfolge nach Ressource
+sortiert -- erst alles, was OHNE Arena laeuft (und dabei drei Straenge
+schliessen KANN), dann die Arena-Bloecke exklusiv und sequenziell.
+
+**Vorbedingungen, vor Schritt 5 zu pruefen (nicht optional):**
+
+- **Engine-Stabilitaet.** Das installierte Wheel stammt vom 2026-08-24
+  00:13 und traegt alles Noetige (geprueft: 78 Knoepfe, darunter
+  `MOSAIC_IMPLICIT_MINIMAX_A` und `MOSAIC_FLOOR_SHAPING_W`; `spec` in
+  `net_vs_net_arena_match`). ABER der Arbeitsbaum traegt uncommittete
+  Engine-Aenderungen der Parallelsitzung (`lib.rs`, `referee.rs`,
+  `serialize.rs`, Wave-3e). **Baut jene Sitzung waehrend der Nacht neu,
+  wechselt die Engine unter einer laufenden Messung.** Vor Schritt 5
+  Wheel-Zeitstempel und Knopf-Schnappschuss festhalten, danach
+  gegenpruefen; im Zweifel abstimmen.
+- **Arena exklusiv.** Schritte 5 und 8 duerfen weder miteinander noch mit
+  1-4 ueberlappen. Server-Partien des Nutzers blocken beides.
+- Platz ist kein Thema: ~10 MB je geloggtem Arm a 407 Partien, 1,6 TB frei.
+
+| # | Schritt | Ressource | Liefert |
+|---|---|---|---|
+| 1 | `PREREG_points_dist_bin_scale.md` par.6 Tor | Python, Minuten | **kann den Strang schliessen** (nach par.2a erwartet) |
+| 2 | `PREREG_score_correlation.md` komplett | Python, ~1 h | MAE_eng-Verdikt **plus** Var(D) als Gegenprobe zu MARGIN_SCALE=20 |
+| 3 | `PREREG_floor_action_aversion.md` par.6 Tor | Netz + Suche, ~1 h | entscheidet, ob Schritt 8 ueberhaupt noetig ist (H1 -> entfaellt) |
+| 4 | `PREREG_saturating_score_utility.md` par.3a Tor | Netz-Forward, ~1 h | "fast konstant" gegen "fast kollinear zu wr" -- Diagnose des teuersten Zuschnitts |
+| 5 | **Alpha-Messung `PREREG_agent_encapsulation.md` par.6a MIT `--log-games`** | **Arena exklusiv**, mehrere h | Schluesselartefakt fuer 6 und 7 |
+| 6 | Locus-Sonden auf dem Artefakt aus 5 | Python, Minuten | `PREREG_completion_bottleneck_locus.md`: Such- gegen Ziel-Lesart |
+| 7 | Alpha-Sweep-Verdikt aus denselben Partien | Python, Minuten | `PREREG_implicit_minimax_backup.md` Folgeentscheid |
+| 8 | Floor-Arme (Task-A-Konfiguration, R/A0/A1) MIT `--log-games` | **Arena exklusiv**, mehrere h | nur falls Schritt 3 auf H2/H3 zeigt; repliziert die -11,25 pp gratis |
+
+**Warum diese Reihenfolge.** Schritte 1-4 sind Tore: jedes kann seinen
+Strang fuer Minuten bis eine Stunde beenden, bevor Rechenzeit hineingeht.
+Schritt 5 ist der Angelpunkt -- EIN Lauf, DREI Verdikte (5, 6, 7), und der
+einzige Unterschied zur ohnehin vorregistrierten Messung ist `--log-games`.
+Schritt 8 haengt an Schritt 3 und faellt weg, wenn das Tor H1 sagt.
+
+**Was ausdruecklich NICHT in der Nacht laeuft:** der Skalenwechsel auf
+[-1,1] (`PREREG_saturating_score_utility.md` par.4b) und der Margen-Kopf.
+Beide sind Bau, kein Messen; par.4c haelt fest, dass sie nicht parallel zu
+einer laufenden Kapselungs-Welle gebaut werden -- und genau daran arbeitet
+die Parallelsitzung.
+
 ## NAECHSTE SCHRITTE – ALLE OFFEN, ALLE NUTZER-ENTSCHEID
 
 Der NAECHSTE Schritt je Strang ist Nutzer-Entscheid; einzelne Straenge tragen
