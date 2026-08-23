@@ -65,6 +65,13 @@ entstanden. Alle drei lieferten echte Befunde — und keiner davon brachte k1 vo
 
 ## FAHRPLAN DIESER GENERATION (Nutzer-Auftrag 2026-08-18, woertlich)
 
+> **UEBERHOLT (2026-08-22):** Dieser Fahrplan ist durchgemessen und
+> ersetzt – der Ownership-Verbraucher-Strang ist in allen gemessenen
+> Formen negativ (Schliessung weiter unten in dieser Datei), der
+> gueltige Auftrag steht in der UEBERGABE-Sektion (2026-08-22, neuer
+> Zuschnitt: Startpositions-Seeding primaer). Der Abschnitt bleibt als
+> Protokoll und wegen der Verwerfungs-Begruendungen am Ende stehen.
+
 > 1. *"modell erstellen dass mit dem ownership head aktiv die züge steuert und
 >    den champ schlägt"*
 > 2. *"anschließend mit dem neuen champ self plays (smoke test) überprüfen ob
@@ -232,27 +239,70 @@ pushen ohne Anweisung; der Nutzer pusht selbst zwischendurch):**
    Seeding-Pfad; json_to_state NICHT angefasst -- Basislinien-Schutz).
    Das installierte Wheel traegt die Faehigkeit bereits.
 
-**NAECHSTER SCHRITT (wartet NUR auf Nutzer-"Start"):** Baustein 3/4 --
-Generierung 9.000 Partien (par.6-Entscheide GEFALLEN: k=6, Kontrollarm
-= vorhandener v21-asymN_best, Schwellen = Asym-par.7):
+**BAUSTEIN 3 KORPUS FERTIG (2026-08-22 20:58 bis 2026-08-23 01:08,
+15.049,7 s):** 9.000/9.000 Partien, 900 Dateien, 642.999 Zuege, keine
+Fehler im Log (Details/Beleg: `PREREG_start_position_seeding.md`
+par.4a). Stellungs-Zuordnung gesichert
+(`data/seed_corpus/seed_position_map.txt`, 9.000 Zeilen, 1.500
+verschiedene idx a 6 Partien, k=6-Zyklik haelt). Befehl war:
 
     $env:MOSAIC_DATA_DIR = "data/seed_corpus"   # eigener Ordner = Sperre
     python -u self_play.py --mode network --model models/alphazero_v21_2d_brierbest.onnx `
       --games 9000 --sims 200 --version v21_seedk1 --threads 8 `
       --seed 20260824 --seed-positions data/seed_positions/seed_positions_v1.jsonl
 
-    (tee-Log Pflicht: die [seed_position]-Zeilen sind die einzige
-    Stellungs-Zuordnung; danach wie beim Asym-Korpus als Map-Datei
-    neben den Korpus sichern. Dauer ~3,8-5,2 h.)
+**Training v21-seedk1 laeuft seit 2026-08-23 01:19** (Manifest
+`models/manifest_train_v21-seedk1_20260823_011959.json`, Standardrezept
+Warm Start Champion, epochs 20, seed 2, Fenster b18-Regex + Seeding-
+Korpus policy-tragend 900/900, Traeger-Manifest
+`policy_carrier_manifest_seedk1.json`, Cache-Zeile verifiziert; Details
+par.4a). Danach: Arena gegen Champion auf `evaluations/seeds_asym_407.txt`
+(S-Muster: _best-Checkpoint, --log-games, Brettwechsel-Pflicht) ->
+k1-Raten aus den Endwertungs-Zeilen (Instrument-Muster: par.14 Asym) ->
+par.7-Verdikt gegen den Kontrollarm v21-asymN auf denselben Seeds.
+Runbook mit der vollstaendigen Befehlszeile, erwartetem
+Checkpoint-Namen und den Modellpfaden fuer
+`tools/probes/asym_value_sibling_check.py` ist vorbereitet, aber NICHT
+ausgefuehrt: `PREREG_start_position_seeding.md` par.4b (Plan,
+2026-08-23).
 
-Danach: Training (Standardrezept, Warm Start Champion, epochs 20,
-seed 2, Fenster = b18-Regex + Seeding-Korpus policy-tragend, eigenes
-Traeger-Manifest nach dem asymS-Muster, Cache-Zeile verifizieren!) ->
-Arena gegen Champion auf `evaluations/seeds_asym_407.txt` (S-Muster:
-_best-Checkpoint, --log-games, Brettwechsel-Pflicht) -> k1-Raten aus
-den Endwertungs-Zeilen (Instrument-Muster: par.14 Asym) ->
-par.7-Verdikt. Sonde `tools/probes/asym_value_sibling_check.py` laeuft
-zusaetzlich (Modellpfade dort anpassen).
+**Suite-Teilabnahme der R5-Trennung: 484/0 bestanden** (par.2b-Abnahme
+`PREREG_r5_solver_split.md`, Paritaets-Hash + Wheel-Neubau bleiben offen,
+Slot nach der Arena -- INZWISCHEN ERLEDIGT, siehe naechster Absatz).
+Pruefstelle: `logs/cargo_suite_r5split_20260823.log`
+(Koordinator-Lauf 2026-08-23 frueh im Slot zwischen Generierung und
+Training, Exit 0, "test result: ok. 484 passed; 0 failed; 26 ignored";
+27 round5_anchor-Treffer im Log = die Anker-Tests liefen mit). Der
+Ungeprueft-Vermerk des Registrier-Agenten ist damit aufgeloest -- die
+Zahl stammte aus diesem Lauf, das Log ist jetzt dauerhaft abgelegt.
+
+**R5-TRENNUNG KOMPLETT ABGENOMMEN (2026-08-23 frueh, par.2c der
+R5-Prereg):** Paritaets-Hash 8c6684ff haelt VOR und NACH dem
+Wheel-Neubau (plus unabhaengige Koordinator-Nachmessung), Wheel neu
+gebaut und installiert, Suite 484/0. **Der Anker-Loeser
+(round5_anchor.rs) ist aktiv und eingefroren; die Elo-Leiter ist ab
+jetzt gegen jede R5-Weiterentwicklung immun.** Logs
+`logs/r5split_*_20260823.log`. Netz-Loeser-Arme (par.2 a/b/c) und
+Teil B (Vierer-Vergleich) sind Nutzer-Entscheide.
+
+**SEEDING-ARENA GEMESSEN + VERDIKT (2026-08-23 frueh, par.4c der
+Seeding-Prereg): KEIN k1-Signal, KEIN Staerkepreis.** k1-Rate 22/156 =
+14,1 % (Swap 21/156 = 13,5 %) unter der 22-%-Signalschwelle -- nominell
+hoechste je gemessene Netz-Rate (Grundrate 12,8 %, asymN-Kontrolle
+9,6 %), aber Abstand = 2 Partien. Staerke: 220/407 gegen Champion
+(Block-t +2,18, Brettwechsel 199/407 traegt nicht mit), gegen
+Kontrollarm asymN n.s. (McNemar p=0,303). Instrument-Zahlen doppelt
+erhoben (Agent + unabhaengige Koordinator-Nachzaehlung, bit-gleich);
+Artefakte `paired_arena_env_seedk1_nullarm{,_swap}.json`. Damit ist
+der Seeding-Primaerarm in der k=6-Dosis der dritte Nullbefund der
+Plattenblick-Kette bei null Staerkekosten. **ABER: die Sibling-Sonde
+(par.4d) liefert das ERSTE POSITIVE Zustandssignal der Kette** --
+Tau(Value~k1-Puffer) seedk1 +0,140 gegen N -0,185, Vorzeichentest
+17/5/11, p=0,017 (dieselben 33 Stellungen, auf denen asymS n.s. war;
+Artefakt `seedk1_value_sibling_check.json`, Asym-Artefakt unversehrt).
+Mechanik bewegt, Verhalten (noch) nicht -- konsistent mit der
+Diagnose "die Suche fragt den Kopf zu selten" (R5-Prereg par.3).
+Folgearme (Dosis, UVFA par.8, Minimax-Knopf) sind Nutzer-Entscheide.
 
 **STEHENDE REGELN (unveraendert + neu kalibriert):** Regel 0; Arena
 exklusiv, ABER seit dem Kalibrierungs-Smoke (Fallen-Sektion) sind
@@ -260,8 +310,28 @@ Single-Thread-IO-Jobs parallel erlaubt (Suchlaeufe/Training weiterhin
 nicht); Score-Analysen auf Block-Ebene; nie loeschen ohne pfadgenaue
 Freigabe; Trainings waehrend Generierung nur mit MOSAIC_DATA_EXCLUDE.
 
-**OFFENE NUTZER-PUNKTE:** (a) night_run_20260820.ps1 loescht der Nutzer
-selbst; (b) logs/nacht_20260820.log darf weg (Zwangsseiten-Map ist
+**PARALLEL ZUR GENERIERUNG ERLEDIGT (2026-08-22, nur Lese-/
+Schreibarbeit, keine Rechenlast):** Baustein 3 lief bis 2026-08-23
+01:08 durch (9.000 Partien nach `data/seed_corpus/`, Log
+`logs/seed_corpus_gen_20260822.log`, [seed_position]-Zeilen
+verifiziert; Ergebnis siehe Absatz oben und par.4a). Nebenher zwei
+Vorarbeiten aus
+`PREREG_r5_solver_split.md` abgeschlossen: **par.3a-Pruefpunkt
+GEKLAERT -- der Ownership-Ausgang des Champions ist UNTRAINIERT**
+(ownership_weight-Kette null->0.0 ueber die gesamte Warm-Start-Linie,
+Beweiskette in par.3a; Arm 3 des Vierer-Vergleichs braucht ein
+b-Serie-Modell mit geprueftem Traeger-Status) und **par.2a
+Bau-Kartierung Teil A** (round5.rs HEAD == c83fb35; Trennschnitt =
+exakt drei mcts.rs-Einstiege 746/777/796; alle uebrigen Konsumenten
+netz-/selfplay-seitig; Abnahme braucht Mehrkern-Slot NACH der
+Generierung; Baubeginn = Nutzer-Entscheid par.4). **Teil A danach per
+Sonnet-Agent VORGESCHRIEBEN (par.2b): round5_anchor.rs + Umhaengung
+mcts.rs, diff/grep-nachgeprueft, aber UNKOMPILIERT -- komplette
+Abnahme (Suite, Paritaets-Hash, Wheel) steht aus und gehoert in den
+Slot nach Generierungsende.**
+
+**OFFENE NUTZER-PUNKTE:** (a) ERLEDIGT: night_run_20260820.ps1 vom
+Nutzer geloescht (Loeschung noch nicht committet); (b) logs/nacht_20260820.log darf weg (Zwangsseiten-Map ist
 extrahiert: data/asym_corpus/zwangsseiten_map.txt); (c) Asym-Korpus
 bleibt lokal (Trainingsinput fuer Seeding/UVFA); (d) Ownership-Korpus
 entfernt der Nutzer (5b-Abschluss registriert); (e) UVFA-par.7- und
@@ -591,7 +661,10 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
   die Paarung ueber den Spielindex selbst gerechnet werden.
 
 - **Champion**: `v21_2d_brierbest` seit 2026-08-09, **Elo 1358**
-  [1292, 1434] (Vorgaenger `v20_2d_opp_brierbest` 1295). Die
+  [1292, 1434] (Alt-Leiter vor dem R5-Minfix-Reset; gueltige neue
+  Leiter: 1215 [1170, 1259], PREREG_round5_minfix_elo_reset par.5 –
+  Kanten ueber die Fix-Grenze nie mischen) (Vorgaenger
+  `v20_2d_opp_brierbest` 1295). Die
   Erst-Schaetzung nach dem Gating (1416, CI +-92) beruhte auf einer
   einzigen Gegnerkante; mit Anker- und Champion-2-Kante sinkt das
   Niveau auf 1358 und das CI wird 23% enger (+-71) -- der ABSTAND zum
