@@ -154,22 +154,25 @@ Abschluss ueber `completed`, der Endstand steht im letzten Datensatz je
 
 ## par.9 Nachgelagerte Verwendung (nachgetragen 2026-08-23)
 
-Diese Prereg ist seit dem Nutzer-Entscheid vom 2026-08-23 eine
-**Bau-Voraussetzung** von `PREREG_saturating_score_utility.md` par.6a. Der
-dortige Margen-Kopf braucht eine eigene Skala `MARGIN_SCALE` (nicht
-`VALUE_SCALE = 50`, die am absoluten Eigenstand kalibriert ist), und die
-vorregistrierte Regel dafuer lautet `MARGIN_SCALE = std(D)` -- also die
-Wurzel aus `Var(D)`, das par.3 Punkt 2 hier ohnehin berechnet.
+`PREREG_saturating_score_utility.md` par.6a baut einen Margen-Kopf mit
+eigener Skala `MARGIN_SCALE`. Deren Wert ist dort **als Referenz gesetzt**
+(20), nicht aus dem Korpus abgeleitet -- aus demselben Grund, aus dem
+`VALUE_SCALE = 50` nie aus Spieldaten kam (`neural_net.py:502-509`): eine
+aus der Verteilung heutiger Netze gezogene Skala schreibt deren Schwaeche
+fest.
 
-Zwei Dinge folgen daraus, beide ausdruecklich:
+Ein Zwischenstand desselben Tages hatte `MARGIN_SCALE = std(D)` gesetzt und
+diese Prereg damit zur Bau-Voraussetzung gemacht. Das ist zurueckgenommen.
 
-1. **Am Programm dieser Prereg aendert sich nichts.** `Var(D)` war schon
-   vorher zu rechnen, als Gegenprobe zur Kovarianz. Es wird nur zusaetzlich
-   weiterverwendet. Insbesondere bleibt `MAE_eng` die
-   Entscheidungsgroesse; `Var(D)` ist und bleibt hier eine deskriptive
-   Zwischengroesse.
-2. **`Var(D)` ist ueber abgeschlossene Partien des Trainingsfensters zu
-   berichten, ungeclampt, mit Angabe des Fensters.** Wer die Zahl
-   weiterverwendet, muss wissen, aus welchem Korpus sie stammt -- sie ist
-   politikabhaengig (Waechter 4), und `MARGIN_SCALE` wird danach
-   eingefroren.
+Was bleibt: **`Var(D)` ist die GEGENPROBE zur Referenzsetzung.** Weicht die
+Self-Play-Streuung stark von der Referenz ab (neun
+Mensch-gegen-v21-Partien: RMS-Marge ~21), ist das ein eigenstaendiger Befund
+ueber den Abstand zwischen Netzspiel und gutem Spiel -- und kein Anlass, die
+Skala zu drehen.
+
+Am Programm dieser Prereg aendert das nichts: `Var(D)` war ohnehin als
+Gegenprobe zur Kovarianz zu rechnen, `MAE_eng` bleibt die
+Entscheidungsgroesse. Zu berichten ist `Var(D)` ueber abgeschlossene
+Partien, ungeclampt, **mit Angabe des Fensters** -- die Zahl ist
+politikabhaengig (Waechter 4), und wer sie weiterverwendet, muss wissen,
+aus welchem Korpus sie stammt.
