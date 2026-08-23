@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Warum meidet der Champion die AKTION "Ziel Strafleiste" massiv, die KONSEQUENZ "Steine auf der Strafleiste" aber nicht -- sitzt das im Policy-Prior oder in der Suche, und warum korrigiert der aktive Floor-Shaping-Term es nicht? | Beleg: nichts gebaut, angelegt 2026-08-23. Anlass ist die gepaarte Strafleisten-Sonde ueber 407 identische Partien: abgeladene Steine 2,88 gegen 6,38 (t=-12,6), Ueberlauf-Steine 2,21 gegen 1,78 (t=+4,2), Strafrunden 4,25 gegen 3,81 (t=+6,0). Nutzer-Hypothese Floor-Shaping am Code geprueft: der Term ist eine reine ZUSTANDS-Funktion und damit symmetrisch, kann die Asymmetrie also nicht erzeugen -- er sollte sie korrigieren und tut es offenbar nicht. Zweiter Fund: sein Gewicht 0,3 wurde in der v9b-Aera bei 11:89 abgenommen und nie nachkalibriert, obwohl der Code-Kommentar es verlangt -->
+<!-- STATUS: OFFEN | Frage: Warum meidet der Champion die AKTION "Ziel Strafleiste" massiv, die KONSEQUENZ "Steine auf der Strafleiste" aber nicht -- sitzt das im Policy-Prior oder in der Suche, und warum korrigiert der aktive Floor-Shaping-Term es nicht? | Beleg: nichts gebaut, angelegt 2026-08-23. Anlass ist die gepaarte Strafleisten-Sonde ueber 407 identische Partien: abgeladene Steine 2,88 gegen 6,38 (t=-12,6), Ueberlauf-Steine 2,21 gegen 1,78 (t=+4,2), Strafrunden 4,25 gegen 3,81 (t=+6,0). Nutzer-Hypothese Floor-Shaping am Code geprueft: der Term ist eine reine ZUSTANDS-Funktion und damit symmetrisch, kann die Asymmetrie also nicht erzeugen -- er sollte sie korrigieren und tut es offenbar nicht. Das Gewicht 0,3 ist auf STAERKE bereits dreifach re-validiert (par.4, PREREG_search_path_remeasurements Messung 1 plus Task A am v21-Champion: 0,15 und 0,6 beide H0, Abschalten kostet 11,25 pp bei p=0,0001 -- Strukturbefund "Schalter, kein Regler"). Diese Prereg stellt die Staerke-Frage NICHT neu; sie misst, ob der Term das tut, wofuer er gebaut ist. Das Task-A-Artefakt traegt beide Arme mit je 400 Partien, aber KEINE Logs, die Verhaltensfrage ist daran also nicht nachtraeglich beantwortbar -->
 
 # Vorregistrierung: Aktions-Ebenen-Aversion gegen die Strafleiste
 
@@ -73,22 +73,45 @@ Zwei Folgerungen:
    Asymmetrie trotzdem besteht, ist der eigentliche Befund -- und die
    Hypothese wird dadurch nicht schwaecher, sondern schaerfer.
 
-## par.4 Der lose Faden, der dabei auffiel
+## par.4 Was am Gewicht 0,3 schon gemessen ist
 
-`FLOOR_SHAPING_WEIGHT = 0.3` (`net_mcts.rs:470`) traegt im Code zwei
-Kommentare, die zusammen nicht mehr stimmen koennen:
+**KORREKTUR 2026-08-23, noch am selben Tag.** Ein erster Entwurf dieses
+Abschnitts behauptete, der Term sei seit der v9b-Aera "nie nachkalibriert".
+Das ist falsch, Nutzer-Hinweis, am Bestand nachgeprueft. Der Code-Kommentar
+an `FLOOR_SHAPING_WEIGHT` (`net_mcts.rs:470`) traegt zwar noch den alten
+Stand ("erster Test, mit echten Arena-Ergebnissen kalibrieren", GETESTET
+2026-07-19/20 an `v9b_domeonly` bei 11:89) -- die Akte ist aber weiter.
 
-- "Bewusst klein gewaehlt (Nudge, kein Ersatz fuer den Value-Head) --
-  **erster Test, mit echten Arena-Ergebnissen kalibrieren**."
-- "GETESTET (2026-07-19/20, **v9b_domeonly**, 150 Sims, n=100): **11:89**
-  (11 % Siege) ... die bisher beste Netz-Performance der gesamten Session.
-  **Bleibt vorerst aktiv.**"
+`PREREG_search_path_remeasurements.md` ist **ENTSCHIEDEN**, Messung 1 war
+genau dieser Sweep in der WDL-Aera:
 
-Der Term wurde also in einer Aera abgenommen, in der das Netz 11 % der
-Partien gewann, und seither ueber rund ein Dutzend Champion-Generationen
-nie nachkalibriert -- obwohl der eigene Kommentar genau das verlangt. Das
-ist unabhaengig von dieser Prereg ein offener Punkt und wird hier
-mitgemessen, weil die Arme ihn ohnehin abdecken.
+| Vergleich | Ergebnis |
+|---|---|
+| W=0,3 gegen W=0,15 | 153/200 gegen 144/200, **p=0,31**, H0 |
+| W=0,3 gegen W=0,6 | **p=0,36**, H0 |
+| **W=0,3 gegen W=0,0** (Task A, 2026-08-09, Champion `v21_2d_brierbest`) | **322/400 gegen 277/400**, 80,5 % gegen 69,3 %, **−11,25 pp**, exakter gepaarter McNemar **p=0,0001** (b=43/c=88), Block-Ebene **13 von 16 Bloecken**, Block-SE 0,71, **t=3,94** |
+
+Daraus der registrierte Strukturbefund: **Floor-Shaping ist ein SCHALTER,
+kein Regler.** Ob es an ist, macht rund 11 pp; welchen Wert es zwischen 0,15
+und 0,6 traegt, macht nichts. Artefakt:
+`evaluations/paired_arena_env_paired_arena_env_floorw_taskA.json`.
+
+**Was daran fuer diese Prereg wichtig ist -- und was trotzdem offen bleibt:**
+
+1. Der Term ist auf **STAERKE** dreifach re-validiert. Die Frage "ist 0,3
+   richtig" ist beantwortet und wird hier **nicht** neu gestellt.
+2. Gemessen wurde ausschliesslich die Siegquote. **Ob der Term das tut,
+   wofuer er gebaut ist, hat nie jemand nachgesehen** -- die
+   Abladen-gegen-Ueberlauf-Aufteilung aus par.1 ist von allen drei Messungen
+   unberuehrt.
+3. Das Task-A-Artefakt traegt **beide Arme mit je 400 Partien, aber KEINE
+   Logs** (`--log-games` war aus; nachgesehen 2026-08-23: 0 von 400 in
+   beiden Armen). Die Verhaltensfrage laesst sich daran also nicht
+   nachtraeglich beantworten, obwohl die Partien existieren.
+
+Das macht diesen Zuschnitt **staerker**, nicht schwaecher: die
+Staerke-Wirkung jedes Arms ist vorab bekannt, ein Verhaltenseffekt kann
+also nicht mit einem Staerkeeffekt verwechselt werden.
 
 ## par.5 Hypothesen
 
@@ -133,17 +156,27 @@ welche Arme ueberhaupt sinnvoll sind, und steht deshalb vorn.
 
 Nur wenn das Tor auf H2 oder H3 zeigt. Ein Faktor, vorhandener Knopf,
 **kein Bau**: `MOSAIC_FLOOR_SHAPING_W` ist registriert und aktiv
-(`docs/knobs.md:18`).
+(`docs/knobs.md:18`). Die Konfiguration ist die von Task A, nur **mit
+`--log-games`** -- das ist der einzige Unterschied und der einzige
+Neu-Aufwand.
 
-| Arm | `MOSAIC_FLOOR_SHAPING_W` |
-|---|---|
-| **R** | 0,3 (Bestand) |
-| **A0** | 0,0 -- Term aus |
-| **A1** | 0,6 -- doppeltes Gewicht |
+| Arm | `W` | Staerke laut par.4 | Rolle hier |
+|---|---|---|---|
+| **R** | 0,3 | Bestand | Referenz |
+| **A0** | 0,0 | **−11,25 pp, p=0,0001** | **reiner Diagnose-Arm** |
+| **A1** | 0,6 | H0, p=0,36 | reine Verhaltenssonde |
 
-`A0` ist der aussagekraeftigste Arm: **wenn der Term aus ist und die
-Asymmetrie bleibt, hat er sie nie getragen.** `A1` prueft, ob mehr Gewicht
-die Konsequenz-Seite ueberhaupt erreicht.
+**A0 ist ausdruecklich KEIN Default-Kandidat.** Dass Abschalten Staerke
+kostet, ist entschieden und wird hier nicht neu verhandelt; der Arm laeuft
+allein, um zu sehen, ob der Term die Asymmetrie traegt. Faende er sich als
+Traeger, waere die Konsequenz eine BESSERE Fassung des Terms, nie sein
+Abschalten.
+
+**Vorregistrierte Vorhersage aus dem Schalter-Befund.** Wenn "Schalter, kein
+Regler" auch fuer das VERHALTEN gilt, dann bewegt `A0` die Aufteilung und
+`A1` bewegt sie nicht. Bewegt umgekehrt `A1` etwas und `A0` nicht, ist der
+Schalter-Befund auf der Verhaltensseite falsch -- ein eigener, berichtbarer
+Befund ueber einen Term, der seit der v9b-Aera aktiv ist.
 
 `MOSAIC_FLOOR_SHAPING_OPP_BIAS` bleibt bei 1,0 und wird NICHT mitvariiert --
 das waere ein anderer Zuschnitt (Denial), und zwei Knoepfe gleichzeitig
@@ -155,9 +188,10 @@ machen jeden Ausgang mehrdeutig.
 Sonde und derselben gepaarten Auswertung. Die Frage ist, ob sich der
 Abstand zwischen abgeladenen und uebergelaufenen Steinen bewegt.
 
-**Als Waechter gleichrangig:** Siegquote und Punkte-Niveau. Der Term ist
-seit v9b aktiv; ihn zu drehen darf keine Staerke kosten, ohne dass es
-auffaellt.
+**Siegquote und Punkte-Niveau:** mitzuberichten, aber als KONTROLLE, nicht
+als Waechter -- die Staerke-Wirkung jedes Arms steht bereits fest (par.4).
+Weicht ein Arm stark von seinem bekannten Wert ab, ist zuerst das Instrument
+zu pruefen, nicht der Befund umzudeuten.
 
 Dazu die sechs Standard-Kennzahlen je Seite (CLAUDE.md): Reihenauslastung,
 Spaltenauslastung, Strafleistenauslastung, Punkte je Wertungsplatte, eigene
@@ -178,10 +212,15 @@ Bestand: Champion 0,57, Heuristik 0,78 (aus par.1 gerechnet).
   unterdrueckt. Dann ist zu klaeren, warum er die Konsequenz nicht
   gleichermassen unterdrueckt hat, obwohl er zustandsbasiert ist -- H3.
 - **`Q` faellt in A1 und die Ueberlauf-Steine fallen mit:** der Term
-  erreicht bei hoeherem Gewicht beide Kanaele. Dann ist die Nachkalibrierung
-  aus par.4 faellig und dieser Zuschnitt hat einen konkreten Vorschlag.
-- **Staerke faellt in irgendeinem Arm ausserhalb der Aufloesung:** Befund
-  unabhaengig vom Rest zu berichten; der Bestandswert 0,3 bleibt.
+  erreicht bei hoeherem Gewicht beide Kanaele. Das WIDERSPRAECHE dem
+  Schalter-Befund aus par.4 auf der Verhaltensseite und waere der
+  interessanteste Ausgang -- ein Regler, der nur in der Siegquote wie ein
+  Schalter aussieht. Zu berichten als eigener Befund, nicht als
+  Default-Vorschlag.
+- **In jedem Fall bleibt `W = 0,3` der Default.** Dieser Zuschnitt aendert
+  keinen Knopfwert; er lokalisiert eine Verhaltensasymmetrie. Ein
+  Default-Wechsel waere ein eigener Zuschnitt mit eigener Staerke-Messung
+  und Frisch-Seed-Replikation.
 
 ## par.10 Waechter
 
@@ -210,7 +249,13 @@ Bestand: Champion 0,57, Heuristik 0,78 (aus par.1 gerechnet).
   und wie "ueberlauferzeugend" genau bestimmt wird (Restkapazitaet gegen
   Entnahmegroesse -- die Entnahmegroessen je Seite sind bisher NICHT
   erhoben, siehe die Einschraenkung im STATUS-Eintrag zur Straf-Sonde).
-- Ob A1 mit 0,6 oder einem anderen Faktor faehrt.
+- Ob A1 mit 0,6 oder einem anderen Faktor faehrt. 0,6 ist gewaehlt, weil
+  genau dieser Wert in Messung 1 schon lief und dort H0 war -- die
+  Staerke-Seite ist damit bekannt.
+- Ob R und A0 als Neu-Lauf gefahren werden oder ob es billiger ist, Task A
+  mit `--log-games` schlicht zu wiederholen (gleiche Seeds, gleiche
+  Konfiguration). Letzteres liefert zusaetzlich eine Replikation der
+  −11,25 pp gratis.
 - Ob der Zuschnitt vor oder nach `PREREG_completion_bottleneck_locus.md`
   laeuft. Beide sind billig; die Reihenfolge ist Nutzer-Entscheid.
 
@@ -220,9 +265,11 @@ Bestand: Champion 0,57, Heuristik 0,78 (aus par.1 gerechnet).
   Auspraegung -- dort Suche gegen Ziel bei der REIHENWAHL, hier Prior gegen
   Suche bei der STRAFLEISTE. Faellt beides auf dieselbe Seite, ist das ein
   gemeinsamer Befund ueber den Agenten und kein Zufall.
-- **`PREREG_search_path_remeasurements.md` M1**: dort ist
-  `MOSAIC_FLOOR_SHAPING_W` als Sweep-Knopf registriert. Dieser Zuschnitt
-  nutzt denselben Knopf, misst aber eine VERHALTENS-Groesse statt Staerke.
+- **`PREREG_search_path_remeasurements.md`** (ENTSCHIEDEN): dort ist der
+  Knopf gebaut und die STAERKE-Frage dreifach beantwortet (par.4). Dieser
+  Zuschnitt nutzt denselben Knopf und dieselbe Instrument-Konfiguration,
+  misst aber eine VERHALTENS-Groesse. Er eroeffnet die Staerke-Frage
+  ausdruecklich nicht wieder.
 - **`PREREG_aggression_style_measurement.md` E2**: dort haengt
   `OPP_BIAS`. Bewusst nicht Gegenstand (par.7).
 - Die Reihen-Sonde und die Straf-Sonde (STATUS 2026-08-23): liefern die
