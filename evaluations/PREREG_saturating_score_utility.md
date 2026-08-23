@@ -207,17 +207,72 @@ Q als Wahrscheinlichkeit behandelt, unter anderem `round5.rs:674`.
 Wirkt hier NICHT: Waechter 1 (par.10) haelt nur den R5-Loeser selbst frei;
 die Unvertraeglichkeit entstuende an der Nahtstelle, nicht im Loeser.
 
-Vor dem Bau ist genau eine der folgenden Formen festzulegen, mit
-Begruendung, und sie gilt dann fuer alle Arme:
+Drei Formen standen zur Wahl:
 
 | Form | Wirkung |
 |---|---|
-| **Klammerung** `U = clamp(wr + E[u_score], 0, 1)` | einfachste Form; die Utility verliert Wirkung genau in den Stellungen, in denen `wr` schon extrem ist. Anteil geklammerter Blaetter ist zu berichten |
+| **Klammerung** `U = clamp(wr + E[u_score], 0, 1)` | einfachste Form; die Utility verliert Wirkung genau in den Stellungen, in denen `wr` schon extrem ist. Anteil geklammerter Blaetter waere zu berichten |
 | **Stauchung** `U = (1 − c_score)·wr + c_score·(0,5 + 0,5·E[u_score]/c_score)` | bleibt in [0,1] ohne Klammerung, aendert aber den Sieg-Term mit -- dann ist es kein rein additiver Term mehr |
 | **Skalenwechsel** ganze Blattbewertung auf [−1,1] wie KataGo | sauberste Form, aber der groesste Eingriff: jede Q-lesende Stelle muss mit |
 
-Nicht zulaessig ist, den Punkt offen zu lassen und im Bau zu entscheiden.
-Die Wahl aendert, was gemessen wird.
+**NUTZER-ENTSCHEID 2026-08-23: der Skalenwechsel.** Gilt fuer alle Arme.
+Begruendung des Nutzers: die sauberste Form, der Preis wird bezahlt.
+
+### par.4b Bau-Umfang des Skalenwechsels (kartiert 2026-08-23, nichts gebaut)
+
+Read-only-Kartierung, damit der Umfang vor dem ersten Eingriff bekannt ist.
+
+**Erzeuger der [0,1]-Skala** (jede Stelle muss auf `2q − 1` mitwandern):
+
+| Stelle | Was |
+|---|---|
+| `mcts.rs:101` | `normalize_score` -- Heuristik-Blattwert |
+| `net_mcts.rs:2229` | `value_to_win_prob` -- Netz-Blattwert |
+| `net_mcts.rs:453` | `opp_aware_points_utility` (Task-#28-Pfad, `w>0`) |
+| `round5.rs:674` | R5-Loeser -- **eingefrorener Anker, siehe unten** |
+| `round5_anchor.rs:671` | Anker-Loeser -- dito |
+
+**Inverse und Kalibrierung:** `round_transition_deep.rs:304`
+(`denormalize_score`, mit Paritaetstest
+`denormalize_score_is_the_inverse_of_normalize_score`) und
+`net_mcts.rs:418/431` (`calibrate_win_prob[_with]`, Platt auf der
+WAHRSCHEINLICHKEITS-Skala; acht Tests pruefen dort ausdruecklich
+Wahrscheinlichkeits-Semantik: Ordnungserhalt, Verhalten an 0/1, "stretches
+above/below half"). Platt auf [−1,1] ist nicht dasselbe wie Platt auf [0,1];
+die Kalibrierungskonstanten `cal_a`/`cal_b` sind kein blosser Umrechnungsfall.
+
+**Der harte Teil: vier Felder gehen ins KORPUS.**
+
+| Schreibstelle | Feld | Verbraucher |
+|---|---|---|
+| `self_play.rs:1772` | `root_q` | Python-Auswertung, `PREREG_uncertainty_guided_selfplay.md` par.4 |
+| `self_play.rs:1777` | `root_child_q` | dito |
+| `self_play.rs:1879` | `round_transition_value` | `neural_net.py:1702-1705` (`2·rtv−1`) |
+| `self_play.rs:1882` | `bootstrap_value` | `neural_net.py:1713-1717` (`2·bv−1`), plus die WDL-Sonderbehandlung, die `bootstrap_value` ausdruecklich als "bereits eine [0,1]-Gewinnwahrscheinlichkeit" direkt blendet |
+
+**Vorab festgelegt, weil hier eine stille Datenkorruption droht:** die
+GESCHRIEBENEN Felder bleiben auf [0,1]. Der Skalenwechsel wirkt intern; an
+der Schreibgrenze wird zurueckkonvertiert. Grund: die 2945 vorhandenen
+Korpusdateien liegen auf [0,1], und ein Skalenwechsel im Schreibpfad wuerde
+sie nicht kaputt machen, sondern still falsch etikettieren -- das Training
+saehe ein gemischtskaliges Fenster ohne jede Fehlermeldung. Wer das doch
+aendern will, zieht `VALUE_SCHEMA_VERSION` und baut den Cache neu.
+
+**Waechter 1 gilt weiter, wird aber praeziser:** `round5.rs`/
+`round5_anchor.rs` sind eingefrorene Anker. Der Skalenwechsel darf dort die
+Skala mitziehen, aber **keine Entscheidung aendern**. Abnahmebedingung ist
+der Paritaets-Hash: identische Zuege bei identischen Seeds vor und nach dem
+Umbau. Faellt der Hash, ist der Umbau falsch, nicht der Anker.
+
+**Abnahme insgesamt:** der Skalenwechsel ist ein bijektiver Refaktor und
+muss **verhaltensgleich** sein. Paritaets-Hash + volle Suite + Wheel-Neubau
+vor jeder Messung. Zahlengleichheit ist hier das ERWARTETE Ergebnis (wie bei
+Arm S0, par.7).
+
+**Reihenfolge:** der Skalenwechsel ist verhaltensneutral und damit
+unabhaengig vom Tor par.3a. Er darf davor gebaut werden. Gebaut wird er aber
+NICHT waehrend einer laufenden Arena (Nebenlast verstuemmelt Partien, und
+ein Wheel-Neubau tauscht die Engine unter der Messung).
 
 ## par.5 Das fehlende Stueck: eine Streuung
 
