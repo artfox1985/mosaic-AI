@@ -389,9 +389,33 @@ Heuristik-Partien erhoben", und das war fuer die wichtigste davon falsch
 
 **Warum diese Reihenfolge.** Schritte 1-4 sind Tore: jedes kann seinen
 Strang fuer Minuten bis eine Stunde beenden, bevor Rechenzeit hineingeht.
-Schritt 5 ist der Angelpunkt -- EIN Lauf, DREI Verdikte (5, 6, 7), und der
-einzige Unterschied zur ohnehin vorregistrierten Messung ist `--log-games`.
-Schritt 8 haengt an Schritt 3 und faellt weg, wenn das Tor H1 sagt.
+Schritt 5 war der Angelpunkt und ist erledigt. Schritt 8 haengt an
+Schritt 3 und faellt weg, wenn das Tor H1 sagt.
+
+### WAS BEIM STARTSIGNAL ZU TUN IST (Stand 2026-08-24 01:40)
+
+Nutzer-Vorgabe: d1 meldet, wenn der Kernbeweis durch ist, DANN loslegen.
+Restliste, in dieser Reihenfolge:
+
+1. `points_dist_bin_scale` par.6 Tor -- Minuten, kann schliessen.
+2. `score_correlation` komplett -- MAE_eng je Runde, Faltung je Schicht,
+   plus Var(D) als Gegenprobe zu MARGIN_SCALE=20.
+3. `floor_action_aversion` par.6 Tor -- Prior gegen Suche. Entscheidet 5.
+4. `saturating_score_utility` par.3a Tor -- Kopf-Ausgabe gegen `wr`.
+5. NUR falls 3 auf H2/H3 zeigt: Floor-Arme R/A0/A1, Task-A-Konfiguration
+   mit `--log-games`. Einziger Arena-Block.
+6. Rest von `completion_bottleneck_locus`: die sekundaere Locus-Frage
+   (Delta der Rundenabhaengigkeit, alpha gegen frozen aus `imm_netvnet`
+   plus `_swap`). Erwartung nach der Paritaet: nichts. Kostet Minuten.
+7. Straf-Sonde gegen die Netz-gegen-Netz-Quelle nachziehen (Sonde trennt
+   seit b60d0d0 nach NetzA/NetzB) -- schliesst den
+   Gegnerspezifitaets-Caveat des Primaervergleichs.
+
+**Vor dem ersten Schritt:** Wheel-Zeitstempel und Knopf-Schnappschuss
+festhalten (die Parallelsitzung hat den `target`-Baum um 01:31 neu
+geschrieben), und den Remote-Stand mit `git ls-remote origin
+refs/heads/main` pruefen -- der lokale Tracking-Ref haengt im geteilten
+Klon nach.
 
 **Was ausdruecklich NICHT in der Nacht laeuft:** der Skalenwechsel auf
 [-1,1] (`PREREG_saturating_score_utility.md` par.4b) und der Margen-Kopf.
