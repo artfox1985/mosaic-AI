@@ -52,6 +52,23 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
 - PNG-Exporte stoesst der Nutzer bei Bedarf selbst an; nicht ungefragt
   mitgenerieren.
 
+## Prereg-Statuskopf und Index (Nutzer-Anweisung 2026-08-23)
+
+- Jede `evaluations/PREREG_*.md` traegt in Zeile 1 den parsebaren
+  Status-Kopf (`<!-- STATUS: ... -->`); `evaluations/PREREG_INDEX.md`
+  wird daraus GENERIERT (tools/generate_prereg_index.py). Der
+  Tabellenteil des Index wird NIE von Hand editiert.
+- **Wer ein Ergebnis oder Verdikt in einer Prereg registriert, zieht
+  IM SELBEN ZUG den Zeile-1-Kopf nach** (gleiche Pflegeregel wie bei
+  STATUS.md). Diese Regel entstand, nachdem ein Audit am 2026-08-23
+  vier Preregs fand, deren Koepfe noch "OFFEN / nichts gebaut" sagten,
+  waehrend der Dateikoerper laengst das registrierte Ergebnis trug.
+- **Sobald sich ein Prereg-Kopf aendert: sofort
+  `python tools/generate_prereg_index.py` laufen lassen** – nicht erst
+  auf den pre-commit-Hook warten (der prueft nur, blockt aber erst
+  beim Commit). Gilt auch fuer Agenten-Auftraege: die Regel gehoert in
+  jeden Prompt, der Prereg-Registrierungen schreibt.
+
 ## Dateinamen-Konvention (Nutzer-Anweisung 2026-08-13)
 
 - **Neue Dateien und Verzeichnisse werden IMMER englisch benannt** (Code,

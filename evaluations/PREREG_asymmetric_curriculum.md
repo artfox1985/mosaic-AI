@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Wert des k1-Baus, wenn er ihn in asymmetrischen Partien (EIN Spieler baut, der andere nicht) erstmals als siegentscheidendes Merkmal sieht? | Beleg: offen, nichts gebaut. Anlass: DOSSIER_ownership_head.md 7(1) -- die Bauer-Arme sind wegsymmetrisiert; externe Spezifikation 2026-08-18. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Lernt der Value-Kopf den Wert des k1-Baus, wenn er ihn in asymmetrischen Partien (EIN Spieler baut, der andere nicht) erstmals als siegentscheidendes Merkmal sieht? | Beleg: Gesamtverdikt par.14-16 (2026-08-22): kein Signal (k1-Rate 12,2 % = Grundrate, Tau-Teilfrage n.s.), aber kein Siegverlust (199/407 gg. 205/407); par.16: implizites Behavior-Cloning drueckte sich nicht aus. Anlass: DOSSIER_ownership_head.md 7(1) -- die Bauer-Arme sind wegsymmetrisiert; externe Spezifikation 2026-08-18. -->
 
 # PREREG: Asymmetrisches Self-Play — den Plattenbau erstmals als Vorteil zeigen
 
