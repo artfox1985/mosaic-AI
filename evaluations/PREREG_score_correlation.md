@@ -150,4 +150,26 @@ Abschluss ueber `completed`, der Endstand steht im letzten Datensatz je
 - Die Frage, ob eine entstauchte Bin-Skala den Verteilungskopf rettet. Das
   ist eine eigene, bisher ungemessene Frage.
 - Die Konsumptionsseite (gesaettigte, integrierte Score-Utility), siehe
-  `research_value_head_alternatives_DRAFT.md` Idee 1.1.
+  `PREREG_saturating_score_utility.md`.
+
+## par.9 Nachgelagerte Verwendung (nachgetragen 2026-08-23)
+
+Diese Prereg ist seit dem Nutzer-Entscheid vom 2026-08-23 eine
+**Bau-Voraussetzung** von `PREREG_saturating_score_utility.md` par.6a. Der
+dortige Margen-Kopf braucht eine eigene Skala `MARGIN_SCALE` (nicht
+`VALUE_SCALE = 50`, die am absoluten Eigenstand kalibriert ist), und die
+vorregistrierte Regel dafuer lautet `MARGIN_SCALE = std(D)` -- also die
+Wurzel aus `Var(D)`, das par.3 Punkt 2 hier ohnehin berechnet.
+
+Zwei Dinge folgen daraus, beide ausdruecklich:
+
+1. **Am Programm dieser Prereg aendert sich nichts.** `Var(D)` war schon
+   vorher zu rechnen, als Gegenprobe zur Kovarianz. Es wird nur zusaetzlich
+   weiterverwendet. Insbesondere bleibt `MAE_eng` die
+   Entscheidungsgroesse; `Var(D)` ist und bleibt hier eine deskriptive
+   Zwischengroesse.
+2. **`Var(D)` ist ueber abgeschlossene Partien des Trainingsfensters zu
+   berichten, ungeclampt, mit Angabe des Fensters.** Wer die Zahl
+   weiterverwendet, muss wissen, aus welchem Korpus sie stammt -- sie ist
+   politikabhaengig (Waechter 4), und `MARGIN_SCALE` wird danach
+   eingefroren.

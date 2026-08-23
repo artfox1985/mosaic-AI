@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score, integriert ueber die Score-Verteilung) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die vorhandene lineare Mischung gescheitert ist? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht ERGAENZT. Ausarbeitung liegt in research_value_head_alternatives_DRAFT.md Idee 1.1, war aber nie vorregistriert. Empirischer Anker: Task #12 Block 2, Marge +2,25 bei 151:149. Neu: Tor par.3a (entscheidet offline zwischen "Punkte-Term fast konstant" und "fast kollinear zu wr" -- die Entwurfs-Diagnose setzte voraus, dass die Kopf-Ausgabe tanh(own/50) schaetzt, was fuer ~83 % der Trainingszeilen wegen des TD-Blends nicht gilt) sowie zwei Bau-Blocker: par.4a (U = wr + E[u_score] verlaesst die [0,1]-Blattwertskala, die PUCT voraussetzt) und par.6.1 (die atanh-Margenrueckgewinnung ist am TD-Gemisch nicht definiert) -->
+<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score, integriert ueber die Score-Verteilung) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die vorhandene lineare Mischung gescheitert ist? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht ERGAENZT. Ausarbeitung liegt in research_value_head_alternatives_DRAFT.md Idee 1.1, war aber nie vorregistriert. Empirischer Anker: Task #12 Block 2, Marge +2,25 bei 151:149. Neu: Tor par.3a (entscheidet offline zwischen "Punkte-Term fast konstant" und "fast kollinear zu wr" -- die Entwurfs-Diagnose setzte voraus, dass die Kopf-Ausgabe tanh(own/50) schaetzt, was fuer ~83 % der Trainingszeilen wegen des TD-Blends nicht gilt) sowie zwei Bau-Blocker, beide am 2026-08-23 per Nutzer-Entscheid geschlossen: par.4a -> SKALENWECHSEL der ganzen Blattbewertung auf [-1,1] (Bau-Umfang in par.4b kartiert; geschriebene Korpus-Felder bleiben auf [0,1], sonst still gemischtskaliges Fenster ueber 2945 Bestandsdateien), und par.6.1 -> eigener ADDITIVER Margen-Kopf mit eigener Skala MARGIN_SCALE = std(D), ohne rtv/TD-Zweig (par.6a; damit entfaellt die Zwei-Kopf-Subtraktion und opp_points bleibt Hilfsziel). Reihenfolge: PREREG_score_correlation.md (liefert Var(D)), dann Tor par.3a, dann Bau -->
 
 # Vorregistrierung: Gesaettigte, re-zentrierte Score-Utility
 
@@ -306,16 +306,17 @@ Drei Fallen dabei.
 1. **Die Ruecktransformation ist heute gar nicht definiert** (Bau-Blocker,
    nachgetragen 2026-08-23). `50·(atanh(p) − atanh(q))` setzt voraus, dass
    `p = tanh(own/50)` ist. Nach par.3(b) ist die Kopf-Ausgabe fuer ~83 % der
-   Trainingszeilen ein Gemisch aus einem Punkte-tanh und einer remappten
-   Gewinnwahrscheinlichkeit. Die atanh-Inversion eines Gemischs liefert
-   keinen Punktestand, sondern eine Zahl ohne Einheit. Damit ist `x` in
+   Trainingszeilen ein Gemisch aus einem Punkte-tanh und einer
+   Value-Kopf-Ausgabe. Die atanh-Inversion eines Gemischs liefert
+   keinen Punktestand, sondern eine Zahl ohne Einheit. Damit waere `x` in
    par.4 nicht bestimmt, und `x0`, `b` und `c_score` haengen alle an `x`.
-   Vor dem Bau ist eine der beiden Formen festzulegen: entweder ein vom
-   TD-Blend unberuehrtes Punkte-Ziel fuer den tragenden Kopf (dann ist die
-   Inversion gueltig), oder `x` aus einer anderen Quelle als `points`/
-   `opp_points`. Ohne diese Festlegung ist der Primaerarm nicht baubar.
-   Verbunden mit dem Tor par.3a: dessen Ausgang bestimmt, wie gross das
-   Problem ist.
+
+   **NUTZER-ENTSCHEID 2026-08-23: eigener, additiver Margen-Kopf.** Siehe
+   par.6a. Damit entfaellt die Zwei-Kopf-Subtraktion vollstaendig, und mit
+   ihr Falle 2 und Falle 3 unten, soweit sie den tragenden Pfad betreffen.
+   Das Tor par.3a bleibt trotzdem stehen: es entscheidet nicht mehr ueber
+   die Quelle von `x`, sondern darueber, ob die Diagnose in par.3
+   ("Re-Zentrierung fehlt") ueberhaupt der richtige Mechanismus ist.
 2. **Numerik.** Auch bei gueltiger Inversion explodiert `atanh` nahe ±1. Es
    braucht eine Klammerung, und deren Wirkung ist zu berichten, nicht
    stillschweigend zu setzen. Welche Notation gemeint ist, muss dabei
@@ -323,9 +324,74 @@ Drei Fallen dabei.
    `value_to_win_prob`-Ergebnis in [0,1]. Der Entwurf liess das offen, und
    die beiden Lesarten ergeben verschiedene Formeln.
 3. `opp_points` ist laut `PREREG_points_head_epsilon.md` ein **Hilfsziel
-   mit unbelegtem Nutzen**. Dieser Zuschnitt macht ihn erstmals tragend.
-   Faellt er durch, ist offenzuhalten, ob die Utility oder der Kopf schuld
-   war.
+   mit unbelegtem Nutzen**. Der Entwurf haette ihn erstmals tragend
+   gemacht. Mit dem Entscheid in par.6a ist das vom Tisch: `opp_points`
+   bleibt Hilfsziel, der Margen-Kopf traegt. Das ist ein Nebengewinn des
+   Entscheids -- ein Nullbefund waere sonst zwischen Utility und einem
+   unbelegten Hilfskopf nicht auftrennbar gewesen.
+
+## par.6a Der Margen-Kopf (Nutzer-Entscheid 2026-08-23)
+
+Ein **additiver** Kopf `score_margin`, nach dem im Projekt etablierten
+Muster fuer optionale Ausgaben (`opp_points`, `points_dist`,
+`value_wdl_logits`). Alte Checkpoints ohne ihn bleiben ladbar und spielen
+auf dem Bestandspfad weiter (Waechter 3, par.10).
+
+Ziel: `tanh((own_total − opp_total) / MARGIN_SCALE)`, aus
+`scores_unclamped` (im Korpus zu 100 % vorhanden, gemessen 2026-08-23).
+**Ohne rtv-Zweig und ohne TD-Blend** -- das ist der ganze Zweck dieses
+Kopfes. Damit ist die Ruecktransformation definiert:
+`x = MARGIN_SCALE · atanh(clamp(m, −m_max, +m_max))`.
+
+Kein neues Self-Play noetig: das Ziel ist aus dem Bestandskorpus rechenbar,
+es kostet einen Cache-Neubau und einen Trainingslauf.
+
+### Die Skala ist NICHT VALUE_SCALE
+
+`VALUE_SCALE = 50.0` ist ausdruecklich am **absoluten Eigenstand**
+kalibriert ("ab ~100 Punkten gilt ein Ergebnis als sehr gut",
+`neural_net.py:502-509`). Fuer eine Marge ist das viel zu gross: bei einer
+Marge von 10 Punkten stuende `tanh(10/50) = 0,197`, der Kopf laege in einem
+schmalen, nahezu linearen Streifen um null und verschenkte den groessten
+Teil des tanh-Bereichs. Das ist der Spiegelfall des Kompressionsproblems aus
+`PREREG_points_dist_bin_scale.md`: dort zu grob an den Raendern, hier zu
+fein in der Mitte.
+
+**Harte Anforderung: eine EIGENE Konstante `MARGIN_SCALE`, nicht
+`VALUE_SCALE`.** `VALUE_SCALE` haengt an `mcts::normalize_score`
+(`mcts.rs:90/101`), an `round5.rs:674`/`round5_anchor.rs:671` und an
+`denormalize_score`. Sie zu drehen wuerde den Elo-Anker mitverschieben. Das
+ist kein Abwaegungspunkt.
+
+### Woher die Zahl kommt (vorab festgelegt, nicht geraten)
+
+`MARGIN_SCALE = std(D)` mit `D = own_total − opp_total` ueber abgeschlossene
+Partien des Trainingsfensters, ungeclampt. Begruendung: das legt ±1 Sigma
+auf |tanh| ≈ 0,76 und ±2 Sigma auf ≈ 0,96 -- die Datenmasse liegt im steilen
+Bereich, die Ausreisser saettigen. In Self-Play ist `D` um null symmetrisch
+(beide Seiten dasselbe Netz), ein Versatz ist also nicht noetig.
+
+**Diese Zahl wird nicht hier erhoben.** `PREREG_score_correlation.md` par.3
+Punkt 2 berechnet `Var(D)` bereits als Teil seines eigenen Programms.
+Damit ist jene Prereg von einem Nachbar-Zuschnitt zu einer
+**Bau-Voraussetzung** dieses Zuschnitts geworden; sie ist billig (reine
+Korpus-Auswertung) und laeuft ohnehin zuerst. `MARGIN_SCALE` wird auf zwei
+signifikante Stellen gerundet und dann **eingefroren** -- eine spaetere
+Nachjustierung waere ein neuer Arm, kein Detail.
+
+Bis diese Messung vorliegt, gilt: eine Schaetzung des Zahlenwerts steht
+hier ausdruecklich NICHT. Die Groessenordnung "deutlich unter 50" ist die
+Einschaetzung des Nutzers und der Anlass dieses Abschnitts, sie ist
+**ungeprueft** und geht in keine Rechnung.
+
+### Was noch offen bleibt
+
+- `m_max`, die Klammerung vor dem `atanh` (Falle 2 oben). Aus der
+  empirischen Margenverteilung abzuleiten, nicht zu raten; der Anteil
+  geklammerter Blaetter ist zu berichten.
+- Ob der Kopf auf die Marge am Partieende trainiert oder, wie `val`, einen
+  Bootstrap-Anteil bekommen darf. **Vorab festgelegt: nein.** Ein
+  TD-Anteil waere genau der Defekt, dessentwegen dieser Kopf existiert.
 
 ## par.7 Arme
 
@@ -413,11 +479,16 @@ stehen hier nur als Merkposten.
 
 - **[Riegel par.4a]** Wie `U` in [0,1] gehalten wird: Klammerung, Stauchung
   oder Skalenwechsel. Aendert, was gemessen wird.
-- **[Riegel par.6.1]** Woher `x` kommt, solange die Kopf-Ausgabe ein
-  TD-Gemisch ist. Ohne Festlegung ist der Primaerarm nicht baubar.
-- `b`, die Breite der arctan-Saettigung, in Punkten.
-- Numerische Klammerung der `atanh`-Ruecktransformation (par.6.2), samt
-  Notationsfestlegung roh gegen [0,1].
+- ~~**[Riegel par.6.1]** Woher `x` kommt~~ -- **entschieden 2026-08-23:**
+  eigener additiver Margen-Kopf, siehe par.6a.
+- `MARGIN_SCALE`: die Regel steht (`std(D)`), die Zahl kommt aus
+  `PREREG_score_correlation.md` par.3.2. Bis dahin ist sie offen, aber
+  nicht mehr frei.
+- `m_max`, die Klammerung vor dem `atanh`.
+- `b`, die Breite der arctan-Saettigung, in Punkten. **Nicht dasselbe wie
+  `MARGIN_SCALE`**: `MARGIN_SCALE` bestimmt, wie gut der Kopf die Marge
+  aufloesen kann, `b` bestimmt die Form der Utility. Zwei Knoepfe, zwei
+  Begruendungen.
 - Ob `x0` aus dem Netz an der Wurzel kommt oder aus der Wurzel-Suchstatistik.
 - Ob der `sigma`-Kopf auf die eigene Punktzahl oder auf die Marge trainiert.
 - Ob die Utility im Backup oder erst in der Wurzelauswahl wirkt.
@@ -430,8 +501,12 @@ stehen hier nur als Merkposten.
   `PREREG_aggression_remapping.md`**: die widerlegte lineare Familie. Diese
   Prereg eroeffnet sie nicht wieder; sie baut einen strukturell anderen Term
   und benennt in par.3, warum der alte scheitern musste.
-- **`PREREG_score_correlation.md`**: unabhaengig, betrifft die Notwendigkeit
-  eines Differenzkopfes.
+- **`PREREG_score_correlation.md`**: seit dem Entscheid vom 2026-08-23
+  **keine Nachbarprereg mehr, sondern eine Bau-Voraussetzung**. Sie liefert
+  `Var(D)` (par.3.2) und damit `MARGIN_SCALE` fuer den Margen-Kopf aus
+  par.6a. Ihre eigene Frage (Notwendigkeit eines Differenzkopfes) bleibt
+  davon unberuehrt; das ist ein Nebenprodukt ihrer Rechnung, kein neues
+  Programm. Reihenfolge: score_correlation, dann par.3a, dann Bau.
 - **`research_value_head_alternatives_DRAFT.md` Idee 1.1**: die Quelle
   dieses Zuschnitts. Der Beitrag hier ist par.3 (Re-Zentrierung statt
   Saettigung als eigentlicher Mechanismus, mit der Empfindlichkeitsrechnung),
