@@ -743,8 +743,8 @@ pub fn root_child_stats<R: Rng + ?Sized>(
     // Alpha-Beta-Wahl statt PUCT-Baum. Einzelner Eintrag mit Gewicht 1.0
     // (statt leer) macht `drafting_policy`s Zufalls-Fallback (bei leerer
     // Stats-Liste) nicht faelschlich fuer die Aktionswahl zustaendig.
-    if crate::round5::applies(state) {
-        return crate::round5::choose_action(state)
+    if crate::round5_anchor::applies(state) {
+        return crate::round5_anchor::choose_action(state)
             .into_iter()
             .map(|a| (a, 1, 1.0))
             .collect();
@@ -774,8 +774,8 @@ pub fn search_action<R: Rng + ?Sized>(
     c: f64,
     rng: &mut R,
 ) -> Option<SearchMove> {
-    if crate::round5::applies(state) {
-        return crate::round5::choose_action(state).map(SearchMove::Draft);
+    if crate::round5_anchor::applies(state) {
+        return crate::round5_anchor::choose_action(state).map(SearchMove::Draft);
     }
     let nodes = build_tree(state, simulations, c, rng, None)?;
     let best = best_root_child(&nodes)?;
@@ -793,8 +793,8 @@ pub fn search_with_tree<R: Rng + ?Sized>(
     top_k: usize,
     log: Option<&mut Vec<String>>,
 ) -> (Option<SearchMove>, Value) {
-    if crate::round5::applies(state) {
-        let (a, analysis) = crate::round5::choose_action_with_analysis(state);
+    if crate::round5_anchor::applies(state) {
+        let (a, analysis) = crate::round5_anchor::choose_action_with_analysis(state);
         return (a.map(SearchMove::Draft), analysis);
     }
     let nodes = match build_tree(state, simulations, c, rng, log) {
@@ -1422,10 +1422,13 @@ mod tests {
     }
 
     /// **Pflicht-Golden-Test v2.** Wie `heuristic_anchor_choices_match_
-    /// fixture`, aber fuer den Runde-5-Zweig (`round5::applies` ->
+    /// fixture`, aber fuer den Runde-5-Zweig (`round5_anchor::applies` ->
     /// Expectiminimax statt PUCT-Baum). Haelt die NACH-Fix-Basislinie
-    /// (c83fb35) fest -- eine Abweichung heisst, der R5-Loeser waehlt
-    /// anders, und der Elo-Anker verschiebt sich mit.
+    /// (c83fb35) fest -- eine Abweichung heisst, der R5-ANKER-Loeser waehlt
+    /// anders, und der Elo-Anker verschiebt sich mit. Seit der R5-Loeser-
+    /// Trennung (`evaluations/PREREG_r5_solver_split.md` par.2) ist
+    /// `round5_anchor` das Pruefziel, nicht mehr `round5` (der Netz-Loeser
+    /// darf sich seither entwickeln, siehe dort).
     #[test]
     fn heuristic_anchor_r5_choice_matches_fixture_v2() {
         let fixture = include_str!(concat!(
@@ -1435,8 +1438,8 @@ mod tests {
         let expected = parse_anchor_fixture(fixture);
         let state = a4_round5_state();
         assert!(
-            crate::round5::applies(&state),
-            "A4-v2-Zustand muss den R5-Loeser treffen"
+            crate::round5_anchor::applies(&state),
+            "A4-v2-Zustand muss den R5-ANKER-Loeser treffen"
         );
         // Die R5-Wahl ist solver-deterministisch; Sims/RNG sind nur die
         // Harness-Parameter des v1-Vertrags.

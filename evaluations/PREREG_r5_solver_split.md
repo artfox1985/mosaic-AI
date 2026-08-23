@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird der R5-Loeser in einen EINGEFRORENEN Anker-Loeser (Heuristik) und einen frei entwickelbaren Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 gut kalibrieren (Steigungs-Metrik der R5-Kalibrierung)? | Beleg: ENTWURF 2026-08-22, Nutzer-Entscheid ("dann machen wir einen eigenen solver fuer den heuristik anker. und schauen dass wir den value kopf gut kalibrieren fuer runde 5."), nichts gebaut; Vorarbeiten par.2a (Bau-Kartierung) und par.3a (Pruefpunkt: Champion-Ownership UNTRAINIERT) am 2026-08-22 erledigt. Anlass: 200-Knoten-Beschneidung als moegliche Schwachstelle; jede R5-Verbesserung wuerde sonst den Anker mitverschieben (Leiter-Reset-Falle, gerade erst bezahlt). -->
+<!-- STATUS: OFFEN | Frage: Wird der R5-Loeser in einen EINGEFRORENEN Anker-Loeser (Heuristik) und einen frei entwickelbaren Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 gut kalibrieren (Steigungs-Metrik der R5-Kalibrierung)? | Beleg: ENTWURF 2026-08-22, Nutzer-Entscheid ("dann machen wir einen eigenen solver fuer den heuristik anker. und schauen dass wir den value kopf gut kalibrieren fuer runde 5."), nichts gebaut; Vorarbeiten par.2a (Bau-Kartierung) und par.3a (Pruefpunkt: Champion-Ownership UNTRAINIERT) am 2026-08-22 erledigt; par.2b/2c: Teil A GEBAUT und ABGENOMMEN (2026-08-23: Suite 484/0, Paritaets-Hash 8c6684ff haelt vor/nach Wheel-Neubau, Wheel installiert) -- der Anker-Loeser ist aktiv und eingefroren. Teil B (par.3, Vierer-Vergleich) offen, Zuschnitt nach Seeding-Ausgang. Anlass: 200-Knoten-Beschneidung als moegliche Schwachstelle; jede R5-Verbesserung wuerde sonst den Anker mitverschieben (Leiter-Reset-Falle, gerade erst bezahlt). -->
 
 # PREREG-SKELETT: R5-Loeser-Trennung (Anker eingefroren) + R5-Value-Kalibrierung
 
@@ -74,6 +74,44 @@ danach zugeschnitten werden.
   braucht Mehrkern-Bau und Testlaeufe -- fruehester Slot nach Ende der
   laufenden Korpus-Generierung. Baubeginn bleibt Nutzer-Entscheid
   (par.4 Punkt 1).
+
+### par.2b NACHTRAG: Teil A VORGESCHRIEBEN, UNKOMPILIERT (2026-08-22, Sonnet-Agent; Koordinator-Nachpruefung der tragenden Punkte per diff/grep)
+
+- Neu `engine/src/round5_anchor.rs`: Kopie von round5.rs mit exakt
+  ZWEI Aenderungen (diff-verifiziert, 2 Hunks): NICHT-ANFASSEN-
+  Modulkopf + `net_solver_enabled` entfernt (Anker knopffrei; die
+  Funktion wird nur extern von net_mcts.rs genutzt, Grep-verifiziert).
+- `engine/src/lib.rs:33` registriert das Modul; mcts.rs haengt an
+  round5_anchor (drei Einstiege + Ordnungstest, `round5::` in mcts.rs
+  = 0 Treffer, Grep-verifiziert); A4-v2-Fixture-Test prueft damit den
+  Anker-Pfad. round5.rs/net_mcts.rs und alle uebrigen Konsumenten
+  unveraendert (git status).
+- **NICHT kompiliert, NICHT getestet** (Sperre wegen laufender
+  Generierung). Abnahme laut par.2 steht KOMPLETT aus: cargo-Suite,
+  Paritaets-Hash 8c6684ff, Wheel-Neubau, Byte-Identitaet am Trenntag.
+  Bis dahin gilt der Arbeitsstand als ungeprueft.
+
+### par.2c ABNAHME TEIL A BESTANDEN (2026-08-23; Agent-Lauf, Paritaets-Hash vom Koordinator unabhaengig nachgemessen)
+
+- **cargo-Suite 484/0** (26 ignorierte), inkl. der round5_anchor-Tests
+  (27 Treffer im Log). Pruefstelle `logs/cargo_suite_r5split_20260823.log`.
+- **Paritaets-Hash HAELT:** `tools/parity_probe.py` liefert VOR dem
+  Wheel-Neubau, NACH Neubau+Installation und in einer unabhaengigen
+  Koordinator-Nachmessung identisch
+  8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423.
+  Pruefstellen `logs/r5split_parity_{before,after}_20260823.log`.
+- **Wheel neu gebaut und installiert** (`python -m maturin build
+  --release`, 24,4 s, Exit 0; pip force-reinstall Exit 0; Logs
+  `logs/r5split_{maturin_build,pip_install}_20260823.log`). Zwei
+  erwartete dead_code-Warnungen im Anker (exact_round5_outcome/
+  outcome_diff ungenutzt -- konsistent mit par.2a: der Anker bedient
+  nur die drei mcts.rs-Einstiege).
+- **Abdeckungs-Hinweis:** die Paritaets-Sonde deckt den NETZ-Suchpfad
+  (net_search_state_json); der Heuristik-Pfad ist ueber die
+  A4-v2-Fixture und die Ordnungstests in der Suite abgedeckt
+  (mcts.rs-Testumhaengung, par.2b). Damit sind alle par.2-Abnahme-
+  punkte erbracht: der Anker ist ab jetzt gegen jede R5-Weiter-
+  entwicklung immun, die Elo-Leiter steht.
 
 ## par.3 Teil B: R5-Value-Kalibrierung (Ziel-Skizze)
 
