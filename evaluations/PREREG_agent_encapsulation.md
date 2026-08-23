@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Pilot-Messung nach par.6a-Lesart LAEUFT (Netz-gegen-Netz, 407 Seeds, 2026-08-23); weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- Frage bleibt OFFEN. -->
+<!-- STATUS: OFFEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- Frage bleibt OFFEN. -->
 
 # PREREG-SKELETT: Agenten-Kapselung (AgentSpec statt Prozess-Global)
 
@@ -196,6 +196,30 @@ Nutzer-Entscheid); Paritaet ohne Verlust = Knopf bleibt Kandidat fuer
 den Self-Play-Einsatz; signifikanter Verlust = Dosis/alpha pruefen,
 kein Self-Play-Einsatz. Die Heuristik-Messung par.2b der
 Minimax-Prereg bleibt davon unberuehrt gueltig.
+
+### par.6b ERGEBNIS PILOT-MESSUNG (2026-08-23, Artefakte `paired_arena_env_imm_netvnet{,_swap}.json`; Zahlen vom Koordinator selbst erhoben)
+
+Champion+alpha=0,2 gegen eingefrorenen Champion (Spec), Netz-gegen-
+Netz, 407 Seeds + Brettwechsel, 400/400 Sims:
+
+- **Siege: PARITAET.** alpha-Arm 201/407 (Normal) und 199/407
+  (Brettwechsel), kombiniert 400/814 = 49,1 % (n.s.). Kein Gewinn,
+  kein Verlust.
+- **k1: der Vs-Heuristik-Effekt UEBERTRAEGT SICH NICHT.** alpha 30/312
+  = 9,6 % gegen frozen 30/312 = 9,6 % (identisch; je Lauf 10,9/12,2 %
+  bzw. 8,3/7,1 %). Der +7,0-pp-Befund aus par.2b der Minimax-Prereg
+  war also gegnerspezifisch (Ausnutzung der Heuristik), kein
+  Verhaltensgewinn gegen gleich starke Gegner. Instrument-Lehre in
+  der Task-#18-Linie: der GEGNER gehoert zur Messanordnung.
+- **par.6a-Verdikt: Parität ohne Verlust -> der Knopf bleibt
+  SELF-PLAY-KANDIDAT** (dort spielen BEIDE Seiten mit Knopf --
+  Datenverteilungs-Frage, kein Ausnutzungs-Szenario; Erwartung nach
+  diesem Befund gedaempft, aber nicht widerlegt). Kein
+  Gating-relevanter Befund.
+- Methoden-Notiz: erste Netz-gegen-Netz-Knopfmessung im selben
+  Prozess ueberhaupt -- die Welle-1-Kapselung hat ihren Zweck in der
+  ersten Anwendung erfuellt (sie korrigierte das Bild des alten
+  Instruments).
 
 ## par.7 Grenzen
 

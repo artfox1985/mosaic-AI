@@ -83,6 +83,13 @@ def main() -> None:
                         "Netz-gegen-Heuristik (--heur-sims wird dann ignoriert)")
     p.add_argument("--sims-b", type=int, default=None,
                    help="Sims fuer --model-b (Default: gleich --net-sims)")
+    # 2026-08-23 (PREREG_agent_encapsulation.md par.4a, Welle 1): per-Seite
+    # SearchConfig-Spec (models/<name>.spec.json) an net_vs_net_arena_match
+    # durchreichen. NICHT gesetzt = SearchConfig::from_env = Bestandsverhalten.
+    p.add_argument("--spec-a", default=None,
+                   help="Spec-JSON fuer Brett 0 (nur mit --model-b)")
+    p.add_argument("--spec-b", default=None,
+                   help="Spec-JSON fuer Brett 1 (nur mit --model-b)")
     # 2026-08-11: durchgereicht an `net_arena_match`s `log_games` (Commit
     # 9dfeb16). AUS = Bestandsverhalten, das Ergebnis-JSON ist dann exakt wie
     # vorher. AN = je Partie kommen `game_seed`, `first_player`, `names` und
@@ -108,6 +115,9 @@ def main() -> None:
                                # entscheidet allein der Python-Interpreter (--python-exe
                                # der aufrufenden Seite), nicht dieses Skript.
 
+    if (args.spec_a or args.spec_b) and not args.model_b:
+        p.error("--spec-a/--spec-b brauchen --model-b (Netz-gegen-Netz-Modus)")
+
     if args.model_b:
         raw = mr.net_vs_net_arena_match(
             args.model, args.model_b,
@@ -116,6 +126,7 @@ def main() -> None:
             seed=args.seed, num_threads=args.threads,
             c_puct_a=args.c_puct, c_puct_b=args.c_puct,
             log_games=args.log_games, seeds=seeds,
+            spec_a=args.spec_a, spec_b=args.spec_b,
         )
     else:
         raw = mr.net_arena_match(
