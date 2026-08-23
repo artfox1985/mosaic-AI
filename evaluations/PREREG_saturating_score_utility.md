@@ -109,16 +109,27 @@ Formelzeile (`neural_net.py:1647`) ueberschrieben: `neural_net.py:1704`
 setzt bei vorhandenem `rtv` komplett auf `own_rtv = 2·rtv[p] − 1`, und
 `neural_net.py:1717` blendet `TD_LAMBDA·(2·bv[p] − 1) + (1 − TD_LAMBDA)·
 points_val` mit `TD_LAMBDA = 0.5` (`neural_net.py:717`). Beide eingemischten
-Groessen sind remappte Gewinnwahrscheinlichkeiten. Gemessen am 2026-08-23
+Groessen stammen aus dem **Value**-Kopf des Generators, nicht aus dem
+Punkte-Kopf: `bootstrap_value` ist `net_leaf_eval` nach einem Rollout
+(`round_transition_deep.rs:852` -> `net_mcts.rs:2411`
+`blended_leaf_win_prob(&value, ...)`, bei `w=0` also
+`calibrate_win_prob_with(value_to_win_prob(value))`). Bei WDL-Kopf ist das
+`2·p_win − 1` (`neural_net.py:2503`, eine Gewinnwahrscheinlichkeit), beim
+tanh-Kopf davor `tanh((own−opp)/50)` (eine Punkte-Marge). `tanh(own/50)`
+dagegen ist der Punkte-Kopf. Beide eingemischten Formen sind um null
+zentriert und keine von beiden ist der eigene Endstand.
+Gemessen am 2026-08-23
 (je eine Datei pro Generation, kein Vollscan): `round_transition_value` in
 v18/v19wdl/v19wdlsw/v20wdl/v20wdlsw **nirgends** vorhanden, `bootstrap_value`
 in 82,8 bis 84,0 % der Datensaetze. Nur die restlichen ~17 % (Runde 5, kein
 Uebergang) tragen das reine `tanh(own/50)`.
 
 Damit ist die Erklaerung eine **Hypothese, keine Herleitung**. Die
-Kopf-Ausgabe wird vermutlich vom Wahrscheinlichkeits-Anteil dominiert,
-dessen Spanne die des Punkte-Anteils weit uebersteigt. Der Term war dann
-nicht "fast konstant", sondern **fast kollinear zu `wr`**. Beide Lesarten
+Kopf-Ausgabe wird vermutlich vom Bootstrap-Anteil dominiert, dessen Spanne
+die des Punkte-Anteils weit uebersteigt. Der Term war dann
+nicht "fast konstant", sondern **fast kollinear zu `wr`** -- was in der
+WDL-Aera besonders scharf gilt, weil `wr` und der Bootstrap-Anteil dann
+denselben Kopf lesen. Beide Lesarten
 erklaeren denselben Nullbefund, sind aber verschiedene Mechanismen und
 fuehren zu verschiedenen Auswegen. Welche zutrifft, entscheidet par.3a.
 
