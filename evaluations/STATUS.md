@@ -323,11 +323,28 @@ Gesperrte Dateien der Parallelsitzung, unberuehrt zu lassen:
 `PREREG_agent_encapsulation.md`. Frei: `archive/history.md` und die eigenen
 Preregs. `engine/src/net_mcts.rs` ist seit dffa916 wieder sauber.
 
-**Offene Zustaendigkeitsfrage:** Schritt 5 IST die par.6a-Messung der
-Parallelsitzung. Wer sie faehrt, ist noch nicht geklaert -- angefragt. Wer
-sie faehrt, faehrt sie bitte MIT `--log-games`, sonst ist das Artefakt fuer
-Schritt 6 und 7 wertlos (Praezedenzfall: das Task-A-Artefakt traegt 2x400
-Partien und 0 Logs).
+**ERLEDIGT 2026-08-24 (Meldung der Parallelsitzung):** Schritt 5 ist
+gefahren, mit `--log-games`. Drei Artefakte, alle vollstaendig geloggt:
+`paired_arena_env_imm_netvnet.json` und `..._swap.json` (je 407/407,
+per-Seite-Specs `champion_imm_a02` gegen `champion_frozen`) sowie
+`paired_arena_env_imm_a02.json` (gegen die Heuristik, Arme 0 und 0,2).
+Damit braucht der Fahrplan **nur noch EINEN Arena-Block** (Schritt 8), und
+der haengt an Tor 3.
+
+**Der Befund daraus ist der wichtigste des Abends:** netz-gegen-netz
+**Paritaet** (201/407 und 199/407 = 400/814, 49,1 %, n.s.) und **k1
+30/312 = 9,6 % auf BEIDEN Seiten, identische Zaehler**. Der
++7,0-pp-k1-Sprung des Implicit-Minimax-Hebels war **gegnerspezifisch** --
+gegen die Heuristik, nicht gegen einen gleich starken Gegner. Registriert
+in `PREREG_agent_encapsulation.md` par.6b und
+`PREREG_implicit_minimax_backup.md` par.2c.
+
+**Folge fuer die Messkultur, ueber diesen Fall hinaus:** jede
+Verhaltensmessung gegen die Heuristik steht ab jetzt unter dem Verdacht,
+gegnerspezifisch zu sein. Das betrifft die Reihen-Sonde, die Straf-Sonde
+und die Legalitaets-Stufe gleichermassen -- alle drei sind bisher
+ueberwiegend an Heuristik-Partien erhoben. Der billige Gegentest liegt in
+denselben Artefakten und ist als par.3a registriert.
 
 **Vorbedingungen, vor Schritt 5 zu pruefen (nicht optional):**
 
@@ -350,9 +367,9 @@ Partien und 0 Logs).
 | 2 | `PREREG_score_correlation.md` komplett | Python, ~1 h | MAE_eng-Verdikt **plus** Var(D) als Gegenprobe zu MARGIN_SCALE=20 |
 | 3 | `PREREG_floor_action_aversion.md` par.6 Tor | Netz + Suche, ~1 h | entscheidet, ob Schritt 8 ueberhaupt noetig ist (H1 -> entfaellt) |
 | 4 | `PREREG_saturating_score_utility.md` par.3a Tor | Netz-Forward, ~1 h | "fast konstant" gegen "fast kollinear zu wr" -- Diagnose des teuersten Zuschnitts |
-| 5 | **Alpha-Messung `PREREG_agent_encapsulation.md` par.6a MIT `--log-games`** | **Arena exklusiv**, mehrere h | Schluesselartefakt fuer 6 und 7 |
-| 6 | Locus-Sonden auf dem Artefakt aus 5 | Python, Minuten | `PREREG_completion_bottleneck_locus.md`: Such- gegen Ziel-Lesart |
-| 7 | Alpha-Sweep-Verdikt aus denselben Partien | Python, Minuten | `PREREG_implicit_minimax_backup.md` Folgeentscheid |
+| ~~5~~ | ~~Alpha-Messung mit `--log-games`~~ | **ERLEDIGT 2026-08-24** | von der Parallelsitzung gefahren, drei Artefakte je 407/407 geloggt. **Ergebnis: Paritaet 400/814 (49,1 %), k1 30/312 gegen 30/312 -- identische Zaehler.** Der +7,0-pp-Befund ist GEGNERSPEZIFISCH |
+| 6 | Locus-Sonden auf den vorhandenen Artefakten | Python, Minuten, **keine Arena** | `PREREG_completion_bottleneck_locus.md`, per par.1a/par.3a umgestellt: primaer die Gegnerspezifitaet (Schlupf gegen Konkurrenz), sekundaer die Locus-Frage |
+| 7 | ~~Alpha-Sweep-Verdikt~~ | **ERLEDIGT** | registriert in `PREREG_agent_encapsulation.md` par.6b, Querverweis `PREREG_implicit_minimax_backup.md` par.2c |
 | 8 | Floor-Arme (Task-A-Konfiguration, R/A0/A1) MIT `--log-games` | **Arena exklusiv**, mehrere h | nur falls Schritt 3 auf H2/H3 zeigt; repliziert die -11,25 pp gratis |
 
 **Warum diese Reihenfolge.** Schritte 1-4 sind Tore: jedes kann seinen

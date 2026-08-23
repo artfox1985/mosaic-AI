@@ -14,8 +14,11 @@ Arena-Artefakte lesen und Logzeilen auszaehlen.
 Quelle und warum: `paired_arena_env_imm_a02.json` traegt Champion (Netz) UND
 Heuristik in DENSELBEN Partien auf denselben Seeds. Damit ist der Vergleich
 gepaart je Partie -- kein Korpus-/Aera-Versatz, kein Gegnerwechsel zwischen
-den Seiten. `paired_arena_env_imm_netvnet.json` (Champion beidseitig) laeuft
-als Kontext mit.
+den Seiten. `paired_arena_env_imm_netvnet.json` und `..._swap.json` laufen als
+ZWEITE gepaarte Quelle mit: dort steht dasselbe Netz auf beiden Seiten,
+aber mit verschiedenen per-Seite-Specs (NetzA = champion_imm_a02,
+NetzB = champion_frozen) -- ein gepaarter alpha-gegen-frozen Vergleich auf
+identischen Seeds.
 
 Vier Kennzahlen je Seite und Partie, alle aus `analyze_game_log.PATTERNS`:
 
@@ -141,14 +144,37 @@ def main():
             }
         result[f"champion_vs_heuristik_arm{arm}"] = block
 
-    p_nvn = EVAL / "paired_arena_env_imm_netvnet.json"
-    if p_nvn.exists():
+    # Netz-gegen-Netz: SELBES Modell auf beiden Seiten, aber VERSCHIEDENE
+    # per-Seite-Specs (spec_a = champion_imm_a02, spec_b = champion_frozen).
+    # KORREKTUR 2026-08-24: eine erste Fassung labelte beide Seiten als
+    # "Champion" und mischte damit zwei verhaltensverschiedene Agenten in
+    # einen Topf. NetzA und NetzB sind hier ein gepaarter alpha-gegen-frozen
+    # Vergleich -- dieselben Partien, dieselben Seeds, dasselbe Netz, nur der
+    # Suchknopf unterscheidet sich. Genau die Arm-Struktur, die
+    # PREREG_floor_action_aversion braucht, und sie kostet nichts.
+    for fname, key in (("paired_arena_env_imm_netvnet.json", "netvnet"),
+                       ("paired_arena_env_imm_netvnet_swap.json", "netvnet_swap")):
+        p_nvn = EVAL / fname
+        if not p_nvn.exists():
+            continue
         d = json.load(open(p_nvn, encoding="utf-8"))
-        if d.get("model") == d.get("model_b"):
-            got = collect(p_nvn, None, lambda n: "Champion")
-            result["champion_selfplay_both_sides"] = {
-                lab: summarize(v) for lab, v in got.items()
+        spec_a = str(d.get("spec_a") or "")
+        spec_b = str(d.get("spec_b") or "")
+        assert d.get("model") == d.get("model_b"), (
+            f"{fname}: model != model_b -- Annahme 'selbes Netz beidseitig' faellt")
+        lab_a = "alpha0.2" if "imm_a02" in spec_a else f"A:{spec_a}"
+        lab_b = "frozen" if "frozen" in spec_b else f"B:{spec_b}"
+        got = collect(p_nvn, None,
+                      lambda n, a=lab_a, b=lab_b: a if n == "NetzA" else
+                      (b if n == "NetzB" else None))
+        block = {lab: summarize(v) for lab, v in got.items()}
+        if lab_a in got and lab_b in got:
+            block[f"_gepaart_{lab_a}_minus_{lab_b}"] = {
+                k: paired_diff(got[lab_a], got[lab_b], k)
+                for k in ("strafpunkte", "straf_ziele", "straf_ziel_steine",
+                          "ueberlauf_steine", "strafrunden")
             }
+        result[key] = block
 
     result["_meta"] = dict(
         frage="Meidet der Champion die Strafleiste staerker als der "
