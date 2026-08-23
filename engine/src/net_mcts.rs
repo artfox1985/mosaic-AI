@@ -459,14 +459,30 @@ pub(crate) fn opp_aware_points_utility(pts_raw: f64, opp_raw: f64, lambda_aggr: 
 /// `value`/`points_forecast` schon als Trainingsziel verwenden.
 const FLOOR_SHAPING_SCALE: f64 = 50.0;
 
-/// Gewicht der Floor-Straf-Korrektur relativ zum Netz-Blattwert. Bewusst
-/// klein gewählt (Nudge, kein Ersatz für den Value-Head) — erster Test, mit
-/// echten Arena-Ergebnissen kalibrieren.
+/// Gewicht der Floor-Straf-Korrektur relativ zum Netz-Blattwert. Klein
+/// gehalten (Nudge, kein Ersatz für den Value-Head).
 ///
-/// GETESTET (2026-07-19/20, v9b_domeonly, 150 Sims, n=100, KEIN Early-Stop):
-/// 11:89 (11% Siege), Score 24.5 vs. 44.2, Floor 16.9 vs. 11.2 — spürbar
-/// engerer Floor-Abstand als Baseline (~20-27 vs. ~8-10) und die bisher
-/// beste Netz-Performance der gesamten Session. Bleibt vorerst aktiv.
+/// DREIFACH RE-VALIDIERT, der Wert 0.3 ist bestätigt und bleibt:
+///
+/// 1. Erstvalidierung (2026-07-19/20, v9b_domeonly, 150 Sims, n=100, kein
+///    Early-Stop): 11:89 Siege, Score 24.5 vs. 44.2, Floor 16.9 vs. 11.2 –
+///    deutlich engerer Floor-Abstand als die Baseline (~20-27 vs. ~8-10).
+/// 2. Floor-Sweep in der WDL-Ära (`PREREG_search_path_remeasurements.md`,
+///    Status ENTSCHIEDEN, Messung 1): W=0,3 153/200 gegen W=0,15 144/200
+///    (p=0,31) und gegen W=0,6 (p=0,36) – beides H0, der Wert dazwischen
+///    ist gleichgültig.
+/// 3. Task A (2026-08-09, Champion v21_2d_brierbest @400 gegen
+///    Heuristik@150dyn, Seed 20260825): W=0,3 322/400 gegen W=0,0 277/400
+///    (80,5 % gegen 69,3 %, -11,25 pp), gepaarter exakter McNemar
+///    p=0,0001 (b=43/c=88); Block-Ebene 13 von 16 Blöcken, Block-SE 0,71,
+///    t=3,94. Artefakt
+///    `evaluations/paired_arena_env_paired_arena_env_floorw_taskA.json`.
+///
+/// STRUKTURBEFUND: Floor-Shaping ist ein SCHALTER, kein Regler – ob es an
+/// ist, macht ~11 pp Siegquote; welchen Wert es zwischen 0,15 und 0,6
+/// trägt, macht nichts. Ein Sweep an dieser Konstante ist damit
+/// abgeschlossen; nur ein Abschalten waere eine echte Aenderung – und das
+/// kostet belegt Staerke.
 pub const FLOOR_SHAPING_WEIGHT: f64 = 0.3;
 
 /// Laufzeit-Wert des Floor-Shaping-Gewichts: `MOSAIC_FLOOR_SHAPING_W`
