@@ -43,11 +43,11 @@ from reach_target import reach_buffer_columns  # noqa: E402
 from sibling_order_stability import kendall  # noqa: E402
 
 MODELS = {
-    "S": BASIS / "models/alphazero_v21-asymS_best.onnx",
+    "S": BASIS / "models/alphazero_v21-seedk1_best.onnx",
     "N": BASIS / "models/alphazero_v21-asymN_best.onnx",
 }
 DUMP = BASIS / "evaluations/probe_sibling_succ_k1_w1.0.json"
-OUT = BASIS / "evaluations/asym_value_sibling_check.json"
+OUT = BASIS / "evaluations/seedk1_value_sibling_check.json"
 
 
 def value_for_mover(sess, succ: dict, mover: int) -> float:
