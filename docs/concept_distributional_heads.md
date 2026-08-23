@@ -16,9 +16,10 @@ Vorregistrierungen daraus entstanden sind**. Es ist kein Bauplan.
 
 | Vorschlag | Stand im Projekt |
 |---|---|
-| Verteilungskopf auf die Punktedifferenz | **Task #12**, 2026-07-29: 51-Bin C51/HL-Gauss über die tanh-gestauchte Punktedifferenz. Offline schlechter (R² 0,0906 gegen 0,1160), Arena gepoolt p=0,1046. `POINTS_DIST_BINS` bleibt 0, Code inert erhalten |
+| Verteilungskopf auf das Punkte-Ziel | **Task #12**, 2026-07-29: 51-Bin C51/HL-Gauss über das tanh-gestauchte Punkte-Ziel. Offline schlechter (R² 0,0906 gegen 0,1160), Arena gepoolt p=0,1046. `POINTS_DIST_BINS` bleibt 0, Code inert erhalten |
 | Derselbe Kopf **neben** einem Sieg-Kopf | **Nach-#34-Paket Arm 1** (`t12_dist`), vorregistriert mit genau dieser Begründung. Erst SPRT-H1 mit 54:26, in der vorregistrierten Frisch-Seed-Replikation als Seed-Rauschen entlarvt (206:194 und 181:179). Geschlossen |
-| Punkte-/Gegner-Nutzen in der Suche | `POINTS_UTILITY_WEIGHT` 0,5 → 1:14, 1,0 → 0:12 (2026-07-19). Später w=0,1 gegen w=0: 300/400 gegen 321/400, Block-t −2,68 |
+| Punkte-Nutzen in der Suche, **gegner-blind** | `POINTS_UTILITY_WEIGHT` (`net_mcts.rs:108`, konstant 0,0) 0,5 → 1:14, 1,0 → 0:12 (2026-07-19). Mischt `pts = value_to_win_prob(points)` linear zu `wr`, der Gegner kommt darin nicht vor |
+| Punkte-Nutzen in der Suche, **gegner-bewusst** | `w = points_utility_w()` (Task #28): w=0,1 gegen w=0, 300/400 gegen 321/400, Block-t −2,68. Ruft `opp_aware_points_utility` (`net_mcts.rs:450-454`): `(pts + eps·opp) − lambda·opp` – dieser Arm trägt den Gegner ausdrücklich. **Nicht** mit der Zeile darüber zusammenziehen |
 | Aggressions-Knopf über Gegner-Gewicht | Drei Preregs, alle H0: `task28_aggression` (bester −6,16 Gegnerpunkte, p=0,078), `aggression_remapping` (alle drei Arme), `aggression_style_measurement` (Blend inert) |
 | Mehrfach-Determinisierung, Mittelung über Welten | **Geschlossen negativ 2026-08-10**: k=1/2/4 ergibt 76,0/77,3/70,0 % bei festem Budget und 81,75/77,0/73,0 % bei mit k wachsendem Budget. Wortlaut: das Mitteln über gezogene Welten **schadet aktiv** |
 | Quantil-Darstellung im Baum | Als Idee 1.4 im Recherche-Dokument bewertet und ausdrücklich **nicht empfohlen** mangels Präzedenz |
@@ -27,8 +28,29 @@ Vorregistrierungen daraus entstanden sind**. Es ist kein Bauplan.
 
 Zwei Einschränkungen, damit daraus nicht mehr gelesen wird als drinsteht.
 Die Auflösungsregel des Nach-#34-Pakets hält ausdrücklich fest, dass ein H0
-"kein Beleg" bedeutet und **nicht "widerlegt"**. Und die 51 Bins liefen über
-die tanh-gestauchte Differenz; eine andere Bin-Skala ist nicht gemessen.
+"kein Beleg" bedeutet und **nicht "widerlegt"**. Und eine andere Bin-Skala
+als die heutige (`linspace(-1,1)`, äquidistant im tanh-Raum) ist nicht
+gemessen.
+
+> **Korrektur 2026-08-23 (geprüft).** Hier stand: "die 51 Bins liefen über
+> die tanh-gestauchte Differenz". Das ist falsch. Der Verteilungskopf
+> trainiert auf `targets_points` (`train.py:1073`), also auf `points_val`,
+> und das war seit db73122 (2026-07-06) bis Schema 20 (2026-08-10)
+> `tanh(own/50) − 0,1·tanh(opp/50)`, seither `tanh(own/50)`
+> (`neural_net.py:1647`). #12 lief **eigenseitig**, nicht auf der Differenz;
+> auf der Differenz liegt `val`, das Value-Ziel. Der Fehler stammt aus
+> `research_value_head_alternatives_DRAFT.md` Zeile 7 und ist dort ebenfalls
+> korrigiert.
+>
+> **Zweite Korrektur, gleicher Anlass:** `points_val` ist auch heute nicht
+> schlicht `tanh(own/50)`. Zwei Überschreibungen greifen danach –
+> `neural_net.py:1704` (`points_val = own_rtv`, eine auf [-1,1] remappte
+> Gewinnwahrscheinlichkeit) und `neural_net.py:1717` (TD-Blend
+> `TD_LAMBDA·(2·bv−1) + (1−TD_LAMBDA)·points_val`, `TD_LAMBDA = 0.5`,
+> `neural_net.py:717`). `bootstrap_value` wird je Runde mit echtem Übergang
+> geschrieben (`self_play.rs:1881`), fehlt also nur in Runde 5. Welcher
+> Zweig in einem gegebenen Korpus dominiert, ist eine Datei-Eigenschaft und
+> muss vor jeder Aussage über die Ziel-Verteilung nachgesehen werden.
 
 ---
 
@@ -50,8 +72,8 @@ Gleichstand heißt: der Arm gewinnt größer, wenn er gewinnt. Die Zusatzpunkte
 fallen in ohnehin entschiedenen Partien an, und dort sind sie wertlos.
 
 Damit ist es keine ungehobene Frucht, sondern die **Signatur einer fehlenden
-Schwelle**: ein Kopf, der auf die Punktedifferenz trainiert und als
-Erwartungswert konsumiert wird, maximiert Marge und kennt keine
+Schwelle**: ein Kopf, der auf ein Punkte-Ziel trainiert und als
+Erwartungswert konsumiert wird, maximiert Punkte und kennt keine
 Entscheidungsschwelle. In beiden Läufen, am alten wie am WDL-Ziel, wurde die
 Verteilung ausschließlich als Erwartungswert konsumiert; im Nach-#34-Paket
 sogar per ausdrücklichem Entscheid ("Blend bleibt überall AUS, w=0"). Die
@@ -61,26 +83,48 @@ Verteilung war zweimal im Netz und **nie** in der Suche.
 
 Der naheliegende Schluss lautet, dem heutigen Blend fehle die Sättigung. Das
 stimmt so nicht. `tanh(Punkte/50)` **ist** eine Sättigungsfunktion – sie
-sättigt nur um **null Punkte**. Seit Schema 20 ist das Punkte-Ziel
-eigenseitig, und reale eigene Endstände liegen damit im flachen Bereich:
+sättigt nur um **null Punkte**. Wäre das Punkte-Ziel der reine eigene
+Endstand, läge es im flachen Bereich (Empfindlichkeit von `tanh(x/50)` je
+Punkt, tanh-Einheiten, nicht [0,1]):
 
-| Eigener Punktestand | Empfindlichkeit je Punkt |
+| Eigener Punktestand | Empfindlichkeit je Punkt (tanh-Skala) |
 |---|---|
 | 0 | 0,0200 |
 | 55 | 0,0072 |
 | 70 | 0,0043 |
 
-Über die realistische Spanne von 40 bis 70 Punkten bewegt sich der Term auf
-der [0,1]-Skala nur von 0,832 auf 0,943. Bei w=0,1 sind das höchstens 0,011
-Variation, während der Sieg-Term den vollen Bereich abdeckt. Der gescheiterte
-Blend ist damit zwanglos erklärt, ohne jede Sättigungstheorie: der
-Punkte-Term war fast konstant, hat kaum unterschieden und dafür einen
-gegner-blinden Versatz eingetragen.
+Über die Spanne 40 bis 70 Punkte bewegte sich der Term auf der [0,1]-Skala
+dann nur von 0,832 auf 0,943, bei w=0,1 also um höchstens 0,011, während der
+Sieg-Term den vollen Bereich abdeckt: ein fast konstanter Term, der kaum
+unterscheidet und dafür einen Versatz einträgt.
 
-**Es fehlt also nicht die Sättigung, sondern die Re-Zentrierung.** KataGos
+> **Einschränkung 2026-08-23 (gemessen).** Diese Erklärung setzt voraus,
+> dass die Kopf-Ausgabe `tanh(own/50)` schätzt. Das tut sie für den
+> überwiegenden Teil des Trainingssignals **nicht**. In je einer Stichprobe
+> pro Generation tragen 82,8 bis 84,0 % der Datensätze das Feld
+> `bootstrap_value` (v18/v19wdl/v19wdlsw/v20wdl/v20wdlsw, gemessen
+> 2026-08-23); für diese Zeilen ist das Ziel der TD-Blend
+> `0,5·(2·bv−1) + 0,5·tanh(own/50)` (`neural_net.py:1717`, `TD_LAMBDA = 0.5`).
+> `2·bv−1` ist eine remappte Gewinnwahrscheinlichkeit. `round_transition_value`
+> ist in allen fünf Stichproben **nicht** vorhanden, der rtv-Zweig ist also
+> tot. Nur die restlichen ~17 % (Runde 5, kein Übergang) tragen das reine
+> `tanh(own/50)`.
+>
+> Damit ist die Diagnose eine **Hypothese, keine Herleitung**: die
+> Kopf-Ausgabe wird vom Gewinnwahrscheinlichkeits-Anteil dominiert, dessen
+> Spanne die des Punkte-Anteils weit übersteigt. Der Term war dann
+> vermutlich nicht "fast konstant", sondern **fast kollinear zu `wr`** – was
+> denselben Nullbefund erzeugt, aber ein anderer Mechanismus ist und einen
+> anderen Ausweg verlangt. Die unterscheidende Messung ist billig und steht
+> als Tor in `PREREG_saturating_score_utility.md` par.3a: Histogramm der
+> Kopf-Ausgabe auf dem Messset plus ihre Korrelation mit `wr`.
+
+**Was in beiden Lesarten fehlt, ist die Re-Zentrierung.** KataGos
 arctan-Utility sättigt um den bei jeder Suche neu gesetzten vorhergesagten
 Wurzel-Score; der steile Bereich liegt dort immer da, wo die Partie gerade
-steht.
+steht. Der gegner-blinde Versatz gilt dabei nur für
+`POINTS_UTILITY_WEIGHT`; der Task-#28-Arm `w` trägt den Gegner (siehe die
+zwei getrennten Zeilen in Abschnitt 1).
 
 ---
 
@@ -158,8 +202,16 @@ Die Zahlen in Abschnitt 1 und 2 stammen aus `archive/history.md`,
 `evaluations/PREREG_INDEX.md`, `evaluations/PREREG_post34_package.md` und
 `evaluations/research_value_head_alternatives_DRAFT.md`. Die Codestellen in
 Abschnitt 2 (`value_to_win_prob`, `blended_leaf_win_prob_with`) sind direkt
-gelesen; `VALUE_SCALE = 50` stammt aus einer Agenten-Kartierung und ist
-nicht zeilenweise nachgeprüft.
+gelesen.
+
+Nachgeprüft am 2026-08-23, zeilenweise: `VALUE_SCALE = 50.0`
+(`neural_net.py:712`, vorher nur aus einer Agenten-Kartierung),
+`TD_LAMBDA = 0.5` (`neural_net.py:717`), `POINTS_UTILITY_WEIGHT = 0.0`
+(`net_mcts.rs:108`), die Ziel-Zweige `neural_net.py:1647/1704/1717`, die
+Verlust-Aufrufstelle `train.py:1073` und die Historie des Punkte-Ziels
+(db73122 2026-07-06, 08c565d 2026-08-10). Die Korpus-Feldzählung in
+Abschnitt 2 ist eine eigene Messung derselben Sitzung (je eine Datei pro
+Generation, kein Vollscan).
 
 Ausdrücklich offen geblieben: ob es zu den Bootstrap- und
 Unsicherheits-Ideen einen älteren, anders benannten Vorläufer im Projekt

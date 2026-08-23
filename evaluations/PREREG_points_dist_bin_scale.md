@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Blieb der Verteilungs-Punkte-Kopf (Task #12) unterhalb der Aufloesung, weil seine Bins aequidistant im tanh-Raum liegen und damit im Punkteraum an den Raendern um Faktor 5-25 groeber werden -- und aendert eine punktlineare Bin-Skala das? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23; Bin-Kanten `torch.linspace(-1,1,bins+1)` in `engine/py/neural_net.py:2411` in dieser Sitzung gelesen, Vorpruefung par.6 ist Tor -->
+<!-- STATUS: OFFEN | Frage: Blieb der Verteilungs-Punkte-Kopf (Task #12) unterhalb der Aufloesung, weil seine Bins aequidistant im tanh-Raum liegen und damit im Punkteraum an den Raendern um Faktor 5-25 groeber werden -- und aendert eine punktlineare Bin-Skala das? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht KORRIGIERT (par.2a). Bin-Kanten `torch.linspace(-1,1,bins+1)` in `engine/py/neural_net.py:2411` gelesen. Zwei Entwurfsfehler behoben: (1) #12 lief NICHT am Differenzziel, sondern seit 2026-07-06 eigenseitig -- der behauptete Defekt lag also bereits vor und die Messung kam flach heraus, #12 ist damit ein Prior GEGEN die Hypothese; (2) das Ziel ist nicht `tanh(own/50)`, sondern in ~83 % der Zeilen der TD-Blend mit einer remappten Gewinnwahrscheinlichkeit (gemessen 2026-08-23, je eine Datei pro Generation), der die Ziele in den FEINEN Bereich zieht. Vorpruefung par.6 ist Tor und rechnet jetzt auf dem tatsaechlichen `points_val`, nicht auf der Formel -->
 
 # Vorregistrierung: Bin-Skala des Verteilungs-Punkte-Kopfes
 
@@ -35,7 +35,7 @@ Punkteraum stark ungleich: fein in der Mitte, grob an den Raendern.
 ## par.2 Die Kompression, hergeleitet
 
 Herleitung, nicht gemessen. Sie folgt aus der Bin-Kanten-Zeile oben und aus
-`VALUE_SCALE = 50,0` (Agenten-Kartierung, in dieser Sitzung nicht
+`VALUE_SCALE = 50.0` (`engine/py/neural_net.py:712`, am 2026-08-23
 zeilenweise nachgeprueft). Bei 51 Bins ist die Bin-Breite im tanh-Raum
 `2/51 = 0,0392`. Die entsprechende Breite in Punkten ist
 `0,0392 · VALUE_SCALE / (1 − z²)`:
@@ -55,18 +55,64 @@ Ein Bin von 10 bis 20 Punkten Breite ist fuer eine Groesse, deren
 Gesamtspanne in dieser Groessenordnung liegt, keine Verteilung mehr,
 sondern eine Vergroeberung.
 
-**Der Punkt, der die Wiederaufnahme rechtfertigt:** Seit Schema 20
-(`PREREG_points_head_epsilon.md`, entschieden 2026-08-10) ist das
-Punkte-Ziel **rein eigenseitig**, `tanh(own_total / 50)`, nicht mehr die
-Differenz. Eigene Endstaende liegen typischerweise dort, wo z zwischen 0,7
-und 0,9 liegt, also mitten in der Kompressionszone (Bin-Breite 4 bis 10
-Punkte). Differenzen dagegen sind um null zentriert, also im feinen
-Bereich (Bin-Breite rund 2 Punkte).
+## par.2a Was das Ziel WIRKLICH ist (Korrektur 2026-08-23)
 
-Daraus folgt eine unbequeme Konsequenz: **eine schlichte Wiederholung von
-#12 mit dem heutigen Ziel waere schlechter als die Originalmessung**, nicht
-besser. Die Kompression trifft das eigenseitige Ziel haerter als das
-Differenzziel, unter dem #12 urspruenglich gemessen wurde.
+Der urspruengliche Entwurf dieser Prereg rechnete mit
+`Ziel = tanh(own_total / 50)`. Das ist zweimal falsch, beide Male am Code
+nachgeprueft.
+
+**Erstens: `points_val` ist nicht nur der eigene Endstand.** Nach der
+Formelzeile (`neural_net.py:1647`) greifen zwei Ueberschreibungen:
+
+| Stelle | Wirkung |
+|---|---|
+| `neural_net.py:1704` | `points_val = own_rtv` -- ersetzt komplett, `own_rtv = 2·rtv[p] − 1`, also eine remappte GEWINNWAHRSCHEINLICHKEIT |
+| `neural_net.py:1717` | `points_val = TD_LAMBDA·(2·bv[p] − 1) + (1 − TD_LAMBDA)·points_val`, `TD_LAMBDA = 0.5` (`neural_net.py:717`) |
+
+Kein Schalter unterdrueckt den TD-Blend; `value_target_variant` greift nur
+am rtv-Zweig. `bootstrap_value` wird je Runde mit echtem Uebergang
+geschrieben (`self_play.rs:1881`), fehlt also nur in Runde 5.
+
+**Gemessen am 2026-08-23** (je eine Datei pro Generation, kein Vollscan):
+
+| Korpus | Datensaetze | `round_transition_value` | `bootstrap_value` |
+|---|---|---|---|
+| v18 | 1628 | 0 | 1362 (83,7 %) |
+| v19wdl | 1654 | 0 | 1381 (83,5 %) |
+| v19wdlsw | 1610 | 0 | 1352 (84,0 %) |
+| v20wdl | 1644 | 0 | 1361 (82,8 %) |
+| v20wdlsw | 1612 | 0 | 1344 (83,4 %) |
+
+Der rtv-Zweig ist tot. Fuer rund 83 % aller Zeilen ist das Ziel der
+TD-Blend, fuer die restlichen ~17 % (Runde 5) das reine `tanh(own/50)`.
+Bei ausgeglichener Stellung liegt `2·bv−1` nahe null, der Blend also nahe
+`0,5·tanh(own/50)` -- z um 0,42 statt 0,85, und damit im FEINEN Bereich der
+Skala (Bin-Breite rund 2,4 Punkte statt 4 bis 10).
+
+**Zweitens: #12 lief nicht am Differenzziel.** Der Verteilungskopf trainiert
+auf `targets_points` (`train.py:1073`), und `points_val` war seit db73122
+(2026-07-06, "Differenzbildung durch getrennt gesaettigte Terme ersetzt")
+bis Schema 20 (08c565d, 2026-08-10)
+`tanh(own/50) − 0,1·tanh(opp/50)` (`git show 78f3cf5:engine/py/neural_net.py`
+Z. 571-572, `VALUE_OPP_EPSILON = 0.1`). Beide #12-Messungen lagen also
+bereits eigenseitig. Der Irrtum stammt aus
+`research_value_head_alternatives_DRAFT.md` Z. 7 und ist dort korrigiert.
+
+**Konsequenz fuer diese Prereg** -- sie faellt haerter aus als der Entwurf
+sie geplant hatte:
+
+1. Die Behauptung "eine schlichte Wiederholung von #12 mit dem heutigen Ziel
+   waere schlechter als die Originalmessung" ist **gestrichen**. Beide
+   Messungen liefen am eigenseitigen Ziel, die Zielumstellung Schema 20 hat
+   nur den 0,1-Gegner-Term entfernt.
+2. Die Kompression war in #12 damit **bereits wirksam** -- soweit sie
+   ueberhaupt wirksam ist. #12 ist kein neutraler Vorlauf, sondern ein
+   **Prior gegen** die Hypothese: der behauptete Defekt lag vor, und die
+   Messung kam flach heraus.
+3. Ob die Kompression ueberhaupt beisst, haengt vollstaendig am TD-Blend und
+   damit an einer Datei-Eigenschaft. Genau das entscheidet die Vorpruefung
+   par.6, die deshalb auf den TATSAECHLICH gebauten `points_val` zu rechnen
+   ist und nicht auf die Formel.
 
 ## par.3 Begriffsklaerung: das ist NICHT die Platt-Entstauchung
 
@@ -79,35 +125,41 @@ Hier geht es um etwas anderes: um die **Lage der Bin-Kanten** auf der
 Punkteskala. Um die Begriffe nicht zu vermischen, heisst die hier gemeinte
 Variante durchgehend **punktlineare Bin-Skala**, nie "entstaucht".
 
-## par.4 Hypothese -- und was sie ausdruecklich NICHT erklaert
+## par.4 Hypothese -- und die Beweislast, die auf ihr liegt
 
-> Am **heutigen, eigenseitigen** Ziel bricht die Aufloesung des
-> Verteilungskopfes genau dort zusammen, wo die Datenmasse liegt. Eine
-> punktlineare Bin-Skala behebt das.
+> Am heutigen Ziel bricht die Aufloesung des Verteilungskopfes dort
+> zusammen, wo die Datenmasse liegt. Eine punktlineare Bin-Skala behebt das.
 
-**Diese Hypothese erklaert die beiden #12-Messungen nicht, und das ist
-wichtig.** #12 lief am Differenzziel. Punktedifferenzen sind um null
-zentriert; die gemessenen Durchschnittsmargen lagen bei 3,76 und 2,25
-Punkten, das entspricht z-Werten um 0,05 bis 0,08 und damit dem feinsten
-Bereich der Skala (Bin-Breite rund 2 Punkte). Die Randvergroeberung war dort
-also **kein** Faktor.
+**Diese Hypothese steht schlechter da als im Entwurf angenommen** (par.2a).
+Der Entwurf hielt sie fuer vorwaerts gerichtet, weil #12 angeblich am
+Differenzziel lief und die Randvergroeberung dort kein Faktor gewesen waere.
+Das war falsch: beide #12-Messungen liefen am eigenseitigen Ziel, unter
+demselben `linspace(-1,1)` und, soweit die Korpora `bootstrap_value` trugen,
+unter demselben TD-Blend. Der behauptete Defekt lag also bereits vor, und
+die Messung kam flach heraus.
 
-Der stehende #12-Befund hat eine andere und bereits identifizierte Ursache:
-im belastbaren Block (n=150) stand eine Marge von +2,25 gegen ein
-Partieergebnis von 151:149, also exakter Gleichstand. Positive Marge ohne
-Siegvorsprung heisst, dass die Zusatzpunkte in ohnehin entschiedenen Partien
-anfielen. Das ist die Signatur einer fehlenden **Saettigung** in der
-Konsumption, nicht einer zu groben Bin-Skala, und der zustaendige Zuschnitt
-dafuer ist `research_value_head_alternatives_DRAFT.md` Idee 1.1.
+Damit traegt diese Prereg die Beweislast und nicht die Gegenhypothese. Sie
+darf nur weiterlaufen, wenn die Vorpruefung par.6 beziffert, dass die
+Datenmasse tatsaechlich in groben Bins liegt -- was die 83-%-Messung in
+par.2a eher unwahrscheinlich macht, weil der TD-Blend die Ziele Richtung
+null zieht, also in den feinen Bereich.
 
-Diese Prereg ist damit **vorwaerts gerichtet**: sie behauptet nicht, die
-Vergangenheit zu erklaeren, sondern verhindert, dass eine Wiederaufnahme des
-Kopfes am heutigen Ziel an einem Fehler scheitert, den #12 noch gar nicht
-hatte.
+**Der stehende #12-Befund gehoert weiterhin nicht hierher.** Im belastbaren
+Block (n=150) stand eine Marge von +2,25 gegen ein Partieergebnis von
+151:149, also exakter Gleichstand. Positive Marge ohne Siegvorsprung heisst,
+dass die Zusatzpunkte in ohnehin entschiedenen Partien anfielen. Das ist die
+Signatur einer fehlenden **Schwelle in der Konsumption**, nicht einer zu
+groben Bin-Skala; zustaendig ist `PREREG_saturating_score_utility.md`.
 
-Gegenhypothese, die die Vorpruefung ausdruecklich zulassen muss: die
-Datenmasse liegt auch am eigenseitigen Ziel so weit innen, dass die
-Randvergroeberung folgenlos ist.
+Gestrichen ist dabei die Ableitung des Entwurfs, die Durchschnittsmargen
+3,76 und 2,25 entspraechen "z-Werten um 0,05 bis 0,08". Das war eine
+Kategorie-Verwechslung: 3,76 und 2,25 sind **Arena-Margen zwischen zwei
+Armen**, keine Zielwerte einzelner Partien. Der Zielwert je Partie hat die
+volle Streuung des Endstands, nicht die eines Armmittelwerts.
+
+Gegenhypothese, die die Vorpruefung ausdruecklich zulassen muss und die nach
+par.2a die wahrscheinlichere ist: die Datenmasse liegt so weit innen, dass
+die Randvergroeberung folgenlos ist.
 
 ## par.5 Arme
 
@@ -120,9 +172,13 @@ Bestandsrezept.
 | **T** tanh-Bins | `points-dist-bins 51`, Kanten wie heute (`linspace(-1,1)`) -- Replikation des bekannten Stands am HEUTIGEN, eigenseitigen Ziel |
 | **P** punktlineare Bins | `points-dist-bins 51`, Kanten aequidistant in PUNKTEN ueber den empirisch belegten Bereich, danach durch tanh auf die Zielkoordinate abgebildet |
 
-Arm T ist nicht verzichtbar. Ohne ihn waere ein Unterschied zwischen R und P
-nicht von der Zielumstellung (Differenz zu eigenseitig) trennbar, die seit
-#12 stattgefunden hat.
+Arm T ist nicht verzichtbar, seine Begruendung aendert sich aber durch
+par.2a. Nicht mehr: "trennt die Zielumstellung Differenz zu eigenseitig ab"
+-- die hat es nie gegeben. Sondern: er repliziert den bekannten Stand unter
+dem HEUTIGEN Korpus, heutigem Fenster, heutigem Rezept und ohne den
+0,1-Gegner-Term. Ohne ihn waere ein Unterschied zwischen R und P nicht von
+diesen Aera-Effekten trennbar, die im Projekt wiederholt groesser waren als
+der jeweilige Knopf.
 
 HL-Gauss-Sigma ist heute in **Bin-Breiten** definiert
 (`train.py:196`: `sigma = POINTS_DIST_SIGMA * (edges[1] - edges[0])`). Bei
@@ -133,12 +189,30 @@ oder global bleibt; siehe par.9.
 
 **Vor jedem Training.** Auf dem vorhandenen Korpus:
 
-1. Histogramm der Zielwerte `tanh(own_total/50)` ueber die 51 heutigen Bins.
-2. Je Bin die Breite in Punkten und die Belegung.
-3. Die Kennzahl: **Anteil der Datenmasse in Bins, die breiter als 5 Punkte
+1. **Nicht** die Formel `tanh(own_total/50)` histogrammieren. Zu
+   histogrammieren ist der Zielwert, den der Cache-Bau TATSAECHLICH
+   erzeugt, also `points_val` nach allen Zweigen aus par.2a (rtv-Override,
+   TD-Blend). Der Entwurf hatte hier die Formel stehen; das haette den
+   Masseanteil in breiten Bins systematisch UEBERSCHAETZT, weil der TD-Blend
+   die Ziele Richtung null zieht, und haette das 30-%-Tor faelschlich
+   oeffnen koennen.
+   Bezugsquelle ist dieselbe Codestelle, die trainiert
+   (`neural_net.py:1640-1720`), nicht eine nachgebaute Formel -- sonst misst
+   das Tor eine Groesse, die kein Training je gesehen hat.
+2. Vorschaltung, eine Zeile: welche der Felder `round_transition_value` und
+   `bootstrap_value` traegt der Korpus? Die Antwort entscheidet, welcher
+   Zweig dominiert. Fuer den Bestand ist sie in par.2a gemessen (rtv nirgends,
+   bootstrap ~83 %); fuer ein neues Korpus ist sie erneut zu erheben.
+3. Je Bin die Breite in Punkten und die Belegung.
+4. Die Kennzahl: **Anteil der Datenmasse in Bins, die breiter als 5 Punkte
    sind.**
+5. Dieselbe Kennzahl zusaetzlich **getrennt nach Runde**. Runde 5 traegt
+   das reine `tanh(own/50)`, alle anderen den Blend; ein gepoolter Wert
+   verwischt genau den Unterschied, um den es geht.
 
-Entscheidungsregeln, vorab festgelegt:
+Entscheidungsregeln, vorab festgelegt (unveraendert gegenueber dem Entwurf,
+nur auf die richtige Groesse bezogen -- die Schwellen sind a priori gesetzt
+und werden nicht nachtraeglich an das Ergebnis angepasst):
 
 - **Anteil < 10 %**: Die Vergroeberung trifft die Daten kaum. Die Hypothese
   aus par.4 ist damit **widerlegt**, der Zuschnitt endet hier, und #12
@@ -147,6 +221,10 @@ Entscheidungsregeln, vorab festgelegt:
   liegt beim Nutzer.
 - **Anteil > 30 %**: Die Hypothese ist plausibel und beziffert. Arme T und P
   werden gefahren.
+
+Der gepoolte Wert entscheidet. Die Aufschluesselung nach Runde ist
+mitzuberichten, aber kein zweiter Riegel -- sonst gaebe es zwei Tore und
+damit Auswahlfreiheit im Nachhinein.
 
 Diese Vorpruefung kostet eine Auswertung vorhandener Pickles. Sie kann die
 ganze Wiederaufnahme fuer wenige Minuten Aufwand beenden, und genau dafuer
@@ -179,10 +257,13 @@ Metrik um ein Vielfaches dessen, was ein einzelner Knopf bewegt.
 - **P gegen T positiv, Replikation negativ**: derselbe Ausgang wie beim
   letzten Mal. Zu berichten als das, was es ist, und nicht zu
   reinterpretieren.
-- **T weicht unerwartet stark von der #12-Historie ab**: dann ist die
-  Zielumstellung (Differenz zu eigenseitig) der dominierende Faktor und
+- **T weicht unerwartet stark von der #12-Historie ab**: dann dominiert ein
+  Aera-Effekt (Korpus, Fenster, Rezept, Wegfall des 0,1-Gegner-Terms) und
   nicht die Bin-Skala. Eigener Befund, unabhaengig vom Ausgang von P zu
   berichten.
+- **Der TD-Blend-Anteil im Korpus liegt deutlich unter den ~83 % aus
+  par.2a**: dann gilt die Vorpruefung nicht mehr und ist zu wiederholen,
+  bevor irgendein Arm gefahren wird.
 
 ## par.9 Offen, vor dem Bau zu entscheiden
 
@@ -191,21 +272,30 @@ Metrik um ein Vielfaches dessen, was ein einzelner Knopf bewegt.
 - HL-Gauss-Sigma bei ungleichen Bin-Breiten: mitwandernd je Bin oder global.
 - Ob dieselbe Frage auch fuer den `opp_points`-Kopf gilt, falls er je
   verteilungsfoermig wird.
-- Ob die Bin-Kanten als Puffer im Checkpoint liegen bleiben (heute
-  `register_buffer`), damit Alt-Checkpoints ihre eigene Skala mitbringen und
-  ladbar bleiben.
+- Ob eine punktlineare Skala am TD-Blend ueberhaupt die richtige Antwort
+  waere. Der Blend mischt zwei Groessen verschiedener Natur (Punkte-tanh und
+  remappte Gewinnwahrscheinlichkeit) in EINE Koordinate; "aequidistant in
+  Punkten" ist fuer den Wahrscheinlichkeits-Anteil ohne Bedeutung. Faellt
+  das Tor positiv aus, ist diese Frage vor Arm P zu klaeren.
+
+Bereits beantwortet, hier nur zur Sicherung: die Bin-Kanten liegen heute
+schon als `register_buffer` im `state_dict` (`neural_net.py:2412-2413`),
+Alt-Checkpoints bringen ihre eigene Skala also mit und bleiben ladbar. Das
+war im Entwurf als offene Frage gefuehrt.
 
 ## par.10 Verhaeltnis zu den Nachbar-Zuschnitten
 
 - **Task #12 / `PREREG_post34_package.md` Arm 1**: derselbe Kopf, neuer
   Faktor. Diese Prereg eroeffnet ihn nicht generell wieder, sondern prueft
   genau eine bisher ungemessene Bedingung.
-- **`research_value_head_alternatives_DRAFT.md` Idee 1.1**: die dortige
-  These ist, dass nicht die Kopf-Architektur, sondern die **Konsumption**
-  der offene Hebel ist. Beide Thesen schliessen einander nicht aus: eine
-  vergroeberte Verteilung waere auch fuer eine gesaettigte, integrierte
-  Utility ein schlechter Eingang. Faellt die Vorpruefung positiv aus, ist
-  diese Prereg die guenstigere Vorstufe zu Idee 1.1.
+- **`PREREG_saturating_score_utility.md`** (Ausarbeitung: Idee 1.1 in
+  `research_value_head_alternatives_DRAFT.md`): die dortige These ist, dass
+  nicht die Kopf-Architektur, sondern die **Konsumption** der offene Hebel
+  ist. Beide Thesen schliessen einander nicht aus: eine vergroeberte
+  Verteilung waere auch fuer eine gesaettigte, integrierte Utility ein
+  schlechter Eingang. Faellt die Vorpruefung positiv aus, ist diese Prereg
+  die guenstigere Vorstufe. Der TD-Blend-Befund aus par.2a betrifft beide
+  Zuschnitte und ist dort als par.3a-Tor registriert.
 - **`PREREG_score_correlation.md`**: unabhaengig. Dort geht es um die
   Notwendigkeit eines Differenzkopfes, hier um die Aufloesung eines
   vorhandenen.

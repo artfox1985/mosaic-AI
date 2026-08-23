@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es Staerke, Self-Play-Startstellungen dort zu waehlen, wo das Netz nachweislich unsicher ist UND diese Unsicherheit die Zugwahl kippen kann, statt kuratiert oder zufaellig? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23; Anschluss an PREREG_start_position_seeding par.4d (erstes positives Zustandssignal, Tau +0,14 vs -0,19, p=0,017), Tor G (Gueltigkeit des Unsicherheitsmasses) vor jedem Eingriff -->
+<!-- STATUS: OFFEN | Frage: Bringt es Staerke, Self-Play-Startstellungen dort zu waehlen, wo das Netz nachweislich unsicher ist UND diese Unsicherheit die Zugwahl kippen kann, statt kuratiert oder zufaellig? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht praezisiert. Anschluss an PREREG_start_position_seeding par.4d (erstes positives Zustandssignal, Tau +0,14 vs -0,19, p=0,017), Tor G (Gueltigkeit des Unsicherheitsmasses) vor jedem Eingriff; dessen Ziel (Sieg oder Punkte) ist jetzt Vorbedingung statt offener Punkt. Stufe 1 braucht KEINE Engine-Aenderung: Akquisition wird nach dem Zyklus in Python auf dem Korpus gerechnet, Entscheidungsnaehe aus den vorhandenen Feldern root_q/root_child_q (in 65,2 % der Datensaetze, gemessen 2026-08-23; die restlichen kommen nicht in die Warteschlange). Abdeckungsmass festgelegt auf shannon_entropy aus tools/selfplay_diversity_report.py -->
 
 # Vorregistrierung: Unsicherheitsgesteuertes Self-Play
 
@@ -51,6 +51,16 @@ mit eigenem Initialisierungs-Seed und eigener Bootstrap-Ziehung des Korpus.
 Kosten: ein Forward-Pass wie bisher, die Koepfe sind gegen den Rumpf billig;
 der Aufpreis liegt im Training.
 
+**Praezisierung 2026-08-23:** "billig" gilt fuer den Rechenaufwand, nicht
+fuer die Verdrahtung. Sobald die Koepfe INNERHALB der Erzeugung gelesen
+werden sollen, muessen sie durch den ONNX-Export und den Rust-Ausgabevertrag
+-- und der ist bereits eng: `_unpack_optional_outputs` (`train.py:205 ff.`)
+loest bis zu drei optionale Ausgaenge ueber das MODELL auf, ausdruecklich
+nicht ueber die Tupel-Laenge, weil Laenge 6 sonst mehrdeutig waere; auf der
+Rust-Seite haengen `net.rs::eval_ex` und `has_opp_head` daran. K zusaetzliche
+Ausgaenge landen genau dort. Stufe 1 (par.4) vermeidet das vollstaendig,
+Stufe 2 (par.5) nicht.
+
 Mass ist die Streuung der **Entscheidungsgroesse** ueber die K Koepfe, nicht
 die Divergenz ihrer Verteilungsformen. Begruendung: zwei Koepfe koennen
 verschieden aussehen und dieselbe Zugwahl treffen. Das ist folgenlose
@@ -72,17 +82,26 @@ Zwei Beispiele, die den Unterschied tragen:
 
 Die Akquisition kombiniert deshalb **Uneinigkeit** und
 **Entscheidungsnaehe** (Abstand der besten Wurzelkandidaten). Die konkrete
-Verrechnung ist offen, siehe par.8.
+Verrechnung ist offen, siehe par.9 (im Entwurf stand hier faelschlich par.8,
+das ist die Nicht-Erfolgs-Liste).
 
 ## par.3 Tor G: taugt das Mass ueberhaupt?
 
 **Vor jedem Eingriff in die Erzeugung.** Die Bootstrap-Koepfe werden gebaut
 und rein messend gefahren, ohne Einfluss auf Self-Play oder Suche.
 
+**Vorbedingung, vor Tor G zu entscheiden** (nachgetragen 2026-08-23): an
+welchem Ziel die K Koepfe haengen, Sieg oder Punkte. Der Entwurf fuehrte das
+unter par.9 als offenen Punkt fuer "vor dem Bau". Das ist zu spaet: der
+Gueltigkeitsnachweis unten misst Uneinigkeit gegen den "tatsaechlichen
+Vorhersagefehler", und dieser Fehler ist ohne die Zielwahl nicht definiert.
+Ohne die Festlegung ist Tor G nicht spezifiziert.
+
 Zwei Nachweise:
 
 - **Gueltigkeit.** Auf einem Holdout-Satz muss die Uneinigkeit mit dem
-  tatsaechlichen Vorhersagefehler zusammenhaengen. Vorregistriert:
+  tatsaechlichen Vorhersagefehler zusammenhaengen -- gemessen am oben
+  festgelegten Ziel. Vorregistriert:
   Rangkorrelation zwischen Uneinigkeit und absolutem Fehler, positiv und
   signifikant, mit Block-Bootstrap ueber Korpusdateien (nicht ueber
   Einzelstellungen, siehe Waechter 5).
@@ -96,19 +115,48 @@ unbewiesen ist, und ein spaeterer Nullbefund waere nicht interpretierbar.
 
 ## par.4 Stufe 1: Warteschlange offline
 
-Kein asynchroner Umbau der Erzeugung. Die Warteschlange laeuft **ueber
-Zyklen hinweg**:
+Kein asynchroner Umbau der Erzeugung, und -- Praezisierung 2026-08-23 --
+**kein Eingriff in die Engine ueberhaupt**. Der Entwurf schrieb hier "waehrend
+eines regulaeren Self-Play-Zyklus wird je Stellung die Akquisition
+mitgeschrieben". Das haette die K Koepfe in den ONNX-Export und den
+Rust-Ausgabevertrag gezwungen (par.2) und war der groesste Einzelposten der
+Stufe. Er ist nicht noetig: die Stellungen liegen nach dem Zyklus ohnehin im
+Korpus, und die Akquisition ist auf ihnen **nachtraeglich in Python**
+berechenbar. Die Warteschlange laeuft damit ueber Zyklen hinweg:
 
-1. Waehrend eines regulaeren Self-Play-Zyklus wird je Stellung die
-   Akquisition mitgeschrieben.
-2. Nach dem Zyklus werden die Stellungen mit der hoechsten Akquisition
-   ausgeschrieben.
-3. Im naechsten Zyklus werden sie als zusaetzliche Startstellungen
+1. Ein regulaerer Self-Play-Zyklus laeuft **unveraendert**. Keine Engine-
+   Aenderung, kein neuer Ausgang, kein neues Feld.
+2. Danach wird der Korpus in Python durchlaufen: je Stellung ein
+   Vorwaertslauf durch die K Bootstrap-Koepfe (Uneinigkeit) und die
+   Entscheidungsnaehe aus den bereits mitgeschriebenen Wurzelstatistiken.
+   **Nachgesehen 2026-08-23** an `selfplay_v20wdl_*_g4000.pkl`: die
+   Datensaetze tragen `root_q` (Wurzelwert) und `root_child_q` (Liste der
+   Kind-Q-Werte auf der [0,1]-Skala, im Stichprobendatensatz 347 Eintraege),
+   beide in **65,2 %** der Zeilen. Der Abstand der beiden besten Eintraege
+   in `root_child_q` IST die Entscheidungsnaehe; sie muss nicht neu erzeugt
+   werden.
+3. Die Stellungen mit der hoechsten Akquisition werden ausgeschrieben.
+4. Im naechsten Zyklus werden sie als zusaetzliche Startstellungen
    eingespeist, ueber die vorhandene Startstellungs-Mechanik.
 
-Das ist traeger als echtes Verzweigen, kostet aber keine neue Architektur
-und nutzt genau den Pfad, der in `PREREG_start_position_seeding.md` bereits
-abgenommen ist.
+Das ist traeger als echtes Verzweigen, kostet aber **keine neue Architektur
+und keine Engine-Aenderung** und nutzt genau den Pfad, der in
+`PREREG_start_position_seeding.md` bereits abgenommen ist. Stufe 1 ist damit
+ein Auswertungsskript plus ein Trainingslauf fuer die K Koepfe.
+
+Was das kostet, ist Genauigkeit: die Uneinigkeit wird an der gespielten
+Stellung gemessen und nicht an der, die die Suche gerade betrachtet. Fuer
+die Auswahl von Startstellungen ist das dieselbe Groesse; fuer Stufe 2
+(Verzweigen mitten in der Suche) waere es das nicht.
+
+Zweiter Preis, vorab zu benennen: **fuer 34,8 % der Stellungen fehlen die
+Wurzelstatistiken**, dort ist die Entscheidungsnaehe offline nicht
+bestimmbar (Verteilung ueber die Runden in der Stichprobe: R1 232/321,
+R2 235/345, R3 232/348, R4 225/358, R5 147/271). Vorab festgelegt, damit
+daraus keine stille Auswahl wird: diese Stellungen kommen **nicht** in die
+Warteschlange, und ihr Anteil ist je Zyklus zu berichten. Wuerden sie
+stattdessen allein nach Uneinigkeit bewertet, waere das genau der Fehler,
+den par.2 ausschliesst -- Auswahl ohne Entscheidungsnaehe.
 
 ## par.5 Stufe 2: echtes Verzweigen (nur bei Beleg aus Stufe 1)
 
@@ -136,6 +184,14 @@ der groesste Engineering-Posten des Zuschnitts.
 4. **Abdeckungsmass.** Faellt die Uneinigkeit global, muss unabhaengig
    sichtbar sein, ob der besuchte Stellungsraum breiter oder enger geworden
    ist. Sonst ist Koennen nicht von Kopf-Angleichung zu unterscheiden.
+   **Festgelegt 2026-08-23** (der Entwurf nannte hier keine Groesse, und
+   ohne Groesse ist es kein Waechter): das Mass ist die
+   Shannon-Entropie der Eroeffnungs-Ereignisse aus
+   `tools/selfplay_diversity_report.py` (`shannon_entropy`, `:90`, gespeist
+   aus `opening_events`, `:59`), gerechnet je Arm auf denselben
+   Zyklus-Umfang. Bestandswerkzeug, keine Neuentwicklung. Berichtet wird die
+   Differenz zum Kontrollarm, nicht der Absolutwert -- der haengt an der
+   Partiezahl.
 5. **Block-Ebene bei jeder Auswertung.** Score- und Fehleranalysen werden
    auf Block-Ebene gerechnet, nicht auf Stellungs- oder Paar-Ebene; im
    Projekt sind Paar-SEs schon einmal massiv unterschaetzt worden.
@@ -190,10 +246,22 @@ wertlos.
 - Verrechnung von Uneinigkeit und Entscheidungsnaehe. Ein Produkt ist die
   einfachste Annahme und vermutlich nicht die beste.
 - Anteil des On-Policy-Ankers.
-- Ob die Bootstrap-Koepfe am Sieg-Ziel oder am Punkte-Ziel haengen.
 - Schwelle beziehungsweise Quantil, ab dem eine Stellung in die
   Warteschlange kommt, und wie viele Stellungen je Zyklus eingespeist
   werden.
+
+Herausgenommen 2026-08-23: "ob die Bootstrap-Koepfe am Sieg-Ziel oder am
+Punkte-Ziel haengen" stand hier und ist nach par.3 vorgezogen -- Tor G ist
+ohne diese Wahl nicht spezifizierbar. Ebenfalls entschieden statt offen: das
+Abdeckungsmass (Waechter 4) und der Verzicht auf jede Engine-Aenderung in
+Stufe 1 (par.4).
+
+Am Rande, aber vor dem Bau zu wissen: die Wurzelstatistik im Korpus liegt
+auf der [0,1]-Blattwertskala (`root_q`/`root_child_q`), das Punkte-Ziel des
+Netzes dagegen auf der tanh-Skala und ist zusaetzlich TD-geblendet (siehe
+`PREREG_points_dist_bin_scale.md` par.2a). Uneinigkeit und
+Entscheidungsnaehe liegen also NICHT in derselben Einheit; die Verrechnung
+oben muss das ausweisen und nicht stillschweigend addieren.
 
 ## par.10 Verhaeltnis zu den Nachbar-Zuschnitten
 

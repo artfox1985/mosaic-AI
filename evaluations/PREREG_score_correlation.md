@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie stark sind eigener und gegnerischer Endpunktestand tatsaechlich korreliert, und wie gross ist der Fehler, den die Unabhaengigkeitsannahme in P(Sieg) erzeugt? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23; reine Korpus-Messung ohne Training, entscheidet eine Architekturbehauptung aus dem Verteilungskopf-Entwurf -->
+<!-- STATUS: OFFEN | Frage: Wie stark sind eigener und gegnerischer Endpunktestand tatsaechlich korreliert, und wie gross ist der Fehler, den die Unabhaengigkeitsannahme in P(Sieg) erzeugt? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht praezisiert. Reine Korpus-Messung ohne Training, entscheidet eine Architekturbehauptung aus dem Verteilungskopf-Entwurf. Zwei Spezifikationsluecken geschlossen: die Faltung ist JE SCHICHT aus den bedingten Randverteilungen zu bilden (global gegen bedingt gestellt maesse man den Bedingungseffekt statt der Abhaengigkeit), und MAE_eng wird JE RUNDE gebildet, weil die Schichtung sonst dieselbe Partie vier- bis fuenffach zaehlt und Waechter 1 bricht. Einlesepfad geprueft: selfplay_diversity_report.py liest das GEKLEMMTE Feld, par.2 braucht scores_unclamped (vorhanden, 100 %) -->
 
 # Vorregistrierung: Korrelation von eigenem und gegnerischem Endstand
 
@@ -53,6 +53,14 @@ Kontrast zu netzgenerierten Partien.
    `P_gefaltet(D > 0)`, und dieselbe Groesse bedingt auf Zwischenstaende
    (siehe par.4).
 
+**Wichtig, sonst misst Punkt 5 das Falsche** (nachgetragen 2026-08-23): die
+Faltung in Punkt 4 ist eine GLOBALE Konstruktion ueber die unbedingten
+Randverteilungen. Fuer den bedingten Vergleich in par.4 muss sie **je
+Schicht neu gebildet** werden, aus den bedingten Randverteilungen
+`P(X | Zwischenstand)` und `P(Y | Zwischenstand)`. Wer die globale Faltung
+gegen bedingte Empirie stellt, misst den Bedingungseffekt und nicht die
+Abhaengigkeit -- und bekommt einen grossen `MAE_eng`, der nichts belegt.
+
 ## par.4 Die eigentliche Groesse: Fehler dort, wo es zaehlt
 
 Ein globaler Vergleich von `P(D > 0)` ueber alle Partien ist zu grob, weil
@@ -62,12 +70,24 @@ Unabhaengigkeitsannahme schadet dort, wo die Entscheidung eng ist.
 Gemessen wird deshalb der Fehler **bedingt auf den Zwischenstand**:
 Partien werden nach dem Punktestand am Ende jeder Runde geschichtet, und
 innerhalb jeder Schicht wird die empirische gegen die gefaltete
-Siegwahrscheinlichkeit gestellt. Berichtet wird der mittlere absolute
-Fehler ueber die Schichten, deren wahre Siegwahrscheinlichkeit zwischen
-0,30 und 0,70 liegt.
+Siegwahrscheinlichkeit gestellt (Faltung je Schicht, siehe par.3).
+Berichtet wird der mittlere absolute Fehler ueber die Schichten, deren wahre
+Siegwahrscheinlichkeit zwischen 0,30 und 0,70 liegt.
 
 Begruendung der Fensterwahl: ausserhalb dieses Bereichs aendert ein Fehler
 in der Siegwahrscheinlichkeit die Zugwahl praktisch nicht mehr.
+
+**Verhaeltnis zu par.2** (nachgetragen 2026-08-23). Par.2 verlangt genau ein
+Zahlenpaar je Partie; die Schichtung hier laeuft ueber vier bis fuenf
+Rundenenden, dieselbe Partie taucht also in mehreren Schichten auf. Das ist
+zulaessig, **solange je Runde getrennt ausgewertet und berichtet wird** --
+dann ist jede Schicht eine eigene bedingte Schaetzung mit einem Paar je
+Partie. Ueber Runden zu poolen ist NICHT zulaessig: dann geht jede Partie
+vier- bis fuenffach ein, und Waechter 1 ist gebrochen. Der Kennwert
+`MAE_eng` aus par.5 ist entsprechend **je Runde** zu bilden; wo eine einzige
+Zahl gebraucht wird, ist es das Maximum ueber die Runden, nicht der
+Mittelwert -- die Runde mit dem groessten Fehler entscheidet, ob die
+Unabhaengigkeitsannahme irgendwo schadet.
 
 ## par.5 Entscheidungsregeln, vorab festgelegt
 
@@ -111,9 +131,18 @@ ueblichen Paarzahlen aufloest.
 ## par.7 Aufwand und Werkzeug
 
 Reine Auswertung vorhandener Pickles, kein Training, keine Arena, keine
-Engine-Aenderung. Vor dem Bau eines neuen Skripts ist zu pruefen, ob
-`tools/selfplay_diversity_report.py` (liest bereits Endstaende aus den
-Self-Play-Pickles) den Einlesepfad schon bereitstellt.
+Engine-Aenderung.
+
+Einlesepfad, am 2026-08-23 nachgesehen: `tools/selfplay_diversity_report.py`
+ist wiederverwendbar, aber **nicht unveraendert**. Es liest den Endstand aus
+dem geklemmten Feld (`:79`, `last.get("scores")`); par.2 verlangt
+`scores_unclamped`. Das Feld ist vorhanden -- in je einer Stichprobe pro
+Generation (v18, v19wdl, v19wdlsw, v20wdl, v20wdlsw) tragen es 100 % der
+Datensaetze. Ebenfalls nachgesehen, damit es niemand erneut herausfinden
+muss: eine Korpusdatei ist eine FLACHE Liste von Schritt-Datensaetzen, nicht
+eine Liste von Partien; die Partiezuordnung laeuft ueber `game_id`, der
+Abschluss ueber `completed`, der Endstand steht im letzten Datensatz je
+`game_id`.
 
 ## par.8 Was NICHT Gegenstand ist
 
