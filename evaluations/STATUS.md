@@ -63,476 +63,66 @@ entstanden. Alle drei lieferten echte Befunde — und keiner davon brachte k1 vo
 
 ---
 
-## FAHRPLAN DIESER GENERATION (Nutzer-Auftrag 2026-08-18, woertlich)
+## STAND JETZT (2026-08-23)
 
-> **UEBERHOLT (2026-08-22):** Dieser Fahrplan ist durchgemessen und
-> ersetzt – der Ownership-Verbraucher-Strang ist in allen gemessenen
-> Formen negativ (Schliessung weiter unten in dieser Datei), der
-> gueltige Auftrag steht in der UEBERGABE-Sektion (2026-08-22, neuer
-> Zuschnitt: Startpositions-Seeding primaer). Der Abschnitt bleibt als
-> Protokoll und wegen der Verwerfungs-Begruendungen am Ende stehen.
+**Champion unveraendert:** `v21_2d_brierbest`, Elo **1215** [1170, 1259] auf
+der neuen R5-Fix-Leiter (`PREREG_round5_minfix_elo_reset.md` par.5). Kanten
+ueber die Fix-Grenze hinweg nie mischen; Alt-Register in
+`../archive/elo_history_pre_r5fix.csv`.
 
-> 1. *"modell erstellen dass mit dem ownership head aktiv die züge steuert und
->    den champ schlägt"*
-> 2. *"anschließend mit dem neuen champ self plays (smoke test) überprüfen ob
->    hier genug diversität vorhanden ist für den ownership head"*
-> 3. *"dann self plays für v22 erstellen"*
+**Die Plattenblick-Kette hat drei Nullbefunde in Folge – alle ohne
+Staerkekosten:**
 
-Die Reihenfolge ist bindend: **kein v22-Korpus, bevor Schritt 1 und 2 stehen.**
-Der Grund ist gemessen und nicht theoretisch — ein Korpus, den ein Netz erzeugt,
-das die Platten nicht steuert, enthaelt die Zielhandlung nicht, und genau daran
-ist die Destillation zweimal gescheitert (`PREREG_corpus_distillation.md`
-par.10.7 warm, par.10.9 kalt).
-
-### Schritt 1 — Stand: SIEG-HAELFTE ERFUELLT, PLATTEN-HAELFTE NICHT
-
-**Nutzer-Einwand 2026-08-18, und er ist entscheidend:** *"ja nur spielt er noch
-nicht auf die wertungsplatten"*. Der Sieg allein erfuellt Schritt 1 NICHT — der
-Hebel des ganzen Vorhabens ist der Plattenblick, nicht die Siegquote.
-
-Praezisiert man, WELCHE Platten der Regler bewegt (gegen den Nullarm,
-Block-Ebene, Schwelle 2,571), wird das Bild eindeutig:
-
-| Kriterium | Δ | Block-t |
-|---|---:|---:|
-| **k3** Mehrfarbige Felder | +1,59 | **2,58** |
-| **k5** Eckplatten | +0,34 | **2,79** |
-| k1 Vertikale Reihen | −0,09 | 0,23 |
-| k2 Diagonale Reihen | +0,07 | 1,00 |
-
-Er spielt auf die **kurzen Ketten** und laesst die teuren Geometrien liegen —
-dieselbe Kettenlaengen-Grenze wie in der Skalen-Rechnung
-(`PREREG_ownership_coupling.md` par.3), hier in Arena-Zahlen. Die Siege kommen
-mit einiger Wahrscheinlichkeit von k3/k5.
-
-**Folge fuer die Reihenfolge, und sie ist scharf:** wuerde dieser Stand als
-Champion promoviert, erzeugten seine Self-Plays k3/k5-Verhalten und weiter kein
-k1/k2 — der v22-Korpus enthielte die Zielhandlung erneut nicht. Genau die Falle,
-gegen die die Fahrplan-Reihenfolge gebaut ist. **Schritt 1 braucht also beides:
-Sieg UND Bewegung bei k1/k2.**
-
-#### Die Sieg-Haelfte, dokumentiert (Zurechnung fehlt)
-
-`alphazero_v21-b18_best.onnx` @400 gegen Champion @400, 407 Seeds, keine Remis:
-
-| Arm | Siege | gegen 50 % |
-|---|---:|---|
-| Regler **AUS** | 211/407 = 51,8 % | p = 0,457 — Paritaet |
-| **Produktform D1** `0.1,0.3` | **236/407 = 58,0 %** | **p = 0,0013** |
-| **Konjunktionsform D1** | **229/407 = 56,3 %** | **p = 0,0115** |
-
-**Mit aktivem Kopf schlaegt `b18_best` den Champion signifikant, ohne ihn
-nicht** — und "aktiv steuert" ist keine Behauptung: 402 von 407 Partien laufen
-anders als im Nullarm. Zwei Vorbehalte, beide offen:
-
-1. **Kein Brettwechsel.** Alle drei Arme liefen auf Brett 0. Der Seiteneffekt
-   ist damit unkontrolliert; die DIFFERENZ zwischen den Armen ist es nicht
-   (gleiche Seite, gleiche Seeds), wohl aber die absolute Aussage gegen den
-   Champion. Naechste Messung: derselbe Arm mit vertauschten
-   `--model`/`--model-b` und eigenem `--out-prefix`.
-2. **Gepaarte Zurechnung fehlt.** Gegen den Nullarm ist der Zuwachs NICHT
-   signifikant (exakter McNemar: Produktform p = 0,066, Konjunktionsform
-   p = 0,2025). Der Sieg ueber den Champion steht, die Zurechnung zum Kopf
-   nicht.
-
-**NICHT FREIGEGEBEN (Nutzer 2026-08-18):** *"es ist good to know, aber noch
-nicht von mir freigegeben den champion herauszufordern"*. Also **kein
-Brettwechsel-Lauf, kein Gating, keine Promotion** auf diesem Stand — die Zahlen
-sind Kenntnisstand, kein Auftrag. Der Grund liegt oben: die Platten-Haelfte
-fehlt, und ein Champion ohne k1/k2 wuerde den v22-Korpus wieder ohne die
-Zielhandlung erzeugen.
-
-Wenn Schritt 1 spaeter freigegeben wird, waere die Reihenfolge: erst
-Brettwechsel (billig, entscheidet Vorbehalt 1 und verdoppelt die Paarungen fuer
-Vorbehalt 2), dann Gating.
-
-### Schritt 2 — die Diversitaet ist GEBAUT, nicht erhofft
-
-**Nutzer-Hinweis 2026-08-18:** *"das haben wir schon mal festgehalten. hier
-variieren wir den 'zug' zur wertungsplatte mit dem seed. sprich es wird dann
-eine gleichverteilung geben bei der sich die partien mal mehr und mal weniger
-auf die wertungsplatten fokussieren"*. Der Mechanismus existiert und ist
-verdrahtet — nachgeprueft:
-
-| Baustein | Stelle |
-|---|---|
-| `MOSAIC_WERTUNG_STREUUNG_MAX`, Default **0,0 (aus)** | `net_mcts.rs:1152`, Registry `knob_registry.rs:81` |
-| Ziehung: SplitMix64 aus dem Partie-Seed, **gleichverteilt in [0, max]** | `net_mcts.rs:1164` |
-| Produktions-Verdrahtung im Self-Play, je Partie | `self_play.rs:3134-3136` |
-| Wirkt auf | `wertung_shaping_weights()` → `[w; 8]` (`net_mcts.rs:1218`) |
-| Ausgesetzt fuer Label-Rollouts (sonst Rauschen im Ziel) | `net_mcts.rs:1105 ff.` |
-
-**Korrektur einer frueheren Formulierung in dieser Datei:** hier stand, der
-Smoke Test muesse pruefen, ob der Champion "zu deterministisch" spielt. Das ist
-die falsche Richtung — die Streuung erzeugt die Diversitaet aktiv, unabhaengig
-davon, wie deterministisch das Netz ist. Der Smoke Test prueft, ob die
-gezogene Spreizung sich in den LABELS niederschlaegt.
-
-**Zwei Punkte, die dabei zu beachten sind (beide aus dem Code, nicht vermutet):**
-
-1. Die Streuung dreht das **heuristische** Plattengewicht (`wertung_progress`),
-   nicht das Ownership-Gewicht. Fuer Label-Diversitaet ist das richtig — die
-   Partien variieren im Plattenfokus, also variieren die Ownership-Ziele mit.
-2. `wertung_shaping_weights()` liefert `[w; 8]` — **derselbe** Wert fuer alle
-   acht Kriterien. Die Streuung variiert also den Plattenfokus INSGESAMT, nicht
-   je Kriterium. Damit kann k1/k2 weiter untersampelt bleiben, obwohl die
-   Spreizung insgesamt gut aussieht. **Der Smoke Test muss deshalb die
-   Positivrate von k1 und k2 EINZELN ausweisen**, nicht nur ein Diversitaetsmass
-   ueber alle Kriterien. Vergleichsmassstab sind die Raten des v21-Fensters.
-
-### Schritt 3 — v22-Korpus
-
-Erst danach. Design liegt auf Halde (Abschnitt "v22-FENSTER"), NICHT eingeplant.
-
-### Zwei neue Vorregistrierungen (2026-08-18) — beide OFFEN, nichts gebaut
-
-Anlass: externe Durchsicht mit zwei ausgearbeiteten Spezifikationen. Beide sind
-gepruefte Antworten auf `DOSSIER_ownership_head.md` Abschnitt 7, beide in
-Plan-Zeitform, **keine** ist freigegeben.
-
-| Datei | Greift an | Stand |
+| Arm | Verdikt | Beleg |
 |---|---|---|
-| `PREREG_asymmetric_curriculum.md` | 7(1) Wegsymmetrisierung — der Value-Kopf hat den Plattenbau nie als Vorteil gesehen | Sperre par.5 vor dem Training; **erzeugt einen Self-Play-Korpus** |
-| `PREREG_reachability_target.md` par.12 (Arm P) | die Saettigung des Vollendbarkeits-Labels in Runde 1-2 | **Vorab-Sperre BESTANDEN 2026-08-19**, Stauchung CAP 12 festgelegt; faellt in den ohnehin anstehenden Relabeling-Durchlauf |
+| Ownership-VERBRAUCHER (Produktform, Konjunktionsform, hoerbare Skala, neues Ziel) | in allen gemessenen Formen negativ | `../archive/history.md`, Kapitel 2026-08-18..08-23; `PREREG_reachability_target.md` par.14/16 |
+| Asymmetrisches Curriculum | kein Signal (k1-Rate 12,2 % = Grundrate), kein Siegverlust | `PREREG_asymmetric_curriculum.md` par.14-16 |
+| Startpositions-Seeding, Dosis k=6 | kein k1-Signal (14,1 % gegen Schwelle 22 %), kein Staerkepreis | `PREREG_start_position_seeding.md` par.4c |
 
-**Die eine offene Entscheidung, die nicht beim Bauen fallen darf:** der
-asymmetrische Arm erzeugt einen neuen Korpus. Der Fahrplan sperrt
-Korpus-Erzeugung bis Schritt 1 und 2 stehen; Praezedenz fuer einen *Lehr*-Korpus
-ausserhalb der Reihe ist `PREREG_ownership_corpus.md`. Einordnung — Lehrkorpus
-(jetzt) oder Schritt 3 (spaeter) — ist **Nutzer-Entscheid und offen**
-(`PREREG_asymmetric_curriculum.md` par.9).
+**Das erste POSITIVE Zustandssignal der Kette** steht daneben und ist der
+Grund, warum der Strang nicht geschlossen ist: die Sibling-Sonde (par.4d)
+liefert Tau(Value~k1-Puffer) **seedk1 +0,140 gegen N -0,185**,
+Vorzeichentest 17/5/11, **p = 0,017** – auf denselben 33 Stellungen, auf
+denen der Asym-Arm nicht signifikant war (`seedk1_value_sibling_check.json`).
+**Mechanik bewegt sich, Verhalten (noch) nicht.** Das ist konsistent mit der
+Diagnose „die Suche fragt den Kopf zu selten" (`PREREG_r5_solver_split.md`
+par.3) und macht den Such-Hebel zum naechsten Kandidaten, nicht das naechste
+Ziel-Experiment.
 
-Was aus den externen Spezifikationen **verworfen** wurde, steht mit Begruendung
-in den Dateien selbst (`asymmetric_curriculum` par.8, `reachability_target`
-par.13) — damit es nicht in einem halben Jahr erneut vorgeschlagen wird.
+**Abgenommen und aktiv: die R5-Loeser-Trennung.** `round5_anchor.rs` ist
+eingefroren und in allen drei Sucheinstiegen verdrahtet (geprueft
+2026-08-23: `engine/src/mcts.rs:746`, `:777`, `:796`, Modul
+`engine/src/lib.rs:33`); Paritaets-Hash 8c6684ff haelt VOR und NACH dem
+Wheel-Neubau, Suite 484/0 (`logs/cargo_suite_r5split_20260823.log`,
+`logs/r5split_*_20260823.log`). **Die Elo-Leiter ist ab jetzt gegen jede
+R5-Weiterentwicklung immun** – der Netz-Loeser darf sich entwickeln, ohne
+den Anker zu entwerten.
 
----
+## NAECHSTE SCHRITTE – ALLE OFFEN, ALLE NUTZER-ENTSCHEID
 
-## UEBERGABE AN DIE NAECHSTE SITZUNG (angelegt 2026-08-22 — ZUERST LESEN; ersetzt die 20.08.-Uebergabe darunter, die vollstaendig ABGEARBEITET ist)
+Der NAECHSTE Schritt je Strang ist Nutzer-Entscheid; einzelne Straenge tragen
+bereits gebaute/gemessene Teilergebnisse (siehe jeweilige Zeile). Umfaenge und
+Schwellen fuer noch nicht begonnene Teile stehen je Prereg und sind vor
+Baubeginn freizugeben.
 
-**WO WIR STEHEN (alles committed, ~8 Commits vor origin/main -- NIE
-pushen ohne Anweisung; der Nutzer pusht selbst zwischendurch):**
+| Strang | Datei | Zuschnitt |
+|---|---|---|
+| **Such-Hebel: Implicit-Minimax-Backup** | `PREREG_implicit_minimax_backup.md` | **GEMESSEN 2026-08-23, ERFOLG nach vorregistrierter Lesart** (par.2b): kein Staerkeverlust (304 vs 296/407 n.s.), Score-Level signifikant +2,77 (Block-t +3,83), **k1 9,0 % -> 16,0 % (+7,0 pp, p=0,090)** -- die groesste je gemessene k1-Bewegung der Netz-Seite, konsistent mit par.4d (Kopf traegt Signal, Suche macht es jetzt wirksam). Caveat: Instrument misst gegen Heuristik. Folgeschritte (alpha-Sweep, Knopf im Self-Play) = Nutzer-Entscheid |
+| **R5-Netz-Loeser + R5-Value-Kalibrierung** | `PREREG_r5_solver_split.md` par.2 a/b/c, Teil B | Netz-Loeser-Arme (Budget, Policy-Sortierung, spaeter Value-Korrekturterm; je per-Agent verdrahtet, NIE per Env-Knopf) und der Vierer-Kopf-Vergleich. Zielmetrik der Kalibrierung: `r5_value_calibration`-Steigung, heute 0,06-0,09 statt ~1. **Arm 3 des Vierer-Vergleichs braucht ein b-Serie-Modell mit geprueftem Traeger-Status** – der Ownership-Ausgang des Champions ist untrainiert (Beweiskette par.3a) |
+| **Seeding-Folgearm: Dosis** | `PREREG_start_position_seeding.md` | k=6 war die erste Dosis; hoehere Dosis ist der naheliegende Folgeschritt, aber nicht registriert |
+| **UVFA-Regime-Eingabe** | `PREREG_uvfa_plate_regime.md` | Folge-/Kombinationsarm; par.8: Conditioning-Dropout + Leakage-Waechter sind PFLICHT. par.7-Entscheid steht aus |
+| **Reihenfolge Seeding-Kette gegen R5-Strang** | – | entscheidet der Nutzer beim Aufgreifen |
+| **Agenten-Kapselung (AgentSpec statt Prozess-Global)** | `PREREG_agent_encapsulation.md` | **Welle 1 (Pilot) GEBAUT UND ABGENOMMEN 2026-08-23** (par.4a): `SearchConfig`-Geruest + Migration von `MOSAIC_IMPLICIT_MINIMAX_A`, per-Seite-Spec (`spec`/`spec_a`+`spec_b`) an `net_arena_match`/`net_vs_net_arena_match`/`net_self_play_games`. Suite 498/0/26, Paritaets-Hash haelt, Spec==Env-Default bestaetigt. Naechster Schritt: die eigentliche Alpha-Sweep-Messung (par.6a Vorab-Lesart, Champion vs. Champion+alpha=0,2 netz-gegen-netz auf den 407 Seeds) -- noch nicht gelaufen. Weitere Knopf-Wellen (Schritt 2) bleiben Nutzer-Entscheid |
 
-1. **Asym-Curriculum KOMPLETT durchgemessen (par.12-16 der Prereg):**
-   Sperre bestanden (+31,3 pp), beide Arme trainiert, Nullarm-Arena auf
-   den 407 Kampagnen-Seeds inkl. Brettwechsel: **kein Signal** (k1-Rate
-   12,2 % = Grundrate, Teilfrage-B-Tau S -0,08 vs N -0,19 n.s.), kein
-   Siegverlust. par.16: die Bauer-Zuege waren als One-Hot-Policy-Ziele
-   im Training (implizites Behavior-Cloning) und drueckten sich nicht
-   aus -- zweiter Null-Befund dieser Mechanik.
-2. **Neuer Zuschnitt nach zwei externen Opus-Recherchen**
-   (`RESEARCH_plate_intent_external_2026-08-22.md`,
-   `RESEARCH_search_alternatives_external_2026-08-22.md`; beide sagen:
-   kein Suchparadigmen-Wechsel, additive Hebel): **Primaerarm
-   Startpositions-Seeding** (`PREREG_start_position_seeding.md`),
-   parallel `PREREG_implicit_minimax_backup.md` (Env-Knopf, ungebaut),
-   Folgearm `PREREG_uvfa_plate_regime.md` (par.8: Conditioning-Dropout
-   + Leakage-Waechter Pflicht). Q-Skalierungs-Option GESCHLOSSEN
-   (Aera-Nachmessung `gumbel_scale_calibration_v21.json`: q:prior 1,47,
-   kein mctx-Faktor-14).
-3. **Seeding-Bausteine 1+2 FERTIG und abgenommen:** 1.500 kuratierte
-   Stellungen (`data/seed_positions/seed_positions_v1.jsonl`,
-   `tools/seed_position_curation.py`, Bericht in par.2) und die
-   Engine-Faehigkeit `--seed-positions` (Suite 466/0, Paritaets-Hash
-   8c6684ff HAELT, Netz-Smoke 2x4 byte-identisch, par.3-Ergebnis).
-   Dabei gefixter Roundtrip-Befund: `seed_state_fixup` (nur im
-   Seeding-Pfad; json_to_state NICHT angefasst -- Basislinien-Schutz).
-   Das installierte Wheel traegt die Faehigkeit bereits.
-
-**BAUSTEIN 3 KORPUS FERTIG (2026-08-22 20:58 bis 2026-08-23 01:08,
-15.049,7 s):** 9.000/9.000 Partien, 900 Dateien, 642.999 Zuege, keine
-Fehler im Log (Details/Beleg: `PREREG_start_position_seeding.md`
-par.4a). Stellungs-Zuordnung gesichert
-(`data/seed_corpus/seed_position_map.txt`, 9.000 Zeilen, 1.500
-verschiedene idx a 6 Partien, k=6-Zyklik haelt). Befehl war:
-
-    $env:MOSAIC_DATA_DIR = "data/seed_corpus"   # eigener Ordner = Sperre
-    python -u self_play.py --mode network --model models/alphazero_v21_2d_brierbest.onnx `
-      --games 9000 --sims 200 --version v21_seedk1 --threads 8 `
-      --seed 20260824 --seed-positions data/seed_positions/seed_positions_v1.jsonl
-
-**Training v21-seedk1 laeuft seit 2026-08-23 01:19** (Manifest
-`models/manifest_train_v21-seedk1_20260823_011959.json`, Standardrezept
-Warm Start Champion, epochs 20, seed 2, Fenster b18-Regex + Seeding-
-Korpus policy-tragend 900/900, Traeger-Manifest
-`policy_carrier_manifest_seedk1.json`, Cache-Zeile verifiziert; Details
-par.4a). Danach: Arena gegen Champion auf `evaluations/seeds_asym_407.txt`
-(S-Muster: _best-Checkpoint, --log-games, Brettwechsel-Pflicht) ->
-k1-Raten aus den Endwertungs-Zeilen (Instrument-Muster: par.14 Asym) ->
-par.7-Verdikt gegen den Kontrollarm v21-asymN auf denselben Seeds.
-Runbook mit der vollstaendigen Befehlszeile, erwartetem
-Checkpoint-Namen und den Modellpfaden fuer
-`tools/probes/asym_value_sibling_check.py` ist vorbereitet, aber NICHT
-ausgefuehrt: `PREREG_start_position_seeding.md` par.4b (Plan,
-2026-08-23).
-
-**Suite-Teilabnahme der R5-Trennung: 484/0 bestanden** (par.2b-Abnahme
-`PREREG_r5_solver_split.md`, Paritaets-Hash + Wheel-Neubau bleiben offen,
-Slot nach der Arena -- INZWISCHEN ERLEDIGT, siehe naechster Absatz).
-Pruefstelle: `logs/cargo_suite_r5split_20260823.log`
-(Koordinator-Lauf 2026-08-23 frueh im Slot zwischen Generierung und
-Training, Exit 0, "test result: ok. 484 passed; 0 failed; 26 ignored";
-27 round5_anchor-Treffer im Log = die Anker-Tests liefen mit). Der
-Ungeprueft-Vermerk des Registrier-Agenten ist damit aufgeloest -- die
-Zahl stammte aus diesem Lauf, das Log ist jetzt dauerhaft abgelegt.
-
-**R5-TRENNUNG KOMPLETT ABGENOMMEN (2026-08-23 frueh, par.2c der
-R5-Prereg):** Paritaets-Hash 8c6684ff haelt VOR und NACH dem
-Wheel-Neubau (plus unabhaengige Koordinator-Nachmessung), Wheel neu
-gebaut und installiert, Suite 484/0. **Der Anker-Loeser
-(round5_anchor.rs) ist aktiv und eingefroren; die Elo-Leiter ist ab
-jetzt gegen jede R5-Weiterentwicklung immun.** Logs
-`logs/r5split_*_20260823.log`. Netz-Loeser-Arme (par.2 a/b/c) und
-Teil B (Vierer-Vergleich) sind Nutzer-Entscheide.
-
-**SEEDING-ARENA GEMESSEN + VERDIKT (2026-08-23 frueh, par.4c der
-Seeding-Prereg): KEIN k1-Signal, KEIN Staerkepreis.** k1-Rate 22/156 =
-14,1 % (Swap 21/156 = 13,5 %) unter der 22-%-Signalschwelle -- nominell
-hoechste je gemessene Netz-Rate (Grundrate 12,8 %, asymN-Kontrolle
-9,6 %), aber Abstand = 2 Partien. Staerke: 220/407 gegen Champion
-(Block-t +2,18, Brettwechsel 199/407 traegt nicht mit), gegen
-Kontrollarm asymN n.s. (McNemar p=0,303). Instrument-Zahlen doppelt
-erhoben (Agent + unabhaengige Koordinator-Nachzaehlung, bit-gleich);
-Artefakte `paired_arena_env_seedk1_nullarm{,_swap}.json`. Damit ist
-der Seeding-Primaerarm in der k=6-Dosis der dritte Nullbefund der
-Plattenblick-Kette bei null Staerkekosten. **ABER: die Sibling-Sonde
-(par.4d) liefert das ERSTE POSITIVE Zustandssignal der Kette** --
-Tau(Value~k1-Puffer) seedk1 +0,140 gegen N -0,185, Vorzeichentest
-17/5/11, p=0,017 (dieselben 33 Stellungen, auf denen asymS n.s. war;
-Artefakt `seedk1_value_sibling_check.json`, Asym-Artefakt unversehrt).
-Mechanik bewegt, Verhalten (noch) nicht -- konsistent mit der
-Diagnose "die Suche fragt den Kopf zu selten" (R5-Prereg par.3).
-Folgearme (Dosis, UVFA par.8, Minimax-Knopf) sind Nutzer-Entscheide.
-
-**STEHENDE REGELN (unveraendert + neu kalibriert):** Regel 0; Arena
-exklusiv, ABER seit dem Kalibrierungs-Smoke (Fallen-Sektion) sind
-Single-Thread-IO-Jobs parallel erlaubt (Suchlaeufe/Training weiterhin
-nicht); Score-Analysen auf Block-Ebene; nie loeschen ohne pfadgenaue
-Freigabe; Trainings waehrend Generierung nur mit MOSAIC_DATA_EXCLUDE.
-
-**PARALLEL ZUR GENERIERUNG ERLEDIGT (2026-08-22, nur Lese-/
-Schreibarbeit, keine Rechenlast):** Baustein 3 lief bis 2026-08-23
-01:08 durch (9.000 Partien nach `data/seed_corpus/`, Log
-`logs/seed_corpus_gen_20260822.log`, [seed_position]-Zeilen
-verifiziert; Ergebnis siehe Absatz oben und par.4a). Nebenher zwei
-Vorarbeiten aus
-`PREREG_r5_solver_split.md` abgeschlossen: **par.3a-Pruefpunkt
-GEKLAERT -- der Ownership-Ausgang des Champions ist UNTRAINIERT**
-(ownership_weight-Kette null->0.0 ueber die gesamte Warm-Start-Linie,
-Beweiskette in par.3a; Arm 3 des Vierer-Vergleichs braucht ein
-b-Serie-Modell mit geprueftem Traeger-Status) und **par.2a
-Bau-Kartierung Teil A** (round5.rs HEAD == c83fb35; Trennschnitt =
-exakt drei mcts.rs-Einstiege 746/777/796; alle uebrigen Konsumenten
-netz-/selfplay-seitig; Abnahme braucht Mehrkern-Slot NACH der
-Generierung; Baubeginn = Nutzer-Entscheid par.4). **Teil A danach per
-Sonnet-Agent VORGESCHRIEBEN (par.2b): round5_anchor.rs + Umhaengung
-mcts.rs, diff/grep-nachgeprueft, aber UNKOMPILIERT -- komplette
-Abnahme (Suite, Paritaets-Hash, Wheel) steht aus und gehoert in den
-Slot nach Generierungsende.**
-
-**OFFENE NUTZER-PUNKTE:** (a) ERLEDIGT: night_run_20260820.ps1 vom
-Nutzer geloescht (Loeschung noch nicht committet); (b) logs/nacht_20260820.log darf weg (Zwangsseiten-Map ist
-extrahiert: data/asym_corpus/zwangsseiten_map.txt); (c) Asym-Korpus
-bleibt lokal (Trainingsinput fuer Seeding/UVFA); (d) Ownership-Korpus
-entfernt der Nutzer (5b-Abschluss registriert); (e) UVFA-par.7- und
-Minimax-Knopf-Entscheide stehen aus, stack_top/B1-Paket geparkt.
-
-**NEUER NUTZER-ENTSCHEID (2026-08-22, kurz vor der Uebergabe,
-registriert in `PREREG_r5_solver_split.md`):** der R5-Loeser wird
-getrennt -- EIGENER, EINGEFRORENER Loeser fuer den Heuristik-Anker
-(Leiter-Schutz), der Netz-Loeser darf sich danach entwickeln
-(Budget/Policy-Sortierung/spaeter Value-Korrekturterm, je per-Agent
-verdrahtet, nie per Env-Knopf); dazu das Ziel, den Value-Kopf fuer
-Runde 5 GUT ZU KALIBRIEREN (Metrik: r5_value_calibration-Steigung,
-heute 0,06-0,09; Zuschnitt nach dem Seeding-Verdikt). Reihenfolge
-gegen die Seeding-Kette entscheidet der Nutzer beim Aufgreifen.
+**Geschlossen ohne Messung (nicht neu vorschlagen):** die
+Q-Skalierungs-Option (Aera-Nachmessung `gumbel_scale_calibration_v21.json`:
+q:prior 1,47, kein mctx-Faktor-14; c_scale-Senkung hauseigen mit -13 % Score
+vorbelastet) und jeder Suchparadigmen-Wechsel (beide externen Recherchen
+`RESEARCH_plate_intent_external_2026-08-22.md` und
+`RESEARCH_search_alternatives_external_2026-08-22.md`: additive Hebel zuerst,
+kein Beleg-Fall fuer einen AB-Umbau).
 
 ---
-
-## UEBERGABE VOM 2026-08-20 (ABGEARBEITET -- nur noch Historie, Details in den Fortschritts-Nachtraegen unten)
-
-**Kontext-Wechsel per Nutzer-Entscheid; diese Sektion ist der komplette
-Auftrag der naechsten Sitzung. In der Nacht laufen zwei Ketten in der
-NUTZER-Shell** (Log `logs/nacht_20260820.log`; Ueberwachung ueber Log +
-Dateizahl + Prozessliste, keine PID):
-
-1. **Neue Elo-Leiter** (`PREREG_round5_minfix_elo_reset.md` par.3, auf der
-   Fix-Engine c83fb35): 3 Anker-Kanten (v21/v20/v19 gegen Heuristik@150dyn,
-   je n=150, Seed 20260834) + 2 Nachbar-Kanten (v21-v20, v20-v19, je 400
-   Partien @400, Seeds 20260835/36). Artefakte
-   `evaluations/paired_arena_env_elo_r5fix_*.json`.
-2. **Asym-Korpus** (`PREREG_asymmetric_curriculum.md` par.11): 4 Bloecke
-   a 4.000 nach `data/asym_corpus/` (S1/S2 = `v21_asymS`, Seeds
-   20260830/31; N1/N2 = `v21_asymN`, Seeds 20260832/33), mit
-   automatischem Fruehwarn-Gate nach S1
-   (`tools/probes/asym_early_rate_check.py`, Abbruch < 10 pp).
-
-**FORTSCHRITT (Stand 2026-08-21 frueh):** Schritt 1 und 2 sind ERLEDIGT.
-Die Ketten starteten erst ~22:53 (ein argumentloser Fehlstart, neu
-abgesetzt 22:56, keine Partie doppelt); alle 5 Leiter-Kanten liegen vor
-und sind an den JSONs verifiziert. **Elo-Fit eingetragen und in
-`PREREG_round5_minfix_elo_reset.md` par.5 registriert: v21 1215 [1170,
-1259], v20 1186 [1144, 1227], v19 1136 [1097, 1178], Anker 1000 — die
-Reihung v19 < v20 < v21 haelt** (Nebenbefund dort: auf den Anker-Kanten
-allein laege v19 numerisch ueber v20; die n=400-Direktkanten wiegen das).
-Der Asym-Korpus laeuft seit 00:30 (Block S1). Schritt 3/4 offen.
-
-**FORTSCHRITT-NACHTRAG 2 (2026-08-22): Schritt 3 KOMPLETT, Schritt 4
-Arena-Teil GEMESSEN -- KEIN SIGNAL.** Beide Arme trainiert (par.13),
-Nullarm-Arena auf den 407 Kampagnen-Seeds inkl. Brettwechsel gefahren
-(par.14): **k1-Rate des Lehr-Arms 12,2 % (Swap 12,8 %) = exakt die alte
-Grundrate, unter der 22-%-Signalschwelle -> par.7-Verdikt "kein
-Signal"; aber KEIN Siegverlust** (S 199/407 gegen N 205/407, Block-t
--0,53). Vorregistrierte Einordnung: widerlegt 7(1) nicht
-(Ego-Perspektive). **Teilfrage B ebenfalls GEMESSEN (par.15): Tau
-S -0,08 gegen N -0,19 auf 33 gepaarten Stellungen -- kein
-substanzielles Zustandssignal, nur ein schwacher, nicht signifikanter
-Richtungshinweis (p=0,108). GESAMTVERDIKT: das asymmetrische
-Curriculum hat in dieser Form nichts Suchwirksames gelehrt, bei null
-Staerkekosten.**
-
-**DER NEUE ZUSCHNITT (Nutzer-Freigabe 2026-08-22, nach zwei externen
-Opus-Recherchen `RESEARCH_plate_intent_external` +
-`RESEARCH_search_alternatives_external` und par.16-Klon-Befund):**
-
-1. **Primaerarm: Startpositions-Seeding**
-   (`PREREG_start_position_seeding.md`) -- Self-Play startet ab
-   halbfertigen Spalten-Stellungen aus dem Asym-Korpus und spielt FREI
-   weiter (on-policy-Wertdaten; KataGo-startPoses-Muster). Behebt die
-   Off-Policy-Diagnose des Asym-Nulls. **Der Asym-Korpus bleibt dafuer
-   lokal.**
-2. **Parallel, Such-Hebel: Implicit-Minimax-Backup-Knopf**
-   (`PREREG_implicit_minimax_backup.md`, alpha~0,2, Default 0).
-3. **Folge-/Kombinationsarm: UVFA-Regime-Eingabe**
-   (`PREREG_uvfa_plate_regime.md`, jetzt mit Conditioning-Dropout +
-   Leakage-Waechter, par.8 dort).
-4. **Geschlossen ohne Messung** (Koordinator-Verifikation am Code):
-   die Recherche-Option "Q-Skalierung temperieren" -- die
-   mctx-Faktor-14-Rechnung gilt fuer unsere Engine nicht
-   (GUMBEL_C_SCALE=1,0; Task-#18-Kalibrierung misst sigma(q):ln(prior)
-   ~1,2:1), und c_scale-Senkung ist hauseigen vorbelastet (-13 %
-   Score, Task-#18-Gegenprobe). Ebenso bleiben Suchparadigmen-Wechsel
-   aus (beide Recherchen: kein Beleg-Fall fuer AB-Umbau; additive
-   Hebel zuerst).
-
-Umfaenge/Schwellen je Prereg sind Nutzer-Entscheide vor Baubeginn;
-gebaut ist noch nichts. Nebenbei: Exklusiv-Regel per Kalibrierungs-Smoke
-gelockert (Fallen-Sektion), cargo test 464/0, A4-Abdeckungsluecke
-dokumentiert (Fixture v2 beauftragt).
-
-**FORTSCHRITT-NACHTRAG (2026-08-21 Abend):** Schritt 3 ist zur Haelfte
-durch. Korpus fertig 18:43 (16.000 Partien, 0 unvollstaendige);
-**par.5-Sperre BESTANDEN: +31,3 pp** (Zwangsseite 34,6 % gegen frei
-3,3 % auf 8.000 S-Partien); Siegquote der Zwangsseite protokolliert
-(45,7 % gesamt, 47,5 % bei aktiver k1-Platte; erste unkonfundierte
-6a(B)-Zahl: Zwangsbau kostet ~4 pp). **Training Arm S laeuft** (Warm
-Start Champion, Standardrezept, epochs 20, seed 2, Fenster b18-Regex
-plus asymN-Ausschluss, Traeger-Manifest asymS 800/800 policy-tragend,
-an der Cache-Zeile verifiziert: 2638 Dateien geladen); Arm N folgt
-sequenziell. Details und eine Doku-Falle (Trainings-Manifest listet die
-VOR-Filter-Zusammensetzung) in `PREREG_asymmetric_curriculum.md` par.12.
-
-**AUFTRAG, in dieser Reihenfolge (nichts davon wurde in der alten Sitzung
-begonnen):**
-
-1. Vollstaendigkeit pruefen: 5 Leiter-JSONs vorhanden; `data/asym_corpus/`
-   = 1.600 Dateien / 16.000 Partien (Dateizahl x 10), Log auf Abbrueche/
-   Fruehwarn-Ausgang pruefen. Unvollstaendig -> Stall-Regel (nur fehlenden
-   Rest nachgenerieren, Folge-Seed), NICHT alles neu.
-2. **Elo-Fit** ueber die 5 Kanten (Anker definiert den Nullpunkt wie
-   bisher), Eintraege in die FRISCHE `evaluations/elo_history.csv`
-   (Alt-Register liegt in `archive/elo_history_pre_r5fix.csv`; **Kanten
-   ueber die Fix-Grenze hinweg NIE mischen**). Ergebnis in
-   `PREREG_round5_minfix_elo_reset.md` par.5 registrieren, inkl. der
-   Frage, ob die Reihung v19 < v20 < v21 haelt.
-3. **Asym-Korpus abnehmen:** Vollstaendigkeits-/Greif-Statistik aus dem
-   Log; dann die verbindliche **par.5-Sperre** (k1-Raten-Differenz
-   Zwangs-/freie Seite >= 20 pp auf dem Gesamt-Korpus S; Siegquote der
-   Zwangsseite protokollieren, NICHT tunen). Sperre bestanden ->
-   par.9 Schritt 5 (Training beider Arme: Warm Start Champion,
-   Standardrezept, `--epochs` realistisch ~20, Traeger-Manifest fuer den
-   neuen Korpus policy-tragend, Fenster gepinnt — b18-Fenster-Regex aus
-   `evaluations/b18_window_exclude_regex.txt` bzw. dem Referenz-Manifest).
-4. Danach Messungen nach par.6/par.7 der Asym-Prereg (Nullarm-Arena auf
-   der Fix-Engine; Brettwechsel-Arm ist dort Pflichtteil).
-
-**Stehende Regeln, die letzte Nacht teuer wurden:** Arena nur EXKLUSIV;
-`MOSAIC_OWNERSHIP_CONJ=1` in Ownership-Armen; Nenner sind KOPFSPEZIFISCH
-(par.15-Lehre); Builds nie in Pipes; nie pushen ohne Anweisung.
-
----
-
-## STAND 2026-08-20 — ZIELWECHSEL GEMESSEN: NICHT-ERFOLG, mit umgekehrtem Vorzeichen
-
-> **KORREKTUR, noch am selben Tag (Implementierungs-Review, par.15 der
-> Prereg): das T+S-Verdikt unten ist ein DOSIS-ARTEFAKT-VERDACHT und
-> traegt NICHT als Ziel-Aussage.** Der Vollendbarkeits-Kopf liefert
-> e_k1 Median **36,1** (Konjunktionsform) gegen 0,26 beim
-> Realisierungs-Kopf — mit dem am alten Kopf kalibrierten Nenner 1 war
-> der T+S-Arm **wertblind** (Shift 1,0, q auf 1,0 geclampt, 100 % der
-> Zustaende): die Suche spielte Prior + Rauschen. Auch die beiden
-> Offline-Tau-Werte sind entwertet (q lag in 80/80 Faellen auf der
-> Clamp-Grenze). **Gueltig bleiben:** b24-Null 221/407 (Zielwechsel
-> kostet keine Staerke), S gegen N flach, alle Linsen-Freisprueche.
-> **WIEDERHOLUNG GEFAHREN (noch am 2026-08-20, par.16): NICHT-ERFOLG,
-> diesmal ohne Artefakt.** Nenner S' 3,3 / T+S' 463, Saettigungs-Wache
-> bestanden (Clamp 0,0 %). k1 flach (T+S' gegen S' +0,23, Block-t 1,11;
-> gegen eigenen Nullarm −0,05) — aber KEIN Siegverlust: **T+S' 233/407,
-> nominell bester Arm der Kampagne** (gegen b24-Null p=0,169, n.s.).
-> Korrekt dosiertes Vollendbarkeits-Shaping ist kostenlos, nur
-> k1-wirkungslos. Endverdikt nach par.7-Klausel: das Ziel ist nicht der
-> Engpass; es bleibt die Policy-Seite. Der Ownership-Verbraucher-Strang
-> ist damit ENDGUELTIG durchgemessen. Die Zahlen darunter bleiben als
-> Protokoll des ersten Laufs stehen.
-
-Der Vollendbarkeits-Kopf (`v21-b24`, Arm P) ist trainiert, offline geprueft
-und in der registrierten N/S/T+S-Arena gemessen (par.14 der Prereg, alle
-Zahlen dort). Kurzfassung:
-
-| Arm | Siege | k1-Punkte |
-|---|---:|---:|
-| N (b18, Regler aus) | 211/407 | 0,90 |
-| S (b18, hoerbare Skala) | 214/407 | 0,85 |
-| b24-Null (neues Ziel, Regler aus) | **221/407** | — |
-| **T+S (neues Ziel, hoerbare Skala)** | **194/407** | **0,18** |
-
-- **T+S gegen S: k1 −0,67 Punkte, Block-t −3,73** — signifikant in die
-  FALSCHE Richtung; dazu Siegverlust (McNemar p=0,0045) und mehr
-  Strafleiste (+1,83, Block-t 2,87). Nur die Spezialfelder profitieren
-  (+0,56, Block-t 7,00) — wieder das Kurze-Kette-Muster.
-- **S gegen N: flach** (k1 t −0,18, Siege p=0,84) — die hoerbare Skala
-  allein bewegt beim alten Ziel nichts. Damit sind Skala UND Ziel als
-  Engpass-Erklaerungen GEMESSEN und GEFALLEN.
-- **Der Zielwechsel allein kostet keine Staerke** (b24-Null 221/407,
-  numerisch ueber b18-Null auf denselben Seeds) — der Schaden entsteht
-  erst, wenn der Kopf die Suche steuert.
-- **Die Offline-Sonde hatte es angekuendigt:** Kopf-Ordnung seed-stabil
-  (Tau +0,970), aber OHNE Bezug zum eigenen Trainings-Praedikat
-  (Tau −0,03 gegen die Puffer-Summe der Nachfolgezustaende). Der Kopf
-  lernt das Ziel auf Zustands-Ebene (own_val fiel monoton 0,407→0,361),
-  unterscheidet aber die Geschwister eines Knotens nicht danach —
-  dieselbe Fehlerklasse wie der Feld-Kopf-Befund vom 18.08. („sieht die
-  Absicht kaum").
-
-**Damit ist der Ownership-VERBRAUCHER-Strang in allen gemessenen Formen
-negativ** (Produktform, Konjunktionsform, hoerbare Skala, neues Ziel).
-Was laut par.7-Registrierung bleibt: die **Policy-Seite**
-(orakel-abgeleitete Supervision, AZAL-Muster) als letzter unversuchter
-Strang — und unabhaengig davon das **asymmetrische Curriculum** am
-VALUE-Kopf (von diesem Ergebnis unberuehrt; Rechnungen liegen, Umfang ist
-Nutzer-Entscheid).
-
-Zwei am 2026-08-20 gefangene Fallen stehen in der Fallen-Tabelle
-(Produktform liest keine Atome → `MOSAIC_OWNERSHIP_CONJ=1` Pflicht in
-Ownership-Armen; Arena nur EXKLUSIV fahren).
-
----
-
-*(Abgeschlossen und nach `../archive/history.md` verschoben: STAND 2026-08-19 — Orakel-Abstand in Menschenpartien, Schritt-2-Vorpruefungen (Saettigung + Arm-P-Sperre), Werkzeug-Stand 2026-08-19. Kapitel "Ownership-/Zielwechsel-Kampagne v21-b18..b24 und Begleitbefunde (2026-08-16 bis 2026-08-20)".)*
-
----
-
-*(Abgeschlossen und nach `../archive/history.md` verschoben: STAND 2026-08-17 (Nachmittag) — Korpus policy-maskiert, Regler-Strang, Konjunktionsterme, "Zwei von drei Wegen", Ownership-Kopplung, Frozen Trunk b22, Kalibrierung (inkl. "Kalibrierung gefittet"), Feld-Kopf-Messung, Shaping-Nenner-Strang, LR-Schedules, Cold-Start-Saettigung b20. Kapitel "Ownership-/Zielwechsel-Kampagne v21-b18..b24 und Begleitbefunde (2026-08-16 bis 2026-08-20)".)*
 
 ## OFFENE ENTSCHEIDUNGEN (Nutzer)
 
@@ -543,8 +133,10 @@ Ownership-Armen; Arena nur EXKLUSIV fahren).
 | **Korpus mit hoeheren Sims nachgenerieren** | **ABGELEHNT** (Nutzer 2026-08-17) — nicht neu vorschlagen |
 | **Fester Bewertungssatz** | Bauer-Satz: 300 Dateien / 3000 Partien in `data/holdout/`, fertig 2026-08-18. Details (Zusammensetzung, Abnahme, Herkunft) siehe `../archive/history.md`, Kapitel "Ownership-/Zielwechsel-Kampagne v21-b18..b24 und Begleitbefunde (2026-08-16 bis 2026-08-20)". |
 | **Push** | NIE ohne ausdrueckliche Nutzer-Anweisung (Nutzer-Regel 2026-08-20); Stand wird als "n Commits voraus" gemeldet |
-
-*(Abgeschlossen und nach `../archive/history.md` verschoben: die beiden Fallen-Tabellen vom 2026-08-17 (Zeitkosten) und vom 2026-08-17 (Nacht) / 2026-08-18. Kapitel "Ownership-/Zielwechsel-Kampagne v21-b18..b24 und Begleitbefunde (2026-08-16 bis 2026-08-20)".)*
+| **`logs/nacht_20260820.log`** | darf weg (Nutzer 2026-08-22); die Zwangsseiten-Map ist extrahiert nach `data/asym_corpus/zwangsseiten_map.txt`. Loeschung ist Nutzersache |
+| **Asym-Korpus** | bleibt LOKAL – Trainingsinput fuer Seeding und UVFA |
+| **Ownership-Korpus** | entfernt der Nutzer selbst (5b-Abschluss registriert) |
+| **`tools/night_run_20260820.ps1`** | vom Nutzer geloescht, die Loeschung ist noch nicht committet |
 
 ## FALLE vom 2026-08-20 — CPU-NEBENLAST VERSTUEMMELT ARENA-PARTIEN
 
@@ -593,8 +185,6 @@ erster Schritt waere dann Deckel-Telemetrie zur Taeter-Identifikation.
 
 ---
 
-*(Abgeschlossen und nach `../archive/history.md` verschoben: PARTIE-REPLAY IST EXAKT (`PREREG_action_id_logging.md`), erledigt 2026-08-18. Kapitel "Ownership-/Zielwechsel-Kampagne v21-b18..b24 und Begleitbefunde (2026-08-16 bis 2026-08-20)".)*
-
 ---
 
 ## TASK-INDEX (nur OFFEN/LAUFEND)
@@ -619,6 +209,49 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
 ---
 
 ## GELTENDE REGELN (kompakt)
+
+- **Das Punkte-Ziel ist NICHT `tanh(own/50)` (geprueft 2026-08-23).** Zwei
+  Irrtuemer, die zusammen drei Dokumente falsch gemacht haben; beide am Code
+  nachgesehen, beide korrigiert.
+  1. **`points_val` ist ueberwiegend TD-geblendet.** Nach der Formelzeile
+     (`neural_net.py:1647`) greifen zwei Ueberschreibungen: `:1704` setzt bei
+     vorhandenem `rtv` komplett auf `own_rtv = 2·rtv[p] − 1`, `:1717`
+     blendet `TD_LAMBDA·(2·bv[p] − 1) + (1 − TD_LAMBDA)·points_val` mit
+     `TD_LAMBDA = 0.5` (`:717`). Kein Schalter unterdrueckt den TD-Blend
+     (`value_target_variant` greift nur am rtv-Zweig).
+     **Was da eingemischt wird, ist die Ausgabe des VALUE-Kopfes, nicht des
+     Punkte-Kopfes:** `bootstrap_value` entsteht ueber
+     `self_play.rs:1737` -> `round_transition_deep.rs:852` ->
+     `net_mcts::net_leaf_eval` -> `net_mcts.rs:2411`
+     `blended_leaf_win_prob(&value, ...)`, bei `w=0` also
+     `calibrate_win_prob_with(value_to_win_prob(value))`. Seine Bedeutung
+     haengt am Value-Kopf des GENERATORS: bei WDL-Kopf ist
+     `value_out = 2·p_win − 1` (`neural_net.py:2503`), also eine
+     Gewinnwahrscheinlichkeit; beim tanh-Kopf davor ist es
+     `tanh((own−opp)/50)`, also eine Punkte-MARGE. Beides ist um null
+     zentriert, beides ist NICHT der eigene Endstand `tanh(own/50)` -- die
+     Etikettierung "Gewinnwahrscheinlichkeit" gilt aber nur fuer die
+     WDL-Aera (v19wdl aufwaerts), nicht fuer v18.
+     Gemessen (je eine Datei pro Generation): `round_transition_value` in
+     v18/v19wdl/v19wdlsw/v20wdl/v20wdlsw **nirgends**, `bootstrap_value` in
+     **82,8 bis 84,0 %** der Datensaetze. Nur Runde 5 (kein Uebergang)
+     traegt das reine `tanh(own/50)`. **Folge: jede Aussage ueber die
+     Verteilung des Punkte-Ziels oder ueber die Bedeutung der Kopf-Ausgabe
+     muss diesen Blend mitrechnen.** Eine nachgebaute Formel misst eine
+     Groesse, die kein Training je gesehen hat.
+  2. **Task #12 lief NICHT am Differenzziel, sondern eigenseitig.** Der
+     Verteilungskopf trainiert auf `targets_points` (`train.py:1073`), und
+     `points_val` war seit db73122 (2026-07-06, "Differenzbildung durch
+     getrennt gesaettigte Terme ersetzt") bis Schema 20 (08c565d,
+     2026-08-10) `tanh(own/50) − 0,1·tanh(opp/50)`. Auf der Differenz liegt
+     `val`, das Value-Ziel. **Folge fuer die Wiederaufnahme:** der in
+     `PREREG_points_dist_bin_scale.md` behauptete Bin-Skalen-Defekt lag in
+     #12 bereits vor, und die Messung kam flach heraus -- #12 ist damit ein
+     Prior GEGEN die Hypothese, nicht ein neutraler Vorlauf.
+
+  Der Irrtum stammt aus `research_value_head_alternatives_DRAFT.md` Z. 7 und
+  war von dort nach `docs/concept_distributional_heads.md` und in zwei
+  Preregs gewandert. Alle vier Stellen sind am 2026-08-23 korrigiert.
 
 - **NEUER PUSH-BLOCKER seit 2026-08-21 (79de9fa): Rechnerstruktur im
   `pre-push`-Haken.** Wenn ein Push abbricht mit „RECHNERSTRUKTUR in
@@ -899,6 +532,10 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
   `DEFAULT_C_PUCT = 1,5`, `floor_shaping_weight = 0,3`.
 - `VALUE_SHRINK_ENABLED = false`; `round_transition_sampling = false`;
   `bootstrap_horizon_rounds = 2`.
+- **Zwei R5-Loeser seit 2026-08-23** (`PREREG_r5_solver_split.md`): der
+  EINGEFRORENE Anker-Loeser `round5_anchor.rs` haengt an den drei
+  Sucheinstiegen der Heuristik (`mcts.rs:746`, `:777`, `:796`) und schuetzt
+  die Elo-Leiter; `round5.rs` ist der Netz-Loeser und darf sich entwickeln.
 - Runde 5 wird NICHT vom Netz gespielt: `round5.rs` uebernimmt ab
   `round_number>=5 && phase==Drafting`, Blattwert = exakter Endscore inkl.
   Wertungsplatten. **Seit 2026-08-10 EXPECTIMINIMAX, nicht mehr reines
@@ -945,8 +582,9 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
   Alt-Datei-Bootstraps werden beim Cache-Bau Platt-entstaucht
   (A=0,0051/B=1,9269), `selfplay_v19wdl*`-Bootstraps (WDL-Generator) bleiben
   roh. Training: `--value-head wdl --select-by-brier` (KEIN destretch-Flag
-  mehr noetig). **Das Ziel ist margen-BLIND** -- siehe Abschnitt STAND,
-  "warum das Netz nicht punktoptimiert spielt".
+  mehr noetig). **Das Ziel ist margen-BLIND** -- Herleitung in
+  `../archive/history.md` (der Abschnitt "warum das Netz nicht punktoptimiert
+  spielt" ist mit den Alt-STAND-Kapiteln dorthin gewandert).
   Policy-Traeger-Manifest **`data/policy_carrier_manifest_v21.json`**
   (Default in `neural_net.py` ist noch die v20-Datei -- ein Trainingsstart
   im v21-Fenster MUSS `MOSAIC_CARRIER_MANIFEST` setzen, s. Fenster-Pinning
