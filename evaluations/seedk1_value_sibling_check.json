@@ -1,0 +1,19 @@
+{
+ "n_stellungen": 33,
+ "tau_mean_S": 0.1397031730124992,
+ "tau_mean_N": -0.18486654406922812,
+ "diff_mean": 0.3245697170817273,
+ "diff_sd": 0.8094730500471461,
+ "diff_t": 2.3033639882594144,
+ "vorzeichen": {
+  "S_besser": 17,
+  "N_besser": 5,
+  "gleich": 11
+ },
+ "p_vorzeichentest": 0.01690053939819336,
+ "modelle": {
+  "S": "alphazero_v21-seedk1_best.onnx",
+  "N": "alphazero_v21-asymN_best.onnx"
+ },
+ "dump": "probe_sibling_succ_k1_w1.0.json"
+}
