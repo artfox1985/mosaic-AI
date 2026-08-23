@@ -105,10 +105,20 @@ unterscheidet und dafür einen Versatz einträgt.
 > `bootstrap_value` (v18/v19wdl/v19wdlsw/v20wdl/v20wdlsw, gemessen
 > 2026-08-23); für diese Zeilen ist das Ziel der TD-Blend
 > `0,5·(2·bv−1) + 0,5·tanh(own/50)` (`neural_net.py:1717`, `TD_LAMBDA = 0.5`).
-> `2·bv−1` ist eine remappte Gewinnwahrscheinlichkeit. `round_transition_value`
-> ist in allen fünf Stichproben **nicht** vorhanden, der rtv-Zweig ist also
-> tot. Nur die restlichen ~17 % (Runde 5, kein Übergang) tragen das reine
-> `tanh(own/50)`.
+> `round_transition_value` ist in allen fünf Stichproben **nicht** vorhanden,
+> der rtv-Zweig ist also tot. Nur die restlichen ~17 % (Runde 5, kein
+> Übergang) tragen das reine `tanh(own/50)`.
+>
+> `tanh(own/50)` ist der Punkte-Kopf; die eingemischte Größe `2·bv−1` ist
+> dagegen die Ausgabe des **Value**-Kopfes des Generators
+> (`self_play.rs:1737` → `round_transition_deep.rs:852` →
+> `net_mcts::net_leaf_eval` → `net_mcts.rs:2411`
+> `blended_leaf_win_prob(&value, …)`, bei `w=0` also
+> `calibrate_win_prob_with(value_to_win_prob(value))`). Bei einem WDL-Kopf
+> ist das `2·p_win − 1` (`neural_net.py:2503`), also eine
+> Gewinnwahrscheinlichkeit; beim tanh-Kopf davor `tanh((own−opp)/50)`, also
+> eine Punkte-Marge. Der Blend mischt also **zwei verschiedene Größen**, und
+> das Wahrscheinlichkeits-Etikett gilt nur für die WDL-Ära.
 >
 > Damit ist die Diagnose eine **Hypothese, keine Herleitung**: die
 > Kopf-Ausgabe wird vom Gewinnwahrscheinlichkeits-Anteil dominiert, dessen

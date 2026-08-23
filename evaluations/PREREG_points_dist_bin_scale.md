@@ -66,8 +66,26 @@ Formelzeile (`neural_net.py:1647`) greifen zwei Ueberschreibungen:
 
 | Stelle | Wirkung |
 |---|---|
-| `neural_net.py:1704` | `points_val = own_rtv` -- ersetzt komplett, `own_rtv = 2·rtv[p] − 1`, also eine remappte GEWINNWAHRSCHEINLICHKEIT |
+| `neural_net.py:1704` | `points_val = own_rtv` -- ersetzt komplett, `own_rtv = 2·rtv[p] − 1` |
 | `neural_net.py:1717` | `points_val = TD_LAMBDA·(2·bv[p] − 1) + (1 − TD_LAMBDA)·points_val`, `TD_LAMBDA = 0.5` (`neural_net.py:717`) |
+
+**Was da eingemischt wird.** `tanh(own/50)` ist der Punkte-Kopf. Die
+eingemischte Groesse `2·bv − 1` ist dagegen die Ausgabe des **Value**-Kopfes
+des Generator-Netzes nach einem Rollout: `self_play.rs:1737` ->
+`round_transition_deep.rs:852` -> `net_mcts::net_leaf_eval` ->
+`net_mcts.rs:2411` `blended_leaf_win_prob(&value, ...)`, bei `w=0` also
+`calibrate_win_prob_with(value_to_win_prob(value))`. Was sie BEDEUTET,
+haengt am Value-Kopf des Generators:
+
+- **WDL-Kopf** (Task #34, v19wdl aufwaerts): `value_out = 2·p_win − 1`
+  (`neural_net.py:2503`) -- eine Gewinnwahrscheinlichkeit.
+- **tanh-Kopf** (davor, v18): `value_out = tanh((own−opp)/50)` -- eine
+  Punkte-MARGE.
+
+Beides ist um null zentriert und beides ist NICHT der eigene Endstand. Fuer
+die Bin-Skalen-Frage ist genau das der Punkt; das Etikett
+"Gewinnwahrscheinlichkeit" gilt aber nur fuer die WDL-Aera und ist auf den
+v18-Anteil des Fensters nicht anwendbar.
 
 Kein Schalter unterdrueckt den TD-Blend; `value_target_variant` greift nur
 am rtv-Zweig. `bootstrap_value` wird je Runde mit echtem Uebergang
