@@ -28,7 +28,7 @@ use crate::net_mcts::{derive_search_seed, SearchConfig};
 use crate::round_end::apply_bonus_chips_with;
 use crate::scoring::sample_valid_scoring_ids;
 use crate::self_play::{apply_chosen_action, choose_start_placement, net_arena_choose_action, resolve_tiling_step};
-use crate::serialize::{action_to_dict, state_to_json};
+use crate::serialize::{action_to_dict, state_to_json_exact};
 use crate::tile::TileColor;
 
 /// PREREG_agent_encapsulation.md par.8 (Welle 3): DIE Auswahl-Logik hinter
@@ -58,28 +58,38 @@ pub(crate) fn choose_drafting_action_json(
     sims: u32,
     c_puct: f64,
     seed: u64,
+    rot_seed: u64,
 ) -> PyResult<Value> {
-    // KERNBEWEIS-FIX (PREREG_agent_encapsulation.md par.8a): `json_to_state`
-    // mischt die verdeckten Sammlungen (Beutel/Turm) mit dem uebergebenen RNG
-    // neu (`serialize.rs` Kategorie 1) -- wuerde dieser Aufruf denselben
-    // `rng`-Strom mit der nachfolgenden Suche TEILEN, startete die Suche
-    // hier vorbelastet, waehrend der In-Process-Pfad
-    // (`RefereeGame::drafting_decide_and_apply_inprocess`) OHNE Rekonstruktion
-    // auskommt und `search_rng` unbelastet aus `derive_search_seed(...)`
-    // startet. `json_to_state` selbst bleibt unangetastet (Basislinien-Schutz,
-    // Praezedenz `seed_state_fixup`); stattdessen bekommt NUR die
-    // Rekonstruktion hier einen eigenen, domain-getrennten RNG (XOR-
-    // Distinguisher-Ableitung, Praezedenz `self_play.rs::partie_gewicht_aus_seed`
-    // DISTINGUISHER-Konstante und `lib.rs::resample_round_transition_json`s
-    // separate `recon_rng`-Instanz). Der Such-RNG (`rng` unten) wird danach
-    // FRISCH aus `seed` gezogen -- `seed` ist hier bereits
+    // KERNBEWEIS-FIX FORK A (PREREG_agent_encapsulation.md par.8b,
+    // Nutzer-Entscheid 2026-08-23): `state_json` traegt jetzt additiv die
+    // EXAKTEN Reihenfolgen der verdeckten Sammlungen (Beutel/Turm/
+    // Kuppelstapel/Bonuschip-Pool, `serialize::state_to_json_exact`,
+    // erzeugt von `RefereeGame::state_json`). `json_to_state_exact` liest
+    // sie als PFLICHTFELDER (harter Fehler bei Fehlen, kein stiller
+    // Rueckfall auf Zaehler-Rekonstruktion). Der fruehere, domain-getrennte
+    // Rekonstruktions-RNG (par.8a-Fix, `RECON_DISTINGUISHER`) entfaellt
+    // dadurch ERSATZLOS: er loeste ausschliesslich das Vorbelastungs-Problem
+    // einer RNG-basierten Neumischung, die es jetzt fuer diese vier Felder
+    // gar nicht mehr gibt (weniger bewegliche Teile). Der Such-RNG (`rng`
+    // unten) startet weiterhin FRISCH aus `seed` -- `seed` ist hier bereits
     // `derive_search_seed(game_seed, steps)` (siehe `RefereeGame::
     // pending_search_seed`), also byte-identische Ableitung zum In-Process-Pfad.
-    const RECON_DISTINGUISHER: u64 = 0x5EED_C0DE_5EED_C0DE;
-    let mut recon_rng = StdRng::seed_from_u64(seed ^ RECON_DISTINGUISHER);
+    //
+    // KERNBEWEIS-FIX par.8c (2026-08-23): die zweistufige Kuppel-Entscheidung
+    // (ChooseDomeSlot -> ChooseDomeRotation) lief bisher auf EINEM `rng`-
+    // Strom -- der In-Process-Pfad (`RefereeGame::
+    // drafting_decide_and_apply_inprocess`, je Entscheidungsstufe EIN
+    // eigener Aufruf) zieht dagegen je Stufe einen FRISCHEN
+    // `StdRng::seed_from_u64(derive_search_seed(game_seed, steps))`, mit
+    // `steps` bereits um 1 weitergezaehlt fuer die Rotationsstufe (belegt in
+    // `self_play.rs::unified_game_loop`, `steps += 1` NACH jeder einzelnen
+    // Drafting-Entscheidung, VOR der Seed-Ableitung der naechsten). `rot_seed`
+    // ist deshalb ein ZWEITER, eigener Parameter -- kein Default-Fallback auf
+    // den alten Ein-Strom-Modus, alle Aufrufer liefern ihn hart mit (siehe
+    // `RefereeGame::pending_rotation_search_seed`).
     let parsed: Value = serde_json::from_str(state_json)
         .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
-    let state = crate::serialize::json_to_state(&parsed, &mut recon_rng).map_err(PyValueError::new_err)?;
+    let state = crate::serialize::json_to_state_exact(&parsed).map_err(PyValueError::new_err)?;
     if state.phase != Phase::Drafting || state.players.iter().any(|p| p.start_tile_pending) {
         return Err(PyValueError::new_err(
             "choose_drafting_action_json: state ist keine Drafting-Entscheidung (Startplatzierung/Tiling \
@@ -97,8 +107,10 @@ pub(crate) fn choose_drafting_action_json(
             g.state
         };
         let rot_actions = drafting_actions(&follow_up_state);
-        let rot_chosen =
-            net_arena_choose_action(net, &follow_up_state, &rot_actions, &mut rng, sims, c_puct, true, search_config);
+        let mut rot_rng = StdRng::seed_from_u64(rot_seed);
+        let rot_chosen = net_arena_choose_action(
+            net, &follow_up_state, &rot_actions, &mut rot_rng, sims, c_puct, true, search_config,
+        );
         if let Action::ChooseDomeRotation(rot) = rot_chosen {
             if let Some(obj) = action.as_object_mut() {
                 obj.insert("rotation".to_string(), json!(rot));
@@ -132,8 +144,11 @@ impl FrozenWorkerEngine {
 
     /// `state_json` rein -- `{"action": ..., "value": null}`-JSON-String
     /// raus (identisches Schema zu `lib.rs::net_arena_choice_state_json`).
-    fn choose(&self, state_json: String, sims: u32, c_puct: f64, seed: u64) -> PyResult<String> {
-        let action = choose_drafting_action_json(&self.net, &self.search_config, &state_json, sims, c_puct, seed)?;
+    /// `rot_seed` (par.8c-Fix): eigener Seed fuer die Kuppel-Rotationsstufe,
+    /// harter Parameter -- siehe `choose_drafting_action_json`-Doku.
+    fn choose(&self, state_json: String, sims: u32, c_puct: f64, seed: u64, rot_seed: u64) -> PyResult<String> {
+        let action =
+            choose_drafting_action_json(&self.net, &self.search_config, &state_json, sims, c_puct, seed, rot_seed)?;
         let value: Option<f32> = None;
         Ok(json!({ "action": action, "value": value }).to_string())
     }
@@ -225,8 +240,12 @@ impl RefereeGame {
         RefereeGame { game, rng, game_seed: seed, steps: 0, nets: std::collections::HashMap::new() }
     }
 
+    /// Fork A (par.8b): exakte Variante -- traegt zusaetzlich zu den
+    /// bestehenden `state_to_json`-Feldern die vier geordneten verdeckten
+    /// Sammlungen (Beutel/Turm/Kuppelstapel/Bonuschip-Pool), die der Worker
+    /// jetzt PFLICHT konsumiert (`choose_drafting_action_json`).
     fn state_json(&self) -> String {
-        state_to_json(&self.game.state, true).to_string()
+        state_to_json_exact(&self.game.state, true).to_string()
     }
     fn phase(&self) -> &'static str {
         self.game.state.phase.as_str()
@@ -260,6 +279,21 @@ impl RefereeGame {
     /// `unified_game_loop` (Arena-Pfad).
     fn pending_search_seed(&self) -> u64 {
         derive_search_seed(self.game_seed, self.steps as u64)
+    }
+
+    /// Such-Seed fuer die Kuppel-ROTATIONSSTUFE, FALLS die anstehende
+    /// Drafting-Entscheidung eine Kuppelplatzierung ist (ChooseDomeSlot ->
+    /// ChooseDomeRotation, zwei eigene Entscheidungsstufen). Steps-Arithmetik
+    /// IN-PROCESS-IDENTISCH belegt (`self_play.rs::unified_game_loop`,
+    /// `steps += 1` NACH jeder einzelnen Drafting-Entscheidung, VOR der
+    /// Seed-Ableitung der naechsten -- dasselbe Muster reproduziert
+    /// `drafting_decide_and_apply_inprocess` bei zwei aufeinanderfolgenden
+    /// Aufrufen: Stufe 1 nutzt `steps`, Stufe 2 danach `steps + 1`, weil
+    /// dieser hier NOCH VOR dem ersten `apply` aufgerufen wird, `self.steps`
+    /// also noch den Stand VOR der Slot-Entscheidung traegt -- KERNBEWEIS-FIX
+    /// par.8c, PREREG_agent_encapsulation.md).
+    fn pending_rotation_search_seed(&self) -> u64 {
+        derive_search_seed(self.game_seed, (self.steps + 1) as u64)
     }
 
     /// Loest Startplatzierung und Tiling automatisch auf (Wortlaut-Kopie der

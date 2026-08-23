@@ -1,0 +1,160 @@
+{
+ "all_green": false,
+ "n_games": 8,
+ "sims": 400,
+ "c_puct": 1.5,
+ "games": [
+  {
+   "seed": 910001,
+   "ok": false,
+   "reference_scores": [
+    20,
+    22
+   ],
+   "referee_scores": [
+    19,
+    36
+   ],
+   "reference_steps": 161,
+   "referee_steps": 165,
+   "first_divergence": {
+    "line": 118,
+    "reference": "[R2] 📦 B: 1. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt",
+    "referee": "[R2] B: Kachel 7 → Slot (1,2) rot=270° [Plättchen 2/2]"
+   }
+  },
+  {
+   "seed": 910002,
+   "ok": false,
+   "reference_scores": [
+    59,
+    53
+   ],
+   "referee_scores": [
+    43,
+    59
+   ],
+   "reference_steps": 175,
+   "referee_steps": 170,
+   "first_divergence": {
+    "line": 62,
+    "reference": "[R2] B: Kachel 4 → Slot (2,1) rot=0° [Plättchen 2/2]",
+    "referee": "[R2] B: Kachel 4 → Slot (2,1) rot=90° [Plättchen 2/2]"
+   }
+  },
+  {
+   "seed": 910003,
+   "ok": false,
+   "reference_scores": [
+    36,
+    38
+   ],
+   "referee_scores": [
+    49,
+    37
+   ],
+   "reference_steps": 166,
+   "referee_steps": 165,
+   "first_divergence": {
+    "line": 133,
+    "reference": "[R3] 📦 B: 1. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt",
+    "referee": "[R3] ☀️  B: 2× türkis von GF → Reihe 1 [1/1] (+1 Strafleiste)"
+   }
+  },
+  {
+   "seed": 910004,
+   "ok": false,
+   "reference_scores": [
+    57,
+    51
+   ],
+   "referee_scores": [
+    56,
+    50
+   ],
+   "reference_steps": 168,
+   "referee_steps": 165,
+   "first_divergence": {
+    "line": 137,
+    "reference": "[R3] B: Kachel 16 → Slot (2,2) rot=180° [Plättchen 1/2]",
+    "referee": "[R3] ☀️  B: 2× schwarz von GF → Reihe 3 [2/3]"
+   }
+  },
+  {
+   "seed": 910005,
+   "ok": false,
+   "reference_scores": [
+    0,
+    12
+   ],
+   "referee_scores": [
+    8,
+    13
+   ],
+   "reference_steps": 157,
+   "referee_steps": 156,
+   "first_divergence": {
+    "line": 187,
+    "reference": "[R3] ☀️  B: 3× rot von F4 → Reihe 2 [2/2] (+1 Strafleiste)",
+    "referee": "[R3] ☀️  B: 1× gelb von F3 → Reihe 2 [1/2]"
+   }
+  },
+  {
+   "seed": 910006,
+   "ok": false,
+   "reference_scores": [
+    52,
+    85
+   ],
+   "referee_scores": [
+    33,
+    73
+   ],
+   "reference_steps": 164,
+   "referee_steps": 171,
+   "first_divergence": {
+    "line": 138,
+    "reference": "[R3] 🌙 B: 1 (1)× blau von F3 → Reihe 3 [3/3]",
+    "referee": "[R3] B: Kachel 9 → Slot (1,2) rot=180° [Plättchen 2/2]"
+   }
+  },
+  {
+   "seed": 910007,
+   "ok": false,
+   "reference_scores": [
+    34,
+    54
+   ],
+   "referee_scores": [
+    58,
+    63
+   ],
+   "reference_steps": 166,
+   "referee_steps": 170,
+   "first_divergence": {
+    "line": 89,
+    "reference": "[R2] B: Bonusplättchen von Fabrik 2 genommen [1/2 diese Runde]",
+    "referee": "[R2] 🌙 B: 5 (1+1+1+2)× gelb von F1, F3, F4, GF → Reihe 5 [5/5]"
+   }
+  },
+  {
+   "seed": 910008,
+   "ok": false,
+   "reference_scores": [
+    46,
+    38
+   ],
+   "referee_scores": [
+    40,
+    49
+   ],
+   "reference_steps": 164,
+   "referee_steps": 161,
+   "first_divergence": {
+    "line": 128,
+    "reference": "[R3] ☀️  B: 1× schwarz von F3 → Reihe 1 [1/1]",
+    "referee": "[R3] ☀️  B: 2× blau von F4 → Reihe 1 [1/1] (+1 Strafleiste)"
+   }
+  }
+ ]
+}

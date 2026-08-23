@@ -65,20 +65,16 @@ entstanden. Alle drei lieferten echte Befunde — und keiner davon brachte k1 vo
 
 ## UEBERGABE AN DIE NAECHSTE SITZUNG (2026-08-23 Abend -- ZUERST LESEN; Kapselungs-/Vollendungs-Strang. Die PARALLELE Sitzung des Nutzers fuehrt den Margen-Kopf-Strang: deren Preregs und archive/history.md NICHT anfassen)
 
-**IN-FLIGHT beim Sitzungsende:** der Zweistufen-Seed-Fix (wave3d) der
-Welle 3 -- ein Agent fuhr die Kernbeweis-Wiederholung, die ERSTE
-Partie zeigte bereits wieder eine Abweichung (vermutlich vierte
-Divergenzquelle ODER Fix unvollstaendig). **Erster Schritt der
-naechsten Sitzung:** Ausgang feststellen -- entweder aus dem
-Agenten-Abschlussbericht (falls im Kontext) oder REPRODUZIERBAR aus
-den Artefakten: `evaluations/frozen_kernbeweis_reference_wave3d*.json`
-gegen `..._referee_wave3d*.json` (bzw. wave3c-Paare als Vorlage) --
-Log-Zeilen paarweise diffen, Erstabweichung lokalisieren, dann am Code
-verifizieren (Muster: par.8a-8c der Kapselungs-Prereg, jede Runde hat
-eine reale Bug-Klasse isoliert: RNG-Vorbelastung -> verdeckte Ordnung
--> Stufen-Seed). Ergebnis als par.8d registrieren (Kopf + Index,
-CLAUDE.md-Regel). STOPP-DisziPLIN beibehalten: lokalisieren,
-registrieren, EIN eng umrissener Fix je Runde.
+**WAVE3D-AUSGANG IST FESTGESTELLT UND ALS par.8d REGISTRIERT** (noch
+in dieser Sitzung): Fix korrekt, Kernbeweis weiter rot, strukturelle
+Wurzel isoliert -- der STAPEL-Zweig der Kuppelwahl (vier Aktionstypen,
+moves.rs:105-127) ist im Worker-Protokoll nicht modelliert. **Erster
+Schritt der naechsten Sitzung: der par.8d-Zuschnitt** -- atomare
+Kompression aufgeben, Protokoll echt per-Entscheidung (inkl. Peek-
+Kette), pending-Kuppel-Zwischenzustand additiv ins exact-JSON,
+rot_seed entfaellt wieder; Kernbeweis-Wiederholung als Abnahme.
+STOPP-Disziplin beibehalten (par.8a-8d: vier Runden, vier real
+isolierte Ursachen).
 
 **DANACH DIE EINGETAKTETE PIPELINE (Nutzer-Freigaben liegen ALLE vor,
 nichts mehr rueckfragen):**
