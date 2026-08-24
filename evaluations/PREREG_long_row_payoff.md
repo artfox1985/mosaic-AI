@@ -468,11 +468,40 @@ par.2a Stufe 3: 100.864 Gelegenheits-Entscheidungen).
    systematischer Versatz auf der Blattwertskala entsteht. Die reine
    Eigenseiten-Form waere semantisch naeher am Ziel ("baue DEIN Brett"),
    erzeugt aber einen Offset. Vor dem Bau zu entscheiden, nicht im Bau.
-2. **`SCALE` des Terms.** Vorschlag: Analogie zu `FLOOR_SHAPING_SCALE`
-   (50,0). Da der Zaehler hier nur 0-2 laeuft statt einer Punktsumme, ist
-   die Analogie NICHT selbstverstaendlich -- die Groessenordnung des
-   resultierenden Blattwert-Shifts ist vor dem Bau auszurechnen und mit
-   dem Floor-Term zu vergleichen, nicht zu uebernehmen.
+2. **`SCALE` des Terms -- AUSGERECHNET 2026-08-24, nicht mehr offen in der
+   Groessenordnung.** Die naheliegende Analogie zu `FLOOR_SHAPING_SCALE`
+   (50,0) ist zu verwerfen, und zwar aus einem Grund, der beim Nachrechnen
+   des Floor-Terms selbst aufgefallen ist (eigene Prereg:
+   `PREREG_floor_shaping_scale.md`).
+
+   Der Floor-Term nutzt Nenner 50 fuer einen Zaehler, der nur ueber
+   [−10, +10] laeuft. Sein maximales `tanh`-Argument ist damit 0,2, die
+   `tanh` weicht dort um **1,3 %** von der Geraden ab -- **sie ist
+   dekorativ, der Term ist faktisch linear.** Maximaler Blattwert-Shift:
+   **0,059** auf der [0,1]-Skala.
+
+   Fuer B1 laeuft der Zaehler nur ueber **0 bis 2** (Anzahl gestarteter
+   langer Reihen, Differenzform also [−2, +2]). Mit Nenner 50:
+
+   | | max. Argument | max. Shift bei `W = 0,3` |
+   |---|---|---|
+   | Floor-Term (Bestand) | 0,200 | 0,059 |
+   | **B1 mit `SCALE = 50`** | **0,040** | **0,012** |
+
+   Also **fuenfmal schwaecher als der Floor-Term**, und noch tiefer im
+   linearen Zipfel. Das ist mit hoher Wahrscheinlichkeit zu wenig, um eine
+   Rangfolge zu kippen.
+
+   **Was daraus folgt, ist aber KEINE fertige Zahl.** Der Floor-Praezedenzfall
+   zeigt, dass ein Term dieser Groessenordnung reichen KANN, wenn er nur
+   Vorzeichen setzt (11,25 pp aus einem Shift von maximal 0,059, und der
+   W-Sweep war zweimal H0 -- die Groesse traegt dort nachweislich nicht).
+   Ob B1 einen groesseren Shift braucht oder ebenfalls nur ein Vorzeichen,
+   ist offen. Vorschlag zur Entscheidung: `SCALE` so waehlen, dass der
+   maximale Shift dem Floor-Term entspricht (also `SCALE ≈ 10` bei
+   `W = 0,3`, macht max. Argument 0,2 und Shift 0,059) -- gleiche
+   Groessenordnung wie der einzige Term, der in diesem Projekt
+   nachweislich wirkt. Zu bestaetigen, nicht gesetzt.
 3. **Reihenfolge gegenueber den anderen offenen Straengen** (R5-Teil-B,
    Seeding-Dosis, UVFA, sigma-Kopf-Ziel aus
    `PREREG_saturating_score_utility.md` par.3a) -- alle weiterhin
