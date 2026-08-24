@@ -1369,7 +1369,40 @@ const ZEILEN_ZIEL_MAX: usize = 2;
 pub(crate) fn v2_ziel_zellen(state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
     let player = &state.players[pi];
     let spalten: Vec<_> = (0..6).map(zellen_spalte).collect();
-    let s = ziel_zellen_generisch(state, pi, &spalten)?;
+
+    // Ab Runde 3 die Spalte FESTNAGELN, in die schon investiert wurde.
+    //
+    // Befund 2026-08-24: 47,5 Prozent der Partien enden bei 5 von 6, und rund
+    // 30 der 38 Beinahe-Treffer sind Routing-Fehler -- Rasterzeile 6 wurde
+    // abgeschlossen (nur 10 Prozent der Partien haben gar keinen
+    // R6-Abschluss), der Stein landete nur in einer anderen Spalte. Ursache
+    // ist der frische Neuentscheid bei JEDEM Aufruf: wechselt das Ziel
+    // zwischen dem Fuettern der Musterreihe und ihrem Tiling, ist die
+    // Investition verstreut.
+    //
+    // Umgesetzt OHNE gespeicherten Zustand: "die Spalte mit dem hoechsten
+    // Fuellstand" ist von sich aus stabil, weil sie ihren Vorsprung behaelt.
+    // Damit entfaellt das Leck-Risiko, vor dem `column_build.rs` bei einer
+    // persistenten Zielspalte ausdruecklich warnt (eine fruehere Fassung dort
+    // wurde nach vier Messungen verworfen, weil die Bindung der Kostenformel
+    // die Reaktionsfaehigkeit nahm). Gleichstand faellt weiter an die
+    // Kostenformel, und in Runde 1-2 entscheidet sie allein -- da gibt es
+    // noch nichts zu halten.
+    let s = if state.round_number >= 3 {
+        let fuellung = spalten_fuellung_lokal(player);
+        let max = fuellung.iter().copied().max().unwrap_or(0);
+        if max > 0 {
+            let fuehrende: Vec<_> = (0..6)
+                .filter(|&c| fuellung[c] == max)
+                .map(zellen_spalte)
+                .collect();
+            ziel_zellen_generisch(state, pi, &fuehrende)?
+        } else {
+            ziel_zellen_generisch(state, pi, &spalten)?
+        }
+    } else {
+        ziel_zellen_generisch(state, pi, &spalten)?
+    };
 
     // Zeilen NUR aus den obersten ZWEI Rasterzeilen und nur, wo ein
     // Spezialfeld sie ueberhaupt vollendbar macht (s. Doku unten).
@@ -1462,4 +1495,22 @@ pub(crate) fn v2_drafting_vorzug(state: &GameState) -> Option<Action> {
 pub(crate) fn v2_tiling_vorzug(state: &GameState, pi: usize) -> Option<TilingStep> {
     let z = v2_ziel_zellen(state, pi)?;
     tiling_vorzug_fuer_zellen(state, pi, &z)
+}
+
+/// Fuellstand je Brett-Spalte. Lokale Kopie der Abbildung aus
+/// `heuristic_v2::spalten_fuellung` (Slot `(tr,tc)`, Space `si` -> Spalte
+/// `2*tc + si%2`), damit dieses Modul nicht auf ein anderes zugreifen muss.
+fn spalten_fuellung_lokal(player: &PlayerBoard) -> [u32; 6] {
+    let mut fill = [0u32; 6];
+    for reihe in player.dome_grid.dome_slots.iter() {
+        for (tc, slot) in reihe.iter().enumerate() {
+            let Some(slot) = slot else { continue };
+            for (si, sp) in slot.spaces.iter().enumerate() {
+                if sp.is_filled() {
+                    fill[2 * tc + si % 2] += 1;
+                }
+            }
+        }
+    }
+    fill
 }
