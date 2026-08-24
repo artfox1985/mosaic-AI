@@ -1,0 +1,39 @@
+{
+  "n_dateien_gesamt_korpus": 2945,
+  "n_dateien": 248,
+  "n_datensaetze_gesamt": 404360,
+  "n_mit_score_winner": 404360,
+  "n_mit_round_transition_value": 0,
+  "n_mit_bootstrap_value": 336643,
+  "anteil_breite_bins_gepoolt": 0.0534,
+  "verdikt": "WIDERLEGT (< 10 %) -- Zuschnitt endet, kein Training",
+  "je_runde": {
+    "1": {
+      "n": 80507,
+      "anteil_breit": 0.0012
+    },
+    "2": {
+      "n": 83069,
+      "anteil_breit": 0.0136
+    },
+    "3": {
+      "n": 86731,
+      "anteil_breit": 0.0834
+    },
+    "4": {
+      "n": 86336,
+      "anteil_breit": 0.1225
+    },
+    "5": {
+      "n": 67717,
+      "anteil_breit": 0.0379
+    }
+  },
+  "meta": {
+    "frage": "Anteil der Datenmasse in Bins > 5 Punkte breit, auf dem TATSAECHLICH gebauten points_val (rtv-Override + TD-Bootstrap-Blend), nicht auf der Formel tanh(own/50).",
+    "schwellen": "< 10% widerlegt, 10-30% Grenzfall, > 30% plausibel (a priori gesetzt, PREREG_points_dist_bin_scale.md par.6)",
+    "bins": 51,
+    "value_scale": 50.0,
+    "td_lambda": 0.5
+  }
+}
