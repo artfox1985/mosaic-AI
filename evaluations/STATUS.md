@@ -87,6 +87,19 @@ Bestandstests plus `roundtrip_exact_many_real_games` (80 echte
 Partien). **Lehre fuer kuenftige Aequivalenz-Beweise: nie ueber die
 Serialisierung gegen sich selbst pruefen.**
 
+**FREIGABE-VERMERK (ersetzt das Signal an die Parallelsitzung):** die
+Sitzungen `mosaic-ai-f4` und `mosaic-ai-4c` hielten fuer diese Messung
+Betriebsruhe und warteten auf ein Fertig-Signal; beide waren beim
+Abschluss (~02:30) bereits beendet, das Signal konnte nicht mehr
+zugestellt werden. **Es gilt hiermit als erteilt: keine Datei ist mehr
+reserviert, kein Prozess laeuft, die Maschine ist frei.** Vormals
+gesperrt und jetzt committet: referee.rs, serialize.rs, lib.rs,
+self_play.rs, tools/frozen_*.py, models/frozen_champions/**,
+models/frozen_wheels/**, PREREG_agent_encapsulation.md. Auf main
+liegen 3 ungepushte Commits (Push bleibt Nutzer-Entscheid; der
+pre-push-Hook fuehrt `cargo test --release` aus und ist damit selbst
+Nebenlast).
+
 **QUARANTAENE AUFGEHOBEN:** der Referee-/Worker-Pfad traegt ab jetzt
 Messungen. Cross-Aera-Duelle gegen eingefrorene Champions sind
 erstmals sauber moeglich; Handshake und Golden-Selbsttest gaten sie.
