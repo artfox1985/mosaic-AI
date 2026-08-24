@@ -744,10 +744,18 @@ Spalte -- sie war der Bauschritt, der die Partien mit voller Spalte von 35 auf
 
 ### par.8.2 Was NICHT gebaut ist, und warum
 
-- **Prio 0 (Endspiel)** braucht keine Regel: das Spiel endet nach genau
-  5 Runden (`game.rs:687`, eine volle Reihe beendet es nicht), und Runde 5
-  laeuft bereits als exaktes Endspiel (`round5_anchor::applies`, in `mcts.rs`
-  kurzgeschlossen). Das Routing hoert nach Runde 4 auf und uebergibt.
+- **Prio 0 (Endspiel)**: der TRIGGER-Teil hat keinen Anknuepfungspunkt --
+  das Spiel endet nach genau 5 Runden (`game.rs:687`), eine volle Reihe
+  beendet es nicht. Der RECHEN-Teil ist teilweise gedeckt: der Heuristik-Pfad
+  schaltet in Runde 5 auf den EINGEFRORENEN Anker-Loeser um
+  (`round5_anchor::applies`, in `mcts.rs` kurzgeschlossen), ein
+  Expectiminimax mit Zufallsknoten ueber die verdeckten Bonuschips und
+  exaktem Blattwert. **Kein geloestes Endspiel:** Knotenbudget 200 reicht
+  fuer effektiv ~3 Halbzuege und trifft die Wahl eines tiefen Orakels in
+  81,4 Prozent der Faelle (`round5_anchor.rs:44-59`); die Runde ist zudem
+  nicht vollinformiert. Das Routing hoert nach Runde 4 auf und uebergibt
+  dorthin. Ob der exakte Blattwert den gelernten schlaegt, ist in
+  `PREREG_chance_nodes.md` Teil E ausdruecklich noch offen.
 - **Prio 1 (Strafleiste)** ist als `projected_unplaceable_penalty` bereits
   Summand der Bewertung. Neu ist nur die ROUTING-Seite: ein Vorzug, der die
   eigene Strafleiste ueber `-4` Punkte treibt, wird nicht mehr ausgesprochen
