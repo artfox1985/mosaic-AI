@@ -741,16 +741,23 @@ fn sun_color_counts(state: &GameState) -> [usize; 5] {
 /// Heuristik-Wahl der Startkuppel für Spieler `pi` (Farb-Häufigkeit + Eckbonus):
 /// liefert `(tile_id, slot_row, slot_col, rotation)`. `None`, wenn kein Display
 /// oder kein freier Slot. Gemeinsam genutzt von Self-Play und Arena.
-pub(crate) fn choose_start_placement(state: &GameState, pi: usize) -> Option<(usize, usize, usize, u32)> {
+/// Alle bewerteten Startkuppel-Kandidaten `(score, tile_id, slot_r, slot_c,
+/// rotation)` in fester Reihenfolge: Platte aussen, Slot in der Mitte,
+/// Rotation zuinnerst. Herausgezogen, damit die Varianten-Fassung unten
+/// dieselbe Bewertung benutzt statt sie nachzubilden.
+fn start_placement_kandidaten(
+    state: &GameState,
+    pi: usize,
+) -> Vec<(f64, usize, usize, usize, u32)> {
+    let mut out = Vec::new();
     if state.dome_display.is_empty() {
-        return None;
+        return out;
     }
     let empties = state.players[pi].dome_grid.empty_slots();
     if empties.is_empty() {
-        return None;
+        return out;
     }
     let counts = sun_color_counts(state);
-    let mut best: Option<(f64, usize, usize, usize, u32)> = None;
     for tile in &state.dome_display {
         for &(r, c) in &empties {
             let corner = if (r == 0 || r == 2) && (c == 0 || c == 2) { 0.5 } else { 0.0 };
@@ -771,13 +778,79 @@ pub(crate) fn choose_start_placement(state: &GameState, pi: usize) -> Option<(us
                         SpaceType::Special => 0.0,
                     };
                 }
-                if best.map_or(true, |(b, ..)| score > b) {
-                    best = Some((score, tile.tile_id, r, c, rot));
-                }
+                out.push((score, tile.tile_id, r, c, rot));
             }
         }
     }
+    out
+}
+
+pub(crate) fn choose_start_placement(state: &GameState, pi: usize) -> Option<(usize, usize, usize, u32)> {
+    // Strikt groesser und feste Reihenfolge -- bei Gleichstand gewinnt der
+    // ZUERST gepruefte Kandidat. Byte-identisch zum Bestand, das ist der
+    // Elo-Anker.
+    let mut best: Option<(f64, usize, usize, usize, u32)> = None;
+    for k in start_placement_kandidaten(state, pi) {
+        if best.map_or(true, |(b, ..)| k.0 > b) {
+            best = Some(k);
+        }
+    }
     best.map(|(_, t, r, c, rot)| (t, r, c, rot))
+}
+
+/// Wie [`choose_start_placement`], aber fuer `V2` mit gestreuter ECKE.
+///
+/// **Warum:** der Bestandspfad vergleicht mit striktem `>` in fester
+/// Reihenfolge, und der Eck-Bonus ist fuer alle vier Ecken derselbe `0.5` --
+/// Gleichstaende sind damit der Normalfall und werden systematisch nach oben
+/// links aufgeloest. Gemessen 2026-08-24: 28 von 35 vollen Spalten lagen
+/// links (S0 16, S1 12, S5 1). Fuer ein Lehr-Korpus ist das die falsche Art
+/// Determinismus; das Netz lernte "Spalten baut man links".
+///
+/// **Was gestreut wird:** die ECKE, per Partie-Seed. Innerhalb der gewaehlten
+/// Ecke entscheidet danach unveraendert die Bewertung ueber Platte und
+/// Rotation -- die Streuung wechselt also die Seite, nicht die Qualitaet der
+/// Wahl. Gibt es dort keinen Kandidaten, faellt sie auf den Bestandspfad
+/// zurueck.
+///
+/// **Anker unberuehrt:** `V1` delegiert byte-fuer-byte. Der Seed kommt als
+/// Parameter statt aus einer Thread-lokalen Zelle -- `choose_start_placement`
+/// ist geteilter Code, und ein prozess- oder threadweiter Zustand waere in
+/// einer Partie v1 GEGEN v2 genau die Fehlerquelle, vor der die Kampagne
+/// mehrfach stand.
+pub(crate) fn choose_start_placement_variante(
+    state: &GameState,
+    pi: usize,
+    variante: crate::mcts::HeuristikVariante,
+    game_seed: u64,
+) -> Option<(usize, usize, usize, u32)> {
+    if variante != crate::mcts::HeuristikVariante::V2 {
+        return choose_start_placement(state, pi);
+    }
+    let alle = start_placement_kandidaten(state, pi);
+    if alle.is_empty() {
+        return None;
+    }
+    // Seed je Partie UND Spieler -- sonst waehlen beide Seiten dieselbe Ecke
+    // und die Spiegelung faende wieder nicht statt.
+    const ECKEN: [(usize, usize); 4] = [(0, 0), (0, 2), (2, 0), (2, 2)];
+    let wahl = (game_seed
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        .wrapping_add(pi as u64 + 1)
+        >> 17) as usize
+        % ECKEN.len();
+    let (zr, zc) = ECKEN[wahl];
+    let beste_in_ecke = alle
+        .iter()
+        .filter(|k| k.2 == zr && k.3 == zc)
+        .fold(None::<&(f64, usize, usize, usize, u32)>, |acc, k| match acc {
+            Some(b) if b.0 >= k.0 => Some(b),
+            _ => Some(k),
+        });
+    match beste_in_ecke {
+        Some(&(_, t, r, c, rot)) => Some((t, r, c, rot)),
+        None => choose_start_placement(state, pi),
+    }
 }
 
 // ── Einzelschritte ────────────────────────────────────────────────────────────
@@ -2285,7 +2358,9 @@ fn play_arena_game<R: Rng + ?Sized>(
                     } else {
                         break;
                     };
-                    match choose_start_placement(&game.state, pi) {
+                    match choose_start_placement_variante(
+                        &game.state, pi, varianten[pi], game_seed,
+                    ) {
                         Some((tid, r, c2, rot)) => {
                             let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
                         }
