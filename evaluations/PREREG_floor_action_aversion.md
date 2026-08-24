@@ -21,6 +21,34 @@ Der Champion meidet die **Aktion** massiv und die **Konsequenz** gar nicht.
 Das ist die groesste Einzelbewegung, die in dieser Sondenfamilie je gemessen
 wurde.
 
+### Nachtrag 2026-08-24: Gegnerspezifitaets-Caveat geschlossen
+
+Der obige Vergleich lief ausschliesslich gegen die HEURISTIK. Seit dem
+Paritaets-Befund (`PREREG_completion_bottleneck_locus.md` par.1a) steht
+jede Heuristik-Messung unter Gegnerspezifitaets-Verdacht -- nachgezogen mit
+`penalty_track_probe.py` auf `imm_netvnet.json` + `..._swap.json` (dasselbe
+Netz beidseitig, alpha=0,2 gegen den eingefrorenen Champion, 814 Partien
+gepoolt je Arm):
+
+| Quelle | abgeladene Steine je Partie |
+|---|---|
+| Champion gegen Heuristik (par.1, oben) | **2,88** |
+| Champion (alpha=0,2) netz-gegen-netz | 4,27 |
+| Champion (frozen) netz-gegen-netz | 4,05 |
+| Heuristik gegen Champion (par.1, oben) | **6,38** |
+
+**Die Aversion ist real und ueberlebt netz-gegen-netz, ist aber teilweise
+gegnerspezifisch in ihrer GROESSE.** Netz-gegen-netz liegt der Wert bei
+4,05-4,27 -- deutlich naeher an den 2,88 gegen die Heuristik als an deren
+6,38, aber klar darueber. Ein Teil der -3,50-Differenz aus par.1 ist also
+Aversion, ein anderer Teil ist Kontext (gegen einen schwaecheren Gegner
+laesst sich mehr "sparen"). Das AKTION-KONSEQUENZ-Missverhaeltnis, das
+diese Prereg begruendet, bleibt davon unberuehrt -- es ist eine Eigenschaft
+der Aktionskodierung (par.2), keine Eigenschaft des Gegners, und Tor par.6
+(gefahren auf netz-generierten Korpus-Stellungen, nicht gegen die
+Heuristik) zeigt dieselbe Extremitaet (Prior exakt 0 in 280/280 Stellungen)
+unabhaengig von dieser Frage.
+
 ## par.2 Warum das ueberhaupt eine Frage ist
 
 Beide Wege sind regelseitig **dieselbe Sache**. `docs/engine_manual.md`

@@ -162,8 +162,23 @@ def main():
         spec_b = str(d.get("spec_b") or "")
         assert d.get("model") == d.get("model_b"), (
             f"{fname}: model != model_b -- Annahme 'selbes Netz beidseitig' faellt")
-        lab_a = "alpha0.2" if "imm_a02" in spec_a else f"A:{spec_a}"
-        lab_b = "frozen" if "frozen" in spec_b else f"B:{spec_b}"
+
+        def spec_label(spec):
+            # KORREKTUR (beim Nachziehen fuer Schritt 7 gefunden): eine
+            # erste Fassung prüfte "imm_a02" NUR gegen spec_a und "frozen"
+            # NUR gegen spec_b -- in der Swap-Datei liegen spec_a/spec_b
+            # aber vertauscht (spec_a=champion_frozen, spec_b=champion_
+            # imm_a02), und beide Labels fielen dort auf den generischen
+            # "A:.../B:..."-Fallback zurueck. Jetzt POSITIONSUNABHAENGIG:
+            # jeder String wird gegen BEIDE Substrings geprueft.
+            if "imm_a02" in spec:
+                return "alpha0.2"
+            if "frozen" in spec:
+                return "frozen"
+            return f"unbekannt:{spec}"
+
+        lab_a = spec_label(spec_a)
+        lab_b = spec_label(spec_b)
         got = collect(p_nvn, None,
                       lambda n, a=lab_a, b=lab_b: a if n == "NetzA" else
                       (b if n == "NetzB" else None))

@@ -137,21 +137,142 @@
       }
     }
   },
-  "champion_selfplay_both_sides": {
-    "Champion": {
+  "netvnet": {
+    "frozen": {
       "n_partien": 407,
-      "strafpunkte_je_partie": 18.931,
+      "strafpunkte_je_partie": 18.668,
       "strafpunkte_median": 18,
-      "straf_ziele_je_partie": 2.843,
+      "straf_ziele_je_partie": 2.961,
       "straf_ziele_median": 3,
-      "straf_ziel_steine_je_partie": 3.88,
-      "straf_ziel_steine_median": 3,
-      "ueberlauf_steine_je_partie": 2.693,
+      "straf_ziel_steine_je_partie": 3.963,
+      "straf_ziel_steine_median": 4,
+      "ueberlauf_steine_je_partie": 2.57,
       "ueberlauf_steine_median": 2,
-      "strafrunden_je_partie": 4.172,
+      "strafrunden_je_partie": 4.206,
       "strafrunden_median": 4,
-      "draft_zuege_je_partie": 32.892,
+      "draft_zuege_je_partie": 32.924,
       "draft_zuege_median": 33
+    },
+    "alpha0.2": {
+      "n_partien": 407,
+      "strafpunkte_je_partie": 20.258,
+      "strafpunkte_median": 20,
+      "straf_ziele_je_partie": 2.998,
+      "straf_ziele_median": 3,
+      "straf_ziel_steine_je_partie": 4.226,
+      "straf_ziel_steine_median": 4,
+      "ueberlauf_steine_je_partie": 2.835,
+      "ueberlauf_steine_median": 3,
+      "strafrunden_je_partie": 4.238,
+      "strafrunden_median": 4,
+      "draft_zuege_je_partie": 33.064,
+      "draft_zuege_median": 33
+    },
+    "_gepaart_alpha0.2_minus_frozen": {
+      "strafpunkte": {
+        "n_paare": 407,
+        "mittel": 1.59,
+        "sd": 12.558,
+        "se": 0.623,
+        "t": 2.55
+      },
+      "straf_ziele": {
+        "n_paare": 407,
+        "mittel": 0.037,
+        "sd": 2.599,
+        "se": 0.129,
+        "t": 0.29
+      },
+      "straf_ziel_steine": {
+        "n_paare": 407,
+        "mittel": 0.263,
+        "sd": 4.225,
+        "se": 0.209,
+        "t": 1.26
+      },
+      "ueberlauf_steine": {
+        "n_paare": 407,
+        "mittel": 0.265,
+        "sd": 2.288,
+        "se": 0.113,
+        "t": 2.34
+      },
+      "strafrunden": {
+        "n_paare": 407,
+        "mittel": 0.032,
+        "sd": 1.297,
+        "se": 0.064,
+        "t": 0.5
+      }
+    }
+  },
+  "netvnet_swap": {
+    "alpha0.2": {
+      "n_partien": 407,
+      "strafpunkte_je_partie": 19.658,
+      "strafpunkte_median": 19,
+      "straf_ziele_je_partie": 2.99,
+      "straf_ziele_median": 3,
+      "straf_ziel_steine_je_partie": 4.307,
+      "straf_ziel_steine_median": 4,
+      "ueberlauf_steine_je_partie": 2.607,
+      "ueberlauf_steine_median": 2,
+      "strafrunden_je_partie": 4.189,
+      "strafrunden_median": 4,
+      "draft_zuege_je_partie": 32.87,
+      "draft_zuege_median": 33
+    },
+    "frozen": {
+      "n_partien": 407,
+      "strafpunkte_je_partie": 19.133,
+      "strafpunkte_median": 19,
+      "straf_ziele_je_partie": 2.941,
+      "straf_ziele_median": 3,
+      "straf_ziel_steine_je_partie": 4.138,
+      "straf_ziel_steine_median": 4,
+      "ueberlauf_steine_je_partie": 2.504,
+      "ueberlauf_steine_median": 2,
+      "strafrunden_je_partie": 4.204,
+      "strafrunden_median": 4,
+      "draft_zuege_je_partie": 33.037,
+      "draft_zuege_median": 33
+    },
+    "_gepaart_frozen_minus_alpha0.2": {
+      "strafpunkte": {
+        "n_paare": 407,
+        "mittel": -0.526,
+        "sd": 13.203,
+        "se": 0.654,
+        "t": -0.8
+      },
+      "straf_ziele": {
+        "n_paare": 407,
+        "mittel": -0.049,
+        "sd": 2.643,
+        "se": 0.131,
+        "t": -0.38
+      },
+      "straf_ziel_steine": {
+        "n_paare": 407,
+        "mittel": -0.17,
+        "sd": 4.6,
+        "se": 0.228,
+        "t": -0.74
+      },
+      "ueberlauf_steine": {
+        "n_paare": 407,
+        "mittel": -0.103,
+        "sd": 2.37,
+        "se": 0.117,
+        "t": -0.88
+      },
+      "strafrunden": {
+        "n_paare": 407,
+        "mittel": 0.015,
+        "sd": 1.324,
+        "se": 0.066,
+        "t": 0.22
+      }
     }
   },
   "_meta": {
