@@ -110,6 +110,11 @@ pub enum HeuristikVariante {
     /// Tiling-Vorzug -- ist identisch, damit der Vergleich genau die KARTE
     /// misst.
     V2Heatmap,
+    /// Wie [`HeuristikVariante::V2Heatmap`], aber die Karte traegt die
+    /// ERWARTETEN PUNKTE je Zelle: Plattenanteil PLUS Platzierungspunkte nach
+    /// Linienlaenge (`plate_builder::expected_points_map`, Nutzer-Praezisierung
+    /// 2026-08-25).
+    V2PointMap,
 }
 
 impl HeuristikVariante {
@@ -118,7 +123,10 @@ impl HeuristikVariante {
     pub fn is_v2(self) -> bool {
         matches!(
             self,
-            HeuristikVariante::V2 | HeuristikVariante::V2Huelle | HeuristikVariante::V2Heatmap
+            HeuristikVariante::V2
+                | HeuristikVariante::V2Huelle
+                | HeuristikVariante::V2Heatmap
+                | HeuristikVariante::V2PointMap
         )
     }
 }
@@ -139,7 +147,10 @@ pub(crate) fn player_total_variante(
         + crate::round_end::projected_unplaceable_penalty(&state.players[pi]) as f64;
     match variante {
         HeuristikVariante::V1 => basis,
-        HeuristikVariante::V2 | HeuristikVariante::V2Huelle | HeuristikVariante::V2Heatmap => {
+        HeuristikVariante::V2
+        | HeuristikVariante::V2Huelle
+        | HeuristikVariante::V2Heatmap
+        | HeuristikVariante::V2PointMap => {
             basis
                 + crate::heuristic_v2::row_completion_progress(
                     &state.players[pi],

@@ -958,6 +958,37 @@ fn envelope_drafting_preference(
 /// gegen Spielende faellt die Karte von selbst zusammen, weil die Farben
 /// ausgehen.
 fn points_heatmap(state: &GameState, pi: usize) -> Zielkarte {
+    points_map(state, pi, false)
+}
+
+/// Karte der ERWARTETEN PUNKTE je Zelle (Nutzer-Praezisierung 2026-08-25:
+/// "nicht fuer die wertungsplatten allein ... sondern fuer die erwarteten
+/// endpunkte wenn auf dieses feld gelegt wird").
+///
+/// Wie [`points_heatmap`], PLUS die Platzierungspunkte nach Linienlaenge
+/// (`round_end::score_placed_tile`, horizontal und vertikal getrennt gezaehlt)
+/// -- also die Rundenpunkte, die der Zug sofort bringt, zusammen mit dem
+/// Plattenanteil die erwarteten Endpunkte dieser Zelle.
+///
+/// **Warum das eine ANDERE Karte ist und nicht nur ein Summand mehr:**
+/// `points_heatmap` ist additiv ueber Wertungsplatten und war damit
+/// konstruktionsbedingt ein Breiten-Signal (par.9.1 gemessen: Teilspalten
+/// >= 3 steigen, volle Spalten fallen). Linienpunkte sind SUPERADDITIV -- die
+/// Zelle neben einer langen Linie zahlt mehr als dieselbe Zelle im Freien.
+/// Genau das ist ein Fokus-Signal, also die Groesse, deren Fehlen den ersten
+/// Versuch hat scheitern lassen.
+///
+/// **Bekanntes Gegenargument, ausdruecklich in Kauf genommen:** die
+/// Linienpunkte sind das Kriterium, das `best_first_step_inner` ohnehin
+/// maximiert (`tiling_solver.rs:49-56`), und ihre Alleinherrschaft war der
+/// Anlass fuer v2. Hier stehen sie aber NEBEN dem Plattenanteil und wirken auf
+/// die Zielzellen-Wahl, nicht auf die Schrittwahl -- ob das reicht, entscheidet
+/// die Messung und nicht dieses Argument.
+fn expected_points_map(state: &GameState, pi: usize) -> Zielkarte {
+    points_map(state, pi, true)
+}
+
+fn points_map(state: &GameState, pi: usize, mit_platzierung: bool) -> Zielkarte {
     let player = &state.players[pi];
     let ids = &state.scoring_tile_ids;
     let remaining = crate::provocation::remaining_colors(state);
@@ -1008,6 +1039,12 @@ fn points_heatmap(state: &GameState, pi: usize) -> Zielkarte {
                     }
                 }
             }
+            if mit_platzierung {
+                // Linienpunkte des gelegten Steins -- gezaehlt auf dem
+                // Probe-Brett, also NACH dem Legen, wie im echten Zug.
+                let si = 2 * (r % 2) + (c % 2);
+                bonus += crate::round_end::score_placed_tile(&probe, sr, sc, si).0 as f64;
+            }
             let wert = crate::scoring::scoring_progress(&probe, ids) - basis + bonus;
             if wert > 0.0 {
                 k[r][c] = wert;
@@ -1045,6 +1082,9 @@ fn v2_map_for(
         }
         crate::mcts::HeuristikVariante::V2Heatmap => {
             Some((points_heatmap(state, pi), legacy_cell_value))
+        }
+        crate::mcts::HeuristikVariante::V2PointMap => {
+            Some((expected_points_map(state, pi), legacy_cell_value))
         }
         _ => None,
     }
