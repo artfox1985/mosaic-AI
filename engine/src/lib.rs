@@ -960,8 +960,9 @@ fn net_search_state_json_trace(
 /// KERNBEWEIS-FIX FORK A (PREREG_agent_encapsulation.md par.8b, Nutzer-
 /// Entscheid 2026-08-23): `referee::choose_drafting_action_json`
 /// rekonstruiert den Zustand jetzt ueber `serialize::json_to_state_exact`
-/// -- `state_json` MUSS deshalb die vier `*_order_exact`-Felder tragen
-/// (`serialize::state_to_json_exact`/`RefereeGame::state_json`), harter
+/// -- `state_json` MUSS deshalb die fuenf `*_exact`-Felder tragen (vier
+/// Reihenfolgen PLUS `pending_dome_choice_exact`, par.8d,
+/// `serialize::state_to_json_exact`/`RefereeGame::state_json`), harter
 /// Fehler sonst. Ein `state_json` aus der ALTEN, einfachen `state_to_json`
 /// (z.B. ein historischer `frozen_eval_set.pkl`-Schnappschuss ohne diese
 /// Felder) wird deshalb NICHT mehr akzeptiert -- der fruehere, domain-
@@ -975,20 +976,18 @@ fn net_search_state_json_trace(
 /// `value`: roher Netz-Wert (Value-Kopf, EIN Forward-Pass auf dem
 /// VOR-Zug-Zustand) -- KEIN durchsuchtes Root-Q, rein informativ.
 ///
-/// `rot_seed` (KERNBEWEIS-FIX par.8c, PREREG_agent_encapsulation.md):
-/// eigener Seed fuer die Kuppel-Rotationsstufe (ChooseDomeSlot ->
-/// ChooseDomeRotation) -- additiv zur bestehenden Signatur, harter
-/// Parameter, kein Default-Fallback auf den alten Ein-Strom-Modus. Siehe
-/// `referee::choose_drafting_action_json`-Doku.
+/// PER-ENTSCHEIDUNG-Protokoll (par.8d, PREREG_agent_encapsulation.md): trifft
+/// GENAU EINE Drafting-Entscheidung je Aufruf -- kein `rot_seed`-Parameter
+/// mehr (par.8c-Fix entfaellt ersatzlos, siehe
+/// `referee::choose_drafting_action_json`-Doku).
 #[pyfunction]
-#[pyo3(signature = (state_json, model_path, sims, c_puct, seed, rot_seed, spec=None))]
+#[pyo3(signature = (state_json, model_path, sims, c_puct, seed, spec=None))]
 fn net_arena_choice_state_json(
     state_json: String,
     model_path: String,
     sims: u32,
     c_puct: f64,
     seed: u64,
-    rot_seed: u64,
     spec: Option<String>,
 ) -> PyResult<String> {
     // EINMALIGES Laden (kein Cache) -- fuer Stapelaufrufe (z.B. beim Bau von
@@ -1000,8 +999,7 @@ fn net_arena_choice_state_json(
     let net = crate::net::Net::load_auto(&model_path)
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
     let search_config = resolve_search_config(spec)?;
-    let action =
-        crate::referee::choose_drafting_action_json(&net, &search_config, &state_json, sims, c_puct, seed, rot_seed)?;
+    let action = crate::referee::choose_drafting_action_json(&net, &search_config, &state_json, sims, c_puct, seed)?;
     // `value` bewusst NICHT ueber einen zusaetzlichen `net.eval`-Aufruf: der
     // globale `features::state_to_features`-Helfer liefert IMMER das flache
     // 708er-Legacy-Layout (siehe `PyGame::features`-Dokumentation), waehrend

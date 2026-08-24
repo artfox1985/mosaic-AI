@@ -15,7 +15,7 @@ use serde_json::{json, Map, Value};
 use crate::board::{DomeGrid, PatternLine, PlayerBoard, DOME_TILES_PER_ROUND};
 use crate::dome::{BonusChip, DomeSpace, DomeTile, SpaceType};
 use crate::factory::{Factory, LargeFactory};
-use crate::moves::Action;
+use crate::moves::{Action, PendingDomeChoice};
 use crate::round_end::{
     can_complete_row_with_chips, generate_tiling_actions, get_pending_tiling_rows,
     row_has_open_matching_slot, TilingAction,
@@ -656,6 +656,9 @@ fn get_u64(v: &Value, key: &str) -> Result<u64, String> {
 fn get_i64(v: &Value, key: &str) -> Result<i64, String> {
     v.get(key).and_then(|x| x.as_i64()).ok_or_else(|| json_err(key))
 }
+fn get_i64_arr(v: &Value, key: &str) -> Result<Vec<i64>, String> {
+    get_arr(v, key)?.iter().map(|x| x.as_i64().ok_or_else(|| json_err(key))).collect()
+}
 fn get_bool(v: &Value, key: &str) -> Result<bool, String> {
     v.get(key).and_then(|x| x.as_bool()).ok_or_else(|| json_err(key))
 }
@@ -1022,14 +1025,29 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
 // UNANGETASTET (Basislinien-Schutz, Präzedenz `self_play::seed_state_fixup`)
 // -- `json_to_state_exact` ruft sie nur auf und überschreibt danach gezielt
 // die vier Felder.
+//
+// par.8d-Ergaenzung (PREREG_agent_encapsulation.md, Koordinator-Zuschnitt
+// 2026-08-23): FUENFTES additives Feld `pending_dome_choice_exact` --
+// Rundtrip von `state.pending_dome_choice` (Kategorie 3 oben, vorher
+// dokumentierte Naeherung "Stufe 1 wieder offen"). Noetig, weil die neue
+// PER-ENTSCHEIDUNG-Protokollform (Worker fragt fuer JEDE Drafting-
+// Entscheidung einzeln, `referee.rs::choose_drafting_action_json` presst
+// die Kuppel-Rotationsstufe nicht mehr atomar in dieselbe Antwort) jetzt
+// tatsaechlich einen ZWISCHENZUSTAND ueber die JSON-Grenze traegt (Stufe-1-
+// Wahl bereits angewandt, Stufe-2-Rotationswahl steht noch aus) -- die alte
+// Naeherung wuerde hier die Root-Kandidatenliste faelschlich wieder auf die
+// VOLLEN Drafting-Optionen aufweiten statt nur auf die Rotationswahl.
+// PFLICHTFELD wie die vier anderen (harter Fehler bei Fehlen), auch wenn der
+// Wert oft `null` ist (kein Zug gerade angefangen).
 
 /// Additive Variante von [`state_to_json`]: identischer Output PLUS vier
 /// zusätzliche Top-Level-Felder mit der EXAKTEN Reihenfolge der verdeckten
 /// Sammlungen (s.o. Modul-Kommentar für die Begründung, warum das
-/// verhaltensrelevant ist). NUR für `referee::RefereeGame::state_json`
-/// gedacht -- verdeckte Ordnung ist verstecktes Wissen und darf bestehende
-/// Konsumenten (Debug-UI/`PyGame::state_json`, Trainings-/Diagnose-Exporte)
-/// nie erreichen.
+/// verhaltensrelevant ist) PLUS `pending_dome_choice_exact` (par.8d, fünftes
+/// Feld -- Rundtrip des angefangenen Kuppel-/Stapel-Zugs). NUR für
+/// `referee::RefereeGame::state_json` gedacht -- verdeckte Ordnung ist
+/// verstecktes Wissen und darf bestehende Konsumenten (Debug-UI/
+/// `PyGame::state_json`, Trainings-/Diagnose-Exporte) nie erreichen.
 pub fn state_to_json_exact(state: &GameState, scoring_confirmed: bool) -> Value {
     let mut v = state_to_json(state, scoring_confirmed);
     let obj = v.as_object_mut().expect("state_to_json liefert immer ein JSON-Objekt");
@@ -1049,7 +1067,138 @@ pub fn state_to_json_exact(state: &GameState, scoring_confirmed: bool) -> Value 
         "bonus_chip_pool_order_exact".to_string(),
         json!(state.bonus_chip_pool.iter().map(|c| c.chip_id).collect::<Vec<_>>()),
     );
+    obj.insert("pending_dome_choice_exact".to_string(), pending_dome_choice_to_json(&state.pending_dome_choice));
+    // par.8e-Folge (Koordinator-Auftrag 2026-08-24, "Luecke im Pruefverfahren"):
+    // ZWEI weitere additive Pflichtfelder, empirisch per erschoepfendem
+    // Strukturvergleich (state vs rebuilt, nicht nur JSON vs JSON) gefunden --
+    // beide waren im alten JSON-vs-JSON-Vergleich unsichtbar (s.o.
+    // `json_to_state_exact_tests::diff_game_states`-Doku-Block).
+    //
+    // `log_exact`: `state_to_json`s "log"-Feld ist UI-gefenstert (nur die
+    // letzten 30 NICHT-Maschinenzeilen, s.o. `log_sichtbar`) -- der volle,
+    // ungefensterte `state.log` (bereits als `RefereeGame::full_log()`
+    // separat exponiert) geht sonst beim Rueckweg komplett verloren.
+    obj.insert("log_exact".to_string(), json!(state.log));
+    // `first_player_next_round_exact`: NICHT etwa ein fehlendes Feld --
+    // `state_to_json` schreibt `state.first_player_next_round` bereits
+    // woertlich unter dem Schluessel "first_player_next_round" (s.o.). Der
+    // Fehler sitzt auf der LESE-Seite: `json_to_state` IGNORIERT diesen
+    // Schluessel und LEITET das Feld stattdessen aus
+    // `players[].holds_first_player_marker` ab (mit Rueckfall auf
+    // `current_player`, falls aktuell niemand die Marke haelt) --
+    // `diff_allowing_known_gaps` dokumentiert selbst, dass das "nur
+    // NAEHERUNGSWEISE, nicht exakt" ist. Sobald zu Rundenbeginn niemand die
+    // Marke haelt (Regelfall, siehe Test `roundtrip_exact_random_walk_multi_round`,
+    // weicht bereits ab Schritt 2 ab), liefert die Ableitung den FALSCHEN
+    // Spieler, sobald `current_player` seit der letzten Markennahme
+    // gewechselt hat. Redundanter, aber klarster Fix: den bereits im JSON
+    // vorhandenen Wert unter einem eigenen exact-Schluessel spiegeln, damit
+    // der exact-Pfad ihn woertlich lesen kann, ohne `json_to_state` selbst
+    // anzutasten (Basislinien-Schutz).
+    obj.insert("first_player_next_round_exact".to_string(), json!(state.first_player_next_round));
+    // Vier weitere PlayerBoard-Felder, ebenfalls per erschoepfendem
+    // Strukturvergleich empirisch gefunden (Schritt 29 des Random-Walk-Tests,
+    // sobald Runde 2 erreicht ist und die erste Tiling-Phase durchlaufen
+    // wurde): `json_to_state`s Basisrekonstruktion setzt sie IMMER auf einen
+    // Default (`score`/`-1`/`0`/`[]`), unabhaengig vom echten Wert --
+    // `total_floor_penalties`/`floor_penalties_per_round` werden von
+    // `state_to_json` ueberhaupt nicht ausgegeben (reine Post-hoc-Statistik,
+    // s.o. Doku-Kommentar bei `json_to_state`), `score_unclamped` und
+    // `tiled_max_row` nur indirekt/gefenstert (`score` bzw. der
+    // `can_place_dome`-Vetter existiert dafuer gar nicht -- `tiled_max_row`
+    // ist laut alter Doku "fuer Phase::Drafting per Konstruktion -1", was
+    // die urspruengliche Analyse als geprueft auswies, aber tatsaechlich nur
+    // fuer den FRISCH aus Tiling->Drafting uebergegangenen Fall stimmt, nicht
+    // fuer einen STEHENGEBLIEBENEN Wert aus einer bereits abgeschlossenen
+    // Tiling-Phase derselben Session -- s.o. json_to_state-Doku Kategorie 3,
+    // dort schon als schmale Ausnahme dokumentiert, hier jetzt geschlossen).
+    obj.insert(
+        "score_unclamped_exact".to_string(),
+        json!(state.players.iter().map(|p| p.score_unclamped).collect::<Vec<_>>()),
+    );
+    obj.insert(
+        "total_floor_penalties_exact".to_string(),
+        json!(state.players.iter().map(|p| p.total_floor_penalties).collect::<Vec<_>>()),
+    );
+    obj.insert(
+        "floor_penalties_per_round_exact".to_string(),
+        json!(state.players.iter().map(|p| p.floor_penalties_per_round.clone()).collect::<Vec<_>>()),
+    );
+    obj.insert(
+        "tiled_max_row_exact".to_string(),
+        json!(state.players.iter().map(|p| p.tiled_max_row).collect::<Vec<_>>()),
+    );
+    // `dome_tiles_placed_this_round_exact`: ERSETZT die bisherige
+    // "0 oder DOME_TILES_PER_ROUND aus dem can_place_dome-Bool"-Naeherung
+    // (Kategorie 3, `player_from_json` unten) UND den `seed_state_fixup`-
+    // Behelf (par.8d-Kommentar), der nur den EINEN Unterfall reparierte, in
+    // dem die Naeherung zu KLEIN war (0 statt 1 bei bereits angefangenem
+    // Kuppelzug). Empirisch (erschoepfender Strukturvergleich,
+    // `roundtrip_exact_many_real_games`, seed=1 Schritt 115) gefunden: in
+    // Runde 5 ist `can_place_dome_tile()` IMMER false (reiner
+    // Runden-Gate, s.o. board.rs), unabhaengig vom echten Platzierungsstand
+    // -- die Naeherung liefert dort IMMER `DOME_TILES_PER_ROUND` (2), auch
+    // wenn der echte Wert (nach dem Rundenwechsel-Reset) 0 ist, und
+    // `seed_state_fixup`s Bedingung (`if ...==0`) greift hier NICHT (der
+    // Basiswert ist ja bereits 2, nicht 0) -- also zu GROSS statt zu klein,
+    // der bisherige Fixup deckte nur die Gegenrichtung ab. Direkt den echten
+    // Wert zu tragen macht beide Behelfe ueberfluessig.
+    obj.insert(
+        "dome_tiles_placed_this_round_exact".to_string(),
+        json!(state.players.iter().map(|p| p.dome_tiles_placed_this_round).collect::<Vec<_>>()),
+    );
     v
+}
+
+/// `state.pending_dome_choice` -> JSON (par.8d, fünftes exact-Feld). `null`
+/// bei `None`, sonst ein Objekt mit `kind` ("from_display"/"from_draw_stack")
+/// plus den jeweiligen `PendingDomeChoice`-Feldern (moves.rs).
+fn pending_dome_choice_to_json(choice: &Option<PendingDomeChoice>) -> Value {
+    match choice {
+        None => Value::Null,
+        Some(PendingDomeChoice::FromDisplay { dome_tile_id, slot_row, slot_col }) => json!({
+            "kind": "from_display",
+            "dome_tile_id": dome_tile_id,
+            "slot_row": slot_row,
+            "slot_col": slot_col,
+        }),
+        Some(PendingDomeChoice::FromDrawStack { chosen_id, slot_row, slot_col, return_order }) => json!({
+            "kind": "from_draw_stack",
+            "chosen_id": chosen_id,
+            "slot_row": slot_row,
+            "slot_col": slot_col,
+            "return_order": return_order,
+        }),
+    }
+}
+
+/// Umkehrung von [`pending_dome_choice_to_json`]. PFLICHTFELD-Aufrufer
+/// (`json_to_state_exact`) übergibt hier bereits das per `ok_or_else`
+/// erzwungene, vorhandene JSON-Value -- `null` ist ein gültiger WERT
+/// (kein angefangener Zug), nur das FEHLEN des Schlüssels selbst ist der
+/// harte Fehler (dort geprüft, nicht hier).
+fn pending_dome_choice_from_json(v: &Value) -> Result<Option<PendingDomeChoice>, String> {
+    if v.is_null() {
+        return Ok(None);
+    }
+    let kind = v
+        .get("kind")
+        .and_then(|x| x.as_str())
+        .ok_or_else(|| "json_to_state_exact: pending_dome_choice_exact.kind fehlt".to_string())?;
+    match kind {
+        "from_display" => Ok(Some(PendingDomeChoice::FromDisplay {
+            dome_tile_id: get_u64(v, "dome_tile_id")? as usize,
+            slot_row: get_u64(v, "slot_row")? as usize,
+            slot_col: get_u64(v, "slot_col")? as usize,
+        })),
+        "from_draw_stack" => Ok(Some(PendingDomeChoice::FromDrawStack {
+            chosen_id: get_u64(v, "chosen_id")? as usize,
+            slot_row: get_u64(v, "slot_row")? as usize,
+            slot_col: get_u64(v, "slot_col")? as usize,
+            return_order: get_usize_arr(v, "return_order")?,
+        })),
+        other => Err(format!("json_to_state_exact: unbekannter pending_dome_choice_exact.kind '{other}'")),
+    }
 }
 
 fn get_usize_arr(v: &Value, key: &str) -> Result<Vec<usize>, String> {
@@ -1060,14 +1209,16 @@ fn get_usize_arr(v: &Value, key: &str) -> Result<Vec<usize>, String> {
 }
 
 /// Umkehrung von [`state_to_json_exact`]. Baut wie `json_to_state` einen
-/// `GameState`, überschreibt danach aber die vier verdeckten Sammlungen mit
-/// der exakt geordneten Fassung aus dem JSON -- PFLICHT, harter Fehler bei
-/// Fehlen (kein stiller Rückfall auf die Zähler-Rekonstruktion, Bau-Vorgabe
-/// par.8b). Der intern erzeugte RNG treibt in `json_to_state` nur noch die
-/// gleich darauf überschriebene Erstmischung -- jeder deterministische RNG
-/// reicht dafür, ein fester Seed genügt (der frühere, domain-getrennte
-/// Rekonstruktions-RNG aus par.8a/referee.rs, `RECON_DISTINGUISHER`, entfällt
-/// dadurch ersatzlos -- weniger bewegliche Teile, siehe referee.rs).
+/// `GameState`, überschreibt danach aber die vier verdeckten Sammlungen UND
+/// `pending_dome_choice` (par.8d, fünftes Feld) mit der exakten Fassung aus
+/// dem JSON -- alle fünf PFLICHT, harter Fehler bei Fehlen (kein stiller
+/// Rückfall auf die Zähler-Rekonstruktion bzw. auf "kein Zug angefangen",
+/// Bau-Vorgabe par.8b/par.8d). Der intern erzeugte RNG treibt in
+/// `json_to_state` nur noch die gleich darauf überschriebene Erstmischung --
+/// jeder deterministische RNG reicht dafür, ein fester Seed genügt (der
+/// frühere, domain-getrennte Rekonstruktions-RNG aus par.8a/referee.rs,
+/// `RECON_DISTINGUISHER`, entfällt dadurch ersatzlos -- weniger bewegliche
+/// Teile, siehe referee.rs).
 pub fn json_to_state_exact(v: &Value) -> Result<GameState, String> {
     let mut discard_rng = rand::rngs::StdRng::seed_from_u64(0);
     let mut state = json_to_state(v, &mut discard_rng)?;
@@ -1121,6 +1272,78 @@ pub fn json_to_state_exact(v: &Value) -> Result<GameState, String> {
         ));
     }
 
+    // par.8d: fünftes Pflichtfeld -- Schlüssel MUSS vorhanden sein (auch wenn
+    // sein WERT `null` ist, s.o. `pending_dome_choice_from_json`-Doku).
+    let pending_choice_json =
+        v.get("pending_dome_choice_exact").ok_or_else(|| json_err("pending_dome_choice_exact"))?;
+    state.pending_dome_choice = pending_dome_choice_from_json(pending_choice_json)?;
+
+    // par.8e-Folge: sechstes/siebtes Pflichtfeld (s.o. `state_to_json_exact`-
+    // Doku) -- `log` woertlich statt UI-gefenstert, `first_player_next_round`
+    // woertlich statt (nur naeherungsweise) aus den Marker-Flags abgeleitet.
+    let log_exact: Vec<String> = get_arr(v, "log_exact")?
+        .iter()
+        .map(|s| s.as_str().map(|x| x.to_string()).ok_or_else(|| "json_to_state_exact: log_exact-Eintrag kein String".to_string()))
+        .collect::<Result<_, _>>()?;
+    state.log = log_exact;
+    state.first_player_next_round = get_u64(v, "first_player_next_round_exact")? as usize;
+
+    // Vier weitere Pflichtfelder je Spieler (s.o. `state_to_json_exact`-Doku).
+    let score_unclamped_exact = get_i64_arr(v, "score_unclamped_exact")?;
+    let total_floor_penalties_exact = get_i64_arr(v, "total_floor_penalties_exact")?;
+    let tiled_max_row_exact = get_i64_arr(v, "tiled_max_row_exact")?;
+    let floor_penalties_per_round_exact: Vec<Vec<i32>> = get_arr(v, "floor_penalties_per_round_exact")?
+        .iter()
+        .map(|row| {
+            row.as_array()
+                .ok_or_else(|| "json_to_state_exact: floor_penalties_per_round_exact-Eintrag ist kein Array".to_string())?
+                .iter()
+                .map(|x| x.as_i64().map(|n| n as i32).ok_or_else(|| json_err("floor_penalties_per_round_exact")))
+                .collect::<Result<Vec<i32>, String>>()
+        })
+        .collect::<Result<_, _>>()?;
+    if score_unclamped_exact.len() != state.players.len()
+        || total_floor_penalties_exact.len() != state.players.len()
+        || tiled_max_row_exact.len() != state.players.len()
+        || floor_penalties_per_round_exact.len() != state.players.len()
+    {
+        return Err(format!(
+            "json_to_state_exact: Spieler-exact-Felder haben {}/{}/{}/{} Eintraege, erwartet {} (players.len)",
+            score_unclamped_exact.len(),
+            total_floor_penalties_exact.len(),
+            tiled_max_row_exact.len(),
+            floor_penalties_per_round_exact.len(),
+            state.players.len()
+        ));
+    }
+    let dome_tiles_placed_this_round_exact = get_i64_arr(v, "dome_tiles_placed_this_round_exact")?;
+    if dome_tiles_placed_this_round_exact.len() != state.players.len() {
+        return Err(format!(
+            "json_to_state_exact: dome_tiles_placed_this_round_exact hat {} Eintraege, erwartet {} (players.len)",
+            dome_tiles_placed_this_round_exact.len(),
+            state.players.len()
+        ));
+    }
+    for (i, p) in state.players.iter_mut().enumerate() {
+        p.score_unclamped = score_unclamped_exact[i] as i32;
+        p.total_floor_penalties = total_floor_penalties_exact[i] as i32;
+        p.tiled_max_row = tiled_max_row_exact[i] as i32;
+        p.floor_penalties_per_round = floor_penalties_per_round_exact[i].clone();
+        p.dome_tiles_placed_this_round = dome_tiles_placed_this_round_exact[i] as u32;
+    }
+
+    // Kernbeweis-Diagnose (PREREG_agent_encapsulation.md par.8e-Folge,
+    // 2026-08-24): `seed_state_fixup` (self_play.rs, weiterhin fuer den
+    // SEEDING-Pfad dort in Gebrauch) reparierte nur EINE Richtung der
+    // `can_place_dome`-Bool-Naeherung (zu KLEIN bei bereits angefangenem
+    // Kuppelzug) -- die empirisch gefundene GEGENRICHTUNG (Runde 5: die
+    // Naeherung liefert IMMER `DOME_TILES_PER_ROUND`, auch wenn der echte
+    // Wert nach dem Rundenwechsel-Reset 0 ist, s.o. `state_to_json_exact`-
+    // Doku) blieb dadurch unentdeckt. `dome_tiles_placed_this_round_exact`
+    // oben ersetzt BEIDE Naeherungsrichtungen durch den woertlichen Wert --
+    // der Aufruf hier entfaellt ERSATZLOS (nicht mehr noetig, keine
+    // Naeherung mehr uebrig, die er reparieren muesste).
+
     Ok(state)
 }
 
@@ -1135,6 +1358,236 @@ mod json_to_state_exact_tests {
 
     fn names() -> [String; 2] {
         ["Alpha".into(), "Beta".into()]
+    }
+
+    /// Koordinator-Auftrag "warum faengt der alte Test die Verluste nicht":
+    /// der BISHERIGE `assert_roundtrip_exact` verglich fuer ALLES ausser den
+    /// vier Ordnungsfeldern nur JSON GEGEN JSON
+    /// (`state_to_json_exact(rebuilt)` gegen `state_to_json_exact(state)`,
+    /// ueber `diff_allowing_known_gaps`) -- NIE `state` direkt gegen
+    /// `rebuilt`. Zwei Luecken folgen zwingend aus diesem Aufbau: (1) jedes
+    /// `GameState`/`PlayerBoard`-Feld, das `state_to_json` gar nicht ausgibt
+    /// (`total_floor_penalties`, `floor_penalties_per_round`,
+    /// `start_dome_tile`, `tiling_done`, der UNGEFENSTERTE `log`), ist fuer
+    /// BEIDE Seiten des JSON-Vergleichs unsichtbar -- ein Verlust dort kann
+    /// dort PRINZIPIELL nie auffallen (der Vergleich ist mit sich selbst
+    /// blind, nicht nur zufaellig). (2) jedes Feld, das `state_to_json` nur
+    /// GROB/ABGELEITET ausgibt (`can_place_dome`-Bool statt der echten
+    /// `dome_tiles_placed_this_round`-Zahl), bleibt unsichtbar, solange der
+    /// grobe Wert zufaellig gleich bleibt. `diff_allowing_known_gaps`
+    /// ueberspringt `first_player_next_round` zudem EXPLIZIT -- im
+    /// dortigen Kommentar steht sogar schon, dass die Ableitung "nur
+    /// NAEHERUNGSWEISE, nicht exakt" ist, aber die Ausnahme deckt JEDE
+    /// Abweichung zu, nicht nur die dort ursprünglich gemeinten harmlosen.
+    ///
+    /// Fix: `diff_game_states` unten geht STATT dessen jedes Feld von
+    /// `GameState` und `PlayerBoard` einzeln durch, direkt auf den beiden
+    /// STRUCTS (nicht ueber eine erneute JSON-Serialisierung von `rebuilt`).
+    /// Kein Debug-String-Diff (bei unterschiedlicher `log`-Laenge waere eine
+    /// zeilenweise Diff falsch verschoben, siehe Roundtrip-Verlust unten).
+    /// `GameState`/`PlayerBoard`/`Factory`/`LargeFactory`/`Bag`/`Tower`
+    /// tragen im Bestand kein `PartialEq` -- hier bewusst NICHT nachgeruestet
+    /// (Struct-Aenderung ausserhalb des exact-Pfad-Scopes), stattdessen Feld
+    /// fuer Feld ueber die ohnehin vorhandenen `PartialEq`-Implementierungen
+    /// der Blattwerte (TileColor/DomeTile/PatternLine/DomeGrid/...).
+    fn diff_game_states(a: &GameState, b: &GameState, out: &mut Vec<String>) {
+        if a.bag.tiles != b.bag.tiles {
+            out.push(format!("bag.tiles: {:?} != {:?}", a.bag.tiles, b.bag.tiles));
+        }
+        if a.tower.tiles != b.tower.tiles {
+            out.push(format!("tower.tiles: {:?} != {:?}", a.tower.tiles, b.tower.tiles));
+        }
+        if a.factories.len() != b.factories.len() {
+            out.push(format!("factories.len: {} != {}", a.factories.len(), b.factories.len()));
+        } else {
+            for (i, (fa, fb)) in a.factories.iter().zip(&b.factories).enumerate() {
+                if fa.factory_id != fb.factory_id {
+                    out.push(format!("factories[{i}].factory_id: {} != {}", fa.factory_id, fb.factory_id));
+                }
+                if fa.sun_tiles != fb.sun_tiles {
+                    out.push(format!("factories[{i}].sun_tiles: {:?} != {:?}", fa.sun_tiles, fb.sun_tiles));
+                }
+                if fa.moon_stacks != fb.moon_stacks {
+                    out.push(format!("factories[{i}].moon_stacks: {:?} != {:?}", fa.moon_stacks, fb.moon_stacks));
+                }
+                if fa.bonus_chip != fb.bonus_chip {
+                    out.push(format!("factories[{i}].bonus_chip: {:?} != {:?}", fa.bonus_chip, fb.bonus_chip));
+                }
+                if fa.bonus_chip_revealed != fb.bonus_chip_revealed {
+                    out.push(format!(
+                        "factories[{i}].bonus_chip_revealed: {} != {}",
+                        fa.bonus_chip_revealed, fb.bonus_chip_revealed
+                    ));
+                }
+            }
+        }
+        {
+            let (fa, fb) = (&a.large_factory, &b.large_factory);
+            if fa.sun_tiles != fb.sun_tiles {
+                out.push(format!("large_factory.sun_tiles: {:?} != {:?}", fa.sun_tiles, fb.sun_tiles));
+            }
+            if fa.moon_pool != fb.moon_pool {
+                out.push(format!("large_factory.moon_pool: {:?} != {:?}", fa.moon_pool, fb.moon_pool));
+            }
+            if fa.has_first_player_marker != fb.has_first_player_marker {
+                out.push(format!(
+                    "large_factory.has_first_player_marker: {} != {}",
+                    fa.has_first_player_marker, fb.has_first_player_marker
+                ));
+            }
+            if fa.monochrome_fallback != fb.monochrome_fallback {
+                out.push(format!(
+                    "large_factory.monochrome_fallback: {} != {}",
+                    fa.monochrome_fallback, fb.monochrome_fallback
+                ));
+            }
+        }
+        if a.players.len() != b.players.len() {
+            out.push(format!("players.len: {} != {}", a.players.len(), b.players.len()));
+        } else {
+            for (i, (pa, pb)) in a.players.iter().zip(&b.players).enumerate() {
+                diff_player_board(i, pa, pb, out);
+            }
+        }
+        if a.dome_tile_pool != b.dome_tile_pool {
+            out.push(format!(
+                "dome_tile_pool: {:?} != {:?}",
+                a.dome_tile_pool.iter().map(|t| t.tile_id).collect::<Vec<_>>(),
+                b.dome_tile_pool.iter().map(|t| t.tile_id).collect::<Vec<_>>()
+            ));
+        }
+        if a.dome_display != b.dome_display {
+            out.push(format!(
+                "dome_display: {:?} != {:?}",
+                a.dome_display.iter().map(|t| t.tile_id).collect::<Vec<_>>(),
+                b.dome_display.iter().map(|t| t.tile_id).collect::<Vec<_>>()
+            ));
+        }
+        if a.bonus_chip_pool != b.bonus_chip_pool {
+            out.push(format!(
+                "bonus_chip_pool: {:?} != {:?}",
+                a.bonus_chip_pool.iter().map(|c| c.chip_id).collect::<Vec<_>>(),
+                b.bonus_chip_pool.iter().map(|c| c.chip_id).collect::<Vec<_>>()
+            ));
+        }
+        if a.pending_stack_draw != b.pending_stack_draw {
+            out.push(format!(
+                "pending_stack_draw: {:?} != {:?}",
+                a.pending_stack_draw.iter().map(|t| t.tile_id).collect::<Vec<_>>(),
+                b.pending_stack_draw.iter().map(|t| t.tile_id).collect::<Vec<_>>()
+            ));
+        }
+        if a.pending_dome_choice != b.pending_dome_choice {
+            out.push(format!(
+                "pending_dome_choice: {:?} != {:?}",
+                a.pending_dome_choice, b.pending_dome_choice
+            ));
+        }
+        if a.scoring_tile_ids != b.scoring_tile_ids {
+            out.push(format!("scoring_tile_ids: {:?} != {:?}", a.scoring_tile_ids, b.scoring_tile_ids));
+        }
+        if a.round_number != b.round_number {
+            out.push(format!("round_number: {} != {}", a.round_number, b.round_number));
+        }
+        if a.current_player != b.current_player {
+            out.push(format!("current_player: {} != {}", a.current_player, b.current_player));
+        }
+        if a.first_player_next_round != b.first_player_next_round {
+            out.push(format!(
+                "first_player_next_round: {} != {}",
+                a.first_player_next_round, b.first_player_next_round
+            ));
+        }
+        if a.phase != b.phase {
+            out.push(format!("phase: {:?} != {:?}", a.phase, b.phase));
+        }
+        if a.log != b.log {
+            out.push(format!(
+                "log: len {} != {} (a.first={:?} b.first={:?})",
+                a.log.len(),
+                b.log.len(),
+                a.log.first(),
+                b.log.first()
+            ));
+        }
+        if a.tiling_done != b.tiling_done {
+            out.push(format!("tiling_done: {:?} != {:?}", a.tiling_done, b.tiling_done));
+        }
+    }
+
+    fn diff_player_board(i: usize, a: &PlayerBoard, b: &PlayerBoard, out: &mut Vec<String>) {
+        if a.player_id != b.player_id {
+            out.push(format!("players[{i}].player_id: {} != {}", a.player_id, b.player_id));
+        }
+        if a.name != b.name {
+            out.push(format!("players[{i}].name: {:?} != {:?}", a.name, b.name));
+        }
+        if a.score != b.score {
+            out.push(format!("players[{i}].score: {} != {}", a.score, b.score));
+        }
+        if a.score_unclamped != b.score_unclamped {
+            out.push(format!("players[{i}].score_unclamped: {} != {}", a.score_unclamped, b.score_unclamped));
+        }
+        if a.pattern_lines != b.pattern_lines {
+            out.push(format!("players[{i}].pattern_lines: {:?} != {:?}", a.pattern_lines, b.pattern_lines));
+        }
+        if a.dome_grid != b.dome_grid {
+            out.push(format!("players[{i}].dome_grid differs"));
+        }
+        if a.broken_tiles != b.broken_tiles {
+            out.push(format!("players[{i}].broken_tiles: {:?} != {:?}", a.broken_tiles, b.broken_tiles));
+        }
+        if a.bonus_chips != b.bonus_chips {
+            out.push(format!("players[{i}].bonus_chips: {:?} != {:?}", a.bonus_chips, b.bonus_chips));
+        }
+        if a.dome_tiles_placed_this_round != b.dome_tiles_placed_this_round {
+            out.push(format!(
+                "players[{i}].dome_tiles_placed_this_round: {} != {}",
+                a.dome_tiles_placed_this_round, b.dome_tiles_placed_this_round
+            ));
+        }
+        if a.tiled_max_row != b.tiled_max_row {
+            out.push(format!("players[{i}].tiled_max_row: {} != {}", a.tiled_max_row, b.tiled_max_row));
+        }
+        if a.player_tokens_used != b.player_tokens_used {
+            out.push(format!(
+                "players[{i}].player_tokens_used: {} != {}",
+                a.player_tokens_used, b.player_tokens_used
+            ));
+        }
+        if a.holds_first_player_marker != b.holds_first_player_marker {
+            out.push(format!(
+                "players[{i}].holds_first_player_marker: {} != {}",
+                a.holds_first_player_marker, b.holds_first_player_marker
+            ));
+        }
+        if a.start_dome_tile != b.start_dome_tile {
+            out.push(format!("players[{i}].start_dome_tile differs"));
+        }
+        if a.start_tile_pending != b.start_tile_pending {
+            out.push(format!(
+                "players[{i}].start_tile_pending: {} != {}",
+                a.start_tile_pending, b.start_tile_pending
+            ));
+        }
+        if a.bonus_chips_used_this_round != b.bonus_chips_used_this_round {
+            out.push(format!(
+                "players[{i}].bonus_chips_used_this_round: {} != {}",
+                a.bonus_chips_used_this_round, b.bonus_chips_used_this_round
+            ));
+        }
+        if a.total_floor_penalties != b.total_floor_penalties {
+            out.push(format!(
+                "players[{i}].total_floor_penalties: {} != {}",
+                a.total_floor_penalties, b.total_floor_penalties
+            ));
+        }
+        if a.floor_penalties_per_round != b.floor_penalties_per_round {
+            out.push(format!(
+                "players[{i}].floor_penalties_per_round: {:?} != {:?}",
+                a.floor_penalties_per_round, b.floor_penalties_per_round
+            ));
+        }
     }
 
     /// Roundtrip-Kern (par.8b, Bau-Vorgabe 4a): state → json_exact →
@@ -1160,11 +1613,23 @@ mod json_to_state_exact_tests {
             "{label}: bonus_chip_pool-Reihenfolge weicht ab"
         );
 
+        // ERSCHOEPFENDER direkter Strukturvergleich state vs rebuilt (s.o.
+        // Doku-Block) -- das ist der eigentliche, neue Check dieses Auftrags.
+        let mut struct_mismatches = Vec::new();
+        diff_game_states(state, &rebuilt, &mut struct_mismatches);
+        assert!(
+            struct_mismatches.is_empty(),
+            "{label}: erschoepfender Strukturvergleich (state vs rebuilt) weicht ab:\n{}",
+            struct_mismatches.join("\n")
+        );
+
         // Der Rest des Zustands bleibt an dieselben, bereits per
         // json_to_state_tests::diff_allowing_known_gaps dokumentierten
         // Lücken gebunden (estimated_score bei nicht-leeren bonus_chips,
         // first_player_next_round) -- hier über den bestehenden Vergleicher
-        // der Schwesterngruppe geprüft.
+        // der Schwesterngruppe geprüft (redundant zum Strukturvergleich oben,
+        // aber bewusst stehen gelassen: prüft zusätzlich, dass eine erneute
+        // JSON-Serialisierung von `rebuilt` stabil bleibt).
         let json2 = state_to_json_exact(&rebuilt, true);
         let mut mismatches = Vec::new();
         json_to_state_tests::diff_allowing_known_gaps(&json1, &json2, "", &mut mismatches);
@@ -1231,6 +1696,168 @@ mod json_to_state_exact_tests {
         assert!(steps < MAX_STEPS, "random_walk: MAX_STEPS erreicht, vermutlich Endlos-Schleife");
         assert!(n_checked > 20, "erwartet viele geprüfte Drafting-Zustände, war {n_checked}");
         assert!(n_pending_checked > 0, "erwartet mind. 1 PendingDomeChoice-/Stapel-Zwischenzustand, war {n_pending_checked}");
+    }
+
+    /// Treibt eine Zufallspartie, bis `pending_dome_choice` genau die
+    /// gewünschte Variante trägt (`want_from_draw_stack`: false =
+    /// `FromDisplay`, true = `FromDrawStack`), dann `assert_roundtrip_exact`
+    /// GENAU an dieser Stelle -- gezielter Test statt Zufallstreffer wie bei
+    /// `roundtrip_exact_random_walk_multi_round` (par.8d, Bau-Vorgabe:
+    /// "mindestens ein Test für den exact-Rundtrip des pending-
+    /// Zwischenzustands").
+    fn drive_until_pending_variant(seed: u64, want_from_draw_stack: bool) -> Option<Game> {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut game = Game::start(names(), 0, crate::scoring::sample_valid_scoring_ids(3, &mut rng), &mut rng);
+        for pi in [1usize, 0usize] {
+            let (tile_id, r, c, rot) = crate::self_play::choose_start_placement(&game.state, pi).unwrap();
+            crate::game::apply_start_placement(&mut game.state, pi, tile_id, r, c, rot).unwrap();
+        }
+        let mut steps = 0u32;
+        while game.state.round_number < NUM_ROUNDS && steps < 4000 {
+            steps += 1;
+            match game.state.phase {
+                Phase::Drafting => {
+                    let matches_wanted = matches!(
+                        &game.state.pending_dome_choice,
+                        Some(crate::moves::PendingDomeChoice::FromDrawStack { .. }) if want_from_draw_stack
+                    ) || matches!(
+                        &game.state.pending_dome_choice,
+                        Some(crate::moves::PendingDomeChoice::FromDisplay { .. }) if !want_from_draw_stack
+                    );
+                    if matches_wanted {
+                        return Some(game);
+                    }
+                    let actions = drafting_actions(&game.state);
+                    if actions.is_empty() {
+                        return None;
+                    }
+                    let idx = rng.random_range(0..actions.len());
+                    if game.apply_drafting(&actions[idx]).is_err() {
+                        return None;
+                    }
+                }
+                Phase::Tiling => {
+                    for pi in 0..2 {
+                        loop {
+                            let acts = game.valid_tiling_actions(pi);
+                            let Some(a) = acts.first().copied() else { break };
+                            if game.apply_single_tiling(pi, &a).is_err() {
+                                return None;
+                            }
+                        }
+                        if game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut rng).is_err() {
+                            return None;
+                        }
+                    }
+                }
+                _ => return None,
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn roundtrip_exact_pending_dome_choice_from_display() {
+        let found = (1u64..60).find_map(|seed| drive_until_pending_variant(seed, false));
+        let game = found.expect("kein Seed unter 1..60 erreichte einen FromDisplay-Zwischenzustand");
+        assert!(matches!(
+            game.state.pending_dome_choice,
+            Some(crate::moves::PendingDomeChoice::FromDisplay { .. })
+        ));
+        assert_roundtrip_exact(&game.state, "pending_dome_choice = FromDisplay");
+    }
+
+    #[test]
+    fn roundtrip_exact_pending_dome_choice_from_draw_stack() {
+        let found = (1u64..60).find_map(|seed| drive_until_pending_variant(seed, true));
+        let game = found.expect("kein Seed unter 1..60 erreichte einen FromDrawStack-Zwischenzustand");
+        assert!(matches!(
+            game.state.pending_dome_choice,
+            Some(crate::moves::PendingDomeChoice::FromDrawStack { .. })
+        ));
+        assert_roundtrip_exact(&game.state, "pending_dome_choice = FromDrawStack");
+    }
+
+    /// Koordinator-Auftrag par.2: "baue einen ERSCHOEPFENDEN Roundtrip-Check
+    /// auf ECHTEN Partie-Zustaenden" -- nicht nur EIN Random-Walk-Seed
+    /// (`roundtrip_exact_random_walk_multi_round`), sondern viele echte,
+    /// bis zum Spielende (Runde 5, `Phase::End`/Endwertung) durchgespielte
+    /// Partien, JEDER Drafting-Entscheidungspunkt gegen `assert_roundtrip_exact`
+    /// geprueft -- deckt insbesondere die selteneren Randfaelle ab, die ein
+    /// einzelner Seed verfehlen kann (Bonuschips genommen -> `tiled_max_row`
+    /// stehengeblieben, Strafleiste bespielt -> `floor_penalties_*`,
+    /// monochromer Fallback der grossen Fabrik, Runde-5-Zustaende ohne
+    /// Kuppelzuege, Startspielerwechsel mitten in einer Runde).
+    #[test]
+    fn roundtrip_exact_many_real_games() {
+        let mut n_checked = 0usize;
+        let mut n_pending_checked = 0usize;
+        let mut n_reached_round5 = 0usize;
+        for seed in 1u64..=80 {
+            let mut rng = StdRng::seed_from_u64(seed.wrapping_mul(97).wrapping_add(1));
+            let first_player = (seed % 2) as usize;
+            let mut game =
+                Game::start(names(), first_player, crate::scoring::sample_valid_scoring_ids(3, &mut rng), &mut rng);
+            // Regelwerk: Nicht-Startspieler waehlt zuerst (siehe andere Tests
+            // in diesem Modul) -- hier variiert `first_player` mit dem Seed,
+            // also die Reihenfolge explizit danach ausrichten statt der
+            // festen `[1, 0]`-Reihenfolge der Schwester-Tests (dort immer
+            // first_player=0).
+            for pi in [1 - first_player, first_player] {
+                let (tile_id, r, c, rot) = crate::self_play::choose_start_placement(&game.state, pi).unwrap();
+                crate::game::apply_start_placement(&mut game.state, pi, tile_id, r, c, rot).unwrap();
+            }
+            let mut steps = 0u32;
+            const MAX_STEPS: u32 = 4000;
+            while game.state.round_number <= NUM_ROUNDS && steps < MAX_STEPS {
+                steps += 1;
+                match game.state.phase {
+                    Phase::Drafting => {
+                        let actions = drafting_actions(&game.state);
+                        if actions.is_empty() {
+                            break;
+                        }
+                        let is_pending = game.state.pending_dome_choice.is_some()
+                            || !game.state.pending_stack_draw.is_empty();
+                        assert_roundtrip_exact(&game.state, &format!("many_real_games seed={seed} Schritt {steps} (drafting)"));
+                        n_checked += 1;
+                        if is_pending {
+                            n_pending_checked += 1;
+                        }
+                        if game.state.round_number >= NUM_ROUNDS {
+                            n_reached_round5 += 1;
+                        }
+                        let idx = rng.random_range(0..actions.len());
+                        if game.apply_drafting(&actions[idx]).is_err() {
+                            break;
+                        }
+                    }
+                    Phase::Tiling => {
+                        for pi in 0..2 {
+                            loop {
+                                let acts = game.valid_tiling_actions(pi);
+                                let Some(a) = acts.first().copied() else { break };
+                                if game.apply_single_tiling(pi, &a).is_err() {
+                                    break;
+                                }
+                            }
+                            if game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut rng).is_err() {
+                                break;
+                            }
+                        }
+                    }
+                    Phase::End => {
+                        let _ = game.apply_end_scoring();
+                        break;
+                    }
+                    _ => break,
+                }
+            }
+            assert!(steps < MAX_STEPS, "many_real_games seed={seed}: MAX_STEPS erreicht, vermutlich Endlos-Schleife");
+        }
+        assert!(n_checked > 500, "erwartet viele geprüfte Drafting-Zustände über 40 Partien, war {n_checked}");
+        assert!(n_pending_checked > 10, "erwartet viele PendingDomeChoice-/Stapel-Zwischenzustände, war {n_pending_checked}");
+        assert!(n_reached_round5 > 5, "erwartet, dass mehrere der 40 Partien Runde 5 erreichen, war {n_reached_round5}");
     }
 }
 

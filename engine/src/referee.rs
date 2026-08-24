@@ -41,16 +41,39 @@ use crate::tile::TileColor;
 /// NUR fuer Drafting-Entscheidungen (harter Fehler sonst) -- Start-
 /// platzierung und Tiling loest der Referee-Prozess selbst auf.
 ///
-/// Kuppelplatzierung (Sonderfall, GEMESSEN im Kernbeweis-Vorlauf
-/// 2026-08-23): `pending_dome_choice` (Stufe-2-Rotationswahl) ist in
-/// `state_json` NICHT sichtbar (dokumentierte, vorbestehende Naeherung,
-/// `serialize.rs`-Kommentar "Kategorie 3"). Wird `ChooseDomeSlot` gewaehlt,
-/// wird die Rotationswahl HIER, noch im selben Aufruf, auf einer lokalen
-/// Kopie nachgezogen (derselbe fortlaufende `rng`-Strom) -- die Rueckgabe
-/// ist dann der nach aussen ATOMARE Zug (Tile+Slot+Rotation in einem Dict),
-/// exakt wie `PyGame::apply_dome`/server.py es dem Menschen gegenueber
-/// schon tun. `RefereeGame::drafting_apply_external` erkennt das additive
-/// `rotation`-Feld und wendet beide Stufen an.
+/// PER-ENTSCHEIDUNG-Protokoll (KERNBEWEIS-FIX par.8d, Koordinator-Zuschnitt
+/// 2026-08-23, loest die fruehere ATOMARE Kuppel-Sonderbehandlung ab): diese
+/// Funktion trifft GENAU EINE Drafting-Entscheidung -- was `drafting_actions`
+/// fuer den uebergebenen Zustand als Kandidaten liefert (Stein-Zug, Kuppel-
+/// Slot- ODER -Rotationswahl, Stapel-Peek, Stapel-Slot, Bonuschip, Pass),
+/// keine Sonderbehandlung nach Aktionstyp. Steckt der Zustand mitten in einem
+/// angefangenen Kuppel-/Stapel-Zug (`pending_dome_choice`/
+/// `pending_stack_draw`), grenzt `drafting_actions` die Kandidaten von selbst
+/// auf die Folgeschritte ein -- das setzt voraus, dass `state_json` diesen
+/// Zwischenzustand exakt traegt (`serialize::state_to_json_exact`s fuenftes
+/// Feld `pending_dome_choice_exact`, par.8d; `pending_stack_draw` war schon
+/// vorher Teil der Basis-Serialisierung). Der Aufrufer (`RefereeGame` ueber
+/// den Treiber in `tools/frozen_referee_match.py`) fragt deshalb fuer JEDEN
+/// einzelnen Schritt eines mehrstufigen Zugs erneut an, jeweils mit einem
+/// frischen `RefereeGame::pending_search_seed()` -- ein einziger, genereller
+/// Mechanismus statt getrennter Pfade je Aktionstyp. `rot_seed` (par.8c) und
+/// die atomare `rotation`-Anreicherung der Antwort (par.8a) entfallen damit
+/// ERSATZLOS, nicht nur ungenutzt: der ZWEITE Parameter existierte nur, weil
+/// die Rotationsstufe frueher IM SELBEN Aufruf mitentschieden wurde.
+///
+/// KERNBEWEIS-FIX FORK A (PREREG_agent_encapsulation.md par.8b,
+/// Nutzer-Entscheid 2026-08-23): `state_json` traegt additiv die EXAKTEN
+/// Reihenfolgen der verdeckten Sammlungen (Beutel/Turm/Kuppelstapel/
+/// Bonuschip-Pool, `serialize::state_to_json_exact`, erzeugt von
+/// `RefereeGame::state_json`). `json_to_state_exact` liest sie als
+/// PFLICHTFELDER (harter Fehler bei Fehlen, kein stiller Rueckfall auf
+/// Zaehler-Rekonstruktion). Der Such-RNG (`rng` unten) startet FRISCH aus
+/// `seed` -- `seed` ist hier bereits `derive_search_seed(game_seed, steps)`
+/// (siehe `RefereeGame::pending_search_seed`), also byte-identische
+/// Ableitung zum In-Process-Pfad (`RefereeGame::
+/// drafting_decide_and_apply_inprocess`, welcher `agent.decide()`
+/// ebenfalls je EINZELNER Entscheidung mit genau diesem Seed-Muster aufruft,
+/// `self_play.rs::unified_game_loop`).
 pub(crate) fn choose_drafting_action_json(
     net: &Net,
     search_config: &SearchConfig,
@@ -58,35 +81,7 @@ pub(crate) fn choose_drafting_action_json(
     sims: u32,
     c_puct: f64,
     seed: u64,
-    rot_seed: u64,
 ) -> PyResult<Value> {
-    // KERNBEWEIS-FIX FORK A (PREREG_agent_encapsulation.md par.8b,
-    // Nutzer-Entscheid 2026-08-23): `state_json` traegt jetzt additiv die
-    // EXAKTEN Reihenfolgen der verdeckten Sammlungen (Beutel/Turm/
-    // Kuppelstapel/Bonuschip-Pool, `serialize::state_to_json_exact`,
-    // erzeugt von `RefereeGame::state_json`). `json_to_state_exact` liest
-    // sie als PFLICHTFELDER (harter Fehler bei Fehlen, kein stiller
-    // Rueckfall auf Zaehler-Rekonstruktion). Der fruehere, domain-getrennte
-    // Rekonstruktions-RNG (par.8a-Fix, `RECON_DISTINGUISHER`) entfaellt
-    // dadurch ERSATZLOS: er loeste ausschliesslich das Vorbelastungs-Problem
-    // einer RNG-basierten Neumischung, die es jetzt fuer diese vier Felder
-    // gar nicht mehr gibt (weniger bewegliche Teile). Der Such-RNG (`rng`
-    // unten) startet weiterhin FRISCH aus `seed` -- `seed` ist hier bereits
-    // `derive_search_seed(game_seed, steps)` (siehe `RefereeGame::
-    // pending_search_seed`), also byte-identische Ableitung zum In-Process-Pfad.
-    //
-    // KERNBEWEIS-FIX par.8c (2026-08-23): die zweistufige Kuppel-Entscheidung
-    // (ChooseDomeSlot -> ChooseDomeRotation) lief bisher auf EINEM `rng`-
-    // Strom -- der In-Process-Pfad (`RefereeGame::
-    // drafting_decide_and_apply_inprocess`, je Entscheidungsstufe EIN
-    // eigener Aufruf) zieht dagegen je Stufe einen FRISCHEN
-    // `StdRng::seed_from_u64(derive_search_seed(game_seed, steps))`, mit
-    // `steps` bereits um 1 weitergezaehlt fuer die Rotationsstufe (belegt in
-    // `self_play.rs::unified_game_loop`, `steps += 1` NACH jeder einzelnen
-    // Drafting-Entscheidung, VOR der Seed-Ableitung der naechsten). `rot_seed`
-    // ist deshalb ein ZWEITER, eigener Parameter -- kein Default-Fallback auf
-    // den alten Ein-Strom-Modus, alle Aufrufer liefern ihn hart mit (siehe
-    // `RefereeGame::pending_rotation_search_seed`).
     let parsed: Value = serde_json::from_str(state_json)
         .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
     let state = crate::serialize::json_to_state_exact(&parsed).map_err(PyValueError::new_err)?;
@@ -99,25 +94,7 @@ pub(crate) fn choose_drafting_action_json(
     let actions = drafting_actions(&state);
     let mut rng = StdRng::seed_from_u64(seed);
     let chosen = net_arena_choose_action(net, &state, &actions, &mut rng, sims, c_puct, true, search_config);
-    let mut action = action_to_dict(&chosen);
-    if let Action::ChooseDomeSlot(_) = &chosen {
-        let follow_up_state = {
-            let mut g = Game { state: state.clone() };
-            g.apply_drafting(&chosen).map_err(PyValueError::new_err)?;
-            g.state
-        };
-        let rot_actions = drafting_actions(&follow_up_state);
-        let mut rot_rng = StdRng::seed_from_u64(rot_seed);
-        let rot_chosen = net_arena_choose_action(
-            net, &follow_up_state, &rot_actions, &mut rot_rng, sims, c_puct, true, search_config,
-        );
-        if let Action::ChooseDomeRotation(rot) = rot_chosen {
-            if let Some(obj) = action.as_object_mut() {
-                obj.insert("rotation".to_string(), json!(rot));
-            }
-        }
-    }
-    Ok(action)
+    Ok(action_to_dict(&chosen))
 }
 
 /// Wave-3-Worker-Engine: laedt Modell+Spec EINMAL (Konstruktor), `choose()`
@@ -144,11 +121,11 @@ impl FrozenWorkerEngine {
 
     /// `state_json` rein -- `{"action": ..., "value": null}`-JSON-String
     /// raus (identisches Schema zu `lib.rs::net_arena_choice_state_json`).
-    /// `rot_seed` (par.8c-Fix): eigener Seed fuer die Kuppel-Rotationsstufe,
-    /// harter Parameter -- siehe `choose_drafting_action_json`-Doku.
-    fn choose(&self, state_json: String, sims: u32, c_puct: f64, seed: u64, rot_seed: u64) -> PyResult<String> {
-        let action =
-            choose_drafting_action_json(&self.net, &self.search_config, &state_json, sims, c_puct, seed, rot_seed)?;
+    /// Trifft GENAU EINE Drafting-Entscheidung (par.8d: PER-ENTSCHEIDUNG-
+    /// Protokoll, kein `rot_seed` mehr -- siehe `choose_drafting_action_json`-
+    /// Doku).
+    fn choose(&self, state_json: String, sims: u32, c_puct: f64, seed: u64) -> PyResult<String> {
+        let action = choose_drafting_action_json(&self.net, &self.search_config, &state_json, sims, c_puct, seed)?;
         let value: Option<f32> = None;
         Ok(json!({ "action": action, "value": value }).to_string())
     }
@@ -240,10 +217,11 @@ impl RefereeGame {
         RefereeGame { game, rng, game_seed: seed, steps: 0, nets: std::collections::HashMap::new() }
     }
 
-    /// Fork A (par.8b): exakte Variante -- traegt zusaetzlich zu den
+    /// Fork A (par.8b) + par.8d: exakte Variante -- traegt zusaetzlich zu den
     /// bestehenden `state_to_json`-Feldern die vier geordneten verdeckten
-    /// Sammlungen (Beutel/Turm/Kuppelstapel/Bonuschip-Pool), die der Worker
-    /// jetzt PFLICHT konsumiert (`choose_drafting_action_json`).
+    /// Sammlungen (Beutel/Turm/Kuppelstapel/Bonuschip-Pool) UND
+    /// `pending_dome_choice_exact` (angefangener Kuppel-/Stapel-Zug, par.8d),
+    /// die der Worker jetzt PFLICHT konsumiert (`choose_drafting_action_json`).
     fn state_json(&self) -> String {
         state_to_json_exact(&self.game.state, true).to_string()
     }
@@ -279,21 +257,6 @@ impl RefereeGame {
     /// `unified_game_loop` (Arena-Pfad).
     fn pending_search_seed(&self) -> u64 {
         derive_search_seed(self.game_seed, self.steps as u64)
-    }
-
-    /// Such-Seed fuer die Kuppel-ROTATIONSSTUFE, FALLS die anstehende
-    /// Drafting-Entscheidung eine Kuppelplatzierung ist (ChooseDomeSlot ->
-    /// ChooseDomeRotation, zwei eigene Entscheidungsstufen). Steps-Arithmetik
-    /// IN-PROCESS-IDENTISCH belegt (`self_play.rs::unified_game_loop`,
-    /// `steps += 1` NACH jeder einzelnen Drafting-Entscheidung, VOR der
-    /// Seed-Ableitung der naechsten -- dasselbe Muster reproduziert
-    /// `drafting_decide_and_apply_inprocess` bei zwei aufeinanderfolgenden
-    /// Aufrufen: Stufe 1 nutzt `steps`, Stufe 2 danach `steps + 1`, weil
-    /// dieser hier NOCH VOR dem ersten `apply` aufgerufen wird, `self.steps`
-    /// also noch den Stand VOR der Slot-Entscheidung traegt -- KERNBEWEIS-FIX
-    /// par.8c, PREREG_agent_encapsulation.md).
-    fn pending_rotation_search_seed(&self) -> u64 {
-        derive_search_seed(self.game_seed, (self.steps + 1) as u64)
     }
 
     /// Loest Startplatzierung und Tiling automatisch auf (Wortlaut-Kopie der
@@ -396,17 +359,17 @@ impl RefereeGame {
     /// ueber `serialize::action_to_dict`, dieselbe Funktion, die der Worker
     /// zur Auswahl bekommt, siehe `lib.rs::net_arena_choice_state_json`) --
     /// eine illegale/unbekannte Aktion ist ein Fehler, keine stille
-    /// Ersatzwahl (par.8: "Regel-Autoritaet").
-    ///
-    /// SONDERFALL Kuppelplatzierung: `pending_dome_choice` (Stufe-2-
-    /// Rotationswahl) ist in `state_json` NICHT sichtbar (dokumentierte
-    /// Naeherung, `serialize.rs`), der Worker antwortet deshalb bei einer
-    /// `dome_display`-Wahl mit dem NACH AUSSEN ATOMAREN Dict INKLUSIVE
-    /// `rotation` (siehe `lib.rs::net_arena_choice_state_json`). Hier werden
-    /// dann BEIDE Stufen angewandt -- Stufe 1 exakt matchend wie sonst,
-    /// Stufe 2 (`ChooseDomeRotation`) gegen die dann anstehenden legalen
-    /// Kandidaten geprueft, genau wie `PyGame::apply_dome`s zwei
-    /// aufeinanderfolgende `apply_drafting`-Aufrufe.
+    /// Ersatzwahl (par.8: "Regel-Autoritaet"). Wendet GENAU EINE Aktion an
+    /// (par.8d: PER-ENTSCHEIDUNG-Protokoll) -- der Treiber
+    /// (`tools/frozen_referee_match.py`) ruft diese Methode fuer JEDEN
+    /// einzelnen Schritt eines mehrstufigen Kuppel-/Stapel-Zugs erneut auf,
+    /// mit einem frisch von `state_json()`/`pending_search_seed()` geholten
+    /// Zwischenzustand dazwischen. Die fruehere ATOMARE Sonderbehandlung fuer
+    /// Kuppelplatzierungen (Stufe-2-Rotation im selben Aufruf, `rotation`-
+    /// Feld im Antwort-Dict) ist entfallen: `pending_dome_choice` traegt
+    /// `state_json` jetzt exakt (`serialize::state_to_json_exact`s fuenftes
+    /// Feld, par.8d), also grenzt `drafting_actions` die naechste Anfrage von
+    /// selbst auf die Rotationswahl ein -- keine Sonderbehandlung noetig.
     fn drafting_apply_external(&mut self, action_json: String) -> PyResult<()> {
         if self.game.state.phase != Phase::Drafting || self.game.state.players.iter().any(|p| p.start_tile_pending) {
             return Err(PyValueError::new_err("drafting_apply_external: keine Drafting-Entscheidung anstehend"));
@@ -414,20 +377,17 @@ impl RefereeGame {
         let parsed: Value = serde_json::from_str(&action_json)
             .map_err(|e| PyValueError::new_err(format!("action_json: JSON-Parse-Fehler: {e}")))?;
 
-        let is_dome_with_rotation =
-            parsed.get("type").and_then(|t| t.as_str()) == Some("dome_display") && parsed.get("rotation").is_some();
-        let match_target = if is_dome_with_rotation {
-            let mut stripped = parsed.clone();
-            if let Some(obj) = stripped.as_object_mut() {
-                obj.remove("rotation");
-            }
-            stripped
-        } else {
-            parsed.clone()
-        };
-
+        // par.8d (PER-ENTSCHEIDUNG-Protokoll): GENAU EINE Aktion pruefen und
+        // anwenden -- keine Sonderbehandlung mehr fuer Kuppel-Zuege (die
+        // fruehere atomare `rotation`-Anreicherung/Zwei-Stufen-Anwendung ist
+        // entfallen, siehe `choose_drafting_action_json`-Doku). Eine
+        // Rotationswahl (`ChooseDomeRotation`) ist hier einfach EINE weitere
+        // Aktion unter `drafting_actions(&self.game.state)`, exakt wie jede
+        // andere -- `drafting_actions` grenzt die Kandidaten von selbst auf
+        // die Folgeschritte ein, solange `pending_dome_choice`/
+        // `pending_stack_draw` korrekt gesetzt sind.
         let actions = drafting_actions(&self.game.state);
-        let is_stone = match_target.get("type").and_then(|t| t.as_str()) == Some("stone");
+        let is_stone = parsed.get("type").and_then(|t| t.as_str()) == Some("stone");
         let found = if is_stone {
             // Sonderfall Moon-Order (siehe `stone_dict_without_moon_order`-
             // Doku): erst OHNE `moon_order` matchen, dann die eingereichte
@@ -435,8 +395,8 @@ impl RefereeGame {
             // andere, aber gueltige Permutation ist LEGAL, wird aber nicht
             // stillschweigend durch die kanonische Reihenfolge ersetzt,
             // sondern EXAKT wie eingereicht angewandt (nach Pruefung).
-            let target_stripped = stone_dict_without_moon_order(&match_target);
-            let submitted_order: Vec<String> = match_target
+            let target_stripped = stone_dict_without_moon_order(&parsed);
+            let submitted_order: Vec<String> = parsed
                 .get("moon_order")
                 .and_then(|v| v.as_array())
                 .map(|arr| arr.iter().filter_map(|x| x.as_str().map(str::to_string)).collect())
@@ -473,38 +433,18 @@ impl RefereeGame {
                 }
             })
         } else {
-            actions.into_iter().find(|a| action_to_dict(a) == match_target)
+            actions.into_iter().find(|a| action_to_dict(a) == parsed)
         };
-        let stage1 = match found {
+        let chosen = match found {
             Some(a) => a,
             None => {
                 return Err(PyValueError::new_err(format!(
-                    "Worker-Aktion ist in dieser Stellung nicht legal (Regel-Autoritaet verweigert): {match_target}"
+                    "Worker-Aktion ist in dieser Stellung nicht legal (Regel-Autoritaet verweigert): {parsed}"
                 )))
             }
         };
-        apply_chosen_action(&mut self.game, stage1).map_err(PyValueError::new_err)?;
+        apply_chosen_action(&mut self.game, chosen).map_err(PyValueError::new_err)?;
         self.steps += 1;
-
-        if is_dome_with_rotation {
-            let wanted_rot = parsed.get("rotation").and_then(|r| r.as_u64());
-            let rot_actions = drafting_actions(&self.game.state);
-            let rot_found = rot_actions.into_iter().find(|a| match a {
-                crate::moves::Action::ChooseDomeRotation(r) => Some(u64::from(*r)) == wanted_rot,
-                _ => false,
-            });
-            match rot_found {
-                Some(a) => {
-                    apply_chosen_action(&mut self.game, a).map_err(PyValueError::new_err)?;
-                    self.steps += 1;
-                }
-                None => {
-                    return Err(PyValueError::new_err(format!(
-                        "Worker-Rotation ist in dieser Stellung nicht legal (Regel-Autoritaet verweigert): rotation={wanted_rot:?}"
-                    )))
-                }
-            }
-        }
         Ok(())
     }
 

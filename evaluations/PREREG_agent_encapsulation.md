@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Welle 3 gebaut; Fork A umgesetzt (par.8c: exakte Ordnungsuebergabe steht, Suite 500/0), Kernbeweis-Rest strukturell isoliert (par.8d: Stapel-Zweig der Kuppelwahl nicht im Worker-Protokoll; Zuschnitt = per-Entscheidung-Protokoll + pending-Zustand im exact-JSON, Bau naechste Sitzung); Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- Frage bleibt OFFEN. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Welle 3 gebaut; Fork A umgesetzt (par.8c: exakte Ordnungsuebergabe steht, Suite 500/0), par.8d GEBAUT+ABGENOMMEN (Suite 502/0, Protokoll per Einzelentscheidung, rot_seed weg); Kernbeweis 5. Runde rot, neues Fehlerbild (gleiche Stellung/gleicher Seed, andere Rotation) -> Numerik-Hypothese WIDERLEGT (par.8e: Batcher im Referenzpfad inaktiv, Wurzel-Batch bitgleich max_ulp 0); **KERNBEWEIS GRUEN (par.8f, 2026-08-24): 8/8 Partien byte-identisch, Suite 503/0, Paritaet haelt, Quarantaene des Worker-Pfads AUFGEHOBEN.** Ursache der sieben Runden war eine Luecke im Pruefverfahren (JSON-gegen-JSON statt Struct-Vergleich); sieben Roundtrip-Verluste gemeinsam behoben und als erschoepfender Test verankert; Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- FRAGE BEANTWORTET: Welle 1 und Welle 3 gebaut und abgenommen, offen nur noch der planbare Ausbau (restliche ~31 Knoepfe wellenweise ins SearchConfig, par.4). -->
 
 # PREREG-SKELETT: Agenten-Kapselung (AgentSpec statt Prozess-Global)
 
@@ -414,3 +414,119 @@ weist "nicht versioniert" aus -- Kandidat fuer den Handshake-Ausbau).
   Wiederholung als Abnahme; Stopp-Disziplin unveraendert.
 - Nebenpunkt: manifest.json des Artefakts referenziert noch
   wave3c/alte Golden-Quelle -- beim naechsten Bau nachziehen.
+
+### par.8e UMBAU FERTIG, BEWEIS OFFEN -- NEUE HYPOTHESE: NUMERIK STATT PROTOKOLL (2026-08-24)
+
+**Der par.8d-Umbau ist GEBAUT und ABGENOMMEN:** Protokoll echt per
+Einzelentscheidung, atomare Kompression und rot_seed ersatzlos
+zurueckgebaut, fuenftes exact-Pflichtfeld `pending_dome_choice_exact`
+(serialize.rs, mit zwei gezielten Rundtrip-Tests). Suite 502/0,
+examples/benches-Gate gruen, Paritaets-Hash 8c6684ff haelt, Wheel
+wave3e ueberall installiert und archiviert, Golden-Probe neu erzeugt
+(10/10, jetzt mit pending-Kuppel-Sonden), Manifest vollstaendig
+nachgezogen, 6-Partien-Echtlauf fehlerfrei.
+
+**Kernbeweis bleibt ROT (5. Runde) -- aber das Fehlerbild hat sich
+qualitativ geaendert:** Erstabweichungen wandern immer weiter nach
+hinten (Log-Zeile 62-190 statt zuvor <10-76), und bei seed 910002
+steht erstmals eine Divergenz bei IDENTISCHEM Slot und identischem
+Seed, nur mit anderer Rotation (0 gegen 90 Grad). Gleiche Stellung,
+gleicher Seed, andere Wahl -- das ist kein Protokollfehler mehr.
+
+**KOORDINATOR-HYPOTHESE (2026-08-24, IN PRUEFUNG, ungeprueft
+markiert):** die Restdivergenz ist NUMERISCH. Die Referenz spielt
+mehrere Partien parallel, `net_batcher.rs` buendelt die
+Netz-Forward-Passes (configured_batch_max), der Worker evaluiert
+einzeln -- Floating-Point-Assoziativitaet macht Batch-N und Batch-1
+minimal verschieden und kippt bei zwei fast gleichwertigen Zuegen das
+Argmax. Testplan: (1) Batching in beiden Pfaden am Code klaeren,
+(2) BITWEISER Vergleich Einzel-Eval gegen Batch-Eval derselben
+Stellung, (3) falls verschieden: Kernbeweis mit batchfreier Referenz
+wiederholen.
+
+**ERGEBNIS DER PRUEFUNG (2026-08-24): HYPOTHESE WIDERLEGT** (Agent;
+Struktur-Punkt vom Koordinator per Grep nachgeprueft). Zweifach:
+(1) `net_batcher::ensure_batcher_for` wird im Referenzpfad
+`run_net_vs_net_arena` NIE aufgerufen (nur in run_net_arena_match,
+run_net_self_play und drei Teststellen) -- der Kreuzpartien-Batcher
+ist dort strukturell inaktiv. (2) Der tatsaechlich aktive
+Wurzel-Batch (`batched_expand_root_candidates`, bis GUMBEL_TOP_M=16)
+liefert BITGLEICHE Ergebnisse: neue Sonde
+`engine/examples/eval_batch_size_numeric_probe.rs`, Batch 1/2/16 gegen
+Einzel-Eval, alle sechs Koepfe, 5 Trials -- max_abs 0, max_ulp 0 in
+~90 Vergleichen. Deckt sich mit dem Alt-Befund
+(archive/history.md:1537ff: tract-linalg single-threaded, 12
+Prozessstarts bitgleich). Nebenbefund: der vorsorgliche
+Test-Kommentar "NICHT garantiert bitgleich" (net.rs:1103) war nie
+bitweise nachgemessen und ist fuer dieses Modell empirisch zu streng.
+Ebenfalls ausgeschlossen: CUDA-Hook (Default aus, ohne Cargo-Feature
+No-Op), ROUND_TRANSITION_SAMPLING (harte Konstante false, toter
+Wall-Clock-Zweig).
+
+**Damit bleibt die Rotations-Divergenz bei IDENTISCHEM Slot und Seed
+(seed 910002, Runde 2, Kachel 4 -> Slot (2,1), 0 gegen 90 Grad, ab
+Log-Zeile 62) unerklaert -- und ist der einzige verbliebene Faden.**
+Naechster Zuschnitt (gezielt, EINE Stellung, kein Fischen): Trace-
+Vergleich der Rotationsentscheidung in beiden Pfaden -- Q-Werte und
+Visits je Rotationskandidat, Kandidaten-REIHENFOLGE, effektive
+Sim-Zahl. Sind die Q-Werte gleich und nur die Wahl verschieden, ist es
+Tie-Breaking/Reihenfolge; sind sie verschieden, ist der Zustand doch
+noch nicht identisch.
+
+**Konsequenz je Ausgang (VORAB festgehalten, Numerik-Zweig jetzt
+gegenstandslos):** bestaetigt sich die
+Hypothese, ist Byte-Identitaet zwischen gebatchtem und ungebatchtem
+Pfad prinzipiell unerreichbar -- dann wird das Kernbeweis-Kriterium
+umregistriert (Byte-Identitaet NUR unter gleicher Batch-Bedingung;
+sonst statistische Aequivalenz), und die Quarantaene des Worker-Pfads
+faellt entsprechend. Wird sie widerlegt, bleibt die Quarantaene und
+es folgt eine sechste, gezielte Diagnoserunde an der 910002-Stellung.
+
+### par.8f KERNBEWEIS GRUEN -- WELLE 3 ABGENOMMEN, PREREG-FRAGE BEANTWORTET (2026-08-24; Agent, Verdikt und Hashes vom Koordinator am Artefakt nachgeprueft)
+
+**8/8 Partien BYTE-IDENTISCH** (seeds 910001-910008, 400/400 Sims;
+Artefakt `evaluations/frozen_kernbeweis_result_postfix_20260824.json`:
+verdict GRUEN, n_green 8, n_red 0, identische SHA256-Log-Hashes,
+gleiche Scores/Schrittzahlen, first_diff_line durchgehend None). Der
+eingefrorene Champion spielt ueber die Prozessgrenze exakt dieselbe
+Partie wie in-process.
+
+**Die Ursache der sieben Runden war eine LUECKE IM PRUEFVERFAHREN, nicht
+eine Kette von Zufaellen:** der bestehende Roundtrip-Test verglich vier
+Felder direkt und den REST als `state_to_json_exact(rebuilt)` gegen
+`state_to_json_exact(state)` -- also JSON gegen JSON. Damit war jedes
+Feld, das die Serialisierung gar nicht oder nur abgeleitet abbildet,
+PRINZIPIELL unsichtbar; zusaetzlich deckte eine Ausnahme
+(`first_player_next_round`) jede Abweichung zu. Ein direkter
+Struct-Vergleich existierte nicht (kein PartialEq auf GameState).
+
+**Sieben Verluste, gemeinsam behoben** (neue exact-Pflichtfelder,
+Default-Serialisierung unangetastet): first_player_next_round, log
+(UI-Fenster 30 Zeilen), tiled_max_row, score_unclamped,
+total_floor_penalties, floor_penalties_per_round und -- der schwerste --
+dome_tiles_placed_this_round: in Runde 5 ist `can_place_dome_tile()`
+IMMER false (reiner Runden-Gate), die alte Bool-Naeherung lieferte dort
+stets 2 statt 0, und der seed_state_fixup-Behelf reparierte nur die
+Gegenrichtung. Verankert als erschoepfender Struct-Vergleich
+(`diff_game_states`/`diff_player_board`) in allen vier Bestandstests plus
+neuer Test `roundtrip_exact_many_real_games` (80 echte Partien bis
+Runde 5, einmalig auf 250 Seeds bestaetigt).
+
+**Abnahme komplett:** Suite 503/0/26, examples/benches gruen,
+Paritaets-Hash 8c6684ff haelt (Koordinator-Nachmessung), Wheel wave3g
+in beiden Interpretern installiert und archiviert, contract_hash
+a169ebf0 unveraendert, Golden-Probe neu (10/10), 6-Partien-Echtlauf
+fehlerfrei, manifest.json nachgezogen.
+
+**QUARANTAENE AUFGEHOBEN:** der Referee-/Worker-Pfad darf ab jetzt
+Messungen tragen. Cross-Aera-Duelle gegen eingefrorene Champions sind
+damit erstmals sauber moeglich -- der Handshake (contract_hash) und der
+Golden-Selbsttest gaten sie.
+
+**STAND DER PREREG-FRAGE: BEANTWORTET.** Welle 1 (SearchConfig je Seite,
+Pilot-Knopf) und Welle 3 (Freeze-Artefakt, Worker, Referee, Handshake,
+Golden-Selbsttest, Byte-Beweis) sind gebaut und abgenommen. Offen bleibt
+nur der planbare AUSBAU: die restlichen ~31 aktiven Such-/Blattwert-
+Knoepfe wellenweise ins SearchConfig migrieren (Strategie par.4,
+je Knopf ein Commit mit Paritaets-Gate) -- keine offene Frage mehr,
+sondern Fleissarbeit.

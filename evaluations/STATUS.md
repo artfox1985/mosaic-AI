@@ -63,6 +63,50 @@ entstanden. Alle drei lieferten echte Befunde — und keiner davon brachte k1 vo
 
 ---
 
+## KAPSELUNGS-PREREG DURCH (2026-08-24, ~02:30)
+
+**`PREREG_agent_encapsulation.md` ist ENTSCHIEDEN.** Welle 1
+(SearchConfig je Seite, Pilot-Knopf MOSAIC_IMPLICIT_MINIMAX_A) und
+Welle 3 (Freeze-Artefakt v21, Worker-Subprozess, Referee als
+Regel-Autoritaet, contract_hash-Handshake, Golden-Selbsttest) sind
+gebaut und abgenommen; **der KERNBEWEIS ist GRUEN: 8/8 Partien
+byte-identisch** (identische SHA256-Log-Hashes, Artefakt
+`evaluations/frozen_kernbeweis_result_postfix_20260824.json`, par.8f).
+
+**Die Bugjagd hat sieben Runden gebraucht, weil das PRUEFVERFAHREN
+blind war**, nicht weil es sieben Zufaelle gab: der Roundtrip-Test
+verglich JSON gegen JSON statt Struct gegen Struct -- jedes Feld, das
+die Serialisierung nicht abbildet, konnte prinzipiell nie auffallen.
+Der erschoepfende Struct-Vergleich fand dann sieben Verluste auf
+einmal (u. a. score_unclamped, Strafleisten-Felder, log-Fenster,
+first_player_next_round und, am schwersten,
+dome_tiles_placed_this_round: in Runde 5 ist can_place_dome_tile()
+IMMER false, die Bool-Naeherung lieferte dort stets 2 statt 0).
+Verankert als `diff_game_states`/`diff_player_board` in allen
+Bestandstests plus `roundtrip_exact_many_real_games` (80 echte
+Partien). **Lehre fuer kuenftige Aequivalenz-Beweise: nie ueber die
+Serialisierung gegen sich selbst pruefen.**
+
+**QUARANTAENE AUFGEHOBEN:** der Referee-/Worker-Pfad traegt ab jetzt
+Messungen. Cross-Aera-Duelle gegen eingefrorene Champions sind
+erstmals sauber moeglich; Handshake und Golden-Selbsttest gaten sie.
+Abnahmestand: Suite 503/0/26, examples/benches gruen, Paritaets-Hash
+8c6684ff haelt, Wheel wave3g in beiden Interpretern, contract_hash
+a169ebf0 unveraendert.
+
+**OFFEN (planbarer Ausbau, keine Frage mehr):** die restlichen ~31
+aktiven Such-/Blattwert-Knoepfe wellenweise ins SearchConfig
+migrieren (par.4: je Knopf ein Commit mit Paritaets-Gate). Erst
+danach ist ein Champion-Freeze wirklich vollstaendig -- heute pinnt
+das Spec einen Knopf, den Rest pinnt das archivierte Wheel.
+
+**Offener Sonden-Fix (von der Parallelsitzung gemeldet, bestaetigt,
+NICHT erledigt):** `tools/probes/row_preference_probe.py:190-198`
+labelt in imm_netvnet beide Seiten als "Champion", obwohl
+spec_a=alpha0.2 und spec_b=frozen zwei Agenten sind. Muster fuer den
+Fix: `tools/probes/penalty_track_probe.py`. Der Kernbefund (~55,5 %
+kurze Reihen) ruht auf drei weiteren, eindeutigen Kontexten.
+
 ## UEBERGABE AN DIE NAECHSTE SITZUNG (2026-08-23 Abend -- ZUERST LESEN; Kapselungs-/Vollendungs-Strang. Die PARALLELE Sitzung des Nutzers fuehrt den Margen-Kopf-Strang: deren Preregs und archive/history.md NICHT anfassen)
 
 **WAVE3D-AUSGANG IST FESTGESTELLT UND ALS par.8d REGISTRIERT** (noch
