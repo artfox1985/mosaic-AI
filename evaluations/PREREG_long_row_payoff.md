@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: KOMPLETT GEFAHREN 2026-08-24, B1 ist ENTSCHIEDEN UND NEGATIV. Diagnose: par.2 Prior-Verhaeltnis lang/kurz 0,221 bei FORTSETZUNG; par.2a Stufe 3 (Korpus, entkonfundiert) Initiierung Netz 11,5 Prozent gegen Heuristik 25,2 Prozent, Faktor ~3, flach ueber R1-4. B1 darauf umgeschnitten (Stufenfunktion 0 auf 1 in Musterreihe 5/6, additiv am Blattwert, SCALE 10, w=0,3). Schritt 1 (240 Korpus-Stellungen): Besuchsanteil 0,00317 auf 0,00581, BCI [0,00083; 0,00525], 10 hoch / 0 runter -- Tor bestanden, aber nur Runde 1 abgedeckt. SCHRITT 2 (gepaarte Arena netz-gegen-netz, 407 Seeds, BEIDE Sitzpositionen, 814 Partien, 32 Bloecke): der Mechanismus funktioniert -- begonnene lange Reihen +0,310 je Partie (t=+7,57), vollendete +0,231 (t=+4,98), Vollendungsquote 0,534 gegen 0,514 also NICHT gefallen, Zugziele verlagern sich aus Reihe 3/4 in Reihe 5/6. DER FALSIFIKATOR IST NICHT AUSGELOEST. Trotzdem verliert der Arm klar: Siegquote 42,9 Prozent (gepaart -0,145, t=-4,11), Punkte -3,428 (t=-5,37), und die Bilanz zeigt auf die STRAFLEISTE (+3,640 Strafpunkte, t=+6,75; Plattenpunkte in Summe leicht POSITIV mit +0,33). Volle Spalten +0,033 (n.s.), k1-Rate identisch 43/312. LEHRE: die Meidung langer Musterreihen durch den Champion war kein blinder Fleck, sondern richtiges Spiel -- die Straf-Aversions-Vermutung ist erstmals interventionell gestuetzt. Vorab-Lesart WIDERLEGT (nicht der Falsifikator: strikt trennen). Preis je zusaetzlicher Initiierung rund 11,7 Strafpunkte fuer +0,033 volle Spalten. Ein w-Sweep waere eine NEUE Registrierung, nicht durch dieses Ergebnis motiviert. B2 bleibt offen, aber die Praemisse beider B-Arme ist erschuettert: nicht die Sichtbarkeit der Auszahlung war das Problem, sondern ihre Hoehe -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: KOMPLETT GEFAHREN 2026-08-24, B1 ist ENTSCHIEDEN UND NEGATIV -- aber als falscher HEBEL, nicht als falsches ZIEL (Nutzer-Korrektur, erste Lesart war falsch). Diagnose: par.2 Prior-Verhaeltnis lang/kurz 0,221 bei FORTSETZUNG; par.2a Stufe 3 Initiierung Netz 11,5 Prozent gegen Heuristik 25,2 Prozent, Faktor ~3, flach ueber R1-4. B1 darauf umgeschnitten (Stufenfunktion 0 auf 1 in Musterreihe 5/6, additiv am Blattwert, SCALE 10, w=0,3). Schritt 1 (240 Korpus-Stellungen): Besuchsanteil 0,00317 auf 0,00581, BCI [0,00083; 0,00525] -- Tor bestanden, aber nur Runde 1 abgedeckt. SCHRITT 2 (gepaarte Arena netz-gegen-netz, 407 Seeds, BEIDE Sitzpositionen, 814 Partien, 32 Bloecke): Mechanismus greift -- begonnene lange Reihen +0,310 (t=+7,57), vollendete +0,231 (t=+4,98), Vollendungsquote 0,534 gegen 0,514 also NICHT gefallen, Zugziele wandern aus Reihe 3/4 in Reihe 5/6. FALSIFIKATOR NICHT AUSGELOEST. Trotzdem verliert der Arm klar: Siegquote 42,9 Prozent (gepaart -0,145, t=-4,11), Punkte -3,428 (t=-5,37), Strafpunkte +3,640 (t=+6,75), Plattenpunkte in Summe leicht POSITIV (+0,33), volle Spalten +0,033 (n.s.), k1-Rate identisch 43/312. ENTSCHEIDENDER VORBEHALT: die Vollendungsquote liegt in BEIDEN Armen bei nur ~0,53 -- der Lauf vergleicht zwei inkompetente Regime und sagt NICHTS ueber die Staerke kompetenten Langreihen-Spiels. Ein Blattwert-Additiv kann bewirken DASS eine Reihe angefangen wird, nicht die Faehigkeit sie zu FUEHREN. Die Engstelle bleibt die VOLLENDUNG (Strukturbefund: Bau bis ~4,6 von 6), und die ist eine Trainings-, keine Suchfrage. Vorab-Lesart WIDERLEGT (nicht der Falsifikator: strikt trennen). B2-Zielrichtung praezisiert: nicht lange Reihen sichtbarer machen, sondern ihre Vollendung koennen; ein Arm ohne Vollendungsquote deutlich ueber 0,53 wiederholt B1 -->
 
 # PREREG-SKELETT: Auszahlung langer Musterreihen -- Prior-Sichtbarkeit und Signal-Shaping
 
@@ -592,42 +592,57 @@ t=-5,37 ist deshalb KEIN unabhaengiger Befund, sondern dieselbe Zahl
 skaliert. In gepaarten Netz-gegen-Netz-Laeufen traegt die Marge nichts ueber
 die Punkte hinaus bei.
 
-#### Lesart
+#### Lesart (NUTZER-KORREKTUR 2026-08-24, erste Fassung war falsch)
 
 **Die Vorab-Lesart "primaer kein Staerkeverlust" ist widerlegt.** Sie und
 der Falsifikator sind strikt zu trennen: der Falsifikator hat NICHT
 ausgeloest, die Vorab-Lesart schon. Das Ergebnis ist damit keiner der beiden
-vorregistrierten Zweige, sondern ein dritter: **der Mechanismus funktioniert
-und ist trotzdem schaedlich.**
+vorregistrierten Zweige, sondern ein dritter: **der Mechanismus greift und
+der Arm verliert trotzdem.**
 
-Inhaltlich heisst das: **die Meidung langer Musterreihen durch den Champion
-war kein blinder Fleck, sondern richtiges Spiel.** Die Straf-Aversions-
-Vermutung aus dem Kopf von `tools/probes/penalty_track_probe.py` ("lange
-Reihen tragen Ueberlaufrisiko, kurze nicht") ist damit erstmals
-INTERVENTIONELL gestuetzt statt nur korrelativ: wer die langen Reihen
-erzwingt, zahlt sie auf der Strafleiste.
+**Was daraus NICHT folgt -- und zuerst falsch registriert war:** die erste
+Fassung dieses Abschnitts schloss, die Meidung langer Musterreihen sei
+"kein blinder Fleck, sondern richtiges Spiel". Das ist ein unzulaessiger
+Sprung, vom Nutzer zurueckgewiesen mit der Begruendung, dass so kein ernst
+zu nehmender Gegner spielt. Der Einwand ist durch die eigenen Zahlen
+gestuetzt:
 
-Der Preis je zusaetzlich begonnener langer Reihe betraegt rund **11,7
-Strafpunkte** (+3,64 Strafpunkte je +0,31 Starts) und bringt **+0,033 volle
-Spalten** (nicht signifikant). Das ist der eigentliche Befund, und er ist
-schaerfer als die Siegquote: der Tausch ist auch dann schlecht, wenn man ihn
-kleiner dosiert, weil w beide Seiten des Verhaeltnisses gleichzeitig
-skaliert.
+**Die Vollendungsquote liegt in BEIDEN Armen bei rund 0,53.** Wer eine
+Reihe mit Kapazitaet 5 oder 6 beginnt und sie in der Haelfte der Faelle
+nicht fertigbekommt, spielt lange Reihen schlecht -- das gilt fuer den
+AN- wie fuer den AUS-Arm. Der Lauf vergleicht also zwei inkompetente
+Regime und stellt fest, dass "weniger davon" besser abschneidet. Ueber die
+Staerke KOMPETENTEN Langreihen-Spiels sagt er nichts. Die Strafleisten-
+Rechnung ist damit kein Beleg gegen lange Reihen, sondern der erwartbare
+Preis dafuer, ein Netz in ein Regime zu schieben, das es nie gelernt hat.
 
-**Registrierter Vorbehalt gegen genau dieses Argument:** die Skalierung ist
-nur dann neutral, wenn der Zusammenhang linear ist. Bei kleinerem w wuerde
-die Suche vermutlich zuerst die WERTVOLLSTEN langen Reihen anfangen, das
-Verhaeltnis koennte sich also zugunsten des Terms verschieben. Ein
-w-Sweep ist damit nicht ausgeschlossen -- er ist nur nicht durch dieses
-Ergebnis motiviert, und die Prereg hat vorab "Schalter, kein Regler"
-registriert (Praezedenz Floor-Shaping). Ein Sweep waere eine NEUE
-Registrierung, kein Nachtrag zu dieser.
+**Was der Lauf wirklich zeigt: B1 war der falsche HEBEL, nicht das falsche
+ZIEL.** Ein Additiv am Blattwert kann bewirken, DASS eine lange Reihe
+angefangen wird -- es kann die Faehigkeit, sie zu FUEHREN (Steinwahl,
+Timing, Ueberlaufschutz, Vollendungs-Sequenz), nicht mitliefern. Genau
+diese Faehigkeit fehlt, und genau dort sitzt der Strukturbefund zum
+Spaltenbau: Bau bis etwa 4,6 von 6, die letzten Zellen nie. Die
+Engstelle ist die VOLLENDUNG, und die ist eine Trainings-, keine
+Suchfrage.
 
-**Folge fuer B2:** unveraendert offen und eigener Nutzer-Entscheid. Dieses
-Ergebnis spricht allerdings gegen die Praemisse beider B-Arme in ihrer
-bisherigen Form: nicht die SICHTBARKEIT der verzoegerten Auszahlung war das
-Problem, sondern ihre HOEHE. Das Netz sieht lange Reihen nicht zu selten --
-es bewertet sie richtig.
+**Folge fuer B2:** offen und eigener Nutzer-Entscheid, aber die
+Zielrichtung praezisiert sich. Nicht "lange Reihen sichtbarer machen"
+(das kann B1, und es reicht nicht), sondern **die Vollendung langer
+Reihen ueberhaupt erst koennen**. Ein Arm, der die Initiierung erhoeht,
+ohne die Vollendungsquote deutlich ueber 0,53 zu heben, wiederholt B1.
+
+**Registrierter Vorbehalt zum w-Sweep:** ein kleineres w ist nicht durch
+dieses Ergebnis motiviert -- w skaliert Nutzen und Preis gleichzeitig, und
+die fehlende Faehigkeit bleibt bei jedem w dieselbe. Ein Sweep waere eine
+NEUE Registrierung; die Prereg hat vorab "Schalter, kein Regler"
+festgehalten (Praezedenz Floor-Shaping).
+
+**Methodische Lehre, teuer bezahlt:** aus "Eingriff X in Richtung Y
+verliert" folgt NICHT "Y ist falsch". Es folgt nur, dass X in diesem
+Zustand verliert. Der Unterschied ist genau die Kontrollgruppe, die hier
+fehlt: ein Agent, der lange Reihen KANN. Solange die Vollendungsquote in
+beiden Armen gleich schlecht ist, ist die Faehigkeit konstant gehalten und
+nicht mitgemessen.
 
 ### B2 -- Label-/Trainingsseite (Folgearm, NICHT jetzt gebaut, nur skizziert)
 

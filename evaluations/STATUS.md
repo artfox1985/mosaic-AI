@@ -102,10 +102,61 @@ Reihen-Sonde bestaetigte die Praeferenz (~55,5 % kurze Reihen) und
 widerlegte die Abstammungs-These (der Heuristik-Lehrer spielt spaet
 genau umgekehrt); die Straf-Sonde zeigte eine echte, aber
 richtungsfalsche Aversion (erklaert die Reihenwahl nicht).
-**Naechster Schritt registriert:** `PREREG_long_row_payoff.md`
-(2026-08-24, ENTWURF) -- Prior-Sichtbarkeit (schlaegt der rohe Policy-
-Prior lange Reihen ueberhaupt vor?) und, davon abhaengig, ein
-such-seitiger Shaping-Term nach dem Floor-Shaping-Vorbild.
+
+**`PREREG_long_row_payoff.md` ist DURCH und B1 ist ENTSCHIEDEN UND
+NEGATIV -- aber als falscher HEBEL, nicht als falsches ZIEL.** Die
+Diagnose ergab, dass die Luecke im BEGINNEN langer Reihen sitzt (Netz
+11,5 % gegen Heuristik 25,2 %, Faktor ~3, flach ueber R1-4). Der darauf
+zugeschnittene Such-Additivterm (Stufenfunktion 0 auf 1 in Musterreihe
+5/6, additiv am Blattwert, w=0,3) wurde gebaut, abgenommen
+(Paritaets-Hash haelt) und in zwei Schritten gemessen. Schritt 2:
+gepaarte Arena netz-gegen-netz, 407 Kampagnen-Seeds, BEIDE
+Sitzpositionen, 814 Partien, 32 Bloecke.
+
+- **Der Mechanismus greift.** Begonnene lange Reihen +0,310 je Partie
+  (t=+7,57), vollendete +0,231 (t=+4,98), Vollendungsquote 0,534 gegen
+  0,514 -- also NICHT gefallen. Die Zugziele wandern aus Musterreihe 3
+  und 4 in 5 und 6. **Der registrierte Falsifikator ist NICHT
+  ausgeloest.**
+- **Und der Arm verliert klar.** Siegquote 42,9 % (gepaart -0,145,
+  t=-4,11), eigene Punkte -3,428 (t=-5,37). Die Bilanz zeigt auf die
+  STRAFLEISTE: +3,640 Strafpunkte (t=+6,75), waehrend die Plattenpunkte
+  in Summe leicht POSITIV sind (+0,33) und volle Spalten sich nicht
+  signifikant bewegen (+0,033, t=+1,83). k1-Rate identisch 43/312.
+
+**Lesart -- Nutzer-Korrektur 2026-08-24, die erste Fassung war
+falsch.** Der Schluss "die Meidung langer Reihen ist richtiges Spiel"
+wurde zurueckgewiesen (*"so spielt kein ernst zu nehmender Gegner"*)
+und ist durch die eigenen Zahlen widerlegt: **die Vollendungsquote
+liegt in BEIDEN Armen bei nur ~0,53.** Der Lauf vergleicht zwei
+inkompetente Regime und stellt fest, dass "weniger davon" besser
+abschneidet -- ueber die Staerke KOMPETENTEN Langreihen-Spiels sagt er
+nichts. Die Strafleisten-Rechnung ist kein Beleg gegen lange Reihen,
+sondern der erwartbare Preis dafuer, ein Netz in ein Regime zu
+schieben, das es nie gelernt hat.
+
+**Belastbar bleibt:** ein Additiv am Blattwert kann bewirken, DASS eine
+lange Reihe angefangen wird -- es kann die Faehigkeit, sie zu FUEHREN
+(Steinwahl, Timing, Ueberlaufschutz, Vollendungs-Sequenz), nicht
+mitliefern. Die Engstelle ist damit unveraendert die VOLLENDUNG
+(Strukturbefund: Bau bis ~4,6 von 6, letzte Zellen nie), und die ist
+eine TRAININGS-, keine Suchfrage. **Vorgabe fuer jeden Nachfolge-Arm:
+wer die Initiierung hebt, ohne die Vollendungsquote deutlich ueber 0,53
+zu bringen, wiederholt B1.**
+
+**Methodische Lehre, teuer bezahlt:** aus "Eingriff X in Richtung Y
+verliert" folgt NICHT "Y ist falsch" -- nur, dass X in diesem Zustand
+verliert. Es fehlt die Kontrollgruppe: ein Agent, der Y KANN. Solange
+eine Faehigkeitskennzahl in beiden Armen gleich schlecht ist, ist die
+Faehigkeit konstant gehalten und nicht mitgemessen.
+
+**Arena-Mitschrieb dauerhaft erweitert:** `long_rows_started` /
+`long_rows_completed` / `long_rows_cleared_unplaceable` je Partie und
+Seite (Zaehler auf `PlayerBoard`, NICHT im `state.log` -- das ist das
+Kernbeweis-Vergleichsobjekt). Ohne sie ist die Vollendungsquote aus
+Arena-Laeufen prinzipiell nicht zu gewinnen, weil `round_end.rs`
+unplatzierbare Reihen ohne Logzeile leert. `tools/arena_compact.py`
+nimmt die Felder mit.
 
 **Offener Sonden-Fix (bestaetigt, NICHT erledigt):**
 `tools/probes/row_preference_probe.py:190-198` labelt in
@@ -116,16 +167,20 @@ rechnet die gepaarte Differenz). Der Kernbefund (~55,5 % kurze
 Reihen) ruht auf drei weiteren, eindeutigen Kontexten und duerfte sich
 nicht verschieben.
 
-**Nacht-Fahrplan-Restliste (Punkte-/Margen-Kopf-Strang, eingetaktet,
-noch nicht gestartet -- Details und Begruendung im Archiv-Kapitel):**
-(1) `PREREG_points_dist_bin_scale.md` par.6 Tor, (2)
-`PREREG_score_correlation.md` komplett, (3)
-`PREREG_floor_action_aversion.md` par.6 Tor, (4)
-`PREREG_saturating_score_utility.md` par.3a Tor, (5) nur falls (3) auf
-H2/H3 zeigt: Floor-Arme-Arena, (6) Rest von
-`PREREG_completion_bottleneck_locus.md` (sekundaere Locus-Frage), (7)
-Straf-Sonde gegen die Netz-gegen-Netz-Quelle nachziehen. Vor Schritt 1:
-Wheel-Zeitstempel/Knopf-Schnappschuss und Remote-Stand pruefen.
+**Nacht-Fahrplan (Punkte-/Margen-Kopf-Strang): ABGEARBEITET
+2026-08-24** -- Statuskoepfe in dieser Sitzung nachgeprueft, nicht aus
+dem Gedaechtnis. (1) `PREREG_points_dist_bin_scale.md` ENTSCHIEDEN,
+(2) `PREREG_score_correlation.md` ENTSCHIEDEN, (3)
+`PREREG_floor_action_aversion.md` ENTSCHIEDEN (Verdikt H1: roher
+Policy-Prior auf dem Strafleisten-Ziel in allen 280 Stellungen exakt 0,
+Float32-Softmax-Unterlauf), (4) `PREREG_saturating_score_utility.md`
+par.3a Tor GEFAHREN, Verdikt DAZWISCHEN -- **hier steht ein
+NUTZER-ENTSCHEID aus** (sigma-Kopf auf `points_val` selbst oder auf ein
+TD-unberuehrtes Ziel; kein Automatismus, so im Tor vorgesehen), (5)
+Floor-Arme-Arena ENTFAELLT, weil (3) auf H1 und nicht auf H2/H3 zeigte,
+(6) `PREREG_completion_bottleneck_locus.md` ENTSCHIEDEN, (7) Straf-Sonde
+gegen die Netz-gegen-Netz-Quelle nachgezogen (`penalty_track_probe.json`
+traegt jetzt `netvnet` und `netvnet_swap`).
 
 ## NAECHSTE SCHRITTE – ALLE OFFEN, ALLE NUTZER-ENTSCHEID
 
@@ -141,7 +196,7 @@ Baubeginn freizugeben.
 | **Seeding-Folgearm: Dosis** | `PREREG_start_position_seeding.md` | k=6 war die erste Dosis; hoehere Dosis ist der naheliegende Folgeschritt, aber nicht registriert |
 | **UVFA-Regime-Eingabe** | `PREREG_uvfa_plate_regime.md` | Folge-/Kombinationsarm; par.8: Conditioning-Dropout + Leakage-Waechter sind PFLICHT. par.7-Entscheid steht aus |
 | **Reihenfolge Seeding-Kette gegen R5-Strang** | – | entscheidet der Nutzer beim Aufgreifen |
-| **Lange-Reihen-Auszahlung (Prior + Shaping)** | `PREREG_long_row_payoff.md` | ENTWURF 2026-08-24, nichts gebaut. Zweig A (Prior-Sichtbarkeit, billig) zuerst; Zweig B1 (Such-Shaping, Floor-Shaping-Vorbild) danach; alle par.7-Entscheide offen |
+| **Lange-Reihen-Auszahlung (Prior + Shaping)** | `PREREG_long_row_payoff.md` | **ENTSCHIEDEN 2026-08-24: B1 gebaut, gemessen, NEGATIV** -- 814 gepaarte Partien, Siegquote 42,9 % (t=-4,11), Preis auf der Strafleiste (+3,640, t=+6,75). Der Mechanismus greift (Initiierung +0,310, Vollendungsquote gehalten), der Falsifikator loeste NICHT aus. Nutzer-Korrektur der Lesart: falscher HEBEL, nicht falsches ZIEL -- die Vollendungsquote ist in BEIDEN Armen nur ~0,53, der Lauf vergleicht zwei inkompetente Regime. Offen bleibt der Vollendungs-Weg (Training, nicht Suche); B2 ist Nutzer-Entscheid und muss die Vollendungsquote deutlich ueber 0,53 bringen |
 | **Agenten-Kapselung (AgentSpec statt Prozess-Global)** | `PREREG_agent_encapsulation.md` | **ENTSCHIEDEN 2026-08-24: Welle 1+3 gebaut und abgenommen, Kernbeweis GRUEN** (8/8 Partien byte-identisch, par.8f) -- siehe STAND-JETZT-Absatz oben. Offen ist nur der planbare Ausbau: die restlichen ~31 Such-/Blattwert-Knoepfe wellenweise ins SearchConfig migrieren (par.4) |
 
 **Geschlossen ohne Messung (nicht neu vorschlagen):** die
