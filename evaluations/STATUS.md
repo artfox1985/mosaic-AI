@@ -174,9 +174,12 @@ den Lehrer-Einsatz ist er entschaerft.
    stehen in par.8.4; **noch nicht gefahren.**
 
    Nicht gebaut, weil schon vorhanden oder ohne Anknuepfungspunkt: Prio 0
-   (Spiel endet nach genau 5 Runden, `game.rs:687`; Runde 5 laeuft als
-   exaktes Endspiel ueber `round5_anchor`), Prio 1 in der BEWERTUNG
-   (`projected_unplaceable_penalty`, nur die Routing-Seite ist neu).
+   (Spiel endet nach genau 5 Runden, `game.rs:687`; Runde 5 laeuft ueber den
+   eingefrorenen `round5_anchor` -- Expectiminimax mit Zufallsknoten und
+   exaktem Blattwert, aber **kein geloestes Endspiel**: ~3 Halbzuege,
+   Orakel-Uebereinstimmung 81,4 Prozent, `round5_anchor.rs:44-59`), Prio 1
+   in der BEWERTUNG (`projected_unplaceable_penalty`, nur die Routing-Seite
+   ist neu).
 
    **Offene Luecken aus dem Nutzer-Review 2026-08-25, alle geprueft:**
    `heuristic_v2.rs` koppelt seinen Saettigungsterm an KEINE Farbknappheit
