@@ -102,6 +102,10 @@ Reihen-Sonde bestaetigte die Praeferenz (~55,5 % kurze Reihen) und
 widerlegte die Abstammungs-These (der Heuristik-Lehrer spielt spaet
 genau umgekehrt); die Straf-Sonde zeigte eine echte, aber
 richtungsfalsche Aversion (erklaert die Reihenwahl nicht).
+**Naechster Schritt registriert:** `PREREG_long_row_payoff.md`
+(2026-08-24, ENTWURF) -- Prior-Sichtbarkeit (schlaegt der rohe Policy-
+Prior lange Reihen ueberhaupt vor?) und, davon abhaengig, ein
+such-seitiger Shaping-Term nach dem Floor-Shaping-Vorbild.
 
 **Offener Sonden-Fix (bestaetigt, NICHT erledigt):**
 `tools/probes/row_preference_probe.py:190-198` labelt in
@@ -137,6 +141,7 @@ Baubeginn freizugeben.
 | **Seeding-Folgearm: Dosis** | `PREREG_start_position_seeding.md` | k=6 war die erste Dosis; hoehere Dosis ist der naheliegende Folgeschritt, aber nicht registriert |
 | **UVFA-Regime-Eingabe** | `PREREG_uvfa_plate_regime.md` | Folge-/Kombinationsarm; par.8: Conditioning-Dropout + Leakage-Waechter sind PFLICHT. par.7-Entscheid steht aus |
 | **Reihenfolge Seeding-Kette gegen R5-Strang** | – | entscheidet der Nutzer beim Aufgreifen |
+| **Lange-Reihen-Auszahlung (Prior + Shaping)** | `PREREG_long_row_payoff.md` | ENTWURF 2026-08-24, nichts gebaut. Zweig A (Prior-Sichtbarkeit, billig) zuerst; Zweig B1 (Such-Shaping, Floor-Shaping-Vorbild) danach; alle par.7-Entscheide offen |
 | **Agenten-Kapselung (AgentSpec statt Prozess-Global)** | `PREREG_agent_encapsulation.md` | **ENTSCHIEDEN 2026-08-24: Welle 1+3 gebaut und abgenommen, Kernbeweis GRUEN** (8/8 Partien byte-identisch, par.8f) -- siehe STAND-JETZT-Absatz oben. Offen ist nur der planbare Ausbau: die restlichen ~31 Such-/Blattwert-Knoepfe wellenweise ins SearchConfig migrieren (par.4) |
 
 **Geschlossen ohne Messung (nicht neu vorschlagen):** die
