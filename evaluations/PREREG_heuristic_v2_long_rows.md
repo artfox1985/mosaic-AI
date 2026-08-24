@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: MESSKETTE KOMPLETT 2026-08-24, v2 GEBAUT und variantengebunden (HeuristikVariante::V1/V2, Paritaets-Hash 8c6684ff haelt, Suite 512/0). Vorfragen: der Lehrer v1 kann es auch nicht (volle Spalten 0,098 gegen 0,101), such-seitig ist der Weg zu (scoring_plate_injection und long_row_payoff B1 beide negativ). Der Durchbruch kam vom PLATZIERUNGS-Routing, nicht von einem Bewertungsterm: best_first_step_inner waehlt nach reinen Sofortpunkten und warf jede Draft-Absicht weg. Schritt 2 (v1 gegen v2, 80 gepaarte Partien): volle Spalten 0,163 auf 0,562, Partien mit mindestens einer von 35 auf 50 Prozent, 5/6-Mauer durchbrochen. SCHRITT 3 (v2 gegen Champion, 407 Seeds je Arm, v1-Bezug auf denselben Seeds): Faehigkeit BELEGT, Preis HOCH -- volle Spalten 0,302 gegen v1 0,086 (gepaart +0,175, t=+7,79), Vollendungsquote 0,686 gegen 0,564 (B1-Vorgabe erfuellt), aber Siegquote gegen den Champion 0,128 gegen 0,256 und Marge -19,4 gegen -12,2. URTEIL STEHT AUS: par.5.3 hat bewusst keinen Schwellenwert, die Frage ist, ob das Netz die FAEHIGKEIT uebernimmt ohne das NIVEAU. Nebenbefund: volle Zeilen brechen gegen ein NETZ nicht ein (0,403 gegen 0,432) -- die Regression auf 0,200 war ein Artefakt des v1-gegen-v2-Aufbaus. OFFEN: par.5.4 Korpus und Training, Self-Play-Einstieg (Nutzer-Freigabe erteilt, nicht gebaut), Shaping-Kopf par.3b mit Abkling-Kurve und zwei Kanaelen, Einhuellende im 2D-Encoder. -->
+<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: MESSKETTE KOMPLETT 2026-08-24, v2 GEBAUT und variantengebunden (HeuristikVariante::V1/V2, Paritaets-Hash 8c6684ff haelt, Suite 512/0). Vorfragen: der Lehrer v1 kann es auch nicht (volle Spalten 0,098 gegen 0,101), such-seitig ist der Weg zu (scoring_plate_injection und long_row_payoff B1 beide negativ). Der Durchbruch kam vom PLATZIERUNGS-Routing, nicht von einem Bewertungsterm: best_first_step_inner waehlt nach reinen Sofortpunkten und warf jede Draft-Absicht weg. Schritt 2 (v1 gegen v2, 80 gepaarte Partien): volle Spalten 0,163 auf 0,562, Partien mit mindestens einer von 35 auf 50 Prozent, 5/6-Mauer durchbrochen. SCHRITT 3 (v2 gegen Champion, 407 Seeds je Arm, v1-Bezug auf denselben Seeds): Faehigkeit BELEGT, Preis HOCH -- volle Spalten 0,302 gegen v1 0,086 (gepaart +0,175, t=+7,79), Vollendungsquote 0,686 gegen 0,564 (B1-Vorgabe erfuellt), aber Siegquote gegen den Champion 0,128 gegen 0,256 und Marge -19,4 gegen -12,2. URTEIL STEHT AUS: par.5.3 hat bewusst keinen Schwellenwert, die Frage ist, ob das Netz die FAEHIGKEIT uebernimmt ohne das NIVEAU. Nebenbefund: volle Zeilen brechen gegen ein NETZ nicht ein (0,403 gegen 0,432) -- die Regression auf 0,200 war ein Artefakt des v1-gegen-v2-Aufbaus. OFFEN: par.5.4 Korpus und Training, Self-Play-Einstieg (Nutzer-Freigabe erteilt, nicht gebaut), Shaping-Kopf par.3b mit Abkling-Kurve und zwei Kanaelen, Einhuellende im 2D-Encoder. NEUER ARM par.8 (VORREGISTRIERT 2026-08-24, GEBAUT, NICHT GEMESSEN): Prio-Leiter des Nutzers als Routing-Huelle in eigener Variante V2Huelle -- Bewertung byte-identisch zu V2, nur die Zielzellen-Karte unterscheidet sich (zwei Randspalten, Spezialfeld-Freischaltung, obere Zeilen, Nachbarn; Drafting als linearer Score mit Strafleisten- und Stoerungsterm aus provocation.rs und Phasen-Eskalation). Suite 520/0, Paritaets-Hash unberuehrt. Entscheidungsmass und Falsifikator in par.8.4 vorregistriert: volle Spalten je Partie auf BLOCK-Ebene, Waechter Vollendungsquote >= 0,53. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -680,3 +680,128 @@ Randbedingungen:
 - **Keine Aussage darueber, ob lange Reihen stark sind.** Das ist genau die
   Frage, die mangels eines kompetenten Spielers bisher niemand beantworten
   kann; v2 soll den Spieler liefern, der sie beantwortbar macht.
+
+## par.8 Prio-Leiter als Routing-Huelle (`V2Huelle`, VORREGISTRIERT 2026-08-24)
+
+**Anlass.** Nutzer-Vorgabe 2026-08-24, zwei Zuege: erst "in eine
+Dreiecksmatrix einhuellen mit shaping faktoren der unteren reihen", dann
+ausformuliert als Prioritaeten-Leiter ("ansonsten machen wir es relativ
+stupide") mit dem Implementierungs-Hinweis, sie als lineares Scoring mit
+phasenabhaengigen Gewichten zu bauen statt als `if`-Kaskade. Die Leiter
+beschreibt das Spiel des Nutzers ("so aehnlich spiel ich") und ist damit die
+erste Zielvorgabe im Strang, die aus einer kompetenten Referenz stammt und
+nicht aus dem heutigen Self-Play.
+
+**Warum als ROUTING und nicht als Bewertungsterm.** Zwei Messungen im selben
+Strang zeigen in dieselbe Richtung: die Dreiecks-Abweichung als Suchskalar war
+wirkungslos (80 Partien, volle Spalten 0,588 auf 0,550, Punkte fallen,
+Commit `19405f8`), waehrend alle vier Fortschritte des Strangs aus dem
+Platzierungs-Routing kamen (volle Spalten 0,163 auf 0,562). Die Diagnose dort
+war die Hebelwirkung: der Skalar bewegt hoechstens 1 Punkt je Zug, waehrend
+Platzierungen 2,3 bis 4,3 Punkte auseinanderliegen.
+
+### par.8.1 Was gebaut ist
+
+Eigene Variante `mcts::HeuristikVariante::V2Huelle`. Die BEWERTUNG ist
+byte-identisch zu `V2` (dieselben Summanden in `player_total_variante`), der
+einzige Unterschied ist die Zielzellen-Menge im Routing. Damit misst ein
+Vergleich `V2` gegen `V2Huelle` genau das Routing und nicht ein Buendel.
+
+Die Karte (`plate_builder::zielkarte`) bildet die Leiter als Gewicht je
+Rasterzelle ab, zwei Orientierungen (Randspalte links oder rechts;
+Spiegelung NUR um die Spalten-Achse, gleiche Begruendung wie bei
+`dreiecks_abweichung`):
+
+| Prio | Inhalt | Gewicht |
+| --- | --- | --- |
+| 3 | Randspalte 0 oder 5 | 5,0 |
+| 4 | zweite Spalte 1 oder 4 | 4,0 |
+| 5 | Spezialfeld freischalten, Joker halten | 3,0 (Auflage, hebt nie ab) |
+| 6 | Rasterzeile 0 und 1 | 2,0 |
+| 7 | Nachbarn Rasterzeile 2 und 3 | 1,0; 0,5 bei aktiver Diagonale |
+
+Rasterzeile 4 und 5 ausserhalb der beiden Spalten bekommen im Grundbild 0:
+jede Zelle dort kostet einen Abschluss von Musterreihe 5 bzw. 6. Die
+Prio-5-Auflage hebt sie nur an, wo sie ein Spezialfeld freischalten -- deren
+Ertrag haengt an keinem weiteren Abschluss, weil
+`round_end::check_special_trigger` das Feld automatisch belegt und abrechnet,
+sobald die drei anderen Zellen der Platte liegen.
+
+Drei Entscheidungspunkte lesen die Karte:
+
+1. **Drafting** (`plate_builder::huellen_drafting_vorzug`) als linearer Score
+   `Zielgewicht + W_STOER * Eskalation * Stoerung + W_STRAF * Eskalation *
+   Strafpunkte`, Eskalation `[1, 2, 4, 8]` je Runde 1-4.
+2. **Kuppelplatten-Wahl** (`dome_vorzug_fuer_zellen_gewichtet`) mit
+   `huellen_zellen_wert`: auf Rasterzeile 5 schlaegt Special den Joker und
+   beide jede Normalfarbe.
+3. **Tiling** (`tiling_vorzug_fuer_zellen_gewichtet`) summiert Kartengewichte
+   statt Zellen zu zaehlen.
+
+Die Festnagelung ab Runde 3 bleibt, nur auf der Orientierung statt auf der
+Spalte -- sie war der Bauschritt, der die Partien mit voller Spalte von 35 auf
+50 Prozent hob.
+
+### par.8.2 Was NICHT gebaut ist, und warum
+
+- **Prio 0 (Endspiel)** braucht keine Regel: das Spiel endet nach genau
+  5 Runden (`game.rs:687`, eine volle Reihe beendet es nicht), und Runde 5
+  laeuft bereits als exaktes Endspiel (`round5_anchor::applies`, in `mcts.rs`
+  kurzgeschlossen). Das Routing hoert nach Runde 4 auf und uebergibt.
+- **Prio 1 (Strafleiste)** ist als `projected_unplaceable_penalty` bereits
+  Summand der Bewertung. Neu ist nur die ROUTING-Seite: ein Vorzug, der die
+  eigene Strafleiste ueber `-4` Punkte treibt, wird nicht mehr ausgesprochen
+  (`STRAF_SCHWELLE_PUNKTE`), die Entscheidung faellt an die Suche zurueck.
+  Kein Verbot auf der Zugmenge -- die Beschneidungs-Bauform ist in
+  `PREREG_provocation.md` §7/§9 als spielzerstoerend gemessen.
+- **Prio 2 (Gegner-Stoerung)** ist neu verdrahtet, aber NICHT neu gerechnet:
+  `provocation::gegner_bedarf_akut` und `stoer_bewertung` existieren seit
+  `PREREG_opponent_disruption_v2.md` (dort UEBERHOLT, nichts verdrahtet).
+  Der Suchwert bleibt unberuehrt: `normalize_score` ist weiterhin bewusst
+  KEINE Differenz zum Gegner. Die Stoerung wirkt nur in der Zugpraeferenz.
+
+### par.8.3 Die gesetzten Zahlen
+
+`PRIO_GEWICHT`, `PRIO7_AUFGEWEICHT`, `W_STRAF`, `W_STOER`,
+`STRAF_SCHWELLE_PUNKTE` sind SETZUNGEN, keine Ableitungen -- dieselbe Regel
+wie bei `REIHEN_KREDIT`: eine aus dem heutigen Spiel geschaetzte Groesse
+wuerde die Schwaeche festschreiben, die sie beheben soll. Gefordert ist nur
+die strenge Rangfolge; die Kalibrierung steht je Konstante im Code.
+
+`W_STOER = 0,10` ist bewusst am unteren Rand (Stoerung erreicht in Runde 4
+hoechstens 4,8 und bleibt damit unter Prio 3). Grund ist gemessen:
+`PREREG_long_row_payoff.md` B1 hat mit einem zu starken Zusatzanreiz
+14,5 Prozentpunkte Siegquote gekostet. Ablation ist je eine Zeile
+(`W_STOER = 0.0`, `W_STRAF = 0.0`).
+
+### par.8.4 Messung (vorregistriert, VOR dem Lauf festgelegt)
+
+Aufbau wie Messkette Schritt 2, damit die Zahlen mit der Bauschritt-Tabelle
+vergleichbar bleiben: `V2` gegen `V2Huelle`, je 80 gepaarte Partien, BEIDE
+Sitze (`swap`), 150 Sims je Seite, `--log-games`, gleiche Seeds. Einstieg:
+`mosaic_rust.heuristic_v1_vs_v2_arena(..., variante_a="v2",
+variante_b="v2huelle")`.
+
+**Entscheidungsmass (primaer):** volle Spalten je Partie der Huellen-Seite
+gegen die v2-Seite, gepaart und auf BLOCK-Ebene ausgewertet (Paar-SEs
+unterschaetzen massiv, siehe die Arena-Block-Korrelation).
+
+**Falsifikator:** steigen die vollen Spalten nicht signifikant, ist die Leiter
+als Routing-Bauform negativ entschieden -- und zwar unabhaengig davon, wie
+plausibel das Zielbild ist. Ein "sieht besser aus"-Befund zaehlt nicht.
+
+**Waechter (dieselbe Klasse wie die B1-Vorgabe):** faellt die Vollendungsquote
+langer Musterreihen unter 0,53, wiederholt der Arm B1 und gilt als negativ,
+auch bei mehr vollen Spalten.
+
+**Mitzuschreiben** (Standard-Kennzahlen, je Seite und als Differenz):
+Reihenauslastung, Spaltenauslastung (volle Spalten, max Hoehe, Teilspalten
+>= 3/>= 4), Strafleistenauslastung, Punkte je Wertungsplatte, eigene Punkte,
+Marge. Zusaetzlich fuer diesen Arm: Freischaltungen von Spezialfeldern je
+Partie (Prio 5 zielt genau darauf, und der Posten ist mit -11,94 Punkten der
+groesste Einzelposten der Plattenwertung).
+
+**Ablations-Reihenfolge, falls der Arm gewinnt:** `W_STOER = 0` zuerst
+(Prio 2 ist der einzige Baustein ohne jede Vormessung), dann `W_STRAF = 0`,
+dann Prio-5-Auflage aus. Bei einem Gesamtbefund ohne Ablation ist NICHT
+entscheidbar, welcher Baustein traegt.

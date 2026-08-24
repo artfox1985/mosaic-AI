@@ -67,7 +67,7 @@ def normalspiel_dateien(k):
     return out
 
 
-def bauer_dateien(k):
+def builder_files(k):
     """Nur die gelenkten Arme -- `heur_own` ist der ungelenkte Heuristik-Arm und
     bleibt draussen, sonst mischt sich normales Spiel unter die Bauer-Seite."""
     quellen = collections.defaultdict(list)
@@ -116,7 +116,7 @@ def main():
     print(f"Checkpoint {CHECKPOINT} auf {GA.DEVICE}", flush=True)
 
     quellen = {"normales Spiel": normalspiel_dateien(DATEIEN_JE_QUELLE),
-               "Bauer-Arme": bauer_dateien(DATEIEN_JE_QUELLE)}
+               "Bauer-Arme": builder_files(DATEIEN_JE_QUELLE)}
     daten = {}
     for name, dateien in quellen.items():
         print(f"{name}: {len(dateien)} Dateien ...", flush=True)

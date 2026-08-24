@@ -1082,7 +1082,7 @@ fn end_scoring_from_state_json(
 /// `column_build.rs` (`pub(crate)`) -- dieser Wrapper ist die einzige Bruecke.
 /// Additiv, aendert nichts an Suche, Self-Play oder Wertung.
 ///
-/// Vorratsgroesse ist `provocation::noch_erreichbare_farben`, dieselbe, die auch
+/// Vorratsgroesse ist `provocation::still_reachable_colors`, dieselbe, die auch
 /// das Sicherheitsnetz des Spaltenbauers benutzt (`column_build.rs:643`) -- sie
 /// zaehlt ueber die BRETTER beider Spieler und die Strafleisten, nutzt also nur
 /// beobachtbare Information und kein verdecktes Beutelwissen.
@@ -1110,14 +1110,14 @@ fn plate_completability_json(
         return Err(PyValueError::new_err(format!("player {player} existiert nicht")));
     }
     let p = &state.players[player];
-    let erreichbar = crate::provocation::noch_erreichbare_farben(&state, player);
+    let erreichbar = crate::provocation::still_reachable_colors(&state, player);
     let feats = crate::scoring::player_scoring_features(p);
 
     // Zeilen/Diagonalen ueber dieselbe ZELL-Funktion wie die Spalten -- eine
     // Geometrie ist vollendbar, wenn alle ihre offenen Zellen es sind.
-    let zelle_ok = |r: usize, c: usize| crate::column_build::ist_zelle_vollendbar(p, r, c, &erreichbar);
+    let zelle_ok = |r: usize, c: usize| crate::column_build::cell_is_completable(p, r, c, &erreichbar);
     let spalten: Vec<bool> = (0..6)
-        .map(|c| crate::column_build::ist_spalte_vollendbar(p, c, &erreichbar))
+        .map(|c| crate::column_build::column_is_completable(p, c, &erreichbar))
         .collect();
     let zeilen: Vec<bool> = (0..6).map(|r| (0..6).all(|c| zelle_ok(r, c))).collect();
     let diagonalen = vec![
@@ -1126,12 +1126,12 @@ fn plate_completability_json(
     ];
 
     // Offene Zellen je Spalte, mit Farbbedarf und Vorratspuffer -- dieselbe
-    // Rechnung wie `ist_zelle_vollendbar` (column_build.rs:563), nur mit
+    // Rechnung wie `cell_is_completable` (column_build.rs:563), nur mit
     // ausgewiesenem Abstand statt Boolean. Verbraucher:
     // `PREREG_human_game_oracle_gap.md` par.4 (Farbbedarf der offenen Zellen)
     // und `PREREG_reachability_target.md` par.12 Arm P (Puffer =
     // erreichbar - Bedarf, bindende Zelle = Minimum ueber die Kette).
-    // `color_idx` folgt `provocation::farben_index`, also `TileColor::NORMAL`.
+    // `color_idx` folgt `provocation::color_index`, also `TileColor::NORMAL`.
     let col_open_cells: Vec<Vec<serde_json::Value>> = (0..6usize)
         .map(|c| {
             (0..6usize)
@@ -1156,7 +1156,7 @@ fn plate_completability_json(
                             let zeile = &p.pattern_lines[r];
                             let schon =
                                 if zeile.color == Some(need) { zeile.tiles.len() as i64 } else { 0 };
-                            let Some(i) = crate::provocation::farben_index(need) else {
+                            let Some(i) = crate::provocation::color_index(need) else {
                                 return Some(serde_json::json!({"r": r, "kind": "normal_frei"}));
                             };
                             let benoetigt = (r as i64 + 1) - schon;
@@ -1194,9 +1194,9 @@ fn plate_completability_json(
 /// bereits gemessen (par.3a); dieser Export liefert die noch fehlende
 /// Pfad-A-Seite.
 ///
-/// Ausgegeben werden exakt die Groessen, die in `apply_wertung_shaping_full`
+/// Ausgegeben werden exakt die Groessen, die in `apply_scoring_shaping_full`
 /// (`net_mcts.rs:1462-1487`) in `bei(x) = tanh(x / WERTUNG_SHAPING_SCALE)`
-/// eingehen, mit den Laufzeit-Alphas (`wertung_shaping_alphas()`, Default 2)
+/// eingehen, mit den Laufzeit-Alphas (`scoring_shaping_alphas()`, Default 2)
 /// und `round_gain = 0` (die Prereg registriert ROUND_GAIN fest auf 0):
 /// `wertung_e[k]` je Kriterium 0..8 (unabhaengig davon, ob die Platte liegt --
 /// `active_tile_ids` sagt, welche liegen), `unlock_beta` (k6-Bonusanteil,
@@ -1204,7 +1204,7 @@ fn plate_completability_json(
 /// `tiling_potenzial` (Rundenend-Solverscore minus aktueller Score).
 #[pyfunction]
 #[pyo3(signature = (state_json, player, seed=None))]
-fn wertung_shaping_e_json(state_json: String, player: usize, seed: Option<u64>) -> PyResult<String> {
+fn scoring_shaping_e_json(state_json: String, player: usize, seed: Option<u64>) -> PyResult<String> {
     use pyo3::exceptions::PyValueError;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
@@ -1217,11 +1217,11 @@ fn wertung_shaping_e_json(state_json: String, player: usize, seed: Option<u64>) 
         return Err(PyValueError::new_err(format!("player {player} existiert nicht")));
     }
     let p = &state.players[player];
-    let alphas = crate::net_mcts::wertung_shaping_alphas();
+    let alphas = crate::net_mcts::scoring_shaping_alphas();
 
     let wertung_e: Vec<f64> = (0..8usize)
         .map(|k| {
-            crate::scoring::wertung_progress_per_kriterium(p, &[k], &alphas, state.round_number, 0.0)
+            crate::scoring::scoring_progress_per_criterion(p, &[k], &alphas, state.round_number, 0.0)
         })
         .collect();
     let unlock_beta = crate::scoring::unlock_progress_beta(p, &state.scoring_tile_ids, alphas[6]);
@@ -1667,7 +1667,7 @@ fn bootstrap_horizon_stage0_probe_json(
 /// Partie. Die Vollendungsquote folgt aus `long_rows_started` /
 /// `long_rows_completed` -- der vorregistrierte Falsifikator.
 #[pyfunction]
-#[pyo3(signature = (sims_v1, sims_v2, n_games, seed, num_threads=0, c=0.3, swap=false, log_games=false))]
+#[pyo3(signature = (sims_v1, sims_v2, n_games, seed, num_threads=0, c=0.3, swap=false, log_games=false, variante_a="v1", variante_b="v2"))]
 #[allow(clippy::too_many_arguments)]
 fn heuristic_v1_vs_v2_arena(
     py: Python<'_>,
@@ -1679,10 +1679,13 @@ fn heuristic_v1_vs_v2_arena(
     c: f64,
     swap: bool,
     log_games: bool,
+    variante_a: &str,
+    variante_b: &str,
 ) -> String {
-    py.detach(|| {
+    let (a, b) = (variante_a.to_string(), variante_b.to_string());
+    py.detach(move || {
         crate::self_play::run_heuristic_v1_vs_v2_arena(
-            sims_v1, sims_v2, n_games, seed, num_threads, c, swap, log_games,
+            sims_v1, sims_v2, n_games, seed, num_threads, c, swap, log_games, &a, &b,
         )
     })
 }
@@ -1727,7 +1730,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bootstrap_horizon_stage0_probe_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(plate_completability_json, m)?)?;
-    m.add_function(wrap_pyfunction!(wertung_shaping_e_json, m)?)?;
+    m.add_function(wrap_pyfunction!(scoring_shaping_e_json, m)?)?;
     m.add_function(wrap_pyfunction!(ownership_ek_plate_points_json, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_reset, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_json, m)?)?;

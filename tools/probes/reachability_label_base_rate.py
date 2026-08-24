@@ -15,8 +15,8 @@ Granularitaet ist das ATOM, nicht die Stellung -- der Kopf lernt je Geometrie
 gezaehlt. Die "irgendeine"-Rate kommt als Kontext mit.
 
 Label-Quelle ist `mosaic_rust.plate_completability_json` (Wrapper um
-`column_build::ist_spalte_vollendbar`, Vorrat aus
-`provocation::noch_erreichbare_farben` -- nur beobachtbare Information).
+`column_build::column_is_completable`, Vorrat aus
+`provocation::still_reachable_colors` -- nur beobachtbare Information).
 """
 from __future__ import annotations
 

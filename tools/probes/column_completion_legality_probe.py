@@ -92,9 +92,9 @@ import mosaic_rust  # noqa: E402
 from analyze_game_log import (  # noqa: E402
     Replayer, ReplayDivergence, LogLine, ROUND_PREFIX, _run_loop, check_prereqs,
 )
-from plate_points_from_arena import partien  # noqa: E402
+from plate_points_from_arena import game_list  # noqa: E402
 from column_completion_gap_probe import (  # noqa: E402
-    rekonstruiere_partie_sequenz, hoehe5_ereignisse, QUELLEN, K1_TILE_ID,
+    reconstruct_game_sequence, hoehe5_ereignisse, QUELLEN, K1_TILE_ID,
 )
 
 EVAL = ROOT / "evaluations"
@@ -176,7 +176,7 @@ def state_before_tiling_call(players, first_player, seed, action_log, tiling_cal
 
 def find_empty_cell_in_column(state: dict, player: int, column: int):
     """`column = 2*slot_col + (space_index % 2)`, siehe
-    `column_completion_gap_probe.py::fuellstand_aus_sequenz`. Iteriert die
+    `column_completion_gap_probe.py::fill_level_from_sequence`. Iteriert die
     (bis zu) 6 Zellen dieser Spalte im ECHTEN `dome_grid`-JSON und gibt die
     LEERE zurueck (erwartet genau eine bei Fuellstand 5). `None`, wenn
     keine/mehr als eine leer ist (Konsistenzbruch -- wird vom Aufrufer
@@ -290,7 +290,7 @@ def main() -> None:
                 continue
             arme = quelle.get("arme", [None])
             for arm in arme:
-                spiele = partien(pfad, arm)
+                spiele = game_list(pfad, arm)
                 n_take = min(len(spiele), args.max_games_per_file)
                 for gi in range(n_take):
                     if n_events_checked >= args.target_events:
@@ -318,7 +318,7 @@ def main() -> None:
                     seed = sp["game_seed"]
                     action_log = rep.action_log
 
-                    sequenz_je_spieler = rekonstruiere_partie_sequenz(sp.get("log") or [])
+                    sequenz_je_spieler = reconstruct_game_sequence(sp.get("log") or [])
                     tiling_calls, final_state = index_tiling_calls(players_tuple, first_player, seed, action_log)
 
                     for name in namen:

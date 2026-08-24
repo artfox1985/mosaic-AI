@@ -101,7 +101,7 @@ def p_mindestens(r: int, n: int = PRO_RUNDE) -> Fraction:
                Fraction(0))
 
 
-def p_irgendeine_farbe(r: int, n: int = PRO_RUNDE) -> float:
+def p_any_color(r: int, n: int = PRO_RUNDE) -> float:
     """P(mindestens EINE der 5 Farben hat >= r Steine).
 
     Naeherung: 1 - (1-p)^5 unter Unabhaengigkeitsannahme. Die Farbzahlen sind
@@ -122,7 +122,7 @@ def main() -> int:
           f"{'P(irgendeine Farbe)':>20} | {'geteilt: erwartet':>18}")
     for r_idx, kap in enumerate(KAPAZITAETEN, start=1):
         pX = float(p_mindestens(kap))
-        pAny = p_irgendeine_farbe(kap)
+        pAny = p_any_color(kap)
         # Geteilt: ein Spieler bekommt im Schnitt die Haelfte der Rundenversorgung
         pShare = float(p_mindestens(kap, PRO_RUNDE // 2))
         print(f"{r_idx:>5} {kap:>8} | {pX:>19.4f} {pAny:>20.4f} | {pShare:>18.4f}")

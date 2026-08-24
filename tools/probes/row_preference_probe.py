@@ -65,7 +65,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
-from plate_points_from_arena import partien  # noqa: E402
+from plate_points_from_arena import game_list  # noqa: E402
 
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "row_preference_probe.json"
@@ -140,7 +140,7 @@ class RowStats:
 def add_arena_source(stats: dict, key: str, path: Path, arm: str | None, side_filter=None):
     """`side_filter(name:str) -> label|None` waehlt/labelt die Seite; `None`
     ueberspringt die Zeile (z.B. wenn eine Quelle nur eine Seite tragen soll)."""
-    games = partien(path, arm)
+    games = game_list(path, arm)
     seen_games_per_label: dict[str, set] = defaultdict(set)
     for sp in games:
         seed = sp.get("game_seed")

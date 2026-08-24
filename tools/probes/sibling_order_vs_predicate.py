@@ -103,7 +103,7 @@ def praedikat_ordnung(krit, w=1.0):
     return out
 
 
-def tau_reihe(kopf, praed_key, praedikate):
+def tau_row(kopf, praed_key, praedikate):
     """Kendall-Tau je Stellung zwischen Kopf-Ordnung und einem Praedikat-Skalar,
     gruppiert nach der Runde der jeweiligen Stellung."""
     zeilen = []
@@ -143,7 +143,7 @@ def main() -> None:
 
     for praed_key, label in (("puffer", "Puffer-Summe (stetig, CAP=12)"),
                               ("boolean", "vollendbare Spalten (boolesch, Runde>=3-Ziel)")):
-        zeilen = tau_reihe(kopf, praed_key, praed)
+        zeilen = tau_row(kopf, praed_key, praed)
         n_konstant = sum(1 for k, p in zip(kopf, praed)
                           if len(set(k) & set(p[praed_key])) >= 3
                           and kendall(k, p[praed_key]) is None)

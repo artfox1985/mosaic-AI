@@ -34,7 +34,7 @@ from pathlib import Path
 BASIS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASIS / "tools"))
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
-from plate_points_from_arena import KRITERIUM, partien  # noqa: E402
+from plate_points_from_arena import KRITERIUM, game_list  # noqa: E402
 
 ZIEL = BASIS / "evaluations" / "arena_compact.jsonl"
 
@@ -119,7 +119,7 @@ def main() -> None:
         d = json.load(open(f, encoding="utf-8"))
         g = d["games"]
         quellen = ([(name, g)] if isinstance(g, list)
-                   else [(f"{name}#{arm}", partien(f, arm)) for arm in g])
+                   else [(f"{name}#{arm}", game_list(f, arm)) for arm in g])
         for quelle, sp_liste in quellen:
             if not any(sp.get("log") for sp in sp_liste):
                 ohne_log.append(quelle)

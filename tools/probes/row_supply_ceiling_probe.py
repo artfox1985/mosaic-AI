@@ -96,7 +96,7 @@ N_MC = 200_000
 RNG = random.Random(20260824)
 
 
-def zugausbeute_verteilung() -> dict:
+def move_yield_distribution() -> dict:
     """Verteilung der BESTEN Einfarb-Ausbeute EINER Sonnenseite.
 
     Modelliert eine kleine Fabrik: 4 Fliesen, Farben gleichverteilt (der
@@ -130,7 +130,7 @@ def schranken(budget_zellen: float) -> dict:
             for r in range(6)}
 
 
-def spalten_bei_gleichverteilung(budget_zellen: float) -> float:
+def columns_under_uniform_distribution(budget_zellen: float) -> float:
     """Wieviele volle Spalten ein Budget TRAEGT, wenn es gleichmaessig auf
     alle sechs Reihen verteilt wird.
 
@@ -145,7 +145,7 @@ def spalten_bei_gleichverteilung(budget_zellen: float) -> float:
 
 
 def main() -> None:
-    verteilung = zugausbeute_verteilung()
+    verteilung = move_yield_distribution()
 
     # Fliesen-Budget je Spieler, wenn beide gleich viel abbekommen.
     budget_gleichverteilt = FLIESEN_JE_PARTIE / 2
@@ -174,7 +174,7 @@ def main() -> None:
         schranke_wenn_alles_in_eine_reihe=schranken(
             budget_gleichverteilt + chip_zellen_je_spieler),
         spalten_kosten_je_einheit=SPALTEN_KOSTEN,
-        spalten_decke_analytisch=round(spalten_bei_gleichverteilung(
+        spalten_decke_analytisch=round(columns_under_uniform_distribution(
             budget_gleichverteilt + chip_zellen_je_spieler), 2),
     )
 
@@ -198,7 +198,7 @@ def main() -> None:
                 # Die Luecke dazu ist ein reines VERTEILUNGS-Defizit: sie
                 # kostet keine einzige zusaetzliche Fliese.
                 spalten_moeglich_bei_gleichverteilung=round(
-                    spalten_bei_gleichverteilung(zellen), 2),
+                    columns_under_uniform_distribution(zellen), 2),
             )
             d = pruef[lab]
             d["umsetzungsgrad"] = (round(d["spalten_gemessen"]

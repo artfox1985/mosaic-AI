@@ -47,8 +47,8 @@ def reach_columns(state: dict, player: int):
     """Vollendbarkeit der 6 Spalten fuer `player` -- 1 = noch vollendbar, sonst 0.
 
     Quelle ist der Rust-Export `plate_completability_json` (Wrapper um
-    `column_build::ist_spalte_vollendbar`); der Vorrat kommt aus
-    `provocation::noch_erreichbare_farben` und zaehlt nur ueber die BRETTER
+    `column_build::column_is_completable`); der Vorrat kommt aus
+    `provocation::still_reachable_colors` und zaehlt nur ueber die BRETTER
     beider Spieler, nutzt also keine verdeckte Information.
 
     Bewusst KEIN Python-Nachbau des Praedikats: eine zweite Fassung waere genau

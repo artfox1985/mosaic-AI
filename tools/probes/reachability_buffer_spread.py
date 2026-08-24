@@ -24,7 +24,7 @@ oder Normierungsfehler, den die Sperre selbst nicht faende.
 Anordnung wie par.5/par.10: `data/holdout`, Tiling-Stellungen, je
 (Partie, Runde) eine, 150 je Runde. Quelle: `mosaic_rust.
 plate_completability_json` (Feld `col_open_cells`, Puffer aus
-`provocation::noch_erreichbare_farben` -- nur beobachtbare Information).
+`provocation::still_reachable_colors` -- nur beobachtbare Information).
 
     python -X utf8 tools/probes/reachability_buffer_spread.py
 """
@@ -43,7 +43,7 @@ BASIS = Path(__file__).resolve().parents[2]
 CAP_KANDIDATEN = [4, 8, 12, 16]
 
 
-def spalten_puffer(d: dict) -> list[float | None]:
+def column_buffer(d: dict) -> list[float | None]:
     """Bindender Roh-Puffer je Spalte; None = keine bindende Zelle."""
     out: list[float | None] = []
     for zellen in d["col_open_cells"]:
@@ -94,7 +94,7 @@ def main() -> None:
             except Exception:  # noqa: BLE001
                 continue
             genug[rd] += 1
-            puf = spalten_puffer(d)
+            puf = column_buffer(d)
             # Selbsttest: Puffer-Vorzeichen gegen das boolesche Praedikat --
             # `columns[c]` muss genau dann False sein, wenn eine bindende
             # Zelle negativen Puffer hat.

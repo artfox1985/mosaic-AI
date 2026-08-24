@@ -10,10 +10,10 @@ KEIN eigener Parser. Alles Vorhandene wird importiert, damit eine Aenderung am
 Logtext beide Seiten gemeinsam brechen laesst statt hier still falsche Zahlen
 zu erzeugen:
 
-  plate_points_from_arena   partien, block_mittel, t_wert
+  plate_points_from_arena   games, block_mean, t_value
   penalty_track_probe       penalties_from_log        (Kennzahl 3)
-  column_build_struct...    rekonstruiere_partie, spalten_fuellung,
-                            struktur_kennzahlen, endwertung_kriterien_je_spieler
+  column_build_struct...    reconstruct_game, column_fill,
+                            struktur_kennzahlen, final_scoring_criteria_per_player
                             (Kennzahl 2 und 4)
   row_preference_probe      row_choices_from_log      (Kennzahl 1)
 
@@ -40,7 +40,7 @@ Die Paarung sitzt INNERHALB der Partie: AN und AUS spielen dieselbe Partie
 gegeneinander, die Differenz je Partie ist damit exakt gepaart, ohne Seed- oder
 Aera-Versatz. Der t-Wert gehoert danach auf die BLOECKE, nicht auf die
 Partien -- Paar-SEs sind im Projekt schon einmal massiv unterschaetzt worden
-(stehende Regel seit 2026-08-04). `block_mittel` wird dafuer importiert.
+(stehende Regel seit 2026-08-04). `block_mean` wird dafuer importiert.
 """
 from __future__ import annotations
 
@@ -53,14 +53,14 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tools" / "probes"))
 
-from plate_points_from_arena import partien, block_mittel, t_wert  # noqa: E402
+from plate_points_from_arena import game_list, block_mean, t_value  # noqa: E402
 from penalty_track_probe import penalties_from_log  # noqa: E402
 from row_preference_probe import row_choices_from_log  # noqa: E402
 from column_build_structural_probe import (  # noqa: E402
-    rekonstruiere_partie,
-    spalten_fuellung,
+    reconstruct_game,
+    column_fill,
     struktur_kennzahlen,
-    endwertung_kriterien_je_spieler,
+    final_scoring_criteria_per_player,
 )
 
 EVAL = ROOT / "evaluations"
@@ -102,11 +102,11 @@ def seite_kennzahlen(sp: dict, i: int) -> dict:
     n_reihenzuege = sum(hist.values())
 
     # Kennzahl 2: Spaltenauslastung aus dem rekonstruierten Kuppel-Endstand.
-    zellen = rekonstruiere_partie(log).get(name, set())
-    spalten = struktur_kennzahlen(spalten_fuellung(zellen))
+    zellen = reconstruct_game(log).get(name, set())
+    spalten = struktur_kennzahlen(column_fill(zellen))
 
     # Kennzahl 4: Punkte je Wertungsplatte.
-    kriterien = endwertung_kriterien_je_spieler(log).get(name, {})
+    kriterien = final_scoring_criteria_per_player(log).get(name, {})
 
     # k1: nur dort auswertbar, wo die Platte ueberhaupt aktiv war.
     k1_aktiv = K1_TILE_ID in (sp.get("scoring_tile_ids") or [])
@@ -161,7 +161,7 @@ SKALARE = [
 ]
 
 
-def mittel(werte):
+def mean(werte):
     return round(sum(werte) / len(werte), 4) if werte else None
 
 
@@ -178,13 +178,13 @@ def gepaart(diffs_je_datei: list[list[float]]) -> dict | None:
     for d in diffs_je_datei:
         n_partien += len(d)
         if len(d) >= 2:
-            bl.extend(block_mittel(d, BLOCK))
+            bl.extend(block_mean(d, BLOCK))
     if len(bl) < 2:
         return None
-    m, t = t_wert(bl)
+    m, t = t_value(bl)
     flach = [x for d in diffs_je_datei for x in d]
     return dict(n_partien=n_partien, n_bloecke=len(bl),
-                mittel=round(m, 4), t=round(t, 2),
+                mean=round(m, 4), t=round(t, 2),
                 mittel_je_partie=round(sum(flach) / len(flach), 4) if flach else None)
 
 
@@ -211,9 +211,9 @@ def main() -> None:
         # ohne Schluessel lesen -- der Fallback deckt eine spaetere
         # Umbenennung ab, ohne bei Mehr-Arm-Dateien still das Falsche zu tun.
         try:
-            spiele = partien(pfad, "0")
+            spiele = game_list(pfad, "0")
         except SystemExit:
-            spiele = partien(pfad, None)
+            spiele = game_list(pfad, None)
         for sp in spiele:
             a = seite_kennzahlen(sp, an_brett)
             b = seite_kennzahlen(sp, 1 - an_brett)
@@ -239,13 +239,13 @@ def main() -> None:
     if not an:
         raise SystemExit("keine Partien gelesen")
 
-    def quote(seiten):
+    def share(seiten):
         s = sum(x["long_rows_started"] for x in seiten)
         c = sum(x["long_rows_completed"] for x in seiten)
         r = sum(x["long_rows_cleared_unplaceable"] for x in seiten)
         return dict(
             starts_gesamt=s, vollendet_gesamt=c, geraeumt_gesamt=r,
-            starts_je_partie=mittel([x["long_rows_started"] for x in seiten]),
+            starts_je_partie=mean([x["long_rows_started"] for x in seiten]),
             vollendungsquote=round(c / s, 4) if s else None,
             raeumquote=round(r / s, 4) if s else None,
             offen_am_ende=s - c - r,
@@ -256,7 +256,7 @@ def main() -> None:
         tr = sum(x["k1_getroffen"] for x in akt)
         return dict(n_k1_aktiv=len(akt), getroffen=tr,
                     rate=round(tr / len(akt), 4) if akt else None,
-                    punkte_je_aktiver_partie=mittel(
+                    punkte_je_aktiver_partie=mean(
                         [x["k1_punkte"] or 0 for x in akt]))
 
     ergebnis = dict(
@@ -268,20 +268,20 @@ def main() -> None:
             "Prozent aus par.2a Stufe 3 (dort: Anteil der GELEGENHEITEN, bei "
             "denen initiiert wurde). Nicht verrechnen."
         ),
-        siegquote_an=mittel([x["sieg"] for x in an]),
-        lange_reihen=dict(an=quote(an), aus=quote(aus),
+        siegquote_an=mean([x["sieg"] for x in an]),
+        lange_reihen=dict(an=share(an), aus=share(aus),
                           vollendungsquote_gepaart=gepaart(quoten_diff)),
         k1=dict(an=k1_rate(an), aus=k1_rate(aus)),
-        mittel_an={k: mittel([x[k] for x in an]) for k in SKALARE},
-        mittel_aus={k: mittel([x[k] for x in aus]) for k in SKALARE},
+        mittel_an={k: mean([x[k] for x in an]) for k in SKALARE},
+        mittel_aus={k: mean([x[k] for x in aus]) for k in SKALARE},
         gepaart_an_minus_aus={k: gepaart(diffs[k]) for k in SKALARE},
         reihen_hist_an={str(r): sum(x["reihen_hist"][str(r)] for x in an)
                         for r in range(1, 7)},
         reihen_hist_aus={str(r): sum(x["reihen_hist"][str(r)] for x in aus)
                          for r in range(1, 7)},
         plattenpunkte_je_kriterium=dict(
-            an={k: mittel(v) for k, v in sorted(kriterien_summe["an"].items())},
-            aus={k: mittel(v) for k, v in sorted(kriterien_summe["aus"].items())},
+            an={k: mean(v) for k, v in sorted(kriterien_summe["an"].items())},
+            aus={k: mean(v) for k, v in sorted(kriterien_summe["aus"].items())},
         ),
     )
 
@@ -308,7 +308,7 @@ def main() -> None:
     for k in SKALARE:
         g = ergebnis["gepaart_an_minus_aus"][k]
         if g:
-            print(f"  {k:32s} {g['mittel']:+8.4f}  t={g['t']:+6.2f}  "
+            print(f"  {k:32s} {g['mean']:+8.4f}  t={g['t']:+6.2f}  "
                   f"({g['n_bloecke']} Bloecke)")
     print(f"\n-> {OUT_JSON}")
 

@@ -102,6 +102,29 @@ den Arena-Artefakten (`scores`, plus `scores_unclamped` in Self-Play-Records).
 Fehlt eine Groesse im konkreten Kontext, wird sie ergaenzt oder ihr Fehlen im
 Bericht begruendet – stilles Weglassen ist ein Regelbruch.
 
+## Bezeichner-Konvention: Code ist ENGLISCH (Nutzer-Anweisung 2026-08-24)
+
+- **Alle Bezeichner im Code sind englisch**: Funktionen, Methoden, Typen,
+  Structs, Enums und ihre Varianten, Konstanten, Felder, lokale Variablen,
+  Testnamen. Gilt fuer Rust wie fuer Python.
+- Das gilt auch fuer NEUEN Code in Modulen, deren Bestand noch deutsch heisst.
+  Wer an so einem Modul arbeitet, benennt die beruehrten Bezeichner im selben
+  Zug mit um; ein englischer Neubau neben deutschem Bestand ist der Zustand,
+  den diese Regel abschafft.
+- **Unberuehrt bleibt die Inhaltssprache**: Kommentare, Doc-Kommentare,
+  Commit-Nachrichten, STATUS.md, Preregs und Chat bleiben deutsch, README
+  bleibt englisch. Dateinamen bleiben englisch (Regel unten).
+- Fachbegriffe des Spiels werden uebersetzt, nicht durchgereicht:
+  Musterreihe -> `pattern_line`, Kuppel(platte) -> `dome (tile)`,
+  Wertungsplatte -> `scoring_tile`, Strafleiste -> `floor_line`,
+  Spalte/Zeile -> `column`/`row`, Zielzelle -> `target_cell`,
+  Vorzug(szug) -> `preference`, Bauer -> `builder`.
+
+Anlass: der Layer um `plate_builder.rs`, `column_build.rs` und
+`provocation.rs` war zu grossen Teilen deutsch benannt (86 von 113, 43 von 73,
+34 von 51 Funktionen), und neu gebaute Bausteine haben die Konvention
+fortgeschrieben statt sie zu brechen.
+
 ## Dateinamen-Konvention (Nutzer-Anweisung 2026-08-13)
 
 - **Neue Dateien und Verzeichnisse werden IMMER englisch benannt** (Code,

@@ -13,8 +13,8 @@
 //! ## Verhaeltnis zum Bestandsknopf `MOSAIC_SPALTENBAU`
 //!
 //! `MOSAIC_SPALTENBAU` bleibt der WOERTLICHE Altpfad: ist er aktiv, loest
-//! [`aktiver_bauer`] IMMER auf den Spaltenbauer-Wrapper auf, der die
-//! bestehenden `column_build::{vorzugszug,vorzug_dome_wahl,vorzug_tiling_step}`
+//! [`active_builder`] IMMER auf den Spaltenbauer-Wrapper auf, der die
+//! bestehenden `column_build::{preference_move,preference_dome_choice,preference_tiling_step}`
 //! UNVERAENDERT aufruft -- Verhaltens-Identitaet ist damit durch reine
 //! Delegation garantiert, nicht durch eine Nachbildung (siehe
 //! `plattenbauer_regression_test.rs`-Aequivalenztests unten). `MOSAIC_
@@ -34,8 +34,8 @@
 //! analog `column_build.rs`), Diagonalen (2, zwei Diagonalen), Ecken (5, vier
 //! 2x2-Slots). Fuer sie reicht EINE generische Kosten-/Vorzugs-Mechanik
 //! ueber eine explizite Zellenliste `&[(row, col)]` -- portiert aus
-//! `column_build.rs`s Kosten-/Auswahlformeln (`special_kosten`,
-//! `engpass_aufschlag`, `zellen_wert`, Toleranzband + Seed-Streuung), die
+//! `column_build.rs`s Kosten-/Auswahlformeln (`special_cost`,
+//! `scarcity_surcharge`, `cell_value`, Toleranzband + Seed-Streuung), die
 //! dafuer sichtbar gemacht wurden (`pub(crate)`). Die drei uebrigen
 //! Kriterien -- Mehrfarbig (3, Jokerfelder), Rand (4, additiv-farbfrei),
 //! Spezial (6, Slot-Vervollstaendigung) -- brauchen KEINE Kandidatenauswahl
@@ -46,7 +46,7 @@
 //! (Farbvielfalt statt Farbtreffer).
 
 use crate::board::PlayerBoard;
-use crate::dome::{rotation_indices, SpaceType};
+use crate::dome::{rotation_indices, DomeSpace, SpaceType};
 use crate::moves::{Action, PendingDomeChoice, PlaceDomeTileMove};
 use crate::state::GameState;
 use crate::tiling_solver::TilingStep;
@@ -61,12 +61,12 @@ use crate::tiling_solver::TilingStep;
 pub(crate) trait Plattenbauer {
     /// Drafting-Vorzug: ein Stein-Zug (`Action::Stone`), der ein Zielfeld
     /// dieses Kriteriums bedient.
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action>;
+    fn drafting_preference(&self, state: &GameState) -> Option<Action>;
     /// Kuppelplatten-Wahl-Vorzug: welche Platte/welcher Slot/welche Rotation
     /// (`Action::ChooseDomeSlot`/`Action::ChooseDomeRotation`).
-    fn dome_vorzug(&self, state: &GameState) -> Option<Action>;
+    fn dome_preference(&self, state: &GameState) -> Option<Action>;
     /// Tiling-Routing-Vorzug: welcher naechste Tiling-Schritt.
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep>;
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep>;
 }
 
 // ── Aktivierung: MOSAIC_PLATTENBAU=<0..7|auto>, MOSAIC_SPALTENBAU hat Vorrang ──
@@ -78,7 +78,7 @@ pub(crate) enum Modus {
     Auto,
 }
 
-fn modus_env() -> Modus {
+fn mode_env() -> Modus {
     static CELL: std::sync::OnceLock<Modus> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| match std::env::var("MOSAIC_PLATTENBAU") {
         Err(_) => Modus::Aus,
@@ -110,24 +110,24 @@ thread_local! {
 }
 
 #[cfg(test)]
-pub(crate) fn set_modus_override_for_test(m: Option<Modus>) {
+pub(crate) fn set_mode_override_for_test(m: Option<Modus>) {
     MODUS_OVERRIDE.with(|c| c.set(m));
 }
 
-fn modus() -> Modus {
+fn mode() -> Modus {
     #[cfg(test)]
     {
         if let Some(m) = MODUS_OVERRIDE.with(|c| c.get()) {
             return m;
         }
     }
-    modus_env()
+    mode_env()
 }
 
 thread_local! {
     /// Partie-Seed fuer die generische Kandidatenwahl (Auto-Kriterium +
     /// Kandidaten-Streuung bei Kosten-Gleichstand) -- gleiches Muster wie
-    /// `column_build::PARTIE_SEED`. [`set_partie_seed`] versorgt BEIDE (siehe
+    /// `column_build::PARTIE_SEED`. [`set_game_seed`] versorgt BEIDE (siehe
     /// dort), damit self_play.rs nur noch EINE Stelle aufrufen muss.
     static PARTIE_SEED: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
 }
@@ -137,17 +137,17 @@ thread_local! {
 /// damit self_play.rs an den vier Hook-Stellen nur noch die Abstraktion
 /// aufrufen muss, statt zwei Module einzeln zu versorgen. Aufrufer MUSS am
 /// Partieende (oder vor der naechsten Partie desselben Threads) mit `None`
-/// ueberschreiben (Leck-Warnung wie bei `column_build::set_partie_seed`).
-pub(crate) fn set_partie_seed(seed: Option<u64>) {
+/// ueberschreiben (Leck-Warnung wie bei `column_build::set_game_seed`).
+pub(crate) fn set_game_seed(seed: Option<u64>) {
     PARTIE_SEED.with(|c| c.set(seed));
-    crate::column_build::set_partie_seed(seed);
+    crate::column_build::set_game_seed(seed);
 }
 
 /// Deterministische Mischung Seed -> Index `0..n` -- identisches SplitMix64-
-/// Muster wie `column_build::index_aus_seed`/`provocation::spalte_aus_seed`
+/// Muster wie `column_build::index_from_seed`/`provocation::column_from_seed`
 /// (Projekt-Konvention: diese kleine Mischfunktion wird je Modul dupliziert
 /// statt geteilt, siehe dortige Kommentare).
-fn index_aus_seed(seed: u64, n: usize) -> usize {
+fn index_from_seed(seed: u64, n: usize) -> usize {
     if n == 0 {
         return 0;
     }
@@ -160,7 +160,7 @@ fn index_aus_seed(seed: u64, n: usize) -> usize {
 
 /// Welches Kriterium (0..7) ist JETZT aktiv, oder `None`. `MOSAIC_SPALTENBAU`
 /// hat Vorrang (liefert immer Kriterium 1 ueber den Legacy-Wrapper, siehe
-/// [`aktiver_bauer`]); sonst entscheidet `MOSAIC_PLATTENBAU`. `Auto` streut
+/// [`active_builder`]); sonst entscheidet `MOSAIC_PLATTENBAU`. `Auto` streut
 /// ueber `state.scoring_tile_ids` -- die tatsaechlich fuer DIESE Partie
 /// gezogenen 3 Platten (`scoring.rs`-Doku: "zu Spielbeginn werden 3 ...
 /// gewaehlt"), nicht ueber alle 8 -- ein Kriterium ohne Platte auf dem Tisch
@@ -168,25 +168,25 @@ fn index_aus_seed(seed: u64, n: usize) -> usize {
 // Noch UNVERDRAHTET: gedacht fuer die auto-Zielwahl ueber die aktiven Platten;
 // die heutige auto-Streuung waehlt direkt. Bleibt als vorbereiteter Baustein.
 #[allow(dead_code)]
-fn aktives_kriterium(state: &GameState) -> Option<usize> {
-    if crate::column_build::ist_aktiv() {
+fn active_criterion(state: &GameState) -> Option<usize> {
+    if crate::column_build::is_active() {
         return Some(1);
     }
-    match modus() {
+    match mode() {
         Modus::Aus => None,
         Modus::Fest(k) => Some(k),
-        Modus::Auto => auto_kriterium(state),
+        Modus::Auto => auto_criterion(state),
     }
 }
 
-fn auto_kriterium(state: &GameState) -> Option<usize> {
+fn auto_criterion(state: &GameState) -> Option<usize> {
     let ids = &state.scoring_tile_ids;
     if ids.is_empty() {
         return None; // defensiv: vor Partie-Setup oder in einem Test ohne Platten.
     }
     match PARTIE_SEED.with(|c| c.get()) {
         None => Some(ids[0]),
-        Some(seed) => Some(ids[index_aus_seed(seed, ids.len())]),
+        Some(seed) => Some(ids[index_from_seed(seed, ids.len())]),
     }
 }
 
@@ -194,14 +194,14 @@ fn auto_kriterium(state: &GameState) -> Option<usize> {
 
 struct SpaltenbauerLegacy;
 impl Plattenbauer for SpaltenbauerLegacy {
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
-        crate::column_build::vorzugszug(state)
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
+        crate::column_build::preference_move(state)
     }
-    fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
-        crate::column_build::vorzug_dome_wahl(state)
+    fn dome_preference(&self, state: &GameState) -> Option<Action> {
+        crate::column_build::preference_dome_choice(state)
     }
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
-        crate::column_build::vorzug_tiling_step(state, pi)
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+        crate::column_build::preference_tiling_step(state, pi)
     }
 }
 
@@ -215,7 +215,7 @@ static ECKENBAUER: Eckenbauer = Eckenbauer;
 static SPEZIALBAUER: Spezialbauer = Spezialbauer;
 static FARBENREICHBAUER: Farbenreichbauer = Farbenreichbauer;
 
-fn bauer_fuer(kriterium: usize) -> &'static dyn Plattenbauer {
+fn builder_for(kriterium: usize) -> &'static dyn Plattenbauer {
     match kriterium {
         0 => &ZEILENBAUER,
         1 => &SPALTENBAUER_GENERISCH,
@@ -225,61 +225,61 @@ fn bauer_fuer(kriterium: usize) -> &'static dyn Plattenbauer {
         5 => &ECKENBAUER,
         6 => &SPEZIALBAUER,
         7 => &FARBENREICHBAUER,
-        _ => &ZEILENBAUER, // defensiv; aktives_kriterium liefert nie >7.
+        _ => &ZEILENBAUER, // defensiv; active_criterion liefert nie >7.
     }
 }
 
-fn aktiver_bauer(state: &GameState) -> Option<&'static dyn Plattenbauer> {
-    if crate::column_build::ist_aktiv() {
+fn active_builder(state: &GameState) -> Option<&'static dyn Plattenbauer> {
+    if crate::column_build::is_active() {
         return Some(&SPALTENBAUER_LEGACY);
     }
-    match modus() {
+    match mode() {
         Modus::Aus => None,
-        Modus::Fest(k) => Some(bauer_fuer(k)),
-        Modus::Auto => auto_kriterium(state).map(bauer_fuer),
+        Modus::Fest(k) => Some(builder_for(k)),
+        Modus::Auto => auto_criterion(state).map(builder_for),
     }
 }
 
 /// Aufrufstellen: die vier Drafting-Hook-Stellen in `self_play.rs`, ersetzt
-/// `crate::column_build::vorzugszug(&game.state)` in der `.or_else(...)`-Kette.
+/// `crate::column_build::preference_move(&game.state)` in der `.or_else(...)`-Kette.
 ///
 /// `PREREG_opponent_disruption.md` §2: NACH dem aktiven Bauer haengt der
-/// Stoerungs-Vorzug (`provocation::stoerungs_vorzug`) als `.or_else`-Zweig
+/// Stoerungs-Vorzug (`provocation::disruption_preference`) als `.or_else`-Zweig
 /// an -- "erst die eigene Vollendung [des aktiven Bauers fuer DIESEN Zug],
 /// dann die Stoerung [als Fallback, wenn der aktive Bauer hier nichts
 /// vorschlaegt]" (Nutzer-Domaenenwissen, `docs/domain_knowledge.md`
 /// "Spielstrategie aus Nutzer-Praxis" Punkt 4). Wirkt eigenstaendig ueber
 /// den Knopf `MOSAIC_OPPONENT_DISRUPTION`, unabhaengig davon, ob ueberhaupt
 /// ein Bauer (`MOSAIC_PLATTENBAU`/`MOSAIC_SPALTENBAU`) aktiv ist -- bei
-/// unbesetztem Knopf liefert `stoerungs_vorzug` sofort `None` (Bestandsschutz).
-pub(crate) fn drafting_vorzug(state: &GameState) -> Option<Action> {
-    aktiver_bauer(state)
-        .and_then(|b| b.drafting_vorzug(state))
-        .or_else(|| crate::provocation::stoerungs_vorzug(state))
+/// unbesetztem Knopf liefert `disruption_preference` sofort `None` (Bestandsschutz).
+pub(crate) fn drafting_preference(state: &GameState) -> Option<Action> {
+    active_builder(state)
+        .and_then(|b| b.drafting_preference(state))
+        .or_else(|| crate::provocation::disruption_preference(state))
 }
 
 /// Aufrufstellen: dieselben vier Hook-Stellen, ersetzt
-/// `crate::column_build::vorzug_dome_wahl(&game.state)`.
-pub(crate) fn dome_vorzug(state: &GameState) -> Option<Action> {
-    aktiver_bauer(state).and_then(|b| b.dome_vorzug(state))
+/// `crate::column_build::preference_dome_choice(&game.state)`.
+pub(crate) fn dome_preference(state: &GameState) -> Option<Action> {
+    active_builder(state).and_then(|b| b.dome_preference(state))
 }
 
 /// Aufrufstelle: der Tiling-Hook in `self_play.rs`, ersetzt
-/// `crate::column_build::vorzug_tiling_step(&game.state, pi)`.
-pub(crate) fn tiling_vorzug(state: &GameState, pi: usize) -> Option<TilingStep> {
-    aktiver_bauer(state).and_then(|b| b.tiling_vorzug(state, pi))
+/// `crate::column_build::preference_tiling_step(&game.state, pi)`.
+pub(crate) fn tiling_preference(state: &GameState, pi: usize) -> Option<TilingStep> {
+    active_builder(state).and_then(|b| b.tiling_preference(state, pi))
 }
 
 // ── Generische Zellen-Mechanik (Kriterien 0/1/2/5, Portierung aus column_build.rs) ──
 
-/// Kosten EINER Zelle -- delegiert vollstaendig an `column_build::zelle_kosten`
+/// Kosten EINER Zelle -- delegiert vollstaendig an `column_build::cell_cost`
 /// (§16: dieselbe Formel, jetzt auch fuer die Special-Zellen-Slot-Nachbarn
 /// gebraucht, deshalb dort `pub(crate)` und hier keine eigene Kopie mehr,
 /// siehe CLAUDE.md "Bestehendes wiederverwenden"). Verifiziert aequivalent
 /// per Test unten
-/// (`zellen_kosten_stimmt_mit_spalten_kosten_fuer_spaltengeometrie_ueberein`).
-fn zellen_kosten(player: &PlayerBoard, zellen: &[(usize, usize)], verbleibend: &[i64; 5]) -> f64 {
-    zellen.iter().map(|&(r, c)| crate::column_build::zelle_kosten(player, r, c, verbleibend)).sum()
+/// (`cells_cost_matches_column_cost_for_column_geometry`).
+fn cells_cost(player: &PlayerBoard, zellen: &[(usize, usize)], verbleibend: &[i64; 5]) -> f64 {
+    zellen.iter().map(|&(r, c)| crate::column_build::cell_cost(player, r, c, verbleibend)).sum()
 }
 
 /// Toleranzband, identische Kalibrierung wie `column_build::SPALTEN_TOLERANZ`
@@ -289,8 +289,8 @@ const ZIEL_TOLERANZ: f64 = 0.5;
 /// Waehlt einen Kandidaten-Index aus `kosten` -- guenstigster, oder bei
 /// mehreren nahen (`ZIEL_TOLERANZ`) Kandidaten seed-gestreut, sonst der
 /// kleinste Index (stabiler Tie-Break). Generalisierung von
-/// `column_build::waehle_spalte` auf beliebig viele Kandidaten.
-fn waehle_kandidat(kosten: &[f64], seed: Option<u64>) -> usize {
+/// `column_build::choose_column` auf beliebig viele Kandidaten.
+fn choose_candidate(kosten: &[f64], seed: Option<u64>) -> usize {
     let min_kosten = kosten.iter().cloned().fold(f64::INFINITY, f64::min);
     let kandidaten: Vec<usize> = (0..kosten.len()).filter(|&i| kosten[i] - min_kosten <= ZIEL_TOLERANZ).collect();
     if kandidaten.len() <= 1 {
@@ -298,91 +298,137 @@ fn waehle_kandidat(kosten: &[f64], seed: Option<u64>) -> usize {
     }
     match seed {
         None => kandidaten[0],
-        Some(s) => kandidaten[index_aus_seed(s, kandidaten.len())],
+        Some(s) => kandidaten[index_from_seed(s, kandidaten.len())],
     }
 }
 
-/// §18 (Diagonalen-Baustein): wie [`ziel_zellen_generisch`], aber mit
-/// `column_build::zelle_kosten_smart` statt der geteilten (§16/§17-Schalter-
-/// abhaengigen) [`zellen_kosten`] -- fuer Bauern mit einer EIGENEN,
+/// §18 (Diagonalen-Baustein): wie [`target_cells_generic`], aber mit
+/// `column_build::cell_cost_smart` statt der geteilten (§16/§17-Schalter-
+/// abhaengigen) [`cells_cost`] -- fuer Bauern mit einer EIGENEN,
 /// unabhaengig validierten Special-Zellen-Uebernahme (siehe dortige Doku).
-fn ziel_zellen_generisch_smart(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<Vec<(usize, usize)>> {
+fn target_cells_generic_smart(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<Vec<(usize, usize)>> {
     if kandidaten.is_empty() {
         return None;
     }
     let player = &state.players[pi];
-    let verbleibend = crate::provocation::verbleibende_farben(state);
+    let verbleibend = crate::provocation::remaining_colors(state);
     let kosten: Vec<f64> = kandidaten
         .iter()
-        .map(|z| z.iter().map(|&(r, c)| crate::column_build::zelle_kosten_smart(player, r, c, &verbleibend)).sum())
+        .map(|z| z.iter().map(|&(r, c)| crate::column_build::cell_cost_smart(player, r, c, &verbleibend)).sum())
         .collect();
     let seed = PARTIE_SEED.with(|c| c.get());
-    let idx = waehle_kandidat(&kosten, seed);
+    let idx = choose_candidate(&kosten, seed);
     Some(kandidaten[idx].clone())
 }
 
 /// Loest die aktive Zielzellen-Menge aus einer Kandidatenliste auf --
-/// Generalisierung von `column_build::ziel_spalte` auf beliebige Geometrien.
-fn ziel_zellen_generisch(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<Vec<(usize, usize)>> {
+/// Generalisierung von `column_build::target_column` auf beliebige Geometrien.
+fn target_cells_generic(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<Vec<(usize, usize)>> {
+    let idx = target_index_generic(state, pi, kandidaten)?;
+    Some(kandidaten[idx].clone())
+}
+
+/// Wie [`target_cells_generic`], liefert aber den INDEX des gewaehlten
+/// Kandidaten statt seiner Zellen. Gebraucht von der Orientierungswahl der
+/// Dreiecks-Huelle, die aus der Wahl zwischen zwei Randspalten eine
+/// Orientierung ableiten muss -- ueber denselben Kostenvergleich und
+/// dieselbe Seed-Streuung wie jeder andere Bauer, statt einer zweiten,
+/// separat zu pflegenden Regel.
+fn target_index_generic(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<usize> {
     if kandidaten.is_empty() {
         return None;
     }
     let player = &state.players[pi];
-    let verbleibend = crate::provocation::verbleibende_farben(state);
-    let kosten: Vec<f64> = kandidaten.iter().map(|z| zellen_kosten(player, z, &verbleibend)).collect();
+    let verbleibend = crate::provocation::remaining_colors(state);
+    let kosten: Vec<f64> = kandidaten.iter().map(|z| cells_cost(player, z, &verbleibend)).collect();
     let seed = PARTIE_SEED.with(|c| c.get());
-    let idx = waehle_kandidat(&kosten, seed);
-    Some(kandidaten[idx].clone())
+    Some(choose_candidate(&kosten, seed))
 }
 
 /// Drafting-Vorzug ueber einer beliebigen Zielzellen-Menge -- Generalisierung
-/// von `provocation::vorzugszug_fuer_spalte`. Fuer eine Reihe `r`, die in
+/// von `provocation::preference_move_for_column`. Fuer eine Reihe `r`, die in
 /// `zellen` mit MEHREREN Eintraegen vorkommt (Zeilen-/Ecken-Geometrie), zaehlt
 /// "qualifiziert", wenn IRGENDEINE offene Zielzelle dieser Reihe die
 /// angebotene Farbe fordert (eine Musterreihe fuehrt ohnehin nur eine Farbe
 /// je Zug, welche der mehreren Zielzellen davon profitiert, ist fuer die
 /// Zugwahl selbst gleichgueltig).
-pub(crate) fn vorzugszug_fuer_zellen(state: &GameState, zellen: &[(usize, usize)]) -> Option<Action> {
+pub(crate) fn preference_move_for_cells(state: &GameState, zellen: &[(usize, usize)]) -> Option<Action> {
+    preference_move_for_cells_weighted(state, zellen, &EINHEITSKARTE)
+}
+
+/// Wie [`preference_move_for_cells`], aber mit der Zielkarte als drittem
+/// Sortierschluessel.
+///
+/// Warum genau dort und nicht weiter vorn: Farbknappheit und Reihenfuellstand
+/// sind die beiden Schluessel, unter denen die vier gemessenen Bauschritte
+/// gelaufen sind -- sie bleiben unberuehrt. Der DRITTE Schluessel war bisher
+/// `r` AUFSTEIGEND und bevorzugte damit die oberen Rasterzeilen. Solange die
+/// Zielmenge eine einzelne Spalte war, hat das kaum etwas entschieden; mit
+/// der Prio-Leiter qualifizieren sich viel mehr Zuege, und ein Gleichstand
+/// fiele sonst systematisch nach OBEN -- also gegen Prio 1 und 2.
+///
+/// Gewertet wird die BESTE Zielzelle, die der Zug in seiner Reihe bedienen
+/// kann. Nicht die Summe: eine Musterreihe legt je Abschluss genau EINEN
+/// Stein, mehrere bedienbare Zellen sind also Alternativen und keine
+/// Addition -- dieselbe Begruendung, aus der `heuristic_v2` das Maximum statt
+/// der Summe nimmt.
+///
+/// Mit [`EINHEITSKARTE`] ist der Rang fuer jede Zelle gleich, der Tie-Break
+/// faellt wie bisher auf `r` aufsteigend zurueck: byte-identisch zum Bestand.
+pub(crate) fn preference_move_for_cells_weighted(
+    state: &GameState,
+    zellen: &[(usize, usize)],
+    karte: &Zielkarte,
+) -> Option<Action> {
     if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
         return None;
     }
     let player = &state.players[state.current_player];
-    let verbleibend = crate::provocation::verbleibende_farben(state);
+    let verbleibend = crate::provocation::remaining_colors(state);
     let moves = crate::validation::generate_valid_moves(state);
-    let mut best: Option<(i64, i32, i32, crate::moves::Move)> = None;
+    let mut best: Option<(i64, i32, i64, i32, crate::moves::Move)> = None;
     for m in moves {
         let r = m.place.row_index;
         if !(0..=5).contains(&r) {
             continue;
         }
         let r = r as usize;
-        let qualifiziert = zellen.iter().any(|&(zr, zc)| {
+        let mut bestes: Option<f64> = None;
+        for &(zr, zc) in zellen {
             if zr != r {
-                return false;
+                continue;
             }
-            let Some(sp) = player.dome_grid.get_space(zr, zc) else { return false };
+            let Some(sp) = player.dome_grid.get_space(zr, zc) else { continue };
             if sp.is_filled() {
-                return false;
+                continue;
             }
-            match sp.space_type {
+            let bedient = match sp.space_type {
                 SpaceType::Wild => true,
                 SpaceType::Normal => sp.required_color == Some(m.take.color),
                 SpaceType::Special => false,
+            };
+            if bedient && bestes.is_none_or(|b| karte[zr][zc] > b) {
+                bestes = Some(karte[zr][zc]);
             }
-        });
-        if !qualifiziert {
-            continue;
         }
+        let Some(bestes) = bestes else { continue };
         let zeile = &player.pattern_lines[r];
         let fuellung = zeile.tiles.len() as i32;
-        let knappheit = crate::provocation::farben_index(m.take.color).map(|i| verbleibend[i]).unwrap_or(i64::MAX);
-        let kandidat = (knappheit, -fuellung, r as i32, m);
-        let besser = best.as_ref().map_or(true, |(k, f, rr, _)| (kandidat.0, kandidat.1, kandidat.2) < (*k, *f, *rr));
+        let knappheit = crate::provocation::color_index(m.take.color).map(|i| verbleibend[i]).unwrap_or(i64::MAX);
+        // Hoeheres Gewicht = kleinerer Rang, damit die bestehende
+        // "kleiner gewinnt"-Ordnung unveraendert bleibt. Ganzzahlig
+        // (Faktor 1000), weil der Schluessel sonst kein `Ord` hat; die
+        // gesetzten Gewichte sind ganze Zahlen.
+        let rang = -((bestes * 1000.0) as i64);
+        let kandidat = (knappheit, -fuellung, rang, r as i32, m);
+        let besser = best
+            .as_ref()
+            .map_or(true, |(k, f, g, rr, _)| (kandidat.0, kandidat.1, kandidat.2, kandidat.3) < (*k, *f, *g, *rr));
         if besser {
             best = Some(kandidat);
         }
     }
-    best.map(|(_, _, _, m)| Action::Stone(m))
+    best.map(|(_, _, _, _, m)| Action::Stone(m))
 }
 
 /// Score einer (Kachel, Slot, Rotation)-Kombination gegen eine beliebige
@@ -392,6 +438,15 @@ pub(crate) fn vorzugszug_fuer_zellen(state: &GameState, zellen: &[(usize, usize)
 /// geprueft. Fuer eine Spalten-Zielzellenliste ist das rechnerisch identisch
 /// zu `slot_score` (jeder Slot hat pro Spalten-Offset genau zwei Positionen,
 /// exakt die dort gelesenen `idx[cc]`/`idx[cc+2]`).
+///
+/// `karte` skaliert den Beitrag je ZIELZELLE (Nutzer-Vorgabe 2026-08-24: "die
+/// notwendigen/vorteilhaften kuppelplatten sollten dann ebenfalls
+/// dementsprechend gelegt werden"). Ohne diesen Faktor waere der Platte eine
+/// Zelle in Rasterzeile 0 genauso viel wert wie eine in Rasterzeile 5 -- und
+/// gerade die untere ist die knappe. `wert` tauscht die Zellenbewertung aus
+/// (Bestand gegen Huelle, siehe [`envelope_cell_value`]).
+/// [`EINHEITSKARTE`] plus [`legacy_cell_value`] stellen das
+/// Bestandsverhalten her.
 fn slot_score_generic(
     player: &PlayerBoard,
     tile: &crate::dome::DomeTile,
@@ -399,6 +454,8 @@ fn slot_score_generic(
     slot_col: usize,
     rotation: u32,
     zellen: &[(usize, usize)],
+    karte: &Zielkarte,
+    wert: fn(&PlayerBoard, usize, usize, &DomeSpace) -> f64,
 ) -> Option<f64> {
     let idx = rotation_indices(rotation)?;
     let mut summe = 0.0;
@@ -410,7 +467,7 @@ fn slot_score_generic(
             continue;
         }
         beruehrt = true;
-        summe += crate::column_build::zellen_wert(player, row, &tile.spaces[idx[i]]);
+        summe += karte[row][col] * wert(player, row, col, &tile.spaces[idx[i]]);
     }
     if beruehrt {
         Some(summe)
@@ -420,12 +477,24 @@ fn slot_score_generic(
 }
 
 /// Kuppelplatten-Wahl-Vorzug ueber einer beliebigen Zielzellen-Menge --
-/// Generalisierung von `column_build::vorzug_dome_wahl`. Anders als dort wird
+/// Generalisierung von `column_build::preference_dome_choice`. Anders als dort wird
 /// NICHT nach `slot_col` vorgefiltert (eine Zeilen-/Ecken-Zielmenge kann
 /// mehrere Slot-Spalten beruehren) -- [`slot_score_generic`]s `beruehrt`-Flag
 /// uebernimmt den gleichen Ausschluss implizit (Score 0, dann durch den
 /// `>0.0`-Filter unten verworfen).
-pub(crate) fn dome_vorzug_fuer_zellen(state: &GameState, zellen: &[(usize, usize)]) -> Option<Action> {
+pub(crate) fn dome_preference_for_cells(state: &GameState, zellen: &[(usize, usize)]) -> Option<Action> {
+    dome_preference_for_cells_weighted(state, zellen, &EINHEITSKARTE, legacy_cell_value)
+}
+
+/// Wie [`dome_preference_for_cells`], aber mit Zielkarte und austauschbarer
+/// Zellenbewertung (siehe [`slot_score_generic`]). Die Bestandsfassung ist
+/// der Sonderfall [`EINHEITSKARTE`] plus [`legacy_cell_value`].
+pub(crate) fn dome_preference_for_cells_weighted(
+    state: &GameState,
+    zellen: &[(usize, usize)],
+    karte: &Zielkarte,
+    wert: fn(&PlayerBoard, usize, usize, &DomeSpace) -> f64,
+) -> Option<Action> {
     let player = &state.players[state.current_player];
 
     if let Some(choice) = &state.pending_dome_choice {
@@ -443,7 +512,7 @@ pub(crate) fn dome_vorzug_fuer_zellen(state: &GameState, zellen: &[(usize, usize
                     if crate::game::validate_dome_move(state, &m).is_some() {
                         continue;
                     }
-                    if let Some(score) = slot_score_generic(player, tile, *slot_row, *slot_col, rot, zellen) {
+                    if let Some(score) = slot_score_generic(player, tile, *slot_row, *slot_col, rot, zellen, karte, wert) {
                         if best.map_or(true, |(bs, _)| score > bs) {
                             best = Some((score, rot));
                         }
@@ -470,7 +539,7 @@ pub(crate) fn dome_vorzug_fuer_zellen(state: &GameState, zellen: &[(usize, usize
                 if crate::game::validate_dome_move(state, &m).is_some() {
                     continue;
                 }
-                if let Some(score) = slot_score_generic(player, tile, sr, sc, rot, zellen) {
+                if let Some(score) = slot_score_generic(player, tile, sr, sc, rot, zellen, karte, wert) {
                     if best_rot_score.map_or(true, |b| score > b) {
                         best_rot_score = Some(score);
                     }
@@ -489,27 +558,48 @@ pub(crate) fn dome_vorzug_fuer_zellen(state: &GameState, zellen: &[(usize, usize
 }
 
 /// Tiling-Routing-Vorzug ueber einer beliebigen Zielzellen-Menge --
-/// Generalisierung von `column_build::vorzug_tiling_step_fuer_spalte`: zaehlt
+/// Generalisierung von `column_build::preference_tiling_step_for_column`: zaehlt
 /// gefuellte Zielzellen statt gefuellte Zellen EINER Spalte.
-pub(crate) fn tiling_vorzug_fuer_zellen(state: &GameState, pi: usize, zellen: &[(usize, usize)]) -> Option<TilingStep> {
+pub(crate) fn tiling_preference_for_cells(state: &GameState, pi: usize, zellen: &[(usize, usize)]) -> Option<TilingStep> {
+    tiling_preference_for_cells_weighted(state, pi, zellen, &EINHEITSKARTE)
+}
+
+/// Wie [`tiling_preference_for_cells`], aber die Zielzellen zaehlen mit ihrem
+/// KARTENGEWICHT statt je 1.
+///
+/// Bei einer Zielmenge aus einer Spalte war jede Zelle gleich viel wert --
+/// sie kamen ohnehin aus sechs verschiedenen Musterreihen. Die Prio-Leiter
+/// stellt 28 Zellen auf vier Stufen; ohne Gewichtung waere ein Schritt in
+/// eine Nachbarzelle der Stufe 4 einem Schritt in die Randspalte
+/// gleichgestellt.
+///
+/// Mit [`EINHEITSKARTE`] ist die Summe die Anzahl (Einsen sind in f64 exakt
+/// darstellbar und exakt summierbar), also byte-identisch zum Bestand.
+pub(crate) fn tiling_preference_for_cells_weighted(
+    state: &GameState,
+    pi: usize,
+    zellen: &[(usize, usize)],
+    karte: &Zielkarte,
+) -> Option<TilingStep> {
     if !(1..=4).contains(&state.round_number) {
         return None;
     }
-    let ziel_zellen_count = |s: &GameState| -> usize {
+    let ziel_zellen_summe = |s: &GameState| -> f64 {
         zellen
             .iter()
             .filter(|&&(r, c)| s.players[pi].dome_grid.get_space(r, c).map_or(false, |sp| sp.is_filled()))
-            .count()
+            .map(|&(r, c)| karte[r][c])
+            .sum()
     };
-    let vorher = ziel_zellen_count(state);
+    let vorher = ziel_zellen_summe(state);
     let cands = crate::tiling_solver::top_k_tilings(state, pi, crate::tiling_solver::MAX_TILING_LEAVES);
     let best = cands
         .into_iter()
         .map(|c| {
-            let z = ziel_zellen_count(&c.final_state);
+            let z = ziel_zellen_summe(&c.final_state);
             (z, c.points, c.first_step)
         })
-        .max_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)))?;
+        .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal).then(a.1.cmp(&b.1)))?;
     if best.0 > vorher {
         Some(best.2)
     } else {
@@ -519,20 +609,379 @@ pub(crate) fn tiling_vorzug_fuer_zellen(state: &GameState, pi: usize, zellen: &[
 
 // ── Geometrie-Bausteine ──────────────────────────────────────────────────────
 
-fn zellen_zeile(r: usize) -> Vec<(usize, usize)> {
+fn cells_row(r: usize) -> Vec<(usize, usize)> {
     (0..6).map(|c| (r, c)).collect()
 }
 
-fn zellen_spalte(c: usize) -> Vec<(usize, usize)> {
+fn cells_column(c: usize) -> Vec<(usize, usize)> {
     (0..6).map(|r| (r, c)).collect()
 }
 
-fn zellen_diagonale_haupt() -> Vec<(usize, usize)> {
+fn cells_main_diagonal() -> Vec<(usize, usize)> {
     (0..6).map(|i| (i, i)).collect()
 }
 
-fn zellen_diagonale_neben() -> Vec<(usize, usize)> {
+fn cells_anti_diagonal() -> Vec<(usize, usize)> {
     (0..6).map(|i| (i, 5 - i)).collect()
+}
+
+// -- Zielhuelle v2: die Prio-Leiter (Nutzer-Vorgabe 2026-08-24) --------------
+
+/// Gewicht je RASTERZELLE. `0.0` heisst "nicht im Ziel".
+type Zielkarte = [[f64; 6]; 6];
+
+/// Neutrale Karte fuer alle Aufrufer, die KEINE Zielgewichtung wollen (jeder
+/// Bestands-Bauer). Multiplikation mit exakt `1.0` ist in f64 verlustfrei und
+/// die Summe exakt darstellbarer Einsen ebenfalls -- die gewichteten
+/// Fassungen sind fuer sie byte-identisch zum Bestand.
+const EINHEITSKARTE: Zielkarte = [[1.0; 6]; 6];
+
+/// **HANDGESETZT.** Gewicht je Prioritaetsstufe der Nutzer-Leiter
+/// (2026-08-24, erweiterte Fassung), Index 0..4 fuer Prio 3..7:
+///
+/// 3. **Randspalte fuellen** (Rasterspalte 0 oder 5) -- hoechste Basiswertigkeit.
+/// 4. **Zweite Spalte fuellen** (Rasterspalte 1 oder 4), mit Spezialfliese
+///    oder Joker auf Rasterzeile 5 (siehe [`envelope_cell_value`]).
+/// 5. **Wertungsplatten und Ziele sichern**: Spezialfelder freischalten und
+///    Joker-Zellen halten. Steht VOR den kurzen Reihen, weil beides im
+///    Lategame skaliert -- ein leeres Spezialfeld kostet `-3`
+///    (`scoring.rs`, Zweig 6) und die Freischaltung bringt zusaetzlich eine
+///    Gratis-Zelle plus Punkte in Hoehe der Rasterreihe.
+/// 6. **Rasterzeile 0 und 1 fuellen**, soweit es geht.
+/// 7. **Nachbarn mitnehmen** aus Rasterzeile 2 und 3 -- reiner Tie-Break.
+///
+/// Prio 0 (Endspiel), 1 (Strafleiste) und 2 (Gegner-Stoerung) stehen bewusst
+/// NICHT in dieser Karte. Sie sind keine Routing-Ziele, sondern Sache der
+/// SUCHE, und dort schon entschieden: Runde 5 laeuft als exaktes Endspiel
+/// (`round5_anchor::applies`, `mcts.rs`), die Strafleiste steckt als
+/// `round_end::projected_unplaceable_penalty` in `player_total_variante`,
+/// und die Gegner-Stoerung ist in `PREREG_opponent_disruption_v2.md` als
+/// UEBERHOLT abgelegt (nichts gebaut, kein Knopf). Sie hier zu duplizieren
+/// hiesse, dieselbe Groesse zweimal zu zaehlen.
+///
+/// Die Zahlen sind eine SETZUNG, keine Ableitung -- dieselbe Regel wie bei
+/// `heuristic_v2::REIHEN_KREDIT`. Gefordert ist nur die strenge Rangfolge.
+const PRIO_GEWICHT: [f64; 5] = [5.0, 4.0, 3.0, 2.0, 1.0];
+
+/// Prio 7 bei AKTIVER Diagonalen-Wertungsplatte (`scoring.rs`, Zweig 2).
+///
+/// Nutzer-Vorgabe 2026-08-24: "bei Verwendung der Diagonale wird Prio 7
+/// aufgeweicht". Die Nachbarschafts-Mitnahme ist ohnehin nur Tie-Break; wenn
+/// eine Diagonale anliegt, sollen die Zuege dorthin nicht von ihr
+/// ueberstimmt werden.
+const PRIO7_AUFGEWEICHT: f64 = 0.5;
+
+/// Wertungsplatten-Id der DIAGONALEN (`scoring.rs`, Zweig 2).
+const K2_DIAGONALEN: usize = 2;
+
+/// Zielkarte je Orientierung: `0` = Randspalte LINKS (Rasterspalte 0, zweite
+/// Spalte 1), `1` = Randspalte RECHTS (5 bzw. 4).
+///
+/// **Warum genau zwei Orientierungen** (dieselbe Einschraenkung wie
+/// `heuristic_v2::triangle_deviation`, Nutzer-Korrektur 2026-08-24): die
+/// volle ZEILE liegt immer oben. Eine Spiegelung um die Reihen-Achse
+/// verlangte eine volle Rasterzeile 5, gespeist ausschliesslich von
+/// Musterreihe 6 (0,74-1,31 Abschluesse je Partie) -- strukturell
+/// unerreichbar.
+///
+/// **Rasterzeile 4 und 5 ausserhalb der beiden Spalten bekommen im Grundbild
+/// 0.** Dort kostet jede Zelle einen Abschluss von Musterreihe 5 bzw. 6, und
+/// die sind in Prio 3/4 besser angelegt. Die Prio-5-Auflage kann sie wieder
+/// anheben -- aber nur fuer Zellen, die ein Spezialfeld freischalten, weil
+/// deren Ertrag nicht an einem weiteren Abschluss haengt.
+fn target_map(player: &PlayerBoard, tile_ids: &[usize], orientierung: usize) -> Zielkarte {
+    let spalte1 = if orientierung == 0 { 0 } else { 5 };
+    let spalte2 = if orientierung == 0 { 1 } else { 4 };
+    let nachbar = if tile_ids.contains(&K2_DIAGONALEN) { PRIO7_AUFGEWEICHT } else { PRIO_GEWICHT[4] };
+    let mut k = [[0.0f64; 6]; 6];
+    for r in 0..6 {
+        for c in 0..6 {
+            k[r][c] = if c == spalte1 {
+                PRIO_GEWICHT[0]
+            } else if c == spalte2 {
+                PRIO_GEWICHT[1]
+            } else if r <= 1 {
+                PRIO_GEWICHT[3]
+            } else if r <= 3 {
+                nachbar
+            } else {
+                0.0
+            };
+        }
+    }
+    prio5_overlay(player, &mut k);
+    k
+}
+
+/// Prio 5 als AUFLAGE auf das Grundbild: hebt Zellen auf `PRIO_GEWICHT[2]`,
+/// senkt aber nie eine hoehere Stufe.
+///
+/// Zwei Sorten, beide aus der Nutzer-Vorgabe ("Spezialfliesen und
+/// Jokerplatten"; die uebrigen Wertungsplatten sind durch Prio 3/4/6 bereits
+/// gedeckt):
+///
+/// 1. **Freischalt-Zellen**: die noch leeren REGULAEREN Zellen einer Platte,
+///    deren Spezialfeld noch gesperrt ist. Sind alle drei belegt, wird das
+///    Spezialfeld automatisch belegt und abgerechnet
+///    (`round_end::check_special_trigger`). Diese Zellen duerfen auch aus
+///    dem Nichts angehoben werden -- der Ertrag haengt nicht an einem
+///    weiteren Musterreihen-Abschluss.
+/// 2. **Joker-Zellen** (Wild): nur, wo die Karte ohnehin schon > 0 ist. Ein
+///    Joker nimmt die Farbbindung, aber die Zelle kostet weiterhin einen
+///    Abschluss ihrer Musterreihe -- das rechtfertigt keinen Eintritt in
+///    Rasterzeile 4/5 ausserhalb der beiden Spalten.
+fn prio5_overlay(player: &PlayerBoard, k: &mut Zielkarte) {
+    let stufe = PRIO_GEWICHT[2];
+    for (tr, reihe) in player.dome_grid.dome_slots.iter().enumerate() {
+        for (tc, slot) in reihe.iter().enumerate() {
+            let Some(slot) = slot else { continue };
+            let sp_idx = slot.special_space_idx();
+            let special_gesperrt = sp_idx.is_some_and(|i| slot.spaces[i].is_locked);
+            for (si, sp) in slot.spaces.iter().enumerate() {
+                if sp.is_filled() {
+                    continue;
+                }
+                let (r, c) = (2 * tr + si / 2, 2 * tc + si % 2);
+                let freischalt = special_gesperrt && Some(si) != sp_idx;
+                let joker = sp.space_type == SpaceType::Wild && k[r][c] > 0.0;
+                if (freischalt || joker) && k[r][c] < stufe {
+                    k[r][c] = stufe;
+                }
+            }
+        }
+    }
+}
+
+// -- Prio 0/1/2: die Leiter oberhalb der Zielkarte ---------------------------
+
+/// Phasen-Eskalation je Runde 1..4 (Nutzer-Vorgabe 2026-08-24: "Late Game
+/// steigen die Gewichte fuer Prio 0, 1 und 2 exponentiell an").
+///
+/// Runde 5 kommt nicht vor: dort uebernimmt das exakte Endspiel
+/// (`round5_anchor::applies`, kurzgeschlossen in `mcts.rs`), und dieses
+/// Routing laeuft ohnehin nur bis Runde 4. Das IST Prio 0 der Leiter -- sie
+/// braucht keine eigene Regel, sondern nur die Uebergabe.
+const ESKALATION: [f64; 4] = [1.0, 2.0, 4.0, 8.0];
+
+/// Gewicht der Strafleisten-Punkte (Prio 1) im linearen Score.
+///
+/// **SETZUNG.** Kalibrierung, damit die Rangfolge nachvollziehbar bleibt:
+/// eine einzelne Strafliese kostet in Runde 1 `0,5` und liegt damit unter
+/// jeder Zielstufe ausser dem Nachbar-Tie-Break; in Runde 4 kostet sie `4,0`
+/// und schlaegt alles ausser Prio 3 (`5,0`). Genau das beschreibt die
+/// Vorgabe: frueh nachrangig, spaet dominant.
+const W_STRAF: f64 = 0.5;
+
+/// Gewicht der Stoerwirkung (Prio 2) im linearen Score.
+///
+/// **SETZUNG, bewusst am unteren Rand.** `disruption_score` liefert hoechstens
+/// so viele Einheiten, wie der Zug Fliesen nimmt (typisch 1-4, selten 6). Bei
+/// `0,10` erreicht die Stoerung in Runde 4 hoechstens `0,1*8*6 = 4,8` und
+/// bleibt damit knapp unter Prio 3 (`5,0`) -- sie kann den Spaltenbau
+/// zuspitzen, aber nicht abraeumen.
+///
+/// Der Grund fuer die Vorsicht ist gemessen, nicht theoretisch:
+/// `PREREG_long_row_payoff.md` B1 hat mit einem zu starken Zusatzanreiz
+/// 14,5 Prozentpunkte Siegquote gekostet, und `PREREG_opponent_disruption_v2`
+/// liegt als UEBERHOLT ohne gebauten Baustein. Wer die Dosis erhoehen will,
+/// misst sie -- eine Ablation ist eine Zeile (`W_STOER = 0.0`).
+const W_STOER: f64 = 0.10;
+
+/// Schwelle der Schadensbegrenzung in PUNKTEN (Prio 1, Nutzer-Vorgabe
+/// 2026-08-24: "Threshold z. B. ab -4 Punkten").
+///
+/// Ein Kandidat, der so viel oder mehr kostet, wird nicht mehr bevorzugt --
+/// die Entscheidung faellt dann an die Suche zurueck, die die Strafleiste
+/// ueber `round_end::projected_unplaceable_penalty` exakt einpreist. Kein
+/// hartes Verbot: das Routing ist eine Praeferenz, kein Filter auf der
+/// Zugmenge (die Beschneidungs-Bauform ist in `PREREG_provocation.md` §7/§9
+/// als spielzerstoerend gemessen).
+const STRAF_SCHWELLE_PUNKTE: i32 = -4;
+
+/// Punktekosten, die `zusatz` weitere Fliesen auf der Strafleiste ausloesen.
+///
+/// Marginal ab dem aktuellen Fuellstand, gedeckelt bei `MAX_BROKEN` -- exakt
+/// dieselbe Rechnung wie `round_end::projected_unplaceable_penalty`
+/// (`BROKEN_PENALTIES = [-1, -2, -3, -4]`, board.rs:228), damit Routing und
+/// Bewertung nicht auseinanderlaufen.
+fn floor_points(player: &PlayerBoard, zusatz: usize) -> i32 {
+    let vorher = player.broken_tiles.len();
+    let nachher = (vorher + zusatz).min(crate::board::MAX_BROKEN);
+    (vorher..nachher).map(|i| crate::board::BROKEN_PENALTIES[i]).sum()
+}
+
+/// Bestes Zielgewicht, das ein Zug in Musterreihe `r` mit Farbe `farbe`
+/// bedienen kann -- `0.0`, wenn er keine Zielzelle bedient.
+///
+/// MAX statt Summe: eine Musterreihe legt je Abschluss genau EINEN Stein,
+/// mehrere bedienbare Zellen sind Alternativen und keine Addition (dieselbe
+/// Begruendung, aus der `heuristic_v2` das Maximum nimmt).
+fn best_target_weight(
+    player: &PlayerBoard,
+    karte: &Zielkarte,
+    zellen: &[(usize, usize)],
+    r: usize,
+    farbe: crate::tile::TileColor,
+) -> f64 {
+    let mut bestes = 0.0f64;
+    for &(zr, zc) in zellen {
+        if zr != r {
+            continue;
+        }
+        let Some(sp) = player.dome_grid.get_space(zr, zc) else { continue };
+        if sp.is_filled() {
+            continue;
+        }
+        let bedient = match sp.space_type {
+            SpaceType::Wild => true,
+            SpaceType::Normal => sp.required_color == Some(farbe),
+            SpaceType::Special => false,
+        };
+        if bedient && karte[zr][zc] > bestes {
+            bestes = karte[zr][zc];
+        }
+    }
+    bestes
+}
+
+/// Drafting-Vorzug der Huellen-Variante: die ganze Prio-Leiter als LINEARER
+/// Score statt als `if`-Kaskade (Nutzer-Vorgabe 2026-08-24, Implementierungs-
+/// Hinweis).
+///
+/// ```text
+/// score = Zielgewicht                       (Prio 3-7, `target_map`)
+///       + W_STOER * Eskalation * Stoerung   (Prio 2, `provocation::disruption_score`)
+///       + W_STRAF * Eskalation * Strafpunkte (Prio 1, <= 0)
+/// ```
+///
+/// Prio 0 steckt in der Abwesenheit: ab Runde 5 liefert diese Funktion nichts
+/// und das exakte Endspiel uebernimmt.
+///
+/// **Nichts davon ist neu gerechnet.** Stoerwirkung und Strafleisten-Zuwachs
+/// kommen aus `provocation.rs` (dort gegen `PREREG_opponent_disruption_v2`
+/// gebaut und dokumentiert), die Strafpunkte-Tabelle aus `board.rs`. Neu ist
+/// allein, dass sie hier zusammen gewichtet werden.
+///
+/// **Bodenzuege bekommen nie einen Vorzug** -- gleiche Regel und gleicher
+/// Grund wie in `provocation::preference_move_for_color`: Schadensbegrenzung
+/// steht ueber Stoerung.
+fn envelope_drafting_preference(
+    state: &GameState,
+    karte: &Zielkarte,
+    zellen: &[(usize, usize)],
+) -> Option<Action> {
+    if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
+        return None;
+    }
+    let pi = state.current_player;
+    let player = &state.players[pi];
+    let verbleibend = crate::provocation::remaining_colors(state);
+    let bedarf_akut = crate::provocation::opponent_demand_acute(state, pi);
+    let eskal = ESKALATION[(state.round_number as usize).clamp(1, 4) - 1];
+
+    let mut best: Option<(f64, i64, i32, i32, crate::moves::Move)> = None;
+    for m in crate::validation::generate_valid_moves(state) {
+        let r = m.place.row_index;
+        if !(0..=5).contains(&r) {
+            continue; // Bodenzug
+        }
+        let r = r as usize;
+
+        // Prio 1: Schadensbegrenzung. Ueber der Schwelle gar nicht erst
+        // bevorzugen -- die Suche preist die Strafleiste exakt ein.
+        let strafe = floor_points(player, crate::provocation::floor_line_growth(state, pi, &m));
+        if strafe <= STRAF_SCHWELLE_PUNKTE {
+            continue;
+        }
+        // Prio 2: verhinderte Gegner-Fliesen zaehlen wie eigener Gewinn.
+        let (stoer, _) = crate::provocation::disruption_score(state, &m, &bedarf_akut);
+        // Prio 3-7: die Zielkarte.
+        let ziel = best_target_weight(player, karte, zellen, r, m.take.color);
+        if ziel == 0.0 && stoer == 0 {
+            continue; // weder offensiv noch defensiv ein Grund
+        }
+
+        let score = ziel + W_STOER * eskal * stoer as f64 + W_STRAF * eskal * strafe as f64;
+        // Tie-Break unveraendert zum Bestand: knappste Farbe zuerst, dann die
+        // vollste eigene Reihe, dann die kleinste Reihe (stabil).
+        let knappheit =
+            crate::provocation::color_index(m.take.color).map(|i| verbleibend[i]).unwrap_or(i64::MAX);
+        let fuellung = player.pattern_lines[r].tiles.len() as i32;
+        // Alle vier Schluessel "groesser ist besser": Score hoch, Farbe knapp
+        // (negiert), eigene Reihe voll, Reihenindex klein (negiert).
+        let schluessel = (score, -knappheit, fuellung, -(r as i32));
+        let besser = best.as_ref().map_or(true, |(bs, bk, bf, br, _)| schluessel > (*bs, *bk, *bf, *br));
+        if besser {
+            best = Some((schluessel.0, schluessel.1, schluessel.2, schluessel.3, m));
+        }
+    }
+    best.map(|(_, _, _, _, m)| Action::Stone(m))
+}
+
+/// Alle Zellen mit Gewicht > 0, in Rasterreihenfolge.
+fn cells_from_map(karte: &Zielkarte) -> Vec<(usize, usize)> {
+    let mut v = Vec::with_capacity(28);
+    for r in 0..6 {
+        for c in 0..6 {
+            if karte[r][c] > 0.0 {
+                v.push((r, c));
+            }
+        }
+    }
+    v
+}
+
+/// Gewichteter Fuellstand der Zielkarte -- das Mass fuer die
+/// Orientierungs-Festnagelung ab Runde 3.
+///
+/// Dieselbe Bauform wie die Zielspalten-Festnagelung in [`v2_target_cells`]:
+/// der Fuellstand ist von sich aus stabil (eine fuehrende Seite behaelt ihren
+/// Vorsprung), also braucht es keinen gespeicherten Zustand und es entsteht
+/// kein Leck ueber Partiegrenzen.
+fn map_fill(player: &PlayerBoard, karte: &Zielkarte) -> f64 {
+    let mut summe = 0.0;
+    for r in 0..6 {
+        for c in 0..6 {
+            if karte[r][c] > 0.0 && player.dome_grid.get_space(r, c).is_some_and(|sp| sp.is_filled()) {
+                summe += karte[r][c];
+            }
+        }
+    }
+    summe
+}
+
+/// Zellenwert fuer die PLATTENWAHL, Bestandsfassung: unveraendert
+/// `column_build::cell_value`.
+fn legacy_cell_value(player: &PlayerBoard, r: usize, _c: usize, space: &DomeSpace) -> f64 {
+    crate::column_build::cell_value(player, r, space)
+}
+
+/// Zellenwert fuer die Plattenwahl der Huellen-Variante.
+///
+/// Einziger Unterschied zum Bestand: auf RASTERZEILE 5 schlagen Spezialfeld
+/// und Wild jede Normalfarbe (Nutzer-Vorgabe 2026-08-24, Prio 2: "mit
+/// Spezialfliese auf Reihe 6. Alternativ ... jokerplatten verwenden").
+///
+/// Der Grund ist mechanisch und geprueft, nicht aesthetisch: Rasterzeile 5
+/// wird ausschliesslich von Musterreihe 6 gespeist, dem seltensten Abschluss
+/// im Spiel. Ein SPEZIALFELD dort kostet gar keinen -- es wird automatisch
+/// belegt, sobald die drei anderen Zellen seiner Platte liegen
+/// (`round_end::check_special_trigger`). Ein WILD kostet einen Abschluss,
+/// nimmt ihm aber die Farbbindung. Der Bestandswert kehrt die Rangfolge um
+/// (Wild 3,0 ueber Special 2,0), weil er fuer Zellen OHNE diese Knappheit
+/// geschrieben ist.
+///
+/// Werte sind eine SETZUNG. Gefordert ist nur: Special > Wild > jede
+/// Normalfarbe, und Normalfarbe hoechstens `JACKPOT_WERT` (4,0).
+fn envelope_cell_value(player: &PlayerBoard, r: usize, _c: usize, space: &DomeSpace) -> f64 {
+    if r == 5 {
+        match space.space_type {
+            SpaceType::Special => return 6.0,
+            SpaceType::Wild => return 5.0,
+            SpaceType::Normal => {}
+        }
+    }
+    crate::column_build::cell_value(player, r, space)
 }
 
 /// Die vier Eckslots aus `scoring::score_corner_tiles`: `(0,0)`/`(0,2)` (obere
@@ -542,7 +991,7 @@ fn zellen_diagonale_neben() -> Vec<(usize, usize)> {
 /// isolierten Eck-Slots, siehe dortige Doku) -- bleibt fuer den eigenen
 /// Geometrietest stehen.
 #[allow(dead_code)]
-fn zellen_ecke(idx: usize) -> Vec<(usize, usize)> {
+fn cells_corner(idx: usize) -> Vec<(usize, usize)> {
     let (sr, sc) = [(0usize, 0usize), (0, 2), (2, 0), (2, 2)][idx];
     let mut v = Vec::with_capacity(4);
     for dr in 0..2usize {
@@ -558,22 +1007,22 @@ fn zellen_ecke(idx: usize) -> Vec<(usize, usize)> {
 struct Zeilenbauer;
 impl Zeilenbauer {
     fn zellen(&self, state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
-        let kand: Vec<_> = (0..6).map(zellen_zeile).collect();
-        ziel_zellen_generisch(state, pi, &kand)
+        let kand: Vec<_> = (0..6).map(cells_row).collect();
+        target_cells_generic(state, pi, &kand)
     }
 }
 impl Plattenbauer for Zeilenbauer {
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(state, state.current_player)?;
-        vorzugszug_fuer_zellen(state, &z)
+        preference_move_for_cells(state, &z)
     }
-    fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn dome_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(state, state.current_player)?;
-        dome_vorzug_fuer_zellen(state, &z)
+        dome_preference_for_cells(state, &z)
     }
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
         let z = self.zellen(state, pi)?;
-        tiling_vorzug_fuer_zellen(state, pi, &z)
+        tiling_preference_for_cells(state, pi, &z)
     }
 }
 
@@ -582,22 +1031,22 @@ impl Plattenbauer for Zeilenbauer {
 struct SpaltenbauerGenerisch;
 impl SpaltenbauerGenerisch {
     fn zellen(&self, state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
-        let kand: Vec<_> = (0..6).map(zellen_spalte).collect();
-        ziel_zellen_generisch(state, pi, &kand)
+        let kand: Vec<_> = (0..6).map(cells_column).collect();
+        target_cells_generic(state, pi, &kand)
     }
 }
 impl Plattenbauer for SpaltenbauerGenerisch {
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(state, state.current_player)?;
-        vorzugszug_fuer_zellen(state, &z)
+        preference_move_for_cells(state, &z)
     }
-    fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn dome_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(state, state.current_player)?;
-        dome_vorzug_fuer_zellen(state, &z)
+        dome_preference_for_cells(state, &z)
     }
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
         let z = self.zellen(state, pi)?;
-        tiling_vorzug_fuer_zellen(state, pi, &z)
+        tiling_preference_for_cells(state, pi, &z)
     }
 }
 
@@ -605,41 +1054,41 @@ impl Plattenbauer for SpaltenbauerGenerisch {
 
 struct Diagonalenbauer;
 impl Diagonalenbauer {
-    /// §18: nutzt `ziel_zellen_generisch_smart` (immer die echten Special-
+    /// §18: nutzt `target_cells_generic_smart` (immer die echten Special-
     /// Nachbar-Kosten, siehe dortige Doku) statt der geteilten, §16/§17-
-    /// Schalter-abhaengigen `ziel_zellen_generisch` -- die Diagonalen-
+    /// Schalter-abhaengigen `target_cells_generic` -- die Diagonalen-
     /// Special-Erweiterung ist eine EIGENE, in §18 validierte Entscheidung
     /// (+2,61 Plattenpunkte, t=2,79, p=0,011, kein Sieg-Verlust), unabhaengig
     /// vom k1-Legacy-Befund (§17: final NEIN).
     fn zellen(&self, state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
-        let kand = vec![zellen_diagonale_haupt(), zellen_diagonale_neben()];
-        ziel_zellen_generisch_smart(state, pi, &kand)
+        let kand = vec![cells_main_diagonal(), cells_anti_diagonal()];
+        target_cells_generic_smart(state, pi, &kand)
     }
 }
 impl Plattenbauer for Diagonalenbauer {
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(state, state.current_player)?;
-        vorzugszug_fuer_zellen(state, &z).or_else(|| {
+        preference_move_for_cells(state, &z).or_else(|| {
             // §18 (Diagonalen-Baustein, Nutzer-Taktik domain_knowledge.md
             // §5): eine offene Special-Zelle in der Diagonalen-Slot-Reihe 3
             // braucht ihre Slot-Nachbarn, die oft NICHT selbst Diagonal-
-            // zellen sind. UNBEDINGT (siehe `special_nachbar_zellen_immer`-
+            // zellen sind. UNBEDINGT (siehe `special_neighbour_cells_always`-
             // Doku) -- §18 hat diese Erweiterung EIGENSTAeNDIG validiert.
             let player = &state.players[state.current_player];
-            let nz = crate::column_build::special_nachbar_zellen_immer(player, &z);
-            if nz.is_empty() { None } else { vorzugszug_fuer_zellen(state, &nz) }
+            let nz = crate::column_build::special_neighbour_cells_always(player, &z);
+            if nz.is_empty() { None } else { preference_move_for_cells(state, &nz) }
         })
     }
-    fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn dome_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(state, state.current_player)?;
-        dome_vorzug_fuer_zellen(state, &z)
+        dome_preference_for_cells(state, &z)
     }
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
         let z = self.zellen(state, pi)?;
-        tiling_vorzug_fuer_zellen(state, pi, &z).or_else(|| {
+        tiling_preference_for_cells(state, pi, &z).or_else(|| {
             let player = &state.players[pi];
-            let nz = crate::column_build::special_nachbar_zellen_immer(player, &z);
-            if nz.is_empty() { None } else { tiling_vorzug_fuer_zellen(state, pi, &nz) }
+            let nz = crate::column_build::special_neighbour_cells_always(player, &z);
+            if nz.is_empty() { None } else { tiling_preference_for_cells(state, pi, &nz) }
         })
     }
 }
@@ -658,7 +1107,7 @@ impl Plattenbauer for Diagonalenbauer {
 // dreistufige `.or_else`-Kette, gleiches Muster wie die Special-Nachbar-
 // Kette in §16/§18.
 
-fn zellen_spaltenpaar(c0: usize) -> Vec<(usize, usize)> {
+fn cells_column_pair(c0: usize) -> Vec<(usize, usize)> {
     let mut v = Vec::with_capacity(12);
     for r in 0..6usize {
         v.push((r, c0));
@@ -667,7 +1116,7 @@ fn zellen_spaltenpaar(c0: usize) -> Vec<(usize, usize)> {
     v
 }
 
-fn zellen_untere_ecke_paar(c0: usize) -> Vec<(usize, usize)> {
+fn cells_lower_corner_pair(c0: usize) -> Vec<(usize, usize)> {
     let mut v = Vec::with_capacity(4);
     for r in 4..6usize {
         v.push((r, c0));
@@ -676,7 +1125,7 @@ fn zellen_untere_ecke_paar(c0: usize) -> Vec<(usize, usize)> {
     v
 }
 
-fn zellen_obere_ecke_paar(c0: usize) -> Vec<(usize, usize)> {
+fn cells_upper_corner_pair(c0: usize) -> Vec<(usize, usize)> {
     let mut v = Vec::with_capacity(4);
     for r in 0..2usize {
         v.push((r, c0));
@@ -688,34 +1137,34 @@ fn zellen_obere_ecke_paar(c0: usize) -> Vec<(usize, usize)> {
 struct Eckenbauer;
 impl Eckenbauer {
     /// Waehlt zwischen den beiden AEUSSEREN Spaltenpaaren (0+1 / 4+5) --
-    /// `ziel_zellen_generisch_smart` (§18) fuer die echte Special-Nachbar-
+    /// `target_cells_generic_smart` (§18) fuer die echte Special-Nachbar-
     /// Kostenrechnung, dieselbe Seed-Streuung/Zielwechsel-Logik wie alle
     /// anderen generischen Bauern (§14-Lehre: keine sture Bindung). Liefert
     /// die KLEINERE der beiden Spaltennummern des gewaehlten Paars.
-    fn spalte0(&self, state: &GameState, pi: usize) -> Option<usize> {
-        let kand = vec![zellen_spaltenpaar(0), zellen_spaltenpaar(4)];
-        let z = ziel_zellen_generisch_smart(state, pi, &kand)?;
+    fn column0(&self, state: &GameState, pi: usize) -> Option<usize> {
+        let kand = vec![cells_column_pair(0), cells_column_pair(4)];
+        let z = target_cells_generic_smart(state, pi, &kand)?;
         z.iter().map(|&(_, c)| c).min()
     }
 }
 impl Plattenbauer for Eckenbauer {
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
-        let c0 = self.spalte0(state, state.current_player)?;
-        vorzugszug_fuer_zellen(state, &zellen_untere_ecke_paar(c0))
-            .or_else(|| vorzugszug_fuer_zellen(state, &zellen_obere_ecke_paar(c0)))
-            .or_else(|| vorzugszug_fuer_zellen(state, &zellen_spaltenpaar(c0)))
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
+        let c0 = self.column0(state, state.current_player)?;
+        preference_move_for_cells(state, &cells_lower_corner_pair(c0))
+            .or_else(|| preference_move_for_cells(state, &cells_upper_corner_pair(c0)))
+            .or_else(|| preference_move_for_cells(state, &cells_column_pair(c0)))
     }
-    fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
-        let c0 = self.spalte0(state, state.current_player)?;
-        dome_vorzug_fuer_zellen(state, &zellen_untere_ecke_paar(c0))
-            .or_else(|| dome_vorzug_fuer_zellen(state, &zellen_obere_ecke_paar(c0)))
-            .or_else(|| dome_vorzug_fuer_zellen(state, &zellen_spaltenpaar(c0)))
+    fn dome_preference(&self, state: &GameState) -> Option<Action> {
+        let c0 = self.column0(state, state.current_player)?;
+        dome_preference_for_cells(state, &cells_lower_corner_pair(c0))
+            .or_else(|| dome_preference_for_cells(state, &cells_upper_corner_pair(c0)))
+            .or_else(|| dome_preference_for_cells(state, &cells_column_pair(c0)))
     }
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
-        let c0 = self.spalte0(state, pi)?;
-        tiling_vorzug_fuer_zellen(state, pi, &zellen_untere_ecke_paar(c0))
-            .or_else(|| tiling_vorzug_fuer_zellen(state, pi, &zellen_obere_ecke_paar(c0)))
-            .or_else(|| tiling_vorzug_fuer_zellen(state, pi, &zellen_spaltenpaar(c0)))
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+        let c0 = self.column0(state, pi)?;
+        tiling_preference_for_cells(state, pi, &cells_lower_corner_pair(c0))
+            .or_else(|| tiling_preference_for_cells(state, pi, &cells_upper_corner_pair(c0)))
+            .or_else(|| tiling_preference_for_cells(state, pi, &cells_column_pair(c0)))
     }
 }
 
@@ -723,7 +1172,7 @@ impl Plattenbauer for Eckenbauer {
 //
 // Kein Kandidatenvergleich noetig -- es gibt nur EINE sinnvolle Zielmenge:
 // ALLE noch offenen Wild-Zellen des Bretts (jede Farbe qualifiziert dort
-// ohnehin, siehe `vorzugszug_fuer_zellen`s `SpaceType::Wild => true`).
+// ohnehin, siehe `preference_move_for_cells`s `SpaceType::Wild => true`).
 
 struct Mehrfarbigbauer;
 impl Mehrfarbigbauer {
@@ -746,11 +1195,11 @@ impl Mehrfarbigbauer {
     }
 }
 impl Plattenbauer for Mehrfarbigbauer {
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(&state.players[state.current_player]);
-        vorzugszug_fuer_zellen(state, &z)
+        preference_move_for_cells(state, &z)
     }
-    fn dome_vorzug(&self, _state: &GameState) -> Option<Action> {
+    fn dome_preference(&self, _state: &GameState) -> Option<Action> {
         // Bewusst kein Vorzug: mehr Wild-Zellen sind IMMER neutral-bis-gut
         // (jede Farbe qualifiziert), eine Rotationsentscheidung aendert die
         // Wild-ANZAHL einer Kachel nicht (Rotation permutiert nur Positionen,
@@ -758,9 +1207,9 @@ impl Plattenbauer for Mehrfarbigbauer {
         // Vorzug besser treffen koennte als das Netz selbst.
         None
     }
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
         let z = self.zellen(&state.players[pi]);
-        tiling_vorzug_fuer_zellen(state, pi, &z)
+        tiling_preference_for_cells(state, pi, &z)
     }
 }
 
@@ -784,17 +1233,17 @@ impl Randbauer {
     }
 }
 impl Plattenbauer for Randbauer {
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(&state.players[state.current_player]);
-        vorzugszug_fuer_zellen(state, &z)
+        preference_move_for_cells(state, &z)
     }
-    fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn dome_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(&state.players[state.current_player]);
-        dome_vorzug_fuer_zellen(state, &z)
+        dome_preference_for_cells(state, &z)
     }
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
         let z = self.zellen(&state.players[pi]);
-        tiling_vorzug_fuer_zellen(state, pi, &z)
+        tiling_preference_for_cells(state, pi, &z)
     }
 }
 
@@ -835,12 +1284,12 @@ impl Spezialbauer {
     }
 }
 impl Plattenbauer for Spezialbauer {
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(&state.players[state.current_player]);
-        vorzugszug_fuer_zellen(state, &z)
+        preference_move_for_cells(state, &z)
     }
-    fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
-        // §19: `kuppeldraft_vorzug_k6` (Joker-Kuppeln auf untere Slots,
+    fn dome_preference(&self, state: &GameState) -> Option<Action> {
+        // §19: `dome_draft_preference_k6` (Joker-Kuppeln auf untere Slots,
         // erzwungene Special-Kuppeln nach oben, domain_knowledge.md §8)
         // wurde GEBAUT UND GEMESSEN, aber NICHT verkettet -- die Messung auf
         // 20 frischen k6-Seeds zeigte eine LEICHT SCHLECHTERE eigene
@@ -852,11 +1301,11 @@ impl Plattenbauer for Spezialbauer {
         // (5/20 statt 9/20). Bleibt als getestete, unverdrahtete Funktion
         // stehen (siehe PREREG_provocation.md §19).
         let z = self.zellen(&state.players[state.current_player]);
-        dome_vorzug_fuer_zellen(state, &z)
+        dome_preference_for_cells(state, &z)
     }
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
         let z = self.zellen(&state.players[pi]);
-        tiling_vorzug_fuer_zellen(state, pi, &z)
+        tiling_preference_for_cells(state, pi, &z)
     }
 }
 
@@ -885,10 +1334,10 @@ impl Plattenbauer for Spezialbauer {
 /// Rotation bleibt bei 0 (Platzhalter wie bei den anderen Bauern) -- Stufe 2
 /// entscheidet die tatsaechliche Rotation ueber die bestehende Special-
 /// Nachbar-Mechanik (siehe Aufrufstelle).
-// Absichtlich NICHT verkettet (siehe `Spezialbauer::dome_vorzug`-Kommentar):
+// Absichtlich NICHT verkettet (siehe `Spezialbauer::dome_preference`-Kommentar):
 // gemessen und mit falschem Vorzeichen abgelehnt (§19).
 #[allow(dead_code)]
-fn kuppeldraft_vorzug_k6(state: &GameState) -> Option<Action> {
+fn dome_draft_preference_k6(state: &GameState) -> Option<Action> {
     let player = &state.players[state.current_player];
     if state.pending_dome_choice.is_some() {
         return None;
@@ -939,13 +1388,13 @@ fn kuppeldraft_vorzug_k6(state: &GameState) -> Option<Action> {
 struct Farbenreichbauer;
 impl Farbenreichbauer {
     fn zellen(&self, state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
-        let kand: Vec<_> = (0..6).map(zellen_zeile).collect();
-        ziel_zellen_generisch(state, pi, &kand)
+        let kand: Vec<_> = (0..6).map(cells_row).collect();
+        target_cells_generic(state, pi, &kand)
     }
 
     /// Farben, die in der Zielreihe (aus `zellen`, alle mit gleichem `row`)
     /// schon platziert sind -- gelesen aus `placed_color` der Slot-Zellen.
-    fn vorhandene_farben(&self, player: &PlayerBoard, row: usize) -> std::collections::HashSet<crate::tile::TileColor> {
+    fn available_colors(&self, player: &PlayerBoard, row: usize) -> std::collections::HashSet<crate::tile::TileColor> {
         let mut farben = std::collections::HashSet::new();
         for c in 0..6usize {
             if let Some(sp) = player.dome_grid.get_space(row, c) {
@@ -958,15 +1407,15 @@ impl Farbenreichbauer {
     }
 }
 impl Plattenbauer for Farbenreichbauer {
-    fn drafting_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
         let z = self.zellen(state, state.current_player)?;
-        vorzugszug_fuer_zellen(state, &z)
+        preference_move_for_cells(state, &z)
     }
-    fn dome_vorzug(&self, state: &GameState) -> Option<Action> {
+    fn dome_preference(&self, state: &GameState) -> Option<Action> {
         let zellen = self.zellen(state, state.current_player)?;
         let row = zellen.first()?.0;
         let player = &state.players[state.current_player];
-        let vorhanden = self.vorhandene_farben(player, row);
+        let vorhanden = self.available_colors(player, row);
 
         // Score einer Kombination: Zahl der Positionen in der Zielreihe, die
         // eine noch NICHT vorhandene Farbe einbringen wuerden (Wild zaehlt
@@ -1053,9 +1502,9 @@ impl Plattenbauer for Farbenreichbauer {
             Action::ChooseDomeSlot(PlaceDomeTileMove { dome_tile_id: tid, slot_row: sr, slot_col: sc, rotation: 0 })
         })
     }
-    fn tiling_vorzug(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
         let z = self.zellen(state, pi)?;
-        tiling_vorzug_fuer_zellen(state, pi, &z)
+        tiling_preference_for_cells(state, pi, &z)
     }
 }
 
@@ -1086,14 +1535,14 @@ mod tests {
 
     #[test]
     fn default_aus_liefert_ueberall_none() {
-        crate::column_build::set_aktiv_override_for_test(Some(false));
-        set_modus_override_for_test(Some(Modus::Aus));
+        crate::column_build::set_active_override_for_test(Some(false));
+        set_mode_override_for_test(Some(Modus::Aus));
         let game = drafting_game(1);
-        assert_eq!(drafting_vorzug(&game.state), None);
-        assert_eq!(dome_vorzug(&game.state), None);
-        assert!(tiling_vorzug(&game.state, 0).is_none());
-        set_modus_override_for_test(None);
-        crate::column_build::set_aktiv_override_for_test(None);
+        assert_eq!(drafting_preference(&game.state), None);
+        assert_eq!(dome_preference(&game.state), None);
+        assert!(tiling_preference(&game.state, 0).is_none());
+        set_mode_override_for_test(None);
+        crate::column_build::set_active_override_for_test(None);
     }
 
     /// Kernabnahme Stufe 1: bei aktivem `MOSAIC_SPALTENBAU` muss die
@@ -1101,115 +1550,115 @@ mod tests {
     /// reine Delegation, keine Nachbildung. Ueber mehrere Seeds/Zustaende,
     /// damit der Test nicht nur eine einzelne Zufallskonstellation trifft.
     #[test]
-    fn mosaic_spaltenbau_an_ist_verhaltensidentisch_zur_direkten_ansteuerung() {
-        crate::column_build::set_aktiv_override_for_test(Some(true));
+    fn mosaic_spaltenbau_on_is_behaviorally_identical_to_direct_targeting() {
+        crate::column_build::set_active_override_for_test(Some(true));
         for seed in 0u64..30 {
-            // Runde 4: `column_build::ziel_spalte` merkt sich jetzt die zuletzt
+            // Runde 4: `column_build::target_column` merkt sich jetzt die zuletzt
             // gewaehlte Spalte je Partie (Vollendbarkeits-Buchhaltung, siehe
             // dortige Doku) -- ohne Reset hier wuerde die Spalte des VORIGEN
             // Seeds in dieses (voellig andere) Brett hineinlecken, exakt das
-            // Leck, vor dem `set_partie_seed`s Doku schon immer warnt. Echte
-            // Partien (self_play.rs) rufen `set_partie_seed` ohnehin schon
+            // Leck, vor dem `set_game_seed`s Doku schon immer warnt. Echte
+            // Partien (self_play.rs) rufen `set_game_seed` ohnehin schon
             // pro Partie auf -- dieser Test muss es fuer sein eigenes
             // Pro-Seed-"Partie"-Modell jetzt auch tun.
-            crate::column_build::set_partie_seed(None);
+            crate::column_build::set_game_seed(None);
             let mut game = drafting_game(seed);
             let pi = game.state.current_player;
             let tile = normal_tile(100 + seed as usize, [Rot, Blau, Gelb, Schwarz]);
             let _ = game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0);
 
             assert_eq!(
-                drafting_vorzug(&game.state),
-                crate::column_build::vorzugszug(&game.state),
-                "Seed {seed}: drafting_vorzug muss column_build::vorzugszug entsprechen"
+                drafting_preference(&game.state),
+                crate::column_build::preference_move(&game.state),
+                "Seed {seed}: drafting_preference muss column_build::preference_move entsprechen"
             );
             assert_eq!(
-                dome_vorzug(&game.state),
-                crate::column_build::vorzug_dome_wahl(&game.state),
-                "Seed {seed}: dome_vorzug muss column_build::vorzug_dome_wahl entsprechen"
+                dome_preference(&game.state),
+                crate::column_build::preference_dome_choice(&game.state),
+                "Seed {seed}: dome_preference muss column_build::preference_dome_choice entsprechen"
             );
             assert_eq!(
-                tiling_vorzug(&game.state, pi),
-                crate::column_build::vorzug_tiling_step(&game.state, pi),
-                "Seed {seed}: tiling_vorzug muss column_build::vorzug_tiling_step entsprechen"
+                tiling_preference(&game.state, pi),
+                crate::column_build::preference_tiling_step(&game.state, pi),
+                "Seed {seed}: tiling_preference muss column_build::preference_tiling_step entsprechen"
             );
         }
-        crate::column_build::set_aktiv_override_for_test(None);
+        crate::column_build::set_active_override_for_test(None);
     }
 
-    /// `zellen_kosten` ueber einer Spalten-Zellenliste muss exakt
-    /// `column_build::spalten_kosten` fuer dieselbe Spalte liefern -- das ist
+    /// `cells_cost` ueber einer Spalten-Zellenliste muss exakt
+    /// `column_build::column_cost` fuer dieselbe Spalte liefern -- das ist
     /// der rechnerische Beleg, dass die Generalisierung fuer den Spalten-Fall
     /// nichts verschiebt (siehe Moduldoku).
     #[test]
-    fn zellen_kosten_stimmt_mit_spalten_kosten_fuer_spaltengeometrie_ueberein() {
+    fn cells_cost_matches_column_cost_for_column_geometry() {
         let mut game = drafting_game(9);
         let pi = game.state.current_player;
         let tile = normal_tile(200, [Rot, Blau, Gelb, Schwarz]);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
-        let verbleibend = crate::provocation::verbleibende_farben(&game.state);
+        let verbleibend = crate::provocation::remaining_colors(&game.state);
         for spalte in 0..6usize {
-            let alt = crate::column_build::spalten_kosten(&game.state.players[pi], spalte, &verbleibend);
-            let neu = zellen_kosten(&game.state.players[pi], &zellen_spalte(spalte), &verbleibend);
+            let alt = crate::column_build::column_cost(&game.state.players[pi], spalte, &verbleibend);
+            let neu = cells_cost(&game.state.players[pi], &cells_column(spalte), &verbleibend);
             assert!((alt - neu).abs() < 1e-9, "Spalte {spalte}: alt={alt} neu={neu}");
         }
     }
 
     #[test]
-    fn mosaic_plattenbau_1_ohne_altknopf_liefert_generischen_spaltenpfad() {
-        crate::column_build::set_aktiv_override_for_test(Some(false));
-        set_modus_override_for_test(Some(Modus::Fest(1)));
+    fn mosaic_plattenbau_1_without_legacy_knob_returns_generic_column_path() {
+        crate::column_build::set_active_override_for_test(Some(false));
+        set_mode_override_for_test(Some(Modus::Fest(1)));
         let game = drafting_game(11);
         // Der generische Pfad muss ETWAS liefern koennen (keine strikte
         // Gleichheit zum Legacy-Pfad gefordert -- das ist der zweite, bewusst
         // getrennte Codepfad, siehe Moduldoku).
-        let _ = drafting_vorzug(&game.state);
-        assert_eq!(aktives_kriterium(&game.state), Some(1));
-        set_modus_override_for_test(None);
-        crate::column_build::set_aktiv_override_for_test(None);
+        let _ = drafting_preference(&game.state);
+        assert_eq!(active_criterion(&game.state), Some(1));
+        set_mode_override_for_test(None);
+        crate::column_build::set_active_override_for_test(None);
     }
 
     #[test]
-    fn mosaic_plattenbau_0_waehlt_zeilenbauer() {
-        set_modus_override_for_test(Some(Modus::Fest(0)));
+    fn mosaic_plattenbau_0_chooses_row_builder() {
+        set_mode_override_for_test(Some(Modus::Fest(0)));
         let game = drafting_game(12);
-        assert_eq!(aktives_kriterium(&game.state), Some(0));
-        set_modus_override_for_test(None);
+        assert_eq!(active_criterion(&game.state), Some(0));
+        set_mode_override_for_test(None);
     }
 
     #[test]
-    fn auto_modus_streut_ueber_scoring_tile_ids_der_partie() {
-        set_modus_override_for_test(Some(Modus::Auto));
+    fn auto_mode_scatters_over_game_scoring_tile_ids() {
+        set_mode_override_for_test(Some(Modus::Auto));
         let mut game = drafting_game(13);
         game.state.scoring_tile_ids = vec![2, 4, 6];
-        set_partie_seed(None);
-        assert_eq!(aktives_kriterium(&game.state), Some(2), "ohne Seed: erstes aktives Kriterium");
+        set_game_seed(None);
+        assert_eq!(active_criterion(&game.state), Some(2), "ohne Seed: erstes aktives Kriterium");
         let mut gesehen = std::collections::HashSet::new();
         for seed in 0u64..40 {
-            set_partie_seed(Some(seed));
-            let k = aktives_kriterium(&game.state).expect("Auto mit gesetzten IDs muss liefern");
+            set_game_seed(Some(seed));
+            let k = active_criterion(&game.state).expect("Auto mit gesetzten IDs muss liefern");
             assert!(game.state.scoring_tile_ids.contains(&k), "Kriterium {k} muss unter den 3 aktiven Platten sein");
             gesehen.insert(k);
         }
-        set_partie_seed(None);
+        set_game_seed(None);
         assert!(gesehen.len() >= 2, "40 Seeds sollten mehr als 1 der 3 IDs treffen: {gesehen:?}");
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     #[test]
-    fn auto_modus_ohne_scoring_tile_ids_liefert_none() {
-        set_modus_override_for_test(Some(Modus::Auto));
+    fn auto_mode_without_scoring_tile_ids_returns_none() {
+        set_mode_override_for_test(Some(Modus::Auto));
         let mut game = drafting_game(14);
         game.state.scoring_tile_ids = Vec::new();
-        assert_eq!(aktives_kriterium(&game.state), None);
-        set_modus_override_for_test(None);
+        assert_eq!(active_criterion(&game.state), None);
+        set_mode_override_for_test(None);
     }
 
     /// Kriterium 3 (Mehrfarbig): eine Wild-Zelle in Zeile 0 muss als Ziel
     /// erkannt werden -- jede angebotene Farbe qualifiziert.
     #[test]
-    fn mehrfarbigbauer_erkennt_offene_wild_zelle_als_ziel() {
-        set_modus_override_for_test(Some(Modus::Fest(3)));
+    fn multicolor_builder_detects_open_wild_cell_as_target() {
+        set_mode_override_for_test(Some(Modus::Fest(3)));
         let mut game = drafting_game(15);
         let pi = game.state.current_player;
         let tile = DomeTile::new(
@@ -1219,34 +1668,34 @@ mod tests {
         );
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
-        let ergebnis = drafting_vorzug(&game.state);
+        let ergebnis = drafting_preference(&game.state);
         assert!(ergebnis.is_some(), "Wild-Zelle muss als Ziel gelten, egal welche Farbe angeboten wird");
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     /// Kriterium 4 (Rand): eine offene Randzelle (Zeile 0) muss als Ziel
     /// erkannt werden.
     #[test]
-    fn randbauer_erkennt_offene_randzelle_als_ziel() {
-        set_modus_override_for_test(Some(Modus::Fest(4)));
+    fn border_builder_detects_open_border_cell_as_target() {
+        set_mode_override_for_test(Some(Modus::Fest(4)));
         let mut game = drafting_game(16);
         let pi = game.state.current_player;
         let tile = normal_tile(400, [Rot, Blau, Gelb, Schwarz]);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
-        let ergebnis = drafting_vorzug(&game.state);
+        let ergebnis = drafting_preference(&game.state);
         match ergebnis {
             Some(Action::Stone(m)) => assert_eq!(m.place.row_index, 0),
             other => panic!("erwartet einen Stein-Zug in Zeile 0 (Rand), bekam {other:?}"),
         }
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     /// Kriterium 6 (Spezial): eine Special-Zelle mit offenen Nachbarn muss
     /// deren Nachbarn als Ziel liefern (nicht die Special-Zelle selbst).
     #[test]
-    fn spezialbauer_zielt_auf_nachbarn_nicht_auf_die_special_zelle_selbst() {
-        set_modus_override_for_test(Some(Modus::Fest(6)));
+    fn special_builder_targets_neighbours_not_the_special_cell_itself() {
+        set_mode_override_for_test(Some(Modus::Fest(6)));
         let mut game = drafting_game(17);
         let pi = game.state.current_player;
         // Slot (0,0): si=0->Special(Zeile0,Spalte0), si=1..3 normal.
@@ -1259,17 +1708,17 @@ mod tests {
         let z = Spezialbauer.zellen(&game.state.players[pi]);
         assert!(!z.contains(&(0, 0)), "die Special-Zelle selbst darf kein Ziel sein");
         assert!(z.contains(&(0, 1)) || z.contains(&(1, 0)) || z.contains(&(1, 1)), "mindestens ein Nachbar muss Ziel sein: {z:?}");
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     /// Kriterium 5 (Ecken): Zielzellen fuer Slot-Index 0 muessen exakt die 4
     /// Rasterzellen von Slot (0,0) sein.
     #[test]
-    fn zellen_ecke_liefert_die_vier_zellen_des_slots() {
-        let mut z = zellen_ecke(0);
+    fn cells_corner_returns_the_four_cells_of_the_slot() {
+        let mut z = cells_corner(0);
         z.sort();
         assert_eq!(z, vec![(0, 0), (0, 1), (1, 0), (1, 1)]);
-        let mut z3 = zellen_ecke(3);
+        let mut z3 = cells_corner(3);
         z3.sort();
         assert_eq!(z3, vec![(4, 4), (4, 5), (5, 4), (5, 5)]);
     }
@@ -1278,8 +1727,8 @@ mod tests {
     /// einer NOCH NICHT vorhandenen Farbe in der Zielreihe einer bevorzugen,
     /// die nur Farben wiederholt, die schon in der Reihe stehen.
     #[test]
-    fn farbenreichbauer_bevorzugt_neue_farbe_in_der_zielreihe() {
-        set_modus_override_for_test(Some(Modus::Fest(7)));
+    fn colorful_builder_prefers_new_color_in_target_row() {
+        set_mode_override_for_test(Some(Modus::Fest(7)));
         let mut game = drafting_game(18);
         let pi = game.state.current_player;
         // Zeile 0 hat schon ALLE VIER Farben Rot/Blau/Gelb/Schwarz stehen
@@ -1312,7 +1761,7 @@ mod tests {
             // Kachel B: Tuerkis ist in Zeile 0 GARANTIERT neu.
             normal_tile(703, [Tuerkis, Blau, Gelb, Schwarz]),
         ];
-        let a = Farbenreichbauer.dome_vorzug(&game.state);
+        let a = Farbenreichbauer.dome_preference(&game.state);
         match a {
             Some(Action::ChooseDomeSlot(m)) => {
                 assert_eq!(m.dome_tile_id, 703, "die Kachel mit einer NEUEN Farbe fuer Zeile 0 muss gewinnen");
@@ -1321,7 +1770,7 @@ mod tests {
             }
             other => panic!("erwartet ChooseDomeSlot, bekam {other:?}"),
         }
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 }
 
@@ -1333,7 +1782,7 @@ mod tests {
 /// das Beiwerk").
 ///
 /// Waehlt die GUENSTIGSTE Spalte und die GUENSTIGSTE Zeile mit derselben
-/// Kostenformel wie die uebrigen Bauer (`ziel_zellen_generisch`) und liefert
+/// Kostenformel wie die uebrigen Bauer (`target_cells_generic`) und liefert
 /// die Vereinigung ihrer Zellen. Der Schnittpunkt beider liegt zwangslaeufig
 /// in der Menge -- er ist der natuerliche Anker fuer die Nachbarschaft, weil
 /// ein Stein dort BEIDE Linien bedient und nach `engine_manual.md:143-147`
@@ -1366,9 +1815,9 @@ mod tests {
 /// anzubieten verduennt nur die Zellenmenge.
 const ZEILEN_ZIEL_MAX: usize = 2;
 
-pub(crate) fn v2_ziel_zellen(state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
+pub(crate) fn v2_target_cells(state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
     let player = &state.players[pi];
-    let spalten: Vec<_> = (0..6).map(zellen_spalte).collect();
+    let spalten: Vec<_> = (0..6).map(cells_column).collect();
 
     // Ab Runde 3 die Spalte FESTNAGELN, in die schon investiert wurde.
     //
@@ -1389,29 +1838,29 @@ pub(crate) fn v2_ziel_zellen(state: &GameState, pi: usize) -> Option<Vec<(usize,
     // Kostenformel, und in Runde 1-2 entscheidet sie allein -- da gibt es
     // noch nichts zu halten.
     let s = if state.round_number >= 3 {
-        let fuellung = spalten_fuellung_lokal(player);
+        let fuellung = column_fill_local(player);
         let max = fuellung.iter().copied().max().unwrap_or(0);
         if max > 0 {
             let fuehrende: Vec<_> = (0..6)
                 .filter(|&c| fuellung[c] == max)
-                .map(zellen_spalte)
+                .map(cells_column)
                 .collect();
-            ziel_zellen_generisch(state, pi, &fuehrende)?
+            target_cells_generic(state, pi, &fuehrende)?
         } else {
-            ziel_zellen_generisch(state, pi, &spalten)?
+            target_cells_generic(state, pi, &spalten)?
         }
     } else {
-        ziel_zellen_generisch(state, pi, &spalten)?
+        target_cells_generic(state, pi, &spalten)?
     };
 
     // Zeilen NUR aus den obersten ZWEI Rasterzeilen und nur, wo ein
     // Spezialfeld sie ueberhaupt vollendbar macht (s. Doku unten).
     let zeilen: Vec<_> = (0..ZEILEN_ZIEL_MAX)
-        .filter(|&r| zeile_ist_vollendbar(player, r))
-        .map(zellen_zeile)
+        .filter(|&r| row_is_completable(player, r))
+        .map(cells_row)
         .collect();
     let mut alle = s;
-    if let Some(z) = ziel_zellen_generisch(state, pi, &zeilen) {
+    if let Some(z) = target_cells_generic(state, pi, &zeilen) {
         for zelle in z {
             if !alle.contains(&zelle) {
                 alle.push(zelle);
@@ -1441,7 +1890,7 @@ pub(crate) fn v2_ziel_zellen(state: &GameState, pi: usize) -> Option<Vec<(usize,
 /// Spezialfeld, und ist es entweder schon belegt oder noch freischaltbar
 /// (also nicht dauerhaft blockiert)? Wenn nicht, ist die Zeile als ZIEL
 /// wertlos und wird gar nicht erst angeboten.
-fn zeile_ist_vollendbar(player: &PlayerBoard, r: usize) -> bool {
+fn row_is_completable(player: &PlayerBoard, r: usize) -> bool {
     let tr = r / 2;
     let teilreihe = r % 2;
     (0..3).any(|tc| {
@@ -1462,14 +1911,72 @@ fn zeile_ist_vollendbar(player: &PlayerBoard, r: usize) -> bool {
 }
 
 
+/// Orientierung der Zielhuelle nach der KOSTENFORMEL.
+///
+/// Verglichen werden die beiden RANDSPALTEN 0 und 5 -- Prio 1 der Leiter und
+/// damit die Spalte, an der die ganze Huelle haengt. Bewusst NICHT die 28
+/// Zellen der ganzen Karte: die sind zu grossen Teilen dieselben und
+/// unterscheiden die beiden Seiten kaum noch. Die Randspalte ist derselbe
+/// 6-Zellen-Vergleich, den [`v2_target_cells`] ueber alle sechs Spalten
+/// fuehrt, nur auf die beiden zulaessigen Kanten eingeschraenkt -- und er
+/// laeuft ueber [`target_index_generic`], behaelt also die Seed-Streuung, an
+/// der die gestreute Start-Ecke haengt.
+fn envelope_orientation_by_cost(state: &GameState, pi: usize) -> Option<usize> {
+    let kandidaten = vec![cells_column(0), cells_column(5)];
+    target_index_generic(state, pi, &kandidaten)
+}
+
+/// Zielkarte fuer `mcts::HeuristikVariante::V2Huelle`: die Prio-Leiter in
+/// einer der beiden Orientierungen.
+///
+/// Unterschied zu [`v2_target_cells`]: dort ist das Ziel die Vereinigung aus
+/// EINER billigsten Spalte und EINER billigsten oberen Zeile (6-12 Zellen,
+/// alle gleich viel wert). Hier sind es 28 Zellen auf vier Prioritaetsstufen
+/// ([`target_map`]), die die alte Menge als Teilmenge enthalten: Prio 1 ist
+/// eine volle Randspalte, Prio 3 sind die beiden oberen Rasterzeilen.
+///
+/// **Die Festnagelung ab Runde 3 bleibt**, nur auf der Orientierung statt auf
+/// der Spalte. Sie war der Bauschritt, der die Partien mit mindestens einer
+/// vollen Spalte von 35 auf 50 Prozent gehoben hat; sie hier fallen zu lassen
+/// waere ein zweiter, mit der Huelle konfundierter Unterschied.
+pub(crate) fn v2_envelope_target(state: &GameState, pi: usize) -> Option<Zielkarte> {
+    let player = &state.players[pi];
+    let ids = &state.scoring_tile_ids;
+    let orientierung = if state.round_number >= 3 {
+        let f0 = map_fill(player, &target_map(player, ids, 0));
+        let f1 = map_fill(player, &target_map(player, ids, 1));
+        if f0 > f1 {
+            0
+        } else if f1 > f0 {
+            1
+        } else {
+            // Gleichstand faellt wie in `v2_target_cells` an die Kostenformel;
+            // in Runde 1-2 entscheidet sie ohnehin allein.
+            envelope_orientation_by_cost(state, pi)?
+        }
+    } else {
+        envelope_orientation_by_cost(state, pi)?
+    };
+    Some(target_map(player, ids, orientierung))
+}
+
 /// Drafting-Vorzug fuer v2 -- UNGEGATET, also ohne `MOSAIC_SPALTENBAU` und
 /// ohne `MOSAIC_PLATTENBAU`.
 ///
 /// Beide Bestandsknoepfe sind prozessweit. Fuer eine Partie v1 GEGEN v2 sind
 /// sie damit unbrauchbar: sie gaelten fuer beide Seiten oder fuer keine. Die
 /// Variante ist der einzige Weg, der die Seiten trennt.
-pub(crate) fn v2_drafting_vorzug(state: &GameState) -> Option<Action> {
-    let z = v2_ziel_zellen(state, state.current_player)?;
+pub(crate) fn v2_drafting_preference(
+    state: &GameState,
+    variante: crate::mcts::HeuristikVariante,
+) -> Option<Action> {
+    if variante == crate::mcts::HeuristikVariante::V2Huelle {
+        let karte = v2_envelope_target(state, state.current_player)?;
+        let z = cells_from_map(&karte);
+        return envelope_drafting_preference(state, &karte, &z)
+            .or_else(|| dome_preference_for_cells_weighted(state, &z, &karte, envelope_cell_value));
+    }
+    let z = v2_target_cells(state, state.current_player)?;
     // Erst der Stein-Zug, dann die KUPPELPLATTEN-Wahl. Die zweite war bis
     // 2026-08-24 nicht verdrahtet, und sie ist der Grund, warum die
     // gestreute Start-Ecke die vollen Zeilen von 0,400 auf 0,263 gedrueckt
@@ -1478,33 +1985,43 @@ pub(crate) fn v2_drafting_vorzug(state: &GameState) -> Option<Action> {
     // 2026-08-24: "dann muss man halt Kuppel ziehen fuer die oberen
     // Rasterzeilen".
     //
-    // `dome_vorzug_fuer_zellen` waehlt Platte, Slot und Rotation so, dass die
+    // `dome_preference_for_cells` waehlt Platte, Slot und Rotation so, dass die
     // Zielzellen bedienbar werden -- laut `column_build.rs`-Moduldoku die
     // Stelle, die "bisher nie gesteuert" wurde, obwohl sie `required_color`
     // der Zellen bestimmt.
-    vorzugszug_fuer_zellen(state, &z).or_else(|| dome_vorzug_fuer_zellen(state, &z))
+    preference_move_for_cells(state, &z).or_else(|| dome_preference_for_cells(state, &z))
 }
 
-/// Tiling-Routing fuer v2 -- ungegatet, siehe [`v2_drafting_vorzug`].
+/// Tiling-Routing fuer v2 -- ungegatet, siehe [`v2_drafting_preference`].
 ///
 /// Das ist die Haelfte, die der bisherige v2-Term GAR NICHT beruehrt hat und
 /// die laut `PREREG_provocation.md` der eigentliche Engpass ist ("der Engpass
 /// ist die PLATZIERBARKEIT, nicht die Plattenbewertung"): ohne sie waehlt
 /// `best_first_step_inner` nach reinen Sofortpunkten und wirft jede
 /// Draft-seitige Absicht wieder weg.
-pub(crate) fn v2_tiling_vorzug(state: &GameState, pi: usize) -> Option<TilingStep> {
-    let z = v2_ziel_zellen(state, pi)?;
+pub(crate) fn v2_tiling_preference(
+    state: &GameState,
+    pi: usize,
+    variante: crate::mcts::HeuristikVariante,
+) -> Option<TilingStep> {
+    if variante == crate::mcts::HeuristikVariante::V2Huelle {
+        let karte = v2_envelope_target(state, pi)?;
+        let z = cells_from_map(&karte);
+        return v2_chip_preference(state, pi, &z)
+            .or_else(|| tiling_preference_for_cells_weighted(state, pi, &z, &karte));
+    }
+    let z = v2_target_cells(state, pi)?;
     // Chip-Einsatz auf die BLOCKIERENDE Reihe zuerst. Befund 2026-08-24:
     // trotz Routing null Chip-Vollendungen von Rasterreihe 6 in 80 Partien,
     // und 7,5 Prozent der Partien haben ueberhaupt keinen R6-Abschluss --
     // ausnahmslos ohne jede volle Spalte. Die generische Suche unten
-    // (`tiling_vorzug_fuer_zellen`, ueber `top_k_tilings`) SCHLIESST
+    // (`tiling_preference_for_cells`, ueber `top_k_tilings`) SCHLIESST
     // Chip-Schritte technisch ein (`legal_steps` -> `chippable_rows`), findet
     // sie aber im DFS-Budget (2000 Knoten, `NODE_BUDGET`) offenbar nicht
     // zuverlaessig -- die Verzweigung ueber Chip-Allokationen ist teuer.
     // Ein direkter Vorzug macht die Absicht explizit statt auf den
     // Suchzufall zu hoffen.
-    v2_chip_vorzug(state, pi, &z).or_else(|| tiling_vorzug_fuer_zellen(state, pi, &z))
+    v2_chip_preference(state, pi, &z).or_else(|| tiling_preference_for_cells(state, pi, &z))
 }
 
 /// Vollendet per Bonuschip die Musterreihe, die eine ZIELZELLE blockiert --
@@ -1512,13 +2029,13 @@ pub(crate) fn v2_tiling_vorzug(state: &GameState, pi: usize) -> Option<TilingSte
 /// platzierbar ist (`row_has_open_matching_slot`). Kein Griff in fremde
 /// Reihen: eine Reihe, die keine Zielzelle bedient, wird nie angefasst,
 /// Bonuschips bleiben dafuer erhalten.
-fn v2_chip_vorzug(state: &GameState, pi: usize, zellen: &[(usize, usize)]) -> Option<TilingStep> {
+fn v2_chip_preference(state: &GameState, pi: usize, zellen: &[(usize, usize)]) -> Option<TilingStep> {
     let player = &state.players[pi];
     if player.bonus_chips.is_empty() {
         return None;
     }
     // `zellen` sind RASTER-Koordinaten (r, c) im 6x6-Raster -- dieselbe
-    // Konvention wie `column_build::zelle_kosten`. Musterreihe r speist
+    // Konvention wie `column_build::cell_cost`. Musterreihe r speist
     // GENAU Rasterreihe r (`round_end::row_has_open_matching_slot` benutzt
     // dieselbe Zuordnung: `dome_row = r/2, space_row = r%2`), ein Umweg ueber
     // Slot-Koordinaten ist unnoetig -- `get_space` uebernimmt die Umrechnung.
@@ -1553,9 +2070,9 @@ fn v2_chip_vorzug(state: &GameState, pi: usize, zellen: &[(usize, usize)]) -> Op
 
 
 /// Fuellstand je Brett-Spalte. Lokale Kopie der Abbildung aus
-/// `heuristic_v2::spalten_fuellung` (Slot `(tr,tc)`, Space `si` -> Spalte
+/// `heuristic_v2::column_fill` (Slot `(tr,tc)`, Space `si` -> Spalte
 /// `2*tc + si%2`), damit dieses Modul nicht auf ein anderes zugreifen muss.
-fn spalten_fuellung_lokal(player: &PlayerBoard) -> [u32; 6] {
+fn column_fill_local(player: &PlayerBoard) -> [u32; 6] {
     let mut fill = [0u32; 6];
     for reihe in player.dome_grid.dome_slots.iter() {
         for (tc, slot) in reihe.iter().enumerate() {
@@ -1571,6 +2088,174 @@ fn spalten_fuellung_lokal(player: &PlayerBoard) -> [u32; 6] {
 }
 
 #[cfg(test)]
+mod huellen_tests {
+    use super::*;
+    use crate::dome::build_dome_tile_pool;
+
+    /// Die Prio-Leiter, Zelle fuer Zelle (Nutzer-Vorgabe 2026-08-24,
+    /// erweiterte Fassung). Ohne diesen Test waere eine vertauschte Stufe nur
+    /// in einer Arena sichtbar -- und dort nicht von "das Konzept traegt
+    /// nicht" zu unterscheiden.
+    ///
+    /// Leeres Brett: ohne Kuppelplatten greift die Prio-5-Auflage nicht, der
+    /// Test sieht also das reine Grundbild.
+    #[test]
+    fn target_map_reflects_the_priority_ladder() {
+        let p = crate::board::PlayerBoard::new(0, "P");
+        let k = target_map(&p, &[], 0);
+        for r in 0..6 {
+            assert_eq!(k[r][0], PRIO_GEWICHT[0], "Prio 3: Randspalte 0, Zeile {r}");
+            assert_eq!(k[r][1], PRIO_GEWICHT[1], "Prio 4: zweite Spalte 1, Zeile {r}");
+        }
+        for c in 2..6 {
+            assert_eq!(k[0][c], PRIO_GEWICHT[3], "Prio 6: Rasterzeile 0, Spalte {c}");
+            assert_eq!(k[1][c], PRIO_GEWICHT[3], "Prio 6: Rasterzeile 1, Spalte {c}");
+            assert_eq!(k[2][c], PRIO_GEWICHT[4], "Prio 7: Nachbar Rasterzeile 2, Spalte {c}");
+            assert_eq!(k[3][c], PRIO_GEWICHT[4], "Prio 7: Nachbar Rasterzeile 3, Spalte {c}");
+            // Rasterzeile 4 und 5 ausserhalb der beiden Spalten: NICHT im
+            // Grundbild. Jede Zelle dort kostet einen Abschluss von
+            // Musterreihe 5 bzw. 6, und die sind in Prio 3/4 besser angelegt.
+            assert_eq!(k[4][c], 0.0, "Rasterzeile 4, Spalte {c} darf nicht im Grundbild sein");
+            assert_eq!(k[5][c], 0.0, "Rasterzeile 5, Spalte {c} darf nicht im Grundbild sein");
+        }
+        // Strenge Rangfolge -- die einzige Eigenschaft, die die Leiter fordert.
+        for i in 0..4 {
+            assert!(PRIO_GEWICHT[i] > PRIO_GEWICHT[i + 1], "Stufe {i} muss ueber {} liegen", i + 1);
+        }
+        assert!(PRIO_GEWICHT[4] > 0.0);
+        // Prio 5 (Wertungsplatten) steht ueber Prio 6 (kurze Reihen) --
+        // die Umstellung der erweiterten Fassung.
+        assert!(PRIO_GEWICHT[2] > PRIO_GEWICHT[3]);
+    }
+
+    /// "Bei Verwendung der Diagonale wird Prio 7 aufgeweicht."
+    #[test]
+    fn active_diagonal_softens_the_neighbour_tiebreak() {
+        let p = crate::board::PlayerBoard::new(0, "P");
+        let ohne = target_map(&p, &[], 0);
+        let mit = target_map(&p, &[K2_DIAGONALEN], 0);
+        assert_eq!(ohne[2][3], PRIO_GEWICHT[4]);
+        assert_eq!(mit[2][3], PRIO7_AUFGEWEICHT);
+        assert!(PRIO7_AUFGEWEICHT < PRIO_GEWICHT[4]);
+        // Die uebrigen Stufen bleiben unberuehrt.
+        assert_eq!(ohne[0][0], mit[0][0]);
+        assert_eq!(ohne[0][3], mit[0][3]);
+    }
+
+    /// Prio 5, Auflage: die leeren REGULAEREN Zellen einer Platte mit noch
+    /// gesperrtem Spezialfeld steigen auf die Wertungsplatten-Stufe -- auch
+    /// dort, wo das Grundbild 0 sagt. Der Ertrag haengt nicht an einem
+    /// weiteren Musterreihen-Abschluss, sondern faellt beim Freischalten an
+    /// (`round_end::check_special_trigger`).
+    #[test]
+    fn prio5_raises_unlock_cells_even_from_zero() {
+        let mut p = crate::board::PlayerBoard::new(0, "P");
+        // Platte 0 traegt ein Spezialfeld; in Slot (2,1) deckt sie die
+        // Rasterzellen (4,2),(4,3),(5,2),(5,3) -- im Grundbild alle 0.
+        let tile = build_dome_tile_pool()[0].clone();
+        p.dome_grid.place_dome_tile(tile, 2, 1).unwrap();
+        let k = target_map(&p, &[], 0);
+        let angehoben = [(4, 2), (4, 3), (5, 2), (5, 3)]
+            .iter()
+            .filter(|&&(r, c)| k[r][c] >= PRIO_GEWICHT[2])
+            .count();
+        assert_eq!(angehoben, 3, "genau die drei REGULAEREN Zellen steigen, nicht das Spezialfeld selbst");
+        // Gegenprobe: eine Zelle ohne Platte bleibt bei 0.
+        assert_eq!(k[4][4], 0.0);
+    }
+
+    /// Strafpunkte sind MARGINAL ab dem aktuellen Fuellstand, gedeckelt bei
+    /// `MAX_BROKEN` -- dieselbe Rechnung wie
+    /// `round_end::projected_unplaceable_penalty`.
+    #[test]
+    fn floor_points_are_marginal_and_capped() {
+        let mut p = crate::board::PlayerBoard::new(0, "P");
+        assert_eq!(floor_points(&p, 0), 0);
+        assert_eq!(floor_points(&p, 1), -1);
+        assert_eq!(floor_points(&p, 2), -3); // -1 + -2
+        assert_eq!(floor_points(&p, 9), -10, "gedeckelt bei MAX_BROKEN = 4");
+        // Mit einer bereits liegenden Fliese kostet die naechste MEHR.
+        p.broken_tiles.push(crate::tile::TileColor::Rot);
+        assert_eq!(floor_points(&p, 1), -2);
+        // Und die Schwelle greift erst ab dem vorgegebenen Punktwert.
+        assert!(floor_points(&p, 1) > STRAF_SCHWELLE_PUNKTE);
+        assert!(floor_points(&p, 2) <= STRAF_SCHWELLE_PUNKTE);
+    }
+
+    /// Orientierung 1 ist Orientierung 0, an der SPALTEN-Achse gespiegelt --
+    /// und nur an ihr. Eine Spiegelung um die Reihen-Achse verlangte eine
+    /// volle Rasterzeile 5 (nur von Musterreihe 6 gespeist, 0,74-1,31
+    /// Abschluesse je Partie) und ist deshalb nicht vorgesehen.
+    #[test]
+    fn orientation_1_is_the_column_mirror() {
+        let p = crate::board::PlayerBoard::new(0, "P");
+        let links = target_map(&p, &[], 0);
+        let rechts = target_map(&p, &[], 1);
+        for r in 0..6 {
+            for c in 0..6 {
+                assert_eq!(links[r][c], rechts[r][5 - c], "Zelle ({r},{c})");
+            }
+        }
+        // Gegenprobe: KEINE Reihen-Spiegelung. Zeile 0 traegt Prio 3, Zeile 5
+        // ausserhalb der Spalten gar nichts -- waeren sie gespiegelt, muesste
+        // das Bild dort gleich aussehen.
+        assert_ne!(links[0][3], links[5][3]);
+    }
+
+    /// 28 Zellen: 2 volle Spalten (12) plus die beiden oberen Zeilen (8) plus
+    /// die Nachbarzeilen 2 und 3 (8), jeweils ausserhalb der zwei Spalten.
+    #[test]
+    fn target_set_has_28_cells() {
+        let p = crate::board::PlayerBoard::new(0, "P");
+        let z = cells_from_map(&target_map(&p, &[], 0));
+        assert_eq!(z.len(), 28);
+        assert!(!z.contains(&(4, 3)), "Rasterzeile 4 ausserhalb der Spalten gehoert nicht dazu");
+        assert!(z.contains(&(5, 0)) && z.contains(&(5, 1)), "beide Spalten reichen bis Rasterzeile 5");
+    }
+
+    /// Prio 2, Kern: auf Rasterzeile 5 schlaegt das Spezialfeld den Joker und
+    /// beide jede Normalfarbe. Grund ist mechanisch -- das Spezialfeld wird
+    /// gratis belegt (`round_end::check_special_trigger`), waehrend jede
+    /// andere Zelle dort einen Musterreihe-6-Abschluss kostet.
+    #[test]
+    fn on_row_5_special_beats_wild() {
+        let p = crate::board::PlayerBoard::new(0, "P");
+        // Platte 0 = [Gelb, Schwarz, Tuerkis, Special]; Space 3 ist Special.
+        let tile = build_dome_tile_pool()[0].clone();
+        let special = &tile.spaces[3];
+        let normal = &tile.spaces[0];
+        assert_eq!(special.space_type, SpaceType::Special);
+        assert_eq!(normal.space_type, SpaceType::Normal);
+
+        let s_special = envelope_cell_value(&p, 5, 1, special);
+        let s_normal = envelope_cell_value(&p, 5, 1, normal);
+        assert!(s_special > s_normal, "Special {s_special} muss Normal {s_normal} schlagen");
+        // Ausserhalb von Rasterzeile 5 unveraendert zum Bestand: dort gilt die
+        // Knappheitsbegruendung nicht.
+        for r in 0..5 {
+            assert_eq!(
+                envelope_cell_value(&p, r, 1, special),
+                legacy_cell_value(&p, r, 1, special),
+                "Rasterzeile {r} darf nicht abweichen"
+            );
+        }
+    }
+
+    /// Der gewichtete Fuellstand entscheidet die Orientierungs-Festnagelung ab
+    /// Runde 3. Ein Brett mit Belegung LINKS muss links hoeher stehen.
+    #[test]
+    fn map_fill_detects_the_served_side() {
+        let mut p = crate::board::PlayerBoard::new(0, "P");
+        let tile = build_dome_tile_pool()[0].clone();
+        p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        p.dome_grid.place_tile(0, 0, crate::tile::TileColor::Gelb).unwrap();
+        let links = map_fill(&p, &target_map(&p, &[], 0));
+        let rechts = map_fill(&p, &target_map(&p, &[], 1));
+        assert!(links > rechts, "links {links} muss ueber rechts {rechts} liegen");
+    }
+}
+
+#[cfg(test)]
 mod v2_chip_vorzug_tests {
     use super::*;
     use crate::dome::{build_dome_tile_pool, BonusChip};
@@ -1580,9 +2265,9 @@ mod v2_chip_vorzug_tests {
     /// Baut einen Zustand mit: Kuppelplatte in Slot (0,0), Musterreihe 1
     /// (Kapazitaet 2) mit EINER Fliese (Rot), einem Space in Slot (0,0), das
     /// Rot akzeptiert und noch leer ist, und zwei passenden Chips. Erwartung:
-    /// `v2_chip_vorzug` findet die Vollendung.
+    /// `v2_chip_preference` findet die Vollendung.
     #[test]
-    fn findet_chip_vollendung_fuer_blockierende_reihe() {
+    fn finds_chip_completion_for_blocking_row() {
         let mut state = crate::game::Game::start(
             ["A".to_string(), "B".to_string()], 0, vec![], &mut rand::rngs::StdRng::seed_from_u64(1),
         ).state.clone();
@@ -1605,7 +2290,7 @@ mod v2_chip_vorzug_tests {
         let zellen: Vec<(usize, usize)> = (0..6).map(|r| (r, 0)).collect();
         let ok = state.players[pi].dome_grid.get_space(1, 0).map(|s| !s.is_filled() && !s.is_locked);
         assert_eq!(ok, Some(true), "Vorbedingung: Zielzelle (1,0) muss offen sein");
-        let schritt = v2_chip_vorzug(&state, pi, &zellen);
+        let schritt = v2_chip_preference(&state, pi, &zellen);
         assert!(matches!(schritt, Some(TilingStep::Chips { row: 1, .. })),
                 "erwartet Chips{{row:1}}, bekam {schritt:?}");
     }

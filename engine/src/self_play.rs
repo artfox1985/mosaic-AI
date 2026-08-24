@@ -40,7 +40,7 @@ use crate::round_end::{
     apply_bonus_chips_with, can_complete_row_with_chips, generate_tiling_actions,
     row_has_open_matching_slot,
 };
-use crate::scoring::{sample_valid_scoring_ids, wertung_progress};
+use crate::scoring::{sample_valid_scoring_ids, scoring_progress};
 use crate::serialize::state_to_json;
 use crate::state::{GameState, Phase};
 use crate::tile::TileColor;
@@ -458,7 +458,7 @@ fn best_eval_for_tile(state: &GameState, tile: &crate::dome::DomeTile) -> (f64, 
                 return_order: Vec::new(),
             };
             if execute_draw_from_stack(&mut g.state, &mv).is_ok() {
-                let progress = wertung_progress(&g.state.players[pi], &g.state.scoring_tile_ids);
+                let progress = scoring_progress(&g.state.players[pi], &g.state.scoring_tile_ids);
                 let placed = g.state.players[pi].dome_grid.dome_slots[sr][sc].as_ref();
                 let bonus = placed.map_or(0, |t| t.bonus_points) as f64;
                 let wild_count = placed.map_or(0, |t| {
@@ -824,7 +824,7 @@ pub(crate) fn choose_start_placement_variante(
     variante: crate::mcts::HeuristikVariante,
     game_seed: u64,
 ) -> Option<(usize, usize, usize, u32)> {
-    if variante != crate::mcts::HeuristikVariante::V2 {
+    if !variante.is_v2() {
         return choose_start_placement(state, pi);
     }
     let alle = start_placement_kandidaten(state, pi);
@@ -1110,7 +1110,7 @@ fn warne_fehlenden_punkte_kopf_einmal() {
 ///   1. `ownership_tiling_weight() == 0` (Default) -> `None`, kein Pass.
 ///   2. Runde ausserhalb des Plattenzweig-Fensters -> der Solver wuerde die
 ///      Karte gar nicht lesen. Das Fenster kommt aus
-///      `tiling_solver::platten_branch_applies`, damit hier keine zweite,
+///      `tiling_solver::plate_branch_applies`, damit hier keine zweite,
 ///      still verstimmbare Kopie von `1..=4` entsteht.
 pub(crate) fn ownership_tiling_marginals(
     net: &Net,
@@ -1118,7 +1118,7 @@ pub(crate) fn ownership_tiling_marginals(
     pi: usize,
 ) -> Option<[f64; crate::scoring::OWNERSHIP_FIELDS]> {
     if crate::tiling_solver::ownership_tiling_weight() == 0.0
-        || !crate::tiling_solver::platten_branch_applies(state.round_number)
+        || !crate::tiling_solver::plate_branch_applies(state.round_number)
     {
         return None;
     }
@@ -1170,7 +1170,7 @@ pub(crate) fn resolve_tiling_step(state: &GameState, pi: usize, net: Option<&Net
 /// Wie [`resolve_tiling_step`], mit ausdruecklicher Heuristik-Variante.
 ///
 /// `V2` routet die Platzierung ZUERST in die v2-Zielzellen (1-2 Spalten plus
-/// 1-2 Zeilen, `plate_builder::v2_tiling_vorzug`) und faellt sonst auf den
+/// 1-2 Zeilen, `plate_builder::v2_tiling_preference`) und faellt sonst auf den
 /// Bestandspfad durch.
 ///
 /// **Das ist die Haelfte, die ein Bewertungsterm nicht erreichen kann.**
@@ -1191,8 +1191,8 @@ pub(crate) fn resolve_tiling_step_variante(
     net: Option<&Net>,
     variante: crate::mcts::HeuristikVariante,
 ) -> TilingStep {
-    if variante == crate::mcts::HeuristikVariante::V2 {
-        if let Some(step) = crate::plate_builder::v2_tiling_vorzug(state, pi) {
+    if variante.is_v2() {
+        if let Some(step) = crate::plate_builder::v2_tiling_preference(state, pi, variante) {
             return step;
         }
     }
@@ -1272,10 +1272,10 @@ fn tiling_step<R: Rng + ?Sized>(game: &mut Game, net: Option<&Net>, rng: &mut R)
 /// kanonische Reihenfolge fuer alle Vorzugs-Stellen. Bei unbesetzten
 /// Knoepfen (`MOSAIC_SPALTENBAU`/`MOSAIC_PLATTENBAU` unset) liefern alle
 /// drei Glieder `None` (dokumentiertes No-Op-Verhalten der Module selbst).
-fn bauer_drafting_vorzug(state: &GameState) -> Option<Action> {
-    crate::provocation::vorzugszug(state)
-        .or_else(|| crate::plate_builder::drafting_vorzug(state))
-        .or_else(|| crate::plate_builder::dome_vorzug(state))
+fn builder_drafting_preference(state: &GameState) -> Option<Action> {
+    crate::provocation::preference_move(state)
+        .or_else(|| crate::plate_builder::drafting_preference(state))
+        .or_else(|| crate::plate_builder::dome_preference(state))
 }
 
 /// Nach-Korrektur fuer Seeding-Startzustaende (PREREG_start_position_seeding
@@ -1321,9 +1321,9 @@ pub(crate) fn seed_state_fixup(st: &mut GameState) {
 /// gleiches Muster wie `stack_draw_research`): je Partie bekommt GENAU EINE
 /// Seite den Bauer-Vorzug (`vorzug: true`), die andere `vorzug: false` --
 /// Seitenwahl deterministisch aus dem Partie-Seed, siehe
-/// [`asym_vorzug_seite`]. `dome_vorzug` faehrt in derselben Kette mit
+/// [`asym_preference_side`]. `dome_preference` faehrt in derselben Kette mit
 /// (par.4(1): NICHT getrennt schaltbar, das ist Absicht).
-fn asym_vorzug_active() -> bool {
+fn asym_preference_active() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         std::env::var("MOSAIC_ASYM_VORZUG")
@@ -1338,15 +1338,15 @@ fn asym_vorzug_active() -> bool {
 /// verteilt (Ziel aus par.3).
 ///
 /// Wiederverwendet den bereits GEPRUEFTEN SplitMix64-Finalizer aus
-/// [`crate::net_mcts::partie_gewicht_aus_seed`] (net_mcts.rs:1164, Vorbild
+/// [`crate::net_mcts::game_weight_from_seed`] (net_mcts.rs:1164, Vorbild
 /// laut Auftrag) statt einer zweiten Kopie derselben Mischung -- XOR mit
 /// einem Distinguisher-Konstante VOR dem Mischen, damit die Seitenwahl NICHT
 /// bit-fuer-bit mit einer gleichzeitig aktiven `MOSAIC_WERTUNG_STREUUNG_MAX`-
 /// Ableitung DESSELBEN Partie-Seeds korreliert (beide Knoepfe koennten in
 /// derselben Partie aktiv sein).
-fn asym_vorzug_seite(game_seed: u64) -> usize {
+fn asym_preference_side(game_seed: u64) -> usize {
     const DISTINGUISHER: u64 = 0xA5A5_A5A5_A5A5_A5A5;
-    let w = crate::net_mcts::partie_gewicht_aus_seed(game_seed ^ DISTINGUISHER, 1.0);
+    let w = crate::net_mcts::game_weight_from_seed(game_seed ^ DISTINGUISHER, 1.0);
     if w < 0.5 {
         0
     } else {
@@ -1456,8 +1456,8 @@ impl DraftingAgent for HeuristicArenaAgent {
             // v2-Vorzug ZUERST, wie im Heuristik-vs-Heuristik-Pfad
             // (`play_arena_game`) -- Praeferenz statt Verbot, greift nur bei
             // einem LEGALEN Zug, sonst entscheidet die Suche frei.
-            let vorzug = if self.variante == crate::mcts::HeuristikVariante::V2 {
-                crate::plate_builder::v2_drafting_vorzug(state).filter(|a| actions.contains(a))
+            let vorzug = if self.variante.is_v2() {
+                crate::plate_builder::v2_drafting_preference(state, self.variante).filter(|a| actions.contains(a))
             } else {
                 None
             };
@@ -1500,7 +1500,7 @@ impl DraftingAgent for NetArenaAgent<'_> {
         let vorzug_kandidat = if actions.len() == 1 {
             None
         } else if self.vorzug {
-            bauer_drafting_vorzug(state)
+            builder_drafting_preference(state)
         } else {
             None
         };
@@ -1531,7 +1531,7 @@ pub(crate) fn net_arena_choose_action(
     if actions.len() == 1 {
         return actions[0].clone();
     }
-    let vorzug_kandidat = if vorzug { bauer_drafting_vorzug(state) } else { None };
+    let vorzug_kandidat = if vorzug { builder_drafting_preference(state) } else { None };
     let s = net_effective_sims(base_sims, actions.len());
     vorzug_kandidat
         .or_else(|| net_search_drafting_action(net, state, s, c_puct, false, search_rng, search_config))
@@ -1582,7 +1582,7 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
             Some(false) => self.pcr_cheap_sims,
             _ => self.base_sims,
         };
-        let vorzug_kandidat = if self.vorzug { bauer_drafting_vorzug(state) } else { None };
+        let vorzug_kandidat = if self.vorzug { builder_drafting_preference(state) } else { None };
         let (chosen, policy, root_q, root_child_q) = if actions.len() == 1 {
             let a = actions[0].clone();
             let e = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
@@ -1652,7 +1652,7 @@ struct PlayerLoopConfig<'a> {
     /// `play_net_game`).
     apply_via_chosen_action: bool,
     /// `[SB]`-Trace-Zeilen ins Spiel-Log (Nutzer-Ergaenzung 2026-08-13) --
-    /// bisher NUR die Netz-Seite von `play_net_game`; `trace_zeile` selbst
+    /// bisher NUR die Netz-Seite von `play_net_game`; `trace_line` selbst
     /// ist No-Op ohne `MOSAIC_SPALTENBAU_TRACE`/`MOSAIC_SPALTENBAU`.
     column_build_trace: bool,
     /// Heuristik-Variante fuer die TILING-Aufloesung dieser Seite
@@ -1687,7 +1687,7 @@ struct GameLoopConfig<'a> {
     mode: LoopMode<'a>,
     players: [PlayerLoopConfig<'a>; 2],
     /// Baustein 1 (`PREREG_asymmetric_curriculum.md` par.5): optionaler
-    /// Zaehler, wie oft die Bauer-Vorzugskette ([`bauer_drafting_vorzug`])
+    /// Zaehler, wie oft die Bauer-Vorzugskette ([`builder_drafting_preference`])
     /// je Seite tatsaechlich einen Kandidaten geliefert hat (`DraftingDecision::
     /// vorzug.is_some()`), Index = Spielerindex. `None` (alle Aufrufer ausser
     /// `play_net_self_play_game` unter `MOSAIC_ASYM_VORZUG`) = kein Zaehlen,
@@ -1843,7 +1843,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                             Action::ChooseDomeSlot(_) | Action::ChooseDomeRotation(_) => "Dome",
                             _ => "Drafting",
                         };
-                        crate::column_build::trace_zeile(
+                        crate::column_build::trace_line(
                             &game.state, player, typ,
                             d.vorzug.as_ref().map(|a| a as &dyn std::fmt::Debug),
                             &d.chosen as &dyn std::fmt::Debug,
@@ -1964,23 +1964,23 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     records.push(tiling_step(&mut game, pcfg.tiling_net, rng));
                 } else {
                     // Arena-Pfade: Tiling ohne Aufzeichnung. Spaltenbau-Trace:
-                    // `tiling_vorzug` separat (rein lesend) NUR fuer die
+                    // `tiling_preference` separat (rein lesend) NUR fuer die
                     // Log-Zeile aufgerufen. BERICHTIGUNG (PREREG_asymmetric_
                     // curriculum.md par.2, geprueft): `resolve_tiling_step`
                     // ruft `plate_builder` NICHT auf -- es ist ein reiner
                     // DFS-Solver (`best_first_step_exact_or_valued[_ex]`).
-                    // `tiling_vorzug` hat genau DIESEN einen Aufrufer (die
+                    // `tiling_preference` hat genau DIESEN einen Aufrufer (die
                     // Log-Zeile hier); der Solver selbst sieht den
                     // Bauer-Vorzug also gar nicht, weder pruefend noch
                     // steuernd.
                     let vorzug_kandidat_tiling = if pcfg.column_build_trace {
-                        crate::plate_builder::tiling_vorzug(&game.state, pi)
+                        crate::plate_builder::tiling_preference(&game.state, pi)
                     } else {
                         None
                     };
                     let step = resolve_tiling_step_variante(&game.state, pi, pcfg.tiling_net, pcfg.heuristik_variante);
                     let trace = if pcfg.column_build_trace {
-                        crate::column_build::trace_zeile(
+                        crate::column_build::trace_line(
                             &game.state, pi, "Tiling",
                             vorzug_kandidat_tiling.as_ref().map(|a| a as &dyn std::fmt::Debug),
                             &step as &dyn std::fmt::Debug,
@@ -2212,8 +2212,8 @@ pub fn run_self_play(
         let gid = format!("{prefix}_g{}", i + 1);
         // `net: None` -- rtv wird hier ohnehin nie berechnet (siehe `play_one_game`s
         // `net`-Gate), `record_rtv` daher irrelevant, aber als Parameter Pflicht.
-        // Keine `set_partie_shaping_weight`-Streuung hier: `net` ist `None`,
-        // also liest NICHTS in diesem Pfad `apply_wertung_shaping`/`net_leaf_eval`
+        // Keine `set_game_shaping_weight`-Streuung hier: `net` ist `None`,
+        // also liest NICHTS in diesem Pfad `apply_scoring_shaping`/`net_leaf_eval`
         // -- die Streuung waere in dieser Funktion tote Verdrahtung (verschoben
         // nach `run_net_self_play`, wo sie tatsaechlich einen Netz-Blattwert
         // erreicht).
@@ -2277,14 +2277,14 @@ pub fn run_self_play_with_net_labels(
 
     let play = |i: usize| -> Vec<Value> {
         let partie_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
-        // Keine `set_partie_shaping_weight`-Streuung hier (verschoben nach
+        // Keine `set_game_shaping_weight`-Streuung hier (verschoben nach
         // `run_net_self_play`, siehe dortiger Kommentar). Bei DEFAULT
         // (`MOSAIC_WERTUNG_STREUUNG_MAX=0`) exakt aequivalent. HINWEIS: anders
         // als bei `run_self_play` ist das hier kein reiner No-Op-Fund -- die
         // Drafting-Entscheidungen bleiben heuristisch, aber die Rundenuebergaenge
         // werden per `round_transition_deep.rs` ueber `net_leaf_eval` bewertet
         // (`round_transition_deep.rs:496/577/606/635/719`), und `net_leaf_eval`
-        // liest `wertung_shaping_weights()` -> `PARTIE_GEWICHT`. Bei gesetztem
+        // liest `scoring_shaping_weights()` -> `PARTIE_GEWICHT`. Bei gesetztem
         // `MOSAIC_WERTUNG_STREUUNG_MAX>0` haette die Streuung hier also die
         // aufgezeichneten `round_transition_value`-Labels beeinflusst, nicht nur
         // die Zugwahl. Entfernt trotzdem wie beauftragt (Heuristik-Generator,
@@ -2405,8 +2405,8 @@ fn play_arena_game<R: Rng + ?Sized>(
                         // Beschneiden der Aktionsmenge: das war gemessen
                         // spielzerstoerend (PREREG_provocation.md par.7/par.9,
                         // Endstand 6-15 statt 47,80).
-                        let vorzug = if varianten[pi] == crate::mcts::HeuristikVariante::V2 {
-                            crate::plate_builder::v2_drafting_vorzug(&game.state)
+                        let vorzug = if varianten[pi].is_v2() {
+                            crate::plate_builder::v2_drafting_preference(&game.state, varianten[pi])
                                 .filter(|a| actions.contains(a))
                         } else {
                             None
@@ -2503,6 +2503,27 @@ fn play_arena_game<R: Rng + ?Sized>(
 ///
 /// `swap` tauscht die Bretter (Pflichtteil): v2 spielt dann auf Brett 0.
 /// Ohne den Tausch waere jeder Befund mit dem Sitzplatz konfundiert.
+/// Loest einen Variantennamen auf. `None` bei unbekanntem Namen -- der
+/// Aufrufer soll das melden statt still auf v1 zurueckzufallen (dieselbe
+/// Falle wie `train.py --load`, das bei unlesbarem Pfad stumm von vorn
+/// trainiert hat).
+pub fn variant_from_name(name: &str) -> Option<crate::mcts::HeuristikVariante> {
+    use crate::mcts::HeuristikVariante as HV;
+    match name.to_ascii_lowercase().as_str() {
+        "v1" => Some(HV::V1),
+        "v2" => Some(HV::V2),
+        "v2huelle" | "v2_huelle" => Some(HV::V2Huelle),
+        _ => None,
+    }
+}
+
+/// Heuristik gegen Heuristik, JE BRETT eine Variante.
+///
+/// `variante_a`/`variante_b` sind `"v1"`, `"v2"` oder `"v2huelle"`. Die
+/// Vorgabe `"v1"`/`"v2"` ist der Bestandslauf der Messkette Schritt 2; mit
+/// `"v2"`/`"v2huelle"` misst derselbe Aufbau die Prio-Leiter gegen das alte
+/// Routing -- gleiche Fabriken, gleiche Platten, gleiche Seeds, damit der
+/// Vergleich das Routing misst und nicht die Streuung.
 pub fn run_heuristic_v1_vs_v2_arena(
     sims_v1: u32,
     sims_v2: u32,
@@ -2512,15 +2533,26 @@ pub fn run_heuristic_v1_vs_v2_arena(
     c: f64,
     swap: bool,
     log_games: bool,
+    variante_a: &str,
+    variante_b: &str,
 ) -> String {
-    use crate::mcts::HeuristikVariante as HV;
-    // Brett 0 traegt v1, Brett 1 traegt v2 -- oder umgekehrt bei `swap`.
-    let varianten = if swap { [HV::V2, HV::V1] } else { [HV::V1, HV::V2] };
+    let va = match variant_from_name(variante_a) {
+        Some(v) => v,
+        None => return json!({"error": format!("unbekannte Variante: {variante_a}")}).to_string(),
+    };
+    let vb = match variant_from_name(variante_b) {
+        Some(v) => v,
+        None => return json!({"error": format!("unbekannte Variante: {variante_b}")}).to_string(),
+    };
+    // Brett 0 traegt Variante A, Brett 1 traegt B -- oder umgekehrt bei `swap`.
+    let varianten = if swap { [vb, va] } else { [va, vb] };
     let sims = if swap { [sims_v2, sims_v1] } else { [sims_v1, sims_v2] };
+    let name_a = format!("Heuristik_{variante_a}");
+    let name_b = format!("Heuristik_{variante_b}");
     let namen = if swap {
-        ["HeuristikV2".to_string(), "HeuristikV1".to_string()]
+        [name_b.clone(), name_a.clone()]
     } else {
-        ["HeuristikV1".to_string(), "HeuristikV2".to_string()]
+        [name_a.clone(), name_b.clone()]
     };
 
     let play = |i: usize| -> Value {
@@ -2536,7 +2568,10 @@ pub fn run_heuristic_v1_vs_v2_arena(
         // Welches Brett welche Variante trug, mitschreiben -- sonst muss die
         // Auswertung es aus dem Aufruf rekonstruieren.
         if let Some(obj) = v.as_object_mut() {
+            // `v2_board` heisst historisch so, meint aber "Brett der Variante
+            // B" -- Bestandsfeld, von `tools/` gelesen, deshalb unveraendert.
             obj.insert("v2_board".to_string(), json!(if swap { 0 } else { 1 }));
+            obj.insert("varianten".to_string(), json!(namen.clone()));
         }
         v
     };
@@ -2749,7 +2784,7 @@ pub fn run_net_arena_match(
         // richtigen Thread. Reset danach, damit ein rayon-recycelter Thread
         // nicht den Seed der VORHERIGEN Partie fuer die naechste `column_build`-
         // Anfrage ausserhalb dieser Funktion mitschleppt.
-        crate::plate_builder::set_partie_seed(Some(game_seed));
+        crate::plate_builder::set_game_seed(Some(game_seed));
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
@@ -2758,7 +2793,7 @@ pub fn run_net_arena_match(
             &net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng, game_seed, log_games,
             search_config,
         );
-        crate::plate_builder::set_partie_seed(None);
+        crate::plate_builder::set_game_seed(None);
         result
     };
 
@@ -2803,7 +2838,7 @@ pub fn run_net_vs_heuristic_v2_arena(
             Some(s) => s[i],
             None => seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
         };
-        crate::plate_builder::set_partie_seed(Some(game_seed));
+        crate::plate_builder::set_game_seed(Some(game_seed));
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
@@ -2812,7 +2847,7 @@ pub fn run_net_vs_heuristic_v2_arena(
             &net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng, game_seed, log_games,
             search_config, crate::mcts::HeuristikVariante::V2,
         );
-        crate::plate_builder::set_partie_seed(None);
+        crate::plate_builder::set_game_seed(None);
         result
     };
 
@@ -2931,7 +2966,7 @@ pub fn run_net_vs_net_arena(
             None => seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
         };
         // Siehe Kommentar in `run_net_arena_match`s `play`-Closure.
-        crate::plate_builder::set_partie_seed(Some(game_seed));
+        crate::plate_builder::set_game_seed(Some(game_seed));
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
@@ -2940,7 +2975,7 @@ pub fn run_net_vs_net_arena(
             &net_a, &net_b, sims_a, sims_b, c_puct_a, c_puct_b, ids, names, first, &mut rng, game_seed,
             log_games, search_config_a, search_config_b,
         );
-        crate::plate_builder::set_partie_seed(None);
+        crate::plate_builder::set_game_seed(None);
         result
     };
 
@@ -3039,9 +3074,9 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                         .unwrap_or_else(|| actions[0].clone())
                     } else {
                         let s = net_effective_sims(sims_plain, actions.len());
-                        crate::provocation::vorzugszug(&game.state)
-                            .or_else(|| crate::plate_builder::drafting_vorzug(&game.state))
-                            .or_else(|| crate::plate_builder::dome_vorzug(&game.state))
+                        crate::provocation::preference_move(&game.state)
+                            .or_else(|| crate::plate_builder::drafting_preference(&game.state))
+                            .or_else(|| crate::plate_builder::dome_preference(&game.state))
                             .or_else(|| {
                                 net_search_drafting_action(
                                     plain_net, &game.state, s, c_puct_plain, false, rng,
@@ -3548,12 +3583,12 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // par.3): bei INAKTIVEM Knopf bleibt es exakt beim Bestand -- EIN Agent
     // fuer beide Seiten, `vorzug: true` beidseitig. Bei AKTIVEM Knopf
     // bekommt GENAU EINE Seite (deterministisch aus `game_seed`, siehe
-    // [`asym_vorzug_seite`]) `vorzug: true`, die andere `vorzug: false` --
+    // [`asym_preference_side`]) `vorzug: true`, die andere `vorzug: false` --
     // dafuer sind ZWEI eigene Agenten-Instanzen noetig, weil `vorzug` ein
     // Konstruktor-Argument von `NetSelfPlayAgent` ist, kein Laufzeit-Parameter
     // von `decide`.
-    let asym = asym_vorzug_active();
-    let vorzug_seite = if asym { Some(asym_vorzug_seite(game_seed)) } else { None };
+    let asym = asym_preference_active();
+    let vorzug_seite = if asym { Some(asym_preference_side(game_seed)) } else { None };
     let vorzug_p0 = vorzug_seite.map(|s| s == 0).unwrap_or(true);
     let vorzug_p1 = vorzug_seite.map(|s| s == 1).unwrap_or(true);
     let agent0 = NetSelfPlayAgent {
@@ -3840,9 +3875,9 @@ pub fn run_net_self_play(
             // `net_leaf_eval` der tatsaechliche Blattbewerter dieses gesamten
             // Suchpfads (Drafting UND Rundenuebergaenge), die Streuung erreicht
             // ihn also wirklich.
-            let streuung_max = crate::net_mcts::wertung_streuung_max();
-            crate::net_mcts::set_partie_shaping_weight(if streuung_max > 0.0 {
-                Some(crate::net_mcts::partie_gewicht_aus_seed(partie_seed, streuung_max))
+            let streuung_max = crate::net_mcts::scoring_scatter_max();
+            crate::net_mcts::set_game_shaping_weight(if streuung_max > 0.0 {
+                Some(crate::net_mcts::game_weight_from_seed(partie_seed, streuung_max))
             } else {
                 None
             });
@@ -3857,11 +3892,11 @@ pub fn run_net_self_play(
             // rayon-Worker-Threads (siehe die ausfuehrlichen Leck-Warnungen in
             // column_build.rs) ist ein "vorher"-Zustand hier strukturell
             // ausgeschlossen. Ohne diesen Aufruf bliebe `PARTIE_SEED` auf
-            // `None` -- `column_build::waehle_spalte`s/`plate_builder::waehle_
+            // `None` -- `column_build::choose_column`s/`plate_builder::waehle_
             // kandidat`s Seed-Streuung wuerde dann nie greifen (Bestands-
             // verhalten des jeweiligen "kein Seed"-Zweigs: stabil kleinste
             // Spalte/kleinster Index statt gestreut).
-            crate::plate_builder::set_partie_seed(Some(partie_seed));
+            crate::plate_builder::set_game_seed(Some(partie_seed));
             // Task #32 (`profiling.rs`-Modulkopf "Task #32"): "total_selfplay"
             // -- die GANZE Spielschleife dieser einen Partie (einziger
             // Aufrufer von `play_net_self_play_game`).
@@ -4373,9 +4408,9 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
                         )
                     } else {
                         let s = net_effective_sims(sims1, actions.len());
-                        crate::provocation::vorzugszug(&game.state)
-                            .or_else(|| crate::plate_builder::drafting_vorzug(&game.state))
-                            .or_else(|| crate::plate_builder::dome_vorzug(&game.state))
+                        crate::provocation::preference_move(&game.state)
+                            .or_else(|| crate::plate_builder::drafting_preference(&game.state))
+                            .or_else(|| crate::plate_builder::dome_preference(&game.state))
                             .or_else(|| {
                                 net_search_drafting_action(
                                     net, &game.state, s, c_puct, false, rng, &SearchConfig::from_env(),
@@ -6534,14 +6569,14 @@ pub(crate) mod tests {
     /// Aktionsmenge nie veraendern. Geprueft ueber ECHTE Spielverlaeufe
     /// (mehrere Seeds, mehrere Runden) als Ergaenzung zu den adversarialen
     /// Unit-Tests in `provocation.rs` (die exakte Identitaet auf
-    /// handgebauten Kandidatenlisten zeigen): `beschneide_moves` filtert nur
+    /// handgebauten Kandidatenlisten zeigen): `prune_moves` filtert nur
     /// weg, fuegt nie hinzu (siehe dortige Doku) -- ein `Fest`-Lauf auf
     /// GENAU DEMSELBEN, unveraenderten Zustand muss deshalb IMMER eine
     /// Teilmenge des `Aus`-Laufs sein. Waere "Aus" faelschlich NICHT
     /// identisch zum Bestand, wuerde diese Teilmengen-Eigenschaft irgendwann
     /// verletzt.
     #[test]
-    fn provokation_default_aus_ist_stets_obermenge_ueber_mehrere_seeds_und_runden() {
+    fn provocation_default_off_is_always_a_superset_over_seeds_and_rounds() {
         use crate::validation::generate_valid_moves;
         for seed in [101u64, 202, 303, 404, 505] {
             let spalte = (seed % 6) as usize;
@@ -6556,7 +6591,7 @@ pub(crate) mod tests {
                 if guard > 4000 || game.state.round_number > start_round + 2 {
                     break; // mehrere Rundenuebergaenge abgedeckt, dann Testlaufzeit begrenzen.
                 }
-                crate::provocation::set_modus_override_for_test(Some(crate::provocation::Modus::Aus));
+                crate::provocation::set_mode_override_for_test(Some(crate::provocation::Modus::Aus));
                 match game.state.phase {
                     Phase::StartPlacement | Phase::Drafting => {
                         if game.state.players.iter().any(|p| p.start_tile_pending) {
@@ -6565,7 +6600,7 @@ pub(crate) mod tests {
                             }
                         } else if game.state.phase == Phase::Drafting {
                             let aus = generate_valid_moves(&game.state);
-                            crate::provocation::set_modus_override_for_test(Some(
+                            crate::provocation::set_mode_override_for_test(Some(
                                 crate::provocation::Modus::Fest(spalte),
                             ));
                             let fest = generate_valid_moves(&game.state);
@@ -6575,7 +6610,7 @@ pub(crate) mod tests {
                                  des Aus-Ergebnisses sein -- sonst hat 'Aus' faelschlich mitbeschnitten",
                                 game.state.round_number
                             );
-                            crate::provocation::set_modus_override_for_test(Some(
+                            crate::provocation::set_mode_override_for_test(Some(
                                 crate::provocation::Modus::Aus,
                             ));
                             let actions = drafting_actions(&game.state);
@@ -6595,7 +6630,7 @@ pub(crate) mod tests {
                 }
             }
         }
-        crate::provocation::set_modus_override_for_test(None);
+        crate::provocation::set_mode_override_for_test(None);
     }
 
     /// Provokations-Pflichttest 4 (`evaluations/PREREG_provocation.md`,
@@ -6605,9 +6640,9 @@ pub(crate) mod tests {
     /// Reiner Heuristik-Zufallsrollout, gleiches Grundmuster wie
     /// `tile_color_accounting_invariant_holds_throughout_random_games` oben.
     #[test]
-    fn provokation_mit_gesetztem_knopf_erreicht_phase_final_ohne_deadlock() {
+    fn provocation_with_knob_set_reaches_final_phase_without_deadlock() {
         for (seed, spalte) in [(61u64, 0usize), (62, 2), (63, 5)] {
-            crate::provocation::set_modus_override_for_test(Some(crate::provocation::Modus::Fest(spalte)));
+            crate::provocation::set_mode_override_for_test(Some(crate::provocation::Modus::Fest(spalte)));
             let mut rng = StdRng::seed_from_u64(seed);
             let ids = sample_valid_scoring_ids(3, &mut rng);
             let mut game =
@@ -6659,7 +6694,7 @@ pub(crate) mod tests {
                 "Seed {seed}, Spalte {spalte}: Partie mit aktiver Provokation muss Phase::Final \
                  erreichen (kein Deadlock, guard={guard})"
             );
-            crate::provocation::set_modus_override_for_test(None);
+            crate::provocation::set_mode_override_for_test(None);
         }
     }
 
@@ -6669,9 +6704,9 @@ pub(crate) mod tests {
     /// asymmetrischer Vorzug, `play_net_self_play_game` bleibt bei
     /// `vorzug: true` beidseitig.
     #[test]
-    fn asym_vorzug_active_defaults_to_off() {
+    fn asym_preference_active_defaults_to_off() {
         assert!(
-            !asym_vorzug_active(),
+            !asym_preference_active(),
             "MOSAIC_ASYM_VORZUG muss bei ungesetzter Env-Var aus sein (Bestandsverhalten)"
         );
     }
@@ -6680,15 +6715,15 @@ pub(crate) mod tests {
     /// je Partie-Seed (dieselbe Partie -> dieselbe Zwangsseite bei jedem
     /// Aufruf) und (b) ~50/50 ueber den Korpus verteilt. Beides hier direkt
     /// an der reinen Funktion geprueft, ohne Env-Var/OnceLock (siehe
-    /// `net_mcts.rs`-Musterkommentar zu `apply_wertung_shaping_full`: ein
+    /// `net_mcts.rs`-Musterkommentar zu `apply_scoring_shaping_full`: ein
     /// Test kann einen einmal gelesenen OnceLock-Cache nicht mehr umstellen).
     #[test]
-    fn asym_vorzug_seite_ist_deterministisch_und_naehert_sich_50_50() {
+    fn asym_preference_side_is_deterministic_and_approaches_50_50() {
         let n = 20_000u64;
         let mut side0 = 0u64;
         for seed in 0..n {
-            let a = asym_vorzug_seite(seed);
-            let b = asym_vorzug_seite(seed);
+            let a = asym_preference_side(seed);
+            let b = asym_preference_side(seed);
             assert_eq!(a, b, "Seed {seed}: Seitenwahl muss deterministisch sein (zweiter Aufruf weicht ab)");
             assert!(a == 0 || a == 1, "Seed {seed}: Seite muss 0 oder 1 sein, war {a}");
             if a == 0 {
@@ -6709,13 +6744,13 @@ pub(crate) mod tests {
     /// dass die 50/50-Naeherung oben nur ein Artefakt fortlaufender
     /// Seed-Werte 0..n ist.
     #[test]
-    fn asym_vorzug_seite_50_50_ueber_abgeleitete_partie_seeds() {
+    fn asym_preference_side_50_50_over_derived_game_seeds() {
         let base: u64 = 0x1234_5678_9ABC_DEF0;
         let n = 20_000u64;
         let mut side0 = 0u64;
         for i in 0..n {
             let seed = base.wrapping_add(i.wrapping_mul(0x9E37_79B9_7F4A_7C15));
-            if asym_vorzug_seite(seed) == 0 {
+            if asym_preference_side(seed) == 0 {
                 side0 += 1;
             }
         }

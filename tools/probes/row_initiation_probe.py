@@ -46,7 +46,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
-from plate_points_from_arena import partien  # noqa: E402
+from plate_points_from_arena import game_list  # noqa: E402
 
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "row_initiation_probe.json"
@@ -145,7 +145,7 @@ def bootstrap_share(stats, prefix=""):
 
 def collect(path, arm, side_filter):
     stats = defaultdict(SideStats)
-    for sp in partien(path, arm):
+    for sp in game_list(path, arm):
         seed = sp.get("game_seed")
         for rnd, name, row, is_init, _fv in classify_moves(sp.get("log") or []):
             lab = side_filter(name)

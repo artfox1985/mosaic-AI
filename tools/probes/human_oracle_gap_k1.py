@@ -12,7 +12,7 @@ KLASSIFIKATION (par.4, operativ): ein Drafting-Zug (kind == "stone") heisst
 k1-relevant, wenn die genommene Farbe von mindestens einer noch
 UNVOLLSTAENDIGEN und noch VOLLENDBAREN Spalte des Ziehenden gebraucht wird --
 Vollendbarkeit aus `mosaic_rust.plate_completability_json`
-(`column_build::ist_spalte_vollendbar`), Farbbedarf aus den offenen
+(`column_build::column_is_completable`), Farbbedarf aus den offenen
 Normal-Zellen (`col_open_cells`, Bedarf > 0). Alle uebrigen bewerteten Zuege
 heissen neutral. Wild-Fliesen ("bunt") fordern keine Farbe und zaehlen als
 neutral; ihre Anzahl wird getrennt ausgewiesen.
@@ -74,7 +74,7 @@ def main() -> None:
 
     import mosaic_rust as mr  # noqa: PLC0415
 
-    partien = []
+    games = []
     for orakel_pfad in sorted(glob.glob(str(Path(a.dumps) / "oracle_game_*.jsonl"))):
         stem = Path(orakel_pfad).stem.removeprefix("oracle_")
         dump_pfad = Path(a.dumps) / f"{stem}.jsonl"
@@ -120,7 +120,7 @@ def main() -> None:
         m_k1 = statistics.mean(deltas["k1"]) if deltas["k1"] else None
         m_ne = statistics.mean(deltas["neutral"]) if deltas["neutral"] else None
         groesste.sort(reverse=True)
-        partien.append({
+        games.append({
             "partie": stem, "mensch_idx": mensch,
             "n_k1": len(deltas["k1"]), "n_neutral": len(deltas["neutral"]), "n_wild": wild,
             "mittel_k1": m_k1, "mittel_neutral": m_ne,
@@ -132,14 +132,14 @@ def main() -> None:
 
     print("\n  Partie                              | n_k1 | n_neu | wild | Mittel k1 | Mittel neu | Differenz")
     print("  ------------------------------------+------+-------+------+-----------+------------+----------")
-    for p in partien:
+    for p in games:
         d = p["differenz"]
         print(f"  {p['partie']:36}| {p['n_k1']:4} | {p['n_neutral']:5} | {p['n_wild']:4} |"
               f" {p['mittel_k1'] if p['mittel_k1'] is not None else float('nan'):9.2f} |"
               f" {p['mittel_neutral'] if p['mittel_neutral'] is not None else float('nan'):10.2f} |"
               f" {d if d is not None else float('nan'):8.2f}")
 
-    diffs = [p["differenz"] for p in partien if p["differenz"] is not None]
+    diffs = [p["differenz"] for p in games if p["differenz"] is not None]
     verdikt = {"n_partien": len(diffs)}
     if len(diffs) >= 2:
         m = statistics.mean(diffs)
@@ -170,7 +170,7 @@ def main() -> None:
               + ("" if len(diffs) >= 5 else f"  (erst {len(diffs)} Partien)"))
 
     (BASIS / "evaluations" / "probe_human_oracle_gap_k1.json").write_text(
-        json.dumps({"partien": partien, "verdikt": verdikt}, indent=1, ensure_ascii=False),
+        json.dumps({"games": games, "verdikt": verdikt}, indent=1, ensure_ascii=False),
         encoding="utf-8")
     print("\n  geschrieben: evaluations/probe_human_oracle_gap_k1.json")
 

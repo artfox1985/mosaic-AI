@@ -234,5 +234,5 @@ pub fn generate_valid_moves(state: &GameState) -> Vec<Move> {
     // HIER (im Generator selbst, "Single Source of Truth" fuer Suche/GUI/
     // Rundenabschluss-Check `game::current_player_can_move`), nicht am
     // gespielten Zug -- sonst plant die Suche an der Beschraenkung vorbei.
-    crate::provocation::beschneide_moves(state, moves)
+    crate::provocation::prune_moves(state, moves)
 }

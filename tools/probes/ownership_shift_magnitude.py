@@ -154,18 +154,18 @@ def main() -> None:
     if not zeilen:
         raise SystemExit("kein Trace lieferte >= 2 Kandidaten -- Trace-Format pruefen")
 
-    def mittel(k):
+    def avg(k):
         return statistics.mean(z[k] for z in zeilen)
 
     print(f"\n  {len(zeilen)} Stellungen mit >= 2 Kandidaten, Sims {a.sims}")
-    print(f"  Kandidaten je Stellung (Mittel): {mittel('n_kand'):.1f}")
-    print(f"  Spannweite sigma_q ueber die Kandidaten: {mittel('sigma_q_spanne'):.4f}"
-          f"   (std {mittel('sigma_q_std'):.4f})")
-    print(f"  Spannweite log-Prior ueber die Kandidaten: {mittel('logit_spanne'):.4f}"
-          f"   (std {mittel('logit_std'):.4f})")
-    print(f"  Spannweite q ueber die Kandidaten: {mittel('q_spanne'):.4f}")
-    print(f"  max_N (gemessen, nicht angenommen): {mittel('max_visits'):.1f}")
-    verh = mittel("sigma_q_spanne") / mittel("logit_spanne") if mittel("logit_spanne") else float("inf")
+    print(f"  Kandidaten je Stellung (Mittel): {avg('n_kand'):.1f}")
+    print(f"  Spannweite sigma_q ueber die Kandidaten: {avg('sigma_q_spanne'):.4f}"
+          f"   (std {avg('sigma_q_std'):.4f})")
+    print(f"  Spannweite log-Prior ueber die Kandidaten: {avg('logit_spanne'):.4f}"
+          f"   (std {avg('logit_std'):.4f})")
+    print(f"  Spannweite q ueber die Kandidaten: {avg('q_spanne'):.4f}")
+    print(f"  max_N (gemessen, nicht angenommen): {avg('max_visits'):.1f}")
+    verh = avg("sigma_q_spanne") / avg("logit_spanne") if avg("logit_spanne") else float("inf")
     print(f"\n  VERHAELTNIS sigma_q-Spanne zu log-Prior-Spanne: {verh:.2f}")
     print("  Deutung: < 1 heisst, die Suche kann den Prior nicht umsortieren;")
     print("           die Ownership-Anteil DARIN ist noch kleiner (Differenzlauf noetig).")
@@ -174,7 +174,7 @@ def main() -> None:
     ziel.write_text(json.dumps({
         "model": a.model, "sims": a.sims, "phase": a.phase, "dose": a.dose,
         "conj": a.conj, "n_stellungen": len(zeilen),
-        "mittel": {k: mittel(k) for k in zeilen[0]},
+        "avg": {k: avg(k) for k in zeilen[0]},
         "verhaeltnis_sigma_zu_logit": verh,
         "roh": roh,
     }, indent=1, ensure_ascii=False), encoding="utf-8")

@@ -25,8 +25,8 @@ Existenzbeweis ("es geht, und es zahlt sich aus") traegt das; als exaktes
 Zielprofil ist es eine Stichprobe.
 
 KEIN eigener Parser -- dieselben Bausteine wie die Arena-Sonden:
-`row_choices_from_log` (Zugziele), `rekonstruiere_partie` /
-`spalten_fuellung` / `struktur_kennzahlen` (Kuppel-Endstand).
+`row_choices_from_log` (Zugziele), `reconstruct_game` /
+`column_fill` / `struktur_kennzahlen` (Kuppel-Endstand).
 
 SELBSTTEST: das KI-Profil aus diesen Logs muss der unabhaengigen
 Self-Play-Messung in `docs/domain_knowledge.md` §1 in der FORM entsprechen
@@ -50,8 +50,8 @@ sys.path.insert(0, str(ROOT / "tools" / "probes"))
 
 from row_preference_probe import row_choices_from_log  # noqa: E402
 from column_build_structural_probe import (  # noqa: E402
-    rekonstruiere_partie,
-    spalten_fuellung,
+    reconstruct_game,
+    column_fill,
     struktur_kennzahlen,
 )
 
@@ -63,15 +63,15 @@ LOGS = ROOT / "static" / "log"
 DOMAIN_KNOWLEDGE_KI = [4.80, 4.77, 2.84, 1.89, 0.84, 0.58]
 
 
-def rasterreihe(space_index: int, tile_row: int) -> int:
+def grid_row(space_index: int, tile_row: int) -> int:
     """Kuppel-Rasterreihe einer Zelle. Slot-Layout [0][1] / [2][3]
     (`dome.rs::rotation_indices`): Space 0/1 liegen in der oberen
     Teilreihe des Slots, 2/3 in der unteren. Gegenstueck zur
-    Spalten-Formel in `spalten_fuellung` (2*tc + si%2)."""
+    Spalten-Formel in `column_fill` (2*tc + si%2)."""
     return 2 * tile_row + space_index // 2
 
 
-def partie_auswerten(pfad: Path) -> dict | None:
+def evaluate_game(pfad: Path) -> dict | None:
     lines = pfad.read_text(encoding="utf-8", errors="replace").splitlines()
     kopf = next((l for l in lines[:6] if l.startswith("# {")), None)
     if not kopf:
@@ -89,13 +89,13 @@ def partie_auswerten(pfad: Path) -> dict | None:
 
     abschluesse = {"Mensch": Counter(), "KI": Counter()}
     spalten = {}
-    for nm, zellen in rekonstruiere_partie(lines).items():
+    for nm, zellen in reconstruct_game(lines).items():
         if nm not in rolle:
             continue
         lab = rolle[nm]
         for (tr, _tc, si) in zellen:
-            abschluesse[lab][rasterreihe(si, tr)] += 1
-        spalten[lab] = struktur_kennzahlen(spalten_fuellung(zellen))
+            abschluesse[lab][grid_row(si, tr)] += 1
+        spalten[lab] = struktur_kennzahlen(column_fill(zellen))
 
     if len(spalten) != 2:
         return None
@@ -105,46 +105,46 @@ def partie_auswerten(pfad: Path) -> dict | None:
 
 
 def main() -> None:
-    partien = [p for p in (partie_auswerten(Path(f))
+    games = [p for p in (evaluate_game(Path(f))
                            for f in sorted(glob.glob(str(LOGS / "game_*.log")))) if p]
-    if len(partien) < 3:
-        raise SystemExit(f"nur {len(partien)} auswertbare Logs -- zu wenig")
-    n = len(partien)
+    if len(games) < 3:
+        raise SystemExit(f"nur {len(games)} auswertbare Logs -- zu wenig")
+    n = len(games)
 
     ergebnis = {"n_partien": n,
-                "quellen": [p["datei"] for p in partien],
-                "ai_modelle": sorted({p["ai_model"] for p in partien}),
+                "quellen": [p["datei"] for p in games],
+                "ai_modelle": sorted({p["ai_model"] for p in games}),
                 "vorbehalt": ("gepaart je Partie (Mensch und Netz spielen dieselbe "
                               "Partie), Differenz belastbar; absolutes Niveau ist eine "
                               "Stichprobe EINES Spielers gegen einen schwachen Gegner")}
 
     for lab in ("Mensch", "KI"):
-        zuege_ges = sum(sum(p["zuege"][lab].values()) for p in partien)
+        zuege_ges = sum(sum(p["zuege"][lab].values()) for p in games)
         ergebnis[lab] = dict(
             zugziele_anteil_prozent={
-                str(r): round(100.0 * sum(p["zuege"][lab][r] for p in partien) / zuege_ges, 2)
+                str(r): round(100.0 * sum(p["zuege"][lab][r] for p in games) / zuege_ges, 2)
                 for r in range(1, 7)} if zuege_ges else None,
             n_reihenzuege=zuege_ges,
             abschluesse_je_partie={
-                str(r + 1): round(sum(p["abschluesse"][lab][r] for p in partien) / n, 3)
+                str(r + 1): round(sum(p["abschluesse"][lab][r] for p in games) / n, 3)
                 for r in range(6)},
             volle_spalten_je_partie=round(
-                sum(p["spalten"][lab]["volle_spalten"] for p in partien) / n, 3),
+                sum(p["spalten"][lab]["volle_spalten"] for p in games) / n, 3),
             max_spaltenhoehe=round(
-                sum(p["spalten"][lab]["max_hoehe"] for p in partien) / n, 3),
+                sum(p["spalten"][lab]["max_hoehe"] for p in games) / n, 3),
             teilspalten_ge4=round(
-                sum(p["spalten"][lab]["teilspalten_ge4"] for p in partien) / n, 3),
+                sum(p["spalten"][lab]["teilspalten_ge4"] for p in games) / n, 3),
         )
 
     # Gepaarte Differenz je Partie -- die belastbare Groesse (s. Kopf).
     ergebnis["gepaart_mensch_minus_ki"] = dict(
         abschluesse_je_reihe={
             str(r + 1): round(sum(p["abschluesse"]["Mensch"][r] - p["abschluesse"]["KI"][r]
-                                  for p in partien) / n, 3)
+                                  for p in games) / n, 3)
             for r in range(6)},
         volle_spalten=round(sum(p["spalten"]["Mensch"]["volle_spalten"]
                                 - p["spalten"]["KI"]["volle_spalten"]
-                                for p in partien) / n, 3),
+                                for p in games) / n, 3),
     )
 
     ki = [ergebnis["KI"]["abschluesse_je_partie"][str(r + 1)] for r in range(6)]

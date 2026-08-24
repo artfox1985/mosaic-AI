@@ -142,7 +142,7 @@ def main() -> None:
                         ref[ci].append(float(v) if mover == pi else 1.0 - float(v))
                 except Exception:
                     ref[ci].append(float("nan"))
-        # Nur Kandidatenpaare mit vollstaendigen Referenzen auswerten
+        # Nur Kandidatenpaare mit vollstaendigen Referenzen evaluate
         for a in range(len(cands)):
             for b in range(a + 1, len(cands)):
                 da = [ref[a][d] - ref[b][d] for d in range(args.draws)

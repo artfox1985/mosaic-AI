@@ -25,7 +25,7 @@ import re
 KRITERIUM = re.compile(r"^\s+\S+ (?P<name>[^:]+): (?P<pkt>-?\d+) Pkt$")
 
 
-def gegner_auswertung(sp: dict) -> dict:
+def opponent_evaluation(sp: dict) -> dict:
     """Eine Partie -> Kennzahlen der HEURISTIK-Seite (der GEGNER aus Netz-Sicht)."""
     namen = sp["names"]
     ni = next((i for i, n in enumerate(namen) if "euristik" not in n), 0)  # Netz-Index
@@ -63,7 +63,7 @@ def gegner_auswertung(sp: dict) -> dict:
     )
 
 
-def t_wert(werte: list[float]) -> tuple[float, float]:
+def t_value(werte: list[float]) -> tuple[float, float]:
     n = len(werte)
     if n < 2:
         return (werte[0] if werte else 0.0), 0.0
@@ -75,8 +75,8 @@ def t_wert(werte: list[float]) -> tuple[float, float]:
 def load(path_prefix: str) -> tuple[list[dict], list[dict]]:
     d = json.load(open(BASIS / "evaluations" / f"{path_prefix}.json", encoding="utf-8"))
     games = d["games"]
-    off = [gegner_auswertung(s) for s in games["0"]]
-    on = [gegner_auswertung(s) for s in games["1"]]
+    off = [opponent_evaluation(s) for s in games["0"]]
+    on = [opponent_evaluation(s) for s in games["1"]]
     return off, on
 
 
@@ -93,10 +93,10 @@ def summarize(label: str, off: list[dict], on: list[dict]) -> dict:
     c = sum(1 for i in range(n) if on[i]["netz_sieg"] == 0 and off[i]["netz_sieg"] == 1)  # off gewinnt, on nicht
     mc_p = mcnemar_exact_p(b, c)
 
-    mgp, tgp = t_wert(d_gpunkte)
-    mgpl, tgpl = t_wert(d_gplatten)
-    mnp, tnp = t_wert(d_npunkte)
-    mnb, tnb = t_wert(d_nboden)
+    mgp, tgp = t_value(d_gpunkte)
+    mgpl, tgpl = t_value(d_gplatten)
+    mnp, tnp = t_value(d_npunkte)
+    mnb, tnb = t_value(d_nboden)
 
     print(f"\n=== {label} (n={n}) ===")
     print(f"Netz-Siege: aus {sieg_off}/{n} -> an {sieg_on}/{n}  (b={b} c={c} McNemar p={mc_p:.4f})")

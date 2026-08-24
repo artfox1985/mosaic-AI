@@ -52,7 +52,7 @@
 //!   hier Zeile fuer Zeile gespiegelt) aufgerufen -- nur mit dem einen
 //!   zusaetzlichen Registrierungsschritt. Ausschliesslich `pub`-Bausteine
 //!   verwendet (`Net::load_auto`, `play_one_game`, `ensure_batcher_for`,
-//!   `sample_valid_scoring_ids`, `set_partie_shaping_weight`), keine Datei
+//!   `sample_valid_scoring_ids`, `set_game_shaping_weight`), keine Datei
 //!   im Bestand geaendert.
 //!
 //! ## Aufruf
@@ -187,9 +187,9 @@ fn play_one(
     i: usize,
 ) -> Vec<Value> {
     let partie_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
-    let streuung_max = mosaic_rust::net_mcts::wertung_streuung_max();
-    mosaic_rust::net_mcts::set_partie_shaping_weight(if streuung_max > 0.0 {
-        Some(mosaic_rust::net_mcts::partie_gewicht_aus_seed(partie_seed, streuung_max))
+    let streuung_max = mosaic_rust::net_mcts::scoring_scatter_max();
+    mosaic_rust::net_mcts::set_game_shaping_weight(if streuung_max > 0.0 {
+        Some(mosaic_rust::net_mcts::game_weight_from_seed(partie_seed, streuung_max))
     } else {
         None
     });

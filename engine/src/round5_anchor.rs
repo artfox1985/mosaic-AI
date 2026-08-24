@@ -7,7 +7,7 @@
 //! Elo-Leiter mitverschiebt (OnceLock-Falle, par.1 Punkt 3).
 //!
 //! **EINFRIEREN, NICHT REPARIEREN.** Dieselbe Philosophie wie
-//! `wertung_progress`/A4: dieses Modul ist der eingefrorene Vergleichspunkt,
+//! `scoring_progress`/A4: dieses Modul ist der eingefrorene Vergleichspunkt,
 //! nicht das Entwicklungsziel. NICHT ANFASSEN -- Aenderungen hier
 //! verschieben den Anker selbst und entwerten jede darauf aufbauende
 //! Elo-Messung. Verbesserungen gehoeren in `round5.rs` (den Netz-Loeser).

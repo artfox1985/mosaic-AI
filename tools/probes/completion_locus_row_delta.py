@@ -13,7 +13,7 @@ Datei hatte densselben Seiten-Labelling-Fehler wie `penalty_track_probe.py`
 gleich, obwohl spec_a/spec_b zwei verhaltensverschiedene Agenten sind) und
 war von einer anderen, inzwischen beendeten Sitzung als Fix-Ziel reserviert
 -- reine Lesefunktionen (`row_choices_from_log`, `PATTERNS`,
-`plate_points_from_arena.partien`) werden importiert, nicht veraendert.
+`plate_points_from_arena.games`) werden importiert, nicht veraendert.
 
 Auswertung auf BLOCK-Ebene (je Partie, dann ueber Partien gebootstrapt),
 wie in par.5 vorgeschrieben.
@@ -31,7 +31,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tools" / "probes"))
 
 from row_preference_probe import row_choices_from_log  # noqa: E402
-from plate_points_from_arena import partien  # noqa: E402
+from plate_points_from_arena import game_list  # noqa: E402
 
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "completion_locus_row_delta.json"
@@ -57,7 +57,7 @@ def collect_per_game_shares(paths):
         assert d.get("model") == d.get("model_b"), f"{p.name}: model != model_b"
         lab_a = label_for_spec(d["spec_a"])
         lab_b = label_for_spec(d["spec_b"])
-        for sp in partien(p, None):
+        for sp in game_list(p, None):
             seed = sp.get("game_seed")
             log = sp.get("log") or []
             choices = row_choices_from_log(log)

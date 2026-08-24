@@ -157,7 +157,7 @@ pub fn calculate_end_scoring(player: &PlayerBoard, tile_ids: &[usize]) -> EndSco
 /// linear, die brauchen keinen Fortschritts-Ersatz. Der Exponent 2 bevorzugt
 /// EINE fast fertige Linie/Ecke gegenüber vielen halbfertigen (verhindert
 /// Verzetteln der Suche über zu viele Baustellen).
-pub fn wertung_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
+pub fn scoring_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
     let sf = player_scoring_features(player);
     let mut total = 0.0;
     for &id in tile_ids {
@@ -183,15 +183,15 @@ pub fn wertung_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
     total
 }
 
-/// Parametrisierte Schwester von [`wertung_progress`] -- ABSICHTLICH eine
-/// EIGENE Funktion, nicht `wertung_progress` selbst um einen `alpha`-
-/// Parameter erweitert. `wertung_progress` haengt an `mcts.rs::player_total`,
+/// Parametrisierte Schwester von [`scoring_progress`] -- ABSICHTLICH eine
+/// EIGENE Funktion, nicht `scoring_progress` selbst um einen `alpha`-
+/// Parameter erweitert. `scoring_progress` haengt an `mcts.rs::player_total`,
 /// dem Heuristik-Blattwert, der den Elo-Anker der gesamten Projekt-Historie
 /// bildet -- jede Aenderung an dessen Zahlenwert (auch nur eine Verzweigung,
 /// die bei `alpha=2.0` bitgleich dasselbe Ergebnis liefern SOLLTE) wuerde die
 /// Elo-Historie entwerten, weil sie nicht mehr beweisbar an derselben Formel
 /// haengt. Der Anker-Schutz entsteht hier daher durch KONSTRUKTION (zwei
-/// getrennte Funktionen, `wertung_progress` unveraendert) statt durch eine
+/// getrennte Funktionen, `scoring_progress` unveraendert) statt durch eine
 /// Bedingung innerhalb einer gemeinsamen Funktion -- und selbst wenn man eine
 /// solche Bedingung wollte: `f.powi(2)` und `f.powf(2.0)` sind NICHT
 /// garantiert bitgleich (verschiedene Implementierungen, siehe Rust-Doku zu
@@ -199,20 +199,20 @@ pub fn wertung_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
 /// also selbst schon eine (wenn auch winzige) Verhaltensaenderung gegenueber
 /// dem Bestand.
 ///
-/// Inhaltlich identische Struktur zu `wertung_progress`, aber `.powf(alpha)`
+/// Inhaltlich identische Struktur zu `scoring_progress`, aber `.powf(alpha)`
 /// statt `.powi(2)` fuer die KONJUNKTIVEN Geometrien (0 Reihen, 1 Spalten,
 /// 2 Diagonalen, 3 Mehrfarbige Felder, 5 Eckplatten, 7 Farbenreiche Reihen).
 /// `alpha > 1` verstaerkt die Praemie fuer EINE fast vollstaendige Linie/Ecke
 /// gegenueber vielen halbfertigen (Buendelung), `alpha = 1` macht die
 /// Formel linear in der Fuellung (keine Buendelungs-Praemie mehr), siehe
-/// Test `wertung_progress_alpha_rewards_bundling_when_alpha_above_one`.
+/// Test `scoring_progress_alpha_rewards_bundling_when_alpha_above_one`.
 ///
 /// Kriterium 4 (`border_fill`) und 6 (`-3 * special_empty`) bleiben LINEAR
 /// (kein Exponent) -- das ist keine Wahl, sondern exakt: beide zahlen PRO
 /// FELD, nicht pro vollstaendigem Satz, es gibt also gar keine "Teilerfuellung
 /// eines Satzes", die ein Exponent ueberhaupt modulieren koennte.
 /// MESSUNG 2026-08-11 zur Erreichbarkeit der Kriterien -- als DOKUMENTATION,
-/// nicht als Einstellwert. Heuristik-Referenz (`plattenkopf_referenzlauf_heuristik`,
+/// nicht als Einstellwert. Heuristik-Referenz (`plate_head_reference_run_heuristic`,
 /// 400 Partien, `logs/kalibrierung_alle_kriterien.log`), also ein Spieler der die
 /// Abschluesse ANSPIELT (der Champion-Korpus taugt nicht: dort misst die Rate sein
 /// Defizit, nicht die Erreichbarkeit):
@@ -236,7 +236,7 @@ pub fn wertung_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
 /// Ownership-Kopf der SCHAETZER.** Ein Lenker darf verzerrt sein, das ist seine
 /// Funktion. Die Zahlen oben sind die Vergleichsbasis, an der spaeter zu sehen ist,
 /// ob der Kopf bessere Wahrscheinlichkeiten liefert als die Faustformel.
-/// [`wertung_progress_alpha`] mit EINEM EXPONENTEN JE KRITERIUM (Nutzer-Vorgabe
+/// [`scoring_progress_alpha`] mit EINEM EXPONENTEN JE KRITERIUM (Nutzer-Vorgabe
 /// 2026-08-11: *"das globale alpha macht für mich keinen sinn. wir wollen ja alpha
 /// pro wertungsplatte seperat festlegen"*).
 ///
@@ -247,11 +247,11 @@ pub fn wertung_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
 /// Die additiven Kriterien 4 (Randfelder) und 6 (Spezialfelder) tragen ohnehin
 /// keinen Exponenten -- ihr Eintrag ist ohne Wirkung.
 ///
-/// Bewusst als DUENNE Huelle ueber `wertung_progress_alpha`, je Kriterium einzeln
+/// Bewusst als DUENNE Huelle ueber `scoring_progress_alpha`, je Kriterium einzeln
 /// aufgerufen, damit die Formel nicht auseinanderlaufen kann. Preis:
 /// `player_scoring_features` laeuft einmal je aktivem Kriterium (bei 3 Platten also
 /// 3x) -- ein Gang ueber 36 Felder gegen einen Netz-Vorwaertslauf im selben Blatt.
-pub fn wertung_progress_per_kriterium(
+pub fn scoring_progress_per_criterion(
     player: &PlayerBoard,
     tile_ids: &[usize],
     alphas: &[f64; 8],
@@ -263,12 +263,12 @@ pub fn wertung_progress_per_kriterium(
         .iter()
         .map(|&id| {
             let a = alphas[id.min(7)] * (1.0 + round_gain * t);
-            wertung_progress_alpha(player, &[id], a)
+            scoring_progress_alpha(player, &[id], a)
         })
         .sum()
 }
 
-pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f64) -> f64 {
+pub fn scoring_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f64) -> f64 {
     let sf = player_scoring_features(player);
     let mut total = 0.0;
     for &id in tile_ids {
@@ -299,7 +299,7 @@ pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f
             // Beantworten der Nutzer-Frage "hast du das fuer alle
             // wertungsplatten beruecksichtigt" aufgefallen.
             //
-            // Der ANKER `wertung_progress` (oben, Zeile ~178) behaelt seinen
+            // Der ANKER `scoring_progress` (oben, Zeile ~178) behaelt seinen
             // Kriterium-6-Term unveraendert -- er ist eine andere Funktion mit
             // anderem Aufrufer (`mcts.rs:82`, Heuristik) und darf sich nicht
             // bewegen.
@@ -339,7 +339,7 @@ pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f
 ///   (`docs/engine_manual.md` Abschnitt 5: "bringt sofort Punkte entsprechend
 ///   der Reihe (1 bis 6)"). Zahlt IMMER, unabhaengig von `scoring_tile_ids`.
 ///   Das ist die Quelle fuer den `n_s`-Fortschrittsteil unten.
-/// - **Wertungsplatte 6 (ENDWERTUNG, `wertung_progress`/`wertung_progress_
+/// - **Wertungsplatte 6 (ENDWERTUNG, `scoring_progress`/`wertung_progress_
 ///   alpha`)**: FLACH `-3` je leerem Spezialfeld, KEIN Rasterreihen-Bezug
 ///   (`docs/engine_manual.md`, Platte Nr. 7 der 8 Wertungsplatten: "-3 Pkt.
 ///   je leer gebliebenem Spezialfeld") -- zahlt NUR, wenn `6` in `tile_ids`
@@ -365,7 +365,7 @@ pub fn wertung_progress_alpha(player: &PlayerBoard, tile_ids: &[usize], alpha: f
 /// zahlt beim Legen des weissen Steins IMMER, unabhaengig von den am
 /// Spielstart gezogenen Wertungsplatten (das ist ein Spielzug-Bonus, keine
 /// Wertungsplatte). Kriterium 6 (`-3 * special_empty`, dieselbe Definition
-/// wie in `wertung_progress`/`wertung_progress_alpha`) kommt ZUSAETZLICH
+/// wie in `scoring_progress`/`scoring_progress_alpha`) kommt ZUSAETZLICH
 /// dazu, aber NUR wenn `6` in `tile_ids` liegt -- das ist die tatsaechliche
 /// Wertungsplatte und bleibt an ihre Auswahl gebunden, UND bleibt flach
 /// (keine Rasterreihen-Gewichtung -- das ist eine andere Regel als der
@@ -1108,7 +1108,7 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn plattenkopf_atom_identities_hold_on_real_end_boards() {
+    fn plate_head_atom_identities_hold_on_real_end_boards() {
         use crate::round_transition::drive_to_game_end;
 
         let mut boards = 0usize;
@@ -1296,7 +1296,7 @@ mod tests {
     }
 
     #[test]
-    fn plattenkopf_conjunction_atoms_match_spec() {
+    fn plate_head_conjunction_atoms_match_spec() {
         const N: usize = 34;
         let corner_weights = [3, 3, 8, 8];
         let colors5 = [Blau, Gelb, Rot, Schwarz, Tuerkis];
@@ -1602,14 +1602,14 @@ mod tests {
 
         // KALIBRIERUNG des Fortschritts-Proxys (2026-08-11, Nutzer-Auftrag).
         // Frage: ist `(fill/6)^2` -- die Wahrscheinlichkeitsschaetzung in
-        // `wertung_progress`/`wertung_progress_alpha` -- gut kalibriert?
+        // `scoring_progress`/`scoring_progress_alpha` -- gut kalibriert?
         //
         // WARUM NICHT AM CHAMPION-KORPUS: dort liegt die realisierte
         // Abschlussrate bei 0,56 % (Spalten), weil der Champion Spalten nicht
         // ANSPIELT. Der Vergleich messe dann sein Defizit, nicht die Guete der
         // Formel -- Nutzer-Einwand 2026-08-11 ("der v20wdl-Korpus ist keine
         // gute referenz, da er die abschluesse nicht sauber spielt"). Die
-        // Heuristik spielt sie an (`wertung_progress` haengt an `mcts.rs:82`),
+        // Heuristik spielt sie an (`scoring_progress` haengt an `mcts.rs:82`),
         // ist also die brauchbare Referenz.
         // ALLE SECHS Kriterien mit Exponent, und alpha DIREKT gefittet.
         // Zwei Korrekturen gegenueber der ersten Fassung (Nutzer-Einwaende):
@@ -1683,7 +1683,7 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn plattenkopf_referenzlauf_zufall() {
+    fn plate_head_reference_run_random() {
         use crate::round_transition::{drive_to_game_end_reference, ReferenzPolitik};
         use rayon::prelude::*;
 
@@ -1700,7 +1700,7 @@ mod tests {
 
     #[test]
     #[ignore]
-    fn plattenkopf_referenzlauf_heuristik() {
+    fn plate_head_reference_run_heuristic() {
         use crate::round_transition::{drive_to_game_end_reference, ReferenzPolitik};
         use rayon::prelude::*;
 
@@ -1727,7 +1727,7 @@ mod tests {
     /// Befund ueber das Spiel. NUR als Kontrolle gedacht, nicht als Boden.
     #[test]
     #[ignore]
-    fn plattenkopf_referenzlauf_zufall_ohne_startplatte() {
+    fn plate_head_reference_run_random_without_start_tile() {
         use crate::round_transition::drive_to_game_end_random;
         use rayon::prelude::*;
 
@@ -1854,14 +1854,14 @@ mod tests {
     }
 
     #[test]
-    fn wertung_progress_matches_end_scoring_on_full_board() {
+    fn scoring_progress_matches_end_scoring_on_full_board() {
         // Bei voller Fuellung muss die stetige Fortschritts-Formel exakt auf
         // den echten (diskreten) Wertungsplatten-Punktwert zurueckfallen --
         // sonst waere sie keine gueltige Ersatzformel fuer die Suche.
         let p = fully_filled_board();
         for id in [0usize, 1, 2, 3, 4, 5, 6] {
             let exact = calculate_end_scoring(&p, &[id]).total as f64;
-            let progress = wertung_progress(&p, &[id]);
+            let progress = scoring_progress(&p, &[id]);
             assert!(
                 (exact - progress).abs() < 1e-9,
                 "Platte {id}: exakt={exact} vs fortschritt={progress}"
@@ -1870,13 +1870,13 @@ mod tests {
     }
 
     #[test]
-    fn wertung_progress_is_zero_on_empty_board() {
+    fn scoring_progress_is_zero_on_empty_board() {
         let p = PlayerBoard::new(0, "P");
-        assert_eq!(wertung_progress(&p, &[0, 1, 2, 3, 5, 7]), 0.0);
+        assert_eq!(scoring_progress(&p, &[0, 1, 2, 3, 5, 7]), 0.0);
     }
 
     #[test]
-    fn wertung_progress_gives_partial_credit_before_completion() {
+    fn scoring_progress_gives_partial_credit_before_completion() {
         // Kuppelplatte (0,0) ist eine obere Eckplatte (3 Pkt bei voller
         // Fuellung aller 4 Spaces). Hier nur 2 von 4 Spaces gefuellt -- die
         // diskrete Wertung (`calculate_end_scoring`) sieht das noch als 0,
@@ -1894,7 +1894,7 @@ mod tests {
         p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
 
         let exact = calculate_end_scoring(&p, &[5]).total as f64;
-        let progress = wertung_progress(&p, &[5]);
+        let progress = scoring_progress(&p, &[5]);
         assert_eq!(exact, 0.0, "Eckplatte noch nicht komplett -> diskret 0");
         assert!(progress > 0.0 && progress < 3.0, "Teil-Bonus erwartet, war {progress}");
         // (2/4)^2 * 3 = 0.75
@@ -1902,34 +1902,34 @@ mod tests {
     }
 
     #[test]
-    fn per_kriterium_alphas_wirken_einzeln_und_runden_gain_hebt_an() {
+    fn per_criterion_alphas_act_individually_and_round_gain_lifts() {
         // Waechter fuer die Nutzer-Vorgabe "alpha pro wertungsplatte separat":
         // ein geaendertes alpha darf NUR sein eigenes Kriterium bewegen.
         let p = fully_filled_board();
         let mut a = [2.0f64; 8];
-        let basis_spalten = wertung_progress_per_kriterium(&p, &[1], &a, 1, 0.0);
-        let basis_reihen = wertung_progress_per_kriterium(&p, &[0], &a, 1, 0.0);
+        let basis_spalten = scoring_progress_per_criterion(&p, &[1], &a, 1, 0.0);
+        let basis_reihen = scoring_progress_per_criterion(&p, &[0], &a, 1, 0.0);
         a[1] = 6.0; // NUR Spalten
         assert_eq!(
-            wertung_progress_per_kriterium(&p, &[0], &a, 1, 0.0), basis_reihen,
+            scoring_progress_per_criterion(&p, &[0], &a, 1, 0.0), basis_reihen,
             "Aenderung an alpha[1] darf Kriterium 0 nicht beruehren"
         );
         // Auf einem VOLLEN Brett ist x=1, also alpha-unabhaengig -- deshalb
         // zusaetzlich ein teilgefuelltes Brett fuer die Wirkungsrichtung.
         let teil = board_with_border_fill_local(3);
         let mut b = [2.0f64; 8];
-        let flach = wertung_progress_per_kriterium(&teil, &[0], &b, 1, 0.0);
+        let flach = scoring_progress_per_criterion(&teil, &[0], &b, 1, 0.0);
         b[0] = 6.0;
-        let steil = wertung_progress_per_kriterium(&teil, &[0], &b, 1, 0.0);
+        let steil = scoring_progress_per_criterion(&teil, &[0], &b, 1, 0.0);
         assert!(steil < flach,
                 "hoeheres alpha muss den Teilfortschritt ABWERTEN ({steil} !< {flach})");
         // round_gain: 0 = keine Rundenabhaengigkeit, >0 = spaeter steiler
         let c = [2.0f64; 8];
-        assert_eq!(wertung_progress_per_kriterium(&teil, &[0], &c, 5, 0.0),
-                   wertung_progress_per_kriterium(&teil, &[0], &c, 1, 0.0),
+        assert_eq!(scoring_progress_per_criterion(&teil, &[0], &c, 5, 0.0),
+                   scoring_progress_per_criterion(&teil, &[0], &c, 1, 0.0),
                    "round_gain=0 muss rundenunabhaengig sein");
-        assert!(wertung_progress_per_kriterium(&teil, &[0], &c, 5, 1.0)
-                    < wertung_progress_per_kriterium(&teil, &[0], &c, 1, 1.0),
+        assert!(scoring_progress_per_criterion(&teil, &[0], &c, 5, 1.0)
+                    < scoring_progress_per_criterion(&teil, &[0], &c, 1, 1.0),
                 "mit round_gain>0 muss Runde 5 steiler (= kleinerer Teilwert) sein");
         let _ = basis_spalten;
     }
@@ -1958,12 +1958,12 @@ mod tests {
     }
 
     #[test]
-    fn wertung_progress_alpha_matches_wertung_progress_at_alpha_two() {
-        // Neutralitaets-Nachweis: `alpha=2.0` muss `wertung_progress` fuer
+    fn scoring_progress_alpha_matches_scoring_progress_at_alpha_two() {
+        // Neutralitaets-Nachweis: `alpha=2.0` muss `scoring_progress` fuer
         // mehrere nichttriviale Bretter reproduzieren (Toleranz 1e-9, NICHT
         // Bit-Gleichheit -- `powf(2.0)` vs `powi(2)` duerfen im letzten Bit
-        // abweichen, exakt deshalb ist `wertung_progress_alpha` eine eigene
-        // Funktion statt eines Zweigs in `wertung_progress`).
+        // abweichen, exakt deshalb ist `scoring_progress_alpha` eine eigene
+        // Funktion statt eines Zweigs in `scoring_progress`).
         let boards = [fully_filled_board(), {
             // Teilgefuelltes Brett (wie im Teil-Bonus-Test oben), damit auch
             // die Nicht-0/Nicht-1-Zwischenwerte der konjunktiven Kriterien
@@ -1982,42 +1982,42 @@ mod tests {
         }];
         // KRITERIUM 6 IST AUSGENOMMEN, und zwar ABSICHTLICH (Nutzer-Spezifikation
         // 2026-08-11): den Spezialfeld-Abzug haelt `unlock_progress_beta`, nicht
-        // `wertung_progress_alpha` -- sonst zaehlt er doppelt, wenn beide
-        // Shaping-Knoepfe gesetzt sind. Der ANKER `wertung_progress` behaelt ihn.
+        // `scoring_progress_alpha` -- sonst zaehlt er doppelt, wenn beide
+        // Shaping-Knoepfe gesetzt sind. Der ANKER `scoring_progress` behaelt ihn.
         // Die Divergenz wird unten ausdruecklich GEPRUEFT statt stillschweigend
         // uebergangen.
         const OHNE_K6: [usize; 7] = [0, 1, 2, 3, 4, 5, 7];
         for p in &boards {
             for id in OHNE_K6 {
-                let exact = wertung_progress(p, &[id]);
-                let via_alpha = wertung_progress_alpha(p, &[id], 2.0);
+                let exact = scoring_progress(p, &[id]);
+                let via_alpha = scoring_progress_alpha(p, &[id], 2.0);
                 assert!(
                     (exact - via_alpha).abs() < 1e-9,
-                    "Platte {id}: wertung_progress={exact} vs wertung_progress_alpha(alpha=2.0)={via_alpha}"
+                    "Platte {id}: scoring_progress={exact} vs scoring_progress_alpha(alpha=2.0)={via_alpha}"
                 );
             }
             // Und ueber alle Platten gemeinsam (deckt Summierungs-Reihenfolge ab).
-            let exact_all = wertung_progress(p, &OHNE_K6);
-            let via_alpha_all = wertung_progress_alpha(p, &OHNE_K6, 2.0);
+            let exact_all = scoring_progress(p, &OHNE_K6);
+            let via_alpha_all = scoring_progress_alpha(p, &OHNE_K6, 2.0);
             assert!((exact_all - via_alpha_all).abs() < 1e-9);
 
             // Die BEABSICHTIGTE Divergenz: die Schwester liefert fuer Kriterium 6
             // immer 0, der Anker liefert -3 je leerem Spezialfeld.
             assert_eq!(
-                wertung_progress_alpha(p, &[6], 2.0),
+                scoring_progress_alpha(p, &[6], 2.0),
                 0.0,
-                "Kriterium 6 muss in wertung_progress_alpha 0 sein (haelt unlock_progress_beta)"
+                "Kriterium 6 muss in scoring_progress_alpha 0 sein (haelt unlock_progress_beta)"
             );
             let sf = player_scoring_features(p);
             assert!(
-                (wertung_progress(p, &[6]) - (-3.0 * sf.special_empty as f64)).abs() < 1e-9,
-                "Anker wertung_progress muss Kriterium 6 unveraendert behalten"
+                (scoring_progress(p, &[6]) - (-3.0 * sf.special_empty as f64)).abs() < 1e-9,
+                "Anker scoring_progress muss Kriterium 6 unveraendert behalten"
             );
         }
     }
 
     #[test]
-    fn wertung_progress_alpha_rewards_bundling_when_alpha_above_one() {
+    fn scoring_progress_alpha_rewards_bundling_when_alpha_above_one() {
         // Kriterium 1 (Vertikale Reihen, 7 Pkt/volle Spalte): sechs gefuellte
         // Felder gebuendelt in EINER Spalte muessen bei `alpha>1` mehr wert
         // sein als sechs Felder verteilt als drei-plus-drei auf zwei Spalten
@@ -2067,13 +2067,13 @@ mod tests {
         assert_eq!(sf_spread.col_fill, [3, 3, 0, 0, 0, 0], "Vorbedingung verteilt");
 
         // alpha=1: linear in der Fuellung -> beide Anordnungen gleichwertig.
-        let bundled_a1 = wertung_progress_alpha(&bundled, &[1], 1.0);
-        let spread_a1 = wertung_progress_alpha(&spread, &[1], 1.0);
+        let bundled_a1 = scoring_progress_alpha(&bundled, &[1], 1.0);
+        let spread_a1 = scoring_progress_alpha(&spread, &[1], 1.0);
         assert!((bundled_a1 - spread_a1).abs() < 1e-9, "bei alpha=1 gleichwertig: {bundled_a1} vs {spread_a1}");
 
         // alpha=2: Buendelung wird praemiert.
-        let bundled_a2 = wertung_progress_alpha(&bundled, &[1], 2.0);
-        let spread_a2 = wertung_progress_alpha(&spread, &[1], 2.0);
+        let bundled_a2 = scoring_progress_alpha(&bundled, &[1], 2.0);
+        let spread_a2 = scoring_progress_alpha(&spread, &[1], 2.0);
         assert!(
             bundled_a2 > spread_a2,
             "gebuendelt sollte bei alpha=2 mehr wert sein: {bundled_a2} vs {spread_a2}"
@@ -2294,7 +2294,7 @@ mod tests {
 
         // Kriterium 6 kommt NUR zusaetzlich dazu, wenn 6 explizit gewaehlt ist
         // -- exakt -3 je leerem Special-Feld (dieselbe Definition wie in
-        // `wertung_progress`).
+        // `scoring_progress`).
         let mut q = PlayerBoard::new(0, "P");
         place_special_type_tile_at(&mut q, 0, 0, 0, 0, false); // 1 Special-Slot, nichts gefuellt
         let with_6 = unlock_progress_beta(&q, &[6], 2.0);

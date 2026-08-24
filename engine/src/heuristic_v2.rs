@@ -13,7 +13,7 @@
 //! | Teil | sieht `pattern_lines`? | Richtung |
 //! | --- | --- | --- |
 //! | Tiling-Solver-Score | Endstand, nicht Zwischenstand | keine |
-//! | `wertung_progress` | **nein**, nur `dome_slots` (`scoring.rs`) | keine: innerhalb einer Runde fuer JEDEN Drafting-Zug gleich |
+//! | `scoring_progress` | **nein**, nur `dome_slots` (`scoring.rs`) | keine: innerhalb einer Runde fuer JEDEN Drafting-Zug gleich |
 //! | `projected_unplaceable_penalty` | ja | **gegen** lange Reihen |
 //!
 //! Die Bewertung enthaelt also einen Grund, lange Musterreihen zu meiden, und
@@ -116,8 +116,8 @@ const STRAFE_LEERES_SPEZIALFELD: f64 = 3.0;
 ///
 /// Spalten-Zuordnung: Slot `(tr, tc)`, Space `si` -> Spalte `2*tc + si%2`.
 /// Dieselbe Abbildung wie in `tools/probes/column_build_structural_probe.py`
-/// (`spalten_fuellung`), dort gegen die Engine verifiziert.
-fn spalten_fuellung(player: &PlayerBoard) -> [u32; 6] {
+/// (`column_fill`), dort gegen die Engine verifiziert.
+fn column_fill(player: &PlayerBoard) -> [u32; 6] {
     let mut fill = [0u32; 6];
     for (_tr, reihe) in player.dome_grid.dome_slots.iter().enumerate() {
         for (tc, slot) in reihe.iter().enumerate() {
@@ -134,7 +134,7 @@ fn spalten_fuellung(player: &PlayerBoard) -> [u32; 6] {
 
 /// Punktwert der Spalten-Platte bei gegebener Fuellung, exakt nach der
 /// Anker-Formel.
-fn spalten_punkte(fuellung: u32) -> f64 {
+fn column_points(fuellung: u32) -> f64 {
     (fuellung as f64 / SPALTE_ZELLEN).powi(2) * SPALTE_VOLL_PUNKTE
 }
 
@@ -142,7 +142,7 @@ fn spalten_punkte(fuellung: u32) -> f64 {
 ///
 /// Zwei Posten, beide nur wenn die zugehoerige Wertungsplatte aktiv ist:
 /// der marginale Spalten-Zuwachs und die Freischaltung eines Spezialfeldes.
-fn ertrag_des_feldes(
+fn cell_yield(
     player: &PlayerBoard,
     tile_ids: &[usize],
     fuellung: &[u32; 6],
@@ -156,8 +156,8 @@ fn ertrag_des_feldes(
         let spalte = 2 * tc + si % 2;
         let jetzt = fuellung[spalte];
         // Marginal, nicht absolut: der bereits erreichte Fuellstand steht
-        // schon in `wertung_progress` und darf hier nicht doppelt zaehlen.
-        ertrag += spalten_punkte(jetzt + 1) - spalten_punkte(jetzt);
+        // schon in `scoring_progress` und darf hier nicht doppelt zaehlen.
+        ertrag += column_points(jetzt + 1) - column_points(jetzt);
     }
 
     // Plattenlokal: waere dieses Feld die letzte fehlende REGULAERE Zelle,
@@ -201,7 +201,7 @@ fn ertrag_des_feldes(
 ///
 /// Anlass (gemessen 2026-08-24): v2 baut 0,562 volle Spalten je Partie, wenn
 /// k1 aktiv ist, aber nur 0,229 wenn nicht. Der Grund ist strukturell --
-/// `wertung_progress` kreditiert Spaltenfuellung ausschliesslich bei aktivem
+/// `scoring_progress` kreditiert Spaltenfuellung ausschliesslich bei aktivem
 /// k1 (`scoring.rs`, Zweig `1`), und k1 liegt nur in rund 40 Prozent der
 /// Partien an. In den uebrigen 60 Prozent arbeitet die Suche also GEGEN das
 /// Routing statt mit ihm.
@@ -212,17 +212,17 @@ fn ertrag_des_feldes(
 /// (Nutzer-Entscheid 2026-08-24: "solange er Spalten baut ... ist es ok").
 ///
 /// **Keine Doppelzaehlung:** ist die Platte aktiv, kreditiert
-/// `wertung_progress` sie bereits, und dieser Term liefert fuer sie 0. Er
+/// `scoring_progress` sie bereits, und dieser Term liefert fuer sie 0. Er
 /// springt nur ein, wo der Bestand schweigt.
 ///
-/// **MAX statt Summe:** `wertung_progress` summiert ueber alle sechs Spalten
+/// **MAX statt Summe:** `scoring_progress` summiert ueber alle sechs Spalten
 /// und belohnt damit Breite. Eine volle Spalte braucht aber Fokus -- die
 /// 21-Zellen-Identitaet haengt am Minimum ueber die Rasterzeilen, nicht an
 /// der Summe. Das Maximum lenkt auf die Spalte, die ohnehin am weitesten ist.
 ///
 /// Billig gehalten: reines Auszaehlen der 36 Zellen, kein Kandidaten-Kosten-
 /// vergleich. Der Term laeuft an JEDEM Suchblatt.
-pub fn plattenunabhaengiger_l_wert(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
+pub fn plate_independent_l_value(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
     let mut spalten = [0u32; 6];
     let mut zeilen = [0u32; 6];
     for (tr, reihe) in player.dome_grid.dome_slots.iter().enumerate() {
@@ -239,7 +239,7 @@ pub fn plattenunabhaengiger_l_wert(player: &PlayerBoard, tile_ids: &[usize]) -> 
     let mut wert = 0.0;
     if !tile_ids.contains(&K1_VERTIKALE_REIHEN) {
         let beste = spalten.iter().copied().max().unwrap_or(0);
-        wert += spalten_punkte(beste);
+        wert += column_points(beste);
     }
     if !tile_ids.contains(&K0_HORIZONTALE_REIHEN) {
         // Nur die obersten zwei Rasterzeilen: weiter unten ist eine volle
@@ -253,7 +253,7 @@ pub fn plattenunabhaengiger_l_wert(player: &PlayerBoard, tile_ids: &[usize]) -> 
 }
 
 pub fn row_completion_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
-    let fuellung = spalten_fuellung(player);
+    let fuellung = column_fill(player);
     let mut summe = 0.0;
 
     for (r, reihe) in player.pattern_lines.iter().enumerate() {
@@ -284,7 +284,7 @@ pub fn row_completion_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 
                     continue;
                 }
                 erreichbar = true;
-                let e = ertrag_des_feldes(player, tile_ids, &fuellung, tr, tc, si);
+                let e = cell_yield(player, tile_ids, &fuellung, tr, tc, si);
                 if e > bester {
                     bester = e;
                 }
@@ -307,7 +307,7 @@ pub fn row_completion_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 
 
 /// Nur zur Diagnose: sind ueberhaupt Spezialfeld-Spaces auf dem Brett, die
 /// noch gesperrt sind? Wird von keiner Bewertung gelesen.
-pub fn gesperrte_spezialfelder(player: &PlayerBoard) -> usize {
+pub fn locked_special_fields(player: &PlayerBoard) -> usize {
     player
         .dome_grid
         .dome_slots
@@ -334,7 +334,7 @@ mod tests {
     /// Term zu unterscheiden, der schlicht immer 0 liefert -- also von einem
     /// Bug. Genau dieser Zweifel kam bei der ersten Abnahme auf.
     #[test]
-    fn term_ist_positiv_wenn_eine_reihe_erreichbar_angefangen_ist() {
+    fn term_is_positive_when_a_reachable_row_is_started() {
         let mut p = crate::board::PlayerBoard::new(0, "P");
         // Platte 0 = [Gelb, Schwarz, Tuerkis, Special] in Slot (0,0).
         // Musterreihe 1 (Index 0) speist Slot-Reihe 0, Space 0/1.
@@ -357,7 +357,7 @@ mod tests {
     /// genau der Fehler, an dem `PREREG_long_row_payoff.md` B1 gescheitert
     /// ist -- der Term darf ihn nicht durch die Hintertuer wieder einfuehren.
     #[test]
-    fn leere_reihe_bekommt_nichts() {
+    fn empty_row_gets_nothing() {
         let mut p = crate::board::PlayerBoard::new(0, "P");
         let tile = build_dome_tile_pool()[0].clone();
         p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
@@ -366,7 +366,7 @@ mod tests {
 
     /// Ohne Kuppelplatte gibt es kein erreichbares Zielfeld -- Baustein 2.
     #[test]
-    fn unerreichbare_reihe_bekommt_nichts() {
+    fn unreachable_row_gets_nothing() {
         let mut p = crate::board::PlayerBoard::new(0, "P");
         p.pattern_lines[1].add_tiles(&[Tuerkis]);
         assert_eq!(row_completion_progress(&p, &[K1_VERTIKALE_REIHEN]), 0.0);
@@ -417,7 +417,7 @@ pub const DREIECK_GEWICHT: f64 = 1.0;
 /// Partie ab, gebraucht wuerden sechs). Damit bleibt die gestreute
 /// Start-Ecke fuer die LINKS/RECHTS-Wahl wirksam, ohne dass eine nie
 /// erreichbare Form belohnt wird.
-pub fn dreiecks_abweichung(player: &PlayerBoard) -> u32 {
+pub fn triangle_deviation(player: &PlayerBoard) -> u32 {
     let mut belegt = [[false; 6]; 6];
     for (tr, reihe) in player.dome_grid.dome_slots.iter().enumerate() {
         for (tc, slot) in reihe.iter().enumerate() {
@@ -472,22 +472,22 @@ mod dreieck_tests {
     /// Bereichs sind leer, im verbotenen liegt nichts. Das ist zugleich die
     /// Probe auf die Groesse des erlaubten Bereichs (1+2+3+4+5+6).
     #[test]
-    fn leeres_brett_hat_21_abweichungen() {
+    fn empty_board_has_21_deviations() {
         let p = crate::board::PlayerBoard::new(0, "P");
-        assert_eq!(dreiecks_abweichung(&p), 21);
+        assert_eq!(triangle_deviation(&p), 21);
     }
 
     /// Jede belegte Zelle im erlaubten Bereich senkt die Abweichung um genau
     /// 1 -- die Metrik ist in der Binaermatrix linear, wie vorregistriert.
     #[test]
-    fn belegte_zelle_im_erlaubten_bereich_senkt_um_eins() {
+    fn filled_cell_in_allowed_area_lowers_by_one() {
         let mut p = crate::board::PlayerBoard::new(0, "P");
         let tile = build_dome_tile_pool()[0].clone();
         p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
-        let vorher = dreiecks_abweichung(&p);
+        let vorher = triangle_deviation(&p);
         // Zelle (0,0) liegt in JEDER Orientierung ausser unten-rechts im
         // erlaubten Bereich; das Minimum ueber die vier faellt also um 1.
         p.dome_grid.place_tile(0, 0, crate::tile::TileColor::Gelb).unwrap();
-        assert_eq!(dreiecks_abweichung(&p), vorher - 1);
+        assert_eq!(triangle_deviation(&p), vorher - 1);
     }
 }
