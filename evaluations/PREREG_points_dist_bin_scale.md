@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Blieb der Verteilungs-Punkte-Kopf (Task #12) unterhalb der Aufloesung, weil seine Bins aequidistant im tanh-Raum liegen und damit im Punkteraum an den Raendern um Faktor 5-25 groeber werden -- und aendert eine punktlineare Bin-Skala das? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht KORRIGIERT (par.2a). Bin-Kanten `torch.linspace(-1,1,bins+1)` in `engine/py/neural_net.py:2411` gelesen. Zwei Entwurfsfehler behoben: (1) #12 lief NICHT am Differenzziel, sondern seit 2026-07-06 eigenseitig -- der behauptete Defekt lag also bereits vor und die Messung kam flach heraus, #12 ist damit ein Prior GEGEN die Hypothese; (2) das Ziel ist nicht `tanh(own/50)`, sondern in ~83 % der Zeilen der TD-Blend mit einer remappten Gewinnwahrscheinlichkeit (gemessen 2026-08-23, je eine Datei pro Generation), der die Ziele in den FEINEN Bereich zieht. Vorpruefung par.6 ist Tor und rechnet jetzt auf dem tatsaechlichen `points_val`, nicht auf der Formel -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Blieb der Verteilungs-Punkte-Kopf (Task #12) unterhalb der Aufloesung, weil seine Bins aequidistant im tanh-Raum liegen und damit im Punkteraum an den Raendern um Faktor 5-25 groeber werden -- und aendert eine punktlineare Bin-Skala das? | Beleg: par.6 Tor GEFAHREN 2026-08-24 (points_dist_bin_scale_gate.json, 248/2945 Dateien stratifiziert, 404.360 Datensaetze, auf dem TATSAECHLICHEN points_val nach neural_net.py:1640-1720, nicht der Formel): gepoolter Anteil breiter Bins 5,34 % < 10-%-Schwelle -> WIDERLEGT. Die Hypothese aus par.4 traegt nicht, #12 bleibt aus anderen Gruenden unterhalb der Aufloesung, kein Training, Zuschnitt endet. Vorgeschichte: Entwurf 2026-08-23, am selben Tag per par.2a korrigiert (Task #12 lief eigenseitig statt am Differenzziel; das Ziel ist zu ~83 % TD-geblendet, nicht reines tanh(own/50)) -->
 
 # Vorregistrierung: Bin-Skala des Verteilungs-Punkte-Kopfes
 
@@ -248,7 +248,49 @@ Diese Vorpruefung kostet eine Auswertung vorhandener Pickles. Sie kann die
 ganze Wiederaufnahme fuer wenige Minuten Aufwand beenden, und genau dafuer
 steht sie hier vorn.
 
+### par.6 ERGEBNIS (2026-08-24): WIDERLEGT, Zuschnitt endet hier
+
+Gefahren mit `tools/probes/points_dist_bin_scale_gate.py`, Artefakt
+`points_dist_bin_scale_gate.json`. Stichprobe: jede 12. Datei je Generation
+(v18/v19wdl/v19wdlsw/v20wdl/v20wdlsw), stratifiziert damit keine Generation
+ausgeduennt wird -- 248 von 2945 Dateien, 404.360 Datensaetze mit Score/
+Winner, davon 0 mit `round_transition_value` (Zweig weiterhin tot) und
+336.643 (83,3 %) mit `bootstrap_value`. Deckt sich mit der par.2a-Messung
+(82,8-84,0 % je Einzeldatei).
+
+Der Zielwert ist exakt nach `neural_net.py:1640-1720` nachgebaut (own-Zweig,
+rtv-Override, TD-Blend), nicht die Formel `tanh(own/50)`.
+
+**Gepoolter Anteil der Datenmasse in Bins > 5 Punkte breit: 5,34 %.**
+Unter der 10-%-Schwelle. **Verdikt: WIDERLEGT.** Die Vergroeberung trifft
+die Daten kaum. #12 bleibt aus anderen Gruenden unterhalb der Aufloesung.
+**Kein Training. Der Zuschnitt endet hier**, wie in par.6 vorab festgelegt.
+
+Je Runde, mitzuberichten (kein zweiter Riegel):
+
+| Runde | n | Anteil breit |
+|---|---|---|
+| 1 | 80.507 | 0,12 % |
+| 2 | 83.069 | 1,36 % |
+| 3 | 86.731 | 8,34 % |
+| 4 | 86.336 | 12,25 % |
+| 5 | 67.717 | 3,79 % |
+
+Nicht vorregistrierter, aber berichtenswerter Nebenbefund: Runde 5 (die
+einzige mit reinem `tanh(own/50)`, kein TD-Blend) liegt bei 3,79 % und
+damit NIEDRIG -- nicht in der in par.2 angenommenen Kompressionszone. Der
+in par.2 unterstellte Bereich "eigene Endstaende typischerweise z=0,7-0,9"
+war eine Herleitung, keine Messung: `own_total` ist der Punktestand ZUM
+ZEITPUNKT DES SCHRITTS, nicht der finale, mit Endwertung versehene
+Spielstand -- selbst Runde-5-Schritte liegen ueberwiegend vor der
+Endwertung. Rechnung damit endgueltig geschlossen, dieser Nebenbefund
+aendert am WIDERLEGT-Verdikt nichts.
+
 ## par.7 Entscheidungsmetrik der Trainingsarme
+
+**ENTFAELLT (2026-08-24).** Par.6 hat WIDERLEGT ergeben; nach der dort
+vorab festgelegten Regel wird kein Trainingsarm gefahren. Dieser Abschnitt
+bleibt zur Dokumentation stehen.
 
 **Primaer: gepaarte Arena**, feste Paarzahl, **kein SPRT-Fruehstopp**.
 Begruendung ist der Praezedenzfall dieses Kopfes selbst: `t12_dist` zeigte
