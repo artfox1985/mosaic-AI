@@ -9,7 +9,7 @@ WARUM RUNDE 5 UND TILING: der Plattenbau ist eine Tiling-Handlung
 also ist die k1-Wertung jedes Kandidaten exakt berechenbar -- kein Orakel, kein
 Minimax, keine Schranke. Das ist der einzige Ort im Spiel mit dieser Eigenschaft
 (`round5.rs` ist budgetiert, `mcts::evaluate` ist eine Heuristik mit
-`wertung_progress` darin, siehe par.2 der Prereg).
+`scoring_progress` darin, siehe par.2 der Prereg).
 
 DIE DREI GROESSEN je Stellung, ueber die Kandidaten desselben Knotens:
 
@@ -100,7 +100,7 @@ def main() -> None:
     # nur das Kuppelraster) und laeuft VOR der teuren Kandidaten-Aufzaehlung.
     from neural_net import _dome_grids_from_dome  # noqa: PLC0415
 
-    def beste_spaltenfuellung(st) -> int:
+    def best_column_fill(st) -> int:
         pi = st.get("current_player", 0)
         dome = ((st.get("players") or [{}])[pi]).get("dome_grid")
         if not dome:
@@ -120,7 +120,7 @@ def main() -> None:
                 continue
             if K1 not in (st.get("scoring_tile_ids") or []):
                 continue
-            if beste_spaltenfuellung(st) < a.min_fill:
+            if best_column_fill(st) < a.min_fill:
                 continue
             g = (f, s.get("game_id"))
             if gesehen.get(g):

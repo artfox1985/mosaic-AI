@@ -13,7 +13,7 @@ Rekonstruktionsweg (Schritt 1 des Auftrags: "erst schauen was da ist"):
   - Log-Regexe/Praefix-Behandlung: `analyze_game_log.PATTERNS`/`ROUND_PREFIX`
     (1:1 aus den log_event(...)-Aufrufen der Engine transkribiert -- siehe
     dortiger Modul-Docstring; hier importiert, nicht nachgebaut).
-  - Mehr-/Ein-Arm-JSON-Laden: `plate_points_from_arena.partien()`.
+  - Mehr-/Ein-Arm-JSON-Laden: `plate_points_from_arena.game_list()`.
   - Endwertungs-Kriterienzeile ("   emoji Name: N Pkt", NUR direkt nach
     einer Endwertungs-Zeile): `plate_points_from_arena.KRITERIUM`.
   - Spalten-Mapping (Slot (tr,tc), Space-Index si) -> Spalte `2*tc + si%2`:
@@ -62,7 +62,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
-from plate_points_from_arena import partien, KRITERIUM  # noqa: E402
+from plate_points_from_arena import game_list, KRITERIUM  # noqa: E402
 
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "column_build_structural_probe.json"
@@ -119,7 +119,7 @@ def rotated_special_local_index(tile_id: int, rot: int) -> int | None:
 
 # ── Log -> Zellen je Spieler (nur Textzeilen, kein Replay) ─────────────────
 
-def rekonstruiere_partie(log: list[str]) -> dict[str, set[tuple[int, int, int]]]:
+def reconstruct_game(log: list[str]) -> dict[str, set[tuple[int, int, int]]]:
     """{spielername: {(slot_row, slot_col, space_index), ...}} -- alle
     gefuellten 6x6-Zellen, aus DOME_PLACE/START_TILE (Kachel+Rotation je
     Slot) und TILING_PLACE (gefuellte Farb-/Jokerzelle + ggf. mitgefuellte
@@ -171,7 +171,7 @@ def rekonstruiere_partie(log: list[str]) -> dict[str, set[tuple[int, int, int]]]
     return cells
 
 
-def spalten_fuellung(cells: set[tuple[int, int, int]]) -> list[int]:
+def column_fill(cells: set[tuple[int, int, int]]) -> list[int]:
     """`col_fill_py`-Mapping (seed_position_curation.py, dort gegen die
     Engine verifiziert): Slot (tr,tc), Space si -> Spalte 2*tc + si%2."""
     fill = [0] * 6
@@ -190,9 +190,9 @@ def struktur_kennzahlen(fill: list[int]) -> dict:
     }
 
 
-def endwertung_kriterien_je_spieler(log: list[str]) -> dict[str, dict[str, int]]:
+def final_scoring_criteria_per_player(log: list[str]) -> dict[str, dict[str, int]]:
     """{spielername: {kriterium_name: punkte}} -- exakt die Logik aus
-    `plate_points_from_arena.auswerten()`, nur nicht auf EINEN Netzname
+    `plate_points_from_arena.evaluate()`, nur nicht auf EINEN Netzname
     beschraenkt, sondern fuer BEIDE Spieler gesammelt."""
     out: dict[str, dict[str, int]] = defaultdict(dict)
     aktiv_name: str | None = None
@@ -262,20 +262,20 @@ def main() -> None:
                 continue
             arme = quelle.get("arme", [None])
             for arm in arme:
-                spiele = partien(pfad, arm)
+                spiele = game_list(pfad, arm)
                 for sp in spiele:
                     namen = sp["names"]
                     rollen = quelle["rollen"](namen)
                     log = sp.get("log") or []
-                    cells_je_spieler = rekonstruiere_partie(log)
-                    kriterien_je_spieler = endwertung_kriterien_je_spieler(log)
+                    cells_je_spieler = reconstruct_game(log)
+                    kriterien_je_spieler = final_scoring_criteria_per_player(log)
                     k1_aktiv = K1_TILE_ID in (sp.get("scoring_tile_ids") or [])
 
                     for name in namen:
                         rolle = rollen.get(name)
                         if rolle is None:
                             continue
-                        fill = spalten_fuellung(cells_je_spieler.get(name, set()))
+                        fill = column_fill(cells_je_spieler.get(name, set()))
                         kz = struktur_kennzahlen(fill)
 
                         if k1_aktiv:

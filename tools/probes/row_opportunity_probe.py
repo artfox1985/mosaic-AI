@@ -37,7 +37,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
-from plate_points_from_arena import partien  # noqa: E402
+from plate_points_from_arena import game_list  # noqa: E402
 
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "row_opportunity_probe.json"
@@ -143,7 +143,7 @@ def collect(path, arm, side_filter):
     n_games = defaultdict(set)
     n_mismatch = 0
     n_total = 0
-    for sp in partien(path, arm):
+    for sp in game_list(path, arm):
         seed = sp.get("game_seed")
         n_total += 1
         try:

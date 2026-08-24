@@ -33,11 +33,11 @@ sys.path.insert(0, str(ROOT / "tools" / "probes"))
 import mosaic_rust as mr  # noqa: E402
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
 from column_build_structural_probe import (  # noqa: E402
-    rekonstruiere_partie,
-    spalten_fuellung,
+    reconstruct_game,
+    column_fill,
     struktur_kennzahlen,
 )
-from plate_points_from_arena import block_mittel, t_wert  # noqa: E402
+from plate_points_from_arena import block_mean, t_value  # noqa: E402
 
 MODELL = str(ROOT / "models" / "alphazero_v21_2d_brierbest.onnx")
 SEEDS_DATEI = ROOT / "evaluations" / "kampagnen_seeds_407.txt"
@@ -80,8 +80,8 @@ def seiten_kennzahlen(sp, i):
                 ueberlauf += int(ov)
             break
 
-    zellen = rekonstruiere_partie(log).get(name, set())
-    kz = struktur_kennzahlen(spalten_fuellung(zellen))
+    zellen = reconstruct_game(log).get(name, set())
+    kz = struktur_kennzahlen(column_fill(zellen))
     zeilen_fill = [0] * 6
     for (tr, _tc, si) in zellen:
         zeilen_fill[2 * tr + si // 2] += 1
@@ -106,7 +106,7 @@ SKALARE = ["punkte", "marge", "sieg", "strafpunkte", "straf_ziele", "ueberlauf_s
            "teilspalten_ge4", "volle_zeilen", "lr_started", "lr_completed", "lr_cleared"]
 
 
-def mittel(v):
+def avg(v):
     return round(statistics.mean(v), 4) if v else None
 
 
@@ -118,11 +118,11 @@ def gepaart(diffs):
     """
     if len(diffs) < 2:
         return None
-    bl = block_mittel(diffs, BLOCK)
+    bl = block_mean(diffs, BLOCK)
     if len(bl) < 2:
         return None
-    m, tv = t_wert(bl)
-    return dict(n_partien=len(diffs), n_bloecke=len(bl), mittel=round(m, 4), t=round(tv, 2))
+    m, tv = t_value(bl)
+    return dict(n_partien=len(diffs), n_bloecke=len(bl), avg=round(m, 4), t=round(tv, 2))
 
 
 def lauf(fn, seeds, label):
@@ -132,7 +132,7 @@ def lauf(fn, seeds, label):
     return json.loads(roh)
 
 
-def auswerten(spiele, heur_label):
+def evaluate(spiele, heur_label):
     netz, heur = [], []
     for sp in spiele:
         nb = sp["net_board"]
@@ -140,8 +140,8 @@ def auswerten(spiele, heur_label):
         heur.append(seiten_kennzahlen(sp, 1 - nb))
     out = {
         "n_partien": len(spiele),
-        "Netz": {k: mittel([x[k] for x in netz]) for k in SKALARE},
-        heur_label: {k: mittel([x[k] for x in heur]) for k in SKALARE},
+        "Netz": {k: avg([x[k] for x in netz]) for k in SKALARE},
+        heur_label: {k: avg([x[k] for x in heur]) for k in SKALARE},
         "gepaart_heur_minus_netz": {
             k: gepaart([h[k] - n[k] for h, n in zip(heur, netz)]) for k in SKALARE
         },
@@ -151,7 +151,7 @@ def auswerten(spiele, heur_label):
         c = sum(x["lr_completed"] for x in seiten)
         out[label]["vollendungsquote"] = round(c / s, 4) if s else None
         akt = [x for x in seiten if x["k1_aktiv"]]
-        out[label]["volle_spalten_bei_k1_aktiv"] = mittel([x["volle_spalten"] for x in akt])
+        out[label]["volle_spalten_bei_k1_aktiv"] = avg([x["volle_spalten"] for x in akt])
         out[label]["n_k1_aktiv"] = len(akt)
     return out
 
@@ -161,8 +161,8 @@ def main():
     print("%d Kampagnen-Seeds, Netz@%d gegen Heuristik@%d"
           % (len(seeds), NET_SIMS, HEUR_SIMS), file=sys.stderr, flush=True)
 
-    v2 = auswerten(lauf(mr.net_vs_heuristic_v2_arena, seeds, "v2 als Lehrer"), "HeuristikV2")
-    v1 = auswerten(lauf(mr.net_arena_match, seeds, "v1 als Bezug (dieselben Seeds)"), "HeuristikV1")
+    v2 = evaluate(lauf(mr.net_vs_heuristic_v2_arena, seeds, "v2 als Lehrer"), "HeuristikV2")
+    v1 = evaluate(lauf(mr.net_arena_match, seeds, "v1 als Bezug (dieselben Seeds)"), "HeuristikV1")
 
     ergebnis = {"v2_lauf": v2, "v1_bezug": v1,
                 "hinweis": ("Kein vorregistrierter Schwellenwert fuer par.5.3 -- die Prereg "
@@ -188,7 +188,7 @@ def main():
         g = v2["gepaart_heur_minus_netz"][k]
         if g:
             print("    %-16s %+8.3f  t=%+6.2f  (%d Bloecke)"
-                  % (k, g["mittel"], g["t"], g["n_bloecke"]))
+                  % (k, g["avg"], g["t"], g["n_bloecke"]))
     print("\n-> " + str(OUT_JSON))
 
 

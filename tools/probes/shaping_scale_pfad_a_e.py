@@ -6,10 +6,10 @@ Umbau-Code die Verteilung von `E` je Pfad und je Runde messen. Pfad B
 (Ownership-Kopf) ist gemessen (par.3a, `shaping_scale_e_distribution.py`);
 diese Sonde liefert die noch fehlende PFAD-A-Seite (Engine-Groessen).
 
-Quelle ist der Read-only-Export `mosaic_rust.wertung_shaping_e_json` -- er
-rechnet exakt die Groessen, die in `apply_wertung_shaping_full`
+Quelle ist der Read-only-Export `mosaic_rust.scoring_shaping_e_json` -- er
+rechnet exakt die Groessen, die in `apply_scoring_shaping_full`
 (`net_mcts.rs:1462-1487`) in `bei(x) = tanh(x / WERTUNG_SHAPING_SCALE)`
-eingehen: `wertung_progress_per_kriterium` je Kriterium (Laufzeit-Alphas,
+eingehen: `scoring_progress_per_criterion` je Kriterium (Laufzeit-Alphas,
 `round_gain = 0` wie in der Prereg registriert), `unlock_progress_beta` (k6,
 zahlt ungegatet), `projected_unplaceable_penalty` (Strafleisten-Gegenterm,
 `MOSAIC_WERTUNG_FLOOR_W` Default 0,0 -- NICHT zu verwechseln mit
@@ -86,7 +86,7 @@ def main() -> None:
     for st in proben:
         pi = st.get("current_player", 0)
         try:
-            e = json.loads(mr.wertung_shaping_e_json(json.dumps(st), pi))
+            e = json.loads(mr.scoring_shaping_e_json(json.dumps(st), pi))
         except Exception:  # noqa: BLE001
             continue
         rd = e["round"]

@@ -57,11 +57,11 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tools" / "probes"))
 
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
-from plate_points_from_arena import partien  # noqa: E402
+from plate_points_from_arena import game_list  # noqa: E402
 from column_build_structural_probe import (  # noqa: E402
     rotated_special_local_index,
-    rekonstruiere_partie,
-    spalten_fuellung,
+    reconstruct_game,
+    column_fill,
     QUELLEN,
     K1_TILE_ID,
 )
@@ -72,8 +72,8 @@ OUT_JSON = EVAL / "column_completion_gap_probe.json"
 
 # ── Log -> GEORDNETE Aktionsfolge je Spieler ────────────────────────────────
 
-def rekonstruiere_partie_sequenz(log: list[str]) -> dict[str, list[dict]]:
-    """Wie `column_build_structural_probe.rekonstruiere_partie`, aber statt
+def reconstruct_game_sequence(log: list[str]) -> dict[str, list[dict]]:
+    """Wie `column_build_structural_probe.reconstruct_game`, aber statt
     nur der finalen Zellmenge wird je Spieler die GEORDNETE Folge der
     Tiling-Aktionen zurueckgegeben: `[{"runde": int|None, "zellen": [(r,c,si),...]}, ...]`.
     Jede Aktion traegt 1 Zelle (reine Farb-/Jokerplatzierung) oder 2 Zellen
@@ -129,7 +129,7 @@ def rekonstruiere_partie_sequenz(log: list[str]) -> dict[str, list[dict]]:
     return sequenz
 
 
-def fuellstand_aus_sequenz(sequenz: list[dict]) -> list[int]:
+def fill_level_from_sequence(sequenz: list[dict]) -> list[int]:
     fill = [0] * 6
     for akt in sequenz:
         for (_r, c, si) in akt["zellen"]:
@@ -215,15 +215,15 @@ def main() -> None:
                 continue
             arme = quelle.get("arme", [None])
             for arm in arme:
-                spiele = partien(pfad, arm)
+                spiele = game_list(pfad, arm)
                 for sp in spiele:
                     namen = sp["names"]
                     rollen = quelle["rollen"](namen)
                     log = sp.get("log") or []
-                    sequenz_je_spieler = rekonstruiere_partie_sequenz(log)
+                    sequenz_je_spieler = reconstruct_game_sequence(log)
                     # Konsistenzpruefung gegen die (unabhaengig geordnete)
                     # Basissonden-Rekonstruktion -- siehe Modul-Doc.
-                    cells_je_spieler = rekonstruiere_partie(log)
+                    cells_je_spieler = reconstruct_game(log)
                     k1_aktiv = K1_TILE_ID in (sp.get("scoring_tile_ids") or [])
 
                     for name in namen:
@@ -231,9 +231,9 @@ def main() -> None:
                         if rolle is None:
                             continue
                         sequenz = sequenz_je_spieler.get(name, [])
-                        fill_final = fuellstand_aus_sequenz(sequenz)
+                        fill_final = fill_level_from_sequence(sequenz)
 
-                        fill_via_basissonde = spalten_fuellung(cells_je_spieler.get(name, set()))
+                        fill_via_basissonde = column_fill(cells_je_spieler.get(name, set()))
                         n_konsistent += 1
                         if fill_final != fill_via_basissonde:
                             konsistenz_abweichungen.append({

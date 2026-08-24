@@ -46,7 +46,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
-from plate_points_from_arena import partien  # noqa: E402
+from plate_points_from_arena import game_list  # noqa: E402
 
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "penalty_track_probe.json"
@@ -93,7 +93,7 @@ def penalties_from_log(log_lines):
 def collect(path, arm, side_filter):
     """{label: {seed: kennzahlen}} ueber alle Partien EINES Arms."""
     out = defaultdict(dict)
-    for sp in partien(path, arm):
+    for sp in game_list(path, arm):
         seed = sp.get("game_seed")
         for name, vals in penalties_from_log(sp.get("log") or []).items():
             label = side_filter(name)

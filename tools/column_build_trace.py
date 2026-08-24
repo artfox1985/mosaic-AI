@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
-"""Entscheidungs-Spur des Spaltenbauers auswerten (`[SB]`-Logzeilen).
+"""Entscheidungs-Spur des Spaltenbauers evaluate (`[SB]`-Logzeilen).
 
 ANLASS (Nutzer-Ergaenzung 2026-08-13, VOR der Runde-2-Abnahme fuer
 `engine/src/column_build.rs` angefordert): "damit die Iteration sieht, WIE die
 Entscheidungen fallen, nicht nur die Aggregate". Die Engine schreibt bei
 `MOSAIC_SPALTENBAU=1 MOSAIC_SPALTENBAU_TRACE=1` je Entscheidung eine
 zusaetzliche Logzeile mit Praefix `[SB]` ueber den bestehenden
-`log_event`-Strom (additiv, siehe `column_build.rs::trace_zeile`-Doku) --
+`log_event`-Strom (additiv, siehe `column_build.rs::trace_line`-Doku) --
 dieses Werkzeug liest sie aus einem Arena-JSON (`--log-games`) und baut je
 Partie eine Entscheidungs-Zusammenfassung.
 
 WARUM KEIN EIGENER PARSER FUER DAS DRUMHERUM: `tools/analyze_game_log.py`
-(ROUND_PREFIX) und `tools/plate_points_from_arena.py` (`partien()`, liest
+(ROUND_PREFIX) und `tools/plate_points_from_arena.py` (`game_list()`, liest
 Ein- oder Mehrarm-JSON) werden importiert statt nachgebaut (CLAUDE.md:
 Bestehendes wiederverwenden). Nur der `[SB]`-Zeileninhalt selbst ist neu.
 
-Zeilenformat (siehe `column_build.rs::trace_zeile`):
+Zeilenformat (siehe `column_build.rs::trace_line`):
     [SB] Spieler=<pi> Typ=<Drafting|Dome|Tiling> Ziel=<spalte>
          Top2=[<spalte>:<kosten>,<spalte>:<kosten>]
          Vorzug=<ja VorzugAktion=<debug>|nein Grund=<wort>>
@@ -41,7 +41,7 @@ BASIS = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASIS / "tools"))
 
 from analyze_game_log import ROUND_PREFIX  # noqa: E402
-from plate_points_from_arena import partien  # noqa: E402
+from plate_points_from_arena import game_list  # noqa: E402
 
 # Nicht-gierig fuer `vorzug`, weil sein Wert bei `ja` selbst ein
 # `VorzugAktion=...`-Feld mit Leerzeichen enthaelt -- der Regex-Motor
@@ -71,7 +71,7 @@ class Entscheidung:
     angebot: str | None
 
 
-def parse_sb_zeilen(log: list[str]) -> list[Entscheidung]:
+def parse_sb_lines(log: list[str]) -> list[Entscheidung]:
     """Alle `[SB]`-Zeilen EINER Partie -> geordnete Liste von Entscheidungen.
     Zeilen, die nicht passen (sollte bei unveraendertem Format nicht
     vorkommen), werden STILL uebersprungen -- dieses Werkzeug ist Diagnose,
@@ -158,7 +158,7 @@ def zusammenfassen(entscheidungen: list[Entscheidung], seed: int | None) -> Part
         letzter_wert = z.ziel_verlauf[-1][1]
         for runde, ziel in reversed(z.ziel_verlauf):
             if ziel != letzter_wert:
-                z.ziel_stagnation_ab_runde = runde_nach(z.ziel_verlauf, runde)
+                z.ziel_stagnation_ab_runde = round_after(z.ziel_verlauf, runde)
                 break
         else:
             z.ziel_stagnation_ab_runde = z.ziel_verlauf[0][0]
@@ -179,7 +179,7 @@ def zusammenfassen(entscheidungen: list[Entscheidung], seed: int | None) -> Part
     return z
 
 
-def runde_nach(verlauf: list[tuple[int, int]], runde: int) -> int:
+def round_after(verlauf: list[tuple[int, int]], runde: int) -> int:
     """Kleinste Runde im Verlauf, die STRIKT nach `runde` liegt -- Hilfsfunktion
     fuer die Stagnations-Suche (naechste Runde nach dem letzten Wechsel)."""
     kandidaten = [r for r, _ in verlauf if r > runde]
@@ -192,14 +192,14 @@ def main() -> None:
     p.add_argument("--json", type=Path, default=None, help="Zusammenfassung zusaetzlich als JSON schreiben")
     a = p.parse_args()
 
-    spiele = partien(a.datei)
+    spiele = game_list(a.datei)
     zusammenfassungen: list[PartieZusammenfassung] = []
     ziel_haeufigkeit: Counter[int] = Counter()
     ohne_sb_zeilen = 0
 
     for sp in spiele:
         log = sp.get("log") or []
-        entscheidungen = parse_sb_zeilen(log)
+        entscheidungen = parse_sb_lines(log)
         if not entscheidungen:
             ohne_sb_zeilen += 1
             continue

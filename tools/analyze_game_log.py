@@ -396,7 +396,7 @@ class Replayer:
         return g
 
     # ── Textvergleich mit EINER benannten, datierten Toleranz ───────────────
-    def _zeilen_gleich(self, original: str, replay: str) -> bool:
+    def _lines_equal(self, original: str, replay: str) -> bool:
         """String-Gleichheit -- mit genau einer Ausnahme, und die ist keine
         Aufweichung, sondern eine bekannte Aenderung am Logtext.
 
@@ -442,7 +442,7 @@ class Replayer:
         n = len(new_lines)
         if li + n > len(lines):
             return False, n, new_lines
-        matched = all(self._zeilen_gleich(lines[li + k].raw, new_lines[k]) for k in range(n))
+        matched = all(self._lines_equal(lines[li + k].raw, new_lines[k]) for k in range(n))
         return matched, n, new_lines
 
     def apply(self, lines: list[LogLine], li: int, method: str, *args, **kwargs) -> int:

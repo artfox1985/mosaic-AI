@@ -107,7 +107,7 @@ def tiling_zustaende(cap: int) -> list[dict]:
     return raus
 
 
-def kosten_je_label(zustaende: list[dict]) -> dict:
+def cost_per_label(zustaende: list[dict]) -> dict:
     """A) Gepaarte Laufzeit je Horizont auf DENSELBEN Zustaenden."""
     zeiten = {h: [] for h in HORIZONTE}
     verworfen = 0
@@ -142,7 +142,7 @@ def kosten_je_label(zustaende: list[dict]) -> dict:
     return out
 
 
-def bootstrap_anteil() -> dict:
+def bootstrap_share() -> dict:
     """B) Anteil der Bootstrap-Labels an der Self-Play-Gesamtzeit."""
     mr.selfplay_profile_reset()
     t0 = time.time()
@@ -166,11 +166,11 @@ def main() -> None:
     print(f"A) Kosten je Label, {N_ZUSTAENDE} Korpus-Zustaende, gepaart ...", file=sys.stderr)
     zust = tiling_zustaende(N_ZUSTAENDE)
     print(f"   {len(zust)} Tiling-Zustaende gesammelt", file=sys.stderr)
-    a = kosten_je_label(zust)
+    a = cost_per_label(zust)
 
     print(f"B) Bootstrap-Anteil an der Self-Play-Zeit "
           f"({SELFPLAY_PARTIEN} Partien) ...", file=sys.stderr)
-    b = bootstrap_anteil()
+    b = bootstrap_share()
 
     prof = b["profil"]
     boot_ns = prof.get("bootstrap_value_ns") or 0
@@ -185,7 +185,7 @@ def main() -> None:
     anteil = (boot_ns / total_ns) if total_ns else None
 
     ergebnis = dict(
-        kosten_je_label=a,
+        cost_per_label=a,
         selfplay=b,
         anteil_bootstrap_an_selfplay=round(anteil, 4) if anteil is not None else None,
         profil_schluessel=sorted(prof.keys()),

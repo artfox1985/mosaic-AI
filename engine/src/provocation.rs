@@ -8,7 +8,7 @@
 //! `PREREG_scoring_plate_injection.md`).
 //!
 //! DIAGNOSE-KNOPF, KEIN SPIELPARAMETER (Muster: `MOSAIC_VOLLE_VERSORGUNG`,
-//! `state.rs::volle_versorgung`). Default AUS -> [`beschneide_moves`] ist ein
+//! `state.rs::volle_versorgung`). Default AUS -> [`prune_moves`] ist ein
 //! No-Op, `validation::generate_valid_moves` bleibt byte-identisch zum
 //! Bestand. Eine mit gesetztem Knopf gespielte Partie ist NICHT regelkonform
 //! im Sinne eines freien Spiels (eine Seite plant mit einer verkleinerten
@@ -18,7 +18,7 @@
 //! realisierten Endzustands-Feldlabels, und die sind bei JEDER Steuerung
 //! (auch mit Beschneidung) korrekt -- es aendert sich nur die
 //! Zustandsverteilung, aus der gelernt wird (gleiche Begruendung wie
-//! `net_mcts::set_partie_shaping_weight`/`MOSAIC_WERTUNG_STREUUNG_MAX`).
+//! `net_mcts::set_game_shaping_weight`/`MOSAIC_WERTUNG_STREUUNG_MAX`).
 
 use crate::board::PlayerBoard;
 use crate::dome::SpaceType;
@@ -34,9 +34,9 @@ pub(crate) enum Modus {
     /// Env-Var ist eine Ziffer 0..=5 -- feste Ziel-Spalte fuer den gesamten Prozess.
     Fest(usize),
     /// Env-Var ist `"auto"` -- Ziel-Spalte wird je Partie aus dem Partie-Seed
-    /// abgeleitet, siehe [`set_ziel_spalte_seed`]/[`spalte_aus_seed`]. Ohne
+    /// abgeleitet, siehe [`set_target_column_seed`]/[`column_from_seed`]. Ohne
     /// einen per Aufruf gesetzten Seed ist dieser Modus wirkungslos (kein
-    /// Rateweg) -- `ziel_spalte()` liefert dann `None`.
+    /// Rateweg) -- `target_column()` liefert dann `None`.
     Auto,
 }
 
@@ -44,7 +44,7 @@ pub(crate) enum Modus {
 /// wie `net_mcts::read_f64_env`/`state::volle_versorgung`). Ungueltiger Wert
 /// (weder Ziffer 0..5 noch `"auto"`) -> einmalige Warnung + `Aus` (kein Panic,
 /// Laufzeit-Konfiguration darf einen Prozess nie abstuerzen lassen).
-fn modus_env() -> Modus {
+fn mode_env() -> Modus {
     static CELL: std::sync::OnceLock<Modus> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| match std::env::var("MOSAIC_PROVOKATION_SPALTE") {
         Err(_) => Modus::Aus,
@@ -85,18 +85,18 @@ thread_local! {
 /// leckt der Wert in den naechsten Test auf demselben Worker-Thread (`cargo
 /// test` recycelt Threads).
 #[cfg(test)]
-pub(crate) fn set_modus_override_for_test(m: Option<Modus>) {
+pub(crate) fn set_mode_override_for_test(m: Option<Modus>) {
     MODUS_OVERRIDE.with(|c| c.set(m));
 }
 
-fn modus() -> Modus {
+fn mode() -> Modus {
     #[cfg(test)]
     {
         if let Some(m) = MODUS_OVERRIDE.with(|c| c.get()) {
             return m;
         }
     }
-    modus_env()
+    mode_env()
 }
 
 thread_local! {
@@ -107,7 +107,7 @@ thread_local! {
 
 /// Setzt (oder loescht mit `None`) die pro-Partie aufgeloeste Ziel-Spalte fuer
 /// `MOSAIC_PROVOKATION_SPALTE=auto` in DIESEM Thread -- Muster identisch zu
-/// `net_mcts::set_partie_shaping_weight` (Self-Play spielt mehrere Partien
+/// `net_mcts::set_game_shaping_weight` (Self-Play spielt mehrere Partien
 /// GLEICHZEITIG in Threads; ein prozessweiter Wert waere fuer alle Partien
 /// gleich, die Streuung entstuende gar nicht). Wirkt NUR im Modus `Auto`; in
 /// `Aus`/`Fest` ist der Aufruf folgenlos (aber harmlos).
@@ -122,17 +122,17 @@ thread_local! {
 // Bewusst unverdrahtete Stufe-2-API (PREREG_provocation §6: bleibt unbenutzt,
 // bis Stufe 1 ihre Zahl hat) -- kein toter Rest, sondern vorbereiteter Baustein.
 #[allow(dead_code)]
-pub(crate) fn set_ziel_spalte_seed(seed: Option<u64>) {
-    AUTO_SPALTE.with(|c| c.set(seed.map(spalte_aus_seed)));
+pub(crate) fn set_target_column_seed(seed: Option<u64>) {
+    AUTO_SPALTE.with(|c| c.set(seed.map(column_from_seed)));
 }
 
 /// Deterministische Ableitung Ziel-Spalte 0..=5 aus dem Partie-Seed -- gleiche
-/// SplitMix64-Mischung wie `net_mcts::partie_gewicht_aus_seed` (dort
+/// SplitMix64-Mischung wie `net_mcts::game_weight_from_seed` (dort
 /// kontinuierlich in `[0,max]`, hier ein Index; siehe dortige Begruendung,
 /// warum die Mischung noetig ist: aufeinanderfolgende Partie-Seeds im
 /// Self-Play unterscheiden sich oft nur in den unteren Bits).
 #[allow(dead_code)]
-fn spalte_aus_seed(seed: u64) -> usize {
+fn column_from_seed(seed: u64) -> usize {
     let mut z = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
     z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
     z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
@@ -142,8 +142,8 @@ fn spalte_aus_seed(seed: u64) -> usize {
 
 /// Aktive Ziel-Spalte fuer die aktuelle Partie in DIESEM Thread, oder `None`
 /// = Beschneidung aus (Bestandsverhalten -- Default).
-fn ziel_spalte() -> Option<usize> {
-    match modus() {
+fn target_column() -> Option<usize> {
+    match mode() {
         Modus::Aus => None,
         Modus::Fest(c) => Some(c),
         Modus::Auto => AUTO_SPALTE.with(|c| c.get()),
@@ -158,7 +158,7 @@ fn ziel_spalte() -> Option<usize> {
 /// Musterreihe `row_idx` speist Rasterreihe `row_idx` 1:1 (geprueft
 /// scoring.rs:416-422, deckungsgleich mit `round_end::
 /// row_has_open_matching_slot`s `dome_row=r/2,space_row=r%2`).
-pub(crate) fn geforderte_farbe(player: &PlayerBoard, row_idx: usize, spalte: usize) -> Option<TileColor> {
+pub(crate) fn required_color_for(player: &PlayerBoard, row_idx: usize, spalte: usize) -> Option<TileColor> {
     player.dome_grid.get_space(row_idx, spalte).and_then(|s| s.required_color)
 }
 
@@ -177,8 +177,8 @@ pub(crate) fn geforderte_farbe(player: &PlayerBoard, row_idx: usize, spalte: usi
 /// moves` u.a. genau auf Leerheit (Teil der Rundenabschluss-Erkennung) und
 /// verlaesst sich darauf, dass die Beschneidung diese Leerheit nie
 /// veraendert.
-pub(crate) fn beschneide_moves(state: &GameState, moves: Vec<Move>) -> Vec<Move> {
-    let Some(spalte) = ziel_spalte() else {
+pub(crate) fn prune_moves(state: &GameState, moves: Vec<Move>) -> Vec<Move> {
+    let Some(spalte) = target_column() else {
         return moves; // Default aus -- byte-identisch zum Bestand.
     };
     let player = &state.players[state.current_player];
@@ -186,7 +186,7 @@ pub(crate) fn beschneide_moves(state: &GameState, moves: Vec<Move>) -> Vec<Move>
         .iter()
         .filter(|m| match m.place.row_index {
             -1 => true, // Bodenzug: nie beschnitten (Nutzer-Vorgabe).
-            r if (0..=5).contains(&r) => match geforderte_farbe(player, r as usize, spalte) {
+            r if (0..=5).contains(&r) => match required_color_for(player, r as usize, spalte) {
                 Some(x) => x == m.take.color,
                 None => true, // kein Slot / Wild / Special -- keine Forderung.
             },
@@ -261,12 +261,12 @@ mod tests {
     }
 
     #[test]
-    fn default_aus_ist_identitaet_auch_bei_konfliktfaehigen_zuegen() {
+    fn default_off_is_identity_even_for_conflicting_moves() {
         // Test 1 (Pflicht): ungesetzter Knopf -> Aktionsmenge unveraendert --
-        // hier direkt an `beschneide_moves` gezeigt, mit Zuegen, die bei
+        // hier direkt an `prune_moves` gezeigt, mit Zuegen, die bei
         // AKTIVER Beschneidung durchaus rausfallen wuerden (Kontrastprobe:
         // Aus ist nicht "zufaellig kein Konflikt", sondern echtes No-Op).
-        set_modus_override_for_test(Some(Modus::Aus));
+        set_mode_override_for_test(Some(Modus::Aus));
         for seed in [1u64, 2, 3, 4, 5] {
             let mut game = drafting_game(seed);
             let tile = normal_tile(0, [Rot, Blau, Gelb, Schwarz]);
@@ -275,18 +275,18 @@ mod tests {
                 .place_dome_tile(tile, 0, 0)
                 .expect("Slot (0,0) ist frei");
             let raw = vec![stone_move(Blau, 0), stone_move(Rot, 0), stone_move(Gelb, -1)];
-            let out = beschneide_moves(&game.state, raw.clone());
+            let out = prune_moves(&game.state, raw.clone());
             assert_eq!(out, raw, "Seed {seed}: Modus::Aus darf die Menge nicht veraendern");
         }
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     #[test]
-    fn beschneidung_entfernt_falsche_farbe_in_geforderter_reihe() {
+    fn pruning_removes_wrong_color_in_required_row() {
         // Test 2 (Pflicht): bei gesetzter Ziel-Spalte faellt eine falsche
         // Farbe in der geforderten Musterreihe raus, die Bodenzug-Variante
         // UND die passende Farbe bleiben.
-        set_modus_override_for_test(Some(Modus::Fest(0)));
+        set_mode_override_for_test(Some(Modus::Fest(0)));
         let mut game = drafting_game(11);
         // Slot (0,0): si=0 -> Rasterzelle (row=0,col=0) fordert Rot;
         // si=2 -> (row=1,col=0) fordert Gelb (cell_to_dome_space, board.rs:98).
@@ -301,34 +301,34 @@ mod tests {
             stone_move(Rot, 0),   // Musterreihe 0, richtige Farbe -> bleibt
             stone_move(Blau, -1), // Bodenzug -> bleibt IMMER
         ];
-        let out = beschneide_moves(&game.state, raw);
+        let out = prune_moves(&game.state, raw);
         assert!(
             !out.contains(&stone_move(Blau, 0)),
             "falsche Farbe in der geforderten Reihe muss beschnitten werden"
         );
         assert!(out.contains(&stone_move(Rot, 0)), "die geforderte Farbe darf nicht beschnitten werden");
         assert!(out.contains(&stone_move(Blau, -1)), "Bodenzuege sind nie beschnitten");
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     #[test]
-    fn wild_und_leerer_slot_beschneiden_nichts() {
+    fn wild_and_empty_slot_prune_nothing() {
         // Ergaenzend zu Test 2: Zellen ohne Farbforderung (kein Slot, oder
         // Wild/Special) duerfen laut Auftrag nichts beschneiden.
-        set_modus_override_for_test(Some(Modus::Fest(0)));
+        set_mode_override_for_test(Some(Modus::Fest(0)));
         let game = drafting_game(12); // kein Dome-Tile an Slot (0,0) platziert
         let raw = vec![stone_move(Blau, 0), stone_move(Rot, 0)];
-        let out = beschneide_moves(&game.state, raw.clone());
+        let out = prune_moves(&game.state, raw.clone());
         assert_eq!(out, raw, "leerer Slot -- keine Forderung, keine Beschneidung");
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     #[test]
-    fn beschneidung_ueber_das_echte_generate_valid_moves() {
+    fn pruning_over_the_real_generate_valid_moves() {
         // Wie Test 2, aber ueber den echten Generator (validation::
         // generate_valid_moves) statt einer handgebauten Liste -- deckt die
         // tatsaechliche Einbaustelle ab, nicht nur die reine Funktion.
-        set_modus_override_for_test(Some(Modus::Fest(0)));
+        set_mode_override_for_test(Some(Modus::Fest(0)));
         let mut game = drafting_game(21);
         let tile = normal_tile(2, [Rot, Blau, Gelb, Schwarz]);
         let pi = game.state.current_player;
@@ -346,17 +346,17 @@ mod tests {
             moves.iter().any(|m| m.place.row_index == -1 && m.take.color == Blau),
             "Bodenzug fuer Blau muss weiterhin verfuegbar sein"
         );
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     #[test]
-    fn fallback_liefert_unbeschnittene_menge_statt_leer() {
+    fn fallback_returns_unpruned_set_instead_of_empty() {
         // Test 3 (Pflicht, "der wichtigste"): eine Kandidatenliste, die nach
         // der Beschneidung LEER waere (absichtlich OHNE Bodenzug-Eintrag,
         // damit der reale Rettungsanker -- Bodenzuege sind nie beschnitten --
         // hier nicht mitgreift und die Fallback-Logik selbst geprueft wird),
         // muss die UNBESCHNITTENE Menge zurueckgeben, nicht leer.
-        set_modus_override_for_test(Some(Modus::Fest(0)));
+        set_mode_override_for_test(Some(Modus::Fest(0)));
         let mut game = drafting_game(31);
         let tile = normal_tile(3, [Rot, Blau, Gelb, Schwarz]); // (0,0) fordert Rot
         game.state.players[game.state.current_player]
@@ -367,15 +367,15 @@ mod tests {
         // Ausschliesslich Musterreihe-0-Platzierungen mit falscher Farbe --
         // JEDE davon wuerde einzeln beschnitten, kein Bodenzug im Angebot.
         let raw = vec![stone_move(Blau, 0), stone_move(Gelb, 0), stone_move(Schwarz, 0)];
-        let out = beschneide_moves(&game.state, raw.clone());
+        let out = prune_moves(&game.state, raw.clone());
         assert!(!out.is_empty(), "Fallback muss greifen -- die Aktionsmenge darf NIE leer werden");
         assert_eq!(out, raw, "im leeren Fall gilt exakt die unbeschnittene Ausgangsmenge");
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     #[test]
-    fn invariante_leerheit_bleibt_ueber_beschneidung_erhalten() {
-        // Direktes Korrelat zur Dokumentation an `beschneide_moves`:
+    fn emptiness_invariant_survives_pruning() {
+        // Direktes Korrelat zur Dokumentation an `prune_moves`:
         // `ergebnis.is_empty() == moves.is_empty()`, fuer Aus UND Fest.
         let mut game = drafting_game(41);
         let tile = normal_tile(4, [Rot, Blau, Gelb, Schwarz]);
@@ -385,40 +385,40 @@ mod tests {
             .expect("Slot frei");
 
         for m in [Modus::Aus, Modus::Fest(0)] {
-            set_modus_override_for_test(Some(m));
+            set_mode_override_for_test(Some(m));
             let leer: Vec<Move> = Vec::new();
-            assert!(beschneide_moves(&game.state, leer).is_empty(), "{m:?}: leer bleibt leer");
+            assert!(prune_moves(&game.state, leer).is_empty(), "{m:?}: leer bleibt leer");
             let voll = vec![stone_move(Blau, 0)];
             assert_eq!(
-                beschneide_moves(&game.state, voll).is_empty(),
+                prune_moves(&game.state, voll).is_empty(),
                 false,
                 "{m:?}: nicht-leer darf durch Beschneidung nie leer werden"
             );
         }
-        set_modus_override_for_test(None);
+        set_mode_override_for_test(None);
     }
 
     #[test]
-    fn spalte_aus_seed_ist_deterministisch_und_liegt_in_0_bis_5() {
+    fn column_from_seed_is_deterministic_and_within_0_to_5() {
         for seed in [0u64, 1, 42, 999_999, u64::MAX] {
-            let a = spalte_aus_seed(seed);
-            let b = spalte_aus_seed(seed);
+            let a = column_from_seed(seed);
+            let b = column_from_seed(seed);
             assert_eq!(a, b, "gleiche Eingabe -> gleiche Spalte (reproduzierbar)");
             assert!(a <= 5, "Spalte muss in 0..=5 liegen, war {a}");
         }
     }
 
     #[test]
-    fn auto_modus_ohne_gesetzten_seed_ist_wirkungslos() {
-        // "auto" ohne vorherigen `set_ziel_spalte_seed`-Aufruf darf NICHT
-        // raten -- `ziel_spalte()` muss `None` liefern (kein Beschneiden).
-        set_modus_override_for_test(Some(Modus::Auto));
-        set_ziel_spalte_seed(None); // explizit: kein Partie-Seed gesetzt
-        assert_eq!(ziel_spalte(), None);
-        set_ziel_spalte_seed(Some(123));
-        assert_eq!(ziel_spalte(), Some(spalte_aus_seed(123)));
-        set_ziel_spalte_seed(None); // Aufraeumen (Leck-Warnung in der Doku oben)
-        set_modus_override_for_test(None);
+    fn auto_mode_without_a_seed_has_no_effect() {
+        // "auto" ohne vorherigen `set_target_column_seed`-Aufruf darf NICHT
+        // raten -- `target_column()` muss `None` liefern (kein Beschneiden).
+        set_mode_override_for_test(Some(Modus::Auto));
+        set_target_column_seed(None); // explizit: kein Partie-Seed gesetzt
+        assert_eq!(target_column(), None);
+        set_target_column_seed(Some(123));
+        assert_eq!(target_column(), Some(column_from_seed(123)));
+        set_target_column_seed(None); // Aufraeumen (Leck-Warnung in der Doku oben)
+        set_mode_override_for_test(None);
     }
 }
 
@@ -435,7 +435,7 @@ mod tests {
 /// Ziel-Spalte des Vorzugsmodus, `MOSAIC_VORZUG_SPALTE` = 0..5.
 /// Default aus. BEWUSST getrennt vom Beschneidungs-Knopf -- die beiden Modi
 /// sind Alternativen und sollen nicht versehentlich kombiniert laufen.
-pub(crate) fn vorzug_spalte() -> Option<usize> {
+pub(crate) fn preference_column() -> Option<usize> {
     static CELL: std::sync::OnceLock<Option<usize>> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| match std::env::var("MOSAIC_VORZUG_SPALTE") {
         Ok(v) => match v.trim().parse::<usize>() {
@@ -464,24 +464,24 @@ pub(crate) fn vorzug_spalte() -> Option<usize> {
 ///  3. dann kleinste Reihe (billig vor teuer), dann stabile Reihenfolge.
 ///
 /// Zwei Bedingungen je Kandidat, beide aus dem Brett ablesbar:
-///  - Zelle `(r, spalte)` fordert GENAU `m.take.color` (`geforderte_farbe`)
+///  - Zelle `(r, spalte)` fordert GENAU `m.take.color` (`required_color_for`)
 ///    und ist noch nicht gefuellt -- eine gefuellte Zelle braucht keine
 ///    Lieferung mehr.
 ///  - Die Platzierung ist ohnehin legal (`generate_valid_moves` liefert nur
 ///    legale Zuege; Farb-/Kapazitaetsregeln der Musterreihe stecken dort).
-pub(crate) fn vorzugszug(state: &GameState) -> Option<crate::moves::Action> {
-    let spalte = vorzug_spalte()?;
-    vorzugszug_fuer_spalte(state, spalte)
+pub(crate) fn preference_move(state: &GameState) -> Option<crate::moves::Action> {
+    let spalte = preference_column()?;
+    preference_move_for_column(state, spalte)
 }
 
-/// Kern von [`vorzugszug`], mit EXPLIZITER Ziel-Spalte statt des Env-Knopfs
+/// Kern von [`preference_move`], mit EXPLIZITER Ziel-Spalte statt des Env-Knopfs
 /// -- ausgelagert (2026-08-13, Spaltenbau-Auftrag), damit `column_build.rs` die
 /// IDENTISCHE Praeferenzlogik mit einer je Entscheid dynamisch bestimmten
 /// Spalte wiederverwenden kann, statt sie zu duplizieren (CLAUDE.md:
 /// "vorhandene scripts/Funktionen wiederverwenden"). Reiner Parameter-
-/// Extrakt, keine Verhaltensaenderung -- `vorzugszug` selbst bleibt
+/// Extrakt, keine Verhaltensaenderung -- `preference_move` selbst bleibt
 /// byte-identisch.
-pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option<crate::moves::Action> {
+pub(crate) fn preference_move_for_column(state: &GameState, spalte: usize) -> Option<crate::moves::Action> {
     if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
         return None;
     }
@@ -490,7 +490,7 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
     // einmal je Entscheid berechnet, nicht je Kandidat -- `verbleibende_
     // farben` iteriert den ganzen sichtbaren Zustand (siehe Doku dort), das
     // in der Kandidatenschleife zu wiederholen waere O(n^2) ohne Nutzen.
-    let verbleibend = verbleibende_farben(state);
+    let verbleibend = remaining_colors(state);
     let moves = crate::validation::generate_valid_moves(state);
     let mut best: Option<(usize, i64, i32, i32, crate::moves::Move)> = None;
     for m in moves {
@@ -500,7 +500,7 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
         }
         let r = r as usize;
         // Task 7a (Spaltenbau Runde 2, Nutzer-Auftrag 2026-08-13): Wild-Zellen
-        // aktiv bedienen -- `geforderte_farbe` liefert fuer Wild `None`
+        // aktiv bedienen -- `required_color_for` liefert fuer Wild `None`
         // (`dome.rs`, `required_color: None`), das alte `Some(x) if x ==
         // m.take.color`-Muster liess Wild-Zellen also NIE als Ziel gelten,
         // obwohl JEDE Farbe sie fuellen darf. Special bleibt ausgeschlossen
@@ -534,7 +534,7 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
         // wieder (PREREG_provocation.md §11: 74,1% Blocker "Farbe nicht im
         // Angebot"). Kleinerer `knappheit`-Wert (wenig verbleibend) gewinnt,
         // weil `besser` auf Tupel-`<` sortiert.
-        let knappheit = farben_index(m.take.color)
+        let knappheit = color_index(m.take.color)
             .map(|i| verbleibend[i])
             .unwrap_or(i64::MAX); // TakeAction liefert nie Wild (kein ziehbarer Stein, tile.rs); defensiv.
         let kandidat = (0usize, knappheit, -fuellung, r as i32, m);
@@ -555,7 +555,7 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
 //
 // PREREG_provocation.md §11 letzter Satz: dominanter Blocker (74,1%) ist
 // nicht mehr Farblogik, sondern die VERSORGUNG -- die fuer die Zielspalte
-// geforderte Farbe war schlicht nirgends im Angebot. `verbleibende_farben`
+// geforderte Farbe war schlicht nirgends im Angebot. `remaining_colors`
 // beantwortet die dafuer nötige Frage "wie viel von Farbe X ist ueberhaupt
 // noch NICHT verbraucht", aus rein OEFFENTLICHER Information.
 
@@ -582,13 +582,13 @@ pub(crate) fn vorzugszug_fuer_spalte(state: &GameState, spalte: usize) -> Option
 ///    `dome.rs`).
 ///
 /// Ergebnis in der Reihenfolge von `TileColor::NORMAL`, siehe
-/// [`farben_index`]. `i64` statt `usize`: eine Inkonsistenz soll als
+/// [`color_index`]. `i64` statt `usize`: eine Inkonsistenz soll als
 /// sichtbar NEGATIVE Zahl auffallen statt in einem Unsigned-Underflow zu
 /// verschwinden (defensiv, kein Panic) -- Aufrufer clampen selbst auf 0.
-pub(crate) fn verbleibende_farben(state: &GameState) -> [i64; 5] {
+pub(crate) fn remaining_colors(state: &GameState) -> [i64; 5] {
     let mut verbaut = [0i64; 5];
     let mut zaehle = |c: TileColor| {
-        if let Some(i) = farben_index(c) {
+        if let Some(i) = color_index(c) {
             verbaut[i] += 1;
         }
     };
@@ -633,7 +633,7 @@ pub(crate) fn verbleibende_farben(state: &GameState) -> [i64; 5] {
 }
 
 /// Runde 4, Baustein 1 (Nutzer-Auftrag `PREREG_provocation.md` §14): fuer
-/// [`crate::column_build::ist_spalte_vollendbar`] ist [`verbleibende_farben`]
+/// [`crate::column_build::column_is_completable`] ist [`remaining_colors`]
 /// die FALSCHE Zahl -- die zaehlt Fabrik-/Mond-Kacheln als "verbaut", obwohl
 /// sie JETZT noch nehmbar sind (sie misst "im Beutel/Turm versteckt", nicht
 /// "noch erreichbar"). Eine tiefe Reihe (braucht bis zu 6 Kopien) erschien
@@ -651,10 +651,10 @@ pub(crate) fn verbleibende_farben(state: &GameState) -> [i64; 5] {
 /// vollendbar`s "transiente Falschbindung"-Kommentar), es zusaetzlich
 /// abzuziehen waere erneut zu pessimistisch. Fabrik-/Mond-/Beutel-/Turm-
 /// Kacheln bleiben unangetastet -- sie sind (irgendwann) erreichbar.
-pub(crate) fn noch_erreichbare_farben(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
+pub(crate) fn still_reachable_colors(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
     let mut verloren = [0i64; 5];
     let mut zaehle = |c: TileColor| {
-        if let Some(i) = farben_index(c) {
+        if let Some(i) = color_index(c) {
             verloren[i] += 1;
         }
     };
@@ -687,7 +687,7 @@ pub(crate) fn noch_erreichbare_farben(state: &GameState, aktueller_spieler: usiz
 
 /// Index 0..=4 von `color` in `TileColor::NORMAL` -- `None` fuer `Wild`
 /// (kein ziehbarer Stein, siehe `tile.rs`-Doku "kein ziehbarer Stein").
-pub(crate) fn farben_index(color: TileColor) -> Option<usize> {
+pub(crate) fn color_index(color: TileColor) -> Option<usize> {
     TileColor::NORMAL.iter().position(|&c| c == color)
 }
 
@@ -696,9 +696,9 @@ pub(crate) fn farben_index(color: TileColor) -> Option<usize> {
 // Dieselbe oeffentliche Zaehlung, die oben die eigene Vollendbarkeit prueft,
 // beantwortet auch: welche Farbe braucht der GEGNER? Musterreihen-Farbe ist
 // Spielregel (`PatternLine::color`), Kuppelzellen-Forderung ist
-// `geforderte_farbe` -- beides oeffentlich sichtbar, keine Vorhersage.
+// `required_color_for` -- beides oeffentlich sichtbar, keine Vorhersage.
 
-fn disruption_aktiv_env() -> bool {
+fn disruption_active_env() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| match std::env::var("MOSAIC_OPPONENT_DISRUPTION") {
         Err(_) => false,
@@ -723,17 +723,17 @@ pub(crate) fn set_disruption_override_for_test(v: Option<bool>) {
 }
 
 /// Liest `MOSAIC_OPPONENT_DISRUPTION` einmalig (Prozess-Cache, Muster
-/// `column_build::aktiv_env`/`ist_aktiv`). Jeder nicht-leere Wert ausser
+/// `column_build::active_env`/`is_active`). Jeder nicht-leere Wert ausser
 /// `"0"` schaltet die Stoerung ein. Default (unset) = AUS, reiner
 /// Diagnose-Knopf, NIE im Gating (siehe `PREREG_opponent_disruption.md` §3).
-fn disruption_aktiv() -> bool {
+fn disruption_active() -> bool {
     #[cfg(test)]
     {
         if let Some(v) = DISRUPTION_OVERRIDE.with(|c| c.get()) {
             return v;
         }
     }
-    disruption_aktiv_env()
+    disruption_active_env()
 }
 
 /// Wie sehr braucht der GEGNER (aus Sicht von `aktueller_spieler`) jede der
@@ -751,14 +751,14 @@ fn disruption_aktiv() -> bool {
 /// Rein oeffentliche Buchhaltung -- `aktueller_spieler` sieht exakt das, was
 /// auch ein menschlicher Mitspieler am Gegnerbrett abliest.
 ///
-/// Der Musterreihen-Anteil allein steht als [`gegner_bedarf_akut`] zur
+/// Der Musterreihen-Anteil allein steht als [`opponent_demand_acute`] zur
 /// Verfuegung (PREREG_opponent_disruption_v2.md §4.1: der Kuppelraster-Anteil
 /// ist eine Langfrist-Forderung, die sich ueber eine Runde kaum aendert; das
 /// Rangkriterium des Stoerungs-Bausteins v2 nutzt deshalb nur den akuten
 /// Teil). Diese Funktion delegiert an ihn -- ihr eigenes Ergebnis bleibt
-/// unveraendert (Bestandsschutz fuer `stoerungs_vorzug`, per Test gesichert).
-pub(crate) fn gegner_bedarf(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
-    let mut bedarf = gegner_bedarf_akut(state, aktueller_spieler);
+/// unveraendert (Bestandsschutz fuer `disruption_preference`, per Test gesichert).
+pub(crate) fn opponent_demand(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
+    let mut bedarf = opponent_demand_acute(state, aktueller_spieler);
     let gegner_idx = 1 - aktueller_spieler;
     let Some(gegner) = state.players.get(gegner_idx) else {
         return bedarf; // defensiv, sollte bei genau 2 Spielern nie vorkommen.
@@ -770,7 +770,7 @@ pub(crate) fn gegner_bedarf(state: &GameState, aktueller_spieler: usize) -> [i64
                 continue; // schon geliefert -- kein Bedarf mehr.
             }
             if let Some(c) = sp.required_color {
-                if let Some(i) = farben_index(c) {
+                if let Some(i) = color_index(c) {
                     bedarf[i] += 1;
                 }
             }
@@ -783,22 +783,22 @@ pub(crate) fn gegner_bedarf(state: &GameState, aktueller_spieler: usize) -> [i64
 //
 // Drei reine Lesefunktionen fuer den Zaehlmodus (§5.2) bzw. spaeter den
 // Tie-Break selbst (§4.1). Keine davon veraendert Zustand, keine wird vom
-// Bestandspfad aufgerufen -- der abgelehnte v1-Pfad (`stoerungs_vorzug`)
+// Bestandspfad aufgerufen -- der abgelehnte v1-Pfad (`disruption_preference`)
 // bleibt unberuehrt.
 
 /// AKUTER Gegner-Bedarf je Farbe: nur die offenen Plaetze seiner bereits
 /// BEGONNENEN Musterreihen (`PatternLine::color`/`spaces_left`, board.rs:40).
-/// Das ist der Teil von [`gegner_bedarf`], der sich innerhalb einer Runde
+/// Das ist der Teil von [`opponent_demand`], der sich innerhalb einer Runde
 /// tatsaechlich bewegt -- eine begonnene Reihe verlangt JETZT Nachschub,
 /// waehrend eine offene Kuppelzelle noch viele Runden Zeit hat.
-pub(crate) fn gegner_bedarf_akut(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
+pub(crate) fn opponent_demand_acute(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
     let mut bedarf = [0i64; 5];
     let Some(gegner) = state.players.get(1 - aktueller_spieler) else {
         return bedarf; // defensiv, sollte bei genau 2 Spielern nie vorkommen.
     };
     for line in &gegner.pattern_lines {
         let Some(c) = line.color else { continue }; // leere Reihe -- keine Farbe festgelegt.
-        if let Some(i) = farben_index(c) {
+        if let Some(i) = color_index(c) {
             bedarf[i] += line.spaces_left() as i64;
         }
     }
@@ -812,7 +812,7 @@ pub(crate) fn gegner_bedarf_akut(state: &GameState, aktueller_spieler: usize) ->
 /// Fliesen auf die Strafleiste -- `0` wuerde Bodenzuege faelschlich als
 /// schadensfrei durchwinken. Reihenzug: Ueberlauf wie `mcts.rs:636-638`
 /// (`execution::execute_place` -> `PatternLine::add_tiles`, board.rs:56-67).
-pub(crate) fn strafleisten_zuwachs(state: &GameState, spieler: usize, m: &Move) -> usize {
+pub(crate) fn floor_line_growth(state: &GameState, spieler: usize, m: &Move) -> usize {
     let n = crate::mcts::tiles_taken(state, &m.take);
     let r = m.place.row_index;
     if !(0..=5).contains(&r) {
@@ -823,22 +823,22 @@ pub(crate) fn strafleisten_zuwachs(state: &GameState, spieler: usize, m: &Move) 
 }
 
 /// Bewertung EINES Zuges fuer den Stoerungs-Baustein v2:
-/// `(stoerwirkung, strafleisten_zuwachs)`.
+/// `(stoerwirkung, floor_line_growth)`.
 ///
 /// `stoerwirkung = min(genommene Fliesen, akuter Gegner-Bedarf dieser Farbe)`
 /// -- eine Farbe wegzunehmen hilft nur bis zu der Menge, die der Gegner
 /// ueberhaupt noch braucht (PREREG §4.1; Modellierungs-Entscheidung, vorab
 /// fixiert). `bedarf_akut` wird vom Aufrufer EINMAL je Entscheidung berechnet
 /// und hereingereicht, nicht je Kandidat neu (gleiche Begruendung wie bei
-/// `verbleibende_farben` in `vorzugszug_fuer_spalte`).
-pub(crate) fn stoer_bewertung(state: &GameState, m: &Move, bedarf_akut: &[i64; 5]) -> (i64, usize) {
+/// `remaining_colors` in `preference_move_for_column`).
+pub(crate) fn disruption_score(state: &GameState, m: &Move, bedarf_akut: &[i64; 5]) -> (i64, usize) {
     let n = crate::mcts::tiles_taken(state, &m.take) as i64;
-    let bedarf = farben_index(m.take.color).map(|i| bedarf_akut[i]).unwrap_or(0);
-    (n.min(bedarf), strafleisten_zuwachs(state, state.current_player, m))
+    let bedarf = color_index(m.take.color).map(|i| bedarf_akut[i]).unwrap_or(0);
+    (n.min(bedarf), floor_line_growth(state, state.current_player, m))
 }
 
-/// Kern von [`vorzugszug_fuer_spalte`], aber OHNE dessen Spalten-/
-/// `geforderte_farbe`-Filter: die Stoerung zielt auf IRGENDeine eigene
+/// Kern von [`preference_move_for_column`], aber OHNE dessen Spalten-/
+/// `required_color_for`-Filter: die Stoerung zielt auf IRGENDeine eigene
 /// Platzierung der Zielfarbe (die Farbe wird dem Gegner damit entzogen,
 /// unabhaengig davon, wo sie bei mir landet) -- Portierung des Tie-Breaks
 /// ("vollste eigene Reihe zuerst, kleinste Reihe als Rest-Tie-Break"),
@@ -847,7 +847,7 @@ pub(crate) fn stoer_bewertung(state: &GameState, m: &Move, bedarf_akut: &[i64; 5
 /// werden bewusst NICHT beruecksichtigt -- Stoerung soll nicht auf Kosten
 /// der eigenen Strafleiste gehen (Nutzer-Vorgabe: "bei ~gleichwertigen
 /// eigenen Zuegen"; Schadensbegrenzung bleibt Prioritaet vor Stoerung).
-pub(crate) fn vorzugszug_fuer_farbe(state: &GameState, farbe: TileColor) -> Option<crate::moves::Action> {
+pub(crate) fn preference_move_for_color(state: &GameState, farbe: TileColor) -> Option<crate::moves::Action> {
     if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
         return None;
     }
@@ -884,19 +884,19 @@ pub(crate) fn vorzugszug_fuer_farbe(state: &GameState, farbe: TileColor) -> Opti
 /// kein Gegner-Bedarf/kein passender eigener Zug existiert.
 ///
 /// Zielfarben-Wahl: unter den Farben mit `bedarf > 0` die mit dem
-/// KLEINSTEN `noch_erreichbare_farben`-Wert (knappste zuerst) -- Gleichstand
+/// KLEINSTEN `still_reachable_colors`-Wert (knappste zuerst) -- Gleichstand
 /// nach hoechstem `bedarf`, dann nach Farbindex (stabil, bewusst KEINE
 /// Streuung: die Stoerung soll deterministisch aus der Buchhaltung folgen,
 /// nicht gewuerfelt sein).
-pub(crate) fn stoerungs_vorzug(state: &GameState) -> Option<crate::moves::Action> {
-    if !disruption_aktiv() {
+pub(crate) fn disruption_preference(state: &GameState) -> Option<crate::moves::Action> {
+    if !disruption_active() {
         return None;
     }
     if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
         return None;
     }
-    let bedarf = gegner_bedarf(state, state.current_player);
-    let erreichbar = noch_erreichbare_farben(state, state.current_player);
+    let bedarf = opponent_demand(state, state.current_player);
+    let erreichbar = still_reachable_colors(state, state.current_player);
     let mut ziel: Option<(i64, i64, usize)> = None; // (erreichbar, -bedarf, farbindex)
     for i in 0..5 {
         if bedarf[i] <= 0 {
@@ -913,7 +913,7 @@ pub(crate) fn stoerungs_vorzug(state: &GameState) -> Option<crate::moves::Action
     }
     let (_, _, farbindex) = ziel?;
     let farbe = TileColor::NORMAL[farbindex];
-    vorzugszug_fuer_farbe(state, farbe)
+    preference_move_for_color(state, farbe)
 }
 
 #[cfg(test)]
@@ -940,10 +940,10 @@ mod vorzugszug_tests {
 
     /// Task 7a (Spaltenbau Runde 2): eine Wild-Zelle in der Ziel-Spalte MUSS
     /// jetzt als Ziel gelten, unabhaengig von der genommenen Farbe -- vor dem
-    /// Fix lieferte `geforderte_farbe` fuer Wild `None` und das
+    /// Fix lieferte `required_color_for` fuer Wild `None` und das
     /// `Some(x) if x == m.take.color`-Muster verwarf JEDE Farbe.
     #[test]
-    fn vorzugszug_fuer_spalte_akzeptiert_jede_farbe_an_einer_wild_zelle() {
+    fn preference_move_for_column_accepts_any_color_at_a_wild_cell() {
         let mut game = drafting_game(101);
         let pi = game.state.current_player;
         // Slot (0,0): si=0 -> (Zeile0,Spalte0)=Wild, restliche normal.
@@ -958,7 +958,7 @@ mod vorzugszug_tests {
         // waere die Wild-Zelle (0,0) nicht qualifiziert, gaebe es hier gar
         // keinen Kandidaten fuer Spalte 0.
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
-        let ergebnis = vorzugszug_fuer_spalte(&game.state, 0);
+        let ergebnis = preference_move_for_column(&game.state, 0);
         match ergebnis.expect("Wild-Zelle muss JEDE Farbe als Kandidat zulassen") {
             Action::Stone(m) => {
                 assert_eq!(m.place.row_index, 0, "muss Musterreihe 0 (die Wild-Zelle) treffen");
@@ -983,12 +983,12 @@ mod vorzugszug_tests {
     /// Fabrik + 2 angebotene = 13 von 13, Rest 0), Gelb bleibt reichlich
     /// (nur 3 von 13 sichtbar verbraucht).
     #[test]
-    fn vorzugszug_fuer_spalte_bevorzugt_knappe_farbe_vor_vollerer_reihe() {
+    fn preference_move_for_column_prefers_scarce_color_over_fuller_row() {
         let mut game = drafting_game(103);
         let pi = game.state.current_player;
         // Slot (0,0), Rotation 0: si=0 -> (Zeile0,Spalte0)=Rot,
         // si=2 -> (Zeile1,Spalte0)=Gelb (dieselbe Geometrie wie
-        // `vorzugszug_fuer_spalte_akzeptiert_jede_farbe_an_einer_wild_zelle`).
+        // `preference_move_for_column_accepts_any_color_at_a_wild_cell`).
         let tile = DomeTile::new(
             52,
             vec![
@@ -1008,7 +1008,7 @@ mod vorzugszug_tests {
         game.state.large_factory.moon_pool = vec![Rot; 11];
 
         let ergebnis =
-            vorzugszug_fuer_spalte(&game.state, 0).expect("es muss einen Kandidaten geben (Rot ODER Gelb)");
+            preference_move_for_column(&game.state, 0).expect("es muss einen Kandidaten geben (Rot ODER Gelb)");
         match ergebnis {
             Action::Stone(m) => {
                 assert_eq!(
@@ -1022,7 +1022,7 @@ mod vorzugszug_tests {
     }
 
     #[test]
-    fn vorzugszug_fuer_spalte_ignoriert_special_zellen() {
+    fn preference_move_for_column_ignores_special_cells() {
         let mut game = drafting_game(102);
         let pi = game.state.current_player;
         // Slot (0,0), Rotation 0: si=0 -> (Zeile0,Spalte0)=Special,
@@ -1035,7 +1035,7 @@ mod vorzugszug_tests {
             0,
         );
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
-        let ergebnis = vorzugszug_fuer_spalte(&game.state, 0);
+        let ergebnis = preference_move_for_column(&game.state, 0);
         if let Some(Action::Stone(m)) = &ergebnis {
             assert_ne!(
                 m.place.row_index, 0,
@@ -1045,24 +1045,24 @@ mod vorzugszug_tests {
     }
 
     #[test]
-    fn farben_index_deckt_alle_fuenf_normalfarben_ab_und_verwirft_wild() {
+    fn color_index_covers_all_five_normal_colors_and_rejects_wild() {
         let mut gesehen = std::collections::HashSet::new();
         for c in crate::tile::TileColor::NORMAL {
-            let i = farben_index(c).expect("jede Normalfarbe muss einen Index haben");
+            let i = color_index(c).expect("jede Normalfarbe muss einen Index haben");
             assert!(i < 5);
             gesehen.insert(i);
         }
         assert_eq!(gesehen.len(), 5, "alle 5 Indizes muessen verschieden sein");
-        assert_eq!(farben_index(crate::tile::TileColor::Wild), None, "Wild ist kein ziehbarer Stein");
+        assert_eq!(color_index(crate::tile::TileColor::Wild), None, "Wild ist kein ziehbarer Stein");
     }
 
-    /// Task 1 (Runde 3): `verbleibende_farben` muss Gesamtvorrat minus JEDE
+    /// Task 1 (Runde 3): `remaining_colors` muss Gesamtvorrat minus JEDE
     /// sichtbare Fundstelle liefern -- Fabrik, Grosse Fabrik (Sonne+Mond),
     /// beide Spielerbretter (Musterreihen, Strafleiste, verbaute Kuppelzellen).
     /// NICHT gezaehlt: `state.bag`/`state.tower` selbst (die Differenz IST
     /// das Ergebnis).
     #[test]
-    fn verbleibende_farben_zaehlt_jede_sichtbare_fundstelle() {
+    fn remaining_colors_counts_every_visible_occurrence() {
         let mut game = drafting_game(104);
         let pi = game.state.current_player;
         let gegner = 1 - pi;
@@ -1091,8 +1091,8 @@ mod vorzugszug_tests {
         game.state.players[gegner].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
         game.state.players[gegner].dome_grid.dome_slots[0][0].as_mut().unwrap().spaces[0].placed_color = Some(Rot);
 
-        let verbleibend = verbleibende_farben(&game.state);
-        let i = farben_index(Rot).unwrap();
+        let verbleibend = remaining_colors(&game.state);
+        let i = color_index(Rot).unwrap();
         // 2 (Fabrik) + 1 (Mond GF) + 1 (Strafleiste) + 1 (Musterreihe) + 1 (verbaut) = 6 sichtbare Rot.
         assert_eq!(
             verbleibend[i],
@@ -1101,18 +1101,18 @@ mod vorzugszug_tests {
         );
         // Blau wurde in diesem Test nirgends platziert und die Tischmitte ist
         // deterministisch leer -- muss exakt beim vollen Vorrat stehen.
-        let bi = farben_index(Blau).unwrap();
+        let bi = color_index(Blau).unwrap();
         assert_eq!(verbleibend[bi], crate::tile::TILES_PER_COLOR as i64);
     }
 
-    /// Runde 4, Baustein 1: `noch_erreichbare_farben` darf FABRIK-Kacheln
+    /// Runde 4, Baustein 1: `still_reachable_colors` darf FABRIK-Kacheln
     /// NICHT abziehen (die sind jetzt noch nehmbar) -- anders als
-    /// `verbleibende_farben` im Test oben. Abgezogen werden nur beider
+    /// `remaining_colors` im Test oben. Abgezogen werden nur beider
     /// Spieler Strafleiste/verbaute Kuppelzellen UND die Musterreihen des
     /// GEGNERS (der haelt sie schon); die EIGENEN Musterreihen bleiben
     /// unangetastet.
     #[test]
-    fn noch_erreichbare_farben_zaehlt_fabrikkacheln_nicht_als_verloren() {
+    fn still_reachable_colors_does_not_count_factory_tiles_as_lost() {
         let mut game = drafting_game(105);
         let pi = game.state.current_player;
         let gegner = 1 - pi;
@@ -1138,8 +1138,8 @@ mod vorzugszug_tests {
         game.state.players[gegner].pattern_lines[1].color = Some(Rot);
         game.state.players[gegner].pattern_lines[1].tiles.push(Rot);
 
-        let erreichbar = noch_erreichbare_farben(&game.state, pi);
-        let i = farben_index(Rot).unwrap();
+        let erreichbar = still_reachable_colors(&game.state, pi);
+        let i = color_index(Rot).unwrap();
         // 13 - 1 (Strafleiste Gegner) - 1 (Musterreihe Gegner) = 11.
         assert_eq!(
             erreichbar[i],
@@ -1150,12 +1150,12 @@ mod vorzugszug_tests {
 
     // ── Stoerungs-Baustein (PREREG_opponent_disruption.md) ──────────────────
 
-    /// `gegner_bedarf` muss (a) eine begonnene, nicht-volle Musterreihe des
+    /// `opponent_demand` muss (a) eine begonnene, nicht-volle Musterreihe des
     /// GEGNERS mit ihren `spaces_left()` zaehlen, (b) eine OFFENE Kuppelzelle
     /// mit determinierter Farbforderung zaehlen, und (c) eine bereits
     /// GEFUELLTE Kuppelzelle NICHT zaehlen (kein Bedarf mehr).
     #[test]
-    fn gegner_bedarf_zaehlt_musterreihen_und_offene_kuppelzellen_des_gegners() {
+    fn opponent_demand_counts_pattern_lines_and_open_dome_cells() {
         let mut game = drafting_game(201);
         let pi = game.state.current_player;
         let gegner = 1 - pi;
@@ -1174,23 +1174,23 @@ mod vorzugszug_tests {
         game.state.players[gegner].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
         game.state.players[gegner].dome_grid.dome_slots[0][0].as_mut().unwrap().spaces[2].placed_color = Some(Gelb);
 
-        let bedarf = gegner_bedarf(&game.state, pi);
-        assert_eq!(bedarf[farben_index(Rot).unwrap()], 2, "Musterreihe 2 braucht noch 2 Rot: {bedarf:?}");
-        assert_eq!(bedarf[farben_index(Blau).unwrap()], 1, "offene Zelle (0,0) braucht 1 Blau: {bedarf:?}");
-        assert_eq!(bedarf[farben_index(Gelb).unwrap()], 0, "gefuellte Zelle (1,0) darf nicht zaehlen: {bedarf:?}");
+        let bedarf = opponent_demand(&game.state, pi);
+        assert_eq!(bedarf[color_index(Rot).unwrap()], 2, "Musterreihe 2 braucht noch 2 Rot: {bedarf:?}");
+        assert_eq!(bedarf[color_index(Blau).unwrap()], 1, "offene Zelle (0,0) braucht 1 Blau: {bedarf:?}");
+        assert_eq!(bedarf[color_index(Gelb).unwrap()], 0, "gefuellte Zelle (1,0) darf nicht zaehlen: {bedarf:?}");
     }
 
     /// Kill-Probe Teil 1: dieselbe eindeutig stoerbare Stellung wie im
     /// Folgetest, aber OHNE gesetzten Knopf -- muss `None` liefern
     /// (Bestandsschutz).
     #[test]
-    fn stoerungs_vorzug_ist_aus_ohne_knopf() {
+    fn disruption_preference_is_off_without_knob() {
         set_disruption_override_for_test(Some(false));
         let mut game = drafting_game(202);
         let gegner = 1 - game.state.current_player;
         game.state.players[gegner].pattern_lines[0].color = Some(Rot);
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
-        let ergebnis = stoerungs_vorzug(&game.state);
+        let ergebnis = disruption_preference(&game.state);
         set_disruption_override_for_test(None);
         assert!(ergebnis.is_none(), "ohne Knopf darf kein Stoerungs-Vorzug entstehen, bekam {ergebnis:?}");
     }
@@ -1198,14 +1198,14 @@ mod vorzugszug_tests {
     /// Runde 5 hat ihren exakten Solver -- der Vorzug darf dort nicht
     /// eingreifen, selbst bei aktivem Knopf und eindeutigem Gegner-Bedarf.
     #[test]
-    fn stoerungs_vorzug_wirkt_nicht_nach_runde_4() {
+    fn disruption_preference_has_no_effect_after_round_4() {
         set_disruption_override_for_test(Some(true));
         let mut game = drafting_game(203);
         let gegner = 1 - game.state.current_player;
         game.state.players[gegner].pattern_lines[0].color = Some(Rot);
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
         game.state.round_number = 5;
-        let ergebnis = stoerungs_vorzug(&game.state);
+        let ergebnis = disruption_preference(&game.state);
         set_disruption_override_for_test(None);
         assert!(ergebnis.is_none(), "Runde 5 muss dem exakten Solver ueberlassen bleiben, bekam {ergebnis:?}");
     }
@@ -1217,7 +1217,7 @@ mod vorzugszug_tests {
     /// fehlerhafte Sortierung (z.B. nur nach Bedarf, ohne Knappheit) wuerde
     /// hier Gelb waehlen und den Test zum Scheitern bringen.
     #[test]
-    fn stoerungs_vorzug_waehlt_die_vom_gegner_gebrauchte_knappe_farbe() {
+    fn disruption_preference_chooses_the_scarce_color_the_opponent_needs() {
         set_disruption_override_for_test(Some(true));
         let mut game = drafting_game(204);
         let pi = game.state.current_player;
@@ -1243,7 +1243,7 @@ mod vorzugszug_tests {
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
         game.state.factories[1].sun_tiles = vec![Gelb, Gelb];
 
-        let ergebnis = stoerungs_vorzug(&game.state);
+        let ergebnis = disruption_preference(&game.state);
         set_disruption_override_for_test(None);
         match ergebnis.expect("eindeutiger Stoerungs-Kandidat muss existieren") {
             Action::Stone(m) => {
@@ -1253,29 +1253,29 @@ mod vorzugszug_tests {
         }
     }
 
-    /// `plate_builder::drafting_vorzug` bei ausgeschaltetem Stoerungs-Knopf
+    /// `plate_builder::drafting_preference` bei ausgeschaltetem Stoerungs-Knopf
     /// bleibt exakt der Bestand -- keine `.or_else`-Wirkung ohne Knopf.
     #[test]
-    fn drafting_vorzug_integration_ohne_stoerungs_knopf_ist_bestand() {
+    fn drafting_preference_integration_without_disruption_knob_is_legacy() {
         set_disruption_override_for_test(Some(false));
         let mut game = drafting_game(205);
         let gegner = 1 - game.state.current_player;
         game.state.players[gegner].pattern_lines[0].color = Some(Rot);
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
-        let vorher = crate::plate_builder::drafting_vorzug(&game.state);
+        let vorher = crate::plate_builder::drafting_preference(&game.state);
         set_disruption_override_for_test(None);
         // Ohne aktiven Bauer UND ohne Stoerungs-Knopf muss der Dispatch
         // `None` liefern (kein Kriterium aktiv in diesem Testaufbau).
-        assert!(vorher.is_none(), "ohne jeden Knopf darf drafting_vorzug nichts vorschlagen, bekam {vorher:?}");
+        assert!(vorher.is_none(), "ohne jeden Knopf darf drafting_preference nichts vorschlagen, bekam {vorher:?}");
     }
 
     // ── Stoerungs-Baustein v2 (PREREG_opponent_disruption_v2.md) ────────────
 
-    /// Bestandsschutz fuer die Aufteilung: `gegner_bedarf` = akuter Anteil
+    /// Bestandsschutz fuer die Aufteilung: `opponent_demand` = akuter Anteil
     /// PLUS Kuppelzellen-Anteil. Waere die Refaktorierung schiefgegangen,
-    /// haette sich `stoerungs_vorzug`s Zielfarben-Wahl still veraendert.
+    /// haette sich `disruption_preference`s Zielfarben-Wahl still veraendert.
     #[test]
-    fn gegner_bedarf_ist_akut_plus_kuppelzellen() {
+    fn opponent_demand_is_acute_plus_dome_cells() {
         let mut game = drafting_game(301);
         let pi = game.state.current_player;
         let gegner = 1 - pi;
@@ -1295,9 +1295,9 @@ mod vorzugszug_tests {
         );
         game.state.players[gegner].dome_grid.place_dome_tile(tile, 0, 0).expect("Slot frei");
 
-        let akut = gegner_bedarf_akut(&game.state, pi);
-        let voll = gegner_bedarf(&game.state, pi);
-        let i_rot = farben_index(Rot).expect("Rot ist eine Normalfarbe");
+        let akut = opponent_demand_acute(&game.state, pi);
+        let voll = opponent_demand(&game.state, pi);
+        let i_rot = color_index(Rot).expect("Rot ist eine Normalfarbe");
         assert_eq!(akut[i_rot], 2, "zwei offene Plaetze der begonnenen Rot-Reihe");
         assert_eq!(voll[i_rot], 3, "plus die eine offene Rot-Kuppelzelle");
         // Der akute Anteil darf NIE groesser sein als der volle.
@@ -1305,7 +1305,7 @@ mod vorzugszug_tests {
             assert!(akut[i] <= voll[i], "Farbe {i}: akut {} > voll {}", akut[i], voll[i]);
         }
         // Blau/Gelb/Schwarz haben KEINE begonnene Reihe -> akut 0, voll 1.
-        let i_blau = farben_index(Blau).expect("Blau ist eine Normalfarbe");
+        let i_blau = color_index(Blau).expect("Blau ist eine Normalfarbe");
         assert_eq!(akut[i_blau], 0);
         assert_eq!(voll[i_blau], 1);
     }
@@ -1314,7 +1314,7 @@ mod vorzugszug_tests {
     /// Strafleiste (die Vorregistrierung hatte hier faelschlich "0"), ein
     /// Reihenzug nur den Ueberlauf.
     #[test]
-    fn strafleisten_zuwachs_zaehlt_bodenzug_voll_und_reihenueberlauf() {
+    fn floor_line_growth_counts_floor_moves_fully_and_row_overflow() {
         let mut game = drafting_game(302);
         let pi = game.state.current_player;
         let fid = game.state.factories[0].factory_id;
@@ -1329,16 +1329,16 @@ mod vorzugszug_tests {
             place: PlaceAction { row_index: row },
         };
         // 3 Fliesen, Reihe 1 (Kapazitaet 1, leer) -> 2 Ueberlauf.
-        assert_eq!(strafleisten_zuwachs(&game.state, pi, &zug(0)), 2);
+        assert_eq!(floor_line_growth(&game.state, pi, &zug(0)), 2);
         // 3 Fliesen, Reihe 6 (Kapazitaet 6, leer) -> kein Ueberlauf.
-        assert_eq!(strafleisten_zuwachs(&game.state, pi, &zug(5)), 0);
+        assert_eq!(floor_line_growth(&game.state, pi, &zug(5)), 0);
         // Bodenzug -> alle 3 auf die Strafleiste (NICHT 0).
-        assert_eq!(strafleisten_zuwachs(&game.state, pi, &zug(-1)), 3);
+        assert_eq!(floor_line_growth(&game.state, pi, &zug(-1)), 3);
     }
 
     /// Das Rangkriterium selbst: `min(genommene Fliesen, akuter Bedarf)`.
     #[test]
-    fn stoer_bewertung_deckelt_die_wirkung_am_akuten_bedarf() {
+    fn disruption_score_caps_the_effect_at_acute_demand() {
         let mut game = drafting_game(303);
         let pi = game.state.current_player;
         let gegner = 1 - pi;
@@ -1347,7 +1347,7 @@ mod vorzugszug_tests {
         // die Fabrik bietet 3x Rot an.
         game.state.players[gegner].pattern_lines[0].color = Some(Rot);
         game.state.factories[0].sun_tiles = vec![Rot, Rot, Rot];
-        let bedarf = gegner_bedarf_akut(&game.state, pi);
+        let bedarf = opponent_demand_acute(&game.state, pi);
         let m = Move {
             take: TakeAction {
                 source: crate::moves::TakeSource::SmallFactorySun,
@@ -1357,7 +1357,7 @@ mod vorzugszug_tests {
             },
             place: PlaceAction { row_index: 5 },
         };
-        let (wirkung, boden) = stoer_bewertung(&game.state, &m, &bedarf);
+        let (wirkung, boden) = disruption_score(&game.state, &m, &bedarf);
         assert_eq!(wirkung, 1, "3 genommene Fliesen, aber nur 1 gebraucht -> Wirkung 1");
         assert_eq!(boden, 0, "Reihe 6 fasst alle drei");
     }

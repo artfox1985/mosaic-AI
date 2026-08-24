@@ -67,7 +67,7 @@ bekommt.
 ## Zweites Ziel: die 36 OWNERSHIP-Zellen (`--target ownership`)
 
 Fuer eine konvexe Aggregation (`(Summe P ueber die Zellen eines Kriteriums / n)^2
-x Punktwert`, Muster `wertung_progress`) sind nicht die Konjunktionen die
+x Punktwert`, Muster `scoring_progress`) sind nicht die Konjunktionen die
 Grundlage, sondern die RANDwahrscheinlichkeiten je Zelle aus
 `_ownership_from_dome`. Die Frage ist, ob die einzelnen Zellen Signal tragen --
 auch dort, wo die Vollendung nie eintritt.
@@ -550,7 +550,7 @@ def main() -> int:
                          "both = beide aus DEMSELBEN Korpuslauf")
     ap.add_argument("--conditional-layout", "--conditional", dest="conditional",
                     action="store_true",
-                    help="nur noch UNENTSCHIEDENE Zellen auswerten: Layout-Atome "
+                    help="nur noch UNENTSCHIEDENE Zellen evaluate: Layout-Atome "
                          "nur auf Slots ohne Platte, Ownership-Zellen nur wenn "
                          "noch leer (Default: Bestandsverhalten, unbedingt)")
     ap.add_argument("--mask-train-decided", "--mask-train-layout",

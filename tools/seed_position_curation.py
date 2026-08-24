@@ -40,7 +40,7 @@ PROGRESS = (3, 4, 5)
 STEP_STRIDE = 2  # jeden 2. Schritt pruefen -- Fortschritt aendert sich langsam
 
 
-def lade_map() -> dict[str, int]:
+def load_map() -> dict[str, int]:
     zwang = {}
     zeile = re.compile(r"^(\S+) (\d+) (\d) (\d+) (\d+)$")
     for line in MAP_PATH.read_text(encoding="utf-8").splitlines():
@@ -90,7 +90,7 @@ def verify(n: int, seed: int) -> None:
 
 
 def run(target: int, seed: int) -> None:
-    zwang = lade_map()
+    zwang = load_map()
     files = sorted(glob.glob(KORPUS_GLOB))
     kandidaten = []  # (stratum, game_id, file, step_idx, meta)
     je_partie: dict[str, list] = defaultdict(list)
@@ -134,13 +134,13 @@ def run(target: int, seed: int) -> None:
         pro_stratum[stratum].append((meta, st))
 
     kandidaten_zahl = {f"r{r}_p{p}": len(pro_stratum.get((r, p), [])) for r in ROUNDS for p in PROGRESS}
-    quote = max(1, target // (len(ROUNDS) * len(PROGRESS)))
+    rate = max(1, target // (len(ROUNDS) * len(PROGRESS)))
     auswahl = []
     for stratum in sorted(pro_stratum):
         pool = pro_stratum[stratum]
         rng.shuffle(pool)
-        auswahl.extend(pool[:quote])
-    rest = [x for stratum in sorted(pro_stratum) for x in pro_stratum[stratum][quote:]]
+        auswahl.extend(pool[:rate])
+    rest = [x for stratum in sorted(pro_stratum) for x in pro_stratum[stratum][rate:]]
     rng.shuffle(rest)
     auswahl.extend(rest[: max(0, target - len(auswahl))])
 

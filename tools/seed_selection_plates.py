@@ -3,7 +3,7 @@
 (`evaluations/PREREG_plate_head.md`, 2026-08-11).
 
 Hintergrund: `MOSAIC_WERTUNG_ALPHA` nimmt acht kommagetrennte Werte, einen je
-Wertungsplatten-Kriterium (`net_mcts.rs::wertung_shaping_alphas`). Um den
+Wertungsplatten-Kriterium (`net_mcts.rs::scoring_shaping_alphas`). Um den
 Effekt EINER Platte auf ihr eigenes Alpha zurechenbar zu messen -- statt auf
 irgendeine der immer 3 gleichzeitig liegenden Platten --, braucht der Versuch
 je Kriterium Partien, in denen GENAU dieses Kriterium aktiv ist. Welche

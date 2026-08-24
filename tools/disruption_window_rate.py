@@ -33,7 +33,7 @@ PORTIERTE ENGINE-LOGIK (Duplikate bewusst, weil der Rust-Weg gesperrt war --
 `--validate` prueft beide Portierungen gegen die Engine selbst):
  - `tiles_taken`      <- `mcts.rs:573-595`
  - Strafleisten-Zuwachs <- `mcts.rs:634-642`, `board.rs:56-67`
- - `gegner_bedarf`    <- `provocation.rs:753-779`
+ - `opponent_demand`    <- `provocation.rs:753-779`
 
 CLI:
     python tools/disruption_window_rate.py --validate
@@ -98,7 +98,7 @@ def floor_zuwachs(state, player, row, n) -> int:
     return max(0, n - (pl["capacity"] - len(pl["tiles"])))
 
 
-def gegner_bedarf(state, aktueller_spieler):
+def opponent_demand(state, aktueller_spieler):
     """Port `provocation.rs:753-779`. Rueckgabe `(akut, voll)`:
     `akut` = nur Musterreihen-Anteil (`provocation.rs:759-764`),
     `voll` = zzgl. offene Kuppelzellen mit Farbforderung (`:765-777`)."""
@@ -262,7 +262,7 @@ def analyse(files, verbose=True):
             if not idxs:
                 continue
             me = st["current_player"]
-            akut, voll = gegner_bedarf(st, me)
+            akut, voll = opponent_demand(st, me)
             vmi = vm_index(st)
             cands = []
             for j in idxs:

@@ -52,7 +52,7 @@ def is_qualifying(rec):
     einer offenen Spalte', wenn ihr aufgezeichnetes Policy-Ziel ein reines
     Demonstrations-One-Hot ist (self_play.rs::NetSelfPlayAgent::decide,
     Zweig `vorzug_kandidat` -- fuer den own_k1-Korpus loest die Vorzugskette
-    `bauer_drafting_vorzug` auf `column_build::vorzugszug`/`vorzug_dome_wahl`
+    `builder_drafting_preference` auf `column_build::preference_move`/`preference_dome_choice`
     auf, den Spaltenbauer) UND mehr als eine legale Aktion vorlag (schliesst
     den trivialen Ein-Aktion-Kurzschluss aus, der ebenfalls prob=1.0 liefert,
     aber keine Bauer-Entscheidung ist) UND es sich nicht um die Start-
@@ -217,9 +217,9 @@ def main():
             "Eine Drafting-Entscheidung 'dient einer offenen Spalte' <=> ihr "
             "aufgezeichnetes Policy-Ziel im own_k1-Korpus ist ein reines "
             "Demonstrations-One-Hot (prob=1.0 auf genau einer Aktion), das "
-            "aus der Bauer-Vorzugskette stammt (self_play.rs::bauer_drafting_vorzug, "
-            "die fuer own_k1 auf column_build::vorzugszug / "
-            "column_build::vorzug_dome_wahl -- den Spaltenbauer -- aufloest), "
+            "aus der Bauer-Vorzugskette stammt (self_play.rs::builder_drafting_preference, "
+            "die fuer own_k1 auf column_build::preference_move / "
+            "column_build::preference_dome_choice -- den Spaltenbauer -- aufloest), "
             "UND mehr als eine legale Aktion vorlag (schliesst den trivialen "
             "Ein-Aktion-Kurzschluss aus) UND es keine Start-Kuppelplatzierung "
             "ist (eigene, bauer-unabhaengige Heuristik). Unter dieser Bedingung "

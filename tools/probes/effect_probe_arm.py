@@ -4,7 +4,7 @@ neu verdrahtete Bauer-Vorzug-Einspeisung in run_net_self_play).
 
 EIN Arm pro Prozessaufruf (Pflicht, nicht Bequemlichkeit): MOSAIC_SPALTENBAU/
 MOSAIC_PLATTENBAU werden in Rust je per `OnceLock` EINMAL je Prozess gelesen
-(siehe spaltenbau.rs::aktiv_env, plattenbauer.rs::modus_env) -- ein zweiter Arm
+(siehe spaltenbau.rs::active_env, plattenbauer.rs::modus_env) -- ein zweiter Arm
 im selben Prozess wuerde den Knopf des ERSTEN Arms einfrieren. Deshalb: env
 VOR dem `import mosaic_rust` setzen, ein Python-Interpreter je Arm.
 

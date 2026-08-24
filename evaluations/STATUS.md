@@ -161,6 +161,33 @@ den Lehrer-Einsatz ist er entschaerft.
    acht Bestandsstellen auf `V1`).
 3. **Abstand zum Ziel**: 0,562 volle Spalten im Heuristik-Duell gegen die vom
    Nutzer geforderte 1,0.
+4. **NEUER ARM `V2Huelle` -- GEBAUT 2026-08-24, NICHT GEMESSEN**
+   (`PREREG_heuristic_v2_long_rows.md` par.8). Die Prio-Leiter des Nutzers
+   als Routing-Huelle: eigene Variante, Bewertung byte-identisch zu `V2`,
+   nur die Zielzellen-Karte unterscheidet sich. Prio 3 Randspalte, Prio 4
+   zweite Spalte (Spezialfliese auf Rasterzeile 5), Prio 5 Spezialfeld
+   freischalten und Joker halten, Prio 6 obere Zeilen, Prio 7 Nachbarn
+   (aufgeweicht bei aktiver Diagonale). Drafting als LINEARER Score mit
+   Strafleisten- und Stoerungsterm (`provocation::floor_line_growth` /
+   `disruption_score`, beide Bestand) und Phasen-Eskalation `[1,2,4,8]`.
+   Suite 520/0, Paritaets-Hash `8c6684ff` haelt. Messung und Falsifikator
+   stehen in par.8.4; **noch nicht gefahren.**
+
+   Nicht gebaut, weil schon vorhanden oder ohne Anknuepfungspunkt: Prio 0
+   (Spiel endet nach genau 5 Runden, `game.rs:687`; Runde 5 laeuft als
+   exaktes Endspiel ueber `round5_anchor`), Prio 1 in der BEWERTUNG
+   (`projected_unplaceable_penalty`, nur die Routing-Seite ist neu).
+
+   **Offene Luecken aus dem Nutzer-Review 2026-08-25, alle geprueft:**
+   `heuristic_v2.rs` koppelt seinen Saettigungsterm an KEINE Farbknappheit
+   (0 Vorkommen, waehrend `column_build::cell_cost:287` die Knappheit ueber
+   `scarcity_surcharge` einpreist); es gibt keinen Term, der FREIE
+   Musterreihen als Puffer belohnt; und die **Mondstapel-Reihenfolge**
+   (`Move::moon_order`) ist eine legale Wahl, die `generate_valid_moves`
+   nie aufspannt (`validation.rs:183` emittiert genau eine kanonische
+   Reihenfolge) -- der schaerfste variantenspezifische Stoerhebel liegt
+   damit brach. Zum Moon-Order-Kopf siehe die Zeile in OFFENE
+   ENTSCHEIDUNGEN.
 
 **Vorregistriert, NICHT gebaut:** Shaping-Kopf statt Ownership-Kopf, der die
 Dreiecks-Abweichung vorhersagt (par.3b) -- mit Abkling-Kurve zugunsten des

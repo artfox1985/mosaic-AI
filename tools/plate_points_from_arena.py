@@ -23,7 +23,7 @@ Aufruf:
 
 Token-Form je Datei: `kuerzel[#arm][@seite]` -- `#arm` waehlt aus einer
 Mehr-Arm-Datei, `@seite` (0/1) das BRETT (nur Netz-gegen-Netz noetig, siehe
-`auswerten`).
+`evaluate`).
 """
 from __future__ import annotations
 
@@ -43,9 +43,9 @@ from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402  (bewusst nach
 KRITERIUM = re.compile(r"^\s+\S+ (?P<name>[^:]+): (?P<pkt>-?\d+) Pkt$")
 
 
-def partien(pfad: Path, arm: str | None = None) -> list[dict]:
+def game_list(pfad: Path, arm: str | None = None) -> list[dict]:
     """Partien EINES Arms. `arm` waehlt aus der Mehr-Arm-Form
-    (`{armwert: [partien]}`, die `paired_arena_env_ab.py` schreibt, sobald
+    (`{armwert: [game_list]}`, die `paired_arena_env_ab.py` schreibt, sobald
     `--arms` mehr als einen Wert traegt).
 
     ERWEITERT 2026-08-16 (Tor C, `PREREG_gate_c_consumer_sweep.md`): vorher
@@ -55,7 +55,7 @@ def partien(pfad: Path, arm: str | None = None) -> list[dict]:
     ohne `arm` verhaelt sich unveraendert."""
     d = json.load(open(pfad, encoding="utf-8"))
     g = d["games"]
-    if isinstance(g, dict):  # Mehr-Arm-Form: {armwert: [partien]}
+    if isinstance(g, dict):  # Mehr-Arm-Form: {armwert: [game_list]}
         if arm is not None:
             if arm not in g:
                 raise SystemExit(f"{pfad.name}: Arm {arm!r} nicht vorhanden "
@@ -69,7 +69,7 @@ def partien(pfad: Path, arm: str | None = None) -> list[dict]:
     return g
 
 
-def auswerten(sp: dict, seite: int | None = None) -> dict:
+def evaluate(sp: dict, seite: int | None = None) -> dict:
     """Eine Partie -> Kennzahlen des NETZ-Spielers.
 
     `seite` (2026-08-16, Destillations-Messung `PREREG_corpus_distillation.md`
@@ -125,7 +125,7 @@ def auswerten(sp: dict, seite: int | None = None) -> dict:
     )
 
 
-def t_wert(werte: list[float]) -> tuple[float, float]:
+def t_value(werte: list[float]) -> tuple[float, float]:
     n = len(werte)
     if n < 2:
         return (werte[0] if werte else 0.0), 0.0
@@ -134,7 +134,7 @@ def t_wert(werte: list[float]) -> tuple[float, float]:
     return m, (m / (sd / math.sqrt(n)) if sd > 0 else 0.0)
 
 
-def block_mittel(diffs: list[float], block: int) -> list[float]:
+def block_mean(diffs: list[float], block: int) -> list[float]:
     """Gepaarte Differenzen in LAUFREIHENFOLGE zu Blockmitteln zusammenfassen.
 
     Stehende Regel seit 2026-08-04 ([[feedback_arena_block_correlation]]): auf
@@ -174,7 +174,7 @@ def main() -> None:
     reihenfolge: dict[str, list[int]] = {}  # Laufreihenfolge je Kuerzel, fuer --block
     for k in a.kuerzel:
         # Token-Form: kuerzel[#arm][@seite]. `@seite` (0/1) waehlt bei
-        # Netz-gegen-Netz-Dateien das BRETT -- siehe `auswerten`-Docstring.
+        # Netz-gegen-Netz-Dateien das BRETT -- siehe `evaluate`-Docstring.
         rest, _, seite_s = k.partition("@")
         seite = int(seite_s) if seite_s else None
         if seite not in (None, 0, 1):
@@ -185,7 +185,7 @@ def main() -> None:
         if not pf.exists():
             print(f"{k}: FEHLT ({pf.name})")
             continue
-        satz = [auswerten(s, seite) for s in partien(pf, arm or None)]
+        satz = [evaluate(s, seite) for s in game_list(pf, arm or None)]
         daten[k] = {r["seed"]: r for r in satz}
         reihenfolge[k] = [r["seed"] for r in satz]
 
@@ -216,9 +216,9 @@ def main() -> None:
                  f"{mpl:>8.2f} {mb:>7.2f}")
         if bezug:
             gem = [s for s in ks if s in bezug]
-            dp, tp = t_wert([v[s]["marge"] - bezug[s]["marge"] for s in gem])
-            dl, tl = t_wert([(v[s]["platten"] or 0) - (bezug[s]["platten"] or 0) for s in gem])
-            db, tb = t_wert([v[s]["boden"] - bezug[s]["boden"] for s in gem])
+            dp, tp = t_value([v[s]["marge"] - bezug[s]["marge"] for s in gem])
+            dl, tl = t_value([(v[s]["platten"] or 0) - (bezug[s]["platten"] or 0) for s in gem])
+            db, tb = t_value([v[s]["boden"] - bezug[s]["boden"] for s in gem])
             zeile += f" | {dp:>+8.2f} {tp:>6.2f} {dl:>+9.2f} {tl:>6.2f} {db:>+7.2f} {tb:>6.2f}"
         print(zeile)
 
@@ -235,13 +235,13 @@ def main() -> None:
             if k == a.bezug:
                 continue
             gem = [s for s in ordn if s in v]
-            bp = block_mittel([v[s]["marge"] - bezug[s]["marge"] for s in gem], a.block)
-            bl = block_mittel([(v[s]["platten"] or 0) - (bezug[s]["platten"] or 0)
+            bp = block_mean([v[s]["marge"] - bezug[s]["marge"] for s in gem], a.block)
+            bl = block_mean([(v[s]["platten"] or 0) - (bezug[s]["platten"] or 0)
                                for s in gem], a.block)
-            bb = block_mittel([v[s]["boden"] - bezug[s]["boden"] for s in gem], a.block)
-            dp, tp = t_wert(bp)
-            dl, tl = t_wert(bl)
-            db, tb = t_wert(bb)
+            bb = block_mean([v[s]["boden"] - bezug[s]["boden"] for s in gem], a.block)
+            dp, tp = t_value(bp)
+            dl, tl = t_value(bl)
+            db, tb = t_value(bb)
             print(f"{k:<10} {len(bp):>7} {dp:>+8.2f} {tp:>6.2f} "
                   f"{dl:>+9.2f} {tl:>6.2f} {db:>+7.2f} {tb:>6.2f}")
 
@@ -275,11 +275,11 @@ def main() -> None:
                 if not gem:
                     continue
                 diffs = [v[s]["je_kriterium"][n] - bezug[s]["je_kriterium"][n] for s in gem]
-                d, t = t_wert(diffs)
+                d, t = t_value(diffs)
                 rest = ""
                 if a.block:
-                    bd, bt = t_wert(block_mittel(diffs, a.block))
-                    rest = f"   Block {bd:>+7.2f} t={bt:>6.2f} (nB={len(block_mittel(diffs, a.block))})"
+                    bd, bt = t_value(block_mean(diffs, a.block))
+                    rest = f"   Block {bd:>+7.2f} t={bt:>6.2f} (nB={len(block_mean(diffs, a.block))})"
                 print(f"    {n[:22]:<24} n={len(gem):>3}  {d:>+7.2f} t={t:>6.2f}{rest}")
 
 

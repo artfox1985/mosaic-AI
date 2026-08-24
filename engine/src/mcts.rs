@@ -17,7 +17,7 @@ use serde_json::{json, Value};
 
 use crate::game::{drafting_actions, Game};
 use crate::moves::Action;
-use crate::scoring::wertung_progress;
+use crate::scoring::scoring_progress;
 use crate::tile::TileColor;
 use crate::serialize::action_to_dict;
 use crate::state::{GameState, Phase};
@@ -67,7 +67,7 @@ impl crate::search_common::SearchNode for Node {
 
 /// Erwarteter finaler Rundenscore eines Spielers — EXAKT per Tiling-Solver
 /// (optimale Platzierung der vollen Reihen inkl. Linien über mehrere Reihen)
-/// PLUS ein stetiger Wertungsplatten-Fortschritts-Term ([`wertung_progress`]),
+/// PLUS ein stetiger Wertungsplatten-Fortschritts-Term ([`scoring_progress`]),
 /// damit die Suche Baustellen an aktiven Wertungsplatten (volle Reihen/Spalten/
 /// Diagonalen, Ecken, Mehrfarbige Felder) schon vor Fertigstellung goutiert,
 /// statt sie erst beim letzten fehlenden Feld zu bemerken, MINUS die Strafe,
@@ -93,6 +93,24 @@ pub enum HeuristikVariante {
     /// v1 PLUS `heuristic_v2::row_completion_progress` -- der einzige
     /// Unterschied. Siehe `PREREG_heuristic_v2_long_rows.md`.
     V2,
+    /// Wie [`HeuristikVariante::V2`] in der BEWERTUNG (byte-identische
+    /// Summanden), aber mit der Dreiecks-Huelle als Zielzellen-Menge im
+    /// ROUTING (`plate_builder::v2_dreieck_ziel`).
+    ///
+    /// Eigene Variante und kein Env-Knopf, aus demselben Grund wie bei `V2`:
+    /// nur so laesst sich v2-alt GEGEN v2-neu in EINER Partie messen, mit
+    /// denselben Fabriken und denselben Platten. Die Bewertung bleibt
+    /// bewusst gleich -- damit misst der Vergleich GENAU das Routing und
+    /// nicht ein Buendel von Unterschieden.
+    V2Huelle,
+}
+
+impl HeuristikVariante {
+    /// Laeuft diese Variante ueber den v2-Pfad (Zusatzterme UND Routing)?
+    /// Die beiden v2-Varianten unterscheiden sich nur in der Zielzellen-Menge.
+    pub fn is_v2(self) -> bool {
+        matches!(self, HeuristikVariante::V2 | HeuristikVariante::V2Huelle)
+    }
 }
 
 /// Wie [`player_total`], aber mit ausdruecklicher Variante.
@@ -107,17 +125,17 @@ pub(crate) fn player_total_variante(
     variante: HeuristikVariante,
 ) -> f64 {
     let basis = solve_round_final_score(state, pi) as f64
-        + wertung_progress(&state.players[pi], &state.scoring_tile_ids)
+        + scoring_progress(&state.players[pi], &state.scoring_tile_ids)
         + crate::round_end::projected_unplaceable_penalty(&state.players[pi]) as f64;
     match variante {
         HeuristikVariante::V1 => basis,
-        HeuristikVariante::V2 => {
+        HeuristikVariante::V2 | HeuristikVariante::V2Huelle => {
             basis
                 + crate::heuristic_v2::row_completion_progress(
                     &state.players[pi],
                     &state.scoring_tile_ids,
                 )
-                + crate::heuristic_v2::plattenunabhaengiger_l_wert(
+                + crate::heuristic_v2::plate_independent_l_value(
                     &state.players[pi],
                     &state.scoring_tile_ids,
                 )
@@ -1374,14 +1392,14 @@ mod tests {
     // EINFRIEREN, NICHT REPARIEREN: dieser Test haelt fest, was die Heuristik
     // HEUTE tatsaechlich waehlt -- er bewertet nicht, ob das die beste
     // Entscheidung ist. Der grobe Kriterium-6-Term in
-    // `scoring.rs::wertung_progress` (`6 => -3.0 * sf.special_empty as f64`,
+    // `scoring.rs::scoring_progress` (`6 => -3.0 * sf.special_empty as f64`,
     // Zeile ~178) bleibt ABSICHTLICH im Anker stehen, auch wenn er
     // suboptimal ist -- die Plattenschwaeche gehoert auf die Netzseite
     // (`PREREG_plate_head.md`), nicht in eine Reparatur dieses Ankers. Ein
     // Massstab, der bei jeder vermeintlichen Verbesserung mitgezogen wird,
     // ist kein Massstab mehr -- er wuerde die Elo-Leiter selbst entwerten.
     // Deckt `mcts.rs` (Baumsuche/Selektion, dieses Modul), `scoring.rs::
-    // wertung_progress` und `tiling_solver.rs` (beide via `player_total`
+    // scoring_progress` und `tiling_solver.rs` (beide via `player_total`
     // oben) GEMEINSAM ab -- netzfrei (`ACTIVE_LEAF` spielt hier keine Rolle,
     // dieser Pfad braucht kein Netz), laeuft komplett in `cargo test`.
 
@@ -1391,10 +1409,10 @@ mod tests {
     /// echten Spiel via `Game::start`) zugeteilte `scoring_tile_ids` -- ohne
     /// diesen Schritt bleibt `state.scoring_tile_ids` beim rohen
     /// `setup_new_game`-Pfad LEER (nur `Game::start` befuellt es sofort beim
-    /// Anlegen), `wertung_progress` liefert dann fuer JEDEN Korpus-Zustand
-    /// konstant 0.0 und der Test deckt `scoring.rs::wertung_progress`
+    /// Anlegen), `scoring_progress` liefert dann fuer JEDEN Korpus-Zustand
+    /// konstant 0.0 und der Test deckt `scoring.rs::scoring_progress`
     /// tatsaechlich NICHT ab, trotz der Behauptung in der Modul-Doku oben
-    /// (per Gegenprobe verifiziert: ein 10x-Faktor auf `wertung_progress`s
+    /// (per Gegenprobe verifiziert: ein 10x-Faktor auf `scoring_progress`s
     /// Rueckgabe aenderte ohne diese Zuteilung KEINEN gewaehlten Zug). Eigener
     /// dritter Seed je Zustand fuer die Wertungsplatten-Auswahl UND ein
     /// eigener zweiter Seed fuer die MCTS-internen Zufallsentscheidungen

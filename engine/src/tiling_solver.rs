@@ -48,20 +48,20 @@ const NODE_BUDGET: u32 = 2_000;
 ///
 /// BEFUND (2026-07-28): `best_first_step_inner` maximiert `pts + solve_rec(..)`,
 /// also **reine Sofortpunkte der Runde**. `calculate_end_scoring` bzw.
-/// `wertung_progress` kommen im gesamten Modul nicht vor. Da
+/// `scoring_progress` kommen im gesamten Modul nicht vor. Da
 /// `best_first_step_exact` der Pfad für ALLE echten Platzierungen ist
 /// (`self_play.rs:894`, `py.rs:687`, `round_transition.rs:135/323`), wählt die
 /// KI ihre Steine, ohne die Wertungsplatten je zu berücksichtigen — auch wenn
 /// die darüberliegende Suche sie sehr wohl bewertet.
 ///
 /// Die Heuristik macht es seit jeher anders: `mcts::player_total` =
-/// `solve_round_final_score` **+ `wertung_progress`** + Straf-Term. Dieses
+/// `solve_round_final_score` **+ `scoring_progress`** + Straf-Term. Dieses
 /// Shaping überträgt denselben Term auf die Zugwahl des Solvers — deshalb
 /// Gewicht 1.0, dieselben Einheiten (Rundenpunkte), dieselbe Ersatzformel.
 ///
 /// BEWUSST NUR auf der ersten Stufe (`best_first_step_inner`), NICHT in
 /// `solve_rec`: (a) `solve_rec` ist der Blatt-Bewertungs-Hot-Path des MCTS,
-/// dort würde der Term mit `player_total`s eigenem `wertung_progress`
+/// dort würde der Term mit `player_total`s eigenem `scoring_progress`
 /// DOPPELT zählen; (b) die erste Stufe ist die, die den Zug tatsächlich
 /// bestimmt. Der Fortschritts-Delta wird daher nur über den ersten Schritt
 /// gemessen, nicht über den ganzen Rollout — Unterschätzung in Kauf genommen,
@@ -578,7 +578,7 @@ fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingSte
     // Basis-Fortschritt EINMAL vor der Schleife: der Shaping-Term ist ein
     // Delta gegen den Zustand VOR dem Schritt (siehe TILING_SHAPING_ENABLED).
     let base_progress = if TILING_SHAPING_ENABLED {
-        crate::scoring::wertung_progress(&state.players[pi], &state.scoring_tile_ids)
+        crate::scoring::scoring_progress(&state.players[pi], &state.scoring_tile_ids)
     } else {
         0.0
     };
@@ -589,7 +589,7 @@ fn best_first_step_inner(state: &GameState, pi: usize, exact: bool) -> TilingSte
         if let Some((next, pts)) = apply_step(state, pi, &step) {
             let mut val = f64::from(pts + solve_rec(&next, pi, 1, exact, &mut budget));
             if TILING_SHAPING_ENABLED {
-                let delta = crate::scoring::wertung_progress(
+                let delta = crate::scoring::scoring_progress(
                     &next.players[pi],
                     &next.scoring_tile_ids,
                 ) - base_progress;
@@ -908,7 +908,7 @@ fn select_best_tiling_candidate(
 // `MOSAIC_TILING_PLATTEN_W` (Default `0.0` = aus). Bei Wert != 0 wird zu den
 // Platzierungspunkten eines Tiling-Abschlusses `w * calculate_end_scoring(Brett
 // NACH dem vollstaendigen Abschluss, state.scoring_tile_ids).total` addiert,
-// und nach dieser SUMME gewaehlt -- siehe `best_first_step_platten_valued`.
+// und nach dieser SUMME gewaehlt -- siehe `best_first_step_plate_valued`.
 //
 // UNTERSCHIED zu `NET_TILING_TIEBREAK_ENABLED` (oben): dieser Zweig deckt
 // Runde 1 MIT ab (Rundenfenster 1..=4, siehe `best_first_step_exact_or_valued`
@@ -917,7 +917,7 @@ fn select_best_tiling_candidate(
 // `calculate_end_scoring` ist dagegen eine BERECHNETE Formel ohne Schaetzfehler,
 // dieser Ausschlussgrund entfaellt hier.
 //
-// NAEHERUNG in Runden 1-4 (bewusst, siehe `best_first_step_platten_valued`):
+// NAEHERUNG in Runden 1-4 (bewusst, siehe `best_first_step_plate_valued`):
 // das Kuppelraster aendert sich zwischen jetzt und Rundenende noch durch
 // spaetere Drafting-Zuege -- `calculate_end_scoring` bewertet dort also ein
 // Zwischenbrett, nicht das tatsaechliche Endbrett. Fuer eine Rangfolge unter
@@ -952,34 +952,34 @@ fn read_f64_env_local(name: &str, default: f64) -> f64 {
 }
 
 thread_local! {
-    /// Test-Override fuer [`tiling_platten_weight`] -- thread-lokal, gleiches
+    /// Test-Override fuer [`tiling_plate_weight`] -- thread-lokal, gleiches
     /// Muster wie `STATS_OVERRIDE`/`CACHE_OVERRIDE` oben: erlaubt Tests, den
     /// Wert gezielt zu setzen, OHNE die prozessweite `OnceLock`-gecachte
     /// Env-Var fuer alle parallel laufenden `cargo test`-Threads zu bestimmen.
     static PLATTEN_WEIGHT_OVERRIDE: std::cell::Cell<Option<f64>> = std::cell::Cell::new(None);
 }
 
-fn tiling_platten_weight_env() -> f64 {
+fn tiling_plate_weight_env() -> f64 {
     static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| read_f64_env_local("MOSAIC_TILING_PLATTEN_W", 0.0))
 }
 
-/// Laufzeitgewicht `w` fuer [`best_first_step_platten_valued`]. Default `0.0`
+/// Laufzeitgewicht `w` fuer [`best_first_step_plate_valued`]. Default `0.0`
 /// = aus -- `best_first_step_exact_or_valued` faellt dann exakt auf das
 /// Bestandsverhalten zurueck (siehe dort).
-fn tiling_platten_weight() -> f64 {
-    PLATTEN_WEIGHT_OVERRIDE.with(|c| c.get()).unwrap_or_else(tiling_platten_weight_env)
+fn tiling_plate_weight() -> f64 {
+    PLATTEN_WEIGHT_OVERRIDE.with(|c| c.get()).unwrap_or_else(tiling_plate_weight_env)
 }
 
 #[cfg(test)]
-pub(crate) fn set_platten_weight_override_for_test(v: Option<f64>) {
+pub(crate) fn set_plate_weight_override_for_test(v: Option<f64>) {
     PLATTEN_WEIGHT_OVERRIDE.with(|c| c.set(v));
 }
 
 // ── Ownership-Verbraucher Teil 2: Tiling (PREREG_ownership_consumer.md §3) ──
 //
 // Zweiter Pol AM SELBEN Entscheid wie `MOSAIC_TILING_PLATTEN_W`: dort misst
-// `wertung_progress_per_kriterium` den IST-Fortschritt des Bretts, hier
+// `scoring_progress_per_criterion` den IST-Fortschritt des Bretts, hier
 // prognostiziert der Ownership-Kopf, welche Geometrien am Spielende
 // tatsaechlich VOLLENDET sind. Der Term routet die Fliese zu Feldern, deren
 // Geometrie das Netz fuer vollendbar haelt, und ignoriert Felder in toten
@@ -1033,7 +1033,7 @@ pub(crate) fn set_ownership_tiling_weight_override_for_test(v: Option<f64>) {
 ///
 /// GETEILTES GEWICHTS-MUSTER, kein drittes daneben (Auftrag Punkt 4): der
 /// Ownership-Pol benutzt DIESELBEN acht Gewichte wie der Heuristik-Pol
-/// derselben Entscheidung, `MOSAIC_TILING_PLATTEN_GEW` ([`platten_gewichte`]).
+/// derselben Entscheidung, `MOSAIC_TILING_PLATTEN_GEW` ([`plate_weights`]).
 /// Begruendung:
 ///   - die Semantik ist identisch -- "welches Wertungskriterium soll die
 ///     Tiling-Wahl steuern"; beide Pole beantworten dieselbe Frage, nur mit
@@ -1042,7 +1042,7 @@ pub(crate) fn set_ownership_tiling_weight_override_for_test(v: Option<f64>) {
 ///     widerspruechliche Konfigurationen zu ("Heuristik nur vertikal,
 ///     Ownership nur diagonal"), die kein Messprotokoll mehr interpretieren
 ///     koennte;
-///   - es gibt den Praezedenzfall im selben Modul: `platten_wert` teilt sich
+///   - es gibt den Praezedenzfall im selben Modul: `plate_value` teilt sich
 ///     die `alphas` mit der Draftingseite (`MOSAIC_WERTUNG_ALPHA`) aus genau
 ///     diesem Grund (siehe dortiger Kommentar).
 /// Die DOSIS bleibt getrennt (`MOSAIC_TILING_PLATTEN_W` vs.
@@ -1056,7 +1056,7 @@ pub(crate) fn ownership_marginals(
     p_own: &[f64; crate::scoring::OWNERSHIP_FIELDS],
     ids: &[usize],
 ) -> [f64; crate::scoring::OWNERSHIP_FIELDS] {
-    crate::scoring::marginal_plate_points(player, p_own, ids, &platten_gewichte())
+    crate::scoring::marginal_plate_points(player, p_own, ids, &plate_weights())
 }
 
 /// Rundenfenster des Plattenzweigs (Zweig 1 in
@@ -1065,7 +1065,7 @@ pub(crate) fn ownership_marginals(
 /// Wurzel-Ownership-Karte nur dann per Netz-Vorwaertspass holen, wenn der
 /// Zweig sie ueberhaupt liest. Eine zweite, handkopierte `1..=4`-Bremse dort
 /// waere still verstimmbar.
-pub(crate) fn platten_branch_applies(round: u32) -> bool {
+pub(crate) fn plate_branch_applies(round: u32) -> bool {
     (1..=4).contains(&round)
 }
 
@@ -1110,7 +1110,7 @@ pub(crate) fn platten_branch_applies(round: u32) -> bool {
 /// Groessenordnung des Spezialfeld-Postens -- im Mittel **-11,70** (3,9 leere
 /// Spezialkuppeln a -3). Er ueberdeckt jede Geometrie. Mit einem Gewicht je
 /// Kriterium laesst sich die Geometrie isolieren, ohne den Term zu verbiegen.
-fn platten_gewichte() -> [f64; 8] {
+fn plate_weights() -> [f64; 8] {
     static CELL: std::sync::OnceLock<[f64; 8]> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         let mut out = [1.0f64; 8];
@@ -1139,7 +1139,7 @@ fn platten_gewichte() -> [f64; 8] {
 /// keine Richtung; genau das war die Ursache dafuer, dass acht Zellen mit
 /// verschiedenen Gewichten bit-identisch blieben.
 ///
-/// `wertung_progress_per_kriterium` gibt bei Teilfuellung eine quadratisch
+/// `scoring_progress_per_criterion` gibt bei Teilfuellung eine quadratisch
 /// skalierte Teilgutschrift und faellt bei voller Fuellung exakt auf den echten
 /// Punktwert zurueck (`scoring.rs:150-158`). DAS ist der Gradient. Die Messung
 /// sagt auch, wie gross er ausfaellt, wo es zaehlt: in 36 von 57 Partien steht
@@ -1150,21 +1150,21 @@ fn platten_gewichte() -> [f64; 8] {
 /// Die `alphas` kommen aus derselben Quelle wie die Draftingseite
 /// (`MOSAIC_WERTUNG_ALPHA`), damit beide Haelften EINEN Exponenten teilen und
 /// nicht zwei widersprechende Kurven verwenden.
-fn platten_wert(
+fn plate_value(
     player: &crate::board::PlayerBoard,
     ids: &[usize],
     gew: &[f64; 8],
     runde: u32,
 ) -> f64 {
-    let alphas = crate::net_mcts::wertung_shaping_alphas();
-    let gain = crate::net_mcts::wertung_round_gain();
+    let alphas = crate::net_mcts::scoring_shaping_alphas();
+    let gain = crate::net_mcts::scoring_round_gain();
     ids.iter()
         .map(|&id| {
             let k = id.min(7);
             if gew[k] == 0.0 {
                 return 0.0;
             }
-            gew[k] * crate::scoring::wertung_progress_per_kriterium(
+            gew[k] * crate::scoring::scoring_progress_per_criterion(
                 player, &[id], &alphas, runde, gain,
             )
         })
@@ -1203,7 +1203,7 @@ fn belegtes_raster(player: &crate::board::PlayerBoard) -> [bool; crate::scoring:
 /// OWNERSHIP-POL (Teil 2, §3): `own_marg` sind die EINMAL je Zug aus der
 /// Wurzel-Ownership-Karte abgeleiteten marginalen Feldwerte (36 Stellen,
 /// Rasterindex wie `scoring::ownership_index_for_grid`). Sie gehen als
-/// KOMPLEMENT in dieselbe Summe -- analog `zellen_wert` im Spaltenbauer, und
+/// KOMPLEMENT in dieselbe Summe -- analog `cell_value` im Spaltenbauer, und
 /// ausdruecklich NICHT als Ersatz des Platzierungspunkt-Terms:
 ///
 /// ```text
@@ -1221,7 +1221,7 @@ fn belegtes_raster(player: &crate::board::PlayerBoard) -> [bool; crate::scoring:
 /// (harte Kostenbedingung des Vertrags). Bereits belegte Felder zaehlen nicht
 /// mit (Differenzmenge vorher/nachher), doppelt zaehlen kann der Term also
 /// nicht.
-fn best_first_step_platten_valued(
+fn best_first_step_plate_valued(
     state: &GameState,
     pi: usize,
     w: f64,
@@ -1230,7 +1230,7 @@ fn best_first_step_platten_valued(
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
 ) -> Option<TilingStep> {
     let cands = top_k_tilings(state, pi, MAX_TILING_LEAVES);
-    let gew = platten_gewichte();
+    let gew = plate_weights();
     // DIFFERENZ, nicht Absolutwert (gemessen 2026-08-12): der Plattenstand VOR
     // dem Tiling ist fuer alle Kandidaten desselben Zuges identisch und traegt
     // nur einen konstanten Sockel bei -- in `.total`-Form war das ein grosser
@@ -1243,7 +1243,7 @@ fn best_first_step_platten_valued(
     // nur die Auswertung.
     let heur_aktiv = w != 0.0;
     let vorher = if heur_aktiv {
-        platten_wert(&state.players[pi], &state.scoring_tile_ids, &gew, state.round_number)
+        plate_value(&state.players[pi], &state.scoring_tile_ids, &gew, state.round_number)
     } else {
         0.0
     };
@@ -1252,7 +1252,7 @@ fn best_first_step_platten_valued(
     let mut best: Option<(f64, TilingStep)> = None;
     for c in cands {
         let nachher = if heur_aktiv {
-            platten_wert(
+            plate_value(
                 &c.final_state.players[pi],
                 &c.final_state.scoring_tile_ids,
                 &gew,
@@ -1326,7 +1326,7 @@ pub fn best_first_step_valued(
 /// Zweige entscheiden diesen Zug dann nie mehr:
 ///
 /// 1. `MOSAIC_TILING_PLATTEN_W != 0` UND Runde in `1..=4` ->
-///    `best_first_step_platten_valued` (Task #100, additive Endwertungs-Summe,
+///    `best_first_step_plate_valued` (Task #100, additive Endwertungs-Summe,
 ///    KEIN Netz noetig). Liefert das `Some`, ist der Zug entschieden.
 /// 2. Sonst: `NET_TILING_TIEBREAK_ENABLED` UND Runde in `2..=4` UND ein
 ///    Evaluator vorhanden -> `best_first_step_valued` (Task #20, Netz-
@@ -1339,7 +1339,7 @@ pub fn best_first_step_valued(
 /// `evaluator: None` (Heuristik-Spieler, kein Netz geladen) oder Runde
 /// ausserhalb [2,4] oder Toggle aus → Zweig 2 entfaellt. Ist zusaetzlich
 /// `MOSAIC_TILING_PLATTEN_W` unveraendert `0.0` (Default, siehe
-/// `tiling_platten_weight`) oder die Runde ausserhalb [1,4], entfaellt auch
+/// `tiling_plate_weight`) oder die Runde ausserhalb [1,4], entfaellt auch
 /// Zweig 1 -- dann EXAKT `best_first_step_exact`, byte-identisch zum
 /// Vor-Task-#20-Verhalten.
 ///
@@ -1360,7 +1360,7 @@ pub fn best_first_step_valued(
 /// hier also nichts zusaetzlich zu tun, nur nicht versehentlich mit einem der
 /// beiden Stichentscheide ueberschreiben.
 /// Tiling-Haelfte des Vorzugsmodus (`MOSAIC_VORZUG_SPALTE`, gleicher Knopf
-/// wie die Drafting-Haelfte in `provocation.rs::vorzugszug`).
+/// wie die Drafting-Haelfte in `provocation.rs::preference_move`).
 ///
 /// GEMESSEN BEGRUENDET (generator_matrix, 18 Partien an der 5/6-Mauer): in 10
 /// von 18 Faellen hat die Musterreihe geliefert und das TILING die Fliese in
@@ -1374,18 +1374,18 @@ pub fn best_first_step_valued(
 /// Punktzahl. Fuellt kein Kandidat mehr Ziel-Zellen als jeder andere, faellt
 /// die Wahl auf den Bestandspfad zurueck -- der Vorzug verschenkt dann nichts.
 /// Nur Runden 1..=4; Runde 5 gehoert dem exakten Endwertungs-Loeser.
-fn vorzug_tiling_step(state: &GameState, pi: usize) -> Option<TilingStep> {
-    let spalte = crate::provocation::vorzug_spalte()?;
-    vorzug_tiling_step_fuer_spalte(state, pi, spalte)
+fn preference_tiling_step(state: &GameState, pi: usize) -> Option<TilingStep> {
+    let spalte = crate::provocation::preference_column()?;
+    preference_tiling_step_for_column(state, pi, spalte)
 }
 
-/// Kern von [`vorzug_tiling_step`], mit EXPLIZITER Ziel-Spalte statt des
+/// Kern von [`preference_tiling_step`], mit EXPLIZITER Ziel-Spalte statt des
 /// Env-Knopfs -- ausgelagert (2026-08-13, Spaltenbau-Auftrag) aus demselben
-/// Grund wie `provocation::vorzugszug_fuer_spalte`: `column_build.rs` braucht
+/// Grund wie `provocation::preference_move_for_column`: `column_build.rs` braucht
 /// dieselbe Routing-Praeferenz fuer eine je Entscheid dynamisch bestimmte
-/// Spalte. Reiner Parameter-Extrakt, `vorzug_tiling_step` bleibt
+/// Spalte. Reiner Parameter-Extrakt, `preference_tiling_step` bleibt
 /// byte-identisch.
-pub(crate) fn vorzug_tiling_step_fuer_spalte(
+pub(crate) fn preference_tiling_step_for_column(
     state: &GameState,
     pi: usize,
     spalte: usize,
@@ -1459,15 +1459,15 @@ pub fn best_first_step_exact_or_valued_ex(
 ) -> TilingStep {
     // Spaltenbau (MOSAIC_SPALTENBAU, eigene Entscheidung siehe column_build.rs-
     // Moduldoku): PRUEFT ZUERST, damit das dynamisch gewaehlte Ziel der
-    // Drafting-Seite (column_build::ziel_spalte) auch beim Tiling-Routing
+    // Drafting-Seite (column_build::target_column) auch beim Tiling-Routing
     // ankommt -- ohne das wuerde eine im Drafting korrekt gelieferte Farbe
     // beim Tiling trotzdem in eine andere Rasterzelle wandern (der in
-    // `vorzug_tiling_step`s Doku genannte 10-von-18-Blocker). Default aus ->
-    // No-Op, faellt sofort durch zum bestehenden `vorzug_tiling_step`.
-    if let Some(step) = crate::column_build::vorzug_tiling_step(state, pi) {
+    // `preference_tiling_step`s Doku genannte 10-von-18-Blocker). Default aus ->
+    // No-Op, faellt sofort durch zum bestehenden `preference_tiling_step`.
+    if let Some(step) = crate::column_build::preference_tiling_step(state, pi) {
         return step;
     }
-    if let Some(step) = vorzug_tiling_step(state, pi) {
+    if let Some(step) = preference_tiling_step(state, pi) {
         return step;
     }
     // Zweig 1 (Task #100), KORRIGIERT 2026-08-12: der Plattenterm ERGAENZT den
@@ -1478,7 +1478,7 @@ pub fn best_first_step_exact_or_valued_ex(
     // gegen 2,10 im Bezug: der Vergleich war faktisch "Bezug MINUS
     // Netz-Stichentscheid PLUS Plattenterm", also kein Test des Plattenterms.
     //
-    // Jetzt bekommt `best_first_step_platten_valued` den Evaluator selbst und
+    // Jetzt bekommt `best_first_step_plate_valued` den Evaluator selbst und
     // bildet `(punkte + w * plattendelta) * p_win` -- die Bestandsform mit dem
     // Plattenterm in den Punkten. Zweig 2 bleibt fuer den Fall `w == 0`
     // unveraendert zustaendig.
@@ -1487,12 +1487,12 @@ pub fn best_first_step_exact_or_valued_ex(
     // unabhaengig dosierten Term. Er kann den Zweig auch ALLEIN aktivieren
     // (`w == 0`, `w_own != 0`) -- Tor C faehrt beide Haelften einzeln und
     // gemeinsam.
-    if platten_branch_applies(state.round_number) {
-        let w = tiling_platten_weight();
+    if plate_branch_applies(state.round_number) {
+        let w = tiling_plate_weight();
         let w_own = ownership_tiling_weight();
         let own = if w_own != 0.0 { own_marg } else { None };
         if w != 0.0 || own.is_some() {
-            if let Some(step) = best_first_step_platten_valued(state, pi, w, w_own, own, evaluator) {
+            if let Some(step) = best_first_step_plate_valued(state, pi, w, w_own, own, evaluator) {
                 return step;
             }
         }
@@ -1733,7 +1733,7 @@ mod tests {
         let mut budget = NODE_BUDGET;
         let mut best_step = TilingStep::End;
         let mut best_val = f64::NEG_INFINITY;
-        let base = crate::scoring::wertung_progress(&state.players[pi], &state.scoring_tile_ids);
+        let base = crate::scoring::scoring_progress(&state.players[pi], &state.scoring_tile_ids);
         for step in steps {
             if budget == 0 {
                 break;
@@ -1742,7 +1742,7 @@ mod tests {
                 let mut val = f64::from(pts + solve_rec(&next, pi, 1, true, &mut budget));
                 if shaped {
                     val += TILING_SHAPING_WEIGHT
-                        * (crate::scoring::wertung_progress(
+                        * (crate::scoring::scoring_progress(
                             &next.players[pi],
                             &next.scoring_tile_ids,
                         ) - base);
@@ -1758,7 +1758,7 @@ mod tests {
 
     /// Reiche Tiling-Stellung: volles 3x3-Kuppelraster, ein Teil der Felder
     /// vorbefuellt (erzeugt fast-volle Mosaikreihen/-spalten/-diagonalen, wo
-    /// `wertung_progress` grosse Deltas liefert), mehrere gefuellte Musterreihen.
+    /// `scoring_progress` grosse Deltas liefert), mehrere gefuellte Musterreihen.
     ///
     /// NOETIG, weil `tiling_state()` allein ein LEERES Kuppelraster hat: dort
     /// gibt `generate_tiling_actions` nichts zurueck, jeder Vergleich waere
@@ -2248,7 +2248,7 @@ mod tests {
     /// `round` wird nur gesetzt, NICHT in der Geometrie selbst genutzt -- die
     /// Rundenabhaengigkeit lebt ausschliesslich im Aufrufer
     /// (`best_first_step_exact_or_valued`s Rundenfenster).
-    fn platten_fork_state(round: u32) -> GameState {
+    fn plate_fork_state(round: u32) -> GameState {
         use crate::dome::{DomeSpace, DomeTile};
         let mut s = tiling_state(7);
         s.round_number = round;
@@ -2281,13 +2281,13 @@ mod tests {
     const PLATTEN_FORK_PLATTE_MOVE: TilingAction =
         TilingAction { pattern_row: 0, slot_row: 0, slot_col: 0, space_index: 0 };
 
-    /// Vorab-Beleg der Handrechnung im Doc-Kommentar von `platten_fork_state`:
+    /// Vorab-Beleg der Handrechnung im Doc-Kommentar von `plate_fork_state`:
     /// die beiden Zuege muessen tatsaechlich 1 bzw. 2 Punkte bringen und sich
     /// im Endwertungs-Delta (0 vs. 2) unterscheiden -- sonst waere der Fork
     /// kein echter Fork fuer die folgenden Tests.
     #[test]
-    fn platten_fork_state_matches_hand_computed_points_and_end_scoring() {
-        let s = platten_fork_state(2);
+    fn plate_fork_state_matches_hand_computed_points_and_end_scoring() {
+        let s = plate_fork_state(2);
         let actions = generate_tiling_actions(&s, 0);
         assert_eq!(actions.len(), 2, "erwarte genau 2 Ziel-Slots als Fork: {actions:?}");
 
@@ -2327,9 +2327,9 @@ mod tests {
     /// `exact_or_valued_without_evaluator_matches_exact` oben, hier gezielt auf
     /// den neuen Plattenwert-Zweig zugeschnitten (engeres Rundenfenster 1..=4).
     #[test]
-    fn platten_weight_default_off_matches_exact_rounds_1_to_4() {
+    fn plate_weight_default_off_matches_exact_rounds_1_to_4() {
         assert_eq!(
-            tiling_platten_weight(),
+            tiling_plate_weight(),
             0.0,
             "Testumgebung darf MOSAIC_TILING_PLATTEN_W nicht gesetzt haben"
         );
@@ -2357,22 +2357,22 @@ mod tests {
     /// `w=5` (Plattenbonus 2*5=10 uebersteigt den 1-Punkt-Vorsprung) gewinnt
     /// der plattenvollendende Zug.
     #[test]
-    fn platten_weight_overrides_points_rounds_2_to_4() {
+    fn plate_weight_overrides_points_rounds_2_to_4() {
         for round in [2u32, 3, 4] {
-            let s = platten_fork_state(round);
+            let s = plate_fork_state(round);
 
-            set_platten_weight_override_for_test(Some(0.0));
+            set_plate_weight_override_for_test(Some(0.0));
             let off = best_first_step_exact_or_valued(&s, 0, None);
-            set_platten_weight_override_for_test(None);
+            set_plate_weight_override_for_test(None);
             assert_eq!(
                 off,
                 TilingStep::Place(PLATTEN_FORK_POINTS_MOVE),
                 "Runde {round}: w=0 sollte die punktereichere Platzierung waehlen"
             );
 
-            set_platten_weight_override_for_test(Some(5.0));
+            set_plate_weight_override_for_test(Some(5.0));
             let on = best_first_step_exact_or_valued(&s, 0, None);
-            set_platten_weight_override_for_test(None);
+            set_plate_weight_override_for_test(None);
             assert_eq!(
                 on,
                 TilingStep::Place(PLATTEN_FORK_PLATTE_MOVE),
@@ -2386,12 +2386,12 @@ mod tests {
     /// plattenblind (kein `NET_TILING_TIEBREAK_ENABLED`-Zweig, der ist auf
     /// Runden 2-4 begrenzt). Der neue Zweig muss trotzdem greifen.
     #[test]
-    fn platten_weight_overrides_points_in_round_1() {
-        let s = platten_fork_state(1);
+    fn plate_weight_overrides_points_in_round_1() {
+        let s = plate_fork_state(1);
 
-        set_platten_weight_override_for_test(Some(0.0));
+        set_plate_weight_override_for_test(Some(0.0));
         let off = best_first_step_exact_or_valued(&s, 0, None);
-        set_platten_weight_override_for_test(None);
+        set_plate_weight_override_for_test(None);
         assert_eq!(
             off,
             TilingStep::Place(PLATTEN_FORK_POINTS_MOVE),
@@ -2400,9 +2400,9 @@ mod tests {
         // Gegenprobe: w=0 ist tatsaechlich identisch zum bestehenden, plattenblinden Pfad.
         assert_eq!(off, best_first_step_exact(&s, 0));
 
-        set_platten_weight_override_for_test(Some(5.0));
+        set_plate_weight_override_for_test(Some(5.0));
         let on = best_first_step_exact_or_valued(&s, 0, None);
-        set_platten_weight_override_for_test(None);
+        set_plate_weight_override_for_test(None);
         assert_eq!(
             on,
             TilingStep::Place(PLATTEN_FORK_PLATTE_MOVE),
@@ -2425,7 +2425,7 @@ mod tests {
     /// beide Ergebnisse sind unterscheidbar, der Test kann also tatsaechlich
     /// eine kaputte Bremse aufdecken statt nur zufaellig gruen zu sein.
     #[test]
-    fn platten_weight_round5_unaffected() {
+    fn plate_weight_round5_unaffected() {
         use crate::dome::{DomeSpace, DomeTile};
         let mut s = tiling_state(7);
         s.round_number = 5;
@@ -2433,7 +2433,7 @@ mod tests {
         s.dome_display.clear();
 
         // si1 traegt Blau statt Rot -- sonst waere si1 (unbelegt, `valid_si=[0,1]`)
-        // selbst ein dritter gueltiger Rot-Zug, siehe `platten_fork_state`-Doku.
+        // selbst ein dritter gueltiger Rot-Zug, siehe `plate_fork_state`-Doku.
         let slot_a = DomeTile::new(
             100,
             vec![DomeSpace::wild(), DomeSpace::normal(Blau), DomeSpace::normal(Rot), DomeSpace::normal(Rot)],
@@ -2456,9 +2456,9 @@ mod tests {
 
         let baseline = best_first_step_exact_or_valued(&s, 0, None); // Default 0.0, kein Override
 
-        set_platten_weight_override_for_test(Some(5.0));
+        set_plate_weight_override_for_test(Some(5.0));
         let with_weight = best_first_step_exact_or_valued(&s, 0, None);
-        set_platten_weight_override_for_test(None);
+        set_plate_weight_override_for_test(None);
 
         assert_eq!(
             with_weight, baseline,
@@ -2481,7 +2481,7 @@ mod tests {
     /// damit die folgenden Tests nicht auf einer stillen Annahme stehen: der
     /// Platten-Zug legt auf Slot (0,0) si0 -> Raster (0,0), der Punkte-Zug auf
     /// Slot (0,2) si0 -> Raster (0,4).
-    fn fork_feld_platte() -> usize {
+    fn fork_cell_plate() -> usize {
         crate::scoring::ownership_index_for_grid(0, 0)
     }
     fn fork_feld_punkte() -> usize {
@@ -2491,7 +2491,7 @@ mod tests {
     #[test]
     fn fork_field_indices_match_the_two_fork_moves() {
         assert_eq!(
-            fork_feld_platte(),
+            fork_cell_plate(),
             crate::scoring::ownership_field_index(
                 PLATTEN_FORK_PLATTE_MOVE.slot_row,
                 PLATTEN_FORK_PLATTE_MOVE.slot_col,
@@ -2512,7 +2512,7 @@ mod tests {
     /// Solver in den Runden 1-4 exakt `best_first_step_exact` liefern -- und
     /// zwar AUCH DANN, wenn eine (beliebig grosse) Ownership-Karte anliegt. Das
     /// ist die schaerfere Variante von
-    /// `platten_weight_default_off_matches_exact_rounds_1_to_4`: sie belegt,
+    /// `plate_weight_default_off_matches_exact_rounds_1_to_4`: sie belegt,
     /// dass der Fruehausstieg am GEWICHT haengt und nicht daran, dass zufaellig
     /// keine Karte da ist.
     #[test]
@@ -2560,9 +2560,9 @@ mod tests {
     #[test]
     fn ownership_tiling_overrides_points_rounds_1_to_4() {
         for round in [1u32, 2, 3, 4] {
-            let s = platten_fork_state(round);
+            let s = plate_fork_state(round);
             let mut marg = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
-            marg[fork_feld_platte()] = 2.0;
+            marg[fork_cell_plate()] = 2.0;
 
             set_ownership_tiling_weight_override_for_test(Some(0.0));
             let off = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
@@ -2594,9 +2594,9 @@ mod tests {
     /// beliebig (Gleichstand -> erster Kandidat).
     #[test]
     fn ownership_tiling_complements_and_does_not_replace_the_points_term() {
-        let s = platten_fork_state(2);
+        let s = plate_fork_state(2);
         let mut marg = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
-        marg[fork_feld_platte()] = 3.0;
+        marg[fork_cell_plate()] = 3.0;
         marg[fork_feld_punkte()] = 3.0;
 
         set_ownership_tiling_weight_override_for_test(Some(5.0));
@@ -2617,16 +2617,16 @@ mod tests {
     /// Terme den anderen verdraengt.
     #[test]
     fn ownership_tiling_and_heuristic_pole_add_up() {
-        let s = platten_fork_state(2);
+        let s = plate_fork_state(2);
         let mut marg = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
 
-        set_platten_weight_override_for_test(Some(1.0));
+        set_plate_weight_override_for_test(Some(1.0));
         set_ownership_tiling_weight_override_for_test(Some(1.0));
         let ohne_feldwert = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
         marg[fork_feld_punkte()] = 4.0;
         let mit_feldwert = best_first_step_exact_or_valued_ex(&s, 0, None, Some(&marg));
         set_ownership_tiling_weight_override_for_test(None);
-        set_platten_weight_override_for_test(None);
+        set_plate_weight_override_for_test(None);
 
         assert_eq!(
             ohne_feldwert,
@@ -2648,7 +2648,7 @@ mod tests {
     /// einer Absolutform die Rangfolge verzerren.
     #[test]
     fn ownership_tiling_counts_only_newly_filled_fields() {
-        let s = platten_fork_state(2);
+        let s = plate_fork_state(2);
         let vorbefuellt = crate::scoring::ownership_field_index(0, 2, 1);
         assert!(
             s.players[0].dome_grid.get_space(0, 5).is_some_and(|sp| sp.is_filled()),
@@ -2669,13 +2669,13 @@ mod tests {
     }
 
     /// Runde 5 unangetastet -- gleiches Rundenfenster wie der Heuristik-Pol
-    /// (`platten_branch_applies`). Diskriminierend konstruiert: die Baseline in
+    /// (`plate_branch_applies`). Diskriminierend konstruiert: die Baseline in
     /// Runde 5 ist der PLATTEN-Zug (Task #21 addiert die Endwertung mit Gewicht
     /// 1: 1+2=3 > 2+0=2), der hohe Feldwert liegt auf dem PUNKTE-Feld -- ein
     /// faelschlich in Runde 5 aktiver Pol wuerde also sichtbar umschwenken.
     #[test]
     fn ownership_tiling_round5_unaffected() {
-        let s = platten_fork_state(5);
+        let s = plate_fork_state(5);
         let baseline = best_first_step_exact_or_valued_ex(&s, 0, None, None);
         assert_eq!(
             baseline,
@@ -2693,10 +2693,10 @@ mod tests {
 
     /// Die Kriteriengewichte sind GETEILT (`MOSAIC_TILING_PLATTEN_GEW`, siehe
     /// `ownership_marginals`): der Wrapper muss genau das durchreichen, was
-    /// `platten_gewichte()` liefert -- kein zweiter, eigener Satz.
+    /// `plate_weights()` liefert -- kein zweiter, eigener Satz.
     #[test]
     fn ownership_marginals_uses_the_shared_criterion_weights() {
-        let s = platten_fork_state(2);
+        let s = plate_fork_state(2);
         let mut p_own = [0.0f64; crate::scoring::OWNERSHIP_FIELDS];
         for r in 0..6 {
             if r != 3 {
@@ -2709,7 +2709,7 @@ mod tests {
             &s.players[0],
             &p_own,
             &ids,
-            &platten_gewichte(),
+            &plate_weights(),
         );
         assert_eq!(ueber_wrapper, direkt);
         // Und die Rechnung ist nicht trivial leer.

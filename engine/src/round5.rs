@@ -165,7 +165,7 @@ fn chance_nodes_enabled() -> bool {
 /// Soll der NETZPFAD in Runde 5 diesen Loeser benutzen? Default JA (=
 /// byte-identisch zu vorher). Die HEURISTIK-Bahn ist bewusst NICHT betroffen:
 /// dort bleibt der Loeser gesetzt, weil ihre Alternative eine
-/// Fortschritts-Naeherung (`wertung_progress`) waere, und weil der Anker
+/// Fortschritts-Naeherung (`scoring_progress`) waere, und weil der Anker
 /// eingefroren bleiben muss.
 ///
 /// Hintergrund (`PREREG_chance_nodes.md`, Teil E): dass der Loeser das Netz

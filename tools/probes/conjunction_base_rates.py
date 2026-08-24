@@ -64,7 +64,7 @@ def main() -> None:
 
     # je Quelle: Zaehler je Gruppe -> [positiv, gesamt]
     stat = {q: {g: [0, 0] for g in GRUPPEN} for q in quellen}
-    partien = collections.Counter()
+    games = collections.Counter()
 
     for q, dateien in sorted(quellen.items()):
         for f in sorted(dateien)[:DATEIEN_JE_PRAEFIX]:
@@ -83,7 +83,7 @@ def main() -> None:
                 spieler = st.get("players") or []
                 if len(spieler) < 2:
                     continue
-                partien[q] += 1
+                games[q] += 1
                 for pl in spieler:
                     grid = pl.get("dome_grid")
                     if grid is None:
@@ -97,14 +97,14 @@ def main() -> None:
 
     kopf = ["Quelle", "Partien"] + [g.split(" ")[0] for g in GRUPPEN]
     print(f"\n{kopf[0]:14s} {kopf[1]:>8s} " + " ".join(f"{k:>12s}" for k in kopf[2:]))
-    for q in sorted(stat, key=lambda x: -partien[x]):
-        if not partien[q]:
+    for q in sorted(stat, key=lambda x: -games[x]):
+        if not games[q]:
             continue
         zellen = []
         for g in GRUPPEN:
             pos, ges = stat[q][g]
             zellen.append(f"{100*pos/ges:11.2f}%" if ges else "          --")
-        print(f"{q:14s} {partien[q]:8d} " + " ".join(zellen))
+        print(f"{q:14s} {games[q]:8d} " + " ".join(zellen))
     print("\nAlle Werte sind Positivraten der ENDZUSTANDS-Labels, je Atom und Spieler.")
     print("Lesart: liegt 'Spalten' in den Bauer-Armen (k1/k2/k5/k6) weit ueber dem")
     print("Fenster (v18/v19wdl/v20wdl/v20wdlsw), ist die Verteilungsverschiebung belegt.")

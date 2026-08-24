@@ -5,7 +5,7 @@
 METHODE (v2 -- verbessert gegenueber der ersten Fassung: benutzt die FIXE
 Kuppelplatten-Geometrie aus engine/src/dome.rs:201-233 (GEPRUEFT, Zeilen
 zitiert) statt die geforderte Farbe aus den [SB]-Grund-Texten zu erraten --
-`kein_vorzug_grund` nennt nur die ERSTE blockierende Zeile, das verdeckt die
+`no_preference_reason` nennt nur die ERSTE blockierende Zeile, das verdeckt die
 Zeile, die uns tatsaechlich interessiert (die eine offene "Mauer"-Zelle),
 in den meisten Partien. Die Kachel-Palette ist dagegen ein FESTER, 18-
 Platten-Katalog (tile_id 0..18 fortlaufend, dome.rs:201 `build_dome_tile_pool`)
@@ -256,7 +256,7 @@ def is_filled(recon: GameRecon, r: int, c: int) -> bool | None:
     return (r, c) in recon.grid_filled
 
 
-def find_mauer_zellen(recon: GameRecon) -> list[tuple[int, int]]:
+def find_wall_cells(recon: GameRecon) -> list[tuple[int, int]]:
     """Alle Spalten mit GENAU 1 offener Zelle (von 6 belegten Slots) --
     unabhaengig von der zuletzt verfolgten Zielspalte (die Zielspalte kann
     zwischenzeitlich woandershin gezeigt haben, waehrend eine FRUeHERE Spalte
@@ -336,7 +336,7 @@ def main() -> None:
         n_mauer_zellen = 0
         for sp in spiele:
             recon = GameRecon(sp.get("log") or [])
-            zellen = find_mauer_zellen(recon)
+            zellen = find_wall_cells(recon)
             if zellen:
                 n_partien_mit_mauer += 1
             for r_open, ziel in zellen:

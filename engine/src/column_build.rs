@@ -10,14 +10,14 @@
 //! `provocation.rs`s "Vorzugszug: Praeferenz statt Verbot" -- und erweitert
 //! sie um zwei Stellen, die dort noch NICHTS steuert:
 //!
-//!  1. [`vorzug_dome_wahl`]: die Kuppelplatten-Wahl (welche Platte, welcher
+//!  1. [`preference_dome_choice`]: die Kuppelplatten-Wahl (welche Platte, welcher
 //!     Slot, welche Rotation) bestimmt `required_color` der Zellen -- bisher
 //!     nie gesteuert (§9 selbst listet nur Drafting- und Tiling-Mechanismen).
-//!  2. [`ziel_spalte`]: die Ziel-Spalte wird JE ENTSCHEID frisch aus dem
+//!  2. [`target_column`]: die Ziel-Spalte wird JE ENTSCHEID frisch aus dem
 //!     aktuellen Brettzustand bestimmt (vorhandene Platten, Wild-/Special-
 //!     Zellen, schon gefuellte Zellen, blockierte Musterreihen) statt fest
 //!     0..5 zu sein. RUNDE 4 (§14) fuegt EIN Sicherheitsnetz DARUeBER hinzu
-//!     ([`ist_spalte_vollendbar`]): ist die naturgemaess billigste Spalte
+//!     ([`column_is_completable`]): ist die naturgemaess billigste Spalte
 //!     gerade unvollendbar (eine offene Zeile braucht mehr Kopien einer
 //!     Farbe, als noch erreichbar sind), wird auf die beste VOLLENDBARE
 //!     Alternative ausgewichen -- eine FRUEHERE Fassung hielt die Spalte
@@ -27,11 +27,11 @@
 //!     genau die Reaktionsfaehigkeit, die schon in Runde 1-3 funktionierte
 //!     (0,70-2,45 statt 5,95 vertikale Punkte, siehe §14).
 //!
-//! [`vorzugszug`] (Stein-Zuege) ist eine duenne Huelle um
-//! `provocation::vorzugszug_fuer_spalte` mit der dynamischen Spalte statt
+//! [`preference_move`] (Stein-Zuege) ist eine duenne Huelle um
+//! `provocation::preference_move_for_column` mit der dynamischen Spalte statt
 //! des Env-Knopfs `MOSAIC_VORZUG_SPALTE` -- IDENTISCHE Praeferenzlogik,
 //! wiederverwendet statt dupliziert (CLAUDE.md-Vorgabe). Ebenso
-//! [`vorzug_tiling_step`] fuer `tiling_solver::vorzug_tiling_step_fuer_spalte`.
+//! [`preference_tiling_step`] fuer `tiling_solver::preference_tiling_step_for_column`.
 //!
 //! Bewusst NICHT gebaut: eine Beschneidung der Aktionsmenge ("Musterreihe
 //! fuer die Ziel-Zelle freihalten"). §7/§9 haben genau das gemessen und
@@ -43,17 +43,17 @@
 //! Blocker-Klassifikation MIT Farbabgleich.
 //!
 //! RUNDE 4 (PREREG_provocation.md §14) fuegt zwei weitere Bausteine hinzu:
-//! [`ist_spalte_vollendbar`]/[`waehle_beste_vollendbare_spalte`] (Vollendbar-
-//! keits-Sicherheitsnetz mit Zielwechsel) und [`ueberpraesenz_vorzug`]
+//! [`column_is_completable`]/[`choose_best_completable_column`] (Vollendbar-
+//! keits-Sicherheitsnetz mit Zielwechsel) und [`overpresence_preference`]
 //! (Material-zuerst-Drafting, GEBAUT+GEMESSEN, aber NICHT verkettet -- brach
-//! die Netz-Staerke auf 2/20 ein, siehe Kommentar in `vorzugszug`). Die
-//! Kuppelwahl ([`zellen_wert`]) kann einen "Jackpot" (Zelle fordert exakt die
+//! die Netz-Staerke auf 2/20 ein, siehe Kommentar in `preference_move`). Die
+//! Kuppelwahl ([`cell_value`]) kann einen "Jackpot" (Zelle fordert exakt die
 //! Farbe, die ihre Musterreihe schon fuehrt) dominant ueber Wild gewichten.
 //!
 //! §15 (Entkonfundierung, Koordinator-Auftrag 2026-08-13): Sicherheitsnetz
 //! und Jackpot sind seither je ein EIGENER Diagnose-Knopf
 //! (`MOSAIC_SPALTENBAU_SICHERHEITSNETZ`/`MOSAIC_SPALTENBAU_JACKPOT`,
-//! [`sicherheitsnetz_aktiv`]/[`jackpot_aktiv`]), **Default AUS** -- keiner der
+//! [`safety_net_active`]/[`jackpot_active`]), **Default AUS** -- keiner der
 //! vier 2x2-Arme (Sicherheitsnetz x Jackpot) uebertraf auf denselben 20
 //! k1-Seeds die Runde-3-Abnahme (5,95), also bleibt die Runde-3-Konfiguration
 //! per Vorab-Regel der aktive Stand. Beide Bausteine bleiben im Code (per
@@ -71,9 +71,9 @@ use crate::tile::TileColor;
 use crate::tiling_solver::TilingStep;
 
 /// Liest `MOSAIC_SPALTENBAU` einmalig (Prozess-Cache, gleiches Muster wie
-/// `provocation::modus_env`). Jeder nicht-leere Wert ausser `"0"` schaltet
+/// `provocation::mode_env`). Jeder nicht-leere Wert ausser `"0"` schaltet
 /// den Spaltenbauer ein.
-fn aktiv_env() -> bool {
+fn active_env() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| match std::env::var("MOSAIC_SPALTENBAU") {
         Err(_) => false,
@@ -93,7 +93,7 @@ thread_local! {
 }
 
 #[cfg(test)]
-pub(crate) fn set_aktiv_override_for_test(v: Option<bool>) {
+pub(crate) fn set_active_override_for_test(v: Option<bool>) {
     AKTIV_OVERRIDE.with(|c| c.set(v));
     // Runde 4: LETZTER_WECHSEL/LETZTER_JACKPOT sind Entscheidungs-Zustand
     // (kein Partie-Zustand mehr seit dem Verwurf der Zielspalten-Bindung,
@@ -104,14 +104,14 @@ pub(crate) fn set_aktiv_override_for_test(v: Option<bool>) {
     LETZTER_JACKPOT.with(|c| c.set(false));
 }
 
-pub(crate) fn ist_aktiv() -> bool {
+pub(crate) fn is_active() -> bool {
     #[cfg(test)]
     {
         if let Some(v) = AKTIV_OVERRIDE.with(|c| c.get()) {
             return v;
         }
     }
-    aktiv_env()
+    active_env()
 }
 
 // ── §15: Diagnose-Knoepfe zur Entkonfundierung von Baustein 1 (Sicherheits-
@@ -125,11 +125,11 @@ pub(crate) fn ist_aktiv() -> bool {
 // spaetere Fassung, die die 5,95-Schwelle tatsaechlich uebertrifft.
 
 /// `MOSAIC_SPALTENBAU_SICHERHEITSNETZ=1` schaltet Baustein 1 (Vollendbarkeits-
-/// Filter in [`ziel_spalte_fuer_player`]) EIN -- Default (unset) ist seit §15
+/// Filter in [`target_column_for_player`]) EIN -- Default (unset) ist seit §15
 /// AUS: die Zielspalte ist dann die reine Kostenwahl aus Runde 1-3, ohne jede
 /// Vollendbarkeits-Pruefung (§15-Messung: 3,15 vs. 3,15 mit Filter -- kein
 /// messbarer Unterschied auf den 20 k1-Seeds, siehe PREREG_provocation.md §15).
-fn sicherheitsnetz_env() -> bool {
+fn safety_net_env() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| match std::env::var("MOSAIC_SPALTENBAU_SICHERHEITSNETZ") {
         Err(_) => false,
@@ -141,7 +141,7 @@ fn sicherheitsnetz_env() -> bool {
 }
 
 /// `MOSAIC_SPALTENBAU_JACKPOT=1` schaltet Baustein 3a (die dominante
-/// Jackpot-Gewichtung in [`zellen_wert`]) EIN -- Default (unset) ist seit §15
+/// Jackpot-Gewichtung in [`cell_value`]) EIN -- Default (unset) ist seit §15
 /// AUS: eine Zelle, deren Musterreihe schon die geforderte Farbe fuehrt,
 /// bewertet dann mit dem Runde-3-Wert 2,5 statt [`JACKPOT_WERT`] (4,0)
 /// (§15-Messung: +0,70 Plattenpunkte mit Jackpot, t=0,81, NICHT signifikant
@@ -164,7 +164,7 @@ thread_local! {
 }
 
 #[cfg(test)]
-pub(crate) fn set_sicherheitsnetz_override_for_test(v: Option<bool>) {
+pub(crate) fn set_safety_net_override_for_test(v: Option<bool>) {
     SICHERHEITSNETZ_OVERRIDE.with(|c| c.set(v));
 }
 
@@ -173,17 +173,17 @@ pub(crate) fn set_jackpot_override_for_test(v: Option<bool>) {
     JACKPOT_OVERRIDE.with(|c| c.set(v));
 }
 
-fn sicherheitsnetz_aktiv() -> bool {
+fn safety_net_active() -> bool {
     #[cfg(test)]
     {
         if let Some(v) = SICHERHEITSNETZ_OVERRIDE.with(|c| c.get()) {
             return v;
         }
     }
-    sicherheitsnetz_env()
+    safety_net_env()
 }
 
-fn jackpot_aktiv() -> bool {
+fn jackpot_active() -> bool {
     #[cfg(test)]
     {
         if let Some(v) = JACKPOT_OVERRIDE.with(|c| c.get()) {
@@ -196,7 +196,7 @@ fn jackpot_aktiv() -> bool {
 /// §16 (Special-Zellen-Baustein, Koordinator-Auftrag 2026-08-13):
 /// `MOSAIC_SPALTENBAU_SPECIAL=1` schaltet die geometrie-genaue
 /// Special-Kosten/Vollendbarkeit/Vorzugs-Erweiterung ein -- Default (unset)
-/// ist AUS, gleiches Muster wie [`sicherheitsnetz_env`]/[`jackpot_env`]
+/// ist AUS, gleiches Muster wie [`safety_net_env`]/[`jackpot_env`]
 /// (§15: neue Bausteine starten als Diagnose-Knopf, nie im Gating, bis eine
 /// Messung sie freigibt).
 fn special_env() -> bool {
@@ -220,7 +220,7 @@ pub(crate) fn set_special_override_for_test(v: Option<bool>) {
     SPECIAL_OVERRIDE.with(|c| c.set(v));
 }
 
-fn special_aktiv() -> bool {
+fn special_active() -> bool {
     #[cfg(test)]
     {
         if let Some(v) = SPECIAL_OVERRIDE.with(|c| c.get()) {
@@ -251,7 +251,7 @@ fn special_aktiv() -> bool {
 ///    Farbe gebunden ist (diese Runde fuer diese Zeile blockiert -- Nutzer-
 ///    Vorgabe "schon gefuellte Zellen"/"Farbforderungen" einbeziehen). Eine
 ///    OFFENE Zeile bekommt zusaetzlich den Versorgungs-Aufschlag
-///    [`engpass_aufschlag`] (Runde 3, Task 2, Nutzer-Auftrag 2026-08-13):
+///    [`scarcity_surcharge`] (Runde 3, Task 2, Nutzer-Auftrag 2026-08-13):
 ///    je knapper die geforderte Farbe oeffentlich noch verfuegbar ist, desto
 ///    teurer -- "eine Zelle, deren Farbe fast aufgebraucht ist, ist teuer,
 ///    auch wenn die Reihe frei ist" (wortgleiche Vorgabe). Der falsch-
@@ -260,31 +260,31 @@ fn special_aktiv() -> bool {
 ///
 /// Additiv aus dem Brett UND (seit Runde 3) der oeffentlichen Versorgungslage
 /// ablesbar (`dome_grid`/`pattern_lines` + `verbleibend`, vom Aufrufer EINMAL
-/// je Entscheid vorberechnet, siehe [`crate::provocation::verbleibende_farben`])
+/// je Entscheid vorberechnet, siehe [`crate::provocation::remaining_colors`])
 /// -- keine Suche, kein Blick in Beutel/Turm selbst -- daher weiterhin O(6) je
 /// Spalte (die Special-Nachbarpruefung ist selbst O(1), feste 2x2-Slot-Geometrie).
-pub(crate) fn spalten_kosten(player: &PlayerBoard, spalte: usize, verbleibend: &[i64; 5]) -> f64 {
-    (0..6usize).map(|r| zelle_kosten(player, r, spalte, verbleibend)).sum()
+pub(crate) fn column_cost(player: &PlayerBoard, spalte: usize, verbleibend: &[i64; 5]) -> f64 {
+    (0..6usize).map(|r| cell_cost(player, r, spalte, verbleibend)).sum()
 }
 
-/// Kosten EINER Zelle -- die per-Zeile-Formel aus [`spalten_kosten`], aber
+/// Kosten EINER Zelle -- die per-Zeile-Formel aus [`column_cost`], aber
 /// fuer ein beliebiges `(r, c)` statt nur `(r, spalte)`. §16 (Special-
-/// Zellen-Baustein): dieselbe Funktion, die `spalten_kosten` fuer die
+/// Zellen-Baustein): dieselbe Funktion, die `column_cost` fuer die
 /// Zielspalte selbst aufruft, wird jetzt AUCH auf die Slot-Nachbarn einer
-/// offenen Special-Zelle angewandt (siehe [`special_kosten`]) -- die
+/// offenen Special-Zelle angewandt (siehe [`special_cost`]) -- die
 /// Nachbarn brauchen dieselbe Kostenrechnung wie jede andere Zelle,
 /// unabhaengig davon, in welcher Spalte sie liegen.
-pub(crate) fn zelle_kosten(player: &PlayerBoard, r: usize, c: usize, verbleibend: &[i64; 5]) -> f64 {
+pub(crate) fn cell_cost(player: &PlayerBoard, r: usize, c: usize, verbleibend: &[i64; 5]) -> f64 {
     match player.dome_grid.get_space(r, c) {
         None => 1.0,
         Some(sp) if sp.is_filled() => 0.0,
         Some(sp) => match sp.space_type {
             SpaceType::Wild => 0.2,
-            SpaceType::Special => special_kosten(player, r, c, verbleibend),
+            SpaceType::Special => special_cost(player, r, c, verbleibend),
             SpaceType::Normal => {
                 let need = sp.required_color;
                 match (player.pattern_lines[r].color, need) {
-                    (None, Some(x)) => 1.0 + engpass_aufschlag(verbleibend, x),
+                    (None, Some(x)) => 1.0 + scarcity_surcharge(verbleibend, x),
                     (None, None) => 1.0, // Normal hat laut dome.rs immer required_color=Some(..); defensiv.
                     (Some(c2), Some(x)) if c2 == x => 0.3,
                     _ => 2.0,
@@ -297,7 +297,7 @@ pub(crate) fn zelle_kosten(player: &PlayerBoard, r: usize, c: usize, verbleibend
 /// Geometrie: die 3 Slot-Nachbarn von `(r, c)` -- die anderen 3 Zellen im
 /// selben 2x2-Dome-Slot (Slot `(r/2, c/2)`). Reine Geometrie, kein
 /// Spielzustand -- siehe `slot_score`s Doku fuer die Herleitung.
-fn slot_nachbarn(r: usize, c: usize) -> [(usize, usize); 3] {
+fn slot_neighbours(r: usize, c: usize) -> [(usize, usize); 3] {
     let slot_row = r / 2;
     let slot_col = c / 2;
     let mut out = [(0usize, 0usize); 3];
@@ -327,8 +327,8 @@ fn slot_nachbarn(r: usize, c: usize) -> [(usize, usize); 3] {
 /// frei ist" (wortgleiche Nutzer-Vorgabe) gilt damit selbst im Extremfall.
 const ENGPASS_MAX: f64 = 2.5;
 
-pub(crate) fn engpass_aufschlag(verbleibend: &[i64; 5], farbe: TileColor) -> f64 {
-    let Some(i) = crate::provocation::farben_index(farbe) else {
+pub(crate) fn scarcity_surcharge(verbleibend: &[i64; 5], farbe: TileColor) -> f64 {
+    let Some(i) = crate::provocation::color_index(farbe) else {
         return 0.0; // Wild ist keine ziehbare Farbe, kommt hier nie vor; defensiv.
     };
     let frac = (verbleibend[i].max(0) as f64 / crate::tile::TILES_PER_COLOR as f64).min(1.0);
@@ -343,23 +343,23 @@ pub(crate) fn engpass_aufschlag(verbleibend: &[i64; 5], farbe: TileColor) -> f64
 ///
 /// **§16-EIN** (Koordinator-Auftrag 2026-08-13, "Slot-Nachbarzellen ... sind
 /// der Weg zur Special-Zelle"): die Kosten sind die SUMME der echten
-/// [`zelle_kosten`] ihrer 3 Slot-Nachbarn -- eine Special-Zelle ist billig,
+/// [`cell_cost`] ihrer 3 Slot-Nachbarn -- eine Special-Zelle ist billig,
 /// wenn ihre Nachbarn billig sind (Wild, oder schon richtig gebunden), teuer,
 /// wenn sie eine knappe/falsch gebundene Farbe brauchen. Bildet die
 /// Nutzer-Taktik (`docs/domain_knowledge.md` §8: "erzwungene Spezialkuppeln
 /// nach OBEN ... obere Slots haengen an billigen Musterreihen") OHNE eigene
 /// Slot-Reihen-Sonderregel ab: obere Slots (Zeilen 0/1) haben Nachbarn mit
-/// KLEINEM `r`, also kleiner `benoetigt`-Kopienzahl in [`zelle_kosten`]s
+/// KLEINEM `r`, also kleiner `benoetigt`-Kopienzahl in [`cell_cost`]s
 /// Normal-Zweig -- der Reihen-Tiefe-Effekt entsteht automatisch aus der
 /// bestehenden Kostenformel, keine zusaetzliche Sonderregel noetig.
 ///
-/// Geometrie ([`slot_nachbarn`], wie `slot_score`): Slot `(r/2, spalte/2)`
+/// Geometrie ([`slot_neighbours`], wie `slot_score`): Slot `(r/2, spalte/2)`
 /// deckt Rasterzeilen `2*(r/2)`/`2*(r/2)+1` und -spalten `2*(spalte/2)`/
 /// `2*(spalte/2)+1` ab.
-pub(crate) fn special_kosten(player: &PlayerBoard, r: usize, spalte: usize, verbleibend: &[i64; 5]) -> f64 {
-    if !special_aktiv() {
+pub(crate) fn special_cost(player: &PlayerBoard, r: usize, spalte: usize, verbleibend: &[i64; 5]) -> f64 {
+    if !special_active() {
         let mut offene_nachbarn = 0u32;
-        for &(rr, cc) in &slot_nachbarn(r, spalte) {
+        for &(rr, cc) in &slot_neighbours(r, spalte) {
             let gefuellt = player.dome_grid.get_space(rr, cc).map_or(true, |s| s.is_filled());
             if !gefuellt {
                 offene_nachbarn += 1;
@@ -367,12 +367,12 @@ pub(crate) fn special_kosten(player: &PlayerBoard, r: usize, spalte: usize, verb
         }
         return 0.3 + 0.8 * offene_nachbarn as f64;
     }
-    slot_nachbarn(r, spalte).iter().map(|&(rr, cc)| zelle_kosten(player, rr, cc, verbleibend)).sum()
+    slot_neighbours(r, spalte).iter().map(|&(rr, cc)| cell_cost(player, rr, cc, verbleibend)).sum()
 }
 
 /// §18 (Diagonalen-Baustein, Koordinator-Auftrag 2026-08-13): wie
-/// [`special_kosten`]s "smart"-Zweig (echte Nachbar-Kosten statt der ALT-
-/// Schaetzung), aber OHNE den §16/§17-Schalter [`special_aktiv`] -- der
+/// [`special_cost`]s "smart"-Zweig (echte Nachbar-Kosten statt der ALT-
+/// Schaetzung), aber OHNE den §16/§17-Schalter [`special_active`] -- der
 /// gilt nur fuer den column_build-EIGENEN (Kriterium 1) Pfad, dessen
 /// Uebernahme-Entscheidung in §17 final NEIN war. Andere Bauern
 /// (`plate_builder.rs`) mit einer EIGENEN, unabhaengig gemessenen und
@@ -380,17 +380,17 @@ pub(crate) fn special_kosten(player: &PlayerBoard, r: usize, spalte: usize, verb
 /// Plattenpunkte, t=2,79, p=0,011) rufen diese Funktion UNBEDINGT auf --
 /// jeder Bauer hat seinen eigenen Uebernahme-Status, das globale
 /// `MOSAIC_SPALTENBAU_SPECIAL` bleibt reserviert fuer den k1-Legacy-Pfad.
-pub(crate) fn zelle_kosten_smart(player: &PlayerBoard, r: usize, c: usize, verbleibend: &[i64; 5]) -> f64 {
+pub(crate) fn cell_cost_smart(player: &PlayerBoard, r: usize, c: usize, verbleibend: &[i64; 5]) -> f64 {
     match player.dome_grid.get_space(r, c) {
         None => 1.0,
         Some(sp) if sp.is_filled() => 0.0,
         Some(sp) => match sp.space_type {
             SpaceType::Wild => 0.2,
-            SpaceType::Special => slot_nachbarn(r, c).iter().map(|&(rr, cc)| zelle_kosten_smart(player, rr, cc, verbleibend)).sum(),
+            SpaceType::Special => slot_neighbours(r, c).iter().map(|&(rr, cc)| cell_cost_smart(player, rr, cc, verbleibend)).sum(),
             SpaceType::Normal => {
                 let need = sp.required_color;
                 match (player.pattern_lines[r].color, need) {
-                    (None, Some(x)) => 1.0 + engpass_aufschlag(verbleibend, x),
+                    (None, Some(x)) => 1.0 + scarcity_surcharge(verbleibend, x),
                     (None, None) => 1.0,
                     (Some(c2), Some(x)) if c2 == x => 0.3,
                     _ => 2.0,
@@ -400,18 +400,18 @@ pub(crate) fn zelle_kosten_smart(player: &PlayerBoard, r: usize, c: usize, verbl
     }
 }
 
-/// Wie [`special_nachbar_zellen_fuer_liste`], aber UNBEDINGT (kein
-/// `special_aktiv`-Schalter) -- siehe [`zelle_kosten_smart`]-Doku fuer die
+/// Wie [`special_neighbour_cells_for_list`], aber UNBEDINGT (kein
+/// `special_active`-Schalter) -- siehe [`cell_cost_smart`]-Doku fuer die
 /// Begruendung (jeder generische Bauer hat seinen eigenen, unabhaengigen
 /// Uebernahme-Status).
-pub(crate) fn special_nachbar_zellen_immer(player: &PlayerBoard, zellen: &[(usize, usize)]) -> Vec<(usize, usize)> {
+pub(crate) fn special_neighbour_cells_always(player: &PlayerBoard, zellen: &[(usize, usize)]) -> Vec<(usize, usize)> {
     let mut v = Vec::new();
     for &(r, c) in zellen {
         let Some(sp) = player.dome_grid.get_space(r, c) else { continue };
         if sp.is_filled() || sp.space_type != SpaceType::Special {
             continue;
         }
-        v.extend_from_slice(&slot_nachbarn(r, c));
+        v.extend_from_slice(&slot_neighbours(r, c));
     }
     v
 }
@@ -438,7 +438,7 @@ const SPALTEN_TOLERANZ: f64 = 0.5;
 /// Spalte 0 braeuchte einen Kostenunterschied, der sich oft erst spaet
 /// einstellt. Das Verteilungs-Gate (Nutzer-Ergaenzung) prueft genau das:
 /// Ereignisse muessen auf allen sechs Spalten auftauchen, nicht nur auf 0.
-fn waehle_spalte(kosten: [f64; 6]) -> usize {
+fn choose_column(kosten: [f64; 6]) -> usize {
     let min_kosten = kosten.iter().cloned().fold(f64::INFINITY, f64::min);
     let kandidaten: Vec<usize> = (0..6usize).filter(|&c| kosten[c] - min_kosten <= SPALTEN_TOLERANZ).collect();
     if kandidaten.len() <= 1 {
@@ -446,49 +446,49 @@ fn waehle_spalte(kosten: [f64; 6]) -> usize {
     }
     match PARTIE_SEED.with(|c| c.get()) {
         None => kandidaten[0],
-        Some(seed) => kandidaten[index_aus_seed(seed, kandidaten.len())],
+        Some(seed) => kandidaten[index_from_seed(seed, kandidaten.len())],
     }
 }
 
 thread_local! {
-    /// Partie-Seed fuer die Kosten-Streuung in [`waehle_spalte`] (Task 7c).
+    /// Partie-Seed fuer die Kosten-Streuung in [`choose_column`] (Task 7c).
     /// `None` = kein Seed gesetzt -- Bestandsverhalten (kleinste
     /// Spaltennummer bei Gleichstand/Naehe).
     static PARTIE_SEED: std::cell::Cell<Option<u64>> = const { std::cell::Cell::new(None) };
 
     /// Runde 4, Baustein 1: letzte Substitution durch [`ziel_spalte_fuer_
     /// player`]s Vollendbarkeits-Sicherheitsnetz (natuerlicher Kandidat, neue
-    /// Spalte), fuer den naechsten [`trace_zeile`]-Aufruf zum Ablesen/
+    /// Spalte), fuer den naechsten [`trace_line`]-Aufruf zum Ablesen/
     /// Loeschen (Nutzer-Vorgabe: "Der Wechsel muss im [SB]-Trace als eigenes
     /// Ereignis erscheinen"). KEIN Partie-Zustand (anders als eine fruehere
-    /// Fassung, siehe Moduldoku) -- wird bei jedem `ziel_spalte_fuer_player`-
+    /// Fassung, siehe Moduldoku) -- wird bei jedem `target_column_for_player`-
     /// Aufruf frisch bewertet, nur bei einer tatsaechlichen Substitution
     /// gesetzt.
     static LETZTER_WECHSEL: std::cell::Cell<Option<(usize, usize)>> = const { std::cell::Cell::new(None) };
 
     /// Runde 4, Baustein 3 (zweite Nutzer-Korrektur, "Material zuerst,
-    /// Forderung danach"): true, wenn die letzte [`vorzug_dome_wahl`]-
+    /// Forderung danach"): true, wenn die letzte [`preference_dome_choice`]-
     /// Entscheidung eine Kachel/Rotation gewaehlt hat, die eine Zelle mit
     /// EXAKT der schon in ihrer Musterreihe liegenden Farbe versorgt (der
-    /// "Jackpot" der Nutzer-Vorgabe). Wird bei jedem `vorzug_dome_wahl`-
+    /// "Jackpot" der Nutzer-Vorgabe). Wird bei jedem `preference_dome_choice`-
     /// Aufruf frisch gesetzt (kein Leck-Risiko wie bei `PARTIE_SEED`, weil
     /// es keinen Partie-Bezug hat, sondern nur den letzten Dome-Entscheid).
     static LETZTER_JACKPOT: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 /// Setzt (oder loescht mit `None`) den Partie-Seed fuer DIESEN Thread --
-/// gleiches Muster wie `net_mcts::set_partie_shaping_weight`/
-/// `provocation::set_ziel_spalte_seed`. Aufrufer MUSS am Partieende (oder vor
+/// gleiches Muster wie `net_mcts::set_game_shaping_weight`/
+/// `provocation::set_target_column_seed`. Aufrufer MUSS am Partieende (oder vor
 /// der naechsten Partie desselben Threads) mit `None`/dem neuen Seed
 /// ueberschreiben, sonst leckt der Wert in die naechste Partie.
-pub(crate) fn set_partie_seed(seed: Option<u64>) {
+pub(crate) fn set_game_seed(seed: Option<u64>) {
     PARTIE_SEED.with(|c| c.set(seed));
 }
 
 /// Runde 4, Baustein 1: ist Spalte `spalte` fuer `player` unter der AKTUELLEN
 /// oeffentlichen Versorgungslage `verbleibend` noch VOLLENDBAR? Prueft NUR
 /// Normal-Zellen (Wild braucht keine Farbe; Special hat eine eigene, von der
-/// Farbversorgung unabhaengige Trigger-Bedingung, siehe `special_kosten`-Doku
+/// Farbversorgung unabhaengige Trigger-Bedingung, siehe `special_cost`-Doku
 /// -- eine Special-Zelle als "unvollendbar wegen Farbe" zu werten waere
 /// sachlich falsch, sie kennt gar keine Farbforderung):
 ///
@@ -503,7 +503,7 @@ pub(crate) fn set_partie_seed(seed: Option<u64>) {
 /// Kein Slot an einer Zeile (`None`) blockt nicht (neutral, wie ueberall
 /// sonst in diesem Modul) -- eine Spalte mit noch unbelegten Slots ist per
 /// Definition nicht ausgeschlossen, nur weil dort noch keine Platte liegt.
-pub(crate) fn ist_spalte_vollendbar(player: &PlayerBoard, spalte: usize, verbleibend: &[i64; 5]) -> bool {
+pub(crate) fn column_is_completable(player: &PlayerBoard, spalte: usize, verbleibend: &[i64; 5]) -> bool {
     for r in 0..6usize {
         let Some(sp) = player.dome_grid.get_space(r, spalte) else { continue };
         if sp.is_filled() {
@@ -518,11 +518,11 @@ pub(crate) fn ist_spalte_vollendbar(player: &PlayerBoard, spalte: usize, verblei
                 // vollendbar, wenn ihre 3 Slot-Nachbarn es sind -- SIE sind
                 // die eigentliche Farbforderung, die Special-Zelle selbst
                 // hat keine.
-                if !special_aktiv() {
+                if !special_active() {
                     continue;
                 }
-                for &(rr, cc) in &slot_nachbarn(r, spalte) {
-                    if !ist_zelle_vollendbar(player, rr, cc, verbleibend) {
+                for &(rr, cc) in &slot_neighbours(r, spalte) {
+                    if !cell_is_completable(player, rr, cc, verbleibend) {
                         return false;
                     }
                 }
@@ -543,7 +543,7 @@ pub(crate) fn ist_spalte_vollendbar(player: &PlayerBoard, spalte: usize, verblei
                 // Zeile (0 Fortschritt fuer `need`, volle r+1 Kopien noetig)
                 // statt als Sofort-Blocker.
                 let schon = if zeile.color == Some(need) { zeile.tiles.len() as i64 } else { 0 };
-                let Some(i) = crate::provocation::farben_index(need) else { continue };
+                let Some(i) = crate::provocation::color_index(need) else { continue };
                 let benoetigt = (r as i64 + 1) - schon;
                 if verbleibend[i] < benoetigt {
                     return false;
@@ -554,13 +554,13 @@ pub(crate) fn ist_spalte_vollendbar(player: &PlayerBoard, spalte: usize, verblei
     true
 }
 
-/// §16: dieselbe Vollendbarkeits-Pruefung wie [`ist_spalte_vollendbar`]s
+/// §16: dieselbe Vollendbarkeits-Pruefung wie [`column_is_completable`]s
 /// Normal-Zweig, aber fuer eine EINZELNE Zelle `(r, c)` -- gebraucht fuer die
 /// Slot-Nachbarn einer offenen Special-Zelle, die in einer ANDEREN Spalte
 /// liegen koennen als die gerade gepruefte Zielspalte. Wild/Special selbst
 /// gelten immer als vollendbar (Special-in-Special kommt laut Katalog nie
 /// vor, ein zweiter Rekursionsschritt waere aber ohnehin terminierend).
-pub(crate) fn ist_zelle_vollendbar(player: &PlayerBoard, r: usize, c: usize, verbleibend: &[i64; 5]) -> bool {
+pub(crate) fn cell_is_completable(player: &PlayerBoard, r: usize, c: usize, verbleibend: &[i64; 5]) -> bool {
     let Some(sp) = player.dome_grid.get_space(r, c) else { return true };
     if sp.is_filled() {
         return true;
@@ -571,7 +571,7 @@ pub(crate) fn ist_zelle_vollendbar(player: &PlayerBoard, r: usize, c: usize, ver
             let Some(need) = sp.required_color else { return true };
             let zeile = &player.pattern_lines[r];
             let schon = if zeile.color == Some(need) { zeile.tiles.len() as i64 } else { 0 };
-            let Some(i) = crate::provocation::farben_index(need) else { return true };
+            let Some(i) = crate::provocation::color_index(need) else { return true };
             let benoetigt = (r as i64 + 1) - schon;
             verbleibend[i] >= benoetigt
         }
@@ -586,15 +586,15 @@ pub(crate) fn ist_zelle_vollendbar(player: &PlayerBoard, r: usize, c: usize, ver
 /// (spaetes Spiel, sehr seltener Grenzfall) faellt die Funktion auf die
 /// gewohnte Kostenwahl zurueck -- ein Zwang zu einer nachweislich
 /// unvollendbaren Spalte waere kein Fortschritt.
-fn waehle_beste_vollendbare_spalte(player: &PlayerBoard, verbleibend: &[i64; 5], kosten: &[f64; 6]) -> usize {
+fn choose_best_completable_column(player: &PlayerBoard, verbleibend: &[i64; 5], kosten: &[f64; 6]) -> usize {
     let gefuellte_zellen = |c: usize| -> i32 {
         (0..6usize)
             .filter(|&r| player.dome_grid.get_space(r, c).map_or(false, |sp| sp.is_filled()))
             .count() as i32
     };
-    let mut kandidaten: Vec<usize> = (0..6usize).filter(|&c| ist_spalte_vollendbar(player, c, verbleibend)).collect();
+    let mut kandidaten: Vec<usize> = (0..6usize).filter(|&c| column_is_completable(player, c, verbleibend)).collect();
     if kandidaten.is_empty() {
-        return waehle_spalte(*kosten);
+        return choose_column(*kosten);
     }
     kandidaten.sort_by(|&a, &b| {
         gefuellte_zellen(b)
@@ -604,15 +604,15 @@ fn waehle_beste_vollendbare_spalte(player: &PlayerBoard, verbleibend: &[i64; 5],
     kandidaten[0]
 }
 
-/// Zielspalte fuer Spieler `pi`: die gewohnte Kostenwahl aus [`waehle_spalte`]
+/// Zielspalte fuer Spieler `pi`: die gewohnte Kostenwahl aus [`choose_column`]
 /// (frisch bei jedem Aufruf), mit einem Vollendbarkeits-Sicherheitsnetz
 /// (Runde 4, Baustein 1) darueber -- ist der natuerliche Kandidat unvollendbar,
-/// weicht die Funktion auf [`waehle_beste_vollendbare_spalte`] aus und
+/// weicht die Funktion auf [`choose_best_completable_column`] aus und
 /// vermerkt das in [`LETZTER_WECHSEL`] fuer den naechsten Trace-Aufruf.
-fn ziel_spalte_fuer_player(state: &GameState, pi: usize) -> usize {
+fn target_column_for_player(state: &GameState, pi: usize) -> usize {
     let player = &state.players[pi];
-    let verbleibend = crate::provocation::verbleibende_farben(state);
-    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c, &verbleibend));
+    let verbleibend = crate::provocation::remaining_colors(state);
+    let kosten: [f64; 6] = std::array::from_fn(|c| column_cost(player, c, &verbleibend));
     // FRISCH bei jedem Aufruf, wie in Runde 1-3 -- KEIN gespeichertes
     // "bisheriges Ziel" mehr (fruehere Fassung dieser Funktion hielt eine
     // Spalte per `LETZTES_ZIEL`-Thread-Local fest und wechselte nur bei
@@ -624,13 +624,13 @@ fn ziel_spalte_fuer_player(state: &GameState, pi: usize) -> usize {
     // in Kategorie "Farbe nie verfuegbar" -- das Problem, das die Bindung
     // loesen sollte, war empirisch gar nicht die dominante Ursache). Siehe
     // PREREG_provocation.md §14 fuer die volle Messreihe.
-    let kandidat = waehle_spalte(kosten);
+    let kandidat = choose_column(kosten);
 
     // §15-Entscheidung: Default (unset) ist AUS -- kein Arm der
     // Entkonfundierung uebertraf 5,95, also bleibt die Runde-3-Konfiguration
     // der aktive Stand (Vorab-Regel des Koordinators). `MOSAIC_SPALTENBAU_
     // SICHERHEITSNETZ=1` schaltet Baustein 1 gezielt wieder ein.
-    if !sicherheitsnetz_aktiv() {
+    if !safety_net_active() {
         return kandidat;
     }
 
@@ -638,13 +638,13 @@ fn ziel_spalte_fuer_player(state: &GameState, pi: usize) -> usize {
     // Filter ueber der unveraenderten Kostenwahl, nicht als Ersatz dafuer):
     // ist die naturgemaess billigste Spalte gerade unvollendbar (Farbe fuer
     // eine offene Zeile objektiv erschoepft), wird auf die beste VOLLENDBARE
-    // Alternative ausgewichen. `noch_erreichbare_farben` (nicht `verbleibend`)
+    // Alternative ausgewichen. `still_reachable_colors` (nicht `verbleibend`)
     // ist hier die richtige Zahl -- siehe dortige Doku.
-    let erreichbar = crate::provocation::noch_erreichbare_farben(state, pi);
-    if ist_spalte_vollendbar(player, kandidat, &erreichbar) {
+    let erreichbar = crate::provocation::still_reachable_colors(state, pi);
+    if column_is_completable(player, kandidat, &erreichbar) {
         return kandidat;
     }
-    let neu = waehle_beste_vollendbare_spalte(player, &erreichbar, &kosten);
+    let neu = choose_best_completable_column(player, &erreichbar, &kosten);
     if neu != kandidat {
         LETZTER_WECHSEL.with(|c| c.set(Some((kandidat, neu))));
     }
@@ -652,12 +652,12 @@ fn ziel_spalte_fuer_player(state: &GameState, pi: usize) -> usize {
 }
 
 /// Deterministische Mischung Seed -> Index `0..n` -- identisches SplitMix64-
-/// Muster wie `net_mcts::partie_gewicht_aus_seed`/`provocation::spalte_aus_
+/// Muster wie `net_mcts::game_weight_from_seed`/`provocation::spalte_aus_
 /// seed` (aufeinanderfolgende Partie-Seeds unterscheiden sich im Self-Play
 /// oft nur in den unteren Bits, eine rohe Modulo-Bildung ergaebe eine Treppe
 /// statt einer Streuung). `n == 0` kommt hier nie vor (Aufrufer filtert immer
 /// mindestens den Minimum-Eintrag selbst ein), degradiert defensiv auf 0.
-fn index_aus_seed(seed: u64, n: usize) -> usize {
+fn index_from_seed(seed: u64, n: usize) -> usize {
     if n == 0 {
         return 0;
     }
@@ -673,80 +673,80 @@ fn index_aus_seed(seed: u64, n: usize) -> usize {
 /// wenn die bisherige Ziel-Spalte unbedienbar wird (Nutzer-Vorgabe): der
 /// naechste Aufruf sieht den neuen Brettzustand und kann eine andere Spalte
 /// liefern, ohne dass irgendwo ein Flag geloescht werden muesste (kein
-/// Leck-Risiko wie bei `provocation::AUTO_SPALTE`/`set_ziel_spalte_seed`).
-/// Auswahl unter den guenstigsten Kandidaten: siehe [`waehle_spalte`].
-pub(crate) fn ziel_spalte(state: &GameState) -> Option<usize> {
-    if !ist_aktiv() {
+/// Leck-Risiko wie bei `provocation::AUTO_SPALTE`/`set_target_column_seed`).
+/// Auswahl unter den guenstigsten Kandidaten: siehe [`choose_column`].
+pub(crate) fn target_column(state: &GameState) -> Option<usize> {
+    if !is_active() {
         return None;
     }
-    Some(ziel_spalte_fuer_player(state, state.current_player))
+    Some(target_column_for_player(state, state.current_player))
 }
 
 // ── Wiederverwendung: Stein-Zug- und Tiling-Praeferenz mit dynamischer Spalte ──
 
-/// Stein-Zug-Praeferenz, IDENTISCHE Logik zu `provocation::vorzugszug`, aber
+/// Stein-Zug-Praeferenz, IDENTISCHE Logik zu `provocation::preference_move`, aber
 /// mit der je Entscheid dynamisch bestimmten Spalte statt `MOSAIC_VORZUG_SPALTE`.
-/// [`ueberpraesenz_vorzug`] als zweite Vorzugsstufe wurde GEBAUT und GEMESSEN,
+/// [`overpresence_preference`] als zweite Vorzugsstufe wurde GEBAUT und GEMESSEN,
 /// ist aber NICHT verkettet -- siehe der lange Kommentar im Funktionskoerper
 /// fuer den gemessenen Grund (2/20 statt 15-16/20 Netz-Siege).
-pub(crate) fn vorzugszug(state: &GameState) -> Option<Action> {
-    let spalte = ziel_spalte(state)?;
-    crate::provocation::vorzugszug_fuer_spalte(state, spalte)
-        // §16 (Special-Zellen-Baustein): `vorzugszug_fuer_spalte` sieht nur
+pub(crate) fn preference_move(state: &GameState) -> Option<Action> {
+    let spalte = target_column(state)?;
+    crate::provocation::preference_move_for_column(state, spalte)
+        // §16 (Special-Zellen-Baustein): `preference_move_for_column` sieht nur
         // die Zielspalte selbst -- eine offene Special-Zelle braucht aber
         // ihre 3 Slot-Nachbarn, die oft in der NACHBAR-Spalte liegen. Zweite
-        // Vorzugsstufe (Default AUS, siehe `special_aktiv`): liefert `None`,
+        // Vorzugsstufe (Default AUS, siehe `special_active`): liefert `None`,
         // solange kein Nachbar offen ist -- KEIN zusaetzliches Risiko wie
-        // `ueberpraesenz_vorzug` (siehe unten), weil sie nur bei einer
+        // `overpresence_preference` (siehe unten), weil sie nur bei einer
         // KONKRETEN, schon platzierten Special-Zelle ueberhaupt greift, nicht
         // bei jeder Fruehphasen-Entscheidung ohne Kandidat.
         .or_else(|| {
             let player = &state.players[state.current_player];
-            let zellen = special_nachbar_zellen(player, spalte);
+            let zellen = special_neighbour_cells(player, spalte);
             if zellen.is_empty() {
                 None
             } else {
-                crate::plate_builder::vorzugszug_fuer_zellen(state, &zellen)
+                crate::plate_builder::preference_move_for_cells(state, &zellen)
             }
         })
-    // [`ueberpraesenz_vorzug`] BEWUSST NICHT verkettet: die erste volle
+    // [`overpresence_preference`] BEWUSST NICHT verkettet: die erste volle
     // Runde-4-Messung mit dieser Stufe im Vorzugspfad brach von 15-16/20 auf
     // 2/20 Netz-Siege ein (McNemar p=0.0001, sofort mit einer 6-Seed-Sonde
     // ohne diese Stufe repliziert: 5/6 bleibt bei der gewohnten Grössenordnung
-    // -- Isolation eindeutig). Grund vermutet: `vorzugszug_fuer_spalte`
+    // -- Isolation eindeutig). Grund vermutet: `preference_move_for_column`
     // greift nur, wenn eine ZIELSPALTEN-spezifische Zelle passt (schmal,
-    // genau die Situationen aus §11/§12); `ueberpraesenz_vorzug` greift
+    // genau die Situationen aus §11/§12); `overpresence_preference` greift
     // JEDESMAL, wenn das nicht der Fall ist -- also auf einem GROSSEN Teil
     // aller Fruehphasen-Entscheidungen -- und ersetzt dort die Netz-Suche
     // durch eine Ein-Kriterium-Heuristik (nur Farbmenge + Zeilentiefe), die
     // Strafleiste/Gegner/andere Wertungsplatten komplett ignoriert. Exakt
     // das Muster aus §7 ("Beschneidung zu stark", Endstand-Kollaps) -- nur
     // ueber die Vorzugs- statt die Aktionsmengen-Seite. Bleibt als GETESTETE,
-    // aber UNVERDRAHTETE Funktion stehen (siehe `ueberpraesenz_vorzug`-Tests)
+    // aber UNVERDRAHTETE Funktion stehen (siehe `overpresence_preference`-Tests)
     // fuer eine spaetere, enger gefasste Fassung (z.B. nur als zusaetzliches
     // Suchsignal statt als Suche-ersetzender Vorzug).
 }
 
 /// §16: Slot-Nachbarn ALLER noch offenen Special-Zellen der Zielspalte --
 /// leere Liste, wenn Baustein AUS oder keine offene Special-Zelle vorliegt.
-/// Geteilt zwischen [`vorzugszug`] (Drafting) und [`vorzug_tiling_step`]
+/// Geteilt zwischen [`preference_move`] (Drafting) und [`preference_tiling_step`]
 /// (Tiling) -- beide reichen die Liste an die generische Zellen-Mechanik aus
-/// `plate_builder.rs` durch (`vorzugszug_fuer_zellen`/`tiling_vorzug_fuer_
+/// `plate_builder.rs` durch (`preference_move_for_cells`/`tiling_vorzug_fuer_
 /// zellen`), statt eine eigene Praeferenzlogik zu duplizieren.
-fn special_nachbar_zellen(player: &PlayerBoard, spalte: usize) -> Vec<(usize, usize)> {
-    special_nachbar_zellen_fuer_liste(player, &zellen_spalte_liste(spalte))
+fn special_neighbour_cells(player: &PlayerBoard, spalte: usize) -> Vec<(usize, usize)> {
+    special_neighbour_cells_for_list(player, &cells_column_list(spalte))
 }
 
 /// §18 (Diagonalen-Baustein, Koordinator-Auftrag 2026-08-13): Generalisierung
-/// von [`special_nachbar_zellen`] auf eine BELIEBIGE Zielzellen-Liste, nicht
+/// von [`special_neighbour_cells`] auf eine BELIEBIGE Zielzellen-Liste, nicht
 /// nur eine Spalte -- fuer `plate_builder.rs`s generische Kriterien
 /// (Diagonalen, Ecken, Zeilen, ...), die keine `spalte: usize` haben,
 /// sondern eine `&[(usize, usize)]`-Liste. Findet alle offenen Special-Zellen
 /// INNERHALB der Liste und liefert ihre Slot-Nachbarn (koennen ausserhalb der
 /// Liste liegen, z.B. in einer Nachbar-Spalte -- das ist der Punkt).
-pub(crate) fn special_nachbar_zellen_fuer_liste(player: &PlayerBoard, zellen: &[(usize, usize)]) -> Vec<(usize, usize)> {
+pub(crate) fn special_neighbour_cells_for_list(player: &PlayerBoard, zellen: &[(usize, usize)]) -> Vec<(usize, usize)> {
     let mut v = Vec::new();
-    if !special_aktiv() {
+    if !special_active() {
         return v;
     }
     for &(r, c) in zellen {
@@ -754,12 +754,12 @@ pub(crate) fn special_nachbar_zellen_fuer_liste(player: &PlayerBoard, zellen: &[
         if sp.is_filled() || sp.space_type != SpaceType::Special {
             continue;
         }
-        v.extend_from_slice(&slot_nachbarn(r, c));
+        v.extend_from_slice(&slot_neighbours(r, c));
     }
     v
 }
 
-fn zellen_spalte_liste(spalte: usize) -> [(usize, usize); 6] {
+fn cells_column_list(spalte: usize) -> [(usize, usize); 6] {
     std::array::from_fn(|r| (r, spalte))
 }
 
@@ -769,7 +769,7 @@ fn zellen_spalte_liste(spalte: usize) -> [(usize, usize); 6] {
 /// Vorzugsstufe, unabhaengig von einer bestimmten Zielspalte (die hat ja noch
 /// keine Platte, kann also noch keine Farbforderung stellen): unter den JETZT
 /// tatsaechlich nehmbaren Farben (`generate_valid_moves`) wird die
-/// ueberpraesenteste gewaehlt (hoechster `verbleibende_farben`-Wert -- am
+/// ueberpraesenteste gewaehlt (hoechster `remaining_colors`-Wert -- am
 /// wenigsten verbraucht, nicht die im aktuellen Angebot haeufigste Kopie, das
 /// waere ein reiner Momentaufnahme-Zufall) und in die TIEFSTE Musterreihe
 /// gelegt, die diese Farbe laut Spielregeln gerade annehmen darf (`place.
@@ -779,22 +779,22 @@ fn zellen_spalte_liste(spalte: usize) -> [(usize, usize); 6] {
 /// zu 6) und die laengste Anlaufzeit hat -- Ueberfluss zaehlt dort am
 /// meisten (wortgleiche Nutzer-Begruendung).
 ///
-/// Bewusst KEINE Ziel-Zeilen-Pruefung wie `vorzugszug_fuer_spalte` -- diese
+/// Bewusst KEINE Ziel-Zeilen-Pruefung wie `preference_move_for_column` -- diese
 /// Stufe kennt noch keine feste Zielspalte, sie bindet nur Material, die
-/// Kuppelwahl (Runde 4, Baustein 3, [`zellen_wert`]) entscheidet spaeter,
+/// Kuppelwahl (Runde 4, Baustein 3, [`cell_value`]) entscheidet spaeter,
 /// welche Zellen davon profitieren.
-// Absichtlich NICHT in `vorzugszug` verkettet (siehe dortiger Kommentar) --
+// Absichtlich NICHT in `preference_move` verkettet (siehe dortiger Kommentar) --
 // bleibt fuer eine spaetere, enger gefasste Fassung UND die eigenen Tests
 // stehen, produktiv also `dead_code` aus Compiler-Sicht.
 #[allow(dead_code)]
-pub(crate) fn ueberpraesenz_vorzug(state: &GameState) -> Option<Action> {
-    if !ist_aktiv() {
+pub(crate) fn overpresence_preference(state: &GameState) -> Option<Action> {
+    if !is_active() {
         return None;
     }
     if state.phase != crate::state::Phase::Drafting || state.round_number > 4 {
         return None;
     }
-    let verbleibend = crate::provocation::verbleibende_farben(state);
+    let verbleibend = crate::provocation::remaining_colors(state);
     let moves = crate::validation::generate_valid_moves(state);
 
     // Feste Farbreihenfolge (`TileColor::NORMAL`) statt eines HashSets --
@@ -809,7 +809,7 @@ pub(crate) fn ueberpraesenz_vorzug(state: &GameState) -> Option<Action> {
         if !im_angebot {
             continue;
         }
-        let Some(i) = crate::provocation::farben_index(farbe) else { continue };
+        let Some(i) = crate::provocation::color_index(farbe) else { continue };
         let wert = verbleibend[i];
         if bestes.map_or(true, |(bw, _)| wert > bw) {
             bestes = Some((wert, farbe));
@@ -825,33 +825,33 @@ pub(crate) fn ueberpraesenz_vorzug(state: &GameState) -> Option<Action> {
 }
 
 /// Tiling-Routing-Praeferenz, IDENTISCHE Logik zu
-/// `tiling_solver::vorzug_tiling_step`, aber mit der dynamischen Spalte.
+/// `tiling_solver::preference_tiling_step`, aber mit der dynamischen Spalte.
 /// Aufrufstelle: `tiling_solver::best_first_step_exact_or_valued` (PRUEFT
 /// diese Funktion ZUERST, dann erst den Env-Knopf-Pfad) -- ohne das wuerde
 /// eine im Drafting korrekt gelieferte Farbe beim Tiling in eine andere
-/// Rasterzelle wandern (der in `vorzug_tiling_step`s Doku genannte
+/// Rasterzelle wandern (der in `preference_tiling_step`s Doku genannte
 /// 10-von-18-Blocker waere fuer den Spaltenbauer unadressiert).
-pub(crate) fn vorzug_tiling_step(state: &GameState, pi: usize) -> Option<TilingStep> {
-    if !ist_aktiv() {
+pub(crate) fn preference_tiling_step(state: &GameState, pi: usize) -> Option<TilingStep> {
+    if !is_active() {
         return None;
     }
     // `pi` bewusst NICHT durch `state.current_player` ersetzt, sondern direkt
-    // an [`ziel_spalte_fuer_player`] durchgereicht (Runde 4: dieselbe
+    // an [`target_column_for_player`] durchgereicht (Runde 4: dieselbe
     // Vollendbarkeits-/Wechsel-Buchhaltung wie Drafting/Dome, sonst wuerde
     // Tiling eine ANDERE, veraltete Spalte ansteuern als der Rest der
     // Entscheidungen derselben Runde).
-    let spalte = ziel_spalte_fuer_player(state, pi);
-    crate::tiling_solver::vorzug_tiling_step_fuer_spalte(state, pi, spalte).or_else(|| {
-        // §16: dieselbe Slot-Nachbar-Erweiterung wie in `vorzugszug` --
+    let spalte = target_column_for_player(state, pi);
+    crate::tiling_solver::preference_tiling_step_for_column(state, pi, spalte).or_else(|| {
+        // §16: dieselbe Slot-Nachbar-Erweiterung wie in `preference_move` --
         // eine bereits gebundene Farbe muss beim Tiling auch tatsaechlich
         // in die Special-Nachbarzelle geroutet werden, nicht nur beim
         // Drafting genommen worden sein.
         let player = &state.players[pi];
-        let zellen = special_nachbar_zellen(player, spalte);
+        let zellen = special_neighbour_cells(player, spalte);
         if zellen.is_empty() {
             None
         } else {
-            crate::plate_builder::tiling_vorzug_fuer_zellen(state, pi, &zellen)
+            crate::plate_builder::tiling_preference_for_cells(state, pi, &zellen)
         }
     })
 }
@@ -866,7 +866,7 @@ pub(crate) fn vorzug_tiling_step(state: &GameState, pi: usize) -> Option<TilingS
 /// verwertbar wird -- Wild bleibt zwar immer brauchbar, bindet aber KEIN
 /// bereits gebundenes Material frei, waehrend ein Jackpot-Treffer genau das
 /// tut (die Reihe kann dadurch frueher zum Tiling). Exakter Literal-Wert
-/// (keine Rechnung), damit `slot_score`/`vorzug_dome_wahl` einen Jackpot per
+/// (keine Rechnung), damit `slot_score`/`preference_dome_choice` einen Jackpot per
 /// Gleichheitsvergleich sicher erkennen koennen (siehe `LETZTER_JACKPOT`).
 const JACKPOT_WERT: f64 = 4.0;
 
@@ -877,7 +877,7 @@ const JACKPOT_WERT: f64 = 4.0;
 /// Musterreihe `r` schon GENAU diese Farbe fuehrt ([`JACKPOT_WERT`], Runde 4),
 /// brauchbar, wenn die Reihe noch leer ist, und ungeeignet (0), wenn die
 /// Reihe an eine andere Farbe gebunden ist.
-pub(crate) fn zellen_wert(player: &PlayerBoard, r: usize, space: &DomeSpace) -> f64 {
+pub(crate) fn cell_value(player: &PlayerBoard, r: usize, space: &DomeSpace) -> f64 {
     match space.space_type {
         SpaceType::Wild => 3.0,
         SpaceType::Special => 2.0,
@@ -886,7 +886,7 @@ pub(crate) fn zellen_wert(player: &PlayerBoard, r: usize, space: &DomeSpace) -> 
             // Runde-3-Wert. `MOSAIC_SPALTENBAU_JACKPOT=1` schaltet Baustein 3a
             // gezielt wieder ein (JACKPOT_WERT=4,0).
             (Some(c), Some(x)) if c == x => {
-                if jackpot_aktiv() {
+                if jackpot_active() {
                     JACKPOT_WERT
                 } else {
                     2.5
@@ -899,7 +899,7 @@ pub(crate) fn zellen_wert(player: &PlayerBoard, r: usize, space: &DomeSpace) -> 
 }
 
 /// Score einer (Kachel, Slot, Rotation)-Kombination fuer die Ziel-Spalte:
-/// Summe von [`zellen_wert`] ueber die GENAU 2 Zellen, die nach Rotation in
+/// Summe von [`cell_value`] ueber die GENAU 2 Zellen, die nach Rotation in
 /// die Ziel-Spalte fallen. `None`, wenn der Slot die Ziel-Spalte gar nicht
 /// beruehrt (`slot_col != spalte / 2`) -- dann hat die Wahl fuer dieses Ziel
 /// keine Bedeutung, der Spaltenbauer soll sich da nicht einmischen.
@@ -929,16 +929,16 @@ fn slot_score(
     let bottom_row = slot_row * 2 + 1;
     let top_space = &tile.spaces[idx[cc]];
     let bottom_space = &tile.spaces[idx[cc + 2]];
-    Some(zellen_wert(player, top_row, top_space) + zellen_wert(player, bottom_row, bottom_space))
+    Some(cell_value(player, top_row, top_space) + cell_value(player, bottom_row, bottom_space))
 }
 
 /// Kuppelplatten-Praeferenz: steuert BEIDE Stufen des zweistufigen
 /// Kuppel-Suchknotens (`moves.rs::PendingDomeChoice`/`Action::ChooseDomeSlot`/
 /// `Action::ChooseDomeRotation`) auf die dynamische Ziel-Spalte, PRAEFERENZ
-/// wie `provocation::vorzugszug` -- greift nur, wenn ein Kandidat echten
+/// wie `provocation::preference_move` -- greift nur, wenn ein Kandidat echten
 /// Nutzen zeigt (`score > 0`), sonst `None` und das Netz entscheidet frei.
 ///
-/// Aufrufstelle: dieselben Drafting-Entscheidpunkte wie `vorzugszug`
+/// Aufrufstelle: dieselben Drafting-Entscheidpunkte wie `preference_move`
 /// (self_play.rs) -- `drafting_actions` liefert `ChooseDomeSlot`/
 /// `ChooseDomeRotation` als Kandidaten in DERSELBEN Aktionsliste, es ist also
 /// keine eigene Codestelle, sondern dieselbe `.or_else(...)`-Kette.
@@ -948,11 +948,11 @@ fn slot_score(
 /// Fall haeufiger vorkommt, sobald Stufe 1 einmal gegriffen hat.
 /// `FromDrawStack` (Stapel-Variante) bewusst NICHT abgedeckt -- seltener Pfad
 /// (Aktion A), siehe Bericht.
-pub(crate) fn vorzug_dome_wahl(state: &GameState) -> Option<Action> {
-    if !ist_aktiv() {
+pub(crate) fn preference_dome_choice(state: &GameState) -> Option<Action> {
+    if !is_active() {
         return None;
     }
-    let spalte = ziel_spalte(state)?;
+    let spalte = target_column(state)?;
     let player = &state.players[state.current_player];
     // Runde 4, Baustein 3: pro Aufruf frisch gesetzt (kein Partie-Zustand,
     // siehe `LETZTER_JACKPOT`-Doku) -- eine Entscheidung ohne Kandidat darf
@@ -985,7 +985,7 @@ pub(crate) fn vorzug_dome_wahl(state: &GameState) -> Option<Action> {
                 }
                 let ergebnis = best.filter(|(s, _)| *s > 0.0).map(|(_, rot)| Action::ChooseDomeRotation(rot));
                 if let Some((_, rot)) = best.filter(|(s, _)| *s > 0.0) {
-                    if kombination_hat_jackpot(player, tile, *slot_row, *slot_col, rot, spalte) {
+                    if combination_has_jackpot(player, tile, *slot_row, *slot_col, rot, spalte) {
                         LETZTER_JACKPOT.with(|c| c.set(true));
                     }
                 }
@@ -1035,7 +1035,7 @@ pub(crate) fn vorzug_dome_wahl(state: &GameState) -> Option<Action> {
     let gewinner = best.filter(|(s, _, _, _)| *s > 0.0);
     if let Some((_, tid, sr, rot)) = gewinner {
         if let Some(tile) = state.dome_display.iter().find(|t| t.tile_id == tid) {
-            if kombination_hat_jackpot(player, tile, sr, target_slot_col, rot, spalte) {
+            if combination_has_jackpot(player, tile, sr, target_slot_col, rot, spalte) {
                 LETZTER_JACKPOT.with(|c| c.set(true));
             }
         }
@@ -1053,15 +1053,15 @@ pub(crate) fn vorzug_dome_wahl(state: &GameState) -> Option<Action> {
 /// Runde 4, Baustein 3: hat die (Kachel, Slot, Rotation)-Kombination fuer
 /// `spalte` eine JACKPOT-Zelle unter den zwei betroffenen Positionen
 /// (`slot_score`s Geometrie, siehe dortige Doku)? Exakter Gleichheitsvergleich
-/// mit [`JACKPOT_WERT`] ist hier sicher, weil `zellen_wert` diesen Wert als
+/// mit [`JACKPOT_WERT`] ist hier sicher, weil `cell_value` diesen Wert als
 /// LITERAL zurueckgibt (keine Rechnung, kein Rundungsrisiko).
-fn kombination_hat_jackpot(player: &PlayerBoard, tile: &DomeTile, slot_row: usize, _slot_col: usize, rotation: u32, spalte: usize) -> bool {
+fn combination_has_jackpot(player: &PlayerBoard, tile: &DomeTile, slot_row: usize, _slot_col: usize, rotation: u32, spalte: usize) -> bool {
     let Some(idx) = rotation_indices(rotation) else { return false };
     let cc = spalte % 2;
     let top_row = slot_row * 2;
     let bottom_row = slot_row * 2 + 1;
-    zellen_wert(player, top_row, &tile.spaces[idx[cc]]) == JACKPOT_WERT
-        || zellen_wert(player, bottom_row, &tile.spaces[idx[cc + 2]]) == JACKPOT_WERT
+    cell_value(player, top_row, &tile.spaces[idx[cc]]) == JACKPOT_WERT
+        || cell_value(player, bottom_row, &tile.spaces[idx[cc + 2]]) == JACKPOT_WERT
 }
 
 // ── Entscheidungs-Spur (Nutzer-Ergaenzung 2026-08-13, VOR der Runde-2- ──────
@@ -1075,7 +1075,7 @@ fn kombination_hat_jackpot(player: &PlayerBoard, tile: &DomeTile, slot_row: usiz
 // Zeile -- die Zeilen hier tragen deshalb nur noch das `[SB]`-Praefix.
 
 /// Liest `MOSAIC_SPALTENBAU_TRACE` einmalig (Prozess-Cache, gleiches Muster
-/// wie `aktiv_env`).
+/// wie `active_env`).
 fn trace_env() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| match std::env::var("MOSAIC_SPALTENBAU_TRACE") {
@@ -1097,7 +1097,7 @@ pub(crate) fn set_trace_override_for_test(v: Option<bool>) {
     TRACE_OVERRIDE.with(|c| c.set(v));
 }
 
-fn ist_trace_aktiv() -> bool {
+fn trace_is_active() -> bool {
     #[cfg(test)]
     {
         if let Some(v) = TRACE_OVERRIDE.with(|c| c.get()) {
@@ -1112,7 +1112,7 @@ fn ist_trace_aktiv() -> bool {
 /// statt Quellen einzeln nachzubauen (CLAUDE.md: Bestehendes wiederverwenden).
 /// Gruppiert nach Quelle fuer die Log-Lesbarkeit ("welche Farben in welchen
 /// Quellen verfuegbar" -- Nutzer-Vorgabe).
-fn angebot_zusammenfassung(state: &GameState) -> String {
+fn offer_summary(state: &GameState) -> String {
     let mut nach_quelle: std::collections::BTreeMap<String, std::collections::BTreeSet<String>> =
         std::collections::BTreeMap::new();
     for m in crate::validation::generate_valid_moves(state) {
@@ -1145,8 +1145,8 @@ fn angebot_zusammenfassung(state: &GameState) -> String {
 /// Zelle schon voll? Slot fehlt?"). Special-Zeilen werden uebersprungen (sie
 /// nehmen nie eine Farbe entgegen, sind also kein Vorzugs-Blocker in diesem
 /// Sinn); Wild-Zeilen nur, wenn ueberhaupt keine Farbe im Angebot ist (jede
-/// Farbe qualifiziert dort, siehe `provocation::vorzugszug_fuer_spalte`).
-fn kein_vorzug_grund(state: &GameState, player: &PlayerBoard, spalte: usize) -> String {
+/// Farbe qualifiziert dort, siehe `provocation::preference_move_for_column`).
+fn no_preference_reason(state: &GameState, player: &PlayerBoard, spalte: usize) -> String {
     let angebot: std::collections::HashSet<TileColor> = crate::validation::generate_valid_moves(state)
         .into_iter()
         .map(|m| m.take.color)
@@ -1190,28 +1190,28 @@ fn kein_vorzug_grund(state: &GameState, player: &PlayerBoard, spalte: usize) -> 
 /// `vorzug_kandidat`: die vom AUFRUFER schon ermittelte Praeferenz-Aktion
 /// (`column_build`/`provocation`, VOR dem Fallback auf die Netz-Suche) -- bei
 /// `None` haelt diese Funktion selbst fest, WARUM keine existierte.
-pub(crate) fn trace_zeile(
+pub(crate) fn trace_line(
     state: &GameState,
     pi: usize,
     entscheidungstyp: &str,
     vorzug_kandidat: Option<&dyn std::fmt::Debug>,
     gespielte_aktion: &dyn std::fmt::Debug,
 ) -> Option<String> {
-    if !ist_trace_aktiv() || !ist_aktiv() {
+    if !trace_is_active() || !is_active() {
         return None;
     }
     let player = &state.players[pi];
-    let verbleibend = crate::provocation::verbleibende_farben(state);
-    let kosten: [f64; 6] = std::array::from_fn(|c| spalten_kosten(player, c, &verbleibend));
+    let verbleibend = crate::provocation::remaining_colors(state);
+    let kosten: [f64; 6] = std::array::from_fn(|c| column_cost(player, c, &verbleibend));
     // Runde 4: dieselbe Vollendbarkeits-/Wechsel-Buchhaltung wie die
     // eigentlichen Vorzugsfunktionen -- der Aufrufer hat sie fuer DIESE
     // Entscheidung bereits einmal durchlaufen (self_play.rs ruft den Vorzug
-    // vor `trace_zeile` auf), ein zweiter Aufruf hier ist idempotent (siehe
-    // `ziel_spalte_fuer_player`-Doku: kein erneuter Wechsel, wenn die Spalte
+    // vor `trace_line` auf), ein zweiter Aufruf hier ist idempotent (siehe
+    // `target_column_for_player`-Doku: kein erneuter Wechsel, wenn die Spalte
     // sich seit dem ersten Aufruf nicht veraendert hat) und stellt sicher,
     // dass die Trace-Zeile GENAU das Ziel zeigt, das der Vorzug tatsaechlich
     // verwendet hat -- nicht eine eigene, davon abweichende Neuberechnung.
-    let ziel = ziel_spalte_fuer_player(state, pi);
+    let ziel = target_column_for_player(state, pi);
     let wechsel = LETZTER_WECHSEL.with(|c| c.take());
     let jackpot = if entscheidungstyp == "Dome" { LETZTER_JACKPOT.with(|c| c.get()) } else { false };
     let mut sortiert: Vec<(usize, f64)> = (0..6usize).map(|c| (c, kosten[c])).collect();
@@ -1231,11 +1231,11 @@ pub(crate) fn trace_zeile(
         // eindeutig trennbar, weil beide Rust-Debug-Text mit Leerzeichen
         // enthalten koennen).
         Some(a) => format!("ja VorzugAktion={a:?}"),
-        None => format!("nein Grund={}", kein_vorzug_grund(state, player, ziel)),
+        None => format!("nein Grund={}", no_preference_reason(state, player, ziel)),
     };
 
     let angebot_teil = if entscheidungstyp == "Drafting" {
-        format!(" Angebot={}", angebot_zusammenfassung(state))
+        format!(" Angebot={}", offer_summary(state))
     } else {
         String::new()
     };
@@ -1282,53 +1282,53 @@ mod tests {
 
     #[test]
     fn default_aus_liefert_ueberall_none() {
-        set_aktiv_override_for_test(Some(false));
+        set_active_override_for_test(Some(false));
         let game = drafting_game(1);
-        assert_eq!(ziel_spalte(&game.state), None);
-        assert_eq!(vorzugszug(&game.state), None);
-        assert_eq!(vorzug_dome_wahl(&game.state), None);
-        assert!(vorzug_tiling_step(&game.state, 0).is_none());
-        set_aktiv_override_for_test(None);
+        assert_eq!(target_column(&game.state), None);
+        assert_eq!(preference_move(&game.state), None);
+        assert_eq!(preference_dome_choice(&game.state), None);
+        assert!(preference_tiling_step(&game.state, 0).is_none());
+        set_active_override_for_test(None);
     }
 
     /// Nutzer-Ergaenzung 2026-08-13 (Trace-Knopf): ohne `MOSAIC_SPALTENBAU_
-    /// TRACE` (auch bei aktivem Spaltenbau) darf `trace_zeile` NIE etwas
+    /// TRACE` (auch bei aktivem Spaltenbau) darf `trace_line` NIE etwas
     /// liefern -- additiv heisst additiv, keine ungewollte Log-Flut.
     #[test]
-    fn trace_zeile_ist_ohne_trace_knopf_immer_none() {
-        set_aktiv_override_for_test(Some(true));
+    fn trace_line_is_always_none_without_trace_knob() {
+        set_active_override_for_test(Some(true));
         set_trace_override_for_test(Some(false));
         let game = drafting_game(60);
         let pi = game.state.current_player;
         let aktion = Action::Pass;
         assert_eq!(
-            trace_zeile(&game.state, pi, "Drafting", None, &aktion as &dyn std::fmt::Debug),
+            trace_line(&game.state, pi, "Drafting", None, &aktion as &dyn std::fmt::Debug),
             None,
             "ohne MOSAIC_SPALTENBAU_TRACE darf nie eine Zeile entstehen"
         );
         set_trace_override_for_test(None);
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     /// Bei aktivem Trace-Knopf muss die Zeile das `[SB]`-Praefix tragen und
-    /// die Kernfelder enthalten -- UND ohne Spaltenbau selbst (`ist_aktiv`
+    /// die Kernfelder enthalten -- UND ohne Spaltenbau selbst (`is_active`
     /// aus) trotzdem `None` bleiben (der Trace-Knopf allein schaltet nichts
     /// frei, er ist additiv ZUM Spaltenbauer, kein Ersatz).
     #[test]
-    fn trace_zeile_hat_sb_praefix_und_kernfelder_bei_aktivem_knopf() {
-        set_aktiv_override_for_test(Some(false));
+    fn trace_line_has_sb_prefix_and_core_fields_when_knob_active() {
+        set_active_override_for_test(Some(false));
         set_trace_override_for_test(Some(true));
         let game = drafting_game(61);
         let pi = game.state.current_player;
         let aktion = Action::Pass;
         assert_eq!(
-            trace_zeile(&game.state, pi, "Drafting", None, &aktion as &dyn std::fmt::Debug),
+            trace_line(&game.state, pi, "Drafting", None, &aktion as &dyn std::fmt::Debug),
             None,
             "Trace ohne aktiven Spaltenbauer muss weiterhin None liefern"
         );
 
-        set_aktiv_override_for_test(Some(true));
-        let zeile = trace_zeile(&game.state, pi, "Drafting", None, &aktion as &dyn std::fmt::Debug)
+        set_active_override_for_test(Some(true));
+        let zeile = trace_line(&game.state, pi, "Drafting", None, &aktion as &dyn std::fmt::Debug)
             .expect("bei beiden Knoepfen aktiv muss eine Zeile entstehen");
         assert!(zeile.starts_with("[SB] "), "Zeile muss mit [SB] beginnen: {zeile:?}");
         assert!(zeile.contains(&format!("Spieler={pi}")), "muss den Spieler tragen: {zeile:?}");
@@ -1339,42 +1339,42 @@ mod tests {
         assert!(zeile.contains("Angebot="), "Drafting-Zeilen muessen das Angebot tragen: {zeile:?}");
 
         set_trace_override_for_test(None);
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     /// Fuer Tiling-Zeilen darf KEIN `Angebot=`-Feld auftauchen (Nutzer-Vorgabe:
     /// nur Drafting braucht das aktuelle Angebot).
     #[test]
-    fn trace_zeile_traegt_kein_angebot_bei_tiling() {
-        set_aktiv_override_for_test(Some(true));
+    fn trace_line_carries_no_offer_during_tiling() {
+        set_active_override_for_test(Some(true));
         set_trace_override_for_test(Some(true));
         let game = drafting_game(62);
         let pi = game.state.current_player;
         let aktion = Action::Pass;
-        let zeile = trace_zeile(&game.state, pi, "Tiling", None, &aktion as &dyn std::fmt::Debug)
+        let zeile = trace_line(&game.state, pi, "Tiling", None, &aktion as &dyn std::fmt::Debug)
             .expect("Tiling-Zeile muss entstehen");
         assert!(!zeile.contains("Angebot="), "Tiling-Zeilen duerfen kein Angebot tragen: {zeile:?}");
         set_trace_override_for_test(None);
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
-    /// Runde 3, Task 2: `engpass_aufschlag` muss 0 sein, solange nichts von
+    /// Runde 3, Task 2: `scarcity_surcharge` muss 0 sein, solange nichts von
     /// der Farbe verbraucht ist, linear bis `ENGPASS_MAX` bei restlosem
     /// Verbrauch steigen, und dazwischen (halbe Versorgung) einen Wert
     /// STRIKT zwischen 0 und `ENGPASS_MAX` liefern.
     #[test]
-    fn engpass_aufschlag_ist_linear_zwischen_voll_und_leer() {
+    fn scarcity_surcharge_is_linear_between_full_and_empty() {
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
         let leer = [0i64; 5];
-        let i = crate::provocation::farben_index(Rot).unwrap();
-        assert_eq!(engpass_aufschlag(&voll, Rot), 0.0, "reichliche Farbe darf keinen Aufschlag tragen");
+        let i = crate::provocation::color_index(Rot).unwrap();
+        assert_eq!(scarcity_surcharge(&voll, Rot), 0.0, "reichliche Farbe darf keinen Aufschlag tragen");
         assert!(
-            (engpass_aufschlag(&leer, Rot) - ENGPASS_MAX).abs() < 1e-9,
+            (scarcity_surcharge(&leer, Rot) - ENGPASS_MAX).abs() < 1e-9,
             "restlos verbrauchte Farbe muss den vollen Aufschlag ENGPASS_MAX tragen"
         );
         let mut halb = voll;
         halb[i] = crate::tile::TILES_PER_COLOR as i64 / 2;
-        let a_halb = engpass_aufschlag(&halb, Rot);
+        let a_halb = scarcity_surcharge(&halb, Rot);
         assert!(
             a_halb > 0.0 && a_halb < ENGPASS_MAX,
             "bei halber Versorgung muss der Aufschlag strikt zwischen 0 und ENGPASS_MAX liegen: {a_halb}"
@@ -1387,8 +1387,8 @@ mod tests {
     /// uebersteigt ("auch wenn die Reihe frei ist", wortgleiche
     /// Nutzer-Vorgabe; ENGPASS_MAX-Kalibrierung: 1,0 + 2,5 = 3,5 > 2,0).
     #[test]
-    fn spalten_kosten_offene_zeile_wird_teurer_bei_knapper_farbe() {
-        set_aktiv_override_for_test(Some(true));
+    fn column_cost_open_row_gets_costlier_on_scarce_color() {
+        set_active_override_for_test(Some(true));
         let mut game = drafting_game(70);
         let pi = game.state.current_player;
         // Slot (0,0): si=0 -> (Zeile0,Spalte0) fordert Rot.
@@ -1397,10 +1397,10 @@ mod tests {
 
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
         let mut leer_rot = voll;
-        leer_rot[crate::provocation::farben_index(Rot).unwrap()] = 0;
+        leer_rot[crate::provocation::color_index(Rot).unwrap()] = 0;
 
-        let k_voll = spalten_kosten(&game.state.players[pi], 0, &voll);
-        let k_knapp = spalten_kosten(&game.state.players[pi], 0, &leer_rot);
+        let k_voll = column_cost(&game.state.players[pi], 0, &voll);
+        let k_knapp = column_cost(&game.state.players[pi], 0, &leer_rot);
         assert!(
             k_knapp > k_voll,
             "restlos verbrauchtes Rot muss Spalte 0 teurer machen: voll={k_voll} knapp={k_knapp}"
@@ -1410,14 +1410,14 @@ mod tests {
             "Aufschlag bei Vollverbrauch muss > 2,0 sein (uebersteigt die falsch-gebundene Basis 2,0): {}",
             k_knapp - k_voll
         );
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     #[test]
-    fn spalten_kosten_bevorzugt_wild_und_bestehende_farbe() {
+    fn column_cost_prefers_wild_and_existing_color() {
         // Spalte 0 (leerer Slot ueberall) vs. Spalte 1 mit einer Wild-Zelle
         // in Zeile 0 -- Spalte 1 muss billiger sein.
-        set_aktiv_override_for_test(Some(true));
+        set_active_override_for_test(Some(true));
         let mut game = drafting_game(2);
         let pi = game.state.current_player;
         let tile = DomeTile::new(
@@ -1435,15 +1435,15 @@ mod tests {
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
         // Ueberall reichlich Versorgung (Runde 3): dieser Test prueft
         // Wild-vs-Normal, nicht Versorgung -- der Engpass-Aufschlag soll hier
-        // 0 bleiben (siehe `engpass_aufschlag`-Kalibrierung).
+        // 0 bleiben (siehe `scarcity_surcharge`-Kalibrierung).
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
-        let k_wild_spalte = spalten_kosten(&game.state.players[pi], 0, &voll);
-        let k_normal_spalte = spalten_kosten(&game.state.players[pi], 1, &voll);
+        let k_wild_spalte = column_cost(&game.state.players[pi], 0, &voll);
+        let k_normal_spalte = column_cost(&game.state.players[pi], 1, &voll);
         assert!(
             k_wild_spalte < k_normal_spalte,
             "Spalte mit Wild-Zelle (0) muss billiger sein als Spalte mit gebundener Normal-Zelle (1): {k_wild_spalte} vs {k_normal_spalte}"
         );
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     /// Task 7b: eine Special-Zelle MUSS teurer werden, je mehr ihrer 3
@@ -1452,8 +1452,8 @@ mod tests {
     /// Nachbarn (keiner gefuellt) muss teurer sein als eine falsch gebundene
     /// Normal-Zelle (2,0).
     #[test]
-    fn special_kosten_skaliert_mit_offenen_slot_nachbarn() {
-        set_aktiv_override_for_test(Some(true));
+    fn special_cost_scales_with_open_slot_neighbours() {
+        set_active_override_for_test(Some(true));
         let mut game = drafting_game(50);
         let pi = game.state.current_player;
         // Slot (0,0): si=0->(Zeile0,Spalte0)=Special, si=1->(Zeile0,Spalte1),
@@ -1473,7 +1473,7 @@ mod tests {
         // Reichlich Versorgung (Runde 3): dieser Test prueft Special-Skalierung,
         // nicht Versorgung -- Aufschlag soll hier 0 bleiben.
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
-        let k_alle_offen = spalten_kosten(&game.state.players[pi], 0, &voll);
+        let k_alle_offen = column_cost(&game.state.players[pi], 0, &voll);
 
         // Alle drei Nachbarn direkt als gefuellt markieren (Farbe + Special-
         // Zelle selbst bleibt ungefuellt) -- die Special-Zelle muss jetzt
@@ -1484,7 +1484,7 @@ mod tests {
             slot.spaces[2].placed_color = Some(Blau);
             slot.spaces[3].placed_color = Some(Gelb);
         }
-        let k_alle_gefuellt = spalten_kosten(&game.state.players[pi], 0, &voll);
+        let k_alle_gefuellt = column_cost(&game.state.players[pi], 0, &voll);
 
         assert!(
             k_alle_gefuellt < k_alle_offen,
@@ -1506,7 +1506,7 @@ mod tests {
             k_alle_offen > 2.0 + 0.0 + 4.0,
             "bei 3 offenen Nachbarn muss Special (2,7+Rest) teurer sein als eine falsch gebundene Normal-Zelle (2,0+Rest): war {k_alle_offen}"
         );
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     /// Task 7c: bei gesetztem Partie-Seed wird unter mehreren gleich guten
@@ -1515,20 +1515,20 @@ mod tests {
     /// (Bestandsverhalten, siehe `ziel_spalte_wechselt_wenn_bisherige_spalte_
     /// teurer_wird`).
     #[test]
-    fn waehle_spalte_streut_unter_seed_und_bleibt_ohne_seed_stabil() {
+    fn choose_column_scatters_under_seed_and_stays_stable_without_one() {
         let kosten = [6.0; 6]; // wie beim leeren Brett: alle Spalten gleich teuer.
-        assert_eq!(waehle_spalte(kosten), 0, "ohne Seed muss die kleinste Spaltennummer gewinnen");
+        assert_eq!(choose_column(kosten), 0, "ohne Seed muss die kleinste Spaltennummer gewinnen");
 
         let mut gesehen = std::collections::HashSet::new();
         for seed in 0u64..40 {
-            set_partie_seed(Some(seed));
-            let c = waehle_spalte(kosten);
+            set_game_seed(Some(seed));
+            let c = choose_column(kosten);
             assert!(c < 6, "Spalte muss in 0..6 liegen, war {c}");
             gesehen.insert(c);
             // Reproduzierbarkeit: derselbe Seed liefert immer dieselbe Spalte.
-            assert_eq!(waehle_spalte(kosten), c, "Seed {seed} muss reproduzierbar dieselbe Spalte liefern");
+            assert_eq!(choose_column(kosten), c, "Seed {seed} muss reproduzierbar dieselbe Spalte liefern");
         }
-        set_partie_seed(None);
+        set_game_seed(None);
         assert!(
             gesehen.len() >= 3,
             "40 verschiedene Seeds sollten mehr als 1-2 Spalten treffen, gesehen: {gesehen:?}"
@@ -1539,18 +1539,18 @@ mod tests {
         let mut kosten_schief = [1.0; 6];
         kosten_schief[5] = 10.0;
         for seed in 0u64..20 {
-            set_partie_seed(Some(seed));
+            set_game_seed(Some(seed));
             assert_ne!(
-                waehle_spalte(kosten_schief), 5,
+                choose_column(kosten_schief), 5,
                 "Seed {seed}: eine Spalte weit ausserhalb der Toleranz darf nie gewaehlt werden"
             );
         }
-        set_partie_seed(None);
+        set_game_seed(None);
     }
 
     #[test]
-    fn ziel_spalte_wechselt_wenn_bisherige_spalte_teurer_wird() {
-        // `ziel_spalte` ist WIEDER die reine, bei jedem Aufruf frisch
+    fn target_column_switches_when_previous_column_gets_costlier() {
+        // `target_column` ist WIEDER die reine, bei jedem Aufruf frisch
         // berechnete Kostenwahl aus Runde 1-3 (siehe Moduldoku fuer den
         // Verwurf der Zielspalten-Bindung) -- dieser Test ist bewusst wieder
         // die urspruengliche Fassung. Ohne jede Platte sind alle Spalten
@@ -1558,10 +1558,10 @@ mod tests {
         // von Spalte 0 an eine ANDERE Farbe gebunden wird, muss die Wahl
         // wechseln (Spalte 1 profitiert vom selben geteilten Slot und wird
         // dadurch billiger).
-        set_aktiv_override_for_test(Some(true));
+        set_active_override_for_test(Some(true));
         let mut game = drafting_game(3);
         let pi = game.state.current_player;
-        assert_eq!(ziel_spalte(&game.state), Some(0));
+        assert_eq!(target_column(&game.state), Some(0));
 
         let tile = normal_tile(10, [Rot, Blau, Gelb, Schwarz]);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
@@ -1569,17 +1569,17 @@ mod tests {
         game.state.players[pi].pattern_lines[0].color = Some(Blau);
         game.state.players[pi].pattern_lines[0].tiles.push(Blau);
 
-        let neu = ziel_spalte(&game.state).expect("Spaltenbau aktiv");
+        let neu = target_column(&game.state).expect("Spaltenbau aktiv");
         assert_ne!(neu, 0, "Spalte 0 ist jetzt teurer (Zeile 0 an falsche Farbe gebunden) -- Wahl muss wechseln");
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     #[test]
-    fn vorzug_dome_wahl_stufe1_waehlt_slot_in_zielspalte() {
+    fn preference_dome_choice_stage1_chooses_slot_in_target_column() {
         // Ziel-Spalte 0 (Default bei leerem Brett) -> target_slot_col = 0.
         // Zwei Kacheln im Display: eine mit Wild an Position 0 (gut fuer
         // Spalte 0), eine rein normal -- die Wild-Kachel muss gewinnen.
-        set_aktiv_override_for_test(Some(true));
+        set_active_override_for_test(Some(true));
         let mut game = drafting_game(4);
         game.state.dome_display = vec![
             normal_tile(20, [Rot, Blau, Gelb, Schwarz]),
@@ -1589,7 +1589,7 @@ mod tests {
                 0,
             ),
         ];
-        let a = vorzug_dome_wahl(&game.state).expect("Spaltenbau muss hier eingreifen");
+        let a = preference_dome_choice(&game.state).expect("Spaltenbau muss hier eingreifen");
         match a {
             Action::ChooseDomeSlot(m) => {
                 assert_eq!(m.dome_tile_id, 21, "die Wild-Kachel (mehr Nutzen fuer Spalte 0) muss gewaehlt werden");
@@ -1597,11 +1597,11 @@ mod tests {
             }
             other => panic!("erwartet ChooseDomeSlot, bekam {other:?}"),
         }
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     #[test]
-    fn vorzug_dome_wahl_stufe2_waehlt_rotation_mit_bestem_score() {
+    fn preference_dome_choice_stage2_chooses_rotation_with_best_score() {
         // Stufe 1 schon getroffen (pending_dome_choice gesetzt): eine Kachel
         // mit Wild an Original-Index 1 -- bei Rotation 0 landet Wild an
         // Platzierungsposition 1 (Spalte-Offset 1, NICHT Ziel-Spalte 0);
@@ -1610,7 +1610,7 @@ mod tests {
         // Spalte-Offset 0 (Position 0 oder 2) bringt: idx[0]==1 oder
         // idx[2]==1. idx(180)=[3,2,1,0] -> idx[2]=1 -- Rotation 180 muss
         // also die beste sein.
-        set_aktiv_override_for_test(Some(true));
+        set_active_override_for_test(Some(true));
         let mut game = drafting_game(5);
         let pi = game.state.current_player;
         let tile = DomeTile::new(
@@ -1630,19 +1630,19 @@ mod tests {
             slot_col: 0,
         });
         let _ = pi;
-        let a = vorzug_dome_wahl(&game.state).expect("Spaltenbau muss hier eingreifen");
+        let a = preference_dome_choice(&game.state).expect("Spaltenbau muss hier eingreifen");
         match a {
             Action::ChooseDomeRotation(rot) => {
                 assert_eq!(rot, 180, "Rotation 180 bringt die Wild-Zelle in die Ziel-Spalte (Offset 0)");
             }
             other => panic!("erwartet ChooseDomeRotation, bekam {other:?}"),
         }
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     #[test]
-    fn vorzug_dome_wahl_ignoriert_slots_ausserhalb_der_zielspalte() {
-        set_aktiv_override_for_test(Some(true));
+    fn preference_dome_choice_ignores_slots_outside_the_target_column() {
+        set_active_override_for_test(Some(true));
         let mut game = drafting_game(6);
         let pi = game.state.current_player;
         game.state.pending_dome_choice = Some(PendingDomeChoice::FromDisplay {
@@ -1652,23 +1652,23 @@ mod tests {
         });
         game.state.dome_display = vec![normal_tile(30, [Rot, Blau, Gelb, Schwarz])];
         let _ = pi;
-        assert_eq!(vorzug_dome_wahl(&game.state), None);
-        set_aktiv_override_for_test(None);
+        assert_eq!(preference_dome_choice(&game.state), None);
+        set_active_override_for_test(None);
     }
 
     #[test]
-    fn vorzugszug_reicht_dynamische_spalte_an_provokation_kern_durch() {
-        // Direkter Vergleich: `column_build::vorzugszug` muss fuer eine
+    fn preference_move_passes_dynamic_column_to_provocation_core() {
+        // Direkter Vergleich: `column_build::preference_move` muss fuer eine
         // Stellung, in der Spalte 0 Ziel ist, denselben Zug liefern wie
-        // `provocation::vorzugszug_fuer_spalte(state, 0)`.
-        set_aktiv_override_for_test(Some(true));
+        // `provocation::preference_move_for_column(state, 0)`.
+        set_active_override_for_test(Some(true));
         let mut game = drafting_game(7);
         let pi = game.state.current_player;
         let tile = normal_tile(40, [Rot, Blau, Gelb, Schwarz]);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
         // Tischmitte deterministisch leeren (Runde 3): seit die Zielspalten-
         // Kosten die oeffentliche Versorgungslage einbeziehen
-        // (`spalten_kosten`/`engpass_aufschlag`), wuerde der echte
+        // (`column_cost`/`scarcity_surcharge`), wuerde der echte
         // Zufalls-Fabrikinhalt beim Partiestart die Kosten je Farbe VERZERREN
         // -- ohne dieses Leeren waere Spalte 0 nicht mehr zuverlaessig die
         // guenstigste, die Testvoraussetzung ("Spalte 0 ist Ziel") wuerde vom
@@ -1680,16 +1680,16 @@ mod tests {
         game.state.large_factory.sun_tiles.clear();
         game.state.large_factory.moon_pool.clear();
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
-        let erwartet = crate::provocation::vorzugszug_fuer_spalte(&game.state, 0);
-        assert_eq!(vorzugszug(&game.state), erwartet);
+        let erwartet = crate::provocation::preference_move_for_column(&game.state, 0);
+        assert_eq!(preference_move(&game.state), erwartet);
         assert!(erwartet.is_some(), "Testvoraussetzung: es sollte ueberhaupt einen Kandidaten geben");
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     // ── Runde 4, Baustein 1: Vollendbarkeits-Buchhaltung + Zielwechsel ──────
 
     #[test]
-    fn ist_spalte_vollendbar_erkennt_erschoepfte_farbe_als_unvollendbar() {
+    fn column_is_completable_detects_exhausted_color_as_incompletable() {
         let mut game = drafting_game(80);
         let pi = game.state.current_player;
         // Slot (2,2): si=2 -> (Zeile5, Spalte4) = Rot.
@@ -1697,21 +1697,21 @@ mod tests {
         game.state.players[pi].dome_grid.place_dome_tile(tile, 2, 2).expect("frei");
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
         assert!(
-            ist_spalte_vollendbar(&game.state.players[pi], 4, &voll),
+            column_is_completable(&game.state.players[pi], 4, &voll),
             "bei reichlicher Versorgung muss Spalte 4 vollendbar sein"
         );
 
         let mut knapp = voll;
-        let i = crate::provocation::farben_index(Rot).unwrap();
+        let i = crate::provocation::color_index(Rot).unwrap();
         knapp[i] = 5; // Zeile 5 braucht r+1=6 Kopien -- 5 reicht nicht mehr.
         assert!(
-            !ist_spalte_vollendbar(&game.state.players[pi], 4, &knapp),
+            !column_is_completable(&game.state.players[pi], 4, &knapp),
             "Rot reicht nicht fuer die 6 Kopien von Zeile 5 -- Spalte 4 muss unvollendbar sein"
         );
     }
 
     #[test]
-    fn ist_spalte_vollendbar_bleibt_bei_transienter_falschbindung_vollendbar() {
+    fn column_is_completable_stays_completable_on_transient_miscolor() {
         // Korrigiertes Verhalten nach dem 5,25-Wechsel/Partie-Fund der ersten
         // vollen Runde-4-Messung (siehe Kommentar in `ist_spalte_
         // vollendbar`): eine JETZT falsch gebundene Zeile ist NUR transient
@@ -1726,13 +1726,13 @@ mod tests {
         game.state.players[pi].pattern_lines[0].tiles.push(Blau);
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
         assert!(
-            ist_spalte_vollendbar(&game.state.players[pi], 0, &voll),
+            column_is_completable(&game.state.players[pi], 0, &voll),
             "eine transient falsch gebundene Zeile darf die Spalte bei voller Versorgung nicht als unvollendbar werten"
         );
     }
 
     #[test]
-    fn ziel_spalte_wechselt_bei_unvollendbarer_spalte_und_meldet_wechsel() {
+    fn target_column_switches_on_incompletable_column_and_reports_it() {
         // Baut Spalte 0 aus lauter Wild-Zellen (0,2 je Zelle, IGNORIERT die
         // Musterreihen-Bindung) bis auf eine erschoepfte Rot-Zeile --
         // Spalte 0 bleibt trotz der Erschoepfung die NATUERLICH billigste
@@ -1744,11 +1744,11 @@ mod tests {
         // als Spalte 0 UND als 2-5, und der Test wuerde das Sicherheitsnetz
         // gar nicht erst herausfordern (erste Fassung dieses Tests hatte
         // genau dieses Problem).
-        set_aktiv_override_for_test(Some(true));
+        set_active_override_for_test(Some(true));
         // §15: Sicherheitsnetz ist seit der Entkonfundierung Default AUS --
         // dieser Test prueft den MECHANISMUS selbst, braucht ihn also
         // explizit eingeschaltet.
-        set_sicherheitsnetz_override_for_test(Some(true));
+        set_safety_net_override_for_test(Some(true));
         let mut game = drafting_game(90);
         let pi = game.state.current_player;
 
@@ -1766,23 +1766,23 @@ mod tests {
 
         game.state.players[pi].broken_tiles = vec![Rot; crate::tile::TILES_PER_COLOR];
 
-        let neu = ziel_spalte(&game.state).expect("Spaltenbau aktiv");
+        let neu = target_column(&game.state).expect("Spaltenbau aktiv");
         assert_ne!(neu, 0, "Spalte 0 ist unvollendbar (Rot fuer Zeile 5 komplett verbraucht) -- die Wahl muss abweichen");
         assert_ne!(neu, 1, "Spalte 1 ist ueberall falsch gebunden -- darf nicht als Ausweg gewaehlt werden");
         assert_eq!(
             LETZTER_WECHSEL.with(|c| c.get()),
             Some((0, neu)),
-            "die Substitution muss vermerkt sein, damit trace_zeile sie im [SB]-Trace melden kann"
+            "die Substitution muss vermerkt sein, damit trace_line sie im [SB]-Trace melden kann"
         );
-        set_sicherheitsnetz_override_for_test(None);
-        set_aktiv_override_for_test(None);
+        set_safety_net_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     // ── Runde 4, Baustein 3: Material zuerst / Ueberpraesenz + Kuppel-Jackpot ──
 
     #[test]
-    fn ueberpraesenz_vorzug_waehlt_tiefste_reihe_der_ueberpraesentesten_farbe() {
-        set_aktiv_override_for_test(Some(true));
+    fn overpresence_preference_chooses_lowest_row_of_most_present_color() {
+        set_active_override_for_test(Some(true));
         let mut game = drafting_game(95);
         for f in game.state.factories.iter_mut() {
             f.sun_tiles.clear();
@@ -1796,7 +1796,7 @@ mod tests {
         // muss trotz identischem Angebot als "ueberpraesent" gelten.
         game.state.players[1 - pi].broken_tiles = vec![Rot; 4];
 
-        let a = ueberpraesenz_vorzug(&game.state).expect("Kandidat muss existieren");
+        let a = overpresence_preference(&game.state).expect("Kandidat muss existieren");
         match a {
             Action::Stone(m) => {
                 assert_eq!(m.take.color, Blau, "Blau hat mehr verbleibende Kopien als Rot -- muss gewinnen");
@@ -1804,11 +1804,11 @@ mod tests {
             }
             other => panic!("erwartet Stone, bekam {other:?}"),
         }
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     #[test]
-    fn zellen_wert_jackpot_uebertrifft_wild_und_offene_zeile() {
+    fn cell_value_jackpot_beats_wild_and_open_row() {
         // §15: Jackpot ist seit der Entkonfundierung Default AUS -- dieser
         // Test prueft die GEWICHTUNG des Mechanismus selbst, braucht ihn
         // also explizit eingeschaltet.
@@ -1820,13 +1820,13 @@ mod tests {
         let passend = DomeSpace::normal(Rot);
         let unpassend = DomeSpace::normal(Blau);
         let wild = DomeSpace::wild();
-        assert_eq!(zellen_wert(&game.state.players[pi], 2, &passend), JACKPOT_WERT);
+        assert_eq!(cell_value(&game.state.players[pi], 2, &passend), JACKPOT_WERT);
         assert!(
-            JACKPOT_WERT > zellen_wert(&game.state.players[pi], 2, &wild),
+            JACKPOT_WERT > cell_value(&game.state.players[pi], 2, &wild),
             "Jackpot muss dominant ueber Wild liegen (Nutzer-Vorgabe)"
         );
         assert_eq!(
-            zellen_wert(&game.state.players[pi], 5, &unpassend),
+            cell_value(&game.state.players[pi], 5, &unpassend),
             1.5,
             "eine offene, ungebundene Zeile bleibt beim alten Wert (kein Jackpot ohne bereits liegendes Material)"
         );
@@ -1836,7 +1836,7 @@ mod tests {
     // ── §15: Entkonfundierungs-Diagnose-Knoepfe ─────────────────────────────
 
     #[test]
-    fn jackpot_knopf_aus_liefert_runde3_wert() {
+    fn jackpot_knob_off_returns_round3_value() {
         set_jackpot_override_for_test(Some(false));
         let mut game = drafting_game(97);
         let pi = game.state.current_player;
@@ -1844,7 +1844,7 @@ mod tests {
         game.state.players[pi].pattern_lines[2].tiles.push(Rot);
         let passend = DomeSpace::normal(Rot);
         assert_eq!(
-            zellen_wert(&game.state.players[pi], 2, &passend),
+            cell_value(&game.state.players[pi], 2, &passend),
             2.5,
             "MOSAIC_SPALTENBAU_JACKPOT=0 muss den Runde-3-Wert 2,5 statt JACKPOT_WERT liefern"
         );
@@ -1852,7 +1852,7 @@ mod tests {
     }
 
     #[test]
-    fn jackpot_knopf_default_ist_seit_par15_der_runde3_wert() {
+    fn jackpot_knob_default_is_the_round3_value_since_par15() {
         // §15-Entscheidung: unset (kein Override, keine Env-Var) muss seit
         // der Entkonfundierung den reinen Runde-3-Wert 2,5 liefern, NICHT
         // mehr JACKPOT_WERT -- kein Arm uebertraf 5,95, also faellt der
@@ -1862,18 +1862,18 @@ mod tests {
         game.state.players[pi].pattern_lines[2].color = Some(Rot);
         game.state.players[pi].pattern_lines[2].tiles.push(Rot);
         let passend = DomeSpace::normal(Rot);
-        assert_eq!(zellen_wert(&game.state.players[pi], 2, &passend), 2.5);
+        assert_eq!(cell_value(&game.state.players[pi], 2, &passend), 2.5);
     }
 
     #[test]
-    fn sicherheitsnetz_knopf_aus_ueberspringt_vollendbarkeits_filter() {
+    fn safety_net_knob_off_skips_completability_filter() {
         // Dieselbe unvollendbare Spalte-0-Konstruktion wie in
-        // `ziel_spalte_wechselt_bei_unvollendbarer_spalte_und_meldet_wechsel`
+        // `target_column_switches_on_incompletable_column_and_reports_it`
         // -- mit `MOSAIC_SPALTENBAU_SICHERHEITSNETZ=0` darf KEIN Wechsel
-        // mehr stattfinden, `ziel_spalte` muss den reinen Kosten-Kandidaten
+        // mehr stattfinden, `target_column` muss den reinen Kosten-Kandidaten
         // (Spalte 0) unveraendert durchreichen, obwohl er unvollendbar ist.
-        set_aktiv_override_for_test(Some(true));
-        set_sicherheitsnetz_override_for_test(Some(false));
+        set_active_override_for_test(Some(true));
+        set_safety_net_override_for_test(Some(false));
         let mut game = drafting_game(90);
         let pi = game.state.current_player;
 
@@ -1888,28 +1888,28 @@ mod tests {
         game.state.players[pi].dome_grid.place_dome_tile(t2, 2, 0).expect("frei");
         game.state.players[pi].broken_tiles = vec![Rot; crate::tile::TILES_PER_COLOR];
 
-        let neu = ziel_spalte(&game.state).expect("Spaltenbau aktiv");
+        let neu = target_column(&game.state).expect("Spaltenbau aktiv");
         assert_eq!(neu, 0, "mit abgeschaltetem Sicherheitsnetz muss die reine Kostenwahl (Spalte 0) durchgereicht werden");
         assert_eq!(
             LETZTER_WECHSEL.with(|c| c.get()),
             None,
             "ohne Sicherheitsnetz darf kein Wechsel vermerkt werden"
         );
-        set_sicherheitsnetz_override_for_test(None);
-        set_aktiv_override_for_test(None);
+        set_safety_net_override_for_test(None);
+        set_active_override_for_test(None);
     }
 
     // ── §16: Special-Zellen-Baustein ─────────────────────────────────────────
 
     #[test]
-    fn special_kosten_par16_nutzt_echte_nachbarkosten() {
+    fn special_cost_par16_uses_real_neighbour_cost() {
         set_special_override_for_test(Some(true));
         let mut game = drafting_game(51);
         let pi = game.state.current_player;
         let tile = DomeTile::new(61, vec![DomeSpace::special(), DomeSpace::wild(), DomeSpace::wild(), DomeSpace::wild()], 0);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
-        let k = special_kosten(&game.state.players[pi], 0, 0, &voll);
+        let k = special_cost(&game.state.players[pi], 0, 0, &voll);
         assert!(
             (k - 0.6).abs() < 1e-9,
             "3 Wild-Nachbarn muessen 3*0,2=0,6 kosten (statt der ALT-Formel 0,3+0,8*3=2,7): war {k}"
@@ -1918,7 +1918,7 @@ mod tests {
     }
 
     #[test]
-    fn ist_spalte_vollendbar_par16_prueft_special_nachbarn() {
+    fn column_is_completable_par16_checks_special_neighbours() {
         set_special_override_for_test(Some(true));
         let mut game = drafting_game(52);
         let pi = game.state.current_player;
@@ -1928,55 +1928,55 @@ mod tests {
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
         let voll = [crate::tile::TILES_PER_COLOR as i64; 5];
         assert!(
-            ist_spalte_vollendbar(&game.state.players[pi], 0, &voll),
+            column_is_completable(&game.state.players[pi], 0, &voll),
             "bei voller Versorgung muss Spalte 0 vollendbar sein (Special-Nachbar Rot ist erreichbar)"
         );
 
         let mut leer_rot = voll;
-        leer_rot[crate::provocation::farben_index(Rot).unwrap()] = 0;
+        leer_rot[crate::provocation::color_index(Rot).unwrap()] = 0;
         assert!(
-            !ist_spalte_vollendbar(&game.state.players[pi], 0, &leer_rot),
+            !column_is_completable(&game.state.players[pi], 0, &leer_rot),
             "Rot komplett verbraucht -- der Special-Nachbar (Zeile0,Spalte1) braucht 1 Kopie, die nicht mehr da ist"
         );
         set_special_override_for_test(None);
     }
 
     #[test]
-    fn ist_spalte_vollendbar_default_ignoriert_special_wie_par14() {
+    fn column_is_completable_default_ignores_special_like_par14() {
         let mut game = drafting_game(52);
         let pi = game.state.current_player;
         let tile = DomeTile::new(62, vec![DomeSpace::special(), DomeSpace::normal(Rot), DomeSpace::wild(), DomeSpace::wild()], 0);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
         let mut leer_rot = [crate::tile::TILES_PER_COLOR as i64; 5];
-        leer_rot[crate::provocation::farben_index(Rot).unwrap()] = 0;
+        leer_rot[crate::provocation::color_index(Rot).unwrap()] = 0;
         assert!(
-            ist_spalte_vollendbar(&game.state.players[pi], 0, &leer_rot),
+            column_is_completable(&game.state.players[pi], 0, &leer_rot),
             "Default AUS: Special-Zeilen bleiben unberuecksichtigt, auch wenn ihr Nachbar Rot ausgeschoepft ist"
         );
     }
 
     #[test]
-    fn special_nachbar_zellen_liefert_die_drei_slot_nachbarn_nur_wenn_aktiv() {
+    fn special_neighbour_cells_returns_the_three_slot_neighbours_only_when_active() {
         let mut game = drafting_game(53);
         let pi = game.state.current_player;
         let tile = DomeTile::new(63, vec![DomeSpace::special(), DomeSpace::normal(Rot), DomeSpace::wild(), DomeSpace::normal(Blau)], 0);
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
 
         assert!(
-            special_nachbar_zellen(&game.state.players[pi], 0).is_empty(),
+            special_neighbour_cells(&game.state.players[pi], 0).is_empty(),
             "Default AUS muss leer liefern"
         );
 
         set_special_override_for_test(Some(true));
-        let mut zellen = special_nachbar_zellen(&game.state.players[pi], 0);
+        let mut zellen = special_neighbour_cells(&game.state.players[pi], 0);
         zellen.sort();
         assert_eq!(zellen, vec![(0, 1), (1, 0), (1, 1)]);
         set_special_override_for_test(None);
     }
 
     #[test]
-    fn vorzugszug_bedient_special_nachbarn_wenn_zielspalte_selbst_nichts_findet() {
-        set_aktiv_override_for_test(Some(true));
+    fn preference_move_serves_special_neighbours_when_target_column_finds_nothing() {
+        set_active_override_for_test(Some(true));
         set_special_override_for_test(Some(true));
         let mut game = drafting_game(54);
         let pi = game.state.current_player;
@@ -1986,7 +1986,7 @@ mod tests {
         game.state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).expect("frei");
         // Zeile1/Spalte0 (Wild) schon gefuellt -- Spalte 0s einzige noch
         // offene EIGENE Zelle ist danach die Special-Zeile selbst, die
-        // `vorzugszug_fuer_spalte` nie qualifiziert (space_type Special).
+        // `preference_move_for_column` nie qualifiziert (space_type Special).
         {
             let slot = game.state.players[pi].dome_grid.dome_slots[0][0].as_mut().unwrap();
             slot.spaces[2].placed_color = Some(Schwarz);
@@ -1999,13 +1999,13 @@ mod tests {
         game.state.large_factory.moon_pool.clear();
         game.state.factories[0].sun_tiles = vec![Rot, Rot];
 
-        assert_eq!(ziel_spalte(&game.state), Some(0), "Testvoraussetzung: Spalte 0 muss Ziel sein");
+        assert_eq!(target_column(&game.state), Some(0), "Testvoraussetzung: Spalte 0 muss Ziel sein");
         assert!(
-            crate::provocation::vorzugszug_fuer_spalte(&game.state, 0).is_none(),
+            crate::provocation::preference_move_for_column(&game.state, 0).is_none(),
             "Testvoraussetzung: die Zielspalte selbst darf keinen Kandidaten liefern (Special qualifiziert nie)"
         );
 
-        let aktion = vorzugszug(&game.state).expect("die Special-Nachbar-Stufe muss greifen");
+        let aktion = preference_move(&game.state).expect("die Special-Nachbar-Stufe muss greifen");
         match aktion {
             Action::Stone(m) => {
                 assert_eq!(m.take.color, Rot);
@@ -2014,6 +2014,6 @@ mod tests {
             other => panic!("erwartet Stone, bekam {other:?}"),
         }
         set_special_override_for_test(None);
-        set_aktiv_override_for_test(None);
+        set_active_override_for_test(None);
     }
 }
