@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: DIAGNOSE ABGESCHLOSSEN und B1 GEBAUT UND ABGENOMMEN (2026-08-24), aber NICHTS GEMESSEN -- die Messkette par.3/B1 steht komplett aus. Diagnose: par.2 Prior-Verhaeltnis lang/kurz 0,221 bei FORTSETZUNG, Suche bewegt es kaum. par.2a in drei Stufen (Arena-Log-Anteil zeigte einen R3-Einbruch, der sich als BELEGUNGS-KONFUNDIERER erwies; die Log-Rekonstruktion scheiterte am eigenen Selbsttest, Ursache round_end.rs:87 leert Reihen ohne Logzeile; die Korpus-Fassung entkonfundiert) ergibt bei der INITIIERUNG Netz 11,5 Prozent gegen Heuristik 25,2 Prozent, Faktor ~3, flach ueber R1-4. B1 daraufhin auf die Initiierung umgeschnitten (Nutzer-Entscheid): Stufenfunktion 0 auf 1 in Musterreihe 5/6, additiv am Blattwert, SearchConfig-Feld long_row_init_shaping_w, Env MOSAIC_LONG_ROW_INIT_W, SCALE 10 statt 50 damit der maximale Shift dem Floor-Term entspricht. Abnahme bestanden: Suite 506/0, Paritaets-Hash 8c6684ff haelt nach Wheel-Neubau, Determinismus 20/20, Wirkungsnachweis 10 von 60 qualifizierenden Stellungen aendern die Zugwahl bei w=0,3. Registriertes Risiko mit Falsifikator: Initiierungspraemie kann das Vollendungs-Defizit (Bau bis ~4,6/6) verschaerfen -- Vollendungsquote ist Pflicht-Kennzahl, "Initiierung hoch UND Vollendung runter" gilt als NICHT-Erfolg auch bei guenstiger Arena. Achtung: Spec-Dateien sind gitignored, das neue Feld ist PFLICHT, Alt-Specs fallen mit benannter Fehlermeldung auf -->
+<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: DIAGNOSE ABGESCHLOSSEN, B1 GEBAUT UND ABGENOMMEN, MESSKETTE SCHRITT 1 DURCH (2026-08-24) -- offen ist nur noch Schritt 2 (gepaarte Arena netz-gegen-netz, 407 Seeds, vorbereitet in tools/run_lr_init_arena.sh). Diagnose: par.2 Prior-Verhaeltnis lang/kurz 0,221 bei FORTSETZUNG, Suche bewegt es kaum; par.2a Stufe 3 (Korpus, entkonfundiert) ergibt bei der INITIIERUNG Netz 11,5 Prozent gegen Heuristik 25,2 Prozent, Faktor ~3, flach ueber R1-4. B1 darauf umgeschnitten: Stufenfunktion 0 auf 1 in Musterreihe 5/6, additiv am Blattwert, SearchConfig-Feld long_row_init_shaping_w, Env MOSAIC_LONG_ROW_INIT_W, SCALE 10. SCHRITT 1 (240 Korpus-Stellungen, 200 Sims, w=0,3, gepaart): Besuchsanteil Initiierung lang 0,00317 auf 0,00581, Delta +0,00264, Bootstrap-BCI [0,00083; 0,00525], 10 Stellungen hoch, 0 runter, 230 unveraendert -- Tor bestanden, aber der Effekt ist winzig und alle Stellungen liegen in RUNDE 1 (Auswahl-Artefakt der Sonde, R2-4 ungeprueft). ARENA-MITSCHRIEB ERWEITERT: long_rows_started / _completed / _cleared_unplaceable je Partie und Seite, Zaehler auf PlayerBoard statt Logzeile (state.log ist das Kernbeweis-Vergleichsobjekt), Paritaets-Hash 8c6684ff haelt. Registrierter Falsifikator bleibt: Initiierung hoch UND Vollendungsquote runter gilt als NICHT-Erfolg auch bei guenstiger Arena. Achtung: Spec-Dateien sind gitignored, das neue Feld ist PFLICHT, Alt-Specs fallen mit benannter Fehlermeldung auf -->
 
 # PREREG-SKELETT: Auszahlung langer Musterreihen -- Prior-Sichtbarkeit und Signal-Shaping
 
@@ -438,11 +438,92 @@ belegungsgenaue Auswertung aus Logs ist prinzipiell unmoeglich. Wer diese
 Kennzahlen aus einem Arena-Lauf braucht, muss den Zustand mitschreiben
 lassen -- das ist ein eigener Aufwandsposten und keine Selbstverstaendlichkeit.
 
+**ERLEDIGT (2026-08-24, Nutzer-Auftrag "erweitere den arena mitschrieb"):**
+dieser Aufwandsposten ist gebaut. Das Arena-Artefakt traegt jetzt je Partie
+und Seite drei Zaehler, aus denen die Vollendungsquote direkt folgt:
+
+| Feld | Bedeutung | Zaehlstelle |
+| --- | --- | --- |
+| `long_rows_started` | Uebergang LEER -> belegt in Musterreihe 5/6 | `execution.rs::execute_place`, vor `add_tiles` gelesen |
+| `long_rows_completed` | Reihe voll ins Tiling gegangen | `round_end.rs::execute_tiling_action`; `validate_tiling_action` lehnt `!is_complete()` ab, die Stelle IST das Vollendungsereignis |
+| `long_rows_cleared_unplaceable` | unvollendeter Abbruch, Steine auf die Strafleiste | `round_end.rs::process_unplaceable_rows` |
+
+Vollendungsquote = `completed / started`; `cleared_unplaceable` ist der
+teure Abbruch, der Rest steht am Partie-Ende noch belegt.
+
+**Warum Zaehler und keine Logzeile:** `state.log` ist das Vergleichsobjekt
+des Kernbeweises (`referee.rs::full_log`, dort so dokumentiert). Eine neue
+Logzeile haette ihn gegen das eingefrorene Artefakt gebrochen. Die Zaehler
+liegen wie ihr Vorbild `total_floor_penalties` auf `PlayerBoard` und
+erscheinen nur im Arena-JSON -- `state.log` ist unberuehrt.
+
+Abnahme: Suite 506/0 gruen, **Paritaets-Hash `8c6684ff...` haelt nach
+Wheel-Neubau und Neuinstallation** (die Erweiterung ist such-neutral).
+Live-Gegenprobe netz-gegen-netz mit beiden Specs, 4 Partien a 60 Sims:
+Start 14/12, vollendet 7/8, geraeumt 0/1 -- Quote 0,50 gegen 0,667. Bei
+n=4 ist das Rauschen, belegt aber die Ableitbarkeit Ende zu Ende.
+
+Ein Test in `self_play.rs::arena_match_produces_results` prueft die
+Buchhaltung (`completed + cleared <= started` je Seite) und dass ueber
+vier Partien ueberhaupt Starts gezaehlt werden -- sonst waere die
+Ungleichung trivial erfuellt.
+
 **Vorab-Lesart:** primaer kein Staerkeverlust; eine Verschiebung der
 Initiierungsrate Richtung Lehrer-Niveau bei gehaltener Vollendungsquote ist
 der Bonus-Befund, der die Kausalkette schliesst. Ein Sweep wird NICHT
 vorab erwartet (Praezedenz Floor-Shaping: Schalter, kein Regler) -- ein
 Wert genuegt zum Testen.
+
+### Messkette Schritt 1 ERGEBNIS (2026-08-24): Tor BESTANDEN, aber knapp und schmal
+
+Gemessen mit `tools/probes/long_row_init_knob_effect.py`, Artefakt
+`evaluations/long_row_init_knob_effect.json`. 240 qualifizierende
+Korpus-Stellungen (leere lange Reihe UND legale Steinaktion dorthin, sonst
+kann der Term per Konstruktion nichts bewegen), 200 Sims,
+w = 0,3, gepaart mit identischem Seed je Stellung in beiden Armen,
+Block-Bootstrap ueber `game_id`.
+
+| Groesse | aus | an | Delta | 95-Prozent-BCI |
+| --- | --- | --- | --- | --- |
+| Besuchsanteil Initiierung LANG | 0,00317 | 0,00581 | **+0,00264** | [0,00083; 0,00525] |
+| Besuchsanteil Initiierung KURZ | 0,44977 | 0,44894 | -0,00083 | [-0,00183; -0,00017] |
+
+Stellungsweise: **10 hoch, 0 runter, 230 unveraendert.**
+
+**Verdikt: das Tor aus par.4 Punkt 2 ist bestanden.** Die Richtung stimmt,
+das Intervall schliesst die Null aus, und keine einzige Stellung bewegt
+sich gegen die Absicht. Die Masse kommt erkennbar aus der Kurzreihen-
+Initiierung (-0,00083, ebenfalls null-ausschliessend).
+
+**Drei Einschraenkungen, die zum Ergebnis gehoeren:**
+
+1. **Der Effekt ist winzig.** Der Besuchsanteil auf Initiierung langer
+   Reihen steigt von 0,32 auf 0,58 Prozent. Der Term verschiebt die
+   Entscheidung, aber er stellt das Verhalten nicht um. Achtung beim
+   Vergleich: das ist ein BESUCHSANTEIL EINER Suche und NICHT dieselbe
+   Groesse wie die 11,5 gegen 25,2 Prozent aus par.2a Stufe 3 (dort:
+   Anteil der Gelegenheiten, bei denen tatsaechlich initiiert wurde).
+   Die beiden Zahlen duerfen nicht verrechnet werden.
+2. **Nur Runde 1.** Alle 240 Stellungen liegen in Runde 1
+   (`je_runde` im Artefakt). Das ist kein Zufall, sondern ein
+   Auswahl-Artefakt: die Sonde nimmt je Datei die ersten bis zu zehn
+   qualifizierenden Records, und die Korpus-Pickles stehen in Zugreihenfolge.
+   **Die Runden 2-4 sind damit ungeprueft** -- ausgerechnet die, in denen
+   par.2a den Faktor 3 als flach ueber R1-4 ausweist. Wenn Schritt 2
+   keinen Effekt zeigt, ist das die erste Stelle, an der nachzusehen ist.
+3. **Abweichung vom registrierten Instrument.** Die Messkette nannte
+   `row_initiation_opportunity_probe.py`. Die tatsaechliche Sonde ist
+   neu gebaut, weil jene Sonde den Knopf nicht schaltet und keine
+   gepaarte An/Aus-Struktur hat; die Qualifikations- und
+   Bootstrap-Logik ist uebernommen. Runde 5 ist ausgeschlossen (exakter
+   R5-Loeser, andere Suche) -- dieselbe Einschraenkung wie in
+   `long_row_prior_gate.py`.
+
+**Folge:** Schritt 2 (gepaarte Arena netz-gegen-netz, 407 Seeds) ist
+freigegeben. Vorab-Lesart bleibt "primaer kein Staerkeverlust"; nach
+diesem Schritt-1-Bild ist ein Staerke-EFFEKT in beide Richtungen
+unwahrscheinlich, und der eigentliche Ertrag des Laufs sind die
+Initiierungs- und Vollendungszahlen aus dem erweiterten Mitschrieb.
 
 ### B2 -- Label-/Trainingsseite (Folgearm, NICHT jetzt gebaut, nur skizziert)
 
