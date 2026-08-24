@@ -1,0 +1,266 @@
+{
+  "quellen": [
+    "paired_arena_env_lrinit_netvnet.json",
+    "paired_arena_env_lrinit_netvnet_swap.json"
+  ],
+  "n_partien_gesamt": 814,
+  "block_size": 25,
+  "hinweis_normierung": "starts_je_partie ist NICHT dieselbe Groesse wie die 11,5/25,2 Prozent aus par.2a Stufe 3 (dort: Anteil der GELEGENHEITEN, bei denen initiiert wurde). Nicht verrechnen.",
+  "siegquote_an": 0.4287,
+  "lange_reihen": {
+    "an": {
+      "starts_gesamt": 2962,
+      "vollendet_gesamt": 1582,
+      "geraeumt_gesamt": 294,
+      "starts_je_partie": 3.6388,
+      "vollendungsquote": 0.5341,
+      "raeumquote": 0.0993,
+      "offen_am_ende": 1086
+    },
+    "aus": {
+      "starts_gesamt": 2706,
+      "vollendet_gesamt": 1392,
+      "geraeumt_gesamt": 266,
+      "starts_je_partie": 3.3243,
+      "vollendungsquote": 0.5144,
+      "raeumquote": 0.0983,
+      "offen_am_ende": 1048
+    },
+    "vollendungsquote_gepaart": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.0187,
+      "t": 1.42,
+      "mittel_je_partie": 0.0187
+    }
+  },
+  "k1": {
+    "an": {
+      "n_k1_aktiv": 312,
+      "getroffen": 43,
+      "rate": 0.1378,
+      "punkte_je_aktiver_partie": 0.9872
+    },
+    "aus": {
+      "n_k1_aktiv": 312,
+      "getroffen": 43,
+      "rate": 0.1378,
+      "punkte_je_aktiver_partie": 0.9647
+    }
+  },
+  "mittel_an": {
+    "punkte": 40.9656,
+    "marge": -3.3857,
+    "sieg": 0.4287,
+    "strafpunkte": 21.0872,
+    "straf_ziele": 3.2924,
+    "straf_ziel_steine": 4.8059,
+    "ueberlauf_steine": 2.7002,
+    "strafrunden": 4.2543,
+    "draft_zuege": 33.3661,
+    "n_reihenzuege": 30.0737,
+    "reihen_kurz_1_3": 16.473,
+    "reihen_lang_4_6": 13.6007,
+    "volle_spalten": 0.1364,
+    "max_spaltenhoehe": 4.7224,
+    "teilspalten_ge3": 3.8415,
+    "teilspalten_ge4": 2.0246,
+    "long_rows_started": 3.6388,
+    "long_rows_completed": 1.9435,
+    "long_rows_cleared_unplaceable": 0.3612
+  },
+  "mittel_aus": {
+    "punkte": 44.3514,
+    "marge": 3.3857,
+    "sieg": 0.5713,
+    "strafpunkte": 17.5381,
+    "straf_ziele": 2.5528,
+    "straf_ziel_steine": 3.4337,
+    "ueberlauf_steine": 2.4582,
+    "strafrunden": 4.1192,
+    "draft_zuege": 32.473,
+    "n_reihenzuege": 29.9201,
+    "reihen_kurz_1_3": 16.7752,
+    "reihen_lang_4_6": 13.145,
+    "volle_spalten": 0.102,
+    "max_spaltenhoehe": 4.6536,
+    "teilspalten_ge3": 3.8919,
+    "teilspalten_ge4": 2.0872,
+    "long_rows_started": 3.3243,
+    "long_rows_completed": 1.7101,
+    "long_rows_cleared_unplaceable": 0.3268
+  },
+  "gepaart_an_minus_aus": {
+    "punkte": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": -3.4275,
+      "t": -5.37,
+      "mittel_je_partie": -3.3857
+    },
+    "marge": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": -6.855,
+      "t": -5.37,
+      "mittel_je_partie": -6.7715
+    },
+    "sieg": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": -0.145,
+      "t": -4.11,
+      "mittel_je_partie": -0.1425
+    },
+    "strafpunkte": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 3.64,
+      "t": 6.75,
+      "mittel_je_partie": 3.5491
+    },
+    "straf_ziele": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.7525,
+      "t": 6.32,
+      "mittel_je_partie": 0.7396
+    },
+    "straf_ziel_steine": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 1.3938,
+      "t": 6.68,
+      "mittel_je_partie": 1.3722
+    },
+    "ueberlauf_steine": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.2388,
+      "t": 2.79,
+      "mittel_je_partie": 0.242
+    },
+    "strafrunden": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.1463,
+      "t": 3.14,
+      "mittel_je_partie": 0.1351
+    },
+    "draft_zuege": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.9113,
+      "t": 6.85,
+      "mittel_je_partie": 0.8931
+    },
+    "n_reihenzuege": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.1588,
+      "t": 1.98,
+      "mittel_je_partie": 0.1536
+    },
+    "reihen_kurz_1_3": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": -0.2787,
+      "t": -3.25,
+      "mittel_je_partie": -0.3022
+    },
+    "reihen_lang_4_6": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.4375,
+      "t": 4.49,
+      "mittel_je_partie": 0.4558
+    },
+    "volle_spalten": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.0325,
+      "t": 1.83,
+      "mittel_je_partie": 0.0344
+    },
+    "max_spaltenhoehe": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.0675,
+      "t": 1.74,
+      "mittel_je_partie": 0.0688
+    },
+    "teilspalten_ge3": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": -0.045,
+      "t": -1.01,
+      "mittel_je_partie": -0.0504
+    },
+    "teilspalten_ge4": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": -0.0575,
+      "t": -1.38,
+      "mittel_je_partie": -0.0627
+    },
+    "long_rows_started": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.31,
+      "t": 7.57,
+      "mittel_je_partie": 0.3145
+    },
+    "long_rows_completed": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.2313,
+      "t": 4.98,
+      "mittel_je_partie": 0.2334
+    },
+    "long_rows_cleared_unplaceable": {
+      "n_partien": 814,
+      "n_bloecke": 32,
+      "mittel": 0.035,
+      "t": 1.43,
+      "mittel_je_partie": 0.0344
+    }
+  },
+  "reihen_hist_an": {
+    "1": 4038,
+    "2": 5042,
+    "3": 4329,
+    "4": 4212,
+    "5": 3514,
+    "6": 3345
+  },
+  "reihen_hist_aus": {
+    "1": 4037,
+    "2": 5059,
+    "3": 4559,
+    "4": 4563,
+    "5": 3061,
+    "6": 3076
+  },
+  "plattenpunkte_je_kriterium": {
+    "an": {
+      "Diagonale Reihen": 0.1,
+      "Eckplatten": 3.6933,
+      "Farbenreiche Reihen": 0.3867,
+      "Horizontale Reihen": 1.3462,
+      "Mehrfarbige Felder": 4.1053,
+      "Spezialfelder": -11.9412,
+      "Vertikale Reihen": 0.9872,
+      "Äußere Felder": 9.5747
+    },
+    "aus": {
+      "Diagonale Reihen": 0.0,
+      "Eckplatten": 3.5367,
+      "Farbenreiche Reihen": 0.3867,
+      "Horizontale Reihen": 1.3173,
+      "Mehrfarbige Felder": 4.5066,
+      "Spezialfelder": -12.2255,
+      "Vertikale Reihen": 0.9647,
+      "Äußere Felder": 9.4383
+    }
+  }
+}

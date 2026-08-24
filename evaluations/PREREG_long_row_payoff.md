@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: DIAGNOSE ABGESCHLOSSEN, B1 GEBAUT UND ABGENOMMEN, MESSKETTE SCHRITT 1 DURCH (2026-08-24) -- offen ist nur noch Schritt 2 (gepaarte Arena netz-gegen-netz, 407 Seeds, vorbereitet in tools/run_lr_init_arena.sh). Diagnose: par.2 Prior-Verhaeltnis lang/kurz 0,221 bei FORTSETZUNG, Suche bewegt es kaum; par.2a Stufe 3 (Korpus, entkonfundiert) ergibt bei der INITIIERUNG Netz 11,5 Prozent gegen Heuristik 25,2 Prozent, Faktor ~3, flach ueber R1-4. B1 darauf umgeschnitten: Stufenfunktion 0 auf 1 in Musterreihe 5/6, additiv am Blattwert, SearchConfig-Feld long_row_init_shaping_w, Env MOSAIC_LONG_ROW_INIT_W, SCALE 10. SCHRITT 1 (240 Korpus-Stellungen, 200 Sims, w=0,3, gepaart): Besuchsanteil Initiierung lang 0,00317 auf 0,00581, Delta +0,00264, Bootstrap-BCI [0,00083; 0,00525], 10 Stellungen hoch, 0 runter, 230 unveraendert -- Tor bestanden, aber der Effekt ist winzig und alle Stellungen liegen in RUNDE 1 (Auswahl-Artefakt der Sonde, R2-4 ungeprueft). ARENA-MITSCHRIEB ERWEITERT: long_rows_started / _completed / _cleared_unplaceable je Partie und Seite, Zaehler auf PlayerBoard statt Logzeile (state.log ist das Kernbeweis-Vergleichsobjekt), Paritaets-Hash 8c6684ff haelt. Registrierter Falsifikator bleibt: Initiierung hoch UND Vollendungsquote runter gilt als NICHT-Erfolg auch bei guenstiger Arena. Achtung: Spec-Dateien sind gitignored, das neue Feld ist PFLICHT, Alt-Specs fallen mit benannter Fehlermeldung auf -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: KOMPLETT GEFAHREN 2026-08-24, B1 ist ENTSCHIEDEN UND NEGATIV. Diagnose: par.2 Prior-Verhaeltnis lang/kurz 0,221 bei FORTSETZUNG; par.2a Stufe 3 (Korpus, entkonfundiert) Initiierung Netz 11,5 Prozent gegen Heuristik 25,2 Prozent, Faktor ~3, flach ueber R1-4. B1 darauf umgeschnitten (Stufenfunktion 0 auf 1 in Musterreihe 5/6, additiv am Blattwert, SCALE 10, w=0,3). Schritt 1 (240 Korpus-Stellungen): Besuchsanteil 0,00317 auf 0,00581, BCI [0,00083; 0,00525], 10 hoch / 0 runter -- Tor bestanden, aber nur Runde 1 abgedeckt. SCHRITT 2 (gepaarte Arena netz-gegen-netz, 407 Seeds, BEIDE Sitzpositionen, 814 Partien, 32 Bloecke): der Mechanismus funktioniert -- begonnene lange Reihen +0,310 je Partie (t=+7,57), vollendete +0,231 (t=+4,98), Vollendungsquote 0,534 gegen 0,514 also NICHT gefallen, Zugziele verlagern sich aus Reihe 3/4 in Reihe 5/6. DER FALSIFIKATOR IST NICHT AUSGELOEST. Trotzdem verliert der Arm klar: Siegquote 42,9 Prozent (gepaart -0,145, t=-4,11), Punkte -3,428 (t=-5,37), und die Bilanz zeigt auf die STRAFLEISTE (+3,640 Strafpunkte, t=+6,75; Plattenpunkte in Summe leicht POSITIV mit +0,33). Volle Spalten +0,033 (n.s.), k1-Rate identisch 43/312. LEHRE: die Meidung langer Musterreihen durch den Champion war kein blinder Fleck, sondern richtiges Spiel -- die Straf-Aversions-Vermutung ist erstmals interventionell gestuetzt. Vorab-Lesart WIDERLEGT (nicht der Falsifikator: strikt trennen). Preis je zusaetzlicher Initiierung rund 11,7 Strafpunkte fuer +0,033 volle Spalten. Ein w-Sweep waere eine NEUE Registrierung, nicht durch dieses Ergebnis motiviert. B2 bleibt offen, aber die Praemisse beider B-Arme ist erschuettert: nicht die Sichtbarkeit der Auszahlung war das Problem, sondern ihre Hoehe -->
 
 # PREREG-SKELETT: Auszahlung langer Musterreihen -- Prior-Sichtbarkeit und Signal-Shaping
 
@@ -524,6 +524,110 @@ freigegeben. Vorab-Lesart bleibt "primaer kein Staerkeverlust"; nach
 diesem Schritt-1-Bild ist ein Staerke-EFFEKT in beide Richtungen
 unwahrscheinlich, und der eigentliche Ertrag des Laufs sind die
 Initiierungs- und Vollendungszahlen aus dem erweiterten Mitschrieb.
+
+### Messkette Schritt 2 ERGEBNIS (2026-08-24): Mechanismus BESTAETIGT, Staerke VERLOREN
+
+Gepaarte Arena netz-gegen-netz, `alphazero_v21_2d_brierbest` beidseitig,
+400/400 Sims, 407 Kampagnen-Seeds, **beide Sitzpositionen** (Pflicht-Brett-
+wechsel) = 814 gepaarte Partien. Artefakte
+`paired_arena_env_lrinit_netvnet.json` und `..._swap.json`, Auswertung
+`tools/probes/long_row_init_arena_eval.py` ->
+`evaluations/long_row_init_arena_eval.json`. Die 407 Seeds sind mengen- UND
+reihenfolgengleich mit `paired_arena_env_imm_netvnet.json` (in dieser Sitzung
+nachgeprueft), der Lauf ist also direkt mit dem Implicit-Minimax-Vergleich
+vergleichbar. Statistik auf BLOCK-Ebene, Blockmittel je Datei gebildet
+(32 Bloecke a 25 Partien).
+
+#### Der Falsifikator ist NICHT ausgeloest
+
+| Groesse | AN | AUS | gepaart AN-AUS | t |
+| --- | --- | --- | --- | --- |
+| begonnene lange Reihen je Partie | 3,639 | 3,324 | **+0,310** | **+7,57** |
+| vollendete lange Reihen je Partie | - | - | **+0,231** | **+4,98** |
+| **Vollendungsquote** | **0,534** | **0,514** | +0,019 | +1,42 |
+| unplatzierbar geraeumt je Partie | - | - | +0,035 | +1,43 |
+
+Der registrierte Nicht-Erfolgs-Fall war "Initiierung hoch **und**
+Vollendungsquote runter". Die Initiierung steigt hoch signifikant, die
+Vollendungsquote faellt **nicht** -- sie steigt leicht (nicht signifikant).
+**Der behauptete Mechanismus ist damit belegt:** der Term erzeugt keine
+angefangenen Ruinen, sondern mehr fertige lange Reihen.
+
+Die Reihenwahl bestaetigt das direkt (Zugziele ueber alle 814 Partie-Seiten):
+
+| Musterreihe | 1 | 2 | 3 | 4 | 5 | 6 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Delta AN-AUS | +1 | -17 | -230 | -351 | **+453** | **+269** |
+
+Die Verlagerung geht aus den Reihen 3 und 4 in die Reihen 5 und 6 -- genau
+die Zielmenge des Knopfes (`LONG_ROW_INDICES = [4, 5]`, 0-indexiert).
+
+#### Und der Arm verliert trotzdem, deutlich
+
+| Groesse | gepaart AN-AUS | t |
+| --- | --- | --- |
+| **Siegquote** | **-0,145** (42,9 Prozent) | **-4,11** |
+| eigene Punkte | **-3,428** | **-5,37** |
+| Strafpunkte | **+3,640** | **+6,75** |
+| Zuege mit Ziel Strafleiste | +0,753 | +6,32 |
+| Steine auf die Strafleiste | +1,394 | +6,68 |
+| Ueberlauf-Steine | +0,239 | +2,79 |
+| Runden mit Strafe | +0,146 | +3,14 |
+| volle Spalten | +0,033 | +1,83 |
+| Teilspalten >= 4 | -0,058 | -1,38 |
+| k1-Rate | 43/312 gegen 43/312, **identisch** | - |
+
+**Die Punktebilanz geht auf, und sie zeigt auf die Strafleiste.** Die
+Plattenpunkte je Kriterium sind in der Summe leicht POSITIV fuer den AN-Arm
+(+0,33 ueber alle acht Kriterien; groesster Einzelposten "Mehrfarbige Felder"
+-0,40, dagegen "Spezialfelder" +0,28 und "Eckplatten" +0,16). Die
+Strafleiste kostet +3,55 Punkte je Partie (21,09 gegen 17,54). Beides
+zusammen ergibt -3,22, gemessen sind -3,39 -- der Rest von etwa 0,17 liegt
+in den uebrigen Score-Bestandteilen und ist nicht weiter aufgeschluesselt.
+
+**Rechenhinweis, damit nichts doppelt gezaehlt wird:** die Marge ist in
+diesem Aufbau algebraisch 2x die Punktedifferenz (beide Seiten spielen
+DIESELBE Partie, marge_AN = -marge_AUS). Der Wert -6,855 bei identischem
+t=-5,37 ist deshalb KEIN unabhaengiger Befund, sondern dieselbe Zahl
+skaliert. In gepaarten Netz-gegen-Netz-Laeufen traegt die Marge nichts ueber
+die Punkte hinaus bei.
+
+#### Lesart
+
+**Die Vorab-Lesart "primaer kein Staerkeverlust" ist widerlegt.** Sie und
+der Falsifikator sind strikt zu trennen: der Falsifikator hat NICHT
+ausgeloest, die Vorab-Lesart schon. Das Ergebnis ist damit keiner der beiden
+vorregistrierten Zweige, sondern ein dritter: **der Mechanismus funktioniert
+und ist trotzdem schaedlich.**
+
+Inhaltlich heisst das: **die Meidung langer Musterreihen durch den Champion
+war kein blinder Fleck, sondern richtiges Spiel.** Die Straf-Aversions-
+Vermutung aus dem Kopf von `tools/probes/penalty_track_probe.py` ("lange
+Reihen tragen Ueberlaufrisiko, kurze nicht") ist damit erstmals
+INTERVENTIONELL gestuetzt statt nur korrelativ: wer die langen Reihen
+erzwingt, zahlt sie auf der Strafleiste.
+
+Der Preis je zusaetzlich begonnener langer Reihe betraegt rund **11,7
+Strafpunkte** (+3,64 Strafpunkte je +0,31 Starts) und bringt **+0,033 volle
+Spalten** (nicht signifikant). Das ist der eigentliche Befund, und er ist
+schaerfer als die Siegquote: der Tausch ist auch dann schlecht, wenn man ihn
+kleiner dosiert, weil w beide Seiten des Verhaeltnisses gleichzeitig
+skaliert.
+
+**Registrierter Vorbehalt gegen genau dieses Argument:** die Skalierung ist
+nur dann neutral, wenn der Zusammenhang linear ist. Bei kleinerem w wuerde
+die Suche vermutlich zuerst die WERTVOLLSTEN langen Reihen anfangen, das
+Verhaeltnis koennte sich also zugunsten des Terms verschieben. Ein
+w-Sweep ist damit nicht ausgeschlossen -- er ist nur nicht durch dieses
+Ergebnis motiviert, und die Prereg hat vorab "Schalter, kein Regler"
+registriert (Praezedenz Floor-Shaping). Ein Sweep waere eine NEUE
+Registrierung, kein Nachtrag zu dieser.
+
+**Folge fuer B2:** unveraendert offen und eigener Nutzer-Entscheid. Dieses
+Ergebnis spricht allerdings gegen die Praemisse beider B-Arme in ihrer
+bisherigen Form: nicht die SICHTBARKEIT der verzoegerten Auszahlung war das
+Problem, sondern ihre HOEHE. Das Netz sieht lange Reihen nicht zu selten --
+es bewertet sie richtig.
 
 ### B2 -- Label-/Trainingsseite (Folgearm, NICHT jetzt gebaut, nur skizziert)
 
