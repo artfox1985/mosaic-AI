@@ -282,6 +282,37 @@ fn net_arena_match(
     .map_err(pyo3::exceptions::PyValueError::new_err)
 }
 
+/// Netz gegen Heuristik V2 (`PREREG_heuristic_v2_long_rows.md`, Messkette
+/// Schritt 3). Zeile fuer Zeile wie `net_arena_match`, einziger Unterschied:
+/// die Heuristik-Seite bewertet mit `HeuristikVariante::V2` statt V1.
+#[pyfunction]
+#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, log_games=false, seeds=None, spec=None))]
+#[allow(clippy::too_many_arguments)]
+fn net_vs_heuristic_v2_arena(
+    py: Python<'_>,
+    model_path: String,
+    net_sims: u32,
+    heur_sims: u32,
+    n_games: usize,
+    seed: Option<u64>,
+    num_threads: usize,
+    c: f64,
+    c_puct: f64,
+    log_games: bool,
+    seeds: Option<Vec<u64>>,
+    spec: Option<String>,
+) -> PyResult<String> {
+    let seed = seed.unwrap_or_else(rand::random);
+    let search_config = resolve_search_config(spec)?;
+    py.detach(move || {
+        crate::self_play::run_net_vs_heuristic_v2_arena(
+            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, log_games, seeds,
+            search_config,
+        )
+    })
+    .map_err(pyo3::exceptions::PyValueError::new_err)
+}
+
 /// Arena-Match Netz A (Brett 0) vs. Netz B (Brett 1). Lädt beide ONNX-Netze,
 /// spielt `n_games` (Startspieler alternierend) und gibt ein JSON-Array
 /// `[{scores:[A,B], winner, steps, total_floor, floor_per_round}]` zurück.
@@ -1669,6 +1700,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(reset_not_deckel_diagnostics, m)?)?;
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
+    m.add_function(wrap_pyfunction!(net_vs_heuristic_v2_arena, m)?)?;
     m.add_function(wrap_pyfunction!(sibling_ranking_diagnostic, m)?)?;
     m.add_function(wrap_pyfunction!(draw_stack_peek_impact_diagnostic, m)?)?;
     m.add_function(wrap_pyfunction!(value_noise_floor_diagnostic, m)?)?;

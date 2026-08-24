@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: ENTWURF-Stand 2026-08-24, nichts gebaut, Nutzer-Vorgabe "v2 als ZUSAETZLICHER Anker". VORFRAGE ENTSCHIEDEN: der Lehrer kann es auch nicht (407 Partien Netz@400 gegen Heuristik@150, Vollendungsquote 0,538 gegen 0,563, volle Spalten 0,101 gegen 0,098) -- Destillation scheidet aus, es gibt nichts zu uebertragen. Gegenreferenz aus zehn Mensch-gegen-Netz-Partien in static/log (Nutzer gewinnt 8 von 9): Abschlussprofil 4,00/4,10/3,40/3,20/2,50/2,20 gegen 4,90/4,90/3,30/2,40/1,10/0,50, volle Spalten 1,80 gegen 0,10. Strukturbefund im Code: wertung_progress liest NUR das Kuppelraster (scoring.rs:876-882), ist innerhalb einer Runde fuer jeden Drafting-Zug gleich und kann die Reihenwahl nicht lenken; das einzige Stueck des Shapings, das pattern_lines liest, ist projected_unplaceable_penalty -- eine STRAFE. ZIEL-KENNZAHL folgt aus einer Identitaet: eine volle Spalte kostet 21 Zellen, das Netz verbraucht 42,7 und truege damit gleichverteilt 2,03 Spalten statt 0,10 -- ein VERTEILUNGS-, kein Versorgungsproblem; die Kennzahl ist das MINIMUM der Abschluesse ueber die sechs Reihen, das Zielprofil ist FLACHER statt laenger. Dritter Versorgungskanal (Nutzer-Hinweis): 9 Spezialfliesen, vierte Plattenzelle zum Preis von dreien, lokale Freischaltbedingung, rund 4 Felder je Partie leer gelassen (groesster Einzelposten der Plattenwertung). Offen und VOR dem Bau zu entscheiden: wie v2 ueberhaupt als eigener Agent existiert, ohne den spec-freien Heuristik-Anker anzufassen GEBAUT 2026-08-24 (eigener Agent-Typ, alle vier Bausteine, Paritaets-Hash haelt, Suite 509/0), ABNAHME NICHT BESTANDEN: 40 Partien v1 gegen v2 ergeben 157 gegen 156 Starts und Vollendungsquote 0,592 gegen 0,603 -- der Term bewegt nichts und kostet leicht Staerke. Drei Unit-Tests schliessen aus, dass er schlicht null liefert. Ursache ist die Groessenordnung: der marginale Spalten-Zuwachs betraegt bei realen Spaltenhoehen nur 0,97 bis 1,75 Punkte, und er ist auf ein aktives k1 gegatet (nur 38 Prozent der Partien). Folge fuer den Zuschnitt: nach der 21-Zellen-Identitaet ist die Spaltenzahl durch das MINIMUM der Abschluesse ueber die Reihen gedeckelt, der Wert eines Abschlusses in der schwaechsten Reihe ist also der Engpasswert und nicht der marginale Zellbeitrag. Ein Verstaerkungsfaktor wurde bewusst NICHT vorgeschaltet (Dosis-Antwort auf ein Strukturproblem, zweimal verworfen). Naechster Zuschnitt = Nutzer-Entscheid. ZWEITE ABNAHME 2026-08-24 gegen die vorab festgelegte PRIMAERMETRIK (volle Spalten je Partie): NICHT-ERFOLG. 80 Partien, beide Sitze: Spalten 0,125 gegen 0,163, das sind 10 gegen 13 in 80 Partien und damit unter der Aufloesung; maximale Spaltenhoehe 4,70 gegen 4,79, der Engpass bewegt sich nicht. Die ZWISCHENGROESSEN bewegen sich dagegen deutlich: Musterreihen-Vollendungsquote 0,571 auf 0,675, unplatzierbar geraeumte Reihen 15 auf 1 (der B1-Fehler tritt also nicht auf), Siege 42/80. Verfahrenslehre dazu: die erste Abnahme hatte die Zwischengroesse als Ergebnis berichtet, die Entscheidungsmetrik ist jetzt VOR dem Lauf registriert. Konstanten-Korrektur aus den Server-Logs: untere Reihen sind NICHT mehr wert (Platzierungspunkte je Reihe 2,31/3,39/3,72/4,31/2,74/3,53 beim Menschen, Maximum in R4), Summe der Platzierungspunkte ist ein Gleichstand (54,9 gegen 55,8), der Mensch-Vorsprung sitzt bei den Spezialfliesen (2,70 gegen 0,50 Freischaltungen je Partie, 8,50 gegen 0,90 Punkte, davon in R5/R6 nur 0,70 je Partie). -->
+<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: MESSKETTE KOMPLETT 2026-08-24, v2 GEBAUT und variantengebunden (HeuristikVariante::V1/V2, Paritaets-Hash 8c6684ff haelt, Suite 512/0). Vorfragen: der Lehrer v1 kann es auch nicht (volle Spalten 0,098 gegen 0,101), such-seitig ist der Weg zu (scoring_plate_injection und long_row_payoff B1 beide negativ). Der Durchbruch kam vom PLATZIERUNGS-Routing, nicht von einem Bewertungsterm: best_first_step_inner waehlt nach reinen Sofortpunkten und warf jede Draft-Absicht weg. Schritt 2 (v1 gegen v2, 80 gepaarte Partien): volle Spalten 0,163 auf 0,562, Partien mit mindestens einer von 35 auf 50 Prozent, 5/6-Mauer durchbrochen. SCHRITT 3 (v2 gegen Champion, 407 Seeds je Arm, v1-Bezug auf denselben Seeds): Faehigkeit BELEGT, Preis HOCH -- volle Spalten 0,302 gegen v1 0,086 (gepaart +0,175, t=+7,79), Vollendungsquote 0,686 gegen 0,564 (B1-Vorgabe erfuellt), aber Siegquote gegen den Champion 0,128 gegen 0,256 und Marge -19,4 gegen -12,2. URTEIL STEHT AUS: par.5.3 hat bewusst keinen Schwellenwert, die Frage ist, ob das Netz die FAEHIGKEIT uebernimmt ohne das NIVEAU. Nebenbefund: volle Zeilen brechen gegen ein NETZ nicht ein (0,403 gegen 0,432) -- die Regression auf 0,200 war ein Artefakt des v1-gegen-v2-Aufbaus. OFFEN: par.5.4 Korpus und Training, Self-Play-Einstieg (Nutzer-Freigabe erteilt, nicht gebaut), Shaping-Kopf par.3b mit Abkling-Kurve und zwei Kanaelen, Einhuellende im 2D-Encoder. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -560,6 +560,52 @@ Fallback kennt). Fuer diese Kampagne ist er eine korrekte, aber seltene
 Randbedingung -- nicht der Hebel, der die 7,5 Prozent Null-R6-Partien
 schliesst.
 
+### par.5.3 ERGEBNIS (2026-08-24): Faehigkeit belegt, Preis hoch -- URTEIL STEHT AUS
+
+`tools/run_v2_teacher_arena.sh` -> `tools/probes/v2_teacher_arena.py`,
+Artefakt `evaluations/v2_teacher_arena.json`. 407 Kampagnen-Seeds je Arm,
+Champion@400 gegen Heuristik@150, mit v1-Bezug auf DENSELBEN Seeds -- ohne
+den waere "v2 verliert X" nicht von "die Heuristik verliert ohnehin X" zu
+trennen.
+
+| | Siege | Punkte | Marge | volle Spalten | Vollendungsquote | max Hoehe |
+| --- | --- | --- | --- | --- | --- | --- |
+| v1 (Bezug) | 0,256 | 37,6 | -12,2 | 0,086 | 0,564 | 4,58 |
+| **v2** | **0,128** | 34,8 | **-19,4** | **0,302** | **0,686** | 5,08 |
+
+Gepaart gegen das Netz (Block-Ebene, 16 Bloecke) im v2-Lauf: volle Spalten
++0,175 (t=+7,79), Punkte -19,610 (t=-18,94), Siege -0,755 (t=-20,09),
+Strafpunkte +7,567 (t=+11,83).
+
+**Die Faehigkeit ist belegt.** v2 baut 3,5-mal so viele volle Spalten wie v1
+und hebt die Vollendungsquote von 0,564 auf 0,686 -- die B1-Vorgabe
+("deutlich ueber 0,53") ist erfuellt. Damit ist erstmals ein Agent im System,
+der lange Reihen nicht nur anfaengt, sondern zu Ende bringt.
+
+**Und der Preis ist hoch.** Die Siegquote gegen den Champion halbiert sich
+(25,6 auf 12,8 Prozent), die Marge verschlechtert sich um 7,2 Punkte. Ein
+v2-Korpus traege die Zielfaehigkeit also auf einem deutlich schwaecheren
+Niveau als der heutige Erzeuger.
+
+**Nebenbefund, der eine frueher registrierte Sorge entkraeftet:** die vollen
+ZEILEN brechen hier NICHT ein (0,403 gegen 0,432). Im
+Heuristik-gegen-Heuristik-Lauf waren sie von 0,438 auf 0,200 gefallen und
+standen seither als ungeloeste Regression in der Prereg. Gegen ein NETZ tritt
+das nicht auf -- die Regression war ein Artefakt des v1-gegen-v2-Aufbaus, in
+dem beide Seiten um dieselbe Zellenmenge konkurrieren. Der offene Posten ist
+damit kleiner als angenommen, aber nicht verschwunden: im Selbstspiel-Aufbau
+bleibt er.
+
+**URTEIL STEHT AUS -- und das ist kein Versaeumnis.** par.5.3 hat bewusst
+keinen Schwellenwert vorregistriert (s. Klarstellung bei par.5.4). Die
+Abwaegung lautet: ein Korpus mit 3,5-mal mehr Spaltenvollendungen -- der
+Faehigkeit, die im System nirgends vorkommt und die weder Destillation noch
+vier Such-Eingriffe erzeugen konnten -- erkauft mit einem Erzeuger auf 12,8
+Prozent Siegquote. Ob das ein guter Tausch ist, haengt daran, ob das Netz die
+FAEHIGKEIT uebernehmen kann, ohne das NIVEAU mitzuuebernehmen. Diese Frage
+ist mit der Messung nicht beantwortet, sondern erst gestellt -- sie gehoert
+zu par.5.4 (Korpus und Training).
+
 ## par.4 Anker-Integritaet: die ERSTE Bauentscheidung, vor der Formel
 
 Der Nutzer-Entscheid lautet "v2 als ZUSAETZLICHER Anker". Daraus folgen harte
@@ -598,6 +644,15 @@ Randbedingungen:
    das die Zielfaehigkeit traegt und das Niveau senkt -- diese Abwaegung
    gehoert gemessen, nicht geschaetzt.
 4. **Korpus und Training.** Erst danach, eigener Zuschnitt, eigene Freigabe.
+
+   **Kein vorregistrierter Schwellenwert fuer par.5.3 (Nutzer-Nachfrage
+   2026-08-24: "warum sollte der Lehrer nicht ueberzeugen, was sind die
+   Kriterien"):** die Formulierung oben ist eine Abwaegung, kein Zahlenwert.
+   Ausgewiesen werden Punkte/Margin (Staerkeverlust gegen den Champion) und
+   Vollendungsquote/volle Spalten (Faehigkeitsgewinn); ob das Verhaeltnis
+   "brauchbar" ist, ist ein NACHTRAEGLICHES Urteil, kein vorab gesetzter
+   Schnitt. Wer diesen Abschnitt spaeter als bereits entschieden zitiert,
+   zitiert falsch.
 5. **Ausgewiesen** in jedem Schritt: Vollendungsquote (Falsifikator),
    Initiierungsrate, sowie die sechs Standard-Kennzahlen je Seite (CLAUDE.md).
    Auswertung auf BLOCK-Ebene.

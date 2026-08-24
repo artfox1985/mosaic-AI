@@ -1435,9 +1435,11 @@ impl DraftingAgent for HeuristicSelfPlayAgent {
 struct HeuristicArenaAgent {
     base_sims: u32,
     c: f64,
+    /// Heuristik-Variante fuer die DRAFTING-Entscheidung. `V1` an jeder
+    /// Bestandsstelle (Konstruktor unten setzt es dort explizit), `V2` nur
+    /// in `run_net_vs_heuristic_v2_arena` (Messkette Schritt 3).
+    variante: crate::mcts::HeuristikVariante,
 }
-
-
 
 impl DraftingAgent for HeuristicArenaAgent {
     fn decide(
@@ -1451,8 +1453,18 @@ impl DraftingAgent for HeuristicArenaAgent {
             actions[0].clone()
         } else {
             let s = dynamic_sims(self.base_sims, actions.len());
-            search_drafting_action(state, s, self.c, search_rng)
-                .unwrap_or_else(|| actions[0].clone())
+            // v2-Vorzug ZUERST, wie im Heuristik-vs-Heuristik-Pfad
+            // (`play_arena_game`) -- Praeferenz statt Verbot, greift nur bei
+            // einem LEGALEN Zug, sonst entscheidet die Suche frei.
+            let vorzug = if self.variante == crate::mcts::HeuristikVariante::V2 {
+                crate::plate_builder::v2_drafting_vorzug(state).filter(|a| actions.contains(a))
+            } else {
+                None
+            };
+            vorzug.unwrap_or_else(|| {
+                crate::mcts::search_drafting_action_variante(state, s, self.c, search_rng, self.variante)
+                    .unwrap_or_else(|| actions[0].clone())
+            })
         };
         DraftingDecision::plain(chosen)
     }
@@ -1643,6 +1655,11 @@ struct PlayerLoopConfig<'a> {
     /// bisher NUR die Netz-Seite von `play_net_game`; `trace_zeile` selbst
     /// ist No-Op ohne `MOSAIC_SPALTENBAU_TRACE`/`MOSAIC_SPALTENBAU`.
     column_build_trace: bool,
+    /// Heuristik-Variante fuer die TILING-Aufloesung dieser Seite
+    /// (`resolve_tiling_step_variante`). An allen Bestands-Konstruktions-
+    /// stellen `V1` -- nur `run_net_vs_heuristic_v2_arena` (PREREG_
+    /// heuristic_v2_long_rows.md, Messkette Schritt 3) setzt `V2`.
+    heuristik_variante: crate::mcts::HeuristikVariante,
 }
 
 /// Gesamt-Konfiguration der vereinheitlichten Schleife.
@@ -1961,7 +1978,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     } else {
                         None
                     };
-                    let step = resolve_tiling_step(&game.state, pi, pcfg.tiling_net);
+                    let step = resolve_tiling_step_variante(&game.state, pi, pcfg.tiling_net, pcfg.heuristik_variante);
                     let trace = if pcfg.column_build_trace {
                         crate::column_build::trace_zeile(
                             &game.state, pi, "Tiling",
@@ -2141,6 +2158,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
         tiling_net: None,
         apply_via_chosen_action: false,
         column_build_trace: false,
+        heuristik_variante: crate::mcts::HeuristikVariante::V1,
     };
     let cfg = GameLoopConfig {
         timeout_secs: heuristic_game_timeout_secs(base_sims)
@@ -2599,6 +2617,35 @@ fn play_net_game<R: Rng + ?Sized>(
     // spec-frei (par.6a Entscheid 3, Heuristik-Anker eingefroren).
     search_config: crate::net_mcts::SearchConfig,
 ) -> Value {
+    play_net_game_variante(
+        net, net_board, net_sims, heur_sims, c, c_puct, scoring_ids, names,
+        first_player, rng, game_seed, log_games, search_config,
+        crate::mcts::HeuristikVariante::V1,
+    )
+}
+
+/// Wie [`play_net_game`], mit ausdruecklicher Heuristik-Variante auf der
+/// HEURISTIK-Seite (`PREREG_heuristic_v2_long_rows.md`, Messkette Schritt 3:
+/// v2 gegen den Champion). Die Netz-Seite ist von der Variante unberuehrt --
+/// sie hat keine Heuristik-Bewertung, `HeuristikVariante` betrifft nur
+/// `mcts::player_total`.
+#[allow(clippy::too_many_arguments)]
+fn play_net_game_variante<R: Rng + ?Sized>(
+    net: &Net,
+    net_board: usize,
+    net_sims: u32,
+    heur_sims: u32,
+    c: f64,
+    c_puct: f64,
+    scoring_ids: Vec<usize>,
+    names: [String; 2],
+    first_player: usize,
+    rng: &mut R,
+    game_seed: u64,
+    log_games: bool,
+    search_config: crate::net_mcts::SearchConfig,
+    heur_variante: crate::mcts::HeuristikVariante,
+) -> Value {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // Netz-Seite = `NetArenaAgent` MIT Vorzug (EINSEITIG -- die Heuristik-
     // Gegenseite ist ein eigener Agent ohne Bauer-Kette, Prereg §3.4:
@@ -2610,18 +2657,20 @@ fn play_net_game<R: Rng + ?Sized>(
     // tatsaechlich gated/trainiert wird; die Heuristik-Seite bleibt bewusst
     // ohne Netz). Spaltenbau-Trace nur Netz-Seite (Nutzer 2026-08-13).
     let net_agent = NetArenaAgent { net, base_sims: net_sims, c_puct, vorzug: true, search_config };
-    let heur_agent = HeuristicArenaAgent { base_sims: heur_sims, c };
+    let heur_agent = HeuristicArenaAgent { base_sims: heur_sims, c, variante: heur_variante };
     let net_player = PlayerLoopConfig {
         agent: &net_agent,
         tiling_net: Some(net),
         apply_via_chosen_action: true,
         column_build_trace: true,
+        heuristik_variante: crate::mcts::HeuristikVariante::V1,
     };
     let heur_player = PlayerLoopConfig {
         agent: &heur_agent,
         tiling_net: None,
         apply_via_chosen_action: false,
         column_build_trace: false,
+        heuristik_variante: heur_variante,
     };
     // `net_board` waehlt das Brett der Netz-Seite (alle Aufrufer nutzen 0).
     let players = if net_board == 0 { [net_player, heur_player] } else { [heur_player, net_player] };
@@ -2724,6 +2773,60 @@ pub fn run_net_arena_match(
     Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
 }
 
+/// Netz gegen HEURISTIK V2 (`PREREG_heuristic_v2_long_rows.md`, Messkette
+/// Schritt 3: "ist v2 als Lehrer stark genug, um ein brauchbares Korpus zu
+/// erzeugen"). Zeile fuer Zeile wie [`run_net_arena_match`] -- der EINZIGE
+/// Unterschied ist `heur_variante: V2` statt der impliziten `V1`, damit die
+/// Konfiguration hinterher exakt mit dem Champion-Referenzlauf
+/// (`paired_arena_env_imm_a02.json` u.a.) vergleichbar bleibt.
+#[allow(clippy::too_many_arguments)]
+pub fn run_net_vs_heuristic_v2_arena(
+    model_path: &str,
+    net_sims: u32,
+    heur_sims: u32,
+    n_games: usize,
+    seed: u64,
+    num_threads: usize,
+    c: f64,
+    c_puct: f64,
+    log_games: bool,
+    seeds: Option<Vec<u64>>,
+    search_config: crate::net_mcts::SearchConfig,
+) -> Result<String, String> {
+    let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
+    let net = std::sync::Arc::new(net);
+    crate::net_batcher::ensure_batcher_for(&net);
+    let n_games = seeds.as_ref().map(|s| s.len()).unwrap_or(n_games);
+
+    let play = |i: usize| -> Value {
+        let game_seed = match &seeds {
+            Some(s) => s[i],
+            None => seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)),
+        };
+        crate::plate_builder::set_partie_seed(Some(game_seed));
+        let mut rng = StdRng::seed_from_u64(game_seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let first = i % 2;
+        let names = ["Netz".to_string(), "HeuristikV2".to_string()];
+        let result = play_net_game_variante(
+            &net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng, game_seed, log_games,
+            search_config, crate::mcts::HeuristikVariante::V2,
+        );
+        crate::plate_builder::set_partie_seed(None);
+        result
+    };
+
+    let all: Vec<Value> = if num_threads <= 1 {
+        (0..n_games).map(play).collect()
+    } else {
+        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+            Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
+            Err(_) => (0..n_games).map(play).collect(),
+        }
+    };
+    Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
+}
+
 // ── Netz vs. Netz (Generationen-Vergleich) ───────────────────────────────────
 
 /// Spielt EIN Spiel Netz A (Brett 0) vs. Netz B (Brett 1). Beide ziehen per
@@ -2773,12 +2876,14 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 tiling_net: Some(net_a),
                 apply_via_chosen_action: true,
                 column_build_trace: false,
+                heuristik_variante: crate::mcts::HeuristikVariante::V1,
             },
             PlayerLoopConfig {
                 agent: &agent_b,
                 tiling_net: Some(net_b),
                 apply_via_chosen_action: true,
                 column_build_trace: false,
+                heuristik_variante: crate::mcts::HeuristikVariante::V1,
             },
         ],
         vorzug_greift: None,
@@ -3478,12 +3583,14 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         tiling_net: Some(net),
         apply_via_chosen_action: true,
         column_build_trace: false,
+        heuristik_variante: crate::mcts::HeuristikVariante::V1,
     };
     let player1 = PlayerLoopConfig {
         agent: &agent1,
         tiling_net: Some(net),
         apply_via_chosen_action: true,
         column_build_trace: false,
+        heuristik_variante: crate::mcts::HeuristikVariante::V1,
     };
     // par.5: Greif-Zaehler nur angelegt und verdrahtet, wenn der Knopf aktiv
     // ist -- sonst exakt dieselbe Nebenwirkungsfreiheit wie vorher.
@@ -5319,6 +5426,7 @@ pub(crate) mod tests {
                 tiling_net: None,
                 apply_via_chosen_action: false,
                 column_build_trace: false,
+                heuristik_variante: crate::mcts::HeuristikVariante::V1,
             };
             let cfg = GameLoopConfig {
                 timeout_secs: 600,
