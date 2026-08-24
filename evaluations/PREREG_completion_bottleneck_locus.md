@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Warum ist der k1-Gewinn des Suchhebels GEGNERSPEZIFISCH (gegen die Heuristik +7,0 pp, netz-gegen-netz exakt null) -- und wirkt der Hebel upstream auf die Reihenwahl oder nur auf die Endplatzierung? | Beleg: nichts gemessen, angelegt 2026-08-23, am 2026-08-24 per par.1a AMENDMENT umgestellt. Anlass war die Legalitaets-Stufe 0/160 (Vollendung nie legal moeglich, 54 Prozent Blockade = Musterreihe nicht voll) plus der Implicit-Minimax-Sprung k1 9,0 auf 16,0 Prozent. Dann kam die Netz-gegen-Netz-Fassung: Paritaet 400/814 und k1 30/312 auf beiden Seiten, identische Zaehler -- der Effekt uebertraegt sich NICHT. Damit ist die urspruengliche Locus-Frage vorab geschwaecht und die Gegnerspezifitaet die neue Primaerfrage (par.3a: Schlupf gegen Konkurrenz, unterschieden ueber die Blockade-Zusammensetzung je Gegnerklasse). Der Zuschnitt erzeugt KEINE Partien: alle drei Artefakte liegen vollstaendig geloggt vor -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Warum ist der k1-Gewinn des Suchhebels GEGNERSPEZIFISCH (gegen die Heuristik +7,0 pp, netz-gegen-netz exakt null) -- und wirkt der Hebel upstream auf die Reihenwahl oder nur auf die Endplatzierung? | Beleg: KOMPLETT GEFAHREN 2026-08-24. par.1a: netz-gegen-netz Paritaet (400/814) und k1 identisch 30/312 auf beiden Seiten -- der Heuristik-Effekt (+7,0 pp) uebertraegt sich nicht. par.3a/par.3b (Schlupf gg. Konkurrenz-Hypothese ueber die Legalitaets-Sonde): Konkurrenz-Hypothese NICHT gestuetzt (netz-gegen-netz 51,6 % "Musterreihe nicht voll" gg. 72,2 % Heuristik, n=18 traegt keine Signifikanz, z=+1,81). par.7 (Primaermetrik, completion_locus_row_delta.json, 814 Partien je Arm): Delta_M-Delta_R=-0,50pp, klar unter der 2-pp-Schwelle -> ZIEL-LESART BESTAETIGT, als SCHWACHE Bestaetigung markiert (der Suchhebel bewegte netz-gegen-netz ohnehin nichts). Zusatzbefund: Delta in beiden Armen leicht NEGATIV (-1,8/-2,3pp), nicht ~0. Anschluss: PREREG_long_row_payoff.md -->
 
 # Vorregistrierung: Wo sitzt der Vollendungs-Engpass, in der Suche oder im Ziel?
 
@@ -252,6 +252,43 @@ Die Schwellen sind a priori gesetzt. Begruendung: der Lehrer trennt sich mit
 +12,6 pp vom Champion; 5 pp sind rund 40 % dieses Abstands und damit eine
 Bewegung, die man nicht wegdiskutieren kann, 2 pp liegen im Bereich dessen,
 was Seed und Gegnerwahl ohnehin bewegen.
+
+### par.7 ERGEBNIS (2026-08-24): Ziel-Lesart bestaetigt, wie in par.1a erwartet
+
+Gefahren mit `tools/probes/completion_locus_row_delta.py` (eigenstaendiges
+Skript statt Aenderung an `row_preference_probe.py`, siehe Werkzeug-Kopf --
+jene Datei traegt denselben Seiten-Labelling-Fehler wie die heutige
+Straf-Sonde vor ihrem Fix und war anderweitig als Fix-Ziel reserviert),
+Artefakt `completion_locus_row_delta.json`. Quelle: `imm_netvnet.json` +
+`..._swap.json`, 814 Partien je Arm (beide Dateien zusammen), Block-Ebene
+je Partie, Block-Bootstrap-KI ueber 1000 Resamples.
+
+| Arm | Kurzanteil R1-2 | Kurzanteil R4-5 | Delta | 95-%-KI |
+|---|---|---|---|---|
+| **M** (alpha=0,2) | 53,60 % | 55,91 % | **-2,30 pp** | [-3,09; -1,55] pp |
+| **R** (frozen) | 53,53 % | 55,34 % | **-1,80 pp** | [-2,62; -1,05] pp |
+
+**`Delta_M - Delta_R = -0,50 pp`, klar unter der +2-pp-Schwelle aus par.7.
+Verdikt: ZIEL-LESART BESTAETIGT.**
+
+**Mit der in par.1a bereits vorweggenommenen Einschraenkung: es ist eine
+SCHWACHE Bestaetigung.** Beide Arme bewegen sich praktisch identisch, weil
+der Minimax-Hebel netz-gegen-netz ueberhaupt nichts bewegt (par.1a: k1
+identisch 30/312 auf beiden Seiten) -- die Ziel-Lesart gewinnt hier nicht,
+weil sie widerlegend geprueft und bestaetigt wurde, sondern weil es nichts
+zu widerlegen gab. Das ist eine andere epistemische Lage als ein Zuschnitt,
+in dem der Suchhebel etwas bewegt und die Reihenwahl trotzdem stillhaelt.
+
+**Zusatzbefund, nicht vorregistriert:** Delta ist in BEIDEN Armen leicht
+NEGATIV (-1,8 bis -2,3 pp), nicht ~0 wie der fruehere, unsauber gemischte
+Bestandswert nahelegte -- der Champion baut netz-gegen-netz in R4-5 sogar
+minimal MEHR kurze Reihen als in R1-2, das Gegenteil der Heuristik-Richtung
+(+12,6 pp) und ebenfalls das Gegenteil des vermuteten Kredit-Horizont-Musters.
+Klein, aber sauber vom Nullpunkt getrennt (beide KIs schliessen 0 aus).
+
+**Folge fuer den Zuschnitt (par.9, Verweis dorthin):** Hebel gehoeren ans
+Ziel beziehungsweise an das fehlende Formungssignal, nicht an die Suche.
+Anschluss ist `PREREG_long_row_payoff.md` (Prior-Sichtbarkeit, Zweig A/B).
 
 ## par.8 Waechter
 

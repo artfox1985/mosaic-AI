@@ -1,0 +1,41 @@
+{
+  "je_arm": {
+    "M_alpha0.2": {
+      "n_partien": 814,
+      "kurzanteil_R1_2": 0.536,
+      "kurzanteil_R4_5": 0.5591,
+      "delta": -0.023,
+      "delta_block_bootstrap_95ci": {
+        "mean": -0.023239668817772337,
+        "p2_5": -0.030926474941093813,
+        "p97_5": -0.015457684934110932,
+        "n_boot": 1000
+      },
+      "n_zuege_R1_2": 10044,
+      "n_zuege_R4_5": 9707
+    },
+    "R_frozen": {
+      "n_partien": 814,
+      "kurzanteil_R1_2": 0.5353,
+      "kurzanteil_R4_5": 0.5534,
+      "delta": -0.018,
+      "delta_block_bootstrap_95ci": {
+        "mean": -0.017963151250222686,
+        "p2_5": -0.02622024414757046,
+        "p97_5": -0.010469714220272323,
+        "n_boot": 1000
+      },
+      "n_zuege_R1_2": 10031,
+      "n_zuege_R4_5": 9755
+    }
+  },
+  "delta_m_minus_delta_r": -0.005,
+  "lesart": "ZIEL-LESART, SCHWACHE BESTAETIGUNG nach par.1a-Amendment (Delta_M - Delta_R = -0.0050 < +0,02)",
+  "meta": {
+    "quelle": [
+      "paired_arena_env_imm_netvnet.json",
+      "paired_arena_env_imm_netvnet_swap.json"
+    ],
+    "hinweis": "Delta = Kurzanteil(R1-2) - Kurzanteil(R4-5), Kurzanteil = Anteil Draft-Ziele auf Musterreihe 1-3. Bestandswerte: Champion ~0 pp, Heuristik-Lehrer +12,6 pp."
+  }
+}
