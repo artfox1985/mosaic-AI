@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: ENTWURF-Stand 2026-08-24, nichts gebaut, Nutzer-Vorgabe "v2 als ZUSAETZLICHER Anker". VORFRAGE ENTSCHIEDEN: der Lehrer kann es auch nicht (407 Partien Netz@400 gegen Heuristik@150, Vollendungsquote 0,538 gegen 0,563, volle Spalten 0,101 gegen 0,098) -- Destillation scheidet aus, es gibt nichts zu uebertragen. Gegenreferenz aus zehn Mensch-gegen-Netz-Partien in static/log (Nutzer gewinnt 8 von 9): Abschlussprofil 4,00/4,10/3,40/3,20/2,50/2,20 gegen 4,90/4,90/3,30/2,40/1,10/0,50, volle Spalten 1,80 gegen 0,10. Strukturbefund im Code: wertung_progress liest NUR das Kuppelraster (scoring.rs:876-882), ist innerhalb einer Runde fuer jeden Drafting-Zug gleich und kann die Reihenwahl nicht lenken; das einzige Stueck des Shapings, das pattern_lines liest, ist projected_unplaceable_penalty -- eine STRAFE. ZIEL-KENNZAHL folgt aus einer Identitaet: eine volle Spalte kostet 21 Zellen, das Netz verbraucht 42,7 und truege damit gleichverteilt 2,03 Spalten statt 0,10 -- ein VERTEILUNGS-, kein Versorgungsproblem; die Kennzahl ist das MINIMUM der Abschluesse ueber die sechs Reihen, das Zielprofil ist FLACHER statt laenger. Dritter Versorgungskanal (Nutzer-Hinweis): 9 Spezialfliesen, vierte Plattenzelle zum Preis von dreien, lokale Freischaltbedingung, rund 4 Felder je Partie leer gelassen (groesster Einzelposten der Plattenwertung). Offen und VOR dem Bau zu entscheiden: wie v2 ueberhaupt als eigener Agent existiert, ohne den spec-freien Heuristik-Anker anzufassen GEBAUT 2026-08-24 (eigener Agent-Typ, alle vier Bausteine, Paritaets-Hash haelt, Suite 509/0), ABNAHME NICHT BESTANDEN: 40 Partien v1 gegen v2 ergeben 157 gegen 156 Starts und Vollendungsquote 0,592 gegen 0,603 -- der Term bewegt nichts und kostet leicht Staerke. Drei Unit-Tests schliessen aus, dass er schlicht null liefert. Ursache ist die Groessenordnung: der marginale Spalten-Zuwachs betraegt bei realen Spaltenhoehen nur 0,97 bis 1,75 Punkte, und er ist auf ein aktives k1 gegatet (nur 38 Prozent der Partien). Folge fuer den Zuschnitt: nach der 21-Zellen-Identitaet ist die Spaltenzahl durch das MINIMUM der Abschluesse ueber die Reihen gedeckelt, der Wert eines Abschlusses in der schwaechsten Reihe ist also der Engpasswert und nicht der marginale Zellbeitrag. Ein Verstaerkungsfaktor wurde bewusst NICHT vorgeschaltet (Dosis-Antwort auf ein Strukturproblem, zweimal verworfen). Naechster Zuschnitt = Nutzer-Entscheid. -->
+<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: ENTWURF-Stand 2026-08-24, nichts gebaut, Nutzer-Vorgabe "v2 als ZUSAETZLICHER Anker". VORFRAGE ENTSCHIEDEN: der Lehrer kann es auch nicht (407 Partien Netz@400 gegen Heuristik@150, Vollendungsquote 0,538 gegen 0,563, volle Spalten 0,101 gegen 0,098) -- Destillation scheidet aus, es gibt nichts zu uebertragen. Gegenreferenz aus zehn Mensch-gegen-Netz-Partien in static/log (Nutzer gewinnt 8 von 9): Abschlussprofil 4,00/4,10/3,40/3,20/2,50/2,20 gegen 4,90/4,90/3,30/2,40/1,10/0,50, volle Spalten 1,80 gegen 0,10. Strukturbefund im Code: wertung_progress liest NUR das Kuppelraster (scoring.rs:876-882), ist innerhalb einer Runde fuer jeden Drafting-Zug gleich und kann die Reihenwahl nicht lenken; das einzige Stueck des Shapings, das pattern_lines liest, ist projected_unplaceable_penalty -- eine STRAFE. ZIEL-KENNZAHL folgt aus einer Identitaet: eine volle Spalte kostet 21 Zellen, das Netz verbraucht 42,7 und truege damit gleichverteilt 2,03 Spalten statt 0,10 -- ein VERTEILUNGS-, kein Versorgungsproblem; die Kennzahl ist das MINIMUM der Abschluesse ueber die sechs Reihen, das Zielprofil ist FLACHER statt laenger. Dritter Versorgungskanal (Nutzer-Hinweis): 9 Spezialfliesen, vierte Plattenzelle zum Preis von dreien, lokale Freischaltbedingung, rund 4 Felder je Partie leer gelassen (groesster Einzelposten der Plattenwertung). Offen und VOR dem Bau zu entscheiden: wie v2 ueberhaupt als eigener Agent existiert, ohne den spec-freien Heuristik-Anker anzufassen GEBAUT 2026-08-24 (eigener Agent-Typ, alle vier Bausteine, Paritaets-Hash haelt, Suite 509/0), ABNAHME NICHT BESTANDEN: 40 Partien v1 gegen v2 ergeben 157 gegen 156 Starts und Vollendungsquote 0,592 gegen 0,603 -- der Term bewegt nichts und kostet leicht Staerke. Drei Unit-Tests schliessen aus, dass er schlicht null liefert. Ursache ist die Groessenordnung: der marginale Spalten-Zuwachs betraegt bei realen Spaltenhoehen nur 0,97 bis 1,75 Punkte, und er ist auf ein aktives k1 gegatet (nur 38 Prozent der Partien). Folge fuer den Zuschnitt: nach der 21-Zellen-Identitaet ist die Spaltenzahl durch das MINIMUM der Abschluesse ueber die Reihen gedeckelt, der Wert eines Abschlusses in der schwaechsten Reihe ist also der Engpasswert und nicht der marginale Zellbeitrag. Ein Verstaerkungsfaktor wurde bewusst NICHT vorgeschaltet (Dosis-Antwort auf ein Strukturproblem, zweimal verworfen). Naechster Zuschnitt = Nutzer-Entscheid. ZWEITE ABNAHME 2026-08-24 gegen die vorab festgelegte PRIMAERMETRIK (volle Spalten je Partie): NICHT-ERFOLG. 80 Partien, beide Sitze: Spalten 0,125 gegen 0,163, das sind 10 gegen 13 in 80 Partien und damit unter der Aufloesung; maximale Spaltenhoehe 4,70 gegen 4,79, der Engpass bewegt sich nicht. Die ZWISCHENGROESSEN bewegen sich dagegen deutlich: Musterreihen-Vollendungsquote 0,571 auf 0,675, unplatzierbar geraeumte Reihen 15 auf 1 (der B1-Fehler tritt also nicht auf), Siege 42/80. Verfahrenslehre dazu: die erste Abnahme hatte die Zwischengroesse als Ergebnis berichtet, die Entscheidungsmetrik ist jetzt VOR dem Lauf registriert. Konstanten-Korrektur aus den Server-Logs: untere Reihen sind NICHT mehr wert (Platzierungspunkte je Reihe 2,31/3,39/3,72/4,31/2,74/3,53 beim Menschen, Maximum in R4), Summe der Platzierungspunkte ist ein Gleichstand (54,9 gegen 55,8), der Mensch-Vorsprung sitzt bei den Spezialfliesen (2,70 gegen 0,50 Freischaltungen je Partie, 8,50 gegen 0,90 Punkte, davon in R5/R6 nur 0,70 je Partie). -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -266,6 +266,79 @@ vorschalten. Das waere die Dosis-Antwort auf ein Struktur-Problem und
 wiederholt die Bauform, die `PREREG_scoring_plate_injection` (Sweep ueber
 30-fachen Dosisbereich) und B1 bereits zweimal verworfen haben. Der naechste
 Zuschnitt ist Nutzer-Entscheid.
+
+### ENTSCHEIDUNGSMETRIK, vorab festgelegt (2026-08-24, Nutzer-Ruege)
+
+**Primaermetrik ist die Zahl der VOLLEN SPALTEN je Partie.** Nichts anderes.
+
+Anlass ist ein Verfahrensfehler in der ersten Abnahme: dort wurde die
+**Musterreihen-Vollendungsquote** (`long_rows_completed / long_rows_started`)
+gemessen und als Ergebnis berichtet. Nutzer: "wollten wir uns nicht auf die
+fertiggestellten Spalten fokussieren?" -- ja, und die Fokus-Regel in
+`STATUS.md` sagt es auch. Die beiden Groessen sind NICHT dasselbe:
+
+- eine volle Musterreihe legt **einen** Stein auf die Kuppel;
+- eine volle Spalte braucht **sechs**, je einen in jeder Rasterreihe.
+
+Die Vollendungsquote ist eine Zwischengroesse. Sie kann steigen, ohne dass
+eine einzige Spalte mehr fertig wird -- etwa wenn die zusaetzlichen
+Abschluesse in Rasterreihen landen, die ohnehin schon bedient waren. Genau
+das ist nach der 21-Zellen-Identitaet der Normalfall: die Spaltenzahl haengt
+am MINIMUM der Abschluesse ueber die sechs Reihen, nicht an ihrer Summe.
+
+**Verbindlich fuer jede v2-Abnahme:**
+
+| Rang | Kennzahl |
+| --- | --- |
+| **Primaer** | volle Spalten je Partie, gepaart, BEIDE Sitzpositionen |
+| Sekundaer | Musterreihen-Vollendungsquote (die bisherige Zahl, jetzt als Zwischengroesse gefuehrt) |
+| Sekundaer | freigeschaltete Spezialfliesen je Partie und ihre Rasterreihe |
+| Sekundaer | Strafleiste, unplatzierbar geraeumte Reihen |
+| Pflicht | die sechs Standard-Kennzahlen je Seite (CLAUDE.md), Block-Ebene |
+
+**Erfolgsschwelle, vorab:** v2 gilt nur dann als Erfolg, wenn die vollen
+Spalten je Partie steigen UND die Staerke nicht faellt. Steigt die
+Vollendungsquote, ohne dass die Spalten folgen, ist das ein NICHT-Erfolg --
+dieselbe Bauform wie der B1-Falsifikator, und aus demselben Grund: ein
+bewegter Zwischenwert ist kein Ergebnis.
+
+**Messbarkeit:** die Spaltenzahl ist aus den Zaehlern NICHT ableitbar, sie
+braucht das Partie-Log (`rekonstruiere_partie` in
+`tools/probes/column_build_structural_probe.py`). `play_arena_game` und
+`run_heuristic_v1_vs_v2_arena` haben dafuer seit dem 2026-08-24 einen
+`log_games`-Schalter (Default aus).
+
+### Abnahme gegen die PRIMAERMETRIK (2026-08-24): Zwischengroesse bewegt, Ziel nicht
+
+80 Partien, beide Sitzpositionen, 150 Sims je Seite, saettigende Form mit
+handgesetztem Reihen-Kredit.
+
+| | volle Spalten je Partie | max Spaltenhoehe | Musterreihen-Quote | geraeumt | Punkte | Siege |
+| --- | --- | --- | --- | --- | --- | --- |
+| v1 | 0,125 | 4,70 | 0,571 | 15 | 40,1 | 38/80 |
+| v2 | **0,163** | 4,79 | **0,675** | **1** | 43,4 | 42/80 |
+
+**Verdikt nach der vorab festgelegten Regel: NICHT-Erfolg.** Die
+Zwischengroessen bewegen sich deutlich -- die Musterreihen-Vollendungsquote
+steigt um 10 Prozentpunkte, die unplatzierbar geraeumten Reihen fallen von 15
+auf 1. Die Primaermetrik bewegt sich nicht messbar: 0,125 gegen 0,163 sind
+**10 gegen 13 volle Spalten in 80 Partien**. Das liegt unter der Aufloesung
+dieses Laufs, und ein Anteil von 30 Prozent auf so kleinen Zahlen ist keine
+Aussage. Die Staerke ist unauffaellig (42/80).
+
+**Die Diagnose steht schon in par.2 und bestaetigt sich hier:** die maximale
+Spaltenhoehe bewegt sich von 4,70 auf 4,79. Der Engpass ist unveraendert,
+weil eine Spalte ALLE sechs Rasterreihen braucht und v2 die zusaetzlichen
+Abschluesse nicht dorthin lenkt, wo sie fehlen. Genau das sagt die
+21-Zellen-Identitaet: die Spaltenzahl haengt am MINIMUM ueber die Reihen,
+nicht an ihrer Summe -- und ein Term, der jede angefangene Reihe belohnt,
+hebt die Summe.
+
+**Wert dieses Laufs, trotz Nicht-Erfolg:** er zeigt, dass die saettigende
+Form (Nutzer-Vorgabe) das Verhalten sehr wohl bewegen kann -- die erste,
+konvexe Fassung tat das nicht. Der Hebel wirkt, er zeigt nur in die falsche
+Richtung. Und die Zahl 1 gegen 15 bei den geraeumten Reihen belegt, dass der
+B1-Fehler (angefangene Ruinen) diesmal NICHT auftritt.
 
 ## par.4 Anker-Integritaet: die ERSTE Bauentscheidung, vor der Formel
 

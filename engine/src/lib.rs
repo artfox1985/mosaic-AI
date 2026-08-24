@@ -1636,7 +1636,7 @@ fn bootstrap_horizon_stage0_probe_json(
 /// Partie. Die Vollendungsquote folgt aus `long_rows_started` /
 /// `long_rows_completed` -- der vorregistrierte Falsifikator.
 #[pyfunction]
-#[pyo3(signature = (sims_v1, sims_v2, n_games, seed, num_threads=0, c=0.3, swap=false))]
+#[pyo3(signature = (sims_v1, sims_v2, n_games, seed, num_threads=0, c=0.3, swap=false, log_games=false))]
 #[allow(clippy::too_many_arguments)]
 fn heuristic_v1_vs_v2_arena(
     py: Python<'_>,
@@ -1647,10 +1647,11 @@ fn heuristic_v1_vs_v2_arena(
     num_threads: usize,
     c: f64,
     swap: bool,
+    log_games: bool,
 ) -> String {
     py.detach(|| {
         crate::self_play::run_heuristic_v1_vs_v2_arena(
-            sims_v1, sims_v2, n_games, seed, num_threads, c, swap,
+            sims_v1, sims_v2, n_games, seed, num_threads, c, swap, log_games,
         )
     })
 }
