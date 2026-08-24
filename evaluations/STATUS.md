@@ -118,20 +118,49 @@ Suite 512/0.
 
 **OFFEN an v2:**
 
-1. **Schritt 3 laeuft** (`tools/run_v2_teacher_arena.sh`): v2 gegen den
-   Champion, 407 Kampagnen-Seeds, mit v1-Bezug auf denselben Seeds --
-   sonst waere "v2 verliert X" nicht von "die Heuristik verliert ohnehin X"
-   zu trennen. **Kein vorregistrierter Schwellenwert**: par.5.3 beschreibt
-   eine Abwaegung, das Urteil faellt NACH der Messung.
-2. **Self-Play-Einstieg** (Nutzer-Freigabe 2026-08-24, noch nicht gebaut):
-   v2 existiert bisher nur in Arenen. Ohne Korpus-Erzeuger haben weder der
+**SCHRITT 3 IST DURCH (2026-08-24): Faehigkeit belegt, Preis hoch, URTEIL
+STEHT AUS.** 407 Kampagnen-Seeds je Arm, Champion@400 gegen Heuristik@150,
+mit v1-Bezug auf denselben Seeds:
+
+| | Siege | Punkte | Marge | volle Spalten | Vollendungsquote | max Hoehe |
+| --- | --- | --- | --- | --- | --- | --- |
+| v1 (Bezug) | 0,256 | 37,6 | -12,2 | 0,086 | 0,564 | 4,58 |
+| **v2** | **0,128** | 34,8 | **-19,4** | **0,302** | **0,686** | 5,08 |
+
+Gepaart gegen das Netz (16 Bloecke): volle Spalten +0,175 (t=+7,79), Punkte
+-19,610 (t=-18,94), Siege -0,755 (t=-20,09), Strafpunkte +7,567 (t=+11,83).
+
+v2 baut **3,5-mal so viele volle Spalten** wie v1 und hebt die
+Vollendungsquote von 0,564 auf 0,686 -- die B1-Vorgabe ("deutlich ueber
+0,53") ist erfuellt. Erstmals gibt es damit einen Agenten im System, der
+lange Reihen nicht nur anfaengt, sondern zu Ende bringt. Der Preis: die
+Siegquote gegen den Champion halbiert sich (25,6 auf 12,8 Prozent).
+
+**Die ZEILEN-Regression ist kleiner als angenommen.** Gegen ein NETZ brechen
+die vollen Zeilen nicht ein (0,403 gegen 0,432). Der Absturz auf 0,200 war
+ein Artefakt des v1-gegen-v2-Aufbaus, in dem beide Seiten um dieselbe
+Zellenmenge konkurrieren. Im Selbstspiel-Aufbau bleibt der Posten offen, fuer
+den Lehrer-Einsatz ist er entschaerft.
+
+**OFFEN an v2:**
+
+1. **URTEIL zu Schritt 3** -- Nutzer-Entscheid. par.5.3 hat bewusst KEINEN
+   Schwellenwert vorregistriert. Die Abwaegung: ein Korpus mit 3,5-mal mehr
+   Spaltenvollendungen (der Faehigkeit, die im System nirgends vorkommt und
+   die weder Destillation noch vier Such-Eingriffe erzeugen konnten), erkauft
+   mit einem Erzeuger auf 12,8 Prozent Siegquote. Ob das ein guter Tausch
+   ist, haengt daran, ob das Netz die FAEHIGKEIT uebernimmt, ohne das NIVEAU
+   mitzuuebernehmen -- das ist par.5.4 und mit dieser Messung nicht
+   beantwortet, sondern erst gestellt.
+2. **Self-Play-Einstieg** (Nutzer-Freigabe 2026-08-24, NICHT gebaut): v2
+   existiert bisher nur in Arenen. Ohne Korpus-Erzeuger haben weder der
    Shaping-Kopf noch eine 2D-Erweiterung Trainingsmaterial. Braucht eine
-   eigene Korpus-Kennung, sonst ist das Fenster still gemischt.
-3. **Zeilen-Regression UNGELOEST**: 0,438 auf 0,200. Ursache benannt -- die
-   Zielzellen-Menge ist eine Vereinigung, in der die Spalte jeden Konflikt
-   gewinnt, weil ihre sechs Zellen aus sechs Musterreihen bedienbar sind und
-   die der Zeile nur aus einer. Mehrfach angefasst, nicht behoben.
-4. **Abstand zum Ziel**: 0,562 gegen die vom Nutzer geforderte 1,0.
+   eigene Korpus-Kennung, sonst ist das Fenster still gemischt und keine
+   spaetere Auswertung kann die Arme trennen. Die Verdrahtung ist vorbereitet:
+   `PlayerLoopConfig` traegt bereits das Feld `heuristik_variante` (an allen
+   acht Bestandsstellen auf `V1`).
+3. **Abstand zum Ziel**: 0,562 volle Spalten im Heuristik-Duell gegen die vom
+   Nutzer geforderte 1,0.
 
 **Vorregistriert, NICHT gebaut:** Shaping-Kopf statt Ownership-Kopf, der die
 Dreiecks-Abweichung vorhersagt (par.3b) -- mit Abkling-Kurve zugunsten des
@@ -202,7 +231,7 @@ Baubeginn freizugeben.
 
 | Strang | Datei | Zuschnitt |
 |---|---|---|
-| **Heuristik v2 als zusaetzlicher Lehrer** | `PREREG_heuristic_v2_long_rows.md` | **AKTIV.** Routing gebaut, volle Spalten 0,163 auf 0,562 (Partien mit mindestens einer: 35 auf 50 Prozent). Schritt 3 (v2 gegen Champion) laeuft. Offen: Self-Play-Einstieg (freigegeben), Zeilen-Regression 0,438 auf 0,200, Abstand zur geforderten 1,0. Details im STAND-JETZT oben |
+| **Heuristik v2 als zusaetzlicher Lehrer** | `PREREG_heuristic_v2_long_rows.md` | **AKTIV, Messkette KOMPLETT.** Schritt 3: Faehigkeit belegt (volle Spalten 0,302 gegen v1 0,086, Vollendungsquote 0,686), Preis hoch (Siegquote 0,128 gegen 0,256). **URTEIL = NUTZER-ENTSCHEID**, kein Schwellenwert vorregistriert. Offen: par.5.4 Korpus und Training, Self-Play-Einstieg (freigegeben, nicht gebaut) |
 | **Shaping-Kopf statt Ownership-Kopf** | `PREREG_heuristic_v2_long_rows.md` par.3b | Vorregistriert, NICHT gebaut. Sagt die Dreiecks-Abweichung voraus; zwei Kanaele (Spalte links/rechts), Abkling-Kurve zugunsten des Value-Kopfes. Braucht erst ein v2-Korpus, sonst auf plattenblindes Spiel geeicht |
 | **Einhuellende im 2D-Encoder** | – | Nutzer-Frage 2026-08-24, nicht registriert. Zusaetzliche Eingabeebene "Dreiecks-Zugehoerigkeit je Zelle". Additiv moeglich (Eingabegroesse kommt vom Modell), aber eigener Bau nach par.3b |
 | **R5-Netz-Loeser + R5-Value-Kalibrierung** | `PREREG_r5_solver_split.md` par.2 a/b/c, Teil B | Netz-Loeser-Arme (Budget, Policy-Sortierung, spaeter Value-Korrekturterm; je per-Agent verdrahtet, NIE per Env-Knopf) und der Vierer-Kopf-Vergleich. Zielmetrik: `r5_value_calibration`-Steigung, heute 0,06-0,09 statt ~1. **Arm 3 braucht ein b-Serie-Modell mit geprueftem Traeger-Status** -- der Ownership-Ausgang des Champions ist untrainiert (par.3a) |
