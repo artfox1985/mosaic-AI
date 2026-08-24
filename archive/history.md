@@ -13037,3 +13037,355 @@ alpha- und frozen-Seite in `imm_netvnet`), der planbare Ausbau der
 restlichen ~31 Such-/Blattwert-Knoepfe ins SearchConfig, und die
 komplette Nacht-Fahrplan-Restliste des Punkte-/Margen-Kopf-Strangs
 (oben).
+
+
+## Kapitel: STATUS.md-Aufraeumung (2026-08-24)
+
+Nutzer-Auftrag: *"status.md ist ein sauhaufen, raeum das auf, und stelle
+sicher dass wirklich nur das aktuelle und offene dort drinnen steht."*
+
+STATUS.md war auf 882 Zeilen gewachsen, davon rund 200 Zeilen Detailtexte zu
+GEPARKTEN Aufgaben, dazu ausgelaufene Chronologien in den Regeln und eine
+lange Erzaehlung zu einem bereits ENTSCHIEDENEN Arm. Gleichzeitig fehlte der
+aktuell wichtigste offene Strang (Heuristik v2) vollstaendig -- genau die
+Mischung, vor der der Dateikopf warnt ("Hier steht nur AKTUELLES und
+OFFENES").
+
+Verschoben wurde hierher, damit nichts verloren geht. Die Verdikte und die
+weitergeltenden Vorgaben sind in STATUS.md geblieben; hier liegen die
+Herleitungen und die Detailtexte.
+
+### Geparkte Aufgaben (Details; der Task-Index in STATUS.md nennt sie weiter)
+
+Task #38 (Moon-Head-Feinschliff), Task #39 (Startkuppel-Platzierung), Task #31
+(Menschen-Schwierigkeitsstufen) und `stack_top_feature` (Sichtgleichheit am
+Kuppelstapel). Alle vier sind im Arbeitskreis "Spaeter" geparkt; ihre
+Beschreibungen standen ausformuliert in STATUS.md, obwohl an ihnen nichts
+laeuft.
+
+## Task #38 (geparkt, Arbeitskreis "Spaeter" mit #31): Moon-Head-Feinschliff (2026-08-05)
+
+Befund aus einer Interesse-Frage des Nutzers, Code verifiziert. Der Kopf
+selbst ist solide (Plackett-Luce-Faktorisierung der Mond-Reihenfolge aus
+dem Policy-Raum, Labels vom exakten Rundensolver, Prior-Aufteilung in der
+Expansion). Zwei nie untersuchte Punkte fuer spaeter:
+
+1. **Loss-Gewicht**: `moon_nll` wird mit VOLLEM Gewicht 1,0 in den
+   Policy-Loss addiert (train.py, `p_loss + moon_nll[sun_mask].mean()`)
+   -- bei NLL ~0,5-1 gegen Policy ~1,9 beansprucht ein Teilproblem, das
+   nur Sonnenzuege betrifft, potenziell ~1/3 des Policy-Gradienten. Nie
+   gesweept (VALUE_WEIGHT-Blindfleck-Muster). Als Arm in einen
+   kuenftigen Loss-Gewichts-Sweep.
+2. **Label-Horizont** (Nutzer-Einordnung 2026-08-05, RELATIVIERT):
+   Referenz maximiert den RUNDENendstand (`solve_round_final_score`).
+   Da die Fabriken zu Rundenbeginn NEU befuellt werden, ist der
+   Wirkhorizont einer Reihenfolge im Wesentlichen die laufende Runde --
+   das Solver-Label ist also naeher am Optimum als zunaechst vermutet,
+   Restpunkt sind allenfalls Randeffekte. Falls Labels je aus der Suche
+   kommen (root_child_q aus #35 liefert die Q-Ordnung der Varianten ab
+   v20 gratis), waere das ein billiger A/B, kein Pflichtumbau.
+   Kein akuter Bedarf: Policy-Seite ist ueber die Orakel-Metriken
+   arena-validiert, inkl. PL-Aufteilung.
+3. **Das Label ist EGOZENTRISCH -- damit ist "Fabriken aushungern"
+   strukturell unerreichbar** (Nutzer-Frage 2026-08-16 "was ist mit
+   fabriken aushungern gemeint", Code am selben Tag geprueft). Die
+   Mond-Stapelreihenfolge ist der EINZIGE Hebel im Spiel, mit dem man dem
+   Gegner gezielt nur vergiftete Optionen hinterlaesst: bei kleinen
+   Fabriken bestimmt der nehmende Spieler die Reihenfolge, und spaeter ist
+   nur die OBERSTE Fliese nehmbar (docs/engine_manual.md, Phase 1 B). Wer
+   das steuert, kann den Gegner in Farben zwingen, die seine Musterreihen
+   ueberlaufen lassen -- Strafpunkte ohne eigenen Einsatz, und der Zwang
+   ist strukturell (die Runde endet erst, wenn alles leer ist; wer keine
+   gueltige Aktion hat, MUSS passen).
+   **AKTENLAGE KORRIGIERT (ungeprimter Review 2026-08-20, am Code
+   bestaetigt): `moon_order_target` ist ein beweisbarer NO-OP** — die
+   Zielfunktion `solve_round_final_score` liest nur `players[pi]`
+   (Cache-Key `tiling_key`), die Mondreihenfolge lebt aber in
+   `state.factories`; alle Permutationen scoren identisch, das Label ist
+   immer die rohe Beutelreihenfolge (80/80-Sonde). Der Kopf trainiert auf
+   RAUSCHEN und zieht dabei potenziell ~1/3 des Policy-Gradienten (Punkt 1
+   oben). Auch der unten skizzierte "billige Zuschnitt" (eigener minus
+   Gegner-Rundenendstand) waere aus demselben Grund ein No-Op. Der Text
+   darunter bleibt als Ideen-Protokoll stehen, seine Praemisse ("bewertet
+   jede Reihenfolge") ist widerlegt. Details:
+   `PREREG_implementation_review_unprimed.md` par.7.
+   **FOLGE FUER DEN #38-ZUSCHNITT (Nutzer-Entscheid 2026-08-20: hier
+   festgehalten, bleibt im Arbeitskreis "Spaeter"):** wenn #38 angegangen
+   wird, ist die Reihenfolge jetzt klar vorgezeichnet —
+   (a) **billigster erster Arm: `moon`-Loss-Gewicht 0** (ein Trainingslauf
+   + Gating). Das testet Punkt 1 (Loss-Gewicht) und den No-Op-Befund in
+   einem: der Kopf zieht heute bis zu ~1/3 des Policy-Gradienten fuer ein
+   NACHWEISLICH konstantes Rauschziel — Gewicht 0 ist die
+   Nullhypothesen-Messung, ob das Gradient-Budget woanders mehr traegt.
+   (b) Ein ECHTES Reihenfolge-Ziel braucht eine Zielfunktion, die
+   `state.factories` liest (Reihenfolge-bewusste Variante von
+   `solve_round_final_score` oder Suche-basierte Labels via root_child_q)
+   — teurer, erst nach (a) sinnvoll. (c) Der alte "billige Zuschnitt"
+   (minus Gegner-Endstand) ist als No-Op gestrichen. Zusaetzlich zu (a)
+   gehoert der Python-Vielfachheiten-Bug der Zielrepraesentation
+   (`neural_net.py:1799-1806`, 42 % der Labels betroffen) mit behoben,
+   falls je ein echtes Ziel kommt.
+   **Das Netz hat den Kopf dafuer, aber nie das Ziel** (Alt-Text): `moon_order_target`
+   (`self_play.rs:634`) probiert Reihenfolgen durch und bewertet jede mit
+   `solve_round_final_score(state, pi)` (`tiling_solver.rs:494`) -- also
+   ausschliesslich dem EIGENEN Rundenendstand. Der Gegner kommt in der
+   Bewertung nicht vor. Der Kopf kann Aushungern also nicht lernen, egal
+   wie gut er wird.
+   **Billiger Zuschnitt, falls je angegangen**: nur das Label aendern
+   (eigener Rundenendstand MINUS Gegner-Rundenendstand, oder als eigener
+   Arm), Bau bleibt unberuehrt. Vorbehalt: das ist eine neue
+   Stoerungs-Wette, und Stoerung hat in diesem Projekt zweimal verloren
+   (k6-Kuppeldraft, Farbzaehlung v1) -- vorher gehoert eine billige
+   Diagnose davor, ob die Reihenfolge-Freiheit ueberhaupt genutzt wird
+   (Praezedenz #39: Rotation/Position der Startkuppel waren tote
+   Freiheitsgrade). Herkunft der Idee: Reddit-Rueckfrage eines Spielers
+   nach adversarialen Faellen.
+
+## Task #39 (geparkt, Arbeitskreis "Spaeter" mit #31/#38): Startkuppel-Platzierung (2026-08-06)
+
+Nutzer-Beobachtung "setzt sie gefuehlt immer an dieselbe Position" --
+am Code bestaetigt und MECHANISCH erklaert
+(`self_play.rs::choose_start_placement`): der Farb-Score ist
+POSITIONS-unabhaengig (summiert nur Fabrik-Farbhaeufigkeiten je Feld),
+der Eckbonus fuer alle 4 Ecken identisch (0,5), Ties behaelt der erste
+Kandidat -> IMMER Ecke (0,0); die Feld-Summe ist zudem
+ROTATIONS-invariant -> immer 0 Grad. Position/Rotation sind tote
+Freiheitsgrade; nur die Platten-WAHL variiert. Gilt ueberall (GUI,
+Arena, Self-Play; Startplatzierung ist policy-maskiert, das Netz lernt
+sie nie).
+
+**Nutzer-Einordnung (2026-08-06, schaerft den Zuschnitt)**: die Ecke an
+sich ist strategisch RICHTIG (Rand/Diagonale/Eckplatten honorieren sie
+alle) -- das Problem ist die MONOTONIE, nicht die Position.
+**KORREKTUR (Nutzer 2026-08-06, zweite Runde)**: auch der Ecken-Rang
+(3 oben / 8 unten) ist KEIN Bewertungsfehler -- Kuppelzeile 0 wird von
+den SCHNELLSTEN Musterreihen (1-2, Kapazitaet 1-2 Steine) gespeist: die
+obere Ecke kommt frueher in Wertung + Orthogonal-Bonus und wird
+zuverlaessiger ueberhaupt komplett; die 8 Punkte unten haengen an den
+traegsten Reihen (5-6). Der (0,0)-Tie-Break loest den Trade-off implizit
+RICHTIG auf. Verbleibende Substanz von #39:
+(1) ROTATION -- bestimmt Farb-Ausrichtung zur Brettmitte und
+Sonderfeld-Lage, heute verschenkt (Score rotationsinvariant);
+(2) MONOTONIE/Tie-Break -- Diversitaets-Frage (GUI-Abwechslung +
+Korpus-Vielfalt), keine Staerke-Frage.
+**Verbesserungs-Optionen (bei Angehen abzuwaegen)**:
+a) Heuristik-Upgrade: Rotations-Bewertung + randomisierter Tie-Break
+   unter nahezu gleichwertigen Kandidaten; jede Aenderung per Arena
+   gegen den Bestand pruefen (die Strategie-Intuition des Koordinators
+   lag hier zweimal daneben, die des Nutzers zweimal richtig).
+b) Prinzipiell: Platzierung in den Aktionsraum der Suche -- ACHTUNG
+   NUM_ACTIONS-Aenderung macht alte Checkpoints unbrauchbar
+   ([[num-actions-change-breaks-old-checkpoints]]), teuer.
+**Randbedingung**: NICHT waehrend einer laufenden Kampagne aendern
+(verschiebt die Self-Play-Zustandsverteilung); fruehestens v21-Setup.
+Nebenaspekt: die heutige Uniformitaet kostet auch Zustands-Diversitaet
+im Korpus.
+
+## Task #31 (vorgemerkt): Menschen-Schwierigkeitsstufen leicht/mittel/schwer/extrem (2026-08-03)
+
+**Nutzer-Auftrag**: Staerke-Skalierung fuer Mensch-Spiele; Einschaetzung
+"Sims allein richten es nicht" ist KORREKT und hier besonders: (a) R5-
+Alpha-Beta + Tiling-DFS spielen sim-unabhaengig exakt -- eine 20-Sims-KI
+spielt trotzdem perfekte Endspiele; (b) Gumbel+Policy-Prior traegt auch
+Mini-Budgets -- flacher, aber nicht menschlich-fehlbar.
+
+**Design-Skizze (3 Hebel je Stufe)**: Sims-Budget + Endspiel-/Tiling-
+Degradation (R5-Knotenbudget-Override bzw. Policy-Sampling statt Solver,
+Tiling greedy statt exakt bei "leicht") + Fehler-Injektion via Root-
+Temperatur-Sampling mit Q-GAP-DECKEL (nur plausible Fehler <=3-5 Punkte;
+menschlich-fehlbar statt gleichmaessig-flach; loest auch Ausrechenbarkeit).
+Stufen: extrem=Champion@600-800 (optional lambda_aggr als Stil),
+schwer=heutiger Stand @400, mittel=~100-150 Sims + Deckel-Sampling +
+reduziertes R5-Budget, leicht=~8-16 Sims + Temperatur hoeher + epsilon +
+Greedy-Tiling. ABGERATEN: alte Generationen als Stufen (Wartung,
+OneDrive-Risiko, Regel-Fix-Inkompatibilitaeten, "gleichmaessig schwach").
+
+**Kalibrierung**: vorhandene Elo-Leiter + Heuristik-Anker; je Konfiguration
+n=150 vs 2 Anker, Ziel-Baender ~leicht 700-800 / mittel ~1000 / schwer
+~1150-1200 / extrem=Champion. Umsetzung nach Muster Task #28
+(Laufzeit-Parameter + Server-Preset + GUI-Dropdown). OFFEN (Nutzer):
+Ziel-Baender ok? Darf "leicht" sichtbar Endspiele verstolpern?
+
+**GATE (Nutzer-Entscheid 2026-08-03): ZURUECKGESTELLT** -- wird erst
+angegangen, wenn ein Champion existiert, der auch gute menschliche
+Spieler wirklich fordert. Bis dahin bleibt die Prioritaet auf
+Staerke-Arbeit (v20-Zyklus, Value-Head-Front #29/#30, lambda=0.7-
+Kandidat), nicht auf Schwierigkeits-UX.
+
+---
+
+## `stack_top_feature` (geparkt, Arbeitskreis "Spaeter" -- gleiche Stufe wie #38): Sichtgleichheit Netz/Spieler am Kuppelstapel (2026-08-20)
+
+Aus einer Nutzer-Frage im Anschluss an eine GUI-Aenderung ("hat diese
+Information das Netz auch?"), Code am selben Tag geprueft. Vollstaendiger
+Zuschnitt in `PREREG_stack_top_feature.md`, hier nur der Kern.
+
+**Das Kriterium ist Sichtgleichheit, nicht Staerke (Nutzer-Vorgabe
+2026-08-20).** Das Netz soll denselben Informationsstand haben wie ein
+Spieler am Tisch -- nicht mehr und nicht weniger. Ein flaches
+Arena-Ergebnis waere kein Grund, das wieder herzunehmen ("Korrektheit vor
+gemessenem Nutzen"); die Arena laeuft als Waechter gegen Regression, nicht
+als Richter ueber das Merkmal. Entsprechend gibt es KEINE
+Haeufigkeitsschwelle als Baubedingung.
+
+**Das Prinzip ist schon gebaut, nur in der anderen Richtung:** die Farben
+eines Bonusplaettchens gehen nur bei aufgedecktem Chip ins Merkmal,
+begruendet mit "sonst versteckte Information, die kein Spieler kennt"
+(`engine/src/features.rs:154`). Diese Prereg zieht die zweite Haelfte nach.
+
+**Befund.** Die Rueckseite der obersten Kuppelstapel-Platte liegt am Tisch
+offen und steht seit Commit 94b9090 auch im Ziehen-Knopf des
+Stapel-Dialogs. Das Netz bekommt sie nicht: `dome_stack_top_type` existiert
+nur in der Frontend-Serialisierung (`engine/src/serialize.rs:269`) und wird
+weder in `features.rs` noch in `neural_net.py` gelesen (Grep, null Treffer).
+Zum Stapel sieht das Netz nur die Menge der Rest-Designs
+(`dome_pool_mask`), den Wild-Anteil und die Stapelgroesse -- alles
+reihenfolgeblind. Zweite Luecke derselben Art: `pending_stack_draw` ist gar
+kein Zustandsmerkmal, waehrend einer Ziehserie kennt der Spieler die
+Rueckseiten aller bereits gezogenen Platten.
+
+**Keine Orakel-Frage.** Die 18 Designs sind ein offener Satz mit je einem
+Exemplar (`engine/src/dome.rs:198-226`); wer Auslage und Bretter sieht,
+kennt den Rest durch Subtraktion. `dome_pool_mask` ist damit abgeleitetes
+oeffentliches Wissen. (Eine gegenteilige Koordinator-Aussage vom
+2026-08-20 ist durch den Nutzer richtiggestellt.)
+
+**Warum es additiv ginge.** Das Eingabe-Layout kommt schon heute aus der
+ONNX-Datei selbst (`detect_layout`, `engine/src/net.rs:104-118`). Zwei neue
+Werte ans Ende des Flat-Vektors (708 -> 710) plus eine Kuerzung auf die vom
+Modell deklarierte Laenge in `features_for_layout`
+(`engine/src/features.rs:952`, dem einzigen Engpass aller Inferenz) laesst
+Bestandsmodelle byte-identisch weiterlaufen. Bestehende Korpora tragen das
+Feld bereits, Neugenerierung waere nicht noetig.
+
+**Erste Stufe ist ein Inventar, kein Bau:** Abgleich Feld fuer Feld,
+was die GUI zeigt gegen das, was der Merkmalsvektor traegt, in BEIDE
+Richtungen ("Netz sieht mehr" / "Netz sieht weniger"). Offen und im
+Inventar zu klaeren sind u.a. Mondstapel-Reihenfolge und Beutel-/Turm-
+zaehler.
+
+
+### B1-Erzaehlung (`PREREG_long_row_payoff.md`, ENTSCHIEDEN 2026-08-24)
+
+Der Arm ist entschieden und negativ; das Verdikt und die weitergeltende
+Vorgabe ("wer die Initiierung hebt, ohne die Vollendungsquote deutlich ueber
+0,53 zu bringen, wiederholt B1") stehen weiter in STATUS.md. Die
+Messchronologie liegt hier.
+
+Diagnose ergab, dass die Luecke im BEGINNEN langer Reihen sitzt (Netz
+11,5 % gegen Heuristik 25,2 %, Faktor ~3, flach ueber R1-4). Der darauf
+zugeschnittene Such-Additivterm (Stufenfunktion 0 auf 1 in Musterreihe
+5/6, additiv am Blattwert, w=0,3) wurde gebaut, abgenommen
+(Paritaets-Hash haelt) und in zwei Schritten gemessen. Schritt 2:
+gepaarte Arena netz-gegen-netz, 407 Kampagnen-Seeds, BEIDE
+Sitzpositionen, 814 Partien, 32 Bloecke.
+
+- **Der Mechanismus greift.** Begonnene lange Reihen +0,310 je Partie
+  (t=+7,57), vollendete +0,231 (t=+4,98), Vollendungsquote 0,534 gegen
+  0,514 -- also NICHT gefallen. Die Zugziele wandern aus Musterreihe 3
+  und 4 in 5 und 6. **Der registrierte Falsifikator ist NICHT
+  ausgeloest.**
+- **Und der Arm verliert klar.** Siegquote 42,9 % (gepaart -0,145,
+  t=-4,11), eigene Punkte -3,428 (t=-5,37). Die Bilanz zeigt auf die
+  STRAFLEISTE: +3,640 Strafpunkte (t=+6,75), waehrend die Plattenpunkte
+  in Summe leicht POSITIV sind (+0,33) und volle Spalten sich nicht
+  signifikant bewegen (+0,033, t=+1,83). k1-Rate identisch 43/312.
+
+**Lesart -- Nutzer-Korrektur 2026-08-24, die erste Fassung war
+falsch.** Der Schluss "die Meidung langer Reihen ist richtiges Spiel"
+wurde zurueckgewiesen (*"so spielt kein ernst zu nehmender Gegner"*)
+und ist durch die eigenen Zahlen widerlegt: **die Vollendungsquote
+liegt in BEIDEN Armen bei nur ~0,53.** Der Lauf vergleicht zwei
+inkompetente Regime und stellt fest, dass "weniger davon" besser
+abschneidet -- ueber die Staerke KOMPETENTEN Langreihen-Spiels sagt er
+nichts. Die Strafleisten-Rechnung ist kein Beleg gegen lange Reihen,
+sondern der erwartbare Preis dafuer, ein Netz in ein Regime zu
+schieben, das es nie gelernt hat.
+
+**Belastbar bleibt:** ein Additiv am Blattwert kann bewirken, DASS eine
+lange Reihe angefangen wird -- es kann die Faehigkeit, sie zu FUEHREN
+(Steinwahl, Timing, Ueberlaufschutz, Vollendungs-Sequenz), nicht
+mitliefern. Die Engstelle ist damit unveraendert die VOLLENDUNG
+(Strukturbefund: Bau bis ~4,6 von 6, letzte Zellen nie), und die ist
+eine TRAININGS-, keine Suchfrage. **Vorgabe fuer jeden Nachfolge-Arm:
+wer die Initiierung hebt, ohne die Vollendungsquote deutlich ueber 0,53
+zu bringen, wiederholt B1.**
+
+**Methodische Lehre, teuer bezahlt:** aus "Eingriff X in Richtung Y
+verliert" folgt NICHT "Y ist falsch" -- nur, dass X in diesem Zustand
+verliert. Es fehlt die Kontrollgruppe: ein Agent, der Y KANN. Solange
+eine Faehigkeitskennzahl in beiden Armen gleich schlecht ist, ist die
+Faehigkeit konstant gehalten und nicht mitgemessen.
+
+**Arena-Mitschrieb dauerhaft erweitert:** `long_rows_started` /
+`long_rows_completed` / `long_rows_cleared_unplaceable` je Partie und
+Seite (Zaehler auf `PlayerBoard`, NICHT im `state.log` -- das ist das
+Kernbeweis-Vergleichsobjekt). Ohne sie ist die Vollendungsquote aus
+Arena-Laeufen prinzipiell nicht zu gewinnen, weil `round_end.rs`
+unplatzierbare Reihen ohne Logzeile leert. `tools/arena_compact.py`
+nimmt die Felder mit.
+
+**Offener Sonden-Fix (bestaetigt, NICHT erledigt):**
+`tools/probes/row_preference_probe.py:190-198` labelt in
+`imm_netvnet` beide Seiten als "Champion", obwohl spec_a=alpha0.2 und
+spec_b=frozen zwei Agenten sind. Fix-Muster: `tools/probes/
+penalty_track_probe.py` (liest spec_a/spec_b, trennt NetzA/NetzB,
+rechnet die gepaarte Differenz). Der Kernbefund (~55,5 % kurze
+Reihen) ruht auf drei weiteren, eindeutigen Kontexten und duerfte sich
+nicht verschieben.
+
+**Nacht-Fahrplan (Punkte-/Margen-Kopf-Strang): ABGEARBEITET
+2026-08-24** -- Statuskoepfe in dieser Sitzung nachgeprueft, nicht aus
+dem Gedaechtnis. (1) `PREREG_points_dist_bin_scale.md` ENTSCHIEDEN,
+(2) `PREREG_score_correlation.md` ENTSCHIEDEN, (3)
+`PREREG_floor_action_aversion.md` ENTSCHIEDEN (Verdikt H1: roher
+Policy-Prior auf dem Strafleisten-Ziel in allen 280 Stellungen exakt 0,
+Float32-Softmax-Unterlauf), (4) `PREREG_saturating_score_utility.md`
+par.3a Tor GEFAHREN, Verdikt DAZWISCHEN -- **hier steht ein
+NUTZER-ENTSCHEID aus** (sigma-Kopf auf `points_val` selbst oder auf ein
+TD-unberuehrtes Ziel; kein Automatismus, so im Tor vorgesehen), (5)
+Floor-Arme-Arena ENTFAELLT, weil (3) auf H1 und nicht auf H2/H3 zeigte,
+(6) `PREREG_completion_bottleneck_locus.md` ENTSCHIEDEN, (7) Straf-Sonde
+gegen die Netz-gegen-Netz-Quelle nachgezogen (`penalty_track_probe.json`
+traegt jetzt `netvnet` und `netvnet_swap`).
+
+
+### CPU-Nebenlast: Kalibrierungs-Smoke und Not-Deckel-Zielbild
+
+Die REGEL steht weiter in STATUS.md (Arena exklusiv; Single-Thread-IO
+erlaubt). Hier liegen die Kalibrierungs-Chronologie und das nie gebaute
+Not-Deckel-Zielbild.
+
+**KALIBRIERUNGS-SMOKE EINGETAKTET (Nutzer 2026-08-22, Vorab-Regel VOR
+der Messung):** Die strenge Fassung ("gar nichts parallel") wird an der
+leichtesten Lastklasse kalibriert. Aufbau: derselbe 8-Partien-Smoke
+zweimal EXKLUSIV (Basislinie, muss byte-identisch sein, sonst Abbruch),
+dann zweimal unter definierter Ein-Kern-Nebenlast (Endlosschleife, die
+Asym-Pickles laedt -- exakt die Lastklasse des Vorfalls vom 2026-08-22,
+der einen Arena-Neustart kostete). Regel: alle vier byte-identisch =>
+leichte Single-Thread-IO-Jobs (keine Suchlaeufe, kein Training) sind
+kuenftig neben Arena-Messungen erlaubt; irgendeine Abweichung => die
+strenge Regel bleibt. Ergebnis wird hier nachgetragen.
+**ERGEBNIS (2026-08-22): BESTANDEN -- alle 4 Laeufe byte-identisch**
+(SHA256 8837a35b... ueber cal_smoke_a1/a2/b1/b2; Stoerlast = Endlos-
+Pickle-Loader, PID-kontrolliert). Damit gilt die kalibrierte Fassung:
+Single-Thread-IO parallel zu Arena-Messungen erlaubt, Suchlaeufe/
+Training/Mehrkern-Last weiterhin verboten. Der Not-Deckel-Umbau
+(Zielbild unten) bleibt Vorrat ohne Dringlichkeit.
+
+**ZIELBILD NOT-DECKEL (Nutzer-Entscheid 2026-08-22, Bauplan, nichts
+gebaut):** Wanduhr-Deckel sollen Ergebnisse nie mehr VERAENDERN
+koennen. Zwei Schichten: (1) alles Algorithmische bekommt
+deterministische ARBEITS-Deckel (Knoten/Samples/Tiefe, Vorbild
+round5-NODE_BUDGET) -- byte-identisch unter jeder Last; (2) die Wanduhr
+bleibt nur als aeusserster Wachhund gegen echte Haenger und darf
+ausschliesslich TOETEN und als ungueltig markieren (Partie wird
+nachproduziert bzw. das Seed-PAAR faellt aus gepaarten Messungen),
+nie beschneiden-und-weiterlaufen; jedes Feuern mit Deckel-Name im
+Ergebnis-JSON gezaehlt. Nebeneffekt: wuerde auch die sync/async-
+Trainingsziel-Divergenz (Async-Gate-B-Rest) aufloesen. Gebaut wird
+erst, wenn der Smoke oder ein Vorfall zeigt, dass ein Deckel bindet;
+erster Schritt waere dann Deckel-Telemetrie zur Taeter-Identifikation.
+
+---
+
