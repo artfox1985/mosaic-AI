@@ -2220,6 +2220,13 @@ fn play_arena_game<R: Rng + ?Sized>(
     // PREREG_search_rng_split.md: siehe `play_one_game`s gleichnamiger
     // Parameter -- der Seed, mit dem der Aufrufer `rng` erzeugt hat.
     game_seed: u64,
+    // Partie-Log mitgeben (Default aus). Noetig, weil die SPALTEN-Vollendung
+    // -- das eigentliche Ziel -- nur aus dem Log rekonstruierbar ist
+    // (`tools/probes/column_build_structural_probe.py::rekonstruiere_partie`).
+    // Die Musterreihen-Vollendungsquote aus den Zaehlern ist eine ANDERE
+    // Groesse: eine volle Musterreihe legt EINEN Stein, eine volle Spalte
+    // braucht SECHS.
+    log_games: bool,
 ) -> Value {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut steps = 0u32;
@@ -2304,7 +2311,7 @@ fn play_arena_game<R: Rng + ?Sized>(
     }
     let p0 = &game.state.players[0];
     let p1 = &game.state.players[1];
-    json!({
+    let mut out = json!({
         "scores": [p0.score, p1.score],
         "scores_unclamped": [p0.score_unclamped, p1.score_unclamped],
         "winner": determine_winner(&game.state),
@@ -2330,7 +2337,18 @@ fn play_arena_game<R: Rng + ?Sized>(
         // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
         // und fuer den #21-Doku-Lauf (Endwertungs-Fix) ist sie zentral.
         "scoring_tile_ids": game.state.scoring_tile_ids,
-    })
+    });
+    if log_games {
+        if let Some(obj) = out.as_object_mut() {
+            obj.insert("log".to_string(), json!(game.state.log));
+            obj.insert("names".to_string(), json!([
+                game.state.players[0].name.clone(),
+                game.state.players[1].name.clone(),
+            ]));
+            obj.insert("game_seed".to_string(), json!(game_seed));
+        }
+    }
+    out
 }
 
 /// Heuristik v1 gegen Heuristik v2, ohne Netz
@@ -2353,6 +2371,7 @@ pub fn run_heuristic_v1_vs_v2_arena(
     num_threads: usize,
     c: f64,
     swap: bool,
+    log_games: bool,
 ) -> String {
     use crate::mcts::HeuristikVariante as HV;
     // Brett 0 traegt v1, Brett 1 traegt v2 -- oder umgekehrt bei `swap`.
@@ -2372,7 +2391,7 @@ pub fn run_heuristic_v1_vs_v2_arena(
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let mut v = play_arena_game(
-            sims, c, ids, namen.clone(), first, &mut rng, varianten, game_seed,
+            sims, c, ids, namen.clone(), first, &mut rng, varianten, game_seed, log_games,
         );
         // Welches Brett welche Variante trug, mitschreiben -- sonst muss die
         // Auswertung es aus dem Aufruf rekonstruieren.
@@ -2414,7 +2433,7 @@ pub fn run_arena_match(
         let names = ["A".to_string(), "B".to_string()];
         play_arena_game(
             [sims_a, sims_b], c, ids, names, first, &mut rng,
-            [crate::mcts::HeuristikVariante::V1; 2], game_seed,
+            [crate::mcts::HeuristikVariante::V1; 2], game_seed, false,
         )
     };
 

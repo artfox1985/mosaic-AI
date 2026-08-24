@@ -32,10 +32,26 @@
 //!
 //! ## Die vier Bausteine (Nutzer-Entscheid 2026-08-24, alle vier gewaehlt)
 //!
-//! 1. **Stetig im Fuellstand.** Kredit skaliert mit `(fuellstand/kapazitaet)^2`
-//!    -- derselbe Exponent wie im Anker (`wertung_progress`, `.powi(2)`), aus
-//!    demselben Grund: er bevorzugt EINE fast fertige Baustelle gegenueber
-//!    vielen halbfertigen und verhindert das Verzetteln.
+//! 1. **Stetig im Fuellstand, SAETTIGEND** (Nutzer-Vorgabe 2026-08-24, zweite
+//!    Fassung): ein hoher Kredit fuer die unteren Reihen, dessen ZUWACHS
+//!    schnell einbricht, sobald die erste Fliese liegt. Formel
+//!    `A(r) * sqrt(fuellstand/kapazitaet)`.
+//!
+//!    **Die erste Fassung hatte die entgegengesetzte Form** und ist daran
+//!    gescheitert: `(fuellstand/kapazitaet)^2` ist KONVEX, der Anreiz waechst
+//!    mit dem Fuellstand und zielt aufs Fortfuehren. Der gemessene Engpass
+//!    sitzt aber im ENTSCHLUSS, eine lange Reihe ueberhaupt anzufangen
+//!    (Netz 11,5 Prozent gegen Heuristik 25,2 Prozent). Konkav setzt den
+//!    Anreiz dorthin und nimmt sich danach zurueck: bei Kapazitaet 6 bringt
+//!    die erste Fliese 0,41 des Kredits, die zweite noch 0,17, die letzte
+//!    0,09.
+//!
+//!    **Unterschied zu B1, damit der Fehler sich nicht wiederholt:** B1 war
+//!    eine STUFE 0 auf 1, die nach dem Start dauerhaft stehen blieb -- kein
+//!    Zug zum Weitermachen, keine Vorsicht, Ergebnis waren angefangene
+//!    Ruinen. Die saettigende Form haelt das NIVEAU (die Reihe aufzugeben
+//!    kostet den ganzen Kredit) und gibt fuers Weiterfuellen nur wenig --
+//!    `projected_unplaceable_penalty` bestraft das Liegenlassen zusaetzlich.
 //! 2. **Nur wenn erreichbar.** Eine Reihe, deren Zielfeld auf der Kuppel gar
 //!    nicht mehr legbar ist, bekommt nichts -- geprueft ueber dieselben
 //!    Kriterien wie `round_end::row_has_open_matching_slot` (offen, nicht
@@ -66,6 +82,25 @@ use crate::dome::SpaceType;
 /// Zuwachs unten benutzt exakt dieselbe Formel, damit v2 und die Endwertung
 /// nicht auseinanderlaufen.
 const K1_VERTIKALE_REIHEN: usize = 1;
+
+/// **HANDGESETZT** (Nutzer-Vorgabe 2026-08-24: "das ist die Heuristik, da
+/// muessen wir handcraften"). Kredit-Hoehe je Musterreihe, Index 0..5 fuer
+/// Musterreihe 1..6, in PUNKTEN.
+///
+/// Kurze Reihen bekommen nichts: sie werden ohnehin praktisch jede Runde
+/// abgeschlossen (Rasterreihe 1 und 2 liegen bei rund 5 von 5 moeglichen
+/// Abschluessen). Der Kredit steigt nach unten, weil dort die Luecke sitzt:
+/// gemessen 1,13 und 0,74 Abschluesse je Partie in Reihe 5 und 6, gegen
+/// 2,50 und 2,20 bei einem Spieler, der das Spiel beherrscht.
+///
+/// Die Zahlen sind eine SETZUNG, keine Ableitung -- und das ist Absicht.
+/// Eine aus dem heutigen Self-Play abgeleitete Groesse wuerde die Schwaeche
+/// festschreiben, die sie beheben soll (dieselbe Regel, an der schon
+/// `MARGIN_SCALE` und `FLOOR_SHAPING_SCALE` haengen). Groessenordnung: eine
+/// zusaetzliche Vollendung in Reihe 6 traegt eine Spalte (7 Punkte bei
+/// aktivem k1) plus Platzierungspunkte, 5 Punkte Kredit sind also die
+/// gleiche Groessenordnung wie der Ertrag und nicht ein Vielfaches davon.
+const REIHEN_KREDIT: [f64; 6] = [0.0, 0.0, 0.0, 1.0, 3.0, 5.0];
 /// Wertungsplatten-Id der SPEZIALFELDER. Kostet `-3` je leerem Feld
 /// (`scoring.rs`, Zweig `6`).
 const K7_SPEZIALFELDER: usize = 6;
@@ -198,9 +233,14 @@ pub fn row_completion_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 
         if !erreichbar {
             continue; // Baustein 2: unerreichbare Reihe bekommt nichts
         }
-        // Baustein 1: stetig im Fuellstand, Exponent wie im Anker.
-        let fortschritt = (fuell as f64 / kapazitaet as f64).powi(2);
-        summe += fortschritt * bester;
+        // Baustein 1: SAETTIGEND. Der Kredit steht fast vollstaendig schon
+        // nach der ersten Fliese, der Zuwachs bricht danach ein.
+        let saettigung = (fuell as f64 / kapazitaet as f64).sqrt();
+        // Der handgesetzte Reihen-Kredit ist der tragende Posten; der
+        // Feld-Ertrag (Spalte, Spezialfeld) kommt additiv obendrauf, weil er
+        // stellungsabhaengig ist und in der ersten Fassung als ALLEINIGER
+        // Traeger zu klein war (0,97 bis 1,75 Punkte, und nur bei aktivem k1).
+        summe += saettigung * (REIHEN_KREDIT[r] + bester);
     }
     summe
 }
