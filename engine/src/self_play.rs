@@ -1091,6 +1091,38 @@ fn warne_unbrauchbaren_ownership_kopf_einmal(len: usize) {
 }
 
 pub(crate) fn resolve_tiling_step(state: &GameState, pi: usize, net: Option<&Net>) -> TilingStep {
+    resolve_tiling_step_variante(state, pi, net, crate::mcts::HeuristikVariante::V1)
+}
+
+/// Wie [`resolve_tiling_step`], mit ausdruecklicher Heuristik-Variante.
+///
+/// `V2` routet die Platzierung ZUERST in die v2-Zielzellen (1-2 Spalten plus
+/// 1-2 Zeilen, `plate_builder::v2_tiling_vorzug`) und faellt sonst auf den
+/// Bestandspfad durch.
+///
+/// **Das ist die Haelfte, die ein Bewertungsterm nicht erreichen kann.**
+/// `best_first_step_inner` waehlt nach reinen Sofortpunkten
+/// (`tiling_solver.rs:49-56`, dort ausdruecklich als Befund vermerkt) und
+/// wuerfe jede Draft-seitige Absicht wieder weg. `PREREG_provocation.md`
+/// nennt denselben Punkt als Kernbefund: "der Engpass ist die
+/// PLATZIERBARKEIT, nicht die Plattenbewertung".
+///
+/// **Der Anker bleibt unberuehrt:** `V1` laeuft Zeile fuer Zeile wie zuvor,
+/// die Bestandssignatur oben ist unveraendert, und der Vorzug haengt an der
+/// VARIANTE statt an `MOSAIC_SPALTENBAU`/`MOSAIC_PLATTENBAU`. Beide Knoepfe
+/// sind prozessweit und damit fuer eine Partie v1 GEGEN v2 unbrauchbar --
+/// sie gaelten fuer beide Seiten oder fuer keine.
+pub(crate) fn resolve_tiling_step_variante(
+    state: &GameState,
+    pi: usize,
+    net: Option<&Net>,
+    variante: crate::mcts::HeuristikVariante,
+) -> TilingStep {
+    if variante == crate::mcts::HeuristikVariante::V2 {
+        if let Some(step) = crate::plate_builder::v2_tiling_vorzug(state, pi) {
+            return step;
+        }
+    }
     match net {
         Some(n) => {
             // Ownership-Pol Teil 2: EINMAL je Zug, VOR der Kandidatenschleife.
@@ -2273,10 +2305,25 @@ fn play_arena_game<R: Rng + ?Sized>(
                         let mut search_rng = StdRng::seed_from_u64(
                             crate::net_mcts::derive_search_seed(game_seed, steps as u64),
                         );
-                        crate::mcts::search_drafting_action_variante(
-                            &game.state, s, c, &mut search_rng, varianten[pi],
-                        )
-                        .unwrap_or_else(|| actions[0].clone())
+                        // v2: Zielzellen-Vorzug VOR der Suche. Dieselbe Bauform
+                        // wie `provocation`s "Vorzugszug: Praeferenz statt
+                        // Verbot" -- greift nur, wenn der Vorzug einen LEGALEN
+                        // Zug liefert, sonst entscheidet die Suche frei. Kein
+                        // Beschneiden der Aktionsmenge: das war gemessen
+                        // spielzerstoerend (PREREG_provocation.md par.7/par.9,
+                        // Endstand 6-15 statt 47,80).
+                        let vorzug = if varianten[pi] == crate::mcts::HeuristikVariante::V2 {
+                            crate::plate_builder::v2_drafting_vorzug(&game.state)
+                                .filter(|a| actions.contains(a))
+                        } else {
+                            None
+                        };
+                        vorzug.unwrap_or_else(|| {
+                            crate::mcts::search_drafting_action_variante(
+                                &game.state, s, c, &mut search_rng, varianten[pi],
+                            )
+                            .unwrap_or_else(|| actions[0].clone())
+                        })
                     };
                     // Siehe `drafting_step`-Kommentar: `chosen` stammt aus
                     // `drafting_actions`, ein `Err` waere ein Engine-Bug.
@@ -2290,7 +2337,7 @@ fn play_arena_game<R: Rng + ?Sized>(
             // Heuristik-vs-Heuristik-Arena, kein Netz -- `None` bleibt byte-identisch.
             Phase::Tiling => {
                 let pi = game.state.current_player;
-                match resolve_tiling_step(&game.state, pi, None) {
+                match resolve_tiling_step_variante(&game.state, pi, None, varianten[pi]) {
                     TilingStep::Place(ta) => {
                         let _ = game.apply_single_tiling(pi, &ta);
                     }
