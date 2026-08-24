@@ -1185,7 +1185,22 @@ fn bauer_drafting_vorzug(state: &GameState) -> Option<Action> {
 /// Engine-Selbstspiel-Invariante tokens == gelegte Kuppeln (Peeks kommen im
 /// Netz-Selbstspiel praktisch nicht vor, Review-Befund 3: 0 Peeks in 56
 /// Partien; falls doch, ist die Korrektur konservativ-legal, nie zu locker).
-fn seed_state_fixup(st: &mut GameState) {
+///
+/// ZWEITER Aufrufer (Kernbeweis-Diagnose, PREREG_agent_encapsulation.md
+/// par.8e-Folge, 2026-08-24, empirisch belegt): `serialize::json_to_state_exact`
+/// hat GENAU dieselbe Untertreibungs-Luecke -- an einer mitten in der
+/// Stufe-2-Rotationswahl eingefrorenen Stellung (seed 910002, Runde 2,
+/// Kachel 4 -> Slot (2,1), zweite Kuppel dieser Runde, tokens_used=1)
+/// rekonstruiert sie `dome_tiles_placed_this_round=0` statt 1 -- die dadurch
+/// im Suchbaum ILLEGAL verfuegbare dritte Kuppel-Platzierung derselben Runde
+/// (dokumentierte Naeherungsgrenze, serialize.rs:597-606 Kategorie 3, "hoechstens
+/// 1 Platzierung zu grosszuegig tiefer im Suchbaum") kippt die Rotationswahl
+/// messbar (Rotation 90 statt 0 im WORKER-Pfad, waehrend der In-Process-Pfad
+/// mit der korrekten Zwischenzahl 0 waehlt -- Kontrollexperiment: identischer
+/// Zustand+Suchseed, NUR dieses eine Feld auf den `tokens_used`-abgeleiteten
+/// Wert gepatcht, kippt `net_search_drafting_action` zurueck auf Rotation 0).
+/// `pub(crate)` dafuer noetig (vorher modul-privat).
+pub(crate) fn seed_state_fixup(st: &mut GameState) {
     for p in st.players.iter_mut() {
         if p.dome_tiles_placed_this_round == 0 {
             p.dome_tiles_placed_this_round =

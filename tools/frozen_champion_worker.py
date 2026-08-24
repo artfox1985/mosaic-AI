@@ -7,13 +7,17 @@ Aufruf:
 
 Laedt model.onnx + spec.json AUS dem Artefaktverzeichnis, dann je Zeile auf
 stdin ein Request-JSON:
-    {"state": <state_json-String>, "seed": <int>, "rot_seed": <int>,
+    {"state": <state_json-String>, "seed": <int>,
      "sims": <int optional>, "c_puct": <float optional>}
 
-`rot_seed` (KERNBEWEIS-FIX par.8c, PREREG_agent_encapsulation.md): eigener
-Seed fuer die Kuppel-Rotationsstufe (ChooseDomeSlot -> ChooseDomeRotation),
-PFLICHTFELD -- harter Fehler bei Fehlen, kein stiller Rueckfall auf `seed`
-(der alte Ein-Strom-Modus war genau der Kernbeweis-Bug).
+PER-ENTSCHEIDUNG-Protokoll (KERNBEWEIS-FIX par.8d, PREREG_agent_encapsulation.md,
+loest die atomare Kuppel-Sonderbehandlung aus par.8a/8c ab): jede Anfrage
+beantwortet GENAU EINE Drafting-Entscheidung -- auch jeder Peek-Schritt, die
+Stapel-Slot-Wahl und die Kuppel-Rotationsstufe sind eigene Anfragen mit dem
+regulaeren `pending_search_seed()` des jeweiligen Schritts. Der fruehere
+zweite `rot_seed`-Parameter ist damit ersatzlos entfallen -- der Treiber
+(`tools/frozen_referee_match.py`) fragt stattdessen einfach erneut an, solange
+die gefrorene Seite noch am Zug ist.
 und schreibt EINE Antwortzeile auf stdout:
     {"ok": true, "action": <dict>, "value": <float|null>}
 oder bei Fehlern:
@@ -92,10 +96,9 @@ def main() -> int:
             req = json.loads(line)
             state_json = req["state"]
             seed = int(req["seed"])
-            rot_seed = int(req["rot_seed"])
             sims = int(req.get("sims", args.sims))
             c_puct = float(req.get("c_puct", args.c_puct))
-            resp = json.loads(engine.choose(state_json, sims, c_puct, seed, rot_seed))
+            resp = json.loads(engine.choose(state_json, sims, c_puct, seed))
             out = {"ok": True, "action": resp["action"], "value": resp.get("value")}
         except Exception as exc:  # noqa: BLE001 -- Protokollantwort statt Traceback
             out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}

@@ -79,10 +79,11 @@ class WorkerProc:
         self.n_calls = 0
         self.total_wait_s = 0.0
 
-    def ask(self, state_json: str, seed: int, rot_seed: int, sims: int | None = None, c_puct: float | None = None):
-        # `rot_seed` (KERNBEWEIS-FIX par.8c): eigener Seed fuer die Kuppel-
-        # Rotationsstufe, PFLICHTFELD -- siehe frozen_champion_worker.py-Doku.
-        req = {"state": state_json, "seed": seed, "rot_seed": rot_seed}
+    def ask(self, state_json: str, seed: int, sims: int | None = None, c_puct: float | None = None):
+        # PER-ENTSCHEIDUNG-Protokoll (par.8d): EINE Anfrage = EINE
+        # Drafting-Entscheidung -- kein `rot_seed` mehr, siehe
+        # frozen_champion_worker.py-Doku.
+        req = {"state": state_json, "seed": seed}
         if sims is not None:
             req["sims"] = sims
         if c_puct is not None:
@@ -120,7 +121,7 @@ def golden_selftest(worker: WorkerProc, golden_probe: dict) -> list[dict]:
     mismatches = []
     for p in golden_probe["probes"]:
         state_json = json.dumps(p["state"])
-        action, value = worker.ask(state_json, p["seed"], p["rot_seed"], sims=p["sims"], c_puct=p["c_puct"])
+        action, value = worker.ask(state_json, p["seed"], sims=p["sims"], c_puct=p["c_puct"])
         if action != p["expected_action"]:
             mismatches.append(
                 {"probe_id": p["probe_id"], "round": p["round"], "expected": p["expected_action"], "got": action}
@@ -165,12 +166,18 @@ def play_one_game(
         if cur == board_a:
             rg.drafting_decide_and_apply_inprocess(model_a, spec_a, sims_a, c_puct_a)
         else:
+            # PER-ENTSCHEIDUNG-Protokoll (par.8d): EINE Anfrage = EINE
+            # Drafting-Entscheidung. `advance_to_decision` ist billig, wenn
+            # nichts aufzuloesen ist (kehrt sofort mit "drafting" zurueck) --
+            # der Aussenschleife ueberlaesst deshalb JEDEN einzelnen Schritt
+            # eines mehrstufigen Kuppel-/Stapel-Zugs (Peek, Stapel-Slot,
+            # Rotation) derselben Behandlung wie eine neue Entscheidung,
+            # keine Sonderbehandlung nach Aktionstyp.
             seed_for_worker = rg.pending_search_seed()
-            rot_seed_for_worker = rg.pending_rotation_search_seed()
             state_json = rg.state_json()
             before_calls = worker.n_calls
             before_wait = worker.total_wait_s
-            action, _value = worker.ask(state_json, seed_for_worker, rot_seed_for_worker)
+            action, _value = worker.ask(state_json, seed_for_worker)
             worker_calls_this_game += worker.n_calls - before_calls
             worker_wait_s += worker.total_wait_s - before_wait
             rg.drafting_apply_external(json.dumps(action))
