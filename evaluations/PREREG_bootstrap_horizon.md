@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht -->
+<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht Nachtrag 2026-08-24: Anker-Arm bleibt geschlossen, aber die WIEDERAUFNAHME-BEDINGUNG ist jetzt benannt und pruefbar -- beide Stufe-0-Zahlen sind an plattenblindem Spiel erhoben, ein Korpus mit echtem Spaltenbau (PREREG_heuristic_v2_long_rows) waere das neue Regime. Ebenso darf der Satz Kredit-Horizont-Verdacht geschwaecht nicht als erledigt weiterzitiert werden. rtv-Waechter fuer den offenen 2-gegen-3-Arm registriert (Nutzer-Auflage): Kostengate wird gemessen statt geschaetzt, sauberes Ziel ist kein Argument. Anlass verschiebt sich: der Lehrer kann Spalten auch nicht (0,098 gegen 0,101), der Mensch schafft 1,80, und der Engpass ist Verteilung statt Versorgung -- der Horizont ist damit nicht mehr der Hauptverdaechtige fuer die Vollendungsschwaeche. -->
 
 # Vorregistrierung: Bootstrap-Horizont (2 vs 3) -- Option fuer den v22-Zuschnitt
 
@@ -168,6 +168,94 @@ Kostengate gilt je zusaetzlichem Rollout; die tiefen fruehen Rollouts
 sind der Kostentreiber und genau das, was Stufe 1 beziffern muss).
 Arm-Auswahl (2v3 vs. rundenabhaengig vs. beides) = Nutzer-Entscheid
 beim v22-Start; diese Prereg bleibt der registrierte Ort dafuer.
+
+## Nachtrag 2026-08-24: der Anker-Arm ist bereits GEMESSEN -- rtv-Waechter und Wiederaufnahme-Bedingung
+
+Der Nutzer hat den rundenabhaengigen Horizont am 2026-08-24 erneut
+aufgebracht ("ich brauch dann aber keinen konstanten horizon oder? denn kann
+ich ja abnehmen lassen mit hoeherer rundenanzahl"). **Die Frage ist bereits
+beantwortet:** Stufe 0 (unten, ENTSCHIEDEN 2026-08-23) hat die Anker-Variante
+gemessen und geschlossen. Dieser Nachtrag traegt nichts Neues zur Idee bei,
+sondern haelt drei Dinge fest, die dabei zur Sprache kamen.
+
+### 1. Selbstkorrektur: eine Kostenrechnung, die um Groessenordnungen danebenlag
+
+Beim Aufgreifen habe ich die Kosten aus der Struktur GESCHAETZT statt die
+vorhandene Messung zu lesen: `h` simuliert `h-1` Runden, gelabelt werden die
+Rundenenden 1 bis 4, also konstant 2 = 4 simulierte Runden je Partie,
+konstant 3 = 7, Anker am R5-Start = 6. Daraus las ich "der Anker kostet das
+1,5-fache".
+
+**Gemessen sind 4.734 ms gegen 235 ms je Label, Faktor 20,1** (Stufe 0). Die
+Schaetzung lag um mehr als eine Groessenordnung daneben, weil sie eine
+simulierte Runde als konstanten Posten behandelt -- der Anker-Rollout ist
+aber strukturell die vorhandene rtv-Kette
+(`sample_round_transition_for_round`) mit rekursiven
+`continue_through_round{2,3,4}`-Ketten, nicht ein flacher Durchlauf. Die
+Lehre ist die alte: **eine Aufwandsstruktur, zu der eine Messung existiert,
+wird nicht aus dem Code hergeleitet.**
+
+### 2. WAECHTER GEGEN DIE rtv-FALLE (Nutzer-Auflage 2026-08-24)
+
+Nutzer-Wortlaut: "pass auf das wir dann nicht wieder in die rtv falle tippen."
+Die Auflage trifft und ist durch Stufe 0 bereits eingeloest: der Anker-Arm
+HAT dieselbe Bauform wie rtv (mehr Rollout je Label fuer ein vermeintlich
+besseres Ziel), ist strukturell sogar dieselbe Kette, und faellt mit
+Faktor 20,1 aus jedem Kostenrahmen.
+
+Fuer den weiterhin offenen 2-gegen-3-Arm gilt vorab festgelegt:
+
+1. **Das Stufe-1-Kostengate (<= +25 Prozent Self-Play-Zeit) bindet** und wird
+   gemessen, nicht geschaetzt (siehe Punkt 1 -- genau dieser Fehler ist am
+   2026-08-24 einmal passiert).
+2. **"Das Ziel sieht sauberer aus" ist kein Argument.** rtv sah auch sauberer
+   aus und machte das Netz schlechter; entschieden wird an Staerke.
+
+### 3. WIEDERAUFNAHME-BEDINGUNG (Nutzer-Einwand 2026-08-24)
+
+Nutzer im selben Zug: "aber auch das relativiert sich, weil wir keine Ahnung
+haben was das Netz macht wenn es wirklich Spalten baut."
+
+Der Einwand ist berechtigt und praezisiert, was der Stufe-0-Verdikt-Satz
+"nicht neu vorschlagen ohne neues Regime" bedeutet. **Beide Stufe-0-Zahlen
+sind an Zustaenden aus plattenblindem Spiel erhoben** -- kritische Zellen wie
+Kosten. Sie fallen damit unter dieselbe Kontaminationsregel wie jede andere
+Aera-Messung: sie schliessen den Arm FUER DAS HEUTIGE REGIME, nicht
+grundsaetzlich.
+
+**Der Ausloeser fuer eine Wiederaufnahme ist damit benannt und pruefbar:** ein
+Korpus, in dem tatsaechlich Spalten gebaut werden (etwa aus
+`PREREG_heuristic_v2_long_rows.md`). Dort waeren die kritischen Zellen andere
+Zustaende, und die Frage, ob tiefere Ziele die Auszahlung tragen, waere neu
+zu stellen. Vorher nicht.
+
+Dasselbe gilt fuer den Satz "Kredit-Horizont-Verdacht ist GESCHWAECHT" im
+Verdikt unten: er ist an Labels von Netzen gemessen, die keine Spalten bauen.
+Er darf nicht als "der Horizont ist als Erklaerung erledigt" weiterzitiert
+werden.
+
+### Anlass-Stand 2026-08-24 (fuer den offenen 2-gegen-3-Arm)
+
+Der Vollendungs-Strukturbefund, der diese Prereg am 2026-08-23 aufgewertet
+hat, ist inzwischen deutlich besser belegt -- und er zeigt inzwischen
+woanders hin als auf den Horizont:
+
+- **Erste unkontaminierte Referenz:** zehn Mensch-gegen-Netz-Partien
+  (`static/log/`, Nutzer gewinnt 8 von 9) ergeben 1,80 volle Spalten je
+  Partie gegen 0,10 des Netzes
+  (`tools/probes/human_row_profile_probe.py`).
+- **Der Lehrer kann es auch nicht** (407 Partien: volle Spalten 0,098 gegen
+  0,101). Der Bias ist also weder geerbt noch im Training verloren gegangen,
+  er war nie da -- das schwaecht die Formulierung "im Training verloren
+  gegangen" im Nachtrag vom 2026-08-23.
+- **Der Engpass ist Verteilung, nicht Versorgung:** eine volle Spalte kostet
+  21 Zellen; das Netz verbraucht 42,7 Zellen und truege damit gleichverteilt
+  2,03 Spalten statt 0,10 (`tools/probes/row_supply_ceiling_probe.py`).
+
+Zusammen mit dem Stufe-0-Verdikt heisst das: der Horizont ist nicht mehr der
+Hauptverdaechtige fuer die Vollendungsschwaeche. Der 2-gegen-3-Arm bleibt als
+eigenstaendige Ziel-Qualitaetsfrage offen, aber er sollte nicht mehr als
+deren Loesung verkauft werden.
 
 ## Stufe 0 (NEU, Nutzer-Freigabe 2026-08-23 "im kleinen testen/debuggen"): Label-Diagnose OHNE Training
 
