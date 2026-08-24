@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Warum meidet der Champion die AKTION "Ziel Strafleiste" massiv, die KONSEQUENZ "Steine auf der Strafleiste" aber nicht -- sitzt das im Policy-Prior oder in der Suche, und warum korrigiert der aktive Floor-Shaping-Term es nicht? | Beleg: nichts gebaut, angelegt 2026-08-23. Anlass ist die gepaarte Strafleisten-Sonde ueber 407 identische Partien: abgeladene Steine 2,88 gegen 6,38 (t=-12,6), Ueberlauf-Steine 2,21 gegen 1,78 (t=+4,2), Strafrunden 4,25 gegen 3,81 (t=+6,0). Nutzer-Hypothese Floor-Shaping am Code geprueft: der Term ist eine reine ZUSTANDS-Funktion und damit symmetrisch, kann die Asymmetrie also nicht erzeugen -- er sollte sie korrigieren und tut es offenbar nicht. Das Gewicht 0,3 ist auf STAERKE bereits dreifach re-validiert (par.4, PREREG_search_path_remeasurements Messung 1 plus Task A am v21-Champion: 0,15 und 0,6 beide H0, Abschalten kostet 11,25 pp bei p=0,0001 -- Strukturbefund "Schalter, kein Regler"). Diese Prereg stellt die Staerke-Frage NICHT neu; sie misst, ob der Term das tut, wofuer er gebaut ist. Das Task-A-Artefakt traegt beide Arme mit je 400 Partien, aber KEINE Logs, die Verhaltensfrage ist daran also nicht nachtraeglich beantwortbar -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Warum meidet der Champion die AKTION "Ziel Strafleiste" massiv, die KONSEQUENZ "Steine auf der Strafleiste" aber nicht -- sitzt das im Policy-Prior oder in der Suche, und warum korrigiert der aktive Floor-Shaping-Term es nicht? | Beleg: par.6 Tor GEFAHREN 2026-08-24 (floor_action_aversion_gate.json, 280 qualifizierende Stellungen, Champion v21_2d_brierbest, sims=200): roher Policy-Prior auf dem Strafleisten-Ziel ist in ALLEN 280 Stellungen numerisch EXAKT 0 (Float32-Softmax-Unterlauf), Suchanteil nach der Suche ebenfalls in allen 280 exakt 0 -- H1, in schaerfster Form. Arme R/A0/A1 entfallen nach der vorab festgelegten Regel. Mechanismus (Herleitung): ein Logit-Abstand > ~87 ist fuer Gumbel(0,1)-Rauschen an der Wurzel unueberwindbar, der Floor-Shaping-Term wirkt am Blattwert -- hinter dem Nadeloehr der Wurzelauswahl, nicht davor, das erklaert zwanglos, warum ein staerke-validierter Term die Aktions-Asymmetrie nicht korrigiert. Einschraenkung: Runden-Verteilung schief (268/11/1/0/0), Gesamt-Verdikt davon unberuehrt -->
 
 # Vorregistrierung: Aktions-Ebenen-Aversion gegen die Strafleiste
 
@@ -152,7 +152,65 @@ Vorab festgelegte Lesart:
 Dieses Tor kostet Vorwaertslaeufe ueber ein Stellungsset. Es entscheidet,
 welche Arme ueberhaupt sinnvoll sind, und steht deshalb vorn.
 
+### par.6 ERGEBNIS (2026-08-24): H1, eindeutig -- die Arme entfallen
+
+Gefahren mit `tools/probes/floor_action_aversion_gate.py`, Artefakt
+`floor_action_aversion_gate.json`. **280 qualifizierende Stellungen**
+(Farbkonflikt- oder GF-Sonne-Kapazitaets-Kriterium, siehe Werkzeug-Kopf fuer
+die exakte, konservative Definition), Champion `v21_2d_brierbest`,
+`sims=200`, `c_puct=1,5`.
+
+**Zwei Selbsttests VOR jeder Kennzahl bestanden** (REGEL 0): die lokal
+portierte `action_to_id` gegen die importierte Referenzfunktion aus
+`neural_net.py`, und "jeder von der Suche zurueckgegebene Kandidat ist
+legal" gegen die Engine selbst. Ein erster Versuch, `mv["action_id"]` aus
+`net_search_state_json` direkt mit der globalen `action_to_id`-Achse zu
+vergleichen, ist dabei PROMPT gescheitert (die Engine gibt dort einen
+LOKALEN Index in die Kandidatenliste zurueck, keine globale ID) --
+korrigiert auf Matching ueber den Aktionsinhalt, bevor irgendetwas gezaehlt
+wurde.
+
+| Groesse | Floor-Ziel | Ueberlauf-Reihen-Ziel |
+|---|---|---|
+| Roher Prior (Mittel ueber 280 Stellungen) | **0,0 -- exakt, in ALLEN 280 Stellungen** (Float32-Softmax-Unterlauf, nicht Rundung) | 0,00055 (72/280 Stellungen > 0) |
+| Suchanteil nach 200 Sims (Mittel) | **0,0 -- in ALLEN 280 Stellungen** | 0,00102 (10/280 Stellungen > 0) |
+
+**Verdikt nach der vorab festgelegten Lesart: H1, und zwar in seiner
+schaerfsten Form.** Der Prior ist nicht nur "schon asymmetrisch" -- er
+schliesst das Strafleisten-Ziel in JEDER gepruefter Stellung numerisch
+vollstaendig aus, und die Suche bewegt daran nichts (kann es auch nicht,
+siehe Mechanismus unten). **Der Hebel liegt im Ziel/Korpus, nicht in der
+Suche -- nach par.7 des Tors entfallen die Arme R/A0/A1 (H2/H3 waeren
+Voraussetzung).**
+
+**Mechanismus, warum die Suche strukturell nicht helfen kann (Herleitung,
+nicht separat gemessen):** ein Float32-Softmax-Unterlauf auf exakt 0
+bedeutet einen Logit-Abstand von grob > 87 natuerlichen Einheiten zum
+Maximum. Gumbels Top-m-Wurzelauswahl addiert Rauschen aus `Gumbel(0,1)`
+(praktisch fast nie ausserhalb von etwa ±10) auf die Logits, bevor die
+`m` hoechsten genommen werden -- ein Abstand von >87 ist damit fuer JEDE
+praktisch erreichbare Rauschziehung unueberwindbar. Der Floor-Shaping-Term
+(`floor_shaping_delta`, additiv auf dem BLATTWERT) wirkt an einer Stelle,
+die die Suche gar nicht mehr erreicht, wenn die Wurzelauswahl das
+Strafleisten-Ziel schon vorher verworfen hat -- **das erklaert zwanglos,
+warum ein aktiver, dreifach staerke-validierter Shaping-Term die
+Aktions-Ebenen-Asymmetrie aus par.1 nicht korrigiert: er sitzt hinter dem
+Nadeloehr, nicht davor.**
+
+**Einschraenkung, offen ausgewiesen:** die Runden-Verteilung der 280
+Stellungen ist stark ungleich (Runde 1: 268, Runde 2: 11, Runde 3: 1,
+Runde 4/5: 0) -- eine Folge der konservativen Ueberlauf-Kriterien (kleine
+Reihenkapazitaet macht Ueberlauf frueh im Spiel haeufiger nachweisbar).
+Die je-Runde-Aufschluesselung im Artefakt ist fuer Runde 2/3 zu duenn fuer
+eine eigene Aussage; das GESAMT-Verdikt (n=280) ist davon nicht beruehrt,
+da Runde 1 ohnehin die grosse Mehrheit stellt und dort allein schon
+eindeutig ist.
+
 ## par.7 Arme
+
+**ENTFAELLT (2026-08-24).** Das Tor aus par.6 hat H1 ergeben; nach der dort
+vorab festgelegten Regel werden die Arme R/A0/A1 nicht gefahren. Dieser
+Abschnitt bleibt zur Dokumentation stehen.
 
 Nur wenn das Tor auf H2 oder H3 zeigt. Ein Faktor, vorhandener Knopf,
 **kein Bau**: `MOSAIC_FLOOR_SHAPING_W` ist registriert und aktiv
