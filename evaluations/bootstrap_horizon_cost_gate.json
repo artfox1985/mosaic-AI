@@ -1,0 +1,73 @@
+{
+  "kosten_je_label": {
+    "2": {
+      "n": 60,
+      "mittel_ms": 223.8,
+      "median_ms": 246.0
+    },
+    "3": {
+      "n": 60,
+      "mittel_ms": 410.2,
+      "median_ms": 436.5
+    },
+    "verhaeltnis_h3_zu_h2_mittel": 1.833,
+    "verhaeltnis_h3_zu_h2_median": 1.774,
+    "n_verworfen": 0
+  },
+  "selfplay": {
+    "profil": {
+      "bootstrap_nonnet_ns": 4308688900,
+      "bootstrap_value_calls": 24,
+      "bootstrap_value_ns": 8406611900,
+      "bootstrap_value_pct_of_total": 0.0,
+      "enabled": true,
+      "net_inference_calls": 7793,
+      "net_inference_inside_bootstrap_ns": 4097923000,
+      "net_inference_inside_round5_ns": 0,
+      "net_inference_ns": 4097923000,
+      "net_inference_pct_of_total": 0.0,
+      "note": "Kategorien UEBERLAPPEN (siehe profiling.rs-Modulkopf-Doku 'Task #32'): round5_alphabeta enthaelt tiling_solver_inside_round5_ns (+ net_inference_inside_round5_ns, erwartet 0), bootstrap_value enthaelt net_inference_inside_bootstrap_ns. Die *_pct_of_total-Werte beziehen sich alle auf total_selfplay_ns und summieren sich DESHALB NICHT auf 100%.",
+      "round5_alphabeta_calls": 0,
+      "round5_alphabeta_ns": 0,
+      "round5_alphabeta_pct_of_total": 0.0,
+      "round5_bookkeeping_ns": 0,
+      "tiling_solver_calls": 1513250,
+      "tiling_solver_inside_round5_ns": 0,
+      "tiling_solver_ns": 6845132200,
+      "tiling_solver_pct_of_total": 0.0,
+      "total_selfplay_calls": 0,
+      "total_selfplay_ns": 0
+    },
+    "wanduhr_s": 25.4,
+    "n_partien": 6,
+    "sims": 300,
+    "nenner": "einthreadige Wanduhr (total_selfplay_ns wird nicht bedient)"
+  },
+  "anteil_bootstrap_an_selfplay": 0.331,
+  "profil_schluessel": [
+    "bootstrap_nonnet_ns",
+    "bootstrap_value_calls",
+    "bootstrap_value_ns",
+    "bootstrap_value_pct_of_total",
+    "enabled",
+    "net_inference_calls",
+    "net_inference_inside_bootstrap_ns",
+    "net_inference_inside_round5_ns",
+    "net_inference_ns",
+    "net_inference_pct_of_total",
+    "note",
+    "round5_alphabeta_calls",
+    "round5_alphabeta_ns",
+    "round5_alphabeta_pct_of_total",
+    "round5_bookkeeping_ns",
+    "tiling_solver_calls",
+    "tiling_solver_inside_round5_ns",
+    "tiling_solver_ns",
+    "tiling_solver_pct_of_total",
+    "total_selfplay_calls",
+    "total_selfplay_ns"
+  ],
+  "aufschlag_selfplay_zeit": 0.6067,
+  "schwelle": 0.25,
+  "verdikt": "GATE GERISSEN -- vorregistriert: verworfen, ohne Rueckfrage"
+}

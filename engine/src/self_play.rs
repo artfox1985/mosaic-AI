@@ -1332,6 +1332,8 @@ struct HeuristicArenaAgent {
     c: f64,
 }
 
+
+
 impl DraftingAgent for HeuristicArenaAgent {
     fn decide(
         &self,
@@ -2203,6 +2205,7 @@ pub fn run_self_play_with_net_labels(
 /// Datenaufzeichnung). Liefert `{scores, winner, steps, total_floor,
 /// floor_per_round, long_rows_started, long_rows_completed,
 /// long_rows_cleared_unplaceable}`.
+#[allow(clippy::too_many_arguments)]
 fn play_arena_game<R: Rng + ?Sized>(
     sims: [u32; 2],
     c: f64,
@@ -2210,6 +2213,10 @@ fn play_arena_game<R: Rng + ?Sized>(
     names: [String; 2],
     first_player: usize,
     rng: &mut R,
+    // PREREG_heuristic_v2_long_rows.md: Heuristik-Variante JE BRETT. `[V1, V1]`
+    // ist das Bestandsverhalten und der Elo-Anker auf beiden Seiten; `[V1, V2]`
+    // ist der Abnahme-Lauf der Messkette Schritt 2 (v1 gegen v2, ohne Netz).
+    varianten: [crate::mcts::HeuristikVariante; 2],
     // PREREG_search_rng_split.md: siehe `play_one_game`s gleichnamiger
     // Parameter -- der Seed, mit dem der Aufrufer `rng` erzeugt hat.
     game_seed: u64,
@@ -2259,8 +2266,10 @@ fn play_arena_game<R: Rng + ?Sized>(
                         let mut search_rng = StdRng::seed_from_u64(
                             crate::net_mcts::derive_search_seed(game_seed, steps as u64),
                         );
-                        search_drafting_action(&game.state, s, c, &mut search_rng)
-                            .unwrap_or_else(|| actions[0].clone())
+                        crate::mcts::search_drafting_action_variante(
+                            &game.state, s, c, &mut search_rng, varianten[pi],
+                        )
+                        .unwrap_or_else(|| actions[0].clone())
                     };
                     // Siehe `drafting_step`-Kommentar: `chosen` stammt aus
                     // `drafting_actions`, ein `Err` waere ein Engine-Bug.
@@ -2324,6 +2333,67 @@ fn play_arena_game<R: Rng + ?Sized>(
     })
 }
 
+/// Heuristik v1 gegen Heuristik v2, ohne Netz
+/// (`PREREG_heuristic_v2_long_rows.md`, Messkette Schritt 2).
+///
+/// Die BILLIGSTE Abnahme des v2-Terms: kann v2 lange Musterreihen ueberhaupt?
+/// Kostet keine Netz-Inferenz. Pflicht-Kennzahl ist die Vollendungsquote
+/// (`long_rows_started`/`long_rows_completed` im Ergebnis-JSON) -- der
+/// vorregistrierte Falsifikator lautet, dass eine gehobene Initiierung OHNE
+/// Vollendungsquote deutlich ueber 0,53 ein NICHT-Erfolg ist und B1
+/// wiederholt.
+///
+/// `swap` tauscht die Bretter (Pflichtteil): v2 spielt dann auf Brett 0.
+/// Ohne den Tausch waere jeder Befund mit dem Sitzplatz konfundiert.
+pub fn run_heuristic_v1_vs_v2_arena(
+    sims_v1: u32,
+    sims_v2: u32,
+    n_games: usize,
+    seed: u64,
+    num_threads: usize,
+    c: f64,
+    swap: bool,
+) -> String {
+    use crate::mcts::HeuristikVariante as HV;
+    // Brett 0 traegt v1, Brett 1 traegt v2 -- oder umgekehrt bei `swap`.
+    let varianten = if swap { [HV::V2, HV::V1] } else { [HV::V1, HV::V2] };
+    let sims = if swap { [sims_v2, sims_v1] } else { [sims_v1, sims_v2] };
+    let namen = if swap {
+        ["HeuristikV2".to_string(), "HeuristikV1".to_string()]
+    } else {
+        ["HeuristikV1".to_string(), "HeuristikV2".to_string()]
+    };
+
+    let play = |i: usize| -> Value {
+        // Seed-Ableitung Zeile fuer Zeile wie `run_arena_match`, damit beide
+        // Laeufe auf denselben Partien vergleichbar sind.
+        let game_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let mut rng = StdRng::seed_from_u64(game_seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let first = i % 2;
+        let mut v = play_arena_game(
+            sims, c, ids, namen.clone(), first, &mut rng, varianten, game_seed,
+        );
+        // Welches Brett welche Variante trug, mitschreiben -- sonst muss die
+        // Auswertung es aus dem Aufruf rekonstruieren.
+        if let Some(obj) = v.as_object_mut() {
+            obj.insert("v2_board".to_string(), json!(if swap { 0 } else { 1 }));
+        }
+        v
+    };
+
+    let all: Vec<Value> = if num_threads == 0 {
+        (0..n_games).into_par_iter().map(play).collect()
+    } else {
+        let pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(num_threads)
+            .build()
+            .expect("Rayon-Pool");
+        pool.install(|| (0..n_games).into_par_iter().map(play).collect())
+    };
+    Value::Array(all).to_string()
+}
+
 /// Spielt `n_games` Arena-Partien (rayon-parallel) zwischen zwei MCTS-Konfigs.
 /// Brett 0 = Agent A (`sims_a`), Brett 1 = Agent B (`sims_b`). Spiel `i` hat den
 /// Startspieler alternierend (`i % 2`), um den Startspieler-Vorteil auszugleichen.
@@ -2342,7 +2412,10 @@ pub fn run_arena_match(
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["A".to_string(), "B".to_string()];
-        play_arena_game([sims_a, sims_b], c, ids, names, first, &mut rng, game_seed)
+        play_arena_game(
+            [sims_a, sims_b], c, ids, names, first, &mut rng,
+            [crate::mcts::HeuristikVariante::V1; 2], game_seed,
+        )
     };
 
     let all: Vec<Value> = if num_threads == 0 {

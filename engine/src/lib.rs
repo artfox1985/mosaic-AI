@@ -13,6 +13,7 @@ pub mod execution;
 pub mod factory;
 pub mod features;
 pub mod game;
+pub mod heuristic_v2;
 pub mod knob_registry;
 pub mod mcts;
 pub mod moves;
@@ -1561,18 +1562,27 @@ fn autoplay_to_round5_and_resample_json(
 ///   "round_before": <u32>,
 ///   "bootstrap_value": [p0, p1],
 ///   "bootstrap_time_ms": <f64>,
+///   "bootstrap_horizon": <u32>,
 ///   "anchor_value": [p0, p1],
 ///   "anchor_time_ms": <f64>
 /// }
 /// ```
 /// `pN` = Gewinnwahrscheinlichkeit aus Sicht von Spieler N (wie
 /// `net_leaf_eval`/`exact_round5_outcome`, [0,1]-Skala).
+///
+/// `horizon` (2026-08-24, `PREREG_bootstrap_horizon.md` Stufe 1): der
+/// Bootstrap-Horizont dieses Aufrufs. Ohne Angabe gilt
+/// `BOOTSTRAP_HORIZON_ROUNDS`, das Bestandsverhalten der Stufe-0-Sonde ist
+/// damit unveraendert. Mit Angabe laesst sich derselbe Zustand bei
+/// verschiedenen Horizonten timen -- genau das Paar, das das Stufe-1-Gate
+/// braucht, und ohne Eingriff in den Self-Play-Pfad (kein Paritaets-Risiko).
 #[pyfunction]
-#[pyo3(signature = (state_json, model_path, seed=None))]
+#[pyo3(signature = (state_json, model_path, seed=None, horizon=None))]
 fn bootstrap_horizon_stage0_probe_json(
     state_json: String,
     model_path: String,
     seed: Option<u64>,
+    horizon: Option<u32>,
 ) -> PyResult<String> {
     use pyo3::exceptions::PyValueError;
     use rand::rngs::StdRng;
@@ -1597,13 +1607,10 @@ fn bootstrap_horizon_stage0_probe_json(
     let net = crate::net::Net::load_auto(&model_path)
         .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
 
+    let horizon = horizon.unwrap_or(crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS);
     let t0 = Instant::now();
-    let bootstrap_value = crate::round_transition_deep::bootstrap_value_after_rounds(
-        &pre,
-        &net,
-        crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
-        &mut rng,
-    );
+    let bootstrap_value =
+        crate::round_transition_deep::bootstrap_value_after_rounds(&pre, &net, horizon, &mut rng);
     let bootstrap_time_ms = t0.elapsed().as_secs_f64() * 1000.0;
 
     let t1 = Instant::now();
@@ -1615,10 +1622,37 @@ fn bootstrap_horizon_stage0_probe_json(
         "round_before": round_before,
         "bootstrap_value": bootstrap_value,
         "bootstrap_time_ms": bootstrap_time_ms,
+        "bootstrap_horizon": horizon,
         "anchor_value": anchor_value,
         "anchor_time_ms": anchor_time_ms,
     });
     Ok(out.to_string())
+}
+
+/// Heuristik v1 gegen Heuristik v2, ohne Netz
+/// (`PREREG_heuristic_v2_long_rows.md`, Messkette Schritt 2).
+///
+/// Liefert dasselbe JSON-Array wie `arena_match`, zusaetzlich `v2_board` je
+/// Partie. Die Vollendungsquote folgt aus `long_rows_started` /
+/// `long_rows_completed` -- der vorregistrierte Falsifikator.
+#[pyfunction]
+#[pyo3(signature = (sims_v1, sims_v2, n_games, seed, num_threads=0, c=0.3, swap=false))]
+#[allow(clippy::too_many_arguments)]
+fn heuristic_v1_vs_v2_arena(
+    py: Python<'_>,
+    sims_v1: u32,
+    sims_v2: u32,
+    n_games: usize,
+    seed: u64,
+    num_threads: usize,
+    c: f64,
+    swap: bool,
+) -> String {
+    py.detach(|| {
+        crate::self_play::run_heuristic_v1_vs_v2_arena(
+            sims_v1, sims_v2, n_games, seed, num_threads, c, swap,
+        )
+    })
 }
 
 #[pymodule]
@@ -1628,6 +1662,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(self_play_games, m)?)?;
     m.add_function(wrap_pyfunction!(self_play_games_with_net_labels, m)?)?;
     m.add_function(wrap_pyfunction!(arena_match, m)?)?;
+    m.add_function(wrap_pyfunction!(heuristic_v1_vs_v2_arena, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(not_deckel_diagnostics_json, m)?)?;
     m.add_function(wrap_pyfunction!(reset_not_deckel_diagnostics, m)?)?;
