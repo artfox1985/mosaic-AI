@@ -354,6 +354,17 @@ Abweichung = leere Felder im ERLAUBTEN Bereich
 Fuer das 6x6-Raster ist der erlaubte Bereich `r + c <= 5`, also
 6+5+4+3+2+1 = **21 Zellen**. Score 0 heisst perfekte Dreiecksform.
 
+**Warum ausgerechnet diese Form (Nutzer-Praezisierung 2026-08-24):
+"theoretisch sind alle bedienbar, praktisch sind nur zwei bedienbar, deshalb
+Dreiecksform als Shaping-Agent".** Die Dreiecksform ist keine aesthetische
+Wahl, sondern die MACHBARKEITSHUELLE. Eine Spalte braucht theoretisch je
+einen Abschluss aus jeder der sechs Musterreihen -- praktisch liefern nur die
+oberen zuverlaessig: gemessen 4,88 / 4,70 / 2,88 / 2,23 / 1,71 / 1,31 belegte
+Zellen je Rasterzeile. Das Dreieck gibt von oben nach unten 6 / 5 / 4 / 3 /
+2 / 1 Zellen frei, hat also exakt dieselbe Neigung. Es beschreibt damit, was
+erreichbar IST, statt ein Ideal vorzuschreiben, das an der Frequenz
+scheitert.
+
 **Warum das die richtige Zielfunktion ist -- und was sie loest.** Die
 bisherige Zielzellen-Menge war eine undifferenzierte VEREINIGUNG aus einer
 Spalte und einer Zeile, und die Spalte gewann darin jeden Konflikt: ihre
@@ -395,7 +406,7 @@ zusammenhaengend, zahlt also Platzierungspunkte nach Linienlaenge.
   Spalten und fallen die Zeilen erneut, hat der Skalar sein Versprechen
   NICHT eingeloest, auch wenn die Primaermetrik guenstig aussieht.
 
-#### par.3a ERGEBNIS (2026-08-24): als SUCHTERM wirkungslos, Metrik bleibt
+#### par.3a ERGEBNIS (2026-08-24): als HEURISTIK-Suchterm wirkungslos -- Netzseite UNGEPRUEFT
 
 80 Partien, beide Sitze, Gewicht 1,0 je Abweichungs-Zelle wie vorab
 festgelegt:
@@ -405,9 +416,19 @@ festgelegt:
 | ohne Dreiecksterm | 0,588 | 0,200 | 40,8 | 31/80 |
 | mit Dreiecksterm | 0,550 | **0,200** | 39,8 | 32/80 |
 
-**Nicht-Erfolg nach der vorab festgelegten Regel.** Die Zeilen bleiben
-unveraendert bei 0,200, die Spalten steigen nicht, die Punkte fallen. Der
-Skalar hat den Spalte-gegen-Zeile-Konflikt also NICHT aufgeloest.
+**Nicht-Erfolg nach der vorab festgelegten Regel -- ABER NUR FUER DIE
+HEURISTIK.** Die Zeilen bleiben unveraendert bei 0,200, die Spalten steigen
+nicht, die Punkte fallen. Der Skalar hat den Spalte-gegen-Zeile-Konflikt
+hier nicht aufgeloest.
+
+**Nicht auf die Netzseite uebertragen (Nutzer-Einwand 2026-08-24: "wuerd ich
+so noch nicht festsetzen, waere erst am Netz wirklich zu pruefen").** Der
+Einwand trifft, und der Mechanismus ist derselbe, der schon par.1 traegt --
+nur umgekehrt: in der HEURISTIK IST das Verhalten die Bewertung, ein Term
+dort steuert unmittelbar. Am NETZ kommen die Priors aus dem Netz
+(`net_mcts.rs:57`), ein Blattterm wirkt also gegen eine trainierte Zugordnung
+statt mit ihr. Dass er hier nichts bewegt, sagt ueber dort nichts. Die
+Netzseite ist UNGEPRUEFT.
 
 **Diagnose: die Hebelwirkung, nicht die Metrik.** Der Score aendert sich je
 Zug um hoechstens 1, waehrend die Platzierungen selbst 2,3 bis 4,3 Punkte
