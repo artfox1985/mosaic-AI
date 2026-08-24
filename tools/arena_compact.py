@@ -79,6 +79,17 @@ def kompakt(sp: dict, quelle: str) -> dict:
         "scoring_tile_ids": sp.get("scoring_tile_ids"),
         "endwertung_gesamt": gesamt,
         "endwertung_je_kriterium": je_spieler,
+        # Zaehler der langen Musterreihen (PREREG_long_row_payoff.md par.3/B1,
+        # Mitschrieb-Erweiterung 2026-08-24). MUSS mitgenommen werden: die
+        # Vollendungsquote laesst sich aus dem Partie-LOG prinzipiell nicht
+        # rekonstruieren (round_end.rs leert unplatzierbare Reihen ohne
+        # Logzeile), sie steht ALLEIN in diesen Feldern. Ohne sie waere das
+        # Eindampfen genau fuer die Messung verlustbehaftet, fuer die die
+        # Felder gebaut wurden. `None` bei Artefakten aus aelteren Wheels --
+        # der Auswerter unterscheidet "fehlt" von "null".
+        "long_rows_started": sp.get("long_rows_started"),
+        "long_rows_completed": sp.get("long_rows_completed"),
+        "long_rows_cleared_unplaceable": sp.get("long_rows_cleared_unplaceable"),
     }
 
 
