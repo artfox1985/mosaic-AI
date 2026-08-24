@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie stark sind eigener und gegnerischer Endpunktestand tatsaechlich korreliert, und wie gross ist der Fehler, den die Unabhaengigkeitsannahme in P(Sieg) erzeugt? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht praezisiert. Reine Korpus-Messung ohne Training, entscheidet eine Architekturbehauptung aus dem Verteilungskopf-Entwurf. Zwei Spezifikationsluecken geschlossen: die Faltung ist JE SCHICHT aus den bedingten Randverteilungen zu bilden (global gegen bedingt gestellt maesse man den Bedingungseffekt statt der Abhaengigkeit), und MAE_eng wird JE RUNDE gebildet, weil die Schichtung sonst dieselbe Partie vier- bis fuenffach zaehlt und Waechter 1 bricht. Einlesepfad geprueft: selfplay_diversity_report.py liest das GEKLEMMTE Feld, par.2 braucht scores_unclamped (vorhanden, 100 %) -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie stark sind eigener und gegnerischer Endpunktestand tatsaechlich korreliert, und wie gross ist der Fehler, den die Unabhaengigkeitsannahme in P(Sieg) erzeugt? | Beleg: KOMPLETT GEFAHREN 2026-08-24 (score_correlation_probe.json, 248/2945 Dateien netz stratifiziert + kompletter Heuristik-Korpus). Pearson r +0,2973 (KI 0,259-0,334), positiv = Gleichtakt. MAE_eng (Maximum ueber Runden 1-4, bedingt auf Zwischenstand) = 0,0390 (Runde 4) -> nach par.5 KENNZAHL, 0,02<=x<0,05, WEDER widerlegt NOCH belegt, kein Bau-Argument. Heuristik-Korpus gleicher Tier (0,0345). Rechenprobe stimmt auf beiden Korpora. Var(D)=399,32 (std~19,98) als Gegenprobe zu MARGIN_SCALE=20 notiert, keine Handlungsfolge -->
 
 # Vorregistrierung: Korrelation von eigenem und gegnerischem Endstand
 
@@ -111,6 +111,69 @@ par.4.
 Die Schwelle 0,02 ist a priori gesetzt und nicht aus den Daten abgeleitet.
 Begruendung: sie liegt unterhalb dessen, was die gepaarte Arena bei den
 ueblichen Paarzahlen aufloest.
+
+### ERGEBNIS (2026-08-24): KENNZAHL, kein Bau-Argument -- Behauptung weder widerlegt noch belegt
+
+Gefahren mit `tools/probes/score_correlation_probe.py`, Artefakt
+`score_correlation_probe.json`. Zwei Korpora: netzgenerierte Stichprobe
+(stratifiziert wie das Bin-Skalen-Tor, jede 12. Datei je Generation,
+248/2945 Dateien, **2.480 abgeschlossene Partien**, 0 wegen inkonsistentem
+Backfill verworfen) und der komplette Heuristik-Korpus
+(`data/holdout/selfplay_hold_heur_*.pkl`, 50 Dateien, 500 Partien).
+
+**par.3, netzgeneriert:**
+
+| Groesse | Wert |
+|---|---|
+| Var(X) / Var(Y) / Var(D) | 285,89 / 282,39 / **399,32** |
+| Cov direkt / ueber Var-Formel | 84,4777 / 84,4777 -- **Rechenprobe stimmt** (Waechter 3) |
+| Pearson r | **+0,2973**, Block-Bootstrap-95-%-KI [0,259; 0,334] (500 Resamples ueber die 248 Dateien, Waechter 1) |
+| Spearman rho | +0,313 |
+| P_empirisch(D>0) / P_gefaltet(D>0), global | 0,4841 / 0,4926 (Abweichung 0,0085) |
+
+**Vorzeichen positiv: Gleichtakt**, nicht Verdraengung (par.1-Nebennutzen).
+In angebotsreichen Partien punkten beide Seiten mehr, nicht auf Kosten des
+Gegners -- ein erstmals bezifferter Befund fuer den Denial-Strang.
+
+**par.4, die eigentliche Entscheidungsgroesse -- bedingt auf den
+Zwischenstand** (Marge aus `state.players[i].score`, live gefuehrt, GECLAMPT
+-- `scores_unclamped` ist auf jeder Partie final zurueckgeschrieben und fuer
+den Zwischenstand ungeeignet, siehe Werkzeug-Kopf. Schichtung: Quantil-Bins
+je Runde, bis zu 10, Mindestbelegung 15 Partien je Bucket -- eine
+IMPLEMENTIERUNGSENTSCHEIDUNG, die die Prereg offengelassen hatte, hier
+transparent statt stillschweigend getroffen):
+
+| Runde | n | Buckets im Fenster [0,30; 0,70] | MAE dieser Runde |
+|---|---|---|---|
+| 1 | 2.480 | 8 von 8 | 0,0157 |
+| 2 | 2.480 | 8 von 10 | 0,0231 |
+| 3 | 2.480 | 5 von 10 | 0,0199 |
+| 4 | 2.480 | 4 von 10 | **0,0390** |
+
+**`MAE_eng` = Maximum ueber die Runden = 0,0390** (Runde 4).
+
+**Verdikt nach par.5, wortgetreu: 0,02 <= 0,0390 < 0,05 -- KENNZAHL, KEIN
+Bau-Argument.** Weder Widerlegung noch Beleg. Die Unabhaengigkeitsannahme
+schadet in der Groessenordnung der Arena-Aufloesung selbst -- ein Effekt,
+der da ist, aber zu klein, um allein einen dritten Kopf zu begruenden.
+
+**Heuristik-Korpus, zum Vergleich:** Pearson r +0,2585 (KI [0,182; 0,342]),
+`MAE_eng` 0,0345 -- **derselbe Tier, dasselbe Muster.** Der Effekt ist nicht
+spezifisch fuer netzgenerierte Partien.
+
+**par.9-Gegenprobe:** `Var(D) = 399,32` auf dieser netzgenerierten
+Stichprobe (Fenster: 248 Dateien ueber v18/v19wdl/v19wdlsw/v20wdl/v20wdlsw,
+gemessen 2026-08-24), also `std(D) ≈ 19,98`. Das liegt bemerkenswert nah an
+`MARGIN_SCALE = 20` aus `PREREG_saturating_score_utility.md` par.6a --
+aber die beiden Groessen sind NICHT dasselbe Objekt: die Referenz dort ist
+die RMS-Marge aus neun Mensch-gegen-v21-Partien (~21, einseitig, Mensch
+gewinnt 8/9, Streuung um +16,7 statt um null), hier ist es die
+STANDARDABWEICHUNG der signierten, um null zentrierten Marge im
+Self-Play (zwei gleich starke Netze). Die Naehe ist eine Beobachtung, kein
+Beleg fuer irgendetwas -- **kein Anlass, `MARGIN_SCALE` zu drehen**, wie
+par.9 selbst festlegt.
+
+**Rechenprobe (Waechter 3):** hat auf beiden Korpora exakt gestimmt.
 
 ## par.6 Waechter
 

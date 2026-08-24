@@ -449,6 +449,17 @@ GEGENPROBE**, nicht die Quelle. Weicht die Self-Play-Streuung stark von der
 Referenz ab, ist das ein eigener Befund ueber den Abstand zwischen
 Netzspiel und gutem Spiel -- und kein Anlass, die Skala zu drehen.
 
+**Gemessen 2026-08-24** (`score_correlation_probe.json`, netzgenerierte
+Stichprobe, 2.480 Partien): `Var(D) = 399,32`, also `std(D) ≈ 19,98` --
+bemerkenswert nah an `MARGIN_SCALE = 20`. Trotzdem **keine Handlungsfolge**,
+aus zwei Gruenden, beide bereits oben festgelegt: erstens sind die beiden
+Groessen verschiedene Objekte (dort RMS-Marge einer einseitigen
+Mensch-Stichprobe, hier Standardabweichung der signierten, um null
+zentrierten Self-Play-Marge zwischen zwei gleich starken Netzen); zweitens
+ist die Netzstreuung explizit NICHT die Quelle, sondern nur die Gegenprobe
+(par.6a oben, "Referenz, NICHT Self-Play-Streuung"). Die Naehe ist eine
+Beobachtung, kein Beleg.
+
 ### Was noch offen bleibt
 
 - `m_max`, die Klammerung vor dem `atanh` (Falle 2 oben). Aus der
