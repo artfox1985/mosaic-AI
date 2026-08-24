@@ -986,3 +986,50 @@ bessere GREEDY-Spieler und der schlechtere BAUMEISTER.
 nicht fuer das Routing. Als Eingabeebene ist sie ein FEATURE, kein Ziel -- ein
 Netz kann aus einem Breiten-Signal Fokus lernen, ein Greedy-Routing nicht.
 Dieser Lauf entscheidet nur die Routing-Verwendung, negativ.
+
+### par.9.2 Erwartete PUNKTE je Zelle (`V2PointMap`) -- ebenfalls negativ
+
+Nutzer-Praezisierung 2026-08-25: die Karte war nicht fuer die Wertungsplatten
+allein gedacht, sondern fuer die erwarteten End- bzw. Rundenpunkte beim Legen
+auf diese Zelle. par.9.1 hat also eine ENGERE Karte gemessen als gemeint.
+
+Nachgebaut als `plate_builder::expected_points_map`: wie par.9, plus die
+Platzierungspunkte nach Linienlaenge (`round_end::score_placed_tile`, auf dem
+Probe-Brett nach dem Legen). Gleicher Aufbau, n=160, gegen `V2Huelle`:
+
+| Kennzahl | Huelle | PointMap | Delta | t |
+| --- | --- | --- | --- | --- |
+| volle Spalten | 0,762 | **0,219** | **-0,544** | -6,12 |
+| max Spaltenhoehe | 5,513 | 4,862 | -0,650 | -7,35 |
+| Teilspalten >= 3 | 2,981 | **3,306** | **+0,325** | +4,63 |
+| Spezialfeld-Freischaltungen | 1,219 | 0,650 | -0,569 | -5,71 |
+| Strafpunkte | -15,39 | -13,02 | +2,369 | +3,85 |
+| eigene Punkte | 43,42 | 39,76 | -3,656 | -2,49 |
+
+Siegquote 0,400. k1-Aufspaltung diesmal ohne Unterschied (-0,540 gegen
+-0,562), die Karte verliert unabhaengig von der Spalten-Wertungsplatte.
+
+**Meine Hypothese war wieder falsch, und zwar dieselbe Sorte Fehler.** Ich
+hatte erwartet, dass Linienpunkte als SUPERADDITIVE Groesse den Fokus liefern,
+der par.9.1 fehlte. Gemessen ist das Gegenteil: die Breiten-Signatur wird
+staerker, nicht schwaecher (Teilspalten >= 3 wieder +0,325, volle Spalten und
+max Hoehe fallen deutlicher als in par.9.1).
+
+Die Erklaerung steht in der Bauform: Linienpunkte belohnen die Nachbarschaft
+zu IRGENDEINEM bestehenden Stein. Jeder angefangene Klumpen zieht damit
+gleich stark an, und das Routing landet auf genau dem Kriterium, das
+`best_first_step_inner` ohnehin maximiert -- der Alleinherrschaft, deren
+Ueberwindung der Anlass fuer v2 war. Das Risiko stand vor dem Lauf im Code
+vermerkt; die Messung hat es bestaetigt.
+
+**Gemeinsamer Befund aus par.9.1 und par.9.2:** beide Punktekarten machen
+denselben Tausch -- weniger Strafpunkte (+2,4 bis +2,7) gegen weniger
+Struktur. Eine gerechnete Punktekarte erzeugt den besseren GREEDY-Spieler und
+den schlechteren BAUMEISTER. Volle Spalten verlangen eine Vorgabe, die dem
+lokalen Punktgradienten widerspricht; genau das leistet die handgesetzte
+Leiter und keine der beiden Karten.
+
+**Unberuehrt bleibt die Netz-Verwendung.** Als Eingabeebene ist eine
+Punktekarte ein FEATURE; ein Netz kann aus einem Breiten-Signal Fokus lernen,
+ein Greedy-Routing nicht. Beide Laeufe entscheiden ausschliesslich die
+Routing-Verwendung, negativ.

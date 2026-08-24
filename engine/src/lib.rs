@@ -286,7 +286,7 @@ fn net_arena_match(
 /// Schritt 3). Zeile fuer Zeile wie `net_arena_match`, einziger Unterschied:
 /// die Heuristik-Seite bewertet mit `HeuristikVariante::V2` statt V1.
 #[pyfunction]
-#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, log_games=false, seeds=None, spec=None))]
+#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, log_games=false, seeds=None, spec=None, variante="v2"))]
 #[allow(clippy::too_many_arguments)]
 fn net_vs_heuristic_v2_arena(
     py: Python<'_>,
@@ -301,13 +301,15 @@ fn net_vs_heuristic_v2_arena(
     log_games: bool,
     seeds: Option<Vec<u64>>,
     spec: Option<String>,
+    variante: &str,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
     let search_config = resolve_search_config(spec)?;
+    let variante = variante.to_string();
     py.detach(move || {
         crate::self_play::run_net_vs_heuristic_v2_arena(
             &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, log_games, seeds,
-            search_config,
+            search_config, &variante,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)

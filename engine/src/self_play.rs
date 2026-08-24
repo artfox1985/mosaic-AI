@@ -2514,6 +2514,7 @@ pub fn variant_from_name(name: &str) -> Option<crate::mcts::HeuristikVariante> {
         "v2" => Some(HV::V2),
         "v2huelle" | "v2_huelle" => Some(HV::V2Huelle),
         "v2heatmap" | "v2_heatmap" => Some(HV::V2Heatmap),
+        "v2pointmap" | "v2_pointmap" => Some(HV::V2PointMap),
         _ => None,
     }
 }
@@ -2828,7 +2829,16 @@ pub fn run_net_vs_heuristic_v2_arena(
     log_games: bool,
     seeds: Option<Vec<u64>>,
     search_config: crate::net_mcts::SearchConfig,
+    // Welche v2-Variante sitzt der Heuristik-Seite auf? `"v2"` ist der
+    // Bestandslauf der Messkette Schritt 3; `"v2huelle"` stellt dieselbe
+    // Frage fuer die Prio-Leiter (par.8.5 nennt sie ausdruecklich offen).
+    variante: &str,
 ) -> Result<String, String> {
+    let hv = variant_from_name(variante)
+        .ok_or_else(|| format!("unbekannte Variante: {variante}"))?;
+    if hv == crate::mcts::HeuristikVariante::V1 {
+        return Err("V1 gehoert in net_arena_match, nicht hierher".into());
+    }
     let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
     crate::net_batcher::ensure_batcher_for(&net);
@@ -2843,10 +2853,10 @@ pub fn run_net_vs_heuristic_v2_arena(
         let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
-        let names = ["Netz".to_string(), "HeuristikV2".to_string()];
+        let names = ["Netz".to_string(), format!("Heuristik_{variante}")];
         let result = play_net_game_variante(
             &net, 0, net_sims, heur_sims, c, c_puct, ids, names, first, &mut rng, game_seed, log_games,
-            search_config, crate::mcts::HeuristikVariante::V2,
+            search_config, hv,
         );
         crate::plate_builder::set_game_seed(None);
         result
