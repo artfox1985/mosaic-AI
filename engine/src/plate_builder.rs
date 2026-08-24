@@ -1324,3 +1324,130 @@ mod tests {
         set_modus_override_for_test(None);
     }
 }
+
+// ── v2-Zielbild: 1-2 Spalten + 1-2 Reihen, Nachbarn verbinden ────────────────
+
+/// Zielzellen fuer `mcts::HeuristikVariante::V2` (Nutzer-Zielbild 2026-08-24:
+/// "1-2 vollstaendige Spalten, 1-2 vollstaendige Reihen, und dann alles so gut
+/// es geht mit Nachbarn verbinden. Eine Diagonale ist dann in der idealen Welt
+/// das Beiwerk").
+///
+/// Waehlt die GUENSTIGSTE Spalte und die GUENSTIGSTE Zeile mit derselben
+/// Kostenformel wie die uebrigen Bauer (`ziel_zellen_generisch`) und liefert
+/// die Vereinigung ihrer Zellen. Der Schnittpunkt beider liegt zwangslaeufig
+/// in der Menge -- er ist der natuerliche Anker fuer die Nachbarschaft, weil
+/// ein Stein dort BEIDE Linien bedient und nach `engine_manual.md:143-147`
+/// horizontal UND vertikal bezahlt wird.
+///
+/// **Warum eine Vereinigung und keine Auswahl:** die 21-Zellen-Identitaet
+/// zeigt, dass eine volle Spalte je einen Abschluss JEDER Musterreihe braucht.
+/// Eine Zeile dagegen braucht sechs Zellen DERSELBEN Musterreihe, also
+/// mehrere Runden derselben Reihe. Beide Ziele zusammen decken die
+/// Zellenmenge so ab, dass fast jeder Abschluss auf mindestens eine der
+/// beiden Linien einzahlt -- und genau das fehlt dem Bestand, dessen
+/// Platzierung nach reinen Sofortpunkten waehlt
+/// (`tiling_solver.rs:49-56`, dort ausdruecklich als Befund vermerkt).
+///
+/// **Diagonale bewusst NICHT enthalten.** Sie ist laut Zielbild Beiwerk und
+/// faellt an, wenn Spalte und Zeile stehen; als eigenes Ziel wuerde sie die
+/// Zellenmenge verduennen. `Diagonalenbauer` bleibt fuer den Fall, dass sie
+/// jemand ALS Ziel fahren will.
+/// Nur die obersten zwei Rasterzeilen kommen als ZEILEN-Ziel in Frage
+/// (Nutzer-Vorgabe 2026-08-24: "eigentlich brauchst nur die ersten zwei
+/// Reihen anvisieren fuer volle Reihen. die anderen bekommst praktisch nicht
+/// zu. das ist ok").
+///
+/// Deckt sich mit der Messung: Musterreihe 1 und 2 schliessen rund 4,9-mal je
+/// Partie ab (`docs/domain_knowledge.md`, und in den Server-Logs 4,90/4,90 auf
+/// der KI-Seite), liefern also die fuenf regulaeren Steine, zu denen ein
+/// Spezialfeld die sechste Zelle beisteuern kann. Musterreihe 3 kommt auf
+/// 2,8-3,3, Reihe 5 und 6 auf 0,7-1,3 -- dort sind sechs Zellen in fuenf
+/// Runden auch mit Spezialfliese nicht zu holen. Eine solche Zeile als Ziel
+/// anzubieten verduennt nur die Zellenmenge.
+const ZEILEN_ZIEL_MAX: usize = 2;
+
+pub(crate) fn v2_ziel_zellen(state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
+    let player = &state.players[pi];
+    let spalten: Vec<_> = (0..6).map(zellen_spalte).collect();
+    let s = ziel_zellen_generisch(state, pi, &spalten)?;
+
+    // Zeilen NUR aus den obersten ZWEI Rasterzeilen und nur, wo ein
+    // Spezialfeld sie ueberhaupt vollendbar macht (s. Doku unten).
+    let zeilen: Vec<_> = (0..ZEILEN_ZIEL_MAX)
+        .filter(|&r| zeile_ist_vollendbar(player, r))
+        .map(zellen_zeile)
+        .collect();
+    let mut alle = s;
+    if let Some(z) = ziel_zellen_generisch(state, pi, &zeilen) {
+        for zelle in z {
+            if !alle.contains(&zelle) {
+                alle.push(zelle);
+            }
+        }
+    }
+    Some(alle)
+}
+
+/// Kann Rasterzeile `r` ueberhaupt voll werden?
+///
+/// **Ohne Spezialfliese nicht.** Rasterzeile `r` wird ausschliesslich von
+/// Musterreihe `r` gespeist (`round_end::validate_tiling_action` erzwingt die
+/// Zuordnung), und die schliesst hoechstens EINMAL je Runde ab -- bei fuenf
+/// Runden also maximal fuenf Steine fuer sechs Zellen. Die sechste Zelle kann
+/// nur ein Spezialfeld sein, das automatisch belegt wird, sobald die drei
+/// anderen regulaeren Zellen seiner Platte voll sind
+/// (`docs/engine_manual.md:168-174`).
+///
+/// Fuer SPALTEN gilt das nicht: ihre sechs Zellen kommen aus sechs
+/// VERSCHIEDENEN Musterreihen, je ein Abschluss je Runde genuegt. Die
+/// Asymmetrie ist der Grund, warum die erste Fassung dieses Ziels die Zeilen
+/// von 0,425 auf 0,188 gedrueckt hat: sie behandelte beide gleichrangig und
+/// steckte Aufwand in Zeilen, die per Konstruktion nie fertig werden konnten.
+///
+/// Geprueft wird deshalb: traegt irgendein Slot dieser Rasterzeile ein
+/// Spezialfeld, und ist es entweder schon belegt oder noch freischaltbar
+/// (also nicht dauerhaft blockiert)? Wenn nicht, ist die Zeile als ZIEL
+/// wertlos und wird gar nicht erst angeboten.
+fn zeile_ist_vollendbar(player: &PlayerBoard, r: usize) -> bool {
+    let tr = r / 2;
+    let teilreihe = r % 2;
+    (0..3).any(|tc| {
+        let Some(slot) = player.dome_grid.dome_slots[tr][tc].as_ref() else {
+            return false;
+        };
+        let Some(si) = slot.special_space_idx() else {
+            return false;
+        };
+        // Liegt das Spezialfeld dieser Platte in DIESER Teilreihe? Ob es schon
+        // belegt oder noch gesperrt ist, spielt keine Rolle: gesperrt heisst
+        // freischaltbar (die drei regulaeren Zellen sind das Ziel), belegt
+        // heisst, es fehlen nur noch fuenf regulaere Zellen. Ausgeschlossen
+        // werden soll nur der Fall "in dieser Rasterzeile gibt es gar kein
+        // Spezialfeld" -- dann sind sechs Zellen in fuenf Runden unmoeglich.
+        si / 2 == teilreihe
+    })
+}
+
+
+/// Drafting-Vorzug fuer v2 -- UNGEGATET, also ohne `MOSAIC_SPALTENBAU` und
+/// ohne `MOSAIC_PLATTENBAU`.
+///
+/// Beide Bestandsknoepfe sind prozessweit. Fuer eine Partie v1 GEGEN v2 sind
+/// sie damit unbrauchbar: sie gaelten fuer beide Seiten oder fuer keine. Die
+/// Variante ist der einzige Weg, der die Seiten trennt.
+pub(crate) fn v2_drafting_vorzug(state: &GameState) -> Option<Action> {
+    let z = v2_ziel_zellen(state, state.current_player)?;
+    vorzugszug_fuer_zellen(state, &z)
+}
+
+/// Tiling-Routing fuer v2 -- ungegatet, siehe [`v2_drafting_vorzug`].
+///
+/// Das ist die Haelfte, die der bisherige v2-Term GAR NICHT beruehrt hat und
+/// die laut `PREREG_provocation.md` der eigentliche Engpass ist ("der Engpass
+/// ist die PLATZIERBARKEIT, nicht die Plattenbewertung"): ohne sie waehlt
+/// `best_first_step_inner` nach reinen Sofortpunkten und wirft jede
+/// Draft-seitige Absicht wieder weg.
+pub(crate) fn v2_tiling_vorzug(state: &GameState, pi: usize) -> Option<TilingStep> {
+    let z = v2_ziel_zellen(state, pi)?;
+    tiling_vorzug_fuer_zellen(state, pi, &z)
+}
