@@ -1,0 +1,71 @@
+{
+  "modell": {
+    "fliesen_je_runde": 21,
+    "fliesen_je_partie": 105,
+    "budget_je_spieler_bei_gleichverteilung": 52.5,
+    "chip_zellen_je_spieler": 5.0,
+    "max_einfarb_ausbeute_eines_zuges": 4,
+    "rundenschranke_erspielte_zellen_je_reihe": 5,
+    "spezialfliesen_reserve": 9,
+    "hinweis_spezialfliesen": "gratis gesetzte Zellen: kosten keine gedraftete Fliese, zaehlen aber fuer Spalten mit. Deshalb koennen belegte Zellen je Rasterreihe die Rundenschranke 5 UEBERSTEIGEN."
+  },
+  "zugausbeute": {
+    "beste_ausbeute": {
+      "1": 0.1928,
+      "2": 0.6715,
+      "3": 0.1275,
+      "4": 0.0082
+    },
+    "beste_ausbeute_mittel": 1.951,
+    "festgelegte_farbe": {
+      "0": 0.4098,
+      "1": 0.41,
+      "2": 0.1536,
+      "3": 0.025,
+      "4": 0.0016
+    },
+    "festgelegte_farbe_mittel": 0.799
+  },
+  "mindestzuege_je_kapazitaet": {
+    "1": 1,
+    "2": 1,
+    "3": 1,
+    "4": 1,
+    "5": 2,
+    "6": 2
+  },
+  "schranke_wenn_alles_in_eine_reihe": {
+    "1": 5,
+    "2": 5,
+    "3": 5,
+    "4": 5,
+    "5": 5,
+    "6": 5
+  },
+  "spalten_kosten_je_einheit": 21,
+  "spalten_decke_analytisch": 2.74,
+  "sanity_check": {
+    "Mensch": {
+      "verbrauchte_zellen": 60.9,
+      "anteil_am_partie_budget": 0.58,
+      "spalten_decke_schwaechste_reihe": 2.2,
+      "spalten_gemessen": 1.8,
+      "spalten_moeglich_bei_gleichverteilung": 2.9,
+      "umsetzungsgrad": 0.818
+    },
+    "KI": {
+      "verbrauchte_zellen": 42.7,
+      "anteil_am_partie_budget": 0.407,
+      "spalten_decke_schwaechste_reihe": 0.5,
+      "spalten_gemessen": 0.1,
+      "spalten_moeglich_bei_gleichverteilung": 2.03,
+      "umsetzungsgrad": 0.2
+    },
+    "_beide_zusammen": {
+      "verbrauchte_zellen": 103.6,
+      "analytisches_partie_budget": 105,
+      "auslastung": 0.987,
+      "hinweis": "Fliesen auf der Strafleiste und in unvollendeten Reihen sind hier NICHT mitgezaehlt, Chip-Zellen dagegen schon -- die Auslastung ist deshalb eine Naeherung, kein Kassensturz."
+    }
+  }
+}
