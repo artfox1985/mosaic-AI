@@ -63,422 +63,65 @@ entstanden. Alle drei lieferten echte Befunde — und keiner davon brachte k1 vo
 
 ---
 
-## KAPSELUNGS-PREREG DURCH (2026-08-24, ~02:30)
-
-**`PREREG_agent_encapsulation.md` ist ENTSCHIEDEN.** Welle 1
-(SearchConfig je Seite, Pilot-Knopf MOSAIC_IMPLICIT_MINIMAX_A) und
-Welle 3 (Freeze-Artefakt v21, Worker-Subprozess, Referee als
-Regel-Autoritaet, contract_hash-Handshake, Golden-Selbsttest) sind
-gebaut und abgenommen; **der KERNBEWEIS ist GRUEN: 8/8 Partien
-byte-identisch** (identische SHA256-Log-Hashes, Artefakt
-`evaluations/frozen_kernbeweis_result_postfix_20260824.json`, par.8f).
-
-**Die Bugjagd hat sieben Runden gebraucht, weil das PRUEFVERFAHREN
-blind war**, nicht weil es sieben Zufaelle gab: der Roundtrip-Test
-verglich JSON gegen JSON statt Struct gegen Struct -- jedes Feld, das
-die Serialisierung nicht abbildet, konnte prinzipiell nie auffallen.
-Der erschoepfende Struct-Vergleich fand dann sieben Verluste auf
-einmal (u. a. score_unclamped, Strafleisten-Felder, log-Fenster,
-first_player_next_round und, am schwersten,
-dome_tiles_placed_this_round: in Runde 5 ist can_place_dome_tile()
-IMMER false, die Bool-Naeherung lieferte dort stets 2 statt 0).
-Verankert als `diff_game_states`/`diff_player_board` in allen
-Bestandstests plus `roundtrip_exact_many_real_games` (80 echte
-Partien). **Lehre fuer kuenftige Aequivalenz-Beweise: nie ueber die
-Serialisierung gegen sich selbst pruefen.**
-
-**FREIGABE-VERMERK (ersetzt das Signal an die Parallelsitzung):** die
-Sitzungen `mosaic-ai-f4` und `mosaic-ai-4c` hielten fuer diese Messung
-Betriebsruhe und warteten auf ein Fertig-Signal; beide waren beim
-Abschluss (~02:30) bereits beendet, das Signal konnte nicht mehr
-zugestellt werden. **Es gilt hiermit als erteilt: keine Datei ist mehr
-reserviert, kein Prozess laeuft, die Maschine ist frei.** Vormals
-gesperrt und jetzt committet: referee.rs, serialize.rs, lib.rs,
-self_play.rs, tools/frozen_*.py, models/frozen_champions/**,
-models/frozen_wheels/**, PREREG_agent_encapsulation.md. Auf main
-liegen 3 ungepushte Commits (Push bleibt Nutzer-Entscheid; der
-pre-push-Hook fuehrt `cargo test --release` aus und ist damit selbst
-Nebenlast).
-
-**QUARANTAENE AUFGEHOBEN:** der Referee-/Worker-Pfad traegt ab jetzt
-Messungen. Cross-Aera-Duelle gegen eingefrorene Champions sind
-erstmals sauber moeglich; Handshake und Golden-Selbsttest gaten sie.
-Abnahmestand: Suite 503/0/26, examples/benches gruen, Paritaets-Hash
-8c6684ff haelt, Wheel wave3g in beiden Interpretern, contract_hash
-a169ebf0 unveraendert.
-
-**OFFEN (planbarer Ausbau, keine Frage mehr):** die restlichen ~31
-aktiven Such-/Blattwert-Knoepfe wellenweise ins SearchConfig
-migrieren (par.4: je Knopf ein Commit mit Paritaets-Gate). Erst
-danach ist ein Champion-Freeze wirklich vollstaendig -- heute pinnt
-das Spec einen Knopf, den Rest pinnt das archivierte Wheel.
-
-**Offener Sonden-Fix (von der Parallelsitzung gemeldet, bestaetigt,
-NICHT erledigt):** `tools/probes/row_preference_probe.py:190-198`
-labelt in imm_netvnet beide Seiten als "Champion", obwohl
-spec_a=alpha0.2 und spec_b=frozen zwei Agenten sind. Muster fuer den
-Fix: `tools/probes/penalty_track_probe.py`. Der Kernbefund (~55,5 %
-kurze Reihen) ruht auf drei weiteren, eindeutigen Kontexten.
-
-## UEBERGABE AN DIE NAECHSTE SITZUNG (2026-08-23 Abend -- ZUERST LESEN; Kapselungs-/Vollendungs-Strang. Die PARALLELE Sitzung des Nutzers fuehrt den Margen-Kopf-Strang: deren Preregs und archive/history.md NICHT anfassen)
-
-**WAVE3D-AUSGANG IST FESTGESTELLT UND ALS par.8d REGISTRIERT** (noch
-in dieser Sitzung): Fix korrekt, Kernbeweis weiter rot, strukturelle
-Wurzel isoliert -- der STAPEL-Zweig der Kuppelwahl (vier Aktionstypen,
-moves.rs:105-127) ist im Worker-Protokoll nicht modelliert. **STUFE 0 IST ENTSCHIEDEN (2026-08-23 spaet, PREREG_bootstrap_horizon
-"Stufe 0 ERGEBNIS + VERDIKT"): die Anker-Variante qualifiziert sich
-NICHT** -- auf den kritischen fruehen Zustaenden korreliert sie
-SCHLECHTER mit dem echten Ausgang (0,282 gg. 0,363) und kostet je
-Label Faktor 20,1 (4.734 ms gg. 235 ms). Anker-/rundenabhaengiger Arm
-GESCHLOSSEN (strukturell = die alte rtv-Kette, die schon in Task #80
-und beim v13_nortv-Championwechsel negativ auffiel); der klassische
-2-gegen-3-Arm bleibt offen. **Der Kredit-Horizont als Erklaerung der
-Vollendungsschwaeche ist damit GESCHWAECHT** -- tiefere Ziele allein
-heben die Label-Qualitaet genau dort nicht, wo der Spaltenbau
-entschieden wird. Naechster Schritt der Kette ist damit der
-Vierer-Vergleich (par.3d) plus Legalitaets-Stufe.
-
-**REIHENFOLGE UMGETAKTET (Nutzer 2026-08-23 spaet): die zwei
-MESS-Schritte zuerst** -- (1) Stufe 0 Horizont-Frage ERLEDIGT, (2)
-Vierer-Vergleich + Legalitaets-Stufe; der par.8d-Zuschnitt (atomare
-Kompression aufgeben, Protokoll per-Entscheidung inkl. Peek-Kette,
-pending-Kuppel-Zustand additiv ins exact-JSON, rot_seed entfaellt;
-Kernbeweis-Wiederholung als Abnahme, STOPP-Disziplin) folgt DANACH.
-Lastfenster beachten: waehrend Mosaic-AI.exe (Server-Partien des
-Nutzers) laeuft, keine Engine-Builds/-Messungen -- ein Waechter
-meldet das Prozessende.
-
-**DANACH DIE EINGETAKTETE PIPELINE (Nutzer-Freigaben liegen ALLE vor,
-nichts mehr rueckfragen):**
-
-1. **Stufe 0 Horizont-Frage** (`PREREG_bootstrap_horizon.md`, Abschnitt
-   "Stufe 0", komplett vorregistriert inkl. Lesart): Probe-Funktion
-   beide Label-Varianten (Horizont-2/net_leaf_eval vs. Anker bis
-   R5-Freebie) auf 200-300 stratifizierten Zustaenden aus fertigen
-   Partien; Divergenz-Landkarte, Korrelation gegen ECHTE Endresultate,
-   Kosten je Anker-Label.
-2. **R5-Teil-B-Vierer-Vergleich** (`PREREG_r5_solver_split.md` par.3;
-   Arm 3 = v21-b18 mit MOSAIC_OWNERSHIP_CONJ=1, Vorklaerung par.3c;
-   VOR dem Lauf Vorabregeln/Stellungsstichprobe registrieren) UND
-   **Legalitaets-Stufe der Vollendungs-Sonde** (Engine-Gegenpruefung
-   je Hoehe-5-Fall: war die fehlende Zelle legal belegbar; Basis
-   `tools/probes/column_completion_gap_probe.py`). Sequenziell.
-
-**HEUTE ABGESCHLOSSEN (Details in den Sektionen darunter + Preregs):**
-Seeding-Zyklus (kein k1-Signal, ERSTES positives Sibling-Signal
-p=0,017), R5-Anker-Trennung aktiv, Minimax-Knopf komplett gemessen
-(Heuristik-Erfolg gegnerspezifisch, Netz-gegen-Netz Paritaet),
-Kapselung Welle 1 abgenommen (SearchConfig, Specs, erste
-Netz-gegen-Netz-Knopfmessung), Welle 3 gebaut (Freeze-Artefakt v21,
-Worker/Referee, Handshake+Golden-Selbsttest; NUR der Kernbeweis noch
-rot, s. o.), Strukturbefund Spalten-Vollendung + Reihenwahl-Sonde,
-Doku-Sweep + Kopf-Pflege-Regel in CLAUDE.md.
-
-**ARBEITSBAUM (18 Commits vor origin, NIE pushen):** uncommitted sind
-(a) Fork-A/wave3d-Engine-Staende (serialize.rs, referee.rs, lib.rs,
-frozen_champion_worker.py, frozen_referee_match.py) -- committen erst
-nach gruenem Kernbeweis oder Koordinator-Entscheid; (b) Prereg-/
-STATUS-Registrierungen des Abends und die vier Sonden-Artefakte
-(column_build/completion, row_preference, kernbeweis_wave3c) --
-committbar als Doku-/Befund-Commit; (c) AGENTEN-MUELL im Repo-Root
-(out*.txt, log_last.txt, log_sample.txt, mid_info.txt) -- NICHT ohne
-pfadgenaue Freigabe loeschen, dem Nutzer zur Loeschung listen.
-models/frozen_champions/ + frozen_wheels/ (wave1-3d) bleiben lokal.
-
-**LAST-/BETRIEBSREGELN dieser Straenge:** Kernbeweis-/byte-Identitaets-
-Laeufe EXKLUSIV (Suchlast-Partien verfaelschen sie); waehrend
-Agenten-Wheel-Installationen keine Server-Partien (DLL-Lock); der
-Nutzer wartet auf Freigabe fuer Server-Partien -- nach Abschluss des
-wave3d-Zyklus explizit freigeben (Engine ist paritaets-identisch,
-nur Timing war der Blocker). Orchestrierungs-Regel beachten:
-Koordinator delegiert, prueft tragende Zahlen selbst nach, schreibt
-nur Verdikte/Registrierungen.
-
-## STAND JETZT (2026-08-23)
+## STAND JETZT (2026-08-24)
 
 **Champion unveraendert:** `v21_2d_brierbest`, Elo **1215** [1170, 1259] auf
 der neuen R5-Fix-Leiter (`PREREG_round5_minfix_elo_reset.md` par.5). Kanten
 ueber die Fix-Grenze hinweg nie mischen; Alt-Register in
 `../archive/elo_history_pre_r5fix.csv`.
 
-**Die Plattenblick-Kette hat drei Nullbefunde in Folge – alle ohne
-Staerkekosten:**
+**Agenten-Kapselung ist ENTSCHIEDEN: der Kernbeweis ist gruen.**
+`PREREG_agent_encapsulation.md` -- Welle 1 (SearchConfig je Seite,
+Pilot-Knopf) und Welle 3 (Freeze-Artefakt v21, Worker-Subprozess,
+Referee, Handshake, Golden-Selbsttest) sind gebaut und abgenommen;
+8/8 Kernbeweis-Partien byte-identisch (`frozen_kernbeweis_result_
+postfix_20260824.json`, par.8f). Sieben Bugjagd-Runden fanden dabei
+eine LUECKE IM PRUEFVERFAHREN (Roundtrip-Test verglich JSON gegen JSON
+statt Struct gegen Struct) -- Details, Chronologie und die Lehre
+daraus siehe `../archive/history.md`, Kapitel "Agenten-Kapselung,
+Vollendungs-Strukturbefund und Kernbeweis (2026-08-23 bis 2026-08-24)".
+**Quarantaene des Referee-/Worker-Pfads ist AUFGEHOBEN** -- Cross-Aera-
+Duelle gegen eingefrorene Champions sind ab jetzt sauber moeglich.
+**Offen (planbarer Ausbau, keine Frage mehr):** die restlichen ~31
+aktiven Such-/Blattwert-Knoepfe wellenweise ins SearchConfig
+migrieren (par.4: je Knopf ein Commit mit Paritaets-Gate).
 
-| Arm | Verdikt | Beleg |
-|---|---|---|
-| Ownership-VERBRAUCHER (Produktform, Konjunktionsform, hoerbare Skala, neues Ziel) | in allen gemessenen Formen negativ | `../archive/history.md`, Kapitel 2026-08-18..08-23; `PREREG_reachability_target.md` par.14/16 |
-| Asymmetrisches Curriculum | kein Signal (k1-Rate 12,2 % = Grundrate), kein Siegverlust | `PREREG_asymmetric_curriculum.md` par.14-16 |
-| Startpositions-Seeding, Dosis k=6 | kein k1-Signal (14,1 % gegen Schwelle 22 %), kein Staerkepreis | `PREREG_start_position_seeding.md` par.4c |
+**Die Plattenblick-Kette hat ihre Ursachenkette geschlossen: der
+Engpass liegt UPSTREAM in der Draft-/Reihenwahl, nicht am Spalten-Ende.**
+Vier durchgemessene Ebenen (alle ohne Staerkekosten, Details im
+Archiv-Kapitel oben): Ownership-Verbraucher, asymmetrisches
+Curriculum und Startpositions-Seeding blieben ohne k1-Signal;
+die Sibling-Sonde zeigte als Erste ein positives Zustandssignal
+(p=0,017); der Strukturbefund zeigte dann, dass der Champion
+plattenunabhaengig keine Spalten vollendet (0,55 Hoehe-5-Spalten je
+Partie bleiben stehen); die Legalitaets-Stufe bewies schliesslich,
+dass **0 von 160 Faellen ueberhaupt legal vollendbar waren** (54 %
+Blockade = Musterreihe noch nicht voll) -- ueberwiegend netz-gegen-
+netz erhoben, also nicht durch Gegnerspezifitaet erklaerbar. Die
+Reihen-Sonde bestaetigte die Praeferenz (~55,5 % kurze Reihen) und
+widerlegte die Abstammungs-These (der Heuristik-Lehrer spielt spaet
+genau umgekehrt); die Straf-Sonde zeigte eine echte, aber
+richtungsfalsche Aversion (erklaert die Reihenwahl nicht).
 
-**Das erste POSITIVE Zustandssignal der Kette** steht daneben und ist der
-Grund, warum der Strang nicht geschlossen ist: die Sibling-Sonde (par.4d)
-liefert Tau(Value~k1-Puffer) **seedk1 +0,140 gegen N -0,185**,
-Vorzeichentest 17/5/11, **p = 0,017** – auf denselben 33 Stellungen, auf
-denen der Asym-Arm nicht signifikant war (`seedk1_value_sibling_check.json`).
-**Mechanik bewegt sich, Verhalten (noch) nicht.** Das ist konsistent mit der
-Diagnose „die Suche fragt den Kopf zu selten" (`PREREG_r5_solver_split.md`
-par.3) und macht den Such-Hebel zum naechsten Kandidaten, nicht das naechste
-Ziel-Experiment.
+**Offener Sonden-Fix (bestaetigt, NICHT erledigt):**
+`tools/probes/row_preference_probe.py:190-198` labelt in
+`imm_netvnet` beide Seiten als "Champion", obwohl spec_a=alpha0.2 und
+spec_b=frozen zwei Agenten sind. Fix-Muster: `tools/probes/
+penalty_track_probe.py` (liest spec_a/spec_b, trennt NetzA/NetzB,
+rechnet die gepaarte Differenz). Der Kernbefund (~55,5 % kurze
+Reihen) ruht auf drei weiteren, eindeutigen Kontexten und duerfte sich
+nicht verschieben.
 
-**NEUER STRUKTURBEFUND (2026-08-23, Nutzer-Beobachtung, per Sonde
-verifiziert): der Champion VOLLENDET keine Spalten -- plattenunabhaengig.**
-Rekonstruktion der End-Brettstaende aus den Arena-Logs
-(`tools/probes/column_build_structural_probe.py`, Korrektheitsbeweis:
-7 x volle Spalten == Vertikale-Reihen-Punkte auf allen 1.560
-k1-aktiven Partieseiten, 0 Abweichungen; Artefakt
-`evaluations/column_build_structural_probe.json`): volle Spalten je
-Partie 0,096 (k1 aktiv) gegen 0,100 (k1 INAKTIV) -- die Platte
-aendert beim Champion NICHTS, waehrend Heuristik (0,090->0,131) und
-seedk1 (0,100->0,141) sichtbar reagieren. Dabei ist die BAU-Faehigkeit
-da: max. Spaltenhoehe im Mittel 4,66/6, ~2 Spalten je Partie auf
-Hoehe >= 4; in 1.628 Champion-Partieseiten NIE mehr als eine volle
-Spalte. **Der Engpass ist die VOLLENDUNG (letzte 1-2 Zellen), nicht
-der Bau -- eine strukturelle Schwaeche unabhaengig vom Plattenblick.**
-Einordnung: passt zur R5-Value-Schwaeche (Vollendungen fallen in die
-spaeten Runden, wo der Kopf am schlechtesten kalibriert ist,
-R5-Prereg par.1) und erklaert, warum plattenseitige Hebel null
-blieben: sie zielten auf den Verstaerker (7 Pkt), nicht auf die Basis
-(Platzierungsfluss der letzten Zellen). Folgezuschnitt =
-Nutzer-Entscheid.
-
-**Vertiefung (Vollendungsluecken-Sonde, gleicher Tag;
-`tools/probes/column_completion_gap_probe.py`, Konsistenzpruefung
-4.070 Seiten / 0 Abweichungen, Artefakt
-`column_completion_gap_probe.json`):** der Champion laesst **0,55
-Spalten je Partie exakt auf Hoehe 5 stehen** und vollendet nur
-15,2 %/14,9 % (k1 inaktiv/aktiv) der erreichten Hoehe-5-Spalten --
-wieder plattenunabhaengig. Das Erreichen konzentriert sich auf
-Runde 4/5 (78 %), und im Mittel bleiben danach noch ~3,3 eigene
-Legezuege (Median 3, bei Nicht-Vollendung kaum weniger): **am
-Gelegenheits-FENSTER liegt es nicht.** WICHTIGE GRENZE der Sonde
-(ausgewiesen): LEGALITAET je Einzelfall (passende Kachel/Farbe
-verfuegbar?) ist ohne Engine ungeprueft -- die Legalitaets-Stufe
-folgt nach dem Welle-3-Abschluss als Engine-Gegenpruefung. Bis dahin
-gilt: 0,55 knapp verpasste Spalten je Partie sind die praezise
-bezifferte Obergrenze des liegengelassenen Postens (bis ~7 Pkt
-Wertung + Platzierungsrest je Partie).
-
-**EINGETAKTETE PIPELINE (Nutzer 2026-08-23, "takte das nach stufe 0
-horizont frage ein") -- Reihenfolge fest, Abarbeitung dieser Sitzung/
-Uebergabe:** (1) Welle-3-Fork-A abschliessen (exakte Zustandsuebergabe,
-laeuft); (2) **Stufe 0 der Horizont-Frage** (Label-Diagnose ohne
-Training, PREREG_bootstrap_horizon Stufe 0); (3) danach BEIDE
-freigegeben: **R5-Teil-B-Vierer-Vergleich** (PREREG_r5_solver_split
-par.3, Arm 3 = v21-b18 mit MOSAIC_OWNERSHIP_CONJ=1 laut par.3c;
-Vorabregeln vor dem Lauf registrieren) und **Legalitaets-Stufe der
-Vollendungs-Sonde** (Engine-Gegenpruefung: war die fehlende Zelle je
-Hoehe-5-Fall legal belegbar; Erweiterung von
-column_completion_gap_probe). Sequenziell fahren, Lastdisziplin wie
-gehabt.
-
-**LEGALITAETS-STUFE (2026-08-23 spaet): DIE VOLLENDUNGEN WAREN NIE
-MOEGLICH -- 0 von 160 geprueften Faellen.** Engine-Gegenpruefung ueber
-den replay-exakten Pfad (`tools/probes/column_completion_legality_probe
-.py`, Artefakt gleichnamig; Positivkontrolle 4/4 bestanden, 0
-unklassifizierte Faelle, Replay-Quote 185/223): in KEINEM der
-stehengelassenen Hoehe-5-Faelle existierte im Restfenster eine legale
-Platzierung, die die Spalte vollendet haette. Blockadegruende:
-**Musterreihe noch nicht voll 87/160 (54 %)**, Zielfeld ist
-Spezialfeld (nur ueber Sibling-Slot) 41, keine passende Farbe
-verfuegbar 32.
-
-**DAMIT IST DIE URSACHENKETTE GESCHLOSSEN -- und die Deutung des
-Strukturbefunds KORRIGIERT:** der Champion "verpasst" die Vollendung
-nicht am Ende; die noetigen Kacheln kommen nie aufs Brett. Der Engpass
-liegt UPSTREAM in der ZUFUEHRUNG (Draft-/Reihenwahl Runden vorher),
-nicht in der Endplatzierung -- der groesste Blockadeposten ist exakt
-das, was die Reihen-Sonde misst (lange Musterreihen bleiben unvoll).
-Konsequenz fuer jeden kuenftigen Zuschnitt: Hebel muessen an der
-DRAFT-/Reihenwahl ansetzen (welche Musterreihe wird gefuettert,
-Zeitpunkt), nicht an Vollendungs-Shaping oder Endspiel-Bewertung. Die
-0,55 Hoehe-5-Spalten je Partie bleiben die richtige Verlust-Bezifferung,
-aber sie sind ein SYMPTOM-Mass.
-
-**Ursachen-Sonde Reihenwahl (Nutzer-Hypothese "auf Reihen getrimmt,
-weil die Heuristik so spielt"; `tools/probes/row_preference_probe.py`,
-Artefakt `row_preference_probe.json`): Praeferenz BESTAETIGT,
-Abstammungs-These WIDERLEGT.** Der Champion zieht in vier Kontexten
-konsistent 55,5-56,1 % seiner Draft-Ziele auf die kurzen Musterreihen
-1-3 und meidet Reihe 5/6 (12-13 %) -- FLACH ueber alle Runden, ohne
-Spaetrunden-Anpassung. Das Heuristik-SELFPLAY (der Abstammungs-
-Lehrer; data/holdout heur-Arm, am Manifest verifiziert: mode mcts,
-kein Plattenbau) spielt dagegen spaet genau umgekehrt: Kurz-Anteil
-faellt von 46,0 % (R1-2) auf 33,4 % (R4-5), Reihe 6 wird dort mit
-19,1 % am HAEUFIGSTEN gezogen. Der Bias ist also NICHT geerbt --
-der Lehrer "weiss" strukturell, dass spaete lange Reihen zu fuellen
-sind. Regelkopplung (engine_manual Z.125-131): Musterreihe N speist
-Brett-Zeile N; Spalten-Vollendung BRAUCHT vollendete Reihen 5/6 --
-die Spaetrunden-Meidung genau dieser Reihen IST der Mechanismus der
-0,55 stehengelassenen Hoehe-5-Spalten. Ungeprueft-markierte
-Herleitung zur Ursache: verzoegerte Auszahlung langer Reihen faellt
-aus dem Kredit-Horizont des Trainings (TD_LAMBDA 0,5,
-bootstrap_horizon 2 Runden) -- als Verdachtspunkt notiert, nicht
-gemessen.
-
-**STRAF-AVERSION ALS ERKLAERUNG DER KURZREIHEN-PRAEFERENZ: GEMESSEN UND
-GESCHWAECHT (2026-08-23 spaet, `tools/probes/penalty_track_probe.py`,
-Artefakt `penalty_track_probe.json`).** Gepaart ueber 407 IDENTISCHE
-Partien aus `paired_arena_env_imm_a02.json` (Champion und Heuristik
-spielen dieselben Seeds, kein Aera- oder Gegnerversatz), Block-Ebene je
-Partie. Arm alpha=0, der 0,2-Arm laeuft gleich:
-
-| Kennzahl je Partie | Champion | Heuristik | Diff | t |
-|---|---|---|---|---|
-| Strafpunkte | 16,91 | 19,59 | −2,68 | −4,06 |
-| abgeladene Steine (Ziel = Strafleiste) | 2,88 | 6,38 | **−3,50** | **−12,62** |
-| Ueberlauf-Steine | 2,21 | 1,78 | **+0,43** | **+4,16** |
-| Runden mit Strafe | 4,25 | 3,81 | **+0,44** | **+6,02** |
-| Steine auf der Leiste gesamt | 5,09 | 8,15 | | |
-
-**Die Aversion ist belegt, aber sie erklaert die Reihenwahl NICHT -- die
-Richtung stimmt nicht.** Kurze Musterreihen (Kapazitaet 1-3) laufen bei
-gleicher Entnahme LEICHTER ueber als lange (5-6). Wer Ueberlaufrisiko
-meidet, waehlt lange Reihen. Der Champion waehlt kurze und hat
-folgerichtig MEHR Ueberlauf, nicht weniger. Ein risikogetriebener
-Kurzreihen-Bias haette das umgekehrte Vorzeichen. (Die Kausalkette
-Reihenlaenge -> Ueberlauf ist eine Herleitung aus der Kapazitaetsregel,
-nicht selbst gemessen -- die Entnahmegroessen je Seite sind nicht
-erhoben.)
-
-**Was stattdessen herausfaellt, als eigener Befund:** der Champion meidet
-die AKTION "-> Strafleiste" massiv (Steine mehr als halbiert, groesste
-Einzelbewegung der Tabelle), nicht aber die KONSEQUENZ "Steine auf der
-Leiste" -- er kassiert sogar in MEHR Runden ueberhaupt eine Strafe.
-Beide Wege enden auf derselben Leiste (engine_manual Z.110-113) und
-zahlen dieselbe progressive Skala −1/−2/−3/−4 je Slot, gedeckelt bei
-vier (Z.161). Der Mechanismus dahinter ist NICHT gemessen; als
-Verdachtspunkt notiert.
-
-**Nachtrag 2026-08-24:** der Primaervergleich dieser Sonde stammt
-vollstaendig aus `imm_a02`, also gegen die HEURISTIK. Seit dem
-Paritaets-Befund (k1-Effekt gegnerspezifisch) steht er damit unter
-Gegnerspezifitaets-Verdacht. Die Gegenprobe liegt bereit und kostet nichts:
-`imm_netvnet` plus `_swap` tragen dasselbe Netz beidseitig mit
-verschiedenen per-Seite-Specs; die Sonde trennt seit b60d0d0 nach
-NetzA/NetzB. Noch nicht gefahren (Betriebsruhe).
-
-**Abgenommen und aktiv: die R5-Loeser-Trennung.** `round5_anchor.rs` ist
-eingefroren und in allen drei Sucheinstiegen verdrahtet (geprueft
-2026-08-23: `engine/src/mcts.rs:746`, `:777`, `:796`, Modul
-`engine/src/lib.rs:33`); Paritaets-Hash 8c6684ff haelt VOR und NACH dem
-Wheel-Neubau, Suite 484/0 (`logs/cargo_suite_r5split_20260823.log`,
-`logs/r5split_*_20260823.log`). **Die Elo-Leiter ist ab jetzt gegen jede
-R5-Weiterentwicklung immun** – der Netz-Loeser darf sich entwickeln, ohne
-den Anker zu entwerten.
-
-## NACHT-FAHRPLAN 2026-08-23/24 (eingetaktet, NICHT gestartet)
-
-Nutzer-Auftrag: einakten, noch nicht starten. Reihenfolge nach Ressource
-sortiert -- erst alles, was OHNE Arena laeuft (und dabei drei Straenge
-schliessen KANN), dann die Arena-Bloecke exklusiv und sequenziell.
-
-**BETRIEBSSPERRE (Stand 2026-08-24 ~01:20, Meldung der Parallelsitzung):**
-dort laeuft die Byte-Identitaets-Diagnose des Kernbeweises. Bis zu deren
-Signal laeuft aus diesem Strang **gar nichts** -- keine Engine-Builds, keine
-Wheel-Installation, keine Arena-, Such- oder Netz-Forward-Laeufe, und auch
-die reinen Korpus-Auswertungen (Schritte 1-2) nicht: auch die erzeugen
-CPU-Last, und die Diagnose haengt an Deadline-Pfaden
-(`sample_round_transition_value` bricht unter Last auf den Kurzpfad um).
-**Damit sind ALLE acht Schritte blockiert, nicht nur die Arena-Bloecke.**
-
-Gesperrte Dateien der Parallelsitzung, unberuehrt zu lassen:
-`engine/src/referee.rs`, `serialize.rs`, `lib.rs`,
-`tools/frozen_champion_worker.py`, `tools/frozen_referee_match.py`,
-`models/frozen_champions/**`, `models/frozen_wheels/**`,
-`PREREG_agent_encapsulation.md`. Frei: `archive/history.md` und die eigenen
-Preregs. `engine/src/net_mcts.rs` ist seit dffa916 wieder sauber.
-
-**ERLEDIGT 2026-08-24 (Meldung der Parallelsitzung):** Schritt 5 ist
-gefahren, mit `--log-games`. Drei Artefakte, alle vollstaendig geloggt:
-`paired_arena_env_imm_netvnet.json` und `..._swap.json` (je 407/407,
-per-Seite-Specs `champion_imm_a02` gegen `champion_frozen`) sowie
-`paired_arena_env_imm_a02.json` (gegen die Heuristik, Arme 0 und 0,2).
-Damit braucht der Fahrplan **nur noch EINEN Arena-Block** (Schritt 8), und
-der haengt an Tor 3.
-
-**Der Befund daraus ist der wichtigste des Abends:** netz-gegen-netz
-**Paritaet** (201/407 und 199/407 = 400/814, 49,1 %, n.s.) und **k1
-30/312 = 9,6 % auf BEIDEN Seiten, identische Zaehler**. Der
-+7,0-pp-k1-Sprung des Implicit-Minimax-Hebels war **gegnerspezifisch** --
-gegen die Heuristik, nicht gegen einen gleich starken Gegner. Registriert
-in `PREREG_agent_encapsulation.md` par.6b und
-`PREREG_implicit_minimax_backup.md` par.2c.
-
-**Folge fuer die Messkultur, ueber diesen Fall hinaus:** eine
-Verhaltensmessung gegen die HEURISTIK steht ab jetzt unter dem Verdacht,
-gegnerspezifisch zu sein. **Welche Sonde das trifft, ist am Artefakt zu
-pruefen und nicht zu vermuten** -- ein erster Anlauf dieses Absatzes
-behauptete pauschal, alle drei Sonden seien "ueberwiegend an
-Heuristik-Partien erhoben", und das war fuer die wichtigste davon falsch
-(Korrektur der Parallelsitzung, am Artefakt nachgezaehlt 2026-08-24):
-
-| Sonde | Herkunft der tragenden Zahl | Verdacht trifft? |
-|---|---|---|
-| **Legalitaets-Stufe** | **128 von 160 Faellen aus champion_netvnet**, 18 imm_a02-Champion, 14 imm_a02-Heuristik; `n_legal_moeglich_aber_nicht_gespielt = 0` in JEDER Zeile | **NEIN** -- bereits unter der strengen Bedingung erhoben, das 0/160 haelt |
-| Reihen-Sonde | vier Kontexte, drei mit eindeutiger Champion-Seite (55,5 / 56,1 / 55,3 %), einer (netvnet) mischt alpha und frozen und wird neu gerechnet | teilweise |
-| Straf-Sonde | Primaervergleich stammt vollstaendig aus `imm_a02`, also gegen die Heuristik | **JA** |
-
-**Vorbedingungen, vor Schritt 5 zu pruefen (nicht optional):**
-
-- **Engine-Stabilitaet.** Das installierte Wheel stammt vom 2026-08-24
-  00:13 und traegt alles Noetige (geprueft: 78 Knoepfe, darunter
-  `MOSAIC_IMPLICIT_MINIMAX_A` und `MOSAIC_FLOOR_SHAPING_W`; `spec` in
-  `net_vs_net_arena_match`). ABER der Arbeitsbaum traegt uncommittete
-  Engine-Aenderungen der Parallelsitzung (`lib.rs`, `referee.rs`,
-  `serialize.rs`, Wave-3e). **Baut jene Sitzung waehrend der Nacht neu,
-  wechselt die Engine unter einer laufenden Messung.** Vor Schritt 5
-  Wheel-Zeitstempel und Knopf-Schnappschuss festhalten, danach
-  gegenpruefen; im Zweifel abstimmen.
-- **Arena exklusiv.** Schritte 5 und 8 duerfen weder miteinander noch mit
-  1-4 ueberlappen. Server-Partien des Nutzers blocken beides.
-- Platz ist kein Thema: ~10 MB je geloggtem Arm a 407 Partien, 1,6 TB frei.
-
-| # | Schritt | Ressource | Liefert |
-|---|---|---|---|
-| 1 | `PREREG_points_dist_bin_scale.md` par.6 Tor | Python, Minuten | **kann den Strang schliessen** (nach par.2a erwartet) |
-| 2 | `PREREG_score_correlation.md` komplett | Python, ~1 h | MAE_eng-Verdikt **plus** Var(D) als Gegenprobe zu MARGIN_SCALE=20 |
-| 3 | `PREREG_floor_action_aversion.md` par.6 Tor | Netz + Suche, ~1 h | entscheidet, ob Schritt 8 ueberhaupt noetig ist (H1 -> entfaellt) |
-| 4 | `PREREG_saturating_score_utility.md` par.3a Tor | Netz-Forward, ~1 h | "fast konstant" gegen "fast kollinear zu wr" -- Diagnose des teuersten Zuschnitts |
-| ~~5~~ | ~~Alpha-Messung mit `--log-games`~~ | **ERLEDIGT 2026-08-24** | von der Parallelsitzung gefahren, drei Artefakte je 407/407 geloggt. **Ergebnis: Paritaet 400/814 (49,1 %), k1 30/312 gegen 30/312 -- identische Zaehler.** Der +7,0-pp-Befund ist GEGNERSPEZIFISCH |
-| 6 | Locus-Sonden auf den vorhandenen Artefakten | Python, Minuten, **keine Arena** | `PREREG_completion_bottleneck_locus.md`, per par.1a/par.3a umgestellt: primaer die Gegnerspezifitaet (Schlupf gegen Konkurrenz), sekundaer die Locus-Frage |
-| 7 | ~~Alpha-Sweep-Verdikt~~ | **ERLEDIGT** | registriert in `PREREG_agent_encapsulation.md` par.6b, Querverweis `PREREG_implicit_minimax_backup.md` par.2c |
-| 8 | Floor-Arme (Task-A-Konfiguration, R/A0/A1) MIT `--log-games` | **Arena exklusiv**, mehrere h | nur falls Schritt 3 auf H2/H3 zeigt; repliziert die -11,25 pp gratis |
-
-**Warum diese Reihenfolge.** Schritte 1-4 sind Tore: jedes kann seinen
-Strang fuer Minuten bis eine Stunde beenden, bevor Rechenzeit hineingeht.
-Schritt 5 war der Angelpunkt und ist erledigt. Schritt 8 haengt an
-Schritt 3 und faellt weg, wenn das Tor H1 sagt.
-
-### WAS BEIM STARTSIGNAL ZU TUN IST (Stand 2026-08-24 01:40)
-
-Nutzer-Vorgabe: d1 meldet, wenn der Kernbeweis durch ist, DANN loslegen.
-Restliste, in dieser Reihenfolge:
-
-1. `points_dist_bin_scale` par.6 Tor -- Minuten, kann schliessen.
-2. `score_correlation` komplett -- MAE_eng je Runde, Faltung je Schicht,
-   plus Var(D) als Gegenprobe zu MARGIN_SCALE=20.
-3. `floor_action_aversion` par.6 Tor -- Prior gegen Suche. Entscheidet 5.
-4. `saturating_score_utility` par.3a Tor -- Kopf-Ausgabe gegen `wr`.
-5. NUR falls 3 auf H2/H3 zeigt: Floor-Arme R/A0/A1, Task-A-Konfiguration
-   mit `--log-games`. Einziger Arena-Block.
-6. Rest von `completion_bottleneck_locus`: die sekundaere Locus-Frage
-   (Delta der Rundenabhaengigkeit, alpha gegen frozen aus `imm_netvnet`
-   plus `_swap`). Erwartung nach der Paritaet: nichts. Kostet Minuten.
-7. Straf-Sonde gegen die Netz-gegen-Netz-Quelle nachziehen (Sonde trennt
-   seit b60d0d0 nach NetzA/NetzB) -- schliesst den
-   Gegnerspezifitaets-Caveat des Primaervergleichs.
-
-**Vor dem ersten Schritt:** Wheel-Zeitstempel und Knopf-Schnappschuss
-festhalten (die Parallelsitzung hat den `target`-Baum um 01:31 neu
-geschrieben), und den Remote-Stand mit `git ls-remote origin
-refs/heads/main` pruefen -- der lokale Tracking-Ref haengt im geteilten
-Klon nach.
-
-**Was ausdruecklich NICHT in der Nacht laeuft:** der Skalenwechsel auf
-[-1,1] (`PREREG_saturating_score_utility.md` par.4b) und der Margen-Kopf.
-Beide sind Bau, kein Messen; par.4c haelt fest, dass sie nicht parallel zu
-einer laufenden Kapselungs-Welle gebaut werden -- und genau daran arbeitet
-die Parallelsitzung.
+**Nacht-Fahrplan-Restliste (Punkte-/Margen-Kopf-Strang, eingetaktet,
+noch nicht gestartet -- Details und Begruendung im Archiv-Kapitel):**
+(1) `PREREG_points_dist_bin_scale.md` par.6 Tor, (2)
+`PREREG_score_correlation.md` komplett, (3)
+`PREREG_floor_action_aversion.md` par.6 Tor, (4)
+`PREREG_saturating_score_utility.md` par.3a Tor, (5) nur falls (3) auf
+H2/H3 zeigt: Floor-Arme-Arena, (6) Rest von
+`PREREG_completion_bottleneck_locus.md` (sekundaere Locus-Frage), (7)
+Straf-Sonde gegen die Netz-gegen-Netz-Quelle nachziehen. Vor Schritt 1:
+Wheel-Zeitstempel/Knopf-Schnappschuss und Remote-Stand pruefen.
 
 ## NAECHSTE SCHRITTE – ALLE OFFEN, ALLE NUTZER-ENTSCHEID
 
@@ -489,12 +132,12 @@ Baubeginn freizugeben.
 
 | Strang | Datei | Zuschnitt |
 |---|---|---|
-| **Such-Hebel: Implicit-Minimax-Backup** | `PREREG_implicit_minimax_backup.md` | **GEMESSEN 2026-08-23, ERFOLG nach vorregistrierter Lesart** (par.2b): kein Staerkeverlust (304 vs 296/407 n.s.), Score-Level signifikant +2,77 (Block-t +3,83), **k1 9,0 % -> 16,0 % (+7,0 pp, p=0,090)** -- die groesste je gemessene k1-Bewegung der Netz-Seite, konsistent mit par.4d (Kopf traegt Signal, Suche macht es jetzt wirksam). Caveat: Instrument misst gegen Heuristik. Folgeschritte (alpha-Sweep, Knopf im Self-Play) = Nutzer-Entscheid |
+| **Such-Hebel: Implicit-Minimax-Backup** | `PREREG_implicit_minimax_backup.md` | **ENTSCHIEDEN.** Heuristik-Arena (par.2b) zeigte k1 +7,0 pp, aber die Netz-gegen-Netz-Nachmessung (par.2c, via Kapselung) zeigte Paritaet und identische k1-Zaehler (9,6 % beidseitig) -- der Effekt war GEGNERSPEZIFISCH. Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; naechster Schritt = Nutzer-Entscheid |
 | **R5-Netz-Loeser + R5-Value-Kalibrierung** | `PREREG_r5_solver_split.md` par.2 a/b/c, Teil B | Netz-Loeser-Arme (Budget, Policy-Sortierung, spaeter Value-Korrekturterm; je per-Agent verdrahtet, NIE per Env-Knopf) und der Vierer-Kopf-Vergleich. Zielmetrik der Kalibrierung: `r5_value_calibration`-Steigung, heute 0,06-0,09 statt ~1. **Arm 3 des Vierer-Vergleichs braucht ein b-Serie-Modell mit geprueftem Traeger-Status** – der Ownership-Ausgang des Champions ist untrainiert (Beweiskette par.3a) |
 | **Seeding-Folgearm: Dosis** | `PREREG_start_position_seeding.md` | k=6 war die erste Dosis; hoehere Dosis ist der naheliegende Folgeschritt, aber nicht registriert |
 | **UVFA-Regime-Eingabe** | `PREREG_uvfa_plate_regime.md` | Folge-/Kombinationsarm; par.8: Conditioning-Dropout + Leakage-Waechter sind PFLICHT. par.7-Entscheid steht aus |
 | **Reihenfolge Seeding-Kette gegen R5-Strang** | – | entscheidet der Nutzer beim Aufgreifen |
-| **Agenten-Kapselung (AgentSpec statt Prozess-Global)** | `PREREG_agent_encapsulation.md` | **Welle 1 (Pilot) GEBAUT UND ABGENOMMEN 2026-08-23** (par.4a): `SearchConfig`-Geruest + Migration von `MOSAIC_IMPLICIT_MINIMAX_A`, per-Seite-Spec (`spec`/`spec_a`+`spec_b`) an `net_arena_match`/`net_vs_net_arena_match`/`net_self_play_games`. Suite 498/0/26, Paritaets-Hash haelt, Spec==Env-Default bestaetigt. Naechster Schritt: die eigentliche Alpha-Sweep-Messung (par.6a Vorab-Lesart, Champion vs. Champion+alpha=0,2 netz-gegen-netz auf den 407 Seeds) -- noch nicht gelaufen. Weitere Knopf-Wellen (Schritt 2) bleiben Nutzer-Entscheid |
+| **Agenten-Kapselung (AgentSpec statt Prozess-Global)** | `PREREG_agent_encapsulation.md` | **ENTSCHIEDEN 2026-08-24: Welle 1+3 gebaut und abgenommen, Kernbeweis GRUEN** (8/8 Partien byte-identisch, par.8f) -- siehe STAND-JETZT-Absatz oben. Offen ist nur der planbare Ausbau: die restlichen ~31 Such-/Blattwert-Knoepfe wellenweise ins SearchConfig migrieren (par.4) |
 
 **Geschlossen ohne Messung (nicht neu vorschlagen):** die
 Q-Skalierungs-Option (Aera-Nachmessung `gumbel_scale_calibration_v21.json`:
