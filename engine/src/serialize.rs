@@ -843,6 +843,13 @@ fn player_from_json(v: &Value) -> Result<PlayerBoard, String> {
         bonus_chips_used_this_round,
         total_floor_penalties: 0, // reine Post-hoc-Statistik, keine Spiellogik liest sie
         floor_penalties_per_round: Vec::new(),
+        // Ebenfalls reine Post-hoc-Statistik (Arena-Artefakt, PREREG_long_row_payoff
+        // par.3/B1): kein Feature, keine Legalitaet, keine Suche liest sie. Der
+        // exakte Pfad unten traegt sie woertlich, die Basisrekonstruktion darf
+        // sie deshalb defaulten.
+        long_rows_started_total: 0,
+        long_rows_completed_total: 0,
+        long_rows_cleared_unplaceable_total: 0,
     })
 }
 
@@ -1128,6 +1135,31 @@ pub fn state_to_json_exact(state: &GameState, scoring_confirmed: bool) -> Value 
         "tiled_max_row_exact".to_string(),
         json!(state.players.iter().map(|p| p.tiled_max_row).collect::<Vec<_>>()),
     );
+    // Die drei Zaehler der langen Musterreihen (Arena-Artefakt, s.o.
+    // `json_to_state`). Gleiche Klasse wie `total_floor_penalties`: von
+    // `state_to_json` nicht ausgegeben, also fuer den JSON-gegen-JSON-Vergleich
+    // unsichtbar -- genau die Luecke, die der Doku-Kommentar bei
+    // `assert_roundtrip_exact` beschreibt. Hier gleich mitgetragen, damit sie
+    // gar nicht erst entsteht. GELESEN werden sie unten TOLERANT (fehlender
+    // Schluessel -> Nullen), damit aeltere exact-JSONs weiter laden.
+    obj.insert(
+        "long_rows_started_exact".to_string(),
+        json!(state.players.iter().map(|p| p.long_rows_started_total).collect::<Vec<_>>()),
+    );
+    obj.insert(
+        "long_rows_completed_exact".to_string(),
+        json!(state.players.iter().map(|p| p.long_rows_completed_total).collect::<Vec<_>>()),
+    );
+    obj.insert(
+        "long_rows_cleared_unplaceable_exact".to_string(),
+        json!(
+            state
+                .players
+                .iter()
+                .map(|p| p.long_rows_cleared_unplaceable_total)
+                .collect::<Vec<_>>()
+        ),
+    );
     // `dome_tiles_placed_this_round_exact`: ERSETZT die bisherige
     // "0 oder DOME_TILES_PER_ROUND aus dem can_place_dome-Bool"-Naeherung
     // (Kategorie 3, `player_from_json` unten) UND den `seed_state_fixup`-
@@ -1324,12 +1356,31 @@ pub fn json_to_state_exact(v: &Value) -> Result<GameState, String> {
             state.players.len()
         ));
     }
+    // Tolerant: fehlt der Schluessel (exact-JSON aus einer aelteren Engine)
+    // oder hat er die falsche Laenge, bleiben die Zaehler auf 0 -- sie sind
+    // reine Statistik, ein Default kann keinen Spielzustand verfaelschen. Ein
+    // HARTES Pflichtfeld wuerde dagegen jedes Bestands-JSON unlesbar machen.
+    let opt_counter = |key: &str| -> Vec<i64> {
+        match v.get(key).and_then(|x| x.as_array()) {
+            Some(a) if a.len() == state.players.len() => {
+                a.iter().map(|x| x.as_i64().unwrap_or(0)).collect()
+            }
+            _ => vec![0; state.players.len()],
+        }
+    };
+    let lr_started_exact = opt_counter("long_rows_started_exact");
+    let lr_completed_exact = opt_counter("long_rows_completed_exact");
+    let lr_cleared_exact = opt_counter("long_rows_cleared_unplaceable_exact");
+
     for (i, p) in state.players.iter_mut().enumerate() {
         p.score_unclamped = score_unclamped_exact[i] as i32;
         p.total_floor_penalties = total_floor_penalties_exact[i] as i32;
         p.tiled_max_row = tiled_max_row_exact[i] as i32;
         p.floor_penalties_per_round = floor_penalties_per_round_exact[i].clone();
         p.dome_tiles_placed_this_round = dome_tiles_placed_this_round_exact[i] as u32;
+        p.long_rows_started_total = lr_started_exact[i] as i32;
+        p.long_rows_completed_total = lr_completed_exact[i] as i32;
+        p.long_rows_cleared_unplaceable_total = lr_cleared_exact[i] as i32;
     }
 
     // Kernbeweis-Diagnose (PREREG_agent_encapsulation.md par.8e-Folge,
@@ -1586,6 +1637,25 @@ mod json_to_state_exact_tests {
             out.push(format!(
                 "players[{i}].floor_penalties_per_round: {:?} != {:?}",
                 a.floor_penalties_per_round, b.floor_penalties_per_round
+            ));
+        }
+        if (
+            a.long_rows_started_total,
+            a.long_rows_completed_total,
+            a.long_rows_cleared_unplaceable_total,
+        ) != (
+            b.long_rows_started_total,
+            b.long_rows_completed_total,
+            b.long_rows_cleared_unplaceable_total,
+        ) {
+            out.push(format!(
+                "players[{i}].long_rows (start/voll/geraeumt): {}/{}/{} != {}/{}/{}",
+                a.long_rows_started_total,
+                a.long_rows_completed_total,
+                a.long_rows_cleared_unplaceable_total,
+                b.long_rows_started_total,
+                b.long_rows_completed_total,
+                b.long_rows_cleared_unplaceable_total
             ));
         }
     }

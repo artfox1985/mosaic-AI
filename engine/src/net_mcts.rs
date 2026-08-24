@@ -1030,10 +1030,11 @@ fn floor_penalties(state: &GameState) -> (f64, f64) {
 /// Nutzer-Entscheid 2026-08-24.
 const LONG_ROW_INIT_SHAPING_SCALE: f64 = 10.0;
 
-/// Musterreihen-Indizes, die auf die unteren Kuppel-Zeilen speisen und fuer
-/// den Spaltenbau noetig sind (`docs/engine_manual.md` Phase 2: Musterreihe N
-/// speist Brett-Zeile N). 0-indexiert, entspricht Musterreihe 5 und 6.
-const LONG_ROW_INDICES: [usize; 2] = [4, 5];
+/// Musterreihen-Indizes der langen Reihen. Zentral in `board.rs`, damit das
+/// Such-Additiv hier und die Arena-Zaehler (`execution.rs`, `round_end.rs`)
+/// nicht auseinanderlaufen koennen: sonst koennte der Mitschrieb eine andere
+/// Reihenmenge zaehlen als der Knopf bewegt.
+use crate::board::LONG_ROW_INDICES;
 
 /// Zahl der BEGONNENEN langen Musterreihen (mindestens eine Fliese), `0..=2`.
 /// **Stufenfunktion am Uebergang 0 -> 1, kein Fuellstands-Anteil** -- das ist

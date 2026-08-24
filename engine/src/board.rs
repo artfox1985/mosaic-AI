@@ -226,6 +226,14 @@ impl DomeGrid {
 
 pub const MAX_BROKEN: usize = 4;
 pub const BROKEN_PENALTIES: [i32; 4] = [-1, -2, -3, -4];
+
+/// Musterreihen-Indizes der LANGEN Reihen (0-indexiert; Musterreihe 5 und 6,
+/// Kapazitaet 5 und 6). Sie speisen die unteren Kuppel-Zeilen und sind fuer
+/// den Spaltenbau noetig (`docs/engine_manual.md` Phase 2: Musterreihe N
+/// speist Brett-Zeile N). Zentral hier, damit Zaehler (`execution.rs`,
+/// `round_end.rs`) und Such-Additiv (`net_mcts.rs`) dieselbe Definition
+/// benutzen und nicht auseinanderlaufen koennen.
+pub const LONG_ROW_INDICES: [usize; 2] = [4, 5];
 pub const DOME_TILES_PER_ROUND: u32 = 2;
 pub const MAX_DOME_SLOTS: usize = 9;
 pub const TOKENS_PER_ROUND: u32 = 2;
@@ -260,6 +268,29 @@ pub struct PlayerBoard {
     pub bonus_chips_used_this_round: u32,
     pub total_floor_penalties: i32,
     pub floor_penalties_per_round: Vec<i32>,
+    /// Zahl der Male, dass eine LANGE Musterreihe (Index 4/5, Kapazitaet 5/6)
+    /// von LEER auf belegt gewechselt ist -- also "eine lange Reihe begonnen".
+    /// Reiner Beobachtungs-Zaehler fuer das Arena-Artefakt
+    /// (`PREREG_long_row_payoff.md` par.3/B1, Pflicht-Kennzahl), beeinflusst
+    /// KEINE Spiellogik und KEINE Bewertung.
+    ///
+    /// Warum ein Zaehler und keine Log-Auswertung: `round_end.rs`s
+    /// `process_unplaceable_rows` leert Musterreihen OHNE Logzeile, eine
+    /// belegungsgenaue Rekonstruktion aus dem Partie-Log ist deshalb
+    /// unmoeglich (nachgewiesen 2026-08-24, siehe par.2a Stufe 2). Und eine
+    /// neue Logzeile kaeme nicht in Frage: `state.log` ist das
+    /// Vergleichsobjekt des Kernbeweises (`referee.rs::full_log`), eine
+    /// Aenderung dort wuerde ihn gegen das eingefrorene Artefakt brechen.
+    pub long_rows_started_total: i32,
+    /// Zahl der LANGEN Musterreihen, die vollstaendig gefuellt ins Tiling
+    /// gingen (= vollendet). Gegenstueck zu `long_rows_started_total`; der
+    /// Quotient ist die Vollendungsquote aus dem registrierten Falsifikator
+    /// ("Initiierung hoch UND Vollendung runter" = NICHT-Erfolg).
+    pub long_rows_completed_total: i32,
+    /// Zahl der LANGEN Musterreihen, die unvollendet als unplatzierbar
+    /// geraeumt wurden (`process_unplaceable_rows`) -- die teuerste Form des
+    /// Abbruchs, weil die Steine auf die Strafleiste gehen.
+    pub long_rows_cleared_unplaceable_total: i32,
 }
 
 impl PlayerBoard {
@@ -282,6 +313,9 @@ impl PlayerBoard {
             bonus_chips_used_this_round: 0,
             total_floor_penalties: 0,
             floor_penalties_per_round: Vec::new(),
+            long_rows_started_total: 0,
+            long_rows_completed_total: 0,
+            long_rows_cleared_unplaceable_total: 0,
         }
     }
 
