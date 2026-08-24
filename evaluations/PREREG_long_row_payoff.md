@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: par.2 (Zweig-A-Diagnose) GEFAHREN 2026-08-24 (long_row_prior_gate.json, 260 qualifizierende Netz-Stellungen + 260 Heuristik-Kontrast, sims=200): roher Prior lang/kurz-Verhaeltnis 0,221 (Netz) bzw. 0,210 (Heuristik) -- FAST IDENTISCH --, Suche bewegt es kaum (Delta <=0,006 Netz). Verdikt: Signal fehlt BEREITS im Prior (moderat, nicht extrem wie beim Floor-Ziel) -> Zweig B2 (Label/Training) rueckt vor, B1 (Suchseitig) bleibt ein billiger Versuch mit gedaempfter Erwartung. par.3 (B1/B2-Bau) bleibt Nutzer-Entscheid nach par.7, nichts gebaut. Anlass: Reihen-Sonde (STATUS 2026-08-23/24) zeigt eine flache ~55,5-%-Kurzreihen-Praeferenz, die NICHT vom Heuristik-Lehrer geerbt ist; Legalitaets-Stufe zeigt, dass 54 % der verpassten Spalten-Vollendungen an "Musterreihe noch nicht voll" scheitern -- der Engpass liegt upstream in der Draft-Wahl, nicht am Spaltenende. -->
+<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: par.2 (Prior-Sichtbarkeit) und par.2a (Initiierung gegen Fortsetzung) GEFAHREN 2026-08-24. par.2: Prior lang/kurz 0,221, Suche bewegt es kaum -> Signal fehlt bereits im Prior, B2 rueckt vor. KORREKTUR an par.2: die zweite Spalte war NICHT die Heuristik, sondern derselbe Champion auf heuristik-Stellungen -- die Zahl zeigt Robustheit ueber Zustandsverteilungen, keinen Agentenvergleich. par.2a in drei Stufen: Arena-Log-Anteil zeigte einen R3-Einbruch, der sich als BELEGUNGS-KONFUNDIERER erwies; die Log-Rekonstruktion dagegen scheiterte am eigenen Selbsttest (233/407 Partien), Ursache round_end.rs:87 process_unplaceable_rows leert Reihen ohne Logzeile; die Korpus-Fassung entkonfundiert: Policy-Masse auf "beginne eine leere lange Reihe", bedingt auf Gelegenheit, Netz 11,5 % gegen Heuristik 25,2 % -- Faktor ~3, FLACH ueber R1-4, Konvergenz nur in R5. Damit ist die Luecke in der INITIIERUNG lokalisiert, nicht in der Fortsetzung -- ein Fortschritts-Shaping (B1) traefe die falsche Aktionsklasse. par.3 bleibt Nutzer-Entscheid, nichts gebaut. Anlass: Reihen-Sonde (STATUS 2026-08-23/24) plus Legalitaets-Stufe (54 % der verpassten Vollendungen scheitern an "Musterreihe noch nicht voll") -->
 
 # PREREG-SKELETT: Auszahlung langer Musterreihen -- Prior-Sichtbarkeit und Signal-Shaping
 
@@ -153,18 +153,33 @@ Null des Floor-Ziels aus `PREREG_floor_action_aversion.md` entfernt. Zwei
 verschiedene Grade derselben Asymmetrie-Familie, nicht derselbe Befund
 zweimal gemessen.
 
-**Zweiter Befund, nicht vorregistriert, aber auffaellig:** das
-Lang/Kurz-Verhaeltnis ist bei Netz (0,221) und Heuristik (0,210) FAST
-IDENTISCH. Das ist eine andere Grundgesamtheit als die flache
-55,5-56,1-%-Kurzreihen-Praeferenz aus `row_preference_probe.py` (die ALLE
-Draft-Entscheidungen zaehlt, nicht nur Fortsetzungen einer bereits
-begonnenen langen Reihe) -- dieser Zuschnitt misst eine ENGERE, spezifischere
-Entscheidung ("die Reihe steht schon, mache ich weiter oder nicht"), und
-dort unterscheiden sich Netz und Lehrer kaum. Das relativiert nicht den
-Reihen-Sonden-Befund (andere Entscheidungsklasse), zeigt aber: nicht jede
-Auspraegung der Kurzreihen-Neigung ist netz-spezifisch -- diese hier koennte
-strukturell im Spiel selbst liegen (kurze Reihen sind schneller/sicherer
-zu vollenden, unabhaengig vom Agenten) statt gelernt/verlernt zu sein.
+**Zweiter Befund -- KORRIGIERT 2026-08-24, meine erste Deutung war falsch.**
+
+Erste, FALSCHE Fassung dieses Absatzes: *"das Lang/Kurz-Verhaeltnis ist bei
+Netz (0,221) und Heuristik (0,210) fast identisch ... dort unterscheiden
+sich Netz und Lehrer kaum."* Das steht so nicht in den Daten. Am Werkzeug
+nachgesehen (`long_row_prior_gate.py:314-315`): **BEIDE Spalten rufen
+`evaluate(..., model, ...)` mit demselben `model` auf, dem CHAMPION.** Die
+Spalte "heuristik" ist also der Prior DES CHAMPIONS, ausgewertet auf
+heuristik-generierten Stellungen -- nicht das Verhalten der Heuristik. Ein
+Vergleich zweier Agenten ist das nicht und war es nie.
+
+Was die Zahl tatsaechlich sagt: **der Prior des Champions liefert auf zwei
+sehr verschiedenen Zustandsverteilungen praktisch dasselbe Verhaeltnis
+(0,221 gegen 0,210).** Die Unterdrueckung haengt also NICHT an der
+Zustandsverteilung -- sie ist eine Eigenschaft des Netzes, die es in
+fremde Stellungen mitnimmt. Das ist ein brauchbarer Befund, nur ein
+anderer als der behauptete: er staerkt die Prior-Diagnose (die
+Unterdrueckung ist robust), sagt aber NICHTS ueber den Lehrer.
+
+**Was daraus offen bleibt und diesen Zuschnitt erst scharf macht:** die
+Reihen-Sonde vergleicht GESPIELTE Zuege beider Agenten und findet dort
+einen klaren Unterschied (Netz flach, Lehrer adaptiert spaet). Dieser
+Zuschnitt misst PRIOR-MASSE nur des Netzes auf einer engeren
+Entscheidungsklasse (Fortsetzung einer bereits begonnenen langen Reihe).
+Beides ist vereinbar, wenn der Agentenunterschied im BEGINNEN langer
+Reihen liegt statt im Fortsetzen -- eine Ableitung, keine Messung. Sie ist
+Gegenstand von par.2a.
 
 **Je Runde** (n=12/105/82/61 fuer R1-4 -- R1 duenn besetzt, Vorsicht bei
 Einzelaussagen): das Verhaeltnis schwankt zwischen 0,13 (R3) und 0,53
@@ -177,6 +192,103 @@ B1 (Such-seitiges Shaping) ist damit nicht ausgeschlossen -- das Tor sagt
 ausdruecklich "billiger Versuch wert" -- aber mit gedaempfter Erwartung,
 weil die Suche das vorhandene, wenn auch geringe, Prior-Signal in den
 gemessenen 260 Stellungen kaum verstaerkt hat.
+
+## par.2a Initiierung gegen Fortsetzung (2026-08-24, Nutzer-Auftrag)
+
+**Frage:** liegt der Agenten-Unterschied im BEGINNEN langer Reihen statt im
+FORTSETZEN? par.2 misst nur Fortsetzungen; die Reihen-Sonde vergleicht
+gespielte Zuege beider Agenten und findet dort einen Unterschied. Beides ist
+vereinbar, wenn die Luecke bei der Initiierung sitzt.
+
+### Stufe 1 (Arena-Logs): auffaellig, aber KONFUNDIERT -- nicht verwertbar
+
+`tools/probes/row_initiation_probe.py`, Anteil "Initiierung geht in eine
+lange Reihe", gespielte Zuege, gepaart in denselben Partien:
+
+| | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|
+| Champion | 21,8 % | 27,7 % | **2,1 %** | 13,7 % | 20,5 % |
+| Heuristik | 33,4 % | 5,3 % | 12,8 % | 17,1 % | 17,5 % |
+
+Alle gepaarten t-Werte gross (|t| = 3 bis 22). Der R3-Einbruch des
+Champions sah nach einem scharfen Strukturbefund aus.
+
+**Er ist keiner.** Der Anteil ist konfundiert: eine lange Reihe laesst sich
+nur initiieren, wenn sie gerade LEER ist. Wer in R2 viele lange Reihen
+anfaengt, kann sie in R3 nicht mehr initiieren -- der Zickzack kann reine
+Belegungsdynamik sein. **Diese Tabelle wird nicht als Befund gefuehrt.**
+
+### Stufe 2 (Log-Rekonstruktion): am eigenen Selbsttest GESCHEITERT
+
+`tools/probes/row_opportunity_probe.py` sollte die Belegung aus dem Log
+rekonstruieren und darauf normieren. Eingebauter Selbsttest: die
+Rekonstruktion muss den `[f/c]`-Fuellstand jedes Zuges unabhaengig
+reproduzieren. **Er schlug in 233 von 407 Partien an** (netvnet 299/407).
+
+Ursache am Code gefunden, nicht geraten: **`round_end.rs:87
+process_unplaceable_rows` leert Musterreihen am Rundenende und schreibt
+dafuer KEINE Logzeile.** Eine belegungsgenaue Rekonstruktion aus
+Arena-Logs ist damit prinzipiell unmoeglich, ohne `find_unplaceable_rows`
+samt Kuppel-Zustand nachzubauen -- also Spielregeln in einer Sonde zu
+reimplementieren. Der Zuschnitt wurde deshalb umgestellt statt geflickt.
+
+**Diese Stufe ist hier festgehalten, weil ihr Scheitern ein verwertbarer
+Befund ist:** wer kuenftig Musterreihen-Belegung aus Arena-Logs ableiten
+will, kann das nicht, und der Selbsttest ist das Werkzeug, das es zeigt.
+
+### Stufe 3 ERGEBNIS (Korpus statt Logs): Faktor ~3, FLACH ueber R1-4
+
+`tools/probes/row_initiation_opportunity_probe.py`. Der Self-Play-Korpus
+traegt den Zustand exakt (`state.players[p].pattern_lines`) und die legalen
+Zuege direkt -- keine Rekonstruktion, kein Regel-Nachbau. Gemessen wird die
+`policy`-Masse (Besuchsverteilung der jeweiligen Suche) auf Aktionen, die
+eine LEERE lange Reihe beginnen, **bedingt darauf, dass so eine Aktion
+ueberhaupt legal ist**.
+
+Netz: 248 Dateien stratifiziert, 293.250 Drafting-Entscheidungen, davon
+100.864 mit Gelegenheit, 2.480 Partien. Heuristik: kompletter
+Holdout-Korpus, 65.226 Entscheidungen, 14.377 mit Gelegenheit, 500 Partien.
+
+| | gesamt | R1 | R2 | R3 | R4 | R5 |
+|---|---|---|---|---|---|---|
+| **Netz** | **11,5 %** | 7,9 % | 10,6 % | 8,8 % | 11,2 % | **20,2 %** |
+| **Heuristik** | **25,2 %** | 27,0 % | 28,6 % | 27,9 % | 27,0 % | **19,2 %** |
+
+Block-Bootstrap-95-%-KIs (ueber Partien) sind eng und ueberlappen nirgends,
+etwa gesamt Netz [0,113; 0,116] gegen Heuristik [0,249; 0,256].
+
+**Befund: das Netz legt auf das Beginnen einer langen Reihe rund EIN
+DRITTEL der Masse des Lehrers -- konstant ueber die Runden 1 bis 4.** Der
+R3-Einbruch aus Stufe 1 war vollstaendig der Belegungs-Konfundierer; er
+verschwindet unter Normierung restlos.
+
+**Der Konfundierer, jetzt beziffert:** die Gelegenheits-Quote betraegt beim
+Netz 34,4 %, beim Lehrer 22,0 % -- das Netz hat deutlich HAEUFIGER eine
+leere lange Reihe, genau weil es sie seltener beginnt. Stufe 1 hat also
+teilweise die Folge der Ursache gemessen.
+
+**Zweiter Befund: die Konvergenz in Runde 5** (20,2 % gegen 19,2 %, KIs
+ueberlappen). Nur dort verhaelt sich das Netz wie der Lehrer.
+Caveat, ausdruecklich: Runde 5 laeuft ueber einen anderen Suchpfad (exakter
+R5-Loeser), die `policy` dort ist nicht dasselbe Objekt wie in R1-4 -- die
+Konvergenz ist berichtenswert, aber nicht ohne Weiteres als
+"Verhaltensangleichung" zu lesen.
+
+### Folge fuer par.2 und par.3
+
+Die Ableitung aus par.2 ist **bestaetigt**: die Luecke sitzt in der
+INITIIERUNG, nicht in der Fortsetzung. Das praezisiert den Zuschnitt
+erheblich:
+
+- Ein Shaping-Term (B1), der Fortschritt in bereits begonnenen langen
+  Reihen aufwertet, trifft die falsche Entscheidung -- dort ist das Netz
+  nicht auffaellig schlechter als der Lehrer (par.2: Verhaeltnis 0,22, und
+  dieselbe Groesse auf beiden Zustandsverteilungen).
+- Was fehlt, ist der ERSTE Stein in eine lange Reihe. Ein Eingriff muesste
+  genau diese Aktionsklasse treffen, nicht den Fortschritt allgemein.
+
+Das ist eine schaerfere Vorgabe fuer B1 und B2, als par.3 sie bisher hat --
+und sie war ohne die Entkonfundierung nicht sichtbar.
 
 ## par.3 Zweig B: Auszahlung sichtbar machen (Eingriff, nach par.2 zuzuschneiden)
 
