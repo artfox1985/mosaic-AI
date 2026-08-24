@@ -117,6 +117,10 @@ pub(crate) fn player_total_variante(
                     &state.players[pi],
                     &state.scoring_tile_ids,
                 )
+                + crate::heuristic_v2::plattenunabhaengiger_l_wert(
+                    &state.players[pi],
+                    &state.scoring_tile_ids,
+                )
         }
     }
 }

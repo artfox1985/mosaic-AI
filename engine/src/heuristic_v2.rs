@@ -82,6 +82,10 @@ use crate::dome::SpaceType;
 /// Zuwachs unten benutzt exakt dieselbe Formel, damit v2 und die Endwertung
 /// nicht auseinanderlaufen.
 const K1_VERTIKALE_REIHEN: usize = 1;
+/// Wertungsplatten-Id der HORIZONTALEN Reihen (`scoring.rs`, Zweig `0`,
+/// 3 Punkte je voller Zeile).
+const K0_HORIZONTALE_REIHEN: usize = 0;
+const ZEILE_VOLL_PUNKTE: f64 = 3.0;
 
 /// **HANDGESETZT** (Nutzer-Vorgabe 2026-08-24: "das ist die Heuristik, da
 /// muessen wir handcraften"). Kredit-Hoehe je Musterreihe, Index 0..5 fuer
@@ -192,6 +196,62 @@ fn ertrag_des_feldes(
 /// Volle Reihen bekommen nichts: sie liegen bereits im Tiling-Solver-Score.
 /// Leere Reihen bekommen nichts: es gibt keinen Fortschritt zu belohnen (und
 /// ein Anfangs-Bonus ist genau der Fehler, an dem B1 gescheitert ist).
+/// Wert der BESTEN Spalte und der besten oberen Zeile -- **unabhaengig davon,
+/// ob die zugehoerige Wertungsplatte aktiv ist**.
+///
+/// Anlass (gemessen 2026-08-24): v2 baut 0,562 volle Spalten je Partie, wenn
+/// k1 aktiv ist, aber nur 0,229 wenn nicht. Der Grund ist strukturell --
+/// `wertung_progress` kreditiert Spaltenfuellung ausschliesslich bei aktivem
+/// k1 (`scoring.rs`, Zweig `1`), und k1 liegt nur in rund 40 Prozent der
+/// Partien an. In den uebrigen 60 Prozent arbeitet die Suche also GEGEN das
+/// Routing statt mit ihm.
+///
+/// Fuer v2 ist das L (eine Spalte plus eine obere Zeile) das ZIEL, nicht die
+/// Wertungsplatte. Der Term macht es deshalb auch dann wertvoll, wenn es
+/// nichts einbringt -- das ist der bewusst in Kauf genommene Punktepreis
+/// (Nutzer-Entscheid 2026-08-24: "solange er Spalten baut ... ist es ok").
+///
+/// **Keine Doppelzaehlung:** ist die Platte aktiv, kreditiert
+/// `wertung_progress` sie bereits, und dieser Term liefert fuer sie 0. Er
+/// springt nur ein, wo der Bestand schweigt.
+///
+/// **MAX statt Summe:** `wertung_progress` summiert ueber alle sechs Spalten
+/// und belohnt damit Breite. Eine volle Spalte braucht aber Fokus -- die
+/// 21-Zellen-Identitaet haengt am Minimum ueber die Rasterzeilen, nicht an
+/// der Summe. Das Maximum lenkt auf die Spalte, die ohnehin am weitesten ist.
+///
+/// Billig gehalten: reines Auszaehlen der 36 Zellen, kein Kandidaten-Kosten-
+/// vergleich. Der Term laeuft an JEDEM Suchblatt.
+pub fn plattenunabhaengiger_l_wert(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
+    let mut spalten = [0u32; 6];
+    let mut zeilen = [0u32; 6];
+    for (tr, reihe) in player.dome_grid.dome_slots.iter().enumerate() {
+        for (tc, slot) in reihe.iter().enumerate() {
+            let Some(slot) = slot else { continue };
+            for (si, sp) in slot.spaces.iter().enumerate() {
+                if sp.is_filled() {
+                    spalten[2 * tc + si % 2] += 1;
+                    zeilen[2 * tr + si / 2] += 1;
+                }
+            }
+        }
+    }
+    let mut wert = 0.0;
+    if !tile_ids.contains(&K1_VERTIKALE_REIHEN) {
+        let beste = spalten.iter().copied().max().unwrap_or(0);
+        wert += spalten_punkte(beste);
+    }
+    if !tile_ids.contains(&K0_HORIZONTALE_REIHEN) {
+        // Nur die obersten zwei Rasterzeilen: weiter unten ist eine volle
+        // Zeile nicht erreichbar (Musterreihe schliesst hoechstens einmal je
+        // Runde ab, fuenf Steine fuer sechs Zellen), siehe
+        // `plate_builder::ZEILEN_ZIEL_MAX`.
+        let beste = zeilen[..2].iter().copied().max().unwrap_or(0);
+        wert += (beste as f64 / SPALTE_ZELLEN).powi(2) * ZEILE_VOLL_PUNKTE;
+    }
+    wert
+}
+
 pub fn row_completion_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
     let fuellung = spalten_fuellung(player);
     let mut summe = 0.0;
