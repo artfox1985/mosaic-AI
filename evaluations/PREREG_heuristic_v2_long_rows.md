@@ -525,6 +525,41 @@ passend gemacht):**
 
 Eigene Vorregistrierung vor dem Bau, eigene Nutzer-Freigabe.
 
+### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
+
+`plate_builder::v2_chip_vorzug`: vollendet per Bonuschip die Musterreihe, die
+eine Zielzelle blockiert, sobald das mit der Engine-Regel (2 farbgleiche oder
+3 beliebige Chips je fehlende Zelle, `round_end::greedy_chip_alloc`) moeglich
+und die Zielzelle sofort platzierbar ist.
+
+**Erster Befund war ein Test-Fehler, kein Funktions-Fehler.** Ein isolierter
+Rust-Test (`plate_builder::v2_chip_vorzug_tests`) mit konstruiertem
+Zustand -- Kuppelplatte, angefangene Reihe, zwei farbgleiche Chips --
+bestaetigt: die Funktion findet die Vollendung. Erst dabei fiel auf, dass
+mein erster Test die falsche Farbe ansetzte (Zelle (1,0) verlangt Tuerkis,
+nicht Rot, laut Kuppelplatte 0) -- REGEL 0: der Fehler waere ohne den
+isolierten Test als "Funktion kaputt" fehlgemeldet worden.
+
+**Live-Wirkung dennoch null** (80 Partien, beide Sitze): weiterhin 0
+Chip-Vollendungen von Rasterreihe 6, 7,5 Prozent Partien ohne jeden
+R6-Abschluss, Spaltenquote unveraendert bei 0,550. Das ist nach der
+Chip-Oekonomie plausibel, nicht widerspruechlich: `greedy_chip_alloc`
+verlangt 2 FARBGLEICHE Chips je fehlender Zelle. Insgesamt sind nur rund 20
+Chips im gesamten Spiel im Umlauf (`docs/engine_manual.md`: "4 je Runde ueber
+5 Runden"), geteilt zwischen beiden Spielern -- ein einzelner Spieler haelt
+selten mehr als eine Handvoll, und je zwei davon muessen zufaellig dieselbe
+Farbe tragen UND die Reihe muss auf genau eine fehlende Zelle heruntergefuellt
+sein, damit der Vorzug ueberhaupt greift. Diese Kombination trat in 80
+Partien kein einziges Mal ein.
+
+**Kein Ruecknahme-Fall wie par.3a:** der Term kostet nichts (er greift nur,
+wenn er zuschlaegt) und bleibt im Code -- er wird wirksam, sobald ein Korpus
+mehr Chip-Reserven zulaesst oder die Bedingung gelockert wird (z.B. 3
+beliebige statt 2 farbgleiche zulassen, was `greedy_chip_alloc` bereits als
+Fallback kennt). Fuer diese Kampagne ist er eine korrekte, aber seltene
+Randbedingung -- nicht der Hebel, der die 7,5 Prozent Null-R6-Partien
+schliesst.
+
 ## par.4 Anker-Integritaet: die ERSTE Bauentscheidung, vor der Formel
 
 Der Nutzer-Entscheid lautet "v2 als ZUSAETZLICHER Anker". Daraus folgen harte

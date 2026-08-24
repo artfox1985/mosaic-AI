@@ -1064,8 +1064,8 @@ mod tests {
     use super::*;
     use crate::dome::{DomeSpace, DomeTile};
     use crate::tile::TileColor::*;
-    use rand::rngs::StdRng;
     use rand::SeedableRng;
+    use rand::rngs::StdRng;
 
     fn names() -> [String; 2] {
         ["P1".into(), "P2".into()]
@@ -1494,8 +1494,63 @@ pub(crate) fn v2_drafting_vorzug(state: &GameState) -> Option<Action> {
 /// Draft-seitige Absicht wieder weg.
 pub(crate) fn v2_tiling_vorzug(state: &GameState, pi: usize) -> Option<TilingStep> {
     let z = v2_ziel_zellen(state, pi)?;
-    tiling_vorzug_fuer_zellen(state, pi, &z)
+    // Chip-Einsatz auf die BLOCKIERENDE Reihe zuerst. Befund 2026-08-24:
+    // trotz Routing null Chip-Vollendungen von Rasterreihe 6 in 80 Partien,
+    // und 7,5 Prozent der Partien haben ueberhaupt keinen R6-Abschluss --
+    // ausnahmslos ohne jede volle Spalte. Die generische Suche unten
+    // (`tiling_vorzug_fuer_zellen`, ueber `top_k_tilings`) SCHLIESST
+    // Chip-Schritte technisch ein (`legal_steps` -> `chippable_rows`), findet
+    // sie aber im DFS-Budget (2000 Knoten, `NODE_BUDGET`) offenbar nicht
+    // zuverlaessig -- die Verzweigung ueber Chip-Allokationen ist teuer.
+    // Ein direkter Vorzug macht die Absicht explizit statt auf den
+    // Suchzufall zu hoffen.
+    v2_chip_vorzug(state, pi, &z).or_else(|| tiling_vorzug_fuer_zellen(state, pi, &z))
 }
+
+/// Vollendet per Bonuschip die Musterreihe, die eine ZIELZELLE blockiert --
+/// nur wenn diese Zelle sonst leer bliebe UND die Chip-Vollendung sofort
+/// platzierbar ist (`row_has_open_matching_slot`). Kein Griff in fremde
+/// Reihen: eine Reihe, die keine Zielzelle bedient, wird nie angefasst,
+/// Bonuschips bleiben dafuer erhalten.
+fn v2_chip_vorzug(state: &GameState, pi: usize, zellen: &[(usize, usize)]) -> Option<TilingStep> {
+    let player = &state.players[pi];
+    if player.bonus_chips.is_empty() {
+        return None;
+    }
+    // `zellen` sind RASTER-Koordinaten (r, c) im 6x6-Raster -- dieselbe
+    // Konvention wie `column_build::zelle_kosten`. Musterreihe r speist
+    // GENAU Rasterreihe r (`round_end::row_has_open_matching_slot` benutzt
+    // dieselbe Zuordnung: `dome_row = r/2, space_row = r%2`), ein Umweg ueber
+    // Slot-Koordinaten ist unnoetig -- `get_space` uebernimmt die Umrechnung.
+    for &(r, c) in zellen {
+        let Some(sp) = player.dome_grid.get_space(r, c) else { continue };
+        if sp.is_filled() || sp.is_locked {
+            continue;
+        }
+        let row = &player.pattern_lines[r];
+        if row.tiles.is_empty() || row.is_complete() {
+            continue;
+        }
+        let Some(color) = row.color else { continue };
+        if !sp.accepts(color) {
+            continue; // diese Zelle nimmt eine ANDERE Farbe/keine Normalfarbe
+        }
+        if (r as i32) < player.tiled_max_row {
+            continue; // Top-down-Sperre
+        }
+        if !crate::round_end::can_complete_row_with_chips(player, r) {
+            continue;
+        }
+        if !crate::round_end::row_has_open_matching_slot(player, r, color) {
+            continue;
+        }
+        if let Some(chips) = crate::round_end::greedy_chip_alloc(player, r) {
+            return Some(TilingStep::Chips { row: r, chips });
+        }
+    }
+    None
+}
+
 
 /// Fuellstand je Brett-Spalte. Lokale Kopie der Abbildung aus
 /// `heuristic_v2::spalten_fuellung` (Slot `(tr,tc)`, Space `si` -> Spalte
@@ -1513,4 +1568,45 @@ fn spalten_fuellung_lokal(player: &PlayerBoard) -> [u32; 6] {
         }
     }
     fill
+}
+
+#[cfg(test)]
+mod v2_chip_vorzug_tests {
+    use super::*;
+    use crate::dome::{build_dome_tile_pool, BonusChip};
+    use crate::tile::TileColor::*;
+    use rand::SeedableRng;
+
+    /// Baut einen Zustand mit: Kuppelplatte in Slot (0,0), Musterreihe 1
+    /// (Kapazitaet 2) mit EINER Fliese (Rot), einem Space in Slot (0,0), das
+    /// Rot akzeptiert und noch leer ist, und zwei passenden Chips. Erwartung:
+    /// `v2_chip_vorzug` findet die Vollendung.
+    #[test]
+    fn findet_chip_vollendung_fuer_blockierende_reihe() {
+        let mut state = crate::game::Game::start(
+            ["A".to_string(), "B".to_string()], 0, vec![], &mut rand::rngs::StdRng::seed_from_u64(1),
+        ).state.clone();
+        let pi = 0;
+        let tile = build_dome_tile_pool()[0].clone();
+        state.players[pi].dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        // Musterreihe 1 (Index 1, Kapazitaet 2) mit einer Fliese TUERKIS --
+        // cell_to_dome_space(1,0) = Slot(0,0) Space 2, und Platte pool[0] hat
+        // dort Tuerkis (siehe board.rs-Test "Platte 0 = [Gelb, Schwarz,
+        // Tuerkis, Special]").
+        state.players[pi].pattern_lines[1].add_tiles(&[Tuerkis]);
+        // Zwei tuerkise Chips.
+        state.players[pi].bonus_chips = vec![
+            BonusChip { chip_id: 100, colors: vec![Tuerkis] },
+            BonusChip { chip_id: 101, colors: vec![Tuerkis] },
+        ];
+        // Zielzellen: die ganze Spalte 0 (enthaelt (1,0), die Zielzelle
+        // dieser Musterreihe -- siehe cell_to_dome_space: Reihe 1 -> Slot
+        // (0,0), Space 2).
+        let zellen: Vec<(usize, usize)> = (0..6).map(|r| (r, 0)).collect();
+        let ok = state.players[pi].dome_grid.get_space(1, 0).map(|s| !s.is_filled() && !s.is_locked);
+        assert_eq!(ok, Some(true), "Vorbedingung: Zielzelle (1,0) muss offen sein");
+        let schritt = v2_chip_vorzug(&state, pi, &zellen);
+        assert!(matches!(schritt, Some(TilingStep::Chips { row: 1, .. })),
+                "erwartet Chips{{row:1}}, bekam {schritt:?}");
+    }
 }
