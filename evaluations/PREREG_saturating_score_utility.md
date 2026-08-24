@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score, integriert ueber die Score-Verteilung) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die vorhandene lineare Mischung gescheitert ist? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht ERGAENZT. Ausarbeitung liegt in research_value_head_alternatives_DRAFT.md Idee 1.1, war aber nie vorregistriert. Empirischer Anker: Task #12 Block 2, Marge +2,25 bei 151:149. Neu: Tor par.3a (entscheidet offline zwischen "Punkte-Term fast konstant" und "fast kollinear zu wr" -- die Entwurfs-Diagnose setzte voraus, dass die Kopf-Ausgabe tanh(own/50) schaetzt, was fuer ~83 % der Trainingszeilen wegen des TD-Blends nicht gilt) sowie zwei Bau-Blocker, beide am 2026-08-23 per Nutzer-Entscheid geschlossen: par.4a -> SKALENWECHSEL der ganzen Blattbewertung auf [-1,1] (Bau-Umfang in par.4b kartiert; geschriebene Korpus-Felder bleiben auf [0,1], sonst still gemischtskaliges Fenster ueber 2945 Bestandsdateien), und par.6.1 -> eigener ADDITIVER Margen-Kopf ohne rtv/TD-Zweig, mit eigener Skala MARGIN_SCALE = 20 (par.6a; damit entfaellt die Zwei-Kopf-Subtraktion und opp_points bleibt Hilfsziel). Die 20 ist eine REFERENZSETZUNG wie VALUE_SCALE = 50, nicht aus Self-Play abgeleitet -- Beleg: neun Mensch-gegen-v21-Partien in static/log, RMS-Marge ~21, Median der Betragsmarge 17. Reihenfolge: Tor par.3a, dann Bau -->
+<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score, integriert ueber die Score-Verteilung) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die vorhandene lineare Mischung gescheitert ist? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht ERGAENZT. Ausarbeitung liegt in research_value_head_alternatives_DRAFT.md Idee 1.1, war aber nie vorregistriert. Empirischer Anker: Task #12 Block 2, Marge +2,25 bei 151:149. Tor par.3a GEFAHREN 2026-08-24 (saturating_score_utility_gate.json, 1.800 Stellungen aus frozen_eval_set.pkl): Spannweite 0,7685 (weit ueber der "fast konstant"-Schwelle 0,2), Pearson r(pts,wr)=0,7421 [KI 0,708-0,775] (knapp UNTER der "fast kollinear"-Schwelle 0,8, kein Randfall). Verdikt DAZWISCHEN, wie im Tor selbst vorgesehen -- NUTZER-ENTSCHEID noetig, ob der sigma-Kopf auf points_val selbst oder ein TD-unberuehrtes Ziel trainiert wird; kein Automatismus. Skalenwechsel und Margen-Kopf bleiben davon unberuehrt bau-bereit. Zwei Bau-Blocker, beide am 2026-08-23 per Nutzer-Entscheid geschlossen: par.4a -> SKALENWECHSEL der ganzen Blattbewertung auf [-1,1] (Bau-Umfang in par.4b kartiert; geschriebene Korpus-Felder bleiben auf [0,1], sonst still gemischtskaliges Fenster ueber 2945 Bestandsdateien), und par.6.1 -> eigener ADDITIVER Margen-Kopf ohne rtv/TD-Zweig, mit eigener Skala MARGIN_SCALE = 20 (par.6a; damit entfaellt die Zwei-Kopf-Subtraktion und opp_points bleibt Hilfsziel). Die 20 ist eine REFERENZSETZUNG wie VALUE_SCALE = 50, nicht aus Self-Play abgeleitet -- Beleg: neun Mensch-gegen-v21-Partien in static/log, RMS-Marge ~21, Median der Betragsmarge 17. Reihenfolge: Tor par.3a, dann Bau -->
 
 # Vorregistrierung: Gesaettigte, re-zentrierte Score-Utility
 
@@ -172,6 +172,56 @@ Vorab festgelegte Lesart:
 Dieses Tor kostet einen Vorwaertslauf ueber das Messset. Es entscheidet, ob
 der teuerste Value-seitige Zuschnitt des Projekts auf der richtigen Diagnose
 aufsetzt, und steht deshalb vor par.4.
+
+### par.3a ERGEBNIS (2026-08-24): DAZWISCHEN -- weder rein konstant noch rein kollinear
+
+Gefahren mit `tools/probes/saturating_score_utility_gate.py`, Artefakt
+`saturating_score_utility_gate.json`. Messset `frozen_eval_set.pkl`
+(1.800 Stellungen, dasselbe Set wie `tools/oracle_metrics.py`), Champion
+`v21_2d_brierbest`, Forward-Pass-Batch, `wr` mit der Default-Kalibrierung
+(`cal_a=0, cal_b=1`, per Selbsttest vorab als Identitaet bestaetigt).
+
+| Groesse | Wert |
+|---|---|
+| Spannweite von `pts` gesamt | **0,7685** (gegen die Entwurfsannahme 0,111 -- Differenz +0,6575) |
+| Pearson r(pts, wr) | **0,7421**, Block-Bootstrap-95-KI [0,708; 0,775] (500 Resamples ueber 40 Korpusdateien) |
+
+**Verdikt nach der vorab festgelegten Lesart: DAZWISCHEN.** Die
+Spannweiten-Bedingung fuer "fast konstant" (< 0,2) ist klar verfehlt --
+`pts` variiert ueber weite Teile des [0,1]-Bereichs, nicht in einem
+schmalen Streifen. Die Korrelations-Bedingung fuer "fast kollinear"
+(|r| > 0,8) ist knapp NICHT erreicht: 0,7421 liegt unter der Schwelle, und
+das 95-%-Konfidenzintervall [0,708; 0,775] kommt der 0,8-Marke nicht nahe
+-- das ist keine Randentscheidung, die vom Stichprobenrauschen kippen
+koennte.
+
+**Einordnung, ohne die Lesart zu ueberschreiben:** ein r von 0,74 ist eine
+starke, aber keine austauschende Korrelation. Das passt zur bereits
+registrierten Struktur des Ziels (`PREREG_points_dist_bin_scale.md` par.2a,
+`STATUS.md` "Das Punkte-Ziel ist NICHT tanh(own/50)"): in ~83 % der
+Trainingszeilen ist `points_val` ein TD-Blend mit derselben Value-Kopf-
+Ausgabe, die auch `wr` speist -- ein STRUKTURELLER Grund fuer *einen* Teil
+der Korrelation, aber eben nur einen Teil, kein Determinismus.
+
+Je Runde (gleiches Muster: Spannweite waechst von Runde 1 nach 4, faellt in
+Runde 5 wieder leicht):
+
+| Runde | Spannweite | Mittel |
+|---|---|---|
+| 1 | 0,333 | 0,577 |
+| 2 | 0,543 | 0,558 |
+| 3 | 0,627 | 0,556 |
+| 4 | **0,769** | 0,548 |
+| 5 | 0,577 | 0,578 |
+
+**Folge fuer par.4: NUTZER-ENTSCHEID, kein Automatismus.** Das Tor sieht
+fuer diesen Fall explizit "beide Anteile relevant, zu berichten und dem
+Nutzer vorzulegen" vor -- weder "Zuschnitt laeuft wie geplant weiter" noch
+"sigma-Kopf braucht ein TD-unberuehrtes Ziel" ist durch die Messung allein
+entschieden. Der Skalenwechsel (par.4a/par.4b) und der Margen-Kopf
+(par.6a) bleiben davon unberuehrt bau-bereit (eigene Vorbedingungen, siehe
+dort); offen ist nur, ob der `sigma`-Kopf (par.5, Weg S) auf `points_val`
+selbst oder auf ein vom TD-Blend UNBERUEHRTES Ziel trainiert werden soll.
 
 ## par.4 Bauplan
 
