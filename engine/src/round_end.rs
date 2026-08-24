@@ -99,6 +99,12 @@ pub fn process_unplaceable_rows(player: &mut PlayerBoard, tower: &mut Tower) -> 
         let real_tiles = vec![color; real_n];
         let to_tower = player.add_broken(&real_tiles);
         tower.add(&to_tower);
+        // Beobachtungs-Zaehler (siehe oben): unvollendeter Abbruch einer
+        // langen Reihe -- die teuerste Variante, die Steine gehen auf die
+        // Strafleiste.
+        if crate::board::LONG_ROW_INDICES.contains(&row_idx) {
+            player.long_rows_cleared_unplaceable_total += 1;
+        }
         moved.push((row_idx, color, real_n));
     }
     moved
@@ -234,6 +240,13 @@ fn execute_tiling_action(
         let p = &mut state.players[player_idx];
         if action.pattern_row as i32 > p.tiled_max_row {
             p.tiled_max_row = action.pattern_row as i32;
+        }
+        // Beobachtungs-Zaehler (PREREG_long_row_payoff.md par.3/B1): Getilt
+        // wird nur, was VOLL ist -- `validate_tiling_action` lehnt
+        // `!row.is_complete()` ab. Diese Stelle ist damit genau das
+        // Vollendungs-Ereignis einer Musterreihe. Reine Statistik.
+        if crate::board::LONG_ROW_INDICES.contains(&action.pattern_row) {
+            p.long_rows_completed_total += 1;
         }
         let row = &mut p.pattern_lines[action.pattern_row];
         row.tiles.clear();

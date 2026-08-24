@@ -305,7 +305,19 @@ fn execute_place(state: &mut GameState, tiles: &[TileColor], row_index: i32) -> 
         add_to_penalty(state, tiles);
         return 0;
     }
-    let overflow = state.players[pi].pattern_lines[row_index as usize].add_tiles(tiles);
+    // Beobachtungs-Zaehler (PREREG_long_row_payoff.md par.3/B1): Uebergang
+    // LEER -> belegt einer LANGEN Musterreihe. VOR `add_tiles` gelesen, sonst
+    // waere die Reihe schon belegt und der Uebergang unsichtbar. Reine
+    // Statistik, keine Spiellogik.
+    let row_usize = row_index as usize;
+    let war_leer = state.players[pi].pattern_lines[row_usize].tiles.is_empty();
+    let overflow = state.players[pi].pattern_lines[row_usize].add_tiles(tiles);
+    if war_leer
+        && crate::board::LONG_ROW_INDICES.contains(&row_usize)
+        && !state.players[pi].pattern_lines[row_usize].tiles.is_empty()
+    {
+        state.players[pi].long_rows_started_total += 1;
+    }
     let n_overflow = overflow.len();
     if !overflow.is_empty() {
         add_to_penalty(state, &overflow);

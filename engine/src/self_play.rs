@@ -1937,6 +1937,20 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 "steps": steps,
                 "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
                 "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+        // Lange Musterreihen (Index 4/5) -- Pflicht-Kennzahl von
+        // PREREG_long_row_payoff.md par.3/B1. Die Vollendungsquote ist
+        // `long_rows_completed / long_rows_started`; `..._cleared_unplaceable`
+        // ist der teure Abbruch (Steine auf die Strafleiste), der Rest ist am
+        // Partie-Ende noch belegt. Aus dem Partie-LOG NICHT rekonstruierbar
+        // (`round_end.rs::process_unplaceable_rows` leert stumm), und eine
+        // neue Logzeile scheidet aus: `state.log` ist das Vergleichsobjekt
+        // des Kernbeweises (`referee.rs::full_log`).
+        "long_rows_started": [p0.long_rows_started_total, p1.long_rows_started_total],
+        "long_rows_completed": [p0.long_rows_completed_total, p1.long_rows_completed_total],
+        "long_rows_cleared_unplaceable": [
+            p0.long_rows_cleared_unplaceable_total,
+            p1.long_rows_cleared_unplaceable_total,
+        ],
                 // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie
                 // liess sich bei keinem Arena-A/B pruefen, ob ein Effekt an
                 // der Platten-Konfiguration haengt.
@@ -2187,7 +2201,8 @@ pub fn run_self_play_with_net_labels(
 /// Brett 0 sucht mit `sims[0]` Basis-Simulationen, Brett 1 mit `sims[1]`.
 /// Jeder Agent spielt seinen BESTEN Zug (argmax-Visits, keine Temperatur, keine
 /// Datenaufzeichnung). Liefert `{scores, winner, steps, total_floor,
-/// floor_per_round}`.
+/// floor_per_round, long_rows_started, long_rows_completed,
+/// long_rows_cleared_unplaceable}`.
 fn play_arena_game<R: Rng + ?Sized>(
     sims: [u32; 2],
     c: f64,
@@ -2287,6 +2302,20 @@ fn play_arena_game<R: Rng + ?Sized>(
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
         "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+        // Lange Musterreihen (Index 4/5) -- Pflicht-Kennzahl von
+        // PREREG_long_row_payoff.md par.3/B1. Die Vollendungsquote ist
+        // `long_rows_completed / long_rows_started`; `..._cleared_unplaceable`
+        // ist der teure Abbruch (Steine auf die Strafleiste), der Rest ist am
+        // Partie-Ende noch belegt. Aus dem Partie-LOG NICHT rekonstruierbar
+        // (`round_end.rs::process_unplaceable_rows` leert stumm), und eine
+        // neue Logzeile scheidet aus: `state.log` ist das Vergleichsobjekt
+        // des Kernbeweises (`referee.rs::full_log`).
+        "long_rows_started": [p0.long_rows_started_total, p1.long_rows_started_total],
+        "long_rows_completed": [p0.long_rows_completed_total, p1.long_rows_completed_total],
+        "long_rows_cleared_unplaceable": [
+            p0.long_rows_cleared_unplaceable_total,
+            p1.long_rows_cleared_unplaceable_total,
+        ],
         // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie liess
         // sich bei keinem Arena-A/B pruefen, ob ein Effekt an der Platten-
         // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
@@ -2741,6 +2770,20 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
         "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+        // Lange Musterreihen (Index 4/5) -- Pflicht-Kennzahl von
+        // PREREG_long_row_payoff.md par.3/B1. Die Vollendungsquote ist
+        // `long_rows_completed / long_rows_started`; `..._cleared_unplaceable`
+        // ist der teure Abbruch (Steine auf die Strafleiste), der Rest ist am
+        // Partie-Ende noch belegt. Aus dem Partie-LOG NICHT rekonstruierbar
+        // (`round_end.rs::process_unplaceable_rows` leert stumm), und eine
+        // neue Logzeile scheidet aus: `state.log` ist das Vergleichsobjekt
+        // des Kernbeweises (`referee.rs::full_log`).
+        "long_rows_started": [p0.long_rows_started_total, p1.long_rows_started_total],
+        "long_rows_completed": [p0.long_rows_completed_total, p1.long_rows_completed_total],
+        "long_rows_cleared_unplaceable": [
+            p0.long_rows_cleared_unplaceable_total,
+            p1.long_rows_cleared_unplaceable_total,
+        ],
         // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie liess
         // sich bei keinem Arena-A/B pruefen, ob ein Effekt an der Platten-
         // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
@@ -4058,6 +4101,20 @@ fn play_stage3_vs_stage1_game<R: Rng + ?Sized>(
         "steps": steps,
         "total_floor": [p0.total_floor_penalties, p1.total_floor_penalties],
         "floor_per_round": [p0.floor_penalties_per_round, p1.floor_penalties_per_round],
+        // Lange Musterreihen (Index 4/5) -- Pflicht-Kennzahl von
+        // PREREG_long_row_payoff.md par.3/B1. Die Vollendungsquote ist
+        // `long_rows_completed / long_rows_started`; `..._cleared_unplaceable`
+        // ist der teure Abbruch (Steine auf die Strafleiste), der Rest ist am
+        // Partie-Ende noch belegt. Aus dem Partie-LOG NICHT rekonstruierbar
+        // (`round_end.rs::process_unplaceable_rows` leert stumm), und eine
+        // neue Logzeile scheidet aus: `state.log` ist das Vergleichsobjekt
+        // des Kernbeweises (`referee.rs::full_log`).
+        "long_rows_started": [p0.long_rows_started_total, p1.long_rows_started_total],
+        "long_rows_completed": [p0.long_rows_completed_total, p1.long_rows_completed_total],
+        "long_rows_cleared_unplaceable": [
+            p0.long_rows_cleared_unplaceable_total,
+            p1.long_rows_cleared_unplaceable_total,
+        ],
         // Aktive Wertungsplatten mitschreiben (2026-07-29): ohne sie liess
         // sich bei keinem Arena-A/B pruefen, ob ein Effekt an der Platten-
         // Konfiguration haengt -- bei Task #16 blieb genau diese Frage offen,
@@ -5201,7 +5258,36 @@ pub(crate) mod tests {
             assert!(w == 0 || w == 1);
             assert!(g["steps"].as_u64().unwrap() > 0);
             assert_eq!(g["floor_per_round"].as_array().unwrap().len(), 2);
+
+            // PREREG_long_row_payoff.md par.3/B1: die Vollendungsquote muss
+            // aus dem Arena-Artefakt ableitbar sein. Geprueft wird die
+            // Buchhaltung, nicht ein Zahlenwert: jede lange Reihe verlaesst
+            // ihren Startzustand hoechstens auf zwei Wegen (vollendet oder
+            // unplatzierbar geraeumt), der Rest steht am Partie-Ende noch.
+            // Ohne diese Ungleichung koennte ein Zaehler doppelt oder an der
+            // falschen Stelle hochlaufen und die Quote still verfaelschen.
+            for pi in 0..2usize {
+                let started = g["long_rows_started"][pi].as_i64().unwrap();
+                let done = g["long_rows_completed"][pi].as_i64().unwrap();
+                let cleared = g["long_rows_cleared_unplaceable"][pi].as_i64().unwrap();
+                assert!(started >= 0 && done >= 0 && cleared >= 0);
+                assert!(
+                    done + cleared <= started,
+                    "Abgaenge duerfen die Starts nicht uebersteigen:                      {done}+{cleared} > {started}"
+                );
+            }
         }
+        // Ueber vier Partien muss ueberhaupt einmal eine lange Reihe begonnen
+        // worden sein -- sonst haengt der Start-Zaehler still auf 0 und der
+        // Test oben waere trivial erfuellt.
+        let starts: i64 = arr
+            .iter()
+            .map(|g| {
+                g["long_rows_started"][0].as_i64().unwrap()
+                    + g["long_rows_started"][1].as_i64().unwrap()
+            })
+            .sum();
+        assert!(starts > 0, "kein einziger Start langer Reihen in 4 Partien gezaehlt");
     }
 
     #[test]
