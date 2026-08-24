@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: MESSKETTE KOMPLETT 2026-08-24, v2 GEBAUT und variantengebunden (HeuristikVariante::V1/V2, Paritaets-Hash 8c6684ff haelt, Suite 512/0). Vorfragen: der Lehrer v1 kann es auch nicht (volle Spalten 0,098 gegen 0,101), such-seitig ist der Weg zu (scoring_plate_injection und long_row_payoff B1 beide negativ). Der Durchbruch kam vom PLATZIERUNGS-Routing, nicht von einem Bewertungsterm: best_first_step_inner waehlt nach reinen Sofortpunkten und warf jede Draft-Absicht weg. Schritt 2 (v1 gegen v2, 80 gepaarte Partien): volle Spalten 0,163 auf 0,562, Partien mit mindestens einer von 35 auf 50 Prozent, 5/6-Mauer durchbrochen. SCHRITT 3 (v2 gegen Champion, 407 Seeds je Arm, v1-Bezug auf denselben Seeds): Faehigkeit BELEGT, Preis HOCH -- volle Spalten 0,302 gegen v1 0,086 (gepaart +0,175, t=+7,79), Vollendungsquote 0,686 gegen 0,564 (B1-Vorgabe erfuellt), aber Siegquote gegen den Champion 0,128 gegen 0,256 und Marge -19,4 gegen -12,2. URTEIL STEHT AUS: par.5.3 hat bewusst keinen Schwellenwert, die Frage ist, ob das Netz die FAEHIGKEIT uebernimmt ohne das NIVEAU. Nebenbefund: volle Zeilen brechen gegen ein NETZ nicht ein (0,403 gegen 0,432) -- die Regression auf 0,200 war ein Artefakt des v1-gegen-v2-Aufbaus. OFFEN: par.5.4 Korpus und Training, Self-Play-Einstieg (Nutzer-Freigabe erteilt, nicht gebaut), Shaping-Kopf par.3b mit Abkling-Kurve und zwei Kanaelen, Einhuellende im 2D-Encoder. NEUER ARM par.8 (VORREGISTRIERT 2026-08-24, GEBAUT, NICHT GEMESSEN): Prio-Leiter des Nutzers als Routing-Huelle in eigener Variante V2Huelle -- Bewertung byte-identisch zu V2, nur die Zielzellen-Karte unterscheidet sich (zwei Randspalten, Spezialfeld-Freischaltung, obere Zeilen, Nachbarn; Drafting als linearer Score mit Strafleisten- und Stoerungsterm aus provocation.rs und Phasen-Eskalation). Suite 520/0, Paritaets-Hash unberuehrt. Entscheidungsmass und Falsifikator in par.8.4 vorregistriert: volle Spalten je Partie auf BLOCK-Ebene, Waechter Vollendungsquote >= 0,53. -->
+<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: MESSKETTE KOMPLETT 2026-08-24, v2 GEBAUT und variantengebunden (HeuristikVariante::V1/V2, Paritaets-Hash 8c6684ff haelt, Suite 512/0). Vorfragen: der Lehrer v1 kann es auch nicht (volle Spalten 0,098 gegen 0,101), such-seitig ist der Weg zu (scoring_plate_injection und long_row_payoff B1 beide negativ). Der Durchbruch kam vom PLATZIERUNGS-Routing, nicht von einem Bewertungsterm: best_first_step_inner waehlt nach reinen Sofortpunkten und warf jede Draft-Absicht weg. Schritt 2 (v1 gegen v2, 80 gepaarte Partien): volle Spalten 0,163 auf 0,562, Partien mit mindestens einer von 35 auf 50 Prozent, 5/6-Mauer durchbrochen. SCHRITT 3 (v2 gegen Champion, 407 Seeds je Arm, v1-Bezug auf denselben Seeds): Faehigkeit BELEGT, Preis HOCH -- volle Spalten 0,302 gegen v1 0,086 (gepaart +0,175, t=+7,79), Vollendungsquote 0,686 gegen 0,564 (B1-Vorgabe erfuellt), aber Siegquote gegen den Champion 0,128 gegen 0,256 und Marge -19,4 gegen -12,2. URTEIL STEHT AUS: par.5.3 hat bewusst keinen Schwellenwert, die Frage ist, ob das Netz die FAEHIGKEIT uebernimmt ohne das NIVEAU. Nebenbefund: volle Zeilen brechen gegen ein NETZ nicht ein (0,403 gegen 0,432) -- die Regression auf 0,200 war ein Artefakt des v1-gegen-v2-Aufbaus. OFFEN: par.5.4 Korpus und Training, Self-Play-Einstieg (Nutzer-Freigabe erteilt, nicht gebaut), Shaping-Kopf par.3b mit Abkling-Kurve und zwei Kanaelen, Einhuellende im 2D-Encoder. NEUER ARM par.8 (VORREGISTRIERT 2026-08-24, GEBAUT, NICHT GEMESSEN): Prio-Leiter des Nutzers als Routing-Huelle in eigener Variante V2Huelle -- Bewertung byte-identisch zu V2, nur die Zielzellen-Karte unterscheidet sich (zwei Randspalten, Spezialfeld-Freischaltung, obere Zeilen, Nachbarn; Drafting als linearer Score mit Strafleisten- und Stoerungsterm aus provocation.rs und Phasen-Eskalation). Suite 520/0, Paritaets-Hash unberuehrt. Entscheidungsmass und Falsifikator in par.8.4 vorregistriert. **GEMESSEN 2026-08-25 (par.8.5, n=160): ARM GEWINNT.** Volle Spalten 0,425 auf 0,950 (t=9,12 auf Bloecken), Spezialfeld-Freischaltungen 0,713 auf 1,512 (t=9,32), Punkte 40,1 auf 48,2 (t=4,80), Strafpunkte -15,0 auf -13,4, Siegquote 0,706, Vollendungsquote 0,743 (Waechter erfuellt). Erster v2-Bauschritt ueberhaupt, der Spalten NICHT mit Punkten bezahlt. ABLATIONEN GEFAHREN (par.8.6): Struktur haengt an der ZIELKARTE (Spalten bleiben 0,506-0,525 ohne die Zusatzterme, nur die Prio-5-Auflage kostet 0,10), Staerke an den linearen Termen (W_STRAF 5,09 Punkte Marge, Prio-5 2,59, W_STOER 2,56). OFFEN: Lehrer-Test gegen den Champion (net_vs_heuristic_v2_arena ist fest auf V2 verdrahtet). -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -813,3 +813,82 @@ groesste Einzelposten der Plattenwertung).
 (Prio 2 ist der einzige Baustein ohne jede Vormessung), dann `W_STRAF = 0`,
 dann Prio-5-Auflage aus. Bei einem Gesamtbefund ohne Ablation ist NICHT
 entscheidbar, welcher Baustein traegt.
+
+### par.8.5 ERGEBNIS des Laufs (2026-08-25, n=160)
+
+`tools/probes/v2_envelope_arena.py`, Ergebnis in
+`evaluations/v2_envelope_arena.json`. Aufbau genau wie in par.8.4 vorab
+festgelegt: 80 gepaarte Partien je Sitz, 150 Sims je Seite, Seed 20260825,
+Auswertung auf 10 Bloecken zu je 16 Partien.
+
+| Kennzahl | v2 | v2huelle | Delta | t (Block) |
+| --- | --- | --- | --- | --- |
+| volle Spalten | 0,425 | **0,950** | +0,525 | **9,12** |
+| max Spaltenhoehe | 5,306 | 5,612 | +0,306 | 10,17 |
+| Teilspalten >= 3 | 2,919 | 3,094 | +0,175 | 1,83 |
+| Teilspalten >= 4 | 1,837 | 2,237 | +0,400 | 4,25 |
+| Spezialfeld-Freischaltungen | 0,713 | **1,512** | +0,800 | **9,32** |
+| Strafpunkte | -15,04 | -13,40 | +1,64 | 2,31 |
+| eigene Punkte | 40,14 | **48,21** | +8,07 | **4,80** |
+
+Siegquote der Huelle im direkten Duell **0,706**. Vollendungsquote langer
+Musterreihen 0,667 gegen 0,743 -- der B1-Waechter ist erfuellt, und zwar von
+BEIDEN Armen.
+
+Reihenauslastung je Partie (Zuege je Rasterzeile 0..5):
+
+* v2: 4,36 / 4,07 / 2,47 / 1,93 / 1,46 / 1,31
+* Huelle: 3,91 / 3,95 / 2,74 / 2,25 / 2,14 / 1,52
+
+Die Verschiebung geht genau dorthin, wo die Leiter sie haben will: Rasterzeile
+3, 4 und 5 gewinnen (+0,32 / +0,68 / +0,21), die breiten oberen Zeilen geben
+ab. Marge und Punkte sind hier dieselbe Groesse, weil beide Arme im selben
+Spiel sitzen.
+
+**Das Entscheidungsmass ist erfuellt, der Falsifikator greift nicht, der
+Waechter haelt.** Bemerkenswert ist der Punkte-Posten: JEDER bisherige
+v2-Bauschritt hat Spalten mit Punkten bezahlt (Schritt 3: volle Spalten 0,086
+auf 0,302, dafuer Punkte 37,6 auf 34,8 und Siegquote halbiert). Hier steigen
+Spalten UND Punkte, und die Strafleiste sinkt zusaetzlich.
+
+**Was der Lauf NICHT sagt.** Er ist Heuristik gegen Heuristik bei 150 Sims.
+Schritt 3 hat gezeigt, dass eine im Heuristik-Duell belegte Faehigkeit gegen
+den Champion einbrechen kann. Die Frage "taugt die Huelle als LEHRER" ist
+damit gestellt und nicht beantwortet -- dafuer braucht es denselben Aufbau
+wie par.5.3 (Champion@400 gegen Huelle@150), und der Einstieg
+`net_vs_heuristic_v2_arena` ist bisher fest auf `V2` verdrahtet.
+
+### par.8.6 ABLATIONEN (2026-08-25, Reihenfolge wie in par.8.4 festgelegt)
+
+Je Arm derselbe Aufbau, derselbe Seed, dieselben 160 Partien; geaendert wurde
+jeweils EINE Konstante im Code, danach Wheel neu gebaut. Alle Werte sind
+Differenzen Huelle minus v2.
+
+| Arm | volle Spalten | t | Spezialfelder | Strafpunkte | Punkte | Siegquote | Vollendungsquote |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| voll | 0,525 | 9,12 | 0,800 | +1,637 | **+8,069** | **0,706** | 0,743 |
+| `W_STOER = 0` | 0,506 | 7,81 | 0,706 | +1,300 | +5,506 | 0,606 | 0,738 |
+| `W_STRAF = 0` | 0,512 | 8,22 | 0,694 | **-1,438** | +2,975 | 0,575 | 0,733 |
+| Prio-5-Auflage aus | 0,425 | 8,36 | 0,625 | +1,319 | +5,475 | 0,600 | 0,723 |
+
+**Struktur und Staerke haengen an verschiedenen Bausteinen.** Die vollen
+Spalten kommen fast vollstaendig aus der Zielkarte selbst: sie bleiben bei
+0,506-0,525, egal ob Stoerung oder Strafleiste im Score stehen. Nur die
+Prio-5-Auflage bewegt sie (0,525 auf 0,425) -- sie ist der einzige der drei
+Zusatzbausteine, der auf die FORM wirkt, und sie tut es ueber genau den Weg,
+fuer den sie gebaut ist (Freischaltungen 0,800 auf 0,625).
+
+Die Punkte-Marge dagegen zerfaellt sauber in drei Beitraege: `W_STRAF` traegt
+5,09, die Prio-5-Auflage 2,59, `W_STOER` 2,56. `W_STRAF = 0` dreht ausserdem
+das Vorzeichen der Strafleiste (-1,438): ohne den Term nimmt die Huelle MEHR
+Strafpunkte als v2, weil das Routing dann ungebremst in die Zielzellen zieht.
+
+**Keine Dosis-Erhoehung abgeleitet.** Dass `W_STOER` bei 0,10 schon 2,56
+Punkte traegt, ist kein Argument fuer mehr davon -- das waere die
+Dosis-Antwort, an der `scoring_plate_injection` und `long_row_payoff` B1
+gescheitert sind. Wer die Dosis anfasst, registriert vorher.
+
+**Kontrolllauf:** nach dem Zurueckbauen reproduziert der Hauptlauf seine
+Zahlen exakt (Spezialfelder 1,512, Punkte 48,212, Siegquote 0,706;
+`v2_envelope_arena_restore_check.json`) -- die drei Ablationen haben den
+Bestand nicht verschoben.

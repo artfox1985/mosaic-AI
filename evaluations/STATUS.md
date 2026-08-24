@@ -161,7 +161,7 @@ den Lehrer-Einsatz ist er entschaerft.
    acht Bestandsstellen auf `V1`).
 3. **Abstand zum Ziel**: 0,562 volle Spalten im Heuristik-Duell gegen die vom
    Nutzer geforderte 1,0.
-4. **NEUER ARM `V2Huelle` -- GEBAUT 2026-08-24, NICHT GEMESSEN**
+4. **NEUER ARM `V2Huelle` -- GEMESSEN 2026-08-25, ARM GEWINNT**
    (`PREREG_heuristic_v2_long_rows.md` par.8). Die Prio-Leiter des Nutzers
    als Routing-Huelle: eigene Variante, Bewertung byte-identisch zu `V2`,
    nur die Zielzellen-Karte unterscheidet sich. Prio 3 Randspalte, Prio 4
@@ -170,8 +170,30 @@ den Lehrer-Einsatz ist er entschaerft.
    (aufgeweicht bei aktiver Diagonale). Drafting als LINEARER Score mit
    Strafleisten- und Stoerungsterm (`provocation::floor_line_growth` /
    `disruption_score`, beide Bestand) und Phasen-Eskalation `[1,2,4,8]`.
-   Suite 520/0, Paritaets-Hash `8c6684ff` haelt. Messung und Falsifikator
-   stehen in par.8.4; **noch nicht gefahren.**
+   Suite 520/0, Paritaets-Hash `8c6684ff` haelt.
+
+   **Ergebnis (par.8.5, n=160, `v2_envelope_arena.json`):** volle Spalten
+   0,425 auf **0,950** (t=9,12 auf 10 Bloecken), Spezialfeld-Freischaltungen
+   0,713 auf **1,512** (t=9,32), Strafpunkte -15,0 auf -13,4, eigene Punkte
+   40,1 auf **48,2** (t=4,80), Siegquote im direkten Duell **0,706**,
+   Vollendungsquote 0,743 (B1-Waechter erfuellt). Die Reihenauslastung
+   verschiebt sich genau in die Zielrichtung (Rasterzeile 3/4/5:
+   +0,32/+0,68/+0,21). **Erster v2-Bauschritt ueberhaupt, der Spalten NICHT
+   mit Punkten bezahlt** -- alle vier vorherigen taten es, Schritt 3 hat die
+   Siegquote gegen den Champion halbiert.
+
+   **Ablationen (par.8.6):** Struktur und Staerke haengen an verschiedenen
+   Bausteinen. Die Spalten kommen aus der ZIELKARTE (bleiben bei 0,506-0,525
+   ohne Stoer- und Strafterm); nur die Prio-5-Auflage bewegt sie (-0,10). Die
+   Marge zerfaellt in `W_STRAF` 5,09, Prio-5 2,59, `W_STOER` 2,56. Ohne
+   `W_STRAF` dreht die Strafleiste ins Negative (-1,44). Kontrolllauf nach
+   dem Zurueckbauen reproduziert exakt.
+
+   **OFFEN und entscheidend:** der Lauf ist Heuristik gegen Heuristik bei 150
+   Sims. Ob die Huelle als LEHRER taugt, ist damit gestellt und nicht
+   beantwortet -- dafuer braucht es den par.5.3-Aufbau (Champion@400 gegen
+   Huelle@150), und `net_vs_heuristic_v2_arena` ist bisher fest auf `V2`
+   verdrahtet.
 
    Nicht gebaut, weil schon vorhanden oder ohne Anknuepfungspunkt: Prio 0
    (Spiel endet nach genau 5 Runden, `game.rs:687`; Runde 5 laeuft ueber den
