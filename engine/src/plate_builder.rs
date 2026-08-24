@@ -918,6 +918,138 @@ fn envelope_drafting_preference(
     best.map(|(_, _, _, _, m)| Action::Stone(m))
 }
 
+// -- Punkte-Heatmap (Nutzer-Vorschlag 2026-08-25) ---------------------------
+
+/// Zielkarte aus EXAKTEN Plattenpunkten statt aus handgesetzten Stufen.
+///
+/// Nutzer-Formulierung: "wir koennen ihn auch als punkte heatmap verwenden.
+/// dann ist er weniger starr in die dreiecksform gepresst." Der Anlass ist
+/// die Ablation par.8.6: die STRUKTUR haengt an der Zielkarte, nicht an den
+/// linearen Zusatztermen -- die Karte ist damit der Hebel, und eine Karte aus
+/// gerechneten Punkten braucht keine Formvorgabe.
+///
+/// Wert je Zelle = **marginaler Zuwachs der Wertungsplatten-Punkte**, exakt
+/// gemessen: Zelle probeweise belegen, `scoring::scoring_progress` mit den
+/// AKTIVEN Plattenkriterien neu rechnen, Differenz nehmen. Kein
+/// nachgebauter Formelsatz je Kriterium -- damit koennen Karte und Endwertung
+/// nicht auseinanderlaufen (dieselbe Regel, aus der `heuristic_v2` die
+/// Spalten-Formel woertlich uebernimmt).
+///
+/// Zwei Zuschlaege, die `scoring_progress` allein nicht sieht:
+///
+/// 1. **Freischaltung**: schaltet die Probebelegung ein Spezialfeld frei,
+///    wird es sofort mitbelegt -- so verhaelt sich das Spiel auch
+///    (`round_end::check_special_trigger`). Damit enthaelt die Differenz die
+///    zusaetzliche Zelle und die vermiedene `-3`-Strafe von selbst.
+/// 2. **Spezialfliesen-Bonus** in Hoehe der Rasterreihe (1..6); der ist eine
+///    Sofortzahlung beim Tiling und steht in keiner Plattenwertung.
+///
+/// **Bewusst NICHT enthalten: Platzierungspunkte nach Linienlaenge.** Die
+/// sind genau das, was `best_first_step_inner` ohnehin maximiert
+/// (`tiling_solver.rs:49-56`). Sie hier mitzuzaehlen hiesse, das Routing auf
+/// dasselbe Kriterium zu ziehen, dessen Alleinherrschaft der Anlass fuer v2
+/// war.
+///
+/// **Reichweite statt Abklingkurve.** Eine Zelle, deren Farbe nicht mehr in
+/// ausreichender Zahl erreichbar ist, faellt auf 0 -- geprueft mit
+/// `column_build::cell_is_completable` gegen `provocation::remaining_colors`.
+/// Das ist zugleich die Knappheits-Kopplung, die dem Saettigungsterm in
+/// `heuristic_v2` fehlt, und es macht eine Runden-Abklingkurve ueberfluessig:
+/// gegen Spielende faellt die Karte von selbst zusammen, weil die Farben
+/// ausgehen.
+fn points_heatmap(state: &GameState, pi: usize) -> Zielkarte {
+    let player = &state.players[pi];
+    let ids = &state.scoring_tile_ids;
+    let remaining = crate::provocation::remaining_colors(state);
+    let basis = crate::scoring::scoring_progress(player, ids);
+    let mut k = [[0.0f64; 6]; 6];
+
+    for r in 0..6 {
+        // Top-down-Sperre: unterhalb der bereits getilten Reihe geht nichts
+        // mehr (dieselbe Bedingung wie in `v2_chip_preference`).
+        if (r as i32) < player.tiled_max_row {
+            continue;
+        }
+        for c in 0..6 {
+            let Some(sp) = player.dome_grid.get_space(r, c) else { continue };
+            if sp.is_filled() || sp.is_locked || sp.space_type == SpaceType::Special {
+                continue; // Spezialfelder werden nicht angesteuert, sie fallen an
+            }
+            if !crate::column_build::cell_is_completable(player, r, c, &remaining) {
+                continue;
+            }
+            // Welche Farbe wuerde hier liegen? Normal fordert eine bestimmte,
+            // Wild nimmt jede -- dort die reichlichste noch verfuegbare.
+            let farbe = match sp.space_type {
+                SpaceType::Normal => match sp.required_color {
+                    Some(f) => f,
+                    None => continue,
+                },
+                SpaceType::Wild => match most_available_color(&remaining) {
+                    Some(f) => f,
+                    None => continue,
+                },
+                SpaceType::Special => continue,
+            };
+
+            let mut probe = player.clone();
+            if probe.dome_grid.place_tile(r, c, farbe).is_err() {
+                continue;
+            }
+            // Freigeschaltetes Spezialfeld sofort mitbelegen und seinen
+            // Sofortbonus (= Rasterreihe) aufschlagen.
+            let mut bonus = 0.0;
+            let (sr, sc) = (r / 2, c / 2);
+            if let Some(slot) = probe.dome_grid.dome_slots[sr][sc].as_mut() {
+                if let Some(si) = slot.special_space_idx() {
+                    if !slot.spaces[si].is_locked && !slot.spaces[si].placed_special {
+                        slot.spaces[si].placed_special = true;
+                        bonus += (2 * sr + si / 2) as f64 + 1.0;
+                    }
+                }
+            }
+            let wert = crate::scoring::scoring_progress(&probe, ids) - basis + bonus;
+            if wert > 0.0 {
+                k[r][c] = wert;
+            }
+        }
+    }
+    k
+}
+
+/// Farbe mit dem groessten Restbestand -- die einzige sinnvolle Annahme fuer
+/// eine Wild-Zelle, die noch jede Farbe nehmen kann.
+fn most_available_color(remaining: &[i64; 5]) -> Option<crate::tile::TileColor> {
+    let (idx, &n) = remaining.iter().enumerate().max_by_key(|(_, &n)| n)?;
+    if n <= 0 {
+        return None;
+    }
+    // Indexordnung wie `provocation::color_index`: `TileColor::NORMAL`.
+    crate::tile::TileColor::NORMAL.get(idx).copied()
+}
+
+/// Zielkarte UND passende Zellenbewertung je Variante.
+///
+/// `None` fuer `V1`/`V2` -- die laufen weiter ueber `v2_target_cells`.
+/// Die Zellenbewertung gehoert zur Karte: die Prio-Leiter braucht die
+/// Sonderregel fuer Rasterzeile 5 ([`envelope_cell_value`]), die Heatmap
+/// nicht, weil sie die Freischaltung schon eingepreist hat.
+fn v2_map_for(
+    state: &GameState,
+    pi: usize,
+    variante: crate::mcts::HeuristikVariante,
+) -> Option<(Zielkarte, fn(&PlayerBoard, usize, usize, &DomeSpace) -> f64)> {
+    match variante {
+        crate::mcts::HeuristikVariante::V2Huelle => {
+            Some((v2_envelope_target(state, pi)?, envelope_cell_value))
+        }
+        crate::mcts::HeuristikVariante::V2Heatmap => {
+            Some((points_heatmap(state, pi), legacy_cell_value))
+        }
+        _ => None,
+    }
+}
+
 /// Alle Zellen mit Gewicht > 0, in Rasterreihenfolge.
 fn cells_from_map(karte: &Zielkarte) -> Vec<(usize, usize)> {
     let mut v = Vec::with_capacity(28);
@@ -1970,11 +2102,10 @@ pub(crate) fn v2_drafting_preference(
     state: &GameState,
     variante: crate::mcts::HeuristikVariante,
 ) -> Option<Action> {
-    if variante == crate::mcts::HeuristikVariante::V2Huelle {
-        let karte = v2_envelope_target(state, state.current_player)?;
+    if let Some((karte, wert)) = v2_map_for(state, state.current_player, variante) {
         let z = cells_from_map(&karte);
         return envelope_drafting_preference(state, &karte, &z)
-            .or_else(|| dome_preference_for_cells_weighted(state, &z, &karte, envelope_cell_value));
+            .or_else(|| dome_preference_for_cells_weighted(state, &z, &karte, wert));
     }
     let z = v2_target_cells(state, state.current_player)?;
     // Erst der Stein-Zug, dann die KUPPELPLATTEN-Wahl. Die zweite war bis
@@ -2004,8 +2135,7 @@ pub(crate) fn v2_tiling_preference(
     pi: usize,
     variante: crate::mcts::HeuristikVariante,
 ) -> Option<TilingStep> {
-    if variante == crate::mcts::HeuristikVariante::V2Huelle {
-        let karte = v2_envelope_target(state, pi)?;
+    if let Some((karte, _)) = v2_map_for(state, pi, variante) {
         let z = cells_from_map(&karte);
         return v2_chip_preference(state, pi, &z)
             .or_else(|| tiling_preference_for_cells_weighted(state, pi, &z, &karte));

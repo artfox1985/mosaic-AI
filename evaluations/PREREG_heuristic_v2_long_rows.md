@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: MESSKETTE KOMPLETT 2026-08-24, v2 GEBAUT und variantengebunden (HeuristikVariante::V1/V2, Paritaets-Hash 8c6684ff haelt, Suite 512/0). Vorfragen: der Lehrer v1 kann es auch nicht (volle Spalten 0,098 gegen 0,101), such-seitig ist der Weg zu (scoring_plate_injection und long_row_payoff B1 beide negativ). Der Durchbruch kam vom PLATZIERUNGS-Routing, nicht von einem Bewertungsterm: best_first_step_inner waehlt nach reinen Sofortpunkten und warf jede Draft-Absicht weg. Schritt 2 (v1 gegen v2, 80 gepaarte Partien): volle Spalten 0,163 auf 0,562, Partien mit mindestens einer von 35 auf 50 Prozent, 5/6-Mauer durchbrochen. SCHRITT 3 (v2 gegen Champion, 407 Seeds je Arm, v1-Bezug auf denselben Seeds): Faehigkeit BELEGT, Preis HOCH -- volle Spalten 0,302 gegen v1 0,086 (gepaart +0,175, t=+7,79), Vollendungsquote 0,686 gegen 0,564 (B1-Vorgabe erfuellt), aber Siegquote gegen den Champion 0,128 gegen 0,256 und Marge -19,4 gegen -12,2. URTEIL STEHT AUS: par.5.3 hat bewusst keinen Schwellenwert, die Frage ist, ob das Netz die FAEHIGKEIT uebernimmt ohne das NIVEAU. Nebenbefund: volle Zeilen brechen gegen ein NETZ nicht ein (0,403 gegen 0,432) -- die Regression auf 0,200 war ein Artefakt des v1-gegen-v2-Aufbaus. OFFEN: par.5.4 Korpus und Training, Self-Play-Einstieg (Nutzer-Freigabe erteilt, nicht gebaut), Shaping-Kopf par.3b mit Abkling-Kurve und zwei Kanaelen, Einhuellende im 2D-Encoder. NEUER ARM par.8 (VORREGISTRIERT 2026-08-24, GEBAUT, NICHT GEMESSEN): Prio-Leiter des Nutzers als Routing-Huelle in eigener Variante V2Huelle -- Bewertung byte-identisch zu V2, nur die Zielzellen-Karte unterscheidet sich (zwei Randspalten, Spezialfeld-Freischaltung, obere Zeilen, Nachbarn; Drafting als linearer Score mit Strafleisten- und Stoerungsterm aus provocation.rs und Phasen-Eskalation). Suite 520/0, Paritaets-Hash unberuehrt. Entscheidungsmass und Falsifikator in par.8.4 vorregistriert. **GEMESSEN 2026-08-25 (par.8.5, n=160): ARM GEWINNT.** Volle Spalten 0,425 auf 0,950 (t=9,12 auf Bloecken), Spezialfeld-Freischaltungen 0,713 auf 1,512 (t=9,32), Punkte 40,1 auf 48,2 (t=4,80), Strafpunkte -15,0 auf -13,4, Siegquote 0,706, Vollendungsquote 0,743 (Waechter erfuellt). Erster v2-Bauschritt ueberhaupt, der Spalten NICHT mit Punkten bezahlt. ABLATIONEN GEFAHREN (par.8.6): Struktur haengt an der ZIELKARTE (Spalten bleiben 0,506-0,525 ohne die Zusatzterme, nur die Prio-5-Auflage kostet 0,10), Staerke an den linearen Termen (W_STRAF 5,09 Punkte Marge, Prio-5 2,59, W_STOER 2,56). OFFEN: Lehrer-Test gegen den Champion (net_vs_heuristic_v2_arena ist fest auf V2 verdrahtet). -->
+<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: MESSKETTE KOMPLETT 2026-08-24, v2 GEBAUT und variantengebunden (HeuristikVariante::V1/V2, Paritaets-Hash 8c6684ff haelt, Suite 512/0). Vorfragen: der Lehrer v1 kann es auch nicht (volle Spalten 0,098 gegen 0,101), such-seitig ist der Weg zu (scoring_plate_injection und long_row_payoff B1 beide negativ). Der Durchbruch kam vom PLATZIERUNGS-Routing, nicht von einem Bewertungsterm: best_first_step_inner waehlt nach reinen Sofortpunkten und warf jede Draft-Absicht weg. Schritt 2 (v1 gegen v2, 80 gepaarte Partien): volle Spalten 0,163 auf 0,562, Partien mit mindestens einer von 35 auf 50 Prozent, 5/6-Mauer durchbrochen. SCHRITT 3 (v2 gegen Champion, 407 Seeds je Arm, v1-Bezug auf denselben Seeds): Faehigkeit BELEGT, Preis HOCH -- volle Spalten 0,302 gegen v1 0,086 (gepaart +0,175, t=+7,79), Vollendungsquote 0,686 gegen 0,564 (B1-Vorgabe erfuellt), aber Siegquote gegen den Champion 0,128 gegen 0,256 und Marge -19,4 gegen -12,2. URTEIL STEHT AUS: par.5.3 hat bewusst keinen Schwellenwert, die Frage ist, ob das Netz die FAEHIGKEIT uebernimmt ohne das NIVEAU. Nebenbefund: volle Zeilen brechen gegen ein NETZ nicht ein (0,403 gegen 0,432) -- die Regression auf 0,200 war ein Artefakt des v1-gegen-v2-Aufbaus. OFFEN: par.5.4 Korpus und Training, Self-Play-Einstieg (Nutzer-Freigabe erteilt, nicht gebaut), Shaping-Kopf par.3b mit Abkling-Kurve und zwei Kanaelen, Einhuellende im 2D-Encoder. NEUER ARM par.8 (VORREGISTRIERT 2026-08-24, GEBAUT, NICHT GEMESSEN): Prio-Leiter des Nutzers als Routing-Huelle in eigener Variante V2Huelle -- Bewertung byte-identisch zu V2, nur die Zielzellen-Karte unterscheidet sich (zwei Randspalten, Spezialfeld-Freischaltung, obere Zeilen, Nachbarn; Drafting als linearer Score mit Strafleisten- und Stoerungsterm aus provocation.rs und Phasen-Eskalation). Suite 520/0, Paritaets-Hash unberuehrt. Entscheidungsmass und Falsifikator in par.8.4 vorregistriert. **GEMESSEN 2026-08-25 (par.8.5, n=160): ARM GEWINNT.** Volle Spalten 0,425 auf 0,950 (t=9,12 auf Bloecken), Spezialfeld-Freischaltungen 0,713 auf 1,512 (t=9,32), Punkte 40,1 auf 48,2 (t=4,80), Strafpunkte -15,0 auf -13,4, Siegquote 0,706, Vollendungsquote 0,743 (Waechter erfuellt). Erster v2-Bauschritt ueberhaupt, der Spalten NICHT mit Punkten bezahlt. ABLATIONEN GEFAHREN (par.8.6): Struktur haengt an der ZIELKARTE (Spalten bleiben 0,506-0,525 ohne die Zusatzterme, nur die Prio-5-Auflage kostet 0,10), Staerke an den linearen Termen (W_STRAF 5,09 Punkte Marge, Prio-5 2,59, W_STOER 2,56). par.9 Punkte-Heatmap als Routing-Karte GEMESSEN und NEGATIV (n=160): volle Spalten 0,650 auf 0,281 (t=-4,89), Teilspalten >=3 dagegen +0,375 (t=6,07) -- eine additive Punktekarte ist konstruktionsbedingt ein BREITEN-Signal, volle Spalten brauchen FOKUS. Die vorregistrierte k1-Vorhersage ist im Vorzeichen widerlegt. Netz-Verwendung als Eingabeebene bleibt unberuehrt. OFFEN: Lehrer-Test gegen den Champion (net_vs_heuristic_v2_arena ist fest auf V2 verdrahtet). -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -892,3 +892,97 @@ gescheitert sind. Wer die Dosis anfasst, registriert vorher.
 Zahlen exakt (Spezialfelder 1,512, Punkte 48,212, Siegquote 0,706;
 `v2_envelope_arena_restore_check.json`) -- die drei Ablationen haben den
 Bestand nicht verschoben.
+
+## par.9 Punkte-Heatmap statt Prio-Leiter (`V2Heatmap`, VORREGISTRIERT 2026-08-25)
+
+**Anlass.** Nutzer-Vorschlag 2026-08-25: "wir koennen ihn auch als punkte
+heatmap verwenden. dann ist er weniger starr in die dreiecksform gepresst."
+Der Nutzer merkt dazu an, die Karte sei urspruenglich fuer das NETZ gedacht;
+der Heuristik-Test hier ist der billige Vorlauf (22 Sekunden je Messung),
+nicht der eigentliche Einsatzort.
+
+Die Ablation par.8.6 macht den Vorschlag dringlich: die STRUKTUR haengt an der
+Zielkarte, nicht an den linearen Zusatztermen. Die Karte ist der Hebel, und
+die aktuelle ist eine handgesetzte Stufenleiter.
+
+**Was gebaut ist.** `plate_builder::points_heatmap`: Wert je Rasterzelle =
+marginaler Zuwachs der AKTIVEN Wertungsplatten, exakt gemessen (Zelle
+probeweise belegen, `scoring::scoring_progress` neu rechnen, Differenz), plus
+der Spezialfliesen-Sofortbonus, wenn die Belegung ein Spezialfeld
+freischaltet. Unerreichbare Zellen fallen auf 0
+(`column_build::cell_is_completable` gegen `provocation::remaining_colors`) --
+das ist zugleich die Knappheits-Kopplung, die `heuristic_v2` fehlt, und macht
+eine Runden-Abklingkurve ueberfluessig.
+
+Platzierungspunkte nach Linienlaenge sind bewusst NICHT enthalten: die
+maximiert `best_first_step_inner` ohnehin, und ihre Alleinherrschaft war der
+Anlass fuer v2.
+
+Alles andere ist identisch zu `V2Huelle` (Bewertung, linearer Drafting-Score,
+Plattenwahl, Tiling-Vorzug), damit der Vergleich genau die KARTE misst.
+
+**Messung.** `V2Huelle` gegen `V2Heatmap`, sonst Aufbau wie par.8.4:
+je 80 gepaarte Partien, beide Sitze, 150 Sims, Seed 20260825, Bloecke zu 16.
+
+**Entscheidungsmass:** volle Spalten je Partie, gepaart, auf Block-Ebene.
+**Waechter:** Vollendungsquote >= 0,53 (B1-Vorgabe).
+
+**VORHERGESAGT, vor dem Lauf (der eigentliche Zweck dieses Arms):** die
+Heatmap verliert Spaltenbau in Partien OHNE aktive Spalten-Wertungsplatte.
+`scoring_progress` kreditiert Spaltenfuellung ausschliesslich bei aktivem k1
+(`scoring.rs`, Zweig 1), und k1 liegt nur in rund 40 Prozent der Partien an --
+genau die Luecke, fuer die `heuristic_v2::plate_independent_l_value` gebaut
+wurde. Die Sonde spaltet deshalb nach `k1_aktiv`/`k1_inaktiv` auf.
+
+Trifft die Vorhersage zu, ist der Befund NICHT "Heatmap schlecht", sondern
+"Heatmap braucht einen plattenunabhaengigen Sockel" -- und die Reparatur ist
+eine Zeile. Trifft sie nicht zu, war meine Ursachenkette falsch und das ist
+das wertvollere Ergebnis.
+
+### par.9.1 ERGEBNIS (2026-08-25, n=160): Heatmap VERLIERT, Vorhersage WIDERLEGT
+
+`evaluations/v2_envelope_arena_heatmap.json`. Differenzen Heatmap minus Huelle.
+
+| Kennzahl | Huelle | Heatmap | Delta | t (Block) |
+| --- | --- | --- | --- | --- |
+| volle Spalten | 0,650 | **0,281** | **-0,369** | **-4,89** |
+| max Spaltenhoehe | 5,438 | 4,925 | -0,512 | -6,24 |
+| Teilspalten >= 3 | 2,906 | **3,281** | **+0,375** | **+6,07** |
+| Teilspalten >= 4 | 2,019 | 1,906 | -0,113 | -1,68 |
+| Spezialfeld-Freischaltungen | 1,150 | 0,613 | -0,537 | -5,12 |
+| Strafpunkte | -16,36 | **-13,69** | **+2,675** | +3,79 |
+| eigene Punkte | 40,99 | 38,31 | -2,675 | -2,79 |
+
+Siegquote der Heatmap 0,463. Vollendungsquote 0,718 (Waechter erfuellt).
+
+**Die vorregistrierte Vorhersage ist WIDERLEGT, und zwar im Vorzeichen.**
+Registriert war: die Heatmap verliert Spaltenbau dort, wo k1 INAKTIV ist, weil
+`scoring_progress` Spalten nur dann kreditiert. Gemessen ist das Gegenteil --
+der Verlust ist groesser, wo k1 AKTIV ist:
+
+| | n | Huelle | Heatmap | Delta | t |
+| --- | --- | --- | --- | --- | --- |
+| k1 aktiv | 52 | 0,750 | 0,250 | -0,520 | -4,06 |
+| k1 inaktiv | 108 | 0,602 | 0,296 | -0,324 | -5,48 |
+
+**Die Ursache steht seit dem ersten v2-Bauschritt im Code und ich habe sie
+uebersehen** (`heuristic_v2::plate_independent_l_value`, Modul-Doku):
+"`scoring_progress` summiert ueber alle sechs Spalten und belohnt damit
+BREITE. Eine volle Spalte braucht aber FOKUS -- die 21-Zellen-Identitaet
+haengt am Minimum ueber die Rasterzeilen, nicht an der Summe."
+
+Genau das zeigt die Messung: Teilspalten >= 3 steigen hoch signifikant
+(+0,375, t=6,07), waehrend volle Spalten und maximale Hoehe fallen. Die
+Heatmap verteilt die Fuellung auf MEHR Spalten und bringt keine zu Ende. Das
+ist keine Kalibrierungsfrage, sondern die Bauform: **eine additive
+Punktekarte ist konstruktionsbedingt ein Breiten-Signal.** Fokus laesst sich
+daraus nicht gewinnen, indem man die Zahlen anders skaliert.
+
+**Was der Arm sonst zeigt.** Die Heatmap spielt sauberer: Strafpunkte -13,69
+gegen -16,36 (t=3,79) und Vollendungsquote 0,718 gegen 0,677. Sie ist der
+bessere GREEDY-Spieler und der schlechtere BAUMEISTER.
+
+**Was NICHT widerlegt ist.** Der Nutzer hat die Karte fuer das NETZ gedacht,
+nicht fuer das Routing. Als Eingabeebene ist sie ein FEATURE, kein Ziel -- ein
+Netz kann aus einem Breiten-Signal Fokus lernen, ein Greedy-Routing nicht.
+Dieser Lauf entscheidet nur die Routing-Verwendung, negativ.
