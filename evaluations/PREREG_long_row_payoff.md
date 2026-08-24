@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: par.2 (Prior-Sichtbarkeit) und par.2a (Initiierung gegen Fortsetzung) GEFAHREN 2026-08-24. par.2: Prior lang/kurz 0,221, Suche bewegt es kaum -> Signal fehlt bereits im Prior, B2 rueckt vor. KORREKTUR an par.2: die zweite Spalte war NICHT die Heuristik, sondern derselbe Champion auf heuristik-Stellungen -- die Zahl zeigt Robustheit ueber Zustandsverteilungen, keinen Agentenvergleich. par.2a in drei Stufen: Arena-Log-Anteil zeigte einen R3-Einbruch, der sich als BELEGUNGS-KONFUNDIERER erwies; die Log-Rekonstruktion dagegen scheiterte am eigenen Selbsttest (233/407 Partien), Ursache round_end.rs:87 process_unplaceable_rows leert Reihen ohne Logzeile; die Korpus-Fassung entkonfundiert: Policy-Masse auf "beginne eine leere lange Reihe", bedingt auf Gelegenheit, Netz 11,5 % gegen Heuristik 25,2 % -- Faktor ~3, FLACH ueber R1-4, Konvergenz nur in R5. Damit ist die Luecke in der INITIIERUNG lokalisiert, nicht in der Fortsetzung -- ein Fortschritts-Shaping (B1) traefe die falsche Aktionsklasse. par.3 bleibt Nutzer-Entscheid, nichts gebaut. Anlass: Reihen-Sonde (STATUS 2026-08-23/24) plus Legalitaets-Stufe (54 % der verpassten Vollendungen scheitern an "Musterreihe noch nicht voll") -->
+<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: DIAGNOSE ABGESCHLOSSEN 2026-08-24 (par.2, par.2a), B1 daraufhin auf die INITIIERUNG umgeschnitten (Nutzer-Entscheid), nichts gebaut. par.2: Prior-Verhaeltnis lang/kurz 0,221 bei FORTSETZUNG, Suche bewegt es kaum -> Signal fehlt bereits im Prior. Korrektur an par.2: die zweite Spalte war NICHT die Heuristik, sondern derselbe Champion auf heuristik-Stellungen, also kein Agentenvergleich. par.2a in drei Stufen: Arena-Log-Anteil zeigte einen R3-Einbruch, der sich als BELEGUNGS-KONFUNDIERER erwies; die Log-Rekonstruktion scheiterte am eigenen Selbsttest (233/407 Partien), Ursache round_end.rs:87 leert Reihen ohne Logzeile; die Korpus-Fassung entkonfundiert und ergibt bei der INITIIERUNG Netz 11,5 Prozent gegen Heuristik 25,2 Prozent, Faktor ~3, FLACH ueber R1-4, Konvergenz nur in R5. B1 zielt deshalb auf den ERSTEN Stein (Stufenfunktion 0->1 in Reihe 5/6, additiv am Blattwert, SearchConfig-Feld) statt auf Fortschritt. Registriertes Risiko mit Falsifikator: Initiierungspraemie kann das bekannte Vollendungs-Defizit (Bau bis ~4,6/6) verschaerfen -- Vollendungsquote ist Pflicht-Kennzahl, "Initiierung hoch UND Vollendung runter" gilt als NICHT-Erfolg auch bei guenstiger Arena. Warum B1 trotz des Floor-Befunds aussichtsreich bleibt: dort war die Prior-Masse exakt 0 und damit fuer die Wurzelauswahl unerreichbar, hier betraegt sie 11,5 Prozent. Anlass: Reihen-Sonde plus Legalitaets-Stufe (54 Prozent der verpassten Vollendungen scheitern an "Musterreihe noch nicht voll") -->
 
 # PREREG-SKELETT: Auszahlung langer Musterreihen -- Prior-Sichtbarkeit und Signal-Shaping
 
@@ -292,37 +292,103 @@ und sie war ohne die Entkonfundierung nicht sichtbar.
 
 ## par.3 Zweig B: Auszahlung sichtbar machen (Eingriff, nach par.2 zuzuschneiden)
 
-### B1 -- Such-seitiger Shaping-Term (additiv, Netz-Pfad, SearchConfig-Kandidat)
+### B1 -- Such-seitiger Shaping-Term auf die INITIIERUNG (Nutzer-Entscheid 2026-08-24)
 
-Analog `floor_shaping_weight` (par.1 Punkt 7): ein kleiner additiver
-Blattwert-Korrekturterm, der Fortschritt in Reihe 5/6 (Anzahl belegter
-Slots relativ zur Kapazitaet) fuer den ZIEHENDEN Spieler leicht
-aufwertet. Eckpunkte fuer den Bau (bei Freigabe):
+**Umgeschnitten nach par.2a.** Der urspruengliche Entwurf wertete
+*Fortschritt* in Reihe 5/6 auf (belegte Slots relativ zur Kapazitaet).
+par.2a Stufe 3 zeigt, dass das die falsche Aktionsklasse getroffen haette:
+beim FORTSETZEN ist das Netz nicht auffaellig schlechter (par.2:
+Verhaeltnis 0,22, auf beiden Zustandsverteilungen gleich), beim BEGINNEN
+dagegen um Faktor ~3 (11,5 % gegen 25,2 %, flach ueber R1-4). Der Term
+zielt deshalb auf den ERSTEN Stein.
+
+**Warum B1 ueberhaupt noch aussichtsreich ist -- und warum der
+Floor-Befund es nicht erledigt.** `PREREG_floor_action_aversion.md` par.6
+hat gezeigt, dass ein Blattwert-Term wirkungslos bleibt, wenn die
+Wurzelauswahl die Aktion vorher verwirft: dort war die Prior-Masse exakt 0
+in 280/280 Stellungen, ein Logit-Abstand, den Gumbel-Rauschen nie
+ueberbrueckt. **Hier ist die Lage anders und das ist der entscheidende
+Unterschied:** die Masse auf Initiierungs-Aktionen betraegt 11,5 %, liegt
+also weit im Bereich der Top-m-Wurzelauswahl. Ein Blattwert-Term kann diese
+Aktionen erreichen. Der Floor-Befund schliesst B1 also nicht aus, er
+erklaert nur, wo ein solcher Term NICHT wirkt.
+
+**Form des Terms.** Analog `floor_shaping_delta` (`net_mcts.rs:958`) als
+reine Zustandsfunktion, ego-perspektivisch und differenzbildend:
+
+```
+init_delta(state, ego) = (gestartete_lange_Reihen(ego)
+                          - gestartete_lange_Reihen(gegner)) / SCALE
+```
+
+wobei `gestartete_lange_Reihen` = Anzahl der Reihen 5/6 mit mindestens
+einem Stein (Wertebereich 0-2). **STUFENFUNKTION am Uebergang 0 -> 1, kein
+Rampenterm** -- genau die Entscheidung, an der die gemessene Luecke sitzt.
+Die Differenzform ist vom Floor-Vorbild uebernommen, damit kein
+systematischer Versatz auf der Blattwertskala entsteht; die reine
+Eigenseiten-Form waere die Alternative und ist in par.7 als offener Punkt
+gefuehrt.
 
 - **Codepfad:** neu, im Netz-Suchpfad (`net_mcts.rs`), NICHT
   `wertung_progress`/`mcts.rs` (par.1 Punkt 6). Default-Gewicht 0 =
   byte-identisches Bestandsverhalten (Paritaets-Gate wie ueblich).
-- **Kapselungs-Anschluss:** dies waere der ZWEITE Knopf, der ins
-  `SearchConfig`-Geruest wandert (nach `MOSAIC_IMPLICIT_MINIMAX_A`,
-  `PREREG_agent_encapsulation.md` par.4) -- direkt als SearchConfig-Feld
-  bauen statt zuerst als Env-Knopf und spaeter migrieren, spart eine
-  Runde.
-- **Messkette, exakt das Muster von heute (Minimax-Knopf,
-  `PREREG_implicit_minimax_backup.md`):**
-  1. Vorzeichen-Sonde auf einer kleinen Partienzahl (Wirkung
-     ja/nein, grobe Richtung).
-  2. Paired Arena **NETZ-GEGEN-NETZ** (nicht zuerst gegen die
-     Heuristik -- die Gegnerspezifitaets-Lehre vom 2026-08-23/24 gilt
-     hier von Anfang an), 407 Kampagnen-Seeds, `--log-games`.
-  3. Ausgewiesen: Siege (Block-Ebene), k1-Rate, UND die
-     Reihenwahl-Verteilung selbst (mit dem `row_preference_probe.py`-
-     Fix aus Punkt 2, siehe par.5) -- der direkte Wirkungsnachweis auf
-     das Zielverhalten, nicht nur auf die Siegquote.
-- **Vorab-Lesart:** primaer kein Staerkeverlust; eine Verschiebung der
-  Reihenwahl-Verteilung Richtung Reihe 5/6 ist der Bonus-Befund, der
-  die Kausalkette schliesst. Ein Sweep-Kandidat wie bei Floor-Shaping
-  wird NICHT vorab erwartet (Praezedenz: Schalter, kein Regler) --
-  sollte sich das wiederholen, ist EIN Wert ausreichend zu testen.
+- **Kapselungs-Anschluss:** direkt als `SearchConfig`-Feld bauen (zweiter
+  Knopf nach `MOSAIC_IMPLICIT_MINIMAX_A`), nicht erst als Env-Knopf.
+
+#### Registriertes RISIKO: Initiieren ohne Vollenden
+
+Ein Term, der das blosse Beginnen belohnt, kann eine bekannte Schwaeche
+verschaerfen statt sie zu heilen. Der Strukturbefund zum Spaltenbau haelt
+fest, dass der Champion lange Reihen bis etwa 4,6 von 6 fuellt und die
+letzten Zellen nie -- **es gibt also bereits ein Vollendungs-Defizit, und
+eine Initiierungs-Praemie zahlt genau darauf ein.** Das ist keine
+Nebenbemerkung, sondern der wahrscheinlichste Weg, wie dieser Arm
+"funktioniert" und trotzdem schadet.
+
+**Pflicht-Kennzahl und Falsifikator, vorab festgelegt:** die
+**Vollendungsquote begonnener langer Reihen** (Anteil der in Reihe 5/6
+begonnenen Reihen, die ihre Kapazitaet erreichen) ist gleichrangig mit der
+Initiierungsrate zu berichten.
+
+- Initiierung steigt **und** Vollendungsquote bleibt gleich oder steigt:
+  der behauptete Mechanismus.
+- Initiierung steigt **und** Vollendungsquote faellt: **NICHT-ERFOLG, auch
+  bei guenstiger Arena.** Der Term hat dann mehr angefangene Ruinen
+  erzeugt, nicht mehr fertige Reihen. Ausdruecklich als solcher zu
+  berichten und nicht als Teilerfolg zu buchen. (Dieselbe Bauart wie der
+  Marge-in-Siege-Falsifikator in `PREREG_saturating_score_utility.md`
+  par.8 -- eine Richtungsvorhersage, die auch bei guenstigem Ausgang
+  scheitern kann.)
+
+#### Messkette
+
+1. **Direktwirkung auf die Entscheidung, OHNE neue Partien.** Der Knopf
+   an/aus auf DEMSELBEN festen Satz Korpus-Stellungen, gemessen mit
+   `tools/probes/row_initiation_opportunity_probe.py` (Suchseite statt
+   `policy`-Feld). Das isoliert die Wirkung des Knopfes auf die
+   Zugwahl exakt und kostet keine Arena. **Zuerst, weil ein Term, der die
+   Entscheidung nicht bewegt, gar nicht erst in eine Arena muss.**
+2. **Staerke: gepaarte Arena NETZ-GEGEN-NETZ**, 407 Kampagnen-Seeds,
+   `--log-games`. Nicht gegen die Heuristik -- die
+   Gegnerspezifitaets-Lehre vom 2026-08-23/24 gilt hier von Anfang an
+   (der Implicit-Minimax-k1-Sprung von +7,0 pp gegen die Heuristik war
+   netz-gegen-netz exakt null).
+3. **Ausgewiesen:** Siege (Block-Ebene), k1-Rate, Initiierungsrate,
+   **Vollendungsquote** (Falsifikator oben), sowie die sechs
+   Standard-Kennzahlen je Seite (CLAUDE.md).
+
+**Instrument-Hinweis, aus par.2a Stufe 2 gelernt:** die Initiierungs- und
+Vollendungs-Kennzahlen sind **aus dem Korpus** zu ziehen, nicht aus
+Arena-Logs. `round_end.rs:87` leert Musterreihen ohne Logzeile; eine
+belegungsgenaue Auswertung aus Logs ist prinzipiell unmoeglich. Wer diese
+Kennzahlen aus einem Arena-Lauf braucht, muss den Zustand mitschreiben
+lassen -- das ist ein eigener Aufwandsposten und keine Selbstverstaendlichkeit.
+
+**Vorab-Lesart:** primaer kein Staerkeverlust; eine Verschiebung der
+Initiierungsrate Richtung Lehrer-Niveau bei gehaltener Vollendungsquote ist
+der Bonus-Befund, der die Kausalkette schliesst. Ein Sweep wird NICHT
+vorab erwartet (Praezedenz Floor-Shaping: Schalter, kein Regler) -- ein
+Wert genuegt zum Testen.
 
 ### B2 -- Label-/Trainingsseite (Folgearm, NICHT jetzt gebaut, nur skizziert)
 
@@ -345,22 +411,31 @@ erst, wenn par.2 die Richtung vorgibt.
 
 ## par.4 Reihenfolge und Gate
 
-1. **par.2 zuerst, immer** -- billig, liefert die Weichenstellung
-   zwischen B1 und B2, blockt nichts anderes.
-2. **B1 nur nach par.2**, es sei denn der Nutzer gibt es unabhaengig
-   vom Diagnose-Ausgang frei (es ist billig genug, um auch "auf
-   Verdacht" gebaut zu werden -- das ist ein Abwaegungs-Punkt fuer
-   par.7, keine Vorfestlegung).
-3. **B2 fruehestens nach B1**, eigener Zuschnitt, eigene
-   Nutzer-Freigabe.
+**Stand 2026-08-24:** par.2 und par.2a sind GEFAHREN, die Weichenstellung
+ist damit erfolgt, und B1 ist auf die Initiierung umgeschnitten
+(Nutzer-Entscheid). Es gilt jetzt:
+
+1. ~~par.2 zuerst~~ -- erledigt (par.2, par.2a Stufen 1-3).
+2. **B1, Messkette Schritt 1 zuerst** (Knopf an/aus auf festen
+   Korpus-Stellungen, keine Arena). Bewegt der Term die Entscheidung
+   nicht, endet der Arm dort -- ein billiges Tor VOR dem teuren Teil.
+3. **B1, Messkette Schritt 2** (gepaarte Arena netz-gegen-netz) nur nach
+   Schritt 1.
+4. **B2 fruehestens nach B1**, eigener Zuschnitt, eigene
+   Nutzer-Freigabe. Die par.2-Lesart ("Signal fehlt bereits im Prior")
+   spricht inhaltlich fuer B2 -- B1 ist trotzdem zuerst dran, weil er
+   ungleich billiger ist und sein Schritt 1 gar keine Partien kostet.
 
 ## par.5 Beruehrungspunkte mit offenen Nebenpunkten
 
 - Der Fix von `tools/probes/row_preference_probe.py:190-198`
-  (Seiten-Labelling in `imm_netvnet`, aus der Parallelsitzung
-  gemeldet, noch nicht erledigt) sollte VOR der B1-Arena stehen, weil
-  die Reihenwahl-Verteilung dort mit ausgewiesen wird -- sonst mischt
-  das Instrument wieder zwei Agenten.
+  (Seiten-Labelling in `imm_netvnet`) ist fuer diesen Zuschnitt
+  ENTSCHAERFT, aber nicht erledigt: die B1-Kennzahlen laufen nach dem
+  Umschnitt ueber `row_initiation_opportunity_probe.py` (Korpus,
+  eindeutige Seitenzuordnung), nicht ueber die Reihenwahl-Verteilung aus
+  jener Datei. Wer sie dennoch heranzieht, braucht den Fix vorher --
+  dieselbe Falle hat am 2026-08-24 schon `penalty_track_probe.py`
+  getroffen (dort behoben).
 - Die Legalitaets-Sonde (`column_completion_legality_probe.py`) bleibt
   die Referenz fuer "wie viele Faelle betrifft das" -- diese Prereg
   wiederholt sie nicht, sondern baut auf ihrem Befund auf.
@@ -380,12 +455,25 @@ erst, wenn par.2 die Richtung vorgibt.
 
 ## par.7 OFFENE NUTZER-ENTSCHEIDE (vor Baubeginn)
 
-1. Par.2 (Diagnose) sofort freigeben, oder als naechster Schritt einer
-   kommenden Sitzung parken?
-2. Soll B1 unabhaengig vom Diagnose-Ausgang gebaut werden (billig genug,
-   klarer Praezedenzfall), oder strikt gated durch par.2s Ergebnis?
-3. Stichprobengroesse/-quellen fuer par.2 (Vorschlag: 150-250 Zustaende,
-   analog zur Groessenordnung des Vierer-Vergleichs) -- zu bestaetigen.
-4. Reihenfolge gegenueber den anderen offenen Straengen (R5-Teil-B,
-   Seeding-Dosis, UVFA, restliche Kapselungs-Wellen) -- alle weiterhin
+~~1. Par.2 sofort freigeben oder parken?~~ -- erledigt, gefahren 2026-08-24.
+~~2. B1 unabhaengig vom Diagnose-Ausgang bauen?~~ -- gegenstandslos, die
+Diagnose liegt vor und hat B1 umgeschnitten (Nutzer-Entscheid 2026-08-24).
+~~3. Stichprobengroesse fuer par.2?~~ -- erledigt (par.2: 260 Stellungen;
+par.2a Stufe 3: 100.864 Gelegenheits-Entscheidungen).
+
+**Weiterhin offen:**
+
+1. **Form des Terms: Differenz oder reine Eigenseite.** par.3/B1 setzt die
+   Differenzform `(eigen - gegner)` nach dem Floor-Vorbild an, damit kein
+   systematischer Versatz auf der Blattwertskala entsteht. Die reine
+   Eigenseiten-Form waere semantisch naeher am Ziel ("baue DEIN Brett"),
+   erzeugt aber einen Offset. Vor dem Bau zu entscheiden, nicht im Bau.
+2. **`SCALE` des Terms.** Vorschlag: Analogie zu `FLOOR_SHAPING_SCALE`
+   (50,0). Da der Zaehler hier nur 0-2 laeuft statt einer Punktsumme, ist
+   die Analogie NICHT selbstverstaendlich -- die Groessenordnung des
+   resultierenden Blattwert-Shifts ist vor dem Bau auszurechnen und mit
+   dem Floor-Term zu vergleichen, nicht zu uebernehmen.
+3. **Reihenfolge gegenueber den anderen offenen Straengen** (R5-Teil-B,
+   Seeding-Dosis, UVFA, sigma-Kopf-Ziel aus
+   `PREREG_saturating_score_utility.md` par.3a) -- alle weiterhin
    Nutzer-Entscheid, keine Prioritaet impliziert.
