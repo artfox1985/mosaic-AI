@@ -2513,6 +2513,7 @@ pub fn variant_from_name(name: &str) -> Option<crate::mcts::HeuristikVariante> {
         "v1" => Some(HV::V1),
         "v2" => Some(HV::V2),
         "v2huelle" | "v2_huelle" => Some(HV::V2Huelle),
+        "v2heatmap" | "v2_heatmap" => Some(HV::V2Heatmap),
         _ => None,
     }
 }

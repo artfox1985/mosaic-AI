@@ -49,6 +49,8 @@ from column_build_structural_probe import (  # noqa: E402
 from plate_points_from_arena import block_mean, t_value  # noqa: E402
 
 ARM_A, ARM_B = "v2", "v2huelle"
+if "--arms" in sys.argv:
+    ARM_A, ARM_B = sys.argv[sys.argv.index("--arms") + 1].split(":")
 NAME_A, NAME_B = f"Heuristik_{ARM_A}", f"Heuristik_{ARM_B}"
 SIMS, THREADS, C_PUCT = 150, 0, 0.3
 SEED = 20260825
@@ -175,8 +177,27 @@ def main() -> None:
             ges_voll += int(g["long_rows_completed"][i])
         return (ges_voll / ges_start) if ges_start else 0.0
 
+    # Aufspaltung nach aktiver Spalten-Wertungsplatte (k1 = Id 1). Sie liegt
+    # nur in rund 40 Prozent der Partien an, und `scoring_progress` kreditiert
+    # Spaltenfuellung ausschliesslich dann -- eine Karte aus Plattenpunkten
+    # muesste dort ohne Spaltensignal dastehen.
+    k1_split = {}
+    for label, pred in (("k1_aktiv", True), ("k1_inaktiv", False)):
+        idx = [i for i, g in enumerate(spiele) if (1 in g.get("scoring_tile_ids", [])) is pred]
+        if not idx:
+            continue
+        d = [diffs["volle_spalten"][i] for i in idx]
+        bl = block_mean(d, max(1, len(d) // 5))
+        m, t = t_value(bl)
+        k1_split[label] = {
+            "n": len(idx), "delta_volle_spalten": m, "t_block": t,
+            ARM_A: sum(roh_a["volle_spalten"][i] for i in idx) / len(idx),
+            ARM_B: sum(roh_b["volle_spalten"][i] for i in idx) / len(idx),
+        }
+
     n = len(spiele)
     ergebnis = {
+        "k1_split": k1_split,
         "arme": [ARM_A, ARM_B], "n_partien": n, "sims": SIMS, "block": BLOCK,
         "seed": SEED, "fehlende_bretter": fehlend,
         "siegquote_huelle": siege_b / n if n else 0.0,
@@ -203,6 +224,10 @@ def main() -> None:
     print("-" * 68)
     for key, v in ergebnis["kennzahlen"].items():
         print(f"{key:<26}{v[ARM_A]:>10.3f}{v[ARM_B]:>12.3f}{v['delta']:>10.3f}{v['t_block']:>10.2f}")
+    print("\nVolle Spalten nach aktiver Spalten-Platte (k1):")
+    for label, v in ergebnis["k1_split"].items():
+        print(f"  {label:<12} n={v['n']:<4} {ARM_A} {v[ARM_A]:.3f}  {ARM_B} {v[ARM_B]:.3f}  "
+              f"delta {v['delta_volle_spalten']:+.3f}  t {v['t_block']:.2f}")
     print(f"\nSiegquote {ARM_B}: {ergebnis['siegquote_huelle']:.3f}")
     print(f"Vollendungsquote: {ARM_A} {ergebnis['vollendungsquote'][ARM_A]:.3f}  "
           f"{ARM_B} {ergebnis['vollendungsquote'][ARM_B]:.3f}  (B1-Waechter: >= 0,53)")
