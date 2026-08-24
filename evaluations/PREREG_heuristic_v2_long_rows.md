@@ -340,6 +340,167 @@ konvexe Fassung tat das nicht. Der Hebel wirkt, er zeigt nur in die falsche
 Richtung. Und die Zahl 1 gegen 15 bei den geraeumten Reihen belegt, dass der
 B1-Fehler (angefangene Ruinen) diesmal NICHT auftritt.
 
+### par.3a DREIECKS-ABWEICHUNG als Zielfunktion (Nutzer-Formulierung 2026-08-24, VOR der Messung registriert)
+
+Der Nutzer hat das Zielbild in eine Fehler-Metrik ueberfuehrt: das Brett als
+reine **Binaermatrix** (belegt 1 / leer 0), Abweichung von der idealen
+Dreiecksform als Abzaehlung.
+
+```
+Abweichung = leere Felder im ERLAUBTEN Bereich
+           + belegte Felder im VERBOTENEN Bereich
+```
+
+Fuer das 6x6-Raster ist der erlaubte Bereich `r + c <= 5`, also
+6+5+4+3+2+1 = **21 Zellen**. Score 0 heisst perfekte Dreiecksform.
+
+**Warum das die richtige Zielfunktion ist -- und was sie loest.** Die
+bisherige Zielzellen-Menge war eine undifferenzierte VEREINIGUNG aus einer
+Spalte und einer Zeile, und die Spalte gewann darin jeden Konflikt: ihre
+sechs Zellen sind aus sechs verschiedenen Musterreihen bedienbar, die der
+Zeile nur aus einer. Gemessen kostete jeder Spaltengewinn Zeilen:
+
+| Bauschritt | volle Spalten | volle Zeilen |
+| --- | --- | --- |
+| v1 (Anker) | 0,163 | 0,438 |
+| Routing (Draft + Tiling) | 0,362 | 0,250 |
+| + plattenunabhaengiger L-Wert | 0,438 | 0,400 |
+| + gestreute Start-Ecke | 0,450 | 0,263 |
+| + Kuppelplatten-Wahl | 0,588 | 0,200 |
+
+Ein EINZELNER Skalar ueber das ganze Brett hat diesen Konflikt strukturell
+nicht. Und die 21 ist keine Koinzidenz: es ist dieselbe 21, die eine volle
+Spalte kostet (1+2+3+4+5+6). Die Dreiecksform IST die Spalte-plus-Zeile-
+Struktur, nur vollstaendig ausformuliert -- ihre Kanten sind eine volle
+Rasterzeile und eine volle Rasterspalte, und alles dazwischen ist
+zusammenhaengend, zahlt also Platzierungspunkte nach Linienlaenge.
+
+**Vorab festgelegt, damit die Zahl nicht nachtraeglich passend gemacht wird:**
+
+- Gewicht `DREIECK_GEWICHT = 1.0` PUNKT je Abweichungs-Zelle. Bewusst
+  konservativ: eine Platzierung bringt gemessen 2,3 bis 4,3 Punkte, der
+  Formterm kann sie also nie ueberstimmen, sondern nur Gleichstaende in
+  Richtung Form brechen.
+- Alle VIER Orientierungen werden geprueft, das Minimum zaehlt. Damit passt
+  sich die Form der gestreuten Start-Ecke an, statt eine Seite
+  vorzuschreiben.
+- **Primaermetrik bleibt unveraendert** (volle Spalten je Partie, gepaart,
+  beide Sitze). Die Abweichung ist die ZIELFUNKTION des Agenten, nicht das
+  Erfolgsmass -- sonst misst sich der Arm an sich selbst.
+- **Zusaetzlich auszuweisen:** volle Zeilen. Der Zweck dieses Zuschnitts ist
+  gerade, dass Spalten nicht mehr auf Kosten der Zeilen steigen. Steigen die
+  Spalten und fallen die Zeilen erneut, hat der Skalar sein Versprechen
+  NICHT eingeloest, auch wenn die Primaermetrik guenstig aussieht.
+
+#### par.3a ERGEBNIS (2026-08-24): als SUCHTERM wirkungslos, Metrik bleibt
+
+80 Partien, beide Sitze, Gewicht 1,0 je Abweichungs-Zelle wie vorab
+festgelegt:
+
+| | volle Spalten | volle Zeilen | Punkte | Siege |
+| --- | --- | --- | --- | --- |
+| ohne Dreiecksterm | 0,588 | 0,200 | 40,8 | 31/80 |
+| mit Dreiecksterm | 0,550 | **0,200** | 39,8 | 32/80 |
+
+**Nicht-Erfolg nach der vorab festgelegten Regel.** Die Zeilen bleiben
+unveraendert bei 0,200, die Spalten steigen nicht, die Punkte fallen. Der
+Skalar hat den Spalte-gegen-Zeile-Konflikt also NICHT aufgeloest.
+
+**Diagnose: die Hebelwirkung, nicht die Metrik.** Der Score aendert sich je
+Zug um hoechstens 1, waehrend die Platzierungen selbst 2,3 bis 4,3 Punkte
+auseinanderliegen. Ein additiver Term mit Gewicht 1,0 kann damit nur
+Gleichstaende brechen, und die sind selten. Das Gewicht hochzudrehen waere
+die Dosis-Antwort auf ein Strukturproblem -- dieselbe Bauform, die
+`PREREG_scoring_plate_injection` (30-facher Dosisbereich) und
+`PREREG_long_row_payoff` B1 bereits verworfen haben. Bewusst NICHT getan.
+
+**Die Metrik bleibt gueltig, sie ist nur am falschen Ort.** Der Code bleibt
+als `heuristic_v2::dreiecks_abweichung` erhalten (mit Test), weil par.3b ihn
+als LERNZIEL braucht: 36 binaere Zellen, eine Funktion des BRETTES statt des
+gespielten Ausgangs, klarer Nullpunkt. Das ist dieselbe Lehre wie bei B1 --
+such-seitig ist der Weg zu, ziel-seitig nicht.
+
+### par.3b Folgearm: SHAPING-KOPF statt Ownership-Kopf (Nutzer-Idee 2026-08-24, NICHT gebaut)
+
+Nutzer: "vielleicht bauen wir auch statt dem Ownership-Head so etwas
+Aehnliches ein wie ein Shaping-Head, der umso hoeher wird, je eher das Netz
+an die Dreiecksform kommt."
+
+Die Idee passt zu einem bereits registrierten Befund: der Ownership-Kopf
+traegt gemessen NICHTS zur Staerke bei (Gewicht 0), aber seine 36 Feldlabels
+sind das richtige Ziel-FORMAT ([[project_ownership_head_closed]]). Ein Kopf,
+der die Dreiecks-Abweichung vorhersagt, haette genau dieses Format -- 36
+Zellen, binaer -- und ein Ziel, das im Unterschied zum Konjunktions-Kopf
+NICHT politikabhaengig ist: die Abweichung ist eine Funktion des Brettes,
+nicht des gespielten Ausgangs ([[project_conjunction_head_predicts_occurrence]]).
+
+**Voraussetzung, und deshalb Folgearm:** ein Korpus, in dem die Dreiecksform
+ueberhaupt vorkommt. Den soll v2 erst erzeugen. Vorher waere der Kopf auf
+plattenblindes Spiel geeicht -- derselbe Fehler wie viermal zuvor
+([[feedback_dont_calibrate_to_plate_blind_play]]).
+
+**Abklingender Beitrag (Nutzer-Erweiterung 2026-08-24):** der Shaping-Kopf
+soll den Value-Kopf in den FRUEHEN Runden stuetzen und dann zurueckgenommen
+werden -- "dann koennen wir den Shaping-Head decayen und der Value-Head
+uebernimmt immer mehr".
+
+Das trifft eine gemessene Luecke, es ist kein allgemeines Curriculum-Argument:
+
+- Der Value-Kopf ist gerade frueh am schwaechsten (v14-Zyklus: "value head
+  weak early rounds"; die Runde-1/2-R2 waren lange negativ, siehe
+  [[project_v8d_value_head_root_cause]]).
+- Und der TD-Bootstrap kann eine frueh begonnene Investition strukturell
+  nicht tragen: `bootstrap_value_after_rounds` spielt EINE Runde aus und
+  bewertet dann per Netz (`round_transition_deep.rs:852`). Eine lange Reihe,
+  die in Runde 3-4 zahlt, liegt hinter diesem Punkt. Der naheliegende Ausweg
+  -- tieferer Horizont -- ist am Kostengate gescheitert
+  (`PREREG_bootstrap_horizon.md` Stufe 1: Aufschlag 60,7 Prozent gegen eine
+  Schwelle von 25).
+
+Der Shaping-Kopf greift also dieselbe Stelle mit anderen Mitteln an: er
+liefert frueh ein Signal, das nicht auf den Ausgang warten muss, weil die
+Dreiecks-Abweichung eine Funktion des BRETTES ist.
+
+**Ausgabe-Struktur: ZWEI Kanaele, nicht einer und nicht vier**
+(Nutzer-Vorschlag 2026-08-24: "vielleicht brauchst ja zwei Layer beim
+Shaping-Head, einmal mit Spalte 0 als Startwert und einmal mit Spalte 5").
+
+Der Heuristik-Term nimmt das MINIMUM ueber vier Orientierungen. Fuer einen
+gelernten Kopf ist das die falsche Form, aus zwei Gruenden:
+
+- Ein Minimum zerstoert die Richtungsinformation. Der Kopf koennte nur noch
+  sagen, WIE WEIT das Brett von einer Dreiecksform weg ist, nicht WOHIN es
+  laeuft -- und genau das soll er der Suche liefern.
+- Ein Min-Ziel ist nicht glatt: welche Orientierung fuehrt, kann von Zug zu
+  Zug kippen, und das Lernziel springt mit.
+
+**Warum zwei und nicht vier:** die beiden UNTEREN Orientierungen verlangen
+eine volle Rasterzeile 5. Die wird ausschliesslich von Musterreihe 6
+gespeist, und die schliesst gemessen 1,3-mal je Partie ab -- sechs Zellen
+sind dort strukturell unerreichbar (dieselbe Asymmetrie, die schon die
+Zeilenziele auf die obersten zwei Rasterzeilen begrenzt hat, s. par.3a).
+Uebrig bleiben oben-links und oben-rechts, also genau Spalte 0 und Spalte 5
+als Startpunkte. Ein Kanal je Orientierung, beide gegen dieselbe
+Binaermatrix gerechnet.
+
+Geprueft (2026-08-24): alle vier Orientierungen haben exakt 21 Zellen und je
+eine volle Zeile plus eine volle Spalte an ihrer Ecke -- oben links (Z0/S0),
+oben rechts (Z0/S5), unten links (Z5/S0), unten rechts (Z5/S5).
+
+**Vorab festzulegen, BEVOR gebaut wird (sonst wird der Zeitplan hinterher
+passend gemacht):**
+
+1. Die Abkling-Kurve (Form, Start- und Endgewicht, ueber welche Groesse sie
+   laeuft -- Trainingsepochen, Generationen oder Rundennummer). Der Nutzer
+   hat "decayen" gesagt, nicht welche Kurve; das ist ein eigener Entscheid.
+2. Der Waechter dagegen, dass der Kopf zur Kruecke wird: gemessen wird die
+   Value-Qualitaet OHNE Shaping-Beitrag, sonst verdeckt der Kopf genau die
+   Schwaeche, die er beheben soll.
+3. Die Abkling-Parameter duerfen NICHT an der Metrik getunt werden, an der
+   der Arm beurteilt wird ([[feedback_preregister_decision_metric]]).
+
+Eigene Vorregistrierung vor dem Bau, eigene Nutzer-Freigabe.
+
 ## par.4 Anker-Integritaet: die ERSTE Bauentscheidung, vor der Formel
 
 Der Nutzer-Entscheid lautet "v2 als ZUSAETZLICHER Anker". Daraus folgen harte

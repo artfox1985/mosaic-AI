@@ -372,3 +372,108 @@ mod tests {
         assert_eq!(row_completion_progress(&p, &[K1_VERTIKALE_REIHEN]), 0.0);
     }
 }
+
+// ── Dreiecks-Abweichung (Nutzer-Formulierung 2026-08-24) ────────────────────
+
+/// Gewicht der Dreiecks-Abweichung in PUNKTEN je Zelle.
+///
+/// Eine Abweichungs-Einheit ist genau eine Zelle. Gemessen bringt eine
+/// Platzierung 2,3 bis 4,3 Punkte (Server-Logs, Mensch wie KI), `1.0` ist
+/// also bewusst KONSERVATIV: der Formterm kann eine Platzierung nie
+/// ueberstimmen, er bricht nur Gleichstaende in Richtung Form.
+pub const DREIECK_GEWICHT: f64 = 1.0;
+
+/// Abweichung des Brettes von der idealen Dreiecksform, als reine
+/// Binaermatrix betrachtet (Nutzer-Formulierung 2026-08-24).
+///
+/// Zahlenwerte und Farben werden ignoriert, nur belegt (1) gegen leer (0):
+///
+/// * **Erlaubter Bereich** (`r + c <= 5`, 21 Zellen): jedes LEERE Feld ist
+///   eine Abweichung.
+/// * **Verbotener Bereich** (der Rest, 15 Zellen): jedes BELEGTE Feld ist
+///   eine Abweichung.
+///
+/// Score 0 heisst perfekte Dreiecksform, hoeher heisst weiter weg.
+///
+/// **Warum diese Form das Ziel ist:** der erlaubte Bereich hat genau 21
+/// Zellen -- dieselbe 21, die eine volle Spalte kostet (1+2+3+4+5+6). Die
+/// Dreiecksform IST die Spalte-plus-Zeile-Struktur, nur vollstaendig
+/// ausformuliert: ihre Kanten sind eine volle Rasterzeile und eine volle
+/// Rasterspalte, und alles dazwischen ist zusammenhaengend, zahlt also
+/// Platzierungspunkte nach Linienlaenge (`engine_manual.md:143-147`).
+///
+/// **Was sie loest:** die bisherige Zielzellen-Vereinigung aus Spalte und
+/// Zeile war undifferenziert, und die Spalte gewann darin jeden Konflikt --
+/// ihre sechs Zellen sind aus sechs verschiedenen Musterreihen bedienbar, die
+/// der Zeile nur aus einer. Gemessen kostete jeder Spaltengewinn Zeilen
+/// (0,438 auf 0,200 ueber vier Bauschritte). Ein einzelner Skalar ueber das
+/// ganze Brett hat diesen Konflikt nicht.
+///
+/// **Spiegelung:** alle vier Orientierungen werden geprueft, das Minimum
+/// zaehlt. Damit passt sich die Form der Start-Ecke an, statt eine Seite
+/// vorzuschreiben -- und die gestreute Start-Ecke bleibt wirksam.
+pub fn dreiecks_abweichung(player: &PlayerBoard) -> u32 {
+    let mut belegt = [[false; 6]; 6];
+    for (tr, reihe) in player.dome_grid.dome_slots.iter().enumerate() {
+        for (tc, slot) in reihe.iter().enumerate() {
+            let Some(slot) = slot else { continue };
+            for (si, sp) in slot.spaces.iter().enumerate() {
+                if sp.is_filled() {
+                    belegt[2 * tr + si / 2][2 * tc + si % 2] = true;
+                }
+            }
+        }
+    }
+    // Vier Orientierungen: die Ecke, an der das Dreieck seine volle Zeile und
+    // Spalte hat. `erlaubt` ist jeweils die 21er-Haelfte.
+    let orientierungen: [fn(usize, usize) -> bool; 4] = [
+        |r, c| r + c <= 5,             // oben links
+        |r, c| r + (5 - c) <= 5,       // oben rechts
+        |r, c| (5 - r) + c <= 5,       // unten links
+        |r, c| (5 - r) + (5 - c) <= 5, // unten rechts
+    ];
+    orientierungen
+        .iter()
+        .map(|erlaubt| {
+            let mut fehler = 0u32;
+            for r in 0..6 {
+                for c in 0..6 {
+                    if erlaubt(r, c) != belegt[r][c] {
+                        fehler += 1;
+                    }
+                }
+            }
+            fehler
+        })
+        .min()
+        .unwrap_or(0)
+}
+
+#[cfg(test)]
+mod dreieck_tests {
+    use super::*;
+    use crate::dome::build_dome_tile_pool;
+
+    /// Ein LEERES Brett hat genau 21 Abweichungen: alle Zellen des erlaubten
+    /// Bereichs sind leer, im verbotenen liegt nichts. Das ist zugleich die
+    /// Probe auf die Groesse des erlaubten Bereichs (1+2+3+4+5+6).
+    #[test]
+    fn leeres_brett_hat_21_abweichungen() {
+        let p = crate::board::PlayerBoard::new(0, "P");
+        assert_eq!(dreiecks_abweichung(&p), 21);
+    }
+
+    /// Jede belegte Zelle im erlaubten Bereich senkt die Abweichung um genau
+    /// 1 -- die Metrik ist in der Binaermatrix linear, wie vorregistriert.
+    #[test]
+    fn belegte_zelle_im_erlaubten_bereich_senkt_um_eins() {
+        let mut p = crate::board::PlayerBoard::new(0, "P");
+        let tile = build_dome_tile_pool()[0].clone();
+        p.dome_grid.place_dome_tile(tile, 0, 0).unwrap();
+        let vorher = dreiecks_abweichung(&p);
+        // Zelle (0,0) liegt in JEDER Orientierung ausser unten-rechts im
+        // erlaubten Bereich; das Minimum ueber die vier faellt also um 1.
+        p.dome_grid.place_tile(0, 0, crate::tile::TileColor::Gelb).unwrap();
+        assert_eq!(dreiecks_abweichung(&p), vorher - 1);
+    }
+}
