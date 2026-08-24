@@ -1,0 +1,85 @@
+{
+  "arme": [
+    "v2",
+    "v2huelle"
+  ],
+  "n_partien": 160,
+  "sims": 150,
+  "block": 16,
+  "seed": 20260825,
+  "fehlende_bretter": 0,
+  "siegquote_huelle": 0.60625,
+  "vollendungsquote": {
+    "v2": 0.6863905325443787,
+    "v2huelle": 0.7377666248431619
+  },
+  "reihenauslastung": {
+    "v2": {
+      "0": 4.35,
+      "1": 4.18125,
+      "2": 2.4875,
+      "3": 1.9875,
+      "4": 1.575,
+      "5": 1.325
+    },
+    "v2huelle": {
+      "0": 3.875,
+      "1": 3.9125,
+      "2": 2.675,
+      "3": 2.3,
+      "4": 2.13125,
+      "5": 1.54375
+    }
+  },
+  "kennzahlen": {
+    "volle_spalten": {
+      "v2": 0.46875,
+      "v2huelle": 0.975,
+      "delta": 0.50625,
+      "t_block": 7.806284679369311,
+      "n_bloecke": 10
+    },
+    "max_hoehe": {
+      "v2": 5.3875,
+      "v2huelle": 5.56875,
+      "delta": 0.18125,
+      "t_block": 2.951272862254499,
+      "n_bloecke": 10
+    },
+    "teilspalten_ge3": {
+      "v2": 3.05625,
+      "v2huelle": 3.10625,
+      "delta": 0.05,
+      "t_block": 0.6771991775797205,
+      "n_bloecke": 10
+    },
+    "teilspalten_ge4": {
+      "v2": 1.9,
+      "v2huelle": 2.2,
+      "delta": 0.3,
+      "t_block": 3.560170870325871,
+      "n_bloecke": 10
+    },
+    "spezial_freischaltungen": {
+      "v2": 0.7375,
+      "v2huelle": 1.44375,
+      "delta": 0.70625,
+      "t_block": 7.326412456098822,
+      "n_bloecke": 10
+    },
+    "strafpunkte": {
+      "v2": -13.9375,
+      "v2huelle": -12.6375,
+      "delta": 1.3,
+      "t_block": 2.4716796822937916,
+      "n_bloecke": 10
+    },
+    "punkte": {
+      "v2": 42.7875,
+      "v2huelle": 48.29375,
+      "delta": 5.50625,
+      "t_block": 4.604159315654029,
+      "n_bloecke": 10
+    }
+  }
+}
