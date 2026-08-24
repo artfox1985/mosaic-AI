@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: DIAGNOSE ABGESCHLOSSEN 2026-08-24 (par.2, par.2a), B1 daraufhin auf die INITIIERUNG umgeschnitten (Nutzer-Entscheid), nichts gebaut. par.2: Prior-Verhaeltnis lang/kurz 0,221 bei FORTSETZUNG, Suche bewegt es kaum -> Signal fehlt bereits im Prior. Korrektur an par.2: die zweite Spalte war NICHT die Heuristik, sondern derselbe Champion auf heuristik-Stellungen, also kein Agentenvergleich. par.2a in drei Stufen: Arena-Log-Anteil zeigte einen R3-Einbruch, der sich als BELEGUNGS-KONFUNDIERER erwies; die Log-Rekonstruktion scheiterte am eigenen Selbsttest (233/407 Partien), Ursache round_end.rs:87 leert Reihen ohne Logzeile; die Korpus-Fassung entkonfundiert und ergibt bei der INITIIERUNG Netz 11,5 Prozent gegen Heuristik 25,2 Prozent, Faktor ~3, FLACH ueber R1-4, Konvergenz nur in R5. B1 zielt deshalb auf den ERSTEN Stein (Stufenfunktion 0->1 in Reihe 5/6, additiv am Blattwert, SearchConfig-Feld) statt auf Fortschritt. Registriertes Risiko mit Falsifikator: Initiierungspraemie kann das bekannte Vollendungs-Defizit (Bau bis ~4,6/6) verschaerfen -- Vollendungsquote ist Pflicht-Kennzahl, "Initiierung hoch UND Vollendung runter" gilt als NICHT-Erfolg auch bei guenstiger Arena. Warum B1 trotz des Floor-Befunds aussichtsreich bleibt: dort war die Prior-Masse exakt 0 und damit fuer die Wurzelauswahl unerreichbar, hier betraegt sie 11,5 Prozent. Anlass: Reihen-Sonde plus Legalitaets-Stufe (54 Prozent der verpassten Vollendungen scheitern an "Musterreihe noch nicht voll") -->
+<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: DIAGNOSE ABGESCHLOSSEN und B1 GEBAUT UND ABGENOMMEN (2026-08-24), aber NICHTS GEMESSEN -- die Messkette par.3/B1 steht komplett aus. Diagnose: par.2 Prior-Verhaeltnis lang/kurz 0,221 bei FORTSETZUNG, Suche bewegt es kaum. par.2a in drei Stufen (Arena-Log-Anteil zeigte einen R3-Einbruch, der sich als BELEGUNGS-KONFUNDIERER erwies; die Log-Rekonstruktion scheiterte am eigenen Selbsttest, Ursache round_end.rs:87 leert Reihen ohne Logzeile; die Korpus-Fassung entkonfundiert) ergibt bei der INITIIERUNG Netz 11,5 Prozent gegen Heuristik 25,2 Prozent, Faktor ~3, flach ueber R1-4. B1 daraufhin auf die Initiierung umgeschnitten (Nutzer-Entscheid): Stufenfunktion 0 auf 1 in Musterreihe 5/6, additiv am Blattwert, SearchConfig-Feld long_row_init_shaping_w, Env MOSAIC_LONG_ROW_INIT_W, SCALE 10 statt 50 damit der maximale Shift dem Floor-Term entspricht. Abnahme bestanden: Suite 506/0, Paritaets-Hash 8c6684ff haelt nach Wheel-Neubau, Determinismus 20/20, Wirkungsnachweis 10 von 60 qualifizierenden Stellungen aendern die Zugwahl bei w=0,3. Registriertes Risiko mit Falsifikator: Initiierungspraemie kann das Vollendungs-Defizit (Bau bis ~4,6/6) verschaerfen -- Vollendungsquote ist Pflicht-Kennzahl, "Initiierung hoch UND Vollendung runter" gilt als NICHT-Erfolg auch bei guenstiger Arena. Achtung: Spec-Dateien sind gitignored, das neue Feld ist PFLICHT, Alt-Specs fallen mit benannter Fehlermeldung auf -->
 
 # PREREG-SKELETT: Auszahlung langer Musterreihen -- Prior-Sichtbarkeit und Signal-Shaping
 
@@ -334,6 +334,60 @@ gefuehrt.
   byte-identisches Bestandsverhalten (Paritaets-Gate wie ueblich).
 - **Kapselungs-Anschluss:** direkt als `SearchConfig`-Feld bauen (zweiter
   Knopf nach `MOSAIC_IMPLICIT_MINIMAX_A`), nicht erst als Env-Knopf.
+
+#### GEBAUT UND ABGENOMMEN (2026-08-24)
+
+Nutzer-Entscheid: `SCALE = 10`. Gebaut, nichts gemessen -- die Messkette
+unten steht noch komplett aus.
+
+**Was gebaut ist:**
+
+| Baustein | Stelle |
+|---|---|
+| `LONG_ROW_INIT_SHAPING_SCALE = 10.0` | `net_mcts.rs`, mit ausgerechneter Begruendung im Doc-Kommentar |
+| `long_rows_started` (Stufenfunktion, 0..=2) | zaehlt Musterreihe 5/6 mit >= 1 Fliese, KEIN Fuellstands-Anteil |
+| `long_row_init_delta(state, ego)` | `(eigen − gegner) / SCALE`, nullsummen wie `floor_shaping_delta` |
+| `SearchConfig.long_row_init_shaping_w` | Default 0,0; Env `MOSAIC_LONG_ROW_INIT_W`; Spec-PFLICHTFELD |
+| Anwendung | direkt nach dem Floor-Additiv, `w == 0.0` ueberspringt den Block komplett |
+
+**Abnahme, alle vier Punkte bestanden:**
+
+1. **Suite 506/0** (26 ignoriert).
+2. **Paritaets-Hash `8c6684ff…` haelt** (`tools/parity_probe.py`, nach
+   Wheel-Neubau und -Installation) -- Defaults byte-identisch zum Bestand.
+3. **Determinismus-Gegenprobe** 20/20 identisch (aus gegen aus, gleicher
+   Seed).
+4. **Wirkungsnachweis** auf 60 qualifizierenden Korpus-Stellungen (leere
+   lange Reihe UND legale Aktion dorthin): bei `w = 0,3` aendert sich die
+   Zugwahl in **10 von 60** Faellen. Der Knopf erreicht die Entscheidung
+   also tatsaechlich -- das war nach dem Floor-Befund
+   (`PREREG_floor_action_aversion.md` par.6: Prior exakt 0, Blattwert-Term
+   unerreichbar) die offene Frage, und sie ist positiv beantwortet.
+
+**Drei Bau-Entscheidungen, die begruendet gehoeren:**
+
+- **Die Blattwert-Stelle liegt nicht in `make_node`**, sondern in
+  `node_from_net_outputs` -- einer Extraktion, die AUCH der gebuendelte
+  Wurzelpfad (`batched_expand_root_candidates`) benutzt. Beide bekamen den
+  Parameter; nur `make_node` zu verdrahten haette den Term im Batch-Pfad
+  still fehlen lassen.
+- **Das neue Spec-Feld ist PFLICHT, nicht optional.** Damit lehnt dieses
+  Wheel eine Welle-1-Spec (nur `implicit_minimax_alpha`) hart ab. Das ist
+  gewollt: ein eingefrorenes Artefakt gehoert auf sein EIGENES
+  mitgeliefertes Wheel; ein stiller Default wuerde genau diesen Fehler
+  maskieren und die "beweisbar identisch"-Zusage aushebeln. Geprueft, dass
+  der Freeze davon unberuehrt ist -- `frozen_referee_match.py:218` startet
+  den Worker mit dem Interpreter AUS dem Artefakt.
+  **Vorsicht fuer die naechste Sitzung:** die Spec-Dateien liegen unter
+  `/models/*` und sind GITIGNORED. Die beiden aktiven
+  (`champion_frozen`, `champion_imm_a02`) sind lokal nachgezogen; jede
+  andere Alt-Spec faellt mit einer benannten Fehlermeldung auf, nicht
+  still.
+- **`cargo build` war gruen, `cargo test` nicht.** Die Suite kompiliert
+  `engine/examples/` mit, und `kernbeweis_910002_probe.rs` konstruiert
+  `SearchConfig` als Struct-Literal. Nachgezogen mit `0.0` -- jene Sonde
+  ist ein Byte-Identitaets-Nachweis, ihr Suchverhalten MUSS unveraendert
+  bleiben. (Genau die in CLAUDE.md dokumentierte Push-Blocker-Falle.)
 
 #### Registriertes RISIKO: Initiieren ohne Vollenden
 

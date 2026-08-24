@@ -345,6 +345,17 @@ pub struct SearchConfig {
     /// minimax-propagierten Werts (PREREG_implicit_minimax_backup.md par.1,
     /// `mix_q_with_implicit_minimax`). Default `0.0` (keine Beimischung).
     pub implicit_minimax_alpha: f64,
+    /// Gewicht des Langreihen-INITIIERUNGS-Additivs am Blattwert
+    /// (`PREREG_long_row_payoff.md` par.3/B1). Default `0.0` =
+    /// byte-identisches Bestandsverhalten.
+    ///
+    /// Zielt ausdruecklich auf den ERSTEN Stein in Musterreihe 5/6, nicht
+    /// auf Fortschritt darin: par.2a hat gemessen, dass das Netz beim
+    /// FORTSETZEN nicht auffaellig schlechter ist als der Heuristik-Lehrer
+    /// (Verhaeltnis 0,22 auf beiden Zustandsverteilungen), beim BEGINNEN
+    /// dagegen um Faktor ~3 (Policy-Masse 11,5 % gegen 25,2 %, flach ueber
+    /// R1-4). Deshalb Stufenfunktion 0->1, kein Rampenterm.
+    pub long_row_init_shaping_w: f64,
 }
 
 impl SearchConfig {
@@ -366,7 +377,10 @@ impl SearchConfig {
     /// Eindruck erwecken, `SearchConfig::default()` sei ein reiner,
     /// env-unabhaengiger Wert.
     pub fn from_env() -> Self {
-        Self { implicit_minimax_alpha: read_f64_env("MOSAIC_IMPLICIT_MINIMAX_A", 0.0) }
+        Self {
+            implicit_minimax_alpha: read_f64_env("MOSAIC_IMPLICIT_MINIMAX_A", 0.0),
+            long_row_init_shaping_w: read_f64_env("MOSAIC_LONG_ROW_INIT_W", 0.0),
+        }
     }
 
     /// Laedt eine Spec-Datei (`models/<name>.spec.json`,
@@ -384,7 +398,7 @@ impl SearchConfig {
         let obj = value
             .as_object()
             .ok_or_else(|| format!("Spec-Datei {path}: JSON-Wurzel muss ein Objekt sein"))?;
-        const KNOWN_FIELDS: &[&str] = &["implicit_minimax_alpha"];
+        const KNOWN_FIELDS: &[&str] = &["implicit_minimax_alpha", "long_row_init_shaping_w"];
         for key in obj.keys() {
             if !KNOWN_FIELDS.contains(&key.as_str()) {
                 return Err(format!(
@@ -392,12 +406,24 @@ impl SearchConfig {
                 ));
             }
         }
-        let implicit_minimax_alpha = obj
-            .get("implicit_minimax_alpha")
-            .ok_or_else(|| format!("Spec-Datei {path}: Feld 'implicit_minimax_alpha' fehlt"))?
-            .as_f64()
-            .ok_or_else(|| format!("Spec-Datei {path}: 'implicit_minimax_alpha' ist keine Zahl"))?;
-        Ok(Self { implicit_minimax_alpha })
+        let get_required = |name: &str| -> Result<f64, String> {
+            obj.get(name)
+                .ok_or_else(|| format!("Spec-Datei {path}: Feld '{name}' fehlt"))?
+                .as_f64()
+                .ok_or_else(|| format!("Spec-Datei {path}: '{name}' ist keine Zahl"))
+        };
+        // Beide Felder PFLICHT (Welle-1-Regel beibehalten: eine Spec-Datei legt
+        // das Suchverhalten VOLLSTAENDIG fest, kein stiller Default). Folge und
+        // bewusst so gewollt: eine Spec aus der Welle-1-Aera (nur
+        // `implicit_minimax_alpha`) wird von DIESEM Wheel hart abgelehnt. Das
+        // ist die richtige Fehlermeldung -- ein eingefrorenes Artefakt gehoert
+        // auf seinem EIGENEN, mitgelieferten Wheel gefahren
+        // (`models/frozen_champions/<name>/mosaic_rust_*.whl`), nicht auf einem
+        // neueren; ein stiller Default wuerde genau diesen Fehler maskieren und
+        // die "beweisbar identisch"-Zusage aushebeln.
+        let implicit_minimax_alpha = get_required("implicit_minimax_alpha")?;
+        let long_row_init_shaping_w = get_required("long_row_init_shaping_w")?;
+        Ok(Self { implicit_minimax_alpha, long_row_init_shaping_w })
     }
 }
 
@@ -985,6 +1011,48 @@ fn floor_penalties(state: &GameState) -> (f64, f64) {
     let theirs = (state.players[1].broken_penalty()
         + crate::round_end::projected_unplaceable_penalty(&state.players[1])) as f64;
     (mine, theirs)
+}
+
+// ── Langreihen-Initiierung (PREREG_long_row_payoff.md par.3/B1) ─────────────
+
+/// Skala fuer das Langreihen-Initiierungs-Additiv. **NICHT von
+/// `FLOOR_SHAPING_SCALE`/`VALUE_SCALE` uebernommen** -- siehe
+/// `PREREG_floor_shaping_scale.md`: dort ist nachgerechnet, dass ein Nenner
+/// 50 fuer einen Zaehler mit kleiner Spanne die `tanh` dekorativ macht (der
+/// Term bleibt vollstaendig im linearen Zipfel).
+///
+/// Hier laeuft der Zaehler nur ueber `[-2, +2]` (Differenz der Zahl
+/// begonnener langer Reihen). Nenner 10 legt das maximale `tanh`-Argument auf
+/// `0,2` und damit den maximalen Blattwert-Shift bei `w = 0,3` auf `0,059` --
+/// dieselbe Groessenordnung wie der Floor-Term, der EINZIGE Blattwert-Term
+/// mit nachgewiesener Staerkewirkung (11,25 pp, McNemar p=0,0001). Mit
+/// Nenner 50 waere der Shift `0,012` gewesen, also fuenfmal schwaecher.
+/// Nutzer-Entscheid 2026-08-24.
+const LONG_ROW_INIT_SHAPING_SCALE: f64 = 10.0;
+
+/// Musterreihen-Indizes, die auf die unteren Kuppel-Zeilen speisen und fuer
+/// den Spaltenbau noetig sind (`docs/engine_manual.md` Phase 2: Musterreihe N
+/// speist Brett-Zeile N). 0-indexiert, entspricht Musterreihe 5 und 6.
+const LONG_ROW_INDICES: [usize; 2] = [4, 5];
+
+/// Zahl der BEGONNENEN langen Musterreihen (mindestens eine Fliese), `0..=2`.
+/// **Stufenfunktion am Uebergang 0 -> 1, kein Fuellstands-Anteil** -- das ist
+/// der ganze Punkt des Terms (par.2a: die Luecke sitzt im Beginnen, nicht im
+/// Fortsetzen).
+fn long_rows_started(player: &crate::board::PlayerBoard) -> f64 {
+    LONG_ROW_INDICES
+        .iter()
+        .filter(|&&i| !player.pattern_lines[i].tiles.is_empty())
+        .count() as f64
+}
+
+/// Ego-perspektivische Differenz begonnener langer Reihen, skaliert --
+/// dieselbe Bauform wie `floor_shaping_delta_ego` bei `opp_bias = 1.0`
+/// (Nullsummen-Additiv, kein systematischer Versatz auf der Blattwertskala).
+fn long_row_init_delta(state: &GameState, ego: usize) -> f64 {
+    let own = long_rows_started(&state.players[ego]);
+    let opp = long_rows_started(&state.players[1 - ego]);
+    (own - opp) / LONG_ROW_INIT_SHAPING_SCALE
 }
 
 /// Eskalationsstufe E2 (`evaluations/PREREG_aggression_style_measurement.md`,
@@ -2550,6 +2618,7 @@ fn make_node<R: Rng + ?Sized>(
     prior: f32,
     player_who_acted: usize,
     rng: &mut R,
+    search_config: &SearchConfig,
 ) -> Node {
     let terminal = state.phase != Phase::Drafting;
     // `points` fließt bei ACTIVE_LEAF=Net jetzt in `blended_leaf_win_prob` mit
@@ -2670,7 +2739,7 @@ fn make_node<R: Rng + ?Sized>(
 
     node_from_net_outputs(
         net_policy, net_value, state, parent, parent_state, action, prior, player_who_acted, terminal,
-        logits, value, moon, points, opp_points, ownership, other_pass, rng,
+        logits, value, moon, points, opp_points, ownership, other_pass, rng, search_config,
     )
 }
 
@@ -2714,6 +2783,7 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
     ownership: Vec<f32>,
     other_pass: Option<(Vec<f32>, Vec<f32>, Vec<f32>)>,
     rng: &mut R,
+    search_config: &SearchConfig,
 ) -> Node {
     let mut moon_scores = [0f32; 5];
     for (i, s) in moon.iter().take(5).enumerate() {
@@ -2795,6 +2865,22 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             };
             today_value[0] = (today_value[0] + floor_shift0).clamp(0.0, 1.0);
             today_value[1] = (today_value[1] + floor_shift1).clamp(0.0, 1.0);
+
+            // Langreihen-Initiierungs-Additiv (PREREG_long_row_payoff.md
+            // par.3/B1) -- reine State-Funktion wie das Floor-Shaping, direkt
+            // danach, gleiche Bauform. Bei `w == 0.0` (Default) wird der Block
+            // KOMPLETT uebersprungen: keine zusaetzliche Rechnung, keine
+            // Rundungsdifferenz, byte-identisches Bestandsverhalten.
+            let lr_w = search_config.long_row_init_shaping_w;
+            if lr_w != 0.0 {
+                // Nullsummen wie beim Floor-Term bei `opp_bias == 1.0`:
+                // `long_row_init_delta(state, 1) == -long_row_init_delta(state, 0)`
+                // per Konstruktion, deshalb EIN `tanh` und Negation (IEEE754-
+                // Negation ist exakt, kein zweiter Rundungsschritt).
+                let shift = lr_w * long_row_init_delta(&state, 0).tanh();
+                today_value[0] = (today_value[0] + shift).clamp(0.0, 1.0);
+                today_value[1] = (today_value[1] - shift).clamp(0.0, 1.0);
+            }
 
             // Task #93: Wertungsplatten-Fortschritts-Additiv, NACH dem
             // Floor-Shaping-Additiv (koexistiert additiv, siehe
@@ -4244,6 +4330,7 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
     nodes: &mut Vec<Node>,
     candidate_node: &mut [Option<usize>],
     rng: &mut R,
+    search_config: &SearchConfig,
 ) {
     let mover = root_state.current_player;
     let need_other_pass = ACTIVE_LEAF == LeafEval::Net && !MIRROR_OTHER_VAL;
@@ -4322,6 +4409,7 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
         let child = node_from_net_outputs(
             net_policy, net_value, p.child_state, Some(0), Some(root_state), Some(p.action), p.prior, mover,
             p.terminal, logits, value, moon, points, opp_points, ownership, other_pass, rng,
+            search_config,
         );
         let cid = nodes.len();
         nodes.push(child);
@@ -4379,7 +4467,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
     }
     let root_player = root_state.current_player;
     let mut nodes =
-        vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng)];
+        vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)];
 
     if let Some(t) = trace.as_deref_mut() {
         t.determinize_active = DETERMINIZE_ROOT_HIDDEN_INFO;
@@ -4435,6 +4523,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                 child_state.log.clear();
                 let child = make_node(
                     net_policy, net_value, child_state, Some(nid), Some(&nodes[nid].state), Some(act), prior, mover, rng,
+                    search_config,
                 );
                 let cid = nodes.len();
                 nodes.push(child);
@@ -4526,6 +4615,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
         let root_state = nodes[0].state.clone();
         batched_expand_root_candidates(
             net_policy, net_value, &root_state, &candidates, &mut nodes, &mut candidate_node, rng,
+            search_config,
         );
     }
 
@@ -4562,6 +4652,7 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                         child_state.log.clear();
                         let child = make_node(
                             net_policy, net_value, child_state, Some(0), Some(&nodes[0].state), Some(act), prior, mover, rng,
+                            search_config,
                         );
                         let cid = nodes.len();
                         nodes.push(child);
@@ -4790,7 +4881,7 @@ fn build_net_tree<R: Rng + ?Sized>(
     }
     let root_player = root_state.current_player;
     let mut nodes =
-        vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng)];
+        vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)];
 
     macro_rules! logln {
         ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
@@ -4876,6 +4967,7 @@ fn build_net_tree<R: Rng + ?Sized>(
                         prior,
                         mover,
                         rng,
+                        search_config,
                     );
                     let cid = nodes.len();
                     nodes.push(child);
@@ -6814,8 +6906,8 @@ mod tests {
         nodes[0].children.push(1);
         nodes[0].children.push(2);
 
-        let cfg_off = SearchConfig { implicit_minimax_alpha: 0.0 };
-        let cfg_on = SearchConfig { implicit_minimax_alpha: 1.0 };
+        let cfg_off = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0 };
+        let cfg_on = SearchConfig { implicit_minimax_alpha: 1.0, long_row_init_shaping_w: 0.0 };
         let idx_off = gumbel_select_child(&nodes, 0, &cfg_off);
         let idx_on = gumbel_select_child(&nodes, 0, &cfg_on);
         assert_ne!(
@@ -6832,6 +6924,73 @@ mod tests {
     // folgenden Tests untereinander, gleiches Kompromiss-Muster wie
     // `DENIAL_TIEBREAK_TEST_LOCK`/`AGGRESSION_TEST_LOCK`.
     static SEARCH_CONFIG_ENV_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    // ── Langreihen-Initiierungs-Additiv (PREREG_long_row_payoff.md par.3/B1) ──
+
+    /// `long_rows_started` ist eine STUFENFUNKTION: ein Stein zaehlt genauso
+    /// wie eine fast volle Reihe. Genau das unterscheidet den Term vom
+    /// urspruenglich entworfenen Fortschritts-Term -- par.2a hat gemessen,
+    /// dass die Luecke im BEGINNEN sitzt, nicht im Fuellen.
+    #[test]
+    fn long_rows_started_is_a_step_function_not_a_ramp() {
+        use crate::tile::TileColor;
+        let mut p = crate::board::PlayerBoard::new(0, "P");
+        assert_eq!(long_rows_started(&p), 0.0, "leeres Brett: keine begonnene lange Reihe");
+
+        // EIN Stein in Musterreihe 5 (Index 4).
+        p.pattern_lines[4].tiles.push(TileColor::Rot);
+        assert_eq!(long_rows_started(&p), 1.0);
+
+        // Dieselbe Reihe fast voll -> UNVERAENDERT 1.0 (kein Rampenanteil).
+        for _ in 0..3 {
+            p.pattern_lines[4].tiles.push(TileColor::Rot);
+        }
+        assert_eq!(
+            long_rows_started(&p), 1.0,
+            "Fuellstand darf den Term NICHT bewegen -- sonst waere es der              verworfene Fortschritts-Term"
+        );
+
+        // Zweite lange Reihe (Index 5) begonnen -> 2.0.
+        p.pattern_lines[5].tiles.push(TileColor::Blau);
+        assert_eq!(long_rows_started(&p), 2.0);
+
+        // Kurze Reihen zaehlen NICHT mit.
+        p.pattern_lines[0].tiles.push(TileColor::Gelb);
+        p.pattern_lines[2].tiles.push(TileColor::Gelb);
+        assert_eq!(long_rows_started(&p), 2.0, "nur Musterreihe 5/6 zaehlen");
+    }
+
+    /// Der Term ist NULLSUMMEN: `delta(ego=1) == -delta(ego=0)`. Darauf
+    /// stuetzt sich die Anwendungsstelle, die nur EIN `tanh` rechnet und das
+    /// Ergebnis negiert (IEEE754-Negation ist exakt).
+    #[test]
+    fn long_row_init_delta_is_zero_sum_between_egos() {
+        use crate::tile::TileColor;
+        let mut state = crate::game::Game::start(
+            ["A".into(), "B".into()], 0, vec![0, 1, 2], &mut rand::rngs::StdRng::seed_from_u64(7),
+        ).state;
+        state.players[0].pattern_lines[4].tiles.push(TileColor::Rot);
+        state.players[0].pattern_lines[5].tiles.push(TileColor::Rot);
+        let d0 = long_row_init_delta(&state, 0);
+        let d1 = long_row_init_delta(&state, 1);
+        assert_eq!(d0, 2.0 / LONG_ROW_INIT_SHAPING_SCALE);
+        assert_eq!(d1, -d0, "Nullsummen-Eigenschaft haelt");
+    }
+
+    /// Die Skala ist bewusst 10 und NICHT 50: der maximale Blattwert-Shift
+    /// soll dem Floor-Term entsprechen (PREREG_floor_shaping_scale.md par.2).
+    /// Bricht dieser Test, wurde die Konstante geaendert, ohne die
+    /// Begruendung nachzuziehen.
+    #[test]
+    fn long_row_init_scale_matches_floor_term_shift_magnitude() {
+        let max_arg = 2.0 / LONG_ROW_INIT_SHAPING_SCALE;
+        let shift = 0.3 * max_arg.tanh();
+        let floor_max_shift = 0.3 * (10.0f64 / FLOOR_SHAPING_SCALE).tanh();
+        assert!(
+            (shift - floor_max_shift).abs() < 1e-9,
+            "max. Shift {shift} soll dem Floor-Term {floor_max_shift} entsprechen"
+        );
+    }
 
     /// Abnahme (a): Default-Pfad -- `MOSAIC_IMPLICIT_MINIMAX_A` ungesetzt
     /// ergibt `alpha=0.0`.
@@ -6864,7 +7023,7 @@ mod tests {
     fn search_config_from_spec_file_parses_valid_file() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_valid_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "long_row_init_shaping_w": 0.0}"#).unwrap();
         let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltige Spec-Datei muss parsen");
         assert_eq!(cfg.implicit_minimax_alpha, 0.2);
         std::fs::remove_file(&path).ok();
@@ -6876,7 +7035,7 @@ mod tests {
     fn search_config_from_spec_file_rejects_unknown_field() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_unknown_field_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "tpyo_feld": 1.0}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "long_row_init_shaping_w": 0.0, "tpyo_feld": 1.0}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "unbekanntes Feld muss einen Fehler ergeben, nicht still ignoriert werden");
         std::fs::remove_file(&path).ok();

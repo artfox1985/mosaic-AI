@@ -74,7 +74,10 @@ fn main() {
     // bitgleiche Suchergebnisse liefern.
     let net_a = Net::load_auto(model_path).expect("Net::load_auto (Instanz A)");
     let net_b = Net::load_auto(model_path).expect("Net::load_auto (Instanz B)");
-    let search_config = SearchConfig { implicit_minimax_alpha: 0.0 };
+    // `long_row_init_shaping_w: 0.0` = Bestandsverhalten (Term aus) --
+    // diese Sonde ist ein Byte-Identitaets-Nachweis, ihr Suchverhalten
+    // MUSS unveraendert bleiben.
+    let search_config = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0 };
     let actions = drafting_actions(&state1);
     println!(
         "Kandidaten (Reihenfolge aus drafting_actions, n={}):",
