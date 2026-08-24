@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: ENTWURF-Stand 2026-08-24, nichts gebaut, Nutzer-Vorgabe "v2 als ZUSAETZLICHER Anker". VORFRAGE ENTSCHIEDEN: der Lehrer kann es auch nicht (407 Partien Netz@400 gegen Heuristik@150, Vollendungsquote 0,538 gegen 0,563, volle Spalten 0,101 gegen 0,098) -- Destillation scheidet aus, es gibt nichts zu uebertragen. Gegenreferenz aus zehn Mensch-gegen-Netz-Partien in static/log (Nutzer gewinnt 8 von 9): Abschlussprofil 4,00/4,10/3,40/3,20/2,50/2,20 gegen 4,90/4,90/3,30/2,40/1,10/0,50, volle Spalten 1,80 gegen 0,10. Strukturbefund im Code: wertung_progress liest NUR das Kuppelraster (scoring.rs:876-882), ist innerhalb einer Runde fuer jeden Drafting-Zug gleich und kann die Reihenwahl nicht lenken; das einzige Stueck des Shapings, das pattern_lines liest, ist projected_unplaceable_penalty -- eine STRAFE. ZIEL-KENNZAHL folgt aus einer Identitaet: eine volle Spalte kostet 21 Zellen, das Netz verbraucht 42,7 und truege damit gleichverteilt 2,03 Spalten statt 0,10 -- ein VERTEILUNGS-, kein Versorgungsproblem; die Kennzahl ist das MINIMUM der Abschluesse ueber die sechs Reihen, das Zielprofil ist FLACHER statt laenger. Dritter Versorgungskanal (Nutzer-Hinweis): 9 Spezialfliesen, vierte Plattenzelle zum Preis von dreien, lokale Freischaltbedingung, rund 4 Felder je Partie leer gelassen (groesster Einzelposten der Plattenwertung). Offen und VOR dem Bau zu entscheiden: wie v2 ueberhaupt als eigener Agent existiert, ohne den spec-freien Heuristik-Anker anzufassen -->
+<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: ENTWURF-Stand 2026-08-24, nichts gebaut, Nutzer-Vorgabe "v2 als ZUSAETZLICHER Anker". VORFRAGE ENTSCHIEDEN: der Lehrer kann es auch nicht (407 Partien Netz@400 gegen Heuristik@150, Vollendungsquote 0,538 gegen 0,563, volle Spalten 0,101 gegen 0,098) -- Destillation scheidet aus, es gibt nichts zu uebertragen. Gegenreferenz aus zehn Mensch-gegen-Netz-Partien in static/log (Nutzer gewinnt 8 von 9): Abschlussprofil 4,00/4,10/3,40/3,20/2,50/2,20 gegen 4,90/4,90/3,30/2,40/1,10/0,50, volle Spalten 1,80 gegen 0,10. Strukturbefund im Code: wertung_progress liest NUR das Kuppelraster (scoring.rs:876-882), ist innerhalb einer Runde fuer jeden Drafting-Zug gleich und kann die Reihenwahl nicht lenken; das einzige Stueck des Shapings, das pattern_lines liest, ist projected_unplaceable_penalty -- eine STRAFE. ZIEL-KENNZAHL folgt aus einer Identitaet: eine volle Spalte kostet 21 Zellen, das Netz verbraucht 42,7 und truege damit gleichverteilt 2,03 Spalten statt 0,10 -- ein VERTEILUNGS-, kein Versorgungsproblem; die Kennzahl ist das MINIMUM der Abschluesse ueber die sechs Reihen, das Zielprofil ist FLACHER statt laenger. Dritter Versorgungskanal (Nutzer-Hinweis): 9 Spezialfliesen, vierte Plattenzelle zum Preis von dreien, lokale Freischaltbedingung, rund 4 Felder je Partie leer gelassen (groesster Einzelposten der Plattenwertung). Offen und VOR dem Bau zu entscheiden: wie v2 ueberhaupt als eigener Agent existiert, ohne den spec-freien Heuristik-Anker anzufassen GEBAUT 2026-08-24 (eigener Agent-Typ, alle vier Bausteine, Paritaets-Hash haelt, Suite 509/0), ABNAHME NICHT BESTANDEN: 40 Partien v1 gegen v2 ergeben 157 gegen 156 Starts und Vollendungsquote 0,592 gegen 0,603 -- der Term bewegt nichts und kostet leicht Staerke. Drei Unit-Tests schliessen aus, dass er schlicht null liefert. Ursache ist die Groessenordnung: der marginale Spalten-Zuwachs betraegt bei realen Spaltenhoehen nur 0,97 bis 1,75 Punkte, und er ist auf ein aktives k1 gegatet (nur 38 Prozent der Partien). Folge fuer den Zuschnitt: nach der 21-Zellen-Identitaet ist die Spaltenzahl durch das MINIMUM der Abschluesse ueber die Reihen gedeckelt, der Wert eines Abschlusses in der schwaechsten Reihe ist also der Engpasswert und nicht der marginale Zellbeitrag. Ein Verstaerkungsfaktor wurde bewusst NICHT vorgeschaltet (Dosis-Antwort auf ein Strukturproblem, zweimal verworfen). Naechster Zuschnitt = Nutzer-Entscheid. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -205,6 +205,67 @@ gilt als NICHT-Erfolg -- auch bei guenstiger Arena. Die Vollendungsquote ist
 Pflicht-Kennzahl jedes Berichts zu diesem Arm; sie steht seit dem 2026-08-24
 direkt im Arena-Artefakt (`long_rows_started` / `long_rows_completed` /
 `long_rows_cleared_unplaceable`).
+
+### v2 GEBAUT (2026-08-24) -- Abnahme NICHT bestanden: der Term ist zu klein
+
+**Nutzer-Entscheide, beide umgesetzt:** eigener Agent-Typ (nicht Spec-Kanal,
+nicht Env-Knopf) und alle vier Bausteine aus par.3.
+
+Gebaut:
+
+- `engine/src/heuristic_v2.rs`: `row_completion_progress`, alle vier
+  Bausteine. Spalten-Posten als MARGINALER Zuwachs
+  (`(f+1)^2 - f^2` mal 7/36), damit nichts doppelt zaehlt, was
+  `wertung_progress` schon fuer bereits gelegte Zellen kreditiert.
+- `mcts::HeuristikVariante::{V1, V2}` mit `player_total_variante`,
+  `evaluate_variante`, `search_action_variante`,
+  `search_drafting_action_variante`. **Alle Bestandssignaturen bleiben
+  unveraendert und laufen ueber V1** -- Paritaets-Hash `8c6684ff...` haelt
+  nach Wheel-Neubau, Suite 509/0.
+- `self_play::run_heuristic_v1_vs_v2_arena` plus Python-Bindung
+  `heuristic_v1_vs_v2_arena`, mit Brettwechsel-Schalter und `v2_board` im
+  Ergebnis.
+- Der exakte R5-Anker bleibt UNBERUEHRT: dort rechnet der Loeser den
+  Rundenausgang exakt aus, eine Heuristik-Formung koennte nur schaden.
+
+**Abnahme (40 Partien, 150 Sims je Seite, v2 auf Brett 1):**
+
+| | Start | vollendet | Quote | Punkte je Partie |
+| --- | --- | --- | --- | --- |
+| v1 | 156 | 94 | 0,603 | 48,5 |
+| v2 | 157 | 93 | 0,592 | 45,2 |
+
+Siege v2 15/40. **Der Term bewegt das Verhalten praktisch nicht** (157 gegen
+156 Starts) und kostet leicht Staerke.
+
+**Kein Bug, sondern die Groessenordnung.** Drei Unit-Tests belegen, dass der
+Term auf einer angefangenen, erreichbaren Reihe strikt positiv ist und auf
+leeren und unerreichbaren Reihen null -- der Zweifel "liefert er ueberhaupt
+etwas" ist damit ausgeraeumt, bevor der Befund gemeldet wurde.
+
+Die Diagnose folgt aus der Formel selbst: der marginale Spalten-Zuwachs ist
+`(2f+1)/36 * 7`, bei Spaltenhoehe f. Gemessene Hoehen liegen bei 2 bis 4, das
+sind **0,97 bis 1,75 Punkte**, mal `(fuellstand/kapazitaet)^2 <= 1`. Gegen
+einen `player_total` im Bereich mehrerer Dutzend Punkte ist das Rauschen.
+Hinzu kommt: der Spalten-Posten ist auf ein aktives k1 gegatet, und k1 ist
+nur in rund 38 Prozent der Partien aktiv (312 von 814 Partie-Seiten
+gemessen) -- in der Mehrheit der Partien traegt der groessere der beiden
+Posten also gar nichts.
+
+**Was der Befund fuer den Zuschnitt heisst.** Die marginale Lesart ist
+konservativ und zahlenmaessig korrekt, aber sie kann die eigentliche
+Struktur nicht sehen: nach der 21-Zellen-Identitaet (par.2) ist die
+Spaltenzahl durch das **MINIMUM** der Abschluesse ueber die sechs Reihen
+gedeckelt. Der Wert eines Abschlusses in der heute schwaechsten Reihe ist
+deshalb nicht sein marginaler Zellbeitrag, sondern der Engpasswert -- er hebt
+die Decke fuer ALLE Spalten. Ein Term, der das abbildet, waere ein anderer
+Zuschnitt, kein groesserer Faktor auf diesen.
+
+**Ausdruecklich NICHT getan:** dem Term einen Verstaerkungsfaktor
+vorschalten. Das waere die Dosis-Antwort auf ein Struktur-Problem und
+wiederholt die Bauform, die `PREREG_scoring_plate_injection` (Sweep ueber
+30-fachen Dosisbereich) und B1 bereits zweimal verworfen haben. Der naechste
+Zuschnitt ist Nutzer-Entscheid.
 
 ## par.4 Anker-Integritaet: die ERSTE Bauentscheidung, vor der Formel
 

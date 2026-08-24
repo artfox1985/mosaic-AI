@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht Nachtrag 2026-08-24: Anker-Arm bleibt geschlossen, aber die WIEDERAUFNAHME-BEDINGUNG ist jetzt benannt und pruefbar -- beide Stufe-0-Zahlen sind an plattenblindem Spiel erhoben, ein Korpus mit echtem Spaltenbau (PREREG_heuristic_v2_long_rows) waere das neue Regime. Ebenso darf der Satz Kredit-Horizont-Verdacht geschwaecht nicht als erledigt weiterzitiert werden. rtv-Waechter fuer den offenen 2-gegen-3-Arm registriert (Nutzer-Auflage): Kostengate wird gemessen statt geschaetzt, sauberes Ziel ist kein Argument. Anlass verschiebt sich: der Lehrer kann Spalten auch nicht (0,098 gegen 0,101), der Mensch schafft 1,80, und der Engpass ist Verteilung statt Versorgung -- der Horizont ist damit nicht mehr der Hauptverdaechtige fuer die Vollendungsschwaeche. -->
+<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht Nachtrag 2026-08-24: Anker-Arm bleibt geschlossen, aber die WIEDERAUFNAHME-BEDINGUNG ist jetzt benannt und pruefbar -- beide Stufe-0-Zahlen sind an plattenblindem Spiel erhoben, ein Korpus mit echtem Spaltenbau (PREREG_heuristic_v2_long_rows) waere das neue Regime. Ebenso darf der Satz Kredit-Horizont-Verdacht geschwaecht nicht als erledigt weiterzitiert werden. rtv-Waechter fuer den offenen 2-gegen-3-Arm registriert (Nutzer-Auflage): Kostengate wird gemessen statt geschaetzt, sauberes Ziel ist kein Argument. Anlass verschiebt sich: der Lehrer kann Spalten auch nicht (0,098 gegen 0,101), der Mensch schafft 1,80, und der Engpass ist Verteilung statt Versorgung -- der Horizont ist damit nicht mehr der Hauptverdaechtige fuer die Vollendungsschwaeche. STUFE 1 GEFAHREN 2026-08-24: GATE GERISSEN, Arm verworfen (Kosten je Label 223,8 ms gegen 410,2 ms, Verhaeltnis 1,83; Bootstrap-Anteil an der Self-Play-Zeit 33,1 Prozent; Aufschlag fuer BEIDE Labels 60,7 Prozent gegen Schwelle 25). Robust: gemessen bei 300 Sims, CLI-Default ist 100, weniger Sims heben den Anteil weiter. Blosses UMSTELLEN statt beider Labels laege bei 27,5 Prozent, also ebenfalls darueber. Damit sind BEIDE Arme dieser Prereg fuer das heutige Regime geschlossen; die Nutzenfrage ist nicht beantwortet, sondern unbezahlbar. Wiederaufnahme wie beim Anker-Arm nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden. -->
 
 # Vorregistrierung: Bootstrap-Horizont (2 vs 3) -- Option fuer den v22-Zuschnitt
 
@@ -80,6 +80,52 @@ geschaetzt: Self-Play-Zeit je Partie mit einem Rollout gegen zwei
    (Paritaets-Nachweis am Label: dieselben Partien, Horizont-2-Feld
    bit-identisch zum Einzel-Rollout-Lauf). Sonst ist der Vergleich
    wertlos.
+
+### Stufe 1 ERGEBNIS + VERDIKT (2026-08-24): GATE GERISSEN, Arm verworfen
+
+`tools/probes/bootstrap_horizon_cost_gate.py`, Artefakt
+`evaluations/bootstrap_horizon_cost_gate.json`.
+
+| Groesse | Wert |
+| --- | --- |
+| Kosten je Label, Horizont 2 | 223,8 ms (Median 246,0) |
+| Kosten je Label, Horizont 3 | 410,2 ms (Median 436,5) |
+| Verhaeltnis h3/h2 | **1,83** |
+| Anteil Bootstrap an der Self-Play-Zeit | **33,1 Prozent** |
+| **Aufschlag fuer BEIDE Labels** | **60,7 Prozent** |
+| Schwelle | 25 Prozent |
+
+**Vorregistrierte Folge: verworfen, ohne Rueckfrage.** Der 2-gegen-3-Arm ist
+damit fuer den v22-Zuschnitt geschlossen; Horizont 2 bleibt.
+
+**Robustheitspruefung, weil das Verdikt an einer Einstellung haengt:** der
+Bootstrap-Anteil faellt, wenn die Self-Play-Suche teurer wird. Gemessen wurde
+mit 300 Sims, der CLI-Default ist 100 (`self_play.py:688`). Weniger Sims
+heissen weniger Suchzeit und damit einen HOEHEREN Bootstrap-Anteil -- bei der
+Produktionseinstellung faellt der Aufschlag also groesser aus, nicht kleiner.
+Das Verdikt kippt in dieser Richtung nicht.
+
+**Die billigere Variante reisst das Gate ebenfalls, aber knapp:** wuerde man
+statt beider Labels nur auf Horizont 3 UMSTELLEN, betruege der Aufschlag
+33,1 Prozent mal 0,83 = **27,5 Prozent**. Immer noch ueber der Schwelle, aber
+nah dran. Registriert, damit niemand die 60,7 Prozent als "Faktor 2,4 zu
+teuer" liest: der Zuschnitt "beide schreiben" kostet das Doppelte des
+Umstellens, und er ist es, den die Prereg vorsieht (er traegt den gepaarten
+Vergleich).
+
+**Zwei Bestaetigungen nebenbei:** die 223,8 ms decken sich mit den 235 ms aus
+Stufe 0 -- unabhaengige Messung, gleiche Groesse. Und die strukturelle
+Vorhersage ("derselbe Ein-Stichproben-Pfad mit einer Iteration mehr, also
+Richtung Verdopplung") trifft mit 1,83, waehrend dieselbe Art Vorhersage beim
+Anker-Arm um Faktor 13 danebenlag. Der Unterschied ist genau
+`N_SAMPLES_TRAIN = 24` gegen 1 Stichprobe je Uebergang.
+
+**Was NICHT geschlossen ist:** die Frage, ob ein tieferer Horizont das ZIEL
+besser macht. Sie ist nicht beantwortet, sondern unbezahlbar -- und beide
+Faktoren des Preises (Anteil und Verhaeltnis) sind an plattenblindem Spiel
+gemessen. Es gilt dieselbe Wiederaufnahme-Bedingung wie fuer den Anker-Arm
+(s. Nachtrag 2026-08-24 oben): ein Korpus mit echtem Spaltenbau ist ein neues
+Regime, in dem sowohl der Nutzen als auch der Anteil anders liegen koennen.
 
 ## Stufe 2 (nur nach Stufe 1): zwei Arme
 

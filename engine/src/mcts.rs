@@ -78,9 +78,47 @@ impl crate::search_common::SearchNode for Node {
 /// UI (`serialize.rs`) — der bleibt bewusst rein am real erreichbaren
 /// Rundenscore, ohne diese beiden Suche-only-Korrekturterme.
 pub(crate) fn player_total(state: &GameState, pi: usize) -> f64 {
-    solve_round_final_score(state, pi) as f64
+    player_total_variante(state, pi, HeuristikVariante::V1)
+}
+
+/// Welche Heuristik bewertet? **v1 ist der Elo-Anker und wird nicht
+/// angefasst** (Nutzer-Vorgabe 2026-08-24: v2 ist ein ZUSAETZLICHER Anker,
+/// kein Ersatz). Jede Bestands-Aufrufstelle laeuft weiter ueber
+/// [`player_total`] und damit ueber `V1` -- die Paritaets-Sonde muss deshalb
+/// unveraendert durchgehen.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HeuristikVariante {
+    /// Bestand, byte-identisch. Elo-Anker der gesamten Leiter.
+    V1,
+    /// v1 PLUS `heuristic_v2::row_completion_progress` -- der einzige
+    /// Unterschied. Siehe `PREREG_heuristic_v2_long_rows.md`.
+    V2,
+}
+
+/// Wie [`player_total`], aber mit ausdruecklicher Variante.
+///
+/// `V2` addiert genau einen Summanden. Alles andere bleibt gleich, damit ein
+/// spaeterer Vergleich v1 gegen v2 GENAU diesen Term misst und nicht ein
+/// Buendel von Unterschieden -- dieselbe Bauform wie die per-Seite-Specs der
+/// Agenten-Kapselung.
+pub(crate) fn player_total_variante(
+    state: &GameState,
+    pi: usize,
+    variante: HeuristikVariante,
+) -> f64 {
+    let basis = solve_round_final_score(state, pi) as f64
         + wertung_progress(&state.players[pi], &state.scoring_tile_ids)
-        + crate::round_end::projected_unplaceable_penalty(&state.players[pi]) as f64
+        + crate::round_end::projected_unplaceable_penalty(&state.players[pi]) as f64;
+    match variante {
+        HeuristikVariante::V1 => basis,
+        HeuristikVariante::V2 => {
+            basis
+                + crate::heuristic_v2::row_completion_progress(
+                    &state.players[pi],
+                    &state.scoring_tile_ids,
+                )
+        }
+    }
 }
 
 /// Skala für die Score→Wert-Normalisierung — identisch zum Netz-Value-Target
@@ -119,17 +157,33 @@ pub(crate) fn normalize_score(score: f64) -> f64 {
 /// pro Knoten (jeder Besuch ruft `evaluate` neu auf) -- ein N-faches
 /// Sampling würde die Kosten mit *(Besuche × N)* multiplizieren, nicht nur
 /// N, ein leicht zu übersehender Performance-Fallstrick.
-pub fn evaluate(state: &GameState, _n_actions: usize) -> [f64; 2] {
-    [normalize_score(player_total(state, 0)), normalize_score(player_total(state, 1))]
+pub fn evaluate(state: &GameState, n_actions: usize) -> [f64; 2] {
+    evaluate_variante(state, n_actions, HeuristikVariante::V1)
+}
+
+/// Wie [`evaluate`], mit ausdruecklicher Variante.
+pub fn evaluate_variante(
+    state: &GameState,
+    _n_actions: usize,
+    variante: HeuristikVariante,
+) -> [f64; 2] {
+    [
+        normalize_score(player_total_variante(state, 0, variante)),
+        normalize_score(player_total_variante(state, 1, variante)),
+    ]
 }
 
 /// Wie [`evaluate`], zusätzlich mit einer Klartext-Erklärung (nur fürs Log).
 /// Verwendet die Spielernamen statt P0/P1.
-fn evaluate_explain(state: &GameState, _n_actions: usize) -> ([f64; 2], String) {
+fn evaluate_explain(
+    state: &GameState,
+    _n_actions: usize,
+    variante: HeuristikVariante,
+) -> ([f64; 2], String) {
     let n0 = state.players[0].name.as_str();
     let n1 = state.players[1].name.as_str();
-    let t0 = player_total(state, 0);
-    let t1 = player_total(state, 1);
+    let t0 = player_total_variante(state, 0, variante);
+    let t1 = player_total_variante(state, 1, variante);
     let v = [normalize_score(t0), normalize_score(t1)];
     if state.phase != Phase::Drafting {
         let why = format!(
@@ -180,14 +234,21 @@ fn apply_search_move(state: &GameState, mv: &SearchMove) -> Option<GameState> {
 
 /// Teures 1-Ply-Heuristik-Ranking (nur an der Wurzel): jede Aktion ausführen und
 /// nach `total(acting) − total(other)` absteigend sortieren.
-fn rank_actions_root(state: &GameState, moves: Vec<SearchMove>) -> Vec<SearchMove> {
+fn rank_actions_root(
+    state: &GameState,
+    moves: Vec<SearchMove>,
+    variante: HeuristikVariante,
+) -> Vec<SearchMove> {
     let acting = state.current_player;
     let other = 1 - acting;
     let mut scored: Vec<(f64, SearchMove)> = moves
         .into_iter()
         .map(|m| {
             let score = match apply_search_move(state, &m) {
-                Some(child) => player_total(&child, acting) - player_total(&child, other),
+                Some(child) => {
+                    player_total_variante(&child, acting, variante)
+                        - player_total_variante(&child, other, variante)
+                }
                 None => f64::NEG_INFINITY,
             };
             (score, m)
@@ -228,6 +289,7 @@ fn make_node<R: Rng + ?Sized>(
     terminal: bool,
     depth: u32,
     rng: &mut R,
+    variante: HeuristikVariante,
 ) -> Node {
     let (untried, remaining, n_actions) = if terminal {
         (Vec::new(), Vec::new(), 0)
@@ -240,7 +302,7 @@ fn make_node<R: Rng + ?Sized>(
         // der sollte dann auch plausibel sein, nicht zufällig. Ab Tiefe 2
         // (Enkel) wieder das billige Typ-Ranking wie bisher.
         let mut ordered = if depth <= 1 {
-            rank_actions_root(&state, moves)
+            rank_actions_root(&state, moves, variante)
         } else {
             rank_actions_cheap(moves, rng)
         };
@@ -305,12 +367,14 @@ fn log_label(nodes: &[Node], nid: usize) -> String {
 /// einer normalen Simulation, nur außerhalb der Sim-Zählschleife aufrufbar.
 /// Für die Nachlauf-Schließung offener Enden (siehe unten): kein Effekt,
 /// falls `nid` bereits terminal ist oder keine Aktionen mehr übrig hat.
+#[allow(clippy::too_many_arguments)]
 fn expand_and_backprop<R: Rng + ?Sized>(
     nodes: &mut Vec<Node>,
     nid: usize,
     names: &[&str; 2],
     rng: &mut R,
     log: &mut Option<&mut Vec<String>>,
+    variante: HeuristikVariante,
 ) {
     if nodes[nid].untried.is_empty() && !nodes[nid].remaining.is_empty() {
         let allowed = MAX_ACTIONS + (WIDEN_FACTOR * (nodes[nid].visits as f64).sqrt()) as usize;
@@ -328,7 +392,7 @@ fn expand_and_backprop<R: Rng + ?Sized>(
     let Some(child_state) = apply_search_move(&nodes[nid].state, &mv) else { return };
     let terminal = child_state.phase != Phase::Drafting;
     let child_depth = nodes[nid].depth + 1;
-    let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng);
+    let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng, variante);
     let cid = nodes.len();
     nodes.push(child);
     nodes[nid].children.push(cid);
@@ -342,7 +406,7 @@ fn expand_and_backprop<R: Rng + ?Sized>(
     }
 
     let value = if log.is_some() {
-        let (v, why) = evaluate_explain(&nodes[cid].state, nodes[cid].n_actions);
+        let (v, why) = evaluate_explain(&nodes[cid].state, nodes[cid].n_actions, variante);
         if let Some(l) = log.as_deref_mut() {
             l.push(format!(
                 "  EVAL   #{cid} {why} → win[{}]={:.3} win[{}]={:.3}",
@@ -351,7 +415,7 @@ fn expand_and_backprop<R: Rng + ?Sized>(
         }
         v
     } else {
-        evaluate(&nodes[cid].state, nodes[cid].n_actions)
+        evaluate_variante(&nodes[cid].state, nodes[cid].n_actions, variante)
     };
 
     let mut bp = String::from("  BACKPROP");
@@ -374,12 +438,14 @@ fn expand_and_backprop<R: Rng + ?Sized>(
 /// der Drafting-Phase ist (Tiling löst der DFS-Solver separat). Mit
 /// `log = Some(..)` wird die Schleife je Simulation (Selection/Expansion/
 /// Bewertung/Backprop) protokolliert; `None` = kein Overhead.
+#[allow(clippy::too_many_arguments)]
 fn build_tree<R: Rng + ?Sized>(
     state: &GameState,
     simulations: u32,
     c: f64,
     rng: &mut R,
     mut log: Option<&mut Vec<String>>,
+    variante: HeuristikVariante,
 ) -> Option<Vec<Node>> {
     if state.phase != Phase::Drafting {
         return None;
@@ -390,7 +456,7 @@ fn build_tree<R: Rng + ?Sized>(
     root_state.log.clear();
     let root_player = root_state.current_player;
     let mut nodes: Vec<Node> =
-        vec![make_node(root_state, None, None, root_player, false, 0, rng)];
+        vec![make_node(root_state, None, None, root_player, false, 0, rng, variante)];
 
     macro_rules! logln {
         ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
@@ -455,7 +521,7 @@ fn build_tree<R: Rng + ?Sized>(
                 // Terminal sobald die Drafting-Phase verlassen ist (→ DFS-Eval).
                 let terminal = child_state.phase != Phase::Drafting;
                 let child_depth = nodes[nid].depth + 1;
-                let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng);
+                let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng, variante);
                 let cid = nodes.len();
                 nodes.push(child);
                 nodes[nid].children.push(cid);
@@ -471,11 +537,11 @@ fn build_tree<R: Rng + ?Sized>(
 
         // 3. Blattbewertung (Per-Spieler-Win-Prob).
         let value = if log.is_some() {
-            let (v, why) = evaluate_explain(&nodes[nid].state, nodes[nid].n_actions);
+            let (v, why) = evaluate_explain(&nodes[nid].state, nodes[nid].n_actions, variante);
             logln!("  EVAL   #{nid} {why} → win[{}]={:.3} win[{}]={:.3}", names[0], v[0], names[1], v[1]);
             v
         } else {
-            evaluate(&nodes[nid].state, nodes[nid].n_actions)
+            evaluate_variante(&nodes[nid].state, nodes[nid].n_actions, variante)
         };
 
         // 4. Backprop (player_who_acted, ohne Vorzeichenwechsel).
@@ -499,7 +565,7 @@ fn build_tree<R: Rng + ?Sized>(
     // dauerhaft ohne eigene Antwort (siehe search_common::nachlauf_targets).
     for target in crate::search_common::nachlauf_targets(&nodes) {
         logln!("  NACHLAUF → #{target}: offenes Ende nachträglich geschlossen");
-        expand_and_backprop(&mut nodes, target, &names, rng, &mut log);
+        expand_and_backprop(&mut nodes, target, &names, rng, &mut log, variante);
     }
 
     Some(nodes)
@@ -513,7 +579,7 @@ pub fn search_log_text<R: Rng + ?Sized>(
     rng: &mut R,
 ) -> String {
     let mut lines: Vec<String> = Vec::new();
-    let nodes = build_tree(state, simulations, c, rng, Some(&mut lines));
+    let nodes = build_tree(state, simulations, c, rng, Some(&mut lines), HeuristikVariante::V1);
 
     let mut out = String::new();
     let n_actions = drafting_actions(state).len();
@@ -749,7 +815,7 @@ pub fn root_child_stats<R: Rng + ?Sized>(
             .map(|a| (a, 1, 1.0))
             .collect();
     }
-    let nodes = match build_tree(state, simulations, c, rng, None) {
+    let nodes = match build_tree(state, simulations, c, rng, None, HeuristikVariante::V1) {
         Some(n) => n,
         None => return Vec::new(),
     };
@@ -774,10 +840,29 @@ pub fn search_action<R: Rng + ?Sized>(
     c: f64,
     rng: &mut R,
 ) -> Option<SearchMove> {
+    search_action_variante(state, simulations, c, rng, HeuristikVariante::V1)
+}
+
+/// Wie [`search_action`], mit ausdruecklicher Heuristik-Variante.
+///
+/// Die Bestandssignatur oben bleibt unveraendert und laeuft weiter ueber
+/// `V1` -- das haelt alle Aufrufer (inklusive `engine/examples/` und
+/// `engine/benches/`, dem bekannten Push-Blocker) und die Paritaets-Sonde
+/// unberuehrt.
+pub fn search_action_variante<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+    variante: HeuristikVariante,
+) -> Option<SearchMove> {
     if crate::round5_anchor::applies(state) {
+        // Der exakte R5-Anker ist von der Variante UNBERUEHRT: er rechnet den
+        // Rundenausgang exakt aus, eine Heuristik-Formung haette dort nichts
+        // zu verbessern und wuerde nur den Anker verfaelschen.
         return crate::round5_anchor::choose_action(state).map(SearchMove::Draft);
     }
-    let nodes = build_tree(state, simulations, c, rng, None)?;
+    let nodes = build_tree(state, simulations, c, rng, None, variante)?;
     let best = best_root_child(&nodes)?;
     nodes[best].action.clone()
 }
@@ -797,7 +882,7 @@ pub fn search_with_tree<R: Rng + ?Sized>(
         let (a, analysis) = crate::round5_anchor::choose_action_with_analysis(state);
         return (a.map(SearchMove::Draft), analysis);
     }
-    let nodes = match build_tree(state, simulations, c, rng, log) {
+    let nodes = match build_tree(state, simulations, c, rng, log, HeuristikVariante::V1) {
         Some(n) => n,
         None => return (None, Value::Null),
     };
@@ -901,7 +986,18 @@ pub fn search_drafting_action<R: Rng + ?Sized>(
     c: f64,
     rng: &mut R,
 ) -> Option<Action> {
-    match search_action(state, simulations, c, rng)? {
+    search_drafting_action_variante(state, simulations, c, rng, HeuristikVariante::V1)
+}
+
+/// Wie [`search_drafting_action`], mit ausdruecklicher Heuristik-Variante.
+pub fn search_drafting_action_variante<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+    variante: HeuristikVariante,
+) -> Option<Action> {
+    match search_action_variante(state, simulations, c, rng, variante)? {
         SearchMove::Draft(a) => Some(a),
     }
 }
@@ -1071,7 +1167,7 @@ mod tests {
         let s = drafting_state(7);
         assert!(valid_search_moves(&s).len() > MAX_ACTIONS);
         let mut rng = StdRng::seed_from_u64(2);
-        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None).unwrap();
+        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None, HeuristikVariante::V1).unwrap();
         // allowed = 10 + 2.5*sqrt(300) ≈ 53 → Wurzel muss > MAX_ACTIONS Kinder haben.
         assert!(
             nodes[0].children.len() > MAX_ACTIONS,
@@ -1092,7 +1188,7 @@ mod tests {
         // wurde -- daher gilt die Garantie jetzt für ALLE Wurzelkinder.
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(21);
-        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None).unwrap();
+        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None, HeuristikVariante::V1).unwrap();
         assert!(nodes[0].children.len() > 1, "Test braucht mehrere Wurzelkinder");
         for &cid in &nodes[0].children {
             if !nodes[cid].terminal {
@@ -1117,7 +1213,7 @@ mod tests {
         // "alle außer dem letzten".
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(33);
-        let nodes = build_tree(&s, 600, DEFAULT_C, &mut rng, None).unwrap();
+        let nodes = build_tree(&s, 600, DEFAULT_C, &mut rng, None, HeuristikVariante::V1).unwrap();
         let mut checked_any = false;
         for &root_child in &nodes[0].children {
             let grandkids = &nodes[root_child].children;
@@ -1149,7 +1245,7 @@ mod tests {
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(21);
         let mut lines = Vec::new();
-        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, Some(&mut lines)).unwrap();
+        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, Some(&mut lines), HeuristikVariante::V1).unwrap();
         let mut checked_any = false;
         for line in &lines {
             if !line.contains("NACHLAUF") {
