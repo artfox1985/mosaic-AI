@@ -1437,7 +1437,19 @@ fn zeile_ist_vollendbar(player: &PlayerBoard, r: usize) -> bool {
 /// Variante ist der einzige Weg, der die Seiten trennt.
 pub(crate) fn v2_drafting_vorzug(state: &GameState) -> Option<Action> {
     let z = v2_ziel_zellen(state, state.current_player)?;
-    vorzugszug_fuer_zellen(state, &z)
+    // Erst der Stein-Zug, dann die KUPPELPLATTEN-Wahl. Die zweite war bis
+    // 2026-08-24 nicht verdrahtet, und sie ist der Grund, warum die
+    // gestreute Start-Ecke die vollen Zeilen von 0,400 auf 0,263 gedrueckt
+    // hat: startet die Kuppel unten, liegt in den oberen Rasterzeilen frueh
+    // keine Platte, und genau die sind das Zeilenziel. Nutzer-Vorgabe
+    // 2026-08-24: "dann muss man halt Kuppel ziehen fuer die oberen
+    // Rasterzeilen".
+    //
+    // `dome_vorzug_fuer_zellen` waehlt Platte, Slot und Rotation so, dass die
+    // Zielzellen bedienbar werden -- laut `column_build.rs`-Moduldoku die
+    // Stelle, die "bisher nie gesteuert" wurde, obwohl sie `required_color`
+    // der Zellen bestimmt.
+    vorzugszug_fuer_zellen(state, &z).or_else(|| dome_vorzug_fuer_zellen(state, &z))
 }
 
 /// Tiling-Routing fuer v2 -- ungegatet, siehe [`v2_drafting_vorzug`].
