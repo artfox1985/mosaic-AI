@@ -1,0 +1,534 @@
+{
+  "champion_vs_heuristik_arm0": {
+    "Heuristik": {
+      "n_partien": 174,
+      "gesamt": {
+        "rate_init_lang_je_gelegenheit": 0.9655,
+        "n_init_lang": 643,
+        "n_gelegenheiten_lang": 666,
+        "bootstrap_95ci": {
+          "mean": 0.9653,
+          "p2_5": 0.952,
+          "p97_5": 0.9774
+        }
+      },
+      "R1": {
+        "rate_init_lang_je_gelegenheit": 0.9741,
+        "n_init_lang": 339,
+        "n_gelegenheiten_lang": 348,
+        "bootstrap_95ci": {
+          "mean": 0.9746,
+          "p2_5": 0.9569,
+          "p97_5": 0.9885
+        }
+      },
+      "R2": {
+        "rate_init_lang_je_gelegenheit": 1.0,
+        "n_init_lang": 28,
+        "n_gelegenheiten_lang": 28,
+        "bootstrap_95ci": {
+          "mean": 1.0,
+          "p2_5": 1.0,
+          "p97_5": 1.0
+        }
+      },
+      "R3": {
+        "rate_init_lang_je_gelegenheit": 0.971,
+        "n_init_lang": 67,
+        "n_gelegenheiten_lang": 69,
+        "bootstrap_95ci": {
+          "mean": 0.9702,
+          "p2_5": 0.9231,
+          "p97_5": 1.0
+        }
+      },
+      "R4": {
+        "rate_init_lang_je_gelegenheit": 0.9727,
+        "n_init_lang": 107,
+        "n_gelegenheiten_lang": 110,
+        "bootstrap_95ci": {
+          "mean": 0.9726,
+          "p2_5": 0.938,
+          "p97_5": 1.0
+        }
+      },
+      "R5": {
+        "rate_init_lang_je_gelegenheit": 0.9189,
+        "n_init_lang": 102,
+        "n_gelegenheiten_lang": 111,
+        "bootstrap_95ci": {
+          "mean": 0.9198,
+          "p2_5": 0.8687,
+          "p97_5": 0.97
+        }
+      }
+    },
+    "Champion": {
+      "n_partien": 174,
+      "gesamt": {
+        "rate_init_lang_je_gelegenheit": 0.7037,
+        "n_init_lang": 596,
+        "n_gelegenheiten_lang": 847,
+        "bootstrap_95ci": {
+          "mean": 0.7038,
+          "p2_5": 0.681,
+          "p97_5": 0.725
+        }
+      },
+      "R1": {
+        "rate_init_lang_je_gelegenheit": 0.5029,
+        "n_init_lang": 175,
+        "n_gelegenheiten_lang": 348,
+        "bootstrap_95ci": {
+          "mean": 0.5025,
+          "p2_5": 0.4569,
+          "p97_5": 0.5489
+        }
+      },
+      "R2": {
+        "rate_init_lang_je_gelegenheit": 0.9075,
+        "n_init_lang": 157,
+        "n_gelegenheiten_lang": 173,
+        "bootstrap_95ci": {
+          "mean": 0.9084,
+          "p2_5": 0.8667,
+          "p97_5": 0.9468
+        }
+      },
+      "R3": {
+        "rate_init_lang_je_gelegenheit": 0.8125,
+        "n_init_lang": 13,
+        "n_gelegenheiten_lang": 16,
+        "bootstrap_95ci": {
+          "mean": 0.8118,
+          "p2_5": 0.6,
+          "p97_5": 1.0
+        }
+      },
+      "R4": {
+        "rate_init_lang_je_gelegenheit": 0.7239,
+        "n_init_lang": 97,
+        "n_gelegenheiten_lang": 134,
+        "bootstrap_95ci": {
+          "mean": 0.7235,
+          "p2_5": 0.6554,
+          "p97_5": 0.7917
+        }
+      },
+      "R5": {
+        "rate_init_lang_je_gelegenheit": 0.875,
+        "n_init_lang": 154,
+        "n_gelegenheiten_lang": 176,
+        "bootstrap_95ci": {
+          "mean": 0.8759,
+          "p2_5": 0.8295,
+          "p97_5": 0.9226
+        }
+      }
+    },
+    "_selbsttest": {
+      "n_partien_gesamt": 407,
+      "n_verworfen_mismatch": 233
+    }
+  },
+  "champion_vs_heuristik_arm0.2": {
+    "Heuristik": {
+      "n_partien": 190,
+      "gesamt": {
+        "rate_init_lang_je_gelegenheit": 0.9508,
+        "n_init_lang": 696,
+        "n_gelegenheiten_lang": 732,
+        "bootstrap_95ci": {
+          "mean": 0.9508,
+          "p2_5": 0.9354,
+          "p97_5": 0.9644
+        }
+      },
+      "R1": {
+        "rate_init_lang_je_gelegenheit": 0.9763,
+        "n_init_lang": 371,
+        "n_gelegenheiten_lang": 380,
+        "bootstrap_95ci": {
+          "mean": 0.9767,
+          "p2_5": 0.9605,
+          "p97_5": 0.9895
+        }
+      },
+      "R2": {
+        "rate_init_lang_je_gelegenheit": 1.0,
+        "n_init_lang": 26,
+        "n_gelegenheiten_lang": 26,
+        "bootstrap_95ci": {
+          "mean": 1.0,
+          "p2_5": 1.0,
+          "p97_5": 1.0
+        }
+      },
+      "R3": {
+        "rate_init_lang_je_gelegenheit": 0.9753,
+        "n_init_lang": 79,
+        "n_gelegenheiten_lang": 81,
+        "bootstrap_95ci": {
+          "mean": 0.975,
+          "p2_5": 0.9375,
+          "p97_5": 1.0
+        }
+      },
+      "R4": {
+        "rate_init_lang_je_gelegenheit": 0.9652,
+        "n_init_lang": 111,
+        "n_gelegenheiten_lang": 115,
+        "bootstrap_95ci": {
+          "mean": 0.9653,
+          "p2_5": 0.9273,
+          "p97_5": 0.9917
+        }
+      },
+      "R5": {
+        "rate_init_lang_je_gelegenheit": 0.8385,
+        "n_init_lang": 109,
+        "n_gelegenheiten_lang": 130,
+        "bootstrap_95ci": {
+          "mean": 0.8381,
+          "p2_5": 0.775,
+          "p97_5": 0.8992
+        }
+      }
+    },
+    "Champion": {
+      "n_partien": 190,
+      "gesamt": {
+        "rate_init_lang_je_gelegenheit": 0.7037,
+        "n_init_lang": 639,
+        "n_gelegenheiten_lang": 908,
+        "bootstrap_95ci": {
+          "mean": 0.7037,
+          "p2_5": 0.6797,
+          "p97_5": 0.7265
+        }
+      },
+      "R1": {
+        "rate_init_lang_je_gelegenheit": 0.55,
+        "n_init_lang": 209,
+        "n_gelegenheiten_lang": 380,
+        "bootstrap_95ci": {
+          "mean": 0.549,
+          "p2_5": 0.5053,
+          "p97_5": 0.5974
+        }
+      },
+      "R2": {
+        "rate_init_lang_je_gelegenheit": 0.9064,
+        "n_init_lang": 155,
+        "n_gelegenheiten_lang": 171,
+        "bootstrap_95ci": {
+          "mean": 0.9083,
+          "p2_5": 0.8663,
+          "p97_5": 0.9486
+        }
+      },
+      "R3": {
+        "rate_init_lang_je_gelegenheit": 0.6316,
+        "n_init_lang": 12,
+        "n_gelegenheiten_lang": 19,
+        "bootstrap_95ci": {
+          "mean": 0.6354,
+          "p2_5": 0.4117,
+          "p97_5": 0.8502
+        }
+      },
+      "R4": {
+        "rate_init_lang_je_gelegenheit": 0.7379,
+        "n_init_lang": 107,
+        "n_gelegenheiten_lang": 145,
+        "bootstrap_95ci": {
+          "mean": 0.7383,
+          "p2_5": 0.6645,
+          "p97_5": 0.8103
+        }
+      },
+      "R5": {
+        "rate_init_lang_je_gelegenheit": 0.8083,
+        "n_init_lang": 156,
+        "n_gelegenheiten_lang": 193,
+        "bootstrap_95ci": {
+          "mean": 0.8073,
+          "p2_5": 0.7524,
+          "p97_5": 0.8619
+        }
+      }
+    },
+    "_selbsttest": {
+      "n_partien_gesamt": 407,
+      "n_verworfen_mismatch": 217
+    }
+  },
+  "netvnet": {
+    "frozen": {
+      "n_partien": 108,
+      "gesamt": {
+        "rate_init_lang_je_gelegenheit": 0.7763,
+        "n_init_lang": 361,
+        "n_gelegenheiten_lang": 465,
+        "bootstrap_95ci": {
+          "mean": 0.776,
+          "p2_5": 0.7444,
+          "p97_5": 0.8067
+        }
+      },
+      "R1": {
+        "rate_init_lang_je_gelegenheit": 0.6667,
+        "n_init_lang": 144,
+        "n_gelegenheiten_lang": 216,
+        "bootstrap_95ci": {
+          "mean": 0.6671,
+          "p2_5": 0.6111,
+          "p97_5": 0.7222
+        }
+      },
+      "R2": {
+        "rate_init_lang_je_gelegenheit": 0.9167,
+        "n_init_lang": 66,
+        "n_gelegenheiten_lang": 72,
+        "bootstrap_95ci": {
+          "mean": 0.9158,
+          "p2_5": 0.8507,
+          "p97_5": 0.973
+        }
+      },
+      "R3": {
+        "rate_init_lang_je_gelegenheit": 0.7273,
+        "n_init_lang": 8,
+        "n_gelegenheiten_lang": 11,
+        "bootstrap_95ci": {
+          "mean": 0.7263,
+          "p2_5": 0.4283,
+          "p97_5": 1.0
+        }
+      },
+      "R4": {
+        "rate_init_lang_je_gelegenheit": 0.8611,
+        "n_init_lang": 62,
+        "n_gelegenheiten_lang": 72,
+        "bootstrap_95ci": {
+          "mean": 0.8626,
+          "p2_5": 0.7875,
+          "p97_5": 0.9286
+        }
+      },
+      "R5": {
+        "rate_init_lang_je_gelegenheit": 0.8617,
+        "n_init_lang": 81,
+        "n_gelegenheiten_lang": 94,
+        "bootstrap_95ci": {
+          "mean": 0.8614,
+          "p2_5": 0.7889,
+          "p97_5": 0.9255
+        }
+      }
+    },
+    "alpha0.2": {
+      "n_partien": 108,
+      "gesamt": {
+        "rate_init_lang_je_gelegenheit": 0.7332,
+        "n_init_lang": 360,
+        "n_gelegenheiten_lang": 491,
+        "bootstrap_95ci": {
+          "mean": 0.7331,
+          "p2_5": 0.7068,
+          "p97_5": 0.7588
+        }
+      },
+      "R1": {
+        "rate_init_lang_je_gelegenheit": 0.5972,
+        "n_init_lang": 129,
+        "n_gelegenheiten_lang": 216,
+        "bootstrap_95ci": {
+          "mean": 0.5971,
+          "p2_5": 0.5417,
+          "p97_5": 0.6529
+        }
+      },
+      "R2": {
+        "rate_init_lang_je_gelegenheit": 0.9318,
+        "n_init_lang": 82,
+        "n_gelegenheiten_lang": 88,
+        "bootstrap_95ci": {
+          "mean": 0.9321,
+          "p2_5": 0.8777,
+          "p97_5": 0.9778
+        }
+      },
+      "R3": {
+        "rate_init_lang_je_gelegenheit": 0.8,
+        "n_init_lang": 8,
+        "n_gelegenheiten_lang": 10,
+        "bootstrap_95ci": {
+          "mean": 0.8008,
+          "p2_5": 0.5,
+          "p97_5": 1.0
+        }
+      },
+      "R4": {
+        "rate_init_lang_je_gelegenheit": 0.7324,
+        "n_init_lang": 52,
+        "n_gelegenheiten_lang": 71,
+        "bootstrap_95ci": {
+          "mean": 0.7315,
+          "p2_5": 0.6375,
+          "p97_5": 0.8243
+        }
+      },
+      "R5": {
+        "rate_init_lang_je_gelegenheit": 0.8396,
+        "n_init_lang": 89,
+        "n_gelegenheiten_lang": 106,
+        "bootstrap_95ci": {
+          "mean": 0.8398,
+          "p2_5": 0.7805,
+          "p97_5": 0.9
+        }
+      }
+    },
+    "_selbsttest": {
+      "n_partien_gesamt": 407,
+      "n_verworfen_mismatch": 299
+    }
+  },
+  "netvnet_swap": {
+    "alpha0.2": {
+      "n_partien": 126,
+      "gesamt": {
+        "rate_init_lang_je_gelegenheit": 0.746,
+        "n_init_lang": 417,
+        "n_gelegenheiten_lang": 559,
+        "bootstrap_95ci": {
+          "mean": 0.7457,
+          "p2_5": 0.7173,
+          "p97_5": 0.7751
+        }
+      },
+      "R1": {
+        "rate_init_lang_je_gelegenheit": 0.627,
+        "n_init_lang": 158,
+        "n_gelegenheiten_lang": 252,
+        "bootstrap_95ci": {
+          "mean": 0.6277,
+          "p2_5": 0.5754,
+          "p97_5": 0.6865
+        }
+      },
+      "R2": {
+        "rate_init_lang_je_gelegenheit": 0.9043,
+        "n_init_lang": 85,
+        "n_gelegenheiten_lang": 94,
+        "bootstrap_95ci": {
+          "mean": 0.9035,
+          "p2_5": 0.8421,
+          "p97_5": 0.9565
+        }
+      },
+      "R3": {
+        "rate_init_lang_je_gelegenheit": 0.8,
+        "n_init_lang": 16,
+        "n_gelegenheiten_lang": 20,
+        "bootstrap_95ci": {
+          "mean": 0.8046,
+          "p2_5": 0.5713,
+          "p97_5": 1.0
+        }
+      },
+      "R4": {
+        "rate_init_lang_je_gelegenheit": 0.7831,
+        "n_init_lang": 65,
+        "n_gelegenheiten_lang": 83,
+        "bootstrap_95ci": {
+          "mean": 0.7835,
+          "p2_5": 0.7033,
+          "p97_5": 0.863
+        }
+      },
+      "R5": {
+        "rate_init_lang_je_gelegenheit": 0.8455,
+        "n_init_lang": 93,
+        "n_gelegenheiten_lang": 110,
+        "bootstrap_95ci": {
+          "mean": 0.8473,
+          "p2_5": 0.7826,
+          "p97_5": 0.9091
+        }
+      }
+    },
+    "frozen": {
+      "n_partien": 126,
+      "gesamt": {
+        "rate_init_lang_je_gelegenheit": 0.7468,
+        "n_init_lang": 413,
+        "n_gelegenheiten_lang": 553,
+        "bootstrap_95ci": {
+          "mean": 0.747,
+          "p2_5": 0.7128,
+          "p97_5": 0.7774
+        }
+      },
+      "R1": {
+        "rate_init_lang_je_gelegenheit": 0.627,
+        "n_init_lang": 158,
+        "n_gelegenheiten_lang": 252,
+        "bootstrap_95ci": {
+          "mean": 0.6263,
+          "p2_5": 0.5754,
+          "p97_5": 0.6786
+        }
+      },
+      "R2": {
+        "rate_init_lang_je_gelegenheit": 0.9043,
+        "n_init_lang": 85,
+        "n_gelegenheiten_lang": 94,
+        "bootstrap_95ci": {
+          "mean": 0.9038,
+          "p2_5": 0.8378,
+          "p97_5": 0.9592
+        }
+      },
+      "R3": {
+        "rate_init_lang_je_gelegenheit": 0.6667,
+        "n_init_lang": 8,
+        "n_gelegenheiten_lang": 12,
+        "bootstrap_95ci": {
+          "mean": 0.6704,
+          "p2_5": 0.3629,
+          "p97_5": 0.9333
+        }
+      },
+      "R4": {
+        "rate_init_lang_je_gelegenheit": 0.7614,
+        "n_init_lang": 67,
+        "n_gelegenheiten_lang": 88,
+        "bootstrap_95ci": {
+          "mean": 0.7622,
+          "p2_5": 0.6747,
+          "p97_5": 0.85
+        }
+      },
+      "R5": {
+        "rate_init_lang_je_gelegenheit": 0.8879,
+        "n_init_lang": 95,
+        "n_gelegenheiten_lang": 107,
+        "bootstrap_95ci": {
+          "mean": 0.8872,
+          "p2_5": 0.8205,
+          "p97_5": 0.9445
+        }
+      }
+    },
+    "_selbsttest": {
+      "n_partien_gesamt": 407,
+      "n_verworfen_mismatch": 281
+    }
+  },
+  "_meta": {
+    "frage": "Initiierung langer Reihen, NORMIERT auf Gelegenheit (leere lange Reihen zu Rundenbeginn) -- entkonfundiert den Zickzack aus row_initiation_probe.py.",
+    "selbsttest": "Rekonstruierte Belegung muss den Log-Fuellstand jedes Zuges unabhaengig reproduzieren; abweichende Partien werden verworfen und gezaehlt."
+  }
+}
