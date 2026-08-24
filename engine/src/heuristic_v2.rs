@@ -409,9 +409,14 @@ pub const DREIECK_GEWICHT: f64 = 1.0;
 /// (0,438 auf 0,200 ueber vier Bauschritte). Ein einzelner Skalar ueber das
 /// ganze Brett hat diesen Konflikt nicht.
 ///
-/// **Spiegelung:** alle vier Orientierungen werden geprueft, das Minimum
-/// zaehlt. Damit passt sich die Form der Start-Ecke an, statt eine Seite
-/// vorzuschreiben -- und die gestreute Start-Ecke bleibt wirksam.
+/// **Spiegelung nur um die SPALTEN-Achse:** geprueft werden zwei
+/// Orientierungen -- volle Spalte links (0) oder rechts (5) --, das Minimum
+/// zaehlt. Die volle ZEILE liegt immer oben. Eine Spiegelung um die
+/// Reihen-Achse gibt es nicht: sie verlangte eine volle Rasterzeile 5, und
+/// die ist strukturell unerreichbar (Musterreihe 6 schliesst 1,3-mal je
+/// Partie ab, gebraucht wuerden sechs). Damit bleibt die gestreute
+/// Start-Ecke fuer die LINKS/RECHTS-Wahl wirksam, ohne dass eine nie
+/// erreichbare Form belohnt wird.
 pub fn dreiecks_abweichung(player: &PlayerBoard) -> u32 {
     let mut belegt = [[false; 6]; 6];
     for (tr, reihe) in player.dome_grid.dome_slots.iter().enumerate() {
@@ -424,13 +429,22 @@ pub fn dreiecks_abweichung(player: &PlayerBoard) -> u32 {
             }
         }
     }
-    // Vier Orientierungen: die Ecke, an der das Dreieck seine volle Zeile und
-    // Spalte hat. `erlaubt` ist jeweils die 21er-Haelfte.
-    let orientierungen: [fn(usize, usize) -> bool; 4] = [
-        |r, c| r + c <= 5,             // oben links
-        |r, c| r + (5 - c) <= 5,       // oben rechts
-        |r, c| (5 - r) + c <= 5,       // unten links
-        |r, c| (5 - r) + (5 - c) <= 5, // unten rechts
+    // ZWEI Orientierungen, nicht vier (Nutzer-Korrektur 2026-08-24: "es ist
+    // nur gespiegelt um die Spalten, aber nicht um die Reihen").
+    //
+    // Gespiegelt wird an der senkrechten Achse: die volle Spalte kann links
+    // (0) oder rechts (5) liegen. Die volle ZEILE liegt immer oben, denn die
+    // unteren Orientierungen verlangten eine volle Rasterzeile 5 -- und die
+    // wird ausschliesslich von Musterreihe 6 gespeist, die je Partie 1,3-mal
+    // abschliesst. Sechs Zellen sind dort strukturell unerreichbar (dieselbe
+    // Asymmetrie, die `plate_builder::ZEILEN_ZIEL_MAX` begruendet).
+    //
+    // Ein Minimum ueber alle vier wuerde ein Brett belohnen, das auf eine
+    // NIE erreichbare Form zulaeuft -- der Grund, warum die erste Fassung
+    // falsch war.
+    let orientierungen: [fn(usize, usize) -> bool; 2] = [
+        |r, c| r + c <= 5,       // volle Zeile 0, volle Spalte 0
+        |r, c| r + (5 - c) <= 5, // volle Zeile 0, volle Spalte 5
     ];
     orientierungen
         .iter()

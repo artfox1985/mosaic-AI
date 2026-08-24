@@ -381,9 +381,12 @@ zusammenhaengend, zahlt also Platzierungspunkte nach Linienlaenge.
   konservativ: eine Platzierung bringt gemessen 2,3 bis 4,3 Punkte, der
   Formterm kann sie also nie ueberstimmen, sondern nur Gleichstaende in
   Richtung Form brechen.
-- Alle VIER Orientierungen werden geprueft, das Minimum zaehlt. Damit passt
-  sich die Form der gestreuten Start-Ecke an, statt eine Seite
-  vorzuschreiben.
+- Gespiegelt wird NUR um die Spalten-Achse: zwei Orientierungen (volle
+  Spalte links oder rechts), das Minimum zaehlt. Die volle Zeile liegt immer
+  oben. KORREKTUR 2026-08-24 (Nutzer): die erste Fassung nahm alle vier
+  Ecken und haette damit ein Brett belohnt, das auf eine nie erreichbare
+  Form zulaeuft -- die unteren Orientierungen verlangen eine volle
+  Rasterzeile 5, gespeist von Musterreihe 6 mit 1,3 Abschluessen je Partie.
 - **Primaermetrik bleibt unveraendert** (volle Spalten je Partie, gepaart,
   beide Sitze). Die Abweichung ist die ZIELFUNKTION des Agenten, nicht das
   Erfolgsmass -- sonst misst sich der Arm an sich selbst.
