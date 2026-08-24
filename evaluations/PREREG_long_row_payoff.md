@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: ENTWURF 2026-08-24, nichts gebaut. Anlass: Reihen-Sonde (STATUS 2026-08-23/24) zeigt eine flache ~55,5-%-Kurzreihen-Praeferenz, die NICHT vom Heuristik-Lehrer geerbt ist; Legalitaets-Stufe zeigt, dass 54 % der verpassten Spalten-Vollendungen an "Musterreihe noch nicht voll" scheitern -- der Engpass liegt upstream in der Draft-Wahl, nicht am Spaltenende. -->
+<!-- STATUS: OFFEN | Frage: Verschwinden lange Musterreihen (5/6) schon im rohen Policy-Prior, oder erst in der Suche -- und laesst sich ihre verzoegerte Auszahlung als zusaetzliches Signal sichtbar machen, ohne den Kredit-Horizont-Weg zu wiederholen? | Beleg: par.2 (Zweig-A-Diagnose) GEFAHREN 2026-08-24 (long_row_prior_gate.json, 260 qualifizierende Netz-Stellungen + 260 Heuristik-Kontrast, sims=200): roher Prior lang/kurz-Verhaeltnis 0,221 (Netz) bzw. 0,210 (Heuristik) -- FAST IDENTISCH --, Suche bewegt es kaum (Delta <=0,006 Netz). Verdikt: Signal fehlt BEREITS im Prior (moderat, nicht extrem wie beim Floor-Ziel) -> Zweig B2 (Label/Training) rueckt vor, B1 (Suchseitig) bleibt ein billiger Versuch mit gedaempfter Erwartung. par.3 (B1/B2-Bau) bleibt Nutzer-Entscheid nach par.7, nichts gebaut. Anlass: Reihen-Sonde (STATUS 2026-08-23/24) zeigt eine flache ~55,5-%-Kurzreihen-Praeferenz, die NICHT vom Heuristik-Lehrer geerbt ist; Legalitaets-Stufe zeigt, dass 54 % der verpassten Spalten-Vollendungen an "Musterreihe noch nicht voll" scheitern -- der Engpass liegt upstream in der Draft-Wahl, nicht am Spaltenende. -->
 
 # PREREG-SKELETT: Auszahlung langer Musterreihen -- Prior-Sichtbarkeit und Signal-Shaping
 
@@ -113,6 +113,70 @@ bevor die Suche/der Value-Kopf ueberhaupt eingreift?
     billigen Versuch wert (siehe par.4), aber mit gedaempfter Erwartung.
 - Kosten: Minuten bis niedrige einstellige Stunden (kein Self-Play, kein
   Training, kein Engine-Build).
+
+### par.2 ERGEBNIS (2026-08-24): Signal fehlt bereits im Prior -- B2 rueckt vor, B1 mit gedaempfter Erwartung
+
+Gefahren mit `tools/probes/long_row_prior_gate.py`, Artefakt
+`long_row_prior_gate.json`. **260 qualifizierende Netz-Stellungen** (Reihe
+5/6 traegt bereits >= 2 Steine UND mindestens eine legale Fortsetzung
+existiert), plus 260 aus dem Heuristik-Korpus als Kontrast, Champion
+`v21_2d_brierbest`, `sims=200`. Runde 5 ausgeschlossen (par.2-Fokus R1-4;
+`net_search_state_json` faellt dort auf einen Alpha-Beta-Loeser-Pfad mit
+anderem Rueckgabe-Schema zurueck -- beim Bauen entdeckt, dokumentiert im
+Werkzeug-Kopf). Zwei Selbsttests vorab bestanden (lokale `action_to_id`
+gegen die Referenzfunktion; jeder Suchkandidat legal), dasselbe validierte
+Instrument wie beim Floor-Aversions-Tor.
+
+| Groesse | Netz | Heuristik |
+|---|---|---|
+| Roher Prior, lange Reihe (Mittel) | 0,110 | 0,068 |
+| Roher Prior, kurze Reihe (Mittel) | 0,499 | 0,325 |
+| Verhaeltnis lang/kurz, Prior | **0,221** | **0,210** |
+| Suchanteil, lange Reihe (Mittel) | 0,116 | 0,089 |
+| Suchanteil, kurze Reihe (Mittel) | 0,505 | 0,353 |
+| Verhaeltnis lang/kurz, nach Suche | 0,230 | 0,254 |
+| Delta Prior->Suche (lang / kurz) | +0,006 / +0,006 | +0,021 / +0,027 |
+
+**Verdikt nach der vorab festgelegten Lesart: Prior-Masse ist bereits
+niedrig (Verhaeltnis ~0,22, nicht ~1) und die Suche bewegt sie kaum (Delta
+<= 0,006 bei Netz).** Das ist die zweite Lesart aus par.2: *"das Signal
+fehlt bereits im gelernten Prior -> Zweig B2 (Label-/Trainingsseite)
+rueckt vor, B1 waere trotzdem einen billigen Versuch wert, aber mit
+gedaempfter Erwartung."*
+
+**Wichtige Einordnung, damit das nicht mit dem Floor-Aversions-Befund
+verwechselt wird:** dies ist eine MODERATE, keine EXTREME Unterdrueckung.
+Lange Reihen bekommen rund ein Fuenftel der Prior-Masse kurzer Reihen --
+das ist deutlich unter dem "fairen" Anteil (bei 3 langen und 3 kurzen
+Zeilen waere 1,0 die Parity-Marke), aber himmelweit von der buchstaeblichen
+Null des Floor-Ziels aus `PREREG_floor_action_aversion.md` entfernt. Zwei
+verschiedene Grade derselben Asymmetrie-Familie, nicht derselbe Befund
+zweimal gemessen.
+
+**Zweiter Befund, nicht vorregistriert, aber auffaellig:** das
+Lang/Kurz-Verhaeltnis ist bei Netz (0,221) und Heuristik (0,210) FAST
+IDENTISCH. Das ist eine andere Grundgesamtheit als die flache
+55,5-56,1-%-Kurzreihen-Praeferenz aus `row_preference_probe.py` (die ALLE
+Draft-Entscheidungen zaehlt, nicht nur Fortsetzungen einer bereits
+begonnenen langen Reihe) -- dieser Zuschnitt misst eine ENGERE, spezifischere
+Entscheidung ("die Reihe steht schon, mache ich weiter oder nicht"), und
+dort unterscheiden sich Netz und Lehrer kaum. Das relativiert nicht den
+Reihen-Sonden-Befund (andere Entscheidungsklasse), zeigt aber: nicht jede
+Auspraegung der Kurzreihen-Neigung ist netz-spezifisch -- diese hier koennte
+strukturell im Spiel selbst liegen (kurze Reihen sind schneller/sicherer
+zu vollenden, unabhaengig vom Agenten) statt gelernt/verlernt zu sein.
+
+**Je Runde** (n=12/105/82/61 fuer R1-4 -- R1 duenn besetzt, Vorsicht bei
+Einzelaussagen): das Verhaeltnis schwankt zwischen 0,13 (R3) und 0,53
+(R1), ohne klaren monotonen Trend. Keine Rundenabhaengigkeit, die die
+Kredit-Horizont-Hypothese stuetzen wuerde.
+
+**Folge fuer par.4/par.7 (Nutzer-Entscheid, kein Automatismus):** B2
+(Label-/Trainingsseite) ist nach diesem Tor die naheliegendere Richtung.
+B1 (Such-seitiges Shaping) ist damit nicht ausgeschlossen -- das Tor sagt
+ausdruecklich "billiger Versuch wert" -- aber mit gedaempfter Erwartung,
+weil die Suche das vorhandene, wenn auch geringe, Prior-Signal in den
+gemessenen 260 Stellungen kaum verstaerkt hat.
 
 ## par.3 Zweig B: Auszahlung sichtbar machen (Eingriff, nach par.2 zuzuschneiden)
 
