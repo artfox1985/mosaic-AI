@@ -96,11 +96,11 @@ Wertungsplatte, eigene Punkte, Marge.
 
 ## par.5 Was diese Prereg NICHT ist
 
-- **Kein zweiter Blattwert-Knopf im alten Sinn.** Die beiden negativen
-  Praezedenzfaelle waren DOSIS-Knoepfe auf einen bestehenden Term. Hier kommt
-  eine Groesse hinzu, die die Suche bisher gar nicht sieht -- die
-  Klassenverteilung. Ob das den Unterschied macht, entscheidet die Messung
-  und nicht dieses Argument.
+- **Kein zweiter Blattwert-Knopf im alten Sinn.** Die negativen
+  Praezedenzfaelle drehten an einem BESTEHENDEN Term (einmal als Dosis-Sweep,
+  einmal als Einzelwert -- siehe par.2). Hier kommt eine Groesse HINZU, die
+  die Suche bisher gar nicht sieht: die Klassenverteilung. Ob das den
+  Unterschied macht, entscheidet die Messung und nicht dieses Argument.
 - **Keine Aenderung am Trainingsziel in Stufe A.** Der WDL-Kopf bleibt, wie
   er ist; nur der Konsument aendert sich.
 - **Keine Aussage ueber die Heuristik.** `heuristic_v2` und der
