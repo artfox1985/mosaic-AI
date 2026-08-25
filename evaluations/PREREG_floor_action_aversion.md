@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Warum meidet der Champion die AKTION "Ziel Strafleiste" massiv, die KONSEQUENZ "Steine auf der Strafleiste" aber nicht -- sitzt das im Policy-Prior oder in der Suche, und warum korrigiert der aktive Floor-Shaping-Term es nicht? | Beleg: par.6 Tor GEFAHREN 2026-08-24 (floor_action_aversion_gate.json, 280 qualifizierende Stellungen, Champion v21_2d_brierbest, sims=200): roher Policy-Prior auf dem Strafleisten-Ziel ist in ALLEN 280 Stellungen numerisch EXAKT 0 (Float32-Softmax-Unterlauf), Suchanteil nach der Suche ebenfalls in allen 280 exakt 0 -- H1, in schaerfster Form. Arme R/A0/A1 entfallen nach der vorab festgelegten Regel. Mechanismus (Herleitung): ein Logit-Abstand > ~87 ist fuer Gumbel(0,1)-Rauschen an der Wurzel unueberwindbar, der Floor-Shaping-Term wirkt am Blattwert -- hinter dem Nadeloehr der Wurzelauswahl, nicht davor, das erklaert zwanglos, warum ein staerke-validierter Term die Aktions-Asymmetrie nicht korrigiert. Einschraenkung: Runden-Verteilung schief (268/11/1/0/0), Gesamt-Verdikt davon unberuehrt -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Warum meidet der Champion die AKTION "Ziel Strafleiste" massiv, die KONSEQUENZ "Steine auf der Strafleiste" aber nicht -- sitzt das im Policy-Prior oder in der Suche? | Beleg: H1 (Prior schon asymmetrisch, Suche verschiebt kaum), belegt in ZWEI Laeufen mit v21_2d_brierbest, sims=200. par.6 (2026-08-24, 280 Stellungen, floor_action_aversion_gate.json): Prior und Suchanteil auf dem Strafleisten-Ziel exakt 0. par.14 (2026-08-25, Nachmessung, 240 Stellungen aus Runde 2-4, floor_action_aversion_gate_r234_s20260825.json): der Nullwert war eine Eigenschaft der RUNDE 1 -- die par.6-Stichprobe lag zu 268/280 dort, weil die Sonde die ersten N Datensaetze je Datei nahm und die in Zugreihenfolge stehen (Sammel-Artefakt, Sonde repariert, Bestandsauswahl byte-identisch erhalten). In Runde 2-4: Prior 0,00065 gegen Ueberlauf 0,03951, Suchanteil 0,00221 gegen 0,03198; 62 von 240 Stellungen haben Prior > 0, in 10 besucht die Suche die Aktion, groesster Einzelwert Prior 0,0587 mit Suchanteil 0,15. GEFALLEN sind damit "exakt 0", "in schaerfster Form" und die Logit-Abstand-Herleitung; STEHEN bleibt die Asymmetrie (Faktor ~60) und das Verdikt H1. Arme R/A0/A1 entfallen weiterhin nach der vorab festgelegten Regel. -->
 
 # Vorregistrierung: Aktions-Ebenen-Aversion gegen die Strafleiste
 
@@ -122,7 +122,7 @@ genau dieser Sweep in der WDL-Aera:
 Daraus der registrierte Strukturbefund: **Floor-Shaping ist ein SCHALTER,
 kein Regler.** Ob es an ist, macht rund 11 pp; welchen Wert es zwischen 0,15
 und 0,6 traegt, macht nichts. Artefakt:
-`evaluations/paired_arena_env_paired_arena_env_floorw_taskA.json`.
+`evaluations/artifacts/paired_arena_env_paired_arena_env_floorw_taskA.json`.
 
 **Was daran fuer diese Prereg wichtig ist -- und was trotzdem offen bleibt:**
 
@@ -362,3 +362,85 @@ Bestand: Champion 0,57, Heuristik 0,78 (aus par.1 gerechnet).
   Bestandswerte. Straf-Aversion als Erklaerung der Kurzreihen-Praeferenz ist
   dort bereits geschwaecht -- dieser Zuschnitt greift den ZWEITEN Befund
   jener Messung auf, nicht den ersten.
+
+---
+
+## par.14 NACHMESSUNG 2026-08-25: der Nullwert war eine Eigenschaft der RUNDE 1
+
+**Anlass.** Der par.6-Lauf vom 2026-08-24 registrierte "roher Prior auf dem
+Strafleisten-Ziel in ALLEN 280 Stellungen numerisch EXAKT 0, Suchanteil
+ebenfalls in allen 280 exakt 0 -- H1, in schaerfster Form", mit der
+Einschraenkung "Runden-Verteilung schief (268/11/1/0/0)". Diese Schieflage ist
+kein Zufall, sondern ein **Artefakt der Stichprobe**:
+`collect_qualifying` lief die Datensaetze je Datei IN REIHENFOLGE durch und
+nahm die ersten `cap_per_file = 3` qualifizierenden. Datensaetze stehen in
+Zugreihenfolge, die Stichprobe fuellte sich also mit Fruehspiel-Stellungen.
+
+**Reparatur** (Nutzer-Auftrag 2026-08-25): `collect_qualifying` nimmt jetzt
+`rounds=` und `seed=`; mit Seed werden je Datei ALLE qualifizierenden
+Datensaetze gesammelt und daraus reproduzierbar gezogen. Ohne Seed ist die
+Auswahl byte-identisch zum Bestand (geprueft: auf einem 25-Dateien-Ausschnitt
+liefern alte und neue Fassung dieselben 60 Stellungen). Laeufe mit Filter oder
+Seed schreiben in eine ABGELEITETE Artefaktdatei; `floor_action_aversion_gate.json`
+ist unveraendert.
+
+**Nachmessung**, gleiches Modell (`alphazero_v21_2d_brierbest`), gleiche
+sims=200, jetzt 240 Stellungen aus den Runden 2-4 (96/68/76),
+`floor_action_aversion_gate_r234_s20260825.json`:
+
+| Groesse | Bestandslauf (268 von 280 in R1) | NEU, Runde 2-4 |
+| --- | --- | --- |
+| `prior_floor_mean` | **0,0** | **0,00065** |
+| `prior_overflow_mean` | 0,00055 | 0,03951 |
+| `search_floor_share_mean` | **0,0** | **0,00221** |
+| `search_overflow_share_mean` | 0,00102 | 0,03198 |
+
+Und die Verteilung dahinter, die der Mittelwert verdeckt: **62 der 240
+Stellungen haben einen Prior groesser als 0** auf dem Strafleisten-Ziel, in
+**10** besucht die Suche die Aktion tatsaechlich. Der groesste Einzelwert
+liegt bei Prior 0,0587 (Runde 2) mit einem Suchanteil von 0,15 an derselben
+Stelle.
+
+### Was davon steht und was faellt
+
+* **Es faellt**: "numerisch EXAKT 0", "in ALLEN Stellungen", "H1 in schaerfster
+  Form", und die Mechanismus-Herleitung "ein Logit-Abstand > ~87 ist fuer
+  Gumbel(0,1)-Rauschen an der Wurzel unueberwindbar". In den Runden 2-4 ist
+  der Abstand ueberwindbar, und er wird ueberwunden.
+* **Es steht**: die ASYMMETRIE und damit das Verdikt H1. Auch in den Runden
+  2-4 bekommt das Strafleisten-Ziel nur etwa ein Sechzigstel der Masse der
+  ueberlauferzeugenden Reihen-Ziele (0,00065 gegen 0,03951), und die Suche
+  verschiebt daran wenig (0,00221 gegen 0,03198). Die vorab festgelegte
+  Lesart bleibt "Prior schon asymmetrisch, Suche verschiebt kaum".
+* **Neu sichtbar**: die Ueberlauf-Seite bekommt in den Runden 2-4 rund 70-mal
+  so viel Prior-Masse wie in Runde 1 (0,03951 gegen 0,00055). Die Stellungen
+  spaeterer Runden sind also nicht nur zahlreicher, sondern qualitativ andere
+  -- ein Grund mehr, warum eine Runde-1-Stichprobe hier nicht verallgemeinert.
+
+### Nebenlast-Verdacht geprueft und ausgeraeumt
+
+Die Parallelsitzung meldete nach dem Lauf von sich aus, dass sie entgegen
+ihrer Zusage zwischenzeitlich `cargo test --release` und mehrere
+`cargo build --release` gefahren hatte -- also genau die CPU-Nebenlast, vor
+der die Hausregel warnt ("Arena exklusiv, keine Nebenlast").
+
+Zwei Pruefungen:
+
+1. **Zeitfenster.** Der Lauf endete 10:32:32. Im Fenster 10:00-11:00 hat cargo
+   nichts kompiliert (`find target/release/.fingerprint -newermt ... ` liefert
+   0 Treffer, dieselbe Suche fuer 11:00-12:00 liefert 64 -- der Befehl trifft
+   also). Das schliesst eine Kompilier-Ueberlappung aus, aber NICHT einen
+   Suite-Lauf aus dem Cache, der CPU-Last ohne Dateispur erzeugt.
+2. **Wiederholung.** Derselbe Lauf mit identischen Argumenten, auf
+   nachweislich stiller Maschine: das Artefakt ist **byte-identisch**
+   (md5 6e394b2dd54eeab8e4ac1492dd3bbb69). Damit ist die Kontamination
+   ausgeschlossen und zugleich gezeigt, dass die Sonde deterministisch ist.
+
+**Der Zustand des Werkzeugs zum Laufzeitpunkt** (Hausregel "Wheel nach
+Engine-Aenderung neu bauen"): das installierte Wheel enthaelt
+`tiling_budget_stats_json` (in dieser Sitzung geprueft), eine Funktion aus dem
+letzten Engine-Commit -- das Wheel ist also nicht aelter als der
+verhaltensrelevante Quellstand. Eine Quelldatei (`plate_builder.rs`) ist
+juenger, ihr Diff besteht laut Parallelsitzung ausschliesslich aus
+Kommentarzeilen, und `net_search_state_json` beruehrt den Plattenbau-Layer
+nicht.

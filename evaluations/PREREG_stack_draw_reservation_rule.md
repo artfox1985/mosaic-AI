@@ -1,9 +1,13 @@
-<!-- STATUS: OFFEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem (Rueckgriff, konstante Kosten, gratis sichtbarer Typ). Eine Stopp-Regel IST gebaut (self_play.rs:500-545, Default-Pfad) -- ist sie die richtige? | Beleg: NEIN, Schritt 1 gemessen 2026-08-25 (par.4c, 600 Partien v20wdlsw): die gebaute Regel vergleicht ein ABSOLUTES Brettniveau (scoring_progress; Kriterium 6 ist als einziges NEGATIV, -3 je leerem Spezialfeld auf einer bereits gelegten Platte) gegen einen Typmittelwert in [1,3]. Folge, vorhergesagt und bestaetigt: OHNE Platte 6 haben 92 % der Ziehserien Tiefe 1 (ab Runde 3: 100 %), MIT Platte 6 laufen 59,8 % der Serien den Punktestand auf 0 -- 11,22 +- 0,42 Punkte je Partie fuer Blindziehungen gegen 3,93 +- 0,15 ohne, bei praktisch gleicher Serienzahl. Drei weitere Mangel der Regel in par.1c. OFFEN: ob der Kauf sich lohnt (Stufe 1 SOLL-Seite, braucht V in Punkten) und ein Konfundierungs-Verdacht gegen PREREG_chance_nodes Teil C. -->
+<!-- STATUS: OFFEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem. Eine Stopp-Regel IST gebaut (self_play.rs:500-545, Default-Pfad) -- ist sie die richtige? | Beleg: NEIN, sie zieht ZU OFT. par.5b (2026-08-25, netzfrei, konstruierte Bretter): die optimale Tiefe ist in JEDEM geprueften Fall 1 (nach der Pflichtziehung liegt eine Platte im Wert von 2,9-9,0 Punkten in der Hand, die erwartete VERBESSERUNG bleibt unter dem 1 Punkt Ziehkosten), waehrend die gebaute Regel bei negativem Brettniveau 9-11 mal zieht -- rund 10 verschenkte Punkte je betroffenem Stapelzug. Roh und mit Realisierungsabschlag gleiches Ergebnis, das Verdikt haengt also NICHT an der Abschlagswahl. Ursache ist der Einheitenbruch (par.1c Mangel 3): ein absolutes Brettniveau gegen einen Typmittelwert in [1,3]; er ueberfaehrt den Optionswert-Fehler (Mangel 1) um Groessenordnungen. Korpus (par.4c): 11,22 +- 0,42 Punkte je Partie fuer Blindziehungen mit Kriterium 6 gegen 3,93 +- 0,15 ohne, 59,8 % der Serien enden bei Punktestand 0. Spaltenbau behebt es NICHT (par.6d). NAECHSTES: Eingriff in den Default-Pfad, Nutzer-Entscheid. -->
 
 # PREREG: Reservationswert-Regel fuer die Blindziehung (`stack_draw_reservation_rule`)
 
-Stand **2026-08-25**. **ENTWURF, nichts gebaut.** par.2 ist in dieser Sitzung
-am Code geprueft; alles ab par.5 steht in Plan-Zeitform.
+Stand **2026-08-25**. **GEMESSEN sind par.4b, par.4c, par.5b, par.6b, par.6c und par.6d**;
+par.1c und par.2 sind am Code geprueft. **NICHT gebaut** ist jeder Eingriff --
+par.5 (SOLL-Seite) und par.6 (Stufe 2) stehen weiter in Plan-Zeitform.
+Am Code geaendert wurde nur ein `#[cfg(test)]`-Modul am Ende von
+`engine/src/self_play.rs` (die Sonde aus par.6b); der Default-Pfad ist
+unberuehrt.
 
 ## par.1 Die Frage
 
@@ -371,7 +375,17 @@ menschlicher Gegner (er gewinnt 8 von 9, `STATUS.md`), und die Tiefe steht
 | Seite | Serien | Tiefe-1-Anteil | Verteilung |
 | --- | --- | --- | --- |
 | KI | 25 | **100 %** | {1: 25} |
-| Mensch | 14 | **100 %** | {1: 14} |
+| Mensch | 20 | **95 %** | {1: 19, 2: 1} |
+
+> **KORREKTUR 2026-08-25 (Nutzer-Hinweis, die Logs noch einmal anzusehen).**
+> Die erste Fassung nannte fuer den Menschen "14 Serien, 100 %". Das war ein
+> PARSING-Fehler: in 3 der 10 Partien heisst der menschliche Spieler laut
+> Log-Kopf **"Spielerin"** statt "Spieler 1", mein Muster hat diese drei
+> Partien fuer die Menschen-Seite komplett uebersehen. Korrigiert, indem der
+> Name je Partie aus dem Log-Kopf gelesen wird (`players`/`ai_player`) statt
+> fest verdrahtet. Die KI-Seite war nie betroffen. Am Befund aendert sich
+> nichts Wesentliches -- der Mensch zieht in 19 von 20 Serien genau einmal --,
+> aber die Zahl stimmt jetzt.
 
 **Das bestaetigt die eine Haelfte und sagt zur anderen nichts.** Ohne
 Kriterium 6 zieht die Regel genau einmal -- hier in 25 von 25 Serien, im
@@ -400,9 +414,251 @@ Design ist gegenstandslos, nicht bloss unsicher.
 Der teure Arm der Regel bleibt in diesem Regime also unbeobachtet, und der
 konstruierte Test aus par.6b bleibt noetig.
 
-**Status: NICHT GELAUFEN.** Der Test braucht `cargo test`, also die Maschine,
-und die liegt beim Lehrer-Test der Parallelsitzung; ausserdem hat jene Sitzung
-`self_play.rs` offen. Beides wird abgewartet, statt hineinzuschreiben.
+### ERGEBNIS par.6b (2026-08-25, gelaufen)
+
+Angehaengt an `engine/src/self_play.rs` als
+`stack_draw_depth_probe::ziehtiefe_haengt_an_wertungsplatte_6_und_am_brettniveau`,
+`cargo test --release --lib`, Laufzeit 0,04 s. Kein Netz, kein Korpus, kein
+Wurzelrauschen.
+
+| Platten gelegt | Spezialfelder leer | `scoring_progress` | Tiefe MIT Krit. 6 | Tiefe OHNE |
+| --- | --- | --- | --- | --- |
+| 0 | 0 | 0,00 | 2 | 1 |
+| 2 | 2 | **−6,00** | **13** | 1 |
+| 4 | 4 | **−12,00** | **11** | 1 |
+| 4 | 2 | **−4,83** | **11** | 1 |
+| 4 | 0 | **+3,50** | **1** | 1 |
+| 6 | 0 | +4,83 | 1 | 1 |
+| 8 | 0 | +4,83 | 1 | 1 |
+
+**Der Mechanismus ist damit belegt, und zwar praeziser als vermutet: nicht die
+Platte entscheidet, sondern das VORZEICHEN des Brettniveaus.**
+
+* Ohne Kriterium 6 ist die Tiefe in JEDEM Fall 1 -- unabhaengig davon, wie das
+  Brett aussieht. Das deckt sich mit allen drei Beobachtungsregimen
+  (Self-Play 92-95 %, Mensch-gegen-KI 25/25).
+* Mit Kriterium 6 kippt das Verhalten exakt am Nulldurchgang: bei −6,00,
+  −12,00 und −4,83 zieht die Regel 13, 11 und 11 mal; sobald dieselbe
+  Brett-Fuellung ein positives Niveau ergibt (+3,50 bei vier Platten ohne
+  leere Spezialfelder), faellt die Tiefe auf 1. Der Umschlag liegt zwischen
+  −4,83 und +3,50, also am Vorzeichen -- nicht an der Zahl der Platten, nicht
+  an der Zahl der Spezialfelder.
+* Die Zeile "0 Platten, Niveau 0,00, Tiefe 2" ist der Grenzfall und passt ins
+  Bild.
+
+**Damit ist auch die Untergrenzen-Frage aus par.4c beantwortet.** Im Korpus
+brach die sichtbare Tiefe bei 5 ab, weil der Punktestand bei 5 startet und
+Ziehungen bei 0 gratis werden. Hier steht das Konto auf 60 -- und die Regel
+zieht **11 bis 13 mal**, also 11 bis 13 Punkte fuer EINEN Stapelzug. Die
+Korpuszahlen waren nicht nur formal Untergrenzen, sie waren es deutlich; im
+echten Spiel wird der Aderlass allein durch die Kontogrenze gestoppt, nicht
+durch die Regel.
+
+**Was der Test NICHT sagt**: ob 11 Ziehungen an dieser Stelle falsch waren.
+Dazu braucht es `V` in Punkten (par.3) und den Realisierungsabschlag (par.4).
+Belegt ist der Mechanismus und seine Groessenordnung, nicht das Urteil.
+
+### par.6d Stellt der Spaltenbau die Pathologie von selbst ab? NEIN (2026-08-25)
+
+**Nutzer-Frage**, nachdem der Korpus-Einwand geklaert war: mein Messkorpus
+stammt von einem Spieler, der keine Spalten schliesst -- wuerde ein
+spaltenkompetenter Spieler das Brettniveau schnell genug ins Positive heben,
+um die tiefen Ziehungen von selbst zu beenden? Die Vermutung lag nahe, weil
+Spezialfelder sich durch das Fuellen der drei Nachbarzellen freischalten.
+
+Gemessen im selben netzfreien Aufbau, zwei Arme mit identischem Brett und
+identischem Spezialfeld-Defizit, die sich NUR darin unterscheiden, ob
+Spaltenfortschritt belohnt wird: **[0, 1, 6] gegen [0, 4, 6]** (Kriterium 1 =
+vertikale Reihen, Gewicht 7, quadratisch; Kriterium 4 = aeussere Felder,
+Gewicht 1, linear). `special_empty` fest auf 2, Platten ohne Special-Vorzug
+gelegt, variiert wird nur der Spalten-Fuellstand:
+
+| Spalte gefuellt | Spez. leer | Niveau k1 | Tiefe k1 | Niveau k4 | Tiefe k4 |
+| --- | --- | --- | --- | --- | --- |
+| 0 | 2 | −5,72 | 9 | −5,92 | 9 |
+| 2 | 2 | −4,61 | 9 | −3,58 | 9 |
+| 3 | 2 | −3,56 | 9 | −2,50 | 9 |
+| 4 | 2 | −2,11 | 9 | −1,42 | 9 |
+
+**Die Antwort ist nein, und der Grund ist die Kurvenform.** Kriterium 1 zahlt
+`7 * (f/6)^2`, also QUADRATISCH im Fuellstand; das Spezialfeld-Defizit kostet
+`-3` je Feld, also LINEAR und sofort. Partieller Spaltenbau hebt das Niveau
+daher kaum: vier von sechs Zellen bringen 3,11 Punkte. Der lineare Rand-Arm
+liegt in jeder Zeile HOEHER als der Spalten-Arm -- fuer Teilfuellungen ist
+"aeussere Felder" die staerkere Gegenkraft als "vertikale Reihen".
+
+Und die Rechnung fuer den nicht erreichten Bereich, aus der Formel und nicht
+aus dem Test: eine VOLLE Spalte bringt 7,0 und gleicht damit gerade zwei leere
+Spezialfelder (−6) aus. Ein Spieler mit drei offenen Spezialfeldern kaeme also
+auch mit einer kompletten Spalte nicht ins Positive.
+
+**Einschraenkung, ausdruecklich:** der Test saettigt bei vier gefuellten
+Zellen -- Spezialzellen und Farbforderungen blockieren den Rest der
+konstruierten Spalte, die Zeilen fuer 5 und 6 fehlen deshalb. Die Aussage
+ueber f = 5 und f = 6 ist Arithmetik aus `scoring.rs:166`, keine Messung. Die
+Tiefe blieb ueber den gesamten gemessenen Bereich bei 9, es gab also nicht
+einmal eine teilweise Entspannung.
+
+**Folge fuer die Arbeitsteilung:** die Hoffnung, die Spalten-Huelle der
+Parallelsitzung repariere die Ziehregel nebenbei, ist damit unbegruendet. Ihre
+1,512 Spezialfeld-Freischaltungen je Partie (gegen 0,713) wirken auf DIESELBE
+Groesse und in die richtige Richtung, aber sie fallen am ENDE der Partie an --
+die teuren Ziehserien liegen in Runde 1-3. Der Befund macht die Wirkungs-
+Messung der Parallelsitzung nicht ueberfluessig, sondern wichtiger.
+
+### par.4d Der Realisierungsabschlag, gemessen an einem plattenbewussten Spieler
+
+Der Abschlag aus par.4 (2) sollte laut damaligem Stand auf das v22-Korpus
+warten, weil die v20-Zahlen aus plattenblindem Spiel stammen. **Das war
+unnoetig**: die zehn Mensch-gegen-Netz-Partien in `static/log/` sind bereits
+ein plattenbewusstes Regime (der Mensch gewinnt 8 von 9 und schliesst 1,80
+volle Spalten je Partie gegen 0,10 des Netzes, `STATUS.md`). Die Logs
+protokollieren jede Platzierung auf der Kuppel mitsamt Musterreihe
+(`[Rn] ... +X Pkt (Reihe r -> Kuppel ...)`), das Profil ist also direkt
+auszaehlbar.
+
+Platzierungen je Rasterreihe und Partie, 10 Partien, Menschname je Partie aus
+dem Log-Kopf gelesen:
+
+| Reihe | Mensch | Netz (v21, 400 Sims) | v20-Selbstspiel | Mensch / v20 |
+| --- | --- | --- | --- | --- |
+| 1 | 3,60 | 4,70 | 4,80 | 0,75x |
+| 2 | 3,30 | 4,70 | 4,77 | 0,69x |
+| 3 | 3,20 | 3,30 | 2,84 | 1,13x |
+| 4 | 2,60 | 2,30 | 1,89 | 1,38x |
+| 5 | **2,30** | 1,10 | 0,84 | **2,74x** |
+| 6 | **1,70** | 0,50 | 0,58 | **2,93x** |
+| Summe | 16,70 | 16,60 | – | |
+
+**Die Summe ist praktisch gleich (16,70 gegen 16,60), die Verteilung nicht.**
+Der Mensch tauscht kurze Reihen gegen lange: rund ein Viertel weniger in Reihe
+1-2, dafuer das Zwei- bis Dreifache in Reihe 5-6.
+
+**Folge fuer die Reservationsregel:** ein Abschlag, der auf dem v20-Korpus
+geeicht ist, unterschaetzt die Realisierung einer TIEFEN Zelle um etwa den
+Faktor 3. Genau diese Zellen sind es, die eine Kuppelplatte wertvoll machen --
+`V` waere also systematisch zu klein, und die Regel wuerde zu selten ziehen.
+Das wirkt der Richtung von Mangel 1 aus par.1c gleichsinnig entgegen, macht
+die Netto-Aussage also nicht eindeutiger, sondern die Eichung wichtiger.
+
+**Kreuzprobe gegen STATUS.md** (weil die Zahlen dort anders aussehen und ein
+stiller Widerspruch teurer waere als eine Zeile Erklaerung): STATUS nennt ein
+"Abschlussprofil" 4,00/4,10/3,40/3,20/2,50/2,20 gegen 4,90/4,90/3,30/2,40/
+1,10/0,50. Das ist eine ANDERE Groesse -- belegte Rasterzellen am Ende, also
+Musterreihen-Platzierungen PLUS automatisch gelegte Spezialfliesen. Rechnung:
+16,70 + 2,70 Freischaltungen = 19,4 und 16,60 + 0,50 = 17,1, und das sind
+exakt die Summen der beiden STATUS-Profile. Die Platzierungspunkte stimmen
+ohnehin auf die Stelle (54,9 gegen 55,8). Beide Messungen sind also
+konsistent, sie zaehlen Verschiedenes.
+
+**Einschraenkung:** n = 10 Partien, ein einzelner Mensch, und die
+Plattenwahl war in allen zehn auf Kriterium 1 gesetzt (par.6c). Als
+Groessenordnung belastbar, als Konstante nicht.
+
+## par.5b ERGEBNIS SOLL-SEITE (2026-08-25): die Regel zieht ZU OFT
+
+**Vorpruefung, die den Weg geaendert hat.** Die uebergebene Paarung
+`best_plate_value` + `expected_points_map` kann eine noch nicht gelegte Platte
+NICHT bewerten: die Karte liest je Zelle `dome_grid.get_space(r, c)` und
+ueberspringt jede Zelle ohne Space -- auf einem LEEREN Slot gibt es keine, und
+`best_plate_value` laeuft genau ueber die leeren Slots. Gemessen
+(`plate_value_anschluss_check`): Kartensumme **15,33** auf belegten Zellen,
+**0,00** auf leeren, `best_plate_value` fuer eine Pool-Platte **Some(0.0)**.
+Kein Fehler der beiden Bausteine -- sie passen an dieser Stelle nicht
+zusammen: die Karte bewertet VORHANDENE Zellen, die Regel braucht den Wert
+NEU ENTSTEHENDER.
+
+**Stattdessen der Weg, den der Doc-Kommentar von `best_plate_value` selbst
+nennt**: je (Slot, Rotation) ein Probe-Brett, Platte legen, DANACH die
+Punktekarte rechnen und ueber die vier neu entstandenen Zellen summieren --
+mit Realisierungsabschlag je Rasterreihe aus par.4d (0,72 / 0,66 / 0,64 /
+0,52 / 0,46 / 0,34).
+
+**Die Reservationsregel** darauf: weiterziehen, solange
+`E[max(V_next − V_hand, 0)] > 1 Punkt`, Erwartungswert ueber die Pool-Platten
+GLEICHEN TYPS wie die oberste (deren Ruecken ist gratis sichtbar).
+
+| Platten | Spez. leer | V_hand roh | SOLL roh | V_hand abgeschlagen | SOLL abg. | IST (gebaute Regel) |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2 | 0 | 9,00 | 1 | 6,27 | 1 | 1 |
+| 4 | 0 | 7,33 | 1 | 3,89 | 1 | 1 |
+| 4 | 2 | 7,33 | 1 | 3,67 | 1 | **11** |
+| 4 | 4 | 7,33 | 1 | 3,67 | 1 | **11** |
+| 6 | 6 | 7,33 | 1 | 2,87 | 1 | **9** |
+
+**Verdikt: die gebaute Regel zieht ZU OFT, nicht zu selten.** Die optimale
+Tiefe ist in JEDEM geprueften Fall 1 -- nach der Pflichtziehung liegt bereits
+eine Platte im Wert von 2,9 bis 9,0 Punkten in der Hand, und die erwartete
+VERBESSERUNG durch eine weitere Ziehung bleibt unter dem einen Punkt, den sie
+kostet. Wo das Brettniveau negativ ist, zieht die Regel stattdessen 9 bis 11
+mal: **rund 10 verschenkte Punkte je betroffenem Stapelzug.**
+
+**Das entscheidet die in par.1c offengelassene Nettorichtung.** Dort standen
+Mangel 1 (Niveau statt Verbesserung, laesst zu SELTEN ziehen) und Mangel 3
+(Einheitenbruch, Richtung unklar) gegeneinander, und die Nettorichtung war
+nicht vorhersagbar. Gemessen dominiert Mangel 3: sobald `best_eval_for_tile`
+ein negatives Brettniveau liefert, ist `avg_remaining_type_value − 1 >
+max(gezogene)` fast immer erfuellt, weil die rechte Seite stark negativ ist.
+Der Einheitenbruch ueberfaehrt den Optionswert-Fehler um Groessenordnungen.
+
+**Robustheit gegen die eigene Modellwahl:** roh und abgeschlagen liefern
+DIESELBE SOLL-Tiefe von 1, obwohl `V_hand` sich zwischen beiden um bis zu
+Faktor 2,6 unterscheidet. Das Ergebnis haengt also nicht an der Wahl des
+Realisierungsabschlags -- die Groesse, um die ich zuvor das v22-Korpus
+abwarten wollte, ist fuer dieses Verdikt gar nicht ausschlaggebend.
+
+**Einschraenkungen, ausdruecklich:**
+
+1. `V` ist eine Potenzial-Naeherung: Karte auf dem Probe-Brett MIT der Platte
+   gerechnet (das raeumt die Additivitaets-Naeherung teilweise ab), aber immer
+   noch als Summe ueber vier Zellen statt als eine gemeinsame
+   `scoring_progress`-Differenz.
+2. Fuenf konstruierte Bretter, ein Seed. Die Richtung ist eindeutig, die
+   genaue Zahl der verschenkten Punkte ist es nicht.
+3. Die Regel bilanziert Punkte gegen Punkte und ignoriert Tempo (par.7).
+
+## par.5c GEBAUT 2026-08-25: der Knopf `MOSAIC_STACK_DRAW_RESERVATION`
+
+Nutzer-Auftrag nach dem Urteil in par.5b. **Default AUS** = bit-identisches
+Bestandsverhalten; der Bestand bleibt der Elo-Bezug, und die Arena kann beide
+Arme fahren.
+
+**Was der Knopf aendert** (`self_play.rs::resolve_and_apply_stack_draw`):
+statt `avg_remaining_type_value` (Typmittelwert in [1,3]) gegen
+`best_eval_for_tile` (absolutes Brettniveau) zu stellen, rechnen jetzt BEIDE
+Seiten mit derselben Funktion, und verglichen wird die erwartete
+VERBESSERUNG statt des Niveaus:
+
+> weiterziehen, solange `E[max(best_eval(V_next) − V_hand, 0)] > 1 Punkt`
+
+Der Erwartungswert laeuft nur ueber die Pool-Platten des Typs, den die
+sichtbare Rueckseite ansagt (`dome_tile_pool.first()`) -- das Gratis-Signal
+aus par.2, das der Bestand nicht nutzt.
+
+**Wirkung und Kosten, netzfrei auf denselben Brettern wie par.6b** (der Knopf
+haelt seinen Wert in einem `OnceLock`, ein Prozess sieht also nur EINEN Arm --
+die Zahlen stammen aus zwei Laeufen):
+
+| Platten / Spez. leer | Tiefe Bestand | Tiefe repariert | Zeit Bestand | Zeit repariert |
+| --- | --- | --- | --- | --- |
+| 2 / 0 | 1 | 1 | 638 us | 1,8 ms |
+| **4 / 2** | **11** | **1** | **13,8 ms** | **1,2 ms** |
+| 4 / 0 | 1 | 1 | 334 us | 1,2 ms |
+| 6 / 0 | 1 | 1 | 227 us | 740 us |
+
+**Die Kostenfrage aus dem Zuschnitt faellt anders aus als erwartet.** In den
+gutartigen Faellen kostet die Reparatur das Zwei- bis Dreifache (sie rechnet
+ueber den Restpool statt einen Mittelwert), im pathologischen Fall aber ein
+ELFTEL -- sie hoert nach der Pflichtziehung auf, statt elfmal zu ziehen und
+dabei jedes Mal alle bisher gezogenen Platten neu zu bewerten. Da der teure
+Fall genau in den ~39 % Partien mit Kriterium 6 auftritt und dort die
+Rechenzeit dominiert, ist eine Verlangsamung des Self-Play unwahrscheinlich.
+
+**Ausdruecklich NICHT belegt:** dass der Knopf Spielstaerke bringt. Vier
+konstruierte Bretter zeigen Mechanismus und Kosten, nicht Elo. Dafuer steht
+die Abnahme aus par.6 an: gepaarte Arena, Block-Ebene, SPRT auf informativen
+Paaren, **getrennt nach Plattensatz** -- in Partien ohne Kriterium 6 ist die
+Tiefe in allen Regimen 1, dort kann kein Unterschied entstehen.
 
 ## par.5 STUFE 1 (zuerst, ohne Arena-Budget): weicht der Champion ab?
 

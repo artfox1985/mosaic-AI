@@ -60,7 +60,10 @@ from config import INPUT_SIZE, NUM_ACTIONS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "floor_action_aversion_gate.json"
+# Vorgabe-Artefakt (Bestandslauf 2026-08-24). Mit Runden-Filter oder Seed
+# schreibt `main` in eine ABGELEITETE Datei, damit der registrierte Lauf
+# nie ueberschrieben wird.
+OUT_JSON = EVAL / "artifacts" / "floor_action_aversion_gate.json"
 
 MODEL_ONNX = str(ROOT / "models" / "alphazero_v21_2d_brierbest.onnx")
 MODEL_PTH = ROOT / "models" / "alphazero_v21_2d_brierbest.pth"
@@ -220,41 +223,82 @@ def stratified_sample(files, stride):
     return sorted(out)
 
 
-def collect_qualifying(files, cap_total, cap_per_file=3):
+def collect_qualifying(files, cap_total, cap_per_file=3, rounds=None, seed=None):
+    """Qualifizierende Stellungen einsammeln.
+
+    `rounds`: Menge zugelassener Runden (1-basiert, wie `state["round"]`);
+        None = alle.
+    `seed`: None ist das BESTANDSVERHALTEN des Laufs vom 2026-08-24 -- die
+        ERSTEN `cap_per_file` qualifizierenden Datensaetze je Datei, in
+        Datensatz-Reihenfolge. Genau das erzeugt einen stillen Rundenfilter:
+        Datensaetze stehen in Zugreihenfolge, der Deckel je Datei fuellt sich
+        also mit Fruehspiel-Stellungen. Der registrierte Lauf hatte deshalb
+        268 von 280 Stellungen in Runde 1 (`floor_action_aversion_gate.json`,
+        `je_runde`) -- eine Eigenschaft der SAMMLUNG, nicht des Spiels
+        (Befund 2026-08-25). Ist `seed` gesetzt, werden je Datei ALLE
+        qualifizierenden Datensaetze gesammelt und daraus mit diesem Seed
+        gezogen; die Auswahl ist damit reproduzierbar und ordnungsfrei.
+    """
     import pickle
+    import random
+    rng = random.Random(seed) if seed is not None else None
     found = []
     for f in files:
         if len(found) >= cap_total:
             break
         with open(f, "rb") as fh:
             recs = pickle.load(fh)
-        n_this_file = 0
+        cands = []
         for r in recs:
-            if n_this_file >= cap_per_file or len(found) >= cap_total:
+            # Ohne Seed identisch zum Bestand: Abbruch, sobald der Deckel je
+            # Datei erreicht ist (dieselbe Auswahl, byte-identisch).
+            if rng is None and len(cands) >= cap_per_file:
                 break
             st = r.get("state") or {}
             if st.get("phase") != "drafting":
                 continue
+            if rounds is not None and st.get("round") not in rounds:
+                continue
             va = r.get("valid_actions") or []
             all_ids, floor_ids, overflow_ids = classify_actions(st, va)
             if floor_ids and overflow_ids:
-                found.append(dict(state=st, all_ids=all_ids, floor_ids=floor_ids,
+                cands.append(dict(state=st, all_ids=all_ids, floor_ids=floor_ids,
                                   overflow_ids=overflow_ids, round=st.get("round"),
                                   file=f))
-                n_this_file += 1
+        if rng is not None:
+            rng.shuffle(cands)
+        found.extend(cands[: min(cap_per_file, cap_total - len(found))])
     return found
 
 
 def main():
     selftest_local_vs_reference()
 
+    # argv: [stride] [cap_total] [runden] [seed]
+    #   runden: "2,3,4" oder "alle" (Vorgabe)
+    #   seed:   gesetzt -> ordnungsfreie Auswahl je Datei (siehe
+    #           collect_qualifying); weggelassen -> Bestandsverhalten
     stride = int(sys.argv[1]) if len(sys.argv) > 1 else 20
     cap_total = int(sys.argv[2]) if len(sys.argv) > 2 else 240
+    rounds = None
+    if len(sys.argv) > 3 and sys.argv[3] not in ("", "alle"):
+        rounds = {int(x) for x in sys.argv[3].split(",")}
+    seed = int(sys.argv[4]) if len(sys.argv) > 4 else None
+
+    suffix = ""
+    if rounds is not None:
+        suffix += "_r" + "".join(str(r) for r in sorted(rounds))
+    if seed is not None:
+        suffix += f"_s{seed}"
+    out_json = OUT_JSON if not suffix else EVAL / "artifacts" / f"floor_action_aversion_gate{suffix}.json"
+
     all_files = sorted(glob.glob(str(ROOT / "data" / "selfplay_*.pkl")))
     files = stratified_sample(all_files, stride)
     print(f"Scanne {len(files)} von {len(all_files)} Dateien (Stichprobe) "
-          f"nach qualifizierenden Stellungen ...", file=sys.stderr)
-    found = collect_qualifying(files, cap_total)
+          f"nach qualifizierenden Stellungen "
+          f"[runden={sorted(rounds) if rounds else 'alle'}, seed={seed}] ...",
+          file=sys.stderr)
+    found = collect_qualifying(files, cap_total, rounds=rounds, seed=seed)
     print(f"{len(found)} qualifizierende Stellungen gefunden.", file=sys.stderr)
     if not found:
         print("Keine qualifizierenden Stellungen -- Tor nicht auswertbar.", file=sys.stderr)
@@ -348,6 +392,13 @@ def main():
         sims=SIMS, c_puct=C_PUCT, model=MODEL_ONNX,
         gesamt=gesamt, je_runde=je_runde, lesart=lesart,
         rows=rows,
+        stichprobe=dict(
+            stride=stride, cap_total=cap_total, cap_per_file=3,
+            runden=sorted(rounds) if rounds else "alle", seed=seed,
+            auswahl=("zufaellig je Datei (ordnungsfrei)" if seed is not None
+                     else "erste N je Datei (Bestandsverhalten, "
+                          "bevorzugt Fruehspiel-Stellungen)"),
+        ),
         meta=dict(
             kriterien="(a) Farbkonflikt Zielreihe/Zugfarbe -- JEDE Quelle; "
                       "(b) Grossfabrik-Sonne (factory_index==4) ueber "
@@ -356,10 +407,10 @@ def main():
                       "gewertet (Mehrdeutigkeit Sonne/Mond).",
         ),
     )
-    OUT_JSON.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
+    out_json.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(json.dumps({k: v for k, v in result.items() if k != "rows"},
                      indent=2, ensure_ascii=False))
-    print(f"\n-> {OUT_JSON}")
+    print(f"\n-> {out_json}")
 
 
 if __name__ == "__main__":
