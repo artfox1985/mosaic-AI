@@ -2173,6 +2173,11 @@ pub fn play_one_game<R: Rng + ?Sized>(
     net: Option<&Net>,
     record_rtv: bool,
     move_heartbeat: Option<&AtomicU64>,
+    // STATUS "(2) Heuristik-Variante bis ins Self-Play durchreichen": bis
+    // 2026-08-25 war hier `V1` fest verdrahtet, waehrend nur die Arena die
+    // Variante als Parameter nahm -- ein v2-Lehrer-Korpus war damit gar nicht
+    // erzeugbar. Bestandsaufrufer uebergeben `V1` und bleiben bit-identisch.
+    variante: crate::mcts::HeuristikVariante,
     // PREREG_search_rng_split.md: der Seed, mit dem DIESER Aufrufer `rng`
     // erzeugt hat (siehe dortige Formel `seed.wrapping_add(i*0x9E37...)`).
     // Zusammen mit einem lokalen Zugindex (`move_idx` unten) baut
@@ -2198,7 +2203,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
         tiling_net: None,
         apply_via_chosen_action: false,
         column_build_trace: false,
-        heuristik_variante: crate::mcts::HeuristikVariante::V1,
+        heuristik_variante: variante,
     };
     let cfg = GameLoopConfig {
         timeout_secs: heuristic_game_timeout_secs(base_sims)
@@ -2258,7 +2263,7 @@ pub fn run_self_play(
         // nach `run_net_self_play`, wo sie tatsaechlich einen Netz-Blattwert
         // erreicht).
         let steps = play_one_game(
-            base_sims, c, ids, names, first, &gid, &mut rng, None, false, Some(&move_counter), partie_seed,
+            base_sims, c, ids, names, first, &gid, &mut rng, None, false, Some(&move_counter), crate::mcts::HeuristikVariante::V1, partie_seed,
         );
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
@@ -2291,6 +2296,12 @@ pub fn run_self_play(
 /// `progress_path`/`heartbeat_path`: siehe `run_self_play`-Dokumentation (Task #71).
 /// `record_rtv` (Task #85): siehe `play_one_game`-Dokumentation -- Default
 /// AUS auf `self_play.py`-CLI-Ebene, per `--rtv`-Flag reaktivierbar.
+/// Bestandssignatur -- faehrt die V1-Heuristik, byte-identisch zum Verhalten
+/// vor 2026-08-25. BEWUSST unveraendert gelassen: `engine/examples/` ruft sie
+/// auf, und der pre-push-Hook kompiliert die Beispiele mit; eine geaenderte
+/// Signatur braeche den Push, obwohl `cargo build` gruen waere (CLAUDE.md,
+/// wiederkehrende Falle). Wer die Variante waehlen will, nimmt
+/// [`run_self_play_with_net_labels_variante`].
 #[allow(clippy::too_many_arguments)]
 pub fn run_self_play_with_net_labels(
     model_path: &str,
@@ -2303,6 +2314,30 @@ pub fn run_self_play_with_net_labels(
     record_rtv: bool,
     progress_path: Option<&str>,
     heartbeat_path: Option<&str>,
+) -> Result<String, String> {
+    run_self_play_with_net_labels_variante(
+        model_path, n_games, base_sims, c, seed, num_threads, prefix, record_rtv,
+        progress_path, heartbeat_path, crate::mcts::HeuristikVariante::V1,
+    )
+}
+
+/// Wie [`run_self_play_with_net_labels`], aber mit waehlbarer
+/// Heuristik-Variante -- die Voraussetzung fuer ein v2-Lehrer-Korpus
+/// (STATUS "v22-Vorbereitung", Punkt 2). Die Heuristik SPIELT, ein Netz
+/// LABELT (Bootstrap/rtv); die Variante betrifft nur die Spielseite.
+#[allow(clippy::too_many_arguments)]
+pub fn run_self_play_with_net_labels_variante(
+    model_path: &str,
+    n_games: usize,
+    base_sims: u32,
+    c: f64,
+    seed: u64,
+    num_threads: usize,
+    prefix: &str,
+    record_rtv: bool,
+    progress_path: Option<&str>,
+    heartbeat_path: Option<&str>,
+    variante: crate::mcts::HeuristikVariante,
 ) -> Result<String, String> {
     let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
@@ -2337,7 +2372,7 @@ pub fn run_self_play_with_net_labels(
         let gid = format!("{prefix}_g{}", i + 1);
         let steps = play_one_game(
             base_sims, c, ids, names, first, &gid, &mut rng, Some(&net), record_rtv, Some(&move_counter),
-            partie_seed,
+            variante, partie_seed,
         );
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
@@ -5490,7 +5525,7 @@ pub(crate) mod tests {
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let recs = play_one_game(
             40, SELF_PLAY_C, ids, ["P0".into(), "P1".into()], 0, "seedsrc_g1",
-            &mut rng, None, false, None, 321,
+            &mut rng, None, false, None, crate::mcts::HeuristikVariante::V1, 321,
         );
         let mid = recs
             .iter()
@@ -5564,6 +5599,7 @@ pub(crate) mod tests {
             None,
             false,
             None,
+            crate::mcts::HeuristikVariante::V1,
             123,
         );
         assert!(!recs.is_empty(), "Spiel muss Records erzeugen");
@@ -5721,6 +5757,7 @@ pub(crate) mod tests {
                 None,
                 false,
                 None,
+                crate::mcts::HeuristikVariante::V1,
                 seed,
             );
             assert!(
