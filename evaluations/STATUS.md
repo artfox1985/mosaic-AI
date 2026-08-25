@@ -302,6 +302,61 @@ den Lehrer-Einsatz ist er entschaerft.
    fuer Altmodelle STILL verschoben -- Formen gueltig, Werte falsch, kein
    Absturz.
 
+   **ERLEDIGT 2026-08-25, ABNAHME BESTANDEN.** Gebaut wie vorgegeben: 6
+   `col_f_max` ans Ende des flachen Blocks, 1 Ebene Erreichbarkeit als Kanal
+   76 ans Ende des Conv-Blocks, `INPUT_SIZE` 708 -> 714,
+   `NUM_PLANES_CHANNELS` 76 -> 77 (Rust UND Python).
+
+   *Die Falle war anders gelagert als in dieser Uebergabe beschrieben.* Der
+   JSON-Pfad hat sehr wohl einen produktiven Aufrufer -- nur ausserhalb der
+   Engine: `engine/py/neural_net.py:33 state_to_tensor` baut die
+   TRAININGS-Merkmale aus genau diesem JSON, und ein aktiver Rust-gegen-
+   Python-Vergleich der Merkmalsvektoren laeuft nirgends (`PyGame.features()`
+   existiert als Haken, der einzige Verweis nennt ihn den verworfenen Weg;
+   `tools/parity_probe.py` vergleicht Suchantworten, nicht Merkmale).
+   `cell_is_completable` im JSON-Pfad nachzubauen haette also eine dritte,
+   unbewachte Kopie ergeben.
+
+   *Geloest ohne Nachbau*, nach dem Vorbild von `dome_wild_remaining_frac`:
+   beide Groessen werden in `serialize::serialize_player` EINMAL gerechnet
+   (ueber `column_build::cell_is_completable` und
+   `plate_builder::achievable_column_fill`) und ins Zustands-JSON geschrieben;
+   der Rust-JSON-Pfad und Python LESEN sie. Nur `state_to_features_direct`
+   rechnet selbst -- diese eine Doppelung bewachen die
+   `direct_matches_json_path_*`-Tests (grün, 12/12).
+   Kosten gemessen (selfplay_v20wdlsw, 1609 Datensaetze): als Bitmaske
+   **+0,27 %** je Korpus statt +3,80 % als 36er-Liste -- deshalb
+   `cell_reachable_mask` als Maske, `col_f_max` als lesbare Sechserliste.
+
+   **ABNAHME, gemessen statt hergeleitet:** `tools/parity_probe.py` nach
+   Wheel-Neubau liefert unveraendert **8c6684ffba06cf3e...** -- der Champion
+   rechnet mit dem BREITEREN Bauer bitgleich. Das ist der Beleg, den die
+   Kompatibilitaets-Schicht schuldig war (vorher nur bei gleicher Breite
+   belegt). Volle Suite 525/0.
+
+   *Drei Waechter haben dabei angeschlagen und drei Luecken gezeigt:*
+   die Golden-Fixture (es gab keinen Regenerator -- jetzt einer als Opt-in
+   `MOSAIC_UPDATE_FEATURE_FIXTURE=1`, sonst haetten 145 Zeilen von Hand
+   nachgezogen werden muessen, mit der Versuchung, stattdessen den Waechter
+   zu entschaerfen); das Knopf-Register (neue Env-Variable war nicht
+   eingetragen); und der A2-Vertragshash (neu gesetzt
+   `a169ebf0a4451e08` -> `a3f61f246d9bbf5c`, mit der Paritaets-Messung als
+   Begruendung im Code).
+
+   *Ein Vertragsbruch in DREI TESTS, den erst diese Aenderung sichtbar
+   gemacht hat:* `net::tests::{eval_pair,eval_batch}` und
+   `net_batcher::tests::batcher_eval_rows` synthetisierten ihre Eingabe mit
+   `net.input_size()` -- das ist die MODELL-Erwartung
+   (`InputLayout::flat_len`), gefuettert wird aber immer der volle
+   BAUER-Puffer, den die Schicht kuerzt (`net.rs:443` reicht
+   `features::NUM_PLANES_VALUES` als Quell-Grenze durch). Solange beide
+   Breiten gleich waren, fiel das nicht auf; Symptom war
+   `range end index 3480 out of range for slice of length 3444`
+   (3480 = 77*36 + 708, also neue Ebenenzahl mit alter Flachbreite).
+   Behoben ueber einen gemeinsamen Helfer `builder_input_len()`. Damit
+   pruefen diese drei Tests jetzt genau die Konstellation, fuer die die
+   Schicht gebaut wurde.
+
    *Die Falle, die noch wartet:* es gibt ZWEI Flat-Bauer,
    `features::state_to_features` (JSON) und `state_to_features_direct`
    (GameState), und ein Test erzwingt ihre Byte-Gleichheit
@@ -621,6 +676,47 @@ ist ein kleiner Befund.** alpha0.2 55,6 Prozent kurze Reihen gegen frozen
 und beide auf dem Niveau der drei anderen Kontexte (~55,5 Prozent). Die
 Fehlbeschriftung hat die Kernzahl also nicht verzerrt; neu sichtbar ist, dass
 der alpha-Knopf an der Reihenpraeferenz NICHTS aendert.
+
+## EINGETAKTET 2026-08-25: Reparatur der Blindzieh-Stopp-Regel
+
+**Nutzer-Entscheid**, nach dem Urteil in `PREREG_stack_draw_reservation_rule.md`
+par.5b (die gebaute Regel zieht zu oft, rund 10 verschenkte Punkte je
+betroffenem Stapelzug). Eingriff in den DEFAULT-Pfad, deshalb ausdruecklich
+eingetaktet und nicht nebenbei erledigt.
+
+**Der Defekt, praezise:** `self_play.rs:517-534` vergleicht
+`avg_remaining_type_value` (Typmittelwert in [1, 3]) gegen
+`best_eval_for_tile` (absolutes Brettniveau, mit Kriterium 6 stark negativ).
+Zwei Einheiten, ein Vergleich. Sobald das Niveau negativ ist, ist die
+Weiterzieh-Bedingung fast immer erfuellt.
+
+**Die Reparatur, minimal und ohne neue Formel:** `best_eval_for_tile` nimmt
+eine BELIEBIGE Platte, also auch eine aus dem Restpool. Damit laesst sich
+beides in derselben Einheit rechnen -- weiterziehen, solange
+`E[max(best_eval(V_next) − max(best_eval(gezogene)), 0)] > 1`, Erwartungswert
+ueber die Pool-Platten des Typs, den die sichtbare Rueckseite ansagt
+(`dome_tile_pool.first()`). Das ist genau die Regel, die in par.5b als SOLL
+gerechnet wurde, nur mit dem vorhandenen Bewerter statt mit der Punktekarte.
+
+**Vorab zu klaeren, bevor gebaut wird:**
+1. **Kosten.** `best_eval_for_tile` laeuft ueber Slots x Rotationen; ueber den
+   ganzen Restpool je Ziehentscheidung ist das deutlich teurer als der
+   heutige Mittelwert. Zu messen, BEVOR die Regel scharf gestellt wird --
+   sonst wird ein Punktegewinn mit Self-Play-Durchsatz bezahlt.
+2. **Knopf mit Default AUS**, wie bei jedem Eingriff dieser Art, damit die
+   Arena beide Arme fahren kann.
+
+**Abnahme:** gepaarte Arena auf Block-Ebene, SPRT auf informativen Paaren
+(`tools/paired_gating.py`). **Getrennt nach Plattensatz auswerten** -- in
+Partien ohne Kriterium 6 ist die Ziehtiefe in allen bisher untersuchten
+Regimen 1, dort kann kein Unterschied entstehen; wer darueber mittelt,
+verduennt den Effekt mit Partien, die ihn nicht haben koennen.
+
+**Erwartung, vorab festgehalten:** der Effekt sollte in den ~39 % Partien mit
+Kriterium 6 sitzen und dort in der Groessenordnung mehrerer Punkte je Partie
+liegen (par.4c: 11,22 gegen 3,93 Punkte je Partie fuer Blindziehungen). Bleibt
+er aus, ist entweder die Kostenrechnung falsch oder die verschenkten Punkte
+werden anderswo zurueckgewonnen -- beides waere ein eigener Befund.
 
 ## NAECHSTE SCHRITTE – ALLE OFFEN, ALLE NUTZER-ENTSCHEID
 

@@ -146,6 +146,19 @@ fn serialize_player(state: &GameState, pi: usize) -> Value {
     // vollen Reihen inkl. Linien über mehrere Reihen) − fixe Strafen.
     let estimated_score = solve_round_final_score(state, pi) - p.score;
 
+    // Erreichbarkeits-Groessen, einmal gerechnet (siehe Kommentar am
+    // json!-Block unten).
+    let remaining = crate::provocation::remaining_colors(state);
+    let f_max = crate::plate_builder::achievable_column_fill(p, &remaining);
+    let mut reachable_mask: u64 = 0;
+    for r in 0..6usize {
+        for c in 0..6usize {
+            if crate::column_build::cell_is_completable(p, r, c, &remaining) {
+                reachable_mask |= 1u64 << (r * 6 + c);
+            }
+        }
+    }
+
     // Berechnete Endwertungs-/Geometrie-Features (damit das Netz lernt, wie
     // Endpunkte entstehen — siehe scoring::player_scoring_features).
     let sf = crate::scoring::player_scoring_features(p);
@@ -202,6 +215,23 @@ fn serialize_player(state: &GameState, pi: usize) -> Value {
             "row_potential": lf.row_potential,
             "col_potential": lf.col_potential,
         },
+        // Erreichbarkeit (STATUS "(A) Zwei Erreichbarkeits-Eingabeebenen"):
+        // HIER gerechnet und nicht in den Merkmalsbauern, damit die Formel
+        // genau EINMAL existiert. Der JSON-Pfad (`features::state_to_features`)
+        // und der Python-Zwilling (`neural_net.state_to_tensor`) LESEN diese
+        // Felder; nur `state_to_features_direct` rechnet sie selbst, aus
+        // denselben Funktionen -- die Paritaetstests in features.rs bewachen
+        // genau diese eine Doppelung.
+        //
+        // `cell_reachable_mask`: Bit r*6+c gesetzt, wenn Zelle (r,c) laut
+        // `column_build::cell_is_completable` noch bedienbar ist. Als Maske
+        // statt als 36er-Liste, weil das im Self-Play-Korpus 0,27 % statt
+        // 3,80 % kostet (gemessen 2026-08-25 an selfplay_v20wdlsw, 1609
+        // Datensaetze).
+        "cell_reachable_mask": reachable_mask,
+        // `col_f_max`: Fuellstand + noch bedienbare leere Zellen je Spalte,
+        // gedeckelt bei 6 (`plate_builder::achievable_column_fill`).
+        "col_f_max": f_max,
     })
 }
 

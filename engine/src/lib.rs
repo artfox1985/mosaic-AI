@@ -1773,11 +1773,30 @@ mod contract_stamp_tests {
     /// dieses Literals pruefen, ob genau das beabsichtigt ist (neue
     /// Modellgeneration) oder ein Versehen (siehe Design-Dokument Abschnitt
     /// "A2" fuer die zwei realen Vorfaelle, die diesen Waechter motivieren).
+    /// **Neu gesetzt 2026-08-25** (vorher `a169ebf0a4451e08`), Anlass:
+    /// STATUS.md "(A) Zwei Erreichbarkeits-Eingabeebenen" --
+    /// `INPUT_SIZE` 708 -> 714 (+6 `col_f_max`) und
+    /// `NUM_PLANES_CHANNELS` 76 -> 77 (+1 Ebene Erreichbarkeit).
+    ///
+    /// Die Frage, die dieser Waechter stellt -- "bekommen Bestandschampions
+    /// andere Eingaben?" -- ist GEMESSEN beantwortet und nicht hergeleitet:
+    /// `tools/parity_probe.py` nach Wheel-Neubau liefert unveraendert
+    /// `8c6684ffba06cf3e...` ("Defaults sind byte-identisch zum Bestand").
+    /// Der Champion rechnet also bitgleich weiter. Der Grund ist baulich:
+    /// beide neuen Groessen haengen am ENDE ihres Blocks, und
+    /// `net::split_planes_flat_batch_src` kuerzt den Planes-Block auf die
+    /// MODELL-Breite und liest den Flat-Block ab der QUELL-Grenze -- die
+    /// zusaetzliche Ebene und die sechs Werte fallen fuer ein Altmodell
+    /// weg, der Rest bleibt Wert fuer Wert derselbe.
+    ///
+    /// Damit ist zugleich der Beleg erbracht, den die Kompatibilitaets-
+    /// Schicht bis dahin schuldig war: bis 2026-08-25 war nur gezeigt, dass
+    /// sie bei GLEICHER Breite nichts bricht.
     #[test]
     fn contract_hash_matches_pinned_literal() {
         assert_eq!(
             contract_hash(),
-            "a169ebf0a4451e08",
+            "a3f61f246d9bbf5c",
             "A2-Vertragshash hat sich veraendert -- Bestandschampions bekommen \
              andere Eingaben (siehe Testdoku)"
         );

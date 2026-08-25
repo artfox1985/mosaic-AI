@@ -849,7 +849,9 @@ fn phase_wirkt_auf(stufe: Stufe) -> bool {
 /// plus die leeren Zellen, die nach der Restversorgung noch bedienbar sind
 /// (`column_build::cell_is_completable`, dieselbe Relaxation wie in par.12 --
 /// nur gezaehlt statt als Ja/Nein gelesen).
-fn achievable_column_fill(player: &PlayerBoard, remaining: &[i64; 5]) -> [f64; 6] {
+/// Sichtbar fuer `serialize::serialize_player` (Erreichbarkeits-Felder im
+/// Zustands-JSON) -- die Formel soll genau einmal existieren.
+pub(crate) fn achievable_column_fill(player: &PlayerBoard, remaining: &[i64; 5]) -> [f64; 6] {
     let mut out = [0.0f64; 6];
     for (c, slot) in out.iter_mut().enumerate() {
         let mut n = 0u32;
@@ -1251,7 +1253,9 @@ fn points_heatmap(state: &GameState, pi: usize) -> Zielkarte {
 /// Anlass fuer v2. Hier stehen sie aber NEBEN dem Plattenanteil und wirken auf
 /// die Zielzellen-Wahl, nicht auf die Schrittwahl -- ob das reicht, entscheidet
 /// die Messung und nicht dieses Argument.
-fn expected_points_map(state: &GameState, pi: usize) -> Zielkarte {
+/// Sichtbar fuer die Reservationswert-Regel (`PREREG_stack_draw_reservation_rule.md`),
+/// gleiche Begruendung wie bei [`best_plate_value`].
+pub(crate) fn expected_points_map(state: &GameState, pi: usize) -> Zielkarte {
     points_map(state, pi, true)
 }
 

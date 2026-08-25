@@ -6776,3 +6776,536 @@ pub(crate) mod tests {
         );
     }
 }
+
+// ANHANG fuer engine/src/self_play.rs -- ans DATEIENDE haengen.
+// PREREG_stack_draw_reservation_rule.md par.6b: netzfreier Beleg fuer den
+// Mechanismus hinter par.4c.
+//
+// Die Korpus-Messung (par.4c) konnte zwei Dinge nicht: sie sah nur Ziehungen,
+// die tatsaechlich Punkte kosteten (bei Punktestand 0 ist die Ziehung gratis
+// und damit unsichtbar), und ihre Zustaende stammten aus dem Spiel eines
+// bestimmten Netzes. Dieser Test raeumt beides ab: der Punktestand wird hoch
+// gesetzt, damit die WAHRE Tiefe sichtbar wird, und die Bretter werden
+// konstruiert statt gespielt.
+//
+// Gemessen wird je Fall die Zahl der Ziehungen, die
+// `resolve_and_apply_stack_draw` ausfuehrt -- ablesbar am Punkteverbrauch,
+// weil `apply_paid_cost` (game.rs:182) die einzige Aufrufstelle im Drafting
+// ist.
+
+#[cfg(test)]
+mod stack_draw_depth_probe {
+    use super::*;
+    use crate::dome::SpaceType;
+    use rand::SeedableRng;
+    use rand::rngs::StdRng;
+
+    /// Punktestand, mit dem die Fälle starten -- hoch genug, dass der
+    /// Null-Boden (`apply_paid_cost` zahlt nur den vorhandenen Rest) die
+    /// Ziehtiefe NICHT abschneidet. Genau diese Deckelung macht die
+    /// Korpus-Zahlen aus par.4c zu Untergrenzen.
+    const START_SCORE: i32 = 60;
+
+    /// Baut einen ziehbereiten Zustand: Wertungsplatten gesetzt,
+    /// Startkuppel-Pflicht erledigt, Spieler 0 am Zug.
+    pub(super) fn ziehbereites_spiel(scoring_ids: Vec<usize>, seed: u64) -> Game {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
+        state.scoring_tile_ids = scoring_ids;
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
+            p.score = START_SCORE;
+        }
+        assert!(state.dome_tile_pool.len() > 1, "Test braucht einen Pool mit mehreren Platten");
+        Game { state }
+    }
+
+    /// Legt `n_platten` Platten aus dem Stapel auf freie Slots von Spieler 0
+    /// und fuellt davon `n_gefuellt` Spezialfelder. Rueckgabe: wie viele
+    /// Spezialfelder danach LEER sind (= `special_empty`, die Groesse, an der
+    /// Kriterium 6 haengt).
+    pub(super) fn brett_vorbereiten(game: &mut Game, n_platten: usize, n_gefuellt: usize) -> usize {
+        let mut gelegt = 0usize;
+        'slots: for sr in 0..3 {
+            for sc in 0..3 {
+                if gelegt >= n_platten {
+                    break 'slots;
+                }
+                if game.state.players[0].dome_grid.dome_slots[sr][sc].is_some() {
+                    continue;
+                }
+                // Special-Platten bevorzugt -- nur sie tragen zu
+                // `special_empty` bei.
+                let idx = game
+                    .state
+                    .dome_tile_pool
+                    .iter()
+                    .position(|t| t.is_special_type())
+                    .unwrap_or(0);
+                let tile = game.state.dome_tile_pool.remove(idx);
+                if game.state.players[0].dome_grid.place_dome_tile(tile, sr, sc).is_ok() {
+                    gelegt += 1;
+                }
+            }
+        }
+        let mut noch_zu_fuellen = n_gefuellt;
+        for sr in 0..3 {
+            for sc in 0..3 {
+                let Some(slot) = game.state.players[0].dome_grid.dome_slots[sr][sc].as_mut() else {
+                    continue;
+                };
+                let Some(si) = slot.special_space_idx() else { continue };
+                if noch_zu_fuellen > 0 && !slot.spaces[si].is_filled() {
+                    slot.spaces[si].placed_special = true;
+                    noch_zu_fuellen -= 1;
+                }
+            }
+        }
+        let p = &game.state.players[0];
+        let mut leer = 0usize;
+        for sr in 0..3 {
+            for sc in 0..3 {
+                if let Some(slot) = p.dome_grid.dome_slots[sr][sc].as_ref() {
+                    leer += slot
+                        .spaces
+                        .iter()
+                        .filter(|sp| sp.space_type == SpaceType::Special && !sp.is_filled())
+                        .count();
+                }
+            }
+        }
+        leer
+    }
+
+    /// Zieht EINEN Stapelzug durch und gibt die Zahl der Ziehungen zurueck.
+    pub(super) fn ziehtiefe(mut game: Game) -> (usize, usize, f64) {
+        let vorher = game.state.players[0].score;
+        let leer = {
+            let p = &game.state.players[0];
+            let mut n = 0usize;
+            for sr in 0..3 {
+                for sc in 0..3 {
+                    if let Some(slot) = p.dome_grid.dome_slots[sr][sc].as_ref() {
+                        n += slot
+                            .spaces
+                            .iter()
+                            .filter(|sp| sp.space_type == SpaceType::Special && !sp.is_filled())
+                            .count();
+                    }
+                }
+            }
+            n
+        };
+        let niveau = crate::scoring::scoring_progress(
+            &game.state.players[0],
+            &game.state.scoring_tile_ids,
+        );
+        resolve_and_apply_stack_draw(&mut game).expect("Stapelzug muss aufloesen");
+        let tiefe = (vorher - game.state.players[0].score) as usize;
+        (tiefe, leer, niveau)
+    }
+
+    /// Die eigentliche Sonde: dieselben Bretter einmal MIT und einmal OHNE
+    /// Wertungsplatte 6 (Code-Index 6, Spezialfelder), ueber mehrere Grade der
+    /// Brett-Fuellung. Erwartung aus par.1c/par.4c: ohne Platte 6 immer Tiefe
+    /// 1, mit Platte 6 tiefer, solange das Brettniveau negativ ist.
+    ///
+    /// Nutzer-Freigabe 2026-08-25: die Plattenwahl darf hier frei gesetzt
+    /// werden, die Fokus-Regel "nur k1" gilt fuer diesen Diagnose-Test nicht.
+    #[test]
+    fn ziehtiefe_haengt_an_wertungsplatte_6_und_am_brettniveau() {
+        // Die beiden Arme unterscheiden sich in GENAU EINER Groesse: welche
+        // Seite des Paares (6, 3) im Spiel ist. Kriterium 6 = Spezialfelder
+        // (das einzige negative), Kriterium 3 = mehrfarbige Felder. 0 und 4
+        // sind in beiden Armen identisch.
+        //
+        // KORREKTUR beim Bau: der erste Entwurf verglich [0,4,6] gegen
+        // [0,4,1] -- ungueltig, denn (4, 1) ist selbst ein Ausschlusspaar
+        // (`MUTUALLY_EXCLUSIVE_PAIRS`, scoring.rs:60-65). Der Test prueft die
+        // Gueltigkeit jetzt selbst, statt sie anzunehmen.
+        let mit: Vec<usize> = vec![0, 4, 6];
+        let ohne: Vec<usize> = vec![0, 4, 3];
+
+        for satz in [&mit, &ohne] {
+            for &id in satz.iter() {
+                if let Some(partner) = crate::scoring::exclusion_partner(id) {
+                    assert!(
+                        !satz.contains(&partner),
+                        "ungueltiger Plattensatz {satz:?}: {id} und {partner} schliessen sich aus"
+                    );
+                }
+            }
+        }
+
+        println!("\n{:<10}{:>10}{:>12}{:>12}{:>10}", "Platten", "Spez. leer", "Niveau", "Tiefe m.6", "o. 6");
+        let mut tiefen_mit = Vec::new();
+        let mut tiefen_ohne = Vec::new();
+        for (n_platten, n_gefuellt) in [(0usize, 0usize), (2, 0), (4, 0), (4, 2), (4, 4), (6, 6), (8, 8)] {
+            let mut g_mit = ziehbereites_spiel(mit.clone(), 42);
+            let leer = brett_vorbereiten(&mut g_mit, n_platten, n_gefuellt);
+            let (t_mit, _, niveau) = ziehtiefe(g_mit);
+
+            let mut g_ohne = ziehbereites_spiel(ohne.clone(), 42);
+            brett_vorbereiten(&mut g_ohne, n_platten, n_gefuellt);
+            let (t_ohne, _, _) = ziehtiefe(g_ohne);
+
+            println!("{n_platten:<10}{leer:>10}{niveau:>12.2}{t_mit:>12}{t_ohne:>10}");
+            tiefen_mit.push(t_mit);
+            tiefen_ohne.push(t_ohne);
+        }
+
+        // Qualitative Zusicherungen -- bewusst schwach gehalten, die Tabelle
+        // oben ist das eigentliche Ergebnis.
+        assert!(
+            tiefen_ohne.iter().all(|&t| t >= 1),
+            "jede Aufloesung braucht mindestens den Pflicht-Peek"
+        );
+        assert!(
+            tiefen_mit.iter().max() > tiefen_ohne.iter().max(),
+            "mit Wertungsplatte 6 muss mindestens ein Fall tiefer ziehen als jeder Fall ohne \
+             (par.4c: 92 % Tiefe 1 ohne Platte 6, tiefe Serien nur mit ihr)"
+        );
+    }
+}
+
+#[cfg(test)]
+mod stack_draw_depth_columns {
+    //! PREREG_stack_draw_reservation_rule.md par.6d: stellt der Spaltenbau die
+    //! Pathologie aus par.6b von selbst ab?
+    //!
+    //! Nutzer-Frage 2026-08-25: der Messkorpus aus par.4c stammt von einem
+    //! Spieler, der KEINE Spalten schliesst. Fuer den Mechanismus ist das egal
+    //! (par.6b arbeitet auf konstruierten Brettern), fuer das URTEIL nicht --
+    //! deshalb hier dieselbe Sonde, aber mit Kriterium 1 (vertikale Reihen,
+    //! Gewicht 7) im Plattensatz und mit teilgefuellten Spalten.
+    //!
+    //! Erwartung: `scoring_progress` steigt beim Spaltenbau schnell (Gewicht 7,
+    //! quadratisch im Fuellstand), das Niveau wird also frueher positiv, und
+    //! die tiefen Ziehungen hoeren von selbst auf.
+    use super::stack_draw_depth_probe::*;
+    use super::*;
+
+    /// Fuellt bis zu `n` Zellen der Rasterspalte `spalte` bei Spieler 0 --
+    /// je Zelle mit der Farbe, die sie fordert (Wild nimmt die erste beste).
+    /// Rueckgabe: wie viele Zellen tatsaechlich gefuellt wurden.
+    fn spalte_fuellen(game: &mut Game, spalte: usize, n: usize) -> usize {
+        let mut gefuellt = 0usize;
+        for r in 0..6 {
+            if gefuellt >= n {
+                break;
+            }
+            let farbe = {
+                let Some(sp) = game.state.players[0].dome_grid.get_space(r, spalte) else {
+                    continue;
+                };
+                if sp.is_filled() {
+                    continue;
+                }
+                match sp.space_type {
+                    crate::dome::SpaceType::Normal => match sp.required_color {
+                        Some(f) => f,
+                        None => continue,
+                    },
+                    crate::dome::SpaceType::Wild => crate::tile::TileColor::NORMAL[0],
+                    crate::dome::SpaceType::Special => continue,
+                }
+            };
+            if game.state.players[0].dome_grid.place_tile(r, spalte, farbe).is_ok() {
+                gefuellt += 1;
+            }
+        }
+        gefuellt
+    }
+
+    /// Legt `n` Platten in POOL-Reihenfolge (kein Special-Vorzug, anders als
+    /// `brett_vorbereiten`) und fuellt danach so viele Spezialfelder, dass
+    /// genau `leer_lassen` leer bleiben. Damit ist `special_empty` eine
+    /// KONTROLLIERTE Konstante statt eine Folge der Plattenwahl -- das war die
+    /// Schwaeche des ersten Durchlaufs.
+    fn brett_gemischt(game: &mut Game, n_platten: usize, leer_lassen: usize) -> usize {
+        let mut gelegt = 0usize;
+        'slots: for sr in 0..3 {
+            for sc in 0..3 {
+                if gelegt >= n_platten {
+                    break 'slots;
+                }
+                if game.state.players[0].dome_grid.dome_slots[sr][sc].is_some() {
+                    continue;
+                }
+                if game.state.dome_tile_pool.is_empty() {
+                    break 'slots;
+                }
+                let tile = game.state.dome_tile_pool.remove(0);
+                if game.state.players[0].dome_grid.place_dome_tile(tile, sr, sc).is_ok() {
+                    gelegt += 1;
+                }
+            }
+        }
+        // alle Spezialfelder einsammeln, dann alle bis auf `leer_lassen` fuellen
+        let mut adressen = Vec::new();
+        for sr in 0..3 {
+            for sc in 0..3 {
+                if let Some(slot) = game.state.players[0].dome_grid.dome_slots[sr][sc].as_ref() {
+                    if let Some(si) = slot.special_space_idx() {
+                        if !slot.spaces[si].is_filled() {
+                            adressen.push((sr, sc, si));
+                        }
+                    }
+                }
+            }
+        }
+        let zu_fuellen = adressen.len().saturating_sub(leer_lassen);
+        for &(sr, sc, si) in adressen.iter().take(zu_fuellen) {
+            if let Some(slot) = game.state.players[0].dome_grid.dome_slots[sr][sc].as_mut() {
+                slot.spaces[si].placed_special = true;
+            }
+        }
+        adressen.len().min(leer_lassen)
+    }
+
+    /// Faire Fassung: `special_empty` fest auf 2, Plattenwahl ohne Vorzug,
+    /// variiert wird NUR der Spalten-Fuellstand. Beantwortet die Frage aus
+    /// par.6d ohne die Konfundierung des ersten Durchlaufs.
+    #[test]
+    fn spaltenfuellstand_gegen_festes_spezialfeld_defizit() {
+        let mit_spalten: Vec<usize> = vec![0, 1, 6];
+        let ohne_spalten: Vec<usize> = vec![0, 4, 6];
+        println!(
+            "
+{:<14}{:>12}{:>12}{:>12}{:>12}{:>12}",
+            "Spalte voll", "Spez. leer", "Niveau k1", "Tiefe k1", "Niveau k4", "Tiefe k4"
+        );
+        for n_spalte in [0usize, 2, 3, 4, 5, 6] {
+            let mut g1 = ziehbereites_spiel(mit_spalten.clone(), 42);
+            let leer1 = brett_gemischt(&mut g1, 6, 2);
+            let voll1 = spalte_fuellen(&mut g1, 0, n_spalte);
+            let (t1, _, niveau1) = ziehtiefe(g1);
+
+            let mut g4 = ziehbereites_spiel(ohne_spalten.clone(), 42);
+            brett_gemischt(&mut g4, 6, 2);
+            spalte_fuellen(&mut g4, 0, n_spalte);
+            let (t4, _, niveau4) = ziehtiefe(g4);
+
+            println!(
+                "{voll1:<14}{leer1:>12}{niveau1:>12.2}{t1:>12}{niveau4:>12.2}{t4:>12}"
+            );
+        }
+    }
+
+    #[test]
+    fn spaltenbau_beendet_die_tiefen_ziehungen_von_selbst() {
+        // Beide Arme tragen Kriterium 6 (die Ursache der tiefen Ziehungen).
+        // Sie unterscheiden sich darin, ob der Fortschritt beim Spaltenbau
+        // ueberhaupt BELOHNT wird: Kriterium 1 (vertikale Reihen, Gewicht 7)
+        // gegen Kriterium 4 (aeussere Felder, Gewicht 1 je Randfliese).
+        // (4, 1) ist ein Ausschlusspaar, beide gehen also nicht zugleich.
+        let mit_spalten: Vec<usize> = vec![0, 1, 6];
+        let ohne_spalten: Vec<usize> = vec![0, 4, 6];
+        for satz in [&mit_spalten, &ohne_spalten] {
+            for &id in satz.iter() {
+                if let Some(partner) = crate::scoring::exclusion_partner(id) {
+                    assert!(!satz.contains(&partner), "ungueltiger Plattensatz {satz:?}");
+                }
+            }
+        }
+
+        println!(
+            "\n{:<12}{:>12}{:>12}{:>14}{:>12}{:>14}",
+            "Platten", "Spalte voll", "Niveau k1", "Tiefe k1", "Niveau k4", "Tiefe k4"
+        );
+        let mut tiefen_k1 = Vec::new();
+        for (n_platten, n_spalte) in
+            [(4usize, 0usize), (4, 2), (4, 4), (6, 4), (6, 6), (8, 6)]
+        {
+            let mut g1 = ziehbereites_spiel(mit_spalten.clone(), 42);
+            brett_vorbereiten(&mut g1, n_platten, 0);
+            let voll1 = spalte_fuellen(&mut g1, 0, n_spalte);
+            let (t1, _, niveau1) = ziehtiefe(g1);
+
+            let mut g4 = ziehbereites_spiel(ohne_spalten.clone(), 42);
+            brett_vorbereiten(&mut g4, n_platten, 0);
+            spalte_fuellen(&mut g4, 0, n_spalte);
+            let (t4, _, niveau4) = ziehtiefe(g4);
+
+            println!(
+                "{n_platten:<12}{voll1:>12}{niveau1:>12.2}{t1:>14}{niveau4:>12.2}{t4:>14}"
+            );
+            tiefen_k1.push(t1);
+        }
+
+        assert!(
+            tiefen_k1.iter().all(|&t| t >= 1),
+            "jede Aufloesung braucht mindestens den Pflicht-Peek"
+        );
+    }
+}
+
+#[cfg(test)]
+mod plate_value_anschluss_check {
+    //! Vorpruefung fuer die SOLL-Seite von
+    //! PREREG_stack_draw_reservation_rule.md par.5: taugt die vorgeschlagene
+    //! Paarung `best_plate_value` + Punktekarte ueberhaupt, um eine NOCH NICHT
+    //! GELEGTE Platte zu bewerten?
+    //!
+    //! Verdacht: `points_map` liest `player.dome_grid.get_space(r, c)` und
+    //! ueberspringt jede Zelle ohne Space -- auf einem LEEREN Slot gibt es
+    //! aber keine Spaces. `best_plate_value` laeuft genau ueber die leeren
+    //! Slots. Dann waere die Karte dort ueberall 0 und der Plattenwert
+    //! ebenfalls.
+    use super::stack_draw_depth_probe::*;
+    use crate::board::PlayerBoard;
+
+    /// Zellbewertung fuer eine PUNKTE-Karte: 1 fuer jede bespielbare Zelle,
+    /// 0 fuer Spezialfelder (die faellt man nicht an, sie fallen an).
+    fn indikator(_p: &PlayerBoard, _r: usize, _c: usize, sp: &crate::dome::DomeSpace) -> f64 {
+        match sp.space_type {
+            crate::dome::SpaceType::Special => 0.0,
+            _ => 1.0,
+        }
+    }
+
+    #[test]
+    fn punktekarte_ist_auf_leeren_slots_null() {
+        let mut game = ziehbereites_spiel(vec![0, 1, 6], 42);
+        brett_vorbereiten(&mut game, 4, 0);
+        let pi = 0usize;
+        let karte = crate::plate_builder::expected_points_map(&game.state, pi);
+
+        let mut belegt_summe = 0.0;
+        let mut leer_summe = 0.0;
+        for r in 0..6 {
+            for c in 0..6 {
+                let hat_space = game.state.players[pi].dome_grid.get_space(r, c).is_some();
+                if hat_space {
+                    belegt_summe += karte[r][c];
+                } else {
+                    leer_summe += karte[r][c];
+                }
+            }
+        }
+        println!("\nKartensumme auf Zellen MIT Space: {belegt_summe:.2}");
+        println!("Kartensumme auf Zellen OHNE Space (leere Slots): {leer_summe:.2}");
+
+        let alle: Vec<(usize, usize)> =
+            (0..6).flat_map(|r| (0..6).map(move |c| (r, c))).collect();
+        let tile = game.state.dome_tile_pool[0].clone();
+        let wert = crate::plate_builder::best_plate_value(
+            &game.state.players[pi], &tile, &alle, &karte, indikator,
+        );
+        println!("best_plate_value fuer eine Pool-Platte mit Punktekarte: {wert:?}");
+        assert_eq!(
+            leer_summe, 0.0,
+            "Gegenprobe: die Karte darf auf leeren Slots keine Werte tragen"
+        );
+    }
+}
+
+#[cfg(test)]
+mod stack_draw_soll_seite {
+    //! SOLL-Seite zu PREREG_stack_draw_reservation_rule.md par.5: wie oft
+    //! WUERDE die optimale Regel ziehen, und wie steht das zu den 11-13
+    //! Ziehungen der gebauten Regel (par.6b)?
+    //!
+    //! Bewertung einer NOCH NICHT GELEGTEN Platte: die vorgeschlagene Paarung
+    //! `best_plate_value` + `expected_points_map` ist dafuer NICHT brauchbar
+    //! -- die Karte liest `get_space(r, c)` und ist auf leeren Slots ueberall
+    //! 0 (gemessen in `plate_value_anschluss_check`: Kartensumme 15,33 auf
+    //! belegten Zellen, 0,00 auf leeren, `best_plate_value` -> Some(0.0)).
+    //! Stattdessen der Weg, den der Doc-Kommentar von `best_plate_value`
+    //! selbst nennt: Platte probeweise legen, DANACH bewerten.
+    use super::stack_draw_depth_probe::*;
+    use crate::dome::DomeTile;
+    use crate::state::GameState;
+
+    /// Realisierungsabschlag je Rasterreihe, aus par.4d: Anteil der Runden, in
+    /// denen Musterreihe r bei einem PLATTENBEWUSSTEN Spieler abschliesst
+    /// (Mensch-Profil 3,60/3,30/3,20/2,60/2,30/1,70 Platzierungen je Partie,
+    /// geteilt durch die 5 moeglichen). VEREINFACHUNG, ausdruecklich: es wird
+    /// nicht zusaetzlich durch die Zahl der freien Zellen jener Reihe geteilt,
+    /// der Abschlag ist also eher zu MILD.
+    const ABSCHLAG: [f64; 6] = [0.72, 0.66, 0.64, 0.52, 0.46, 0.34];
+
+    /// Wert einer Platte in PUNKTEN: ueber Slot und Rotation maximiert, je
+    /// Kombination die Platte auf einem Probe-Brett legen, dort die
+    /// Punktekarte rechnen und ueber die vier neu entstandenen Zellen
+    /// summieren -- mit Realisierungsabschlag je Rasterreihe.
+    fn plattenwert(state: &GameState, pi: usize, tile: &DomeTile, mit_abschlag: bool) -> f64 {
+        let mut best = 0.0f64;
+        for &(sr, sc) in &state.players[pi].dome_grid.empty_slots() {
+            for rot in [0u32, 90, 180, 270] {
+                let mut probe = state.clone();
+                let mut t = tile.clone();
+                if t.apply_rotation(rot).is_err() {
+                    continue;
+                }
+                if probe.players[pi].dome_grid.place_dome_tile(t, sr, sc).is_err() {
+                    continue;
+                }
+                let karte = crate::plate_builder::expected_points_map(&probe, pi);
+                let mut summe = 0.0;
+                for i in 0..4usize {
+                    let (r, c) = (sr * 2 + i / 2, sc * 2 + i % 2);
+                    summe += karte[r][c] * if mit_abschlag { ABSCHLAG[r] } else { 1.0 };
+                }
+                if summe > best {
+                    best = summe;
+                }
+            }
+        }
+        best
+    }
+
+    /// Optimale Ziehtiefe nach der Reservationsregel: weiterziehen, solange
+    /// `E[max(V_next − V_hand, 0)] > 1 Punkt`. Der Erwartungswert laeuft ueber
+    /// die Platten des Rest-Pools, die den GLEICHEN Typ haben wie die oberste
+    /// (deren Ruecken ist gratis sichtbar, `serialize.rs:270`).
+    fn optimale_tiefe(state: &GameState, pi: usize, mit_abschlag: bool) -> (usize, f64, f64) {
+        let mut pool: Vec<DomeTile> = state.dome_tile_pool.clone();
+        let mut v_hand = f64::NEG_INFINITY;
+        let mut tiefe = 0usize;
+        let mut erste_e = 0.0;
+        while !pool.is_empty() && tiefe < 20 {
+            if tiefe > 0 {
+                let typ = pool[0].is_special_type();
+                let gleiche: Vec<&DomeTile> =
+                    pool.iter().filter(|t| t.is_special_type() == typ).collect();
+                if gleiche.is_empty() {
+                    break;
+                }
+                let e: f64 = gleiche
+                    .iter()
+                    .map(|t| (plattenwert(state, pi, t, mit_abschlag) - v_hand).max(0.0))
+                    .sum::<f64>()
+                    / gleiche.len() as f64;
+                if tiefe == 1 {
+                    erste_e = e;
+                }
+                if e <= 1.0 {
+                    break;
+                }
+            }
+            let gezogen = pool.remove(0);
+            v_hand = v_hand.max(plattenwert(state, pi, &gezogen, mit_abschlag));
+            tiefe += 1;
+        }
+        (tiefe, v_hand, erste_e)
+    }
+
+    #[test]
+    fn soll_tiefe_gegen_gebaute_regel() {
+        println!(
+            "\n{:<10}{:>10}{:>12}{:>10}{:>12}{:>12}{:>10}",
+            "Platten", "Spez.leer", "V_hand roh", "SOLL roh", "V_hand abg.", "SOLL abg.", "IST"
+        );
+        for (n_platten, n_gefuellt) in [(2usize, 2usize), (4, 4), (4, 2), (4, 0), (6, 0)] {
+            let mut g = ziehbereites_spiel(vec![0, 4, 6], 42);
+            let leer = brett_vorbereiten(&mut g, n_platten, n_gefuellt);
+            let (t_roh, v_roh, _) = optimale_tiefe(&g.state, 0, false);
+            let (t_abg, v_abg, _) = optimale_tiefe(&g.state, 0, true);
+            let (ist, _, _) = ziehtiefe(g);
+            println!(
+                "{n_platten:<10}{leer:>10}{v_roh:>12.2}{t_roh:>10}{v_abg:>12.2}{t_abg:>12}{ist:>10}"
+            );
+        }
+    }
+}

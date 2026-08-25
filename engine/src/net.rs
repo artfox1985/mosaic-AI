@@ -1102,8 +1102,8 @@ mod tests {
             x.len() == y.len() && x.iter().zip(y).all(|(u, v)| (u - v).abs() < 1e-5)
         };
         for trial in 0..5u32 {
-            let feats_a: Vec<f32> = (0..net.input_size).map(|_| rng.random_range(-1.0f32..1.0)).collect();
-            let feats_b: Vec<f32> = (0..net.input_size).map(|_| rng.random_range(-1.0f32..1.0)).collect();
+            let feats_a: Vec<f32> = (0..builder_input_len()).map(|_| rng.random_range(-1.0f32..1.0)).collect();
+            let feats_b: Vec<f32> = (0..builder_input_len()).map(|_| rng.random_range(-1.0f32..1.0)).collect();
             let (pa, va, ma, pta) = net.eval(&feats_a).expect("eval a");
             let (pb, vb, mb, ptb) = net.eval(&feats_b).expect("eval b");
             let ((pa2, va2, ma2, pta2), (pb2, vb2, mb2, ptb2)) =
@@ -1126,6 +1126,18 @@ mod tests {
     /// `None` -- die drei `eval_batch`-Tests liefen seither leer-gruen.
     /// Jetzt: Champion + harter Fehler statt Skip (Nutzer-Regel: nie leer
     /// gruen).
+    /// Vertragliche Eingabelaenge fuer `eval`/`eval_batch`: die Laenge, die
+    /// der BAUER liefert, nicht die des Modells. Seit der Bauer breiter sein
+    /// darf als ein Altmodell (`split_planes_flat_batch_src`) faellt beides
+    /// auseinander -- `net.input_size()` ist die MODELL-Erwartung
+    /// (`InputLayout::flat_len`), gefuettert wird aber immer der volle
+    /// Bauer-Puffer, den die Schicht dann kuerzt. Tests, die mit
+    /// `net.input_size()` synthetisieren, pruefen daher seit 2026-08-25 den
+    /// falschen Vertrag (Symptom: `range end index ... out of range`).
+    fn builder_input_len() -> usize {
+        crate::features::NUM_PLANES_VALUES + crate::features::INPUT_SIZE
+    }
+
     fn load_eval_batch_test_net() -> Net {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v21_2d_brierbest.onnx");
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
@@ -1151,7 +1163,7 @@ mod tests {
         };
         for &n in &[1usize, 2, 3, 5, 9, 16] {
             let feats: Vec<Vec<f32>> = (0..n)
-                .map(|_| (0..net.input_size).map(|_| rng.random_range(-1.0f32..1.0)).collect())
+                .map(|_| (0..builder_input_len()).map(|_| rng.random_range(-1.0f32..1.0)).collect())
                 .collect();
             let feats_refs: Vec<&[f32]> = feats.iter().map(|v| v.as_slice()).collect();
             let single: Vec<(Vec<f32>, Vec<f32>, Vec<f32>, Vec<f32>)> =
@@ -1172,7 +1184,7 @@ mod tests {
     #[test]
     fn eval_batch_rejects_batch_size_beyond_max() {
         let net = load_eval_batch_test_net();
-        let feats: Vec<f32> = vec![0.0; net.input_size];
+        let feats: Vec<f32> = vec![0.0; builder_input_len()];
         let refs: Vec<&[f32]> = (0..EVAL_BATCH_MAX_N + 1).map(|_| feats.as_slice()).collect();
         assert!(net.eval_batch(&refs).is_err(), "N > EVAL_BATCH_MAX_N muss fehlschlagen, nicht still zurueckfallen");
     }
