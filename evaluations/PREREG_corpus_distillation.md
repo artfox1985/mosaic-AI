@@ -60,8 +60,8 @@ Policy koennen und ein Blatt-Shift nicht.
 | Ausschluss-Paare | (0,7) (6,3) (4,1) (2,5) — **k2 und k5 kommen NIE zusammen vor**, k1 und k4 auch nicht | `engine/src/scoring.rs:59-65` (`MUTUALLY_EXCLUSIVE_PAIRS`) |
 | Heuristik hat einen eigenen Plattenterm | `wertung_progress` | `engine/src/scoring.rs:160` |
 | Netz-gegen-Netz kann Seeds und Logs | `net_vs_net_arena_match(..., log_games, seeds)` | `engine/src/lib.rs:268` (Signatur) |
-| Durchsatz Netz gegen Heuristik | **2,83 s/Partie** (24 Partien / 67,9 s, 11 Faeden) | Kostenprobe par.6, `evaluations/paired_arena_env_dist_probe.json` |
-| Durchsatz Netz gegen Netz | **11,95 s/Partie** (12 Partien / 143,4 s, 11 Faeden) = 4,2x | Kostenprobe par.6, `evaluations/paired_arena_env_dist_nn_probe.json` |
+| Durchsatz Netz gegen Heuristik | **2,83 s/Partie** (24 Partien / 67,9 s, 11 Faeden) | Kostenprobe par.6, `evaluations/artifacts/paired_arena_env_dist_probe.json` |
+| Durchsatz Netz gegen Netz | **11,95 s/Partie** (12 Partien / 143,4 s, 11 Faeden) = 4,2x | Kostenprobe par.6, `evaluations/artifacts/paired_arena_env_dist_nn_probe.json` |
 
 **Ungeprueft / uebernommen:** die Korpus-Zusammensetzung (3000 Bauer-Partien,
 Trefferquoten 42 % / 40 % / 55 %) stammt aus `PREREG_ownership_corpus.md` §8
@@ -219,7 +219,7 @@ untragbar erklaeren (par.11.2). Das wird hier nicht wiederholt.
 
 **Seed-Satz:** `tools/seed_selection_plates.py --seed-start 1000 --seed-count
 4000 --pro-kriterium 150` → **407 Seeds**, jedes der 8 Kriterien in >= 150
-Partien aktiv (`evaluations/seed_selection_distillation_main.json`,
+Partien aktiv (`evaluations/artifacts/seed_selection_distillation_main.json`,
 `evaluations/distillation_seeds_main.txt`). Der gate-C-Hauptsatz ist als MENGE
 darin enthalten; die ersten 99 Seeds stehen in identischer Reihenfolge, danach
 weicht die Greedy-Auswahl ab.
@@ -354,9 +354,9 @@ nachgerechnet, damit die Zahlen nicht als Vorbefund weiterwandern:
 **Was gelaufen ist:** `champion` und `w0_best`, je 407 Partien. Der `w1_best`-Arm
 starb mitten im Lauf (keine Datei — der Orchestrator schreibt erst nach dem
 letzten Block), `f1` wurde nie gestartet. **Damit gibt es genau EINE der drei
-registrierten Paarungen.** Rohdaten: `evaluations/paired_arena_env_dist_h_ch.json`,
+registrierten Paarungen.** Rohdaten: `evaluations/artifacts/paired_arena_env_dist_h_ch.json`,
 `..._dist_h_w0.json` (je ~10 MB, per `.gitignore:78` nicht versioniert);
-Kennzahlen versioniert in `evaluations/distillation_block_h_partial.json`.
+Kennzahlen versioniert in `evaluations/artifacts/distillation_block_h_partial.json`.
 
 ### par.8.1 Absolut (Block-Mittel; der Restblock von 7 Partien faellt nach der Blockregel raus)
 
@@ -537,7 +537,7 @@ richtige Warnung).
 
 ### par.10.3 NACHTRAG 2026-08-16, 17:00 — DAS DIREKTE DUELL IST GEFAHREN, UND ES KIPPT AUSGANG 3
 
-`evaluations/paired_gating_w0best_vs_champion.json`, `tools/paired_gating.py`,
+`evaluations/artifacts/paired_gating_w0best_vs_champion.json`, `tools/paired_gating.py`,
 `--no-promote-winner` (der Default haette `models/champion.txt` selbsttaetig
 umgeschrieben, `paired_gating.py:473`). Beide @400 Sims, Brett-Tausch je Paar.
 
@@ -717,7 +717,7 @@ Partien Sockel — es ist also MEHR, nicht weniger).
 
 **Messung:** `v21-b18_best` gegen den Champion, Netz gegen Netz, beide @400,
 407 Seeds, alle Regler aus, Brett-Tausch je Block.
-`evaluations/paired_arena_env_b18best_vs_ch.json`.
+`evaluations/artifacts/paired_arena_env_b18best_vs_ch.json`.
 
 | | `b18_best` | Champion | Delta |
 |---|---:|---:|---:|
@@ -798,7 +798,7 @@ erwarteten Plateau. `v21-b21` haengt dahinter und kommt entsprechend spaet.
 ### par.10.9 ERGEBNIS COLD START (2026-08-17) — DER PRIOR WAR NICHT DIE BLOCKADE
 
 `v21-b20_best` gegen den Champion, 407 Seeds, alle Regler aus, identische
-Anordnung wie par.10.7. Rohdaten `evaluations/paired_arena_env_b20best_vs_ch.json`.
+Anordnung wie par.10.7. Rohdaten `evaluations/artifacts/paired_arena_env_b20best_vs_ch.json`.
 
 | | `b18` (Warm Start) | `b20` (Cold Start) |
 |---|---:|---:|

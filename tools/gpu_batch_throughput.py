@@ -99,7 +99,7 @@ def main() -> int:
     ap.add_argument("--model", default="models/alphazero_v21_2d_brierbest.pth")
     ap.add_argument("--reps", type=int, default=30)
     ap.add_argument("--warmup", type=int, default=10)
-    ap.add_argument("--out", default="evaluations/gpu_batch_throughput.json")
+    ap.add_argument("--out", default="evaluations/artifacts/gpu_batch_throughput.json")
     args = ap.parse_args()
 
     import torch

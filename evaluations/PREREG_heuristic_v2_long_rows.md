@@ -61,7 +61,7 @@ Eingriff -- und genau deshalb ist der Lehrer der richtige Ort.
 
 ## par.2 Zahlenstand, gegen den v2 sich messen muss
 
-Aus `evaluations/long_row_init_arena_eval.json` (814 gepaarte Partien,
+Aus `evaluations/artifacts/long_row_init_arena_eval.json` (814 gepaarte Partien,
 Champion beidseitig, 400 Sims):
 
 | Groesse | Wert |
@@ -723,7 +723,7 @@ schliesst.
 ### par.5.3 ERGEBNIS (2026-08-24): Faehigkeit belegt, Preis hoch -- URTEIL STEHT AUS
 
 `tools/run_v2_teacher_arena.sh` -> `tools/probes/v2_teacher_arena.py`,
-Artefakt `evaluations/v2_teacher_arena.json`. 407 Kampagnen-Seeds je Arm,
+Artefakt `evaluations/artifacts/v2_teacher_arena.json`. 407 Kampagnen-Seeds je Arm,
 Champion@400 gegen Heuristik@150, mit v1-Bezug auf DENSELBEN Seeds -- ohne
 den waere "v2 verliert X" nicht von "die Heuristik verliert ohnehin X" zu
 trennen.
@@ -977,7 +977,7 @@ entscheidbar, welcher Baustein traegt.
 ### par.8.5 ERGEBNIS des Laufs (2026-08-25, n=160)
 
 `tools/probes/v2_envelope_arena.py`, Ergebnis in
-`evaluations/v2_envelope_arena.json`. Aufbau genau wie in par.8.4 vorab
+`evaluations/artifacts/v2_envelope_arena.json`. Aufbau genau wie in par.8.4 vorab
 festgelegt: 80 gepaarte Partien je Sitz, 150 Sims je Seite, Seed 20260825,
 Auswertung auf 10 Bloecken zu je 16 Partien.
 
@@ -1130,7 +1130,7 @@ das wertvollere Ergebnis.
 
 ### par.9.1 ERGEBNIS (2026-08-25, n=160): Heatmap VERLIERT, Vorhersage WIDERLEGT
 
-`evaluations/v2_envelope_arena_heatmap.json`. Differenzen Heatmap minus Huelle.
+`evaluations/artifacts/v2_envelope_arena_heatmap.json`. Differenzen Heatmap minus Huelle.
 
 | Kennzahl | Huelle | Heatmap | Delta | t (Block) |
 | --- | --- | --- | --- | --- |
@@ -1338,7 +1338,7 @@ falsch (par.9.1, par.9.2). Ich registriere hier keine dritte.
 
 ### par.10.1 ERGEBNIS: die Huelle schlaegt v1 UND v2 als Lehrer (2026-08-25)
 
-`evaluations/v2_teacher_arena_v2huelle.json`, 407 Kampagnen-Seeds je Arm,
+`evaluations/artifacts/v2_teacher_arena_v2huelle.json`, 407 Kampagnen-Seeds je Arm,
 Champion `v21_2d_brierbest`@400 gegen die Heuristik@150, v1 auf denselben
 Seeds als Bezug. Laufzeit 2.610 s bei 11 Threads (814 Partien, 3,207 s je
 Partie).
@@ -1385,7 +1385,7 @@ Lauf nicht ausgewertet -- `v2_teacher_arena.py` hat sie nicht, nur
 
 ### par.11.1 ERGEBNIS: H0, die externe Form uebertraegt sich nicht (2026-08-25)
 
-`evaluations/v2_envelope_arena_phase.json`, n=160 gegen `V2Huelle`, sonst
+`evaluations/artifacts/v2_envelope_arena_phase.json`, n=160 gegen `V2Huelle`, sonst
 Aufbau wie par.8.4.
 
 | Kennzahl | Huelle | Phase | Delta | t (Block) |
@@ -1505,7 +1505,7 @@ ohne Bestaetigungslauf negativ.
 
 ### par.13.1 ERGEBNIS Screening (2026-08-25): Position irrelevant, Arm negativ
 
-`evaluations/phase_sweep.json`, 16 LHS-Punkte, je 160 gepaarte Partien gegen
+`evaluations/artifacts/phase_sweep.json`, 16 LHS-Punkte, je 160 gepaarte Partien gegen
 `V2Huelle`, Entwurfs-Seed 20260825, Laufzeit 236 s.
 
 | Groesse | Wert |
@@ -1561,7 +1561,7 @@ und die beiden Diagnose-Knoepfe bleiben im Code, Default aus.
 
 ### par.12.1 ERGEBNIS (2026-08-25): NEGATIV, und das vorab benannte Risiko ist eingetreten
 
-`evaluations/v2_envelope_arena_filter.json`, n=160 gegen `V2Huelle`.
+`evaluations/artifacts/v2_envelope_arena_filter.json`, n=160 gegen `V2Huelle`.
 
 | Kennzahl | Huelle | Filter | Delta | t (Block) |
 | --- | --- | --- | --- | --- |
@@ -1664,7 +1664,7 @@ Arme und 65 gemessene Formen.
 
 ### par.14.2 ERGEBNIS (2026-08-25): NEGATIV -- und meine Erklaerung war falsch
 
-`evaluations/phase_sweep.json`, 48 Laeufe (3 Stufen x 16 LHS-Punkte), je 160
+`evaluations/artifacts/phase_sweep.json`, 48 Laeufe (3 Stufen x 16 LHS-Punkte), je 160
 gepaarte Partien, Entwurfs-Seed 20260826, Laufzeit 732 s.
 
 | Stufe | n | Mittel Delta Spalten | max \|t\| | Mittel Delta Punkte | Mittel Siegquote |
@@ -1762,7 +1762,7 @@ die Modellierung widerlegt ist.
 
 ### par.15.1 ERGEBNIS (2026-08-25): auch als MASS negativ -- die Bauform ist widerlegt
 
-`evaluations/v2_envelope_arena_reach.json`, n=160 gegen `V2Huelle`, 16,4 s.
+`evaluations/artifacts/v2_envelope_arena_reach.json`, n=160 gegen `V2Huelle`, 16,4 s.
 
 | Kennzahl | Huelle | Reach | Delta | t (Block) |
 | --- | --- | --- | --- | --- |

@@ -86,7 +86,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--pattern", default="data/selfplay_v10b_*.pkl",
                      help="Glob-Pattern für die zu analysierenden .pkl-Korpusdateien")
-    ap.add_argument("--out", default="evaluations/rtv_redundancy_v10b.json")
+    ap.add_argument("--out", default="evaluations/artifacts/rtv_redundancy_v10b.json")
     args = ap.parse_args()
 
     files = sorted(glob.glob(args.pattern))

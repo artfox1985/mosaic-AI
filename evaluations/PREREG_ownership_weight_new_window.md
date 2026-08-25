@@ -22,7 +22,7 @@ wird):
 
 - Die **Kopfguete-Messung** ist weiter gueltig. Tor A lief auf dem
   KORPUS-Anteil des Held-outs (`n_val_corpus_files = 82`,
-  `n_heldout_games = 820`, `evaluations/ownership_gate_a_f1_f2.json`) — also
+  `n_heldout_games = 820`, `evaluations/artifacts/ownership_gate_a_f1_f2.json`) — also
   fensterunabhaengig, und der Korpus ist unveraendert.
 - Der **monotone Trend** ueber fuenf Stuetzstellen (0 / 0,1 / 0,2 / 0,5 / 1,0)
   auf mehreren Zielkriterien traegt. Die Projektregel "≥6 gepaarte Seeds"
@@ -162,7 +162,7 @@ und das direkte Duell 43:57 verlor.
 
 Beide Arme durch, Early Stopping jeweils nach Epoche 15. Bester Checkpoint
 `b18` Epoche 4, `b19` Epoche 3. Kopfguete mit `tools/probes/ownership_gate_a.py`
-auf der CPU, Rohzahlen `evaluations/ownership_gate_a_b18_b19.json`.
+auf der CPU, Rohzahlen `evaluations/artifacts/ownership_gate_a_b18_b19.json`.
 
 | Metrik am besten Checkpoint | `b18` (1,0) | `b19` (2,0) | besser |
 |---|---:|---:|---|

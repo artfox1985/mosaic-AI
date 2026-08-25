@@ -103,7 +103,7 @@ def main() -> None:
     print(f"  VORABREGEL par.5: {'BESTANDEN' if bestanden else 'NICHT BESTANDEN'}")
     print("  Bezug: Realisierungsrate k1 heute ~13 % (20 Spalten in 156 Partien)")
 
-    (BASIS / "evaluations" / "probe_reachability_base_rate.json").write_text(json.dumps({
+    (BASIS / "evaluations" / "artifacts" / "probe_reachability_base_rate.json").write_text(json.dumps({
         "states": a.states, "phase": a.phase, "je_runde": erg,
         "k1_runden_im_band": k1_ok, "k2_runden_im_band": k2_ok,
         "bestanden": bestanden,

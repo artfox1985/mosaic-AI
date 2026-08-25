@@ -60,7 +60,7 @@ Mittel ueber schwache Geschwister-Fortsetzungen verwaessert.
    beachten: bei engine-weiten Aenderungen zaehlt der absolute
    Score-Level mit, nicht nur die Siegquote.
 
-### par.2a ERGEBNIS VORZEICHEN-SONDE (2026-08-23, `tools/probes/implicit_minimax_sign_probe.py`, Artefakt `evaluations/implicit_minimax_sign_probe.json`)
+### par.2a ERGEBNIS VORZEICHEN-SONDE (2026-08-23, `tools/probes/implicit_minimax_sign_probe.py`, Artefakt `evaluations/artifacts/implicit_minimax_sign_probe.json`)
 
 30 gepaarte Partien Champion@400 gegen Heuristik@150 auf identischen
 Seeds, alpha 0 vs 0,2 in getrennten Prozessen (OnceLock):
@@ -86,7 +86,7 @@ Seeds, alpha 0 vs 0,2 in getrennten Prozessen (OnceLock):
   Nenner-Hinweis: 100 % auf Partie-Ebene ist NICHT mit den 3,1 %
   Einzelentscheidungen der r5_chance-Vorlage vergleichbar.
 
-### par.2b ERGEBNIS ARENA + VERDIKT (2026-08-23, Artefakt `evaluations/paired_arena_env_imm_a02.json`, Log `logs/arena_imm_a02_20260823.log`; Instrument-Zahlen vom Koordinator selbst erhoben)
+### par.2b ERGEBNIS ARENA + VERDIKT (2026-08-23, Artefakt `evaluations/artifacts/paired_arena_env_imm_a02.json`, Log `logs/arena_imm_a02_20260823.log`; Instrument-Zahlen vom Koordinator selbst erhoben)
 
 407 Kampagnen-Seeds, Champion@400 gegen Heuristik@150, alpha 0 vs 0,2
 in getrennten Prozessen, gepaart je Spielindex:

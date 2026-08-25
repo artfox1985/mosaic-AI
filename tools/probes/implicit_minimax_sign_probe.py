@@ -47,7 +47,7 @@ sys.path.insert(0, str(BASIS / "tools"))
 from paired_arena_env_ab import champion_model  # noqa: E402 -- bestehende Champion-Aufloesung wiederverwenden
 
 WORKER = BASIS / "tools" / "paired_arena_arm_worker.py"
-OUT = BASIS / "evaluations" / "implicit_minimax_sign_probe.json"
+OUT = BASIS / "evaluations" / "artifacts" / "implicit_minimax_sign_probe.json"
 
 KNOB = "MOSAIC_IMPLICIT_MINIMAX_A"
 ARMS = ["0", "0.2"]  # aus (Bestand) vs. an (Literatur-Empfehlung, par.1)

@@ -146,6 +146,6 @@ if __name__ == "__main__":
             raise SystemExit(f"{name}-venv-Python nicht gefunden: {exe}")
     result = run_paired_ab()
     print(json.dumps(result, indent=2))
-    out_path = BASE_DIR / "evaluations" / "paired_arena_round5_result.json"
+    out_path = BASE_DIR / "evaluations" / "artifacts" / "paired_arena_round5_result.json"
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(f"Ergebnis gespeichert: {out_path}")

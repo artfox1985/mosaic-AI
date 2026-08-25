@@ -181,7 +181,7 @@ def main() -> None:
             raise SystemExit(f"{k}: @seite muss 0 oder 1 sein")
         roh, _, arm = rest.partition("#")
         pf = Path(roh) if roh.endswith(".json") else \
-            BASIS / "evaluations" / f"paired_arena_env_{a.praefix}_{roh}.json"
+            BASIS / "evaluations" / "artifacts" / f"paired_arena_env_{a.praefix}_{roh}.json"
         if not pf.exists():
             print(f"{k}: FEHLT ({pf.name})")
             continue

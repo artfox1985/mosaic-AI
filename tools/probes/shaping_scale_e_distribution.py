@@ -144,7 +144,7 @@ def main() -> None:
               if ergebnis.get("r1_k1", {}).get("median", 0) > 1e-9 else
               "  Runde-1-Frage: E ist dort ~0 -- Nenner-Profil koennte greifen.")
 
-    (BASIS / "evaluations" / "probe_shaping_e_distribution.json").write_text(
+    (BASIS / "evaluations" / "artifacts" / "probe_shaping_e_distribution.json").write_text(
         json.dumps({"model": a.model, "states": a.states, "n": len(proben),
                     "profil": PROFIL, "ergebnis": ergebnis}, indent=1, ensure_ascii=False),
         encoding="utf-8")

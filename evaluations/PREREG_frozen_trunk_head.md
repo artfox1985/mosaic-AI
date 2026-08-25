@@ -53,7 +53,7 @@ Das ist keine Absichtserklaerung, sondern eine pruefbare Bedingung, siehe §4.
 | **J** (Bestand, laeuft nicht neu) | -- | `v21_2d_own_w05` `_best` + `final` aus §10 | Der GEMEINSAME Arm (Kopf + Trunk zusammen), Zahlen liegen bereits vor |
 
 Arm J wird **nicht neu gerechnet**: seine Zahlen stehen in
-`evaluations/ownership_gate_a_results.json` und stammen aus demselben
+`evaluations/artifacts/ownership_gate_a_results.json` und stammen aus demselben
 Held-out-Satz, den F1/F2 verwenden werden (§4). Ein Neulauf waere reine
 Rechenzeit ohne Erkenntnis.
 
@@ -169,7 +169,7 @@ neu geschrieben:
 
 ```
 python tools/probes/ownership_gate_a.py --arms f1,f2 \
-  --model-prefix alphazero_v21_2d_own_ --out evaluations/ownership_gate_frozen_results.json
+  --model-prefix alphazero_v21_2d_own_ --out evaluations/artifacts/ownership_gate_frozen_results.json
 ```
 
 (Die drei Schalter sind in dieser Sitzung additiv ergaenzt worden, Default =
@@ -276,7 +276,7 @@ Aenderung am Verbraucher.
 Lauf: `--freeze-trunk --load v21_2d_own_w1_best --ownership-weight 1,0
 --lr 5e-4`, Early Stop Epoche 15 (Ownership-Plateau ab Ep. 10). Auswertung
 mit `tools/probes/ownership_gate_a.py` auf demselben Held-out (820 Partien);
-Rohzahlen `evaluations/ownership_gate_a_f1.json`. Zahlen vom Koordinator
+Rohzahlen `evaluations/artifacts/ownership_gate_a_f1.json`. Zahlen vom Koordinator
 nachgerechnet.
 
 | Stand | Ep | policy val | value Brier | Feld-AUC | E_k k1 | k2 | k5 |

@@ -186,7 +186,7 @@ def main():
                           "Default (None) = --seed + 1000, reproduziert dort die dortigen "
                           "hartkodierten 1000/2000.")
     ap.add_argument("--arm", default="off", help="Label fuer PLATE_SHAPING_ENABLED-Zustand des installierten Wheels (nur Doku im Ergebnis-JSON, wird nicht geprueft)")
-    ap.add_argument("--out", default="evaluations/plate_rank_invariance_result.json")
+    ap.add_argument("--out", default="evaluations/artifacts/plate_rank_invariance_result.json")
     args = ap.parse_args()
     seed2 = args.seed2 if args.seed2 is not None else args.seed + 1000
 

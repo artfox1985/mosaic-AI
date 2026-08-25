@@ -78,7 +78,7 @@ DEFAULT_SIMS = 400
 DEFAULT_C_PUCT = 1.5
 MIN_CANDIDATES_FOR_TAU = 3  # identische Schwelle wie oracle_metrics.py
 
-OUT_DEFAULT = ROOT / "evaluations" / "value_rank_metric.json"
+OUT_DEFAULT = ROOT / "evaluations" / "artifacts" / "value_rank_metric.json"
 
 
 def usable_oracle_labels(labels: list[dict]) -> list[dict]:
@@ -374,7 +374,7 @@ def main() -> None:
     args = p.parse_args()
 
     if args.validate:
-        out_path = Path(args.out) if args.out else ROOT / "evaluations" / "value_rank_metric_validation.json"
+        out_path = Path(args.out) if args.out else ROOT / "evaluations" / "artifacts" / "value_rank_metric_validation.json"
         run_validate(args.min_pairs, args.alpha_decisive, out_path)
         return
 
@@ -382,7 +382,7 @@ def main() -> None:
         models = args.models or ["v18_best", "v17_best"]
         n_states = args.n_states if args.n_states is not None else 30
         result = run_smoke(models, n_states, args.sims, args.c_puct)
-        out_path = Path(args.out) if args.out else ROOT / "evaluations" / "value_rank_metric_smoke.json"
+        out_path = Path(args.out) if args.out else ROOT / "evaluations" / "artifacts" / "value_rank_metric_smoke.json"
     else:
         if not args.models:
             raise SystemExit("--models erforderlich (ausser bei --smoke/--validate).")

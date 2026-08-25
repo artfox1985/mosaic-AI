@@ -68,7 +68,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-glob", default="data/selfplay_v16_*.pkl")
     ap.add_argument("--limit-files", type=int, default=None, help="None = alle Dateien")
-    ap.add_argument("--out", default="evaluations/scoring_tile_distribution_v16.json")
+    ap.add_argument("--out", default="evaluations/artifacts/scoring_tile_distribution_v16.json")
     args = ap.parse_args()
 
     files = sorted(glob.glob(args.data_glob))

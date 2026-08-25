@@ -109,7 +109,7 @@ N_FILES_PER_CORPUS = 20   # feste Datei-Stichprobe je Korpus (deterministisch
 FROZEN_V1_CORPORA = ["v10b", "v12", "netcq"]
 
 OUT_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
-OUT_MANIFEST = ROOT / "evaluations" / "frozen_eval_set_manifest.json"
+OUT_MANIFEST = ROOT / "evaluations" / "artifacts" / "frozen_eval_set_manifest.json"
 
 
 def _out_paths(frozen_version: str, out_override: str | None) -> tuple[Path, Path]:
@@ -129,7 +129,7 @@ def _out_paths(frozen_version: str, out_override: str | None) -> tuple[Path, Pat
         return OUT_PKL, OUT_MANIFEST
     suffix = frozen_version[len("frozen_"):] if frozen_version.startswith("frozen_") else frozen_version
     pkl = ROOT / "evaluations" / f"frozen_eval_set_{suffix}.pkl"
-    manifest = ROOT / "evaluations" / f"frozen_eval_set_{suffix}_manifest.json"
+    manifest = ROOT / "evaluations" / "artifacts" / f"frozen_eval_set_{suffix}_manifest.json"
     return pkl, manifest
 
 

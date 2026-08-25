@@ -51,7 +51,7 @@ deshalb NACHGELAGERT und nur bedingt gefahren (par.4, Stufe 2).
 | Wertungsplatten je Partie | **genau 3**, aus vier paarweise ausschliessenden Paaren gezogen | `scoring.rs:89` (`sample_valid_scoring_ids`), Aufrufe mit `n=3` u.a. `self_play.rs:2288` |
 | Ausschluss-Paare | (0,7) (6,3) (4,1) (2,5) — **k1 und k4 nie zusammen, k2 und k5 nie zusammen, k6 und k3 nie zusammen** | `scoring.rs:60-65` |
 | F1-Checkpoint | `models/alphazero_v21_2d_own_f1.onnx`, ownership-Ausgang Breite 140 | ONNX-Kopfliste; Identitaet ueber `ownership_gate_a_f1.json` (`checkpoint: alphazero_v21_2d_own_f1.pth`, 15 Epochen) |
-| F1-Guete | policy val 0,2141, value-Brier 0,1884, Feld-AUC 0,780; E_k-Spearman k1 0,280 / k2 0,314 / k5 0,345 | `evaluations/ownership_gate_a_f1.json` |
+| F1-Guete | policy val 0,2141, value-Brier 0,1884, Feld-AUC 0,780; E_k-Spearman k1 0,280 / k2 0,314 / k5 0,345 | `evaluations/artifacts/ownership_gate_a_f1.json` |
 | w1-final-Checkpoint | `models/alphazero_v21_2d_own_w1.onnx`, ownership-Ausgang Breite 140 | ONNX-Kopfliste |
 | w1-final-Guete | policy val 0,3018, Feld-AUC 0,870, E_k k1 0,361 / k2 0,354 / k5 0,466 | `PREREG_ownership_corpus.md` par.10.6, `ownership_gate_a_w1.json` |
 | Champion taugt nicht als Traeger | `alphazero_v21_2d_brierbest.onnx` hat ownership-Breite **72** und einen untrainierten Kopf | ONNX-Kopfliste + `PREREG_ownership_consumer.md` par.1 |
@@ -78,7 +78,7 @@ gegen `scoring.rs::wertung_progress`, Z. 160-183 — identischer Satz).
 Gemessener Nullpunkt derselben Groessen (Champion@400 gegen Heuristik@150,
 n=20, **in dieser Sitzung nachgerechnet** mit
 `tools/plate_points_from_arena.py aus --praefix platten` auf
-`evaluations/paired_arena_env_platten_aus.json`):
+`evaluations/artifacts/paired_arena_env_platten_aus.json`):
 
 | Kriterium | Punkte am Nullpunkt | `tanh(E/50)` |
 |---|---:|---:|
@@ -184,9 +184,9 @@ DENSELBEN Partien kommen wie die Siege).
 **Seed-Saetze** (vorab gezogen, `tools/seed_selection_plates.py`, spielt keine
 Partie — nur `PyGame`-Konstruktion je Seed):
 
-- Haupt: `evaluations/seed_selection_gate_c_main.json` — **121 Seeds** aus
+- Haupt: `evaluations/artifacts/seed_selection_gate_c_main.json` — **121 Seeds** aus
   [1000,2200), jedes der 8 Kriterien in >= 45 Partien aktiv.
-- Replikation: `evaluations/seed_selection_gate_c_repl.json` — **122 Seeds**
+- Replikation: `evaluations/artifacts/seed_selection_gate_c_repl.json` — **122 Seeds**
   aus [5000,6200), disjunkt zum Hauptsatz, gleiche Abdeckung.
 
 Warum eine ausgewogene Abdeckung und keine fortlaufende Spanne: die
@@ -377,20 +377,20 @@ muss der Preis bekannt sein.
 
 | Datei | Inhalt |
 |---|---|
-| `evaluations/seed_selection_gate_c_main.json` | Hauptseed-Satz (121) |
-| `evaluations/seed_selection_gate_c_repl.json` | Replikationsseed-Satz (122) |
+| `evaluations/artifacts/seed_selection_gate_c_main.json` | Hauptseed-Satz (121) |
+| `evaluations/artifacts/seed_selection_gate_c_repl.json` | Replikationsseed-Satz (122) |
 | `evaluations/gate_c_seeds_main.txt` | derselbe Satz zeilenweise fuer `--seeds` |
 | `evaluations/gate_c_seeds_repl.txt` | dito |
-| `evaluations/paired_arena_env_gate_c_s0.json` | Stufe 0 |
-| `evaluations/paired_arena_env_gate_c_f1.json` | Stufe 1 |
-| `evaluations/paired_arena_env_gate_c_w1.json` | Stufe 2 |
-| `evaluations/paired_arena_env_gate_c_repl.json` | Stufe 3 |
+| `evaluations/artifacts/paired_arena_env_gate_c_s0.json` | Stufe 0 |
+| `evaluations/artifacts/paired_arena_env_gate_c_f1.json` | Stufe 1 |
+| `evaluations/artifacts/paired_arena_env_gate_c_w1.json` | Stufe 2 |
+| `evaluations/artifacts/paired_arena_env_gate_c_repl.json` | Stufe 3 |
 
 Die `paired_arena_env_*.json` sind **gitignoriert** (`.gitignore:78`, Anlass:
 57 Dateien / 43,7 MB in einer Nacht bei 1,8 % verwertbarer Fraktion). Sie
 bleiben lokal; die eingedampfte, VERSIONIERTE Form entsteht am Ende ueber
 `python -X utf8 tools/arena_compact.py --muster "gate_c_*"` →
-`evaluations/arena_compact.jsonl`.
+`evaluations/artifacts/arena_compact.jsonl`.
 
 ---
 
@@ -398,7 +398,7 @@ bleiben lokal; die eingedampfte, VERSIONIERTE Form entsteht am Ende ueber
 
 Gefahren 2026-08-16, 12 Seeds `900000..900011` (BEWUSST ausserhalb beider
 Versuchssaetze, damit Stufe 0 keine Hauptdaten anfasst), F1 @400 gegen
-Heuristik@150, 11 Faeden. Roh: `evaluations/paired_arena_env_gate_c_s0.json`.
+Heuristik@150, 11 Faeden. Roh: `evaluations/artifacts/paired_arena_env_gate_c_s0.json`.
 
 ### Kostenprobe (Punkt 1 der Stufe-0-Regel)
 
@@ -466,7 +466,7 @@ Verdikt ein. Sie stehen hier nur, weil sie in der Rohdatei stehen.
 ## par.11 ERGEBNIS Stufe 1 — NICHT-ERFOLG nach der Vorab-Regel, und zwar deutlich
 
 4 Arme x 121 Seeds = 484 Partien, F1 @400 gegen Heuristik@150, 11 Faeden,
-Bloecke a 25. Roh: `evaluations/paired_arena_env_gate_c_f1.json` (gitignoriert,
+Bloecke a 25. Roh: `evaluations/artifacts/paired_arena_env_gate_c_f1.json` (gitignoriert,
 kompakte Form in `arena_compact.jsonl`). Auswertung
 `tools/plate_points_from_arena.py --block 25`.
 
@@ -621,7 +621,7 @@ unabhaengig vom Verbraucher.
 
 2 Arme x 121 Seeds = 242 Partien auf `alphazero_v21_2d_own_w1.onnx`
 (Feld-AUC 0,870), dieselben Seeds wie Stufe 1. Roh:
-`evaluations/paired_arena_env_gate_c_w1.json`.
+`evaluations/artifacts/paired_arena_env_gate_c_w1.json`.
 
 | Groesse | w1-N `0,0` | w1-D1 `0.1,0.3` | Delta (Block, t) |
 |---|---:|---:|---:|
@@ -726,7 +726,7 @@ Warum genau diese Zelle und keine andere:
 ## par.13.1 ERGEBNIS Stufe 3 — der Nullbefund repliziert, der Schaden ist nicht belegbar
 
 2 Arme x 122 frische Seeds = 244 Partien, F1, Seeds `5000..5241` (disjunkt zum
-Hauptsatz). Roh: `evaluations/paired_arena_env_gate_c_repl.json`.
+Hauptsatz). Roh: `evaluations/artifacts/paired_arena_env_gate_c_repl.json`.
 
 | Groesse | N `0,0` | D1 `0.1,0.3` | Delta (Block, t) |
 |---|---:|---:|---:|
@@ -1017,7 +1017,7 @@ par.16.1 liess zwei Erklaerungen fuer einen negativen Ausgang offen. Eine
 davon ist jetzt erledigt.
 
 **Sonde** `tools/probes/column_build_prior_mass.py`, Ergebnis in
-`evaluations/probe_column_build_prior_mass_heldout.json`. Gemessen wird die
+`evaluations/artifacts/probe_column_build_prior_mass_heldout.json`. Gemessen wird die
 Policy-Priormasse auf der **tatsaechlich gewaehlten Bauer-Aktion** in den
 k1-Bauer-Partien des Korpus — eine Groesse, die keine Hilfskonstruktion
 braucht, weil die gespielte Aktion dort per Konstruktion die Bauer-Aktion ist.
@@ -1068,7 +1068,7 @@ der Korpuserzeugung mitlief, ist mangels Env-Protokollierung ungeprueft.
 Drei Dosisarme x 407 Partien gegen den Champion, Nullarm aus
 `paired_arena_env_b18best_vs_ch.json` (identische Seeds, Reproduktion in den
 ersten 50 Partien byte-genau geprueft). Rohdaten
-`evaluations/paired_arena_env_gate_c_b18.json`.
+`evaluations/artifacts/paired_arena_env_gate_c_b18.json`.
 
 | Arm | Siege | McNemar gegen N |
 |---|---:|---:|

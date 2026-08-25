@@ -78,9 +78,9 @@ Stand: 79 Knoepfe (48 aktiv, 23 diagnose, 7 tot, 1 geplant).
 | `MOSAIC_CACHE_F32` | aus (nur =1) | aktiv | float32 statt float16 fuer states/policies im Cache, Notausstieg (neural_net.py:1872) | - |
 | `MOSAIC_PLANES_LAZY` | aus (nur =1) | aktiv | lazy HDF5-Pro-Index-Zugriff statt Planes-in-RAM, nur fuer knappes RAM (neural_net.py:2014) | - |
 | `MOSAIC_PLANES_H5_DIR` | unset | diagnose | Planes-HDF5 aus anderem Ordner oeffnen, OneDrive-Ausschlusstest (neural_net.py:1105) | - |
-| `MOSAIC_DISPLAY_CAL` | an (=0 schaltet ab) | aktiv | Platt-Kalibrierung der ANGEZEIGTEN Gewinnwahrscheinlichkeit, nicht der Suche (server.py:1409) | evaluations/platt_fit_v21.json |
-| `MOSAIC_DISPLAY_CAL_A` | -0.0033 | aktiv | Platt-A der Anzeige-Kalibrierung, modellspezifisch (server.py:1407) | evaluations/platt_fit_v21.json |
-| `MOSAIC_DISPLAY_CAL_B` | 0.9060 | aktiv | Platt-B der Anzeige-Kalibrierung, modellspezifisch (server.py:1408) | evaluations/platt_fit_v21.json |
+| `MOSAIC_DISPLAY_CAL` | an (=0 schaltet ab) | aktiv | Platt-Kalibrierung der ANGEZEIGTEN Gewinnwahrscheinlichkeit, nicht der Suche (server.py:1409) | evaluations/artifacts/platt_fit_v21.json |
+| `MOSAIC_DISPLAY_CAL_A` | -0.0033 | aktiv | Platt-A der Anzeige-Kalibrierung, modellspezifisch (server.py:1407) | evaluations/artifacts/platt_fit_v21.json |
+| `MOSAIC_DISPLAY_CAL_B` | 0.9060 | aktiv | Platt-B der Anzeige-Kalibrierung, modellspezifisch (server.py:1408) | evaluations/artifacts/platt_fit_v21.json |
 | `MOSAIC_GAME_TIMEOUT_SCALE` | 1.0 (geplant) | geplant | Multiplikator auf den Pro-Partie-Timeout im Self-Play; im Prereg beschrieben, Grep 2026-08-15 findet KEIN Vorkommen in engine/src oder *.py -- nicht verdrahtet | PREREG_gpu_inference_path.md (Deckel-Knopf) |
 | `MOSAIC_UNLOCK_SHAPING_W` | - | tot | wirkungslos seit Zusammenfuehrung 2026-08-11, nur noch Warn-Stub (net_mcts.rs:1257) | PREREG_scoring_plate_injection.md |
 | `MOSAIC_UNLOCK_BETA` | - | tot | wirkungslos seit Zusammenfuehrung 2026-08-11, nur noch Warn-Stub (net_mcts.rs:1257) | PREREG_scoring_plate_injection.md |

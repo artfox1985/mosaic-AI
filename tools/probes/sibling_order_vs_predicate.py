@@ -170,7 +170,7 @@ def main() -> None:
         ergebnis["gesamt"][praed_key] = gesamt
         ergebnis.setdefault("konstant_ausgeschlossen", {})[praed_key] = n_konstant
 
-    out_path = BASIS / "evaluations" / "probe_sibling_vs_predicate_k1.json"
+    out_path = BASIS / "evaluations" / "artifacts" / "probe_sibling_vs_predicate_k1.json"
     out_path.write_text(json.dumps(ergebnis, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"  geschrieben: evaluations/{out_path.name}")
 

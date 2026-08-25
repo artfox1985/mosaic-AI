@@ -21,7 +21,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "points_dist_bin_scale_gate.json"
+OUT_JSON = EVAL / "artifacts" / "points_dist_bin_scale_gate.json"
 
 VALUE_SCALE = 50.0
 TD_LAMBDA = 0.5

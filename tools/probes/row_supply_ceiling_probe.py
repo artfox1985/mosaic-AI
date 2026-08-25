@@ -72,8 +72,8 @@ from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-OUT_JSON = ROOT / "evaluations" / "row_supply_ceiling.json"
-MESSUNG = ROOT / "evaluations" / "human_row_profile.json"
+OUT_JSON = ROOT / "evaluations" / "artifacts" / "row_supply_ceiling.json"
+MESSUNG = ROOT / "evaluations" / "artifacts" / "human_row_profile.json"
 
 FARBEN = 5
 FLIESEN_JE_FARBE = 13

@@ -70,7 +70,7 @@ def main() -> None:
                          "Hauptlauf Runde 4 komplett verfehlte: Dateien werden in "
                          "Spielreihenfolge gelesen, das Pro-Datei-Limit war erschoepft, "
                          "bevor Runde-4-Zustaende drankamen.")
-    ap.add_argument("--out", default="evaluations/tiling_value_reference_main.json")
+    ap.add_argument("--out", default="evaluations/artifacts/tiling_value_reference_main.json")
     args = ap.parse_args()
 
     import mosaic_rust as mr

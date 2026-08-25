@@ -71,7 +71,7 @@ from ownership_gate_a import (  # noqa: E402
 )
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
-OUT_JSON = REPO / "evaluations" / "ownership_route_calibration_results.json"
+OUT_JSON = REPO / "evaluations" / "artifacts" / "ownership_route_calibration_results.json"
 
 CHECKPOINTS = [
     ("f1", "alphazero_v21_2d_own_f1.pth"),

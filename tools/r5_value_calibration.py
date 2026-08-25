@@ -321,7 +321,7 @@ def main():
     ap.add_argument("--n-states", type=int, default=24)
     ap.add_argument("--n-combos", type=int, default=6)
     ap.add_argument("--curve-n-states", type=int, default=233)
-    ap.add_argument("--out", default="evaluations/r5_value_calibration_result.json")
+    ap.add_argument("--out", default="evaluations/artifacts/r5_value_calibration_result.json")
     ap.add_argument("--seed", type=int, default=1000)
     args = ap.parse_args()
 

@@ -334,13 +334,13 @@ SPEZIAL-Zellen):
 ### Aufbau (identisch zur letzten Messung, PLUS Trace)
 
 `net_arena_match`, Champion (`v21_2d_brierbest`) @400 vs Heuristik@150, 20
-k1-Seeds (`evaluations/seed_selection_plates.json`, GEPRUEFT:
+k1-Seeds (`evaluations/artifacts/seed_selection_plates.json`, GEPRUEFT:
 `[2,3,6,8,9,11,13,20,22,26,29,32,34,39,44,50,52,57,59,69]`), gepaart gegen
 `MOSAIC_SPALTENBAU=0` als Kontrolle, `MOSAIC_SPALTENBAU_TRACE=1` fuer beide
 Arme (No-Op ohne aktiven Spaltenbauer). Werkzeug: `tools/paired_arena_env_ab.py
 --env-name MOSAIC_SPALTENBAU --arms 0 1 --control 0 --net-sims 400
 --heur-sims 150 --seeds <k1> --log-games`, Ergebnis in
-`evaluations/paired_arena_env_column_build_r2.json`. Metrik ueber
+`evaluations/artifacts/paired_arena_env_column_build_r2.json`. Metrik ueber
 `tools/plate_points_from_arena.py`s `auswerten()`, Kriterium "Vertikale
 Reihen"; Verteilung/Blocker ueber das NEU gebaute `tools/column_build_trace.py`
 (liest die `[SB]`-Zeilen).
@@ -467,7 +467,7 @@ Aufbau IDENTISCH zu Runde 2 (§11): `alphazero_v21_2d_brierbest.onnx`@400 vs
 Heuristik@150(dyn), dieselben 20 k1-Seeds
 (`[2,3,6,8,9,11,13,20,22,26,29,32,34,39,44,50,52,57,59,69]`), gepaart gegen
 `MOSAIC_SPALTENBAU=0`, `MOSAIC_SPALTENBAU_TRACE=1` fuer beide Arme.
-Ergebnis: `evaluations/paired_arena_env_column_build_r3.json`.
+Ergebnis: `evaluations/artifacts/paired_arena_env_column_build_r3.json`.
 
 | Groesse | Spaltenbau AUS (Kontrolle) | Spaltenbau AN |
 | --- | ---: | ---: |
@@ -689,7 +689,7 @@ Begleitzahlen (gleiche Partien, GEPRUEFT aus den Rohdaten):
 | 7 | +0,52 |  1,00 | 17/23 | 7/23  | 0,021 | 10,35 -> 15,39 | 50,30 -> 34,35 |
 
 Rohdaten: `evaluations/paired_arena_env_plate_builder_k{0,2,3,4,5,6,7}.json`
-(neu) und `evaluations/paired_arena_env_plate_builder_regress_k1.json`
+(neu) und `evaluations/artifacts/paired_arena_env_plate_builder_regress_k1.json`
 (Kriterium 1, Regressionslauf). Verrechnungsskript (Scratch, nicht Teil des
 Repos): importiert `auswerten`/`t_wert` aus `tools/plate_points_from_arena.py`
 unveraendert.
@@ -909,7 +909,7 @@ frische Kostenwahl auf eine nachweislich unvollendbare Spalte faellt.
 Aufbau IDENTISCH zu Runde 2/3: `alphazero_v21_2d_brierbest.onnx@400` vs
 Heuristik@150(dyn), Seeds `[2,3,6,8,9,11,13,20,22,26,29,32,34,39,44,50,52,57,
 59,69]`, `MOSAIC_SPALTENBAU_TRACE=1` beide Arme. Ergebnis:
-`evaluations/paired_arena_env_column_build_r4d.json`.
+`evaluations/artifacts/paired_arena_env_column_build_r4d.json`.
 
 | Groesse | AUS (Kontrolle) | AN (v5) |
 | --- | ---: | ---: |
@@ -997,11 +997,11 @@ beide Bausteine unabhaengig schaltbar sind -- keiner davon im Gating.
 gemeinsam per Shell-Export gesetzt, je EIN Baustein-Knopf ueber `--arms 0 1`
 variiert, der ANDERE per Export fixiert:
 
-- Lauf 1 (`evaluations/paired_arena_env_konfund_AB.json`):
+- Lauf 1 (`evaluations/artifacts/paired_arena_env_konfund_AB.json`):
   `MOSAIC_SPALTENBAU_JACKPOT=0` fix, `--env-name MOSAIC_SPALTENBAU_
   SICHERHEITSNETZ --arms 0 1` -> liefert Arm A (beide aus) und Arm B (nur
   Sicherheitsnetz).
-- Lauf 2 (`evaluations/paired_arena_env_konfund_AC.json`):
+- Lauf 2 (`evaluations/artifacts/paired_arena_env_konfund_AC.json`):
   `MOSAIC_SPALTENBAU_SICHERHEITSNETZ=0` fix, `--env-name MOSAIC_SPALTENBAU_
   JACKPOT --arms 0 1` -> liefert Arm A (erneut, zur Reproduzierbarkeits-
   Kontrolle) und Arm C (nur Jackpot).
@@ -1212,7 +1212,7 @@ haelt (Default unveraendert, der Knopf ist unset).
 
 Aufbau: `--env-name MOSAIC_SPALTENBAU_SPECIAL --arms 0 1 --control 0`,
 `MOSAIC_SPALTENBAU=1` per Export fix, dieselben 20 k1-Seeds, gleiches Modell.
-Ergebnis: `evaluations/paired_arena_env_special_r16_k1.json`.
+Ergebnis: `evaluations/artifacts/paired_arena_env_special_r16_k1.json`.
 
 | Groesse | A (Special aus) | Special AN |
 | --- | ---: | ---: |
@@ -1248,7 +1248,7 @@ Eigene Wahl (markiert): die 20 auf den k1-Bereich `[2..69]` unmittelbar
 folgenden Ganzzahlen 70-89 -- keine Auswahl nach Ergebnis, transparent
 nachvollziehbar. Gleicher Aufbau (`--env-name MOSAIC_SPALTENBAU_JACKPOT
 --arms 0 1 --control 0`). Ergebnis:
-`evaluations/paired_arena_env_jackpot_replik_fresh.json`.
+`evaluations/artifacts/paired_arena_env_jackpot_replik_fresh.json`.
 
 | Groesse | Jackpot aus | Jackpot AN |
 | --- | ---: | ---: |
@@ -1319,7 +1319,7 @@ ursachen-klassifizieren, ERST danach ggf. gezielt eingreifen.
 
 Eigene Wahl (markiert): naechster unbenutzter Block nach den Jackpot-Replik-
 Seeds (70-89) -- wieder ohne Auswahl nach Ergebnis. Aufbau identisch zu §16(2).
-Ergebnis: `evaluations/paired_arena_env_special_r17_fresh.json` (GEPRUEFT
+Ergebnis: `evaluations/artifacts/paired_arena_env_special_r17_fresh.json` (GEPRUEFT
 vollstaendig: n=20 auf beiden Seiten, kein Teillauf).
 
 | Groesse | A (Special aus) | Special AN |
@@ -1354,7 +1354,7 @@ vorgesehen (Vorab-Regel war zweistufig, nicht mehrstufig).
 ### (2) (c)-Blocker-Ursachen-Diagnose: [SB]-Trace-Auswertung, kein Umbau ins Blaue
 
 Bester Arm = Special AN (höchster Mittelwert trotz (1), 20 k1-Seeds,
-`evaluations/paired_arena_env_special_r16_k1.json`). Methode: `blocker_split_
+`evaluations/artifacts/paired_arena_env_special_r16_k1.json`). Methode: `blocker_split_
 abcd.py` (Scratch) erweitert -- fuer jeden bereits klassifizierten
 `c_vorzug_griff_nicht`-Fall (den FRUeHESTEN Moment, an dem die geforderte
 Farbe X verfuegbar UND die Zeile offen war, aber die tatsaechliche Aktion
@@ -1449,7 +1449,7 @@ Koordinator ausdruecklich als Prioritaet vorgegeben: "k2 fertig vor k6 halb")
 
 Die vom Koordinator genannte Ausgangslage ("0,00 Punkte in allen 18 aktiven
 Partien") wurde vor dieser Messung NICHT bestaetigt -- eine frische
-Referenzmessung (`evaluations/paired_arena_env_k2_baseline_fresh.json`,
+Referenzmessung (`evaluations/artifacts/paired_arena_env_k2_baseline_fresh.json`,
 `MOSAIC_PLATTENBAU=0` vs `=2`, die 23 Seeds aus `seeds_per_criterion/k2.txt`,
 GEPRUEFT: Kriterium "Diagonale Reihen" in 23/23 Partien BEIDER Arme aktiv --
 Seed-Satz nach dem RNG-Schnitt weiterhin gueltig) ergab:
@@ -1468,9 +1468,9 @@ gemessene, GEPRUEFTE Zahl 3,04 als Anker**, nicht die Koordinator-Angabe.
 
 **NACHTRAG (Koordinator, aufgeloest, kein offener Punkt mehr)**: die 0,00-Zahl
 stammte aus den SPALTENBAU-Laeufen (k1-Spieler, Diagonale nur als Beifang auf
-k1-/frischen Seeds -- z.B. `evaluations/paired_arena_env_column_build_r4d.json`),
+k1-/frischen Seeds -- z.B. `evaluations/artifacts/paired_arena_env_column_build_r4d.json`),
 waehrend 3,04 der k2-PLATTENBAUER selbst auf den k2-Seeds ist
-(`evaluations/paired_arena_env_k2_baseline_fresh.json`) -- zwei verschiedene
+(`evaluations/artifacts/paired_arena_env_k2_baseline_fresh.json`) -- zwei verschiedene
 Generatoren auf verschiedenen Partien, keine Drift, beide Zahlen korrekt fuer
 das, was sie je maßen.
 
@@ -1517,7 +1517,7 @@ gesetztem Knopf ueberhaupt erreicht).
 
 Aufbau: `MOSAIC_PLATTENBAU=2` fix, `--env-name MOSAIC_SPALTENBAU_SPECIAL
 --arms 0 1 --control 0` (erste, geschaltete Fassung -- siehe (2) fuer den
-Umbau danach). Ergebnis: `evaluations/paired_arena_env_k2_special_k2seeds.json`.
+Umbau danach). Ergebnis: `evaluations/artifacts/paired_arena_env_k2_special_k2seeds.json`.
 
 | Groesse | Bezug (Special aus, =§18(1)s 3,04) | Special-Erweiterung AN |
 | --- | ---: | ---: |
@@ -1600,7 +1600,7 @@ Stoerkanal). Eingriff primaer in der Kuppelwahl, nicht im Fliesendraft.
 vs `=6` (bestehender `Spezialbauer` aus §13, Nachbarzellen-Fuellung, VOR dem
 Kuppeldraft-Zusatz dieser Sitzung). "Spezialfelder"-Kriterium GEPRUEFT in
 20/20 Partien beider Arme aktiv (`scoring_tile_ids`). Ergebnis:
-`evaluations/paired_arena_env_k6_baseline_fresh.json`.
+`evaluations/artifacts/paired_arena_env_k6_baseline_fresh.json`.
 
 | Groesse | Bezug (kein Plattenbauer) | k6 VOR §19 (bestehender Spezialbauer) |
 | --- | ---: | ---: |
@@ -1633,7 +1633,7 @@ Specials in obere).
 
 `cargo test --lib`: 416/0/20 (unveraendert). Wheel neu gebaut+installiert vor
 UND nach dem Revert in (4), Paritaetsprobe haelt beide Male (`8c6684ff...`).
-Ergebnis: `evaluations/paired_arena_env_k6_kuppeldraft_k6seeds.json`.
+Ergebnis: `evaluations/artifacts/paired_arena_env_k6_kuppeldraft_k6seeds.json`.
 
 | Groesse | Anker (bestehender Spezialbauer) | Kuppeldraft AN |
 | --- | ---: | ---: |
@@ -1704,7 +1704,7 @@ Nach der k2-Lehre (§18) NICHT die archivierte §13-Zahl (4,73) uebernommen,
 sondern frisch nachgemessen: `MOSAIC_PLATTENBAU=0` vs `=5` (ALTER,
 unveraendert isolierter Eckenbauer aus §13) auf `seeds_per_criterion/k5.txt`
 (22 Seeds). "Eckplatten"-Kriterium GEPRUEFT in 22/22 Partien beider Arme
-aktiv. Ergebnis: `evaluations/paired_arena_env_k5_baseline_fresh.json`.
+aktiv. Ergebnis: `evaluations/artifacts/paired_arena_env_k5_baseline_fresh.json`.
 
 | Groesse | Bezug (kein Plattenbauer) | k5 VOR §20 (alter Eckenbauer) |
 | --- | ---: | ---: |
@@ -1742,7 +1742,7 @@ gebaut+installiert, `tools/parity_probe.py`: Hash `8c6684ff...` haelt.
 
 ### (3) Messung: 22 k5-Seeds, Spaltenpaar-Ziel gegen den §20(1)-Anker
 
-Ergebnis: `evaluations/paired_arena_env_k5_spaltenpaar_k5seeds.json`.
+Ergebnis: `evaluations/artifacts/paired_arena_env_k5_spaltenpaar_k5seeds.json`.
 
 | Groesse | Anker (alter Eckenbauer, 3,68) | Spaltenpaar-Ziel |
 | --- | ---: | ---: |

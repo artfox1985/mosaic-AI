@@ -477,7 +477,7 @@ Wert genuegt zum Testen.
 ### Messkette Schritt 1 ERGEBNIS (2026-08-24): Tor BESTANDEN, aber knapp und schmal
 
 Gemessen mit `tools/probes/long_row_init_knob_effect.py`, Artefakt
-`evaluations/long_row_init_knob_effect.json`. 240 qualifizierende
+`evaluations/artifacts/long_row_init_knob_effect.json`. 240 qualifizierende
 Korpus-Stellungen (leere lange Reihe UND legale Steinaktion dorthin, sonst
 kann der Term per Konstruktion nichts bewegen), 200 Sims,
 w = 0,3, gepaart mit identischem Seed je Stellung in beiden Armen,
@@ -554,7 +554,7 @@ Gepaarte Arena netz-gegen-netz, `alphazero_v21_2d_brierbest` beidseitig,
 wechsel) = 814 gepaarte Partien. Artefakte
 `paired_arena_env_lrinit_netvnet.json` und `..._swap.json`, Auswertung
 `tools/probes/long_row_init_arena_eval.py` ->
-`evaluations/long_row_init_arena_eval.json`. Die 407 Seeds sind mengen- UND
+`evaluations/artifacts/long_row_init_arena_eval.json`. Die 407 Seeds sind mengen- UND
 reihenfolgengleich mit `paired_arena_env_imm_netvnet.json` (in dieser Sitzung
 nachgeprueft), der Lauf ist also direkt mit dem Implicit-Minimax-Vergleich
 vergleichbar. Statistik auf BLOCK-Ebene, Blockmittel je Datei gebildet

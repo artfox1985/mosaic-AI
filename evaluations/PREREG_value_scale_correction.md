@@ -24,7 +24,7 @@ Skala-vs-Ordnung-Frage.
 
 ## Kalibrierungs-Parameter (Fit ABGESCHLOSSEN, vor der Arena)
 
-`evaluations/value_calibration_fit.json`: IRLS-Logistik-Fit von
+`evaluations/artifacts/value_calibration_fit.json`: IRLS-Logistik-Fit von
 `P(Sieg) = sigmoid(A + B*logit(win_prob_Netz))` auf dem frozen_eval_set
 (v19_2d_best, Torch-Pfad, nur Runden 1-4 -- in Runde 5 konsultiert die
 Engine das Netz nie, dort greift die Korrektur konstruktionsbedingt

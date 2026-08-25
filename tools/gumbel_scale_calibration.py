@@ -63,7 +63,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
-ORACLE_JSON = ROOT / "evaluations" / "frozen_v1_oracle_labels.json"
+ORACLE_JSON = ROOT / "evaluations" / "artifacts" / "frozen_v1_oracle_labels.json"
 
 # Muss zu net_mcts.rs:1218/1219 passen -- hier nur zum Zurueckrechnen.
 C_VISIT = 50.0
@@ -85,7 +85,7 @@ def main() -> None:
     p.add_argument("--model", default="v18_best")
     p.add_argument("--sims", type=int, default=400)
     p.add_argument("--n-states", type=int, default=150)
-    p.add_argument("--out", default="evaluations/gumbel_scale_calibration.json")
+    p.add_argument("--out", default="evaluations/artifacts/gumbel_scale_calibration.json")
     args = p.parse_args()
 
     import mosaic_rust as mr

@@ -163,7 +163,7 @@ dann hohe Priorität.
    Champion) `--no-plot` (kein Display nötig).
 2. Nach allen 12 Läufen: `tools/offline_diagnosis.py --frozen --model
    fs_flat_s1_best fs_2d_s1_best ... --out
-   evaluations/offline_diagnosis_2d_vs_flat_fs_frozen.json` (Orakel-Metriken
+   evaluations/artifacts/offline_diagnosis_2d_vs_flat_fs_frozen.json` (Orakel-Metriken
    AKTIV, `--no-oracle` NICHT gesetzt).
 3. Gepaarte Auswertung (`tools/train_2d_vs_flat_fs.py` schreibt sie direkt
    mit, kein separates Skript nötig) — Tabelle je Seed + Zusammenfassung
@@ -183,4 +183,4 @@ Anker fuer v19); Orakel-Metriken gelten seither nur 0/1 als
 ARCHITEKTUR-Staerke-Praediktor (bleiben 7/7 fuer Generationenvergleiche).
 Belegstelle: archive/history.md, Zeile ~6660-6741 ("PREREG-Ergebnis" /
 "Arena-Gating" / "ENTSCHEIDUNGEN (Nutzer)");
-evaluations/train_2d_vs_flat_fs_result.json.
+evaluations/artifacts/train_2d_vs_flat_fs_result.json.

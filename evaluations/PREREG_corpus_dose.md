@@ -47,7 +47,7 @@ dadurch exakt erhalten, statt nur im Erwartungswert einer uniformen Ziehung
 zu gelten. Fester Seed `20260801` (`tools/train_corpus_dose.py::STRATIFY_SEED`),
 unabhängig von train.py's eigenen Seeds (Val-Split-Seed `20260707`,
 Task-#69-Subsample-Seed `20260708`). Die Ziehung wird einmalig berechnet und
-als Manifest persistiert (`evaluations/train_corpus_dose_split.json`), damit
+als Manifest persistiert (`evaluations/artifacts/train_corpus_dose_split.json`), damit
 ein Wiederaufnahme-Lauf nach Unterbrechung exakt denselben Split verwendet.
 
 Beide Halb-Arm-Seeds (`halb_s1`..`halb_s6`) trainieren auf **demselben**
@@ -273,7 +273,7 @@ Trajektorienqualitäts-Frage (B2) offen bleibt.
 ## Ausführungsplan
 
 1. Stratifizierte Ziehung berechnen + als
-   `evaluations/train_corpus_dose_split.json` persistieren (einmalig, fester
+   `evaluations/artifacts/train_corpus_dose_split.json` persistieren (einmalig, fester
    Seed `20260801`) — das Manifest friert BEIDE Dateimengen ein
    (`voll_files`: alle 900, `halb_files`: die 450 gezogenen).
 2. Beide Hardlink-Sandboxen aufbauen: `data_dose_voll/` (900 Dateien) und
@@ -289,11 +289,11 @@ Trajektorienqualitäts-Frage (B2) offen bleibt.
    inkl. HDF5-Caches entfernt, `data/` bleibt unangetastet.
 4. Nach allen 12 Läufen: `tools/offline_diagnosis.py --frozen --model
    voll_s1_best halb_s1_best ... --out
-   evaluations/offline_diagnosis_corpus_dose_frozen.json`.
+   evaluations/artifacts/offline_diagnosis_corpus_dose_frozen.json`.
 5. Gepaarte Auswertung (`tools/train_corpus_dose.py` schreibt sie direkt mit,
    kein separates Skript) — Tabelle je Seed + Zusammenfassung (Ø-Differenz,
    t-Test, Vorzeichentest) für beide Orakel-Metriken, Ergebnis-JSON nach
-   `evaluations/train_corpus_dose_result.json`.
+   `evaluations/artifacts/train_corpus_dose_result.json`.
 6. Bericht an den Koordinator — Interpretationsregel oben automatisch
    angewendet (rein deskriptiv, der Mensch entscheidet trotzdem).
 
@@ -307,4 +307,4 @@ Zusaetzlich in der echten Arena bestaetigt: `voll_s3_best` 479:321 gegen
 negativ ausgegangen, siehe `PREREG_pcr.md`). Belegstelle:
 archive/history.md, Abschnitt "Korpus-Dosis-Messung (2026-08-01)" /
 "ERGEBNIS" / "Nachtrag Dosis-Arena", Zeile ~6746-6821;
-evaluations/train_corpus_dose_result.json.
+evaluations/artifacts/train_corpus_dose_result.json.

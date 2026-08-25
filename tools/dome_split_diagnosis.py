@@ -259,9 +259,9 @@ DEFAULT_MODE = "within-tree"
 # ANDEREN Namen (Koordinator-Vorgabe 2026-08-09: alte Datei ist als
 # Budget-/Breiten-Diagnose committet, nicht ueberschreiben).
 OUT_MD_LEGACY = ROOT / "evaluations" / "dome_split_diagnosis.md"
-OUT_JSON_LEGACY = ROOT / "evaluations" / "dome_split_diagnosis.json"
+OUT_JSON_LEGACY = ROOT / "evaluations" / "artifacts" / "dome_split_diagnosis.json"
 OUT_MD_WITHINTREE = ROOT / "evaluations" / "dome_split_diagnosis_withintree.md"
-OUT_JSON_WITHINTREE = ROOT / "evaluations" / "dome_split_diagnosis_withintree.json"
+OUT_JSON_WITHINTREE = ROOT / "evaluations" / "artifacts" / "dome_split_diagnosis_withintree.json"
 
 # Lesart-Schwellen woertlich aus der Prereg (EXTERNAL_REVIEW_2026-08-08.md,
 # TASK B, unveraendert durch das Amendment): Anteil <5% ODER mittlere

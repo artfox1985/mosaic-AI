@@ -1,4 +1,4 @@
-<!-- STATUS: UEBERHOLT | Frage: Laesst sich die Gegner-Stoerung ueber die Farbzaehlung als Gleichwertigkeits-Tausch INNERHALB der Suche (statt als Uebersteuerung davor) so bauen, dass sie die Gegner-Plattenpunkte druckt OHNE die eigene Staerke zu kosten? | Beleg: **UEBERHOLT 2026-08-18.** Die Messungen bleiben gueltig: Stufe 0 bestanden, Stufe 1 echt gefahren (Abschnitt 11, Zaehlmodus im installierten Wheel, Paritaet 8c6684ff und Byte-Identitaet belegt) -- Stoerfensteranteil 7,63 % bei 400 Sims und 7,95 % bei 200 Sims, Abbruchschwelle 5 % NICHT unterschritten, evaluations/color_denial_probe.json; der Offline-Ersatz lag bei 5,50 % und die Fensterstatistik um Faktor 2,5 daneben (11.4). OFFEN war allein die Nutzer-Entscheidung ueber Stufe 2 (Bau des Tie-Breaks) -- und die entfaellt: laut STATUS.md, Abschnitt OFFENE ENTSCHEIDUNGEN, gehoert der Stoerungs-Baustein Stufe 2 zum Moon-Order-Kopf und ist keine Einzelentscheidung mehr. Nichts gebaut, kein Knopf im Bestand. -->
+<!-- STATUS: UEBERHOLT | Frage: Laesst sich die Gegner-Stoerung ueber die Farbzaehlung als Gleichwertigkeits-Tausch INNERHALB der Suche (statt als Uebersteuerung davor) so bauen, dass sie die Gegner-Plattenpunkte druckt OHNE die eigene Staerke zu kosten? | Beleg: **UEBERHOLT 2026-08-18.** Die Messungen bleiben gueltig: Stufe 0 bestanden, Stufe 1 echt gefahren (Abschnitt 11, Zaehlmodus im installierten Wheel, Paritaet 8c6684ff und Byte-Identitaet belegt) -- Stoerfensteranteil 7,63 % bei 400 Sims und 7,95 % bei 200 Sims, Abbruchschwelle 5 % NICHT unterschritten, evaluations/artifacts/color_denial_probe.json; der Offline-Ersatz lag bei 5,50 % und die Fensterstatistik um Faktor 2,5 daneben (11.4). OFFEN war allein die Nutzer-Entscheidung ueber Stufe 2 (Bau des Tie-Breaks) -- und die entfaellt: laut STATUS.md, Abschnitt OFFENE ENTSCHEIDUNGEN, gehoert der Stoerungs-Baustein Stufe 2 zum Moon-Order-Kopf und ist keine Einzelentscheidung mehr. Nichts gebaut, kein Knopf im Bestand. -->
 
 # PREREG: Gegner-Stoerung ueber Farbzaehlung, zweiter Anlauf (v2)
 
@@ -295,7 +295,7 @@ mindestens ein Nicht-Sieger im Fenster liegt.
 **Ehrliche Erwartung, vorab notiert**: diese Stufe wird mit hoher
 Wahrscheinlichkeit bestehen -- E3b hat mit derselben Fensterdefinition
 (z=1,0, f=0,5) eine Feuerrate von **36,52%** gemessen
-(`PREREG_denial_tiebreak.md` Zeilen 137-143, `evaluations/e3b_firing_rate.json`).
+(`PREREG_denial_tiebreak.md` Zeilen 137-143, `evaluations/artifacts/e3b_firing_rate.json`).
 Stufe 0 dient deshalb primaer als **Instrumenten-Probe** (liefert der
 Datensatz ueberhaupt auswertbare `root_child_q`-Felder?), nicht als echtes
 Tor. Kein Besuchszaehler in den JSONs → das Besuchs-Gate ist offline nur
@@ -506,7 +506,7 @@ kein Elo gewonnen.
 ## §9 ERGEBNIS Stufe 0 + Stufe 1 (2026-08-16)
 
 Nutzer-Freigabe "bis Stufe 1, keinen Schritt weiter". Belegstelle:
-`evaluations/disruption_window_rate.json`, Treiber
+`evaluations/artifacts/disruption_window_rate.json`, Treiber
 `tools/disruption_window_rate.py`.
 
 ### §9.1 Abweichung vom vorregistrierten Verfahren -- vorab benannt
@@ -753,7 +753,7 @@ den Zaehlmodus faelschlich als Verhaltensaenderung erscheinen liesse.
 3. `tools/color_denial_probe.py --golden --n-games 12` -- Byte-Identitaet.
 4. `tools/color_denial_probe.py --n-games 200 --net-sims 400
    --heur-sims 150` (wie §5.2 vorregistriert), Ausgabe nach
-   `evaluations/color_denial_probe.json`.
+   `evaluations/artifacts/color_denial_probe.json`.
 5. Verdikt nach derselben Abbruchregel (<5 % -> geschlossen), dann **STOPP**
    -- Stufe 2 bleibt Nutzer-Entscheidung.
 
@@ -783,8 +783,8 @@ Offline-Methodik kuenftig nicht mehr als Ersatz zuzulassen.
 
 ## §11 ERGEBNIS Stufe 1 (live, 2026-08-16): Abbruchregel greift NICHT
 
-Belegstellen: `evaluations/color_denial_probe.json` (Hauptlauf),
-`evaluations/color_denial_probe_200sims.json` (Sim-Kontrolle).
+Belegstellen: `evaluations/artifacts/color_denial_probe.json` (Hauptlauf),
+`evaluations/artifacts/color_denial_probe_200sims.json` (Sim-Kontrolle).
 Treiber `tools/color_denial_probe.py`.
 
 ### §11.1 Voraussetzungen -- selbst geprueft, nicht uebernommen

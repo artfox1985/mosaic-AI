@@ -127,7 +127,7 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=1313)
     p.add_argument("--big-loss", type=float, default=0.05,
                    help="Schwelle fuer 'deutlich schlechterer Zug' in Q-Punkten (Default 0.05 = 5pp Gewinn-Wkt.)")
-    p.add_argument("--out", default="evaluations/play_rule_cost.json")
+    p.add_argument("--out", default="evaluations/artifacts/play_rule_cost.json")
     args = p.parse_args()
 
     model_path = str((BASE_DIR / args.model).resolve()) if not Path(args.model).is_absolute() else args.model

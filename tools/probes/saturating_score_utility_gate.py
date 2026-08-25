@@ -33,7 +33,7 @@ from config import INPUT_SIZE, NUM_ACTIONS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "saturating_score_utility_gate.json"
+OUT_JSON = EVAL / "artifacts" / "saturating_score_utility_gate.json"
 FROZEN_PKL = EVAL / "frozen_eval_set.pkl"
 MODEL_PTH = ROOT / "models" / "alphazero_v21_2d_brierbest.pth"
 

@@ -99,7 +99,7 @@ fn main() -> ort::Result<()> {
         .unwrap_or_else(|| "models/alphazero_v21_2d_brierbest.onnx".to_string());
     let out_path = args
         .next()
-        .unwrap_or_else(|| "evaluations/ort_cuda_batch_throughput.json".to_string());
+        .unwrap_or_else(|| "evaluations/artifacts/ort_cuda_batch_throughput.json".to_string());
 
     println!("Modell: {model_path}");
     // VERSIONS-PIN (Cargo.toml-Kommentar): ort 2.0.0-rc.12 buendelt ONNX

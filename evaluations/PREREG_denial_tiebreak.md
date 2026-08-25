@@ -140,7 +140,7 @@ Feuerrate >= 5% -> Stufe 2.
 Heuristik@150dyn, 200 Partien, Seed 20260826, z=1,0, f=0,5:
 **fired 3.260 / total 8.926 = 36,52%**, ueber alle 8 Bloecke stabil
 (36,58 / 36,50 / 36,40 / 36,52 / 36,55 / 36,52 -- keine Drift).
-Belegstelle `evaluations/e3b_firing_rate.json`.
+Belegstelle `evaluations/artifacts/e3b_firing_rate.json`.
 
 **Die Erwartung der Vorregistrierung war falsch.** Erwartet war eine
 starke Ausbremsung durch das Besuchs-Gate ("am Ende typischerweise nur
@@ -173,7 +173,7 @@ mit verschiedenen Seeds verglichen werden.
 `tools/paired_arena_env_ab.py`, ein Faktor (`MOSAIC_DENIAL_UNCERT_Z`
 0 vs 1,0, `_MIN_VISIT_FRAC=0,5` in BEIDEN Armen), Champion@400 vs
 Heuristik@150dyn, 2x400 Partien, Basis-Seed 20260827. Belegstelle
-`evaluations/paired_arena_env_e3b_stage2.json`.
+`evaluations/artifacts/paired_arena_env_e3b_stage2.json`.
 
 | Arm | Netz-Siege | Quote |
 |---|---|---|

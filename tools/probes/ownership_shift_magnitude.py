@@ -170,7 +170,7 @@ def main() -> None:
     print("  Deutung: < 1 heisst, die Suche kann den Prior nicht umsortieren;")
     print("           die Ownership-Anteil DARIN ist noch kleiner (Differenzlauf noetig).")
 
-    ziel = BASIS / "evaluations" / f"probe_ownership_shift_{a.tag}.json"
+    ziel = BASIS / "evaluations" / "artifacts" / f"probe_ownership_shift_{a.tag}.json"
     ziel.write_text(json.dumps({
         "model": a.model, "sims": a.sims, "phase": a.phase, "dose": a.dose,
         "conj": a.conj, "n_stellungen": len(zeilen),

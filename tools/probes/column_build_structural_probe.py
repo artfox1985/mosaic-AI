@@ -65,7 +65,7 @@ from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
 from plate_points_from_arena import game_list, KRITERIUM  # noqa: E402
 
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "column_build_structural_probe.json"
+OUT_JSON = EVAL / "artifacts" / "column_build_structural_probe.json"
 
 # ── Statischer Kuppelplaettchen-Katalog (engine/src/dome.rs:201-233, wort-
 # getreu transkribiert -- KEIN Engine-Aufruf, reine Konstantendaten). Nur der
@@ -256,7 +256,7 @@ def main() -> None:
 
     for quelle in QUELLEN:
         for dateiname in quelle["dateien"]:
-            pfad = EVAL / dateiname
+            pfad = EVAL / "artifacts" / dateiname
             if not pfad.exists():
                 print(f"FEHLT: {pfad}", file=sys.stderr)
                 continue

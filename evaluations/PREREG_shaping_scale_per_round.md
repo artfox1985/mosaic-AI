@@ -183,7 +183,7 @@ Runde**. Entscheidungsregel:
 `data/holdout` (je (Partie, Runde) einer, 120 je Runde), Quelle der Größen:
 neuer Read-only-Export `mosaic_rust.wertung_shaping_e_json` (rechnet exakt die
 Terme aus `net_mcts.rs:1462-1487`, Laufzeit-Alphas, `round_gain = 0`).
-Rohzahlen: `evaluations/probe_shaping_e_distribution_pfad_a.json`.
+Rohzahlen: `evaluations/artifacts/probe_shaping_e_distribution_pfad_a.json`.
 
 > **par.6, Pfad A: ERFÜLLT.** Alle 90-%-Quantile von `E_r / SCALE_r` liegen
 > unter **0,32** (Maximum: k3 in Runde 4 mit 0,31; die Zielkriterien k1/k2

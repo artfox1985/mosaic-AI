@@ -37,7 +37,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 PROBE = ROOT / "tools" / "probes" / "v2_envelope_arena.py"
-OUT_JSON = ROOT / "evaluations" / "phase_sweep.json"
+OUT_JSON = ROOT / "evaluations" / "artifacts" / "phase_sweep.json"
 
 # par.14: die Nachbesserungen gegenueber par.13, alle drei aus einer
 # benannten Schwaeche des ersten Entwurfs.
@@ -86,7 +86,7 @@ def fahre_punkt(i: int, amp: float, peak: float, stufe: str) -> dict:
         env=umgebung, cwd=str(ROOT), check=True,
         capture_output=True, text=True, encoding="utf-8",
     )
-    d = json.loads((ROOT / "evaluations" / f"v2_envelope_arena_{tag}.json").read_text(encoding="utf-8"))
+    d = json.loads((ROOT / "evaluations" / "artifacts" / f"v2_envelope_arena_{tag}.json").read_text(encoding="utf-8"))
     k = d["kennzahlen"]
     return {
         "i": i, "stufe": stufe, "amp": round(amp, 4), "peak": round(peak, 4),

@@ -46,8 +46,8 @@ MODELS = {
     "S": BASIS / "models/alphazero_v21-seedk1_best.onnx",
     "N": BASIS / "models/alphazero_v21-asymN_best.onnx",
 }
-DUMP = BASIS / "evaluations/probe_sibling_succ_k1_w1.0.json"
-OUT = BASIS / "evaluations/seedk1_value_sibling_check.json"
+DUMP = BASIS / "evaluations/artifacts/probe_sibling_succ_k1_w1.0.json"
+OUT = BASIS / "evaluations/artifacts/seedk1_value_sibling_check.json"
 
 
 def value_for_mover(sess, succ: dict, mover: int) -> float:

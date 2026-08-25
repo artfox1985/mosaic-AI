@@ -327,7 +327,7 @@ def main():
     ap.add_argument("--sims", type=int, default=400)
     ap.add_argument("--c-puct", type=float, default=1.5)
     ap.add_argument("--seed", type=int, default=20260823)
-    ap.add_argument("--out", default="evaluations/r5_four_head_comparison.json")
+    ap.add_argument("--out", default="evaluations/artifacts/r5_four_head_comparison.json")
     args = ap.parse_args()
 
     rng = random.Random(args.seed)

@@ -53,7 +53,7 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=20260826)
     ap.add_argument("--uncert-z", default="1.0")
     ap.add_argument("--min-visit-frac", default="0.5")
-    ap.add_argument("--out", default="evaluations/e3b_firing_rate.json")
+    ap.add_argument("--out", default="evaluations/artifacts/e3b_firing_rate.json")
     args = ap.parse_args()
 
     # Regler VOR dem Import setzen: die Getter sind `OnceLock`, lesen also

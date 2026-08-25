@@ -168,7 +168,7 @@ def main() -> None:
             "bestanden": all(v["std_pos_anteil"] >= 0.8 and v["im_band"] for v in je_cap.values()),
         }
 
-    (BASIS / "evaluations" / "probe_reachability_buffer_spread.json").write_text(
+    (BASIS / "evaluations" / "artifacts" / "probe_reachability_buffer_spread.json").write_text(
         json.dumps({"states": a.states, "phase": a.phase, **ergebnis},
                    indent=1, ensure_ascii=False), encoding="utf-8")
     print("\n  geschrieben: evaluations/probe_reachability_buffer_spread.json")

@@ -450,7 +450,7 @@ def main():
     ap.add_argument("--data-glob", default="data/selfplay_v18_*.pkl")
     ap.add_argument("--state-seed", type=int, default=20260803)
     ap.add_argument("--n-bootstrap", type=int, default=1000)
-    ap.add_argument("--out", default="evaluations/r4_value_calibration_result.json")
+    ap.add_argument("--out", default="evaluations/artifacts/r4_value_calibration_result.json")
     ap.add_argument("--smoke", action="store_true",
                      help="Rauchtest: 2 Zustaende x 3 Refills x NUR das erste Modell, keine Regression.")
     args = ap.parse_args()

@@ -31,7 +31,7 @@ Score beider Seiten um ~13 % (Task-#18-Gegenprobe). Sie wird deshalb
 NICHT gemessen; dieser Absatz ist ihre dokumentierte Schliessung.
 **Aera-Nachmessung (2026-08-22, Nutzer-Rueckfrage):** die Kalibrierung
 wurde auf v21_2d_brierbest wiederholt
-(`evaluations/gumbel_scale_calibration_v21.json`, 216 Stellungen @400):
+(`evaluations/artifacts/gumbel_scale_calibration_v21.json`, 216 Stellungen @400):
 q wiegt das **1,47-Fache** des Priors (v18-Aera: 1,23), je Runde
 1,30-1,46 (R4: 2,92), Gleichgewicht laege bei c_scale~0,68. Die
 Schliessung ist damit auf der aktuellen Aera bestaetigt: kein
@@ -54,7 +54,7 @@ Python-Spaltenzaehlung gegen die Engine verifiziert, 500/500
 identisch):** 7.797/8.000 Zwangspartien mit Kandidat; Auswahl 1.500
 Stellungen (`data/seed_positions/seed_positions_v1.jsonl`, Seed
 20260822, hoechstens eine je Partie), Bericht
-`evaluations/seed_positions_curation_report.json`. Verteilung: R2
+`evaluations/artifacts/seed_positions_curation_report.json`. Verteilung: R2
 duenn (90/9/0 fuer p3/p4/p5 -- vollstaendig uebernommen,
 dokumentierte Schieflage), R3/R4 quotiert 183-276 je Stratum;
 k1-aktiv 567/1500 (37,8 % ~ 3/8). Restlaenge ab Startpunkt: Mittel
@@ -205,7 +205,7 @@ Asym-Artefakten uebernommen) und kein Seeding-spezifischer Regler.
 
 **Kontrollarm auf denselben Seeds** (Nutzer-Entscheid par.6.2: der
 vorhandene v21-asymN): dessen Artefakt liegt bereits vor
-(`evaluations/paired_arena_env_asym_nullarm_n.json`, `model =
+(`evaluations/artifacts/paired_arena_env_asym_nullarm_n.json`, `model =
 models/alphazero_v21-asymN_best.onnx`, dieselben 407 Seeds aus
 `evaluations/seeds_asym_407.txt`) -- **kein neuer Lauf noetig**, der
 Vergleich zieht die dort bereits gemessenen k1-Raten/Siegquoten heran.
@@ -268,7 +268,7 @@ Vergleich zieht die dort bereits gemessenen k1-Raten/Siegquoten heran.
 ### par.4d MECHANIK-SONDE (2026-08-23, Koordinator-Lauf): ERSTES POSITIVES ZUSTANDSSIGNAL
 
 `asym_value_sibling_check` (Modellpfade auf seedk1_best angepasst,
-Ausgabe nach `evaluations/seedk1_value_sibling_check.json`, damit das
+Ausgabe nach `evaluations/artifacts/seedk1_value_sibling_check.json`, damit das
 Asym-Artefakt erhalten bleibt; dieselben 33 gepaarten Stellungen wie
 Asym-par.15): **Tau(Value~k1-Puffer) seedk1 +0,140 gegen N -0,185,
 Differenz +0,325 (sd 0,809, t +2,30), Vorzeichentest 17/5/11,

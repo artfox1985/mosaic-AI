@@ -143,7 +143,7 @@ E3b Stufe 2 und ISMCTS-k um die CPU-Bahn und laufen daher sequenziell.
 
 Gepaartes Gating gegen die Kontrolle/den Champion `v21_2d_brierbest`,
 400 Sims beidseitig, Basis-Seed 20260830, Standard-SPRT.
-Belegstelle `evaluations/paired_gating_t_d_vw04_vs_v21.json`.
+Belegstelle `evaluations/artifacts/paired_gating_t_d_vw04_vs_v21.json`.
 
 | Groesse | Wert |
 |---|---|
@@ -180,7 +180,7 @@ kuenftige Gatings und wird nicht an diesem Arm entschieden.
 ## ERGEBNIS Arm `t_d_vw08` (value_weight 0,8) -- 2026-08-09: H0 (SPRT-Entscheid)
 
 Gleicher Aufbau, Basis-Seed 20260831. Belegstelle
-`evaluations/paired_gating_t_d_vw08_vs_v21.json`.
+`evaluations/artifacts/paired_gating_t_d_vw08_vs_v21.json`.
 
 | Groesse | Wert |
 |---|---|

@@ -97,7 +97,7 @@ VERSION_PREFIXES = tuple(EXPECTED_COUNTS.keys())
 DATA_DIR = BASE_DIR / "data"
 VOLL_DIR = BASE_DIR / "data_dose_voll"
 HALB_DIR = BASE_DIR / "data_dose_halb"
-SPLIT_MANIFEST = BASE_DIR / "evaluations" / "train_corpus_dose_split.json"
+SPLIT_MANIFEST = BASE_DIR / "evaluations" / "artifacts" / "train_corpus_dose_split.json"
 
 
 def selfplay_running() -> bool:
@@ -595,8 +595,8 @@ def run_smoke() -> None:
     smoke_recipe = ["--epochs", "2", "--lr", "4e-4", "--lr-schedule", "cosine",
                      "--value-target-variant", "nortv", "--no-plot", "--no-snapshot"]
     seeds = [1, 2]
-    diag_out = BASE_DIR / "evaluations" / "_smoke_corpus_dose_diag.json"
-    result_out = BASE_DIR / "evaluations" / "_smoke_corpus_dose_result.json"
+    diag_out = BASE_DIR / "evaluations" / "artifacts" / "_smoke_corpus_dose_diag.json"
+    result_out = BASE_DIR / "evaluations" / "artifacts" / "_smoke_corpus_dose_result.json"
     ok = False
     try:
         ensure_hardlink_mirror(voll_names, smoke_voll_dir, DATA_DIR)
@@ -650,8 +650,8 @@ def run_smoke() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5, 6])
-    ap.add_argument("--out", default="evaluations/train_corpus_dose_result.json")
-    ap.add_argument("--diag-out", default="evaluations/offline_diagnosis_corpus_dose_frozen.json")
+    ap.add_argument("--out", default="evaluations/artifacts/train_corpus_dose_result.json")
+    ap.add_argument("--diag-out", default="evaluations/artifacts/offline_diagnosis_corpus_dose_frozen.json")
     ap.add_argument("--skip-training", action="store_true",
                     help="Nur Diagnose+Auswertung auf bereits vorhandenen Checkpoints "
                          "(Sandboxes werden dafuer nicht gebraucht/geprueft).")

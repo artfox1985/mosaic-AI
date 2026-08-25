@@ -60,7 +60,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--models", nargs="+", required=True,
                     help="Versionsnamen (alphazero_<name>.pth in models/)")
-    ap.add_argument("--out", default="evaluations/t36_curve_eval.json")
+    ap.add_argument("--out", default="evaluations/artifacts/t36_curve_eval.json")
     ap.add_argument("--batch", type=int, default=512)
     ap.add_argument("--snapshot-dir", default=None,
                     help="Verzeichnis mit dem EINGEFRORENEN Messset (z.B. "

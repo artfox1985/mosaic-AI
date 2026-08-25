@@ -34,7 +34,7 @@ from row_preference_probe import row_choices_from_log  # noqa: E402
 from plate_points_from_arena import game_list  # noqa: E402
 
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "completion_locus_row_delta.json"
+OUT_JSON = EVAL / "artifacts" / "completion_locus_row_delta.json"
 
 RNG = np.random.default_rng(20260824)
 N_BOOT = 1000
@@ -107,8 +107,8 @@ def block_bootstrap_delta(rows, n_boot=N_BOOT):
 
 
 def main():
-    paths = [EVAL / "paired_arena_env_imm_netvnet.json",
-             EVAL / "paired_arena_env_imm_netvnet_swap.json"]
+    paths = [EVAL / "artifacts" / "paired_arena_env_imm_netvnet.json",
+             EVAL / "artifacts" / "paired_arena_env_imm_netvnet_swap.json"]
     for p in paths:
         assert p.exists(), f"fehlt: {p}"
 
