@@ -84,14 +84,17 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
    "dieser Zug baut die Spalte" tragen. Reihenfolge fuer v23: Fenster steht
    (par.2) -> Traeger-A/B -> Ownership + w0 auf dem gewaehlten Traeger ->
    gaten.
-4. **Zwei Such-Knoepfe am v23-Netz, eingetaktet 2026-08-25** -- beide billig,
+4. **Zwei Such-Knoepfe am v22-Netz, eingetaktet 2026-08-25** -- beide billig,
    beide auf denselben Seeds fahrbar, beide NACH dem Training:
    `PREREG_implicit_minimax_backup.md` par.3 (gebaut und abgenommen, wirkt in
    der Gumbel-Selektion; **nicht** im v22-Label-Pfad, also kein Eingriff in die
-   laufende Erzeugung moeglich oder noetig -- **wohl aber ein WECKER fuer die
-   v23-ERZEUGUNG**, weil Netz-Self-Play durch die Gumbel-Suche laeuft und die
-   Policy-Ziele die Besuchsverteilung SIND. Auflage: Gating-Messung VOR dem
-   v23-Self-Play, sonst faellt der Entscheid per Default. Die beiden Arme
+   laufende Erzeugung moeglich oder noetig -- **wohl aber ein WECKER fuer das
+   v22-SELF-PLAY**, also den Lauf, der das v23-Fenster fuellt: Netz-Self-Play
+   laeuft durch die Gumbel-Suche, und die Policy-Ziele SIND die
+   Besuchsverteilung. Auflage: Gating-Messung VOR jenem Start, sonst faellt
+   der Entscheid per Default. **Dasselbe gilt fuer die risikosensitive Stufe
+   A1** (par.5a): label-neutral ist sie nur gegenueber HEURISTISCHER
+   Erzeugung. Die beiden Arme
    messen Verschiedenes: Gating = Staerke, Self-Play = Korpus-Qualitaet) und
    `PREREG_risk_sensitive_leaf_utility.md` par.5 Stufe A (liest die
    exportierten, aber ungelesenen `value_wdl_logits`). **Wichtig bei Stufe A:**
@@ -302,7 +305,7 @@ Zurueckdrehen: `.gitignore`-Zeile entfernen und
 | **Risikosensitive Blatt-Utility** | `PREREG_risk_sensitive_leaf_utility.md` | Nichts gemessen; `points_dist` ist abgeschaltet, der Champion traegt den Kopf nicht |
 | **Blindziehung: Suche und Merkmale** | `PREREG_chance_nodes.md` Teil B1, `PREREG_stack_top_feature.md` | Beide geparkt. B1 gibt der SUCHE die korrekte Peek-Bewertung, das Merkmal gibt dem NETZ die sichtbare Rueckseite |
 | #31 / #38 / #39 | – | geparkt, Arbeitskreis "Spaeter"; Beschreibungen im Archiv |
-| **v22-Fenster (Rotation)** | `PREREG_v22_window.md` | Design auf Halde, nicht eingeplant. NICHT zu verwechseln mit dem v2-Lehrer-Korpus unter Punkt 1 |
+| **v22-Fenster** | `PREREG_v22_window.md` | **NEU GEFASST 2026-08-25, ENTSCHIEDEN.** Der alte Rotations-Zuschnitt war fuer einen NETZ-Erzeuger gebaut und ist hinfaellig -- das v22-Fenster IST jetzt der v2-Lehrer-Korpus (24.000 Partien, eine Klasse, kein Altbestand). Frueher stand hier ausdruecklich "nicht zu verwechseln mit dem Lehrer-Korpus"; das gilt nicht mehr |
 
 **Geschlossen, nicht neu vorschlagen:** Q-Skalierungs-Option, jeder
 Suchparadigmen-Wechsel (zwei externe Recherchen), Mehrfach-Determinisierung
@@ -366,6 +369,25 @@ zwei Punktekarten (`PREREG_heuristic_v2_long_rows.md` par.11-16),
   2026-08-25 lagen vier davon im Vorzeichen falsch, drei in der
   Parallelsitzung und eine hier (Kriterium 6 "startet bei -27": falsch,
   `special_empty` zaehlt nur Spezialfelder auf bereits GELEGTEN Platten).
+
+---
+
+## BENENNUNG DER GENERATIONEN (damit der Off-by-one nicht wiederkehrt)
+
+**Ein Fenster vN traegt die Partien von Champion v(N-1).** Beleg: das
+v22-Fenster enthielt `v21wdl`-Partien (Generator = v21-Champion, alte Tabelle
+in `PREREG_v22_window.md`). Daraus folgt fuer die laufende Kette:
+
+| | |
+| --- | --- |
+| `hv2`-Korpus (laeuft) | **das v22-Fenster** -- Erzeuger ist die Heuristik, nicht ein Champion |
+| daraus trainiert | **v22-Netz** |
+| dessen Self-Play | fuellt **das v23-Fenster** |
+| daraus trainiert | **v23-Netz** |
+
+Der haeufige Fehler ist, das Self-Play, das v23 fuettert, "v23-Self-Play" zu
+nennen. Es ist das **v22**-Self-Play. Am 2026-08-25 einmal passiert und in
+zwei Preregs korrigiert.
 
 ---
 
