@@ -50,7 +50,14 @@ def run_diagnosis(data_dir: str, label: str):
     mask_max    = masks.sum(1).max().item()
 
     model = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS)
-    pred_p, *_ = model(states)
+    # Der Cache liegt seit den kompakten Typen (2026-08-06) in fp16, das frisch
+    # gebaute Netz rechnet fp32 -- ohne diesen Cast bricht `F.linear` mit
+    # "mat1 and mat2 must have the same dtype, but got Half and Float" ab. Das
+    # hat Punkt 1 unbemerkt lahmgelegt: die Struktur-Pruefungen (zero-mask,
+    # policy leak) sind genau die, die einen Korpus als brauchbar ausweisen.
+    pred_p, *_ = model(states.float())
+    targets_p = targets_p.float()
+    masks = masks.float()
     masked_logits = pred_p + (masks - 1) * 1e9
     log_probs = F.log_softmax(masked_logits, dim=1)
     p_loss = (-torch.sum(targets_p * log_probs) / states.size(0)).item()
