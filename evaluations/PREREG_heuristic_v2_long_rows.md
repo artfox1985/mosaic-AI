@@ -779,6 +779,53 @@ einem BESTEHENDEN Ziel, das Slot-Ziel fuegt ein NEUES hinzu. Reihenfolge:
 Grundwirkung des eingeschalteten Kopfes (Stufe 1), dann (a), dann das
 Slot-Ziel.
 
+**NACHTRAG 2026-08-25 (7): die Abklingkurve EXISTIERT schon -- als Treppe.**
+
+Nutzer-Kette 2026-08-25: der Solver ist exakt, aber myopisch; die
+v2-Routing-Huelle hat *"ebenfalls keinen weitblick"* (sie routet auf eine FESTE
+Zielkarte, unabhaengig von der konkreten Partie); *"dann waere wieder unser
+decaying ownership head an der reihe"*.
+
+**Beim Nachsehen ist die Zustaendigkeit im Code bereits so verteilt**, wie die
+Abklingkurve sie haben will:
+
+| Runde | Value-Tiebreak | Ownership-Pol | warum |
+| --- | --- | --- | --- |
+| 1 | aus (nur 2-4) | **wirkt** | Value-R2 ~0,03, taugt hier nicht |
+| 2-4 | wirkt, nur Gleichstaende | **wirkt** | beide |
+| 5 | aus | aus | Sofortpunkte SIND hier das richtige Ziel, das Spiel endet |
+
+Belege: `exact_or_valued_ignores_evaluator_outside_rounds_2_to_4`
+(tiling_solver.rs:2157), `ownership_tiling_overrides_points_rounds_1_to_4`
+(:2619), `ownership_tiling_round5_unaffected` (:2735).
+
+**Der Value-Kopf ist frueh schwach und spaet stark, der Ownership-Pol ist
+frueh scharf und spaet ueberfluessig -- sie sind Spiegelbilder.** Und die
+Achse, ueber die Nachtrag (4) die Abklingkurve laufen laesst (Nutzer-Entscheid:
+RUNDENNUMMER), ist genau die, die im Code schon die Zustaendigkeit regelt.
+
+**Daraus die Neubewertung dieses ganzen Arms:** die Architektur ist im Umriss
+fertig und nur abgeschaltet. Was fehlt, ist nicht der Mechanismus, sondern
+
+1. ein Korpus, in dem Spalten fertig werden -- sonst sagt der Ownership-Kopf
+   voraus, was plattenblindes Spiel erreicht, und routet in die eigene
+   Schwaeche ([[feedback_dont_calibrate_to_plate_blind_play]]);
+2. `OWNERSHIP_WEIGHT > 0`;
+3. die KURVE statt der Treppe -- eine Verfeinerung, nicht die Hauptsache.
+
+**Und es entscheidet die alte Streitfrage aus Nachtrag (2)/(6):** die
+Dreiecksabweichung ist gegen dieselbe FESTE Karte gerechnet wie die
+Routing-Huelle und hat damit denselben Mangel -- kein Weitblick, nur Geometrie.
+Der Ownership-Kopf sagt dagegen DIESE Partie voraus. Er ist deshalb der
+richtige Traeger, und das Umlabeln auf die Dreiecksform waere ein Rueckschritt
+gewesen, nicht nur ein Informationsverlust.
+
+**Was das fuer die Reihenfolge heisst:** die Huellen-Gewichtung (Option a)
+bleibt sinnvoll als KAPAZITAETS-Lenkung -- sie schaerft den Kopf dort, wo es
+zaehlt, ohne sein Ziel zu ersetzen. Sie ist aber nachrangig gegenueber
+"Gewicht ueber null auf plattenbewusstem Korpus", weil ohne das gar nichts
+wirkt.
+
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
 `plate_builder::v2_chip_vorzug`: vollendet per Bonuschip die Musterreihe, die
