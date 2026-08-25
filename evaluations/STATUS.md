@@ -286,6 +286,53 @@ den Lehrer-Einsatz ist er entschaerft.
    Alle drei Knoepfe bleiben im Code, Default aus. `MOSAIC_PHASE_AMP` und
    `MOSAIC_PHASE_PEAK` sind in `knob_registry.rs` als Diagnose eingetragen.
    
+   **UEBERGEBEN 2026-08-25 (Kontextfenster voll, Nutzer-Entscheid): drei
+   offene Aufgaben aus diesem Strang, in dieser Reihenfolge.**
+
+   **(A) Zwei Erreichbarkeits-Eingabeebenen fuers Netz.** Nutzer-Vorgabe: beide
+   bauen ("mehr features = bessere chance die infos zu extrahieren").
+   `f_max` je Spalte (6 Zahlen) auf den FLACHEN Zweig, Erreichbarkeit je Zelle
+   (36) auf den CONV-Zweig; beide ans ENDE ihres Blocks. `INPUT_SIZE` 708 ->
+   714, `NUM_PLANES_CHANNELS` 76 -> 77.
+
+   *Die Vorarbeit ist erledigt und war der schwierige Teil:* die
+   Kompatibilitaets-Schicht steht (`net::split_planes_flat_batch_src`, Commit
+   0fb043f), Paritaet nach dem Umbau der Fuetterung geprueft
+   (Hash 8c6684ff). Ohne sie haette eine zusaetzliche Ebene den Flat-Block
+   fuer Altmodelle STILL verschoben -- Formen gueltig, Werte falsch, kein
+   Absturz.
+
+   *Die Falle, die noch wartet:* es gibt ZWEI Flat-Bauer,
+   `features::state_to_features` (JSON) und `state_to_features_direct`
+   (GameState), und ein Test erzwingt ihre Byte-Gleichheit
+   (`features.rs:1068`). Der JSON-Pfad hat in der Engine NULL produktive
+   Aufrufer, der Direkt-Pfad zwanzig -- aber der Test gilt. Im JSON-Pfad gibt
+   es keinen `PlayerBoard`, aus dem sich `cell_is_completable` ohne Nachbau
+   rechnen liesse, und ein Nachbau ist genau die Doppelung, an der hier schon
+   Formeln auseinandergelaufen sind. **Abnahme:** Paritaetssonde gegen ein
+   Altmodell MIT breiterem Bauer -- das ist der Beleg, den die
+   Kompatibilitaets-Schicht verdient und der heute noch fehlt (bisher ist nur
+   belegt, dass sie bei GLEICHER Breite nichts kaputt macht).
+
+   **(B) JSON-Umzug in einen Unterordner** (Nutzer-Auftrag: `evaluations/` ist
+   zugemuellt). Vermessen: **172 hart kodierte `evaluations/`-Pfadstellen** in
+   Werkzeugen, dazu 16 Dateien mit eigener `EVAL`-Konstante. 170 getrackte
+   JSON (41 MB) gegen 120 Markdown (2,6 MB) -- 94 Prozent des Volumens sind
+   Ergebnisse. Die fuenf groessten Dateien sind 36 der 41 MB, darunter drei
+   `frozen_*_oracle_labels*` (eingefrorene Referenzen, aendern sich nie).
+   Ein blindes `git mv` bricht die Werkzeugkette; sauber ist: Konstante
+   zentralisieren, dann verschieben, dann alle Sonden einmal durchlaufen
+   lassen. Nebenbei liegen ~64 Sweep-Zwischendateien untracked im Baum --
+   erster Kandidat fuer eine `.gitignore`-Zeile.
+
+   **(C) v22 mit dem v2-Lehrer.** Entscheide stehen in
+   `PREREG_heuristic_v2_long_rows.md` par.3b: Ownership-Kopf EINSCHALTEN statt
+   umbauen (ein Umlabeln auf die Zellabweichung waere Informationsverlust,
+   Begruendung dort), plus `w0`-Kontrollarm AUF DEMSELBEN KORPUS -- ohne ihn
+   sind Kopf und Korpuswechsel konfundiert. Die Parallelsitzung wartet auf
+   diesen Korpus, um Durchsatztabelle und Plattenwert nicht weiter auf
+   plattenblindem v20-Spiel zu eichen.
+
    **UEBERGABE-NOTIZ 2026-08-25:** Maschine und `self_play.rs` sind FREI
    (Commit `ae88cf3`, Suite 520/0, Paritaet haelt). Die Parallelsitzung
    `mosaic-ai-4f` wartete auf diese Freigabe fuer zwei Laeufe
@@ -375,6 +422,14 @@ plattenblindes Spiel geeicht, derselbe Fehler wie viermal zuvor.
   gegen 3,50), der Unterschied sitzt also allein in der TIEFE. Weil Ziehungen
   bei Punktestand 0 gratis und damit unsichtbar sind, sind die gemessenen
   Tiefen UNTERGRENZEN.
+  **NETZFREI BESTAETIGT** (par.6b, konstruierte Bretter, `cargo test`, 0,04 s):
+  nicht die Wertungsplatte entscheidet, sondern das **VORZEICHEN** von
+  `scoring_progress`. Bei Niveau −6,00 / −12,00 / −4,83 zieht die Regel 13 /
+  11 / 11 mal; sobald dasselbe Brett ein positives Niveau ergibt (+3,50 bei
+  vier Platten ohne leere Spezialfelder), faellt die Tiefe auf 1. Ohne
+  Kriterium 6 ist sie in jedem konstruierten Fall 1. Mit einem Konto von 60
+  statt 5 zeigt sich ausserdem, wie stark die Korpuszahlen Untergrenzen waren:
+  im echten Spiel stoppt die KONTOGRENZE den Aderlass, nicht die Regel.
   **Nicht beantwortet:** ob der Kauf sich lohnt -- eine Wild-Platte kann mehr
   wert sein als 5 Punkte. Beantwortet ist nur, dass die Entscheidung auf einem
   Skalenbruch beruht und nicht auf einer Rechnung.
@@ -397,11 +452,18 @@ plattenblindes Spiel geeicht, derselbe Fehler wie viermal zuvor.
   "Strafleisten-Ziel und Ueberlauf raus" waere NICHT wirkungslos, er traefe rund
   11 % der Stein-Entscheidungen. Drei Viertel der Strafleisten-Faelle sind
   allerdings erzwungen und muessten ohnehin stehen bleiben.
-  **Spannung zu `PREREG_floor_action_aversion.md` par.6**: dort ist der rohe
-  Prior auf dem Strafleisten-Ziel in ALLEN 280 qualifizierenden Stellungen exakt
-  0 (nachgeprueft in `floor_action_aversion_gate.json`), hier stehen 1,09
-  freiwillige Faelle je Partie. Die beiden Zahlen sind NICHT deckungsgleich und
-  widerlegen einander auch nicht: das Tor sampelte 268 von 280 Stellungen in
+  **AUFGELOEST 2026-08-25** (Nachmessung `PREREG_floor_action_aversion.md`
+  par.14): der dort registrierte Nullwert -- roher Prior auf dem
+  Strafleisten-Ziel in ALLEN 280 Stellungen exakt 0 -- war eine Eigenschaft der
+  RUNDE 1, nicht des Champions. Auf 240 Stellungen aus Runde 2-4 (ordnungsfrei
+  gezogen, `floor_action_aversion_gate_r234_s20260825.json`) steht der Prior bei
+  0,00065 und der Suchanteil bei 0,00221; **62 von 240 Stellungen haben einen
+  Prior groesser als 0**, in 10 besucht die Suche die Aktion, groesster
+  Einzelwert Prior 0,0587 mit Suchanteil 0,15. Die ASYMMETRIE bleibt (Faktor
+  ~60 gegenueber den Ueberlauf-Zielen) und damit das Verdikt H1; gefallen sind
+  "exakt 0", "in schaerfster Form" und die Logit-Abstand-Herleitung. Die 1,09
+  freiwilligen Faelle je Partie und der Torbefund widersprechen sich damit
+  nicht mehr. Ursache der Schieflage: das Tor sampelte 268 von 280 Stellungen in
   RUNDE 1, die freiwilligen Faelle liegen nach derselben Auswertung in Runde 2-4
   (R1=30, R2=255, R3=214, R4=154). **Die Schieflage ist ein Artefakt der
   Sammlung, nicht des Spiels** (geprueft an
