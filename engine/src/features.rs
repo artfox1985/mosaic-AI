@@ -15,7 +15,7 @@ use crate::tiling_solver::solve_round_final_score;
 /// Feature-Vektor-Länge (= `config.INPUT_SIZE`). EINZIGE Quelle der Wahrheit
 /// für die ONNX-Eingabegröße — bei jeder Feature-Änderung hier UND in
 /// config.py aktualisieren (sonst `Net::load`-Shape-Mismatch beim Inferieren).
-pub const INPUT_SIZE: usize = 708;
+pub const INPUT_SIZE: usize = 714;
 
 /// Per-Kriterium-Normalisierung der 8 Wertungsplatten-Punkte (= `SCORE_NORM`).
 const SCORE_NORM: [f32; 8] = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0];
@@ -392,6 +392,29 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
     // 10. Kuppel-Stapel
     f.push((num(v, "dome_stack_count") / 20.0) as f32);
 
+    // 11. Erreichbare Spaltenfuellung des ZIEHENDEN Spielers (6), ans Ende des
+    // flachen Blocks (STATUS "(A) Zwei Erreichbarkeits-Eingabeebenen").
+    // GELESEN, nicht gerechnet: die Formel steht einmal in
+    // `plate_builder::achievable_column_fill` und wird in
+    // `serialize::serialize_player` ausgewertet. 0.0 als Rueckfall nur fuer
+    // alte Schnappschuesse ohne das Feld (gleiches Muster wie
+    // `dome_wild_remaining_frac`).
+    {
+        let pi = num(v, "current_player") as usize;
+        let f_max = v
+            .get("players")
+            .and_then(|ps| ps.get(pi))
+            .and_then(|p| p.get("col_f_max"))
+            .and_then(|x| x.as_array());
+        for c in 0..6usize {
+            let x = f_max
+                .and_then(|a| a.get(c))
+                .and_then(|x| x.as_f64())
+                .unwrap_or(0.0);
+            f.push((x / 6.0) as f32);
+        }
+    }
+
     f
 }
 
@@ -741,6 +764,20 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
     // 10. Kuppel-Stapel
     f.push(state.dome_tile_pool.len() as f32 / 20.0);
 
+    // 11. Erreichbare Spaltenfuellung -- siehe JSON-Pfad. Hier direkt ueber
+    // dieselbe Funktion, die auch der Serialisierer benutzt; die
+    // `direct_matches_json_path_*`-Tests bewachen die Gleichheit.
+    {
+        let remaining = crate::provocation::remaining_colors(state);
+        let f_max = crate::plate_builder::achievable_column_fill(
+            &state.players[state.current_player],
+            &remaining,
+        );
+        for c in 0..6usize {
+            f.push((f_max[c] / 6.0) as f32);
+        }
+    }
+
     f
 }
 
@@ -764,7 +801,7 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
 //   51..57 : Zeilen@Tile0-gegated (6)  57..63 : Zeilen@Tile7-gegated (6)
 //   63..69 : Spalten@Tile1-gegated (6) 69..71 : Diagonalen@Tile2-gegated (2)
 //   71..72 : Rand@Tile4-gegated (1)    72..76 : Ecken@Tile5-gegated (4)
-pub const NUM_PLANES_CHANNELS: usize = 76;
+pub const NUM_PLANES_CHANNELS: usize = 77;
 const PLANES_H: usize = 6;
 const PLANES_W: usize = 6;
 
@@ -909,6 +946,27 @@ pub fn state_to_planes_direct(state: &GameState) -> Vec<f32> {
                     if gate(5) {
                         out[planes_idx(72 + m, r, w)] = 1.0;
                     }
+                }
+            }
+        }
+    }
+
+    // Kanal 76: Erreichbarkeit je Zelle fuer den ZIEHENDEN Spieler, ans Ende
+    // des Blocks (STATUS "(A) Zwei Erreichbarkeits-Eingabeebenen"). Dieselbe
+    // Funktion, die `serialize::serialize_player` fuer `cell_reachable_mask`
+    // benutzt -- die Formel existiert einmal.
+    //
+    // SEMANTIK, bewusst uebernommen statt umgedeutet: `cell_is_completable`
+    // liefert `true` auch fuer Zellen ohne Space (leerer Slot) und fuer
+    // bereits gefuellte. Die Ebene sagt also "nicht ausgeschlossen", nicht
+    // "noch offen und bedienbar" -- dieselbe Bedeutung wie im Heuristik-Layer.
+    {
+        let p = &state.players[state.current_player];
+        let remaining = crate::provocation::remaining_colors(state);
+        for r in 0..PLANES_H {
+            for w in 0..PLANES_W {
+                if crate::column_build::cell_is_completable(p, r, w, &remaining) {
+                    out[planes_idx(76, r, w)] = 1.0;
                 }
             }
         }
@@ -1380,6 +1438,37 @@ mod tests {
     /// Dokument, Abschnitt "A3"): eine Feature-Zeile testweise aendern MUSS
     /// diesen Test rot machen -- ein Waechter, von dem niemand gesehen hat,
     /// dass er fehlschlagen kann, ist wertlos.
+    /// Regenerator fuer die Fixture -- OPT-IN ueber
+    /// `MOSAIC_UPDATE_FEATURE_FIXTURE=1`. Bis 2026-08-25 musste die Datei von
+    /// Hand nachgezogen werden, was bei einer GEWOLLTEN Feature-Aenderung die
+    /// Versuchung erzeugt, den Waechter stattdessen zu entschaerfen.
+    /// Schreibt NUR bei gesetzter Variable; im Normalfall passiert nichts.
+    fn maybe_update_fixture(pfad: &std::path::Path, zeilen: &[(String, u64)]) -> bool {
+        if std::env::var("MOSAIC_UPDATE_FEATURE_FIXTURE").as_deref() != Ok("1") {
+            return false;
+        }
+        let alt = std::fs::read_to_string(pfad).unwrap_or_default();
+        let mut kopf: Vec<String> = alt
+            .lines()
+            .take_while(|z| z.starts_with('#'))
+            .map(|z| z.to_string())
+            .collect();
+        for z in kopf.iter_mut() {
+            if z.starts_with("# INPUT_SIZE=") {
+                *z = format!("# INPUT_SIZE={INPUT_SIZE}");
+            } else if z.starts_with("# NUM_PLANES_CHANNELS=") {
+                *z = format!("# NUM_PLANES_CHANNELS={NUM_PLANES_CHANNELS}");
+            }
+        }
+        let mut out = kopf.join("\n");
+        out.push('\n');
+        for (label, hash) in zeilen {
+            out.push_str(&format!("{label}\t{hash:016x}\n"));
+        }
+        std::fs::write(pfad, out).expect("Fixture schreiben");
+        true
+    }
+
     #[test]
     fn feature_golden_hash_matches_fixture() {
         let fixture = include_str!(concat!(
@@ -1388,6 +1477,18 @@ mod tests {
         ));
         let expected = parse_hash_fixture(fixture);
         let corpus = a3_golden_hash_corpus();
+        let pfad = std::path::Path::new(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/feature_contract_v1.txt"
+        ));
+        let neu: Vec<(String, u64)> = corpus
+            .iter()
+            .map(|(l, st)| (l.clone(), hash_state_features(st)))
+            .collect();
+        if maybe_update_fixture(pfad, &neu) {
+            eprintln!("Fixture neu geschrieben ({} Zeilen) -- Kopf-Begruendung von Hand ergaenzen.", neu.len());
+            return;
+        }
         assert_eq!(
             corpus.len(),
             expected.len(),

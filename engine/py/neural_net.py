@@ -266,6 +266,19 @@ def state_to_tensor(data):
     # 10. Kuppel-Stapel (Anzahl verbleibende Platten)
     features.append(data.get("dome_stack_count", 0) / 20.0)
 
+    # 11. Erreichbare Spaltenfuellung des ziehenden Spielers (6) -- ans Ende
+    # des flachen Blocks, spiegelbildlich zu features.rs Abschnitt 11.
+    # GELESEN, nicht gerechnet: die Formel steht einmal in
+    # plate_builder::achievable_column_fill und wird in
+    # serialize::serialize_player ausgewertet. 0.0 als Rueckfall fuer alte
+    # Schnappschuesse ohne das Feld (gleiches Muster wie
+    # dome_wild_remaining_frac).
+    _pi = data.get("current_player", 0)
+    _spieler = data.get("players", [])
+    _f_max = (_spieler[_pi].get("col_f_max", []) if _pi < len(_spieler) else [])
+    for _c in range(6):
+        features.append(float(_f_max[_c]) / 6.0 if _c < len(_f_max) else 0.0)
+
     return torch.tensor(features, dtype=torch.float32)
 
 
@@ -322,7 +335,7 @@ _GEOM = _build_geometry_masks()
 #   Geometrie roh:     19 (6 Zeilen + 6 Spalten + 2 Diagonalen + 1 Rand + 4 Ecken)
 #   Geometrie gegatet: 25 (6 Zeilen@Tile0 + 6 Zeilen@Tile7 + 6 Spalten@Tile1
 #                          + 2 Diagonalen@Tile2 + 1 Rand@Tile4 + 4 Ecken@Tile5)
-NUM_PLANES_CHANNELS = 2 * 16 + 19 + 25  # = 76
+NUM_PLANES_CHANNELS = 2 * 16 + 19 + 25 + 1  # = 77 (+1 Erreichbarkeit)
 
 
 def _board_channels(dome_grid) -> torch.Tensor:
@@ -360,7 +373,7 @@ def _board_channels(dome_grid) -> torch.Tensor:
 
 def state_to_planes(data) -> torch.Tensor:
     """2D-Gegenstück zu `state_to_tensor` (Task #11 Phase 1) -- Format
-    [C,6,6], C=NUM_PLANES_CHANNELS=76. ADDITIV: `state_to_tensor` bleibt
+    [C,6,6], C=NUM_PLANES_CHANNELS=77. ADDITIV: `state_to_tensor` bleibt
     unverändert, dies ist ein PARALLELER Zweig für den geplanten
     Conv-Encoder (siehe docs/design_2d_encoder.md). Ego-Perspektive wie
     überall sonst: erst der Spieler am Zug, dann der Gegner."""
@@ -392,7 +405,19 @@ def state_to_planes(data) -> torch.Tensor:
         _GEOM["corner"] * gate(5),
     ], dim=0)  # [25,6,6]
 
-    return torch.cat([board, raw_geom, gated], dim=0)  # [76,6,6]
+    # Kanal 76: Erreichbarkeit je Zelle fuer den ziehenden Spieler,
+    # spiegelbildlich zu features.rs. GELESEN aus `cell_reachable_mask`
+    # (Bit r*6+c), nicht gerechnet -- die Formel steht einmal in
+    # column_build::cell_is_completable und wird in serialize_player
+    # ausgewertet. Fehlt das Feld (alte Schnappschuesse), bleibt die Ebene 0.
+    _maske = int(players[curr_pi].get("cell_reachable_mask", 0))
+    _reach = torch.zeros(1, 6, 6)
+    for _r in range(6):
+        for _c in range(6):
+            if _maske >> (_r * 6 + _c) & 1:
+                _reach[0, _r, _c] = 1.0
+
+    return torch.cat([board, raw_geom, gated, _reach], dim=0)  # [77,6,6]
 
 
 MAX_PENDING_STACK_TILES = 4  # muss zu features.rs::MAX_PENDING_STACK_TILES passen

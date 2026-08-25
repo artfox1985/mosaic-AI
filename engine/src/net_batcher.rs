@@ -364,7 +364,7 @@ mod tests {
         let batcher = spawn_batcher(Arc::clone(&net), 8, Duration::from_millis(5));
 
         let feats: Vec<Vec<f32>> = (0..8)
-            .map(|i| vec![(i as f32) * 0.01; net.input_size()])
+            .map(|i| vec![(i as f32) * 0.01; crate::features::NUM_PLANES_VALUES + crate::features::INPUT_SIZE])
             .collect();
 
         let handles: Vec<_> = feats
