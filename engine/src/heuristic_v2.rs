@@ -252,7 +252,41 @@ pub fn plate_independent_l_value(player: &PlayerBoard, tile_ids: &[usize]) -> f6
     wert
 }
 
+/// par.16: derselbe Term, aber der handgesetzte Reihen-Kredit wird mit dem
+/// noch ERREICHBAREN Ertrag der Zielspalte gedeckelt.
+///
+/// **Was hier optimistisch ist und was nicht.** Die Plattenbewertung
+/// ueberschaetzt NICHTS -- `scoring.rs:166` rechnet `col_fill`, also den
+/// realisierten Fuellstand, keine Projektion auf 6 (in dieser Sitzung
+/// nachgesehen, eine erste Fassung dieser Idee ruhte auf der gegenteiligen
+/// Annahme). Vorausschauend ist allein `REIHEN_KREDIT`: ein Kredit dafuer,
+/// dass eine begonnene lange Reihe sich noch auszahlt.
+///
+/// Zahlt sie sich in eine Spalte ein, die hoechstens noch auf 4 kommt, ist
+/// der Kredit zu hoch. Der Deckel skaliert ihn mit `(f_max/6)^2` -- derselben
+/// Kurve, mit der die Endwertung die Spalte bezahlt.
+///
+/// **Unterschied zu par.12/15, und deshalb ein eigener Arm:** dort wurde die
+/// ZIELWAHL veraendert (welche Zellen ansteuern), hier die BEWERTUNG (was ist
+/// die Stellung wert). Vier Arme haben gezeigt, dass eine zustandsabhaengige
+/// Zielkarte den Fokus verwaessert; ueber die Bewertung sagt das nichts.
+pub fn row_completion_progress_capped(
+    player: &PlayerBoard,
+    tile_ids: &[usize],
+    remaining: &[i64; 5],
+) -> f64 {
+    row_completion_progress_inner(player, tile_ids, Some(remaining))
+}
+
 pub fn row_completion_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 {
+    row_completion_progress_inner(player, tile_ids, None)
+}
+
+fn row_completion_progress_inner(
+    player: &PlayerBoard,
+    tile_ids: &[usize],
+    remaining: Option<&[i64; 5]>,
+) -> f64 {
     let fuellung = column_fill(player);
     let mut summe = 0.0;
 
@@ -273,6 +307,7 @@ pub fn row_completion_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 
         // Bester erreichbarer Zielplatz. Max statt Summe: die Reihe wird
         // genau EINE Zelle belegen, nicht alle in Frage kommenden.
         let mut bester = 0.0f64;
+        let mut beste_spalte = 0usize;
         let mut erreichbar = false;
         for tc in 0..3 {
             let Some(slot) = player.dome_grid.dome_slots[tr][tc].as_ref() else {
@@ -287,6 +322,7 @@ pub fn row_completion_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 
                 let e = cell_yield(player, tile_ids, &fuellung, tr, tc, si);
                 if e > bester {
                     bester = e;
+                    beste_spalte = 2 * tc + si % 2;
                 }
             }
         }
@@ -300,9 +336,34 @@ pub fn row_completion_progress(player: &PlayerBoard, tile_ids: &[usize]) -> f64 
         // Feld-Ertrag (Spalte, Spezialfeld) kommt additiv obendrauf, weil er
         // stellungsabhaengig ist und in der ersten Fassung als ALLEINIGER
         // Traeger zu klein war (0,97 bis 1,75 Punkte, und nur bei aktivem k1).
-        summe += saettigung * (REIHEN_KREDIT[r] + bester);
+        // par.16: Deckel auf den vorausschauenden Anteil. `bester` ist ein
+        // MARGINALER Ertrag der konkreten Zelle und schon realisiert
+        // gerechnet -- nur `REIHEN_KREDIT` blickt nach vorn und wird
+        // gedeckelt.
+        let kredit = match remaining {
+            None => REIHEN_KREDIT[r],
+            Some(rest) => {
+                let f_max = erreichbare_spaltenfuellung(player, rest, beste_spalte);
+                REIHEN_KREDIT[r] * (f_max / SPALTE_ZELLEN).powi(2)
+            }
+        };
+        summe += saettigung * (kredit + bester);
     }
     summe
+}
+
+/// Noch erreichbarer Endfuellstand EINER Rasterspalte -- belegte Zellen plus
+/// die leeren, die nach der Restversorgung noch bedienbar sind. Dieselbe
+/// Relaxation wie in `plate_builder`, hier fuer eine einzelne Spalte.
+fn erreichbare_spaltenfuellung(player: &PlayerBoard, remaining: &[i64; 5], spalte: usize) -> f64 {
+    let mut n = 0u32;
+    for r in 0..6 {
+        let belegt = player.dome_grid.get_space(r, spalte).is_some_and(|sp| sp.is_filled());
+        if belegt || crate::column_build::cell_is_completable(player, r, spalte, remaining) {
+            n += 1;
+        }
+    }
+    n.min(6) as f64
 }
 
 /// Nur zur Diagnose: sind ueberhaupt Spezialfeld-Spaces auf dem Brett, die

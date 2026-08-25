@@ -124,6 +124,15 @@ pub enum HeuristikVariante {
     /// aus der Zielkarte (`plate_builder::completability_overlay`) und eine
     /// unvollendbare Randspalte wird nicht mehr festgenagelt. par.12.
     V2HuelleFilter,
+    /// par.15: wie [`HeuristikVariante::V2Huelle`], aber die Spalten-Stufen
+    /// der Zielkarte werden mit dem noch ERREICHBAREN Spalten-Ertrag
+    /// skaliert (`(f_max/6)^2`, dieselbe Kurve wie die Endwertung). Ersatz
+    /// fuer den binaeren Filter aus par.12.
+    V2HuelleReach,
+    /// par.16: wie [`HeuristikVariante::V2Huelle`] im ROUTING, aber die
+    /// BEWERTUNG deckelt den vorausschauenden Reihen-Kredit mit dem noch
+    /// erreichbaren Spalten-Ertrag (`heuristic_v2::row_completion_progress_capped`).
+    V2HuelleCap,
 }
 
 impl HeuristikVariante {
@@ -138,6 +147,8 @@ impl HeuristikVariante {
                 | HeuristikVariante::V2PointMap
                 | HeuristikVariante::V2HuellePhase
                 | HeuristikVariante::V2HuelleFilter
+                | HeuristikVariante::V2HuelleReach
+                | HeuristikVariante::V2HuelleCap
         )
     }
 }
@@ -158,12 +169,28 @@ pub(crate) fn player_total_variante(
         + crate::round_end::projected_unplaceable_penalty(&state.players[pi]) as f64;
     match variante {
         HeuristikVariante::V1 => basis,
+        HeuristikVariante::V2HuelleCap => {
+            // par.16: einziger Unterschied zu V2Huelle -- der Reihen-Kredit
+            // wird mit dem noch erreichbaren Spalten-Ertrag gedeckelt.
+            let remaining = crate::provocation::remaining_colors(state);
+            basis
+                + crate::heuristic_v2::row_completion_progress_capped(
+                    &state.players[pi],
+                    &state.scoring_tile_ids,
+                    &remaining,
+                )
+                + crate::heuristic_v2::plate_independent_l_value(
+                    &state.players[pi],
+                    &state.scoring_tile_ids,
+                )
+        }
         HeuristikVariante::V2
         | HeuristikVariante::V2Huelle
         | HeuristikVariante::V2Heatmap
         | HeuristikVariante::V2PointMap
         | HeuristikVariante::V2HuellePhase
-        | HeuristikVariante::V2HuelleFilter => {
+        | HeuristikVariante::V2HuelleFilter
+        | HeuristikVariante::V2HuelleReach => {
             basis
                 + crate::heuristic_v2::row_completion_progress(
                     &state.players[pi],

@@ -1565,3 +1565,138 @@ Herleitung, und die ungepruefte Sorte davon hat hier dreimal danebengelegen.
 nichts. `SPALTEN_PHASE` und die drei Diagnose-Knoepfe bleiben im Code, Default
 aus. Ein weiterer Formvorschlag braucht ein neues Argument, keinen neuen
 Entwurf.
+
+## par.15 Erreichbarkeit als MASS statt als TOR (VORREGISTRIERT 2026-08-25)
+
+**Anlass: Nutzer-Einwand 2026-08-25** zum negativen Ergebnis von par.12 --
+"dann hast vielleicht den filter nicht sauber modelliert, ueberleg dir hier
+ein alternatives konzept". Der Einwand trifft: par.12 war kein
+Kalibrierungsfehler, sondern ein Modellierungsfehler.
+
+**Der Fehler, benannt.** `cell_is_completable` beantwortet eine BINAERE Frage
+(reicht die Restversorgung fuer diese Zelle?), aber die Spaltenwertung zahlt
+STETIG und konvex: `(fuellung/6)^2 * 7` (`scoring.rs`, Zweig 1) belohnt auch
+den Schritt von 4 auf 5, obwohl die Spalte nie voll wird. Der Filter hat genau
+diesen Teilfortschritt auf 0 gesetzt -- gemessen volle Spalten 0,794 auf
+0,431 (t=-5,03), und der Verlust war groesser, wo die Spalten-Platte AKTIV
+ist (-0,500 gegen -0,324), also dort, wo Teilfortschritt Punkte bringt.
+
+**Das Ersatzkonzept.** Dieselbe Relaxation, aber GEZAEHLT statt gelesen:
+
+```
+f_max(c) = Fuellstand(c) + noch bedienbare leere Zellen(c),  gedeckelt bei 6
+Gewicht der Spalten-Stufen von c  *=  (f_max(c) / 6)^2
+```
+
+Drei Eigenschaften, die der Filter nicht hatte:
+
+1. **Nichts faellt auf 0**, solange die Spalte irgendeinen Ertrag tragen kann.
+   Eine Spalte, die hoechstens auf 4 kommt, behaelt 44 Prozent statt null.
+2. **Die Gewichtung folgt derselben Kurve wie die Endwertung**, statt eine
+   eigene Schwelle zu erfinden. Der Faktor IST der Anteil des
+   Spalten-Ertrags, der noch erreichbar ist.
+3. **Die Orientierungswahl bleibt unangetastet.** Der zweite Schaden in par.12
+   war das spaete Umschwenken, das die Festnagelung ab Runde 3 aufhob -- den
+   Bauschritt, der die Partien mit voller Spalte von 35 auf 50 Prozent
+   gehoben hat. Hier wird ausschliesslich gewichtet, nie umgeschaltet. Der Arm
+   misst damit genau EINEN Unterschied.
+
+**Messung:** `V2Huelle` gegen `V2HuelleReach`, Aufbau wie par.8.4 (je 80
+gepaarte Partien, beide Sitze, 150 Sims, Seed 20260825, Bloecke zu 16).
+
+**Entscheidungsmass:** volle Spalten je Partie, gepaart, Block-Ebene.
+**Waechter:** Vollendungsquote >= 0,53.
+
+**KEINE VORHERSAGE.** In diesem Strang lagen drei von mir vorab formulierte
+Mechanismus-Vermutungen im Vorzeichen falsch (par.9.1, par.9.2, par.14.2),
+alle drei aus dem Code hergeleitet und alle drei zwingend klingend. Eine
+vierte waere Rauschen. Die Begruendung oben erklaert, warum par.12 GESCHEITERT
+ist -- sie sagt nicht voraus, dass dieser Arm gewinnt.
+
+**Was ein negatives Ergebnis dann hiesse:** dass die Vollendbarkeits-Relaxation
+im Routing ueberhaupt nichts beitraegt -- weder als Tor noch als Mass. Das
+waere der sauberere Schluss als par.12 allein, weil dann die Bauform und nicht
+die Modellierung widerlegt ist.
+
+### par.15.1 ERGEBNIS (2026-08-25): auch als MASS negativ -- die Bauform ist widerlegt
+
+`evaluations/v2_envelope_arena_reach.json`, n=160 gegen `V2Huelle`, 16,4 s.
+
+| Kennzahl | Huelle | Reach | Delta | t (Block) |
+| --- | --- | --- | --- | --- |
+| volle Spalten | 0,794 | **0,569** | **-0,225** | -3,52 |
+| max Spaltenhoehe | 5,569 | 5,381 | -0,188 | -3,56 |
+| Teilspalten >= 3 | 2,975 | **3,119** | **+0,144** | +2,16 |
+| Teilspalten >= 4 | 2,038 | 1,913 | -0,125 | -3,25 |
+| Spezialfeld-Freischaltungen | 0,988 | 1,012 | +0,025 | 0,33 |
+| eigene Punkte | 44,01 | 40,34 | -3,663 | -2,25 |
+
+Siegquote 0,431. Vollendungsquote 0,692 (Waechter haelt).
+
+**Die bessere Modellierung hat geholfen, aber das Vorzeichen nicht gedreht:**
+-0,225 gegen -0,362 beim harten Filter. Der Nutzer-Einwand war also richtig
+(par.12 WAR schlecht modelliert), und er reicht trotzdem nicht.
+
+**Damit gilt der vorab festgeschriebene Schluss:** die
+Vollendbarkeits-Relaxation traegt im ROUTING nichts bei -- weder als Tor
+(par.12) noch als Mass (par.15). Widerlegt ist jetzt die Bauform, nicht meine
+Modellierung.
+
+**Das Muster ueber vier Arme, und es ist staerker als jede meiner
+Herleitungen:** par.9.1 (Plattenpunkte), par.9.2 (erwartete Punkte), par.12
+(Filter), par.15 (Skalierung) zeigen ALLE dieselbe Signatur -- Teilspalten >= 3
+steigen, volle Spalten und maximale Hoehe fallen. Jeder Versuch, die Zielkarte
+auf den Zustand REAGIEREN zu lassen, hat sie verbreitert und verschlechtert.
+Die Staerke der Prio-Leiter kommt offenbar aus dem UNBEDINGTEN Fokus: eine
+Vorgabe, die dem lokalen Gradienten widerspricht und sich nicht davon
+abbringen laesst.
+
+Das ist ein Muster aus vier unabhaengigen Messungen, keine Code-Herleitung --
+und damit belastbarer als die drei Mechanismus-Vermutungen, die in diesem
+Strang im Vorzeichen falsch lagen.
+
+**Fuer die Relaxation heisst das NICHT "unbrauchbar", sondern "nicht im
+Routing".** Als Kostenterm steckt sie laengst in `column_build::cell_cost`,
+und die Verwendungen ausserhalb des Routings sind ungeprueft (Netz-Eingabe,
+Deckel in der v2-Bewertung, Beschneidung des Tiling-DFS).
+
+## par.16 Deckel auf den vorausschauenden Reihen-Kredit (VORREGISTRIERT + GEMESSEN 2026-08-25)
+
+**Prämissen-Korrektur vorweg.** Die erste Fassung dieser Idee lautete "die
+Plattenbewertung kreditiert Spaltenfuellung, als waere Vollendung moeglich".
+Das ist FALSCH und wurde vor dem Bau geprueft: `scoring.rs:166` rechnet
+`col_fill`, also den REALISIERTEN Fuellstand. Es gibt dort keine Projektion
+und nichts zu deckeln.
+
+Vorausschauend ist genau ein Posten: `heuristic_v2::REIHEN_KREDIT` -- ein
+handgesetzter Kredit dafuer, dass eine begonnene lange Reihe sich noch
+auszahlt. Zahlt sie in eine Spalte ein, die hoechstens auf 4 kommt, ist er zu
+hoch. `V2HuelleCap` skaliert ihn mit `(f_max/6)^2`, derselben Kurve, mit der
+die Endwertung die Spalte bezahlt. **Das ROUTING ist unveraendert das der
+Huelle** -- der Arm misst genau den Bewertungs-Unterschied.
+
+**ERGEBNIS (n=160):** H0.
+
+| Kennzahl | Huelle | Cap | Delta | t |
+| --- | --- | --- | --- | --- |
+| volle Spalten | 0,819 | 0,856 | +0,037 | 0,59 |
+| max Spaltenhoehe | 5,562 | 5,594 | +0,031 | 0,47 |
+| Spezialfeld-Freischaltungen | 0,994 | 1,012 | +0,019 | 0,17 |
+| Strafpunkte | -13,59 | -13,48 | +0,119 | 0,13 |
+| eigene Punkte | 44,15 | 44,99 | +0,844 | 0,58 |
+
+Siegquote 0,519, Vollendungsquote 0,705.
+
+**Kein Effekt -- aber der erste zustandsabhaengige Mechanismus in diesem
+Strang, der nicht SCHADET.** par.9.1, par.9.2, par.12 und par.15 haben alle
+die Breiten-Signatur gezeigt (Teilspalten >= 3 hoch, volle Spalten runter);
+hier steigen beide leicht (+0,025 und +0,037). Der Unterschied zu jenen vier:
+sie haben die ZIELKARTE zustandsabhaengig gemacht, dieser Arm die BEWERTUNG.
+
+**Nicht ueberlesen:** alle sieben Kennzahlen zeigen nach oben, aber alle Arme
+teilen denselben Seed-Satz -- eine gemeinsame Verschiebung erklaert das
+genauso gut wie ein Effekt. "7 von 7 positiv" ist hier KEIN unabhaengiger
+Beleg, und kein einzelnes t kommt ueber 0,59. Der Befund ist H0.
+
+**Der Deckel bleibt im Code** (Variante, Default aus). Er kostet nichts und
+ist begrifflich richtig; ihn wieder auszubauen waere Aufwand ohne Gewinn.

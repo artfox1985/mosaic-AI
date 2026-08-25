@@ -2517,6 +2517,8 @@ pub fn variant_from_name(name: &str) -> Option<crate::mcts::HeuristikVariante> {
         "v2pointmap" | "v2_pointmap" => Some(HV::V2PointMap),
         "v2huellephase" | "v2_huelle_phase" => Some(HV::V2HuellePhase),
         "v2huellefilter" | "v2_huelle_filter" => Some(HV::V2HuelleFilter),
+        "v2huellereach" | "v2_huelle_reach" => Some(HV::V2HuelleReach),
+        "v2huellecap" | "v2_huelle_cap" => Some(HV::V2HuelleCap),
         _ => None,
     }
 }
