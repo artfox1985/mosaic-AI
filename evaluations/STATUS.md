@@ -81,7 +81,18 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
    "dieser Zug baut die Spalte" tragen. Reihenfolge fuer v23: Fenster steht
    (par.2) -> Traeger-A/B -> Ownership + w0 auf dem gewaehlten Traeger ->
    gaten.
-4. **NACH dem Korpus wieder aufzunehmen**: die Blindzieh-Spur. Der Knopf
+4. **Zwei Such-Knoepfe am v23-Netz, eingetaktet 2026-08-25** -- beide billig,
+   beide auf denselben Seeds fahrbar, beide NACH dem Training:
+   `PREREG_implicit_minimax_backup.md` par.3 (gebaut und abgenommen, wirkt in
+   der Gumbel-Selektion; **nicht** im v22-Label-Pfad, also kein Eingriff in die
+   laufende Erzeugung moeglich oder noetig) und
+   `PREREG_risk_sensitive_leaf_utility.md` par.5 Stufe A (liest die
+   exportierten, aber ungelesenen `value_wdl_logits`). **Wichtig bei Stufe A:**
+   sie MUSS als Variante A1 gebaut werden, nur an der Gumbel-Blattstelle -- in
+   `net_leaf_eval` wuerde sie die Bootstrap-Labels mitaendern
+   (round_transition_deep.rs:594/698/731) und haette damit Wecker-Charakter wie
+   der Bootstrap-Horizont. Fuer v22 ist dieser Zug vorbei.
+5. **NACH dem Korpus wieder aufzunehmen**: die Blindzieh-Spur. Der Knopf
    bleibt bis dahin AUS (auch waehrend der Erzeugung -- den Korpus unter der zu
    validierenden Regel zu erzeugen waere zirkulaer). Die Wiedervorlage haengt an
    ZWEI Bedingungen, beide in `PREREG_stack_draw_reservation_rule.md` par.5e:
