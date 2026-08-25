@@ -53,6 +53,32 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
 
 ---
 
+## OFFENER PUNKT AUS DER NACHT 2026-08-25: die Traeger-Manifeste sind WEG
+
+`data/` enthaelt **kein einziges** `policy_carrier_manifest_*.json` mehr. Der
+Uebergabe-Abschnitt vom Nachmittag nannte sie ausdruecklich als das, was bei
+der Archivierung bleiben muss.
+
+| Datei | Lage |
+| --- | --- |
+| `policy_carrier_manifest_v20.json` | von git verfolgt, als `D` markiert -- **mit `git checkout -- data/policy_carrier_manifest_v20.json` wiederherstellbar** |
+| `_asymN`, `_asymS`, `_own`, `_seedk1`, `_v21` | **nicht von git verfolgt** -- nur aus einem Backup zurueckzuholen |
+
+**Wirkung auf die Laeufe dieser Nacht: KEINE.** Das Training meldete
+"policy_carrier_manifest_v20.json (NICHT GEFUNDEN -- jede Datei traegt
+Policy)", und fuer den homogenen hv2-Korpus ist genau das die richtige
+Semantik: ein Erzeuger, keine Alt-Dateien, alles traegt Policy.
+
+**Wirkung auf v23: erheblich.** `PREREG_v23_window.md` plant hv2-Dateien
+teils policy-MASKIERT (Schwarm G-1/G-2, Sockel-Rest G-1/G-2). Diese Maskierung
+laeuft ueber ein Traeger-Manifest. Ohne eines traegt jede Datei Policy, und
+der Zuschnitt waere still ein anderer als der registrierte.
+
+**Nicht von mir angefasst** -- Wiederherstellen ist ein Nutzer-Entscheid, weil
+die Loeschung moeglicherweise Teil der Archivierung war.
+
+---
+
 ## SITZUNGSUEBERGABE 2026-08-25
 
 **Was als NAECHSTES zu tun ist, in dieser Reihenfolge:**
