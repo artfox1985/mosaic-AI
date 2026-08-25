@@ -460,9 +460,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # verschoben den Seed-Shuffle -> anderer Key, Voll-Neubau,
     # kontaminiertes Fenster). Gleicher Filter wie in neural_net.py.
     import os as _os
+    # `re` unbedingt, nicht nur im _excl-Zweig: MOSAIC_VAL_POOL unten braucht es
+    # auch ohne gesetztes MOSAIC_DATA_EXCLUDE.
+    import re as _re
     _excl = _os.environ.get("MOSAIC_DATA_EXCLUDE")
     if _excl:
-        import re as _re
         _n0 = len(all_files)
         all_files = [f for f in all_files if not _re.search(_excl, _os.path.basename(f))]
         print(f"🔒 MOSAIC_DATA_EXCLUDE={_excl!r}: {_n0 - len(all_files)} von {_n0} Dateien ausgeschlossen (vor Split).")
@@ -497,6 +499,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "value_head": value_head,
         "ranking_loss_weight": ranking_loss_weight,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
+        "val_pool": _os.environ.get("MOSAIC_VAL_POOL"),
     }
     # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
     # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf
@@ -513,11 +516,44 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     val_files = []
     train_files = None  # None == MosaicDataset laedt wie bisher den ganzen Ordner
     if val_frac > 0 and len(all_files) >= 10:
-        shuffled = all_files[:]
-        random.Random(20260707).shuffle(shuffled)
-        n_val = max(1, round(len(shuffled) * val_frac))
-        val_files = sorted(shuffled[:n_val])
-        train_files = sorted(shuffled[n_val:])
+        # MOSAIC_VAL_POOL (2026-08-25): Regex, der die KANDIDATEN fuer den
+        # Val-Split einschraenkt -- alles, was NICHT matcht, geht garantiert in
+        # den Trainings-Teil. Default (ungesetzt) = bestandsidentisch.
+        #
+        # ANLASS, und er ist spezifisch: beim Warm-Start von einem Modell, das
+        # auf einer TEILMENGE desselben Korpus trainiert wurde, enthaelt ein
+        # frei gezogener Val-Split Dateien, die das Startmodell bereits
+        # trainiert hat. Beim hv2-Fall waeren das rund 21 Prozent des Val-Sets
+        # (240 Val-Dateien von 2.400, davon ~51 aus den 513 hv2sanity-Dateien).
+        # `--select-by-brier` waehlt den Checkpoint AUF diesem Mass aus -- die
+        # Auswahl waere systematisch zugunsten spaeter Epochen verzerrt.
+        # Sonst rotiert der Vorgaenger-Korpus beim naechsten Fenster
+        # groesstenteils aus; hier bleibt er vollstaendig drin, deshalb ist die
+        # Lage anders als bei den bisherigen Warm-Starts.
+        _val_pool_rx = _os.environ.get("MOSAIC_VAL_POOL")
+        if _val_pool_rx:
+            _pool = [f for f in all_files if _re.search(_val_pool_rx, _os.path.basename(f))]
+            _rest = [f for f in all_files if not _re.search(_val_pool_rx, _os.path.basename(f))]
+            n_val = max(1, round(len(all_files) * val_frac))
+            if len(_pool) < n_val:
+                raise SystemExit(
+                    f"MOSAIC_VAL_POOL trifft nur {len(_pool)} Dateien, gebraucht werden "
+                    f"{n_val} fuer val_frac={val_frac}. Entweder den Regex weiten oder "
+                    f"val_frac senken -- ein stillschweigend kleinerer Val-Split waere "
+                    f"ein anderes Mass als das registrierte.")
+            shuffled = _pool[:]
+            random.Random(20260707).shuffle(shuffled)
+            val_files = sorted(shuffled[:n_val])
+            train_files = sorted(shuffled[n_val:] + _rest)
+            print(f"🔒 MOSAIC_VAL_POOL: Val-Split aus {len(_pool)} von {len(all_files)} "
+                  f"Kandidaten gezogen ({n_val} Val-Dateien); die uebrigen "
+                  f"{len(_rest)} gehen garantiert ins Training.")
+        else:
+            shuffled = all_files[:]
+            random.Random(20260707).shuffle(shuffled)
+            n_val = max(1, round(len(shuffled) * val_frac))
+            val_files = sorted(shuffled[:n_val])
+            train_files = sorted(shuffled[n_val:])
 
     # Daten-Skalierungs-Ablation (Task #69): Trainings-Dateien NACH dem
     # Val-Split auf train_file_limit kappen -- der Val-Split oben ist davon
