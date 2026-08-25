@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (Nutzer 2026-08-25), nichts erzeugt -- das v22-Netz existiert noch nicht. Form 29.450 Partien wie das alte v22-Design: Policy-Klasse 5.800, Value-Klasse 23.650. NEU ist die Besetzung: der Neu-Anteil kommt aus dem v22-Self-Play (4.000 Sockel + 8.000 Schwarm), ALLE aelteren Plaetze aus dem hv2-Lehrerkorpus (17.450 von 24.000, 6.550 rotieren aus). DARAUS FOLGT der Umfang des v22-Self-Play: 12.000 Partien. Drei Punkte sind benannt und nicht geloest: (1) G-1 und G-2 kommen aus DEMSELBEN Korpus, die Generationenstruktur ist also Platzhalter, keine Aera-Streuung; (2) RAM 5,02 Mio Zustaende ~30,1 GB gegen 32 GB Grenze, kein Spielraum; (3) die 1.800 hv2-Partien der POLICY-Klasse tragen auf 61,8 Prozent ihrer Draftingzuege policy_target_valid=false -- ihre Policy-Ausbeute haengt an der Traegerfrage aus PREREG_v22_window.md par.4, die Preregs sind gemeinsam zu entscheiden. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (Nutzer 2026-08-25), nichts erzeugt -- das v22-Netz existiert noch nicht. Form 29.450 Partien wie das alte v22-Design: Policy-Klasse 5.800, Value-Klasse 23.650. NEU ist die Besetzung: der Neu-Anteil kommt aus dem v22-Self-Play (4.000 Sockel + 8.000 Schwarm), ALLE aelteren Plaetze aus dem hv2-Lehrerkorpus (17.450 von 24.000, 6.550 rotieren aus). DARAUS FOLGT der Umfang des v22-Self-Play: 12.000 Partien. Drei Punkte sind benannt und nicht geloest: (1) G-1 und G-2 kommen aus DEMSELBEN Korpus, die Generationenstruktur ist also Platzhalter, keine Aera-Streuung; (2) RAM UNKRITISCH -- die alte 6-KB-Zahl war vom Tag vor dem Bitpacking; gemessen sind 2.806 B je Zustand im 2D-Fenster, also ~14,1 GB gegen 34,3 GB. Auslagern bleibt trotzdem verworfen (MOSAIC_PLANES_LAZY ist 400.000x langsamer je Sample); (3) die 1.800 hv2-Partien der POLICY-Klasse tragen auf 61,8 Prozent ihrer Draftingzuege policy_target_valid=false -- ihre Policy-Ausbeute haengt an der Traegerfrage aus PREREG_v22_window.md par.4, die Preregs sind gemeinsam zu entscheiden. -->
 
 # Vorregistrierung: v23-Fenster
 
@@ -50,18 +50,54 @@ Uebergangsloesung, aber sie darf spaeter nicht als Generationen-Vielfalt
 gelesen werden. Ab v24 stehen wieder zwei echte Netz-Generationen zur
 Verfuegung.
 
-**(2) Der Cache liegt am Anschlag.** Gerechnet mit gemessenen Groessen --
-Netz-Korpus 164,9 Records je Partie (`data/holdout/selfplay_hold_a_*`),
-hv2 174,2 (gemessen am laufenden Korpus):
+**(2) Der Cache passt bequem -- die ~6-KB-Zahl war veraltet.**
+
+**BERICHTIGUNG 2026-08-25, am selben Tag:** die erste Fassung dieses Absatzes
+rechnete mit "~6 KB je Zustand" aus der Fensterstrategie vom 2026-08-06 und
+kam auf ~30,1 GB, also an den Anschlag. Die Zahl stammt vom Tag VOR dem
+Bitpacking (v21, 2026-08-07: planes 2.736 B -> 342 B, masks 406 B -> 51 B).
+
+**Gemessen am echten Cache** (`hv2`-Ausschnitt, 47.046 Samples, Felder
+aufsummiert):
+
+| Posten | Groesse je Zustand |
+| --- | --- |
+| `states` (714 x float16) | 1.428 B |
+| `policies` (406 x float16) | 812 B |
+| `ownership` (72 x int8) | 72 B |
+| `masks_packed` (51 x uint8) | 51 B |
+| uebrige 16 Felder | ~101 B |
+| **Summe flacher Cache** | **2.464 B** |
+| `planes_packed` (342 B, NUR im 2D-Fenster, ZUSAETZLICH zu `states`) | 342 B |
+| **2D-Fenster gesamt** | **2.806 B** |
 
 ```
-12.000 x 164,9  +  17.450 x 174,2  =  5,02 Mio Zustaende
-bei ~6 KB je Zustand:  ~30,1 GB   (Grenze 32 GB)
+5,02 Mio Zustaende x 2.806 B = 14,1 GB   (nicht 30,1 GB)
 ```
 
-Das ist zugleich genau die Tragfaehigkeitsgrenze, die die Fensterstrategie
-seit 2026-08-06 nennt (~5 Mio Zustaende). **Kein Spielraum.** Wer einen Posten
-vergroessert, muss einen anderen verkleinern.
+Gegen 34,3 GB Maschinen-RAM (neural_net.py:1207). **Der Schwarm muss NICHT
+verkleinert werden.**
+
+**Auslagern ist gemessen und verworfen.** Der Schalter existiert
+(`MOSAIC_PLANES_LAZY=1`, lazy Pro-Index-HDF5), ist aber **rund 400.000-mal
+langsamer je Sample** -- 205 ms gegen 0,5 Mikrosekunden. Bei Batch 256 waeren
+das ~52 s je Batch fuer reine Planes-I/O; drei vermeintliche "stille
+Abstuerze" beim ersten 2D-Sweep waren genau das (neural_net.py:1198-1210).
+Nicht wieder vorschlagen ohne neues Regime.
+
+**Falls es doch je knapp wird**, in dieser Reihenfolge:
+
+* `policies` (812 B, 29 Prozent) ist der aussichtsreichste Posten: der volle
+  406er-Vektor ist duenn besetzt (gemessen am hv2-Korpus: im Mittel 1,7
+  Aktionen ueber 10 Prozent, 49 Prozent der Ziele auf einer Aktion
+  konzentriert, und 61,8 Prozent der Draftingzuege sind ohnehin one-hot). Eine
+  sparse Ablage waere aber VERLUSTBEHAFTET fuer den KL-Verlust -- das Muster
+  existiert bereits bei `ranking_action_ids`/`ranking_child_q` (TOPK 8).
+  Ungeprueft, nicht gebaut.
+* `states` (1.428 B, 51 Prozent) ist NICHT streichbar: `Mosaic2DNet.forward`
+  nimmt `x_planes` UND `x_flat` und fusioniert beide Zweige -- der flache
+  Vektor ist eine lebende Eingabe, kein Altlast-Feld.
+* Erst danach: den Schwarm verkleinern.
 
 **(3) Die Policy-Ausbeute der hv2-Plaetze haengt an der Traegerfrage.** Die
 1.800 hv2-Partien der Policy-Klasse tragen auf **61,8 Prozent** ihrer
