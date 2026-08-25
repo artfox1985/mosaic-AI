@@ -1301,3 +1301,167 @@ Parallelsitzung vertraeglich (`PREREG_stack_draw_reservation_rule.md`). Fuer
 DIESEN Arm-Vergleich ist der Posten neutral: beide Seiten sind in beiden
 Gruppen flach (+0,200 bzw. -0,257), der Vorbehalt aus par.8.5 greift hier
 also nicht.
+
+## par.13 Phasenfaktor: Sweep ueber STAERKE und POSITION (VORREGISTRIERT 2026-08-25)
+
+**Anlass, und die Abgrenzung gegen par.11.** Nutzer-Auftrag 2026-08-25:
+"variiere staerke und position des faktors ... latin hypercube". par.11 hat
+GENAU EINE Form gemessen (Gipfel 1,4 auf den Runden 2-3) und H0 geliefert.
+Daraus folgt nicht, dass keine Form etwas bewegt -- nur, dass diese es nicht
+tut. Wo der Gipfel liegen soll, war nie gemessen; die Lage kam aus einer
+externen Quelle fuer ein anderes Spiel.
+
+Das ist ausdruecklich NICHT der Werte-Sweep, den par.11.1 abgelehnt hat:
+dort ging es um dieselbe Form mit anderen Zahlen, hier um eine andere FORM.
+
+**Parametrisierung** (`plate_builder::spalten_phase`, zwei Diagnose-Knoepfe,
+Default aus, in `knob_registry.rs` eingetragen):
+
+```
+f(r) = 1 + (amp - 1) * exp(-(r - peak)^2 / (2 * sigma^2)),   sigma = 1,0 fest
+```
+
+`sigma` bleibt fest, damit der Entwurf zwei Dimensionen hat und nicht drei.
+Ohne gesetzte Knoepfe liefert die Funktion die feste par.11-Tabelle -- der
+Bestand ist unberuehrt.
+
+### par.13.1 Stufe 1: SCREENING (entscheidet NICHTS)
+
+Latin-Hypercube, 16 Punkte, `amp` in [1,0; 2,5], `peak` in [1,0; 5,0],
+Entwurfs-Seed 20260825. Je Punkt 160 gepaarte Partien gegen `V2Huelle`, sonst
+Aufbau wie par.8.4. Werkzeug: `tools/probes/phase_sweep.py`.
+
+**`amp = 1,0` ist ein eingebauter NULLPUNKT** -- die Kurve ist dann konstant 1
+und der Arm identisch zur Huelle. Punkte nahe 1,0 liefern den Rauschboden, an
+dem die uebrigen zu messen sind. Das ersetzt keine Signifikanzrechnung, macht
+aber sofort sichtbar, wie gross Ausschlaege ohne jede Ursache werden.
+
+**Diese Stufe darf nichts entscheiden.** Bei 16 Punkten ist das Maximum einer
+t-Statistik auch unter reiner Nullhypothese deutlich von Null entfernt. Den
+besten Punkt abzulesen und als Befund zu melden waere Rosinenpickerei mit
+16 Versuchen -- genau der Fehler, gegen den
+[[feedback_preregister_decision_metric]] steht. Das Screening liefert einen
+KANDIDATEN.
+
+### par.13.2 Stufe 2: BESTAETIGUNG (entscheidet)
+
+Der beste Punkt aus Stufe 1 laeuft erneut, auf einem ANDEREN Seed-Satz
+(Seed 20260826 statt 20260825), gleiche Partienzahl.
+
+**Entscheidungsmass: volle Spalten je Partie, gepaart, auf Block-Ebene** --
+dasselbe wie in par.8.4, damit die Zahlen vergleichbar bleiben.
+**Waechter:** Vollendungsquote >= 0,53.
+
+**Falsifikator:** reproduziert die Bestaetigung den Effekt nicht, war der
+Screening-Ausschlag Rauschen, und der Phasenfaktor ist ueber beide Arme
+(par.11 und par.13) als Bauform negativ entschieden -- ohne dritten Versuch.
+
+**Zusaetzlich vorab festgelegt, damit hinterher nichts umgedeutet wird:** ein
+Kandidat, dessen Screening-Ausschlag den Rauschboden der Nullpunkte nicht
+klar uebersteigt, geht gar nicht erst in Stufe 2. In dem Fall ist par.13
+ohne Bestaetigungslauf negativ.
+
+### par.13.1 ERGEBNIS Screening (2026-08-25): Position irrelevant, Arm negativ
+
+`evaluations/phase_sweep.json`, 16 LHS-Punkte, je 160 gepaarte Partien gegen
+`V2Huelle`, Entwurfs-Seed 20260825, Laufzeit 236 s.
+
+| Groesse | Wert |
+| --- | --- |
+| Korrelation Delta ~ **peak** | **+0,110** |
+| Korrelation Delta ~ **amp** | **+0,674** |
+| groesstes \|t\| ueber alle Punkte | **1,48** |
+| Delta min / median / max | -0,006 / +0,053 / +0,113 |
+| positive Deltas | 15 von 16 |
+| bester Punkt | amp 2,12, peak 3,09: +0,113 (t=1,48) |
+
+**Die POSITION ist es nicht.** Wo der Gipfel liegt, erklaert praktisch nichts
+(r=0,110). Die Vermutung, par.11 habe nur den Gipfel an der falschen Stelle
+gehabt, ist damit widerlegt -- das war der eigentliche Zweck dieses Arms.
+
+**VERDIKT nach der vorab festgelegten Abbruchbedingung: par.13 ist NEGATIV,
+Stufe 2 laeuft NICHT.** Kein Punkt kommt in die Naehe von Signifikanz
+(max t=1,48, und das als Maximum aus 16 Versuchen). Der Kandidat uebersteigt
+den Rauschboden nicht klar, und par.13.2 war genau daran geknuepft.
+
+**Was die Flaeche darueber hinaus zeigt, ausdruecklich UNREGISTRIERT.** Es gibt
+einen Dosis-Trend in der Amplitude (r=0,674; amp >= 1,8 im Mittel +0,072 gegen
++0,034 darunter). Das ist eine Beobachtung an der Antwortflaeche, kein
+Befund, und sie geht in keine Entscheidung ein. Drei Gruende, sie nicht
+weiterzuverfolgen, ohne dass jemand ausdruecklich einen neuen Arm dafuer
+aufmacht:
+
+1. **Alle 16 Punkte teilen denselben Seed-Satz.** Ein gemeinsamer Zug hebt
+   alle Deltas zugleich -- das erklaert die 15 von 16 positiven Werten besser
+   als ein echter Effekt. Auf den amp-Trend wirkt dieser Konfundierer zwar
+   nicht (er ist eine additive Verschiebung, keine Steigung), aber die
+   Fehlerbalken der einzelnen Punkte sind nicht unabhaengig.
+2. **Die Groessenordnung traegt nicht.** Der staerkste Ausschlag ist +0,113
+   gegen +0,525, die die Huelle selbst liefert -- ein Fuenftel, und das als
+   Maximum aus 16 Zuegen.
+3. **Ein struktureller Grund sagt Saettigung voraus.** Im Drafting entscheidet
+   die Karte einen RANG, und Prio 3 schlaegt Prio 5 schon bei amp=1,0; mehr
+   Amplitude aendert die Ordnung nicht. Wirksam wird Hoehe nur dort, wo
+   Gewichte SUMMIERT werden (Tiling-Vorzug, Produkt der Plattenwahl). Das ist
+   ein Verdacht aus dem Code, keine Messung -- aber er sagt vorher, was die
+   Flaeche zeigt.
+
+**Der Bereich war meine Setzung, nicht die des Nutzers** (amp in [1,0; 2,5],
+peak in [1,0; 5,0]). Nach oben aufzumachen, WEIL das Ergebnis flach aussieht,
+waere die Bewegung, die eine Vorregistrierung verhindern soll. Wer hoehere
+Amplituden testen will, macht dafuer einen eigenen Arm mit eigener
+Vorab-Festlegung auf.
+
+**Gemeinsames Fazit par.11 + par.13:** der Phasenfaktor auf die Spalten-Stufen
+ist als Bauform negativ entschieden -- eine feste Form (par.11, t=0,39) und
+16 Formen ueber Staerke und Position (par.13, max t=1,48). `SPALTEN_PHASE`
+und die beiden Diagnose-Knoepfe bleiben im Code, Default aus.
+
+### par.12.1 ERGEBNIS (2026-08-25): NEGATIV, und das vorab benannte Risiko ist eingetreten
+
+`evaluations/v2_envelope_arena_filter.json`, n=160 gegen `V2Huelle`.
+
+| Kennzahl | Huelle | Filter | Delta | t (Block) |
+| --- | --- | --- | --- | --- |
+| volle Spalten | 0,794 | **0,431** | **-0,362** | -5,03 |
+| max Spaltenhoehe | 5,537 | 5,175 | -0,362 | -6,90 |
+| Teilspalten >= 3 | 3,000 | **3,125** | **+0,125** | +2,80 |
+| Spezialfeld-Freischaltungen | 1,069 | 0,919 | -0,150 | -2,32 |
+| Strafpunkte | -14,87 | -13,87 | +1,000 | +1,06 |
+| eigene Punkte | 44,34 | 39,49 | -4,850 | -4,49 |
+
+Siegquote 0,431. Vollendungsquote 0,664 (Waechter haelt). Reihenauslastung
+wandert nach OBEN: Rasterzeile 4 und 5 fallen (1,91 auf 1,69 und 1,38 auf
+1,20), Zeile 0 und 1 steigen.
+
+**Das in par.12 vorab benannte Risiko ist genau so eingetreten.** Dort stand:
+"der Filter kann in Runde 4-5 zu viel wegschneiden ... ein Filter, der die
+Zielspalte spaet noch wechseln laesst, kann genau diesen Gewinn
+zurueckdrehen." Die Zahlen zeigen das Muster: weniger Tiefe, mehr Breite,
+weniger Zuege in die unteren Rasterzeilen.
+
+**Die Ursache ist eine Fehlpassung zwischen Filter und Zielfunktion, nicht
+eine falsche Schwelle.** `cell_is_completable` ist ein BINAeRES Kriterium
+(reicht die Restversorgung fuer die ganze Zelle?), aber die Spaltenwertung
+zahlt STETIG und konvex: `(fuellung/6)^2 * 7` belohnt auch den Schritt von 4
+auf 5, obwohl die Spalte nie voll wird. Der Filter wirft genau diesen
+Teilfortschritt weg -- und mit ihm die Festnagelung, die den Bauschritt
+"Zielspalte ab Runde 3" ueberhaupt erst wirksam gemacht hat.
+
+Die k1-Aufspaltung stuetzt das: der Verlust ist groesser, wo die
+Spalten-Wertungsplatte AKTIV ist (-0,500 gegen -0,324) -- also genau dort, wo
+Teilfortschritt Punkte bringt und das Wegschneiden am meisten kostet.
+
+**Folgerung fuer den Bericht der Parallelsitzung** (§4.5, dort Kandidat 1):
+die Vollendbarkeits-Relaxation taugt als FEATURE und als Kostenterm -- sie
+steckt seit dem Spaltenbauer in `cell_cost` und in beiden Punktekarten. Als
+harter AKTIONSFILTER auf ein stetig kreditiertes Ziel taugt sie NICHT. Die
+Literatur-Empfehlung "Filter statt Bewertungsterm" (§4.4) gilt also nicht
+unbesehen, sondern haengt daran, ob das Ziel binaer oder stetig ausgezahlt
+wird.
+
+**Die Gegenprobe bleibt ein EIGENER Arm, keine Nachbesserung.** par.12 hat sie
+vorab so festgelegt: ein Filter, der nur in Runde 1-3 greift. Sie ist nicht
+gebaut, und sie waere nach diesem Ergebnis auch nicht die naheliegendste
+Fortsetzung -- die Diagnose zeigt auf die Binaeritaet, nicht auf den
+Zeitpunkt.

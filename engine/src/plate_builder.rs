@@ -598,6 +598,7 @@ pub(crate) fn dome_preference_for_cells_weighted(
 ///    schaetzbar: `docs/domain_knowledge.md:30-35` gibt die Abschluesse je
 ///    Musterreihe und Partie mit 4,80 / 4,77 / 2,84 / 1,89 / 0,84 / 0,58 an
 ///    (in dieser Sitzung nachgesehen).
+#[allow(dead_code)] // Verbraucher ist die Reservationswert-Regel der Parallelsitzung
 pub(crate) fn best_plate_value(
     player: &PlayerBoard,
     tile: &crate::dome::DomeTile,
@@ -772,6 +773,69 @@ const K2_DIAGONALEN: usize = 2;
 /// mehr (`preference_move_for_cells` endet nach Runde 4).
 const SPALTEN_PHASE: [f64; 5] = [1.0, 1.4, 1.4, 1.0, 1.0];
 
+/// Breite der Gauss-Glocke fuer den parametrisierten Phasenfaktor, in Runden.
+/// FEST, damit der Sweep zwei Dimensionen hat und nicht drei -- die
+/// Nutzer-Vorgabe 2026-08-25 nennt Staerke und Position.
+const PHASE_SIGMA: f64 = 1.0;
+
+/// Parametrisierte Fassung von [`SPALTEN_PHASE`] fuer den Sweep aus par.13:
+/// `f(r) = 1 + (amp - 1) * exp(-(r - peak)^2 / (2 * sigma^2))`.
+///
+/// Zwei Knoepfe, beide Diagnose und Default AUS:
+/// `MOSAIC_PHASE_AMP` (Gipfelhoehe, `1.0` = wirkungslos) und
+/// `MOSAIC_PHASE_PEAK` (Gipfel-Runde). Ist `AMP` nicht gesetzt, liefert die
+/// Funktion die feste Tabelle [`SPALTEN_PHASE`] -- `V2HuellePhase` verhaelt
+/// sich dann byte-identisch zu par.11.
+///
+/// `amp = 1.0` ist ein eingebauter NULL-Punkt: die Kurve ist dann konstant 1
+/// und der Arm identisch zur Huelle. Im Sweep dienen solche Punkte als
+/// Rauschboden, gegen den die uebrigen zu lesen sind.
+fn spalten_phase(runde: u32) -> f64 {
+    static PARAM: std::sync::OnceLock<Option<(f64, f64)>> = std::sync::OnceLock::new();
+    let param = PARAM.get_or_init(|| {
+        let amp = std::env::var("MOSAIC_PHASE_AMP").ok()?.parse::<f64>().ok()?;
+        let peak = std::env::var("MOSAIC_PHASE_PEAK")
+            .ok()
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(2.5);
+        Some((amp, peak))
+    });
+    let r = runde.clamp(1, 5) as usize;
+    match param {
+        None => SPALTEN_PHASE[r - 1],
+        Some((amp, peak)) => {
+            let d = r as f64 - peak;
+            1.0 + (amp - 1.0) * (-(d * d) / (2.0 * PHASE_SIGMA * PHASE_SIGMA)).exp()
+        }
+    }
+}
+
+/// par.12: Zellen, die nach der Restversorgung NICHT mehr bedienbar sind,
+/// fallen auf 0.
+///
+/// Das ist die Relaxationsheuristik aus
+/// `RESEARCH_heuristic_methodology_external_2026-08-25.md` §4.5 als
+/// AKTIONSFILTER (§4.4: Wissen wirkt ueber die Zugfilterung staerker als
+/// ueber Bewertungsterme -- im eigenen Bestand durch par.8.6 belegt). Der
+/// Erreichbarkeitsbegriff wird NICHT neu erfunden:
+/// `column_build::cell_is_completable` prueft ihn seit dem Spaltenbauer gegen
+/// `provocation::remaining_colors` und ist dort gegen die Engine verifiziert.
+///
+/// **Die Luecke, die das schliesst:** die Prio-Leiter vergibt Prio 3 und 4 an
+/// eine Randspalte, ohne je zu pruefen, ob deren Farben noch reichen -- und
+/// ab Runde 3 nagelt `v2_envelope_target` die Orientierung am Fuellstand
+/// fest, womoeglich auf eine tote Spalte. Die beiden Punktekarten benutzen
+/// den Filter laengst; die Leiter, also der gewinnende Arm, nicht.
+fn completability_overlay(player: &PlayerBoard, remaining: &[i64; 5], k: &mut Zielkarte) {
+    for r in 0..6 {
+        for c in 0..6 {
+            if k[r][c] > 0.0 && !crate::column_build::cell_is_completable(player, r, c, remaining) {
+                k[r][c] = 0.0;
+            }
+        }
+    }
+}
+
 /// Wie [`target_map`], aber mit dem Phasenfaktor auf den Spalten-Stufen.
 fn target_map_phased(
     player: &PlayerBoard,
@@ -779,7 +843,7 @@ fn target_map_phased(
     orientierung: usize,
     runde: u32,
 ) -> Zielkarte {
-    let f = SPALTEN_PHASE[(runde.clamp(1, 5) as usize) - 1];
+    let f = spalten_phase(runde);
     let spalte1 = if orientierung == 0 { 0 } else { 5 };
     let spalte2 = if orientierung == 0 { 1 } else { 4 };
     let mut k = target_map(player, tile_ids, orientierung);
@@ -1197,6 +1261,9 @@ fn v2_map_for(
         }
         crate::mcts::HeuristikVariante::V2HuellePhase => {
             Some((v2_envelope_target_phased(state, pi)?, envelope_cell_value))
+        }
+        crate::mcts::HeuristikVariante::V2HuelleFilter => {
+            Some((v2_envelope_target_filtered(state, pi)?, envelope_cell_value))
         }
         _ => None,
     }
@@ -2223,19 +2290,56 @@ fn envelope_orientation_by_cost(state: &GameState, pi: usize) -> Option<usize> {
 /// der Spalte. Sie war der Bauschritt, der die Partien mit mindestens einer
 /// vollen Spalte von 35 auf 50 Prozent gehoben hat; sie hier fallen zu lassen
 /// waere ein zweiter, mit der Huelle konfundierter Unterschied.
+/// Welche Abwandlung der Zielkarte? Ein Modus statt mehrerer bool-Parameter,
+/// damit die Aufrufstellen lesbar bleiben und ein neuer Arm keinen weiteren
+/// Wahrheitswert an jede Signatur haengt.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum HuellenModus {
+    /// par.8: die Prio-Leiter, unveraendert.
+    Fest,
+    /// par.11/13: Phasenfaktor auf die Spalten-Stufen.
+    Phased,
+    /// par.12: unerreichbare Zellen fallen auf 0.
+    Gefiltert,
+}
+
 pub(crate) fn v2_envelope_target(state: &GameState, pi: usize) -> Option<Zielkarte> {
-    v2_envelope_target_inner(state, pi, false)
+    v2_envelope_target_inner(state, pi, HuellenModus::Fest)
+}
+
+/// Wie [`v2_envelope_target`], aber mit der Vollendbarkeits-Auflage aus
+/// par.12 -- zusaetzlich weicht die Orientierungswahl einer nachweislich
+/// unvollendbaren Randspalte aus, statt sie ab Runde 3 festzunageln.
+pub(crate) fn v2_envelope_target_filtered(state: &GameState, pi: usize) -> Option<Zielkarte> {
+    v2_envelope_target_inner(state, pi, HuellenModus::Gefiltert)
 }
 
 /// Wie [`v2_envelope_target`], aber mit dem Phasenfaktor aus
 /// [`SPALTEN_PHASE`] auf den Spalten-Stufen.
 pub(crate) fn v2_envelope_target_phased(state: &GameState, pi: usize) -> Option<Zielkarte> {
-    v2_envelope_target_inner(state, pi, true)
+    v2_envelope_target_inner(state, pi, HuellenModus::Phased)
 }
 
-fn v2_envelope_target_inner(state: &GameState, pi: usize, phased: bool) -> Option<Zielkarte> {
+fn v2_envelope_target_inner(state: &GameState, pi: usize, modus: HuellenModus) -> Option<Zielkarte> {
     let player = &state.players[pi];
     let ids = &state.scoring_tile_ids;
+    let remaining = crate::provocation::remaining_colors(state);
+
+    // par.12: eine nachweislich unvollendbare Randspalte wird nicht mehr
+    // festgenagelt. Ist genau EINE der beiden Kanten noch vollendbar, faellt
+    // die Wahl auf sie -- unabhaengig vom Fuellstand. Sind beide oder keine
+    // vollendbar, entscheidet die Bestandslogik darunter unveraendert.
+    if modus == HuellenModus::Gefiltert {
+        let l = crate::column_build::column_is_completable(player, 0, &remaining);
+        let r = crate::column_build::column_is_completable(player, 5, &remaining);
+        if l != r {
+            let o = if l { 0 } else { 1 };
+            let mut k = target_map(player, ids, o);
+            completability_overlay(player, &remaining, &mut k);
+            return Some(k);
+        }
+    }
+
     let orientierung = if state.round_number >= 3 {
         let f0 = map_fill(player, &target_map(player, ids, 0));
         let f1 = map_fill(player, &target_map(player, ids, 1));
@@ -2251,11 +2355,14 @@ fn v2_envelope_target_inner(state: &GameState, pi: usize, phased: bool) -> Optio
     } else {
         envelope_orientation_by_cost(state, pi)?
     };
-    Some(if phased {
-        target_map_phased(player, ids, orientierung, state.round_number)
-    } else {
-        target_map(player, ids, orientierung)
-    })
+    let mut k = match modus {
+        HuellenModus::Phased => target_map_phased(player, ids, orientierung, state.round_number),
+        HuellenModus::Fest | HuellenModus::Gefiltert => target_map(player, ids, orientierung),
+    };
+    if modus == HuellenModus::Gefiltert {
+        completability_overlay(player, &remaining, &mut k);
+    }
+    Some(k)
 }
 
 /// Drafting-Vorzug fuer v2 -- UNGEGATET, also ohne `MOSAIC_SPALTENBAU` und

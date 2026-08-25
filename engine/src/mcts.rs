@@ -120,6 +120,10 @@ pub enum HeuristikVariante {
     /// (`plate_builder::SPALTEN_PHASE`). Form extern motiviert (Rzepecki
     /// 2025), Werte gesetzt.
     V2HuellePhase,
+    /// Wie [`HeuristikVariante::V2Huelle`], aber unerreichbare Zellen fallen
+    /// aus der Zielkarte (`plate_builder::completability_overlay`) und eine
+    /// unvollendbare Randspalte wird nicht mehr festgenagelt. par.12.
+    V2HuelleFilter,
 }
 
 impl HeuristikVariante {
@@ -133,6 +137,7 @@ impl HeuristikVariante {
                 | HeuristikVariante::V2Heatmap
                 | HeuristikVariante::V2PointMap
                 | HeuristikVariante::V2HuellePhase
+                | HeuristikVariante::V2HuelleFilter
         )
     }
 }
@@ -157,7 +162,8 @@ pub(crate) fn player_total_variante(
         | HeuristikVariante::V2Huelle
         | HeuristikVariante::V2Heatmap
         | HeuristikVariante::V2PointMap
-        | HeuristikVariante::V2HuellePhase => {
+        | HeuristikVariante::V2HuellePhase
+        | HeuristikVariante::V2HuelleFilter => {
             basis
                 + crate::heuristic_v2::row_completion_progress(
                     &state.players[pi],
