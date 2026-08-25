@@ -511,6 +511,70 @@ Geprueft (2026-08-24): alle vier Orientierungen haben exakt 21 Zellen und je
 eine volle Zeile plus eine volle Spalte an ihrer Ecke -- oben links (Z0/S0),
 oben rechts (Z0/S5), unten links (Z5/S0), unten rechts (Z5/S5).
 
+**NACHTRAG 2026-08-25, zwei Pruefungen auf Nutzer-Auftrag -- beide aendern
+den Zuschnitt dieses Arms.**
+
+**(1) Die Grundrate der Hilfskoepfe in diesem Projekt ist 0 von 4.**
+
+| Kopf | Ergebnis |
+| --- | --- |
+| `endgame_head` | Offline echte Gewinne (R5 0,457, Brier -0,0016), **Arena H0: Gating 97:103, p=0,76** -- wurde Standard-Rezept, Champion unveraendert (`PREREG_plate_intervention.md`) |
+| `ownership_head` | Gewicht 0, kein belegter Staerkeeffekt (n=6, p=0,22) |
+| `plate_head` | 2026-08-10 gebaut und wieder ENTFERNT |
+| `conjunction_head` | Ziel politikabhaengig, vier Kalibrierungsvarianten gescheitert |
+
+Der Endgame-Kopf ist der einschlaegige Praezedenzfall: exakte Labels, gratis,
+genau auf die gemessene Schwachstelle gezielt -- also dieselben drei
+Argumente, die fuer den Shaping-Kopf sprechen. Ergebnis 97:103. Wer diesen
+Arm faehrt, sollte das vorher wissen und nicht hinterher erklaeren.
+
+**(2) Ein Kopf, der die Abweichung JE ZELLE vorhersagt, waere ein
+Informationsverlust -- nicht neutral, sondern schlechter als der Bestand.**
+
+Die Abweichung einer Zelle ist `erlaubt_o(r,c) XOR belegt(r,c)`. `erlaubt_o`
+ist eine FESTE Maske, die Abweichung also eine deterministische Umkodierung
+von "belegt am Spielende". Beide Orientierungen kodieren dieselbe
+`belegt`-Matrix um -- der zweite Kanal traegt damit genau dieselbe Information
+wie der erste. Unterm Strich 36 Bit, zweimal verschieden vorzeichenbehaftet.
+
+Der bestehende Ownership-Kopf traegt dagegen 72 (`neural_net.py:2422`:
+"2 Spieler x 3x3 Slots x 4 Felder") -- also die 36 eigenen UND die 36 des
+Gegners. Das Umlabeln wuerde die Gegnerhaelfte ersatzlos streichen und dafuer
+nichts Neues liefern.
+
+**Was stattdessen substanziell waere** (beide ungebaut, beide brauchen einen
+eigenen Entscheid):
+
+* **(a) Huellen-Gewichtung des bestehenden Ziels.** Ziel und Breite bleiben,
+  aber die Loss-Maske gewichtet die 21 Huellen-Zellen hoeher als die uebrigen
+  15. Das aendert nicht WAS gelernt wird, sondern WO die Kapazitaet hingeht --
+  eine echte Aenderung, kein Relabeln. Die Stelle ist klein: `train.py`
+  rechnet bereits `own_loss = (own_bce * own_m).sum() / own_m.sum()`, es gibt
+  also schon eine Maske.
+* **(b) Die Abweichung als AGGREGAT** (ein oder zwei Skalare) zusaetzlich zum
+  bestehenden Kopf. Auch das bringt keine neue Information, aber eine andere
+  Loss-Geometrie: der Gradient belohnt die Gesamtform statt der Einzelzelle.
+
+**NUTZER-ENTSCHEID 2026-08-25 zum weiteren Vorgehen:** *"mag sein. aber ich
+wuerd den kopf trotzdem mittrainieren ... dann laesst sich sauber abschaetzen
+ob es einen effekt gibt oder nicht."*
+
+Umgesetzt wird das als EINSCHALTEN, nicht als Umbau -- Punkt (2) oben zeigt,
+dass ein Umlabeln auf die Zellabweichung die Gegnerhaelfte streichen wuerde,
+ohne etwas Neues zu liefern. Das bestehende Ziel bleibt, `OWNERSHIP_WEIGHT`
+geht ueber 0 (stehende Freigabe seit 2026-08-16).
+
+**Bedingung, damit "sauber abschaetzen" auch traegt:** v22 wechselt mit dem
+v2-Korpus ohnehin die groessere Variable. Ohne `w0`-Kontrollarm AUF DEMSELBEN
+KORPUS sind Kopf und Korpuswechsel konfundiert und der Effekt nicht
+zuordenbar. Der Kontrollarm ist im Projekt etabliert (`w0`-Waechter, siehe
+`PREREG_ownership_corpus.md`) und kostet einen zweiten Trainingslauf, keine
+zusaetzlichen Partien.
+
+Die Huellen-Gewichtung (a) und das Aggregat (b) bleiben als spaetere Arme
+liegen -- sie sind Verfeinerungen an einem Kopf, dessen Grundwirkung erst
+gemessen sein sollte.
+
 **Vorab festzulegen, BEVOR gebaut wird (sonst wird der Zeitplan hinterher
 passend gemacht):**
 
@@ -1700,3 +1764,46 @@ Beleg, und kein einzelnes t kommt ueber 0,59. Der Befund ist H0.
 
 **Der Deckel bleibt im Code** (Variante, Default aus). Er kostet nichts und
 ist begrifflich richtig; ihn wieder auszubauen waere Aufwand ohne Gewinn.
+
+## par.17 Bindet das Tiling-Knotenbudget? (GEMESSEN 2026-08-25) -- NEIN, deutlich nicht
+
+**Anlass.** Als dritte moegliche Verwendung der Vollendbarkeits-Relaxation
+stand die Beschneidung des Tiling-DFS im Raum: tote Spalten nicht mehr
+durchsuchen, damit Budget frei wird. Die Vermutung stuetzte sich auf einen
+Kommentar im Bestand (`plate_builder::v2_chip_preference`), der die fehlenden
+Chip-Vollendungen dem Knotenbudget zuschrieb.
+
+**Nutzer-Vorgabe 2026-08-25:** erst zaehlen, dann bauen. Gebaut wurde deshalb
+NUR ein Zaehler (`tiling_solver::TILING_BUDGET_STATS`, rein additiv, ueber
+`mosaic_rust.tiling_budget_stats_json()` lesbar).
+
+**Ergebnis** (40 Partien Huelle gegen Huelle, 150 Sims):
+
+| Groesse | Wert |
+| --- | --- |
+| Aufrufe von `top_k_tilings` | 1671 |
+| Budget erschoepft | **0** (0,00 %) |
+| Knoten je Aufruf | **5,4** von 2000 |
+
+Das Budget wird zu **0,27 Prozent** ausgenutzt und bindet an keiner Stelle.
+**Die Beschneidung wuerde nichts freimachen, weil nichts eingeschraenkt ist.**
+Der Arm ist damit erledigt, bevor eine Zeile dafuer gebaut wurde -- Kosten:
+ein Zaehler und vier Minuten statt eines vollen Arms.
+
+**Ein Bestands-Kommentar wird dadurch messbar falsch, und ist korrigiert.**
+`v2_chip_preference` erklaerte die fehlenden Chip-Vollendungen damit, die
+Suche finde sie "im DFS-Budget (2000 Knoten) offenbar nicht zuverlaessig --
+die Verzweigung ueber Chip-Allokationen ist teuer". Bei 5,4 genutzten Knoten
+und null Erschoepfungen kann das nicht stimmen.
+
+**Was daraus FOLGT und was nicht.** Die Suche laeuft vollstaendig durch und
+findet die Chip-Schritte trotzdem nicht -- die Ursache liegt also in der
+Kandidaten-Erzeugung oder in der Bewertung, nicht in der Tiefe. WELCHE von
+beiden, ist offen. Eine weitere Herleitung aus dem Code waere die vierte in
+dieser Sitzung, und drei davon lagen im Vorzeichen falsch; wer das klaeren
+will, misst es.
+
+**Methodischer Ertrag, ueber diesen Arm hinaus:** eine Erklaerung, die als
+Kommentar im Code steht, ist keine Messung. Diese hier hat monatelang
+unwidersprochen dagestanden und eine Bau-Idee getragen, die nichts gebracht
+haette.

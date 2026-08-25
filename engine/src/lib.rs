@@ -1348,6 +1348,19 @@ fn not_deckel_diagnostics_json() -> String {
 
 /// Setzt alle Stufe-1-Not-Deckel-Zaehler auf 0 -- rein additiv, betrifft
 /// keinen Suchpfad (siehe `not_deckel_diagnostics_json`-Doku).
+/// Knotenbudget-Statistik von `tiling_solver::top_k_tilings`
+/// (PREREG_heuristic_v2_long_rows.md par.17). Prozessweit; vor einer Messung
+/// per `reset_tiling_budget_stats` zuruecksetzen.
+#[pyfunction]
+fn tiling_budget_stats_json() -> String {
+    crate::tiling_solver::TILING_BUDGET_STATS.snapshot_json().to_string()
+}
+
+#[pyfunction]
+fn reset_tiling_budget_stats() {
+    crate::tiling_solver::TILING_BUDGET_STATS.reset();
+}
+
 #[pyfunction]
 fn reset_not_deckel_diagnostics() {
     crate::round_transition::NOT_DECKEL_STATS.reset();
@@ -1703,6 +1716,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(not_deckel_diagnostics_json, m)?)?;
     m.add_function(wrap_pyfunction!(reset_not_deckel_diagnostics, m)?)?;
+    m.add_function(wrap_pyfunction!(tiling_budget_stats_json, m)?)?;
+    m.add_function(wrap_pyfunction!(reset_tiling_budget_stats, m)?)?;
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(net_vs_heuristic_v2_arena, m)?)?;
