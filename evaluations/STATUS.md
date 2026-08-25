@@ -76,8 +76,10 @@ Artefakt-Umzug (`4e967e1`, `4a43b8d`), die reparierte Blindzieh-Regel als Knopf
 Heuristik-Variante (`3fe468a`), die einheitliche Threadzahl-Konvention
 (`3da733f`) und das Horizont-Verdikt (`ca9ba1b`).
 
-**Push-Stand: 6 Commits voraus** (`29fb1f1` bis `ca9ba1b`); `4e967e1` und
-`4a43b8d` liegen bereits auf `origin/main`. Pushen ist ein eigener
+**Push-Stand: der Baum ist voraus**, ab `29fb1f1`; `4e967e1` und `4a43b8d`
+liegen bereits auf `origin/main`. Die genaue Zahl steht bewusst nicht hier --
+sie veraltet mit jedem Commit, auch mit dem, der sie eintraegt. Abzulesen mit
+`git rev-list --count origin/main..main`. Pushen ist ein eigener
 Nutzer-Entscheid und wurde nicht getroffen.
 
 **Pruefstand des Baums:** die Suite lief zuletzt nach `3da733f` gruen (526/0),
