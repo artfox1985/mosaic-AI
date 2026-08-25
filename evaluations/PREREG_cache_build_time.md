@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Der Cache-Bau des Trainings dauert rund 70 min fuer 890.000 Zustaende und liegt damit vor JEDER Trainingsfrage. Welche Hebel verkuerzen ihn -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag, Start unmittelbar nach dem Ende der v22-Erzeugung. Gemessen am hv2-Korpus: state_to_planes 1,896 ms je Zustand (85 Prozent der Merkmalskosten), state_to_tensor 0,185 ms, Unpickle 0,150 ms; Summe 2,23 ms = 33 min der beobachteten ~70. DREI HEBEL, absteigend nach erwartetem Nutzen: (1) PARALLELISIERUNG des Bau-Laufs -- neural_net.py enthaelt kein Pool/multiprocessing, die Dateien laufen nacheinander bei ~0,75 Kernen, obwohl sie unabhaengig sind; trifft die GANZE Schleife, nicht nur die Merkmale. (2) RUST-EXPORT der Bauer (features.rs hat sie, pyo3 exportiert sie nicht) -- trifft 85 Prozent von 33 der 70 min, also bestenfalls die halbe Wanduhr. (3) lzf-Kompression pruefen (115,9 MB Feldinhalt -> 7,6 MB Datei, Faktor 15). EIN GEMEINSAMES HARTES TOR fuer alle drei: BIT-IDENTITAET des erzeugten Caches gegen den heutigen Stand. Ein schnellerer, aber anderer Cache entwertet jeden Vergleich mit bestehenden Modellen; faellt die Identitaet und ist die Abweichung nicht behebbar, stirbt der jeweilige Hebel. Reihenfolge (1) vor (2) ist eine Umpriorisierung gegenueber dem ersten Entwurf, in par.5 begruendet. GPU GEPRUEFT UND VERWORFEN (par.5a, Nutzer-Frage): der Bauer ist Umpacken statt Arithmetik, verzweigungslastig, und die Daten liegen als Python-Objekte im Host-RAM -- sie dorthin zu bringen IST die Arbeit. Ob (2) nach (1) noch lohnt, entscheidet eine NEUE Messung des Merkmalsanteils, nicht das Bauchgefuehl (par.5b). -->
+<!-- STATUS: OFFEN | Frage: Der Cache-Bau des Trainings dauert rund 70 min fuer 890.000 Zustaende und liegt damit vor JEDER Trainingsfrage. Welche Hebel verkuerzen ihn -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag, Start unmittelbar nach dem Ende der v22-Erzeugung. Gemessen am hv2-Korpus: state_to_planes 1,896 ms je Zustand (85 Prozent der Merkmalskosten), state_to_tensor 0,185 ms, Unpickle 0,150 ms; Summe 2,23 ms = 33 min der beobachteten ~70. DREI HEBEL, absteigend nach erwartetem Nutzen: (1) PARALLELISIERUNG des Bau-Laufs -- neural_net.py enthaelt kein Pool/multiprocessing, die Dateien laufen nacheinander bei ~0,75 Kernen, obwohl sie unabhaengig sind; trifft die GANZE Schleife, nicht nur die Merkmale. (2) RUST-EXPORT der Bauer (features.rs hat sie, pyo3 exportiert sie nicht) -- trifft 85 Prozent von 33 der 70 min, also bestenfalls die halbe Wanduhr. (3) lzf-Kompression pruefen (115,9 MB Feldinhalt -> 7,6 MB Datei, Faktor 15). EIN GEMEINSAMES HARTES TOR fuer alle drei: BIT-IDENTITAET des erzeugten Caches gegen den heutigen Stand. Ein schnellerer, aber anderer Cache entwertet jeden Vergleich mit bestehenden Modellen; faellt die Identitaet und ist die Abweichung nicht behebbar, stirbt der jeweilige Hebel. Reihenfolge (1) vor (2), in par.5 begruendet. HEBEL (4) NACHGETRAGEN (par.6, Nutzer-Frage): Cache JE DATEI statt je Fenster -- laeuft auf DEMSELBEN Umbau wie (1) (picklebare Funktion je Datei; Pool darueber = Parallelisierung, Memoisierung darauf = Datei-Cache), wird aber getrennt ausgeliefert, weil er eine Schluesselteilung braucht und die still danebengehen kann. Sein Gewinn ist nicht die Wanduhr, sondern der kritische Pfad: ein Datei-Cache kann WAEHREND der Erzeugung mitlaufen, dann ist er fertig, wenn der Korpus fertig ist. GPU GEPRUEFT UND VERWORFEN (par.5a, Nutzer-Frage): der Bauer ist Umpacken statt Arithmetik, verzweigungslastig, und die Daten liegen als Python-Objekte im Host-RAM -- sie dorthin zu bringen IST die Arbeit. Ob (2) nach (1) noch lohnt, entscheidet eine NEUE Messung des Merkmalsanteils, nicht das Bauchgefuehl (par.5b). -->
 
 # Vorregistrierung: Zeit des Cache-Baus
 
@@ -167,15 +167,50 @@ gebaut. Wird der Rest von HDF5-Schreiben und Record-Schleife dominiert, ist
 (2) die Paritaets-Pruefung nicht wert und entfaellt -- ein Nullbefund, kein
 Fehlschlag.
 
-## par.6 Der strukturelle Hebel, bewusst NICHT in diesem Zuschnitt
+## par.6 Hebel (4): Cache JE DATEI -- derselbe Umbau, eigene Auslieferung
 
-Der Cache-Schluessel haengt an der **gesamten Dateiliste**. Jede Aenderung --
-ein Traeger-Arm, ein anderer Fensterzuschnitt, eine neue Datei -- baut alles
-neu. Ein Cache **je Datei** plus billiger Merge wuerde jeden Folgelauf fast
-umsonst machen: nur neue Dateien kosten.
+Nutzer-Frage 2026-08-25: *"das dann noch zusaetzlich oder seperat?"* --
+**zusaetzlich, und zwar auf demselben Umbau.**
 
-Das ist der einzige Ansatz, der das Problem **abschafft** statt es zu
-verkleinern -- und zugleich der invasivste (die pro-Datei-Groessen wie
-`value_target_variant` muessten in den Datei-Schluessel). **Nicht Teil dieses
-Zuschnitts**, aber hier festgehalten, damit er nicht vergessen wird, falls
-sich die Kampagne als wiederholungslastig erweist.
+Um zu parallelisieren, muss der Schleifenkoerper ohnehin in eine picklebare
+Top-Level-Funktion `bau_eine_datei(pfad) -> Arrays`. Genau die braucht der
+Datei-Cache auch: er ist die **Memoisierung derselben Funktion**.
+
+```
+bau_eine_datei(pfad) -> Arrays
+   |-- Pool darueber        = Hebel (1), Parallelisierung
+   +-- Memoisierung darauf  = Hebel (4), Cache je Datei
+```
+
+Wer beides nacheinander baut, macht den teuren Teil zweimal.
+
+**Getrennt ausliefern, in dieser Reihenfolge -- das Risiko ist sehr ungleich
+verteilt:**
+
+* **(1) ist risikoarm.** Kein Schluessel aendert sich, der monolithische Cache
+  bleibt, er entsteht nur in mehreren Prozessen. Bit-Identitaet ist die
+  einzige Pruefung.
+* **(4) verlangt eine SCHLUESSELTEILUNG**, und die ist die heikle Stelle.
+  Heute deckt ein Schluessel alles ab; kuenftig muesste getrennt werden in
+  * **je Datei**: `value_target_variant`, `encoder`, `conjunction_head`,
+    Bitpacking, `ignore_ptv`, Sharpen-Exponent -- **und der
+    Policy-Traeger-Status der Datei**, der pro Datei ausgewertet wird;
+  * **je Fenster**: welche Dateien, Traeger-Manifest, Train/Val-Split.
+
+  Wird das falsch geteilt, zieht ein Lauf STILL einen veralteten Datei-Cache
+  -- genau die Falle, vor der die Schluessel-Kommentare in `neural_net.py` an
+  mehreren Stellen warnen (*"ohne diesen String im Key wuerden
+  nortv/nortv_r1 stillschweigend den default-Cache wiederverwenden"*).
+  Scheitert (4), bleibt (1) trotzdem stehen.
+
+**Der eigentliche Gewinn von (4) ist nicht die Wanduhr, sondern der kritische
+Pfad.** Ein Datei-Cache kann **waehrend der Erzeugung** mitlaufen: jede fertige
+`.pkl` bekommt sofort ihren Block. Ist der Korpus fertig, ist der Cache es
+auch -- die Bauzeit verschwindet nicht nur, sie liegt gar nicht mehr vor dem
+Training. Das ist der Unterschied zwischen "schneller" und "nicht mehr da",
+und er ist groesser als alles, was (1) bis (3) zusammen holen koennen.
+
+**Gleiches Tor wie alle anderen Hebel:** Bit-Identitaet (par.4). Fuer (4)
+kommt eine zweite Pflichtpruefung dazu -- ein absichtlich veraenderter
+per-Datei-Parameter MUSS einen Cache-Miss erzeugen. Ein Test, der nur zeigt,
+dass gleiche Eingaben denselben Cache treffen, prueft die falsche Haelfte.
