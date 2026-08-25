@@ -63,6 +63,13 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
   STATUS.md). Diese Regel entstand, nachdem ein Audit am 2026-08-23
   vier Preregs fand, deren Koepfe noch "OFFEN / nichts gebaut" sagten,
   waehrend der Dateikoerper laengst das registrierte Ergebnis trug.
+- **Der Kopf ist ein STATUS, keine Chronik.** `HEADER_SEARCH_LIMIT = 4096`
+  (tools/generate_prereg_index.py): waechst Zeile 1 darueber hinaus, faellt
+  die Datei STILL aus dem Index -- der Generator meldet nur "ohne parsebaren
+  Status-Kopf". Am 2026-08-25 ist das passiert, nach einer Nacht, in der bei
+  jedem neuen Ergebnis hinten angehaengt wurde (4229 Zeichen). Wer ein
+  Ergebnis nachtraegt, ERSETZT den ueberholten Teil, statt ihn zu ergaenzen;
+  die Herleitung steht ohnehin im Dateikoerper.
 - **Sobald sich ein Prereg-Kopf aendert: sofort
   `python tools/generate_prereg_index.py` laufen lassen** – nicht erst
   auf den pre-commit-Hook warten (der prueft nur, blockt aber erst
@@ -140,6 +147,36 @@ fortgeschrieben statt sie zu brechen.
 - **Fehlerbehandlung** Implementiere defensive Programmierung für alle Benutzer- und KI-Eingaben.
 - **KI-Gegner** Priorisiere Lesbarkeit und Wartbarkeit der Heuristiken gegenüber komplexen, schwer debugbaren Optimierungen.
 
+## Laufzeiten messen, nicht schätzen (Nutzer-Anweisung 2026-08-25)
+
+**Jeder Messlauf schreibt seine Dauer in sein eigenes Artefakt.** Geschätzte
+Restzeiten sind wertlos; in der Nacht vom 2026-08-25 lagen drei davon daneben,
+während ein 814-Partien-Lauf über 99 Minuten ohne ablesbaren Fortschritt lief.
+
+Pflichtfelder im Ergebnis-JSON jedes Laufs:
+
+```
+"laufzeit": {"wanduhr_s": ..., "cpu_s": ..., "threads": ..., "s_je_partie": ...}
+```
+
+`threads` gehört dazu, weil dieselbe Zahl in zwei Arena-Einstiegen
+Verschiedenes bedeutet (`run_heuristic_v1_vs_v2_arena`: `0` = alle Kerne;
+`run_net_vs_heuristic_v2_arena`: `<= 1` = sequenziell). Ohne sie ist
+`wanduhr_s` nicht vergleichbar.
+
+**Warum ins ARTEFAKT und nicht (nur) nach STATUS.md:** STATUS.md wird
+regelmässig gekürzt (zuletzt 882 auf 659 Zeilen). Laufzeiten dort verrotten
+oder verschwinden; im Artefakt des Laufs können sie nicht von ihm driften.
+
+**STATUS.md trägt davon nur die Planungsgrösse** — eine kurze Kostentabelle
+"welcher Aufbau kostet wie lange", damit die nächste Sitzung einen Lauf
+einplanen kann, ohne ihn erst zu starten. Abschnitt "Laufzeiten (gemessen)".
+
+**Dazu Pflicht bei allem, was länger als ein Werkzeugaufruf dauert:** ein
+Fortschrittszähler mit `flush=True` (siehe Abschnitt "Lange Läufe NIE in eine
+Pipe"). Eine Dauer, die man erst am Ende erfährt, hilft beim nächsten Lauf,
+aber nicht beim laufenden.
+
 ## Infrastruktur bewerten: Irrtumskosten, nicht Elo (Nutzer-Anweisung 2026-08-25)
 
 Wenn ein Vorschlag den Spieler nicht stärker macht, ist „wie viel Elo bringt
@@ -181,9 +218,17 @@ Zwei weitere Schäden derselben Bauform:
   stoppt das native Programm, sobald N Zeilen da sind — Ergebnis ist ein
   Phantom-Fehler, der dreimal falsch diagnostiziert wurde.
 
-**Stattdessen:** in eine Datei schreiben und die Datei lesen. Für Läufe, die
-länger als ein Werkzeugaufruf dauern, `run_in_background` benutzen und den
-Fortschritt aus der Ausgabedatei ziehen.
+**Stattdessen:** `run_in_background` OHNE Pipe und OHNE Umleitung starten.
+Dann landet die Ausgabe direkt in der Aufgaben-Datei des Harness, und der
+Nutzer sieht in den Hintergrundaufgaben, dass sich etwas tut. Eine eigene
+Umleitung (`> datei.log`) ist genauso schlecht wie eine Pipe -- sie nimmt dem
+Harness die Ausgabe weg.
+
+**Nutzer-Anweisung 2026-08-25: in den Hintergrundaufgaben muss Fortschritt
+SICHTBAR sein.** Ein Lauf, der stumm bleibt, ist ein Lauf, dessen Stand
+niemand kennt -- und geschätzte Restzeiten sind kein Ersatz (drei Schätzungen
+in einer Nacht lagen daneben). Also: `python -u`, `flush=True` an jeder
+Fortschrittszeile, keine Pipe, keine Umleitung.
 
 ```
 python -u tools/probes/x.py > logs/x.out 2>&1
