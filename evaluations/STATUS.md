@@ -88,7 +88,11 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
    beide auf denselben Seeds fahrbar, beide NACH dem Training:
    `PREREG_implicit_minimax_backup.md` par.3 (gebaut und abgenommen, wirkt in
    der Gumbel-Selektion; **nicht** im v22-Label-Pfad, also kein Eingriff in die
-   laufende Erzeugung moeglich oder noetig) und
+   laufende Erzeugung moeglich oder noetig -- **wohl aber ein WECKER fuer die
+   v23-ERZEUGUNG**, weil Netz-Self-Play durch die Gumbel-Suche laeuft und die
+   Policy-Ziele die Besuchsverteilung SIND. Auflage: Gating-Messung VOR dem
+   v23-Self-Play, sonst faellt der Entscheid per Default. Die beiden Arme
+   messen Verschiedenes: Gating = Staerke, Self-Play = Korpus-Qualitaet) und
    `PREREG_risk_sensitive_leaf_utility.md` par.5 Stufe A (liest die
    exportierten, aber ungelesenen `value_wdl_logits`). **Wichtig bei Stufe A:**
    sie MUSS als Variante A1 gebaut werden, nur an der Gumbel-Blattstelle -- in

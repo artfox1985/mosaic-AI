@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: GEBAUT + ABGENOMMEN 2026-08-23 (par.1a: Suite 492/0, Paritaets-Hash haelt, Knopf registriert); ERFOLG nach vorregistrierter Lesart (par.2b, 2026-08-23): kein Staerkeverlust (304 vs 296/407 n.s.), Score-Level SIGNIFIKANT +2,77 (Block-t +3,83), k1 9,0 % -> 16,0 % (+7,0 pp, p=0,090 knapp n.s., groesste je gemessene Netz-Bewegung). ABER par.2c (Netz-gegen-Netz via Kapselung): Paritaet, k1-Effekt gegnerspezifisch, uebertraegt sich nicht; Self-Play-Einsatz bleibt Kandidat mit gedaempfter Erwartung. Paralleler Such-Hebel des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); EINGETAKTET fuer den v22-Zyklus 2026-08-25 (par.3), aber NICHT fuer die Erzeugung: der Knopf sitzt in der Gumbel-Selektion (net_mcts.rs:3376) und steht damit NICHT im Label-Pfad des heuristischen v22-Self-Play (round_transition_deep nutzt net_leaf_eval und drafting_action_priors, keine Gumbel-Selektion). Zu messen am v23-NETZ: erst im Gating (dort heute schon live, Default 0,0), dann im naechsten netz-basierten Self-Play. Entscheidungsmass ist STAERKE auf Block-Ebene, die k1-Baurate nur begleitend -- sie war schon einmal die groesste je gemessene Bewegung ohne folgende Staerke. Quelle: RESEARCH_search_alternatives_external S4/S6 Option O1. -->
+<!-- STATUS: OFFEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: GEBAUT + ABGENOMMEN 2026-08-23 (par.1a: Suite 492/0, Paritaets-Hash haelt, Knopf registriert); ERFOLG nach vorregistrierter Lesart (par.2b, 2026-08-23): kein Staerkeverlust (304 vs 296/407 n.s.), Score-Level SIGNIFIKANT +2,77 (Block-t +3,83), k1 9,0 % -> 16,0 % (+7,0 pp, p=0,090 knapp n.s., groesste je gemessene Netz-Bewegung). ABER par.2c (Netz-gegen-Netz via Kapselung): Paritaet, k1-Effekt gegnerspezifisch, uebertraegt sich nicht; Self-Play-Einsatz bleibt Kandidat mit gedaempfter Erwartung. Paralleler Such-Hebel des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); EINGETAKTET 2026-08-25 (par.3/par.3a). Fuer die v22-ERZEUGUNG wirkungslos: der Knopf sitzt in der Gumbel-Selektion (net_mcts.rs:3376), das heuristische v22-Self-Play labelt ueber net_leaf_eval/drafting_action_priors ohne Gumbel-Selektion. **Fuer die v23-ERZEUGUNG dagegen ist er ein WECKER** (Nutzer-Einwand): Netz-Self-Play laeuft durch die Gumbel-Suche, die Policy-Ziele SIND die Besuchsverteilung -- nur am Generierungsstart entscheidbar. AUFLAGE: die Gating-Messung muss VOR dem Start des v23-Self-Play laufen, sonst faellt der Entscheid per Default (0,0). ZWEI ARME, die NICHT dasselbe messen: Gating = Staerke gegen einen anderen Gegner (dort gegnerspezifisch, par.2b gegen par.2c); Self-Play = Netz gegen sich selbst, wo ein symmetrischer Eingriff sich im Ergebnis aufheben kann -- dort ist die Frage die KORPUS-Qualitaet (Zielschaerfe, Zustandsabdeckung, Orakelmetriken am Folgenetz), nicht die Siegquote. Kein Bau: SearchConfig ist an net_self_play_games pro Seite per models/<name>.spec.json setzbar. k1-Baurate bleibt Begleitgroesse. Quelle: RESEARCH_search_alternatives_external S4/S6 Option O1. -->
 
 # PREREG-SKELETT: Implicit-Minimax-Backup als Laufzeit-Knopf
 
@@ -163,3 +163,45 @@ Wer hier einen Wiederholungstreffer erwartet, hat par.2c nicht gelesen.
 **Entscheidungsmass:** Staerke in der gepaarten Arena, Block-Ebene. Die
 k1-Baurate ist BEGLEITEND zu berichten, aber nicht das Kriterium -- sie war
 schon einmal die groesste je gemessene Netz-Bewegung, ohne dass Staerke folgte.
+
+
+### par.3a PRAEZISIERUNG (Nutzer 2026-08-25): fuer die v23-ERZEUGUNG ist er ein Wecker
+
+Nutzer-Einwand: *"aber die v23 erzeugung wird sie nutzen"*. Trifft zu, und
+par.3 hat das zu beilaeufig behandelt.
+
+Das Self-Play mit dem v23-Netz laeuft ueber `net_self_play_games`, also durch
+die Gumbel-Suche -- genau dort, wo `mix_q_with_implicit_minimax` sitzt. Damit
+gilt fuer diesen Knopf beim NAECHSTEN Korpus dasselbe wie fuer den
+Bootstrap-Horizont: **er ist nur am Generierungsstart entscheidbar.** Die
+Policy-Ziele sind die Wurzel-Besuchsverteilung; wer die Selektion aendert,
+aendert die Ziele und die besuchten Zustaende mit, und beides ist spaeter
+nicht nachtraeglich zu setzen.
+
+**Daraus eine Reihenfolge-Auflage, die sonst still verfaellt:** die
+Gating-Messung muss VOR dem Start des v23-Self-Play laufen. Passiert sie
+danach, ist der Erzeugungs-Entscheid bereits per Default (0,0 = aus) gefallen
+-- dasselbe Vergiss-Muster, das `PREREG_chance_nodes.md` Entscheidungsregel 4
+zweimal getroffen hat.
+
+**Und eine inhaltliche Trennung, die par.3 verwischt hat: Gating-Arm und
+Self-Play-Arm messen NICHT dasselbe.**
+
+* **Gating** misst Staerke gegen einen anderen Gegner. Dort ist der Effekt
+  gemessen und gegnerspezifisch (par.2b gegen par.2c).
+* **Self-Play** ist Netz gegen sich selbst. Ein symmetrischer Such-Eingriff
+  kann sich in den ERGEBNISSEN aufheben -- par.2c hat fuer Netz-gegen-Netz
+  genau das gezeigt. Was er nicht aufhebt, sind die POLICY-ZIELE und die
+  Zustandsverteilung des erzeugten Korpus. Der Self-Play-Arm ist deshalb keine
+  Staerkefrage, sondern eine **Korpus-Frage**, und sein Mass ist ein anderes:
+  Zielschaerfe und Zustandsabdeckung, gemessen wie beim v22-Korpus
+  (`tools/corpus_sanity_check.py`, `tools/probes/corpus_state_diversity_probe.py`),
+  plus die Orakelmetriken am daraus trainierten Netz.
+
+Wer den Self-Play-Arm an der Siegquote misst, misst die falsche Groesse und
+bekommt mit hoher Wahrscheinlichkeit eine Null, die nichts bedeutet.
+
+**Kein Bau noetig, auch hier nicht:** `SearchConfig` ist an
+`net_self_play_games` pro Seite ueber `models/<name>.spec.json`
+ueberschreibbar (Knopf-Registry, `MOSAIC_IMPLICIT_MINIMAX_A`). Der Arm kostet
+eine Konfigurationsdatei und die Partien.
