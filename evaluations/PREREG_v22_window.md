@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: NEU GEFASST 2026-08-25, der Zuschnitt von 2026-08-08 ist HINFAELLIG -- er war fuer einen NETZ-Erzeuger mit Zwei-Klassen-Rotation ueber drei Generationen gebaut (29.450 Partien), v22 ist ein HEURISTIK-Erzeuger (v2huelle), EINE Klasse, KEIN Altbestand (Nutzer 2026-08-25). Gueltiger Zuschnitt: 24.000 Partien, ~4,18 Mio Zustaende, ~37 GB, ein Lauf mit Seed 20260826, Praefix hv2. Die Rotationsregel ab v22 ist ebenfalls hinfaellig: v22 ist ein Schnitt, keine Rotationsstufe. OFFEN als vorregistrierter Arm INNERHALB dieses Zuschnitts ist allein die TRAEGERFRAGE -- 61,8 Prozent der Draftingzuege mit echter Wahl tragen policy_target_valid=false (v2-Vorzug); ob der Policy-Kopf sie sieht, entscheidet ein gepaartes Trainingspaar auf DEMSELBEN Korpus, Entscheidungsmass vorab festgelegt (par.4). ARM A GEFAHREN 2026-08-25 (par.4a, Flagge geachtet, 5.700 Partien, from-scratch): vom Lehrer kommt NICHTS an -- volle Spalten 0,062 gegen 0,741 im Korpus, Punkte 21,8 gegen 47,0, Strafleiste 9,0 gegen 5,0 -- also CHAMPION-Niveau (0,106), nicht Lehrer-Niveau. BERICHTIGT: die erste Messung lief mit Sampling und Wurzelrauschen und mass damit die EXPLORATION; argmax wie in der Arena gibt 6,7 Punkte und mehr als doppelt so viele volle Spalten. Einschraenkung schwer: from-scratch auf einem Viertel des Korpus, bestes Modell Epoche 4, n=40. Der Befund ist damit KEIN Beleg gegen die Destillation, sondern zeigt, dass der Policy-Kopf unter Arm A nur gut ein Drittel des Draftingmaterials sieht -- ausgeblendet sind ausgerechnet die Vorzugszuege. ARM B LAEUFT (par.4b): MOSAIC_IGNORE_POLICY_TARGET_VALID=1 gebaut, steht im Cache-Schluessel (sonst zoege der zweite Lauf still den Cache des ersten). Richtungstest, kein Gating. Der Bootstrap-Horizont-Wecker ist erledigt: Horizont 2, PREREG_bootstrap_horizon.md par.9f. par.6 (2026-08-25): WARMSTART vom Sanity-Modell hv2sanity geplant; weil dessen Korpus im vollen Fenster VOLLSTAENDIG drinbleibt (anders als bei bisherigen Warmstarts, wo der Vorgaenger-Korpus ausrotiert), waeren ~21 Prozent des Val-Splits vom Startmodell bereits trainiert und die --select-by-brier-Auswahl verzerrt. Gegenmittel GEBAUT und auf dem echten Codepfad abgenommen: MOSAIC_VAL_POOL schraenkt die Val-Kandidaten per Regex ein und bricht ab, statt still einen kleineren Split zu nehmen. Vorbereiteter Pool: evaluations/artifacts/hv2_val_pool_regex.txt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: NEU GEFASST 2026-08-25, der Zuschnitt von 2026-08-08 ist HINFAELLIG -- er war fuer einen NETZ-Erzeuger mit Zwei-Klassen-Rotation ueber drei Generationen gebaut (29.450 Partien), v22 ist ein HEURISTIK-Erzeuger (v2huelle), EINE Klasse, KEIN Altbestand (Nutzer 2026-08-25). Gueltiger Zuschnitt: 24.000 Partien, ~4,18 Mio Zustaende, ~37 GB, ein Lauf mit Seed 20260826, Praefix hv2. Die Rotationsregel ab v22 ist ebenfalls hinfaellig: v22 ist ein Schnitt, keine Rotationsstufe. OFFEN als vorregistrierter Arm INNERHALB dieses Zuschnitts ist allein die TRAEGERFRAGE -- 61,8 Prozent der Draftingzuege mit echter Wahl tragen policy_target_valid=false (v2-Vorzug); ob der Policy-Kopf sie sieht, entscheidet ein gepaartes Trainingspaar auf DEMSELBEN Korpus, Entscheidungsmass vorab festgelegt (par.4). ARM A GEFAHREN 2026-08-25 (par.4a, Flagge geachtet, 5.700 Partien, from-scratch): vom Lehrer kommt NICHTS an -- volle Spalten 0,062 gegen 0,741 im Korpus, Punkte 21,8 gegen 47,0, Strafleiste 9,0 gegen 5,0 -- also CHAMPION-Niveau (0,106), nicht Lehrer-Niveau. BERICHTIGT: die erste Messung lief mit Sampling und Wurzelrauschen und mass damit die EXPLORATION; argmax wie in der Arena gibt 6,7 Punkte und mehr als doppelt so viele volle Spalten. Einschraenkung schwer: from-scratch auf einem Viertel des Korpus, bestes Modell Epoche 4, n=40. Der Befund ist damit KEIN Beleg gegen die Destillation, sondern zeigt, dass der Policy-Kopf unter Arm A nur gut ein Drittel des Draftingmaterials sieht -- ausgeblendet sind ausgerechnet die Vorzugszuege. ARM B GEFAHREN (par.4b): mit identischen Flags gemessen, VIER Kennzahlen in derselben Richtung -- volle Spalten 0,113 gegen 0,062, volle Reihen 0,225 gegen 0,113, Punkte 27,3 gegen 21,8. Keine davon einzeln signifikant (n=40, Intervalle ueberlappen). VORLAEUFIGE ANTWORT: die Maske blockiert den Lehrer, also faellt die Traegerfrage auf IGNORIEREN -- gegen die Empfehlung, die im ersten Zuschnitt stand. Beide Arme bleiben aber weit unter dem Lehrer (0,113 gegen 0,741); ob der Rest Datenmenge ist oder eine Grenze der Destillation, trennt dieser Lauf nicht. Richtungsentscheid, kein Gating. Der Bootstrap-Horizont-Wecker ist erledigt: Horizont 2, PREREG_bootstrap_horizon.md par.9f. par.6 (2026-08-25): WARMSTART vom Sanity-Modell hv2sanity geplant; weil dessen Korpus im vollen Fenster VOLLSTAENDIG drinbleibt (anders als bei bisherigen Warmstarts, wo der Vorgaenger-Korpus ausrotiert), waeren ~21 Prozent des Val-Splits vom Startmodell bereits trainiert und die --select-by-brier-Auswahl verzerrt. Gegenmittel GEBAUT und auf dem echten Codepfad abgenommen: MOSAIC_VAL_POOL schraenkt die Val-Kandidaten per Regex ein und bricht ab, statt still einen kleineren Split zu nehmen. Vorbereiteter Pool: evaluations/artifacts/hv2_val_pool_regex.txt. -->
 
 # Vorregistrierung: v22-Fenster
 
@@ -293,3 +293,40 @@ gleiche Architektur. Ein Flag Unterschied.
 **Vorsicht bei der Auswertung:** dieser Vergleich ist wegen der oben genannten
 Einschraenkungen ein RICHTUNGSTEST, kein Gating. Er beantwortet "erreicht der
 Vorzug die Policy ueberhaupt", nicht "ist Arm B staerker".
+
+### ERGEBNIS ARM B (2026-08-25): die Maske hat den Lehrer blockiert
+
+Gemessen mit IDENTISCHEN Flags wie Arm A -- `--deterministic --no-root-noise`,
+Seed 20260901, 40 Partien, 400 Sims. Unterschied zwischen den Armen: ein
+Trainings-Flag.
+
+| Kennzahl | Arm A (Flagge geachtet) | **Arm B (ignoriert)** | Lehrer | Champion |
+| --- | --- | --- | --- | --- |
+| volle Spalten | 0,062 ± 0,053 | **0,113 ± 0,085** | 0,741 | 0,106 |
+| volle Reihen | 0,113 ± 0,078 | **0,225 ± 0,110** | 0,128 | – |
+| Eigene Punkte | 21,77 ± 3,10 | **27,25 ± 3,31** | 46,97 | – |
+| Strafleistensteine | 8,96 | 8,81 | 5,04 | – |
+
+**Vier Kennzahlen, vier mal dieselbe Richtung** -- Spalten fast verdoppelt,
+Reihen verdoppelt, +5,5 Punkte. **Einzeln ist keine davon signifikant**, alle
+Intervalle ueberlappen bei n=40. Dass vier Groessen gemeinsam wandern, wiegt
+mehr als jede einzelne, ist aber kein Ersatz fuer Signifikanz.
+
+**Vorlaeufige Antwort auf die Traegerfrage: die Maske blockiert den Lehrer.**
+Das steht gegen die Empfehlung, die im ersten Zuschnitt dieses par.4 stand --
+dort war das Markieren als "vorgeschlagene Variante" begruendet mit dem
+Argument, ein one-hot-Ziel lehre "das Routing ohne das Urteil dahinter". Die
+Messung sagt: ohne das Routing lernt es gar nichts.
+
+**Was weiterhin offen ist.** Beide Arme liegen weit unter dem Lehrer (0,113
+gegen 0,741). Arm B erreicht Champion-Niveau, nicht Lehrer-Niveau. Ob der
+Abstand an der Datenmenge liegt (5.700 von 24.000 Partien, from-scratch) oder
+daran, dass die Destillation den Vorzug grundsaetzlich nicht traegt, trennt
+dieser Lauf NICHT.
+
+**Konsequenz fuer den vollen Korpus:** die Entscheidung faellt auf Arm B --
+also `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` --, aber als Richtungsentscheid mit
+n=40 auf einem Viertelkorpus, nicht als Gating. Wer die Frage endgueltig
+beantworten will, braucht beide Arme auf dem vollen Korpus; das kostet nach
+heutigem Stand zweimal ~7 h und ist der Grund, warum
+`PREREG_cache_build_time.md` existiert.
