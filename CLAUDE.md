@@ -140,6 +140,64 @@ fortgeschrieben statt sie zu brechen.
 - **Fehlerbehandlung** Implementiere defensive Programmierung für alle Benutzer- und KI-Eingaben.
 - **KI-Gegner** Priorisiere Lesbarkeit und Wartbarkeit der Heuristiken gegenüber komplexen, schwer debugbaren Optimierungen.
 
+## Infrastruktur bewerten: Irrtumskosten, nicht Elo (Nutzer-Anweisung 2026-08-25)
+
+Wenn ein Vorschlag den Spieler nicht stärker macht, ist „wie viel Elo bringt
+das?" die falsche Frage. Die richtige lautet: **wie viel billiger macht es,
+sich zu irren?**
+
+Der Nutzen von Messinfrastruktur taucht in keinem Elo-Wert auf. Er zeigt sich
+darin, dass ein falscher Weg früher, mit weniger Partien und weniger
+Rechenzeit als falsch erkennbar wird. Präzedenzfall:
+`PREREG_search_rng_split.md` hat keinen einzigen Zug verbessert – aber vorher
+galt „gleicher Spielindex, gleiche Startbedingungen" nur bis zur ersten Suche;
+gepaarte Arenen waren nominell gepaart, nicht tatsächlich.
+
+**Der Beleg, dass der Engpass hier wirklich beim Messen sitzt** (und die Regel
+damit kein Freibrief ist): 5,75 Prozentpunkte Streuung bei n=400 für
+IDENTISCHE Konfiguration, und der Seed bewegt die Metrik 4- bis 6-mal stärker
+als jeder Knopf. Unter dieser Auflösung kauft man Zufallsbefunde.
+
+**Und die Gegenprobe, damit die Regel nicht jede Infrastrukturarbeit
+schönredet:** genau so kann man sich in Messgenauigkeit einrichten und die
+härtere Frage vermeiden, ob überhaupt Ideen da sind, die stark genug sind, um
+gemessen zu werden. Ein Infrastruktur-Vorschlag braucht deshalb einen
+BENANNTEN Nutznießer – eine konkrete Messung, die dadurch möglich oder
+schärfer wird –, nicht „hilft künftig allgemein".
+
+## Lange Läufe NIE in eine Pipe (Nutzer-Anweisung 2026-08-25)
+
+**Kein `| tail`, `| head`, `| grep`, `| Select-Object` hinter einem Build, Test,
+Training oder Messlauf.** Die Pipe puffert, bis der Prozess endet: solange
+sieht man NICHTS — auch keine Fortschrittszeilen, auch nicht mit `python -u`.
+Bei einem Lauf über Stunden heißt das, man kann weder Fortschritt noch
+Führung noch Partienzahl ablesen, bis alles vorbei ist.
+
+Zwei weitere Schäden derselben Bauform:
+
+- **Der Exit-Code verschwindet.** In der Pipe zählt der Status des LETZTEN
+  Glieds; ein abgestürzter Build hinter `| tail` sieht grün aus.
+- **PowerShell bricht die Pipeline früh ab.** `... | Select-Object -First N`
+  stoppt das native Programm, sobald N Zeilen da sind — Ergebnis ist ein
+  Phantom-Fehler, der dreimal falsch diagnostiziert wurde.
+
+**Stattdessen:** in eine Datei schreiben und die Datei lesen. Für Läufe, die
+länger als ein Werkzeugaufruf dauern, `run_in_background` benutzen und den
+Fortschritt aus der Ausgabedatei ziehen.
+
+```
+python -u tools/probes/x.py > logs/x.out 2>&1
+```
+
+**Und die andere Hälfte des Problems:** eine Sonde, die nur am Ende druckt,
+ist auch bei sauberem Start blind. Wer einen Lauf über mehr als ein paar
+Minuten baut, gibt ihm einen Fortschrittszähler mit `flush=True` — sonst ist
+die einzige Antwort auf „wie steht's?" ein Achselzucken.
+
+Anlass: der Lehrer-Test am 2026-08-25 lief 27 Minuten ohne jede ablesbare
+Zwischeninformation, weil er als `python -u ... 2>&1 | tail -26` gestartet
+wurde. Die Regel stand vorher nur im Gedächtnis und hat dort nicht gegriffen.
+
 ## Push scheitert am pre-push-Hook: examples/ und benches/ (wiederkehrend)
 
 Der pre-push-Hook laeuft `cargo test --release`, und das kompiliert **auch

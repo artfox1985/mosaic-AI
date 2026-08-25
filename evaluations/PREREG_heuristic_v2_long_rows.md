@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: MESSKETTE KOMPLETT 2026-08-24, v2 GEBAUT und variantengebunden (HeuristikVariante::V1/V2, Paritaets-Hash 8c6684ff haelt, Suite 512/0). Vorfragen: der Lehrer v1 kann es auch nicht (volle Spalten 0,098 gegen 0,101), such-seitig ist der Weg zu (scoring_plate_injection und long_row_payoff B1 beide negativ). Der Durchbruch kam vom PLATZIERUNGS-Routing, nicht von einem Bewertungsterm: best_first_step_inner waehlt nach reinen Sofortpunkten und warf jede Draft-Absicht weg. Schritt 2 (v1 gegen v2, 80 gepaarte Partien): volle Spalten 0,163 auf 0,562, Partien mit mindestens einer von 35 auf 50 Prozent, 5/6-Mauer durchbrochen. SCHRITT 3 (v2 gegen Champion, 407 Seeds je Arm, v1-Bezug auf denselben Seeds): Faehigkeit BELEGT, Preis HOCH -- volle Spalten 0,302 gegen v1 0,086 (gepaart +0,175, t=+7,79), Vollendungsquote 0,686 gegen 0,564 (B1-Vorgabe erfuellt), aber Siegquote gegen den Champion 0,128 gegen 0,256 und Marge -19,4 gegen -12,2. URTEIL STEHT AUS: par.5.3 hat bewusst keinen Schwellenwert, die Frage ist, ob das Netz die FAEHIGKEIT uebernimmt ohne das NIVEAU. Nebenbefund: volle Zeilen brechen gegen ein NETZ nicht ein (0,403 gegen 0,432) -- die Regression auf 0,200 war ein Artefakt des v1-gegen-v2-Aufbaus. OFFEN: par.5.4 Korpus und Training, Self-Play-Einstieg (Nutzer-Freigabe erteilt, nicht gebaut), Shaping-Kopf par.3b mit Abkling-Kurve und zwei Kanaelen, Einhuellende im 2D-Encoder. NEUER ARM par.8 (VORREGISTRIERT 2026-08-24, GEBAUT, NICHT GEMESSEN): Prio-Leiter des Nutzers als Routing-Huelle in eigener Variante V2Huelle -- Bewertung byte-identisch zu V2, nur die Zielzellen-Karte unterscheidet sich (zwei Randspalten, Spezialfeld-Freischaltung, obere Zeilen, Nachbarn; Drafting als linearer Score mit Strafleisten- und Stoerungsterm aus provocation.rs und Phasen-Eskalation). Suite 520/0, Paritaets-Hash unberuehrt. Entscheidungsmass und Falsifikator in par.8.4 vorregistriert. **GEMESSEN 2026-08-25 (par.8.5, n=160): ARM GEWINNT.** Volle Spalten 0,425 auf 0,950 (t=9,12 auf Bloecken), Spezialfeld-Freischaltungen 0,713 auf 1,512 (t=9,32), Punkte 40,1 auf 48,2 (t=4,80), Strafpunkte -15,0 auf -13,4, Siegquote 0,706, Vollendungsquote 0,743 (Waechter erfuellt). Erster v2-Bauschritt ueberhaupt, der Spalten NICHT mit Punkten bezahlt. ABLATIONEN GEFAHREN (par.8.6): Struktur haengt an der ZIELKARTE (Spalten bleiben 0,506-0,525 ohne die Zusatzterme, nur die Prio-5-Auflage kostet 0,10), Staerke an den linearen Termen (W_STRAF 5,09 Punkte Marge, Prio-5 2,59, W_STOER 2,56). par.9 Punkte-Heatmap als Routing-Karte GEMESSEN und NEGATIV (n=160): volle Spalten 0,650 auf 0,281 (t=-4,89), Teilspalten >=3 dagegen +0,375 (t=6,07) -- eine additive Punktekarte ist konstruktionsbedingt ein BREITEN-Signal, volle Spalten brauchen FOKUS. Die vorregistrierte k1-Vorhersage ist im Vorzeichen widerlegt. Netz-Verwendung als Eingabeebene bleibt unberuehrt. OFFEN: Lehrer-Test gegen den Champion (net_vs_heuristic_v2_arena ist fest auf V2 verdrahtet). -->
+<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: MESSKETTE KOMPLETT 2026-08-24, v2 GEBAUT und variantengebunden (HeuristikVariante::V1/V2, Paritaets-Hash 8c6684ff haelt, Suite 512/0). Vorfragen: der Lehrer v1 kann es auch nicht (volle Spalten 0,098 gegen 0,101), such-seitig ist der Weg zu (scoring_plate_injection und long_row_payoff B1 beide negativ). Der Durchbruch kam vom PLATZIERUNGS-Routing, nicht von einem Bewertungsterm: best_first_step_inner waehlt nach reinen Sofortpunkten und warf jede Draft-Absicht weg. Schritt 2 (v1 gegen v2, 80 gepaarte Partien): volle Spalten 0,163 auf 0,562, Partien mit mindestens einer von 35 auf 50 Prozent, 5/6-Mauer durchbrochen. SCHRITT 3 (v2 gegen Champion, 407 Seeds je Arm, v1-Bezug auf denselben Seeds): Faehigkeit BELEGT, Preis HOCH -- volle Spalten 0,302 gegen v1 0,086 (gepaart +0,175, t=+7,79), Vollendungsquote 0,686 gegen 0,564 (B1-Vorgabe erfuellt), aber Siegquote gegen den Champion 0,128 gegen 0,256 und Marge -19,4 gegen -12,2. URTEIL STEHT AUS: par.5.3 hat bewusst keinen Schwellenwert, die Frage ist, ob das Netz die FAEHIGKEIT uebernimmt ohne das NIVEAU. Nebenbefund: volle Zeilen brechen gegen ein NETZ nicht ein (0,403 gegen 0,432) -- die Regression auf 0,200 war ein Artefakt des v1-gegen-v2-Aufbaus. OFFEN: par.5.4 Korpus und Training, Self-Play-Einstieg (Nutzer-Freigabe erteilt, nicht gebaut), Shaping-Kopf par.3b mit Abkling-Kurve und zwei Kanaelen, Einhuellende im 2D-Encoder. NEUER ARM par.8 (VORREGISTRIERT 2026-08-24, GEBAUT, NICHT GEMESSEN): Prio-Leiter des Nutzers als Routing-Huelle in eigener Variante V2Huelle -- Bewertung byte-identisch zu V2, nur die Zielzellen-Karte unterscheidet sich (zwei Randspalten, Spezialfeld-Freischaltung, obere Zeilen, Nachbarn; Drafting als linearer Score mit Strafleisten- und Stoerungsterm aus provocation.rs und Phasen-Eskalation). Suite 520/0, Paritaets-Hash unberuehrt. Entscheidungsmass und Falsifikator in par.8.4 vorregistriert. **GEMESSEN 2026-08-25 (par.8.5, n=160): ARM GEWINNT.** Volle Spalten 0,425 auf 0,950 (t=9,12 auf Bloecken), Spezialfeld-Freischaltungen 0,713 auf 1,512 (t=9,32), Punkte 40,1 auf 48,2 (t=4,80), Strafpunkte -15,0 auf -13,4, Siegquote 0,706, Vollendungsquote 0,743 (Waechter erfuellt). Erster v2-Bauschritt ueberhaupt, der Spalten NICHT mit Punkten bezahlt. ABLATIONEN GEFAHREN (par.8.6): Struktur haengt an der ZIELKARTE (Spalten bleiben 0,506-0,525 ohne die Zusatzterme, nur die Prio-5-Auflage kostet 0,10), Staerke an den linearen Termen (W_STRAF 5,09 Punkte Marge, Prio-5 2,59, W_STOER 2,56). par.9 Punkte-Heatmap als Routing-Karte GEMESSEN und NEGATIV (n=160): volle Spalten 0,650 auf 0,281 (t=-4,89), Teilspalten >=3 dagegen +0,375 (t=6,07) -- eine additive Punktekarte ist konstruktionsbedingt ein BREITEN-Signal, volle Spalten brauchen FOKUS. Die vorregistrierte k1-Vorhersage ist im Vorzeichen widerlegt. Netz-Verwendung als Eingabeebene bleibt unberuehrt. par.9.2 (Karte der ERWARTETEN PUNKTE, also inkl. Platzierungspunkten -- die vom Nutzer gemeinte Fassung) EBENFALLS NEGATIV: volle Spalten 0,762 auf 0,219 (t=-6,12), Siegquote 0,400; beide Karten zeigen dieselbe Breiten-Signatur und handeln Struktur gegen weniger Strafpunkte. VORREGISTRIERT UND OFFEN: par.10 Lehrer-Test (Champion@400 gegen Huelle@150, 407 Kampagnen-Seeds, LAEUFT), par.11 rundenabhaengige Spalten-Gewichte (extern motiviert, Code geschrieben, nicht kompiliert), par.12 Vollendbarkeit als FILTER auf der Zielkarte (die Leiter filtert heute nicht). par.3b ENTSCHEID 2026-08-25: die Abkling-Kurve des Shaping-Kopfes laeuft ueber die RUNDENNUMMER. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -517,6 +517,24 @@ passend gemacht):**
 1. Die Abkling-Kurve (Form, Start- und Endgewicht, ueber welche Groesse sie
    laeuft -- Trainingsepochen, Generationen oder Rundennummer). Der Nutzer
    hat "decayen" gesagt, nicht welche Kurve; das ist ein eigener Entscheid.
+
+   **ENTSCHIEDEN 2026-08-25 (Nutzer): die Kurve laeuft ueber die RUNDENNUMMER.**
+   Anlass war die Frage nach einer rundenabhaengigen Gewichtung des
+   Value-Loss; der Nutzer hat sie ausdruecklich hierher gezogen ("das wuerd
+   ich gern mit dem shaping/heatmap term machen, dafuer gibt es schon eine
+   prereg") statt sie als eigenen Arm zu fuehren. Damit faellt eine geplante
+   Extra-Vorregistrierung weg.
+
+   Das passt zur Begruendung des Abklingens oben: der Value-Kopf ist gerade
+   FRUEH am schwaechsten, und "frueh" heisst hier Runde, nicht Epoche. Die
+   Groessenordnung steht schon im Bestand -- das Runden-R2 des Value-Kopfes
+   liegt bei rund 0,03 in Runde 1 gegen rund 0,62 in Runde 5
+   (`net_mcts.rs`-Kopf zur geblendeten Utility). Der Shaping-Beitrag traegt
+   also dort am meisten, wo der Value-Kopf am wenigsten weiss.
+
+   Form, Start- und Endgewicht bleiben offen und sind VOR dem Bau
+   festzulegen. Punkt 3 unten gilt unveraendert: nicht an der Metrik tunen,
+   an der der Arm beurteilt wird.
 2. Der Waechter dagegen, dass der Kopf zur Kruecke wird: gemessen wird die
    Value-Qualitaet OHNE Shaping-Beitrag, sonst verdeckt der Kopf genau die
    Schwaeche, die er beheben soll.
@@ -1033,3 +1051,116 @@ Leiter und keine der beiden Karten.
 Punktekarte ein FEATURE; ein Netz kann aus einem Breiten-Signal Fokus lernen,
 ein Greedy-Routing nicht. Beide Laeufe entscheiden ausschliesslich die
 Routing-Verwendung, negativ.
+
+## par.10 Lehrer-Test der Prio-Leiter (VORREGISTRIERT 2026-08-25)
+
+par.8.5 hat die Frage gestellt und offen gelassen: die Huelle ist im
+Heuristik-Duell belegt, aber Schritt 3 hat gezeigt, dass eine dort belegte
+Faehigkeit gegen den Champion einbrechen kann. Dieser Lauf beantwortet sie im
+GLEICHEN Aufbau wie par.5.3, damit die Zahlen nebeneinander stehen:
+`alphazero_v21_2d_brierbest`@400 gegen die Heuristik@150, 407 Kampagnen-Seeds
+(`kampagnen_seeds_407.txt`), `--log-games`, plus v1 auf denselben Seeds als
+Bezug.
+
+Einstieg: `tools/probes/v2_teacher_arena.py --variante v2huelle`. Der
+Rust-Einstieg nimmt die Variante seit heute als Parameter; vorher war er fest
+auf `V2` verdrahtet.
+
+**Kein vorregistrierter Schwellenwert** -- dieselbe Regel wie par.5.3: die
+Abwaegung Faehigkeit gegen Niveau ist ein Nutzer-Entscheid, kein Schnitt. Die
+Bezugszahlen aus par.5.3 (n=407) sind:
+
+| | Siege | Punkte | Marge | volle Spalten | Vollendungsquote |
+| --- | --- | --- | --- | --- | --- |
+| v1 | 0,256 | 37,6 | -12,2 | 0,086 | 0,564 |
+| v2 | 0,128 | 34,8 | -19,4 | 0,302 | 0,686 |
+
+**Was der Lauf entscheidet:** ob die Huelle den Tausch aufhebt, den v2 machen
+musste. v2 hat Faehigkeit mit Niveau bezahlt; im Heuristik-Duell tut die
+Huelle das nicht (par.8.5). Ob das gegen ein NETZ haelt, ist genau die Frage,
+die par.5.4 offen laesst.
+
+**Vorlauf, ausdruecklich keine Messung:** ein 20-Seed-Anlauf zeigte 0,450
+Siege, 1,200 volle Spalten und 55,0 Punkte. n=20 ist unter jeder
+Aussagekraft und wird durch den vollen Lauf ersetzt, nicht ergaenzt.
+
+## par.11 Rundenabhaengige Spalten-Gewichte (`V2HuellePhase`, VORREGISTRIERT 2026-08-25)
+
+**Anlass ist eine EXTERNE Quelle, keine eigene Messung.** Rzepecki 2025
+(Wroclaw, `docs/Rzepecki2025ImplementingSuperhuman.pdf`, von der
+Parallelsitzung im Volltext gelesen, von mir NICHT nachgeprueft) beschreibt
+einen Azul-Agenten auf Platz 1 beider BGA-Ranglisten. Zwei Punkte daraus sind
+fuer diesen Strang einschlaegig:
+
+1. Seine beste Handheuristik fuehrt die Spaltenvollendung als eigenen
+   POTENZIAL-Term ("the biggest potential of completing a yet not completed
+   column"), nicht als Punktesumme. Das stuetzt par.9.1/9.2 von der anderen
+   Seite: eine Punktesumme ist dort gemessen negativ.
+2. Seine Koeffizienten haengen von der Spielphase ab, und die Spalten-Terme
+   tragen ihr HOECHSTES Gewicht in den mittleren Runden.
+
+Meine Zielkarte ist heute rundenkonstant; rundenabhaengig ist nur die
+Eskalation der linearen Zusatzterme (`ESKALATION`). Punkt 2 ist damit eine
+billige Variation mit externer Stuetze.
+
+**Gebaut:** `plate_builder::SPALTEN_PHASE = [1,0 / 1,4 / 1,4 / 1,0 / 1,0]` als
+Faktor auf die Grundstufen von Prio 3 und Prio 4, je Runde. Zellen, die die
+Prio-5-Auflage angehoben hat, bleiben unberuehrt -- sonst verschoebe der
+Faktor zwei Bausteine zugleich.
+
+**Uebernommen ist die FORM, nicht der WERT.** Die Quelle ist anderes Spiel
+(Azul-Grundspiel), andere Suchtiefe, andere Termmenge; ihre Koeffizienten sind
+hier nicht uebertragbar. `1,4` ist eine SETZUNG.
+
+**Messung:** `V2Huelle` gegen `V2HuellePhase`, Aufbau wie par.8.4 (je 80
+gepaarte Partien, beide Sitze, 150 Sims, Seed 20260825, Bloecke zu 16).
+
+**Entscheidungsmass:** volle Spalten je Partie, gepaart, Block-Ebene.
+**Waechter:** Vollendungsquote >= 0,53.
+
+**Erwartung, ausdruecklich als schwach markiert:** ich habe keine eigene
+Vorhersage mit Begruendung. Die letzten zwei Vorhersagen in diesem Strang
+waren im Vorzeichen falsch (par.9.1, par.9.2); eine dritte Vermutung ohne
+neuen Beleg waere Rauschen. Der Lauf ist ein Test der externen Form, nicht
+meiner Ursachenkette.
+
+## par.12 Vollendbarkeit als FILTER auf der Zielkarte (VORREGISTRIERT 2026-08-25)
+
+**Anlass.** `docs/research_heuristics_external.md` §4.5 und Kandidat 1: die
+Planungsliteratur baut Heuristiken durch Vereinfachen und exaktes Loesen der
+Vereinfachung (Delete-Relaxation), und §4.4 sagt, dass Wissen ueber die
+ZUGFILTERUNG staerker wirkt als ueber Bewertungsterme. Beides zusammen zeigt
+auf eine Luecke, die im eigenen Code offen liegt.
+
+**Die Luecke, geprueft.** `column_build::cell_is_completable` und
+`column_is_completable` existieren und pruefen genau die Relaxation "reicht
+die Restversorgung dieser Farbe noch?". Benutzt werden sie heute in
+`points_heatmap`/`expected_points_map` (beide gemessen negativ) und im
+Sicherheitsnetz des Spaltenbauers (Default aus). **Die Prio-Leiter selbst
+filtert nicht:** `target_map` vergibt Prio 3 und 4 an eine Randspalte, ohne je
+zu pruefen, ob sie noch vollendbar ist -- und ab Runde 3 nagelt
+`v2_envelope_target` die Orientierung am Fuellstand fest, also womoeglich auf
+eine tote Spalte.
+
+**Was gebaut wird.** Eine Auflage auf `target_map`, die Zellen mit
+`!cell_is_completable(...)` auf 0 setzt, und eine Orientierungswahl, die eine
+nachweislich unvollendbare Randspalte nicht mehr festnagelt. Beides nutzt die
+vorhandenen, gegen die Engine verifizierten Funktionen -- kein neuer
+Erreichbarkeitsbegriff.
+
+**Messung:** `V2Huelle` gegen `V2HuelleFilter`, Aufbau wie par.8.4 (je 80
+gepaarte Partien, beide Sitze, 150 Sims, Seed 20260825, Bloecke zu 16).
+
+**Entscheidungsmass:** volle Spalten je Partie, gepaart, Block-Ebene.
+**Waechter:** Vollendungsquote >= 0,53.
+
+**Vorab benanntes Risiko, damit es hinterher nicht als Erklaerung nachgereicht
+wird:** der Filter kann in Runde 4-5 zu viel wegschneiden. Die Festnagelung
+ab Runde 3 war der Bauschritt, der die Partien mit voller Spalte von 35 auf 50
+Prozent hob; ein Filter, der die Zielspalte spaet noch wechseln laesst, kann
+genau diesen Gewinn zurueckdrehen. Faellt der Arm negativ aus, ist die erste
+Gegenprobe deshalb ein Filter, der NUR in Runde 1-3 greift -- und die ist dann
+ein EIGENER Arm, keine Nachbesserung an diesem.
+
+**Keine Vorhersage.** Zwei Vorhersagen in diesem Strang waren im Vorzeichen
+falsch (par.9.1, par.9.2). Ich registriere hier keine dritte.

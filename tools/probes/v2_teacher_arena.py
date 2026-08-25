@@ -125,11 +125,40 @@ def gepaart(diffs):
     return dict(n_partien=len(diffs), n_bloecke=len(bl), avg=round(m, 4), t=round(tv, 2))
 
 
+# par.8.5: derselbe Aufbau, aber mit waehlbarer v2-Variante. Vorgabe `v2` ist
+# der Bestandslauf der Messkette Schritt 3.
+VARIANTE = "v2"
+if "--variante" in sys.argv:
+    VARIANTE = sys.argv[sys.argv.index("--variante") + 1]
+    OUT_JSON = OUT_JSON.with_name(f"v2_teacher_arena_{VARIANTE}.json")
+SEED_LIMIT = int(sys.argv[sys.argv.index("--seeds") + 1]) if "--seeds" in sys.argv else None
+
+
+# Seeds in Stuecken fahren, damit ein langer Lauf ABLESBAR ist (CLAUDE.md:
+# "Lange Laeufe nie in eine Pipe" -- die andere Haelfte derselben Lehre ist,
+# dass eine Sonde ohne Fortschrittszaehler auch bei sauberem Start blind ist).
+# Die Stueckelung aendert nichts am Ergebnis: jede Partie haengt allein an
+# ihrem Seed, die Teillisten sind disjunkt und werden der Reihe nach
+# aneinandergehaengt.
+CHUNK = 40
+
+
 def lauf(fn, seeds, label):
     print("  " + label + " ...", file=sys.stderr, flush=True)
-    roh = fn(MODELL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, n_games=len(seeds),
-             seed=0, num_threads=THREADS, log_games=True, seeds=seeds)
-    return json.loads(roh)
+    extra = {"variante": VARIANTE} if fn is mr.net_vs_heuristic_v2_arena else {}
+    alle = []
+    for i in range(0, len(seeds), CHUNK):
+        teil = seeds[i:i + CHUNK]
+        roh = fn(MODELL, net_sims=NET_SIMS, heur_sims=HEUR_SIMS, n_games=len(teil),
+                 seed=0, num_threads=THREADS, log_games=True, seeds=teil, **extra)
+        alle += json.loads(roh)
+        siege = sum(1 for sp in alle if sp["winner"] == 1 - sp["net_board"])
+        pkt_h = sum(sp["scores"][1 - sp["net_board"]] for sp in alle) / len(alle)
+        pkt_n = sum(sp["scores"][sp["net_board"]] for sp in alle) / len(alle)
+        print("    [%s] %d/%d Partien | Heuristik-Siege %.3f | Punkte %.1f gegen %.1f"
+              % (label, len(alle), len(seeds), siege / len(alle), pkt_h, pkt_n),
+              file=sys.stderr, flush=True)
+    return alle
 
 
 def evaluate(spiele, heur_label):
@@ -158,10 +187,12 @@ def evaluate(spiele, heur_label):
 
 def main():
     seeds = [int(z) for z in SEEDS_DATEI.read_text().split() if z.strip()]
+    if SEED_LIMIT:
+        seeds = seeds[:SEED_LIMIT]
     print("%d Kampagnen-Seeds, Netz@%d gegen Heuristik@%d"
           % (len(seeds), NET_SIMS, HEUR_SIMS), file=sys.stderr, flush=True)
 
-    v2 = evaluate(lauf(mr.net_vs_heuristic_v2_arena, seeds, "v2 als Lehrer"), "HeuristikV2")
+    v2 = evaluate(lauf(mr.net_vs_heuristic_v2_arena, seeds, f"{VARIANTE} als Lehrer"), "HeuristikV2")
     v1 = evaluate(lauf(mr.net_arena_match, seeds, "v1 als Bezug (dieselben Seeds)"), "HeuristikV1")
 
     ergebnis = {"v2_lauf": v2, "v1_bezug": v1,

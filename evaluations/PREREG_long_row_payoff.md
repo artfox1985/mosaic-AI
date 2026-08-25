@@ -495,6 +495,28 @@ das Intervall schliesst die Null aus, und keine einzige Stellung bewegt
 sich gegen die Absicht. Die Masse kommt erkennbar aus der Kurzreihen-
 Initiierung (-0,00083, ebenfalls null-ausschliessend).
 
+**NACHTRAG 2026-08-25: das Tor wurde ueber RUNDE 1 gemessen, nicht ueber die
+Partie.** Aufgefallen im Sonden-Audit der Parallelsitzung, von mir am Artefakt
+und am Code nachgeprueft: `long_row_init_knob_effect.json` traegt
+`je_runde = {"1": {"n": 240}}` -- alle 240 Stellungen liegen in Runde 1.
+Ursache ist die Sammelstelle (`long_row_init_knob_effect.py:89-103`): sie
+nimmt je Datei die ERSTEN `cap_per_file` qualifizierenden Datensaetze, und die
+Datensaetze stehen in Zugreihenfolge. Bei kleinem Deckel und frueh haeufigem
+Kriterium fuellt sich die Stichprobe damit ausschliesslich mit
+Eroeffnungsstellungen.
+
+Das ist ein Artefakt der SAMMLUNG, nicht des Spiels, und es ist nicht generell:
+dieselbe Form in `long_row_prior_gate.py:193-221` beisst NICHT (je_runde
+12/105/82/61), weil ihr Deckel 25 statt 3 betraegt. Die Falle haengt am
+Verhaeltnis Deckel zu Trefferdichte.
+
+**Was das aendert und was nicht.** Die drei Einschraenkungen unten gelten
+unveraendert; die Zahlen sind korrekt gerechnet. Was sich aendert, ist ihre
+REICHWEITE: "das Tor ist bestanden" heisst ab jetzt "in Runde 1 bestanden",
+und ob der Knopf in Runde 2-4 dasselbe tut, ist ungemessen. Das Endverdikt von
+B1 (Staerke verloren, `par.6`) ist davon unberuehrt -- es kam aus 80 vollen
+Arena-Partien, nicht aus dieser Sonde.
+
 **Drei Einschraenkungen, die zum Ergebnis gehoeren:**
 
 1. **Der Effekt ist winzig.** Der Besuchsanteil auf Initiierung langer
