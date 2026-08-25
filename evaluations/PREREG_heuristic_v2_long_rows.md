@@ -811,14 +811,44 @@ fertig und nur abgeschaltet. Was fehlt, ist nicht der Mechanismus, sondern
    voraus, was plattenblindes Spiel erreicht, und routet in die eigene
    Schwaeche ([[feedback_dont_calibrate_to_plate_blind_play]]);
 2. `OWNERSHIP_WEIGHT > 0`;
-3. die KURVE statt der Treppe -- eine Verfeinerung, nicht die Hauptsache.
+3. die HUELLEN-GEWICHTUNG (Option a) -- nach der Berichtigung unten kein
+   Beiwerk, sondern die Stelle, an der Randbedingung und Vorhersage
+   zusammenkommen;
+4. die KURVE statt der Treppe -- eine Verfeinerung, nicht die Hauptsache.
 
-**Und es entscheidet die alte Streitfrage aus Nachtrag (2)/(6):** die
-Dreiecksabweichung ist gegen dieselbe FESTE Karte gerechnet wie die
-Routing-Huelle und hat damit denselben Mangel -- kein Weitblick, nur Geometrie.
-Der Ownership-Kopf sagt dagegen DIESE Partie voraus. Er ist deshalb der
-richtige Traeger, und das Umlabeln auf die Dreiecksform waere ein Rueckschritt
-gewesen, nicht nur ein Informationsverlust.
+**BERICHTIGUNG am selben Tag (Nutzer: *"die routing huelle im tiling ist schon
+gut"*).** Der Absatz oben warf Huelle und Dreiecksabweichung in einen Topf --
+"feste Karte, kein Weitblick". Das ist falsch, und der Unterschied ist die
+ROLLE, nicht die Festigkeit:
+
+| Rolle derselben Geometrie | Wert |
+| --- | --- |
+| Huelle als ROUTING-ZIEL (wohin zielen) | **strukturelle Identitaet**: eine volle Spalte kostet 1+2+3+4+5+6 = 21 Zellen, *unabhaengig davon, wie geschickt platziert wird* (par.1 dieser Prereg, `row_supply_ceiling_probe.py`). Gilt in JEDER Stellung; gemessen 0,798 gegen 0,086 |
+| Dreiecksabweichung als VORHERSAGE-ZIEL (was wird belegt) | Umkodierung von "belegt", traegt nichts bei (Nachtrag 2) |
+
+**Die Huelle sagt nichts voraus -- sie kodiert eine Randbedingung.** Deshalb
+braucht sie keinen Weitblick: sie behauptet nichts ueber die Zukunft, sondern
+beschreibt, was ueberhaupt moeglich ist. Ein Netz muesste die 21-Zellen-
+Identitaet aus Daten rekonstruieren; sie hinzuschreiben ist billiger und
+sicherer.
+
+**Huelle und Ownership-Kopf sind damit KOMPLEMENTAER, nicht alternativ:**
+
+* die **Huelle** sagt, WO zu zielen ist -- strukturell, immer gueltig;
+* der **Ownership-Kopf** sagt, WAS DAVON in dieser Partie fertig wird --
+  gelernt, stellungsspezifisch, genau der Weitblick, den die Huelle nicht hat.
+
+**Das ist exakt Option (a), die Huellen-Gewichtung** (Nachtrag 6): die
+Loss-Maske auf die 21 Huellen-Zellen konzentrieren. Die Huelle lenkt die
+Kapazitaet, der Kopf sagt darin voraus. Sie ist damit **nicht** die
+nachrangige Verfeinerung, als die der Absatz oben sie einordnet, sondern der
+Kern der Kombination.
+
+**Und der Vorschlag, dem NETZ-Pfad die Routing-Huelle zu geben** (heute
+verworfen mit "kein Weitblick"), steht damit wieder: das ist kein Tausch einer
+Handregel gegen eine andere, sondern das Mitgeben einer Randbedingung, die
+immer stimmt. Er bleibt ein eigener Arm mit Default AUS, weil er den Elo-Anker
+beruehrt.
 
 **Was das fuer die Reihenfolge heisst:** die Huellen-Gewichtung (Option a)
 bleibt sinnvoll als KAPAZITAETS-Lenkung -- sie schaerft den Kopf dort, wo es
