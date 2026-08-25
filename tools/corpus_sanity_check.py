@@ -101,5 +101,30 @@ def auswerten(verzeichnis):
 if __name__ == "__main__":
     if len(sys.argv) < 2:
         raise SystemExit("Aufruf: python -X utf8 tools/corpus_sanity_check.py <verzeichnis> ...")
-    for v in sys.argv[1:]:
-        auswerten(v)
+    import json
+    import pathlib
+    import time
+
+    t0 = time.time()
+    ergebnisse = [auswerten(v) for v in sys.argv[1:]]
+    wand = time.time() - t0
+    print(f"\nLaufzeit {wand:.1f} s")
+
+    # Laufzeit ins eigene Artefakt (CLAUDE.md, Nutzer-Anweisung 2026-08-25) --
+    # beim ersten Bau dieses Werkzeugs vergessen, am selben Tag nachgetragen.
+    erg = {"arme": ergebnisse,
+           "laufzeit": {"wanduhr_s": round(wand, 1),
+                        "cpu_s": round(time.process_time(), 1),
+                        "threads": 1,
+                        "s_je_partie": None}}
+    ziel = pathlib.Path("evaluations/artifacts/corpus_sanity_check.json")
+    ziel.parent.mkdir(parents=True, exist_ok=True)
+    for _ in range(5):
+        try:
+            ziel.write_text(json.dumps(erg, indent=2, ensure_ascii=False),
+                            encoding="utf-8", newline="\n")
+            print(f"Artefakt: {ziel}")
+            break
+        except OSError as e:
+            print("Retry:", e, flush=True)
+            time.sleep(1)

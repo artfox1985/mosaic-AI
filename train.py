@@ -12,6 +12,7 @@ except Exception:
 import torch
 import math
 import glob
+import time
 import json
 import re
 import subprocess
@@ -485,6 +486,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Lauf-Manifest + Korpus-Log (#64 Teil 2) -- siehe Funktionskommentare
     # oben. Additiv, rührt die train_file_limit-Logik unten nicht an.
     _run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    _t_start_train = time.time()
+    _t_daten_fertig = None
     _cli_args = {
         "name": version_name, "load": load_version, "epochs": input_epoch, "hidden": hidden_size,
         "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
@@ -576,6 +579,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
               f"+ Flach-Zweig auf state_to_tensor)")
     dataset = MosaicDataset(str(DATA_DIR), files=train_files, value_target_variant=value_target_variant,
                             encoder=encoder, conjunction_head=conjunction_head)
+    _t_daten_fertig = time.time()
+    print(f"⏱️  Datenaufbau: {_t_daten_fertig - _t_start_train:.1f}s "
+          f"({len(dataset)} Zustaende aus {len(train_files or [])} Dateien)")
     if len(dataset) == 0:
         print(f"❌ Fehler: Keine Daten im Ordner '{DATA_DIR}' gefunden!")
         return
@@ -921,7 +927,9 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # Projekt Engpass 2, ein Lauf belegt 15-19 GB von 32. 0 = aus.
     _mem_log_every = int(os.environ.get("MOSAIC_MEM_LOG_EVERY", "2000"))
 
+    epoch_count_done = 0
     for epoch in range(epochs):
+        epoch_count_done = epoch + 1
         t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
         t_opp_pointsloss = 0  # Task #28: nur != 0 relevant, wenn opp_points_head aktiv
         t_endgameloss = 0  # Schema 18: nur != 0 relevant, wenn endgame_head aktiv
@@ -2003,6 +2011,23 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         print("💾 Modell-Snapshot uebersprungen (--no-snapshot): fuer Ablations-/Sweep-Laeufe, "
               "deren Checkpoints per --seed reproduzierbar und keine Champions sind. "
               "Ein Snapshot je Lauf zippt den GESAMTEN models/-Ordner (>140 MB).")
+
+    # 9. Laufzeit ins Manifest (CLAUDE.md, Nutzer-Anweisung 2026-08-25). Bis
+    #    dahin hielt es nur den START-Zeitstempel; die Dauer stand allein auf
+    #    stdout. `datenaufbau_s` ist hier eigens getrennt, weil genau dieser
+    #    Teil am 2026-08-25 ueber eine Stunde ohne Fortschrittsausgabe lief und
+    #    niemand sagen konnte, ob er arbeitet oder haengt.
+    from train_manifest import append_train_laufzeit
+    append_train_laufzeit(version_name, _run_timestamp, {
+        "wanduhr_s": round(time.time() - _t_start_train, 1),
+        "cpu_s": round(time.process_time(), 1),
+        "datenaufbau_s": round(_t_daten_fertig - _t_start_train, 1)
+        if _t_daten_fertig is not None else None,
+        "threads": torch.get_num_threads(),
+        "device": str(device),
+        "epochen": epoch_count_done,
+        "samples": len(dataset) if dataset is not None else None,
+    })
 
 
 def _snapshot_models_to_backup(version_name: str) -> None:
