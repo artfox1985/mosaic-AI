@@ -71,7 +71,17 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
    `--seed-positions` ist auf `--mode network` beschraenkt, und der
    mcts-Einstieg kennt `seed_positions_path` gar nicht -- kein blosser
    Waechter.
-3. **NACH dem Korpus wieder aufzunehmen**: die Blindzieh-Spur. Der Knopf
+3. **Fuer v23 anzuschauen** (aus dem BESTAND, keine neuen Preregs):
+   `PREREG_v22_window.md` par.4 -- die Traegerfrage (Vorzugs-Records im
+   Policy-Verlust: ja oder nein), Entscheidungsmass dort vorab festgelegt;
+   `PREREG_heuristic_v2_long_rows.md` par.3b -- Ownership-Kopf plus
+   w0-Kontrollarm auf DEMSELBEN Korpus, sonst sind Kopf und Korpuswechsel
+   konfundiert; `PREREG_plate_policy_supervision.md` -- bekommt durch v22
+   erstmals seine Label-Quelle, weil 61,8 Prozent der Zuege genau das Label
+   "dieser Zug baut die Spalte" tragen. Reihenfolge fuer v23: Fenster steht
+   (par.2) -> Traeger-A/B -> Ownership + w0 auf dem gewaehlten Traeger ->
+   gaten.
+4. **NACH dem Korpus wieder aufzunehmen**: die Blindzieh-Spur. Der Knopf
    bleibt bis dahin AUS (auch waehrend der Erzeugung -- den Korpus unter der zu
    validierenden Regel zu erzeugen waere zirkulaer). Die Wiedervorlage haengt an
    ZWEI Bedingungen, beide in `PREREG_stack_draw_reservation_rule.md` par.5e:

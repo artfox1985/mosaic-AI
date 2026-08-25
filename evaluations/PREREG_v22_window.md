@@ -1,29 +1,104 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten (Zwei-Klassen-Rotation, 29.450 Partien, stationaere Rotationsregel ab v22)? | Beleg: OFFEN, angelegt 2026-08-08 als reines Design-Dokument auf Halde (Nutzer-Entscheid 2026-08-08 im Kasten am Dateianfang: kein v22-Self-Play vor Abarbeitung der v21-Task-Queue); Zuschnitt fixiert, damit er nicht neu diskutiert werden muss. Bisher bewusst nicht im Index gefuehrt, seit der Generator-Umstellung mit aufgenommen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: NEU GEFASST 2026-08-25, der Zuschnitt von 2026-08-08 ist HINFAELLIG -- er war fuer einen NETZ-Erzeuger mit Zwei-Klassen-Rotation ueber drei Generationen gebaut (29.450 Partien), v22 ist ein HEURISTIK-Erzeuger (v2huelle), EINE Klasse, KEIN Altbestand (Nutzer 2026-08-25). Gueltiger Zuschnitt: 24.000 Partien, ~4,18 Mio Zustaende, ~37 GB, ein Lauf mit Seed 20260826, Praefix hv2. Die Rotationsregel ab v22 ist ebenfalls hinfaellig: v22 ist ein Schnitt, keine Rotationsstufe. OFFEN als vorregistrierter Arm INNERHALB dieses Zuschnitts ist allein die TRAEGERFRAGE -- 61,8 Prozent der Draftingzuege mit echter Wahl tragen policy_target_valid=false (v2-Vorzug); ob der Policy-Kopf sie sieht, entscheidet ein gepaartes Trainingspaar auf DEMSELBEN Korpus, Entscheidungsmass vorab festgelegt (par.4). Der Bootstrap-Horizont-Wecker ist erledigt: Horizont 2, PREREG_bootstrap_horizon.md par.9f. -->
 
-# Vorregistrierung: v22-Fenster (Nutzer-Zuschnitt 2026-08-08)
+# Vorregistrierung: v22-Fenster
 
-**Angelegt VOR der v22-Generierung.** Zuschnitt vom Nutzer festgelegt;
-der juengste Value-Posten ist eine bewusste Nutzer-Entscheidung (siehe
-"Begruendung" unten).
+**Neu gefasst am 2026-08-25**, unmittelbar vor und waehrend der Erzeugung.
+Der Zuschnitt von 2026-08-08 steht unten als Altstand und ist NICHT mehr
+gueltig; seine Begruendung zum Schwarm-Anteil wird aufgehoben, weil sie
+wieder greift, sobald Netz-Self-Play zurueckkehrt.
 
-> **NICHT EINGEPLANT (Nutzer-Entscheid 2026-08-08): "v22 laesst du mal
-> weg. keine self plays in die richtung. als erstes v21 tasks
-> abarbeiten."** Dieses Dokument ist damit ein reines DESIGN-Dokument
-> auf Halde -- es wird NICHT ausgefuehrt, solange die v21-Task-Queue
-> (B, A, E3b, ISMCTS-k, D) nicht abgearbeitet ist. Kein
-> v22-Self-Play, keine Generierung, keine Vorbereitung. Der Zuschnitt
-> ist festgehalten, damit er nicht neu diskutiert werden muss, wenn der
-> Zeitpunkt kommt.
+## par.1 Warum der alte Zuschnitt hinfaellig ist
 
-> **WECKER VOR DER ERSTEN v22-PARTIE (nachgetragen 2026-08-21, Nutzer-
-> Freigabe):** `PREREG_bootstrap_horizon.md` ist NUR am Generierungsstart
-> ausfuehrbar (Horizont steckt in den Records, nicht im Cache-Key).
-> VOR der ersten v22-Self-Play-Partie: deren Stufe 1 fahren (Doppel-Label
-> Horizont 2+3 in denselben Record schreiben, Kostengate <= +25 %).
-> Wird das uebersehen, ist die Frage wieder eine volle Generation
-> verschoben -- dasselbe Vergiss-Muster wie bei
-> `PREREG_chance_nodes.md` Entscheidungsregel 4 (zweimal passiert).
-> Am Fensterzuschnitt selbst aendert das NICHTS.
+Drei Praemissen sind weggefallen, alle drei ohne Zutun dieses Dokuments:
+
+1. **Der Erzeuger ist nicht mehr das Netz.** v22 wird von der Heuristik
+   `v2huelle` erzeugt, nicht vom v21-Champion. Grund: der Champion vollendet
+   keine Spalten (0,050 je Partie), der Lehrer schon (0,741). Ohne
+   Spaltenvollendungen im Korpus hat der Value-Kopf nie gesehen, was eine
+   Spalte wert ist.
+2. **Es gibt keine zwei Klassen mehr.** `--value-only` existiert nur unter
+   `--mode network` (`self_play.py:732`); im Heuristik-Modus ist es nicht
+   verfuegbar. Sockel und Schwarm lassen sich also nicht mehr ueber die
+   ERZEUGUNG trennen. Das ist kein Verlust: die Traeger-Auswahl geschieht
+   ohnehin erst beim Training ueber die Manifeste.
+3. **Kein Altbestand** (Nutzer-Entscheid 2026-08-25). Der gesamte Altbestand
+   stammt aus plattenblindem Spiel -- genau der Verteilung, die v22 ersetzen
+   soll. Damit entfaellt die Rotationsmechanik: **v22 ist ein Schnitt, keine
+   Rotationsstufe.** Die "stationaere Rotationsregel ab v22" unten ist
+   gegenstandslos.
+
+## par.2 Gueltiger Zuschnitt
+
+| | |
+|---|---|
+| Erzeuger | Heuristik `v2huelle` + Champion-Labels (`alphazero_v21_2d_brierbest.onnx`) |
+| Aufruf | `--mode mcts --heuristik-variante v2huelle --sims 600 --threads 11 --version hv2 --per-file 10` |
+| Partien | **24.000**, ein Lauf, Seed 20260826 |
+| Bootstrap-Horizont | **2** (`PREREG_bootstrap_horizon.md` par.9f) |
+| Blindzieh-Knopf | **AUS** (`PREREG_stack_draw_reservation_rule.md` par.5d) |
+| Zustaende | ~4,18 Mio (174,2 Records je Partie, gemessen) |
+| Plattenplatz | ~37 GB (308 MB je 200 Partien, gemessen) |
+| Altbestand | **keiner** |
+
+**Warum 24.000:** Volumen ist ein gemessener Hebel (Dosis-Befund 6/6 auf beiden
+Orakelmetriken, arena-bestaetigt 479:321). Die Obergrenze setzt der
+Fenster-Cache: bei ~6 KB je Zustand liegen 4,18 Mio Zustaende bei ~25 GB gegen
+32 GB RAM. 30.000 Partien sprengen das.
+
+## par.3 Was der Korpus enthaelt (gemessen, 270 Partien des laufenden Korpus)
+
+| Kennzahl | `v2huelle` | `v1`-Kontrolle |
+| --- | --- | --- |
+| volle Spalten je Seite | **0,741 ± 0,068** | 0,050 |
+| k1-Punkte / Anteil Partien mit Ertrag | **+5,48 / 55,2 %** | +0,35 / 5,1 % |
+| Strafleistensteine je Partie und Seite | **5,04** | 10,30 |
+| Eigene Punkte | **46,97** | 20,91 |
+| distinkte Brettzustaende (je 200 Partien) | **6.164** | 6.008 |
+
+Struktur-Abnahme bestanden: zero-mask 0, policy leak 0,000000, keine NaN/Inf,
+0 abgeschnittene Partien, alle Partien erreichen Runde 5.
+
+## par.4 OFFENER ARM: traegt der Vorzug Policy? (vorregistriert, nicht gefahren)
+
+**61,8 Prozent** der Draftingzuege mit echter Wahl sind Vorzugszuege und
+tragen `policy_target_valid=false`; `neural_net.py:1858` setzt deren
+Policy-Gewicht auf 0. Die Flagge steht JE RECORD -- die Entscheidung ist
+deshalb NICHT im Korpus zementiert, sondern ein Trainings-Schalter.
+
+Beide Lesarten sind ernsthaft:
+
+* **Flagge achten**: der Policy-Kopf sieht nur die ~38 Prozent such-getriebenen
+  Zuege. Er lernt das Routing nicht, aber auch nicht das Routing OHNE das
+  Urteil dahinter.
+* **Flagge ignorieren**: klassische Verhaltensklonung des Lehrers -- genau das,
+  wofuer ein Lehrer-Korpus da ist. Preis: das Ziel ist auf 62 Prozent der
+  Zuege eine reine Eins.
+
+**Aufbau:** zwei identische Trainings auf DEMSELBEN Korpus, ein Schalter
+Unterschied, gepaarte Seeds (>= 6, Seed-Varianz-Regel).
+
+**Entscheidungsmass, VORAB festgelegt** (Regel: das Mass wird vor dem Lauf
+benannt): `prior_mass_on_oracle_top3` und `kendall_tau`. Begruendung fuer
+genau diese: sie sind im Regime "gleiche Architektur, verschiedene Daten"
+**7/7** Arena-Praediktoren -- und dieses Regime liegt hier exakt vor.
+`policy_top3` ist AUSGESCHLOSSEN (zeigte 6/6 auf den VERLIERER),
+`value_r2_rounds_1_4` ebenfalls (unterhalb ~0,015 Abstand 0/3).
+Bei Gleichstand beider Orakelmetriken entscheidet die gepaarte Arena.
+
+## par.5 Was an die Stelle der Rotationsregel tritt
+
+Nichts -- vorerst mit Absicht. v22 ist ein Schnitt: das Fenster besteht aus
+genau einem Korpus. Eine Rotationsregel wird erst wieder gebraucht, wenn es
+eine zweite Generation im selben Regime gibt; sie dann aus dem Altstand unten
+zu uebernehmen waere falsch, weil der fuer ZWEI Erzeugungsklassen geschrieben
+ist, die es im Heuristik-Modus nicht gibt.
+
+---
+
+# ALTSTAND (2026-08-08) -- NICHT GUELTIG
+
+Aufgehoben wegen der Schwarm-Anteils-Begruendung, die wieder greift, sobald
+Netz-Self-Play zurueckkehrt. Der Zuschnitt selbst ist durch par.2 ersetzt.
 
 ## Fenster (29.450 Partien, 2.945 Dateien -- identische Form wie v21)
 
