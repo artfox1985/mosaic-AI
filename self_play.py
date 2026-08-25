@@ -35,6 +35,7 @@ except Exception:
     pass
 
 from config import DATA_DIR, MODELS_DIR, BASE_DIR
+from selfplay_manifest import _write_run_manifest, _append_laufzeit
 
 # GPU-Inferenzpfad (PREREG_gpu_inference_path.md §19, Nutzer-Auftrag 2026-08-13):
 # das mit `--features ort_cuda_probe` gebaute Wheel bringt den ORT-CUDA-
@@ -360,72 +361,6 @@ def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> N
     print(f"💾 {len(steps)} Züge gespeichert in '{filename}'")
 
 
-# ── Lauf-Manifest (#64 Teil 1, Phase 2a, 2026-07-22) ─────────────────────────
-# Ein Self-Play-Lauf soll rückwirkend rekonstruierbar sein: welche CLI-Args,
-# welcher Rust-Commit-Stand, welche aktiven Suchkonstanten haben DIESE Daten
-# erzeugt -- ohne den Rust-Quellcode zum jeweiligen Stand extra auschecken zu
-# müssen. Alles hier best-effort (git/engine_config_json können fehlen, z.B.
-# in einem isolierten Wheel-Export ohne .git oder mit altem Wheel ohne die
-# neue pyo3-Funktion) -- ein Manifest-Fehler darf den eigentlichen
-# Self-Play-Lauf NIE verhindern.
-
-def _git_commit_hash() -> str | None:
-    """Best-effort HEAD-Commit-Hash. None, wenn nicht ermittelbar."""
-    import subprocess
-    try:
-        out = subprocess.run(
-            ["git", "rev-parse", "HEAD"], cwd=str(BASE_DIR),
-            capture_output=True, text=True, timeout=5, check=True,
-        )
-        return out.stdout.strip()
-    except Exception:
-        return None
-
-
-def _git_is_dirty() -> bool | None:
-    """Best-effort: gibt es uncommittete Änderungen im Arbeitsbaum? None,
-    wenn nicht ermittelbar -- wichtig fürs Manifest, sonst sieht ein Lauf
-    gegen einen unsauberen Stand fälschlich wie ein sauberer Commit aus."""
-    import subprocess
-    try:
-        out = subprocess.run(
-            ["git", "status", "--porcelain"], cwd=str(BASE_DIR),
-            capture_output=True, text=True, timeout=5, check=True,
-        )
-        return bool(out.stdout.strip())
-    except Exception:
-        return None
-
-
-def _engine_config() -> dict:
-    """Aktive Rust-Suchkonstanten, siehe `mosaic_rust.engine_config_json`
-    (lib.rs). Best-effort: ein altes Wheel ohne diese Funktion (AttributeError)
-    darf das Manifest nicht verhindern, nur diesen Teil leer/fehlerhaft lassen."""
-    try:
-        return json.loads(_mr.engine_config_json())
-    except Exception as e:
-        return {"_error": f"engine_config_json nicht verfügbar: {e!r}"}
-
-
-def _write_run_manifest(version_name: str, run_timestamp: str, cli_args: dict) -> None:
-    """Schreibt `data/manifest_<version>_<timestamp>.json` neben die
-    generierten .pkl-Dateien."""
-    manifest = {
-        "version": version_name,
-        "run_timestamp": run_timestamp,
-        "cli_args": cli_args,
-        "git_commit": _git_commit_hash(),
-        "git_dirty": _git_is_dirty(),
-        "engine_config": _engine_config(),
-    }
-    path = DATA_DIR / f"manifest_{version_name}_{run_timestamp}.json"
-    try:
-        with open(path, "w", encoding="utf-8") as f:
-            json.dump(manifest, f, indent=2, ensure_ascii=False)
-        print(f"📝 Lauf-Manifest geschrieben: '{path}'")
-    except Exception as e:
-        print(f"  ⚠️  Manifest konnte nicht geschrieben werden ({e!r}) -- Self-Play läuft trotzdem weiter.")
-
 
 def generate_data(mode: str, num_games: int, simulations: int, version_name: str,
                   tag: str = None, threads: int = 0, chunk: int = 10, seed: int = None,
@@ -661,7 +596,25 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         if buffer:   # Rest (< per_file Spiele) sichern
             _flush(buffer, version_name, tag, done)
 
-        print(f"\n✅ Fertig: {num_games} Spiele, {total_steps} Züge nach {time.time() - t_start:.1f}s")
+        _wanduhr = time.time() - t_start
+        print(f"\n✅ Fertig: {num_games} Spiele, {total_steps} Züge nach {_wanduhr:.1f}s")
+        # cpu_s: die Partien laufen in `mp.Process`-KINDERN, `time.process_time()`
+        # misst aber nur diesen Prozess -- eine Zahl daraus waere um eine
+        # Groessenordnung zu klein. `os.times()` fuehrt Kinderzeiten, auf Windows
+        # aber als 0. Also nur eintragen, wo sie wirklich gemessen ist, sonst
+        # None. Eine plausible falsche Zahl ist schlechter als eine fehlende.
+        _t = os.times()
+        _kinder = _t.children_user + _t.children_system
+        _append_laufzeit(version_name, run_timestamp, {
+            "wanduhr_s": round(_wanduhr, 1),
+            "cpu_s": round(_kinder + _t.user + _t.system, 1) if _kinder > 0 else None,
+            "cpu_s_hinweis": None if _kinder > 0 else
+                "nicht gemessen: os.times() fuehrt auf dieser Plattform keine Kinderzeiten",
+            "threads": threads,
+            "s_je_partie": round(_wanduhr / max(1, done), 3),
+            "partien": done,
+            "zuege": total_steps,
+        })
     finally:
         _allow_system_sleep()
 

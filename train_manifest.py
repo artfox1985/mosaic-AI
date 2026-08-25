@@ -170,6 +170,29 @@ def corpus_composition(all_files: list[str]) -> list[dict]:
     return composition
 
 
+def append_train_laufzeit(version_name, run_timestamp, laufzeit) -> None:
+    """Traegt den `laufzeit`-Block NACHTRAEGLICH ins Trainings-Manifest ein.
+
+    CLAUDE.md, Nutzer-Anweisung 2026-08-25: jeder Messlauf schreibt seine Dauer
+    in sein EIGENES Artefakt. Bis 2026-08-25 hielt das Manifest nur
+    `run_timestamp`, also den Start -- die Dauer stand allein auf stdout und
+    war nach dem Lauf verloren. Anders als beim Self-Play laeuft das Training
+    im selben Prozess, `cpu_s` ist hier also echt messbar.
+    """
+    path = MODELS_DIR / f"manifest_train_{version_name}_{run_timestamp}.json"
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        manifest["laufzeit"] = laufzeit
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2, ensure_ascii=False)
+        print(f"⏱️  Laufzeit ins Manifest nachgetragen: {laufzeit['wanduhr_s']:.1f}s "
+              f"(davon Datenaufbau {laufzeit.get('datenaufbau_s', float('nan')):.1f}s, "
+              f"{laufzeit.get('epochen', '?')} Epochen)")
+    except Exception as e:
+        print(f"  ⚠️  Laufzeit konnte nicht nachgetragen werden ({e!r}).")
+
+
 def write_train_manifest(version_name, cli_args, corpus_composition, run_timestamp,
                           policy_carriers=None) -> None:
     """Schreibt `models/manifest_train_<name>_<timestamp>.json` und loggt die
