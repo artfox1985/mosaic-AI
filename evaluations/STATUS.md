@@ -385,7 +385,7 @@ in `PREREG_v22_window.md`). Daraus folgt fuer die laufende Kette:
 | dessen Self-Play | fuellt **das v23-Fenster** |
 | daraus trainiert | **v23-Netz** |
 
-Zuschnitt des v23-Fensters ist seit 2026-08-25 festgelegt (`PREREG_v23_window.md`): 29.450 Partien, davon **12.000 aus dem v22-Self-Play** (4.000 Sockel + 8.000 Schwarm `--value-only`) und **17.450 aus hv2** (6.550 rotieren aus). Damit steht auch der Umfang des v22-Self-Play-Laufs fest. Drei offene Punkte dort: G-1/G-2 kommen aus DEMSELBEN Korpus (Platzhalter, keine Aera-Streuung), der Cache liegt mit ~30,1 GB am 32-GB-Anschlag, und die Policy-Ausbeute der hv2-Plaetze haengt an der Traegerfrage.
+Zuschnitt des v23-Fensters ist seit 2026-08-25 festgelegt (`PREREG_v23_window.md`): 29.450 Partien, davon **12.000 aus dem v22-Self-Play** (4.000 Sockel + 8.000 Schwarm `--value-only`) und **17.450 aus hv2** (6.550 rotieren aus). Damit steht auch der Umfang des v22-Self-Play-Laufs fest. Drei offene Punkte dort: G-1/G-2 kommen aus DEMSELBEN Korpus (Platzhalter, keine Aera-Streuung), der Cache ist UNKRITISCH (gemessen 2.806 B je Zustand statt der veralteten 6 KB -> ~14,1 GB gegen 34,3 GB), und die Policy-Ausbeute der hv2-Plaetze haengt an der Traegerfrage.
 
 Der haeufige Fehler ist, das Self-Play, das v23 fuettert, "v23-Self-Play" zu
 nennen. Es ist das **v22**-Self-Play. Am 2026-08-25 einmal passiert und in
