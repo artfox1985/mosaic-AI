@@ -911,6 +911,77 @@ das vorher klaeren: eine Schlagseite von 3:1 kann eine echte
 Brett-Eigenschaft sein oder ein Artefakt einer Handregel, und im zweiten Fall
 wuerde die Huelle sie fortschreiben.
 
+**NACHTRAG 2026-08-25 (9): die Huelle ist die Machbarkeitshuelle der AKTIVEN
+WERTUNG -- und sie muss ein Gewicht bleiben, kein Filter.**
+
+Nutzer 2026-08-25: *"es kann natuerlich manchmal sinnvoll sein aus der huelle
+auszubrechen wenn die joker wertungsplatte aktiv ist um alle jokerplatten zu
+schliessen"* -- gefolgt von zwei weiteren Ausbruchsgruenden, siehe unten.
+
+**Kriterium 3 ist "Mehrfarbige Felder": 2 Punkte je Wildcard-Feld, aber NUR
+wenn ALLE belegt sind** (scoring.rs:45). Alles-oder-nichts. Liegt auch nur ein
+Wild-Feld ausserhalb der Huelle, muss man ausbrechen oder die Platte
+abschreiben.
+
+**Gemessen (270 hv2-Partien, 2026-08-25):**
+
+| Kennzahl | Wert |
+| --- | --- |
+| Partien mit aktivem k3 | **101 von 270 (37 %)** |
+| Wild-Felder je Brett | 4,5 im Mittel (2-7) |
+| davon AUSSERHALB der Huelle | **1,7** im Mittel |
+| Bretter mit mindestens einem ausserhalb | **88-92 %** |
+
+**Aus "manchmal sinnvoll" wird damit "fast immer noetig".** Eine harte Huelle
+wuerde die k3-Platte in gut einem Drittel aller Partien verschenken.
+
+**Der tiefere Haken:** bei einem Alles-oder-nichts-Kriterium ist die MARGINALE
+eines nicht-letzten Feldes ungefaehr null. Der Ownership-Kopf allein wuerde die
+Wild-Investition also nie ANFANGEN -- dieselbe Struktur, aus der die
+Spalten-Schwaeche kommt. Auf die Marginalen zu vertrauen reicht nicht.
+
+**Daraus die verallgemeinerte Fassung:**
+
+```
+Zielset = Huelle (21 Zellen)                    <- Spalten-Identitaet
+        + alle Wild-Felder, wenn k3 aktiv       <- Alles-oder-nichts-Identitaet
+```
+
+Das bleibt STRUKTURELL und ohne Weitblick: welche Platten aktiv sind, steht ab
+Zug 1 fest, die Wild-Positionen stehen auf dem Brett. Dieselbe Sorte Aussage
+wie die 21 Zellen ("das kostet diese Wertung"), nur fuer ein anderes
+Kriterium. Bezahlbar ist es auch: 21 + ~1,7 gegen die 60,9 Zellen, die ein
+Mensch insgesamt verbraucht.
+
+Damit ist die Huelle nicht mehr die "Spalten-Huelle", sondern die
+**Machbarkeitshuelle der AKTIVEN WERTUNG**.
+
+### par.3b.1 Das Gewicht braucht ein Fenster -- und ob es existiert, ist messbar
+
+Nutzer, zwei weitere Ausbruchsgruende: *"es wird immer wieder situationen
+geben wo eine einzelne fliese ausserhalb der huelle platziert wird um keine
+strafpunkte zu bekommen oder die reihe abzuschliessen damit sie frei ist fuer
+die naechste runde"*. Beides sind Ressourcen- und Tempo-Fragen, keine
+Wertungsgeometrie -- und sie begrenzen das Gewicht nach oben.
+
+**`w` braucht zwei Schranken:**
+
+* **Untergrenze:** es muss kleine Sofortpunkte-Unterschiede ueberstimmen
+  koennen, sonst wird nie eine Spalte gebaut -- der Solver naehme immer den
+  punktereicheren Zug. Das ist der ganze Zweck.
+* **Obergrenze:** es darf NIE Strafpunkte in Kauf nehmen oder eine Reihe
+  blockiert lassen. Beides kostet mehr als jede Struktur.
+
+**Ob dieses Fenster nicht leer ist, ist eine MESSUNG, keine Designfrage** und
+gehoert vor den Bau: wie gross ist der typische Punktunterschied zwischen dem
+huellen-optimalen und dem punkt-optimalen Tiling-Zug, und wie teuer ist eine
+blockierte Reihe? Liegt das erste ueber dem zweiten, gibt es kein gueltiges
+`w` und die Konstruktion faellt -- ein vollwertiges Ergebnis.
+
+**Konsequenz fuer die Bauform, endgueltig:** die Huelle ist ein GEWICHT auf den
+Marginalen, kein Filter. Ein hartes Zielset haette alle drei genannten Faelle
+ausgeschlossen -- k3-Vervollstaendigung, Strafvermeidung, Reihen-Freimachen.
+
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
 `plate_builder::v2_chip_vorzug`: vollendet per Bonuschip die Musterreihe, die
