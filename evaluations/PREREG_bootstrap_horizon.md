@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht Nachtrag 2026-08-24: Anker-Arm bleibt geschlossen, aber die WIEDERAUFNAHME-BEDINGUNG ist jetzt benannt und pruefbar -- beide Stufe-0-Zahlen sind an plattenblindem Spiel erhoben, ein Korpus mit echtem Spaltenbau (PREREG_heuristic_v2_long_rows) waere das neue Regime. Ebenso darf der Satz Kredit-Horizont-Verdacht geschwaecht nicht als erledigt weiterzitiert werden. rtv-Waechter fuer den offenen 2-gegen-3-Arm registriert (Nutzer-Auflage): Kostengate wird gemessen statt geschaetzt, sauberes Ziel ist kein Argument. Anlass verschiebt sich: der Lehrer kann Spalten auch nicht (0,098 gegen 0,101), der Mensch schafft 1,80, und der Engpass ist Verteilung statt Versorgung -- der Horizont ist damit nicht mehr der Hauptverdaechtige fuer die Vollendungsschwaeche. STUFE 1 GEFAHREN 2026-08-24: GATE GERISSEN, Arm verworfen (Kosten je Label 223,8 ms gegen 410,2 ms, Verhaeltnis 1,83; Bootstrap-Anteil an der Self-Play-Zeit 33,1 Prozent; Aufschlag fuer BEIDE Labels 60,7 Prozent gegen Schwelle 25). Robust: gemessen bei 300 Sims, CLI-Default ist 100, weniger Sims heben den Anteil weiter. Blosses UMSTELLEN statt beider Labels laege bei 27,5 Prozent, also ebenfalls darueber. Damit sind BEIDE Arme dieser Prereg fuer das heutige Regime geschlossen; die Nutzenfrage ist nicht beantwortet, sondern unbezahlbar. Wiederaufnahme wie beim Anker-Arm nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden. par.9 ENTSCHIEDEN 2026-08-25 auf v2huelle-Partien, n=200 gepaart: HORIZONT 3 VERWORFEN -- er trifft den echten Partieausgang SCHLECHTER (Brier gepaart +0,0567 ± 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63 je Label. Der Waechter greift nicht: 51 Prozent der Zustaende weichen um mehr als 0,01 ab, im Mittel 0,089 -- die Frage war echt, die Antwort ist negativ. Damit sind BEIDE Arme geschlossen (Anker ueber das Kostengate par.8, Tiefe ueber die Zielguete par.9f) und v22 wird mit HORIZONT 2 erzeugt. Wiederaufnahme beider Arme nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden. Sonde: tools/probes/bootstrap_horizon_paired_probe.py. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: BEIDE ARME NEGATIV, Prereg geschlossen 2026-08-25. ANKER-ARM (par.8): Kostengate gerissen, Aufschlag 60,7 Prozent gegen Schwelle 25. TIEFEN-ARM 2 gegen 3 (par.9f): gepaart auf 200 Zustaenden trifft Horizont 3 den echten Partieausgang SCHLECHTER (Brier gepaart +0,0567 +- 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63 je Label. Der Waechter aus par.9c greift NICHT: 51 Prozent der Zustaende weichen um mehr als 0,01 ab, im Mittel 0,089 -- die Frage war echt, nur die Antwort negativ. Damit erzeugt v22 mit HORIZONT 2; der Wert steht bei der ERZEUGUNG im Korpus (self_play.rs:1941) und ist spaeter nur durch Neu-Labeln aenderbar. BERICHTIGUNG par.9g: der Messkorpus war trotz --heuristik-variante v2huelle ein V1-Korpus (die Variante erreichte den aufzeichnenden Pfad nicht, Commit 224cc42; die Draft-Seite ist weiter blind). Am Verdikt aendert das nichts -- gepaart auf denselben Zustaenden -- wohl aber an der Reichweite: gemessen wurde im ALTEN Regime. WIEDERAUFNAHME beider Arme nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden; diese Bedingung ist unveraendert offen. Sonde: tools/probes/bootstrap_horizon_paired_probe.py. -->
 
 # Vorregistrierung: Bootstrap-Horizont (2 vs 3) -- Option fuer den v22-Zuschnitt
 
@@ -523,3 +523,33 @@ auch im Artefakt selbst. Wanduhr **2151 s fuer 200 Zustaende** (10,8 s je
 Zustand, aus den Zeitstempeln der Aufgabendatei), davon nur 0,49 s je Zustand
 fuer die eigentlichen Bootstrap-Aufrufe -- der Rest ist der ungenutzte
 Anker-Zweig.
+
+
+### par.9g BERICHTIGUNG (2026-08-25, am selben Tag): der Korpus war V1, nicht v2huelle
+
+`data/probe_v2huelle_horizon.pkl` wurde mit `--heuristik-variante v2huelle`
+erzeugt, ist aber ein **V1-Korpus**. Grund: die Variante erreichte den
+aufzeichnenden Tiling-Pfad nicht (`tiling_step` rief die varianten-blinde
+Fassung; behoben in Commit `224cc42`), und die Draft-Entscheidung ist bis
+heute variantenblind (`HeuristicSelfPlayAgent` hat kein Variantenfeld).
+Nachgewiesen an einem 200-Partien-Paar: v2huelle und v1 waren bis auf die
+letzte Nachkommastelle identisch (volle Spalten 0,004665140240412135 in
+BEIDEN Armen).
+
+**Was das am Verdikt aendert: nichts.** par.9f vergleicht Horizont 2 gegen 3
+GEPAART auf denselben Zustaenden; welcher Erzeuger die Zustaende erzeugt hat,
+geht in die Differenz nicht ein. Brier, Kostenfaktor und Power bleiben, wie
+sie registriert sind.
+
+**Was es aendert, ist die REICHWEITE.** Die Saetze in par.9e/par.9f, der Korpus
+sei "ein Schritt Richtung Spaltenbau-Korpus" und die Messung liefe "auf
+v2huelle-Partien", sind falsch: gemessen wurde im ALTEN Regime. Die
+Wiederaufnahme-Bedingung beider Arme -- ein Korpus, in dem tatsaechlich
+Spalten gebaut werden -- ist damit **unveraendert offen**, nicht
+angenaehert. Sie ist es sogar staerker als gedacht, weil jetzt belegt ist,
+dass der Lehrer im Self-Play noch gar nicht ankommt.
+
+Lehre, und sie ist die teure: die Abnahme des Durchreich-Commits hat "gleicher
+Seed, v1 gegen v2huelle -> die Partien unterscheiden sich" auf einem
+ARENA-Pfad geprueft. Dort sitzt der Verbraucher. Der Pfad, fuer den der Umbau
+gebaut war, war der einzige, den sie nicht angefasst hat.

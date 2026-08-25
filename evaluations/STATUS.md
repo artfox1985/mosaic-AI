@@ -57,11 +57,16 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
 
 **Was als NAECHSTES zu tun ist, in dieser Reihenfolge:**
 
-1. **Die v22-Vorbereitung ist VOLLSTAENDIG** -- alle fuenf Punkte der Liste
-   unten sind erledigt. Die Kampagne kann zugeschnitten werden: Erzeugung mit
-   **`v2huelle`**, **Bootstrap-Horizont 2**, Blindzieh-Knopf **AUS**,
-   heutiges Wheel. Der Nutzer hat die Kampagne in dieser Sitzung ausdruecklich
-   noch draussen gelassen -- sie ist der naechste Punkt, aber sein Entscheid.
+1. **Die v22-Vorbereitung ist NICHT vollstaendig.** Punkt 2 der Liste unten
+   ist am 2026-08-25 aufgeklappt: der Lehrer kommt im Self-Play noch gar nicht
+   an. Die Tiling-Haelfte ist behoben (`224cc42`), die **Draft-Haelfte fehlt**
+   -- `HeuristicSelfPlayAgent` hat kein Variantenfeld, waehrend der Arena-Agent
+   den v2-Vorzug anwendet. Solange das so ist, erzeugt jede Kampagne einen
+   V1-Korpus. **Das ist der naechste Bauschritt**, und er ist kein
+   Durchreichen: der Self-Play-Agent muss eine POLICY-Verteilung liefern, ein
+   harter Vorzug wuerde das Ziel auf one-hot zusammenfalten. Wie der Vorzug in
+   das Policy-Ziel eingeht, ist ein Nutzer-Entscheid.
+   Alles Uebrige steht: Horizont 2, Blindzieh-Knopf AUS, heutiges Wheel.
 2. **Vor dem Start zu klaeren** (nicht blockierend, aber billig jetzt):
    Partienzahl und Fenster-Zuschnitt. Der Datenordner wird gerade archiviert,
    das beruehrt die Fenster-Manifeste.
@@ -140,9 +145,9 @@ und gehoert danach.
 | # | Punkt | Stand |
 | --- | --- | --- |
 | 1 | **Blindzieh-Reparatur entscheiden** | **ERLEDIGT 2026-08-25: kein Staerkegewinn**, Knopf bleibt AUS. Korpus kann mit dem Bestand erzeugt werden (`PREREG_stack_draw_reservation_rule.md` par.5d) |
-| 2 | **Heuristik-Variante bis ins Self-Play durchreichen** | **ERLEDIGT 2026-08-25.** Kette: `self_play.py --heuristik-variante` -> `generate_data` -> `_run_chunk_supervised` -> `_worker_run_chunk` -> pyo3 -> `run_self_play_with_net_labels_variante` -> `play_one_game`. Vorgabe "v1" ueberall, Paritaet haelt. Alle NEUN Enum-Varianten sind zugeordnet, unbekannte Werte werden ABGEWIESEN |
+| 2 | **Heuristik-Variante bis ins Self-Play durchreichen** | **NICHT ERLEDIGT -- die Abnahme war falsch.** Die Kette reicht die Variante bis in die `PlayerLoopConfig`, aber der Verbraucher sass nur im ARENA-Zweig: beim Aufzeichnen -- also auf jedem Self-Play-Pfad -- lief die varianten-blinde `tiling_step`. Belegt an einem 200-Partien-Paar: v2huelle und v1 identisch bis auf die letzte Nachkommastelle (volle Spalten 0,004665140240412135 in BEIDEN Armen). **Tiling-Haelfte behoben** (Commit `224cc42`), **Draft-Haelfte offen**: `HeuristicArenaAgent` traegt die Variante und wendet den v2-Vorzug an, `HeuristicSelfPlayAgent` hat kein Variantenfeld. Ein Korpus aus dem heutigen Stand ist ein V1-Korpus mit leicht anderem Tiling-Routing. Messung nach dem Fix: volle Spalten 0,037 (v2huelle) gegen 0,050 (v1) -- weit weg von den 0,798 des Lehrer-Tests |
 | 3 | **Arena-Threadzahl geradeziehen** | **ERLEDIGT 2026-08-25.** EINE Konvention (`self_play::thread_plan`): `0` = alle Kerne, `1` = sequenziell, `n` = n Threads. Vier Arena-Einstiege umgestellt. Abnahme: dieselben 12 Seeds sequenziell gegen 11 Threads -> **Ergebnisse identisch**, 44,5 s auf 13,0 s (3,4x) |
-| 4 | **Bootstrap-Horizont 2 gegen 3** | **ERLEDIGT 2026-08-25: Horizont 3 VERWORFEN.** Gepaart auf 200 v2huelle-Zustaenden trifft er den echten Ausgang schlechter (Brier +0,0567 ± 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63. Die Labels unterscheiden sich dabei sehr wohl (51 % ueber 0,01) -- die Frage war echt, nur die Antwort negativ. **v22 laeuft mit Horizont 2.** `PREREG_bootstrap_horizon.md` par.9f |
+| 4 | **Bootstrap-Horizont 2 gegen 3** | **ERLEDIGT 2026-08-25: Horizont 3 VERWORFEN** (Verdikt gilt; der Messkorpus war aber V1, nicht v2huelle -- par.9g). Gepaart auf 200 v2huelle-Zustaenden trifft er den echten Ausgang schlechter (Brier +0,0567 ± 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63. Die Labels unterscheiden sich dabei sehr wohl (51 % ueber 0,01) -- die Frage war echt, nur die Antwort negativ. **v22 laeuft mit Horizont 2.** `PREREG_bootstrap_horizon.md` par.9f |
 | 5 | **Erzeugung mit dem HEUTIGEN Wheel** | erfuellt, darf nicht rueckwaerts passieren |
 
 **Zu 1:** `resolve_and_apply_stack_draw` sitzt in `apply_chosen_action` und
