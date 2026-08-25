@@ -90,6 +90,13 @@ def per_side_metrics(game: dict) -> dict[str, dict]:
     rows = defaultdict(Counter)      # Reihenauslastung: Ziel-Rasterzeile je Zug
     unlocks = Counter()              # Spezialfeld-Freischaltungen
     strafe = Counter()               # Strafpunkte (negativ)
+    # Blindziehungen je Seite. GEZAEHLT, nicht aus dem Punktestand abgeleitet:
+    # bei Punktestand 0 ist eine Ziehung gratis und damit im Punktestand
+    # unsichtbar, und zwar UNGLEICHMAESSIG -- der tiefer ziehende Arm wird
+    # staerker abgeschnitten, ein Armvergleich unterschaetzt den Unterschied
+    # also systematisch. Hinweis der Parallelsitzung, Ursache in game.rs:182
+    # (Score kann nie unter 0 fallen).
+    ziehungen = Counter()
     for text in _texte(log):
         tp = PATTERNS["TILING_PLACE"].match(text)
         if tp:
@@ -102,6 +109,10 @@ def per_side_metrics(game: dict) -> dict[str, dict]:
         rs = PATTERNS["ROUND_STRAFE"].match(text)
         if rs:
             strafe[rs.group("name")] += int(rs.group("pen"))
+            continue
+        sp = PATTERNS["STACK_PEEK"].match(text)
+        if sp:
+            ziehungen[sp.group("name")] += 1
 
     out: dict[str, dict] = {}
     for name in (NAME_A, NAME_B):
@@ -111,6 +122,7 @@ def per_side_metrics(game: dict) -> dict[str, dict]:
             "reihen": dict(rows.get(name, Counter())),
             "spezial_freischaltungen": unlocks.get(name, 0),
             "strafpunkte": strafe.get(name, 0),
+            "ziehungen": ziehungen.get(name, 0),
         }
     return out
 
@@ -159,7 +171,7 @@ def main() -> None:
             siege_b += 1
 
         for key in ("volle_spalten", "max_hoehe", "teilspalten_ge3", "teilspalten_ge4",
-                    "spezial_freischaltungen", "strafpunkte"):
+                    "spezial_freischaltungen", "strafpunkte", "ziehungen"):
             a, b = float(m[NAME_A][key]), float(m[NAME_B][key])
             roh_a[key].append(a)
             roh_b[key].append(b)
@@ -192,7 +204,8 @@ def main() -> None:
     # jede Ziehung 1 Punkt kostet -- ein Punkte-Vorsprung, der sich DORT
     # konzentriert, kaeme aus dem Ziehmechanismus und nicht aus besserem Spiel.
     k1_split = {}
-    for kid, kname, key in ((1, "k1", "volle_spalten"), (6, "k6", "punkte")):
+    for kid, kname, key in ((1, "k1", "volle_spalten"), (6, "k6", "punkte"),
+                            (6, "k6zieh", "ziehungen")):
         for label, pred in ((f"{kname}_aktiv", True), (f"{kname}_inaktiv", False)):
             idx = [i for i, g in enumerate(spiele) if (kid in g.get("scoring_tile_ids", [])) is pred]
             if not idx:
@@ -226,7 +239,7 @@ def main() -> None:
         "kennzahlen": {},
     }
     for key in ("volle_spalten", "max_hoehe", "teilspalten_ge3", "teilspalten_ge4",
-                "spezial_freischaltungen", "strafpunkte", "punkte"):
+                "spezial_freischaltungen", "strafpunkte", "ziehungen", "punkte"):
         bl = block_mean(diffs[key], BLOCK)
         mittel, t = t_value(bl)
         ergebnis["kennzahlen"][key] = {
