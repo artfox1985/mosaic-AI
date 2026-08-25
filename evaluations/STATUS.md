@@ -69,12 +69,21 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
    dort) -- er beruehrt die BEWERTUNG einer Kuppelplatte, nicht die
    Stopp-Regel.
 
-**Was in dieser Sitzung entstanden ist** (Commits `29fb1f1`, `4e967e1`,
-`4a43b8d`, `cc46504`, `6fc0b7e`, `3fe468a`, `3da733f`): zwei
-Erreichbarkeits-Eingaben fuers Netz mit Champion-Paritaet, der Artefakt-Umzug,
-die reparierte Blindzieh-Regel als Knopf, diese STATUS-Neufassung, das
-Durchreichen der Heuristik-Variante und die einheitliche Threadzahl-Konvention.
-Der Baum ist **nicht gepusht** (Nutzer-Regel).
+**Was in dieser Sitzung entstanden ist**, in Reihenfolge: zwei
+Erreichbarkeits-Eingaben fuers Netz mit Champion-Paritaet (`29fb1f1`), der
+Artefakt-Umzug (`4e967e1`, `4a43b8d`), die reparierte Blindzieh-Regel als Knopf
+(`cc46504`), diese STATUS-Neufassung (`6fc0b7e`), das Durchreichen der
+Heuristik-Variante (`3fe468a`), die einheitliche Threadzahl-Konvention
+(`3da733f`) und das Horizont-Verdikt (`ca9ba1b`).
+
+**Push-Stand: 6 Commits voraus** (`29fb1f1` bis `ca9ba1b`); `4e967e1` und
+`4a43b8d` liegen bereits auf `origin/main`. Pushen ist ein eigener
+Nutzer-Entscheid und wurde nicht getroffen.
+
+**Pruefstand des Baums:** die Suite lief zuletzt nach `3da733f` gruen (526/0),
+und `ca9ba1b` beruehrt nur `evaluations/` plus eine neue Python-Sonde -- der
+Rust-Stand ist also der gepruefte. Paritaets-Hash `8c6684ffba06cf3e...`
+unveraendert.
 
 **Womit die naechste Sitzung rechnen muss:**
 
