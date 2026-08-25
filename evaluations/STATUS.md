@@ -261,10 +261,28 @@ den Lehrer-Einsatz ist er entschaerft.
    die Laufbedingungen jener Messung sind aber nicht von mir verifiziert,
    deshalb nicht ungefragt nachgetragen.
 
-   **par.11 GEMESSEN, H0** (par.11.1): rundenabhaengige Spalten-Gewichte
-   bewegen nichts (volle Spalten +0,025, t=0,39; Siegquote 0,500). Der Arm ist
-   negativ entschieden; ein Werte-Sweep findet NICHT statt (Dosis-Antwort,
-   dreimal negativ entschieden). `SPALTEN_PHASE` bleibt im Code.
+   **DREI ARME GEMESSEN, ALLE NEGATIV -- die Huelle bleibt der Stand:**
+
+   * **par.11/13 Phasenfaktor**: eine feste Form (t=0,39) und 16 Formen ueber
+     Staerke und Position im Latin-Hypercube (max t=1,48 bei 16 Versuchen).
+     Die POSITION erklaert nichts (partielle Korrelation -0,072), die
+     Amplitude zeigt einen Dosis-Trend (r=0,674), dessen groesster Ausschlag
+     mit +0,113 ein Fuenftel dessen ist, was die Huelle selbst bringt.
+     Entwurfs-Schwaeche eingestanden: `peak` bis 5,0 gezogen, aber das
+     Routing endet nach Runde 4 -- die Position ist schwaecher geprueft als
+     die Staerke.
+   * **par.12 Vollendbarkeits-FILTER**: volle Spalten 0,794 auf 0,431
+     (t=-5,03), Punkte -4,85, Siegquote 0,431. Das vorab benannte Risiko ist
+     eingetreten. **Diagnose mit Reichweite ueber diesen Arm hinaus:**
+     `cell_is_completable` ist BINAER, die Spaltenwertung zahlt STETIG und
+     konvex -- der Filter wirft Teilfortschritt weg. Die Empfehlung "Wissen
+     als Aktionsfilter statt als Bewertungsterm"
+     (`RESEARCH_heuristic_methodology_external_2026-08-25.md` §4.4/§4.5) gilt
+     also NICHT unbesehen: sie haengt daran, ob das Ziel binaer oder stetig
+     ausgezahlt wird.
+
+   Alle drei Knoepfe bleiben im Code, Default aus. `MOSAIC_PHASE_AMP` und
+   `MOSAIC_PHASE_PEAK` sind in `knob_registry.rs` als Diagnose eingetragen.
 
    **UEBERGABE-NOTIZ 2026-08-25:** Maschine und `self_play.rs` sind FREI
    (Commit `ae88cf3`, Suite 520/0, Paritaet haelt). Die Parallelsitzung
