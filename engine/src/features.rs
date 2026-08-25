@@ -768,6 +768,15 @@ pub const NUM_PLANES_CHANNELS: usize = 76;
 const PLANES_H: usize = 6;
 const PLANES_W: usize = 6;
 
+/// Zahl der Werte im Planes-Block, den der Bauer LIEFERT.
+///
+/// Getrennt von dem, was ein Modell ERWARTET: `net::split_planes_flat_batch_src`
+/// braucht die Quell-Grenze, um den Flat-Block richtig zu finden, waehrend der
+/// Planes-Block auf die Modellbreite gekuerzt wird. Ohne diese Trennung
+/// verschiebt sich der Flat-Block, sobald der Bauer eine Ebene mehr liefert
+/// als ein Altmodell kennt -- Formen gueltig, Werte falsch.
+pub const NUM_PLANES_VALUES: usize = NUM_PLANES_CHANNELS * PLANES_H * PLANES_W;
+
 /// Slot-Koordinaten (sr, sc) der 4 Eckplatten -- Pendant zu
 /// `neural_net.py::_CORNER_SLOTS` (siehe dort für die Punktwert-Asymmetrie-
 /// Begründung, 4 einzelne Masken statt einer gemeinsamen).

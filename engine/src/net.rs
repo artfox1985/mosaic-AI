@@ -418,7 +418,11 @@ impl Net {
             InputLayout::Flat(n) => {
                 let mut buf = Vec::with_capacity(batch * n);
                 for s in samples {
-                    buf.extend_from_slice(s);
+                    // Auf die MODELLBREITE kuerzen: neue Merkmale haengen
+                    // hinten, Altmodelle sehen damit unveraendert ihre ersten
+                    // n Werte (Befund 2026-08-25, siehe
+                    // `split_planes_flat_batch_src`).
+                    buf.extend_from_slice(&s[..n.min(s.len())]);
                 }
                 let t: Tensor = tract_ndarray::Array2::from_shape_vec((batch, n), buf)?.into();
                 Ok(tvec!(t.into()))
@@ -433,7 +437,11 @@ impl Net {
             }
             InputLayout::PlanesPlusFlat { c, h, w, flat: flat_n } => {
                 let planes_len = c * h * w;
-                let (planes_buf, flat_buf) = split_planes_flat_batch(samples, planes_len, flat_n);
+                // Quell-Grenze ist die Breite, die der BAUER liefert -- nicht
+                // die des Modells. Sonst verschiebt sich der Flat-Block,
+                // sobald der Bauer eine Ebene mehr hat (siehe `..._src`).
+                let (planes_buf, flat_buf) = split_planes_flat_batch_src(
+                    samples, crate::features::NUM_PLANES_VALUES, planes_len, flat_n);
                 let planes_t: Tensor = tract_ndarray::Array4::from_shape_vec((batch, c, h, w), planes_buf)?.into();
                 let flat_t: Tensor = tract_ndarray::Array2::from_shape_vec((batch, flat_n), flat_buf)?.into();
                 Ok(tvec!(planes_t.into(), flat_t.into()))
@@ -937,12 +945,42 @@ pub(crate) fn split_batch_n_or_empty_rows(flat: Vec<f32>, n: usize) -> Vec<Vec<f
 // `pub(crate)`: Weg B (`net_ort.rs::build_ort_inputs`) braucht denselben
 // Puffer-Split fuer `InputLayout::PlanesPlusFlat` wie `build_inputs` hier.
 pub(crate) fn split_planes_flat_batch(samples: &[&[f32]], planes_len: usize, flat_len: usize) -> (Vec<f32>, Vec<f32>) {
+    // Bedeutung UNVERAENDERT: Quell- und Zielbreite des Planes-Blocks sind
+    // gleich. Die Kompatibilitaets-Variante ist `..._src` und wird nur dort
+    // benutzt, wo ein echter Feature-Puffer auf ein Modell trifft.
+    split_planes_flat_batch_src(samples, planes_len, planes_len, flat_len)
+}
+
+/// Wie [`split_planes_flat_batch`], aber mit AUSDRUECKLICHER Quell-Laenge des
+/// Planes-Blocks -- die Laenge, die der FEATURE-BAUER erzeugt, nicht die, die
+/// das Modell erwartet.
+///
+/// **Warum das getrennt sein muss** (Befund 2026-08-25, vor dem Bau der
+/// Erreichbarkeits-Ebenen): die alte Fassung schnitt den Flat-Block mit
+/// `s[planes_len .. planes_len + flat_len]` und benutzte damit die
+/// MODELL-Laenge als Offset in den Puffer des BAUERS. Solange beide Laengen
+/// gleich waren, stimmte das. Sobald der Bauer eine Ebene mehr liefert als
+/// ein Altmodell erwartet, verschiebt sich der Flat-Block um genau diese
+/// Ebene: die Tensor-FORMEN bleiben gueltig, die WERTE sind falsch. Ein
+/// stiller Datenfehler ohne Absturz -- die Sorte, die erst drei Messungen
+/// spaeter auffaellt.
+///
+/// Richtig ist: den Planes-Block ab 0 auf die Modellbreite kuerzen (neue
+/// Ebenen haengen hinten), und den Flat-Block ab der QUELL-Grenze lesen und
+/// dort ebenfalls kuerzen. Damit bleiben Altmodelle bitgleich, waehrend der
+/// Bauer waechst.
+pub(crate) fn split_planes_flat_batch_src(
+    samples: &[&[f32]],
+    src_planes_len: usize,
+    planes_len: usize,
+    flat_len: usize,
+) -> (Vec<f32>, Vec<f32>) {
     let batch = samples.len();
     let mut planes_buf = Vec::with_capacity(batch * planes_len);
     let mut flat_buf = Vec::with_capacity(batch * flat_len);
     for s in samples {
         planes_buf.extend_from_slice(&s[..planes_len]);
-        flat_buf.extend_from_slice(&s[planes_len..planes_len + flat_len]);
+        flat_buf.extend_from_slice(&s[src_planes_len..src_planes_len + flat_len]);
     }
     (planes_buf, flat_buf)
 }
