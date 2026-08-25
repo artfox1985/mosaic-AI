@@ -65,9 +65,15 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
 2. **Vor dem Start zu klaeren** (nicht blockierend, aber billig jetzt):
    Partienzahl und Fenster-Zuschnitt. Der Datenordner wird gerade archiviert,
    das beruehrt die Fenster-Manifeste.
-3. **Offen und ohne Zahl**: der Widerspruch aus der Blindzieh-Spur (siehe
-   dort) -- er beruehrt die BEWERTUNG einer Kuppelplatte, nicht die
-   Stopp-Regel.
+3. **NACH dem Korpus wieder aufzunehmen**: die Blindzieh-Spur. Der Knopf
+   bleibt bis dahin AUS (auch waehrend der Erzeugung -- den Korpus unter der zu
+   validierenden Regel zu erzeugen waere zirkulaer). Die Wiedervorlage haengt an
+   ZWEI Bedingungen, beide in `PREREG_stack_draw_reservation_rule.md` par.5e:
+   die `V`-Eichung braucht einen Vergleichspunkt ausserhalb der v22-Verteilung
+   (sonst misst man den Plattenwert gegen die Unfaehigkeit, Platten zu nutzen),
+   und es braucht einen EINSEITIGEN Knopf, weil der heutige auf beide Seiten
+   wirkt und ein symmetrischer Effekt im Duell bei jedem n unsichtbar ist.
+   **Eine blosse Wiederholung mit mehr Partien ist es ausdruecklich nicht.**
 
 **Was in dieser Sitzung entstanden ist**, in Reihenfolge: zwei
 Erreichbarkeits-Eingaben fuers Netz mit Champion-Paritaet (`29fb1f1`), der
