@@ -1253,11 +1253,16 @@ pub(crate) fn resolve_tiling_step_variante(
 /// `net`: siehe `resolve_tiling_step` -- `None` fuer alle Heuristik-Pfade
 /// (byte-identisch zum Vor-Task-#20-Verhalten), `Some(&Net)` nur fuer die
 /// echten Netz-Spielpfade (`play_net_self_play_game`).
-fn tiling_step<R: Rng + ?Sized>(game: &mut Game, net: Option<&Net>, rng: &mut R) -> Map<String, Value> {
+fn tiling_step<R: Rng + ?Sized>(
+    game: &mut Game,
+    net: Option<&Net>,
+    rng: &mut R,
+    variante: crate::mcts::HeuristikVariante,
+) -> Map<String, Value> {
     let pi = game.state.current_player;
     let state_json = state_to_json(&game.state, true);
     let valid_actions = tiling_env_actions(&game.state, pi);
-    let step = resolve_tiling_step(&game.state, pi, net);
+    let step = resolve_tiling_step_variante(&game.state, pi, net, variante);
 
     let chosen_env: Value = match &step {
         TilingStep::Place(ta) => json!({
@@ -2001,7 +2006,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 if recording {
                     // Self-Play-Pfade: Tiling MIT Trainings-Record; `tiling_net`
                     // je Spieler-Konfiguration (Task #20, siehe Feld-Doku).
-                    records.push(tiling_step(&mut game, pcfg.tiling_net, rng));
+                    records.push(tiling_step(&mut game, pcfg.tiling_net, rng, pcfg.heuristik_variante));
                 } else {
                     // Arena-Pfade: Tiling ohne Aufzeichnung. Spaltenbau-Trace:
                     // `tiling_preference` separat (rein lesend) NUR fuer die
@@ -4366,7 +4371,7 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                 // Konsistenz der Such-/Rollout-Politik geht vor, `net` bliebe
                 // hier zwar verfuegbar, aber ungenutzt.
                 Phase::Tiling => {
-                    tiling_step(&mut g, None, rng);
+                    tiling_step(&mut g, None, rng, crate::mcts::HeuristikVariante::V1);
                 }
                 _ => break,
             }
@@ -5114,7 +5119,7 @@ pub fn value_noise_floor_diagnostic(
                 // Task #20 bewusst NICHT verdrahtet (reiner Heuristik-Walk,
                 // kein Netz in diesem Kontext geladen).
                 Phase::Tiling => {
-                    tiling_step(&mut game, None, &mut rng);
+                    tiling_step(&mut game, None, &mut rng, crate::mcts::HeuristikVariante::V1);
                 }
                 _ => break,
             }
@@ -5172,7 +5177,7 @@ pub fn value_noise_floor_diagnostic(
                         // Task #20 bewusst NICHT verdrahtet (reiner Heuristik-
                         // Rollout, kein Netz in diesem Kontext geladen).
                         Phase::Tiling => {
-                            tiling_step(&mut g2, None, &mut rng);
+                            tiling_step(&mut g2, None, &mut rng, crate::mcts::HeuristikVariante::V1);
                         }
                         _ => break,
                     }
@@ -5346,7 +5351,7 @@ pub(crate) mod tests {
                     // Task #20 bewusst NICHT verdrahtet (reiner Heuristik-
                     // Rollout, kein Netz in diesem Kontext geladen).
                     Phase::Tiling => {
-                        tiling_step(&mut game, None, &mut rng);
+                        tiling_step(&mut game, None, &mut rng, crate::mcts::HeuristikVariante::V1);
                     }
                     _ => break,
                 }
@@ -5447,7 +5452,7 @@ pub(crate) mod tests {
                     // Task #20 bewusst NICHT verdrahtet (reiner Heuristik-
                     // Rollout, kein Netz in diesem Kontext geladen).
                     Phase::Tiling => {
-                        tiling_step(&mut g, None, &mut rng);
+                        tiling_step(&mut g, None, &mut rng, crate::mcts::HeuristikVariante::V1);
                     }
                     _ => break,
                 }
@@ -6751,7 +6756,7 @@ pub(crate) mod tests {
                         }
                     }
                     Phase::Tiling => {
-                        tiling_step(&mut game, None, &mut rng);
+                        tiling_step(&mut game, None, &mut rng, crate::mcts::HeuristikVariante::V1);
                     }
                     _ => break,
                 }
@@ -6801,7 +6806,7 @@ pub(crate) mod tests {
                         }
                     }
                     Phase::Tiling => {
-                        tiling_step(&mut game, None, &mut rng);
+                        tiling_step(&mut game, None, &mut rng, crate::mcts::HeuristikVariante::V1);
                     }
                     // `Phase::End` ist ein Zwischenhalt -- die Endwertung ist
                     // ein separater expliziter Aufruf (`game.rs::
