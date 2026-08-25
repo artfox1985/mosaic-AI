@@ -44,8 +44,16 @@ trennt zwei Stellungen, die heute denselben Blattwert bekommen: eine mit
 70 Prozent Sieg / 30 Prozent Niederlage und eine mit 70 Prozent Sieg /
 25 Prozent Remis / 5 Prozent Niederlage.
 
-**EIN Wert fuer LAMBDA, kein Sweep.** Das ist ein Regler am Blattwert, und
-diese Bauform hat im Bestand zwei Negative -- allerdings von verschiedener
+**EIN Wert fuer LAMBDA, kein Sweep.** Das ist ein Regler an der
+NETZ-BLATTBEWERTUNG -- und HIER traegt der Praezedenzfall, weil er denselben
+Eingriffspunkt betrifft (`PREREG_scoring_plate_injection.md` injiziert
+woertlich in die Blattbewertung, `PREREG_long_row_payoff.md` B1 ist
+`net_mcts.rs::long_row_init_shaping_w`, ein additiver Term ebendort). Fuer
+Eingriffe an anderer Stelle -- etwa im Routing der Heuristik -- gilt er NICHT;
+das ist am 2026-08-25 einmal falsch herangezogen worden
+(`PREREG_heuristic_v2_long_rows.md` par.11.1).
+
+Diese Bauform hat im Bestand zwei Negative -- allerdings von verschiedener
 Art, und das gehoert genau gesagt: `PREREG_scoring_plate_injection.md` ist ein
 ECHTER Dosis-Sweep (w = 0,03/0,1/0,3/1,0) und negativ entschieden;
 `PREREG_long_row_payoff.md` B1 ist negativ, war aber ausdruecklich KEIN Sweep

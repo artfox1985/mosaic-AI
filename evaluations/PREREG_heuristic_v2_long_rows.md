@@ -1266,23 +1266,33 @@ phasenabhaengige Koeffizienten fuer ein anderes Spiel (Azul-Grundspiel),
 andere Suchtiefe, andere Termmenge. Uebernommen war ausdruecklich die FORM,
 nicht der Wert. Das Ergebnis sagt also nicht "Tapered Eval funktioniert
 nicht", sondern "diese Form, auf diese Karte, mit diesen Werten, bewegt hier
-nichts". Ein Sweep ueber die Werte findet NICHT statt.
+nichts". Ein Sweep ueber die Werte findet NICHT statt, und die Begruendung
+steht in den Daten: der Arm zeigt KEINEN Effekt in irgendeine Richtung
+(t=0,39 auf dem Entscheidungsmass, Siegquote 0,500). Werte eines Faktors zu
+variieren, der bei der gesetzten Staerke nichts bewegt, braucht erst ein
+Argument, warum eine andere Staerke etwas anderes tun sollte -- und das gibt
+es hier nicht.
 
-**KORREKTUR 2026-08-25 an meiner eigenen Begruendung:** die erste Fassung
-dieses Absatzes sprach von einer Dosis-Antwort, "die in diesem Projekt schon
-dreimal negativ entschieden wurde". Diese Zahl ist unbelegt und stammt aus
-einer Hochsetzung ohne neuen Fall. Nachgesehen steht im Bestand:
-`PREREG_scoring_plate_injection.md` ist ein ECHTER Dosis-Sweep
-(w = 0,03/0,1/0,3/1,0) und negativ entschieden; `PREREG_long_row_payoff.md`
-B1 ist negativ, war aber ausdruecklich KEIN Sweep ("ein Wert genuegt zum
-Testen"). Also einmal als Dosis-Antwort, dazu ein verwandter Einzelwert-Knopf
--- nicht dreimal.
+**KORREKTUR 2026-08-25 (Nutzer-Einwand), doppelt.** Die erste Fassung dieses
+Absatzes begruendete den Verzicht mit einer "Dosis-Antwort, die in diesem
+Projekt schon dreimal negativ entschieden wurde". Daran war beides falsch:
 
-**Der Verzicht auf den Sweep haengt ohnehin nicht am Praezedenzfall.** Der Arm
-zeigt KEINEN Effekt in irgendeine Richtung (t=0,39 auf dem
-Entscheidungsmass). Werte eines Faktors zu variieren, der bei der gesetzten
-Staerke nichts bewegt, braucht erst ein Argument, warum eine andere Staerke
-etwas anderes tun sollte -- und das gibt es hier nicht.
+1. **Die Zahl.** Nachgesehen gibt es EINEN echten Dosis-Sweep, der negativ
+   entschieden ist (`PREREG_scoring_plate_injection.md`, w = 0,03/0,1/0,3/1,0).
+   `PREREG_long_row_payoff.md` B1 ist ebenfalls negativ, war aber
+   ausdruecklich KEIN Sweep ("ein Wert genuegt zum Testen"). Kein dritter Fall.
+2. **Der Bezug, und das wiegt schwerer.** Beide Praezedenzfaelle sitzen in der
+   NETZ-BLATTBEWERTUNG -- B1 ist `net_mcts.rs::long_row_init_shaping_w`, ein
+   additiver Term am Blattwert, und die Injektion fragt wortwoertlich nach der
+   "Blattbewertung". par.11 dreht dagegen an einem Rundenfaktor auf die
+   ZIELZELLEN-KARTE einer handgeschriebenen Heuristik im ROUTING. Anderer
+   Layer, anderer Mechanismus, andere Fehlermoeglichkeit. Die Praezedenzfaelle
+   gehoeren dorthin, wo an derselben Stelle gedreht wird
+   (`PREREG_risk_sensitive_leaf_utility.md` par.2), nicht hierher.
+
+Fuer kuenftige Arme heisst das: ein Praezedenzfall traegt nur, wenn er
+DENSELBEN Eingriffspunkt betrifft. "Schon mal negativ entschieden" ohne
+Layer-Abgleich ist ein Scheinargument.
 
 **Nebenbefund aus der neu gebauten k6-Aufspaltung, erster Einsatz:** das
 Punkteniveau liegt bei aktiver Wertungsplatte 6 bei 34,0 gegen 48,9 ohne --
