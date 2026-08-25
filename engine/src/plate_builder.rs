@@ -810,6 +810,39 @@ fn spalten_phase(runde: u32) -> f64 {
     }
 }
 
+/// An welcher Entscheidungsstelle wird die Zielkarte gelesen?
+///
+/// par.14: der Phasenfaktor wirkt an den drei Stellen VERSCHIEDEN, und das
+/// ist messbar statt zu vermuten. Im DRAFTING entscheidet die Karte einen
+/// RANG (`envelope_drafting_preference` nimmt das beste Zielgewicht der
+/// Reihe) -- die Rangordnung steht schon bei amp=1,0 fest, mehr Amplitude
+/// aendert dort nichts. Im TILING und in der Plattenwahl werden Gewichte
+/// SUMMIERT bzw. multipliziert (`tiling_preference_for_cells_weighted`,
+/// `slot_score_generic`), dort schlaegt Hoehe durch.
+///
+/// Die Plattenwahl haengt an der Drafting-Stufe, weil sie dort als
+/// `.or_else`-Zweig laeuft.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Stufe {
+    Drafting,
+    Tiling,
+}
+
+/// Auf welche Stufen wirkt der Phasenfaktor? `MOSAIC_PHASE_STAGE`:
+/// `draft` / `tiling` / `both` (Vorgabe `both` = Verhalten vor par.14).
+fn phase_wirkt_auf(stufe: Stufe) -> bool {
+    static MODE: std::sync::OnceLock<(bool, bool)> = std::sync::OnceLock::new();
+    let (d, t) = *MODE.get_or_init(|| match std::env::var("MOSAIC_PHASE_STAGE").as_deref() {
+        Ok("draft") => (true, false),
+        Ok("tiling") => (false, true),
+        _ => (true, true),
+    });
+    match stufe {
+        Stufe::Drafting => d,
+        Stufe::Tiling => t,
+    }
+}
+
 /// par.12: Zellen, die nach der Restversorgung NICHT mehr bedienbar sind,
 /// fallen auf 0.
 ///
@@ -1248,6 +1281,7 @@ fn v2_map_for(
     state: &GameState,
     pi: usize,
     variante: crate::mcts::HeuristikVariante,
+    stufe: Stufe,
 ) -> Option<(Zielkarte, fn(&PlayerBoard, usize, usize, &DomeSpace) -> f64)> {
     match variante {
         crate::mcts::HeuristikVariante::V2Huelle => {
@@ -1260,7 +1294,14 @@ fn v2_map_for(
             Some((expected_points_map(state, pi), legacy_cell_value))
         }
         crate::mcts::HeuristikVariante::V2HuellePhase => {
-            Some((v2_envelope_target_phased(state, pi)?, envelope_cell_value))
+            // par.14: wirkt der Faktor auf DIESER Stufe? Sonst die
+            // ungefaerbte Karte -- so misst der Sweep, WO er greift.
+            let karte = if phase_wirkt_auf(stufe) {
+                v2_envelope_target_phased(state, pi)?
+            } else {
+                v2_envelope_target(state, pi)?
+            };
+            Some((karte, envelope_cell_value))
         }
         crate::mcts::HeuristikVariante::V2HuelleFilter => {
             Some((v2_envelope_target_filtered(state, pi)?, envelope_cell_value))
@@ -2375,7 +2416,7 @@ pub(crate) fn v2_drafting_preference(
     state: &GameState,
     variante: crate::mcts::HeuristikVariante,
 ) -> Option<Action> {
-    if let Some((karte, wert)) = v2_map_for(state, state.current_player, variante) {
+    if let Some((karte, wert)) = v2_map_for(state, state.current_player, variante, Stufe::Drafting) {
         let z = cells_from_map(&karte);
         return envelope_drafting_preference(state, &karte, &z)
             .or_else(|| dome_preference_for_cells_weighted(state, &z, &karte, wert));
@@ -2408,7 +2449,7 @@ pub(crate) fn v2_tiling_preference(
     pi: usize,
     variante: crate::mcts::HeuristikVariante,
 ) -> Option<TilingStep> {
-    if let Some((karte, _)) = v2_map_for(state, pi, variante) {
+    if let Some((karte, _)) = v2_map_for(state, pi, variante, Stufe::Tiling) {
         let z = cells_from_map(&karte);
         return v2_chip_preference(state, pi, &z)
             .or_else(|| tiling_preference_for_cells_weighted(state, pi, &z, &karte));
