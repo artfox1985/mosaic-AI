@@ -53,6 +53,48 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
 
 ---
 
+## SITZUNGSUEBERGABE 2026-08-25
+
+**Was als NAECHSTES zu tun ist, in dieser Reihenfolge:**
+
+1. **Die v22-Vorbereitung ist VOLLSTAENDIG** -- alle fuenf Punkte der Liste
+   unten sind erledigt. Die Kampagne kann zugeschnitten werden: Erzeugung mit
+   **`v2huelle`**, **Bootstrap-Horizont 2**, Blindzieh-Knopf **AUS**,
+   heutiges Wheel. Der Nutzer hat die Kampagne in dieser Sitzung ausdruecklich
+   noch draussen gelassen -- sie ist der naechste Punkt, aber sein Entscheid.
+2. **Vor dem Start zu klaeren** (nicht blockierend, aber billig jetzt):
+   Partienzahl und Fenster-Zuschnitt. Der Datenordner wird gerade archiviert,
+   das beruehrt die Fenster-Manifeste.
+3. **Offen und ohne Zahl**: der Widerspruch aus der Blindzieh-Spur (siehe
+   dort) -- er beruehrt die BEWERTUNG einer Kuppelplatte, nicht die
+   Stopp-Regel.
+
+**Was in dieser Sitzung entstanden ist** (Commits `29fb1f1`, `4e967e1`,
+`4a43b8d`, `cc46504`, `6fc0b7e`, `3fe468a`, `3da733f`): zwei
+Erreichbarkeits-Eingaben fuers Netz mit Champion-Paritaet, der Artefakt-Umzug,
+die reparierte Blindzieh-Regel als Knopf, diese STATUS-Neufassung, das
+Durchreichen der Heuristik-Variante und die einheitliche Threadzahl-Konvention.
+Der Baum ist **nicht gepusht** (Nutzer-Regel).
+
+**Womit die naechste Sitzung rechnen muss:**
+
+* **Die Artefakte liegen nur noch lokal** (`evaluations/artifacts/`,
+  ungetrackt). Preregs zitieren sie als Beleg. Ein frischer Klon hat sie nicht.
+* **Der Datenordner wird gerade archiviert** (Nutzer, 2026-08-25). Was bleiben
+  muss: `data/holdout/`, die `policy_carrier_manifest_*.json`, `asym_corpus`,
+  `seed_corpus`, `seed_positions` und die Fenster-Manifeste.
+* **`CLAUDE.md` steht als modifiziert im Baum**, seit Sitzungsbeginn und nicht
+  von dieser Sitzung. Bewusst unangetastet gelassen.
+
+**Ein methodischer Punkt, der diese Sitzung durchzieht** und den die naechste
+uebernehmen sollte: **eine Herleitung aus dem Code ist eine Hypothese, kein
+Befund.** Heute lagen vier davon im Vorzeichen falsch. Was funktioniert hat,
+war jedes Mal dasselbe -- die Praemisse zaehlen, bevor gebaut wird, und die
+erwartete Trefferzahl pruefen, statt blind zu ersetzen. Zwei uebersehene
+Umbaustellen und ein stiller Rundenfilter sind genau so gefunden worden.
+
+---
+
 ## OFFEN, nach Reihenfolge
 
 ### 1. v22-Korpus mit dem v2-Lehrer -- NUTZER: "muessen wir noch was vorbereiten"
@@ -83,7 +125,7 @@ und gehoert danach.
 | 1 | **Blindzieh-Reparatur entscheiden** | **ERLEDIGT 2026-08-25: kein Staerkegewinn**, Knopf bleibt AUS. Korpus kann mit dem Bestand erzeugt werden (`PREREG_stack_draw_reservation_rule.md` par.5d) |
 | 2 | **Heuristik-Variante bis ins Self-Play durchreichen** | **ERLEDIGT 2026-08-25.** Kette: `self_play.py --heuristik-variante` -> `generate_data` -> `_run_chunk_supervised` -> `_worker_run_chunk` -> pyo3 -> `run_self_play_with_net_labels_variante` -> `play_one_game`. Vorgabe "v1" ueberall, Paritaet haelt. Alle NEUN Enum-Varianten sind zugeordnet, unbekannte Werte werden ABGEWIESEN |
 | 3 | **Arena-Threadzahl geradeziehen** | **ERLEDIGT 2026-08-25.** EINE Konvention (`self_play::thread_plan`): `0` = alle Kerne, `1` = sequenziell, `n` = n Threads. Vier Arena-Einstiege umgestellt. Abnahme: dieselben 12 Seeds sequenziell gegen 11 Threads -> **Ergebnisse identisch**, 44,5 s auf 13,0 s (3,4x) |
-| 4 | **Bootstrap-Horizont 2 gegen 3** auf einem kleinen v2-Ausschnitt | eingetaktet, `PREREG_bootstrap_horizon.md` par.9 |
+| 4 | **Bootstrap-Horizont 2 gegen 3** | **ERLEDIGT 2026-08-25: Horizont 3 VERWORFEN.** Gepaart auf 200 v2huelle-Zustaenden trifft er den echten Ausgang schlechter (Brier +0,0567 ± 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63. Die Labels unterscheiden sich dabei sehr wohl (51 % ueber 0,01) -- die Frage war echt, nur die Antwort negativ. **v22 laeuft mit Horizont 2.** `PREREG_bootstrap_horizon.md` par.9f |
 | 5 | **Erzeugung mit dem HEUTIGEN Wheel** | erfuellt, darf nicht rueckwaerts passieren |
 
 **Zu 1:** `resolve_and_apply_stack_draw` sitzt in `apply_chosen_action` und
@@ -326,6 +368,20 @@ abgeleiteten Suchstrom.
   971 Byte Zuwachs bei zwei geaenderten Zeilen. `git diff` zeigte wegen der
   Normalisierung weiter zwei Zeilen -- aufgefallen ist es nur an der
   Datei-Groessen-Ratsche. Wer so ein Skript schreibt: `newline` auf LF setzen.
+- **Totes Wheel: Zahlengleichheit bei gleichen Seeds ist ALARM** (2026-08-25).
+  Eine gepaarte 200-Partien-Arena lieferte NULL diskordante Paare, Block fuer
+  Block identisch. Das war kein "kein Effekt", sondern ein Wheel ohne den
+  gemessenen Knopf: Wheel 13:14, Knopf-Einbau 13:28. Neun Minuten Messzeit auf
+  totem Code. Wer einen Knopf misst, prueft VORHER, ob das installierte Modul
+  ihn kennt -- und zwar mit `knob_registry_json()`, nicht mit
+  `engine_config_json()`: letzteres listet nur ausgewaehlte Werte und meldete
+  auch nach korrektem Neubau "nicht bekannt". **Ein negatives Ergebnis aus
+  einem ungeprueften Instrument ist kein Befund.**
+- **Prereg-Koepfe veralten gegen ihren eigenen Koerper** (2026-08-25, zweimal
+  an einem Tag). `PREREG_chance_nodes` behauptete ein Merkmal, das es nicht
+  gibt; `PREREG_heuristic_v2_long_rows` fuehrte par.11 als "ungemessen",
+  waehrend par.11.1 laengst das Ergebnis trug. Beide Male hat der Kopf einen
+  Leser in die Irre gefuehrt. Die Pflegeregel ist nicht Kosmetik.
 - **Wheel nach Engine-Aenderung neu bauen.** `cargo test` gruen heisst nicht,
   dass Python den neuen Code sieht. `maturin develop` scheitert hier (kein
   Virtualenv); der Weg ist `maturin build --release` plus

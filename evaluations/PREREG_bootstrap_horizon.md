@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht Nachtrag 2026-08-24: Anker-Arm bleibt geschlossen, aber die WIEDERAUFNAHME-BEDINGUNG ist jetzt benannt und pruefbar -- beide Stufe-0-Zahlen sind an plattenblindem Spiel erhoben, ein Korpus mit echtem Spaltenbau (PREREG_heuristic_v2_long_rows) waere das neue Regime. Ebenso darf der Satz Kredit-Horizont-Verdacht geschwaecht nicht als erledigt weiterzitiert werden. rtv-Waechter fuer den offenen 2-gegen-3-Arm registriert (Nutzer-Auflage): Kostengate wird gemessen statt geschaetzt, sauberes Ziel ist kein Argument. Anlass verschiebt sich: der Lehrer kann Spalten auch nicht (0,098 gegen 0,101), der Mensch schafft 1,80, und der Engpass ist Verteilung statt Versorgung -- der Horizont ist damit nicht mehr der Hauptverdaechtige fuer die Vollendungsschwaeche. STUFE 1 GEFAHREN 2026-08-24: GATE GERISSEN, Arm verworfen (Kosten je Label 223,8 ms gegen 410,2 ms, Verhaeltnis 1,83; Bootstrap-Anteil an der Self-Play-Zeit 33,1 Prozent; Aufschlag fuer BEIDE Labels 60,7 Prozent gegen Schwelle 25). Robust: gemessen bei 300 Sims, CLI-Default ist 100, weniger Sims heben den Anteil weiter. Blosses UMSTELLEN statt beider Labels laege bei 27,5 Prozent, also ebenfalls darueber. Damit sind BEIDE Arme dieser Prereg fuer das heutige Regime geschlossen; die Nutzenfrage ist nicht beantwortet, sondern unbezahlbar. Wiederaufnahme wie beim Anker-Arm nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden. NACHTRAG 2026-08-25, par.9 EINGETAKTET (Nutzer-Entscheid): gepaarter Klein-Ausschnitt auf v2-Partien, Horizont 2 gegen 3, zweimal gelabelt. Muss VOR der v22-Kampagne laufen, weil der Bootstrap-Wert bei der ERZEUGUNG in den Korpus geschrieben wird (self_play.rs:1941) und spaeter nur durch Neu-Labeln aenderbar ist. Vorbedingung: die Heuristik-Variante muss bis run_self_play durchgereicht werden (heute auf V1 festgenagelt, self_play.rs:2201). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht Nachtrag 2026-08-24: Anker-Arm bleibt geschlossen, aber die WIEDERAUFNAHME-BEDINGUNG ist jetzt benannt und pruefbar -- beide Stufe-0-Zahlen sind an plattenblindem Spiel erhoben, ein Korpus mit echtem Spaltenbau (PREREG_heuristic_v2_long_rows) waere das neue Regime. Ebenso darf der Satz Kredit-Horizont-Verdacht geschwaecht nicht als erledigt weiterzitiert werden. rtv-Waechter fuer den offenen 2-gegen-3-Arm registriert (Nutzer-Auflage): Kostengate wird gemessen statt geschaetzt, sauberes Ziel ist kein Argument. Anlass verschiebt sich: der Lehrer kann Spalten auch nicht (0,098 gegen 0,101), der Mensch schafft 1,80, und der Engpass ist Verteilung statt Versorgung -- der Horizont ist damit nicht mehr der Hauptverdaechtige fuer die Vollendungsschwaeche. STUFE 1 GEFAHREN 2026-08-24: GATE GERISSEN, Arm verworfen (Kosten je Label 223,8 ms gegen 410,2 ms, Verhaeltnis 1,83; Bootstrap-Anteil an der Self-Play-Zeit 33,1 Prozent; Aufschlag fuer BEIDE Labels 60,7 Prozent gegen Schwelle 25). Robust: gemessen bei 300 Sims, CLI-Default ist 100, weniger Sims heben den Anteil weiter. Blosses UMSTELLEN statt beider Labels laege bei 27,5 Prozent, also ebenfalls darueber. Damit sind BEIDE Arme dieser Prereg fuer das heutige Regime geschlossen; die Nutzenfrage ist nicht beantwortet, sondern unbezahlbar. Wiederaufnahme wie beim Anker-Arm nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden. par.9 ENTSCHIEDEN 2026-08-25 auf v2huelle-Partien, n=200 gepaart: HORIZONT 3 VERWORFEN -- er trifft den echten Partieausgang SCHLECHTER (Brier gepaart +0,0567 ± 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63 je Label. Der Waechter greift nicht: 51 Prozent der Zustaende weichen um mehr als 0,01 ab, im Mittel 0,089 -- die Frage war echt, die Antwort ist negativ. Damit sind BEIDE Arme geschlossen (Anker ueber das Kostengate par.8, Tiefe ueber die Zielguete par.9f) und v22 wird mit HORIZONT 2 erzeugt. Wiederaufnahme beider Arme nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden. Sonde: tools/probes/bootstrap_horizon_paired_probe.py. -->
 
 # Vorregistrierung: Bootstrap-Horizont (2 vs 3) -- Option fuer den v22-Zuschnitt
 
@@ -442,3 +442,84 @@ durchgereicht werden, bevor ueberhaupt v2-Partien erzeugt werden koennen.
 
 **Nicht Gegenstand:** Spielstaerke. Ein Klein-Ausschnitt entscheidet die
 Ziel-Qualitaet und die Kosten, nicht Elo.
+
+
+### par.9e VORLAEUFIGES ERGEBNIS (2026-08-25, n=60): Horizont 3 ist SCHLECHTER
+
+Erster Durchlauf auf v2huelle-Partien, gepaart auf denselben Zustaenden.
+Korpus `data/probe_v2huelle_horizon.pkl` (20 Partien, 3444 Datensaetze, 837
+Tiling-Zustaende, erzeugt in 17 s mit `heuristik_variante="v2huelle"` --
+moeglich erst seit dem Durchreichen der Variante). Zustaende ORDNUNGSFREI
+gezogen (Seed 20260825), nicht "die ersten N" -- die Falle vom selben Tag.
+
+| Kennzahl | Ergebnis |
+| --- | --- |
+| 1) Label-Differenz h3 gegen h2 | **0,0876 ± 0,0420**; 41,7 % der Zustaende weichen um mehr als 0,01 ab |
+| 2) Brier gegen echten Ausgang | h2 **0,1615**, h3 **0,2215**; gepaart **+0,0600 ± 0,0569** |
+| 3) Kosten je Label | 164,4 ms gegen 245,9 ms -- **Faktor 1,50** |
+
+**Der Waechter aus par.9c schliesst den Arm NICHT** -- die Labels
+unterscheiden sich deutlich, die Frage war also berechtigt. Aber der tiefere
+Horizont trifft den tatsaechlichen Ausgang **schlechter**, bei 50 Prozent
+Mehrkosten. Das Konfidenzintervall schliesst die Null knapp aus
+(0,0600 − 0,0569 = 0,0031).
+
+**Power, aus der gemessenen Streuung statt aus einer Annahme:** aus dem KI
+folgt σ_d = 0,0569·√60/1,96 ≈ 0,225. Mit `n = 7,85·σ_d²/Δ²` braucht ein
+Effekt von 0,06 rund 110 Zustaende, 0,02 rund 990, 0,01 rund 3970. Eine
+Bestaetigungsrunde mit 200 Zustaenden ist damit ausreichend dimensioniert;
+feiner zu messen waere sinnlos, weil ein Unterschied unter 0,015 ohnehin
+unter der Aufloesungsgrenze liegt, ab der Offline-Masse in diesem Projekt die
+Arena vorhersagen.
+
+**Kostenhinweis fuer die Wiederholung:** die Sonde rechnet je Zustand
+zusaetzlich den ANKER (rtv-Kette, ~4,9 s), der fuer diesen Vergleich nicht
+gebraucht wird -- der reine Bootstrap-Aufruf kostet 0,16-0,25 s. Ein
+`with_anchor=false` am pyo3-Einstieg wuerde die Messung rund zwanzigfach
+verbilligen. Nicht gebaut, weil es produktiven Sondencode beruehrt.
+
+### par.9f VERDIKT (2026-08-25, n=200): Horizont 3 VERWORFEN
+
+Bestaetigungsrunde, gleicher Aufbau, gleicher Seed, 200 statt 60 Zustaende.
+
+| Kennzahl | n=60 (Pilot) | **n=200 (Verdikt)** |
+| --- | --- | --- |
+| 1) Label-Differenz | 0,0876 ± 0,0420 | **0,0892 ± 0,0191**; 51,0 % ueber 0,01 |
+| 2) Brier h2 | 0,1615 | **0,1875 ± 0,0377** |
+| 2) Brier h3 | 0,2215 | **0,2441 ± 0,0489** |
+| 2) gepaart h3−h2 | +0,0600 ± 0,0569 | **+0,0567 ± 0,0254** |
+| 3) Kostenfaktor | 1,50x | **1,63x** (185,0 gegen 302,2 ms) |
+
+**Beide Zahlen halten, und das Intervall schliesst die Null jetzt klar aus**
+(+0,0313 bis +0,0821). Der tiefere Horizont trifft den echten Partieausgang
+schlechter, bei 63 Prozent Mehrkosten je Label.
+
+**Der Waechter aus par.9c greift weiterhin nicht** -- die Labels sind nicht
+etwa gleich: gut die Haelfte der Zustaende weicht um mehr als 0,01 ab, im
+Mittel um 0,089. Der Arm war also eine echte Frage; die Antwort ist nur
+negativ. Das unterscheidet dieses Ergebnis von einem Null-Befund aus einem
+wirkungslosen Knopf.
+
+**Nachgerechnete Power:** aus dem Intervall folgt σ_d = 0,0254·√200/1,96 ≈
+0,183. Damit braucht Δ=0,06 rund 73 Zustaende, Δ=0,02 rund 660, Δ=0,01 rund
+2640. Die 200 waren reichlich dimensioniert; der Pilot mit 60 lag knapp unter
+der noetigen Zahl, was das gerade eben ausgeschlossene Intervall dort erklaert.
+
+**Konsequenz fuer v22: Horizont 2.** Damit ist der letzte offene Punkt der
+Korpus-Vorbereitung entschieden.
+
+**Beide Arme dieser Prereg sind jetzt geschlossen** -- der Anker-Arm ueber das
+Kostengate (par.8), der Tiefen-Arm hier ueber die Zielguete. Die
+Wiederaufnahme-Bedingung bleibt in beiden Faellen dieselbe: ein Korpus, in dem
+tatsaechlich Spalten gebaut werden. Der hier verwendete v2huelle-Korpus ist
+ein Schritt in diese Richtung, aber 20 Partien sind kein Regimewechsel.
+
+Sonde: `tools/probes/bootstrap_horizon_paired_probe.py` (aus dem Scratchpad in
+den Baum uebernommen, damit die naechste Sitzung sie wiederholen kann);
+Artefakt `evaluations/artifacts/bootstrap_horizon_paired_200.json` -- die Werte
+darin sind aus der stdout-Ausgabe uebernommen, weil der Lauf noch die
+Scratchpad-Fassung ohne Artefakt-Ausgabe nutzte; das Feld `herkunft` sagt das
+auch im Artefakt selbst. Wanduhr **2151 s fuer 200 Zustaende** (10,8 s je
+Zustand, aus den Zeitstempeln der Aufgabendatei), davon nur 0,49 s je Zustand
+fuer die eigentlichen Bootstrap-Aufrufe -- der Rest ist der ungenutzte
+Anker-Zweig.
