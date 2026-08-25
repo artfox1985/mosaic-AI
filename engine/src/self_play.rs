@@ -2598,6 +2598,41 @@ pub fn variant_from_name(name: &str) -> Option<crate::mcts::HeuristikVariante> {
     }
 }
 
+/// EINE Konvention fuer die Threadzahl aller Arena-Einstiege.
+///
+/// **Anlass** (STATUS "v22-Vorbereitung" Punkt 3): bis 2026-08-25 hiess
+/// `threads = 0` in `run_heuristic_v1_vs_v2_arena` ALLE KERNE und in
+/// `run_net_vs_heuristic_v2_arena` SEQUENZIELL (`num_threads <= 1`).
+/// Dieselbe Sonde mit derselben Zahl lief also einmal 12-fach und einmal
+/// einfach -- am Lehrer-Test gemessen 19,8 CPU-Minuten in 20,4
+/// Wanduhr-Minuten bei 12 Kernen, Faktor 1,0 statt Beschleunigung.
+///
+/// Konvention ab jetzt, ueberall gleich:
+/// * `0` -> globaler rayon-Pool (alle Kerne)
+/// * `1` -> sequenziell, kein Pool
+/// * `n` -> dedizierter Pool mit n Threads
+///
+/// Die Self-Play-Einstiege (`num_threads == 0` -> globaler Pool) folgen ihr
+/// schon; dort baut `1` einen Pool mit einem Thread statt sequenziell zu
+/// laufen -- verhaltensgleich, deshalb bewusst nicht angefasst.
+///
+/// **Ergebnisneutral, gemessen statt angenommen**: jede Partie haengt an
+/// ihrem eigenen abgeleiteten Suchstrom (`PREREG_search_rng_split.md`).
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum ThreadPlan {
+    Global,
+    Sequenziell,
+    Pool(usize),
+}
+
+pub(crate) fn thread_plan(num_threads: usize) -> ThreadPlan {
+    match num_threads {
+        0 => ThreadPlan::Global,
+        1 => ThreadPlan::Sequenziell,
+        n => ThreadPlan::Pool(n),
+    }
+}
+
 /// Heuristik gegen Heuristik, JE BRETT eine Variante.
 ///
 /// `variante_a`/`variante_b` sind `"v1"`, `"v2"` oder `"v2huelle"`. Die
@@ -2878,13 +2913,13 @@ pub fn run_net_arena_match(
         result
     };
 
-    let all: Vec<Value> = if num_threads <= 1 {
-        (0..n_games).map(play).collect()
-    } else {
-        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+    let all: Vec<Value> = match thread_plan(num_threads) {
+        ThreadPlan::Sequenziell => (0..n_games).map(play).collect(),
+        ThreadPlan::Global => (0..n_games).into_par_iter().map(play).collect(),
+        ThreadPlan::Pool(n) => match rayon::ThreadPoolBuilder::new().num_threads(n).build() {
             Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
             Err(_) => (0..n_games).map(play).collect(),
-        }
+        },
     };
     Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
 }
@@ -2941,13 +2976,13 @@ pub fn run_net_vs_heuristic_v2_arena(
         result
     };
 
-    let all: Vec<Value> = if num_threads <= 1 {
-        (0..n_games).map(play).collect()
-    } else {
-        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+    let all: Vec<Value> = match thread_plan(num_threads) {
+        ThreadPlan::Sequenziell => (0..n_games).map(play).collect(),
+        ThreadPlan::Global => (0..n_games).into_par_iter().map(play).collect(),
+        ThreadPlan::Pool(n) => match rayon::ThreadPoolBuilder::new().num_threads(n).build() {
             Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
             Err(_) => (0..n_games).map(play).collect(),
-        }
+        },
     };
     Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
 }
@@ -3069,13 +3104,13 @@ pub fn run_net_vs_net_arena(
         result
     };
 
-    let all: Vec<Value> = if num_threads <= 1 {
-        (0..n_games).map(play).collect()
-    } else {
-        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+    let all: Vec<Value> = match thread_plan(num_threads) {
+        ThreadPlan::Sequenziell => (0..n_games).map(play).collect(),
+        ThreadPlan::Global => (0..n_games).into_par_iter().map(play).collect(),
+        ThreadPlan::Pool(n) => match rayon::ThreadPoolBuilder::new().num_threads(n).build() {
             Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
             Err(_) => (0..n_games).map(play).collect(),
-        }
+        },
     };
     Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
 }
@@ -3292,13 +3327,13 @@ pub fn run_net_vs_net_arena_hybrid(
         )
     };
 
-    let all: Vec<Value> = if num_threads <= 1 {
-        (0..n_games).map(play).collect()
-    } else {
-        match rayon::ThreadPoolBuilder::new().num_threads(num_threads).build() {
+    let all: Vec<Value> = match thread_plan(num_threads) {
+        ThreadPlan::Sequenziell => (0..n_games).map(play).collect(),
+        ThreadPlan::Global => (0..n_games).into_par_iter().map(play).collect(),
+        ThreadPlan::Pool(n) => match rayon::ThreadPoolBuilder::new().num_threads(n).build() {
             Ok(pool) => pool.install(|| (0..n_games).into_par_iter().map(play).collect()),
             Err(_) => (0..n_games).map(play).collect(),
-        }
+        },
     };
     Ok(serde_json::to_string(&Value::Array(all)).unwrap_or_else(|_| "[]".to_string()))
 }
