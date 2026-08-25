@@ -243,7 +243,7 @@ Richtung und Groessenordnung).
 
 ### §7.3 Diagnose (Ursache, nicht nur Befund)
 
-Log-Inspektion (`evaluations/paired_arena_env_opp_disruption_run1.json`,
+Log-Inspektion (`evaluations/artifacts/paired_arena_env_opp_disruption_run1.json`,
 Partie Index 0, Seed 20260815): erster Zug des Netzes unter aktivem Knopf
 bereits ein Ueberlauf — `"Netz: 2× gelb von F1 → Reihe 1 [1/1] (+1
 Strafleiste)"` (Reihe 1 hat Kapazitaet 1, die Fabrik bot aber 2 Fliesen,

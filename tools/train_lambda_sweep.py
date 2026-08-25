@@ -102,7 +102,7 @@ ROOT_Q_CAPABLE_PREFIXES = ("v18",)  # einzige Praefixe, die root_q tragen KOENNE
 
 DATA_DIR = BASE_DIR / "data"
 SWEEP_DIR = BASE_DIR / "data_lambda_sweep"
-SPLIT_MANIFEST = BASE_DIR / "evaluations" / "train_lambda_sweep_split.json"
+SPLIT_MANIFEST = BASE_DIR / "evaluations" / "artifacts" / "train_lambda_sweep_split.json"
 
 
 def selfplay_running() -> bool:
@@ -627,8 +627,8 @@ def run_smoke() -> None:
                      "--value-target-variant", "nortv", "--no-plot", "--no-snapshot"]
     smoke_arms = {"lam10": 1.0, "lam05": 0.5}
     seeds = [1, 2]
-    diag_out = BASE_DIR / "evaluations" / "_smoke_lambda_sweep_diag.json"
-    result_out = BASE_DIR / "evaluations" / "_smoke_lambda_sweep_result.json"
+    diag_out = BASE_DIR / "evaluations" / "artifacts" / "_smoke_lambda_sweep_diag.json"
+    result_out = BASE_DIR / "evaluations" / "artifacts" / "_smoke_lambda_sweep_result.json"
     ok = False
     mix_fracs_seen: list[float] = []
     try:
@@ -686,8 +686,8 @@ def run_smoke() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5, 6])
-    ap.add_argument("--out", default="evaluations/train_lambda_sweep_result.json")
-    ap.add_argument("--diag-out", default="evaluations/offline_diagnosis_lambda_target_frozen.json")
+    ap.add_argument("--out", default="evaluations/artifacts/train_lambda_sweep_result.json")
+    ap.add_argument("--diag-out", default="evaluations/artifacts/offline_diagnosis_lambda_target_frozen.json")
     ap.add_argument("--skip-training", action="store_true",
                     help="Nur Diagnose+Auswertung auf bereits vorhandenen Checkpoints.")
     ap.add_argument("--smoke", action="store_true",
@@ -711,11 +711,11 @@ def main() -> None:
         ARM_LAMBDAS = {"l10v18": 1.0, "l07v18": 0.7}
         BASELINE_ARM = "l10v18"
         SWEEP_DIR = BASE_DIR / "data_lambda_sweep_v18"
-        SPLIT_MANIFEST = BASE_DIR / "evaluations" / "train_lambda_sweep_v18only_split.json"
+        SPLIT_MANIFEST = BASE_DIR / "evaluations" / "artifacts" / "train_lambda_sweep_v18only_split.json"
         if args.out == ap.get_default("out"):
-            args.out = "evaluations/train_lambda_sweep_v18only_result.json"
+            args.out = "evaluations/artifacts/train_lambda_sweep_v18only_result.json"
         if args.diag_out == ap.get_default("diag_out"):
-            args.diag_out = "evaluations/offline_diagnosis_lambda_v18only_frozen.json"
+            args.diag_out = "evaluations/artifacts/offline_diagnosis_lambda_v18only_frozen.json"
 
     if args.smoke:
         run_smoke()

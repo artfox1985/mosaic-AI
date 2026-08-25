@@ -42,7 +42,7 @@ from plate_points_from_arena import block_mean, t_value  # noqa: E402
 
 MODELL = str(ROOT / "models" / "alphazero_v21_2d_brierbest.onnx")
 SEEDS_DATEI = ROOT / "evaluations" / "kampagnen_seeds_407.txt"
-OUT_JSON = ROOT / "evaluations" / "v2_teacher_arena.json"
+OUT_JSON = ROOT / "evaluations" / "artifacts" / "v2_teacher_arena.json"
 NET_SIMS, HEUR_SIMS, THREADS, BLOCK = 400, 150, 0, 25
 K1_TILE_ID = 1
 TAKE_CATS = ("SUN_TAKE", "MOON_GLOBAL_TAKE")

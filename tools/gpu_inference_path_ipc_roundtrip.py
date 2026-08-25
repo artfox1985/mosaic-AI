@@ -128,7 +128,7 @@ def load_gpu_reference() -> dict:
     `evaluations/gpu_batch_throughput.json` (torch/CUDA-Messung, RTX 3060,
     ungeaendert -- KEINE Neumessung). Entscheidungsregel 1 verlangt die
     GPU-Zeit DESSELBEN Batches (256), nicht die Nachbarpunkte 128/512."""
-    path = REPO / "evaluations" / "gpu_batch_throughput.json"
+    path = REPO / "evaluations" / "artifacts" / "gpu_batch_throughput.json"
     data = json.loads(path.read_text(encoding="utf-8"))
     evals = data["evals_per_s"]
     gpu_name = data["gpu"]
@@ -309,7 +309,7 @@ def main() -> int:
     ap.add_argument("--batch", type=int, default=256)
     ap.add_argument("--reps", type=int, default=200)
     ap.add_argument("--warmup", type=int, default=20)
-    ap.add_argument("--out", default="evaluations/gpu_inference_path_ipc_roundtrip.json")
+    ap.add_argument("--out", default="evaluations/artifacts/gpu_inference_path_ipc_roundtrip.json")
     args = ap.parse_args()
 
     fsize = feature_size_report(args.batch)

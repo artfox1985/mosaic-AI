@@ -191,7 +191,7 @@ def main() -> int:
         },
         "criteria_under_target": under_target,
     }
-    out_path = Path(args.out) if args.out else (BASE_DIR / "evaluations" / "seed_selection_plates.json")
+    out_path = Path(args.out) if args.out else (BASE_DIR / "evaluations" / "artifacts" / "seed_selection_plates.json")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(json.dumps(result, indent=2, ensure_ascii=False), encoding="utf-8")
     print(f"\nAuswahl geschrieben nach {out_path}")

@@ -105,9 +105,9 @@ Fehlers ueber Fortsetzung/Wiederholung.
 
 ## Artefakte
 
-- `evaluations/lambda_ceiling_result.json` -- Teil 1: Block-Winraten je
+- `evaluations/artifacts/lambda_ceiling_result.json` -- Teil 1: Block-Winraten je
   Arm, Differenzen zu la00, t/p je lambda-Arm, gewaehltes lambda.
-- `evaluations/gating_opp_block_report.json` -- Teil 2: Block-Winraten,
+- `evaluations/artifacts/gating_opp_block_report.json` -- Teil 2: Block-Winraten,
   Block-t-Test gegen 0,5, deskriptive Block-Score-Kontextzahlen.
 - `evaluations/paired_gating_result_ceil_la*_vs_v19_2d_best.json` --
   Rohergebnisse Teil 1 (ein File je Arm, vom Tool selbst geschrieben).
@@ -127,4 +127,4 @@ McNemar p=0,68 -- kein Staerkebeleg, keine Promotion; Champion blieb
 `v19_2d_best` (Nutzer-Entscheid 2026-08-04). Belegstelle: archive/history.md,
 Abschnitt "Kartierung + Champion-Gating v19_2d_opp: KEIN Staerkebeleg,
 Promotion offen (2026-08-04)", Zeile ~7315-7351;
-evaluations/lambda_ceiling_result.json.
+evaluations/artifacts/lambda_ceiling_result.json.

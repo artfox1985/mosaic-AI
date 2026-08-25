@@ -53,7 +53,7 @@ from config import INPUT_SIZE, NUM_ACTIONS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "long_row_prior_gate.json"
+OUT_JSON = EVAL / "artifacts" / "long_row_prior_gate.json"
 
 MODEL_ONNX = str(ROOT / "models" / "alphazero_v21_2d_brierbest.onnx")
 MODEL_PTH = ROOT / "models" / "alphazero_v21_2d_brierbest.pth"

@@ -82,7 +82,7 @@ ARMS = ["w0", "w01", "w02", "w05"]
 # W0_MANIFEST prueft.
 MODEL_PREFIX = "alphazero_v21_2d_own_"
 W0_MANIFEST = REPO / "models" / "manifest_train_v21_2d_own_w0_20260815_015638.json"
-OUT_JSON = REPO / "evaluations" / "ownership_gate_a_results.json"
+OUT_JSON = REPO / "evaluations" / "artifacts" / "ownership_gate_a_results.json"
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # Conjunction index plan (verified: _conjunctions_from_dome docstring +

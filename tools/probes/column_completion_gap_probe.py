@@ -67,7 +67,7 @@ from column_build_structural_probe import (  # noqa: E402
 )
 
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "column_completion_gap_probe.json"
+OUT_JSON = EVAL / "artifacts" / "column_completion_gap_probe.json"
 
 
 # ── Log -> GEORDNETE Aktionsfolge je Spieler ────────────────────────────────
@@ -209,7 +209,7 @@ def main() -> None:
 
     for quelle in QUELLEN:
         for dateiname in quelle["dateien"]:
-            pfad = EVAL / dateiname
+            pfad = EVAL / "artifacts" / dateiname
             if not pfad.exists():
                 print(f"FEHLT: {pfad}", file=sys.stderr)
                 continue

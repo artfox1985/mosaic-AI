@@ -73,7 +73,7 @@ def t_value(werte: list[float]) -> tuple[float, float]:
 
 
 def load(path_prefix: str) -> tuple[list[dict], list[dict]]:
-    d = json.load(open(BASIS / "evaluations" / f"{path_prefix}.json", encoding="utf-8"))
+    d = json.load(open(BASIS / "evaluations" / "artifacts" / f"{path_prefix}.json", encoding="utf-8"))
     games = d["games"]
     off = [opponent_evaluation(s) for s in games["0"]]
     on = [opponent_evaluation(s) for s in games["1"]]
@@ -129,7 +129,7 @@ def main():
     out = dict(lauf1=r1, lauf2=r2, gepoolt=pooled,
                block_means_gegner_punkte=block_means_gpunkte,
                block_means_netz_punkte=block_means_npunkte)
-    with open(BASIS / "evaluations" / "opponent_disruption_summary.json", "w", encoding="utf-8") as f:
+    with open(BASIS / "evaluations" / "artifacts" / "opponent_disruption_summary.json", "w", encoding="utf-8") as f:
         json.dump(out, f, indent=2, ensure_ascii=False)
     print("\n-> evaluations/opponent_disruption_summary.json")
 

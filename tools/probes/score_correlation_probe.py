@@ -28,7 +28,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "score_correlation_probe.json"
+OUT_JSON = EVAL / "artifacts" / "score_correlation_probe.json"
 
 ROUNDS = (1, 2, 3, 4)
 N_BOOT = 500

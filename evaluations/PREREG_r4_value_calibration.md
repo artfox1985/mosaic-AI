@@ -286,13 +286,13 @@ liefert genau dafür die Priorisierung).
    > 0). Kein voller Lauf, kein Ergebnis-Blick über den Rauchtest hinaus.
 4. STOPP — Bericht an den Koordinator.
 5. NACH separater Freigabe (nach dem vollen R5-Lauf): voller Lauf
-   (N=24, K=16+1, alle 3 Modelle) → `evaluations/r4_value_calibration_result.json`.
+   (N=24, K=16+1, alle 3 Modelle) → `evaluations/artifacts/r4_value_calibration_result.json`.
 6. Bericht mit den vorregistrierten Kennzahlen; danach Entscheidung über
    die R3/R2-Folge-Vorregistrierung.
 
 ---
 **STATUS (Stand 2026-08-08): ENTSCHIEDEN** -- der volle Lauf (N=24, K=16,
-3 Modelle) fand statt und erzeugte `evaluations/r4_value_calibration_result.json`.
+3 Modelle) fand statt und erzeugte `evaluations/artifacts/r4_value_calibration_result.json`.
 Formales Ergebnis nach eigener Regel: "kein Befund" (Modell-R² aller drei
 Netze negativ, -0,15 bis -0,21). Der eingebaute Vorzeichen-Anker-Check
 deckte zusaetzlich einen METHODEN-ALARM auf: nur 9/24 korrekt (statt
@@ -305,5 +305,5 @@ N=72) wurde initiiert. Belegstelle: Git-Commit `cb4773d` ("R4-Kalibrierung
 in archive/history.md selbst gibt es dazu KEINEN Prosa-Absatz, nur
 Vorbereitung (Zeile ~6941-6958); die Commit-Message ist die einzige
 textuelle Verdikt-Quelle. Nicht zu verwechseln mit dem spaeteren, separaten
-"R4b"-Task (`evaluations/r4b_value_calibration_wdl.json`, N=72, andere
+"R4b"-Task (`evaluations/artifacts/r4b_value_calibration_wdl.json`, N=72, andere
 Methodik, eigene Vorregistrierung/eigenes Werkzeug).

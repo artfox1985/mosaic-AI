@@ -85,4 +85,4 @@ WDL-Aera-Grenze relativiert (der Mechanismus gilt als nicht uebertragbar,
 siehe `PREREG_lambda_wdl_arm.md`). Belegstelle: archive/history.md,
 Abschnitt "Lambda-v18only: ARENA-SIGNIFIKANTER SIEG -- λ=0.7 wird
 v20-Standard-Kandidat (2026-08-03)", Zeile ~7107-7138;
-evaluations/train_lambda_sweep_v18only_result.json.
+evaluations/artifacts/train_lambda_sweep_v18only_result.json.

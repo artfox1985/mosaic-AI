@@ -125,7 +125,7 @@ def main() -> None:
           " Strafleisten-Term, MOSAIC_WERTUNG_FLOOR_W) -- ein Profil aendert"
           " kein Live-Verhalten. Korrektur 2026-08-19, siehe par.6a.")
 
-    (BASIS / "evaluations" / "probe_shaping_e_distribution_pfad_a.json").write_text(
+    (BASIS / "evaluations" / "artifacts" / "probe_shaping_e_distribution_pfad_a.json").write_text(
         json.dumps({"states": a.states, "n": len(proben), "profil": PROFIL,
                     "ergebnis": ergebnis}, indent=1, ensure_ascii=False),
         encoding="utf-8")

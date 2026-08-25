@@ -267,7 +267,7 @@ def main() -> None:
         print(f"{args.control} vs {v}: diskordant b(test)={b} / c(kontrolle)={c}"
               f"  McNemar p={p:.4f}")
 
-    out_path = EVAL_DIR / f"paired_arena_env_{args.out_prefix}.json"
+    out_path = EVAL_DIR / "artifacts" / f"paired_arena_env_{args.out_prefix}.json"
     out_path.write_text(json.dumps(out, indent=1), encoding="utf-8")
     print(f"\nErgebnis: {out_path}")
 

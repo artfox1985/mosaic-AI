@@ -126,7 +126,7 @@ def load_offline() -> tuple[dict, dict]:
     # damaligen Kennzahlen sind damit die einzige verbliebene Quelle -- neu
     # rechnen (und damit value_r2_rounds_1_4 oder die Orakel-Metriken ergaenzen)
     # ist fuer sie unmoeglich. evaluations/ hat Vorrang bei Namensgleichheit.
-    sources = (sorted(glob.glob(str(BASE_DIR / "evaluations" / "offline_diagnosis_*.json")))
+    sources = (sorted(glob.glob(str(BASE_DIR / "evaluations" / "artifacts" / "offline_diagnosis_*.json")))
                + sorted(glob.glob(str(BASE_DIR / "archive" / "offline_diagnosis_*.json"))))
     for f in sources:
         try:
@@ -152,7 +152,7 @@ def load_gatings(min_pairs: int) -> list[dict]:
     rows = []
     seen_gatings = {}
     seen_exact = set()
-    for f in (sorted(glob.glob(str(BASE_DIR / "evaluations" / "paired_gating_result_*.json")))
+    for f in (sorted(glob.glob(str(BASE_DIR / "evaluations" / "artifacts" / "paired_gating_result_*.json")))
               + sorted(glob.glob(str(BASE_DIR / "archive" / "paired_gating_result_*.json")))):
         try:
             d = json.load(open(f, encoding="utf-8"))
@@ -219,7 +219,7 @@ def main() -> None:
                    help="Gating-Laeufe mit weniger Paaren ignorieren (Default 50).")
     p.add_argument("--alpha-decisive", type=float, default=0.05,
                    help="Ein Gating gilt als ENTSCHIEDEN, wenn McNemar-p darunter liegt.")
-    p.add_argument("--out", default="evaluations/offline_vs_arena.json")
+    p.add_argument("--out", default="evaluations/artifacts/offline_vs_arena.json")
     args = p.parse_args()
 
     offline, versions = load_offline()

@@ -108,12 +108,12 @@ def kendall(a: dict, b: dict):
 
 
 def pfad(krit, w):
-    return BASIS / "evaluations" / f"probe_sibling_k{krit}_w{w}.json"
+    return BASIS / "evaluations" / "artifacts" / f"probe_sibling_k{krit}_w{w}.json"
 
 
 def succ_pfad(krit, w):
     """Eigener Dateiname fuer `--dump-successors` -- ueberschreibt nie `pfad()`."""
-    return BASIS / "evaluations" / f"probe_sibling_succ_k{krit}_w{w}.json"
+    return BASIS / "evaluations" / "artifacts" / f"probe_sibling_succ_k{krit}_w{w}.json"
 
 
 def kand_full(res):
@@ -160,7 +160,7 @@ def vergleiche(krit, w):
     urteil = "TRAEGT SIGNAL" if tstat > 1.68 else "RAUSCHEN -- B4 nicht bauen"
     print()
     print(f"  VORAB-REGEL par.6.3 Stufe 1: {urteil}")
-    (BASIS / "evaluations" / f"probe_sibling_order_k{krit}.json").write_text(json.dumps({
+    (BASIS / "evaluations" / "artifacts" / f"probe_sibling_order_k{krit}.json").write_text(json.dumps({
         "kriterium": krit, "n": len(taus), "tau_mittel": m, "t": tstat,
         "spanne_mittel": statistics.mean(spannen), "urteil": urteil,
     }, indent=1, ensure_ascii=False), encoding="utf-8")

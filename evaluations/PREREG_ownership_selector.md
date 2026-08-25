@@ -357,7 +357,7 @@ sie da.
 
 ### par.9.1 Kopfguete F2 gegen F1 (Stufe 0 Punkt 1)
 
-`evaluations/ownership_gate_a_f1_f2.json`, Sonde
+`evaluations/artifacts/ownership_gate_a_f1_f2.json`, Sonde
 `tools/probes/ownership_gate_a.py`, beide Arme ueber den `final`-Tag
 (Epoche 15). Held-out identisch: 820 Partien, 82 Val-Dateien.
 
@@ -386,7 +386,7 @@ Rangverlust von wenigen Prozent gegen +12 Siege Policy-Staerke (333 statt
 
 ### par.9.2 Kalibrierung dort, wo die Route liest (Stufe 0 Punkte 2+3)
 
-`evaluations/ownership_route_calibration_results.json`, neue Sonde
+`evaluations/artifacts/ownership_route_calibration_results.json`, neue Sonde
 `tools/probes/ownership_route_calibration.py`. **Methodisch besser als
 beauftragt:** gemessen wird nicht am Endzustand wie Tor A, sondern auf den
 **36.611 Tiling-Zustaenden**, an denen die Route tatsaechlich lesen wuerde

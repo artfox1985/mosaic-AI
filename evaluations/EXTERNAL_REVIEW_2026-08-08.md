@@ -279,7 +279,7 @@ vollstaendig abgeschlossen.
 
 Das gebaute Werkzeug (`tools/dome_split_diagnosis.py`) kann die
 Task-B-Frage in dieser Form NICHT beantworten. Befund aus dem
-Selbsttest-Datensatz (`evaluations/dome_split_diagnosis.json`, Feld
+Selbsttest-Datensatz (`evaluations/artifacts/dome_split_diagnosis.json`, Feld
 `root_num_actions_considered` vs `per_tile_debug`):
 
 | Arm | Wurzel-Kandidaten | betrachtet | Sims-Budget |

@@ -64,8 +64,8 @@ def main() -> None:
     off_all, on_all, blocks = [], [], []
 
     for pref in args.prefix:
-        off = json.loads((EVAL_DIR / f"paired_arena_{pref}_off_raw.json").read_text(encoding="utf-8"))
-        on = json.loads((EVAL_DIR / f"paired_arena_{pref}_on_raw.json").read_text(encoding="utf-8"))
+        off = json.loads((EVAL_DIR / "artifacts" / f"paired_arena_{pref}_off_raw.json").read_text(encoding="utf-8"))
+        on = json.loads((EVAL_DIR / "artifacts" / f"paired_arena_{pref}_on_raw.json").read_text(encoding="utf-8"))
         if off["base_seed"] != on["base_seed"] or off["n_games"] != on["n_games"]:
             raise SystemExit(f"Block '{pref}' nicht paarungskompatibel: "
                              f"OFF seed={off['base_seed']} n={off['n_games']} vs "
@@ -118,7 +118,7 @@ def main() -> None:
         print("  Sichtung eines Zwischenergebnisses beschlossen (optionales Stoppen), ist")
         print("  dieser p-Wert OPTIMISTISCH -- die Falsch-Positiv-Rate liegt ueber Alpha.")
 
-    out = Path(args.out) if args.out else EVAL_DIR / f"paired_arena_pooled_{args.prefix[0]}.json"
+    out = Path(args.out) if args.out else EVAL_DIR / "artifacts" / f"paired_arena_pooled_{args.prefix[0]}.json"
     out.write_text(json.dumps({
         "blocks": blocks, "n_games_per_arm": tot["n"],
         "champion_wins_off": tot["off_wins"], "champion_wins_on": tot["on_wins"],

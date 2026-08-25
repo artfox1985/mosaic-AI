@@ -485,7 +485,7 @@ es folgt eine sechste, gezielte Diagnoserunde an der 910002-Stellung.
 ### par.8f KERNBEWEIS GRUEN -- WELLE 3 ABGENOMMEN, PREREG-FRAGE BEANTWORTET (2026-08-24; Agent, Verdikt und Hashes vom Koordinator am Artefakt nachgeprueft)
 
 **8/8 Partien BYTE-IDENTISCH** (seeds 910001-910008, 400/400 Sims;
-Artefakt `evaluations/frozen_kernbeweis_result_postfix_20260824.json`:
+Artefakt `evaluations/artifacts/frozen_kernbeweis_result_postfix_20260824.json`:
 verdict GRUEN, n_green 8, n_red 0, identische SHA256-Log-Hashes,
 gleiche Scores/Schrittzahlen, first_diff_line durchgehend None). Der
 eingefrorene Champion spielt ueber die Prozessgrenze exakt dieselbe

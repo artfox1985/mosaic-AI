@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Sind der k5-Zuwachs und der Siegzuwachs der kleinen Dosis D1 aus PREREG_gate_c_consumer_sweep.md par.16.3 echt oder Glueck? | Beleg: **ENTSCHIEDEN 2026-08-17, NICHT REPLIZIERT** (eigenes par.5 ERGEBNIS und par.6 VERDIKT NACH DER VORAB-REGEL). 150 frische Seeds, k5 gepaart +0,19 bei Block-t 1,10 (nB=6) gegen die Vorabregel Betrag t > 2,571; Siege 81:77, McNemar p = 0,699. Beide positiven Zahlen des Erstbefunds (t 2,79 und 236:211, p=0,066) sind zusammengebrochen. Rohdaten evaluations/paired_arena_env_gate_c_repl_k5.json. Damit ist der REGLER-STRANG ABGESCHLOSSEN: der Laufzeit-Verbraucher in Produktform hebt die Zielkriterien weder bei plattenblinder noch bei plattenfaehiger Policy, Tor C bleibt in JEDER Lesart negativ. Beide Regler bleiben auf Default 0. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Sind der k5-Zuwachs und der Siegzuwachs der kleinen Dosis D1 aus PREREG_gate_c_consumer_sweep.md par.16.3 echt oder Glueck? | Beleg: **ENTSCHIEDEN 2026-08-17, NICHT REPLIZIERT** (eigenes par.5 ERGEBNIS und par.6 VERDIKT NACH DER VORAB-REGEL). 150 frische Seeds, k5 gepaart +0,19 bei Block-t 1,10 (nB=6) gegen die Vorabregel Betrag t > 2,571; Siege 81:77, McNemar p = 0,699. Beide positiven Zahlen des Erstbefunds (t 2,79 und 236:211, p=0,066) sind zusammengebrochen. Rohdaten evaluations/artifacts/paired_arena_env_gate_c_repl_k5.json. Damit ist der REGLER-STRANG ABGESCHLOSSEN: der Laufzeit-Verbraucher in Produktform hebt die Zielkriterien weder bei plattenblinder noch bei plattenfaehiger Policy, Tor C bleibt in JEDER Lesart negativ. Beide Regler bleiben auf Default 0. -->
 
 # PREREG: Frisch-Seed-Replikation der Dosis D1 — Ziel k5
 
@@ -85,7 +85,7 @@ Umbau nicht verlieren darf.
 
 150 frische Seeds (50000..50435, Ueberschneidung mit dem alten Satz 0), alle
 mit k5 aktiv, zwei Arme, `first_player` je Seed identisch (geprueft).
-Rohdaten `evaluations/paired_arena_env_gate_c_repl_k5.json`.
+Rohdaten `evaluations/artifacts/paired_arena_env_gate_c_repl_k5.json`.
 
 | | N (0/0) | D1 (0,1/0,3) |
 |---|---:|---:|

@@ -216,7 +216,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--data-glob", default="data/selfplay_v16_*.pkl")
     ap.add_argument("--limit-files", type=int, default=None, help="None = alle Dateien")
-    ap.add_argument("--out", default="evaluations/scoring_tile_impact_result.json")
+    ap.add_argument("--out", default="evaluations/artifacts/scoring_tile_impact_result.json")
     args = ap.parse_args()
 
     if not hasattr(mosaic_rust, "end_scoring_from_state_json"):

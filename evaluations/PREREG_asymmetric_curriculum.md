@@ -435,7 +435,7 @@ Lastklasse -- der Neustart war ueberkonservativ, aber regelkonform.)
 ## par.15 TEILFRAGE B GEMESSEN (2026-08-22) + GESAMTVERDIKT
 
 Instrument NEU (`tools/probes/asym_value_sibling_check.py`, Artefakt
-`evaluations/asym_value_sibling_check.json`): identische Stellungsbasis
+`evaluations/artifacts/asym_value_sibling_check.json`): identische Stellungsbasis
 fuer beide Netze (der bestehende Nachfolger-Dump
 `probe_sibling_succ_k1_w1.0.json`, 40 Runde-2-Stellungen aus
 Champion-Suchlaeufen), je Kandidat rohes Value-Kopf-Urteil

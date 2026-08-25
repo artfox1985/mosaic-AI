@@ -55,7 +55,7 @@ from column_build_structural_probe import (  # noqa: E402
     struktur_kennzahlen,
 )
 
-OUT_JSON = ROOT / "evaluations" / "human_row_profile.json"
+OUT_JSON = ROOT / "evaluations" / "artifacts" / "human_row_profile.json"
 LOGS = ROOT / "static" / "log"
 
 # Referenz aus docs/domain_knowledge.md §1 (selfplay_v20wdl_*, 600 Partien).

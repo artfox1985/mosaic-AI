@@ -49,7 +49,7 @@ from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
 from plate_points_from_arena import game_list  # noqa: E402
 
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "row_initiation_probe.json"
+OUT_JSON = EVAL / "artifacts" / "row_initiation_probe.json"
 
 TAKE_CATS = ("SUN_TAKE", "MOON_GLOBAL_TAKE")
 LONG_ROWS = (5, 6)
@@ -195,7 +195,7 @@ def summarize(stats):
 def main():
     result = {}
 
-    p_a02 = EVAL / "paired_arena_env_imm_a02.json"
+    p_a02 = EVAL / "artifacts" / "paired_arena_env_imm_a02.json"
     for arm in ("0", "0.2"):
         st = collect(p_a02, arm,
                      lambda n: "Champion" if n == "Netz" else
@@ -212,7 +212,7 @@ def main():
 
     for fname, key in (("paired_arena_env_imm_netvnet.json", "netvnet"),
                        ("paired_arena_env_imm_netvnet_swap.json", "netvnet_swap")):
-        p = EVAL / fname
+        p = EVAL / "artifacts" / fname
         if not p.exists():
             continue
         d = json.load(open(p, encoding="utf-8"))

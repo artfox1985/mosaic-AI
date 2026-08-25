@@ -128,7 +128,7 @@ def main() -> None:
                    help="Feld aus offline_diagnosis, das verglichen wird (Default: die "
                         "Entscheidungsmetrik aus Task #15 A -- Runde 5 ausgeschlossen, weil das "
                         "Netz dort nie konsultiert wird).")
-    p.add_argument("--out", default="evaluations/train_seed_sweep.json")
+    p.add_argument("--out", default="evaluations/artifacts/train_seed_sweep.json")
     p.add_argument("--allow-selfplay", action="store_true",
                    help="Sicherheitsabfrage uebergehen (NICHT empfohlen -- siehe Modul-Doku).")
     args = p.parse_args()
@@ -156,7 +156,7 @@ def main() -> None:
                 raise SystemExit(f"Arm {arm}, Seed {seed} fehlgeschlagen -- Sweep abgebrochen.")
 
     models = [f"{arm}_s{seed}_best" for arm, _ in arms for seed in args.seeds]
-    diag_out = BASE_DIR / "evaluations" / "offline_diagnosis_seed_sweep.json"
+    diag_out = BASE_DIR / "evaluations" / "artifacts" / "offline_diagnosis_seed_sweep.json"
     print(f"\n[sweep] Diagnose ueber {len(models)} Checkpoints (frozen set)...")
     r = subprocess.run([sys.executable, "-u", str(BASE_DIR / "tools" / "offline_diagnosis.py"),
                         "--model", *models, "--frozen", "--out", str(diag_out)],

@@ -177,8 +177,8 @@ def main() -> None:
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5, 6])
     ap.add_argument("--allow-selfplay", action="store_true",
                     help="Sicherheitsabfrage uebergehen (NICHT empfohlen -- siehe Moduldoku).")
-    ap.add_argument("--out", default="evaluations/train_2d_vs_flat_fs_result.json")
-    ap.add_argument("--diag-out", default="evaluations/offline_diagnosis_2d_vs_flat_fs_frozen.json")
+    ap.add_argument("--out", default="evaluations/artifacts/train_2d_vs_flat_fs_result.json")
+    ap.add_argument("--diag-out", default="evaluations/artifacts/offline_diagnosis_2d_vs_flat_fs_frozen.json")
     ap.add_argument("--skip-training", action="store_true",
                     help="Nur Diagnose+Auswertung auf bereits vorhandenen Checkpoints.")
     args = ap.parse_args()

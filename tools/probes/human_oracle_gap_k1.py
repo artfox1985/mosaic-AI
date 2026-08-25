@@ -169,7 +169,7 @@ def main() -> None:
               f"{'BESTAETIGT' if bestaetigt and len(diffs) >= 5 else 'NICHT BESTAETIGT'}"
               + ("" if len(diffs) >= 5 else f"  (erst {len(diffs)} Partien)"))
 
-    (BASIS / "evaluations" / "probe_human_oracle_gap_k1.json").write_text(
+    (BASIS / "evaluations" / "artifacts" / "probe_human_oracle_gap_k1.json").write_text(
         json.dumps({"games": games, "verdikt": verdikt}, indent=1, ensure_ascii=False),
         encoding="utf-8")
     print("\n  geschrieben: evaluations/probe_human_oracle_gap_k1.json")

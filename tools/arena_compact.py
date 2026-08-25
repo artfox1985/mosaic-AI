@@ -36,7 +36,7 @@ sys.path.insert(0, str(BASIS / "tools"))
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
 from plate_points_from_arena import KRITERIUM, game_list  # noqa: E402
 
-ZIEL = BASIS / "evaluations" / "arena_compact.jsonl"
+ZIEL = BASIS / "evaluations" / "artifacts" / "arena_compact.jsonl"
 
 
 def kompakt(sp: dict, quelle: str) -> dict:

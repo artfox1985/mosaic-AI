@@ -84,7 +84,7 @@ geschaetzt: Self-Play-Zeit je Partie mit einem Rollout gegen zwei
 ### Stufe 1 ERGEBNIS + VERDIKT (2026-08-24): GATE GERISSEN, Arm verworfen
 
 `tools/probes/bootstrap_horizon_cost_gate.py`, Artefakt
-`evaluations/bootstrap_horizon_cost_gate.json`.
+`evaluations/artifacts/bootstrap_horizon_cost_gate.json`.
 
 | Groesse | Wert |
 | --- | --- |

@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | Beleg: **ENTSCHIEDEN**: E Miss-Rate 1,21% ⇒ Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (Verhaeltnis 1,232 -> 2,287), Schwelle 3 nicht erreicht ⇒ keine Wiedereroeffnung, aber Pflicht-Diagnostik je Champion. `evaluations/t_e_prior_blind_spot.json`, `evaluations/t_g_gumbel_scale_v21.json` -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | Beleg: **ENTSCHIEDEN**: E Miss-Rate 1,21% ⇒ Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (Verhaeltnis 1,232 -> 2,287), Schwelle 3 nicht erreicht ⇒ keine Wiedereroeffnung, aber Pflicht-Diagnostik je Champion. `evaluations/artifacts/t_e_prior_blind_spot.json`, `evaluations/artifacts/t_g_gumbel_scale_v21.json` -->
 
 # Vorregistrierung: Prior-Blindfleck & Wurzelbreite (externes Review R2)
 
@@ -18,7 +18,7 @@ Punkt, der eine echte, nie gemessene Luecke trifft.
 Die Wurzel-Kandidatenmenge wird EINMAL vor der ersten Simulation
 fixiert (Gumbel-Top-m auf logit+Noise); Sequential Halving kann sie
 nur verkleinern, nie erweitern. Gemessene Abdeckung
-(`evaluations/dome_split_diagnosis.json`, n=50 Stellungen, 400 Sims):
+(`evaluations/artifacts/dome_split_diagnosis.json`, n=50 Stellungen, 400 Sims):
 
 | Groesse | Median | Min | Max |
 |---|---|---|---|
@@ -185,7 +185,7 @@ d.h. echter Dominanz einer Seite). Kosten ~10 min.
 
 Lauf am Champion `v21_2d_brierbest` gegen `frozen_v2_oracle_labels.json`,
 n=930 (Runden 1-4; Runde 5 per Altcode ausgeschlossen, dort exakter
-Loeser). Belegstelle `evaluations/t_e_prior_blind_spot.json`.
+Loeser). Belegstelle `evaluations/artifacts/t_e_prior_blind_spot.json`.
 
 | m | rauschfrei `prior_recall_at_m` | rausch-treu `gumbel_recall_at_m` |
 |---|---|---|
@@ -263,7 +263,7 @@ in beiden.
 ## ERGEBNIS Task G (2026-08-09): AERA-EFFEKT BESTAETIGT, KEINE WIEDEREROEFFNUNG
 
 `tools/gumbel_scale_calibration.py --model v21_2d_brierbest --sims 400
---n-states 300`; Belegstelle `evaluations/t_g_gumbel_scale_v21.json`.
+--n-states 300`; Belegstelle `evaluations/artifacts/t_g_gumbel_scale_v21.json`.
 Identische Zustandsmenge wie Task #18 (n_used 233, n_skipped 67,
 max_N-Median 96 in beiden -- die Halbierungs-Verteilung haengt am Budget,
 nicht am Netz).

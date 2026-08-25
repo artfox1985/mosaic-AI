@@ -79,7 +79,7 @@ def main() -> None:
     ap.add_argument("--draws", type=int, default=16, help="Zufallsziehungen je Kandidat")
     ap.add_argument("--n-states", type=int, default=25)
     ap.add_argument("--sims", type=int, default=2000)
-    ap.add_argument("--out", default="evaluations/tiling_value_reference_pilot.json")
+    ap.add_argument("--out", default="evaluations/artifacts/tiling_value_reference_pilot.json")
     args = ap.parse_args()
 
     import mosaic_rust as mr

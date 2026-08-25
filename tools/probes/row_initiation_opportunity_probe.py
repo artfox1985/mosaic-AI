@@ -52,7 +52,7 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "row_initiation_opportunity_probe.json"
+OUT_JSON = EVAL / "artifacts" / "row_initiation_opportunity_probe.json"
 
 LONG_IDX = (4, 5)     # 0-indexiert -> Musterreihe 5/6
 SHORT_IDX = (0, 1, 2)  # -> Musterreihe 1/2/3

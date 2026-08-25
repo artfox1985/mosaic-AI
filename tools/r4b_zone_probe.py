@@ -40,7 +40,7 @@ for _s in (sys.stdout, sys.stderr):
 
 from r4_value_calibration import select_states  # noqa: E402
 
-R4B_JSON = BASE_DIR / "evaluations" / "r4b_value_calibration_v20_n72.json"
+R4B_JSON = BASE_DIR / "evaluations" / "artifacts" / "r4b_value_calibration_v20_n72.json"
 MODEL_KEY = "models/alphazero_v20_2d_opp_brierbest.pth"
 
 
@@ -129,7 +129,7 @@ def main() -> None:
         print(f"  {k}: {v:+.3f}")
     print(f"Decke (R2_max): {out['r2_max']}")
 
-    out_path = BASE_DIR / "evaluations" / "r4b_zone_probe_v20.json"
+    out_path = BASE_DIR / "evaluations" / "artifacts" / "r4b_zone_probe_v20.json"
     out_path.write_text(json.dumps(out, indent=1), encoding="utf-8")
     print(f"\nErgebnis: {out_path}")
 

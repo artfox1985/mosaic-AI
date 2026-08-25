@@ -71,7 +71,7 @@ from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
 from plate_points_from_arena import game_list  # noqa: E402
 
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "row_preference_probe.json"
+OUT_JSON = EVAL / "artifacts" / "row_preference_probe.json"
 
 ROW_CATS = ("SUN_TAKE", "MOON_GLOBAL_TAKE")
 
@@ -204,7 +204,7 @@ def main() -> None:
     #    Vergleich auf genau einem Sitz.
     for fname in ("paired_arena_env_imm_netvnet.json",
                   "paired_arena_env_imm_netvnet_swap.json"):
-        p1 = EVAL / fname
+        p1 = EVAL / "artifacts" / fname
         if not p1.exists():
             continue
         d1 = json.load(open(p1, encoding="utf-8"))
@@ -237,7 +237,7 @@ def main() -> None:
 
     # 2) Champion (Netz) vs Heuristik, zwei Arme (0 / 0.2), kombiniert +
     #    einzeln.
-    p2 = EVAL / "paired_arena_env_imm_a02.json"
+    p2 = EVAL / "artifacts" / "paired_arena_env_imm_a02.json"
     for arm in ("0", "0.2"):
         add_arena_source(stats, f"champion_vs_heuristik_arm{arm}", p2, arm=arm,
                           side_filter=lambda n: "Champion" if n == "Netz" else
@@ -250,7 +250,7 @@ def main() -> None:
                       ("Heuristik" if n == "Heuristik" else None))
 
     # 3) seedk1 (NetzA) vs Champion (NetzB).
-    p3 = EVAL / "paired_arena_env_seedk1_nullarm.json"
+    p3 = EVAL / "artifacts" / "paired_arena_env_seedk1_nullarm.json"
     d3 = json.load(open(p3, encoding="utf-8"))
     assert "seedk1" in d3["model"] and "seedk1" not in d3["model_b"], (
         f"{p3.name}: erwartete Anordnung NetzA=seedk1 NetzB=Champion nicht "

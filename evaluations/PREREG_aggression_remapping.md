@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Zeigt einer der 3 (w,λ)-Blend-Arme einen signifikanten Staerkegewinn gegen die w=0-Kontrolle (v20-Aera, F1-gefixt)? | Beleg: Alle 3 Arme H0 (149/154/161/155 von je 200), w bleibt ueberall 0; `evaluations/paired_arena_env_aggr_remapping.json` -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Zeigt einer der 3 (w,λ)-Blend-Arme einen signifikanten Staerkegewinn gegen die w=0-Kontrolle (v20-Aera, F1-gefixt)? | Beleg: Alle 3 Arme H0 (149/154/161/155 von je 200), w bleibt ueberall 0; `evaluations/artifacts/paired_arena_env_aggr_remapping.json` -->
 
 # Vorregistrierung: Aggressions-Neukartierung (v20-Aera)
 
@@ -65,5 +65,5 @@ Kontrolle (0,0: 149/200 vs Heuristik): (0.1,1.0) 154/200, p=0,59;
 Staerkegewinn -> w bleibt ueberall 0, der Punkt gilt als geschlossen bis
 zur naechsten Kopf-Generation; die (0,1;2,0)-Richtung ist deskriptiv
 (+6pp) fuer kuenftige Kopf-Generationen vermerkt, keine
-Style-Interpretation. Belegstelle: evaluations/paired_arena_env_aggr_remapping.json
+Style-Interpretation. Belegstelle: evaluations/artifacts/paired_arena_env_aggr_remapping.json
 (Felder `arm_wins`, `comparisons`); Commit b5123df.

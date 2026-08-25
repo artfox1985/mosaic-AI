@@ -55,7 +55,7 @@ if "--arms" in sys.argv:
 NAME_A, NAME_B = f"Heuristik_{ARM_A}", f"Heuristik_{ARM_B}"
 SIMS, THREADS, C_PUCT = 150, 0, 0.3
 SEED = 20260825
-OUT_JSON = ROOT / "evaluations" / "v2_envelope_arena.json"
+OUT_JSON = ROOT / "evaluations" / "artifacts" / "v2_envelope_arena.json"
 
 # Vorregistriert: 80 gepaarte Partien JE SITZ. `--games` ist ausschliesslich
 # fuer den Rauchtest da -- ein Messlauf mit anderer Zahl waere ein anderer
@@ -65,7 +65,7 @@ BLOCK = 16
 if "--games" in sys.argv:
     GAMES_PER_SEAT = int(sys.argv[sys.argv.index("--games") + 1])
     BLOCK = max(1, GAMES_PER_SEAT // 5)
-    OUT_JSON = ROOT / "evaluations" / "v2_envelope_arena_smoke.json"
+    OUT_JSON = ROOT / "evaluations" / "artifacts" / "v2_envelope_arena_smoke.json"
 # `--tag` fuer die Ablationen (par.8.4): gleicher Aufbau, gleicher Seed, nur
 # eine Konstante im Code auf 0 -- die Ergebnisse muessen nebeneinander liegen.
 if "--tag" in sys.argv:

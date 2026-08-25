@@ -122,7 +122,7 @@ def main() -> None:
                     help="Fuellstand >= hi -> Gruppe 'nach' (Default 15 von 21)")
     ap.add_argument("--lo", type=int, default=6,
                     help="Fuellstand <= lo -> Gruppe 'vor' (Default 6 von 21)")
-    ap.add_argument("--out", default="evaluations/chance_node_pretest.json")
+    ap.add_argument("--out", default="evaluations/artifacts/chance_node_pretest.json")
     args = ap.parse_args()
 
     import torch

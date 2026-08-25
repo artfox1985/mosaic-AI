@@ -72,7 +72,7 @@ EXPECTED_COUNTS = {"pcrkontrolle": 117, "pcrpcr": 210}
 SOURCE_DIR = BASE_DIR / "data_pcr_ab"
 SANDBOX_DIRS = {"pcrkontrolle": BASE_DIR / "data_pcr_kontrolle",
                 "pcrpcr": BASE_DIR / "data_pcr_pcr"}
-SPLIT_MANIFEST = BASE_DIR / "evaluations" / "train_pcr_dose_split.json"
+SPLIT_MANIFEST = BASE_DIR / "evaluations" / "artifacts" / "train_pcr_dose_split.json"
 
 
 def sign_test_p(n_pos: int, n_neg: int) -> float:
@@ -471,8 +471,8 @@ def run_smoke() -> None:
     smoke_recipe = ["--epochs", "2", "--lr", "4e-4", "--lr-schedule", "cosine",
                      "--value-target-variant", "nortv", "--no-plot", "--no-snapshot"]
     seeds = [1]
-    diag_out = BASE_DIR / "evaluations" / "_smoke_pcr_dose_diag.json"
-    result_out = BASE_DIR / "evaluations" / "_smoke_pcr_dose_result.json"
+    diag_out = BASE_DIR / "evaluations" / "artifacts" / "_smoke_pcr_dose_diag.json"
+    result_out = BASE_DIR / "evaluations" / "artifacts" / "_smoke_pcr_dose_result.json"
     ok = False
     try:
         for a in ARMS:
@@ -553,8 +553,8 @@ def run_smoke() -> None:
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seeds", type=int, nargs="+", default=[1, 2, 3, 4, 5, 6])
-    ap.add_argument("--out", default="evaluations/train_pcr_dose_result.json")
-    ap.add_argument("--diag-out", default="evaluations/offline_diagnosis_pcr_dose_frozen.json")
+    ap.add_argument("--out", default="evaluations/artifacts/train_pcr_dose_result.json")
+    ap.add_argument("--diag-out", default="evaluations/artifacts/offline_diagnosis_pcr_dose_frozen.json")
     ap.add_argument("--skip-training", action="store_true",
                     help="Nur Diagnose+Auswertung auf bereits vorhandenen Checkpoints.")
     ap.add_argument("--smoke", action="store_true",

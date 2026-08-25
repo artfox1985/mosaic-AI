@@ -443,7 +443,7 @@ holdout`, Tiling-Stellungen, je (Partie, Runde) eine, 150 je Runde). Puffer aus
 dem erweiterten Export `plate_completability_json` (neues Feld
 `col_open_cells`: je offener Normal-Zelle `buffer = erreichbar - Bedarf`,
 bindende Zelle = Minimum ueber die Spalte). Rohzahlen:
-`evaluations/probe_reachability_buffer_spread.json`.
+`evaluations/artifacts/probe_reachability_buffer_spread.json`.
 
 | Runde | bindende Spalten je Stellung | Roh-Puffer p10 / Median / p90 |
 |---|---:|---|

@@ -652,7 +652,7 @@ def main() -> None:
     if out_path is None:
         base = Path(__file__).resolve().parent.parent / "evaluations"
         suffix = "_frozen" if args.frozen else ""
-        out_path = str(base / f"offline_diagnosis_{'_vs_'.join(args.model)}{suffix}.json")
+        out_path = str(base / "artifacts" / f"offline_diagnosis_{'_vs_'.join(args.model)}{suffix}.json")
     with open(out_path, "w", encoding="utf-8") as f:
         json.dump({
             **frozen_meta,

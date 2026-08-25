@@ -42,7 +42,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / "engine" / "py"))
 
-CURVE = REPO / "evaluations" / "gpu_batch_throughput.json"
+CURVE = REPO / "evaluations" / "artifacts" / "gpu_batch_throughput.json"
 FROZEN = REPO / "evaluations" / "frozen_eval_set.pkl"
 MODEL = REPO / "models" / "alphazero_v21_2d_brierbest.onnx"
 
@@ -102,7 +102,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--sims", type=int, default=400)
     ap.add_argument("--repeats", type=int, default=3)
-    ap.add_argument("--out", default="evaluations/interleave_batch_probe.json")
+    ap.add_argument("--out", default="evaluations/artifacts/interleave_batch_probe.json")
     args = ap.parse_args()
 
     if not CURVE.exists():

@@ -282,7 +282,7 @@ Schritt ist die Rangregel, nicht eine weitere Dosis.
 ## par.9 ERGEBNIS (2026-08-18) — NICHT-ERFOLG, die Form ist nicht der Engpass
 
 Gefahren wie in par.6 registriert, Gueltigkeitskontrollen in par.6.1.
-Rohdaten `evaluations/paired_arena_env_conj_d1_b18.json`, Arm `0.1,0.3,1`.
+Rohdaten `evaluations/artifacts/paired_arena_env_conj_d1_b18.json`, Arm `0.1,0.3,1`.
 
 **Die Zielkriterien, gepaart gegen die Produktform bei derselben Dosis D1**
 (Block-Ebene, nB=6, Schwelle |t| > 2,571):

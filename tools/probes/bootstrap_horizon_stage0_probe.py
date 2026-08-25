@@ -64,7 +64,7 @@ from paired_arena_env_ab import champion_model  # noqa: E402 -- bestehende Champ
 import mosaic_rust as mr  # noqa: E402
 
 KORPUS_GLOB = str(BASIS / "data" / "selfplay_v20wdl_*.pkl")
-OUT = BASIS / "evaluations" / "bootstrap_horizon_stage0_probe.json"
+OUT = BASIS / "evaluations" / "artifacts" / "bootstrap_horizon_stage0_probe.json"
 
 ROUNDS = (1, 2, 3)
 PROGRESS_HIGH_THRESHOLD = 3  # wie seed_position_curation.py: PROGRESS=(3,4,5) = "hoch"

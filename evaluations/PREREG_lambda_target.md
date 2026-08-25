@@ -58,7 +58,7 @@ reines `z` (Präsenz-Maske 0), unabhängig von λ.
 **Der Misch-Anteil auf SAMPLE-Ebene (nicht Datei-Ebene) wird von
 `tools/train_lambda_sweep.py --build-only` exakt bestimmt** (scannt alle
 `v18`-Dateien des eingefrorenen Fensters, zählt Records mit `root_q`) und in
-`evaluations/train_lambda_sweep_split.json` persistiert — er ist NIEDRIGER
+`evaluations/artifacts/train_lambda_sweep_split.json` persistiert — er ist NIEDRIGER
 als der Datei-Anteil (600/900 ≈ 66,7%), weil `root_q` selbst innerhalb der
 `v18`-Dateien nur bei Mehr-Aktionen-Drafting-Zügen geloggt wird (Tiling-/
 Start-/Ein-Aktion-Schritte bleiben immer ohne). Der exakte Wert wird VOR dem
@@ -115,7 +115,7 @@ python train.py --name <arm>_s<seed> --seed <seed> \
 
 Wie `PREREG_corpus_dose.md`: `tools/train_lambda_sweep.py` baut EINE
 eingefrorene Hardlink-Sandbox `data_lambda_sweep/` (900 Dateien: 600 `v18` +
-200 `v17` + 100 `v16`, Split-Manifest `evaluations/train_lambda_sweep_split.json`)
+200 `v17` + 100 `v16`, Split-Manifest `evaluations/artifacts/train_lambda_sweep_split.json`)
 und setzt `MOSAIC_DATA_DIR` für alle 24 `train.py`-Subprozesse darauf — anders
 als bei der Korpus-Dosis-Vorstudie gibt es hier nur EINE Korpusgröße (alle 4
 Arme sehen denselben Korpus), die Sandbox schützt trotzdem vor Verzerrung
@@ -263,17 +263,17 @@ weitere Empfehlung ausgesprochen wird.
 1. `tools/train_lambda_sweep.py --build-only`: Split-Manifest +
    Hardlink-Sandbox `data_lambda_sweep/` (900 Dateien) aufbauen,
    Sample-Misch-Anteil exakt bestimmen (scannt alle `v18`-Dateien), Ergebnis
-   in `evaluations/train_lambda_sweep_split.json` UND oben im Abschnitt
+   in `evaluations/artifacts/train_lambda_sweep_split.json` UND oben im Abschnitt
    "Datengrundlage" nachtragen.
 2. 24 Läufe sequenziell (`tools/train_lambda_sweep.py`, Vorbild
    `train_corpus_dose.py`, aber EINE Sandbox + `--value-target-lambda` statt
    zwei Sandboxes je Korpusgröße).
 3. `tools/offline_diagnosis.py --frozen --model lam10_s1_best ... lam03_s6_best
-   --out evaluations/offline_diagnosis_lambda_target_frozen.json`.
+   --out evaluations/artifacts/offline_diagnosis_lambda_target_frozen.json`.
 4. Gepaarte Auswertung (`tools/train_lambda_sweep.py` schreibt sie direkt
    mit) — 3 Vergleiche (`lam07`/`lam05`/`lam03` je vs. `lam10`) auf
    `value_r2_rounds_1_4` (primär) + den 2 Orakel-Metriken (sekundär),
-   Ergebnis-JSON nach `evaluations/train_lambda_sweep_result.json`.
+   Ergebnis-JSON nach `evaluations/artifacts/train_lambda_sweep_result.json`.
 5. Interpretationsregel oben automatisch angewendet (rein deskriptiv, der
    Mensch entscheidet trotzdem) — bestimmt, ob Schritt 6 überhaupt läuft.
 6. NUR falls Schritt 5 einen Arm bestimmt: Arena-Gating (`paired_gating.py`,
@@ -288,4 +288,4 @@ p=0,25). Verdikt: Offline-Signal ohne Arena-Bestaetigung bleibt Beobachtung,
 kein Rezeptwechsel; λ bleibt 1,0 auf diesem 900er-Fenster (43,8%
 root_q-Mix). Belegstelle: archive/history.md, Abschnitt "Lambda-Sweep
 ABGESCHLOSSEN: klares Offline-Signal, KEINE Arena-Bestaetigung
-(2026-08-03)", Zeile ~6969-7002; evaluations/train_lambda_sweep_result.json.
+(2026-08-03)", Zeile ~6969-7002; evaluations/artifacts/train_lambda_sweep_result.json.

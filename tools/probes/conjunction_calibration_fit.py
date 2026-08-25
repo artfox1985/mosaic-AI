@@ -361,7 +361,7 @@ def main():
     print("TRANSFER besser ist als V0 -- im Fit-Satz ist jede Variante per")
     print("Konstruktion besser, das entscheidet nichts.")
 
-    ziel = REPO / "evaluations" / "conjunction_calibration_fit.json"
+    ziel = REPO / "evaluations" / "artifacts" / "conjunction_calibration_fit.json"
     ziel.write_text(json.dumps({"checkpoint": CHECKPOINT, "fit_arme": vorhanden,
                                 "transfer_arm": TRANSFER_ARM, "gruppen": ergebnis},
                                indent=1), encoding="utf-8")

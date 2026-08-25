@@ -17,7 +17,7 @@ vermessen in `PREREG_gpu_inference_path.md` §7-§19) kann die GPU-Gewinnzone
 **strukturell nicht erreichen**:
 
 - Gemessener mittlerer Batch **~14,64** bei Deckel **16** (`EVAL_BATCH_MAX_N`)
-  -- GEPRÜFT: `evaluations/gpu_inference_path_selfplay_e2e_route_b.json`,
+  -- GEPRÜFT: `evaluations/artifacts/gpu_inference_path_selfplay_e2e_route_b.json`,
   `laeufe.armB_t8.batcher_mean_batch = 14.64`, `batcher_max_batch_seen = 16`.
 - Die gemessene GPU-Gewinnzone beginnt erst bei Batch **128** (ORT-CUDA-
   Kennlinie, `PREREG_gpu_inference_path.md` §8/§11).

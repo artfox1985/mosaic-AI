@@ -266,7 +266,7 @@ ownership-tragend trainierten Netz.
   Referee-/Worker-Pfad -- der traegt bis zum gruenen Kernbeweis
   (Kapselungs-Prereg par.8d) keine Messungen.
 
-### par.3e ERGEBNIS VIERER-VERGLEICH + VERDIKT (2026-08-23; Agent, Zahlen vom Koordinator am Artefakt `evaluations/r5_four_head_comparison.json` nachgemessen)
+### par.3e ERGEBNIS VIERER-VERGLEICH + VERDIKT (2026-08-23; Agent, Zahlen vom Koordinator am Artefakt `evaluations/artifacts/r5_four_head_comparison.json` nachgemessen)
 
 200 R5-Startzustaende (70 k1-aktiv), Grundwahrheit = exakte
 Solver-Wurzelmarge ueber den NETZ-Loeserpfad (ab_value):

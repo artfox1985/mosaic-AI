@@ -450,7 +450,7 @@ Start-Konfiguration (Entscheidungen beim Vollzug, hier festgeschrieben):
   eigener Nutzer-Startknopf.
 
 ## §8 DECKUNGS-BERICHT (2026-08-14, vor jedem Training; volle Zahlen:
-## evaluations/ownership_corpus_coverage_report.json, exakt mit den
+## evaluations/artifacts/ownership_corpus_coverage_report.json, exakt mit den
 ## Trainings-Label-Bauern _conjunctions_from_dome/_ownership_from_dome gerechnet)
 
 8000/8000 Partien vollstaendig (0 unvollstaendige). Positive Partien je Seite
@@ -516,7 +516,7 @@ der Alarm.
 
 Messung: `tools/probes/ownership_gate_a.py`, 820 Held-out-Partien / 14.360
 Bretter aus dem Val-Split (identisch ueber alle Arme: gleicher Seed 2,
-gleiche Dateiliste). Rohzahlen: `evaluations/ownership_gate_a_results.json`.
+gleiche Dateiliste). Rohzahlen: `evaluations/artifacts/ownership_gate_a_results.json`.
 Alle Zahlen unten vom Koordinator am JSON nachgerechnet.
 
 ### §10.1 Waechter (§9 Punkt 1): kein Arm faellt durch
@@ -622,7 +622,7 @@ faellt w1 gegen w05 ab, ist 0,5 als Optimum bestaetigt.
 
 Gemessen mit demselben `ownership_gate_a.py` auf demselben Held-out
 (820 Partien, Dateilisten-Kontrolle bestanden). Rohzahlen:
-`evaluations/ownership_gate_a_w1.json`.
+`evaluations/artifacts/ownership_gate_a_w1.json`.
 
 | Arm | Feld-AUC (best/final) | E_k k1 (final) | k2 | k5 | policy val_loss (best) |
 |---|---|---:|---:|---:|---:|

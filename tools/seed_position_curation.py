@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parent.parent
 KORPUS_GLOB = str(ROOT / "data/asym_corpus/selfplay_v21_asymS_*.pkl")
 MAP_PATH = ROOT / "data/asym_corpus/zwangsseiten_map.txt"
 OUT_SET = ROOT / "data/seed_positions/seed_positions_v1.jsonl"
-OUT_REPORT = ROOT / "evaluations/seed_positions_curation_report.json"
+OUT_REPORT = ROOT / "evaluations/artifacts/seed_positions_curation_report.json"
 
 ROUNDS = (2, 3, 4)
 PROGRESS = (3, 4, 5)

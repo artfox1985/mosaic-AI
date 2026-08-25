@@ -79,6 +79,6 @@ for prefix, name in ARME:
               f"p1: {a1[0]:>4} / {a1[1]:>5}")
     print(f"  offene Spezialfelder Ø   p0: {offene_specials[0]/spiele:.2f} | p1: {offene_specials[1]/spiele:.2f}")
 
-aus = B / "evaluations" / "ownership_corpus_coverage_report.json"
+aus = B / "evaluations" / "artifacts" / "ownership_corpus_coverage_report.json"
 aus.write_text(json.dumps(bericht, indent=1, ensure_ascii=False), encoding="utf-8")
 print(f"\nBericht -> {aus}")

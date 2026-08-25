@@ -142,9 +142,9 @@ pub const KNOBS: &[KnobEntry] = &[
     KnobEntry { name: "MOSAIC_CACHE_F32", default: "aus (nur =1)", status: KnobStatus::Aktiv, purpose: "float32 statt float16 fuer states/policies im Cache, Notausstieg (neural_net.py:1872)", prereg: "-" },
     KnobEntry { name: "MOSAIC_PLANES_LAZY", default: "aus (nur =1)", status: KnobStatus::Aktiv, purpose: "lazy HDF5-Pro-Index-Zugriff statt Planes-in-RAM, nur fuer knappes RAM (neural_net.py:2014)", prereg: "-" },
     KnobEntry { name: "MOSAIC_PLANES_H5_DIR", default: "unset", status: KnobStatus::Diagnose, purpose: "Planes-HDF5 aus anderem Ordner oeffnen, OneDrive-Ausschlusstest (neural_net.py:1105)", prereg: "-" },
-    KnobEntry { name: "MOSAIC_DISPLAY_CAL", default: "an (=0 schaltet ab)", status: KnobStatus::Aktiv, purpose: "Platt-Kalibrierung der ANGEZEIGTEN Gewinnwahrscheinlichkeit, nicht der Suche (server.py:1409)", prereg: "evaluations/platt_fit_v21.json" },
-    KnobEntry { name: "MOSAIC_DISPLAY_CAL_A", default: "-0.0033", status: KnobStatus::Aktiv, purpose: "Platt-A der Anzeige-Kalibrierung, modellspezifisch (server.py:1407)", prereg: "evaluations/platt_fit_v21.json" },
-    KnobEntry { name: "MOSAIC_DISPLAY_CAL_B", default: "0.9060", status: KnobStatus::Aktiv, purpose: "Platt-B der Anzeige-Kalibrierung, modellspezifisch (server.py:1408)", prereg: "evaluations/platt_fit_v21.json" },
+    KnobEntry { name: "MOSAIC_DISPLAY_CAL", default: "an (=0 schaltet ab)", status: KnobStatus::Aktiv, purpose: "Platt-Kalibrierung der ANGEZEIGTEN Gewinnwahrscheinlichkeit, nicht der Suche (server.py:1409)", prereg: "evaluations/artifacts/platt_fit_v21.json" },
+    KnobEntry { name: "MOSAIC_DISPLAY_CAL_A", default: "-0.0033", status: KnobStatus::Aktiv, purpose: "Platt-A der Anzeige-Kalibrierung, modellspezifisch (server.py:1407)", prereg: "evaluations/artifacts/platt_fit_v21.json" },
+    KnobEntry { name: "MOSAIC_DISPLAY_CAL_B", default: "0.9060", status: KnobStatus::Aktiv, purpose: "Platt-B der Anzeige-Kalibrierung, modellspezifisch (server.py:1408)", prereg: "evaluations/artifacts/platt_fit_v21.json" },
     // ── Geplante Knoepfe (Prereg-beschrieben, im Arbeitsbaum nicht verdrahtet) ──
     KnobEntry { name: "MOSAIC_GAME_TIMEOUT_SCALE", default: "1.0 (geplant)", status: KnobStatus::Geplant, purpose: "Multiplikator auf den Pro-Partie-Timeout im Self-Play; im Prereg beschrieben, Grep 2026-08-15 findet KEIN Vorkommen in engine/src oder *.py -- nicht verdrahtet", prereg: "PREREG_gpu_inference_path.md (Deckel-Knopf)" },
     // ── Tote Knoepfe (dokumentiert statt geraten) ───────────────────────────

@@ -98,7 +98,7 @@ from column_completion_gap_probe import (  # noqa: E402
 )
 
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "column_completion_legality_probe.json"
+OUT_JSON = EVAL / "artifacts" / "column_completion_legality_probe.json"
 
 
 # ── Arena-JSON -> Replayer-Adapter (siehe Moduldoku) ────────────────────────
@@ -284,7 +284,7 @@ def main() -> None:
     for quelle in QUELLEN:
         stop_all = False
         for dateiname in quelle["dateien"]:
-            pfad = EVAL / dateiname
+            pfad = EVAL / "artifacts" / dateiname
             if not pfad.exists():
                 print(f"FEHLT: {pfad}", file=sys.stderr)
                 continue

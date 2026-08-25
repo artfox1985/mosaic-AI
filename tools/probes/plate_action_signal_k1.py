@@ -196,7 +196,7 @@ def main() -> None:
         urteil = "(B) KOPF WEISS ES NICHT -- stabile Ordnung ist stabil FALSCH"
     print(f"\n  VORABREGEL par.5: {urteil}")
 
-    (BASIS / "evaluations" / "probe_plate_action_signal_k1.json").write_text(json.dumps({
+    (BASIS / "evaluations" / "artifacts" / "probe_plate_action_signal_k1.json").write_text(json.dumps({
         "model": a.model, "runde": a.runde, "n_stellungen": n,
         "n_mit_spreizung": len(tau_kopf),
         "anteil_ohne_spreizung": ohne_spreizung / max(n, 1),

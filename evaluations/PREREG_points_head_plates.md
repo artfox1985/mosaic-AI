@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Traegt der Punkte-/Gegner-Punkte-Kopf Platten-Information, und differenziert er die ZUEGE danach? | Beleg: **ENTSCHIEDEN (Stufe 2)**: beide Koepfe sortieren die Wurzelkandidaten plattenabhaengig UM -- `net_points_forecast` Tau-Median 0,792, `net_opp_points_forecast` 0,640, `net_raw_value` 0,778 ⇒ alle Regel 2a (Zug-Differenzierung). Stufe-1-Gate war fehlkonstruiert und ist als ungueltig erklaert. Motiviert `PREREG_points_blend_w.md`. `evaluations/points_head_plates_stage2.json` -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Traegt der Punkte-/Gegner-Punkte-Kopf Platten-Information, und differenziert er die ZUEGE danach? | Beleg: **ENTSCHIEDEN (Stufe 2)**: beide Koepfe sortieren die Wurzelkandidaten plattenabhaengig UM -- `net_points_forecast` Tau-Median 0,792, `net_opp_points_forecast` 0,640, `net_raw_value` 0,778 ⇒ alle Regel 2a (Zug-Differenzierung). Stufe-1-Gate war fehlkonstruiert und ist als ungueltig erklaert. Motiviert `PREREG_points_blend_w.md`. `evaluations/artifacts/points_head_plates_stage2.json` -->
 
 # Vorregistrierung: Reagiert der PUNKTE-Kopf auf die Wertungsplatten?
 
@@ -101,7 +101,7 @@ beruecksichtigt die Platten" berichtet werden, sondern nur als
 ### ERGEBNIS Stufe 1 (2026-08-09): GATE WAR FEHLKONSTRUIERT -- Zahlen nur deskriptiv
 
 Lauf: Champion, 400 Sims, Seed 1000 (Rauschboden-Seed 2000), 16 Zustaende
-x 8 Kombinationen. Belegstelle `evaluations/points_head_plates_stage1.json`.
+x 8 Kombinationen. Belegstelle `evaluations/artifacts/points_head_plates_stage1.json`.
 Kipprate im selben Lauf unveraendert reproduziert (36/124 = 29,03%),
 Altverhalten also intakt.
 
@@ -312,7 +312,7 @@ vergleichbar).
 
 `tools/points_head_stage2.py`, Champion, 400 Sims, Seed 1000, 16 Zustaende
 x 8 feste Kombinationen; 12 nutzbar (3x Runde 5 ohne Netz, 1x nur ein
-Kandidat). Belegstelle `evaluations/points_head_plates_stage2.json`.
+Kandidat). Belegstelle `evaluations/artifacts/points_head_plates_stage2.json`.
 
 | Groesse | Tau-Median | Relative Verschiebung | Regel |
 |---|---|---|---|

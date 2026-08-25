@@ -405,7 +405,7 @@ keinen Fehler, auf den er hätte reagieren müssen.
 ### Die Kennlinie -- VOLLE Zeit je Batch (Merkmalspuffer -> Tensor -> `run` -> `Vec<f32>`)
 
 Zwei Läufe (derselbe Build, dieselben DLLs) zur Streubreiten-Einordnung:
-Lauf 2 ist der in `evaluations/ort_cuda_batch_throughput.json` persistierte
+Lauf 2 ist der in `evaluations/artifacts/ort_cuda_batch_throughput.json` persistierte
 (korrekte Versions-Metadaten; Lauf 1 hatte einen Anzeige-Fehler -- Quelltext
 sagte fälschlich "rc.13"/"1.28", behoben vor Lauf 2).
 
@@ -689,7 +689,7 @@ gepresst).
 ### (3) Kennlinie neu gemessen mit `with_tf32(false)`
 
 Gleiches Modell/gleiche Batch-Punkte wie §11, JSON
-`evaluations/ort_cuda_batch_throughput_tf32off.json` (§11s Datei bleibt
+`evaluations/artifacts/ort_cuda_batch_throughput_tf32off.json` (§11s Datei bleibt
 unangetastet):
 
 | Batch | TF32 aus (Evals/s) | TF32 auf ORT-Default (§11, Lauf 2) | Torch/CUDA |
@@ -1109,7 +1109,7 @@ Nutzer-Auftrag 2026-08-13: die frühere e2e-Messung (`self_play_throughput_probe
 Beispiel-Binary, NICHT über den Produktionspfad -- deshalb hier wiederholt über
 `self_play.py` → `mosaic_rust.net_self_play_games` → `run_net_self_play`
 (`self_play.rs:2822`), also exakt den Pfad, den ein echter Self-Play-Lauf nimmt.
-Volle Zahlen: `evaluations/gpu_inference_path_selfplay_e2e_route_b.json`.
+Volle Zahlen: `evaluations/artifacts/gpu_inference_path_selfplay_e2e_route_b.json`.
 
 ### Vorgefunden, nicht gebaut: die Verdrahtung aus §12 war bereits vollständig
 
@@ -1272,7 +1272,7 @@ Ergebniszeile).
 
 ### Die Messtabelle
 
-Rohdaten: `evaluations/async_gpu_stage3_probe.jsonl` (8 Zeilen).
+Rohdaten: `evaluations/artifacts/async_gpu_stage3_probe.jsonl` (8 Zeilen).
 
 | Messpunkt | Träger-Fäden | N (Nebenläufigkeit) | fertig/angefordert | Wandzeit | mittlerer Batch | Batch-Deckel-Sättigung |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |

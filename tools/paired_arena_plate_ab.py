@@ -155,7 +155,7 @@ def run_arm(arm: str, seed: int, n_games: int, block_size: int, threads: int,
         "sims": SIMS, "c_puct": C_PUCT, "model_champion": MODEL_CHAMPION,
         "model_opponent": MODEL_OPPONENT, "games": all_games,
     }
-    out_path = EVAL_DIR / f"paired_arena_{out_prefix}_{arm}_raw.json"
+    out_path = EVAL_DIR / "artifacts" / f"paired_arena_{out_prefix}_{arm}_raw.json"
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     champ_wins = sum(1 for g in all_games if g["winner"] == 0)
     print(f"Arm {label} fertig: Champion {champ_wins}:{n_games - champ_wins} Vor-Referenz "
@@ -169,8 +169,8 @@ def _avg(games: list[dict], key: str, idx: int) -> float:
 
 
 def combine(out_prefix: str = "plate") -> dict:
-    off_path = EVAL_DIR / f"paired_arena_{out_prefix}_off_raw.json"
-    on_path = EVAL_DIR / f"paired_arena_{out_prefix}_on_raw.json"
+    off_path = EVAL_DIR / "artifacts" / f"paired_arena_{out_prefix}_off_raw.json"
+    on_path = EVAL_DIR / "artifacts" / f"paired_arena_{out_prefix}_on_raw.json"
     off = json.loads(off_path.read_text(encoding="utf-8"))
     on = json.loads(on_path.read_text(encoding="utf-8"))
 
@@ -232,7 +232,7 @@ def combine(out_prefix: str = "plate") -> dict:
     print(f"McNemar exakter p-Wert: {p:.4f}")
     print(f"Evidenzregel-Entscheidung: {result['decision']}")
 
-    out_path = EVAL_DIR / f"paired_arena_{out_prefix}_ab_result.json"
+    out_path = EVAL_DIR / "artifacts" / f"paired_arena_{out_prefix}_ab_result.json"
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(f"Ergebnis gespeichert: {out_path}")
     return result

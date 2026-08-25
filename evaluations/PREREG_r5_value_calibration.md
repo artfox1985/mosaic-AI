@@ -13,7 +13,7 @@ unten dürfen nach Sichtung von Zwischenergebnissen nicht mehr geändert werden
 `tools/scoring_tile_sensitivity.py` (2026-07-26) zeigt: der Root-Value über
 verschiedene Wertungsplatten-Kombinationen bei FESTEM Zustand streut nur
 Ø 0,035–0,043 (`treatment_value_spread_across_combos`, siehe
-`evaluations/scoring_tile_sensitivity_v18_best.json`/`_v19_best.json`/
+`evaluations/artifacts/scoring_tile_sensitivity_v18_best.json`/`_v19_best.json`/
 `_v19_2d_best.json`) — deutlich über dem Baseline-Rauschen, aber der
 Nutzer-Verdacht ist: **unterkalibriert**, nicht nur "klein, aber real". Eine
 reine Spread-Zahl beantwortet das nicht — dafür fehlt eine GROUND TRUTH, wie
@@ -348,7 +348,7 @@ python tools/r5_value_calibration.py \
     --model-path-for-api models/alphazero_v18_best.onnx \
     --n-states 24 --n-combos 6 --sims 400 --c-puct 1.5 \
     --curve-n-states 233 \
-    --out evaluations/r5_value_calibration_result.json
+    --out evaluations/artifacts/r5_value_calibration_result.json
 ```
 
 `--models` sind jetzt `.pth`-Torch-Checkpoints (alle drei gleichberechtigt,
@@ -377,4 +377,4 @@ b=0,128 Logit/Punkt, McFadden-R²=0,316. Value-Kopf-Steigungen: v18_best
 fuer v18_best und v19_2d_best bestaetigt (nur ~6-9% der erwarteten
 Reaktion). Belegstelle: archive/history.md, Abschnitt "R5-Value-
 Kalibrierung (Task #27) ABGESCHLOSSEN: Unterkalibrierung BESTAETIGT",
-Zeile ~7065-7089; evaluations/r5_value_calibration_result.json.
+Zeile ~7065-7089; evaluations/artifacts/r5_value_calibration_result.json.

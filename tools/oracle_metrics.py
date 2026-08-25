@@ -74,8 +74,8 @@ FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
 # fuer die der Naehe-Vorbehalt widerlegt ist, 8/8 treffen.
 # KONKRET JETZT: v18_best (Quelle) wird unter diesen Labels nicht gescored --
 # ueber v19-Kandidaten vs. Champion entscheidet allein die Arena.
-ORACLE_JSON = ROOT / "evaluations" / "frozen_v1_oracle_labels_v18.json"
-OUT_JSON = ROOT / "evaluations" / "task89_oracle_metrics.json"
+ORACLE_JSON = ROOT / "evaluations" / "artifacts" / "frozen_v1_oracle_labels_v18.json"
+OUT_JSON = ROOT / "evaluations" / "artifacts" / "task89_oracle_metrics.json"
 
 CANDIDATE_MODELS = ["v14_best", "v14b_best", "v15_f2k_best", "v15_best", "v16_best", "v16"]
 

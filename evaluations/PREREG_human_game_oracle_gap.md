@@ -140,7 +140,7 @@ wie der Gegner), Klassifikation par.4 ueber den erweiterten Export
 `plate_completability_json` (`col_open_cells`: offene Normal-Zellen mit
 Farbbedarf, Spalte vollendbar und unvollstaendig). Werkzeug:
 `tools/probes/human_oracle_gap_k1.py`; Rohzahlen:
-`evaluations/probe_human_oracle_gap_k1.json`; Berichte je Partie:
+`evaluations/artifacts/probe_human_oracle_gap_k1.json`; Berichte je Partie:
 `evaluations/game_analysis/game_analysis_<seed>_champion.md`.
 
 | Partie | Platten | Endstand | n k1 / neutral | Mittel k1 | Mittel neutral | Differenz |

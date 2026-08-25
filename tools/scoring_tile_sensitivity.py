@@ -190,7 +190,7 @@ def main():
     ap.add_argument("--c-puct", type=float, default=1.5)
     ap.add_argument("--n-states", type=int, default=16)
     ap.add_argument("--n-combos", type=int, default=8)
-    ap.add_argument("--out", default="evaluations/scoring_tile_sensitivity_result.json")
+    ap.add_argument("--out", default="evaluations/artifacts/scoring_tile_sensitivity_result.json")
     args = ap.parse_args()
 
     with open(args.eval_set, "rb") as f:

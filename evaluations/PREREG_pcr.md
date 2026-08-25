@@ -295,9 +295,9 @@ Engine-Code, reine Prozess-/Dateibenennungsregel:
 4. 6 gepaarte Flach-Encoder-Seeds je Korpus (`tools/train_pcr_dose.py`, noch
    zu schreiben, Vorbild `tools/train_corpus_dose.py`).
 5. `tools/offline_diagnosis.py --frozen --model pcrkontrolle_s1_best
-   pcrpcr_s1_best ... --out evaluations/offline_diagnosis_pcr_dose_frozen.json`.
+   pcrpcr_s1_best ... --out evaluations/artifacts/offline_diagnosis_pcr_dose_frozen.json`.
 6. Gepaarte Auswertung (t-Test + Vorzeichentest fuer beide Orakel-Metriken),
-   Ergebnis-JSON nach `evaluations/train_pcr_dose_result.json`.
+   Ergebnis-JSON nach `evaluations/artifacts/train_pcr_dose_result.json`.
 7. Bei positivem Ergebnis (siehe Abbruch-/Fortsetzungsregel): Arena-Gating
    des Siegers, danach Uebergang in den produktiven Zwei-Kampagnen-Betrieb ab
    v20 (Fenster-Politik oben).
@@ -315,4 +315,4 @@ Experiment (neues Value-Ziel nach #34, neu gemessener
 Tiling-Cache-Durchsatz 1,371x) -- keine Neulesung dieser Zahlen.
 Belegstelle: archive/history.md, Abschnitt "PCR-A/B ABGESCHLOSSEN: Task
 #14 wird NICHT produktiv eingesetzt", Zeile ~7008-7063; Wiedereroeffnung
-Zeile ~10041-10094; evaluations/train_pcr_dose_result.json.
+Zeile ~10041-10094; evaluations/artifacts/train_pcr_dose_result.json.

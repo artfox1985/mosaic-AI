@@ -256,4 +256,4 @@ fuehrt "#29-Instrument" als OFFEN -- das betrifft eine NEUE Wiederaufnahme
 unter der WDL-Aera (neue frozen_v2-Labels), nicht diese bereits
 beantwortete Frage. Belegstelle: archive/history.md, Abschnitt "Task #29
 ERGEBNIS: Value-Rangmetrik NICHT VALIDIERT (2026-08-04)", Zeile
-~7532-7567; evaluations/value_rank_metric_validation.json.
+~7532-7567; evaluations/artifacts/value_rank_metric_validation.json.

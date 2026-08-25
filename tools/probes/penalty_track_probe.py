@@ -49,7 +49,7 @@ from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
 from plate_points_from_arena import game_list  # noqa: E402
 
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "penalty_track_probe.json"
+OUT_JSON = EVAL / "artifacts" / "penalty_track_probe.json"
 
 TAKE_CATS = ("SUN_TAKE", "MOON_GLOBAL_TAKE")
 
@@ -130,7 +130,7 @@ def paired_diff(a_per_seed, b_per_seed, key):
 def main():
     result = {}
 
-    p_a02 = EVAL / "paired_arena_env_imm_a02.json"
+    p_a02 = EVAL / "artifacts" / "paired_arena_env_imm_a02.json"
     for arm in ("0", "0.2"):
         got = collect(p_a02, arm,
                       lambda n: "Champion" if n == "Netz" else
@@ -154,7 +154,7 @@ def main():
     # PREREG_floor_action_aversion braucht, und sie kostet nichts.
     for fname, key in (("paired_arena_env_imm_netvnet.json", "netvnet"),
                        ("paired_arena_env_imm_netvnet_swap.json", "netvnet_swap")):
-        p_nvn = EVAL / fname
+        p_nvn = EVAL / "artifacts" / fname
         if not p_nvn.exists():
             continue
         d = json.load(open(p_nvn, encoding="utf-8"))

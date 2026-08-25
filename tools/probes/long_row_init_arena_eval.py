@@ -64,7 +64,7 @@ from column_build_structural_probe import (  # noqa: E402
 )
 
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "long_row_init_arena_eval.json"
+OUT_JSON = EVAL / "artifacts" / "long_row_init_arena_eval.json"
 BLOCK = 25  # `paired_arena_env_ab.py --block-size` Default, so gefahren
 
 K1_TILE_ID = 1
@@ -200,7 +200,7 @@ def main() -> None:
     fehlende = []
 
     for dateiname, an_brett in QUELLEN:
-        pfad = EVAL / dateiname
+        pfad = EVAL / "artifacts" / dateiname
         if not pfad.exists():
             fehlende.append(dateiname)
             continue

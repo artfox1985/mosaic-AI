@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Verbessert Mehrfach-Determinisierung (k=1/2/4) die Spielstaerke gegen die PIMC-Strategy-Fusion? | Beleg: **GESCHLOSSEN 2026-08-10 unter ZWEI Anordnungen**: Sims-Split (Budget fix) 76,0/77,3/70,0%; gleiche Tiefe je Welt (Budget waechst mit k) 81,75/77,0/73,0% -- k=4 faellt in beiden ab, im zweiten Fall mit VIERFACHEM Budget und in beiden Pflichtinstrumenten signifikant (Block-t -3,73, McNemar p=0,00262, Bonferroni inklusive). Nicht ein Tiefenverlust, sondern: das Mitteln ueber gezogene Welten schadet aktiv. `evaluations/paired_arena_env_ismcts_k.json`, `..._tiefe_k{1,2,4}.json` -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verbessert Mehrfach-Determinisierung (k=1/2/4) die Spielstaerke gegen die PIMC-Strategy-Fusion? | Beleg: **GESCHLOSSEN 2026-08-10 unter ZWEI Anordnungen**: Sims-Split (Budget fix) 76,0/77,3/70,0%; gleiche Tiefe je Welt (Budget waechst mit k) 81,75/77,0/73,0% -- k=4 faellt in beiden ab, im zweiten Fall mit VIERFACHEM Budget und in beiden Pflichtinstrumenten signifikant (Block-t -3,73, McNemar p=0,00262, Bonferroni inklusive). Nicht ein Tiefenverlust, sondern: das Mitteln ueber gezogene Welten schadet aktiv. `evaluations/artifacts/paired_arena_env_ismcts_k.json`, `..._tiefe_k{1,2,4}.json` -->
 
 # Vorregistrierung: Mehrfach-Determinisierung (ISMCTS-k, Task #65-Reaktivierung)
 
@@ -98,7 +98,7 @@ Punkt 2 ("ISMCTS-k"); kein Ergebnis in archive/history.md.
 `tools/paired_arena_env_ab.py`, `MOSAIC_NUM_DETERMINIZATIONS` 1/2/4,
 Champion@**600** Sims vs Heuristik@150dyn, 3x400 Partien, identische
 Basis-Seeds (20260820). Belegstelle
-`evaluations/paired_arena_env_ismcts_k.json`.
+`evaluations/artifacts/paired_arena_env_ismcts_k.json`.
 
 | Arm | Netz-Siege | Quote | vs k=1 | McNemar | Block-Ebene |
 |---|---|---|---|---|---|
@@ -231,7 +231,7 @@ Verschraenkung nur ein Mittel zum Batch-Fuellen, kein Staerke-Hebel.
 
 Zwei gepaarte Laeufe, identischer Basis-Seed 20260828, je 400 Partien,
 Champion vs Heuristik@150dyn. Belegstellen
-`evaluations/paired_arena_env_ismcts_depth_k1.json` /
+`evaluations/artifacts/paired_arena_env_ismcts_depth_k1.json` /
 `..._tiefe_k2.json`.
 
 | Arm | Budget | Netz-Siege | Quote |

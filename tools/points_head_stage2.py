@@ -144,7 +144,7 @@ def main():
     ap.add_argument("--n-states", type=int, default=16)
     ap.add_argument("--n-combos", type=int, default=8)
     ap.add_argument("--seed", type=int, default=1000)
-    ap.add_argument("--out", default="evaluations/points_head_plates_stage2.json")
+    ap.add_argument("--out", default="evaluations/artifacts/points_head_plates_stage2.json")
     args = ap.parse_args()
 
     with open(args.eval_set, "rb") as f:

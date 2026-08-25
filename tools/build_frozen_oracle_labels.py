@@ -73,7 +73,7 @@ FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
 # gipfeln exakt bei der damaligen Quelle v16_best und sagen genau die beiden
 # Nach-Orakel-Paare falsch vorher. Ein aus v18 gebautes Orakel ist daher erst
 # ab v19 aufwaerts als Praediktor gueltig.
-OUT_JSON = ROOT / "evaluations" / "frozen_v1_oracle_labels.json"
+OUT_JSON = ROOT / "evaluations" / "artifacts" / "frozen_v1_oracle_labels.json"
 MODEL_PATH = ROOT / "models" / "alphazero_v16_best.onnx"
 SIMS = 5000
 C_PUCT = 1.5

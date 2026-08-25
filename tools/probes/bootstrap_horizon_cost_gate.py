@@ -62,7 +62,7 @@ sys.path.insert(0, str(ROOT / "engine" / "py"))
 
 import mosaic_rust as mr  # noqa: E402
 
-OUT_JSON = ROOT / "evaluations" / "bootstrap_horizon_cost_gate.json"
+OUT_JSON = ROOT / "evaluations" / "artifacts" / "bootstrap_horizon_cost_gate.json"
 MODEL = str(ROOT / "models" / "alphazero_v21_2d_brierbest.onnx")
 
 HORIZONTE = (2, 3)

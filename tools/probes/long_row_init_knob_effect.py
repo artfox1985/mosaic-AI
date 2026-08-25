@@ -42,7 +42,7 @@ sys.path.insert(0, str(ROOT / "engine" / "py"))
 import mosaic_rust as m  # noqa: E402
 
 EVAL = ROOT / "evaluations"
-OUT_JSON = EVAL / "long_row_init_knob_effect.json"
+OUT_JSON = EVAL / "artifacts" / "long_row_init_knob_effect.json"
 MODEL = str(ROOT / "models" / "alphazero_v21_2d_brierbest.onnx")
 
 SIMS = 200
