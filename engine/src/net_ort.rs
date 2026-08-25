@@ -113,7 +113,7 @@ use ort::ep::CUDA;
 use ort::session::{Session, SessionInputValue};
 use ort::value::Tensor;
 
-use crate::net::{split_batch_n, split_batch_n_or_empty_rows, split_planes_flat_batch, InputLayout, Net};
+use crate::net::{split_batch_n, split_batch_n_or_empty_rows, split_planes_flat_batch_src, InputLayout, Net};
 
 /// Liest eine `MOSAIC_*`-Bool-Env-Var einmalig -- lokal dupliziert statt
 /// importiert (gleiches Muster wie `net_mcts.rs`/`tiling_solver.rs`: Module
@@ -227,7 +227,10 @@ fn build_ort_inputs(layout: InputLayout, feats: &[&[f32]]) -> Result<Vec<(&'stat
             Ok(vec![("state", t.into())])
         }
         InputLayout::PlanesPlusFlat { c, h, w, flat } => {
-            let (planes_buf, flat_buf) = split_planes_flat_batch(feats, c * h * w, flat);
+            // Wie in `net::build_inputs`: Quell-Grenze ist die Bauer-Breite,
+            // damit Altmodelle einen korrekt ausgerichteten Flat-Block sehen.
+            let (planes_buf, flat_buf) = split_planes_flat_batch_src(
+                feats, crate::features::NUM_PLANES_VALUES, c * h * w, flat);
             let planes_t = Tensor::<f32>::from_array(([batch, c, h, w], planes_buf.into_boxed_slice()))
                 .map_err(|e| e.to_string())?;
             let flat_t = Tensor::<f32>::from_array(([batch, flat], flat_buf.into_boxed_slice()))
