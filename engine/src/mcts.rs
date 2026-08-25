@@ -115,6 +115,11 @@ pub enum HeuristikVariante {
     /// Linienlaenge (`plate_builder::expected_points_map`, Nutzer-Praezisierung
     /// 2026-08-25).
     V2PointMap,
+    /// Wie [`HeuristikVariante::V2Huelle`], aber die Spalten-Stufen der
+    /// Zielkarte tragen einen RUNDENABHAENGIGEN Faktor
+    /// (`plate_builder::SPALTEN_PHASE`). Form extern motiviert (Rzepecki
+    /// 2025), Werte gesetzt.
+    V2HuellePhase,
 }
 
 impl HeuristikVariante {
@@ -127,6 +132,7 @@ impl HeuristikVariante {
                 | HeuristikVariante::V2Huelle
                 | HeuristikVariante::V2Heatmap
                 | HeuristikVariante::V2PointMap
+                | HeuristikVariante::V2HuellePhase
         )
     }
 }
@@ -150,7 +156,8 @@ pub(crate) fn player_total_variante(
         HeuristikVariante::V2
         | HeuristikVariante::V2Huelle
         | HeuristikVariante::V2Heatmap
-        | HeuristikVariante::V2PointMap => {
+        | HeuristikVariante::V2PointMap
+        | HeuristikVariante::V2HuellePhase => {
             basis
                 + crate::heuristic_v2::row_completion_progress(
                     &state.players[pi],

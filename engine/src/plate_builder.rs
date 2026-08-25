@@ -557,6 +557,67 @@ pub(crate) fn dome_preference_for_cells_weighted(
     })
 }
 
+/// Bester erreichbarer Wert EINER Kuppelplatte auf dem aktuellen Brett,
+/// maximiert ueber Slot und Rotation. **Rohwert, nicht auf `> 0` gefiltert.**
+///
+/// Gebaut auf Anfrage der Parallelsitzung fuer die Reservationswert-Regel der
+/// Blindziehung (`docs/research_heuristics_external.md` §3). Bisher rechnete
+/// [`dome_preference_for_cells_weighted`] dieses Maximum intern aus und warf
+/// es weg -- sie liefert nur die Aktion.
+///
+/// `wert` wird durchgereicht, damit derselbe Aufruf mit
+/// [`legacy_cell_value`] (Praeferenz-Einheiten) ODER mit einer
+/// Punktebewertung laufen kann. Fuer die Reservationsregel ist NUR die
+/// Punktevariante zulaessig: die Regel loest `E[max(V - R, 0)] = c` mit
+/// `c = 1 PUNKT`, und `legacy_cell_value` ist dimensionslos (Wild 3,0,
+/// Special 2,0, ...) -- ein `R` aus gemischten Einheiten waere eine Zahl
+/// ohne Bedeutung.
+///
+/// **Legalitaet nur geometrisch** (freier Slot, gueltige Rotation), NICHT
+/// gegen `state.dome_display` geprueft. Fuer eine Reservationsregel ist die
+/// Platte bereits in der Hand; die Frage lautet "was waere sie mir wert",
+/// nicht "darf ich sie gerade nehmen". Wer Display-Legalitaet braucht, filtert
+/// vorher.
+///
+/// **ZWEI SKALEN-VORBEHALTE, die diese Funktion NICHT abraeumt** (beide von
+/// der Parallelsitzung benannt, hier festgehalten, damit sie beim Aufrufer
+/// ankommen):
+///
+/// 1. **Die Summe ueber die vier Zellen ist keine Identitaet, sondern eine
+///    Naeherung mit bekannter Richtung (eher zu hoch).**
+///    `scoring::scoring_progress` ist ueber Zellen NICHT additiv -- zwei
+///    Zellen, die zusammen eine Spalte schliessen, sind gemeinsam mehr wert
+///    als einzeln, und der gemeinsame Anteil wird bei getrennter Zaehlung
+///    doppelt gezaehlt. Wer den exakten Plattenwert braucht, belegt die vier
+///    Zellen auf einem Probe-Brett GEMEINSAM und nimmt EINE
+///    `scoring_progress`-Differenz.
+/// 2. **Potenzial ist nicht Realisierung.** Eine Platte fuellt keine Zelle,
+///    sie macht sie bedienbar; die Steine muessen noch gedraftet und
+///    gekachelt werden. Ein `V` aus reinen Potenzialpunkten laesst eine
+///    Reservationsregel zu oft ziehen. Der Abschlag ist messbar statt
+///    schaetzbar: `docs/domain_knowledge.md:30-35` gibt die Abschluesse je
+///    Musterreihe und Partie mit 4,80 / 4,77 / 2,84 / 1,89 / 0,84 / 0,58 an
+///    (in dieser Sitzung nachgesehen).
+pub(crate) fn best_plate_value(
+    player: &PlayerBoard,
+    tile: &crate::dome::DomeTile,
+    zellen: &[(usize, usize)],
+    karte: &Zielkarte,
+    wert: fn(&PlayerBoard, usize, usize, &DomeSpace) -> f64,
+) -> Option<f64> {
+    let mut best: Option<f64> = None;
+    for &(sr, sc) in &player.dome_grid.empty_slots() {
+        for rot in [0u32, 90, 180, 270] {
+            if let Some(score) = slot_score_generic(player, tile, sr, sc, rot, zellen, karte, wert) {
+                if best.is_none_or(|b| score > b) {
+                    best = Some(score);
+                }
+            }
+        }
+    }
+    best
+}
+
 /// Tiling-Routing-Vorzug ueber einer beliebigen Zielzellen-Menge --
 /// Generalisierung von `column_build::preference_tiling_step_for_column`: zaehlt
 /// gefuellte Zielzellen statt gefuellte Zellen EINER Spalte.
@@ -689,6 +750,54 @@ const K2_DIAGONALEN: usize = 2;
 /// die sind in Prio 3/4 besser angelegt. Die Prio-5-Auflage kann sie wieder
 /// anheben -- aber nur fuer Zellen, die ein Spezialfeld freischalten, weil
 /// deren Ertrag nicht an einem weiteren Abschluss haengt.
+/// **HANDGESETZT, extern motiviert.** Faktor auf die SPALTEN-Stufen (Prio 3
+/// und 4) je Runde 1..5.
+///
+/// Anlass ist ein externer Vorgaenger, nicht eine eigene Messung: Rzepecki
+/// 2025 (Wroclaw, `docs/Rzepecki2025ImplementingSuperhuman.pdf`) beschreibt
+/// einen Azul-Agenten auf Platz 1 beider BGA-Ranglisten, dessen lineare
+/// Handheuristik die Spaltenvollendung als eigenen POTENZIAL-Term fuehrt --
+/// und dessen Koeffizienten von der Spielphase abhaengen, mit dem HOECHSTEN
+/// Spaltengewicht in den mittleren Runden. Diese Quelle ist [EXTERN]: in
+/// dieser Sitzung nicht nachgeprueft, anderes Spiel (Azul-Grundspiel), andere
+/// Suchtiefe.
+///
+/// Die Zahlen hier sind deshalb eine SETZUNG mit uebernommener FORM, nicht
+/// uebernommene Werte: Spitze in Runde 2 und 3, flach aussen. Begruendung
+/// aus dem eigenen Bestand, nicht aus der Quelle -- in Runde 1 steht die
+/// Kuppel noch kaum (Platten kommen erst), und ab Runde 4 entscheidet
+/// ohnehin die Vollendbarkeit, nicht die Praeferenz.
+///
+/// Runde 5 steht mit 1,0 nur der Vollstaendigkeit halber: dort routet nichts
+/// mehr (`preference_move_for_cells` endet nach Runde 4).
+const SPALTEN_PHASE: [f64; 5] = [1.0, 1.4, 1.4, 1.0, 1.0];
+
+/// Wie [`target_map`], aber mit dem Phasenfaktor auf den Spalten-Stufen.
+fn target_map_phased(
+    player: &PlayerBoard,
+    tile_ids: &[usize],
+    orientierung: usize,
+    runde: u32,
+) -> Zielkarte {
+    let f = SPALTEN_PHASE[(runde.clamp(1, 5) as usize) - 1];
+    let spalte1 = if orientierung == 0 { 0 } else { 5 };
+    let spalte2 = if orientierung == 0 { 1 } else { 4 };
+    let mut k = target_map(player, tile_ids, orientierung);
+    for r in 0..6 {
+        for c in [spalte1, spalte2] {
+            // Nur die Grundstufe skalieren. Zellen, die die Prio-5-Auflage
+            // angehoben hat, bleiben unberuehrt -- sonst wuerde der
+            // Phasenfaktor zwei Bausteine zugleich verschieben und der
+            // Vergleich waere konfundiert.
+            let basis = if c == spalte1 { PRIO_GEWICHT[0] } else { PRIO_GEWICHT[1] };
+            if (k[r][c] - basis).abs() < f64::EPSILON {
+                k[r][c] = basis * f;
+            }
+        }
+    }
+    k
+}
+
 fn target_map(player: &PlayerBoard, tile_ids: &[usize], orientierung: usize) -> Zielkarte {
     let spalte1 = if orientierung == 0 { 0 } else { 5 };
     let spalte2 = if orientierung == 0 { 1 } else { 4 };
@@ -1085,6 +1194,9 @@ fn v2_map_for(
         }
         crate::mcts::HeuristikVariante::V2PointMap => {
             Some((expected_points_map(state, pi), legacy_cell_value))
+        }
+        crate::mcts::HeuristikVariante::V2HuellePhase => {
+            Some((v2_envelope_target_phased(state, pi)?, envelope_cell_value))
         }
         _ => None,
     }
@@ -2112,6 +2224,16 @@ fn envelope_orientation_by_cost(state: &GameState, pi: usize) -> Option<usize> {
 /// vollen Spalte von 35 auf 50 Prozent gehoben hat; sie hier fallen zu lassen
 /// waere ein zweiter, mit der Huelle konfundierter Unterschied.
 pub(crate) fn v2_envelope_target(state: &GameState, pi: usize) -> Option<Zielkarte> {
+    v2_envelope_target_inner(state, pi, false)
+}
+
+/// Wie [`v2_envelope_target`], aber mit dem Phasenfaktor aus
+/// [`SPALTEN_PHASE`] auf den Spalten-Stufen.
+pub(crate) fn v2_envelope_target_phased(state: &GameState, pi: usize) -> Option<Zielkarte> {
+    v2_envelope_target_inner(state, pi, true)
+}
+
+fn v2_envelope_target_inner(state: &GameState, pi: usize, phased: bool) -> Option<Zielkarte> {
     let player = &state.players[pi];
     let ids = &state.scoring_tile_ids;
     let orientierung = if state.round_number >= 3 {
@@ -2129,7 +2251,11 @@ pub(crate) fn v2_envelope_target(state: &GameState, pi: usize) -> Option<Zielkar
     } else {
         envelope_orientation_by_cost(state, pi)?
     };
-    Some(target_map(player, ids, orientierung))
+    Some(if phased {
+        target_map_phased(player, ids, orientierung, state.round_number)
+    } else {
+        target_map(player, ids, orientierung)
+    })
 }
 
 /// Drafting-Vorzug fuer v2 -- UNGEGATET, also ohne `MOSAIC_SPALTENBAU` und
