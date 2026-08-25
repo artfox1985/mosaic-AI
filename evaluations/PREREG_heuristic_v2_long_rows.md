@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm gegen Champion@400). Die Prio-Leiter des Nutzers als Routing-Huelle (HeuristikVariante::V2Huelle) schlaegt v1 UND das alte v2: Siegquote 0,373 gegen 0,256 und 0,128, volle Spalten 0,798 gegen 0,086 und 0,302 (Netz selbst 0,106), Marge -5,5 gegen -12,2 und -19,4, Strafpunkte 13,6 gegen 19,3, Vollendungsquote 0,717; gepaart +0,700 volle Spalten (t=+13,73 auf 16 Bloecken). Der Tausch Faehigkeit-gegen-Niveau, den v2 in par.5.3 machen musste, ist damit AUFGEHOBEN, und die Voraussetzung von par.3b (Korpus mit Dreiecksform) ist erstmals erfuellbar. Preis: volle Zeilen 0,432 auf 0,216, echte Verschiebung und kein Aufbau-Artefakt. Der Durchbruch kam durchgehend vom ROUTING, nie von einem Bewertungsterm: Ablationen (par.8.6) trennen Struktur (Zielkarte) von Staerke (lineare Terme), und zwei gerechnete Punktekarten als Routing-Ziel sind negativ (par.9.1/9.2) -- eine additive Punktekarte ist ein BREITEN-Signal, volle Spalten brauchen FOKUS. Paritaets-Hash 8c6684ff haelt, Suite 520/0. par.11 (rundenabhaengige Spalten-Gewichte) ist GEMESSEN und H0 (par.11.1, n=160 gegen V2Huelle: volle Spalten 0,812 gegen 0,787, t=0,39, Siegquote 0,500) -- als Arm negativ entschieden, Kopf am 2026-08-25 nachgezogen. OFFEN: par.12 (Vollendbarkeit als Filter, registriert, ungebaut), par.5.4 Korpus und Training, Self-Play-Einstieg. par.3b ENTSCHEID: die Abkling-Kurve laeuft ueber die RUNDENNUMMER. -->
+<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm gegen Champion@400). Die Prio-Leiter des Nutzers als Routing-Huelle (HeuristikVariante::V2Huelle) schlaegt v1 UND das alte v2: Siegquote 0,373 gegen 0,256 und 0,128, volle Spalten 0,798 gegen 0,086 und 0,302 (Netz selbst 0,106), Marge -5,5 gegen -12,2 und -19,4, Strafpunkte 13,6 gegen 19,3, Vollendungsquote 0,717; gepaart +0,700 volle Spalten (t=+13,73 auf 16 Bloecken). Der Tausch Faehigkeit-gegen-Niveau, den v2 in par.5.3 machen musste, ist damit AUFGEHOBEN, und die Voraussetzung von par.3b (Korpus mit Dreiecksform) ist erstmals erfuellbar. Preis: volle Zeilen 0,432 auf 0,216, echte Verschiebung und kein Aufbau-Artefakt. Der Durchbruch kam durchgehend vom ROUTING, nie von einem Bewertungsterm: Ablationen (par.8.6) trennen Struktur (Zielkarte) von Staerke (lineare Terme), und zwei gerechnete Punktekarten als Routing-Ziel sind negativ (par.9.1/9.2) -- eine additive Punktekarte ist ein BREITEN-Signal, volle Spalten brauchen FOKUS. Paritaets-Hash 8c6684ff haelt, Suite 520/0. par.11 (rundenabhaengige Spalten-Gewichte) ist GEMESSEN und H0 (par.11.1, n=160 gegen V2Huelle: volle Spalten 0,812 gegen 0,787, t=0,39, Siegquote 0,500) -- als Arm negativ entschieden, Kopf am 2026-08-25 nachgezogen. OFFEN: par.12 (Vollendbarkeit als Filter, registriert, ungebaut), par.5.4 Korpus und Training, Self-Play-Einstieg. par.3b ENTSCHEID: die Abkling-Kurve laeuft ueber die RUNDENNUMMER. par.3b STUFENPLAN (Nachtrag 5, Nutzer 2026-08-25): Stufe 1 = Ownership-Kopf EINSCHALTEN (kein Umbau) plus w0-Kontrollarm auf demselben v22-Korpus; Stufe 2 BEDINGT = ein 2D-KOPF statt/zusaetzlich, gerechtfertigt durch einen geprueften Befund -- auch Mosaic2DNet liest den Ownership-Kopf FLACH aus (neural_net.py:2735, byte-identisch zum flachen MosaicNet), der 2D-Rumpf wirft die Geometrie am Ausgang also wieder weg. Das faellt NICHT unter den Umlabel-Einwand: das Ziel bleibt 72 Felder, nur die Ablesung wird raeumlich. Uebergang Stufe 1 -> 2 bei KEINEM signifikanten Schaden (nicht erst bei Wirkung); Vorbehalt: 2D ist fuer STAERKE unbelegt (PREREG_2d_encoder: Orakel 6/6, Arena 416:384 Wash). -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -684,6 +684,56 @@ passend gemacht):**
    der Arm beurteilt wird ([[feedback_preregister_decision_metric]]).
 
 Eigene Vorregistrierung vor dem Bau, eigene Nutzer-Freigabe.
+
+**NACHTRAG 2026-08-25 (5): STUFENPLAN (Nutzer). Erst der eingeschaltete
+Kopf, dann -- bedingt -- ein 2D-KOPF.**
+
+Nutzer-Vorgabe: *"wir schauen uns im ersten schritt den umgebauten ownership
+head an. wenn das traegt bzw. nicht schaedlich ist bauen wir einen 2d kopf
+statt/zusaetzlich zu dem umgebauten ownership head."*
+
+Der 2D-Kopf stand bis hierher NICHT in dieser Prereg -- er wird mit diesem
+Nachtrag registriert.
+
+**Stufe 1 (wie oben registriert):** `OWNERSHIP_WEIGHT` > 0 auf dem v22-Korpus,
+mit `w0`-Kontrollarm auf DEMSELBEN Korpus. Frage: traegt der Kopf, oder
+schadet er wenigstens nicht?
+
+**Stufe 2 (bedingt): ein 2D-Kopf statt oder zusaetzlich zum bestehenden.**
+
+**Der Befund, der die Stufe rechtfertigt, am Code geprueft 2026-08-25:** auch
+`Mosaic2DNet` -- die Champion-Architektur -- liest den Ownership-Kopf FLACH
+aus, `nn.Linear(hidden_size, 128) -> ReLU -> nn.Linear(128, 72)`
+(neural_net.py:2735-2739), byte-identisch zum flachen `MosaicNet`
+(neural_net.py:2462-2466). Der Rumpf traegt seit v19 raeumliche Struktur, der
+Kopf wirft sie am Ausgang wieder weg. Fuer ein Ziel, das die 6x6-Geometrie IST
+-- Huelle, Spalten, Zeilen -- ist das die naheliegendste ungenutzte Stelle:
+der flache Ausgang weiss nicht, dass Zelle (r,c) neben (r,c+1) liegt.
+
+**Warum das NICHT unter den Einwand aus Punkt (2) faellt.** Dort ging es um ein
+UMLABELN des ZIELS -- 36 Zellabweichungen statt der 72 Ownership-Felder, was
+die Gegnerhaelfte ersatzlos gestrichen haette. Ein 2D-Kopf aendert die
+ARCHITEKTUR DER ABLESUNG und laesst das Ziel unangetastet: weiterhin 72
+Ausgaben, nur raeumlich gerechnet statt flach. Das ist ein anderer Eingriff,
+und der alte Einwand trifft ihn nicht.
+
+**Vorbehalt, der vor den Lauf gehoert und nicht danach:** "2D hilft" ist in
+diesem Projekt fuer STAERKE nicht belegt. `PREREG_2d_encoder.md` ist
+ENTSCHIEDEN mit Orakel 6/6 fuer 2D, aber Arena-Gating 416:384 (p=0,30, Wash).
+Belegt ist der 2D-Vorteil auf Offline-Policy-Massen, nicht im Duell. Wer
+Stufe 2 faehrt, sollte das vorher wissen.
+
+**Uebergangsregel Stufe 1 -> Stufe 2, vorab festgelegt:** Stufe 2 wird gebaut,
+wenn der `w0`-Vergleich KEINEN signifikanten Schaden zeigt (gepaarte Arena,
+Block-Ebene). "Traegt" ist ausdruecklich NICHT Bedingung -- der Nutzer hat
+"traegt bzw. nicht schaedlich" gesagt, und die Grundrate der Hilfskoepfe
+(0 von 4, Nachtrag 1) macht einen Nullbefund zum wahrscheinlichsten Ausgang.
+Ein Nullbefund STOPPT die Kette also nicht; ein Schaden schon.
+
+**Was bei Stufe 2 vorab zu entscheiden ist** (nicht jetzt, aber vor dem Bau):
+"statt" oder "zusaetzlich". Beides ist vertretbar -- "statt" haelt die
+Parameterzahl, "zusaetzlich" erlaubt einen sauberen Ablationsvergleich gegen
+denselben flachen Kopf. Der Nutzer hat beides offengelassen.
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 

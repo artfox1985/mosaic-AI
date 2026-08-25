@@ -74,9 +74,12 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
 3. **Fuer v23 anzuschauen** (aus dem BESTAND, keine neuen Preregs):
    `PREREG_v22_window.md` par.4 -- die Traegerfrage (Vorzugs-Records im
    Policy-Verlust: ja oder nein), Entscheidungsmass dort vorab festgelegt;
-   `PREREG_heuristic_v2_long_rows.md` par.3b -- Ownership-Kopf plus
-   w0-Kontrollarm auf DEMSELBEN Korpus, sonst sind Kopf und Korpuswechsel
-   konfundiert; `PREREG_plate_policy_supervision.md` -- bekommt durch v22
+   `PREREG_heuristic_v2_long_rows.md` par.3b -- **Stufenplan**: Stufe 1 =
+   Ownership-Kopf EINSCHALTEN plus w0-Kontrollarm auf DEMSELBEN Korpus
+   (sonst sind Kopf und Korpuswechsel konfundiert); Stufe 2 bedingt = ein
+   2D-KOPF statt/zusaetzlich, weil auch `Mosaic2DNet` den Kopf FLACH ausliest
+   (neural_net.py:2735) und die Geometrie am Ausgang wegwirft. Uebergang bei
+   KEINEM Schaden, nicht erst bei Wirkung; `PREREG_plate_policy_supervision.md` -- bekommt durch v22
    erstmals seine Label-Quelle, weil 61,8 Prozent der Zuege genau das Label
    "dieser Zug baut die Spalte" tragen. Reihenfolge fuer v23: Fenster steht
    (par.2) -> Traeger-A/B -> Ownership + w0 auf dem gewaehlten Traeger ->
