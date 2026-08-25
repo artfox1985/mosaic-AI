@@ -1885,3 +1885,54 @@ will, misst es.
 Kommentar im Code steht, ist keine Messung. Diese hier hat monatelang
 unwidersprochen dagestanden und eine Bau-Idee getragen, die nichts gebracht
 haette.
+
+## par.18 Repariert die Huelle die Blindzieh-Pathologie nebenbei? (GEMESSEN 2026-08-25) -- NEIN
+
+**Anlass.** Die Parallelsitzung vermutete, der Spaltenbau koennte die tiefen
+Blindziehungen bei aktiver Wertungsplatte 6 von selbst abstellen: freigeschaltete
+Spezialfelder senken `special_empty` und heben damit das Brettniveau, an dem
+`resolve_and_apply_stack_draw` seine Stopp-Entscheidung faellt. Die Huelle
+schaltet 1,512 Felder je Partie frei gegen 0,713 bei v2 (par.8.5) -- die
+Groesse bewegt sich also stark in die richtige Richtung.
+
+**Zwei Messungen, zwei Seiten derselben Frage.** Die Parallelsitzung hat den
+MECHANISMUS auf konstruierten Brettern geprueft (`PREREG_stack_draw_reservation_rule.md`
+par.6d): die Ziehtiefe bleibt ueber den ganzen Spalten-Fuellbereich bei 9,
+weil Kriterium 1 quadratisch zahlt (`7*(f/6)^2`) waehrend das
+Spezialfeld-Defizit linear und sofort kostet (`-3` je Feld). Hier steht die
+WIRKUNG im echten Spiel.
+
+**Aufbau:** derselbe Lauf wie par.8.5 (v2 gegen Huelle, n=160), zusaetzlich
+gezaehlte Blindziehungen. **GEZAEHLT, nicht aus dem Punktestand abgeleitet** --
+bei Punktestand 0 ist eine Ziehung gratis und im Punktestand unsichtbar
+(`game.rs:182`), und zwar UNGLEICHMAESSIG: der tiefer ziehende Arm wird
+staerker abgeschnitten, ein Armvergleich ueber Punktdifferenzen
+unterschaetzte den Unterschied also systematisch. Hinweis der
+Parallelsitzung, vor dem Lauf eingebaut.
+
+| Groesse | v2 | Huelle | Delta | t (Block) |
+| --- | --- | --- | --- | --- |
+| Ziehungen je Partie | 1,869 | **2,925** | **+1,056** | 4,94 |
+| davon k6 AKTIV (n=52) | 2,596 | 3,308 | +0,760 | 1,71 |
+| davon k6 INAKTIV (n=108) | 1,519 | 2,741 | **+1,276** | **6,80** |
+
+**Die Vermutung ist doppelt widerlegt.** Die Huelle zieht MEHR statt weniger,
+und der Zuwachs ist GROESSER, wo Kriterium 6 gar nicht liegt -- also
+ausserhalb der Pathologie. Waere der vermutete Mechanismus am Werk, muesste es
+genau umgekehrt sein.
+
+**Was stattdessen passiert, und es ist ein eigener Befund:** die Huelle hat ein
+Zielbild und KAUFT gezielt Platten dafuer. Jede Ziehung kostet 1 Punkt, sie
+zahlt also rund 1,06 Punkte je Partie mehr an den Stapel -- und gewinnt dabei
+8,07 (par.8.5). Das ist ein Handel, kein Symptom. Die Plattenwahl ist seit dem
+Bauschritt "Kuppelplatten-Wahl verdrahtet" Teil des Routings (volle Spalten
+0,450 auf 0,588), und dass sie sich auch das Ziehen etwas kosten laesst, ist
+die konsequente Fortsetzung.
+
+**Vorbehalt zur Vergleichbarkeit:** hier sind ZIEHUNGEN JE PARTIE gezaehlt,
+bei der Parallelsitzung war es die TIEFE EINER SERIE auf einem konstruierten
+Brett. Die Zahlen stehen nebeneinander, nicht uebereinander.
+
+**Fuer die Blindzieh-Spur heisst das:** der billige Ausweg ist zu. Die
+Pathologie muss dort behoben werden, wo sie sitzt -- im Einheitenbruch der
+Stopp-Regel -- und nicht durch besseres Spiel an anderer Stelle.
