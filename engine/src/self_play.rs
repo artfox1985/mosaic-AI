@@ -1410,8 +1410,13 @@ struct DraftingDecision {
     root_q: Option<f64>,
     /// completed-Q je Wurzelkandidat (nur `NetSelfPlayAgent`, sonst leer).
     root_child_q: Vec<f64>,
-    /// PCR-Muenzwurf-Ergebnis (nur `NetSelfPlayAgent` mit aktivem PCR).
-    pcr_is_full: Option<bool>,
+    /// Wird als `policy_target_valid` in den Record geschrieben. `None` = Feld
+    /// fehlt (Bestandsverhalten, Ziel gilt als gueltig). Zwei Quellen, die sich
+    /// nie ueberschneiden: der PCR-Muenzwurf im `NetSelfPlayAgent` (nur
+    /// `--mode network`) und der v2-Vorzug im `HeuristicSelfPlayAgent` (nur
+    /// `--mode mcts`). Frueher `pcr_is_full` -- der Name log, seit der zweite
+    /// Schreiber dazukam.
+    policy_target_valid: Option<bool>,
     /// Vorzugs-Kandidat der Bauer-Kette, falls einer existierte -- fuer den
     /// Spaltenbau-Trace des Arena-Pfads (`column_build_trace`).
     vorzug: Option<Action>,
@@ -1425,7 +1430,7 @@ impl DraftingDecision {
             policy: None,
             root_q: None,
             root_child_q: Vec::new(),
-            pcr_is_full: None,
+            policy_target_valid: None,
             vorzug: None,
         }
     }
@@ -1451,6 +1456,11 @@ trait DraftingAgent {
 struct HeuristicSelfPlayAgent {
     base_sims: u32,
     c: f64,
+    /// Heuristik-Variante fuer die DRAFTING-Entscheidung -- dieselbe Rolle wie
+    /// in `HeuristicArenaAgent`. Bis 2026-08-25 fehlte dieses Feld, und der
+    /// Lehrer kam im Self-Play deshalb gar nicht an: die Variante erreichte nur
+    /// den Tiling-Schritt, ein `v2huelle`-Korpus war bitgleich mit `v1`.
+    variante: crate::mcts::HeuristikVariante,
 }
 
 impl DraftingAgent for HeuristicSelfPlayAgent {
@@ -1462,6 +1472,40 @@ impl DraftingAgent for HeuristicSelfPlayAgent {
         _move_number: u64,
     ) -> DraftingDecision {
         let n = actions.len();
+        // v2-Vorzug ZUERST, wortgleich zu `HeuristicArenaAgent` -- Praeferenz
+        // statt Verbot, greift nur bei einem LEGALEN Zug. Das ist die Fassung,
+        // deren Verhalten VERMESSEN ist (Lehrer-Test: 0,798 volle Spalten gegen
+        // 0,086, PREREG_heuristic_v2_long_rows.md par.10). Ein weicherer
+        // Einbau -- Vorzug als Prior in die Suche -- waere ein Agent, den
+        // niemand gemessen hat, und die Suche koennte genau die
+        // Spaltenvollendungen wieder wegoptimieren, fuer die der Korpus da ist.
+        let vorzug = if self.variante.is_v2() {
+            crate::plate_builder::v2_drafting_preference(state, self.variante)
+                .filter(|a| actions.contains(a))
+        } else {
+            None
+        };
+        if let Some(a) = vorzug {
+            // Der Vorzug ist ein Override, kein Suchergebnis: das Policy-Ziel
+            // waere hier eine reine Eins auf dem erzwungenen Zug. So ein Ziel
+            // lehrt das Routing OHNE das Urteil dahinter, deshalb wird der
+            // Record fuer den Policy-Verlust als ungueltig markiert
+            // (`policy_target_valid=false`, neural_net.py:1858 setzt das
+            // Policy-Gewicht dann auf 0). Die VALUE-Labels bleiben gueltig --
+            // und die sind der Zweck dieses Korpus.
+            //
+            // Nebenwirkung mit Absicht: die Flagge IST damit der Zaehler fuer
+            // die Vorzugs-Feuerrate. Ein zweiter Schreiber existiert zwar
+            // (PCR), aber nur unter `--mode network`; in einem
+            // Heuristik-Korpus ist `policy_target_valid=false` eindeutig.
+            let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
+            return DraftingDecision {
+                policy: Some(vec![entry]),
+                policy_target_valid: Some(false),
+                vorzug: Some(a.clone()),
+                ..DraftingDecision::plain(a)
+            };
+        }
         // Aktionsabhängige Temperatur (Port self_play.py:172).
         let temp = if n > 50 { 0.7 } else if n > 15 { 0.4 } else { 0.15 };
         let (chosen, policy) = if n == 1 {
@@ -1653,7 +1697,7 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
             policy: Some(policy),
             root_q,
             root_child_q,
-            pcr_is_full,
+            policy_target_valid: pcr_is_full,
             vorzug: vorzug_kandidat,
         }
     }
@@ -1987,8 +2031,8 @@ fn unified_game_loop<R: Rng + ?Sized>(
                             m.insert("root_child_q".into(), v);
                         }
                         // Task #14 (PCR): additiv, NUR bei aktivem PCR.
-                        if let Some(is_full) = d.pcr_is_full {
-                            m.insert("policy_target_valid".into(), json!(is_full));
+                        if let Some(gueltig) = d.policy_target_valid {
+                            m.insert("policy_target_valid".into(), json!(gueltig));
                         }
                         records.push(m);
                     }
@@ -2202,7 +2246,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
     // statt `apply_chosen_action` (Bestand dieses Pfads), Timeout mit
     // EXTRA-Zuschlag nur bei aktivem Label-Sampling (Bugfix-Historie siehe
     // urspruenglicher Kommentar in round_transition_deep.rs).
-    let agent = HeuristicSelfPlayAgent { base_sims, c };
+    let agent = HeuristicSelfPlayAgent { base_sims, c, variante };
     let player = PlayerLoopConfig {
         agent: &agent,
         tiling_net: None,
@@ -5585,7 +5629,7 @@ pub(crate) mod tests {
             let mut st_rng = StdRng::seed_from_u64(654);
             let mut state = crate::serialize::json_to_state(&mid["state"], &mut st_rng).unwrap();
             seed_state_fixup(&mut state);
-            let agent = HeuristicSelfPlayAgent { base_sims: 40, c: SELF_PLAY_C };
+            let agent = HeuristicSelfPlayAgent { base_sims: 40, c: SELF_PLAY_C, variante: crate::mcts::HeuristikVariante::V1 };
             let player = PlayerLoopConfig {
                 agent: &agent,
                 tiling_net: None,
@@ -5622,6 +5666,56 @@ pub(crate) mod tests {
             out.last().unwrap().get("winner").is_some(),
             "Partie muss zu Ende gespielt und gestempelt sein"
         );
+    }
+
+    /// Die Abnahme, die beim ersten Durchreichen GEFEHLT hat: sie laeuft auf
+    /// dem AUFZEICHNENDEN Pfad. Die erste Fassung hatte "v1 gegen v2huelle
+    /// unterscheidet sich" auf einem Arena-Pfad geprueft -- dort sass der
+    /// einzige Verbraucher der Variante -- und damit genau den Pfad verfehlt,
+    /// fuer den der Umbau gebaut war. Ein 200-Partien-Korpus war deshalb
+    /// bitgleich mit v1 (volle Spalten 0,004665140240412135 in beiden Armen).
+    #[test]
+    fn heuristik_variante_reaches_the_recording_self_play_path() {
+        let spiele = |variante: crate::mcts::HeuristikVariante| -> Vec<Value> {
+            let mut rng = StdRng::seed_from_u64(4242);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            play_one_game(
+                40, SELF_PLAY_C, ids, ["P0".into(), "P1".into()], 0, "var_g1",
+                &mut rng, None, false, None, variante, 4242,
+            )
+        };
+        let v1 = spiele(crate::mcts::HeuristikVariante::V1);
+        let v2 = spiele(crate::mcts::HeuristikVariante::V2Huelle);
+        assert!(!v1.is_empty() && !v2.is_empty());
+
+        // 1) Gleicher Seed, andere Variante -> ANDERE Partie. Zahlengleichheit
+        //    waere hier der Alarm, nicht der Befund.
+        assert_ne!(v1, v2, "v2huelle muss den aufzeichnenden Pfad erreichen");
+
+        // 2) Der Vorzug markiert seine Records als policy-ungueltig, und zwar
+        //    NUR im v2-Arm. Ohne diese Haelfte lehrt der Korpus das Routing
+        //    ohne das Urteil dahinter.
+        let ungueltig = |recs: &[Value]| -> usize {
+            recs.iter()
+                .filter(|r| r.get("policy_target_valid") == Some(&Value::Bool(false)))
+                .count()
+        };
+        assert_eq!(ungueltig(&v1), 0, "V1 kennt keinen Vorzug, darf also nichts markieren");
+        assert!(
+            ungueltig(&v2) > 0,
+            "v2huelle muss mindestens einen Vorzugszug fahren und ihn markieren"
+        );
+
+        // 3) Ein markierter Record traegt trotzdem ein one-hot Policy-Ziel und
+        //    seine Value-Labels -- ausgenommen ist nur der Policy-Verlust.
+        let markiert = v2
+            .iter()
+            .find(|r| r.get("policy_target_valid") == Some(&Value::Bool(false)))
+            .unwrap();
+        let pol = markiert.get("policy").unwrap().as_array().unwrap();
+        assert_eq!(pol.len(), 1, "Vorzug ist ein Override, also genau ein Eintrag");
+        assert_eq!(pol[0].get("prob").unwrap().as_f64().unwrap(), 1.0);
+        assert!(markiert.get("scores").is_some(), "Value-Labels bleiben erhalten");
     }
 
     #[test]
