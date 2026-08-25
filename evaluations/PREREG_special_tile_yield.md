@@ -178,6 +178,51 @@ prinzipiell ableitbar; die Wette ist Lesbarkeit, nicht Neuheit.
 Eingabegroesse trainiert wird -- fuer das laufende v22 kommt es zu spaet
 (`INPUT_SIZE` steckt im Korpus-Cache und im Modell).
 
+## par.4c ANSCHLUSS an den Shaping-2D-Kopf (Nutzer 2026-08-25)
+
+Nutzer: *"und somit haben wir wieder futter fuer den shaping 2d head"*. Der
+Anschluss traegt, und er loest ein Problem, an dem der Kopf in
+`PREREG_heuristic_v2_long_rows.md` par.3b haengt.
+
+**Das dortige Ziel war schwach begruendet.** Nachtrag (2) hat gezeigt: die
+Dreiecks-Abweichung je Zelle ist `erlaubt_o XOR belegt`, und `erlaubt_o` ist
+eine FESTE Maske -- das Ziel ist also eine deterministische Umkodierung von
+"belegt". Der Kopf haette nichts vorherzusagen gehabt.
+
+**Die Slot-Ausloesung ist genau das Gegenteil.** "Wird dieses Spezialfeld bis
+Partieende ausgeloest?" ist keine Umkodierung des heutigen Bretts, sondern
+eine Vorhersage -- und zwar ueber die Groesse, bei der der Value-Kopf frueh am
+schwaechsten ist. Dazu drei Eigenschaften, die kein bisheriges Shaping-Ziel
+hatte:
+
+* **Es ist 3x3.** Die Slot-Ebene ist von Haus aus zweidimensional -- der
+  natuerlichste 2D-Kopf im ganzen Spiel, und einer, der beim heutigen flachen
+  `Linear(hidden,128) -> Linear(128,72)` nichts von seiner Geometrie behaelt.
+* **Es rechnet in PUNKTEN, nicht in Form.** Der Ertrag ist `pattern_row + 1`,
+  die Vorhersage laesst sich also direkt in erwartete Punkte umrechnen. Damit
+  faellt der Einwand weg, an dem vier Arme gescheitert sind -- "Formziel
+  optimiert, Punkte verloren" (par.9.1/9.2/12/15): hier IST das Formziel der
+  Punktestand.
+* **Es ist klein.** 9 Ausgaben, nicht 36 oder 72.
+
+**Der Einwand, der bleibt und benannt gehoert: das Ziel ist
+POLITIKABHAENGIG.** "Wird ausgeloest" haengt am gespielten Verlauf, nicht am
+Brett -- dieselbe Bauform, an der der Konjunktions-Kopf gescheitert ist
+([[project_conjunction_head_predicts_occurrence]]: vier
+Kalibrierungsvarianten, alle schlechter). Was den Fall hier unterscheidet, ist
+allein der KORPUS: auf plattenblindem Spiel war "wird nicht ausgeloest" die
+korrekte Vorhersage und der Kopf haette die Schwaeche festgeschrieben; auf
+einem Lehrer-Korpus ist sie es nicht mehr. Das ist genau die Wiedervorlage,
+die par.3b Nachtrag (3)(b) beschreibt -- und sie ist unbewiesen, bis die
+Neumessung aus par.5 vorliegt.
+
+**Verhaeltnis zur Eingabe aus par.4a:** die beiden sind KEINE Alternativen und
+duerfen nicht in einem Arm laufen. Die Eingabe sagt dem Netz, was auf dem
+Brett STEHT (Betrag und Abstand); der Kopf laesst es vorhersagen, was daraus
+WIRD. Wer beides gleichzeitig einbaut, kann hinterher nicht zuordnen.
+Reihenfolge-Vorschlag: erst die Eingabe (billiger, kein neues Ziel, bekannte
+Bauform), der Kopf danach und nur, wenn die Neumessung das Ziel traegt.
+
 ## par.5 Was VOR jedem Bau zu tun ist
 
 **(1) Neumessung auf hv2.** Alle Zahlen in par.3 stammen aus plattenblindem
