@@ -25,8 +25,11 @@ LASTSPERRE: reines Datei-Lesen + Single-Thread-Python. Kein mosaic_rust-
 Import, kein Engine-Replay, kein Build.
 
 Datenquellen:
-  1. evaluations/paired_arena_env_imm_netvnet.json  -- Champion beidseitig
-     (model == model_b, geprueft unten per Assertion).
+  1. evaluations/paired_arena_env_imm_netvnet{,_swap}.json -- SELBES Netz
+     beidseitig (model == model_b), aber ZWEI Agenten: die per-Seite-Specs
+     unterscheiden sich (alpha0.2 gegen frozen). Beide Seiten werden getrennt
+     ausgewiesen; eine frueher Fassung labelte sie gemeinsam als "Champion"
+     und mischte damit zwei Verhaltensweisen (korrigiert 2026-08-25).
   2. evaluations/paired_arena_env_imm_a02.json       -- Champion (Netz) vs.
      Heuristik, direkter Abstammungsvergleich, zwei Arme (0 / 0.2), hier
      kombiniert UND einzeln ausgewiesen.
@@ -187,15 +190,50 @@ def add_heur_pkl_source(stats: dict, key: str, pkl_glob: str):
 def main() -> None:
     stats: dict[str, RowStats] = {}
 
-    # 1) Champion beidseitig (imm_netvnet.json) -- model==model_b PRUEFEN.
-    p1 = EVAL / "paired_arena_env_imm_netvnet.json"
-    d1 = json.load(open(p1, encoding="utf-8"))
-    assert d1["model"] == d1["model_b"], (
-        f"{p1.name}: model != model_b ({d1['model']} vs {d1['model_b']}) -- "
-        f"Quelle ist NICHT Champion-beidseitig, Annahme im Docstring falsch."
-    )
-    add_arena_source(stats, "champion_selfplay_both_sides", p1, arm=None,
-                      side_filter=lambda n: "Champion")
+    # 1) SELBES Netz beidseitig, aber ZWEI Agenten: die per-Seite-Specs
+    #    unterscheiden sich (alpha0.2 gegen frozen).
+    #
+    #    KORREKTUR 2026-08-25 (in STATUS.md als offener Sonden-Fix gefuehrt):
+    #    die erste Fassung labelte beide Seiten als "Champion" und warf damit
+    #    zwei verhaltensverschiedene Agenten in einen Topf. Der Assert prueft
+    #    nur `model == model_b` und geht deshalb durch -- das Modell IST
+    #    dasselbe, der Suchknopf nicht. Fix-Muster uebernommen aus
+    #    `penalty_track_probe.py:146-190`.
+    #
+    #    Die Swap-Datei kommt mit: ohne sie saesse der alpha-gegen-frozen-
+    #    Vergleich auf genau einem Sitz.
+    for fname in ("paired_arena_env_imm_netvnet.json",
+                  "paired_arena_env_imm_netvnet_swap.json"):
+        p1 = EVAL / fname
+        if not p1.exists():
+            continue
+        d1 = json.load(open(p1, encoding="utf-8"))
+        assert d1["model"] == d1["model_b"], (
+            f"{fname}: model != model_b ({d1['model']} vs {d1['model_b']}) -- "
+            f"Annahme 'selbes Netz beidseitig' faellt."
+        )
+
+        def spec_label(spec: str) -> str:
+            # POSITIONSUNABHAENGIG: in der Swap-Datei liegen spec_a/spec_b
+            # vertauscht (dort spec_a=champion_frozen). Wer die Position
+            # statt des Inhalts prueft, labelt die Swap-Haelfte falsch --
+            # derselbe Fehler ist in `penalty_track_probe.py` schon einmal
+            # passiert und dort dokumentiert.
+            if "imm_a02" in spec:
+                return "alpha0.2"
+            if "frozen" in spec:
+                return "frozen"
+            return f"unbekannt:{spec}"
+
+        lab_a = spec_label(str(d1.get("spec_a") or ""))
+        lab_b = spec_label(str(d1.get("spec_b") or ""))
+        assert lab_a != lab_b, (
+            f"{fname}: beide Seiten tragen dasselbe Label ({lab_a}) -- "
+            f"spec_a/spec_b unterscheiden die Agenten nicht."
+        )
+        add_arena_source(stats, "imm_alpha_vs_frozen", p1, arm=None,
+                          side_filter=lambda n, a=lab_a, b=lab_b:
+                          a if n == "NetzA" else (b if n == "NetzB" else None))
 
     # 2) Champion (Netz) vs Heuristik, zwei Arme (0 / 0.2), kombiniert +
     #    einzeln.

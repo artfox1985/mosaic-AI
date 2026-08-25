@@ -1465,3 +1465,103 @@ vorab so festgelegt: ein Filter, der nur in Runde 1-3 greift. Sie ist nicht
 gebaut, und sie waere nach diesem Ergebnis auch nicht die naheliegendste
 Fortsetzung -- die Diagnose zeigt auf die Binaeritaet, nicht auf den
 Zeitpunkt.
+
+## par.14 Phasenfaktor, sauberer Entwurf: Stufe x Staerke x Position (VORREGISTRIERT 2026-08-25)
+
+**Anlass: Nutzer-Auftrag 2026-08-25** nach dem Ergebnis von par.13 -- "mehr
+sweeps, nur runde 1-4 damit es unterscheidbar ist, und bei bedarf ziehst auch
+den tiling mit; drafting ist nur die halbe miete". Drei benannte Schwaechen
+des ersten Entwurfs werden behoben:
+
+1. **`peak` nur noch bis 4,0.** Das Routing endet nach Runde 4
+   (`preference_move_for_cells` und `tiling_preference_for_cells` liefern ab
+   Runde 5 nichts). In par.13 lag `peak` bis 5,0, vier von sechzehn Punkten
+   setzten die Spitze also teilweise dorthin, wo sie niemand liest -- die
+   Position war dadurch schwaecher geprueft als die Staerke.
+2. **Dreimal so viele Punkte.** 48 statt 16, damit die Position ueberhaupt
+   aufloesbar wird; in par.13 lagen nur vier Punkte je Runden-Gruppe.
+3. **Die STUFE als dritte Dimension** (`MOSAIC_PHASE_STAGE`, Diagnose,
+   Vorgabe `both`). Das ist der inhaltlich wichtigste Punkt.
+
+### par.14.1 Warum die Stufe eine eigene Dimension ist
+
+Die Zielkarte wird an drei Stellen gelesen, und sie wirkt dort VERSCHIEDEN:
+
+| Stelle | Wie die Karte benutzt wird | Was Amplitude tut |
+| --- | --- | --- |
+| Drafting (`envelope_drafting_preference`) | bestes Zielgewicht der Reihe als RANG | nichts -- die Ordnung steht schon bei amp=1,0 |
+| Plattenwahl (`slot_score_generic`) | Produkt aus Kartengewicht und Zellenwert | wirkt |
+| Tiling (`tiling_preference_for_cells_weighted`) | SUMME der Kartengewichte | wirkt |
+
+Das war in par.13 mein Erklaerungsversuch fuer die flache Antwortflaeche --
+als Verdacht aus dem Code formuliert, nicht gemessen. Hier wird er zur
+Messgroesse: `draft` / `tiling` / `both` als drei Arme mit je demselben
+LHS-Entwurf. Ist der Verdacht richtig, muss `tiling` staerker ausschlagen als
+`draft`.
+
+Die Plattenwahl haengt an der Drafting-Stufe, weil sie dort als
+`.or_else`-Zweig laeuft -- eine vierte Trennung waere ein eigener Umbau.
+
+**Entwurf:** LHS ueber `amp` in [1,0; 2,5] und `peak` in [1,0; 4,0], 16 Punkte,
+je Stufe derselbe Entwurf (Seed 20260826, ANDERER als par.13 -- das hier ist
+kein Nachziehen desselben Laufs). 48 Laeufe zu je 160 gepaarten Partien.
+
+**Diese Stufe entscheidet wieder NICHTS.** Dieselbe Regel wie par.13.1: bei 48
+Punkten ist das Maximum einer t-Statistik erst recht vom Zufall bewegt. Was
+sie liefert, ist der Stufen-Vergleich als AGGREGAT (Mittel je Stufe ueber 16
+Punkte) -- und ein Kandidat.
+
+**Bestaetigung (par.14.2), falls eine Stufe deutlich herausfaellt:** bester
+Punkt dieser Stufe auf frischen Seeds, Entscheidungsmass volle Spalten je
+Partie auf Block-Ebene, Waechter Vollendungsquote >= 0,53.
+
+**Abbruchbedingung, vorab:** liegt kein Stufen-Mittel klar ueber dem
+Rauschboden der Quasi-Nullpunkte (amp < 1,1), ist par.14 ohne
+Bestaetigungslauf negativ -- und damit der Phasenfaktor endgueltig, ueber drei
+Arme und 65 gemessene Formen.
+
+### par.14.2 ERGEBNIS (2026-08-25): NEGATIV -- und meine Erklaerung war falsch
+
+`evaluations/phase_sweep.json`, 48 Laeufe (3 Stufen x 16 LHS-Punkte), je 160
+gepaarte Partien, Entwurfs-Seed 20260826, Laufzeit 732 s.
+
+| Stufe | n | Mittel Delta Spalten | max \|t\| | Mittel Delta Punkte | Mittel Siegquote |
+| --- | --- | --- | --- | --- | --- |
+| **draft** | 16 | **+0,048** | 1,33 | +0,17 | 0,510 |
+| **tiling** | 16 | **+0,002** | 0,10 | -0,17 | 0,487 |
+| both | 16 | +0,051 | 1,38 | +0,04 | 0,498 |
+
+Rauschboden aus 3 Quasi-Nullpunkten (amp < 1,1): |delta| bis 0,025.
+Nach Gipfel-Runde: [1;2) +0,016 (n=18), [2;3) +0,043 (n=12), [3;4) +0,045
+(n=18).
+
+**VERDIKT: negativ.** Kein Stufen-Mittel uebersteigt den Rauschboden klar
+(0,051 gegen 0,025), kein einzelnes t kommt ueber 1,38. Die vorab festgelegte
+Abbruchbedingung greift, par.14.3 laeuft nicht.
+
+**MEINE ERKLAERUNG AUS par.14.1 IST WIDERLEGT, und zwar im Vorzeichen.** Dort
+stand als Vorhersage: im Drafting entscheidet die Karte einen RANG, dort kann
+Amplitude nichts bewirken; im Tiling und in der Plattenwahl werden Gewichte
+SUMMIERT bzw. multipliziert, dort muss sie greifen. Gemessen ist es umgekehrt
+-- `tiling` liefert exakt nichts (+0,002, max t 0,10), waehrend `draft` den
+kleinen Rest traegt, den es ueberhaupt gibt.
+
+Das war das dritte Mal in diesem Strang, dass eine von mir vorab formulierte
+MECHANISMUS-Vermutung im Vorzeichen falsch lag (par.9.1 k1-Abhaengigkeit,
+par.9.2 Fokus durch Superadditivitaet, jetzt Rang gegen Summe). Alle drei
+waren aus dem Code hergeleitet und klangen zwingend. Die Lehre ist nicht "besser
+herleiten", sondern: **eine Herleitung aus dem Code ist eine Hypothese, kein
+Befund** -- sie gehoert vorregistriert und gemessen, nicht als Begruendung in
+eine Zusammenfassung.
+
+Warum das Tiling nichts tut, ist damit OFFEN und ausdruecklich nicht erklaert.
+Eine naheliegende Vermutung waere, dass `tiling_preference_for_cells_weighted`
+ohnehin nur zwischen wenigen Kandidaten des DFS-Budgets waehlt und die
+Gewichtung dort selten den Ausschlag gibt -- aber das ist wieder eine
+Herleitung, und die ungepruefte Sorte davon hat hier dreimal danebengelegen.
+
+**ENDGUELTIG fuer den Phasenfaktor:** ueber drei Arme und 65 gemessene Formen
+(par.11 eine feste, par.13 sechzehn, par.14 achtundvierzig) bewegt sich
+nichts. `SPALTEN_PHASE` und die drei Diagnose-Knoepfe bleiben im Code, Default
+aus. Ein weiterer Formvorschlag braucht ein neues Argument, keinen neuen
+Entwurf.

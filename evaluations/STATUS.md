@@ -36,13 +36,13 @@ diese Frage "nichts" war.
 **Bis auf Widerruf wird ausschliesslich k1 (Vertikale Reihen, 7 Pkt je volle
 Spalte) bearbeitet.** Warum k1 und nicht eine andere – alles gemessen:
 
-| | |
-|---|---|
-| Wert | 7 Punkte je Spalte, 6 Geometrien |
-| Kosten | **keine** – innerhalb des k1-Bauer-Arms +7,86 Gesamtpunkte, davon 7,02 aus der Platte, Rest +0,84 |
+|          |                                                                                                                              |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| Wert     | 7 Punkte je Spalte, 6 Geometrien                                                                                             |
+| Kosten   | **keine** – innerhalb des k1-Bauer-Arms +7,86 Gesamtpunkte, davon 7,02 aus der Platte, Rest +0,84                            |
 | Synergie | Platzierung zahlt den vertikalen Lauf getrennt (`round_end.rs:366`), Spaltenbau liegt auf derselben Achse wie normales Spiel |
-| Luecke | Netz 20/156 Partien (13 %), Bauer 419/1000 (42 %) |
-| Label | Vollendbarkeits-Sperre bestanden, traegt in Runde 3-5 |
+| Luecke   | Netz 20/156 Partien (13 %), Bauer 419/1000 (42 %)                                                                            |
+| Label    | Vollendbarkeits-Sperre bestanden, traegt in Runde 3-5                                                                        |
 
 **Was das AUSSCHLIESST**, obwohl dazu Befunde vorliegen: k2 (Diagonalen), k4
 (Aeussere Felder), k5 (Eckplatten), k6 (Spezialfelder). Ihre Messungen bleiben in
@@ -62,7 +62,6 @@ heraus Analysen zu k6 (Spezialkuppel-Platzierung, Stapel-Ziehungen), k5 und k4
 entstanden. Alle drei lieferten echte Befunde – und keiner davon brachte k1 voran.
 
 ---
-
 
 ## STAND JETZT (2026-08-24)
 
@@ -88,14 +87,14 @@ Zwei Vorfragen sind beantwortet und schliessen die billigeren Wege aus:
 
 **Gebaut und gemessen** (v1 gegen v2, je 80 gepaarte Partien, beide Sitze):
 
-| Bauschritt | volle Spalten | volle Zeilen |
-| --- | --- | --- |
-| v1 (Anker) | 0,163 | 0,438 |
-| Routing (Draft + Tiling) | 0,362 | 0,250 |
-| + plattenunabhaengiger L-Wert | 0,438 | 0,400 |
-| + gestreute Start-Ecke | 0,450 | 0,263 |
-| + Kuppelplatten-Wahl | 0,588 | 0,200 |
-| + Zielspalte ab Runde 3 festgenagelt | 0,562 | 0,200 |
+| Bauschritt                           | volle Spalten | volle Zeilen |
+| ------------------------------------ | ------------- | ------------ |
+| v1 (Anker)                           | 0,163         | 0,438        |
+| Routing (Draft + Tiling)             | 0,362         | 0,250        |
+| + plattenunabhaengiger L-Wert        | 0,438         | 0,400        |
+| + gestreute Start-Ecke               | 0,450         | 0,263        |
+| + Kuppelplatten-Wahl                 | 0,588         | 0,200        |
+| + Zielspalte ab Runde 3 festgenagelt | 0,562         | 0,200        |
 
 Das Festnageln wirkt in der VERTEILUNG, nicht im Mittelwert: Partien mit
 mindestens einer vollen Spalte **35 auf 50 Prozent** (Hoehe 4/6 von 14 auf 8,
@@ -122,10 +121,10 @@ Suite 512/0.
 STEHT AUS.** 407 Kampagnen-Seeds je Arm, Champion@400 gegen Heuristik@150,
 mit v1-Bezug auf denselben Seeds:
 
-| | Siege | Punkte | Marge | volle Spalten | Vollendungsquote | max Hoehe |
-| --- | --- | --- | --- | --- | --- | --- |
-| v1 (Bezug) | 0,256 | 37,6 | -12,2 | 0,086 | 0,564 | 4,58 |
-| **v2** | **0,128** | 34,8 | **-19,4** | **0,302** | **0,686** | 5,08 |
+|            | Siege     | Punkte | Marge     | volle Spalten | Vollendungsquote | max Hoehe |
+| ---------- | --------- | ------ | --------- | ------------- | ---------------- | --------- |
+| v1 (Bezug) | 0,256     | 37,6   | -12,2     | 0,086         | 0,564            | 4,58      |
+| **v2**     | **0,128** | 34,8   | **-19,4** | **0,302**     | **0,686**        | 5,08      |
 
 Gepaart gegen das Netz (16 Bloecke): volle Spalten +0,175 (t=+7,79), Punkte
 -19,610 (t=-18,94), Siege -0,755 (t=-20,09), Strafpunkte +7,567 (t=+11,83).
@@ -152,6 +151,7 @@ den Lehrer-Einsatz ist er entschaerft.
    ist, haengt daran, ob das Netz die FAEHIGKEIT uebernimmt, ohne das NIVEAU
    mitzuuebernehmen -- das ist par.5.4 und mit dieser Messung nicht
    beantwortet, sondern erst gestellt.
+
 2. **Self-Play-Einstieg** (Nutzer-Freigabe 2026-08-24, NICHT gebaut): v2
    existiert bisher nur in Arenen. Ohne Korpus-Erzeuger haben weder der
    Shaping-Kopf noch eine 2D-Erweiterung Trainingsmaterial. Braucht eine
@@ -159,8 +159,10 @@ den Lehrer-Einsatz ist er entschaerft.
    spaetere Auswertung kann die Arme trennen. Die Verdrahtung ist vorbereitet:
    `PlayerLoopConfig` traegt bereits das Feld `heuristik_variante` (an allen
    acht Bestandsstellen auf `V1`).
+
 3. **Abstand zum Ziel**: 0,562 volle Spalten im Heuristik-Duell gegen die vom
    Nutzer geforderte 1,0.
+
 4. **NEUER ARM `V2Huelle` -- GEMESSEN 2026-08-25, ARM GEWINNT**
    (`PREREG_heuristic_v2_long_rows.md` par.8). Die Prio-Leiter des Nutzers
    als Routing-Huelle: eigene Variante, Bewertung byte-identisch zu `V2`,
@@ -171,7 +173,7 @@ den Lehrer-Einsatz ist er entschaerft.
    Strafleisten- und Stoerungsterm (`provocation::floor_line_growth` /
    `disruption_score`, beide Bestand) und Phasen-Eskalation `[1,2,4,8]`.
    Suite 520/0, Paritaets-Hash `8c6684ff` haelt.
-
+   
    **Ergebnis (par.8.5, n=160, `v2_envelope_arena.json`):** volle Spalten
    0,425 auf **0,950** (t=9,12 auf 10 Bloecken), Spezialfeld-Freischaltungen
    0,713 auf **1,512** (t=9,32), Strafpunkte -15,0 auf -13,4, eigene Punkte
@@ -181,14 +183,14 @@ den Lehrer-Einsatz ist er entschaerft.
    +0,32/+0,68/+0,21). **Erster v2-Bauschritt ueberhaupt, der Spalten NICHT
    mit Punkten bezahlt** -- alle vier vorherigen taten es, Schritt 3 hat die
    Siegquote gegen den Champion halbiert.
-
+   
    **Ablationen (par.8.6):** Struktur und Staerke haengen an verschiedenen
    Bausteinen. Die Spalten kommen aus der ZIELKARTE (bleiben bei 0,506-0,525
    ohne Stoer- und Strafterm); nur die Prio-5-Auflage bewegt sie (-0,10). Die
    Marge zerfaellt in `W_STRAF` 5,09, Prio-5 2,59, `W_STOER` 2,56. Ohne
    `W_STRAF` dreht die Strafleiste ins Negative (-1,44). Kontrolllauf nach
    dem Zurueckbauen reproduziert exakt.
-
+   
    **Zwei Punktekarten als Alternative zur Leiter: BEIDE NEGATIV**
    (par.9.1/9.2, je n=160 gegen die Huelle). `V2Heatmap` (Plattenanteil aus
    `scoring_progress`): volle Spalten 0,650 auf 0,281, Siegquote 0,463.
@@ -196,7 +198,7 @@ den Lehrer-Einsatz ist er entschaerft.
    0,219, Siegquote 0,400. Beide zeigen dieselbe Signatur -- Teilspalten >= 3
    STEIGEN (+0,375 / +0,325), volle Spalten und maximale Hoehe fallen, und die
    Strafpunkte werden besser (+2,4 / +2,7).
-
+   
    **Der Befund dahinter ist allgemein und gilt fuer kuenftige Arme:** eine
    gerechnete Punktekarte ist ein BREITEN-Signal und erzeugt den besseren
    Greedy-Spieler bei schlechterem Bau. Volle Spalten verlangen eine Vorgabe,
@@ -207,62 +209,62 @@ den Lehrer-Einsatz ist er entschaerft.
    Eingabeebene ist davon NICHT beruehrt** (Nutzer-Absicht 2026-08-25: die
    Karte war fuers Netz gedacht) -- ein Netz kann aus einem Breiten-Signal
    Fokus lernen, ein Greedy-Routing nicht.
-
+   
    **LEHRER-TEST DURCH (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm,
    Champion@400 gegen Heuristik@150, 2.610 s bei 11 Threads): DIE HUELLE
    SCHLAEGT v1 UND v2.**
-
-   | | Siege | Punkte | Marge | volle Spalten | Vollend. | Strafpkt | volle Zeilen |
-   | --- | --- | --- | --- | --- | --- | --- | --- |
-   | v1 | 0,256 | 37,6 | -12,2 | 0,086 | 0,564 | 19,3 | 0,432 |
-   | v2 | 0,128 | 34,8 | -19,4 | 0,302 | 0,686 | -- | 0,403 |
-   | **Huelle** | **0,373** | **47,1** | **-5,5** | **0,798** | **0,717** | **13,6** | 0,216 |
-
+   
+   |            | Siege     | Punkte   | Marge    | volle Spalten | Vollend.  | Strafpkt | volle Zeilen |
+   | ---------- | --------- | -------- | -------- | ------------- | --------- | -------- | ------------ |
+   | v1         | 0,256     | 37,6     | -12,2    | 0,086         | 0,564     | 19,3     | 0,432        |
+   | v2         | 0,128     | 34,8     | -19,4    | 0,302         | 0,686     | --       | 0,403        |
+   | **Huelle** | **0,373** | **47,1** | **-5,5** | **0,798**     | **0,717** | **13,6** | 0,216        |
+   
    Gepaart gegen das Netz (16 Bloecke): volle Spalten +0,700 (t=+13,73),
    Punkte -5,468 (t=-5,46), Siege -0,245 (t=-5,67). Das Netz selbst kommt auf
    0,106 volle Spalten.
-
+   
    **Der Tausch ist aufgehoben.** v2 hat Faehigkeit mit Niveau bezahlt; die
    Huelle liefert 2,6-mal so viele volle Spalten wie v2 UND fast die
    dreifache Siegquote, dazu 9,5 Punkte mehr als v1 und 5,7 Strafpunkte
    weniger. **Damit ist die Voraussetzung von par.3b erstmals erfuellbar:**
    ein Lehrer, der die Dreiecksform erzeugt, ohne schwaecher zu sein als der
    bisherige Anker.
-
+   
    **Der Preis, und er ist echt:** volle Zeilen 0,432 auf 0,216. Anders als
    bei v2 (dort war der Einbruch ein Artefakt des v1-gegen-v2-Duells, gegen
    ein Netz blieben 0,403) misst hier derselbe Netz-Aufbau die Haelfte. Bei
    7 Punkten je Spalte gegen 3 je Zeile ist der Tausch rechnerisch guenstig,
    gehoert aber bei jedem Nachfolgearm mitgemessen.
-
+   
    **ELO EINGETRAGEN (2026-08-25):** `Heuristik_v2huelle@150` = **1125**
    [1069, 1186]. Die Kante kam aus dem Lehrer-Test selbst (407 Partien gegen
    `v21_2d_brierbest`@400, 255:152) -- keine zusaetzlichen Partien noetig,
    weil der Elo-Anker der Leiter genau diese Heuristik@150-Bedingung ist.
    Vertrags-Hash `a169ebf0a4451e08` identisch zur Leiter, also keine Kante
    ueber die Fix-Grenze.
-
-   | Modell | Elo | 95%-KI |
-   | --- | --- | --- |
-   | v21_2d_brierbest@400 | 1215 | [1173, 1261] |
-   | v20_2d_opp_brierbest@400 | 1186 | [1147, 1230] |
-   | v19_2d_best@400 | 1136 | [1096, 1177] |
+   
+   | Modell                     | Elo      | 95%-KI       |
+   | -------------------------- | -------- | ------------ |
+   | v21_2d_brierbest@400       | 1215     | [1173, 1261] |
+   | v20_2d_opp_brierbest@400   | 1186     | [1147, 1230] |
+   | v19_2d_best@400            | 1136     | [1096, 1177] |
    | **Heuristik_v2huelle@150** | **1125** | [1069, 1186] |
-   | Heuristik@150 | 1000 | Anker (fix) |
-
+   | Heuristik@150              | 1000     | Anker (fix)  |
+   
    **+125 Elo ueber dem Anker**, mit einer handgeschriebenen Heuristik bei 150
    Sims gegen Netze bei 400. **Nicht belegt** ist ein Vorsprung vor v19: das
    KI ueberlappt deutlich. Belegt ist der Abstand zum Anker und der Rueckstand
    von 90 Elo auf den Champion.
-
+   
    Nicht eingetragen, aber verfuegbar: das ALTE v2 hat auf denselben
    Kampagnen-Seeds 0,128 Siegquote gegen den Champion (par.5.3). Eine Kante
    daraus wuerde v2 unter den Anker setzen und den Sprung sichtbar machen --
    die Laufbedingungen jener Messung sind aber nicht von mir verifiziert,
    deshalb nicht ungefragt nachgetragen.
-
+   
    **DREI ARME GEMESSEN, ALLE NEGATIV -- die Huelle bleibt der Stand:**
-
+   
    * **par.11/13 Phasenfaktor**: eine feste Form (t=0,39) und 16 Formen ueber
      Staerke und Position im Latin-Hypercube (max t=1,48 bei 16 Versuchen).
      Die POSITION erklaert nichts (partielle Korrelation -0,072), die
@@ -280,10 +282,10 @@ den Lehrer-Einsatz ist er entschaerft.
      (`RESEARCH_heuristic_methodology_external_2026-08-25.md` §4.4/§4.5) gilt
      also NICHT unbesehen: sie haengt daran, ob das Ziel binaer oder stetig
      ausgezahlt wird.
-
+   
    Alle drei Knoepfe bleiben im Code, Default aus. `MOSAIC_PHASE_AMP` und
    `MOSAIC_PHASE_PEAK` sind in `knob_registry.rs` als Diagnose eingetragen.
-
+   
    **UEBERGABE-NOTIZ 2026-08-25:** Maschine und `self_play.rs` sind FREI
    (Commit `ae88cf3`, Suite 520/0, Paritaet haelt). Die Parallelsitzung
    `mosaic-ai-4f` wartete auf diese Freigabe fuer zwei Laeufe
@@ -292,14 +294,14 @@ den Lehrer-Einsatz ist er entschaerft.
    nicht mehr erreichbar (`ListAgents`: keine Agenten), die Nachricht kam
    nicht zu. Wer dort weitermacht, findet den Stand in
    `PREREG_stack_draw_reservation_rule.md`.
-
+   
    **FRUEHERER STAND (par.10, jetzt erledigt):** Champion@400 gegen Huelle@150 auf den
    407 Kampagnen-Seeds, mit v1 als Bezug -- derselbe Aufbau wie par.5.3, damit
    die Zahlen nebeneinander stehen. `net_vs_heuristic_v2_arena` nimmt die
    Variante seit heute als Parameter. Das ist die Frage, an der der ganze
    Strang haengt: v2 hat Faehigkeit mit Niveau bezahlt (Siegquote 0,256 auf
    0,128), die Huelle tut das im Heuristik-Duell nicht.
-
+   
    Nicht gebaut, weil schon vorhanden oder ohne Anknuepfungspunkt: Prio 0
    (Spiel endet nach genau 5 Runden, `game.rs:687`; Runde 5 laeuft ueber den
    eingefrorenen `round5_anchor` -- Expectiminimax mit Zufallsknoten und
@@ -307,7 +309,7 @@ den Lehrer-Einsatz ist er entschaerft.
    Orakel-Uebereinstimmung 81,4 Prozent, `round5_anchor.rs:44-59`), Prio 1
    in der BEWERTUNG (`projected_unplaceable_penalty`, nur die Routing-Seite
    ist neu).
-
+   
    **Offene Luecken aus dem Nutzer-Review 2026-08-25, alle geprueft:**
    `heuristic_v2.rs` koppelt seinen Saettigungsterm an KEINE Farbknappheit
    (0 Vorkommen, waehrend `column_build::cell_cost:287` die Knappheit ueber
@@ -435,11 +437,11 @@ plattenblindes Spiel geeicht, derselbe Fehler wie viermal zuvor.
   - `tools/probes/column_completion_legality_probe.py:294` -- **kein Fall**:
     der Deckel greift auf PARTIEN, nicht auf Stellungen innerhalb einer Partie;
     Partien in einem Arena-Artefakt sind untereinander unabhaengig.
-  Dazu zwei weitere Unterschiede, die einen
-  direkten Vergleich verbieten: Generation (v21-Modell im Tor, v20-Korpus hier)
-  und Groesse (roher Prior gegen Argmax einer wurzelverrauschten
-  Self-Play-Policy). **Mit einem Lauf aufloesbar**:
-  `tools/probes/floor_action_aversion_gate.py` auf Runde-2-4-Stellungen.
+    Dazu zwei weitere Unterschiede, die einen
+    direkten Vergleich verbieten: Generation (v21-Modell im Tor, v20-Korpus hier)
+    und Groesse (roher Prior gegen Argmax einer wurzelverrauschten
+    Self-Play-Policy). **Mit einem Lauf aufloesbar**:
+    `tools/probes/floor_action_aversion_gate.py` auf Runde-2-4-Stellungen.
 
 ### Laufzeiten (gemessen, nicht geschaetzt)
 
@@ -447,14 +449,14 @@ Planungsgroessen. Die belastbaren Zahlen stehen je Lauf im Artefakt
 (`laufzeit`-Block, Pflichtfeld seit 2026-08-25); hier steht nur, was man zum
 Einplanen braucht. Wer eine Zeile ergaenzt, traegt GEMESSENES ein.
 
-| Aufbau | Umfang | Threads | Wanduhr |
-| --- | --- | --- | --- |
-| Heuristik gegen Heuristik, 150 Sims (`v2_envelope_arena.py`) | 160 Partien | 0 = alle 12 Kerne | **21,9 s** |
-| dito, Rauchtest | 20 Partien | alle Kerne | **4,1 s** |
-| Netz@400 gegen Heuristik@150 (`v2_teacher_arena.py`), je Partie | -- | 0 = **sequenziell** | **12,357 s** |
-| dito | -- | 11 | **2,575 s** |
-| dito, voller Lauf 407 Seeds + v1-Bezug | 814 Partien | 0 = sequenziell | ~2 h 48 min (hochgerechnet aus 12,357 s je Partie; ein Lauf wurde nach 99 min abgebrochen) |
-| dito | 814 Partien | 11 | ~35 min |
+| Aufbau                                                          | Umfang      | Threads             | Wanduhr                                                                                    |
+| --------------------------------------------------------------- | ----------- | ------------------- | ------------------------------------------------------------------------------------------ |
+| Heuristik gegen Heuristik, 150 Sims (`v2_envelope_arena.py`)    | 160 Partien | 0 = alle 12 Kerne   | **21,9 s**                                                                                 |
+| dito, Rauchtest                                                 | 20 Partien  | alle Kerne          | **4,1 s**                                                                                  |
+| Netz@400 gegen Heuristik@150 (`v2_teacher_arena.py`), je Partie | --          | 0 = **sequenziell** | **12,357 s**                                                                               |
+| dito                                                            | --          | 11                  | **2,575 s**                                                                                |
+| dito, voller Lauf 407 Seeds + v1-Bezug                          | 814 Partien | 0 = sequenziell     | ~2 h 48 min (hochgerechnet aus 12,357 s je Partie; ein Lauf wurde nach 99 min abgebrochen) |
+| dito                                                            | 814 Partien | 11                  | ~35 min                                                                                    |
 
 **Parallelisierung ist ergebnisneutral, gemessen statt angenommen**
 (2026-08-25, 20 Seeds beidseitig, `neutral_seq.json` / `neutral_par.json`):
@@ -489,13 +491,20 @@ Aufgabe "Arena-Threadzahl geradeziehen" in der Strang-Tabelle.
   (Zaehler auf `PlayerBoard`, NICHT im `state.log` -- das ist das
   Kernbeweis-Vergleichsobjekt). `tools/arena_compact.py` nimmt sie mit.
 
-**Offener Sonden-Fix (bestaetigt, NICHT erledigt):**
-`tools/probes/row_preference_probe.py:190-198` labelt in `imm_netvnet` beide
-Seiten als "Champion", obwohl spec_a=alpha0.2 und spec_b=frozen zwei Agenten
-sind. Fix-Muster: `tools/probes/penalty_track_probe.py` (liest spec_a/spec_b,
-trennt NetzA/NetzB, rechnet die gepaarte Differenz). Der Kernbefund (~55,5 %
-kurze Reihen) ruht auf drei weiteren, eindeutigen Kontexten.
+**Sonden-Fix ERLEDIGT 2026-08-25** (Nutzer-Auftrag beim STATUS-Durchgang):
+`row_preference_probe.py` labelte in `imm_netvnet` beide Seiten als
+"Champion", obwohl spec_a=alpha0.2 und spec_b=frozen zwei Agenten sind -- der
+Assert prueft nur `model == model_b` und geht deshalb durch, das MODELL ist ja
+dasselbe. Fix nach dem Muster aus `penalty_track_probe.py:146-190`:
+positionsunabhaengige Label aus den Spec-Strings, NetzA/NetzB getrennt, und
+die Swap-Datei kommt mit (ohne sie saesse der Vergleich auf einem Sitz).
 
+**Ergebnis nach der Trennung: der Kernbefund haelt, und die Trennung selbst
+ist ein kleiner Befund.** alpha0.2 55,6 Prozent kurze Reihen gegen frozen
+55,4 Prozent, je 407 Partien und rund 24.400 Zugziele -- praktisch identisch,
+und beide auf dem Niveau der drei anderen Kontexte (~55,5 Prozent). Die
+Fehlbeschriftung hat die Kernzahl also nicht verzerrt; neu sichtbar ist, dass
+der alpha-Knopf an der Reihenpraeferenz NICHTS aendert.
 
 ## NAECHSTE SCHRITTE – ALLE OFFEN, ALLE NUTZER-ENTSCHEID
 
@@ -504,21 +513,21 @@ bereits gebaute/gemessene Teilergebnisse (siehe jeweilige Zeile). Umfaenge und
 Schwellen fuer noch nicht begonnene Teile stehen je Prereg und sind vor
 Baubeginn freizugeben.
 
-| Strang | Datei | Zuschnitt |
-|---|---|---|
-| **Arena-Threadzahl geradeziehen** | (kein Prereg, Werkzeugarbeit) | **EINGETAKTET 2026-08-25 (Nutzer-Entscheid), NICHT GEBAUT.** `threads = 0` heisst in `run_heuristic_v1_vs_v2_arena` ALLE KERNE und in `run_net_vs_heuristic_v2_arena` SEQUENZIELL (`self_play.rs:2866`, `if num_threads <= 1`). Gemessen am Lehrer-Test: 19,8 CPU-Minuten in 20,4 Wanduhr-Minuten bei 12 Kernen, Faktor 1,0. Betrifft `tools/probes/v2_teacher_arena.py` (`THREADS = 0`) und damit auch die urspruengliche Schritt-3-Messung. **Vorsicht beim Beheben:** die Bedeutung von `0` einfach umzudrehen aendert still das Verhalten JEDER Bestandsaufrufstelle. Sauber ist ein gemeinsamer Helfer mit EINER dokumentierten Konvention plus Nachweis der Ergebnisgleichheit auf einer Stichprobe (Partien sind je Seed unabhaengig, also sollte Parallelisierung nichts verschieben -- das ist zu ZEIGEN, nicht anzunehmen). |
-| **Heuristik v2 als zusaetzlicher Lehrer** | `PREREG_heuristic_v2_long_rows.md` | **AKTIV, Messkette KOMPLETT.** Schritt 3: Faehigkeit belegt (volle Spalten 0,302 gegen v1 0,086, Vollendungsquote 0,686), Preis hoch (Siegquote 0,128 gegen 0,256). **URTEIL = NUTZER-ENTSCHEID**, kein Schwellenwert vorregistriert. Offen: par.5.4 Korpus und Training, Self-Play-Einstieg (freigegeben, nicht gebaut) |
-| **Shaping-Kopf statt Ownership-Kopf** | `PREREG_heuristic_v2_long_rows.md` par.3b | Vorregistriert, NICHT gebaut. Sagt die Dreiecks-Abweichung voraus; zwei Kanaele (Spalte links/rechts), Abkling-Kurve zugunsten des Value-Kopfes. Braucht erst ein v2-Korpus, sonst auf plattenblindes Spiel geeicht |
-| **Einhuellende im 2D-Encoder** | – | Nutzer-Frage 2026-08-24, nicht registriert. Zusaetzliche Eingabeebene "Dreiecks-Zugehoerigkeit je Zelle". Additiv moeglich (Eingabegroesse kommt vom Modell), aber eigener Bau nach par.3b |
-| **R5-Netz-Loeser + R5-Value-Kalibrierung** | `PREREG_r5_solver_split.md` par.2 a/b/c, Teil B | Netz-Loeser-Arme (Budget, Policy-Sortierung, spaeter Value-Korrekturterm; je per-Agent verdrahtet, NIE per Env-Knopf) und der Vierer-Kopf-Vergleich. Zielmetrik: `r5_value_calibration`-Steigung, heute 0,06-0,09 statt ~1. **Arm 3 braucht ein b-Serie-Modell mit geprueftem Traeger-Status** -- der Ownership-Ausgang des Champions ist untrainiert (par.3a) |
-| **Seeding-Folgearm: Dosis** | `PREREG_start_position_seeding.md` | k=6 war die erste Dosis; hoehere Dosis ist der naheliegende Folgeschritt, aber nicht registriert |
-| **UVFA-Regime-Eingabe** | `PREREG_uvfa_plate_regime.md` | Folge-/Kombinationsarm; par.8: Conditioning-Dropout + Leakage-Waechter sind PFLICHT. par.7-Entscheid steht aus |
-| **Saettigende Score-Utility** | `PREREG_saturating_score_utility.md` | Tor par.3a gefahren, Verdikt DAZWISCHEN -- **NUTZER-ENTSCHEID offen**: sigma-Kopf auf `points_val` selbst oder auf ein TD-unberuehrtes Ziel. Kein Automatismus, so im Tor vorgesehen |
-| **Agenten-Kapselung: Ausbau** | `PREREG_agent_encapsulation.md` par.4 | ENTSCHIEDEN und gruen; offen ist nur der planbare Ausbau der restlichen ~31 Such-/Blattwert-Knoepfe ins SearchConfig, je Knopf ein Commit mit Paritaets-Gate |
-| **Implicit-Minimax-Backup** | `PREREG_implicit_minimax_backup.md` | ENTSCHIEDEN: Effekt war GEGNERSPEZIFISCH (Heuristik-Arena +7,0 pp k1, netz-gegen-netz Paritaet). Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung |
-| **Lange-Reihen-Auszahlung** | `PREREG_long_row_payoff.md` | ENTSCHIEDEN und NEGATIV, aber als falscher HEBEL, nicht falsches ZIEL. B2 ist Nutzer-Entscheid und muss die Vollendungsquote deutlich ueber 0,53 bringen |
-| **Bootstrap-Horizont** | `PREREG_bootstrap_horizon.md` | ENTSCHIEDEN: BEIDE Arme geschlossen (Anker an Stufe 0, klassisch am Kostengate). Wiederaufnahme nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden |
-| **Reihenfolge Seeding-Kette gegen R5-Strang** | – | entscheidet der Nutzer beim Aufgreifen |
+| Strang                                        | Datei                                           | Zuschnitt                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Arena-Threadzahl geradeziehen**             | (kein Prereg, Werkzeugarbeit)                   | **EINGETAKTET 2026-08-25 (Nutzer-Entscheid), NICHT GEBAUT.** `threads = 0` heisst in `run_heuristic_v1_vs_v2_arena` ALLE KERNE und in `run_net_vs_heuristic_v2_arena` SEQUENZIELL (`self_play.rs:2866`, `if num_threads <= 1`). Gemessen am Lehrer-Test: 19,8 CPU-Minuten in 20,4 Wanduhr-Minuten bei 12 Kernen, Faktor 1,0. Betrifft `tools/probes/v2_teacher_arena.py` (`THREADS = 0`) und damit auch die urspruengliche Schritt-3-Messung. **Vorsicht beim Beheben:** die Bedeutung von `0` einfach umzudrehen aendert still das Verhalten JEDER Bestandsaufrufstelle. Sauber ist ein gemeinsamer Helfer mit EINER dokumentierten Konvention plus Nachweis der Ergebnisgleichheit auf einer Stichprobe (Partien sind je Seed unabhaengig, also sollte Parallelisierung nichts verschieben -- das ist zu ZEIGEN, nicht anzunehmen). |
+| **Heuristik v2 als zusaetzlicher Lehrer**     | `PREREG_heuristic_v2_long_rows.md`              | **AKTIV, Messkette KOMPLETT.** Schritt 3: Faehigkeit belegt (volle Spalten 0,302 gegen v1 0,086, Vollendungsquote 0,686), Preis hoch (Siegquote 0,128 gegen 0,256). **URTEIL = NUTZER-ENTSCHEID**, kein Schwellenwert vorregistriert. Offen: par.5.4 Korpus und Training, Self-Play-Einstieg (freigegeben, nicht gebaut)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Shaping-Kopf statt Ownership-Kopf**         | `PREREG_heuristic_v2_long_rows.md` par.3b       | Vorregistriert, NICHT gebaut. Sagt die Dreiecks-Abweichung voraus; zwei Kanaele (Spalte links/rechts), Abkling-Kurve zugunsten des Value-Kopfes. Braucht erst ein v2-Korpus, sonst auf plattenblindes Spiel geeicht                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **Einhuellende im 2D-Encoder**                | –                                               | Nutzer-Frage 2026-08-24, nicht registriert. Zusaetzliche Eingabeebene "Dreiecks-Zugehoerigkeit je Zelle". Additiv moeglich (Eingabegroesse kommt vom Modell), aber eigener Bau nach par.3b                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **R5-Netz-Loeser + R5-Value-Kalibrierung**    | `PREREG_r5_solver_split.md` par.2 a/b/c, Teil B | Netz-Loeser-Arme (Budget, Policy-Sortierung, spaeter Value-Korrekturterm; je per-Agent verdrahtet, NIE per Env-Knopf) und der Vierer-Kopf-Vergleich. Zielmetrik: `r5_value_calibration`-Steigung, heute 0,06-0,09 statt ~1. **Arm 3 braucht ein b-Serie-Modell mit geprueftem Traeger-Status** -- der Ownership-Ausgang des Champions ist untrainiert (par.3a)                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Seeding-Folgearm: Dosis**                   | `PREREG_start_position_seeding.md`              | k=6 war die erste Dosis; hoehere Dosis ist der naheliegende Folgeschritt, aber nicht registriert                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **UVFA-Regime-Eingabe**                       | `PREREG_uvfa_plate_regime.md`                   | Folge-/Kombinationsarm; par.8: Conditioning-Dropout + Leakage-Waechter sind PFLICHT. par.7-Entscheid steht aus                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| **Saettigende Score-Utility**                 | `PREREG_saturating_score_utility.md`            | Tor par.3a gefahren, Verdikt DAZWISCHEN -- **NUTZER-ENTSCHEID offen**: sigma-Kopf auf `points_val` selbst oder auf ein TD-unberuehrtes Ziel. Kein Automatismus, so im Tor vorgesehen                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **Agenten-Kapselung: Ausbau**                 | `PREREG_agent_encapsulation.md` par.4           | ENTSCHIEDEN und gruen; offen ist nur der planbare Ausbau der restlichen ~31 Such-/Blattwert-Knoepfe ins SearchConfig, je Knopf ein Commit mit Paritaets-Gate                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| **Implicit-Minimax-Backup**                   | `PREREG_implicit_minimax_backup.md`             | ENTSCHIEDEN: Effekt war GEGNERSPEZIFISCH (Heuristik-Arena +7,0 pp k1, netz-gegen-netz Paritaet). Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **Lange-Reihen-Auszahlung**                   | `PREREG_long_row_payoff.md`                     | ENTSCHIEDEN und NEGATIV, aber als falscher HEBEL, nicht falsches ZIEL. B2 ist Nutzer-Entscheid und muss die Vollendungsquote deutlich ueber 0,53 bringen                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **Bootstrap-Horizont**                        | `PREREG_bootstrap_horizon.md`                   | ENTSCHIEDEN: BEIDE Arme geschlossen (Anker an Stufe 0, klassisch am Kostengate). Wiederaufnahme nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **Reihenfolge Seeding-Kette gegen R5-Strang** | –                                               | entscheidet der Nutzer beim Aufgreifen                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 
 **Geschlossen ohne Messung (nicht neu vorschlagen):** die
 Q-Skalierungs-Option (Aera-Nachmessung `gumbel_scale_calibration_v21.json`:
@@ -532,18 +541,16 @@ kein Beleg-Fall fuer einen AB-Umbau).
 
 ## OFFENE ENTSCHEIDUNGEN (Nutzer)
 
-| Punkt | Stand |
-|---|---|
-| **Gewichtsarm 4,0** | Vorabregel hat ihn freigegeben (`PREREG_ownership_weight_new_window.md` par.7); Nutzer-Entscheid 2026-08-17: **weiter hinten geparkt** |
-| **Stoerungs-Baustein Stufe 2** | gehoert zum **Moon-Order-Kopf**, keine Einzelentscheidung mehr |
-| **Korpus mit hoeheren Sims nachgenerieren** | **ABGELEHNT** (Nutzer 2026-08-17) – nicht neu vorschlagen |
-| **Fester Bewertungssatz** | Bauer-Satz: 300 Dateien / 3000 Partien in `data/holdout/`, fertig 2026-08-18. Details (Zusammensetzung, Abnahme, Herkunft) siehe `../archive/history.md`, Kapitel "Ownership-/Zielwechsel-Kampagne v21-b18..b24 und Begleitbefunde (2026-08-16 bis 2026-08-20)". |
-| **Push** | NIE ohne ausdrueckliche Nutzer-Anweisung (Nutzer-Regel 2026-08-20); Stand wird als "n Commits voraus" gemeldet |
-| **`logs/nacht_20260820.log`** | darf weg (Nutzer 2026-08-22); die Zwangsseiten-Map ist extrahiert nach `data/asym_corpus/zwangsseiten_map.txt`. Loeschung ist Nutzersache |
-| **Asym-Korpus** | bleibt LOKAL – Trainingsinput fuer Seeding und UVFA |
-| **Ownership-Korpus** | entfernt der Nutzer selbst (5b-Abschluss registriert) |
-| **`tools/night_run_20260820.ps1`** | vom Nutzer geloescht, die Loeschung ist noch nicht committet |
-
+| Punkt                          | Stand                                                                                                                                                                                                                                                            |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Stoerungs-Baustein Stufe 2** | gehoert zum **Moon-Order-Kopf**, keine Einzelentscheidung mehr                                                                                                                                                                                                   |
+|                                |                                                                                                                                                                                                                                                                  |
+| **Fester Bewertungssatz**      | Bauer-Satz: 300 Dateien / 3000 Partien in `data/holdout/`, fertig 2026-08-18. Details (Zusammensetzung, Abnahme, Herkunft) siehe `../archive/history.md`, Kapitel "Ownership-/Zielwechsel-Kampagne v21-b18..b24 und Begleitbefunde (2026-08-16 bis 2026-08-20)". |
+| **Push**                       | NIE ohne ausdrueckliche Nutzer-Anweisung (Nutzer-Regel 2026-08-20); Stand wird als "n Commits voraus" gemeldet                                                                                                                                                   |
+|                                |                                                                                                                                                                                                                                                                  |
+| **Asym-Korpus**                | bleibt LOKAL – Trainingsinput fuer Seeding und UVFA                                                                                                                                                                                                              |
+|                                |                                                                                                                                                                                                                                                                  |
+|                                |                                                                                                                                                                                                                                                                  |
 
 ## FALLE vom 2026-08-20 – CPU-NEBENLAST VERSTUEMMELT ARENA-PARTIEN
 
@@ -559,14 +566,13 @@ beide exklusiv). Belege: `paired_arena_env_reach_conj_smoke1/2.json`
 (unter Last, abweichend) gegen `reach_smoke1/3/4.json` (exklusiv,
 identisch).
 
-
 ## TASK-INDEX (nur OFFEN/LAUFEND)
 
-| Task | Status |
-| --- | --- |
-| **#29-Instrument (Offline-Value-Praediktor)** | **WARTET AUF POWER**: braucht >=6 arena-entschiedene Paare (Stand ~3); Kandidaten-Metriken werden je Gating mitgefuehrt. `PREREG_post34_package.md` |
-| #31 / #38 / #39 | geparkt (Arbeitskreis "Spaeter"). Beschreibungen: ../archive/history.md, Kapitel "STATUS.md-Aufraeumung (2026-08-24)" |
-| `stack_top_feature` | geparkt, Arbeitskreis "Spaeter", gleiche Stufe wie #38 (Nutzer-Entscheid 2026-08-20). Ziel ist SICHTGLEICHHEIT Netz/Spieler, kein Staerke-A/B. `PREREG_stack_top_feature.md`; Beschreibung im Archiv-Kapitel oben |
+| Task                                          | Status                                                                                                                                                                                                            |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **#29-Instrument (Offline-Value-Praediktor)** | **WARTET AUF POWER**: braucht >=6 arena-entschiedene Paare (Stand ~3); Kandidaten-Metriken werden je Gating mitgefuehrt. `PREREG_post34_package.md`                                                               |
+| #31 / #38 / #39                               | geparkt (Arbeitskreis "Spaeter"). Beschreibungen: ../archive/history.md, Kapitel "STATUS.md-Aufraeumung (2026-08-24)"                                                                                             |
+| `stack_top_feature`                           | geparkt, Arbeitskreis "Spaeter", gleiche Stufe wie #38 (Nutzer-Entscheid 2026-08-20). Ziel ist SICHTGLEICHHEIT Netz/Spieler, kein Staerke-A/B. `PREREG_stack_top_feature.md`; Beschreibung im Archiv-Kapitel oben |
 
 ### v22-FENSTER -- DESIGN AUF HALDE, NICHT EINGEPLANT
 
@@ -581,12 +587,12 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
 
 ---
 
-
 ## GELTENDE REGELN (kompakt)
 
 - **Das Punkte-Ziel ist NICHT `tanh(own/50)` (geprueft 2026-08-23).** Zwei
   Irrtuemer, die zusammen drei Dokumente falsch gemacht haben; beide am Code
   nachgesehen, beide korrigiert.
+  
   1. **`points_val` ist ueberwiegend TD-geblendet.** Nach der Formelzeile
      (`neural_net.py:1647`) greifen zwei Ueberschreibungen: `:1704` setzt bei
      vorhandenem `rtv` komplett auf `own_rtv = 2·rtv[p] − 1`, `:1717`
@@ -622,7 +628,7 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
      `PREREG_points_dist_bin_scale.md` behauptete Bin-Skalen-Defekt lag in
      #12 bereits vor, und die Messung kam flach heraus -- #12 ist damit ein
      Prior GEGEN die Hypothese, nicht ein neutraler Vorlauf.
-
+  
   Der Irrtum stammt aus `research_value_head_alternatives_DRAFT.md` Z. 7 und
   war von dort nach `docs/concept_distributional_heads.md` und in zwei
   Preregs gewandert. Alle vier Stellen sind am 2026-08-23 korrigiert.
@@ -648,7 +654,7 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
   Kosten < 1 s (gemessen 0,44 s ueber 10 Commits), laeuft VOR der
   `engine/src`-Weiche, also auch bei reinen Doku-Pushes. Details:
   `tools/hooks/README.md`.
-
+  
   Gleicher Zug: `.git/hooks/pre-push` (tote Alt-Kopie ohne den
   `cygpath`-Fix) geloescht -- aktiv ist ausschliesslich `tools/hooks/` via
   `core.hooksPath`. Und die Golden-Waechter **A1-A4 sind gebaut** (geprueft
@@ -884,7 +890,6 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
   nachgeruestet: Task E hatte zuerst zeigen muessen, ob die MENGE
   stimmt (Ergebnis: Miss-Rate 1,21%, weit unter der 5%-Schwelle).
 
-
 ## ARCHITEKTUR, Stand jetzt (Referenz; aktualisiert 2026-08-24)
 
 **Such-/Engine-Seite** (`engine/src/net_mcts.rs`, `engine_config_json()`):
@@ -961,4 +966,3 @@ ausserhalb der Rotation (`data/ownership_corpus/`, additiv via
 - Champion: `models/champion.txt` -> **`v21_2d_brierbest`**.
 
 ---
-
