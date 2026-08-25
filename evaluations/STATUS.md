@@ -64,15 +64,23 @@ war halb falsch und ist hiermit berichtigt:
 * Auf die Laeufe dieser Nacht wirkt das Fehlen nicht: fuer den homogenen
   hv2-Korpus ist "jede Datei traegt Policy" die richtige Semantik.
 
-**Was WIRKLICH fehlt, ist etwas anderes: es gibt keinen GENERATOR.**
-`neural_net.py:1284` und `train_manifest.py` LESEN `policy_carrier_files`,
-geschrieben wird eine solche Datei nirgends im Baum. Das v23-Fenster
-(`PREREG_v23_window.md` par.1) verlangt aber, dass von 17.450 hv2-Partien nur
-1.800 policy-aktiv sind -- also ein Manifest ueber rund 180 Dateinamen, das
-heute nur von Hand entstehen kann.
+**Was fehlt, ist der ERZEUGER -- aber nicht seine Regel.** Im Baum LESEN
+`neural_net.py:1284` und `train_manifest.py` das Traeger-Manifest; geschrieben
+wird es nirgends. Das aufgeloeste `carrier_report.py` (bb23ecd, spaeter in
+`train_manifest.py` eingegliedert) war ebenfalls nur ein BERICHT, ohne eine
+einzige schreibende Stelle.
 
-**Vor der v23-Kampagne zu klaeren**, nicht dringend: ein kleines Werkzeug, das
-aus einer Dateiliste plus Seed ein Traeger-Manifest schreibt. Ohne das ist der
+**BERICHTIGUNG einer eigenen Fehlannahme (2026-08-25):** daraus hatte ich
+geschlossen, das Manifest sei von Hand entstanden. Falsch -- die
+v20-Kampagnen-Prereg dokumentiert *"Seed 20260806, zeitlich gestreute
+Auswahl"*, und die Datei traegt ihre Herkunft im Kopf (`"seed"`, `"design"`).
+Es wurde ERZEUGT, das Skript wurde nur nie committet.
+
+**Damit ist die Aufgabe klein:** aus Seed plus dokumentierter Regel ("zeitlich
+gestreute Auswahl") laesst sich der Erzeuger rekonstruieren, statt ihn neu zu
+erfinden. Fuer v23 waeren es rund 180 von 1.745 hv2-Dateien.
+
+**Vor der v23-Kampagne zu klaeren**, nicht dringend. Ohne das Werkzeug ist der
 registrierte Zuschnitt nicht ausfuehrbar, und "jede Datei traegt Policy" waere
 still ein anderer Zuschnitt als der beschlossene.
 
