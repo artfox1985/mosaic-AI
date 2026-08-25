@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: NEU GEFASST 2026-08-25, der Zuschnitt von 2026-08-08 ist HINFAELLIG -- er war fuer einen NETZ-Erzeuger mit Zwei-Klassen-Rotation ueber drei Generationen gebaut (29.450 Partien), v22 ist ein HEURISTIK-Erzeuger (v2huelle), EINE Klasse, KEIN Altbestand (Nutzer 2026-08-25). Gueltiger Zuschnitt: 24.000 Partien, ~4,18 Mio Zustaende, ~37 GB, ein Lauf mit Seed 20260826, Praefix hv2. Die Rotationsregel ab v22 ist ebenfalls hinfaellig: v22 ist ein Schnitt, keine Rotationsstufe. OFFEN als vorregistrierter Arm INNERHALB dieses Zuschnitts ist allein die TRAEGERFRAGE -- 61,8 Prozent der Draftingzuege mit echter Wahl tragen policy_target_valid=false (v2-Vorzug); ob der Policy-Kopf sie sieht, entscheidet ein gepaartes Trainingspaar auf DEMSELBEN Korpus, Entscheidungsmass vorab festgelegt (par.4). Der Bootstrap-Horizont-Wecker ist erledigt: Horizont 2, PREREG_bootstrap_horizon.md par.9f. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: NEU GEFASST 2026-08-25, der Zuschnitt von 2026-08-08 ist HINFAELLIG -- er war fuer einen NETZ-Erzeuger mit Zwei-Klassen-Rotation ueber drei Generationen gebaut (29.450 Partien), v22 ist ein HEURISTIK-Erzeuger (v2huelle), EINE Klasse, KEIN Altbestand (Nutzer 2026-08-25). Gueltiger Zuschnitt: 24.000 Partien, ~4,18 Mio Zustaende, ~37 GB, ein Lauf mit Seed 20260826, Praefix hv2. Die Rotationsregel ab v22 ist ebenfalls hinfaellig: v22 ist ein Schnitt, keine Rotationsstufe. OFFEN als vorregistrierter Arm INNERHALB dieses Zuschnitts ist allein die TRAEGERFRAGE -- 61,8 Prozent der Draftingzuege mit echter Wahl tragen policy_target_valid=false (v2-Vorzug); ob der Policy-Kopf sie sieht, entscheidet ein gepaartes Trainingspaar auf DEMSELBEN Korpus, Entscheidungsmass vorab festgelegt (par.4). Der Bootstrap-Horizont-Wecker ist erledigt: Horizont 2, PREREG_bootstrap_horizon.md par.9f. par.6 (2026-08-25): WARMSTART vom Sanity-Modell hv2sanity geplant; weil dessen Korpus im vollen Fenster VOLLSTAENDIG drinbleibt (anders als bei bisherigen Warmstarts, wo der Vorgaenger-Korpus ausrotiert), waeren ~21 Prozent des Val-Splits vom Startmodell bereits trainiert und die --select-by-brier-Auswahl verzerrt. Gegenmittel GEBAUT und auf dem echten Codepfad abgenommen: MOSAIC_VAL_POOL schraenkt die Val-Kandidaten per Regex ein und bricht ab, statt still einen kleineren Split zu nehmen. Vorbereiteter Pool: evaluations/artifacts/hv2_val_pool_regex.txt. -->
 
 # Vorregistrierung: v22-Fenster
 
@@ -174,3 +174,53 @@ Generators erhaelt ein Unterscheidungs-Suffix (`v20wdlb` /
 `v20wdlbsw`), und die Rotationsregel verschiebt sich um eine
 Generation (Gen-1 = v20-Erstbatch, Gen-2 = v19). Das ist eine
 Namens-, keine Design-Aenderung.
+
+
+## par.6 WARMSTART-VORBEREITUNG: der Val-Pool (Nutzer-Entscheid 2026-08-25)
+
+**Plan:** ein Sanity-Modell (`hv2sanity`) auf dem bis dahin erzeugten Teil des
+Korpus, und -- wenn es vernuenftig aussieht -- der volle v22-Lauf als
+WARMSTART von diesem Modell.
+
+**Das Problem, das dabei entsteht, und es liegt hier anders als bei den
+bisherigen Warmstarts.** Sonst rotiert der Korpus des Vorgaengermodells beim
+naechsten Fenster groesstenteils AUS. Hier bleibt er vollstaendig DRIN:
+`hv2sanity` trainiert auf 513 Dateien, die im vollen Lauf alle wieder dabei
+sind. Ein frei gezogener Val-Split enthaelt dann Dateien, die das Startmodell
+bereits trainiert hat:
+
+| | |
+| --- | --- |
+| voller Korpus | 2.400 Dateien |
+| Val-Split bei `--val-frac 0.1` | 240 Dateien |
+| davon von `hv2sanity` bereits trainiert | ~240 x 513/2400 ~ **51**, also ~21 Prozent |
+
+`--select-by-brier` waehlt den Checkpoint AUF diesem Mass -- die Auswahl waere
+systematisch zugunsten spaeter Epochen verzerrt.
+
+**Gebaut 2026-08-25: `MOSAIC_VAL_POOL`** (train.py, additiv, Default ungesetzt
+= bestandsidentisch). Ein Regex schraenkt die KANDIDATEN des Val-Splits ein;
+alles, was nicht matcht, geht garantiert in den Trainings-Teil. Trifft der
+Regex weniger Dateien als der Split braucht, bricht der Lauf AB statt still
+einen kleineren Val-Split zu nehmen -- ein kleinerer Split waere ein anderes
+Mass als das registrierte.
+
+**Abgenommen auf dem echten Codepfad** (nicht nur am Regex): Lauf mit
+gesetztem Pool meldete "Val-Split aus 71 von 570 Kandidaten gezogen (57
+Val-Dateien); die uebrigen 499 gehen garantiert ins Training."
+
+**Vorbereiteter Aufruf fuer den vollen Lauf** (Pool =
+`evaluations/artifacts/hv2_val_pool_regex.txt`, das ist genau der
+"g > 5700"-Teil, also alles, was `hv2sanity` nie gesehen hat; 1.830 Kandidaten
+fuer 240 Val-Dateien):
+
+```
+export MOSAIC_VAL_POOL="$(cat evaluations/artifacts/hv2_val_pool_regex.txt)"
+python -u train.py --name v22 --load hv2sanity_best --encoder 2d --value-head wdl     --select-by-brier --lr-schedule cosine --epochs <N> --seed <S>
+```
+
+Geprueft: keine der `hv2sanity`-Dateien faellt in den Pool, alle Dateien ab
+g5710 schon.
+
+**Nicht vergessen:** der Val-Pool gehoert ins Trainings-Manifest, damit er
+spaeter nachvollziehbar ist. Ist eingebaut (`"val_pool"` in den CLI-Args).
