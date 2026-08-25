@@ -642,6 +642,16 @@ function normColor(c) {
   return low === 'türkis' ? 'tuerkis' : low;
 }
 
+// Farbname fuer die ANZEIGE (Nutzer-Wunsch 2026-08-25: grosser
+// Anfangsbuchstabe). Bewusst getrennt von `normColor`, das den Schluessel fuer
+// CSS-Klassen und Datenattribute liefert -- die Kleinschreibung dort ist
+// Vertragsbestandteil zum Backend und darf sich nicht mitaendern. Behaelt das
+// Umlaut-ü der Anzeige ("Türkis", nicht "Tuerkis").
+function colorLabel(c) {
+  if (!c) return '';
+  return c.charAt(0).toUpperCase() + c.slice(1);
+}
+
 // Wild-Rueckseiten-Icon. Historie: 🃏 -> 🤡 (beide bei 10-11px schlecht
 // erkennbar). Nutzer-Feedback 2026-08-07: 🌀 als einheitliches Wild-Symbol --
 // identisch auf Kuppel-Wildfeldern (.ds.W, s. spaceHTML) und den
@@ -1132,7 +1142,7 @@ function renderCenter() {
 
   const info = document.getElementById('info-area');
   if(sel) {
-    info.innerHTML=`<div class="info sel">🎨 <strong>${sel.color}</strong> ausgewählt - Musterreihe wählen oder → Boden</div>`;
+    info.innerHTML=`<div class="info sel">🎨 <strong>${colorLabel(sel.color)}</strong> ausgewählt - Musterreihe wählen oder → Boden</div>`;
   } else if(S.phase==='tiling') {
     const placeableRows = (S.valid_tiling_rows||[]); 
     const allComplete = S.players.flatMap((p,pi)=>
@@ -1636,7 +1646,7 @@ function openChipModal(pi, ri) {
     confirmedGroups: [],
   };
   document.getElementById('chip-title').textContent =
-    `Reihe ${ri+1} (${row.color}) - fehlen ${chipModal.missing} Fliese(n)`;
+    `Reihe ${ri+1} (${colorLabel(row.color)}) - fehlen ${chipModal.missing} Fliese(n)`;
   document.getElementById('chip-info').textContent =
     `Wähle je Gruppe: 2 gleichfarbige ODER 3 beliebige Plättchen = 1 Fliese ersetzen`;
   renderChipModal();
@@ -2243,7 +2253,7 @@ function renderMoonModal() {
     const div = document.createElement('div');
     div.className = `tile ${normColor(item.color)} click`;
     div.style.cursor = 'pointer';
-    div.title = `${item.color} - klicken zum Stapeln`;
+    div.title = `${colorLabel(item.color)} - klicken zum Stapeln`;
     div.addEventListener('click', () => addToMoonStack(item.uid));
     tilesDiv.appendChild(div);
   });
