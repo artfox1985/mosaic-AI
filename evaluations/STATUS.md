@@ -53,31 +53,28 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
 
 ---
 
-## OFFENER PUNKT AUS DER NACHT 2026-08-25: die Traeger-Manifeste sind WEG
+## TRAEGER-MANIFESTE: archiviert, und das ist in Ordnung (2026-08-25)
 
-`data/` enthaelt **kein einziges** `policy_carrier_manifest_*.json` mehr. Der
-Uebergabe-Abschnitt vom Nachmittag nannte sie ausdruecklich als das, was bei
-der Archivierung bleiben muss.
+`data/` enthaelt kein `policy_carrier_manifest_*.json` mehr. **Nutzer:
+bewusst archiviert.** Mein erster Vermerk stellte das als Verlust dar -- das
+war halb falsch und ist hiermit berichtigt:
 
-| Datei | Lage |
-| --- | --- |
-| `policy_carrier_manifest_v20.json` | von git verfolgt, als `D` markiert -- **mit `git checkout -- data/policy_carrier_manifest_v20.json` wiederherstellbar** |
-| `_asymN`, `_asymS`, `_own`, `_seedk1`, `_v21` | **nicht von git verfolgt** -- nur aus einem Backup zurueckzuholen |
+* Die archivierten Manifeste listen **v18/v20/v21-Dateien**. Fuer v23 werden
+  sie nicht gebraucht; dessen Fenster maskiert **hv2**-Dateien.
+* Auf die Laeufe dieser Nacht wirkt das Fehlen nicht: fuer den homogenen
+  hv2-Korpus ist "jede Datei traegt Policy" die richtige Semantik.
 
-**Wirkung auf die Laeufe dieser Nacht: KEINE.** Das Training meldete
-"policy_carrier_manifest_v20.json (NICHT GEFUNDEN -- jede Datei traegt
-Policy)", und fuer den homogenen hv2-Korpus ist genau das die richtige
-Semantik: ein Erzeuger, keine Alt-Dateien, alles traegt Policy.
+**Was WIRKLICH fehlt, ist etwas anderes: es gibt keinen GENERATOR.**
+`neural_net.py:1284` und `train_manifest.py` LESEN `policy_carrier_files`,
+geschrieben wird eine solche Datei nirgends im Baum. Das v23-Fenster
+(`PREREG_v23_window.md` par.1) verlangt aber, dass von 17.450 hv2-Partien nur
+1.800 policy-aktiv sind -- also ein Manifest ueber rund 180 Dateinamen, das
+heute nur von Hand entstehen kann.
 
-**Wirkung auf v23: erheblich.** `PREREG_v23_window.md` plant hv2-Dateien
-teils policy-MASKIERT (Schwarm G-1/G-2, Sockel-Rest G-1/G-2). Diese Maskierung
-laeuft ueber ein Traeger-Manifest. Ohne eines traegt jede Datei Policy, und
-der Zuschnitt waere still ein anderer als der registrierte.
-
-**Nicht von mir angefasst** -- Wiederherstellen ist ein Nutzer-Entscheid, weil
-die Loeschung moeglicherweise Teil der Archivierung war.
-
----
+**Vor der v23-Kampagne zu klaeren**, nicht dringend: ein kleines Werkzeug, das
+aus einer Dateiliste plus Seed ein Traeger-Manifest schreibt. Ohne das ist der
+registrierte Zuschnitt nicht ausfuehrbar, und "jede Datei traegt Policy" waere
+still ein anderer Zuschnitt als der beschlossene.
 
 ## SITZUNGSUEBERGABE 2026-08-25
 
