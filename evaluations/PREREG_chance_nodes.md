@@ -151,6 +151,18 @@ der obersten Platte: Special oder Wild) und `dome_wild_remaining_frac`
 (Wild-Anteil des Rests), dazu die aktiven Platten als One-hot. Ob es die
 Interaktion GELERNT hat, ist nie geprueft worden.
 
+> **KORREKTUR 2026-08-25.** Der erste Teil dieses Satzes ist falsch:
+> `dome_stack_top_type` steht NUR in der Serialisierung fuers Frontend
+> (`engine/src/serialize.rs:270`) und wird weder in `engine/src/features.rs`
+> noch in `engine/py/neural_net.py` gelesen -- das Netz bekommt vom Stapel nur
+> `dome_pool_mask`, `dome_wild_remaining_frac` und `dome_stack_count`, alle
+> drei reihenfolgeblind. Unabhaengig registriert in
+> `PREREG_stack_top_feature.md` par.3 (2026-08-20) und hier am 2026-08-25 an
+> `features.rs` nachvollzogen.
+> **Das Teil-C-ERGEBNIS unten bleibt davon unberuehrt**: es bedingt auf die
+> aktive Wertungsplatte, und die steht als One-hot im Vektor. Betroffen ist
+> nur diese Begruendung, nicht die Messung.
+
 **Messung ohne neues Instrument**: in den Sockel-Self-Play-Records
 (Policy aktiv, nicht maskiert) den Anteil der Policy-Masse auf der
 `dome_stack_peek`-Aktion auszaehlen -- getrennt danach, ob Kriterium 6 in
