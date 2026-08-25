@@ -57,19 +57,20 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
 
 **Was als NAECHSTES zu tun ist, in dieser Reihenfolge:**
 
-1. **Die v22-Vorbereitung ist NICHT vollstaendig.** Punkt 2 der Liste unten
-   ist am 2026-08-25 aufgeklappt: der Lehrer kommt im Self-Play noch gar nicht
-   an. Die Tiling-Haelfte ist behoben (`224cc42`), die **Draft-Haelfte fehlt**
-   -- `HeuristicSelfPlayAgent` hat kein Variantenfeld, waehrend der Arena-Agent
-   den v2-Vorzug anwendet. Solange das so ist, erzeugt jede Kampagne einen
-   V1-Korpus. **Das ist der naechste Bauschritt**, und er ist kein
-   Durchreichen: der Self-Play-Agent muss eine POLICY-Verteilung liefern, ein
-   harter Vorzug wuerde das Ziel auf one-hot zusammenfalten. Wie der Vorzug in
-   das Policy-Ziel eingeht, ist ein Nutzer-Entscheid.
-   Alles Uebrige steht: Horizont 2, Blindzieh-Knopf AUS, heutiges Wheel.
-2. **Vor dem Start zu klaeren** (nicht blockierend, aber billig jetzt):
-   Partienzahl und Fenster-Zuschnitt. Der Datenordner wird gerade archiviert,
-   das beruehrt die Fenster-Manifeste.
+1. **Die v22-Vorbereitung ist VOLLSTAENDIG** (Punkt 2 im zweiten Anlauf
+   erledigt, `224cc42` + `61b2fff`). Kampagnen-Parameter:
+   `--mode mcts --model alphazero_v21_2d_brierbest.onnx
+   --heuristik-variante v2huelle --sims 600 --threads 11`, Horizont 2,
+   Blindzieh-Knopf AUS. Durchsatz **gemessen: 50 Partien/min**.
+   **Offen ist nur noch die Partienzahl** -- und dafuer gibt es ein neues
+   Argument: durch die Vorzugs-Feuerrate von 61,9 Prozent traegt nur noch gut
+   ein Drittel der Draftingzuege Policy-Material. Wer den Policy-Sockel auf
+   altem Niveau halten will, braucht rund die 2,6-fache Partienzahl.
+2. **DANACH das Startpositions-Seeding** (Nutzer-Entscheid 2026-08-25,
+   `PREREG_start_position_seeding.md` par.5). Braucht Engine-Arbeit:
+   `--seed-positions` ist auf `--mode network` beschraenkt, und der
+   mcts-Einstieg kennt `seed_positions_path` gar nicht -- kein blosser
+   Waechter.
 3. **NACH dem Korpus wieder aufzunehmen**: die Blindzieh-Spur. Der Knopf
    bleibt bis dahin AUS (auch waehrend der Erzeugung -- den Korpus unter der zu
    validierenden Regel zu erzeugen waere zirkulaer). Die Wiedervorlage haengt an
@@ -145,7 +146,7 @@ und gehoert danach.
 | # | Punkt | Stand |
 | --- | --- | --- |
 | 1 | **Blindzieh-Reparatur entscheiden** | **ERLEDIGT 2026-08-25: kein Staerkegewinn**, Knopf bleibt AUS. Korpus kann mit dem Bestand erzeugt werden (`PREREG_stack_draw_reservation_rule.md` par.5d) |
-| 2 | **Heuristik-Variante bis ins Self-Play durchreichen** | **NICHT ERLEDIGT -- die Abnahme war falsch.** Die Kette reicht die Variante bis in die `PlayerLoopConfig`, aber der Verbraucher sass nur im ARENA-Zweig: beim Aufzeichnen -- also auf jedem Self-Play-Pfad -- lief die varianten-blinde `tiling_step`. Belegt an einem 200-Partien-Paar: v2huelle und v1 identisch bis auf die letzte Nachkommastelle (volle Spalten 0,004665140240412135 in BEIDEN Armen). **Tiling-Haelfte behoben** (Commit `224cc42`), **Draft-Haelfte offen**: `HeuristicArenaAgent` traegt die Variante und wendet den v2-Vorzug an, `HeuristicSelfPlayAgent` hat kein Variantenfeld. Ein Korpus aus dem heutigen Stand ist ein V1-Korpus mit leicht anderem Tiling-Routing. Messung nach dem Fix: volle Spalten 0,037 (v2huelle) gegen 0,050 (v1) -- weit weg von den 0,798 des Lehrer-Tests |
+| 2 | **Heuristik-Variante bis ins Self-Play durchreichen** | **ERLEDIGT 2026-08-25, im zweiten Anlauf.** Der erste Durchreich-Commit erreichte den Erzeugungspfad nicht (Verbraucher nur im Arena-Zweig); ein 200-Partien-Korpus war bitgleich mit v1. Behoben in ZWEI Haelften: Tiling (`224cc42`) und Draft-Vorzug (`61b2fff`). **Abnahme jetzt auf dem AUFZEICHNENDEN Pfad** (`heuristik_variante_reaches_the_recording_self_play_path`). Wirkung am 200-Partien-Piloten: volle Spalten **0,755 ± 0,080** gegen 0,050 (v1) -- reproduziert den Lehrer-Test (0,798) im Rauschen. k1 von 5,1 % auf **55,7 %** der Partien, Strafleiste 10,30 auf 5,09 Steine, Punkte 20,9 auf 47,1. Vorzugs-Records tragen `policy_target_valid=false` (Feuerrate **61,9 %** der Draftingzuege mit echter Wahl); die Flagge steht JE RECORD, die Trainingsseite kann sie achten oder ignorieren -- der Korpus ist in beide Richtungen brauchbar |
 | 3 | **Arena-Threadzahl geradeziehen** | **ERLEDIGT 2026-08-25.** EINE Konvention (`self_play::thread_plan`): `0` = alle Kerne, `1` = sequenziell, `n` = n Threads. Vier Arena-Einstiege umgestellt. Abnahme: dieselben 12 Seeds sequenziell gegen 11 Threads -> **Ergebnisse identisch**, 44,5 s auf 13,0 s (3,4x) |
 | 4 | **Bootstrap-Horizont 2 gegen 3** | **ERLEDIGT 2026-08-25: Horizont 3 VERWORFEN** (Verdikt gilt; der Messkorpus war aber V1, nicht v2huelle -- par.9g). Gepaart auf 200 v2huelle-Zustaenden trifft er den echten Ausgang schlechter (Brier +0,0567 ± 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63. Die Labels unterscheiden sich dabei sehr wohl (51 % ueber 0,01) -- die Frage war echt, nur die Antwort negativ. **v22 laeuft mit Horizont 2.** `PREREG_bootstrap_horizon.md` par.9f |
 | 5 | **Erzeugung mit dem HEUTIGEN Wheel** | erfuellt, darf nicht rueckwaerts passieren |
@@ -355,7 +356,9 @@ traegt GEMESSENES ein.
 | dito, voller Lauf | 814 Partien | 0 = sequenziell | ~2 h 48 min |
 | dito | 814 Partien | 11 | ~35 min |
 | Strafleisten-Tor (`floor_action_aversion_gate.py`), 240 Stellungen, sims=200 | – | – | **~7 min** |
-| `cargo test --release --lib` (volle Suite) | 525 Tests | – | **~72 s** |
+| Heuristik-Self-Play `v2huelle`, 600 Basis-Sims, Netz-Labels | 200 Partien | 11 | **239 s** = 50 Partien/min |
+| dito, `v1` (Vorzug feuert nicht, Suche laeuft voll) | 200 Partien | 11 | **331 s** = 36 Partien/min |
+| `cargo test --release --lib` (volle Suite) | 527 Tests | – | **~65 s** |
 | Wheel-Bau (`maturin build --release`) plus Installation | – | – | **~30 s** |
 
 **Parallelisierung ist ergebnisneutral, gemessen statt angenommen** (20 Seeds

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Spalten-Stellungen aus FREI weiterspielt (Startpositions-Seeding, KataGo-startPoses-Muster) -- also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: komplette Kette durchgemessen (par.2-4c): Bausteine 1-3 gebaut/abgenommen, Training v21-seedk1 (Warm Start, Best=Epoche 1), Arena-Verdikt 2026-08-23 (par.4c): KEIN k1-Signal (14,1 %/Swap 13,5 % < 22-%-Schwelle; nominell hoechste je gemessene Netz-Rate), KEIN Siegverlust (220/407 u. 199/407 gg. Champion, gg. Kontrollarm asymN n.s.). Mechanik-Sonde par.4d: ERSTES POSITIVES Zustandssignal (Tau +0,14 vs N -0,19, p=0,017) -- Mechanik bewegt, Verhalten (noch) nicht. Folgearme = Nutzer-Entscheid. Primaerarm des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); Anlass: RESEARCH_plate_intent_external F1/F4 (Startzustandsverteilung ist der belegteste Strukturhebel; Off-Policy-Diagnose erklaert das Asym-Null par.14/15). Stellungsquelle: der vorhandene Asym-Korpus. -->
+<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Spalten-Stellungen aus FREI weiterspielt (Startpositions-Seeding, KataGo-startPoses-Muster) -- also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: komplette Kette durchgemessen (par.2-4c): Bausteine 1-3 gebaut/abgenommen, Training v21-seedk1 (Warm Start, Best=Epoche 1), Arena-Verdikt 2026-08-23 (par.4c): KEIN k1-Signal (14,1 %/Swap 13,5 % < 22-%-Schwelle; nominell hoechste je gemessene Netz-Rate), KEIN Siegverlust (220/407 u. 199/407 gg. Champion, gg. Kontrollarm asymN n.s.). Mechanik-Sonde par.4d: ERSTES POSITIVES Zustandssignal (Tau +0,14 vs N -0,19, p=0,017) -- Mechanik bewegt, Verhalten (noch) nicht. REIHENFOLGE ENTSCHIEDEN 2026-08-25 (Nutzer, par.5): erst v22, DANN Seeding als eigener Arm. Grund ist inhaltlich, nicht terminlich -- par.4c ist an PLATTENBLINDEM Spiel erhoben (Stellungsquelle und weiterspielende Netze konnten beide keine Spalten), und der v22-Lehrer liefert erstmals ein anderes Regime (0,755 volle Spalten gegen 0,050, k1 in 55,7 statt 5,1 Prozent der Partien). VOR der Wiederaufnahme ist Engine-Arbeit noetig: --seed-positions ist auf --mode network beschraenkt, und der mcts-Einstieg kennt seed_positions_path gar nicht (self_play.py:193 gegen 196) -- kein blosser Waechter. Dosis-Folgearm (k=6 war die erste Dosis) bleibt unregistriert. Primaerarm des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); Anlass: RESEARCH_plate_intent_external F1/F4 (Startzustandsverteilung ist der belegteste Strukturhebel; Off-Policy-Diagnose erklaert das Asym-Null par.14/15). Stellungsquelle: der vorhandene Asym-Korpus. -->
 
 # PREREG-SKELETT: Startpositions-Seeding -- frei weiterspielen ab halbfertigen Spalten
 
@@ -318,3 +318,37 @@ mehrere Python-Konsumenten; der Seeding-Korpus liegt ohnehin in einem
 EIGENEN Ordner, jede Partie dort ist per Konstruktion geseedet -- ein
 Per-Step-Feld waere redundant). Die Log-Zeilen werden wie die
 Zwangsseiten-Map als Datei neben dem Korpus gesichert.
+
+
+## par.5 REIHENFOLGE ENTSCHIEDEN (Nutzer 2026-08-25): erst v22, dann Seeding
+
+Zur Wahl standen: v22 ohne Seeding, Seeding zuerst in den mcts-Pfad bauen,
+oder v22 jetzt und Seeding als eigener Arm danach. **Der Nutzer hat den
+dritten Weg gewaehlt.**
+
+**Der inhaltliche Grund, nicht nur der terminliche:** das Verdikt aus par.4c
+(kein k1-Signal) ist an PLATTENBLINDEM Spiel erhoben -- der Korpus, aus dem
+die geseateten Stellungen stammen, und die Netze, die ab dort weiterspielten,
+konnten beide keine Spalten. Genau davor warnt die stehende Regel, Zielraten
+nicht gegen die Verteilung heutiger Netze zu eichen, wenn deren Verhalten das
+Ziel IST. Ein plattenbewusster Korpus ist die Voraussetzung, unter der eine
+Wiedervorlage ueberhaupt etwas anderes zeigen kann. Seit dem 2026-08-25 gibt
+es einen: der v2-Lehrer erreicht im Self-Play **0,755 volle Spalten** gegen
+0,050 (v1), und k1 wird in 55,7 statt 5,1 Prozent der Partien erreicht.
+
+**Was VOR einer Wiederaufnahme gebaut werden muss** (heute nicht vorhanden):
+`--seed-positions` ist auf `--mode network` beschraenkt, und das ist kein
+blosser Waechter. Der Waechter steht in `self_play.py:772`, aber der
+mcts-Einstieg `self_play_games_with_net_labels` kennt den Parameter
+`seed_positions_path` gar nicht -- nur `net_self_play_games` hat ihn
+(`self_play.py:193` gegen `self_play.py:196`). Ein Lehrer-Korpus ab geseateten
+Stellungen ist damit Engine-Arbeit, kein Flag.
+
+**Material liegt bereit:** `data/seed_positions/seed_positions_v1.jsonl`
+(22,8 MB, 2026-08-22). Der Dosis-Folgearm (k=6 war die erste Dosis) bleibt
+unregistriert und wartet weiter auf einen eigenen Zuschnitt.
+
+**Wiedervorlage-Bedingung:** nach der v22-Kampagne, mit dem dann vorliegenden
+plattenbewussten Korpus als Stellungsquelle UND als Vergleichsanker. Der
+Vergleich gegen die alten Zahlen aus par.4c ist dann ausdruecklich KEIN
+gepaarter Vergleich -- verschiedene Regime, verschiedene Stellungsquelle.
