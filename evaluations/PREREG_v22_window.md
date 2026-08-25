@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: NEU GEFASST 2026-08-25, der Zuschnitt von 2026-08-08 ist HINFAELLIG -- er war fuer einen NETZ-Erzeuger mit Zwei-Klassen-Rotation ueber drei Generationen gebaut (29.450 Partien), v22 ist ein HEURISTIK-Erzeuger (v2huelle), EINE Klasse, KEIN Altbestand (Nutzer 2026-08-25). Gueltiger Zuschnitt: 24.000 Partien, ~4,18 Mio Zustaende, ~37 GB, ein Lauf mit Seed 20260826, Praefix hv2. Die Rotationsregel ab v22 ist ebenfalls hinfaellig: v22 ist ein Schnitt, keine Rotationsstufe. OFFEN als vorregistrierter Arm INNERHALB dieses Zuschnitts ist allein die TRAEGERFRAGE -- 61,8 Prozent der Draftingzuege mit echter Wahl tragen policy_target_valid=false (v2-Vorzug); ob der Policy-Kopf sie sieht, entscheidet ein gepaartes Trainingspaar auf DEMSELBEN Korpus, Entscheidungsmass vorab festgelegt (par.4). Der Bootstrap-Horizont-Wecker ist erledigt: Horizont 2, PREREG_bootstrap_horizon.md par.9f. par.6 (2026-08-25): WARMSTART vom Sanity-Modell hv2sanity geplant; weil dessen Korpus im vollen Fenster VOLLSTAENDIG drinbleibt (anders als bei bisherigen Warmstarts, wo der Vorgaenger-Korpus ausrotiert), waeren ~21 Prozent des Val-Splits vom Startmodell bereits trainiert und die --select-by-brier-Auswahl verzerrt. Gegenmittel GEBAUT und auf dem echten Codepfad abgenommen: MOSAIC_VAL_POOL schraenkt die Val-Kandidaten per Regex ein und bricht ab, statt still einen kleineren Split zu nehmen. Vorbereiteter Pool: evaluations/artifacts/hv2_val_pool_regex.txt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: NEU GEFASST 2026-08-25, der Zuschnitt von 2026-08-08 ist HINFAELLIG -- er war fuer einen NETZ-Erzeuger mit Zwei-Klassen-Rotation ueber drei Generationen gebaut (29.450 Partien), v22 ist ein HEURISTIK-Erzeuger (v2huelle), EINE Klasse, KEIN Altbestand (Nutzer 2026-08-25). Gueltiger Zuschnitt: 24.000 Partien, ~4,18 Mio Zustaende, ~37 GB, ein Lauf mit Seed 20260826, Praefix hv2. Die Rotationsregel ab v22 ist ebenfalls hinfaellig: v22 ist ein Schnitt, keine Rotationsstufe. OFFEN als vorregistrierter Arm INNERHALB dieses Zuschnitts ist allein die TRAEGERFRAGE -- 61,8 Prozent der Draftingzuege mit echter Wahl tragen policy_target_valid=false (v2-Vorzug); ob der Policy-Kopf sie sieht, entscheidet ein gepaartes Trainingspaar auf DEMSELBEN Korpus, Entscheidungsmass vorab festgelegt (par.4). ARM A GEFAHREN 2026-08-25 (par.4a, Flagge geachtet, 5.700 Partien, from-scratch): vom Lehrer kommt NICHTS an -- volle Spalten 0,025 gegen 0,741 im Korpus, Punkte 15,1 gegen 47,0, Strafleiste 11,6 gegen 5,0. Einschraenkung schwer: from-scratch auf einem Viertel des Korpus, bestes Modell Epoche 4, n=40. Der Befund ist damit KEIN Beleg gegen die Destillation, sondern zeigt, dass der Policy-Kopf unter Arm A nur gut ein Drittel des Draftingmaterials sieht -- ausgeblendet sind ausgerechnet die Vorzugszuege. ARM B LAEUFT (par.4b): MOSAIC_IGNORE_POLICY_TARGET_VALID=1 gebaut, steht im Cache-Schluessel (sonst zoege der zweite Lauf still den Cache des ersten). Richtungstest, kein Gating. Der Bootstrap-Horizont-Wecker ist erledigt: Horizont 2, PREREG_bootstrap_horizon.md par.9f. par.6 (2026-08-25): WARMSTART vom Sanity-Modell hv2sanity geplant; weil dessen Korpus im vollen Fenster VOLLSTAENDIG drinbleibt (anders als bei bisherigen Warmstarts, wo der Vorgaenger-Korpus ausrotiert), waeren ~21 Prozent des Val-Splits vom Startmodell bereits trainiert und die --select-by-brier-Auswahl verzerrt. Gegenmittel GEBAUT und auf dem echten Codepfad abgenommen: MOSAIC_VAL_POOL schraenkt die Val-Kandidaten per Regex ein und bricht ab, statt still einen kleineren Split zu nehmen. Vorbereiteter Pool: evaluations/artifacts/hv2_val_pool_regex.txt. -->
 
 # Vorregistrierung: v22-Fenster
 
@@ -224,3 +224,55 @@ g5710 schon.
 
 **Nicht vergessen:** der Val-Pool gehoert ins Trainings-Manifest, damit er
 spaeter nachvollziehbar ist. Ist eingebaut (`"val_pool"` in den CLI-Args).
+
+
+### par.4a ARM A GEFAHREN (2026-08-25): Flagge geachtet -- der Lehrer kommt nicht an
+
+Unfreiwillig zuerst gefahren, als Sanity-Training auf dem bis dahin erzeugten
+Korpusteil (570 Dateien = 5.700 Partien, gepinnt per `MOSAIC_DATA_EXCLUDE`).
+From-scratch, 2D, WDL-Kopf, 20 Epochen, Seed 20260825; bestes Modell Epoche 4.
+Das Training hat die Flagge GEACHTET, ist also Arm A.
+
+**40 Netz-Self-Play-Partien mit `hv2sanity_best`, 400 Sims:**
+
+| Kennzahl | Netz (Arm A) | Lehrer im Korpus | Champion v21 |
+| --- | --- | --- | --- |
+| volle Spalten | **0,025 ± 0,034** | 0,741 | 0,106 |
+| k1 mit Ertrag | 7,1 % | 55,2 % | – |
+| Strafleistensteine | **11,55** | 5,04 | – |
+| Eigene Punkte | **15,09** | 46,97 | – |
+| k6 Spezialfelder | −12,53 | −9,77 | – |
+
+**Vom Lehrer ist nichts angekommen.** Das Netz spielt sogar schwaecher als der
+Champion.
+
+**Was das NICHT belegt**, und die Einschraenkungen wiegen schwer:
+
+* **From-scratch auf 5.700 Partien** ist ein schwacher Spieler -- der Champion
+  steht auf Zehntausenden plus langer Warmstart-Kette. Ein Teil des Abstands
+  misst Datenmenge, nicht den Lehrer.
+* **Bestes Modell Epoche 4** von 20.
+* **n=40**, die Intervalle sind breit (±0,034 auf 0,025).
+
+**Was es sehr wohl zeigt:** der Policy-Kopf hat nur gut ein Drittel des
+Draftingmaterials gesehen, und ausgeblendet waren ausgerechnet die
+Vorzugszuege -- also genau die, die den Spaltenbau AUSMACHEN. Damit ist Arm A
+kein neutraler Referenzpunkt, sondern die Bedingung, unter der der Lehrer
+strukturell nicht ankommen KANN.
+
+### par.4b ARM B laeuft (2026-08-25): Flagge ignoriert
+
+Gebaut: `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` (neural_net.py). Setzt **genau
+diese eine** Maskierung aus; die uebrigen Nullsetzungen (Tiling/Start,
+Traeger-Manifest, PCR) bleiben unberuehrt, sonst waere es ein anderer Arm als
+der registrierte. Der Schalter steht im **Cache-Schluessel**
+(`+ignore_ptv_v1`) -- ohne das haette der zweite Lauf still den Cache des
+ersten gezogen, in dem die Gewichte bereits genullt sind, und ein
+Nullergebnis geliefert, das nichts bedeutet.
+
+Alles uebrige identisch: gleicher Pin, gleicher Seed, gleiche Epochenzahl,
+gleiche Architektur. Ein Flag Unterschied.
+
+**Vorsicht bei der Auswertung:** dieser Vergleich ist wegen der oben genannten
+Einschraenkungen ein RICHTUNGSTEST, kein Gating. Er beantwortet "erreicht der
+Vorzug die Policy ueberhaupt", nicht "ist Arm B staerker".

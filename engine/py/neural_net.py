@@ -1,5 +1,11 @@
 import os
 import glob
+
+# Traeger-A/B (PREREG_v22_window.md par.4): mit "1" sieht der Policy-Kopf
+# auch die Records mit policy_target_valid=false. Einmal beim Import
+# gelesen, damit derselbe Prozess nicht auf halber Strecke die Semantik
+# wechselt -- der Wert geht in den Cache-Schluessel ein.
+_IGNORE_PTV = os.environ.get("MOSAIC_IGNORE_POLICY_TARGET_VALID") == "1"
 import re
 import json
 import math
@@ -1326,6 +1332,8 @@ class MosaicDataset(Dataset):
         # durchfaellt und zurueckgeschaltet werden muss).
         cache_nopack = os.environ.get("MOSAIC_CACHE_NOPACK") == "1"
         cache_key_material += "+nopack_v1" if cache_nopack else "+bitpack_v1"
+        if _IGNORE_PTV:
+            cache_key_material += "+ignore_ptv_v1"
         cache_key = hashlib.md5(cache_key_material.encode()).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
@@ -1855,7 +1863,18 @@ class MosaicDataset(Dataset):
                         # (PREREG_pcr.md). Maske 0 wie Tiling/Start-Schritte; das
                         # Value-/Punkte-/root_q-Ziel bleibt unmaskiert. Feld fehlt
                         # (None) in allen Nicht-PCR-Korpora -> dort byte-identisch.
-                        if step.get("policy_target_valid") is False:
+                        # MOSAIC_IGNORE_POLICY_TARGET_VALID (2026-08-25,
+                        # PREREG_v22_window.md par.4): setzt genau DIESE
+                        # Maskierung aus -- der Traeger-A/B-Arm. Im v22-Korpus
+                        # tragen 61,8 Prozent der Draftingzuege die Flagge, weil
+                        # sie Vorzugszuege des v2-Lehrers sind; ob der
+                        # Policy-Kopf sie sehen soll, ist die offene Frage. Die
+                        # ANDEREN Nullsetzungen (Tiling/Start, Traeger-Manifest,
+                        # PCR) bleiben unberuehrt -- sonst waere es ein anderer
+                        # Arm als der registrierte. Default aus =
+                        # bestandsidentisch; der Schalter steht im Cache-Key,
+                        # sonst zoege der zweite Lauf still den ersten Cache.
+                        if step.get("policy_target_valid") is False and not _IGNORE_PTV:
                             pol_w = 0.0
                         polw_l.append(np.float32(pol_w))
                         # Schema 19 (RANKING_CACHE_FIELDS): finale Maske erst
