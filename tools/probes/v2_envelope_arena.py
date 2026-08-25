@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import sys
+import time
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -128,6 +129,10 @@ def run_seat(swap: bool) -> list[dict]:
 
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
+    # Laufzeit ist Pflichtfeld im Artefakt (CLAUDE.md, "Laufzeiten messen,
+    # nicht schaetzen"). `process_time` erfasst auch die Rust-Arbeit, weil sie
+    # im selben Prozess laeuft.
+    t0, c0 = time.monotonic(), time.process_time()
     spiele: list[dict] = []
     for swap in (False, True):
         print(f"[lauf] Sitz swap={swap}: {GAMES_PER_SEAT} Partien, {SIMS} Sims", flush=True)
@@ -177,28 +182,40 @@ def main() -> None:
             ges_voll += int(g["long_rows_completed"][i])
         return (ges_voll / ges_start) if ges_start else 0.0
 
-    # Aufspaltung nach aktiver Spalten-Wertungsplatte (k1 = Id 1). Sie liegt
-    # nur in rund 40 Prozent der Partien an, und `scoring_progress` kreditiert
-    # Spaltenfuellung ausschliesslich dann -- eine Karte aus Plattenpunkten
-    # muesste dort ohne Spaltensignal dastehen.
+    # Aufspaltung nach Wertungsplatte. k1 liegt nur in rund 40 Prozent der
+    # Partien an, und `scoring_progress` kreditiert Spaltenfuellung
+    # ausschliesslich dann -- eine Karte aus Plattenpunkten muesste dort ohne
+    # Spaltensignal dastehen.
+    # Kriterium 1 = Spalten, Kriterium 6 = leere Spezialfelder. Die 6 ist
+    # zusaetzlich aufgespalten, weil `resolve_and_apply_stack_draw`
+    # (self_play.rs:500-545) bei aktiver 6 deutlich tiefer blind zieht und
+    # jede Ziehung 1 Punkt kostet -- ein Punkte-Vorsprung, der sich DORT
+    # konzentriert, kaeme aus dem Ziehmechanismus und nicht aus besserem Spiel.
     k1_split = {}
-    for label, pred in (("k1_aktiv", True), ("k1_inaktiv", False)):
-        idx = [i for i, g in enumerate(spiele) if (1 in g.get("scoring_tile_ids", [])) is pred]
-        if not idx:
-            continue
-        d = [diffs["volle_spalten"][i] for i in idx]
-        bl = block_mean(d, max(1, len(d) // 5))
-        m, t = t_value(bl)
-        k1_split[label] = {
-            "n": len(idx), "delta_volle_spalten": m, "t_block": t,
-            ARM_A: sum(roh_a["volle_spalten"][i] for i in idx) / len(idx),
-            ARM_B: sum(roh_b["volle_spalten"][i] for i in idx) / len(idx),
-        }
+    for kid, kname, key in ((1, "k1", "volle_spalten"), (6, "k6", "punkte")):
+        for label, pred in ((f"{kname}_aktiv", True), (f"{kname}_inaktiv", False)):
+            idx = [i for i, g in enumerate(spiele) if (kid in g.get("scoring_tile_ids", [])) is pred]
+            if not idx:
+                continue
+            d = [diffs[key][i] for i in idx]
+            bl = block_mean(d, max(1, len(d) // 5))
+            m, tw = t_value(bl)
+            k1_split[label] = {
+                "n": len(idx), "mass": key, f"delta_{key}": m, "t_block": tw,
+                ARM_A: sum(roh_a[key][i] for i in idx) / len(idx),
+                ARM_B: sum(roh_b[key][i] for i in idx) / len(idx),
+            }
 
     n = len(spiele)
     ergebnis = {
         "k1_split": k1_split,
         "arme": [ARM_A, ARM_B], "n_partien": n, "sims": SIMS, "block": BLOCK,
+        "laufzeit": {
+            "wanduhr_s": round(time.monotonic() - t0, 1),
+            "cpu_s": round(time.process_time() - c0, 1),
+            "threads": THREADS,
+            "s_je_partie": round((time.monotonic() - t0) / n, 3) if n else None,
+        },
         "seed": SEED, "fehlende_bretter": fehlend,
         "siegquote_huelle": siege_b / n if n else 0.0,
         "vollendungsquote": {ARM_A: quoten("a"), ARM_B: quoten("b")},
@@ -224,10 +241,11 @@ def main() -> None:
     print("-" * 68)
     for key, v in ergebnis["kennzahlen"].items():
         print(f"{key:<26}{v[ARM_A]:>10.3f}{v[ARM_B]:>12.3f}{v['delta']:>10.3f}{v['t_block']:>10.2f}")
-    print("\nVolle Spalten nach aktiver Spalten-Platte (k1):")
+    print("\nAufspaltung nach Wertungsplatte (k1 = Spalten, k6 = leere Spezialfelder):")
     for label, v in ergebnis["k1_split"].items():
-        print(f"  {label:<12} n={v['n']:<4} {ARM_A} {v[ARM_A]:.3f}  {ARM_B} {v[ARM_B]:.3f}  "
-              f"delta {v['delta_volle_spalten']:+.3f}  t {v['t_block']:.2f}")
+        key = v["mass"]
+        print(f"  {label:<12} n={v['n']:<4} [{key}] {ARM_A} {v[ARM_A]:.3f}  {ARM_B} {v[ARM_B]:.3f}  "
+              f"delta {v['delta_' + key]:+.3f}  t {v['t_block']:.2f}")
     print(f"\nSiegquote {ARM_B}: {ergebnis['siegquote_huelle']:.3f}")
     print(f"Vollendungsquote: {ARM_A} {ergebnis['vollendungsquote'][ARM_A]:.3f}  "
           f"{ARM_B} {ergebnis['vollendungsquote'][ARM_B]:.3f}  (B1-Waechter: >= 0,53)")

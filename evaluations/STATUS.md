@@ -208,7 +208,43 @@ den Lehrer-Einsatz ist er entschaerft.
    Karte war fuers Netz gedacht) -- ein Netz kann aus einem Breiten-Signal
    Fokus lernen, ein Greedy-Routing nicht.
 
-   **LAUFEND: Lehrer-Test (par.10).** Champion@400 gegen Huelle@150 auf den
+   **LEHRER-TEST DURCH (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm,
+   Champion@400 gegen Heuristik@150, 2.610 s bei 11 Threads): DIE HUELLE
+   SCHLAEGT v1 UND v2.**
+
+   | | Siege | Punkte | Marge | volle Spalten | Vollend. | Strafpkt | volle Zeilen |
+   | --- | --- | --- | --- | --- | --- | --- | --- |
+   | v1 | 0,256 | 37,6 | -12,2 | 0,086 | 0,564 | 19,3 | 0,432 |
+   | v2 | 0,128 | 34,8 | -19,4 | 0,302 | 0,686 | -- | 0,403 |
+   | **Huelle** | **0,373** | **47,1** | **-5,5** | **0,798** | **0,717** | **13,6** | 0,216 |
+
+   Gepaart gegen das Netz (16 Bloecke): volle Spalten +0,700 (t=+13,73),
+   Punkte -5,468 (t=-5,46), Siege -0,245 (t=-5,67). Das Netz selbst kommt auf
+   0,106 volle Spalten.
+
+   **Der Tausch ist aufgehoben.** v2 hat Faehigkeit mit Niveau bezahlt; die
+   Huelle liefert 2,6-mal so viele volle Spalten wie v2 UND fast die
+   dreifache Siegquote, dazu 9,5 Punkte mehr als v1 und 5,7 Strafpunkte
+   weniger. **Damit ist die Voraussetzung von par.3b erstmals erfuellbar:**
+   ein Lehrer, der die Dreiecksform erzeugt, ohne schwaecher zu sein als der
+   bisherige Anker.
+
+   **Der Preis, und er ist echt:** volle Zeilen 0,432 auf 0,216. Anders als
+   bei v2 (dort war der Einbruch ein Artefakt des v1-gegen-v2-Duells, gegen
+   ein Netz blieben 0,403) misst hier derselbe Netz-Aufbau die Haelfte. Bei
+   7 Punkten je Spalte gegen 3 je Zeile ist der Tausch rechnerisch guenstig,
+   gehoert aber bei jedem Nachfolgearm mitgemessen.
+
+   **UEBERGABE-NOTIZ 2026-08-25:** Maschine und `self_play.rs` sind FREI
+   (Commit `ae88cf3`, Suite 520/0, Paritaet haelt). Die Parallelsitzung
+   `mosaic-ai-4f` wartete auf diese Freigabe fuer zwei Laeufe
+   (Strafleisten-Tor Runde 2-4, dann ein netzfreier Gegentest zur
+   Blindziehungs-Regel, Code bei ihr fertig) -- sie war beim Freigabezeitpunkt
+   nicht mehr erreichbar (`ListAgents`: keine Agenten), die Nachricht kam
+   nicht zu. Wer dort weitermacht, findet den Stand in
+   `PREREG_stack_draw_reservation_rule.md`.
+
+   **FRUEHERER STAND (par.10, jetzt erledigt):** Champion@400 gegen Huelle@150 auf den
    407 Kampagnen-Seeds, mit v1 als Bezug -- derselbe Aufbau wie par.5.3, damit
    die Zahlen nebeneinander stehen. `net_vs_heuristic_v2_arena` nimmt die
    Variante seit heute als Parameter. Das ist die Frage, an der der ganze
@@ -274,6 +310,27 @@ plattenblindes Spiel geeicht, derselbe Fehler wie viermal zuvor.
 - **Methodische Lehre**: aus "Eingriff X in Richtung Y verliert" folgt NICHT
   "Y ist falsch" -- nur, dass X in diesem Zustand verliert. Es fehlt die
   Kontrollgruppe: ein Agent, der Y KANN.
+- **Die Blindzieh-Stopp-Regel laeuft bei Wertungsplatte 6 das Konto leer**
+  (2026-08-25, `PREREG_stack_draw_reservation_rule.md` par.4c; 600 Partien
+  `selfplay_v20wdlsw_*`, Einheit Partie ueber beide Bretter, CI 95 %).
+  `self_play.rs:500-545` `resolve_and_apply_stack_draw` entscheidet auf dem
+  DEFAULT-Pfad, wie oft blind gezogen wird, und vergleicht dabei ein
+  ABSOLUTES Brettniveau (`scoring_progress`, `scoring.rs:160` -- bei
+  Kriterium 6 als einziges NEGATIV) gegen einen Typmittelwert in [1, 3]. Aus dem Code
+  vorhergesagt und dann gemessen: **ohne Platte 6** haben 92 % der Ziehserien
+  Tiefe 1, ab Runde 3 sind es 100 %; **mit Platte 6** enden **59,8 %** der
+  Serien bei Punktestand 0, und es gehen **11,22 ± 0,42 Punkte je Partie** in
+  Blindziehungen statt 3,93 ± 0,15 -- bei praktisch gleicher Serienzahl (3,60
+  gegen 3,50), der Unterschied sitzt also allein in der TIEFE. Weil Ziehungen
+  bei Punktestand 0 gratis und damit unsichtbar sind, sind die gemessenen
+  Tiefen UNTERGRENZEN.
+  **Nicht beantwortet:** ob der Kauf sich lohnt -- eine Wild-Platte kann mehr
+  wert sein als 5 Punkte. Beantwortet ist nur, dass die Entscheidung auf einem
+  Skalenbruch beruht und nicht auf einer Rechnung.
+  **Konfundierungs-Verdacht** `[HERLEITUNG, ungeprueft]`: `PREREG_chance_nodes.md`
+  Teil C liest die erhoehte Ziehquote bei Platte 6 als GELERNTE Interaktion.
+  Dieselbe Korrelation entstuende auch rein mechanisch, weil der Resolver die
+  Labels praegt. Nicht widerlegt, aber mit unausgeschlossenem Alternativerklaerer.
 - **Strafleisten- und Ueberlauf-Zuege sind gemessen, nicht selten** (2026-08-25,
   `tools/diagnosis.py::run_penalty_bias` unveraendert + Aggregation je Partie;
   Korpus `selfplay_v20wdlsw_*`, 60 Dateien = 600 Partien, 97.970
@@ -334,6 +391,33 @@ plattenblindes Spiel geeicht, derselbe Fehler wie viermal zuvor.
   und Groesse (roher Prior gegen Argmax einer wurzelverrauschten
   Self-Play-Policy). **Mit einem Lauf aufloesbar**:
   `tools/probes/floor_action_aversion_gate.py` auf Runde-2-4-Stellungen.
+
+### Laufzeiten (gemessen, nicht geschaetzt)
+
+Planungsgroessen. Die belastbaren Zahlen stehen je Lauf im Artefakt
+(`laufzeit`-Block, Pflichtfeld seit 2026-08-25); hier steht nur, was man zum
+Einplanen braucht. Wer eine Zeile ergaenzt, traegt GEMESSENES ein.
+
+| Aufbau | Umfang | Threads | Wanduhr |
+| --- | --- | --- | --- |
+| Heuristik gegen Heuristik, 150 Sims (`v2_envelope_arena.py`) | 160 Partien | 0 = alle 12 Kerne | **21,9 s** |
+| dito, Rauchtest | 20 Partien | alle Kerne | **4,1 s** |
+| Netz@400 gegen Heuristik@150 (`v2_teacher_arena.py`), je Partie | -- | 0 = **sequenziell** | **12,357 s** |
+| dito | -- | 11 | **2,575 s** |
+| dito, voller Lauf 407 Seeds + v1-Bezug | 814 Partien | 0 = sequenziell | ~2 h 48 min (hochgerechnet aus 12,357 s je Partie; ein Lauf wurde nach 99 min abgebrochen) |
+| dito | 814 Partien | 11 | ~35 min |
+
+**Parallelisierung ist ergebnisneutral, gemessen statt angenommen**
+(2026-08-25, 20 Seeds beidseitig, `neutral_seq.json` / `neutral_par.json`):
+Siegquote 0,450, volle Spalten 1,200 und Punkte 55,0 in BEIDEN Faellen
+identisch, bei 4,8-fachem Tempo. Grund ist `PREREG_search_rng_split.md`: jede
+Partie haengt an ihrem eigenen, abgeleiteten Suchstrom.
+
+**Die Falle in der dritten Zeile:** `threads = 0` heisst in
+`run_heuristic_v1_vs_v2_arena` ALLE KERNE und in
+`run_net_vs_heuristic_v2_arena` SEQUENZIELL. Dieselbe Sonde mit derselben
+Zahl laeuft also einmal 12-fach und einmal einfach. Siehe die eingetaktete
+Aufgabe "Arena-Threadzahl geradeziehen" in der Strang-Tabelle.
 
 ### Weitere entschiedene Straenge (Herleitungen im Archiv)
 

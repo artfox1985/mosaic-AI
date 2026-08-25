@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import json
 import statistics
+import time
 import sys
 from collections import Counter
 from pathlib import Path
@@ -132,6 +133,14 @@ if "--variante" in sys.argv:
     VARIANTE = sys.argv[sys.argv.index("--variante") + 1]
     OUT_JSON = OUT_JSON.with_name(f"v2_teacher_arena_{VARIANTE}.json")
 SEED_LIMIT = int(sys.argv[sys.argv.index("--seeds") + 1]) if "--seeds" in sys.argv else None
+# `--threads`: die VORGABE 0 bleibt, weil par.5.3 so gemessen wurde. Achtung,
+# 0 heisst in `run_net_vs_heuristic_v2_arena` SEQUENZIELL (self_play.rs:2866,
+# `num_threads <= 1`), nicht "alle Kerne" -- wer parallel fahren will, muss
+# eine Zahl > 1 setzen. Jede Abweichung von 0 gehoert in die Prereg.
+if "--threads" in sys.argv:
+    THREADS = int(sys.argv[sys.argv.index("--threads") + 1])
+if "--out" in sys.argv:
+    OUT_JSON = ROOT / "evaluations" / sys.argv[sys.argv.index("--out") + 1]
 
 
 # Seeds in Stuecken fahren, damit ein langer Lauf ABLESBAR ist (CLAUDE.md:
@@ -192,10 +201,19 @@ def main():
     print("%d Kampagnen-Seeds, Netz@%d gegen Heuristik@%d"
           % (len(seeds), NET_SIMS, HEUR_SIMS), file=sys.stderr, flush=True)
 
+    # Pflichtfeld, siehe CLAUDE.md "Laufzeiten messen, nicht schaetzen".
+    t0, c0 = time.monotonic(), time.process_time()
     v2 = evaluate(lauf(mr.net_vs_heuristic_v2_arena, seeds, f"{VARIANTE} als Lehrer"), "HeuristikV2")
     v1 = evaluate(lauf(mr.net_arena_match, seeds, "v1 als Bezug (dieselben Seeds)"), "HeuristikV1")
 
+    wanduhr = time.monotonic() - t0
+    n_ges = v2["n_partien"] + v1["n_partien"]
     ergebnis = {"v2_lauf": v2, "v1_bezug": v1,
+                "laufzeit": {"wanduhr_s": round(wanduhr, 1),
+                             "cpu_s": round(time.process_time() - c0, 1),
+                             "threads": THREADS,
+                             "n_partien_gesamt": n_ges,
+                             "s_je_partie": round(wanduhr / n_ges, 3) if n_ges else None},
                 "hinweis": ("Kein vorregistrierter Schwellenwert fuer par.5.3 -- die Prereg "
                             "beschreibt eine Abwaegung. Diese Zahlen sind die Grundlage, "
                             "nicht das Urteil.")}
