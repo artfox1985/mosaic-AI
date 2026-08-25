@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt eine RISIKOSENSITIVE Blatt-Utility Spielstaerke -- also die Verteilung des Ausgangs statt nur ihres Mittels in die Suche zu ziehen? | Beleg: NICHTS GEMESSEN. Ausgangspunkt war die Nutzer-Idee der Varianz-Penalisierung. Wichtige Korrektur aus der Vorpruefung: der Verteilungs-Kopf points_dist ist ABGESCHALTET (POINTS_DIST_BINS = 0, config.py:134) und der Champion traegt ihn nicht -- seine ONNX-Ausgaenge sind policy/value/moon/points/ownership/value_wdl_logits/opp_points/endgame_margin. Die volle Fassung braucht also ein neues Training. GEGENBEFUND, der eine billige Stufe erlaubt: value_wdl_logits WIRD exportiert, aber net_mcts.rs liest es nirgends -- die Suche kennt die Klassenverteilung des Ausgangs nicht, obwohl sie im Modell steht. Zweistufig: Stufe A ohne Training (P(Niederlage) aus den WDL-Logits), Stufe B mit Training (unteres Quantil von points_dist). Entscheidungsmass ist STAERKE, kein Offline-Mass. -->
+<!-- STATUS: OFFEN | Frage: Bringt eine RISIKOSENSITIVE Blatt-Utility Spielstaerke -- also die Verteilung des Ausgangs statt nur ihres Mittels in die Suche zu ziehen? | Beleg: NICHTS GEMESSEN. Ausgangspunkt war die Nutzer-Idee der Varianz-Penalisierung. Wichtige Korrektur aus der Vorpruefung: der Verteilungs-Kopf points_dist ist ABGESCHALTET (POINTS_DIST_BINS = 0, config.py:134) und der Champion traegt ihn nicht -- seine ONNX-Ausgaenge sind policy/value/moon/points/ownership/value_wdl_logits/opp_points/endgame_margin. Die volle Fassung braucht also ein neues Training. GEGENBEFUND, der eine billige Stufe erlaubt: value_wdl_logits WIRD exportiert, aber net_mcts.rs liest es nirgends -- die Suche kennt die Klassenverteilung des Ausgangs nicht, obwohl sie im Modell steht. Zweistufig: Stufe A ohne Training (P(Niederlage) aus den WDL-Logits), Stufe B mit Training (unteres Quantil von points_dist). Entscheidungsmass ist STAERKE, kein Offline-Mass. EINGETAKTET fuer den v22-Zyklus 2026-08-25 (par.5) mit einer Bau-Entscheidung davor: Stufe A kann die KORPUS-LABELS aendern, weil der Bootstrap ueber net_leaf_eval laeuft (round_transition_deep.rs:594/698/731). Variante A1 (nur an der Gumbel-Blattstelle) laesst die Labels unberuehrt und ist die vorgeschlagene; A2 (in net_leaf_eval) bekaeme Wecker-Charakter wie der Bootstrap-Horizont und ist fuer v22 zu spaet -- die Erzeugung laeuft. Fuer v22 also A1 oder gar nicht. Zu fahren gemeinsam mit PREREG_implicit_minimax_backup.md par.3, beide sind Such-Knoepfe am selben Netz. -->
 
 # PREREG: Risikosensitive Blatt-Utility
 
@@ -113,3 +113,42 @@ Wertungsplatte, eigene Punkte, Marge.
   er ist; nur der Konsument aendert sich.
 - **Keine Aussage ueber die Heuristik.** `heuristic_v2` und der
   Plattenbau-Layer bleiben unberuehrt.
+
+
+## par.5 STUFE A EINGETAKTET fuer den v22-Zyklus (Nutzer 2026-08-25)
+
+**Der Befund, der den Zuschnitt bestimmt, und er ist am Code geprueft:
+Stufe A kann die KORPUS-LABELS veraendern.** Die Bootstrap-Labels laufen ueber
+`crate::net_mcts::net_leaf_eval` (round_transition_deep.rs:594, 698, 731). Wer
+die Blatt-Utility dort risikosensitiv macht, aendert nicht nur die Suche,
+sondern auch das aufgezeichnete Value-Ziel.
+
+Daraus folgt eine Bau-Entscheidung, die VOR dem Bau fallen muss:
+
+* **(A1) Nur in der Suche** -- die risikosensitive Utility wird an der
+  Gumbel-Blattstelle angewandt, `net_leaf_eval` bleibt unveraendert. Labels
+  unberuehrt, Bestandskorpora bleiben vergleichbar, der Knopf ist jederzeit
+  ein- und ausschaltbar. **Das ist die vorgeschlagene Variante.**
+* **(A2) In `net_leaf_eval`** -- wirkt zusaetzlich auf die Labels. Damit
+  bekommt sie denselben Wecker-Charakter wie der Bootstrap-Horizont: nur am
+  GENERIERUNGSSTART entscheidbar, spaeter nur durch Neu-Labeln aenderbar. Fuer
+  v22 ist dieser Zug bereits vorbei -- die Erzeugung laeuft seit 17:20.
+
+**Fuer v22 heisst das: A1, oder gar nicht.** Ein Wechsel auf A2 mitten im
+laufenden Korpus wuerde eine Datei-Haelfte mit einer anderen Zieldefinition
+erzeugen als die andere -- ein stiller Messfehler im Artefakt, genau die
+Bauform, vor der die Exklusivitaets-Regel warnt.
+
+**Warum die Stufe trotzdem billig ist:** `value_wdl_logits` WIRD vom Champion
+exportiert, aber `net_mcts.rs` liest es nirgends. Die Information ist bereits
+bezahlt und liegt ungenutzt im Modell; A1 ist eine Leseoperation plus eine
+Utility-Mischung, kein Training.
+
+**Entscheidungsmass bleibt wie im Kopf registriert: STAERKE, kein
+Offline-Mass.** Gepaarte Arena, Block-Ebene. Das ist hier nicht
+Formalitaet -- eine Blatt-Utility, die den Erwartungswert verlaesst, kann
+Offline-Kalibrierung verbessern und die Zugwahl trotzdem verschlechtern.
+
+**Reihenfolge im Zyklus:** nach dem v23-Training, gemeinsam mit dem
+implicit-minimax-Arm (`PREREG_implicit_minimax_backup.md` par.3) -- beide sind
+Such-Knoepfe am selben Netz und lassen sich auf denselben Seeds fahren.

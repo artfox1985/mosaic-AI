@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: GEBAUT + ABGENOMMEN 2026-08-23 (par.1a: Suite 492/0, Paritaets-Hash haelt, Knopf registriert); ERFOLG nach vorregistrierter Lesart (par.2b, 2026-08-23): kein Staerkeverlust (304 vs 296/407 n.s.), Score-Level SIGNIFIKANT +2,77 (Block-t +3,83), k1 9,0 % -> 16,0 % (+7,0 pp, p=0,090 knapp n.s., groesste je gemessene Netz-Bewegung). ABER par.2c (Netz-gegen-Netz via Kapselung): Paritaet, k1-Effekt gegnerspezifisch, uebertraegt sich nicht; Self-Play-Einsatz bleibt Kandidat mit gedaempfter Erwartung. Paralleler Such-Hebel des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); Quelle: RESEARCH_search_alternatives_external S4/S6 Option O1 (Baier/Winands-Linie, in Brettspielen belegt, Netz unveraendert). -->
+<!-- STATUS: OFFEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: GEBAUT + ABGENOMMEN 2026-08-23 (par.1a: Suite 492/0, Paritaets-Hash haelt, Knopf registriert); ERFOLG nach vorregistrierter Lesart (par.2b, 2026-08-23): kein Staerkeverlust (304 vs 296/407 n.s.), Score-Level SIGNIFIKANT +2,77 (Block-t +3,83), k1 9,0 % -> 16,0 % (+7,0 pp, p=0,090 knapp n.s., groesste je gemessene Netz-Bewegung). ABER par.2c (Netz-gegen-Netz via Kapselung): Paritaet, k1-Effekt gegnerspezifisch, uebertraegt sich nicht; Self-Play-Einsatz bleibt Kandidat mit gedaempfter Erwartung. Paralleler Such-Hebel des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); EINGETAKTET fuer den v22-Zyklus 2026-08-25 (par.3), aber NICHT fuer die Erzeugung: der Knopf sitzt in der Gumbel-Selektion (net_mcts.rs:3376) und steht damit NICHT im Label-Pfad des heuristischen v22-Self-Play (round_transition_deep nutzt net_leaf_eval und drafting_action_priors, keine Gumbel-Selektion). Zu messen am v23-NETZ: erst im Gating (dort heute schon live, Default 0,0), dann im naechsten netz-basierten Self-Play. Entscheidungsmass ist STAERKE auf Block-Ebene, die k1-Baurate nur begleitend -- sie war schon einmal die groesste je gemessene Bewegung ohne folgende Staerke. Quelle: RESEARCH_search_alternatives_external S4/S6 Option O1. -->
 
 # PREREG-SKELETT: Implicit-Minimax-Backup als Laufzeit-Knopf
 
@@ -131,3 +131,35 @@ ist widerlegt. Self-Play-Einsatz bleibt Kandidat (beidseitiger Knopf
 Behandelt NICHT die Datenseite (das leistet
 `PREREG_start_position_seeding.md`); Kombinationsmessungen erst, wenn
 beide Einzelhebel gemessen sind.
+
+
+## par.3 EINGETAKTET fuer den v22-Zyklus (Nutzer 2026-08-25)
+
+**Zuerst eine Abgrenzung, die den Zuschnitt bestimmt: dieser Knopf kann die
+v22-ERZEUGUNG nicht beeinflussen.** `mix_q_with_implicit_minimax` sitzt in der
+Selektion der Gumbel-Baumsuche (net_mcts.rs:3376, Alpha aus
+`SearchConfig::implicit_minimax_alpha`). Die v22-Partien werden heuristisch
+gespielt; das Netz liefert nur die Rundenuebergangs-Labels, und deren Pfad
+(`round_transition_deep`) benutzt `net_leaf_eval` und
+`drafting_action_priors`, aber KEINE Gumbel-Selektion. Der Knopf steht also
+nicht im Label-Pfad -- ein Eingriff waehrend des laufenden Korpus waere
+wirkungslos, nicht schaedlich.
+
+**Was damit eingetaktet ist:** der Arm gehoert an das v23-NETZ, nicht an den
+Korpus. Zwei Stellen, an denen er wirkt und an denen er zu messen ist:
+
+1. **Gating/Arena von v23** -- dort ist er heute schon live (Default 0,0 = aus,
+   pro Seite ueberschreibbar per `models/<name>.spec.json`). Das ist die
+   billigste Messung: kein Bau, ein Konfigurationsfeld.
+2. **Das NAECHSTE netz-basierte Self-Play** (also nach v23, nicht v22) -- das
+   ist der in par.2c offen gebliebene Punkt.
+
+**Erwartung ausdruecklich gedaempft, und das gehoert vor den Lauf und nicht
+danach:** par.2b war ein Erfolg nach vorregistrierter Lesart (k1 9,0 auf
+16,0 Prozent, Score +2,77 signifikant), aber par.2c hat gezeigt, dass der
+k1-Effekt GEGNERSPEZIFISCH ist und sich auf Netz-gegen-Netz nicht uebertraegt.
+Wer hier einen Wiederholungstreffer erwartet, hat par.2c nicht gelesen.
+
+**Entscheidungsmass:** Staerke in der gepaarten Arena, Block-Ebene. Die
+k1-Baurate ist BEGLEITEND zu berichten, aber nicht das Kriterium -- sie war
+schon einmal die groesste je gemessene Netz-Bewegung, ohne dass Staerke folgte.
