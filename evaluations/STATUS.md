@@ -82,7 +82,7 @@ und gehoert danach.
 | --- | --- | --- |
 | 1 | **Blindzieh-Reparatur entscheiden** | **ERLEDIGT 2026-08-25: kein Staerkegewinn**, Knopf bleibt AUS. Korpus kann mit dem Bestand erzeugt werden (`PREREG_stack_draw_reservation_rule.md` par.5d) |
 | 2 | **Heuristik-Variante bis ins Self-Play durchreichen** | **ERLEDIGT 2026-08-25.** Kette: `self_play.py --heuristik-variante` -> `generate_data` -> `_run_chunk_supervised` -> `_worker_run_chunk` -> pyo3 -> `run_self_play_with_net_labels_variante` -> `play_one_game`. Vorgabe "v1" ueberall, Paritaet haelt. Alle NEUN Enum-Varianten sind zugeordnet, unbekannte Werte werden ABGEWIESEN |
-| 3 | **Arena-Threadzahl geradeziehen** | eingetaktet, nicht gebaut |
+| 3 | **Arena-Threadzahl geradeziehen** | **ERLEDIGT 2026-08-25.** EINE Konvention (`self_play::thread_plan`): `0` = alle Kerne, `1` = sequenziell, `n` = n Threads. Vier Arena-Einstiege umgestellt. Abnahme: dieselben 12 Seeds sequenziell gegen 11 Threads -> **Ergebnisse identisch**, 44,5 s auf 13,0 s (3,4x) |
 | 4 | **Bootstrap-Horizont 2 gegen 3** auf einem kleinen v2-Ausschnitt | eingetaktet, `PREREG_bootstrap_horizon.md` par.9 |
 | 5 | **Erzeugung mit dem HEUTIGEN Wheel** | erfuellt, darf nicht rueckwaerts passieren |
 
@@ -104,9 +104,12 @@ auf, und der pre-push-Hook kompiliert die Beispiele mit.
 Partien unterscheiden sich; ein ungueltiger Wert wird abgewiesen statt still
 auf v1 zu fallen. Die Variante steht ausserdem in den Metadaten der erzeugten
 Dateien -- sonst waere spaeter nicht feststellbar, womit ein Korpus entstand.
-**Offene Frage an den Nutzer:** welche Variante soll v22 erzeugen? Der
-Lehrer-Test spricht fuer `v2huelle`; `v2huellephase` ist der juengste Arm der
-Parallelsitzung und war bei der Uebergabe geschrieben, aber nicht gemessen.
+**ENTSCHIEDEN 2026-08-25 (Nutzer): v22 wird mit `v2huelle` erzeugt.**
+Gestuetzt durch beide Messungen -- der Lehrer-Test (par.10.1) gibt der Huelle
+0,798 volle Spalten gegen 0,086, und der Phasenfaktor `v2huellephase` ist in
+par.11.1 als H0 negativ entschieden (n=160, volle Spalten 0,812 gegen 0,787,
+t=0,39, Siegquote 0,500). Es gibt also keinen gemessenen Grund, die Kampagne
+an den juengeren Arm zu binden.
 
 **Zu 3:** ein 814-Partien-Lauf kostet sequenziell 2 h 48 min statt 35 min. Bei
 einer Korpus-Kampagne ist das kein Schoenheitsfehler.
@@ -157,19 +160,28 @@ Partien, Champion@400 gegen Heuristik@150. Netz-Siege 151/200 gegen 141/200
    niedrig), oder die Reparatur zieht jetzt zu wenig. Beide Zweige brauchen
    ein `V`, das an realisierten Punkten geeicht ist -- also das v22-Korpus.
 
-### 3. Arena-Threadzahl geradeziehen (EINGETAKTET 2026-08-25, nicht gebaut)
+### 3. Arena-Threadzahl geradeziehen -- ERLEDIGT 2026-08-25
 
-`threads = 0` heisst in `run_heuristic_v1_vs_v2_arena` ALLE KERNE und in
-`run_net_vs_heuristic_v2_arena` SEQUENZIELL (`self_play.rs:2866`,
-`if num_threads <= 1`). Dieselbe Sonde mit derselben Zahl laeuft also einmal
-12-fach und einmal einfach; am Lehrer-Test gemessen: 19,8 CPU-Minuten in 20,4
-Wanduhr-Minuten bei 12 Kernen, Faktor 1,0.
+`threads = 0` hiess in `run_heuristic_v1_vs_v2_arena` ALLE KERNE und in
+`run_net_vs_heuristic_v2_arena` SEQUENZIELL. Dieselbe Sonde mit derselben Zahl
+lief also einmal 12-fach und einmal einfach -- am Lehrer-Test sichtbar als
+19,8 CPU-Minuten in 20,4 Wanduhr-Minuten bei 12 Kernen, Faktor 1,0.
 
-**Vorsicht:** die Bedeutung von `0` umzudrehen aendert still JEDE
-Bestandsaufrufstelle. Sauber ist ein gemeinsamer Helfer mit EINER
-dokumentierten Konvention plus Nachweis der Ergebnisgleichheit auf einer
-Stichprobe -- Partien sind je Seed unabhaengig, das ist zu ZEIGEN, nicht
-anzunehmen.
+**Gebaut:** `self_play::thread_plan` als EINE Konvention -- `0` = globaler
+Pool (alle Kerne), `1` = sequenziell, `n` = eigener Pool. Umgestellt sind
+VIER Arena-Einstiege; es waren vier und nicht zwei, die erwartete Trefferzahl
+im Umbau-Skript hat die beiden uebersehenen gefunden. Die Self-Play-Einstiege
+bleiben unberuehrt: dort heisst `0` schon "alle Kerne", und `1` baut einen
+Pool mit einem Thread statt sequenziell zu laufen -- verhaltensgleich, im
+Doc-Kommentar festgehalten, damit die Asymmetrie nicht fuer ein Versehen
+gehalten wird.
+
+**Abnahme, gemessen statt angenommen:** dieselben 12 Seeds,
+`net_vs_heuristic_v2_arena` einmal mit `threads=1` und einmal mit
+`threads=11` -- **Ergebnisse byte-identisch**, 44,5 s gegen 13,0 s (Faktor
+3,4). Das war noetig, weil die Umstellung fuer die Netz-Arenen die Bedeutung
+von `threads=0` von "sequenziell" auf "alle Kerne" dreht: jeder
+Bestandsaufrufer mit 0 laeuft ab jetzt parallel.
 
 ### 4. JSON-Umzug: Restentscheid
 
