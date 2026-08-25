@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem. Eine Stopp-Regel IST gebaut (self_play.rs:500-545, Default-Pfad) -- ist sie die richtige? | Beleg: NEIN, sie zieht ZU OFT. par.5b (2026-08-25, netzfrei, konstruierte Bretter): die optimale Tiefe ist in JEDEM geprueften Fall 1 (nach der Pflichtziehung liegt eine Platte im Wert von 2,9-9,0 Punkten in der Hand, die erwartete VERBESSERUNG bleibt unter dem 1 Punkt Ziehkosten), waehrend die gebaute Regel bei negativem Brettniveau 9-11 mal zieht -- rund 10 verschenkte Punkte je betroffenem Stapelzug. Roh und mit Realisierungsabschlag gleiches Ergebnis, das Verdikt haengt also NICHT an der Abschlagswahl. Ursache ist der Einheitenbruch (par.1c Mangel 3): ein absolutes Brettniveau gegen einen Typmittelwert in [1,3]; er ueberfaehrt den Optionswert-Fehler (Mangel 1) um Groessenordnungen. Korpus (par.4c): 11,22 +- 0,42 Punkte je Partie fuer Blindziehungen mit Kriterium 6 gegen 3,93 +- 0,15 ohne, 59,8 % der Serien enden bei Punktestand 0. Spaltenbau behebt es NICHT (par.6d). NAECHSTES: Eingriff in den Default-Pfad, Nutzer-Entscheid. -->
+<!-- STATUS: OFFEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem. Eine Stopp-Regel IST gebaut (self_play.rs:500-545, Default-Pfad) -- ist sie die richtige? | Beleg: NEIN, sie zieht ZU OFT. par.5b (2026-08-25, netzfrei, konstruierte Bretter): die optimale Tiefe ist in JEDEM geprueften Fall 1 (nach der Pflichtziehung liegt eine Platte im Wert von 2,9-9,0 Punkten in der Hand, die erwartete VERBESSERUNG bleibt unter dem 1 Punkt Ziehkosten), waehrend die gebaute Regel bei negativem Brettniveau 9-11 mal zieht -- rund 10 verschenkte Punkte je betroffenem Stapelzug. Roh und mit Realisierungsabschlag gleiches Ergebnis, das Verdikt haengt also NICHT an der Abschlagswahl. Ursache ist der Einheitenbruch (par.1c Mangel 3): ein absolutes Brettniveau gegen einen Typmittelwert in [1,3]; er ueberfaehrt den Optionswert-Fehler (Mangel 1) um Groessenordnungen. Korpus (par.4c): 11,22 +- 0,42 Punkte je Partie fuer Blindziehungen mit Kriterium 6 gegen 3,93 +- 0,15 ohne, 59,8 % der Serien enden bei Punktestand 0. Spaltenbau behebt es NICHT (par.6d). par.5c Knopf GEBAUT (Default AUS, bit-identisch), par.5d Abnahme GEFAHREN: KEIN Staerkeunterschied in beide Richtungen (n=200 gepaart, Netz-Punkte -0,97 +- 1,59; Platte-6-Teilmenge -1,26 +- 3,34). Knopf bleibt AUS, auch fuer die v22-Erzeugung -- den Korpus unter der zu validierenden Regel zu erzeugen waere zirkulaer. WIEDERVORLAGE nach v22 (par.5e) nur mit ZWEI Bedingungen: (1) V-Eichung braucht einen Vergleichspunkt ausserhalb der v22-Verteilung (sonst misst man Plattenwert gegen Verwertungsunfaehigkeit, Kandidat: Mensch-Logs par.6c), (2) EINSEITIGER Knopf, weil der heutige auf beide Seiten wirkt und ein symmetrischer Effekt im Duell bei jedem n unsichtbar ist. Mehr Partien allein heilen das nicht. -->
 
 # PREREG: Reservationswert-Regel fuer die Blindziehung (`stack_draw_reservation_rule`)
 
@@ -716,6 +716,34 @@ DIESE Daten trennen sie nicht:
 Beides waere ein Befund ueber die BEWERTUNG einer Kuppelplatte, nicht ueber
 die Stopp-Regel. Ein Zuschnitt dafuer braucht ein `V`, das an realisierten
 Punkten geeicht ist -- also das v22-Korpus.
+
+### par.5e WIEDERVORLAGE nach dem v22-Korpus (Nutzer-Entscheid 2026-08-25)
+
+Der Knopf bleibt AUS, auch waehrend der v22-Erzeugung -- den Korpus unter der
+Regel zu erzeugen, die er erst validieren soll, waere zirkulaer. Nach dem
+Korpus wird der Arm wieder aufgenommen, aber **nur mit diesen beiden
+Bedingungen**; ohne sie liefert eine Wiederholung dasselbe Nichtergebnis.
+
+**Bedingung 1: die Eichung von `V` braucht einen Vergleichspunkt von
+AUSSERHALB der v22-Verteilung.** v22 wird von Spielern erzeugt, die Platten
+schlecht verwerten. Eicht man `V` an deren realisierten Punkten, misst man den
+Wert einer Kuppelplatte gegen die Unfaehigkeit, sie zu nutzen, und bekommt
+zwangslaeufig "nicht ziehen" heraus -- zirkulaer in der Gegenrichtung zu dem,
+was oben abgelehnt wird. Dieselbe Signatur wie die Plattenblind-Falle. Der
+Kandidat fuer den zweiten Punkt sind die Mensch-Logs aus par.6c.
+
+**Bedingung 2: ein EINSEITIGER Knopf.** Der heutige wirkt auf beide Seiten
+(`resolve_and_apply_stack_draw` sitzt in `apply_chosen_action`), und ein
+symmetrischer Effekt ist im Duell unsichtbar -- bei JEDEM n. Die ±3,3 Punkte
+Power in der Platte-6-Teilmenge sind also nur die halbe Erklaerung fuer das
+Nichtergebnis aus par.5d; mehr Partien heilen die andere Haelfte nicht.
+Mechanisch moeglich ist es: die Funktion bekommt das ganze `Game`
+(self_play.rs:500), der handelnde Spieler ist damit in Reichweite. **Nicht
+gebaut.**
+
+**Was die Wiedervorlage NICHT ist:** eine Wiederholung derselben Arena mit
+mehr Partien. Solange Bedingung 2 offen ist, kauft zusaetzliches Budget nur
+engere Intervalle um eine Groesse, die strukturell auf Null liegt.
 
 **Fuer die v22-Vorbereitung heisst das:** die Frage "mit oder ohne Reparatur
 erzeugen" ist damit NICHT entschieden, sondern gegenstandslos geworden -- es
