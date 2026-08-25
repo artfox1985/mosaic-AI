@@ -1266,8 +1266,23 @@ phasenabhaengige Koeffizienten fuer ein anderes Spiel (Azul-Grundspiel),
 andere Suchtiefe, andere Termmenge. Uebernommen war ausdruecklich die FORM,
 nicht der Wert. Das Ergebnis sagt also nicht "Tapered Eval funktioniert
 nicht", sondern "diese Form, auf diese Karte, mit diesen Werten, bewegt hier
-nichts". Ein Sweep ueber die Werte waere die Dosis-Antwort, die in diesem
-Projekt schon dreimal negativ entschieden wurde -- er findet NICHT statt.
+nichts". Ein Sweep ueber die Werte findet NICHT statt.
+
+**KORREKTUR 2026-08-25 an meiner eigenen Begruendung:** die erste Fassung
+dieses Absatzes sprach von einer Dosis-Antwort, "die in diesem Projekt schon
+dreimal negativ entschieden wurde". Diese Zahl ist unbelegt und stammt aus
+einer Hochsetzung ohne neuen Fall. Nachgesehen steht im Bestand:
+`PREREG_scoring_plate_injection.md` ist ein ECHTER Dosis-Sweep
+(w = 0,03/0,1/0,3/1,0) und negativ entschieden; `PREREG_long_row_payoff.md`
+B1 ist negativ, war aber ausdruecklich KEIN Sweep ("ein Wert genuegt zum
+Testen"). Also einmal als Dosis-Antwort, dazu ein verwandter Einzelwert-Knopf
+-- nicht dreimal.
+
+**Der Verzicht auf den Sweep haengt ohnehin nicht am Praezedenzfall.** Der Arm
+zeigt KEINEN Effekt in irgendeine Richtung (t=0,39 auf dem
+Entscheidungsmass). Werte eines Faktors zu variieren, der bei der gesetzten
+Staerke nichts bewegt, braucht erst ein Argument, warum eine andere Staerke
+etwas anderes tun sollte -- und das gibt es hier nicht.
 
 **Nebenbefund aus der neu gebauten k6-Aufspaltung, erster Einsatz:** das
 Punkteniveau liegt bei aktiver Wertungsplatte 6 bei 34,0 gegen 48,9 ohne --

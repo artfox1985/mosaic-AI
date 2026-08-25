@@ -45,11 +45,14 @@ trennt zwei Stellungen, die heute denselben Blattwert bekommen: eine mit
 25 Prozent Remis / 5 Prozent Niederlage.
 
 **EIN Wert fuer LAMBDA, kein Sweep.** Das ist ein Regler am Blattwert, und
-genau diese Bauform ist zweimal negativ entschieden worden
-(`PREREG_scoring_plate_injection.md` ueber einen 30-fachen Dosisbereich,
-`PREREG_long_row_payoff.md` B1). Ein Sweep wuerde die dritte Wiederholung
-derselben Dosis-Antwort. Der Wert ist vor dem Lauf zu setzen und zu
-begruenden.
+diese Bauform hat im Bestand zwei Negative -- allerdings von verschiedener
+Art, und das gehoert genau gesagt: `PREREG_scoring_plate_injection.md` ist ein
+ECHTER Dosis-Sweep (w = 0,03/0,1/0,3/1,0) und negativ entschieden;
+`PREREG_long_row_payoff.md` B1 ist negativ, war aber ausdruecklich KEIN Sweep
+("ein Wert genuegt zum Testen"). Es gibt also einen Praezedenzfall gegen die
+Dosis-Antwort, nicht zwei. Der Wert ist trotzdem vor dem Lauf zu setzen und zu
+begruenden -- ein Sweep waere hier die Wiederholung des einen Falles, den es
+gibt.
 
 **Vertraeglichkeit ist Pflicht, nicht Kuer:** Modelle ohne
 `value_wdl_logits` muessen byte-identisch weiterlaufen. Vorbild ist die
