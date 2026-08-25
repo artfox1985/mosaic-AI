@@ -843,6 +843,67 @@ fn phase_wirkt_auf(stufe: Stufe) -> bool {
     }
 }
 
+/// par.15: **Erreichbarkeit als MASS statt als TOR.**
+///
+/// Je Rasterspalte der noch erreichbare Endfuellstand: aktueller Fuellstand
+/// plus die leeren Zellen, die nach der Restversorgung noch bedienbar sind
+/// (`column_build::cell_is_completable`, dieselbe Relaxation wie in par.12 --
+/// nur gezaehlt statt als Ja/Nein gelesen).
+fn achievable_column_fill(player: &PlayerBoard, remaining: &[i64; 5]) -> [f64; 6] {
+    let mut out = [0.0f64; 6];
+    for (c, slot) in out.iter_mut().enumerate() {
+        let mut n = 0u32;
+        for r in 0..6 {
+            let belegt = player.dome_grid.get_space(r, c).is_some_and(|sp| sp.is_filled());
+            if belegt || crate::column_build::cell_is_completable(player, r, c, remaining) {
+                n += 1;
+            }
+        }
+        *slot = n.min(6) as f64;
+    }
+    out
+}
+
+/// Skaliert die SPALTEN-Stufen (Prio 3 und 4) mit dem Anteil des
+/// Spalten-Ertrags, der ueberhaupt noch erreichbar ist.
+///
+/// `faktor(c) = (f_max(c) / 6)^2` -- **dieselbe Kurve, mit der die Endwertung
+/// eine Spalte bezahlt** (`scoring.rs`, Zweig 1: `(fuellung/6)^2 * 7`). Eine
+/// Spalte, die noch voll werden kann, behaelt volles Gewicht; eine, die
+/// hoechstens auf 4 kommt, behaelt 44 Prozent statt null.
+///
+/// **Warum das der Ersatz fuer den gescheiterten Filter aus par.12 ist**
+/// (Nutzer-Einwand 2026-08-25: "dann hast vielleicht den filter nicht sauber
+/// modelliert"): `cell_is_completable` ist BINAER, die Spaltenwertung zahlt
+/// STETIG und konvex. Der Filter hat den Teilfortschritt weggeworfen, den die
+/// Wertung sehr wohl bezahlt -- gemessen volle Spalten 0,794 auf 0,431. Hier
+/// wird derselbe Erreichbarkeitsbegriff benutzt, aber als Faktor auf einer
+/// Kurve, die zur Zielfunktion passt. Nichts faellt je auf 0, solange die
+/// Spalte noch irgendeinen Ertrag tragen kann.
+///
+/// **Die Orientierungswahl bleibt UNANGETASTET.** Der zweite Schaden in
+/// par.12 war das spaete Umschwenken auf eine andere Spalte, das die
+/// Festnagelung ab Runde 3 aufgehoben hat. Hier wird ausschliesslich
+/// gewichtet, nie umgeschaltet -- damit misst der Arm genau EINEN Unterschied.
+///
+/// Nur die Grundstufen werden skaliert; die Prio-5-Auflage kann eine
+/// Spalten-Zelle ohnehin nicht anheben (3,0 liegt unter 4,0 und 5,0).
+fn reachability_scaling(
+    player: &PlayerBoard,
+    remaining: &[i64; 5],
+    orientierung: usize,
+    k: &mut Zielkarte,
+) {
+    let f_max = achievable_column_fill(player, remaining);
+    let spalten = if orientierung == 0 { [0usize, 1] } else { [5, 4] };
+    for c in spalten {
+        let faktor = (f_max[c] / 6.0).powi(2);
+        for r in 0..6 {
+            k[r][c] *= faktor;
+        }
+    }
+}
+
 /// par.12: Zellen, die nach der Restversorgung NICHT mehr bedienbar sind,
 /// fallen auf 0.
 ///
@@ -1305,6 +1366,13 @@ fn v2_map_for(
         }
         crate::mcts::HeuristikVariante::V2HuelleFilter => {
             Some((v2_envelope_target_filtered(state, pi)?, envelope_cell_value))
+        }
+        crate::mcts::HeuristikVariante::V2HuelleReach => {
+            Some((v2_envelope_target_reach(state, pi)?, envelope_cell_value))
+        }
+        // par.16 aendert NUR die Bewertung -- das Routing ist das der Huelle.
+        crate::mcts::HeuristikVariante::V2HuelleCap => {
+            Some((v2_envelope_target(state, pi)?, envelope_cell_value))
         }
         _ => None,
     }
@@ -2342,6 +2410,8 @@ enum HuellenModus {
     Phased,
     /// par.12: unerreichbare Zellen fallen auf 0.
     Gefiltert,
+    /// par.15: Spalten-Stufen mit dem noch erreichbaren Ertrag skaliert.
+    Erreichbar,
 }
 
 pub(crate) fn v2_envelope_target(state: &GameState, pi: usize) -> Option<Zielkarte> {
@@ -2353,6 +2423,12 @@ pub(crate) fn v2_envelope_target(state: &GameState, pi: usize) -> Option<Zielkar
 /// unvollendbaren Randspalte aus, statt sie ab Runde 3 festzunageln.
 pub(crate) fn v2_envelope_target_filtered(state: &GameState, pi: usize) -> Option<Zielkarte> {
     v2_envelope_target_inner(state, pi, HuellenModus::Gefiltert)
+}
+
+/// Wie [`v2_envelope_target`], aber mit der Erreichbarkeits-SKALIERUNG aus
+/// par.15 -- der Ersatz fuer den gescheiterten Filter.
+pub(crate) fn v2_envelope_target_reach(state: &GameState, pi: usize) -> Option<Zielkarte> {
+    v2_envelope_target_inner(state, pi, HuellenModus::Erreichbar)
 }
 
 /// Wie [`v2_envelope_target`], aber mit dem Phasenfaktor aus
@@ -2398,10 +2474,12 @@ fn v2_envelope_target_inner(state: &GameState, pi: usize, modus: HuellenModus) -
     };
     let mut k = match modus {
         HuellenModus::Phased => target_map_phased(player, ids, orientierung, state.round_number),
-        HuellenModus::Fest | HuellenModus::Gefiltert => target_map(player, ids, orientierung),
+        _ => target_map(player, ids, orientierung),
     };
-    if modus == HuellenModus::Gefiltert {
-        completability_overlay(player, &remaining, &mut k);
+    match modus {
+        HuellenModus::Gefiltert => completability_overlay(player, &remaining, &mut k),
+        HuellenModus::Erreichbar => reachability_scaling(player, &remaining, orientierung, &mut k),
+        _ => {}
     }
     Some(k)
 }
