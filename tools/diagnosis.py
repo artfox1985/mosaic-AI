@@ -45,7 +45,7 @@ def run_diagnosis(data_dir: str, label: str):
 
     zero_mask   = (masks.sum(1) == 0).sum().item()
     leak        = (targets_p * (1 - masks)).sum(1).max().item()
-    mask_mean   = masks.sum(1).mean().item()
+    mask_mean   = masks.sum(1).float().mean().item()
     mask_min    = masks.sum(1).min().item()
     mask_max    = masks.sum(1).max().item()
 

@@ -1,0 +1,105 @@
+# -*- coding: utf-8 -*-
+"""Sanity-Check eines Self-Play-Korpus auf den sechs Standard-Kennzahlen
+(CLAUDE.md, Nutzer-Anweisung 2026-08-23) plus der Plattenfrage:
+werden die Wertungsplatten ueberhaupt angespielt?
+
+ERGAENZT `tools/diagnosis.py`, ersetzt es nicht -- dort stehen Policy-Schaerfe,
+Strafleisten-Bias und Ergebnis-Uebersicht; hier Reihen, Spalten und Platten.
+Quelle ist das strukturierte `score_geo` / `scoring_tile_points` aus dem
+Endzustand jeder Partie, KEIN Log-Regex.
+
+Aufruf:
+    python -X utf8 tools/corpus_sanity_check.py <verzeichnis> [<verzeichnis2> ...]
+"""
+import glob, json, os, pickle, sys
+
+KRIT = {0: "k0", 1: "k1", 2: "k2", 3: "k3", 4: "k4",
+        5: "k5", 6: "k6 Spezialfelder", 7: "k7"}
+
+
+def mw(v):
+    return sum(v) / len(v) if v else float("nan")
+
+
+def ci(v):
+    if len(v) < 2:
+        return float("nan")
+    m = mw(v)
+    sd = (sum((x - m) ** 2 for x in v) / (len(v) - 1)) ** 0.5
+    return 1.96 * sd / len(v) ** 0.5
+
+
+def auswerten(verzeichnis):
+    dateien = sorted(glob.glob(os.path.join(verzeichnis, "*.pkl")))
+    partien = {}       # game_id -> letzter Record
+    floor_max = {}     # (game_id, spieler, runde) -> groesste Strafleisten-Laenge
+    for f in dateien:
+        with open(f, "rb") as fh:
+            recs = pickle.load(fh)
+        for r in recs:
+            gid = r.get("game_id")
+            st = r.get("state") or {}
+            for pi, p in enumerate(st.get("players", [])):
+                k = (gid, pi, st.get("round"))
+                floor_max[k] = max(floor_max.get(k, 0), len(p.get("floor") or []))
+            if r.get("winner") is not None:
+                partien[gid] = r
+
+    # Je Partie und Seite die Endgroessen einsammeln.
+    zeilen_voll, zeilen_fuell, sp_voll, sp_ge4, sp_ge3, sp_max = [], [], [], [], [], []
+    punkte, margin, floor_steine = [], [], []
+    platten = {i: [] for i in range(8)}
+    aktiv = {i: 0 for i in range(8)}
+    partien_gesamt = 0
+    for gid, r in partien.items():
+        st = r["state"]
+        ids = st.get("scoring_tile_ids") or []
+        partien_gesamt += 1
+        for i in ids:
+            aktiv[i] += 1
+        sc = r.get("scores") or [p.get("score") for p in st["players"]]
+        for pi, p in enumerate(st["players"]):
+            g = p.get("score_geo") or {}
+            rf = g.get("row_fill") or []
+            cf = g.get("col_fill") or []
+            zeilen_voll.append(sum(1 for x in rf if x >= 6))
+            zeilen_fuell.append(mw(rf) if rf else 0.0)
+            sp_voll.append(sum(1 for x in cf if x >= 6))
+            sp_ge4.append(sum(1 for x in cf if x >= 4))
+            sp_ge3.append(sum(1 for x in cf if x >= 3))
+            sp_max.append(max(cf) if cf else 0)
+            punkte.append(sc[pi])
+            margin.append(sc[pi] - sc[1 - pi])
+            floor_steine.append(sum(v for (g2, p2, _), v in floor_max.items()
+                                    if g2 == gid and p2 == pi))
+            stp = p.get("scoring_tile_points") or []
+            for i in ids:
+                if i < len(stp):
+                    platten[i].append(stp[i])
+
+    print(f"\n=== {verzeichnis} ===")
+    print(f"Partien: {partien_gesamt}   Seiten: {len(punkte)}")
+    print(f"1) Reihenauslastung : volle Reihen {mw(zeilen_voll):.3f} +- {ci(zeilen_voll):.3f} "
+          f"| mittlerer Fuellstand {mw(zeilen_fuell):.2f}/6")
+    print(f"2) Spaltenauslastung: volle Spalten {mw(sp_voll):.3f} +- {ci(sp_voll):.3f} "
+          f"| >=4 {mw(sp_ge4):.2f} | >=3 {mw(sp_ge3):.2f} | hoechste {mw(sp_max):.2f}/6")
+    print(f"3) Strafleiste      : {mw(floor_steine):.2f} +- {ci(floor_steine):.2f} Steine je Partie und Seite")
+    print(f"5) Eigene Punkte    : {mw(punkte):.2f} +- {ci(punkte):.2f}")
+    print(f"6) Margin           : {mw(margin):.2f} (per Konstruktion 0 im Mittel ueber beide Seiten)")
+    print("4) Punkte je Wertungsplatte (nur wo aktiv):")
+    for i in range(8):
+        if not platten[i]:
+            continue
+        v = platten[i]
+        anteil = 100.0 * sum(1 for x in v if x > 0) / len(v)
+        print(f"     {KRIT[i]:18s} aktiv in {aktiv[i]:4d} Partien | "
+              f"{mw(v):+7.2f} +- {ci(v):.2f} Pkt | mit Ertrag > 0: {anteil:5.1f} %")
+    return dict(zeilen_voll=mw(zeilen_voll), sp_voll=mw(sp_voll),
+                floor=mw(floor_steine), punkte=mw(punkte))
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        raise SystemExit("Aufruf: python -X utf8 tools/corpus_sanity_check.py <verzeichnis> ...")
+    for v in sys.argv[1:]:
+        auswerten(v)
