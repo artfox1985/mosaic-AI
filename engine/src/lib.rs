@@ -105,7 +105,7 @@ fn self_play_games(
 /// per `self_play.py --rtv` reaktivierbar. `bootstrap_value` bleibt davon
 /// unberührt.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust_netlabel".to_string(), record_rtv=false, progress_path=None, heartbeat_path=None))]
+#[pyo3(signature = (model_path, n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust_netlabel".to_string(), record_rtv=false, progress_path=None, heartbeat_path=None, heuristik_variante="v1".to_string()))]
 #[allow(clippy::too_many_arguments)]
 fn self_play_games_with_net_labels(
     py: Python<'_>,
@@ -119,12 +119,38 @@ fn self_play_games_with_net_labels(
     record_rtv: bool,
     progress_path: Option<String>,
     heartbeat_path: Option<String>,
+    heuristik_variante: String,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
+    // STATUS "v22-Vorbereitung" Punkt 2: bis 2026-08-25 war der
+    // Self-Play-Einstieg auf V1 festgenagelt, ein v2-Lehrer-Korpus damit gar
+    // nicht erzeugbar. Vorgabe "v1" = Bestandsverhalten; unbekannte Werte
+    // werden ABGEWIESEN statt still auf V1 zu fallen -- ein Tippfehler im
+    // Kampagnen-Aufruf wuerde sonst schweigend den falschen Korpus erzeugen.
+    // Alle Varianten aus `mcts::HeuristikVariante`, nicht nur v1/v2 -- der
+    // Lehrer-Test hat die HUELLE gewonnen (volle Spalten 0,798 gegen 0,086,
+    // PREREG_heuristic_v2_long_rows.md par.10), sie ist also der wahrscheinliche
+    // Kandidat fuer ein v22-Lehrer-Korpus.
+    let variante = match heuristik_variante.to_ascii_lowercase().as_str() {
+        "v1" => crate::mcts::HeuristikVariante::V1,
+        "v2" => crate::mcts::HeuristikVariante::V2,
+        "v2huelle" => crate::mcts::HeuristikVariante::V2Huelle,
+        "v2heatmap" => crate::mcts::HeuristikVariante::V2Heatmap,
+        "v2pointmap" => crate::mcts::HeuristikVariante::V2PointMap,
+        "v2huellephase" => crate::mcts::HeuristikVariante::V2HuellePhase,
+        "v2huellefilter" => crate::mcts::HeuristikVariante::V2HuelleFilter,
+        "v2huellereach" => crate::mcts::HeuristikVariante::V2HuelleReach,
+        "v2huellecap" => crate::mcts::HeuristikVariante::V2HuelleCap,
+        other => {
+            return Err(pyo3::exceptions::PyValueError::new_err(format!(
+                "unbekannte heuristik_variante {other:?} -- erlaubt: v1, v2, v2huelle,                  v2heatmap, v2pointmap, v2huellephase, v2huellefilter, v2huellereach, v2huellecap"
+            )))
+        }
+    };
     py.detach(move || {
-        crate::self_play::run_self_play_with_net_labels(
+        crate::self_play::run_self_play_with_net_labels_variante(
             &model_path, n_games, base_sims, c, seed, num_threads, &prefix, record_rtv,
-            progress_path.as_deref(), heartbeat_path.as_deref(),
+            progress_path.as_deref(), heartbeat_path.as_deref(), variante,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)

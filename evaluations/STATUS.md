@@ -80,8 +80,8 @@ und gehoert danach.
 
 | # | Punkt | Stand |
 | --- | --- | --- |
-| 1 | **Blindzieh-Reparatur entscheiden** (gepaarte Arena, beide Arme) | Knopf gebaut, Arme fahrbar -- Entscheid steht aus |
-| 2 | **Heuristik-Variante bis ins Self-Play durchreichen** | NICHT gebaut, blockiert alles Weitere |
+| 1 | **Blindzieh-Reparatur entscheiden** | **ERLEDIGT 2026-08-25: kein Staerkegewinn**, Knopf bleibt AUS. Korpus kann mit dem Bestand erzeugt werden (`PREREG_stack_draw_reservation_rule.md` par.5d) |
+| 2 | **Heuristik-Variante bis ins Self-Play durchreichen** | **ERLEDIGT 2026-08-25.** Kette: `self_play.py --heuristik-variante` -> `generate_data` -> `_run_chunk_supervised` -> `_worker_run_chunk` -> pyo3 -> `run_self_play_with_net_labels_variante` -> `play_one_game`. Vorgabe "v1" ueberall, Paritaet haelt. Alle NEUN Enum-Varianten sind zugeordnet, unbekannte Werte werden ABGEWIESEN |
 | 3 | **Arena-Threadzahl geradeziehen** | eingetaktet, nicht gebaut |
 | 4 | **Bootstrap-Horizont 2 gegen 3** auf einem kleinen v2-Ausschnitt | eingetaktet, `PREREG_bootstrap_horizon.md` par.9 |
 | 5 | **Erzeugung mit dem HEUTIGEN Wheel** | erfuellt, darf nicht rueckwaerts passieren |
@@ -93,10 +93,20 @@ und treibt 58-66 Prozent der Ziehserien auf Punktestand 0. Das landet in den
 Scores, den Trajektorien und damit in den **Value-Labels**. Wird v22 mit dem
 Defekt erzeugt, traegt ihn jedes daraus trainierte Netz mit.
 
-**Zu 2:** der Self-Play-Einstieg ist auf V1 festgenagelt
-(`heuristik_variante: HeuristikVariante::V1`, `self_play.rs:2201`); nur die
-Arena nimmt die Variante als Parameter. Ohne das Durchreichen gibt es keine
-v2-Partien und damit weder Punkt 4 noch die Kampagne selbst.
+**Zu 2 (erledigt):** der Self-Play-Einstieg war auf V1 festgenagelt; nur die
+Arena nahm die Variante als Parameter. Jetzt durchgereicht, mit Vorgabe "v1"
+auf jeder Ebene -- Bestandsaufrufer bleiben byte-identisch (Paritaets-Hash
+`8c6684ff...` haelt, Suite 526/0). Die Bestandssignatur
+`run_self_play_with_net_labels` ist BEWUSST unveraendert geblieben und
+delegiert; daneben steht `..._variante`. Grund: `engine/examples/` ruft sie
+auf, und der pre-push-Hook kompiliert die Beispiele mit.
+**Belegt statt angenommen:** gleicher Seed, `v1` gegen `v2huelle` -> die
+Partien unterscheiden sich; ein ungueltiger Wert wird abgewiesen statt still
+auf v1 zu fallen. Die Variante steht ausserdem in den Metadaten der erzeugten
+Dateien -- sonst waere spaeter nicht feststellbar, womit ein Korpus entstand.
+**Offene Frage an den Nutzer:** welche Variante soll v22 erzeugen? Der
+Lehrer-Test spricht fuer `v2huelle`; `v2huellephase` ist der juengste Arm der
+Parallelsitzung und war bei der Uebergabe geschrieben, aber nicht gemessen.
 
 **Zu 3:** ein 814-Partien-Lauf kostet sequenziell 2 h 48 min statt 35 min. Bei
 einer Korpus-Kampagne ist das kein Schoenheitsfehler.
@@ -127,10 +137,25 @@ mal Rotationen, ueber den ganzen Restpool je Entscheidung ist das deutlich
 teurer als der heutige Mittelwert; zu messen, BEVOR die Regel scharf gestellt
 wird. (b) Knopf mit Default AUS, damit die Arena beide Arme fahren kann.
 
-**Abnahme:** gepaarte Arena, Block-Ebene, SPRT auf informativen Paaren
-(`tools/paired_gating.py`), **getrennt nach Plattensatz** -- in Partien ohne
-Kriterium 6 ist die Ziehtiefe in allen drei untersuchten Regimen 1, dort kann
-kein Unterschied entstehen.
+**ABNAHME GEFAHREN 2026-08-25 (par.5d): KEIN Staerkegewinn.** 200 gepaarte
+Partien, Champion@400 gegen Heuristik@150. Netz-Siege 151/200 gegen 141/200
+(McNemar p=0,1539), Punkteniveau −0,97 ± 1,59; in der Platte-6-Teilmenge
+(n=76) −1,26 ± 3,34. Kein Arm ist besser, der Knopf bleibt auf Default AUS.
+
+**Zwei Lehren daraus, beide korrigierend:**
+
+1. **Meine Begruendung fuer den Plattensatz-Schnitt war falsch.** Hier stand,
+   ohne Kriterium 6 "kann kein Unterschied entstehen" -- es entsteht einer
+   (−0,80 Punkte, zwei gekippte Partien). Ohne Kriterium 6 ist das Brettniveau
+   zwar positiv, aber `avg_remaining_type_value` liegt in [1, 3]; bei kleinem
+   `max_drawn` zieht auch die Bestandsregel weiter. Richtig: der Unterschied
+   ist dort SELTEN, nicht unmoeglich.
+2. **Der erwartete Punktegewinn bleibt aus**, obwohl die Bestandsregel
+   nachweislich 9-13 mal zieht, wo die optimale Regel 1 sagt. Damit steht die
+   BEWERTUNG einer Kuppelplatte zur Debatte, nicht die Stopp-Regel: entweder
+   waren die gekauften Platten ihren Preis wert (das `V` aus par.5b ist zu
+   niedrig), oder die Reparatur zieht jetzt zu wenig. Beide Zweige brauchen
+   ein `V`, das an realisierten Punkten geeicht ist -- also das v22-Korpus.
 
 ### 3. Arena-Threadzahl geradeziehen (EINGETAKTET 2026-08-25, nicht gebaut)
 

@@ -660,6 +660,69 @@ die Abnahme aus par.6 an: gepaarte Arena, Block-Ebene, SPRT auf informativen
 Paaren, **getrennt nach Plattensatz** -- in Partien ohne Kriterium 6 ist die
 Tiefe in allen Regimen 1, dort kann kein Unterschied entstehen.
 
+## par.5d ABNAHME GEFAHREN 2026-08-25: KEIN Staerkegewinn
+
+Gepaarter Zwei-Arm-A/B (`tools/paired_arena_env_ab.py`), Champion@400 gegen
+Heuristik@150, 200 Partien auf identischen Basis-Seeds, Knopf 0 gegen 1;
+Artefakt `paired_arena_env_stackdraw2.json`.
+
+| | Netz | Heuristik | Netz-Siege |
+| --- | --- | --- | --- |
+| gesamt (n=200) | −0,97 ± 1,59 (t=−1,20) | +0,06 ± 1,80 (t=+0,07) | 151/200 -> 141/200, McNemar p=0,1539 |
+| **mit Kriterium 6** (n=76) | −1,26 ± 3,34 (t=−0,74) | +0,97 ± 3,87 (t=+0,49) | 49/76 -> 41/76 |
+| ohne Kriterium 6 (n=124) | −0,80 ± 1,55 (t=−1,01) | −0,50 ± 1,68 (t=−0,58) | 102/124 -> 100/124 |
+
+**Verdikt: kein Arm ist besser.** Weder in der Siegquote noch im Punkteniveau,
+weder gesamt noch in der Teilmenge, in der die Regel ueberhaupt greifen kann.
+Alle t-Werte liegen im Rauschen. Der Knopf bleibt auf Default AUS.
+
+### Zwei Einschraenkungen des Instruments, vorab benannt und hier bestaetigt
+
+1. **Der Knopf wirkt auf BEIDE Seiten.** `resolve_and_apply_stack_draw` sitzt
+   in `apply_chosen_action`; die Doku von `paired_arena_env_ab.py` unterstellt
+   dagegen "die Heuristik liest keinen der Knoepfe -- die Arm-Differenz
+   attribuiert sauber auf die Netz-Seite". Fuer diesen Knopf gilt das NICHT.
+   Ein symmetrischer Effekt ist im Duell unsichtbar; deshalb war das
+   Punkteniveau vorab als primaeres Mass benannt -- und auch dort bewegt sich
+   nichts.
+2. **Power.** In der Platte-6-Teilmenge (n=76) ist das KI der Punktedifferenz
+   ±3,3. Ein Effekt von 1-2 Punkten waere hier nicht auffindbar. Das Ergebnis
+   heisst "nicht nachweisbar", nicht "null".
+
+### KORREKTUR einer eigenen Vorregistrierung
+
+par.6 und STATUS trugen die Begruendung, in Partien OHNE Kriterium 6 "kann
+kein Unterschied entstehen". **Das ist falsch, und die Daten zeigen es**: dort
+stehen −0,80 Punkte und zwei gekippte Partien. Der Grund ist Arithmetik, die
+ich zu grob genommen hatte -- ohne Kriterium 6 ist das Brettniveau zwar
+positiv, aber `avg_remaining_type_value` liegt in [1, 3]; bei kleinem
+`max_drawn` zieht auch die Bestandsregel weiter. Die gemessenen 92-95 Prozent
+Tiefe 1 hiessen nie "immer", sie liessen 5-8 Prozent uebrig. Richtig ist:
+*dort ist der Unterschied SELTEN*, nicht *dort gibt es keinen*.
+
+### Was das inhaltlich offen laesst
+
+Der erwartete Punktegewinn bleibt aus. Nach par.5b haette die Bestandsregel in
+Platte-6-Partien mehrere Punkte je Partie verschenken muessen (11,22 gegen
+3,93 Punkte je Partie in Blindziehungen). Zwei Erklaerungen bleiben, und
+DIESE Daten trennen sie nicht:
+
+* **Die gekauften Platten waren ihren Preis wert** -- dann ist das `V` aus
+  par.5b zu niedrig angesetzt, und der Fehler liegt in der Potenzial-
+  Naeherung, nicht in der Regel.
+* **Die reparierte Regel zieht jetzt zu wenig** -- dieselbe Ursache, andere
+  Richtung.
+
+Beides waere ein Befund ueber die BEWERTUNG einer Kuppelplatte, nicht ueber
+die Stopp-Regel. Ein Zuschnitt dafuer braucht ein `V`, das an realisierten
+Punkten geeicht ist -- also das v22-Korpus.
+
+**Fuer die v22-Vorbereitung heisst das:** die Frage "mit oder ohne Reparatur
+erzeugen" ist damit NICHT entschieden, sondern gegenstandslos geworden -- es
+gibt keinen belegten Staerkeunterschied in beide Richtungen. Der Korpus kann
+mit dem Bestand erzeugt werden; der Vorbehalt bleibt, dass ein symmetrischer
+Fehler im Duell unsichtbar ist und im Label trotzdem steht.
+
 ## par.5 STUFE 1 (zuerst, ohne Arena-Budget): weicht der Champion ab?
 
 Reine Korpus-Auswertung auf vorhandenen Self-Play-Records, kein Netzlauf, kein

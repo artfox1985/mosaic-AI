@@ -159,7 +159,8 @@ def _chunk_timeout_secs(n_games: int, threads: int, sims: int, has_model: bool) 
 def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix,
                       add_root_noise, deterministic, record_rtv, pcr_full_prob,
                       pcr_cheap_sims, tau_argmax_from_move, queue, progress_path,
-                      heartbeat_path, seed_positions=None, seed_positions_offset=0):
+                      heartbeat_path, seed_positions=None, seed_positions_offset=0,
+                      heuristik_variante="v1"):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -197,6 +198,7 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                 seed=seed, num_threads=threads, prefix=prefix,
                 record_rtv=record_rtv,
                 progress_path=progress_path, heartbeat_path=heartbeat_path,
+                heuristik_variante=heuristik_variante,
             )
         else:
             raw = mr.self_play_games(
@@ -249,7 +251,7 @@ def _cleanup_progress_files(progress_path, heartbeat_path) -> None:
 
 def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, prefix,
                           add_root_noise, deterministic, record_rtv, timeout_secs,
-                          progress_path, heartbeat_path,
+                          progress_path, heartbeat_path, heuristik_variante="v1",
                           pcr_full_prob=None, pcr_cheap_sims=150,
                           tau_argmax_from_move=0, seed_positions=None,
                           seed_positions_offset=0) -> str | None:
@@ -268,7 +270,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               add_root_noise, deterministic, record_rtv, pcr_full_prob,
               pcr_cheap_sims, tau_argmax_from_move, queue,
               str(progress_path), str(heartbeat_path),
-              seed_positions, seed_positions_offset),
+              seed_positions, seed_positions_offset, heuristik_variante),
     )
     proc.start()
     t_start = time.time()
@@ -431,7 +433,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   add_root_noise: bool = True, deterministic: bool = False,
                   record_rtv: bool = False,
                   pcr_full_prob: float | None = None, pcr_cheap_sims: int = 150,
-                  tau_argmax_from_move: int = 0, seed_positions: str = None):
+                  tau_argmax_from_move: int = 0, seed_positions: str = None,
+                  heuristik_variante: str = "v1"):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -493,6 +496,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         "per_file": per_file, "model": model, "c_puct": c_puct,
         "add_root_noise": add_root_noise, "deterministic": deterministic,
         "record_rtv": record_rtv, "tau_argmax_from_move": tau_argmax_from_move,
+        "heuristik_variante": heuristik_variante,
     })
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -552,7 +556,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         raw = _run_chunk_supervised(
             mode, model, n, simulations, c_puct, base_seed + chunk_idx, threads,
             f"{prefix}_c{chunk_idx}", add_root_noise, deterministic, record_rtv, timeout_secs,
-            progress_path, heartbeat_path,
+            progress_path, heartbeat_path, heuristik_variante,
             pcr_full_prob=pcr_full_prob, pcr_cheap_sims=pcr_cheap_sims,
             tau_argmax_from_move=tau_argmax_from_move,
             seed_positions=seed_positions, seed_positions_offset=pos_offset,
@@ -673,6 +677,11 @@ if __name__ == "__main__":
                              "z.B. alphazero_s100.onnx (oder ein voller Pfad)")
     parser.add_argument("--c-puct", dest="c_puct", type=float, default=1.5,
                         help="PUCT-Explorationskonstante (nur --mode network)")
+    parser.add_argument("--heuristik-variante", dest="heuristik_variante", type=str,
+                        default="v1",
+                        help="Heuristik-Variante fuer den mcts-Modus: v1 (Bestand), v2, "
+                             "v2huelle, v2huellephase, ... Unbekannte Werte werden von "
+                             "der Engine ABGEWIESEN, nicht still auf v1 gefaltet.")
     parser.add_argument("--rtv", action="store_true",
                         help="Task #85 (rtv-Ablation Phase 2): das teure "
                              "round_transition_value-Sampling an den vier Rundenübergängen "
@@ -784,4 +793,5 @@ if __name__ == "__main__":
         pcr_cheap_sims=_resolved_pcr_cheap_sims,
         tau_argmax_from_move=args.tau_argmax_from_move,
         seed_positions=args.seed_positions,
+        heuristik_variante=args.heuristik_variante,
     )
