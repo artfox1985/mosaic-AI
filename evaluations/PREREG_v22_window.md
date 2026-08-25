@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: NEU GEFASST 2026-08-25, der Zuschnitt von 2026-08-08 ist HINFAELLIG -- er war fuer einen NETZ-Erzeuger mit Zwei-Klassen-Rotation ueber drei Generationen gebaut (29.450 Partien), v22 ist ein HEURISTIK-Erzeuger (v2huelle), EINE Klasse, KEIN Altbestand (Nutzer 2026-08-25). Gueltiger Zuschnitt: 24.000 Partien, ~4,18 Mio Zustaende, ~37 GB, ein Lauf mit Seed 20260826, Praefix hv2. Die Rotationsregel ab v22 ist ebenfalls hinfaellig: v22 ist ein Schnitt, keine Rotationsstufe. OFFEN als vorregistrierter Arm INNERHALB dieses Zuschnitts ist allein die TRAEGERFRAGE -- 61,8 Prozent der Draftingzuege mit echter Wahl tragen policy_target_valid=false (v2-Vorzug); ob der Policy-Kopf sie sieht, entscheidet ein gepaartes Trainingspaar auf DEMSELBEN Korpus, Entscheidungsmass vorab festgelegt (par.4). ARM A GEFAHREN 2026-08-25 (par.4a, Flagge geachtet, 5.700 Partien, from-scratch): vom Lehrer kommt NICHTS an -- volle Spalten 0,062 gegen 0,741 im Korpus, Punkte 21,8 gegen 47,0, Strafleiste 9,0 gegen 5,0 -- also CHAMPION-Niveau (0,106), nicht Lehrer-Niveau. BERICHTIGT: die erste Messung lief mit Sampling und Wurzelrauschen und mass damit die EXPLORATION; argmax wie in der Arena gibt 6,7 Punkte und mehr als doppelt so viele volle Spalten. Einschraenkung schwer: from-scratch auf einem Viertel des Korpus, bestes Modell Epoche 4, n=40. Der Befund ist damit KEIN Beleg gegen die Destillation, sondern zeigt, dass der Policy-Kopf unter Arm A nur gut ein Drittel des Draftingmaterials sieht -- ausgeblendet sind ausgerechnet die Vorzugszuege. ARM B GEFAHREN (par.4b): mit identischen Flags gemessen, VIER Kennzahlen in derselben Richtung -- volle Spalten 0,113 gegen 0,062, volle Reihen 0,225 gegen 0,113, Punkte 27,3 gegen 21,8. Keine davon einzeln signifikant (n=40, Intervalle ueberlappen). VORLAEUFIGE ANTWORT: die Maske blockiert den Lehrer, also faellt die Traegerfrage auf IGNORIEREN -- gegen die Empfehlung, die im ersten Zuschnitt stand. Beide Arme bleiben aber weit unter dem Lehrer (0,113 gegen 0,741); ob der Rest Datenmenge ist oder eine Grenze der Destillation, trennt dieser Lauf nicht. Richtungsentscheid, kein Gating. Der Bootstrap-Horizont-Wecker ist erledigt: Horizont 2, PREREG_bootstrap_horizon.md par.9f. par.6 (2026-08-25): WARMSTART vom Sanity-Modell hv2sanity geplant; weil dessen Korpus im vollen Fenster VOLLSTAENDIG drinbleibt (anders als bei bisherigen Warmstarts, wo der Vorgaenger-Korpus ausrotiert), waeren ~21 Prozent des Val-Splits vom Startmodell bereits trainiert und die --select-by-brier-Auswahl verzerrt. Gegenmittel GEBAUT und auf dem echten Codepfad abgenommen: MOSAIC_VAL_POOL schraenkt die Val-Kandidaten per Regex ein und bricht ab, statt still einen kleineren Split zu nehmen. Vorbereiteter Pool: evaluations/artifacts/hv2_val_pool_regex.txt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: NEU GEFASST 2026-08-25, der Zuschnitt von 2026-08-08 ist HINFAELLIG -- er war fuer einen NETZ-Erzeuger mit Zwei-Klassen-Rotation ueber drei Generationen gebaut (29.450 Partien), v22 ist ein HEURISTIK-Erzeuger (v2huelle), EINE Klasse, KEIN Altbestand (Nutzer 2026-08-25). Gueltiger Zuschnitt: 24.000 Partien, ~4,18 Mio Zustaende, ~37 GB, ein Lauf mit Seed 20260826, Praefix hv2. Die Rotationsregel ab v22 ist ebenfalls hinfaellig: v22 ist ein Schnitt, keine Rotationsstufe. OFFEN als vorregistrierter Arm INNERHALB dieses Zuschnitts ist allein die TRAEGERFRAGE -- 61,8 Prozent der Draftingzuege mit echter Wahl tragen policy_target_valid=false (v2-Vorzug); ob der Policy-Kopf sie sieht, entscheidet ein gepaartes Trainingspaar auf DEMSELBEN Korpus, Entscheidungsmass vorab festgelegt (par.4). ARM A GEFAHREN 2026-08-25 (par.4a, Flagge geachtet, 5.700 Partien, from-scratch): vom Lehrer kommt NICHTS an -- volle Spalten 0,062 gegen 0,741 im Korpus, Punkte 21,8 gegen 47,0, Strafleiste 9,0 gegen 5,0 -- also CHAMPION-Niveau (0,106), nicht Lehrer-Niveau. BERICHTIGT: die erste Messung lief mit Sampling und Wurzelrauschen und mass damit die EXPLORATION; argmax wie in der Arena gibt 6,7 Punkte und mehr als doppelt so viele volle Spalten. Einschraenkung schwer: from-scratch auf einem Viertel des Korpus, bestes Modell Epoche 4, n=40. Der Befund ist damit KEIN Beleg gegen die Destillation, sondern zeigt, dass der Policy-Kopf unter Arm A nur gut ein Drittel des Draftingmaterials sieht -- ausgeblendet sind ausgerechnet die Vorzugszuege. ARM B GEFAHREN (par.4b): mit identischen Flags gemessen, VIER Kennzahlen in derselben Richtung -- volle Spalten 0,113 gegen 0,062, volle Reihen 0,225 gegen 0,113, Punkte 27,3 gegen 21,8. Keine davon einzeln signifikant (n=40, Intervalle ueberlappen). VORLAEUFIGE ANTWORT: die Maske blockiert den Lehrer, also faellt die Traegerfrage auf IGNORIEREN -- gegen die Empfehlung, die im ersten Zuschnitt stand. Beide Arme bleiben aber weit unter dem Lehrer (0,113 gegen 0,741); ob der Rest Datenmenge ist oder eine Grenze der Destillation, trennt dieser Lauf nicht. Richtungsentscheid, kein Gating. STRUKTURBEFUND par.4c: das Netz KANN den Lehrer nicht erben -- dessen Spalten kommen vom TILING-Routing, und das ist ihm doppelt verschlossen: play_net_self_play_game setzt fuer beide Spieler V1 (self_play.rs:3795/3801, Arena ebenso 2821), und Tiling-Records tragen IMMER pol_w=0, das Routing hinterlaesst also keine Spur im Policy-Ziel. Deckelung liegt damit nicht an der Datenmenge. Entscheidender Test vorregistriert und billig: Heuristik mit v2huelle im DRAFTING, V1 im TILING -- spaltet die 0,741 in ihre Haelften. Vorher nichts bauen. Der Bootstrap-Horizont-Wecker ist erledigt: Horizont 2, PREREG_bootstrap_horizon.md par.9f. par.6 (2026-08-25): WARMSTART vom Sanity-Modell hv2sanity geplant; weil dessen Korpus im vollen Fenster VOLLSTAENDIG drinbleibt (anders als bei bisherigen Warmstarts, wo der Vorgaenger-Korpus ausrotiert), waeren ~21 Prozent des Val-Splits vom Startmodell bereits trainiert und die --select-by-brier-Auswahl verzerrt. Gegenmittel GEBAUT und auf dem echten Codepfad abgenommen: MOSAIC_VAL_POOL schraenkt die Val-Kandidaten per Regex ein und bricht ab, statt still einen kleineren Split zu nehmen. Vorbereiteter Pool: evaluations/artifacts/hv2_val_pool_regex.txt. -->
 
 # Vorregistrierung: v22-Fenster
 
@@ -330,3 +330,51 @@ n=40 auf einem Viertelkorpus, nicht als Gating. Wer die Frage endgueltig
 beantworten will, braucht beide Arme auf dem vollen Korpus; das kostet nach
 heutigem Stand zweimal ~7 h und ist der Grund, warum
 `PREREG_cache_build_time.md` existiert.
+
+
+### par.4c STRUKTURBEFUND (2026-08-25): das Netz KANN den Lehrer nicht erben
+
+Nutzer: *"was mich eher irritiert ist das selbst ohne flag die spalten vom
+netz nicht gebaut werden"*. Der Grund ist am Code gefunden und hat mit
+Datenmenge nichts zu tun.
+
+**Der v2-Durchbruch kommt vom PLATZIERUNGS-Routing** (Lehrer-Prereg: "der
+Durchbruch kam durchgehend vom ROUTING, nie von einem Bewertungsterm"), also
+vom Tiling. Und dieses Routing ist dem Netz an ZWEI Stellen zugleich
+verschlossen:
+
+1. **Beim Spielen.** `play_net_self_play_game` setzt fuer BEIDE Spieler
+   `heuristik_variante: HeuristikVariante::V1` (self_play.rs:3795 und 3801).
+   Das Tiling des Netzes laeuft damit ueber den V1-Pfad -- exakter DFS-Loeser
+   mit Netz-Tiebreak -- und NICHT ueber `v2_tiling_preference`. Dasselbe gilt
+   in der Arena (self_play.rs:2821, Netz-Seite ebenfalls V1).
+2. **Beim Lernen.** Tiling-Records tragen IMMER `pol_w = 0.0` (maskiert als
+   "Tiling/Start-Schritte", unabhaengig von der Traegerflagge). Das Routing
+   des Lehrers hinterlaesst im Policy-Ziel also **ueberhaupt keine Spur**.
+
+**Daraus die Vorhersage, die zu den Messungen passt:** das Netz erbt nur die
+DRAFT-Haelfte des Lehrers und spielt Tiling wie der Champion. Gemessen: Arm B
+0,113 volle Spalten, Champion 0,106, Lehrer 0,741.
+
+**Was das fuer die Traegerfrage bedeutet.** Der A/B-Befund bleibt gueltig --
+die Maske kostet messbar, Arm B ist besser als Arm A. Aber die Deckelung
+liegt woanders: **auch Arm B kann den Lehrer nicht erreichen, weil ihm der
+Mechanismus fehlt, der die Spalten erzeugt.** Mehr Korpus verschiebt das
+nicht.
+
+**Der entscheidende Test ist billig und netzfrei** (ungebaut, hier
+vorregistriert): die Heuristik mit `v2huelle` im DRAFTING, aber `V1` im
+TILING laufen lassen -- der Zuschnitt ist vorhanden, `PlayerLoopConfig`
+traegt beide Angaben getrennt. Das spaltet die 0,741 in ihre beiden Haelften.
+
+* **Ergebnis nahe 0,1** ⇒ das Routing traegt den Loewenanteil. Dann ist mehr
+  Korpus die falsche Antwort, und die Frage lautet: bekommt die Netz-Seite
+  das v2-Tiling, oder lernt der Policy-Kopf Tiling-Ziele (heute maskiert)?
+* **Ergebnis nahe 0,7** ⇒ das Drafting traegt es, das Netz muesste es also
+  lernen koennen -- dann sind Datenmenge und Trainingsdauer wieder die
+  Verdaechtigen.
+
+**Vorher NICHTS bauen.** Beide Folgewege -- Netz-Seite auf v2-Tiling
+umstellen oder Tiling-Policy-Ziele freischalten -- sind Eingriffe in den
+Elo-Anker bzw. in das Trainingsziel; welcher ueberhaupt lohnt, entscheidet
+diese eine Messung.
