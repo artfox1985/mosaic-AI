@@ -575,6 +575,84 @@ Die Huellen-Gewichtung (a) und das Aggregat (b) bleiben als spaetere Arme
 liegen -- sie sind Verfeinerungen an einem Kopf, dessen Grundwirkung erst
 gemessen sein sollte.
 
+**NACHTRAG 2026-08-25 (3): der geometrische Abgleich ist etwas ANDERES als
+das bereits negativ Gemessene -- aber aus ZWEI Gruenden zugleich.**
+
+Nutzer-Praezisierung: *"nur verwenden wir ihn diesmal nicht als
+bewertungsterm fuer wertungsplatten oder spezialfliesen usw. sondern rein als
+geometrischen abgleich."* Die Unterscheidung traegt, aber nur zur Haelfte --
+und beide Haelften gehoeren benannt, damit ein Ergebnis hinterher nicht auf
+eine verkuerzt wird.
+
+**(a) Plattenunabhaengige statt plattenabhaengiger Ablesung.** Der gemessene
+Verbraucher (`PREREG_ownership_consumer.md`, UEBERHOLT) rechnete die
+Kopfausgaben in ERWARTETE PLATTENPUNKTE um und hing damit an den aktiven
+Kriterien. Ein geometrischer Abgleich haengt nur an der festen Huellenmaske:
+
+```
+E[Abweichung_o] = SUM (1 - p(r,c)) ueber die 21 Huellen-Zellen
+                + SUM  p(r,c)      ueber die 15 uebrigen
+```
+
+Das ist eine feste Maskenrechnung auf den 36 Ego-Feldern -- kein neuer Kopf,
+keine Formaenderung. Und die Plattenunabhaengigkeit hat hier einen POSITIVEN
+Praezedenzfall: `heuristic_v2::plate_independent_l_value` war einer der vier
+Bauschritte, die die vollen Spalten von 0,362 auf 0,438 gehoben haben, und
+wurde genau deshalb gebaut, weil die Suche in rund 60 Prozent der Partien
+ohne k1 GEGEN das Routing arbeitete.
+
+**(b) Plattenbewusster statt plattenblinder Korpus.** Der Einwand aus dem
+Dossier (Punkt 3, "Beschreibungsmodell als Zielgroesse") haengt NICHT an der
+Ablesung, sondern an der Quelle: der Kopf beschreibt das heutige Spiel. Sagt
+er "diese Zellen bleiben leer", ist die vorhergesagte Abweichung gross, und
+ein Term, der sie bestraft, zieht die Suche zu Zustaenden, die das heutige
+Spiel ohnehin erreicht -- selbsterfuellend, egal ob man in Punkte oder in
+Geometrie umrechnet.
+
+Was das aufloest, ist der KORPUS. Auf plattenblindem Spiel WAR "wird nicht
+fertig" die korrekte Vorhersage. Auf einem v22-Korpus aus dem v2-Lehrer
+(0,798 volle Spalten gegen 0,106 des Champions, par.10.1) ist sie es nicht
+mehr. Das ist die Wiedervorlage, die
+[[feedback_dont_calibrate_to_plate_blind_play]] ausdruecklich fuer den ersten
+plattenbewussten Champion vorsieht.
+
+**Keiner der beiden Gruende allein haette gereicht.** (a) behebt die Kopplung
+an aktive Platten, (b) das Selbsterfuellende. Faellt der Arm negativ aus, ist
+das deshalb NICHT wieder "Hilfskoepfe bringen nichts" -- dann waeren erstmals
+beide Bedingungen gemeinsam geprueft, und DAS waere der Befund.
+
+**NACHTRAG 2026-08-25 (4): die Einsatzform ist ERSETZEN, nicht nur stuetzen.**
+
+Nutzer-Vorgabe: *"denk dran das wir den kopf in den ersten runden statt dem
+value head im live spiel verwenden wollen. dann decay."* Das ist schaerfer als
+die urspruengliche Formulierung oben ("stuetzen") und aendert drei Dinge:
+
+1. **Es ist ein SUCH-Eingriff, kein blosser Trainings-Hilfsverlust.** Der
+   Blattwert der fruehen Runden kaeme aus dem Formsignal statt aus der
+   Ausgangsschaetzung. Gut begruendet ist das durch die gemessene Schwaeche
+   genau dort -- Runden-R2 des Value-Kopfes rund 0,03 in Runde 1 gegen rund
+   0,62 in Runde 5.
+2. **Einheiten-Problem, und es ist das erste, was gebaut werden muss.** Eine
+   Abweichung zaehlt FALSCHE ZELLEN, der Value-Kopf liefert eine
+   Gewinnwahrscheinlichkeit. Ohne Abbildung auf die Wertskala ist "statt"
+   nicht definiert. Kalibrierung ist in diesem Projekt schon einmal die
+   Ursache gewesen ([[project_r5_calibration_result]]: gemessene Steigung
+   0,06-0,09 statt ~1) -- die Abbildung wird vorab festgelegt und NICHT an
+   der Entscheidungsmetrik getunt.
+3. **Der Waechter aus Punkt 2 unten reicht dafuer NICHT.** Er wurde fuer eine
+   stuetzende Rolle geschrieben ("Value-Qualitaet OHNE Shaping-Beitrag
+   messen"). Beim ERSETZEN ist die Gefahr eine andere und heute Nacht vierfach
+   gemessen: par.9.1, par.9.2, par.12 und par.15 haben alle dieselbe Signatur
+   gezeigt -- ein Formziel optimiert, Punkte verloren, Teilspalten hoch, volle
+   Spalten runter. Der Waechter beim Ersetzen muss deshalb das PUNKTENIVEAU
+   und die Strafleiste der fruehen Runden mitmessen, nicht nur die
+   Value-Guete.
+
+Dass jene vier Arme das ROUTING veraendert haben und dieser die BEWERTUNG,
+ist ein Unterschied -- aber kein Freibrief. par.16 (Deckel in der Bewertung)
+war der einzige zustandsabhaengige Eingriff, der nicht geschadet hat, und
+auch er hat nichts gebracht.
+
 **Vorab festzulegen, BEVOR gebaut wird (sonst wird der Zeitplan hinterher
 passend gemacht):**
 
