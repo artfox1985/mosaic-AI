@@ -525,9 +525,36 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Result<Action, String> {
         if !crate::game::can_draw_stack_peek(&game.state) || peeks >= MAX_STACK_PEEKS {
             break;
         }
-        let continue_estimate = avg_remaining_type_value(&game.state) - (cost_so_far + 1.0);
-        if continue_estimate <= stop_value {
-            break;
+        if stack_draw_reservation() {
+            // REPARIERTE FASSUNG (STATUS.md "Reparatur der Blindzieh-Stopp-Regel",
+            // PREREG_stack_draw_reservation_rule.md par.5b). Der Bestand
+            // vergleicht `avg_remaining_type_value` (Typmittelwert in [1,3])
+            // gegen `best_eval_for_tile` (absolutes Brettniveau, mit
+            // Kriterium 6 stark negativ) -- zwei Einheiten in einem Vergleich.
+            // Hier stattdessen beide Seiten mit DERSELBEN Funktion und die
+            // erwartete VERBESSERUNG statt des Niveaus:
+            //     weiterziehen, solange E[max(V_next − V_hand, 0)] > 1 Punkt
+            // Erwartungswert nur ueber die Pool-Platten des Typs, den die
+            // sichtbare Rueckseite ansagt (`dome_tile_pool.first()`,
+            // serialize.rs:270 -- das Signal ist gratis und wurde bisher
+            // nicht genutzt).
+            let v_hand = stop_value + cost_so_far; // versunkene Kosten heraus
+            let Some(top) = game.state.dome_tile_pool.first() else { break };
+            let typ = top.is_special_type();
+            let mut summe = 0.0f64;
+            let mut n = 0usize;
+            for t in game.state.dome_tile_pool.iter().filter(|t| t.is_special_type() == typ) {
+                summe += (best_eval_for_tile(&game.state, t).0 - v_hand).max(0.0);
+                n += 1;
+            }
+            if n == 0 || summe / n as f64 <= 1.0 {
+                break;
+            }
+        } else {
+            let continue_estimate = avg_remaining_type_value(&game.state) - (cost_so_far + 1.0);
+            if continue_estimate <= stop_value {
+                break;
+            }
         }
         game.apply_drafting(&Action::DrawStackPeek)?;
         peeks += 1;
@@ -606,6 +633,19 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Result<Action, String> {
 /// Nebeneffekt, bewusst: die −1 Pkt stehen dann schon im Score, wenn die
 /// nächste Suche läuft -- das Netz sieht die Kosten in seinen eigenen Köpfen,
 /// statt dass `best_eval_for_tile` sie per `cost_so_far` von Hand gegenrechnet.
+/// Reparierte Blindzieh-Stopp-Regel (`PREREG_stack_draw_reservation_rule.md`
+/// par.5b). Default AUS = bit-identisches Bestandsverhalten; `=1` schaltet die
+/// einheitentreue Fassung scharf. Als Knopf und nicht als Ersatz, damit die
+/// Arena beide Arme fahren kann -- der Bestand ist der Elo-Bezug.
+fn stack_draw_reservation() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_STACK_DRAW_RESERVATION")
+            .map(|v| !v.is_empty() && v != "0")
+            .unwrap_or(false)
+    })
+}
+
 fn stack_draw_research() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
@@ -7306,6 +7346,37 @@ mod stack_draw_soll_seite {
             println!(
                 "{n_platten:<10}{leer:>10}{v_roh:>12.2}{t_roh:>10}{v_abg:>12.2}{t_abg:>12}{ist:>10}"
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod stack_draw_reservation_check {
+    //! Wirkung und Kosten der reparierten Regel
+    //! (`PREREG_stack_draw_reservation_rule.md`, STATUS "Reparatur der
+    //! Blindzieh-Stopp-Regel"). Netzfrei, konstruierte Bretter -- dieselben
+    //! wie in par.6b, damit die Zahlen nebeneinander stehen.
+    //!
+    //! Der Knopf wird per `set_var` im Test gesetzt; weil
+    //! `stack_draw_reservation()` seinen Wert in einem `OnceLock` festhaelt,
+    //! kann EIN Testlauf nur EINEN Arm sehen. Deshalb misst dieser Test nur
+    //! den Arm, der gerade eingestellt ist, und gibt ihn mit aus -- der
+    //! Vergleich entsteht aus zwei Laeufen, nicht aus einem.
+    use super::stack_draw_depth_probe::*;
+    use std::time::Instant;
+
+    #[test]
+    fn tiefe_und_kosten_der_aktiven_fassung() {
+        let arm = if super::stack_draw_reservation() { "REPARIERT" } else { "BESTAND" };
+        println!("\nArm: {arm}  (MOSAIC_STACK_DRAW_RESERVATION)");
+        println!("{:<10}{:>12}{:>10}{:>14}", "Platten", "Spez. leer", "Tiefe", "Zeit je Zug");
+        for (n_platten, n_gefuellt) in [(2usize, 2usize), (4, 2), (4, 4), (6, 6)] {
+            let mut g = ziehbereites_spiel(vec![0, 4, 6], 42);
+            let leer = brett_vorbereiten(&mut g, n_platten, n_gefuellt);
+            let t0 = Instant::now();
+            let (tiefe, _, _) = ziehtiefe(g);
+            let dt = t0.elapsed();
+            println!("{n_platten:<10}{leer:>12}{tiefe:>10}{:>13.1?}", dt);
         }
     }
 }
