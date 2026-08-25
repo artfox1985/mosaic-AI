@@ -856,6 +856,61 @@ zaehlt, ohne sein Ziel zu ersetzen. Sie ist aber nachrangig gegenueber
 "Gewicht ueber null auf plattenbewusstem Korpus", weil ohne das gar nichts
 wirkt.
 
+**NACHTRAG 2026-08-25 (8): die Orientierungswahl -- Nutzer-Regel plus Messung**
+
+Offene Frage aus Nachtrag (7): die Huelle hat zwei brauchbare Orientierungen
+(oben-links, oben-rechts), und WELCHE gilt, ist stellungsabhaengig -- damit
+haengt die Randbedingung scheinbar wieder am Weitblick, den sie ersetzen soll.
+
+**Nutzer-Regel 2026-08-25:** *"es gilt jene, in der bereits mehr steine
+liegen."* Sie liest die AKTUELLE Stellung, sagt also nichts voraus -- die
+Eigenschaft, die die Huelle wertvoll macht, bleibt erhalten.
+
+**Gemessen (540 Seiten aus 270 hv2-Partien, 2026-08-25):**
+
+| Kennzahl | Wert |
+| --- | --- |
+| Orientierungs-Wechsel je Seite und Partie | **0,21** im Mittel, max 2 |
+| Seiten ganz ohne Wechsel | **82,2 %** |
+| Endgueltige Seite | 77 % links / 23 % rechts |
+| Zustaende ohne Fuehrung (Gleichstand) | 26.523 |
+
+**Der Kippel-Verdacht aus Nachtrag (5) bestaetigt sich NICHT** -- dort stand,
+ein Min-Ziel sei nicht glatt, "welche Orientierung fuehrt, kann von Zug zu Zug
+kippen". Einmal in Fuehrung, bleibt es dabei.
+
+**Die Gleichstaende sind kein Mangel, sondern Geometrie.** Die beiden Huellen
+UEBERLAPPEN sich in 12 von 21 Zellen; nur 9 je Seite unterscheiden, und die
+liegen UNTEN:
+
+```
+BBBBBB     B = beide Orientierungen
+LBBBBR     L = nur links
+LLBBRR     R = nur rechts
+LLLRRR
+LL..RR
+L....R
+```
+
+Zeile 0 ist vollstaendig geteilt. Solange oben gebaut wird, GIBT es keine
+Fuehrung -- und dann ist die Orientierung auch nicht zu entscheiden.
+
+**Daraus die Regel in ihrer vollstaendigen Form, ohne Notbehelf:**
+
+* **Gleichstand ⇒ nicht entscheiden.** Beide Huellen zeigen auf dieselben 12
+  Zellen; dorthin routen. Die Entscheidung wird genau bis zu dem Punkt
+  aufgeschoben, an dem die Daten fuer sie existieren.
+* **Fuehrung ⇒ dieser Orientierung folgen.** Keine Hysterese noetig, keine
+  Verpflichtungsregel -- 82 Prozent wechseln ohnehin nie.
+
+**Offen und unerklaert:** die endgueltige Seite ist 77 Prozent links gegen 23
+Prozent rechts. Eine Symmetrie waere zu erwarten gewesen. Verdacht ist der
+Eckbonus der Startkuppel-Heuristik (`start_placement_kandidaten`,
+self_play.rs:756ff) -- **ungeprueft**. Wer die Orientierungsregel baut, sollte
+das vorher klaeren: eine Schlagseite von 3:1 kann eine echte
+Brett-Eigenschaft sein oder ein Artefakt einer Handregel, und im zweiten Fall
+wuerde die Huelle sie fortschreiben.
+
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
 `plate_builder::v2_chip_vorzug`: vollendet per Bonuschip die Musterreihe, die
