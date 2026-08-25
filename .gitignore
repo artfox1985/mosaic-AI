@@ -73,7 +73,6 @@ logs/
 !dist/mosaic_release.spec
 !dist/run_mosaic.py
 !dist/README_GAME.txt
-docs/DE_AzulDuel_Rulebook_compressed2.pdf
 data/altmess_90files/
 
 # Roh-Arena-Ergebnisse mit Partie-Logs (Nutzer-Entscheid 2026-08-12).
@@ -92,3 +91,5 @@ evaluations/paired_arena_env_*.json
 # Ohne diese Datei ist player_profiles.json nach frischem Klon unlesbar.
 /git-crypt-key
 scratchpad/
+*.pdf
+/evaluations/artifacts

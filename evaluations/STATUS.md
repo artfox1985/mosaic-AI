@@ -320,10 +320,54 @@ den Lehrer-Einsatz ist er entschaerft.
    JSON (41 MB) gegen 120 Markdown (2,6 MB) -- 94 Prozent des Volumens sind
    Ergebnisse. Die fuenf groessten Dateien sind 36 der 41 MB, darunter drei
    `frozen_*_oracle_labels*` (eingefrorene Referenzen, aendern sich nie).
-   Ein blindes `git mv` bricht die Werkzeugkette; sauber ist: Konstante
-   zentralisieren, dann verschieben, dann alle Sonden einmal durchlaufen
-   lassen. Nebenbei liegen ~64 Sweep-Zwischendateien untracked im Baum --
-   erster Kandidat fuer eine `.gitignore`-Zeile.
+   **ERLEDIGT 2026-08-25.** Ziel ist `evaluations/artifacts/`. Ablauf, in
+   dieser Reihenfolge: erst Referenzen umschreiben, dann `git mv`, dann
+   pruefen -- so war der Baum nie in einem Zustand, in dem Werkzeuge ins Leere
+   greifen.
+   - **176 getrackte JSON/JSONL** per `git mv` verschoben, dazu **140
+     untrackte** Sweep- und Smoke-Dateien (nur verschoben, NICHTS geloescht).
+   - **145 Code-Referenzen in 84 Dateien** umgeschrieben, per Skript mit
+     Trockenlauf. Die neun Stellen mit variablem Dateinamen (`EVAL / fname`)
+     wurden EINZELN nachgesehen, bevor sie mitgezogen wurden; die eine
+     nicht klassifizierbare Stelle ist korrekt unberuehrt geblieben
+     (`frozen_eval_set.pkl` zieht nicht mit um).
+   - **158 Dokument-Verweise in 48 Dateien** nachgezogen
+     (`evaluations/x.json` -> `evaluations/artifacts/x.json`).
+   - **Unberuehrt**: `PREREG_DIR` in `check_conventions.py` und
+     `generate_prereg_index.py` -- die zeigen bewusst auf die Markdown-Seite.
+   - **Abnahme**: alle geaenderten Werkzeuge kompilieren (`py_compile`),
+     Prereg-Index erzeugt sich, `check_conventions.py` meldet keinen Verstoss,
+     und von 71 im Code referenzierten Artefaktnamen liegen alle 54
+     vorhandenen am neuen Ort (die 17 uebrigen sind Ausgabedateien kuenftiger
+     Laeufe). In `evaluations/` liegt jetzt **kein** JSON mehr.
+   - Wurzel danach: 103 Markdown, 10 Seed-Listen (.txt), 2 CSV, 2 PKL, drei
+     Unterverzeichnisse.
+
+   **Stolperfalle, die dabei zugeschlagen hat und die naechste Migration
+   betrifft:** ein Python-Skript, das Dateien mit `write_text` schreibt,
+   wandelt auf Windows LF still in CRLF -- 137 Dateien waren betroffen, in
+   `dome_split_diagnosis.py` waren das 971 Bytes Zuwachs bei zwei geaenderten
+   Zeilen. Aufgefallen ist es NUR, weil die Datei-Groessen-Ratsche aus
+   `check_conventions.py` angeschlagen hat; der `git diff` zeigte wegen der
+   Normalisierung weiter nur zwei Zeilen. Behoben durch Ruecksetzen auf LF.
+   Wer so ein Skript schreibt: `newline="
+"` setzen.
+
+   **NUTZER-ENTSCHEID 2026-08-25: die Artefakte bleiben vorerst NUR LOKAL.**
+   `.gitignore` traegt `/evaluations/artifacts` (die Zeile lag schon vor dem
+   Umzug im Baum), und die 176 zuvor getrackten Dateien sind per
+   `git rm --cached` aus dem Index genommen -- auf der Platte liegen weiterhin
+   alle 316, geloescht wurde nichts.
+
+   **Was daraus folgt und wer es wissen muss:** ein frischer Klon hat die
+   Messartefakte NICHT. Preregs zitieren sie als Beleg (`Beleg: ...
+   floor_action_aversion_gate.json`), diese Belege liegen also ab jetzt
+   ausserhalb der Versionierung. Wer eine Zahl nachpruefen will, braucht den
+   Arbeitsrechner oder muss den Lauf wiederholen -- bei den deterministischen
+   Sonden ist das moeglich (Beleg: der Wiederholungslauf des Strafleisten-Tors
+   war byte-identisch), bei allem mit Netz-Zufall nicht ohne Weiteres.
+   Wer das zurueckdrehen will: `.gitignore`-Zeile entfernen und
+   `git add -f evaluations/artifacts` -- die Dateien sind da.
 
    **(C) v22 mit dem v2-Lehrer.** Entscheide stehen in
    `PREREG_heuristic_v2_long_rows.md` par.3b: Ownership-Kopf EINSCHALTEN statt
@@ -430,7 +474,17 @@ plattenblindes Spiel geeicht, derselbe Fehler wie viermal zuvor.
   Kriterium 6 ist sie in jedem konstruierten Fall 1. Mit einem Konto von 60
   statt 5 zeigt sich ausserdem, wie stark die Korpuszahlen Untergrenzen waren:
   im echten Spiel stoppt die KONTOGRENZE den Aderlass, nicht die Regel.
-  **Nicht beantwortet:** ob der Kauf sich lohnt -- eine Wild-Platte kann mehr
+  **URTEIL 2026-08-25 (par.5b): die Regel zieht ZU OFT.** Die optimale
+  Reservationsregel (`E[max(V_next − V_hand, 0)] > 1 Punkt`, `V` in Punkten
+  ueber ein Probe-Brett gerechnet) sagt in JEDEM geprueften Fall Tiefe **1** --
+  nach der Pflichtziehung liegt eine Platte im Wert von 2,9 bis 9,0 Punkten in
+  der Hand, die erwartete VERBESSERUNG bleibt unter dem einen Punkt, den eine
+  weitere Ziehung kostet. Die gebaute Regel zieht bei negativem Brettniveau 9
+  bis 11 mal: **rund 10 verschenkte Punkte je betroffenem Stapelzug.** Roh und
+  mit Realisierungsabschlag dasselbe Ergebnis -- das Verdikt haengt NICHT an
+  der Abschlagswahl. Ursache ist der Einheitenbruch, nicht der
+  Optionswert-Fehler; er ueberfaehrt ihn um Groessenordnungen.
+  **Nicht beantwortet:** wie viel Elo darin steckt -- eine Wild-Platte kann mehr
   wert sein als 5 Punkte. Beantwortet ist nur, dass die Entscheidung auf einem
   Skalenbruch beruht und nicht auf einer Rechnung.
   **Konfundierungs-Verdacht** `[HERLEITUNG, ungeprueft]`: `PREREG_chance_nodes.md`
