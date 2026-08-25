@@ -189,11 +189,31 @@ den Lehrer-Einsatz ist er entschaerft.
    `W_STRAF` dreht die Strafleiste ins Negative (-1,44). Kontrolllauf nach
    dem Zurueckbauen reproduziert exakt.
 
-   **OFFEN und entscheidend:** der Lauf ist Heuristik gegen Heuristik bei 150
-   Sims. Ob die Huelle als LEHRER taugt, ist damit gestellt und nicht
-   beantwortet -- dafuer braucht es den par.5.3-Aufbau (Champion@400 gegen
-   Huelle@150), und `net_vs_heuristic_v2_arena` ist bisher fest auf `V2`
-   verdrahtet.
+   **Zwei Punktekarten als Alternative zur Leiter: BEIDE NEGATIV**
+   (par.9.1/9.2, je n=160 gegen die Huelle). `V2Heatmap` (Plattenanteil aus
+   `scoring_progress`): volle Spalten 0,650 auf 0,281, Siegquote 0,463.
+   `V2PointMap` (dazu die Platzierungspunkte nach Linienlaenge): 0,762 auf
+   0,219, Siegquote 0,400. Beide zeigen dieselbe Signatur -- Teilspalten >= 3
+   STEIGEN (+0,375 / +0,325), volle Spalten und maximale Hoehe fallen, und die
+   Strafpunkte werden besser (+2,4 / +2,7).
+
+   **Der Befund dahinter ist allgemein und gilt fuer kuenftige Arme:** eine
+   gerechnete Punktekarte ist ein BREITEN-Signal und erzeugt den besseren
+   Greedy-Spieler bei schlechterem Bau. Volle Spalten verlangen eine Vorgabe,
+   die dem lokalen Punktgradienten WIDERSPRICHT -- das leistet die
+   handgesetzte Leiter, keine der beiden Karten. Zwei Hypothesen von mir sind
+   dabei im Vorzeichen widerlegt worden (k1-Abhaengigkeit in par.9.1, Fokus
+   durch Superadditivitaet in par.9.2). **Die Netz-Verwendung als
+   Eingabeebene ist davon NICHT beruehrt** (Nutzer-Absicht 2026-08-25: die
+   Karte war fuers Netz gedacht) -- ein Netz kann aus einem Breiten-Signal
+   Fokus lernen, ein Greedy-Routing nicht.
+
+   **LAUFEND: Lehrer-Test (par.10).** Champion@400 gegen Huelle@150 auf den
+   407 Kampagnen-Seeds, mit v1 als Bezug -- derselbe Aufbau wie par.5.3, damit
+   die Zahlen nebeneinander stehen. `net_vs_heuristic_v2_arena` nimmt die
+   Variante seit heute als Parameter. Das ist die Frage, an der der ganze
+   Strang haengt: v2 hat Faehigkeit mit Niveau bezahlt (Siegquote 0,256 auf
+   0,128), die Huelle tut das im Heuristik-Duell nicht.
 
    Nicht gebaut, weil schon vorhanden oder ohne Anknuepfungspunkt: Prio 0
    (Spiel endet nach genau 5 Runden, `game.rs:687`; Runde 5 laeuft ueber den
@@ -241,9 +261,79 @@ plattenblindes Spiel geeicht, derselbe Fehler wie viermal zuvor.
   (2,70 gegen 0,50 Freischaltungen je Partie, 8,50 gegen 0,90 Punkte).
 - **B1-Vorgabe fuer jeden Nachfolge-Arm**: wer die Initiierung hebt, ohne die
   Vollendungsquote deutlich ueber 0,53 zu bringen, wiederholt B1.
+- **Infrastruktur zahlt in Irrtumskosten, nicht in Elo** (Nutzer-Entscheid
+  2026-08-25). `PREREG_search_rng_split.md` hat keinen Zug verbessert; vor ihr
+  galt "gleicher Spielindex, gleiche Startbedingungen" aber nur bis zur ersten
+  Suche, gepaarte Arenen waren also nur nominell gepaart. Genau davon lebt der
+  laufende Lehrer-Test (par.10): Huellen-Arm und v1-Bezug sind GETRENNTE
+  Partien auf denselben 407 Seeds. Wer kuenftig Messinfrastruktur vorschlaegt,
+  begruendet sie an einer BENANNTEN Messung, die dadurch moeglich oder
+  schaerfer wird -- sonst richtet man sich in Messgenauigkeit ein und
+  vermeidet die haertere Frage, ob ueberhaupt Ideen da sind, die stark genug
+  sind, um gemessen zu werden.
 - **Methodische Lehre**: aus "Eingriff X in Richtung Y verliert" folgt NICHT
   "Y ist falsch" -- nur, dass X in diesem Zustand verliert. Es fehlt die
   Kontrollgruppe: ein Agent, der Y KANN.
+- **Strafleisten- und Ueberlauf-Zuege sind gemessen, nicht selten** (2026-08-25,
+  `tools/diagnosis.py::run_penalty_bias` unveraendert + Aggregation je Partie;
+  Korpus `selfplay_v20wdlsw_*`, 60 Dateien = 600 Partien, 97.970
+  Entscheidungsschritte; Einheit Partie ueber beide Bretter, CI 95 %): die
+  TOP-Aktion ist ein reiner Strafleisten-Zug (`row=-1`) in **4,40 ± 0,19**
+  Schritten je Partie (2,70 % aller Schritte) -- davon **3,31 erzwungen** (keine
+  legale Reihe) und **1,09 freiwillig**; eine Reihe MIT Ueberlauf ist TOP-Aktion
+  in **5,51 ± 0,21** Schritten (6,17 uebergelaufene Steine je Partie). Bezogen
+  auf die 89,08 Schritte je Partie, in denen ueberhaupt ein Stein-Zug angeboten
+  wird, sind das 4,9 % bzw. 6,2 %.
+  **Folge fuer die Aktionsfilter-Frage** (Anlass: externe Recherche,
+  `evaluations/RESEARCH_heuristic_methodology_external_2026-08-25.md`): ein harter Filter nach dem Muster
+  "Strafleisten-Ziel und Ueberlauf raus" waere NICHT wirkungslos, er traefe rund
+  11 % der Stein-Entscheidungen. Drei Viertel der Strafleisten-Faelle sind
+  allerdings erzwungen und muessten ohnehin stehen bleiben.
+  **Spannung zu `PREREG_floor_action_aversion.md` par.6**: dort ist der rohe
+  Prior auf dem Strafleisten-Ziel in ALLEN 280 qualifizierenden Stellungen exakt
+  0 (nachgeprueft in `floor_action_aversion_gate.json`), hier stehen 1,09
+  freiwillige Faelle je Partie. Die beiden Zahlen sind NICHT deckungsgleich und
+  widerlegen einander auch nicht: das Tor sampelte 268 von 280 Stellungen in
+  RUNDE 1, die freiwilligen Faelle liegen nach derselben Auswertung in Runde 2-4
+  (R1=30, R2=255, R3=214, R4=154). **Die Schieflage ist ein Artefakt der
+  Sammlung, nicht des Spiels** (geprueft an
+  `tools/probes/floor_action_aversion_gate.py:221-242`): `collect_qualifying`
+  laeuft die Datensaetze je Datei IN REIHENFOLGE durch und nimmt die ersten
+  `cap_per_file = 3` qualifizierenden; Datensaetze stehen in Zugreihenfolge,
+  also fuellt sich die Stichprobe mit Fruehspiel-Stellungen. Wer dasselbe Muster
+  "erste N je Datei" anderswo benutzt, hat denselben stillen Rundenfilter drin.
+  **Sonde repariert** (2026-08-25, Nutzer-Auftrag): `collect_qualifying` nimmt
+  jetzt `rounds=` und `seed=`; mit Seed werden je Datei ALLE qualifizierenden
+  Datensaetze gesammelt und daraus reproduzierbar gezogen. Ohne Seed ist die
+  Auswahl unveraendert -- GEPRUEFT, nicht behauptet: auf einem 25-Dateien-
+  Ausschnitt liefern alte und neue Fassung dieselben 60 Stellungen (alle in
+  Runde 1), mit `rounds={2,3,4}` und Seed dagegen 17/19/24 aus Runde 2/3/4.
+  Laeufe mit Filter oder Seed schreiben in eine ABGELEITETE Artefaktdatei, das
+  registrierte `floor_action_aversion_gate.json` wird nie ueberschrieben.
+  **Audit desselben Musters** (2026-08-25, Nutzer-Auftrag, an den Artefakten
+  belegt statt vermutet):
+  - `tools/probes/long_row_init_knob_effect.py:89-103` -- gleiche Form, und sie
+    beisst: `long_row_init_knob_effect.json` hat `je_runde = {1: n=240}`, also
+    **alle 240 Stellungen in Runde 1**. Wer aus dieser Sonde etwas ableitet,
+    leitet es ueber Runde 1 ab. (Gehoert zum v2-/Langreihen-Strang, nicht
+    angefasst.)
+  - `tools/probes/long_row_prior_gate.py:193-221` -- gleiche Form, beisst hier
+    NICHT: `je_runde` = 12/105/82/61 fuer Runde 1-4. Grund ist der groessere
+    Deckel (`cap_per_file` Vorgabe 25 statt 3), der tief genug in jede Partie
+    laeuft. Die Falle haengt also am VERHAELTNIS Deckel zu Trefferdichte, nicht
+    am Muster allein.
+  - `tools/tiling_value_reference_main.py:127` -- gleiche Form, aber mit
+    explizitem Rundenfenster 2-4 und `--only_round`; Restbias innerhalb des
+    Fensters Richtung Runde 2. Derzeit kein Artefakt in `evaluations/`, also
+    haengt kein registriertes Ergebnis daran.
+  - `tools/probes/column_completion_legality_probe.py:294` -- **kein Fall**:
+    der Deckel greift auf PARTIEN, nicht auf Stellungen innerhalb einer Partie;
+    Partien in einem Arena-Artefakt sind untereinander unabhaengig.
+  Dazu zwei weitere Unterschiede, die einen
+  direkten Vergleich verbieten: Generation (v21-Modell im Tor, v20-Korpus hier)
+  und Groesse (roher Prior gegen Argmax einer wurzelverrauschten
+  Self-Play-Policy). **Mit einem Lauf aufloesbar**:
+  `tools/probes/floor_action_aversion_gate.py` auf Runde-2-4-Stellungen.
 
 ### Weitere entschiedene Straenge (Herleitungen im Archiv)
 
@@ -283,6 +373,7 @@ Baubeginn freizugeben.
 
 | Strang | Datei | Zuschnitt |
 |---|---|---|
+| **Arena-Threadzahl geradeziehen** | (kein Prereg, Werkzeugarbeit) | **EINGETAKTET 2026-08-25 (Nutzer-Entscheid), NICHT GEBAUT.** `threads = 0` heisst in `run_heuristic_v1_vs_v2_arena` ALLE KERNE und in `run_net_vs_heuristic_v2_arena` SEQUENZIELL (`self_play.rs:2866`, `if num_threads <= 1`). Gemessen am Lehrer-Test: 19,8 CPU-Minuten in 20,4 Wanduhr-Minuten bei 12 Kernen, Faktor 1,0. Betrifft `tools/probes/v2_teacher_arena.py` (`THREADS = 0`) und damit auch die urspruengliche Schritt-3-Messung. **Vorsicht beim Beheben:** die Bedeutung von `0` einfach umzudrehen aendert still das Verhalten JEDER Bestandsaufrufstelle. Sauber ist ein gemeinsamer Helfer mit EINER dokumentierten Konvention plus Nachweis der Ergebnisgleichheit auf einer Stichprobe (Partien sind je Seed unabhaengig, also sollte Parallelisierung nichts verschieben -- das ist zu ZEIGEN, nicht anzunehmen). |
 | **Heuristik v2 als zusaetzlicher Lehrer** | `PREREG_heuristic_v2_long_rows.md` | **AKTIV, Messkette KOMPLETT.** Schritt 3: Faehigkeit belegt (volle Spalten 0,302 gegen v1 0,086, Vollendungsquote 0,686), Preis hoch (Siegquote 0,128 gegen 0,256). **URTEIL = NUTZER-ENTSCHEID**, kein Schwellenwert vorregistriert. Offen: par.5.4 Korpus und Training, Self-Play-Einstieg (freigegeben, nicht gebaut) |
 | **Shaping-Kopf statt Ownership-Kopf** | `PREREG_heuristic_v2_long_rows.md` par.3b | Vorregistriert, NICHT gebaut. Sagt die Dreiecks-Abweichung voraus; zwei Kanaele (Spalte links/rechts), Abkling-Kurve zugunsten des Value-Kopfes. Braucht erst ein v2-Korpus, sonst auf plattenblindes Spiel geeicht |
 | **Einhuellende im 2D-Encoder** | – | Nutzer-Frage 2026-08-24, nicht registriert. Zusaetzliche Eingabeebene "Dreiecks-Zugehoerigkeit je Zelle". Additiv moeglich (Eingabegroesse kommt vom Modell), aber eigener Bau nach par.3b |
