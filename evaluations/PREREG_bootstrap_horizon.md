@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht Nachtrag 2026-08-24: Anker-Arm bleibt geschlossen, aber die WIEDERAUFNAHME-BEDINGUNG ist jetzt benannt und pruefbar -- beide Stufe-0-Zahlen sind an plattenblindem Spiel erhoben, ein Korpus mit echtem Spaltenbau (PREREG_heuristic_v2_long_rows) waere das neue Regime. Ebenso darf der Satz Kredit-Horizont-Verdacht geschwaecht nicht als erledigt weiterzitiert werden. rtv-Waechter fuer den offenen 2-gegen-3-Arm registriert (Nutzer-Auflage): Kostengate wird gemessen statt geschaetzt, sauberes Ziel ist kein Argument. Anlass verschiebt sich: der Lehrer kann Spalten auch nicht (0,098 gegen 0,101), der Mensch schafft 1,80, und der Engpass ist Verteilung statt Versorgung -- der Horizont ist damit nicht mehr der Hauptverdaechtige fuer die Vollendungsschwaeche. STUFE 1 GEFAHREN 2026-08-24: GATE GERISSEN, Arm verworfen (Kosten je Label 223,8 ms gegen 410,2 ms, Verhaeltnis 1,83; Bootstrap-Anteil an der Self-Play-Zeit 33,1 Prozent; Aufschlag fuer BEIDE Labels 60,7 Prozent gegen Schwelle 25). Robust: gemessen bei 300 Sims, CLI-Default ist 100, weniger Sims heben den Anteil weiter. Blosses UMSTELLEN statt beider Labels laege bei 27,5 Prozent, also ebenfalls darueber. Damit sind BEIDE Arme dieser Prereg fuer das heutige Regime geschlossen; die Nutzenfrage ist nicht beantwortet, sondern unbezahlbar. Wiederaufnahme wie beim Anker-Arm nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden. -->
+<!-- STATUS: OFFEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: **OFFEN, vorregistriert 2026-08-09** (Nutzer-Auftrag). Nur beim v22-Generierungsstart aenderbar (Horizont steckt in den Records, nicht im Cache-Key); Stufe 1 = Kostengate <= +25% Self-Play-Zeit, Stufe 2 = Arme auf identischen Partien via mehrfach geschriebener Labels. Nachtrag 2026-08-23: NEUER ANLASS (Vollendungs-Strukturbefund; Bias nicht geerbt, Verdacht Kredit-Horizont) + Nutzer-Vorschlag rundenabhaengiger Horizont (Ziele bis zum R5-Anker statt fester Tiefe) als dritter Arm-Kandidat; Stufe 0 ENTSCHIEDEN (2026-08-23): Anker-Variante qualifiziert sich NICHT (kritische Zellen 0,282 gg. 0,363; Kosten Faktor 20,1) -- Anker-Arm geschlossen, klassischer 2-gegen-3-Arm bleibt offen, Kredit-Horizont-Verdacht geschwaecht Nachtrag 2026-08-24: Anker-Arm bleibt geschlossen, aber die WIEDERAUFNAHME-BEDINGUNG ist jetzt benannt und pruefbar -- beide Stufe-0-Zahlen sind an plattenblindem Spiel erhoben, ein Korpus mit echtem Spaltenbau (PREREG_heuristic_v2_long_rows) waere das neue Regime. Ebenso darf der Satz Kredit-Horizont-Verdacht geschwaecht nicht als erledigt weiterzitiert werden. rtv-Waechter fuer den offenen 2-gegen-3-Arm registriert (Nutzer-Auflage): Kostengate wird gemessen statt geschaetzt, sauberes Ziel ist kein Argument. Anlass verschiebt sich: der Lehrer kann Spalten auch nicht (0,098 gegen 0,101), der Mensch schafft 1,80, und der Engpass ist Verteilung statt Versorgung -- der Horizont ist damit nicht mehr der Hauptverdaechtige fuer die Vollendungsschwaeche. STUFE 1 GEFAHREN 2026-08-24: GATE GERISSEN, Arm verworfen (Kosten je Label 223,8 ms gegen 410,2 ms, Verhaeltnis 1,83; Bootstrap-Anteil an der Self-Play-Zeit 33,1 Prozent; Aufschlag fuer BEIDE Labels 60,7 Prozent gegen Schwelle 25). Robust: gemessen bei 300 Sims, CLI-Default ist 100, weniger Sims heben den Anteil weiter. Blosses UMSTELLEN statt beider Labels laege bei 27,5 Prozent, also ebenfalls darueber. Damit sind BEIDE Arme dieser Prereg fuer das heutige Regime geschlossen; die Nutzenfrage ist nicht beantwortet, sondern unbezahlbar. Wiederaufnahme wie beim Anker-Arm nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden. NACHTRAG 2026-08-25, par.9 EINGETAKTET (Nutzer-Entscheid): gepaarter Klein-Ausschnitt auf v2-Partien, Horizont 2 gegen 3, zweimal gelabelt. Muss VOR der v22-Kampagne laufen, weil der Bootstrap-Wert bei der ERZEUGUNG in den Korpus geschrieben wird (self_play.rs:1941) und spaeter nur durch Neu-Labeln aenderbar ist. Vorbedingung: die Heuristik-Variante muss bis run_self_play durchgereicht werden (heute auf V1 festgenagelt, self_play.rs:2201). -->
 
 # Vorregistrierung: Bootstrap-Horizont (2 vs 3) -- Option fuer den v22-Zuschnitt
 
@@ -372,3 +372,73 @@ QUALIFIZIERT SICH NICHT. Beide Bedingungen verfehlt.**
   ueber beide Spieler, am ersten Tiling-Record der FOLGERUNDE
   gemessen) ist eine markierte Annahme des Agenten, nicht
   vorregistriert.
+
+---
+
+## par.9 EINGETAKTET 2026-08-25: gepaarter Klein-Ausschnitt auf v2-Partien
+
+**Nutzer-Entscheid.** Anlass ist die eigene Wiederaufnahme-Bedingung dieser
+Prereg -- "beide Zahlen sind an plattenblindem Spiel erhoben, ein Korpus mit
+echtem Spaltenbau waere ein neues Regime" -- und die anstehende v22-Kampagne
+mit der Heuristik v2 als Erzeuger (volle Spalten 0,798 je Partie gegen 0,086).
+
+### par.9a Warum das VOR der Kampagne entschieden werden muss
+
+Der Bootstrap-Wert wird **bei der Erzeugung** in den Korpus geschrieben
+(`self_play.rs:1941-1954`, `bootstrap_value_after_rounds(&pre, lbl.net,
+BOOTSTRAP_HORIZON_ROUNDS, rng)`). Einen anderen Horizont spaeter zu pruefen
+heisst also neu labeln oder neu erzeugen -- es ist kein Trainingsschalter.
+Wer die Frage offen laesst, entscheidet sie faktisch zugunsten des Bestands.
+
+**Am Code geprueft, weil es leicht falsch erinnert wird:** der Bootstrap-Wert
+wird IMMER vom Netz gerechnet, unabhaengig davon, wer spielt. Der Pfad haengt
+nur daran, ob ein Netz FUER DIE LABELS uebergeben wurde
+(`labels: net.map(...)`, `self_play.rs:2209`) -- genau dafuer gibt es
+`run_self_play_with_net_labels`: die Heuristik spielt, ein Netz labelt. Ohne
+Label-Netz gibt es gar keine Bootstrap-Labels, und das Value-Ziel faellt auf
+den harten Ausgang zurueck.
+
+### par.9b Zuschnitt
+
+Ein KLEINER Ausschnitt v2-erzeugter Partien, **zweimal gelabelt** -- Horizont
+2 (Bestand) gegen Horizont 3 --, dieselben Partien und dieselben Seeds in
+beiden Durchlaufen. Damit ist der Vergleich gepaart und braucht keine Arena.
+
+**Vorbedingung, ohne die es nicht laeuft:** der Self-Play-Einstieg ist auf die
+V1-Heuristik festgenagelt (`heuristik_variante: HeuristikVariante::V1`,
+`self_play.rs:2201`); nur die Arena nimmt die Variante als Parameter. Die
+Variante muss bis `run_self_play`/`run_self_play_with_net_labels`
+durchgereicht werden, bevor ueberhaupt v2-Partien erzeugt werden koennen.
+
+### par.9c Drei Kennzahlen, vorab festgelegt
+
+1. **Unterscheiden sich die Labels ueberhaupt?** Mittlere absolute Differenz
+   der beiden Bootstrap-Werte je Datensatz. **Waechter:** ist sie klein, kauft
+   der tiefere Horizont nichts -- unabhaengig von allem anderen, und der Arm
+   ist ohne weitere Messung erledigt.
+2. **Welcher Horizont trifft den tatsaechlichen Ausgang besser?** Beide
+   Bootstrap-Werte gegen den ECHTEN Partieausgang (Brier und MSE). Das ist die
+   Aufgabe des Ziels, und sie ist auf ausgespielten Partien offline messbar.
+   **Einschraenkung, ausdruecklich:** eine bessere Ausgangs-Uebereinstimmung
+   ist nicht automatisch ein besseres TD-Ziel -- ein Bootstrap, der den
+   Ausgang nur kopiert, traegt nichts ueber den harten Ausgang hinaus bei.
+   Deshalb wird (1) MITBERICHTET und nicht durch (2) ersetzt.
+3. **Kostenfaktor**, gemessen statt geschaetzt: Wanduhr je Label in beiden
+   Durchlaufen. Der Bestandswert, an dem der Arm 2026-08 gescheitert ist,
+   waren +60,7 Prozent gegen eine Schwelle von 25 -- gemessen an
+   plattenblindem Spiel. Auf v2-Partien kann er anders liegen: dort laufen
+   Partien mit mehr vollen Spalten, und der Horizont sieht mehr Struktur.
+
+### par.9d Lesarten, vorab
+
+- **Labels praktisch gleich** (Kennzahl 1 klein): Arm erledigt, Korpus mit
+  Horizont 2 erzeugen. Das ist ein vollwertiges Ergebnis.
+- **Labels verschieden UND Horizont 3 trifft den Ausgang besser UND der
+  Kostenfaktor bleibt unter der Schwelle**: Nutzer-Entscheid, ob die Kampagne
+  mit Horizont 3 faehrt.
+- **Labels verschieden, aber Horizont 3 trifft nicht besser**: Bestand, und
+  der Befund gehoert hierher -- der tiefere Horizont sieht dann zwar mehr,
+  aber nichts Nuetzliches.
+
+**Nicht Gegenstand:** Spielstaerke. Ein Klein-Ausschnitt entscheidet die
+Ziel-Qualitaet und die Kosten, nicht Elo.
