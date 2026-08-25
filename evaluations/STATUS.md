@@ -235,6 +235,37 @@ den Lehrer-Einsatz ist er entschaerft.
    7 Punkten je Spalte gegen 3 je Zeile ist der Tausch rechnerisch guenstig,
    gehoert aber bei jedem Nachfolgearm mitgemessen.
 
+   **ELO EINGETRAGEN (2026-08-25):** `Heuristik_v2huelle@150` = **1125**
+   [1069, 1186]. Die Kante kam aus dem Lehrer-Test selbst (407 Partien gegen
+   `v21_2d_brierbest`@400, 255:152) -- keine zusaetzlichen Partien noetig,
+   weil der Elo-Anker der Leiter genau diese Heuristik@150-Bedingung ist.
+   Vertrags-Hash `a169ebf0a4451e08` identisch zur Leiter, also keine Kante
+   ueber die Fix-Grenze.
+
+   | Modell | Elo | 95%-KI |
+   | --- | --- | --- |
+   | v21_2d_brierbest@400 | 1215 | [1173, 1261] |
+   | v20_2d_opp_brierbest@400 | 1186 | [1147, 1230] |
+   | v19_2d_best@400 | 1136 | [1096, 1177] |
+   | **Heuristik_v2huelle@150** | **1125** | [1069, 1186] |
+   | Heuristik@150 | 1000 | Anker (fix) |
+
+   **+125 Elo ueber dem Anker**, mit einer handgeschriebenen Heuristik bei 150
+   Sims gegen Netze bei 400. **Nicht belegt** ist ein Vorsprung vor v19: das
+   KI ueberlappt deutlich. Belegt ist der Abstand zum Anker und der Rueckstand
+   von 90 Elo auf den Champion.
+
+   Nicht eingetragen, aber verfuegbar: das ALTE v2 hat auf denselben
+   Kampagnen-Seeds 0,128 Siegquote gegen den Champion (par.5.3). Eine Kante
+   daraus wuerde v2 unter den Anker setzen und den Sprung sichtbar machen --
+   die Laufbedingungen jener Messung sind aber nicht von mir verifiziert,
+   deshalb nicht ungefragt nachgetragen.
+
+   **par.11 GEMESSEN, H0** (par.11.1): rundenabhaengige Spalten-Gewichte
+   bewegen nichts (volle Spalten +0,025, t=0,39; Siegquote 0,500). Der Arm ist
+   negativ entschieden; ein Werte-Sweep findet NICHT statt (Dosis-Antwort,
+   dreimal negativ entschieden). `SPALTEN_PHASE` bleibt im Code.
+
    **UEBERGABE-NOTIZ 2026-08-25:** Maschine und `self_play.rs` sind FREI
    (Commit `ae88cf3`, Suite 520/0, Paritaet haelt). Die Parallelsitzung
    `mosaic-ai-4f` wartete auf diese Freigabe fuer zwei Laeufe

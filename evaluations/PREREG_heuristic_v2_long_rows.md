@@ -1240,3 +1240,39 @@ koennte aus der Blindziehungs-Regel stammen (`resolve_and_apply_stack_draw`,
 Einheitenbruch). Die k6-Aufspaltung ist in der Sonde gebaut, aber fuer DIESEN
 Lauf nicht ausgewertet -- `v2_teacher_arena.py` hat sie nicht, nur
 `v2_envelope_arena.py`. Die Struktur-Kennzahlen sind davon nicht beruehrt.
+
+### par.11.1 ERGEBNIS: H0, die externe Form uebertraegt sich nicht (2026-08-25)
+
+`evaluations/v2_envelope_arena_phase.json`, n=160 gegen `V2Huelle`, sonst
+Aufbau wie par.8.4.
+
+| Kennzahl | Huelle | Phase | Delta | t (Block) |
+| --- | --- | --- | --- | --- |
+| volle Spalten | 0,787 | 0,812 | +0,025 | 0,39 |
+| max Spaltenhoehe | 5,550 | 5,581 | +0,031 | 0,52 |
+| Spezialfeld-Freischaltungen | 1,000 | 0,950 | -0,050 | -0,38 |
+| Strafpunkte | -13,43 | -13,49 | -0,056 | -0,06 |
+| eigene Punkte | 44,05 | 43,86 | -0,188 | -0,17 |
+
+Siegquote 0,500. Vollendungsquote 0,714 gegen 0,712.
+
+**Kein Effekt in irgendeiner Richtung.** Das Entscheidungsmass bewegt sich
+nicht (t=0,39), und keine der uebrigen Kennzahlen kommt in die Naehe von
+Signifikanz. `SPALTEN_PHASE` bleibt im Code, aber `V2HuellePhase` ist als Arm
+negativ entschieden.
+
+**Einordnung, weil die Quelle extern war:** Rzepecki 2025 beschreibt
+phasenabhaengige Koeffizienten fuer ein anderes Spiel (Azul-Grundspiel),
+andere Suchtiefe, andere Termmenge. Uebernommen war ausdruecklich die FORM,
+nicht der Wert. Das Ergebnis sagt also nicht "Tapered Eval funktioniert
+nicht", sondern "diese Form, auf diese Karte, mit diesen Werten, bewegt hier
+nichts". Ein Sweep ueber die Werte waere die Dosis-Antwort, die in diesem
+Projekt schon dreimal negativ entschieden wurde -- er findet NICHT statt.
+
+**Nebenbefund aus der neu gebauten k6-Aufspaltung, erster Einsatz:** das
+Punkteniveau liegt bei aktiver Wertungsplatte 6 bei 34,0 gegen 48,9 ohne --
+knapp 15 Punkte Unterschied. Das ist mit dem Blindziehungs-Befund der
+Parallelsitzung vertraeglich (`PREREG_stack_draw_reservation_rule.md`). Fuer
+DIESEN Arm-Vergleich ist der Posten neutral: beide Seiten sind in beiden
+Gruppen flach (+0,200 bzw. -0,257), der Vorbehalt aus par.8.5 greift hier
+also nicht.
