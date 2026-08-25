@@ -735,6 +735,50 @@ Ein Nullbefund STOPPT die Kette also nicht; ein Schaden schon.
 Parameterzahl, "zusaetzlich" erlaubt einen sauberen Ablationsvergleich gegen
 denselben flachen Kopf. Der Nutzer hat beides offengelassen.
 
+**NACHTRAG 2026-08-25 (6): der Kopf SOLL zusaetzlich auf die Dreiecksform
+getrimmt werden -- das ist Option (a), nicht ein neuer Kopf.**
+
+Nutzer: *"dennoch halte ich es fuer sinnvoll den shaping head zusaetzlich auf
+die dreiecksform zu trimmen, damit der value head in runde 1/2 entlastet
+wird"*.
+
+**Der Einwand aus Nachtrag (2) richtete sich nicht gegen das Anliegen**, er
+richtete sich gegen die BAUFORM: ein eigener Kopf auf die Zellabweichung
+saehe 36 Bit, wo der Ownership-Kopf 72 traegt (eigene UND gegnerische Haelfte),
+und die Abweichung ist eine feste Umkodierung der Endbelegung -- also sein
+schwaecheres Duplikat.
+
+**Das Anliegen ist ohne neuen Kopf erreichbar, in zwei Stuecken, die beide
+schon registriert sind:**
+
+* **Die Ablesung** ist die Maskenrechnung aus Nachtrag (3)(a) --
+  `E[Abweichung] = SUM (1-p) ueber die 21 Huellen-Zellen + SUM p ueber die
+  uebrigen 15`, gerechnet auf den vorhandenen Kopfausgaben. Kein neues Ziel,
+  keine Formaenderung. **Sie liefert das fruehe Signal, das nicht auf den
+  Ausgang wartet** -- der Grund, aus dem der Nutzer den Kopf will.
+* **Das "Trimmen" ist Option (a)**, die Huellen-Gewichtung der Loss-Maske: die
+  21 Huellen-Zellen im Verlust hoeher gewichten als die uebrigen 15. Ziel und
+  Breite bleiben, die Gegnerhaelfte bleibt erhalten; es aendert nicht WAS
+  gelernt wird, sondern WO die Kapazitaet hingeht. `train.py` rechnet bereits
+  `own_loss = (own_bce * own_m).sum() / own_m.sum()`, die Maske existiert also.
+
+**Damit ist der Nutzer-Wunsch vollstaendig abgedeckt, ohne die
+Hilfskopf-Grundrate von 0 aus 4 erneut zu bemuehen.**
+
+**Was davon unberuehrt bleibt und weiter vorab zu klaeren ist** (Nachtrag 4):
+das Einheitenproblem beim ERSETZEN -- eine Abweichung zaehlt Zellen, der
+Value-Kopf liefert eine Gewinnwahrscheinlichkeit; die Abbildung wird VORAB
+festgelegt und nicht an der Entscheidungsmetrik getunt. Und der Waechter muss
+beim Ersetzen das PUNKTENIVEAU und die Strafleiste der fruehen Runden
+mitmessen, nicht nur die Value-Guete.
+
+**Verhaeltnis zum Slot-Ausloesungs-Ziel** (`PREREG_special_tile_yield.md`
+par.4c): das sind ZWEI Aenderungen am selben Kopf. Sie duerfen nicht in einem
+Arm laufen -- die Huellen-Gewichtung veraendert die Kapazitaetsverteilung auf
+einem BESTEHENDEN Ziel, das Slot-Ziel fuegt ein NEUES hinzu. Reihenfolge:
+Grundwirkung des eingeschalteten Kopfes (Stufe 1), dann (a), dann das
+Slot-Ziel.
+
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
 `plate_builder::v2_chip_vorzug`: vollendet per Bonuschip die Musterreihe, die
