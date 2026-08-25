@@ -712,10 +712,68 @@ fn collect_tilings(
 
 /// Bis zu `k` vollstaendige Abschluesse, absteigend nach Punkten, ohne
 /// Duplikate gleicher Endbelegung.
+/// Diagnose-Zaehler fuer das Knotenbudget von [`top_k_tilings`]
+/// (PREREG_heuristic_v2_long_rows.md par.17).
+///
+/// **Anlass:** der Kommentar an `plate_builder::v2_chip_preference` haelt fest,
+/// dass die generische Tiling-Suche Chip-Schritte technisch einschliesst, sie
+/// im Knotenbudget "offenbar nicht zuverlaessig" findet. Daraus wurde die
+/// Vermutung abgeleitet, das Budget binde und eine Beschneidung wuerde welches
+/// freimachen. Diese Vermutung ist BISHER UNGEPRUEFT -- und in dieser Sitzung
+/// sind drei aus dem Code hergeleitete Vermutungen im Vorzeichen falsch
+/// gewesen. Also erst zaehlen, dann bauen.
+///
+/// Rein additiv: die Zaehler beeinflussen keine Entscheidung, nur ihre eigene
+/// Statistik. Prozessweite `static`s, also ueber alle rayon-Worker summiert --
+/// vor einer Messung zuruecksetzen.
+pub struct TilingBudgetStats {
+    pub calls: std::sync::atomic::AtomicU64,
+    pub exhausted: std::sync::atomic::AtomicU64,
+    pub nodes_used: std::sync::atomic::AtomicU64,
+}
+
+pub static TILING_BUDGET_STATS: TilingBudgetStats = TilingBudgetStats {
+    calls: std::sync::atomic::AtomicU64::new(0),
+    exhausted: std::sync::atomic::AtomicU64::new(0),
+    nodes_used: std::sync::atomic::AtomicU64::new(0),
+};
+
+impl TilingBudgetStats {
+    pub fn reset(&self) {
+        use std::sync::atomic::Ordering::Relaxed;
+        self.calls.store(0, Relaxed);
+        self.exhausted.store(0, Relaxed);
+        self.nodes_used.store(0, Relaxed);
+    }
+
+    pub fn snapshot_json(&self) -> serde_json::Value {
+        use std::sync::atomic::Ordering::Relaxed;
+        let c = self.calls.load(Relaxed);
+        let e = self.exhausted.load(Relaxed);
+        let n = self.nodes_used.load(Relaxed);
+        serde_json::json!({
+            "aufrufe": c,
+            "budget_erschoepft": e,
+            "anteil_erschoepft": if c > 0 { e as f64 / c as f64 } else { 0.0 },
+            "knoten_gesamt": n,
+            "knoten_je_aufruf": if c > 0 { n as f64 / c as f64 } else { 0.0 },
+            "budget": NODE_BUDGET,
+        })
+    }
+}
+
 pub fn top_k_tilings(state: &GameState, pi: usize, k: usize) -> Vec<TilingOutcome> {
     let mut out: Vec<TilingOutcome> = Vec::new();
     let mut budget = NODE_BUDGET;
     collect_tilings(state, pi, 0, None, 0, &mut budget, &mut out);
+    {
+        use std::sync::atomic::Ordering::Relaxed;
+        TILING_BUDGET_STATS.calls.fetch_add(1, Relaxed);
+        TILING_BUDGET_STATS.nodes_used.fetch_add((NODE_BUDGET - budget) as u64, Relaxed);
+        if budget == 0 {
+            TILING_BUDGET_STATS.exhausted.fetch_add(1, Relaxed);
+        }
+    }
     out.sort_by(|a, b| b.points.cmp(&a.points));
     let mut seen: Vec<(Vec<bool>, Vec<String>)> = Vec::new();
     let mut uniq: Vec<TilingOutcome> = Vec::new();

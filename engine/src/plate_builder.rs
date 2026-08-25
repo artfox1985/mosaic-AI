@@ -2539,10 +2539,22 @@ pub(crate) fn v2_tiling_preference(
     // ausnahmslos ohne jede volle Spalte. Die generische Suche unten
     // (`tiling_preference_for_cells`, ueber `top_k_tilings`) SCHLIESST
     // Chip-Schritte technisch ein (`legal_steps` -> `chippable_rows`), findet
-    // sie aber im DFS-Budget (2000 Knoten, `NODE_BUDGET`) offenbar nicht
-    // zuverlaessig -- die Verzweigung ueber Chip-Allokationen ist teuer.
-    // Ein direkter Vorzug macht die Absicht explizit statt auf den
-    // Suchzufall zu hoffen.
+    // sie aber nicht zuverlaessig. Ein direkter Vorzug macht die Absicht
+    // explizit statt auf den Suchzufall zu hoffen.
+    //
+    // KORREKTUR 2026-08-25 (par.17, gemessen): die frueher hier stehende
+    // ERKLAERUNG war falsch. Sie lautete, die Suche finde die Chip-Schritte
+    // "im DFS-Budget (2000 Knoten) offenbar nicht zuverlaessig -- die
+    // Verzweigung ueber Chip-Allokationen ist teuer". Gemessen ueber 1671
+    // Aufrufe: das Budget wird NIE erschoepft (0 von 1671) und im Mittel zu
+    // 5,4 von 2000 Knoten genutzt, also zu 0,27 Prozent. Das Budget bindet
+    // nirgends und kann die Ursache nicht sein.
+    //
+    // Die Suche laeuft also VOLLSTAENDIG durch und findet die Chip-Schritte
+    // trotzdem nicht -- die Ursache liegt damit in der Kandidaten-Erzeugung
+    // oder in der Bewertung, nicht in der Tiefe. WELCHE von beiden, ist
+    // offen; eine weitere Herleitung aus dem Code waere die vierte in dieser
+    // Sitzung, und drei davon lagen im Vorzeichen falsch.
     v2_chip_preference(state, pi, &z).or_else(|| tiling_preference_for_cells(state, pi, &z))
 }
 
