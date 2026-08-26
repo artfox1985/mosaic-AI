@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Welle 3 gebaut; Fork A umgesetzt (par.8c: exakte Ordnungsuebergabe steht, Suite 500/0), par.8d GEBAUT+ABGENOMMEN (Suite 502/0, Protokoll per Einzelentscheidung, rot_seed weg); Kernbeweis 5. Runde rot, neues Fehlerbild (gleiche Stellung/gleicher Seed, andere Rotation) -> Numerik-Hypothese WIDERLEGT (par.8e: Batcher im Referenzpfad inaktiv, Wurzel-Batch bitgleich max_ulp 0); **KERNBEWEIS GRUEN (par.8f, 2026-08-24): 8/8 Partien byte-identisch, Suite 503/0, Paritaet haelt, Quarantaene des Worker-Pfads AUFGEHOBEN.** Ursache der sieben Runden war eine Luecke im Pruefverfahren (JSON-gegen-JSON statt Struct-Vergleich); sieben Roundtrip-Verluste gemeinsam behoben und als erschoepfender Test verankert; Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- FRAGE BEANTWORTET: Welle 1 und Welle 3 gebaut und abgenommen, offen nur noch der planbare Ausbau (restliche ~31 Knoepfe wellenweise ins SearchConfig, par.4). **WELLE HEURISTIK GEBAUT UND ABGENOMMEN 2026-08-26 (par.9):** heuristik_variante ist ein SearchConfig-/Spec-PFLICHTfeld (Name, kein Default, unbekannter Name = harter Fehler); v1_anchor und v2huelle_generator liegen als vollstaendige Artefakte in models/frozen_heuristics/ und sind VERSIONIERT. Golden Probe ist hier ein SELF-PLAY-Lauf aus dem eigenen Wheel statt der Drafting-Sonde -- der Referee loest Tiling/Startsetzung selbst auf und ist dabei auf V1 verdrahtet (referee.rs:312 -> self_play.rs:1207), die Welle-3-Probe waere fuer eine Heuristik also eine halbe. Staerkster Beleg: die Golden Probe des Generators ist Feld fuer Feld identisch mit der ersten Datei des echten v22-Korpus. Suite 531/0.-->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Welle 3 gebaut; Fork A umgesetzt (par.8c: exakte Ordnungsuebergabe steht, Suite 500/0), par.8d GEBAUT+ABGENOMMEN (Suite 502/0, Protokoll per Einzelentscheidung, rot_seed weg); Kernbeweis 5. Runde rot, neues Fehlerbild (gleiche Stellung/gleicher Seed, andere Rotation) -> Numerik-Hypothese WIDERLEGT (par.8e: Batcher im Referenzpfad inaktiv, Wurzel-Batch bitgleich max_ulp 0); **KERNBEWEIS GRUEN (par.8f, 2026-08-24): 8/8 Partien byte-identisch, Suite 503/0, Paritaet haelt, Quarantaene des Worker-Pfads AUFGEHOBEN.** Ursache der sieben Runden war eine Luecke im Pruefverfahren (JSON-gegen-JSON statt Struct-Vergleich); sieben Roundtrip-Verluste gemeinsam behoben und als erschoepfender Test verankert; Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- FRAGE BEANTWORTET: Welle 1 und Welle 3 gebaut und abgenommen, offen nur noch der planbare Ausbau (restliche ~31 Knoepfe wellenweise ins SearchConfig, par.4). **WELLE HEURISTIK GEBAUT UND ABGENOMMEN 2026-08-26 (par.9):** heuristik_variante ist ein SearchConfig-/Spec-PFLICHTfeld (Name, kein Default, unbekannter Name = harter Fehler); v1_anchor und v2huelle_generator liegen als vollstaendige Artefakte in models/frozen_heuristics/ und sind VERSIONIERT. Golden Probe ist hier ein SELF-PLAY-Lauf aus dem eigenen Wheel statt der Drafting-Sonde -- der Referee loest Tiling/Startsetzung selbst auf und ist dabei auf V1 verdrahtet (referee.rs:312 -> self_play.rs:1207), die Welle-3-Probe waere fuer eine Heuristik also eine halbe. Staerkster Beleg: die Golden Probe des Generators ist Feld fuer Feld identisch mit der ersten Datei des echten v22-Korpus. **REFEREE-PFAD GESCHLOSSEN (par.10, vier Bausteine):** ein gefrorener Agent trifft dort jetzt ALLE Entscheidungen selbst -- Startsetzung, Drafting, Platzierung. Getrennt wurden Regel-Autoritaet (bleibt beim Referee, prueft hart) und Entscheidungs-Autoritaet (gehoert dem Agenten); beim Drafting stand die Trennung seit Welle 3, fuer Tiling und Startsetzung fehlte sie. Wirkung belegt: v1 [27,15] gegen v2huelle [63,27] aus derselben Startlage. Suite 531/0.-->
 
 # PREREG-SKELETT: Agenten-Kapselung (AgentSpec statt Prozess-Global)
 
@@ -609,3 +609,82 @@ sind hier fast umsonst.
   Varianten-Faedelung (111 Stellen, davon 103 blosse Weitergabe, 5 echte
   Verzweigungen) bleiben stehen, bis die Artefakte sich bewaehrt haben.
   Entfernen ist ein eigener Schritt und gehoert in eigene Commits.
+
+
+## par.10 REFEREE-PFAD GESCHLOSSEN (2026-08-26, vier Bausteine)
+
+**Der Befund, der die Arbeit ausloeste:** par.8 legt fest, dass die
+Regel-Autoritaet bei der aktuellen Engine bleibt -- richtig, und der Grund ist
+gut (Regelfixes duerfen einen Alt-Agenten nie still nach alten Regeln spielen
+lassen). Umgesetzt war das aber so, dass der Referee auch ENTSCHIED: er loeste
+Startsetzung und Tiling selbst auf, ueber `resolve_tiling_step`, und das ist
+auf `V1` verdrahtet (`referee.rs:312` -> `self_play.rs:1207`).
+
+Fuer ein NETZ ist das die richtige Abgrenzung -- seine Identitaet ist das ONNX
+plus die Draft-Policy. Fuer eine HEURISTIK nicht: ein gefrorenes
+`v2huelle`-Artefakt haette als `v1` gekachelt, mit plausibel aussehendem
+Ergebnis. Dieselbe Fehlerklasse wie "Signatur da, Wirkung nicht", nur teurer.
+
+**Die Aufloesung ist eine Unterscheidung, keine Aufweichung:**
+
+| | wer | wie durchgesetzt |
+| --- | --- | --- |
+| WAS legal ist | Referee | `tiling_apply_external` / `start_placement_apply_external` pruefen gegen `legal_steps` bzw. `start_placement_kandidaten`; illegal = Abbruch mit Diagnose |
+| WELCHER legale Zug | Agent | `tiling_choice_state_json` / `start_placement_choice_state_json` mit der Variante aus der Spec |
+
+Die Regel-Autoritaet verliert dabei nichts: ein Artefakt aus einer aelteren
+Aera kann keinen Zug durchsetzen, den die heutigen Regeln nicht kennen.
+
+### Die vier Bausteine
+
+1. **Netzlose Drafting-Antwort.** Eine Extraktion, kein Neubau: die
+   Entscheidung lag im `decide`-Rumpf von `HeuristicArenaAgent` und war nur
+   ueber den Agenten erreichbar. Jetzt rufen beide Wege dieselbe freie
+   Funktion -- dieselbe Regel, der das Netz-Gegenstueck schon folgt.
+2. **Tiling extern.** Serialisierung des `TilingStep` (handgeschrieben, nicht
+   abgeleitet: das Schema geht ueber eine Prozessgrenze zwischen ZWEI
+   Engine-Versionen, ein abgeleitetes Format aendert sich still mit dem Typ).
+3. **Startsetzung extern.** Dieselbe Bauform. Zwei Fallen dabei:
+   `pending_start_placement_player()` statt `current_player()` (der
+   Nicht-Starter kann zuerst dran sein), und `game_seed` als Pflicht (v2
+   waehlt unter mehreren Kandidaten seed-basiert).
+4. **Protokoll.** Drei Anfragearten ueber `kind`; fehlt das Feld, gilt
+   `drafting` und Welle-3-Aufrufer bleiben unveraendert. Eine UNBEKANNTE Art
+   wird abgewiesen statt als `drafting` gelesen -- ein Rueckfall waere ein
+   unsichtbarer Zugwechsel.
+
+### Was fast einen Regressionsschaden gekostet haette
+
+Der Treiber haette die externe Platzierung auch fuer NETZ-Artefakte
+angefordert. Deren Worker laeuft auf einem AELTEREN Wheel, ignoriert `kind`
+und haette auf eine Tiling-Anfrage mit einer Drafting-Aktion geantwortet --
+`KeyError` an genau dem Pfad, der seit par.8f gruen ist. Jetzt entscheidet das
+Manifest-Feld `typ`; fuer ein Netz bleibt es beim Bestandsverhalten.
+
+### Abnahme
+
+Zwei dauerhafte Sonden, keine Wegwerf-Skripte:
+
+* `tools/probes/frozen_agent_referee_probe.py` -- (A) laeuft eine ganze Partie
+  mit externem Tiling und externer Startsetzung, (B) **wirkt** die Variante,
+  (C) prallt ein illegaler Schritt ab. **B ist das eigentliche:** ohne B
+  belegt A nur, dass nichts abstuerzt.
+* `tools/probes/frozen_worker_protocol_probe.py` -- echter Worker-PROZESS,
+  alle drei Anfragearten, gegen `v1_anchor` und damit ohne `model.onnx`.
+
+Gemessen: v1 `[27,15]` gegen v2huelle `[63,27]` aus derselben Startlage, 24
+externe Tiling-Schritte und eine externe Startsetzung je Partie. Suite 531/0,
+beide Artefakte reproduzieren ihre Golden Probe weiterhin Feld fuer Feld.
+
+### Damit ist der Weg frei, aber noch nicht gegangen
+
+Die Quell-Konservierung kann jetzt fallen: `round5_anchor.rs` (1664 Zeilen)
+und die Varianten-Faedelung (111 Stellen, davon 103 blosse Weitergabe, 5
+echte Verzweigungen). Das ist ein eigener Schritt und gehoert in eigene
+Commits -- ein Bisect soll ihn finden koennen.
+
+Ebenfalls offen: eine Partie ARTEFAKT gegen ARTEFAKT ueber
+`frozen_referee_match.py`. Der Treiber faehrt heute "aktuelle Engine gegen
+EIN Artefakt"; seine A-Seite ruft `drafting_decide_and_apply_inprocess` und
+verlangt dafuer ein Modell. Fuer zwei gefrorene Heuristiken braucht es
+entweder einen netzlosen In-Process-Zweig oder einen zweiten Worker.
