@@ -74,6 +74,45 @@ use crate::tile::TileColor;
 /// drafting_decide_and_apply_inprocess`, welcher `agent.decide()`
 /// ebenfalls je EINZELNER Entscheidung mit genau diesem Seed-Muster aufruft,
 /// `self_play.rs::unified_game_loop`).
+/// Wie [`choose_drafting_action_json`], aber fuer eine NETZLOSE
+/// Heuristik-Seite.
+///
+/// Notwendig fuer eingefrorene Heuristik-Artefakte: die haben kein ONNX, ihr
+/// Verhalten steckt vollstaendig im Wheel. Der bestehende Worker-Pfad
+/// verlangte ein Modell und war damit fuer sie verschlossen.
+///
+/// Ruft `self_play::heuristic_arena_choose_action` -- dieselbe Funktion, die
+/// auch `HeuristicArenaAgent::decide` benutzt, keine zweite Auswahl-Logik
+/// (gleiche Regel wie beim Netz-Gegenstueck oben).
+///
+/// Die Variante kommt aus der `SearchConfig` und damit aus der Spec des
+/// Artefakts, NICHT aus einem Parameter des Aufrufers. Das ist der ganze
+/// Punkt: am 2026-08-26 hat ein vom Aufrufer vergessenes
+/// `--heuristik-variante` einen falschen Befund erzeugt. Ein Artefakt, das
+/// sich selbst beschreibt, kann so nicht mehr falsch gespielt werden.
+pub(crate) fn choose_heuristic_drafting_action_json(
+    search_config: &SearchConfig,
+    state_json: &str,
+    sims: u32,
+    c: f64,
+    seed: u64,
+) -> PyResult<Value> {
+    let parsed: Value = serde_json::from_str(state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state_exact(&parsed).map_err(PyValueError::new_err)?;
+    if state.phase != Phase::Drafting || state.players.iter().any(|p| p.start_tile_pending) {
+        return Err(PyValueError::new_err(
+            "choose_heuristic_drafting_action_json: state ist keine Drafting-Entscheidung.",
+        ));
+    }
+    let actions = drafting_actions(&state);
+    let mut rng = StdRng::seed_from_u64(seed);
+    let chosen = crate::self_play::heuristic_arena_choose_action(
+        &state, &actions, &mut rng, sims, c, search_config.heuristik_variante,
+    );
+    Ok(action_to_dict(&chosen))
+}
+
 pub(crate) fn choose_drafting_action_json(
     net: &Net,
     search_config: &SearchConfig,
