@@ -48,7 +48,34 @@ sys.path.insert(0, str(_ROOT / "engine" / "py"))
 
 import mosaic_rust as mr  # noqa: E402
 
+# ACHTUNG, haeufige Fehllesart: von hier kommt nur die SPEC-DATEI, nicht das
+# Wheel. Alle `mr.*`-Aufrufe laufen im AKTUELLEN Prozess, also auf dem
+# aktuellen Wheel.
+#
+# Das ist fuer DIESE Frage richtig und keine Nachlaessigkeit: verglichen werden
+# zwei PFADE (Referee gegen `net_arena_match`). Liefe eine Seite auf dem Wheel
+# des Artefakts, koennte ein Unterschied vom WHEEL statt vom PFAD kommen, und
+# das Ergebnis waere nicht mehr zuzuordnen.
+#
+# Die andere Frage -- spielt der aktuelle Stand noch wie das Artefakt? -- misst
+# `tools/verify_frozen_heuristic.py` (Drift-Modus gegen die Golden Probe).
+# Beide zusammen decken ab: Pfad hier, Wheel dort.
 V1_SPEC = str(_ROOT / "models/frozen_heuristics/v1_anchor/spec.json")
+
+
+def _spec_pruefen() -> None:
+    """Die Spec-Datei ist der REFERENZPUNKT -- sie darf sich nicht still aendern.
+
+    Die Sonde zeigt in ein Artefaktverzeichnis. Wuerde das Artefakt neu
+    eingefroren und traege dabei eine andere Konfiguration, verschoebe sich der
+    Vergleich lautlos. Deshalb hier eine Zusicherung statt einer Hoffnung.
+    """
+    spec = json.loads(pathlib.Path(V1_SPEC).read_text(encoding="utf-8"))
+    if spec.get("heuristik_variante") != "v1":
+        raise SystemExit(
+            f"{V1_SPEC} sagt heuristik_variante={spec.get('heuristik_variante')!r}, "
+            "erwartet wird 'v1'. Die Sonde vergleicht gegen den ANKER -- mit einer "
+            "anderen Variante misst sie etwas anderes, als ihr Name behauptet.")
 
 
 def referee_partie(model: str, spec_net: str | None, game_seed: int, first_player: int,
@@ -111,6 +138,7 @@ def main() -> int:
     ap.add_argument("--out", default="evaluations/artifacts/anchor_referee_parity.json")
     a = ap.parse_args()
 
+    _spec_pruefen()
     t0 = time.monotonic()
     seeds = [a.seed_base + i for i in range(a.games)]
 
