@@ -61,6 +61,12 @@ def referee_partie(model: str, spec_net: str | None, game_seed: int, first_playe
     Beides wird gemessen, weil es zwei verschiedene Fragen sind.
     """
     rg = mr.RefereeGame(("Netz", "Heuristik"), first_player, game_seed, None)
+    # DER SCHALTER, an dem die Wege auseinanderliefen: die Arena gibt der
+    # NETZ-Seite `apply_via_chosen_action = true` (Sammelaufloesung des
+    # Stapelzugs) und der HEURISTIK-Seite `false` (nur der Peek, die
+    # Folgeschritte werden gesucht). Der Referee wandte bis 2026-08-26 immer
+    # sammelaufloesend an und gab der Heuristik damit das Netz-Verhalten.
+    rg.set_apply_modes((True, False))
     extern = [1] if heuristik_extern else []
     guard = 0
     while True:
