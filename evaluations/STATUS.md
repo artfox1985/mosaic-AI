@@ -347,6 +347,50 @@ nicht ich.
 
 ---
 
+## STAPELZUG: Korpus und Netz-Self-Play loesen ihn VERSCHIEDEN auf (2026-08-26)
+
+Beim Nachgehen der Anker-Frage (par.10b) aufgefallen, am Code geprueft:
+
+| Pfad | `apply_via_chosen_action` | Stapelzug |
+| --- | --- | --- |
+| `play_heuristic_self_play_game` (self_play.rs:2255) | `false` | nur der Peek, Slot/Rotation werden **gesucht** |
+| `play_net_self_play_game` (:3879/:3886) | **beide `true`** | **sammelaufgeloest**, `best_eval_for_tile` waehlt |
+| `play_net_game_variante` (Arena) | Netz `true`, Heuristik `false` | gemischt |
+| `play_net_vs_net_game` (Gating) | beide `true` | sammelaufgeloest |
+
+**Der v22-Korpus entsteht also anders, als das Netz spielt.** Die
+Heuristik-Self-Play-Partien loesen Stapelzuege per Suche auf, die
+Netz-Self-Play-Partien per fester Heuristik.
+
+**Was `best_eval_for_tile` (self_play.rs:444) tut:** erschoepfende Ein-Zug-
+Bewertung ueber alle leeren Slots x vier Rotationen, bewertet mit
+`scoring_progress + bonus_points + Anzahl Wild-Felder`. Keine Suche, kein
+Gegner, keine Zukunft. `scoring_progress` ist der Elo-Anker-Term.
+
+**Die Folge fuer die Trainingsziele** benennt der Code selbst
+(`MOSAIC_STACK_DRAW_RESEARCH`-Kommentar): die Suche bewertet die Wurzelaktion
+"Ziehen", ausgefuehrt wird danach eine Fortsetzung, die sie nie gesehen hat
+(bis zu 20 weitere Zuege zu je -1 Punkt). Das Policy-Ziel vergleicht "Ziehen"
+also gegen die anderen Wurzelzuege auf falscher Grundlage, und der
+Folgezustand, aus dem Value- und Ownership-Ziele gebildet werden, stammt aus
+der blinden Heuristik.
+
+**Haeufigkeit, gemessen** (8 Partien, Netz@100 gegen Heuristik@150): **13,1
+Stapelzieh-Ereignisse je Partie, 7,6 Prozent aller Schritte**. Caveat: die
+Zaehlung erfasst jedes einzelne Ziehen, und eine Sammelaufloesung erzeugt
+mehrere -- die Zahl der betroffenen WURZEL-Entscheidungen ist kleiner.
+
+**NICHT angefasst.** Der Bestand ist der Elo-Bezug, und die reparierte
+Abbruchregel liegt bereits als Knopf daneben
+(`MOSAIC_STACK_DRAW_RESERVATION`, `PREREG_stack_draw_reservation_rule.md`
+par.5b, Default AUS). Neu ist hier nur die ASYMMETRIE zwischen Korpus und
+Netz-Self-Play und ihre Haeufigkeit.
+
+**Was sich durch die Kapselung geaendert hat:** der Anker liegt jetzt als
+Artefakt vor und ist gegen eine Aenderung an dieser Stelle geschuetzt. Die
+Frage, ob die Sammelaufloesung im Netz-Self-Play bleiben soll, ist damit
+billiger zu stellen als vorher.
+
 ## OFFEN, nach Reihenfolge
 
 ### 1. v22-Korpus mit dem v2-Lehrer -- NUTZER: "muessen wir noch was vorbereiten"
