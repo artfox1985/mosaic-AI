@@ -244,6 +244,35 @@ Strafsteine **5,2 gegen 10,4**, hoechste Spalte 5,44 gegen 4,22. Artefakt:
 `evaluations/artifacts/generator_drift.json` (dort als Drift etikettiert --
 es ist keine, siehe oben).
 
+### 1d. HEURISTIK-KAPSELUNG GEBAUT (2026-08-26)
+
+`PREREG_agent_encapsulation.md` par.9. Beide Heuristiken liegen als
+vollstaendige Agenten-Artefakte vor und sind VERSIONIERT:
+
+| Artefakt | Rolle | Inhalt |
+| --- | --- | --- |
+| `models/frozen_heuristics/v1_anchor/` | Elo-Anker | Wheel, Spec, Manifest, Golden Probe (6,8 MB) |
+| `models/frozen_heuristics/v2huelle_generator/` | v22-Erzeuger | dazu `tiling_net.onnx` als Kopie (16 MB) |
+
+`heuristik_variante` ist jetzt ein Spec-PFLICHTfeld (Name, kein Default,
+unbekannter Name = harter Fehler). Golden Probe ist ein SELF-PLAY-Lauf aus dem
+eigenen Wheel, byte-verglichen -- die Welle-3-Drafting-Sonde waere fuer eine
+Heuristik eine halbe Probe, weil der Referee das Tiling selbst und auf V1
+aufloest (`referee.rs:312` -> `self_play.rs:1207`).
+
+**Staerkster Beleg:** die Golden Probe des Generators ist Feld fuer Feld
+identisch mit `data/selfplay_hv2_20260825_1727_g10.pkl`. Das Artefakt IST der
+Erzeuger.
+
+Werkzeuge: `tools/freeze_heuristic.py`, `tools/verify_frozen_heuristic.py`
+(zwei getrennte Modi: Drift gegen aktuelles Wheel, Konservierung gegen das
+Artefakt-Wheel).
+
+**Noch nicht:** der Referee-Pfad (eine gefrorene Heuristik kann nicht in der
+Referee-Arena spielen -- der Worker beantwortet nur Drafting und braucht ein
+Netz) und das Entfernen der Quell-Konservierung (`round5_anchor.rs`, 1664
+Zeilen; Varianten-Faedelung 111 Stellen, davon 5 echte Verzweigungen).
+
 ### 2. Offen, mit Kosten
 
 | Punkt | Kosten | wofuer noetig |
