@@ -1073,6 +1073,43 @@ fn net_arena_choice_state_json(
     Ok(json!({ "action": action, "value": value }).to_string())
 }
 
+/// Drafting-Entscheidung einer NETZLOSEN Heuristik-Seite fuer einen extern
+/// gespeicherten Zustand -- das Gegenstueck zu
+/// [`net_arena_choice_state_json`] fuer eingefrorene Heuristik-Artefakte.
+///
+/// Eine Heuristik hat kein ONNX; ihr Verhalten steckt vollstaendig im Wheel.
+/// Der bestehende Worker-Pfad verlangte ein `model_path` und war fuer sie
+/// damit verschlossen (Nutzer-Auftrag 2026-08-26: gefrorene Agenten sollen
+/// gegeneinander spielen, nicht nur Korpora erzeugen).
+///
+/// Die VARIANTE kommt aus der Spec-Datei, nicht aus einem Parameter. Das ist
+/// der Punkt der Kapselung: ein Artefakt, das sich selbst beschreibt, kann
+/// nicht mehr versehentlich als etwas anderes gespielt werden. `spec=None`
+/// faellt auf `SearchConfig::from_env()` und damit auf `V1` zurueck --
+/// zulaessig fuer den Anker, aber ein Artefakt gehoert MIT seiner Spec
+/// gefahren.
+///
+/// Gleiche Zusagen wie beim Netz-Gegenstueck: `state_json` muss die
+/// `*_exact`-Felder tragen, der Seed ist explizit (der Referee gibt
+/// `pending_search_seed()` vor), Rueckgabe im `action_to_dict`-Schema, gegen
+/// das `RefereeGame::drafting_apply_external` matcht, und NUR
+/// Drafting-Entscheidungen (harter Fehler sonst).
+#[pyfunction]
+#[pyo3(signature = (state_json, sims, c_puct, seed, spec=None))]
+fn heuristic_arena_choice_state_json(
+    state_json: String,
+    sims: u32,
+    c_puct: f64,
+    seed: u64,
+    spec: Option<String>,
+) -> PyResult<String> {
+    let search_config = resolve_search_config(spec)?;
+    let action = crate::referee::choose_heuristic_drafting_action_json(
+        &search_config, &state_json, sims, c_puct, seed,
+    )?;
+    Ok(json!({ "action": action, "value": Option::<f32>::None }).to_string())
+}
+
 /// Wertungsplatten-Endwertung für einen extern gespeicherten Zustand (z.B.
 /// ein Self-Play-Record `state`-Feld, `json.dumps(record["state"])`) --
 /// reine additive Lesefunktion für die Wertungsplatten-Diagnose (2026-07-26,
@@ -1785,6 +1822,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(selfplay_profile_reset, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_choice_state_json, m)?)?;
+    m.add_function(wrap_pyfunction!(heuristic_arena_choice_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     m.add_class::<crate::referee::RefereeGame>()?;
     m.add_class::<crate::referee::FrozenWorkerEngine>()?;

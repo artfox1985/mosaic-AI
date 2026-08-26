@@ -1530,6 +1530,45 @@ struct HeuristicArenaAgent {
     variante: crate::mcts::HeuristikVariante,
 }
 
+/// Die Drafting-Entscheidung der Heuristik-Arena-Seite -- als FREIE Funktion,
+/// damit der Worker-Pfad sie aufrufen kann, ohne sie nachzubauen.
+///
+/// Gegenstueck zu [`net_arena_choose_action`] und aus demselben Grund
+/// herausgeloest: `net_arena_choice_state_json` ruft ausdruecklich "GENAU die
+/// Funktion, die auch `NetArenaAgent::decide` verwendet, keine zweite
+/// Auswahl-Logik". Fuer die Heuristik gab es diese Funktion bis 2026-08-26
+/// nicht -- die Logik lag im `decide`-Rumpf und war damit nur ueber den
+/// Agenten erreichbar. Ein eingefrorenes Heuristik-Artefakt braucht sie aber
+/// von aussen (Nutzer-Auftrag: gefrorene Agenten spielen gegeneinander).
+///
+/// Reine Extraktion, kein Verhaltenswechsel: derselbe Rumpf, derselbe
+/// `dynamic_sims`-Aufruf, dieselbe Reihenfolge (v2-Vorzug ZUERST, dann Suche).
+pub(crate) fn heuristic_arena_choose_action(
+    state: &GameState,
+    actions: &[Action],
+    search_rng: &mut StdRng,
+    base_sims: u32,
+    c: f64,
+    variante: crate::mcts::HeuristikVariante,
+) -> Action {
+    if actions.len() == 1 {
+        return actions[0].clone();
+    }
+    let s = dynamic_sims(base_sims, actions.len());
+    // v2-Vorzug ZUERST, wie im Heuristik-vs-Heuristik-Pfad
+    // (`play_arena_game`) -- Praeferenz statt Verbot, greift nur bei
+    // einem LEGALEN Zug, sonst entscheidet die Suche frei.
+    let vorzug = if variante.is_v2() {
+        crate::plate_builder::v2_drafting_preference(state, variante).filter(|a| actions.contains(a))
+    } else {
+        None
+    };
+    vorzug.unwrap_or_else(|| {
+        crate::mcts::search_drafting_action_variante(state, s, c, search_rng, variante)
+            .unwrap_or_else(|| actions[0].clone())
+    })
+}
+
 impl DraftingAgent for HeuristicArenaAgent {
     fn decide(
         &self,
@@ -1538,24 +1577,9 @@ impl DraftingAgent for HeuristicArenaAgent {
         search_rng: &mut StdRng,
         _move_number: u64,
     ) -> DraftingDecision {
-        let chosen = if actions.len() == 1 {
-            actions[0].clone()
-        } else {
-            let s = dynamic_sims(self.base_sims, actions.len());
-            // v2-Vorzug ZUERST, wie im Heuristik-vs-Heuristik-Pfad
-            // (`play_arena_game`) -- Praeferenz statt Verbot, greift nur bei
-            // einem LEGALEN Zug, sonst entscheidet die Suche frei.
-            let vorzug = if self.variante.is_v2() {
-                crate::plate_builder::v2_drafting_preference(state, self.variante).filter(|a| actions.contains(a))
-            } else {
-                None
-            };
-            vorzug.unwrap_or_else(|| {
-                crate::mcts::search_drafting_action_variante(state, s, self.c, search_rng, self.variante)
-                    .unwrap_or_else(|| actions[0].clone())
-            })
-        };
-        DraftingDecision::plain(chosen)
+        DraftingDecision::plain(heuristic_arena_choose_action(
+            state, actions, search_rng, self.base_sims, self.c, self.variante,
+        ))
     }
 }
 
