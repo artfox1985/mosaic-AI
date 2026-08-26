@@ -42,6 +42,19 @@ NET = _ROOT / "models/frozen_heuristics/v2huelle_generator/tiling_net.onnx"
 
 SIMS, C_PUCT = 150, 0.3
 
+# FESTGENAGELTE Erwartung. Kein Schoenheitsfehler, wenn sie bricht: am
+# 2026-08-26 hat eine Aenderung im Worker dazu gefuehrt, dass das
+# v2huelle-Artefakt sein TILING-Netz auch fuers Drafting benutzte -- es
+# spielte als Netz statt als Heuristik. Aufgefallen ist das nur, weil die
+# Partieergebnisse sich gegenueber dem Lauf davor aenderten, also durch Zufall.
+#
+# Diese Zahlen sind der Ersatz fuer diesen Zufall. Aendern sie sich, ist das
+# ein BEFUND und gehoert erklaert, bevor die Zahl hier angepasst wird.
+ERWARTET = {
+    "v1":       {"scores": [27, 15], "steps": 159},
+    "v2huelle": {"scores": [63, 27], "steps": 163},
+}
+
 
 def partie(spec, netz, seed, extern_seite=1):
     """Eine Partie; `extern_seite` liefert Drafting UND Tiling von aussen.
@@ -107,6 +120,14 @@ def main() -> int:
     print(f"B) v2huelle ueber den Referee: {b['scores']}, {b['steps']} Schritte, "
           f"{b['tiling_extern']} externe Tiling-Schritte, "
           f"{b['start_extern']} externe Startsetzungen", flush=True)
+    # Gegen die festgenagelte Erwartung pruefen, nicht nur gegeneinander.
+    for name, ist in (("v1", a), ("v2huelle", b)):
+        soll = ERWARTET[name]
+        if [ist["scores"], ist["steps"]] != [soll["scores"], soll["steps"]]:
+            versagt.append(
+                f"{name} weicht von der festgenagelten Erwartung ab: "
+                f"{ist['scores']}/{ist['steps']} statt {soll['scores']}/{soll['steps']} "
+                "-- ERST erklaeren, dann die Zahl hier anpassen")
     wirkt = (a["scores"] != b["scores"]) or (a["steps"] != b["steps"])
     befunde["variante_wirkt"] = wirkt
     print(f"   Verlaeufe unterschiedlich? {wirkt}", flush=True)

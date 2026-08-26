@@ -1,6 +1,6 @@
 {
   "version": "probe",
-  "run_timestamp": "20260826_175304",
+  "run_timestamp": "20260826_181636",
   "cli_args": {
     "mode": "mcts",
     "games": 10,
@@ -19,7 +19,7 @@
     "tau_argmax_from_move": 0,
     "heuristik_variante": "v1"
   },
-  "git_commit": "e08249869dc3a1f99f6121bf3c252374063f1a57",
+  "git_commit": "40600ba8882b7bdf43be8c213c9891ec0f8bce0e",
   "git_dirty": true,
   "engine_config": {
     "active_leaf": "Net",
@@ -47,11 +47,11 @@
     "value_opp_epsilon": 0.0
   },
   "laufzeit": {
-    "wanduhr_s": 12.2,
+    "wanduhr_s": 11.9,
     "cpu_s": null,
     "cpu_s_hinweis": "nicht gemessen: os.times() fuehrt auf dieser Plattform keine Kinderzeiten",
     "threads": 11,
-    "s_je_partie": 1.218,
+    "s_je_partie": 1.19,
     "partien": 10,
     "zuege": 1763
   }

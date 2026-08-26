@@ -15,24 +15,29 @@
   },
   "tiling_net": null,
   "herkunft": {
-    "git_commit": "e08249869dc3a1f99f6121bf3c252374063f1a57",
+    "git_commit": "40600ba8882b7bdf43be8c213c9891ec0f8bce0e",
     "git_dirty": true,
     "git_dirty_hinweis": "TRUE heisst: der Baum trug beim Einfrieren unversionierte Aenderungen. Das Wheel im Artefakt ist dann NICHT aus dem Commit rekonstruierbar -- es ist die einzige Kopie des Verhaltens.",
     "dirty_dateien": [
       "M CLAUDE.md",
       " D data/policy_carrier_manifest_v20.json",
-      " D models/frozen_heuristics/v1_anchor/golden_probe/manifest_probe_20260826_165413.json",
-      " D models/frozen_heuristics/v1_anchor/golden_probe/selfplay_probe_20260826_1654_g10.pkl",
+      " M engine/src/referee.rs",
+      " D models/frozen_heuristics/v1_anchor/golden_probe/manifest_probe_20260826_175304.json",
+      " D models/frozen_heuristics/v1_anchor/golden_probe/selfplay_probe_20260826_1753_g10.pkl",
       " D models/frozen_heuristics/v1_anchor/manifest.json",
       " M models/frozen_heuristics/v1_anchor/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
-      " D models/frozen_heuristics/v2huelle_generator/golden_probe/manifest_probe_20260826_165352.json",
-      " D models/frozen_heuristics/v2huelle_generator/golden_probe/selfplay_probe_20260826_1654_g10.pkl",
+      " D models/frozen_heuristics/v2huelle_generator/golden_probe/manifest_probe_20260826_175248.json",
+      " D models/frozen_heuristics/v2huelle_generator/golden_probe/selfplay_probe_20260826_1753_g10.pkl",
       " M models/frozen_heuristics/v2huelle_generator/manifest.json",
       " M models/frozen_heuristics/v2huelle_generator/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
-      "?? models/frozen_heuristics/v1_anchor/golden_probe/manifest_probe_20260826_175304.json",
-      "?? models/frozen_heuristics/v1_anchor/golden_probe/selfplay_probe_20260826_1753_g10.pkl",
-      "?? models/frozen_heuristics/v2huelle_generator/golden_probe/manifest_probe_20260826_175248.json",
-      "?? models/frozen_heuristics/v2huelle_generator/golden_probe/selfplay_probe_20260826_1753_g10.pkl",
+      " M tools/frozen_champion_worker.py",
+      " M tools/frozen_referee_match.py",
+      " M tools/probes/frozen_agent_referee_probe.py",
+      "?? evaluations/frozen_referee_match_v2huelle_generator.json",
+      "?? models/frozen_heuristics/v1_anchor/golden_probe/manifest_probe_20260826_181636.json",
+      "?? models/frozen_heuristics/v1_anchor/golden_probe/selfplay_probe_20260826_1816_g10.pkl",
+      "?? models/frozen_heuristics/v2huelle_generator/golden_probe/manifest_probe_20260826_181622.json",
+      "?? models/frozen_heuristics/v2huelle_generator/golden_probe/selfplay_probe_20260826_1816_g10.pkl",
       "?? models/manifest_train_hv2sanity_20260825_191036.json",
       "?? models/manifest_train_hv2sanity_20260825_191107.json",
       "?? models/manifest_train_hv2sanity_ptv_20260825_210744.json",
@@ -94,12 +99,12 @@
       "model": null
     },
     "dateien": [
-      "selfplay_probe_20260826_1753_g10.pkl"
+      "selfplay_probe_20260826_1816_g10.pkl"
     ],
     "pruefbefehl": "python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/v1_anchor"
   },
   "laufzeit": {
-    "wanduhr_s": 15.2,
+    "wanduhr_s": 14.9,
     "cpu_s": null,
     "threads": 11,
     "s_je_partie": null

@@ -152,6 +152,32 @@ class WorkerProc:
             self.proc.terminate()
 
 
+def golden_selbsttest_heuristik(worker_python, artifact_dir, repo) -> None:
+    """Golden-Selbsttest eines HEURISTIK-Artefakts: Self-Play-Reproduktion.
+
+    Die Welle-3-Sonde prueft Drafting-Zustaende und deckt fuer eine Heuristik
+    damit nur die halbe Identitaet ab (par.9). Hier laeuft stattdessen das
+    dafuer gebaute Werkzeug -- mit dem Interpreter des Artefakts, also als
+    KONSERVIERUNGS-Pruefung und nicht als Drift-Test.
+
+    Wirft `SystemExit` bei Abweichung. Es gibt bewusst keine Rueckgabe von
+    "Abweichungen zum Weiterreichen": ein Artefakt, das seine eigene Probe
+    nicht mehr trifft, darf nicht in eine Messung.
+    """
+    print(f"[referee] Golden-Selbsttest ({artifact_dir.name}): Self-Play-Reproduktion ...",
+          file=sys.stderr, flush=True)
+    r = subprocess.run(
+        [str(worker_python), "-X", "utf8", "-u",
+         str(repo / "tools" / "verify_frozen_heuristic.py"),
+         "--artifact-dir", str(artifact_dir), "--venv"],
+        cwd=str(repo), text=True, encoding="utf-8", capture_output=True)
+    if r.returncode != 0:
+        raise SystemExit(
+            f"GOLDEN-SELBSTTEST ROT ({artifact_dir.name}, Self-Play-Reproduktion). Verweigert."
+            + chr(10) + (r.stdout or "")[-1500:] + (r.stderr or "")[-1500:])
+    print(f"[referee] Golden-Selbsttest gruen ({artifact_dir.name}).", file=sys.stderr)
+
+
 def golden_selftest(worker: WorkerProc, golden_probe: dict) -> list[dict]:
     """Spielt golden_probe.json gegen den Worker nach, exakter Vergleich.
     Gibt die Liste der Abweichungen zurueck (leer = gruen)."""
@@ -169,7 +195,13 @@ def golden_selftest(worker: WorkerProc, golden_probe: dict) -> list[dict]:
 def play_one_game(
     mr,
     worker: WorkerProc,
-    model_a: str,
+    # Ist gesetzt, wenn auch die A-Seite ein gefrorenes Artefakt ist. Dann
+    # laeuft die Partie ARTEFAKT gegen ARTEFAKT, moeglicherweise auf zwei
+    # verschiedenen Wheels -- der Fall, fuer den die Prozess-Isolation aus
+    # par.8 ueberhaupt gebaut wurde (zwei Engine-Versionen passen nicht in
+    # einen Prozess). `model_a`/`spec_a` sind dann unbenutzt.
+    worker_a: WorkerProc | None,
+    model_a: str | None,
     spec_a: str | None,
     sims_a: int,
     c_puct_a: float,
@@ -188,6 +220,22 @@ def play_one_game(
     board_b = 1 - board_a
     model_p0 = model_a if board_a == 0 else artifact_model
     model_p1 = model_a if board_a == 1 else artifact_model
+
+    def worker_fuer(pi: int) -> WorkerProc:
+        """Der Worker der Seite `pi`.
+
+        Mit zwei Artefakten haengt an JEDER Anfrage, WELCHE Seite gefragt
+        wird -- die Seiten haben verschiedene Specs und moeglicherweise
+        verschiedene Wheels. Eine feste Zuordnung auf `worker` waere der
+        stille Fehler, bei dem ein Agent die Zuege des anderen bekommt.
+        """
+        if pi == board_a:
+            if worker_a is None:
+                raise RuntimeError(
+                    f"Seite {pi} ist in-process, wurde aber extern gefragt -- "
+                    "Widerspruch zwischen `externe_seiten` und der Besetzung.")
+            return worker_a
+        return worker
     guard = 0
     worker_calls_this_game = 0
     worker_wait_s = 0.0
@@ -212,12 +260,16 @@ def play_one_game(
             rg.finalize_scoring()
             break
         if status == "tiling":
-            rg.tiling_apply_external(json.dumps(worker.ask_tiling(rg.state_json())))
+            pi_t = rg.current_player()
+            rg.tiling_apply_external(json.dumps(worker_fuer(pi_t).ask_tiling(rg.state_json())))
             continue
         if status == "start_placement":
+            # `pending_start_placement_player()`, NICHT `current_player()`:
+            # in dieser Phase kann der Nicht-Starter zuerst dran sein.
             pi_start = rg.pending_start_placement_player()
             rg.start_placement_apply_external(json.dumps(
-                worker.ask_start_placement(rg.state_json(), pi_start, rg.game_seed())))
+                worker_fuer(pi_start).ask_start_placement(
+                    rg.state_json(), pi_start, rg.game_seed())))
             continue
         if status == "stuck":
             raise RuntimeError(
@@ -225,8 +277,11 @@ def play_one_game(
                 f"phase={rg.phase()} -- Diagnose noetig, kein stiller Fallback."
             )
         cur = rg.current_player()
-        if cur == board_a:
+        if cur == board_a and worker_a is None:
             rg.drafting_decide_and_apply_inprocess(model_a, spec_a, sims_a, c_puct_a)
+        elif cur == board_a:
+            action, _v = worker_a.ask(rg.state_json(), rg.pending_search_seed())
+            rg.drafting_apply_external(json.dumps(action))
         else:
             # PER-ENTSCHEIDUNG-Protokoll (par.8d): EINE Anfrage = EINE
             # Drafting-Entscheidung. `advance_to_decision` ist billig, wenn
@@ -261,7 +316,13 @@ def play_one_game(
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--artifact-dir", required=True)
-    ap.add_argument("--model-a", required=True, help="Modellpfad fuer Seite A (aktuelle Engine, in-process)")
+    ap.add_argument("--model-a", default=None,
+                    help="Modellpfad fuer Seite A (aktuelle Engine, in-process). "
+                         "Entfaellt bei --artifact-dir-a.")
+    ap.add_argument("--artifact-dir-a", default=None,
+                    help="Seite A ist ebenfalls ein gefrorenes Artefakt (eigener Worker, "
+                         "eigenes Wheel). Damit spielen zwei Artefakte GEGENEINANDER -- der "
+                         "Fall, fuer den die Prozess-Isolation gebaut wurde.")
     ap.add_argument("--spec-a", default=None, help="Such-Spec fuer Seite A (None = SearchConfig::from_env())")
     ap.add_argument("--sims-a", type=int, default=400)
     ap.add_argument("--c-puct-a", type=float, default=1.5)
@@ -307,29 +368,53 @@ def main() -> int:
     handshake = static_handshake(manifest, args.force_cross_era)
     print(f"[referee] Handshake: {handshake}", file=sys.stderr)
 
+    if not args.artifact_dir_a and not args.model_a:
+        raise SystemExit(
+            "Seite A ist unbesetzt: entweder --model-a (aktuelle Engine, in-process) "
+            "oder --artifact-dir-a (zweites gefrorenes Artefakt).")
+
     worker = WorkerProc(worker_python, worker_script, artifact_dir, args.sims_worker, args.c_puct_worker)
     time.sleep(0.2)  # Worker-Startzeit (Modell laden) -- erste Anfrage wartet ohnehin, reine Kulanz
 
-    golden_mismatches = []
-    if not args.skip_golden and ist_heuristik:
-        # Die Golden Probe einer Heuristik ist ein SELF-PLAY-Lauf, kein
-        # Drafting-Sondensatz (par.9: die Welle-3-Sonde deckt fuer eine
-        # Heuristik nur die halbe Identitaet ab). Statt sie zu ueberspringen,
-        # laeuft hier das dafuer gebaute Werkzeug -- mit der venv des
-        # Artefakts, also als Konservierungs-Pruefung.
-        print("[referee] Golden-Selbsttest (Heuristik): Self-Play-Reproduktion ...",
-              file=sys.stderr, flush=True)
-        r = subprocess.run(
-            [str(worker_python), "-X", "utf8", "-u",
-             str(REPO / "tools" / "verify_frozen_heuristic.py"),
-             "--artifact-dir", str(artifact_dir), "--venv"],
-            cwd=str(REPO), text=True, encoding="utf-8", capture_output=True)
-        if r.returncode != 0:
+    # --- Seite A als zweites Artefakt (optional)
+    worker_a = None
+    manifest_a = None
+    artifact_dir_a = None
+    if args.artifact_dir_a:
+        artifact_dir_a = Path(args.artifact_dir_a).resolve()
+        manifest_a = load_manifest(artifact_dir_a)
+        # DIESELBEN Tore wie fuer die B-Seite. Ein zweites Artefakt ohne
+        # Handshake und ohne Golden-Selbsttest waere die Haelfte der Zusage:
+        # die Verweigerung bei Aera-Mismatch ist genau das, was die Leiter
+        # zusammenhaelt.
+        handshake_a = static_handshake(manifest_a, args.force_cross_era)
+        print(f"[referee] Handshake A: {handshake_a}", file=sys.stderr)
+        eigene_a = [artifact_dir_a / "venv/Scripts/python.exe", artifact_dir_a / "venv/bin/python"]
+        py_a = next((q for q in eigene_a if q.exists()), None)
+        if "worker_python" in manifest_a:
+            py_a = artifact_dir_a / manifest_a["worker_python"]["interpreter_relative"]
+        if py_a is None:
             worker.close()
             raise SystemExit(
-                "GOLDEN-SELBSTTEST ROT (Self-Play-Reproduktion). Verweigert.\n"
-                + (r.stdout or "")[-1500:] + (r.stderr or "")[-1500:])
-        print("[referee] Golden-Selbsttest gruen (Self-Play-Reproduktion).", file=sys.stderr)
+                f"Keine venv in {artifact_dir_a}. Anlegen mit:" + chr(10) +
+                f"  python tools/verify_frozen_heuristic.py --artifact-dir {artifact_dir_a} "
+                "--build-venv")
+        if not args.skip_golden and manifest_a.get("typ") == "heuristik":
+            try:
+                golden_selbsttest_heuristik(py_a, artifact_dir_a, REPO)
+            except SystemExit:
+                worker.close()
+                raise
+        worker_a = WorkerProc(py_a, worker_script, artifact_dir_a, args.sims_a, args.c_puct_a)
+        time.sleep(0.2)
+
+    golden_mismatches = []
+    if not args.skip_golden and ist_heuristik:
+        try:
+            golden_selbsttest_heuristik(worker_python, artifact_dir, REPO)
+        except SystemExit:
+            worker.close()
+            raise
     elif not args.skip_golden:
         golden_probe = json.loads((artifact_dir / "golden_probe.json").read_text(encoding="utf-8"))
         golden_mismatches = golden_selftest(worker, golden_probe)
@@ -347,7 +432,8 @@ def main() -> int:
     else:
         seeds = [args.seed_base + i for i in range(args.n_games)]
 
-    names = ("EngineA", "ArtefaktB")
+    names = (manifest_a.get("artefakt", "ArtefaktA") if manifest_a else "EngineA",
+             manifest.get("artefakt") or manifest.get("champion") or "ArtefaktB")
     # Nur Artefakte, deren Worker das erweiterte Protokoll kennt, entscheiden
     # Startsetzung und Tiling selbst. Das Manifest-Feld `typ` gibt es seit
     # 2026-08-26; ein Welle-3-Netz-Artefakt hat es nicht und bleibt beim
@@ -368,6 +454,19 @@ def main() -> int:
             "ANDEREN Spieler zu messen als den eingefrorenen.\n"
             "Abhilfe: das Artefakt mit dem heutigen Wheel neu einfrieren.")
     externe_seiten_aktiv = ist_heuristik
+    # Auch die A-Seite entscheidet selbst, wenn sie ein protokollfaehiges
+    # Heuristik-Artefakt ist. Sonst kachelte SIE ueber den auf V1
+    # verdrahteten Referee-Pfad -- derselbe Fehler, nur auf der anderen Seite.
+    kinds_a = set(((manifest_a or {}).get("protokoll") or {}).get("kinds") or [])
+    a_ist_heuristik = (manifest_a or {}).get("typ") == "heuristik"
+    if a_ist_heuristik and not {"tiling", "start_placement"} <= kinds_a:
+        worker.close()
+        if worker_a:
+            worker_a.close()
+        raise SystemExit(
+            f"Artefakt A {artifact_dir_a.name} deklariert das erweiterte Protokoll nicht "
+            f"(protokoll.kinds={sorted(kinds_a) or 'fehlt'}). Neu einfrieren.")
+    externe_seiten_a_aktiv = a_ist_heuristik
     # Eine Heuristik hat kein `model.onnx`. Der Pfad wuerde zwar nie geladen
     # (fuer externe Seiten kehrt `advance_to_decision` vorher zurueck), aber
     # einen Pfad mitzugeben, der nicht existiert, ist eine Falle fuer den
@@ -381,16 +480,23 @@ def main() -> int:
     for i, seed in enumerate(seeds):
         first_player = i % 2
         board_a = i % 2  # Brettwechsel-Pflicht, wie paired_arena-Konvention
+        externe = []
+        if externe_seiten_aktiv:
+            externe.append(1 - board_a)
+        if externe_seiten_a_aktiv:
+            externe.append(board_a)
         g = play_one_game(
-            mr, worker, args.model_a, args.spec_a, args.sims_a, args.c_puct_a,
+            mr, worker, worker_a, args.model_a, args.spec_a, args.sims_a, args.c_puct_a,
             artefakt_modell, names, first_player, seed, board_a,
-            externe_seiten=[1 - board_a] if externe_seiten_aktiv else [],
+            externe_seiten=externe,
         )
         total_move_count += g["steps"]
         games.append(g)
         print(f"[referee] Partie {i + 1}/{len(seeds)} seed={seed}: {g['scores']} winner={g['winner']} steps={g['steps']}", file=sys.stderr)
     elapsed = time.perf_counter() - t_start
     worker.close()
+    if worker_a:
+        worker_a.close()
 
     result = {
         "artifact_dir": str(artifact_dir),
@@ -400,6 +506,8 @@ def main() -> int:
         "champion": manifest.get("champion"),
         "artefakt": manifest.get("artefakt"),
         "typ": manifest.get("typ", "netz"),
+        "seite_a": ({"artefakt": manifest_a.get("artefakt"), "typ": manifest_a.get("typ")}
+                    if manifest_a else {"modell": args.model_a, "typ": "aktuelle Engine"}),
         "handshake": handshake,
         "force_cross_era": args.force_cross_era,
         "golden_selftest": {"ran": not args.skip_golden, "mismatches": golden_mismatches},
