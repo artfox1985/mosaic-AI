@@ -268,10 +268,26 @@ Werkzeuge: `tools/freeze_heuristic.py`, `tools/verify_frozen_heuristic.py`
 (zwei getrennte Modi: Drift gegen aktuelles Wheel, Konservierung gegen das
 Artefakt-Wheel).
 
-**Noch nicht:** der Referee-Pfad (eine gefrorene Heuristik kann nicht in der
-Referee-Arena spielen -- der Worker beantwortet nur Drafting und braucht ein
-Netz) und das Entfernen der Quell-Konservierung (`round5_anchor.rs`, 1664
-Zeilen; Varianten-Faedelung 111 Stellen, davon 5 echte Verzweigungen).
+**REFEREE-PFAD GESCHLOSSEN** (par.10, vier Bausteine): ein gefrorener Agent
+trifft dort jetzt ALLE Entscheidungen selbst -- Startsetzung, Drafting,
+Platzierung. Getrennt wurden Regel-Autoritaet (bleibt beim Referee und prueft
+hart) und Entscheidungs-Autoritaet (gehoert dem Agenten). Wirkung belegt:
+v1 `[27,15]` gegen v2huelle `[63,27]` aus derselben Startlage.
+
+Sonden: `frozen_agent_referee_probe.py` (laeuft es / wirkt die Variante /
+prallt Unsinn ab) und `frozen_worker_protocol_probe.py` (echter
+Worker-Prozess, alle drei Anfragearten, ohne Modell).
+
+**Noch nicht:**
+
+* Entfernen der Quell-Konservierung -- `round5_anchor.rs` (1664 Zeilen) und
+  die Varianten-Faedelung (111 Stellen, davon 103 blosse Weitergabe, 5 echte
+  Verzweigungen). Der Weg ist jetzt frei, der Schritt gehoert in eigene
+  Commits.
+* Artefakt GEGEN Artefakt ueber `frozen_referee_match.py`: der Treiber faehrt
+  "aktuelle Engine gegen EIN Artefakt", seine A-Seite verlangt ein Modell.
+  Fuer zwei gefrorene Heuristiken braucht es einen netzlosen In-Process-Zweig
+  oder einen zweiten Worker.
 
 ### 2. Offen, mit Kosten
 
