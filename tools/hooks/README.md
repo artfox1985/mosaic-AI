@@ -8,15 +8,20 @@ Herleitung und Zeitbudgets: `docs/DESIGN_conventions_as_checks.md`,
 Abschnitt "Entscheid: LOKALER GIT-HOOK".
 
 Die Golden-Waechter A1-A4 aus dem Design-Dokument sind **gebaut** (Stand
-2026-08-21 geprueft) und laufen als Teil von `cargo test --release`, also im
-`pre-push`-Haken:
+2026-08-26 geprueft, Fundstellen und Zahlen an diesem Tag nachgezogen) und
+laufen als Teil von `cargo test --release`, also im `pre-push`-Haken:
 
 | | Waechter | Fundstelle |
 |---|---|---|
-| A1 | Testbestand als Regressionsnetz | `cargo test --release` (483 Tests) |
-| A2 | Laufzeit-Vertragsstempel | `engine/src/lib.rs:583`, exponiert in `engine_config_json()` |
-| A3 | Feature-Golden-Hash | `engine/src/features.rs:1375` (`feature_golden_hash_matches_fixture`) |
-| A4 | Heuristik-Anker-Verhaltenstest | `engine/src/mcts.rs:1271` ff., 200 Simulationen gegen Fixture |
+| A1 | Testbestand als Regressionsnetz | `cargo test --release` (553 Tests: 527 aktiv, 26 `#[ignore]`) |
+| A2 | Laufzeit-Vertragsstempel | `engine/src/lib.rs:647` (`contract_stamp_input`-Doku), Stempel exponiert in `engine_config_json()` (`lib.rs:741`) |
+| A3 | Feature-Golden-Hash | `engine/src/features.rs:1473` (`feature_golden_hash_matches_fixture`) |
+| A4 | Heuristik-Anker-Verhaltenstest | `engine/src/mcts.rs:1521` (`heuristic_anchor_choices_match_fixture`), plus `mcts.rs:1612` fuer die R5/v2-Variante |
+
+Die Fundstellen sind `datei:zeile` und driften mit jedem Refactoring -- der
+stabile Teil ist der Testname bzw. der Dateiname. Zwischen 2026-08-21 und
+2026-08-26 sind alle vier verrutscht (A3 um 98 Zeilen, A4 um 250), ohne dass
+etwas kaputt war.
 
 ## Aktivierung
 
@@ -38,7 +43,14 @@ bei Exit != 0 ab. Prueft nur die gestagten Dateien:
 2. Doku-Sprachkonvention (README.md englisch, STATUS.md/history.md deutsch)
 3. Keine neuen `#NN`-Task-Nummern (gegen `evaluations/TASK_NUMBER_REGISTRY.md`)
 4. Prereg-Index-Konsistenz (`evaluations/PREREG_*.md` <-> `PREREG_INDEX.md`)
-5. Stille Test-Skips (`warn_silent_test_skips`) -- **nur Warnung, kein
+5. Knopf-Doku aktuell (`docs/knobs.md` <-> `engine/src/knob_registry.rs`) --
+   die Tabelle ist GENERIERT; wer die Registratur aendert, laesst
+   `python tools/generate_knob_docs.py` laufen und committet die Doku mit.
+   Greift nur, wenn eine der beiden Dateien gestagt ist (gemessen 4 ms).
+   Ergaenzt 2026-08-26: der Rust-Waechter erzwingt, dass jeder Knopf im Code
+   REGISTRIERT ist, aber nichts erzwang, dass die abgeleitete Tabelle
+   mitwaechst.
+6. Stille Test-Skips (`warn_silent_test_skips`) -- **nur Warnung, kein
    Commit-Blocker.** Sucht fruehe `return` direkt hinter einer
    Voraussetzungs-Pruefung: ein stiller Skip besteht leer-gruen und prueft
    nichts. Die Heuristik ist grob, Nicht-Test-Treffer sind zu ignorieren.
@@ -82,7 +94,11 @@ Prueft, ob im zu pushenden Bereich `engine/src/` geaendert wurde. Wenn nein:
 sofortiger Durchlass. Wenn ja: `cargo test --release` in `engine/` (A1-A4,
 siehe Tabelle oben).
 
-**Budget: < 90 s**, aber nur wenn `engine/src/` betroffen ist -- sonst < 1 s.
+**Budget: < 90 s** laut Design-Dok, aber nur wenn `engine/src/` betroffen ist
+-- sonst < 1 s. **Gemessen 2026-08-26 (exklusiver Lauf): 97 s reine
+Testlaufzeit**, dazu die Kompilierung bei kaltem `target/`. Das Budget ist
+damit knapp gerissen; kein Handlungsbedarf, aber die Zahl steht hier, statt
+geschaetzt zu werden (CLAUDE.md "Laufzeiten messen, nicht schaetzen").
 
 ## Fehlalarm? `--no-verify`
 

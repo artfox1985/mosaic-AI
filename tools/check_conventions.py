@@ -6,7 +6,7 @@ Siehe docs/DESIGN_conventions_as_checks.md, Abschnitt
 (tools/hooks/pre-commit), Budget < 3 s -- daher NUR textnahe Pruefungen:
 keine Compilierung, kein Netz, keine Korpus-/Modell-Dateien.
 
-Vier harte Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg),
+Fuenf harte Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg),
 plus eine Warn-Regel 5 (stille Test-Skips, nur stderr -- Heuristik zu grob
 fuer einen Commit-Blocker, siehe dortiger Kommentar):
   1. Datei-Groessen-RATSCHE   -- tools/size_baseline.json, Schwelle 40 KB,
@@ -26,6 +26,11 @@ fuer einen Commit-Blocker, siehe dortiger Kommentar):
                                   Status-Kopf in Zeile 1, und der generierte
                                   Tabellenteil des Index muss dem Output von
                                   tools/generate_prereg_index.py entsprechen.
+  6. Knopf-Doku aktuell       -- docs/knobs.md ist GENERIERT aus
+                                  engine/src/knob_registry.rs; wer die
+                                  Registratur aendert, zieht die Doku im
+                                  selben Commit nach (gleiche Bauform wie
+                                  Regel 4, Generator per Import).
 
 CLI:
     python tools/check_conventions.py                    # ganzes Repo (manueller Lauf)
@@ -51,6 +56,8 @@ SIZE_BASELINE_PATH = REPO_ROOT / "tools" / "size_baseline.json"
 TASK_REGISTRY_PATH = REPO_ROOT / "evaluations" / "TASK_NUMBER_REGISTRY.md"
 PREREG_INDEX_PATH = REPO_ROOT / "evaluations" / "PREREG_INDEX.md"
 PREREG_DIR = REPO_ROOT / "evaluations"
+KNOB_REGISTRY_PATH = REPO_ROOT / "engine" / "src" / "knob_registry.rs"
+KNOB_DOCS_PATH = REPO_ROOT / "docs" / "knobs.md"
 
 # Ab welcher Groesse eine Datei ueberhaupt geratscht wird -- unterhalb darf sie
 # frei wachsen. Der Wert ist GESETZT, nicht hergeleitet: das Design-Dok begruendet
@@ -490,6 +497,54 @@ SILENT_SKIP_TRIGGER = re.compile(
 SILENT_SKIP_RETURN = re.compile(r"^\s*return(\s+Ok\(\(\)\))?\s*;\s*$")
 
 
+def check_knob_docs_current(staged_only: bool, staged_files: set[str]) -> list[str]:
+    """REGEL 6: docs/knobs.md muss dem Generator-Output entsprechen.
+
+    ANLASS 2026-08-26: der Waechter-Test in `knob_registry.rs` erzwingt, dass
+    jeder Knopf im Code REGISTRIERT ist -- aber nichts erzwang, dass die
+    daraus GENERIERTE Tabelle mitwaechst. Beim Nachtragen von
+    MOSAIC_IGNORE_POLICY_TARGET_VALID und MOSAIC_VAL_POOL war docs/knobs.md
+    prompt veraltet, und eine veraltete Knopf-Tabelle ist genau die Sorte
+    plausibler Zweitquelle, gegen die STATUS.md-Regel und REGEL 0 gebaut sind.
+
+    Bauform wie Regel 4: der Generator wird IMPORTIERT (kein Subprozess), das
+    Hook-Budget von < 3 s bleibt eingehalten. Quelle ist der rs-Parse, nicht
+    das Wheel -- der Haken darf keine Installation voraussetzen.
+    """
+    relevant = {"engine/src/knob_registry.rs", "docs/knobs.md"}
+    if staged_only and not (relevant & staged_files):
+        return []  # dieser Commit ruehrt weder Registratur noch Knopf-Doku an
+
+    if not KNOB_REGISTRY_PATH.exists():
+        return []  # kein Engine-Baum (z.B. Teil-Checkout) -- nichts zu pruefen
+
+    try:
+        sys.path.insert(0, str(REPO_ROOT / "tools"))
+        import generate_knob_docs as _gkd
+        expected = _gkd.render_markdown(_gkd.knobs_from_source(), "direkt geparst, kein Wheel noetig")
+    except Exception as e:  # Parse-/Import-Fehler sind selbst ein Befund
+        return [
+            f"REGEL 6 (Knopf-Doku aktuell): docs/knobs.md nicht pruefbar -- {type(e).__name__}: {e}\n"
+            "  Konsequenz: der Format-Vertrag zwischen knob_registry.rs und dem Generator ist "
+            "verletzt (typisch: ein KnobEntry ueber mehrere Zeilen umgebrochen).\n"
+            "  Ausweg: den Eintrag auf EINE Zeile bringen, dann "
+            "`python tools/generate_knob_docs.py` laufen lassen."
+        ]
+
+    current = KNOB_DOCS_PATH.read_text(encoding="utf-8") if KNOB_DOCS_PATH.exists() else ""
+    if current == expected:
+        return []
+    return [
+        "REGEL 6 (Knopf-Doku aktuell): docs/knobs.md entspricht nicht der Registratur in "
+        "engine/src/knob_registry.rs.\n"
+        "  Konsequenz: die einzige Uebersicht ueber die MOSAIC_*-Knoepfe zeigt einen "
+        "ueberholten Stand -- ein Knopf fehlt dort, traegt einen falschen Default oder einen "
+        "falschen Status. Genau die plausible Zweitquelle, die eine Sitzung kostet.\n"
+        "  Ausweg: `python tools/generate_knob_docs.py` laufen lassen und docs/knobs.md "
+        "mitcommitten (die Datei ist GENERIERT, nicht von Hand zu editieren)."
+    ]
+
+
 def warn_silent_test_skips(staged_only: bool, staged_files: set[str]) -> None:
     if staged_only:
         targets = [f for f in sorted(staged_files) if f.endswith(".rs")]
@@ -566,6 +621,7 @@ def main() -> int:
     violations += check_doc_language(staged_mode, staged_files)
     violations += check_no_new_task_numbers(staged_mode, staged_files)
     violations += check_prereg_index_consistency(staged_mode, staged_files)
+    violations += check_knob_docs_current(staged_mode, staged_files)
     warn_silent_test_skips(staged_mode, staged_files)  # Regel 5: nur Warnung, kein Exit-1
 
     if violations:

@@ -1354,7 +1354,7 @@ mod tests {
         let _ = features_for_layout(layout, &s);
     }
 
-    // ── A3 Feature-Golden-Hash (`evaluations/DESIGN_conventions_as_
+    // ── A3 Feature-Golden-Hash (`docs/DESIGN_conventions_as_
     // checks.md`, Abschnitt "A3") ───────────────────────────────────────
     //
     // QUANTISIERT (~1e-6), NICHT bitgenau (`f32::to_bits`): ein rustc-/LLVM-

@@ -644,7 +644,7 @@ fn onnx_eval(
         .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))
 }
 
-/// A2 (Laufzeit-Vertragsstempel, `evaluations/DESIGN_conventions_as_
+/// A2 (Laufzeit-Vertragsstempel, `docs/DESIGN_conventions_as_
 /// checks.md` Abschnitt "A2"): die kanonische Zeichenkette, aus der
 /// [`contract_hash`] gebildet wird. ÖFFENTLICH als eigener Schritt (statt
 /// direkt in `contract_hash` verdrahtet), damit ein Rust-Test die Herleitung

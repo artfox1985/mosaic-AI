@@ -107,6 +107,14 @@ sprechender Fehlermeldung:
   `PREREG_INDEX.md` und umgekehrt; Zaehler in den Abschnitts-
   Ueberschriften stimmen mit der Zeilenzahl.
 
+Diese vier Bullets sind der ENTWURFSSTAND. Spaeter dazugekommen (die
+Liste im Modulkopf von `tools/check_conventions.py` ist die aktuelle):
+eine Warn-Regel gegen stille Test-Skips (kein Commit-Blocker) und
+2026-08-26 die Regel **Knopf-Doku aktuell** -- `docs/knobs.md` ist aus
+`engine/src/knob_registry.rs` GENERIERT, und der Rust-Waechter erzwang
+zwar die Registrierung jedes Knopfes, nicht aber das Mitwachsen der
+abgeleiteten Tabelle.
+
 ## Stufe B -- manuelle Gatter (an den Installationsschritt gebunden)
 
 **B1 Paritaets-Probe ins Repo holen und reparieren.** Sie liegt heute in
