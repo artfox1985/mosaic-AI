@@ -159,8 +159,9 @@ from head_warmstart import apply_head_warmstart
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from train_manifest import (policy_carrier_report, corpus_composition,
                             write_train_manifest, _SELFPLAY_FILENAME_RE)
+from corpus_dataset import MosaicDataset
 from neural_net import (
-    MosaicNet, Mosaic2DNet, MosaicDataset, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
+    MosaicNet, Mosaic2DNet, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
     VALUE_SCHEMA_VERSION, encoder_from_state_dict, VALUE_HEAD_VARIANTS,
     value_head_variant_from_state, unpack_planes_batch, unpack_masks_batch, RANKING_TOPK,
 )

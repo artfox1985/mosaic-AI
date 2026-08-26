@@ -54,7 +54,8 @@ def _bau_teilmenge(args):
     """
     data_dir, dateien, kwargs, idx = args
     import neural_net  # erst im Worker importieren (spawn-sicher)
-    ds = neural_net.MosaicDataset(data_dir, files=list(dateien), **kwargs)
+    import corpus_dataset  # C 2026-08-27: MosaicDataset ist ausgezogen
+    ds = corpus_dataset.MosaicDataset(data_dir, files=list(dateien), **kwargs)
     return idx, ds.cache_path_h5, len(ds)
 
 
