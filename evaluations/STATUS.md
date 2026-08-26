@@ -450,6 +450,29 @@ Anker im IN-PROCESS-Pfad, und die Arenen benutzen weiter genau den.
 | Gewichtsfenster der Huelle | Messung | `PREREG_heuristic_v2_long_rows.md` par.3b.1 |
 | Serielle Referenz fuer den vollen Cache | 2,58 h | bevor der Cache eine Champion-Entscheidung traegt |
 
+### C2. Wheels leben ab jetzt IM Artefakt (Nutzer-Entscheid 2026-08-26)
+
+`models/frozen_wheels/` ist **entfernt**. Der Ordner war das Nebenprodukt
+EINER Nacht: der Kernbeweis (par.8f) war sechs Diagnoserunden rot, und jede
+brauchte ein installierbares Wheel -- zehn Stueck zwischen 23.08. 17:50 und
+24.08. 02:29, von denen genau EINES gefahren wird.
+
+Das gefahrene (`mosaic_rust_wave3g_20260824.whl`) liegt jetzt im
+v21-Artefakt. Vorher trug das Artefakt nur die Provenienz-Kopie
+(`searchconfig_wave1`) und NICHT das Wheel, das seine venv ausfuehrt -- ginge
+der Ordner verloren, waere die venv nicht wiederherstellbar gewesen. Belegt
+statt angenommen: der sha256 der kopierten Datei entspricht dem in
+`venv/.../direct_url.json`.
+
+**Regel ab jetzt: ein Wheel liegt im Artefakt, das es ausfuehrt** --
+`frozen_heuristics/<name>/` oder `frozen_champions/<name>/`. Kein
+Sammelordner, in dem Sackgassen und Gefahrenes nebeneinander liegen.
+
+Gegenprobe nach dem Loeschen: Referee-Lauf gruen, und v21s venv meldet
+weiterhin `contract_hash a169ebf0a4451e08` gegen `a3f61f246d9bbf5c` des
+aktuellen Builds -- zwei Engine-Versionen nebeneinander, genau wofuer die
+Kapselung gebaut wurde.
+
 ### D. Was NICHT ansteht
 
 * **v2 weiterentwickeln.** Nutzer-Entscheid 2026-08-26: "v2 ist durch". Es ist
