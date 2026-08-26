@@ -1382,35 +1382,6 @@ impl DraftingAgent for HeuristicSelfPlayAgent {
         _move_number: u64,
     ) -> DraftingDecision {
         let n = actions.len();
-        // v2-Vorzug ZUERST, wortgleich zu `HeuristicArenaAgent` -- Praeferenz
-        // statt Verbot, greift nur bei einem LEGALEN Zug. Das ist die Fassung,
-        // deren Verhalten VERMESSEN ist (Lehrer-Test: 0,798 volle Spalten gegen
-        // 0,086, PREREG_heuristic_v2_long_rows.md par.10). Ein weicherer
-        // Einbau -- Vorzug als Prior in die Suche -- waere ein Agent, den
-        // niemand gemessen hat, und die Suche koennte genau die
-        // Spaltenvollendungen wieder wegoptimieren, fuer die der Korpus da ist.
-        let vorzug: Option<Action> = None;
-        if let Some(a) = vorzug {
-            // Der Vorzug ist ein Override, kein Suchergebnis: das Policy-Ziel
-            // waere hier eine reine Eins auf dem erzwungenen Zug. So ein Ziel
-            // lehrt das Routing OHNE das Urteil dahinter, deshalb wird der
-            // Record fuer den Policy-Verlust als ungueltig markiert
-            // (`policy_target_valid=false`, neural_net.py:1858 setzt das
-            // Policy-Gewicht dann auf 0). Die VALUE-Labels bleiben gueltig --
-            // und die sind der Zweck dieses Korpus.
-            //
-            // Nebenwirkung mit Absicht: die Flagge IST damit der Zaehler fuer
-            // die Vorzugs-Feuerrate. Ein zweiter Schreiber existiert zwar
-            // (PCR), aber nur unter `--mode network`; in einem
-            // Heuristik-Korpus ist `policy_target_valid=false` eindeutig.
-            let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
-            return DraftingDecision {
-                policy: Some(vec![entry]),
-                policy_target_valid: Some(false),
-                vorzug: Some(a.clone()),
-                ..DraftingDecision::plain(a)
-            };
-        }
         // Aktionsabhängige Temperatur (Port self_play.py:172).
         let temp = if n > 50 { 0.7 } else if n > 15 { 0.4 } else { 0.15 };
         let (chosen, policy) = if n == 1 {

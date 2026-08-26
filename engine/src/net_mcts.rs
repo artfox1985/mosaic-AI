@@ -7051,7 +7051,7 @@ mod tests {
     /// Das Artefakt selbst bleibt lauffaehig: es bringt sein eigenes Wheel
     /// mit (`models/frozen_heuristics/v2huelle_generator/`).
     #[test]
-    fn search_config_from_spec_file_rejects_v2_variante() {
+    fn search_config_from_spec_file_rejects_v2_variant() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_v2_{}.json", std::process::id()));
         std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "v2huelle"}"#).unwrap();

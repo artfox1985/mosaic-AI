@@ -356,7 +356,7 @@ pub struct RefereeGame {
     /// Default: BEIDE Seiten sammelaufloesend -- das ist das Bestandsverhalten
     /// des Referees und damit der Stand, auf dem der Kernbeweis (par.8f) gruen
     /// ist.
-    sammelaufloesend: [bool; 2],
+    apply_via_chosen_action: [bool; 2],
 }
 
 /// Freie Funktion statt Methode (NICHT `&mut self`): so kann der Aufrufer
@@ -384,7 +384,7 @@ impl RefereeGame {
         let game = Game::start([names.0, names.1], first_player, ids, &mut rng);
         RefereeGame { game, rng, game_seed: seed, steps: 0, nets: std::collections::HashMap::new(),
                       pending_start_player: None,
-                      sammelaufloesend: [true, true] }
+                      apply_via_chosen_action: [true, true] }
     }
 
     /// Fork A (par.8b) + par.8d: exakte Variante -- traegt zusaetzlich zu den
@@ -392,7 +392,7 @@ impl RefereeGame {
     /// Sammlungen (Beutel/Turm/Kuppelstapel/Bonuschip-Pool) UND
     /// `pending_dome_choice_exact` (angefangener Kuppel-/Stapel-Zug, par.8d),
     /// die der Worker jetzt PFLICHT konsumiert (`choose_drafting_action_json`).
-    /// Setzt den Anwendungsmodus je Seite (siehe Feld `sammelaufloesend`).
+    /// Setzt den Anwendungsmodus je Seite (siehe Feld `apply_via_chosen_action`).
     ///
     /// `true` = wie die NETZ-Seite der Arena (`apply_chosen_action`,
     /// Sammelaufloesung des Stapelzugs), `false` = wie die HEURISTIK-Seite
@@ -402,8 +402,8 @@ impl RefereeGame {
     /// Muss gesetzt werden, wer eine Partie mit dem Arena-Pfad vergleichen
     /// will: der Default (beide sammelaufloesend) entspricht dort nur der
     /// Netz-Seite.
-    fn set_apply_modes(&mut self, sammelaufloesend: (bool, bool)) {
-        self.sammelaufloesend = [sammelaufloesend.0, sammelaufloesend.1];
+    fn set_apply_modes(&mut self, modes: (bool, bool)) {
+        self.apply_via_chosen_action = [modes.0, modes.1];
     }
 
     fn state_json(&self) -> String {
@@ -703,7 +703,7 @@ impl RefereeGame {
         };
         let dict = action_to_dict(&chosen);
         let pi_akt = self.game.state.current_player;
-        if self.sammelaufloesend[pi_akt] {
+        if self.apply_via_chosen_action[pi_akt] {
             apply_chosen_action(&mut self.game, chosen).map_err(PyValueError::new_err)?;
         } else {
             self.game.apply_drafting(&chosen).map_err(PyValueError::new_err)?;
@@ -802,7 +802,7 @@ impl RefereeGame {
             }
         };
         let pi = self.game.state.current_player;
-        if self.sammelaufloesend[pi] {
+        if self.apply_via_chosen_action[pi] {
             apply_chosen_action(&mut self.game, chosen).map_err(PyValueError::new_err)?;
         } else {
             // Nur die eine Aktion. Bei `DrawStackPeek` bleibt der Zug damit

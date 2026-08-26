@@ -62,7 +62,7 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "engine" / "py"))
 
-ZIEL_BASIS = _ROOT / "models" / "frozen_heuristics"
+TARGET_BASE = _ROOT / "models" / "frozen_heuristics"
 
 
 def _git(*args) -> str:
@@ -70,7 +70,7 @@ def _git(*args) -> str:
                           text=True, encoding="utf-8", timeout=30).stdout.strip()
 
 
-def _herkunft() -> dict:
+def _git_provenance() -> dict:
     """Commit UND Schmutzigkeit -- beides, oder das Feld ist wertlos."""
     dirty = bool(_git("status", "--porcelain"))
     return {
@@ -86,7 +86,7 @@ def _herkunft() -> dict:
     }
 
 
-def _herkunft(pfad) -> str:
+def _git_provenance(path) -> str:
     """Pfad OHNE Rechnerstruktur -- repo-relativ, sonst nur der Dateiname.
 
     Das Repo ist oeffentlich (CLAUDE.md, Nutzer-Entscheid 2026-08-17): keine
@@ -98,7 +98,7 @@ def _herkunft(pfad) -> str:
     Der Wert bleibt aussagekraeftig: er sagt WOHER im Repo die Datei kam
     (`engine/target/wheels/...`), nur nicht mehr, wie der Rechner heisst.
     """
-    p = pathlib.Path(pfad).resolve()
+    p = pathlib.Path(path).resolve()
     try:
         return p.relative_to(_ROOT).as_posix()
     except ValueError:
@@ -130,28 +130,28 @@ def main() -> int:
     # Golden-Probe-Lauf unten hart und das Artefakt entsteht gar nicht erst.
     # Eine zweite Liste hier waere eine zweite Wahrheit.
 
-    ziel = ZIEL_BASIS / a.name
-    if ziel.exists():
+    target = TARGET_BASE / a.name
+    if target.exists():
         raise SystemExit(
-            f"{ziel} existiert bereits. Ein Artefakt wird NICHT ueberschrieben -- "
+            f"{target} existiert bereits. Ein Artefakt wird NICHT ueberschrieben -- "
             "es ist der Bezugspunkt fuer alles, was darauf gemessen wurde. "
             "Neuer Name, oder das alte bewusst von Hand entfernen.")
-    ziel.mkdir(parents=True)
+    target.mkdir(parents=True)
     t0 = time.monotonic()
 
     # --- Wheel
     wheel = pathlib.Path(a.wheel) if a.wheel else max(
         (_ROOT / "engine" / "target" / "wheels").glob("mosaic_rust-*.whl"),
         key=lambda p: p.stat().st_mtime)
-    shutil.copy2(wheel, ziel / wheel.name)
+    shutil.copy2(wheel, target / wheel.name)
     print(f"Wheel: {wheel.name}", flush=True)
 
     # --- Tiling-Netz (nur wo noetig), als KOPIE
     tiling_net = None
     if a.tiling_net:
         src = pathlib.Path(a.tiling_net)
-        shutil.copy2(src, ziel / "tiling_net.onnx")
-        tiling_net = {"datei": "tiling_net.onnx", "quelle": _herkunft(src),
+        shutil.copy2(src, target / "tiling_net.onnx")
+        tiling_net = {"datei": "tiling_net.onnx", "quelle": _git_provenance(src),
                       "rolle": ("Stichentscheid im Tiling-Durchfall (self_play.rs:1234: die "
                                 "v2-Vorzugskarte greift nur, wenn sie einen Zug liefert -- sonst "
                                 "faellt es auf das Netz durch) und Erzeuger der "
@@ -161,13 +161,13 @@ def main() -> int:
     # --- Spec: was der Agent IST
     spec = {"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0,
             "heuristik_variante": a.variante}
-    (ziel / "spec.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n",
+    (target / "spec.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n",
                                     encoding="utf-8", newline="\n")
 
     # --- Golden Probe: der Referenzlauf, aus DIESEM Wheel
-    probe_dir = ziel / "golden_probe"
+    probe_dir = target / "golden_probe"
     probe_dir.mkdir()
-    rezept = {
+    recipe = {
         "mode": "mcts", "games": a.games, "sims": a.sims, "version": "probe",
         "threads": a.threads, "chunk": a.games, "per_file": a.games, "seed": a.seed,
         "c_puct": a.c_puct, "add_root_noise": True, "deterministic": False,
@@ -184,15 +184,15 @@ def main() -> int:
            # Aufrufers -- genau der Unterschied, den dieses Artefakt ausmacht.
            "--heuristik-variante", spec["heuristik_variante"]]
     if tiling_net:
-        cmd += ["--model", str(ziel / "tiling_net.onnx")]
+        cmd += ["--model", str(target / "tiling_net.onnx")]
     env = dict(os.environ, MOSAIC_DATA_DIR=str(probe_dir))
     print(f"Golden Probe: {a.games} Partien, Variante {a.variante} ...", flush=True)
     r = subprocess.run(cmd, cwd=str(_ROOT), env=env, text=True, encoding="utf-8")
     if r.returncode != 0:
         raise SystemExit(f"Golden-Probe-Lauf fehlgeschlagen (Code {r.returncode}) -- Artefakt "
-                         f"unvollstaendig, {ziel} von Hand entfernen.")
-    probe_dateien = sorted(p.name for p in probe_dir.glob("*.pkl"))
-    if not probe_dateien:
+                         f"unvollstaendig, {target} von Hand entfernen.")
+    probe_files = sorted(p.name for p in probe_dir.glob("*.pkl"))
+    if not probe_files:
         raise SystemExit("Golden-Probe-Lauf hat keine .pkl erzeugt -- Abbruch.")
 
     # --- Manifest
@@ -202,11 +202,11 @@ def main() -> int:
         "typ": "heuristik",
         "freeze_date": time.strftime("%Y-%m-%d"),
         "spec": spec,
-        "wheel": {"datei": wheel.name, "quelle": _herkunft(wheel),
+        "wheel": {"datei": wheel.name, "quelle": _git_provenance(wheel),
                   "rolle": ("Traeger des VERHALTENS. Bei einer Heuristik gibt es kein ONNX, "
                             "das es mittraegt -- ohne dieses Wheel ist der Agent weg.")},
         "tiling_net": tiling_net,
-        "herkunft": _herkunft(),
+        "herkunft": _git_provenance(),
         "contract_hash": json.loads(mr.engine_config_json()).get("contract_hash"),
         "engine_config": json.loads(mr.engine_config_json()),
         # WAS DER WORKER DIESES ARTEFAKTS BEANTWORTEN KANN. Geschrieben zur
@@ -231,21 +231,21 @@ def main() -> int:
                       " verdrahtet (referee.rs:312 -> self_play.rs:1207). Fuer eine Heuristik "
                       "waere das eine halbe Probe. Ein Self-Play-Lauf aus dem eigenen Wheel "
                       "deckt Drafting, Tiling und Runde 5 ab."),
-            "rezept": rezept,
-            "dateien": probe_dateien,
+            "rezept": recipe,
+            "dateien": probe_files,
             "pruefbefehl": (f"python -X utf8 -u tools/verify_frozen_heuristic.py "
                             f"--artifact-dir models/frozen_heuristics/{a.name}"),
         },
         "laufzeit": {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
                      "threads": a.threads, "s_je_partie": None},
     }
-    (ziel / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+    (target / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
                                         encoding="utf-8", newline="\n")
 
-    print(f"\nArtefakt: {ziel}")
+    print(f"\nArtefakt: {target}")
     print(f"  Wheel        {wheel.name}")
     print(f"  Variante     {a.variante}")
-    print(f"  Golden Probe {len(probe_dateien)} Datei(en), {a.games} Partien")
+    print(f"  Golden Probe {len(probe_files)} Datei(en), {a.games} Partien")
     print(f"  git_dirty    {manifest['herkunft']['git_dirty']}")
     print(f"\nvenv wird NICHT hier gebaut -- siehe tools/verify_frozen_heuristic.py --build-venv.")
     return 0

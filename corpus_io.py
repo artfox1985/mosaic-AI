@@ -38,15 +38,15 @@ GZIP_MAGIC = b"\x1f\x8b"
 COMPRESS_LEVEL = 6
 
 
-def ist_komprimiert(pfad) -> bool:
+def is_compressed(path) -> bool:
     """True, wenn die Datei gzip-Inhalt hat -- unabhaengig von der Endung."""
-    with open(pfad, "rb") as f:
+    with open(path, "rb") as f:
         return f.read(2) == GZIP_MAGIC
 
 
-def load_records(pfad):
+def load_records(path):
     """Laedt eine Korpus-Datei, komprimiert oder nicht."""
-    with open(pfad, "rb") as f:
+    with open(path, "rb") as f:
         if f.read(2) == GZIP_MAGIC:
             f.seek(0)
             with gzip.open(f, "rb") as g:
@@ -62,18 +62,18 @@ def load_records_fh(fh):
     in `neural_net.py` haengen rund 490 Zeilen darunter, und ein Dedent waere
     ein Riesendiff ohne Gegenwert.
     """
-    kopf = fh.read(2)
+    header = fh.read(2)
     fh.seek(0)
-    if kopf == GZIP_MAGIC:
+    if header == GZIP_MAGIC:
         with gzip.open(fh, "rb") as g:
             return pickle.load(g)
     return pickle.load(fh)
 
 
-def dump_records(pfad, obj, compress=True) -> None:
+def dump_records(path, obj, compress=True) -> None:
     """Schreibt eine Korpus-Datei. Standard komprimiert, Name bleibt `.pkl`."""
     if compress:
-        with open(pfad, "wb") as f:
+        with open(path, "wb") as f:
             with gzip.GzipFile(fileobj=f, mode="wb", compresslevel=COMPRESS_LEVEL,
                                # mtime=0: sonst steckt die Uhrzeit im gzip-Kopf und
                                # zwei Laeufe mit gleichem Inhalt ergaeben
@@ -81,10 +81,10 @@ def dump_records(pfad, obj, compress=True) -> None:
                                mtime=0) as g:
                 pickle.dump(obj, g)
     else:
-        with open(pfad, "wb") as f:
+        with open(path, "wb") as f:
             pickle.dump(obj, f)
 
 
-def corpus_files(data_dir, muster="*.pkl"):
+def corpus_files(data_dir, pattern="*.pkl"):
     """Sortierte Korpus-Dateiliste. Endung unveraendert -- siehe Modul-Doku."""
-    return sorted(glob.glob(os.path.join(data_dir, muster)))
+    return sorted(glob.glob(os.path.join(data_dir, pattern)))

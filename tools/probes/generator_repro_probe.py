@@ -38,7 +38,7 @@ sys.path.insert(0, str(_ROOT))
 from corpus_io import load_records  # noqa: E402
 
 
-def _partien(records):
+def _games(records):
     """Gruppiert die flache Schrittliste nach Partie.
 
     Die .pkl traegt eine flache Liste von Schritten; die Partie steht als Feld
@@ -47,23 +47,23 @@ def _partien(records):
     """
     if not records:
         return []
-    schluessel = None
-    for kandidat in ("game_id", "game", "gid", "partie"):
-        if kandidat in records[0]:
-            schluessel = kandidat
+    key_str = None
+    for candidate in ("game_id", "game", "gid", "partie"):
+        if candidate in records[0]:
+            key_str = candidate
             break
-    if schluessel is None:
+    if key_str is None:
         return [records]  # keine Kennung: als EINE Einheit vergleichen
-    partien, aktuell, letzte = [], [], object()
+    game_list, current, last = [], [], object()
     for r in records:
-        if r.get(schluessel) != letzte and aktuell:
-            partien.append(aktuell)
-            aktuell = []
-        letzte = r.get(schluessel)
-        aktuell.append(r)
-    if aktuell:
-        partien.append(aktuell)
-    return partien
+        if r.get(key_str) != last and current:
+            game_list.append(current)
+            current = []
+        last = r.get(key_str)
+        current.append(r)
+    if current:
+        game_list.append(current)
+    return game_list
 
 
 # Felder, die eine LAUF-Identitaet tragen und kein Verhalten. `game_id` ist
@@ -72,10 +72,10 @@ def _partien(records):
 # Ohne diese Ausnahme meldet der Vergleich Abweichung an Schritt 0 und
 # verdeckt, dass alles dahinter uebereinstimmt. Gefunden an genau diesem Fall:
 # die Selbstkontrolle zweier frischer Laeufe fiel nur hierueber.
-IDENTITAETS_FELDER = ("game_id",)
+IDENTITY_FIELDS = ("game_id",)
 
 
-def _erste_abweichung(a, b, ignoriere=IDENTITAETS_FELDER):
+def _first_divergence(a, b, ignore=IDENTITY_FIELDS):
     """Erste Abweichung als (schritt_index, feld, wert_a, wert_b) oder None.
 
     Meldet NAMENTLICH, welches Feld zuerst auseinanderlaeuft. Ein blosses
@@ -85,16 +85,16 @@ def _erste_abweichung(a, b, ignoriere=IDENTITAETS_FELDER):
     import numpy as np
 
     for i, (ra, rb) in enumerate(zip(a, b)):
-        felder = sorted((set(ra) | set(rb)) - set(ignoriere))
-        for f in felder:
+        fields = sorted((set(ra) | set(rb)) - set(ignore))
+        for f in fields:
             if f not in ra or f not in rb:
                 return i, f, "FEHLT" if f not in ra else "da", "FEHLT" if f not in rb else "da"
             va, vb = ra[f], rb[f]
             try:
-                gleich = bool(np.array_equal(np.asarray(va), np.asarray(vb)))
+                same = bool(np.array_equal(np.asarray(va), np.asarray(vb)))
             except Exception:
-                gleich = va == vb
-            if not gleich:
+                same = va == vb
+            if not same:
                 return i, f, repr(va)[:120], repr(vb)[:120]
     if len(a) != len(b):
         return min(len(a), len(b)), "<schrittzahl>", len(a), len(b)
@@ -109,27 +109,27 @@ def main() -> int:
     a = ap.parse_args()
 
     t0, c0 = time.monotonic(), time.process_time()
-    ref = load_records(a.referenz)
-    neu = load_records(a.neu)
-    print(f"Referenz: {a.referenz}  ({len(ref)} Schritte)", flush=True)
-    print(f"Neu:      {a.neu}  ({len(neu)} Schritte)", flush=True)
+    ref = load_records(a.reference)
+    new = load_records(a.new)
+    print(f"Referenz: {a.reference}  ({len(ref)} Schritte)", flush=True)
+    print(f"Neu:      {a.new}  ({len(new)} Schritte)", flush=True)
 
-    p_ref, p_neu = _partien(ref), _partien(neu)
+    p_ref, p_neu = _games(ref), _games(new)
     print(f"Partien: Referenz {len(p_ref)}, neu {len(p_neu)}", flush=True)
 
-    abw = _erste_abweichung(ref, neu)
-    identisch = abw is None and len(ref) == len(neu)
+    div = _first_divergence(ref, new)
+    identical = div is None and len(ref) == len(new)
 
-    befund = {
+    finding = {
         "frage": "Reproduziert der heutige Build den v22-Korpus-Erzeuger?",
-        "referenz": a.referenz, "neu": a.neu,
-        "schritte": {"referenz": len(ref), "neu": len(neu)},
+        "referenz": a.reference, "neu": a.new,
+        "schritte": {"referenz": len(ref), "neu": len(new)},
         "partien": {"referenz": len(p_ref), "neu": len(p_neu)},
-        "verdikt": "REPRODUZIERT" if identisch else "ABWEICHUNG",
-        "erste_abweichung": None if abw is None else {
-            "schritt": abw[0], "feld": abw[1], "referenz": abw[2], "neu": abw[3],
+        "verdikt": "REPRODUZIERT" if identical else "ABWEICHUNG",
+        "erste_abweichung": None if div is None else {
+            "schritt": div[0], "feld": div[1], "referenz": div[2], "neu": div[3],
         },
-        "ignorierte_felder": list(IDENTITAETS_FELDER),
+        "ignorierte_felder": list(IDENTITY_FIELDS),
         "hinweis": ("Verglichen wurden RECORDS ueber corpus_io, nicht Dateibytes -- der Korpus "
                     "ist umgepackt, die Bytes sind darum ohnehin verschieden. `game_id` traegt "
                     "einen Zeitstempel und ist Lauf-Identitaet, kein Verhalten."),
@@ -137,19 +137,19 @@ def main() -> int:
                      "cpu_s": round(time.process_time() - c0, 1),
                      "threads": 1, "s_je_partie": None},
     }
-    ziel = pathlib.Path(a.out)
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    ziel.write_text(json.dumps(befund, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
+    target = pathlib.Path(a.out)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(finding, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
 
-    if identisch:
+    if identical:
         print(f"\nREPRODUZIERT: {len(ref)} Schritte in {len(p_ref)} Partien, Feld fuer Feld gleich.")
     else:
-        print(f"\nABWEICHUNG: {befund['erste_abweichung']}", file=sys.stderr)
+        print(f"\nABWEICHUNG: {finding['erste_abweichung']}", file=sys.stderr)
         print("Der heutige Build erzeugt NICHT denselben Korpus. Das ist ein Befund, keine "
               "Panne -- der Erzeuger lief mit unversionierten Aenderungen (git_dirty).",
               file=sys.stderr)
-    print(f"Artefakt: {ziel}")
-    return 0 if identisch else 1
+    print(f"Artefakt: {target}")
+    return 0 if identical else 1
 
 
 if __name__ == "__main__":

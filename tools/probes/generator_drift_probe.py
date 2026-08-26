@@ -48,22 +48,22 @@ ENTSCHEIDUNGSMASS = "volle_spalten"
 WAECHTER_ANTEIL = 0.10
 
 
-def _blockwerte(pfad):
+def _blockwerte(path):
     """Kennzahlen EINER Korpusdatei, je Seite gemittelt.
 
     Spiegelt `corpus_sanity_check.auswerten`: Endzustand ist der Record mit
     gesetztem `winner`, die Strafleiste wird als groesste Laenge JE RUNDE
     aufsummiert (nicht als Endstand -- sie wird zwischendurch geleert).
     """
-    letzte, floor_max = {}, {}
-    for r in load_records(pfad):
+    last, floor_max = {}, {}
+    for r in load_records(path):
         gid = r.get("game_id")
         stt = r.get("state") or {}
         for pi, p in enumerate(stt.get("players", [])):
             k = (gid, pi, stt.get("round"))
             floor_max[k] = max(floor_max.get(k, 0), len(p.get("floor") or []))
         if r.get("winner") is not None:
-            letzte[gid] = r
+            last[gid] = r
     floor_je_seite = {}
     for (g, pi_, _r), v in floor_max.items():
         floor_je_seite[(g, pi_)] = floor_je_seite.get((g, pi_), 0) + v
@@ -72,7 +72,7 @@ def _blockwerte(pfad):
                            "teilspalten_ge3", "teilspalten_ge4", "max_hoehe",
                            "strafsteine", "punkte", "margin")}
     platten = {}
-    for gid, r in letzte.items():
+    for gid, r in last.items():
         stt = r["state"]
         ids = stt.get("scoring_tile_ids") or []
         sc = r.get("scores") or [p.get("score") for p in stt["players"]]
@@ -95,7 +95,7 @@ def _blockwerte(pfad):
     mittel = {k: (sum(v) / len(v) if v else float("nan")) for k, v in aus.items()}
     for k, v in platten.items():
         mittel[k] = sum(v) / len(v) if v else float("nan")
-    mittel["_partien"] = len(letzte)
+    mittel["_partien"] = len(last)
     return mittel
 
 
@@ -119,7 +119,7 @@ def main() -> int:
 
     t0, c0 = time.monotonic(), time.process_time()
     k_files = sorted(glob.glob(os.path.join(a.korpus, "selfplay_hv2_*.pkl")))[:a.n_dateien]
-    n_files = sorted(glob.glob(os.path.join(a.neu, "selfplay_hv2_*.pkl")))[:a.n_dateien]
+    n_files = sorted(glob.glob(os.path.join(a.new, "selfplay_hv2_*.pkl")))[:a.n_dateien]
     if len(k_files) != len(n_files):
         raise SystemExit(
             f"Ungleiche Blockzahl: Korpus {len(k_files)}, neu {len(n_files)}. "
@@ -154,7 +154,7 @@ def main() -> int:
                  and abs(h["ki_oben"]) < AEQUIVALENZGRENZE)
     ausserhalb = (abs(h["delta"]) > AEQUIVALENZGRENZE
                   and (h["ki_unten"] > AEQUIVALENZGRENZE or h["ki_oben"] < -AEQUIVALENZGRENZE))
-    verdikt = "VERHALTENSGLEICH" if innerhalb else ("MATERIELL VERSCHIEDEN" if ausserhalb
+    verdict = "VERHALTENSGLEICH" if innerhalb else ("MATERIELL VERSCHIEDEN" if ausserhalb
                                                     else "UNENTSCHIEDEN")
 
     # --- Waechter gegen den Tunnelblick (par.4): der Korpus ist nicht nur
@@ -167,24 +167,24 @@ def main() -> int:
         if bezug > 1e-9 and abs(v["delta"]) > WAECHTER_ANTEIL * bezug:
             gerissen.append({"kennzahl": key, "korpus": v["korpus"],
                              "neu": v["neu"], "delta": v["delta"]})
-    if gerissen and verdikt == "VERHALTENSGLEICH":
-        verdikt = "UNENTSCHIEDEN"
+    if gerissen and verdict == "VERHALTENSGLEICH":
+        verdict = "UNENTSCHIEDEN"
 
-    erg = {
+    out = {
         "prereg": "PREREG_generator_drift.md par.4",
-        "korpus": a.korpus, "neu": a.neu, "n_bloecke": len(k_files),
+        "korpus": a.korpus, "neu": a.new, "n_bloecke": len(k_files),
         "entscheidungsmass": ENTSCHEIDUNGSMASS,
         "aequivalenzgrenze": AEQUIVALENZGRENZE,
-        "verdikt": verdikt,
+        "verdikt": verdict,
         "waechter_gerissen": gerissen,
         "kennzahlen": kennzahlen,
         "laufzeit": {"wanduhr_s": round(time.monotonic() - t0, 1),
                      "cpu_s": round(time.process_time() - c0, 1),
                      "threads": 1, "s_je_partie": None},
     }
-    ziel = pathlib.Path(a.out)
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    ziel.write_text(json.dumps(erg, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
+    target = pathlib.Path(a.out)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
 
     print(f"\n{'Kennzahl':<22}{'Korpus':>10}{'neu':>10}{'Delta':>10}{'95%-KI':>20}")
     print("-" * 72)
@@ -192,10 +192,10 @@ def main() -> int:
         print(f"{key:<22}{v['korpus']:>10.3f}{v['neu']:>10.3f}{v['delta']:>+10.3f}"
               f"   [{v['ki_unten']:+.3f}, {v['ki_oben']:+.3f}]")
     print(f"\nEntscheidungsmass {ENTSCHEIDUNGSMASS}, Grenze +-{AEQUIVALENZGRENZE}")
-    print(f"VERDIKT: {verdikt}")
+    print(f"VERDIKT: {verdict}")
     if gerissen:
         print("Waechter gerissen bei:", ", ".join(g["kennzahl"] for g in gerissen))
-    print(f"Artefakt: {ziel}")
+    print(f"Artefakt: {target}")
     return 0
 
 

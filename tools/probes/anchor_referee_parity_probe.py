@@ -63,7 +63,7 @@ import mosaic_rust as mr  # noqa: E402
 V1_SPEC = str(_ROOT / "models/frozen_heuristics/v1_anchor/spec.json")
 
 
-def _spec_pruefen() -> None:
+def _check_spec() -> None:
     """Die Spec-Datei ist der REFERENZPUNKT -- sie darf sich nicht still aendern.
 
     Die Sonde zeigt in ein Artefaktverzeichnis. Wuerde das Artefakt neu
@@ -78,9 +78,9 @@ def _spec_pruefen() -> None:
             "anderen Variante misst sie etwas anderes, als ihr Name behauptet.")
 
 
-def referee_partie(model: str, spec_net: str | None, game_seed: int, first_player: int,
+def referee_game(model: str, spec_net: str | None, game_seed: int, first_player: int,
                    net_sims: int, heur_sims: int, c_puct: float, c: float,
-                   heuristik_extern: bool) -> dict:
+                   heuristic_external: bool) -> dict:
     """Netz auf Brett 0 (in-process), Heuristik auf Brett 1.
 
     `heuristik_extern` schaltet Platzierung und Startsetzung der Heuristik-Seite
@@ -94,13 +94,13 @@ def referee_partie(model: str, spec_net: str | None, game_seed: int, first_playe
     # Folgeschritte werden gesucht). Der Referee wandte bis 2026-08-26 immer
     # sammelaufloesend an und gab der Heuristik damit das Netz-Verhalten.
     rg.set_apply_modes((True, False))
-    extern = [1] if heuristik_extern else []
+    external = [1] if heuristic_external else []
     guard = 0
     while True:
         guard += 1
         if guard > 100_000:
             raise RuntimeError("Schrittlimit -- Haenger-Verdacht")
-        st = rg.advance_to_decision(model, None, extern)
+        st = rg.advance_to_decision(model, None, external)
         if st == "game_over":
             rg.finalize_scoring()
             break
@@ -138,41 +138,41 @@ def main() -> int:
     ap.add_argument("--out", default="evaluations/artifacts/anchor_referee_parity.json")
     a = ap.parse_args()
 
-    _spec_pruefen()
+    _check_spec()
     t0 = time.monotonic()
     seeds = [a.seed_base + i for i in range(a.games)]
 
     # --- Referenz: DER PFAD, AUF DEM DIE LEITER GEMESSEN IST
-    roh = json.loads(mr.net_arena_match(
+    raw = json.loads(mr.net_arena_match(
         a.model, a.net_sims, a.heur_sims, len(seeds), None, 1, a.c, a.c_puct,
         False, seeds, a.spec_net))
-    print(f"Anker-Pfad (net_arena_match): {len(roh)} Partien", flush=True)
+    print(f"Anker-Pfad (net_arena_match): {len(raw)} Partien", flush=True)
 
-    befunde = {"extern": [], "inprocess": []}
-    for modus in ("inprocess", "extern"):
-        for i, (g, s) in enumerate(zip(roh, seeds)):
-            r = referee_partie(a.model, a.spec_net, s, i % 2, a.net_sims, a.heur_sims,
-                               a.c_puct, a.c, heuristik_extern=(modus == "extern"))
-            gleich = (list(g["scores"]) == r["scores"]) and (int(g["steps"]) == r["steps"])
+    findings = {"extern": [], "inprocess": []}
+    for run_mode in ("inprocess", "extern"):
+        for i, (g, s) in enumerate(zip(raw, seeds)):
+            r = referee_game(a.model, a.spec_net, s, i % 2, a.net_sims, a.heur_sims,
+                               a.c_puct, a.c, heuristic_external=(run_mode == "extern"))
+            same = (list(g["scores"]) == r["scores"]) and (int(g["steps"]) == r["steps"])
             # Fortschritt SICHTBAR (CLAUDE.md 2026-08-25): der externe Durchgang
             # laeuft je Zug ueber die Prozessgrenze und braucht bei 20 Partien
             # mehrere Minuten. Ohne diese Zeile ist die einzige Antwort auf
             # "wie steht's?" ein Achselzucken -- und eine ABWEICHUNG faellt erst
             # am Ende auf, statt bei der Partie, in der sie entsteht.
-            print(f"    [{modus}] {i + 1}/{len(seeds)} seed={s} "
-                  f"{'=' if gleich else 'ABWEICHUNG'} {r['scores']}", flush=True)
-            befunde[modus].append({
-                "partie": i, "seed": s, "identisch": gleich,
+            print(f"    [{run_mode}] {i + 1}/{len(seeds)} seed={s} "
+                  f"{'=' if same else 'ABWEICHUNG'} {r['scores']}", flush=True)
+            findings[run_mode].append({
+                "partie": i, "seed": s, "identisch": same,
                 "anker": {"scores": list(g["scores"]), "steps": int(g["steps"])},
                 "referee": r,
             })
-        n_gl = sum(1 for x in befunde[modus] if x["identisch"])
-        print(f"  Referee, Heuristik {'EXTERN' if modus == 'extern' else 'in-process'}: "
-              f"{n_gl}/{len(seeds)} identisch", flush=True)
+        n_same = sum(1 for x in findings[run_mode] if x["identisch"])
+        print(f"  Referee, Heuristik {'EXTERN' if run_mode == 'extern' else 'in-process'}: "
+              f"{n_same}/{len(seeds)} identisch", flush=True)
 
-    gleich_extern = sum(1 for x in befunde["extern"] if x["identisch"])
-    verdikt = "GRUEN" if gleich_extern == len(seeds) else "ROT"
-    erg = {
+    same_external = sum(1 for x in findings["extern"] if x["identisch"])
+    verdict = "GRUEN" if same_external == len(seeds) else "ROT"
+    out = {
         "frage": ("Spielt der Referee-Pfad dieselben Partien wie net_arena_match "
                   "(der Pfad, auf dem die Elo-Leiter gemessen ist)?"),
         "referenz": "net_arena_match -> play_net_game -> unified_game_loop",
@@ -180,24 +180,24 @@ def main() -> int:
                           "verschiebt den Anker'. Das ist ein Nutzer-Entscheid, keine "
                           "Reparatur."),
         "partien": len(seeds), "net_sims": a.net_sims, "heur_sims": a.heur_sims,
-        "seeds": seeds, "verdikt": verdikt,
-        "identisch": {"extern": gleich_extern,
-                      "inprocess": sum(1 for x in befunde["inprocess"] if x["identisch"])},
-        "befunde": befunde,
+        "seeds": seeds, "verdikt": verdict,
+        "identisch": {"extern": same_external,
+                      "inprocess": sum(1 for x in findings["inprocess"] if x["identisch"])},
+        "befunde": findings,
         "laufzeit": {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
                      "threads": 1,
                      "s_je_partie": round((time.monotonic() - t0) / max(1, 2 * len(seeds)), 2)},
     }
-    ziel = pathlib.Path(a.out)
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    ziel.write_text(json.dumps(erg, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
-    print(f"\n{verdikt}\nArtefakt: {ziel}")
-    if verdikt == "ROT":
-        for d in befunde["extern"][:3]:
+    target = pathlib.Path(a.out)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
+    print(f"\n{verdict}\nArtefakt: {target}")
+    if verdict == "ROT":
+        for d in findings["extern"][:3]:
             if not d["identisch"]:
                 print(f"  Partie {d['partie']} (seed {d['seed']}): Anker {d['anker']} "
                       f"gegen Referee {d['referee']}", file=sys.stderr)
-    return 0 if verdikt == "GRUEN" else 1
+    return 0 if verdict == "GRUEN" else 1
 
 
 if __name__ == "__main__":

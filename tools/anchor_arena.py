@@ -33,10 +33,10 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "tools" / "probes"))
 
-ANKER = _ROOT / "models" / "frozen_heuristics" / "v1_anchor"
+ANCHOR = _ROOT / "models" / "frozen_heuristics" / "v1_anchor"
 
 
-def _kennzahlen(spiele: list[dict], name_netz: str, name_anker: str) -> dict:
+def _metrics(games: list[dict], name_net: str, name_anchor: str) -> dict:
     """Die sechs Standard-Kennzahlen aus den Partie-Logs (CLAUDE.md 2026-08-23).
 
     Wiederverwendet die vorhandenen Helfer statt eigener Regexe -- dieselbe
@@ -48,43 +48,43 @@ def _kennzahlen(spiele: list[dict], name_netz: str, name_anker: str) -> dict:
     from analyze_game_log import PATTERNS, ROUND_PREFIX
     from column_build_structural_probe import column_fill, reconstruct_game, struktur_kennzahlen
 
-    je_seite = defaultdict(lambda: defaultdict(list))
-    for g in spiele:
+    per_side = defaultdict(lambda: defaultdict(list))
+    for g in games:
         log = g.get("log") or []
-        zellen = reconstruct_game(log)
-        reihen, unlocks, strafe = defaultdict(Counter), Counter(), Counter()
-        for roh in log:
-            if roh.startswith("#"):
+        cells = reconstruct_game(log)
+        rows, unlocks, penalty = defaultdict(Counter), Counter(), Counter()
+        for raw in log:
+            if raw.startswith("#"):
                 continue
-            m = ROUND_PREFIX.match(roh)
-            text = m.group(2) if m else roh
+            m = ROUND_PREFIX.match(raw)
+            text = m.group(2) if m else raw
             tp = PATTERNS["TILING_PLACE"].match(text)
             if tp:
-                reihen[tp.group("name")][2 * int(tp.group("r")) + int(tp.group("si")) // 2] += 1
+                rows[tp.group("name")][2 * int(tp.group("r")) + int(tp.group("si")) // 2] += 1
                 if tp.group("special"):
                     unlocks[tp.group("name")] += 1
                 continue
             rs = PATTERNS["ROUND_STRAFE"].match(text)
             if rs:
-                strafe[rs.group("name")] += int(rs.group("pen"))
+                penalty[rs.group("name")] += int(rs.group("pen"))
         # Brett je Seite aus der Partie lesen, NICHT als 0/1 annehmen: der
         # Treiber wechselt die Bretter je Partie (paired_arena-Konvention).
-        b_netz = int(g["board_a"])
-        for idx, name in ((b_netz, name_netz), (1 - b_netz, name_anker)):
-            k = struktur_kennzahlen(column_fill(zellen.get(name, set())))
+        b_net = int(g["board_a"])
+        for idx, name in ((b_net, name_net), (1 - b_net, name_anchor)):
+            k = struktur_kennzahlen(column_fill(cells.get(name, set())))
             # NUR die Skalare: `struktur_kennzahlen` liefert zusaetzlich das
             # Listenfeld `fill` (die Fuellstaende je Spalte). Dieselbe Auswahl
             # wie `v2_envelope_arena.py` -- sonst sind die Zahlen nicht
             # vergleichbar, und genau das ist der Zweck der Standard-Kennzahlen.
-            for feld in ("volle_spalten", "max_hoehe", "teilspalten_ge3", "teilspalten_ge4"):
-                je_seite[name][feld].append(float(k[feld]))
-            je_seite[name]["spezial_freischaltungen"].append(float(unlocks.get(name, 0)))
-            je_seite[name]["strafpunkte"].append(float(strafe.get(name, 0)))
-            je_seite[name]["punkte"].append(float(g["scores"][idx]))
-            je_seite[name]["margin"].append(float(g["scores"][idx] - g["scores"][1 - idx]))
-            je_seite[name]["reihen"].append(float(sum(reihen.get(name, Counter()).values())))
+            for field in ("volle_spalten", "max_hoehe", "teilspalten_ge3", "teilspalten_ge4"):
+                per_side[name][field].append(float(k[field]))
+            per_side[name]["spezial_freischaltungen"].append(float(unlocks.get(name, 0)))
+            per_side[name]["strafpunkte"].append(float(penalty.get(name, 0)))
+            per_side[name]["punkte"].append(float(g["scores"][idx]))
+            per_side[name]["margin"].append(float(g["scores"][idx] - g["scores"][1 - idx]))
+            per_side[name]["reihen"].append(float(sum(rows.get(name, Counter()).values())))
     return {n: {f: (sum(v) / len(v) if v else 0.0) for f, v in d.items()}
-            for n, d in je_seite.items()}
+            for n, d in per_side.items()}
 
 
 def main() -> int:
@@ -96,20 +96,20 @@ def main() -> int:
     ap.add_argument("--n-games", type=int, default=200)
     ap.add_argument("--seed-base", type=int, default=900001)
     ap.add_argument("--workers", type=int, default=6)
-    ap.add_argument("--artifact-dir", default=str(ANKER))
+    ap.add_argument("--artifact-dir", default=str(ANCHOR))
     ap.add_argument("--out", default="evaluations/artifacts/anchor_arena.json")
     a = ap.parse_args()
 
-    anker = pathlib.Path(a.artifact_dir)
-    manifest = json.loads((anker / "manifest.json").read_text(encoding="utf-8"))
+    anchor = pathlib.Path(a.artifact_dir)
+    manifest = json.loads((anchor / "manifest.json").read_text(encoding="utf-8"))
     # Der Anker-NAME traegt den Build, nicht nur die Gattung (B3): zwei Kanten
     # gegen VERSCHIEDENE Anker-Builds saehen in der CSV sonst gleich aus.
-    anker_name = f"Heuristik_{manifest['artefakt']}"
+    anchor_name = f"Heuristik_{manifest['artefakt']}"
 
     t0 = time.monotonic()
     roh_out = pathlib.Path(a.out).with_suffix(".referee.json")
     cmd = [sys.executable, "-X", "utf8", "-u", str(_ROOT / "tools" / "frozen_referee_match.py"),
-           "--artifact-dir", str(anker), "--model-a", a.model,
+           "--artifact-dir", str(anchor), "--model-a", a.model,
            "--sims-a", str(a.net_sims), "--c-puct-a", "1.5",
            "--sims-worker", str(a.anchor_sims), "--c-puct-worker", "0.3",
            "--n-games", str(a.n_games), "--seed-base", str(a.seed_base),
@@ -121,52 +121,52 @@ def main() -> int:
         raise SystemExit(f"Referee-Serie fehlgeschlagen (Code {r.returncode}).")
 
     d = json.loads(roh_out.read_text(encoding="utf-8"))
-    spiele = d["games"]
-    netz_name = pathlib.Path(a.model).stem
+    games = d["games"]
+    net_name = pathlib.Path(a.model).stem
     # Die Namen im LOG stammen vom Treiber: Seite A heisst "EngineA" (kein
     # Artefakt), Seite B traegt den Artefaktnamen. Hier nicht raten -- die
     # Brett-Rekonstruktion schluesselt nach genau diesen Namen.
-    kz = _kennzahlen(spiele, "EngineA", manifest["artefakt"])
+    stats = _metrics(games, "EngineA", manifest["artefakt"])
 
-    erg = {
+    out = {
         "frage": "Wie stark ist das Netz gegen den EINGEFRORENEN Anker?",
         "netz": {"modell": a.model, "spec": a.spec, "sims": a.net_sims},
-        "anker": {"artefakt": str(anker).replace("\\", "/"), "name": anker_name,
+        "anker": {"artefakt": str(anchor).replace("\\", "/"), "name": anchor_name,
                   "sims": a.anchor_sims,
                   "wheel": manifest["wheel"]["datei"],
                   "spec": manifest["spec"]},
         "handshake": d.get("handshake"),
         "n_games": d["n_games"], "wins_netz": d["wins_a"], "wins_anker": d["wins_b"],
         "draws": d["draws"],
-        "kennzahlen": kz,
+        "kennzahlen": stats,
         # B3: die Zeile weiss, WO ihre Knoepfe stehen. `active_knobs()` des
         # Trackers erfasst die Prozessumgebung -- fuer ein Artefakt ist das die
         # falsche Quelle, seine Knoepfe liegen in spec.json.
         "elo_zeile": {
-            "player_a": netz_name, "sims_a": a.net_sims,
-            "player_b": anker_name, "sims_b": a.anchor_sims,
+            "player_a": net_name, "sims_a": a.net_sims,
+            "player_b": anchor_name, "sims_b": a.anchor_sims,
             "wins_a": d["wins_a"], "wins_b": d["wins_b"], "n": d["n_games"],
-            "knobs": f"spec:{anker}/spec.json",
+            "knobs": f"spec:{anchor}/spec.json",
         },
         "laufzeit": {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
                      "threads": a.workers,
                      "s_je_partie": round((time.monotonic() - t0) / max(1, d["n_games"]), 3)},
     }
-    ziel = pathlib.Path(a.out)
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    ziel.write_text(json.dumps(erg, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
+    target = pathlib.Path(a.out)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
 
-    print(f"\n{netz_name}@{a.net_sims} gegen {anker_name}@{a.anchor_sims}")
+    print(f"\n{net_name}@{a.net_sims} gegen {anchor_name}@{a.anchor_sims}")
     print(f"  {d['wins_a']} : {d['wins_b']} bei n={d['n_games']} "
           f"({100 * d['wins_a'] / max(1, d['n_games']):.1f} % fuer das Netz)")
     print("\nFertige Eintragung (NICHT automatisch ausgefuehrt -- der Tracker traegt nur ein, "
           "was ein Mensch beauftragt):")
-    print(f"  python tools/elo_tracker.py add --player-a {netz_name} --sims-a {a.net_sims} "
-          f"--player-b {anker_name} --sims-b {a.anchor_sims} "
+    print(f"  python tools/elo_tracker.py add --player-a {net_name} --sims-a {a.net_sims} "
+          f"--player-b {anchor_name} --sims-b {a.anchor_sims} "
           f"--wins-a {d['wins_a']} --wins-b {d['wins_b']} --n {d['n_games']} "
-          f"--knobs \"spec:{anker.name}/spec.json\" "
+          f"--knobs \"spec:{anchor.name}/spec.json\" "
           f"--comment \"Anker aus dem Artefakt (B2), Handshake gruen\"")
-    print(f"\nArtefakt: {ziel}")
+    print(f"\nArtefakt: {target}")
     return 0
 
 
