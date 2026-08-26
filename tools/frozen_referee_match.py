@@ -173,7 +173,7 @@ def play_one_game(
     spec_a: str | None,
     sims_a: int,
     c_puct_a: float,
-    artifact_model: str,
+    artifact_model: str | None,
     names: tuple[str, str],
     first_player: int,
     seed: int,
@@ -277,7 +277,28 @@ def main() -> int:
 
     artifact_dir = Path(args.artifact_dir).resolve()
     manifest = load_manifest(artifact_dir)
-    worker_python = artifact_dir / manifest["worker_python"]["interpreter_relative"]
+    ist_heuristik = manifest.get("typ") == "heuristik"
+    # Welle-3-Netz-Artefakte tragen ihren Interpreter im Manifest. Ein
+    # Heuristik-Artefakt tut das nicht -- seine venv wird bei Bedarf gebaut
+    # (verify_frozen_heuristic.py --build-venv) und ist bewusst nicht
+    # versioniert.
+    if "worker_python" in manifest:
+        worker_python = artifact_dir / manifest["worker_python"]["interpreter_relative"]
+    else:
+        eigene = [artifact_dir / "venv/Scripts/python.exe", artifact_dir / "venv/bin/python"]
+        gefunden = next((p for p in eigene if p.exists()), None)
+        if gefunden is None:
+            # KEIN stiller Rueckfall: das Artefakt auf dem AKTUELLEN Wheel zu
+            # fahren beantwortet die Drift-Frage, nicht die Konservierungs-
+            # Frage. Beides ist nuetzlich, aber es sind verschiedene Fragen,
+            # und ein Bericht, der sie vermengt, ist wertlos.
+            raise SystemExit(
+                f"Keine venv in {artifact_dir}. Anlegen mit:\n"
+                f"  python tools/verify_frozen_heuristic.py --artifact-dir {artifact_dir} "
+                f"--build-venv\n"
+                "Ohne sie liefe das Artefakt auf dem heutigen Wheel -- das waere ein "
+                "Drift-Test, kein Match gegen den eingefrorenen Agenten.")
+        worker_python = gefunden
     worker_script = REPO / "tools" / "frozen_champion_worker.py"
 
     sys.path.insert(0, str(REPO))
@@ -290,7 +311,26 @@ def main() -> int:
     time.sleep(0.2)  # Worker-Startzeit (Modell laden) -- erste Anfrage wartet ohnehin, reine Kulanz
 
     golden_mismatches = []
-    if not args.skip_golden:
+    if not args.skip_golden and ist_heuristik:
+        # Die Golden Probe einer Heuristik ist ein SELF-PLAY-Lauf, kein
+        # Drafting-Sondensatz (par.9: die Welle-3-Sonde deckt fuer eine
+        # Heuristik nur die halbe Identitaet ab). Statt sie zu ueberspringen,
+        # laeuft hier das dafuer gebaute Werkzeug -- mit der venv des
+        # Artefakts, also als Konservierungs-Pruefung.
+        print("[referee] Golden-Selbsttest (Heuristik): Self-Play-Reproduktion ...",
+              file=sys.stderr, flush=True)
+        r = subprocess.run(
+            [str(worker_python), "-X", "utf8", "-u",
+             str(REPO / "tools" / "verify_frozen_heuristic.py"),
+             "--artifact-dir", str(artifact_dir), "--venv"],
+            cwd=str(REPO), text=True, encoding="utf-8", capture_output=True)
+        if r.returncode != 0:
+            worker.close()
+            raise SystemExit(
+                "GOLDEN-SELBSTTEST ROT (Self-Play-Reproduktion). Verweigert.\n"
+                + (r.stdout or "")[-1500:] + (r.stderr or "")[-1500:])
+        print("[referee] Golden-Selbsttest gruen (Self-Play-Reproduktion).", file=sys.stderr)
+    elif not args.skip_golden:
         golden_probe = json.loads((artifact_dir / "golden_probe.json").read_text(encoding="utf-8"))
         golden_mismatches = golden_selftest(worker, golden_probe)
         if golden_mismatches:
@@ -313,7 +353,26 @@ def main() -> int:
     # 2026-08-26; ein Welle-3-Netz-Artefakt hat es nicht und bleibt beim
     # Bestandsverhalten -- sein Worker laeuft auf einem aelteren Wheel und
     # wuerde eine Tiling-Anfrage als Drafting missverstehen.
-    externe_seiten_aktiv = manifest.get("typ") == "heuristik"
+    # Eine Heuristik MUSS ihre Platzierung selbst entscheiden -- sonst kachelt
+    # sie ueber den auf V1 verdrahteten Referee-Pfad und ist ein anderer
+    # Spieler als der eingefrorene. Kann ihr Wheel das nicht, wird verweigert.
+    kinds = set((manifest.get("protokoll") or {}).get("kinds") or [])
+    if ist_heuristik and not {"tiling", "start_placement"} <= kinds:
+        worker.close()
+        raise SystemExit(
+            f"Artefakt {artifact_dir.name} deklariert das erweiterte Protokoll nicht "
+            f"(protokoll.kinds={sorted(kinds) or 'fehlt'}).\n"
+            "Sein Wheel stammt aus der Zeit vor Bausteinen 3/4 und kann Platzierung und "
+            "Startsetzung nicht selbst entscheiden. Es hier trotzdem zu fahren hiesse, es "
+            "ueber den auf V1 verdrahteten Referee-Pfad kacheln zu lassen -- also gegen einen "
+            "ANDEREN Spieler zu messen als den eingefrorenen.\n"
+            "Abhilfe: das Artefakt mit dem heutigen Wheel neu einfrieren.")
+    externe_seiten_aktiv = ist_heuristik
+    # Eine Heuristik hat kein `model.onnx`. Der Pfad wuerde zwar nie geladen
+    # (fuer externe Seiten kehrt `advance_to_decision` vorher zurueck), aber
+    # einen Pfad mitzugeben, der nicht existiert, ist eine Falle fuer den
+    # naechsten Leser.
+    artefakt_modell = None if ist_heuristik else str(artifact_dir / "model.onnx")
     print(f"[referee] externe Platzierung/Startsetzung: "
           f"{'AN' if externe_seiten_aktiv else 'aus (Netz-Artefakt)'}", file=sys.stderr)
     games = []
@@ -324,7 +383,7 @@ def main() -> int:
         board_a = i % 2  # Brettwechsel-Pflicht, wie paired_arena-Konvention
         g = play_one_game(
             mr, worker, args.model_a, args.spec_a, args.sims_a, args.c_puct_a,
-            str(artifact_dir / "model.onnx"), names, first_player, seed, board_a,
+            artefakt_modell, names, first_player, seed, board_a,
             externe_seiten=[1 - board_a] if externe_seiten_aktiv else [],
         )
         total_move_count += g["steps"]
