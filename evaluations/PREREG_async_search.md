@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inference_path.md`) strukturell scheitert? | Beleg: ENTSCHIEDEN, nachgetragen 2026-08-21 (das Verdikt selbst fiel 2026-08-14): JA fuer den Batch (99,7 % Fuellung bei N=128), NEIN fuer den Zweck -- Stufe 3 wurde mit DIESEM Async-Pfad als Vehikel in `PREREG_gpu_inference_path.md` §20-§23 vermessen; nach Condvar-Fix (0,053x -> 0,98x) bleibt das Maximum 1,255x (Doppel-Prozess-Aggregat) gegen den ehrlichen Sync-Nenner 528,5 Partien/h @ 11 Faeden -- Gate C (>= 2,0x) VERFEHLT, Weg geschlossen bis zum groesseren Netz. Korrektheit war durchweg gruen: Gate A 0/1148; Gate B Spielgeschehen 0/16 bit-identisch; die Trainingsziel-Divergenz ist Task-#71-Wall-Clock (eigene Prereg `PREREG_deterministic_labels.md`, ENTSCHIEDEN). Code NICHT in main -- Archiv-Branches `async_search_stage{1,3}_archive`; Worktrees wt_async/wt_async2 entfernt. Abschluss: Abschnitt 13. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inference_path.md`) strukturell scheitert? | Beleg: ENTSCHIEDEN, nachgetragen 2026-08-21 (das Verdikt selbst fiel 2026-08-14): JA fuer den Batch (99,7 % Fuellung bei N=128), NEIN fuer den Zweck -- Stufe 3 wurde mit DIESEM Async-Pfad als Vehikel in `PREREG_gpu_inference_path.md` §20-§23 vermessen; nach Condvar-Fix (0,053x -> 0,98x) bleibt das Maximum 1,255x (Doppel-Prozess-Aggregat) gegen den ehrlichen Sync-Nenner 528,5 Partien/h @ 11 Faeden -- Gate C (>= 2,0x) VERFEHLT, Weg geschlossen bis zum groesseren Netz. Korrektheit war durchweg gruen: Gate A 0/1148; Gate B Spielgeschehen 0/16 bit-identisch; die Trainingsziel-Divergenz ist Task-#71-Wall-Clock (eigene Prereg `PREREG_deterministic_labels.md`, ENTSCHIEDEN). Code NICHT in main -- Archiv-Tags `archive/async_search_stage{1,3}` (bis 2026-08-27 gleichnamige Branches, seither Tags); Worktrees wt_async/wt_async2 entfernt. Abschluss: Abschnitt 13. -->
 
 # Vorregistrierung: Async-Suche (Drafting-Suche als Zustandsautomat)
 
@@ -948,9 +948,19 @@ schliesst die Luecke:
   Weg V scheiterte (~14,6), wurde erreicht und uebertroffen (mittl. Batch
   87-128, Fuellung 99,7 %) -- es hat nur nicht gereicht, weil der ehrliche
   Sync-Nenner hoeher lag als der alte Bezug.
-- **Verbleib des Codes**: nie in main gemerged; gesichert in den Branches
-  `async_search_stage1_archive` / `async_search_stage3_archive`. Die
-  Worktrees `scratchpad/wt_async{,2}` sind entfernt. Der Gate-B-Retest aus
+- **Verbleib des Codes**: nie in main gemerged; gesichert in den annotierten
+  Tags `archive/async_search_stage1` (3 Commits, Spitze 98ea99f) und
+  `archive/async_search_stage3` (6 Commits, Spitze 9881fc9). Bis 2026-08-27
+  waren das die gleichnamigen Branches `async_search_stage{1,3}_archive`;
+  umgestellt beim Aufraeumen, damit die Branch-Liste nur noch main zeigt --
+  die Commits sind ueber die Tags unveraendert erreichbar. Die Refs sind NUR
+  LOKAL, origin fuehrt sie nicht. Ein Rebase auf main waere kein Rebase,
+  sondern ein Port: seit der Abzweigung (Basis d25f2f9) ist self_play.rs um
+  3221+/861- und net_mcts.rs um 2447+/1081- gewandert, und der Batch-Vertrag
+  in net_batcher.rs ging von 4 auf 6 Spalten (Ownership-Verbraucher); der
+  Versuch am 2026-08-27 blieb am ERSTEN der 9 Commits mit Konflikten in
+  net_batcher.rs (3 Bloecke) und round_transition_deep.rs (1 Block) stehen.
+  Die Worktrees `scratchpad/wt_async{,2}` sind entfernt. Der Gate-B-Retest aus
   `PREREG_deterministic_labels.md` Punkt 4 ("bis wt_async2 frei ist") ist
   damit gegenstandslos -- der Strang, den er absichern sollte, ist zu.
 - **Nicht mehr gueltige Einordnung in §6**: die dortige Prioritaets-
