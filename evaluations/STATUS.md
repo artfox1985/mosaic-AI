@@ -380,11 +380,23 @@ Stapelzieh-Ereignisse je Partie, 7,6 Prozent aller Schritte**. Caveat: die
 Zaehlung erfasst jedes einzelne Ziehen, und eine Sammelaufloesung erzeugt
 mehrere -- die Zahl der betroffenen WURZEL-Entscheidungen ist kleiner.
 
-**NICHT angefasst.** Der Bestand ist der Elo-Bezug, und die reparierte
-Abbruchregel liegt bereits als Knopf daneben
-(`MOSAIC_STACK_DRAW_RESERVATION`, `PREREG_stack_draw_reservation_rule.md`
-par.5b, Default AUS). Neu ist hier nur die ASYMMETRIE zwischen Korpus und
-Netz-Self-Play und ihre Haeufigkeit.
+**ES GIBT DAFUER SCHON EINE PREREG:** `PREREG_chance_nodes.md`. Ihre
+Entscheidungsregel 4 verlangt den Kontrollfluss-Knopf "ins naechste
+Self-Play", und das war zweimal nicht erfolgt. **Sie ist seit v22 erfuellt --
+ohne dass der Knopf je gesetzt wurde** (dort par.13, gemessen 2026-08-26): der
+Erzeuger ist auf die Heuristik gewechselt, die ohnehin per Entscheidung
+aufloest. Im Korpus stehen `choose_draw_stack_slot` in 2,5 Prozent der
+Datensaetze (gegen "0 von 16.322" im Bestandskorpus) und tragen dabei zu
+**100 Prozent** ein gueltiges Policy-Ziel.
+
+**NICHT angefasst.** Die reparierte Abbruchregel liegt bereits als Knopf
+daneben (`MOSAIC_STACK_DRAW_RESERVATION`,
+`PREREG_stack_draw_reservation_rule.md` par.5b, Default AUS). Offen bleibt der
+Kontrollfluss im NETZ-Self-Play -- eine Arena-Frage.
+
+**Sie ist seit heute billiger:** der Anker liegt als Artefakt vor, und der
+Knopf beruehrt ohnehin nur die NETZ-Seite (die Heuristik-Seite der Ankerarena
+traegt `false`). Ein Umschalten aendert den SPIELER, nicht den MASSSTAB.
 
 **Was sich durch die Kapselung geaendert hat:** der Anker liegt jetzt als
 Artefakt vor und ist gegen eine Aenderung an dieser Stelle geschuetzt. Die

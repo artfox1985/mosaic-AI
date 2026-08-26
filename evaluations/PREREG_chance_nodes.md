@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: GROSSTEILS GELIEFERT, Rest GEPARKT (Kopf aktualisiert 2026-08-21). Scharf in Produktion: die R5-Zufallsknoten (`MOSAIC_R5_CHANCE_NODES`, Default an seit 2026-08-10, round5.rs ist seitdem Expectiminimax; Vorzeichen-Sonde H0, t=-0,71) -- der round5-Min-Knoten-Fix c83fb35 lebt in genau diesem Loeser. Gemessen: Teil C (Platte-6/Peek-Interaktion IST gelernt, Policy-Masse +0,079, 3x staerker als jede andere Platte) sowie Weg A/Teil D/Teil E. Gebaut, Default aus: Kontrollfluss `MOSAIC_STACK_DRAW_RESEARCH` -- Entscheidungsregel 4 ("ins naechste Self-Play") ist inzwischen ZWEIMAL nicht erfolgt (Ownership- und Asym-Korpus, dort je bewusst wg. Regel 3). OFFEN und GEPARKT (Arbeitskreis "Spaeter", Nutzer 2026-08-21): Teil B1 (`MOSAIC_STACK_DRAW_CHANCE`, Ein-Schritt-Erwartung am Peek -- nie gebaut, null Code-Treffer) + Teil A1 (Bekannt-Segment-Zaehler); als Paket mit `PREREG_stack_top_feature.md` zu heben (dieselbe blinde Zone: das Merkmal gibt dem NETZ die oberste Rueckseite, B1 gibt der SUCHE die korrekte Peek-Bewertung). -->
+<!-- STATUS: OFFEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: GROSSTEILS GELIEFERT, Rest GEPARKT (Kopf aktualisiert 2026-08-21). Scharf in Produktion: die R5-Zufallsknoten (`MOSAIC_R5_CHANCE_NODES`, Default an seit 2026-08-10, round5.rs ist seitdem Expectiminimax; Vorzeichen-Sonde H0, t=-0,71) -- der round5-Min-Knoten-Fix c83fb35 lebt in genau diesem Loeser. Gemessen: Teil C (Platte-6/Peek-Interaktion IST gelernt, Policy-Masse +0,079, 3x staerker als jede andere Platte) sowie Weg A/Teil D/Teil E. Gebaut, Default aus: Kontrollfluss `MOSAIC_STACK_DRAW_RESEARCH`. ENTSCHEIDUNGSREGEL 4 IST SEIT v22 ERFUELLT, ohne dass der Knopf je gesetzt wurde (par.13, gemessen 2026-08-26): der Erzeuger ist auf die HEURISTIK gewechselt, und die laeuft ohnehin auf apply_via_chosen_action=false, loest den Stapelzug also per Entscheidung auf. Im v22-Korpus stehen choose_draw_stack_slot in 2,5 Prozent der Datensaetze (215 von 8.700 in 5 Dateien) und choose_dome_rotation in 9,2 Prozent -- gegen "0 von 16.322" im Bestandskorpus. Der Slot traegt dabei zu 100 Prozent ein gueltiges Policy-Ziel (der v2-Vorzug greift dort nicht, die Suche entscheidet). Die zuvor zweimal aufgeschobene Regel (Ownership- und Asym-Korpus, je wg. Regel 3) ist damit gegenstandslos, nicht ein drittes Mal offen. OFFEN und GEPARKT (Arbeitskreis "Spaeter", Nutzer 2026-08-21): Teil B1 (`MOSAIC_STACK_DRAW_CHANCE`, Ein-Schritt-Erwartung am Peek -- nie gebaut, null Code-Treffer) + Teil A1 (Bekannt-Segment-Zaehler); als Paket mit `PREREG_stack_top_feature.md` zu heben (dieselbe blinde Zone: das Merkmal gibt dem NETZ die oberste Rueckseite, B1 gibt der SUCHE die korrekte Peek-Bewertung). -->
 
 # Vorregistrierung: Wahrscheinlichkeiten statt Welten (Zufallsknoten)
 
@@ -946,3 +946,64 @@ completed-Q; bei <=9 Slots x 4 Rotationen ist der Unterraum damit praktisch
 abgedeckt. Generation eins sucht dort also ohne Vorsortierung, aber nicht
 blind -- ein Zwei-Generationen-Vorlauf, der vorher notiert ist, damit er
 hinterher nicht als Fehlschlag gelesen wird.
+
+
+## par.13 Regel 4 ist erfuellt -- durch den Erzeugerwechsel, nicht durch den Knopf (2026-08-26)
+
+**Anlass:** beim Nachgehen der Anker-Frage (PREREG_agent_encapsulation.md
+par.10b) fiel auf, dass `apply_via_chosen_action` je Seite verschieden gesetzt
+ist -- und dass der v22-Korpus damit auf der Seite steht, die Regel 4 wollte.
+
+### Der Befund
+
+`apply_via_chosen_action` entscheidet, ob ein Stapelzug SAMMELAUFGELOEST wird
+(`resolve_and_apply_stack_draw` waehlt Platte, Slot und Rotation per
+`best_eval_for_tile`) oder ob nur der Peek angewandt wird und die
+Folgeschritte GESUCHT werden:
+
+| Pfad | Wert | Stapelzug |
+| --- | --- | --- |
+| `play_heuristic_self_play_game` (self_play.rs:2255) | `false` | per Entscheidung, **gesucht** |
+| `play_net_self_play_game` (:3879/:3886) | beide `true` | sammelaufgeloest |
+| `play_net_game_variante` (Arena) | Netz `true`, Heuristik `false` | gemischt |
+| `play_net_vs_net_game` (Gating) | beide `true` | sammelaufgeloest |
+
+**Der v22-Korpus ist Heuristik-Self-Play.** Die Zwischenzustaende, deren
+Fehlen Regel 4 verhindern wollte, sind also da -- als Nebenwirkung des
+Erzeugerwechsels auf den v2-Lehrer, nicht als Ergebnis einer Entscheidung.
+
+### Gemessen (5 Korpusdateien, 8.700 Datensaetze)
+
+| Aktionsart | Datensaetze | Anteil | davon policy-tragend |
+| --- | --- | --- | --- |
+| `choose_draw_stack_slot` | 215 | 2,5 % | **100 %** |
+| `choose_dome_rotation` | 800 | 9,2 % | 32,4 % |
+| `dome_stack_peek` | 3.660 | 42,1 % | 21,6 % |
+| `stone` | 4.078 | 46,9 % | 28,4 % |
+
+Gegen die Erwartung im Prereg-Koerper ("0 von 16.322 Datensaetzen im
+Bestandskorpus") ist das der Unterschied zwischen "gar nicht vorhanden" und
+"vorhanden, beim Slot sogar durchgehend mit gueltigem Ziel". Dass der Slot bei
+100 Prozent liegt, hat einen nachvollziehbaren Grund: der v2-Vorzug ist eine
+DRAFTING-Praeferenz auf Steine und Zielzellen, er greift an dieser
+Unterentscheidung nicht -- also entscheidet die Suche, und das Ziel bleibt
+gueltig.
+
+### Was damit NICHT beantwortet ist
+
+Der Kontrollfluss im **Netz**-Self-Play. Dort steht `apply_via_chosen_action`
+weiterhin auf `true`, das Netz erzeugt seine eigenen Partien also anders, als
+der Korpus entstanden ist, aus dem es lernt. Die Frage, ob
+`MOSAIC_STACK_DRAW_RESEARCH=1` das Netz STAERKER macht, ist offen und
+unverandert eine Arena-Frage.
+
+**Sie ist seit dem 2026-08-26 aber billiger geworden**, und das ist der Grund,
+sie hier zu vermerken: der Elo-Anker liegt seit der Heuristik-Kapselung als
+Artefakt mit eigenem Wheel vor (`models/frozen_heuristics/v1_anchor/`). Ein
+Umschalten des Knopfes beruehrt ausserdem nur die NETZ-Seite -- die
+Heuristik-Seite der Ankerarena traegt `false` ohnehin. Es aendert also den
+SPIELER, nicht den MASSSTAB.
+
+**Regel 3 bleibt in Kraft:** `MOSAIC_STACK_DRAW_CHANCE` und
+`MOSAIC_STACK_DRAW_RESEARCH` werden weiterhin GETRENNT gemessen. Der hier
+vermerkte Wegfall betrifft ausschliesslich Regel 4.
