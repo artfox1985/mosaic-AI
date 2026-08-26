@@ -40,6 +40,59 @@ ENTRY_RE = re.compile(
 STATUS_MAP = {"Aktiv": "aktiv", "Diagnose": "diagnose", "Tot": "tot", "Geplant": "geplant"}
 
 
+PREREG_DIR = REPO / "evaluations"
+PREREG_STATUS_RE = re.compile(r"<!--\s*STATUS:\s*(OFFEN|ENTSCHIEDEN|UEBERHOLT)\b")
+PREREG_NAME_RE = re.compile(r"PREREG_[a-z0-9_]+\.md")
+
+
+def prereg_verdicts() -> dict[str, str]:
+    """{Dateiname: OFFEN|ENTSCHIEDEN|UEBERHOLT} aus Zeile 1 jeder Prereg.
+
+    Dieselbe Quelle, aus der `tools/generate_prereg_index.py` seinen Index
+    baut -- der Zeile-1-Statuskopf. Hier wird nur das Verdikt gebraucht,
+    nicht Frage und Beleg.
+    """
+    out: dict[str, str] = {}
+    for path in sorted(PREREG_DIR.glob("PREREG_*.md")):
+        head = path.read_text(encoding="utf-8", errors="replace")[:4096]
+        m = PREREG_STATUS_RE.search(head)
+        if m:
+            out[path.name] = m.group(1)
+    return out
+
+
+def verdict_for(prereg_field: str, verdicts: dict[str, str]) -> str:
+    """Verdikt der Prereg(s), auf die ein Knopf verweist.
+
+    Das Feld traegt Freitext ("PREREG_x.md par.3", "-", manchmal zwei
+    Dateien). Deshalb werden ALLE genannten Dateinamen aufgeloest; nennt ein
+    Knopf mehrere und sie sind sich uneinig, steht das auch so da -- raten
+    waere hier die falsche Freundlichkeit.
+    """
+    names = PREREG_NAME_RE.findall(prereg_field or "")
+    if not names:
+        return "-"
+    found = [verdicts.get(n) or "?" for n in names]
+    distinct = sorted(set(found))
+    return distinct[0] if len(distinct) == 1 else "/".join(distinct)
+
+
+def stale_knobs(knobs: list[dict]) -> list[dict]:
+    """Verdrahtete Knoepfe, deren Frage laut Prereg BEANTWORTET ist.
+
+    Genau die Schnittmenge, die weder die Registratur noch der Prereg-Index
+    allein zeigt: der Status sagt "verdrahtet" (er sagt ausdruecklich NICHTS
+    darueber, ob der Default an ist), der Prereg-Kopf sagt "entschieden" oder
+    "ueberholt". Ein Knopf hier ist nicht automatisch zu loeschen -- ein
+    negatives Ergebnis kann "falscher HEBEL, richtiges Ziel" heissen
+    (PREREG_long_row_payoff ist genau so ein Fall). Die Liste macht die
+    Entscheidung moeglich, sie nimmt sie niemandem ab.
+    """
+    return [k for k in knobs
+            if k["status"] in ("aktiv", "diagnose")
+            and k.get("verdict") in ("ENTSCHIEDEN", "UEBERHOLT")]
+
+
 def knobs_from_source() -> list[dict]:
     text = REGISTRY_RS.read_text(encoding="utf-8")
     # Nur die KNOBS-Tabelle parsen, nicht evtl. Beispiel-Eintraege in Tests.
@@ -62,7 +115,79 @@ def knobs_from_wheel() -> list[dict]:
     return payload["knobs"]
 
 
+OFF_DEFAULTS = ("0", "0.0", "0,0", "false", "aus", "unset", "none", "nicht gesetzt")
+
+
+def _default_is_off(default: str) -> bool:
+    """Ist der beschriebene Default ein AUS?
+
+    `default` ist laut `KnobEntry` ein BESCHREIBENDER String, kein Wert --
+    die Erkennung ist deshalb eine Heuristik und wird im Dokument auch so
+    ausgewiesen. Sie soll niemanden ueberzeugen, nur sortieren.
+    """
+    d = (default or "").strip().lower()
+    return any(d == o or d.startswith(o + " ") for o in OFF_DEFAULTS)
+
+
+def _stale_block(knobs: list[dict]) -> str:
+    """Abschnitt fuer verdrahtete Knoepfe, deren Prereg beantwortet ist.
+
+    WICHTIGE EINSCHRAENKUNG, die hier stehen muss, weil das Dokument sonst in
+    die Irre fuehrt: der Zeile-1-Kopf einer Prereg sagt ENTSCHIEDEN, aber
+    nicht die RICHTUNG. `MOSAIC_FLOOR_SHAPING_W` ist entschieden UND mit
+    Default 0,3 der einzige Shaping-Knopf, der im Champion wirklich laeuft --
+    eine Liste, die ihn neben die verworfenen Terme stellt, ist falsch.
+    Deshalb wird nach dem Default getrennt.
+    """
+    answered = stale_knobs(knobs)
+    if not answered:
+        return "Kein verdrahteter Knopf haengt an einer beantworteten Prereg.\n"
+    off = [k for k in answered if _default_is_off(k.get("default", ""))]
+    on = [k for k in answered if not _default_is_off(k.get("default", ""))]
+    lines = [
+        f"**{len(answered)} verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** "
+        "(entschieden oder ueberholt).",
+        "",
+        "Der Statuskopf sagt ENTSCHIEDEN, aber NICHT die Richtung -- deshalb die",
+        "Trennung nach Default. Kein Loeschauftrag: ein negatives Ergebnis kann",
+        "\"falscher Hebel, richtiges Ziel\" heissen (`PREREG_long_row_payoff` ist",
+        "genau so ein Fall). Es ist die Liste, an der die Frage stellbar wird.",
+        "",
+        f"**Beantwortet UND Default aus ({len(off)})** -- hier lohnt die Nachfrage,",
+        "ob der Knopf noch etwas offen haelt:",
+        "",
+    ]
+    for k in off:
+        lines.append(f"- `{k['name']}` ({k['verdict']}, {k['prereg']})")
+    lines += ["",
+              f"**Beantwortet, Default AN ({len(on)})** -- in Benutzung, hier ist "
+              "\"entschieden\" das Ergebnis, nicht das Ende:", ""]
+    for k in on:
+        lines.append(f"- `{k['name']}` = {k['default']} ({k['verdict']}, {k['prereg']})")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def attach_verdicts(knobs: list[dict]) -> list[dict]:
+    """Haengt jedem Knopf das Verdikt seiner Prereg an.
+
+    Bewusst in BEIDEN Quellwegen (rs-Parse und Wheel) derselbe Schritt: die
+    Verdikte kommen aus den Prereg-Dateien, nicht aus der Registratur -- die
+    Paritaetsprobe zwischen beiden Wegen bleibt damit gueltig.
+    """
+    verdicts = prereg_verdicts()
+    for k in knobs:
+        k["verdict"] = verdict_for(k.get("prereg", ""), verdicts)
+    return knobs
+
+
 def render_markdown(knobs: list[dict], source_label: str) -> str:
+    # Die Verdikte werden HIER angeheftet, nicht beim Aufrufer. Grund, beim
+    # Bau aufgefallen: `check_conventions.py` Regel 6 ruft `render_markdown`
+    # direkt, um docs/knobs.md gegen die Registratur zu pruefen -- ein
+    # Anheften in `main()` haette diesen Weg uebersprungen, und die Regel
+    # haette die Datei bei JEDEM Lauf als veraltet gemeldet.
+    knobs = attach_verdicts(knobs)
     lines = [
         "# MOSAIC_*-Laufzeit-Knoepfe",
         "",
@@ -78,12 +203,20 @@ def render_markdown(knobs: list[dict], source_label: str) -> str:
         f"{sum(1 for k in knobs if k['status'] == 'tot')} tot, "
         f"{sum(1 for k in knobs if k['status'] == 'geplant')} geplant).",
         "",
-        "| Knopf | Default | Status | Zweck | Beleg |",
-        "|---|---|---|---|---|",
+        "**Status** sagt, ob der Knopf VERDRAHTET ist -- ausdruecklich nicht, ob sein",
+        "Default an ist (`knob_registry.rs`: \"Default kann an ODER aus sein\").",
+        "**Verdikt** ist der Zeile-1-Status der zitierten Prereg. Erst beide zusammen",
+        "trennen \"aus, weil noch niemand ihn eingeschaltet hat\" von \"aus, weil die",
+        "Messung ihn erledigt hat\" -- in der Registratur allein sehen die gleich aus.",
+        "",
+        _stale_block(knobs),
+        "| Knopf | Default | Status | Verdikt | Zweck | Beleg |",
+        "|---|---|---|---|---|---|",
     ]
     for k in knobs:
         lines.append(
-            f"| `{k['name']}` | {k['default']} | {k['status']} | {k['purpose']} | {k['prereg']} |"
+            f"| `{k['name']}` | {k['default']} | {k['status']} | {k.get('verdict', '-')} "
+            f"| {k['purpose']} | {k['prereg']} |"
         )
     lines.append("")
     return "\n".join(lines)
