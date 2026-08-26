@@ -162,6 +162,105 @@ vollen Laufs sind wiederverwendbar. Dazu `.ref_serial.h5`, `.par_test*.h5`,
 
 ---
 
+## ARCHITEKTUR: B -> C -> A gefahren (2026-08-27, Nutzer-Auftrag)
+
+Anlass war eine Nutzer-Frage, keine Aufraeum-Laune: "was bringt mir eigentlich
+die Ratsche" -- und daraus "gib mir eine Empfehlung fuer die Architektur".
+
+### Was die Ratsche wirklich gebracht hat
+
+| | |
+| --- | --- |
+| Basislinie neu gelegt | **10 x** |
+| Dateien wegen der Ratsche zerlegt | **0** |
+
+Sie ist deshalb WARNUNG statt Blocker (eigener Nachtrag in
+`docs/DESIGN_conventions_as_checks.md`). Der Schaden war nicht das Wachstum,
+sondern die Uebung: ein Tor, das man routinemaessig per Kommandozeile gruen
+macht, faerbt auf die Tore ab, die tragen.
+
+**Und sie misst den falschen Stellvertreter.** Die Modularitaetsregel nennt
+ZUSTAENDIGKEITEN, keine Bytes. Der Beleg kam am selben Tag: der B-Umbau hat
+`train.py` strukturell besser gemacht und sie ist dabei GEWACHSEN (+2,7 %) --
+als Blocker haette die Ratsche genau diesen Commit aufgehalten.
+
+### Die drei Schnitte
+
+| | vorher | nachher | Beleg |
+| --- | --- | --- | --- |
+| **B** `train()` | 1.678 Z | **1.194 Z** | `epoch_history` bitgleich |
+| **C** `neural_net.py` | 2.933 Z | **1.655 Z** | dito + Import-Rauchtest + Cache-Sonde |
+| **A** `net_mcts.rs` | 10.923 Z | **9.909 Z** | Suite 489/0, Anker-Tor 20/20 in-process UND extern |
+
+Das Tor fuer B und C war vorher festgelegt: derselbe Lauf
+(`--train-file-limit 6 --epochs 2 --seed 4242`) vor und nach dem Umbau, und
+die `epoch_history` im Manifest muss BITGLEICH bleiben. Sie ist es.
+
+### Die Methode, die sich bewaehrt hat: NAHTBREITE MESSEN
+
+Mein erster Zuschnitt fuer B war falsch -- Aufbau / Schleife / Abschluss als
+drei Funktionen. Gemessen liest die Epochenschleife **54** lokale Variablen
+aus dem Aufbau, der Abschluss **57**. Drei Funktionen hiessen 54 Argumente
+durchreichen, schlechter als der Monolith.
+
+Die tragfaehigen Naehte lagen eine Ebene tiefer: Trainings-Durchgang 20 rein /
+7 raus, Validierungs-Durchgang 13 rein / 11 raus. Mit dem Verlust-Buendel
+`LossSetup` wurden daraus 11 und 6 Parameter.
+
+**Merksatz fuer den naechsten Schnitt:** nicht Zeilen zaehlen, sondern zaehlen,
+wieviele lokale Namen die geplante Naht ueberqueren. Ist das zweistellig, ist
+es die falsche Naht.
+
+### Drei Behauptungen von mir, die an Messungen gescheitert sind
+
+1. "Aufbau/Schleife/Abschluss sind die Naehte" -- 54 bzw. 57 Namen ueber die
+   Naht, verworfen.
+2. "Task#95 Debug-Trace sind 1.797 Zeilen Diagnose" -- der echte Trace-Block
+   ist **309** Zeilen; ab `batched_expand_root_candidates` folgt ohne neues
+   Banner der SUCHKERN. Die Banner in `net_mcts.rs` markieren Anfaenge, keine
+   Enden.
+3. "Die Knopf-Registratur driftet von den Preregs weg" -- tut sie NICHT.
+   `Aktiv` heisst laut eigener Definition "verdrahtet, Default kann an ODER
+   aus sein". Der Befund war ein anderer, siehe unten.
+
+### Zwei Waechter, die jetzt greifen statt zu existieren
+
+**Regel 7 (Bezeichner englisch)** im Konventions-Linter. Anlass: diese Sitzung
+hat 14 Dateien mit deutschen Bezeichnern hinterlassen, und der Linter meldete
+bei jedem dieser Commits "alle Regeln gruen". Geprueft werden nur
+HINZUGEFUEGTE Definitionszeilen (Zuschnitt wie die Ratsche), Python ueber
+`ast`, Ausweg `konvention-ok: <Grund>`.
+
+Er hat noch am selben Tag dreimal zugeschlagen: in `freeze_heuristic.py`, in
+seinem EIGENEN Neubau, und beim A-Commit an `PARTIE_GEWICHT`/`conj_breite`.
+Der letzte Fall war beim Bau nicht bedacht: **eine reine Verschiebung laesst
+Altbestand als "neu" erscheinen** -- und ist genau deshalb kein Fehlalarm.
+
+**Verdikt-Spalte in `docs/knobs.md`.** Die Registratur sagt "verdrahtet", der
+Prereg-Kopf sagt "beantwortet"; niemand hat beides zusammengefuehrt. Jetzt
+schon: **51 verdrahtete Knoepfe haengen an einer beantworteten Prereg**, davon
+36 mit Default AUS. Kein Loeschauftrag -- ein negatives Ergebnis kann
+"falscher Hebel, richtiges Ziel" heissen (`PREREG_long_row_payoff`), und
+`MOSAIC_FLOOR_SHAPING_W` ist entschieden UND der einzige Shaping-Knopf, der
+im Champion laeuft.
+
+### Offen, benannt statt stillschweigend
+
+- **C ist halb**: die Kodierschicht (`state_to_tensor`, `action_to_id`, ~630
+  Zeilen) bleibt in `neural_net.py`. Sie haengt an `_padn` und zehn
+  Modulkonstanten, die andere Dateien ebenfalls von dort importieren.
+  `neural_net.py` heisst weiter "Netze UND Kodierung".
+- **A ist Schritt 1 von mehreren**: `net_mcts.rs` hat noch 9.909 Zeilen.
+  Naechste Kandidaten nach Groesse: Moon-Order-Wahl (893), Implicit-Minimax
+  (707+267), Denial-Tiebreak (142+185).
+- **Die Shaping-Tests** liegen weiter in `net_mcts.rs` und ziehen sich die
+  Namen ueber `use crate::shaping::*`.
+- **Groessen-Basislinie**: 36 Dateien liegen ueber ihrem Eintrag. Ein
+  globales `--update-size-baseline` wuerde alle auf einmal akzeptieren,
+  darunter fremde -- deshalb NICHT gelaufen.
+
+---
+
 ## V2 IST AUS DEM QUELLSTAND (2026-08-27, B4a abgeschlossen)
 
 **Nutzer-Entscheid**, in seiner eigenen Reihenfolge: "V2 ist durch. Keine
