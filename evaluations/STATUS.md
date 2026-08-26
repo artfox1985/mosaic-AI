@@ -289,6 +289,17 @@ Worker-Prozess, alle drei Anfragearten, ohne Modell).
   Fuer zwei gefrorene Heuristiken braucht es einen netzlosen In-Process-Zweig
   oder einen zweiten Worker.
 
+**REIHENFOLGE, die nicht vertauscht werden darf** (par.10a): `round5_anchor.rs`
+schuetzt den Elo-Anker im IN-PROCESS-Pfad, und die Arenen benutzen weiter genau
+den. Das Modul zu entfernen, BEVOR die Arenen den Anker aus dem Artefakt
+beziehen, liesse den Anker still wandern -- genau das, wogegen es gebaut wurde.
+
+**Treiber traegt die Heuristik** (par.10a): aktuelle Engine gegen gefrorene
+Heuristik laeuft, mit Handshake, Golden-Selbsttest in der Artefakt-venv und
+externer Platzierung. Beide Artefakte tragen `protokoll.kinds` und wurden mit
+dem vollstaendigen Wheel neu eingefroren; die Golden Probe des Generators ist
+weiterhin Feld fuer Feld identisch mit der ersten Korpusdatei.
+
 ### 2. Offen, mit Kosten
 
 | Punkt | Kosten | wofuer noetig |

@@ -683,8 +683,46 @@ und die Varianten-Faedelung (111 Stellen, davon 103 blosse Weitergabe, 5
 echte Verzweigungen). Das ist ein eigener Schritt und gehoert in eigene
 Commits -- ein Bisect soll ihn finden koennen.
 
-Ebenfalls offen: eine Partie ARTEFAKT gegen ARTEFAKT ueber
-`frozen_referee_match.py`. Der Treiber faehrt heute "aktuelle Engine gegen
+### par.10a Treiber traegt die Heuristik, und ein Cross-Versions-Fall trat wirklich ein
+
+`frozen_referee_match.py` faehrt jetzt auch eine gefrorene HEURISTIK als
+Gegner der aktuellen Engine: Interpreter aus der Artefakt-venv
+(Heuristik-Manifeste tragen kein `worker_python`), Golden-Selbsttest ueber die
+Self-Play-Reproduktion statt ueber den Drafting-Sondensatz, kein
+`model.onnx`-Pfad wo es keins gibt.
+
+**Der Fall, fuer den die Kapselung gebaut ist, trat dabei sofort ein.** Die
+ersten beiden Artefakte wurden eingefroren, BEVOR die Bausteine 3/4 fertig
+waren; ihr mitgeliefertes Wheel kannte `start_placement_choice_state_json`
+nicht, und der Treiber starb mitten in der Partie an einem `AttributeError`.
+
+**Die naheliegende Antwort waere die falsche gewesen:** ein Rueckfall auf
+referee-aufgeloestes Tiling haette die Partie zu Ende gebracht -- und das
+Artefakt dabei als `V1` kacheln lassen. Gemessen worden waere ein Spieler,
+den nie jemand eingefroren hat. Deshalb deklariert das Manifest zur
+EINFRIERZEIT, was sein Wheel beantwortet (`protokoll.kinds`), und der Treiber
+VERWEIGERT mit Diagnose und Abhilfe, statt zu raten.
+
+Beide Artefakte danach mit dem vollstaendigen Wheel neu eingefroren
+(Nutzer-Freigabe, pfadgenau; vor dem Loeschen auf Junctions geprueft --
+2.540 gemeldete Reparse-Punkte waren OneDrive-Platzhalter, `LinkType` leer).
+Identitaet sofort wieder belegt: die Golden Probe des Generators ist erneut
+Feld fuer Feld identisch mit der ersten Datei des echten v22-Korpus. Damit ist
+zugleich belegt, dass die Bausteine 1-4 verhaltensneutral waren.
+
+Gefahren: Handshake gruen, Golden-Selbsttest gruen (in der Artefakt-venv, also
+Konservierung), externe Platzierung AN, Partien gespielt.
+
+### Noch offen
+
+Eine Partie ARTEFAKT gegen ARTEFAKT. Der Treiber faehrt "aktuelle Engine gegen
 EIN Artefakt"; seine A-Seite ruft `drafting_decide_and_apply_inprocess` und
-verlangt dafuer ein Modell. Fuer zwei gefrorene Heuristiken braucht es
-entweder einen netzlosen In-Process-Zweig oder einen zweiten Worker.
+verlangt dafuer ein Modell. Fuer zwei gefrorene Heuristiken braucht es einen
+netzlosen In-Process-Zweig oder einen zweiten Worker.
+
+**Und der Grund, warum die Quell-Konservierung noch NICHT fallen darf:**
+`round5_anchor.rs` schuetzt den Elo-Anker im IN-PROCESS-Pfad, und die Arenen
+(`run_net_vs_heuristik_*`) benutzen weiter genau den. Das Modul jetzt zu
+entfernen liesse den Anker still wandern -- genau das, wogegen es gebaut
+wurde. Erst muessen die Arenen den Anker aus dem ARTEFAKT beziehen, dann darf
+die Quellkopie weg.
