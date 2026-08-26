@@ -451,7 +451,7 @@ der Erzeugung mitbauen (1b).
 | B2 | Arena ueber den Referee | **fertig** -- `tools/anchor_arena.py`, misst gegen `frozen_heuristics/v1_anchor` |
 | B3 | Elo-Konventionen | **fertig** -- `player_b` traegt den Build, `elo_tracker add --knobs` verweist auf die Spec |
 | B4b | `round5_anchor.rs` entfernt | **fertig** -- 1.664 Zeilen, dreifach als verhaltensneutral belegt |
-| B4a | Varianten-Faedelung entfernen | **offen mit bekanntem Umfang** -- fuenf Werkzeuge muessen auf den Artefakt-Pfad umziehen, siehe unten |
+| B4a | Varianten-Faedelung entfernen | **offen, kleiner Umfang** -- ZWEI Messinstrumente muessen ueber das Artefakt fahren, siehe unten |
 
 **B4a ist nicht blockiert, sondern KOSTET etwas. Berichtigung
 (Nutzer-Einwand 2026-08-26):**
@@ -474,16 +474,29 @@ braucht.
    betrifft aber nur die Tabelle, nicht die 111 Faedelungs-Stellen.
 2. **Die Huellen-Logik in `plate_builder.rs` bleibt ohnehin** -- par.3b.1
    analysiert sie.
-3. **Fuenf Werkzeuge spielen v2huelle heute IN-PROCESS** und muessten auf den
-   Artefakt-Pfad umziehen: `self_play.py`, `v2_envelope_arena.py`,
-   `freeze_heuristic.py`, `verify_frozen_heuristic.py` und
-   `anchor_referee_parity_probe.py`. Das ist der eigentliche Preis von B4a --
-   eine Migration, kein Loeschen.
+3. **ZWEI Werkzeuge spielen v2huelle mit der AKTUELLEN Engine** und muessten
+   stattdessen ueber das Artefakt fahren:
 
-Damit ist B4a eine Aufgabe mit bekanntem Umfang statt einer blockierten. Sie
-gehoert trotzdem in einen eigenen Schritt: fuenf Werkzeuge umzuhaengen und
-dabei zu belegen, dass sie dasselbe messen wie vorher, ist kein Anhaengsel an
-eine Aufraeum-Kette.
+   | | wodurch |
+   | --- | --- |
+   | `tools/probes/frozen_agent_referee_probe.py` | benutzt die v2huelle-Spec in-process |
+   | `tools/probes/v2_envelope_arena.py` | ruft `heuristic_v1_vs_v2_arena` |
+
+   **"Ueber das Artefakt fahren" heisst: anderer INTERPRETER, nicht anderer
+   Ort.** Das Muster steht schon und laeuft --
+   `verify_frozen_heuristic.py --venv` ruft `self_play.py` AUS DEM REPO mit dem
+   Python der Artefakt-venv. Keine Datei wandert.
+
+   `self_play.py` gehoert NICHT auf diese Liste: es reicht nur ein Flag durch.
+   Wer einen v2huelle-Korpus will, ruft es mit dem Interpreter des Artefakts --
+   eine Aufrufkonvention, kein Codeumbau. `freeze_heuristic.py` und
+   `verify_frozen_heuristic.py` tun das bereits, und
+   `anchor_referee_parity_probe.py` benutzt ohnehin nur V1.
+
+Damit ist B4a eine Aufgabe mit kleinem, bekanntem Umfang. Sie gehoert trotzdem
+in einen eigenen Schritt -- zwei Messinstrumente umzuhaengen und dabei zu
+BELEGEN, dass sie dasselbe messen wie vorher, ist kein Anhaengsel an eine
+Aufraeum-Kette.
 
 **Was sich durch B4b geaendert hat und ausgesprochen gehoert:** ab jetzt
 bewegt eine Aenderung an `round5.rs` auch den Heuristik-Pfad. Der Schutz ist
