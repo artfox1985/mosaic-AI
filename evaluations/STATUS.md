@@ -207,6 +207,54 @@ wirkungslos, sobald ein Cache existierte.
 **Noch nicht:** volle Korpus-Paritaet (es fehlt die serielle Referenz, 2,58 h)
 und die Verdrahtung in `train.py`. Beides wie bei Hebel (1) bewusst offen.
 
+### 1c. REPRODUKTIONSBEWEIS GEFAHREN 2026-08-26: der Erzeuger ist NICHT reproduzierbar
+
+**Ergebnis: der Korpus laesst sich mit KEINEM versionierten Stand nachbauen --
+und die 42 Commits seit dem Erzeuger-Commit sind daran unschuldig.**
+
+Aufbau: Rezept woertlich aus `cli_args` von
+`data/manifest_hv2_20260825_172710.json`, 10 Partien, Seed 20260826. Der
+Chunk-Seed ist `base_seed + chunk_idx` (`self_play.py`, `make_chunk`), bei
+`chunk = per_file = 10` faellt Chunk 0 also genau auf
+`data/selfplay_hv2_20260825_1727_g10.pkl`. Verglichen wurden RECORDS ueber
+`corpus_io`, nicht Dateibytes (der Korpus ist umgepackt).
+
+| Vergleich | Ergebnis |
+| --- | --- |
+| zwei frische Laeufe, HEAD | **identisch**, 1755 Schritte, Feld fuer Feld |
+| HEAD gegen Korpus | ABWEICHUNG (1755 gegen 1733 Schritte) |
+| Build auf `dbf6a08` gegen Korpus | ABWEICHUNG, **dieselbe** wie HEAD |
+| Build auf `dbf6a08` gegen HEAD | **identisch**, Feld fuer Feld |
+
+**Die Selbstkontrolle war die Voraussetzung, nicht die Kuer.** Das Rezept
+laeuft mit `add_root_noise: true` und `deterministic: false`; ohne den Beleg,
+dass zwei frische Laeufe uebereinstimmen, waere jede Abweichung undeutbar
+gewesen. Sie stimmen ueberein -- das Rauschen ist geseedet.
+
+**Was git geleistet hat:** die Lokalisierung, mit negativem Ergebnis. In
+`engine/src` sind seit `dbf6a08` nur vier Dateien beruehrt, drei davon aus der
+Arena-Arbeit vom 2026-08-26; die vier Routing-Module sind unveraendert und der
+`contract_hash` stimmt (`a3f61f246d9bbf5c`). Die 94 geaenderten Zeilen in
+`self_play.py` sind Manifest-Auszug und Kompression, also Schreibweg. Und der
+Build auf `dbf6a08` erzeugt Feld fuer Feld dasselbe wie HEAD -- die Commits
+scheiden damit gemeinsam aus, nicht einzeln nach Verdacht.
+
+**Der Rest ist der unversionierte Anteil.** `git_dirty: true` im
+Erzeuger-Manifest, und dieser Anteil ist nicht rekonstruierbar. Das Modell
+scheidet aus (`alphazero_v21_2d_brierbest.onnx`, md5 `86bc9bddf604ea77`,
+identisch zur eingefrorenen Kopie, mtime 9. August).
+
+**Wo die Partien auseinanderlaufen:** in Schritt 0 sind `state`, `policy` und
+`valid_actions` GLEICH; verschieden sind nur `bootstrap_value` (schaut voraus)
+und die Ausgangsfelder `scores`/`winner` (auf jeden Schritt gestempelt). Die
+erste abweichende Entscheidung faellt in Schritt 2 (`policy`), der erste
+abweichende Zustand in Schritt 3.
+
+**Was das fuer v22 heisst -- Nutzer-Entscheid, hier NICHT vorweggenommen:** der
+Korpus bleibt gueltig als Datensatz, aber sein Erzeuger ist ein Verhalten ohne
+Quelle. Ein Einfrieren kann nur den heutigen Build festnageln, und der ist
+nachweislich ein ANDERER Spieler als der, der die 24.000 Partien erzeugt hat.
+
 ### 2. Offen, mit Kosten
 
 | Punkt | Kosten | wofuer noetig |
