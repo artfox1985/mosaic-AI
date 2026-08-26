@@ -109,7 +109,17 @@ def main() -> int:
     # Nur fuer NETZ-Artefakte: haelt Modell+Spec ueber die Prozesslaufzeit.
     # Ein Heuristik-Artefakt braucht das nicht -- es gibt kein Modell zu
     # halten, und die Suche liest die Variante je Aufruf aus der Spec.
-    engine = None if ist_heuristik else mr.FrozenWorkerEngine(str(model_path), str(spec_path))
+    # EINE Engine fuer alles, auch fuer Heuristiken: sie haelt das (optionale)
+    # Tiling-Netz ueber die Prozesslaufzeit. Ohne das laedt jede
+    # Tiling-Anfrage das ~9 MB ONNX neu -- gemessen 2.023 ms je Entscheidung
+    # gegen 3 ms mit Cache.
+    engine_modell = None if ist_heuristik else str(model_path)
+    if engine_modell is None and tiling_net_path.exists():
+        engine_modell = str(tiling_net_path)
+    # `heuristik_drafting` EXPLIZIT, nicht aus dem Vorhandensein des Netzes
+    # abgeleitet: ein v2huelle-Artefakt hat ein Netz, draftet aber
+    # heuristisch. Das Netz ist dort NUR fuer den Tiling-Durchfall da.
+    engine = mr.FrozenWorkerEngine(engine_modell, str(spec_path), ist_heuristik)
     tiling_net = str(tiling_net_path) if tiling_net_path.exists() else None
     print(f"[worker] typ={'heuristik' if ist_heuristik else 'netz'} "
           f"tiling_net={'ja' if tiling_net else 'nein'}", file=sys.stderr, flush=True)
@@ -128,19 +138,13 @@ def main() -> int:
                 seed = int(req["seed"])
                 sims = int(req.get("sims", args.sims))
                 c_puct = float(req.get("c_puct", args.c_puct))
-                if ist_heuristik:
-                    resp = json.loads(mr.heuristic_arena_choice_state_json(
-                        state_json, sims, c_puct, seed, str(spec_path)))
-                else:
-                    resp = json.loads(engine.choose(state_json, sims, c_puct, seed))
+                resp = json.loads(engine.choose(state_json, sims, c_puct, seed))
                 out = {"ok": True, "action": resp["action"], "value": resp.get("value")}
             elif kind == "tiling":
-                step = mr.tiling_choice_state_json(state_json, str(spec_path), tiling_net)
-                out = {"ok": True, "step": json.loads(step)}
+                out = {"ok": True, "step": json.loads(engine.tiling(state_json))}
             elif kind == "start_placement":
-                p = mr.start_placement_choice_state_json(
-                    state_json, int(req["pi"]), int(req["game_seed"]), str(spec_path))
-                out = {"ok": True, "placement": json.loads(p)}
+                out = {"ok": True, "placement": json.loads(
+                    engine.start_placement(state_json, int(req["pi"]), int(req["game_seed"])))}
             else:
                 raise ValueError(
                     f"unbekannte Anfrageart '{kind}' (drafting/tiling/start_placement). "

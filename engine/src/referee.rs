@@ -202,18 +202,37 @@ pub(crate) fn choose_drafting_action_json(
 /// gesamte Prozess-Laufzeit.
 #[pyclass]
 pub struct FrozenWorkerEngine {
-    net: Net,
+    /// `None` fuer ein HEURISTIK-Artefakt: es hat kein ONNX, sein Verhalten
+    /// steckt im Wheel. Fuer `v2huelle` ist es dennoch gesetzt -- der
+    /// Tiling-Durchfall-Pfad braucht es (self_play.rs:1234).
+    net: Option<Net>,
+    /// Ob die DRAFTING-Entscheidung heuristisch faellt.
+    ///
+    /// Getrennt vom Vorhandensein eines Netzes, und das ist der Kern: ein
+    /// `v2huelle`-Artefakt HAT ein Netz -- aber nur fuer den
+    /// Tiling-Durchfall-Pfad (self_play.rs:1234). Sein Drafting ist
+    /// heuristisch. Wer beides an derselben Frage aufhaengt ("ist ein Netz
+    /// da?"), laesst den Generator als Netz draften und misst einen anderen
+    /// Spieler.
+    ///
+    /// Genau das ist am 2026-08-26 passiert und nur aufgefallen, weil sich
+    /// die Partieergebnisse gegenueber dem Lauf davor aenderten.
+    heuristik_drafting: bool,
     search_config: SearchConfig,
 }
 
 #[pymethods]
 impl FrozenWorkerEngine {
     #[new]
-    #[pyo3(signature = (model_path, spec=None))]
-    fn new(model_path: String, spec: Option<String>) -> PyResult<Self> {
-        let net = load_net(&model_path)?;
+    #[pyo3(signature = (model_path=None, spec=None, heuristik_drafting=false))]
+    fn new(model_path: Option<String>, spec: Option<String>, heuristik_drafting: bool)
+        -> PyResult<Self> {
+        let net = match model_path {
+            Some(p) => Some(load_net(&p)?),
+            None => None,
+        };
         let search_config = crate::resolve_search_config(spec)?;
-        Ok(FrozenWorkerEngine { net, search_config })
+        Ok(FrozenWorkerEngine { net, heuristik_drafting, search_config })
     }
 
     /// `state_json` rein -- `{"action": ..., "value": null}`-JSON-String
@@ -222,9 +241,39 @@ impl FrozenWorkerEngine {
     /// Protokoll, kein `rot_seed` mehr -- siehe `choose_drafting_action_json`-
     /// Doku).
     fn choose(&self, state_json: String, sims: u32, c_puct: f64, seed: u64) -> PyResult<String> {
-        let action = choose_drafting_action_json(&self.net, &self.search_config, &state_json, sims, c_puct, seed)?;
+        // Nach dem MODUS verzweigen, nicht danach, ob ein Netz da ist -- siehe
+        // Feld-Doku zu `heuristik_drafting`.
+        let action = match (&self.net, self.heuristik_drafting) {
+            (Some(net), false) => choose_drafting_action_json(
+                net, &self.search_config, &state_json, sims, c_puct, seed)?,
+            _ => choose_heuristic_drafting_action_json(
+                &self.search_config, &state_json, sims, c_puct, seed)?,
+        };
         let value: Option<f32> = None;
         Ok(json!({ "action": action, "value": value }).to_string())
+    }
+
+    /// Tiling-Schritt -- mit dem EINMAL geladenen Netz.
+    ///
+    /// PERFORMANCE, und die Zahl ist gemessen: die freie Funktion
+    /// `lib.rs::tiling_choice_state_json` laedt das ~9 MB ONNX bei JEDEM
+    /// Aufruf neu und braucht dadurch **2.023 ms** je Entscheidung. Ueber die
+    /// rund 24 Tiling-Schritte einer Partie sind das 48 Sekunden -- der
+    /// Loewenanteil der 50 s, die eine Referee-Partie zunaechst kostete.
+    ///
+    /// Derselbe Fehler stand schon einmal im Code und ist dort dokumentiert
+    /// ("ein 3-Partien-Testlauf schaffte in 20 Minuten nicht mal die erste
+    /// Partie"). Ich habe ihn beim Bau von Baustein 2 wieder eingebaut; der
+    /// Weg dagegen ist derselbe wie damals: der WORKER haelt das Netz.
+    fn tiling(&self, state_json: String) -> PyResult<String> {
+        let step = choose_tiling_step_json(&self.search_config, &state_json, self.net.as_ref())?;
+        Ok(step.to_string())
+    }
+
+    /// Startsetzung -- braucht kein Netz, aber die Spec (und bei v2 den Seed).
+    fn start_placement(&self, state_json: String, pi: usize, game_seed: u64) -> PyResult<String> {
+        let p = choose_start_placement_json(&self.search_config, &state_json, pi, game_seed)?;
+        Ok(p.to_string())
     }
 }
 use crate::state::Phase;
