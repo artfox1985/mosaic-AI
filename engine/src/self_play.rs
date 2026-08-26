@@ -2463,7 +2463,19 @@ fn play_arena_game<R: Rng + ?Sized>(
     // PREREG_heuristic_v2_long_rows.md: Heuristik-Variante JE BRETT. `[V1, V1]`
     // ist das Bestandsverhalten und der Elo-Anker auf beiden Seiten; `[V1, V2]`
     // ist der Abnahme-Lauf der Messkette Schritt 2 (v1 gegen v2, ohne Netz).
+    //
+    // ZWEI ACHSEN seit PREREG_v22_window.md par.4c: `varianten` steuert die
+    // DRAFT-Seite (Startsetzung, Vorzug, Suche), `tiling_varianten` die
+    // PLATZIERUNG. Bis hierher war es EIN Wert fuer beides -- die Struktur
+    // `PlayerLoopConfig` trennt die Angaben zwar seit jeher, dieser Einstieg
+    // hat sie aber gekoppelt. Genau das verhinderte den in par.4c
+    // vorregistrierten Split-Test, der die 0,741 vollen Spalten des Lehrers
+    // in ihre beiden Haelften zerlegt: Routing oder Drafting.
+    //
+    // Wer beide Achsen gleich setzt, bekommt das Bestandsverhalten -- die
+    // Aufteilung ist additiv, kein Verhaltenswechsel.
     varianten: [crate::mcts::HeuristikVariante; 2],
+    tiling_varianten: [crate::mcts::HeuristikVariante; 2],
     // PREREG_search_rng_split.md: siehe `play_one_game`s gleichnamiger
     // Parameter -- der Seed, mit dem der Aufrufer `rng` erzeugt hat.
     game_seed: u64,
@@ -2554,7 +2566,7 @@ fn play_arena_game<R: Rng + ?Sized>(
             // Heuristik-vs-Heuristik-Arena, kein Netz -- `None` bleibt byte-identisch.
             Phase::Tiling => {
                 let pi = game.state.current_player;
-                match resolve_tiling_step_variante(&game.state, pi, None, varianten[pi]) {
+                match resolve_tiling_step_variante(&game.state, pi, None, tiling_varianten[pi]) {
                     TilingStep::Place(ta) => {
                         let _ = game.apply_single_tiling(pi, &ta);
                     }
@@ -2700,6 +2712,11 @@ pub fn run_heuristic_v1_vs_v2_arena(
     log_games: bool,
     variante_a: &str,
     variante_b: &str,
+    // PREREG_v22_window.md par.4c: Variante der PLATZIERUNG, getrennt von der
+    // des Draftings. `None` = wie die Draft-Seite, also exakt das
+    // Bestandsverhalten -- jeder heutige Aufrufer bleibt bit-identisch.
+    tiling_a: Option<&str>,
+    tiling_b: Option<&str>,
 ) -> String {
     let va = match variant_from_name(variante_a) {
         Some(v) => v,
@@ -2709,11 +2726,44 @@ pub fn run_heuristic_v1_vs_v2_arena(
         Some(v) => v,
         None => return json!({"error": format!("unbekannte Variante: {variante_b}")}).to_string(),
     };
+    // Ein unbekannter Tiling-Name darf NICHT still auf die Draft-Variante
+    // zurueckfallen: der Lauf saehe dann aus wie der gewollte Split, waere
+    // aber der Bestandslauf -- ein stiller Messfehler statt eines Fehlers.
+    let vta = match tiling_a {
+        None => va,
+        Some(n) => match variant_from_name(n) {
+            Some(v) => v,
+            None => return json!({"error": format!("unbekannte Tiling-Variante: {n}")}).to_string(),
+        },
+    };
+    let vtb = match tiling_b {
+        None => vb,
+        Some(n) => match variant_from_name(n) {
+            Some(v) => v,
+            None => return json!({"error": format!("unbekannte Tiling-Variante: {n}")}).to_string(),
+        },
+    };
     // Brett 0 traegt Variante A, Brett 1 traegt B -- oder umgekehrt bei `swap`.
     let varianten = if swap { [vb, va] } else { [va, vb] };
+    let tiling_varianten = if swap { [vtb, vta] } else { [vta, vtb] };
     let sims = if swap { [sims_v2, sims_v1] } else { [sims_v1, sims_v2] };
-    let name_a = format!("Heuristik_{variante_a}");
-    let name_b = format!("Heuristik_{variante_b}");
+    // Der Name traegt die TILING-Achse mit, sobald sie von der Draft-Achse
+    // abweicht. Notwendig, nicht kosmetisch: die Auswertung schluesselt Bretter
+    // nach Spielernamen (`reconstruct_game`), und ein Routing-Split laeuft mit
+    // GLEICHER Draft-Variante auf beiden Seiten -- ohne Zusatz hiessen beide
+    // "Heuristik_v1", und die Rekonstruktion legte zwei Bretter uebereinander.
+    // Gefangen hat das der Katalog-Waechter der Sonde; ohne ihn waere es ein
+    // stiller Messfehler gewesen. Sind beide Achsen gleich, bleibt der Name
+    // Zeichen fuer Zeichen der alte -- Bestandslaeufe und ihre Artefakte
+    // aendern sich nicht.
+    let name_mit_achse = |draft: &str, tiling: Option<&str>| -> String {
+        match tiling {
+            Some(t) if t != draft => format!("Heuristik_{draft}_tile{t}"),
+            _ => format!("Heuristik_{draft}"),
+        }
+    };
+    let name_a = name_mit_achse(variante_a, tiling_a);
+    let name_b = name_mit_achse(variante_b, tiling_b);
     let namen = if swap {
         [name_b.clone(), name_a.clone()]
     } else {
@@ -2728,7 +2778,8 @@ pub fn run_heuristic_v1_vs_v2_arena(
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let mut v = play_arena_game(
-            sims, c, ids, namen.clone(), first, &mut rng, varianten, game_seed, log_games,
+            sims, c, ids, namen.clone(), first, &mut rng, varianten, tiling_varianten,
+            game_seed, log_games,
         );
         // Welches Brett welche Variante trug, mitschreiben -- sonst muss die
         // Auswertung es aus dem Aufruf rekonstruieren.
@@ -2737,6 +2788,13 @@ pub fn run_heuristic_v1_vs_v2_arena(
             // B" -- Bestandsfeld, von `tools/` gelesen, deshalb unveraendert.
             obj.insert("v2_board".to_string(), json!(if swap { 0 } else { 1 }));
             obj.insert("varianten".to_string(), json!(namen.clone()));
+            // par.4c: ohne diese Zeile ist im Artefakt nicht ablesbar, ob der
+            // Lauf gesplittet war -- die Draft-Namen allein sehen im Split
+            // genauso aus wie im Bestandslauf.
+            obj.insert(
+                "tiling_varianten".to_string(),
+                json!([format!("{:?}", tiling_varianten[0]), format!("{:?}", tiling_varianten[1])]),
+            );
         }
         v
     };
@@ -2773,6 +2831,7 @@ pub fn run_arena_match(
         let names = ["A".to_string(), "B".to_string()];
         play_arena_game(
             [sims_a, sims_b], c, ids, names, first, &mut rng,
+            [crate::mcts::HeuristikVariante::V1; 2],
             [crate::mcts::HeuristikVariante::V1; 2], game_seed, false,
         )
     };

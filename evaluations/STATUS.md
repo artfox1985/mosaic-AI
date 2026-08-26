@@ -213,7 +213,7 @@ und die Verdrahtung in `train.py`. Beides wie bei Hebel (1) bewusst offen.
 | --- | --- | --- |
 | Serielle Referenz fuer den vollen Cache | 2,58 h | bevor der Cache eine Champion-Entscheidung traegt |
 | Traeger-Manifest-Generator | klein | `PREREG_v23_window.md` verlangt 1.800 von 17.450 hv2-Partien policy-aktiv; es gibt nur Leser, kein Werkzeug. Regel ist dokumentiert (Seed + zeitlich gestreute Auswahl) |
-| Split-Test Routing gegen Drafting | Minuten | `PREREG_v22_window.md` par.4c -- wieviel der 0,741 haengt am Tiling-Routing |
+| ~~Split-Test Routing gegen Drafting~~ ERLEDIGT 2026-08-26 | 3x 22 s | `PREREG_v22_window.md` par.4f: **Drafting 0,756, Routing allein 0,000** -- par.4c hatte das Gegenteil vorhergesagt |
 | Gewichtsfenster der Huelle | Messung | `PREREG_heuristic_v2_long_rows.md` par.3b.1 -- existiert ein `w`, das kleine Punktunterschiede ueberstimmt, aber nie Strafpunkte akzeptiert? |
 
 ### 3. Zustand des Baums
@@ -430,9 +430,18 @@ zwei Punktekarten (`PREREG_heuristic_v2_long_rows.md` par.11-16),
 - **Eine volle Rasterzeile ist ohne Spezialfliese unmoeglich**: sie wird nur
   von ihrer Musterreihe gespeist, und die schliesst hoechstens einmal je Runde
   ab -- fuenf Steine fuer sechs Zellen. Spalten haben das Problem nicht.
-- **Der Durchbruch kam vom Platzierungs-ROUTING, nicht von Bewertungstermen.**
-  `best_first_step_inner` waehlt nach reinen Sofortpunkten
-  (`tiling_solver.rs:49-56`) und warf jede Draft-seitige Absicht wieder weg.
+- **BERICHTIGT 2026-08-26 (gemessen): der Durchbruch kommt vom DRAFTING, das
+  Routing allein traegt nichts.** Bis hierher stand hier "der Durchbruch kam
+  vom Platzierungs-ROUTING". Der Split-Test (`PREREG_v22_window.md` par.4f,
+  je 160 gepaarte Partien) zerlegt die vollen Spalten so:
+  Huelle nur im Drafting **0,756** gegen 0,044 (t 10,29), Huelle nur im
+  Routing **0,113 gegen 0,113** (delta 0,000), gekoppelt 0,975 gegen 0,062.
+  Die Luecke von +0,199 zur Summe ist eine WECHSELWIRKUNG: das Routing kann
+  nur einsortieren, was das Drafting geholt hat -- ohne passende Steine laeuft
+  `v2_tiling_preference` ins Leere.
+  Richtig bleibt der Mechanismus-Satz dahinter: `best_first_step_inner` waehlt
+  nach reinen Sofortpunkten (`tiling_solver.rs:49-56`) und wirft Draft-seitige
+  Absicht weg -- nur ist das die kleinere Haelfte.
 - **Erste unkontaminierte Referenz**: zehn Mensch-gegen-Netz-Partien in
   `static/log/`, der Mensch gewinnt 8 von 9 und schliesst **1,80 volle
   Spalten** je Partie gegen 0,10 des Netzes. Platzierungspunkte sind dabei ein
@@ -503,6 +512,7 @@ traegt GEMESSENES ein.
 | `cargo test --release --lib` (volle Suite) | 527 Tests | – | **~65 s** |
 | `cargo test --release` (alle Ziele, exklusiv, 2026-08-26) | 553 Tests | – | **97,1 s** |
 | Datei-Cache erstbauen (`build_cache_incremental.py`) | 120 Dateien | 6 Worker | **112,6 s** = 0,96 s je Datei |
+| Split-Arm Heuristik (`v2_envelope_arena.py --tiling`) | 160 Partien | 0 = alle Kerne | **~22 s** |
 | dito, Bloecke liegen schon (anderes Fenster) | 120 Dateien | 6 | **7,9 s** |
 | Wheel-Bau (`maturin build --release`) plus Installation | – | – | **~30 s** |
 
