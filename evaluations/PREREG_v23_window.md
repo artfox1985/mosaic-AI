@@ -118,6 +118,9 @@ veraendert, wieviel Policy dieses Fenster wirklich enthaelt.
 Der Lauf, der die 12.000 Partien erzeugt, ist der Zeitpunkt, an dem folgende
 Entscheide nicht mehr nachziehbar sind (Policy-Ziele = Besuchsverteilung):
 
+* **Spalten-Abnahme-Tor** aus `PREREG_heuristic_v2_long_rows.md` par.3b.2 muss
+  BESTANDEN sein, bevor dieser Lauf startet (verfehlt = kein Start, das
+  Fenster bliebe unbesetzt).
 * `MOSAIC_IMPLICIT_MINIMAX_A` -- `PREREG_implicit_minimax_backup.md` par.3a;
   die Gating-Messung gehoert VOR diesen Start.
 * Risikosensitive Blatt-Utility Stufe A1 --
