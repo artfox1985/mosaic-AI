@@ -384,13 +384,21 @@ def main():
     p_add.add_argument("--n", type=int, required=True)
     p_add.add_argument("--date", default=None)
     p_add.add_argument("--comment", default="")
+    # B3 (2026-08-26): eine Kante gegen ein EINGEFRORENES Artefakt soll sagen
+    # koennen, wo ihre Knoepfe stehen. `active_knobs()` liest die
+    # Prozessumgebung -- fuer ein Artefakt die falsche Quelle, seine Knoepfe
+    # liegen in spec.json. Ohne Angabe bleibt es beim Bestandsverhalten.
+    p_add.add_argument("--knobs", default=None,
+                       help="Knopf-Herkunft ueberschreiben, z.B. 'spec:v1_anchor/spec.json'. "
+                            "Ohne Angabe: die aktiven MOSAIC_*-Variablen des Prozesses.")
 
     args = ap.parse_args()
     if args.cmd == "report":
         report()
     elif args.cmd == "add":
         add_result(args.player_a, args.sims_a, args.player_b, args.sims_b,
-                   args.wins_a, args.wins_b, args.n, date=args.date, comment=args.comment)
+                   args.wins_a, args.wins_b, args.n, date=args.date, comment=args.comment,
+                   knobs=args.knobs)
         report()
 
 
