@@ -356,6 +356,23 @@ pub struct SearchConfig {
     /// dagegen um Faktor ~3 (Policy-Masse 11,5 % gegen 25,2 %, flach ueber
     /// R1-4). Deshalb Stufenfunktion 0->1, kein Rampenterm.
     pub long_row_init_shaping_w: f64,
+    /// Welche Heuristik-Variante dieser Agent spielt (Drafting-Vorzug,
+    /// Platzierungs-Routing, Startsetzung). Default `V1` = der Elo-Anker.
+    ///
+    /// GEHOERT HIERHER, weil die Variante den AGENTEN ausmacht und nicht den
+    /// Prozess: bis 2026-08-26 stand sie als Literal an fuenf Stellen in
+    /// `self_play.rs` und als CLI-Parameter davor. Ein eingefrorenes
+    /// Heuristik-Artefakt kann sich damit nicht selbst beschreiben -- es
+    /// haengt daran, dass der AUFRUFER die richtige Variante mitgibt. Genau
+    /// dieser Fehler ist am 2026-08-26 passiert (fehlendes
+    /// `--heuristik-variante v2huelle`, Default v1, falscher Befund
+    /// committet und weitergemeldet).
+    ///
+    /// KEIN Env-Knopf als Gegenstueck. Die anderen beiden Felder haben einen,
+    /// weil sie aus der Knopf-Aera stammen; ein neuer prozessglobaler Schalter
+    /// waere hier das Gegenteil dessen, was die Kapselung erreichen soll
+    /// (PREREG_agent_encapsulation.md par.1).
+    pub heuristik_variante: crate::mcts::HeuristikVariante,
 }
 
 impl SearchConfig {
@@ -380,6 +397,9 @@ impl SearchConfig {
         Self {
             implicit_minimax_alpha: read_f64_env("MOSAIC_IMPLICIT_MINIMAX_A", 0.0),
             long_row_init_shaping_w: read_f64_env("MOSAIC_LONG_ROW_INIT_W", 0.0),
+            // V1 fest, kein Env-Knopf: siehe Feld-Doku. Wer eine andere
+            // Variante will, gibt sie als Parameter oder per Spec-Datei mit.
+            heuristik_variante: crate::mcts::HeuristikVariante::V1,
         }
     }
 
@@ -398,7 +418,8 @@ impl SearchConfig {
         let obj = value
             .as_object()
             .ok_or_else(|| format!("Spec-Datei {path}: JSON-Wurzel muss ein Objekt sein"))?;
-        const KNOWN_FIELDS: &[&str] = &["implicit_minimax_alpha", "long_row_init_shaping_w"];
+        const KNOWN_FIELDS: &[&str] =
+            &["implicit_minimax_alpha", "long_row_init_shaping_w", "heuristik_variante"];
         for key in obj.keys() {
             if !KNOWN_FIELDS.contains(&key.as_str()) {
                 return Err(format!(
@@ -423,7 +444,21 @@ impl SearchConfig {
         // die "beweisbar identisch"-Zusage aushebeln.
         let implicit_minimax_alpha = get_required("implicit_minimax_alpha")?;
         let long_row_init_shaping_w = get_required("long_row_init_shaping_w")?;
-        Ok(Self { implicit_minimax_alpha, long_row_init_shaping_w })
+        // Als NAME, nicht als Zahl: eine Spec ist ein Dokument, das ein Mensch
+        // in einem halben Jahr lesen koennen muss. `"v2huelle"` sagt, was der
+        // Agent ist; eine 2 saegte an derselben Stelle.
+        let variante_name = obj
+            .get("heuristik_variante")
+            .ok_or_else(|| format!("Spec-Datei {path}: Feld 'heuristik_variante' fehlt"))?
+            .as_str()
+            .ok_or_else(|| {
+                format!("Spec-Datei {path}: 'heuristik_variante' ist keine Zeichenkette")
+            })?;
+        let heuristik_variante = crate::self_play::variant_from_name(variante_name)
+            .ok_or_else(|| {
+                format!("Spec-Datei {path}: unbekannte heuristik_variante '{variante_name}'")
+            })?;
+        Ok(Self { implicit_minimax_alpha, long_row_init_shaping_w, heuristik_variante })
     }
 }
 
@@ -6907,8 +6942,8 @@ mod tests {
         nodes[0].children.push(1);
         nodes[0].children.push(2);
 
-        let cfg_off = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0 };
-        let cfg_on = SearchConfig { implicit_minimax_alpha: 1.0, long_row_init_shaping_w: 0.0 };
+        let cfg_off = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0, heuristik_variante: crate::mcts::HeuristikVariante::V1 };
+        let cfg_on = SearchConfig { implicit_minimax_alpha: 1.0, long_row_init_shaping_w: 0.0, heuristik_variante: crate::mcts::HeuristikVariante::V1 };
         let idx_off = gumbel_select_child(&nodes, 0, &cfg_off);
         let idx_on = gumbel_select_child(&nodes, 0, &cfg_on);
         assert_ne!(
@@ -7024,10 +7059,73 @@ mod tests {
     fn search_config_from_spec_file_parses_valid_file() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_valid_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "long_row_init_shaping_w": 0.0}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "long_row_init_shaping_w": 0.0, "heuristik_variante": "v1"}"#).unwrap();
         let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltige Spec-Datei muss parsen");
         assert_eq!(cfg.implicit_minimax_alpha, 0.2);
+        assert_eq!(cfg.heuristik_variante, crate::mcts::HeuristikVariante::V1);
         std::fs::remove_file(&path).ok();
+    }
+
+    /// Die Variante kommt als NAME aus der Spec an -- und zwar die, die
+    /// dort steht.
+    ///
+    /// Der Test ist die Lehre vom 2026-08-26 in Testform: dort war die
+    /// Variante im Rezept dokumentiert und kam trotzdem nicht an, weil der
+    /// Aufruf sie nicht mitnahm und der Default (v1) still einsprang. Ein
+    /// Test, der nur `v1` prueft, haette das nicht gefangen -- v1 IST der
+    /// Default. Deshalb wird hier auf `v2huelle` geprueft.
+    #[test]
+    fn search_config_from_spec_file_reads_heuristik_variante() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_variante_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "v2huelle"}"#).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltige Spec-Datei muss parsen");
+        assert_eq!(cfg.heuristik_variante, crate::mcts::HeuristikVariante::V2Huelle);
+        assert_ne!(cfg.heuristik_variante, SearchConfig::from_env().heuristik_variante,
+                   "Der Test muss sich vom Default UNTERSCHEIDEN, sonst prueft er nichts.");
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// Ein unbekannter Variantenname ist ein harter Fehler, kein Rueckfall
+    /// auf v1. Ein stiller Rueckfall saehe wie der gewollte Lauf aus und
+    /// waere der Bestandslauf -- genau der Messfehler vom 2026-08-26.
+    #[test]
+    fn search_config_from_spec_file_rejects_unknown_variante() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_badvariante_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "v2huelle_tippfehler"}"#).unwrap();
+        let result = SearchConfig::from_spec_file(path.to_str().unwrap());
+        assert!(result.is_err(), "unbekannte Variante muss abgewiesen werden");
+        assert!(result.unwrap_err().contains("unbekannte heuristik_variante"));
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// Ein FEHLENDES Pflichtfeld ist ebenfalls ein Fehler -- eine Spec legt
+    /// das Verhalten VOLLSTAENDIG fest (Welle-1-Regel).
+    #[test]
+    fn search_config_from_spec_file_requires_heuristik_variante() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_novariante_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0}"#).unwrap();
+        let result = SearchConfig::from_spec_file(path.to_str().unwrap());
+        assert!(result.is_err(), "fehlende heuristik_variante muss abgewiesen werden");
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// `name()` und `variant_from_name` muessen ueber ALLE Varianten
+    /// zueinander passen. Zwei Tabellen, die dasselbe abbilden, laufen sonst
+    /// auseinander -- und eine Spec-Datei traegt dann einen Namen, den kein
+    /// Leser mehr aufloest.
+    #[test]
+    fn variant_name_roundtrips_for_every_variant() {
+        use crate::mcts::HeuristikVariante as HV;
+        for v in [HV::V1, HV::V2, HV::V2Huelle, HV::V2Heatmap, HV::V2PointMap,
+                  HV::V2HuellePhase, HV::V2HuelleFilter, HV::V2HuelleReach, HV::V2HuelleCap] {
+            let name = v.name();
+            let zurueck = crate::self_play::variant_from_name(name)
+                .unwrap_or_else(|| panic!("name() liefert '{name}', das variant_from_name nicht kennt"));
+            assert_eq!(zurueck, v, "Roundtrip fuer '{name}' gebrochen");
+        }
     }
 
     /// Abnahme (c): unbekanntes Feld ist ein harter Fehler (kein stilles
