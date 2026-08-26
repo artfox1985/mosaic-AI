@@ -341,6 +341,25 @@ pub struct RefereeGame {
     /// kann zuerst dran sein). Zweimal dieselbe Herleitung waeren zwei
     /// Gelegenheiten, sie unterschiedlich zu schreiben.
     pending_start_player: Option<usize>,
+    /// Seiten, die eine Drafting-Aktion ueber `apply_chosen_action` anwenden
+    /// (Sammelaufloesung des Stapelzugs) statt ueber `apply_drafting`.
+    ///
+    /// SPIEGELT `PlayerLoopConfig::apply_via_chosen_action` (self_play.rs:1971).
+    /// Dort traegt die NETZ-Seite `true` und die HEURISTIK-Seite `false`: beim
+    /// Netz loest `resolve_and_apply_stack_draw` den Zug zu Ende (Platte, Slot,
+    /// Rotation nach fester Heuristik), bei der Heuristik wird nur der Peek
+    /// angewandt und die Folgeschritte werden GESUCHT.
+    ///
+    /// Der Referee kannte diese Unterscheidung bis 2026-08-26 nicht und wandte
+    /// immer sammelaufloesend an -- er gab der Heuristik-Seite also das
+    /// Netz-Verhalten. Gemessen: 0 von 6 Partien identisch zu
+    /// `net_arena_match`, erste Abweichung jeweils in der Kuppel-Slot-/
+    /// Rotationswahl direkt nach einem Stapelzug.
+    ///
+    /// Default: BEIDE Seiten sammelaufloesend -- das ist das Bestandsverhalten
+    /// des Referees und damit der Stand, auf dem der Kernbeweis (par.8f) gruen
+    /// ist.
+    sammelaufloesend: [bool; 2],
 }
 
 /// Freie Funktion statt Methode (NICHT `&mut self`): so kann der Aufrufer
@@ -367,7 +386,8 @@ impl RefereeGame {
         let ids = scoring_ids.unwrap_or_else(|| sample_valid_scoring_ids(3, &mut rng));
         let game = Game::start([names.0, names.1], first_player, ids, &mut rng);
         RefereeGame { game, rng, game_seed: seed, steps: 0, nets: std::collections::HashMap::new(),
-                      pending_start_player: None }
+                      pending_start_player: None,
+                      sammelaufloesend: [true, true] }
     }
 
     /// Fork A (par.8b) + par.8d: exakte Variante -- traegt zusaetzlich zu den
@@ -375,6 +395,20 @@ impl RefereeGame {
     /// Sammlungen (Beutel/Turm/Kuppelstapel/Bonuschip-Pool) UND
     /// `pending_dome_choice_exact` (angefangener Kuppel-/Stapel-Zug, par.8d),
     /// die der Worker jetzt PFLICHT konsumiert (`choose_drafting_action_json`).
+    /// Setzt den Anwendungsmodus je Seite (siehe Feld `sammelaufloesend`).
+    ///
+    /// `true` = wie die NETZ-Seite der Arena (`apply_chosen_action`,
+    /// Sammelaufloesung des Stapelzugs), `false` = wie die HEURISTIK-Seite
+    /// (`apply_drafting`, nur der Peek -- die Folgeschritte werden als eigene
+    /// Entscheidungen gesucht).
+    ///
+    /// Muss gesetzt werden, wer eine Partie mit dem Arena-Pfad vergleichen
+    /// will: der Default (beide sammelaufloesend) entspricht dort nur der
+    /// Netz-Seite.
+    fn set_apply_modes(&mut self, sammelaufloesend: (bool, bool)) {
+        self.sammelaufloesend = [sammelaufloesend.0, sammelaufloesend.1];
+    }
+
     fn state_json(&self) -> String {
         state_to_json_exact(&self.game.state, true).to_string()
     }
@@ -643,7 +677,12 @@ impl RefereeGame {
             net_arena_choose_action(net, &self.game.state, &actions, &mut search_rng, sims, c_puct, true, &search_config)
         };
         let dict = action_to_dict(&chosen);
-        apply_chosen_action(&mut self.game, chosen).map_err(PyValueError::new_err)?;
+        let pi_akt = self.game.state.current_player;
+        if self.sammelaufloesend[pi_akt] {
+            apply_chosen_action(&mut self.game, chosen).map_err(PyValueError::new_err)?;
+        } else {
+            self.game.apply_drafting(&chosen).map_err(PyValueError::new_err)?;
+        }
         self.steps += 1;
         Ok(dict.to_string())
     }
@@ -737,7 +776,17 @@ impl RefereeGame {
                 )))
             }
         };
-        apply_chosen_action(&mut self.game, chosen).map_err(PyValueError::new_err)?;
+        let pi = self.game.state.current_player;
+        if self.sammelaufloesend[pi] {
+            apply_chosen_action(&mut self.game, chosen).map_err(PyValueError::new_err)?;
+        } else {
+            // Nur die eine Aktion. Bei `DrawStackPeek` bleibt der Zug damit
+            // OFFEN, und `advance_to_decision` meldet gleich wieder
+            // "drafting" -- die Folgeschritte werden zu eigenen Anfragen.
+            // Genau dafuer ist das PER-ENTSCHEIDUNG-Protokoll aus par.8d
+            // gebaut; bis 2026-08-26 wurde nur nie danach gefragt.
+            self.game.apply_drafting(&chosen).map_err(PyValueError::new_err)?;
+        }
         self.steps += 1;
         Ok(())
     }
