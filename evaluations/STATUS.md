@@ -323,14 +323,27 @@ weiterhin Feld fuer Feld identisch mit der ersten Korpusdatei.
 | Traeger-Manifest-Generator | klein | `PREREG_v23_window.md` verlangt 1.800 von 17.450 hv2-Partien policy-aktiv; es gibt nur Leser, kein Werkzeug. Regel ist dokumentiert (Seed + zeitlich gestreute Auswahl) |
 | ~~Split-Test Routing gegen Drafting~~ ERLEDIGT 2026-08-26 | 3x 22 s | `PREREG_v22_window.md` par.4f: **Drafting 0,756, Routing allein 0,000** -- par.4c hatte das Gegenteil vorhergesagt |
 | Gewichtsfenster der Huelle | Messung | `PREREG_heuristic_v2_long_rows.md` par.3b.1 -- existiert ein `w`, das kleine Punktunterschiede ueberstimmt, aber nie Strafpunkte akzeptiert? |
+| Blindzieh-Stopp-Regel gegenpruefen | Arena | `PREREG_stack_draw_reservation_rule.md` par.5b sagt "zieht zu oft, ~10 Punkte je betroffenem Stapelzug". Knopf `MOSAIC_STACK_DRAW_RESERVATION` ist gebaut, Default AUS. Seit der Kapselung billig: der Anker liegt als Artefakt vor |
+| Kontrollfluss im NETZ-Self-Play | Arena | `MOSAIC_STACK_DRAW_RESEARCH=1`. Beruehrt nur die NETZ-Seite -- aendert den SPIELER, nicht den MASSSTAB |
 
-### 3. Zustand des Baums
+### 3. Zustand des Baums (Stand 2026-08-26, Ende der Kapselungs-Sitzung)
 
-* **49+ Commits ungepusht** (Nutzer-Regel: Push ist ein eigener Entscheid).
-* `CLAUDE.md` ist seit Sitzungsbeginn modifiziert, **nicht von dieser Sitzung**.
-* `data/` enthaelt neben den 2.400 `.pkl` auch 57 Block-Caches, `.par_full.h5`,
-  `.ref_serial.h5`, `.par_test*.h5` -- zusammen rund 2 GB. Aufraeumen ist ein
-  Nutzer-Entscheid, ich habe nichts geloescht.
+* **25 Commits vor `origin/main`**, nicht gepusht (Nutzer-Regel: Push ist ein
+  eigener Entscheid). `origin/main` traegt inzwischen die frueheren Commits
+  dieser Sitzung -- gepusht hat sie NICHT diese Sitzung.
+* `CLAUDE.md` ist seit Sitzungsbeginn modifiziert, **nicht von dieser Sitzung**;
+  ebenso die Loeschung von `data/policy_carrier_manifest_v20.json`.
+* `.git` ist von 30 auf 60 MB gewachsen -- die eingefrorenen Artefakte sind
+  jetzt versioniert. 22,8 MB Artefaktdateien kosten davon 7 MB, weil git
+  inhaltsadressiert ist (`tiling_net.onnx` teilt seinen Blob mit dem
+  v21-Artefakt, die beiden Wheels sind identisch).
+* `data/` enthaelt neben den 2.400 `.pkl` weiterhin Block-Caches und
+  Referenzdateien -- rund 2 GB. Dazu jetzt tot: `.inc_window_120.h5` (die
+  durchgefallene erste Paritaets-Fassung) und der `.filecache_*`-Block der
+  geloeschten Sonde. Aufraeumen ist ein Nutzer-Entscheid, geloescht wurde
+  nichts davon.
+* `models/frozen_heuristics/*/venv/` (je 33 MB) sind gebaut, aber bewusst
+  NICHT versioniert -- aus dem Wheel neu herstellbar.
 * `models/` enthaelt vier untrackte Trainings-Manifeste, darunter eines von
   einem abgebrochenen Testlauf (`valpooltest`).
 
@@ -344,6 +357,93 @@ in der Signatur heisst nicht, dass die Variante ankommt, "kein Schreiber im
 Baum" heisst nicht "von Hand erzeugt". Jedes Mal war die Antwort ein Blick auf
 Default, Reichweite und Aufrufer -- und jedes Mal hat der Nutzer sie gefunden,
 nicht ich.
+
+**2026-08-26 kamen zwei Auspraegungen dazu, beide teuer:**
+
+1. **Abwesenheit meldet sich nicht.** Ein fehlendes
+   `--heuristik-variante v2huelle` (Default `v1`) hat einen falschen Befund
+   erzeugt, der committet und an die Parallelsitzung gemeldet wurde. Der
+   Kontrollmechanismus war da -- `self_play.py` schreibt `cli_args` ins
+   Manifest neben die Daten. Ich habe hinterher hineingesehen, nicht vorher.
+   **Regel daraus: vor der Auswertung das erzeugte Manifest gegen das
+   Referenz-Manifest halten.**
+2. **Die falsche Referenz ist so teuer wie die falsche Messung.** Beim
+   Anker-Tor zuerst gegen `play_arena_game` gemessen statt gegen
+   `unified_game_loop`. Ergebnis: 0/6 und die Fehldeutung "die Umstellung
+   verschiebt den Anker". Es gibt DREI In-Process-Pfade, und nur einer traegt
+   den Anker.
+
+---
+
+## NAECHSTE SCHRITTE (Stand 2026-08-26, nach Prioritaet)
+
+### A. Der Leitstern-Pfad -- das Einzige, was den Spieler staerker macht
+
+**Das v22-Training steht weiterhin aus.** Alles an diesem Tag war
+Infrastruktur; kein Zug ist dadurch besser geworden. Konfiguration
+unveraendert (Abschnitt 1 oben): `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` PLUS
+`--ownership-weight w>0`, dazu der **w0-Kontrollarm auf demselben Korpus**.
+Beim Warmstart `MOSAIC_VAL_POOL` setzen.
+
+Vorbereitet ist dafuer inzwischen alles: der Korpus ist reproduzierbar
+(1c), sein Erzeuger eingefroren (1d), und der Cache laesst sich waehrend
+der Erzeugung mitbauen (1b).
+
+### B. Den Aufraeumeffekt einloesen -- vier Schritte, in dieser Reihenfolge
+
+Ziel (Nutzer 2026-08-26): gefrorene Agenten spielen gegeneinander,
+Entwicklungsversionen bleiben ungekapselt, der Engine-Code wird schlanker.
+Belegt ist bereits, dass der Pfadwechsel den Anker NICHT verschiebt (par.10b,
+20/20). Es fehlt:
+
+1. **Treiber parallelisieren.** `frozen_referee_match.py` spielt seriell in
+   einem Prozess; Partien sind unabhaengig. Gemessen 3,3 s je Partie seriell
+   gegen 1,6 s je Partie auf einem Kern in-process -- mit 11 Prozessen ist
+   Gleichstand erreichbar.
+2. **Ein Arena-Einstieg ueber den Referee.** Eine Python-seitige Arena ist der
+   kleinere Weg (der Treiber existiert).
+3. **Elo-Kette nachziehen** -- vier Punkte, am Bestand geprueft:
+   * **AERA-ENTSCHEID (der grosse, und er gilt unabhaengig von der
+     Kapselung):** die gesamte Elo-Historie steht auf
+     `contract=a169ebf0a4451e08`, der heutige Build auf
+     `a3f61f246d9bbf5c`. Eine neue Messung laesst sich also NICHT ohne
+     Weiteres anhaengen, und ein Duell v21-Artefakt (alte Aera) gegen die
+     neuen Heuristik-Artefakte verweigert der statische Handshake. Optionen:
+     neu verankern (Praezedenz `PREREG_round5_minfix_elo_reset`), einen
+     `v1_anchor` zusaetzlich in der ALTEN Aera einfrieren, oder zwei Leitern
+     getrennt fuehren.
+   * **Anker-Identitaet in der Zeile:** `player_b` ist heute `Heuristik` --
+     ein Name ohne Build. Die Konvention unterscheidet bereits
+     `Heuristik_v2huelle`, also fuegt sich `Heuristik_v1_anchor` ein. Ohne das
+     sehen zwei Kanten gegen VERSCHIEDENE Anker-Builds in der CSV gleich aus.
+   * **Zwei Vertrags-Hashes:** bei Artefakt gegen Artefakt gibt es zwei, die
+     Spalte `contract` haelt einen. Der Handshake erzwingt Gleichheit, also
+     reicht einer -- die Zeile sollte aber sagen, welche Seite sie beschreibt.
+   * **`knobs`-Spalte** ist durchweg leer; mit Artefakt liegen die Knoepfe in
+     `spec.json`, die Zeile sollte darauf verweisen statt sie zu wiederholen.
+4. **Erst dann** `round5_anchor.rs` (1.664 Zeilen) und die Varianten-Faedelung
+   entfernen (111 Stellen, davon 103 blosse Weitergabe, 5 echte
+   Verzweigungen), jeweils als EIGENER Commit.
+
+**Die Reihenfolge ist nicht verhandelbar:** `round5_anchor.rs` schuetzt den
+Anker im IN-PROCESS-Pfad, und die Arenen benutzen weiter genau den.
+
+### C. Billig und offen
+
+| Punkt | Kosten | Warum jetzt billiger als frueher |
+| --- | --- | --- |
+| Blindzieh-Stopp-Regel gegenpruefen | Arena | Vorhersage quantifiziert (~10 Pkt je Stapelzug), Knopf gebaut, Anker als Artefakt geschuetzt |
+| Kontrollfluss im Netz-Self-Play | Arena | beruehrt nur die NETZ-Seite -- Spieler, nicht Massstab |
+| Traeger-Manifest-Generator | klein | `PREREG_v23_window.md` braucht ihn; Regel ist dokumentiert |
+| Gewichtsfenster der Huelle | Messung | `PREREG_heuristic_v2_long_rows.md` par.3b.1 |
+| Serielle Referenz fuer den vollen Cache | 2,58 h | bevor der Cache eine Champion-Entscheidung traegt |
+
+### D. Was NICHT ansteht
+
+* **v2 weiterentwickeln.** Nutzer-Entscheid 2026-08-26: "v2 ist durch". Es ist
+  eingefroren, weil es fertig ist.
+* **Artefakt gegen Artefakt ausbauen.** Es laeuft (par.10a); ein Messlauf
+  braucht nur die Parallelisierung aus B.1.
 
 ---
 
