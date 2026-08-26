@@ -162,6 +162,92 @@ vollen Laufs sind wiederverwendbar. Dazu `.ref_serial.h5`, `.par_test*.h5`,
 
 ---
 
+## V2 IST AUS DEM QUELLSTAND (2026-08-27, B4a abgeschlossen)
+
+**Nutzer-Entscheid**, in seiner eigenen Reihenfolge: "V2 ist durch. Keine
+Entwicklung mehr." -> "Split-Test als Ergebnis stehen lassen, die beiden
+anderen migrieren." -> "mach das. ist eh alles im git versioniert."
+
+Entfernt: `HeuristikVariante` (9 Varianten), `heuristic_v2.rs`, die
+v2-Routing-Haelfte von `plate_builder.rs`, beide v2-Arena-Einstiege samt
+pyo3-Bindungen, die Faedelung durch fuenf Module. Der Umfang stand vorher als
+"129 Stellen" im Raum; entfernt wurden am Ende netto 2.933 Zeilen
+(`git diff HEAD --numstat`: +130 / -3.063 in `engine/` und `self_play.py`),
+davon 1.429 in `plate_builder.rs`, 705 in `self_play.rs`, 554 als ganze
+Datei `heuristic_v2.rs`.
+
+**Nicht nach eigenem Urteil ausgewaehlt:** die 39 toten Items in
+`plate_builder.rs` hat der COMPILER benannt, iterativ, bis nichts mehr tot
+war. Dieselbe Methode fuer die Tests -- Anker war jeweils die Fehlerzeile,
+nicht meine Einschaetzung, was noch gebraucht wird.
+
+**Der Anker ist davon nicht beruehrt.** Zu jeder Funktion `X` gab es einen
+Zwilling `X_variante`; der V1-Zweig war in jedem Fall der Bestandsrumpf. Die
+Verschmelzung entfernt eine Weiche, die nur noch einen Ausgang hatte.
+
+### Was ausdruecklich BLEIBT -- und warum das kein Restposten ist
+
+- **Spec-Feld `heuristik_variante`**: weiter PFLICHT, aber nur `"v1"` wird
+  angenommen. Eine v2-Spec scheitert HART. Ein stilles Durchwinken als v1
+  waere genau der Fehler vom 2026-08-26 (Flag vergessen, Default v1, Korpus
+  bitgleich, falscher Befund committet) -- nur an neuer Stelle.
+- **CLI-Flag `--heuristik-variante`**: bleibt mit `choices=["v1"]`, damit ein
+  alter Kampagnen-Aufruf LAUT scheitert.
+- **Beide Artefakte**: lauffaehig auf ihrem MITGELIEFERTEN Wheel. Die
+  v22-Korpora in `data/` sind unberuehrt.
+
+### Der Beleg, der die ganze Kapselung rechtfertigt
+
+`frozen_agent_referee_probe.py` liefert seine festgenagelten Werte
+UNVERAENDERT: `v1_anchor [27,15]/159`, `v2huelle_generator [63,27]/163`.
+
+Der Quellstand kennt v2 nicht mehr, und das v2-Artefakt spielt trotzdem Zug
+fuer Zug dieselbe Partie. Genau dafuer war die Kapselung gebaut; das ist der
+erste Fall, in dem sie sich beweisen musste.
+
+### Drei Werkzeuge, drei verschiedene Lose
+
+| Werkzeug | Los | Grund |
+| --- | --- | --- |
+| `frozen_agent_referee_probe.py` | MIGRIERT auf Artefakte | beide Arme SIND Artefakte |
+| `v2_envelope_arena.py` | stillgelegt, Datei bleibt | Arm `v2`-plain ist kein Artefakt |
+| `v2_teacher_arena.py` | stillgelegt, Datei bleibt | dito |
+
+Die Trennlinie ist die Kapselungsregel, nicht Bequemlichkeit: eine Messung
+laeuft ueber Artefakte, und `v2`-plain war nie Champion und nie Erzeuger,
+sondern ein Vergleichsarm.
+
+### Kollateral, benannt statt still weggeraeumt
+
+Die SOLL-Seite von `PREREG_stack_draw_reservation_rule.md` par.5 hing an
+`plate_builder::expected_points_map` und ist mit entfernt. Das registrierte
+Ergebnis bleibt gueltig, nachrechnen laesst es sich auf dem heutigen Build
+nicht mehr. Herkunft fuer eine Wiederherstellung: die Historie unmittelbar
+vor dem B4a-Commit.
+
+### Abnahme (2026-08-27, alles auf dem NEU gebauten Wheel)
+
+| | |
+| --- | --- |
+| `cargo test --release` | **489 / 0** (19 ignoriert), Exit 0 |
+| `cargo check --all-targets` | keine neue Warnung; die einzige (`net.rs::split_planes_flat_batch`) ist Altbestand, gegen `git stash` geprueft |
+| `frozen_agent_referee_probe` | **GRUEN**, beide Artefakte auf ihren festgenagelten Werten |
+| `anchor_referee_parity_probe --games 20` | **GRUEN**, 20/20 in-process UND 20/20 extern (368,8 s, 9,22 s je Partie, 1 Thread) |
+
+Das Wheel wurde vor den Sonden neu gebaut und installiert -- ohne das haetten
+sie den alten Code gemessen (`feedback_wheel_neu_bauen_nach_engine_aenderung`).
+
+**Ein Fehler von mir, den der Compiler gefangen hat:** beim Loeschen des
+`_variante`-Zwillings ging der RUMPF von `resolve_tiling_step` mit, der Wrapper
+rief sich selbst. `unconditional_recursion` hat es gemeldet, der Rumpf kam aus
+git zurueck. Ohne diese Lint waere es eine Endlosschleife im Tiling gewesen --
+und die Suite haette sie gefunden, aber erst nach 67 Sekunden Rauschen.
+
+Details: `PREREG_heuristic_v2_long_rows.md` par.19 (Kopf nachgezogen, Index
+generiert).
+
+---
+
 ## UEBERGABE AN DIE NAECHSTE SITZUNG (2026-08-26, Abend)
 
 **Lies zuerst `NAECHSTE SCHRITTE` weiter unten** -- dort steht, was ansteht,
@@ -216,15 +302,30 @@ kann (`PREREG_v22_window.md` par.4e). Die richtige Konfiguration ist:
 
 ```
 MOSAIC_IGNORE_POLICY_TARGET_VALID=1   (Traeger-Arm B, Richtungsbefund par.4b)
---ownership-weight <w0>               (par.3b der Lehrer-Prereg, w > 0)
+--ownership-weight 1.0                (par.3b der Lehrer-Prereg, w > 0)
 ```
+
+**Notation, festgelegt in par.3b.2:** dieser Messarm heisst "w1-Arm"; der
+**w0-KONTROLLARM** faehrt `--ownership-weight 0`. Der frueher hier stehende
+Platzhalter `<w0>` war doppeldeutig.
 
 plus **w0-Kontrollarm auf DEMSELBEN Korpus** -- ohne ihn sind Kopfwirkung und
 Korpuswechsel konfundiert.
 
-Beim Warmstart von einem Zwischenmodell: `MOSAIC_VAL_POOL` setzen
-(`PREREG_v22_window.md` par.6), sonst ist der Val-Split zu rund 21 Prozent
-vom Startmodell schon gesehen.
+**KALTSTART entschieden (Nutzer 2026-08-27): "wir werden einen kaltstart
+machen und bei bedarf afterburnen."** v22 trainiert from-scratch auf dem
+vollen Korpus; der vorbereitete Warmstart aus `PREREG_v22_window.md` par.6
+entfaellt. Zwei Konfundierer weniger: die Sanity-Modelle weichen in der
+Kopfbestueckung vom Champion-Rezept ab (`opp_points_head`/`endgame_head`
+beide false, am Manifest geprueft), und `hv2sanity_best` war ohnehin Arm A.
+`MOSAIC_VAL_POOL` wird fuer den Kaltstart nicht gebraucht -- greift wieder,
+falls der Afterburner als Warmstart auf demselben Korpus laeuft (par.6).
+
+**Erfolgsmass entschieden (Nutzer 2026-08-27):** v22 tritt im NORMALEN
+Gating gegen den Elo-Anker UND gegen v21 an. Promotion ist NICHT
+Voraussetzung fuer den Self-Play-Start ("ich geh nicht davon aus dass v22
+besser ist als v21") -- der Start haengt am Spalten-Abnahme-Tor (par.3b.2),
+nicht am Gating-Ausgang.
 
 ### 1b. ERLEDIGT 2026-08-26: Cache je Datei (Hebel 4)
 
@@ -436,14 +537,24 @@ verteidigen.
 **Das v22-Training steht weiterhin aus.** Alles an diesem Tag war
 Infrastruktur; kein Zug ist dadurch besser geworden. Konfiguration
 unveraendert (Abschnitt 1 oben): `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` PLUS
-`--ownership-weight w>0`, dazu der **w0-Kontrollarm auf demselben Korpus**.
-Beim Warmstart `MOSAIC_VAL_POOL` setzen.
+`--ownership-weight 1.0` (w1-Arm), dazu der **w0-Kontrollarm auf demselben
+Korpus**. **KALTSTART** (Nutzer 2026-08-27), bei Bedarf Afterburner;
+`MOSAIC_VAL_POOL` nur im Afterburner-Fall. Gating gegen Anker und v21 laeuft
+als Standard-Messung, entscheidet aber nicht den Self-Play-Start.
 
 Vorbereitet ist dafuer inzwischen alles: der Korpus ist reproduzierbar
 (1c), sein Erzeuger eingefroren (1d), und der Cache laesst sich waehrend
 der Erzeugung mitbauen (1b).
 
-### B. ERLEDIGT 2026-08-26 bis auf B4a
+**Spalten-Abnahme-Tor (par.3b.2 der Lehrer-Prereg, registriert 2026-08-27).**
+Zwischen Training und Self-Play-Start steht ein vorregistriertes Tor mit zwei
+harten Bedingungen: volle Spalten je Partie im w1-Arm signifikant ueber dem
+w0-Arm UND ueber der neu gemessenen Champion-Referenz, dazu Vollendungsquote
+signifikant ueber 0,53 bei Punktschaetzung mindestens 0,60. Tor 1 verfehlt =
+kein Self-Play-Start. Herleitung, Instrument und Folgewege stehen in der
+Prereg, nicht hier.
+
+### B. ERLEDIGT (B1-B4b, abgeschlossen 2026-08-27)
 
 | | | Stand |
 | --- | --- | --- |
@@ -451,52 +562,33 @@ der Erzeugung mitbauen (1b).
 | B2 | Arena ueber den Referee | **fertig** -- `tools/anchor_arena.py`, misst gegen `frozen_heuristics/v1_anchor` |
 | B3 | Elo-Konventionen | **fertig** -- `player_b` traegt den Build, `elo_tracker add --knobs` verweist auf die Spec |
 | B4b | `round5_anchor.rs` entfernt | **fertig** -- 1.664 Zeilen, dreifach als verhaltensneutral belegt |
-| B4a | Varianten-Faedelung entfernen | **offen, kleiner Umfang** -- ZWEI Messinstrumente muessen ueber das Artefakt fahren, siehe unten |
+| B4a | Varianten-Faedelung entfernen | **fertig 2026-08-27** -- rund 1.900 Zeilen, eigener Abschnitt oben |
 
-**B4a ist nicht blockiert, sondern KOSTET etwas. Berichtigung
-(Nutzer-Einwand 2026-08-26):**
+**ZWEI Annahmen aus der Planung dieses Blocks haben nicht gehalten.** Beide
+standen hier als Tatsache und waren es nicht:
 
-Hier stand, `PREREG_heuristic_v2_long_rows.md` par.3b.1 brauche v2 aus dem
-Quellstand und blockiere damit B4a. **Das war falsch gelesen.** par.3b.1 fragt
-nach einer ANDEREN, noch ungebauten Bauform -- ihr Schluesselsatz lautet "die
-Huelle ist ein GEWICHT auf den Marginalen, kein Filter", waehrend das
-eingefrorene `v2huelle` die Filter-Form IST. Und die Messung selbst ist eine
-Zustandsanalyse (huellen-optimaler gegen punkt-optimalen Tiling-Zug), die die
-Huellen-Funktionen direkt aufruft und keine zwei Varianten in EINER Partie
-braucht.
+1. *"Enum und Namenstabelle muessen bleiben, weil die Artefakt-Specs die
+   Variante nennen."* -- Halb richtig. Das SPEC-FELD musste bleiben, die
+   Aufloesung ueber ein Enum nicht: die Spec prueft den Namen jetzt als
+   Zeichenkette und weist alles ausser `"v1"` HART ab. Der Vertrag ist
+   erhalten, die Tabelle nicht noetig.
 
-**Was wirklich bleibt, und es ist kleiner:**
+2. *"Die Huellen-Logik in `plate_builder.rs` bleibt ohnehin, weil par.3b.1 sie
+   analysiert."* -- **Falsch.** Die Huellen-Funktionen haengen ausnahmslos am
+   v2-Routing; der Compiler hat sie als tot benannt, und sie sind mitgefallen.
+   `plate_builder.rs` ging von 2.835 auf 1.422 Zeilen.
 
-1. **Enum und Namenstabelle muessen bleiben.** Die Artefakt-Specs nennen die
-   Variante (`heuristik_variante: "v2huelle"`), und
-   `SearchConfig::from_spec_file` loest den Namen ueber `variant_from_name`
-   auf. Ohne sie kann kein Werkzeug eine Artefakt-Spec mehr lesen. Das
-   betrifft aber nur die Tabelle, nicht die 111 Faedelungs-Stellen.
-2. **Die Huellen-Logik in `plate_builder.rs` bleibt ohnehin** -- par.3b.1
-   analysiert sie.
-3. **ZWEI Werkzeuge spielen v2huelle mit der AKTUELLEN Engine** und muessten
-   stattdessen ueber das Artefakt fahren:
+   **Folge, ausdruecklich:** `PREREG_heuristic_v2_long_rows.md` par.3b.1 (das
+   Gewichts-FENSTER, registriert und ungebaut) braucht die Huellen-Geometrie
+   als Bezug. Wer die Messung baut, holt `v2_envelope_target` samt Umfeld aus
+   der Historie unmittelbar vor dem B4a-Commit. Das ist vertretbar, weil
+   par.3b.1 ohnehin eine ANDERE Bauform verlangt -- ein GEWICHT auf den
+   Marginalen, waehrend das entfernte `v2huelle` die Filter-Form ist --, aber
+   es ist kein Nullposten und wird hier nicht als einer gefuehrt.
 
-   | | wodurch |
-   | --- | --- |
-   | `tools/probes/frozen_agent_referee_probe.py` | benutzt die v2huelle-Spec in-process |
-   | `tools/probes/v2_envelope_arena.py` | ruft `heuristic_v1_vs_v2_arena` |
-
-   **"Ueber das Artefakt fahren" heisst: anderer INTERPRETER, nicht anderer
-   Ort.** Das Muster steht schon und laeuft --
-   `verify_frozen_heuristic.py --venv` ruft `self_play.py` AUS DEM REPO mit dem
-   Python der Artefakt-venv. Keine Datei wandert.
-
-   `self_play.py` gehoert NICHT auf diese Liste: es reicht nur ein Flag durch.
-   Wer einen v2huelle-Korpus will, ruft es mit dem Interpreter des Artefakts --
-   eine Aufrufkonvention, kein Codeumbau. `freeze_heuristic.py` und
-   `verify_frozen_heuristic.py` tun das bereits, und
-   `anchor_referee_parity_probe.py` benutzt ohnehin nur V1.
-
-Damit ist B4a eine Aufgabe mit kleinem, bekanntem Umfang. Sie gehoert trotzdem
-in einen eigenen Schritt -- zwei Messinstrumente umzuhaengen und dabei zu
-BELEGEN, dass sie dasselbe messen wie vorher, ist kein Anhaengsel an eine
-Aufraeum-Kette.
+**Was inhaltlich richtig war:** par.3b.1 blockiert B4a nicht (Nutzer-Einwand
+2026-08-26, hier korrekt eingearbeitet), und "ueber das Artefakt fahren" heisst
+anderer INTERPRETER, nicht anderer Ort -- `self_play.py` ist nicht gewandert.
 
 **Was sich durch B4b geaendert hat und ausgesprochen gehoert:** ab jetzt
 bewegt eine Aenderung an `round5.rs` auch den Heuristik-Pfad. Der Schutz ist
@@ -911,6 +1003,11 @@ Planungsgroessen. Die belastbaren Zahlen stehen je Lauf im Artefakt
 (`laufzeit`-Block, Pflichtfeld seit 2026-08-25). Wer eine Zeile ergaenzt,
 traegt GEMESSENES ein.
 
+**Zwei Zeilen nennen stillgelegte Werkzeuge** (`v2_envelope_arena.py`,
+`v2_teacher_arena.py`, seit B4a nicht mehr lauffaehig). Die Zahlen bleiben als
+Planungsgroessen gueltig -- sie beschreiben die FORM des Laufs (Heuristik gegen
+Heuristik bzw. Netz gegen Heuristik, gleiche Sims), nicht das Werkzeug.
+
 | Aufbau | Umfang | Threads | Wanduhr |
 | --- | --- | --- | --- |
 | Heuristik gegen Heuristik, 150 Sims (`v2_envelope_arena.py`) | 160 Partien | 0 = alle 12 Kerne | **21,9 s** |
@@ -918,6 +1015,7 @@ traegt GEMESSENES ein.
 | Netz@400 gegen Heuristik@150 (`v2_teacher_arena.py`), je Partie | – | 0 = **sequenziell** | **12,357 s** |
 | dito | – | 11 | **2,575 s** |
 | dito, voller Lauf | 814 Partien | 0 = sequenziell | ~2 h 48 min |
+| Anker-Tor (`anchor_referee_parity_probe --games 20`) | 20 Partien, doppelt (in-process + extern) | 1 | **368,8 s** = 9,22 s je Partie |
 | dito | 814 Partien | 11 | ~35 min |
 | Strafleisten-Tor (`floor_action_aversion_gate.py`), 240 Stellungen, sims=200 | – | – | **~7 min** |
 | Heuristik-Self-Play `v2huelle`, 600 Basis-Sims, Netz-Labels | 200 Partien | 11 | **239 s** = 50 Partien/min |

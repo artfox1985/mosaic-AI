@@ -86,6 +86,25 @@ def _herkunft() -> dict:
     }
 
 
+def _herkunft(pfad) -> str:
+    """Pfad OHNE Rechnerstruktur -- repo-relativ, sonst nur der Dateiname.
+
+    Das Repo ist oeffentlich (CLAUDE.md, Nutzer-Entscheid 2026-08-17): keine
+    absoluten Pfade, kein Nutzername in neuen Dateien. Diese Funktion ist die
+    Reparatur eines konkreten Regelbruchs -- die beiden Manifeste vom
+    2026-08-26 trugen den vollen Build-Pfad und haben am 2026-08-27 den
+    pre-push-Hook ausgeloest.
+
+    Der Wert bleibt aussagekraeftig: er sagt WOHER im Repo die Datei kam
+    (`engine/target/wheels/...`), nur nicht mehr, wie der Rechner heisst.
+    """
+    p = pathlib.Path(pfad).resolve()
+    try:
+        return p.relative_to(_ROOT).as_posix()
+    except ValueError:
+        return p.name
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--name", required=True, help="Artefaktname, z.B. v1_anchor")
@@ -132,7 +151,7 @@ def main() -> int:
     if a.tiling_net:
         src = pathlib.Path(a.tiling_net)
         shutil.copy2(src, ziel / "tiling_net.onnx")
-        tiling_net = {"datei": "tiling_net.onnx", "quelle": str(src).replace("\\", "/"),
+        tiling_net = {"datei": "tiling_net.onnx", "quelle": _herkunft(src),
                       "rolle": ("Stichentscheid im Tiling-Durchfall (self_play.rs:1234: die "
                                 "v2-Vorzugskarte greift nur, wenn sie einen Zug liefert -- sonst "
                                 "faellt es auf das Netz durch) und Erzeuger der "
@@ -183,7 +202,7 @@ def main() -> int:
         "typ": "heuristik",
         "freeze_date": time.strftime("%Y-%m-%d"),
         "spec": spec,
-        "wheel": {"datei": wheel.name, "quelle": str(wheel).replace("\\", "/"),
+        "wheel": {"datei": wheel.name, "quelle": _herkunft(wheel),
                   "rolle": ("Traeger des VERHALTENS. Bei einer Heuristik gibt es kein ONNX, "
                             "das es mittraegt -- ohne dieses Wheel ist der Agent weg.")},
         "tiling_net": tiling_net,

@@ -118,9 +118,8 @@ pub(crate) fn choose_start_placement_json(
     let parsed: Value = serde_json::from_str(state_json)
         .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
     let state = crate::serialize::json_to_state_exact(&parsed).map_err(PyValueError::new_err)?;
-    match crate::self_play::choose_start_placement_variante(
-        &state, pi, search_config.heuristik_variante, game_seed,
-    ) {
+    let _ = (search_config, game_seed);
+    match crate::self_play::choose_start_placement(&state, pi) {
         Some((tid, r, c, rot)) => Ok(json!({"tile_id": tid, "row": r, "col": c, "rot": rot})),
         None => Err(PyValueError::new_err(
             "choose_start_placement_json: keine legale Startsetzung fuer diesen Zustand",
@@ -142,9 +141,8 @@ pub(crate) fn choose_tiling_step_json(
         ));
     }
     let pi = state.current_player;
-    let step = crate::self_play::resolve_tiling_step_variante(
-        &state, pi, net, search_config.heuristik_variante,
-    );
+    let _ = search_config;
+    let step = crate::self_play::resolve_tiling_step(&state, pi, net);
     Ok(crate::serialize::tiling_step_to_dict(&step))
 }
 
@@ -165,9 +163,8 @@ pub(crate) fn choose_heuristic_drafting_action_json(
     }
     let actions = drafting_actions(&state);
     let mut rng = StdRng::seed_from_u64(seed);
-    let chosen = crate::self_play::heuristic_arena_choose_action(
-        &state, &actions, &mut rng, sims, c, search_config.heuristik_variante,
-    );
+    let _ = search_config;
+    let chosen = crate::self_play::heuristic_arena_choose_action(&state, &actions, &mut rng, sims, c);
     Ok(action_to_dict(&chosen))
 }
 

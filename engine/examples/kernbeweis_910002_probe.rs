@@ -77,7 +77,7 @@ fn main() {
     // `long_row_init_shaping_w: 0.0` = Bestandsverhalten (Term aus) --
     // diese Sonde ist ein Byte-Identitaets-Nachweis, ihr Suchverhalten
     // MUSS unveraendert bleiben.
-    let search_config = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0, heuristik_variante: mosaic_rust::mcts::HeuristikVariante::V1 };
+    let search_config = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0 };
     let actions = drafting_actions(&state1);
     println!(
         "Kandidaten (Reihenfolge aus drafting_actions, n={}):",

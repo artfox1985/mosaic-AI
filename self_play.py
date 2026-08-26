@@ -634,10 +634,15 @@ if __name__ == "__main__":
     parser.add_argument("--c-puct", dest="c_puct", type=float, default=1.5,
                         help="PUCT-Explorationskonstante (nur --mode network)")
     parser.add_argument("--heuristik-variante", dest="heuristik_variante", type=str,
-                        default="v1",
-                        help="Heuristik-Variante fuer den mcts-Modus: v1 (Bestand), v2, "
-                             "v2huelle, v2huellephase, ... Unbekannte Werte werden von "
-                             "der Engine ABGEWIESEN, nicht still auf v1 gefaltet.")
+                        default="v1", choices=["v1"],
+                        help="Heuristik-Variante fuer den mcts-Modus. Seit dem 2026-08-26 "
+                             "gibt es nur noch v1: der v2-Zweig ist aus dem Quellstand "
+                             "entfernt (PREREG_heuristic_v2_long_rows.md par.19). Die mit "
+                             "v2huelle erzeugten Korpora liegen unveraendert in data/, und "
+                             "das Erzeuger-Artefakt laeuft auf seinem mitgelieferten Wheel "
+                             "weiter (models/frozen_heuristics/v2huelle_generator/). "
+                             "Das Flag BLEIBT, damit ein alter Kampagnen-Aufruf laut "
+                             "scheitert statt still etwas anderes zu erzeugen.")
     parser.add_argument("--rtv", action="store_true",
                         help="Task #85 (rtv-Ablation Phase 2): das teure "
                              "round_transition_value-Sampling an den vier Rundenübergängen "

@@ -10,12 +10,12 @@
   },
   "wheel": {
     "datei": "mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
-    "quelle": "D:/OneDrive/Documents/Projekte/mosaic-AI/engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
+    "quelle": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
     "rolle": "Traeger des VERHALTENS. Bei einer Heuristik gibt es kein ONNX, das es mittraegt -- ohne dieses Wheel ist der Agent weg."
   },
   "tiling_net": {
     "datei": "tiling_net.onnx",
-    "quelle": "models/alphazero_v21_2d_brierbest.onnx",
+    "quelle": "alphazero_v21_2d_brierbest.onnx",
     "rolle": "Stichentscheid im Tiling-Durchfall (self_play.rs:1234: die v2-Vorzugskarte greift nur, wenn sie einen Zug liefert -- sonst faellt es auf das Netz durch) und Erzeuger der bootstrap_value-Label"
   },
   "herkunft": {

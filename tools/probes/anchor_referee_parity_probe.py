@@ -154,6 +154,13 @@ def main() -> int:
             r = referee_partie(a.model, a.spec_net, s, i % 2, a.net_sims, a.heur_sims,
                                a.c_puct, a.c, heuristik_extern=(modus == "extern"))
             gleich = (list(g["scores"]) == r["scores"]) and (int(g["steps"]) == r["steps"])
+            # Fortschritt SICHTBAR (CLAUDE.md 2026-08-25): der externe Durchgang
+            # laeuft je Zug ueber die Prozessgrenze und braucht bei 20 Partien
+            # mehrere Minuten. Ohne diese Zeile ist die einzige Antwort auf
+            # "wie steht's?" ein Achselzucken -- und eine ABWEICHUNG faellt erst
+            # am Ende auf, statt bei der Partie, in der sie entsteht.
+            print(f"    [{modus}] {i + 1}/{len(seeds)} seed={s} "
+                  f"{'=' if gleich else 'ABWEICHUNG'} {r['scores']}", flush=True)
             befunde[modus].append({
                 "partie": i, "seed": s, "identisch": gleich,
                 "anker": {"scores": list(g["scores"]), "steps": int(g["steps"])},
