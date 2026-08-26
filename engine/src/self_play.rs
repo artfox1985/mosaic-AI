@@ -785,7 +785,10 @@ fn sun_color_counts(state: &GameState) -> [usize; 5] {
 /// rotation)` in fester Reihenfolge: Platte aussen, Slot in der Mitte,
 /// Rotation zuinnerst. Herausgezogen, damit die Varianten-Fassung unten
 /// dieselbe Bewertung benutzt statt sie nachzubilden.
-fn start_placement_kandidaten(
+// `pub(crate)` seit 2026-08-26: der Referee prueft eine EXTERN entschiedene
+// Startsetzung gegen genau diese Kandidatenmenge. Reine
+// Sichtbarkeits-Erweiterung.
+pub(crate) fn start_placement_kandidaten(
     state: &GameState,
     pi: usize,
 ) -> Vec<(f64, usize, usize, usize, u32)> {

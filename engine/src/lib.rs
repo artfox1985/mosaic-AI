@@ -1135,6 +1135,26 @@ fn tiling_choice_state_json(
     Ok(step.to_string())
 }
 
+/// Startsetzung eines gefrorenen Agenten. Rueckgabe im Schema, gegen das
+/// `RefereeGame::start_placement_apply_external` prueft.
+///
+/// `pi` kommt aus `RefereeGame::pending_start_placement_player()`, NICHT aus
+/// `current_player()`: in dieser Phase kann der Nicht-Starter zuerst dran sein.
+/// `game_seed` aus `RefereeGame::game_seed()` -- v2-Varianten waehlen unter
+/// mehreren Kandidaten seed-basiert.
+#[pyfunction]
+#[pyo3(signature = (state_json, pi, game_seed, spec=None))]
+fn start_placement_choice_state_json(
+    state_json: String,
+    pi: usize,
+    game_seed: u64,
+    spec: Option<String>,
+) -> PyResult<String> {
+    let search_config = resolve_search_config(spec)?;
+    let p = crate::referee::choose_start_placement_json(&search_config, &state_json, pi, game_seed)?;
+    Ok(p.to_string())
+}
+
 /// Wertungsplatten-Endwertung für einen extern gespeicherten Zustand (z.B.
 /// ein Self-Play-Record `state`-Feld, `json.dumps(record["state"])`) --
 /// reine additive Lesefunktion für die Wertungsplatten-Diagnose (2026-07-26,
@@ -1849,6 +1869,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(net_arena_choice_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(heuristic_arena_choice_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_choice_state_json, m)?)?;
+    m.add_function(wrap_pyfunction!(start_placement_choice_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     m.add_class::<crate::referee::RefereeGame>()?;
     m.add_class::<crate::referee::FrozenWorkerEngine>()?;

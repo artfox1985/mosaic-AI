@@ -103,6 +103,43 @@ class WorkerProc:
             raise RuntimeError(f"Worker meldet Fehler: {resp.get('error')}")
         return resp["action"], resp.get("value")
 
+    def _roundtrip(self, req: dict) -> dict:
+        """Eine Anfrage, eine Antwort -- gemeinsamer Rumpf fuer alle Arten."""
+        t0 = time.perf_counter()
+        assert self.proc.stdin is not None and self.proc.stdout is not None
+        self.proc.stdin.write(json.dumps(req) + "\n")
+        self.proc.stdin.flush()
+        line = self.proc.stdout.readline()
+        self.total_wait_s += time.perf_counter() - t0
+        self.n_calls += 1
+        if not line:
+            err = self.proc.stderr.read() if self.proc.stderr else ""
+            raise RuntimeError(f"Worker hat die Verbindung beendet (kein Response). stderr:\n{err}")
+        resp = json.loads(line)
+        if not resp.get("ok"):
+            raise RuntimeError(f"Worker meldet Fehler: {resp.get('error')}")
+        return resp
+
+    def ask_tiling(self, state_json: str) -> dict:
+        """Platzierungs-Schritt der gefrorenen Seite.
+
+        Seit 2026-08-26: bis dahin loeste der Referee das Tiling selbst auf,
+        ueber einen auf V1 verdrahteten Pfad. Ein `v2huelle`-Artefakt haette
+        damit als `v1` gekachelt.
+        """
+        return self._roundtrip({"kind": "tiling", "state": state_json})["step"]
+
+    def ask_start_placement(self, state_json: str, pi: int, game_seed: int) -> dict:
+        """Startsetzung der gefrorenen Seite.
+
+        `pi` kommt aus `pending_start_placement_player()`, nicht aus
+        `current_player()` -- in dieser Phase kann der Nicht-Starter zuerst
+        dran sein. `game_seed`, weil v2-Varianten unter mehreren Kandidaten
+        seed-basiert waehlen.
+        """
+        return self._roundtrip({"kind": "start_placement", "state": state_json,
+                                "pi": pi, "game_seed": game_seed})["placement"]
+
     def close(self):
         try:
             if self.proc.stdin:
@@ -141,7 +178,12 @@ def play_one_game(
     first_player: int,
     seed: int,
     board_a: int,
+    # Seiten, die ihre Startsetzung und ihr Tiling SELBST entscheiden. Leer =
+    # Bestandsverhalten (der Referee loest beides auf), und das bleibt der
+    # Default fuer Netz-Artefakte aus Welle 3.
+    externe_seiten=None,
 ) -> dict:
+    externe_seiten = externe_seiten or []
     rg = mr.RefereeGame(names, first_player, seed, None)
     board_b = 1 - board_a
     model_p0 = model_a if board_a == 0 else artifact_model
@@ -153,10 +195,30 @@ def play_one_game(
         guard += 1
         if guard > 100_000:
             raise RuntimeError("Referee: Schritt-Limit ueberschritten (Haenger-Verdacht).")
-        status = rg.advance_to_decision(model_p0, model_p1)
+        # `externe_seiten`: die gefrorene Seite entscheidet Startsetzung und
+        # Tiling SELBST -- aber NUR, wenn ihr Worker das erweiterte Protokoll
+        # kennt (Manifest-Feld `typ`, gesetzt seit 2026-08-26).
+        #
+        # Ein Welle-3-Netz-Artefakt bringt sein EIGENES, aelteres Wheel und
+        # seinen eigenen Worker mit; der ignoriert ein `kind`-Feld und
+        # antwortete auf eine Tiling-Anfrage mit einer Drafting-Aktion. Der
+        # Treiber wuerde `step` erwarten und mit KeyError sterben -- ein
+        # Regressionsschaden an genau dem Pfad, der seit par.8f gruen ist.
+        # Fuer solche Artefakte bleibt es beim Bestandsverhalten: der Referee
+        # loest Platzierung und Startsetzung selbst auf. Das ist fuer ein Netz
+        # auch inhaltlich richtig, seine Identitaet ist das ONNX.
+        status = rg.advance_to_decision(model_p0, model_p1, externe_seiten)
         if status == "game_over":
             rg.finalize_scoring()
             break
+        if status == "tiling":
+            rg.tiling_apply_external(json.dumps(worker.ask_tiling(rg.state_json())))
+            continue
+        if status == "start_placement":
+            pi_start = rg.pending_start_placement_player()
+            rg.start_placement_apply_external(json.dumps(
+                worker.ask_start_placement(rg.state_json(), pi_start, rg.game_seed())))
+            continue
         if status == "stuck":
             raise RuntimeError(
                 f"Referee: Deadlock (advance_to_decision='stuck') bei steps={rg.steps()}, "
@@ -246,6 +308,14 @@ def main() -> int:
         seeds = [args.seed_base + i for i in range(args.n_games)]
 
     names = ("EngineA", "ArtefaktB")
+    # Nur Artefakte, deren Worker das erweiterte Protokoll kennt, entscheiden
+    # Startsetzung und Tiling selbst. Das Manifest-Feld `typ` gibt es seit
+    # 2026-08-26; ein Welle-3-Netz-Artefakt hat es nicht und bleibt beim
+    # Bestandsverhalten -- sein Worker laeuft auf einem aelteren Wheel und
+    # wuerde eine Tiling-Anfrage als Drafting missverstehen.
+    externe_seiten_aktiv = manifest.get("typ") == "heuristik"
+    print(f"[referee] externe Platzierung/Startsetzung: "
+          f"{'AN' if externe_seiten_aktiv else 'aus (Netz-Artefakt)'}", file=sys.stderr)
     games = []
     t_start = time.perf_counter()
     total_move_count = 0
@@ -255,6 +325,7 @@ def main() -> int:
         g = play_one_game(
             mr, worker, args.model_a, args.spec_a, args.sims_a, args.c_puct_a,
             str(artifact_dir / "model.onnx"), names, first_player, seed, board_a,
+            externe_seiten=[1 - board_a] if externe_seiten_aktiv else [],
         )
         total_move_count += g["steps"]
         games.append(g)
