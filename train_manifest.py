@@ -36,7 +36,8 @@ def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
     unterschiedliche Traegersaetze, und bisher stand in keinem Trainings-
     manifest, welches aktiv war."""
     try:
-        from neural_net import _is_policy_carrier, WDL_GENERATOR_PREFIXES
+        from corpus_dataset import _is_policy_carrier
+        from neural_net import WDL_GENERATOR_PREFIXES
     except ImportError:                                   # defensiv: nie den Lauf blockieren
         return {"error": "neural_net._is_policy_carrier nicht importierbar"}
 

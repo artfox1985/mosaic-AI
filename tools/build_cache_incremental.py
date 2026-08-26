@@ -74,8 +74,9 @@ def _carrier_status(basename, carrier_set, carrier_prefixes):
     schon eingebaut.
     """
     import neural_net
+    import corpus_dataset  # C 2026-08-27: MosaicDataset ist ausgezogen
     bootstrap_native = basename.startswith(neural_net.WDL_GENERATOR_PREFIXES)
-    return neural_net._is_policy_carrier(basename, carrier_set, carrier_prefixes,
+    return corpus_dataset._is_policy_carrier(basename, carrier_set, carrier_prefixes,
                                          bootstrap_native)
 
 
@@ -94,6 +95,7 @@ def _load_manifest(data_dir):
 
 def _block_path(data_dir, basename, kwargs, carrier):
     import neural_net
+    import corpus_dataset  # C 2026-08-27: MosaicDataset ist ausgezogen
     key = neural_net.per_file_cache_key(
         basename, value_target_variant=kwargs["value_target_variant"],
         encoder=kwargs["encoder"], conjunction_head=kwargs["conjunction_head"],
@@ -115,7 +117,7 @@ def _build_one_file(args):
             n = hf["values"].shape[0] if "values" in hf else 0
         return basename, block_file, n, False
     import neural_net
-    ds = neural_net.MosaicDataset(data_dir, files=[path_pkl],
+    ds = corpus_dataset.MosaicDataset(data_dir, files=[path_pkl],
                                   cache_path_override=block_file, **kwargs)
     return basename, block_file, len(ds), True
 

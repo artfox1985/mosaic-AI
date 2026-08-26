@@ -64,7 +64,8 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
     reach_target_k1_active = _nn.reach_target_k1_active
     reach_buffer_mode = _nn.reach_buffer_mode
     _IGNORE_PTV = _nn._IGNORE_PTV
-    _cache_f32_active = _nn._cache_f32_active
+    import corpus_dataset as _cd
+    _cache_f32_active = _cd._cache_f32_active
 
     material = (
         "filecache_v1|" + basename

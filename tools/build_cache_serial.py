@@ -39,6 +39,7 @@ def main():
     a = ap.parse_args()
 
     import neural_net
+    import corpus_dataset  # C 2026-08-27: MosaicDataset ist ausgezogen
 
     dateien = sorted(glob.glob(os.path.join(a.data_dir, "*.pkl")))
     _excl = os.environ.get("MOSAIC_DATA_EXCLUDE")
@@ -50,7 +51,7 @@ def main():
     print(f"📦 seriell: {len(dateien)} Dateien, encoder={a.encoder}")
 
     t0 = time.time()
-    ds = neural_net.MosaicDataset(a.data_dir, files=dateien, encoder=a.encoder,
+    ds = corpus_dataset.MosaicDataset(a.data_dir, files=dateien, encoder=a.encoder,
                                   value_target_variant=a.value_target_variant,
                                   conjunction_head=a.conjunction_head)
     wand = time.time() - t0

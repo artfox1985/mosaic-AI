@@ -19,7 +19,8 @@ from collections import Counter
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine" / "py"))
-from neural_net import MosaicDataset, MosaicNet, action_to_id, unpack_masks_batch
+from corpus_dataset import MosaicDataset
+from neural_net import MosaicNet, action_to_id, unpack_masks_batch
 from config import DATA_DIR, INPUT_SIZE, NUM_ACTIONS
 
 
