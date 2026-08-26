@@ -61,9 +61,11 @@ def _bau_teilmenge(args):
 def zusammenfuegen(teile, ziel):
     """Konkateniert die Teil-Caches in Blockreihenfolge zu einem Cache.
 
-    Feldweise und streamend: alle Teile eines Feldes werden gelesen,
-    konkateniert und geschrieben, bevor das naechste Feld drankommt -- sonst
-    laegen beim vollen Korpus alle Felder gleichzeitig im RAM.
+    WIRKLICH streamend: das Zielfeld wird mit seiner ENDGUELTIGEN Form angelegt
+    und dann Block fuer Block in seinen Schnitt geschrieben. Die erste Fassung
+    las alle Bloecke eines Feldes ein und konkatenierte sie -- das haelt das
+    Feld doppelt im RAM (beim vollen Korpus 6 GB Bloecke plus 6 GB Ergebnis)
+    und war Teil desselben Speicherproblems wie die Blockzahl unten.
     """
     with h5py.File(teile[0], "r") as hf:
         felder = sorted(hf.keys())
@@ -77,24 +79,42 @@ def zusammenfuegen(teile, ziel):
                 raise SystemExit(
                     f"Teil-Caches haben verschiedene Felder:\n  {teile[0]}: {felder}\n"
                     f"  {t}: {sorted(hf.keys())}\nAbbruch -- das waere ein stiller Fehler.")
+    # Formen vorab einsammeln, damit das Ziel in einem Stueck angelegt werden
+    # kann.
+    formen = {}
+    for t in teile:
+        with h5py.File(t, "r") as hf:
+            for k in felder:
+                formen.setdefault(k, []).append((hf[k].shape, hf[k].dtype))
     with h5py.File(ziel, "w") as out:
         for k in felder:
-            bloecke = []
+            n_ges = sum(f[0][0] for f in formen[k])
+            rest = formen[k][0][0][1:]
+            dt = formen[k][0][1]
+            d = out.create_dataset(k, shape=(n_ges,) + rest, dtype=dt, compression="lzf")
+            off = 0
             for t in teile:
                 with h5py.File(t, "r") as hf:
-                    bloecke.append(np.array(hf[k]))
-            ganz = np.concatenate(bloecke, axis=0)
-            out.create_dataset(k, data=ganz, compression="lzf")
+                    blk = np.array(hf[k])
+                d[off:off + blk.shape[0]] = blk
+                off += blk.shape[0]
+                del blk
             for a, v in attrs[k].items():
-                out[k].attrs[a] = v
-            del bloecke, ganz
+                d.attrs[a] = v
     return felder
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-dir", default="data")
-    ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2))
+    ap.add_argument("--workers", type=int, default=max(1, (os.cpu_count() or 2) - 2),
+                    help="gleichzeitig laufende Prozesse")
+    ap.add_argument("--blocks", type=int, default=None,
+                    help="Zahl der Datei-Bloecke. NICHT an --workers koppeln: jeder Worker "
+                         "haelt einen ganzen Block im Zwischenformat (~7 KB je Zustand). Bei "
+                         "10 Bloecken auf dem vollen Korpus waren das 24 GB und 0,7 GB frei "
+                         "-- Vorfall 2026-08-26. Default: so viele, dass ein Block rund 100k "
+                         "Zustaende hat.")
     ap.add_argument("--out", required=True, help="Zieldatei des zusammengefuegten Caches")
     ap.add_argument("--encoder", default="flat", choices=["flat", "2d"])
     ap.add_argument("--value-target-variant", default="default")
@@ -113,23 +133,39 @@ def main():
     if not dateien:
         raise SystemExit(f"Keine .pkl-Dateien in {a.data_dir}")
 
-    n_w = max(1, min(a.workers, len(dateien)))
+    # Blockzahl aus dem SPEICHER, nicht aus der Workerzahl: rund 100k Zustaende
+    # je Block, bei gemessenen ~174 Zustaenden je Partie und 10 Partien je Datei
+    # also rund 57 Dateien. Wer mehr Worker will, bekommt mehr Gleichzeitigkeit,
+    # nicht groessere Bloecke.
+    n_b = a.blocks or max(1, round(len(dateien) / 57))
+    n_b = max(1, min(n_b, len(dateien)))
     # ZUSAMMENHAENGENDE Bloecke, damit die Konkatenation die serielle
     # Reihenfolge reproduziert.
-    grenzen = [round(i * len(dateien) / n_w) for i in range(n_w + 1)]
-    bloecke = [dateien[grenzen[i]:grenzen[i + 1]] for i in range(n_w)]
+    grenzen = [round(i * len(dateien) / n_b) for i in range(n_b + 1)]
+    bloecke = [dateien[grenzen[i]:grenzen[i + 1]] for i in range(n_b)]
     bloecke = [b for b in bloecke if b]
+    n_w = max(1, min(a.workers, len(bloecke)))
 
     kwargs = dict(encoder=a.encoder, value_target_variant=a.value_target_variant,
                   conjunction_head=a.conjunction_head)
-    print(f"📦 {len(dateien)} Dateien auf {len(bloecke)} Bloecke, {a.workers} Worker angefordert")
-    for i, b in enumerate(bloecke):
-        print(f"   Block {i}: {len(b)} Dateien ({os.path.basename(b[0])} .. {os.path.basename(b[-1])})")
+    print(f"📦 {len(dateien)} Dateien auf {len(bloecke)} Bloecke "
+          f"(~{len(dateien)//max(1,len(bloecke))} Dateien je Block), {n_w} gleichzeitig",
+          flush=True)
 
     t0 = time.time()
-    with mp.Pool(len(bloecke)) as pool:
-        ergebnisse = pool.map(_bau_teilmenge,
-                              [(a.data_dir, b, kwargs, i) for i, b in enumerate(bloecke)])
+    ergebnisse = []
+    with mp.Pool(n_w) as pool:
+        # imap_unordered statt map: Fortschritt wird sichtbar, sobald ein Block
+        # fertig ist (Regel "lange Laeufe zeigen Fortschritt"). Die Reihenfolge
+        # stellt das `sort()` unten wieder her -- sie haengt am Block-Index,
+        # nicht an der Fertigstellungsfolge.
+        for fertig, e in enumerate(pool.imap_unordered(
+                _bau_teilmenge,
+                [(a.data_dir, b, kwargs, i) for i, b in enumerate(bloecke)]), 1):
+            ergebnisse.append(e)
+            print(f"   {fertig}/{len(bloecke)} Bloecke fertig "
+                  f"({time.time()-t0:.0f}s, zuletzt Block {e[0]} mit {e[2]} Zustaenden)",
+                  flush=True)
     t_bau = time.time() - t0
     ergebnisse.sort()
     teile = [pfad for _, pfad, _ in ergebnisse]

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Der Cache-Bau des Trainings dauert rund 70 min fuer 890.000 Zustaende und liegt damit vor JEDER Trainingsfrage. Welche Hebel verkuerzen ihn -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag, Start unmittelbar nach dem Ende der v22-Erzeugung. Gemessen am hv2-Korpus: state_to_planes 1,896 ms je Zustand (85 Prozent der Merkmalskosten), state_to_tensor 0,185 ms, Unpickle 0,150 ms; Summe 2,23 ms = 33 min der beobachteten ~70. DREI HEBEL, absteigend nach erwartetem Nutzen: (1) PARALLELISIERUNG des Bau-Laufs -- neural_net.py enthaelt kein Pool/multiprocessing, die Dateien laufen nacheinander bei ~0,75 Kernen, obwohl sie unabhaengig sind; trifft die GANZE Schleife, nicht nur die Merkmale. (2) RUST-EXPORT der Bauer (features.rs hat sie, pyo3 exportiert sie nicht) -- trifft 85 Prozent von 33 der 70 min, also bestenfalls die halbe Wanduhr. (3) lzf-Kompression pruefen (115,9 MB Feldinhalt -> 7,6 MB Datei, Faktor 15). EIN GEMEINSAMES HARTES TOR fuer alle drei: BIT-IDENTITAET des erzeugten Caches gegen den heutigen Stand. Ein schnellerer, aber anderer Cache entwertet jeden Vergleich mit bestehenden Modellen; faellt die Identitaet und ist die Abweichung nicht behebbar, stirbt der jeweilige Hebel. HEBEL (1) GEBAUT UND ABGENOMMEN 2026-08-26 (par.7): 120 Dateien / 209.057 Zustaende, seriell 463,6 s gegen parallel 93,0 s = **Faktor 4,99**, und das TOR IST BESTANDEN -- alle 21 Felder bit-identisch. Zuschnitt ohne Eingriff in die Bauschleife: die Worker bauen Datei-Teilmengen mit dem Bestandscode und geben nur ihren Cache-Pfad zurueck. Einzige Aenderung an neural_net.py ist eine Zuweisung. Hochrechnung voller Korpus: seriell ~2,6 h, parallel ~31 min. Die vorab benannte Erwartung (Faktor 4-6) hat gehalten. NICHT verdrahtet in train.py -- erst soll der Hebel auf dem vollen Korpus das Tor nochmal bestehen. Reihenfolge (1) vor (2), in par.5 begruendet. HEBEL (4) NACHGETRAGEN (par.6, Nutzer-Frage): Cache JE DATEI statt je Fenster -- laeuft auf DEMSELBEN Umbau wie (1) (picklebare Funktion je Datei; Pool darueber = Parallelisierung, Memoisierung darauf = Datei-Cache), wird aber getrennt ausgeliefert, weil er eine Schluesselteilung braucht und die still danebengehen kann. Sein Gewinn ist nicht die Wanduhr, sondern der kritische Pfad: ein Datei-Cache kann WAEHREND der Erzeugung mitlaufen, dann ist er fertig, wenn der Korpus fertig ist. GPU GEPRUEFT UND VERWORFEN (par.5a, Nutzer-Frage): der Bauer ist Umpacken statt Arithmetik, verzweigungslastig, und die Daten liegen als Python-Objekte im Host-RAM -- sie dorthin zu bringen IST die Arbeit. Ob (2) nach (1) noch lohnt, entscheidet eine NEUE Messung des Merkmalsanteils, nicht das Bauchgefuehl (par.5b). -->
+<!-- STATUS: OFFEN | Frage: Der Cache-Bau des Trainings dauert rund 70 min fuer 890.000 Zustaende und liegt damit vor JEDER Trainingsfrage. Welche Hebel verkuerzen ihn -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag, Start unmittelbar nach dem Ende der v22-Erzeugung. Gemessen am hv2-Korpus: state_to_planes 1,896 ms je Zustand (85 Prozent der Merkmalskosten), state_to_tensor 0,185 ms, Unpickle 0,150 ms; Summe 2,23 ms = 33 min der beobachteten ~70. DREI HEBEL, absteigend nach erwartetem Nutzen: (1) PARALLELISIERUNG des Bau-Laufs -- neural_net.py enthaelt kein Pool/multiprocessing, die Dateien laufen nacheinander bei ~0,75 Kernen, obwohl sie unabhaengig sind; trifft die GANZE Schleife, nicht nur die Merkmale. (2) RUST-EXPORT der Bauer (features.rs hat sie, pyo3 exportiert sie nicht) -- trifft 85 Prozent von 33 der 70 min, also bestenfalls die halbe Wanduhr. (3) lzf-Kompression pruefen (115,9 MB Feldinhalt -> 7,6 MB Datei, Faktor 15). EIN GEMEINSAMES HARTES TOR fuer alle drei: BIT-IDENTITAET des erzeugten Caches gegen den heutigen Stand. Ein schnellerer, aber anderer Cache entwertet jeden Vergleich mit bestehenden Modellen; faellt die Identitaet und ist die Abweichung nicht behebbar, stirbt der jeweilige Hebel. HEBEL (1) GEBAUT UND ABGENOMMEN 2026-08-26 (par.7): 120 Dateien / 209.057 Zustaende, seriell 463,6 s gegen parallel 93,0 s = **Faktor 4,99**, und das TOR IST BESTANDEN -- alle 21 Felder bit-identisch. Zuschnitt ohne Eingriff in die Bauschleife: die Worker bauen Datei-Teilmengen mit dem Bestandscode und geben nur ihren Cache-Pfad zurueck. Einzige Aenderung an neural_net.py ist eine Zuweisung. Hochrechnung voller Korpus: seriell ~2,6 h, parallel ~31 min. Die vorab benannte Erwartung (Faktor 4-6) hat gehalten. VOLLER KORPUS GEFAHREN 2026-08-26 (par.8): 4.186.112 Zustaende in 36,1 min gegen 2,58 h seriell hochgerechnet, Faktor ~4,3; Cache 0,83 GB auf Platte, 2.811 Byte je Zustand. Dabei ZWEI Zuschnittfehler gefunden und behoben -- Blockzahl war an die Workerzahl gekoppelt (10 Bloecke ergaben 24,1 GB belegt und 0,7 GB frei, abgebrochen), und das Zusammenfuegen hielt ein Feld doppelt im RAM. Nach der Korrektur 3,9 GB. ACHTUNG: fuer den vollen Korpus ist das TOR NICHT gefahren (keine serielle Referenz); belegt ist Bit-Identitaet auf 120 Dateien. NICHT verdrahtet in train.py. Reihenfolge (1) vor (2), in par.5 begruendet. HEBEL (4) NACHGETRAGEN (par.6, Nutzer-Frage): Cache JE DATEI statt je Fenster -- laeuft auf DEMSELBEN Umbau wie (1) (picklebare Funktion je Datei; Pool darueber = Parallelisierung, Memoisierung darauf = Datei-Cache), wird aber getrennt ausgeliefert, weil er eine Schluesselteilung braucht und die still danebengehen kann. Sein Gewinn ist nicht die Wanduhr, sondern der kritische Pfad: ein Datei-Cache kann WAEHREND der Erzeugung mitlaufen, dann ist er fertig, wenn der Korpus fertig ist. GPU GEPRUEFT UND VERWORFEN (par.5a, Nutzer-Frage): der Bauer ist Umpacken statt Arithmetik, verzweigungslastig, und die Daten liegen als Python-Objekte im Host-RAM -- sie dorthin zu bringen IST die Arbeit. Ob (2) nach (1) noch lohnt, entscheidet eine NEUE Messung des Merkmalsanteils, nicht das Bauchgefuehl (par.5b). -->
 
 # Vorregistrierung: Zeit des Cache-Baus
 
@@ -265,3 +265,52 @@ nicht in den `*.pkl`-Glob.
 ist heute ein eigenstaendiges Werkzeug; das Training nutzt weiter den
 seriellen Weg. Das ist Absicht -- erst soll der Hebel auf dem vollen Korpus
 laufen und wieder das Tor bestehen.
+
+
+## par.8 VOLLER KORPUS (2026-08-26) -- und ein Speicher-Vorfall, der den Zuschnitt korrigiert hat
+
+**Erster Versuch: abgebrochen wegen RAM.** Mit 10 Bloecken auf 2.400 Dateien
+hielt jeder Worker ein Zehntel des Korpus im Zwischenformat. Gemessen: 12
+Prozesse, 24,1 GB belegt, **0,7 GB frei von 31,9**. Abgebrochen, bevor das
+System zu tauschen begann.
+
+**Die Ursache war ein Zuschnittfehler, nicht die Idee:** die erste Fassung
+koppelte die Blockzahl an die Workerzahl. Das Zwischenformat kostet rund 7 KB
+je Zustand (nicht die 2,8 KB des fertigen Caches), also skaliert der Bedarf
+mit `Worker x Zustaende_je_Block`. Behoben: `--blocks` ist jetzt von
+`--workers` getrennt, Default rund 100.000 Zustaende je Block. Wer mehr Worker
+will, bekommt mehr Gleichzeitigkeit, nicht groessere Bloecke.
+
+**Zweiter Zuschnittfehler, gleich mitbehoben:** das Zusammenfuegen las alle
+Bloecke eines Feldes ein und konkatenierte -- also das Feld doppelt im RAM
+(6 GB Bloecke plus 6 GB Ergebnis fuer `states`). Jetzt wird das Zielfeld mit
+seiner Endform angelegt und Block fuer Block in seinen Schnitt geschrieben.
+
+**Nach der Korrektur: 3,9 GB statt 24,1**, 21,6 GB frei.
+
+**Ergebnis, 2.400 Dateien / 4.186.112 Zustaende, 42 Bloecke, 6 gleichzeitig:**
+
+| | Wert |
+| --- | --- |
+| Teil-Bau | 2.106,3 s |
+| Zusammenfuegen | 58,3 s |
+| **gesamt** | **2.164,7 s = 36,1 min** |
+| seriell hochgerechnet (4,186 Mio x 2,22 ms) | **2,58 h** |
+| **Beschleunigung** | **~4,3x** |
+| Cache auf Platte | 0,83 GB (lzf) |
+| Felder unkomprimiert | 11,77 GB = **2.811 Byte je Zustand** |
+
+Die 2.811 Byte bestaetigen die Rechnung aus par.3(2) (2.806 geschaetzt) und
+damit auch, dass das Trainingsfenster bequem ins RAM passt.
+
+**WICHTIG -- was hier NICHT belegt ist:** fuer den vollen Korpus gibt es
+KEINE serielle Referenz, das Tor ist hier also nicht gefahren. Belegt ist die
+Bit-Identitaet auf 120 Dateien (par.7), zusaetzlich fuer den geaenderten,
+streamenden Merge in beide Richtungen (gegen die serielle Referenz UND gegen
+den alten Merge). Wer den vollen Cache fuer eine Champion-Entscheidung
+benutzt, sollte die 2,58 h Referenz einmal fahren.
+
+**Nebenbefund:** in `data/` liegen jetzt 57 Block-Caches mit zusammen 1,2 GB.
+Sie sind dot-praefigiert und fallen nicht in den `*.pkl`-Glob; ein zweiter
+Lauf mit denselben Blockgrenzen trifft sie. Nicht aufgeraeumt -- Loeschen ist
+ein Nutzer-Entscheid.
