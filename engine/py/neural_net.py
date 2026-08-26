@@ -1,5 +1,6 @@
 import os
 import glob
+from corpus_io import load_records_fh as _load_records_fh
 
 # Traeger-A/B (PREREG_v22_window.md par.4): mit "1" sieht der Policy-Kopf
 # auch die Records mit policy_target_valid=false. Einmal beim Import
@@ -1582,7 +1583,12 @@ class MosaicDataset(Dataset):
                 file_policy_carrier = _is_policy_carrier(
                     os.path.basename(f), policy_carrier_set, carrier_prefixes, bootstrap_native)
                 with open(f, "rb") as file:
-                    game_data = pickle.load(file)
+                    # corpus_io: erkennt gzip am INHALT (Magic-Bytes), nicht an
+                    # der Endung -- Bestandsdateien und komprimierte liegen
+                    # nebeneinander, und der Dateiname bleibt `.pkl`, weil
+                    # Cache-Schluessel, MOSAIC_DATA_EXCLUDE und alle Globs an
+                    # ihm haengen.
+                    game_data = _load_records_fh(file)
                     final_own = _final_ownership_by_game(game_data)
                     reach_k1 = self.conjunction_head and reach_target_k1_active()
                     reach_buf = reach_k1 and reach_buffer_mode()

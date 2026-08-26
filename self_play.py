@@ -36,6 +36,7 @@ except Exception:
 
 from config import DATA_DIR, MODELS_DIR, BASE_DIR
 from selfplay_manifest import _write_run_manifest, _append_laufzeit
+from corpus_io import dump_records, load_records
 
 # GPU-Inferenzpfad (PREREG_gpu_inference_path.md §19, Nutzer-Auftrag 2026-08-13):
 # das mit `--features ort_cuda_probe` gebaute Wheel bringt den ORT-CUDA-
@@ -355,8 +356,10 @@ def _flush(steps: list[dict], version_name: str, tag: str, game_count: int) -> N
     timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     file_tag = f"_{tag}" if tag else ""
     filename = DATA_DIR / f"selfplay_{version_name}{file_tag}_{timestamp}_g{game_count}.pkl"
-    with open(filename, "wb") as f:
-        pickle.dump(steps, f)
+    # Komprimiert geschrieben, Endung bleibt .pkl (corpus_io-Doku: der Name
+    # haengt an Cache-Schluessel, MOSAIC_DATA_EXCLUDE und allen Globs).
+    # Gemessen 2026-08-26: Faktor 35,4 ueber 12 Dateien, 0,06 s Packen.
+    dump_records(filename, steps)
     _check_completion(steps, filename)
     print(f"💾 {len(steps)} Züge gespeichert in '{filename}'")
 
