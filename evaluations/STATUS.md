@@ -124,99 +124,60 @@ Bit-Identitaet auf 120 Dateien belegt; fuer den vollen Korpus NICHT gefahren
 
 ---
 
-## SITZUNGSUEBERGABE 2026-08-25
+## SITZUNGSUEBERGABE 2026-08-26
 
-**Was als NAECHSTES zu tun ist, in dieser Reihenfolge:**
+**Der v22-Korpus ist FERTIG und ausgewertet, der Cache liegt gebaut bereit.**
+Was jetzt ansteht, ist das Training -- und dabei eine Konfiguration, die in
+beiden Naechte-Armen gefehlt hat.
 
-1. **Die v22-Vorbereitung ist VOLLSTAENDIG** (Punkt 2 im zweiten Anlauf
-   erledigt, `224cc42` + `61b2fff`). Kampagnen-Parameter:
-   `--mode mcts --model alphazero_v21_2d_brierbest.onnx
-   --heuristik-variante v2huelle --sims 600 --threads 11`, Horizont 2,
-   Blindzieh-Knopf AUS. Durchsatz **gemessen: 50 Partien/min**.
-   **Offen ist nur noch die Partienzahl** -- und dafuer gibt es ein neues
-   Argument: durch die Vorzugs-Feuerrate von 61,9 Prozent traegt nur noch gut
-   ein Drittel der Draftingzuege Policy-Material. Wer den Policy-Sockel auf
-   altem Niveau halten will, braucht rund die 2,6-fache Partienzahl.
-2. **DANACH das Startpositions-Seeding** (Nutzer-Entscheid 2026-08-25,
-   `PREREG_start_position_seeding.md` par.5). Braucht Engine-Arbeit:
-   `--seed-positions` ist auf `--mode network` beschraenkt, und der
-   mcts-Einstieg kennt `seed_positions_path` gar nicht -- kein blosser
-   Waechter.
-3. **Fuer v23 anzuschauen** (aus dem BESTAND, keine neuen Preregs):
-   `PREREG_v22_window.md` par.4 -- die Traegerfrage (Vorzugs-Records im
-   Policy-Verlust: ja oder nein), Entscheidungsmass dort vorab festgelegt;
-   `PREREG_heuristic_v2_long_rows.md` par.3b -- **Stufenplan**: Stufe 1 =
-   Ownership-Kopf EINSCHALTEN plus w0-Kontrollarm auf DEMSELBEN Korpus
-   (sonst sind Kopf und Korpuswechsel konfundiert); Stufe 2 bedingt = ein
-   2D-KOPF statt/zusaetzlich, weil auch `Mosaic2DNet` den Kopf FLACH ausliest
-   (neural_net.py:2735) und die Geometrie am Ausgang wegwirft. Uebergang bei
-   KEINEM Schaden, nicht erst bei Wirkung; `PREREG_plate_policy_supervision.md` -- bekommt durch v22
-   erstmals seine Label-Quelle, weil 61,8 Prozent der Zuege genau das Label
-   "dieser Zug baut die Spalte" tragen. Reihenfolge fuer v23: Fenster steht
-   (par.2) -> Traeger-A/B -> Ownership + w0 auf dem gewaehlten Traeger ->
-   gaten.
-4. **Zwei Such-Knoepfe am v22-Netz, eingetaktet 2026-08-25** -- beide billig,
-   beide auf denselben Seeds fahrbar, beide NACH dem Training:
-   `PREREG_implicit_minimax_backup.md` par.3 (gebaut und abgenommen, wirkt in
-   der Gumbel-Selektion; **nicht** im v22-Label-Pfad, also kein Eingriff in die
-   laufende Erzeugung moeglich oder noetig -- **wohl aber ein WECKER fuer das
-   v22-SELF-PLAY**, also den Lauf, der das v23-Fenster fuellt: Netz-Self-Play
-   laeuft durch die Gumbel-Suche, und die Policy-Ziele SIND die
-   Besuchsverteilung. Auflage: Gating-Messung VOR jenem Start, sonst faellt
-   der Entscheid per Default. **Dasselbe gilt fuer die risikosensitive Stufe
-   A1** (par.5a): label-neutral ist sie nur gegenueber HEURISTISCHER
-   Erzeugung. Die beiden Arme
-   messen Verschiedenes: Gating = Staerke, Self-Play = Korpus-Qualitaet) und
-   `PREREG_risk_sensitive_leaf_utility.md` par.5 Stufe A (liest die
-   exportierten, aber ungelesenen `value_wdl_logits`). **Wichtig bei Stufe A:**
-   sie MUSS als Variante A1 gebaut werden, nur an der Gumbel-Blattstelle -- in
-   `net_leaf_eval` wuerde sie die Bootstrap-Labels mitaendern
-   (round_transition_deep.rs:594/698/731) und haette damit Wecker-Charakter wie
-   der Bootstrap-Horizont. Fuer v22 ist dieser Zug vorbei.
-5. **NACH dem Korpus wieder aufzunehmen**: die Blindzieh-Spur. Der Knopf
-   bleibt bis dahin AUS (auch waehrend der Erzeugung -- den Korpus unter der zu
-   validierenden Regel zu erzeugen waere zirkulaer). Die Wiedervorlage haengt an
-   ZWEI Bedingungen, beide in `PREREG_stack_draw_reservation_rule.md` par.5e:
-   die `V`-Eichung braucht einen Vergleichspunkt ausserhalb der v22-Verteilung
-   (sonst misst man den Plattenwert gegen die Unfaehigkeit, Platten zu nutzen),
-   und es braucht einen EINSEITIGEN Knopf, weil der heutige auf beide Seiten
-   wirkt und ein symmetrischer Effekt im Duell bei jedem n unsichtbar ist.
-   **Eine blosse Wiederholung mit mehr Partien ist es ausdruecklich nicht.**
+### 1. Das naechste Training: Arm B PLUS Ownership-Gewicht
 
-**Was in dieser Sitzung entstanden ist**, in Reihenfolge: zwei
-Erreichbarkeits-Eingaben fuers Netz mit Champion-Paritaet (`29fb1f1`), der
-Artefakt-Umzug (`4e967e1`, `4a43b8d`), die reparierte Blindzieh-Regel als Knopf
-(`cc46504`), diese STATUS-Neufassung (`6fc0b7e`), das Durchreichen der
-Heuristik-Variante (`3fe468a`), die einheitliche Threadzahl-Konvention
-(`3da733f`) und das Horizont-Verdikt (`ca9ba1b`).
+**Nicht "Arm B".** Beide Arme der Nacht liefen mit `OWNERSHIP_WEIGHT = 0` und
+konnten deshalb STRUKTURELL keine Spalten bauen -- der Ownership-Pol ist der
+einzige gebaute Kanal, der im Tiling Sofortpunkte gegen Struktur eintauschen
+kann (`PREREG_v22_window.md` par.4e). Die richtige Konfiguration ist:
 
-**Push-Stand: der Baum ist voraus**, ab `29fb1f1`; `4e967e1` und `4a43b8d`
-liegen bereits auf `origin/main`. Die genaue Zahl steht bewusst nicht hier --
-sie veraltet mit jedem Commit, auch mit dem, der sie eintraegt. Abzulesen mit
-`git rev-list --count origin/main..main`. Pushen ist ein eigener
-Nutzer-Entscheid und wurde nicht getroffen.
+```
+MOSAIC_IGNORE_POLICY_TARGET_VALID=1   (Traeger-Arm B, Richtungsbefund par.4b)
+--ownership-weight <w0>               (par.3b der Lehrer-Prereg, w > 0)
+```
 
-**Pruefstand des Baums:** die Suite lief zuletzt nach `3da733f` gruen (526/0),
-und `ca9ba1b` beruehrt nur `evaluations/` plus eine neue Python-Sonde -- der
-Rust-Stand ist also der gepruefte. Paritaets-Hash `8c6684ffba06cf3e...`
-unveraendert.
+plus **w0-Kontrollarm auf DEMSELBEN Korpus** -- ohne ihn sind Kopfwirkung und
+Korpuswechsel konfundiert.
 
-**Womit die naechste Sitzung rechnen muss:**
+Beim Warmstart von einem Zwischenmodell: `MOSAIC_VAL_POOL` setzen
+(`PREREG_v22_window.md` par.6), sonst ist der Val-Split zu rund 21 Prozent
+vom Startmodell schon gesehen.
 
-* **Die Artefakte liegen nur noch lokal** (`evaluations/artifacts/`,
-  ungetrackt). Preregs zitieren sie als Beleg. Ein frischer Klon hat sie nicht.
-* **Der Datenordner wird gerade archiviert** (Nutzer, 2026-08-25). Was bleiben
-  muss: `data/holdout/`, die `policy_carrier_manifest_*.json`, `asym_corpus`,
-  `seed_corpus`, `seed_positions` und die Fenster-Manifeste.
-* **`CLAUDE.md` steht als modifiziert im Baum**, seit Sitzungsbeginn und nicht
-  von dieser Sitzung. Bewusst unangetastet gelassen.
+### 2. Offen, mit Kosten
 
-**Ein methodischer Punkt, der diese Sitzung durchzieht** und den die naechste
-uebernehmen sollte: **eine Herleitung aus dem Code ist eine Hypothese, kein
-Befund.** Heute lagen vier davon im Vorzeichen falsch. Was funktioniert hat,
-war jedes Mal dasselbe -- die Praemisse zaehlen, bevor gebaut wird, und die
-erwartete Trefferzahl pruefen, statt blind zu ersetzen. Zwei uebersehene
-Umbaustellen und ein stiller Rundenfilter sind genau so gefunden worden.
+| Punkt | Kosten | wofuer noetig |
+| --- | --- | --- |
+| Serielle Referenz fuer den vollen Cache | 2,58 h | bevor der Cache eine Champion-Entscheidung traegt |
+| Traeger-Manifest-Generator | klein | `PREREG_v23_window.md` verlangt 1.800 von 17.450 hv2-Partien policy-aktiv; es gibt nur Leser, kein Werkzeug. Regel ist dokumentiert (Seed + zeitlich gestreute Auswahl) |
+| Split-Test Routing gegen Drafting | Minuten | `PREREG_v22_window.md` par.4c -- wieviel der 0,741 haengt am Tiling-Routing |
+| Gewichtsfenster der Huelle | Messung | `PREREG_heuristic_v2_long_rows.md` par.3b.1 -- existiert ein `w`, das kleine Punktunterschiede ueberstimmt, aber nie Strafpunkte akzeptiert? |
+
+### 3. Zustand des Baums
+
+* **49+ Commits ungepusht** (Nutzer-Regel: Push ist ein eigener Entscheid).
+* `CLAUDE.md` ist seit Sitzungsbeginn modifiziert, **nicht von dieser Sitzung**.
+* `data/` enthaelt neben den 2.400 `.pkl` auch 57 Block-Caches, `.par_full.h5`,
+  `.ref_serial.h5`, `.par_test*.h5` -- zusammen rund 2 GB. Aufraeumen ist ein
+  Nutzer-Entscheid, ich habe nichts geloescht.
+* `models/` enthaelt vier untrackte Trainings-Manifeste, darunter eines von
+  einem abgebrochenen Testlauf (`valpooltest`).
+
+### 4. Der methodische Faden dieser Sitzung
+
+Er gehoert in die Uebergabe, weil er sich durchzieht und die naechste Sitzung
+Zeit sparen kann: **aus dem Vorhandensein eines Feldes folgt nicht seine
+Wirksamkeit.** Fuenfmal an einem Tag falsch geschlossen -- `tiling_net:
+Some(net)` heisst nicht "das Netz steuert das Tiling", `--heuristik-variante`
+in der Signatur heisst nicht, dass die Variante ankommt, "kein Schreiber im
+Baum" heisst nicht "von Hand erzeugt". Jedes Mal war die Antwort ein Blick auf
+Default, Reichweite und Aufrufer -- und jedes Mal hat der Nutzer sie gefunden,
+nicht ich.
 
 ---
 
