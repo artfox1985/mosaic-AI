@@ -49,10 +49,40 @@ from column_build_structural_probe import (  # noqa: E402
 )
 from plate_points_from_arena import block_mean, t_value  # noqa: E402
 
+def _spielername(draft: str, tiling: str | None) -> str:
+    """Spiegelt die Namensregel der Engine (self_play.rs, `name_mit_achse`).
+
+    Die Engine haengt die Tiling-Achse an, sobald sie von der Draft-Achse
+    abweicht -- sonst traegen beide Seiten eines Routing-Splits denselben Namen
+    und die Brett-Rekonstruktion mischt sie. Diese Funktion MUSS der dortigen
+    Regel folgen; laufen sie auseinander, findet die Auswertung ihre Seite
+    nicht wieder.
+    """
+    return f"Heuristik_{draft}_tile{tiling}" if tiling and tiling != draft else f"Heuristik_{draft}"
+
+
 ARM_A, ARM_B = "v2", "v2huelle"
 if "--arms" in sys.argv:
     ARM_A, ARM_B = sys.argv[sys.argv.index("--arms") + 1].split(":")
-NAME_A, NAME_B = f"Heuristik_{ARM_A}", f"Heuristik_{ARM_B}"
+
+# `--tiling A:B` (PREREG_v22_window.md par.4c): Variante der PLATZIERUNG je
+# Seite, getrennt von der des Draftings. Weggelassen = wie `--arms`, also der
+# Bestandslauf aus par.8.4 Zeichen fuer Zeichen.
+#
+# Damit ist der Split-Test ausdrueckbar, der die 0,73 vollen Spalten des
+# Lehrers in seine beiden Haelften zerlegt:
+#   --arms v1:v2huelle --tiling v1:v1   -> nur die DRAFT-Haelfte wirkt
+#   --arms v1:v1 --tiling v1:v2huelle   -> nur die ROUTING-Haelfte wirkt
+TILING_A = TILING_B = None
+if "--tiling" in sys.argv:
+    TILING_A, TILING_B = sys.argv[sys.argv.index("--tiling") + 1].split(":")
+NAME_A, NAME_B = _spielername(ARM_A, TILING_A), _spielername(ARM_B, TILING_B)
+# Anzeige- und Artefakt-Schluessel. Normalerweise die Armnamen; beim
+# Routing-Split heissen aber BEIDE Arme gleich ("v1" gegen "v1"), und dann
+# ueberschreibt der zweite Eintrag den ersten -- die Tabelle zeigte zweimal
+# dieselbe Zahl. Der tragende Wert (`delta`, je Partie gepaart) war nie
+# betroffen, die ROHWERTE je Seite schon.
+LABEL_A, LABEL_B = (ARM_A, ARM_B) if ARM_A != ARM_B else (NAME_A, NAME_B)
 SIMS, THREADS, C_PUCT = 150, 0, 0.3
 SEED = 20260825
 OUT_JSON = ROOT / "evaluations" / "artifacts" / "v2_envelope_arena.json"
@@ -129,7 +159,8 @@ def per_side_metrics(game: dict) -> dict[str, dict]:
 
 def run_seat(swap: bool) -> list[dict]:
     roh = mr.heuristic_v1_vs_v2_arena(
-        SIMS, SIMS, GAMES_PER_SEAT, SEED, THREADS, C_PUCT, swap, True, ARM_A, ARM_B
+        SIMS, SIMS, GAMES_PER_SEAT, SEED, THREADS, C_PUCT, swap, True, ARM_A, ARM_B,
+        TILING_A, TILING_B
     )
     spiele = json.loads(roh)
     if isinstance(spiele, dict) and "error" in spiele:
@@ -230,11 +261,13 @@ def main() -> None:
             "s_je_partie": round((time.monotonic() - t0) / n, 3) if n else None,
         },
         "seed": SEED, "fehlende_bretter": fehlend,
+        "arme": {"draft": [ARM_A, ARM_B],
+                 "tiling": [TILING_A or ARM_A, TILING_B or ARM_B]},
         "siegquote_huelle": siege_b / n if n else 0.0,
-        "vollendungsquote": {ARM_A: quoten("a"), ARM_B: quoten("b")},
+        "vollendungsquote": {LABEL_A: quoten("a"), LABEL_B: quoten("b")},
         "reihenauslastung": {
-            ARM_A: {str(k): reihen_a[k] / n for k in sorted(reihen_a)},
-            ARM_B: {str(k): reihen_b[k] / n for k in sorted(reihen_b)},
+            LABEL_A: {str(k): reihen_a[k] / n for k in sorted(reihen_a)},
+            LABEL_B: {str(k): reihen_b[k] / n for k in sorted(reihen_b)},
         },
         "kennzahlen": {},
     }
@@ -243,27 +276,27 @@ def main() -> None:
         bl = block_mean(diffs[key], BLOCK)
         mittel, t = t_value(bl)
         ergebnis["kennzahlen"][key] = {
-            ARM_A: sum(roh_a[key]) / n if n else 0.0,
-            ARM_B: sum(roh_b[key]) / n if n else 0.0,
+            LABEL_A: sum(roh_a[key]) / n if n else 0.0,
+            LABEL_B: sum(roh_b[key]) / n if n else 0.0,
             "delta": mittel, "t_block": t, "n_bloecke": len(bl),
         }
 
     OUT_JSON.write_text(json.dumps(ergebnis, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    print(f"\n{'Kennzahl':<26}{ARM_A:>10}{ARM_B:>12}{'Delta':>10}{'t(Block)':>10}")
+    print(f"\n{'Kennzahl':<26}{LABEL_A:>10}{LABEL_B:>12}{'Delta':>10}{'t(Block)':>10}")
     print("-" * 68)
     for key, v in ergebnis["kennzahlen"].items():
-        print(f"{key:<26}{v[ARM_A]:>10.3f}{v[ARM_B]:>12.3f}{v['delta']:>10.3f}{v['t_block']:>10.2f}")
+        print(f"{key:<26}{v[LABEL_A]:>10.3f}{v[LABEL_B]:>12.3f}{v['delta']:>10.3f}{v['t_block']:>10.2f}")
     print("\nAufspaltung nach Wertungsplatte (k1 = Spalten, k6 = leere Spezialfelder):")
     for label, v in ergebnis["k1_split"].items():
         key = v["mass"]
-        print(f"  {label:<12} n={v['n']:<4} [{key}] {ARM_A} {v[ARM_A]:.3f}  {ARM_B} {v[ARM_B]:.3f}  "
+        print(f"  {label:<12} n={v['n']:<4} [{key}] {LABEL_A} {v[LABEL_A]:.3f}  {LABEL_B} {v[LABEL_B]:.3f}  "
               f"delta {v['delta_' + key]:+.3f}  t {v['t_block']:.2f}")
     print(f"\nSiegquote {ARM_B}: {ergebnis['siegquote_huelle']:.3f}")
-    print(f"Vollendungsquote: {ARM_A} {ergebnis['vollendungsquote'][ARM_A]:.3f}  "
-          f"{ARM_B} {ergebnis['vollendungsquote'][ARM_B]:.3f}  (B1-Waechter: >= 0,53)")
+    print(f"Vollendungsquote: {LABEL_A} {ergebnis['vollendungsquote'][LABEL_A]:.3f}  "
+          f"{LABEL_B} {ergebnis['vollendungsquote'][LABEL_B]:.3f}  (B1-Waechter: >= 0,53)")
     print("Reihenauslastung je Partie (Rasterzeile: Zuege)")
-    for arm in (ARM_A, ARM_B):
+    for arm in (LABEL_A, LABEL_B):
         z = ergebnis["reihenauslastung"][arm]
         print(f"  {arm:<10}" + "  ".join(f"{k}:{v:.2f}" for k, v in z.items()))
     if fehlend:

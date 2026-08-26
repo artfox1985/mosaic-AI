@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: ZUSCHNITT ENTSCHIEDEN 2026-08-25 (par.2): 24.000 Partien hv2, EINE Klasse, KEIN Altbestand, ~4,18 Mio Zustaende, ~14,1 GB Cache. Der Rotations-Zuschnitt von 2026-08-08 war fuer einen NETZ-Erzeuger gebaut und ist hinfaellig; v22 ist ein Schnitt, keine Rotationsstufe. OFFEN darin nur die TRAEGERFRAGE (par.4): 61,8 Prozent der Draftingzuege tragen policy_target_valid=false. A/B gefahren (par.4a/4b, from-scratch auf 5.700 Partien, je 40 Partien argmax gemessen): Arm B (Flagge ignoriert) besser in vier Kennzahlen -- volle Spalten 0,113 gegen 0,062, Reihen 0,225 gegen 0,113, Punkte 27,3 gegen 21,8 -- keine davon einzeln signifikant. Richtungsentscheid: IGNORIEREN. ABER beide Arme bleiben auf Champion-Niveau (0,106) statt Lehrer-Niveau (0,741), und par.4e erklaert warum: im Tiling ist nur der VALUE-Kopf aktiv, und der bricht bloss Gleichstaende unter punktegleichen Zuegen in Runde 2-4; Punkte-Kopf und Ownership-Pol waren NIE aktiv, und nur der Ownership-Pol koennte Sofortpunkte gegen Struktur eintauschen -- genau den Tausch verlangt Spaltenbau. Naechste Konfiguration daher Arm B PLUS OWNERSHIP_WEIGHT>0 (par.3b der Lehrer-Prereg). par.4c und par.4d sind ueberholte Zwischendeutungen, par.4e ist der Stand. par.6: Warmstart-Val-Pool gebaut (MOSAIC_VAL_POOL). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v22-Trainingsfenster zugeschnitten? | Beleg: ZUSCHNITT ENTSCHIEDEN 2026-08-25 (par.2): 24.000 Partien hv2, EINE Klasse, KEIN Altbestand, ~4,18 Mio Zustaende, ~14,1 GB Cache. Der Rotations-Zuschnitt von 2026-08-08 war fuer einen NETZ-Erzeuger gebaut und ist hinfaellig; v22 ist ein Schnitt, keine Rotationsstufe. OFFEN darin nur die TRAEGERFRAGE (par.4): 61,8 Prozent der Draftingzuege tragen policy_target_valid=false. A/B gefahren (par.4a/4b, from-scratch auf 5.700 Partien, je 40 Partien argmax gemessen): Arm B (Flagge ignoriert) besser in vier Kennzahlen -- volle Spalten 0,113 gegen 0,062, Reihen 0,225 gegen 0,113, Punkte 27,3 gegen 21,8 -- keine davon einzeln signifikant. Richtungsentscheid: IGNORIEREN. ABER beide Arme bleiben auf Champion-Niveau (0,106) statt Lehrer-Niveau (0,741), und par.4e erklaert warum: im Tiling ist nur der VALUE-Kopf aktiv, und der bricht bloss Gleichstaende unter punktegleichen Zuegen in Runde 2-4; Punkte-Kopf und Ownership-Pol waren NIE aktiv, und nur der Ownership-Pol koennte Sofortpunkte gegen Struktur eintauschen -- genau den Tausch verlangt Spaltenbau. Naechste Konfiguration daher Arm B PLUS OWNERSHIP_WEIGHT>0 (par.3b der Lehrer-Prereg). par.4c und par.4d sind ueberholte Zwischendeutungen, par.4e ist der Stand. par.4f SPLIT-TEST GEFAHREN 2026-08-26 und er KEHRT die Vorhersage von par.4c UM: die Huelle im DRAFTING allein, mit V1-Tiling, bringt 0,756 volle Spalten gegen 0,044 der V1-Kontrolle (delta +0,713, t 10,29) -- das ist der von par.4c benannte Nahe-0,7-Fall, also traegt das DRAFTING den Loewenanteil, nicht das Routing. Das Routing ALLEIN (Huelle nur im Tiling, V1-Drafting) bringt exakt NICHTS: 0,113 gegen 0,113, delta 0,000, t 0,00. Gekoppelt sind es 0,975 gegen 0,062 (delta +0,912); die Luecke von +0,199 zur Summe der Einzelteile ist eine WECHSELWIRKUNG -- das Routing zahlt sich nur aus, wenn das Drafting die passenden Steine liefert. Folge fuer die Netz-Seite: die hartverdrahtete V1-Kachelung (self_play.rs:2866/3088/3095/3795/3802) kostet weniger als par.4c annahm, und der Kanal, ueber den das Netz erben kann, ist der Policy-Kopf im Drafting -- der ist offen. par.6: Warmstart-Val-Pool gebaut (MOSAIC_VAL_POOL). -->
 
 # Vorregistrierung: v22-Fenster
 
@@ -478,3 +478,75 @@ derselbe -- ich habe aus dem Vorhandensein eines Feldes auf seine Wirksamkeit
 geschlossen, statt Default und Reichweite nachzusehen. `tiling_net:
 Some(net)` heisst nicht "das Netz steuert das Tiling", sondern "das Netz darf
 unter Gleichstaenden mitreden, in drei von fuenf Runden".
+
+
+### par.4f SPLIT-TEST GEFAHREN (2026-08-26): das DRAFTING traegt es, das Routing allein nichts
+
+par.4c hat den Test vorregistriert und zwei Ausgaenge benannt: *"Ergebnis nahe
+0,1 => das Routing traegt den Loewenanteil"*, *"Ergebnis nahe 0,7 => das
+Drafting traegt es"*. **Gemessen: 0,756.** Der zweite Fall, und damit das
+Gegenteil dessen, was par.4c bis par.4e als Strukturbefund gefuehrt hat.
+
+**Aufbau**, gleicher Seed und gleiche Sims in allen drei Armen, 160 gepaarte
+Partien je Arm (80 je Sitz), 150 Sims, Block-Auswertung mit 10 Bloecken:
+
+| Arm | Draft | Tiling | V1-Kontrolle | Testseite | Delta | t |
+| --- | --- | --- | --- | --- | --- | --- |
+| gekoppelt | v1 : v2huelle | v1 : v2huelle | 0,062 | **0,975** | +0,912 | 13,43 |
+| nur Drafting | v1 : v2huelle | v1 : **v1** | 0,044 | **0,756** | +0,713 | 10,29 |
+| nur Routing | v1 : **v1** | v1 : v2huelle | 0,113 | **0,113** | **+0,000** | 0,00 |
+
+**Die Zerlegung ist nicht additiv, und das ist der eigentliche Befund.**
+0,713 (Drafting) + 0,000 (Routing) = 0,713, gekoppelt sind es aber 0,912. Die
+Luecke von **+0,199** ist eine Wechselwirkung: das Routing kann nur einsortieren,
+was das Drafting geholt hat. Ohne passende Steine laeuft
+`v2_tiling_preference` ins Leere und faellt auf den Bestandspfad durch -- was
+die exakte Null im dritten Arm erklaert.
+
+**Was das an par.4c berichtigt.** Dort stand, der v2-Durchbruch komme vom
+PLATZIERUNGS-Routing, und dem Netz sei genau dieses Routing verschlossen.
+Der erste Teil ist durch diese Messung widerlegt: das Routing allein bewegt
+die vollen Spalten nicht. Der zweite Teil bleibt richtig -- die Netz-Seite
+kachelt hartverdrahtet V1 (self_play.rs:2866, 3088/3095, 3795/3802, an allen
+sechs Stellen nachgelesen) --, aber die Kosten dieser Verdrahtung sind
+kleiner als angenommen: sie kostet die Wechselwirkung, nicht den Hauptteil.
+
+**Und was daraus folgt, ohne es hier zu entscheiden:** der Kanal, ueber den
+ein Netz den Lehrer erben koennte, ist die DRAFT-Haelfte, und die ist offen --
+Draftingzuege tragen Policy-Ziele. Die Tiling-Maskierung (par.4c Punkt 2)
+verschliesst die Haelfte, die allein ohnehin nichts traegt. Ob die
+Netz-Kachelung trotzdem umgestellt wird, ist damit eine Frage nach den 0,199
+Wechselwirkung, nicht mehr nach den 0,7 Hauptteil.
+
+### Was dafuer gebaut werden musste
+
+par.4c sagte, der Zuschnitt sei vorhanden: *"`PlayerLoopConfig` traegt beide
+Angaben getrennt"*. Das stimmt fuer die STRUKTUR und nicht fuer den EINSTIEG.
+`play_arena_game` nahm EINE Variante und legte sie auf Startsetzung, Drafting
+UND Tiling; `run_heuristic_v1_vs_v2_arena` reichte ebenfalls nur eine durch.
+Der Split war also nicht fahrbar, sondern musste erst ausdrueckbar gemacht
+werden -- dieselbe Falle wie beim Korpus, eine Ebene hoeher: die Struktur
+trennt, der Aufrufer koppelt.
+
+Additiv geloest: zweite Variantenachse `tiling_varianten` in
+`play_arena_game`, zwei optionale Namen am Einstieg (`None` = wie die
+Draft-Seite, also Bestandsverhalten), `--tiling A:B` in
+`tools/probes/v2_envelope_arena.py`.
+
+**Drei Gegenproben vor der Messung**, weil ein durchgereichter Wert genau hier
+schon einmal nicht angekommen ist:
+
+1. ein unbekannter Tiling-Name muss FEHLSCHLAGEN statt still auf die
+   Draft-Variante zurueckzufallen -- sonst saehe ein Bestandslauf wie der
+   gewollte Split aus. Meldet `unbekannte Tiling-Variante: gibtsnicht`.
+2. der Split-Lauf schreibt seine Achsen ins Artefakt (`tiling_varianten`).
+3. der Bestandsaufruf mit zehn Argumenten ergibt weiterhin Tiling = Draft.
+
+**Ein Fund dabei:** im Routing-Arm heissen beide Seiten `v1`, und die
+Auswertung schluesselt Bretter nach SPIELERNAMEN. Ohne Unterscheidung legte
+`reconstruct_game` zwei Bretter uebereinander. Gefangen hat es der
+Katalog-Waechter der Sonde (`Special freigeschaltet, aber Katalog kennt dort
+kein Spezialfeld`) -- ohne ihn waere es ein stiller Messfehler gewesen. Der
+Spielername traegt die Tiling-Achse jetzt mit, sobald sie abweicht; bei
+gleichen Achsen bleibt er Zeichen fuer Zeichen der alte. Gegenprobe: der
+Drafting-Arm reproduziert nach der Umbenennung exakt (0,756 / t 10,29).

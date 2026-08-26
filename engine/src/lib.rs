@@ -1708,7 +1708,7 @@ fn bootstrap_horizon_stage0_probe_json(
 /// Partie. Die Vollendungsquote folgt aus `long_rows_started` /
 /// `long_rows_completed` -- der vorregistrierte Falsifikator.
 #[pyfunction]
-#[pyo3(signature = (sims_v1, sims_v2, n_games, seed, num_threads=0, c=0.3, swap=false, log_games=false, variante_a="v1", variante_b="v2"))]
+#[pyo3(signature = (sims_v1, sims_v2, n_games, seed, num_threads=0, c=0.3, swap=false, log_games=false, variante_a="v1", variante_b="v2", tiling_a=None, tiling_b=None))]
 #[allow(clippy::too_many_arguments)]
 fn heuristic_v1_vs_v2_arena(
     py: Python<'_>,
@@ -1722,11 +1722,18 @@ fn heuristic_v1_vs_v2_arena(
     log_games: bool,
     variante_a: &str,
     variante_b: &str,
+    // PREREG_v22_window.md par.4c: Variante der PLATZIERUNG je Seite. Weggelassen
+    // (None) = wie die Draft-Variante, also unveraendertes Bestandsverhalten --
+    // `tools/probes/v2_envelope_arena.py` ruft weiter mit zehn Argumenten auf.
+    tiling_a: Option<&str>,
+    tiling_b: Option<&str>,
 ) -> String {
     let (a, b) = (variante_a.to_string(), variante_b.to_string());
+    let (ta, tb) = (tiling_a.map(str::to_string), tiling_b.map(str::to_string));
     py.detach(move || {
         crate::self_play::run_heuristic_v1_vs_v2_arena(
             sims_v1, sims_v2, n_games, seed, num_threads, c, swap, log_games, &a, &b,
+            ta.as_deref(), tb.as_deref(),
         )
     })
 }
