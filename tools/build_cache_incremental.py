@@ -65,7 +65,7 @@ sys.path.insert(0, str(_ROOT / "engine" / "py"))
 sys.path.insert(0, str(_ROOT / "tools"))
 
 
-def _traegerstatus(basename, carrier_set, carrier_prefixes):
+def _carrier_status(basename, carrier_set, carrier_prefixes):
     """Traegerstatus EINER Datei -- mit der Funktion der Bauschleife.
 
     `bootstrap_native` wird hier genauso gebildet wie dort (Praefix-Test auf
@@ -79,20 +79,20 @@ def _traegerstatus(basename, carrier_set, carrier_prefixes):
                                          bootstrap_native)
 
 
-def _manifest_laden(data_dir):
+def _load_manifest(data_dir):
     """Traeger-Manifest wie `MosaicDataset.__init__` es liest (gleiche Env-Var,
     gleicher Default, gleiche Felder)."""
-    pfad = os.path.join(
+    path = os.path.join(
         data_dir, os.environ.get("MOSAIC_CARRIER_MANIFEST", "policy_carrier_manifest_v20.json"))
-    if not os.path.exists(pfad):
-        return None, None, pfad
-    with open(pfad, encoding="utf-8") as mf:
+    if not os.path.exists(path):
+        return None, None, path
+    with open(path, encoding="utf-8") as mf:
         m = json.load(mf)
     prefixes = list(m["carrier_prefixes"]) if "carrier_prefixes" in m else None
-    return frozenset(m["policy_carrier_files"]), prefixes, pfad
+    return frozenset(m["policy_carrier_files"]), prefixes, path
 
 
-def _blockpfad(data_dir, basename, kwargs, carrier):
+def _block_path(data_dir, basename, kwargs, carrier):
     import neural_net
     key = neural_net.per_file_cache_key(
         basename, value_target_variant=kwargs["value_target_variant"],
@@ -101,56 +101,56 @@ def _blockpfad(data_dir, basename, kwargs, carrier):
     return os.path.join(data_dir, f".filecache_{key}.h5")
 
 
-def _bau_eine_datei(args):
+def _build_one_file(args):
     """Laeuft im Worker: baut GENAU EINE Datei in ihren Block-Cache.
 
     Gibt (basename, pfad, n_zustaende, gebaut?) zurueck -- die Arrays bleiben
     auf der Platte (bei 2.400 Dateien waeren es sonst >11 GB durch die Pipe).
     """
-    data_dir, pfad_pkl, kwargs, blockpfad = args
-    basename = os.path.basename(pfad_pkl)
-    if os.path.exists(blockpfad):
+    data_dir, path_pkl, kwargs, block_file = args
+    basename = os.path.basename(path_pkl)
+    if os.path.exists(block_file):
         import h5py
-        with h5py.File(blockpfad, "r") as hf:
+        with h5py.File(block_file, "r") as hf:
             n = hf["values"].shape[0] if "values" in hf else 0
-        return basename, blockpfad, n, False
+        return basename, block_file, n, False
     import neural_net
-    ds = neural_net.MosaicDataset(data_dir, files=[pfad_pkl],
-                                  cache_path_override=blockpfad, **kwargs)
-    return basename, blockpfad, len(ds), True
+    ds = neural_net.MosaicDataset(data_dir, files=[path_pkl],
+                                  cache_path_override=block_file, **kwargs)
+    return basename, block_file, len(ds), True
 
 
-def _dateien(data_dir, limit=None):
-    dateien = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+def _files(data_dir, limit=None):
+    file_list = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
     _excl = os.environ.get("MOSAIC_DATA_EXCLUDE")
     if _excl:
-        dateien = [f for f in dateien if not re.search(_excl, os.path.basename(f))]
-    return dateien[:limit] if limit else dateien
+        file_list = [f for f in file_list if not re.search(_excl, os.path.basename(f))]
+    return file_list[:limit] if limit else file_list
 
 
-def _durchgang(data_dir, dateien, kwargs, carrier_set, carrier_prefixes, workers, t0):
+def _pass(data_dir, file_list, kwargs, carrier_set, carrier_prefixes, workers, t0):
     """Ein Durchgang ueber alle bekannten Dateien. Gibt (ergebnisse, n_neu)."""
-    auftraege = []
-    for f in dateien:
-        carrier = _traegerstatus(os.path.basename(f), carrier_set, carrier_prefixes)
-        auftraege.append((data_dir, f, kwargs, _blockpfad(data_dir, os.path.basename(f),
+    jobs = []
+    for f in file_list:
+        carrier = _carrier_status(os.path.basename(f), carrier_set, carrier_prefixes)
+        jobs.append((data_dir, f, kwargs, _block_path(data_dir, os.path.basename(f),
                                                           kwargs, carrier)))
-    offen = [a for a in auftraege if not os.path.exists(a[3])]
-    fertig_schon = len(auftraege) - len(offen)
-    print(f"📦 {len(auftraege)} Dateien: {fertig_schon} Bloecke liegen schon, "
-          f"{len(offen)} zu bauen", flush=True)
-    ergebnisse = []
-    if offen:
-        n_w = max(1, min(workers, len(offen)))
+    pending = [a for a in jobs if not os.path.exists(a[3])]
+    already_done = len(jobs) - len(pending)
+    print(f"📦 {len(jobs)} Dateien: {already_done} Bloecke liegen schon, "
+          f"{len(pending)} zu bauen", flush=True)
+    results = []
+    if pending:
+        n_w = max(1, min(workers, len(pending)))
         with mp.Pool(n_w) as pool:
-            for fertig, e in enumerate(pool.imap_unordered(_bau_eine_datei, offen), 1):
-                ergebnisse.append(e)
+            for done, e in enumerate(pool.imap_unordered(_build_one_file, pending), 1):
+                results.append(e)
                 # Fortschritt JE DATEI: bei 2.400 Dateien ist das die einzige
                 # Groesse, an der man den Stand ablesen kann (CLAUDE.md
                 # "Zaehlen statt hochrechnen").
-                print(f"   {fertig}/{len(offen)} gebaut  ({time.time()-t0:.0f}s, "
+                print(f"   {done}/{len(pending)} gebaut  ({time.time()-t0:.0f}s, "
                       f"zuletzt {e[0]} mit {e[2]} Zustaenden)", flush=True)
-    return ergebnisse, len(offen)
+    return results, len(pending)
 
 
 def main():
@@ -175,79 +175,79 @@ def main():
 
     kwargs = dict(encoder=a.encoder, value_target_variant=a.value_target_variant,
                   conjunction_head=a.conjunction_head)
-    carrier_set, carrier_prefixes, manifest_pfad = _manifest_laden(a.data_dir)
-    print(f"Traeger-Manifest: {manifest_pfad if carrier_set is not None else 'KEINS (jede Datei traegt)'}",
+    carrier_set, carrier_prefixes, manifest_path = _load_manifest(a.data_dir)
+    print(f"Traeger-Manifest: {manifest_path if carrier_set is not None else 'KEINS (jede Datei traegt)'}",
           flush=True)
 
     t0 = time.time()
     t_cpu0 = time.process_time()
-    alle = []
-    gebaut_gesamt = 0
-    leer = 0
+    all_entries = []
+    built_total = 0
+    empty = 0
     while True:
-        dateien = _dateien(a.data_dir, a.limit)
-        if not dateien:
+        file_list = _files(a.data_dir, a.limit)
+        if not file_list:
             raise SystemExit(f"Keine .pkl-Dateien in {a.data_dir}")
-        ergebnisse, n_offen = _durchgang(a.data_dir, dateien, kwargs, carrier_set,
+        results, n_open = _pass(a.data_dir, file_list, kwargs, carrier_set,
                                          carrier_prefixes, a.workers, t0)
-        alle = dateien
-        gebaut_gesamt += sum(1 for e in ergebnisse if e[3])
+        all_entries = file_list
+        built_total += sum(1 for e in results if e[3])
         if not a.watch:
             break
-        leer = leer + 1 if n_offen == 0 else 0
-        if leer >= a.leerlauf_abbruch:
-            print(f"✅ {leer} Durchgaenge ohne neue Datei -- Ende des Mitlaufens.", flush=True)
+        empty = empty + 1 if n_open == 0 else 0
+        if empty >= a.leerlauf_abbruch:
+            print(f"✅ {empty} Durchgaenge ohne neue Datei -- Ende des Mitlaufens.", flush=True)
             break
         time.sleep(a.wartezeit)
 
-    wand = time.time() - t0
+    wall = time.time() - t0
     cpu = time.process_time() - t_cpu0
 
     # --- Zusammensetzen (optional): sortierte Dateireihenfolge = serielle
     # Reihenfolge, Voraussetzung fuer die Bit-Identitaet.
     merge_s = None
     if a.merge_out:
-        from build_cache_parallel import zusammenfuegen
-        teile = []
-        for f in alle:
+        from build_cache_parallel import merge
+        parts = []
+        for f in all_entries:
             b = os.path.basename(f)
-            c = _traegerstatus(b, carrier_set, carrier_prefixes)
-            p = _blockpfad(a.data_dir, b, kwargs, c)
+            c = _carrier_status(b, carrier_set, carrier_prefixes)
+            p = _block_path(a.data_dir, b, kwargs, c)
             if not os.path.exists(p):
                 raise SystemExit(f"Block fehlt: {p} (zu {b}) -- erst bauen, dann zusammensetzen.")
-            teile.append(p)
+            parts.append(p)
         t1 = time.time()
-        felder = zusammenfuegen(teile, a.merge_out)
+        fields = merge(parts, a.merge_out)
         merge_s = time.time() - t1
-        print(f"⏱️  Zusammenfuegen: {merge_s:.1f}s ({len(felder)} Felder) -> {a.merge_out}",
+        print(f"⏱️  Zusammenfuegen: {merge_s:.1f}s ({len(fields)} Felder) -> {a.merge_out}",
               flush=True)
 
-    erg = {
+    out = {
         "prereg": "PREREG_cache_build_time.md par.6 (Hebel 4)",
-        "data_dir": a.data_dir, "dateien": len(alle), "neu_gebaut": gebaut_gesamt,
+        "data_dir": a.data_dir, "dateien": len(all_entries), "neu_gebaut": built_total,
         "encoder": a.encoder, "value_target_variant": a.value_target_variant,
         "conjunction_head": a.conjunction_head,
-        "traeger_manifest": manifest_pfad if carrier_set is not None else None,
+        "traeger_manifest": manifest_path if carrier_set is not None else None,
         "watch": a.watch, "merge_out": a.merge_out,
         # Pflichtfelder nach CLAUDE.md "Laufzeiten messen, nicht schaetzen".
         # `threads` ist hier die Worker-Zahl des Pools; `cpu_s` misst NUR den
         # Elternprozess (die Worker sind eigene Prozesse), taugt also als
         # Overhead-Mass, nicht als Rechenzeit -- deshalb steht es so dabei.
         "laufzeit": {
-            "wanduhr_s": round(wand, 1),
+            "wanduhr_s": round(wall, 1),
             "cpu_s": round(cpu, 1),
             "cpu_s_hinweis": "nur Elternprozess, Worker sind eigene Prozesse",
             "threads": a.workers,
             "zusammenfuegen_s": round(merge_s, 1) if merge_s is not None else None,
-            "s_je_datei": round(wand / gebaut_gesamt, 2) if gebaut_gesamt else None,
+            "s_je_datei": round(wall / built_total, 2) if built_total else None,
         },
     }
-    ziel = pathlib.Path("evaluations/artifacts/cache_build_incremental.json")
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    ziel.write_text(json.dumps(erg, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
-    print(f"✅ {gebaut_gesamt} Bloecke neu gebaut, {len(alle)} Dateien abgedeckt, "
-          f"{wand:.1f}s gesamt")
-    print(f"Artefakt: {ziel}")
+    target = pathlib.Path("evaluations/artifacts/cache_build_incremental.json")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
+    print(f"✅ {built_total} Bloecke neu gebaut, {len(all_entries)} Dateien abgedeckt, "
+          f"{wall:.1f}s gesamt")
+    print(f"Artefakt: {target}")
 
 
 if __name__ == "__main__":

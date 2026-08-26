@@ -60,32 +60,32 @@ SIMS, C_PUCT = 150, 0.3
 #
 # Diese Zahlen sind der Ersatz fuer diesen Zufall. Aendern sie sich, ist das
 # ein BEFUND und gehoert erklaert, bevor die Zahl hier angepasst wird.
-ERWARTET = {
+EXPECTED = {
     "v1_anchor":          {"scores": [27, 15], "steps": 159},
     "v2huelle_generator": {"scores": [63, 27], "steps": 163},
 }
 
 
-def _worker(artefakt: pathlib.Path) -> WorkerProc:
+def _worker(artifact_name: pathlib.Path) -> WorkerProc:
     """Startet den Worker eines Artefakts auf DESSEN venv."""
-    py = next((artefakt / rel for rel in ("venv/Scripts/python.exe", "venv/bin/python")
-               if (artefakt / rel).exists()), None)
+    py = next((artifact_name / rel for rel in ("venv/Scripts/python.exe", "venv/bin/python")
+               if (artifact_name / rel).exists()), None)
     if py is None:
         raise SystemExit(
-            f"Keine venv in {artefakt}. Anlegen mit:" + chr(10) +
-            f"  python tools/verify_frozen_heuristic.py --artifact-dir {artefakt} --build-venv")
-    return WorkerProc(py, _ROOT / "tools" / "frozen_champion_worker.py", artefakt,
+            f"Keine venv in {artifact_name}. Anlegen mit:" + chr(10) +
+            f"  python tools/verify_frozen_heuristic.py --artifact-dir {artifact_name} --build-venv")
+    return WorkerProc(py, _ROOT / "tools" / "frozen_champion_worker.py", artifact_name,
                       SIMS, C_PUCT)
 
 
-def partie(artefakt: pathlib.Path, seed: int, extern_seite: int = 1) -> dict:
+def game(artifact_name: pathlib.Path, seed: int, external_side: int = 1) -> dict:
     """Eine Partie, BEIDE Seiten aus demselben Artefakt.
 
     EIN Worker genuegt fuer beide: er ist zustandslos je Anfrage -- der
     Zustand kommt mit. `extern_seite` bestimmt nur, fuer welche Seite der
     Referee auch Platzierung und Startsetzung abfragt.
     """
-    w = _worker(artefakt)
+    w = _worker(artifact_name)
     rg = mr.RefereeGame(("A", "B"), 0, seed, None)
     tiling_extern = start_extern = 0
     guard = 0
@@ -94,7 +94,7 @@ def partie(artefakt: pathlib.Path, seed: int, extern_seite: int = 1) -> dict:
             guard += 1
             if guard > 100_000:
                 raise RuntimeError("Schrittlimit -- Haenger-Verdacht")
-            st = rg.advance_to_decision(None, None, [extern_seite])
+            st = rg.advance_to_decision(None, None, [external_side])
             if st == "game_over":
                 rg.finalize_scoring()
                 break
@@ -122,31 +122,31 @@ def partie(artefakt: pathlib.Path, seed: int, extern_seite: int = 1) -> dict:
 
 def main() -> int:
     t0 = time.monotonic()
-    befunde, versagt = {}, []
+    findings, failures = {}, []
 
-    for artefakt in (V1, V2H):
-        r = partie(artefakt, 4242)
-        befunde[artefakt.name] = r
-        print(f"{artefakt.name}: {r['scores']}, {r['steps']} Schritte, "
+    for artifact_name in (V1, V2H):
+        r = game(artifact_name, 4242)
+        findings[artifact_name.name] = r
+        print(f"{artifact_name.name}: {r['scores']}, {r['steps']} Schritte, "
               f"{r['tiling_extern']} externe Tiling-Schritte, "
               f"{r['start_extern']} externe Startsetzungen", flush=True)
         if r["tiling_extern"] == 0:
-            versagt.append(f"{artefakt.name}: kein externer Tiling-Schritt")
+            failures.append(f"{artifact_name.name}: kein externer Tiling-Schritt")
         if r["start_extern"] == 0:
-            versagt.append(f"{artefakt.name}: keine externe Startsetzung")
-        soll = ERWARTET[artefakt.name]
-        if [r["scores"], r["steps"]] != [soll["scores"], soll["steps"]]:
-            versagt.append(
-                f"{artefakt.name} weicht von der festgenagelten Erwartung ab: "
-                f"{r['scores']}/{r['steps']} statt {soll['scores']}/{soll['steps']} "
+            failures.append(f"{artifact_name.name}: keine externe Startsetzung")
+        expected = EXPECTED[artifact_name.name]
+        if [r["scores"], r["steps"]] != [expected["scores"], expected["steps"]]:
+            failures.append(
+                f"{artifact_name.name} weicht von der festgenagelten Erwartung ab: "
+                f"{r['scores']}/{r['steps']} statt {expected['scores']}/{expected['steps']} "
                 "-- ERST erklaeren, dann die Zahl hier anpassen")
 
-    a, b = befunde[V1.name], befunde[V2H.name]
-    wirkt = (a["scores"] != b["scores"]) or (a["steps"] != b["steps"])
-    befunde["variante_wirkt"] = wirkt
-    print(f"Verlaeufe unterschiedlich? {wirkt}", flush=True)
-    if not wirkt:
-        versagt.append("v1 und v2huelle nehmen denselben Verlauf -- die Variante kommt nicht an")
+    a, b = findings[V1.name], findings[V2H.name]
+    effective = (a["scores"] != b["scores"]) or (a["steps"] != b["steps"])
+    findings["variante_wirkt"] = effective
+    print(f"Verlaeufe unterschiedlich? {effective}", flush=True)
+    if not effective:
+        failures.append("v1 und v2huelle nehmen denselben Verlauf -- die Variante kommt nicht an")
 
     # --- C) prallt Unsinn ab
     w = _worker(V1)
@@ -165,30 +165,30 @@ def main() -> int:
                 continue
             act, _v = w.ask(rg.state_json(), rg.pending_search_seed())
             rg.drafting_apply_external(json.dumps(act))
-        boese = json.dumps({"type": "place", "pattern_row": 99, "slot_row": 99,
+        bogus = json.dumps({"type": "place", "pattern_row": 99, "slot_row": 99,
                             "slot_col": 99, "space_index": 99})
         try:
-            rg.tiling_apply_external(boese)
+            rg.tiling_apply_external(bogus)
             print("C) ROT -- illegaler Schritt wurde ANGENOMMEN", flush=True)
-            versagt.append("illegaler Tiling-Schritt wurde angenommen")
-            befunde["c_abgewiesen"] = False
+            failures.append("illegaler Tiling-Schritt wurde angenommen")
+            findings["c_abgewiesen"] = False
         except ValueError as e:
             print(f"C) illegaler Schritt abgewiesen: {str(e)[:90]}...", flush=True)
-            befunde["c_abgewiesen"] = True
+            findings["c_abgewiesen"] = True
     finally:
         w.close()
 
-    befunde["verdikt"] = "GRUEN" if not versagt else "ROT"
-    befunde["versagt"] = versagt
-    befunde["laufzeit"] = {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
+    findings["verdikt"] = "GRUEN" if not failures else "ROT"
+    findings["versagt"] = failures
+    findings["laufzeit"] = {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
                            "threads": 1, "s_je_partie": None}
-    ziel = pathlib.Path("evaluations/artifacts/frozen_agent_referee.json")
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    ziel.write_text(json.dumps(befunde, indent=2, ensure_ascii=False), encoding="utf-8",
+    target = pathlib.Path("evaluations/artifacts/frozen_agent_referee.json")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(findings, indent=2, ensure_ascii=False), encoding="utf-8",
                     newline="\n")
-    print(f"\n{befunde['verdikt']}\nArtefakt: {ziel}")
-    if versagt:
-        for v in versagt:
+    print(f"\n{findings['verdikt']}\nArtefakt: {target}")
+    if failures:
+        for v in failures:
             print(f"  - {v}", file=sys.stderr)
         return 1
     return 0

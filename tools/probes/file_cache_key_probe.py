@@ -43,7 +43,7 @@ BASIS = dict(value_target_variant="default", encoder="flat",
 #   ("arg", name, wert)  -> Aufrufargument aendern
 #   ("env", name, wert)  -> Umgebungsknopf setzen (Modul wird neu geladen,
 #                           weil _IGNORE_PTV beim Import gelesen wird)
-ABWEICHUNGEN = [
+DIVERGENCES = [
     ("value_target_variant", "arg", "value_target_variant", "nortv"),
     ("encoder",              "arg", "encoder",              "2d"),
     ("conjunction_head",     "arg", "conjunction_head",     True),
@@ -55,7 +55,7 @@ ABWEICHUNGEN = [
 ]
 
 
-def _schluessel(basename, argaenderung=None, envaenderung=None):
+def _key(basename, arg_change=None, env_change=None):
     """Schluessel in einem FRISCHEN Import berechnen.
 
     Der Neu-Import ist Pflicht, nicht Kosmetik: `_IGNORE_PTV` wird EINMAL beim
@@ -63,21 +63,21 @@ def _schluessel(basename, argaenderung=None, envaenderung=None):
     Strecke wechselt). Wer den Knopf nur setzt und dieselbe Modulinstanz
     befragt, misst den alten Wert und bekommt einen falschen GRUENEN Befund.
     """
-    alt = {}
-    if envaenderung:
-        k, v = envaenderung
-        alt[k] = os.environ.get(k)
+    old = {}
+    if env_change:
+        k, v = env_change
+        old[k] = os.environ.get(k)
         os.environ[k] = v
     try:
         for mod in ("neural_net",):
             sys.modules.pop(mod, None)
         import neural_net
         kw = dict(BASIS)
-        if argaenderung:
-            kw[argaenderung[0]] = argaenderung[1]
+        if arg_change:
+            kw[arg_change[0]] = arg_change[1]
         return neural_net.per_file_cache_key(basename, **kw)
     finally:
-        for k, v in alt.items():
+        for k, v in old.items():
             if v is None:
                 os.environ.pop(k, None)
             else:
@@ -85,53 +85,53 @@ def _schluessel(basename, argaenderung=None, envaenderung=None):
 
 
 def main() -> int:
-    datei = "selfplay_hv2_g10_0001.pkl"
-    referenz = _schluessel(datei)
-    print(f"Referenz-Schluessel fuer {datei}: {referenz}", flush=True)
+    fname = "selfplay_hv2_g10_0001.pkl"
+    reference = _key(fname)
+    print(f"Referenz-Schluessel fuer {fname}: {reference}", flush=True)
 
-    befunde = {"referenz": referenz, "miss": {}, "treffer": None, "fenster_unabhaengig": None}
-    versagt = []
+    findings = {"referenz": reference, "miss": {}, "treffer": None, "fenster_unabhaengig": None}
+    failures = []
 
     # --- A) jede Abweichung muss einen MISS erzeugen
-    for anzeige, art, name, wert in ABWEICHUNGEN:
-        if art == "arg":
-            k = _schluessel(datei, argaenderung=(name, wert))
+    for display, kind, name, val in DIVERGENCES:
+        if kind == "arg":
+            k = _key(fname, arg_change=(name, val))
         else:
-            k = _schluessel(datei, envaenderung=(name, wert))
-        miss = (k != referenz)
-        befunde["miss"][anzeige] = {"schluessel": k, "miss": miss}
-        print(f"  {'OK  ' if miss else 'ROT '} {anzeige:38s} -> {k}"
+            k = _key(fname, env_change=(name, val))
+        miss = (k != reference)
+        findings["miss"][display] = {"schluessel": k, "miss": miss}
+        print(f"  {'OK  ' if miss else 'ROT '} {display:38s} -> {k}"
               f"{'' if miss else '   ← TRIFFT DEN REFERENZ-CACHE'}", flush=True)
         if not miss:
-            versagt.append(anzeige)
+            failures.append(display)
 
     # --- B) Gegenprobe: gleicher Aufruf, gleicher Schluessel
-    wieder = _schluessel(datei)
-    befunde["treffer"] = (wieder == referenz)
-    print(f"  {'OK  ' if wieder == referenz else 'ROT '} Wiederholung ergibt denselben Schluessel",
+    again = _key(fname)
+    findings["treffer"] = (again == reference)
+    print(f"  {'OK  ' if again == reference else 'ROT '} Wiederholung ergibt denselben Schluessel",
           flush=True)
-    if wieder != referenz:
-        versagt.append("Wiederholbarkeit")
+    if again != reference:
+        failures.append("Wiederholbarkeit")
 
     # --- C) Fenster-Unabhaengigkeit: andere Datei -> anderer Schluessel,
     #        aber NICHTS an der Dateiliste geht ein (die Funktion kennt sie gar
     #        nicht -- diese Pruefung haelt das fest, damit es so bleibt).
-    andere = _schluessel("selfplay_hv2_g10_0002.pkl")
-    befunde["fenster_unabhaengig"] = (andere != referenz)
-    print(f"  {'OK  ' if andere != referenz else 'ROT '} andere Datei -> anderer Schluessel",
+    other = _key("selfplay_hv2_g10_0002.pkl")
+    findings["fenster_unabhaengig"] = (other != reference)
+    print(f"  {'OK  ' if other != reference else 'ROT '} andere Datei -> anderer Schluessel",
           flush=True)
-    if andere == referenz:
-        versagt.append("Dateiname im Schluessel")
+    if other == reference:
+        failures.append("Dateiname im Schluessel")
 
-    ziel = pathlib.Path("evaluations/artifacts/file_cache_key_probe.json")
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    befunde["verdikt"] = "GRUEN" if not versagt else "ROT"
-    befunde["versagt"] = versagt
-    ziel.write_text(json.dumps(befunde, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
-    print(f"\nArtefakt: {ziel}")
+    target = pathlib.Path("evaluations/artifacts/file_cache_key_probe.json")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    findings["verdikt"] = "GRUEN" if not failures else "ROT"
+    findings["versagt"] = failures
+    target.write_text(json.dumps(findings, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
+    print(f"\nArtefakt: {target}")
 
-    if versagt:
-        print(f"\nROT -- diese Parameter aendern den Schluessel NICHT: {', '.join(versagt)}",
+    if failures:
+        print(f"\nROT -- diese Parameter aendern den Schluessel NICHT: {', '.join(failures)}",
               file=sys.stderr)
         print("Ein Lauf mit dieser Abweichung wuerde still den vorhandenen Block laden.",
               file=sys.stderr)

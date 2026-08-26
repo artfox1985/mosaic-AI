@@ -47,7 +47,7 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "tools" / "probes"))
 
 from corpus_io import load_records  # noqa: E402
-from generator_repro_probe import _erste_abweichung  # noqa: E402
+from generator_repro_probe import _first_divergence  # noqa: E402
 
 
 def _venv_python(artifact: pathlib.Path) -> pathlib.Path:
@@ -91,7 +91,7 @@ def main() -> int:
 
     artifact = pathlib.Path(a.artifact_dir)
     manifest = json.loads((artifact / "manifest.json").read_text(encoding="utf-8"))
-    rezept = manifest["golden_probe"]["rezept"]
+    recipe = manifest["golden_probe"]["rezept"]
     spec = json.loads((artifact / "spec.json").read_text(encoding="utf-8"))
 
     # Die Variante kommt aus der SPEC des Artefakts, nicht aus dem Aufruf.
@@ -99,11 +99,11 @@ def main() -> int:
     # (Rezept dokumentiert, Aufruf hat es nicht mitgenommen) kann hier nicht
     # mehr passieren. Gegenprobe trotzdem, weil zwei Quellen zwei Wahrheiten
     # sind: Spec und Rezept muessen uebereinstimmen.
-    if spec["heuristik_variante"] != rezept["heuristik_variante"]:
+    if spec["heuristik_variante"] != recipe["heuristik_variante"]:
         raise SystemExit(
             f"Artefakt widerspruechlich: spec.json sagt "
             f"'{spec['heuristik_variante']}', das Probe-Rezept sagt "
-            f"'{rezept['heuristik_variante']}'. Kein Lauf, bis das geklaert ist.")
+            f"'{recipe['heuristik_variante']}'. Kein Lauf, bis das geklaert ist.")
 
     if a.build_venv:
         py = _build_venv(artifact)
@@ -112,21 +112,21 @@ def main() -> int:
         py = _venv_python(artifact)
     else:
         py = pathlib.Path(sys.executable)
-    modus = "Artefakt-venv (Konservierung)" if a.venv else "aktueller Interpreter (Drift)"
-    print(f"Pruefmodus: {modus}\n  Interpreter: {py}", flush=True)
+    run_mode = "Artefakt-venv (Konservierung)" if a.venv else "aktueller Interpreter (Drift)"
+    print(f"Pruefmodus: {run_mode}\n  Interpreter: {py}", flush=True)
 
     t0 = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="frozen_verify_") as tmp:
         cmd = [str(py), "-X", "utf8", "-u", str(_ROOT / "self_play.py"),
-               "--mode", rezept["mode"], "--games", str(rezept["games"]),
-               "--sims", str(rezept["sims"]), "--version", rezept["version"],
-               "--threads", str(rezept["threads"]), "--chunk", str(rezept["chunk"]),
-               "--per-file", str(rezept["per_file"]), "--seed", str(rezept["seed"]),
-               "--c-puct", str(rezept["c_puct"]),
-               "--tau-argmax-from-move", str(rezept["tau_argmax_from_move"]),
+               "--mode", recipe["mode"], "--games", str(recipe["games"]),
+               "--sims", str(recipe["sims"]), "--version", recipe["version"],
+               "--threads", str(recipe["threads"]), "--chunk", str(recipe["chunk"]),
+               "--per-file", str(recipe["per_file"]), "--seed", str(recipe["seed"]),
+               "--c-puct", str(recipe["c_puct"]),
+               "--tau-argmax-from-move", str(recipe["tau_argmax_from_move"]),
                "--heuristik-variante", spec["heuristik_variante"]]
-        if rezept.get("model"):
-            cmd += ["--model", str(artifact / rezept["model"])]
+        if recipe.get("model"):
+            cmd += ["--model", str(artifact / recipe["model"])]
         env = dict(os.environ, MOSAIC_DATA_DIR=tmp)
         r = subprocess.run(cmd, cwd=str(_ROOT), env=env, text=True, encoding="utf-8",
                            capture_output=True)
@@ -135,40 +135,40 @@ def main() -> int:
             print(r.stderr[-2000:], file=sys.stderr)
             raise SystemExit(f"Wiederholungslauf fehlgeschlagen (Code {r.returncode}).")
 
-        neu = sorted(pathlib.Path(tmp).glob("*.pkl"))
+        new = sorted(pathlib.Path(tmp).glob("*.pkl"))
         ref = sorted((artifact / "golden_probe").glob("*.pkl"))
-        if len(neu) != len(ref):
-            raise SystemExit(f"Dateizahl verschieden: Probe {len(ref)}, Lauf {len(neu)}.")
+        if len(new) != len(ref):
+            raise SystemExit(f"Dateizahl verschieden: Probe {len(ref)}, Lauf {len(new)}.")
 
-        befunde, alle_gleich = [], True
-        for rf, nf in zip(ref, neu):
+        findings, all_same = [], True
+        for rf, nf in zip(ref, new):
             ra, rb = load_records(rf), load_records(nf)
-            abw = _erste_abweichung(ra, rb)
-            gleich = abw is None and len(ra) == len(rb)
-            alle_gleich &= gleich
-            befunde.append({"probe": rf.name, "schritte": len(ra), "identisch": gleich,
-                            "erste_abweichung": None if abw is None else
-                            {"schritt": abw[0], "feld": abw[1]}})
-            print(f"  {'IDENTISCH ' if gleich else 'ABWEICHUNG'} {rf.name}  {len(ra)} Schritte",
+            div = _first_divergence(ra, rb)
+            same = div is None and len(ra) == len(rb)
+            all_same &= same
+            findings.append({"probe": rf.name, "schritte": len(ra), "identisch": same,
+                            "erste_abweichung": None if div is None else
+                            {"schritt": div[0], "feld": div[1]}})
+            print(f"  {'IDENTISCH ' if same else 'ABWEICHUNG'} {rf.name}  {len(ra)} Schritte",
                   flush=True)
 
-    erg = {
+    out = {
         "artefakt": str(artifact).replace("\\", "/"),
         "variante": spec["heuristik_variante"],
-        "modus": modus,
-        "verdikt": "GRUEN" if alle_gleich else "ROT",
-        "dateien": befunde,
+        "modus": run_mode,
+        "verdikt": "GRUEN" if all_same else "ROT",
+        "dateien": findings,
         "laufzeit": {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
-                     "threads": rezept["threads"], "s_je_partie": None},
+                     "threads": recipe["threads"], "s_je_partie": None},
     }
-    ziel = pathlib.Path(a.out or f"evaluations/artifacts/frozen_verify_{artifact.name}.json")
-    ziel.parent.mkdir(parents=True, exist_ok=True)
-    ziel.write_text(json.dumps(erg, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
+    target = pathlib.Path(a.out or f"evaluations/artifacts/frozen_verify_{artifact.name}.json")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
 
-    print(f"\n{erg['verdikt']}: {sum(b['identisch'] for b in befunde)}/{len(befunde)} Dateien "
-          f"Feld fuer Feld gleich ({modus})")
-    print(f"Artefakt: {ziel}")
-    return 0 if alle_gleich else 1
+    print(f"\n{out['verdikt']}: {sum(b['identisch'] for b in findings)}/{len(findings)} Dateien "
+          f"Feld fuer Feld gleich ({run_mode})")
+    print(f"Artefakt: {target}")
+    return 0 if all_same else 1
 
 
 if __name__ == "__main__":

@@ -52,7 +52,7 @@ def static_handshake(manifest: dict, force_cross_era: bool) -> dict:
             "Verweigert (par.8: Kanten ueber die Fix-Grenze nie mischen). "
             "Override nur per --force-cross-era (Cross-Aera-Messung, Ergebnis mit "
             "Vorsicht lesen -- Regel-/Kontrakt-Drift zwischen den Seiten ist dann "
-            "moeglich).".format(art=artifact_hash, cur=current_hash)
+            "moeglich).".format(kind=artifact_hash, cur=current_hash)
         )
     if not ok:
         print(
@@ -153,7 +153,7 @@ class WorkerProc:
             self.proc.terminate()
 
 
-def golden_selbsttest_heuristik(worker_python, artifact_dir, repo) -> None:
+def golden_selftest_heuristic(worker_python, artifact_dir, repo) -> None:
     """Golden-Selbsttest eines HEURISTIK-Artefakts: Self-Play-Reproduktion.
 
     Die Welle-3-Sonde prueft Drafting-Zustaende und deckt fuer eine Heuristik
@@ -193,7 +193,7 @@ def golden_selftest(worker: WorkerProc, golden_probe: dict) -> list[dict]:
     return mismatches
 
 
-def _spiele_block(auftrag: dict) -> list[dict]:
+def _play_block(job: dict) -> list[dict]:
     """Spielt EINEN Seed-Block in einem eigenen Prozess, mit eigenen Workern.
 
     PARALLELISIERT WIRD AUSSEN, nicht innen: das Protokoll ist je Worker
@@ -214,43 +214,43 @@ def _spiele_block(auftrag: dict) -> list[dict]:
     """
     import mosaic_rust as mr  # im Kind importieren (spawn-sicher)
 
-    worker = WorkerProc(Path(auftrag["worker_python"]), Path(auftrag["worker_script"]),
-                        Path(auftrag["artifact_dir"]), auftrag["sims_worker"],
-                        auftrag["c_puct_worker"])
+    worker = WorkerProc(Path(job["worker_python"]), Path(job["worker_script"]),
+                        Path(job["artifact_dir"]), job["sims_worker"],
+                        job["c_puct_worker"])
     worker_a = None
-    if auftrag["artifact_dir_a"]:
-        worker_a = WorkerProc(Path(auftrag["worker_python_a"]), Path(auftrag["worker_script"]),
-                              Path(auftrag["artifact_dir_a"]), auftrag["sims_a"],
-                              auftrag["c_puct_a"])
+    if job["artifact_dir_a"]:
+        worker_a = WorkerProc(Path(job["worker_python_a"]), Path(job["worker_script"]),
+                              Path(job["artifact_dir_a"]), job["sims_a"],
+                              job["c_puct_a"])
     time.sleep(0.2)
-    ergebnisse = []
+    results = []
     try:
-        for i, seed in auftrag["indizierte_seeds"]:
+        for i, seed in job["indizierte_seeds"]:
             first_player = i % 2
             board_a = i % 2  # Brettwechsel-Pflicht, wie paired_arena-Konvention
-            externe = []
-            if auftrag["externe_b"]:
-                externe.append(1 - board_a)
-            if auftrag["externe_a"]:
-                externe.append(board_a)
+            external_list = []
+            if job["externe_b"]:
+                external_list.append(1 - board_a)
+            if job["externe_a"]:
+                external_list.append(board_a)
             g = play_one_game(
-                mr, worker, worker_a, auftrag["model_a"], auftrag["spec_a"],
-                auftrag["sims_a"], auftrag["c_puct_a"], auftrag["artefakt_modell"],
-                tuple(auftrag["names"]), first_player, seed, board_a,
-                externe_seiten=externe,
+                mr, worker, worker_a, job["model_a"], job["spec_a"],
+                job["sims_a"], job["c_puct_a"], job["artefakt_modell"],
+                tuple(job["names"]), first_player, seed, board_a,
+                external_sides=external_list,
             )
             # Der Index reist MIT: die Bloecke kommen in beliebiger
             # Reihenfolge zurueck, die Ergebnisliste muss aber der Seed-Folge
             # entsprechen (sonst stimmt jede spaetere Paarung nicht mehr).
             g["_index"] = i
-            ergebnisse.append(g)
+            results.append(g)
             print(f"[referee] Partie {i + 1} seed={seed}: {g['scores']} "
                   f"winner={g['winner']} steps={g['steps']}", file=sys.stderr, flush=True)
     finally:
         worker.close()
         if worker_a:
             worker_a.close()
-    return ergebnisse
+    return results
 
 
 def play_one_game(
@@ -274,9 +274,9 @@ def play_one_game(
     # Seiten, die ihre Startsetzung und ihr Tiling SELBST entscheiden. Leer =
     # Bestandsverhalten (der Referee loest beides auf), und das bleibt der
     # Default fuer Netz-Artefakte aus Welle 3.
-    externe_seiten=None,
+    external_sides=None,
 ) -> dict:
-    externe_seiten = externe_seiten or []
+    external_sides = external_sides or []
     # Die Namen MIT dem Brett tauschen. `wins_a` rechnet korrekt ueber
     # `board_a`, die Namen gingen aber ungetauscht hinein -- bei `board_a == 1`
     # sass die A-Seite auf dem Brett, das im Log den B-Namen trug. Fuer die
@@ -284,13 +284,13 @@ def play_one_game(
     # auswertet (Kennzahlen je Seite, tools/anchor_arena.py), vertauscht es die
     # Seiten. Gefunden am 2026-08-26 an einem Margin, der dem Siegverhaeltnis
     # widersprach.
-    namen_im_spiel = names if board_a == 0 else (names[1], names[0])
-    rg = mr.RefereeGame(namen_im_spiel, first_player, seed, None)
+    names_in_game = names if board_a == 0 else (names[1], names[0])
+    rg = mr.RefereeGame(names_in_game, first_player, seed, None)
     board_b = 1 - board_a
     model_p0 = model_a if board_a == 0 else artifact_model
     model_p1 = model_a if board_a == 1 else artifact_model
 
-    def worker_fuer(pi: int) -> WorkerProc:
+    def worker_for(pi: int) -> WorkerProc:
         """Der Worker der Seite `pi`.
 
         Mit zwei Artefakten haengt an JEDER Anfrage, WELCHE Seite gefragt
@@ -324,20 +324,20 @@ def play_one_game(
         # Fuer solche Artefakte bleibt es beim Bestandsverhalten: der Referee
         # loest Platzierung und Startsetzung selbst auf. Das ist fuer ein Netz
         # auch inhaltlich richtig, seine Identitaet ist das ONNX.
-        status = rg.advance_to_decision(model_p0, model_p1, externe_seiten)
+        status = rg.advance_to_decision(model_p0, model_p1, external_sides)
         if status == "game_over":
             rg.finalize_scoring()
             break
         if status == "tiling":
             pi_t = rg.current_player()
-            rg.tiling_apply_external(json.dumps(worker_fuer(pi_t).ask_tiling(rg.state_json())))
+            rg.tiling_apply_external(json.dumps(worker_for(pi_t).ask_tiling(rg.state_json())))
             continue
         if status == "start_placement":
             # `pending_start_placement_player()`, NICHT `current_player()`:
             # in dieser Phase kann der Nicht-Starter zuerst dran sein.
             pi_start = rg.pending_start_placement_player()
             rg.start_placement_apply_external(json.dumps(
-                worker_fuer(pi_start).ask_start_placement(
+                worker_for(pi_start).ask_start_placement(
                     rg.state_json(), pi_start, rg.game_seed())))
             continue
         if status == "stuck":
@@ -410,7 +410,7 @@ def main() -> int:
 
     artifact_dir = Path(args.artifact_dir).resolve()
     manifest = load_manifest(artifact_dir)
-    ist_heuristik = manifest.get("typ") == "heuristik"
+    is_heuristic = manifest.get("typ") == "heuristik"
     # Welle-3-Netz-Artefakte tragen ihren Interpreter im Manifest. Ein
     # Heuristik-Artefakt tut das nicht -- seine venv wird bei Bedarf gebaut
     # (verify_frozen_heuristic.py --build-venv) und ist bewusst nicht
@@ -418,9 +418,9 @@ def main() -> int:
     if "worker_python" in manifest:
         worker_python = artifact_dir / manifest["worker_python"]["interpreter_relative"]
     else:
-        eigene = [artifact_dir / "venv/Scripts/python.exe", artifact_dir / "venv/bin/python"]
-        gefunden = next((p for p in eigene if p.exists()), None)
-        if gefunden is None:
+        own = [artifact_dir / "venv/Scripts/python.exe", artifact_dir / "venv/bin/python"]
+        found = next((p for p in own if p.exists()), None)
+        if found is None:
             # KEIN stiller Rueckfall: das Artefakt auf dem AKTUELLEN Wheel zu
             # fahren beantwortet die Drift-Frage, nicht die Konservierungs-
             # Frage. Beides ist nuetzlich, aber es sind verschiedene Fragen,
@@ -431,7 +431,7 @@ def main() -> int:
                 f"--build-venv\n"
                 "Ohne sie liefe das Artefakt auf dem heutigen Wheel -- das waere ein "
                 "Drift-Test, kein Match gegen den eingefrorenen Agenten.")
-        worker_python = gefunden
+        worker_python = found
     worker_script = REPO / "tools" / "frozen_champion_worker.py"
 
     sys.path.insert(0, str(REPO))
@@ -461,8 +461,8 @@ def main() -> int:
         # zusammenhaelt.
         handshake_a = static_handshake(manifest_a, args.force_cross_era)
         print(f"[referee] Handshake A: {handshake_a}", file=sys.stderr)
-        eigene_a = [artifact_dir_a / "venv/Scripts/python.exe", artifact_dir_a / "venv/bin/python"]
-        py_a = next((q for q in eigene_a if q.exists()), None)
+        own_a = [artifact_dir_a / "venv/Scripts/python.exe", artifact_dir_a / "venv/bin/python"]
+        py_a = next((q for q in own_a if q.exists()), None)
         if "worker_python" in manifest_a:
             py_a = artifact_dir_a / manifest_a["worker_python"]["interpreter_relative"]
         if py_a is None:
@@ -473,7 +473,7 @@ def main() -> int:
                 "--build-venv")
         if not args.skip_golden and manifest_a.get("typ") == "heuristik":
             try:
-                golden_selbsttest_heuristik(py_a, artifact_dir_a, REPO)
+                golden_selftest_heuristic(py_a, artifact_dir_a, REPO)
             except SystemExit:
                 worker.close()
                 raise
@@ -481,9 +481,9 @@ def main() -> int:
         time.sleep(0.2)
 
     golden_mismatches = []
-    if not args.skip_golden and ist_heuristik:
+    if not args.skip_golden and is_heuristic:
         try:
-            golden_selbsttest_heuristik(worker_python, artifact_dir, REPO)
+            golden_selftest_heuristic(worker_python, artifact_dir, REPO)
         except SystemExit:
             worker.close()
             raise
@@ -515,7 +515,7 @@ def main() -> int:
     # sie ueber den auf V1 verdrahteten Referee-Pfad und ist ein anderer
     # Spieler als der eingefrorene. Kann ihr Wheel das nicht, wird verweigert.
     kinds = set((manifest.get("protokoll") or {}).get("kinds") or [])
-    if ist_heuristik and not {"tiling", "start_placement"} <= kinds:
+    if is_heuristic and not {"tiling", "start_placement"} <= kinds:
         worker.close()
         raise SystemExit(
             f"Artefakt {artifact_dir.name} deklariert das erweiterte Protokoll nicht "
@@ -525,40 +525,40 @@ def main() -> int:
             "ueber den auf V1 verdrahteten Referee-Pfad kacheln zu lassen -- also gegen einen "
             "ANDEREN Spieler zu messen als den eingefrorenen.\n"
             "Abhilfe: das Artefakt mit dem heutigen Wheel neu einfrieren.")
-    externe_seiten_aktiv = ist_heuristik
+    external_sides_active = is_heuristic
     # Auch die A-Seite entscheidet selbst, wenn sie ein protokollfaehiges
     # Heuristik-Artefakt ist. Sonst kachelte SIE ueber den auf V1
     # verdrahteten Referee-Pfad -- derselbe Fehler, nur auf der anderen Seite.
     kinds_a = set(((manifest_a or {}).get("protokoll") or {}).get("kinds") or [])
-    a_ist_heuristik = (manifest_a or {}).get("typ") == "heuristik"
-    if a_ist_heuristik and not {"tiling", "start_placement"} <= kinds_a:
+    a_is_heuristic = (manifest_a or {}).get("typ") == "heuristik"
+    if a_is_heuristic and not {"tiling", "start_placement"} <= kinds_a:
         worker.close()
         if worker_a:
             worker_a.close()
         raise SystemExit(
             f"Artefakt A {artifact_dir_a.name} deklariert das erweiterte Protokoll nicht "
             f"(protokoll.kinds={sorted(kinds_a) or 'fehlt'}). Neu einfrieren.")
-    externe_seiten_a_aktiv = a_ist_heuristik
+    external_sides_a_active = a_is_heuristic
     # Eine Heuristik hat kein `model.onnx`. Der Pfad wuerde zwar nie geladen
     # (fuer externe Seiten kehrt `advance_to_decision` vorher zurueck), aber
     # einen Pfad mitzugeben, der nicht existiert, ist eine Falle fuer den
     # naechsten Leser.
-    artefakt_modell = None if ist_heuristik else str(artifact_dir / "model.onnx")
+    artifact_model_path = None if is_heuristic else str(artifact_dir / "model.onnx")
     print(f"[referee] externe Platzierung/Startsetzung: "
-          f"{'AN' if externe_seiten_aktiv else 'aus (Netz-Artefakt)'}", file=sys.stderr)
+          f"{'AN' if external_sides_active else 'aus (Netz-Artefakt)'}", file=sys.stderr)
     # --- Blockaufteilung. Mindestens MIN_JE_BLOCK Partien je Prozess, sonst
     # frisst der Worker-Start (Wheel laden, bei Netzen zusaetzlich das ONNX)
     # den Gewinn wieder auf. Der Wert ist gesetzt, nicht hergeleitet: bei
     # gemessenen ~3,3 s je Partie und ~1-2 s Worker-Start ist ab vier Partien
     # je Block der Overhead unter 15 Prozent.
     MIN_JE_BLOCK = 4
-    n_proz = max(1, min(args.workers, max(1, len(seeds) // MIN_JE_BLOCK)))
-    indiziert = list(enumerate(seeds))
-    bloecke = [indiziert[k::n_proz] for k in range(n_proz)]
-    bloecke = [b for b in bloecke if b]
-    print(f"[referee] {len(seeds)} Partien auf {len(bloecke)} Prozess(e)", file=sys.stderr)
+    n_procs = max(1, min(args.workers, max(1, len(seeds) // MIN_JE_BLOCK)))
+    indexed = list(enumerate(seeds))
+    blocks = [indexed[k::n_procs] for k in range(n_procs)]
+    blocks = [b for b in blocks if b]
+    print(f"[referee] {len(seeds)} Partien auf {len(blocks)} Prozess(e)", file=sys.stderr)
 
-    basis = {
+    base = {
         "worker_python": str(worker_python), "worker_script": str(worker_script),
         "artifact_dir": str(artifact_dir), "sims_worker": args.sims_worker,
         "c_puct_worker": args.c_puct_worker,
@@ -566,27 +566,27 @@ def main() -> int:
         "worker_python_a": str(py_a) if artifact_dir_a else None,
         "model_a": args.model_a, "spec_a": args.spec_a,
         "sims_a": args.sims_a, "c_puct_a": args.c_puct_a,
-        "artefakt_modell": artefakt_modell, "names": list(names),
-        "externe_b": externe_seiten_aktiv, "externe_a": externe_seiten_a_aktiv,
+        "artefakt_modell": artifact_model_path, "names": list(names),
+        "externe_b": external_sides_active, "externe_a": external_sides_a_active,
     }
 
     t_start = time.perf_counter()
-    if len(bloecke) == 1:
+    if len(blocks) == 1:
         # Seriell im ELTERNPROZESS -- die bereits gestarteten Worker werden
         # weiterbenutzt, kein zweiter Start. Bestandsverhalten.
         games = []
-        for i, seed in bloecke[0]:
+        for i, seed in blocks[0]:
             first_player = i % 2
             board_a = i % 2
-            externe = []
-            if externe_seiten_aktiv:
-                externe.append(1 - board_a)
-            if externe_seiten_a_aktiv:
-                externe.append(board_a)
+            external_list = []
+            if external_sides_active:
+                external_list.append(1 - board_a)
+            if external_sides_a_active:
+                external_list.append(board_a)
             g = play_one_game(
                 mr, worker, worker_a, args.model_a, args.spec_a, args.sims_a,
-                args.c_puct_a, artefakt_modell, names, first_player, seed, board_a,
-                externe_seiten=externe,
+                args.c_puct_a, artifact_model_path, names, first_player, seed, board_a,
+                external_sides=external_list,
             )
             g["_index"] = i
             games.append(g)
@@ -599,9 +599,9 @@ def main() -> int:
         worker.close()
         if worker_a:
             worker_a.close()
-        with mp.Pool(len(bloecke)) as pool:
-            teile = pool.map(_spiele_block, [dict(basis, indizierte_seeds=b) for b in bloecke])
-        games = [g for teil in teile for g in teil]
+        with mp.Pool(len(blocks)) as pool:
+            parts = pool.map(_play_block, [dict(base, indexed_seeds=b) for b in blocks])
+        games = [g for part in parts for g in part]
 
     # Reihenfolge wiederherstellen: die Bloecke kommen unsortiert zurueck,
     # jede spaetere Paarung haengt aber an der Seed-Folge.
@@ -651,8 +651,8 @@ def main() -> int:
     # Name aus dem Artefakt, nicht aus einem Feld, das nur eine Sorte kennt:
     # ein Heuristik-Manifest hat kein `champion`, die Datei hiess deshalb
     # `..._None.json`.
-    bezeichner = manifest.get("champion") or manifest.get("artefakt") or artifact_dir.name
-    out_path = Path(args.out) if args.out else REPO / "evaluations" / f"frozen_referee_match_{bezeichner}.json"
+    identifier = manifest.get("champion") or manifest.get("artefakt") or artifact_dir.name
+    out_path = Path(args.out) if args.out else REPO / "evaluations" / f"frozen_referee_match_{identifier}.json"
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"[referee] fertig: {wins_a} A / {wins_b} B / {draws} Remis, geschrieben nach {out_path}", file=sys.stderr)
     return 0
