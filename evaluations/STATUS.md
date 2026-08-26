@@ -402,23 +402,35 @@ Belegt ist bereits, dass der Pfadwechsel den Anker NICHT verschiebt (par.10b,
    Gleichstand erreichbar.
 2. **Ein Arena-Einstieg ueber den Referee.** Eine Python-seitige Arena ist der
    kleinere Weg (der Treiber existiert).
-3. **Elo-Kette nachziehen** -- vier Punkte, am Bestand geprueft:
-   * **AERA-ENTSCHEID (der grosse, und er gilt unabhaengig von der
-     Kapselung):** die gesamte Elo-Historie steht auf
-     `contract=a169ebf0a4451e08`, der heutige Build auf
-     `a3f61f246d9bbf5c`. Eine neue Messung laesst sich also NICHT ohne
-     Weiteres anhaengen, und ein Duell v21-Artefakt (alte Aera) gegen die
-     neuen Heuristik-Artefakte verweigert der statische Handshake. Optionen:
-     neu verankern (Praezedenz `PREREG_round5_minfix_elo_reset`), einen
-     `v1_anchor` zusaetzlich in der ALTEN Aera einfrieren, oder zwei Leitern
-     getrennt fuehren.
-   * **Anker-Identitaet in der Zeile:** `player_b` ist heute `Heuristik` --
+3. **Elo-Kette: WENIGER als zunaechst behauptet.**
+
+   **BERICHTIGUNG (Nutzer-Einwand 2026-08-26):** hier stand ein
+   "Aera-Entscheid" als grosser Posten, weil die Elo-Historie auf
+   `contract=a169ebf0a4451e08` steht und der heutige Build auf
+   `a3f61f246d9bbf5c`. Das war zu breit formuliert. Der Vertragsstempel
+   umfasst AUSSCHLIESSLICH Netz-Groessen (`contract_canonical_string`,
+   lib.rs): `INPUT_SIZE`, `NUM_PLANES_CHANNELS`, `NUM_ACTIONS`, `HEADS`.
+   Keine davon beruehrt, wie V1 spielt.
+
+   **Belegt, nicht argumentiert:** die Vertragsaenderung stammt aus `29fb1f1`
+   ("Zwei Erreichbarkeits-Eingaben fuers Netz, Champion bleibt bitgleich"),
+   und die V1-Anker-Fixture (`anchor_behaviour_v1.txt`) stammt vom
+   2026-08-21, also von VOR dieser Aenderung -- der A4-Test laeuft heute in
+   der gruenen Suite. **V1 spielt ueber die Vertragsgrenze hinweg identisch.**
+   Kanten gegen `Heuristik@150` bleiben damit vergleichbar.
+
+   Was der `contract`-Wert legitim absichert, ist die NETZ-Seite einer Kante:
+   ein ONNX aus einer anderen `INPUT_SIZE`-Aera ist nicht vergleichbar (Memory
+   "NUM_ACTIONS change orphans old checkpoints"). Dass der Handshake das
+   v21-Artefakt unter der heutigen Engine verweigert, ist deshalb RICHTIG --
+   es betrifft v21s eigenes Netz, nicht den Heuristik-Gegner.
+
+   **Was wirklich bleibt, und es ist klein:**
+   * **Anker-Identitaet in der Zeile.** `player_b` ist heute `Heuristik` --
      ein Name ohne Build. Die Konvention unterscheidet bereits
-     `Heuristik_v2huelle`, also fuegt sich `Heuristik_v1_anchor` ein. Ohne das
-     sehen zwei Kanten gegen VERSCHIEDENE Anker-Builds in der CSV gleich aus.
-   * **Zwei Vertrags-Hashes:** bei Artefakt gegen Artefakt gibt es zwei, die
-     Spalte `contract` haelt einen. Der Handshake erzwingt Gleichheit, also
-     reicht einer -- die Zeile sollte aber sagen, welche Seite sie beschreibt.
+     `Heuristik_v2huelle`, also fuegt sich `Heuristik_v1_anchor` ein. Kein
+     Blocker, aber ab jetzt billig zu haben und spaeter nicht mehr
+     rekonstruierbar.
    * **`knobs`-Spalte** ist durchweg leer; mit Artefakt liegen die Knoepfe in
      `spec.json`, die Zeile sollte darauf verweisen statt sie zu wiederholen.
 4. **Erst dann** `round5_anchor.rs` (1.664 Zeilen) und die Varianten-Faedelung
