@@ -1,5 +1,23 @@
 #!/usr/bin/env python
-"""PREREG_heuristic_v2_long_rows.md par.5.3 (Messkette Schritt 3):
+"""STILLGELEGT am 2026-08-27 (B4a). NICHT MEHR LAUFFAEHIG auf dem heutigen Build.
+
+Der v2-Zweig ist aus dem Quellstand entfernt (PREREG_heuristic_v2_long_rows.md
+par.19); der Engine-Einstieg, den diese Sonde ruft (mr.net_vs_heuristic_v2_arena), existiert
+nicht mehr. Die Datei bleibt als BELEG stehen, nicht als Werkzeug: sie zeigt,
+wie das registrierte Ergebnis zustande kam.
+
+WARUM NICHT MIGRIERT: die Kapselung fuehrt Messungen ueber ARTEFAKTE. Dieser
+Lauf braucht die Heuristik-Variante v2 als GEGNER einer Netz-Seite -- und dafuer gibt es kein Artefakt, weil v2-plain nie Champion und nie Erzeuger war, sondern ein Messarm.
+Ein Artefakt allein zum Erhalt eines abgeschlossenen Messarms zu bauen, waere
+Aufwand ohne Nutznieser (CLAUDE.md, "Infrastruktur bewerten": ein
+Infrastruktur-Vorschlag braucht einen BENANNTEN Nutznieser).
+
+WIEDER LAUFFAEHIG MACHEN, falls je noetig: der letzte Stand mit v2 im
+Quellstand steht in der Historie unmittelbar vor dem B4a-Commit.
+
+--- urspruenglicher Kopf ---
+
+PREREG_heuristic_v2_long_rows.md par.5.3 (Messkette Schritt 3):
 Champion gegen HEURISTIK V2.
 
 Frage laut Prereg: "ist v2 als LEHRER stark genug, um ein brauchbares Korpus
@@ -32,6 +50,14 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tools" / "probes"))
 
 import mosaic_rust as mr  # noqa: E402
+
+# STILLGELEGT: ohne diese Wache scheitert der Lauf mit einem
+# nichtssagenden AttributeError statt mit seinem Grund.
+if not hasattr(mr, "net_vs_heuristic_v2_arena"):
+    raise SystemExit(
+        "STILLGELEGT: mr.net_vs_heuristic_v2_arena gibt es nicht mehr "
+        "(B4a, 2026-08-27). Der v2-Zweig ist aus dem Quellstand entfernt; "
+        "siehe Dateikopf und PREREG_heuristic_v2_long_rows.md par.19.")
 from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
 from column_build_structural_probe import (  # noqa: E402
     reconstruct_game,

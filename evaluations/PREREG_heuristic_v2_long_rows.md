@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm gegen Champion@400). Die Prio-Leiter des Nutzers als Routing-Huelle (HeuristikVariante::V2Huelle) schlaegt v1 UND das alte v2: Siegquote 0,373 gegen 0,256 und 0,128, volle Spalten 0,798 gegen 0,086 und 0,302 (Netz selbst 0,106), Marge -5,5 gegen -12,2 und -19,4, Strafpunkte 13,6 gegen 19,3, Vollendungsquote 0,717; gepaart +0,700 volle Spalten (t=+13,73 auf 16 Bloecken). Der Tausch Faehigkeit-gegen-Niveau, den v2 in par.5.3 machen musste, ist damit AUFGEHOBEN, und die Voraussetzung von par.3b (Korpus mit Dreiecksform) ist erstmals erfuellbar. Preis: volle Zeilen 0,432 auf 0,216, echte Verschiebung und kein Aufbau-Artefakt. Der Durchbruch kam durchgehend vom ROUTING, nie von einem Bewertungsterm: Ablationen (par.8.6) trennen Struktur (Zielkarte) von Staerke (lineare Terme), und zwei gerechnete Punktekarten als Routing-Ziel sind negativ (par.9.1/9.2) -- eine additive Punktekarte ist ein BREITEN-Signal, volle Spalten brauchen FOKUS. Paritaets-Hash 8c6684ff haelt, Suite 520/0. par.11 (rundenabhaengige Spalten-Gewichte) ist GEMESSEN und H0 (par.11.1, n=160 gegen V2Huelle: volle Spalten 0,812 gegen 0,787, t=0,39, Siegquote 0,500) -- als Arm negativ entschieden, Kopf am 2026-08-25 nachgezogen. OFFEN: par.12 (Vollendbarkeit als Filter, registriert, ungebaut), par.5.4 Korpus und Training, Self-Play-Einstieg. par.3b ENTSCHEID: die Abkling-Kurve laeuft ueber die RUNDENNUMMER. par.3b STUFENPLAN (Nachtrag 5, Nutzer 2026-08-25): Stufe 1 = Ownership-Kopf EINSCHALTEN (kein Umbau) plus w0-Kontrollarm auf demselben v22-Korpus; Stufe 2 BEDINGT = ein 2D-KOPF statt/zusaetzlich, gerechtfertigt durch einen geprueften Befund -- auch Mosaic2DNet liest den Ownership-Kopf FLACH aus (neural_net.py:2735, byte-identisch zum flachen MosaicNet), der 2D-Rumpf wirft die Geometrie am Ausgang also wieder weg. Das faellt NICHT unter den Umlabel-Einwand: das Ziel bleibt 72 Felder, nur die Ablesung wird raeumlich. Uebergang Stufe 1 -> 2 bei KEINEM signifikanten Schaden (nicht erst bei Wirkung); Vorbehalt: 2D ist fuer STAERKE unbelegt (PREREG_2d_encoder: Orakel 6/6, Arena 416:384 Wash). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm gegen Champion@400). Die Prio-Leiter des Nutzers als Routing-Huelle (V2Huelle) schlaegt v1 UND das alte v2: Siegquote 0,373 gegen 0,256 und 0,128, volle Spalten 0,798 gegen 0,086 und 0,302 (Netz selbst 0,106), Marge -5,5 gegen -12,2 und -19,4, Vollendungsquote 0,717; gepaart +0,700 volle Spalten (t=+13,73 auf 16 Bloecken). Preis: volle Zeilen 0,432 auf 0,216. Der Durchbruch kam durchgehend vom ROUTING, nie von einem Bewertungsterm (par.8.6); zwei gerechnete Punktekarten als Routing-Ziel sind negativ (par.9.1/9.2) -- eine additive Punktekarte ist ein BREITEN-Signal, volle Spalten brauchen FOKUS. par.11 (rundenabhaengige Spalten-Gewichte) GEMESSEN und H0 (n=160, t=0,39). par.17 NEIN (Knotenbudget bindet nicht), par.18 NEIN (Blindzieh-Pathologie bleibt). -- ABSCHLUSS par.19 (2026-08-27, Nutzer-Entscheid "V2 ist durch"): der v2-Zweig ist AUS DEM QUELLSTAND ENTFERNT -- Enum, heuristic_v2.rs, v2-Routing in plate_builder, beide v2-Arena-Einstiege, die ganze Faedelung. Erhalten bleiben: das Spec-Pflichtfeld heuristik_variante (v2-Specs werden HART abgewiesen), das CLI-Flag mit choices=[v1], die v22-Korpora in data/ und BEIDE Artefakte auf ihrem mitgelieferten Wheel (v1_anchor als Elo-Anker, v2huelle_generator als Erzeuger). Beleg der Kapselung: frozen_agent_referee_probe liefert v1_anchor [27,15]/159 und v2huelle_generator [63,27]/163 unveraendert, obwohl der Quellstand v2 nicht mehr kennt. Stillgelegt statt migriert: v2_envelope_arena und v2_teacher_arena (ihr Vergleichsarm v2-plain war nie ein Artefakt). Nicht mehr nachrechenbar: die SOLL-Seite von PREREG_stack_draw_reservation_rule par.5 (nutzte expected_points_map). -- OFFEN: par.3b.2 Spalten-Abnahme-Tor registriert 2026-08-27 (w1=1,0 gegen w0, argmax-Instrument, zwei harte Tore, entscheidet ueber den Start des v22-Self-Play; Nachtrag 2026-08-27: KALTSTART statt Warmstart, Gating gegen Anker+v21 laeuft informativ und entscheidet den Start NICHT). par.12/par.15 sind mit dem Zweig entfallen. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -981,6 +981,96 @@ blockierte Reihe? Liegt das erste ueber dem zweiten, gibt es kein gueltiges
 **Konsequenz fuer die Bauform, endgueltig:** die Huelle ist ein GEWICHT auf den
 Marginalen, kein Filter. Ein hartes Zielset haette alle drei genannten Faelle
 ausgeschlossen -- k3-Vervollstaendigung, Strafvermeidung, Reihen-Freimachen.
+
+### par.3b.2 Spalten-Abnahme-Tor (registriert 2026-08-27, VOR dem v22-Training)
+
+**Zweck: das Arena-Gating misst Siege, nicht ob der Mechanismus angekommen
+ist.** Der Sanity-Lauf (`PREREG_v22_window.md` par.4a/4b) hat genau diese
+Luecke vorgefuehrt: Arm B kam auf 0,113 volle Spalten je Partie, also
+Champion-Niveau (0,106) statt Lehrer-Niveau (0,741). Ein Gating haette daraus
+"Netz B ist ungefaehr so stark wie der Champion" gemacht und die Frage, ob der
+Spaltenbau ueberhaupt uebertragen wurde, offen gelassen. Dieses Tor
+entscheidet, ob das v22-Self-Play gestartet wird -- der Lauf, der das
+v23-Fenster besetzt (12.000 Partien, `PREREG_v23_window.md` par.2).
+
+**Zeitpunkt:** nach dem v22-Training (beide Arme), VOR dem Start des
+v22-Self-Play. Nicht danach, weil ein verfehltes Tor den Lauf gegenstandslos
+macht und nicht nachtraeglich billiger wird.
+
+**Stufe-1-Konfiguration, hiermit festgelegt.** Der Messarm ist Arm B
+(`MOSAIC_IGNORE_POLICY_TARGET_VALID=1`) mit `--ownership-weight 1.0`, der
+Kontrollarm derselbe Aufbau mit `--ownership-weight 0`, auf DEMSELBEN Korpus.
+Praezedenz fuer die 1,0: die b-Serie fuhr w=1,0 und w=2,0; die stehende
+Freigabe fuer w>1,0 ([[feedback_ownership_weight_may_rise]]) bleibt davon
+unberuehrt und gilt fuer spaetere Arme weiter.
+
+**NOTATIONS-KLARSTELLUNG, weil der Platzhalter `<w0>` in aelteren
+Befehlsbloecken doppeldeutig war:** "w0-Kontrollarm" bezeichnet das Gewicht
+NULL. Der Messarm heisst ab jetzt "w1-Arm" (Gewicht 1,0). Wo `<w0>` als
+einzusetzender Wert fuer den Messarm stand, war das ein Schreibfehler, keine
+zweite Bedeutung.
+
+**Instrument -- dasselbe wie in par.4a/4b der v22-Fenster-Prereg**, damit die
+dort gemessenen Baselines 0,062 (Arm A) und 0,113 (Arm B) vergleichbar
+bleiben: argmax-Trajektorien mit `--deterministic --no-root-noise`, 400 Sims,
+je Arm 200 Partien in 10 Bloecken zu 20. Gesampeltes Self-Play ist als
+Messgrundlage AUSGESCHLOSSEN -- es hat in par.4a die vollen Spalten mehr als
+halbiert und misst die Exploration statt des Spiels.
+
+Drei Messreihen: w1-Arm, w0-Arm, und Champion v21 als mit DEMSELBEN Instrument
+NEU gemessene Referenz. Die 0,106 aus par.4a stammt aus einem anderen Aufbau
+und wird nicht als Vergleichswert eingesetzt; Provenienzen werden nicht
+gemischt. Die sechs Standard-Kennzahlen sind Pflicht (CLAUDE.md-Regel:
+Reihenauslastung, Spaltenauslastung, Strafleistenauslastung, Punkte je
+Wertungsplatte, eigene Punkte, Marge). Laufzeit-Anhaltspunkt: rund 2,6 s je
+Partie bei 11 Threads.
+
+**TOR 1 (MECHANISMUS, hart).** Volle Spalten je Partie im w1-Arm signifikant
+ueber (a) dem w0-Arm UND (b) der neu gemessenen Champion-Referenz, jeweils
+Block-t ueber 2,262 (df=9, zweiseitig 5 Prozent). Verfehlt => KEIN
+Self-Play-Start.
+
+Damit ein verfehltes Tor nicht in Neu-Raten muendet, sind die Folgewege hier
+BENANNT: Stufe 2 (2D-Ablesung des Ownership-Kopfs, Stufenplan in par.3b), die
+Tiling-Kanal-Frage (die +0,199 Wechselwirkung aus `PREREG_v22_window.md`
+par.4f), und ein Datenmengen-Check (voller Korpus statt Viertelkorpus -- der
+offene Punkt aus par.4b).
+
+**TOR 2 (VOLLENDUNG, B1-Vorgabe).** Vollendungsquote signifikant ueber 0,53
+UND Punktschaetzung mindestens 0,60 (Lehrer: 0,717). Die 0,53 ist die Schwelle
+aus B1: dort lagen BEIDE Arme bei rund 0,53, der Lauf verglich also zwei
+inkompetente Regime ([[project_long_row_avoidance_is_correct]]).
+
+Tor 1 bestanden und Tor 2 verfehlt => Befund dokumentieren, der Start ist dann
+Nutzer-Entscheid. Das benannte Risiko ist die B1-Wiederholung: Initiierung
+erzwingbar, Vollendungsfaehigkeit nicht -- ein Korpus aus angefangenen und
+nicht vollendeten Spalten waere teurer als keiner.
+
+**Berichtsgroessen ohne Torfunktion** (werden erhoben und berichtet, aber
+entscheiden nichts): Abstand zum Lehrer (0,741), k1-Anteil, k6-Spezialfelder,
+und ein Mechanik-Blick auf die Ownership-Marginalen -- zeigen sie auf
+Spaltenzellen? Das trennt "Kopf gelernt, Konsument setzt es nicht um" von
+"Kopf nicht gelernt", und nur der erste Fall macht Stufe 2 zum richtigen
+Folgeweg.
+
+**Nachtrag (Nutzer-Entscheide 2026-08-27, am Tag der Registrierung):**
+
+1. **KALTSTART statt Warmstart** ("wir werden einen kaltstart machen und bei
+   bedarf afterburnen"). Beide Arme trainieren from-scratch auf dem vollen
+   Korpus. Grund: die Sanity-Modelle weichen in der Kopfbestueckung vom
+   Champion-Rezept ab (`opp_points_head`/`endgame_head` beide false, am
+   Trainings-Manifest geprueft) -- ein Warmstart haette Kopfbestueckung,
+   Traegerarm, Ownership-Gewicht und Korpuswechsel in einen Vergleich
+   gemengt. Der vorbereitete Warmstart-Aufruf in `PREREG_v22_window.md`
+   par.6 ist damit ueberholt (er lud zudem `hv2sanity_best`, also Arm A).
+   `MOSAIC_VAL_POOL` entfaellt fuer den Kaltstart und greift erst wieder,
+   falls der Afterburner als Warmstart auf demselben Korpus laeuft.
+2. **Rolle des Gatings:** v22 tritt im normalen Gating gegen den Elo-Anker
+   und gegen v21 an. Die Promotion ist ausdruecklich NICHT Voraussetzung
+   fuer den Self-Play-Start ("ich geh nicht davon aus dass v22 besser ist
+   als v21. wichtiger ... ist jedoch ob der spaltenbau uebernommen wurde").
+   Ueber den Start entscheiden allein Tor 1 und Tor 2 dieses Absatzes; das
+   Gating liefert die Elo-Einordnung.
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
@@ -2233,3 +2323,89 @@ Brett. Die Zahlen stehen nebeneinander, nicht uebereinander.
 **Fuer die Blindzieh-Spur heisst das:** der billige Ausweg ist zu. Die
 Pathologie muss dort behoben werden, wo sie sitzt -- im Einheitenbruch der
 Stopp-Regel -- und nicht durch besseres Spiel an anderer Stelle.
+
+## par.19 v2 verlaesst den Quellstand (ENTSCHIEDEN + AUSGEFUEHRT 2026-08-27)
+
+**Nutzer-Entscheid**, in zwei Schritten und mit ausdruecklicher Begruendung:
+"V2 ist durch. Keine Entwicklung mehr. Sonst wuerde ich es nicht einfrieren."
+(2026-08-26) und, auf die Frage nach den letzten beiden Messwerkzeugen,
+"Split-Test als Ergebnis stehen lassen, die beiden anderen migrieren. ich will
+nicht mehr allzu viel zeit mit der heuristik verschwenden" (2026-08-26),
+schliesslich "mach das. ist eh alles im git versioniert" (2026-08-27).
+
+### Was entfernt wurde
+
+`HeuristikVariante` (9 Varianten), `heuristic_v2.rs` (554 Zeilen), die
+v2-Routing-Haelfte von `plate_builder.rs` (39 Items, vom Compiler
+als tot benannt -- nicht nach eigenem Urteil ausgewaehlt), die beiden
+Arena-Einstiege `run_heuristic_v1_vs_v2_arena` und
+`run_net_vs_heuristic_v2_arena` samt pyo3-Bindungen, sowie die Faedelung durch
+`self_play.rs`, `mcts.rs`, `net_mcts.rs`, `referee.rs` und `lib.rs`.
+
+**Bilanz, gemessen statt geschaetzt** (`git diff HEAD --numstat` ueber
+`engine/` und `self_play.py`): +130 / -3.063, netto **2.933 Zeilen**. Davon
+1.429 in `plate_builder.rs`, 705 in `self_play.rs`, 554 als ganze Datei
+`heuristic_v2.rs`, 184 in `mcts.rs`.
+
+Zu jeder Funktion `X` gab es einen Zwilling `X_variante`; die Zwillinge sind
+mit ihren Wrappern verschmolzen. Der V1-Zweig war in jedem Fall der
+Bestandsrumpf -- die Verschmelzung ist deshalb keine Umschreibung des Ankers,
+sondern das Entfernen einer Weiche, die nur noch einen Ausgang hatte.
+
+### Was ausdruecklich BLEIBT
+
+- **Das Spec-Feld `heuristik_variante`** ist weiter PFLICHT. Die Specs der
+  eingefrorenen Artefakte tragen es; ein weggelassenes Pflichtfeld waere ein
+  stiller Vertragsbruch. Eine Spec mit `v2*` wird jetzt HART ABGEWIESEN
+  (`net_mcts.rs::from_spec_file`, Test
+  `search_config_from_spec_file_rejects_v2_variante`).
+- **Das CLI-Flag `--heuristik-variante`** bleibt, mit `choices=["v1"]`. Ein
+  alter Kampagnen-Aufruf soll LAUT scheitern statt still einen anderen Korpus
+  zu erzeugen -- genau der Fehler vom 2026-08-26 (Flag vergessen, Default v1,
+  Korpus bitgleich, falscher Befund committet).
+- **Beide Artefakte bleiben lauffaehig**, auf ihrem MITGELIEFERTEN Wheel:
+  `models/frozen_heuristics/v1_anchor/` (Elo-Anker) und
+  `models/frozen_heuristics/v2huelle_generator/` (Erzeuger des v22-Korpus).
+  Genau dafuer ist die Kapselung gebaut. Die mit v2huelle erzeugten Korpora
+  in `data/` sind unberuehrt.
+
+### Die drei Messwerkzeuge, und warum sie verschieden behandelt wurden
+
+| Werkzeug | Los | Grund |
+|---|---|---|
+| `frozen_agent_referee_probe.py` | MIGRIERT | beide Arme SIND Artefakte |
+| `v2_envelope_arena.py` | stillgelegt | Arm `v2`-plain ist kein Artefakt |
+| `v2_teacher_arena.py` | stillgelegt | dito, Netz gegen `v2`-plain |
+
+Die Trennlinie ist nicht Bequemlichkeit, sondern die Kapselungsregel: eine
+Messung laeuft ueber Artefakte. `v2`-plain war nie Champion und nie Erzeuger,
+sondern ein Vergleichsarm -- dafuer ein Artefakt zu bauen, waere Aufwand ohne
+benannten Nutznieser. Beide Dateien bleiben mit einem Stillegungs-Kopf
+STEHEN, als Beleg dafuer, wie das registrierte Ergebnis zustande kam.
+
+Dieselbe Linie hat schon der Split-Test bekommen (par.8.5): ein Ergebnis, kein
+laufendes Werkzeug.
+
+### Kollateral, ausdruecklich benannt statt still weggeraeumt
+
+Die SOLL-Seite von `PREREG_stack_draw_reservation_rule.md` par.5
+(`stack_draw_soll_seite`, `plate_value_anschluss_check` in `self_play.rs`) hat
+`plate_builder::expected_points_map` als Plattenwert-Schaetzer benutzt --
+"Platte probeweise legen, DANACH bewerten". Diese Karte war Teil des
+v2-Routings und ist mitgefallen; die beiden Testmodule sind entfernt.
+
+**Das registrierte Ergebnis bleibt gueltig**, nachrechnen laesst es sich auf
+dem heutigen Build nicht mehr. Wer es je wieder braucht, holt
+`expected_points_map` samt `points_map` und `most_available_color` aus der
+Historie unmittelbar vor diesem Commit.
+
+### Belege
+
+- Suite gruen, `cargo check --all-targets` ohne neue Warnung (die einzige,
+  `net.rs::split_planes_flat_batch`, ist Altbestand -- gegen `git stash`
+  geprueft).
+- `frozen_agent_referee_probe.py` liefert seine festgenagelten Werte
+  UNVERAENDERT: `v1_anchor [27,15]/159`, `v2huelle_generator [63,27]/163`.
+  Das ist der eigentliche Beleg der Kapselung: v2 ist aus dem Quellstand
+  verschwunden, und das v2-Artefakt spielt trotzdem Zug fuer Zug dieselbe
+  Partie -- weil es sein eigenes Wheel mitbringt.

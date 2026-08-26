@@ -198,12 +198,9 @@ fn play_one(
     let first = rng.random_range(0..2usize);
     let names = ["Spieler 1".to_string(), "Spieler 2".to_string()];
     let gid = format!("{prefix}_g{}", i + 1);
-    // V1 = Bestandsverhalten dieser Sonde; `play_one_game` nimmt die
-    // Heuristik-Variante seit 2026-08-25 als Parameter (STATUS
-    // "v22-Vorbereitung" Punkt 2).
     play_one_game(
         base_sims, c, ids, names, first, &gid, &mut rng, Some(net), record_rtv, None,
-        mosaic_rust::mcts::HeuristikVariante::V1, partie_seed,
+        partie_seed,
     )
 }
 

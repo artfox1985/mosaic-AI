@@ -13,7 +13,6 @@ pub mod execution;
 pub mod factory;
 pub mod features;
 pub mod game;
-pub mod heuristic_v2;
 pub mod knob_registry;
 pub mod mcts;
 pub mod moves;
@@ -121,35 +120,20 @@ fn self_play_games_with_net_labels(
     heuristik_variante: String,
 ) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
-    // STATUS "v22-Vorbereitung" Punkt 2: bis 2026-08-25 war der
-    // Self-Play-Einstieg auf V1 festgenagelt, ein v2-Lehrer-Korpus damit gar
-    // nicht erzeugbar. Vorgabe "v1" = Bestandsverhalten; unbekannte Werte
-    // werden ABGEWIESEN statt still auf V1 zu fallen -- ein Tippfehler im
-    // Kampagnen-Aufruf wuerde sonst schweigend den falschen Korpus erzeugen.
-    // Alle Varianten aus `mcts::HeuristikVariante`, nicht nur v1/v2 -- der
-    // Lehrer-Test hat die HUELLE gewonnen (volle Spalten 0,798 gegen 0,086,
-    // PREREG_heuristic_v2_long_rows.md par.10), sie ist also der wahrscheinliche
-    // Kandidat fuer ein v22-Lehrer-Korpus.
-    let variante = match heuristik_variante.to_ascii_lowercase().as_str() {
-        "v1" => crate::mcts::HeuristikVariante::V1,
-        "v2" => crate::mcts::HeuristikVariante::V2,
-        "v2huelle" => crate::mcts::HeuristikVariante::V2Huelle,
-        "v2heatmap" => crate::mcts::HeuristikVariante::V2Heatmap,
-        "v2pointmap" => crate::mcts::HeuristikVariante::V2PointMap,
-        "v2huellephase" => crate::mcts::HeuristikVariante::V2HuellePhase,
-        "v2huellefilter" => crate::mcts::HeuristikVariante::V2HuelleFilter,
-        "v2huellereach" => crate::mcts::HeuristikVariante::V2HuelleReach,
-        "v2huellecap" => crate::mcts::HeuristikVariante::V2HuelleCap,
-        other => {
-            return Err(pyo3::exceptions::PyValueError::new_err(format!(
-                "unbekannte heuristik_variante {other:?} -- erlaubt: v1, v2, v2huelle,                  v2heatmap, v2pointmap, v2huellephase, v2huellefilter, v2huellereach, v2huellecap"
-            )))
-        }
-    };
+    // Der Parameter bleibt, obwohl nur noch ein Wert gueltig ist: der
+    // Kampagnen-Aufruf (`self_play.py --heuristik-variante`) traegt ihn, und
+    // ein still ignoriertes Argument ist genau die Bauform, an der am
+    // 2026-08-26 ein falscher Befund entstanden ist (Flag vergessen, Default
+    // v1, Korpus bitgleich). Unbekannte Werte werden ABGEWIESEN.
+    if !heuristik_variante.eq_ignore_ascii_case("v1") {
+        return Err(pyo3::exceptions::PyValueError::new_err(format!(
+            "heuristik_variante {heuristik_variante:?} ist in diesem Build nicht mehr spielbar              -- erlaubt: v1. Der v2-Zweig wurde am 2026-08-26 entfernt              (PREREG_heuristic_v2_long_rows.md par.19); die damit erzeugten Korpora liegen              unveraendert in data/, und das Erzeuger-Artefakt laeuft auf seinem              mitgelieferten Wheel weiter."
+        )));
+    }
     py.detach(move || {
-        crate::self_play::run_self_play_with_net_labels_variante(
+        crate::self_play::run_self_play_with_net_labels(
             &model_path, n_games, base_sims, c, seed, num_threads, &prefix, record_rtv,
-            progress_path.as_deref(), heartbeat_path.as_deref(), variante,
+            progress_path.as_deref(), heartbeat_path.as_deref(),
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -302,39 +286,6 @@ fn net_arena_match(
         crate::self_play::run_net_arena_match(
             &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, log_games, seeds,
             search_config,
-        )
-    })
-    .map_err(pyo3::exceptions::PyValueError::new_err)
-}
-
-/// Netz gegen Heuristik V2 (`PREREG_heuristic_v2_long_rows.md`, Messkette
-/// Schritt 3). Zeile fuer Zeile wie `net_arena_match`, einziger Unterschied:
-/// die Heuristik-Seite bewertet mit `HeuristikVariante::V2` statt V1.
-#[pyfunction]
-#[pyo3(signature = (model_path, net_sims=100, heur_sims=100, n_games=50, seed=None, num_threads=1, c=0.3, c_puct=1.5, log_games=false, seeds=None, spec=None, variante="v2"))]
-#[allow(clippy::too_many_arguments)]
-fn net_vs_heuristic_v2_arena(
-    py: Python<'_>,
-    model_path: String,
-    net_sims: u32,
-    heur_sims: u32,
-    n_games: usize,
-    seed: Option<u64>,
-    num_threads: usize,
-    c: f64,
-    c_puct: f64,
-    log_games: bool,
-    seeds: Option<Vec<u64>>,
-    spec: Option<String>,
-    variante: &str,
-) -> PyResult<String> {
-    let seed = seed.unwrap_or_else(rand::random);
-    let search_config = resolve_search_config(spec)?;
-    let variante = variante.to_string();
-    py.detach(move || {
-        crate::self_play::run_net_vs_heuristic_v2_arena(
-            &model_path, net_sims, heur_sims, n_games, seed, num_threads, c, c_puct, log_games, seeds,
-            search_config, &variante,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)
@@ -1782,43 +1733,6 @@ fn bootstrap_horizon_stage0_probe_json(
     Ok(out.to_string())
 }
 
-/// Heuristik v1 gegen Heuristik v2, ohne Netz
-/// (`PREREG_heuristic_v2_long_rows.md`, Messkette Schritt 2).
-///
-/// Liefert dasselbe JSON-Array wie `arena_match`, zusaetzlich `v2_board` je
-/// Partie. Die Vollendungsquote folgt aus `long_rows_started` /
-/// `long_rows_completed` -- der vorregistrierte Falsifikator.
-#[pyfunction]
-#[pyo3(signature = (sims_v1, sims_v2, n_games, seed, num_threads=0, c=0.3, swap=false, log_games=false, variante_a="v1", variante_b="v2", tiling_a=None, tiling_b=None))]
-#[allow(clippy::too_many_arguments)]
-fn heuristic_v1_vs_v2_arena(
-    py: Python<'_>,
-    sims_v1: u32,
-    sims_v2: u32,
-    n_games: usize,
-    seed: u64,
-    num_threads: usize,
-    c: f64,
-    swap: bool,
-    log_games: bool,
-    variante_a: &str,
-    variante_b: &str,
-    // PREREG_v22_window.md par.4c: Variante der PLATZIERUNG je Seite. Weggelassen
-    // (None) = wie die Draft-Variante, also unveraendertes Bestandsverhalten --
-    // `tools/probes/v2_envelope_arena.py` ruft weiter mit zehn Argumenten auf.
-    tiling_a: Option<&str>,
-    tiling_b: Option<&str>,
-) -> String {
-    let (a, b) = (variante_a.to_string(), variante_b.to_string());
-    let (ta, tb) = (tiling_a.map(str::to_string), tiling_b.map(str::to_string));
-    py.detach(move || {
-        crate::self_play::run_heuristic_v1_vs_v2_arena(
-            sims_v1, sims_v2, n_games, seed, num_threads, c, swap, log_games, &a, &b,
-            ta.as_deref(), tb.as_deref(),
-        )
-    })
-}
-
 #[pymodule]
 fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
@@ -1826,7 +1740,6 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(self_play_games, m)?)?;
     m.add_function(wrap_pyfunction!(self_play_games_with_net_labels, m)?)?;
     m.add_function(wrap_pyfunction!(arena_match, m)?)?;
-    m.add_function(wrap_pyfunction!(heuristic_v1_vs_v2_arena, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(not_deckel_diagnostics_json, m)?)?;
     m.add_function(wrap_pyfunction!(reset_not_deckel_diagnostics, m)?)?;
@@ -1834,7 +1747,6 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(reset_tiling_budget_stats, m)?)?;
     m.add_function(wrap_pyfunction!(onnx_eval, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_match, m)?)?;
-    m.add_function(wrap_pyfunction!(net_vs_heuristic_v2_arena, m)?)?;
     m.add_function(wrap_pyfunction!(sibling_ranking_diagnostic, m)?)?;
     m.add_function(wrap_pyfunction!(draw_stack_peek_impact_diagnostic, m)?)?;
     m.add_function(wrap_pyfunction!(value_noise_floor_diagnostic, m)?)?;

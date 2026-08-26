@@ -338,7 +338,6 @@ pub(crate) fn value_cal_b() -> f64 {
 /// Knopfwerte, die frueher prozessglobal galten, aber PRO SEITE
 /// unterschiedlich gesetzt werden sollen -- angedockt an die bestehenden
 /// Pro-Seite-Objekte (`self_play::NetArenaAgent`/`NetSelfPlayAgent`).
-/// Welle 1 traegt GENAU EIN Feld, den Pilot-Knopf `MOSAIC_IMPLICIT_MINIMAX_A`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct SearchConfig {
     /// Mischgewicht `alpha` fuer die Selektions-Q-Beimischung des implizit-
@@ -356,23 +355,6 @@ pub struct SearchConfig {
     /// dagegen um Faktor ~3 (Policy-Masse 11,5 % gegen 25,2 %, flach ueber
     /// R1-4). Deshalb Stufenfunktion 0->1, kein Rampenterm.
     pub long_row_init_shaping_w: f64,
-    /// Welche Heuristik-Variante dieser Agent spielt (Drafting-Vorzug,
-    /// Platzierungs-Routing, Startsetzung). Default `V1` = der Elo-Anker.
-    ///
-    /// GEHOERT HIERHER, weil die Variante den AGENTEN ausmacht und nicht den
-    /// Prozess: bis 2026-08-26 stand sie als Literal an fuenf Stellen in
-    /// `self_play.rs` und als CLI-Parameter davor. Ein eingefrorenes
-    /// Heuristik-Artefakt kann sich damit nicht selbst beschreiben -- es
-    /// haengt daran, dass der AUFRUFER die richtige Variante mitgibt. Genau
-    /// dieser Fehler ist am 2026-08-26 passiert (fehlendes
-    /// `--heuristik-variante v2huelle`, Default v1, falscher Befund
-    /// committet und weitergemeldet).
-    ///
-    /// KEIN Env-Knopf als Gegenstueck. Die anderen beiden Felder haben einen,
-    /// weil sie aus der Knopf-Aera stammen; ein neuer prozessglobaler Schalter
-    /// waere hier das Gegenteil dessen, was die Kapselung erreichen soll
-    /// (PREREG_agent_encapsulation.md par.1).
-    pub heuristik_variante: crate::mcts::HeuristikVariante,
 }
 
 impl SearchConfig {
@@ -397,9 +379,6 @@ impl SearchConfig {
         Self {
             implicit_minimax_alpha: read_f64_env("MOSAIC_IMPLICIT_MINIMAX_A", 0.0),
             long_row_init_shaping_w: read_f64_env("MOSAIC_LONG_ROW_INIT_W", 0.0),
-            // V1 fest, kein Env-Knopf: siehe Feld-Doku. Wer eine andere
-            // Variante will, gibt sie als Parameter oder per Spec-Datei mit.
-            heuristik_variante: crate::mcts::HeuristikVariante::V1,
         }
     }
 
@@ -444,9 +423,15 @@ impl SearchConfig {
         // die "beweisbar identisch"-Zusage aushebeln.
         let implicit_minimax_alpha = get_required("implicit_minimax_alpha")?;
         let long_row_init_shaping_w = get_required("long_row_init_shaping_w")?;
-        // Als NAME, nicht als Zahl: eine Spec ist ein Dokument, das ein Mensch
-        // in einem halben Jahr lesen koennen muss. `"v2huelle"` sagt, was der
-        // Agent ist; eine 2 saegte an derselben Stelle.
+        // Das Feld bleibt PFLICHT, obwohl es seit 2026-08-26 nur noch einen
+        // gueltigen Wert hat: die Specs der eingefrorenen Artefakte tragen es,
+        // und ein weggelassenes Pflichtfeld waere ein stiller Vertragsbruch.
+        //
+        // Der v2-Zweig ist aus dem Quellstand entfernt (B4a). Eine v2-Spec
+        // wird deshalb ABGEWIESEN und nicht still als v1 gefahren -- sonst
+        // laege genau der Fehler vor, gegen den die Kapselung gebaut ist:
+        // ein Agent, der etwas anderes spielt, als seine Spec sagt. Das
+        // Artefakt bleibt auf seinem MITGELIEFERTEN Wheel lauffaehig.
         let variante_name = obj
             .get("heuristik_variante")
             .ok_or_else(|| format!("Spec-Datei {path}: Feld 'heuristik_variante' fehlt"))?
@@ -454,11 +439,12 @@ impl SearchConfig {
             .ok_or_else(|| {
                 format!("Spec-Datei {path}: 'heuristik_variante' ist keine Zeichenkette")
             })?;
-        let heuristik_variante = crate::self_play::variant_from_name(variante_name)
-            .ok_or_else(|| {
-                format!("Spec-Datei {path}: unbekannte heuristik_variante '{variante_name}'")
-            })?;
-        Ok(Self { implicit_minimax_alpha, long_row_init_shaping_w, heuristik_variante })
+        if variante_name != "v1" {
+            return Err(format!(
+                "Spec-Datei {path}: heuristik_variante '{variante_name}' ist in diesem Build                  nicht mehr spielbar -- nur 'v1'. Der v2-Zweig wurde am 2026-08-26 entfernt                  (PREREG_heuristic_v2_long_rows.md par.19). Das Artefakt laeuft weiter auf                  seinem mitgelieferten Wheel."
+            ));
+        }
+        Ok(Self { implicit_minimax_alpha, long_row_init_shaping_w })
     }
 }
 
@@ -6942,8 +6928,8 @@ mod tests {
         nodes[0].children.push(1);
         nodes[0].children.push(2);
 
-        let cfg_off = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0, heuristik_variante: crate::mcts::HeuristikVariante::V1 };
-        let cfg_on = SearchConfig { implicit_minimax_alpha: 1.0, long_row_init_shaping_w: 0.0, heuristik_variante: crate::mcts::HeuristikVariante::V1 };
+        let cfg_off = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0 };
+        let cfg_on = SearchConfig { implicit_minimax_alpha: 1.0, long_row_init_shaping_w: 0.0 };
         let idx_off = gumbel_select_child(&nodes, 0, &cfg_off);
         let idx_on = gumbel_select_child(&nodes, 0, &cfg_on);
         assert_ne!(
@@ -7054,35 +7040,26 @@ mod tests {
         }
     }
 
-    /// Abnahme (c): gueltige Spec-Datei -- exakt das dokumentierte Schema.
-    #[test]
-    fn search_config_from_spec_file_parses_valid_file() {
-        let dir = std::env::temp_dir();
-        let path = dir.join(format!("mosaic_test_spec_valid_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "long_row_init_shaping_w": 0.0, "heuristik_variante": "v1"}"#).unwrap();
-        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltige Spec-Datei muss parsen");
-        assert_eq!(cfg.implicit_minimax_alpha, 0.2);
-        assert_eq!(cfg.heuristik_variante, crate::mcts::HeuristikVariante::V1);
-        std::fs::remove_file(&path).ok();
-    }
-
-    /// Die Variante kommt als NAME aus der Spec an -- und zwar die, die
-    /// dort steht.
+    /// Eine Spec, die eine NICHT MEHR SPIELBARE Variante verlangt, muss hart
+    /// scheitern. Das ist dieselbe Zusage wie vorher, nur unter neuer Lage:
+    /// bis zum 2026-08-26 hiess sie "die Spec muss ANKOMMEN" (Anlass: ein
+    /// Erzeugerlauf, dessen Aufruf `v2huelle` nicht mitnahm, worauf der
+    /// Default v1 still einsprang und ein falscher Befund entstand). Seit
+    /// B4a gibt es den v2-Zweig nicht mehr -- ein stilles Durchwinken als v1
+    /// waere GENAU derselbe Fehler, nur an einer neuen Stelle.
     ///
-    /// Der Test ist die Lehre vom 2026-08-26 in Testform: dort war die
-    /// Variante im Rezept dokumentiert und kam trotzdem nicht an, weil der
-    /// Aufruf sie nicht mitnahm und der Default (v1) still einsprang. Ein
-    /// Test, der nur `v1` prueft, haette das nicht gefangen -- v1 IST der
-    /// Default. Deshalb wird hier auf `v2huelle` geprueft.
+    /// Das Artefakt selbst bleibt lauffaehig: es bringt sein eigenes Wheel
+    /// mit (`models/frozen_heuristics/v2huelle_generator/`).
     #[test]
-    fn search_config_from_spec_file_reads_heuristik_variante() {
+    fn search_config_from_spec_file_rejects_v2_variante() {
         let dir = std::env::temp_dir();
-        let path = dir.join(format!("mosaic_test_spec_variante_{}.json", std::process::id()));
+        let path = dir.join(format!("mosaic_test_spec_v2_{}.json", std::process::id()));
         std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "v2huelle"}"#).unwrap();
-        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltige Spec-Datei muss parsen");
-        assert_eq!(cfg.heuristik_variante, crate::mcts::HeuristikVariante::V2Huelle);
-        assert_ne!(cfg.heuristik_variante, SearchConfig::from_env().heuristik_variante,
-                   "Der Test muss sich vom Default UNTERSCHEIDEN, sonst prueft er nichts.");
+        let result = SearchConfig::from_spec_file(path.to_str().unwrap());
+        assert!(result.is_err(), "eine v2-Spec darf in diesem Build NICHT still als v1 laufen");
+        let msg = result.unwrap_err();
+        assert!(msg.contains("nicht mehr spielbar"), "Fehlermeldung muss den Grund nennen: {msg}");
+        assert!(msg.contains("mitgelieferten Wheel"), "Fehlermeldung muss den Ausweg nennen: {msg}");
         std::fs::remove_file(&path).ok();
     }
 
@@ -7096,7 +7073,7 @@ mod tests {
         std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "v2huelle_tippfehler"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "unbekannte Variante muss abgewiesen werden");
-        assert!(result.unwrap_err().contains("unbekannte heuristik_variante"));
+        assert!(result.unwrap_err().contains("nicht mehr spielbar"));
         std::fs::remove_file(&path).ok();
     }
 
@@ -7110,22 +7087,6 @@ mod tests {
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "fehlende heuristik_variante muss abgewiesen werden");
         std::fs::remove_file(&path).ok();
-    }
-
-    /// `name()` und `variant_from_name` muessen ueber ALLE Varianten
-    /// zueinander passen. Zwei Tabellen, die dasselbe abbilden, laufen sonst
-    /// auseinander -- und eine Spec-Datei traegt dann einen Namen, den kein
-    /// Leser mehr aufloest.
-    #[test]
-    fn variant_name_roundtrips_for_every_variant() {
-        use crate::mcts::HeuristikVariante as HV;
-        for v in [HV::V1, HV::V2, HV::V2Huelle, HV::V2Heatmap, HV::V2PointMap,
-                  HV::V2HuellePhase, HV::V2HuelleFilter, HV::V2HuelleReach, HV::V2HuelleCap] {
-            let name = v.name();
-            let zurueck = crate::self_play::variant_from_name(name)
-                .unwrap_or_else(|| panic!("name() liefert '{name}', das variant_from_name nicht kennt"));
-            assert_eq!(zurueck, v, "Roundtrip fuer '{name}' gebrochen");
-        }
     }
 
     /// Abnahme (c): unbekanntes Feld ist ein harter Fehler (kein stilles
