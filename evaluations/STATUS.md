@@ -294,6 +294,21 @@ schuetzt den Elo-Anker im IN-PROCESS-Pfad, und die Arenen benutzen weiter genau
 den. Das Modul zu entfernen, BEVOR die Arenen den Anker aus dem Artefakt
 beziehen, liesse den Anker still wandern -- genau das, wogegen es gebaut wurde.
 
+**ANKER-TOR GRUEN** (par.10b): der Referee-Pfad spielt **20 von 20** Partien
+identisch zu `net_arena_match` -- auch mit der Heuristik-Seite vollstaendig
+extern. Die Umstellung verschiebt den Anker also nicht.
+
+Zuvor war es 0 von 6, und die Ursache war EIN Schalter: die Arena traegt je
+Seite `apply_via_chosen_action` (Netz `true` = Sammelaufloesung des
+Stapelzugs, Heuristik `false` = nur der Peek, Slot und Rotation werden
+gesucht). Der Referee kannte das nicht und gab der Heuristik das
+Netz-Verhalten. Wer den Referee mit dem Arena-Pfad vergleicht, MUSS
+`set_apply_modes((True, False))` setzen.
+
+Merkposten: es gibt DREI In-Process-Pfade -- `play_arena_game` (Heuristik
+gegen Heuristik), `unified_game_loop` (Netz gegen Heuristik, **hier haengt der
+Anker**) und `RefereeGame`.
+
 **Treiber traegt die Heuristik** (par.10a): aktuelle Engine gegen gefrorene
 Heuristik laeuft, mit Handshake, Golden-Selbsttest in der Artefakt-venv und
 externer Platzierung. Beide Artefakte tragen `protokoll.kinds` und wurden mit
