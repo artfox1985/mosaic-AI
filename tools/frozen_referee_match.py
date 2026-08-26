@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import multiprocessing as mp
 import subprocess
 import sys
 import time
@@ -192,6 +193,66 @@ def golden_selftest(worker: WorkerProc, golden_probe: dict) -> list[dict]:
     return mismatches
 
 
+def _spiele_block(auftrag: dict) -> list[dict]:
+    """Spielt EINEN Seed-Block in einem eigenen Prozess, mit eigenen Workern.
+
+    PARALLELISIERT WIRD AUSSEN, nicht innen: das Protokoll ist je Worker
+    seriell (eine Anfrage, eine Antwort), also bringt es nichts, einen Worker
+    von mehreren Partien gleichzeitig befragen zu lassen. Partien sind
+    dagegen voneinander unabhaengig -- jeder Prozess bekommt deshalb seinen
+    eigenen Worker (bzw. sein eigenes Paar) und einen Ausschnitt der Seeds.
+
+    KOSTEN, die man kennen muss: je Block startet ein eigener Worker-Prozess
+    und laedt sein Wheel (bei Netz-Artefakten zusaetzlich das ONNX). Bei sehr
+    wenigen Partien je Block frisst das den Gewinn wieder auf -- die
+    Blockaufteilung unten haelt deshalb einen Mindest-Block ein.
+
+    Der Handshake und der Golden-Selbsttest laufen NICHT hier, sondern EINMAL
+    im Elternprozess. Sie pruefen das Artefakt, nicht den Block; je Block
+    wiederholt waeren sie reine Wartezeit -- und ein Selbsttest, der in Block 3
+    rot wird, waere ohnehin zu spaet.
+    """
+    import mosaic_rust as mr  # im Kind importieren (spawn-sicher)
+
+    worker = WorkerProc(Path(auftrag["worker_python"]), Path(auftrag["worker_script"]),
+                        Path(auftrag["artifact_dir"]), auftrag["sims_worker"],
+                        auftrag["c_puct_worker"])
+    worker_a = None
+    if auftrag["artifact_dir_a"]:
+        worker_a = WorkerProc(Path(auftrag["worker_python_a"]), Path(auftrag["worker_script"]),
+                              Path(auftrag["artifact_dir_a"]), auftrag["sims_a"],
+                              auftrag["c_puct_a"])
+    time.sleep(0.2)
+    ergebnisse = []
+    try:
+        for i, seed in auftrag["indizierte_seeds"]:
+            first_player = i % 2
+            board_a = i % 2  # Brettwechsel-Pflicht, wie paired_arena-Konvention
+            externe = []
+            if auftrag["externe_b"]:
+                externe.append(1 - board_a)
+            if auftrag["externe_a"]:
+                externe.append(board_a)
+            g = play_one_game(
+                mr, worker, worker_a, auftrag["model_a"], auftrag["spec_a"],
+                auftrag["sims_a"], auftrag["c_puct_a"], auftrag["artefakt_modell"],
+                tuple(auftrag["names"]), first_player, seed, board_a,
+                externe_seiten=externe,
+            )
+            # Der Index reist MIT: die Bloecke kommen in beliebiger
+            # Reihenfolge zurueck, die Ergebnisliste muss aber der Seed-Folge
+            # entsprechen (sonst stimmt jede spaetere Paarung nicht mehr).
+            g["_index"] = i
+            ergebnisse.append(g)
+            print(f"[referee] Partie {i + 1} seed={seed}: {g['scores']} "
+                  f"winner={g['winner']} steps={g['steps']}", file=sys.stderr, flush=True)
+    finally:
+        worker.close()
+        if worker_a:
+            worker_a.close()
+    return ergebnisse
+
+
 def play_one_game(
     mr,
     worker: WorkerProc,
@@ -333,6 +394,9 @@ def main() -> int:
     ap.add_argument("--seed-base", type=int, default=900001)
     ap.add_argument("--force-cross-era", action="store_true")
     ap.add_argument("--skip-golden", action="store_true", help="NUR fuer Debug -- Abnahme braucht den Golden-Test")
+    ap.add_argument("--workers", type=int, default=1,
+                    help="gleichzeitige Referee-Prozesse. Partien sind unabhaengig; je Prozess "
+                         "startet ein eigener Worker (bzw. ein Paar). 1 = seriell wie bisher.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -474,25 +538,70 @@ def main() -> int:
     artefakt_modell = None if ist_heuristik else str(artifact_dir / "model.onnx")
     print(f"[referee] externe Platzierung/Startsetzung: "
           f"{'AN' if externe_seiten_aktiv else 'aus (Netz-Artefakt)'}", file=sys.stderr)
-    games = []
+    # --- Blockaufteilung. Mindestens MIN_JE_BLOCK Partien je Prozess, sonst
+    # frisst der Worker-Start (Wheel laden, bei Netzen zusaetzlich das ONNX)
+    # den Gewinn wieder auf. Der Wert ist gesetzt, nicht hergeleitet: bei
+    # gemessenen ~3,3 s je Partie und ~1-2 s Worker-Start ist ab vier Partien
+    # je Block der Overhead unter 15 Prozent.
+    MIN_JE_BLOCK = 4
+    n_proz = max(1, min(args.workers, max(1, len(seeds) // MIN_JE_BLOCK)))
+    indiziert = list(enumerate(seeds))
+    bloecke = [indiziert[k::n_proz] for k in range(n_proz)]
+    bloecke = [b for b in bloecke if b]
+    print(f"[referee] {len(seeds)} Partien auf {len(bloecke)} Prozess(e)", file=sys.stderr)
+
+    basis = {
+        "worker_python": str(worker_python), "worker_script": str(worker_script),
+        "artifact_dir": str(artifact_dir), "sims_worker": args.sims_worker,
+        "c_puct_worker": args.c_puct_worker,
+        "artifact_dir_a": str(artifact_dir_a) if artifact_dir_a else None,
+        "worker_python_a": str(py_a) if artifact_dir_a else None,
+        "model_a": args.model_a, "spec_a": args.spec_a,
+        "sims_a": args.sims_a, "c_puct_a": args.c_puct_a,
+        "artefakt_modell": artefakt_modell, "names": list(names),
+        "externe_b": externe_seiten_aktiv, "externe_a": externe_seiten_a_aktiv,
+    }
+
     t_start = time.perf_counter()
-    total_move_count = 0
-    for i, seed in enumerate(seeds):
-        first_player = i % 2
-        board_a = i % 2  # Brettwechsel-Pflicht, wie paired_arena-Konvention
-        externe = []
-        if externe_seiten_aktiv:
-            externe.append(1 - board_a)
-        if externe_seiten_a_aktiv:
-            externe.append(board_a)
-        g = play_one_game(
-            mr, worker, worker_a, args.model_a, args.spec_a, args.sims_a, args.c_puct_a,
-            artefakt_modell, names, first_player, seed, board_a,
-            externe_seiten=externe,
-        )
-        total_move_count += g["steps"]
-        games.append(g)
-        print(f"[referee] Partie {i + 1}/{len(seeds)} seed={seed}: {g['scores']} winner={g['winner']} steps={g['steps']}", file=sys.stderr)
+    if len(bloecke) == 1:
+        # Seriell im ELTERNPROZESS -- die bereits gestarteten Worker werden
+        # weiterbenutzt, kein zweiter Start. Bestandsverhalten.
+        games = []
+        for i, seed in bloecke[0]:
+            first_player = i % 2
+            board_a = i % 2
+            externe = []
+            if externe_seiten_aktiv:
+                externe.append(1 - board_a)
+            if externe_seiten_a_aktiv:
+                externe.append(board_a)
+            g = play_one_game(
+                mr, worker, worker_a, args.model_a, args.spec_a, args.sims_a,
+                args.c_puct_a, artefakt_modell, names, first_player, seed, board_a,
+                externe_seiten=externe,
+            )
+            g["_index"] = i
+            games.append(g)
+            print(f"[referee] Partie {i + 1}/{len(seeds)} seed={seed}: {g['scores']} "
+                  f"winner={g['winner']} steps={g['steps']}", file=sys.stderr)
+    else:
+        # Die Eltern-Worker werden hier NICHT gebraucht -- jeder Kindprozess
+        # bringt seine eigenen mit. Vorher schliessen, sonst laufen sie
+        # waehrend der ganzen Serie leer mit.
+        worker.close()
+        if worker_a:
+            worker_a.close()
+        with mp.Pool(len(bloecke)) as pool:
+            teile = pool.map(_spiele_block, [dict(basis, indizierte_seeds=b) for b in bloecke])
+        games = [g for teil in teile for g in teil]
+
+    # Reihenfolge wiederherstellen: die Bloecke kommen unsortiert zurueck,
+    # jede spaetere Paarung haengt aber an der Seed-Folge.
+    games.sort(key=lambda g: g["_index"])
+    for g in games:
+        g.pop("_index", None)
+    total_move_count = sum(g["steps"] for g in games)
+
     elapsed = time.perf_counter() - t_start
     worker.close()
     if worker_a:
