@@ -190,6 +190,21 @@ def main() -> int:
         "herkunft": _herkunft(),
         "contract_hash": json.loads(mr.engine_config_json()).get("contract_hash"),
         "engine_config": json.loads(mr.engine_config_json()),
+        # WAS DER WORKER DIESES ARTEFAKTS BEANTWORTEN KANN. Geschrieben zur
+        # EINFRIERZEIT, weil genau dann feststeht, was das mitgelieferte Wheel
+        # kann -- nicht was die Engine irgendwann kann.
+        #
+        # Anlass 2026-08-26: die ersten beiden Artefakte wurden eingefroren,
+        # bevor das erweiterte Protokoll fertig war. Ihr Worker kannte
+        # `start_placement_choice_state_json` nicht, und der Treiber lief
+        # mitten in der Partie in einen AttributeError. Ein Rueckfall auf
+        # referee-aufgeloestes Tiling waere die schlechtere Antwort gewesen:
+        # das Artefakt haette dann still als V1 gekachelt.
+        "protokoll": {"kinds": ["drafting", "tiling", "start_placement"],
+                      "hinweis": ("Fehlt dieses Feld, stammt das Artefakt aus der Zeit vor dem "
+                                  "erweiterten Protokoll und kann seine Platzierung NICHT selbst "
+                                  "entscheiden. Der Treiber verweigert dann, statt es als V1 "
+                                  "kacheln zu lassen.")},
         "golden_probe": {
             "art": "self-play-reproduktion, byte-verglichen",
             "warum": ("Die Welle-3-Probe der Netz-Champions prueft nur DRAFTING-Entscheidungen; "
