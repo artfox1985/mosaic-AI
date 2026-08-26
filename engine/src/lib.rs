@@ -31,6 +31,7 @@ pub mod provocation;
 pub mod py;
 pub mod referee;
 pub mod round5;
+pub mod shaping;
 pub mod round_end;
 pub mod round_transition;
 pub mod round_transition_deep;

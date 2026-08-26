@@ -1665,7 +1665,7 @@ struct GameLoopConfig<'a> {
     /// `play_net_self_play_game` unter `MOSAIC_ASYM_VORZUG`) = kein Zaehlen,
     /// keine Nebenwirkung -- byte-identisches Bestandsverhalten. `Cell` statt
     /// `AtomicU64`-Paar: die Schleife laeuft sequenziell in EINEM Thread (kein
-    /// Rayon-Zugriff auf denselben Zaehler), gleiche Wahl wie `PARTIE_GEWICHT`
+    /// Rayon-Zugriff auf denselben Zaehler), gleiche Wahl wie `GAME_WEIGHT`
     /// in net_mcts.rs.
     vorzug_greift: Option<&'a std::cell::Cell<[u64; 2]>>,
     /// Startpositions-Seeding (`PREREG_start_position_seeding.md` par.3):
@@ -2252,7 +2252,7 @@ pub fn run_self_play_with_net_labels(
         // Drafting-Entscheidungen bleiben heuristisch, aber die Rundenuebergaenge
         // werden per `round_transition_deep.rs` ueber `net_leaf_eval` bewertet
         // (`round_transition_deep.rs:496/577/606/635/719`), und `net_leaf_eval`
-        // liest `scoring_shaping_weights()` -> `PARTIE_GEWICHT`. Bei gesetztem
+        // liest `scoring_shaping_weights()` -> `GAME_WEIGHT`. Bei gesetztem
         // `MOSAIC_WERTUNG_STREUUNG_MAX>0` haette die Streuung hier also die
         // aufgezeichneten `round_transition_value`-Labels beeinflusst, nicht nur
         // die Zugwahl. Entfernt trotzdem wie beauftragt (Heuristik-Generator,
@@ -3650,7 +3650,7 @@ pub fn run_net_self_play(
             // Aus dem Partie-Seed abgeleitet, also reproduzierbar. MUSS hier
             // gesetzt werden, NICHT in der aeusseren `play`-Closure: `run_with_
             // watchdog` spawnt einen NEUEN Thread (`std::thread::spawn`, siehe
-            // dortige Definition) fuer genau diese Closure -- `PARTIE_GEWICHT`
+            // dortige Definition) fuer genau diese Closure -- `GAME_WEIGHT`
             // ist thread-lokal, ein Setzen im Rayon-Thread der aeusseren
             // Closure wuerde auf dem falschen Thread landen und nie gelesen.
             // `MOSAIC_WERTUNG_STREUUNG_MAX=0` (Default) laesst es aus und das
@@ -3667,7 +3667,7 @@ pub fn run_net_self_play(
                 None
             });
             // PREREG_ownership_corpus.md §3.1-Nachruestung: `plate_builder::
-            // PARTIE_SEED` ist wie `PARTIE_GEWICHT` oben thread-lokal -- MUSS
+            // PARTIE_SEED` ist wie `GAME_WEIGHT` oben thread-lokal -- MUSS
             // HIER gesetzt werden (nicht in der aeusseren `play`-Closure),
             // aus demselben Grund (`run_with_watchdog` spawnt einen NEUEN OS-
             // Thread fuer genau diese Closure). Kein Reset auf `None` noetig:
