@@ -12,6 +12,10 @@ Aufruf:
     python -X utf8 tools/corpus_sanity_check.py <verzeichnis> [<verzeichnis2> ...]
 """
 import glob, json, os, pickle, sys
+import pathlib as _pl
+import sys as _sys
+_sys.path.insert(0, str(_pl.Path(__file__).resolve().parent.parent))
+from corpus_io import load_records
 
 KRIT = {0: "k0", 1: "k1", 2: "k2", 3: "k3", 4: "k4",
         5: "k5", 6: "k6 Spezialfelder", 7: "k7"}
@@ -40,8 +44,7 @@ def auswerten(verzeichnis):
     # (Partie, Seite) aggregiert und die Runde nur im Zwischenspeicher gehalten.
     floor_max = {}     # (game_id, spieler, runde) -> groesste Laenge, wird gleich aggregiert
     for f in dateien:
-        with open(f, "rb") as fh:
-            recs = pickle.load(fh)
+        recs = load_records(f)
         for r in recs:
             gid = r.get("game_id")
             st = r.get("state") or {}
