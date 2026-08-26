@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Der heutige Build reproduziert den v22-Korpus nachweislich nicht (PREREG_v22_window par.4f-Nachbar, STATUS 1c). Ist er deshalb ein MATERIELL anderer Spieler -- oder nur ein schrittverschiedener, verhaltensgleicher? | Beleg: ANGELEGT 2026-08-26 VOR dem Lauf. Ausgangslage: Build auf dem Erzeuger-Commit dbf6a08 erzeugt Feld fuer Feld dasselbe wie HEAD und weicht vom Korpus mit demselben Wert ab; im Erzeugungsfenster hat KEIN Commit engine/src angefasst (34 Commits geprueft); Modell md5-identisch. Der Unterschied stammt also vom unversionierten Anteil (git_dirty true) und ist nicht rekonstruierbar. Schrittverschieden heisst aber nicht verhaltensverschieden -- diese Prereg misst die GROESSE. Zuschnitt: n=1000 Partien, Seed 20260826 wie der Korpus (gleiche Spielindizes, gleiche Startbedingungen), Rezept woertlich aus cli_args des Korpus-Manifests, gepaart Datei gegen Datei. n=1000 statt der vorgeschlagenen 500, weil die gemessene Streuung (SD 0,803 je Seite, aus den ersten 50 Korpusdateien) bei 500 ein 95%-KI von +-0,05 ergibt -- eine Regel "Delta unter 0,05 heisst gleich" laege damit AUF der Aufloesungsgrenze und koennte 0,04 nicht von 0,09 trennen. -->
+<!-- STATUS: UEBERHOLT | Frage: Wie gross ist die Drift zwischen dem heutigen Build und dem v22-Korpus-Erzeuger? | Beleg: ZURUECKGEZOGEN/GEGENSTANDSLOS 2026-08-26, noch am Tag der Anlage. Die Frage setzte voraus, dass der heutige Build den Korpus nicht reproduziert -- diese Voraussetzung war ein MESSFEHLER: in den zugrundeliegenden Laeufen fehlte --heuristik-variante v2huelle (Default v1, self_play.py:637), es wurde also v1 gegen einen v2huelle-Korpus gehalten. Korrekt gefahren reproduziert der heutige Build den Korpus BIT-GENAU (1733 Schritte, Feld fuer Feld, STATUS.md 1c). Es gibt keine Drift zu messen. Der Lauf selbst (1000 Partien, 24,8 min) ist als v1-gegen-v2huelle-Vergleich unter Self-Play-Bedingungen verwertbar und in STATUS.md 1c festgehalten. Die Prereg bleibt als Beleg dafuer stehen, wie der Fehler entstand: das Rezept stand hier woertlich richtig, inklusive v2huelle -- nur der Kommandoaufruf hat es nicht uebernommen, und ein fehlendes Flag ist kein Fehler, sondern ein Default. -->
 
 # Vorregistrierung: Wie gross ist die Erzeuger-Drift?
 
@@ -88,3 +88,27 @@ engerer Wert waere nicht messbar, ein weiterer nicht aussagekraeftig.
 Standard-Kennzahlen um mehr als 10 Prozent ihres Korpus-Werts auseinander,
 gilt der Lauf als UNENTSCHIEDEN, auch wenn die vollen Spalten die
 Aequivalenzgrenze halten. Der Korpus ist nicht nur seine Spaltenzahl.
+
+
+## par.5 ZURUECKGEZOGEN (2026-08-26, am Tag der Anlage)
+
+**Die Voraussetzung dieser Prereg war ein Messfehler.** par.1 stuetzt sich auf
+"HEAD gegen Korpus: ABWEICHUNG". In den drei Laeufen dahinter fehlte
+`--heuristik-variante v2huelle`; `self_play.py:637` setzt dann `v1`. Gemessen
+wurde v1 gegen einen v2huelle-Korpus.
+
+Korrekt gefahren, gleiches Rezept, gleicher Seed: **1733 Schritte, Feld fuer
+Feld gleich** zur ersten Korpusdatei. Der heutige Build IST der Erzeuger.
+
+**Warum die Datei stehen bleibt statt geloescht zu werden:** die
+Entscheidungsregel in par.4 war richtig gebaut -- Aequivalenz statt
+Nullhypothese, Grenze ueber der gemessenen Aufloesung, Waechter gegen den
+Tunnelblick. Sie hat nur eine Frage beantwortet, die es nicht gab. Und par.3
+zeigt den Fehler im Original: das Rezept steht dort woertlich richtig,
+inklusive `heuristik_variante v2huelle`. Zwischen Vorregistrierung und
+Kommandozeile ist es verlorengegangen.
+
+**Die Lehre, in einem Satz:** ein fehlendes Flag meldet sich nicht, es ist ein
+Default. Das Manifest DES EIGENEN LAUFS haette es sofort gezeigt -- es fuehrt
+`cli_args.heuristik_variante` als Feld. Ab jetzt: vor der Auswertung das
+erzeugte Manifest gegen das Referenz-Manifest halten, nicht erst danach.

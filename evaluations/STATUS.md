@@ -207,53 +207,42 @@ wirkungslos, sobald ein Cache existierte.
 **Noch nicht:** volle Korpus-Paritaet (es fehlt die serielle Referenz, 2,58 h)
 und die Verdrahtung in `train.py`. Beides wie bei Hebel (1) bewusst offen.
 
-### 1c. REPRODUKTIONSBEWEIS GEFAHREN 2026-08-26: der Erzeuger ist NICHT reproduzierbar
+### 1c. REPRODUKTIONSBEWEIS: der Erzeuger IST reproduzierbar (berichtigt 2026-08-26)
 
-**Ergebnis: der Korpus laesst sich mit KEINEM versionierten Stand nachbauen --
-und die 42 Commits seit dem Erzeuger-Commit sind daran unschuldig.**
+**Ergebnis: der heutige Build erzeugt den v22-Korpus BIT-GENAU.** 10 Partien
+mit dem Rezept aus `cli_args` des Korpus-Manifests, Seed 20260826, verglichen
+gegen `data/selfplay_hv2_20260825_1727_g10.pkl`: 1733 Schritte, Feld fuer Feld
+gleich. `git_dirty: true` war verhaltensneutral.
 
-Aufbau: Rezept woertlich aus `cli_args` von
-`data/manifest_hv2_20260825_172710.json`, 10 Partien, Seed 20260826. Der
-Chunk-Seed ist `base_seed + chunk_idx` (`self_play.py`, `make_chunk`), bei
-`chunk = per_file = 10` faellt Chunk 0 also genau auf
-`data/selfplay_hv2_20260825_1727_g10.pkl`. Verglichen wurden RECORDS ueber
-`corpus_io`, nicht Dateibytes (der Korpus ist umgepackt).
+**Dieser Abschnitt sagte bis zur Berichtigung das Gegenteil, und der Grund war
+ein Fehler von mir, kein Befund am Code:** in keinem der ersten drei
+Reproduktionslaeufe war `--heuristik-variante v2huelle` gesetzt. Der Default
+ist `v1` (`self_play.py:637`). Gemessen wurde also v1 gegen einen
+v2huelle-Korpus, und die Differenz (1755 gegen 1733 Schritte) wurde dem
+unversionierten Anteil zugeschrieben. Der Commit `b54b41d` traegt den falschen
+Stand; er bleibt in der Historie, die Berichtigung liegt obendrauf.
 
-| Vergleich | Ergebnis |
-| --- | --- |
-| zwei frische Laeufe, HEAD | **identisch**, 1755 Schritte, Feld fuer Feld |
-| HEAD gegen Korpus | ABWEICHUNG (1755 gegen 1733 Schritte) |
-| Build auf `dbf6a08` gegen Korpus | ABWEICHUNG, **dieselbe** wie HEAD |
-| Build auf `dbf6a08` gegen HEAD | **identisch**, Feld fuer Feld |
+**Was aus dem alten Abschnitt STEHEN bleibt** -- es hing nicht an den Laeufen:
 
-**Die Selbstkontrolle war die Voraussetzung, nicht die Kuer.** Das Rezept
-laeuft mit `add_root_noise: true` und `deterministic: false`; ohne den Beleg,
-dass zwei frische Laeufe uebereinstimmen, waere jede Abweichung undeutbar
-gewesen. Sie stimmen ueberein -- das Rauschen ist geseedet.
+* Im Erzeugungsfenster (25.08. 17:16 bis 26.08. 01:52, 34 Commits) hat KEIN
+  Commit `engine/src` angefasst.
+* Das Modell ist md5-identisch zur eingefrorenen Kopie (`86bc9bddf604ea77`).
+* Build auf `dbf6a08` und HEAD erzeugen Feld fuer Feld dasselbe.
 
-**Was git geleistet hat:** die Lokalisierung, mit negativem Ergebnis. In
-`engine/src` sind seit `dbf6a08` nur vier Dateien beruehrt, drei davon aus der
-Arena-Arbeit vom 2026-08-26; die vier Routing-Module sind unveraendert und der
-`contract_hash` stimmt (`a3f61f246d9bbf5c`). Die 94 geaenderten Zeilen in
-`self_play.py` sind Manifest-Auszug und Kompression, also Schreibweg. Und der
-Build auf `dbf6a08` erzeugt Feld fuer Feld dasselbe wie HEAD -- die Commits
-scheiden damit gemeinsam aus, nicht einzeln nach Verdacht.
+**Was NICHT stehen bleibt:** "der heutige Build ist ein anderer Spieler", und
+alles, was daraus ueber Neuerzeugung des Korpus folgte.
 
-**Der Rest ist der unversionierte Anteil.** `git_dirty: true` im
-Erzeuger-Manifest, und dieser Anteil ist nicht rekonstruierbar. Das Modell
-scheidet aus (`alphazero_v21_2d_brierbest.onnx`, md5 `86bc9bddf604ea77`,
-identisch zur eingefrorenen Kopie, mtime 9. August).
+**Folge fuer das Einfrieren:** ein v2-Artefakt konserviert den ECHTEN Erzeuger,
+keine Rekonstruktion. Die Frage, ob v22 auf einem Korpus ohne reproduzierbaren
+Erzeuger trainiert wird, stellt sich nicht mehr.
 
-**Wo die Partien auseinanderlaufen:** in Schritt 0 sind `state`, `policy` und
-`valid_actions` GLEICH; verschieden sind nur `bootstrap_value` (schaut voraus)
-und die Ausgangsfelder `scores`/`winner` (auf jeden Schritt gestempelt). Die
-erste abweichende Entscheidung faellt in Schritt 2 (`policy`), der erste
-abweichende Zustand in Schritt 3.
-
-**Was das fuer v22 heisst -- Nutzer-Entscheid, hier NICHT vorweggenommen:** der
-Korpus bleibt gueltig als Datensatz, aber sein Erzeuger ist ein Verhalten ohne
-Quelle. Ein Einfrieren kann nur den heutigen Build festnageln, und der ist
-nachweislich ein ANDERER Spieler als der, der die 24.000 Partien erzeugt hat.
+**Nebenprodukt des Fehllaufs**, weil er sonst nur Rechenzeit waere: die
+1000-Partien-Fahrt ist ein sauberer v1-gegen-v2huelle-Vergleich unter
+SELF-PLAY-Bedingungen (600 Sims, mit Netz), gepaart auf Dateiebene ueber 100
+Bloecke. Volle Spalten **0,737 gegen 0,050**, Punkte **46,0 gegen 20,5**,
+Strafsteine **5,2 gegen 10,4**, hoechste Spalte 5,44 gegen 4,22. Artefakt:
+`evaluations/artifacts/generator_drift.json` (dort als Drift etikettiert --
+es ist keine, siehe oben).
 
 ### 2. Offen, mit Kosten
 
