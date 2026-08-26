@@ -633,7 +633,35 @@ impl RefereeGame {
         // zurueckgewiesen worden -- der erste End-to-End-Lauf ist genau
         // darueber gestolpert.
         let legal = crate::tiling_solver::legal_steps(&self.game.state, pi, true);
-        if step != TilingStep::End && !legal.contains(&step) {
+        // Chips ORDNUNGSFREI vergleichen. `TilingStep` leitet `PartialEq` ab,
+        // also vergleicht `contains` den `Vec<usize>` der Chip-Indizes
+        // ORDNUNGSEMPFINDLICH -- die Engine tut das nicht:
+        // `apply_bonus_chips_with` (round_end.rs) sortiert die Indizes als
+        // ERSTES (`idx.sort_unstable(); idx.dedup();`), die Reihenfolge ist
+        // semantisch bedeutungslos.
+        //
+        // Sie kommt trotzdem vor: bei mehr als `CHIP_ALLOC_CAP` Chips faellt
+        // `chip_allocations` auf `greedy_chip_indices` zurueck, und das
+        // liefert Greedy-Reihenfolge statt aufsteigender. Gefunden am
+        // 2026-08-26 in einem 24-Partien-Lauf, der einen legalen Zug
+        // `{"chips":[2,3,0,1,4]}` abwies.
+        //
+        // Das ist KEINE Aufweichung der Regel-Autoritaet: verglichen wird
+        // genau das, was die Engine anwendet -- die MENGE. `Place` und `End`
+        // bleiben strikt.
+        let passt = |a: &TilingStep| -> bool {
+            match (a, &step) {
+                (TilingStep::Chips { row: r1, chips: c1 },
+                 TilingStep::Chips { row: r2, chips: c2 }) => {
+                    let (mut x, mut y) = (c1.clone(), c2.clone());
+                    x.sort_unstable();
+                    y.sort_unstable();
+                    r1 == r2 && x == y
+                }
+                _ => a == &step,
+            }
+        };
+        if step != TilingStep::End && !legal.iter().any(passt) {
             return Err(PyValueError::new_err(format!(
                 "tiling_apply_external: Schritt {step_json} ist fuer Spieler {pi} NICHT legal \
                  ({} legale Schritte). Kein stiller Ersatz -- das Artefakt und die aktuelle \
