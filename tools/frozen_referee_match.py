@@ -277,7 +277,15 @@ def play_one_game(
     externe_seiten=None,
 ) -> dict:
     externe_seiten = externe_seiten or []
-    rg = mr.RefereeGame(names, first_player, seed, None)
+    # Die Namen MIT dem Brett tauschen. `wins_a` rechnet korrekt ueber
+    # `board_a`, die Namen gingen aber ungetauscht hinein -- bei `board_a == 1`
+    # sass die A-Seite auf dem Brett, das im Log den B-Namen trug. Fuer die
+    # blosse Sieg-Zaehlung war das folgenlos; sobald jemand die Log-NAMEN
+    # auswertet (Kennzahlen je Seite, tools/anchor_arena.py), vertauscht es die
+    # Seiten. Gefunden am 2026-08-26 an einem Margin, der dem Siegverhaeltnis
+    # widersprach.
+    namen_im_spiel = names if board_a == 0 else (names[1], names[0])
+    rg = mr.RefereeGame(namen_im_spiel, first_player, seed, None)
     board_b = 1 - board_a
     model_p0 = model_a if board_a == 0 else artifact_model
     model_p1 = model_a if board_a == 1 else artifact_model
