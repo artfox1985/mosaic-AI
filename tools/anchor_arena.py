@@ -67,7 +67,10 @@ def _kennzahlen(spiele: list[dict], name_netz: str, name_anker: str) -> dict:
             rs = PATTERNS["ROUND_STRAFE"].match(text)
             if rs:
                 strafe[rs.group("name")] += int(rs.group("pen"))
-        for idx, name in ((0, name_netz), (1, name_anker)):
+        # Brett je Seite aus der Partie lesen, NICHT als 0/1 annehmen: der
+        # Treiber wechselt die Bretter je Partie (paired_arena-Konvention).
+        b_netz = int(g["board_a"])
+        for idx, name in ((b_netz, name_netz), (1 - b_netz, name_anker)):
             k = struktur_kennzahlen(column_fill(zellen.get(name, set())))
             # NUR die Skalare: `struktur_kennzahlen` liefert zusaetzlich das
             # Listenfeld `fill` (die Fuellstaende je Spalte). Dieselbe Auswahl
