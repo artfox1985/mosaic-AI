@@ -451,23 +451,39 @@ der Erzeugung mitbauen (1b).
 | B2 | Arena ueber den Referee | **fertig** -- `tools/anchor_arena.py`, misst gegen `frozen_heuristics/v1_anchor` |
 | B3 | Elo-Konventionen | **fertig** -- `player_b` traegt den Build, `elo_tracker add --knobs` verweist auf die Spec |
 | B4b | `round5_anchor.rs` entfernt | **fertig** -- 1.664 Zeilen, dreifach als verhaltensneutral belegt |
-| B4a | Varianten-Faedelung entfernen | **BLOCKIERT**, siehe unten |
+| B4a | Varianten-Faedelung entfernen | **offen mit bekanntem Umfang** -- fuenf Werkzeuge muessen auf den Artefakt-Pfad umziehen, siehe unten |
 
-**B4a ist blockiert, und zwar registriert, nicht vorsichtshalber:**
+**B4a ist nicht blockiert, sondern KOSTET etwas. Berichtigung
+(Nutzer-Einwand 2026-08-26):**
 
-* `PREREG_heuristic_v2_long_rows.md` ist **OFFEN**; par.3b.1 (Gewichtsfenster
-  der Huelle) ist eine vorregistrierte Messung, die v2 aus dem QUELLSTAND
-  braucht. Die Faedelung zu entfernen wuerde sie unmoeglich machen.
-* Die Artefakt-Specs NENNEN die Variante (`heuristik_variante: "v2huelle"`).
-  Die aktuelle Engine muss den Namen aufloesen koennen, sonst kann kein
-  Werkzeug eine Artefakt-Spec mehr lesen -- auch `freeze_heuristic.py`,
-  `frozen_champion_worker.py` und die Sonden nicht.
+Hier stand, `PREREG_heuristic_v2_long_rows.md` par.3b.1 brauche v2 aus dem
+Quellstand und blockiere damit B4a. **Das war falsch gelesen.** par.3b.1 fragt
+nach einer ANDEREN, noch ungebauten Bauform -- ihr Schluesselsatz lautet "die
+Huelle ist ein GEWICHT auf den Marginalen, kein Filter", waehrend das
+eingefrorene `v2huelle` die Filter-Form IST. Und die Messung selbst ist eine
+Zustandsanalyse (huellen-optimaler gegen punkt-optimalen Tiling-Zug), die die
+Huellen-Funktionen direkt aufruft und keine zwei Varianten in EINER Partie
+braucht.
 
-Die Faedelung existiert genau WEGEN v2. Sie faellt, wenn v2 auch aus dem
-Quellstand verschwindet -- und dazu muessen zuerst die v2-messenden Werkzeuge
-(`v2_envelope_arena.py`, der `--tiling`-Split, `self_play.py
---heuristik-variante`) auf den Artefakt-Pfad umziehen. Das ist ein eigener
-Schritt mit eigenem Tor, kein Anhaengsel.
+**Was wirklich bleibt, und es ist kleiner:**
+
+1. **Enum und Namenstabelle muessen bleiben.** Die Artefakt-Specs nennen die
+   Variante (`heuristik_variante: "v2huelle"`), und
+   `SearchConfig::from_spec_file` loest den Namen ueber `variant_from_name`
+   auf. Ohne sie kann kein Werkzeug eine Artefakt-Spec mehr lesen. Das
+   betrifft aber nur die Tabelle, nicht die 111 Faedelungs-Stellen.
+2. **Die Huellen-Logik in `plate_builder.rs` bleibt ohnehin** -- par.3b.1
+   analysiert sie.
+3. **Fuenf Werkzeuge spielen v2huelle heute IN-PROCESS** und muessten auf den
+   Artefakt-Pfad umziehen: `self_play.py`, `v2_envelope_arena.py`,
+   `freeze_heuristic.py`, `verify_frozen_heuristic.py` und
+   `anchor_referee_parity_probe.py`. Das ist der eigentliche Preis von B4a --
+   eine Migration, kein Loeschen.
+
+Damit ist B4a eine Aufgabe mit bekanntem Umfang statt einer blockierten. Sie
+gehoert trotzdem in einen eigenen Schritt: fuenf Werkzeuge umzuhaengen und
+dabei zu belegen, dass sie dasselbe messen wie vorher, ist kein Anhaengsel an
+eine Aufraeum-Kette.
 
 **Was sich durch B4b geaendert hat und ausgesprochen gehoert:** ab jetzt
 bewegt eine Aenderung an `round5.rs` auch den Heuristik-Pfad. Der Schutz ist
