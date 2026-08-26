@@ -161,3 +161,54 @@ gegen die real eingetretene Fehlerklasse), dann A3/A4 (Golden-Waechter,
 brauchen einen Wheel-Neubau und damit ein freies Fenster), dann B1, dann
 B2. A5/B2 beruehren nur `tools/` + `evaluations/`, A2-A4 nur
 `engine/src` -- die beiden Straenge koennen parallel laufen.
+
+## Nachtrag 2026-08-27: Regel 7, Bezeichner englisch
+
+**Anlass, und er ist unangenehm konkret.** Eine Sitzung hat 14 Dateien mit
+deutschen Funktions-, Parameter- und Variablennamen hinterlassen. Bei JEDEM
+dieser Commits meldete dieser Linter "alle Regeln gruen". Die Regel steht seit
+2026-08-24 in CLAUDE.md; geprueft hat sie nichts, gefunden hat sie der Nutzer.
+
+Das ist genau die Lage, gegen die dieses Dokument gebaut wurde: eine Regel,
+die nur gelesen wird, haelt nicht. Der Gegenbeweis steht daneben -- die
+Gedankenstrich-Regel ist seit ihrer Aufnahme in den Haken nicht mehr gebrochen
+worden.
+
+### Zuschnitt: nur HINZUGEFUEGTE Definitionszeilen
+
+Dieselbe Bauform wie die Groessen-Ratsche (Regel 1). Der deutsche Altbestand
+ist gross (`plate_builder.rs`: 86 von 113 Funktionen); ein Waechter, der ihn
+anmeckert, blockiert jeden Commit und wird nach dem zweiten Mal abgeschaltet.
+Geprueft wird deshalb der Diff, nicht die Datei.
+
+**Nur Definitionen, keine Verwendungen.** Neuer Code darf eine deutsch
+benannte Bestandsfunktion aufrufen (`struktur_kennzahlen(...)`), ohne dass das
+ein Verstoss ist -- sonst waere die Regel ein Umbenennungszwang fuer fremden
+Bestand.
+
+### Zwei Fehlalarm-Klassen, die beim Bau aufgefallen sind
+
+1. **Prosa in Docstrings.** Ein Zeilen-Muster fuer Zuweisungen nimmt
+   `Abweichung = Verweigerung.` aus einem Docstring fuer eine Zuweisung.
+   Behoben, indem die Python-Haelfte ueber `ast` laeuft: der Parser sieht
+   Zeichenketten und Kommentare gar nicht erst. Rust bleibt musterbasiert
+   (kein Parser zur Hand), dort deckt das Streichen von `//` und `"..."` den
+   Fall ab -- Gegenprobe: `referee.rs` und `mcts.rs` melden 0 Treffer.
+2. **Teilzeichenketten.** `art` steckt in `start`, `zug` in `bezug`. Deshalb
+   EXAKTER Vergleich der an `_` und CamelCase getrennten Wortteile -- mit
+   einer kuratierten Ausnahmeliste langer, eindeutiger Staemme
+   (`kennzahl`, `abweichung`, `aufloes`, ...), weil deutsche Komposita ohne
+   Unterstrich (`quellzeilen`, `sammelaufloesend`) sonst durchrutschen.
+
+### Ausweg
+
+`konvention-ok: <Grund>` am Zeilenende, zeilengenau. Ein Waechter ohne Ausweg
+wird beim ersten begruendeten Sonderfall im Ganzen abgeschaltet.
+
+### Abnahme
+
+Am historischen Fall geprueft, nicht nur synthetisch: die Fassung von
+`tools/freeze_heuristic.py` aus dem Commit, der `_herkunft` und `ziel`
+einfuehrte, erzeugt 6 Treffer. Der bereinigte Stand ist gruen. Und der
+Waechter hat im selben Zug die deutschen Namen in seinem EIGENEN Neubau
+gemeldet (`treffer`, `quellzeilen`) -- die sind daraufhin englisch geworden.

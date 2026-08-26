@@ -6,7 +6,7 @@ Siehe docs/DESIGN_conventions_as_checks.md, Abschnitt
 (tools/hooks/pre-commit), Budget < 3 s -- daher NUR textnahe Pruefungen:
 keine Compilierung, kein Netz, keine Korpus-/Modell-Dateien.
 
-Fuenf harte Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg),
+Sechs harte Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg),
 plus eine Warn-Regel 5 (stille Test-Skips, nur stderr -- Heuristik zu grob
 fuer einen Commit-Blocker, siehe dortiger Kommentar):
   1. Datei-Groessen-RATSCHE   -- tools/size_baseline.json, Schwelle 40 KB,
@@ -26,6 +26,13 @@ fuer einen Commit-Blocker, siehe dortiger Kommentar):
                                   Status-Kopf in Zeile 1, und der generierte
                                   Tabellenteil des Index muss dem Output von
                                   tools/generate_prereg_index.py entsprechen.
+  7. Bezeichner ENGLISCH      -- CLAUDE.md 2026-08-24. Geprueft werden NUR
+                                  HINZUGEFUEGTE Definitionszeilen (Zuschnitt
+                                  wie Regel 1): der deutsche Altbestand blockt
+                                  nichts, ein neuer deutscher Name schon.
+                                  Python ueber `ast` (sieht Strings und
+                                  Kommentare gar nicht), Rust ueber Muster.
+                                  Ausweg je Zeile: `konvention-ok: <Grund>`.
   6. Knopf-Doku aktuell       -- docs/knobs.md ist GENERIERT aus
                                   engine/src/knob_registry.rs; wer die
                                   Registratur aendert, zieht die Doku im
@@ -45,6 +52,7 @@ Exit 0 = alle Regeln gruen. Exit 1 = mindestens ein Verstoss (Details auf stderr
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import re
 import subprocess
@@ -581,6 +589,206 @@ def warn_silent_test_skips(staged_only: bool, staged_files: set[str]) -> None:
 
 
 # --------------------------------------------------------------------------
+# Regel 7: Bezeichner sind ENGLISCH (CLAUDE.md, Nutzer-Anweisung 2026-08-24)
+# --------------------------------------------------------------------------
+#
+# ANLASS, damit die Form nachvollziehbar bleibt: am 2026-08-27 hat eine
+# Sitzung 14 Dateien mit deutschen Funktions-, Parameter- und
+# Variablennamen hinterlassen -- und dieser Linter meldete bei JEDEM dieser
+# Commits "alle Regeln gruen". Die Regel stand seit 2026-08-24 in CLAUDE.md
+# und wurde von nichts geprueft; gefunden hat sie am Ende der Nutzer.
+#
+# ZUSCHNITT wie bei Regel 1 (Groessen-Ratsche): geprueft werden NUR
+# HINZUGEFUEGTE Definitionszeilen des Diffs. Der deutsche Altbestand
+# (plate_builder.rs: 86 von 113 Funktionen) blockt damit keinen Commit,
+# neuer deutscher Name faellt aber sofort auf. Genau dort soll die Regel
+# wirken -- sie sagt ausdruecklich, dass auch NEUER Code in deutsch
+# benannten Modulen englisch heisst.
+#
+# NUR DEFINITIONEN, nicht Verwendungen: eine neue Zeile darf eine deutsch
+# benannte Bestandsfunktion AUFRUFEN (`struktur_kennzahlen(...)`), ohne dass
+# das ein Verstoss waere -- sonst waere die Regel ein Umbenennungszwang fuer
+# fremden Bestand und wuerde bei der ersten Gelegenheit abgeschaltet.
+#
+# Ausweg fuer den begruendeten Einzelfall: `konvention-ok: <Grund>` am
+# Zeilenende.
+
+DEUTSCHE_STAEMME = {
+    # Substantive, die in dieser Kampagne wirklich als Bezeichner auftraten
+    "pfad", "pfade", "datei", "dateien", "ziel", "ziele", "quelle", "quellen",
+    "partie", "partien", "spiel", "spiele", "befund", "befunde", "kennzahl",
+    "kennzahlen", "rezept", "auftrag", "auftraege", "schluessel", "vorzug",
+    "traeger", "traegerstatus", "abweichung", "abweichungen", "anker",
+    "verdikt", "herkunft", "hinweis", "kopf", "rumpf", "muster", "wache",
+    "teil", "teile", "zeile", "zeilen", "zelle", "zellen", "reihe", "reihen",
+    "spalte", "spalten", "strafe", "laufzeit", "zaehler", "treffer",
+    "grund", "tiefe", "breite", "karte", "marge", "schritt", "schritte",
+    "zug", "zuege", "seite", "seiten", "namen", "wert", "werte",
+    "bloecke", "durchgang", "stand", "arme", "lauf", "laeufe",
+    # Verben und Adjektive
+    "laden", "bauen", "pruefen", "waehlen", "setzen", "spielen",
+    "zusammenfuegen", "gleich", "neu", "alt", "roh", "leer", "fertig",
+    "offen", "gefunden", "indiziert", "versagt", "erwartet", "eigene",
+    "andere", "alle", "wieder", "wirkt", "ignoriere", "boese", "soll",
+    "aktuell", "letzte", "identisch", "referenz", "modus", "warum",
+    "sammel", "aufloesend", "sammelaufloesend", "bezeichner",
+    "variante", "varianten", "selbsttest", "anzeige", "wache",
+}
+
+# `extern` ist in Rust ein Schluesselwort und dort legitim; die deutsche
+# Verwendung (`extern_seite`) faellt ohnehin ueber den Wortteil `seite` auf.
+DEUTSCHE_STAEMME_NUR_PY = {"extern", "externe"}
+
+# Lange, eindeutige Staemme -- hier ist auch die TEILZEICHENKETTE sicher,
+# weil kein englisches Wort sie enthaelt. Fuer deutsche Komposita ohne
+# Unterstrich (`quellzeilen`, `sammelaufloesend`) ist das der einzige Weg.
+KOMPOSITA_STAEMME = (
+    "kennzahl", "abweichung", "schluessel", "herkunft", "aufloes", "zeilen",
+    "datei", "partie", "traeger", "vorzug", "rezept", "auftrag", "verdikt",
+    "referenz", "bezeichner", "durchgang", "laufzeit", "gesehen", "treffer",
+    "pruef", "waehl", "anzeige", "variante", "selbsttest", "ausgenommen",
+)
+
+_RS_DEFS = [
+    re.compile(r"^\s*(?:pub(?:\(crate\))?\s+)?(?:async\s+)?fn\s+([A-Za-z_]\w*)"),
+    re.compile(r"^\s*let\s+(?:mut\s+)?([A-Za-z_]\w*)"),
+    re.compile(r"^\s*(?:pub(?:\(crate\))?\s+)?(?:const|static)\s+([A-Za-z_]\w*)"),
+    # Strukturfeld bzw. Parameter einer mehrzeiligen Signatur: `name: Typ,`.
+    # OHNE diese Zeile faellt genau der Fall durch, der die Regel ausgeloest
+    # hat (`sammelaufloesend: [bool; 2]` in referee.rs). Match-Arme (`=>`)
+    # und Vergleiche sind ausgeschlossen, sonst haette der Waechter
+    # Fehlalarme -- und ein Waechter mit Fehlalarmen wird abgeschaltet.
+    re.compile(r"^\s*(?:pub(?:\(crate\))?\s+)?([a-z_]\w*)\s*:\s*[A-Za-z_&\[(]"),
+]
+_STRIP_PY = re.compile(r"(\"[^\"]*\"|'[^']*'|#.*$)")
+_STRIP_RS = re.compile(r"(\"[^\"]*\"|//.*$)")
+
+
+def _german_parts(name: str, stems: set[str]) -> list[str]:
+    """Wortteile eines Bezeichners, die deutsch sind.
+
+    ZWEI Wege, weil einer allein je eine Haelfte verfehlt:
+
+    * EXAKTER Teilvergleich nach Trennung an `_` und CamelCase. Exakt und
+      nicht als Teilzeichenkette, sonst traefe `art` jedes `start` und
+      `zug` jedes `bezug` -- ein Waechter mit Fehlalarmen wird abgeschaltet.
+    * TEILZEICHENKETTE, aber nur fuer die lange, kuratierte Liste unten.
+      Anlass beim Bau: `quellzeilen` hat keinen Unterstrich, der exakte
+      Vergleich sieht ein einziges Wort und laesst es durch. Deutsche
+      Komposita sind genau der haeufige Fall.
+    """
+    parts = re.findall(r'[a-z]+|[A-Z][a-z]*', name)
+    hits = [p for p in (x.lower() for x in parts) if p in stems]
+    tief = name.lower()
+    hits += [k for k in KOMPOSITA_STAEMME if k in tief and k not in hits]
+    return hits
+
+
+def _added_lines(staged_only: bool) -> dict[str, set[int]]:
+    """{Datei: {Zeilennummern}} der HINZUGEFUEGTEN Zeilen des Diffs."""
+    cmd = ["git", "diff", "--cached", "-U0"] if staged_only else ["git", "diff", "HEAD", "-U0"]
+    try:
+        diff = subprocess.run(cmd, cwd=REPO_ROOT, capture_output=True,
+                              text=True, encoding="utf-8").stdout or ""
+    except Exception:
+        return {}
+    out: dict[str, set[int]] = {}
+    rel, lineno = None, 0
+    for line in diff.splitlines():
+        if line.startswith("+++ b/"):
+            rel = line[6:]
+        elif line.startswith("@@"):
+            m = re.search(r"\+(\d+)", line)
+            lineno = int(m.group(1)) if m else 0
+        elif line.startswith("+") and not line.startswith("+++"):
+            if rel:
+                out.setdefault(rel, set()).add(lineno)
+            lineno += 1
+    return out
+
+
+def _python_definitions(text: str) -> list[tuple[int, str]]:
+    """(Zeile, Name) jeder DEFINITION -- ueber `ast`, nicht per Regex.
+
+    Der Regex-Weg hatte eine Fehlalarm-Klasse, die beim Bau aufgefallen ist:
+    in einem Docstring steht `Abweichung = Verweigerung.` als PROSA, und ein
+    Zeilen-Muster fuer Zuweisungen nimmt das fuer eine Zuweisung. `ast` sieht
+    Zeichenketten und Kommentare gar nicht erst.
+
+    Nur Definitionen, keine Verwendungen: neuer Code darf eine deutsch
+    benannte Bestandsfunktion aufrufen, ohne dass das ein Verstoss ist.
+    """
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return []
+    found: list[tuple[int, str]] = []
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            found.append((node.lineno, node.name))
+        elif isinstance(node, ast.arg):
+            found.append((node.lineno, node.arg))
+        elif isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+            found.append((node.lineno, node.id))
+    return found
+
+
+def check_identifiers_english(staged_only: bool, staged_files: set[str]) -> list[str]:
+    added = _added_lines(staged_only)
+    findings: list[str] = []
+
+    for rel, lines in sorted(added.items()):
+        if not rel.endswith((".py", ".rs")):
+            continue
+        if staged_only:
+            text = get_staged_content(rel)
+        else:
+            p = REPO_ROOT / rel
+            text = p.read_text(encoding="utf-8", errors="replace") if p.exists() else None
+        if text is None:
+            continue
+        src_lines = text.splitlines()
+
+        def _exempt(nr: int) -> bool:
+            return 0 < nr <= len(src_lines) and "konvention-ok" in src_lines[nr - 1]
+
+        hits: list[tuple[int, str]] = []
+        if rel.endswith(".py"):
+            stems = DEUTSCHE_STAEMME | DEUTSCHE_STAEMME_NUR_PY
+            hits = [(nr, name) for nr, name in _python_definitions(text) if nr in lines]
+        else:
+            stems = DEUTSCHE_STAEMME
+            for nr in sorted(lines):
+                if not 0 < nr <= len(src_lines):
+                    continue
+                code = _STRIP_RS.sub("", src_lines[nr - 1])
+                for rx in _RS_DEFS:
+                    m = rx.search(code)
+                    if m:
+                        hits.append((nr, m.group(1)))
+
+        seen = set()
+        for nr, name in hits:
+            if (nr, name) in seen or _exempt(nr):
+                continue
+            seen.add((nr, name))
+            bad = _german_parts(name, stems)
+            if not bad:
+                continue
+            findings.append(
+                f"[Regel 7 -- Bezeichner englisch] {rel}:{nr}: neuer Bezeichner "
+                f"`{name}` ist deutsch ({', '.join(bad)}).\n"
+                "  CLAUDE.md 2026-08-24: alle Bezeichner im Code sind englisch -- auch "
+                "NEUER Code in Modulen, deren Bestand noch deutsch heisst. Die "
+                "Inhaltssprache (Kommentare, Doc-Kommentare) bleibt unberuehrt.\n"
+                "  Glossar: Musterreihe -> pattern_line, Wertungsplatte -> scoring_tile, "
+                "Strafleiste -> floor_line, Vorzug -> preference, Bauer -> builder.\n"
+                "  Begruendeter Einzelfall: `konvention-ok: <Grund>` ans Zeilenende."
+            )
+    return findings
+
+
+# --------------------------------------------------------------------------
 # Main
 # --------------------------------------------------------------------------
 
@@ -622,6 +830,7 @@ def main() -> int:
     violations += check_no_new_task_numbers(staged_mode, staged_files)
     violations += check_prereg_index_consistency(staged_mode, staged_files)
     violations += check_knob_docs_current(staged_mode, staged_files)
+    violations += check_identifiers_english(staged_mode, staged_files)
     warn_silent_test_skips(staged_mode, staged_files)  # Regel 5: nur Warnung, kein Exit-1
 
     if violations:
