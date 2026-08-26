@@ -16,6 +16,32 @@
 # ist -- mit '/models/' waere die Negation unten wirkungslos.
 /models/*
 !/models/manifest_train_*.json
+
+# --- Eingefrorene Artefakte (Nutzer-Entscheid 2026-08-26) --------------------
+# Ein eingefrorener Champion oder Lehrer ist kein Modell, sondern ein
+# vollstaendiger AGENT: Gewichte, Spec, Wheel, Manifest, Golden Probe. Er ist
+# per Bauart NICHT rekonstruierbar -- Training ist stochastisch, und ein Wheel
+# laesst sich nur nachbauen, wenn Commit UND sauberer Baum bekannt sind.
+#
+# Am 2026-08-26 hat genau diese Luecke den v22-Korpus-Erzeuger gekostet:
+# Commit bekannt (dbf6a08), git_dirty true, Verhalten unwiederbringlich. Ein
+# sauberer Build desselben Commits erzeugt Feld fuer Feld etwas anderes als
+# der Korpus (PREREG_generator_drift.md par.1). Bei einem HEURISTIK-Freeze
+# waere der Schaden groesser: dort steckt das Verhalten vollstaendig im Wheel,
+# es gibt kein ONNX, das es mittraegt.
+#
+# Die Verzeichnisse muessen hier stehen, nicht nur die Dateimuster: git steigt
+# nicht in ein ausgeschlossenes Verzeichnis hinab, um Ausnahmen zu suchen
+# (dieselbe Falle, vor der der Kommentar zu '/models/*' oben warnt).
+# '/models/*' trifft nur DIREKTE Kinder -- ist das Verzeichnis wieder drin,
+# sind die Dateien darunter automatisch sichtbar.
+!/models/frozen_champions/
+!/models/frozen_heuristics/
+
+# Ausgenommen bleibt, was ABLEITBAR ist: 'venv/' (Abschnitt 3 weiter unten)
+# greift auch hier und haelt die 33 MB je Artefakt draussen -- sie entstehen
+# aus dem Wheel neu. Die Wheel-Negation steht am Dateiende, sie muss NACH
+# '*.whl' kommen.
 /static/log
 *.pkl
 *.pth
@@ -93,3 +119,11 @@ evaluations/paired_arena_env_*.json
 scratchpad/
 *.pdf
 /evaluations/artifacts
+
+# --- Wheels INNERHALB eingefrorener Artefakte (Nutzer-Entscheid 2026-08-26) ---
+# '*.whl' oben schliesst Build-Artefakte aus, und das bleibt richtig. In einem
+# eingefrorenen Artefakt ist das Wheel aber kein Build-Abfall, sondern der
+# Traeger des Verhaltens. Diese Negation MUSS nach '*.whl' stehen: bei git
+# gewinnt die zuletzt passende Regel.
+!/models/frozen_champions/**/*.whl
+!/models/frozen_heuristics/**/*.whl
