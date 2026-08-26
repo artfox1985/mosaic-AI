@@ -715,7 +715,7 @@ const EINHEITSKARTE: Zielkarte = [[1.0; 6]; 6];
 /// Prio 0 (Endspiel), 1 (Strafleiste) und 2 (Gegner-Stoerung) stehen bewusst
 /// NICHT in dieser Karte. Sie sind keine Routing-Ziele, sondern Sache der
 /// SUCHE, und dort schon entschieden: Runde 5 laeuft als exaktes Endspiel
-/// (`round5_anchor::applies`, `mcts.rs`), die Strafleiste steckt als
+/// (`round5::applies`, `mcts.rs`), die Strafleiste steckt als
 /// `round_end::projected_unplaceable_penalty` in `player_total_variante`,
 /// und die Gegner-Stoerung ist in `PREREG_opponent_disruption_v2.md` als
 /// UEBERHOLT abgelegt (nichts gebaut, kein Knopf). Sie hier zu duplizieren
@@ -1027,7 +1027,7 @@ fn prio5_overlay(player: &PlayerBoard, k: &mut Zielkarte) {
 /// steigen die Gewichte fuer Prio 0, 1 und 2 exponentiell an").
 ///
 /// Runde 5 kommt nicht vor: dort uebernimmt das exakte Endspiel
-/// (`round5_anchor::applies`, kurzgeschlossen in `mcts.rs`), und dieses
+/// (`round5::applies`, kurzgeschlossen in `mcts.rs`), und dieses
 /// Routing laeuft ohnehin nur bis Runde 4. Das IST Prio 0 der Leiter -- sie
 /// braucht keine eigene Regel, sondern nur die Uebergabe.
 const ESKALATION: [f64; 4] = [1.0, 2.0, 4.0, 8.0];
