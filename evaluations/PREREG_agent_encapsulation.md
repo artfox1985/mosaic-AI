@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Welle 3 gebaut; Fork A umgesetzt (par.8c: exakte Ordnungsuebergabe steht, Suite 500/0), par.8d GEBAUT+ABGENOMMEN (Suite 502/0, Protokoll per Einzelentscheidung, rot_seed weg); Kernbeweis 5. Runde rot, neues Fehlerbild (gleiche Stellung/gleicher Seed, andere Rotation) -> Numerik-Hypothese WIDERLEGT (par.8e: Batcher im Referenzpfad inaktiv, Wurzel-Batch bitgleich max_ulp 0); **KERNBEWEIS GRUEN (par.8f, 2026-08-24): 8/8 Partien byte-identisch, Suite 503/0, Paritaet haelt, Quarantaene des Worker-Pfads AUFGEHOBEN.** Ursache der sieben Runden war eine Luecke im Pruefverfahren (JSON-gegen-JSON statt Struct-Vergleich); sieben Roundtrip-Verluste gemeinsam behoben und als erschoepfender Test verankert; Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- FRAGE BEANTWORTET: Welle 1 und Welle 3 gebaut und abgenommen, offen nur noch der planbare Ausbau (restliche ~31 Knoepfe wellenweise ins SearchConfig, par.4). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: Welle 1 (SearchConfig-Geruest + Pilot-Migration MOSAIC_IMPLICIT_MINIMAX_A) GEBAUT UND ABGENOMMEN 2026-08-23 (par.4a: Suite 498/0/26, Paritaets-Hash 8c6684ff.. haelt, Spec==Env-Default bestaetigt, per-Seite-Wirkung nachgewiesen); Koordinator-Nachpruefung + Instrument-Erweiterung par.4b (Spec-Durchleitung in paired_arena_env_ab, Wirk-/Identitaets-Smoke bestanden); Welle 3 gebaut; Fork A umgesetzt (par.8c: exakte Ordnungsuebergabe steht, Suite 500/0), par.8d GEBAUT+ABGENOMMEN (Suite 502/0, Protokoll per Einzelentscheidung, rot_seed weg); Kernbeweis 5. Runde rot, neues Fehlerbild (gleiche Stellung/gleicher Seed, andere Rotation) -> Numerik-Hypothese WIDERLEGT (par.8e: Batcher im Referenzpfad inaktiv, Wurzel-Batch bitgleich max_ulp 0); **KERNBEWEIS GRUEN (par.8f, 2026-08-24): 8/8 Partien byte-identisch, Suite 503/0, Paritaet haelt, Quarantaene des Worker-Pfads AUFGEHOBEN.** Ursache der sieben Runden war eine Luecke im Pruefverfahren (JSON-gegen-JSON statt Struct-Vergleich); sieben Roundtrip-Verluste gemeinsam behoben und als erschoepfender Test verankert; Pilot-Messung ENTSCHIEDEN (par.6b): Netz-gegen-Netz PARITAET (400/814), k1-Effekt der Heuristik-Messung uebertraegt sich NICHT (9,6 % beidseitig) -- Knopf bleibt Self-Play-Kandidat mit gedaempfter Erwartung; weitere Knopf-Wellen offen; Welle 3 (gefrorene Champions als eigene Engine-Prozesse, Handshake + Golden-Selbsttest, par.8) FREIGEGEBEN, Bau nach der Pilot-Messung, erstes Ziel v21 -- FRAGE BEANTWORTET: Welle 1 und Welle 3 gebaut und abgenommen, offen nur noch der planbare Ausbau (restliche ~31 Knoepfe wellenweise ins SearchConfig, par.4). **WELLE HEURISTIK GEBAUT UND ABGENOMMEN 2026-08-26 (par.9):** heuristik_variante ist ein SearchConfig-/Spec-PFLICHTfeld (Name, kein Default, unbekannter Name = harter Fehler); v1_anchor und v2huelle_generator liegen als vollstaendige Artefakte in models/frozen_heuristics/ und sind VERSIONIERT. Golden Probe ist hier ein SELF-PLAY-Lauf aus dem eigenen Wheel statt der Drafting-Sonde -- der Referee loest Tiling/Startsetzung selbst auf und ist dabei auf V1 verdrahtet (referee.rs:312 -> self_play.rs:1207), die Welle-3-Probe waere fuer eine Heuristik also eine halbe. Staerkster Beleg: die Golden Probe des Generators ist Feld fuer Feld identisch mit der ersten Datei des echten v22-Korpus. Suite 531/0.-->
 
 # PREREG-SKELETT: Agenten-Kapselung (AgentSpec statt Prozess-Global)
 
@@ -530,3 +530,82 @@ nur der planbare AUSBAU: die restlichen ~31 aktiven Such-/Blattwert-
 Knoepfe wellenweise ins SearchConfig migrieren (Strategie par.4,
 je Knopf ein Commit mit Paritaets-Gate) -- keine offene Frage mehr,
 sondern Fleissarbeit.
+
+
+## par.9 WELLE HEURISTIK: gebaut und abgenommen (2026-08-26)
+
+**Anlass, und er ist konkret:** am selben Tag hat ein fehlendes
+`--heuristik-variante v2huelle` (Default `v1`) einen falschen Befund erzeugt,
+der committet und an eine Parallelsitzung gemeldet wurde. Eine Heuristik, die
+nur durch einen CLI-Parameter definiert ist, haengt daran, dass der AUFRUFER
+sie richtig mitgibt. Das ist genau die Prozessglobalitaet aus par.1, eine
+Ebene hoeher.
+
+### Schritt 1: `heuristik_variante` wird ein Spec-Feld
+
+Als NAME (`"v2huelle"`), als PFLICHTfeld, ohne Env-Knopf.
+
+* **Pflicht, kein Default.** Ein fehlendes Feld und ein unbekannter Name sind
+  harte Fehler. Ein stiller Rueckfall auf `v1` saehe wie der gewollte Lauf aus
+  und waere der Bestandslauf -- der Fehler des Tages, in Dauerform.
+* **Kein Env-Knopf als Gegenstueck.** Die beiden Bestandsfelder haben einen,
+  weil sie aus der Knopf-Aera stammen; ein neuer prozessglobaler Schalter waere
+  das Gegenteil des Ziels.
+* **Waechter:** der Lesetest prueft auf `v2huelle`, NICHT auf `v1` -- ein Test
+  gegen `v1` haette den Fehler nicht gefangen, weil `v1` der Default IST. Dazu
+  Roundtrip `name()` gegen `variant_from_name` ueber alle neun Varianten.
+
+`from_env()` liefert `V1`; Bestandsverhalten unveraendert, und der HEAD-Build
+reproduziert den v22-Korpus danach weiterhin bit-genau (1733 Schritte, Feld
+fuer Feld) -- die Aenderung ist belegt verhaltensneutral, nicht bloss
+plausibel.
+
+### Schritt 2: die Golden Probe ist hier eine ANDERE
+
+Die Welle-3-Probe (`build_frozen_golden_probe.py`) sammelt Drafting-Zustaende
+und vergleicht die gewaehlte Aktion. Mehr kann sie nicht: der Referee loest
+Tiling und Startsetzung selbst auf (`referee.rs:312` ruft
+`resolve_tiling_step`, und das ist `self_play.rs:1207` hart auf `V1`
+verdrahtet). Fuer ein Netz ist das die richtige Abgrenzung -- die Regel-
+Autoritaet soll bei der aktuellen Engine bleiben. Fuer eine HEURISTIK waere es
+eine halbe Probe, denn `v2huelle` wirkt gerade im Platzierungs-Routing.
+
+Die Probe ist deshalb ein **Self-Play-Lauf aus dem eigenen Wheel**,
+byte-verglichen (Nutzer-Vorschlag 2026-08-26). Sie deckt Drafting, Tiling und
+Runde 5 ab und ist damit strenger als die der Netz-Artefakte.
+
+**Der Beleg dafuer, dass das kein Selbstbetrug ist:** die Golden Probe von
+`v2huelle_generator` ist Feld fuer Feld identisch mit
+`data/selfplay_hv2_20260825_1727_g10.pkl` -- der ersten Datei des echten
+v22-Korpus. Das Artefakt IST der Erzeuger, keine Nachbildung.
+
+### Was gebaut wurde
+
+| | |
+| --- | --- |
+| `tools/freeze_heuristic.py` | baut das Artefakt: Wheel, Spec, Manifest, Golden Probe, optional Tiling-Netz als KOPIE |
+| `tools/verify_frozen_heuristic.py` | prueft gegen die Probe, in zwei getrennten Modi |
+| `models/frozen_heuristics/v1_anchor/` | Elo-Anker, 6,8 MB, kein ONNX |
+| `models/frozen_heuristics/v2huelle_generator/` | v22-Erzeuger, 16 MB, mit `tiling_net.onnx` |
+
+**Der Pruefer trennt zwei Fragen, die gern vermengt werden:** mit dem
+AKTUELLEN Wheel beantwortet er *"hat sich der heutige Code entfernt?"*
+(Drift), mit `--venv` *"spielt das Artefakt noch wie eingefroren?"*
+(Konservierung). Rot heisst in beiden Faellen etwas voellig anderes; ein
+Bericht, der sie vermengt, ist wertlos.
+
+**Kosten im Repo:** 22,8 MB Artefaktdateien kosten 7 MB in `.git`. Git ist
+inhaltsadressiert -- `tiling_net.onnx` teilt seinen Blob mit dem v21-Artefakt
+und `models/`, die beiden Wheels sind identisch. Selbstgenuegsame Artefakte
+sind hier fast umsonst.
+
+### Offen geblieben, ausdruecklich
+
+* **Der Referee-Pfad.** Eine eingefrorene Heuristik kann heute NICHT in der
+  Referee-Arena spielen: der Worker beantwortet nur Drafting und braucht dafuer
+  ein Netz. Fuer die Beweisfrage ist das egal (Self-Play deckt mehr ab), fuer
+  "gefrorene Heuristik als Arena-Gegner" nicht.
+* **Die Quell-Konservierung.** `round5_anchor.rs` (1664 Zeilen) und die
+  Varianten-Faedelung (111 Stellen, davon 103 blosse Weitergabe, 5 echte
+  Verzweigungen) bleiben stehen, bis die Artefakte sich bewaehrt haben.
+  Entfernen ist ein eigener Schritt und gehoert in eigene Commits.
