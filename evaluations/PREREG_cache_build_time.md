@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Der Cache-Bau des Trainings dauert rund 70 min fuer 890.000 Zustaende und liegt damit vor JEDER Trainingsfrage. Welche Hebel verkuerzen ihn -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag, Start unmittelbar nach dem Ende der v22-Erzeugung. Gemessen am hv2-Korpus: state_to_planes 1,896 ms je Zustand (85 Prozent der Merkmalskosten), state_to_tensor 0,185 ms, Unpickle 0,150 ms; Summe 2,23 ms = 33 min der beobachteten ~70. DREI HEBEL, absteigend nach erwartetem Nutzen: (1) PARALLELISIERUNG des Bau-Laufs -- neural_net.py enthaelt kein Pool/multiprocessing, die Dateien laufen nacheinander bei ~0,75 Kernen, obwohl sie unabhaengig sind; trifft die GANZE Schleife, nicht nur die Merkmale. (2) RUST-EXPORT der Bauer (features.rs hat sie, pyo3 exportiert sie nicht) -- trifft 85 Prozent von 33 der 70 min, also bestenfalls die halbe Wanduhr. (3) lzf-Kompression pruefen (115,9 MB Feldinhalt -> 7,6 MB Datei, Faktor 15). EIN GEMEINSAMES HARTES TOR fuer alle drei: BIT-IDENTITAET des erzeugten Caches gegen den heutigen Stand. Ein schnellerer, aber anderer Cache entwertet jeden Vergleich mit bestehenden Modellen; faellt die Identitaet und ist die Abweichung nicht behebbar, stirbt der jeweilige Hebel. HEBEL (1) GEBAUT UND ABGENOMMEN 2026-08-26 (par.7): 120 Dateien / 209.057 Zustaende, seriell 463,6 s gegen parallel 93,0 s = **Faktor 4,99**, und das TOR IST BESTANDEN -- alle 21 Felder bit-identisch. Zuschnitt ohne Eingriff in die Bauschleife: die Worker bauen Datei-Teilmengen mit dem Bestandscode und geben nur ihren Cache-Pfad zurueck. Einzige Aenderung an neural_net.py ist eine Zuweisung. Hochrechnung voller Korpus: seriell ~2,6 h, parallel ~31 min. Die vorab benannte Erwartung (Faktor 4-6) hat gehalten. VOLLER KORPUS GEFAHREN 2026-08-26 (par.8): 4.186.112 Zustaende in 36,1 min gegen 2,58 h seriell hochgerechnet, Faktor ~4,3; Cache 0,83 GB auf Platte, 2.811 Byte je Zustand. Dabei ZWEI Zuschnittfehler gefunden und behoben -- Blockzahl war an die Workerzahl gekoppelt (10 Bloecke ergaben 24,1 GB belegt und 0,7 GB frei, abgebrochen), und das Zusammenfuegen hielt ein Feld doppelt im RAM. Nach der Korrektur 3,9 GB. ACHTUNG: fuer den vollen Korpus ist das TOR NICHT gefahren (keine serielle Referenz); belegt ist Bit-Identitaet auf 120 Dateien. NICHT verdrahtet in train.py. Reihenfolge (1) vor (2), in par.5 begruendet. HEBEL (4) NACHGETRAGEN (par.6, Nutzer-Frage): Cache JE DATEI statt je Fenster -- laeuft auf DEMSELBEN Umbau wie (1) (picklebare Funktion je Datei; Pool darueber = Parallelisierung, Memoisierung darauf = Datei-Cache), wird aber getrennt ausgeliefert, weil er eine Schluesselteilung braucht und die still danebengehen kann. Sein Gewinn ist nicht die Wanduhr, sondern der kritische Pfad: ein Datei-Cache kann WAEHREND der Erzeugung mitlaufen, dann ist er fertig, wenn der Korpus fertig ist. GPU GEPRUEFT UND VERWORFEN (par.5a, Nutzer-Frage): der Bauer ist Umpacken statt Arithmetik, verzweigungslastig, und die Daten liegen als Python-Objekte im Host-RAM -- sie dorthin zu bringen IST die Arbeit. Ob (2) nach (1) noch lohnt, entscheidet eine NEUE Messung des Merkmalsanteils, nicht das Bauchgefuehl (par.5b). -->
+<!-- STATUS: OFFEN | Frage: Der Cache-Bau des Trainings dauert rund 70 min fuer 890.000 Zustaende und liegt damit vor JEDER Trainingsfrage. Welche Hebel verkuerzen ihn -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag, Start unmittelbar nach dem Ende der v22-Erzeugung. Gemessen am hv2-Korpus: state_to_planes 1,896 ms je Zustand (85 Prozent der Merkmalskosten), state_to_tensor 0,185 ms, Unpickle 0,150 ms; Summe 2,23 ms = 33 min der beobachteten ~70. DREI HEBEL, absteigend nach erwartetem Nutzen: (1) PARALLELISIERUNG des Bau-Laufs -- neural_net.py enthaelt kein Pool/multiprocessing, die Dateien laufen nacheinander bei ~0,75 Kernen, obwohl sie unabhaengig sind; trifft die GANZE Schleife, nicht nur die Merkmale. (2) RUST-EXPORT der Bauer (features.rs hat sie, pyo3 exportiert sie nicht) -- trifft 85 Prozent von 33 der 70 min, also bestenfalls die halbe Wanduhr. (3) lzf-Kompression pruefen (115,9 MB Feldinhalt -> 7,6 MB Datei, Faktor 15). EIN GEMEINSAMES HARTES TOR fuer alle drei: BIT-IDENTITAET des erzeugten Caches gegen den heutigen Stand. Ein schnellerer, aber anderer Cache entwertet jeden Vergleich mit bestehenden Modellen; faellt die Identitaet und ist die Abweichung nicht behebbar, stirbt der jeweilige Hebel. HEBEL (1) GEBAUT UND ABGENOMMEN 2026-08-26 (par.7): 120 Dateien / 209.057 Zustaende, seriell 463,6 s gegen parallel 93,0 s = **Faktor 4,99**, und das TOR IST BESTANDEN -- alle 21 Felder bit-identisch. Zuschnitt ohne Eingriff in die Bauschleife: die Worker bauen Datei-Teilmengen mit dem Bestandscode und geben nur ihren Cache-Pfad zurueck. Einzige Aenderung an neural_net.py ist eine Zuweisung. Hochrechnung voller Korpus: seriell ~2,6 h, parallel ~31 min. Die vorab benannte Erwartung (Faktor 4-6) hat gehalten. VOLLER KORPUS GEFAHREN 2026-08-26 (par.8): 4.186.112 Zustaende in 36,1 min gegen 2,58 h seriell hochgerechnet, Faktor ~4,3; Cache 0,83 GB auf Platte, 2.811 Byte je Zustand. Dabei ZWEI Zuschnittfehler gefunden und behoben -- Blockzahl war an die Workerzahl gekoppelt (10 Bloecke ergaben 24,1 GB belegt und 0,7 GB frei, abgebrochen), und das Zusammenfuegen hielt ein Feld doppelt im RAM. Nach der Korrektur 3,9 GB. ACHTUNG: fuer den vollen Korpus ist das TOR NICHT gefahren (keine serielle Referenz); belegt ist Bit-Identitaet auf 120 Dateien. NICHT verdrahtet in train.py. Reihenfolge (1) vor (2), in par.5 begruendet. HEBEL (4) GEBAUT UND ABGENOMMEN 2026-08-26 (par.9): Cache JE DATEI, BEIDE Pflichtpruefungen bestanden -- 21/21 Felder bit-identisch gegen die serielle Referenz (120 Dateien), und jeder der sieben per-Datei-Parameter erzeugt einen MISS (file_cache_key_probe.py). Die Schluesselteilung ist ADDITIV: der Fenster-Schluessel bleibt Zeichen fuer Zeichen, der Datei-Block bekommt einen eigenen Namensraum (per_file_cache_key) mit dem AUFGELOESTEN Traegerstatus der Datei statt des Manifest-Inhalts -- kein Bestands-Cache verfaellt. Beleg fuer den Gewinn: 119 von 120 Bloecken wurden ueber ein ANDERES Fenster hinweg wiederverwendet (7,9 s statt Neubau). Kosten 0,96 s je Datei bei 6 Workern; der Lauf kann per --watch WAEHREND der Erzeugung mitlaufen. NEBENBEFUND, live und behoben: MOSAIC_CACHE_F32 stand in KEINER Key-Komponente, obwohl der Knopf den gespeicherten dtype aendert -- der Notausstieg war wirkungslos, sobald ein Cache existierte. GPU GEPRUEFT UND VERWORFEN (par.5a, Nutzer-Frage): der Bauer ist Umpacken statt Arithmetik, verzweigungslastig, und die Daten liegen als Python-Objekte im Host-RAM -- sie dorthin zu bringen IST die Arbeit. Ob (2) nach (1) noch lohnt, entscheidet eine NEUE Messung des Merkmalsanteils, nicht das Bauchgefuehl (par.5b). -->
 
 # Vorregistrierung: Zeit des Cache-Baus
 
@@ -314,3 +314,95 @@ benutzt, sollte die 2,58 h Referenz einmal fahren.
 Sie sind dot-praefigiert und fallen nicht in den `*.pkl`-Glob; ein zweiter
 Lauf mit denselben Blockgrenzen trifft sie. Nicht aufgeraeumt -- Loeschen ist
 ein Nutzer-Entscheid.
+
+
+## par.9 HEBEL (4) GEBAUT UND ABGENOMMEN (2026-08-26)
+
+**Die Schluesselteilung ist ADDITIV geloest, nicht durch Umbau des
+Bestandsschluessels.** par.6 nennt sie die heikle Stelle, und der naheliegende
+Weg -- den vorhandenen Schluessel in "je Datei" und "je Fenster" zerlegen --
+haette JEDEN Bestands-Cache entwertet: den 14-GB-Vollcache, `.par_full.h5` und
+`.ref_serial.h5` inbegriffen, zusammen ueber zwei Stunden Rechenzeit. Statt
+dessen bleibt der Fenster-Schluessel Zeichen fuer Zeichen unveraendert, und
+der Datei-Block bekommt einen EIGENEN Namensraum: `per_file_cache_key`
+(`neural_net.py`), Praefix `filecache_v1`, Dateien `.filecache_<key>.h5`.
+
+**Was drin steht und was bewusst nicht:**
+
+| | im Datei-Schluessel | warum |
+| --- | --- | --- |
+| Schema/Aktionen/Sharpen/TD_LAMBDA | ja | bestimmen den Blockinhalt |
+| Encoder, Value-Ziel-Variante | ja | dito |
+| Konjunktion/Reachability, Bitpacking | ja | dito |
+| `ignore_ptv`, `f32` | ja | dito, beide aendern gespeicherte Werte |
+| **aufgeloester Traegerstatus DIESER Datei** | **ja** | das Manifest wirkt pro Datei; zwei Manifeste mit gleichem Ergebnis fuer diese Datei duerfen denselben Block teilen |
+| Manifest-INHALT, Dateiliste, Train/Val-Split | **nein** | genau daran haengt heute jeder Block unnoetig mit |
+
+Der Traegerstatus wird mit `_is_policy_carrier` gebildet, also mit derselben
+Funktion wie in der Bauschleife, und `bootstrap_native` aus derselben
+Praefix-Konstante. Ein Nachbau haette genau die Drift erzeugt, gegen die die
+zweite Pflichtpruefung gerichtet ist.
+
+### Beide Pflichtpruefungen bestanden
+
+**(a) Bit-Identitaet.** `cache_parity_probe.py data/.ref_serial.h5
+data/.inc_window_ref120.h5`: 21 von 21 Feldern bit-identisch, `np.array_equal`,
+keine Toleranz. Verglichen wurde gegen die BESTEHENDE serielle Referenz aus
+par.7, nicht gegen einen neu gebauten Massstab.
+
+**(b) MISS je Parameter** (`tools/probes/file_cache_key_probe.py`, netzfrei,
+Sekunden): alle sieben per-Datei-Parameter erzeugen einen anderen Schluessel --
+`value_target_variant`, `encoder`, `conjunction_head`, Traegerstatus,
+`MOSAIC_CACHE_NOPACK`, `MOSAIC_CACHE_F32`, `MOSAIC_IGNORE_POLICY_TARGET_VALID`.
+Dazu die beiden Gegenproben, ohne die (b) trivial bestuende: derselbe Aufruf
+ergibt denselben Schluessel, eine andere Datei einen anderen.
+
+Die Sonde laedt das Modul je Fall NEU. Das ist Pflicht, nicht Kosmetik:
+`_IGNORE_PTV` wird einmal beim Import gelesen; wer den Knopf setzt und
+dieselbe Modulinstanz befragt, misst den alten Wert und bekommt einen falschen
+GRUENEN Befund.
+
+### Der Gewinn, gemessen statt behauptet
+
+Die erste Paritaets-Fahrt fiel durch -- mit Formunterschied, nicht
+Inhaltsunterschied: 210.777 gegen 209.057 Zustaende. Ursache war die
+Dateimenge, nicht der Bau: seit der Referenz liegt `probe_v2huelle_horizon.pkl`
+in `data/`, sortiert sich vor alles und verdraengte die 120. Korpusdatei.
+Nach `MOSAIC_DATA_EXCLUDE=^probe_` waren **119 der 120 Bloecke bereits da**;
+gebaut werden musste genau einer, und der hatte die vorhergesagten 1.724
+Zustaende (209.057 - 207.333).
+
+Das ist zugleich der Beleg fuer den eigentlichen Gewinn: **Bloecke ueberleben
+den Fensterwechsel.** Ein anderes Fenster kostete 7,9 s statt eines Neubaus.
+
+| | Wanduhr | Bemerkung |
+| --- | --- | --- |
+| 120 Dateien, 117 Bloecke neu, 6 Worker | 112,6 s | 0,96 s je Datei |
+| davon Zusammenfuegen | 4,2 s | |
+| dieselben 120 Dateien, anderes Fenster | 7,9 s | 119 Bloecke wiederverwendet |
+| Gegenprobe Memoisierung (3 Dateien, alle da) | 2,0 s | 0 neu gebaut |
+
+**Was das NICHT heisst:** eine Beschleunigung gegen Hebel (1). Auf dem vollen
+Korpus laege der Erstbau in derselben Groessenordnung wie die 36,1 min aus
+par.8 -- der Gewinn liegt woanders, und par.6 hat ihn vorab benannt: der Bau
+kann per `--watch` WAEHREND der Erzeugung mitlaufen, dann liegt er nicht mehr
+vor dem Training. Fuer den vollen Korpus ist das Tor weiterhin NICHT gefahren
+(es fehlt die serielle Referenz, 2,58 h) -- belegt ist Bit-Identitaet auf 120
+Dateien, wie bei Hebel (1).
+
+### Nebenbefund, live und behoben: MOSAIC_CACHE_F32 war wirkungslos
+
+Beim Aufzaehlen der per-Datei-Parameter fiel auf, dass `MOSAIC_CACHE_F32` in
+KEINER Key-Komponente stand, obwohl der Knopf den gespeicherten dtype von
+`states`/`policies` auf float32 hebt und der Kommentar an der Schreibstelle
+selbst "NICHT bit-identisch" sagt. Folge: ein Lauf mit dem Notausstieg traf
+den vorhandenen float16-Cache, und der Knopf blieb still ohne Wirkung -- genau
+die Fehlerklasse, gegen die `+nopack_v1` und `+ignore_ptv_v1` gebaut wurden.
+
+Behoben mit `+f32_v1`, nach demselben Muster NUR bei gesetztem Knopf
+angehaengt: der Default-Schluessel bleibt unveraendert, kein Bestands-Cache
+verfaellt. Schreibweg und Schluessel lesen den Knopf jetzt durch dieselbe
+Funktion (`_cache_f32_active`).
+
+**Nicht verdrahtet in `train.py`** -- wie bei Hebel (1) Absicht: das Werkzeug
+steht fuer sich, bis es auf dem vollen Korpus gelaufen ist.
