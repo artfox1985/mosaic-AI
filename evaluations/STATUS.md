@@ -124,6 +124,44 @@ Bit-Identitaet auf 120 Dateien belegt; fuer den vollen Korpus NICHT gefahren
 
 ---
 
+## KORPUS-DATEIEN KOMPRIMIERT (2026-08-26)
+
+Nutzer-Frage nach doppeltem Speicherplatz durch den Cache. Die Messung dreht
+sie um: **nicht der Cache war gross, sondern die pkl.**
+
+| | vorher | jetzt |
+| --- | --- | --- |
+| pkl (2.401 Dateien) | **34,70 GB** | **0,98 GB** |
+| Block-Caches (64) | – | 1,29 GB |
+| voller Cache | – | 0,89 GB |
+| Testartefakte | – | 0,16 GB |
+| **`data/` gesamt** | **34,70** | **3,32 GB** |
+
+gzip-6, **Faktor 35,4** (gemessen an 12 ordnungsfrei gezogenen Dateien,
+Spanne 35,1-35,7). Umpacken 523 s, jede Datei einzeln gegen ihre
+Originalbytes geprueft VOR dem Ersetzen.
+
+**Der Dateiname bleibt `.pkl`** -- am Namen haengen Cache-Schluessel,
+`MOSAIC_DATA_EXCLUDE`-Regexe und alle Globs; eine Umbenennung haette alle drei
+STILL gebrochen. Erkannt wird am Inhalt (gzip-Magic), siehe `corpus_io.py`.
+
+**Dreifach abgenommen mit dem Bit-Identitaets-Tor:** Cache aus komprimierten
+Kopien, Cache aus dem umgepackten Bestand, und der parallele Bau selbst --
+alle drei bit-identisch zur seriellen Referenz.
+
+**Die pkl bleiben der Rohstand und werden NICHT durch den Cache ersetzt.** Als
+`INPUT_SIZE` am 2026-08-25 von 708 auf 714 ging, war jeder bestehende Cache
+unbrauchbar und nur die pkl erlaubten den Neubau. Die offenen Preregs
+(Spezialfeld-Eingaben, Slot-Ziel, Huellen-Gewichtung) wuerden dasselbe wieder
+ausloesen.
+
+**Aufraeumbar, Nutzer-Entscheid:** die 64 Block-Caches (1,29 GB) sind
+Nebenprodukt der Bau-Versuche mit verschiedenen Blockteilungen; nur die 42 des
+vollen Laufs sind wiederverwendbar. Dazu `.ref_serial.h5`, `.par_test*.h5`,
+`.gz_check.h5` (0,16 GB) aus den Abnahmen.
+
+---
+
 ## SITZUNGSUEBERGABE 2026-08-26
 
 **Der v22-Korpus ist FERTIG und ausgewertet, der Cache liegt gebaut bereit.**
