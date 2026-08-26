@@ -136,3 +136,33 @@ statt gezogen senkt die Varianz zusaetzlich und kostet nichts.
 Der Startslot steckt in den Partien UND in den Policy-Zielen, ist also nur am
 Generierungsstart entscheidbar -- fuer das laufende v22 zu spaet. Gehoert auf
 die Wecker-Liste des v22-Self-Play (`PREREG_v23_window.md` par.4).
+
+
+## Nachtrag 2026-08-26: dasselbe Muster steht an DREI Stellen
+
+Beim Nachgehen der Stapelzug-Frage (`PREREG_chance_nodes.md` par.13) gefunden:
+die Startkuppel ist kein Einzelfall, sondern die dritte Auspraegung desselben
+Musters -- Aktionsraum vorhanden, Entscheidung von einer blinden Handheuristik,
+Trainingsziel behauptet trotzdem eine Wahl.
+
+| Stelle | Aktionsraum | wer entscheidet | Trainingsziel |
+| --- | --- | --- | --- |
+| **Startkuppel** | voll in `valid_actions` (self_play.rs:922-935) | `choose_start_placement` (Farbhaeufigkeit + Eckbonus) | one-hot darauf |
+| **Stapelzug** | `DrawStackPeek` als Wurzelaktion, Folgeschritte als eigene Kinder | im NETZ-Self-Play `resolve_and_apply_stack_draw` -> `best_eval_for_tile` | Policy-Ziel auf einer Fortsetzung, die nicht ausgefuehrt wird |
+| **Kuppel-Rotation** | `ChooseDomeRotation` im Aktionsraum | im NETZ-Self-Play mit sammelaufgeloest | dito |
+
+**Der Unterschied, den v22 gemacht hat:** die beiden unteren Zeilen gelten nur
+noch fuer den NETZ-Pfad. Das Heuristik-Self-Play, aus dem der v22-Korpus
+stammt, laeuft auf `apply_via_chosen_action = false` und loest per Entscheidung
+auf -- `choose_draw_stack_slot` steht dort in 2,5 Prozent der Datensaetze und
+traegt zu 100 Prozent ein gueltiges Policy-Ziel (par.13 der Chance-Nodes-
+Prereg, gemessen).
+
+**Die Startkuppel dagegen ist unveraendert**: dort steht weiterhin das one-hot,
+in JEDEM Erzeugerpfad. Sie ist damit die einzige der drei Stellen, an der die
+Frage dieser Prereg vollstaendig offen bleibt.
+
+Verwandt und als Bezug zu lesen: `PREREG_chance_nodes.md` (Kontrollfluss,
+Regel 3/4), `PREREG_stack_draw_reservation_rule.md` (die Stopp-Regel zieht zu
+oft, ~10 Punkte je betroffenem Stapelzug), `PREREG_stack_top_feature.md`
+(dieselbe blinde Zone auf der Merkmalsseite).
