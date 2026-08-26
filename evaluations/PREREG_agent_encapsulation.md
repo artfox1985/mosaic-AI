@@ -726,3 +726,44 @@ netzlosen In-Process-Zweig oder einen zweiten Worker.
 entfernen liesse den Anker still wandern -- genau das, wogegen es gebaut
 wurde. Erst muessen die Arenen den Anker aus dem ARTEFAKT beziehen, dann darf
 die Quellkopie weg.
+
+### par.10b Das Anker-Tor: erst rot, dann die Ursache, dann gruen
+
+**Vor der Umstellung geprueft, ob der Referee-Pfad dieselben Partien spielt wie
+der Pfad, auf dem die Leiter gemessen ist** (`net_arena_match` ->
+`play_net_game` -> `unified_game_loop`). Sonst beseitigt man eine Driftquelle
+und baut dabei eine neue ein.
+
+**Erst rot: 0 von 6.** Und zwar auch mit der Heuristik IN-PROCESS, also ohne
+alles, was in dieser Sitzung gebaut wurde -- der Unterschied lag zwischen den
+Schleifen und war aelter.
+
+**Die Referenzwahl war dabei selbst eine Falle.** Es gibt DREI
+In-Process-Pfade: `play_arena_game` (Heuristik gegen Heuristik),
+`unified_game_loop` (Netz gegen Heuristik -- HIER haengt der Anker) und
+`RefereeGame`. Der erste Anlauf mass gegen `play_arena_game`, also gegen den
+falschen.
+
+**Ursache, am Code lokalisiert:** die Arena traegt je Seite ein
+`apply_via_chosen_action` (self_play.rs:1971). Die NETZ-Seite hat `true`
+(`apply_chosen_action` -> `resolve_and_apply_stack_draw` loest den Stapelzug
+zu Ende und waehlt Platte, Slot und Rotation per `best_eval_for_tile`), die
+HEURISTIK-Seite hat `false` (`apply_drafting`, nur der Peek -- Slot und
+Rotation werden GESUCHT). Der Referee wandte immer sammelaufloesend an und gab
+der Heuristik damit das Netz-Verhalten.
+
+Die Richtung ist bemerkenswert: **nicht der Referee zerlegte feiner, sondern
+groeber.** Das PER-ENTSCHEIDUNG-Protokoll aus par.8d haette den Peek einzeln
+beantworten koennen -- es wurde nur nie danach gefragt.
+
+**Dann gruen: 20 von 20**, in beiden Modi, auch mit der Heuristik-Seite
+vollstaendig extern (also so, wie ein gefrorenes Artefakt spielt). Damit
+verschiebt die Anker-Umstellung den Anker NICHT.
+
+**Eine Luecke im Bestand, die dabei sichtbar wurde:** der Kernbeweis aus par.8f
+hat `RefereeGame` gegen `RefereeGame` geprueft (in-process gegen Worker) -- nie
+gegen `unified_game_loop`. Die Zusage "byte-identisch" galt also INNERHALB des
+Referee-Pfads. Seit par.10b ist sie auch zwischen den Pfaden belegt, aber nur
+MIT gesetztem Anwendungsmodus.
+
+Sonde: `tools/probes/anchor_referee_parity_probe.py`.
