@@ -27,10 +27,28 @@ Encoding-Falle (Merkzettel): stdin/stdout IMMER als UTF-8 behandeln --
 Windows' Konsolen-Default ist cp1252 und wuerde deutsche Kommentare in
 Fehlermeldungen stillschweigend verstuemmeln oder crashen.
 
-Der Worker fuehrt KEIN eigenes Spielregelwissen -- er beantwortet nur
-Drafting-Entscheidungen (net_arena_choice_state_json verweigert alles
-andere hart). Start-Platzierung und Tiling loest der Referee-Prozess selbst
-auf (Regel-Autoritaet bleibt bei der aktuellen Engine, siehe par.8).
+Der Worker fuehrt KEIN eigenes Spielregelwissen -- er waehlt nur Zuege. Ob
+ein Zug legal ist, entscheidet weiterhin der Referee, und er weist eine
+unzulaessige Antwort hart ab (Regel-Autoritaet, par.8).
+
+SEIT 2026-08-26 beantwortet er DREI Arten von Anfragen, unterschieden ueber
+das Feld `kind` (fehlt es, gilt "drafting" -- Bestandsaufrufer bleiben
+unveraendert):
+
+    {"kind": "drafting",        "state": ..., "seed": ..., "sims":?, "c_puct":?}
+    {"kind": "tiling",          "state": ...}
+    {"kind": "start_placement", "state": ..., "pi": ..., "game_seed": ...}
+
+Der Grund ist die Heuristik-Kapselung (Nutzer-Richtung: gefrorene Agenten
+sollen gegeneinander spielen). Vorher loeste der Referee Tiling und
+Startsetzung selbst auf -- ueber einen auf V1 verdrahteten Pfad. Ein
+gefrorenes `v2huelle`-Artefakt haette damit als `v1` gekachelt, also als ein
+anderer Spieler, mit plausibel aussehendem Ergebnis.
+
+NETZLOSE ARTEFAKTE: fehlt `model.onnx`, ist das Artefakt eine Heuristik --
+ihr Verhalten steckt vollstaendig im Wheel. Die Drafting-Antwort kommt dann
+aus `heuristic_arena_choice_state_json` statt aus der Netzsuche. Ein
+`tiling_net.onnx` im Artefakt wird fuer den Tiling-Durchfall-Pfad benutzt.
 """
 from __future__ import annotations
 
@@ -50,11 +68,13 @@ def main() -> int:
 
     artifact = Path(args.artifact_dir).resolve()
     model_path = artifact / "model.onnx"
+    tiling_net_path = artifact / "tiling_net.onnx"
     spec_path = artifact / "spec.json"
     manifest_path = artifact / "manifest.json"
-    if not model_path.exists():
-        print(json.dumps({"ok": False, "error": f"Modell fehlt: {model_path}"}), flush=True)
-        return 2
+    # `model.onnx` ist NICHT mehr Pflicht: ein Heuristik-Artefakt hat keins.
+    # Die Spec dagegen schon -- sie sagt, WAS der Agent ist, und ohne sie
+    # waere die Variante wieder eine Sache des Aufrufers.
+    ist_heuristik = not model_path.exists()
     if not spec_path.exists():
         print(json.dumps({"ok": False, "error": f"Spec fehlt: {spec_path}"}), flush=True)
         return 2
@@ -86,7 +106,13 @@ def main() -> int:
     # ONNX-Modell bei JEDEM Zug neu, ein 3-Partien-Testlauf schaffte in 20
     # Minuten nicht mal die erste Partie). `engine.choose()` haelt Modell+Spec
     # ueber die gesamte Prozesslaufzeit.
-    engine = mr.FrozenWorkerEngine(str(model_path), str(spec_path))
+    # Nur fuer NETZ-Artefakte: haelt Modell+Spec ueber die Prozesslaufzeit.
+    # Ein Heuristik-Artefakt braucht das nicht -- es gibt kein Modell zu
+    # halten, und die Suche liest die Variante je Aufruf aus der Spec.
+    engine = None if ist_heuristik else mr.FrozenWorkerEngine(str(model_path), str(spec_path))
+    tiling_net = str(tiling_net_path) if tiling_net_path.exists() else None
+    print(f"[worker] typ={'heuristik' if ist_heuristik else 'netz'} "
+          f"tiling_net={'ja' if tiling_net else 'nein'}", file=sys.stderr, flush=True)
 
     for line in stdin:
         line = line.strip()
@@ -95,11 +121,31 @@ def main() -> int:
         try:
             req = json.loads(line)
             state_json = req["state"]
-            seed = int(req["seed"])
-            sims = int(req.get("sims", args.sims))
-            c_puct = float(req.get("c_puct", args.c_puct))
-            resp = json.loads(engine.choose(state_json, sims, c_puct, seed))
-            out = {"ok": True, "action": resp["action"], "value": resp.get("value")}
+            # `kind` fehlt = "drafting": Bestandsaufrufer (Welle 3) senden es
+            # nicht, und ihr Verhalten bleibt Zeichen fuer Zeichen dasselbe.
+            kind = req.get("kind", "drafting")
+            if kind == "drafting":
+                seed = int(req["seed"])
+                sims = int(req.get("sims", args.sims))
+                c_puct = float(req.get("c_puct", args.c_puct))
+                if ist_heuristik:
+                    resp = json.loads(mr.heuristic_arena_choice_state_json(
+                        state_json, sims, c_puct, seed, str(spec_path)))
+                else:
+                    resp = json.loads(engine.choose(state_json, sims, c_puct, seed))
+                out = {"ok": True, "action": resp["action"], "value": resp.get("value")}
+            elif kind == "tiling":
+                step = mr.tiling_choice_state_json(state_json, str(spec_path), tiling_net)
+                out = {"ok": True, "step": json.loads(step)}
+            elif kind == "start_placement":
+                p = mr.start_placement_choice_state_json(
+                    state_json, int(req["pi"]), int(req["game_seed"]), str(spec_path))
+                out = {"ok": True, "placement": json.loads(p)}
+            else:
+                raise ValueError(
+                    f"unbekannte Anfrageart '{kind}' (drafting/tiling/start_placement). "
+                    "Kein Rueckfall auf drafting -- eine falsch verstandene Anfrage waere "
+                    "ein stiller Zugwechsel.")
         except Exception as exc:  # noqa: BLE001 -- Protokollantwort statt Traceback
             out = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
         stdout.write(json.dumps(out, ensure_ascii=False) + "\n")

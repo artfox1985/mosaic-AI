@@ -51,6 +51,7 @@ def partie(spec, netz, seed, extern_seite=1):
     """
     rg = mr.RefereeGame(("A", "B"), 0, seed, None)
     tiling_extern = 0
+    start_extern = 0
     guard = 0
     while True:
         guard += 1
@@ -68,10 +69,20 @@ def partie(spec, netz, seed, extern_seite=1):
                                             str(netz) if netz else None))
             tiling_extern += 1
             continue
+        if st == "start_placement":
+            # `pending_start_placement_player()`, NICHT `current_player()`:
+            # in dieser Phase kann der Nicht-Starter zuerst dran sein.
+            pi = rg.pending_start_placement_player()
+            rg.start_placement_apply_external(
+                mr.start_placement_choice_state_json(rg.state_json(), pi,
+                                                     rg.game_seed(), str(spec)))
+            start_extern += 1
+            continue
         act = json.loads(mr.heuristic_arena_choice_state_json(
             rg.state_json(), SIMS, C_PUCT, rg.pending_search_seed(), str(spec)))["action"]
         rg.drafting_apply_external(json.dumps(act))
-    return {"scores": list(rg.scores()), "steps": rg.steps(), "tiling_extern": tiling_extern}
+    return {"scores": list(rg.scores()), "steps": rg.steps(),
+            "tiling_extern": tiling_extern, "start_extern": start_extern}
 
 
 def main() -> int:
@@ -83,15 +94,19 @@ def main() -> int:
     a = partie(V1, None, 4242)
     befunde["a_v1"] = a
     print(f"A) v1 ueber den Referee: {a['scores']}, {a['steps']} Schritte, "
-          f"{a['tiling_extern']} externe Tiling-Schritte", flush=True)
+          f"{a['tiling_extern']} externe Tiling-Schritte, "
+          f"{a['start_extern']} externe Startsetzungen", flush=True)
     if a["tiling_extern"] == 0:
         versagt.append("kein einziger externer Tiling-Schritt -- der Referee hat selbst gekachelt")
+    if a["start_extern"] == 0:
+        versagt.append("keine externe Startsetzung -- der Referee hat selbst gesetzt")
 
     # --- B) wirkt die Variante
     b = partie(V2H, NET, 4242)
     befunde["b_v2huelle"] = b
     print(f"B) v2huelle ueber den Referee: {b['scores']}, {b['steps']} Schritte, "
-          f"{b['tiling_extern']} externe Tiling-Schritte", flush=True)
+          f"{b['tiling_extern']} externe Tiling-Schritte, "
+          f"{b['start_extern']} externe Startsetzungen", flush=True)
     wirkt = (a["scores"] != b["scores"]) or (a["steps"] != b["steps"])
     befunde["variante_wirkt"] = wirkt
     print(f"   Verlaeufe unterschiedlich? {wirkt}", flush=True)
@@ -106,6 +121,12 @@ def main() -> int:
             break
         if st in ("game_over", "stuck"):
             raise RuntimeError("keine Tiling-Entscheidung erreicht")
+        if st == "start_placement":
+            pi = rg.pending_start_placement_player()
+            rg.start_placement_apply_external(
+                mr.start_placement_choice_state_json(rg.state_json(), pi,
+                                                     rg.game_seed(), str(V1)))
+            continue
         act = json.loads(mr.heuristic_arena_choice_state_json(
             rg.state_json(), SIMS, C_PUCT, rg.pending_search_seed(), str(V1)))["action"]
         rg.drafting_apply_external(json.dumps(act))

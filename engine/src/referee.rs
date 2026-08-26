@@ -102,6 +102,32 @@ use crate::tile::TileColor;
 /// einen Zug liefert; sonst faellt es auf den Bestandspfad durch, und DORT
 /// entscheidet das Netz Gleichstaende (self_play.rs). Ein v2-Artefakt bringt
 /// sein Netz deshalb selbst mit (`tiling_net.onnx`).
+/// Waehlt eine Startsetzung fuer einen extern gespeicherten Zustand -- mit
+/// der Variante aus der Spec.
+///
+/// `game_seed` ist Pflicht und kein Zufall: fuer v2-Varianten waehlt
+/// `choose_start_placement_variante` unter mehreren Kandidaten SEED-BASIERT
+/// aus. Ohne den Seed des Referees waere die Setzung eine andere als die, die
+/// derselbe Agent in-process getroffen haette.
+pub(crate) fn choose_start_placement_json(
+    search_config: &SearchConfig,
+    state_json: &str,
+    pi: usize,
+    game_seed: u64,
+) -> PyResult<Value> {
+    let parsed: Value = serde_json::from_str(state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state_exact(&parsed).map_err(PyValueError::new_err)?;
+    match crate::self_play::choose_start_placement_variante(
+        &state, pi, search_config.heuristik_variante, game_seed,
+    ) {
+        Some((tid, r, c, rot)) => Ok(json!({"tile_id": tid, "row": r, "col": c, "rot": rot})),
+        None => Err(PyValueError::new_err(
+            "choose_start_placement_json: keine legale Startsetzung fuer diesen Zustand",
+        )),
+    }
+}
+
 pub(crate) fn choose_tiling_step_json(
     search_config: &SearchConfig,
     state_json: &str,
@@ -260,6 +286,12 @@ pub struct RefereeGame {
     /// (`self_play.rs::run_net_vs_net_arena`) laden `Net` ebenfalls nur
     /// EINMAL pro Match, dieselbe Erwartung gilt hier.
     nets: std::collections::HashMap<String, Net>,
+    /// Welcher Spieler bei einer angehaltenen EXTERNEN Startsetzung am Zug
+    /// ist. Gemerkt statt neu hergeleitet, weil die Auswahl in
+    /// `advance_to_decision` nicht `current_player()` folgt (der Nicht-Starter
+    /// kann zuerst dran sein). Zweimal dieselbe Herleitung waeren zwei
+    /// Gelegenheiten, sie unterschiedlich zu schreiben.
+    pending_start_player: Option<usize>,
 }
 
 /// Freie Funktion statt Methode (NICHT `&mut self`): so kann der Aufrufer
@@ -285,7 +317,8 @@ impl RefereeGame {
         let mut rng = StdRng::seed_from_u64(seed);
         let ids = scoring_ids.unwrap_or_else(|| sample_valid_scoring_ids(3, &mut rng));
         let game = Game::start([names.0, names.1], first_player, ids, &mut rng);
-        RefereeGame { game, rng, game_seed: seed, steps: 0, nets: std::collections::HashMap::new() }
+        RefereeGame { game, rng, game_seed: seed, steps: 0, nets: std::collections::HashMap::new(),
+                      pending_start_player: None }
     }
 
     /// Fork A (par.8b) + par.8d: exakte Variante -- traegt zusaetzlich zu den
@@ -339,12 +372,19 @@ impl RefereeGame {
     /// `play_net_vs_net_game`: Spieler 0 -> `model_path_p0`, Spieler 1 ->
     /// `model_path_p1`); `None` = reiner DFS-Solver (Bestandsverhalten).
     ///
-    /// `external_tiling_players`: Seiten, deren PLATZIERUNG von aussen kommt
-    /// (Nutzer-Richtung 2026-08-26). Fuer sie haelt die Schleife mit
-    /// `"tiling"` an, statt selbst zu entscheiden; der Aufrufer holt den
-    /// Schritt beim Artefakt und reicht ihn ueber `tiling_apply_external`
-    /// zurueck. `None`/leer = Bestandsverhalten, der Referee loest alles
-    /// selbst auf.
+    /// `external_players`: Seiten, die ihre EIGENEN Entscheidungen treffen --
+    /// Startsetzung wie Platzierung (Nutzer-Richtung 2026-08-26). Fuer sie
+    /// haelt die Schleife mit `"start_placement"` bzw. `"tiling"` an, statt
+    /// selbst zu entscheiden; der Aufrufer holt den Zug beim Artefakt und
+    /// reicht ihn ueber `start_placement_apply_external` /
+    /// `tiling_apply_external` zurueck. `None`/leer = Bestandsverhalten, der
+    /// Referee loest alles selbst auf.
+    ///
+    /// EIN Begriff fuer beide Phasen, nicht zwei Listen: "diese Seite
+    /// entscheidet selbst" ist EINE Eigenschaft des Agenten. Zwei Schalter
+    /// waeren zwei Gelegenheiten, nur einen davon zu setzen -- und ein
+    /// Artefakt, das sein Tiling selbst waehlt, aber die Startsetzung vom
+    /// Referee bekommt, waere wieder ein halber Agent.
     ///
     /// WARUM DAS KEIN BRUCH DER REGEL-AUTORITAET IST (par.8): getrennt werden
     /// zwei Dinge, die bisher in `resolve_tiling_step` zusammenfielen -- WAS
@@ -362,12 +402,12 @@ impl RefereeGame {
     /// naechstes aufrufen), oder `"stuck"` (Deadlock -- laut Bestandscode nie
     /// erwartet, siehe `unified_game_loop`s `None => break`-Zweige; wird hier
     /// NICHT verschluckt, sondern woertlich gemeldet).
-    #[pyo3(signature = (model_path_p0=None, model_path_p1=None, external_tiling_players=None))]
+    #[pyo3(signature = (model_path_p0=None, model_path_p1=None, external_players=None))]
     fn advance_to_decision(
         &mut self, model_path_p0: Option<String>, model_path_p1: Option<String>,
-        external_tiling_players: Option<Vec<usize>>,
+        external_players: Option<Vec<usize>>,
     ) -> PyResult<String> {
-        let extern_tiling = external_tiling_players.unwrap_or_default();
+        let externe = external_players.unwrap_or_default();
         loop {
             match self.game.state.phase {
                 Phase::StartPlacement | Phase::Drafting => {
@@ -381,6 +421,10 @@ impl RefereeGame {
                         } else {
                             return Ok("stuck".to_string());
                         };
+                        if externe.contains(&pi) {
+                            self.pending_start_player = Some(pi);
+                            return Ok("start_placement".to_string());
+                        }
                         match choose_start_placement(&self.game.state, pi) {
                             Some((tid, r, c2, rot)) => {
                                 let _ = apply_start_placement(&mut self.game.state, pi, tid, r, c2, rot);
@@ -396,7 +440,7 @@ impl RefereeGame {
                 }
                 Phase::Tiling => {
                     let pi = self.game.state.current_player;
-                    if extern_tiling.contains(&pi) {
+                    if externe.contains(&pi) {
                         return Ok("tiling".to_string());
                     }
                     let model_path = if pi == 0 { &model_path_p0 } else { &model_path_p1 };
@@ -421,6 +465,56 @@ impl RefereeGame {
                 _ => return Ok("game_over".to_string()),
             }
         }
+    }
+
+    /// Welcher Spieler bei `"start_placement"` am Zug ist.
+    ///
+    /// Eigene Abfrage, weil `current_player()` in dieser Phase NICHT die
+    /// Antwort ist: die Startsetzung laeuft ueber `start_tile_pending` und
+    /// kann den Nicht-Starter zuerst betreffen (siehe die Auswahllogik in
+    /// `advance_to_decision`). Wer hier `current_player()` benutzt, setzt fuer
+    /// die falsche Seite.
+    fn pending_start_placement_player(&self) -> PyResult<usize> {
+        self.pending_start_player.ok_or_else(|| {
+            PyValueError::new_err(
+                "pending_start_placement_player: keine Startsetzung anstehend \
+                 (advance_to_decision hat zuletzt nicht 'start_placement' gemeldet)",
+            )
+        })
+    }
+
+    /// Wendet eine EXTERN entschiedene Startsetzung an -- nach Pruefung gegen
+    /// die Kandidatenmenge der aktuellen Engine.
+    ///
+    /// Gleiche Linie wie [`Self::tiling_apply_external`]: die ENTSCHEIDUNG
+    /// gehoert dem Agenten, die LEGALITAET der Engine. Anders als beim Tiling
+    /// gibt es hier kein implizites "aufhoeren" -- jede eingereichte Setzung
+    /// muss in der Kandidatenliste stehen.
+    fn start_placement_apply_external(&mut self, placement_json: String) -> PyResult<String> {
+        let pi = self.pending_start_placement_player()?;
+        let parsed: Value = serde_json::from_str(&placement_json)
+            .map_err(|e| PyValueError::new_err(format!("placement_json: JSON-Parse-Fehler: {e}")))?;
+        let feld = |name: &str| -> PyResult<u64> {
+            parsed.get(name).and_then(|x| x.as_u64()).ok_or_else(|| {
+                PyValueError::new_err(format!("placement_json: Feld '{name}' fehlt oder ist keine Zahl"))
+            })
+        };
+        let (tid, r, c, rot) = (
+            feld("tile_id")? as usize, feld("row")? as usize,
+            feld("col")? as usize, feld("rot")? as u32,
+        );
+        let legal = crate::self_play::start_placement_kandidaten(&self.game.state, pi);
+        if !legal.iter().any(|(_, t, rr, cc, ro)| (*t, *rr, *cc, *ro) == (tid, r, c, rot)) {
+            return Err(PyValueError::new_err(format!(
+                "start_placement_apply_external: Setzung {placement_json} ist fuer Spieler {pi} \
+                 NICHT legal ({} Kandidaten). Kein stiller Ersatz.",
+                legal.len()
+            )));
+        }
+        let _ = apply_start_placement(&mut self.game.state, pi, tid, r, c, rot);
+        self.pending_start_player = None;
+        self.steps += 1;
+        Ok(json!({"tile_id": tid, "row": r, "col": c, "rot": rot}).to_string())
     }
 
     /// Wendet einen EXTERN entschiedenen Tiling-Schritt an -- nach harter
