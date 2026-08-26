@@ -767,3 +767,43 @@ Referee-Pfads. Seit par.10b ist sie auch zwischen den Pfaden belegt, aber nur
 MIT gesetztem Anwendungsmodus.
 
 Sonde: `tools/probes/anchor_referee_parity_probe.py`.
+
+
+## par.11 Was das Einfrieren zusagt -- und was nicht (Nutzer-Klarstellung 2026-08-26)
+
+**Die Zusage ist enger, als sie klingt, und das gehoert hier hin, bevor jemand
+sie breiter liest.**
+
+| | woher | eingefroren? |
+| --- | --- | --- |
+| ENTSCHEIDUNG -- welcher legale Zug | Artefakt-Wheel | **ja** |
+| REGEL -- was legal ist, wie gewertet wird | aktuelle Engine (Referee) | **nein, absichtlich** (par.8: Regel-Fixes duerfen einen Alt-Agenten nie still nach alten Regeln spielen lassen) |
+
+**Warum daraus NICHT "der Agent spielt immer dieselben Zuege" folgt.** Die
+Bewertungsfunktionen der Heuristik sind reine Funktionen des ZUSTANDS
+(`mcts::player_total_variante(state, pi, variante)`,
+`scoring::scoring_progress(player, tile_ids)`). Das Artefakt traegt die
+FUNKTION, der Referee liefert das ARGUMENT. Aendert sich die Wertung in der
+Engine, erzeugt der Referee andere Zustaende, und der gefrorene Agent
+entscheidet darauf anders -- er spielt dann NICHT dieselben Zuege mit anderen
+Punkten, sondern andere Zuege.
+
+Ein frueherer Absatz dieser Sitzung behauptete das Gegenteil; der
+Nutzer-Einwand hat es berichtigt.
+
+**Was das Artefakt-Wheel also leistet:** die Selbstkonsistenz-Pruefung -- hat
+sich der Agent gegenueber seinem eigenen Wheel veraendert (Umgebungsdrift bei
+ORT/DLL/Interpreter)? Das ist der `--venv`-Modus von
+`verify_frozen_heuristic.py`.
+
+**Was kein Einfrieren leisten kann:** Elo-Vergleichbarkeit ueber eine
+REGELAENDERUNG hinweg. Ein Agent, der auf anderen Zustaenden anders
+entscheidet, ist gegen die alte Leiter nicht mehr direkt messbar. Der
+Praezedenzfall im Repo ist die richtige Antwort darauf und kein Artefakt-
+Problem: NEUVERANKERUNG (`PREREG_round5_minfix_elo_reset.md`).
+
+**Verworfen:** ein zusaetzlicher "Regeltreue"-Pruefmodus (Artefakt-
+Entscheidungen unter aktuellen Regeln, Vergleich gegen die Aufzeichnung). Er
+wuerde bei einer Regelaenderung divergierende Partien melden -- das sagt aber
+der Commit, der die Regel aendert, ohnehin. Er faengt keine STILLE
+Fehlerklasse, sondern bestaetigt eine laute.
