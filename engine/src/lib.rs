@@ -1110,6 +1110,31 @@ fn heuristic_arena_choice_state_json(
     Ok(json!({ "action": action, "value": Option::<f32>::None }).to_string())
 }
 
+/// Tiling-Schritt eines gefrorenen Agenten fuer einen extern gespeicherten
+/// Zustand. Rueckgabe im Schema, gegen das `RefereeGame::tiling_apply_external`
+/// prueft.
+///
+/// Die Variante kommt aus der Spec, das Tiling-Netz (falls die Variante eines
+/// braucht) aus dem Artefakt. Ohne diesen Einstieg kachelt eine gefrorene
+/// Heuristik im Referee-Pfad als V1 -- also als etwas anderes, als sie ist.
+#[pyfunction]
+#[pyo3(signature = (state_json, spec=None, model_path=None))]
+fn tiling_choice_state_json(
+    state_json: String,
+    spec: Option<String>,
+    model_path: Option<String>,
+) -> PyResult<String> {
+    let search_config = resolve_search_config(spec)?;
+    let net = match model_path {
+        Some(p) => Some(crate::net::Net::load_auto(&p).map_err(|e| {
+            pyo3::exceptions::PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}"))
+        })?),
+        None => None,
+    };
+    let step = crate::referee::choose_tiling_step_json(&search_config, &state_json, net.as_ref())?;
+    Ok(step.to_string())
+}
+
 /// Wertungsplatten-Endwertung für einen extern gespeicherten Zustand (z.B.
 /// ein Self-Play-Record `state`-Feld, `json.dumps(record["state"])`) --
 /// reine additive Lesefunktion für die Wertungsplatten-Diagnose (2026-07-26,
@@ -1823,6 +1848,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(selfplay_profile_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_arena_choice_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(heuristic_arena_choice_state_json, m)?)?;
+    m.add_function(wrap_pyfunction!(tiling_choice_state_json, m)?)?;
     m.add_class::<crate::py::PyGame>()?;
     m.add_class::<crate::referee::RefereeGame>()?;
     m.add_class::<crate::referee::FrozenWorkerEngine>()?;

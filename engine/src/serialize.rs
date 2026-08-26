@@ -353,6 +353,71 @@ fn source_name(src: crate::moves::TakeSource) -> &'static str {
 /// Drafting-Aktion → Anzeige-Move-Dict (für KI-Zug-Rückgabe und Baum-Labels).
 /// Bewusst informativ/vollständig (anders als die UI-`valid_moves`-Variante,
 /// die z.B. `dome_stack` ohne Slot-Felder liefert).
+/// Serialisiert einen [`TilingStep`] fuer die Referee-Worker-Grenze.
+///
+/// Gegenstueck zu [`action_to_dict`], und aus demselben Grund noetig: seit
+/// 2026-08-26 darf auch die PLATZIERUNG von aussen entschieden werden (ein
+/// eingefrorenes Heuristik-Artefakt spielt sonst nur seine halbe Identitaet
+/// -- `v2huelle` wirkt gerade im Routing).
+///
+/// Bewusst flach und benannt statt serde-abgeleitet: dieses Schema geht ueber
+/// eine Prozessgrenze zwischen ZWEI Engine-Versionen. Ein abgeleitetes Format
+/// aendert sich still mit dem Typ; ein handgeschriebenes bricht sichtbar.
+pub fn tiling_step_to_dict(step: &crate::tiling_solver::TilingStep) -> Value {
+    use crate::tiling_solver::TilingStep;
+    match step {
+        TilingStep::Place(ta) => json!({
+            "type": "place",
+            "pattern_row": ta.pattern_row,
+            "slot_row": ta.slot_row,
+            "slot_col": ta.slot_col,
+            "space_index": ta.space_index,
+        }),
+        TilingStep::Chips { row, chips } => json!({
+            "type": "chips",
+            "row": row,
+            "chips": chips,
+        }),
+        TilingStep::End => json!({ "type": "end" }),
+    }
+}
+
+/// Umkehrung von [`tiling_step_to_dict`]. Fehlende oder unbekannte Felder
+/// sind ein FEHLER, kein Default -- ein stillschweigend als `End` gelesener
+/// Tippfehler waere ein unsichtbar verkuerzter Zug.
+pub fn dict_to_tiling_step(v: &Value) -> Result<crate::tiling_solver::TilingStep, String> {
+    use crate::round_end::TilingAction;
+    use crate::tiling_solver::TilingStep;
+    let obj = v.as_object().ok_or("tiling_step: JSON-Wurzel muss ein Objekt sein")?;
+    let typ = obj.get("type").and_then(|x| x.as_str())
+        .ok_or("tiling_step: Feld 'type' fehlt oder ist keine Zeichenkette")?;
+    let feld = |name: &str| -> Result<usize, String> {
+        obj.get(name)
+            .and_then(|x| x.as_u64())
+            .map(|x| x as usize)
+            .ok_or_else(|| format!("tiling_step: Feld '{name}' fehlt oder ist keine Zahl"))
+    };
+    match typ {
+        "place" => Ok(TilingStep::Place(TilingAction {
+            pattern_row: feld("pattern_row")?,
+            slot_row: feld("slot_row")?,
+            slot_col: feld("slot_col")?,
+            space_index: feld("space_index")?,
+        })),
+        "chips" => {
+            let chips = obj.get("chips").and_then(|x| x.as_array())
+                .ok_or("tiling_step: Feld 'chips' fehlt oder ist keine Liste")?
+                .iter()
+                .map(|x| x.as_u64().map(|n| n as usize)
+                    .ok_or_else(|| "tiling_step: 'chips' enthaelt Nicht-Zahlen".to_string()))
+                .collect::<Result<Vec<_>, String>>()?;
+            Ok(TilingStep::Chips { row: feld("row")?, chips })
+        }
+        "end" => Ok(TilingStep::End),
+        other => Err(format!("tiling_step: unbekannter Typ '{other}' (place/chips/end)")),
+    }
+}
+
 pub fn action_to_dict(a: &Action) -> Value {
     match a {
         Action::Stone(m) => json!({

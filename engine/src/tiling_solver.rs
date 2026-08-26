@@ -148,7 +148,10 @@ fn chippable_rows(state: &GameState, pi: usize) -> Vec<usize> {
 ///   Verzweigen über ALLE 2^n-Allokationen wäre hier unbezahlbar (E2E 8 s→75 s+).
 /// - `true` (nur der echte KI-Zug, einmal pro Tiling-Schritt): alle distinkten
 ///   Allokationen → exakt optimale Chip-Nutzung im tatsächlich gespielten Zug.
-fn legal_steps(state: &GameState, pi: usize, exact: bool) -> Vec<TilingStep> {
+// `pub(crate)` seit 2026-08-26: der Referee braucht die legalen Schritte, um
+// einen EXTERN entschiedenen Tiling-Zug hart zu pruefen. Reine
+// Sichtbarkeits-Erweiterung, kein Verhaltenswechsel.
+pub(crate) fn legal_steps(state: &GameState, pi: usize, exact: bool) -> Vec<TilingStep> {
     let mut steps: Vec<TilingStep> = generate_tiling_actions(state, pi)
         .into_iter()
         .map(TilingStep::Place)

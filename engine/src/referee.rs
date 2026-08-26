@@ -90,6 +90,38 @@ use crate::tile::TileColor;
 /// Punkt: am 2026-08-26 hat ein vom Aufrufer vergessenes
 /// `--heuristik-variante` einen falschen Befund erzeugt. Ein Artefakt, das
 /// sich selbst beschreibt, kann so nicht mehr falsch gespielt werden.
+/// Waehlt einen Tiling-Schritt fuer einen extern gespeicherten Zustand --
+/// mit der Variante aus der Spec.
+///
+/// Das ist die Haelfte, die der Referee bis 2026-08-26 selbst entschied, und
+/// zwar ueber `resolve_tiling_step`, das auf `V1` verdrahtet ist. Fuer ein
+/// Netz war das die richtige Abgrenzung; fuer eine Heuristik nicht -- der
+/// v2-Durchbruch sitzt im Platzierungs-Routing.
+///
+/// `net`: optionales Tiling-Netz. Die v2-Vorzugskarte greift nur, wenn sie
+/// einen Zug liefert; sonst faellt es auf den Bestandspfad durch, und DORT
+/// entscheidet das Netz Gleichstaende (self_play.rs). Ein v2-Artefakt bringt
+/// sein Netz deshalb selbst mit (`tiling_net.onnx`).
+pub(crate) fn choose_tiling_step_json(
+    search_config: &SearchConfig,
+    state_json: &str,
+    net: Option<&Net>,
+) -> PyResult<Value> {
+    let parsed: Value = serde_json::from_str(state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state_exact(&parsed).map_err(PyValueError::new_err)?;
+    if state.phase != Phase::Tiling {
+        return Err(PyValueError::new_err(
+            "choose_tiling_step_json: state ist keine Tiling-Phase.",
+        ));
+    }
+    let pi = state.current_player;
+    let step = crate::self_play::resolve_tiling_step_variante(
+        &state, pi, net, search_config.heuristik_variante,
+    );
+    Ok(crate::serialize::tiling_step_to_dict(&step))
+}
+
 pub(crate) fn choose_heuristic_drafting_action_json(
     search_config: &SearchConfig,
     state_json: &str,
@@ -307,14 +339,35 @@ impl RefereeGame {
     /// `play_net_vs_net_game`: Spieler 0 -> `model_path_p0`, Spieler 1 ->
     /// `model_path_p1`); `None` = reiner DFS-Solver (Bestandsverhalten).
     ///
+    /// `external_tiling_players`: Seiten, deren PLATZIERUNG von aussen kommt
+    /// (Nutzer-Richtung 2026-08-26). Fuer sie haelt die Schleife mit
+    /// `"tiling"` an, statt selbst zu entscheiden; der Aufrufer holt den
+    /// Schritt beim Artefakt und reicht ihn ueber `tiling_apply_external`
+    /// zurueck. `None`/leer = Bestandsverhalten, der Referee loest alles
+    /// selbst auf.
+    ///
+    /// WARUM DAS KEIN BRUCH DER REGEL-AUTORITAET IST (par.8): getrennt werden
+    /// zwei Dinge, die bisher in `resolve_tiling_step` zusammenfielen -- WAS
+    /// legal ist (bleibt beim Referee, `tiling_apply_external` prueft hart
+    /// gegen `legal_steps`) und WELCHER legale Zug gewaehlt wird (gehoert dem
+    /// Agenten). Beim Drafting steht diese Trennung seit Welle 3; fuer das
+    /// Tiling fehlte sie, und damit spielte ein gefrorenes
+    /// Heuristik-Artefakt nur seine halbe Identitaet: `resolve_tiling_step`
+    /// ist auf `V1` verdrahtet (self_play.rs), also haette `v2huelle` wie
+    /// `v1` gekachelt.
+    ///
     /// Rueckgabe: `"drafting"` (Entscheidung noetig, `current_player()` sagt
-    /// wer), `"game_over"` (Runde 5 fertig -- `finalize_scoring()` als
+    /// wer), `"tiling"` (Platzierung einer externen Seite noetig),
+    /// `"game_over"` (Runde 5 fertig -- `finalize_scoring()` als
     /// naechstes aufrufen), oder `"stuck"` (Deadlock -- laut Bestandscode nie
     /// erwartet, siehe `unified_game_loop`s `None => break`-Zweige; wird hier
     /// NICHT verschluckt, sondern woertlich gemeldet).
+    #[pyo3(signature = (model_path_p0=None, model_path_p1=None, external_tiling_players=None))]
     fn advance_to_decision(
         &mut self, model_path_p0: Option<String>, model_path_p1: Option<String>,
+        external_tiling_players: Option<Vec<usize>>,
     ) -> PyResult<String> {
+        let extern_tiling = external_tiling_players.unwrap_or_default();
         loop {
             match self.game.state.phase {
                 Phase::StartPlacement | Phase::Drafting => {
@@ -343,6 +396,9 @@ impl RefereeGame {
                 }
                 Phase::Tiling => {
                     let pi = self.game.state.current_player;
+                    if extern_tiling.contains(&pi) {
+                        return Ok("tiling".to_string());
+                    }
                     let model_path = if pi == 0 { &model_path_p0 } else { &model_path_p1 };
                     let net = match model_path {
                         Some(p) => Some(load_cached(&mut self.nets, p)?),
@@ -365,6 +421,62 @@ impl RefereeGame {
                 _ => return Ok("game_over".to_string()),
             }
         }
+    }
+
+    /// Wendet einen EXTERN entschiedenen Tiling-Schritt an -- nach harter
+    /// Pruefung gegen die aktuell legalen Schritte.
+    ///
+    /// Gegenstueck zu [`Self::drafting_apply_external`]. Die Pruefung ist der
+    /// Grund, warum die Regel-Autoritaet beim Referee bleiben kann, obwohl die
+    /// ENTSCHEIDUNG von aussen kommt: ein Artefakt aus einer aelteren Aera
+    /// kann keinen Zug durchsetzen, den die heutigen Regeln nicht kennen. Eine
+    /// nicht-legale Antwort ist ein Abbruch mit Diagnose, keine stille
+    /// Korrektur -- dieselbe Linie wie beim Drafting.
+    ///
+    /// `exact=true` bei der Legalitaetspruefung, weil GENAU DAS die Menge ist,
+    /// aus der der echte Zug gewaehlt wird (`tiling_solver`: exakte
+    /// Chip-Allokation nur im tatsaechlich gespielten Zug, nicht im
+    /// MCTS-Blatt). Mit `false` waere eine legale Chip-Aufteilung faelschlich
+    /// als illegal zurueckgewiesen worden.
+    fn tiling_apply_external(&mut self, step_json: String) -> PyResult<String> {
+        if self.game.state.phase != Phase::Tiling {
+            return Err(PyValueError::new_err(
+                "tiling_apply_external: keine Tiling-Phase anstehend",
+            ));
+        }
+        let pi = self.game.state.current_player;
+        let parsed: Value = serde_json::from_str(&step_json)
+            .map_err(|e| PyValueError::new_err(format!("step_json: JSON-Parse-Fehler: {e}")))?;
+        let step = crate::serialize::dict_to_tiling_step(&parsed).map_err(PyValueError::new_err)?;
+        // `End` steht NICHT in `legal_steps` und ist trotzdem immer erlaubt:
+        // der Solver fuehrt "hier aufhoeren" als Baseline 0 statt als
+        // aufgezaehlten Schritt (`solve_rec`, Kommentar "Baseline 0 = hier
+        // aufhoeren"). Die Liste enthaelt nur `Place` und `Chips`. Ohne diese
+        // Unterscheidung waere JEDER Tiling-Abschluss als illegal
+        // zurueckgewiesen worden -- der erste End-to-End-Lauf ist genau
+        // darueber gestolpert.
+        let legal = crate::tiling_solver::legal_steps(&self.game.state, pi, true);
+        if step != TilingStep::End && !legal.contains(&step) {
+            return Err(PyValueError::new_err(format!(
+                "tiling_apply_external: Schritt {step_json} ist fuer Spieler {pi} NICHT legal \
+                 ({} legale Schritte). Kein stiller Ersatz -- das Artefakt und die aktuelle \
+                 Engine sind sich ueber die Regeln nicht einig, und das gehoert diagnostiziert.",
+                legal.len()
+            )));
+        }
+        match &step {
+            TilingStep::Place(ta) => {
+                let _ = self.game.apply_single_tiling(pi, ta);
+            }
+            TilingStep::Chips { row, chips } => {
+                apply_bonus_chips_with(&mut self.game.state.players[pi], *row, chips);
+            }
+            TilingStep::End => {
+                let _ = self.game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut self.rng);
+            }
+        }
+        self.steps += 1;
+        Ok(crate::serialize::tiling_step_to_dict(&step).to_string())
     }
 
     /// Seite IN-PROCESS: Netzsuche + Anwenden fuer die aktuell anstehende
