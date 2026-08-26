@@ -443,7 +443,38 @@ Vorbereitet ist dafuer inzwischen alles: der Korpus ist reproduzierbar
 (1c), sein Erzeuger eingefroren (1d), und der Cache laesst sich waehrend
 der Erzeugung mitbauen (1b).
 
-### B. Den Aufraeumeffekt einloesen -- vier Schritte, in dieser Reihenfolge
+### B. ERLEDIGT 2026-08-26 bis auf B4a
+
+| | | Stand |
+| --- | --- | --- |
+| B1 | Treiber parallelisieren | **fertig** -- Faktor 2,42 (39,5 s -> 16,3 s bei 24 Partien), ergebnisneutral Partie fuer Partie |
+| B2 | Arena ueber den Referee | **fertig** -- `tools/anchor_arena.py`, misst gegen `frozen_heuristics/v1_anchor` |
+| B3 | Elo-Konventionen | **fertig** -- `player_b` traegt den Build, `elo_tracker add --knobs` verweist auf die Spec |
+| B4b | `round5_anchor.rs` entfernt | **fertig** -- 1.664 Zeilen, dreifach als verhaltensneutral belegt |
+| B4a | Varianten-Faedelung entfernen | **BLOCKIERT**, siehe unten |
+
+**B4a ist blockiert, und zwar registriert, nicht vorsichtshalber:**
+
+* `PREREG_heuristic_v2_long_rows.md` ist **OFFEN**; par.3b.1 (Gewichtsfenster
+  der Huelle) ist eine vorregistrierte Messung, die v2 aus dem QUELLSTAND
+  braucht. Die Faedelung zu entfernen wuerde sie unmoeglich machen.
+* Die Artefakt-Specs NENNEN die Variante (`heuristik_variante: "v2huelle"`).
+  Die aktuelle Engine muss den Namen aufloesen koennen, sonst kann kein
+  Werkzeug eine Artefakt-Spec mehr lesen -- auch `freeze_heuristic.py`,
+  `frozen_champion_worker.py` und die Sonden nicht.
+
+Die Faedelung existiert genau WEGEN v2. Sie faellt, wenn v2 auch aus dem
+Quellstand verschwindet -- und dazu muessen zuerst die v2-messenden Werkzeuge
+(`v2_envelope_arena.py`, der `--tiling`-Split, `self_play.py
+--heuristik-variante`) auf den Artefakt-Pfad umziehen. Das ist ein eigener
+Schritt mit eigenem Tor, kein Anhaengsel.
+
+**Was sich durch B4b geaendert hat und ausgesprochen gehoert:** ab jetzt
+bewegt eine Aenderung an `round5.rs` auch den Heuristik-Pfad. Der Schutz ist
+ins Artefakt gewandert -- eine Anker-Messung MUSS deshalb ab jetzt ueber
+`tools/anchor_arena.py` laufen, nicht ueber die In-Process-Heuristik.
+
+### B (Historie). Die vier Schritte, wie sie geplant waren
 
 Ziel (Nutzer 2026-08-26): gefrorene Agenten spielen gegeneinander,
 Entwicklungsversionen bleiben ungekapselt, der Engine-Code wird schlanker.
