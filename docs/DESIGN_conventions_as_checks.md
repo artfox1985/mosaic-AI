@@ -212,3 +212,44 @@ Am historischen Fall geprueft, nicht nur synthetisch: die Fassung von
 einfuehrte, erzeugt 6 Treffer. Der bereinigte Stand ist gruen. Und der
 Waechter hat im selben Zug die deutschen Namen in seinem EIGENEN Neubau
 gemeldet (`treffer`, `quellzeilen`) -- die sind daraufhin englisch geworden.
+
+## Nachtrag 2026-08-27: Regel 1 wird WARNUNG (Nutzer-Entscheid)
+
+Nachgezaehlt statt vermutet, auf Nutzer-Frage "was bringt mir eigentlich die
+Ratsche":
+
+| | |
+| --- | --- |
+| Basislinie neu gelegt | **10 x** |
+| Dateien wegen der Ratsche zerlegt | **0** |
+
+Die einzige Auslagerung im Baum (`train_manifest.py` aus `train.py`, `d8d34f5`)
+nennt in ihrer Begruendung weder Groesse noch Wachstum -- sie kam aus zwei
+Nutzer-Anstoessen.
+
+**Warum das strukturell so kommt.** Wenn die Ratsche feuert, stehen zwei Wege
+offen: zerlegen, oder `--update-size-baseline`. Der zweite kostet zehn
+Sekunden, der erste eine Architekturentscheidung -- und die hat in diesem Repo
+keinen Besitzer. Die Regel wusste das und sagte es in ihrer eigenen
+Fehlermeldung: "ein Refactoring-Rueckstand, den niemand beauftragt hat".
+
+**Der eigentliche Preis war nicht das ungebremste Wachstum.** Ein Tor, das man
+regelmaessig umgeht, bringt das Umgehen bei. Zehn Basislinien-Resets sind zehn
+Uebungen darin, einen roten Konventions-Check per Kommandozeile gruen zu
+machen -- das faerbt auf die Tore ab, die wirklich tragen (REGEL 0,
+Rechnerstruktur, Prereg-Koepfe).
+
+**Und sie misst einen Stellvertreter fuer das Falsche.** Die Modularitaetsregel
+in CLAUDE.md nennt ZUSTAENDIGKEITEN (Spiellogik / KI-Entscheidungen /
+Spielzustand strikt getrennt), keine Dateigroessen. `neural_net.py` ist nicht
+wegen 168 KB fragwuerdig, sondern hoechstens dann, wenn sie mehrere
+Zuständigkeiten mischt. Bytes wurden gemessen, weil Bytes billig zu messen
+sind.
+
+Nach dem Massstab, den das Projekt selbst an Infrastruktur anlegt (CLAUDE.md,
+"Infrastruktur bewerten": ein Vorschlag braucht einen BENANNTEN Nutzniesser),
+faellt die Ratsche als Blocker durch.
+
+**Was bleibt:** die Zahl wird weiter gemeldet, als Warnung auf stderr. Rot ist
+nur noch der kaputte Fall -- `size_baseline.json` fehlt ganz, dann kann die
+Warnung nicht einmal rechnen.

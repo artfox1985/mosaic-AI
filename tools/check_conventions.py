@@ -6,12 +6,21 @@ Siehe docs/DESIGN_conventions_as_checks.md, Abschnitt
 (tools/hooks/pre-commit), Budget < 3 s -- daher NUR textnahe Pruefungen:
 keine Compilierung, kein Netz, keine Korpus-/Modell-Dateien.
 
-Sechs harte Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg),
+Fuenf harte Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg),
 plus eine Warn-Regel 5 (stille Test-Skips, nur stderr -- Heuristik zu grob
 fuer einen Commit-Blocker, siehe dortiger Kommentar):
-  1. Datei-Groessen-RATSCHE   -- tools/size_baseline.json, Schwelle 40 KB,
-                                  rot nur bei Wachstum > +2% einer bereits
-                                  zu grossen Datei (kein Refactoring-Zwang).
+  1. Datei-Groessen-Ratsche   -- WARNUNG, kein Blocker (Nutzer-Entscheid
+                                  2026-08-27). Sie war 10 Auslesungen lang rot
+                                  und hat NULL Zerlegungen bewirkt: wer sie
+                                  traf, legte die Basislinie neu, weil das
+                                  zehn Sekunden kostet und eine Zerlegung eine
+                                  Architekturentscheidung, die niemand
+                                  beauftragt hatte. Ein Tor, das man
+                                  routinemaessig umgeht, bringt das Umgehen
+                                  bei -- und faerbt auf die Tore ab, die
+                                  tragen. Die Zahl bleibt sichtbar, der Zwang
+                                  faellt. ROT bleibt nur der kaputte Fall:
+                                  size_baseline.json fehlt ganz.
   2. Doku-Sprachkonvention    -- README.md englisch, STATUS.md/history.md
                                   deutsch (Stopwort-Mehrheit, grosszuegig).
   3. Keine neuen `#NN`        -- jede `Task #NN` muss in
@@ -170,17 +179,16 @@ def check_file_size_ratchet(staged_only: bool, staged_files: set[str]) -> list[s
             continue
         if base_bytes > SIZE_THRESHOLD_BYTES and cur_bytes > base_bytes * SIZE_GROWTH_TOLERANCE:
             growth_pct = (cur_bytes / base_bytes - 1) * 100
-            violations.append(
-                f"REGEL 1 (Datei-Groessen-Ratsche): {rel} ist von {base_bytes / 1024:.1f} KB auf "
+            print(
+                f"[WARNUNG, Regel 1 -- Groessen-Ratsche] {rel} ist von {base_bytes / 1024:.1f} KB auf "
                 f"{cur_bytes / 1024:.1f} KB gewachsen (+{growth_pct:.1f}%, mehr als die 2%-Rauschtoleranz) "
                 f"-- die Basislinie lag bereits ueber der {SIZE_THRESHOLD_BYTES / 1024:.0f}-KB-Schwelle.\n"
-                "  Konsequenz: diese Datei verstoesst schon gegen die Modularitaetsregel aus CLAUDE.md; "
-                "jedes weitere Wachstum vertieft einen Refactoring-Rueckstand, den niemand beauftragt hat.\n"
-                f"  Ausweg: (a) die Aenderung zuschneiden, bis die Datei wieder unter "
-                f"{base_bytes * SIZE_GROWTH_TOLERANCE / 1024:.1f} KB liegt (z.B. Funktionsblock in ein "
-                "neues Modul auslagern), oder (b) falls das Wachstum bewusst und reviewt ist: Basislinie neu "
-                "legen mit `python tools/check_conventions.py --update-size-baseline` und "
-                "tools/size_baseline.json mitcommitten."
+                "  Kein Blocker (Nutzer-Entscheid 2026-08-27, Begruendung im Regel-Kopf). Wenn dieses "
+                "Wachstum ein Zeichen ist, dann fuer die ZUSTAENDIGKEITS-Frage: macht diese Datei mehr "
+                "als eine Sache? Bytes beantworten das nicht.\n"
+                "  Basislinie nachziehen (optional, macht die Meldung ruhiger): "
+                "`python tools/check_conventions.py --update-size-baseline`.",
+                file=sys.stderr,
             )
         elif base_bytes <= SIZE_THRESHOLD_BYTES < cur_bytes:
             # Kein Regelverstoss -- die Datei durfte wachsen, bis sie die Schwelle riss (Design-Dok A5).
