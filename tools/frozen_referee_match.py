@@ -394,7 +394,12 @@ def main() -> int:
 
     result = {
         "artifact_dir": str(artifact_dir),
+        # `champion` gibt es nur bei Netz-Artefakten, eine Heuristik traegt
+        # `artefakt`. Beide mitschreiben, statt eines davon zu erzwingen --
+        # das Artefakt beschreibt sich selbst, der Bericht verbiegt es nicht.
         "champion": manifest.get("champion"),
+        "artefakt": manifest.get("artefakt"),
+        "typ": manifest.get("typ", "netz"),
         "handshake": handshake,
         "force_cross_era": args.force_cross_era,
         "golden_selftest": {"ran": not args.skip_golden, "mismatches": golden_mismatches},
@@ -418,7 +423,11 @@ def main() -> int:
     result["wins_b"] = wins_b
     result["draws"] = draws
 
-    out_path = Path(args.out) if args.out else REPO / "evaluations" / f"frozen_referee_match_{manifest.get('champion')}.json"
+    # Name aus dem Artefakt, nicht aus einem Feld, das nur eine Sorte kennt:
+    # ein Heuristik-Manifest hat kein `champion`, die Datei hiess deshalb
+    # `..._None.json`.
+    bezeichner = manifest.get("champion") or manifest.get("artefakt") or artifact_dir.name
+    out_path = Path(args.out) if args.out else REPO / "evaluations" / f"frozen_referee_match_{bezeichner}.json"
     out_path.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"[referee] fertig: {wins_a} A / {wins_b} B / {draws} Remis, geschrieben nach {out_path}", file=sys.stderr)
     return 0
