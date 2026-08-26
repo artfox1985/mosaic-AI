@@ -1337,6 +1337,12 @@ class MosaicDataset(Dataset):
         cache_key = hashlib.md5(cache_key_material.encode()).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
+        # Nach aussen sichtbar fuer den parallelen Bau
+        # (PREREG_cache_build_time.md Hebel 1): die Worker bauen je eine
+        # Datei-Teilmenge und geben nur DIESEN Pfad zurueck, statt die
+        # Arrays durch die Prozess-Pipe zu schicken -- beim vollen Korpus
+        # waeren das ueber 11 GB. Reine Zuweisung, kein Kontrollfluss.
+        self.cache_path_h5 = cache_path_h5
 
         if os.path.exists(cache_path_h5):
             # HDF5 Cache laden — deutlich schneller als .pt

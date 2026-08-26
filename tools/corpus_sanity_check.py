@@ -32,7 +32,13 @@ def ci(v):
 def auswerten(verzeichnis):
     dateien = sorted(glob.glob(os.path.join(verzeichnis, "*.pkl")))
     partien = {}       # game_id -> letzter Record
-    floor_max = {}     # (game_id, spieler, runde) -> groesste Strafleisten-Laenge
+    # (game_id, spieler) -> Summe der groessten Strafleisten-Laenge JE RUNDE.
+    # ACHTUNG, Fehler vom 2026-08-26: erst stand hier ein Dict mit dem Schluessel
+    # (game_id, spieler, runde), und die Summe je Partie wurde am Ende per
+    # Filterlauf ueber ALLE Eintraege gebildet -- quadratisch. Bei 270 Partien
+    # unauffaellig, bei 24.000 laeuft es Stunden. Jetzt wird direkt auf die
+    # (Partie, Seite) aggregiert und die Runde nur im Zwischenspeicher gehalten.
+    floor_max = {}     # (game_id, spieler, runde) -> groesste Laenge, wird gleich aggregiert
     for f in dateien:
         with open(f, "rb") as fh:
             recs = pickle.load(fh)
@@ -44,6 +50,11 @@ def auswerten(verzeichnis):
                 floor_max[k] = max(floor_max.get(k, 0), len(p.get("floor") or []))
             if r.get("winner") is not None:
                 partien[gid] = r
+
+    # EINMAL auf (Partie, Seite) aggregieren statt je Partie zu filtern.
+    floor_je_seite = {}
+    for (g, pi_, _r), v in floor_max.items():
+        floor_je_seite[(g, pi_)] = floor_je_seite.get((g, pi_), 0) + v
 
     # Je Partie und Seite die Endgroessen einsammeln.
     zeilen_voll, zeilen_fuell, sp_voll, sp_ge4, sp_ge3, sp_max = [], [], [], [], [], []
@@ -70,8 +81,7 @@ def auswerten(verzeichnis):
             sp_max.append(max(cf) if cf else 0)
             punkte.append(sc[pi])
             margin.append(sc[pi] - sc[1 - pi])
-            floor_steine.append(sum(v for (g2, p2, _), v in floor_max.items()
-                                    if g2 == gid and p2 == pi))
+            floor_steine.append(floor_je_seite.get((gid, pi), 0))
             stp = p.get("scoring_tile_points") or []
             for i in ids:
                 if i < len(stp):

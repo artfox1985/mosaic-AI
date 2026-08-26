@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Der Cache-Bau des Trainings dauert rund 70 min fuer 890.000 Zustaende und liegt damit vor JEDER Trainingsfrage. Welche Hebel verkuerzen ihn -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag, Start unmittelbar nach dem Ende der v22-Erzeugung. Gemessen am hv2-Korpus: state_to_planes 1,896 ms je Zustand (85 Prozent der Merkmalskosten), state_to_tensor 0,185 ms, Unpickle 0,150 ms; Summe 2,23 ms = 33 min der beobachteten ~70. DREI HEBEL, absteigend nach erwartetem Nutzen: (1) PARALLELISIERUNG des Bau-Laufs -- neural_net.py enthaelt kein Pool/multiprocessing, die Dateien laufen nacheinander bei ~0,75 Kernen, obwohl sie unabhaengig sind; trifft die GANZE Schleife, nicht nur die Merkmale. (2) RUST-EXPORT der Bauer (features.rs hat sie, pyo3 exportiert sie nicht) -- trifft 85 Prozent von 33 der 70 min, also bestenfalls die halbe Wanduhr. (3) lzf-Kompression pruefen (115,9 MB Feldinhalt -> 7,6 MB Datei, Faktor 15). EIN GEMEINSAMES HARTES TOR fuer alle drei: BIT-IDENTITAET des erzeugten Caches gegen den heutigen Stand. Ein schnellerer, aber anderer Cache entwertet jeden Vergleich mit bestehenden Modellen; faellt die Identitaet und ist die Abweichung nicht behebbar, stirbt der jeweilige Hebel. Reihenfolge (1) vor (2), in par.5 begruendet. HEBEL (4) NACHGETRAGEN (par.6, Nutzer-Frage): Cache JE DATEI statt je Fenster -- laeuft auf DEMSELBEN Umbau wie (1) (picklebare Funktion je Datei; Pool darueber = Parallelisierung, Memoisierung darauf = Datei-Cache), wird aber getrennt ausgeliefert, weil er eine Schluesselteilung braucht und die still danebengehen kann. Sein Gewinn ist nicht die Wanduhr, sondern der kritische Pfad: ein Datei-Cache kann WAEHREND der Erzeugung mitlaufen, dann ist er fertig, wenn der Korpus fertig ist. GPU GEPRUEFT UND VERWORFEN (par.5a, Nutzer-Frage): der Bauer ist Umpacken statt Arithmetik, verzweigungslastig, und die Daten liegen als Python-Objekte im Host-RAM -- sie dorthin zu bringen IST die Arbeit. Ob (2) nach (1) noch lohnt, entscheidet eine NEUE Messung des Merkmalsanteils, nicht das Bauchgefuehl (par.5b). -->
+<!-- STATUS: OFFEN | Frage: Der Cache-Bau des Trainings dauert rund 70 min fuer 890.000 Zustaende und liegt damit vor JEDER Trainingsfrage. Welche Hebel verkuerzen ihn -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag, Start unmittelbar nach dem Ende der v22-Erzeugung. Gemessen am hv2-Korpus: state_to_planes 1,896 ms je Zustand (85 Prozent der Merkmalskosten), state_to_tensor 0,185 ms, Unpickle 0,150 ms; Summe 2,23 ms = 33 min der beobachteten ~70. DREI HEBEL, absteigend nach erwartetem Nutzen: (1) PARALLELISIERUNG des Bau-Laufs -- neural_net.py enthaelt kein Pool/multiprocessing, die Dateien laufen nacheinander bei ~0,75 Kernen, obwohl sie unabhaengig sind; trifft die GANZE Schleife, nicht nur die Merkmale. (2) RUST-EXPORT der Bauer (features.rs hat sie, pyo3 exportiert sie nicht) -- trifft 85 Prozent von 33 der 70 min, also bestenfalls die halbe Wanduhr. (3) lzf-Kompression pruefen (115,9 MB Feldinhalt -> 7,6 MB Datei, Faktor 15). EIN GEMEINSAMES HARTES TOR fuer alle drei: BIT-IDENTITAET des erzeugten Caches gegen den heutigen Stand. Ein schnellerer, aber anderer Cache entwertet jeden Vergleich mit bestehenden Modellen; faellt die Identitaet und ist die Abweichung nicht behebbar, stirbt der jeweilige Hebel. HEBEL (1) GEBAUT UND ABGENOMMEN 2026-08-26 (par.7): 120 Dateien / 209.057 Zustaende, seriell 463,6 s gegen parallel 93,0 s = **Faktor 4,99**, und das TOR IST BESTANDEN -- alle 21 Felder bit-identisch. Zuschnitt ohne Eingriff in die Bauschleife: die Worker bauen Datei-Teilmengen mit dem Bestandscode und geben nur ihren Cache-Pfad zurueck. Einzige Aenderung an neural_net.py ist eine Zuweisung. Hochrechnung voller Korpus: seriell ~2,6 h, parallel ~31 min. Die vorab benannte Erwartung (Faktor 4-6) hat gehalten. NICHT verdrahtet in train.py -- erst soll der Hebel auf dem vollen Korpus das Tor nochmal bestehen. Reihenfolge (1) vor (2), in par.5 begruendet. HEBEL (4) NACHGETRAGEN (par.6, Nutzer-Frage): Cache JE DATEI statt je Fenster -- laeuft auf DEMSELBEN Umbau wie (1) (picklebare Funktion je Datei; Pool darueber = Parallelisierung, Memoisierung darauf = Datei-Cache), wird aber getrennt ausgeliefert, weil er eine Schluesselteilung braucht und die still danebengehen kann. Sein Gewinn ist nicht die Wanduhr, sondern der kritische Pfad: ein Datei-Cache kann WAEHREND der Erzeugung mitlaufen, dann ist er fertig, wenn der Korpus fertig ist. GPU GEPRUEFT UND VERWORFEN (par.5a, Nutzer-Frage): der Bauer ist Umpacken statt Arithmetik, verzweigungslastig, und die Daten liegen als Python-Objekte im Host-RAM -- sie dorthin zu bringen IST die Arbeit. Ob (2) nach (1) noch lohnt, entscheidet eine NEUE Messung des Merkmalsanteils, nicht das Bauchgefuehl (par.5b). -->
 
 # Vorregistrierung: Zeit des Cache-Baus
 
@@ -214,3 +214,54 @@ und er ist groesser als alles, was (1) bis (3) zusammen holen koennen.
 kommt eine zweite Pflichtpruefung dazu -- ein absichtlich veraenderter
 per-Datei-Parameter MUSS einen Cache-Miss erzeugen. Ein Test, der nur zeigt,
 dass gleiche Eingaben denselben Cache treffen, prueft die falsche Haelfte.
+
+
+## par.7 HEBEL (1) GEBAUT UND ABGENOMMEN (2026-08-26)
+
+**Zuschnitt ohne Eingriff in die 500-Zeilen-Bauschleife.** `MosaicDataset`
+nimmt bereits eine explizite Dateiliste; die Worker bauen je eine
+ZUSAMMENHAENGENDE Teilmenge mit dem UNVERAENDERTEN Bestandscode und geben nur
+ihren Cache-Pfad zurueck. Der Elternprozess liest die Teil-Caches von der
+Platte und fuegt feldweise zusammen. Arrays durch die Prozess-Pipe zu schicken
+waere beim vollen Korpus ueber 11 GB.
+
+Einzige Aenderung an `neural_net.py`: `self.cache_path_h5 = cache_path_h5` --
+eine Zuweisung, kein Kontrollfluss.
+
+**Messung, 120 Dateien / 209.057 Zustaende, encoder=2d, 10 Worker:**
+
+| | Wanduhr | je Zustand |
+| --- | --- | --- |
+| seriell (Bestandsweg) | **463,6 s** | 2,22 ms |
+| parallel (Teil-Bau) | 90,6 s | |
+| parallel (Zusammenfuegen) | 2,4 s | |
+| **parallel gesamt** | **93,0 s** | |
+| **Beschleunigung** | **4,99x** | |
+
+Die 2,22 ms je Zustand decken sich mit der Einzelmessung aus par.2 (2,23 ms)
+-- die Vorhersage traegt.
+
+**DAS TOR IST BESTANDEN: bit-identisch.** `cache_parity_probe.py` vergleicht
+alle 21 Felder mit `np.array_equal`, keine Toleranz: identisch. Damit ist der
+Hebel nicht nur schneller, sondern folgenlos fuer jeden Vergleich mit
+bestehenden Modellen.
+
+**Hochrechnung auf den vollen Korpus** (Herleitung aus dieser Messung, nicht
+gemessen): 2.400 Dateien = 4,18 Mio Zustaende, also seriell rund **2,6 h**,
+parallel rund **31 min**. Die frueher genannten "~5,5 h" waren zu hoch -- sie
+stammten aus dem 70-Minuten-Beobachtungswert fuer 513 Dateien, der unter Last
+und mit `OMP_NUM_THREADS=2` zustande kam.
+
+**Die vorab benannte Erwartung aus par.5 war "Faktor 4-6, nicht 12".**
+Gemessen 4,99 -- die Erwartung hat gehalten, und sie stand vor der Messung da.
+
+**Nebeneffekt wie vorhergesagt:** die zehn Teil-Caches bleiben in `data/`
+liegen. Ein zweiter Lauf mit derselben Blockteilung trifft sie -- der
+Datei-Cache aus Hebel (4) in grober Form, ohne dessen Schluesselteilung.
+Aufraeumbedarf: die `.cache_*.h5`-Dateien sind dot-praefigiert und fallen
+nicht in den `*.pkl`-Glob.
+
+**Was NICHT gemacht ist:** die Verdrahtung in `train.py`. Der parallele Bau
+ist heute ein eigenstaendiges Werkzeug; das Training nutzt weiter den
+seriellen Weg. Das ist Absicht -- erst soll der Hebel auf dem vollen Korpus
+laufen und wieder das Tor bestehen.
