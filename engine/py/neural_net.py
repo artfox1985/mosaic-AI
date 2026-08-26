@@ -16,6 +16,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
+# Der Datei-Cache-Schluessel (Hebel 4) liegt in einem EIGENEN Modul: er ist
+# ein abgeschlossener Vertrag, und `neural_net.py` steht laut Groessen-
+# Ratsche (tools/check_conventions.py Regel 1) ohnehin ueber der Schwelle.
+# Re-Export, damit Aufrufer weiter `neural_net.per_file_cache_key` sehen.
+from file_cache_key import per_file_cache_key  # noqa: F401
 from reach_target import (REACH_ATOMS, REACH_K1_MIN_ROUND, REACH_BUF_CAP,
                           reach_columns, reach_target_k1_active,
                           reach_buffer_mode, reach_buffer_columns)
@@ -711,6 +716,15 @@ def _destretch_prob(p: float) -> float:
     return 1.0 / (1.0 + math.exp(-(DESTRETCH_A + DESTRETCH_B * z)))
 
 
+def _cache_f32_active() -> bool:
+    """MOSAIC_CACHE_F32: float32 statt float16 fuer states/policies im Cache.
+
+    EINE Quelle fuer Key und Schreibweg -- vorher las nur der Schreibweg den
+    Knopf, und der Key wusste nichts davon (Befund 2026-08-26).
+    """
+    return os.environ.get("MOSAIC_CACHE_F32") == "1"
+
+
 def _is_policy_carrier(basename, carrier_set, carrier_prefixes, bootstrap_native):
     """Entscheidet, ob eine Self-Play-Datei Policy-Ziele traegt (pol_w>0-Vorfrage).
 
@@ -1148,7 +1162,7 @@ def _resolve_planes_h5_path(cache_path_h5: str) -> str:
 
 class MosaicDataset(Dataset):
     def __init__(self, data_dir="data", files=None, value_target_variant="default", encoder="flat",
-                 conjunction_head=False):
+                 conjunction_head=False, cache_path_override=None):
         """`files`: optionale explizite Dateiliste (z.B. ein Train- oder
         Val-Split desselben `data_dir`) -- ohne Angabe werden wie bisher ALLE
         `*.pkl` im Ordner geladen. Der Cache-Key haengt von der tatsaechlich
@@ -1335,9 +1349,32 @@ class MosaicDataset(Dataset):
         cache_key_material += "+nopack_v1" if cache_nopack else "+bitpack_v1"
         if _IGNORE_PTV:
             cache_key_material += "+ignore_ptv_v1"
+        # MOSAIC_CACHE_F32 (Befund 2026-08-26): der Knopf entscheidet ueber den
+        # gespeicherten dtype von states/policies (float32 statt float16, siehe
+        # `_f` weiter unten) und der Kommentar dort sagt selbst "NICHT
+        # bit-identisch" -- er stand aber in KEINER Key-Komponente. Ein Lauf
+        # mit dem Notausstieg traf damit den vorhandenen float16-Cache und der
+        # Knopf blieb still wirkungslos, also genau die Fehlerklasse, gegen die
+        # "+nopack_v1"/"+ignore_ptv_v1" gebaut sind. NUR bei gesetztem Knopf
+        # angehaengt: der Default-Key (float16) bleibt unveraendert, kein
+        # Bestands-Cache verfaellt.
+        if _cache_f32_active():
+            cache_key_material += "+f32_v1"
         cache_key = hashlib.md5(cache_key_material.encode()).hexdigest()[:12]
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
+        # `cache_path_override` (Hebel 4, PREREG_cache_build_time.md par.6):
+        # der Datei-Cache braucht einen EIGENEN Schluessel-Namensraum
+        # (`per_file_cache_key`), nicht den Fenster-Schluessel oben. Statt die
+        # Schluesselbildung hier zu verzweigen -- was den Fenster-Schluessel
+        # anfassbar machen wuerde und damit jeden Bestands-Cache gefaehrdet --
+        # nimmt der Aufrufer den fertigen Pfad mit. Default None = die Zeilen
+        # darueber gelten unveraendert, Bestandsverhalten bit-identisch.
+        #
+        # Der `.pt`-Zweig bleibt bewusst am Fenster-Schluessel: er ist der
+        # Altformat-Lesepfad, und ein Datei-Cache wird nie als .pt geschrieben.
+        if cache_path_override is not None:
+            cache_path_h5 = cache_path_override
         # Nach aussen sichtbar fuer den parallelen Bau
         # (PREREG_cache_build_time.md Hebel 1): die Worker bauen je eine
         # Datei-Teilmenge und geben nur DIESEN Pfad zurueck, statt die
@@ -1972,7 +2009,7 @@ class MosaicDataset(Dataset):
             # - masks -> uint8 (0/1, EXAKT),
             # - planes waren bereits uint8, ownership bereits int8.
             # train.py castet je Batch nach dem Device-Move auf float32.
-            _f = np.float32 if os.environ.get("MOSAIC_CACHE_F32") == "1" else np.float16
+            _f = np.float32 if _cache_f32_active() else np.float16
             states_np    = np.array(states_l,    dtype=_f);         del states_l
             policies_np  = np.array(policies_l,  dtype=_f);         del policies_l
             values_np    = np.array(values_l,    dtype=np.float32); del values_l

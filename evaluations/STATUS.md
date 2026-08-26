@@ -187,6 +187,26 @@ Beim Warmstart von einem Zwischenmodell: `MOSAIC_VAL_POOL` setzen
 (`PREREG_v22_window.md` par.6), sonst ist der Val-Split zu rund 21 Prozent
 vom Startmodell schon gesehen.
 
+### 1b. ERLEDIGT 2026-08-26: Cache je Datei (Hebel 4)
+
+`PREREG_cache_build_time.md` par.9. **Beide Pflichtpruefungen bestanden** --
+21/21 Felder bit-identisch gegen die serielle Referenz, und jeder der sieben
+per-Datei-Parameter erzeugt einen MISS. Die Schluesselteilung ist ADDITIV: der
+Fenster-Schluessel bleibt unangetastet (kein Bestands-Cache verfaellt), der
+Datei-Block bekommt einen eigenen Namensraum mit dem AUFGELOESTEN
+Traegerstatus der Datei statt des Manifest-Inhalts.
+
+Werkzeug: `tools/build_cache_incremental.py`, mit `--watch` waehrend der
+Erzeugung mitlaufend. Belegter Gewinn: 119 von 120 Bloecken ueberlebten einen
+Fensterwechsel (7,9 s statt Neubau).
+
+**Nebenbefund, behoben:** `MOSAIC_CACHE_F32` stand in keiner Key-Komponente,
+obwohl der Knopf den gespeicherten dtype aendert -- der Notausstieg war
+wirkungslos, sobald ein Cache existierte.
+
+**Noch nicht:** volle Korpus-Paritaet (es fehlt die serielle Referenz, 2,58 h)
+und die Verdrahtung in `train.py`. Beides wie bei Hebel (1) bewusst offen.
+
 ### 2. Offen, mit Kosten
 
 | Punkt | Kosten | wofuer noetig |
@@ -481,6 +501,9 @@ traegt GEMESSENES ein.
 | Heuristik-Self-Play `v2huelle`, 600 Basis-Sims, Netz-Labels | 200 Partien | 11 | **239 s** = 50 Partien/min |
 | dito, `v1` (Vorzug feuert nicht, Suche laeuft voll) | 200 Partien | 11 | **331 s** = 36 Partien/min |
 | `cargo test --release --lib` (volle Suite) | 527 Tests | – | **~65 s** |
+| `cargo test --release` (alle Ziele, exklusiv, 2026-08-26) | 553 Tests | – | **97,1 s** |
+| Datei-Cache erstbauen (`build_cache_incremental.py`) | 120 Dateien | 6 Worker | **112,6 s** = 0,96 s je Datei |
+| dito, Bloecke liegen schon (anderes Fenster) | 120 Dateien | 6 | **7,9 s** |
 | Wheel-Bau (`maturin build --release`) plus Installation | – | – | **~30 s** |
 
 **Parallelisierung ist ergebnisneutral, gemessen statt angenommen** (20 Seeds
