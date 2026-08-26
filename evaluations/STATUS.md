@@ -84,6 +84,46 @@ erfinden. Fuer v23 waeren es rund 180 von 1.745 hv2-Dateien.
 registrierte Zuschnitt nicht ausfuehrbar, und "jede Datei traegt Policy" waere
 still ein anderer Zuschnitt als der beschlossene.
 
+## NACHTLAUF 2026-08-25/26 -- was fertig ist
+
+**1. Der v22-Korpus steht.** 24.000 Partien, 17:27 bis 01:52, **8,43 h** bei
+47,5 Partien/min. Laufzeit REKONSTRUIERT aus Manifest-Start und der mtime der
+letzten Datei (der Lauf begann vor dem `laufzeit`-Einbau) und im Manifest
+`data/manifest_hv2_20260825_172710.json` nachgetragen.
+
+**2. Sanity-Check ueber alle 24.020 Partien** (die 20 aus
+`probe_v2huelle_horizon.pkl` zaehlen mit -- fuer ein Training auszuschliessen):
+
+| Kennzahl | voller Korpus | Pilot (200) | Lehrer-Test |
+| --- | --- | --- | --- |
+| volle Spalten | **0,732 ± 0,007** | 0,741 | 0,798 |
+| k1-Punkte / Anteil | +5,29 / 53,1 % | 5,67 / 55,7 % | – |
+| Strafleistensteine | 5,15 | 5,09 | – |
+| Eigene Punkte | 46,06 | 47,05 | – |
+| k6 Spezialfelder | −9,90 | −9,77 | – |
+
+Der Korpus haelt, was der Pilot versprach, jetzt mit engen Intervallen.
+
+**3. Cache-Bau parallelisiert** (`PREREG_cache_build_time.md` par.7/par.8):
+voller Korpus in **36,1 min** statt 2,58 h seriell, Faktor ~4,3.
+Bit-Identitaet auf 120 Dateien belegt; fuer den vollen Korpus NICHT gefahren
+(braeuchte 2,58 h serielle Referenz). Der fertige Cache liegt als
+`data/.par_full.h5`, 0,83 GB, 4.186.112 Zustaende.
+
+**Naechste Schritte, in dieser Reihenfolge:**
+
+1. **Entscheiden, ob die serielle Referenz gefahren wird** (2,58 h). Noetig,
+   bevor der volle Cache eine Champion-Entscheidung traegt.
+2. **Das v22-Training** -- und zwar in der Konfiguration aus
+   `PREREG_v22_window.md` par.4e: Arm B (`MOSAIC_IGNORE_POLICY_TARGET_VALID=1`)
+   **plus `OWNERSHIP_WEIGHT > 0`**, mit w0-Kontrollarm. Beide Naechte-Arme
+   liefen ohne das Gewicht und konnten deshalb strukturell keine Spalten
+   bauen.
+3. `data/` enthaelt 57 Block-Caches (1,2 GB) aus dem parallelen Bau plus
+   `.ref_serial.h5`, `.par_test*.h5`. Aufraeumen ist ein Nutzer-Entscheid.
+
+---
+
 ## SITZUNGSUEBERGABE 2026-08-25
 
 **Was als NAECHSTES zu tun ist, in dieser Reihenfolge:**
