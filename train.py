@@ -2,6 +2,7 @@
 import sys
 import os
 import argparse
+from dataclasses import dataclass
 
 # Windows-Konsolen (cp1252) können die Emoji-Ausgaben sonst nicht kodieren.
 try:
@@ -348,6 +349,575 @@ def _destretch_wdl_target(targets_v_wdl, wdl_outcome, a, b):
     bv_corr = torch.sigmoid(a + b * logit_bv)
     t_corr = TD_LAMBDA * bv_corr + (1.0 - TD_LAMBDA) * y
     return torch.where(valid, t_corr, targets_v_wdl)
+
+
+
+@dataclass(frozen=True)
+class LossSetup:
+    """Wie der Verlust gerechnet wird -- die Knoepfe, die BEIDE Epochen-
+    Durchgaenge brauchen.
+
+    Ein Buendel, kein Sammelbeutel: jedes Feld beantwortet dieselbe Frage
+    ("wie wird aus Netzausgabe und Ziel eine Zahl?"). Ohne dieses Buendel
+    haette `_train_one_epoch` 21 und `_validate_one_epoch` 20 Parameter --
+    eine Naht, die so breit ist, ist keine.
+
+    `frozen`, weil sich innerhalb eines Laufs keiner dieser Werte aendert;
+    ein versehentliches Zuweisen im Durchgang faellt damit sofort auf.
+    """
+    destretch_a: float
+    destretch_b: float
+    wdl_bootstrap_destretch: bool
+    wdl_hard_only: bool
+    wdl_label_smooth: float
+    ranking_loss_weight: float
+    exclude_round5: bool
+    value_weight: float
+    points_weight: float
+    ownership_weight: float
+    mse_loss: object
+
+
+def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_batches, epoch, mem_log_every, ftz, loss_setup) -> dict:
+    """EINE Trainingsepoche. Herausgeloest aus `train()` (2026-08-27).
+
+    Reine Extraktion: der Rumpf ist Zeile fuer Zeile der bisherige, nur
+    ausgerueckt und mit `loss.` vor den Verlust-Knoepfen. Keine
+    Verhaltensaenderung -- belegt gegen den Referenzlauf
+    (`--train-file-limit 6 --epochs 2 --seed 4242`), dessen `epoch_history`
+    im Manifest bitgleich bleiben muss.
+    """
+    t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
+    t_opp_pointsloss = 0  # Task #28: nur != 0 relevant, wenn opp_points_head aktiv
+    t_endgameloss = 0  # Schema 18: nur != 0 relevant, wenn endgame_head aktiv
+    t_rankingloss = 0  # Task #35b: nur != 0 relevant, wenn ranking_loss_weight>0
+
+    for _batch_idx, _batch in enumerate(dataloader):
+        if mem_log_every and _batch_idx % mem_log_every == 0:
+            _mi = _mem_info_gb()
+            if _mi is not None:
+                print(f"  [mem] epoch={epoch+1} batch={_batch_idx}/{n_batches} "
+                      f"rss={_mi[0]:.2f}GB commit={_mi[1]:.2f}GB", flush=True)
+        # Task #11 Phase 2 / Task #28 / Task #34: MosaicDataset liefert bei
+        # encoder="2d" ein 14-Tupel (planes VORAN), bei encoder="flat"
+        # (Standard) das 13-Tupel -- die letzten 4 Elemente
+        # (opp_points_forecast, opp_points_mask, values_wdl, wdl_outcome)
+        # sind additiv ANS ENDE angehaengt (siehe
+        # `neural_net.py::MosaicDataset.__getitem__`), unabhaengig davon,
+        # ob `--opp-points-head`/`--value-head wdl` aktiv sind (die Cache-
+        # Felder existieren immer, werden nur ggf. nicht im Loss genutzt).
+        if encoder == "2d":
+            (planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
+             s_rounds, s_own, targets_opp_points, s_opp_mask,
+             targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask,
+             s_rank_ids, s_rank_q, s_rank_mask) = _batch
+            # RAM-Optimierung v21 (Bitpacking): liegt der Cache gepackt
+            # vor (`dataset.bitpacked`, Standard seit diesem Feature),
+            # kommt `planes` als [B,342]-Bytes statt [B,76,6,6] aus dem
+            # DataLoader -- EINMAL pro Batch entpackt, NOCH VOR dem
+            # Device-Move (Micro-Benchmark in neural_net.py zeigt diese
+            # Reihenfolge als schnellsten Pfad, siehe
+            # `unpack_planes_batch`-Kommentar). Alt-Cache/
+            # MOSAIC_CACHE_NOPACK=1 -> `bitpacked=False`, `planes` ist
+            # bereits [B,76,6,6] wie bisher, Aufruf entfaellt.
+            if dataset.bitpacked:
+                planes = unpack_planes_batch(planes)
+            # RAM-Optimierung v20: Cache liefert kompakte Typen (planes
+            # uint8, states/policies fp16, masks uint8) -- Cast auf
+            # float32 erst NACH dem Device-Move (billig, spart Transfer).
+            # `.float()` ist fuer Alt-Caches in float32 ein No-op.
+            planes = planes.to(device).float()
+        else:
+            (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
+             s_rounds, s_own, targets_opp_points, s_opp_mask,
+             targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask,
+             s_rank_ids, s_rank_q, s_rank_mask) = _batch
+        # RAM-Optimierung v21 (Bitpacking): masks-Entpacken analog zu
+        # planes oben, UNABHAENGIG vom Encoder (masks gehoeren zum
+        # Basis-Tupel, siehe MosaicDataset.__getitem__).
+        if dataset.bitpacked:
+            masks = unpack_masks_batch(masks)
+        states    = states.to(device).float()
+        targets_p = targets_p.to(device).float()
+        targets_v = targets_v.to(device)
+        targets_points = targets_points.to(device)
+        targets_opp_points = targets_opp_points.to(device)
+        s_opp_mask = s_opp_mask.to(device)
+        targets_v_wdl = targets_v_wdl.to(device)
+        s_wdl_outcome = s_wdl_outcome.to(device)
+        targets_endgame = targets_endgame.to(device)
+        s_endgame_mask = s_endgame_mask.to(device)
+        masks     = masks.to(device).float()
+        pol_w     = pol_w.to(device)
+        # Task #35b: NUR bei aktivem Gewicht auf Device verschoben --
+        # bei ranking_loss_weight==0.0 (Default) bleibt der Batch-Pfad
+        # sonst byte-identisch zum Bestand (kein zusaetzlicher Transfer).
+        if loss_setup.ranking_loss_weight > 0.0:
+            s_rank_ids  = s_rank_ids.to(device)
+            s_rank_q    = s_rank_q.to(device)
+            s_rank_mask = s_rank_mask.to(device)
+
+        optimizer.zero_grad()
+        _out = model(planes, states) if encoder == "2d" else model(states)
+        pred_p, pred_v, pred_moon, pred_points, pred_own = _out[:5]
+        (pred_points_logits, pred_value_wdl_logits, pred_opp_points,
+         pred_endgame) = _unpack_optional_outputs(model, _out)
+
+        # Policy Loss mit Masking:
+        # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
+        masked_logits = pred_p + (masks - 1) * 1e9   # illegale Aktionen auf -inf
+        log_probs = F.log_softmax(masked_logits, dim=1)
+
+        per_sample_ce = -torch.sum(targets_p * log_probs, dim=1)   # (B,)
+        # Policy-Loss NUR auf echten Drafting-Schritten (pol_w=1); Tiling/Start-
+        # One-Hot-Steps (pol_w=0) macht der DFS-Solver — sie würden sonst den
+        # Policy-Head mit Tiling-Aktionen fluten und die Drafting-Priors ruinieren.
+        # Task #15 B (2026-07-28): Runde-5-Samples optional komplett aus
+        # dem Loss nehmen. Das Netz wird in Runde 5 NIE konsultiert
+        # (net_mcts.rs:2265 bypassed den Suchpfad zu round5::choose_action,
+        # der R4-Bootstrap nutzt round5::exact_round5_outcome) -- ~17% der
+        # Value- und ~15% der Policy-Samples gehen dort in Entscheidungen,
+        # die ein exakter Alpha-Beta-Solver trifft. Praezedenzfall: pol_w=0
+        # fuer Tiling-Schritte, weil das der DFS-Solver macht.
+        rw = (s_rounds.to(device) != 5).float() if loss_setup.exclude_round5 else None
+
+        w = pol_w if rw is None else pol_w * rw
+        p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
+
+        # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter.
+        # Plackett-Luce-NLL statt MSE-auf-Rängen: der moon_order_head liefert
+        # jetzt echte Präferenz-SCORES, die net_mcts.rs zur Suchzeit direkt als
+        # P(Order)-Verteilung nutzt (statt einer bloßen Rang-Regression).
+        moon_targets = moon_targets.to(device)
+        # BUGFIX: sun_mask prüfte zuvor nur Spalte 0 (blau) auf >=0 — das
+        # schloss gültige Sonnenzug-Samples aus, deren Restfarben blau nicht
+        # enthielten (z.B. remaining=[gelb,rot]), und verzerrte den Loss
+        # systematisch zugunsten blau-haltiger Samples. Jetzt: irgendeine Spalte.
+        sun_mask = (moon_targets >= 0).any(dim=1)
+        if sun_mask.any():
+            moon_nll = plackett_luce_moon_loss(pred_moon, moon_targets)
+            p_loss = p_loss + moon_nll[sun_mask].mean()
+
+        # Value-/Punkte-Aux-Losses: reines Trainings-Zusatzsignal fuer den
+        # Trunk (Suche/Self-Play nutzt weiterhin nur die Policy, siehe
+        # evaluations/stage2_investigation.md) -- klein gewichtet, damit
+        # sie den Policy-Loss nicht dominieren.
+        rw2 = rw.view(-1, 1) if rw is not None else None
+        denom = rw2.sum().clamp(min=1e-6) if rw2 is not None else None
+        # Task #34: bei aktivem WDL-Kopf ist der Value-Verlust eine
+        # Kreuzentropie mit WEICHEN Labels statt MSE (siehe
+        # VALUE_SCHEMA_VERSION=16-Kommentar in neural_net.py). Ein
+        # 2-Logit-Softmax reduziert algebraisch auf BCEWithLogits der
+        # Logit-DIFFERENZ gegen die Ziel-Wahrscheinlichkeit `targets_v_wdl`
+        # -- numerisch identisch zur kategorialen Kreuzentropie
+        # -log(softmax)[y], aber stabiler (kein manuelles log(softmax)).
+        # ACHTUNG (STATUS.md "val_combined"-Falle): diese Loss-GROESSE hat
+        # eine ANDERE Einheit als die MSE des tanh-Arms -- `val_combined`
+        # (current_metric weiter unten) ist damit NUR arm-INTERN fuer die
+        # Checkpoint-Auswahl vergleichbar, NICHT zwischen tanh- und
+        # wdl-Laeufen (siehe Kommentar an der current_metric-Stelle).
+        if pred_value_wdl_logits is not None:
+            logit_diff = pred_value_wdl_logits[:, 1] - pred_value_wdl_logits[:, 0]
+            # Task #34 Audit 2026-08-05 (`--wdl-hard-only`): `values_wdl`
+            # ist TD-geblendet mit `bootstrap_value` -- und der stammt aus
+            # Self-Play-Suchen der GENERATOR-Netze (v16-v18, tanh-Kopf,
+            # Platt-B~1,9): eine gestauchte Punkte-Marge, als
+            # Wahrscheinlichkeit gelesen. Die Haelfte (TD_LAMBDA=0,5) des
+            # "kohaerenten" WDL-Ziels traegt also die ALTE Semantik weiter.
+            # Dieser Schalter trainiert stattdessen auf dem ROHEN Ausgang
+            # `wdl_outcome` (-1 = unbekannt -> maskiert) -- das einzige auf
+            # Bestandskorpora saubere Wahrscheinlichkeits-Ziel, bis eine
+            # Kampagne mit WDL-Generator neue Bootstrap-Werte liefert.
+            if loss_setup.wdl_hard_only:
+                v_wdl_target = s_wdl_outcome.view(-1)
+                wdl_mask = (v_wdl_target >= 0.0).float()
+                # Erosions-Arm A (`--wdl-label-smooth`): weiche Labels
+                # 1-eps/2 bzw. eps/2 statt 1/0 -- testet die
+                # Memorisierungs-Hypothese (Trainings-Loss 0,60->0,39 bei
+                # steigendem Val-Brier). Brier unten bleibt gegen den
+                # ROHEN Ausgang gerechnet, unveraendert vergleichbar.
+                hard_t = v_wdl_target.clamp(min=0.0)
+                if loss_setup.wdl_label_smooth > 0.0:
+                    hard_t = hard_t * (1.0 - loss_setup.wdl_label_smooth) + 0.5 * loss_setup.wdl_label_smooth
+                v_bce = F.binary_cross_entropy_with_logits(
+                    logit_diff, hard_t, reduction="none") * wdl_mask
+                if rw is None:
+                    v_loss = v_bce.sum() / wdl_mask.sum().clamp(min=1.0)
+                else:
+                    # Audit-F3: Nenner muss die MASKIERTE Gewichtssumme
+                    # sein -- `denom` (=rw2.sum()) zaehlt auch
+                    # wdl_mask==0-Samples und verduennte den Loss.
+                    v_loss = ((v_bce.view(-1, 1) * rw2).sum()
+                              / (wdl_mask.view(-1, 1) * rw2).sum().clamp(min=1e-6))
+            else:
+                v_wdl_target = targets_v_wdl.view(-1)
+                if loss_setup.wdl_bootstrap_destretch:
+                    v_wdl_target = _destretch_wdl_target(
+                        v_wdl_target, s_wdl_outcome.view(-1),
+                        loss_setup.destretch_a, loss_setup.destretch_b)
+                if rw is None:
+                    v_loss = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target)
+                else:
+                    v_bce = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target, reduction="none")
+                    v_loss = (v_bce.view(-1, 1) * rw2).sum() / denom
+        elif rw is None:
+            v_loss = loss_setup.mse_loss(pred_v, targets_v)
+        else:
+            v_loss = (((pred_v - targets_v) ** 2) * rw2).sum() / denom
+
+        # Task #12: bei aktivem Verteilungs-Kopf ist der Punkte-Verlust eine
+        # KREUZENTROPIE gegen ein HL-Gauss-geglaettetes Ziel statt MSE auf
+        # dem Erwartungswert -- reicheres Gradientensignal, robuster gegen
+        # Ausreisser (Farebrother et al. 2024). Der ausgegebene Skalar
+        # bleibt der Erwartungswert, die Schnittstelle also unveraendert.
+        if pred_points_logits is not None:
+            points_loss = points_dist_loss(
+                pred_points_logits, targets_points, model, rw2, denom)
+        elif rw is None:
+            points_loss = loss_setup.mse_loss(pred_points, targets_points)
+        else:
+            points_loss = (((pred_points - targets_points) ** 2) * rw2).sum() / denom
+
+        # Ownership-Loss (Task #9): dichtes Hilfsziel, 72 Binaerlabels je
+        # Position statt eines Skalars. -1 = unbekannt (unvollstaendiges
+        # Spiel) und wird maskiert. Bei Gewicht 0.0 wird der Term komplett
+        # uebersprungen -- kein Gradient, Bestandsverhalten unveraendert.
+        own_loss = torch.zeros((), device=device)
+        if loss_setup.ownership_weight > 0.0:
+            own_t = s_own.to(device).float()
+            own_m = (own_t >= 0).float()
+            if own_m.sum() > 0:
+                own_bce = F.binary_cross_entropy_with_logits(
+                    pred_own, own_t.clamp(min=0.0), reduction="none")
+                own_loss = (own_bce * own_m).sum() / own_m.sum()
+
+        # Task #28 (PREREG_task28_aggression.md "Minimal-invasiver
+        # Zuschnitt" Punkt 2): Opp-Punkte-Aux-Loss, NUR wenn der additive
+        # Kopf aktiv ist. MSE, Gewicht = POINTS_WEIGHT (symmetrisch zum
+        # eigenen Punkte-Kopf, kein neues Tuning), maskiert mit
+        # `s_opp_mask` (0 bei unvollstaendigen Partien ODER einem Alt-
+        # Cache ohne das Feld -- kein erfundener Zielwert geht in den
+        # Loss ein) UND zusaetzlich mit `rw` (--exclude-round5), falls
+        # aktiv -- gleiches Kombinationsmuster wie beim Punkte-Loss oben.
+        # Geht NICHT in `val_combined`/die Checkpoint-Auswahl ein (siehe
+        # Kommentar an der Auswahlstelle unten) -- Bestandsmetrik bleibt
+        # unveraendert vergleichbar mit Alt-Laeufen.
+        opp_loss = torch.zeros((), device=device)
+        if pred_opp_points is not None:
+            opp_w = s_opp_mask.view(-1, 1) if rw2 is None else s_opp_mask.view(-1, 1) * rw2
+            opp_denom = opp_w.sum().clamp(min=1e-6)
+            opp_loss = (((pred_opp_points - targets_opp_points) ** 2) * opp_w).sum() / opp_denom
+
+        # Schema 18 (PREREG_plate_intervention.md): Endgame-Aux-Loss,
+        # NUR bei aktivem Kopf. MSE gegen den exakten R5-Wurzelwert
+        # (Cache [0,1] -> Remap auf die Tanh-Skala [-1,1]), maskiert mit
+        # `s_endgame_mask` (nur R5-Drafting mit root_q). Gewicht =
+        # POINTS_WEIGHT (symmetrisch, kein neues Tuning, Muster opp_loss).
+        # KEIN rw2: --exclude-round5 wuerde die Zone komplett leeren --
+        # der Kopf ist ausdruecklich ein R5-Zonen-Signal. Geht NICHT in
+        # val_combined/Brier-Checkpoint-Auswahl ein.
+        endgame_loss = torch.zeros((), device=device)
+        if pred_endgame is not None:
+            eg_w = s_endgame_mask.view(-1, 1)
+            eg_denom = eg_w.sum().clamp(min=1e-6)
+            eg_target = targets_endgame * 2.0 - 1.0
+            endgame_loss = (((pred_endgame - eg_target) ** 2) * eg_w).sum() / eg_denom
+
+        # Task #35b ("Ranking-Loss auf Geschwister-Q"): NUR berechnet,
+        # wenn `ranking_loss_weight>0` -- bei 0.0 (Default) komplett
+        # uebersprungen, kein zusaetzlicher Gradient/keine zusaetzliche
+        # Rechenzeit, byte-identisches Bestandsverhalten. Kein eigener
+        # Modell-Kopf (nutzt die bestehenden Policy-Logits `pred_p`
+        # VOR dem Illegal-Masking, siehe `_pairwise_ranking_loss`-
+        # Docstring). Geht NICHT in val_combined/Brier-Checkpoint-
+        # Auswahl ein (Muster opp_loss/endgame_loss oben).
+        ranking_loss = torch.zeros((), device=device)
+        if loss_setup.ranking_loss_weight > 0.0:
+            ranking_loss, _rk_acc, _rk_n = _pairwise_ranking_loss(
+                pred_p, s_rank_ids, s_rank_q, s_rank_mask)
+
+        loss = (p_loss + loss_setup.value_weight * v_loss
+                + loss_setup.points_weight * points_loss
+                + loss_setup.ownership_weight * own_loss
+                + loss_setup.points_weight * opp_loss
+                + loss_setup.points_weight * endgame_loss
+                + loss_setup.ranking_loss_weight * ranking_loss)
+        if ftz.backward_ok(loss):   # nur im Freeze-Modus je restriktiv, s. Docstring
+            loss.backward()
+            optimizer.step()
+
+        t_loss       += loss.item()
+        t_ploss      += p_loss.item()
+        t_vloss      += v_loss.item()
+        t_pointsloss += points_loss.item()
+        if pred_opp_points is not None:
+            t_opp_pointsloss += opp_loss.item()
+        if pred_endgame is not None:
+            t_endgameloss += endgame_loss.item()
+        if loss_setup.ranking_loss_weight > 0.0:
+            t_rankingloss += ranking_loss.item()
+
+    return {"t_loss": t_loss, "t_ploss": t_ploss, "t_vloss": t_vloss, "t_pointsloss": t_pointsloss, "t_opp_pointsloss": t_opp_pointsloss, "t_endgameloss": t_endgameloss, "t_rankingloss": t_rankingloss}
+
+
+def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, loss_setup) -> dict:
+    """EINE Validierungsepoche. Herausgeloest aus `train()` (2026-08-27).
+
+    Gibt die elf Kennzahlen zurueck, die `train()` danach in die Historien
+    schreibt. `own_meter` bleibt innen -- es wird ausserhalb nicht gelesen.
+    """
+    epoch_val_ploss = None
+    epoch_val_vloss = None
+    epoch_val_pointsloss = None
+    epoch_val_value_r2 = None
+    epoch_val_points_r2 = None
+    epoch_val_opp_pointsloss = None
+    epoch_val_opp_points_r2 = None
+    epoch_val_endgame_mse = None
+    epoch_val_ranking_acc = None  # Task #35b: rein deskriptiv, siehe val_ranking_acc_history
+    epoch_val_brier = None  # Task #34: arm-uebergreifend vergleichbare Kalibrierungskennzahl
+    epoch_val_ownloss = None  # PREREG_frozen_trunk_head.md, s. val_ownloss_history
+    own_meter = OwnershipValLoss(loss_setup.ownership_weight > 0.0)
+    if val_dataloader is not None:
+        model.eval()
+        val_ploss_sum, val_vloss_sum, val_pointsloss_sum, val_batches = 0.0, 0.0, 0.0, 0
+        val_opp_pointsloss_sum, val_opp_batches = 0.0, 0  # Task #28, nur relevant wenn opp_points_head aktiv
+        val_endgame_sqerr_sum, val_endgame_n = 0.0, 0.0  # Schema 18, nur relevant wenn endgame_head aktiv
+        val_rank_correct_sum, val_rank_n = 0.0, 0.0  # Task #35b, nur relevant wenn ranking_loss_weight>0
+        v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
+        pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
+        opp_sum, opp_sumsq, opp_sqerr_sum, n_opp = 0.0, 0.0, 0.0, 0
+        brier_sqerr_sum, n_brier = 0.0, 0  # Task #34
+        with torch.no_grad():
+            for _v_batch in val_dataloader:
+                if encoder == "2d":
+                    (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
+                     v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
+                     v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask,
+                     v_rank_ids, v_rank_q, v_rank_mask) = _v_batch
+                    # RAM-Optimierung v21 (Bitpacking): Entpacken wie im
+                    # Trainingszweig, siehe dortigen Kommentar.
+                    if val_dataset.bitpacked:
+                        v_planes = unpack_planes_batch(v_planes)
+                    # RAM-Optimierung v20: Cast wie im Trainingszweig.
+                    v_planes = v_planes.to(device).float()
+                else:
+                    (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
+                     v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
+                     v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask,
+                     v_rank_ids, v_rank_q, v_rank_mask) = _v_batch
+                if val_dataset.bitpacked:
+                    v_masks = unpack_masks_batch(v_masks)
+                v_states = v_states.to(device).float()
+                v_targets_p = v_targets_p.to(device).float()
+                v_targets_v = v_targets_v.to(device)
+                v_targets_points = v_targets_points.to(device)
+                v_targets_opp_points = v_targets_opp_points.to(device)
+                v_opp_mask = v_opp_mask.to(device)
+                v_targets_v_wdl = v_targets_v_wdl.to(device)
+                v_wdl_outcome = v_wdl_outcome.to(device)
+                v_targets_endgame = v_targets_endgame.to(device)
+                v_endgame_mask = v_endgame_mask.to(device)
+                v_masks = v_masks.to(device).float()
+                v_pol_w = v_pol_w.to(device)
+                if loss_setup.ranking_loss_weight > 0.0:
+                    v_rank_ids  = v_rank_ids.to(device)
+                    v_rank_q    = v_rank_q.to(device)
+                    v_rank_mask = v_rank_mask.to(device)
+                _vout = model(v_planes, v_states) if encoder == "2d" else model(v_states)
+                v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
+                (_v_pred_points_logits, v_pred_value_wdl_logits,
+                 v_pred_opp_points, v_pred_endgame) = _unpack_optional_outputs(model, _vout)
+                own_meter.add(v_pred_own, v_own)
+                if v_pred_endgame is not None:
+                    _eg_w = v_endgame_mask.view(-1, 1)
+                    val_endgame_sqerr_sum += (((v_pred_endgame - (v_targets_endgame * 2.0 - 1.0)) ** 2) * _eg_w).sum().item()
+                    val_endgame_n += _eg_w.sum().item()
+                # Task #35b: rein DESKRIPTIVE Val-Metrik (paarweise
+                # Ranking-Accuracy, STATUS.md-Vorgabe) -- NICHT Teil von
+                # val_combined/der Checkpoint-Auswahl. Gewichtete Summe
+                # ueber alle Val-Batches (Anzahl gueltiger Paare variiert
+                # je Batch, ein einfaches Batch-Mittel wuerde kleine
+                # Batches ueberbewerten).
+                if loss_setup.ranking_loss_weight > 0.0:
+                    _, _v_rk_acc, _v_rk_n = _pairwise_ranking_loss(
+                        v_pred_p, v_rank_ids, v_rank_q, v_rank_mask)
+                    if _v_rk_acc is not None:
+                        val_rank_correct_sum += _v_rk_acc * _v_rk_n
+                        val_rank_n += _v_rk_n
+                v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
+                v_log_probs = F.log_softmax(v_masked_logits, dim=1)
+                v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
+                v_rw = (v_rounds.to(device) != 5).float() if loss_setup.exclude_round5 else None
+                v_w = v_pol_w if v_rw is None else v_pol_w * v_rw
+                v_p_loss = (v_per_sample_ce * v_w).sum() / v_w.sum().clamp(min=1e-6)
+                # Task #12, WICHTIG: der VALIDIERUNGS-Punkteverlust bleibt
+                # auch bei aktivem Verteilungs-Kopf MSE auf dem
+                # ERWARTUNGSWERT -- absichtlich NICHT die Kreuzentropie des
+                # Trainings. Grund: `val_combined` ist zugleich die
+                # Auswahlmetrik fuer den besten Checkpoint. Waere sie in den
+                # beiden A/B-Armen eine andere GROESSE, waeren die Arme nicht
+                # vergleichbar -- genau der Fehler, der am 2026-07-28 beim
+                # lr1e5-Arm beinahe zur falschen Entscheidung gefuehrt haette
+                # (siehe STATUS.md "Seed-Sweep", Abschnitt val_combined).
+                # Task #34: der VALIDIERUNGS-Value-Verlust folgt (anders
+                # als der Punkte-Verlust oben) bewusst DEMSELBEN Loss wie
+                # das Training des jeweiligen Arms (MSE fuer 'tanh', BCE
+                # fuer 'wdl') -- die STATUS.md-Vorgabe akzeptiert
+                # ausdruecklich, dass `val_combined` dadurch zwischen den
+                # Armen NICHT vergleichbar ist (nur armintern zur
+                # Checkpoint-Auswahl, siehe Kommentar an der v_loss-Stelle
+                # oben im Trainingsblock). Der arm-uebergreifend
+                # vergleichbare Wert ist der Brier-Score weiter unten.
+                if v_pred_value_wdl_logits is not None:
+                    v_logit_diff = v_pred_value_wdl_logits[:, 1] - v_pred_value_wdl_logits[:, 0]
+                    v_wdl_target = v_targets_v_wdl.view(-1)
+                    # `--wdl-hard-only`: Val-Loss konsistent zum Trainings-
+                    # Ziel auf dem rohen Ausgang (Maskierung wie im
+                    # Trainingsblock; der Brier unten bleibt unveraendert,
+                    # er nutzt ohnehin schon `wdl_outcome`).
+                    if loss_setup.wdl_bootstrap_destretch:
+                        # Erosions-Arm B: Val-Ziel identisch zum
+                        # Trainingsziel transformieren (sonst misst der
+                        # Val-Loss ein anderes Ziel als trainiert wird).
+                        v_wdl_target = _destretch_wdl_target(
+                            v_wdl_target, v_wdl_outcome.view(-1),
+                            loss_setup.destretch_a, loss_setup.destretch_b)
+                    if loss_setup.wdl_hard_only:
+                        v_raw = v_wdl_outcome.view(-1)
+                        v_mask = (v_raw >= 0.0).float()
+                        # Audit-F3: Val-Zweig muss `v_rw` genauso
+                        # respektieren wie der Trainingszweig -- sonst
+                        # enthaelt val_combined (Auswahlmetrik!) bei
+                        # `--exclude-round5` andere Samples als der Loss.
+                        if v_rw is not None:
+                            v_mask = v_mask * v_rw.view(-1)
+                        v_hard_t = v_raw.clamp(min=0.0)
+                        if loss_setup.wdl_label_smooth > 0.0:
+                            v_hard_t = v_hard_t * (1.0 - loss_setup.wdl_label_smooth) + 0.5 * loss_setup.wdl_label_smooth
+                        v_bce_h = F.binary_cross_entropy_with_logits(
+                            v_logit_diff, v_hard_t, reduction="none") * v_mask
+                        v_v_loss = v_bce_h.sum() / v_mask.sum().clamp(min=1e-6)
+                    elif v_rw is None:
+                        v_v_loss = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target)
+                    else:
+                        v_rw2 = v_rw.view(-1, 1)
+                        v_den = v_rw2.sum().clamp(min=1e-6)
+                        v_bce = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target, reduction="none")
+                        v_v_loss = (v_bce.view(-1, 1) * v_rw2).sum() / v_den
+                elif v_rw is None:
+                    v_v_loss = loss_setup.mse_loss(v_pred_v, v_targets_v)
+                else:
+                    v_rw2 = v_rw.view(-1, 1)
+                    v_den = v_rw2.sum().clamp(min=1e-6)
+                    v_v_loss = (((v_pred_v - v_targets_v) ** 2) * v_rw2).sum() / v_den
+                if v_rw is None:
+                    v_points_loss = loss_setup.mse_loss(v_pred_points, v_targets_points)
+                else:
+                    v_rw2 = v_rw.view(-1, 1)
+                    v_den = v_rw2.sum().clamp(min=1e-6)
+                    v_points_loss = (((v_pred_points - v_targets_points) ** 2) * v_rw2).sum() / v_den
+                val_ploss_sum += v_p_loss.item()
+                val_vloss_sum += v_v_loss.item()
+                val_pointsloss_sum += v_points_loss.item()
+                val_batches += 1
+
+                # Task #34: R² auf der ARM-EIGENEN Groesse -- 'tanh'
+                # bleibt byte-identisch (targets_v/pred_v, [-1,1]-Marge),
+                # 'wdl' vergleicht auf der [0,1]-Wahrscheinlichkeitsskala
+                # (P(Sieg) = (v_pred_v+1)/2 gegen targets_v_wdl) -- dieselben
+                # Groessen wie der Loss oben, daher intern konsistent, aber
+                # NICHT direkt mit dem 'tanh'-R² vergleichbar (andere
+                # Zielgroesse).
+                if v_pred_value_wdl_logits is not None:
+                    v_p_win = (v_pred_v + 1.0) * 0.5
+                    v_sum += v_targets_v_wdl.sum().item()
+                    v_sumsq += (v_targets_v_wdl ** 2).sum().item()
+                    v_sqerr_sum += ((v_targets_v_wdl - v_p_win) ** 2).sum().item()
+                    n_v += v_targets_v_wdl.numel()
+                else:
+                    v_sum += v_targets_v.sum().item()
+                    v_sumsq += (v_targets_v ** 2).sum().item()
+                    v_sqerr_sum += ((v_targets_v - v_pred_v) ** 2).sum().item()
+                    n_v += v_targets_v.numel()
+
+                # Task #34 (STATUS.md "gib pro Epoche eine Value-
+                # KALIBRIERUNGSKENNZAHL aus, die zwischen Armen
+                # vergleichbar ist"): Brier-Score von P(Sieg)=(pred_v+1)/2
+                # gegen den ROHEN, UNGEBLENDETEN tatsaechlichen Ausgang
+                # (`wdl_outcome`, -1 = unbekannt/maskiert) -- UNABHAENGIG
+                # vom Arm, weil `pred_v` in BEIDEN Armen auf derselben
+                # [-1,1]-Position/Skala liegt (siehe forward()-Kommentar in
+                # neural_net.py). Anders als `targets_v`/`targets_v_wdl`
+                # (beide TD-geblendet) ist `wdl_outcome` NICHT geblendet --
+                # genau deshalb ist dieser Wert arm-uebergreifend
+                # vergleichbar, waehrend val_vloss/value_r2 es nicht sind.
+                brier_p_win = (v_pred_v + 1.0) * 0.5
+                brier_mask = (v_wdl_outcome >= 0.0).float()
+                brier_n_batch = brier_mask.sum().item()
+                if brier_n_batch > 0:
+                    brier_sqerr_sum += (((brier_p_win - v_wdl_outcome.clamp(min=0.0)) ** 2)
+                                        * brier_mask).sum().item()
+                    n_brier += brier_n_batch
+
+                pts_sum += v_targets_points.sum().item()
+                pts_sumsq += (v_targets_points ** 2).sum().item()
+                pts_sqerr_sum += ((v_targets_points - v_pred_points) ** 2).sum().item()
+                n_pts += v_targets_points.numel()
+
+                # Task #28: Val-MSE + R² NUR ueber die tatsaechlich
+                # gemaskten (opp_mask==1) Samples -- analog zum
+                # Ownership-Loss-Muster, NICHT die volle Val-Menge (sonst
+                # verwaesserte ein Alt-Cache-Anteil ohne das Feld die
+                # Kennzahl mit erfundenen Nullen).
+                if v_pred_opp_points is not None:
+                    opp_m = v_opp_mask.view(-1, 1)
+                    opp_n_batch = opp_m.sum().item()
+                    if opp_n_batch > 0:
+                        opp_batch_loss = (((v_targets_opp_points - v_pred_opp_points) ** 2)
+                                          * opp_m).sum() / opp_m.sum().clamp(min=1e-6)
+                        val_opp_pointsloss_sum += opp_batch_loss.item()
+                        val_opp_batches += 1
+                        opp_sum += (v_targets_opp_points * opp_m).sum().item()
+                        opp_sumsq += ((v_targets_opp_points ** 2) * opp_m).sum().item()
+                        opp_sqerr_sum += (((v_targets_opp_points - v_pred_opp_points) ** 2)
+                                          * opp_m).sum().item()
+                        n_opp += opp_n_batch
+        model.train()
+        epoch_val_ploss = val_ploss_sum / max(val_batches, 1)
+        epoch_val_vloss = val_vloss_sum / max(val_batches, 1)
+        epoch_val_pointsloss = val_pointsloss_sum / max(val_batches, 1)
+        epoch_val_opp_pointsloss = (val_opp_pointsloss_sum / val_opp_batches
+                                    if val_opp_batches > 0 else None)
+        # Schema 18: maskiertes Val-MSE des endgame_head -- None (statt
+        # einer erfundenen 0.0), wenn kein einziges maskiertes Sample im
+        # Val-Split lag (Alt-Cache/Kopf inaktiv). Geht NICHT in
+        # val_combined/die Brier-Checkpoint-Auswahl ein (Muster opp_loss,
+        # siehe Kommentar am Trainings-Loss-Block oben).
+        epoch_val_endgame_mse = (val_endgame_sqerr_sum / val_endgame_n
+                                 if val_endgame_n > 0 else None)
+        # Task #35b: gewichtetes Mittel ueber alle Val-Batches -- None
+        # (statt einer erfundenen 0.0), wenn kein einziges gueltiges Paar
+        # im Val-Split lag (Gewicht 0.0/Alt-Cache-Split ohne Geschwister-
+        # Set). Rein deskriptiv, geht NICHT in val_combined ein.
+        epoch_val_ranking_acc = (val_rank_correct_sum / val_rank_n
+                                 if val_rank_n > 0 else None)
+        epoch_val_ownloss = own_meter.value()  # PREREG_frozen_trunk_head.md
+
+        def _r2(sum_y, sumsq_y, sqerr, n):
+            if n == 0:
+                return None
+            ss_tot = sumsq_y - (sum_y ** 2) / n
+            if ss_tot <= 1e-9:  # entartet: Val-Targets praktisch konstant
+                return None
+            return 1.0 - sqerr / ss_tot
+
+        epoch_val_value_r2 = _r2(v_sum, v_sumsq, v_sqerr_sum, n_v)
+        epoch_val_points_r2 = _r2(pts_sum, pts_sumsq, pts_sqerr_sum, n_pts)
+        epoch_val_opp_points_r2 = _r2(opp_sum, opp_sumsq, opp_sqerr_sum, n_opp)
+        epoch_val_brier = brier_sqerr_sum / n_brier if n_brier > 0 else None
+
+    return {"epoch_val_ploss": epoch_val_ploss, "epoch_val_vloss": epoch_val_vloss, "epoch_val_pointsloss": epoch_val_pointsloss, "epoch_val_value_r2": epoch_val_value_r2, "epoch_val_points_r2": epoch_val_points_r2, "epoch_val_opp_pointsloss": epoch_val_opp_pointsloss, "epoch_val_opp_points_r2": epoch_val_opp_points_r2, "epoch_val_endgame_mse": epoch_val_endgame_mse, "epoch_val_ranking_acc": epoch_val_ranking_acc, "epoch_val_brier": epoch_val_brier, "epoch_val_ownloss": epoch_val_ownloss}
 
 
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
@@ -928,277 +1498,29 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     _mem_log_every = int(os.environ.get("MOSAIC_MEM_LOG_EVERY", "2000"))
 
     epoch_count_done = 0
+    # Die Verlust-Knoepfe einmal buendeln (siehe `LossSetup`): sie aendern
+    # sich innerhalb eines Laufs nicht, und beide Durchgaenge brauchen sie.
+    _loss_setup = LossSetup(
+        destretch_a=destretch_a, destretch_b=destretch_b,
+        wdl_bootstrap_destretch=wdl_bootstrap_destretch,
+        wdl_hard_only=wdl_hard_only, wdl_label_smooth=wdl_label_smooth,
+        ranking_loss_weight=ranking_loss_weight, exclude_round5=exclude_round5,
+        value_weight=effective_value_weight, points_weight=effective_points_weight,
+        ownership_weight=effective_ownership_weight, mse_loss=mse_loss,
+    )
     for epoch in range(epochs):
         epoch_count_done = epoch + 1
-        t_loss, t_ploss, t_vloss, t_pointsloss = 0, 0, 0, 0
-        t_opp_pointsloss = 0  # Task #28: nur != 0 relevant, wenn opp_points_head aktiv
-        t_endgameloss = 0  # Schema 18: nur != 0 relevant, wenn endgame_head aktiv
-        t_rankingloss = 0  # Task #35b: nur != 0 relevant, wenn ranking_loss_weight>0
-
-        for _batch_idx, _batch in enumerate(dataloader):
-            if _mem_log_every and _batch_idx % _mem_log_every == 0:
-                _mi = _mem_info_gb()
-                if _mi is not None:
-                    print(f"  [mem] epoch={epoch+1} batch={_batch_idx}/{n_batches} "
-                          f"rss={_mi[0]:.2f}GB commit={_mi[1]:.2f}GB", flush=True)
-            # Task #11 Phase 2 / Task #28 / Task #34: MosaicDataset liefert bei
-            # encoder="2d" ein 14-Tupel (planes VORAN), bei encoder="flat"
-            # (Standard) das 13-Tupel -- die letzten 4 Elemente
-            # (opp_points_forecast, opp_points_mask, values_wdl, wdl_outcome)
-            # sind additiv ANS ENDE angehaengt (siehe
-            # `neural_net.py::MosaicDataset.__getitem__`), unabhaengig davon,
-            # ob `--opp-points-head`/`--value-head wdl` aktiv sind (die Cache-
-            # Felder existieren immer, werden nur ggf. nicht im Loss genutzt).
-            if encoder == "2d":
-                (planes, states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
-                 s_rounds, s_own, targets_opp_points, s_opp_mask,
-                 targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask,
-                 s_rank_ids, s_rank_q, s_rank_mask) = _batch
-                # RAM-Optimierung v21 (Bitpacking): liegt der Cache gepackt
-                # vor (`dataset.bitpacked`, Standard seit diesem Feature),
-                # kommt `planes` als [B,342]-Bytes statt [B,76,6,6] aus dem
-                # DataLoader -- EINMAL pro Batch entpackt, NOCH VOR dem
-                # Device-Move (Micro-Benchmark in neural_net.py zeigt diese
-                # Reihenfolge als schnellsten Pfad, siehe
-                # `unpack_planes_batch`-Kommentar). Alt-Cache/
-                # MOSAIC_CACHE_NOPACK=1 -> `bitpacked=False`, `planes` ist
-                # bereits [B,76,6,6] wie bisher, Aufruf entfaellt.
-                if dataset.bitpacked:
-                    planes = unpack_planes_batch(planes)
-                # RAM-Optimierung v20: Cache liefert kompakte Typen (planes
-                # uint8, states/policies fp16, masks uint8) -- Cast auf
-                # float32 erst NACH dem Device-Move (billig, spart Transfer).
-                # `.float()` ist fuer Alt-Caches in float32 ein No-op.
-                planes = planes.to(device).float()
-            else:
-                (states, targets_p, targets_v, masks, moon_targets, pol_w, targets_points,
-                 s_rounds, s_own, targets_opp_points, s_opp_mask,
-                 targets_v_wdl, s_wdl_outcome, targets_endgame, s_endgame_mask,
-                 s_rank_ids, s_rank_q, s_rank_mask) = _batch
-            # RAM-Optimierung v21 (Bitpacking): masks-Entpacken analog zu
-            # planes oben, UNABHAENGIG vom Encoder (masks gehoeren zum
-            # Basis-Tupel, siehe MosaicDataset.__getitem__).
-            if dataset.bitpacked:
-                masks = unpack_masks_batch(masks)
-            states    = states.to(device).float()
-            targets_p = targets_p.to(device).float()
-            targets_v = targets_v.to(device)
-            targets_points = targets_points.to(device)
-            targets_opp_points = targets_opp_points.to(device)
-            s_opp_mask = s_opp_mask.to(device)
-            targets_v_wdl = targets_v_wdl.to(device)
-            s_wdl_outcome = s_wdl_outcome.to(device)
-            targets_endgame = targets_endgame.to(device)
-            s_endgame_mask = s_endgame_mask.to(device)
-            masks     = masks.to(device).float()
-            pol_w     = pol_w.to(device)
-            # Task #35b: NUR bei aktivem Gewicht auf Device verschoben --
-            # bei ranking_loss_weight==0.0 (Default) bleibt der Batch-Pfad
-            # sonst byte-identisch zum Bestand (kein zusaetzlicher Transfer).
-            if ranking_loss_weight > 0.0:
-                s_rank_ids  = s_rank_ids.to(device)
-                s_rank_q    = s_rank_q.to(device)
-                s_rank_mask = s_rank_mask.to(device)
-
-            optimizer.zero_grad()
-            _out = model(planes, states) if encoder == "2d" else model(states)
-            pred_p, pred_v, pred_moon, pred_points, pred_own = _out[:5]
-            (pred_points_logits, pred_value_wdl_logits, pred_opp_points,
-             pred_endgame) = _unpack_optional_outputs(model, _out)
-
-            # Policy Loss mit Masking:
-            # Illegale Aktionen aus pred_p rausrechnen, dann renormalisieren
-            masked_logits = pred_p + (masks - 1) * 1e9   # illegale Aktionen auf -inf
-            log_probs = F.log_softmax(masked_logits, dim=1)
-
-            per_sample_ce = -torch.sum(targets_p * log_probs, dim=1)   # (B,)
-            # Policy-Loss NUR auf echten Drafting-Schritten (pol_w=1); Tiling/Start-
-            # One-Hot-Steps (pol_w=0) macht der DFS-Solver — sie würden sonst den
-            # Policy-Head mit Tiling-Aktionen fluten und die Drafting-Priors ruinieren.
-            # Task #15 B (2026-07-28): Runde-5-Samples optional komplett aus
-            # dem Loss nehmen. Das Netz wird in Runde 5 NIE konsultiert
-            # (net_mcts.rs:2265 bypassed den Suchpfad zu round5::choose_action,
-            # der R4-Bootstrap nutzt round5::exact_round5_outcome) -- ~17% der
-            # Value- und ~15% der Policy-Samples gehen dort in Entscheidungen,
-            # die ein exakter Alpha-Beta-Solver trifft. Praezedenzfall: pol_w=0
-            # fuer Tiling-Schritte, weil das der DFS-Solver macht.
-            rw = (s_rounds.to(device) != 5).float() if exclude_round5 else None
-
-            w = pol_w if rw is None else pol_w * rw
-            p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
-
-            # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter.
-            # Plackett-Luce-NLL statt MSE-auf-Rängen: der moon_order_head liefert
-            # jetzt echte Präferenz-SCORES, die net_mcts.rs zur Suchzeit direkt als
-            # P(Order)-Verteilung nutzt (statt einer bloßen Rang-Regression).
-            moon_targets = moon_targets.to(device)
-            # BUGFIX: sun_mask prüfte zuvor nur Spalte 0 (blau) auf >=0 — das
-            # schloss gültige Sonnenzug-Samples aus, deren Restfarben blau nicht
-            # enthielten (z.B. remaining=[gelb,rot]), und verzerrte den Loss
-            # systematisch zugunsten blau-haltiger Samples. Jetzt: irgendeine Spalte.
-            sun_mask = (moon_targets >= 0).any(dim=1)
-            if sun_mask.any():
-                moon_nll = plackett_luce_moon_loss(pred_moon, moon_targets)
-                p_loss = p_loss + moon_nll[sun_mask].mean()
-
-            # Value-/Punkte-Aux-Losses: reines Trainings-Zusatzsignal fuer den
-            # Trunk (Suche/Self-Play nutzt weiterhin nur die Policy, siehe
-            # evaluations/stage2_investigation.md) -- klein gewichtet, damit
-            # sie den Policy-Loss nicht dominieren.
-            rw2 = rw.view(-1, 1) if rw is not None else None
-            denom = rw2.sum().clamp(min=1e-6) if rw2 is not None else None
-            # Task #34: bei aktivem WDL-Kopf ist der Value-Verlust eine
-            # Kreuzentropie mit WEICHEN Labels statt MSE (siehe
-            # VALUE_SCHEMA_VERSION=16-Kommentar in neural_net.py). Ein
-            # 2-Logit-Softmax reduziert algebraisch auf BCEWithLogits der
-            # Logit-DIFFERENZ gegen die Ziel-Wahrscheinlichkeit `targets_v_wdl`
-            # -- numerisch identisch zur kategorialen Kreuzentropie
-            # -log(softmax)[y], aber stabiler (kein manuelles log(softmax)).
-            # ACHTUNG (STATUS.md "val_combined"-Falle): diese Loss-GROESSE hat
-            # eine ANDERE Einheit als die MSE des tanh-Arms -- `val_combined`
-            # (current_metric weiter unten) ist damit NUR arm-INTERN fuer die
-            # Checkpoint-Auswahl vergleichbar, NICHT zwischen tanh- und
-            # wdl-Laeufen (siehe Kommentar an der current_metric-Stelle).
-            if pred_value_wdl_logits is not None:
-                logit_diff = pred_value_wdl_logits[:, 1] - pred_value_wdl_logits[:, 0]
-                # Task #34 Audit 2026-08-05 (`--wdl-hard-only`): `values_wdl`
-                # ist TD-geblendet mit `bootstrap_value` -- und der stammt aus
-                # Self-Play-Suchen der GENERATOR-Netze (v16-v18, tanh-Kopf,
-                # Platt-B~1,9): eine gestauchte Punkte-Marge, als
-                # Wahrscheinlichkeit gelesen. Die Haelfte (TD_LAMBDA=0,5) des
-                # "kohaerenten" WDL-Ziels traegt also die ALTE Semantik weiter.
-                # Dieser Schalter trainiert stattdessen auf dem ROHEN Ausgang
-                # `wdl_outcome` (-1 = unbekannt -> maskiert) -- das einzige auf
-                # Bestandskorpora saubere Wahrscheinlichkeits-Ziel, bis eine
-                # Kampagne mit WDL-Generator neue Bootstrap-Werte liefert.
-                if wdl_hard_only:
-                    v_wdl_target = s_wdl_outcome.view(-1)
-                    wdl_mask = (v_wdl_target >= 0.0).float()
-                    # Erosions-Arm A (`--wdl-label-smooth`): weiche Labels
-                    # 1-eps/2 bzw. eps/2 statt 1/0 -- testet die
-                    # Memorisierungs-Hypothese (Trainings-Loss 0,60->0,39 bei
-                    # steigendem Val-Brier). Brier unten bleibt gegen den
-                    # ROHEN Ausgang gerechnet, unveraendert vergleichbar.
-                    hard_t = v_wdl_target.clamp(min=0.0)
-                    if wdl_label_smooth > 0.0:
-                        hard_t = hard_t * (1.0 - wdl_label_smooth) + 0.5 * wdl_label_smooth
-                    v_bce = F.binary_cross_entropy_with_logits(
-                        logit_diff, hard_t, reduction="none") * wdl_mask
-                    if rw is None:
-                        v_loss = v_bce.sum() / wdl_mask.sum().clamp(min=1.0)
-                    else:
-                        # Audit-F3: Nenner muss die MASKIERTE Gewichtssumme
-                        # sein -- `denom` (=rw2.sum()) zaehlt auch
-                        # wdl_mask==0-Samples und verduennte den Loss.
-                        v_loss = ((v_bce.view(-1, 1) * rw2).sum()
-                                  / (wdl_mask.view(-1, 1) * rw2).sum().clamp(min=1e-6))
-                else:
-                    v_wdl_target = targets_v_wdl.view(-1)
-                    if wdl_bootstrap_destretch:
-                        v_wdl_target = _destretch_wdl_target(
-                            v_wdl_target, s_wdl_outcome.view(-1),
-                            destretch_a, destretch_b)
-                    if rw is None:
-                        v_loss = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target)
-                    else:
-                        v_bce = F.binary_cross_entropy_with_logits(logit_diff, v_wdl_target, reduction="none")
-                        v_loss = (v_bce.view(-1, 1) * rw2).sum() / denom
-            elif rw is None:
-                v_loss = mse_loss(pred_v, targets_v)
-            else:
-                v_loss = (((pred_v - targets_v) ** 2) * rw2).sum() / denom
-
-            # Task #12: bei aktivem Verteilungs-Kopf ist der Punkte-Verlust eine
-            # KREUZENTROPIE gegen ein HL-Gauss-geglaettetes Ziel statt MSE auf
-            # dem Erwartungswert -- reicheres Gradientensignal, robuster gegen
-            # Ausreisser (Farebrother et al. 2024). Der ausgegebene Skalar
-            # bleibt der Erwartungswert, die Schnittstelle also unveraendert.
-            if pred_points_logits is not None:
-                points_loss = points_dist_loss(
-                    pred_points_logits, targets_points, model, rw2, denom)
-            elif rw is None:
-                points_loss = mse_loss(pred_points, targets_points)
-            else:
-                points_loss = (((pred_points - targets_points) ** 2) * rw2).sum() / denom
-
-            # Ownership-Loss (Task #9): dichtes Hilfsziel, 72 Binaerlabels je
-            # Position statt eines Skalars. -1 = unbekannt (unvollstaendiges
-            # Spiel) und wird maskiert. Bei Gewicht 0.0 wird der Term komplett
-            # uebersprungen -- kein Gradient, Bestandsverhalten unveraendert.
-            own_loss = torch.zeros((), device=device)
-            if effective_ownership_weight > 0.0:
-                own_t = s_own.to(device).float()
-                own_m = (own_t >= 0).float()
-                if own_m.sum() > 0:
-                    own_bce = F.binary_cross_entropy_with_logits(
-                        pred_own, own_t.clamp(min=0.0), reduction="none")
-                    own_loss = (own_bce * own_m).sum() / own_m.sum()
-
-            # Task #28 (PREREG_task28_aggression.md "Minimal-invasiver
-            # Zuschnitt" Punkt 2): Opp-Punkte-Aux-Loss, NUR wenn der additive
-            # Kopf aktiv ist. MSE, Gewicht = POINTS_WEIGHT (symmetrisch zum
-            # eigenen Punkte-Kopf, kein neues Tuning), maskiert mit
-            # `s_opp_mask` (0 bei unvollstaendigen Partien ODER einem Alt-
-            # Cache ohne das Feld -- kein erfundener Zielwert geht in den
-            # Loss ein) UND zusaetzlich mit `rw` (--exclude-round5), falls
-            # aktiv -- gleiches Kombinationsmuster wie beim Punkte-Loss oben.
-            # Geht NICHT in `val_combined`/die Checkpoint-Auswahl ein (siehe
-            # Kommentar an der Auswahlstelle unten) -- Bestandsmetrik bleibt
-            # unveraendert vergleichbar mit Alt-Laeufen.
-            opp_loss = torch.zeros((), device=device)
-            if pred_opp_points is not None:
-                opp_w = s_opp_mask.view(-1, 1) if rw2 is None else s_opp_mask.view(-1, 1) * rw2
-                opp_denom = opp_w.sum().clamp(min=1e-6)
-                opp_loss = (((pred_opp_points - targets_opp_points) ** 2) * opp_w).sum() / opp_denom
-
-            # Schema 18 (PREREG_plate_intervention.md): Endgame-Aux-Loss,
-            # NUR bei aktivem Kopf. MSE gegen den exakten R5-Wurzelwert
-            # (Cache [0,1] -> Remap auf die Tanh-Skala [-1,1]), maskiert mit
-            # `s_endgame_mask` (nur R5-Drafting mit root_q). Gewicht =
-            # POINTS_WEIGHT (symmetrisch, kein neues Tuning, Muster opp_loss).
-            # KEIN rw2: --exclude-round5 wuerde die Zone komplett leeren --
-            # der Kopf ist ausdruecklich ein R5-Zonen-Signal. Geht NICHT in
-            # val_combined/Brier-Checkpoint-Auswahl ein.
-            endgame_loss = torch.zeros((), device=device)
-            if pred_endgame is not None:
-                eg_w = s_endgame_mask.view(-1, 1)
-                eg_denom = eg_w.sum().clamp(min=1e-6)
-                eg_target = targets_endgame * 2.0 - 1.0
-                endgame_loss = (((pred_endgame - eg_target) ** 2) * eg_w).sum() / eg_denom
-
-            # Task #35b ("Ranking-Loss auf Geschwister-Q"): NUR berechnet,
-            # wenn `ranking_loss_weight>0` -- bei 0.0 (Default) komplett
-            # uebersprungen, kein zusaetzlicher Gradient/keine zusaetzliche
-            # Rechenzeit, byte-identisches Bestandsverhalten. Kein eigener
-            # Modell-Kopf (nutzt die bestehenden Policy-Logits `pred_p`
-            # VOR dem Illegal-Masking, siehe `_pairwise_ranking_loss`-
-            # Docstring). Geht NICHT in val_combined/Brier-Checkpoint-
-            # Auswahl ein (Muster opp_loss/endgame_loss oben).
-            ranking_loss = torch.zeros((), device=device)
-            if ranking_loss_weight > 0.0:
-                ranking_loss, _rk_acc, _rk_n = _pairwise_ranking_loss(
-                    pred_p, s_rank_ids, s_rank_q, s_rank_mask)
-
-            loss = (p_loss + effective_value_weight * v_loss
-                    + effective_points_weight * points_loss
-                    + effective_ownership_weight * own_loss
-                    + effective_points_weight * opp_loss
-                    + effective_points_weight * endgame_loss
-                    + ranking_loss_weight * ranking_loss)
-            if ftz.backward_ok(loss):   # nur im Freeze-Modus je restriktiv, s. Docstring
-                loss.backward()
-                optimizer.step()
-
-            t_loss       += loss.item()
-            t_ploss      += p_loss.item()
-            t_vloss      += v_loss.item()
-            t_pointsloss += points_loss.item()
-            if pred_opp_points is not None:
-                t_opp_pointsloss += opp_loss.item()
-            if pred_endgame is not None:
-                t_endgameloss += endgame_loss.item()
-            if ranking_loss_weight > 0.0:
-                t_rankingloss += ranking_loss.item()
+        _t = _train_one_epoch(
+            model, dataloader, dataset, optimizer, device, encoder,
+            n_batches, epoch, _mem_log_every, ftz, _loss_setup,
+        )
+        t_loss = _t["t_loss"]
+        t_ploss = _t["t_ploss"]
+        t_vloss = _t["t_vloss"]
+        t_pointsloss = _t["t_pointsloss"]
+        t_opp_pointsloss = _t["t_opp_pointsloss"]
+        t_endgameloss = _t["t_endgameloss"]
+        t_rankingloss = _t["t_rankingloss"]
 
         epoch_ploss = t_ploss / n_batches
         epoch_vloss = t_vloss / n_batches
@@ -1222,256 +1544,20 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # ein Batch-Mittel würde das verzerren). SS_tot/SS_res daher als
         # laufende Summen über alle Batches akkumuliert, R² erst danach
         # einmalig berechnet.
-        epoch_val_ploss = None
-        epoch_val_vloss = None
-        epoch_val_pointsloss = None
-        epoch_val_value_r2 = None
-        epoch_val_points_r2 = None
-        epoch_val_opp_pointsloss = None
-        epoch_val_opp_points_r2 = None
-        epoch_val_endgame_mse = None
-        epoch_val_ranking_acc = None  # Task #35b: rein deskriptiv, siehe val_ranking_acc_history
-        epoch_val_brier = None  # Task #34: arm-uebergreifend vergleichbare Kalibrierungskennzahl
-        epoch_val_ownloss = None  # PREREG_frozen_trunk_head.md, s. val_ownloss_history
-        own_meter = OwnershipValLoss(effective_ownership_weight > 0.0)
-        if val_dataloader is not None:
-            model.eval()
-            val_ploss_sum, val_vloss_sum, val_pointsloss_sum, val_batches = 0.0, 0.0, 0.0, 0
-            val_opp_pointsloss_sum, val_opp_batches = 0.0, 0  # Task #28, nur relevant wenn opp_points_head aktiv
-            val_endgame_sqerr_sum, val_endgame_n = 0.0, 0.0  # Schema 18, nur relevant wenn endgame_head aktiv
-            val_rank_correct_sum, val_rank_n = 0.0, 0.0  # Task #35b, nur relevant wenn ranking_loss_weight>0
-            v_sum, v_sumsq, v_sqerr_sum, n_v = 0.0, 0.0, 0.0, 0
-            pts_sum, pts_sumsq, pts_sqerr_sum, n_pts = 0.0, 0.0, 0.0, 0
-            opp_sum, opp_sumsq, opp_sqerr_sum, n_opp = 0.0, 0.0, 0.0, 0
-            brier_sqerr_sum, n_brier = 0.0, 0  # Task #34
-            with torch.no_grad():
-                for _v_batch in val_dataloader:
-                    if encoder == "2d":
-                        (v_planes, v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
-                         v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
-                         v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask,
-                         v_rank_ids, v_rank_q, v_rank_mask) = _v_batch
-                        # RAM-Optimierung v21 (Bitpacking): Entpacken wie im
-                        # Trainingszweig, siehe dortigen Kommentar.
-                        if val_dataset.bitpacked:
-                            v_planes = unpack_planes_batch(v_planes)
-                        # RAM-Optimierung v20: Cast wie im Trainingszweig.
-                        v_planes = v_planes.to(device).float()
-                    else:
-                        (v_states, v_targets_p, v_targets_v, v_masks, _vmoon, v_pol_w,
-                         v_targets_points, v_rounds, v_own, v_targets_opp_points, v_opp_mask,
-                         v_targets_v_wdl, v_wdl_outcome, v_targets_endgame, v_endgame_mask,
-                         v_rank_ids, v_rank_q, v_rank_mask) = _v_batch
-                    if val_dataset.bitpacked:
-                        v_masks = unpack_masks_batch(v_masks)
-                    v_states = v_states.to(device).float()
-                    v_targets_p = v_targets_p.to(device).float()
-                    v_targets_v = v_targets_v.to(device)
-                    v_targets_points = v_targets_points.to(device)
-                    v_targets_opp_points = v_targets_opp_points.to(device)
-                    v_opp_mask = v_opp_mask.to(device)
-                    v_targets_v_wdl = v_targets_v_wdl.to(device)
-                    v_wdl_outcome = v_wdl_outcome.to(device)
-                    v_targets_endgame = v_targets_endgame.to(device)
-                    v_endgame_mask = v_endgame_mask.to(device)
-                    v_masks = v_masks.to(device).float()
-                    v_pol_w = v_pol_w.to(device)
-                    if ranking_loss_weight > 0.0:
-                        v_rank_ids  = v_rank_ids.to(device)
-                        v_rank_q    = v_rank_q.to(device)
-                        v_rank_mask = v_rank_mask.to(device)
-                    _vout = model(v_planes, v_states) if encoder == "2d" else model(v_states)
-                    v_pred_p, v_pred_v, _v_pred_moon, v_pred_points, v_pred_own = _vout[:5]
-                    (_v_pred_points_logits, v_pred_value_wdl_logits,
-                     v_pred_opp_points, v_pred_endgame) = _unpack_optional_outputs(model, _vout)
-                    own_meter.add(v_pred_own, v_own)
-                    if v_pred_endgame is not None:
-                        _eg_w = v_endgame_mask.view(-1, 1)
-                        val_endgame_sqerr_sum += (((v_pred_endgame - (v_targets_endgame * 2.0 - 1.0)) ** 2) * _eg_w).sum().item()
-                        val_endgame_n += _eg_w.sum().item()
-                    # Task #35b: rein DESKRIPTIVE Val-Metrik (paarweise
-                    # Ranking-Accuracy, STATUS.md-Vorgabe) -- NICHT Teil von
-                    # val_combined/der Checkpoint-Auswahl. Gewichtete Summe
-                    # ueber alle Val-Batches (Anzahl gueltiger Paare variiert
-                    # je Batch, ein einfaches Batch-Mittel wuerde kleine
-                    # Batches ueberbewerten).
-                    if ranking_loss_weight > 0.0:
-                        _, _v_rk_acc, _v_rk_n = _pairwise_ranking_loss(
-                            v_pred_p, v_rank_ids, v_rank_q, v_rank_mask)
-                        if _v_rk_acc is not None:
-                            val_rank_correct_sum += _v_rk_acc * _v_rk_n
-                            val_rank_n += _v_rk_n
-                    v_masked_logits = v_pred_p + (v_masks - 1) * 1e9
-                    v_log_probs = F.log_softmax(v_masked_logits, dim=1)
-                    v_per_sample_ce = -torch.sum(v_targets_p * v_log_probs, dim=1)
-                    v_rw = (v_rounds.to(device) != 5).float() if exclude_round5 else None
-                    v_w = v_pol_w if v_rw is None else v_pol_w * v_rw
-                    v_p_loss = (v_per_sample_ce * v_w).sum() / v_w.sum().clamp(min=1e-6)
-                    # Task #12, WICHTIG: der VALIDIERUNGS-Punkteverlust bleibt
-                    # auch bei aktivem Verteilungs-Kopf MSE auf dem
-                    # ERWARTUNGSWERT -- absichtlich NICHT die Kreuzentropie des
-                    # Trainings. Grund: `val_combined` ist zugleich die
-                    # Auswahlmetrik fuer den besten Checkpoint. Waere sie in den
-                    # beiden A/B-Armen eine andere GROESSE, waeren die Arme nicht
-                    # vergleichbar -- genau der Fehler, der am 2026-07-28 beim
-                    # lr1e5-Arm beinahe zur falschen Entscheidung gefuehrt haette
-                    # (siehe STATUS.md "Seed-Sweep", Abschnitt val_combined).
-                    # Task #34: der VALIDIERUNGS-Value-Verlust folgt (anders
-                    # als der Punkte-Verlust oben) bewusst DEMSELBEN Loss wie
-                    # das Training des jeweiligen Arms (MSE fuer 'tanh', BCE
-                    # fuer 'wdl') -- die STATUS.md-Vorgabe akzeptiert
-                    # ausdruecklich, dass `val_combined` dadurch zwischen den
-                    # Armen NICHT vergleichbar ist (nur armintern zur
-                    # Checkpoint-Auswahl, siehe Kommentar an der v_loss-Stelle
-                    # oben im Trainingsblock). Der arm-uebergreifend
-                    # vergleichbare Wert ist der Brier-Score weiter unten.
-                    if v_pred_value_wdl_logits is not None:
-                        v_logit_diff = v_pred_value_wdl_logits[:, 1] - v_pred_value_wdl_logits[:, 0]
-                        v_wdl_target = v_targets_v_wdl.view(-1)
-                        # `--wdl-hard-only`: Val-Loss konsistent zum Trainings-
-                        # Ziel auf dem rohen Ausgang (Maskierung wie im
-                        # Trainingsblock; der Brier unten bleibt unveraendert,
-                        # er nutzt ohnehin schon `wdl_outcome`).
-                        if wdl_bootstrap_destretch:
-                            # Erosions-Arm B: Val-Ziel identisch zum
-                            # Trainingsziel transformieren (sonst misst der
-                            # Val-Loss ein anderes Ziel als trainiert wird).
-                            v_wdl_target = _destretch_wdl_target(
-                                v_wdl_target, v_wdl_outcome.view(-1),
-                                destretch_a, destretch_b)
-                        if wdl_hard_only:
-                            v_raw = v_wdl_outcome.view(-1)
-                            v_mask = (v_raw >= 0.0).float()
-                            # Audit-F3: Val-Zweig muss `v_rw` genauso
-                            # respektieren wie der Trainingszweig -- sonst
-                            # enthaelt val_combined (Auswahlmetrik!) bei
-                            # `--exclude-round5` andere Samples als der Loss.
-                            if v_rw is not None:
-                                v_mask = v_mask * v_rw.view(-1)
-                            v_hard_t = v_raw.clamp(min=0.0)
-                            if wdl_label_smooth > 0.0:
-                                v_hard_t = v_hard_t * (1.0 - wdl_label_smooth) + 0.5 * wdl_label_smooth
-                            v_bce_h = F.binary_cross_entropy_with_logits(
-                                v_logit_diff, v_hard_t, reduction="none") * v_mask
-                            v_v_loss = v_bce_h.sum() / v_mask.sum().clamp(min=1e-6)
-                        elif v_rw is None:
-                            v_v_loss = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target)
-                        else:
-                            v_rw2 = v_rw.view(-1, 1)
-                            v_den = v_rw2.sum().clamp(min=1e-6)
-                            v_bce = F.binary_cross_entropy_with_logits(v_logit_diff, v_wdl_target, reduction="none")
-                            v_v_loss = (v_bce.view(-1, 1) * v_rw2).sum() / v_den
-                    elif v_rw is None:
-                        v_v_loss = mse_loss(v_pred_v, v_targets_v)
-                    else:
-                        v_rw2 = v_rw.view(-1, 1)
-                        v_den = v_rw2.sum().clamp(min=1e-6)
-                        v_v_loss = (((v_pred_v - v_targets_v) ** 2) * v_rw2).sum() / v_den
-                    if v_rw is None:
-                        v_points_loss = mse_loss(v_pred_points, v_targets_points)
-                    else:
-                        v_rw2 = v_rw.view(-1, 1)
-                        v_den = v_rw2.sum().clamp(min=1e-6)
-                        v_points_loss = (((v_pred_points - v_targets_points) ** 2) * v_rw2).sum() / v_den
-                    val_ploss_sum += v_p_loss.item()
-                    val_vloss_sum += v_v_loss.item()
-                    val_pointsloss_sum += v_points_loss.item()
-                    val_batches += 1
-
-                    # Task #34: R² auf der ARM-EIGENEN Groesse -- 'tanh'
-                    # bleibt byte-identisch (targets_v/pred_v, [-1,1]-Marge),
-                    # 'wdl' vergleicht auf der [0,1]-Wahrscheinlichkeitsskala
-                    # (P(Sieg) = (v_pred_v+1)/2 gegen targets_v_wdl) -- dieselben
-                    # Groessen wie der Loss oben, daher intern konsistent, aber
-                    # NICHT direkt mit dem 'tanh'-R² vergleichbar (andere
-                    # Zielgroesse).
-                    if v_pred_value_wdl_logits is not None:
-                        v_p_win = (v_pred_v + 1.0) * 0.5
-                        v_sum += v_targets_v_wdl.sum().item()
-                        v_sumsq += (v_targets_v_wdl ** 2).sum().item()
-                        v_sqerr_sum += ((v_targets_v_wdl - v_p_win) ** 2).sum().item()
-                        n_v += v_targets_v_wdl.numel()
-                    else:
-                        v_sum += v_targets_v.sum().item()
-                        v_sumsq += (v_targets_v ** 2).sum().item()
-                        v_sqerr_sum += ((v_targets_v - v_pred_v) ** 2).sum().item()
-                        n_v += v_targets_v.numel()
-
-                    # Task #34 (STATUS.md "gib pro Epoche eine Value-
-                    # KALIBRIERUNGSKENNZAHL aus, die zwischen Armen
-                    # vergleichbar ist"): Brier-Score von P(Sieg)=(pred_v+1)/2
-                    # gegen den ROHEN, UNGEBLENDETEN tatsaechlichen Ausgang
-                    # (`wdl_outcome`, -1 = unbekannt/maskiert) -- UNABHAENGIG
-                    # vom Arm, weil `pred_v` in BEIDEN Armen auf derselben
-                    # [-1,1]-Position/Skala liegt (siehe forward()-Kommentar in
-                    # neural_net.py). Anders als `targets_v`/`targets_v_wdl`
-                    # (beide TD-geblendet) ist `wdl_outcome` NICHT geblendet --
-                    # genau deshalb ist dieser Wert arm-uebergreifend
-                    # vergleichbar, waehrend val_vloss/value_r2 es nicht sind.
-                    brier_p_win = (v_pred_v + 1.0) * 0.5
-                    brier_mask = (v_wdl_outcome >= 0.0).float()
-                    brier_n_batch = brier_mask.sum().item()
-                    if brier_n_batch > 0:
-                        brier_sqerr_sum += (((brier_p_win - v_wdl_outcome.clamp(min=0.0)) ** 2)
-                                            * brier_mask).sum().item()
-                        n_brier += brier_n_batch
-
-                    pts_sum += v_targets_points.sum().item()
-                    pts_sumsq += (v_targets_points ** 2).sum().item()
-                    pts_sqerr_sum += ((v_targets_points - v_pred_points) ** 2).sum().item()
-                    n_pts += v_targets_points.numel()
-
-                    # Task #28: Val-MSE + R² NUR ueber die tatsaechlich
-                    # gemaskten (opp_mask==1) Samples -- analog zum
-                    # Ownership-Loss-Muster, NICHT die volle Val-Menge (sonst
-                    # verwaesserte ein Alt-Cache-Anteil ohne das Feld die
-                    # Kennzahl mit erfundenen Nullen).
-                    if v_pred_opp_points is not None:
-                        opp_m = v_opp_mask.view(-1, 1)
-                        opp_n_batch = opp_m.sum().item()
-                        if opp_n_batch > 0:
-                            opp_batch_loss = (((v_targets_opp_points - v_pred_opp_points) ** 2)
-                                              * opp_m).sum() / opp_m.sum().clamp(min=1e-6)
-                            val_opp_pointsloss_sum += opp_batch_loss.item()
-                            val_opp_batches += 1
-                            opp_sum += (v_targets_opp_points * opp_m).sum().item()
-                            opp_sumsq += ((v_targets_opp_points ** 2) * opp_m).sum().item()
-                            opp_sqerr_sum += (((v_targets_opp_points - v_pred_opp_points) ** 2)
-                                              * opp_m).sum().item()
-                            n_opp += opp_n_batch
-            model.train()
-            epoch_val_ploss = val_ploss_sum / max(val_batches, 1)
-            epoch_val_vloss = val_vloss_sum / max(val_batches, 1)
-            epoch_val_pointsloss = val_pointsloss_sum / max(val_batches, 1)
-            epoch_val_opp_pointsloss = (val_opp_pointsloss_sum / val_opp_batches
-                                        if val_opp_batches > 0 else None)
-            # Schema 18: maskiertes Val-MSE des endgame_head -- None (statt
-            # einer erfundenen 0.0), wenn kein einziges maskiertes Sample im
-            # Val-Split lag (Alt-Cache/Kopf inaktiv). Geht NICHT in
-            # val_combined/die Brier-Checkpoint-Auswahl ein (Muster opp_loss,
-            # siehe Kommentar am Trainings-Loss-Block oben).
-            epoch_val_endgame_mse = (val_endgame_sqerr_sum / val_endgame_n
-                                     if val_endgame_n > 0 else None)
-            # Task #35b: gewichtetes Mittel ueber alle Val-Batches -- None
-            # (statt einer erfundenen 0.0), wenn kein einziges gueltiges Paar
-            # im Val-Split lag (Gewicht 0.0/Alt-Cache-Split ohne Geschwister-
-            # Set). Rein deskriptiv, geht NICHT in val_combined ein.
-            epoch_val_ranking_acc = (val_rank_correct_sum / val_rank_n
-                                     if val_rank_n > 0 else None)
-            epoch_val_ownloss = own_meter.value()  # PREREG_frozen_trunk_head.md
-
-            def _r2(sum_y, sumsq_y, sqerr, n):
-                if n == 0:
-                    return None
-                ss_tot = sumsq_y - (sum_y ** 2) / n
-                if ss_tot <= 1e-9:  # entartet: Val-Targets praktisch konstant
-                    return None
-                return 1.0 - sqerr / ss_tot
-
-            epoch_val_value_r2 = _r2(v_sum, v_sumsq, v_sqerr_sum, n_v)
-            epoch_val_points_r2 = _r2(pts_sum, pts_sumsq, pts_sqerr_sum, n_pts)
-            epoch_val_opp_points_r2 = _r2(opp_sum, opp_sumsq, opp_sqerr_sum, n_opp)
-            epoch_val_brier = brier_sqerr_sum / n_brier if n_brier > 0 else None
+        _v = _validate_one_epoch(
+            model, val_dataloader, val_dataset, device, encoder, _loss_setup,
+        )
+        epoch_val_ploss = _v["epoch_val_ploss"]
+        epoch_val_vloss = _v["epoch_val_vloss"]
+        epoch_val_pointsloss = _v["epoch_val_pointsloss"]
+        epoch_val_value_r2 = _v["epoch_val_value_r2"]
+        epoch_val_points_r2 = _v["epoch_val_points_r2"]
+        epoch_val_opp_pointsloss = _v["epoch_val_opp_pointsloss"]
+        epoch_val_opp_points_r2 = _v["epoch_val_opp_points_r2"]
+        epoch_val_endgame_mse = _v["epoch_val_endgame_mse"]
+        epoch_val_ranking_acc = _v["epoch_val_ranking_acc"]
+        epoch_val_brier = _v["epoch_val_brier"]
+        epoch_val_ownloss = _v["epoch_val_ownloss"]
         val_ploss_history.append(epoch_val_ploss)
         val_vloss_history.append(epoch_val_vloss)
         val_pointsloss_history.append(epoch_val_pointsloss)
