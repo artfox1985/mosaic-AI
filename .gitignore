@@ -16,6 +16,11 @@
 # ist -- mit '/models/' waere die Negation unten wirkungslos.
 /models/*
 !/models/manifest_train_*.json
+# Such-Specs (Nutzer-Entscheid 2026-08-26): sie definieren MESSARME
+# (paired_arena_env_ab reicht sie je Seite durch) und sind damit Teil des
+# Messaufbaus, nicht Beiwerk. Vier winzige JSON, und ohne sie laesst sich ein
+# Arm-Vergleich nicht wiederholen.
+!/models/*.spec.json
 
 # --- Eingefrorene Artefakte (Nutzer-Entscheid 2026-08-26) --------------------
 # Ein eingefrorener Champion oder Lehrer ist kein Modell, sondern ein
@@ -127,3 +132,12 @@ scratchpad/
 # gewinnt die zuletzt passende Regel.
 !/models/frozen_champions/**/*.whl
 !/models/frozen_heuristics/**/*.whl
+
+# --- Golden Probes eingefrorener Artefakte (Nutzer-Entscheid 2026-08-26) -----
+# '*.pkl' oben haelt den Korpus aus dem Repo, und das bleibt richtig -- er ist
+# 1,1 GB. Die Golden Probe eines Artefakts ist aber KEIN Korpus, sondern sein
+# Beweismittel: 10 Partien, gegen die jede spaetere Pruefung laeuft. Ohne sie
+# ist das Artefakt nicht mehr pruefbar, nur noch vorhanden.
+# Auch diese Negation MUSS nach '*.pkl' stehen -- letzte passende Regel gewinnt.
+!/models/frozen_champions/**/golden_probe/*.pkl
+!/models/frozen_heuristics/**/golden_probe/*.pkl

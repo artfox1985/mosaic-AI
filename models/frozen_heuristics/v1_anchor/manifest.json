@@ -1,0 +1,96 @@
+{
+  "artefakt": "v1_anchor",
+  "rolle": "Elo-Anker der gesamten Leiter",
+  "typ": "heuristik",
+  "freeze_date": "2026-08-26",
+  "spec": {
+    "implicit_minimax_alpha": 0.0,
+    "long_row_init_shaping_w": 0.0,
+    "heuristik_variante": "v1"
+  },
+  "wheel": {
+    "datei": "mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
+    "quelle": "D:/OneDrive/Documents/Projekte/mosaic-AI/engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
+    "rolle": "Traeger des VERHALTENS. Bei einer Heuristik gibt es kein ONNX, das es mittraegt -- ohne dieses Wheel ist der Agent weg."
+  },
+  "tiling_net": null,
+  "herkunft": {
+    "git_commit": "b770612608178cb1206781d4cf01bbe21da23de9",
+    "git_dirty": true,
+    "git_dirty_hinweis": "TRUE heisst: der Baum trug beim Einfrieren unversionierte Aenderungen. Das Wheel im Artefakt ist dann NICHT aus dem Commit rekonstruierbar -- es ist die einzige Kopie des Verhaltens.",
+    "dirty_dateien": [
+      "M  .gitignore",
+      " M CLAUDE.md",
+      " D data/policy_carrier_manifest_v20.json",
+      "A  models/champion_frozen.spec.json",
+      "A  models/champion_imm_a02.spec.json",
+      "A  models/lr_init_off.spec.json",
+      "A  models/lr_init_on.spec.json",
+      "?? models/frozen_heuristics/",
+      "?? models/manifest_train_hv2sanity_20260825_191036.json",
+      "?? models/manifest_train_hv2sanity_20260825_191107.json",
+      "?? models/manifest_train_hv2sanity_ptv_20260825_210744.json",
+      "?? models/manifest_train_valpooltest_20260825_191540.json",
+      "?? tools/freeze_heuristic.py",
+      "?? tools/probes/generator_drift_probe.py",
+      "?? tools/verify_frozen_heuristic.py"
+    ]
+  },
+  "contract_hash": "a3f61f246d9bbf5c",
+  "engine_config": {
+    "active_leaf": "Net",
+    "aggr_lambda": 0.0,
+    "bootstrap_horizon_rounds": 2,
+    "contract_hash": "a3f61f246d9bbf5c",
+    "decouple_net_sims_from_actions": true,
+    "determinize_root_hidden_info": true,
+    "engine_version": "0.1.0",
+    "floor_shaping_weight": 0.3,
+    "gumbel_top_m": 16,
+    "input_size": 714,
+    "mirror_other_val": false,
+    "num_actions": 406,
+    "num_planes_channels": 77,
+    "points_utility_w": 0.0,
+    "points_utility_weight": 0.0,
+    "policy_mass_cutoff": 0.95,
+    "round_transition_n_samples_search": 8,
+    "round_transition_sampling": false,
+    "shuffle_stack_peek_in_search": false,
+    "use_gumbel_search": true,
+    "value_cal_a": 0.0,
+    "value_cal_b": 1.0,
+    "value_opp_epsilon": 0.0
+  },
+  "golden_probe": {
+    "art": "self-play-reproduktion, byte-verglichen",
+    "warum": "Die Welle-3-Probe der Netz-Champions prueft nur DRAFTING-Entscheidungen; der Referee loest Tiling und Startsetzung selbst auf und ist dabei auf V1 verdrahtet (referee.rs:312 -> self_play.rs:1207). Fuer eine Heuristik waere das eine halbe Probe. Ein Self-Play-Lauf aus dem eigenen Wheel deckt Drafting, Tiling und Runde 5 ab.",
+    "rezept": {
+      "mode": "mcts",
+      "games": 10,
+      "sims": 600,
+      "version": "probe",
+      "threads": 11,
+      "chunk": 10,
+      "per_file": 10,
+      "seed": 20260826,
+      "c_puct": 1.5,
+      "add_root_noise": true,
+      "deterministic": false,
+      "record_rtv": false,
+      "tau_argmax_from_move": 0,
+      "heuristik_variante": "v1",
+      "model": null
+    },
+    "dateien": [
+      "selfplay_probe_20260826_1654_g10.pkl"
+    ],
+    "pruefbefehl": "python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/v1_anchor"
+  },
+  "laufzeit": {
+    "wanduhr_s": 14.9,
+    "cpu_s": null,
+    "threads": 11,
+    "s_je_partie": null
+  }
+}
