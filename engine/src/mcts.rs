@@ -136,6 +136,29 @@ pub enum HeuristikVariante {
 }
 
 impl HeuristikVariante {
+    /// Der kanonische Name dieser Variante -- die Umkehrung von
+    /// `self_play::variant_from_name`.
+    ///
+    /// Damit koennen Spec-Dateien und Artefakt-Manifeste ihre Variante
+    /// SCHREIBEN, ohne die Zuordnung ein zweites Mal von Hand zu pflegen.
+    /// Zwei Tabellen, die dasselbe abbilden, laufen auseinander; der Test
+    /// unten haelt sie zusammen.
+    pub fn name(self) -> &'static str {
+        match self {
+            HeuristikVariante::V1 => "v1",
+            HeuristikVariante::V2 => "v2",
+            HeuristikVariante::V2Huelle => "v2huelle",
+            HeuristikVariante::V2Heatmap => "v2heatmap",
+            HeuristikVariante::V2PointMap => "v2pointmap",
+            HeuristikVariante::V2HuellePhase => "v2huellephase",
+            HeuristikVariante::V2HuelleFilter => "v2huellefilter",
+            HeuristikVariante::V2HuelleReach => "v2huellereach",
+            HeuristikVariante::V2HuelleCap => "v2huellecap",
+        }
+    }
+}
+
+impl HeuristikVariante {
     /// Laeuft diese Variante ueber den v2-Pfad (Zusatzterme UND Routing)?
     /// Die beiden v2-Varianten unterscheiden sich nur in der Zielzellen-Menge.
     pub fn is_v2(self) -> bool {

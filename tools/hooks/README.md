@@ -13,7 +13,7 @@ laufen als Teil von `cargo test --release`, also im `pre-push`-Haken:
 
 | | Waechter | Fundstelle |
 |---|---|---|
-| A1 | Testbestand als Regressionsnetz | `cargo test --release` (553 Tests: 527 aktiv, 26 `#[ignore]`) |
+| A1 | Testbestand als Regressionsnetz | `cargo test --release` (557 Tests: 531 aktiv, 26 `#[ignore]`) |
 | A2 | Laufzeit-Vertragsstempel | `engine/src/lib.rs:647` (`contract_stamp_input`-Doku), Stempel exponiert in `engine_config_json()` (`lib.rs:741`) |
 | A3 | Feature-Golden-Hash | `engine/src/features.rs:1473` (`feature_golden_hash_matches_fixture`) |
 | A4 | Heuristik-Anker-Verhaltenstest | `engine/src/mcts.rs:1521` (`heuristic_anchor_choices_match_fixture`), plus `mcts.rs:1612` fuer die R5/v2-Variante |
