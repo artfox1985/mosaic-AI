@@ -162,7 +162,46 @@ vollen Laufs sind wiederverwendbar. Dazu `.ref_serial.h5`, `.par_test*.h5`,
 
 ---
 
-## SITZUNGSUEBERGABE 2026-08-26
+## UEBERGABE AN DIE NAECHSTE SITZUNG (2026-08-26, Abend)
+
+**Lies zuerst `NAECHSTE SCHRITTE` weiter unten** -- dort steht, was ansteht,
+nach Prioritaet. Diese Zeilen sagen nur, was sich seit der Uebergabe von heute
+frueh geaendert hat.
+
+**Der Tag ging vollstaendig in Infrastruktur.** Kein Zug ist dadurch besser
+geworden; das v22-Training steht unveraendert aus und ist weiterhin der
+einzige Posten, der den Leitstern bedient.
+
+Gebaut und abgenommen:
+
+| | |
+| --- | --- |
+| Cache je Datei (Hebel 4) | beide Pflichtpruefungen bestanden, Abschnitt 1b |
+| Reproduktionsbeweis des v22-Erzeugers | er IST reproduzierbar, Abschnitt 1c (die erste Fassung war falsch, siehe dort) |
+| Heuristik-Kapselung | v1_anchor und v2huelle_generator als Artefakte, Abschnitt 1d |
+| Referee-Pfad | ein gefrorener Agent trifft ALLE Entscheidungen selbst; Artefakt gegen Artefakt laeuft |
+| Anker-Tor | 20/20 identisch zu `net_arena_match` -- die Umstellung verschiebt den Anker NICHT |
+| Wheels | liegen ab jetzt IM Artefakt, `models/frozen_wheels/` ist entfernt (Abschnitt C2) |
+
+**Vier Befunde, die ohne diese Arbeit unentdeckt geblieben waeren** und die
+eine naechste Sitzung kennen sollte:
+
+1. `MOSAIC_CACHE_F32` stand in keiner Cache-Key-Komponente -- der Notausstieg
+   war wirkungslos, sobald ein Cache existierte.
+2. Der Split-Test kehrt `PREREG_v22_window.md` par.4c um: das **Drafting**
+   traegt die vollen Spalten (0,756), das Routing allein **nichts** (0,000).
+3. Korpus und Netz-Self-Play loesen Stapelzuege VERSCHIEDEN auf (eigener
+   Abschnitt weiter unten) -- das Netz lernt an Daten aus einem anderen Spiel
+   als dem, das es selbst spielt.
+4. Regel 4 aus `PREREG_chance_nodes.md` ist erfuellt, ohne dass der Knopf je
+   gesetzt wurde -- der Erzeugerwechsel hat es erledigt.
+
+**Zustand:** Suite 531/0, alle Sonden gruen, Arbeitsbaum bis auf Fremdes leer.
+Ungepusht (Push ist ein eigener Nutzer-Entscheid).
+
+---
+
+## SITZUNGSUEBERGABE 2026-08-26 (frueh, EINGEHEND -- Stand vor der Kapselung)
 
 **Der v22-Korpus ist FERTIG und ausgewertet, der Cache liegt gebaut bereit.**
 Was jetzt ansteht, ist das Training -- und dabei eine Konfiguration, die in
@@ -372,6 +411,21 @@ nicht ich.
    `unified_game_loop`. Ergebnis: 0/6 und die Fehldeutung "die Umstellung
    verschiebt den Anker". Es gibt DREI In-Process-Pfade, und nur einer traegt
    den Anker.
+3. **Einen Waechter breiter gelesen, als er ist.** Aus dem
+   `contract_hash`-Unterschied einen "Aera-Entscheid" fuer den ANKER gemacht.
+   Der Stempel umfasst nur Netz-Groessen; V1 spielt ueber die Grenze hinweg
+   identisch, und die Anker-Fixture von vor der Aenderung belegt es.
+4. **Eine Zusage breiter beschrieben, als sie ist.** Behauptet, ein
+   gefrorener Agent spiele bei geaenderter Wertung dieselben Zuege mit
+   anderen Punkten. Das Gegenteil stimmt: die Bewertung ist eine reine
+   Funktion des ZUSTANDS, den der Referee liefert -- andere Regeln, andere
+   Zustaende, ANDERE Zuege (`PREREG_agent_encapsulation.md` par.11).
+
+**Alle vier hat der Nutzer gefunden, nicht ich, und alle vier waren
+plausibel.** Die gemeinsame Form: eine Aussage, die aus einer richtigen
+Beobachtung eine zu breite Folgerung zieht. Das Gegenmittel ist jedes Mal
+dasselbe gewesen -- die Fundstelle aufmachen, statt die Folgerung zu
+verteidigen.
 
 ---
 
