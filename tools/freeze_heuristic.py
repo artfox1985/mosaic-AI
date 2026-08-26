@@ -1,0 +1,221 @@
+# -*- coding: utf-8 -*-
+"""Friert eine Heuristik als vollstaendiges Agenten-Artefakt ein.
+
+Nutzer-Auftrag 2026-08-26. Gegenstueck zu `models/frozen_champions/` fuer die
+NETZ-Seite, aber mit einem anderen Beweismittel -- und das ist der Kern dieses
+Werkzeugs.
+
+WARUM EINE HEURISTIK ANDERS EINGEFROREN WIRD ALS EIN NETZ
+---------------------------------------------------------
+Bei einem Netz-Champion traegt `model.onnx` das Verhalten; das Wheel ist
+Beiwerk. Bei einer Heuristik ist es umgekehrt: es GIBT kein ONNX, das
+Verhalten steckt vollstaendig im Wheel. Faellt das Wheel weg und war der Baum
+unversioniert veraendert, ist der Agent unwiederbringlich.
+
+Und die Golden Probe ist eine andere. Die Welle-3-Probe der Netz-Champions
+(`build_frozen_golden_probe.py`) sammelt DRAFTING-Zustaende und prueft die
+gewaehlte Aktion -- mehr kann sie nicht, weil der Referee Tiling und
+Startsetzung selbst aufloest (`referee.rs:312` ruft `resolve_tiling_step`,
+und das ist auf V1 hart verdrahtet). Fuer eine Heuristik waere das eine
+HALBE Probe: v2huelle wirkt gerade im Platzierungs-Routing.
+
+Die Probe hier ist deshalb ein SELF-PLAY-Lauf aus dem eigenen Wheel, byte-
+verglichen (Nutzer-Vorschlag 2026-08-26: "laesst sich einfach pruefen ueber
+10 self plays"). Der deckt Drafting UND Tiling UND Runde 5 ab und ist damit
+strenger als das, was die Netz-Artefakte haben.
+
+WAS INS ARTEFAKT GEHOERT
+------------------------
+  spec.json          was der Agent IST (heuristik_variante + Suchfelder)
+  manifest.json      Herkunft: git_commit UND git_dirty, contract_hash,
+                     engine_config, Rezept der Golden Probe
+  <wheel>.whl        der Traeger des Verhaltens
+  golden_probe/      der Referenzlauf, gegen den verglichen wird
+  tiling_net.onnx    NUR wo die Variante ein Netz braucht (Durchfall-Pfad,
+                     self_play.rs:1234) -- als KOPIE, nicht als Verweis auf
+                     models/: ein Artefakt, das auf einen geteilten Pfad
+                     zeigt, ist nicht eingefroren, sondern ein Zeiger, der
+                     wandern kann.
+  venv/              wird gebaut, aber NICHT versioniert (aus dem Wheel neu
+                     herstellbar, Pfade sind maschinenspezifisch)
+
+`git_dirty` steht im Manifest, weil es dort weh tun soll. Am 2026-08-26 hat
+ein `git_dirty: true` ohne festgehaltenen Anteil einen halben Tag gekostet --
+erst mit dem Verdacht, der Erzeuger sei verloren, dann mit dem Nachweis, dass
+er es nicht war.
+
+Aufruf:
+    python -X utf8 -u tools/freeze_heuristic.py --name v1_anchor --variante v1
+    python -X utf8 -u tools/freeze_heuristic.py --name v2huelle_generator \\
+        --variante v2huelle --tiling-net models/alphazero_v21_2d_brierbest.onnx
+"""
+import argparse
+import json
+import os
+import pathlib
+import shutil
+import subprocess
+import sys
+import time
+
+_ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_ROOT))
+sys.path.insert(0, str(_ROOT / "engine" / "py"))
+
+ZIEL_BASIS = _ROOT / "models" / "frozen_heuristics"
+
+
+def _git(*args) -> str:
+    return subprocess.run(["git", *args], cwd=str(_ROOT), capture_output=True,
+                          text=True, encoding="utf-8", timeout=30).stdout.strip()
+
+
+def _herkunft() -> dict:
+    """Commit UND Schmutzigkeit -- beides, oder das Feld ist wertlos."""
+    dirty = bool(_git("status", "--porcelain"))
+    return {
+        "git_commit": _git("rev-parse", "HEAD"),
+        "git_dirty": dirty,
+        "git_dirty_hinweis": (
+            "TRUE heisst: der Baum trug beim Einfrieren unversionierte Aenderungen. "
+            "Das Wheel im Artefakt ist dann NICHT aus dem Commit rekonstruierbar -- "
+            "es ist die einzige Kopie des Verhaltens." if dirty else
+            "FALSE heisst: das Wheel laesst sich aus dem Commit neu bauen. Die Kopie "
+            "im Artefakt ist trotzdem der schnellere und sichere Weg."),
+        "dirty_dateien": _git("status", "--porcelain").splitlines() if dirty else [],
+    }
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--name", required=True, help="Artefaktname, z.B. v1_anchor")
+    ap.add_argument("--variante", required=True, help="Heuristik-Variante, z.B. v1 / v2huelle")
+    ap.add_argument("--wheel", default=None,
+                    help="Pfad zum Wheel (Default: der frischeste Build in engine/target/wheels)")
+    ap.add_argument("--tiling-net", default=None,
+                    help="ONNX fuer den Tiling-Durchfall-Pfad; wird als tiling_net.onnx kopiert")
+    ap.add_argument("--games", type=int, default=10, help="Partien der Golden Probe")
+    ap.add_argument("--sims", type=int, default=600)
+    ap.add_argument("--seed", type=int, default=20260826)
+    ap.add_argument("--threads", type=int, default=11)
+    ap.add_argument("--c-puct", dest="c_puct", type=float, default=1.5)
+    ap.add_argument("--rolle", default=None,
+                    help="Rolle im Klartext (z.B. 'Elo-Anker' oder 'Korpus-Generator v22')")
+    a = ap.parse_args()
+
+    import mosaic_rust as mr
+
+    # KEINE eigene Variantenliste hier. Ein unbekannter Name wird von der
+    # Engine abgewiesen (self_play.py: "Unbekannte Werte werden von der Engine
+    # ABGEWIESEN, nicht still auf v1 gefaltet"), also scheitert der
+    # Golden-Probe-Lauf unten hart und das Artefakt entsteht gar nicht erst.
+    # Eine zweite Liste hier waere eine zweite Wahrheit.
+
+    ziel = ZIEL_BASIS / a.name
+    if ziel.exists():
+        raise SystemExit(
+            f"{ziel} existiert bereits. Ein Artefakt wird NICHT ueberschrieben -- "
+            "es ist der Bezugspunkt fuer alles, was darauf gemessen wurde. "
+            "Neuer Name, oder das alte bewusst von Hand entfernen.")
+    ziel.mkdir(parents=True)
+    t0 = time.monotonic()
+
+    # --- Wheel
+    wheel = pathlib.Path(a.wheel) if a.wheel else max(
+        (_ROOT / "engine" / "target" / "wheels").glob("mosaic_rust-*.whl"),
+        key=lambda p: p.stat().st_mtime)
+    shutil.copy2(wheel, ziel / wheel.name)
+    print(f"Wheel: {wheel.name}", flush=True)
+
+    # --- Tiling-Netz (nur wo noetig), als KOPIE
+    tiling_net = None
+    if a.tiling_net:
+        src = pathlib.Path(a.tiling_net)
+        shutil.copy2(src, ziel / "tiling_net.onnx")
+        tiling_net = {"datei": "tiling_net.onnx", "quelle": str(src).replace("\\", "/"),
+                      "rolle": ("Stichentscheid im Tiling-Durchfall (self_play.rs:1234: die "
+                                "v2-Vorzugskarte greift nur, wenn sie einen Zug liefert -- sonst "
+                                "faellt es auf das Netz durch) und Erzeuger der "
+                                "bootstrap_value-Label")}
+        print(f"Tiling-Netz kopiert: {src.name} -> tiling_net.onnx", flush=True)
+
+    # --- Spec: was der Agent IST
+    spec = {"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0,
+            "heuristik_variante": a.variante}
+    (ziel / "spec.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n",
+                                    encoding="utf-8", newline="\n")
+
+    # --- Golden Probe: der Referenzlauf, aus DIESEM Wheel
+    probe_dir = ziel / "golden_probe"
+    probe_dir.mkdir()
+    rezept = {
+        "mode": "mcts", "games": a.games, "sims": a.sims, "version": "probe",
+        "threads": a.threads, "chunk": a.games, "per_file": a.games, "seed": a.seed,
+        "c_puct": a.c_puct, "add_root_noise": True, "deterministic": False,
+        "record_rtv": False, "tau_argmax_from_move": 0,
+        "heuristik_variante": a.variante,
+        "model": "tiling_net.onnx" if tiling_net else None,
+    }
+    cmd = [sys.executable, "-X", "utf8", "-u", str(_ROOT / "self_play.py"),
+           "--mode", "mcts", "--games", str(a.games), "--sims", str(a.sims),
+           "--version", "probe", "--threads", str(a.threads), "--chunk", str(a.games),
+           "--per-file", str(a.games), "--seed", str(a.seed), "--c-puct", str(a.c_puct),
+           "--tau-argmax-from-move", "0",
+           # Die Variante kommt aus der SPEC, nicht aus dem Gedaechtnis des
+           # Aufrufers -- genau der Unterschied, den dieses Artefakt ausmacht.
+           "--heuristik-variante", spec["heuristik_variante"]]
+    if tiling_net:
+        cmd += ["--model", str(ziel / "tiling_net.onnx")]
+    env = dict(os.environ, MOSAIC_DATA_DIR=str(probe_dir))
+    print(f"Golden Probe: {a.games} Partien, Variante {a.variante} ...", flush=True)
+    r = subprocess.run(cmd, cwd=str(_ROOT), env=env, text=True, encoding="utf-8")
+    if r.returncode != 0:
+        raise SystemExit(f"Golden-Probe-Lauf fehlgeschlagen (Code {r.returncode}) -- Artefakt "
+                         f"unvollstaendig, {ziel} von Hand entfernen.")
+    probe_dateien = sorted(p.name for p in probe_dir.glob("*.pkl"))
+    if not probe_dateien:
+        raise SystemExit("Golden-Probe-Lauf hat keine .pkl erzeugt -- Abbruch.")
+
+    # --- Manifest
+    manifest = {
+        "artefakt": a.name,
+        "rolle": a.rolle or f"eingefrorene Heuristik {a.variante}",
+        "typ": "heuristik",
+        "freeze_date": time.strftime("%Y-%m-%d"),
+        "spec": spec,
+        "wheel": {"datei": wheel.name, "quelle": str(wheel).replace("\\", "/"),
+                  "rolle": ("Traeger des VERHALTENS. Bei einer Heuristik gibt es kein ONNX, "
+                            "das es mittraegt -- ohne dieses Wheel ist der Agent weg.")},
+        "tiling_net": tiling_net,
+        "herkunft": _herkunft(),
+        "contract_hash": json.loads(mr.engine_config_json()).get("contract_hash"),
+        "engine_config": json.loads(mr.engine_config_json()),
+        "golden_probe": {
+            "art": "self-play-reproduktion, byte-verglichen",
+            "warum": ("Die Welle-3-Probe der Netz-Champions prueft nur DRAFTING-Entscheidungen; "
+                      "der Referee loest Tiling und Startsetzung selbst auf und ist dabei auf V1"
+                      " verdrahtet (referee.rs:312 -> self_play.rs:1207). Fuer eine Heuristik "
+                      "waere das eine halbe Probe. Ein Self-Play-Lauf aus dem eigenen Wheel "
+                      "deckt Drafting, Tiling und Runde 5 ab."),
+            "rezept": rezept,
+            "dateien": probe_dateien,
+            "pruefbefehl": (f"python -X utf8 -u tools/verify_frozen_heuristic.py "
+                            f"--artifact-dir models/frozen_heuristics/{a.name}"),
+        },
+        "laufzeit": {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
+                     "threads": a.threads, "s_je_partie": None},
+    }
+    (ziel / "manifest.json").write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n",
+                                        encoding="utf-8", newline="\n")
+
+    print(f"\nArtefakt: {ziel}")
+    print(f"  Wheel        {wheel.name}")
+    print(f"  Variante     {a.variante}")
+    print(f"  Golden Probe {len(probe_dateien)} Datei(en), {a.games} Partien")
+    print(f"  git_dirty    {manifest['herkunft']['git_dirty']}")
+    print(f"\nvenv wird NICHT hier gebaut -- siehe tools/verify_frozen_heuristic.py --build-venv.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
