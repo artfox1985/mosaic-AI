@@ -682,7 +682,7 @@ naechste Sitzung mitten im Ablauf uebernehmen kann:
 | 2a | 79er-Cache parallel (~36 min) auf nativ-Kodierung | offen, nach 1d |
 | 2b | Serielle Referenz (~2,6 h) + Bit-Vergleich = Cache-Tor | offen, nach 2a |
 | 2c | Cache-Verdrahtung in train.py | offen, nach 2b |
-| 3 | v22-KALTSTART: w1-Arm (`MOSAIC_IGNORE_POLICY_TARGET_VALID=1`, `--ownership-weight 1.0`), dann w0-Kontrollarm; Plateau-Schedule (Cold-Start-Weg), `--select-by-brier`; plus Arm L falls 1d ihn zur Pflicht macht | offen |
+| 3 | v22-KALTSTART: **v22-b01** = w1-Arm (`MOSAIC_IGNORE_POLICY_TARGET_VALID=1`, `--ownership-weight 1.0`), dann **v22-b02** = w0-Kontrollarm; Plateau-Schedule (Cold-Start-Weg), `--select-by-brier`. Nomenklatur (Nutzer 2026-08-28): fortlaufend v22-bNN wie die v21-b-Serie; Folgearme (Arm K, Surprise, Arm L) reihen sich als b03+ ein | offen |
 | 4 | Spalten-Abnahme-Tor (par.3b.2, drei argmax-Messreihen) | offen, nach 3 |
 | 5 | Wecker-Liste VOR dem v22-Self-Play (`PREREG_v23_window.md` par.4): Implicit-Minimax-Gating, Risiko-A1, `MOSAIC_STACK_DRAW_RESEARCH`, Traeger-Manifest-Generator, 6.550er-Rotation, Startkuppel | offen, nach 4 |
 
@@ -1329,6 +1329,15 @@ STATUS-Stand vom 2026-08-25", Abschnitt "GELTENDE REGELN".
   Default NICHT policy-traeger.
 - **Backup- und Alt-Regel-Korpora kommen NIE wieder ins Training.**
 - **Promotions-Checkliste** und **Nachschub bei Gating-Fehlschlag**: Langform
+  im Archiv. **ERGAENZT 2026-08-28 (Nutzer-Frage): bei jedem Champion-Wechsel
+  gehoert die ANZEIGE-Kalibrierung des Value-Kopfs nachgezogen** --
+  `python tools/platt_fit.py --models models/alphazero_<neu>.pth`, dann die
+  hartkodierten Defaults in server.py:1411-1412 und die knobs-Registratur
+  (`MOSAIC_DISPLAY_CAL_A/_B`, heute auf v21 gefittet: A=-0,0033/B=0,906).
+  CAVEAT dabei: der Fit lief bisher auf dem Frozen-Set (v12-Aera-Zustaende);
+  fuer einen spaltenbewussten Champion braucht er eine passende
+  Zustandsverteilung (derselbe Verteilungs-Vorbehalt wie beim
+  Optimismus-Befund, par.3b.3 Arm K). Langform-Checkliste bleibt
   im Archiv, hier nur der Merkposten, dass beides existiert und gilt.
 - **Nie auf plattenblindes Normalspiel eichen.** Kalibrierung und Zielraten
   nicht gegen die Verteilung heutiger Netze, wenn genau deren Verhalten das

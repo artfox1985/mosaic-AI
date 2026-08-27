@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten -- also nach KL(Prior gegen Ziel) -- statt jede Stichprobe gleich zu zaehlen? | Beleg: ENTWURF 2026-08-27 aus dem Recherche-Abgleich, Nutzer-Entscheid ueber den Bau offen, NICHTS GEBAUT und nichts gemessen. Quellen: RESEARCH_alphazero_improvements_2026-08-01.md Fund 7 (Policy Surprise Weighting / Auxiliary Soft Policy / Optimistic Policy, 40-90 Elo bei KataGo) und RESEARCH_plate_intent_external_2026-08-22.md F2.4 sowie F5-Punkt 5. Der Fund traegt dort die Uebertragbarkeits-Note NIEDRIG-MITTEL mit der Begruendung "alles Policy-Hebel, die 2x2-Attribution zeigt: bei 400 Sims traegt der Value-Kopf die Staerke" -- diese Abwertung stammt aus einer Aera, in der Policy-Ziele NETZ-Besuchsverteilungen waren. In v22 ist die Policy der TRANSPORTKANAL des Spaltenbaus (Traegerarm B, Lehrer-Vorzugszuege aus dem Drafting, PREREG_v22_window.md par.4f: das Drafting traegt den Loewenanteil, +0,713 volle Spalten). Zuschnitt: reine Loss-Gewichtung in train.py, KEIN Engine-Eingriff, kein Neu-Erzeugen. Frist ist der Trainingsstart des v22-Kaltstarts, sonst v22b. Entscheidungsmass VORAB: die beiden validierten Orakelmetriken (prior_mass_on_oracle_top3, kendall_tau), bei Gleichstand die Arena. -->
+<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten -- also nach KL(Prior gegen Ziel) -- statt jede Stichprobe gleich zu zaehlen? | Beleg: ENTWURF 2026-08-27 aus dem Recherche-Abgleich, Nutzer-Entscheid ueber den Bau offen, NICHTS GEBAUT und nichts gemessen. Zeitpunkt par.8: NICHT im v22-Erstlauf (Konfundierungs-Budget); Kandidat als v22-bNN-Folgearm bei schwachem Lehrer-Transfer oder beim v23-Training. Quellen: RESEARCH_alphazero_improvements_2026-08-01.md Fund 7 (Policy Surprise Weighting / Auxiliary Soft Policy / Optimistic Policy, 40-90 Elo bei KataGo) und RESEARCH_plate_intent_external_2026-08-22.md F2.4 sowie F5-Punkt 5. Der Fund traegt dort die Uebertragbarkeits-Note NIEDRIG-MITTEL mit der Begruendung "alles Policy-Hebel, die 2x2-Attribution zeigt: bei 400 Sims traegt der Value-Kopf die Staerke" -- diese Abwertung stammt aus einer Aera, in der Policy-Ziele NETZ-Besuchsverteilungen waren. In v22 ist die Policy der TRANSPORTKANAL des Spaltenbaus (Traegerarm B, Lehrer-Vorzugszuege aus dem Drafting, PREREG_v22_window.md par.4f: das Drafting traegt den Loewenanteil, +0,713 volle Spalten). Zuschnitt: reine Loss-Gewichtung in train.py, KEIN Engine-Eingriff, kein Neu-Erzeugen. Frist ist der Trainingsstart des v22-Kaltstarts, sonst v22b. Entscheidungsmass VORAB: die beiden validierten Orakelmetriken (prior_mass_on_oracle_top3, kendall_tau), bei Gleichstand die Arena. -->
 
 # Vorregistrierung: Policy-Surprise-Weighting
 
@@ -112,3 +112,21 @@ p=0,30). Wer den Arm faehrt, sollte das vorher wissen. Der Unterschied, auf den
 diese Registrierung setzt, ist par.2 -- und wenn der Arm negativ ausfaellt,
 ist DAS der Befund: dann traegt auch der Transportkanal-Zuschnitt die
 Policy-Hebel nicht.
+
+## par.8 Zeitpunkt (Nutzer-Frage 2026-08-28, Empfehlung des Koordinators, Entscheid offen)
+
+Nutzer: *"die frage ist ob wir das schon bei v22 machen, oder erst bei echten
+netz self plays."* Empfehlung: **NICHT im v22-Erstlauf** (v22-b01/b02). Die
+Kampagne traegt bereits vier neue Faktoren gleichzeitig (Lehrerkorpus,
+Traeger-Arm B, Ownership-Gewicht, neue Eingaben), und der w0-Kontrollarm
+kontrolliert genau EINE Achse -- ein fuenfter Faktor waere unzuordenbar.
+Stattdessen zwei benannte Zeitfenster:
+
+1. **Als v22-bNN-Folgearm**, falls das Spalten-Tor (par.3b.2 der
+   Lehrer-Prereg) zeigt, dass der Lehrer-Transfer SCHWACH ankommt -- genau
+   dafuer ist dieser Hebel gebaut (seltene Bauzuege uebergewichten). Billig:
+   gleicher Korpus, gleicher Cache, ein Loss-Knopf.
+2. **Beim v23-Training** mit echten Netz-Self-Play-Zielen, wo die klassische
+   Form (Suchverteilung gegen Prior) ohne Sonderfall gilt.
+
+Im v22-Erstlauf ist der Knopf damit ausdruecklich AUS.
