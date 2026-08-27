@@ -307,4 +307,9 @@ sein sollte (par.3-Erwartung widerlegt).
 2. Welche Netz-Loeser-Arme in welcher Reihenfolge (a/b/c), je mit
    Vorzeichen-Sonde vor jeder Arena (r5_chance-Muster; eine Arena fuer
    ~0,02-Punkte-Effekte waere eine erschlichene Freigabe).
-3. Teil-B-Zuschnitt nach dem Seeding-par.7-Verdikt.
+3. Teil-B-Zuschnitt nach dem Seeding-Verdikt in
+   `PREREG_start_position_seeding.md` **par.4c** (Verweis BERICHTIGT
+   2026-08-27: hier stand "Seeding-par.7-Verdikt"; einen Abschnitt par.7 gibt
+   es dort nicht -- nur die Zwischenueberschrift "par.7-Schwellen" innerhalb
+   von par.4b, und die traegt die Schwellen, nicht das Verdikt. Das Verdikt
+   steht in par.4c: Schwellen VERFEHLT, kein k1-Signal, kein Staerkepreis).

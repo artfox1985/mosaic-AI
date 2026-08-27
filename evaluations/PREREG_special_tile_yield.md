@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett -- ihr Wert steigt genau dort, wo sie am schwersten erreichbar sind. Laesst sich das heben, und an welchem der beiden Hebel? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag. NEUE Datei, weil die Substanz bisher in ZWEI Dokumenten liegt, die BEIDE UEBERHOLT sind -- und zwar aus Traeger-Gruenden, nicht weil die Frage beantwortet waere: PREREG_plate_head.md (Kopf gebaut und wieder entfernt) traegt die Messung, PREREG_injection_dose.md (Knopf MOSAIC_UNLOCK_SHAPING_W wirkungslos) traegt den Bau-Versuch. Mechanik am Code geprueft: Punktwert = Musterreihe + 1, also 1..6 (round_end.rs:361-362); Freischaltung erst, wenn die anderen drei Felder des Slots gefuellt sind (dome.rs:139); Kriterium 6 ist -3 je LEEREM Spezialfeld auf GELEGTEN Platten, rein negativ-additiv und gated (scoring.rs:921-923). Gemessene Luecke: ein Spezialfeld der UNTEREN Slot-Reihe bleibt in ~84 Prozent der Partien leer, in der oberen nur in ~13 (monoton, Slot 8 unten rechts 89,8 Prozent). ZWEI HEBEL, die nicht vermengt werden duerfen: (A) Auswahl -- solche Platten gar nicht erst unten legen; (B) Vollendung -- die vorhandenen freischalten. VOR jedem Bau steht eine Neumessung auf hv2, weil alle Zahlen aus plattenblindem Spiel stammen. IN WELCHER FORM (par.4a, Nutzer-Vorgabe 2026-08-25 "wir fassen die heuristik nicht mehr an"): NETZSEITIG, und zwar als ADDITIVE EINGABE -- Hilfskoepfe stehen 0 von 4, Platten-Shaping ist tot oder H0, additive Eingaben sind am selben Tag gebaut und paritaetsgeprueft. Ort ist das DRAFTING, nicht das Tiling: der Loeser kennt den Spezial-Bonus bereits exakt (tiling_solver.rs:244/310, Test Zeile 1750). Zuschnitt: zwei 6x6-Kanaele, ausstehender Ertrag (pattern_row+1) und Abstand zur Ausloesung (0-3) -- das Paar Betrag x Abstand. Wirksam erst ab dem naechsten Netz mit erweiterter INPUT_SIZE, fuer v22 zu spaet. -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett -- ihr Wert steigt genau dort, wo sie am schwersten erreichbar sind. Laesst sich das heben, und an welchem der beiden Hebel? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25 auf Nutzer-Auftrag. NEUE Datei, weil die Substanz bisher in ZWEI Dokumenten liegt, die BEIDE UEBERHOLT sind -- und zwar aus Traeger-Gruenden, nicht weil die Frage beantwortet waere: PREREG_plate_head.md (Kopf gebaut und wieder entfernt) traegt die Messung, PREREG_injection_dose.md (Knopf MOSAIC_UNLOCK_SHAPING_W wirkungslos) traegt den Bau-Versuch. Mechanik am Code geprueft: Punktwert = Musterreihe + 1, also 1..6 (round_end.rs:361-362); Freischaltung erst, wenn die anderen drei Felder des Slots gefuellt sind (dome.rs:139); Kriterium 6 ist -3 je LEEREM Spezialfeld auf GELEGTEN Platten, rein negativ-additiv und gated (scoring.rs:921-923). Gemessene Luecke: ein Spezialfeld der UNTEREN Slot-Reihe bleibt in ~84 Prozent der Partien leer, in der oberen nur in ~13 (monoton, Slot 8 unten rechts 89,8 Prozent). ZWEI HEBEL, die nicht vermengt werden duerfen: (A) Auswahl -- solche Platten gar nicht erst unten legen; (B) Vollendung -- die vorhandenen freischalten. VOR jedem Bau steht eine Neumessung auf hv2, weil alle Zahlen aus plattenblindem Spiel stammen. IN WELCHER FORM (par.4a, Nutzer-Vorgabe 2026-08-25 "wir fassen die heuristik nicht mehr an"): NETZSEITIG, und zwar als ADDITIVE EINGABE -- Hilfskoepfe stehen 0 von 4, Platten-Shaping ist tot oder H0, additive Eingaben sind am selben Tag gebaut und paritaetsgeprueft. Ort ist das DRAFTING, nicht das Tiling: der Loeser kennt den Spezial-Bonus bereits exakt (tiling_solver.rs:244/310, Test Zeile 1750). Zuschnitt: zwei 6x6-Kanaele, ausstehender Ertrag (pattern_row+1) und Abstand zur Ausloesung (0-3) -- das Paar Betrag x Abstand. BERICHTIGT 2026-08-27: fuer v22 ist der Arm OFFEN, nicht zu spaet -- die Frist ist der TRAININGS-START, und der steht noch aus (Kaltstart, Nutzer-Entscheid 2026-08-27). Die beiden Kanaele sind aus den VORHANDENEN pkl beim Cache-Bau rechenbar (dome_grid ist seit jeher voll serialisiert, serialize.rs:182), also KEIN Korpus-Neubau; der Preis ist ein Cache-Neubau, parallel ~36 min (PREREG_cache_build_time.md par.8). Zuschnitt waeren Plane-Kanaele (NUM_PLANES_CHANNELS 77 -> 79), additiv; Altmodelle bleiben bitgleich ueber net::split_planes_flat_batch_src. -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
@@ -178,6 +178,32 @@ prinzipiell ableitbar; die Wette ist Lesbarkeit, nicht Neuheit.
 Eingabegroesse trainiert wird -- fuer das laufende v22 kommt es zu spaet
 (`INPUT_SIZE` steckt im Korpus-Cache und im Modell).
 
+**BERICHTIGUNG (2026-08-27): der Absatz oben ist UEBERHOLT.** Er hat "zu
+spaet" an die KORPUS-Erzeugung gehaengt; die Frist ist aber der
+TRAININGS-START, und der steht noch aus (v22 laeuft als Kaltstart,
+Nutzer-Entscheid 2026-08-27). Vier Punkte, die zusammen zeigen, dass fuer die
+beiden Kanaele kein Korpus-Neubau noetig waere:
+
+1. **Die Rohdaten liegen vor.** `dome_grid` wird seit jeher VOLL serialisiert,
+   je Feld `type`/`color`/`filled`/`locked` (`engine/src/serialize.rs:182`) --
+   die 2.400 vorhandenen pkl tragen also alles, was die Kanaele brauchen.
+2. **Der Bauer sitzt schon an dieser Quelle.** `_board_channels`
+   (`engine/py/neural_net.py:353`) rechnet die heutigen 6x6-Kanaele direkt aus
+   `dome_grid`; zwei weitere entstuenden an derselben Stelle.
+3. **Beide Formeln sind reine Geometrie und Brettzustand**, nichts
+   Aufgezeichnetes: der Ertrag ist `pattern_row + 1`
+   (`engine/src/round_end.rs:361-362`), die Ausloesung sind die drei
+   gefuellten Nachbarfelder des Slots (`engine/src/dome.rs:139-141`).
+4. **Der Preis ist ein CACHE-Neubau, kein Korpus-Neubau** -- parallel 36,1 min
+   fuer den vollen Korpus (`PREREG_cache_build_time.md` par.8).
+
+**Der Zuschnitt aendert sich damit auch technisch:** die beiden 6x6-Ebenen
+waeren PLANE-Kanaele (`NUM_PLANES_CHANNELS` 77 -> 79, `features.rs:804`),
+nicht flache Eingaben; `INPUT_SIZE` (714, `config.py:38`) bliebe unberuehrt.
+Additiv nach dem 29fb1f1-Muster, Altmodelle bleiben bitgleich, weil
+`net::split_planes_flat_batch_src` (`engine/src/net.rs:972ff`) den
+Planes-Block auf die vom MODELL deklarierte Kanalzahl kuerzt.
+
 ## par.4c ANSCHLUSS an den Shaping-2D-Kopf (Nutzer 2026-08-25)
 
 Nutzer: *"und somit haben wir wieder futter fuer den shaping 2d head"*. Der
@@ -228,7 +254,11 @@ Bauform), der Kopf danach und nur, wenn die Neumessung das Ziel traegt.
 **(1) Neumessung auf hv2.** Alle Zahlen in par.3 stammen aus plattenblindem
 Spiel. Die stehende Regel
 ([[feedback_dont_calibrate_to_plate_blind_play]]) sieht die Wiedervorlage
-genau fuer den ersten plattenbewussten Korpus vor -- und der laeuft gerade.
+genau fuer den ersten plattenbewussten Korpus vor -- und der ist seit dem
+2026-08-26 01:52 FERTIG (2.400 pkl = 24.000 Partien,
+`data/manifest_hv2_20260825_172710.json`; "laeuft gerade" war der Stand vom
+2026-08-25, BERICHTIGT 2026-08-27). Die Neumessung ist damit sofort fahrbar
+und haengt an keinem Lauf mehr.
 Zu erheben: Leer-Rate je Slot, Zahl der freigeschalteten Spezialfelder je
 Partie, Summe der dadurch erzielten Punkte, und k6 getrennt davon.
 

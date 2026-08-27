@@ -134,8 +134,20 @@ statt gezogen senkt die Varianz zusaetzlich und kostet nichts.
 ## par.7 Wecker
 
 Der Startslot steckt in den Partien UND in den Policy-Zielen, ist also nur am
-Generierungsstart entscheidbar -- fuer das laufende v22 zu spaet. Gehoert auf
-die Wecker-Liste des v22-Self-Play (`PREREG_v23_window.md` par.4).
+Generierungsstart entscheidbar. Gehoert auf die Wecker-Liste des
+v22-Self-Play (`PREREG_v23_window.md` par.4).
+
+**BERICHTIGUNG 2026-08-27, zwei Punkte:**
+
+1. **"fuer das laufende v22 zu spaet" war unpraezise.** Zu spaet ist es fuer
+   den hv2-KORPUS -- der ist seit dem 2026-08-26 01:52 fertig (2.400 pkl,
+   24.000 Partien) und traegt in jeder Partie das one-hot auf
+   `choose_start_placement`. Fuer das v22-SELF-PLAY, also den Lauf, der das
+   v23-Fenster fuellt, ist die Frage OFFEN: er hat noch nicht begonnen.
+2. **Der Wecker steht jetzt tatsaechlich dort.** Bis zum 2026-08-27 war der
+   Verweis eine Absichtserklaerung -- die Liste in `PREREG_v23_window.md`
+   par.4 fuehrte die Startkuppel nicht. Sie ist am 2026-08-27 eingetragen
+   worden.
 
 
 ## Nachtrag 2026-08-26: dasselbe Muster steht an DREI Stellen

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score, integriert ueber die Score-Verteilung) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die vorhandene lineare Mischung gescheitert ist? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht ERGAENZT. Ausarbeitung liegt in research_value_head_alternatives_DRAFT.md Idee 1.1, war aber nie vorregistriert. Empirischer Anker: Task #12 Block 2, Marge +2,25 bei 151:149. Tor par.3a GEFAHREN 2026-08-24 (saturating_score_utility_gate.json, 1.800 Stellungen aus frozen_eval_set.pkl): Spannweite 0,7685 (weit ueber der "fast konstant"-Schwelle 0,2), Pearson r(pts,wr)=0,7421 [KI 0,708-0,775] (knapp UNTER der "fast kollinear"-Schwelle 0,8, kein Randfall). Verdikt DAZWISCHEN, wie im Tor selbst vorgesehen -- NUTZER-ENTSCHEID noetig, ob der sigma-Kopf auf points_val selbst oder ein TD-unberuehrtes Ziel trainiert wird; kein Automatismus. Skalenwechsel und Margen-Kopf bleiben davon unberuehrt bau-bereit. Zwei Bau-Blocker, beide am 2026-08-23 per Nutzer-Entscheid geschlossen: par.4a -> SKALENWECHSEL der ganzen Blattbewertung auf [-1,1] (Bau-Umfang in par.4b kartiert; geschriebene Korpus-Felder bleiben auf [0,1], sonst still gemischtskaliges Fenster ueber 2945 Bestandsdateien), und par.6.1 -> eigener ADDITIVER Margen-Kopf ohne rtv/TD-Zweig, mit eigener Skala MARGIN_SCALE = 20 (par.6a; damit entfaellt die Zwei-Kopf-Subtraktion und opp_points bleibt Hilfsziel). Die 20 ist eine REFERENZSETZUNG wie VALUE_SCALE = 50, nicht aus Self-Play abgeleitet -- Beleg: neun Mensch-gegen-v21-Partien in static/log, RMS-Marge ~21, Median der Betragsmarge 17. Reihenfolge: Tor par.3a, dann Bau -->
+<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score, integriert ueber die Score-Verteilung) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die vorhandene lineare Mischung gescheitert ist? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23, am selben Tag nach Durchsicht ERGAENZT. Ausarbeitung liegt in research_value_head_alternatives_DRAFT.md Idee 1.1, war aber nie vorregistriert. Empirischer Anker: Task #12 Block 2, Marge +2,25 bei 151:149. Tor par.3a GEFAHREN 2026-08-24 (saturating_score_utility_gate.json, 1.800 Stellungen aus frozen_eval_set.pkl): Spannweite 0,7685 (weit ueber der "fast konstant"-Schwelle 0,2), Pearson r(pts,wr)=0,7421 [KI 0,708-0,775] (knapp UNTER der "fast kollinear"-Schwelle 0,8, kein Randfall). Verdikt DAZWISCHEN, wie im Tor selbst vorgesehen -- NUTZER-ENTSCHEID noetig, ob der sigma-Kopf auf points_val selbst oder ein TD-unberuehrtes Ziel trainiert wird; kein Automatismus. Skalenwechsel und Margen-Kopf bleiben davon unberuehrt bau-bereit. Zwei Bau-Blocker, beide am 2026-08-23 per Nutzer-Entscheid geschlossen: par.4a -> SKALENWECHSEL der ganzen Blattbewertung auf [-1,1] (Bau-Umfang in par.4b kartiert; geschriebene Korpus-Felder bleiben auf [0,1], sonst still gemischtskaliges Fenster ueber 2945 Bestandsdateien), und par.6a (im Kopf stand hier frueher "par.6.1", den Abschnitt gibt es nicht) -> eigener ADDITIVER Margen-Kopf ohne rtv/TD-Zweig, mit eigener Skala MARGIN_SCALE = 20 (par.6a; damit entfaellt die Zwei-Kopf-Subtraktion und opp_points bleibt Hilfsziel). Die 20 ist eine REFERENZSETZUNG wie VALUE_SCALE = 50, nicht aus Self-Play abgeleitet -- Beleg: neun Mensch-gegen-v21-Partien in static/log, RMS-Marge ~21, Median der Betragsmarge 17. Reihenfolge: Tor par.3a, dann Bau -->
 
 # Vorregistrierung: Gesaettigte, re-zentrierte Score-Utility
 
@@ -279,8 +279,8 @@ Read-only-Kartierung, damit der Umfang vor dem ersten Eingriff bekannt ist.
 | `mcts.rs:101` | `normalize_score` -- Heuristik-Blattwert |
 | `net_mcts.rs:2229` | `value_to_win_prob` -- Netz-Blattwert |
 | `net_mcts.rs:453` | `opp_aware_points_utility` (Task-#28-Pfad, `w>0`) |
-| `round5.rs:674` | R5-Loeser -- **eingefrorener Anker, siehe unten** |
-| `round5_anchor.rs:671` | Anker-Loeser -- dito |
+| `round5.rs:674` | R5-NETZ-Loeser -- entwickelbar (BERICHTIGT 2026-08-27, gleicher Fehler wie in par.10: der eingefrorene Anker ist `round5_anchor.rs`) |
+| `round5_anchor.rs:671` | Anker-Loeser -- **eingefroren** |
 
 **Inverse und Kalibrierung:** `round_transition_deep.rs:304`
 (`denormalize_score`, mit Paritaetstest
@@ -560,9 +560,23 @@ zeigte SPRT-H1 mit 54:26 und war in der Replikation Seed-Rauschen.
 
 **Mitzuberichten, gleichrangig:** Durchschnittsmarge je Block, wegen par.8.
 
-**Sekundaer, deskriptiv:** R5-Kalibrierungssteigung (heute 0,06-0,09 fuer
-den Value-Kopf, 0,26 fuer den Punkte-Kopf), Brier/ECE, die beiden
+**Sekundaer, deskriptiv:** R5-Kalibrierungssteigung, Brier/ECE, die beiden
 Orakel-Metriken.
+
+**Die R5-Steigung ist GETRENNT auszuweisen (praezisiert 2026-08-27,
+`PREREG_r5_solver_split.md` par.3e verlangt die Trennung ausdruecklich):**
+
+| Skala | Steigung des Value-Kopfs heute |
+|---|---|
+| Gesamtwert (Solver-Wurzelmarge) | **0,87-0,89** -- fast richtig geeicht |
+| Platten-/Spaltenanteil | **0,06-0,09** -- der Kopf sieht ihn praktisch nicht |
+
+Die frueher hier stehende Kurzform "0,06-0,09 fuer den Value-Kopf" liest sich
+als allgemeine Fehleichung und ist in dieser Form falsch: der Kopf ordnet die
+R5-Marge sehr gut (Tau 0,762 k1-aktiv). Der Zusatz "0,26 fuer den Punkte-Kopf"
+war eine FEHLZUORDNUNG (an der Primaerstelle geprueft
+2026-08-27, par.3e-Tabelle der r5-Prereg): die 0,263 ist die Steigung des
+Kopfs `endgame_margin`; `points - opp_points` steht bei 1,131.
 
 **Seed-Disziplin:** gepaarte Seeds, mindestens sechs bei Trainingsarmen.
 
@@ -570,9 +584,15 @@ Orakel-Metriken.
 
 ## par.10 Waechter
 
-1. **Der R5-Loeser wird nicht angefasst.** `round5.rs` ist eingefrorener
-   Anker und rechnet exakt/endaware; die Utility wirkt nur auf
-   netzbewertete Blaetter. Ein Eingriff dort waere ein anderer Zuschnitt.
+1. **Der R5-ANKER wird nicht angefasst** (Datei BERICHTIGT 2026-08-27). Der
+   eingefrorene Anker ist `round5_anchor.rs`, nicht `round5.rs`;
+   `round5.rs` ist der NETZ-Loeser und darf sich entwickeln
+   (`PREREG_r5_solver_split.md` par.2/par.2c, STATUS-Abschnitt
+   "Architektur"). Der Waechter bleibt bestehen, schuetzt aber die richtige
+   Datei: `round5_anchor.rs` bleibt unberuehrt, weil an ihm der Elo-Anker
+   haengt. Ein Eingriff in `round5.rs` waere KEIN Ankereingriff -- er ist
+   trotzdem gating-pflichtig, weil er die Zugwahl in Runde 5 aendert. Die
+   Utility selbst wirkt ohnehin nur auf netzbewertete Blaetter.
 2. **`POINTS_UTILITY_WEIGHT` bleibt 0.** Der neue Term steht daneben, nicht
    darin. Die alte Konstante wird nicht rekalibriert, sonst vermengen sich
    ein widerlegter und ein ungetesteter Mechanismus.
@@ -605,7 +625,9 @@ stehen hier nur als Merkposten.
 
 - **[Riegel par.4a]** Wie `U` in [0,1] gehalten wird: Klammerung, Stauchung
   oder Skalenwechsel. Aendert, was gemessen wird.
-- ~~**[Riegel par.6.1]** Woher `x` kommt~~ -- **entschieden 2026-08-23:**
+- ~~**[Riegel par.6a]** Woher `x` kommt~~ (Verweis BERICHTIGT 2026-08-27:
+  stand als "par.6.1" da, einen solchen Abschnitt gibt es nicht; gemeint ist
+  par.6a, der Margen-Kopf) -- **entschieden 2026-08-23:**
   eigener additiver Margen-Kopf, siehe par.6a.
 - ~~`MARGIN_SCALE`~~ -- **entschieden 2026-08-23: 20**, als Referenzsetzung
   wie `VALUE_SCALE = 50`, mit Groessenordnungs-Beleg aus neun
