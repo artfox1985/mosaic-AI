@@ -33,7 +33,13 @@ PRIVACY_HITS=""
 # Zeichenklasse mit ZWEI Backslashes: `[\\/]` trifft Backslash ODER Slash.
 # Mit einem escapt er nur den Schraegstrich und laesst jeden Windows-Pfad
 # still stehen -- genau dieser Fehler ist am 2026-08-17 zweimal passiert.
-PRIVACY_PAT='[A-Za-z]:[\\/]Users[\\/]|/[a-z]/Users/|OneDrive[\\/](Documents|Backups)'
+# '+' statt genau einem Trenner: in JSON stehen Windows-Pfade mit DOPPELTEM
+# Backslash ("D:\\OneDrive\\Documents\\..."). Das alte Muster erwartete genau
+# einen und hat deshalb am 2026-08-27 einen getrackten -- und bereits
+# gepushten -- absoluten Pfad samt Nutzernamen durchgelassen:
+# models/frozen_heuristics/v2huelle_generator/golden_probe/manifest_probe_*.json.
+# Gegenprobe damals: altes Muster 0 Treffer, dieses 1.
+PRIVACY_PAT='[A-Za-z]:[\\/]+Users[\\/]+|/[a-z]/Users/|OneDrive[\\/]+(Documents|Backups)'
 PRIVACY_USER="${USERNAME:-${USER:-}}"
 if [ -n "$PRIVACY_USER" ] && [ "${#PRIVACY_USER}" -ge 4 ]; then
     PRIVACY_PAT="$PRIVACY_PAT|$PRIVACY_USER"
