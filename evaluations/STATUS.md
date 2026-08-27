@@ -13,6 +13,14 @@ Verweis stehen.
 Neu gefasst am **2026-08-25** (Nutzer-Auftrag: STATUS war mit 1180 Zeilen
 schwer lesbar geworden).
 
+**Entflechtung am 2026-08-28** (Nutzer-Hinweis: STATUS ist kein
+Langzeitgedaechtnis -- dauerhaftes Prozesswissen verrottet hier ins Archiv).
+Kanonisch liegen ab jetzt in `../docs/`:
+`promotion_checklist.md`, `working_rules.md`, `pitfalls.md`,
+`generation_naming.md`, `measured_runtimes.md`, `architecture_reference.md`.
+Die betreffenden Abschnitte unten sind auf einen Verweis eingedampft; wer an
+diesen Inhalten etwas aendert, aendert es DORT.
+
 ---
 
 ## DAS ZIEL (Leitstern)
@@ -1191,11 +1199,12 @@ zwei Punktekarten (`PREREG_heuristic_v2_long_rows.md` par.11-16),
 
 ---
 
-## BENENNUNG DER GENERATIONEN (damit der Off-by-one nicht wiederkehrt)
+## BENENNUNG DER GENERATIONEN
 
-**Ein Fenster vN traegt die Partien von Champion v(N-1).** Beleg: das
-v22-Fenster enthielt `v21wdl`-Partien (Generator = v21-Champion, alte Tabelle
-in `PREREG_v22_window.md`). Daraus folgt fuer die laufende Kette:
+**Die REGEL ("ein Fenster vN traegt die Partien von Champion v(N-1)"), die
+Off-by-one-Warnung und die Namenskonvention der Arme sind kanonisch in
+`../docs/generation_naming.md`** (seit 2026-08-28 aus STATUS entflochten).
+Hier steht nur noch die KONKRETE Kette der laufenden Kampagne:
 
 | | |
 | --- | --- |
@@ -1206,47 +1215,15 @@ in `PREREG_v22_window.md`). Daraus folgt fuer die laufende Kette:
 
 Zuschnitt des v23-Fensters ist seit 2026-08-25 festgelegt (`PREREG_v23_window.md`): 29.450 Partien, davon **12.000 aus dem v22-Self-Play** (4.000 Sockel + 8.000 Schwarm `--value-only`) und **17.450 aus hv2** (6.550 rotieren aus). Damit steht auch der Umfang des v22-Self-Play-Laufs fest. Drei offene Punkte dort: G-1/G-2 kommen aus DEMSELBEN Korpus (Platzhalter, keine Aera-Streuung), der Cache ist UNKRITISCH (gemessen 2.806 B je Zustand statt der veralteten 6 KB -> ~14,1 GB gegen 34,3 GB), und die Policy-Ausbeute der hv2-Plaetze haengt an der Traegerfrage.
 
-Der haeufige Fehler ist, das Self-Play, das v23 fuettert, "v23-Self-Play" zu
-nennen. Es ist das **v22**-Self-Play. Am 2026-08-25 einmal passiert und in
-zwei Preregs korrigiert.
-
 ---
 
-## LAUFZEITEN (gemessen, nicht geschaetzt)
+## LAUFZEITEN
 
-Planungsgroessen. Die belastbaren Zahlen stehen je Lauf im Artefakt
-(`laufzeit`-Block, Pflichtfeld seit 2026-08-25). Wer eine Zeile ergaenzt,
-traegt GEMESSENES ein.
-
-**Zwei Zeilen nennen stillgelegte Werkzeuge** (`v2_envelope_arena.py`,
-`v2_teacher_arena.py`, seit B4a nicht mehr lauffaehig). Die Zahlen bleiben als
-Planungsgroessen gueltig -- sie beschreiben die FORM des Laufs (Heuristik gegen
-Heuristik bzw. Netz gegen Heuristik, gleiche Sims), nicht das Werkzeug.
-
-| Aufbau | Umfang | Threads | Wanduhr |
-| --- | --- | --- | --- |
-| Heuristik gegen Heuristik, 150 Sims (`v2_envelope_arena.py`) | 160 Partien | 0 = alle 12 Kerne | **21,9 s** |
-| dito, Rauchtest | 20 Partien | alle Kerne | **4,1 s** |
-| Netz@400 gegen Heuristik@150 (`v2_teacher_arena.py`), je Partie | – | 0 = **sequenziell** | **12,357 s** |
-| dito | – | 11 | **2,575 s** |
-| dito, voller Lauf | 814 Partien | 0 = sequenziell | ~2 h 48 min |
-| Anker-Tor (`anchor_referee_parity_probe --games 20`) | 20 Partien, doppelt (in-process + extern) | 1 | **368,8 s** = 9,22 s je Partie |
-| dito | 814 Partien | 11 | ~35 min |
-| Strafleisten-Tor (`floor_action_aversion_gate.py`), 240 Stellungen, sims=200 | – | – | **~7 min** |
-| Heuristik-Self-Play `v2huelle`, 600 Basis-Sims, Netz-Labels | 200 Partien | 11 | **239 s** = 50 Partien/min |
-| dito, `v1` (Vorzug feuert nicht, Suche laeuft voll) | 200 Partien | 11 | **331 s** = 36 Partien/min |
-| `cargo test --release --lib` (volle Suite) | 527 Tests | – | **~65 s** |
-| `cargo test --release` (alle Ziele, exklusiv, 2026-08-26) | 553 Tests | – | **97,1 s** |
-| Datei-Cache erstbauen (`build_cache_incremental.py`) | 120 Dateien | 6 Worker | **112,6 s** = 0,96 s je Datei |
-| Split-Arm Heuristik (`v2_envelope_arena.py --tiling`) | 160 Partien | 0 = alle Kerne | **~22 s** |
-| dito, Bloecke liegen schon (anderes Fenster) | 120 Dateien | 6 | **7,9 s** |
-| Wheel-Bau (`maturin build --release`) plus Installation | – | – | **~30 s** |
-
-**Parallelisierung ist ergebnisneutral, gemessen statt angenommen** (20 Seeds
-beidseitig): Siegquote 0,450, volle Spalten 1,200 und Punkte 55,0 in BEIDEN
-Faellen identisch, bei 4,8-fachem Tempo. Grund:
-`PREREG_search_rng_split.md` -- jede Partie haengt an ihrem eigenen,
-abgeleiteten Suchstrom.
+**Kanonisch in `../docs/measured_runtimes.md`** (seit 2026-08-28 aus STATUS
+entflochten) -- Planungsgroessen je Aufbau, samt Threads-Konvention und der
+Pflegeregel "wer eine Zeile ergaenzt, traegt GEMESSENES ein". Die belastbaren
+Zahlen stehen ohnehin je Lauf im Artefakt (`laufzeit`-Block, Pflichtfeld seit
+2026-08-25).
 
 ---
 
@@ -1284,163 +1261,36 @@ sie nichts. Sonde `tools/probes/corpus_state_diversity_probe.py`, Artefakt
 
 ## FALLEN (aus echten Vorfaellen)
 
-- **CPU-Nebenlast verstuemmelt Arena-Partien** (2026-08-20). Derselbe
-  8-Partien-Smoke lieferte unter Last zwei verschiedene Ergebnisse (eine
-  Partie endete 3:1), ohne Last dreimal byte-identisch. **Arena-Messungen
-  laufen EXKLUSIV** -- keine zweite Arena, keine Sonde mit Suchlauf, kein
-  Training, auch kein `cargo`-Lauf. Determinismus-Checks zaehlen nur unter
-  denselben Lastbedingungen wie die Messung.
-- **"Erste N je Datei" ist ein stiller Rundenfilter** (2026-08-25). Sonden,
-  die je Datei die ersten N qualifizierenden Datensaetze nehmen, ziehen
-  Fruehspiel-Stellungen -- Datensaetze stehen in Zugreihenfolge.
-  `floor_action_aversion_gate.py` hatte dadurch 268 von 280 Stellungen in
-  Runde 1 und ein daraus abgeleitetes Verdikt, das nur fuer Runde 1 galt;
-  repariert (`rounds=`/`seed=`, Bestandsauswahl byte-identisch erhalten).
-  **Gleiches Muster, gleiche Wirkung, NICHT repariert:
-  `long_row_init_knob_effect.py` misst ausschliesslich Runde 1** (alle 240
-  Stellungen). Gegenprobe: `long_row_prior_gate.py` hat dasselbe Muster, aber
-  einen groesseren Deckel und ist unauffaellig (12/105/82/61) -- die Falle
-  haengt am Verhaeltnis Deckel zu Trefferdichte.
-- **Python schreibt auf Windows still CRLF** (2026-08-25). Ein Skript mit
-  `write_text` wandelte in 137 Dateien LF in CRLF; in einer Datei waren das
-  971 Byte Zuwachs bei zwei geaenderten Zeilen. `git diff` zeigte wegen der
-  Normalisierung weiter zwei Zeilen -- aufgefallen ist es nur an der
-  Datei-Groessen-Ratsche. Wer so ein Skript schreibt: `newline` auf LF setzen.
-- **Totes Wheel: Zahlengleichheit bei gleichen Seeds ist ALARM** (2026-08-25).
-  Eine gepaarte 200-Partien-Arena lieferte NULL diskordante Paare, Block fuer
-  Block identisch. Das war kein "kein Effekt", sondern ein Wheel ohne den
-  gemessenen Knopf: Wheel 13:14, Knopf-Einbau 13:28. Neun Minuten Messzeit auf
-  totem Code. Wer einen Knopf misst, prueft VORHER, ob das installierte Modul
-  ihn kennt -- und zwar mit `knob_registry_json()`, nicht mit
-  `engine_config_json()`: letzteres listet nur ausgewaehlte Werte und meldete
-  auch nach korrektem Neubau "nicht bekannt". **Ein negatives Ergebnis aus
-  einem ungeprueften Instrument ist kein Befund.**
-- **Prereg-Koepfe veralten gegen ihren eigenen Koerper** (2026-08-25, zweimal
-  an einem Tag). `PREREG_chance_nodes` behauptete ein Merkmal, das es nicht
-  gibt; `PREREG_heuristic_v2_long_rows` fuehrte par.11 als "ungemessen",
-  waehrend par.11.1 laengst das Ergebnis trug. Beide Male hat der Kopf einen
-  Leser in die Irre gefuehrt. Die Pflegeregel ist nicht Kosmetik.
-- **Wheel nach Engine-Aenderung neu bauen.** `cargo test` gruen heisst nicht,
-  dass Python den neuen Code sieht. `maturin develop` scheitert hier (kein
-  Virtualenv); der Weg ist `maturin build --release` plus
-  `pip install --force-reinstall --no-deps`.
-- **Backticks in doppelten Quotes** werden von der Shell ausgefuehrt --
-  Markdown-Code-Spans verschwinden spurlos aus Text, der ueber `python -c`
-  oder `git -m` geschrieben wird. Heredoc mit einfachen Quotes benutzen.
+**Kanonisch in `../docs/pitfalls.md`** (seit 2026-08-28 aus STATUS
+entflochten): CPU-Nebenlast, "erste N je Datei" als stiller Rundenfilter,
+stilles CRLF, totes Wheel, veraltete Prereg-Koepfe, Wheel-Neubau, Backticks in
+doppelten Quotes -- dazu die 2026-08-26/27 dazugekommenen Faelle (fehlendes
+Flag = Default, falsche Referenz, Feld-vorhanden-heisst-nicht-wirksam,
+Verschiebung sieht wie Neubau aus, umgangenes Tor).
 
 ---
 
-## GELTENDE REGELN (kompakt)
+## GELTENDE REGELN
 
-Langform samt Herleitung: `../archive/history.md`, Kapitel "Vollstaendiger
-STATUS-Stand vom 2026-08-25", Abschnitt "GELTENDE REGELN".
-
-**Messen und Auswerten**
-
-- **Score-Auswertungen IMMER auf Block-Ebene.** Paar-SEs werden sonst massiv
-  unterschaetzt.
-- **Aufloesung schlaegt Sparsamkeit.** Bei n=400 streut dieselbe Konfiguration
-  um 5,75 Prozentpunkte; der Seed bewegt die Metrik 4- bis 6-mal staerker als
-  jeder Knopf.
-- **Value-Aenderungen brauchen Arena-Gating** -- es gibt keinen validierten
-  Offline-Praediktor.
-- **Sechs Standard-Kennzahlen in JEDEM Messbericht**: Reihen-, Spalten- und
-  Strafleistenauslastung, Punkte je Wertungsplatte, eigene Punkte, Margin.
-- **Laufzeit ins Artefakt**, nicht nur nach STATUS: `laufzeit`-Block mit
-  `wanduhr_s`, `cpu_s`, `threads`, `s_je_partie`.
-- **Lange Laeufe nie in eine Pipe**, keine eigene Umleitung; Fortschritt mit
-  `flush` sichtbar machen.
-
-**Training und Korpus**
-
-- **Fenster-Pinning: ZWEI Variablen**, nicht eine -- Trainings waehrend
-  laufender Generierung immer pinnen (Split-Shift, Cache-Neubau,
-  Kontamination).
-- **Traeger-Status vor jeder Policy-Aussage pruefen.** Korpora sind per
-  Default NICHT policy-traeger.
-- **Backup- und Alt-Regel-Korpora kommen NIE wieder ins Training.**
-- **Promotions-Checkliste: kanonisch in `docs/promotion_checklist.md`**
-  (seit 2026-08-28, Nutzer-Hinweis: dauerhaftes Prozesswissen verrottet in
-  STATUS ins Archiv). Enthaelt u.a. 5b Anzeige-Kalibrierung (Platt-Refit je
-  Champion, mit Verteilungs-Caveat) und 5c sigma/Prior-Balance-Waechter
-  (Kennzahl > 3 oeffnet die c_visit-Familie per Regel).
-  **Nachschub bei Gating-Fehlschlag**: Langform
-  im Archiv, hier nur der Merkposten, dass beides existiert und gilt.
-- **Nie auf plattenblindes Normalspiel eichen.** Kalibrierung und Zielraten
-  nicht gegen die Verteilung heutiger Netze, wenn genau deren Verhalten das
-  Ziel ist.
-
-**Arbeitsweise**
-
-- **Loeschen nur mit expliziter, pfadgenauer Rueckfrage.** Eine Frage ist
-  keine Anweisung.
-- **Push nie ohne ausdrueckliche Anweisung.**
-- **Parallele Sitzungen: Spurdisziplin.** Fremde Straenge und Preregs nicht
-  abarbeiten; `git add` pfadgenau statt verzeichnisweit (am 2026-08-25 sind
-  drei fremde Dateien in einen Commit gerutscht).
-- **Prereg-Kopf und Index**: wer ein Ergebnis registriert, zieht den
-  Zeile-1-Kopf im selben Zug nach und laesst
-  `python tools/generate_prereg_index.py` laufen. Gueltige Status:
-  OFFEN / ENTSCHIEDEN / UEBERHOLT.
-- **Heuristik-Anker-Parameterpaket: NICHT ANFASSEN** -- es definiert die
-  Elo-Leiter.
-- **Elo-Betrugsschutz (GUI)**: gewertete Spiele nur gegen verankerte Gegner.
+**Kanonisch in `../docs/working_rules.md`** (seit 2026-08-28 aus STATUS
+entflochten): Messen und Auswerten (Block-Ebene, Aufloesung, Arena-Gating fuer
+Value-Aenderungen, Sechs-Kennzahlen-Pflicht, Laufzeit ins Artefakt, keine
+Pipes), Training und Korpus (Fenster-Pinning, Traeger-Status, Alt-Korpora,
+Promotions-Checkliste, Eich-Verbot auf plattenblindes Spiel) und Arbeitsweise
+(Loeschen, Push, Spurdisziplin, Prereg-Kopf, Anker-Paket, Elo-Betrugsschutz).
+Regeln, die schon in `../CLAUDE.md` stehen, sind dort nur verwiesen, nicht
+kopiert. Langform samt Herleitung weiterhin `../archive/history.md`, Kapitel
+"Vollstaendiger STATUS-Stand vom 2026-08-25".
 
 ---
 
-## ARCHITEKTUR (Referenz, Stand 2026-08-25)
+## ARCHITEKTUR (Referenz)
 
-**Such- und Engine-Seite** (`engine/src/net_mcts.rs`)
+**Kanonisch in `../docs/architecture_reference.md`** (seit 2026-08-28 aus
+STATUS entflochten): Such- und Engine-Seite, Netz- und Trainingsseite samt
+aktiven Konstanten, sowie die "Konstanten mit Fallstrick". Pflegeregel: wer die
+Architektur aendert, zieht die Datei im selben Zug nach und setzt ihr
+Stand-Datum neu. **Beim Uebertrag berichtigt:** der STATUS-Stand nannte
+`NUM_PLANES_CHANNELS = 77`, gebaut sind **79** (features.rs:813, geprueft
+2026-08-28) -- Schritt 1a des Schlachtplans (`e91cd34`) war nicht nachgezogen.
 
-- `ACTIVE_LEAF = LeafEval::Net`; Stufe 1 (DFS-Blatt) liegt dormant, Rueckfall
-  ist ausgeschlossen (Rundenweitsicht ist harte Anforderung).
-- Gumbel-Suche aktiv: `GUMBEL_TOP_M = 16`, `GUMBEL_C_SCALE = 1,0`,
-  `DEFAULT_C_PUCT = 1,5`, `floor_shaping_weight = 0,3`.
-- `VALUE_SHRINK_ENABLED = false`, `ROUND_TRANSITION_SAMPLING = false`,
-  `SHUFFLE_STACK_PEEK_IN_SEARCH = false`, `bootstrap_horizon_rounds = 2`.
-- **Zwei R5-Loeser**: der eingefrorene `round5_anchor.rs` haengt an den drei
-  Heuristik-Sucheinstiegen und schuetzt die Elo-Leiter; `round5.rs` ist der
-  Netz-Loeser und darf sich entwickeln. Runde 5 ist **Expectiminimax** mit
-  Zufallsknoten an den Chip-Aufdeckstellen; `NODE_BUDGET = 200` ist eine
-  Bezahlbarkeits-, keine Hinreichenszahl -- **kein geloestes Endspiel**
-  (~3 Halbzuege, Orakel-Uebereinstimmung 81,4 Prozent).
-- **Der Stapelzug wird gesammelt aufgeloest**
-  (`self_play.rs::resolve_and_apply_stack_draw`, Default-Pfad): die Suche
-  bewertet EINEN Peek, danach zieht eine handgeschriebene Schleife weiter und
-  waehlt Platte, Slot und Rotation selbst -- Kosten und Ergebnis weichen vom
-  Bewerteten ab. Siehe offener Punkt 2.
-
-**Netz- und Trainingsseite** (`config.py`, `engine/py/neural_net.py`)
-
-- **`INPUT_SIZE = 714`** (seit 2026-08-25: plus 6 `col_f_max`),
-  **`NUM_PLANES_CHANNELS = 77`** (plus 1 Ebene Erreichbarkeit, Kanal 76),
-  `NUM_ACTIONS = 406`.
-- Beide neuen Groessen werden in `serialize::serialize_player` **einmal**
-  gerechnet und ins Zustands-JSON geschrieben; der Rust-JSON-Pfad und Python
-  LESEN sie, nur `state_to_features_direct` rechnet selbst (bewacht von den
-  `direct_matches_json_path_*`-Tests). Kosten als Bitmaske: plus 0,27 Prozent
-  je Korpus statt plus 3,80 Prozent als Liste.
-- **Altmodelle bleiben bitgleich**: `net::split_planes_flat_batch_src` kuerzt
-  den Planes-Block auf die Modellbreite und liest den Flat-Block ab der
-  Quell-Grenze; neue Groessen haengen am ENDE ihres Blocks. Am Champion
-  belegt (Paritaets-Hash unveraendert), nicht hergeleitet.
-- Champion-Encoder ist **2D** (`Mosaic2DNet`); der flache `MosaicNet` bleibt
-  Parallel- und Messarm.
-- Koepfe: `policy`, `value`, `moon_order`, `points`, `ownership`,
-  `opp_points`. `ownership` ist 140 breit, `OWNERSHIP_WEIGHT = 0` -- der
-  Champion-Kopf ist **untrainiert**.
-- `VALUE_WEIGHT = 0,2`, `POINTS_WEIGHT = 0,5`, `VALUE_SCALE = 50`,
-  `TD_LAMBDA = 0,5`, `VALUE_OPP_EPSILON = 0,0`.
-- **Value-Ziel ist margen-BLIND** (`values_wdl`, TD-Blend aus
-  Bootstrap-Gewinnwahrscheinlichkeit und hartem Ausgang). Training:
-  `--value-head wdl --select-by-brier`.
-- Champion: `models/champion.txt` zeigt auf `v21_2d_brierbest`.
-
-**Konstanten mit Fallstrick**
-
-- `bonus_points` in `dome.rs` ist ein **Diskriminator** (Special = 3,
-  Wild = 0), KEIN Punktwert -- der echte Spezialfeld-Wert ist die Rasterreihe
-  1 bis 6.
-- `special_empty` zaehlt nur Spezialfelder auf **bereits gelegten** Platten.
-- Die Handbuch-Nummerierung der Wertungsplatten ist um eins gegen die
-  Code-Indizes verschoben: Handbuch 7 = Code 6 = Spezialfelder.
