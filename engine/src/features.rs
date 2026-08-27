@@ -1055,8 +1055,8 @@ pub fn state_to_planes_direct(state: &GameState) -> Vec<f32> {
 }
 
 /// Kombinierter Puffer für `net.rs::InputLayout::PlanesPlusFlat`-Eval:
-/// Planes-Teil (`NUM_PLANES_CHANNELS*6*6` = 2736 Werte) gefolgt vom Flat-Teil
-/// (`INPUT_SIZE` = 708 Werte, byte-identisch zu `state_to_features_direct`)
+/// Planes-Teil (`NUM_PLANES_CHANNELS*6*6` Werte) gefolgt vom Flat-Teil
+/// (`INPUT_SIZE` Werte, byte-identisch zu `state_to_features_direct`)
 /// -- exakt die Konvention, die `net.rs::Net::build_inputs` (`eval`/
 /// `eval_pair`) für `PlanesPlusFlat`-Modelle erwartet.
 pub fn state_to_features_2d_direct(state: &GameState) -> Vec<f32> {

@@ -67,7 +67,7 @@ def apply_head_warmstart(old_state: dict, new_state: dict, head_warmstart: bool 
 
     # (b) ownership_head verbreitert (CONJUNCTIONS_PER_PLAYER gewachsen,
     # z.B. 25->34 Zeilen je Spieler): NICHT trunkieren. Layout GEPRUEFT am
-    # Code (neural_net.py::MosaicDataset, own_l.append-Stelle, Kommentar
+    # Code (corpus_dataset.py::MosaicDataset, own_l.append-Stelle, Kommentar
     # "[0:36] Rand ich, [36:72] Rand Gegner, [72:97] Konj. ich, [97:122]
     # Konj. Gegner" -- NICHT nur aus der Tupelreihenfolge (own_p0, own_p1,
     # conj_p0, conj_p1) abgeleitet): [OWNERSHIP_TARGETS Ownership][conj_p0]

@@ -1256,7 +1256,7 @@ fn plate_completability_json(
 /// Pfad-A-Seite.
 ///
 /// Ausgegeben werden exakt die Groessen, die in `apply_scoring_shaping_full`
-/// (`net_mcts.rs:1462-1487`) in `bei(x) = tanh(x / WERTUNG_SHAPING_SCALE)`
+/// (`shaping.rs`) in `bei(x) = tanh(x / WERTUNG_SHAPING_SCALE)`
 /// eingehen, mit den Laufzeit-Alphas (`scoring_shaping_alphas()`, Default 2)
 /// und `round_gain = 0` (die Prereg registriert ROUND_GAIN fest auf 0):
 /// `wertung_e[k]` je Kriterium 0..8 (unabhaengig davon, ob die Platte liegt --

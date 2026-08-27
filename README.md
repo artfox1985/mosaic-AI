@@ -170,7 +170,7 @@ the project's directory mantra: root executes, `tools/` measures, `evaluations/`
 ```text
 📦 mosaic-AI/
 ├── 📂 engine/       # Rust crate (mosaic_rust): game/search/self-play, PyO3 bindings
-│   └── 📂 py/       # neural_net.py (MosaicNet, MosaicDataset, value target)
+│   └── 📂 py/       # neural_net.py (MosaicNet), corpus_dataset.py (MosaicDataset, value target)
 ├── 📂 evaluations/  # STATUS.md, elo_history.csv, arena_trends.csv, eval JSONs/reports
 ├── 📂 data/         # Self-play output (.pkl) + run manifests, data/archive_*/ = retired
 ├── 📂 models/       # Checkpoints (.pth/.onnx), loss plots, training manifests
