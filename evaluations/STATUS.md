@@ -667,6 +667,31 @@ verteidigen.
 
 ## NAECHSTE SCHRITTE (Stand 2026-08-26, nach Prioritaet)
 
+### A0. SCHLACHTPLAN v22 -> v23 (Nutzer-Auftrag 2026-08-27) und Nachtstand
+
+Der Plan der Nacht 2026-08-27/28, mit Ist-Stand je Schritt -- damit eine
+naechste Sitzung mitten im Ablauf uebernehmen kann:
+
+| # | Schritt | Stand |
+| --- | --- | --- |
+| 0 | Phase 0: Doku-Audit, 13 Preregs + STATUS berichtigt | ERLEDIGT (`936fc40`) |
+| 1a | Spezialfeld-Kanaele 77->79 (additiv, Paritaets-Hash haelt) | ERLEDIGT (`e91cd34`) |
+| 1b | Entstauchung -> Alt-Mechanik, nativ als Default (Blockliste) | ERLEDIGT (`4a775e1`) |
+| 1c | train.py-Hygiene: --lr-t-max, Val-Pool-Waechter, Traeger-Flag im Manifest | ERLEDIGT (`dc40551`); Manifest-Felder am ersten echten Lauf gegenpruefen |
+| 1d | Stufe-0-Sonde (par.3b.3): Daempfungs-Verdikt, entscheidet Arm-L-Pflicht | LAEUFT (voller Korpus; Smoke deutete auf "bestaetigt") |
+| 2a | 79er-Cache parallel (~36 min) auf nativ-Kodierung | offen, nach 1d |
+| 2b | Serielle Referenz (~2,6 h) + Bit-Vergleich = Cache-Tor | offen, nach 2a |
+| 2c | Cache-Verdrahtung in train.py | offen, nach 2b |
+| 3 | v22-KALTSTART: w1-Arm (`MOSAIC_IGNORE_POLICY_TARGET_VALID=1`, `--ownership-weight 1.0`), dann w0-Kontrollarm; Plateau-Schedule (Cold-Start-Weg), `--select-by-brier`; plus Arm L falls 1d ihn zur Pflicht macht | offen |
+| 4 | Spalten-Abnahme-Tor (par.3b.2, drei argmax-Messreihen) | offen, nach 3 |
+| 5 | Wecker-Liste VOR dem v22-Self-Play (`PREREG_v23_window.md` par.4): Implicit-Minimax-Gating, Risiko-A1, `MOSAIC_STACK_DRAW_RESEARCH`, Traeger-Manifest-Generator, 6.550er-Rotation, Startkuppel | offen, nach 4 |
+
+**Offene NUTZER-Entscheide, nachts nicht angefasst:** (a) Anker-Artefakt
+neu einfrieren oder Cross-Aera messen (Vertragshash `efd564d8...`;
+Empfehlung: neu einfrieren, Beweisfuehrung = Golden-Probe-Bytevergleich
+als Traeger, A4-Fixture als Beigabe), (b) Sanierung der drei gepushten
+JSONs mit Pfadfragmenten (Tabelle in Abschnitt 2), (c) jeder Push.
+
 ### A. Der Leitstern-Pfad -- das Einzige, was den Spieler staerker macht
 
 **Das v22-Training steht weiterhin aus.** Alles an diesem Tag war
