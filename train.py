@@ -267,6 +267,19 @@ _RANKING_PAIR_IDX = list(itertools.combinations(range(RANKING_TOPK), 2))
 _RANKING_PAIR_I = [i for i, _ in _RANKING_PAIR_IDX]
 _RANKING_PAIR_J = [j for _, j in _RANKING_PAIR_IDX]
 
+# Ab welchem --epochs die Cosine-Warnung greift (siehe Scheduler-Block in
+# `train()`). Herleitung, nachgerechnet: CosineAnnealingLR mit eta_min=0 hat
+# den Faktor (1 + cos(pi * t / T_max)) / 2.
+#   T_max = 25, Stopp bei t = 15  ->  0,345  (34,5 % der Start-LR)
+#   T_max = 100, Stopp bei t = 15 ->  0,946  (94,6 % der Start-LR)
+# Bei T_max = 25 ist ein frueher Stopp also unkritisch (die LR ist bereits auf
+# rund ein Drittel gefallen, der Sinn des Annealings ist erfuellt); bei einem
+# grossen --epochs regelt der Scheduler faktisch nicht ab. 25 ist damit die
+# Grenze, ab der die Kombination "cosine + Early Stopping + kein --lr-t-max"
+# eine Meldung verdient. Die Zahl ist eine Auslegungsschwelle fuer eine
+# WARNUNG, kein gemessener Optimalwert -- sie aendert kein Verhalten.
+COSINE_TMAX_WARN_EPOCHS = 25
+
 
 def _pairwise_ranking_loss(policy_logits, ranking_action_ids, ranking_child_q, ranking_mask):
     """Task #35b: paarweiser Ranking-Loss + deskriptive Ranking-Accuracy.
@@ -926,6 +939,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           wdl_label_smooth=0.0, wdl_bootstrap_destretch=False,
           destretch_a=0.0051, destretch_b=1.9269,
           show_plot=True, val_frac=0.1, train_file_limit=None, lr=None, lr_schedule="none",
+          lr_t_max=None,
           exclude_round5=False, ownership_weight=None, seed=None, snapshot=True,
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
@@ -1059,10 +1073,37 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     _run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     _t_start_train = time.time()
     _t_daten_fertig = None
+    # Val-Pool-Waechter (2026-08-27): MOSAIC_VAL_POOL schuetzt den Val-Split
+    # beim Warm-Start heute nur, wenn man daran DENKT -- ohne die Variable
+    # zieht der Split still frei (Mechanismus und die ~21 Prozent
+    # Kontamination stehen im Kommentar am Split-Block unten). Der Zustand
+    # wird hier EINMAL bestimmt: als Feld im Manifest, damit spaeter ablesbar
+    # ist, unter welcher Bedingung der Split entstand, und als Warnung im Log.
+    # Kein Abbruch: beim normalen Warm-Start rotiert der Vorgaenger-Korpus
+    # groesstenteils aus dem Fenster, die Kontamination ist dann klein.
+    # Die Bedingung `val_frac > 0 and len(all_files) >= 10` ist DIESELBE wie am
+    # Split-Block unten -- sonst meldete der Waechter eine Kontaminationsgefahr
+    # fuer einen Split, den es gar nicht gibt.
+    _val_split_happens = val_frac > 0 and len(all_files) >= 10
+    _val_pool_env = _os.environ.get("MOSAIC_VAL_POOL")
+    if _val_pool_env:
+        _val_pool_guard = "pool_set"
+    elif load_version and _val_split_happens:
+        _val_pool_guard = "warned"
+    else:
+        _val_pool_guard = "not_applicable"
+    if _val_pool_guard == "warned":
+        print(f"⚠️  Warm-Start (--load {load_version}) OHNE MOSAIC_VAL_POOL: der Val-Split "
+              f"wird frei aus dem gesamten Fenster gezogen und kann darum Dateien "
+              f"enthalten, auf denen das Startmodell bereits trainiert wurde -- die "
+              f"Val-Metrik (und mit --select-by-brier die Checkpoint-Auswahl) ist dann "
+              f"zugunsten spaeter Epochen verzerrt. Ausweg: MOSAIC_VAL_POOL auf einen "
+              f"Regex setzen, der nur unverbrauchte Dateien als Val-Kandidaten zulaesst.")
     _cli_args = {
         "name": version_name, "load": load_version, "epochs": input_epoch, "hidden": hidden_size,
         "early_stop": early_stop, "show_plot": show_plot, "val_frac": val_frac,
         "train_file_limit": train_file_limit, "lr": lr, "lr_schedule": lr_schedule,
+        "lr_t_max": lr_t_max,
         "exclude_round5": exclude_round5, "ownership_weight": ownership_weight,
         "conjunction_head": conjunction_head,
         "seed": seed, "snapshot": snapshot,
@@ -1073,7 +1114,20 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "value_head": value_head,
         "ranking_loss_weight": ranking_loss_weight,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
-        "val_pool": _os.environ.get("MOSAIC_VAL_POOL"),
+        "val_pool": _val_pool_env,
+        "val_pool_guard": _val_pool_guard,
+        # MOSAIC_IGNORE_POLICY_TARGET_VALID definiert einen Trainings-ARM
+        # (PREREG_v22_window.md par.4: der Policy-Kopf sieht die
+        # `policy_target_valid=false`-Zuege oder nicht -- im v22-Korpus 61,8
+        # Prozent der Draftingzuege), stand aber in keinem Manifest-Feld:
+        # geprueft am hv2sanity_ptv-Manifest, 0 Treffer. Der Cache-Key
+        # waechterte den Schalter, das Manifest schwieg -- exakt die
+        # Fehlerklasse des MOSAIC_CARRIER_MANIFEST-Vorfalls
+        # (train_manifest.py:74). Abgelegt wird der AUFGELOESTE Wert mit
+        # DERSELBEN Regel wie neural_net.py:9 (`== "1"`, nicht Truthiness) --
+        # rein dokumentierend, kein Verhalten haengt daran.
+        "ignore_policy_target_valid":
+            _os.environ.get("MOSAIC_IGNORE_POLICY_TARGET_VALID") == "1",
     }
     # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
     # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf
@@ -1104,7 +1158,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Sonst rotiert der Vorgaenger-Korpus beim naechsten Fenster
         # groesstenteils aus; hier bleibt er vollstaendig drin, deshalb ist die
         # Lage anders als bei den bisherigen Warm-Starts.
-        _val_pool_rx = _os.environ.get("MOSAIC_VAL_POOL")
+        # Derselbe Wert wie oben beim Waechter (`_val_pool_env`) -- EINMAL
+        # gelesen, damit Manifest-Feld `val_pool_guard` und tatsaechlicher
+        # Split nicht auseinanderlaufen koennen.
+        _val_pool_rx = _val_pool_env
         if _val_pool_rx:
             _pool = [f for f in all_files if _re.search(_val_pool_rx, _os.path.basename(f))]
             _rest = [f for f in all_files if not _re.search(_val_pool_rx, _os.path.basename(f))]
@@ -1331,20 +1388,42 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     epochs = input_epoch
     print(f"   Epochen       : {epochs}")
 
-    # LR-Scheduler (Task #77, v12b_lr): Cosine-Annealing ueber die angeforderten
-    # Epochen (`epochs`, NICHT die evtl. durch Early Stopping tatsaechlich
-    # gelaufenen -- T_max ist der volle Deckel, ein frueher Stopp bricht die
-    # Kurve einfach vorzeitig ab, das ist unproblematisch). `eta_min=0`
-    # (Standard-Verhalten von CosineAnnealingLR) -- die LR faellt bis Epoche
-    # `epochs` gegen 0. Kein Scheduler (None) reproduziert exakt das alte
+    # LR-Scheduler (Task #77, v12b_lr): Cosine-Annealing ueber `T_max` Epochen,
+    # `eta_min=0` (Standard von CosineAnnealingLR) -- die LR faellt bis Epoche
+    # `T_max` gegen 0. Kein Scheduler (None) reproduziert exakt das alte
     # Verhalten (konstante LR).
+    #
+    # BERICHTIGUNG 2026-08-27: hier stand, ein frueher Stopp breche die Kurve
+    # "einfach vorzeitig ab, das ist unproblematisch". Das verharmlost. T_max
+    # hing bis hierher fest an `--epochs`, und mit Early Stopping (Patience 5)
+    # endet ein Lauf typischerweise weit vor `--epochs`. Nachgerechnet (Faktor
+    # (1 + cos(pi * t / T_max)) / 2): bei T_max = 100 und Stopp bei t = 15
+    # liegt die LR noch bei 94,6 Prozent der Start-LR -- es hat faktisch KEIN
+    # Annealing stattgefunden, der Lauf ist ein Lauf mit konstanter LR unter
+    # anderem Namen. Erst bei T_max = 25 waere sie bis t = 15 auf 34,5 Prozent
+    # gefallen. Der Sweep-Horizont (`--epochs`) und der Anneal-Horizont sind
+    # also zwei verschiedene Groessen; `--lr-t-max` entkoppelt sie.
+    #
+    # `--lr-t-max` ungesetzt (Default None) = T_max ist `epochs`, also
+    # bestandsidentisch -- KEIN stiller Default-Wechsel, nur die Warnung unten.
     lr_scheduler = None
     if lr_schedule == "cosine":
-        lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+        cosine_t_max = lr_t_max if lr_t_max is not None else epochs
+        if lr_t_max is not None:
+            print(f"   Cosine-T_max  : {cosine_t_max} (--lr-t-max, entkoppelt von --epochs={epochs})")
+        elif early_stop and epochs is not None and epochs > COSINE_TMAX_WARN_EPOCHS:
+            print(f"   ⚠️  --lr-schedule cosine mit T_max=--epochs={epochs} UND aktivem Early "
+                  f"Stopping (Patience 5): stoppt der Lauf frueh, ist die LR kaum gefallen "
+                  f"(Faktor (1+cos(pi*t/T_max))/2 -- bei T_max={epochs} und Stopp bei Epoche 15 "
+                  f"noch {(1 + math.cos(math.pi * 15 / epochs)) / 2:.1%} der Start-LR; zum "
+                  f"Vergleich T_max={COSINE_TMAX_WARN_EPOCHS}: 34,5%). Ausweg: --lr-t-max auf "
+                  f"den erwarteten Stopp-Horizont setzen oder --lr-schedule plateau nehmen.")
+        lr_scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=cosine_t_max)
     elif lr_schedule == "plateau":
         # Grob bis zum Plateau, dann feiner in der Zielregion (Nutzer-Anstoss
         # 2026-08-17). Adaptiv, braucht also den Horizont NICHT -- der Grund, warum
-        # Cosine beim Cold Start ausfaellt: dessen T_max haengt an --epochs, und der
+        # Cosine beim Cold Start ausfaellt: dessen T_max braucht einen geschaetzten
+        # Anneal-Horizont (per --lr-t-max, sonst --epochs), und der
         # Saettigungspunkt eines Laufs von null ist unbekannt.
         # patience=2 ist bewusst KLEINER als die 5 Epochen des Early Stoppings --
         # sonst braeche der Lauf ab, bevor die LR je gesenkt wuerde. Greift die
@@ -1918,6 +1997,10 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "batch_size":        BATCH_SIZE,
         "lr":                effective_lr,
         "lr_schedule":       lr_schedule,
+        # Nur bei 'cosine' belegt: der TATSAECHLICH benutzte Anneal-Horizont
+        # (--lr-t-max oder ersatzweise --epochs). Ohne ihn ist aus dem
+        # Checkpoint nicht ablesbar, wie weit die LR ueberhaupt abregeln konnte.
+        "lr_t_max":          (lr_t_max if lr_t_max is not None else epochs) if lr_schedule == "cosine" else None,
         "final_policy_loss": round(final_p, 4),
         "final_policy_val_loss": round(final_val_ploss, 4) if final_val_ploss is not None else None,
         "final_value_loss":  round(value_history[-1], 4),
@@ -2252,7 +2335,19 @@ if __name__ == "__main__":
                              "~17%% der Value- und ~15%% der Policy-Samples liegen dort.")
     parser.add_argument("--lr-schedule", type=str, default="none", choices=["none", "cosine", "plateau"],
                         help="LR-Verlauf ueber die Epochen. 'none' (Standard): konstante LR wie bisher. "
-                             "'cosine': CosineAnnealingLR mit T_max=--epochs (ACHTUNG: bei zu grossem --epochs regelt er faktisch nicht ab). 'plateau': ReduceLROnPlateau (factor 0.5, patience 2) -- adaptiv, fuer Laeufe mit unbekanntem Saettigungspunkt.")
+                             "'cosine': CosineAnnealingLR mit T_max=--lr-t-max, ersatzweise --epochs "
+                             "(ACHTUNG: bei zu grossem --epochs regelt er faktisch nicht ab -- dann "
+                             "--lr-t-max setzen). 'plateau': ReduceLROnPlateau (factor 0.5, patience 2) "
+                             "-- adaptiv, fuer Laeufe mit unbekanntem Saettigungspunkt.")
+    parser.add_argument("--lr-t-max", type=int, default=None,
+                        help="Anneal-Horizont fuer --lr-schedule cosine (T_max in Epochen). "
+                             "Ungesetzt (Default): T_max = --epochs, bestandsidentisch. ANLASS: mit "
+                             "Early Stopping (Patience 5) endet ein Lauf meist weit vor --epochs, und "
+                             "T_max=--epochs heisst dann faktisch konstante LR -- bei --epochs 100 und "
+                             "Stopp bei Epoche 15 steht die LR noch bei 94,6%% der Start-LR (Faktor "
+                             "(1+cos(pi*t/T_max))/2). Mit diesem Flag wird der Anneal-Horizont auf den "
+                             "ERWARTETEN Stopp-Horizont gesetzt, unabhaengig vom Epochen-Deckel. "
+                             "Landet als Feld 'lr_t_max' im Trainings-Manifest.")
     parser.add_argument("--value-weight", type=float, default=None,
                         help="Gewicht des Value-Aux-Loss im Gesamt-Loss (Standard: VALUE_WEIGHT aus "
                              "config.py, aktuell 0.2). Task #79 (v12d): VALUE_WEIGHT/POINTS_WEIGHT-Sweep. "
@@ -2372,6 +2467,7 @@ if __name__ == "__main__":
           destretch_a=args.destretch_a, destretch_b=args.destretch_b,
           show_plot=not args.no_plot, val_frac=args.val_frac,
           train_file_limit=args.train_file_limit, lr=args.lr, lr_schedule=args.lr_schedule,
+          lr_t_max=args.lr_t_max,
           exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
           conjunction_head=args.conjunction_head,
           seed=args.seed, snapshot=not args.no_snapshot,
