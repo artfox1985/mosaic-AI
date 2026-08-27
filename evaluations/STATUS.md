@@ -1359,16 +1359,12 @@ STATUS-Stand vom 2026-08-25", Abschnitt "GELTENDE REGELN".
 - **Traeger-Status vor jeder Policy-Aussage pruefen.** Korpora sind per
   Default NICHT policy-traeger.
 - **Backup- und Alt-Regel-Korpora kommen NIE wieder ins Training.**
-- **Promotions-Checkliste** und **Nachschub bei Gating-Fehlschlag**: Langform
-  im Archiv. **ERGAENZT 2026-08-28 (Nutzer-Frage): bei jedem Champion-Wechsel
-  gehoert die ANZEIGE-Kalibrierung des Value-Kopfs nachgezogen** --
-  `python tools/platt_fit.py --models models/alphazero_<neu>.pth`, dann die
-  hartkodierten Defaults in server.py:1411-1412 und die knobs-Registratur
-  (`MOSAIC_DISPLAY_CAL_A/_B`, heute auf v21 gefittet: A=-0,0033/B=0,906).
-  CAVEAT dabei: der Fit lief bisher auf `evaluations/frozen_eval_set.pkl` (= frozen_v1, Task #87, eingefroren 2026-07-24 aus Zustaenden der v12-Aera; NICHT der holdout-Satz von 2026-08-18);
-  fuer einen spaltenbewussten Champion braucht er eine passende
-  Zustandsverteilung (derselbe Verteilungs-Vorbehalt wie beim
-  Optimismus-Befund, par.3b.3 Arm K). Langform-Checkliste bleibt
+- **Promotions-Checkliste: kanonisch in `docs/promotion_checklist.md`**
+  (seit 2026-08-28, Nutzer-Hinweis: dauerhaftes Prozesswissen verrottet in
+  STATUS ins Archiv). Enthaelt u.a. 5b Anzeige-Kalibrierung (Platt-Refit je
+  Champion, mit Verteilungs-Caveat) und 5c sigma/Prior-Balance-Waechter
+  (Kennzahl > 3 oeffnet die c_visit-Familie per Regel).
+  **Nachschub bei Gating-Fehlschlag**: Langform
   im Archiv, hier nur der Merkposten, dass beides existiert und gilt.
 - **Nie auf plattenblindes Normalspiel eichen.** Kalibrierung und Zielraten
   nicht gegen die Verteilung heutiger Netze, wenn genau deren Verhalten das
