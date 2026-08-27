@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm gegen Champion@400). Die Prio-Leiter des Nutzers als Routing-Huelle (V2Huelle) schlaegt v1 UND das alte v2: Siegquote 0,373 gegen 0,256 und 0,128, volle Spalten 0,798 gegen 0,086 und 0,302 (Netz selbst 0,106), Marge -5,5 gegen -12,2 und -19,4, Vollendungsquote 0,717; gepaart +0,700 volle Spalten (t=+13,73 auf 16 Bloecken). Preis: volle Zeilen 0,432 auf 0,216. Der Durchbruch kam durchgehend vom ROUTING, nie von einem Bewertungsterm (par.8.6); zwei gerechnete Punktekarten als Routing-Ziel sind negativ (par.9.1/9.2) -- eine additive Punktekarte ist ein BREITEN-Signal, volle Spalten brauchen FOKUS. par.11 (rundenabhaengige Spalten-Gewichte) GEMESSEN und H0 (n=160, t=0,39). par.17 NEIN (Knotenbudget bindet nicht), par.18 NEIN (Blindzieh-Pathologie bleibt). -- ABSCHLUSS par.19 (2026-08-27, Nutzer-Entscheid "V2 ist durch"): der v2-Zweig ist AUS DEM QUELLSTAND ENTFERNT -- Enum, heuristic_v2.rs, v2-Routing in plate_builder, beide v2-Arena-Einstiege, die ganze Faedelung. Erhalten bleiben: das Spec-Pflichtfeld heuristik_variante (v2-Specs werden HART abgewiesen), das CLI-Flag mit choices=[v1], die v22-Korpora in data/ und BEIDE Artefakte auf ihrem mitgelieferten Wheel (v1_anchor als Elo-Anker, v2huelle_generator als Erzeuger). Beleg der Kapselung: frozen_agent_referee_probe liefert v1_anchor [27,15]/159 und v2huelle_generator [63,27]/163 unveraendert, obwohl der Quellstand v2 nicht mehr kennt. Stillgelegt statt migriert: v2_envelope_arena und v2_teacher_arena (ihr Vergleichsarm v2-plain war nie ein Artefakt). Nicht mehr nachrechenbar: die SOLL-Seite von PREREG_stack_draw_reservation_rule par.5 (nutzte expected_points_map). -- OFFEN: par.3b.2 Spalten-Abnahme-Tor registriert 2026-08-27 (w1=1,0 gegen w0, argmax-Instrument, zwei harte Tore, entscheidet ueber den Start des v22-Self-Play; Nachtrag 2026-08-27: KALTSTART statt Warmstart, Gating gegen Anker+v21 laeuft informativ und entscheidet den Start NICHT). par.12/par.15 sind mit dem Zweig entfallen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm gegen Champion@400). Die Prio-Leiter des Nutzers als Routing-Huelle (V2Huelle) schlaegt v1 UND das alte v2: Siegquote 0,373 gegen 0,256 und 0,128, volle Spalten 0,798 gegen 0,086 und 0,302 (Netz selbst 0,106), Marge -5,5 gegen -12,2 und -19,4, Vollendungsquote 0,717; gepaart +0,700 volle Spalten (t=+13,73 auf 16 Bloecken). Preis: volle Zeilen 0,432 auf 0,216. Der Durchbruch kam durchgehend vom ROUTING, nie von einem Bewertungsterm (par.8.6); zwei gerechnete Punktekarten als Routing-Ziel sind negativ (par.9.1/9.2) -- eine additive Punktekarte ist ein BREITEN-Signal, volle Spalten brauchen FOKUS. par.11 (rundenabhaengige Spalten-Gewichte) GEMESSEN und H0 (n=160, t=0,39). par.17 NEIN (Knotenbudget bindet nicht), par.18 NEIN (Blindzieh-Pathologie bleibt). -- ABSCHLUSS par.19 (2026-08-27, Nutzer-Entscheid "V2 ist durch"): der v2-Zweig ist AUS DEM QUELLSTAND ENTFERNT -- Enum, heuristic_v2.rs, v2-Routing in plate_builder, beide v2-Arena-Einstiege, die ganze Faedelung. Erhalten bleiben: das Spec-Pflichtfeld heuristik_variante (v2-Specs werden HART abgewiesen), das CLI-Flag mit choices=[v1], die v22-Korpora in data/ und BEIDE Artefakte auf ihrem mitgelieferten Wheel (v1_anchor als Elo-Anker, v2huelle_generator als Erzeuger). Beleg der Kapselung: frozen_agent_referee_probe liefert v1_anchor [27,15]/159 und v2huelle_generator [63,27]/163 unveraendert, obwohl der Quellstand v2 nicht mehr kennt. Stillgelegt statt migriert: v2_envelope_arena und v2_teacher_arena (ihr Vergleichsarm v2-plain war nie ein Artefakt). Nicht mehr nachrechenbar: die SOLL-Seite von PREREG_stack_draw_reservation_rule par.5 (nutzte expected_points_map). -- OFFEN: par.3b.2 Spalten-Abnahme-Tor registriert 2026-08-27 (w1=1,0 gegen w0, argmax-Instrument, zwei harte Tore, entscheidet ueber den Start des v22-Self-Play; Nachtrag 2026-08-27: KALTSTART statt Warmstart, Gating gegen Anker+v21 laeuft informativ und entscheidet den Start NICHT). par.3b.3 Alternativplan Label-Qualitaet registriert 2026-08-27 (Vorab-Sonde Bootstrap-gegen-Ausgang nach Spaltenfortschritt; Folgewege TD_LAMBDA-Leiter und Neu-Labeln mit v22). par.12/par.15 sind mit dem Zweig entfallen. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1071,6 +1071,52 @@ Folgeweg.
    als v21. wichtiger ... ist jedoch ob der spaltenbau uebernommen wurde").
    Ueber den Start entscheiden allein Tor 1 und Tor 2 dieses Absatzes; das
    Gating liefert die Elo-Einordnung.
+
+### par.3b.3 Alternativplan Label-Qualitaet (Nutzer-Auftrag 2026-08-27: "dann brauchen wir einen alternativplan falls uns v21 die labels im rundenuebergang zerschiesst")
+
+**Das Risiko, als Herleitung markiert:** das Value-Ziel ist der TD-Blend
+`TD_LAMBDA * bootstrap + (1 - TD_LAMBDA) * Ausgang` mit `TD_LAMBDA = 0,5`
+(Blend bei der Zielkonstruktion, corpus_dataset.py:919 fuer WDL;
+`bootstrap_value` ist ein gespeichertes Record-Feld). Die Bootstrap-Haelfte
+ist die Meinung des v21-Label-Netzes -- und dessen Value-Kopf traegt die
+gemessene PLATTEN-Daempfung (R5-Plattensteigung 0,06-0,09 statt ~1,
+`PREREG_r5_solver_split.md` par.3e). Die Bootstrap-Haelfte koennte
+Spaltenfortschritt also genau dort unterbewerten, wo der Korpus ihn lehren
+soll. Plattenwahr sind dagegen die Ausgangs-Haelfte und die Ownership-Ziele
+(echte Endbretter) -- zwei eingebaute Hedges, der w1-Arm aktiviert den
+zweiten.
+
+**Stufe 0 -- VORAB-SONDE (vor dem Training fahrbar, reine Datenpassage ohne
+Engine):** auf dem fertigen Korpus je Rundenuebergangs-Record den
+gespeicherten Bootstrap gegen den realisierten Ausgang stellen, gebinnt nach
+Spaltenfortschritt der Stellung (`col_f_max`-Maximum der eigenen Seite; das
+Feld steht seit dem Erzeugungs-Wheel in jedem Zustand). Vorab festgelegte
+Lesart: **Daempfung bestaetigt**, wenn das mittlere Residuum
+(Ausgang minus Bootstrap, auf der Gewinnskala) ueber die Fortschritts-Bins
+monoton waechst UND im obersten Bin ueber +0,05 liegt (Block-SE auf
+Dateiebene). Dann wird Arm L PFLICHTARM des v22-Trainings statt Reserve.
+Werkzeug-Praezedenz: `tools/probes/bootstrap_horizon_paired_probe.py` liest
+dieselben Felder.
+
+**Arm L -- TD_LAMBDA-Leiter (kein Neu-Labeln, kein Neu-Erzeugen):**
+identisches Training, `TD_LAMBDA` 0,5 -> 0,25 -> 0,0 als Leiter auf
+DEMSELBEN Korpus. `TD_LAMBDA` steht im Cache-Schluessel
+(corpus_dataset.py:388, nach dem Retrain-Sweep-Audit nachgeruestet) -- die
+Arme koennen sich also keinen falschen Cache teilen. Preis, aus v11
+gemessen: der TD-Bootstrap hob damals erstmals das R1/R2-R2 -- reiner
+Ausgang ist verrauschter. Deshalb Leiter statt Sprung, und Arm L nur bei
+Sondenbefund (Stufe 0) oder verfehltem Spalten-Tor mit Value-Diagnose.
+
+**Arm R -- Neu-Labeln der Bootstrap-Haelfte (erst NACH v22):** das
+`bootstrap_value`-Feld der Records mit einem besseren Bewerter (dem
+v22-Netz) neu schreiben; alle uebrigen Felder unangetastet, kein Neu-Spielen
+-- reine Vorwaertspaesse an den Uebergaengen. Ergebnis waere ein
+v22b-Training im Afterburner-Muster. Arm R setzt voraus, dass v22 die
+Plattendaempfung nachweislich reduziert hat (R5-Plattensteigungs-Messung am
+v22-Kopf), sonst tauscht man einen gedaempften Bewerter gegen den naechsten.
+
+**Reihenfolge:** Stufe 0 vor dem Training; L und R sind BENANNTE Folgewege
+des Spalten-Tors (par.3b.2), keine Parallelarme des Erstlaufs.
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
