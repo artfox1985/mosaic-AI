@@ -39,7 +39,11 @@ from config import (NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS,
 from neural_net import (  # einseitig, siehe Modulkopf
     DESTRETCH_A,
     DESTRETCH_B,
+    NUM_BINARY_PLANES_CHANNELS,
     NUM_PLANES_CHANNELS,
+    PLANES_BINARY_BITS,
+    PLANES_PACKED_ROW_BYTES,
+    PLANES_RAW_VALUE_BYTES,
     POLICY_TARGET_SHARPEN_EXPONENT,
     RANKING_TOPK,
     TD_LAMBDA,
@@ -146,24 +150,72 @@ def _final_ownership_by_game(game_data) -> dict:
 # ── Bitpacking planes/masks (RAM-Optimierung v21, 2026-08-07) ──────────────
 # PREREG_v21_window.md, Abschnitt "RAM-Voraussetzung": das ~4,8-Mio-Zustaende-
 # Fenster passt im heutigen Cache-Format (planes uint8 [76,6,6]=2.736 B,
-# masks uint8 [406]=406 B) nicht mehr komfortabel in 32 GB RAM. Beide Felder
-# sind STRIKT binaer (nur 0/1, siehe state_to_planes/mask-Bau oben) --
+# masks uint8 [406]=406 B) nicht mehr komfortabel in 32 GB RAM. `masks` ist
+# STRIKT binaer, `planes` war es bis 2026-08-27 ebenfalls --
 # np.packbits/np.unpackbits packt 8 Bits verlustfrei in 1 Byte.
 #
+# SEITHER GILT DAS NUR NOCH FUER DIE ERSTEN `NUM_BINARY_PLANES_CHANNELS`
+# planes-Kanaele: die zwei Spezialfeld-Kanaele tragen Werte 1..6 bzw. 0..3.
+# Fuer sie ist `_pack_planes` (unten) zustaendig, NICHT `_pack_bits`.
+#
 # LAYOUT (exakt): pro Sample wird das Feld zuerst C-kontiguos auf 1D
-# geflacht (planes [76,6,6] -> [2736], masks ist bereits 1D [406]),
+# geflacht (planes [79,6,6] -> [2844], masks ist bereits 1D [406]),
 # anschliessend `np.packbits(..., axis=-1)` -- NumPy-Standard-Bitreihenfolge
 # 'big': Bit-Index 0 des flachen Arrays landet im HOECHSTWERTIGEN Bit (0x80)
-# des ERSTEN Ausgabe-Bytes. planes: 2736 Bit / 8 = exakt 342 Byte (kein
-# Padding). masks: 406 Bit / 8 = 50,75 -> 51 Byte (letztes Byte hat 2
-# Padding-Nullbits). Entpacken mit `np.unpackbits(..., count=K)` schneidet
-# das Padding exakt wieder ab -- `count` ist deshalb Pflichtparameter, kein
-# optionales Detail.
+# des ERSTEN Ausgabe-Bytes. masks: 406 Bit / 8 = 50,75 -> 51 Byte (letztes
+# Byte hat 2 Padding-Nullbits). Entpacken mit `np.unpackbits(..., count=K)`
+# schneidet das Padding exakt wieder ab -- `count` ist deshalb
+# Pflichtparameter, kein optionales Detail.
+#
+# planes ZWEITEILIG (seit 2026-08-27): die ersten 77*36 = 2.772 Bit werden
+# gepackt (-> 346,5 -> 347 Byte, letztes Byte mit 4 Padding-Nullbits), die
+# restlichen 2*36 = 72 Werte haengen ROH (uint8) dahinter -> 419 Byte je
+# Sample. Die Grenzkonstanten stehen in `neural_net.py`
+# (PLANES_BINARY_BITS / PLANES_PACKED_BINARY_BYTES / PLANES_RAW_VALUE_BYTES /
+# PLANES_PACKED_ROW_BYTES) und werden von beiden Seiten benutzt.
 def _pack_bits(arr: np.ndarray) -> np.ndarray:
     """Bitpackt ein striktes 0/1-uint8-Array entlang der letzten Achse.
     [..., K] -> [..., ceil(K/8)]. Siehe Kopf-Kommentar fuer das exakte
     Layout (Bitreihenfolge 'big', Padding-Konvention)."""
     return np.packbits(arr, axis=-1)
+
+
+def _pack_planes(arr: np.ndarray) -> np.ndarray:
+    """Packt einen planes-Block [N,C,6,6] uint8 -> [N,PLANES_PACKED_ROW_BYTES].
+
+    NICHT einfach `_pack_bits` auf alles: `np.packbits` liest jeden Wert != 0
+    als gesetztes Bit. Seit den zwei Spezialfeld-Kanaelen (Ertrag 1..6,
+    Abstand 0..3, `neural_net.py::state_to_planes`) ist der Block NICHT mehr
+    durchweg binaer -- ein Voll-Pack haette diese Werte still auf 0/1
+    plattgedrueckt, ohne Fehlermeldung und ohne Absturz.
+
+    Aufteilung: die ersten `NUM_BINARY_PLANES_CHANNELS` Kanaele werden wie
+    bisher bitgepackt, die wertetragenden Kanaele dahinter bleiben ROH
+    (uint8). Umkehrfunktion: `neural_net.py::unpack_planes_batch` -- beide
+    Seiten benutzen dieselben Grenzkonstanten aus `neural_net`.
+    """
+    n = len(arr)
+    assert arr.shape[1:] == (NUM_PLANES_CHANNELS, 6, 6), (
+        f"_pack_planes erwartet [N,{NUM_PLANES_CHANNELS},6,6], bekam {arr.shape}")
+    flat = arr.reshape(n, -1)
+    binary_part = flat[:, :PLANES_BINARY_BITS]
+    # Waechter statt Vertrauen: EIN voller uint8-Reduktionslauf (Sekunden auf
+    # dem vollen Korpus) gegen einen stillen Datenfehler, der sonst erst
+    # Messungen spaeter auffiele. Feuert, sobald jemand einen wertetragenden
+    # Kanal VOR die Grenze legt.
+    if n and int(binary_part.max()) > 1:
+        raise ValueError(
+            f"_pack_planes: die ersten {NUM_BINARY_PLANES_CHANNELS} planes-Kanaele muessen "
+            f"strikt binaer sein, gefunden wurde der Wert {int(binary_part.max())}. "
+            "Ein wertetragender Kanal gehoert HINTER NUM_BINARY_PLANES_CHANNELS "
+            "(neural_net.py), sonst drueckt np.packbits ihn still auf 0/1.")
+    packed = _pack_bits(binary_part)
+    if PLANES_RAW_VALUE_BYTES:
+        packed = np.concatenate([packed, flat[:, PLANES_BINARY_BITS:]], axis=-1)
+    assert packed.shape[1] == PLANES_PACKED_ROW_BYTES, (
+        f"_pack_planes: Zeilenbreite {packed.shape[1]} != PLANES_PACKED_ROW_BYTES "
+        f"{PLANES_PACKED_ROW_BYTES} -- Grenzkonstanten und Packen laufen auseinander")
+    return packed
 
 
 def _resolve_planes_h5_path(cache_path_h5: str) -> str:
@@ -208,19 +260,22 @@ class MosaicDataset(Dataset):
         byte-identisch zum Vor-v21-Verhalten (Cache-Key/-Inhalt/
         `__getitem__`-Tupel-INHALT aendert sich; die Tupel-FORM/-POSITION
         bleibt gleich). "2d" ergaenzt ein zusaetzliches `planes`-HDF5-Dataset
-        ([N,76,6,6], `neural_net.py::state_to_planes`) NEBEN den bestehenden
-        Datasets -- der Cache-Key bekommt dafuer den Suffix "+enc2d_v1"
-        (siehe docs/design_2d_encoder.md Abschnitt 7), ein Flach-Cache
-        derselben Dateiliste bleibt davon unberuehrt (eigener Dateiname).
-        Speicherformat uint8 (0/1) statt float32: JEDER der 76 Kanaele ist
-        binaer (One-Hot-Belegung + 0/1-Geometriemasken, siehe
-        design_2d_encoder.md Abschnitt 3/4).
+        ([N,NUM_PLANES_CHANNELS,6,6], `neural_net.py::state_to_planes`) NEBEN
+        den bestehenden Datasets -- der Cache-Key bekommt dafuer den Suffix
+        "+enc2d_v2" (siehe docs/design_2d_encoder.md Abschnitt 7), ein
+        Flach-Cache derselben Dateiliste bleibt davon unberuehrt (eigener
+        Dateiname). Speicherformat uint8 statt float32: die ersten
+        `NUM_BINARY_PLANES_CHANNELS` Kanaele sind binaer (One-Hot-Belegung +
+        0/1-Geometriemasken, siehe design_2d_encoder.md Abschnitt 3/4), die
+        zwei Spezialfeld-Kanaele dahinter tragen kleine ganze Zahlen
+        (Ertrag 1..6, Abstand 0..3).
 
         BITPACKING (RAM-Optimierung v21, 2026-08-07, PREREG_v21_window.md
         "RAM-Voraussetzung"): sowohl `masks` (406 Bit/Sample) als auch
-        `planes` (2.736 Bit/Sample, NUR "2d") sind STANDARDMAESSIG bitgepackt
-        im Cache (siehe `_pack_bits`-Kommentar oben fuer das exakte Layout;
-        406 B -> 51 B bzw. 2.736 B -> 342 B). `__getitem__` liefert dann die
+        `planes` (NUR "2d") STANDARDMAESSIG gepackt im Cache (siehe
+        `_pack_bits`/`_pack_planes` oben fuer das exakte Layout; masks
+        406 B -> 51 B, planes 2.844 B -> 419 B = 347 gepackte + 72 rohe
+        Bytes). `__getitem__` liefert dann die
         GEPACKTEN Bytes (kuerzere letzte Dimension) statt der entpackten
         Werte -- das Entpacken passiert bewusst NICHT hier pro Sample,
         sondern EINMAL pro Batch in train.py (`unpack_masks_batch`/
@@ -229,7 +284,7 @@ class MosaicDataset(Dataset):
         zeigt Aufrufern, ob dieser Schritt noetig ist. Escape-Hatch
         `MOSAIC_CACHE_NOPACK=1` erzwingt das alte unkomprimierte Format
         (eigener Cache-Key-Suffix, siehe dort) -- dann liefert `__getitem__`
-        weiterhin die vollen [406]/[76,6,6]-Werte wie vor v21 und
+        weiterhin die vollen [406]/[79,6,6]-Werte wie vor v21 und
         `self.bitpacked` ist False."""
         from config import INPUT_SIZE
         import hashlib, time
@@ -342,7 +397,14 @@ class MosaicDataset(Dataset):
             # (Fenster-Kollision, siehe Auftrag Punkt 3).
             cache_key_material += "+carrier_prefixes:" + ",".join(sorted(carrier_prefixes))
         if encoder == "2d":
-            cache_key_material += "+enc2d_v1"
+            # "+enc2d_v2" (2026-08-27, PREREG_special_tile_yield.md par.4a):
+            # NUM_PLANES_CHANNELS 77 -> 79 UND ein neues Packlayout
+            # (`_pack_planes`: 419 statt 347 Byte je Zeile). Der Marker MUSS
+            # mitziehen -- die Kanalzahl steckt in KEINER anderen
+            # Key-Komponente (geprueft 2026-08-27: `cache_key_material` fuehrt
+            # INPUT_SIZE, aber nicht NUM_PLANES_CHANNELS). Ohne den Bump
+            # traefe ein 79er-Lauf den 77er-Bestandscache.
+            cache_key_material += "+enc2d_v2"
         # Konjunktions-Erweiterung (2026-08-10): die 25 Zusatzlabels je Spieler
         # haengen HINTEN an den `ownership`-Vektor. Eigener Suffix, NUR wenn
         # aktiv -- Muster "+enc2d_v1". Bewusst KEIN VALUE_SCHEMA_VERSION-Bump:
@@ -514,7 +576,7 @@ class MosaicDataset(Dataset):
                         self._planes_dataset_name = 'planes'
                     else:
                         raise RuntimeError(
-                            f"HDF5-Cache {cache_path_h5} hat den '+enc2d_v1'-Key, aber weder "
+                            f"HDF5-Cache {cache_path_h5} hat den '+enc2d_v2'-Key, aber weder "
                             f"'planes' noch 'planes_packed' -- Cache-Korruption? Datei loeschen "
                             f"und neu bauen lassen."
                         )
@@ -531,13 +593,13 @@ class MosaicDataset(Dataset):
 
         elif os.path.exists(cache_path_pt):
             # Alten .pt Cache laden und nach HDF5 migrieren -- kann fuer
-            # encoder="2d" praktisch nie greifen (der "+enc2d_v1"-Key-Suffix
+            # encoder="2d" praktisch nie greifen (der "+enc2d_v2"-Key-Suffix
             # existiert erst seit Task #11 Phase 2, ein .pt-Cache mit diesem
             # Key kann also nicht vorliegen), aber defensiv statt eines
             # stillen `planes=None` trotzdem hart pruefen.
             if self.encoder == "2d":
                 raise RuntimeError(
-                    f"Alter .pt-Cache {cache_path_pt} passt zum '+enc2d_v1'-Key -- das kann "
+                    f"Alter .pt-Cache {cache_path_pt} passt zum '+enc2d_v2'-Key -- das kann "
                     f"eigentlich nicht vorkommen (der Suffix ist neuer als jeder .pt-Cache). "
                     f"Cache-Datei loeschen und neu bauen lassen."
                 )
@@ -627,7 +689,8 @@ class MosaicDataset(Dataset):
             # Task #11 Phase 2: Planes-Puffer NUR im 2D-Modus gesammelt (leere
             # Liste bei encoder="flat" -> keine zusaetzliche Rechenzeit/Speicher
             # im Bestandsverhalten). uint8 (0/1) statt float32, siehe
-            # `encoder`-Doku oben -- jeder der 76 Kanaele ist binaer.
+            # `encoder`-Doku oben -- binaere Kanaele plus die zwei
+            # wertetragenden Spezialfeld-Kanaele am Ende.
             planes_l = [] if self.encoder == "2d" else None
 
             for f in files:
@@ -1064,9 +1127,10 @@ class MosaicDataset(Dataset):
                 del planes_l
 
             # Bitpacking (RAM-Optimierung v21, PREREG_v21_window.md "RAM-
-            # Voraussetzung"): masks/planes sind striktes 0/1 -- `_pack_bits`
-            # packt verlustfrei auf 1/8 der Byte-Groesse (masks 406->51 B,
-            # planes 2736->342 B je Sample, exaktes Layout siehe
+            # Voraussetzung"): `masks` ist striktes 0/1 (`_pack_bits`),
+            # `planes` nur in seinem binaeren Vorderteil (`_pack_planes`) --
+            # verlustfrei in beiden Faellen (masks 406->51 B,
+            # planes 2844->419 B je Sample, exaktes Layout siehe
             # `_pack_bits`-Kopf-Kommentar oben). `cache_nopack` (bereits Teil
             # des Cache-Keys, s.o.) erzwingt als Notausstieg das alte
             # unkomprimierte Format 1:1. `masks_np`/`planes_np` werden ab hier
@@ -1078,7 +1142,9 @@ class MosaicDataset(Dataset):
             if self.bitpacked:
                 masks_np = _pack_bits(masks_np)  # [N,406] -> [N,51]
                 if planes_np is not None:
-                    planes_np = _pack_bits(planes_np.reshape(len(planes_np), -1))  # [N,76,6,6] -> [N,342]
+                    # `_pack_planes`, NICHT `_pack_bits`: der Block ist seit den
+                    # zwei Spezialfeld-Kanaelen nicht mehr durchweg binaer.
+                    planes_np = _pack_planes(planes_np)  # [N,79,6,6] -> [N,419]
 
             print(f"Datensatz geladen: {len(states_np)} Züge. "
                   f"(Features pro Zug: {states_np.shape[1]}) — {time.time()-t0:.1f}s")
@@ -1298,7 +1364,7 @@ class MosaicDataset(Dataset):
         # (train.py castet batchweise) -- spart 4x Collate-/Transfer-Volumen
         # gegenueber dem frueheren Per-Sample-`.float()`.
         # RAM-Optimierung v21 (Bitpacking): ist `self.bitpacked` True, liefert
-        # dies ein FLACHES [342]-Byte-Sample statt [76,6,6] -- das Entpacken
+        # dies ein FLACHES [419]-Byte-Sample statt [79,6,6] -- das Entpacken
         # passiert NICHT hier (pro Sample), sondern EINMAL pro Batch in
         # train.py (`unpack_planes_batch`, siehe Benchmark-Kommentar dort).
         if self._planes_eager_tensor is not None:

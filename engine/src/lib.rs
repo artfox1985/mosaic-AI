@@ -1822,11 +1822,27 @@ mod contract_stamp_tests {
     /// Damit ist zugleich der Beleg erbracht, den die Kompatibilitaets-
     /// Schicht bis dahin schuldig war: bis 2026-08-25 war nur gezeigt, dass
     /// sie bei GLEICHER Breite nichts bricht.
+    ///
+    /// **Neu gesetzt 2026-08-27** (vorher `a3f61f246d9bbf5c`), Anlass:
+    /// `evaluations/PREREG_special_tile_yield.md` par.4a --
+    /// `NUM_PLANES_CHANNELS` 77 -> 79 (+2 Ebenen: ausstehender
+    /// Spezialfeld-Ertrag `pattern_row + 1`, Abstand zur Ausloesung 0..3).
+    /// `INPUT_SIZE` bleibt 714, `NUM_ACTIONS` bleibt 406, die Kopf-Liste
+    /// bleibt unveraendert -- die Rotlaerm-Ursache ist ausschliesslich die
+    /// Kanalzahl.
+    ///
+    /// ADDITIV wie der Schritt davor: beide Ebenen haengen am ENDE des
+    /// Planes-Blocks, und `net::split_planes_flat_batch_src` kuerzt den
+    /// Planes-Block auf die MODELL-Breite (`c*h*w` aus dem geladenen ONNX,
+    /// `net.rs::build_inputs`/`net_ort.rs::build_ort_inputs`), waehrend der
+    /// Flat-Block ab `features::NUM_PLANES_VALUES` gelesen wird. Ein
+    /// 77-Kanal-Altmodell sieht dadurch Wert fuer Wert dieselben Eingaben
+    /// wie vorher und spielt bitgleich weiter; das v22-Training benutzt 79.
     #[test]
     fn contract_hash_matches_pinned_literal() {
         assert_eq!(
             contract_hash(),
-            "a3f61f246d9bbf5c",
+            "efd564d87bac2722",
             "A2-Vertragshash hat sich veraendert -- Bestandschampions bekommen \
              andere Eingaben (siehe Testdoku)"
         );
