@@ -47,12 +47,17 @@ def static_handshake(manifest: dict, force_cross_era: bool) -> dict:
     ok = artifact_hash == current_hash
     result = {"ok": ok, "artifact_contract_hash": artifact_hash, "current_contract_hash": current_hash}
     if not ok and not force_cross_era:
+        # f-String statt `.format()`: die alte Fassung hatte ein `{art}` im
+        # Text, uebergab aber `kind=` -- der Abbruch endete in einem
+        # `KeyError: 'art'` statt in dieser Meldung. Aufgefallen am
+        # 2026-08-27, bevor die erste echte Kontraktaenderung ihn ausloeste;
+        # dieser Zweig lief bis dahin nie, weil der Handshake immer gruen war.
         raise SystemExit(
-            "HANDSHAKE ROT: Artefakt-contract_hash={art} != aktuelle Engine {cur}. "
-            "Verweigert (par.8: Kanten ueber die Fix-Grenze nie mischen). "
-            "Override nur per --force-cross-era (Cross-Aera-Messung, Ergebnis mit "
-            "Vorsicht lesen -- Regel-/Kontrakt-Drift zwischen den Seiten ist dann "
-            "moeglich).".format(kind=artifact_hash, cur=current_hash)
+            f"HANDSHAKE ROT: Artefakt-contract_hash={artifact_hash} != aktuelle "
+            f"Engine {current_hash}. Verweigert (par.8: Kanten ueber die "
+            "Fix-Grenze nie mischen). Override nur per --force-cross-era "
+            "(Cross-Aera-Messung, Ergebnis mit Vorsicht lesen -- Regel-/"
+            "Kontrakt-Drift zwischen den Seiten ist dann moeglich)."
         )
     if not ok:
         print(
