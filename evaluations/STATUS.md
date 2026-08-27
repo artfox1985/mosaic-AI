@@ -1365,7 +1365,7 @@ STATUS-Stand vom 2026-08-25", Abschnitt "GELTENDE REGELN".
   `python tools/platt_fit.py --models models/alphazero_<neu>.pth`, dann die
   hartkodierten Defaults in server.py:1411-1412 und die knobs-Registratur
   (`MOSAIC_DISPLAY_CAL_A/_B`, heute auf v21 gefittet: A=-0,0033/B=0,906).
-  CAVEAT dabei: der Fit lief bisher auf dem Frozen-Set (v12-Aera-Zustaende);
+  CAVEAT dabei: der Fit lief bisher auf `evaluations/frozen_eval_set.pkl` (= frozen_v1, Task #87, eingefroren 2026-07-24 aus Zustaenden der v12-Aera; NICHT der holdout-Satz von 2026-08-18);
   fuer einen spaltenbewussten Champion braucht er eine passende
   Zustandsverteilung (derselbe Verteilungs-Vorbehalt wie beim
   Optimismus-Befund, par.3b.3 Arm K). Langform-Checkliste bleibt
