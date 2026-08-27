@@ -166,7 +166,7 @@ unbrauchbar und nur die pkl erlaubten den Neubau. Die offenen Preregs
 (Spezialfeld-Eingaben, Slot-Ziel, Huellen-Gewichtung) wuerden dasselbe wieder
 ausloesen.
 
-**Aufraeumbar, Nutzer-Entscheid:** die 64 Block-Caches (1,29 GB) sind
+**ERLEDIGT 2026-08-27 (Nutzer-Freigabe, 194 Dateien / 2,54 GB geloescht -- darunter auch alles Folgende):** die 64 Block-Caches (1,29 GB) sind
 Nebenprodukt der Bau-Versuche mit verschiedenen Blockteilungen; nur die 42 des
 vollen Laufs sind wiederverwendbar. Dazu `.ref_serial.h5`, `.par_test*.h5`,
 `.gz_check.h5` (0,16 GB) aus den Abnahmen.
@@ -455,8 +455,9 @@ Status (Fenster-Key mit Blockliste, per-Datei-Key aufgeloest);
 Fixier-Probe `bootstrap_native_default_probe.py` GRUEN (nativ=roh,
 alt=entstaucht, Schluessel trennt), vom Koordinator nachgefahren.
 **Folge: 66 `.cache_*.h5` + 121 `.filecache_*.h5` in data/ sind tot**
-(entstauchte hv2-Ziele bzw. alter Schluessel) -- Loeschen ist
-Nutzer-Entscheid, nichts geloescht. Der 79er-Cache wird auf dem neuen
+(entstauchte hv2-Ziele bzw. alter Schluessel) -- **GELOESCHT auf
+Nutzer-Freigabe 2026-08-27**, zusammen mit .par_full.h5 und den alten
+Abnahme-Artefakten: 194 Dateien, 2,54 GB. Der 79er-Cache wird auf dem neuen
 Stand gebaut. Details: `PREREG_heuristic_v2_long_rows.md` par.3b.3
 Nachtrag Punkt 3.
 
