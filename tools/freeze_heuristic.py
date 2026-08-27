@@ -31,7 +31,8 @@ WAS INS ARTEFAKT GEHOERT
                      engine_config, Rezept der Golden Probe
   <wheel>.whl        der Traeger des Verhaltens
   golden_probe/      der Referenzlauf, gegen den verglichen wird
-  tiling_net.onnx    NUR wo die Variante ein Netz braucht (Durchfall-Pfad,
+  label_net.onnx     NUR wo der Agent ein Netz zum LABELN braucht (Bootstrap an
+                     den Rundenuebergaengen + Drafting-Priors; am Spiel
                      self_play.rs:1234) -- als KOPIE, nicht als Verweis auf
                      models/: ein Artefakt, das auf einen geteilten Pfad
                      zeigt, ist nicht eingefroren, sondern ein Zeiger, der
@@ -112,7 +113,7 @@ def main() -> int:
     ap.add_argument("--wheel", default=None,
                     help="Pfad zum Wheel (Default: der frischeste Build in engine/target/wheels)")
     ap.add_argument("--tiling-net", default=None,
-                    help="ONNX fuer den Tiling-Durchfall-Pfad; wird als tiling_net.onnx kopiert")
+                    help="ONNX fuer die LABEL-Erzeugung (Rundenuebergangs-Bootstrap, Drafting-Priors); wird als label_net.onnx kopiert. Es entscheidet auf dem Heuristik-Erzeugerpfad NICHTS am Spiel -- dort steht tiling_net auf None.")
     ap.add_argument("--games", type=int, default=10, help="Partien der Golden Probe")
     ap.add_argument("--sims", type=int, default=600)
     ap.add_argument("--seed", type=int, default=20260826)
@@ -150,13 +151,13 @@ def main() -> int:
     tiling_net = None
     if a.tiling_net:
         src = pathlib.Path(a.tiling_net)
-        shutil.copy2(src, target / "tiling_net.onnx")
-        tiling_net = {"datei": "tiling_net.onnx", "quelle": _git_provenance(src),
+        shutil.copy2(src, target / "label_net.onnx")
+        tiling_net = {"datei": "label_net.onnx", "quelle": _git_provenance(src),
                       "rolle": ("Stichentscheid im Tiling-Durchfall (self_play.rs:1234: die "
                                 "v2-Vorzugskarte greift nur, wenn sie einen Zug liefert -- sonst "
                                 "faellt es auf das Netz durch) und Erzeuger der "
                                 "bootstrap_value-Label")}
-        print(f"Tiling-Netz kopiert: {src.name} -> tiling_net.onnx", flush=True)
+        print(f"Label-Netz kopiert: {src.name} -> label_net.onnx", flush=True)
 
     # --- Spec: was der Agent IST
     spec = {"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0,
@@ -173,7 +174,7 @@ def main() -> int:
         "c_puct": a.c_puct, "add_root_noise": True, "deterministic": False,
         "record_rtv": False, "tau_argmax_from_move": 0,
         "heuristik_variante": a.variante,
-        "model": "tiling_net.onnx" if tiling_net else None,
+        "model": "label_net.onnx" if tiling_net else None,
     }
     cmd = [sys.executable, "-X", "utf8", "-u", str(_ROOT / "self_play.py"),
            "--mode", "mcts", "--games", str(a.games), "--sims", str(a.sims),
@@ -184,7 +185,7 @@ def main() -> int:
            # Aufrufers -- genau der Unterschied, den dieses Artefakt ausmacht.
            "--heuristik-variante", spec["heuristik_variante"]]
     if tiling_net:
-        cmd += ["--model", str(target / "tiling_net.onnx")]
+        cmd += ["--model", str(target / "label_net.onnx")]
     env = dict(os.environ, MOSAIC_DATA_DIR=str(probe_dir))
     print(f"Golden Probe: {a.games} Partien, Variante {a.variante} ...", flush=True)
     r = subprocess.run(cmd, cwd=str(_ROOT), env=env, text=True, encoding="utf-8")

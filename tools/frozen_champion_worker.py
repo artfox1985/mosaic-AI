@@ -48,7 +48,9 @@ anderer Spieler, mit plausibel aussehendem Ergebnis.
 NETZLOSE ARTEFAKTE: fehlt `model.onnx`, ist das Artefakt eine Heuristik --
 ihr Verhalten steckt vollstaendig im Wheel. Die Drafting-Antwort kommt dann
 aus `heuristic_arena_choice_state_json` statt aus der Netzsuche. Ein
-`tiling_net.onnx` im Artefakt wird fuer den Tiling-Durchfall-Pfad benutzt.
+`label_net.onnx` im Artefakt ist das LABEL-Netz des Erzeugers (Bootstrap an den
+Rundenuebergaengen, Drafting-Priors) -- es entscheidet auf dem Heuristik-Pfad
+nichts am Spiel, siehe Rollen-Vermerk im Artefakt-Manifest.
 """
 from __future__ import annotations
 
@@ -68,7 +70,12 @@ def main() -> int:
 
     artifact = Path(args.artifact_dir).resolve()
     model_path = artifact / "model.onnx"
-    tiling_net_path = artifact / "tiling_net.onnx"
+    # Alter Name `tiling_net.onnx` wird weiter akzeptiert: Artefakte, die vor
+    # der Umbenennung am 2026-08-27 eingefroren wurden, tragen ihn noch, und
+    # ein Artefakt ist per Definition unveraenderlich.
+    tiling_net_path = artifact / "label_net.onnx"
+    if not tiling_net_path.exists():
+        tiling_net_path = artifact / "tiling_net.onnx"
     spec_path = artifact / "spec.json"
     manifest_path = artifact / "manifest.json"
     # `model.onnx` ist NICHT mehr Pflicht: ein Heuristik-Artefakt hat keins.
