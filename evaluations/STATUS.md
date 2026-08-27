@@ -441,6 +441,17 @@ Voraussetzung fuer den Self-Play-Start ("ich geh nicht davon aus dass v22
 besser ist als v21") -- der Start haengt am Spalten-Abnahme-Tor (par.3b.2),
 nicht am Gating-Ausgang.
 
+**PFLICHT-FIX VOR DEM TRAINING (Fund 2026-08-27, Nutzer-Entscheid):**
+`WDL_GENERATOR_PREFIXES` kennt `selfplay_hv2` nicht -- der native
+WDL-Bootstrap des v21-Label-Netzes wird im Zielbau faelschlich
+Platt-entstaucht (corpus_dataset.py:917-919, Logit mal 1,93; betrifft JEDES
+bisher auf hv2 gebaute Value-Ziel, auch die Sanity-Trainings). Beschlossene
+Loesung ist die Umkehr der Semantik: **nativ ist der Default**, entstaucht
+wird nur noch eine explizite Blockliste alter tanh-Aera-Praefixe
+(`PREREG_heuristic_v2_long_rows.md` par.3b.3 Nachtrag Stufe 0, Punkt 3).
+Mit eigener Cache-Key-Komponente und Fixier-Test; der 79er-Cache wird erst
+NACH diesem Fix gebaut.
+
 ### 1b. ERLEDIGT 2026-08-26: Cache je Datei (Hebel 4)
 
 `PREREG_cache_build_time.md` par.9. **Beide Pflichtpruefungen bestanden** --

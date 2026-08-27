@@ -1118,6 +1118,34 @@ v22-Kopf), sonst tauscht man einen gedaempften Bewerter gegen den naechsten.
 **Reihenfolge:** Stufe 0 vor dem Training; L und R sind BENANNTE Folgewege
 des Spalten-Tors (par.3b.2), keine Parallelarme des Erstlaufs.
 
+**Nachtrag Stufe 0 (2026-08-27, VOR dem vollen Sondenlauf; der Smoke war
+Instrumententest):** Der Sondenbau fand ZWEI Fehler in dieser Registrierung
+und EINEN im Zielbau selbst.
+
+1. **Binning-Feld berichtigt:** `col_f_max` ist die ERREICHBARE Fuellung
+   (serialize.rs:232-234, startet bei 6 und faellt) -- als Fortschritts-Bin
+   fast ohne Aufloesung (Smoke: 4373 von 4386 Records in Bin 6). Gemeint war
+   der GEBAUTE Fuellstand. Das Tor laeuft auf
+   `max(score_geo.col_fill)` (serialize.rs:200), Bins unveraendert
+   0-2/3/4/5/6; die `col_f_max`-Tabelle laeuft als Zusatz ohne Torfunktion
+   mit.
+2. **Skala berichtigt:** getort wird auf der ZIEL-AEQUIVALENTEN Skala --
+   dem Wert, der tatsaechlich in `value_wdl` geblendet wird -- nicht auf dem
+   rohen Speicherfeld. Beide Tabellen stehen im Artefakt.
+3. **FUND im Zielbau (Nutzer-Entscheid 2026-08-27, VOR dem v22-Training zu
+   beheben):** `WDL_GENERATOR_PREFIXES` (neural_net.py:759) kennt
+   `selfplay_hv2` nicht; der NATIVE WDL-Bootstrap des v21-Label-Netzes wird
+   dadurch faelschlich Platt-entstaucht (corpus_dataset.py:917-919,
+   B=1,9269). Nutzer: *"das muessen wir sowieso anders loesen. wir haben
+   keine gestauchten netze mehr. das war nur ein fix."* Beschlossene Form:
+   **native ist der DEFAULT**; die Entstauchung wird zur Alt-Mechanik, die
+   nur noch fuer eine explizite Blockliste alter tanh-Aera-Praefixe greift
+   (heutiger data/-Bestand: ausschliesslich hv2). Der Umbau aendert die
+   Zieldefinition und braucht deshalb eine eigene Cache-Key-Komponente und
+   einen Test, der den hv2-Fall (nativ, unveraendert) und den Alt-Fall
+   (entstaucht) fixiert. Nach dem Fix ist Punkt 2 gegenstandslos vereinfacht:
+   Zielskala = Rohwert.
+
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
 `plate_builder::v2_chip_vorzug`: vollendet per Bonuschip die Musterreihe, die
