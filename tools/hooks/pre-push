@@ -34,7 +34,9 @@ PRIVACY_HITS=""
 # Mit einem escapt er nur den Schraegstrich und laesst jeden Windows-Pfad
 # still stehen -- genau dieser Fehler ist am 2026-08-17 zweimal passiert.
 # '+' statt genau einem Trenner: in JSON stehen Windows-Pfade mit DOPPELTEM
-# Backslash ("D:\\OneDrive\\Documents\\..."). Das alte Muster erwartete genau
+# Backslash (Form "D:\\Wolke\\Ordner\\..."; das echte Beispiel stuende hier
+# selbst im Muster -- der Waechter hat sich am 2026-08-27 prompt in diesem
+# Kommentar gefangen und einen Push geblockt). Das alte Muster erwartete genau
 # einen und hat deshalb am 2026-08-27 einen getrackten -- und bereits
 # gepushten -- absoluten Pfad samt Nutzernamen durchgelassen:
 # models/frozen_heuristics/v2huelle_generator/golden_probe/manifest_probe_*.json.
