@@ -50,7 +50,8 @@ from neural_net import (  # einseitig, siehe Modulkopf
     VALUE_SCALE,
     VALUE_SCHEMA_VERSION,
     VALUE_TARGET_VARIANTS,
-    WDL_GENERATOR_PREFIXES,
+    LEGACY_STRETCHED_PREFIXES,
+    V20_CARRIER_SHORTCUT_PREFIXES,
     _IGNORE_PTV,
     _conjunctions_from_dome,
     _ownership_from_dome,
@@ -76,24 +77,29 @@ def _cache_f32_active() -> bool:
     return os.environ.get("MOSAIC_CACHE_F32") == "1"
 
 
-def _is_policy_carrier(basename, carrier_set, carrier_prefixes, bootstrap_native):
+def _is_policy_carrier(basename, carrier_set, carrier_prefixes, v20_wdl_generator):
     """Entscheidet, ob eine Self-Play-Datei Policy-Ziele traegt (pol_w>0-Vorfrage).
 
     Schema 17 (v20) hatte hier einen Kurzschluss: JEDE Datei eines
-    WDL-Generators (`bootstrap_native`) trug automatisch Policy, egal ob sie
-    im Manifest gelistet war -- fuer v20 harmlos (dort SOLLTEN alle
-    v19wdl-Sockel-Dateien tragen), fuer v21 falsch (nur ein Teilsatz der
-    v19wdl-Dateien soll Traeger sein). `bootstrap_native` bleibt fuer die
-    Platt-Entstauchung (siehe Aufrufer, `not bootstrap_native`) unangetastet
-    -- diese Funktion regelt NUR die Policy-Traeger-Frage.
+    WDL-Generators trug automatisch Policy, egal ob sie im Manifest gelistet
+    war -- fuer v20 harmlos (dort SOLLTEN alle v19wdl-Sockel-Dateien tragen),
+    fuer v21 falsch (nur ein Teilsatz der v19wdl-Dateien soll Traeger sein).
+
+    `v20_wdl_generator` traegt genau diesen eingefrorenen Kurzschluss und
+    kommt aus `V20_CARRIER_SHORTCUT_PREFIXES`. Bis 2026-08-27 war das
+    dieselbe Groesse wie das Entstauchungs-Flag `bootstrap_native`; seit der
+    Semantik-Umkehr dort (nativ ist Default, siehe
+    `LEGACY_STRETCHED_PREFIXES`) sind es ZWEI Fragen mit zwei Konstanten.
+    Wer sie wieder zusammenlegt, macht mit dem umgedrehten Flag still ALLE
+    Dateien zu Policy-Traegern.
 
     - `carrier_set is None` (kein Manifest gefunden): JEDE Datei traegt
       (Bestandsverhalten, manifest-unabhaengig).
     - `carrier_prefixes is None` (Manifest OHNE das neue Feld = v20-Schema):
-      Alt-Verhalten EXAKT erhalten, inkl. `bootstrap_native`-Kurzschluss --
+      Alt-Verhalten EXAKT erhalten, inkl. WDL-Generator-Kurzschluss --
       Rueckwaerts-Kompatibilitaet/bit-identische v20-Caches sind Pflicht.
     - `carrier_prefixes` vorhanden (auch als leere Liste; v21+-Schema): der
-      `bootstrap_native`-Kurzschluss wird NICHT mehr benutzt. Traeger ist nur,
+      Kurzschluss wird NICHT mehr benutzt. Traeger ist nur,
       wer im `carrier_set` gelistet ist ODER dessen Basename mit einem der
       Praefixe beginnt (str.startswith -- "selfplay_v20wdl_" matcht NICHT
       "selfplay_v20wdlsw_...", der Unterstrich ist Teil des Praefixes).
@@ -101,7 +107,7 @@ def _is_policy_carrier(basename, carrier_set, carrier_prefixes, bootstrap_native
     if carrier_set is None:
         return True
     if carrier_prefixes is None:
-        return bootstrap_native or basename in carrier_set
+        return v20_wdl_generator or basename in carrier_set
     return basename in carrier_set or basename.startswith(tuple(carrier_prefixes))
 
 
@@ -387,6 +393,19 @@ class MosaicDataset(Dataset):
             str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
             + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)
             + "+rounds_v1+own_v1"
+            # "+bsnative_default_v1" (2026-08-27, PREREG_heuristic_v2_long_rows.md
+            # par.3b.3 Punkt 3): der bootstrap_native-Status ist eine
+            # ZIELDEFINITION je Datei -- er entscheidet, ob `values_wdl` den
+            # rohen oder den Platt-entstauchten Bootstrap eingeblendet
+            # bekommt, und das passiert VOR dem Caching (gleiche Falle wie
+            # TD_LAMBDA und value_target_variant oben). Die Umkehr auf
+            # "nativ ist Default" aendert diesen Status fuer JEDE Datei
+            # ausserhalb von LEGACY_STRETCHED_PREFIXES; ohne diesen Marker
+            # wuerde ein v22-Lauf still den Bestandscache mit den
+            # ENTSTAUCHTEN hv2-Zielen weiterbenutzen. Die Blockliste steht
+            # mit im Marker, damit auch eine spaetere Aenderung an IHR den
+            # Cache entwertet.
+            + "+bsnative_default_v1:" + ",".join(sorted(LEGACY_STRETCHED_PREFIXES))
         )
         if policy_carrier_set is not None:
             cache_key_material += "+carriers:" + ",".join(sorted(policy_carrier_set))
@@ -694,12 +713,16 @@ class MosaicDataset(Dataset):
             planes_l = [] if self.encoder == "2d" else None
 
             for f in files:
-                # Schema 17 (v20-Aera): stammt die Datei von einem
-                # WDL-Generator, ist `bootstrap_value` eine NATIVE
-                # [0,1]-Gewinnwahrscheinlichkeit; Alt-Generatoren (tanh-Kopf)
-                # liefern eine gestauchte Marge, die unten Platt-entstaucht
-                # wird (Audit Befund 1 + Erosions-Arm-B-Ergebnis).
-                bootstrap_native = os.path.basename(f).startswith(WDL_GENERATOR_PREFIXES)
+                # `bootstrap_value` ist eine NATIVE [0,1]-Gewinnwahrschein-
+                # lichkeit -- das ist seit 2026-08-27 der DEFAULT. Nur die
+                # tanh-Aera-Praefixe der Blockliste liefern eine gestauchte
+                # Marge, die unten Platt-entstaucht wird (Begruendung der
+                # Umkehr an `LEGACY_STRETCHED_PREFIXES` in neural_net.py).
+                bootstrap_native = not os.path.basename(f).startswith(LEGACY_STRETCHED_PREFIXES)
+                # ZWEITE, unabhaengige Frage: der eingefrorene v20-Traeger-
+                # Kurzschluss (siehe `_is_policy_carrier`). Eigene Konstante,
+                # damit die Umkehr oben ihn nicht mitdreht.
+                v20_wdl_generator = os.path.basename(f).startswith(V20_CARRIER_SHORTCUT_PREFIXES)
                 # Policy-Traeger-Regel (siehe pol_w-Kommentar unten und
                 # `_is_policy_carrier`-Doku oben): ohne Manifest traegt jede
                 # Datei Policy (Bestandsverhalten); mit v20-Manifest (kein
@@ -707,9 +730,9 @@ class MosaicDataset(Dataset):
                 # Alt-Dateien (Alt-Verhalten, Rueckwaerts-kompatibel); mit
                 # v21-Manifest (`carrier_prefixes` gesetzt) nur die
                 # gelisteten Dateien plus explizite Praefix-Treffer -- der
-                # bootstrap_native-Kurzschluss greift dann NICHT mehr.
+                # v20-Kurzschluss greift dann NICHT mehr.
                 file_policy_carrier = _is_policy_carrier(
-                    os.path.basename(f), policy_carrier_set, carrier_prefixes, bootstrap_native)
+                    os.path.basename(f), policy_carrier_set, carrier_prefixes, v20_wdl_generator)
                 with open(f, "rb") as file:
                     # corpus_io: erkennt gzip am INHALT (Magic-Bytes), nicht an
                     # der Endung -- Bestandsdateien und komprimierte liegen
@@ -910,9 +933,11 @@ class MosaicDataset(Dataset):
                                 wdl_outcome_val = 1.0 if int(step["winner"]) == p else 0.0
                                 value_wdl = wdl_outcome_val
                                 if bv is not None:
-                                    # Schema 17: Alt-Generator-Bootstrap wird
-                                    # entstaucht, WDL-nativer bleibt roh
-                                    # (siehe VALUE_SCHEMA_VERSION-Kommentar).
+                                    # Nativ ist der DEFAULT (2026-08-27):
+                                    # entstaucht wird nur der tanh-Aera-
+                                    # Bootstrap der Blockliste, alles andere
+                                    # bleibt roh (siehe
+                                    # `LEGACY_STRETCHED_PREFIXES`).
                                     bvp = float(bv[p])
                                     if not bootstrap_native:
                                         bvp = _destretch_prob(bvp)

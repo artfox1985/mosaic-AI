@@ -5,10 +5,11 @@ Frage: unterbewertet die v21-Bootstrap-Haelfte der Value-Ziele den
 Spaltenfortschritt? Reine Datenpassage ueber den fertigen Korpus, keine
 Engine, kein Netz -- gelesen werden nur gespeicherte Record-Felder.
 
-Vorab festgelegte Lesart (par.3b.3, Zeile 1089-1099): je Record mit
-gespeichertem Bootstrap das Residuum `realisierter Ausgang minus Bootstrap`
-auf der Gewinnskala [0,1] des ziehenden Spielers bilden, nach dem
-Spaltenfortschritt der EIGENEN Seite binnen (`col_f_max`-Maximum, Bins
+Vorab festgelegte Lesart (par.3b.3, in der BERICHTIGTEN Fassung "Nachtrag
+Stufe 0" vom 2026-08-27): je Record mit gespeichertem Bootstrap das Residuum
+`realisierter Ausgang minus Bootstrap` auf der Gewinnskala [0,1] des
+ziehenden Spielers bilden, nach dem Spaltenfortschritt der EIGENEN Seite
+binnen (Maximum des GEBAUTEN Fuellstands `col_fill`, Bins
 0-2 / 3 / 4 / 5 / 6) und je Bin n, mittleres Residuum und Block-SE auf
 DATEI-Ebene ausweisen. **Daempfung bestaetigt**, wenn das mittlere Residuum
 ueber die Bins monoton waechst UND im obersten Bin ueber +0,05 liegt; dann
@@ -29,38 +30,37 @@ Feld-Herkunft, alles in dieser Sitzung am Code geprueft:
   `p` (corpus_dataset.py:910). Ein Record zaehlt nur, wenn
   `record.get("completed", True) is not False` (Audit-F2, corpus_dataset.py:802):
   Rust stempelt `scores`/`winner` auch bei Timeout-Abbruch.
-* Spaltenfortschritt -- `state["players"][p]["col_f_max"]`, Sechserliste
-  (neural_net.py:288-292 liest dasselbe Feld). ACHTUNG bei der Lesart:
-  `col_f_max` ist die ERREICHBARE Spaltenfuellung, "Fuellstand + noch
-  bedienbare leere Zellen je Spalte, gedeckelt bei 6"
-  (serialize.rs:232-234, `plate_builder::achievable_column_fill`) -- der Wert
-  startet bei 6 und faellt monoton, er waechst nicht mit dem Bau. Bin 6 heisst
-  also "eine volle Spalte ist noch erreichbar", nicht "sechs Zellen liegen".
-  Der Bin haengt dadurch mit der Runde zusammen; die Rundentabelle unten ist
-  genau dafuer da (ohne Torfunktion).
+* Spaltenfortschritt (TOR) -- `state["players"][p]["score_geo"]["col_fill"]`,
+  Sechserliste, der GEBAUTE Fuellstand je Spalte (serialize.rs:200). Sein
+  Maximum ist das Binnungsfeld der berichtigten Registrierung.
 
-**Zwei Binnungen, eine davon getort.** Getort wird nach dem Wortlaut der
-Registrierung auf `col_f_max`. Gemessen am Smoke faellt dabei fast alles in
-Bin 6 (4373 von 4386 Records, 3 Dateien) -- die erreichbare Fuellung bleibt
-fast die ganze Partie bei 6, die Bins 0-2/3/4 bleiben leer und die Tabelle
-hat kaum Aufloesung. Der GEBAUTE Fuellstand steht daneben im selben Zustand:
-`state["players"][p]["score_geo"]["col_fill"]` (serialize.rs:200), und dessen
-Maximum belegt alle fuenf Bins (Smoke: 309/186/315/145/298/145/61 auf 0..6).
-Beide Tabellen laufen deshalb mit; `col_fill` ist ZUSATZ OHNE TORFUNKTION,
-solange die Registrierung `col_f_max` nennt. Ob der Prereg-Text die
-erreichbare oder die gebaute Fuellung meinte, entscheidet der Koordinator --
-diese Sonde entscheidet es nicht still.
+**Zwei Binnungen, eine davon getort -- die Zuordnung ist am 2026-08-27
+GEWECHSELT.** Die Erstfassung der Registrierung nannte `col_f_max`; der
+Sondenbau hat gezeigt, dass das die ERREICHBARE Fuellung ist, "Fuellstand +
+noch bedienbare leere Zellen je Spalte, gedeckelt bei 6"
+(serialize.rs:232-234, `plate_builder::achievable_column_fill`) -- der Wert
+startet bei 6 und FAELLT, er waechst nicht mit dem Bau. Als Fortschritts-Bin
+hatte er fast keine Aufloesung (Smoke: 4373 von 4386 Records in Bin 6). Der
+Nutzer hat daraufhin auf den GEBAUTEN Fuellstand berichtigt (par.3b.3,
+"Nachtrag Stufe 0" Punkt 1): getort wird auf `max(score_geo.col_fill)`, Bins
+unveraendert; die `col_f_max`-Tabelle laeuft als ZUSATZ OHNE TORFUNKTION mit
+(sie bleibt lesenswert, weil ihr Bin mit der Runde zusammenhaengt -- dafuer
+ist auch die Rundentabelle unten da).
 
-**Zwei Skalen, beide ausgewiesen.** Der Trainingspfad blendet nicht den rohen
-Wert: fuer Dateien, deren Basename nicht mit `WDL_GENERATOR_PREFIXES`
-("selfplay_v19wdl", "selfplay_v20wdl", neural_net.py:759) beginnt, laeuft
-`bvp` zuerst durch die Platt-Entstauchung `_destretch_prob`
-(corpus_dataset.py:702 setzt `bootstrap_native`, :917-919 wendet sie an).
-`selfplay_hv2_*` faellt NICHT unter die Praefixe, im v22-Ziel steht also der
-entstauchte Wert. Getort wird nach dem Wortlaut der Registrierung auf dem
-GESPEICHERTEN (rohen) Bootstrap; die entstauchte Tabelle laeuft als zweite
-Skala mit, und beide Verdikte stehen im Artefakt. Eine stille Skalenmischung
-waere genau der Fehler, den diese Sonde suchen soll.
+**Eine Zielskala, plus eine Vergleichsspalte.** Seit dem Umbau vom
+2026-08-27 (par.3b.3 "Nachtrag Stufe 0" Punkt 3) ist NATIV der Default: der
+Trainingspfad blendet den ROHEN gespeicherten `bootstrap_value` in
+`values_wdl`, und entstaucht nur noch Dateien der Blockliste
+`LEGACY_STRETCHED_PREFIXES` (tanh-Aera v10b/v12/v16/v17/v18,
+neural_net.py). `selfplay_hv2_*` steht nicht darin -- **fuer diesen Korpus
+sind ziel-aequivalente und rohe Skala also dasselbe**, und der Punkt 2 der
+Berichtigung ("torte auf der ziel-aequivalenten Skala") ist damit
+gegenstandslos vereinfacht.
+
+Die entstauchte Tabelle laeuft weiter mit, aber NUR noch als klar etikettierte
+Vergleichsspalte "so haette der ALTE Pfad geblendet" -- sie zeigt, wie gross
+der behobene Fehler in dieser Auswertung gewesen waere. Sie hat keine
+Torfunktion.
 
 Aufruf (voller Lauf, exklusiv):
     python -u tools/probes/bootstrap_plate_damping_probe.py
@@ -88,14 +88,15 @@ PREREG = "PREREG_heuristic_v2_long_rows.md par.3b.3 (Stufe 0)"
 BIN_LABELS = ("0-2", "3", "4", "5", "6")
 # Vorregistrierte Schwelle fuer den obersten Bin.
 TOP_BIN_THRESHOLD = 0.05
-# Binnungs-Felder: das REGISTRIERTE zuerst, das Zusatzfeld ohne Torfunktion
-# dahinter (siehe Modul-Doku "Zwei Binnungen").
-GATING_FIELD = "col_f_max"
-EXTRA_FIELD = "col_fill"
+# Binnungs-Felder: das REGISTRIERTE (berichtigte) zuerst, das Zusatzfeld ohne
+# Torfunktion dahinter (siehe Modul-Doku "Zwei Binnungen").
+GATING_FIELD = "col_fill"
+EXTRA_FIELD = "col_f_max"
 
-# Platt-Entstauchung, identisch zu corpus_dataset._destretch_prob
-# (Konstanten aus neural_net.py:760-761). Hier nachgebaut statt importiert,
-# damit die Sonde ohne torch/h5py-Abhaengigkeit laeuft.
+# Platt-Entstauchung, identisch zu corpus_dataset._destretch_prob. Sie ist
+# fuer diesen Korpus ALT-MECHANIK (hv2 ist nativ, siehe Modul-Doku) und
+# liefert hier nur noch die Vergleichsspalte. Hier nachgebaut statt
+# importiert, damit die Sonde ohne torch/h5py-Abhaengigkeit laeuft.
 DESTRETCH_A = 0.0051
 DESTRETCH_B = 1.9269
 
@@ -116,8 +117,13 @@ def column_progress_bin(values) -> str:
 
 
 def column_values(player_state, field):
-    """Sechserliste je Binnungs-Feld, oder None wenn sie im Zustand fehlt."""
-    if field == GATING_FIELD:
+    """Sechserliste je Binnungs-Feld, oder None wenn sie im Zustand fehlt.
+
+    Auf den FELDNAMEN geprueft, nicht auf `field == GATING_FIELD`: sonst
+    wandert die Feld-Herkunft mit, sobald das Tor auf das andere Feld
+    wechselt -- genau das ist am 2026-08-27 passiert.
+    """
+    if field == "col_f_max":
         return player_state.get("col_f_max") or None
     return (player_state.get("score_geo") or {}).get("col_fill") or None
 
@@ -244,7 +250,11 @@ def main():
     round_totals = {}   # Runde -> [sum, n], eigene Seite, rohe Skala
     counters = {"records": 0, "mit_bootstrap": 0, "gewertet": 0,
                 "ohne_bootstrap": 0, "abgebrochen": 0, "ohne_winner": 0,
-                "ohne_col_f_max": 0, "player_abweichung": 0, "unentschieden": 0}
+                # nach dem TOR-Feld benannt (seit 2026-08-27 col_fill); der
+                # Zaehler fuer das Zusatzfeld fehlte bisher ganz und haette
+                # beim ersten Treffer einen KeyError geworfen.
+                f"ohne_{GATING_FIELD}": 0, f"ohne_{EXTRA_FIELD}": 0,
+                "player_abweichung": 0, "unentschieden": 0}
 
     for index, path in enumerate(paths, 1):
         for record in load_records(path):
@@ -279,7 +289,7 @@ def main():
             players = state.get("players") or []
             if len(players) < 2 or column_values(players[mover], GATING_FIELD) is None \
                     or column_values(players[1 - mover], GATING_FIELD) is None:
-                counters["ohne_col_f_max"] += 1
+                counters[f"ohne_{GATING_FIELD}"] += 1
                 continue
 
             counters["gewertet"] += 1
@@ -293,7 +303,7 @@ def main():
                     values = column_values(players[player_index], field)
                     if values is None:
                         if side == "eigen" and field == EXTRA_FIELD:
-                            counters["ohne_col_fill"] += 1
+                            counters[f"ohne_{EXTRA_FIELD}"] += 1
                         continue
                     bin_label = column_progress_bin(values)
                     for scale, residual in residuals.items():
@@ -309,18 +319,30 @@ def main():
             print(f"  {index}/{len(paths)} Dateien, {counters['gewertet']} Records "
                   f"gewertet, {elapsed:.0f} s", flush=True)
 
-    tables = {side: {scale: acc.table(side, scale) for scale in ("roh", "entstaucht")}
+    # Die Sammlung laeuft je (Seite, FELD, Skala) -- der Akkumulator wollte
+    # das immer schon (`table(side, field, scale)`), nur der Aufruf hier hat
+    # das Feld unterschlagen (TypeError). Beide Felder werden ausgewiesen,
+    # getort wird GATING_FIELD.
+    tables = {side: {field: {scale: acc.table(side, field, scale)
+                             for scale in ("roh", "entstaucht")}
+                     for field in (GATING_FIELD, EXTRA_FIELD)}
               for side in ("eigen", "gegner")}
-    verdict = verdict_from_table(tables["eigen"]["roh"])
-    verdict_destretched = verdict_from_table(tables["eigen"]["entstaucht"])
-    sanity_opponent = verdict_from_table(tables["gegner"]["roh"])
+    verdict = verdict_from_table(tables["eigen"][GATING_FIELD]["roh"])
+    verdict_destretched = verdict_from_table(tables["eigen"][GATING_FIELD]["entstaucht"])
+    sanity_opponent = verdict_from_table(tables["gegner"][GATING_FIELD]["roh"])
 
-    print_table("EIGENE Seite, roher gespeicherter Bootstrap (TOR-Tabelle)",
-                tables["eigen"]["roh"])
-    print_table("EIGENE Seite, entstaucht (Skala des Trainingsziels, KEIN Tor)",
-                tables["eigen"]["entstaucht"])
-    print_table("GEGNER-Seite, roh (Sanity: Daempfung sollte seitensymmetrisch sein)",
-                tables["gegner"]["roh"])
+    print_table(f"EIGENE Seite, Bin={GATING_FIELD}, roher Bootstrap "
+                "(TOR-Tabelle; roh == Zielskala, hv2 ist nativ)",
+                tables["eigen"][GATING_FIELD]["roh"])
+    print_table(f"EIGENE Seite, Bin={GATING_FIELD}, entstaucht "
+                "(VERGLEICH: so haette der ALTE Pfad geblendet, KEIN Tor)",
+                tables["eigen"][GATING_FIELD]["entstaucht"])
+    print_table(f"EIGENE Seite, Bin={EXTRA_FIELD}, roh "
+                "(Zusatzfeld ohne Torfunktion, siehe Modul-Doku)",
+                tables["eigen"][EXTRA_FIELD]["roh"])
+    print_table(f"GEGNER-Seite, Bin={GATING_FIELD}, roh "
+                "(Sanity: Daempfung sollte seitensymmetrisch sein)",
+                tables["gegner"][GATING_FIELD]["roh"])
 
     round_rows = [{"runde": r, "n": n, "mittel_residuum": total / n}
                   for r, (total, n) in sorted(round_totals.items()) if n]
@@ -328,12 +350,14 @@ def main():
     for row in round_rows:
         print(f"  Runde {row['runde']}: n {row['n']:6d}  Mittel {row['mittel_residuum']:+.4f}")
 
-    print(f"\nVERDIKT (par.3b.3, rohe Skala): {verdict['verdikt']}")
+    print(f"\nVERDIKT (par.3b.3, Bin={GATING_FIELD}, Zielskala = Rohwert): "
+          f"{verdict['verdikt']}")
     print(f"  monoton: {verdict['monoton']}   oberster Bin {verdict['oberster_bin']}: "
           f"{verdict['oberster_bin_mittel']:+.4f} (Schwelle +{TOP_BIN_THRESHOLD})")
     if verdict["grenzfall"]:
         print(f"  GRENZFALL: {verdict['grenzfall_grund']}")
-    print(f"  Zweitskala (entstaucht): {verdict_destretched['verdikt']}")
+    print(f"  Vergleich (Alt-Pfad, entstaucht -- KEIN Tor): "
+          f"{verdict_destretched['verdikt']}")
 
     wall = time.time() - wall_start
     cpu = time.process_time() - cpu_start
@@ -343,22 +367,29 @@ def main():
                    "dateien": len(paths), "limit": args.limit},
         "skalen": {
             "bootstrap_roh": "record['bootstrap_value'][p], bereits [0,1]-Gewinnwahrscheinlichkeit "
-                             "(corpus_dataset.py:900-902)",
+                             "-- seit dem Umbau vom 2026-08-27 zugleich die ZIELSKALA: nativ ist "
+                             "der Default, entstaucht wird nur LEGACY_STRETCHED_PREFIXES "
+                             "(v10b/v12/v16/v17/v18), und selfplay_hv2_* steht nicht darin",
             "bootstrap_entstaucht": "destretch_prob(bootstrap_roh), Platt A=0,0051 B=1,9269 -- "
-                                    "der Trainingspfad wendet das auf selfplay_hv2_* AN, weil der "
-                                    "Basename nicht unter WDL_GENERATOR_PREFIXES faellt "
-                                    "(corpus_dataset.py:702/917-919, neural_net.py:759)",
+                                    "VERGLEICHSSPALTE ohne Torfunktion: so haette der ALTE Pfad "
+                                    "(Entstauchung als Default) diesen Korpus geblendet",
             "ausgang": "1/0 aus Sicht des ziehenden Spielers record['player'] "
-                       "(corpus_dataset.py:804/910)",
+                       "(corpus_dataset.py, WDL-Zweig)",
             "residuum": "Ausgang minus Bootstrap, beides auf der Gewinnskala [0,1]",
-            "bin": "max(state['players'][p]['col_f_max']) -- ERREICHBARE Spaltenfuellung "
-                   "(serialize.rs:232-234), faellt ueber die Partie, startet bei 6",
+            "bin_tor": "max(state['players'][p]['score_geo']['col_fill']) -- GEBAUTER "
+                       "Spaltenfuellstand (serialize.rs:200), Binnungsfeld der berichtigten "
+                       "Registrierung",
+            "bin_zusatz": "max(state['players'][p]['col_f_max']) -- ERREICHBARE Spaltenfuellung "
+                          "(serialize.rs:232-234), faellt ueber die Partie, startet bei 6; "
+                          "OHNE Torfunktion",
         },
+        "tor_feld": GATING_FIELD,
+        "zusatz_feld": EXTRA_FIELD,
         "zaehler": counters,
         "tabellen": tables,
         "runden_eigen_roh": round_rows,
         "verdikt": verdict,
-        "verdikt_entstaucht": verdict_destretched,
+        "vergleich_altpfad_entstaucht": verdict_destretched,
         "sanity_gegner_roh": sanity_opponent,
         "laufzeit": {"wanduhr_s": round(wall, 1), "cpu_s": round(cpu, 1), "threads": 1,
                      "s_je_datei": round(wall / max(1, len(paths)), 3)},

@@ -1146,6 +1146,21 @@ und EINEN im Zielbau selbst.
    (entstaucht) fixiert. Nach dem Fix ist Punkt 2 gegenstandslos vereinfacht:
    Zielskala = Rohwert.
 
+   **GEBAUT UND ABGENOMMEN 2026-08-27, noch am selben Tag.** Konstante
+   heisst jetzt `LEGACY_STRETCHED_PREFIXES` (fuenf tanh-Aera-Praefixe:
+   v10b/v12/v16/v17/v18, Inventur ueber data/, holdout/ und das
+   v20-Traeger-Manifest); der v20-Traeger-Kurzschluss bekam eine EIGENE
+   eingefrorene Konstante (`V20_CARRIER_SHORTCUT_PREFIXES`), weil die alte
+   Liste ZWEI Aufgaben hatte und die Umkehr ihn sonst still mitgedreht
+   haette. Beide Cache-Schluessel tragen den Status. Abnahme:
+   `tools/probes/bootstrap_native_default_probe.py` GRUEN (Blend unabhaengig
+   nachgerechnet, nativ=roh und alt=entstaucht auf 1733 Records, Delta der
+   beiden Welten bis 0,0715, per-Datei-Schluessel trennt); vom Koordinator
+   selbst nachgefahren. Die Sonde dieser Stufe laeuft seither auf
+   `col_fill`-Tor und Rohskala (Punkte 1 und 2 umgesetzt); dabei zwei
+   latente Fehler der Erstfassung behoben (Signatur-Absturz am Laufende,
+   nie initialisierter Zaehler).
+
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
 `plate_builder::v2_chip_vorzug`: vollendet per Bonuschip die Musterreihe, die
