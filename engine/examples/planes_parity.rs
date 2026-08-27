@@ -2,7 +2,7 @@
 //! `features::state_to_planes_direct` gegen `neural_net.py::state_to_planes`.
 //! Liest eine JSON-Datei mit einer LISTE von State-Dicts (`state_to_json`-
 //! Format, z.B. aus `evaluations/frozen_eval_set.pkl` extrahiert), berechnet
-//! je Zustand den `[76,6,6]`-Planes-Puffer (C-Major, wie `net.rs` ihn
+//! je Zustand den `[NUM_PLANES_CHANNELS,6,6]`-Planes-Puffer (C-Major, wie `net.rs` ihn
 //! erwartet) und schreibt ihn als EINE Zeile Leerzeichen-getrennter Floats
 //! (feste Präzision) pro Zustand nach stdout -- die Python-Seite vergleicht
 //! das Zeile für Zeile gegen `state_to_planes(state).flatten()`.
@@ -12,7 +12,7 @@
 //!
 //! Aufruf: cargo run --release --example planes_parity -- <states.json>
 
-use mosaic_rust::features::state_to_planes_direct;
+use mosaic_rust::features::{state_to_planes_direct, NUM_PLANES_CHANNELS};
 use mosaic_rust::serialize::json_to_state;
 use rand::rngs::StdRng;
 use rand::SeedableRng;
@@ -37,7 +37,15 @@ fn main() {
         let state = json_to_state(v, &mut rng)
             .unwrap_or_else(|e| panic!("json_to_state fehlgeschlagen bei Zustand {i}: {e}"));
         let planes = state_to_planes_direct(&state);
-        assert_eq!(planes.len(), 76 * 6 * 6, "Zustand {i}: falsche Planes-Laenge");
+        // Aus der KONSTANTE, nicht als Literal: der Block waechst additiv
+        // (76 -> 77 -> 79), und ein Literal hier war nach dem 77er-Schritt
+        // still falsch -- die Beispiel-Binary haette beim naechsten Lauf
+        // gepanickt, ohne dass die Suite es je gemerkt haette.
+        assert_eq!(
+            planes.len(),
+            NUM_PLANES_CHANNELS * 6 * 6,
+            "Zustand {i}: falsche Planes-Laenge"
+        );
         let line: Vec<String> = planes.iter().map(|x| format!("{x:.8}")).collect();
         println!("{}", line.join(" "));
     }

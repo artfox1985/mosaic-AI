@@ -347,7 +347,26 @@ _GEOM = _build_geometry_masks()
 #   Geometrie roh:     19 (6 Zeilen + 6 Spalten + 2 Diagonalen + 1 Rand + 4 Ecken)
 #   Geometrie gegatet: 25 (6 Zeilen@Tile0 + 6 Zeilen@Tile7 + 6 Spalten@Tile1
 #                          + 2 Diagonalen@Tile2 + 1 Rand@Tile4 + 4 Ecken@Tile5)
-NUM_PLANES_CHANNELS = 2 * 16 + 19 + 25 + 1  # = 77 (+1 Erreichbarkeit)
+#   Erreichbarkeit:     1 (Kanal 76, ziehender Spieler)
+#   Spezialfeld:        2 (Kanal 77 Ertrag 1..6, Kanal 78 Abstand 0..3,
+#                          PREREG_special_tile_yield.md par.4a)
+NUM_PLANES_CHANNELS = 2 * 16 + 19 + 25 + 1 + 2  # = 79
+
+# Wieviele der Kanaele STRIKT BINAER (0/1) sind -- die Grenze, an der das
+# Bitpacking des Korpus-Caches endet.
+#
+# WARUM DAS EINE EIGENE ZAHL BRAUCHT: `corpus_dataset.py::_pack_bits` schiebt
+# die planes durch `np.packbits`, und das interpretiert JEDEN Wert != 0 als
+# gesetztes Bit. Die zwei Spezialfeld-Kanaele tragen 1..6 bzw. 0..3 -- ohne
+# diese Grenze waeren sie im Cache stillschweigend auf 0/1 plattgedrueckt,
+# ohne Fehlermeldung, und das Netz haette "irgendein Spezialfeld" statt
+# "Ertrag 6, noch zwei Felder offen" gelernt. Die nicht-binaeren Kanaele
+# werden deshalb ROH (uint8) hinter den gepackten Block gehaengt, siehe
+# `unpack_planes_batch` unten und `corpus_dataset.py::_pack_planes`.
+#
+# Regel fuer kuenftige Kanaele: binaere Ebenen kommen VOR diese Grenze,
+# wertetragende dahinter -- sonst bricht die Zerlegung.
+NUM_BINARY_PLANES_CHANNELS = 2 * 16 + 19 + 25 + 1  # = 77
 
 
 def _board_channels(dome_grid) -> torch.Tensor:
@@ -385,7 +404,7 @@ def _board_channels(dome_grid) -> torch.Tensor:
 
 def state_to_planes(data) -> torch.Tensor:
     """2D-Gegenstück zu `state_to_tensor` (Task #11 Phase 1) -- Format
-    [C,6,6], C=NUM_PLANES_CHANNELS=77. ADDITIV: `state_to_tensor` bleibt
+    [C,6,6], C=NUM_PLANES_CHANNELS=79. ADDITIV: `state_to_tensor` bleibt
     unverändert, dies ist ein PARALLELER Zweig für den geplanten
     Conv-Encoder (siehe docs/design_2d_encoder.md). Ego-Perspektive wie
     überall sonst: erst der Spieler am Zug, dann der Gegner."""
@@ -422,14 +441,47 @@ def state_to_planes(data) -> torch.Tensor:
     # (Bit r*6+c), nicht gerechnet -- die Formel steht einmal in
     # column_build::cell_is_completable und wird in serialize_player
     # ausgewertet. Fehlt das Feld (alte Schnappschuesse), bleibt die Ebene 0.
-    _maske = int(players[curr_pi].get("cell_reachable_mask", 0))
+    _mask = int(players[curr_pi].get("cell_reachable_mask", 0))
     _reach = torch.zeros(1, 6, 6)
     for _r in range(6):
         for _c in range(6):
-            if _maske >> (_r * 6 + _c) & 1:
+            if _mask >> (_r * 6 + _c) & 1:
                 _reach[0, _r, _c] = 1.0
 
-    return torch.cat([board, raw_geom, gated, _reach], dim=0)  # [77,6,6]
+    # Kanaele 77/78 (PREREG_special_tile_yield.md par.4a), NUR ziehender
+    # Spieler, spiegelbildlich zu `features.rs::write_special_tile_channels_direct`:
+    #   [0] ausstehender Ertrag  = pattern_row + 1 = r + 1 (1..6) auf einem
+    #       noch UNGEFUELLTEN SPECIAL-Feld (Punktformel round_end.rs:361-362),
+    #   [1] Abstand zur Ausloesung = Zahl der noch ungefuellten
+    #       Nicht-SPECIAL-Felder desselben Slots (0..3; WILD zaehlt als
+    #       Nicht-SPECIAL, Freischaltbedingung dome.rs::try_unlock_special).
+    # Alles Uebrige 0; ein Ertrag > 0 unterscheidet "Abstand 0" von
+    # "kein Spezialfeld". GERECHNET aus `dome_grid`, nicht aus einem neuen
+    # serialisierten Feld gelesen -- so wirken die Kanaele rueckwirkend auf
+    # dem gesamten Bestandskorpus. KEINE Normalisierung: die Skalierung
+    # lernt das Netz.
+    _special = torch.zeros(2, 6, 6)
+    for _sr in range(3):
+        _row = me_grid[_sr] if _sr < len(me_grid) else []
+        for _sc in range(3):
+            _slot = _row[_sc] if _sc < len(_row) else None
+            if _slot is None:
+                continue
+            _spaces = _slot.get("spaces", [{}, {}, {}, {}])
+            _open_others = sum(
+                1 for _sp in _spaces
+                if _sp.get("type", "NORMAL") != "SPECIAL" and _sp.get("filled") is None
+            )
+            for _si in range(4):
+                _sp = _spaces[_si] if _si < len(_spaces) else {}
+                if _sp.get("type", "NORMAL") != "SPECIAL" or _sp.get("filled") is not None:
+                    continue
+                _r = _sr * 2 + _si // 2
+                _c = _sc * 2 + _si % 2
+                _special[0, _r, _c] = float(_r + 1)
+                _special[1, _r, _c] = float(_open_others)
+
+    return torch.cat([board, raw_geom, gated, _reach, _special], dim=0)  # [79,6,6]
 
 
 MAX_PENDING_STACK_TILES = 4  # muss zu features.rs::MAX_PENDING_STACK_TILES passen
@@ -1021,15 +1073,34 @@ def _conjunctions_from_dome(dome_grid) -> list[int]:
 # `.to(device)`-Move (siehe `unpack_planes_batch`/`unpack_masks_batch` unten,
 # Aufrufstellen in train.py). Ergebnis: 0% messbarer Overhead (eher ein
 # kleiner Gewinn) statt der geforderten "hoechstens ~1-2%".
+# Byte-Grenzen der gepackten Planes-Zeile (siehe NUM_BINARY_PLANES_CHANNELS):
+#   [0 .. PLANES_PACKED_BINARY_BYTES)  = die 77 binaeren Kanaele, bitgepackt
+#   [PLANES_PACKED_BINARY_BYTES .. )   = die wertetragenden Kanaele, ROH uint8
+PLANES_BINARY_BITS = NUM_BINARY_PLANES_CHANNELS * 36          # 2772
+PLANES_PACKED_BINARY_BYTES = (PLANES_BINARY_BITS + 7) // 8    # 347
+PLANES_RAW_VALUE_BYTES = (NUM_PLANES_CHANNELS - NUM_BINARY_PLANES_CHANNELS) * 36  # 72
+PLANES_PACKED_ROW_BYTES = PLANES_PACKED_BINARY_BYTES + PLANES_RAW_VALUE_BYTES     # 419
+
+
 def unpack_planes_batch(packed: torch.Tensor) -> torch.Tensor:
-    """Entpackt einen KOMPLETTEN Batch bitgepackter planes IN EINEM
+    """Entpackt einen KOMPLETTEN Batch gepackter planes IN EINEM
     vektorisierten `np.unpackbits`-Aufruf (gewaehlte Variante b2, siehe
-    Benchmark-Kommentar oben) -- NICHT pro Sample. `packed`: [B,342] uint8
-    (CPU, NOCH VOR dem `.to(device)`-Move, siehe train.py) -> [B,76,6,6]
-    uint8 (0/1), identisch zum unentpackten Bestandsformat vor der
-    Bitpacking-Aenderung."""
+    Benchmark-Kommentar oben) -- NICHT pro Sample. `packed`:
+    [B,PLANES_PACKED_ROW_BYTES] uint8 (CPU, NOCH VOR dem `.to(device)`-Move,
+    siehe train.py) -> [B,NUM_PLANES_CHANNELS,6,6] uint8.
+
+    ZWEITEILIG seit den Spezialfeld-Kanaelen: die ersten
+    `NUM_BINARY_PLANES_CHANNELS` Kanaele sind bitgepackt (0/1), die restlichen
+    tragen Werte > 1 und liegen ROH dahinter. Umkehrfunktion zu
+    `corpus_dataset.py::_pack_planes` -- beide Seiten muessen dieselbe Grenze
+    benutzen, sonst verschiebt sich der gesamte Kanalblock."""
     n = packed.shape[0]
-    flat = np.unpackbits(packed.numpy(), axis=-1, count=NUM_PLANES_CHANNELS * 36)
+    raw = packed.numpy()
+    bits = np.unpackbits(raw[:, :PLANES_PACKED_BINARY_BYTES], axis=-1, count=PLANES_BINARY_BITS)
+    if PLANES_RAW_VALUE_BYTES:
+        flat = np.concatenate([bits, raw[:, PLANES_PACKED_BINARY_BYTES:]], axis=-1)
+    else:
+        flat = bits
     return torch.from_numpy(flat.reshape(n, NUM_PLANES_CHANNELS, 6, 6))
 
 
@@ -1638,7 +1709,17 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
     if encoder == "2d":
         in_size = input_size if input_size is not None else state["flat_branch.0.weight"].shape[1]
         ph = state["policy_head.0.bias"].shape[0] if "policy_head.2.weight" in state else 0
+        # Kanalzahl AUS DEM CHECKPOINT, nicht aus der globalen Konstante
+        # (gleiches Muster wie `in_size` eine Zeile darueber und wie
+        # `export_onnx.py:185`). Ohne diese Ableitung baute der Lader nach
+        # jedem Kanal-Zuwachs ein zu breites Conv und `load_state_dict`
+        # scheiterte an `size mismatch for conv.0.weight` -- ein
+        # 77-Kanal-Checkpoint waere in Python schlagartig unladbar gewesen,
+        # obwohl die Engine ihn ueber `split_planes_flat_batch_src` weiter
+        # bitgleich bedient. Gefunden 2026-08-27 beim Schritt 77 -> 79.
+        pc = state["conv.0.weight"].shape[1]
         model = Mosaic2DNet(input_size=in_size, num_actions=num_actions, hidden_size=hs,
+                            planes_channels=pc,
                             policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
                             endgame_head=eg_head,
                             conjunction_head=cj_head,

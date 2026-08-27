@@ -75,6 +75,13 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
         + "|carrier=" + ("1" if policy_carrier else "0")
         + "|rounds_v1+own_v1"
     )
+    if encoder == "2d":
+        # Die Kanalzahl bestimmt den INHALT jedes Datei-Blocks (Breite des
+        # planes-Datasets UND, seit den Spezialfeld-Kanaelen, das Packlayout).
+        # Sie stand bis 2026-08-27 in KEINER Key-Komponente -- `str(encoder)`
+        # ist nur "2d" und bleibt bei 77 wie bei 79 gleich. Ein 79er-Lauf
+        # haette damit die 77er-Bloecke des Bestands wiederverwendet.
+        material += f"|planes{_nn.NUM_PLANES_CHANNELS}_bin{_nn.NUM_BINARY_PLANES_CHANNELS}"
     if conjunction_head:
         material += "|conj_v2"
         if reach_target_k1_active():

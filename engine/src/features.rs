@@ -785,9 +785,9 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
 //
 // Rust-Zwilling von `neural_net.py::state_to_planes` -- MUSS Kanal für Kanal
 // IDENTISCH sein (siehe Paritätstest `examples/planes_parity.rs`, Toleranz
-// 0). Layout `[C,H,W] = [76,6,6]`, C-Major/NCHW-kontiguierlich (Kanal c,
-// Zeile r, Spalte w liegt bei Index `c*36 + r*6 + w`) -- exakt die Form, in
-// der PyTorch `torch.zeros(1,76,6,6)` beim ONNX-Export linearisiert, und die
+// 0). Layout `[C,H,W] = [NUM_PLANES_CHANNELS,6,6]`, C-Major/NCHW-kontiguierlich
+// (Kanal c, Zeile r, Spalte w liegt bei Index `c*36 + r*6 + w`) -- exakt die
+// Form, in der PyTorch beim ONNX-Export linearisiert, und die
 // `net.rs::InputLayout::Planes`/`PlanesPlusFlat` erwarten.
 //
 // Kanal-Aufteilung (docs/design_2d_encoder.md Abschnitt 3/4, 1:1 aus
@@ -801,9 +801,40 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
 //   51..57 : Zeilen@Tile0-gegated (6)  57..63 : Zeilen@Tile7-gegated (6)
 //   63..69 : Spalten@Tile1-gegated (6) 69..71 : Diagonalen@Tile2-gegated (2)
 //   71..72 : Rand@Tile4-gegated (1)    72..76 : Ecken@Tile5-gegated (4)
-pub const NUM_PLANES_CHANNELS: usize = 77;
+//   76..77 : Erreichbarkeit je Zelle (1, ziehender Spieler)
+//   77..78 : Spezialfeld-Ertrag (1, ziehender Spieler, Werte 0 und 1..6)
+//   78..79 : Abstand zur Ausloesung (1, ziehender Spieler, Werte 0..3)
+//
+// ADDITIVITAETS-REGEL fuer diesen Block: neue Ebenen haengen IMMER hinten an.
+// `net::split_planes_flat_batch_src` kuerzt den Planes-Block auf die
+// MODELL-Breite und liest den Flat-Block ab der QUELL-Grenze
+// (`NUM_PLANES_VALUES`) -- ein Altmodell sieht dadurch seine Ebenen Wert fuer
+// Wert unveraendert, obwohl der Bauer breiter geworden ist.
+pub const NUM_PLANES_CHANNELS: usize = 79;
 const PLANES_H: usize = 6;
 const PLANES_W: usize = 6;
+
+/// Ebene "Erreichbarkeit je Zelle" (ziehender Spieler), 0/1.
+pub const REACHABILITY_CHANNEL: usize = 76;
+
+/// Ebene "ausstehender Spezialfeld-Ertrag" (ziehender Spieler),
+/// `pattern_row + 1` = `r + 1` (1..6) auf einem noch UNGEFUELLTEN
+/// SPECIAL-Feld, sonst 0. Beleg fuer die Punktformel:
+/// `round_end.rs:361-362` (`pattern_row = slot_row * 2 + sp_idx / 2;
+/// bonus = pattern_row + 1`) -- rein geometrisch, identisch zur
+/// Rasterzeile `r` dieses Planes-Layouts.
+pub const SPECIAL_YIELD_CHANNEL: usize = 77;
+
+/// Ebene "Abstand zur Ausloesung" (ziehender Spieler): Zahl der noch
+/// UNGEFUELLTEN Nicht-SPECIAL-Felder desselben Slots (0..3), geschrieben auf
+/// dem ungefuellten SPECIAL-Feld, sonst 0. 0 heisst "freischaltbar bzw.
+/// bereits freigeschaltet". Beleg fuer die Freischaltbedingung:
+/// `dome.rs::try_unlock_special` (die anderen drei Felder muessen gefuellt
+/// sein). WILD-Felder zaehlen als Nicht-SPECIAL-Nachbarn.
+///
+/// Der Ertrags-Kanal disambiguiert: Abstand 0 auf einem echten Spezialfeld
+/// hat dort einen Ertrag > 0, eine Zelle ohne Spezialfeld hat 0 in BEIDEN.
+pub const SPECIAL_UNLOCK_DISTANCE_CHANNEL: usize = 78;
 
 /// Zahl der Werte im Planes-Block, den der Bauer LIEFERT.
 ///
@@ -882,6 +913,50 @@ fn write_board_channels_direct(out: &mut [f32], channel_offset: usize, grid: &cr
                 if sp.is_locked {
                     out[planes_idx(channel_offset + 15, r, w)] = 1.0;
                 }
+            }
+        }
+    }
+}
+
+/// "Gefuellt" EXAKT so, wie das JSON-Feld `filled` es meldet
+/// (`serialize.rs::serialize_space`: `placed_color` zuerst, sonst
+/// `placed_special`, sonst `null`) -- BEWUSST nicht `DomeSpace::is_filled`,
+/// das fuer SPECIAL nur `placed_special` und sonst nur `placed_color`
+/// ansieht. Die zwei Praedikate stimmen im realen Bestand ueberein, aber der
+/// Python-Zwilling liest `filled`, und der Zwilling muss Zelle fuer Zelle
+/// gleich sein -- nicht "gleich, solange keine Invariante kippt".
+fn space_is_filled_like_json(sp: &DomeSpace) -> bool {
+    sp.placed_color.is_some() || sp.placed_special
+}
+
+/// Kanaele [`SPECIAL_YIELD_CHANNEL`]/[`SPECIAL_UNLOCK_DISTANCE_CHANNEL`] fuer
+/// EIN Spielerbrett -- Rust-Zwilling des gleichnamigen Blocks in
+/// `neural_net.py::state_to_planes` (PREREG_special_tile_yield.md par.4a).
+///
+/// GERECHNET, nicht aus einem vorberechneten Feld gelesen (anders als
+/// `col_f_max`/`cell_reachable_mask`): dadurch wirken die zwei Ebenen
+/// rueckwirkend auf dem gesamten Bestandskorpus, dessen Schnappschuesse ein
+/// neues serialisiertes Feld nicht enthalten wuerden.
+fn write_special_tile_channels_direct(out: &mut [f32], grid: &crate::board::DomeGrid) {
+    for sr in 0..3 {
+        for sc in 0..3 {
+            let Some(tile) = &grid.dome_slots[sr][sc] else { continue };
+            // Abstand zur Ausloesung: die noch offenen Nicht-SPECIAL-Felder
+            // DESSELBEN Slots (WILD zaehlt mit, siehe Konstanten-Doku).
+            let open_others = tile
+                .spaces
+                .iter()
+                .filter(|s| s.space_type != SpaceType::Special && !space_is_filled_like_json(s))
+                .count();
+            for (si, sp) in tile.spaces.iter().enumerate() {
+                if sp.space_type != SpaceType::Special || space_is_filled_like_json(sp) {
+                    continue;
+                }
+                let r = sr * 2 + si / 2;
+                let w = sc * 2 + si % 2;
+                // Ertrag = pattern_row + 1 = r + 1 (round_end.rs:361-362).
+                out[planes_idx(SPECIAL_YIELD_CHANNEL, r, w)] = (r + 1) as f32;
+                out[planes_idx(SPECIAL_UNLOCK_DISTANCE_CHANNEL, r, w)] = open_others as f32;
             }
         }
     }
@@ -966,11 +1041,16 @@ pub fn state_to_planes_direct(state: &GameState) -> Vec<f32> {
         for r in 0..PLANES_H {
             for w in 0..PLANES_W {
                 if crate::column_build::cell_is_completable(p, r, w, &remaining) {
-                    out[planes_idx(76, r, w)] = 1.0;
+                    out[planes_idx(REACHABILITY_CHANNEL, r, w)] = 1.0;
                 }
             }
         }
     }
+
+    // Kanaele 77/78: Spezialfeld-Ertrag und Abstand zur Ausloesung, wieder NUR
+    // fuer den ziehenden Spieler (gleiche Bauform wie die Erreichbarkeits-
+    // Ebene, siehe `write_special_tile_channels_direct`).
+    write_special_tile_channels_direct(&mut out, &state.players[curr_pi].dome_grid);
     out
 }
 
@@ -1321,6 +1401,231 @@ mod tests {
                 );
             }
         }
+    }
+
+    // ── Spezialfeld-Kanaele 77/78 (PREREG_special_tile_yield.md par.4a) ──
+    //
+    // Es gibt fuer die Planes KEINEN Rust-JSON-Pfad (siehe
+    // `state_to_planes_direct`-Doku: der 2D-Zweig entstand direkt, ohne
+    // JSON-Vorlaeufer). Die Rolle, die `state_to_features` fuer den
+    // Flach-Vektor spielt, uebernimmt hier eine im TEST gebaute
+    // JSON-Referenz: sie liest denselben `state_to_json`-Schnappschuss, den
+    // auch `neural_net.py::state_to_planes` bekommt, und benutzt dieselben
+    // Praedikate (`filled is None`, `type != "SPECIAL"`). Damit prueft der
+    // Test genau die Naht, an der Rust und Python auseinanderlaufen koennten.
+
+    fn json_space_is_special(sp: &Value) -> bool {
+        sp.get("type").and_then(|x| x.as_str()) == Some("SPECIAL")
+    }
+
+    /// "Gefuellt" = das JSON-Feld `filled` ist NICHT null (fehlendes Feld
+    /// zaehlt wie null) -- exakt das Praedikat des Python-Zwillings.
+    fn json_space_is_filled(sp: &Value) -> bool {
+        !sp.get("filled").map(|f| f.is_null()).unwrap_or(true)
+    }
+
+    /// Baut die zwei Kanaele (je 36 Werte, Zeile r Spalte w bei `r*6+w`)
+    /// AUS DEM SERIALISIERTEN ZUSTAND nach.
+    fn special_channels_from_json(v: &Value) -> (Vec<f32>, Vec<f32>) {
+        let mut yields = vec![0.0f32; 36];
+        let mut distances = vec![0.0f32; 36];
+        let curr_pi = v.get("current_player").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+        let grid = v
+            .get("players")
+            .and_then(|x| x.as_array())
+            .and_then(|ps| ps.get(curr_pi))
+            .and_then(|p| p.get("dome_grid"))
+            .and_then(|g| g.as_array());
+        let Some(grid) = grid else { return (yields, distances) };
+        for (sr, row) in grid.iter().enumerate().take(3) {
+            let Some(row) = row.as_array() else { continue };
+            for (sc, slot) in row.iter().enumerate().take(3) {
+                let Some(spaces) = slot.get("spaces").and_then(|x| x.as_array()) else { continue };
+                let open_others = spaces
+                    .iter()
+                    .filter(|sp| !json_space_is_special(sp) && !json_space_is_filled(sp))
+                    .count();
+                for (si, sp) in spaces.iter().enumerate().take(4) {
+                    if !json_space_is_special(sp) || json_space_is_filled(sp) {
+                        continue;
+                    }
+                    let r = sr * 2 + si / 2;
+                    let w = sc * 2 + si % 2;
+                    yields[r * 6 + w] = (r + 1) as f32;
+                    distances[r * 6 + w] = open_others as f32;
+                }
+            }
+        }
+        (yields, distances)
+    }
+
+    /// Schneidet EINEN Kanal aus dem Planes-Puffer heraus.
+    fn planes_channel(planes: &[f32], channel: usize) -> &[f32] {
+        &planes[channel * 36..(channel + 1) * 36]
+    }
+
+    /// Vergleicht die zwei Kanaele des Direktpfads gegen die JSON-Referenz
+    /// und meldet zurueck, ob der Zustand die Kanaele ueberhaupt BENUTZT
+    /// (mindestens ein Wert != 0) -- der Aufrufer stellt damit sicher, dass
+    /// der Test nicht leer-gruen besteht (Nutzer-Regel).
+    fn assert_special_channel_parity(state: &crate::state::GameState, ctx: &str) -> bool {
+        let planes = state_to_planes_direct(state);
+        let (want_yield, want_dist) = special_channels_from_json(&state_to_json(state, true));
+        let got_yield = planes_channel(&planes, SPECIAL_YIELD_CHANNEL);
+        let got_dist = planes_channel(&planes, SPECIAL_UNLOCK_DISTANCE_CHANNEL);
+        assert_eq!(got_yield, want_yield.as_slice(), "{ctx}: Ertrags-Kanal weicht vom JSON-Pfad ab");
+        assert_eq!(got_dist, want_dist.as_slice(), "{ctx}: Abstands-Kanal weicht vom JSON-Pfad ab");
+        want_yield.iter().any(|&x| x != 0.0)
+    }
+
+    #[test]
+    fn special_tile_channels_match_json_path_across_random_drafting_games() {
+        let mut with_signal = 0usize;
+        for seed in 0..8u64 {
+            for (i, s) in random_drafting_states(seed, 60).into_iter().enumerate() {
+                if assert_special_channel_parity(&s, &format!("seed={seed} step={i}")) {
+                    with_signal += 1;
+                }
+            }
+        }
+        assert!(
+            with_signal > 0,
+            "Kein einziger gesammelter Zustand hatte ein offenes Spezialfeld -- der Test \
+             haette die neuen Kanaele nie beruehrt (leer gruen). Korpus verbreitern statt \
+             die Zusicherung entfernen."
+        );
+    }
+
+    #[test]
+    fn special_tile_channels_match_json_path_in_tiling_phase() {
+        let states = random_drafting_states(3, 40);
+        let mut s = states.last().expect("mind. ein Zustand").clone();
+        s.phase = crate::state::Phase::Tiling;
+        assert_special_channel_parity(&s, "Tiling-Phase (manuell umgeschaltet)");
+    }
+
+    /// Konstruiertes Brett mit allen drei Faellen aus par.4a auf einmal:
+    /// offenes Spezialfeld in Rasterzeile 5 (Ertrag 6) mit 2 offenen
+    /// Nachbarn (Abstand 2), bereits GEFUELLTES Spezialfeld (beide Kanaele 0,
+    /// obwohl ein Nachbar noch offen ist) und ein Slot ganz OHNE Spezialfeld.
+    /// Dazu ein offenes Spezialfeld auf dem GEGNERbrett, das nicht
+    /// durchschlagen darf (die Kanaele gelten nur fuer den ziehenden Spieler).
+    fn constructed_special_tile_state() -> crate::state::GameState {
+        use crate::dome::DomeTile;
+        let mut rng = StdRng::seed_from_u64(0);
+        let mut s = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        s.current_player = 0;
+        for pi in 0..2 {
+            for sr in 0..3 {
+                for sc in 0..3 {
+                    s.players[pi].dome_grid.dome_slots[sr][sc] = None;
+                }
+            }
+        }
+
+        // (A) Slot (2,0), SPECIAL auf Space-Index 2 -> r = 2*2 + 2/2 = 5,
+        //     w = 0*2 + 2%2 = 0. Ertrag 6. Von den drei Nicht-SPECIAL-Feldern
+        //     ist genau eines gefuellt -> Abstand 2.
+        let mut open_special = vec![
+            DomeSpace::normal(TileColor::Blau),
+            DomeSpace::normal(TileColor::Gelb),
+            DomeSpace::special(),
+            DomeSpace::normal(TileColor::Rot),
+        ];
+        open_special[0].placed_color = Some(TileColor::Blau);
+        s.players[0].dome_grid.dome_slots[2][0] = Some(DomeTile::new(1, open_special, 3));
+
+        // (B) Slot (0,0), SPECIAL auf Index 0 (r=0, w=0) ist GEFUELLT --
+        //     beide Kanaele muessen 0 bleiben, obwohl ein Nachbar offen ist
+        //     (ein Fehler in der `filled`-Pruefung ergaebe hier Ertrag 1).
+        let mut filled_special = vec![
+            DomeSpace::special(),
+            DomeSpace::normal(TileColor::Blau),
+            DomeSpace::normal(TileColor::Gelb),
+            DomeSpace::normal(TileColor::Rot),
+        ];
+        filled_special[0].is_locked = false;
+        filled_special[0].placed_special = true;
+        filled_special[1].placed_color = Some(TileColor::Blau);
+        filled_special[2].placed_color = Some(TileColor::Gelb);
+        s.players[0].dome_grid.dome_slots[0][0] = Some(DomeTile::new(2, filled_special, 3));
+
+        // (C) Slot (0,2) ganz ohne SPECIAL (eine WILD-Platte) -> alles 0.
+        //     WILD zaehlt als Nicht-SPECIAL, darf also nie einen Ertrag tragen.
+        let no_special = vec![
+            DomeSpace::normal(TileColor::Blau),
+            DomeSpace::wild(),
+            DomeSpace::normal(TileColor::Rot),
+            DomeSpace::normal(TileColor::Schwarz),
+        ];
+        s.players[0].dome_grid.dome_slots[0][2] = Some(DomeTile::new(3, no_special, 0));
+
+        // (D) Gegnerbrett: offenes SPECIAL auf Index 3 von Slot (2,2) ->
+        //     Zelle (5,5). Darf in KEINEM der beiden Kanaele auftauchen.
+        let enemy_special = vec![
+            DomeSpace::normal(TileColor::Blau),
+            DomeSpace::normal(TileColor::Gelb),
+            DomeSpace::normal(TileColor::Rot),
+            DomeSpace::special(),
+        ];
+        s.players[1].dome_grid.dome_slots[2][2] = Some(DomeTile::new(4, enemy_special, 3));
+        s
+    }
+
+    #[test]
+    fn special_tile_channels_on_constructed_board() {
+        let s = constructed_special_tile_state();
+        let planes = state_to_planes_direct(&s);
+        let yields = planes_channel(&planes, SPECIAL_YIELD_CHANNEL);
+        let distances = planes_channel(&planes, SPECIAL_UNLOCK_DISTANCE_CHANNEL);
+
+        // (A): Rasterzeile 5, Spalte 0 -- Ertrag pattern_row+1 = 6, Abstand 2.
+        assert_eq!(yields[5 * 6], 6.0, "offenes Spezialfeld in Zeile 5: Ertrag muss 6 sein");
+        assert_eq!(distances[5 * 6], 2.0, "zwei offene Nicht-SPECIAL-Nachbarn -> Abstand 2");
+
+        // (B)/(C)/(D) und alle uebrigen Zellen: 0 in BEIDEN Kanaelen.
+        for idx in 0..36 {
+            if idx == 5 * 6 {
+                continue;
+            }
+            assert_eq!(yields[idx], 0.0, "Zelle {idx}: Ertrag muss 0 sein");
+            assert_eq!(distances[idx], 0.0, "Zelle {idx}: Abstand muss 0 sein");
+        }
+
+        // Und derselbe Zustand ueber die JSON-Referenz -- Rust-Direktpfad und
+        // der Weg, den der Python-Zwilling nimmt, muessen sich decken.
+        assert_special_channel_parity(&s, "konstruiertes Brett");
+    }
+
+    /// Gegenprobe zur Disambiguierung aus par.4a: Abstand 0 auf einem ECHTEN
+    /// Spezialfeld ist von "kein Spezialfeld" unterscheidbar, weil der
+    /// Ertrag dort > 0 ist. Ohne diese Eigenschaft waere der Abstands-Kanal
+    /// allein nicht lesbar.
+    #[test]
+    fn special_tile_distance_zero_is_distinguishable_from_no_special_tile() {
+        use crate::dome::DomeTile;
+        let mut s = constructed_special_tile_state();
+        // Alle drei Nicht-SPECIAL-Felder von Slot (1,1) gefuellt, SPECIAL auf
+        // Index 1 -> Zelle r = 1*2 + 0 = 2, w = 1*2 + 1 = 3. Abstand 0,
+        // Ertrag 3.
+        let mut unlockable = vec![
+            DomeSpace::normal(TileColor::Blau),
+            DomeSpace::special(),
+            DomeSpace::normal(TileColor::Gelb),
+            DomeSpace::normal(TileColor::Rot),
+        ];
+        unlockable[0].placed_color = Some(TileColor::Blau);
+        unlockable[2].placed_color = Some(TileColor::Gelb);
+        unlockable[3].placed_color = Some(TileColor::Rot);
+        s.players[0].dome_grid.dome_slots[1][1] = Some(DomeTile::new(5, unlockable, 3));
+
+        let planes = state_to_planes_direct(&s);
+        let yields = planes_channel(&planes, SPECIAL_YIELD_CHANNEL);
+        let distances = planes_channel(&planes, SPECIAL_UNLOCK_DISTANCE_CHANNEL);
+        let cell = 2 * 6 + 3;
+        assert_eq!(distances[cell], 0.0, "alle Nachbarn gefuellt -> Abstand 0");
+        assert_eq!(yields[cell], 3.0, "Abstand 0 bleibt am Ertrag > 0 erkennbar");
+        assert_special_channel_parity(&s, "freischaltbares Spezialfeld");
     }
 
     #[test]
