@@ -120,6 +120,25 @@ Paarungs-Trennschaerfe fuer diesen Arm hingenommen wird, und ob der
 Paritaets-Hash unter scharfem Schalter ueberhaupt noch gelten soll oder ob
 die Sonde den Schalter explizit aus erzwingt.
 
+### par.4.3 ZUSATZ aus der externen Recherche: robuste Aggregatoren (registriert 2026-08-27)
+
+Bisher stand dieser Zusatz nur in `STATUS.md` (Abschnitt "Weitere offene
+Straenge") und damit an einer Stelle, die regelmaessig gekuerzt wird. Hier ist
+er registriert; **an der Messkette in par.5 aendert er nichts.**
+
+Der Schalter mittelt heute ARITHMETISCH ueber die Stichprobe
+(`sample_round_transition_value`, `N_SAMPLES_SEARCH = 8`). Die Recherche legt
+nahe, stattdessen einen ROBUSTEN Aggregator zu pruefen: **Median, gestutztes
+oder winsorisiertes Mittel**. Begruendung: bei acht Ziehungen bestimmt ein
+einzelner Ausreisser der Fabrik-Neubefuellung das Mittel merklich mit, und
+genau diese Schwankung soll der Schalter ja daempfen, nicht durchreichen.
+
+**Als Arm zu behandeln, nicht als Verbesserung:** der Aggregator ist ein
+ZWEITER Faktor neben "Schalter an/aus". Wer beide zugleich dreht, kann
+hinterher nicht zuordnen -- die Reihenfolge bleibt also Kostentor, dann
+Schalter, ein Aggregator erst danach und nur, wenn der Schalter ueberhaupt
+etwas bewegt.
+
 ## par.5 Messkette (Reihenfolge bindend)
 
 **Schritt 0 -- Entscheid zur Paarungs-Trennschaerfe.** Nutzer entscheidet

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (Nutzer 2026-08-25), nichts erzeugt -- das v22-Netz existiert noch nicht. Form 29.450 Partien wie das alte v22-Design: Policy-Klasse 5.800, Value-Klasse 23.650. NEU ist die Besetzung: der Neu-Anteil kommt aus dem v22-Self-Play (4.000 Sockel + 8.000 Schwarm), ALLE aelteren Plaetze aus dem hv2-Lehrerkorpus (17.450 von 24.000, 6.550 rotieren aus). DARAUS FOLGT der Umfang des v22-Self-Play: 12.000 Partien. Drei Punkte sind benannt und nicht geloest: (1) G-1 und G-2 kommen aus DEMSELBEN Korpus, die Generationenstruktur ist also Platzhalter, keine Aera-Streuung; (2) RAM UNKRITISCH -- die alte 6-KB-Zahl war vom Tag vor dem Bitpacking; gemessen sind 2.806 B je Zustand im 2D-Fenster, also ~14,1 GB gegen 34,3 GB. Auslagern bleibt trotzdem verworfen (MOSAIC_PLANES_LAZY ist 400.000x langsamer je Sample); (3) die 1.800 hv2-Partien der POLICY-Klasse tragen auf 61,8 Prozent ihrer Draftingzuege policy_target_valid=false -- ihre Policy-Ausbeute haengt an der Traegerfrage aus PREREG_v22_window.md par.4, die Preregs sind gemeinsam zu entscheiden. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (Nutzer 2026-08-25), nichts erzeugt -- das v22-Netz existiert noch nicht. Form 29.450 Partien wie das alte v22-Design: Policy-Klasse 5.800, Value-Klasse 23.650. NEU ist die Besetzung: der Neu-Anteil kommt aus dem v22-Self-Play (4.000 Sockel + 8.000 Schwarm), ALLE aelteren Plaetze aus dem hv2-Lehrerkorpus (17.450 von 24.000, 6.550 rotieren aus). DARAUS FOLGT der Umfang des v22-Self-Play: 12.000 Partien. Drei Punkte sind benannt, zwei davon offen: (1) G-1 und G-2 kommen aus DEMSELBEN Korpus, die Generationenstruktur ist also Platzhalter, keine Aera-Streuung; (2) RAM UNKRITISCH -- die alte 6-KB-Zahl war vom Tag vor dem Bitpacking; gemessen sind 2.806 B je Zustand im 2D-Fenster, also ~14,1 GB gegen 34,3 GB. Auslagern bleibt trotzdem verworfen (MOSAIC_PLANES_LAZY ist 400.000x langsamer je Sample); (3) TRAEGERFRAGE ENTSCHIEDEN (2026-08-27 nachgetragen, entschieden 2026-08-25): v22 faehrt ARM B, also MOSAIC_IGNORE_POLICY_TARGET_VALID=1 (PREREG_v22_window.md par.4b/par.4e, Konfiguration par.3b.2 der Lehrer-Prereg). Unter Arm B liefern die 1.800 hv2-Partien der Policy-Klasse ihr VOLLES nominelles Material; die "~4.690 Partien-Aequivalente" in par.3(3) gelten nur im verworfenen Arm-A-Fall. OFFEN bleibt davon nur der TRAEGER-MANIFEST-GENERATOR: es gibt Leser, aber kein schreibendes Werkzeug. -->
 
 # Vorregistrierung: v23-Fenster
 
@@ -113,6 +113,25 @@ unteren Rand. **Dieses Fenster und `PREREG_v22_window.md` par.4 sind deshalb
 gemeinsam zu entscheiden**, nicht nacheinander -- der Traeger-Entscheid
 veraendert, wieviel Policy dieses Fenster wirklich enthaelt.
 
+**NACHTRAG 2026-08-27: der gemeinsame Entscheid IST gefallen -- ARM B.** v22
+faehrt mit `MOSAIC_IGNORE_POLICY_TARGET_VALID=1`, die Flagge wird also
+IGNORIERT (`PREREG_v22_window.md` par.4b und par.4e; die Konfiguration steht
+in par.3b.2 der Lehrer-Prereg als w1-Arm). Damit gilt fuer dieses Fenster:
+
+* **Die Tabelle oben beschreibt den verworfenen Fall.** Unter Arm B liefern
+  die 1.800 hv2-Partien der Policy-Klasse ihr VOLLES nominelles Material, die
+  Policy-Klasse bleibt bei 5.800 -- die "~4.690 Partien-Aequivalente" sind
+  keine Planungsgroesse mehr.
+* **Einschraenkung, die dazugehoert:** der Entscheid ist ein RICHTUNGSENTSCHEID
+  mit n=40 auf einem Viertelkorpus (par.4b dort sagt das ausdruecklich), kein
+  Gating. Er legt fest, womit trainiert wird; er belegt nicht, dass Arm B
+  staerker ist.
+* **Offen bleibt der TRAEGER-MANIFEST-GENERATOR**, und das ist ein anderer
+  Punkt als die Traegerfrage: `neural_net.py` und `train_manifest.py` LESEN
+  ein Traeger-Manifest, geschrieben wird es nirgends. Die seed-bestimmte
+  Auswahl der 1.800 policy-aktiven hv2-Partien aus par.1 ist ohne dieses
+  Werkzeug nicht ausfuehrbar (STATUS-Abschnitt "TRAEGER-MANIFESTE").
+
 ## par.4 Wecker: was VOR dem v22-Self-Play fallen muss
 
 Der Lauf, der die 12.000 Partien erzeugt, ist der Zeitpunkt, an dem folgende
@@ -130,6 +149,25 @@ Entscheide nicht mehr nachziehbar sind (Policy-Ziele = Besuchsverteilung):
   Entscheidungsregel 4, bisher ZWEIMAL nicht erfolgt.
 * `--seed-positions` -- `PREREG_start_position_seeding.md` par.5; im
   NETZ-Pfad bereits vorhanden, also hier ohne Bauarbeit einsetzbar.
+* **Startkuppel-Streuung** -- `PREREG_start_dome_choice.md` par.5/par.7
+  (ergaenzt 2026-08-27). Der Startslot steckt in den PARTIEN und in den
+  POLICY-ZIELEN (heute ein one-hot auf `choose_start_placement`), ist also nur
+  am Generierungsstart entscheidbar. Fuer den hv2-Korpus war es zu spaet;
+  fuer diesen Lauf ist es offen. Stufe 0 dort (netzfrei, gepaart) muesste
+  davor laufen, sonst faellt der Entscheid per Default auf "Handheuristik".
+* **`MOSAIC_STACK_DRAW_RESERVATION`** -- `PREREG_stack_draw_reservation_rule.md`
+  par.5e (ergaenzt 2026-08-27). Der Knopf sitzt in `apply_chosen_action`
+  (`resolve_and_apply_stack_draw`, self_play.rs:500) und wirkt damit in JEDEM
+  Self-Play. **Default AUS ist entschieden** und bleibt es; die beiden
+  Wiedervorlage-Bedingungen aus par.5e (Eichung von `V` an einem Punkt
+  AUSSERHALB der v22-Verteilung, und ein EINSEITIGER Knopf) sind ungebaut --
+  ohne sie ist der Arm nicht fahrbar, mit ihnen waere es ein Erzeugungs-Knopf.
+* **`ROUND_TRANSITION_SAMPLING`** -- `PREREG_round_transition_search_sampling.md`
+  (ergaenzt 2026-08-27). Ein Such-Eingriff am Blattwert des
+  Rundenuebergangs; er verschiebt die Wurzel-Besuchsverteilung und damit die
+  Policy-Ziele, gehoert also auf diese Liste. Reihenfolge dort ist bindend:
+  ZUERST das Kostentor (Schwelle 25 Prozent Wanduhr-Aufschlag), Staerke
+  danach -- der Schalter steht heute auf `false` (net_mcts.rs:84).
 * Bootstrap-Horizont -- ENTSCHIEDEN auf 2
   (`PREREG_bootstrap_horizon.md` par.9f).
 * `--rtv` (Default aus), `--pcr-full-prob` (Default aus), `--sims`,

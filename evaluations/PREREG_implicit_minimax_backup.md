@@ -128,6 +128,12 @@ ist widerlegt. Self-Play-Einsatz bleibt Kandidat (beidseitiger Knopf
 
 ## par.3 Grenzen
 
+> **Nummerierungs-Anmerkung (2026-08-27):** diese Datei traegt ZWEI
+> Abschnitte "par.3" -- diesen hier und weiter unten "par.3 EINGETAKTET fuer
+> den v22-Zyklus". Externe Verweise auf `par.3a` meinen den unteren
+> (das Eingetaktete) samt seiner Praezisierung. Nicht umnummeriert, weil auf
+> die Bezeichner bereits verwiesen wird.
+
 Behandelt NICHT die Datenseite (das leistet
 `PREREG_start_position_seeding.md`); Kombinationsmessungen erst, wenn
 beide Einzelhebel gemessen sind.
@@ -151,8 +157,14 @@ hv2-Lehrerkorpus trainierte), nicht an den Korpus selbst. Zwei Stellen, an denen
 1. **Gating/Arena von v23** -- dort ist er heute schon live (Default 0,0 = aus,
    pro Seite ueberschreibbar per `models/<name>.spec.json`). Das ist die
    billigste Messung: kein Bau, ein Konfigurationsfeld.
-2. **Das NAECHSTE netz-basierte Self-Play** (also nach v23, nicht v22) -- das
-   ist der in par.2c offen gebliebene Punkt.
+2. ~~**Das NAECHSTE netz-basierte Self-Play** (also nach v23, nicht v22)~~ --
+   **BERICHTIGT durch par.3a (Vermerk 2026-08-27):** die Klammer stimmt
+   nicht. Der naechste netz-basierte Self-Play-Lauf ist das
+   **v22-SELF-PLAY** -- der Lauf, der das v23-FENSTER fuellt (Konvention:
+   Fenster vN traegt die Partien von Champion v(N-1)). Er kommt also VOR v23,
+   nicht danach. Daraus die Auflage aus par.3a: die Gating-Messung gehoert
+   VOR den Start dieses Laufs, sonst faellt der Erzeugungs-Entscheid per
+   Default auf 0,0. Der in par.2c offen gebliebene Punkt bleibt dieser Lauf.
 
 **Erwartung ausdruecklich gedaempft, und das gehoert vor den Lauf und nicht
 danach:** par.2b war ein Erfolg nach vorregistrierter Lesart (k1 9,0 auf

@@ -106,6 +106,12 @@ selbst bestimmt (`detect_layout`, `engine/src/net.rs:104-118`), nicht aus
    `[top_is_special, top_is_wild]`; leerer Stapel = `[0, 0]`. `INPUT_SIZE`
    708 -> 710, Indizes 0..707 unveraendert. One-hot statt eines
    Einzelwerts, damit "leer" nicht zwischen Special und Wild interpoliert.
+
+   **AKTUALISIERT 2026-08-27:** die Zahlen stammen vom 2026-08-20;
+   `INPUT_SIZE` steht heute bei **714** (`config.py:38`), das Merkmalspaar
+   waere also 714 -> 716. Das PRINZIP ist unveraendert: Anhaengen am ENDE,
+   Indizes davor bleiben Zeichen fuer Zeichen gleich. Wer die Stufe baut,
+   liest den Ist-Stand ab, statt die 708 aus diesem Absatz zu uebernehmen.
 2. **Die eine Stelle, an der Additivitaet entsteht**: `features_for_layout`
    (`engine/src/features.rs:952`) ignoriert die deklarierte Laenge heute
    (`Flat(_)`, `PlanesPlusFlat { .. }`) und baut immer den vollen Vektor. Es
@@ -117,6 +123,15 @@ selbst bestimmt (`detect_layout`, `engine/src/net.rs:104-118`), nicht aus
    `features_for_net` (17 Aufrufstellen, alle `engine/src/net_mcts.rs`),
    keine zweite Feature-Quelle; die erwartete Puffergroesse kommt aus
    `layout.flat_len()` (`engine/src/net.rs:397`).
+
+   **NACHTRAG 2026-08-27: fuer den 2D-Pfad ist das bereits gebaut.** Seit dem
+   2026-08-25 kuerzt `net::split_planes_flat_batch_src`
+   (`engine/src/net.rs:972ff`, Vermerk `engine/src/lib.rs:1817`) den
+   Planes-Block auf die vom MODELL deklarierte Groesse -- am Champion belegt,
+   der nach der Erweiterung unveraendert weiterlaeuft. **Offen bleibt genau
+   der hier beschriebene FLACHE Pfad** (`features_for_layout`). Der Baustein,
+   den `PREREG_uvfa_plate_regime.md` par.2 mitbenutzt, ist damit kleiner als
+   beim Anlegen dieser Prereg angenommen.
 3. **Drei Encoder-Stellen, jeweils append-only**: JSON-Pfad
    `features.rs:122`, Direktpfad `features.rs:520`, `neural_net.py:65`.
    Der 2D-Zweig braucht nichts Eigenes, er waechst mit.

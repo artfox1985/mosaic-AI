@@ -59,8 +59,16 @@ Feature-Erweiterung; Paritaets-Hash `8c6684ffba06cf3e...` unveraendert, Suite
 bewusst archiviert.** Mein erster Vermerk stellte das als Verlust dar -- das
 war halb falsch und ist hiermit berichtigt:
 
-* Die archivierten Manifeste listen **v18/v20/v21-Dateien**. Fuer v23 werden
-  sie nicht gebraucht; dessen Fenster maskiert **hv2**-Dateien.
+* Die archivierten Manifeste listen **v18/v20/v21-Dateien**. Diese ALTEN
+  Manifeste werden fuer v23 nicht gebraucht; dessen Fenster besteht aus
+  **hv2**-Dateien.
+  **BERICHTIGUNG 2026-08-27:** der frueher hier stehende Satz "fuer v23
+  werden sie nicht gebraucht" las sich, als brauche v23 ueberhaupt kein
+  Traeger-Manifest. Das ist falsch. `PREREG_v23_window.md` par.1 verlangt
+  **1.800 policy-aktive hv2-Partien** (Sockel G-1 1.350 + G-2 450) neben
+  15.650 policy-maskierten aus demselben Korpus -- also eine seed-bestimmte
+  AUSWAHL, und genau die ist ein Traeger-Manifest. Was fehlt, ist nicht das
+  Manifest-Konzept, sondern der ERZEUGER (naechster Absatz).
 * Auf die Laeufe dieser Nacht wirkt das Fehlen nicht: fuer den homogenen
   hv2-Korpus ist "jede Datei traegt Policy" die richtige Semantik.
 
@@ -92,7 +100,10 @@ letzten Datei (der Lauf begann vor dem `laufzeit`-Einbau) und im Manifest
 `data/manifest_hv2_20260825_172710.json` nachgetragen.
 
 **2. Sanity-Check ueber alle 24.020 Partien** (die 20 aus
-`probe_v2huelle_horizon.pkl` zaehlen mit -- fuer ein Training auszuschliessen):
+`probe_v2huelle_horizon.pkl` zaehlen mit -- fuer ein Training auszuschliessen).
+**Die Auflage ist seit 2026-08-27 GEGENSTANDSLOS:** die Datei existiert nicht
+mehr, `data/` enthaelt 2.400 pkl = 24.000 Partien. Nichts auszuschliessen,
+kein `^probe_`-Pin noetig:
 
 | Kennzahl | voller Korpus | Pilot (200) | Lehrer-Test |
 | --- | --- | --- | --- |
@@ -378,8 +389,12 @@ eine naechste Sitzung kennen sollte:
 3. Korpus und Netz-Self-Play loesen Stapelzuege VERSCHIEDEN auf (eigener
    Abschnitt weiter unten) -- das Netz lernt an Daten aus einem anderen Spiel
    als dem, das es selbst spielt.
-4. Regel 4 aus `PREREG_chance_nodes.md` ist erfuellt, ohne dass der Knopf je
-   gesetzt wurde -- der Erzeugerwechsel hat es erledigt.
+4. Regel 4 aus `PREREG_chance_nodes.md` ist **fuer den HEURISTIK-Korpus**
+   erfuellt, ohne dass der Knopf je gesetzt wurde -- der Erzeugerwechsel hat
+   es erledigt. **Nicht** fuer das NETZ-Self-Play: dort steht die
+   Sammelaufloesung unveraendert (`self_play.rs:3879/3886`, beide
+   `apply_via_chosen_action = true`), der Wecker auf der v23-Liste bleibt
+   also scharf (praezisiert 2026-08-27).
 
 **Zustand:** Suite 531/0, alle Sonden gruen, Arbeitsbaum bis auf Fremdes leer.
 Ungepusht (Push ist ein eigener Nutzer-Entscheid).
@@ -561,7 +576,7 @@ weiterhin Feld fuer Feld identisch mit der ersten Korpusdatei.
 | Serielle Referenz fuer den vollen Cache | 2,58 h | bevor der Cache eine Champion-Entscheidung traegt |
 | Traeger-Manifest-Generator | klein | `PREREG_v23_window.md` verlangt 1.800 von 17.450 hv2-Partien policy-aktiv; es gibt nur Leser, kein Werkzeug. Regel ist dokumentiert (Seed + zeitlich gestreute Auswahl) |
 | ~~Split-Test Routing gegen Drafting~~ ERLEDIGT 2026-08-26 | 3x 22 s | `PREREG_v22_window.md` par.4f: **Drafting 0,756, Routing allein 0,000** -- par.4c hatte das Gegenteil vorhergesagt |
-| Gewichtsfenster der Huelle | Messung | `PREREG_heuristic_v2_long_rows.md` par.3b.1 -- existiert ein `w`, das kleine Punktunterschiede ueberstimmt, aber nie Strafpunkte akzeptiert? |
+| Gewichtsfenster der Huelle | Messung | `PREREG_heuristic_v2_long_rows.md` par.3b.1 -- existiert ein `w`, das kleine Punktunterschiede ueberstimmt, aber nie Strafpunkte akzeptiert? **Klarstellung 2026-08-27: dieses `w` ist das ROUTING-Gewicht der Huelle auf den Ownership-Marginalen im Tiling-Loeser (die Verbraucherseite), NICHT das Trainings-Loss-Gewicht `OWNERSHIP_WEIGHT` / `--ownership-weight` aus par.3b und par.3b.2. Zwei verschiedene `w`, zwei verschiedene Messungen** |
 | Blindzieh-Stopp-Regel gegenpruefen | Arena | `PREREG_stack_draw_reservation_rule.md` par.5b sagt "zieht zu oft, ~10 Punkte je betroffenem Stapelzug". Knopf `MOSAIC_STACK_DRAW_RESERVATION` ist gebaut, Default AUS. Seit der Kapselung billig: der Anker liegt als Artefakt vor |
 | Kontrollfluss im NETZ-Self-Play | Arena | `MOSAIC_STACK_DRAW_RESEARCH=1`. Beruehrt nur die NETZ-Seite -- aendert den SPIELER, nicht den MASSSTAB |
 
@@ -641,9 +656,22 @@ Korpus**. **KALTSTART** (Nutzer 2026-08-27), bei Bedarf Afterburner;
 `MOSAIC_VAL_POOL` nur im Afterburner-Fall. Gating gegen Anker und v21 laeuft
 als Standard-Messung, entscheidet aber nicht den Self-Play-Start.
 
-Vorbereitet ist dafuer inzwischen alles: der Korpus ist reproduzierbar
+Vorbereitet ist dafuer inzwischen das Meiste: der Korpus ist reproduzierbar
 (1c), sein Erzeuger eingefroren (1d), und der Cache laesst sich waehrend
 der Erzeugung mitbauen (1b).
+
+**Einschraenkung, ergaenzt 2026-08-27 -- "alles" war zu viel:**
+
+* **Der parallele Cache-Bau ist NICHT in `train.py` verdrahtet.** Er ist ein
+  eigenstaendiges Werkzeug; `train.py` kennt keinen Cache-Pfad-Parameter und
+  baut weiter SERIELL. Wer das Training einfach startet, zahlt also rund
+  2,6 h Vorlauf statt der 36,1 min -- die 36,1 min bekommt nur, wer den Cache
+  vorher mit dem Werkzeug baut. Das ist Absicht
+  (`PREREG_cache_build_time.md` par.7/par.9: "Nicht verdrahtet ... bis es auf
+  dem vollen Korpus gelaufen ist"), aber es ist kein erledigter Punkt.
+* **Die serielle Referenz fuer den vollen Cache fehlt** (2,58 h). Belegt ist
+  Bit-Identitaet auf 120 Dateien, nicht auf den 4,19 Mio Zustaenden. Solange
+  sie fehlt, traegt der volle Cache keine Champion-Entscheidung.
 
 **Spalten-Abnahme-Tor (par.3b.2 der Lehrer-Prereg, registriert 2026-08-27).**
 Zwischen Training und Self-Play-Start steht ein vorregistriertes Tor mit zwei
@@ -752,7 +780,7 @@ Anker im IN-PROCESS-Pfad, und die Arenen benutzen weiter genau den.
 | Blindzieh-Stopp-Regel gegenpruefen | Arena | Vorhersage quantifiziert (~10 Pkt je Stapelzug), Knopf gebaut, Anker als Artefakt geschuetzt |
 | Kontrollfluss im Netz-Self-Play | Arena | beruehrt nur die NETZ-Seite -- Spieler, nicht Massstab |
 | Traeger-Manifest-Generator | klein | `PREREG_v23_window.md` braucht ihn; Regel ist dokumentiert |
-| Gewichtsfenster der Huelle | Messung | `PREREG_heuristic_v2_long_rows.md` par.3b.1 |
+| Gewichtsfenster der Huelle | Messung | `PREREG_heuristic_v2_long_rows.md` par.3b.1 -- das ROUTING-Gewicht im Tiling-Loeser, NICHT `OWNERSHIP_WEIGHT` aus par.3b/par.3b.2 (Klarstellung 2026-08-27) |
 | Serielle Referenz fuer den vollen Cache | 2,58 h | bevor der Cache eine Champion-Entscheidung traegt |
 
 ### C2. Wheels leben ab jetzt IM Artefakt (Nutzer-Entscheid 2026-08-26)
@@ -822,8 +850,10 @@ mehrere -- die Zahl der betroffenen WURZEL-Entscheidungen ist kleiner.
 
 **ES GIBT DAFUER SCHON EINE PREREG:** `PREREG_chance_nodes.md`. Ihre
 Entscheidungsregel 4 verlangt den Kontrollfluss-Knopf "ins naechste
-Self-Play", und das war zweimal nicht erfolgt. **Sie ist seit v22 erfuellt --
-ohne dass der Knopf je gesetzt wurde** (dort par.13, gemessen 2026-08-26): der
+Self-Play", und das war zweimal nicht erfolgt. **Sie ist seit v22 fuer den
+HEURISTIK-Korpus erfuellt -- ohne dass der Knopf je gesetzt wurde**
+(dort par.13, gemessen 2026-08-26; Einschraenkung praezisiert 2026-08-27, sie
+gilt NICHT fuer das kommende v22-Self-Play, s. uebernaechster Absatz): der
 Erzeuger ist auf die Heuristik gewechselt, die ohnehin per Entscheidung
 aufloest. Im Korpus stehen `choose_draw_stack_slot` in 2,5 Prozent der
 Datensaetze (gegen "0 von 16.322" im Bestandskorpus) und tragen dabei zu
@@ -833,6 +863,15 @@ Datensaetze (gegen "0 von 16.322" im Bestandskorpus) und tragen dabei zu
 daneben (`MOSAIC_STACK_DRAW_RESERVATION`,
 `PREREG_stack_draw_reservation_rule.md` par.5b, Default AUS). Offen bleibt der
 Kontrollfluss im NETZ-Self-Play -- eine Arena-Frage.
+
+**Und genau da liegt die Grenze der Erfuellung (praezisiert 2026-08-27):** das
+NETZ-Self-Play loest Stapelzuege weiter GESAMMELT auf
+(`play_net_self_play_game`, self_play.rs:3879/3886, beide
+`apply_via_chosen_action = true`). Der naechste Erzeugerlauf ist aber genau
+ein Netz-Self-Play -- das des v22-Champions, das das v23-Fenster fuellt. Fuer
+IHN ist Regel 4 unerfuellt, und der Wecker auf der Liste in
+`PREREG_v23_window.md` par.4 bleibt scharf. Erfuellt ist die Regel allein fuer
+den heuristisch erzeugten hv2-Korpus.
 
 **Sie ist seit heute billiger:** der Anker liegt als Artefakt vor, und der
 Knopf beruehrt ohnehin nur die NETZ-Seite (die Heuristik-Seite der Ankerarena
@@ -989,7 +1028,7 @@ Zurueckdrehen: `.gitignore`-Zeile entfernen und
 | --- | --- | --- |
 | **Shaping-Kopf statt Ownership-Kopf** | `PREREG_heuristic_v2_long_rows.md` par.3b | Vorregistriert, nicht gebaut. Sagt die Dreiecks-Abweichung voraus; zwei Kanaele, Abkling-Kurve. Braucht erst das v22-Korpus |
 | **Einhuellende im 2D-Encoder** | – | Nutzer-Frage 2026-08-24, nicht registriert. Zusaetzliche Eingabeebene "Dreiecks-Zugehoerigkeit je Zelle"; additiv moeglich, aber nach par.3b |
-| **R5-Netz-Loeser + R5-Value-Kalibrierung** | `PREREG_r5_solver_split.md` par.2, Teil B | Netz-Loeser-Arme und Vierer-Kopf-Vergleich. Zielmetrik `r5_value_calibration`-Steigung, heute 0,06-0,09 statt ~1. Arm 3 braucht ein b-Serie-Modell mit gepruefter Traegerschaft |
+| **R5-Netz-Loeser + R5-Value-Kalibrierung** | `PREREG_r5_solver_split.md` par.2, Teil B | Netz-Loeser-Arme und Vierer-Kopf-Vergleich. Zielmetrik `r5_value_calibration`-Steigung, und die ist GETRENNT zu lesen (praezisiert 2026-08-27, par.3e verlangt das): **Platten-Steigung 0,06-0,09**, **Gesamtwert-Steigung 0,87-0,89** -- der Kopf ist auf der Gesamtskala fast richtig geeicht und sieht nur den Platten-/Spaltenanteil nicht. Arm 3 braucht ein b-Serie-Modell mit gepruefter Traegerschaft |
 | **Seeding-Folgearm: Dosis** | `PREREG_start_position_seeding.md` | k=6 war die erste Dosis; hoehere Dosis naheliegend, nicht registriert |
 | **UVFA-Regime-Eingabe** | `PREREG_uvfa_plate_regime.md` | par.8: Conditioning-Dropout und Leakage-Waechter sind PFLICHT. par.7-Entscheid steht aus |
 | **Saettigende Score-Utility** | `PREREG_saturating_score_utility.md` | Tor gefahren, Verdikt DAZWISCHEN -- **Nutzer-Entscheid offen**: sigma-Kopf auf `points_val` oder auf ein TD-unberuehrtes Ziel |

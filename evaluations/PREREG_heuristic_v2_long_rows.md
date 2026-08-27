@@ -1144,7 +1144,12 @@ damit kleiner als angenommen, aber nicht verschwunden: im Selbstspiel-Aufbau
 bleibt er.
 
 **URTEIL STEHT AUS -- und das ist kein Versaeumnis.** par.5.3 hat bewusst
-keinen Schwellenwert vorregistriert (s. Klarstellung bei par.5.4). Die
+keinen Schwellenwert vorregistriert (s. Klarstellung unter **par.5 Punkt 4**
+"Korpus und Training"; Verweis BERICHTIGT 2026-08-27 -- er stand als "par.5.4"
+da, und eine Ueberschrift dieses Namens gibt es nicht. Gemeint ist und war der
+vierte Punkt der Messkette in par.5, der die Klarstellung woertlich traegt;
+dieselbe Schreibweise steht noch an drei weiteren Stellen dieser Datei und
+meint jedes Mal denselben Listenpunkt). Die
 Abwaegung lautet: ein Korpus mit 3,5-mal mehr Spaltenvollendungen -- der
 Faehigkeit, die im System nirgends vorkommt und die weder Destillation noch
 vier Such-Eingriffe erzeugen konnten -- erkauft mit einem Erzeuger auf 12,8

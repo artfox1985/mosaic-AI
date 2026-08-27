@@ -44,7 +44,11 @@ Armparameter EINGABE ist") -- diese Bedingung wird hier erfuellt.
 ## par.2 Primaerarm UVFA: Zuschnitt
 
 - **Eingabe**: EIN zusaetzliches Flat-Merkmal `plate_regime` am Ende des
-  Vektors (INPUT_SIZE 708 -> 709), Wert 1.0 = "dieser Zustand gehoert
+  Vektors (INPUT_SIZE 708 -> 709 -- **Zahlen vom 2026-08-22, AKTUALISIERT
+  2026-08-27**: `INPUT_SIZE` steht heute bei **714** (`config.py:38`), das
+  Merkmal waere also 714 -> 715. Am Zuschnitt aendert das nichts, die Regel
+  ist unveraendert: neue Groessen haengen am ENDE des Blocks, Indizes davor
+  bleiben unberuehrt, Altmodelle bleiben bitgleich ladbar), Wert 1.0 = "dieser Zustand gehoert
   der Bau-Regime-Seite", sonst 0.0. Kodierung ego-perspektivisch: 1.0
   genau dann, wenn `state.current_player` die Zwangsseite der Partie
   ist (Quelle: `data/asym_corpus/zwangsseiten_map.txt`); ALLE Zustaende
@@ -55,6 +59,18 @@ Armparameter EINGABE ist") -- diese Bedingung wird hier erfuellt.
   MODELL deklarierte Laenge; nur kuerzen, nie auffuellen) -- er wird
   HIER zuerst gebraucht und dient danach beiden Preregs. 708er-Bestand
   bleibt byte-identisch ladbar (Nutzer-Anforderung Additivitaet).
+
+  **NACHTRAG 2026-08-27: der Baustein ist zur Haelfte schon da, die Kosten
+  waren ueberschaetzt.** Fuer den 2D-Pfad existiert der Kuerzungs-Mechanismus
+  seit dem 2026-08-25: `net::split_planes_flat_batch_src`
+  (`engine/src/net.rs:972ff`, Vermerk `engine/src/lib.rs:1817`) kuerzt den
+  Planes-Block auf die vom MODELL deklarierte Groesse, und der Champion ist
+  der Beleg -- er laeuft nach der Erweiterung unveraendert weiter. **Offen
+  ist nur noch der FLACHE Pfad**: `features_for_layout`
+  (`engine/src/features.rs`) baut weiterhin den vollen Vektor, statt auf die
+  deklarierte Laenge zu kuerzen. Das ist genau der Punkt, den
+  `PREREG_stack_top_feature.md` par.6 Punkt 2 beschreibt, und er ist damit
+  kleiner als beim Anlegen dieser Prereg angenommen.
 - **Training**: Standardrezept, Warm Start Champion, dasselbe Fenster
   wie die Asym-Arme (b18-Regex, Asym-Korpus policy-tragend); Warmstart
   der neuen Eingabespalte null-initialisiert (head_warmstart-Muster:
@@ -64,6 +80,17 @@ Armparameter EINGABE ist") -- diese Bedingung wird hier erfuellt.
 - **Spielzeit**: Laufzeit-Knopf (Name beim Bau, Registry-Pflicht), der
   das Flag fuer die EIGENE Seite setzt -- der erhoffte Stil-Regler
   "plattenbewusst". Default aus = 0.0 = Bestandsverhalten.
+
+**VORBEHALT zum Trainingsinput, nachgetragen 2026-08-27:** der Asym-Korpus
+stammt aus PLATTENBLINDEM Spiel. Die stehende Regel "nie auf plattenblindes
+Normalspiel eichen" (STATUS, Abschnitt "Geltende Regeln") trifft diesen
+Zuschnitt direkt: das Flag soll ein Verhalten konditionieren, das im
+Trainingsmaterial gerade nicht vorkommt, und die Zwangsseite dort ist nicht
+plattenbewusstes Spiel, sondern erzwungenes Bauen auf schwachem Niveau
+(34,6-%-Verteilung, 45,7 % Siegquote, par.8). **Beim Zuschnitt ist zu
+adressieren**, ob der Asym-Korpus ueberhaupt noch der richtige Trainingsinput
+ist oder ob der hv2-Lehrerkorpus an seine Stelle tritt; stillschweigend auf
+dem Asym-Bestand weiterzubauen waere ein Regelbruch, kein Detail.
 
 ## par.3 Messanordnung und VORAB-ERFOLGSREGEL (Entwurf, vor Baubeginn zu fixieren)
 

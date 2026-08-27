@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt eine RISIKOSENSITIVE Blatt-Utility Spielstaerke -- also die Verteilung des Ausgangs statt nur ihres Mittels in die Suche zu ziehen? | Beleg: NICHTS GEMESSEN. Ausgangspunkt war die Nutzer-Idee der Varianz-Penalisierung. Wichtige Korrektur aus der Vorpruefung: der Verteilungs-Kopf points_dist ist ABGESCHALTET (POINTS_DIST_BINS = 0, config.py:134) und der Champion traegt ihn nicht -- seine ONNX-Ausgaenge sind policy/value/moon/points/ownership/value_wdl_logits/opp_points/endgame_margin. Die volle Fassung braucht also ein neues Training. GEGENBEFUND, der eine billige Stufe erlaubt: value_wdl_logits WIRD exportiert, aber net_mcts.rs liest es nirgends -- die Suche kennt die Klassenverteilung des Ausgangs nicht, obwohl sie im Modell steht. Zweistufig: Stufe A ohne Training (P(Niederlage) aus den WDL-Logits), Stufe B mit Training (unteres Quantil von points_dist). Entscheidungsmass ist STAERKE, kein Offline-Mass. EINGETAKTET fuer den v22-Zyklus 2026-08-25 (par.5) mit einer Bau-Entscheidung davor: Stufe A kann die KORPUS-LABELS aendern, weil der Bootstrap ueber net_leaf_eval laeuft (round_transition_deep.rs:594/698/731). Variante A1 (nur an der Gumbel-Blattstelle) laesst die Labels unberuehrt und ist die vorgeschlagene; A2 (in net_leaf_eval) bekaeme Wecker-Charakter wie der Bootstrap-Horizont und ist fuer v22 zu spaet -- die Erzeugung laeuft. Fuer v22 also A1 oder gar nicht. Zu fahren gemeinsam mit PREREG_implicit_minimax_backup.md par.3, beide sind Such-Knoepfe am selben Netz (dem v22-Netz aus dem hv2-Korpus). NACHTRAG par.5a: A1 ist nur gegenueber HEURISTISCHER Erzeugung label-neutral -- sobald der v22-Champion Self-Play faehrt (Lauf, der das v23-Fenster fuellt), verschiebt eine geaenderte Blatt-Utility die Wurzel-Besuchsverteilung und damit die Policy-Ziele. Entscheid also VOR jenem Start. -->
+<!-- STATUS: OFFEN | Frage: Bringt eine RISIKOSENSITIVE Blatt-Utility Spielstaerke -- also die Verteilung des Ausgangs statt nur ihres Mittels in die Suche zu ziehen? | Beleg: NICHTS GEMESSEN. Ausgangspunkt war die Nutzer-Idee der Varianz-Penalisierung. Wichtige Korrektur aus der Vorpruefung: der Verteilungs-Kopf points_dist ist ABGESCHALTET (POINTS_DIST_BINS = 0, config.py:134) und der Champion traegt ihn nicht -- seine ONNX-Ausgaenge sind policy/value/moon/points/ownership/value_wdl_logits/opp_points/endgame_margin. Die volle Fassung braucht also ein neues Training. GEGENBEFUND, der eine billige Stufe erlaubt: value_wdl_logits WIRD exportiert, aber net_mcts.rs liest es nirgends -- die Suche kennt die Klassenverteilung des Ausgangs nicht, obwohl sie im Modell steht. Zweistufig: Stufe A ohne Training (P(Niederlage) aus den WDL-Logits), Stufe B mit Training (unteres Quantil von points_dist). Entscheidungsmass ist STAERKE, kein Offline-Mass. EINGETAKTET fuer den v22-Zyklus 2026-08-25 (par.5) mit einer Bau-Entscheidung davor: Stufe A kann die KORPUS-LABELS aendern, weil der Bootstrap ueber net_leaf_eval laeuft (round_transition_deep.rs:594/698/731). Variante A1 (nur an der Gumbel-Blattstelle) laesst die Labels unberuehrt und ist die vorgeschlagene; A2 (in net_leaf_eval) bekaeme Wecker-Charakter wie der Bootstrap-Horizont; fuer v22 bleibt es bei A1 oder gar nicht. BERICHTIGT 2026-08-27: der hv2-Korpus ist seit 2026-08-26 01:52 FERTIG (2.400 pkl, 24.000 Partien) -- die A2-Begruendung lautet damit nicht mehr "die Erzeugung laeuft", sondern: A2 verlangt ein NEU-LABELN des fertigen Korpus (Bootstrap-Labels laufen ueber net_leaf_eval), und das ist ein eigener Lauf, kein Knopf. Der A1-Entscheid bleibt unveraendert VOR dem Start des v22-Self-Play faellig (par.5a). Zu fahren gemeinsam mit PREREG_implicit_minimax_backup.md par.3, beide sind Such-Knoepfe am selben Netz (dem v22-Netz aus dem hv2-Korpus). NACHTRAG par.5a: A1 ist nur gegenueber HEURISTISCHER Erzeugung label-neutral -- sobald der v22-Champion Self-Play faehrt (Lauf, der das v23-Fenster fuellt), verschiebt eine geaenderte Blatt-Utility die Wurzel-Besuchsverteilung und damit die Policy-Ziele. Entscheid also VOR jenem Start. -->
 
 # PREREG: Risikosensitive Blatt-Utility
 
@@ -104,6 +104,12 @@ Wertungsplatte, eigene Punkte, Marge.
 
 ## par.5 Was diese Prereg NICHT ist
 
+> **Nummerierungs-Anmerkung (2026-08-27):** diese Datei traegt ZWEI
+> Abschnitte "par.5" -- diesen hier und weiter unten "par.5 STUFE A
+> EINGETAKTET". Externe Verweise auf `par.5a` meinen den unteren
+> (das Eingetaktete) samt seinem Nachtrag. Nicht umnummeriert, weil auf die
+> Bezeichner bereits verwiesen wird.
+
 - **Kein zweiter Blattwert-Knopf im alten Sinn.** Die negativen
   Praezedenzfaelle drehten an einem BESTEHENDEN Term (einmal als Dosis-Sweep,
   einmal als Einzelwert -- siehe par.2). Hier kommt eine Groesse HINZU, die
@@ -134,10 +140,25 @@ Daraus folgt eine Bau-Entscheidung, die VOR dem Bau fallen muss:
   GENERIERUNGSSTART entscheidbar, spaeter nur durch Neu-Labeln aenderbar. Fuer
   v22 ist dieser Zug bereits vorbei -- die Erzeugung laeuft seit 17:20.
 
-**Fuer v22 heisst das: A1, oder gar nicht.** Ein Wechsel auf A2 mitten im
-laufenden Korpus wuerde eine Datei-Haelfte mit einer anderen Zieldefinition
-erzeugen als die andere -- ein stiller Messfehler im Artefakt, genau die
-Bauform, vor der die Exklusivitaets-Regel warnt.
+**BERICHTIGUNG (2026-08-27): der letzte Halbsatz oben ist ueberholt.** Der
+hv2-Korpus ist seit dem 2026-08-26 01:52 FERTIG -- 2.400 pkl, 24.000 Partien,
+`data/manifest_hv2_20260825_172710.json`. Am Ergebnis fuer A2 aendert das
+nichts, wohl aber an der Begruendung, und die trug bisher das falsche
+Argument:
+
+* **frueher:** "zu spaet, weil die Erzeugung laeuft" (Halb-Halb-Korpus, ein
+  Wechsel mitten im Lauf erzeugte zwei Zieldefinitionen in einem Fenster);
+* **jetzt:** A2 verlangt ein **NEU-LABELN des fertigen Korpus**. Die
+  Bootstrap-Labels laufen ueber `net_leaf_eval`
+  (round_transition_deep.rs:594/698/731); eine risikosensitive Utility dort
+  aendert jedes bereits geschriebene Value-Ziel. Das ist ein eigener,
+  vollstaendiger Lauf ueber 2.400 Dateien, kein Knopf -- und er waere gegen
+  den bereits gemessenen Korpus zu rechtfertigen.
+
+**Fuer v22 heisst das unveraendert: A1, oder gar nicht.** Wer A2 will, plant
+einen Neu-Label-Lauf ein und begruendet ihn eigenstaendig; ein gemischter
+Bestand (ein Teil alt gelabelt, ein Teil neu) waere ein stiller Messfehler im
+Artefakt, genau die Bauform, vor der die Exklusivitaets-Regel warnt.
 
 **Warum die Stufe trotzdem billig ist:** `value_wdl_logits` WIRD vom Champion
 exportiert, aber `net_mcts.rs` liest es nirgends. Die Information ist bereits
