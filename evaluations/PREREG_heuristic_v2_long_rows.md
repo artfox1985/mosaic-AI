@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm gegen Champion@400). Die Prio-Leiter des Nutzers als Routing-Huelle (V2Huelle) schlaegt v1 UND das alte v2: Siegquote 0,373 gegen 0,256 und 0,128, volle Spalten 0,798 gegen 0,086 und 0,302 (Netz selbst 0,106), Marge -5,5 gegen -12,2 und -19,4, Vollendungsquote 0,717; gepaart +0,700 volle Spalten (t=+13,73 auf 16 Bloecken). Preis: volle Zeilen 0,432 auf 0,216. Der Durchbruch kam durchgehend vom ROUTING, nie von einem Bewertungsterm (par.8.6); zwei gerechnete Punktekarten als Routing-Ziel sind negativ (par.9.1/9.2) -- eine additive Punktekarte ist ein BREITEN-Signal, volle Spalten brauchen FOKUS. par.11 (rundenabhaengige Spalten-Gewichte) GEMESSEN und H0 (n=160, t=0,39). par.17 NEIN (Knotenbudget bindet nicht), par.18 NEIN (Blindzieh-Pathologie bleibt). -- ABSCHLUSS par.19 (2026-08-27, Nutzer-Entscheid "V2 ist durch"): der v2-Zweig ist AUS DEM QUELLSTAND ENTFERNT -- Enum, heuristic_v2.rs, v2-Routing in plate_builder, beide v2-Arena-Einstiege, die ganze Faedelung. Erhalten bleiben: das Spec-Pflichtfeld heuristik_variante (v2-Specs werden HART abgewiesen), das CLI-Flag mit choices=[v1], die v22-Korpora in data/ und BEIDE Artefakte auf ihrem mitgelieferten Wheel (v1_anchor als Elo-Anker, v2huelle_generator als Erzeuger). Beleg der Kapselung: frozen_agent_referee_probe liefert v1_anchor [27,15]/159 und v2huelle_generator [63,27]/163 unveraendert, obwohl der Quellstand v2 nicht mehr kennt. Stillgelegt statt migriert: v2_envelope_arena und v2_teacher_arena (ihr Vergleichsarm v2-plain war nie ein Artefakt). Nicht mehr nachrechenbar: die SOLL-Seite von PREREG_stack_draw_reservation_rule par.5 (nutzte expected_points_map). -- OFFEN: par.3b.2 Spalten-Abnahme-Tor registriert 2026-08-27 (w1=1,0 gegen w0, argmax-Instrument, zwei harte Tore, entscheidet ueber den Start des v22-Self-Play; Nachtrag 2026-08-27: KALTSTART statt Warmstart, Gating gegen Anker+v21 laeuft informativ und entscheidet den Start NICHT). par.3b.3 Alternativplan Label-Qualitaet: Stufe 0 GEFAHREN 2026-08-27, DAEMPFUNG NICHT BESTAETIGT (oberster Bin -0,015 gegen Schwelle +0,05, voller Korpus) -- Arm L bleibt Reserve, Kaltstart mit TD_LAMBDA 0,5; Beifang: v21-Bootstrap global ~5-7 pp zu optimistisch. par.12/par.15 sind mit dem Zweig entfallen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm gegen Champion@400). Die Prio-Leiter des Nutzers als Routing-Huelle (V2Huelle) schlaegt v1 UND das alte v2: Siegquote 0,373 gegen 0,256 und 0,128, volle Spalten 0,798 gegen 0,086 und 0,302 (Netz selbst 0,106), Marge -5,5 gegen -12,2 und -19,4, Vollendungsquote 0,717; gepaart +0,700 volle Spalten (t=+13,73 auf 16 Bloecken). Preis: volle Zeilen 0,432 auf 0,216. Der Durchbruch kam durchgehend vom ROUTING, nie von einem Bewertungsterm (par.8.6); zwei gerechnete Punktekarten als Routing-Ziel sind negativ (par.9.1/9.2) -- eine additive Punktekarte ist ein BREITEN-Signal, volle Spalten brauchen FOKUS. par.11 (rundenabhaengige Spalten-Gewichte) GEMESSEN und H0 (n=160, t=0,39). par.17 NEIN (Knotenbudget bindet nicht), par.18 NEIN (Blindzieh-Pathologie bleibt). -- ABSCHLUSS par.19 (2026-08-27, Nutzer-Entscheid "V2 ist durch"): der v2-Zweig ist AUS DEM QUELLSTAND ENTFERNT -- Enum, heuristic_v2.rs, v2-Routing in plate_builder, beide v2-Arena-Einstiege, die ganze Faedelung. Erhalten bleiben: das Spec-Pflichtfeld heuristik_variante (v2-Specs werden HART abgewiesen), das CLI-Flag mit choices=[v1], die v22-Korpora in data/ und BEIDE Artefakte auf ihrem mitgelieferten Wheel (v1_anchor als Elo-Anker, v2huelle_generator als Erzeuger). Beleg der Kapselung: frozen_agent_referee_probe liefert v1_anchor [27,15]/159 und v2huelle_generator [63,27]/163 unveraendert, obwohl der Quellstand v2 nicht mehr kennt. Stillgelegt statt migriert: v2_envelope_arena und v2_teacher_arena (ihr Vergleichsarm v2-plain war nie ein Artefakt). Nicht mehr nachrechenbar: die SOLL-Seite von PREREG_stack_draw_reservation_rule par.5 (nutzte expected_points_map). -- OFFEN: par.3b.2 Spalten-Abnahme-Tor registriert 2026-08-27 (w1=1,0 gegen w0, argmax-Instrument, zwei harte Tore, entscheidet ueber den Start des v22-Self-Play; Nachtrag 2026-08-27: KALTSTART statt Warmstart, Gating gegen Anker+v21 laeuft informativ und entscheidet den Start NICHT). par.3b.3 Alternativplan Label-Qualitaet: Stufe 0 GEFAHREN 2026-08-27, DAEMPFUNG NICHT BESTAETIGT (oberster Bin -0,015 gegen Schwelle +0,05, voller Korpus) -- Arm L bleibt Reserve, Kaltstart mit TD_LAMBDA 0,5; Beifang ist ein GLOBALER Optimismus-Versatz des v21-Bootstrap (~+0,05 je Seite, Summe der beiden Gewinnwahrscheinlichkeiten ~1,13-1,14). Daraus drei Registrierungen vom 2026-08-27: (a) Arm K Bootstrap-Kohaerenz, ENTWURF, Nutzer-Entscheid OFFEN -- Summen-Normierung oder affine Versatz-Korrektur als reine Label-Transformation im WDL-Zweig, Cache-Key-Komponente Pflicht, Staerkebeitrag unbelegt (Ordnung unveraendert), das Argument sind Irrtumskosten fuer alles, was Absolutwerte liest; kein Spiegelungs-Artefakt (MIRROR_OTHER_VAL=false, net_mcts.rs:670). (b) Arm-R-Vorbedingung BERICHTIGT: "v22 reduziert die Plattendaempfung" ist strukturell unerfuellbar, weil es die Daempfung nicht gibt -- neue Bedingung ist die Senkung des GLOBALEN Versatzes gegen denselben Korpus mit derselben Sonde. (c) par.3b.4 REGISTRIERT, VOR der Tor-Auswertung von par.3b.2: Symmetrie-Pruefung des Lehrerkorpus -- hv2 laeuft mit v2huelle auf BEIDEN Seiten, also koennte der Value-Kopf ueber den WERT des Spaltenbaus wieder nichts lernen (Mechanismus aus DOSSIER_ownership_head Abschnitt 7(1)); Stufe 0 baufrei: Spalten-Differenz Sieger minus Verlierer gegen den Ausgang, Blockebene je Datei; trennt sie nicht, misst par.3b.2 nur Policy-VERHALTEN und ist entsprechend zu etikettieren. Sonde corpus_column_outcome_symmetry_probe.py GESCHRIEBEN und smoke-abgenommen, voller Lauf STEHT AUS. par.12/par.15 sind mit dem Zweig entfallen. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1115,6 +1115,17 @@ v22b-Training im Afterburner-Muster. Arm R setzt voraus, dass v22 die
 Plattendaempfung nachweislich reduziert hat (R5-Plattensteigungs-Messung am
 v22-Kopf), sonst tauscht man einen gedaempften Bewerter gegen den naechsten.
 
+**BERICHTIGUNG der Arm-R-Vorbedingung (2026-08-27, nach dem Stufe-0-Lauf):**
+die eben genannte Bedingung ist STRUKTURELL UNERFUELLBAR. Stufe 0 hat gezeigt,
+dass es die Plattendaempfung im Bootstrap gar nicht gibt (Residuum ueberall
+negativ, oberster Bin -0,0150 gegen eine Schwelle von +0,05) -- eine Messung,
+die ihre "Reduktion" nachweist, kann es also nicht geben. **NEUE Bedingung:**
+Arm R setzt voraus, dass v22 den GLOBALEN Versatz gegen DENSELBEN Korpus
+senkt, gemessen mit DERSELBEN Sonde
+(`tools/probes/bootstrap_plate_damping_probe.py`, voller Lauf 727 s). Damit
+haengt der Arm an einer Groesse, die die Sonde tatsaechlich ausweist, und der
+Vergleich bleibt gepaart auf denselben Zustaenden.
+
 **Reihenfolge:** Stufe 0 vor dem Training; L und R sind BENANNTE Folgewege
 des Spalten-Tors (par.3b.2), keine Parallelarme des Erstlaufs.
 
@@ -1178,6 +1189,108 @@ ohne Torfunktion: die Optimismus-Konstante (~+0,05 auf beiden Seiten,
 Summe der Gewinnwahrscheinlichkeiten ueber 1) ist ein KALIBRIER-Befund
 am v21-Value-Kopf, kein Platten-Befund; Runde 4 ist fast kalibriert
 (-0,018), Runde 1-3 tragen den Versatz.
+
+**Arm K -- Bootstrap-Kohaerenz (ENTWURF 2026-08-27, Nutzer-Entscheid offen)**
+
+**Befund-Basis:** Stufe 0 fand statt der vermuteten Plattendaempfung einen
+GLOBALEN Optimismus-Versatz -- rund +0,05 je Seite, beidseitig, die Summe der
+beiden Bootstrap-Gewinnwahrscheinlichkeiten liegt bei ~1,13-1,14 statt bei 1.
+Ein Spiegelungs-Artefakt ist das nicht: `MIRROR_OTHER_VAL` steht auf `false`
+(net_mcts.rs:670), `net_leaf_eval` rechnet also fuer Zieher und Gegner ZWEI
+UNABHAENGIGE Vorwaertspaesse (Agent-geprueft, net_mcts.rs:1503-1534). Beide
+Werte kommen aus demselben Kopf, aber aus verschiedenen Eingaben -- nichts
+zwingt sie auf Summe 1.
+
+**Idee:** die beiden Bootstrap-Werte je Zustand VOR dem TD-Blend auf Summe 1
+normieren ODER den auf hv2 gefitteten affinen Versatz herausrechnen. Beides
+ist eine reine LABEL-Transformation im WDL-Zweig von `corpus_dataset`, kein
+Neu-Spielen und kein Engine-Eingriff. Eine eigene Cache-Key-Komponente ist
+PFLICHT -- dieselbe Auflage wie beim Nativ-Default (Punkt 3 oben); ohne sie
+teilen sich beide Welten still denselben Cache.
+
+**Herleitung, als solche markiert (nicht gemessen):** ein fuer alle
+Geschwister gleicher additiver Versatz hebt sich unter Softmax weg, ist also
+SUCH-neutral -- aber nicht LABEL-neutral. Mit `TD_LAMBDA = 0,5` gehen rund
++0,03 je Seite systematisch ins v22-Value-Ziel, und ueber das v22-Self-Play
+wandern sie weiter ins v23-Fenster.
+
+**Praezedenz, die der Leser sehen muss:** eine Kohaerenz-Erzwingung zur
+SUCHZEIT gab es bereits -- `MIRROR_OTHER_VAL` setzt `other_val = 1 - mover_val`
+aus EINEM Vorwaertspass. Sie wurde arena-getestet (3:97) und auf `false`
+zurueckgesetzt (net_mcts.rs:663-670). Arm K sitzt an einem ANDEREN
+Eingriffsort: nicht am Blattwert der laufenden Suche, sondern am gespeicherten
+Label des Trainingsziels. Das entwertet den Praezedenzfall nicht, es grenzt
+ihn ab.
+
+**Quer-Beleg, der die Reichweite begrenzt:** `tools/platt_fit.py` und
+`evaluations/artifacts/platt_fit_v21.json` finden auf dem FROZEN-Set
+A = -0,0033 und B = 0,906, also praktisch KEINEN Versatz. Der Versatz existiert
+nur auf der LEHRER-Verteilung. Das ist genau das Muster "nie auf der falschen
+Verteilung eichen" ([[feedback_dont_calibrate_to_plate_blind_play]]), diesmal
+in Gegenrichtung: eine Eichung, die auf der einen Verteilung stimmt, sagt
+ueber die andere nichts.
+
+**Leitstern-Ehrlichkeit:** der Staerkebeitrag ist UNBELEGT. Ein globaler
+Versatz laesst die Ordnung unveraendert, und die Suche entscheidet nach
+Ordnung. Das Argument sind IRRTUMSKOSTEN fuer alles, was Absolutwerte liest:
+die risikosensitive Blatt-Utility Stufe A
+(`PREREG_risk_sensitive_leaf_utility.md`), die saettigende Score-Utility und
+die WDL-Klassen. Die Infrastruktur-Regel verlangt einen BENANNTEN
+Nutzniesser -- diese drei sind es.
+
+**Entscheid faellt der Nutzer.** Bei JA ist der Arm nach dem laufenden
+Kaltstart als v22b-Retrain nachholbar: zwei Arme auf DEMSELBEN Korpus,
+Entscheid an Brier PLUS Arena.
+
+### par.3b.4 Symmetrie-Pruefung des Lehrerkorpus (registriert 2026-08-27, VOR der Tor-Auswertung von par.3b.2)
+
+**Der Mechanismus ist in diesem Projekt schon einmal aufgetreten.**
+`DOSSIER_ownership_head.md` Abschnitt 7, Punkt 1 haelt fest: die Bauer-Knoepfe
+waren ein Prozess-Schalter ohne Spielerparameter, in den Bauer-Armen bauten
+BEIDE Spieler, damit war das Value-Ziel bezueglich des Plattenbaus
+wegsymmetrisiert -- und der Value-Kopf hat ueber den WERT des Plattenbaus
+nichts gelernt, "nicht das Falsche, sondern nichts".
+
+**Der hv2-Korpus hat dieselbe Bauform.** Er laeuft mit `v2huelle` auf BEIDEN
+Seiten (`PREREG_v22_window.md` par.2, Aufruf
+`--mode mcts --heuristik-variante v2huelle --sims 600 --threads 11 --version hv2
+--per-file 10`). Bauen beide, trennt Spaltenbau Sieg nicht von Niederlage --
+und der Value-Kopf koennte ueber den Wert des Spaltenbaus wieder nichts
+lernen, obwohl der Korpus ihn im Uebermass zeigt (0,732 +- 0,007 volle Spalten
+je Seite, `STATUS.md`). **Das ist eine HERLEITUNG aus der CLI-Zeile, nicht
+gemessen** -- genau darum diese Pruefung.
+
+**Stufe 0 (baufrei am Korpus, kein Netz, keine Engine):** je Partie die
+SPALTEN-DIFFERENZ der beiden Seiten bilden -- volle Spalten des Siegers minus
+die des Verlierers, dazu dieselbe Differenz auf `col_fill` -- und gegen den
+Ausgang stellen. Ausgewertet wird auf BLOCK-Ebene je Datei (stehende Regel;
+Paar-SEs unterschaetzen massiv).
+
+**Vorab festgelegte Lesart:**
+
+* **Trennt die Differenz den Ausgang NICHT** (punkt-biseriale Korrelation,
+  Block-KI schliesst die 0 ein), dann misst par.3b.2 nur Policy-VERHALTEN,
+  waehrend der Value-Kopf blind bleibt. Das Tor-Ergebnis ist dann entsprechend
+  zu ETIKETTIEREN, und der w1-gegen-w0-Vergleich beantwortet die WERT-Frage
+  NICHT -- er beantwortet nur, ob der Ownership-Kopf das Verhalten bewegt.
+* **Trennt sie den Ausgang**, ist die Sorge vom Tisch und par.3b.2 laeuft
+  unveraendert.
+
+**Werkzeug:** `tools/probes/corpus_column_outcome_symmetry_probe.py`, NEU
+geschrieben nach dem Lade-Muster von `bootstrap_plate_damping_probe.py`
+(dieselbe `corpus_io`-Passage, Fortschrittszeilen mit `flush`,
+`laufzeit`-Block im Artefakt, `--limit` fuer den Smoke). Geschrieben und als
+3-Dateien-Smoke abgenommen am 2026-08-27; der VOLLE Lauf steht aus, weil ein
+Cache-Bau die Maschine belegte (Regel "Messungen laufen exklusiv").
+
+**Konsequenz-Kette, damit die Reihenfolge nicht verrutscht:**
+
+1. Das Ergebnis gehoert VOR die Interpretation des Spalten-Tors (par.3b.2).
+2. Die Wiederaufnahme des Bootstrap-Horizonts
+   (`PREREG_bootstrap_horizon.md`; im Recherche-Abgleich vom 2026-08-27 als
+   "P5" gefuehrt) kommt erst DANACH. Sieht der Value-Kopf Spalten gar nicht,
+   misst ein Horizont-Vergleich wieder das falsche Regime -- derselbe Fehler
+   wie in par.9g dort, nur an anderer Stelle.
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
