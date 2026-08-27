@@ -27,8 +27,9 @@ Beide Richtungen sind vor dem ersten Bau geprueft worden:
 WARUM DER TRAEGERSTATUS HIER NOCH EINMAL AUFGELOEST WIRD, statt ihn dem
 Bauweg zu ueberlassen: der Schluessel muss VOR dem Bau feststehen. Damit er
 nicht von der Bauschleife abweichen kann, benutzt dieses Werkzeug DIESELBE
-Funktion wie sie (`neural_net._is_policy_carrier`) und dieselbe Quelle fuer
-`bootstrap_native` (`WDL_GENERATOR_PREFIXES`).
+Funktion wie sie (`corpus_dataset._is_policy_carrier`) und dieselben
+Konstanten -- `V20_CARRIER_SHORTCUT_PREFIXES` fuer den Traeger-Kurzschluss,
+`LEGACY_STRETCHED_PREFIXES` fuer `bootstrap_native`.
 
 Aufruf:
     # einmalig ueber alles, was da ist
@@ -68,16 +69,18 @@ sys.path.insert(0, str(_ROOT / "tools"))
 def _carrier_status(basename, carrier_set, carrier_prefixes):
     """Traegerstatus EINER Datei -- mit der Funktion der Bauschleife.
 
-    `bootstrap_native` wird hier genauso gebildet wie dort (Praefix-Test auf
-    den WDL-Generator), damit Schluessel und Bauweg nicht auseinanderlaufen
-    koennen. Wer das nachbaut statt aufzurufen, hat den Fehler von morgen
-    schon eingebaut.
+    Der eingefrorene v20-Kurzschluss wird hier genauso gebildet wie dort
+    (`V20_CARRIER_SHORTCUT_PREFIXES`), damit Schluessel und Bauweg nicht
+    auseinanderlaufen koennen. Wer das nachbaut statt aufzurufen, hat den
+    Fehler von morgen schon eingebaut. NICHT zu verwechseln mit
+    `bootstrap_native` (Entstauchungs-Frage, eigene Blockliste seit
+    2026-08-27) -- bis dahin war es dieselbe Groesse.
     """
     import neural_net
     import corpus_dataset  # C 2026-08-27: MosaicDataset ist ausgezogen
-    bootstrap_native = basename.startswith(neural_net.WDL_GENERATOR_PREFIXES)
+    v20_wdl_generator = basename.startswith(neural_net.V20_CARRIER_SHORTCUT_PREFIXES)
     return corpus_dataset._is_policy_carrier(basename, carrier_set, carrier_prefixes,
-                                         bootstrap_native)
+                                         v20_wdl_generator)
 
 
 def _load_manifest(data_dir):
@@ -99,7 +102,11 @@ def _block_path(data_dir, basename, kwargs, carrier):
     key = neural_net.per_file_cache_key(
         basename, value_target_variant=kwargs["value_target_variant"],
         encoder=kwargs["encoder"], conjunction_head=kwargs["conjunction_head"],
-        policy_carrier=carrier)
+        policy_carrier=carrier,
+        # Gleiche Regel wie beim Traegerstatus: DIESELBE Quelle wie die
+        # Bauschleife (corpus_dataset), damit Schluessel und Bauweg nicht
+        # auseinanderlaufen koennen.
+        bootstrap_native=not basename.startswith(neural_net.LEGACY_STRETCHED_PREFIXES))
     return os.path.join(data_dir, f".filecache_{key}.h5")
 
 

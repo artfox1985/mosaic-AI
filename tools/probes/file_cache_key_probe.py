@@ -37,7 +37,8 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "engine" / "py"))
 
 BASIS = dict(value_target_variant="default", encoder="flat",
-             conjunction_head=False, policy_carrier=True)
+             conjunction_head=False, policy_carrier=True,
+             bootstrap_native=True)
 
 # Je Eintrag: Anzeigename, wie die Abweichung erzeugt wird.
 #   ("arg", name, wert)  -> Aufrufargument aendern
@@ -48,6 +49,10 @@ DIVERGENCES = [
     ("encoder",              "arg", "encoder",              "2d"),
     ("conjunction_head",     "arg", "conjunction_head",     True),
     ("policy_carrier",       "arg", "policy_carrier",       False),
+    # 2026-08-27: Zieldefinition je Datei (roher vs. Platt-entstauchter
+    # Bootstrap in `values_wdl`) -- muss einen MISS erzeugen, sonst zieht ein
+    # Lauf nach der Semantik-Umkehr still die entstauchten Bestands-Bloecke.
+    ("bootstrap_native",     "arg", "bootstrap_native",     False),
     ("MOSAIC_CACHE_NOPACK",  "env", "MOSAIC_CACHE_NOPACK",  "1"),
     ("MOSAIC_CACHE_F32",     "env", "MOSAIC_CACHE_F32",     "1"),
     ("MOSAIC_IGNORE_POLICY_TARGET_VALID", "env",

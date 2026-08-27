@@ -728,7 +728,10 @@ def action_to_id(action: dict) -> int:
 # ALT-Generatoren (tanh-Kopf, gestauchte Marge als "Wahrscheinlichkeit")
 # bereits beim Cache-Bau Platt-ENTSTAUCHT geblendet (Konstanten unten,
 # v19_2d_best-Fit aus value_calibration_fit.json "full"); Dateien von
-# WDL-Generatoren (Prefix-Liste) blenden den nativen [0,1]-Bootstrap roh.
+# WDL-Generatoren blenden den nativen [0,1]-Bootstrap roh. ACHTUNG, seit
+# 2026-08-27 ist die Fallunterscheidung UMGEKEHRT gebaut: roh ist der
+# Default, entstaucht wird nur `LEGACY_STRETCHED_PREFIXES` (Begruendung
+# an der Konstante unten).
 # train.py's `--wdl-bootstrap-destretch` ist damit fuer Schema>=17-Caches
 # UEBERFLUESSIG und darf NICHT zusaetzlich gesetzt werden (doppelte
 # Streckung); der Flag bleibt nur fuer Alt-Experimente auf Schema-16.
@@ -754,9 +757,43 @@ VALUE_SCHEMA_VERSION = 20
 # Namenskonvention: Dateien heissen nach dem GENERATOR (v19-Aera-Modell
 # t34_wdldestretch_brierbest -> "v19wdl"), NICHT nach der Ziel-Generation
 # (Koordinator-Fehler #2 mit dieser Konvention, vom Nutzer 2026-08-06
-# gefangen -- BEVOR falsch entstaucht wurde). Kuenftige WDL-Generatoren
-# ergaenzen ihre Praefixe hier.
-WDL_GENERATOR_PREFIXES = ("selfplay_v19wdl", "selfplay_v20wdl")
+# gefangen -- BEVOR falsch entstaucht wurde).
+#
+# SEMANTIK-UMKEHR (2026-08-27, PREREG_heuristic_v2_long_rows.md par.3b.3
+# "Nachtrag Stufe 0" Punkt 3): bis hierher war die Entstauchung der DEFAULT
+# und eine ALLOWLISTE (`WDL_GENERATOR_PREFIXES` = v19wdl/v20wdl) nahm die
+# nativen WDL-Generatoren davon aus. Der hv2-Fund zeigt den Preis dieser
+# Bauform: `selfplay_hv2_*` stammt vom v21-Label-Netz, traegt also einen
+# NATIVEN [0,1]-Bootstrap -- weil sein Praefix in der Allowliste fehlte,
+# lief er trotzdem durch die Platt-Streckung (Logit mal B=1,9269) und das
+# v22-Ziel haette einen verzerrten Bootstrap-Anteil bekommen.
+#
+# Jetzt gilt: **nativ ist der DEFAULT**, entstaucht wird nur noch, wer in
+# dieser BLOCKLISTE steht. Warum Blockliste statt Allowliste -- die
+# Fehlerrichtung dreht sich um:
+#   * Neue Generatoren kommen laufend dazu. Ein vergessener Eintrag in der
+#     Allowliste war ein STILLER Ziel-Fehler (genau der hv2-Fall); ein
+#     vergessener Eintrag in der Blockliste kann es nicht mehr sein, denn
+#     jeder neue Generator hat einen nativen WDL-Kopf.
+#   * Die Blockliste ist ABGESCHLOSSEN: sie zaehlt die tanh-Aera auf, und
+#     die waechst nicht mehr. Alt-Korpora kommen per stehender Regel
+#     (Zwei-Klassen-Fenster, MEMORY "Replay window strategy") NIE wieder
+#     ins Training -- die Liste ist damit reine Alt-Mechanik, kein
+#     Pflegeposten.
+# Aufgenommen sind alle Praefixe der tanh-Aera, die im Repo je vorkamen
+# (Inventur 2026-08-27 ueber archive/history.md + das v20-Traeger-Manifest):
+# v10b, v12, v16, v17, v18. Ab `selfplay_v19wdl*` ist der Kopf nativ.
+LEGACY_STRETCHED_PREFIXES = (
+    "selfplay_v10b", "selfplay_v12", "selfplay_v16", "selfplay_v17", "selfplay_v18",
+)
+# EIGENE Konstante, bewusst NICHT `LEGACY_STRETCHED_PREFIXES`: der
+# v20-Rueckwaerts-Pfad in `_is_policy_carrier` (Manifest OHNE das Feld
+# `carrier_prefixes`) benutzt denselben Praefix-Test als Traeger-Kurzschluss.
+# Dessen Ergebnis muss bit-identisch bleiben, waehrend die Entstauchungs-Frage
+# darueber die Seite gewechselt hat -- eine gemeinsame Konstante haette den
+# Kurzschluss mit umgedreht und still ALLE Dateien zu Policy-Traegern gemacht.
+# EINGEFROREN auf den Stand vom 2026-08-06; hier kommt nichts mehr dazu.
+V20_CARRIER_SHORTCUT_PREFIXES = ("selfplay_v19wdl", "selfplay_v20wdl")
 DESTRETCH_A = 0.0051
 DESTRETCH_B = 1.9269
 

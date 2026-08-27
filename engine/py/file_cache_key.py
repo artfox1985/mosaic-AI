@@ -16,7 +16,8 @@ sehen wie die Bauschleife. Nebenbei vermeidet es den Ringschluss --
 
 
 def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str,
-                       conjunction_head: bool, policy_carrier: bool) -> str:
+                       conjunction_head: bool, policy_carrier: bool,
+                       bootstrap_native: bool) -> str:
     """Schluessel EINER Korpusdatei (PREREG_cache_build_time.md par.6, Hebel 4).
 
     EIGENER NAMENSRAUM, nicht der Fenster-Schluessel: dieser hier deckt nur
@@ -35,6 +36,15 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
 
     Der Aufrufer muss `policy_carrier` mit `_is_policy_carrier` bilden (nicht
     von Hand), sonst koennen Schluessel und Bauschleife auseinanderlaufen.
+
+    `bootstrap_native` (2026-08-27, PREREG_heuristic_v2_long_rows.md par.3b.3
+    Punkt 3) ist nach derselben Regel gebaut: der AUFGELOESTE Status DIESER
+    Datei, nicht die Blockliste. Er ist eine ZIELDEFINITION -- er entscheidet,
+    ob in `values_wdl` der rohe oder der Platt-entstauchte Bootstrap steckt,
+    und das wird VOR dem Caching eingerechnet. Ohne ihn traefe ein Lauf nach
+    der Semantik-Umkehr ("nativ ist Default") still die Bestands-Bloecke mit
+    den ENTSTAUCHTEN hv2-Zielen. Bildung beim Aufrufer:
+    `not basename.startswith(neural_net.LEGACY_STRETCHED_PREFIXES)`.
 
     Alles Uebrige ist per Datei wirksam und steht darum hier: Schema- und
     Aktionszahlen, Sharpen-Exponent, TD_LAMBDA, Value-Ziel-Variante, Encoder,
@@ -73,6 +83,7 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
         + "|" + str(POLICY_TARGET_SHARPEN_EXPONENT) + "|" + str(TD_LAMBDA)
         + "|" + str(value_target_variant) + "|" + str(encoder)
         + "|carrier=" + ("1" if policy_carrier else "0")
+        + "|bsnative=" + ("1" if bootstrap_native else "0")
         + "|rounds_v1+own_v1"
     )
     if encoder == "2d":

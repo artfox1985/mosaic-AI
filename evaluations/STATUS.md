@@ -441,16 +441,24 @@ Voraussetzung fuer den Self-Play-Start ("ich geh nicht davon aus dass v22
 besser ist als v21") -- der Start haengt am Spalten-Abnahme-Tor (par.3b.2),
 nicht am Gating-Ausgang.
 
-**PFLICHT-FIX VOR DEM TRAINING (Fund 2026-08-27, Nutzer-Entscheid):**
-`WDL_GENERATOR_PREFIXES` kennt `selfplay_hv2` nicht -- der native
-WDL-Bootstrap des v21-Label-Netzes wird im Zielbau faelschlich
-Platt-entstaucht (corpus_dataset.py:917-919, Logit mal 1,93; betrifft JEDES
-bisher auf hv2 gebaute Value-Ziel, auch die Sanity-Trainings). Beschlossene
-Loesung ist die Umkehr der Semantik: **nativ ist der Default**, entstaucht
-wird nur noch eine explizite Blockliste alter tanh-Aera-Praefixe
-(`PREREG_heuristic_v2_long_rows.md` par.3b.3 Nachtrag Stufe 0, Punkt 3).
-Mit eigener Cache-Key-Komponente und Fixier-Test; der 79er-Cache wird erst
-NACH diesem Fix gebaut.
+**PFLICHT-FIX VOR DEM TRAINING -- ERLEDIGT 2026-08-27 (gebaut und
+abgenommen):** der native WDL-Bootstrap des v21-Label-Netzes wurde im
+Zielbau faelschlich Platt-entstaucht (`WDL_GENERATOR_PREFIXES` kannte
+`selfplay_hv2` nicht; Fehlmass bis 0,0715 je Record, gemessen). Semantik
+UMGEKEHRT: **nativ ist der Default**, entstaucht wird nur noch die
+Blockliste der fuenf tanh-Aera-Praefixe (`LEGACY_STRETCHED_PREFIXES`,
+v10b/v12/v16/v17/v18; Inventur ueber data/, holdout/ und das
+v20-Traeger-Manifest). Der v20-Traeger-Kurzschluss haengt an einer EIGENEN
+eingefrorenen Konstante (`V20_CARRIER_SHORTCUT_PREFIXES`) -- die Umkehr
+haette ihn sonst still mitgedreht. Beide Cache-Schluessel tragen den
+Status (Fenster-Key mit Blockliste, per-Datei-Key aufgeloest);
+Fixier-Probe `bootstrap_native_default_probe.py` GRUEN (nativ=roh,
+alt=entstaucht, Schluessel trennt), vom Koordinator nachgefahren.
+**Folge: 66 `.cache_*.h5` + 121 `.filecache_*.h5` in data/ sind tot**
+(entstauchte hv2-Ziele bzw. alter Schluessel) -- Loeschen ist
+Nutzer-Entscheid, nichts geloescht. Der 79er-Cache wird auf dem neuen
+Stand gebaut. Details: `PREREG_heuristic_v2_long_rows.md` par.3b.3
+Nachtrag Punkt 3.
 
 ### 1b. ERLEDIGT 2026-08-26: Cache je Datei (Hebel 4)
 
@@ -584,6 +592,7 @@ weiterhin Feld fuer Feld identisch mit der ersten Korpusdatei.
 
 | Punkt | Kosten | wofuer noetig |
 | --- | --- | --- |
+| Drei getrackte JSONs mit absoluten Pfadfragmenten repo-relativ machen: `evaluations/frozen_referee_match_v1_anchor.json`, `..._v2huelle_generator.json`, `models/frozen_champions/v21_2d_brierbest/golden_probe.json` (Fund 2026-08-27 per breitem Privacy-Grep; bereits gepusht, kein Nutzername enthalten) | klein | oeffentliches Repo. Gehoert in die Kapselungs-Spur: bei der golden_probe.json im EINGEFRORENEN Artefakt vorher klaeren, ob verify-Tooling sie hasht (Praezedenz: golden_probe-Manifest-Sanierung 25a632f) |
 | Serielle Referenz fuer den vollen Cache | 2,58 h | bevor der Cache eine Champion-Entscheidung traegt |
 | Traeger-Manifest-Generator | klein | `PREREG_v23_window.md` verlangt 1.800 von 17.450 hv2-Partien policy-aktiv; es gibt nur Leser, kein Werkzeug. Regel ist dokumentiert (Seed + zeitlich gestreute Auswahl) |
 | ~~Split-Test Routing gegen Drafting~~ ERLEDIGT 2026-08-26 | 3x 22 s | `PREREG_v22_window.md` par.4f: **Drafting 0,756, Routing allein 0,000** -- par.4c hatte das Gegenteil vorhergesagt |

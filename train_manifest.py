@@ -23,7 +23,8 @@ def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
     WARUM DAS HIER STEHT (Befund 2026-08-16): der gesamte Ownership-Korpus war
     in SIEBEN Trainingslaeufen policy-maskiert, ohne dass es irgendwo sichtbar
     wurde -- die Korpusdateien sind weder im Traeger-Manifest gelistet noch
-    beginnen sie mit `WDL_GENERATOR_PREFIXES`, also galt `pol_w = 0.0`
+    beginnen sie mit `V20_CARRIER_SHORTCUT_PREFIXES` (bis 2026-08-27
+    `WDL_GENERATOR_PREFIXES`), also galt `pol_w = 0.0`
     (`neural_net.py:1804`). Value-, Punkte- und Ownership-Ziele liefen normal
     durch, die Laeufe sahen also voellig unauffaellig aus. Aufgefallen ist es
     erst ueber eine Nutzer-Frage, nicht ueber eine Messung.
@@ -37,7 +38,7 @@ def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
     manifest, welches aktiv war."""
     try:
         from corpus_dataset import _is_policy_carrier
-        from neural_net import WDL_GENERATOR_PREFIXES
+        from neural_net import V20_CARRIER_SHORTCUT_PREFIXES
     except ImportError:                                   # defensiv: nie den Lauf blockieren
         return {"error": "neural_net._is_policy_carrier nicht importierbar"}
 
@@ -60,7 +61,7 @@ def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
         m = (selfplay_filename_re or _SELFPLAY_FILENAME_RE).match(name)
         prefix = m.group("prefix") if m else "_unmatched"
         ist = _is_policy_carrier(name, carrier_set, carrier_prefixes,
-                                 name.startswith(WDL_GENERATOR_PREFIXES))
+                                 name.startswith(V20_CARRIER_SHORTCUT_PREFIXES))
         je_praefix[prefix] = je_praefix.get(prefix, 0) + (1 if ist else 0)
         traeger_gesamt += 1 if ist else 0
     return {
