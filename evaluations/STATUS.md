@@ -678,7 +678,7 @@ naechste Sitzung mitten im Ablauf uebernehmen kann:
 | 1a | Spezialfeld-Kanaele 77->79 (additiv, Paritaets-Hash haelt) | ERLEDIGT (`e91cd34`) |
 | 1b | Entstauchung -> Alt-Mechanik, nativ als Default (Blockliste) | ERLEDIGT (`4a775e1`) |
 | 1c | train.py-Hygiene: --lr-t-max, Val-Pool-Waechter, Traeger-Flag im Manifest | ERLEDIGT (`dc40551`); Manifest-Felder am ersten echten Lauf gegenpruefen |
-| 1d | Stufe-0-Sonde (par.3b.3): Daempfungs-Verdikt, entscheidet Arm-L-Pflicht | LAEUFT (voller Korpus; Smoke deutete auf "bestaetigt") |
+| 1d | Stufe-0-Sonde (par.3b.3): Daempfungs-Verdikt | ERLEDIGT: NICHT bestaetigt (oberster Bin -0,015 gg. +0,05); Arm L bleibt Reserve, TD_LAMBDA 0,5. Beifang: v21-Bootstrap global ~5-7 pp zu optimistisch |
 | 2a | 79er-Cache parallel (~36 min) auf nativ-Kodierung | offen, nach 1d |
 | 2b | Serielle Referenz (~2,6 h) + Bit-Vergleich = Cache-Tor | offen, nach 2a |
 | 2c | Cache-Verdrahtung in train.py | offen, nach 2b |
