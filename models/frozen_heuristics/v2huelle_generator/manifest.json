@@ -14,9 +14,9 @@
     "rolle": "Traeger des VERHALTENS. Bei einer Heuristik gibt es kein ONNX, das es mittraegt -- ohne dieses Wheel ist der Agent weg."
   },
   "tiling_net": {
-    "datei": "tiling_net.onnx",
+    "datei": "label_net.onnx",
     "quelle": "alphazero_v21_2d_brierbest.onnx",
-    "rolle": "Stichentscheid im Tiling-Durchfall (self_play.rs:1234: die v2-Vorzugskarte greift nur, wenn sie einen Zug liefert -- sonst faellt es auf das Netz durch) und Erzeuger der bootstrap_value-Label"
+    "rolle": "LABEL-Netz, kein Tiling-Netz. Im Erzeugerpfad (run_self_play_with_net_labels -> play_one_game) steht tiling_net auf None (self_play.rs), und resolve_tiling_step nimmt ohne Netz den reinen Heuristik-Zweig -- Value-Tiebreak und Ownership-Pol sind auf allen Heuristik-Pfaden strukturell aus. Dieses Netz LABELT nur: Rundenuebergangs-Bootstrap ueber net_leaf_eval plus die aufgezeichneten Drafting-Priors. Am SPIEL entscheidet es hier nichts. Der alte Name tiling_net.onnx stammte vom Parameter-Slot der Netz-Pfade und hat am 2026-08-27 bereits zu einer Fehlfolgerung gefuehrt."
   },
   "herkunft": {
     "git_commit": "40600ba8882b7bdf43be8c213c9891ec0f8bce0e",
@@ -99,7 +99,7 @@
       "record_rtv": false,
       "tau_argmax_from_move": 0,
       "heuristik_variante": "v2huelle",
-      "model": "tiling_net.onnx"
+      "model": "label_net.onnx"
     },
     "dateien": [
       "selfplay_probe_20260826_1816_g10.pkl"

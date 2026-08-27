@@ -634,7 +634,17 @@ if __name__ == "__main__":
     parser.add_argument("--c-puct", dest="c_puct", type=float, default=1.5,
                         help="PUCT-Explorationskonstante (nur --mode network)")
     parser.add_argument("--heuristik-variante", dest="heuristik_variante", type=str,
-                        default="v1", choices=["v1"],
+                        default="v1",
+                        # KEIN `choices=`. Die Verengung gehoert in die ENGINE, nicht in
+                        # argparse: dieses Skript ist auch der Treiber, mit dem ein
+                        # EINGEFRORENES Artefakt seine Golden Probe reproduziert
+                        # (tools/verify_frozen_heuristic.py --venv ruft genau diese Datei
+                        # mit dem Python UND dem Wheel des Artefakts). Ein v2huelle-Artefakt
+                        # bringt ein Wheel mit, das v2huelle kann -- eine argparse-Schranke
+                        # im Repo haette es trotzdem abgewiesen und dem Artefakt seinen
+                        # staerksten Beleg genommen. Genau das ist am 2026-08-27 passiert.
+                        # Wer entscheidet: das GELADENE Wheel. Das aktuelle weist v2* hart
+                        # ab (lib.rs), ein Artefakt-Wheel nimmt seine eigene Variante an.
                         help="Heuristik-Variante fuer den mcts-Modus. Seit dem 2026-08-26 "
                              "gibt es nur noch v1: der v2-Zweig ist aus dem Quellstand "
                              "entfernt (PREREG_heuristic_v2_long_rows.md par.19). Die mit "

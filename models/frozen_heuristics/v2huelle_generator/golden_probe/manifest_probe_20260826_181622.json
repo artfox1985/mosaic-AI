@@ -11,7 +11,7 @@
     "chunk": 10,
     "seed": 20260826,
     "per_file": 10,
-    "model": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\frozen_heuristics\\v2huelle_generator\\tiling_net.onnx",
+    "model": "models/frozen_heuristics/v2huelle_generator/label_net.onnx",
     "c_puct": 1.5,
     "add_root_noise": true,
     "deterministic": false,
