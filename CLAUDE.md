@@ -202,6 +202,44 @@ gemessen zu werden. Ein Infrastruktur-Vorschlag braucht deshalb einen
 BENANNTEN Nutznießer – eine konkrete Messung, die dadurch möglich oder
 schärfer wird –, nicht „hilft künftig allgemein".
 
+## Messungen laufen EXKLUSIV — und ein Build ist Nebenlast (2026-08-25)
+
+**Während eine Arena, ein Self-Play oder eine netz-/suchgestützte Sonde läuft,
+darf nichts anderes Rechenlast erzeugen.** CPU-Nebenlast verstümmelt Partien
+nichtdeterministisch; die Signatur, an der es einmal aufgefallen ist, war ein
+Endstand von 3:1. Determinismus-Prüfungen gelten nur unter den
+Lastbedingungen, unter denen gemessen wurde.
+
+**Nebenlast heißt CPU-Last, nicht Absicht.** Das ist die Stelle, an der die
+Regel am 2026-08-25 gebrochen wurde: `cargo test --release` und `cargo build`
+wurden als „nur Bauen, keine Messung" verbucht und liefen gegen den Lauf einer
+Parallelsitzung. Ein Build ist Volllast über viele Kerne — er zählt.
+
+Dazu gehören ausdrücklich:
+
+- `cargo build` / `cargo test` (rayon, viele Kerne)
+- `python -m maturin build`, `pip install` des Wheels
+- jede Sonde, jedes Trainings- oder Auswertungsskript
+- auch „nur schnell" — die Dauer ändert nichts an der Art
+
+**Nicht davon betroffen:** Dateien lesen und schreiben, Dokumentation, greps.
+Ein `git commit` ist ein Grenzfall (der pre-commit-Hook scannt das Repo) —
+im Zweifel bis nach dem Lauf aufheben.
+
+**Bei parallelen Sitzungen gilt ein ausdrücklicher Staffelstab.** Wer misst,
+sagt es an; wer wartet, fasst nichts an; wer fertig ist, gibt die Maschine
+in EINER Nachricht frei. Und wer die Zusage bricht, meldet es SOFORT und
+ungefragt — die andere Sitzung muss entscheiden können, ob ihr Lauf
+kontaminiert ist. Ein wiederholter Lauf ist billiger als ein stiller
+Messfehler im Artefakt.
+
+**Spurenlage, falls es doch passiert ist:** Kompilier-Überlappung lässt sich
+an `target/release/.fingerprint` mit `find -newermt` datieren. Ein `cargo
+test` aus dem Cache erzeugt dagegen CPU-Last OHNE Spur im Dateisystem — der
+Verdacht ist dadurch nicht ausräumbar, nur durch Wiederholung. Byte-gleiche
+Artefakte belegen dann beides auf einmal: keine Kontamination und
+Determinismus unter sauberen Bedingungen.
+
 ## Lange Läufe NIE in eine Pipe (Nutzer-Anweisung 2026-08-25)
 
 **Kein `| tail`, `| head`, `| grep`, `| Select-Object` hinter einem Build, Test,
@@ -322,6 +360,16 @@ Beim Bereinigen solcher Pfade per Regex: eine Zeichenklasse braucht ZWEI
 Backslashes vor dem Schrägstrich (`[\/]`). Mit einem escapt er den
 Schrägstrich, trifft nur Vorwärtsschrägstriche und lässt jeden Windows-Pfad
 still stehen — dieser Fehler ist am 2026-08-17 zweimal passiert.
+
+## Subagenten: Opus, Aufwand mittel (Nutzer-Anweisung 2026-08-26)
+
+- **Subagenten laufen mit Modell Opus bei mittlerem Aufwand** (`model: "opus"`,
+  Reasoning-Effort medium). Ersetzt die fruehere Sonnet-Vorgabe vom 2026-07-21.
+- Die Arbeitsteilung bleibt unveraendert: der Koordinator plant, prueft und
+  entscheidet; Ausfuehrung (Code-Kartierung, Doku-Entwuerfe, Beleg-Greps,
+  Umbauten) geht wo immer moeglich an Subagenten.
+- Regel 0 gilt weiter: Agenten-Befunde sind Behauptungen; tragende Zahlen
+  selbst nachpruefen.
 
 ## Workflow-Präferenzen
 
