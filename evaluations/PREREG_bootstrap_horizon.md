@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: BEIDE ARME NEGATIV, Prereg geschlossen 2026-08-25. ANKER-ARM (par.8): Kostengate gerissen, Aufschlag 60,7 Prozent gegen Schwelle 25. TIEFEN-ARM 2 gegen 3 (par.9f): gepaart auf 200 Zustaenden trifft Horizont 3 den echten Partieausgang SCHLECHTER (Brier gepaart +0,0567 +- 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63 je Label. Der Waechter aus par.9c greift NICHT: 51 Prozent der Zustaende weichen um mehr als 0,01 ab, im Mittel 0,089 -- die Frage war echt, nur die Antwort negativ. Damit erzeugt v22 mit HORIZONT 2; der Wert steht bei der ERZEUGUNG im Korpus (self_play.rs:1941) und ist spaeter nur durch Neu-Labeln aenderbar. BERICHTIGUNG par.9g: der Messkorpus war trotz --heuristik-variante v2huelle ein V1-Korpus (die Variante erreichte den aufzeichnenden Pfad nicht, Commit 224cc42; die Draft-Seite ist weiter blind). Am Verdikt aendert das nichts -- gepaart auf denselben Zustaenden -- wohl aber an der Reichweite: gemessen wurde im ALTEN Regime. WIEDERAUFNAHME beider Arme nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden; diese Bedingung ist unveraendert offen. Sonde: tools/probes/bootstrap_horizon_paired_probe.py. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verbessert ein tieferer Bootstrap-Horizont (3 statt 2) das Value-Ziel -- und ist der zweite Rollout je Uebergang bezahlbar? | Beleg: BEIDE ARME NEGATIV, Prereg geschlossen 2026-08-25. ANKER-ARM (par.8): Kostengate gerissen, Aufschlag 60,7 Prozent gegen Schwelle 25. TIEFEN-ARM 2 gegen 3 (par.9f): gepaart auf 200 Zustaenden trifft Horizont 3 den echten Partieausgang SCHLECHTER (Brier gepaart +0,0567 +- 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63 je Label. Der Waechter aus par.9c greift NICHT: 51 Prozent der Zustaende weichen um mehr als 0,01 ab, im Mittel 0,089 -- die Frage war echt, nur die Antwort negativ. Damit erzeugt v22 mit HORIZONT 2; der Wert steht bei der ERZEUGUNG im Korpus (self_play.rs:1941) und ist spaeter nur durch Neu-Labeln aenderbar. BERICHTIGUNG par.9g: der Messkorpus war trotz --heuristik-variante v2huelle ein V1-Korpus (die Variante erreichte den aufzeichnenden Pfad nicht, Commit 224cc42; die Draft-Seite ist weiter blind). Am Verdikt aendert das nichts -- gepaart auf denselben Zustaenden -- wohl aber an der Reichweite: gemessen wurde im ALTEN Regime. WIEDERAUFNAHME beider Arme nur mit einem Korpus, in dem tatsaechlich Spalten gebaut werden -- diese Bedingung ist seit dem fertigen hv2-Korpus NACHWEISLICH ERFUELLT (2026-08-27: 24.000 Partien, volle Spalten 0,732 +- 0,007 je Seite, STATUS.md). Wiederaufnahme damit MOEGLICH, aber ZURUECKGESTELLT hinter par.3b.4 der Lehrer-Prereg (Symmetrie-Pruefung des Lehrerkorpus): baut in hv2 auf BEIDEN Seiten dieselbe Huelle, koennte der Value-Kopf ueber den WERT des Spaltenbaus nichts gelernt haben -- dann verglichen zwei Horizonte wieder das falsche Regime, derselbe Fehler wie in par.9g. Der Status bleibt ENTSCHIEDEN mit diesem Vermerk. Sonde: tools/probes/bootstrap_horizon_paired_probe.py. -->
 
 # Vorregistrierung: Bootstrap-Horizont (2 vs 3) -- Option fuer den v22-Zuschnitt
 
@@ -553,3 +553,28 @@ Lehre, und sie ist die teure: die Abnahme des Durchreich-Commits hat "gleicher
 Seed, v1 gegen v2huelle -> die Partien unterscheiden sich" auf einem
 ARENA-Pfad geprueft. Dort sitzt der Verbraucher. Der Pfad, fuer den der Umbau
 gebaut war, war der einzige, den sie nicht angefasst hat.
+
+## par.10 Wiederaufnahme-Bedingung ERFUELLT, Wiederaufnahme ZURUECKGESTELLT (2026-08-27)
+
+Die vorregistrierte Wiederaufnahme-Bedingung beider Arme -- "ein Korpus, in dem
+tatsaechlich Spalten gebaut werden" (Nachtrag 2026-08-24, Punkt 3, und par.9g,
+das sie ausdruecklich als weiter OFFEN bestaetigt hat) -- ist seit dem fertigen
+hv2-Korpus **nachweislich erfuellt**: 24.000 Partien, volle Spalten
+**0,732 +- 0,007** je Seite (`evaluations/STATUS.md`, Sanity ueber den vollen
+Korpus). Das ist kein "Schritt in diese Richtung" mehr wie die 20 Partien aus
+par.9e, sondern das neue Regime selbst.
+
+**Die Wiederaufnahme ist damit MOEGLICH -- und wird trotzdem ZURUECKGESTELLT**,
+hinter par.3b.4 von `PREREG_heuristic_v2_long_rows.md` (Symmetrie-Pruefung des
+Lehrerkorpus). Begruendung dort in einem Satz: der hv2-Korpus laeuft mit
+`v2huelle` auf BEIDEN Seiten, also trennt Spaltenbau Sieg nicht von
+Niederlage; der Value-Kopf koennte ueber den WERT des Spaltenbaus wieder
+nichts gelernt haben, obwohl der Korpus ihn im Uebermass zeigt. Traefe das zu,
+verglichen zwei Horizonte erneut das falsche Regime -- genau der Fehler, den
+par.9g fuer diese Prereg schon einmal teuer bezahlt hat, nur an anderer
+Stelle.
+
+**Der Status dieser Prereg bleibt ENTSCHIEDEN** (beide Arme geschlossen, par.8
+und par.9f). Dieser Absatz aendert daran nichts; er haelt nur fest, dass die
+Wiederaufnahme-Bedingung nicht mehr die Sperre ist, und benennt die Sperre,
+die stattdessen gilt.

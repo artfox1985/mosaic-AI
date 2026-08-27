@@ -168,8 +168,23 @@ Entscheide nicht mehr nachziehbar sind (Policy-Ziele = Besuchsverteilung):
   Policy-Ziele, gehoert also auf diese Liste. Reihenfolge dort ist bindend:
   ZUERST das Kostentor (Schwelle 25 Prozent Wanduhr-Aufschlag), Staerke
   danach -- der Schalter steht heute auf `false` (net_mcts.rs:84).
+* **Vollendbarkeits-FILTER im Netz-Spieler** (ergaenzt 2026-08-27 aus dem
+  Recherche-Abgleich). Quelle:
+  `RESEARCH_heuristic_methodology_external_2026-08-25.md` Abschnitt 4.5 plus
+  Uebernahme-Kandidat 1 -- Zuege in nachweislich UNVOLLENDBARE Zielzellen in
+  der SUCHE ausschliessen oder abwerten. Das ist die FILTER-Haelfte von K1: auf
+  der Heuristik-Seite ist sie tragend (`cell_is_completable` schneidet
+  unerreichbare Zielzellen), im NETZ ist sie nie gebaut worden. Das
+  Erreichbarkeits-Praedikat liegt seit Commit `29fb1f1` als Netz-Eingabe vor,
+  der Filter waere also kein Neubau der Relaxation, sondern ihre Anwendung im
+  Aktionsraum. **Warum auf DIESE Liste:** ein Aktionsfilter verschiebt die
+  Wurzel-Besuchsverteilung und damit die Policy-Ziele -- der Entscheid faellt
+  VOR dem v22-Self-Play, danach nicht mehr. Stand: UNGEBAUT, Default aus,
+  Paritaets-Gate Pflicht (Champion bitgleich bei ausgeschaltetem Knopf).
 * Bootstrap-Horizont -- ENTSCHIEDEN auf 2
-  (`PREREG_bootstrap_horizon.md` par.9f).
+  (`PREREG_bootstrap_horizon.md` par.9f). Die Wiederaufnahme-Bedingung ist
+  seit dem hv2-Korpus erfuellt, die Wiederaufnahme aber hinter par.3b.4 der
+  Lehrer-Prereg zurueckgestellt (dort par.10).
 * `--rtv` (Default aus), `--pcr-full-prob` (Default aus), `--sims`,
   `--c-puct`, `--no-root-noise`, `--tau-argmax-from-move`,
   `MOSAIC_WERTUNG_STREUUNG_MAX`.
