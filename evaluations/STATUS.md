@@ -589,6 +589,37 @@ externer Platzierung. Beide Artefakte tragen `protokoll.kinds` und wurden mit
 dem vollstaendigen Wheel neu eingefroren; die Golden Probe des Generators ist
 weiterhin Feld fuer Feld identisch mit der ersten Korpusdatei.
 
+### 1e. CODEPFLEGE-AUDIT 2026-08-27: die VERSCHOBENEN Befunde (Merkliste)
+
+Das 25-Punkte-Audit ist zur Haelfte umgesetzt (`97126a2`, S-Fixes). Der Rest
+ist BEWUSST verschoben und hier festgehalten, damit er nicht im
+Chat-Scrollback verrottet. Fundstellen-Details stehen im jeweiligen Befund
+des Audit-Berichts (Agenten-Lauf 2026-08-27); die Nummern sind dessen
+Zaehlung.
+
+**Naechstes Build-Fenster (brauchen cargo, Paritaets-Gate):**
+
+| Befund | Kern | Risiko |
+| --- | --- | --- |
+| 4 | SECHS Dialekte fuer "ist dieser Bool-Knopf an?" (shaping.rs:999, state.rs:209, tiling_solver.rs:374/386, net_mcts.rs:230): `X=true` schaltet je nach Knopf AN oder AUS. Fix: ein `read_bool_env` neben `read_f64_env`, ~18 Stellen | ein A/B-Arm laeuft still als Kontrollarm |
+| 13-15 | Drei stille Env-Verschlucker: `MOSAIC_INTERLEAVE_BATCH_MAX` ausser Range (net_batcher.rs:249), `MOSAIC_R5_NODE_BUDGET=0`/Tippfehler (round5.rs:199), `MOSAIC_PLATTENKOPF_GAMES`-Parse (scoring.rs:1508) -- alle fallen wortlos auf den Default | Messung glaubt Knopf X, faehrt Default |
+| 16 | Value-Spread-Pfad verkleinert bei eval-Fehlern still den Pool und liefert bei Serialisierungsfehler "{}" (self_play.rs:4607/4666) | plausibel-aber-falsch |
+| 19 | Toter Zweitpfad board.rs:184-220 + `DOME_TILES_EACH` (state.rs:19, null Nutzer, doppelt belegt): `completed_cols`/`is_col_complete` heissen wie die Spaltenbau-Wahrheit, SIND sie aber nicht (die lebt in scoring.rs:709-712). Loeschen oder `#[allow(dead_code)]` mit Begruendung | der naechste Spaltenbau-Bearbeiter greift zum falschen Symbol |
+
+**Nach dem v22-Training:**
+
+| Befund | Kern | Risiko |
+| --- | --- | --- |
+| 18 | ONNX-Paritaetspruefung NIE fertiggebaut: 56 `models/*.onnx.ref.txt` (export_onnx.py schreibt sie) + `py.rs:123 net_eval_raw` mit NULL Aufrufern. Entscheid: Vergleichsschritt fertigbauen ODER beide Haelften abraeumen -- der heutige Zustand sieht aus wie Absicherung und ist keine | Schein-Schutz |
+| 5 | Fenster-Cache-Key traegt die Kanalzahl nur als Hand-Literal `+enc2d_v2` (corpus_dataset.py:426), der Datei-Key rechnet sie aus den Konstanten. Fix = Selbstbedienung auch im Fenster-Key. NICHT vor dem Training (wuerde den frischen Cache entwerten) | naechster Kanal-Schritt zieht still den alten Fenster-Cache |
+| 20 | Viermal dasselbe 95%-KI mit drei Entartungen (u.a. Breite 0,0 bei n<2 = perfekte Schein-Praezision); eine gemeinsame Funktion | Zufallsbefund besteht als signifikant |
+| 21 | Sieben Eigenaufloesungen von `models/champion.txt`; nur arena.py traegt die Audit-V2-Haertung gegen fehlendes ONNX | OneDrive-Dateiverlust-Klasse |
+| 22 | `MosaicDataset.__init__` = 998 Zeilen; Schnitt in drei Phasen (Schluessel, Cache-Lesen, Korpus-Bau) -- Nahtbreite VOR dem Schnitt auszaehlen (stehende Regel) | Wartbarkeit |
+| 6 | `tools/offline_diagnosis.py` rechnet ein historisches Value-Ziel (Docstring seit `97126a2` ehrlich); echte Loesung = Zielbildung aus corpus_dataset herausziehen und teilen | Metrik misst Altziel |
+
+(Befund 25, absolute Pfade in den Artefakt-Schreibern, steht bereits in der
+Tabelle unten bei den drei JSONs.)
+
 ### 2. Offen, mit Kosten
 
 | Punkt | Kosten | wofuer noetig |
