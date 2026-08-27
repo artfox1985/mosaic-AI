@@ -13,7 +13,7 @@ laufen als Teil von `cargo test --release`, also im `pre-push`-Haken:
 
 | | Waechter | Fundstelle |
 |---|---|---|
-| A1 | Testbestand als Regressionsnetz | `cargo test --release` (557 Tests: 531 aktiv, 26 `#[ignore]`) |
+| A1 | Testbestand als Regressionsnetz | `cargo test --release` (Zaehlung: der Lauf selbst; Attribut-Zaehlung Stand 2026-08-27: 518 `#[test]` / 23 `#[ignore` in `engine/src`) |
 | A2 | Laufzeit-Vertragsstempel | `engine/src/lib.rs:647` (`contract_stamp_input`-Doku), Stempel exponiert in `engine_config_json()` (`lib.rs:741`) |
 | A3 | Feature-Golden-Hash | `engine/src/features.rs:1473` (`feature_golden_hash_matches_fixture`) |
 | A4 | Heuristik-Anker-Verhaltenstest | `engine/src/mcts.rs:1521` (`heuristic_anchor_choices_match_fixture`), plus `mcts.rs:1612` fuer die R5/v2-Variante |
@@ -39,21 +39,40 @@ Deaktivieren: `git config --unset core.hooksPath`.
 Ruft `python tools/check_conventions.py --staged` auf und bricht den Commit
 bei Exit != 0 ab. Prueft nur die gestagten Dateien:
 
-1. Datei-Groessen-Ratsche (`tools/size_baseline.json`, Schwelle 40 KB)
-2. Doku-Sprachkonvention (README.md englisch, STATUS.md/history.md deutsch)
+Die Nummern sind die des Linters (`REGEL n` in seinen Meldungen), nicht die
+Reihenfolge des Laufs:
+
+1. Datei-Groessen-Ratsche (`tools/size_baseline.json`, Schwelle 40 KB) --
+   **seit 2026-08-27 nur noch WARNUNG, kein Commit-Blocker** (Nutzer-Entscheid).
+   Sie war zehn Auslesungen lang rot und hat null Zerlegungen bewirkt: wer sie
+   traf, legte die Basislinie neu, weil das zehn Sekunden kostet und eine
+   Zerlegung eine Architekturentscheidung ist, die niemand beauftragt hatte.
+   Ein Tor, das man routinemaessig umgeht, bringt das Umgehen bei. Die Zahl
+   bleibt sichtbar, der Zwang faellt. ROT bleibt nur der kaputte Fall:
+   `tools/size_baseline.json` fehlt ganz.
+2. Doku-Sprachkonvention (README.md englisch, STATUS.md/history.md deutsch) --
+   blockt.
 3. Keine neuen `#NN`-Task-Nummern (gegen `evaluations/TASK_NUMBER_REGISTRY.md`)
-4. Prereg-Index-Konsistenz (`evaluations/PREREG_*.md` <-> `PREREG_INDEX.md`)
-5. Knopf-Doku aktuell (`docs/knobs.md` <-> `engine/src/knob_registry.rs`) --
-   die Tabelle ist GENERIERT; wer die Registratur aendert, laesst
+   -- blockt.
+4. Prereg-Index-Konsistenz (`evaluations/PREREG_*.md` <-> `PREREG_INDEX.md`) --
+   blockt.
+5. Stille Test-Skips (`warn_silent_test_skips`) -- **nur Warnung, kein
+   Commit-Blocker.** Sucht fruehe `return` direkt hinter einer
+   Voraussetzungs-Pruefung: ein stiller Skip besteht leer-gruen und prueft
+   nichts. Die Heuristik ist grob, Nicht-Test-Treffer sind zu ignorieren.
+   Laeuft als letzte Pruefung, traegt aber die Nummer 5.
+6. Knopf-Doku aktuell (`docs/knobs.md` <-> `engine/src/knob_registry.rs`) --
+   blockt. Die Tabelle ist GENERIERT; wer die Registratur aendert, laesst
    `python tools/generate_knob_docs.py` laufen und committet die Doku mit.
    Greift nur, wenn eine der beiden Dateien gestagt ist (gemessen 4 ms).
    Ergaenzt 2026-08-26: der Rust-Waechter erzwingt, dass jeder Knopf im Code
    REGISTRIERT ist, aber nichts erzwang, dass die abgeleitete Tabelle
    mitwaechst.
-6. Stille Test-Skips (`warn_silent_test_skips`) -- **nur Warnung, kein
-   Commit-Blocker.** Sucht fruehe `return` direkt hinter einer
-   Voraussetzungs-Pruefung: ein stiller Skip besteht leer-gruen und prueft
-   nichts. Die Heuristik ist grob, Nicht-Test-Treffer sind zu ignorieren.
+7. Bezeichner ENGLISCH (CLAUDE.md 2026-08-24) -- **blockt.** Geprueft werden
+   NUR HINZUGEFUEGTE Definitionszeilen (gleicher Zuschnitt wie Regel 1): der
+   deutsche Altbestand blockt nichts, ein neuer deutscher Name schon. Python
+   ueber `ast` (sieht Strings und Kommentare gar nicht), Rust ueber Muster.
+   Ausweg je Zeile: `konvention-ok: <Grund>` ans Zeilenende.
 
 **Budget: < 3 s.** Keine Compilierung, kein Netz, keine Korpus-/Modelldateien.
 

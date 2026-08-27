@@ -4211,7 +4211,7 @@ pub fn net_root_child_stats<R: Rng + ?Sized>(
 /// Skala wie `mcts_q`/`win_pct` überall sonst (`value_to_win_prob`,
 /// `crate::mcts::normalize_score`) -- also NICHT die [-1,1]-tanh-Skala des
 /// späteren `z`-Labels; Python remapt beim Cache-Bau ohnehin `*2-1` (siehe
-/// `round_transition_value`-Konvention, `neural_net.py::MosaicDataset`),
+/// `round_transition_value`-Konvention, `corpus_dataset.py::MosaicDataset`),
 /// `root_q` folgt exakt demselben Muster. `None` nur, wenn keine Bewertung
 /// zustande kam (kein Kandidat/leere Suche).
 ///

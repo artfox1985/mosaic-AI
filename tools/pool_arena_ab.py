@@ -31,10 +31,15 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
+import time
 from math import comb
 from pathlib import Path
 
 EVAL_DIR = Path(__file__).resolve().parent.parent / "evaluations"
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock, Codepflege-Audit 2026-08-27)
 
 
 def mcnemar_exact_p(b: int, c: int) -> float:
@@ -59,6 +64,10 @@ def main() -> None:
                    help="Praefixe der zu poolenden Bloecke, z.B. tiling tiling2")
     p.add_argument("--out", default=None)
     args = p.parse_args()
+
+    # CLAUDE.md "Laufzeiten messen, nicht schaetzen": Startmarken fuer den
+    # `laufzeit`-Block im Artefakt (Codepflege-Audit 2026-08-27).
+    t_wall0, t_cpu0 = time.monotonic(), time.process_time()
 
     tot = {"b": 0, "c": 0, "cc_win": 0, "cc_lose": 0, "off_wins": 0, "on_wins": 0, "n": 0}
     off_all, on_all, blocks = [], [], []
@@ -128,6 +137,11 @@ def main() -> None:
         "avg_score_champion_off": sc_off_a, "avg_score_opponent_off": sc_off_b,
         "avg_score_champion_on": sc_on_a, "avg_score_opponent_on": sc_on_b,
         "optional_stopping_caveat": len(args.prefix) > 1,
+        # CLAUDE.md-Pflichtblock. Dieses Werkzeug SPIELT nicht, es poolt
+        # fertige Bloecke: `threads` und `s_je_partie` sind hier ohne Sinn und
+        # stehen darum ausdruecklich auf null, statt eine Zahl zu erfinden.
+        # `wanduhr_s`/`cpu_s` messen die reine Auswertung (Sekundenbereich).
+        "laufzeit": laufzeit_block(t_wall0, cpu_start=t_cpu0),
     }, indent=2), encoding="utf-8")
     print(f"\nErgebnis: {out}")
 

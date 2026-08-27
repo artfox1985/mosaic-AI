@@ -417,7 +417,7 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
         # (Standard) das 13-Tupel -- die letzten 4 Elemente
         # (opp_points_forecast, opp_points_mask, values_wdl, wdl_outcome)
         # sind additiv ANS ENDE angehaengt (siehe
-        # `neural_net.py::MosaicDataset.__getitem__`), unabhaengig davon,
+        # `corpus_dataset.py::MosaicDataset.__getitem__`), unabhaengig davon,
         # ob `--opp-points-head`/`--value-head wdl` aktiv sind (die Cache-
         # Felder existieren immer, werden nur ggf. nicht im Loss genutzt).
         if encoder == "2d":
@@ -2367,7 +2367,7 @@ if __name__ == "__main__":
                              "'default' bleibt waehlbar, um Alt-Laeufe byte-identisch zu "
                              "reproduzieren (rtv-Override bevorzugt, wo vorhanden); 'nortv_r1' "
                              "ignoriert den Override nur fuer Runde-1-Zustaende. Aendert den "
-                             "HDF5-Cache-Key (siehe neural_net.py::MosaicDataset).")
+                             "HDF5-Cache-Key (siehe corpus_dataset.py::MosaicDataset).")
     parser.add_argument("--value-target-lambda", type=float, default=1.0,
                         help="λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, 'soft-Z' -- "
                              "Varianzreduktion des HAUPT-Value-Targets durch Mischen mit dem "
@@ -2376,7 +2376,7 @@ if __name__ == "__main__":
                              "sonst bleibt z unveraendert. STANDARD 1.0 = KEIN Mix, byte-identisches "
                              "Bestandsverhalten (values-Tensor bleibt unangetastet). Harte Validierung "
                              "0<=λ<=1 (kein stiller Clamp). Siehe "
-                             "neural_net.py::MosaicDataset.apply_value_target_lambda, "
+                             "corpus_dataset.py::MosaicDataset.apply_value_target_lambda, "
                              "evaluations/PREREG_lambda_target.md. Aendert den HDF5-Cache-Key NICHT "
                              "(root_q ist additiv im Cache, der Mix passiert erst hier). "
                              "KORREKTHEITS-FIX 2026-08-08: bei --value-head wdl mischt dies "

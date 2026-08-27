@@ -138,6 +138,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from arena_trends import append_run  # noqa: E402  (Task #92, Trend-Log-Append)
 from set_champion import set_champion as _set_champion  # noqa: E402  (Nutzer-Anstoss 2026-07-27)
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock, Codepflege-Audit 2026-08-27)
 
 BLOCK_SIZE = 25
 MAX_PAIRS = 200                 # harter Deckel (Nutzer-Anstoss: 150 -> 200)
@@ -268,6 +269,11 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     Projekt JEDE entschiedene Gating-Runde als neue Referenz/neuer Generator
     uebernommen (siehe evaluations/STATUS.md)."""
     import mosaic_rust as mr
+
+    # CLAUDE.md "Laufzeiten messen, nicht schaetzen": Startmarken fuer den
+    # `laufzeit`-Block im Ergebnis-JSON (Codepflege-Audit 2026-08-27 -- das
+    # Gating war einer von drei Nachzueglern ohne den Pflichtblock).
+    t_wall0, t_cpu0 = time.monotonic(), time.process_time()
 
     name_a = name_a or os.path.basename(model_a)
     name_b = name_b or os.path.basename(model_b)
@@ -401,6 +407,11 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         "per_pair_scores": per_pair_scores,
         "avg_floor_a": avg_floor_a, "avg_floor_b": avg_floor_b,
         "zerozero_anteil": zerozero_anteil,
+        # CLAUDE.md-Pflichtblock. `cpu_s` ist hier aussagekraeftig: die Partien
+        # laufen IM SELBEN Prozess (PyO3-Rust-Threads), und `process_time()`
+        # summiert ueber alle Threads des Prozesses.
+        "laufzeit": laufzeit_block(t_wall0, cpu_start=t_cpu0, threads=threads,
+                                   n_games=n_games_total),
     }
 
     # Task #92: Arena-Trend-Log -- eine Zeile aus Sicht von A (Kandidat).

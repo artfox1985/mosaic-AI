@@ -13,13 +13,25 @@ und das beim v12-Zyklus dafür genutzte Skript war nirgends im Repo abgelegt
 rekonstruiert das Vorgehen laut STATUS.md-Beschreibung ("mirrort MosaicDataset
 1:1 inkl. Runden-Index je Schritt") und wird DIESMAL nach tools/ committet.
 
-Value-Ziel-Berechnung ist 1:1 aus `neural_net.py::MosaicDataset.__init__`
+Value-Ziel-Berechnung ist aus `corpus_dataset.py::MosaicDataset.__init__`
 kopiert (own_total/opp_total → tanh-Margin, `round_transition_value`-Override,
 `bootstrap_value`-TD-Blend) -- bewusst NICHT der HDF5-Cache direkt
 wiederverwendet, weil der keine Pro-Schritt-Rundennummer mitführt (nur die
 bereits zu Tensoren geflachten Features). Policy-Ziel/Maske ebenfalls 1:1
 kopiert (inkl. Selbstkonsistenz-Fix: gespielte Policy-Aktionen immer in die
 Maske aufnehmen).
+
+ACHTUNG, ZIELGLEICHHEIT NUR HISTORISCH (Codepflege-Audit 2026-08-27): die
+Kopie hier bildet den Stand VOR `values_wdl`, vor der nortv-/nortv_r1-
+Variantenwahl und vor der Umkehr auf den nativen (un-entstauchten) Bootstrap
+ab. Sie rechnet unbedingt den tanh-Margin mit `round_transition_value`-
+Override und festem TD_LAMBDA-Blend -- also NICHT das Ziel, auf das die
+heutigen Champions trainiert wurden. Fuer Vergleiche INNERHALB dieses
+Werkzeugs (Modell gegen Modell auf demselben Split) bleibt es brauchbar, als
+Aussage ueber "das Trainingsziel" nicht. Wahrheit ist
+`engine/py/corpus_dataset.py` (`MosaicDataset.__init__`,
+`apply_value_target_lambda`, `LEGACY_STRETCHED_PREFIXES`); wer die Zahlen
+zielgleich braucht, zieht sie dort nach, statt dieser Datei zu glauben.
 
 Verwendung:
     python tools/offline_diagnosis.py --model v12_best

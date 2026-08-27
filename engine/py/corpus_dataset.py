@@ -61,6 +61,12 @@ from neural_net import (  # einseitig, siehe Modulkopf
 )
 
 
+# Codepflege-Audit 2026-08-27 (Befund-1-Haertung): Merker je Manifest-Pfad,
+# damit der Hinweis auf ein FEHLENDES Traeger-Manifest genau einmal je Pfad
+# und Prozess im Log steht statt bei jedem Datensatz-Aufbau erneut.
+_CARRIER_MANIFEST_NOTICE_SHOWN: set = set()
+
+
 def _destretch_prob(p: float) -> float:
     """Platt-Streckung einer gestauchten Alt-Kopf-'Wahrscheinlichkeit'."""
     p = min(max(p, 1e-6), 1.0 - 1e-6)
@@ -388,6 +394,17 @@ class MosaicDataset(Dataset):
                 policy_carrier_set = frozenset(_manifest["policy_carrier_files"])
                 if "carrier_prefixes" in _manifest:
                     carrier_prefixes = list(_manifest["carrier_prefixes"])
+        else:
+            # Codepflege-Audit 2026-08-27, Befund 1: das Fehlen der Datei ist ein
+            # STILLER Semantik-Wechsel -- ohne Manifest traegt JEDE Korpusdatei
+            # Policy (siehe Kommentarblock oben). Das ist gewolltes
+            # Bestandsverhalten, aber es gehoert ins Log, damit ein versehentlich
+            # fehlendes/verschobenes Manifest nicht als Normalfall durchgeht.
+            # Reiner Hinweis, KEIN Verhaltenswechsel.
+            if manifest_path not in _CARRIER_MANIFEST_NOTICE_SHOWN:
+                _CARRIER_MANIFEST_NOTICE_SHOWN.add(manifest_path)
+                print(f"ℹ️  Traeger-Manifest {manifest_path} nicht gefunden -- "
+                      f"Bestandsverhalten: jede Datei traegt Policy", flush=True)
 
         cache_key_material = (
             str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)

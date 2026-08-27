@@ -50,6 +50,7 @@ ARM_TIMEOUT_SECS = 6 * 3600
 # Worker erst innerhalb von `main()`).
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from paired_arena_arm_worker import parse_seeds  # noqa: E402
+from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock, Codepflege-Audit 2026-08-27)
 
 
 def mcnemar_exact_p(b: int, c: int) -> float:
@@ -223,6 +224,10 @@ def main() -> None:
         raise SystemExit("--seed oder --seeds ist erforderlich")
     n_games = len(seeds) if seeds is not None else args.n_games
 
+    # CLAUDE.md "Laufzeiten messen, nicht schaetzen": Startmarke fuer den
+    # `laufzeit`-Block im Artefakt (Codepflege-Audit 2026-08-27).
+    t_wall0 = time.monotonic()
+
     results: dict[str, list[dict]] = {}
     for v in args.arms:
         results[v] = run_arm(args.env_name, v, model, args.net_sims,
@@ -266,6 +271,12 @@ def main() -> None:
                                                         "p_mcnemar": p}
         print(f"{args.control} vs {v}: diskordant b(test)={b} / c(kontrolle)={c}"
               f"  McNemar p={p:.4f}")
+
+    # CLAUDE.md-Pflichtblock. `cpu_s` bleibt null: die Partien laufen in
+    # Worker-UNTERPROZESSEN, deren CPU-Zeit `time.process_time()` nicht sieht.
+    # `s_je_partie` bezieht sich auf ALLE Partien des Laufs (alle Arme).
+    out["laufzeit"] = laufzeit_block(t_wall0, threads=args.threads,
+                                     n_games=n_games * len(args.arms))
 
     out_path = EVAL_DIR / "artifacts" / f"paired_arena_env_{args.out_prefix}.json"
     out_path.write_text(json.dumps(out, indent=1), encoding="utf-8")
