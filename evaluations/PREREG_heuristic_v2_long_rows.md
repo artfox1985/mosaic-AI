@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1; Preis: volle Zeilen 0,432 auf 0,216). v2-Zweig entfernt, beide gefrorenen Artefakte lauffaehig (par.19). Spalten-Tor par.3b.2: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play. par.3b.3 Daempfung nicht bestaetigt, par.3b.4 trennt, par.3b.5 Lesart 3 (die PLATZIERUNG verschenkt das Draft-Erbe); par.3b.6 STEHT AUS. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1; Preis: volle Zeilen 0,432 -> 0,216). v2-Zweig entfernt, beide gefrorenen Artefakte lauffaehig (par.19). Spalten-Tor par.3b.2: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play; par.3b.5 Lesart 3 (die Platzierung verschenkt das Draft-Erbe). par.3b.6 GEFAHREN 2026-08-29: TOR VERFEHLT, Leiter dosisabhaengig negativ (w2,0 t -2,85 unter w0) => Stufe 2 (2D-Ablesung) vor Surprise-Weighting, Self-Play bleibt gestoppt. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1477,6 +1477,38 @@ Messdateien `selfplay_otw22b01w*_*.pkl` landen in `data/` im Trainings-Glob
 Laufzeit-Anhaltspunkt: 6,7 s je Partie bei 11 Threads
 (manifest_tor22b01_20260828_202529.json), also ~22 min je Arm, ~90 min
 gesamt; die w>0-Arme zahlen einen Vorwaertspass je Tiling-Zug extra.
+
+**par.3b.6 GEFAHREN 2026-08-29 (ownership_tiling_consumer_v22.json): TOR
+VERFEHLT, die Leiter zeigt dosisabhaengig NEGATIV.**
+
+| Arm | volle Spalten | Block-t vs w0 | Quote (==6/>=4) | Punkte |
+| --- | --- | --- | --- | --- |
+| w0 | 0,2975 +- 0,030 | -- | 0,154 | 34,78 |
+| w0,5 | 0,2800 +- 0,033 | -1,17 | 0,147 | 34,82 |
+| w1,0 | 0,2800 +- 0,035 | -0,98 | 0,143 | 35,21 |
+| w2,0 | 0,2425 +- 0,029 | **-2,85** | 0,124 (t -2,60) | 34,31 |
+
+Kein w-Arm hebt die vollen Spalten; w2,0 liegt SIGNIFIKANT UNTER w0
+(|t| ueber der 2,262-Schwelle), die Vollendungsquote faellt mit.
+Punkte-Waechter ohne signifikanten Befund in allen Armen.
+
+**Waechter beide gruen:** w0 reproduziert die 0,2975 aus par.3b.2 EXAKT
+(unabhaengige Nachzaehlung deckungsgleich), und kein w-Arm ist
+zahlengleich mit w0 (der Knopf kam an; die Warnung "Kopf unbrauchbar"
+erschien nicht). Sauberkeit: Neustart auf stiller Maschine (Blockdauern
+107-145 s); der lastgebremste Erstlauf erwies sich im Inhaltsvergleich als
+PARTIEGLEICH bis auf den game_id-Zeitstempel -- Determinismus belegt, die
+Fremdlast hatte nur gebremst, nicht verfaelscht (Positivbefund im
+Artefakt; die EXKLUSIV-Regel bleibt davon unberuehrt).
+
+**Deutung (markiert als Deutung):** die flache Karte des b01-Kopfs gibt
+dem Tiling-Pol keine Richtung, die die Vollendung hebt -- bei w=2 zieht
+sie die Platzierung messbar vom Spaltenbau WEG. Zusammen mit par.3b.2
+(Trainingsgewicht traegt nicht) ist der Ownership-Kopf in seiner heutigen
+flachen Form auf BEIDEN Wirkwegen leer. **Konsequenz nach registrierter
+Weg-Wahl (par.3b.5 Punkt 2): Stufe 2 -- 2D-Ablesung des Ownership-Kopfs,
+schaerfere Karten fuer denselben Konsumenten -- VOR Surprise-Weighting.
+Der v22-Self-Play-Start bleibt gestoppt.**
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 

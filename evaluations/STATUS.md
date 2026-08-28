@@ -48,38 +48,25 @@ R5-Fix-Leiter -- unveraendert. Kanten ueber die Fix-Grenze nie mischen.
 Vertragshash `efd564d87bac2722`; der Paritaets-Hash `8c6684ff...` ist
 gemessen unveraendert.
 
-**Es laeuft: NEUSTART der Ownership-Pol-Konsument-Arena (par.3b.6)** --
-w05/w10/w20 sequenziell auf freier Maschine (Nutzer-Freigabe 2026-08-28,
-"andere last ist durch"). Maschine NICHT frei: kein Build, kein Test, keine
-Sonde nebenher. Der Auswerter nimmt seit dem Neustart je Partie-Nummer nur
-die NEUESTE Datei (Erstlauf-Reste mischen nicht mehr). Historie des
-abgebrochenen Erstlaufs: Registriert 2026-08-28
-(`PREREG_heuristic_v2_long_rows.md` par.3b.6): MOSAIC_OWNERSHIP_TILING_W-Sweep
-(w 0 / 0,5 / 1,0 / 2,0) mit dem b01-Kopf, argmax-Instrument des Spalten-Tors.
-Der erste Anlauf wurde am 2026-08-28 GESTOPPT, weil parallel fremde
-Nutzer-Last auf dem Rechner lief (EXKLUSIV-Regel). Lastbeginn per
-Datei-mtimes datiert: Blockdauern konstant 118-133 s bis w05-Block 4
-(22:24), ab w05-Block 5 (~22:25) ansteigend 164 -> 358 s. Stand je Arm:
+**Konsument-Arena par.3b.6 GEFAHREN 2026-08-29 -- TOR VERFEHLT, Leiter
+dosisabhaengig NEGATIV** (ownership_tiling_consumer_v22.json; Neustart auf
+stiller Maschine, Blockdauern 107-145 s): w0 0,2975 (reproduziert par.3b.2
+EXAKT), w0,5 0,280 (t -1,17), w1,0 0,280 (t -0,98), w2,0 0,2425
+(**t -2,85, signifikant UNTER w0**); Vollendungsquote faellt mit (w2,0
+t -2,60), Punkte ohne Befund. Beide Instrument-Waechter gruen. Beifang:
+der lastgebremste Erstlauf war PARTIEGLEICH mit dem sauberen Neustart
+(nur game_id-Zeitstempel differiert) -- Determinismus belegt, die Last
+hatte gebremst, nicht verfaelscht. Details und Deutung: par.3b.6 der
+Lehrer-Prereg.
 
-* w00 (21:55-22:16): KOMPLETT, alle 10 Bloecke 118-133 s -- SAUBER.
-  Zusaetzlich gilt der registrierte Reproduktions-Waechter (0,2975 aus
-  par.3b.2) als Gegenprobe bei der Auswertung.
-* w05 (22:16-22:52): KOMPLETT (g200 da), aber Bloecke 5-10 lastkontaminiert
-  -> wird auf stiller Maschine KOMPLETT neu gefahren. Beifang der sauberen
-  Bloecke 1-4: der Knopf kostet praktisch keinen Durchsatz (128-133 s wie
-  w00). Byte-Vergleich Bloecke 1-4 alt gegen neu = gratis
-  Determinismus-Gegenprobe.
-* w10 (22:52-23:32): bis g140 gelaufen, durchgehend unter Last (~300 s je
-  Block) -> verwerfen, komplett neu.
-* w20: NIE GESTARTET.
-
-Vor dem Neustart muessen die kontaminierten pkl weg (NUR mit pfadgenauer
-Nutzer-Freigabe) oder die Auswertung filtert nach Lauf-Zeitstempel -- der
-Auswerter (tools/probes/ownership_tiling_consumer_eval.py) globt heute je
-Praefix und wuerde sonst zwei Laeufe mischen.
-
-Loeschung von data/-Dateien nur mit pfadgenauer Nutzer-Freigabe. (Die
-serielle Cache-Referenz, Tor 2b, ist GRUEN abgeschlossen -- A0-Tabelle.)
+**NAECHSTER SCHRITT (registrierte Weg-Wahl par.3b.5 Punkt 2): Stufe 2 --
+2D-Ablesung des Ownership-Kopfs**, schaerfere Karten fuer denselben
+Konsumenten, VOR Surprise-Weighting. Trainings-Freigabe des Nutzers vom
+2026-08-29 liegt vor ("weitere Trainings fuer v22, solang es dem Ziel
+naeher bringt"); der v22-Self-Play-Start bleibt gestoppt und ist weiterhin
+Nutzer-Entscheid. Die Sweep-Messdaten (selfplay_otw22b01w*) sind nach
+Abschluss der Auswertung mit Nutzer-Freigabe vom 2026-08-29 GELOESCHT;
+Manifeste und Artefakt bleiben.
 
 **Warum dieser Schritt** (par.3b.5 Weg-Wahl Punkt 1): der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-TRAININGSGEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt. Der Tiling-Pol lief bisher NIE mit einem spaltenbewussten Kopf (Gate-C-Nullmessungen: plattenblinde Koepfe).
 
@@ -193,7 +180,7 @@ daran gemessen, ob er das Netz dem Spaltenspiel naeher bringt:
 | --- | --- | --- |
 | Orakel-Treue-Diagnose (prior_mass/tau gegen den Lehrer) | Werkzeug vorhanden | WO der Verlust sitzt: Draft-Erbe oder Tiling |
 | Surprise-Weighting (waere v22-b03) | Entwurf registriert | Draft-Erbe schaerfen, falls Treue niedrig |
-| `MOSAIC_OWNERSHIP_TILING_W` mit b01-Kopf | Knopf gebaut, nie richtig bedingt gefahren | Tiling-ABSICHT zur Spielzeit |
+| `MOSAIC_OWNERSHIP_TILING_W` mit b01-Kopf | GEFAHREN 2026-08-29: TOR VERFEHLT, dosisabhaengig negativ (par.3b.6) | Tiling-ABSICHT zur Spielzeit -- traegt mit flacher Karte NICHT |
 | Stufe 2: 2D-Ablesung des Ownership-Kopfs | registriert (par.3b Stufenplan) | Kopf-Geometrie statt flacher Projektion |
 | Vollendungs-Filter in der Suche | Wecker-Liste v23 | den Vollendungs-Engpass direkt |
 | Arm K / Arm L (Label-Qualitaet) | Arm K EINGETAKTET vor das v23-Training (PREREG_v23_window.md par.4a2, Nutzer 2026-08-29); Arm L Reserve | Value-Ziel-Hygiene |
@@ -217,9 +204,9 @@ naechste Sitzung mitten im Ablauf uebernehmen kann:
 | 2a | 79er-Cache parallel auf nativ-Kodierung | ERLEDIGT 2026-08-28 (37,7 min, data/.par_full_79.h5, 916 MB) |
 | 2b | Serielle Referenz + Bit-Vergleich = Cache-Tor | ERLEDIGT 2026-08-28: GRUEN, 21/21 Felder ueber 4,19 Mio Zustaende bit-identisch (cache_parity_full_79.json, 98 s). Ein Windows-Update-Reboot um 03:00 kostete einen Anlauf |
 | 2c  | Cache-Verdrahtung in train.py                                                                                                                                                                                                                                                                                                           | GEBAUT (`--cache-file` + harter Schluessel-Waechter, Stempel in beiden Bau-Werkzeugen, tools/stamp_cache_key.py; Ladelauf UNGETESTET). BEFUND: der Voll-Cache passt per Design nicht auf Laeufe mit Val-Split (anderer Fenster-Schluessel, Waechter lehnt korrekt ab) -- v22-b01/b02 fahren den klassischen In-Train-Bau (~2,3 h, einmal; b02 trifft denselben Schluessel). --cache-file nutzt, wer --val-frac 0 faehrt oder ein exakt passendes Fenster baut |
-| 3 | v22-KALTSTART b01/b02 | ERLEDIGT 2026-08-28: b01 E17 (best E7, brierbest E1, Own-Val 0,394), b02 E16 (best E6, brierbest E1); Cache-Treffer sparte b02 den Datenaufbau (31,5 s). Endgame-Loss 0,0000 trotz Flag -- URSACHE GEKLAERT 2026-08-29 (Code-Beleg): das Ziel ist root_q in der R5-Drafting-Zone (corpus_dataset.py:1000-1012), und root_q schreibt nur der NetSelfPlayAgent (self_play.rs:1324); ein Heuristik-Korpus traegt es strukturell nicht -> Maske komplett 0. Kein Bug; Kopf in b01/b02 untrainiert und konsumentenlos (einziger engine/src-Treffer ist ein Kommentar). Heilt sich mit dem v22-Self-Play-Korpus von selbst. Korpus-Gegenprobe als Formalie offen; Flag-Entscheid (konstant lassen vs. false auf Heuristik-Korpora) beim Nutzer |
+| 3 | v22-KALTSTART b01/b02 | ERLEDIGT 2026-08-28: b01 E17 (best E7, brierbest E1, Own-Val 0,394), b02 E16 (best E6, brierbest E1); Cache-Treffer sparte b02 den Datenaufbau (31,5 s). Endgame-Loss 0,0000 trotz Flag -- URSACHE GEKLAERT 2026-08-29 (Code-Beleg): das Ziel ist root_q in der R5-Drafting-Zone (corpus_dataset.py:1000-1012), und root_q schreibt nur der NetSelfPlayAgent (self_play.rs:1324); ein Heuristik-Korpus traegt es strukturell nicht -> Maske komplett 0. Kein Bug; Kopf in b01/b02 untrainiert und konsumentenlos (einziger engine/src-Treffer ist ein Kommentar). Heilt sich mit dem v22-Self-Play-Korpus von selbst. Korpus-Gegenprobe BESTAETIGT 2026-08-29 (root_q 0/1733, 0/1740, 0/1729 in drei hv2-Dateien; Netz-Korpus 2087/3299, davon 296 R5-Drafting); Flag-Entscheid (konstant lassen vs. false auf Heuristik-Korpora) beim Nutzer |
 | 4 | Spalten-Tor + par.3b.4 + par.3b.5 | ERLEDIGT 2026-08-28: Tor 1(b) BESTANDEN (b01 0,297 gg. Champion 0,102, t 5,55), Tor 1(a) VERFEHLT (gg. w0 +0,037, t 1,53) => KEIN v22-Self-Play nach Regel. Symmetrie TRENNT (+0,573, t 93). Treue LESART 3: Draft-Erbe da (Masse 0,81->0,60, Lift 28x), die PLATZIERUNG verschenkt es. Alles in der Lehrer-Prereg registriert |
-| 5 | Wecker-Liste vor dem v22-Self-Play | AUSGESETZT -- Start per Tor-Regel gestoppt. NEUER NAECHSTER SCHRITT: Ownership-Pol-Konsument-Arena (MOSAIC_OWNERSHIP_TILING_W-Sweep mit b01-Kopf, argmax-Instrument; par.3b.5 Weg-Wahl). Traegt er, kommen Start und Weckerliste zurueck |
+| 5 | Wecker-Liste vor dem v22-Self-Play | AUSGESETZT -- Start per Tor-Regel gestoppt. Konsument-Arena par.3b.6 GEFAHREN 2026-08-29: TOR VERFEHLT (w2,0 signifikant UNTER w0) => Stufe 2 (2D-Ablesung) vor Surprise-Weighting ist der registrierte naechste Weg |
 
 **Offene NUTZER-Entscheide:** (a) ENTSCHIEDEN 2026-08-29 (Nutzer):
 **Cross-Aera ist der Normalfall** -- das Anker-Wheel wird NICHT je
