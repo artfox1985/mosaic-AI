@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (Nutzer 2026-08-25), nichts erzeugt -- das v22-Netz existiert noch nicht. Form 29.450 Partien wie das alte v22-Design: Policy-Klasse 5.800, Value-Klasse 23.650. NEU ist die Besetzung: der Neu-Anteil kommt aus dem v22-Self-Play (4.000 Sockel + 8.000 Schwarm), ALLE aelteren Plaetze aus dem hv2-Lehrerkorpus (17.450 von 24.000, 6.550 rotieren aus). DARAUS FOLGT der Umfang des v22-Self-Play: 12.000 Partien. Drei Punkte sind benannt, zwei davon offen: (1) G-1 und G-2 kommen aus DEMSELBEN Korpus, die Generationenstruktur ist also Platzhalter, keine Aera-Streuung; (2) RAM UNKRITISCH -- die alte 6-KB-Zahl war vom Tag vor dem Bitpacking; gemessen sind 2.806 B je Zustand im 2D-Fenster, also ~14,1 GB gegen 34,3 GB. Auslagern bleibt trotzdem verworfen (MOSAIC_PLANES_LAZY ist 400.000x langsamer je Sample); (3) TRAEGERFRAGE ENTSCHIEDEN (2026-08-27 nachgetragen, entschieden 2026-08-25): v22 faehrt ARM B, also MOSAIC_IGNORE_POLICY_TARGET_VALID=1 (PREREG_v22_window.md par.4b/par.4e, Konfiguration par.3b.2 der Lehrer-Prereg). Unter Arm B liefern die 1.800 hv2-Partien der Policy-Klasse ihr VOLLES nominelles Material; die "~4.690 Partien-Aequivalente" in par.3(3) gelten nur im verworfenen Arm-A-Fall. OFFEN bleibt davon nur der TRAEGER-MANIFEST-GENERATOR: es gibt Leser, aber kein schreibendes Werkzeug. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (Nutzer 2026-08-25), nichts erzeugt -- das v22-Netz existiert noch nicht. Form 29.450 Partien, neu besetzt aus v22-Self-Play und hv2-Lehrerkorpus; daraus folgt der Umfang des v22-Self-Play: 12.000 Partien (par.1/par.2). RAM unkritisch und Traegerfrage auf ARM B entschieden; OFFEN ist nur der TRAEGER-MANIFEST-GENERATOR, es gibt Leser aber kein schreibendes Werkzeug (par.3). -->
 
 # Vorregistrierung: v23-Fenster
 
@@ -192,3 +192,18 @@ Entscheide nicht mehr nachziehbar sind (Policy-Ziele = Besuchsverteilung):
 Diese Liste stammt aus der Knopf-Registry und den Preregs. Sie ist KEIN
 vollstaendiger Audit der Erzeugungs-Knoepfe -- wer den Lauf startet, geht sie
 durch und ergaenzt, was fehlt.
+
+## par.4b Wecker NACH dem v23-Training
+
+Gegenstueck zu par.4 fuer die TRAININGS-Seite dieses Fensters: der folgende
+Punkt wird nicht am Self-Play-Start faellig, sondern nach dem Training des
+ersten Ownership-Kopfs auf den v22-EIGENPARTIEN (= v23).
+
+* **Erreichbarkeits-Nachpruefung** -- eigene Prereg
+  `PREREG_v23_reachability_recheck.md` (Nutzer-Entscheid 2026-08-28,
+  hervorgegangen aus `PREREG_reachability_target.md` par.17): ein
+  Eintretens-Kopf auf Eigenpartien spiegelt wieder die eigene Politik
+  (Selbsterfuellungs-Falle). NACH dem v23-Training dort Stufe 0 fahren
+  (Karten-Diagnose gegen das Vorrats-Praedikat, trainingsfrei -- braucht
+  den trainierten Kopf); nur bei substanzieller Unterschaetzung folgt
+  Stufe 1 (Zielwechsel am par.3b.6-Instrument der Lehrer-Prereg).
