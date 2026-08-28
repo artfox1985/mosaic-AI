@@ -13393,6 +13393,829 @@ erster Schritt waere dann Deckel-Telemetrie zur Taeter-Identifikation.
 
 ---
 
+# Kapitel 2026-08-25 bis 2026-08-28: v22-Vorbereitung, Kapselung, Kanaele, Entstauchung -- ausgelagert aus STATUS.md am 2026-08-28
+
+**Warum dieses Kapitel existiert:** Nutzer-Kritik 2026-08-28 -- *"wenn etwas
+abgeschlossen ist dann gleich ins archiv umziehen. momentan steht wieder so
+viel erledigtes in status.md"*. Die folgenden Bloecke standen abgeschlossen in
+`../evaluations/STATUS.md`; sie liegen hier WORTGLEICH, innere Struktur und
+Ueberschriftenebenen unveraendert. In STATUS steht je eine Verweiszeile. Was
+an denselben Abschnitten OFFEN war, ist dort geblieben und NICHT mitgewandert
+(Merkliste 1e, "Offen, mit Kosten", JSON-Umzug-Restentscheid, die Liste der
+weiteren offenen Straenge, der A0-Schlachtplan).
+
+### Heute fertig geworden
+
+| Strang | Ergebnis | wo es steht |
+| --- | --- | --- |
+| **Erreichbarkeits-Eingaben fuers Netz** | GEBAUT und ABGENOMMEN. `INPUT_SIZE` 708 auf 714, `NUM_PLANES_CHANNELS` 76 auf 77; Champion rechnet bitgleich weiter | Commit `29fb1f1`, Abschnitt "Architektur" |
+| **Artefakt-Umzug** | 176 JSON nach `evaluations/artifacts/`, 145 Code- und 158 Dokument-Verweise nachgezogen; danach auf Nutzer-Entscheid **aus dem Tracking genommen** | Commits `4e967e1`, `4a43b8d` |
+| **Blindzieh-Regel: Urteil** | Die gebaute Stopp-Regel zieht ZU OFT -- rund 10 verschenkte Punkte je betroffenem Stapelzug | `PREREG_stack_draw_reservation_rule.md` par.5b |
+| **Strafleisten-Aversion: Nachmessung** | Der registrierte Nullwert war eine Eigenschaft der RUNDE 1, nicht des Champions | `PREREG_floor_action_aversion.md` par.14 |
+| **Heuristik v2 / Prio-Huelle** | Lehrer-Test positiv: Siegquote 0,373 gegen 0,256 und 0,128, volle Spalten 0,798 gegen 0,086, dabei weniger Strafpunkte | `PREREG_heuristic_v2_long_rows.md` par.10, par.18 |
+
+## TRAEGER-MANIFESTE: archiviert, und das ist in Ordnung (2026-08-25)
+
+`data/` enthaelt kein `policy_carrier_manifest_*.json` mehr. **Nutzer:
+bewusst archiviert.** Mein erster Vermerk stellte das als Verlust dar -- das
+war halb falsch und ist hiermit berichtigt:
+
+* Die archivierten Manifeste listen **v18/v20/v21-Dateien**. Diese ALTEN
+  Manifeste werden fuer v23 nicht gebraucht; dessen Fenster besteht aus
+  **hv2**-Dateien.
+  **BERICHTIGUNG 2026-08-27:** der frueher hier stehende Satz "fuer v23
+  werden sie nicht gebraucht" las sich, als brauche v23 ueberhaupt kein
+  Traeger-Manifest. Das ist falsch. `PREREG_v23_window.md` par.1 verlangt
+  **1.800 policy-aktive hv2-Partien** (Sockel G-1 1.350 + G-2 450) neben
+  15.650 policy-maskierten aus demselben Korpus -- also eine seed-bestimmte
+  AUSWAHL, und genau die ist ein Traeger-Manifest. Was fehlt, ist nicht das
+  Manifest-Konzept, sondern der ERZEUGER (naechster Absatz).
+* Auf die Laeufe dieser Nacht wirkt das Fehlen nicht: fuer den homogenen
+  hv2-Korpus ist "jede Datei traegt Policy" die richtige Semantik.
+
+**Was fehlt, ist der ERZEUGER -- aber nicht seine Regel.** Im Baum LESEN
+`neural_net.py:1284` und `train_manifest.py` das Traeger-Manifest; geschrieben
+wird es nirgends. Das aufgeloeste `carrier_report.py` (bb23ecd, spaeter in
+`train_manifest.py` eingegliedert) war ebenfalls nur ein BERICHT, ohne eine
+einzige schreibende Stelle.
+
+**BERICHTIGUNG einer eigenen Fehlannahme (2026-08-25):** daraus hatte ich
+geschlossen, das Manifest sei von Hand entstanden. Falsch -- die
+v20-Kampagnen-Prereg dokumentiert *"Seed 20260806, zeitlich gestreute
+Auswahl"*, und die Datei traegt ihre Herkunft im Kopf (`"seed"`, `"design"`).
+Es wurde ERZEUGT, das Skript wurde nur nie committet.
+
+**Damit ist die Aufgabe klein:** aus Seed plus dokumentierter Regel ("zeitlich
+gestreute Auswahl") laesst sich der Erzeuger rekonstruieren, statt ihn neu zu
+erfinden. Fuer v23 waeren es rund 180 von 1.745 hv2-Dateien.
+
+**Vor der v23-Kampagne zu klaeren**, nicht dringend. Ohne das Werkzeug ist der
+registrierte Zuschnitt nicht ausfuehrbar, und "jede Datei traegt Policy" waere
+still ein anderer Zuschnitt als der beschlossene.
+
+## NACHTLAUF 2026-08-25/26 -- was fertig ist
+
+**1. Der v22-Korpus steht.** 24.000 Partien, 17:27 bis 01:52, **8,43 h** bei
+47,5 Partien/min. Laufzeit REKONSTRUIERT aus Manifest-Start und der mtime der
+letzten Datei (der Lauf begann vor dem `laufzeit`-Einbau) und im Manifest
+`data/manifest_hv2_20260825_172710.json` nachgetragen.
+
+**2. Sanity-Check ueber alle 24.020 Partien** (die 20 aus
+`probe_v2huelle_horizon.pkl` zaehlen mit -- fuer ein Training auszuschliessen).
+**Die Auflage ist seit 2026-08-27 GEGENSTANDSLOS:** die Datei existiert nicht
+mehr, `data/` enthaelt 2.400 pkl = 24.000 Partien. Nichts auszuschliessen,
+kein `^probe_`-Pin noetig:
+
+| Kennzahl | voller Korpus | Pilot (200) | Lehrer-Test |
+| --- | --- | --- | --- |
+| volle Spalten | **0,732 ± 0,007** | 0,741 | 0,798 |
+| k1-Punkte / Anteil | +5,29 / 53,1 % | 5,67 / 55,7 % | – |
+| Strafleistensteine | 5,15 | 5,09 | – |
+| Eigene Punkte | 46,06 | 47,05 | – |
+| k6 Spezialfelder | −9,90 | −9,77 | – |
+
+Der Korpus haelt, was der Pilot versprach, jetzt mit engen Intervallen.
+
+**3. Cache-Bau parallelisiert** (`PREREG_cache_build_time.md` par.7/par.8):
+voller Korpus in **36,1 min** statt 2,58 h seriell, Faktor ~4,3.
+Bit-Identitaet auf 120 Dateien belegt; fuer den vollen Korpus NICHT gefahren
+(braeuchte 2,58 h serielle Referenz). Der fertige Cache liegt als
+`data/.par_full.h5`, 0,83 GB, 4.186.112 Zustaende.
+
+**Naechste Schritte, in dieser Reihenfolge:**
+
+1. **Entscheiden, ob die serielle Referenz gefahren wird** (2,58 h). Noetig,
+   bevor der volle Cache eine Champion-Entscheidung traegt.
+2. **Das v22-Training** -- und zwar in der Konfiguration aus
+   `PREREG_v22_window.md` par.4e: Arm B (`MOSAIC_IGNORE_POLICY_TARGET_VALID=1`)
+   **plus `OWNERSHIP_WEIGHT > 0`**, mit w0-Kontrollarm. Beide Naechte-Arme
+   liefen ohne das Gewicht und konnten deshalb strukturell keine Spalten
+   bauen.
+3. `data/` enthaelt 57 Block-Caches (1,2 GB) aus dem parallelen Bau plus
+   `.ref_serial.h5`, `.par_test*.h5`. Aufraeumen ist ein Nutzer-Entscheid.
+
+## KORPUS-DATEIEN KOMPRIMIERT (2026-08-26)
+
+Nutzer-Frage nach doppeltem Speicherplatz durch den Cache. Die Messung dreht
+sie um: **nicht der Cache war gross, sondern die pkl.**
+
+| | vorher | jetzt |
+| --- | --- | --- |
+| pkl (2.401 Dateien) | **34,70 GB** | **0,98 GB** |
+| Block-Caches (64) | – | 1,29 GB |
+| voller Cache | – | 0,89 GB |
+| Testartefakte | – | 0,16 GB |
+| **`data/` gesamt** | **34,70** | **3,32 GB** |
+
+gzip-6, **Faktor 35,4** (gemessen an 12 ordnungsfrei gezogenen Dateien,
+Spanne 35,1-35,7). Umpacken 523 s, jede Datei einzeln gegen ihre
+Originalbytes geprueft VOR dem Ersetzen.
+
+**Der Dateiname bleibt `.pkl`** -- am Namen haengen Cache-Schluessel,
+`MOSAIC_DATA_EXCLUDE`-Regexe und alle Globs; eine Umbenennung haette alle drei
+STILL gebrochen. Erkannt wird am Inhalt (gzip-Magic), siehe `corpus_io.py`.
+
+**Dreifach abgenommen mit dem Bit-Identitaets-Tor:** Cache aus komprimierten
+Kopien, Cache aus dem umgepackten Bestand, und der parallele Bau selbst --
+alle drei bit-identisch zur seriellen Referenz.
+
+**Die pkl bleiben der Rohstand und werden NICHT durch den Cache ersetzt.** Als
+`INPUT_SIZE` am 2026-08-25 von 708 auf 714 ging, war jeder bestehende Cache
+unbrauchbar und nur die pkl erlaubten den Neubau. Die offenen Preregs
+(Spezialfeld-Eingaben, Slot-Ziel, Huellen-Gewichtung) wuerden dasselbe wieder
+ausloesen.
+
+**ERLEDIGT 2026-08-27 (Nutzer-Freigabe, 194 Dateien / 2,54 GB geloescht -- darunter auch alles Folgende):** die 64 Block-Caches (1,29 GB) sind
+Nebenprodukt der Bau-Versuche mit verschiedenen Blockteilungen; nur die 42 des
+vollen Laufs sind wiederverwendbar. Dazu `.ref_serial.h5`, `.par_test*.h5`,
+`.gz_check.h5` (0,16 GB) aus den Abnahmen.
+
+## ARCHITEKTUR: B -> C -> A gefahren (2026-08-27, Nutzer-Auftrag)
+
+Anlass war eine Nutzer-Frage, keine Aufraeum-Laune: "was bringt mir eigentlich
+die Ratsche" -- und daraus "gib mir eine Empfehlung fuer die Architektur".
+
+### Was die Ratsche wirklich gebracht hat
+
+| | |
+| --- | --- |
+| Basislinie neu gelegt | **10 x** |
+| Dateien wegen der Ratsche zerlegt | **0** |
+
+Sie ist deshalb WARNUNG statt Blocker (eigener Nachtrag in
+`docs/DESIGN_conventions_as_checks.md`). Der Schaden war nicht das Wachstum,
+sondern die Uebung: ein Tor, das man routinemaessig per Kommandozeile gruen
+macht, faerbt auf die Tore ab, die tragen.
+
+**Und sie misst den falschen Stellvertreter.** Die Modularitaetsregel nennt
+ZUSTAENDIGKEITEN, keine Bytes. Der Beleg kam am selben Tag: der B-Umbau hat
+`train.py` strukturell besser gemacht und sie ist dabei GEWACHSEN (+2,7 %) --
+als Blocker haette die Ratsche genau diesen Commit aufgehalten.
+
+### Die drei Schnitte
+
+| | vorher | nachher | Beleg |
+| --- | --- | --- | --- |
+| **B** `train()` | 1.678 Z | **1.194 Z** | `epoch_history` bitgleich |
+| **C** `neural_net.py` | 2.933 Z | **1.655 Z** | dito + Import-Rauchtest + Cache-Sonde |
+| **A** `net_mcts.rs` | 10.923 Z | **9.909 Z** | Suite 489/0, Anker-Tor 20/20 in-process UND extern |
+
+Das Tor fuer B und C war vorher festgelegt: derselbe Lauf
+(`--train-file-limit 6 --epochs 2 --seed 4242`) vor und nach dem Umbau, und
+die `epoch_history` im Manifest muss BITGLEICH bleiben. Sie ist es.
+
+### Die Methode, die sich bewaehrt hat: NAHTBREITE MESSEN
+
+Mein erster Zuschnitt fuer B war falsch -- Aufbau / Schleife / Abschluss als
+drei Funktionen. Gemessen liest die Epochenschleife **54** lokale Variablen
+aus dem Aufbau, der Abschluss **57**. Drei Funktionen hiessen 54 Argumente
+durchreichen, schlechter als der Monolith.
+
+Die tragfaehigen Naehte lagen eine Ebene tiefer: Trainings-Durchgang 20 rein /
+7 raus, Validierungs-Durchgang 13 rein / 11 raus. Mit dem Verlust-Buendel
+`LossSetup` wurden daraus 11 und 6 Parameter.
+
+**Merksatz fuer den naechsten Schnitt:** nicht Zeilen zaehlen, sondern zaehlen,
+wieviele lokale Namen die geplante Naht ueberqueren. Ist das zweistellig, ist
+es die falsche Naht.
+
+### Drei Behauptungen von mir, die an Messungen gescheitert sind
+
+1. "Aufbau/Schleife/Abschluss sind die Naehte" -- 54 bzw. 57 Namen ueber die
+   Naht, verworfen.
+2. "Task#95 Debug-Trace sind 1.797 Zeilen Diagnose" -- der echte Trace-Block
+   ist **309** Zeilen; ab `batched_expand_root_candidates` folgt ohne neues
+   Banner der SUCHKERN. Die Banner in `net_mcts.rs` markieren Anfaenge, keine
+   Enden.
+3. "Die Knopf-Registratur driftet von den Preregs weg" -- tut sie NICHT.
+   `Aktiv` heisst laut eigener Definition "verdrahtet, Default kann an ODER
+   aus sein". Der Befund war ein anderer, siehe unten.
+
+### Zwei Waechter, die jetzt greifen statt zu existieren
+
+**Regel 7 (Bezeichner englisch)** im Konventions-Linter. Anlass: diese Sitzung
+hat 14 Dateien mit deutschen Bezeichnern hinterlassen, und der Linter meldete
+bei jedem dieser Commits "alle Regeln gruen". Geprueft werden nur
+HINZUGEFUEGTE Definitionszeilen (Zuschnitt wie die Ratsche), Python ueber
+`ast`, Ausweg `konvention-ok: <Grund>`.
+
+Er hat noch am selben Tag dreimal zugeschlagen: in `freeze_heuristic.py`, in
+seinem EIGENEN Neubau, und beim A-Commit an `PARTIE_GEWICHT`/`conj_breite`.
+Der letzte Fall war beim Bau nicht bedacht: **eine reine Verschiebung laesst
+Altbestand als "neu" erscheinen** -- und ist genau deshalb kein Fehlalarm.
+
+**Verdikt-Spalte in `docs/knobs.md`.** Die Registratur sagt "verdrahtet", der
+Prereg-Kopf sagt "beantwortet"; niemand hat beides zusammengefuehrt. Jetzt
+schon: **51 verdrahtete Knoepfe haengen an einer beantworteten Prereg**, davon
+36 mit Default AUS. Kein Loeschauftrag -- ein negatives Ergebnis kann
+"falscher Hebel, richtiges Ziel" heissen (`PREREG_long_row_payoff`), und
+`MOSAIC_FLOOR_SHAPING_W` ist entschieden UND der einzige Shaping-Knopf, der
+im Champion laeuft.
+
+### Offen, benannt statt stillschweigend
+
+- **C ist halb**: die Kodierschicht (`state_to_tensor`, `action_to_id`, ~630
+  Zeilen) bleibt in `neural_net.py`. Sie haengt an `_padn` und zehn
+  Modulkonstanten, die andere Dateien ebenfalls von dort importieren.
+  `neural_net.py` heisst weiter "Netze UND Kodierung".
+- **A ist Schritt 1 von mehreren**: `net_mcts.rs` hat noch 9.909 Zeilen.
+  Naechste Kandidaten nach Groesse: Moon-Order-Wahl (893), Implicit-Minimax
+  (707+267), Denial-Tiebreak (142+185).
+- **Die Shaping-Tests** liegen weiter in `net_mcts.rs` und ziehen sich die
+  Namen ueber `use crate::shaping::*`.
+- **Groessen-Basislinie**: 36 Dateien liegen ueber ihrem Eintrag. Ein
+  globales `--update-size-baseline` wuerde alle auf einmal akzeptieren,
+  darunter fremde -- deshalb NICHT gelaufen.
+
+## V2 IST AUS DEM QUELLSTAND (2026-08-27, B4a abgeschlossen)
+
+**Nutzer-Entscheid**, in seiner eigenen Reihenfolge: "V2 ist durch. Keine
+Entwicklung mehr." -> "Split-Test als Ergebnis stehen lassen, die beiden
+anderen migrieren." -> "mach das. ist eh alles im git versioniert."
+
+Entfernt: `HeuristikVariante` (9 Varianten), `heuristic_v2.rs`, die
+v2-Routing-Haelfte von `plate_builder.rs`, beide v2-Arena-Einstiege samt
+pyo3-Bindungen, die Faedelung durch fuenf Module. Der Umfang stand vorher als
+"129 Stellen" im Raum; entfernt wurden am Ende netto 2.933 Zeilen
+(`git diff HEAD --numstat`: +130 / -3.063 in `engine/` und `self_play.py`),
+davon 1.429 in `plate_builder.rs`, 705 in `self_play.rs`, 554 als ganze
+Datei `heuristic_v2.rs`.
+
+**Nicht nach eigenem Urteil ausgewaehlt:** die 39 toten Items in
+`plate_builder.rs` hat der COMPILER benannt, iterativ, bis nichts mehr tot
+war. Dieselbe Methode fuer die Tests -- Anker war jeweils die Fehlerzeile,
+nicht meine Einschaetzung, was noch gebraucht wird.
+
+**Der Anker ist davon nicht beruehrt.** Zu jeder Funktion `X` gab es einen
+Zwilling `X_variante`; der V1-Zweig war in jedem Fall der Bestandsrumpf. Die
+Verschmelzung entfernt eine Weiche, die nur noch einen Ausgang hatte.
+
+### Was ausdruecklich BLEIBT -- und warum das kein Restposten ist
+
+- **Spec-Feld `heuristik_variante`**: weiter PFLICHT, aber nur `"v1"` wird
+  angenommen. Eine v2-Spec scheitert HART. Ein stilles Durchwinken als v1
+  waere genau der Fehler vom 2026-08-26 (Flag vergessen, Default v1, Korpus
+  bitgleich, falscher Befund committet) -- nur an neuer Stelle.
+- **CLI-Flag `--heuristik-variante`**: bleibt mit `choices=["v1"]`, damit ein
+  alter Kampagnen-Aufruf LAUT scheitert.
+- **Beide Artefakte**: lauffaehig auf ihrem MITGELIEFERTEN Wheel. Die
+  v22-Korpora in `data/` sind unberuehrt.
+
+### Der Beleg, der die ganze Kapselung rechtfertigt
+
+`frozen_agent_referee_probe.py` liefert seine festgenagelten Werte
+UNVERAENDERT: `v1_anchor [27,15]/159`, `v2huelle_generator [63,27]/163`.
+
+Der Quellstand kennt v2 nicht mehr, und das v2-Artefakt spielt trotzdem Zug
+fuer Zug dieselbe Partie. Genau dafuer war die Kapselung gebaut; das ist der
+erste Fall, in dem sie sich beweisen musste.
+
+### Drei Werkzeuge, drei verschiedene Lose
+
+| Werkzeug | Los | Grund |
+| --- | --- | --- |
+| `frozen_agent_referee_probe.py` | MIGRIERT auf Artefakte | beide Arme SIND Artefakte |
+| `v2_envelope_arena.py` | stillgelegt, Datei bleibt | Arm `v2`-plain ist kein Artefakt |
+| `v2_teacher_arena.py` | stillgelegt, Datei bleibt | dito |
+
+Die Trennlinie ist die Kapselungsregel, nicht Bequemlichkeit: eine Messung
+laeuft ueber Artefakte, und `v2`-plain war nie Champion und nie Erzeuger,
+sondern ein Vergleichsarm.
+
+### Kollateral, benannt statt still weggeraeumt
+
+Die SOLL-Seite von `PREREG_stack_draw_reservation_rule.md` par.5 hing an
+`plate_builder::expected_points_map` und ist mit entfernt. Das registrierte
+Ergebnis bleibt gueltig, nachrechnen laesst es sich auf dem heutigen Build
+nicht mehr. Herkunft fuer eine Wiederherstellung: die Historie unmittelbar
+vor dem B4a-Commit.
+
+### Abnahme (2026-08-27, alles auf dem NEU gebauten Wheel)
+
+| | |
+| --- | --- |
+| `cargo test --release` | **489 / 0** (19 ignoriert), Exit 0 |
+| `cargo check --all-targets` | keine neue Warnung; die einzige (`net.rs::split_planes_flat_batch`) ist Altbestand, gegen `git stash` geprueft |
+| `frozen_agent_referee_probe` | **GRUEN**, beide Artefakte auf ihren festgenagelten Werten |
+| `anchor_referee_parity_probe --games 20` | **GRUEN**, 20/20 in-process UND 20/20 extern (368,8 s, 9,22 s je Partie, 1 Thread) |
+
+Das Wheel wurde vor den Sonden neu gebaut und installiert -- ohne das haetten
+sie den alten Code gemessen (`feedback_wheel_neu_bauen_nach_engine_aenderung`).
+
+**Ein Fehler von mir, den der Compiler gefangen hat:** beim Loeschen des
+`_variante`-Zwillings ging der RUMPF von `resolve_tiling_step` mit, der Wrapper
+rief sich selbst. `unconditional_recursion` hat es gemeldet, der Rumpf kam aus
+git zurueck. Ohne diese Lint waere es eine Endlosschleife im Tiling gewesen --
+und die Suite haette sie gefunden, aber erst nach 67 Sekunden Rauschen.
+
+Details: `PREREG_heuristic_v2_long_rows.md` par.19 (Kopf nachgezogen, Index
+generiert).
+
+## B-Block: Planungs-Rueckschau und die vier Schritte, wie sie geplant waren
+
+*(Auslagerungs-Vermerk 2026-08-28: die Ergebnistabelle B1-B4b und die ZWEI
+weitergeltenden Regeln -- Anker-Messung ueber `tools/anchor_arena.py`, und
+par.3b.1 braucht die Huellen-Geometrie aus der Historie vor B4a -- stehen
+weiter in `../evaluations/STATUS.md`, Abschnitt "B. ERLEDIGT (B1-B4b)". Hier
+liegt die Herleitung.)*
+
+**ZWEI Annahmen aus der Planung dieses Blocks haben nicht gehalten.** Beide
+standen hier als Tatsache und waren es nicht:
+
+1. *"Enum und Namenstabelle muessen bleiben, weil die Artefakt-Specs die
+   Variante nennen."* -- Halb richtig. Das SPEC-FELD musste bleiben, die
+   Aufloesung ueber ein Enum nicht: die Spec prueft den Namen jetzt als
+   Zeichenkette und weist alles ausser `"v1"` HART ab. Der Vertrag ist
+   erhalten, die Tabelle nicht noetig.
+
+2. *"Die Huellen-Logik in `plate_builder.rs` bleibt ohnehin, weil par.3b.1 sie
+   analysiert."* -- **Falsch.** Die Huellen-Funktionen haengen ausnahmslos am
+   v2-Routing; der Compiler hat sie als tot benannt, und sie sind mitgefallen.
+   `plate_builder.rs` ging von 2.835 auf 1.422 Zeilen.
+
+   **Folge, ausdruecklich:** `PREREG_heuristic_v2_long_rows.md` par.3b.1 (das
+   Gewichts-FENSTER, registriert und ungebaut) braucht die Huellen-Geometrie
+   als Bezug. Wer die Messung baut, holt `v2_envelope_target` samt Umfeld aus
+   der Historie unmittelbar vor dem B4a-Commit. Das ist vertretbar, weil
+   par.3b.1 ohnehin eine ANDERE Bauform verlangt -- ein GEWICHT auf den
+   Marginalen, waehrend das entfernte `v2huelle` die Filter-Form ist --, aber
+   es ist kein Nullposten und wird hier nicht als einer gefuehrt.
+
+**Was inhaltlich richtig war:** par.3b.1 blockiert B4a nicht (Nutzer-Einwand
+2026-08-26, hier korrekt eingearbeitet), und "ueber das Artefakt fahren" heisst
+anderer INTERPRETER, nicht anderer Ort -- `self_play.py` ist nicht gewandert.
+
+**Was sich durch B4b geaendert hat und ausgesprochen gehoert:** ab jetzt
+bewegt eine Aenderung an `round5.rs` auch den Heuristik-Pfad. Der Schutz ist
+ins Artefakt gewandert -- eine Anker-Messung MUSS deshalb ab jetzt ueber
+`tools/anchor_arena.py` laufen, nicht ueber die In-Process-Heuristik.
+
+### B (Historie). Die vier Schritte, wie sie geplant waren
+
+Ziel (Nutzer 2026-08-26): gefrorene Agenten spielen gegeneinander,
+Entwicklungsversionen bleiben ungekapselt, der Engine-Code wird schlanker.
+Belegt ist bereits, dass der Pfadwechsel den Anker NICHT verschiebt (par.10b,
+20/20). Es fehlt:
+
+1. **Treiber parallelisieren.** `frozen_referee_match.py` spielt seriell in
+   einem Prozess; Partien sind unabhaengig. Gemessen 3,3 s je Partie seriell
+   gegen 1,6 s je Partie auf einem Kern in-process -- mit 11 Prozessen ist
+   Gleichstand erreichbar.
+2. **Ein Arena-Einstieg ueber den Referee.** Eine Python-seitige Arena ist der
+   kleinere Weg (der Treiber existiert).
+3. **Elo-Kette: WENIGER als zunaechst behauptet.**
+
+   **BERICHTIGUNG (Nutzer-Einwand 2026-08-26):** hier stand ein
+   "Aera-Entscheid" als grosser Posten, weil die Elo-Historie auf
+   `contract=a169ebf0a4451e08` steht und der heutige Build auf
+   `a3f61f246d9bbf5c`. Das war zu breit formuliert. Der Vertragsstempel
+   umfasst AUSSCHLIESSLICH Netz-Groessen (`contract_canonical_string`,
+   lib.rs): `INPUT_SIZE`, `NUM_PLANES_CHANNELS`, `NUM_ACTIONS`, `HEADS`.
+   Keine davon beruehrt, wie V1 spielt.
+
+   **Belegt, nicht argumentiert:** die Vertragsaenderung stammt aus `29fb1f1`
+   ("Zwei Erreichbarkeits-Eingaben fuers Netz, Champion bleibt bitgleich"),
+   und die V1-Anker-Fixture (`anchor_behaviour_v1.txt`) stammt vom
+   2026-08-21, also von VOR dieser Aenderung -- der A4-Test laeuft heute in
+   der gruenen Suite. **V1 spielt ueber die Vertragsgrenze hinweg identisch.**
+   Kanten gegen `Heuristik@150` bleiben damit vergleichbar.
+
+   Was der `contract`-Wert legitim absichert, ist die NETZ-Seite einer Kante:
+   ein ONNX aus einer anderen `INPUT_SIZE`-Aera ist nicht vergleichbar (Memory
+   "NUM_ACTIONS change orphans old checkpoints"). Dass der Handshake das
+   v21-Artefakt unter der heutigen Engine verweigert, ist deshalb RICHTIG --
+   es betrifft v21s eigenes Netz, nicht den Heuristik-Gegner.
+
+   **Was wirklich bleibt, und es ist klein:**
+   * **Anker-Identitaet in der Zeile.** `player_b` ist heute `Heuristik` --
+     ein Name ohne Build. Die Konvention unterscheidet bereits
+     `Heuristik_v2huelle`, also fuegt sich `Heuristik_v1_anchor` ein. Kein
+     Blocker, aber ab jetzt billig zu haben und spaeter nicht mehr
+     rekonstruierbar.
+   * **`knobs`-Spalte** ist durchweg leer; mit Artefakt liegen die Knoepfe in
+     `spec.json`, die Zeile sollte darauf verweisen statt sie zu wiederholen.
+4. **Erst dann** `round5_anchor.rs` (1.664 Zeilen) und die Varianten-Faedelung
+   entfernen (111 Stellen, davon 103 blosse Weitergabe, 5 echte
+   Verzweigungen), jeweils als EIGENER Commit.
+
+**Die Reihenfolge ist nicht verhandelbar:** `round5_anchor.rs` schuetzt den
+Anker im IN-PROCESS-Pfad, und die Arenen benutzen weiter genau den.
+
+## UEBERGABE AN DIE NAECHSTE SITZUNG (2026-08-26, Abend)
+
+**Lies zuerst `NAECHSTE SCHRITTE` weiter unten** -- dort steht, was ansteht,
+nach Prioritaet. Diese Zeilen sagen nur, was sich seit der Uebergabe von heute
+frueh geaendert hat.
+
+**Der Tag ging vollstaendig in Infrastruktur.** Kein Zug ist dadurch besser
+geworden; das v22-Training steht unveraendert aus und ist weiterhin der
+einzige Posten, der den Leitstern bedient.
+
+Gebaut und abgenommen:
+
+| | |
+| --- | --- |
+| Cache je Datei (Hebel 4) | beide Pflichtpruefungen bestanden, Abschnitt 1b |
+| Reproduktionsbeweis des v22-Erzeugers | er IST reproduzierbar, Abschnitt 1c (die erste Fassung war falsch, siehe dort) |
+| Heuristik-Kapselung | v1_anchor und v2huelle_generator als Artefakte, Abschnitt 1d |
+| Referee-Pfad | ein gefrorener Agent trifft ALLE Entscheidungen selbst; Artefakt gegen Artefakt laeuft |
+| Anker-Tor | 20/20 identisch zu `net_arena_match` -- die Umstellung verschiebt den Anker NICHT |
+| Wheels | liegen ab jetzt IM Artefakt, `models/frozen_wheels/` ist entfernt (Abschnitt C2) |
+
+**Vier Befunde, die ohne diese Arbeit unentdeckt geblieben waeren** und die
+eine naechste Sitzung kennen sollte:
+
+1. `MOSAIC_CACHE_F32` stand in keiner Cache-Key-Komponente -- der Notausstieg
+   war wirkungslos, sobald ein Cache existierte.
+2. Der Split-Test kehrt `PREREG_v22_window.md` par.4c um: das **Drafting**
+   traegt die vollen Spalten (0,756), das Routing allein **nichts** (0,000).
+3. Korpus und Netz-Self-Play loesen Stapelzuege VERSCHIEDEN auf (eigener
+   Abschnitt weiter unten) -- das Netz lernt an Daten aus einem anderen Spiel
+   als dem, das es selbst spielt.
+4. Regel 4 aus `PREREG_chance_nodes.md` ist **fuer den HEURISTIK-Korpus**
+   erfuellt, ohne dass der Knopf je gesetzt wurde -- der Erzeugerwechsel hat
+   es erledigt. **Nicht** fuer das NETZ-Self-Play: dort steht die
+   Sammelaufloesung unveraendert (`self_play.rs:3879/3886`, beide
+   `apply_via_chosen_action = true`), der Wecker auf der v23-Liste bleibt
+   also scharf (praezisiert 2026-08-27).
+
+**Zustand:** Suite 531/0, alle Sonden gruen, Arbeitsbaum bis auf Fremdes leer.
+Ungepusht (Push ist ein eigener Nutzer-Entscheid).
+
+## SITZUNGSUEBERGABE 2026-08-26 (frueh, EINGEHEND -- Stand vor der Kapselung)
+
+**Der v22-Korpus ist FERTIG und ausgewertet, der Cache liegt gebaut bereit.**
+Was jetzt ansteht, ist das Training -- und dabei eine Konfiguration, die in
+beiden Naechte-Armen gefehlt hat.
+
+*(Auslagerungs-Vermerk 2026-08-28: die Abschnitte 1e -- Merkliste des
+Codepflege-Audits -- und 2 -- "Offen, mit Kosten" -- dieses Blocks waren OFFEN
+und sind in `../evaluations/STATUS.md` geblieben. Hier stehen die
+abgeschlossenen Abschnitte 1, 1b, 1c, 1d, 3 und 4.)*
+
+### 1. Das naechste Training: Arm B PLUS Ownership-Gewicht
+
+**Nicht "Arm B".** Beide Arme der Nacht liefen mit `OWNERSHIP_WEIGHT = 0` und
+konnten deshalb STRUKTURELL keine Spalten bauen -- der Ownership-Pol ist der
+einzige gebaute Kanal, der im Tiling Sofortpunkte gegen Struktur eintauschen
+kann (`PREREG_v22_window.md` par.4e). Die richtige Konfiguration ist:
+
+```
+MOSAIC_IGNORE_POLICY_TARGET_VALID=1   (Traeger-Arm B, Richtungsbefund par.4b)
+--ownership-weight 1.0                (par.3b der Lehrer-Prereg, w > 0)
+```
+
+**Notation, festgelegt in par.3b.2:** dieser Messarm heisst "w1-Arm"; der
+**w0-KONTROLLARM** faehrt `--ownership-weight 0`. Der frueher hier stehende
+Platzhalter `<w0>` war doppeldeutig.
+
+plus **w0-Kontrollarm auf DEMSELBEN Korpus** -- ohne ihn sind Kopfwirkung und
+Korpuswechsel konfundiert.
+
+**KALTSTART entschieden (Nutzer 2026-08-27): "wir werden einen kaltstart
+machen und bei bedarf afterburnen."** v22 trainiert from-scratch auf dem
+vollen Korpus; der vorbereitete Warmstart aus `PREREG_v22_window.md` par.6
+entfaellt. Zwei Konfundierer weniger: die Sanity-Modelle weichen in der
+Kopfbestueckung vom Champion-Rezept ab (`opp_points_head`/`endgame_head`
+beide false, am Manifest geprueft), und `hv2sanity_best` war ohnehin Arm A.
+`MOSAIC_VAL_POOL` wird fuer den Kaltstart nicht gebraucht -- greift wieder,
+falls der Afterburner als Warmstart auf demselben Korpus laeuft (par.6).
+
+**Erfolgsmass entschieden (Nutzer 2026-08-27):** v22 tritt im NORMALEN
+Gating gegen den Elo-Anker UND gegen v21 an. Promotion ist NICHT
+Voraussetzung fuer den Self-Play-Start ("ich geh nicht davon aus dass v22
+besser ist als v21") -- der Start haengt am Spalten-Abnahme-Tor (par.3b.2),
+nicht am Gating-Ausgang.
+
+**PFLICHT-FIX VOR DEM TRAINING -- ERLEDIGT 2026-08-27 (gebaut und
+abgenommen):** der native WDL-Bootstrap des v21-Label-Netzes wurde im
+Zielbau faelschlich Platt-entstaucht (`WDL_GENERATOR_PREFIXES` kannte
+`selfplay_hv2` nicht; Fehlmass bis 0,0715 je Record, gemessen). Semantik
+UMGEKEHRT: **nativ ist der Default**, entstaucht wird nur noch die
+Blockliste der fuenf tanh-Aera-Praefixe (`LEGACY_STRETCHED_PREFIXES`,
+v10b/v12/v16/v17/v18; Inventur ueber data/, holdout/ und das
+v20-Traeger-Manifest). Der v20-Traeger-Kurzschluss haengt an einer EIGENEN
+eingefrorenen Konstante (`V20_CARRIER_SHORTCUT_PREFIXES`) -- die Umkehr
+haette ihn sonst still mitgedreht. Beide Cache-Schluessel tragen den
+Status (Fenster-Key mit Blockliste, per-Datei-Key aufgeloest);
+Fixier-Probe `bootstrap_native_default_probe.py` GRUEN (nativ=roh,
+alt=entstaucht, Schluessel trennt), vom Koordinator nachgefahren.
+**Folge: 66 `.cache_*.h5` + 121 `.filecache_*.h5` in data/ sind tot**
+(entstauchte hv2-Ziele bzw. alter Schluessel) -- **GELOESCHT auf
+Nutzer-Freigabe 2026-08-27**, zusammen mit .par_full.h5 und den alten
+Abnahme-Artefakten: 194 Dateien, 2,54 GB. Der 79er-Cache wird auf dem neuen
+Stand gebaut. Details: `PREREG_heuristic_v2_long_rows.md` par.3b.3
+Nachtrag Punkt 3.
+
+### 1b. ERLEDIGT 2026-08-26: Cache je Datei (Hebel 4)
+
+`PREREG_cache_build_time.md` par.9. **Beide Pflichtpruefungen bestanden** --
+21/21 Felder bit-identisch gegen die serielle Referenz, und jeder der sieben
+per-Datei-Parameter erzeugt einen MISS. Die Schluesselteilung ist ADDITIV: der
+Fenster-Schluessel bleibt unangetastet (kein Bestands-Cache verfaellt), der
+Datei-Block bekommt einen eigenen Namensraum mit dem AUFGELOESTEN
+Traegerstatus der Datei statt des Manifest-Inhalts.
+
+Werkzeug: `tools/build_cache_incremental.py`, mit `--watch` waehrend der
+Erzeugung mitlaufend. Belegter Gewinn: 119 von 120 Bloecken ueberlebten einen
+Fensterwechsel (7,9 s statt Neubau).
+
+**Nebenbefund, behoben:** `MOSAIC_CACHE_F32` stand in keiner Key-Komponente,
+obwohl der Knopf den gespeicherten dtype aendert -- der Notausstieg war
+wirkungslos, sobald ein Cache existierte.
+
+**Noch nicht:** volle Korpus-Paritaet (es fehlt die serielle Referenz, 2,58 h)
+und die Verdrahtung in `train.py`. Beides wie bei Hebel (1) bewusst offen.
+
+### 1c. REPRODUKTIONSBEWEIS: der Erzeuger IST reproduzierbar (berichtigt 2026-08-26)
+
+**Ergebnis: der heutige Build erzeugt den v22-Korpus BIT-GENAU.** 10 Partien
+mit dem Rezept aus `cli_args` des Korpus-Manifests, Seed 20260826, verglichen
+gegen `data/selfplay_hv2_20260825_1727_g10.pkl`: 1733 Schritte, Feld fuer Feld
+gleich. `git_dirty: true` war verhaltensneutral.
+
+**Dieser Abschnitt sagte bis zur Berichtigung das Gegenteil, und der Grund war
+ein Fehler von mir, kein Befund am Code:** in keinem der ersten drei
+Reproduktionslaeufe war `--heuristik-variante v2huelle` gesetzt. Der Default
+ist `v1` (`self_play.py:637`). Gemessen wurde also v1 gegen einen
+v2huelle-Korpus, und die Differenz (1755 gegen 1733 Schritte) wurde dem
+unversionierten Anteil zugeschrieben. Der Commit `b54b41d` traegt den falschen
+Stand; er bleibt in der Historie, die Berichtigung liegt obendrauf.
+
+**Was aus dem alten Abschnitt STEHEN bleibt** -- es hing nicht an den Laeufen:
+
+* Im Erzeugungsfenster (25.08. 17:16 bis 26.08. 01:52, 34 Commits) hat KEIN
+  Commit `engine/src` angefasst.
+* Das Modell ist md5-identisch zur eingefrorenen Kopie (`86bc9bddf604ea77`).
+* Build auf `dbf6a08` und HEAD erzeugen Feld fuer Feld dasselbe.
+
+**Was NICHT stehen bleibt:** "der heutige Build ist ein anderer Spieler", und
+alles, was daraus ueber Neuerzeugung des Korpus folgte.
+
+**Folge fuer das Einfrieren:** ein v2-Artefakt konserviert den ECHTEN Erzeuger,
+keine Rekonstruktion. Die Frage, ob v22 auf einem Korpus ohne reproduzierbaren
+Erzeuger trainiert wird, stellt sich nicht mehr.
+
+**Nebenprodukt des Fehllaufs**, weil er sonst nur Rechenzeit waere: die
+1000-Partien-Fahrt ist ein sauberer v1-gegen-v2huelle-Vergleich unter
+SELF-PLAY-Bedingungen (600 Sims, mit Netz), gepaart auf Dateiebene ueber 100
+Bloecke. Volle Spalten **0,737 gegen 0,050**, Punkte **46,0 gegen 20,5**,
+Strafsteine **5,2 gegen 10,4**, hoechste Spalte 5,44 gegen 4,22. Artefakt:
+`evaluations/artifacts/generator_drift.json` (dort als Drift etikettiert --
+es ist keine, siehe oben).
+
+### 1d. HEURISTIK-KAPSELUNG GEBAUT (2026-08-26)
+
+`PREREG_agent_encapsulation.md` par.9. Beide Heuristiken liegen als
+vollstaendige Agenten-Artefakte vor und sind VERSIONIERT:
+
+| Artefakt | Rolle | Inhalt |
+| --- | --- | --- |
+| `models/frozen_heuristics/v1_anchor/` | Elo-Anker | Wheel, Spec, Manifest, Golden Probe (6,8 MB) |
+| `models/frozen_heuristics/v2huelle_generator/` | v22-Erzeuger | dazu `tiling_net.onnx` als Kopie (16 MB) |
+
+`heuristik_variante` ist jetzt ein Spec-PFLICHTfeld (Name, kein Default,
+unbekannter Name = harter Fehler). Golden Probe ist ein SELF-PLAY-Lauf aus dem
+eigenen Wheel, byte-verglichen -- die Welle-3-Drafting-Sonde waere fuer eine
+Heuristik eine halbe Probe, weil der Referee das Tiling selbst und auf V1
+aufloest (`referee.rs:312` -> `self_play.rs:1207`).
+
+**Staerkster Beleg:** die Golden Probe des Generators ist Feld fuer Feld
+identisch mit `data/selfplay_hv2_20260825_1727_g10.pkl`. Das Artefakt IST der
+Erzeuger.
+
+Werkzeuge: `tools/freeze_heuristic.py`, `tools/verify_frozen_heuristic.py`
+(zwei getrennte Modi: Drift gegen aktuelles Wheel, Konservierung gegen das
+Artefakt-Wheel).
+
+**REFEREE-PFAD GESCHLOSSEN** (par.10, vier Bausteine): ein gefrorener Agent
+trifft dort jetzt ALLE Entscheidungen selbst -- Startsetzung, Drafting,
+Platzierung. Getrennt wurden Regel-Autoritaet (bleibt beim Referee und prueft
+hart) und Entscheidungs-Autoritaet (gehoert dem Agenten). Wirkung belegt:
+v1 `[27,15]` gegen v2huelle `[63,27]` aus derselben Startlage.
+
+Sonden: `frozen_agent_referee_probe.py` (laeuft es / wirkt die Variante /
+prallt Unsinn ab) und `frozen_worker_protocol_probe.py` (echter
+Worker-Prozess, alle drei Anfragearten, ohne Modell).
+
+**Noch nicht:**
+
+* Entfernen der Quell-Konservierung -- `round5_anchor.rs` (1664 Zeilen) und
+  die Varianten-Faedelung (111 Stellen, davon 103 blosse Weitergabe, 5 echte
+  Verzweigungen). Der Weg ist jetzt frei, der Schritt gehoert in eigene
+  Commits.
+* Artefakt GEGEN Artefakt ueber `frozen_referee_match.py`: der Treiber faehrt
+  "aktuelle Engine gegen EIN Artefakt", seine A-Seite verlangt ein Modell.
+  Fuer zwei gefrorene Heuristiken braucht es einen netzlosen In-Process-Zweig
+  oder einen zweiten Worker.
+
+**REIHENFOLGE, die nicht vertauscht werden darf** (par.10a): `round5_anchor.rs`
+schuetzt den Elo-Anker im IN-PROCESS-Pfad, und die Arenen benutzen weiter genau
+den. Das Modul zu entfernen, BEVOR die Arenen den Anker aus dem Artefakt
+beziehen, liesse den Anker still wandern -- genau das, wogegen es gebaut wurde.
+
+**ANKER-TOR GRUEN** (par.10b): der Referee-Pfad spielt **20 von 20** Partien
+identisch zu `net_arena_match` -- auch mit der Heuristik-Seite vollstaendig
+extern. Die Umstellung verschiebt den Anker also nicht.
+
+Zuvor war es 0 von 6, und die Ursache war EIN Schalter: die Arena traegt je
+Seite `apply_via_chosen_action` (Netz `true` = Sammelaufloesung des
+Stapelzugs, Heuristik `false` = nur der Peek, Slot und Rotation werden
+gesucht). Der Referee kannte das nicht und gab der Heuristik das
+Netz-Verhalten. Wer den Referee mit dem Arena-Pfad vergleicht, MUSS
+`set_apply_modes((True, False))` setzen.
+
+Merkposten: es gibt DREI In-Process-Pfade -- `play_arena_game` (Heuristik
+gegen Heuristik), `unified_game_loop` (Netz gegen Heuristik, **hier haengt der
+Anker**) und `RefereeGame`.
+
+**Treiber traegt die Heuristik** (par.10a): aktuelle Engine gegen gefrorene
+Heuristik laeuft, mit Handshake, Golden-Selbsttest in der Artefakt-venv und
+externer Platzierung. Beide Artefakte tragen `protokoll.kinds` und wurden mit
+dem vollstaendigen Wheel neu eingefroren; die Golden Probe des Generators ist
+weiterhin Feld fuer Feld identisch mit der ersten Korpusdatei.
+
+### 3. Zustand des Baums (Stand 2026-08-26, Ende der Kapselungs-Sitzung)
+
+* **25 Commits vor `origin/main`**, nicht gepusht (Nutzer-Regel: Push ist ein
+  eigener Entscheid). `origin/main` traegt inzwischen die frueheren Commits
+  dieser Sitzung -- gepusht hat sie NICHT diese Sitzung.
+* `CLAUDE.md` ist seit Sitzungsbeginn modifiziert, **nicht von dieser Sitzung**;
+  ebenso die Loeschung von `data/policy_carrier_manifest_v20.json`.
+* `.git` ist von 30 auf 60 MB gewachsen -- die eingefrorenen Artefakte sind
+  jetzt versioniert. 22,8 MB Artefaktdateien kosten davon 7 MB, weil git
+  inhaltsadressiert ist (`tiling_net.onnx` teilt seinen Blob mit dem
+  v21-Artefakt, die beiden Wheels sind identisch).
+* `data/` enthaelt neben den 2.400 `.pkl` weiterhin Block-Caches und
+  Referenzdateien -- rund 2 GB. Dazu jetzt tot: `.inc_window_120.h5` (die
+  durchgefallene erste Paritaets-Fassung) und der `.filecache_*`-Block der
+  geloeschten Sonde. Aufraeumen ist ein Nutzer-Entscheid, geloescht wurde
+  nichts davon.
+* `models/frozen_heuristics/*/venv/` (je 33 MB) sind gebaut, aber bewusst
+  NICHT versioniert -- aus dem Wheel neu herstellbar.
+* `models/` enthaelt vier untrackte Trainings-Manifeste, darunter eines von
+  einem abgebrochenen Testlauf (`valpooltest`).
+
+### 4. Der methodische Faden dieser Sitzung
+
+Er gehoert in die Uebergabe, weil er sich durchzieht und die naechste Sitzung
+Zeit sparen kann: **aus dem Vorhandensein eines Feldes folgt nicht seine
+Wirksamkeit.** Fuenfmal an einem Tag falsch geschlossen -- `tiling_net:
+Some(net)` heisst nicht "das Netz steuert das Tiling", `--heuristik-variante`
+in der Signatur heisst nicht, dass die Variante ankommt, "kein Schreiber im
+Baum" heisst nicht "von Hand erzeugt". Jedes Mal war die Antwort ein Blick auf
+Default, Reichweite und Aufrufer -- und jedes Mal hat der Nutzer sie gefunden,
+nicht ich.
+
+**2026-08-26 kamen zwei Auspraegungen dazu, beide teuer:**
+
+1. **Abwesenheit meldet sich nicht.** Ein fehlendes
+   `--heuristik-variante v2huelle` (Default `v1`) hat einen falschen Befund
+   erzeugt, der committet und an die Parallelsitzung gemeldet wurde. Der
+   Kontrollmechanismus war da -- `self_play.py` schreibt `cli_args` ins
+   Manifest neben die Daten. Ich habe hinterher hineingesehen, nicht vorher.
+   **Regel daraus: vor der Auswertung das erzeugte Manifest gegen das
+   Referenz-Manifest halten.**
+2. **Die falsche Referenz ist so teuer wie die falsche Messung.** Beim
+   Anker-Tor zuerst gegen `play_arena_game` gemessen statt gegen
+   `unified_game_loop`. Ergebnis: 0/6 und die Fehldeutung "die Umstellung
+   verschiebt den Anker". Es gibt DREI In-Process-Pfade, und nur einer traegt
+   den Anker.
+3. **Einen Waechter breiter gelesen, als er ist.** Aus dem
+   `contract_hash`-Unterschied einen "Aera-Entscheid" fuer den ANKER gemacht.
+   Der Stempel umfasst nur Netz-Groessen; V1 spielt ueber die Grenze hinweg
+   identisch, und die Anker-Fixture von vor der Aenderung belegt es.
+4. **Eine Zusage breiter beschrieben, als sie ist.** Behauptet, ein
+   gefrorener Agent spiele bei geaenderter Wertung dieselben Zuege mit
+   anderen Punkten. Das Gegenteil stimmt: die Bewertung ist eine reine
+   Funktion des ZUSTANDS, den der Referee liefert -- andere Regeln, andere
+   Zustaende, ANDERE Zuege (`PREREG_agent_encapsulation.md` par.11).
+
+**Alle vier hat der Nutzer gefunden, nicht ich, und alle vier waren
+plausibel.** Die gemeinsame Form: eine Aussage, die aus einer richtigen
+Beobachtung eine zu breite Folgerung zieht. Das Gegenmittel ist jedes Mal
+dasselbe gewesen -- die Fundstelle aufmachen, statt die Folgerung zu
+verteidigen.
+
+## Erledigte Teile aus "OFFEN, nach Reihenfolge"
+
+*(Auslagerungs-Vermerk 2026-08-28: der einleitende, weiterhin OFFENE Teil von
+Abschnitt 1 -- "v22-Korpus mit dem v2-Lehrer" -- ist in
+`../evaluations/STATUS.md` geblieben, ebenso Abschnitt 4 (JSON-Umzug:
+Restentscheid) und Abschnitt 5 (weitere offene Straenge). Hier stehen die
+abgeschlossenen Teile.)*
+
+### Vorbereitung, in dieser Reihenfolge (Nutzer-Entscheid 2026-08-25)
+
+Kriterium fuer "gehoert davor": es aendert, WAS der Generator tut, oder es ist
+spaeter nur durch Neu-Erzeugen korrigierbar. Alles andere misst auf dem Korpus
+und gehoert danach.
+
+| # | Punkt | Stand |
+| --- | --- | --- |
+| 1 | **Blindzieh-Reparatur entscheiden** | **ERLEDIGT 2026-08-25: kein Staerkegewinn**, Knopf bleibt AUS. Korpus kann mit dem Bestand erzeugt werden (`PREREG_stack_draw_reservation_rule.md` par.5d) |
+| 2 | **Heuristik-Variante bis ins Self-Play durchreichen** | **ERLEDIGT 2026-08-25, im zweiten Anlauf.** Der erste Durchreich-Commit erreichte den Erzeugungspfad nicht (Verbraucher nur im Arena-Zweig); ein 200-Partien-Korpus war bitgleich mit v1. Behoben in ZWEI Haelften: Tiling (`224cc42`) und Draft-Vorzug (`61b2fff`). **Abnahme jetzt auf dem AUFZEICHNENDEN Pfad** (`heuristik_variante_reaches_the_recording_self_play_path`). Wirkung am 200-Partien-Piloten: volle Spalten **0,755 ± 0,080** gegen 0,050 (v1) -- reproduziert den Lehrer-Test (0,798) im Rauschen. k1 von 5,1 % auf **55,7 %** der Partien, Strafleiste 10,30 auf 5,09 Steine, Punkte 20,9 auf 47,1. Vorzugs-Records tragen `policy_target_valid=false` (Feuerrate **61,9 %** der Draftingzuege mit echter Wahl); die Flagge steht JE RECORD, die Trainingsseite kann sie achten oder ignorieren -- der Korpus ist in beide Richtungen brauchbar |
+| 3 | **Arena-Threadzahl geradeziehen** | **ERLEDIGT 2026-08-25.** EINE Konvention (`self_play::thread_plan`): `0` = alle Kerne, `1` = sequenziell, `n` = n Threads. Vier Arena-Einstiege umgestellt. Abnahme: dieselben 12 Seeds sequenziell gegen 11 Threads -> **Ergebnisse identisch**, 44,5 s auf 13,0 s (3,4x) |
+| 4 | **Bootstrap-Horizont 2 gegen 3** | **ERLEDIGT 2026-08-25: Horizont 3 VERWORFEN** (Verdikt gilt; der Messkorpus war aber V1, nicht v2huelle -- par.9g). Gepaart auf 200 v2huelle-Zustaenden trifft er den echten Ausgang schlechter (Brier +0,0567 ± 0,0254, Null klar ausgeschlossen) und kostet Faktor 1,63. Die Labels unterscheiden sich dabei sehr wohl (51 % ueber 0,01) -- die Frage war echt, nur die Antwort negativ. **v22 laeuft mit Horizont 2.** `PREREG_bootstrap_horizon.md` par.9f |
+| 5 | **Erzeugung mit dem HEUTIGEN Wheel** | erfuellt, darf nicht rueckwaerts passieren |
+
+**Zu 1:** `resolve_and_apply_stack_draw` sitzt in `apply_chosen_action` und
+laeuft damit in JEDEM Self-Play, auch im heuristischen. In den ~39 Prozent
+Partien mit Kriterium 6 verbrennt die Bestandsfassung rund 11 Punkte je Partie
+und treibt 58-66 Prozent der Ziehserien auf Punktestand 0. Das landet in den
+Scores, den Trajektorien und damit in den **Value-Labels**. Wird v22 mit dem
+Defekt erzeugt, traegt ihn jedes daraus trainierte Netz mit.
+
+**Zu 2 (erledigt):** der Self-Play-Einstieg war auf V1 festgenagelt; nur die
+Arena nahm die Variante als Parameter. Jetzt durchgereicht, mit Vorgabe "v1"
+auf jeder Ebene -- Bestandsaufrufer bleiben byte-identisch (Paritaets-Hash
+`8c6684ff...` haelt, Suite 526/0). Die Bestandssignatur
+`run_self_play_with_net_labels` ist BEWUSST unveraendert geblieben und
+delegiert; daneben steht `..._variante`. Grund: `engine/examples/` ruft sie
+auf, und der pre-push-Hook kompiliert die Beispiele mit.
+**Belegt statt angenommen:** gleicher Seed, `v1` gegen `v2huelle` -> die
+Partien unterscheiden sich; ein ungueltiger Wert wird abgewiesen statt still
+auf v1 zu fallen. Die Variante steht ausserdem in den Metadaten der erzeugten
+Dateien -- sonst waere spaeter nicht feststellbar, womit ein Korpus entstand.
+**ENTSCHIEDEN 2026-08-25 (Nutzer): v22 wird mit `v2huelle` erzeugt.**
+Gestuetzt durch beide Messungen -- der Lehrer-Test (par.10.1) gibt der Huelle
+0,798 volle Spalten gegen 0,086, und der Phasenfaktor `v2huellephase` ist in
+par.11.1 als H0 negativ entschieden (n=160, volle Spalten 0,812 gegen 0,787,
+t=0,39, Siegquote 0,500). Es gibt also keinen gemessenen Grund, die Kampagne
+an den juengeren Arm zu binden.
+
+**Zu 3:** ein 814-Partien-Lauf kostet sequenziell 2 h 48 min statt 35 min. Bei
+einer Korpus-Kampagne ist das kein Schoenheitsfehler.
+
+**Zu 5:** erst seit 2026-08-25 schreibt `serialize_player` `col_f_max` und
+`cell_reachable_mask` ins Zustands-JSON. Ein frueher erzeugter Korpus haette
+die Felder nicht, und die zwei neuen Eingaben waeren auf ihm tote Nullen --
+die Rueckfallwerte sind 0,0. Aktuell erfuellt; wer das Wheel zurueckdreht,
+zerstoert es still.
+
+### 2. Reparatur der Blindzieh-Stopp-Regel (EINGETAKTET 2026-08-25)
+
+Eingriff in den DEFAULT-Pfad, deshalb ausdruecklich eingetaktet.
+
+**Der Defekt:** `self_play.rs:517-534` vergleicht `avg_remaining_type_value`
+(Typmittelwert in [1, 3]) gegen `best_eval_for_tile` (absolutes Brettniveau,
+mit Kriterium 6 stark negativ). Zwei Einheiten, ein Vergleich -- sobald das
+Niveau negativ ist, ist die Weiterzieh-Bedingung fast immer erfuellt.
+
+**Die Reparatur, ohne neue Formel:** `best_eval_for_tile` nimmt eine beliebige
+Platte, also auch eine aus dem Restpool. Damit laesst sich beides in derselben
+Einheit rechnen -- weiterziehen, solange
+`E[max(best_eval(V_next) − max(best_eval(gezogene)), 0)] > 1`, Erwartungswert
+ueber die Pool-Platten des Typs, den die sichtbare Rueckseite ansagt.
+
+**Vorab zu klaeren:** (a) Kosten -- `best_eval_for_tile` laeuft ueber Slots
+mal Rotationen, ueber den ganzen Restpool je Entscheidung ist das deutlich
+teurer als der heutige Mittelwert; zu messen, BEVOR die Regel scharf gestellt
+wird. (b) Knopf mit Default AUS, damit die Arena beide Arme fahren kann.
+
+**ABNAHME GEFAHREN 2026-08-25 (par.5d): KEIN Staerkegewinn.** 200 gepaarte
+Partien, Champion@400 gegen Heuristik@150. Netz-Siege 151/200 gegen 141/200
+(McNemar p=0,1539), Punkteniveau −0,97 ± 1,59; in der Platte-6-Teilmenge
+(n=76) −1,26 ± 3,34. Kein Arm ist besser, der Knopf bleibt auf Default AUS.
+
+**Zwei Lehren daraus, beide korrigierend:**
+
+1. **Meine Begruendung fuer den Plattensatz-Schnitt war falsch.** Hier stand,
+   ohne Kriterium 6 "kann kein Unterschied entstehen" -- es entsteht einer
+   (−0,80 Punkte, zwei gekippte Partien). Ohne Kriterium 6 ist das Brettniveau
+   zwar positiv, aber `avg_remaining_type_value` liegt in [1, 3]; bei kleinem
+   `max_drawn` zieht auch die Bestandsregel weiter. Richtig: der Unterschied
+   ist dort SELTEN, nicht unmoeglich.
+2. **Der erwartete Punktegewinn bleibt aus**, obwohl die Bestandsregel
+   nachweislich 9-13 mal zieht, wo die optimale Regel 1 sagt. Damit steht die
+   BEWERTUNG einer Kuppelplatte zur Debatte, nicht die Stopp-Regel: entweder
+   waren die gekauften Platten ihren Preis wert (das `V` aus par.5b ist zu
+   niedrig), oder die Reparatur zieht jetzt zu wenig. Beide Zweige brauchen
+   ein `V`, das an realisierten Punkten geeicht ist -- also das v22-Korpus.
+
+### 3. Arena-Threadzahl geradeziehen -- ERLEDIGT 2026-08-25
+
+`threads = 0` hiess in `run_heuristic_v1_vs_v2_arena` ALLE KERNE und in
+`run_net_vs_heuristic_v2_arena` SEQUENZIELL. Dieselbe Sonde mit derselben Zahl
+lief also einmal 12-fach und einmal einfach -- am Lehrer-Test sichtbar als
+19,8 CPU-Minuten in 20,4 Wanduhr-Minuten bei 12 Kernen, Faktor 1,0.
+
+**Gebaut:** `self_play::thread_plan` als EINE Konvention -- `0` = globaler
+Pool (alle Kerne), `1` = sequenziell, `n` = eigener Pool. Umgestellt sind
+VIER Arena-Einstiege; es waren vier und nicht zwei, die erwartete Trefferzahl
+im Umbau-Skript hat die beiden uebersehenen gefunden. Die Self-Play-Einstiege
+bleiben unberuehrt: dort heisst `0` schon "alle Kerne", und `1` baut einen
+Pool mit einem Thread statt sequenziell zu laufen -- verhaltensgleich, im
+Doc-Kommentar festgehalten, damit die Asymmetrie nicht fuer ein Versehen
+gehalten wird.
+
+**Abnahme, gemessen statt angenommen:** dieselben 12 Seeds,
+`net_vs_heuristic_v2_arena` einmal mit `threads=1` und einmal mit
+`threads=11` -- **Ergebnisse byte-identisch**, 44,5 s gegen 13,0 s (Faktor
+3,4). Das war noetig, weil die Umstellung fuer die Netz-Arenen die Bedeutung
+von `threads=0` von "sequenziell" auf "alle Kerne" dreht: jeder
+Bestandsaufrufer mit 0 laeuft ab jetzt parallel.
+
 # Vollstaendiger STATUS-Stand vom 2026-08-25 (vor der Neufassung)
 
 **Warum dieses Kapitel existiert:** Nutzer-Auftrag 2026-08-25, STATUS.md
