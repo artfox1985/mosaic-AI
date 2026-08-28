@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Welche Einstellung fuer den adaptiven Plateau-Scheduler taugt als kuenftiges Warm-Start-Rezept -- greift factor 0.5 / patience 2 ueberhaupt, bevor das Early Stopping feuert? | Beleg: **ENTSCHIEDEN 2026-08-18: reaktive Verfahren sind hier strukturell zu spaet, KEIN weiteres Nachstellen** (par.7). Zweimal gemessen (b21 Warm Start, b20 Cold Start): Optimum bei Epoche 4, Plateau-Scheduler feuert bei 8, bester Checkpoint identisch zum konstanten Lauf; auch patience=1 waere zu spaet. Bei v21-b22 hat ReduceLROnPlateau ueber alle 15 Epochen NIE ausgeloest (LR konstant 5,00e-04), weil 0,0001-0,0002 Verbesserung je Epoche als Fortschritt zaehlt -- genau die vermutete strukturelle Schwaeche. Falls doch ein Schedule gewollt: proaktiver Cosine mit T_max 8-10, nicht 20 und nicht 100 (T_max haengt am --epochs-Flag, deshalb war der Cosine des Bestandsrezepts seit v12b_lr inert). Nebenbefund: wer plateau fuer ein Kopf-Training nimmt, muss ihn mit dem Ownership-Verlust speisen, denn val_combined enthaelt ihn nicht. Diese Datei traegt zugleich den Abschlussbefund zu v21-b22 (siehe PREREG_frozen_trunk_head.md). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Welche Einstellung fuer den adaptiven Plateau-Scheduler taugt als kuenftiges Warm-Start-Rezept -- greift factor 0.5 / patience 2 ueberhaupt, bevor das Early Stopping feuert? | Beleg: ENTSCHIEDEN 2026-08-18: reaktive Verfahren greifen hier strukturell zu spaet, plateau ist KEIN Warm-Start-Standard (par.7). Optimum Epoche 4, erste LR-Senkung erst Epoche 8; bei v21-b22 loeste der Scheduler ueber 15 Epochen gar nicht aus. Alternative: proaktiver Cosine, T_max 8-10. Traegt zugleich den v21-b22-Abschluss (siehe PREREG_frozen_trunk_head.md). -->
 
 # PREREG: Lernraten-Schedule — Plateau statt inertem Cosine
 
@@ -205,6 +205,14 @@ mit val_combined.**
 **Der Knopf bleibt drin** (Default `none`, nichts veraendert sich ohne
 Zutun) — fuer Regime mit unbekanntem Saettigungspunkt, etwa den Cold Start
 `v21-b20`, ist er weiter die richtige Wahl. Nur fuer den Warm Start nicht.
+
+**Nachtrag 2026-08-28 (aus dem Zeile-1-Statuskopf hierher verschoben, damit
+er beim Kuerzen nicht verlorengeht):** der Kopf registrierte den Befund als
+ZWEIMAL gemessen -- `b21` (Warm Start, par.6) und `b20` (Cold Start) --, mit
+demselben Bild: Optimum bei Epoche 4, erste Senkung bei Epoche 8, bester
+Checkpoint identisch zum konstanten Lauf. Der `b20`-Verlauf selbst ist in
+dieser Datei nicht tabelliert; die Angabe steht hier als uebernommene
+Registrierung, nicht als in dieser Sitzung nachgerechnete Zahl.
 
 ### ERGEBNIS WEG 1 — VOLLSTAENDIG (2026-08-18): der Frozen Trunk liefert den SCHLECHTEREN Kopf
 

@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Stoert ein Plattenbauer-Baustein nach Runde 4 den Gegner wirksam ueber die oeffentliche Farbzaehlung (verbleibende_farben) -- bei ~gleichwertigen eigenen Zuegen die Fliese nehmen, die dem Gegner ausgeht? | Beleg: **ENTSCHIEDEN 2026-08-15, ABLEHNUNG** (eigener Abschnitt 7 Ergebnis, Verdikt in 7.5). MOSAIC_OPPONENT_DISRUPTION bleibt Default AUS und wird in KEINEM Training-, Gating- oder Korpus-Lauf aktiviert. Der Code bleibt stehen (LOESCHVERBOT); der Aufrufpfad ist erreichbar und per Default inert, deshalb kein zusaetzliches allow(dead_code). Bei Wiederaufnahme sind ZWEI Konstruktionsfehler zu BEHEBEN, nicht bloss zu messen: vorzugszug_fuer_farbe braucht eine Ueberlauf-Pruefung, und stoerungs_vorzug braucht eine echte Gleichwertigkeits-Bedingung statt einer unbedingten Uebersteuerung. Beides sind neue Bausteine. Nachfolge-Versuch mit anderem Ansatzpunkt: PREREG_opponent_disruption_v2.md. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Stoert ein Plattenbauer-Baustein nach Runde 4 den Gegner wirksam ueber die oeffentliche Farbzaehlung (verbleibende_farben) -- bei ~gleichwertigen eigenen Zuegen die Fliese nehmen, die dem Gegner ausgeht? | Beleg: ENTSCHIEDEN 2026-08-15, ABLEHNUNG (§7, Verdikt §7.5): MOSAIC_OPPONENT_DISRUPTION bleibt Default AUS und wird in keinem Training-, Gating- oder Korpus-Lauf aktiviert; der Code bleibt stehen (LOESCHVERBOT). Bei Wiederaufnahme sind zwei Konstruktionsfehler zu beheben, nicht bloss zu messen (§7.5). Nachfolger: PREREG_opponent_disruption_v2.md. -->
 
 # PREREG: Gegner-Stoerung ueber Farbzaehlung ("Stoerungs-Baustein")
 
@@ -323,3 +323,9 @@ Konstruktionsfehler zu beheben, nicht nur zu messen:
 
 Beide Punkte sind NEUE Bausteine, kein Teil dieses Auftrags — als
 `spawn_task`-wuerdiger Folgeauftrag denkbar, aber nicht hier begonnen.
+
+**Nachfolge-Versuch mit anderem Ansatzpunkt** (aus dem Statuskopf in den
+Koerper verschoben bei der Kopf-Kuerzung 2026-08-28):
+`PREREG_opponent_disruption_v2.md` – dort wird die Stoerung als
+Gleichwertigkeits-Tausch INNERHALB der Suche gebaut statt als
+Uebersteuerung davor.

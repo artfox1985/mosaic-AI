@@ -70,6 +70,13 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
   jedem neuen Ergebnis hinten angehaengt wurde (4229 Zeichen). Wer ein
   Ergebnis nachtraegt, ERSETZT den ueberholten Teil, statt ihn zu ergaenzen;
   die Herleitung steht ohnehin im Dateikoerper.
+- **Kurz und knackig (Nutzer-Anweisung 2026-08-28):** der Beleg-Teil ist EIN
+  Verdikt-Satz plus Absatz-Verweise (par.X), hoechstens ein oder zwei
+  tragende Zahlen. Richtwert: Gesamtzeile unter ~600 Zeichen. Herleitungen,
+  Nebenbefunde, Chronologie: NUR im Dateikoerper -- wer Details will, schaut
+  in die Prereg. Anlass: der Index war mit Koepfen bis 3.892 Zeichen
+  praktisch unlesbar. Beim Kuerzen sicherstellen, dass jedes gestrichene
+  Faktum im Dateikoerper steht (sonst dorthin verschieben, nicht loeschen).
 - **Sobald sich ein Prereg-Kopf aendert: sofort
   `python tools/generate_prereg_index.py` laufen lassen** – nicht erst
   auf den pre-commit-Hook warten (der prueft nur, blockt aber erst

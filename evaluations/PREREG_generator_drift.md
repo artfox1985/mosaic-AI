@@ -1,4 +1,4 @@
-<!-- STATUS: UEBERHOLT | Frage: Wie gross ist die Drift zwischen dem heutigen Build und dem v22-Korpus-Erzeuger? | Beleg: ZURUECKGEZOGEN/GEGENSTANDSLOS 2026-08-26, noch am Tag der Anlage. Die Frage setzte voraus, dass der heutige Build den Korpus nicht reproduziert -- diese Voraussetzung war ein MESSFEHLER: in den zugrundeliegenden Laeufen fehlte --heuristik-variante v2huelle (Default v1, self_play.py:637), es wurde also v1 gegen einen v2huelle-Korpus gehalten. Korrekt gefahren reproduziert der heutige Build den Korpus BIT-GENAU (1733 Schritte, Feld fuer Feld, STATUS.md 1c). Es gibt keine Drift zu messen. Der Lauf selbst (1000 Partien, 24,8 min) ist als v1-gegen-v2huelle-Vergleich unter Self-Play-Bedingungen verwertbar und in STATUS.md 1c festgehalten. Die Prereg bleibt als Beleg dafuer stehen, wie der Fehler entstand: das Rezept stand hier woertlich richtig, inklusive v2huelle -- nur der Kommandoaufruf hat es nicht uebernommen, und ein fehlendes Flag ist kein Fehler, sondern ein Default. -->
+<!-- STATUS: UEBERHOLT | Frage: Wie gross ist die Drift zwischen dem heutigen Build und dem v22-Korpus-Erzeuger? | Beleg: ZURUECKGEZOGEN/GEGENSTANDSLOS 2026-08-26, am Tag der Anlage (par.5): die Voraussetzung war ein MESSFEHLER -- in den Laeufen fehlte --heuristik-variante v2huelle (Default v1). Korrekt gefahren reproduziert der heutige Build den Korpus bit-genau, 1733 Schritte Feld fuer Feld; es gibt keine Drift zu messen. Die Datei bleibt als Beleg stehen, wie der Fehler entstand (par.3 gegen par.5). -->
 
 # Vorregistrierung: Wie gross ist die Erzeuger-Drift?
 
@@ -98,7 +98,13 @@ Aequivalenzgrenze halten. Der Korpus ist nicht nur seine Spaltenzahl.
 wurde v1 gegen einen v2huelle-Korpus.
 
 Korrekt gefahren, gleiches Rezept, gleicher Seed: **1733 Schritte, Feld fuer
-Feld gleich** zur ersten Korpusdatei. Der heutige Build IST der Erzeuger.
+Feld gleich** zur ersten Korpusdatei. Der heutige Build IST der Erzeuger. Es
+gibt keine Drift zu messen.
+
+**Der Lauf selbst ist nicht wertlos** (nachgetragen 2026-08-28 aus dem
+Zeile-1-Statuskopf): die 1000 Partien (24,8 min) sind als Vergleich
+`v1` gegen `v2huelle` unter Self-Play-Bedingungen verwertbar und in
+`STATUS.md` Abschnitt 1c festgehalten.
 
 **Warum die Datei stehen bleibt statt geloescht zu werden:** die
 Entscheidungsregel in par.4 war richtig gebaut -- Aequivalenz statt

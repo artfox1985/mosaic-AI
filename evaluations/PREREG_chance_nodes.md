@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: GROSSTEILS GELIEFERT, Rest GEPARKT (Kopf aktualisiert 2026-08-21). Scharf in Produktion: die R5-Zufallsknoten (`MOSAIC_R5_CHANCE_NODES`, Default an seit 2026-08-10, round5.rs ist seitdem Expectiminimax; Vorzeichen-Sonde H0, t=-0,71) -- der round5-Min-Knoten-Fix c83fb35 lebt in genau diesem Loeser. Gemessen: Teil C (Platte-6/Peek-Interaktion IST gelernt, Policy-Masse +0,079, 3x staerker als jede andere Platte) sowie Weg A/Teil D/Teil E. Gebaut, Default aus: Kontrollfluss `MOSAIC_STACK_DRAW_RESEARCH`. ENTSCHEIDUNGSREGEL 4 IST SEIT v22 ERFUELLT, ohne dass der Knopf je gesetzt wurde (par.13, gemessen 2026-08-26): der Erzeuger ist auf die HEURISTIK gewechselt, und die laeuft ohnehin auf apply_via_chosen_action=false, loest den Stapelzug also per Entscheidung auf. Im v22-Korpus stehen choose_draw_stack_slot in 2,5 Prozent der Datensaetze (215 von 8.700 in 5 Dateien) und choose_dome_rotation in 9,2 Prozent -- gegen "0 von 16.322" im Bestandskorpus. Der Slot traegt dabei zu 100 Prozent ein gueltiges Policy-Ziel (der v2-Vorzug greift dort nicht, die Suche entscheidet). Die zuvor zweimal aufgeschobene Regel (Ownership- und Asym-Korpus, je wg. Regel 3) ist damit gegenstandslos, nicht ein drittes Mal offen. OFFEN und GEPARKT (Arbeitskreis "Spaeter", Nutzer 2026-08-21): Teil B1 (`MOSAIC_STACK_DRAW_CHANCE`, Ein-Schritt-Erwartung am Peek -- nie gebaut, null Code-Treffer) + Teil A1 (Bekannt-Segment-Zaehler); als Paket mit `PREREG_stack_top_feature.md` zu heben (dieselbe blinde Zone: das Merkmal gibt dem NETZ die oberste Rueckseite, B1 gibt der SUCHE die korrekte Peek-Bewertung). -->
+<!-- STATUS: OFFEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: Grossteils geliefert, Rest geparkt. Scharf: die R5-Zufallsknoten seit 2026-08-10, round5.rs ist seitdem Expectiminimax (Vorzeichen-Sonde H0, t=-0,71). Gemessen: Teil C, Weg A, Teil D, Teil E. Entscheidungsregel 4 seit v22 erfuellt, ohne dass der Knopf je gesetzt wurde (par.13). Geparkt: Teil B1 und Teil A1, als Paket mit `PREREG_stack_top_feature.md` zu heben (par.14). -->
 
 # Vorregistrierung: Wahrscheinlichkeiten statt Welten (Zufallsknoten)
 
@@ -1007,3 +1007,30 @@ SPIELER, nicht den MASSSTAB.
 **Regel 3 bleibt in Kraft:** `MOSAIC_STACK_DRAW_CHANCE` und
 `MOSAIC_STACK_DRAW_RESEARCH` werden weiterhin GETRENNT gemessen. Der hier
 vermerkte Wegfall betrifft ausschliesslich Regel 4.
+
+### Vorgeschichte der Regel (aus dem Statuskopf hierher gezogen, 2026-08-28)
+
+Entscheidungsregel 4 war vor diesem Befund **zweimal aufgeschoben** worden:
+einmal beim Ownership-Korpus, einmal beim Asym-Korpus, jeweils mit Verweis
+auf Regel 3 (nicht mit dem Kontrollfluss vermischen). Mit dem Erzeugerwechsel
+oben ist sie **gegenstandslos**, nicht ein drittes Mal offen.
+
+## par.14 Was offen und GEPARKT ist (Arbeitskreis "Spaeter", Nutzer 2026-08-21)
+
+Aus dem Statuskopf in den Koerper gezogen 2026-08-28, damit der Kopf kurz
+bleibt und nichts verloren geht.
+
+**Geparkt, nicht verworfen:**
+
+- **Teil B1** (`MOSAIC_STACK_DRAW_CHANCE`, Ein-Schritt-Erwartung an der
+  Peek-Aktion, oben beschrieben): **nie gebaut**, null Code-Treffer auf den
+  Knopfnamen.
+- **Teil A1** (Bekannt-Segment-Zaehler, TEIL A oben): ebenfalls nicht gebaut.
+
+**Als Paket zu heben, zusammen mit `PREREG_stack_top_feature.md`.** Beide
+zielen auf dieselbe blinde Zone von zwei Seiten: das Merkmal gibt dem NETZ
+die oberste Rueckseite, B1 gibt der SUCHE die korrekte Peek-Bewertung.
+
+**Nebenvermerk zur Ankerlage:** der round5-Min-Knoten-Fix `c83fb35` lebt in
+genau dem Loeser, der hier scharfgeschaltet wurde -- wer die R5-Zufallsknoten
+anfasst, fasst dieselbe Datei an.

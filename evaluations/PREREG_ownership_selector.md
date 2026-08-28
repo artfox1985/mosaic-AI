@@ -1,4 +1,4 @@
-<!-- STATUS: UEBERHOLT | Frage: Traegt der Ownership-Kopf, wenn er als SELEKTOR ueber eine Vorzugsroute im Tiling wirkt statt als Gewicht in der Blatt- und Nachsortier-Bewertung? | Beleg: **UEBERHOLT 2026-08-18, Umbau nie gebaut.** Die Stufe-0-Messungen bleiben gueltig (par.9): Spalten-Konjunktion AUC 0,830 auf 36.611 Tiling-Zustaenden bei Grundrate 0,0243, F2 faellt gegen F1 nur 3-5 % relativ ab, keine Abbruchregel greift; der Entwurf aus par.3.1 ist widerlegt, weil eine absolute Schwelle bei 0,7 fuer Spalten in 0,22 % und fuer Ecken in 72,4 % der Zuege feuert; Hauptrisiko gemessen mit Spalten-AUC 0,698 in Runde 1 gegen 0,886 in Runde 5. UEBERHOLT ist der ERSATZ-Entwurf: er ist eine kalibrierungsfreie RANGREGEL mit Abstandsbedingung (par.9.3), und harte Rangregeln sind per Nutzer-Entscheid 2026-08-18 ausgeschlossen. Die Kalibrierungs-Alternative ist ebenfalls geschlossen (STATUS.md: Kalibrierung gefittet, Ergebnis nicht einbauen). Nachfolger ist PREREG_ownership_coupling.md. -->
+<!-- STATUS: UEBERHOLT | Frage: Traegt der Ownership-Kopf, wenn er als SELEKTOR ueber eine Vorzugsroute im Tiling wirkt statt als Gewicht in der Blatt- und Nachsortier-Bewertung? | Beleg: UEBERHOLT 2026-08-18, nie gebaut -- der Ersatz-Entwurf ist eine harte Rangregel (par.9.3), und die sind per Nutzer-Entscheid ausgeschlossen. Stufe 0 bleibt gueltig (par.9): Spalten-AUC 0,830, absolute Schwelle 0,7 feuert bei Spalten in 0,22 % der Zuege. Verdikt, Kalibrierungs-Aus und Nachfolger: par.12. -->
 
 # PREREG: Der Ownership-Kopf als SELEKTOR — Vorzugsroute statt Blattgewicht
 
@@ -483,4 +483,21 @@ genau dagegen gebaut** und bleibt bindend.
 
 ## par.11 ERGEBNIS STUFE 2 (leer bei Registrierung)
 
-## par.12 VERDIKT NACH DER VORAB-REGEL (leer bei Registrierung)
+## par.12 VERDIKT NACH DER VORAB-REGEL
+
+**UEBERHOLT, eingetragen 2026-08-18 (Kopf-Kuerzung 2026-08-28 nachgetragen).**
+Der Umbau wurde nie gebaut; Stufe 1 und Stufe 2 sind nie gelaufen (par.10,
+par.11 bleiben leer). Die Stufe-0-Messungen aus par.9 bleiben gueltig.
+
+Warum UEBERHOLT:
+
+1. Der ERSATZ-Entwurf aus par.9.3 ist eine kalibrierungsfreie **harte
+   Rangregel** mit Abstandsbedingung -- und harte Rangregeln sind per
+   Nutzer-Entscheid 2026-08-18 ausgeschlossen.
+2. Die naheliegende Alternative, den Kopf zu KALIBRIEREN, ist ebenfalls
+   geschlossen: laut STATUS.md wurde die Kalibrierung gefittet, das Ergebnis
+   aber ausdruecklich nicht eingebaut.
+3. Der urspruengliche Entwurf aus par.3.1 (absolute Schwelle) war schon durch
+   par.9.3 widerlegt.
+
+**Nachfolger dieses Strangs: `PREREG_ownership_coupling.md`.**

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid (Auslage x Slot x Rotation) und legt die Brettgeometrie fest -- gelegt wird sie aber seit jeher von einer Handheuristik, und das Trainingsziel ist ein one-hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25. Am Code geprueft: start_placement_step schreibt die VOLLE Aktionsmenge in valid_actions (self_play.rs:922-935), waehlt dann per choose_start_placement (Farbhaeufigkeit + Eckbonus) und legt ein one-hot darauf; Suche und Netz entscheiden nie, weder im Self-Play noch in der Arena. Ausdrueckbar waere es: ChooseDomeSlot (328-354) und ChooseDomeRotation (391-394) stehen im Aktionsraum. NUTZER-EINWAND, der den naiven Zuschnitt erledigt: der Value-Kopf ist genau dort am schwaechsten (R2 ~0,03 in Runde 1 gegen ~0,62 in Runde 5). NUTZER-VORSCHLAG als Ausweg: der maskierte OWNERSHIP-Kopf statt des Value-Kopfs -- er sagt Feldbelegung voraus, nicht den Ausgang, und Belegung ist frueh weit besser bestimmt. STUFE 0 misst zuerst NETZFREI und GEPAART die Effektgroesse des Startslots; faellt sie klein aus, ist der Arm tot und die Handheuristik bleibt. Nicht zu verwechseln mit PREREG_start_position_seeding.md (halbfertige Stellungen als Startpunkt). -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid (Auslage x Slot x Rotation) und legt die Brettgeometrie fest -- gelegt wird sie aber seit jeher von einer Handheuristik, und das Trainingsziel ist ein one-hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. Am Code geprueft (par.1): die volle 108er-Aktionsmenge steht in valid_actions, das Policy-Ziel ist ein one-hot auf die Handheuristik. Der naive Zuschnitt ist am schwachen fruehen Value-Kopf erledigt (par.2), Ausweg waere der Ownership-Kopf (par.2a). Zuerst laeuft Stufe 0, netzfrei und gepaart (par.4). -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -178,3 +178,8 @@ Verwandt und als Bezug zu lesen: `PREREG_chance_nodes.md` (Kontrollfluss,
 Regel 3/4), `PREREG_stack_draw_reservation_rule.md` (die Stopp-Regel zieht zu
 oft, ~10 Punkte je betroffenem Stapelzug), `PREREG_stack_top_feature.md`
 (dieselbe blinde Zone auf der Merkmalsseite).
+
+**NICHT zu verwechseln mit `PREREG_start_position_seeding.md`** (Hinweis aus
+dem Statuskopf hierher gezogen 2026-08-28): dort geht es darum, HALBFERTIGE
+Stellungen als Startpunkt einer Partie zu setzen; hier um die Wahl der
+Startkuppel am regulaeren Partiebeginn. Aehnlicher Name, verschiedene Frage.

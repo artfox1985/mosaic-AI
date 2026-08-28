@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Spalten-Stellungen aus FREI weiterspielt (Startpositions-Seeding, KataGo-startPoses-Muster) -- also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: komplette Kette durchgemessen (par.2-4c): Bausteine 1-3 gebaut/abgenommen, Training v21-seedk1 (Warm Start, Best=Epoche 1), Arena-Verdikt 2026-08-23 (par.4c): KEIN k1-Signal (14,1 %/Swap 13,5 % < 22-%-Schwelle; nominell hoechste je gemessene Netz-Rate), KEIN Siegverlust (220/407 u. 199/407 gg. Champion, gg. Kontrollarm asymN n.s.). Mechanik-Sonde par.4d: ERSTES POSITIVES Zustandssignal (Tau +0,14 vs N -0,19, p=0,017) -- Mechanik bewegt, Verhalten (noch) nicht. REIHENFOLGE ENTSCHIEDEN 2026-08-25 (Nutzer, par.5): erst v22, DANN Seeding als eigener Arm. Grund ist inhaltlich, nicht terminlich -- par.4c ist an PLATTENBLINDEM Spiel erhoben (Stellungsquelle und weiterspielende Netze konnten beide keine Spalten), und der v22-Lehrer liefert erstmals ein anderes Regime (0,755 volle Spalten gegen 0,050, k1 in 55,7 statt 5,1 Prozent der Partien). VOR der Wiederaufnahme ist Engine-Arbeit noetig: --seed-positions ist auf --mode network beschraenkt, und der mcts-Einstieg kennt seed_positions_path gar nicht (self_play.py:193 gegen 196) -- kein blosser Waechter. Dosis-Folgearm (k=6 war die erste Dosis) bleibt unregistriert. Primaerarm des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); Anlass: RESEARCH_plate_intent_external F1/F4 (Startzustandsverteilung ist der belegteste Strukturhebel; Off-Policy-Diagnose erklaert das Asym-Null par.14/15). Stellungsquelle: der vorhandene Asym-Korpus. -->
+<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Spalten-Stellungen aus FREI weiterspielt (Startpositions-Seeding, KataGo-startPoses-Muster) -- also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: Kette komplett durchgemessen. Arena-Verdikt par.4c: KEIN k1-Signal (14,1 % gegen die 22-%-Schwelle), aber auch kein Siegverlust. Mechanik-Sonde par.4d: erstes POSITIVES Zustandssignal (p=0,017) -- Mechanik bewegt, Verhalten noch nicht. Reihenfolge entschieden (par.5): erst v22, dann Seeding; davor Engine-Arbeit. -->
 
 # PREREG-SKELETT: Startpositions-Seeding -- frei weiterspielen ab halbfertigen Spalten
 
@@ -18,7 +18,15 @@ spielen BEIDE Seiten frei mit dem aktuellen Netz. Der Wert des
 Weiterbauens vs. Abbrechens wird damit erstmals on-policy erhoben --
 die Labels beschreiben eine Politik, die das Netz tatsaechlich spielt.
 Produktions-Praezedenz laut Recherche: KataGo startPoses/hintPoses;
-RGSC (+77/+89 Elo). (Agenten-Befunde mit Quellen, Report F1/F4.)
+RGSC (+77/+89 Elo). (Agenten-Befunde mit Quellen,
+`RESEARCH_plate_intent_external` Report F1/F4: die Startzustandsverteilung
+ist dort der belegteste Strukturhebel, und die Off-Policy-Diagnose erklaert
+das Asym-Null aus par.14/15 jener Prereg.)
+
+**Rolle im Gesamtplan** (aus dem Statuskopf hierher gezogen 2026-08-28):
+dieser Zuschnitt ist der **Primaerarm des Policy-Seiten-Zuschnitts**,
+Nutzer-Freigabe der Reihenfolge 2026-08-22. Stellungsquelle ist der
+vorhandene Asym-Korpus (par.2).
 
 **Verifikations-Nachtrag zum Recherche-Kontext (Koordinator, am Code
 geprueft 2026-08-22):** die mctx-Faktor-14-Rechnung des Reports gilt
@@ -151,6 +159,9 @@ v21_seedk1 900/900 policy-tragend, Gesamtkomposition laut
 400 v19wdl + 400 v20wdl = 3.045 Dateien. Ladung in zwei Tranchen: 2.741
 Trainings- + 304 Val-Dateien (dateiweiser 90/10-Split), 3.717.089 Zuege
 (Logzeile "Datensatz geladen"), neuer HDF5-Cache `.cache_811fbb510c2e.h5`.
+
+**Nachgetragen aus dem Statuskopf (2026-08-28):** der beste Checkpoint
+dieses Laufs stammt aus **Epoche 1**.
 
 ## par.4b ARENA-RUNBOOK (Plan, vorbereitet 2026-08-23)
 
