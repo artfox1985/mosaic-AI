@@ -193,6 +193,20 @@ Diese Liste stammt aus der Knopf-Registry und den Preregs. Sie ist KEIN
 vollstaendiger Audit der Erzeugungs-Knoepfe -- wer den Lauf startet, geht sie
 durch und ergaenzt, was fehlt.
 
+## par.4a2 Wecker VOR dem v23-TRAINING: Arm K (Bootstrap-Kohaerenz)
+
+Nutzer-Entscheid 2026-08-29 ("takte es dort ein; wir kuemmern uns fuer v22
+primaer darum, dass die Spalten gebaut werden"): der offene Arm K
+(`PREREG_heuristic_v2_long_rows.md` par.3b.3, Registrierung (a) --
+Summen-Normierung oder affine Versatz-Korrektur des globalen
+Bootstrap-Optimismus ~+0,05 je Seite, als reine Label-Transformation im
+WDL-Zweig, Cache-Key-Komponente Pflicht) wird NICHT im v22-Zyklus
+entschieden, sondern faellig VOR dem v23-Training -- oder frueher, sobald
+ein Konsument Absolutwerte des Value-Kopfs liest (risikosensitive
+Blatt-Utility, Kalibrierungs-Schwellen). Grund der Platzierung: die
+Transformation wirkt beim Labeln, und ein unkorrigierter Versatz vererbt
+sich per Bootstrap in die naechste Generation.
+
 ## par.4b Wecker NACH dem v23-Training
 
 Gegenstueck zu par.4 fuer die TRAININGS-Seite dieses Fensters: der folgende
