@@ -22,12 +22,32 @@ zwei Preregs korrigiert.
 
 **Sonderfall heuristischer Erzeuger:** ein Fenster kann statt von einem
 Champion von einer Heuristik gefuellt werden (so beim v22-Fenster: Erzeuger
-ist die Heuristik v2huelle, kein Netz). Die Zaehlung aendert sich dadurch
+ist die Heuristik `hv2`, kein Netz). Die Zaehlung aendert sich dadurch
 nicht -- benannt wird das Fenster nach dem Netz, das AUS ihm entsteht.
 
 **Dateinamen folgen dem Erzeuger, nicht der Zielgeneration**: die Partien von
 `v18_best` heissen `v18_*`. Beides zusammen ist die Stelle, an der der
 Off-by-one entsteht.
+
+## Heuristik-Varianten heissen `hv1` / `hv2` (Nutzer-Anweisung 2026-08-28)
+
+Die Heuristik-Varianten hiessen bis zum 2026-08-28 `v1` und `v2huelle`. Das
+kollidierte mit der Netz-Zaehlung (`v21`, `v22`) und passte nicht zum
+Korpus-Tag `selfplay_hv2_*`. Seither gilt durchgaengig **`h` = Heuristik**:
+`v1` -> **`hv1`**, `v2huelle` -> **`hv2`**; die Artefaktverzeichnisse heissen
+`models/frozen_heuristics/hv1_anchor` und `.../hv2_generator`.
+
+**Der Live-Code kennt nur die neuen Namen** -- `hv1` ist der einzige spielbare
+Wert, ein Alt-Name ist ein harter Fehler mit Hinweis (`lib.rs`,
+`net_mcts.rs::from_spec_file`). Die Alt-Namen leben nur noch an ZWEI Stellen:
+in historischen Dokumenten (Preregs, `archive/`, bestehende Zeilen in
+`elo_history.csv` -- die werden NICHT umgeschrieben) und in
+`tools/frozen_name_dialect.py`. Dort sitzt die Uebersetzung an der
+Prozessgrenze: die Wheels der beiden am 2026-08-26 eingefrorenen Artefakte
+kennen nur `v1`/`v2huelle`, also uebersetzt der Treiber beim Sprechen mit
+ihnen zurueck -- deterministisch am Manifest-Feld `name_dialect`
+(`"hv"` = neues Wheel, fehlend/`"legacy"` = altes), NICHT per stillem zweitem
+Versuch. Neu eingefrorene Artefakte schreiben `name_dialect: "hv"`.
 
 **Nomenklatur der Trainingsarme** (Nutzer 2026-08-28): fortlaufend `vNN-bMM`
 wie die v21-b-Serie, also `v22-b01`, `v22-b02`, ... Folgearme reihen sich
@@ -40,7 +60,7 @@ wer eine Generation abschliesst, zieht diese Tabelle nach.
 
 | | |
 | --- | --- |
-| `hv2`-Korpus (fertig, 24.000 Partien) | **das v22-Fenster** -- Erzeuger ist die Heuristik `v2huelle`, kein Champion |
+| `hv2`-Korpus (fertig, 24.000 Partien) | **das v22-Fenster** -- Erzeuger ist die Heuristik `hv2`, kein Champion |
 | daraus trainiert (Kaltstart, Arme `v22-b01`/`v22-b02`) | **v22-Netz** |
 | dessen Self-Play (12.000 Partien) | fuellt **das v23-Fenster** |
 | daraus trainiert | **v23-Netz** |

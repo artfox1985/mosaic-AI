@@ -1,5 +1,5 @@
 {
   "implicit_minimax_alpha": 0.2,
   "long_row_init_shaping_w": 0.0,
-  "heuristik_variante": "v1"
+  "heuristik_variante": "hv1"
 }

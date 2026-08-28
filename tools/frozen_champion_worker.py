@@ -41,8 +41,8 @@ unveraendert):
 
 Der Grund ist die Heuristik-Kapselung (Nutzer-Richtung: gefrorene Agenten
 sollen gegeneinander spielen). Vorher loeste der Referee Tiling und
-Startsetzung selbst auf -- ueber einen auf V1 verdrahteten Pfad. Ein
-gefrorenes `v2huelle`-Artefakt haette damit als `v1` gekachelt, also als ein
+Startsetzung selbst auf -- ueber einen auf `hv1` verdrahteten Pfad. Ein
+gefrorenes `hv2`-Artefakt haette damit als `hv1` gekachelt, also als ein
 anderer Spieler, mit plausibel aussehendem Ergebnis.
 
 NETZLOSE ARTEFAKTE: fehlt `model.onnx`, ist das Artefakt eine Heuristik --
@@ -57,8 +57,16 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import os
 import sys
+import tempfile
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from frozen_name_dialect import (  # noqa: E402
+    spec_in_artifact_dialect,
+    speaks_current_dialect,
+)
 
 
 def main() -> int:
@@ -123,10 +131,42 @@ def main() -> int:
     engine_modell = None if ist_heuristik else str(model_path)
     if engine_modell is None and tiling_net_path.exists():
         engine_modell = str(tiling_net_path)
+    # NAMENS-DIALEKT (Umbenennung 2026-08-28, tools/frozen_name_dialect.py):
+    # die Spec traegt den kanonischen Namen (`hv1`/`hv2`), das mitgelieferte
+    # Wheel eines vor dem 2026-08-28 eingefrorenen Artefakts kennt aber nur
+    # `v1`/`v2huelle` und weist alles andere hart ab. Uebersetzt wird EINMAL,
+    # deterministisch am Manifest-Feld `name_dialect` -- kein "erst neu, bei
+    # Fehler alt" (ein stiller zweiter Versuch verschleiert, WELCHER Agent
+    # gespielt hat, und das ist genau der Fehler vom 2026-08-26).
+    #
+    # Ein Welle-3-NETZ-Artefakt hat gar keine `heuristik_variante` in seiner
+    # Spec (Aera-1-Schema, nur `implicit_minimax_alpha`) und bleibt deshalb
+    # unberuehrt.
+    spec_for_engine = spec_path
+    spec_translated = None
+    spec_doc = json.loads(spec_path.read_text(encoding="utf-8"))
+    if "heuristik_variante" in spec_doc and not speaks_current_dialect(manifest):
+        translated = spec_in_artifact_dialect(spec_doc, manifest)
+        handle, tmp_name = tempfile.mkstemp(prefix="frozen_dialect_", suffix=".spec.json")
+        os.close(handle)
+        spec_translated = Path(tmp_name)
+        spec_translated.write_text(json.dumps(translated, indent=2), encoding="utf-8",
+                                   newline="\n")
+        spec_for_engine = spec_translated
+        print(f"[worker] Namens-Dialekt: {spec_doc['heuristik_variante']!r} -> "
+              f"{translated['heuristik_variante']!r} (Wheel vor der Umbenennung)",
+              file=sys.stderr, flush=True)
     # `heuristik_drafting` EXPLIZIT, nicht aus dem Vorhandensein des Netzes
-    # abgeleitet: ein v2huelle-Artefakt hat ein Netz, draftet aber
+    # abgeleitet: ein hv2-Artefakt hat ein Netz, draftet aber
     # heuristisch. Das Netz ist dort NUR fuer den Tiling-Durchfall da.
-    engine = mr.FrozenWorkerEngine(engine_modell, str(spec_path), ist_heuristik)
+    try:
+        engine = mr.FrozenWorkerEngine(engine_modell, str(spec_for_engine), ist_heuristik)
+    finally:
+        # Die Spec wird GENAU EINMAL gelesen (referee.rs: `FrozenWorkerEngine::new`
+        # -> `resolve_search_config`); die Uebersetzung muss den Prozess nicht
+        # ueberleben.
+        if spec_translated is not None:
+            spec_translated.unlink(missing_ok=True)
     tiling_net = str(tiling_net_path) if tiling_net_path.exists() else None
     print(f"[worker] typ={'heuristik' if ist_heuristik else 'netz'} "
           f"tiling_net={'ja' if tiling_net else 'nein'}", file=sys.stderr, flush=True)

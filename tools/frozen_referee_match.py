@@ -130,8 +130,8 @@ class WorkerProc:
         """Platzierungs-Schritt der gefrorenen Seite.
 
         Seit 2026-08-26: bis dahin loeste der Referee das Tiling selbst auf,
-        ueber einen auf V1 verdrahteten Pfad. Ein `v2huelle`-Artefakt haette
-        damit als `v1` gekachelt.
+        ueber einen auf `hv1` verdrahteten Pfad. Ein `hv2`-Artefakt haette
+        damit als `hv1` gekachelt.
         """
         return self._roundtrip({"kind": "tiling", "state": state_json})["step"]
 
@@ -140,7 +140,7 @@ class WorkerProc:
 
         `pi` kommt aus `pending_start_placement_player()`, nicht aus
         `current_player()` -- in dieser Phase kann der Nicht-Starter zuerst
-        dran sein. `game_seed`, weil v2-Varianten unter mehreren Kandidaten
+        dran sein. `game_seed`, weil `hv2` unter mehreren Kandidaten
         seed-basiert waehlen.
         """
         return self._roundtrip({"kind": "start_placement", "state": state_json,
@@ -230,7 +230,11 @@ def _play_block(job: dict) -> list[dict]:
     time.sleep(0.2)
     results = []
     try:
-        for i, seed in job["indizierte_seeds"]:
+        # Schluessel wie beim Erzeuger unten (`dict(base, indexed_seeds=b)`).
+        # Stand hier bis 2026-08-28 als "indizierte_seeds" -- jeder Lauf mit
+        # --workers > 1 starb im Kindprozess an einem KeyError; der serielle
+        # Pfad benutzt diese Funktion nicht und hat es deshalb nie gezeigt.
+        for i, seed in job["indexed_seeds"]:
             first_player = i % 2
             board_a = i % 2  # Brettwechsel-Pflicht, wie paired_arena-Konvention
             external_list = []
@@ -517,7 +521,7 @@ def main() -> int:
     # Bestandsverhalten -- sein Worker laeuft auf einem aelteren Wheel und
     # wuerde eine Tiling-Anfrage als Drafting missverstehen.
     # Eine Heuristik MUSS ihre Platzierung selbst entscheiden -- sonst kachelt
-    # sie ueber den auf V1 verdrahteten Referee-Pfad und ist ein anderer
+    # sie ueber den auf `hv1` verdrahteten Referee-Pfad und ist ein anderer
     # Spieler als der eingefrorene. Kann ihr Wheel das nicht, wird verweigert.
     kinds = set((manifest.get("protokoll") or {}).get("kinds") or [])
     if is_heuristic and not {"tiling", "start_placement"} <= kinds:
@@ -527,12 +531,12 @@ def main() -> int:
             f"(protokoll.kinds={sorted(kinds) or 'fehlt'}).\n"
             "Sein Wheel stammt aus der Zeit vor Bausteinen 3/4 und kann Platzierung und "
             "Startsetzung nicht selbst entscheiden. Es hier trotzdem zu fahren hiesse, es "
-            "ueber den auf V1 verdrahteten Referee-Pfad kacheln zu lassen -- also gegen einen "
+            "ueber den auf `hv1` verdrahteten Referee-Pfad kacheln zu lassen -- also gegen einen "
             "ANDEREN Spieler zu messen als den eingefrorenen.\n"
             "Abhilfe: das Artefakt mit dem heutigen Wheel neu einfrieren.")
     external_sides_active = is_heuristic
     # Auch die A-Seite entscheidet selbst, wenn sie ein protokollfaehiges
-    # Heuristik-Artefakt ist. Sonst kachelte SIE ueber den auf V1
+    # Heuristik-Artefakt ist. Sonst kachelte SIE ueber den auf `hv1`
     # verdrahteten Referee-Pfad -- derselbe Fehler, nur auf der anderen Seite.
     kinds_a = set(((manifest_a or {}).get("protokoll") or {}).get("kinds") or [])
     a_is_heuristic = (manifest_a or {}).get("typ") == "heuristik"

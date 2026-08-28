@@ -2106,9 +2106,9 @@ pub fn play_one_game<R: Rng + ?Sized>(
     record_rtv: bool,
     move_heartbeat: Option<&AtomicU64>,
     // STATUS "(2) Heuristik-Variante bis ins Self-Play durchreichen": bis
-    // 2026-08-25 war hier `V1` fest verdrahtet, waehrend nur die Arena die
-    // Variante als Parameter nahm -- ein v2-Lehrer-Korpus war damit gar nicht
-    // erzeugbar. Bestandsaufrufer uebergeben `V1` und bleiben bit-identisch.
+    // 2026-08-25 war hier `hv1` fest verdrahtet, waehrend nur die Arena die
+    // Variante als Parameter nahm -- ein hv2-Lehrer-Korpus war damit gar nicht
+    // erzeugbar. Bestandsaufrufer uebergeben `hv1` und bleiben bit-identisch.
     // PREREG_search_rng_split.md: der Seed, mit dem DIESER Aufrufer `rng`
     // erzeugt hat (siehe dortige Formel `seed.wrapping_add(i*0x9E37...)`).
     // Zusammen mit einem lokalen Zugindex (`move_idx` unten) baut

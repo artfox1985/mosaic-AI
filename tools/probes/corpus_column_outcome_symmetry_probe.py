@@ -2,7 +2,7 @@
 """PREREG_heuristic_v2_long_rows.md par.3b.4, Stufe 0 -- Symmetrie-Pruefung.
 
 Frage: trennt der Spaltenbau im hv2-Lehrerkorpus ueberhaupt Sieg von
-Niederlage? Der Korpus laeuft mit `v2huelle` auf BEIDEN Seiten
+Niederlage? Der Korpus laeuft mit `hv2` auf BEIDEN Seiten
 (PREREG_v22_window.md par.2), also bauen beide -- dann waere das Value-Ziel
 bezueglich des Spaltenbaus wegsymmetrisiert und der Value-Kopf koennte ueber
 den WERT des Spaltenbaus nichts lernen, obwohl der Korpus ihn im Uebermass

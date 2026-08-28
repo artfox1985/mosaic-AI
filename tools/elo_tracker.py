@@ -389,7 +389,7 @@ def main():
     # Prozessumgebung -- fuer ein Artefakt die falsche Quelle, seine Knoepfe
     # liegen in spec.json. Ohne Angabe bleibt es beim Bestandsverhalten.
     p_add.add_argument("--knobs", default=None,
-                       help="Knopf-Herkunft ueberschreiben, z.B. 'spec:v1_anchor/spec.json'. "
+                       help="Knopf-Herkunft ueberschreiben, z.B. 'spec:hv1_anchor/spec.json'. "
                             "Ohne Angabe: die aktiven MOSAIC_*-Variablen des Prozesses.")
 
     args = ap.parse_args()

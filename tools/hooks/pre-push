@@ -39,7 +39,8 @@ PRIVACY_HITS=""
 # Kommentar gefangen und einen Push geblockt). Das alte Muster erwartete genau
 # einen und hat deshalb am 2026-08-27 einen getrackten -- und bereits
 # gepushten -- absoluten Pfad samt Nutzernamen durchgelassen:
-# models/frozen_heuristics/v2huelle_generator/golden_probe/manifest_probe_*.json.
+# models/frozen_heuristics/hv2_generator/golden_probe/manifest_probe_*.json
+# (Verzeichnis am 2026-08-28 umbenannt, damals noch v2huelle_generator).
 # Gegenprobe damals: altes Muster 0 Treffer, dieses 1.
 PRIVACY_PAT='[A-Za-z]:[\\/]+Users[\\/]+|/[a-z]/Users/|OneDrive[\\/]+(Documents|Backups)'
 PRIVACY_USER="${USERNAME:-${USER:-}}"

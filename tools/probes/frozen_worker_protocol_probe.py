@@ -5,7 +5,7 @@ Nicht in-process nachgestellt, sondern der Prozess, der spaeter auch laeuft --
 inklusive JSON-Zeilen ueber stdin/stdout und der UTF-8-Grenze, an der
 Windows' cp1252-Default schon einmal deutsche Fehlermeldungen verstuemmelt hat.
 
-Gefahren wird gegen `v1_anchor`, und das ist Absicht: das Artefakt hat KEIN
+Gefahren wird gegen `hv1_anchor`, und das ist Absicht: das Artefakt hat KEIN
 model.onnx. Ein Worker, der ueber den Netzpfad antwortet, koennte es gar nicht
 bedienen -- die Sonde belegt also zugleich den netzlosen Weg.
 
@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "engine" / "py"))
 import mosaic_rust as mr  # noqa: E402
 
-ART = ROOT / "models/frozen_heuristics/v1_anchor"
+ART = ROOT / "models/frozen_heuristics/hv1_anchor"
 
 proc = subprocess.Popen(
     [sys.executable, "-X", "utf8", str(ROOT / "tools/frozen_champion_worker.py"), str(ART),

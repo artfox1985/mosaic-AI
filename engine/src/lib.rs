@@ -104,7 +104,7 @@ fn self_play_games(
 /// per `self_play.py --rtv` reaktivierbar. `bootstrap_value` bleibt davon
 /// unberührt.
 #[pyfunction]
-#[pyo3(signature = (model_path, n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust_netlabel".to_string(), record_rtv=false, progress_path=None, heartbeat_path=None, heuristik_variante="v1".to_string()))]
+#[pyo3(signature = (model_path, n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust_netlabel".to_string(), record_rtv=false, progress_path=None, heartbeat_path=None, heuristik_variante="hv1".to_string()))]
 #[allow(clippy::too_many_arguments)]
 fn self_play_games_with_net_labels(
     py: Python<'_>,
@@ -125,10 +125,29 @@ fn self_play_games_with_net_labels(
     // Kampagnen-Aufruf (`self_play.py --heuristik-variante`) traegt ihn, und
     // ein still ignoriertes Argument ist genau die Bauform, an der am
     // 2026-08-26 ein falscher Befund entstanden ist (Flag vergessen, Default
-    // v1, Korpus bitgleich). Unbekannte Werte werden ABGEWIESEN.
-    if !heuristik_variante.eq_ignore_ascii_case("v1") {
+    // hv1, Korpus bitgleich). Unbekannte Werte werden ABGEWIESEN.
+    //
+    // UMBENENNUNG 2026-08-28: die Variante heisst `hv1` (vorher `v1`), passend
+    // zum Korpus-Tag `selfplay_hv2_*` und zur Konvention "h = Heuristik". Der
+    // Alt-Name ist hier KEIN Sonderfall mehr, sondern ein harter Fehler mit
+    // Hinweis -- die einzige Stelle, die noch beide Dialekte kennt, ist der
+    // Treiber an der Grenze zu einem alten Artefakt-Wheel
+    // (tools/frozen_name_dialect.py).
+    if !heuristik_variante.eq_ignore_ascii_case("hv1") {
+        let hint = if heuristik_variante.eq_ignore_ascii_case("v1") {
+            " Das ist der Name VOR der Umbenennung am 2026-08-28; er heisst jetzt 'hv1'."
+        } else if heuristik_variante.eq_ignore_ascii_case("v2huelle") {
+            " Das ist der Name VOR der Umbenennung am 2026-08-28; er heisst jetzt 'hv2' \
+             und ist in diesem Build ohnehin nicht spielbar."
+        } else {
+            ""
+        };
         return Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "heuristik_variante {heuristik_variante:?} ist in diesem Build nicht mehr spielbar              -- erlaubt: v1. Der v2-Zweig wurde am 2026-08-26 entfernt              (PREREG_heuristic_v2_long_rows.md par.19); die damit erzeugten Korpora liegen              unveraendert in data/, und das Erzeuger-Artefakt laeuft auf seinem              mitgelieferten Wheel weiter."
+            "heuristik_variante {heuristik_variante:?} ist in diesem Build nicht mehr spielbar \
+             -- erlaubt: hv1.{hint} Der zweite Zweig wurde am 2026-08-26 entfernt \
+             (PREREG_heuristic_v2_long_rows.md par.19); die damit erzeugten Korpora liegen \
+             unveraendert in data/, und das Erzeuger-Artefakt laeuft auf seinem \
+             mitgelieferten Wheel weiter."
         )));
     }
     py.detach(move || {
@@ -1036,7 +1055,7 @@ fn net_arena_choice_state_json(
 /// Die VARIANTE kommt aus der Spec-Datei, nicht aus einem Parameter. Das ist
 /// der Punkt der Kapselung: ein Artefakt, das sich selbst beschreibt, kann
 /// nicht mehr versehentlich als etwas anderes gespielt werden. `spec=None`
-/// faellt auf `SearchConfig::from_env()` und damit auf `V1` zurueck --
+/// faellt auf `SearchConfig::from_env()` und damit auf `hv1` zurueck --
 /// zulaessig fuer den Anker, aber ein Artefakt gehoert MIT seiner Spec
 /// gefahren.
 ///
@@ -1067,7 +1086,7 @@ fn heuristic_arena_choice_state_json(
 ///
 /// Die Variante kommt aus der Spec, das Tiling-Netz (falls die Variante eines
 /// braucht) aus dem Artefakt. Ohne diesen Einstieg kachelt eine gefrorene
-/// Heuristik im Referee-Pfad als V1 -- also als etwas anderes, als sie ist.
+/// Heuristik im Referee-Pfad als `hv1` -- also als etwas anderes, als sie ist.
 #[pyfunction]
 #[pyo3(signature = (state_json, spec=None, model_path=None))]
 fn tiling_choice_state_json(
@@ -1091,7 +1110,7 @@ fn tiling_choice_state_json(
 ///
 /// `pi` kommt aus `RefereeGame::pending_start_placement_player()`, NICHT aus
 /// `current_player()`: in dieser Phase kann der Nicht-Starter zuerst dran sein.
-/// `game_seed` aus `RefereeGame::game_seed()` -- v2-Varianten waehlen unter
+/// `game_seed` aus `RefereeGame::game_seed()` -- `hv2` waehlt unter
 /// mehreren Kandidaten seed-basiert.
 #[pyfunction]
 #[pyo3(signature = (state_json, pi, game_seed, spec=None))]

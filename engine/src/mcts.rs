@@ -802,7 +802,7 @@ pub fn search_action<R: Rng + ?Sized>(
 /// Wie [`search_action`], mit ausdruecklicher Heuristik-Variante.
 ///
 /// Die Bestandssignatur oben bleibt unveraendert und laeuft weiter ueber
-/// `V1` -- das haelt alle Aufrufer (inklusive `engine/examples/` und
+/// `hv1` -- das haelt alle Aufrufer (inklusive `engine/examples/` und
 /// `engine/benches/`, dem bekannten Push-Blocker) und die Paritaets-Sonde
 /// unberuehrt.
 fn search_action_inner<R: Rng + ?Sized>(

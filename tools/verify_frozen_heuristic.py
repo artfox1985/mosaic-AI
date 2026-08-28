@@ -28,9 +28,9 @@ ausgenommen (siehe `generator_repro_probe.IDENTITAETS_FELDER`).
 
 Aufruf:
     python -X utf8 -u tools/verify_frozen_heuristic.py \\
-        --artifact-dir models/frozen_heuristics/v1_anchor
+        --artifact-dir models/frozen_heuristics/hv1_anchor
     python -X utf8 -u tools/verify_frozen_heuristic.py \\
-        --artifact-dir models/frozen_heuristics/v1_anchor --venv
+        --artifact-dir models/frozen_heuristics/hv1_anchor --venv
 """
 import argparse
 import json
@@ -47,6 +47,7 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "tools" / "probes"))
 
 from corpus_io import load_records  # noqa: E402
+from frozen_name_dialect import to_artifact_dialect  # noqa: E402
 from generator_repro_probe import _first_divergence  # noqa: E402
 
 
@@ -115,6 +116,20 @@ def main() -> int:
     run_mode = "Artefakt-venv (Konservierung)" if a.venv else "aktueller Interpreter (Drift)"
     print(f"Pruefmodus: {run_mode}\n  Interpreter: {py}", flush=True)
 
+    # NAMENS-DIALEKT (Umbenennung 2026-08-28, tools/frozen_name_dialect.py):
+    # im venv-Modus laeuft das MITGELIEFERTE Wheel des Artefakts. Kennt es die
+    # neuen Namen noch nicht (Manifest ohne `name_dialect: "hv"`), wird der
+    # kanonische Name genau hier, an der Prozessgrenze, zurueckuebersetzt --
+    # EINMAL und deterministisch, kein stiller zweiter Versuch.
+    # Im Drift-Modus laeuft das AKTUELLE Wheel, und das kennt nur die neuen
+    # Namen; der kanonische geht also unveraendert hinein.
+    canonical_variant = spec["heuristik_variante"]
+    variant_on_the_wire = (to_artifact_dialect(canonical_variant, manifest)
+                           if a.venv else canonical_variant)
+    if variant_on_the_wire != canonical_variant:
+        print(f"  Namens-Dialekt: {canonical_variant!r} -> {variant_on_the_wire!r} "
+              "(Wheel vor der Umbenennung)", flush=True)
+
     t0 = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="frozen_verify_") as tmp:
         cmd = [str(py), "-X", "utf8", "-u", str(_ROOT / "self_play.py"),
@@ -124,7 +139,7 @@ def main() -> int:
                "--per-file", str(recipe["per_file"]), "--seed", str(recipe["seed"]),
                "--c-puct", str(recipe["c_puct"]),
                "--tau-argmax-from-move", str(recipe["tau_argmax_from_move"]),
-               "--heuristik-variante", spec["heuristik_variante"]]
+               "--heuristik-variante", variant_on_the_wire]
         if recipe.get("model"):
             cmd += ["--model", str(artifact / recipe["model"])]
         env = dict(os.environ, MOSAIC_DATA_DIR=tmp)
@@ -155,6 +170,7 @@ def main() -> int:
     out = {
         "artefakt": str(artifact).replace("\\", "/"),
         "variante": spec["heuristik_variante"],
+        "name_dialect": manifest.get("name_dialect", "legacy"),
         "modus": run_mode,
         "verdikt": "GRUEN" if all_same else "ROT",
         "dateien": findings,

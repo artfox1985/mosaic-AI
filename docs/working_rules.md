@@ -40,7 +40,7 @@ Vorfalls-Herkunft steht in `pitfalls.md`.
 - **Anker-Messungen laufen ueber `tools/anchor_arena.py`**, nicht ueber die
   In-Process-Heuristik. Seit B4b (`round5_anchor.rs` entfernt) bewegt eine
   Aenderung an `round5.rs` auch den Heuristik-Pfad; der Schutz liegt jetzt im
-  Artefakt `models/frozen_heuristics/v1_anchor`. Herleitung: STATUS,
+  Artefakt `models/frozen_heuristics/hv1_anchor`. Herleitung: STATUS,
   Abschnitt "NAECHSTE SCHRITTE / B".
 
 ## Training und Korpus

@@ -358,7 +358,7 @@ fn source_name(src: crate::moves::TakeSource) -> &'static str {
 /// Gegenstueck zu [`action_to_dict`], und aus demselben Grund noetig: seit
 /// 2026-08-26 darf auch die PLATZIERUNG von aussen entschieden werden (ein
 /// eingefrorenes Heuristik-Artefakt spielt sonst nur seine halbe Identitaet
-/// -- `v2huelle` wirkt gerade im Routing).
+/// -- `hv2` wirkt gerade im Routing).
 ///
 /// Bewusst flach und benannt statt serde-abgeleitet: dieses Schema geht ueber
 /// eine Prozessgrenze zwischen ZWEI Engine-Versionen. Ein abgeleitetes Format
