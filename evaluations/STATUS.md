@@ -48,11 +48,40 @@ R5-Fix-Leiter -- unveraendert. Kanten ueber die Fix-Grenze nie mischen.
 Vertragshash `efd564d87bac2722`; der Paritaets-Hash `8c6684ff...` ist
 gemessen unveraendert.
 
-**Es laeuft:** die serielle Cache-Referenz (Tor 2b des A0-Schlachtplans). Die
-Maschine ist damit NICHT frei -- kein Build, kein Test, keine Sonde nebenher
-(CLAUDE.md, "Messungen laufen EXKLUSIV").
+**Es laeuft: NEUSTART der Ownership-Pol-Konsument-Arena (par.3b.6)** --
+w05/w10/w20 sequenziell auf freier Maschine (Nutzer-Freigabe 2026-08-28,
+"andere last ist durch"). Maschine NICHT frei: kein Build, kein Test, keine
+Sonde nebenher. Der Auswerter nimmt seit dem Neustart je Partie-Nummer nur
+die NEUESTE Datei (Erstlauf-Reste mischen nicht mehr). Historie des
+abgebrochenen Erstlaufs: Registriert 2026-08-28
+(`PREREG_heuristic_v2_long_rows.md` par.3b.6): MOSAIC_OWNERSHIP_TILING_W-Sweep
+(w 0 / 0,5 / 1,0 / 2,0) mit dem b01-Kopf, argmax-Instrument des Spalten-Tors.
+Der erste Anlauf wurde am 2026-08-28 GESTOPPT, weil parallel fremde
+Nutzer-Last auf dem Rechner lief (EXKLUSIV-Regel). Lastbeginn per
+Datei-mtimes datiert: Blockdauern konstant 118-133 s bis w05-Block 4
+(22:24), ab w05-Block 5 (~22:25) ansteigend 164 -> 358 s. Stand je Arm:
 
-**Naechster Schritt: die Ownership-Pol-Konsument-Arena** (par.3b.5 Weg-Wahl Punkt 1). Der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-GEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt.
+* w00 (21:55-22:16): KOMPLETT, alle 10 Bloecke 118-133 s -- SAUBER.
+  Zusaetzlich gilt der registrierte Reproduktions-Waechter (0,2975 aus
+  par.3b.2) als Gegenprobe bei der Auswertung.
+* w05 (22:16-22:52): KOMPLETT (g200 da), aber Bloecke 5-10 lastkontaminiert
+  -> wird auf stiller Maschine KOMPLETT neu gefahren. Beifang der sauberen
+  Bloecke 1-4: der Knopf kostet praktisch keinen Durchsatz (128-133 s wie
+  w00). Byte-Vergleich Bloecke 1-4 alt gegen neu = gratis
+  Determinismus-Gegenprobe.
+* w10 (22:52-23:32): bis g140 gelaufen, durchgehend unter Last (~300 s je
+  Block) -> verwerfen, komplett neu.
+* w20: NIE GESTARTET.
+
+Vor dem Neustart muessen die kontaminierten pkl weg (NUR mit pfadgenauer
+Nutzer-Freigabe) oder die Auswertung filtert nach Lauf-Zeitstempel -- der
+Auswerter (tools/probes/ownership_tiling_consumer_eval.py) globt heute je
+Praefix und wuerde sonst zwei Laeufe mischen.
+
+Loeschung von data/-Dateien nur mit pfadgenauer Nutzer-Freigabe. (Die
+serielle Cache-Referenz, Tor 2b, ist GRUEN abgeschlossen -- A0-Tabelle.)
+
+**Warum dieser Schritt** (par.3b.5 Weg-Wahl Punkt 1): der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-TRAININGSGEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt. Der Tiling-Pol lief bisher NIE mit einem spaltenbewussten Kopf (Gate-C-Nullmessungen: plattenblinde Koepfe).
 
 **16 Commits vor `origin/main`** (`git rev-list --count origin/main..HEAD`,
 gezaehlt 2026-08-28), nicht gepusht -- Push ist ein eigener Nutzer-Entscheid.
