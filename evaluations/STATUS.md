@@ -196,7 +196,7 @@ daran gemessen, ob er das Netz dem Spaltenspiel naeher bringt:
 | `MOSAIC_OWNERSHIP_TILING_W` mit b01-Kopf | Knopf gebaut, nie richtig bedingt gefahren | Tiling-ABSICHT zur Spielzeit |
 | Stufe 2: 2D-Ablesung des Ownership-Kopfs | registriert (par.3b Stufenplan) | Kopf-Geometrie statt flacher Projektion |
 | Vollendungs-Filter in der Suche | Wecker-Liste v23 | den Vollendungs-Engpass direkt |
-| Arm K / Arm L (Label-Qualitaet) | Entwurf/Reserve | Value-Ziel-Hygiene |
+| Arm K / Arm L (Label-Qualitaet) | Arm K EINGETAKTET vor das v23-Training (PREREG_v23_window.md par.4a2, Nutzer 2026-08-29); Arm L Reserve | Value-Ziel-Hygiene |
 
 b01-Peek als Anlass: 0,275 volle Spalten (2,5x Champion, weit unter
 Lehrer 0,73; lastkontaminiert, n=20) -- Bau bis >=4 da (1,52), Vollendung
