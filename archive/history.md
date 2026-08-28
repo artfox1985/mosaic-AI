@@ -13395,6 +13395,41 @@ erster Schritt waere dann Deckel-Telemetrie zur Taeter-Identifikation.
 
 # Kapitel 2026-08-25 bis 2026-08-28: v22-Vorbereitung, Kapselung, Kanaele, Entstauchung -- ausgelagert aus STATUS.md am 2026-08-28
 
+**Inhaltsuebersicht (die fruehere STATUS-Verweisliste, am 2026-08-28 hierher gezogen):**
+
+Herleitung jeweils in `../archive/history.md`, Kapitel **"2026-08-25 bis
+2026-08-28: v22-Vorbereitung, Kapselung, Kanaele, Entstauchung"**:
+
+* **Heute fertig geworden (2026-08-25: Erreichbarkeits-Eingaben,
+  Artefakt-Umzug, Blindzieh-Urteil, Strafleisten-Nachmessung, Lehrer-Test
+  v2)**: ERLEDIGT 2026-08-25 -- Herleitung in `../archive/history.md`
+  (Kapitel 2026-08-25 bis 2026-08-28).
+* **Traeger-Manifeste, Berichtigungs-Historie**: ERLEDIGT 2026-08-27 --
+  Herleitung in `../archive/history.md` (Kapitel 2026-08-25 bis 2026-08-28);
+  der offene Kern steht unten.
+* **Nachtlauf 2026-08-25/26 (v22-Korpus, Sanity-Check, paralleler
+  Cache-Bau)**: ERLEDIGT 2026-08-26 -- Herleitung in `../archive/history.md`
+  (Kapitel 2026-08-25 bis 2026-08-28).
+* **Korpus-Dateien komprimiert (Faktor 35,4)**: ERLEDIGT 2026-08-27 --
+  Herleitung in `../archive/history.md` (Kapitel 2026-08-25 bis 2026-08-28).
+* **Architektur B -> C -> A (Ratschen-Bilanz, drei Schnitte, Nahtbreite,
+  Regel-7-Waechter, Verdikt-Spalte)**: ERLEDIGT 2026-08-27 -- Herleitung in
+  `../archive/history.md` (Kapitel 2026-08-25 bis 2026-08-28); die dort
+  benannten Reste (C ist halb, A ist Schritt 1 von mehreren,
+  Groessen-Basislinie) sind Kandidaten, kein eingetakteter Strang.
+* **V2 ist aus dem Quellstand (B4a)**: ERLEDIGT 2026-08-27 -- Herleitung in
+  `../archive/history.md` (Kapitel 2026-08-25 bis 2026-08-28).
+* **B-Block: Planungs-Rueckschau und "B (Historie), die vier Schritte wie sie
+  geplant waren"**: ERLEDIGT 2026-08-27 -- Herleitung in
+  `../archive/history.md` (Kapitel 2026-08-25 bis 2026-08-28). Die zwei
+  weitergeltenden Regeln stehen in "NAECHSTE SCHRITTE B".
+* **Uebergabe 2026-08-26 (Abend) und Sitzungsuebergabe 2026-08-26 (frueh),
+  Abschnitte 1, 1b, 1c, 1d, 3 und 4**: ERLEDIGT 2026-08-26/27 -- Herleitung
+  in `../archive/history.md` (Kapitel 2026-08-25 bis 2026-08-28). Die
+  Trainings-Konfiguration aus Abschnitt 1 steht unveraendert in "NAECHSTE
+  SCHRITTE A".
+
+
 **Warum dieses Kapitel existiert:** Nutzer-Kritik 2026-08-28 -- *"wenn etwas
 abgeschlossen ist dann gleich ins archiv umziehen. momentan steht wieder so
 viel erledigtes in status.md"*. Die folgenden Bloecke standen abgeschlossen in
