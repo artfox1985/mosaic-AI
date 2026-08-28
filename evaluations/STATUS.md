@@ -132,6 +132,27 @@ Tabelle unten bei den drei JSONs.)
 
 ## NAECHSTE SCHRITTE (Stand 2026-08-26, nach Prioritaet)
 
+### VORFALL 2026-08-28: OneDrive-Dateiverlust in models/ (zum zweiten Mal)
+
+Waehrend b01/b02 verschwanden ohne Papierkorb: das Champion-ONNX
+`alphazero_v21_2d_brierbest.onnx` (samt `.pth` und `.onnx.ref.txt`) und
+29 getrackte `manifest_train_*.json`. Wiederhergestellt: das ONNX
+sha256-identisch aus `models/frozen_champions/v21_2d_brierbest/model.onnx`
+(genau der Fall, fuer den die Kapselung gebaut wurde), die 29 Manifeste per
+`git checkout`. **NOCH FEHLEND: die `.pth`- und `.ref.txt`-Begleiter des
+Champions** -- Kandidat: aeltere `models_snapshots`-Zips im Backup-Ordner
+(das 16:57-Zip entstand womoeglich NACH dem Verlust). Braucht erst wieder
+jemand fuer Torch-Diagnosen (platt_fit, Orakel-Referenzen mit .pth).
+
+### UMBENENNUNG hv1/hv2: GEBAUT, Wheel-Neubau ausstehend
+
+Alles traegt die neue Nomenklatur (`f5c60da`, Dialekt-Uebersetzung fuer die
+gefrorenen Wheels via tools/frozen_name_dialect.py). **Bis zum Wheel-Neubau
+ist der Live-Pfad gesperrt** (installiertes Wheel kennt nur "v1", Specs
+sagen "hv1"). Naechstes Fenster: maturin + Paritaets-Hash + Suite gruen +
+Golden-Selbsttests beider Artefakte + frozen_agent_referee_probe
+(Erwartungen [27,15]/159 und [63,27]/163 muessen unveraendert treffen).
+
 ### KAMPAGNEN-ZIEL (Nutzer 2026-08-28, nach dem b01-Peek)
 
 **"Ich will schlussendlich einen sauberen Netz-Generator, der auf Spalten
