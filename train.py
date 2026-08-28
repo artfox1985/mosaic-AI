@@ -158,7 +158,8 @@ from head_warmstart import apply_head_warmstart
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from train_manifest import (policy_carrier_report, corpus_composition,
-                            write_train_manifest, _SELFPLAY_FILENAME_RE)
+                            write_train_manifest, append_train_cache_file,
+                            _SELFPLAY_FILENAME_RE)
 from corpus_dataset import MosaicDataset
 from neural_net import (
     MosaicNet, Mosaic2DNet, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
@@ -945,7 +946,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
           value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
           ranking_loss_weight=0.0, conjunction_head=False, head_warmstart=True, extra_data_dir=None,
-          freeze_trunk=False):
+          freeze_trunk=False, cache_file=None):
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
@@ -1114,6 +1115,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "value_head": value_head,
         "ranking_loss_weight": ranking_loss_weight,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
+        # Schlachtplan A0 Schritt 2c: WELCHE vorab gebaute Cache-Datei benutzt
+        # wurde. Der VALIDIERTE Schluessel kommt weiter unten nach
+        # (`append_train_cache_file`) -- hier steht nur die Wahl, denn das
+        # Manifest wird geschrieben, bevor der Datensatz gebaut ist.
+        "cache_file": cache_file,
         "val_pool": _val_pool_env,
         "val_pool_guard": _val_pool_guard,
         # MOSAIC_IGNORE_POLICY_TARGET_VALID definiert einen Trainings-ARM
@@ -1205,8 +1211,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     if encoder == "2d":
         print(f"🧩 Encoder: '2d' (Task #11 Phase 2, Mosaic2DNet -- Conv-Zweig auf state_to_planes "
               f"+ Flach-Zweig auf state_to_tensor)")
+    # `--cache-file` gilt fuer den TRAININGS-Datensatz. Der Val-Split hat ein
+    # anderes Fenster und damit einen anderen Schluessel -- er baut/laedt
+    # weiterhin seinen eigenen Cache (er ist auch der billigere von beiden:
+    # val_frac=0,1). Wer den Voll-Korpus-Cache benutzen will, braucht folglich
+    # ein Trainingsfenster, das dem Bau-Fenster GLEICHT (--val-frac 0, kein
+    # --train-file-limit, dasselbe MOSAIC_DATA_EXCLUDE); jede Abweichung faengt
+    # der Waechter in `corpus_dataset.verify_cache_file` mit hartem Abbruch ab.
     dataset = MosaicDataset(str(DATA_DIR), files=train_files, value_target_variant=value_target_variant,
-                            encoder=encoder, conjunction_head=conjunction_head)
+                            encoder=encoder, conjunction_head=conjunction_head,
+                            cache_file=cache_file)
+    if cache_file is not None:
+        append_train_cache_file(version_name, _run_timestamp, dataset.cache_file_info)
     _t_daten_fertig = time.time()
     print(f"⏱️  Datenaufbau: {_t_daten_fertig - _t_start_train:.1f}s "
           f"({len(dataset)} Zustaende aus {len(train_files or [])} Dateien)")
@@ -2456,6 +2472,24 @@ if __name__ == "__main__":
                              "(v19wdl/v19wdlann-Sockel-Partien; policy-maskierte Schwarm-Partien tragen "
                              "kein nutzbares Set, Maske dort 0).")
 
+    parser.add_argument("--cache-file", type=str, default=None,
+                        help="Vorab gebauten Trainings-Cache BENUTZEN statt ihn hier seriell zu "
+                             "bauen (Schlachtplan A0 Schritt 2c, PREREG_cache_build_time.md). "
+                             "Gebaut wird er mit tools/build_cache_parallel.py (parallel, ~36 min) "
+                             "oder tools/build_cache_incremental.py --merge-out (mitlaufend "
+                             "waehrend der Erzeugung); der serielle Selbstbau kostet auf dem "
+                             "vollen Korpus ~2,6 h und liegt dabei VOR jeder Trainingsfrage. "
+                             "WAECHTER: die Datei muss ihren Fenster-Schluessel als HDF5-Attribut "
+                             "tragen UND er muss zum aktuell gerechneten passen -- sonst harter "
+                             "Abbruch mit beiden Schluesseln im Text. Ein Cache ohne Attribut wird "
+                             "ABGELEHNT (Nachruesten: tools/stamp_cache_key.py). Der Schluessel "
+                             "haengt an der DATEILISTE, also auch an --val-frac, "
+                             "--train-file-limit und MOSAIC_DATA_EXCLUDE: ein ueber ALLE "
+                             "data/*.pkl gebauter Cache passt nur zu einem Lauf mit --val-frac 0 "
+                             "und ohne --train-file-limit. Gilt NUR fuer den Trainings-Datensatz; "
+                             "der Val-Split behaelt seinen eigenen Cache. STANDARD None = "
+                             "Bestandsverhalten unveraendert.")
+
     args = parser.parse_args()
 
     train(points_dist_bins=args.points_dist_bins, reinit_points_head=args.reinit_points_head,
@@ -2478,4 +2512,4 @@ if __name__ == "__main__":
           value_head=args.value_head,
           ranking_loss_weight=args.ranking_loss_weight,
           head_warmstart=not args.no_head_warmstart, extra_data_dir=args.extra_data_dir,
-          freeze_trunk=args.freeze_trunk)
+          freeze_trunk=args.freeze_trunk, cache_file=args.cache_file)
