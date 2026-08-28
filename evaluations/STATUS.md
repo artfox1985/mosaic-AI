@@ -82,13 +82,12 @@ hv2-Partien** (Sockel G-1 1.350 + G-2 450) neben 15.650 policy-maskierten aus
 demselben Korpus -- also eine seed-bestimmte AUSWAHL, rund **180 von 1.745
 hv2-Dateien**.
 
-Im Baum gibt es nur LESER (`neural_net.py:1284`, `train_manifest.py`), keinen
-Schreiber. Die REGEL ist dokumentiert (Seed plus "zeitlich gestreute
-Auswahl"), der Erzeuger also rekonstruierbar statt neu zu erfinden.
-
-**Vor der v23-Kampagne zu klaeren**, nicht dringend. Ohne das Werkzeug ist der
-registrierte Zuschnitt nicht ausfuehrbar, und "jede Datei traegt Policy" waere
-still ein anderer Zuschnitt als der beschlossene.
+**ERLEDIGT 2026-08-29:** der Erzeuger ist rekonstruiert
+(`tools/generate_carrier_manifest.py`, dokumentierte Regel Seed + zeitlich
+gestreute Auswahl, deterministisch, smoke-geprueft; koppelt per
+--from-list/--list-out an `build_cache_incremental --file-list`). Der
+konkrete v23-Aufruf (180 von ~1.745 Dateien, G-1/G-2-Split) wird bei der
+v23-Kampagne registriert -- die Zahlen stecken bewusst NICHT im Werkzeug.
 
 ---
 
