@@ -131,12 +131,48 @@ def _build_one_file(args):
     return basename, block_file, len(ds), True
 
 
-def _files(data_dir, limit=None):
-    file_list = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+def _files(data_dir, limit=None, explicit=None):
+    """`explicit`: sortierte Basename-Liste aus --file-list -- definiert die
+    EXAKTE Teilmenge. Fehlt eine gelistete Datei auf der Platte oder kollidiert
+    sie mit MOSAIC_DATA_EXCLUDE, ist das ein harter Abbruch: eine still
+    geschrumpfte Teilmenge waere ein anderer Zuschnitt als der beschlossene
+    (dieselbe Fehlerklasse wie beim Traeger-Manifest, STATUS-Abschnitt
+    TRAEGER-MANIFEST-GENERATOR)."""
     _excl = os.environ.get("MOSAIC_DATA_EXCLUDE")
+    if explicit is not None:
+        out = []
+        for b in explicit:
+            f = os.path.join(data_dir, b)
+            if not os.path.exists(f):
+                raise SystemExit(f"--file-list: {b} existiert nicht in {data_dir}")
+            if _excl and re.search(_excl, b):
+                raise SystemExit(f"--file-list: {b} kollidiert mit MOSAIC_DATA_EXCLUDE={_excl!r} "
+                                 f"-- widerspruechliche Konfiguration, bitte aufloesen")
+            out.append(f)
+        return out
+    file_list = sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
     if _excl:
         file_list = [f for f in file_list if not re.search(_excl, os.path.basename(f))]
     return file_list[:limit] if limit else file_list
+
+
+def _load_file_list(path):
+    """Eine Datei je Zeile (Basename oder Pfad, nur der Basename zaehlt);
+    Leerzeilen und #-Kommentare erlaubt. Rueckgabe SORTIERT -- die sortierte
+    Reihenfolge ist die serielle Reihenfolge, Voraussetzung der
+    Bit-Identitaet des Merges (siehe merge-Kommentar unten)."""
+    names = []
+    for line in open(path, encoding="utf-8"):
+        s = line.strip()
+        if not s or s.startswith("#"):
+            continue
+        names.append(os.path.basename(s))
+    if not names:
+        raise SystemExit(f"--file-list {path}: keine Dateinamen enthalten")
+    dupes = {n for n in names if names.count(n) > 1}
+    if dupes:
+        raise SystemExit(f"--file-list {path}: doppelte Eintraege {sorted(dupes)[:3]} ...")
+    return sorted(names)
 
 
 def _pass(data_dir, file_list, kwargs, carrier_set, carrier_prefixes, workers, t0):
@@ -182,7 +218,18 @@ def main():
     ap.add_argument("--merge-out", default=None,
                     help="Fenster-Cache aus den Datei-Bloecken zusammensetzen (Dateireihenfolge "
                          "sortiert, wie der serielle Bau)")
+    ap.add_argument("--file-list", default=None,
+                    help="Textdatei mit einem Dateinamen je Zeile (#-Kommentare erlaubt): "
+                         "definiert die EXAKTE Fenster-Teilmenge fuer Bau und --merge-out, "
+                         "z.B. ein Rotationsfenster v23+. Fehlende Dateien brechen hart ab. "
+                         "Nicht kombinierbar mit --watch/--limit. Nutzer-Auftrag 2026-08-28 "
+                         "(Merkliste 1e): Fenster-Monolithen in Minuten aus den Bloecken "
+                         "fuegen statt ~40 min Neubau je Fenster")
     a = ap.parse_args()
+    if a.file_list and (a.watch or a.limit):
+        raise SystemExit("--file-list ist nicht mit --watch/--limit kombinierbar "
+                         "(feste Teilmenge gegen mitwachsende/gestutzte Menge)")
+    explicit = _load_file_list(a.file_list) if a.file_list else None
 
     kwargs = dict(encoder=a.encoder, value_target_variant=a.value_target_variant,
                   conjunction_head=a.conjunction_head)
@@ -196,7 +243,7 @@ def main():
     built_total = 0
     empty = 0
     while True:
-        file_list = _files(a.data_dir, a.limit)
+        file_list = _files(a.data_dir, a.limit, explicit)
         if not file_list:
             raise SystemExit(f"Keine .pkl-Dateien in {a.data_dir}")
         results, n_open = _pass(a.data_dir, file_list, kwargs, carrier_set,
@@ -249,6 +296,7 @@ def main():
         "conjunction_head": a.conjunction_head,
         "traeger_manifest": manifest_path if carrier_set is not None else None,
         "watch": a.watch, "merge_out": a.merge_out,
+        "file_list": a.file_list,
         "cache_key": window_key.key if window_key is not None else None,
         "cache_key_full": window_key.key_full if window_key is not None else None,
         # Pflichtfelder nach CLAUDE.md "Laufzeiten messen, nicht schaetzen".
