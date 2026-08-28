@@ -1,5 +1,36 @@
 # -*- coding: utf-8 -*-
-"""Paritaets-Sonde: belegt, dass ein Wheel-Neubau das Bestandsverhalten
+"""UEBERHOLT seit 2026-08-28 -- Nachfolger ist der Suite-Test
+`net_parity_hash_matches_champion_fixture` (engine/src/self_play.rs, Fixture
+engine/tests/fixtures/net_parity_champion.txt).
+
+WARUM ABGELOEST (Nutzer-Entscheid 2026-08-28): der eingebaute Soll-Hash
+`8c6684ff...` unten wurde gegen `models/alphazero_v20_2d_opp_brierbest.onnx`
+gebildet -- einen ALT-Champion. Beim Aufraeumen von `models/` am 2026-08-28
+ist dieses Modell aus dem flachen Bestand verschwunden; die Sonde war damit
+nicht mehr lauffaehig, ohne dass irgendetwas rot geworden waere. Genau diese
+Fehlerklasse (ein Waechter, der still ausfaellt) soll der Suite-Test
+beseitigen: er loest den Champion ueber `models/champion.txt` auf, laeuft in
+JEDEM `cargo test` mit und schlaegt beim Champion-Wechsel LAUT fehl statt
+still zu verrotten. Es gibt immer nur EINEN Champion; Alt-Champions rotieren
+aus, und eine Paritaets-Basislinie mit Alt-Champion-Abhaengigkeit rottet mit.
+
+Der Funktionskern bleibt hier ALS BELEG stehen (Herleitung des Hashes, die
+Diagnosefeld-Erlaubnisliste und die geprueften Befunde zum RNG-Schnitt) --
+nicht mehr als laufender Waechter.
+
+NEBENBEFUND beim Umzug, gepruft mit `ast` am 2026-08-28: der unten
+beschriebene WHEEL-FRISCHE-CHECK hat NIE gelaufen. Sein Code (`import
+importlib.util`, `def _wheel_frische_warnung`, der Aufruf) steht INNERHALB
+dieses Modul-Docstrings, ist also blosser Text -- `ast.parse` findet auf
+Modulebene keine Funktion dieses Namens. Er ist deshalb auch nicht in den
+Suite-Test uebernommen worden: uebernommen wird nichts, was nie lief. Wer
+den Gedanken braucht (installierte `.pyd` aelter als eine Engine-Quelle),
+baut ihn neu -- in `cargo test` ist er ohnehin gegenstandslos, dort baut
+cargo selbst.
+
+Historische Beschreibung ab hier:
+
+Paritaets-Sonde: belegt, dass ein Wheel-Neubau das Bestandsverhalten
 BITGLEICH laesst (alle Env-Knoepfe auf Default).
 
 Warum es dieses Werkzeug gibt: jeder Laufzeit-Knopf im Projekt hat einen
@@ -142,6 +173,18 @@ def pick_states() -> list[dict]:
 
 
 def main() -> int:
+    # Deprecation-Zeile beim Start (Nutzer-Auftrag 2026-08-28) -- nach stderr,
+    # damit ein Aufrufer, der die stdout-Hashzeile weiterverarbeitet, davon
+    # nicht durcheinanderkommt.
+    print(
+        "UEBERHOLT: tools/parity_probe.py ist seit 2026-08-28 abgeloest vom Suite-Test\n"
+        "  net_parity_hash_matches_champion_fixture (engine/src/self_play.rs).\n"
+        "  Der eingebaute Soll-Hash haengt an einem ALT-Champion "
+        "(v20_2d_opp_brierbest);\n"
+        "  der Suite-Test loest den amtierenden Champion ueber models/champion.txt auf.\n"
+        "  Diese Datei bleibt als Beleg stehen, nicht als laufender Waechter.",
+        file=sys.stderr,
+    )
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--expected",

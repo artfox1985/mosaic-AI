@@ -318,8 +318,16 @@ mod tests {
     /// alte `Option`-Muster liess die beiden Tests unten bei Abwesenheit
     /// still leer-gruen bestehen (Nutzer-Regel: nie leer gruen; Praezedenz
     /// `self_play.rs::load_test_net_for_gating`).
+    ///
+    /// AMTIERENDER Champion statt hartem Namen (Nutzer-Randbedingung
+    /// 2026-08-28: "es gibt immer nur einen Champion, Alt-Champions koennen
+    /// rausrotieren") -- vorher hing hier `alphazero_v20_2d_opp_brierbest.onnx`
+    /// fest, also ein Alt-Champion, der beim naechsten Aufraeumen von
+    /// `models/` wegfaellt. Die beiden Tests unten pruefen MECHANIK (Registry-
+    /// Lookup, Sammel-Faden gegen Direkt-Eval), kein modellspezifisches
+    /// Verhalten -- jedes geladene Netz taugt dafuer.
     fn load_test_net() -> Net {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v20_2d_opp_brierbest.onnx");
+        let path = crate::net::test_champion_model_path();
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht \
              leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
@@ -399,12 +407,22 @@ mod tests {
             assert!(close(&a.2, &b.2), "Zeile {i}: moon weicht > 1e-5 ab");
             assert!(close(&a.3, &b.3), "Zeile {i}: points weicht > 1e-5 ab");
             // Ownership-Verbraucher Teil 1: die beiden neuen Spalten muessen
-            // ebenfalls durchkommen. `v20_2d_opp_brierbest` traegt BEIDE
-            // Koepfe -- ein leerer `ownership`-Vektor waere hier also ein
-            // Verdrahtungsfehler, kein "Modell ohne Kopf".
+            // ebenfalls durchkommen. Die `!is_empty()`-Zusicherung unten
+            // setzt voraus, dass der geladene Champion den `ownership`-Kopf
+            // TRAEGT -- fuer den amtierenden `v21_2d_brierbest` am
+            // 2026-08-28 am ONNX-Graphen nachgesehen (Outputs: policy,
+            // value, moon, points, ownership, value_wdl_logits, opp_points,
+            // endgame_margin), und `export_onnx.py` exportiert ihn seit der
+            // Ownership-Aera immer. Ein leerer Vektor ist hier also ein
+            // Verdrahtungsfehler im Sammel-Faden, kein "Modell ohne Kopf".
             assert!(close(&a.4, &b.4), "Zeile {i}: opp_points weicht > 1e-5 ab");
             assert!(close(&a.5, &b.5), "Zeile {i}: ownership weicht > 1e-5 ab");
-            assert!(!a.5.is_empty(), "Zeile {i}: ownership leer -- Sammel-Faden reicht den Kopf nicht durch");
+            assert!(
+                !a.5.is_empty(),
+                "Zeile {i}: ownership leer -- entweder reicht der Sammel-Faden den Kopf \
+                 nicht durch, oder der amtierende Champion (models/champion.txt) traegt \
+                 keinen ownership-Kopf mehr; beides gehoert geklaert, nicht weggelassen"
+            );
         }
     }
 }

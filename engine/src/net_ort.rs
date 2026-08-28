@@ -357,7 +357,7 @@ mod tests {
     fn eval_batch_via_ort_cuda_rejects_empty_batch() {
         // Kein echtes Netz noetig -- der Leer-Batch-Check laeuft VOR jedem
         // Session-Zugriff.
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v21_2d_brierbest.onnx");
+        let path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
         let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht              leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -378,7 +378,7 @@ mod tests {
         use rand::rngs::StdRng;
         use rand::{RngExt, SeedableRng};
 
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v21_2d_brierbest.onnx");
+        let path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
         let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht              leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
