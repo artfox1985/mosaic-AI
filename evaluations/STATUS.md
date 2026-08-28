@@ -59,12 +59,13 @@ der lastgebremste Erstlauf war PARTIEGLEICH mit dem sauberen Neustart
 hatte gebremst, nicht verfaelscht. Details und Deutung: par.3b.6 der
 Lehrer-Prereg.
 
-**NAECHSTER SCHRITT (registrierte Weg-Wahl par.3b.5 Punkt 2): Stufe 2 --
-2D-Ablesung des Ownership-Kopfs**, schaerfere Karten fuer denselben
-Konsumenten, VOR Surprise-Weighting. Trainings-Freigabe des Nutzers vom
-2026-08-29 liegt vor ("weitere Trainings fuer v22, solang es dem Ziel
-naeher bringt"); der v22-Self-Play-Start bleibt gestoppt und ist weiterhin
-Nutzer-Entscheid. Die Sweep-Messdaten (selfplay_otw22b01w*) sind nach
+**Es laeuft: v22-b04-Training (Stufe 2, par.3b.7)** -- 2D-Ablesung des
+Ownership-Kopfs STATT flach (OwnershipHead2D, Permutation an 20
+Endbrettern verifiziert), Kaltstart, Rezept identisch b01, einziger
+Unterschied --ownership-head-2d; Trainings-Freigabe Nutzer 2026-08-29.
+Danach argmax-Gegenprobe gegen b01 (0,2975) und Wiederholung des
+Konsument-Sweeps mit b04-Kopf (w 0/0,5/1,0). Der v22-Self-Play-Start
+bleibt gestoppt und ist weiterhin Nutzer-Entscheid. Die Sweep-Messdaten (selfplay_otw22b01w*) sind nach
 Abschluss der Auswertung mit Nutzer-Freigabe vom 2026-08-29 GELOESCHT;
 Manifeste und Artefakt bleiben.
 

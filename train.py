@@ -945,7 +945,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           value_weight=None, points_weight=None, value_target_variant="default",
           points_dist_bins=None, reinit_points_head=False, encoder="flat",
           value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
-          ranking_loss_weight=0.0, conjunction_head=False, head_warmstart=True, extra_data_dir=None,
+          ranking_loss_weight=0.0, conjunction_head=False, ownership_head_2d=False,
+          head_warmstart=True, extra_data_dir=None,
           freeze_trunk=False, cache_file=None):
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
@@ -954,6 +955,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # stiller Fallback auf einen unbekannten Wert.
     if value_head not in VALUE_HEAD_VARIANTS:
         sys.exit(f"❌ --value-head {value_head!r} unbekannt -- erlaubt: {VALUE_HEAD_VARIANTS}.")
+    # par.3b.7 (Stufe 2): harte Vorab-Validierung wie bei --value-head --
+    # die 2D-Ablesung existiert nur im 2D-Netz, und die Konjunktions-
+    # Erweiterung haengt an der flachen Linear-Schicht.
+    if ownership_head_2d and encoder != "2d":
+        sys.exit("❌ --ownership-head-2d braucht --encoder 2d (par.3b.7).")
+    if ownership_head_2d and conjunction_head:
+        sys.exit("❌ --ownership-head-2d und --conjunction-head sind nicht kombinierbar (par.3b.7).")
     # λ-Misch-Value-Target-Experiment (Willemsen et al. 2021, "soft-Z"):
     # harte Validierung VOR jedem teuren Daten-Laden -- kein stiller Clamp
     # (siehe train.py --load-Footgun-Historie im Modulkommentar/Memory
@@ -1107,6 +1115,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "lr_t_max": lr_t_max,
         "exclude_round5": exclude_round5, "ownership_weight": ownership_weight,
         "conjunction_head": conjunction_head,
+        "ownership_head_2d": ownership_head_2d,
         "seed": seed, "snapshot": snapshot,
         "value_weight": value_weight, "points_weight": points_weight,
         "value_target_variant": value_target_variant, "encoder": encoder,
@@ -1350,6 +1359,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         model = Mosaic2DNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
                             points_dist_bins=effective_points_dist_bins, opp_points_head=opp_points_head,
                             endgame_head=endgame_head, conjunction_head=conjunction_head,
+                            ownership_head_2d=ownership_head_2d,
                             value_head_variant=value_head)
     else:
         model = MosaicNet(input_size=dataset.input_size, num_actions=NUM_ACTIONS, hidden_size=hs,
@@ -2332,6 +2342,14 @@ if __name__ == "__main__":
                              "Eigener Cache-Key-Suffix '+conj_v1' (kein VALUE_SCHEMA_VERSION-Bump). "
                              "Wirkt nur zusammen mit --ownership-weight > 0 -- die Konjunktionen "
                              "haengen am selben Verlustterm.")
+    parser.add_argument("--ownership-head-2d", action="store_true",
+                        help="par.3b.7 (Stufe 2 des par.3b-Stufenplans): 2D-Ablesung des "
+                             "Ownership-Kopfs -- Fusionsvektor auf 6x6 projiziert, Faltungen, "
+                             "je Zelle zwei Logits; Ziel, Breite (72) und Ausgabe-Ordnung "
+                             "bleiben unveraendert (kein Cache-Key-Effekt, reine "
+                             "Ablese-Architektur). Nur mit --encoder 2d; nicht mit "
+                             "--conjunction-head kombinierbar. Alt-Checkpoints bleiben "
+                             "unveraendert ladbar (Praesenz wird aus dem state_dict erkannt).")
     parser.add_argument("--ownership-weight", type=float, default=None,
                         help="Task #9: Gewicht des Ownership-Hilfsziels (72 Binaerlabels je "
                              "Position: wird dieses Kuppelfeld am SPIELENDE belegt sein?). "
@@ -2504,6 +2522,7 @@ if __name__ == "__main__":
           lr_t_max=args.lr_t_max,
           exclude_round5=args.exclude_round5, ownership_weight=args.ownership_weight,
           conjunction_head=args.conjunction_head,
+          ownership_head_2d=args.ownership_head_2d,
           seed=args.seed, snapshot=not args.no_snapshot,
           value_weight=args.value_weight, points_weight=args.points_weight,
           value_target_variant=args.value_target_variant, encoder=args.encoder,

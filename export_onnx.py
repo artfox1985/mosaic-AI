@@ -55,6 +55,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from neural_net import (MosaicNet, Mosaic2DNet, points_dist_bins_from_state,  # noqa: E402
                         encoder_from_state_dict, opp_points_head_present,
                         endgame_head_present, conjunction_head_present,
+                        ownership_head_2d_present,
                         value_head_variant_from_state)
 from config import INPUT_SIZE, NUM_ACTIONS, MODELS_DIR  # noqa: E402
 
@@ -202,6 +203,7 @@ def _export_2d(version: str, ckpt: dict, opset: int) -> Path:
                         planes_channels=planes_channels, conv_channels=conv_channels,
                         conv_layers=max(conv_layers, 1), opp_points_head=opp_head,
                         endgame_head=eg_head, conjunction_head=conjunction_head_present(state),
+                        ownership_head_2d=ownership_head_2d_present(state),
                         value_head_variant=value_head_variant)
     new_state = model.state_dict()
     skipped = [k for k in state if k in new_state and state[k].shape != new_state[k].shape]

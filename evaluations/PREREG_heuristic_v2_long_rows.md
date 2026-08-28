@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1; Preis: volle Zeilen 0,432 -> 0,216). v2-Zweig entfernt, beide gefrorenen Artefakte lauffaehig (par.19). Spalten-Tor par.3b.2: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play; par.3b.5 Lesart 3 (die Platzierung verschenkt das Draft-Erbe). par.3b.6 GEFAHREN 2026-08-29: TOR VERFEHLT, Leiter dosisabhaengig negativ (w2,0 t -2,85 unter w0) => Stufe 2 (2D-Ablesung) vor Surprise-Weighting, Self-Play bleibt gestoppt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1; Preis: volle Zeilen 0,432 -> 0,216). v2-Zweig entfernt, beide gefrorenen Artefakte lauffaehig (par.19). Spalten-Tor par.3b.2: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play; par.3b.5 Lesart 3 (die Platzierung verschenkt das Draft-Erbe). par.3b.6 GEFAHREN 2026-08-29: TOR VERFEHLT, Leiter dosisabhaengig negativ (w2,0 t -2,85 unter w0) => Stufe 2 laeuft: par.3b.7 REGISTRIERT 2026-08-29 (Arm v22-b04, 2D-Ablesung STATT flach, Rezept identisch b01), Training gestartet; Self-Play bleibt gestoppt. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1509,6 +1509,60 @@ flachen Form auf BEIDEN Wirkwegen leer. **Konsequenz nach registrierter
 Weg-Wahl (par.3b.5 Punkt 2): Stufe 2 -- 2D-Ablesung des Ownership-Kopfs,
 schaerfere Karten fuer denselben Konsumenten -- VOR Surprise-Weighting.
 Der v22-Self-Play-Start bleibt gestoppt.**
+
+### par.3b.7 Stufe 2: 2D-Ablesung des Ownership-Kopfs, Arm v22-b04 (registriert 2026-08-29, VOR dem Training)
+
+**Ausloeser:** par.3b.2 Tor 1(a) (Trainingsgewicht traegt nicht) plus
+par.3b.6 (Konsument mit flacher Karte traegt nicht, dosisabhaengig negativ)
+-- der flache Kopf ist auf beiden Wirkwegen leer. Die im par.3b-Stufenplan
+registrierte Uebergangsregel ("kein Schaden" genuegt) ist erfuellt; der
+registrierte Vorbehalt bleibt bestehen: "2D hilft" ist fuer STAERKE nicht
+belegt (PREREG_2d_encoder.md, Arena-Wash).
+
+**Entscheid der offenen Frage "statt oder zusaetzlich": STATT.**
+Begruendung: b01 IST die flache Ablation (derselbe Korpus, derselbe Seed,
+dasselbe Rezept) -- ein Doppelkopf wuerde nur die Konsumentenfrage
+vernebeln, welche Karte der Tiling-Pol liest, und Parameter doppeln, ohne
+einen Vergleich zu ermoeglichen, den b01 nicht schon liefert.
+
+**Bauform (implementiert, Commit dieses Zugs):** `OwnershipHead2D` in
+neural_net.py -- Fusionsvektor per Linear auf 32x6x6 projiziert, Conv3x3 +
+ReLU + Conv1x1 auf 2 Kanaele (Zieher/Gegner), dann feste Permutation in
+die Ziel-Ordnung (sr*12+sc*4+si, Primaerquelle
+scoring.rs::ownership_index_for_grid; als Buffer im Modell, an 20 echten
+Endbrettern gegen `_ownership_from_dome` verifiziert). Ziel, Breite (72)
+und Ausgabe-Ordnung UNVERAENDERT: kein Cache-Key-Effekt, ONNX-Vertrag
+unberuehrt, Alt-Checkpoints laden unveraendert (Praesenz-Erkennung aus dem
+state_dict, Muster opp_points_head_present; Roundtrip-Test gruen, b01
+laedt weiter flach). Der Huellen-Trimm (Nachtrag 6, Option a) ist BEWUSST
+NICHT in diesem Arm -- eine Variable je Arm; er ist der benannte Folgearm.
+
+**Arm v22-b04: KALTSTART, Rezept identisch b01** (Arm B
+MOSAIC_IGNORE_POLICY_TARGET_VALID=1, --ownership-weight 1.0, --encoder 2d,
+--value-head wdl, nortv, --opp-points-head, --endgame-head, --lr-schedule
+plateau, --epochs 40, Seed 20260828, volles hv2-Fenster: 2400 Dateien,
+verifiziert identisch zum b01-Stand). EINZIGER Unterschied:
+--ownership-head-2d. Cache-Treffer auf dem b01-Schluessel erwartet
+(Ablesung ist datenseitig unsichtbar).
+
+**Messung und Entscheid:**
+
+1. Own-Val gegen b01 (0,394) -- informative Kopfguete-Anzeige, KEIN Tor.
+2. Das Tor ist verhaltensbasiert und zweistufig: erst argmax-Lauf
+   (Instrument par.3b.2, 200 Partien) b04 ohne Konsument-Knopf gegen die
+   b01-Referenz 0,2975 (der Umbau darf Policy/Spiel nicht verschlechtern;
+   der Trunk wird durch den anderen Ownership-Gradienten mitgeformt).
+   Dann WIEDERHOLUNG des Konsument-Sweeps par.3b.6 mit b04-Kopf, kleine
+   Leiter w 0 / 0,5 / 1,0, gleiche Tore (volle Spalten signifikant ueber
+   w0, Block-t 2,262, ohne signifikanten Punkteverlust).
+3. Traegt der Konsument mit 2D-Karte -> Knopf-Aufnahme und
+   Self-Play-Start zurueck auf den Tisch (Nutzer-Entscheid, wie
+   registriert). Traegt er wieder nicht -> Surprise-Weighting (b03) ist
+   der naechste registrierte Weg; die Konsumenten-Schiene ist dann mit
+   flacher UND raeumlicher Karte leer gemessen.
+
+Trainings-Freigabe: Nutzer 2026-08-29 ("du darfst bei bedarf weitere
+trainings fuer v22 durchfuehren solang es unserem ziel naeher bringt").
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
