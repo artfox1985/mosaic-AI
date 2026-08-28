@@ -14216,6 +14216,37 @@ gehalten wird.
 von `threads=0` von "sequenziell" auf "alle Kerne" dreht: jeder
 Bestandsaufrufer mit 0 laeuft ab jetzt parallel.
 
+## STELLUNGSVIELFALT DES LEHRER-KORPUS (gemessen 2026-08-25) -- ausgelagert aus STATUS.md am 2026-08-28
+
+Anlass war eine Sorge, die sich als unbegruendet erwiesen hat: der v2-Vorzug
+setzt den Zug OHNE Suche und umgeht damit `play_temp` (self_play.rs:374) auf
+61,8 Prozent der Draftingzuege. `play_temp` existiert genau fuer
+Zustandsvielfalt (0,7 / 0,4 / 0,15 je nach Aktionszahl; das AUFGEZEICHNETE
+Ziel laeuft separat mit festem `TARGET_TEMP = 0,15`).
+
+Gemessen auf je 200 Partien, Brett-Vielfalt als (Runde, 36-Bit-Fuellmaske):
+
+| | v2huelle | v1 |
+| --- | --- | --- |
+| distinkte Zustaende | **6.164** | 6.008 |
+| davon mehrfach vorkommend | **36,1 %** | 48,9 % |
+| distinkte je Partie | **40,9** | 37,4 |
+
+**Der Lehrer-Korpus hat MEHR verschiedene Stellungen, nicht weniger**
+(Faktor 1,026) und deutlich weniger Wiederholungen. Grund: v1 wirft die
+Haelfte seiner Steine auf die Strafleiste (10,30 gegen 5,04 Steine je Partie)
+-- was dort landet, erreicht das Brett nie. v1-Bretter bleiben leerer
+(Fuellstand 2,49 gegen 2,92) und haben damit weniger moegliche
+Konfigurationen. Der Vorzug nimmt Vielfalt bei der Zugwahl weg und gibt mehr
+zurueck, weil er das Brett ueberhaupt erst fuellt.
+
+**Grenze der Aussage:** gemessen ist BRETT-Vielfalt, nicht
+Trajektorien-Vielfalt. Fuer den Value-Kopf -- den Grund, warum v22 existiert
+-- ist das die richtige Groesse; ueber die Breite der Policy-Exploration sagt
+sie nichts. Sonde `tools/probes/corpus_state_diversity_probe.py`, Artefakt
+`evaluations/artifacts/corpus_state_diversity.json`.
+
+
 # Vollstaendiger STATUS-Stand vom 2026-08-25 (vor der Neufassung)
 
 **Warum dieses Kapitel existiert:** Nutzer-Auftrag 2026-08-25, STATUS.md
