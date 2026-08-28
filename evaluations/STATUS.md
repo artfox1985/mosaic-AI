@@ -221,11 +221,14 @@ naechste Sitzung mitten im Ablauf uebernehmen kann:
 | 4 | Spalten-Tor + par.3b.4 + par.3b.5 | ERLEDIGT 2026-08-28: Tor 1(b) BESTANDEN (b01 0,297 gg. Champion 0,102, t 5,55), Tor 1(a) VERFEHLT (gg. w0 +0,037, t 1,53) => KEIN v22-Self-Play nach Regel. Symmetrie TRENNT (+0,573, t 93). Treue LESART 3: Draft-Erbe da (Masse 0,81->0,60, Lift 28x), die PLATZIERUNG verschenkt es. Alles in der Lehrer-Prereg registriert |
 | 5 | Wecker-Liste vor dem v22-Self-Play | AUSGESETZT -- Start per Tor-Regel gestoppt. NEUER NAECHSTER SCHRITT: Ownership-Pol-Konsument-Arena (MOSAIC_OWNERSHIP_TILING_W-Sweep mit b01-Kopf, argmax-Instrument; par.3b.5 Weg-Wahl). Traegt er, kommen Start und Weckerliste zurueck |
 
-**Offene NUTZER-Entscheide, nachts nicht angefasst:** (a) Anker-Artefakt
-neu einfrieren oder Cross-Aera messen (Vertragshash `efd564d8...`;
-Empfehlung: neu einfrieren, Beweisfuehrung = Golden-Probe-Bytevergleich
-als Traeger, A4-Fixture als Beigabe), (b) Sanierung der drei gepushten
-JSONs mit Pfadfragmenten (Tabelle in Abschnitt 2), (c) jeder Push.
+**Offene NUTZER-Entscheide:** (a) ENTSCHIEDEN 2026-08-29 (Nutzer):
+**Cross-Aera ist der Normalfall** -- das Anker-Wheel wird NICHT je
+Motorschritt nachgezogen, es prueft nur die Selbst-Invarianz des Ankers;
+bei grundlegender Engine-Aenderung ohnehin Elo-Recheck. Dauerhaft
+festgehalten in docs/promotion_checklist.md Punkt 3 (Aera-Regel). Die
+frühere Empfehlung "neu einfrieren" ist damit ueberholt. (b) Sanierung der
+drei gepushten JSONs mit Pfadfragmenten: vom Nutzer 2026-08-29 fuer das
+Nacht-Build-Fenster freigegeben (Tabelle in Abschnitt 2), (c) jeder Push.
 
 ### A. Der Leitstern-Pfad -- das Einzige, was den Spieler staerker macht
 
