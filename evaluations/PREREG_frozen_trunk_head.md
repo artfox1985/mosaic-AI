@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Loest ein eingefrorener Trunk (nur ownership_head trainiert, Auswahl ueber den Ownership-Val-Verlust) den Checkpoint-Zielkonflikt aus PREREG_ownership_corpus.md §10.3 -- oder ist der eingefrorene Trunk selbst die Decke fuer die Kopfguete? | Beleg: **ENTSCHIEDEN 2026-08-18, NEGATIV.** F1 gemessen 2026-08-16 (Abschnitt 7: Zielkonflikt zur Haelfte geloest, Decke real). Der Abschlusslauf v21-b22 (Frozen Trunk auf v21-b18_best, lr 5e-4, plateau, Seed 2) ist mit Early Stop nach 15 von 60 Epochen durchgelaufen und liefert den SCHLECHTEREN Kopf: Own-Val 0,3407 (bestes, E13) gegen 0,3191 bei gemeinsamem Training b18 und 0,2994 bei b19 (Gewicht 2,0) -- also -0,0216 bzw. -0,0413. Belegstelle: PREREG_lr_schedule.md, Abschnitt Abschluss (2026-08-18). Die Kopfguete haengt an der Rumpfdarstellung; sie einzufrieren spart die Policy und kostet den Kopf. Folge fuer den Verbraucher: fuer PREREG_ownership_coupling.md bleiben b18/b19 die Kandidaten. Der in Abschnitt 7.2 genannte Mittelweg (Teil-Freeze, sanftes Nachtrainieren) bleibt unverfolgt und ist NICHT Teil dieses Verdikts. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Loest ein eingefrorener Trunk (nur ownership_head trainiert, Auswahl ueber den Ownership-Val-Verlust) den Checkpoint-Zielkonflikt aus PREREG_ownership_corpus.md §10.3 -- oder ist der eingefrorene Trunk selbst die Decke fuer die Kopfguete? | Beleg: ENTSCHIEDEN 2026-08-18, NEGATIV. F1 (§7): Zielkonflikt nur halb geloest, Decke real. Der Abschlusslauf v21-b22 liefert den SCHLECHTEREN Kopf als das gemeinsame Training (§8). Folge: fuer PREREG_ownership_coupling.md bleiben b18/b19 die Kandidaten; der Mittelweg aus §7.2 ist NICHT Teil des Verdikts. -->
 
 # PREREG: Trunk einfrieren, nur den Ownership-Kopf weitertrainieren
 
@@ -335,3 +335,21 @@ die Kopfguete tatsaechlich traegt und die Decke wehtut. **F2 (Deckel-Sonde
 vom Champion) wird dadurch NICHT ueberfluessig** -- sie beantwortet die
 andere Haelfte: ob ein Trunk, der nie einen Ownership-Gradienten gesehen hat,
 ueberhaupt so weit kommt wie F1.
+
+## §8 VERDIKT (2026-08-18): NEGATIV -- der Abschlusslauf v21-b22
+
+Nachgetragen 2026-08-28 aus dem Zeile-1-Statuskopf, damit das registrierte
+Verdikt nicht nur im Kopf steht.
+
+`v21-b22` (Frozen Trunk auf `v21-b18_best`, lr 5e-4, `plateau`, Seed 2) ist
+mit Early Stop nach 15 von 60 Epochen durchgelaufen und liefert den
+**SCHLECHTEREN** Kopf: Ownership-Val 0,3407 (bestes, E13) gegen 0,3191 beim
+gemeinsamen Training `b18` und 0,2994 bei `b19` (Gewicht 2,0), also -0,0216
+bzw. -0,0413. Belegstelle mit Epochentabelle: `PREREG_lr_schedule.md`,
+Abschnitt "ERGEBNIS WEG 1 -- VOLLSTAENDIG (2026-08-18)".
+
+Die Kopfguete haengt an der Rumpfdarstellung; sie einzufrieren spart die
+Policy und kostet den Kopf. **Folge fuer den Verbraucher:** fuer
+`PREREG_ownership_coupling.md` bleiben `b18`/`b19` die Kandidaten. Der in
+§7.2 genannte Mittelweg (Teil-Freeze, sanftes Nachtrainieren) bleibt
+unverfolgt und ist NICHT Teil dieses Verdikts.

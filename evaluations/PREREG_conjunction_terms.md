@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Hebt der Verbraucher die Zielkriterien k1/k2, wenn E_k aus den GELERNTEN Konjunktions-Ausgaengen kommt statt aus dem Produkt der 36 Feldwahrscheinlichkeiten? | Beleg: **ENTSCHIEDEN 2026-08-18, NICHT-ERFOLG.** Gebaut (MOSAIC_OWNERSHIP_CONJ, Default 0 = Produktform byte-identisch, Commit d520672, cargo test --release 447 passed) und gefahren (b18_best @400 gegen Champion @400, 407 Seeds, Arm D1, Blockgroesse 25): k1 +0,14 (Block-t 0,54) und k2 +0,07 (Block-t 1,00) gegen die vorregistrierte Schwelle 2,571 -- Erfolgsregel aus par.7 gerissen. Siege 229/407 = 56,3 % gegen 211/407 im Nullarm (McNemar p = 0,2025, kein Verlust), war aber nie das Kriterium. KEIN Nullbefund aus Wirkungslosigkeit: in 402 von 407 Partien weicht der Ausgang vom Nullarm ab, in 178 kippt der Sieger -- damit ist die Produktkollaps-Erklaerung als URSACHE widerlegt, die Form war nicht der Engpass. Der in par.7 registrierte naechste Schritt (Rangregel) ist durch Nutzer-Entscheid 2026-08-18 ausgeschlossen; Nachfolger ist PREREG_ownership_coupling.md (Skala statt Form). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Hebt der Verbraucher die Zielkriterien k1/k2, wenn E_k aus den GELERNTEN Konjunktions-Ausgaengen kommt statt aus dem Produkt der 36 Feldwahrscheinlichkeiten? | Beleg: ENTSCHIEDEN 2026-08-18, NICHT-ERFOLG: k1 +0,14 und k2 +0,07 bleiben weit unter der vorregistrierten Block-t-Schwelle 2,571 (par.9). Kein Nullbefund aus Wirkungslosigkeit -- der Regler kippt 178 von 407 Partien; die Produktkollaps-Erklaerung ist als URSACHE widerlegt. Nachfolger ist PREREG_ownership_coupling.md (par.10). -->
 
 # PREREG: Konjunktionsterme — E_k aus dem gelernten Kopf statt aus dem Produkt
 
@@ -356,3 +356,23 @@ Formumschaltung ist als Ursache endgueltig ausgeschieden: sie aendert nichts
 daran, dass eine Kette aus sechs Feldern je Zug ein Marginal nahe null hat.
 
 ## par.10 VERDIKT NACH DER VORAB-REGEL (leer bei Registrierung)
+
+**NICHT-ERFOLG, entschieden 2026-08-18** (nachgetragen 2026-08-28 aus dem
+Zeile-1-Statuskopf, damit die dort registrierten Angaben nicht nur im Kopf
+stehen).
+
+* **Gebaut:** Knopf `MOSAIC_OWNERSHIP_CONJ`, Default 0 = Produktform
+  byte-identisch, Commit `d520672`; `cargo test --release` 447 passed.
+* **Gefahren:** `b18_best` @400 gegen den Champion @400, 407 Seeds, Arm D1,
+  Blockgroesse 25 (Rohdaten und Tabellen in par.9).
+* **Ergebnis:** k1 +0,14 (Block-t 0,54) und k2 +0,07 (Block-t 1,00) gegen die
+  vorregistrierte Schwelle 2,571 -- die Erfolgsregel aus par.7 ist gerissen.
+  Die Nebenbedingung haelt (229/407 = 56,3 % gegen 211/407 im Nullarm,
+  exakter McNemar p = 0,2025), war aber nie das Kriterium.
+* **Kein Nullbefund aus Wirkungslosigkeit:** in 402 von 407 Partien weicht
+  der Ausgang vom Nullarm ab, in 178 kippt der Sieger. Die
+  Produktkollaps-Erklaerung ist damit als URSACHE widerlegt; die Form war
+  nicht der Engpass.
+* **Anschluss:** der in par.7 registrierte naechste Schritt (Rangregel) ist
+  durch Nutzer-Entscheid vom 2026-08-18 ausgeschlossen. Nachfolger ist
+  `PREREG_ownership_coupling.md` (Skala statt Form).

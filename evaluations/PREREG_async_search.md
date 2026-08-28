@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inference_path.md`) strukturell scheitert? | Beleg: ENTSCHIEDEN, nachgetragen 2026-08-21 (das Verdikt selbst fiel 2026-08-14): JA fuer den Batch (99,7 % Fuellung bei N=128), NEIN fuer den Zweck -- Stufe 3 wurde mit DIESEM Async-Pfad als Vehikel in `PREREG_gpu_inference_path.md` §20-§23 vermessen; nach Condvar-Fix (0,053x -> 0,98x) bleibt das Maximum 1,255x (Doppel-Prozess-Aggregat) gegen den ehrlichen Sync-Nenner 528,5 Partien/h @ 11 Faeden -- Gate C (>= 2,0x) VERFEHLT, Weg geschlossen bis zum groesseren Netz. Korrektheit war durchweg gruen: Gate A 0/1148; Gate B Spielgeschehen 0/16 bit-identisch; die Trainingsziel-Divergenz ist Task-#71-Wall-Clock (eigene Prereg `PREREG_deterministic_labels.md`, ENTSCHIEDEN). Code NICHT in main -- Archiv-Tags `archive/async_search_stage{1,3}` (bis 2026-08-27 gleichnamige Branches, seither Tags); Worktrees wt_async/wt_async2 entfernt. Abschluss: Abschnitt 13. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inference_path.md`) strukturell scheitert? | Beleg: JA fuer den Batch (99,7 % Fuellung), NEIN fuer den Zweck: Gate C (>= 2,0x) mit maximal 1,255x VERFEHLT, Strang geschlossen bis zum groesseren Netz. Korrektheit durchweg gruen (Gate A Abschnitt 8, Gate B Abschnitt 12). Stufe 3 lief als Vehikel in PREREG_gpu_inference_path.md §20-§23; Abschluss und Code-Verbleib in Abschnitt 13. -->
 
 # Vorregistrierung: Async-Suche (Drafting-Suche als Zustandsautomat)
 
@@ -936,7 +936,9 @@ Diese Datei endete bei Gate B, obwohl Stufe 3 laengst gefahren war -- der
 Durchsatzteil wurde (sachlich richtig, dokumentarisch verwirrend) in
 `PREREG_gpu_inference_path.md` §20-§23 protokolliert, weil Async-Suche +
 Sammel-Faden dort das Vehikel fuer die ORT-CUDA-Zellen waren. Der Nachtrag
-schliesst die Luecke:
+schliesst die Luecke. **Das Verdikt selbst fiel am 2026-08-14**, hier
+nachgetragen am 2026-08-21 (Datum aus dem Zeile-1-Statuskopf uebernommen,
+2026-08-28):
 
 - **Gate C (>= 2,0x Ende-zu-Ende) VERFEHLT.** Beste Zelle nach Condvar-Fix
   (§21 dort: Busy-Poll/recv_timeout-Taeter behoben, 0,053x -> 0,98x) und

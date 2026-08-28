@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: GEBAUT + ABGENOMMEN 2026-08-23 (par.1a: Suite 492/0, Paritaets-Hash haelt, Knopf registriert); ERFOLG nach vorregistrierter Lesart (par.2b, 2026-08-23): kein Staerkeverlust (304 vs 296/407 n.s.), Score-Level SIGNIFIKANT +2,77 (Block-t +3,83), k1 9,0 % -> 16,0 % (+7,0 pp, p=0,090 knapp n.s., groesste je gemessene Netz-Bewegung). ABER par.2c (Netz-gegen-Netz via Kapselung): Paritaet, k1-Effekt gegnerspezifisch, uebertraegt sich nicht; Self-Play-Einsatz bleibt Kandidat mit gedaempfter Erwartung. Paralleler Such-Hebel des Policy-Seiten-Zuschnitts (Nutzer-Freigabe der Reihenfolge 2026-08-22); EINGETAKTET 2026-08-25 (par.3/par.3a). Fuer die v22-ERZEUGUNG wirkungslos: der Knopf sitzt in der Gumbel-Selektion (net_mcts.rs:3376), das heuristische v22-Self-Play labelt ueber net_leaf_eval/drafting_action_priors ohne Gumbel-Selektion. **Fuer das v22-SELF-PLAY dagegen ist er ein WECKER** (Nutzer-Einwand), also fuer den Lauf, der das v23-Fenster erzeugt: Netz-Self-Play laeuft durch die Gumbel-Suche, die Policy-Ziele SIND die Besuchsverteilung -- nur am Generierungsstart entscheidbar. AUFLAGE: die Gating-Messung muss VOR dem Start des v22-Self-Play laufen, sonst faellt der Entscheid per Default (0,0). ZWEI ARME, die NICHT dasselbe messen: Gating = Staerke gegen einen anderen Gegner (dort gegnerspezifisch, par.2b gegen par.2c); Self-Play = Netz gegen sich selbst, wo ein symmetrischer Eingriff sich im Ergebnis aufheben kann -- dort ist die Frage die KORPUS-Qualitaet (Zielschaerfe, Zustandsabdeckung, Orakelmetriken am Folgenetz), nicht die Siegquote. Kein Bau: SearchConfig ist an net_self_play_games pro Seite per models/<name>.spec.json setzbar. k1-Baurate bleibt Begleitgroesse. Quelle: RESEARCH_search_alternatives_external S4/S6 Option O1. -->
+<!-- STATUS: OFFEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: GEBAUT + ABGENOMMEN 2026-08-23 (par.1a). Arena par.2b: kein Staerkeverlust, Score +2,77 signifikant, k1 9,0 auf 16,0 Prozent -- aber par.2c zeigt den Effekt als GEGNERSPEZIFISCH (netz-gegen-netz Paritaet). Fuer die v22-ERZEUGUNG wirkungslos (par.3); fuer das v22-SELF-PLAY ein WECKER: Gating VOR dem Start, sonst Entscheid per Default 0,0 (par.3a). Kein Bau noetig. -->
 
 # PREREG-SKELETT: Implicit-Minimax-Backup als Laufzeit-Knopf
 
@@ -19,6 +19,12 @@ Mittel ueber schwache Geschwister-Fortsetzungen verwaessert.
   (Golden-/Paritaets-Gates wie ueblich).
 - Implementierung im Backup-Pfad von net_mcts.rs, additiv; KEINE
   Aenderung am Heuristik-Anker (mcts.rs bleibt unberuehrt).
+
+**Herkunft und Einordnung** (2026-08-28 aus dem Statuskopf hierher verschoben,
+damit sie beim Kuerzen nicht verlorengeht): Quelle ist
+`RESEARCH_search_alternatives_external`, Abschnitte S4/S6, dort Option O1.
+Der Knopf ist der PARALLELE Such-Hebel zum Zuschnitt auf der Policy-Seite;
+die Reihenfolge der beiden hat der Nutzer am 2026-08-22 freigegeben.
 
 ### par.1a GEBAUT + ABGENOMMEN (2026-08-23; Sonnet-Agent, Koordinator-Nachpruefung: Diff-Hotspots gelesen, alle 8 neuen Tests nachgefahren, Paritaet unabhaengig nachgemessen)
 

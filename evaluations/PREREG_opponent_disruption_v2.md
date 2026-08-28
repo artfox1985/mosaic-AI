@@ -1,4 +1,4 @@
-<!-- STATUS: UEBERHOLT | Frage: Laesst sich die Gegner-Stoerung ueber die Farbzaehlung als Gleichwertigkeits-Tausch INNERHALB der Suche (statt als Uebersteuerung davor) so bauen, dass sie die Gegner-Plattenpunkte druckt OHNE die eigene Staerke zu kosten? | Beleg: **UEBERHOLT 2026-08-18.** Die Messungen bleiben gueltig: Stufe 0 bestanden, Stufe 1 echt gefahren (Abschnitt 11, Zaehlmodus im installierten Wheel, Paritaet 8c6684ff und Byte-Identitaet belegt) -- Stoerfensteranteil 7,63 % bei 400 Sims und 7,95 % bei 200 Sims, Abbruchschwelle 5 % NICHT unterschritten, evaluations/artifacts/color_denial_probe.json; der Offline-Ersatz lag bei 5,50 % und die Fensterstatistik um Faktor 2,5 daneben (11.4). OFFEN war allein die Nutzer-Entscheidung ueber Stufe 2 (Bau des Tie-Breaks) -- und die entfaellt: laut STATUS.md, Abschnitt OFFENE ENTSCHEIDUNGEN, gehoert der Stoerungs-Baustein Stufe 2 zum Moon-Order-Kopf und ist keine Einzelentscheidung mehr. Nichts gebaut, kein Knopf im Bestand. -->
+<!-- STATUS: UEBERHOLT | Frage: Laesst sich die Gegner-Stoerung ueber die Farbzaehlung als Gleichwertigkeits-Tausch INNERHALB der Suche (statt als Uebersteuerung davor) so bauen, dass sie die Gegner-Plattenpunkte druckt OHNE die eigene Staerke zu kosten? | Beleg: UEBERHOLT 2026-08-18, nichts gebaut: Stufe 2 gehoert inzwischen zum Moon-Order-Kopf, die Einzelentscheidung entfaellt (§12). Die Messungen bleiben gueltig -- Stufe 1 live gefahren, Stoerfensteranteil 7,63 % bei 400 Sims, Abbruchschwelle 5 % nicht unterschritten (§11); Methodenbefund zum Offline-Ersatz: §11.4. -->
 
 # PREREG: Gegner-Stoerung ueber Farbzaehlung, zweiter Anlauf (v2)
 
@@ -875,3 +875,19 @@ Entscheidungszahl, aber NICHT als Ersatz fuer die Live-Messung, sobald eine
 Aussage ueber das Fenster selbst getroffen werden soll. Wer sie kuenftig
 einsetzt, sollte das ausdruecklich als Vorab-Schaetzung deklarieren -- so
 wie §9.1 es getan hat.
+
+## §12 VERDIKT: UEBERHOLT
+
+**Eingetragen 2026-08-18 (aus dem Statuskopf in den Koerper verschoben bei
+der Kopf-Kuerzung 2026-08-28).** Ersetzt das "v2 bleibt OFFEN" aus §11.3.
+
+Die Messungen bleiben unveraendert gueltig: Stufe 0 bestanden, Stufe 1 echt
+gefahren (§11), Abbruchschwelle 5 % nicht unterschritten.
+
+OFFEN war nach §11.3 allein die **Nutzer-Entscheidung ueber Stufe 2** (Bau
+des echten Tie-Breaks). Diese Einzelentscheidung entfaellt: laut STATUS.md,
+Abschnitt OFFENE ENTSCHEIDUNGEN, gehoert der Stoerungs-Baustein Stufe 2
+inzwischen zum **Moon-Order-Kopf** und wird nicht mehr fuer sich entschieden.
+
+**Zustand des Bestands: nichts gebaut, kein Knopf im Code.** Der Zaehlmodus
+aus Stufe 1 war Messinstrument, kein Spielverhalten.

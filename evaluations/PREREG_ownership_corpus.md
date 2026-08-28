@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird der Zwei-Pole-Korpus für das Ownership-Kopf-Training generiert — welche Arme, Quoten, Ablage, Prüfpunkte und welches Kopfgüte-Tor? | Beleg: Tor A BESTANDEN (par.10.4, 2026-08-15/16): der Kopf schlaegt die Basisrate auf allen Geometrien; Korpus erzeugt, Deckung gegeben. Der Statuskopf hinkte dem eigenen par.10 nach (Stale-Korrektur 2026-08-20). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird der Zwei-Pole-Korpus für das Ownership-Kopf-Training generiert -- welche Arme, Quoten, Ablage, Prüfpunkte und welches Kopfgüte-Tor? | Beleg: Tor A BESTANDEN (par.10.4, 2026-08-15/16): der Kopf schlaegt die Basisrate auf allen Geometrien; Korpus erzeugt, Deckung gegeben. Der Statuskopf hinkte dem eigenen par.10 nach (Stale-Korrektur 2026-08-20). -->
 
 # PREREG: Ownership-Korpus — Generierungsplan (Zwei-Pole)
 
