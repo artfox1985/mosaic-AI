@@ -19,6 +19,17 @@ Gedaechtnis:
    Umbenennung am 2026-08-28; aeltere CSV-Zeilen tragen `Heuristik_v2huelle`
    bzw. `Heuristik` und werden NICHT umgeschrieben); die
    Knoepfe liegen in dessen `spec.json` (elo_tracker `--knobs`).
+
+   **Aera-Regel (Nutzer-Entscheid 2026-08-29): Cross-Aera ist der
+   Normalfall.** Das im Artefakt mitgelieferte Wheel wird NICHT bei jedem
+   Motorschritt nachgezogen -- es ist das Selbst-Invarianz-Instrument des
+   Ankers (Golden-Probe/Referee-Probe: spielt er noch wie am Einfriertag?),
+   kein Bestandteil der Leiter. Anker-Kanten laufen also regulaer gegen den
+   jeweils aktuellen Live-Motor. Aendert sich die Engine GRUNDLEGEND
+   (Anker-Golden-Probe kippt oder Spielregeln/Wertung aendern sich), hilft
+   kein Nachziehen: dann spielt der Anker anders, und es braucht ohnehin
+   einen Elo-Recheck mit neuem Leiter-Segment (Praezedenz: R5-Fix-Leiter,
+   Kanten ueber die Fix-Grenze nie mischen).
 4. Elo-Kante **Champion-2** (der Vorvorgaenger, @400) -- der Punkt, der bei
    v20 UND v21 zunaechst fehlte; ohne ihn ruht die Elo-Schaetzung auf zu
    wenigen Kanten (v21 nach dem Gating: CI +-90 Punkte).
