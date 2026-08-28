@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: par.16 (2026-08-20), Wiederholung mit kopfspezifisch rekalibrierten Nennern (Saettigungs-Wache bestanden): NICHT-ERFOLG -- k1 T+S-neu gegen S-neu +0,23 (Block-t 1,11, Schwelle 2,571), gegen den eigenen Nullarm -0,05. KEIN Siegverlust: T+S-neu 233/407, nominell bester Arm der Kampagne (n.s.). Das Ziel ist nicht der Engpass; es bleibt die Policy-Seite (par.7-Klausel). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: NICHT-ERFOLG (par.16, 2026-08-20): der Zielwechsel traegt nicht (k1 +0,23, Block-t 1,11), kein Siegverlust; Engpass bleibt die Policy-Seite. WIEDERVORLAGE ausgelagert (par.17): eigene Prereg PREREG_v23_reachability_recheck.md, faellig NACH dem v23-Training. -->
 
 # PREREG: Zielwechsel des Ownership-Kopfes — Vollendbarkeit statt Realisierung
 
@@ -673,3 +673,14 @@ Rohdaten `paired_arena_env_reach2_s_b18.json` / `_reach2_ts_b24.json`.
 > Ownership-VERBRAUCHER-Strang ist damit endgueltig durchgemessen —
 > Beifang dieser Wiederholung: das Vollendbarkeits-Shaping ist bei
 > korrekter Dosis KOSTENLOS (kein Siegverlust), nur wirkungslos fuer k1.
+
+
+## par.17 WIEDERVORLAGE -- AUSGELAGERT in eigene Prereg (Nutzer-Entscheid 2026-08-28)
+
+Die am 2026-08-28 hier registrierte Wiedervorlage (Stufe-0-Karten-Diagnose
+plus bedingter Zielwechsel, sobald ein Ownership-Kopf auf einem
+spaltenkompetenten SELF-PLAY-Korpus trainiert ist) lebt jetzt als **eigene
+Prereg**: `PREREG_v23_reachability_recheck.md`, faellig NACH dem
+v23-Training (die Diagnose befragt die Karte des trainierten Kopfs).
+Wecker-Anker: `PREREG_v23_window.md` par.4b. Das par.16-Verdikt dieser
+Datei bleibt davon unberuehrt ENTSCHIEDEN.
