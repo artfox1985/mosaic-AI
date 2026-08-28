@@ -1500,6 +1500,60 @@ class MosaicNet(nn.Module):
         return results
 
 
+class OwnershipHead2D(nn.Module):
+    """2D-Ablesung des Ownership-Kopfs (PREREG_heuristic_v2_long_rows.md
+    par.3b.7, Stufe 2 des par.3b-Stufenplans).
+
+    Ersetzt die flache Linear-Ablesung durch eine raeumliche: der
+    Fusionsvektor wird auf eine 6x6-Karte projiziert und durch Faltungen
+    gerechnet, bevor je Zelle zwei Logits (Zieher/Gegner) entstehen. ZIEL,
+    BREITE (72) und AUSGABE-ORDNUNG bleiben unveraendert -- nur die
+    Architektur der Ablesung aendert sich (registrierter Unterschied zu
+    einem Umlabeln, par.3b Stufenplan).
+
+    AUSGABE-ORDNUNG: identisch zum flachen Kopf und zum Ziel
+    (`_ownership_from_dome`): slot_row-major, dann space_index --
+    `idx = sr*12 + sc*4 + si` mit `sr=r//2, sc=c//2, si=(r%2)*2+(c%2)`
+    (Primaerquelle scoring.rs::ownership_field_index/ownership_index_for_grid,
+    dort gegen build_grid/_dome_grids_from_dome festgehalten). Die
+    Permutation ist ein registrierter Buffer und wandert mit ins ONNX.
+
+    Erste Haelfte der Ausgabe = Spieler am Zug, zweite = Gegner -- wie im
+    flachen Kopf (shaping.rs "PERSPEKTIVE").
+    """
+
+    def __init__(self, hidden_size: int, channels: int = 32):
+        super().__init__()
+        self.channels = int(channels)
+        self.proj = nn.Linear(hidden_size, self.channels * 36)
+        self.conv = nn.Sequential(
+            nn.Conv2d(self.channels, self.channels, 3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(self.channels, 2, 1),
+        )
+        perm = torch.empty(36, dtype=torch.long)
+        for r in range(6):
+            for c in range(6):
+                perm[(r // 2) * 12 + (c // 2) * 4 + (r % 2) * 2 + (c % 2)] = r * 6 + c
+        self.register_buffer("grid_to_slot", perm)
+
+    def forward(self, shared):
+        x = self.proj(shared).view(-1, self.channels, 6, 6)
+        m = self.conv(x).flatten(2)  # (B, 2, 36) in Raster-Ordnung r*6+c
+        mine = m[:, 0, :].index_select(1, self.grid_to_slot)
+        theirs = m[:, 1, :].index_select(1, self.grid_to_slot)
+        return torch.cat([mine, theirs], dim=1)
+
+
+def ownership_head_2d_present(state: dict) -> bool:
+    """Traegt der Checkpoint die 2D-Ablesung des Ownership-Kopfs (par.3b.7)?
+    AUS DEM STATE_DICT abgeleitet, dasselbe Muster wie
+    `opp_points_head_present` -- Alt-Checkpoints (flacher Kopf,
+    `ownership_head.0.weight`) liefern False und bleiben unveraendert ladbar
+    (Additiv-Regel)."""
+    return "ownership_head.proj.weight" in state
+
+
 class Mosaic2DNet(nn.Module):
     """2D-Encoder-Skelett (Task #11, Phase 1) -- Conv-Zweig auf
     `state_to_planes` [C,6,6] + Flach-Zweig auf `state_to_tensor` [input_size],
@@ -1527,12 +1581,21 @@ class Mosaic2DNet(nn.Module):
                  planes_channels=NUM_PLANES_CHANNELS, conv_channels=48, conv_layers=2,
                  opp_points_head=False, endgame_head=False,
                  conjunction_head=False,
+                 ownership_head_2d=False,
                  value_head_variant="tanh"):
         super().__init__()
         if value_head_variant not in VALUE_HEAD_VARIANTS:
             raise ValueError(
                 f"Unbekannter value_head_variant={value_head_variant!r} -- "
                 f"erlaubt: {VALUE_HEAD_VARIANTS}"
+            )
+        if ownership_head_2d and conjunction_head:
+            # Die Konjunktions-Erweiterung haengt an der letzten Linear-Schicht
+            # des FLACHEN Kopfs; eine 2D-Variante dafuer ist nicht registriert.
+            # Laut scheitern statt still einen dritten Bauplan erfinden.
+            raise ValueError(
+                "ownership_head_2d und conjunction_head sind nicht kombinierbar "
+                "(par.3b.7 registriert nur die 72er-Ablesung)"
             )
         self.input_size = input_size
         self.planes_channels = planes_channels
@@ -1629,11 +1692,18 @@ class Mosaic2DNet(nn.Module):
         # ebenfalls identisch: +CONJUNCTION_TARGETS hinten angehaengt, nur bei
         # gesetztem Flag (siehe `MosaicNet`-Kommentar fuer die Begruendung).
         self.conjunction_head = bool(conjunction_head)
-        self.ownership_head = nn.Sequential(
-            nn.Linear(hidden_size, 128),
-            nn.ReLU(),
-            nn.Linear(128, OWNERSHIP_TARGETS + (CONJUNCTION_TARGETS if conjunction_head else 0)),
-        )
+        self.has_ownership_head_2d = bool(ownership_head_2d)
+        if self.has_ownership_head_2d:
+            # par.3b.7 (Stufe 2): 2D-Ablesung STATT der flachen -- Ziel,
+            # Breite (72) und Ausgabe-Ordnung unveraendert, siehe
+            # OwnershipHead2D-Docstring.
+            self.ownership_head = OwnershipHead2D(hidden_size)
+        else:
+            self.ownership_head = nn.Sequential(
+                nn.Linear(hidden_size, 128),
+                nn.ReLU(),
+                nn.Linear(128, OWNERSHIP_TARGETS + (CONJUNCTION_TARGETS if conjunction_head else 0)),
+            )
 
         # opp_points_head (Task #28) -- BYTE-IDENTISCHE Architektur/Begruendung
         # zu `MosaicNet` (siehe dortiger Kommentar), additiv/standardmaessig AUS.
@@ -1760,6 +1830,7 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
                             policy_hidden=ph, points_dist_bins=bins, opp_points_head=opp_head,
                             endgame_head=eg_head,
                             conjunction_head=cj_head,
+                            ownership_head_2d=ownership_head_2d_present(state),
                             value_head_variant=value_head_variant)
     else:
         in_size = input_size if input_size is not None else state["body.0.weight"].shape[1]
