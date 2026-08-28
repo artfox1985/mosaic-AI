@@ -350,28 +350,38 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
     # `selfplay_v19wdl_*`-Dateien zu Traegern macht, obwohl nur ein
     # seed-bestimmter Teilsatz tragen soll. Fehlt das Feld (v20-Manifest,
     # kein Rebuild-Zwang): None -> Alt-Verhalten EXAKT erhalten.
-    manifest_path = os.path.join(
-        data_dir,
-        os.environ.get("MOSAIC_CARRIER_MANIFEST", "policy_carrier_manifest_v20.json"))
+    # Default LEER seit 2026-08-29 (Nutzer-Auftrag 2026-08-28, Merkliste 1e):
+    # der alte Default zeigte auf die bewusst archivierte
+    # policy_carrier_manifest_v20.json -- ein Default, der nach Bedeutung
+    # aussieht, aber tot ist. Wer ein Traeger-Manifest will, setzt
+    # MOSAIC_CARRIER_MANIFEST explizit. Verhaltensneutral im heutigen Baum
+    # (die v20-Datei existiert nicht mehr, beide Wege enden bei "jede Datei
+    # traegt Policy"); der Cache-Key haengt ohnehin am geladenen INHALT
+    # (policy_carrier_set), nicht am Dateinamen.
+    _carrier_manifest_name = os.environ.get("MOSAIC_CARRIER_MANIFEST", "")
+    manifest_path = (os.path.join(data_dir, _carrier_manifest_name)
+                     if _carrier_manifest_name else "")
     policy_carrier_set = None
     carrier_prefixes = None
-    if os.path.exists(manifest_path):
+    if _carrier_manifest_name and os.path.exists(manifest_path):
         with open(manifest_path, encoding="utf-8") as mf:
             _manifest = json.load(mf)
             policy_carrier_set = frozenset(_manifest["policy_carrier_files"])
             if "carrier_prefixes" in _manifest:
                 carrier_prefixes = list(_manifest["carrier_prefixes"])
-    else:
-        # Codepflege-Audit 2026-08-27, Befund 1: das Fehlen der Datei ist ein
-        # STILLER Semantik-Wechsel -- ohne Manifest traegt JEDE Korpusdatei
-        # Policy (siehe Kommentarblock oben). Das ist gewolltes
-        # Bestandsverhalten, aber es gehoert ins Log, damit ein versehentlich
-        # fehlendes/verschobenes Manifest nicht als Normalfall durchgeht.
-        # Reiner Hinweis, KEIN Verhaltenswechsel.
+    elif _carrier_manifest_name:
+        # Codepflege-Audit 2026-08-27, Befund 1: das Fehlen einer EXPLIZIT
+        # gesetzten Datei ist ein stiller Semantik-Wechsel -- ohne Manifest
+        # traegt JEDE Korpusdatei Policy. Gehoert ins Log, damit ein
+        # versehentlich fehlendes/verschobenes Manifest nicht als Normalfall
+        # durchgeht. (Ohne gesetztes MOSAIC_CARRIER_MANIFEST ist "jede Datei
+        # traegt Policy" seit 2026-08-29 der dokumentierte Default -- kein
+        # Hinweis noetig.)
         if manifest_path not in _CARRIER_MANIFEST_NOTICE_SHOWN:
             _CARRIER_MANIFEST_NOTICE_SHOWN.add(manifest_path)
-            print(f"ℹ️  Traeger-Manifest {manifest_path} nicht gefunden -- "
-                  f"Bestandsverhalten: jede Datei traegt Policy", flush=True)
+            print(f"⚠️  MOSAIC_CARRIER_MANIFEST={_carrier_manifest_name} gesetzt, aber "
+                  f"{manifest_path} nicht gefunden -- Rueckfall: jede Datei traegt Policy",
+                  flush=True)
 
     cache_key_material = (
         str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)

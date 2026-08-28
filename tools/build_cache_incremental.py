@@ -86,9 +86,11 @@ def _carrier_status(basename, carrier_set, carrier_prefixes):
 def _load_manifest(data_dir):
     """Traeger-Manifest wie `MosaicDataset.__init__` es liest (gleiche Env-Var,
     gleicher Default, gleiche Felder)."""
-    path = os.path.join(
-        data_dir, os.environ.get("MOSAIC_CARRIER_MANIFEST", "policy_carrier_manifest_v20.json"))
-    if not os.path.exists(path):
+    # Default LEER seit 2026-08-29 (Nutzer-Auftrag, Merkliste 1e) -- gleiche
+    # Semantik wie corpus_dataset.py.
+    name = os.environ.get("MOSAIC_CARRIER_MANIFEST", "")
+    path = os.path.join(data_dir, name) if name else ""
+    if not name or not os.path.exists(path):
         return None, None, path
     with open(path, encoding="utf-8") as mf:
         m = json.load(mf)
