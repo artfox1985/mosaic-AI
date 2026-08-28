@@ -624,8 +624,15 @@ def main() -> int:
     if worker_a:
         worker_a.close()
 
+    # Repo-relativ statt absolut (Codepflege-Audit Befund 25, oeffentliches
+    # Repo: keine Rechnerstruktur in getrackten Artefakten). Reines
+    # Provenienz-Feld, kein Leser loest darueber Pfade auf.
+    try:
+        _artifact_dir_rel = str(Path(artifact_dir).resolve().relative_to(REPO)).replace("\\", "/")
+    except ValueError:
+        _artifact_dir_rel = str(artifact_dir)
     result = {
-        "artifact_dir": str(artifact_dir),
+        "artifact_dir": _artifact_dir_rel,
         # `champion` gibt es nur bei Netz-Artefakten, eine Heuristik traegt
         # `artefakt`. Beide mitschreiben, statt eines davon zu erzwingen --
         # das Artefakt beschreibt sich selbst, der Bericht verbiegt es nicht.
