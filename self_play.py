@@ -162,7 +162,7 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       add_root_noise, deterministic, record_rtv, pcr_full_prob,
                       pcr_cheap_sims, tau_argmax_from_move, queue, progress_path,
                       heartbeat_path, seed_positions=None, seed_positions_offset=0,
-                      heuristik_variante="v1"):
+                      heuristik_variante="hv1"):  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -253,7 +253,7 @@ def _cleanup_progress_files(progress_path, heartbeat_path) -> None:
 
 def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, prefix,
                           add_root_noise, deterministic, record_rtv, timeout_secs,
-                          progress_path, heartbeat_path, heuristik_variante="v1",
+                          progress_path, heartbeat_path, heuristik_variante="hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
                           pcr_full_prob=None, pcr_cheap_sims=150,
                           tau_argmax_from_move=0, seed_positions=None,
                           seed_positions_offset=0) -> str | None:
@@ -372,7 +372,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   record_rtv: bool = False,
                   pcr_full_prob: float | None = None, pcr_cheap_sims: int = 150,
                   tau_argmax_from_move: int = 0, seed_positions: str = None,
-                  heuristik_variante: str = "v1"):
+                  heuristik_variante: str = "hv1"):  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -634,23 +634,29 @@ if __name__ == "__main__":
     parser.add_argument("--c-puct", dest="c_puct", type=float, default=1.5,
                         help="PUCT-Explorationskonstante (nur --mode network)")
     parser.add_argument("--heuristik-variante", dest="heuristik_variante", type=str,
-                        default="v1",
+                        default="hv1",
                         # KEIN `choices=`. Die Verengung gehoert in die ENGINE, nicht in
                         # argparse: dieses Skript ist auch der Treiber, mit dem ein
                         # EINGEFRORENES Artefakt seine Golden Probe reproduziert
                         # (tools/verify_frozen_heuristic.py --venv ruft genau diese Datei
-                        # mit dem Python UND dem Wheel des Artefakts). Ein v2huelle-Artefakt
-                        # bringt ein Wheel mit, das v2huelle kann -- eine argparse-Schranke
-                        # im Repo haette es trotzdem abgewiesen und dem Artefakt seinen
-                        # staerksten Beleg genommen. Genau das ist am 2026-08-27 passiert.
-                        # Wer entscheidet: das GELADENE Wheel. Das aktuelle weist v2* hart
-                        # ab (lib.rs), ein Artefakt-Wheel nimmt seine eigene Variante an.
+                        # mit dem Python UND dem Wheel des Artefakts). Ein hv2-Artefakt
+                        # bringt ein Wheel mit, das seine Variante kann -- eine
+                        # argparse-Schranke im Repo haette es trotzdem abgewiesen und dem
+                        # Artefakt seinen staerksten Beleg genommen. Genau das ist am
+                        # 2026-08-27 passiert. Wer entscheidet: das GELADENE Wheel.
+                        #
+                        # Deshalb steht hier auch die NAMENS-UEBERSETZUNG nicht (Umbenennung
+                        # 2026-08-28, tools/frozen_name_dialect.py): welchen Dialekt ein
+                        # Artefakt-Wheel spricht, weiss nur der Treiber, der es startet.
+                        # Er uebersetzt und uebergibt hier den fertigen Namen.
                         help="Heuristik-Variante fuer den mcts-Modus. Seit dem 2026-08-26 "
-                             "gibt es nur noch v1: der v2-Zweig ist aus dem Quellstand "
-                             "entfernt (PREREG_heuristic_v2_long_rows.md par.19). Die mit "
-                             "v2huelle erzeugten Korpora liegen unveraendert in data/, und "
-                             "das Erzeuger-Artefakt laeuft auf seinem mitgelieferten Wheel "
-                             "weiter (models/frozen_heuristics/v2huelle_generator/). "
+                             "gibt es nur noch eine spielbare: hv1 (bis zur Umbenennung am "
+                             "2026-08-28 hiess sie 'v1'). Der zweite Zweig ist aus dem "
+                             "Quellstand entfernt (PREREG_heuristic_v2_long_rows.md par.19). "
+                             "Die mit hv2 (frueher 'v2huelle') erzeugten Korpora liegen "
+                             "unveraendert in data/, und das Erzeuger-Artefakt laeuft auf "
+                             "seinem mitgelieferten Wheel weiter "
+                             "(models/frozen_heuristics/hv2_generator/). "
                              "Das Flag BLEIBT, damit ein alter Kampagnen-Aufruf laut "
                              "scheitert statt still etwas anderes zu erzeugen.")
     parser.add_argument("--rtv", action="store_true",

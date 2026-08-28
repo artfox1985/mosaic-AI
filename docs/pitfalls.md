@@ -56,9 +56,9 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   Markdown-Code-Spans verschwinden spurlos aus Text, der ueber `python -c`
   oder `git -m` geschrieben wird. Heredoc mit einfachen Quotes benutzen.
 - **Ein fehlendes Flag meldet sich nicht -- es ist ein Default** (2026-08-26).
-  In drei Reproduktionslaeufen fehlte `--heuristik-variante v2huelle`; der
-  Default ist `v1` (`self_play.py:637`). Gemessen wurde v1 gegen einen
-  v2huelle-Korpus, der falsche Befund wurde committet (`b54b41d`) und an die
+  In drei Reproduktionslaeufen fehlte `--heuristik-variante hv2`; der
+  Default ist `hv1` (`self_play.py`). Gemessen wurde `hv1` gegen einen
+  `hv2`-Korpus, der falsche Befund wurde committet (`b54b41d`) und an die
   Parallelsitzung gemeldet. Der Kontrollmechanismus war da: `self_play.py`
   schreibt `cli_args` ins Manifest neben die Daten. **Regel daraus: vor der
   Auswertung das erzeugte Manifest gegen das Referenz-Manifest halten.**

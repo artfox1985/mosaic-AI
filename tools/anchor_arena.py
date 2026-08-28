@@ -5,7 +5,7 @@ WOZU: bis hierher misst jede Anker-Arena gegen die IN-PROCESS-Heuristik --
 also gegen Code, der sich mit jedem Commit bewegen kann. Genau dagegen ist
 `round5_anchor.rs` gebaut, und genau deshalb darf das Modul nicht fallen,
 solange die Arenen so messen. Dieses Werkzeug misst stattdessen gegen
-`models/frozen_heuristics/v1_anchor/` -- ein Artefakt mit eigenem Wheel, das
+`models/frozen_heuristics/hv1_anchor/` -- ein Artefakt mit eigenem Wheel, das
 seine Golden Probe reproduziert.
 
 **Dass der Pfadwechsel den Anker NICHT verschiebt, ist belegt**
@@ -33,7 +33,7 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "tools" / "probes"))
 
-ANCHOR = _ROOT / "models" / "frozen_heuristics" / "v1_anchor"
+ANCHOR = _ROOT / "models" / "frozen_heuristics" / "hv1_anchor"
 
 
 def _metrics(games: list[dict], name_net: str, name_anchor: str) -> dict:

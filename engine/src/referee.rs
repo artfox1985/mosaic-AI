@@ -94,18 +94,18 @@ use crate::tile::TileColor;
 /// mit der Variante aus der Spec.
 ///
 /// Das ist die Haelfte, die der Referee bis 2026-08-26 selbst entschied, und
-/// zwar ueber `resolve_tiling_step`, das auf `V1` verdrahtet ist. Fuer ein
+/// zwar ueber `resolve_tiling_step`, das auf `hv1` verdrahtet ist. Fuer ein
 /// Netz war das die richtige Abgrenzung; fuer eine Heuristik nicht -- der
-/// v2-Durchbruch sitzt im Platzierungs-Routing.
+/// hv2-Durchbruch sitzt im Platzierungs-Routing.
 ///
-/// `net`: optionales Tiling-Netz. Die v2-Vorzugskarte greift nur, wenn sie
+/// `net`: optionales Tiling-Netz. Die hv2-Vorzugskarte greift nur, wenn sie
 /// einen Zug liefert; sonst faellt es auf den Bestandspfad durch, und DORT
-/// entscheidet das Netz Gleichstaende (self_play.rs). Ein v2-Artefakt bringt
+/// entscheidet das Netz Gleichstaende (self_play.rs). Ein hv2-Artefakt bringt
 /// sein Netz deshalb selbst mit (`tiling_net.onnx`).
 /// Waehlt eine Startsetzung fuer einen extern gespeicherten Zustand -- mit
 /// der Variante aus der Spec.
 ///
-/// `game_seed` ist Pflicht und kein Zufall: fuer v2-Varianten waehlt
+/// `game_seed` ist Pflicht und kein Zufall: fuer `hv2` waehlt
 /// `choose_start_placement_variante` unter mehreren Kandidaten SEED-BASIERT
 /// aus. Ohne den Seed des Referees waere die Setzung eine andere als die, die
 /// derselbe Agent in-process getroffen haette.
@@ -200,13 +200,13 @@ pub(crate) fn choose_drafting_action_json(
 #[pyclass]
 pub struct FrozenWorkerEngine {
     /// `None` fuer ein HEURISTIK-Artefakt: es hat kein ONNX, sein Verhalten
-    /// steckt im Wheel. Fuer `v2huelle` ist es dennoch gesetzt -- der
+    /// steckt im Wheel. Fuer `hv2` ist es dennoch gesetzt -- der
     /// Tiling-Durchfall-Pfad braucht es (self_play.rs:1234).
     net: Option<Net>,
     /// Ob die DRAFTING-Entscheidung heuristisch faellt.
     ///
     /// Getrennt vom Vorhandensein eines Netzes, und das ist der Kern: ein
-    /// `v2huelle`-Artefakt HAT ein Netz -- aber nur fuer den
+    /// `hv2`-Artefakt HAT ein Netz -- aber nur fuer den
     /// Tiling-Durchfall-Pfad (self_play.rs:1234). Sein Drafting ist
     /// heuristisch. Wer beides an derselben Frage aufhaengt ("ist ein Netz
     /// da?"), laesst den Generator als Netz draften und misst einen anderen
@@ -473,8 +473,8 @@ impl RefereeGame {
     /// Agenten). Beim Drafting steht diese Trennung seit Welle 3; fuer das
     /// Tiling fehlte sie, und damit spielte ein gefrorenes
     /// Heuristik-Artefakt nur seine halbe Identitaet: `resolve_tiling_step`
-    /// ist auf `V1` verdrahtet (self_play.rs), also haette `v2huelle` wie
-    /// `v1` gekachelt.
+    /// ist auf `hv1` verdrahtet (self_play.rs), also haette `hv2` wie
+    /// `hv1` gekachelt.
     ///
     /// Rueckgabe: `"drafting"` (Entscheidung noetig, `current_player()` sagt
     /// wer), `"tiling"` (Platzierung einer externen Seite noetig),

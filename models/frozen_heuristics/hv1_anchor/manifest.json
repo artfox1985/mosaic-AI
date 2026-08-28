@@ -1,12 +1,14 @@
 {
-  "artefakt": "v1_anchor",
+  "artefakt": "hv1_anchor",
   "rolle": "Elo-Anker der gesamten Leiter",
   "typ": "heuristik",
   "freeze_date": "2026-08-26",
+  "name_dialect": "legacy",
+  "name_dialect_hinweis": "Das mitgelieferte Wheel (2026-08-26) kennt nur die ALTEN Variantennamen (v1 / v2huelle). Die Spec-Dateien oben tragen seit der Umbenennung am 2026-08-28 die neuen (hv1 / hv2); der Repo-Treiber uebersetzt an der Prozessgrenze zurueck (tools/frozen_name_dialect.py). Neu eingefrorene Artefakte tragen hier \"hv\" und brauchen keine Uebersetzung.",
   "spec": {
     "implicit_minimax_alpha": 0.0,
     "long_row_init_shaping_w": 0.0,
-    "heuristik_variante": "v1"
+    "heuristik_variante": "hv1"
   },
   "wheel": {
     "datei": "mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
@@ -76,11 +78,11 @@
       "tiling",
       "start_placement"
     ],
-    "hinweis": "Fehlt dieses Feld, stammt das Artefakt aus der Zeit vor dem erweiterten Protokoll und kann seine Platzierung NICHT selbst entscheiden. Der Treiber verweigert dann, statt es als V1 kacheln zu lassen."
+    "hinweis": "Fehlt dieses Feld, stammt das Artefakt aus der Zeit vor dem erweiterten Protokoll und kann seine Platzierung NICHT selbst entscheiden. Der Treiber verweigert dann, statt es als hv1 kacheln zu lassen."
   },
   "golden_probe": {
     "art": "self-play-reproduktion, byte-verglichen",
-    "warum": "Die Welle-3-Probe der Netz-Champions prueft nur DRAFTING-Entscheidungen; der Referee loest Tiling und Startsetzung selbst auf und ist dabei auf V1 verdrahtet (referee.rs:312 -> self_play.rs:1207). Fuer eine Heuristik waere das eine halbe Probe. Ein Self-Play-Lauf aus dem eigenen Wheel deckt Drafting, Tiling und Runde 5 ab.",
+    "warum": "Die Welle-3-Probe der Netz-Champions prueft nur DRAFTING-Entscheidungen; der Referee loest Tiling und Startsetzung selbst auf und ist dabei auf hv1 verdrahtet (referee.rs:312 -> self_play.rs:1207). Fuer eine Heuristik waere das eine halbe Probe. Ein Self-Play-Lauf aus dem eigenen Wheel deckt Drafting, Tiling und Runde 5 ab.",
     "rezept": {
       "mode": "mcts",
       "games": 10,
@@ -95,13 +97,13 @@
       "deterministic": false,
       "record_rtv": false,
       "tau_argmax_from_move": 0,
-      "heuristik_variante": "v1",
+      "heuristik_variante": "hv1",
       "model": null
     },
     "dateien": [
       "selfplay_probe_20260826_1816_g10.pkl"
     ],
-    "pruefbefehl": "python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/v1_anchor"
+    "pruefbefehl": "python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv1_anchor"
   },
   "laufzeit": {
     "wanduhr_s": 14.9,

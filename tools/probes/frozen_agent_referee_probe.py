@@ -7,13 +7,13 @@ sie sollen gegeneinander spielen.
 WAS HIER GEPRUEFT WIRD, UND WARUM ES NICHT SELBSTVERSTAENDLICH IST
 ------------------------------------------------------------------
 Bis 2026-08-26 delegierte der Referee nur die DRAFTING-Entscheidung. Tiling und
-Startsetzung loeste er selbst auf -- ueber einen auf `V1` verdrahteten Pfad.
-Ein gefrorenes `v2huelle`-Artefakt haette in der Referee-Arena also als `v1`
+Startsetzung loeste er selbst auf -- ueber einen auf `hv1` verdrahteten Pfad.
+Ein gefrorenes `hv2`-Artefakt haette in der Referee-Arena also als `hv1`
 gekachelt: dieselbe Klasse Fehler wie "Signatur da, Wirkung nicht", nur
 teurer, weil das Ergebnis plausibel aussieht.
 
   A) LAEUFT es -- eine ganze Partie mit externem Tiling ohne Deadlock.
-  B) WIRKT die Variante -- v1 und v2huelle nehmen aus derselben Startlage
+  B) WIRKT die Variante -- hv1 und hv2 nehmen aus derselben Startlage
      einen anderen Verlauf. Ohne B belegt A nur, dass nichts abstuerzt.
   C) PRALLT Unsinn ab -- ein illegaler Schritt wird hart abgewiesen, nicht
      still ersetzt. Das ist die Zusage, die die Regel-Autoritaet beim Referee
@@ -25,7 +25,7 @@ Wheel. Jetzt spricht sie den WORKER des Artefakts an -- denselben Prozess, der
 auch in einer Messung laeuft, mit dem Wheel des Artefakts.
 
 Das war ohnehin die staerkere Bauform und wurde durch B4a nur erzwungen: sobald
-v2 aus dem Quellstand verschwindet, KANN die aktuelle Engine `v2huelle` nicht
+hv2 aus dem Quellstand verschwindet, KANN die aktuelle Engine `hv2` nicht
 mehr spielen. Eine Sonde, die es trotzdem versucht, wuerde entweder scheitern
 oder -- schlimmer -- still etwas anderes messen.
 
@@ -47,22 +47,22 @@ import mosaic_rust as mr  # noqa: E402
 
 from frozen_referee_match import WorkerProc  # noqa: E402
 
-V1 = _ROOT / "models/frozen_heuristics/v1_anchor"
-V2H = _ROOT / "models/frozen_heuristics/v2huelle_generator"
+HV1 = _ROOT / "models/frozen_heuristics/hv1_anchor"
+HV2 = _ROOT / "models/frozen_heuristics/hv2_generator"
 
 SIMS, C_PUCT = 150, 0.3
 
 # FESTGENAGELTE Erwartung. Kein Schoenheitsfehler, wenn sie bricht: am
 # 2026-08-26 hat eine Aenderung im Worker dazu gefuehrt, dass das
-# v2huelle-Artefakt sein TILING-Netz auch fuers Drafting benutzte -- es
+# hv2-Artefakt sein TILING-Netz auch fuers Drafting benutzte -- es
 # spielte als Netz statt als Heuristik. Aufgefallen ist das nur, weil die
 # Partieergebnisse sich gegenueber dem Lauf davor aenderten, also durch Zufall.
 #
 # Diese Zahlen sind der Ersatz fuer diesen Zufall. Aendern sie sich, ist das
 # ein BEFUND und gehoert erklaert, bevor die Zahl hier angepasst wird.
 EXPECTED = {
-    "v1_anchor":          {"scores": [27, 15], "steps": 159},
-    "v2huelle_generator": {"scores": [63, 27], "steps": 163},
+    "hv1_anchor":   {"scores": [27, 15], "steps": 159},
+    "hv2_generator": {"scores": [63, 27], "steps": 163},
 }
 
 
@@ -124,7 +124,7 @@ def main() -> int:
     t0 = time.monotonic()
     findings, failures = {}, []
 
-    for artifact_name in (V1, V2H):
+    for artifact_name in (HV1, HV2):
         r = game(artifact_name, 4242)
         findings[artifact_name.name] = r
         print(f"{artifact_name.name}: {r['scores']}, {r['steps']} Schritte, "
@@ -141,15 +141,15 @@ def main() -> int:
                 f"{r['scores']}/{r['steps']} statt {expected['scores']}/{expected['steps']} "
                 "-- ERST erklaeren, dann die Zahl hier anpassen")
 
-    a, b = findings[V1.name], findings[V2H.name]
+    a, b = findings[HV1.name], findings[HV2.name]
     effective = (a["scores"] != b["scores"]) or (a["steps"] != b["steps"])
     findings["variante_wirkt"] = effective
     print(f"Verlaeufe unterschiedlich? {effective}", flush=True)
     if not effective:
-        failures.append("v1 und v2huelle nehmen denselben Verlauf -- die Variante kommt nicht an")
+        failures.append("hv1 und hv2 nehmen denselben Verlauf -- die Variante kommt nicht an")
 
     # --- C) prallt Unsinn ab
-    w = _worker(V1)
+    w = _worker(HV1)
     rg = mr.RefereeGame(("A", "B"), 0, 4242, None)
     try:
         while True:

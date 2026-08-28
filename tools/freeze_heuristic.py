@@ -16,8 +16,8 @@ Und die Golden Probe ist eine andere. Die Welle-3-Probe der Netz-Champions
 (`build_frozen_golden_probe.py`) sammelt DRAFTING-Zustaende und prueft die
 gewaehlte Aktion -- mehr kann sie nicht, weil der Referee Tiling und
 Startsetzung selbst aufloest (`referee.rs:312` ruft `resolve_tiling_step`,
-und das ist auf V1 hart verdrahtet). Fuer eine Heuristik waere das eine
-HALBE Probe: v2huelle wirkt gerade im Platzierungs-Routing.
+und das ist auf `hv1` hart verdrahtet). Fuer eine Heuristik waere das eine
+HALBE Probe: `hv2` wirkt gerade im Platzierungs-Routing.
 
 Die Probe hier ist deshalb ein SELF-PLAY-Lauf aus dem eigenen Wheel, byte-
 verglichen (Nutzer-Vorschlag 2026-08-26: "laesst sich einfach pruefen ueber
@@ -46,9 +46,14 @@ erst mit dem Verdacht, der Erzeuger sei verloren, dann mit dem Nachweis, dass
 er es nicht war.
 
 Aufruf:
-    python -X utf8 -u tools/freeze_heuristic.py --name v1_anchor --variante v1
-    python -X utf8 -u tools/freeze_heuristic.py --name v2huelle_generator \\
-        --variante v2huelle --tiling-net models/alphazero_v21_2d_brierbest.onnx
+    python -X utf8 -u tools/freeze_heuristic.py --name hv1_anchor --variante hv1
+    python -X utf8 -u tools/freeze_heuristic.py --name hv2_generator \\
+        --variante hv2 --tiling-net models/alphazero_v21_2d_brierbest.onnx
+
+NAMENSSCHEMA seit 2026-08-28: die Heuristik-Varianten heissen `hv1`/`hv2`
+(vorher `v1`/`v2huelle`). Ein hier NEU eingefrorenes Artefakt traegt deshalb
+`name_dialect: "hv"` im Manifest -- der Treiber weiss daran, dass er dessen
+Wheel nicht mehr uebersetzen muss (tools/frozen_name_dialect.py).
 """
 import argparse
 import json
@@ -62,6 +67,8 @@ import time
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "engine" / "py"))
+
+from frozen_name_dialect import CURRENT_DIALECT  # noqa: E402
 
 TARGET_BASE = _ROOT / "models" / "frozen_heuristics"
 
@@ -87,8 +94,13 @@ def _git_provenance() -> dict:
     }
 
 
-def _git_provenance(path) -> str:
+def _repo_relative(path) -> str:
     """Pfad OHNE Rechnerstruktur -- repo-relativ, sonst nur der Dateiname.
+
+    HIESS bis 2026-08-28 ebenfalls `_git_provenance` und hat damit die
+    gleichnamige Funktion darueber ueberschrieben: `_git_provenance()` ohne
+    Argument (Zeile "herkunft" im Manifest) lief in einen TypeError, das
+    Werkzeug war seit dem Fix vom 2026-08-27 gar nicht mehr lauffaehig.
 
     Das Repo ist oeffentlich (CLAUDE.md, Nutzer-Entscheid 2026-08-17): keine
     absoluten Pfade, kein Nutzername in neuen Dateien. Diese Funktion ist die
@@ -108,8 +120,9 @@ def _git_provenance(path) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--name", required=True, help="Artefaktname, z.B. v1_anchor")
-    ap.add_argument("--variante", required=True, help="Heuristik-Variante, z.B. v1 / v2huelle")
+    ap.add_argument("--name", required=True, help="Artefaktname, z.B. hv1_anchor")
+    ap.add_argument("--variante", required=True,
+                    help="Heuristik-Variante, z.B. hv1 / hv2 (Namensschema seit 2026-08-28)")
     ap.add_argument("--wheel", default=None,
                     help="Pfad zum Wheel (Default: der frischeste Build in engine/target/wheels)")
     ap.add_argument("--tiling-net", default=None,
@@ -127,7 +140,7 @@ def main() -> int:
 
     # KEINE eigene Variantenliste hier. Ein unbekannter Name wird von der
     # Engine abgewiesen (self_play.py: "Unbekannte Werte werden von der Engine
-    # ABGEWIESEN, nicht still auf v1 gefaltet"), also scheitert der
+    # ABGEWIESEN, nicht still auf hv1 gefaltet"), also scheitert der
     # Golden-Probe-Lauf unten hart und das Artefakt entsteht gar nicht erst.
     # Eine zweite Liste hier waere eine zweite Wahrheit.
 
@@ -152,9 +165,9 @@ def main() -> int:
     if a.tiling_net:
         src = pathlib.Path(a.tiling_net)
         shutil.copy2(src, target / "label_net.onnx")
-        tiling_net = {"datei": "label_net.onnx", "quelle": _git_provenance(src),
+        tiling_net = {"datei": "label_net.onnx", "quelle": _repo_relative(src),
                       "rolle": ("Stichentscheid im Tiling-Durchfall (self_play.rs:1234: die "
-                                "v2-Vorzugskarte greift nur, wenn sie einen Zug liefert -- sonst "
+                                "hv2-Vorzugskarte greift nur, wenn sie einen Zug liefert -- sonst "
                                 "faellt es auf das Netz durch) und Erzeuger der "
                                 "bootstrap_value-Label")}
         print(f"Label-Netz kopiert: {src.name} -> label_net.onnx", flush=True)
@@ -202,8 +215,14 @@ def main() -> int:
         "rolle": a.rolle or f"eingefrorene Heuristik {a.variante}",
         "typ": "heuristik",
         "freeze_date": time.strftime("%Y-%m-%d"),
+        # NAMENS-DIALEKT (Umbenennung 2026-08-28): das hier eingepackte Wheel
+        # stammt aus dem heutigen Quellstand und kennt `hv1`/`hv2`. Der
+        # Treiber (tools/frozen_name_dialect.py) uebersetzt deshalb NICHT.
+        # Die beiden Artefakte vom 2026-08-26 tragen an dieser Stelle
+        # "legacy" -- ihre Wheels kennen nur `v1`/`v2huelle`.
+        "name_dialect": CURRENT_DIALECT,
         "spec": spec,
-        "wheel": {"datei": wheel.name, "quelle": _git_provenance(wheel),
+        "wheel": {"datei": wheel.name, "quelle": _repo_relative(wheel),
                   "rolle": ("Traeger des VERHALTENS. Bei einer Heuristik gibt es kein ONNX, "
                             "das es mittraegt -- ohne dieses Wheel ist der Agent weg.")},
         "tiling_net": tiling_net,
@@ -219,16 +238,16 @@ def main() -> int:
         # `start_placement_choice_state_json` nicht, und der Treiber lief
         # mitten in der Partie in einen AttributeError. Ein Rueckfall auf
         # referee-aufgeloestes Tiling waere die schlechtere Antwort gewesen:
-        # das Artefakt haette dann still als V1 gekachelt.
+        # das Artefakt haette dann still als `hv1` gekachelt.
         "protokoll": {"kinds": ["drafting", "tiling", "start_placement"],
                       "hinweis": ("Fehlt dieses Feld, stammt das Artefakt aus der Zeit vor dem "
                                   "erweiterten Protokoll und kann seine Platzierung NICHT selbst "
-                                  "entscheiden. Der Treiber verweigert dann, statt es als V1 "
+                                  "entscheiden. Der Treiber verweigert dann, statt es als hv1 "
                                   "kacheln zu lassen.")},
         "golden_probe": {
             "art": "self-play-reproduktion, byte-verglichen",
             "warum": ("Die Welle-3-Probe der Netz-Champions prueft nur DRAFTING-Entscheidungen; "
-                      "der Referee loest Tiling und Startsetzung selbst auf und ist dabei auf V1"
+                      "der Referee loest Tiling und Startsetzung selbst auf und ist dabei auf hv1"
                       " verdrahtet (referee.rs:312 -> self_play.rs:1207). Fuer eine Heuristik "
                       "waere das eine halbe Probe. Ein Self-Play-Lauf aus dem eigenen Wheel "
                       "deckt Drafting, Tiling und Runde 5 ab."),

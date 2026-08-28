@@ -15,7 +15,9 @@ Gedaechtnis:
    falls Fruehstopp unter 150 Paaren.
 3. Elo-Kante **Anker**: `Heuristik@150(dyn)`, **festes n=150 ohne
    Fruehstopp** (Praezedenz v18/v19/v20-Verankerung). Seit der Kapselung:
-   Anker-Identitaet in der Zeile als `Heuristik_v1_anchor` fuehren; die
+   Anker-Identitaet in der Zeile als `Heuristik_hv1_anchor` fuehren (seit der
+   Umbenennung am 2026-08-28; aeltere CSV-Zeilen tragen `Heuristik_v2huelle`
+   bzw. `Heuristik` und werden NICHT umgeschrieben); die
    Knoepfe liegen in dessen `spec.json` (elo_tracker `--knobs`).
 4. Elo-Kante **Champion-2** (der Vorvorgaenger, @400) -- der Punkt, der bei
    v20 UND v21 zunaechst fehlte; ohne ihn ruht die Elo-Schaetzung auf zu

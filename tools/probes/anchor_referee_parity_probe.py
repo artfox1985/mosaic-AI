@@ -60,7 +60,7 @@ import mosaic_rust as mr  # noqa: E402
 # Die andere Frage -- spielt der aktuelle Stand noch wie das Artefakt? -- misst
 # `tools/verify_frozen_heuristic.py` (Drift-Modus gegen die Golden Probe).
 # Beide zusammen decken ab: Pfad hier, Wheel dort.
-V1_SPEC = str(_ROOT / "models/frozen_heuristics/v1_anchor/spec.json")
+HV1_SPEC = str(_ROOT / "models/frozen_heuristics/hv1_anchor/spec.json")
 
 
 def _check_spec() -> None:
@@ -70,10 +70,10 @@ def _check_spec() -> None:
     eingefroren und traege dabei eine andere Konfiguration, verschoebe sich der
     Vergleich lautlos. Deshalb hier eine Zusicherung statt einer Hoffnung.
     """
-    spec = json.loads(pathlib.Path(V1_SPEC).read_text(encoding="utf-8"))
-    if spec.get("heuristik_variante") != "v1":
+    spec = json.loads(pathlib.Path(HV1_SPEC).read_text(encoding="utf-8"))
+    if spec.get("heuristik_variante") != "hv1":
         raise SystemExit(
-            f"{V1_SPEC} sagt heuristik_variante={spec.get('heuristik_variante')!r}, "
+            f"{HV1_SPEC} sagt heuristik_variante={spec.get('heuristik_variante')!r}, "
             "erwartet wird 'v1'. Die Sonde vergleicht gegen den ANKER -- mit einer "
             "anderen Variante misst sie etwas anderes, als ihr Name behauptet.")
 
@@ -110,17 +110,17 @@ def referee_game(model: str, spec_net: str | None, game_seed: int, first_player:
             pi = rg.pending_start_placement_player()
             rg.start_placement_apply_external(
                 mr.start_placement_choice_state_json(rg.state_json(), pi,
-                                                     rg.game_seed(), V1_SPEC))
+                                                     rg.game_seed(), HV1_SPEC))
             continue
         if st == "tiling":
             rg.tiling_apply_external(
-                mr.tiling_choice_state_json(rg.state_json(), V1_SPEC, None))
+                mr.tiling_choice_state_json(rg.state_json(), HV1_SPEC, None))
             continue
         if rg.current_player() == 0:
             rg.drafting_decide_and_apply_inprocess(model, spec_net, net_sims, c_puct)
         else:
             act = json.loads(mr.heuristic_arena_choice_state_json(
-                rg.state_json(), heur_sims, c, rg.pending_search_seed(), V1_SPEC))["action"]
+                rg.state_json(), heur_sims, c, rg.pending_search_seed(), HV1_SPEC))["action"]
             rg.drafting_apply_external(json.dumps(act))
     return {"scores": list(rg.scores()), "steps": rg.steps()}
 

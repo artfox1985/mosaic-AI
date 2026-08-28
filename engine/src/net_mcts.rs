@@ -438,21 +438,38 @@ impl SearchConfig {
         // gueltigen Wert hat: die Specs der eingefrorenen Artefakte tragen es,
         // und ein weggelassenes Pflichtfeld waere ein stiller Vertragsbruch.
         //
-        // Der v2-Zweig ist aus dem Quellstand entfernt (B4a). Eine v2-Spec
-        // wird deshalb ABGEWIESEN und nicht still als v1 gefahren -- sonst
-        // laege genau der Fehler vor, gegen den die Kapselung gebaut ist:
-        // ein Agent, der etwas anderes spielt, als seine Spec sagt. Das
+        // Der zweite Zweig ist aus dem Quellstand entfernt (B4a). Eine
+        // hv2-Spec wird deshalb ABGEWIESEN und nicht still als hv1 gefahren --
+        // sonst laege genau der Fehler vor, gegen den die Kapselung gebaut
+        // ist: ein Agent, der etwas anderes spielt, als seine Spec sagt. Das
         // Artefakt bleibt auf seinem MITGELIEFERTEN Wheel lauffaehig.
-        let variante_name = obj
+        //
+        // UMBENENNUNG 2026-08-28: gueltig ist NUR noch `hv1`. Die Alt-Namen
+        // (`v1`, `v2huelle`) sind hier bewusst KEIN Sonderfall -- die Specs
+        // der Artefakte tragen den neuen Namen, und wo ein altes Wheel den
+        // Alt-Namen braucht, uebersetzt der Treiber an der Prozessgrenze
+        // (tools/frozen_name_dialect.py). Eine zweite Akzeptanz hier waere
+        // eine zweite Wahrheit.
+        let variant_name = obj
             .get("heuristik_variante")
             .ok_or_else(|| format!("Spec-Datei {path}: Feld 'heuristik_variante' fehlt"))?
             .as_str()
             .ok_or_else(|| {
                 format!("Spec-Datei {path}: 'heuristik_variante' ist keine Zeichenkette")
             })?;
-        if variante_name != "v1" {
+        if variant_name != "hv1" {
+            let hint = match variant_name {
+                "v1" => " Das ist der Name VOR der Umbenennung am 2026-08-28; er heisst \
+                         jetzt 'hv1'.",
+                "v2huelle" => " Das ist der Name VOR der Umbenennung am 2026-08-28; er \
+                               heisst jetzt 'hv2'.",
+                _ => "",
+            };
             return Err(format!(
-                "Spec-Datei {path}: heuristik_variante '{variante_name}' ist in diesem Build                  nicht mehr spielbar -- nur 'v1'. Der v2-Zweig wurde am 2026-08-26 entfernt                  (PREREG_heuristic_v2_long_rows.md par.19). Das Artefakt laeuft weiter auf                  seinem mitgelieferten Wheel."
+                "Spec-Datei {path}: heuristik_variante '{variant_name}' ist in diesem Build \
+                 nicht mehr spielbar -- nur 'hv1'.{hint} Der zweite Zweig wurde am 2026-08-26 \
+                 entfernt (PREREG_heuristic_v2_long_rows.md par.19). Das Artefakt laeuft \
+                 weiter auf seinem mitgelieferten Wheel."
             ));
         }
         Ok(Self { implicit_minimax_alpha, long_row_init_shaping_w })
@@ -6047,34 +6064,77 @@ mod tests {
     /// Eine Spec, die eine NICHT MEHR SPIELBARE Variante verlangt, muss hart
     /// scheitern. Das ist dieselbe Zusage wie vorher, nur unter neuer Lage:
     /// bis zum 2026-08-26 hiess sie "die Spec muss ANKOMMEN" (Anlass: ein
-    /// Erzeugerlauf, dessen Aufruf `v2huelle` nicht mitnahm, worauf der
-    /// Default v1 still einsprang und ein falscher Befund entstand). Seit
-    /// B4a gibt es den v2-Zweig nicht mehr -- ein stilles Durchwinken als v1
+    /// Erzeugerlauf, dessen Aufruf `hv2` nicht mitnahm, worauf der Default
+    /// `hv1` still einsprang und ein falscher Befund entstand). Seit B4a gibt
+    /// es den zweiten Zweig nicht mehr -- ein stilles Durchwinken als `hv1`
     /// waere GENAU derselbe Fehler, nur an einer neuen Stelle.
     ///
     /// Das Artefakt selbst bleibt lauffaehig: es bringt sein eigenes Wheel
-    /// mit (`models/frozen_heuristics/v2huelle_generator/`).
+    /// mit (`models/frozen_heuristics/hv2_generator/`).
     #[test]
-    fn search_config_from_spec_file_rejects_v2_variant() {
+    fn search_config_from_spec_file_rejects_hv2_variant() {
         let dir = std::env::temp_dir();
-        let path = dir.join(format!("mosaic_test_spec_v2_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "v2huelle"}"#).unwrap();
+        let path = dir.join(format!("mosaic_test_spec_hv2_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "hv2"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
-        assert!(result.is_err(), "eine v2-Spec darf in diesem Build NICHT still als v1 laufen");
+        assert!(result.is_err(), "eine hv2-Spec darf in diesem Build NICHT still als hv1 laufen");
         let msg = result.unwrap_err();
         assert!(msg.contains("nicht mehr spielbar"), "Fehlermeldung muss den Grund nennen: {msg}");
         assert!(msg.contains("mitgelieferten Wheel"), "Fehlermeldung muss den Ausweg nennen: {msg}");
         std::fs::remove_file(&path).ok();
     }
 
+    /// UMBENENNUNG 2026-08-28: die ALTEN Namen (`v1`, `v2huelle`) sind hier
+    /// ebenfalls harte Fehler -- der Live-Parser kennt nur noch `hv1`. Wo ein
+    /// altes Artefakt-Wheel den Alt-Namen braucht, uebersetzt der Treiber an
+    /// der Prozessgrenze (`tools/frozen_name_dialect.py`), NICHT dieser
+    /// Parser: zwei Namen an derselben Stelle waeren zwei Wahrheiten.
+    ///
+    /// Die Fehlermeldung muss den neuen Namen NENNEN. Ein blosses "unbekannt"
+    /// waere fuer genau den Aufrufer nutzlos, der die Umbenennung nicht
+    /// mitbekommen hat.
+    #[test]
+    fn search_config_from_spec_file_rejects_pre_rename_names() {
+        for (old, new) in [("v1", "hv1"), ("v2huelle", "hv2")] {
+            let dir = std::env::temp_dir();
+            let path = dir.join(format!("mosaic_test_spec_old_{old}_{}.json", std::process::id()));
+            std::fs::write(
+                &path,
+                format!(
+                    r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "{old}"}}"#
+                ),
+            )
+            .unwrap();
+            let result = SearchConfig::from_spec_file(path.to_str().unwrap());
+            std::fs::remove_file(&path).ok();
+            let msg = result.expect_err("Alt-Name muss abgewiesen werden");
+            assert!(msg.contains("2026-08-28"), "Meldung muss die Umbenennung nennen: {msg}");
+            assert!(msg.contains(new), "Meldung muss den neuen Namen nennen: {msg}");
+        }
+    }
+
+    /// Der GUELTIGE Name wird angenommen -- ohne diese Gegenprobe belegen die
+    /// Abweisungs-Tests oben nur, dass alles scheitert.
+    #[test]
+    fn search_config_from_spec_file_accepts_hv1() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_hv1_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.25, "long_row_init_shaping_w": 0.3, "heuristik_variante": "hv1"}"#).unwrap();
+        let result = SearchConfig::from_spec_file(path.to_str().unwrap());
+        std::fs::remove_file(&path).ok();
+        let cfg = result.expect("hv1 muss angenommen werden");
+        assert_eq!(cfg.implicit_minimax_alpha, 0.25);
+        assert_eq!(cfg.long_row_init_shaping_w, 0.3);
+    }
+
     /// Ein unbekannter Variantenname ist ein harter Fehler, kein Rueckfall
-    /// auf v1. Ein stiller Rueckfall saehe wie der gewollte Lauf aus und
+    /// auf `hv1`. Ein stiller Rueckfall saehe wie der gewollte Lauf aus und
     /// waere der Bestandslauf -- genau der Messfehler vom 2026-08-26.
     #[test]
-    fn search_config_from_spec_file_rejects_unknown_variante() {
+    fn search_config_from_spec_file_rejects_unknown_variant() {
         let dir = std::env::temp_dir();
-        let path = dir.join(format!("mosaic_test_spec_badvariante_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "v2huelle_tippfehler"}"#).unwrap();
+        let path = dir.join(format!("mosaic_test_spec_badvariant_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "hv2_tippfehler"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "unbekannte Variante muss abgewiesen werden");
         assert!(result.unwrap_err().contains("nicht mehr spielbar"));
@@ -6084,9 +6144,9 @@ mod tests {
     /// Ein FEHLENDES Pflichtfeld ist ebenfalls ein Fehler -- eine Spec legt
     /// das Verhalten VOLLSTAENDIG fest (Welle-1-Regel).
     #[test]
-    fn search_config_from_spec_file_requires_heuristik_variante() {
+    fn search_config_from_spec_file_requires_variant_field() {
         let dir = std::env::temp_dir();
-        let path = dir.join(format!("mosaic_test_spec_novariante_{}.json", std::process::id()));
+        let path = dir.join(format!("mosaic_test_spec_novariant_{}.json", std::process::id()));
         std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "fehlende heuristik_variante muss abgewiesen werden");
