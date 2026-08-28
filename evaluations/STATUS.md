@@ -57,7 +57,8 @@ Maschine ist damit NICHT frei -- kein Build, kein Test, keine Sonde nebenher
 **16 Commits vor `origin/main`** (`git rev-list --count origin/main..HEAD`,
 gezaehlt 2026-08-28), nicht gepusht -- Push ist ein eigener Nutzer-Entscheid.
 
-#
+---
+
 ## TRAEGER-MANIFEST-GENERATOR fehlt (offener Kern)
 
 `data/` enthaelt kein `policy_carrier_manifest_*.json` mehr (Nutzer: bewusst
