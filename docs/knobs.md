@@ -76,7 +76,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_INTERLEAVE_FILL_TIMEOUT_US` = 200 (ENTSCHIEDEN, PREREG_async_search.md)
 - `MOSAIC_TILING_PLATTEN_GEW` = 1.0 (1 oder 8 Werte) (ENTSCHIEDEN, PREREG_placement_side.md)
 - `MOSAIC_DATA_DIR` = <repo>/data (ENTSCHIEDEN, PREREG_corpus_dose.md)
-- `MOSAIC_CARRIER_MANIFEST` = policy_carrier_manifest_v20.json (ENTSCHIEDEN, PREREG_v21_window.md)
+- `MOSAIC_CARRIER_MANIFEST` = LEER (kein Manifest, jede Datei traegt Policy) (ENTSCHIEDEN, PREREG_v21_window.md)
 
 | Knopf | Default | Status | Verdikt | Zweck | Beleg |
 |---|---|---|---|---|---|
@@ -149,7 +149,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_PLATTENKOPF_SIMS` | 150 | diagnose | - | Heuristik-Sims der Plattenkopf-Referenzlaeufe (scoring.rs:1348) | - |
 | `MOSAIC_FROZEN_STATES_JSON` | unset (Pfad; Tests sonst uebersprungen) | diagnose | ENTSCHIEDEN | Pfad zum frozen-Drafting-States-Export fuer Entscheidungsgleichheits-Tests (net_mcts.rs, ort_cuda_/interleaved_-Tests) | PREREG_gpu_inference_path.md |
 | `MOSAIC_DATA_EXCLUDE` | unset (Regex) | aktiv | - | Fenster-Pinning: Dateien vor Cache-Key-Bildung und Training ausschliessen (corpus_dataset.py, MosaicDataset.__init__) | - |
-| `MOSAIC_CARRIER_MANIFEST` | policy_carrier_manifest_v20.json | aktiv | ENTSCHIEDEN | Dateiname des Policy-Traeger-Manifests im Korpus-Ordner (corpus_dataset.py, MosaicDataset.__init__) | PREREG_v21_window.md |
+| `MOSAIC_CARRIER_MANIFEST` | LEER (kein Manifest, jede Datei traegt Policy) | aktiv | ENTSCHIEDEN | Dateiname des Policy-Traeger-Manifests im Korpus-Ordner; Default seit 2026-08-29 leer, der alte v20-Default war tot (corpus_dataset.py, MosaicDataset.__init__) | PREREG_v21_window.md |
 | `MOSAIC_IGNORE_POLICY_TARGET_VALID` | aus (nur =1) | aktiv | ENTSCHIEDEN | Traeger-A/B Arm B: setzt GENAU die Policy-Maskierung aus `policy_target_valid=false` aus, sodass der Policy-Kopf auch die Vorzugszuege des v2-Lehrers sieht (Wirkstelle corpus_dataset.py, MosaicDataset.__init__). Einmal beim Import gelesen (neural_net.py, `_IGNORE_PTV`), damit derselbe Prozess die Semantik nicht auf halber Strecke wechselt, und im Cache-Schluessel (`+ignore_ptv_v1` in corpus_dataset.py, `|ignore_ptv_v1` in file_cache_key.py) -- sonst zoege der zweite Lauf still den Cache des ersten. Die anderen Nullsetzungen (Tiling/Start, Traeger-Manifest, PCR) bleiben unberuehrt | PREREG_v22_window.md par.4 |
 | `MOSAIC_CACHE_NOPACK` | aus (nur =1) | aktiv | ENTSCHIEDEN | erzwingt unkomprimiertes Cache-Format statt Bitpacking, eigener Cache-Key (corpus_dataset.py; Cache-Key in file_cache_key.py, per_file_cache_key) | PREREG_v21_window.md |
 | `MOSAIC_CACHE_F32` | aus (nur =1) | aktiv | - | float32 statt float16 fuer states/policies im Cache, Notausstieg (corpus_dataset.py, _cache_f32_active) | - |

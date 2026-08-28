@@ -42,10 +42,13 @@ def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
     except ImportError:                                   # defensiv: nie den Lauf blockieren
         return {"error": "neural_net._is_policy_carrier nicht importierbar"}
 
-    mf_name = os.environ.get("MOSAIC_CARRIER_MANIFEST", "policy_carrier_manifest_v20.json")
-    mf_path = Path(DATA_DIR) / mf_name
+    # Default LEER seit 2026-08-29 (Nutzer-Auftrag, Merkliste 1e) -- gleiche
+    # Semantik wie corpus_dataset.py: ohne gesetzte Env-Var gibt es kein
+    # Manifest, jede Datei traegt Policy.
+    mf_name = os.environ.get("MOSAIC_CARRIER_MANIFEST", "")
+    mf_path = Path(DATA_DIR) / mf_name if mf_name else None
     carrier_set, carrier_prefixes = None, None
-    if mf_path.exists():
+    if mf_path is not None and mf_path.exists():
         try:
             mf = json.loads(mf_path.read_text(encoding="utf-8"))
             carrier_set = frozenset(mf.get("policy_carrier_files", []))
