@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1, 2026-08-25, 407 Kampagnen-Seeds je Arm gegen Champion@400). Huelle schlaegt v1 und alt-v2 klar (Details par.10.1). Preis: volle Zeilen 0,432 auf 0,216. Durchbruch-Zuordnung: par.8.6/9.1/9.2, par.4f der Fenster-Prereg. par.11 (rundenabhaengige Spalten-Gewichte) GEMESSEN und H0 (n=160, t=0,39). par.17 NEIN (Knotenbudget bindet nicht), par.18 NEIN (Blindzieh-Pathologie bleibt). -- ABSCHLUSS par.19 (2026-08-27, Nutzer-Entscheid "V2 ist durch"): der v2-Zweig ist AUS DEM QUELLSTAND ENTFERNT -- Enum, heuristic_v2.rs, v2-Routing in plate_builder, beide v2-Arena-Einstiege, die ganze Faedelung. Erhalten bleiben: das Spec-Pflichtfeld heuristik_variante (v2-Specs werden HART abgewiesen), das CLI-Flag mit choices=[v1], die v22-Korpora in data/ und BEIDE Artefakte auf ihrem mitgelieferten Wheel (v1_anchor als Elo-Anker, v2huelle_generator als Erzeuger). Beleg der Kapselung: frozen_agent_referee_probe liefert v1_anchor [27,15]/159 und v2huelle_generator [63,27]/163 unveraendert, obwohl der Quellstand v2 nicht mehr kennt. Stillgelegt statt migriert: v2_envelope_arena und v2_teacher_arena (ihr Vergleichsarm v2-plain war nie ein Artefakt). Nicht mehr nachrechenbar: die SOLL-Seite von PREREG_stack_draw_reservation_rule par.5 (nutzte expected_points_map). -- TOR GEFAHREN 2026-08-28: 1(b) bestanden (w1 0,297 gegen Champion 0,102, t 5,55), 1(a) VERFEHLT (w1 gegen w0 +0,037, t 1,53 -- der Ownership-Kopf traegt nicht) => KEIN v22-Self-Play, Folgewege aktiv; Initiierung fast geerbt (1,93/2,14), Vollendung nicht (Quote 0,154 gegen Lehrer 0,347, Schwellen 0,53/0,60 waren fehlskaliert). Registriert 2026-08-27 (w1=1,0 gegen w0, argmax-Instrument, zwei harte Tore, entscheidet ueber den Start des v22-Self-Play; Nachtrag 2026-08-27: KALTSTART statt Warmstart, Gating gegen Anker+v21 laeuft informativ und entscheidet den Start NICHT). par.3b.4 GEFAHREN 2026-08-28: TRENNT (Sieger +0,573 volle Spalten, t 93) -- Symmetrie-Sorge vom Tisch. par.3b.5 GEFAHREN 2026-08-28: LESART 3, starke Tiling-These (Draft-Erbe da: Masse 0,81->0,60, Lift 28x; Platzierung verschenkt) -- Weg-Wahl: erst Ownership-Pol-Konsument-Arena mit b01-Kopf, b03-Training nur falls leer (dann Stufe 2 vor Surprise). par.3b.3 Alternativplan Label-Qualitaet: Stufe 0 GEFAHREN 2026-08-27, DAEMPFUNG NICHT BESTAETIGT (oberster Bin -0,015 gegen Schwelle +0,05, voller Korpus) -- Arm L bleibt Reserve, Kaltstart mit TD_LAMBDA 0,5; Beifang ist ein GLOBALER Optimismus-Versatz des v21-Bootstrap (~+0,05 je Seite, Summe der beiden Gewinnwahrscheinlichkeiten ~1,13-1,14). Daraus drei Registrierungen vom 2026-08-27: (a) Arm K Bootstrap-Kohaerenz, ENTWURF, Nutzer-Entscheid OFFEN -- Summen-Normierung oder affine Versatz-Korrektur als reine Label-Transformation im WDL-Zweig, Cache-Key-Komponente Pflicht, Staerkebeitrag unbelegt (Ordnung unveraendert), das Argument sind Irrtumskosten fuer alles, was Absolutwerte liest; kein Spiegelungs-Artefakt (MIRROR_OTHER_VAL=false, net_mcts.rs:670). (b) Arm-R-Vorbedingung BERICHTIGT: "v22 reduziert die Plattendaempfung" ist strukturell unerfuellbar, weil es die Daempfung nicht gibt -- neue Bedingung ist die Senkung des GLOBALEN Versatzes gegen denselben Korpus mit derselben Sonde. (c) par.3b.4 REGISTRIERT, VOR der Tor-Auswertung von par.3b.2: Symmetrie-Pruefung des Lehrerkorpus -- hv2 laeuft mit v2huelle auf BEIDEN Seiten, also koennte der Value-Kopf ueber den WERT des Spaltenbaus wieder nichts lernen (Mechanismus aus DOSSIER_ownership_head Abschnitt 7(1)); Stufe 0 baufrei: Spalten-Differenz Sieger minus Verlierer gegen den Ausgang, Blockebene je Datei; trennt sie nicht, misst par.3b.2 nur Policy-VERHALTEN und ist entsprechend zu etikettieren. Sonde corpus_column_outcome_symmetry_probe.py GESCHRIEBEN und smoke-abgenommen, voller Lauf STEHT AUS. par.12/par.15 sind mit dem Zweig entfallen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA, BELEGT (par.10.1; Preis: volle Zeilen 0,432 auf 0,216). v2-Zweig entfernt, beide gefrorenen Artefakte lauffaehig (par.19). Spalten-Tor par.3b.2: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play. par.3b.3 Daempfung nicht bestaetigt, par.3b.4 trennt, par.3b.5 Lesart 3 (die PLATZIERUNG verschenkt das Draft-Erbe); par.3b.6 STEHT AUS. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1406,6 +1406,78 @@ Vorzugs-Haelfte traegt.
 3. Der Vollendungs-Filter (v23-Weckerliste) bleibt der komplementaere
    Such-Hebel fuer dieselbe Engpass-Stelle.
 
+### par.3b.6 Ownership-Pol-Konsument-Arena mit b01-Kopf (registriert 2026-08-28, VOR dem Lauf)
+
+**Zweck: Weg-Wahl Punkt 1 aus par.3b.5.** Lesart 3 legt die Beweislast auf
+die PLATZIERUNG: das Draft-Erbe ist da (Masse 0,81->0,60, Lift 28x), die
+Vollendungsquote verschenkt es (0,154 gegen Lehrer 0,347). Der Tiling-Pol
+`MOSAIC_OWNERSHIP_TILING_W` wird hier ERSTMALS mit einem spaltenbewusst
+trainierten Ownership-Kopf gefahren -- die Gate-C-Nullmessungen
+(PREREG_gate_c_consumer_sweep.md) liefen mit plattenblinden Koepfen (par.4e
+der Fenster-Prereg). b01s Kopf hat Own-Val 0,394 (Trainingslauf 2026-08-28,
+STATUS A0 Schritt 3).
+
+**Modell (beide Seiten): `models/alphazero_v22-b01_best.onnx`.**
+
+**Instrument identisch zu par.3b.2**, damit die dortigen Werte vergleichbar
+bleiben: `self_play.py --mode network --deterministic --no-root-noise
+--sims 400 --games 200 --per-file 20 --seed 20260828 --threads 11`
+(argmax-Trajektorien; gesampeltes Self-Play bleibt ausgeschlossen).
+
+**Arme: w in {0 (Kontrolle); 0,5; 1,0; 2,0}**, gesetzt als Env je Prozess.
+Wirkstelle: `tiling_solver.rs` `ownership_tiling_weight()` (Default 0,0 =
+Fruehausstieg ohne Netz-Pass, `self_play.rs` `ownership_tiling_marginals`,
+Fenster R1-4 via `plate_branch_applies`). `MOSAIC_OWNERSHIP_W` (Blatt-Pol)
+bleibt 0 -- gemessen wird NUR der Tiling-Pol. Leiter um die natuerliche
+Einheit 1,0 (Herleitung PREREG_gate_c_consumer_sweep.md par.3.3); die
+Gate-C-Dosen D1-D3 fuhren 0,3/1,0/3,0, hier 0,5/1,0/2,0 als engere Leiter
+um die Einheit.
+
+**Masse (je Partie und Seite, am Endbrett aus `score_geo.col_fill`):
+volle Spalten (Fuellstand >= 6) und Vollendungsquote (Anzahl ==6 je Anzahl
+>= 4)**, dieselben Definitionen wie im Tor-Artefakt `spalten_tor_v22.json`
+(`quota_definition` dort). Statistik: gepaarter Block-t ueber die 10
+Dateibloecke (Paarung ueber den Blockindex, Seeds identisch ueber die Arme),
+Schwelle |t| > 2,262 (df=9, zweiseitig 5 Prozent).
+
+**TOR ("der Konsument traegt"):** mindestens ein w-Arm hebt die vollen
+Spalten signifikant ueber den w0-Arm (Block-t > 2,262) UND senkt im selben
+Arm die eigenen Punkte nicht signifikant (Block-t > -2,262; Schutz gegen
+Spalten um jeden Preis). Die Vollendungsquote wird mit derselben Statistik
+als ko-primaere Groesse berichtet, entscheidet aber nicht allein.
+Konsequenzen wie in par.3b.5 registriert: traegt er, kommen Knopf-Aufnahme
+in die Self-Play-Spec und der v22-Self-Play-Start zurueck auf den Tisch
+(Nutzer-Entscheid); traegt er nicht, ist Stufe 2 (2D-Ablesung des
+Ownership-Kopfs) VOR Surprise-Weighting der naechste Weg.
+
+**Zwei Instrument-Waechter, vorab benannt:**
+
+1. Das Lauf-Manifest erfasst Env-Knoepfe NICHT (selfplay_manifest.py haelt
+   nur cli_args + engine_config; `ownership_tiling_weight` fehlt in
+   `engine_config_json`). Der Arm steckt darum im Versionsnamen
+   (`otw22b01w00/w05/w10/w20`), und das Auswertungs-Artefakt notiert das
+   gesetzte Env je Arm. Ein w>0-Arm, der ZAHLENGLEICH mit w0 endet, heisst
+   "Knopf kam nicht an" (ALARM, kein H0-Befund) -- stehende Lehre
+   [[feedback_wheel_neu_bauen_nach_engine_aenderung]].
+2. Der w0-Arm MUSS die b01-Werte aus par.3b.2 reproduzieren (0,2975 volle
+   Spalten; gleiche Seeds, deterministisch, gleiches Wheel). Abweichung =
+   Instrumentenbruch, zu klaeren VOR jeder Deutung der w-Arme.
+
+Die sechs Standard-Kennzahlen kommen aus den pkl-Endzustaenden
+(`score_geo`, `scoring_tile_points`, `scores`; Muster
+tools/corpus_sanity_check.py). Marge zum Gegner entfaellt strukturell
+(Self-Play desselben Modells, der Knopf wirkt auf BEIDE Seiten); berichtet
+wird stattdessen das Punkte-Niveau je Seite und seine Verschiebung gegen w0.
+Punkte je Wertungsplatte aus `scoring_tile_points` je aktivem Kriterium.
+
+**Artefakt: `evaluations/artifacts/ownership_tiling_consumer_v22.json`**
+(Muster spalten_tor_v22.json) inkl. `laufzeit`-Block je Arm. Die
+Messdateien `selfplay_otw22b01w*_*.pkl` landen in `data/` im Trainings-Glob
+-- Loeschung nach der Auswertung NUR mit pfadgenauer Nutzer-Freigabe.
+Laufzeit-Anhaltspunkt: 6,7 s je Partie bei 11 Threads
+(manifest_tor22b01_20260828_202529.json), also ~22 min je Arm, ~90 min
+gesamt; die w>0-Arme zahlen einen Vorwaertspass je Tiling-Zug extra.
+
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
 `plate_builder::v2_chip_vorzug`: vollendet per Bonuschip die Musterreihe, die
@@ -2737,6 +2809,12 @@ v2-Routings und ist mitgefallen; die beiden Testmodule sind entfernt.
 dem heutigen Build nicht mehr. Wer es je wieder braucht, holt
 `expected_points_map` samt `points_map` und `most_available_color` aus der
 Historie unmittelbar vor diesem Commit.
+
+**Ebenfalls mitgefallen sind par.12 (Vollendbarkeit als FILTER) und par.15
+(Erreichbarkeit als MASS)** -- beide sassen auf der v2-Zielkarte. Beide waren
+zum Zeitpunkt der Entfernung bereits NEGATIV entschieden (par.12.1, par.15.1),
+es geht also kein offener Arm verloren; sie sind mit dem Zweig ERLEDIGT, nicht
+offen. (Vermerk 2026-08-28, aus dem Statuskopf hierher verschoben.)
 
 ### Belege
 
