@@ -1158,8 +1158,8 @@ mod tests {
     /// + harter Fehler statt Skip (Nutzer-Regel: nie leer gruen).
     #[test]
     fn bootstrap_value_after_rounds_is_deterministic_for_same_seed() {
-        let model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../models/alphazero_v21_2d_brierbest.onnx");
-        let net = Net::load_auto(model_path).unwrap_or_else(|e| panic!(
+        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let net = Net::load_auto(model_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf \
              nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -1196,8 +1196,8 @@ mod tests {
         // Fixture-Hinweis wie beim Determinismus-Test oben: bis 2026-08-15
         // v10_best (fehlt) + stiller Skip -- der Test lief nie. Jetzt Champion
         // + harter Fehler (Nutzer-Regel: nie leer gruen).
-        let model_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../models/alphazero_v21_2d_brierbest.onnx");
-        let net = Net::load_auto(model_path).unwrap_or_else(|e| panic!(
+        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let net = Net::load_auto(model_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf \
              nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));

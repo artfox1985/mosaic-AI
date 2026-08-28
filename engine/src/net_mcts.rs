@@ -4923,8 +4923,7 @@ mod tests {
         use rand::SeedableRng;
         use std::time::{Duration, Instant};
 
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
         let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Sonden-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -6423,8 +6422,7 @@ mod tests {
         // mehr gibt (NUM_ACTIONS-Wechsel hat Alt-Checkpoints entwertet). Hier
         // wird der aktuelle Champion gebraucht, weil die Messung seine
         // Eval-Kosten betrifft.
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
         let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Sonden-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -6497,7 +6495,7 @@ mod tests {
     /// Jetzt: amtierender Champion + harter Fehler statt Skip (Nutzer-Regel:
     /// nie leer gruen; Praezedenz `self_play.rs::load_test_net_for_gating`).
     fn load_test_net() -> Net {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v21_2d_brierbest.onnx");
+        let path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ))
@@ -6534,18 +6532,26 @@ mod tests {
         (game.state.phase == Phase::Drafting).then_some(game.state)
     }
 
-    /// Laedt ein lokal vorhandenes Modell fuer den `BATCH_ROOT_EXPANSION`-
-    /// Paritaetstest unten -- `load_test_net()` (oben) haengt an
-    /// `alphazero_v10_best.onnx`, das im aktuellen Modell-Bestand nicht
-    /// mehr vorhanden ist (gleicher Befund wie bei den Task-#14-PCR-Tests
-    /// in `self_play.rs`/den `eval_batch`-Tests in `net.rs`). Bewusst der
-    /// AMTIERENDE 2D-Champion `v19_2d_best` (nicht ein flaches Modell) --
-    /// das ist der eigentliche Zielpunkt dieses Perf-Auftrags (die
+    /// Laedt das Modell fuer den `BATCH_ROOT_EXPANSION`-Paritaetstest unten
+    /// -- `load_test_net()` (oben) haengt an `alphazero_v10_best.onnx`, das
+    /// im aktuellen Modell-Bestand nicht mehr vorhanden ist (gleicher Befund
+    /// wie bei den Task-#14-PCR-Tests in `self_play.rs`/den `eval_batch`-
+    /// Tests in `net.rs`). Bewusst der AMTIERENDE Champion (nicht ein flaches
+    /// Modell) -- das ist der eigentliche Zielpunkt dieses Perf-Auftrags (die
     /// 1,46x-2D-Inferenzkosten druecken), der Paritaetstest soll also genau
-    /// DIESE Architektur (`PlanesPlusFlat`-Layout, ZWEI ONNX-Graph-Inputs)
-    /// abdecken, nicht nur den einfacheren flachen Pfad.
+    /// die Champion-Architektur (`PlanesPlusFlat`-Layout, ZWEI ONNX-Graph-
+    /// Inputs) abdecken, nicht nur den einfacheren flachen Pfad.
+    ///
+    /// Aufloesung ueber `models/champion.txt` statt hartem Namen
+    /// (Nutzer-Randbedingung 2026-08-28: "es gibt immer nur einen Champion,
+    /// Alt-Champions koennen rausrotieren") -- hier stand bis dahin
+    /// `alphazero_v19_2d_best.onnx`, also ein Alt-Champion zweier
+    /// Generationen zurueck. Der Test prueft MECHANIK (batched vs.
+    /// sequenzielle Wurzelexpansion desselben Netzes gegen sich selbst);
+    /// welches Netz das ist, ist fuer die Zusicherung unerheblich, solange
+    /// es die 2D-Architektur traegt.
     fn load_batching_test_net() -> Net {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v19_2d_best.onnx");
+        let path = crate::net::test_champion_model_path();
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ))
@@ -7965,7 +7971,7 @@ mod tests {
     /// `v10`, siehe dortiger Kommentar). Gleiches Skip-statt-Fail-Muster bei
     /// Abwesenheit (frischer Klon ohne `models/`, `.gitignore`).
     fn load_v18_legacy_test_net() -> Option<Net> {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v18_best.onnx");
+        let path = crate::net::test_model_path_opt("alphazero_v18_best.onnx")?;
         Net::load_auto(path.to_str().unwrap()).ok()
     }
 
@@ -8569,12 +8575,7 @@ mod tests {
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty(), "leere Zustandsliste -- Export fehlgeschlagen?");
 
-        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        assert!(
-            onnx_path.exists(),
-            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
-        );
+        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
         let net = Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -8757,12 +8758,7 @@ mod tests {
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty());
 
-        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        assert!(
-            onnx_path.exists(),
-            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
-        );
+        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
         let net = Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -9048,12 +9044,7 @@ mod tests {
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty());
 
-        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        assert!(
-            onnx_path.exists(),
-            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
-        );
+        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
         let net = Arc::new(Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         )));
@@ -9442,12 +9433,7 @@ mod tests {
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty());
 
-        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        assert!(
-            onnx_path.exists(),
-            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
-        );
+        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
         let net = Arc::new(Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         )));
@@ -9622,12 +9608,7 @@ mod tests {
         use std::sync::Arc;
         use std::time::Instant;
 
-        let repo = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let onnx_path = repo.join("models/alphazero_v20_2d_opp_brierbest.onnx");
-        assert!(
-            onnx_path.exists(),
-            "{onnx_path:?} fehlt -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
-        );
+        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
         let net = Arc::new(Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         )));

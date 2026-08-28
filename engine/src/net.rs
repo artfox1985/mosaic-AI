@@ -997,6 +997,115 @@ pub fn softmax(logits: &[f32]) -> Vec<f32> {
     }
 }
 
+/// Sucht ein Testmodell und gibt seinen Pfad zurueck, oder `None`, wenn es
+/// weder lokal noch als eingefrorenes Artefakt vorliegt. Siehe
+/// [`test_model_path`] fuer die harte Variante (Regelfall).
+///
+/// Suchreihenfolge:
+/// 1. `../models/<name>` -- Entwicklungs-Bequemlichkeit: was im Arbeits-
+///    bestand liegt, gewinnt.
+/// 2. `../models/frozen_champions/<stamm>/model.onnx` -- der Artefakt-Pfad,
+///    wobei `<stamm>` aus `<name>` abgeleitet wird: Praefix `alphazero_` und
+///    Endung `.onnx` abschneiden. Geprueft am amtierenden Champion:
+///    `alphazero_v21_2d_brierbest.onnx` -> `v21_2d_brierbest` ->
+///    `../models/frozen_champions/v21_2d_brierbest/model.onnx` (existiert,
+///    2026-08-28 im Bestand nachgesehen).
+#[cfg(test)]
+pub(crate) fn test_model_path_opt(name: &str) -> Option<std::path::PathBuf> {
+    let models = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+    let local = models.join(name);
+    if local.exists() {
+        return Some(local);
+    }
+    let stem = name.strip_suffix(".onnx").unwrap_or(name);
+    let stem = stem.strip_prefix("alphazero_").unwrap_or(stem);
+    let artifact = models.join("frozen_champions").join(stem).join("model.onnx");
+    artifact.exists().then_some(artifact)
+}
+
+/// Pfad zu einem Testmodell -- EINZIGE Stelle, an der Testcode weiss, WO
+/// Modelle liegen (vorher: 22 duplizierte `../models/...`-Pfadbauten in sechs
+/// Dateien).
+///
+/// Anlass: das Aufraeumen von `models/` am 2026-08-28. Die alten Champion-
+/// Gewichte liegen seither nicht mehr flach in `models/`, sondern nur noch im
+/// eingefrorenen Artefakt (`models/frozen_champions/<name>/model.onnx`) --
+/// die Tests, die hart auf `../models/alphazero_*.onnx` zeigten, waeren alle
+/// gleichzeitig ausgefallen.
+///
+/// Suchreihenfolge und Namensableitung: siehe [`test_model_path_opt`]. Die
+/// Ableitung ist bewusst generisch, damit ein KUENFTIGER Champion keine neue
+/// Sonderregel braucht -- wer sein Artefakt nach dem Muster
+/// `frozen_champions/<name ohne "alphazero_" und ohne ".onnx">/model.onnx`
+/// ablegt, wird automatisch gefunden.
+///
+/// Fehlt beides, `panic!`t die Funktion (Nutzer-Regel "nie leer gruen": ein
+/// Test ohne sein Modell muss LAUT scheitern, nicht still ueberspringen).
+/// Wer bewusst ueberspringen will -- etwa fuer ein Alt-Modell ohne Artefakt
+/// --, nimmt [`test_model_path_opt`] und dokumentiert das an der Aufrufstelle.
+#[cfg(test)]
+pub(crate) fn test_model_path(name: &str) -> std::path::PathBuf {
+    test_model_path_opt(name).unwrap_or_else(|| {
+        let models = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models");
+        let stem = name.strip_suffix(".onnx").unwrap_or(name);
+        let stem = stem.strip_prefix("alphazero_").unwrap_or(stem);
+        panic!(
+            "Testmodell {name:?} liegt WEDER unter {:?} NOCH als eingefrorenes \
+             Artefakt unter {:?} -- Test-Voraussetzung fehlt, der Test darf nicht \
+             leer-gruen bestehen (Nutzer-Regel: nie leer gruen). Bereitstellen: \
+             entweder die Datei nach models/{name} kopieren, oder das Artefakt \
+             models/frozen_champions/{stem}/model.onnx anlegen (Ablage eines \
+             eingefrorenen Champions), oder den Test bewusst mit --skip abwaehlen.",
+            models.join(name),
+            models.join("frozen_champions").join(stem).join("model.onnx"),
+        )
+    })
+}
+
+/// Name des AMTIERENDEN Champions aus `models/champion.txt` (ohne
+/// `alphazero_`-Praefix, ohne Endung -- genau so, wie `tools/set_champion.py`
+/// die Datei schreibt).
+///
+/// Anlass (Nutzer-Randbedingung 2026-08-28): "es gibt immer nur EINEN
+/// Champion, Alt-Champions koennen rausrotieren". Testcode, der einen
+/// Modellnamen HART verdrahtet, faellt beim naechsten Aufraeumen von
+/// `models/` aus -- genau das ist am 2026-08-28 passiert (Aufraeumen der
+/// flachen `models/alphazero_*.onnx`). Wer ein Netz nur als MECHANIK-
+/// Traeger braucht (Batcher, Wurzel-Batching, Paritaets-Fixture), nimmt
+/// diesen Einstieg und wird damit automatisch mit-rotiert.
+///
+/// Herkunft der Logik: aus `self_play.rs::tests::load_test_net_for_gating`
+/// hierher gehoben (dort seit dem Champion-Pfad-Bugfix), damit die
+/// `champion.txt`-Aufloesung EINMAL existiert statt je Modul dupliziert.
+///
+/// `panic!`t bei fehlender/leerer Datei (Nutzer-Regel "nie leer gruen").
+#[cfg(test)]
+pub(crate) fn test_champion_name() -> String {
+    let champion_txt =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/champion.txt");
+    let raw = std::fs::read_to_string(&champion_txt).unwrap_or_else(|e| {
+        panic!(
+            "{champion_txt:?} nicht lesbar ({e}) -- der Test braucht den amtierenden \
+             Champion, kein stiller Skip erlaubt (Nutzer-Regel: nie leer gruen)."
+        )
+    });
+    let name = raw.trim().to_string();
+    assert!(
+        !name.is_empty(),
+        "{champion_txt:?} ist leer -- der Test braucht den amtierenden Champion \
+         (Nutzer-Regel: nie leer gruen)."
+    );
+    name
+}
+
+/// Pfad zum ONNX des amtierenden Champions -- [`test_champion_name`] plus
+/// [`test_model_path`] (findet also sowohl `models/alphazero_<name>.onnx` als
+/// auch `models/frozen_champions/<name>/model.onnx`).
+#[cfg(test)]
+pub(crate) fn test_champion_model_path() -> std::path::PathBuf {
+    test_model_path(&format!("alphazero_{}.onnx", test_champion_name()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1080,7 +1189,7 @@ mod tests {
     /// jetzt: existierendes Modell + harter Fehler statt Skip (Nutzer-Regel:
     /// nie leer gruen; Präzedenz `self_play.rs::load_test_net_for_gating`).
     fn load_test_net() -> Net {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v21_2d_brierbest.onnx");
+        let path = test_model_path("alphazero_v21_2d_brierbest.onnx");
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht \
              leer-gruen bestehen (Nutzer-Regel: nie leer gruen). Lokales models/-Checkpoint \
@@ -1139,7 +1248,7 @@ mod tests {
     }
 
     fn load_eval_batch_test_net() -> Net {
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/alphazero_v21_2d_brierbest.onnx");
+        let path = test_model_path("alphazero_v21_2d_brierbest.onnx");
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht \
              leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."

@@ -1,0 +1,21 @@
+# Netz-Paritaets-Fixture -- GENERIERT, nicht von Hand editieren.
+#
+# Nachfolger von tools/parity_probe.py (Nutzer-Entscheid 2026-08-28): belegt,
+# dass der Netz-Spielpfad bei DEFAULT-Knopfstellung dasselbe Verhalten zeigt
+# wie bei der Erzeugung -- nach jedem Wheel-/Engine-Umbau.
+#
+# Die Fixture folgt dem EINEN amtierenden Champion (models/champion.txt).
+# Wechselt der Champion, verfaellt sie mit ihm und wird neu erzeugt:
+#   MOSAIC_UPDATE_NET_PARITY_FIXTURE=1 cargo test --release \
+#     net_parity_hash_matches_champion_fixture -- --nocapture
+# (Schritt 5d der Promotions-Checkliste, docs/promotion_checklist.md)
+#
+# Korpus: 3 Partien ueber play_net_self_play_game, Seeds [4242, 4243, 4244],
+# sims=8, c_puct=Default, kein Wurzelrauschen, deterministic=true,
+# record_rtv=false, Startspieler alternierend. Nicht gehashte Label-Felder:
+# ["round_transition_value", "bootstrap_value"] (siehe NET_PARITY_EXCLUDED_FIELDS in self_play.rs).
+# Hash-Verfahren: FNV-1a-64 ueber die Record-JSONs.
+champion	v21_2d_brierbest
+erzeugt	2026-08-28
+engine	0.1.0
+hash	652f4d14c8204e82

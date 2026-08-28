@@ -47,6 +47,24 @@ Gedaechtnis:
    Verfallsdatum-Waechter fuer die H0-Befunde der Wurzel-Regler-Familie
    (in anderem Balance-Regime gemessen).
 
+   5d. **Netz-Paritaets-Fixture neu erzeugen** (seit 2026-08-28):
+
+   ```
+   $env:MOSAIC_UPDATE_NET_PARITY_FIXTURE=1
+   cargo test --release net_parity_hash_matches_champion_fixture -- --nocapture
+   ```
+
+   Danach die Variable loeschen und denselben Test noch einmal fahren – er
+   muss in einem FRISCHEN Prozess gruen sein (das ist zugleich die Probe,
+   dass der Hash ueber Prozessgrenzen haelt). Die Fixture
+   (`engine/tests/fixtures/net_parity_champion.txt`) folgt dem EINEN
+   amtierenden Champion aus `models/champion.txt`; **Alt-Fixturen verfallen
+   mit ihrem Champion**, ihr Hash wird nicht weitergeschleppt. Ohne diesen
+   Schritt schlaegt der Suite-Test nach dem Champion-Wechsel fehl – mit
+   genau dieser Anleitung in der Fehlermeldung. Nachfolger der
+   `tools/parity_probe.py`-Aera (deren Soll-Hash `8c6684ff...` hing an
+   `v20_2d_opp_brierbest` und ist am 2026-08-28 geschlossen worden).
+
 6. STATUS-Champion-Zeile + history-Kapitel nachziehen.
 
 **Merkregel aus einem echten Vorfall:** Elo-Fragen am Primaerregister

@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 86 Knoepfe (50 aktiv, 28 diagnose, 7 tot, 1 geplant).
+Stand: 87 Knoepfe (50 aktiv, 29 diagnose, 7 tot, 1 geplant).
 
 **Status** sagt, ob der Knopf VERDRAHTET ist -- ausdruecklich nicht, ob sein
 Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
@@ -139,6 +139,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_SPALTENBAU_SPECIAL` | aus (Opt-in =1) | diagnose | ENTSCHIEDEN | par.16 Special-Zellen-Erweiterung des Spaltenbauers (column_build.rs:204) | PREREG_provocation.md par.16 |
 | `MOSAIC_STACK_DRAW_RESERVATION` | aus (Opt-in =1) | diagnose | OFFEN | reparierte Blindzieh-Stopp-Regel: erwartete VERBESSERUNG in einer Einheit statt Niveau gegen Typmittelwert (self_play.rs::resolve_and_apply_stack_draw) | PREREG_stack_draw_reservation_rule.md par.5b |
 | `MOSAIC_UPDATE_FEATURE_FIXTURE` | aus (Opt-in =1) | diagnose | - | schreibt die Feature-Golden-Fixture neu statt zu pruefen; NUR fuer gewollte Feature-Aenderungen (features.rs::maybe_update_fixture) | - |
+| `MOSAIC_UPDATE_NET_PARITY_FIXTURE` | aus (Opt-in =1) | diagnose | - | schreibt die Netz-Paritaets-Fixture (engine/tests/fixtures/net_parity_champion.txt) neu statt zu pruefen; Pflicht-Schritt bei jedem Champion-Wechsel, siehe docs/promotion_checklist.md 5d (self_play.rs::maybe_update_net_parity_fixture) | - |
 | `MOSAIC_SPALTENBAU_TRACE` | aus | diagnose | - | [SB]-Entscheidungs-Spur im Logstrom, additiv (column_build.rs:1081) | - |
 | `MOSAIC_PLATTENBAU` | aus (0..7 oder auto) | diagnose | - | generischer Plattenbauer fuer alle 8 Wertungskriterien (plate_builder.rs:83) | STATUS.md Architektur-Fahrplan P.5 |
 | `MOSAIC_PROVOKATION_SPALTE` | aus (0..5 oder auto) | diagnose | ENTSCHIEDEN | Beschneidung der Drafting-Aktionsmenge auf eine Ziel-Spalte, nie im Gating (provocation.rs:49) | PREREG_provocation.md par.4 |

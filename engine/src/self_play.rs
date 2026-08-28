@@ -5520,21 +5520,321 @@ pub(crate) mod tests {
     /// dauerhaft leer-grün, siehe REGEL 0 "nie leer passed"). Fehlt
     /// `champion.txt` oder der referenzierte Checkpoint, `panic!`t die
     /// Funktion mit klarer Meldung statt still zu überspringen.
+    ///
+    /// Die `champion.txt`-Aufloesung selbst ist am 2026-08-28 nach
+    /// `net.rs::test_champion_model_path` gehoben worden (sie wird jetzt von
+    /// mehreren Modulen gebraucht: Sammel-Faden-Tests, Wurzel-Batching,
+    /// Netz-Paritaets-Fixture) -- hier bleibt nur noch die Ladeprobe.
     fn load_test_net_for_gating() -> String {
-        let champion_txt = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../models/champion.txt");
-        let champion = std::fs::read_to_string(&champion_txt)
-            .unwrap_or_else(|e| panic!(
-                "{champion_txt:?} nicht lesbar ({e}) -- Gating-Test braucht den Champion-Pfad, \
-                 kein stiller Skip erlaubt (Nutzer-Regel: nie leer gruen)."
-            ));
-        let champion = champion.trim();
-        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join(format!("../models/alphazero_{champion}.onnx"));
+        let path = crate::net::test_champion_model_path();
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
-            "{path:?} nicht ladbar ({e}) -- Champion-Checkpoint aus {champion_txt:?} fehlt, \
+            "{path:?} nicht ladbar ({e}) -- Champion-Checkpoint aus models/champion.txt fehlt, \
              Gating-Test darf nicht leer-gruen durchlaufen (Nutzer-Regel: nie leer gruen)."
         ));
         path.to_str().unwrap().to_string()
+    }
+
+    // ── Netz-Paritaets-Fixture (Nutzer-Entscheid 2026-08-28) ────────────────
+    //
+    // NACHFOLGER von `tools/parity_probe.py`. Die alte Sonde hat nach jeder
+    // Wheel-Installation belegt, dass die Default-Knopfstellung das
+    // Bestandsverhalten BITGLEICH laesst -- ihr Soll-Hash
+    // (`8c6684ffba06...`) hing aber an einem festen Modellnamen
+    // (`alphazero_v20_2d_opp_brierbest.onnx`) und ist mit dem Aufraeumen von
+    // `models/` am 2026-08-28 gegenstandslos geworden: Alt-Champions
+    // rotieren aus, ein Hash mit Alt-Champion-Abhaengigkeit rottet also mit.
+    //
+    // Nutzer-Randbedingung woertlich: "denk dran dass es immer nur einen
+    // champion gibt und altchampions dementsprechend rausrotieren koennen".
+    // Deshalb: die Fixture ist an den AMTIERENDEN Champion gebunden
+    // (`models/champion.txt`) und traegt seinen Namen im Kopf. Wechselt der
+    // Champion, schlaegt der Test LAUT fehl (nicht still, nicht leer-gruen)
+    // und nennt den Regenerierungs-Befehl -- die Neuerzeugung ist Schritt 5d
+    // der Promotions-Checkliste (`docs/promotion_checklist.md`).
+    //
+    // ABDECKUNG gegenueber der alten Sonde: die Python-Sonde hashte 6
+    // Einzelsuchen (`net_search_state_json`, 3 Zustaende x sims 150/400) auf
+    // Zustaenden aus `evaluations/frozen_eval_set.pkl` -- eine Pickle-Datei,
+    // die Rust nicht liest. Der Suite-Test spielt stattdessen ganze Partien
+    // ueber den Default-Netz-Spielpfad (`play_net_self_play_game`), womit
+    // Drafting-Suche, Tiling-Pfad und Rundenuebergaenge in EINEM Hash
+    // zusammenkommen (breiter als die alte Sonde, dafuer mit kleinerer
+    // Sim-Zahl, siehe `NET_PARITY_SIMS`). Der Bezug "fixe Zustaende, fixe
+    // Seeds, ein Hash" bleibt.
+
+    /// Simulationszahl je Zug -- klein gehalten, weil dieser Test im
+    /// NORMALEN `cargo test`-Lauf mitlaeuft (Praezedenz: die Arena-Tests in
+    /// diesem Modul fahren ebenfalls mit sims=8). Teil des eingefrorenen
+    /// Vertrags: eine andere Sim-Zahl darf einen anderen Hash liefern, ohne
+    /// dass sich am Verhalten etwas geaendert haette.
+    const NET_PARITY_SIMS: u32 = 8;
+
+    /// Partie-Seeds -- `4242 + i` wie in der alten Sonde
+    /// (`tools/parity_probe.py`, `seed=4242 + i`), damit der Bezug zum
+    /// Vorgaenger erkennbar bleibt.
+    const NET_PARITY_GAME_SEEDS: [u64; 3] = [4242, 4243, 4244];
+
+    /// Felder, die NICHT in den Hash eingehen. Gleiche Bauform wie
+    /// `EXCLUDED_FIELDS` der alten Sonde: eine ERLAUBNISLISTE mit festen
+    /// Namen, kein Muster -- ein NEUES Feld bricht die Fixture weiterhin, und
+    /// das ist gewollt (dann soll ein Mensch entscheiden, ob es Verhalten
+    /// oder Label/Diagnose ist).
+    ///
+    /// Begruendung fuer genau diese zwei, und sie ist gemessen, nicht
+    /// vermutet: `round_transition_deep.rs` (Modul-Kommentar, Abschnitt
+    /// "Restbefund") haelt fest, dass `bootstrap_value_after_rounds`/
+    /// `sample_round_transition_for_round` INNERHALB eines Prozesses exakt
+    /// reproduzieren, ueber ZWEI Prozessstarts hinweg aber ~1e-4..1e-3
+    /// abweichen (Verdacht: Summationsreihenfolge in tract-onnx). Eine
+    /// Fixture wird per Definition in einem ANDEREN Prozess geprueft als
+    /// erzeugt -- diese beiden Label-Felder muessen also draussen bleiben,
+    /// sonst waere der Test flatterhaft statt scharf. Sie beeinflussen den
+    /// gespielten Zug nicht (Praezedenz: derselbe Schnitt in
+    /// `sync_only_repeatability_after_rng_split` weiter unten).
+    const NET_PARITY_EXCLUDED_FIELDS: [&str; 2] = ["round_transition_value", "bootstrap_value"];
+
+    fn net_parity_fixture_path() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/net_parity_champion.txt")
+    }
+
+    /// UTC-Datum als `YYYY-MM-DD` fuer den Fixture-Kopf -- eigene Rechnung
+    /// (Hinnant, `civil_from_days`), weil die Engine bewusst keine
+    /// Datums-Abhaengigkeit hat und dafuer auch keine bekommen soll.
+    fn utc_date_today() -> String {
+        let secs = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let z = secs.div_euclid(86_400) + 719_468;
+        let era = z.div_euclid(146_097);
+        let doe = z - era * 146_097;
+        let yoe = (doe - doe / 1_460 + doe / 36_524 - doe / 146_096) / 365;
+        let y = yoe + era * 400;
+        let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+        let mp = (5 * doy + 2) / 153;
+        let d = doy - (153 * mp + 2) / 5 + 1;
+        let m = if mp < 10 { mp + 3 } else { mp - 9 };
+        let y = y + i64::from(m <= 2);
+        format!("{y:04}-{m:02}-{d:02}")
+    }
+
+    /// Spielt den festen Partie-Korpus und faltet ihn in EINEN Hash.
+    ///
+    /// Hash-Verfahren: FNV-1a-64 ueber die aneinandergehaengten Record-JSONs
+    /// (`crate::fnv1a_64`, dieselbe Funktion wie in der A3-Feature-Fixture).
+    /// Bewusste Abweichung von der alten Sonde, die SHA256 nahm: die Engine
+    /// hat keine `sha2`-Abhaengigkeit, und die Aufgabe des Hashes ist
+    /// Aenderungs-Erkennung, nicht Kryptographie. `serde_json` laeuft hier
+    /// OHNE `preserve_order` (siehe `engine/Cargo.toml`), die Schluessel-
+    /// reihenfolge im `to_string()` ist also sortiert und stabil.
+    ///
+    /// Spielaufbau bewusst OHNE Wurzelrauschen und mit `deterministic=true`
+    /// (greedy): beides senkt die Zahl der Stellen, an denen eine winzige
+    /// Gleitkomma-Drift eine Zugwahl kippen koennte, ohne den durchlaufenen
+    /// Code zu veraendern. `record_rtv=false` spart die teuerste
+    /// Self-Play-Komponente (~81% der Kosten, siehe `run_self_play_with_net_labels`).
+    fn net_parity_hash(net: &Net) -> u64 {
+        let mut buf = String::new();
+        for (i, &seed) in NET_PARITY_GAME_SEEDS.iter().enumerate() {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            let names = ["Netz".to_string(), "Netz".to_string()];
+            let records = play_net_self_play_game(
+                net,
+                NET_PARITY_SIMS,
+                crate::net_mcts::DEFAULT_C_PUCT,
+                ids,
+                names,
+                i % 2, // Startspieler wechselt -- beide Seiten kommen vor
+                "net_parity",
+                &mut rng,
+                false, // add_root_noise
+                true,  // deterministic
+                false, // record_rtv
+                None,  // move_heartbeat
+                None,  // pcr_full_prob
+                0,     // pcr_cheap_sims
+                seed,  // game_seed
+                None,  // start_state
+                crate::net_mcts::SearchConfig::from_env(),
+            );
+            assert!(
+                !records.is_empty(),
+                "Partie mit Seed {seed} lieferte KEINE Records -- die Fixture wuerde \
+                 sonst ueber Nichts gebildet (Nutzer-Regel: nie leer gruen)"
+            );
+            for r in &records {
+                let mut m = r.as_object().cloned().unwrap_or_default();
+                for f in NET_PARITY_EXCLUDED_FIELDS {
+                    m.remove(f);
+                }
+                buf.push_str(&Value::Object(m).to_string());
+                buf.push('\n');
+            }
+        }
+        crate::fnv1a_64(&buf)
+    }
+
+    /// Parst die Fixture: `#`-Kommentare und Leerzeilen raus, sonst je Zeile
+    /// `<schluessel>\t<wert>` (gleiche Bauform wie die A3-/A4-Fixtures).
+    fn parse_net_parity_fixture(text: &str) -> std::collections::HashMap<String, String> {
+        text.lines()
+            .map(str::trim_end)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .map(|l| {
+                let (k, v) = l
+                    .split_once('\t')
+                    .unwrap_or_else(|| panic!("Fixture-Zeile ohne Tab-Trenner: {l:?}"));
+                (k.to_string(), v.to_string())
+            })
+            .collect()
+    }
+
+    /// Regenerator -- OPT-IN ueber `MOSAIC_UPDATE_NET_PARITY_FIXTURE=1`
+    /// (Muster: `features.rs::maybe_update_fixture`). Schreibt Kopf UND
+    /// Datenzeilen komplett neu, damit Champion-Name und Datum nie vom
+    /// Inhalt driften koennen. Gibt `true` zurueck, wenn geschrieben wurde.
+    fn maybe_update_net_parity_fixture(
+        path: &std::path::Path,
+        champion: &str,
+        hash: u64,
+    ) -> bool {
+        if std::env::var("MOSAIC_UPDATE_NET_PARITY_FIXTURE").as_deref() != Ok("1") {
+            return false;
+        }
+        let text = format!(
+            "# Netz-Paritaets-Fixture -- GENERIERT, nicht von Hand editieren.\n\
+             #\n\
+             # Nachfolger von tools/parity_probe.py (Nutzer-Entscheid 2026-08-28): belegt,\n\
+             # dass der Netz-Spielpfad bei DEFAULT-Knopfstellung dasselbe Verhalten zeigt\n\
+             # wie bei der Erzeugung -- nach jedem Wheel-/Engine-Umbau.\n\
+             #\n\
+             # Die Fixture folgt dem EINEN amtierenden Champion (models/champion.txt).\n\
+             # Wechselt der Champion, verfaellt sie mit ihm und wird neu erzeugt:\n\
+             #   MOSAIC_UPDATE_NET_PARITY_FIXTURE=1 cargo test --release \\\n\
+             #     net_parity_hash_matches_champion_fixture -- --nocapture\n\
+             # (Schritt 5d der Promotions-Checkliste, docs/promotion_checklist.md)\n\
+             #\n\
+             # Korpus: {n_games} Partien ueber play_net_self_play_game, Seeds {seeds:?},\n\
+             # sims={sims}, c_puct=Default, kein Wurzelrauschen, deterministic=true,\n\
+             # record_rtv=false, Startspieler alternierend. Nicht gehashte Label-Felder:\n\
+             # {excluded:?} (siehe NET_PARITY_EXCLUDED_FIELDS in self_play.rs).\n\
+             # Hash-Verfahren: FNV-1a-64 ueber die Record-JSONs.\n\
+             champion\t{champion}\n\
+             erzeugt\t{datum}\n\
+             engine\t{engine}\n\
+             hash\t{hash:016x}\n",
+            n_games = NET_PARITY_GAME_SEEDS.len(),
+            seeds = NET_PARITY_GAME_SEEDS,
+            sims = NET_PARITY_SIMS,
+            excluded = NET_PARITY_EXCLUDED_FIELDS,
+            datum = utc_date_today(),
+            engine = env!("CARGO_PKG_VERSION"),
+        );
+        if let Some(dir) = path.parent() {
+            std::fs::create_dir_all(dir).expect("Fixture-Verzeichnis anlegen");
+        }
+        std::fs::write(path, text).expect("Fixture schreiben");
+        true
+    }
+
+    /// **Pflicht-Golden-Test (Netz-Paritaet).** Bricht, wenn der
+    /// Netz-Spielpfad bei Default-Knopfstellung ein anderes Ergebnis liefert
+    /// als bei der Fixture-Erzeugung -- oder wenn der Champion gewechselt hat
+    /// (dann ist die Fixture gegenstandslos und wird neu erzeugt, nicht
+    /// "angepasst").
+    ///
+    /// Anlass: Nutzer-Entscheid 2026-08-28, die Paritaets-Sonde als
+    /// FIXTURE-TEST in die Suite zu holen. Der Vorgaenger
+    /// `tools/parity_probe.py` lief nur, wenn jemand daran dachte, und sein
+    /// Soll-Hash `8c6684ffba06...` hing an `v20_2d_opp_brierbest` -- mit dem
+    /// Aufraeumen von `models/` am selben Tag ist er geschlossen worden.
+    ///
+    /// KEIN stiller Skip an irgendeiner Stelle (Nutzer-Regel "nie leer
+    /// gruen"): fehlendes Modell -> `panic!` in `test_champion_model_path`,
+    /// fehlende Fixture -> `panic!` mit Regenerierungs-Befehl,
+    /// Champion-Wechsel -> `assert_eq!` mit derselben Anleitung.
+    ///
+    /// GEGENPROBE-PFLICHT (wie bei A3/A4): wer den Waechter zum ersten Mal
+    /// erzeugt, aendert testweise eine Verhaltenskonstante und sieht nach,
+    /// dass der Test rot wird -- ein Waechter, von dem niemand gesehen hat,
+    /// dass er fehlschlagen kann, ist wertlos.
+    #[test]
+    fn net_parity_hash_matches_champion_fixture() {
+        const REGEN_HINWEIS: &str =
+            "MOSAIC_UPDATE_NET_PARITY_FIXTURE=1 cargo test --release \
+             net_parity_hash_matches_champion_fixture -- --nocapture \
+             (PowerShell: $env:MOSAIC_UPDATE_NET_PARITY_FIXTURE=1; cargo test ...)";
+
+        let champion = crate::net::test_champion_name();
+        let model_path = crate::net::test_champion_model_path();
+        let net = Net::load_auto(model_path.to_str().unwrap()).unwrap_or_else(|e| {
+            panic!(
+                "{model_path:?} nicht ladbar ({e}) -- Champion aus models/champion.txt \
+                 ({champion}) fehlt, der Test darf nicht leer-gruen bestehen \
+                 (Nutzer-Regel: nie leer gruen)."
+            )
+        });
+
+        // Laufzeit mitschreiben (Nutzer-Anweisung "Laufzeiten messen, nicht
+        // schaetzen") -- dieser Test laeuft im normalen Suite-Lauf mit, sein
+        // Budget gehoert also sichtbar gemacht, nicht geschaetzt.
+        let t0 = std::time::Instant::now();
+        let hash = net_parity_hash(&net);
+        let dauer = t0.elapsed();
+        eprintln!(
+            "net_parity_hash_matches_champion_fixture: champion={champion} hash={hash:016x} \
+             partien={} sims={NET_PARITY_SIMS} wanduhr_s={:.1}",
+            NET_PARITY_GAME_SEEDS.len(),
+            dauer.as_secs_f64()
+        );
+
+        let path = net_parity_fixture_path();
+        if maybe_update_net_parity_fixture(&path, &champion, hash) {
+            eprintln!(
+                "Netz-Paritaets-Fixture NEU GESCHRIEBEN ({path:?}): champion={champion} \
+                 hash={hash:016x}. Zur Abnahme denselben Test OHNE die Umgebungsvariable \
+                 wiederholen -- er muss dann in einem FRISCHEN Prozess gruen sein."
+            );
+            return;
+        }
+
+        let text = std::fs::read_to_string(&path).unwrap_or_else(|e| {
+            panic!(
+                "{path:?} nicht lesbar ({e}) -- die Netz-Paritaets-Fixture fehlt. Kein \
+                 stiller Skip (Nutzer-Regel: nie leer gruen). Einmalig erzeugen mit:\n  \
+                 {REGEN_HINWEIS}"
+            )
+        });
+        let f = parse_net_parity_fixture(&text);
+        let want_champion = f.get("champion").unwrap_or_else(|| {
+            panic!("{path:?} hat keine 'champion'-Zeile -- Fixture neu erzeugen:\n  {REGEN_HINWEIS}")
+        });
+        assert_eq!(
+            want_champion, &champion,
+            "Champion gewechselt (Fixture: {want_champion}, models/champion.txt: {champion}) \
+             -> Fixture neu erzeugen:\n  {REGEN_HINWEIS}\nEs gibt immer nur EINEN Champion; \
+             Alt-Champions rotieren aus, und ihre Paritaets-Fixture verfaellt mit ihnen. \
+             Der Hash des Vorgaengers wird NICHT weitergeschleppt."
+        );
+        let want_hex = f.get("hash").unwrap_or_else(|| {
+            panic!("{path:?} hat keine 'hash'-Zeile -- Fixture neu erzeugen:\n  {REGEN_HINWEIS}")
+        });
+        let want = u64::from_str_radix(want_hex, 16)
+            .unwrap_or_else(|e| panic!("{path:?}: 'hash'-Zeile {want_hex:?} ungueltig ({e})"));
+        assert_eq!(
+            hash, want,
+            "Netz-Paritaet weicht ab (got={hash:016x} want={want:016x}, champion={champion}): \
+             der Default-Netz-Spielpfad spielt nicht mehr dieselben Partien wie bei der \
+             Fixture-Erzeugung. Vor jeder Anpassung pruefen, in dieser Reihenfolge: \
+             (1) steht ein MOSAIC_*-Knopf in der Umgebung? Diese Fixture misst DEFAULT-\
+             Verhalten (SearchConfig::from_env). (2) ist eine Engine-Aenderung gewollt \
+             verhaltensaendernd? Dann Fixture bewusst neu erzeugen UND im Commit \
+             begruenden. (3) sonst ist es ein echter Regressionsbefund -- Ursache klaeren, \
+             BEVOR eine Messung weiterlaeuft (laufende Sweep-Arme waeren sonst ueber den \
+             Wechsel hinweg nicht mehr vergleichbar)."
+        );
     }
 
     /// Task #76 (Gepaartes Gating als Standard) -- Verifikat: `run_net_vs_net_arena`
@@ -5600,8 +5900,7 @@ pub(crate) mod tests {
         // mehr vorhanden ist, siehe `pcr_full_prob_gates_...`-Test weiter
         // unten fuer denselben Workaround) -- `champion.txt` verweist lokal
         // auf `alphazero_v21_2d_brierbest.onnx`, das existiert.
-        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
         let model_path = model_path.to_str().unwrap();
         if let Err(e) = Net::load_auto(model_path) {
             panic!(
@@ -5846,8 +6145,7 @@ pub(crate) mod tests {
     #[test]
     #[ignore]
     fn sync_only_repeatability_after_rng_split() {
-        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
         let model_path = model_path.to_str().unwrap();
         let net = Net::load_auto(model_path).unwrap_or_else(|e| panic!(
             "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
@@ -6067,8 +6365,7 @@ pub(crate) mod tests {
         // v18_best (inzwischen ebenfalls aus dem Bestand gefallen) -- der Test
         // lief dadurch bis 2026-08-15 still leer-gruen. Jetzt: amtierender
         // Champion, und unten harter Fehler statt Skip.
-        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
         let model_path = model_path.to_str().unwrap();
         if let Err(e) = Net::load_auto(model_path) {
             panic!(
@@ -6229,8 +6526,7 @@ pub(crate) mod tests {
     fn root_child_q_present_for_real_decisions_absent_for_shortcuts_and_tiling() {
         // Fixture bis 2026-08-15: v18_best (aus dem Bestand gefallen, Test lief
         // still leer-gruen) -- jetzt amtierender Champion + harter Fehler.
-        let model_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../models/alphazero_v21_2d_brierbest.onnx");
+        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
         let model_path = model_path.to_str().unwrap();
         if let Err(e) = Net::load_auto(model_path) {
             panic!(
