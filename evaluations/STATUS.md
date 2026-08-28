@@ -132,6 +132,26 @@ Tabelle unten bei den drei JSONs.)
 
 ## NAECHSTE SCHRITTE (Stand 2026-08-26, nach Prioritaet)
 
+### KAMPAGNEN-ZIEL (Nutzer 2026-08-28, nach dem b01-Peek)
+
+**"Ich will schlussendlich einen sauberen Netz-Generator, der auf Spalten
+spielt."** Das ist das Erfolgskriterium dieser Kampagne -- nicht, ob v22
+v21 schlaegt (Gating laeuft informativ). Jeder der vorbereiteten Wege wird
+daran gemessen, ob er das Netz dem Spaltenspiel naeher bringt:
+
+| Weg | Stand | prueft/hebt |
+| --- | --- | --- |
+| Orakel-Treue-Diagnose (prior_mass/tau gegen den Lehrer) | Werkzeug vorhanden | WO der Verlust sitzt: Draft-Erbe oder Tiling |
+| Surprise-Weighting (waere v22-b03) | Entwurf registriert | Draft-Erbe schaerfen, falls Treue niedrig |
+| `MOSAIC_OWNERSHIP_TILING_W` mit b01-Kopf | Knopf gebaut, nie richtig bedingt gefahren | Tiling-ABSICHT zur Spielzeit |
+| Stufe 2: 2D-Ablesung des Ownership-Kopfs | registriert (par.3b Stufenplan) | Kopf-Geometrie statt flacher Projektion |
+| Vollendungs-Filter in der Suche | Wecker-Liste v23 | den Vollendungs-Engpass direkt |
+| Arm K / Arm L (Label-Qualitaet) | Entwurf/Reserve | Value-Ziel-Hygiene |
+
+b01-Peek als Anlass: 0,275 volle Spalten (2,5x Champion, weit unter
+Lehrer 0,73; lastkontaminiert, n=20) -- Bau bis >=4 da (1,52), Vollendung
+fehlt.
+
 ### A0. SCHLACHTPLAN v22 -> v23 (Nutzer-Auftrag 2026-08-27) und Nachtstand
 
 Der Plan der Nacht 2026-08-27/28, mit Ist-Stand je Schritt -- damit eine
