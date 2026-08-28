@@ -14247,6 +14247,34 @@ sie nichts. Sonde `tools/probes/corpus_state_diversity_probe.py`, Artefakt
 `evaluations/artifacts/corpus_state_diversity.json`.
 
 
+## B-Strang: Ergebnistabelle (B1-B4b, abgeschlossen 2026-08-27) -- ausgelagert aus STATUS.md am 2026-08-28
+
+| | | Stand |
+| --- | --- | --- |
+| B1 | Treiber parallelisieren | **fertig** -- Faktor 2,42 (39,5 s -> 16,3 s bei 24 Partien), ergebnisneutral Partie fuer Partie |
+| B2 | Arena ueber den Referee | **fertig** -- `tools/anchor_arena.py`, misst gegen `frozen_heuristics/v1_anchor` |
+| B3 | Elo-Konventionen | **fertig** -- `player_b` traegt den Build, `elo_tracker add --knobs` verweist auf die Spec |
+| B4b | `round5_anchor.rs` entfernt | **fertig** -- 1.664 Zeilen, dreifach als verhaltensneutral belegt |
+| B4a | Varianten-Faedelung entfernen | **fertig 2026-08-27** -- rund 1.900 Zeilen, Herleitung im Archiv-Kapitel 2026-08-25 bis 2026-08-28 ("V2 ist aus dem Quellstand") |
+
+**Zwei Regeln aus B, die WEITERGELTEN:**
+
+1. **Eine Anker-Messung laeuft ab jetzt ueber `tools/anchor_arena.py`**
+   (Artefakt-Pfad, misst gegen `frozen_heuristics/v1_anchor`), nicht ueber die
+   In-Process-Heuristik. Grund: seit B4b bewegt eine Aenderung an `round5.rs`
+   auch den Heuristik-Pfad -- der Schutz ist ins Artefakt gewandert.
+2. **`PREREG_heuristic_v2_long_rows.md` par.3b.1 braucht die Huellen-Geometrie
+   aus der Historie VOR dem B4a-Commit.** `v2_envelope_target` samt Umfeld ist
+   mit dem v2-Routing gefallen (`plate_builder.rs` 2.835 -> 1.422 Zeilen); wer
+   das Gewichts-Fenster baut, holt es von dort. Kein Nullposten. Herleitung:
+   `../archive/history.md` (Kapitel 2026-08-25 bis 2026-08-28, Abschnitt
+   "B-Block: Planungs-Rueckschau").
+
+**B (Historie), die vier Schritte wie sie geplant waren, samt der zwei
+gescheiterten Planungsannahmen: ERLEDIGT 2026-08-27 -- Herleitung in
+`../archive/history.md` (Kapitel 2026-08-25 bis 2026-08-28).**
+
+
 # Vollstaendiger STATUS-Stand vom 2026-08-25 (vor der Neufassung)
 
 **Warum dieses Kapitel existiert:** Nutzer-Auftrag 2026-08-25, STATUS.md

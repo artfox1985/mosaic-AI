@@ -958,6 +958,13 @@ Damit ist die Huelle nicht mehr die "Spalten-Huelle", sondern die
 
 ### par.3b.1 Das Gewicht braucht ein Fenster -- und ob es existiert, ist messbar
 
+**BAU-HINWEIS (2026-08-28, aus dem B-Strang):** die Huellen-Geometrie
+(`v2_envelope_target` samt Umfeld) ist mit dem B4a-Commit aus dem Quellstand
+gefallen (`plate_builder.rs` 2.835 -> 1.422 Zeilen). Wer dieses Fenster baut,
+holt die Geometrie aus der Historie VOR B4a; Herleitung in
+`archive/history.md` (Kapitel 2026-08-25 bis 2026-08-28, Abschnitt
+"B-Block: Planungs-Rueckschau").
+
 Nutzer, zwei weitere Ausbruchsgruende: *"es wird immer wieder situationen
 geben wo eine einzelne fliese ausserhalb der huelle platziert wird um keine
 strafpunkte zu bekommen oder die reihe abzuschliessen damit sie frei ist fuer
