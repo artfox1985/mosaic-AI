@@ -71,7 +71,7 @@ def portable_path(path) -> str:
     """Pfad ohne Rechnerstruktur (CLAUDE.md: das Repo ist oeffentlich).
 
     Relativ zum Arbeitsverzeichnis, sonst relativ zur Repo-Wurzel, sonst nur
-    der Dateiname -- ein Artefakt mit einem absoluten Nutzerpfad (Form Laufwerk:/Users/Name, hier bewusst nicht ausgeschrieben: der Waechter traefe sein eigenes Beispiel, Praezedenz pre-push 2026-08-27) darf nicht
+    der Dateiname -- ein Artefakt mit einem absoluten Nutzerpfad (Laufwerk + Nutzerordner + Name; das Muster steht hier bewusst NICHT woertlich, der Waechter traefe sein eigenes Beispiel -- Praezedenz pre-push 2026-08-27 und dieser Kommentar selbst am 2026-08-28, zweiter Anlauf) darf nicht
     entstehen."""
     p = pathlib.Path(path)
     try:
