@@ -506,19 +506,9 @@ zwei Punktekarten (`PREREG_heuristic_v2_long_rows.md` par.11-16),
 
 ## BENENNUNG DER GENERATIONEN
 
-**Die REGEL ("ein Fenster vN traegt die Partien von Champion v(N-1)"), die
-Off-by-one-Warnung und die Namenskonvention der Arme sind kanonisch in
-`../docs/generation_naming.md`** (seit 2026-08-28 aus STATUS entflochten).
-Hier steht nur noch die KONKRETE Kette der laufenden Kampagne:
-
-| | |
-| --- | --- |
-| `hv2`-Korpus (laeuft) | **das v22-Fenster** -- Erzeuger ist die Heuristik, nicht ein Champion |
-| daraus trainiert | **v22-Netz** |
-| dessen Self-Play | fuellt **das v23-Fenster** |
-| daraus trainiert | **v23-Netz** |
-
-Zuschnitt des v23-Fensters ist seit 2026-08-25 festgelegt (`PREREG_v23_window.md`): 29.450 Partien, davon **12.000 aus dem v22-Self-Play** (4.000 Sockel + 8.000 Schwarm `--value-only`) und **17.450 aus hv2** (6.550 rotieren aus). Damit steht auch der Umfang des v22-Self-Play-Laufs fest. Drei offene Punkte dort: G-1/G-2 kommen aus DEMSELBEN Korpus (Platzhalter, keine Aera-Streuung), der Cache ist UNKRITISCH (gemessen 2.806 B je Zustand statt der veralteten 6 KB -> ~14,1 GB gegen 34,3 GB), und die Policy-Ausbeute der hv2-Plaetze haengt an der Traegerfrage.
+**Vollstaendig kanonisch in `../docs/generation_naming.md`** (Nutzer-Entscheid
+2026-08-28: auch die konkrete Kette der laufenden Kampagne wird dort gefuehrt,
+nicht mehr hier).
 
 ---
 
