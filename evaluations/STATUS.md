@@ -389,19 +389,6 @@ Self-Play-Pfad durchgereicht, Arena-Threadzahl auf EINE Konvention gezogen,
 Bootstrap-Horizont 3 verworfen (v22 faehrt Horizont 2), Erzeugung mit dem
 heutigen Wheel.
 
-### 2. Reparatur der Blindzieh-Stopp-Regel
-
-**ERLEDIGT 2026-08-25 -- Herleitung in `../archive/history.md` (Kapitel
-2026-08-25 bis 2026-08-28).** Abnahme gefahren (par.5d): KEIN Staerkegewinn,
-der Knopf bleibt auf Default AUS. Offen bleibt allein das Gegenpruefen in der
-Arena -- Zeile in "Offen, mit Kosten" und in "C. Billig und offen".
-
-### 3. Arena-Threadzahl geradeziehen
-
-**ERLEDIGT 2026-08-25 -- Herleitung in `../archive/history.md` (Kapitel
-2026-08-25 bis 2026-08-28).** `self_play::thread_plan` ist seither die EINE
-Konvention: `0` = alle Kerne, `1` = sequenziell, `n` = n Threads.
-
 ### 4. JSON-Umzug: Restentscheid
 
 Die Artefakte liegen jetzt in `evaluations/artifacts/` und sind **ungetrackt**
