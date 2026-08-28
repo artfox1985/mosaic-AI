@@ -137,12 +137,14 @@ Tabelle unten bei den drei JSONs.)
 Die "verschwundenen" Dateien in models/ waren beabsichtigtes Aufraeumen des
 Nutzers -- meine Fehldiagnose (und die ONNX-Wiederherstellung) kam ihm
 zuvor. Aufgeloest: die 29 Alt-Trainingsmanifeste sind jetzt ordentlich per
-git rm entfernt (`fc92b97`). OFFEN, Nutzer-Entscheid im Gespraech: die
-Champion-`.pth` gehoert kuenftig MIT ins frozen-Artefakt (Torch-Seite fuer
-platt_fit/Warmstarts; Quelle Backup-Zip); Empfehlung ONNX getrackt LASSEN
-(Byte-Beweisstueck, Re-Export aus .pth ist nicht byte-stabil). Haengt daran:
+git rm entfernt (`fc92b97`). ENTSCHIEDEN (Nutzer): die Champion-`.pth`
+liegt jetzt als `model.pth` IM frozen-Artefakt, UNVERSIONIERT (globale
+*.pth-Ignore-Regel greift; Schutz = Backup-Ordner, Praezedenz venv/). Die
+ONNX bleibt getrackt (Byte-Beweisstueck; Re-Export aus .pth ist nicht
+byte-stabil). Kuenftige Einfrierungen legen die .pth mit ab
+(freeze-Werkzeug-Nachzug auf der 1e-Merkliste). WEITER OFFEN:
 champion.txt und 9 Suite-Tests laden aus models/ -- soll models/ leer
-werden, muessen sie auf den Artefakt-Pfad umziehen.
+werden, muessen sie auf den Artefakt-Pfad umziehen (Build-Fenster).
 
 ### UMBENENNUNG hv1/hv2: GEBAUT, Wheel-Neubau ausstehend
 
