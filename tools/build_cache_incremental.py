@@ -215,8 +215,10 @@ def main():
     # --- Zusammensetzen (optional): sortierte Dateireihenfolge = serielle
     # Reihenfolge, Voraussetzung fuer die Bit-Identitaet.
     merge_s = None
+    window_key = None
     if a.merge_out:
         from build_cache_parallel import merge
+        import corpus_dataset
         parts = []
         for f in all_entries:
             b = os.path.basename(f)
@@ -225,11 +227,18 @@ def main():
             if not os.path.exists(p):
                 raise SystemExit(f"Block fehlt: {p} (zu {b}) -- erst bauen, dann zusammensetzen.")
             parts.append(p)
+        # Fenster-Schluessel der zusammengesetzten Datei (2026-08-28): ohne ihn
+        # lehnt `train.py --cache-file` das Ergebnis ab. Die Datei-Bloecke
+        # tragen ihn nicht -- ihr Schluessel gehoert je zu EINER Datei
+        # (`per_file_cache_key`), nicht zum Fenster.
+        window_key = corpus_dataset.window_cache_key(
+            a.data_dir, all_entries, value_target_variant=a.value_target_variant,
+            encoder=a.encoder, conjunction_head=a.conjunction_head)
         t1 = time.time()
-        fields = merge(parts, a.merge_out)
+        fields = merge(parts, a.merge_out, window_key=window_key)
         merge_s = time.time() - t1
-        print(f"⏱️  Zusammenfuegen: {merge_s:.1f}s ({len(fields)} Felder) -> {a.merge_out}",
-              flush=True)
+        print(f"⏱️  Zusammenfuegen: {merge_s:.1f}s ({len(fields)} Felder) -> {a.merge_out} "
+              f"(Fenster-Schluessel {window_key.key})", flush=True)
 
     out = {
         "prereg": "PREREG_cache_build_time.md par.6 (Hebel 4)",
@@ -238,6 +247,8 @@ def main():
         "conjunction_head": a.conjunction_head,
         "traeger_manifest": manifest_path if carrier_set is not None else None,
         "watch": a.watch, "merge_out": a.merge_out,
+        "cache_key": window_key.key if window_key is not None else None,
+        "cache_key_full": window_key.key_full if window_key is not None else None,
         # Pflichtfelder nach CLAUDE.md "Laufzeiten messen, nicht schaetzen".
         # `threads` ist hier die Worker-Zahl des Pools; `cpu_s` misst NUR den
         # Elternprozess (die Worker sind eigene Prozesse), taugt also als

@@ -24,6 +24,7 @@ import json
 import math
 import pickle
 import statistics
+from typing import NamedTuple
 import numpy as np
 import torch
 import torch.nn as nn
@@ -252,14 +253,336 @@ def _resolve_planes_h5_path(cache_path_h5: str) -> str:
     return resolved
 
 
+# Schluessel-Attribute im HDF5-Cache (PREREG_cache_build_time.md par.6, Schritt
+# 2c "vorab gebauten Cache verdrahten"). Ein vorab gebauter Cache ist nur dann
+# gefahrlos benutzbar, wenn die Datei SELBST sagt, fuer welches Fenster sie
+# gebaut wurde -- sonst waere `--cache-file` genau die Fehlerklasse, gegen die
+# `+nopack_v1`/`+f32_v1`/`+bsnative_default_v1` gebaut sind: ein Knopf, der
+# still den falschen Korpus trainiert. Deshalb sind das DATEI-Attribute (nicht
+# Dataset-Attribute): `build_cache_parallel.merge` kopiert nur Dataset-Attribute
+# der Teilbloecke, ein Block-Schluessel kann also nicht versehentlich als
+# Fenster-Schluessel im zusammengefuegten Cache landen.
+CACHE_KEY_ATTR = "mosaic_cache_key"            # md5[:12], identisch zum Dateinamen-Key
+CACHE_KEY_FULL_ATTR = "mosaic_cache_key_full"  # voller md5-Hexdigest (Waechter-Vergleich)
+CACHE_KEY_ATTRS_VERSION = 1
+
+
+class WindowCacheKey(NamedTuple):
+    """Ergebnis von `window_cache_key` -- Fenster-Schluessel plus alles, was auf
+    dem Weg dorthin ohnehin aufgeloest wurde (gefilterte Dateiliste,
+    Traeger-Manifest, Packmodus). EINE Quelle fuer Schluessel und Bauweg:
+    `MosaicDataset.__init__` liest diese Felder statt sie ein zweites Mal aus
+    der Umgebung zu holen."""
+    files: list
+    policy_carrier_set: object      # frozenset | None
+    carrier_prefixes: object        # list | None
+    cache_nopack: bool
+    key: str                        # md5[:12]
+    key_full: str                   # voller md5-Hexdigest
+    material: str                   # das Schluesselmaterial selbst (Diagnose)
+
+
+def window_cache_key(data_dir="data", files=None, *, value_target_variant="default",
+                     encoder="flat", conjunction_head=False) -> WindowCacheKey:
+    """Der FENSTER-Cache-Schluessel: welcher Datensatz-Cache zu dieser
+    Dateiliste und dieser Konfiguration gehoert.
+
+    Herausgeloest aus `MosaicDataset.__init__` am 2026-08-28 (Schlachtplan A0
+    Schritt 2c). Der Rumpf ist zeilenweise der bisherige -- die
+    Zeichenketten-Verkettung unten ist der Schluessel JEDES vorhandenen Caches
+    im `data/`-Ordner; jede Aenderung an ihr entwertet Bestand. Grund fuer den
+    Auszug: der Schluessel muss OHNE Korpus-Ladung berechenbar sein, damit
+    (a) `tools/build_cache_parallel.py` ihn dem zusammengefuegten Cache
+    aufpraegen und (b) `--cache-file` ihn gegen die vorgelegte Datei pruefen
+    kann. Vorher konnte man ihn nur bekommen, indem man den Cache baute.
+
+    NICHT zu verwechseln mit `per_file_cache_key` (file_cache_key.py): der
+    kennt bewusst KEINE Dateiliste und keinen Split, sonst haengt jeder
+    Datei-Block wieder am Fenster (siehe build_cache_incremental.py-Kopf).
+    """
+    from config import INPUT_SIZE
+    import hashlib
+
+    # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
+    # TD_LAMBDA fehlte hier bisher im Hash (Retrain-Sweep-Audit,
+    # 2026-07-22): der TD-Bootstrap-Blend wird in `val`/`points_val`
+    # VOR dem Caching eingerechnet (siehe unten), ein Lambda-Sweep haette
+    # also stillschweigend den Cache der ersten je Dateiliste gebauten
+    # Lambda-Variante wiederverwendet und NICHTS gemessen. Jetzt Teil des
+    # Keys, gleiche Stelle wie POLICY_TARGET_SHARPEN_EXPONENT.
+    # value_target_variant (Task #84) genau dieselbe Falle: der rtv-
+    # Override wird ebenfalls VOR dem Caching eingerechnet -- ohne diesen
+    # String im Key wuerden "nortv"/"nortv_r1" stillschweigend den
+    # "default"-Cache derselben Dateiliste wiederverwenden.
+    files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+    # MOSAIC_DATA_EXCLUDE (2026-08-07, Fenster-Pinning): Regex, der
+    # Dateien VOR Key-Bildung und Training ausschliesst. Noetig, weil
+    # data/ waehrend laufender Generierungen WAECHST (Vorfall: der
+    # pi_ctrl_s3-Neustart glob-te frisch gelandete v19wdlann-Dateien
+    # mit ein -> Cache-Voll-Neubau + kontaminiertes Kontroll-Fenster).
+    # Der gefilterte Datei-Liste steckt via `str(files)` ohnehin im
+    # Cache-Key -- gleicher Filter => gleicher Key => Cache-Hit.
+    _excl = os.environ.get("MOSAIC_DATA_EXCLUDE")
+    if _excl:
+        _n0 = len(files)
+        files = [f for f in files if not re.search(_excl, os.path.basename(f))]
+        print(f"🔒 MOSAIC_DATA_EXCLUDE={_excl!r}: {_n0 - len(files)} von {_n0} Dateien ausgeschlossen.")
+    # "+rounds_v1" (Task #15 B, 2026-07-28): der Cache fuehrt jetzt zusaetzlich
+    # die Rundennummer je Sample mit (fuer rundenselektive Loss-Gewichtung,
+    # z.B. --exclude-round5). Der Marker erzwingt einen einmaligen Rebuild
+    # aller Alt-Caches, statt sie stillschweigend ohne das Feld zu laden.
+    # "+enc2d_v1" (Task #11 Phase 2): NUR im 2D-Modus angehaengt, siehe
+    # `encoder`-Doku oben -- der Flach-Modus-Key bleibt dadurch UNVERAENDERT,
+    # bestehende Flach-Caches werden also nicht ungueltig.
+    # Schema 17: Policy-Traeger-Manifest (v20-Zwei-Klassen-Fenster).
+    # Fehlt die Datei -> None = Bestandsverhalten (alle Dateien tragen
+    # Policy). Inhalt geht in den Cache-Key ein (anderer Traeger-Satz =
+    # anderer Cache).
+    # MOSAIC_CARRIER_MANIFEST (2026-08-08, v21-Uebergabe): Dateiname des
+    # Traeger-Manifests, Default = v20-Bestand. Inhalt steckt via
+    # policy_carrier_set ohnehin im Cache-Key.
+    # `carrier_prefixes` (2026-08-08, v21-Fix): additives, OPTIONALES
+    # Manifest-Feld -- Liste von Dateinamen-Praefixen, die (zusaetzlich
+    # zum `policy_carrier_set`) als Traeger gelten. Ist das Feld
+    # VORHANDEN (auch als leere Liste), schaltet `_is_policy_carrier`
+    # den `bootstrap_native`-Kurzschluss ab (siehe Funktionskommentar
+    # dort) -- notwendig, weil der Kurzschluss fuer v21 ALLE
+    # `selfplay_v19wdl_*`-Dateien zu Traegern macht, obwohl nur ein
+    # seed-bestimmter Teilsatz tragen soll. Fehlt das Feld (v20-Manifest,
+    # kein Rebuild-Zwang): None -> Alt-Verhalten EXAKT erhalten.
+    manifest_path = os.path.join(
+        data_dir,
+        os.environ.get("MOSAIC_CARRIER_MANIFEST", "policy_carrier_manifest_v20.json"))
+    policy_carrier_set = None
+    carrier_prefixes = None
+    if os.path.exists(manifest_path):
+        with open(manifest_path, encoding="utf-8") as mf:
+            _manifest = json.load(mf)
+            policy_carrier_set = frozenset(_manifest["policy_carrier_files"])
+            if "carrier_prefixes" in _manifest:
+                carrier_prefixes = list(_manifest["carrier_prefixes"])
+    else:
+        # Codepflege-Audit 2026-08-27, Befund 1: das Fehlen der Datei ist ein
+        # STILLER Semantik-Wechsel -- ohne Manifest traegt JEDE Korpusdatei
+        # Policy (siehe Kommentarblock oben). Das ist gewolltes
+        # Bestandsverhalten, aber es gehoert ins Log, damit ein versehentlich
+        # fehlendes/verschobenes Manifest nicht als Normalfall durchgeht.
+        # Reiner Hinweis, KEIN Verhaltenswechsel.
+        if manifest_path not in _CARRIER_MANIFEST_NOTICE_SHOWN:
+            _CARRIER_MANIFEST_NOTICE_SHOWN.add(manifest_path)
+            print(f"ℹ️  Traeger-Manifest {manifest_path} nicht gefunden -- "
+                  f"Bestandsverhalten: jede Datei traegt Policy", flush=True)
+
+    cache_key_material = (
+        str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
+        + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)
+        + "+rounds_v1+own_v1"
+        # "+bsnative_default_v1" (2026-08-27, PREREG_heuristic_v2_long_rows.md
+        # par.3b.3 Punkt 3): der bootstrap_native-Status ist eine
+        # ZIELDEFINITION je Datei -- er entscheidet, ob `values_wdl` den
+        # rohen oder den Platt-entstauchten Bootstrap eingeblendet
+        # bekommt, und das passiert VOR dem Caching (gleiche Falle wie
+        # TD_LAMBDA und value_target_variant oben). Die Umkehr auf
+        # "nativ ist Default" aendert diesen Status fuer JEDE Datei
+        # ausserhalb von LEGACY_STRETCHED_PREFIXES; ohne diesen Marker
+        # wuerde ein v22-Lauf still den Bestandscache mit den
+        # ENTSTAUCHTEN hv2-Zielen weiterbenutzen. Die Blockliste steht
+        # mit im Marker, damit auch eine spaetere Aenderung an IHR den
+        # Cache entwertet.
+        + "+bsnative_default_v1:" + ",".join(sorted(LEGACY_STRETCHED_PREFIXES))
+    )
+    if policy_carrier_set is not None:
+        cache_key_material += "+carriers:" + ",".join(sorted(policy_carrier_set))
+    if carrier_prefixes is not None:
+        # Eigene Komponente (nicht Teil von "+carriers:"): sonst wuerden
+        # zwei Manifeste mit identischem policy_carrier_set aber
+        # unterschiedlichen carrier_prefixes denselben Cache treffen
+        # (Fenster-Kollision, siehe Auftrag Punkt 3).
+        cache_key_material += "+carrier_prefixes:" + ",".join(sorted(carrier_prefixes))
+    if encoder == "2d":
+        # "+enc2d_v2" (2026-08-27, PREREG_special_tile_yield.md par.4a):
+        # NUM_PLANES_CHANNELS 77 -> 79 UND ein neues Packlayout
+        # (`_pack_planes`: 419 statt 347 Byte je Zeile). Der Marker MUSS
+        # mitziehen -- die Kanalzahl steckt in KEINER anderen
+        # Key-Komponente (geprueft 2026-08-27: `cache_key_material` fuehrt
+        # INPUT_SIZE, aber nicht NUM_PLANES_CHANNELS). Ohne den Bump
+        # traefe ein 79er-Lauf den 77er-Bestandscache.
+        cache_key_material += "+enc2d_v2"
+    # Konjunktions-Erweiterung (2026-08-10): die 25 Zusatzlabels je Spieler
+    # haengen HINTEN an den `ownership`-Vektor. Eigener Suffix, NUR wenn
+    # aktiv -- Muster "+enc2d_v1". Bewusst KEIN VALUE_SCHEMA_VERSION-Bump:
+    # die Konjunktionen sind ein optionales Zusatzfeld, ein Bump wuerde den
+    # vorhandenen v21-Cache ohne Not entwerten. Der Suffix verhindert
+    # zugleich das stille Wiederverwenden eines Alt-Caches, dessen
+    # `ownership`-Dataset nur OWNERSHIP_TARGETS breit ist (das Ziel waere
+    # dann vollstaendig maskiert und der Kopf lernte nichts -- ohne
+    # Fehlermeldung).
+    if conjunction_head:
+        cache_key_material += "+conj_v2"
+        if reach_target_k1_active():
+            # Eigener Cache, sonst wuerden alte Realisierungs-Labels still
+            # weiterverwendet (Muster wie "+enc2d_v1").
+            cache_key_material += f"+reachk1_r{REACH_K1_MIN_ROUND}_v1"
+            if reach_buffer_mode():
+                # Arm P (par.12): eigener Zusatz-Key, sonst wuerden
+                # boolesche Runde-1-2-Labels aus einem Alt-Cache (reine
+                # k1-Variante) still weiterverwendet.
+                cache_key_material += f"+reachbuf_cap{REACH_BUF_CAP}_v1"
+    # Bitpacking (RAM-Optimierung v21, PREREG_v21_window.md "RAM-
+    # Voraussetzung"): planes/masks werden ab jetzt STANDARDMAESSIG
+    # bitgepackt gespeichert (siehe `_pack_bits`-Kommentar oben) --
+    # eigener Suffix erzwingt einen Rebuild ALLER Alt-Caches (flat UND
+    # 2d, masks sind in beiden Modi betroffen), kein stilles
+    # Fehlinterpretieren des alten unkomprimierten Formats. Escape-Hatch
+    # MOSAIC_CACHE_NOPACK=1 (Muster wie MOSAIC_CACHE_F32) erzwingt exakt
+    # das alte Format -- eigener Suffix, damit die beiden Formate nie
+    # denselben Cache-Key treffen (falls die Bitpack-Validierung mal
+    # durchfaellt und zurueckgeschaltet werden muss).
+    cache_nopack = os.environ.get("MOSAIC_CACHE_NOPACK") == "1"
+    cache_key_material += "+nopack_v1" if cache_nopack else "+bitpack_v1"
+    if _IGNORE_PTV:
+        cache_key_material += "+ignore_ptv_v1"
+    # MOSAIC_CACHE_F32 (Befund 2026-08-26): der Knopf entscheidet ueber den
+    # gespeicherten dtype von states/policies (float32 statt float16, siehe
+    # `_f` weiter unten) und der Kommentar dort sagt selbst "NICHT
+    # bit-identisch" -- er stand aber in KEINER Key-Komponente. Ein Lauf
+    # mit dem Notausstieg traf damit den vorhandenen float16-Cache und der
+    # Knopf blieb still wirkungslos, also genau die Fehlerklasse, gegen die
+    # "+nopack_v1"/"+ignore_ptv_v1" gebaut sind. NUR bei gesetztem Knopf
+    # angehaengt: der Default-Key (float16) bleibt unveraendert, kein
+    # Bestands-Cache verfaellt.
+    if _cache_f32_active():
+        cache_key_material += "+f32_v1"
+    digest = hashlib.md5(cache_key_material.encode()).hexdigest()
+    return WindowCacheKey(files=files, policy_carrier_set=policy_carrier_set,
+                          carrier_prefixes=carrier_prefixes, cache_nopack=cache_nopack,
+                          key=digest[:12], key_full=digest, material=cache_key_material)
+
+
+def stamp_cache_key_attrs(hf, wk: WindowCacheKey) -> None:
+    """Praegt einem offenen (schreibbaren) HDF5-Cache seinen Fenster-Schluessel
+    als DATEI-Attribute auf. Gegenstueck: `verify_cache_file`.
+
+    Bewusst NUR Schluessel plus ein paar Diagnosefelder, NICHT das
+    Schluesselmaterial selbst: `str(files)` ist beim vollen Korpus sechsstellig
+    lang und HDF5-Attribute sind auf 64 KB begrenzt -- ein Attribut, das ab
+    einer bestimmten Korpusgroesse stillschweigend nicht mehr passt, waere
+    genau der Fehler, den der Waechter verhindern soll."""
+    hf.attrs[CACHE_KEY_ATTR] = wk.key
+    hf.attrs[CACHE_KEY_FULL_ATTR] = wk.key_full
+    hf.attrs["mosaic_cache_key_attrs_version"] = CACHE_KEY_ATTRS_VERSION
+    hf.attrs["mosaic_files_n"] = len(wk.files)
+    # Diagnose: erste/letzte Datei des Fensters. Bei einem Schluessel-Streit
+    # ist "welche Dateiliste war das?" die erste Frage, und die Dateiliste
+    # selbst passt nicht ins Attribut (s.o.).
+    hf.attrs["mosaic_files_first"] = os.path.basename(wk.files[0]) if wk.files else ""
+    hf.attrs["mosaic_files_last"] = os.path.basename(wk.files[-1]) if wk.files else ""
+
+
+def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
+    """Waechter fuer `--cache-file`: passt der vorgelegte Cache zum AKTUELL
+    gerechneten Fenster-Schluessel?
+
+    HARTER Abbruch in allen drei Zweifelsfaellen -- Datei fehlt, Datei traegt
+    keinen Schluessel, Schluessel weicht ab. Ein Cache OHNE hinterlegten
+    Schluessel wird ABGELEHNT, nicht durchgewunken: sein Fenster ist von aussen
+    nicht feststellbar, und "wird schon passen" ist bei einem Voll-Cache
+    (ALLE `data/*.pkl`) gegen ein per Val-Split/MOSAIC_DATA_EXCLUDE
+    eingeschraenktes Fenster genau der stille Obermengen-Fehler aus dem
+    Auftrag. Nachruesten: `tools/stamp_cache_key.py`.
+
+    Gibt den Protokollblock zurueck, der ins Trainings-Manifest wandert."""
+    import h5py
+    if not os.path.exists(path):
+        raise SystemExit(
+            f"❌ --cache-file: '{path}' existiert nicht.\n"
+            f"   Kein stiller Rueckfall auf den Selbstbau -- der kostet Stunden und "
+            f"waere hier nicht gewollt.\n"
+            f"   Erwarteter Fenster-Schluessel: {wk.key} ({len(wk.files)} Dateien).")
+    try:
+        with h5py.File(path, "r") as hf:
+            attrs = dict(hf.attrs)
+            keys = set(hf.keys())
+            n_rows = hf["values"].shape[0] if "values" in hf else None
+    except OSError as e:
+        raise SystemExit(
+            f"❌ --cache-file: '{path}' ist nicht als HDF5 lesbar ({e!r}).\n"
+            f"   Datei unvollstaendig geschrieben oder beschaedigt -- neu bauen.")
+    # Mindestbestand: die Felder, die der Ladeweg unten OHNE Fallback liest.
+    # Fehlt eines, waere die Folge ein nackter KeyError mitten im Laden statt
+    # einer Aussage darueber, was mit der Datei nicht stimmt (haeufigster Fall:
+    # abgebrochenes Zusammenfuegen).
+    _required = {"states", "policies", "values", "moon_order_targets"}
+    _missing = sorted(_required - keys)
+    if _missing or not ({"masks", "masks_packed"} & keys):
+        raise SystemExit(
+            f"❌ --cache-file: '{path}' ist unvollstaendig.\n"
+            f"   Fehlende Datasets: {_missing or '-'}"
+            f"{'' if ({'masks','masks_packed'} & keys) else ', masks/masks_packed'}\n"
+            f"   Vorhanden: {sorted(keys)}\n"
+            f"   Vermutlich ein abgebrochener Bau/Merge -- neu bauen.")
+    if CACHE_KEY_FULL_ATTR not in attrs and CACHE_KEY_ATTR not in attrs:
+        raise SystemExit(
+            f"❌ --cache-file: '{path}' traegt KEINEN Fenster-Schluessel "
+            f"(Attribut '{CACHE_KEY_ATTR}' fehlt) -- ABGELEHNT.\n"
+            f"   Vor dem 2026-08-28 gebaute Caches haben das Attribut nicht. Entweder\n"
+            f"     python -X utf8 -u tools/stamp_cache_key.py --cache-file {path} ...\n"
+            f"   (praegt den neu gerechneten Schluessel auf, ohne den Cache neu zu bauen)\n"
+            f"   oder einmal neu bauen.\n"
+            f"   Erwarteter Fenster-Schluessel: {wk.key} ({len(wk.files)} Dateien).")
+    # Vergleich auf dem VOLLEN Digest, wenn vorhanden: die 12 Hexziffern des
+    # Dateinamens sind fuer die Cache-WAHL gut genug (dort entscheidet die
+    # Existenz einer Datei), fuer einen Waechter ist der volle Digest gratis.
+    # `_text`: h5py 3.x liefert Zeichenketten-Attribute als `str`, aeltere
+    # Schreiber koennen `bytes` hinterlassen haben -- ein Waechter, der an
+    # b"abc" != "abc" scheitert, waere ein Fehlalarm, und Fehlalarme schalten
+    # Waechter ab.
+    def _text(v):
+        return v.decode("utf-8") if isinstance(v, bytes) else (None if v is None else str(v))
+    have_full = _text(attrs.get(CACHE_KEY_FULL_ATTR))
+    have_short = _text(attrs.get(CACHE_KEY_ATTR))
+    ok = (have_full == wk.key_full) if have_full is not None else (have_short == wk.key)
+    if not ok:
+        raise SystemExit(
+            f"❌ --cache-file: Schluessel-Abweichung -- ABBRUCH.\n"
+            f"   Datei      : {path}\n"
+            f"   in Datei   : {have_short} (voll: {have_full})\n"
+            f"   erwartet   : {wk.key} (voll: {wk.key_full})\n"
+            f"   Fenster jetzt: {len(wk.files)} Dateien, in der Datei: "
+            f"{attrs.get('mosaic_files_n')} "
+            f"({attrs.get('mosaic_files_first')} .. {attrs.get('mosaic_files_last')})\n"
+            f"   Haeufigste Ursache: der Cache wurde ueber ALLE data/*.pkl gebaut, "
+            f"trainiert wird aber ein Val-Split-Fenster (--val-frac > 0), ein "
+            f"--train-file-limit oder ein per MOSAIC_DATA_EXCLUDE eingeschraenktes "
+            f"Fenster. Dann ist der Cache eine OBERMENGE und darf nicht benutzt werden.\n"
+            f"   Weitere Ursachen: anderer --encoder, andere --value-target-variant, "
+            f"--conjunction-head, anderes Traeger-Manifest, MOSAIC_CACHE_NOPACK/"
+            f"MOSAIC_CACHE_F32/MOSAIC_IGNORE_POLICY_TARGET_VALID.")
+    return {
+        "cache_file": path,
+        "cache_key": wk.key,
+        "cache_key_full": wk.key_full,
+        "files_n": len(wk.files),
+        "rows": int(n_rows) if n_rows is not None else None,
+        "attrs_version": int(attrs.get("mosaic_cache_key_attrs_version", 0)),
+    }
+
+
 class MosaicDataset(Dataset):
     def __init__(self, data_dir="data", files=None, value_target_variant="default", encoder="flat",
-                 conjunction_head=False, cache_path_override=None):
+                 conjunction_head=False, cache_path_override=None, cache_file=None):
         """`files`: optionale explizite Dateiliste (z.B. ein Train- oder
         Val-Split desselben `data_dir`) -- ohne Angabe werden wie bisher ALLE
         `*.pkl` im Ordner geladen. Der Cache-Key haengt von der tatsaechlich
         uebergebenen Liste ab, Train- und Val-Split bekommen also automatisch
         getrennte HDF5-Caches im selben Ordner.
+
+        `cache_file`: vorab gebauter Fenster-Cache (siehe
+        `tools/build_cache_parallel.py`). Statt den Cache hier seriell zu bauen
+        wird DIESE Datei geladen -- aber nur, wenn ihr hinterlegter
+        Fenster-Schluessel zum aktuell gerechneten passt (`verify_cache_file`,
+        harter Abbruch sonst). Default None = Bestandsverhalten, der Cache wird
+        wie bisher unter `data/.cache_<key>.h5` gesucht und notfalls gebaut.
 
         `value_target_variant`: siehe VALUE_TARGET_VARIANTS oben (Task #84,
         rtv-Ablation Phase 1) -- steuert, ob/wo der rtv-Override beim
@@ -298,8 +621,7 @@ class MosaicDataset(Dataset):
         (eigener Cache-Key-Suffix, siehe dort) -- dann liefert `__getitem__`
         weiterhin die vollen [406]/[79,6,6]-Werte wie vor v21 und
         `self.bitpacked` ist False."""
-        from config import INPUT_SIZE
-        import hashlib, time
+        import time
         import h5py
 
         if encoder not in ("flat", "2d"):
@@ -336,157 +658,21 @@ class MosaicDataset(Dataset):
                 f"erlaubt: {VALUE_TARGET_VARIANTS}"
             )
 
-        # Cache-Datei basierend auf Dateiliste + INPUT_SIZE
-        # TD_LAMBDA fehlte hier bisher im Hash (Retrain-Sweep-Audit,
-        # 2026-07-22): der TD-Bootstrap-Blend wird in `val`/`points_val`
-        # VOR dem Caching eingerechnet (siehe unten), ein Lambda-Sweep haette
-        # also stillschweigend den Cache der ersten je Dateiliste gebauten
-        # Lambda-Variante wiederverwendet und NICHTS gemessen. Jetzt Teil des
-        # Keys, gleiche Stelle wie POLICY_TARGET_SHARPEN_EXPONENT.
-        # value_target_variant (Task #84) genau dieselbe Falle: der rtv-
-        # Override wird ebenfalls VOR dem Caching eingerechnet -- ohne diesen
-        # String im Key wuerden "nortv"/"nortv_r1" stillschweigend den
-        # "default"-Cache derselben Dateiliste wiederverwenden.
-        files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
-        # MOSAIC_DATA_EXCLUDE (2026-08-07, Fenster-Pinning): Regex, der
-        # Dateien VOR Key-Bildung und Training ausschliesst. Noetig, weil
-        # data/ waehrend laufender Generierungen WAECHST (Vorfall: der
-        # pi_ctrl_s3-Neustart glob-te frisch gelandete v19wdlann-Dateien
-        # mit ein -> Cache-Voll-Neubau + kontaminiertes Kontroll-Fenster).
-        # Der gefilterte Datei-Liste steckt via `str(files)` ohnehin im
-        # Cache-Key -- gleicher Filter => gleicher Key => Cache-Hit.
-        _excl = os.environ.get("MOSAIC_DATA_EXCLUDE")
-        if _excl:
-            _n0 = len(files)
-            files = [f for f in files if not re.search(_excl, os.path.basename(f))]
-            print(f"🔒 MOSAIC_DATA_EXCLUDE={_excl!r}: {_n0 - len(files)} von {_n0} Dateien ausgeschlossen.")
-        # "+rounds_v1" (Task #15 B, 2026-07-28): der Cache fuehrt jetzt zusaetzlich
-        # die Rundennummer je Sample mit (fuer rundenselektive Loss-Gewichtung,
-        # z.B. --exclude-round5). Der Marker erzwingt einen einmaligen Rebuild
-        # aller Alt-Caches, statt sie stillschweigend ohne das Feld zu laden.
-        # "+enc2d_v1" (Task #11 Phase 2): NUR im 2D-Modus angehaengt, siehe
-        # `encoder`-Doku oben -- der Flach-Modus-Key bleibt dadurch UNVERAENDERT,
-        # bestehende Flach-Caches werden also nicht ungueltig.
-        # Schema 17: Policy-Traeger-Manifest (v20-Zwei-Klassen-Fenster).
-        # Fehlt die Datei -> None = Bestandsverhalten (alle Dateien tragen
-        # Policy). Inhalt geht in den Cache-Key ein (anderer Traeger-Satz =
-        # anderer Cache).
-        # MOSAIC_CARRIER_MANIFEST (2026-08-08, v21-Uebergabe): Dateiname des
-        # Traeger-Manifests, Default = v20-Bestand. Inhalt steckt via
-        # policy_carrier_set ohnehin im Cache-Key.
-        # `carrier_prefixes` (2026-08-08, v21-Fix): additives, OPTIONALES
-        # Manifest-Feld -- Liste von Dateinamen-Praefixen, die (zusaetzlich
-        # zum `policy_carrier_set`) als Traeger gelten. Ist das Feld
-        # VORHANDEN (auch als leere Liste), schaltet `_is_policy_carrier`
-        # den `bootstrap_native`-Kurzschluss ab (siehe Funktionskommentar
-        # dort) -- notwendig, weil der Kurzschluss fuer v21 ALLE
-        # `selfplay_v19wdl_*`-Dateien zu Traegern macht, obwohl nur ein
-        # seed-bestimmter Teilsatz tragen soll. Fehlt das Feld (v20-Manifest,
-        # kein Rebuild-Zwang): None -> Alt-Verhalten EXAKT erhalten.
-        manifest_path = os.path.join(
-            data_dir,
-            os.environ.get("MOSAIC_CARRIER_MANIFEST", "policy_carrier_manifest_v20.json"))
-        policy_carrier_set = None
-        carrier_prefixes = None
-        if os.path.exists(manifest_path):
-            with open(manifest_path, encoding="utf-8") as mf:
-                _manifest = json.load(mf)
-                policy_carrier_set = frozenset(_manifest["policy_carrier_files"])
-                if "carrier_prefixes" in _manifest:
-                    carrier_prefixes = list(_manifest["carrier_prefixes"])
-        else:
-            # Codepflege-Audit 2026-08-27, Befund 1: das Fehlen der Datei ist ein
-            # STILLER Semantik-Wechsel -- ohne Manifest traegt JEDE Korpusdatei
-            # Policy (siehe Kommentarblock oben). Das ist gewolltes
-            # Bestandsverhalten, aber es gehoert ins Log, damit ein versehentlich
-            # fehlendes/verschobenes Manifest nicht als Normalfall durchgeht.
-            # Reiner Hinweis, KEIN Verhaltenswechsel.
-            if manifest_path not in _CARRIER_MANIFEST_NOTICE_SHOWN:
-                _CARRIER_MANIFEST_NOTICE_SHOWN.add(manifest_path)
-                print(f"ℹ️  Traeger-Manifest {manifest_path} nicht gefunden -- "
-                      f"Bestandsverhalten: jede Datei traegt Policy", flush=True)
-
-        cache_key_material = (
-            str(files) + str(INPUT_SIZE) + str(NUM_ACTIONS) + str(VALUE_SCHEMA_VERSION)
-            + str(POLICY_TARGET_SHARPEN_EXPONENT) + str(TD_LAMBDA) + str(value_target_variant)
-            + "+rounds_v1+own_v1"
-            # "+bsnative_default_v1" (2026-08-27, PREREG_heuristic_v2_long_rows.md
-            # par.3b.3 Punkt 3): der bootstrap_native-Status ist eine
-            # ZIELDEFINITION je Datei -- er entscheidet, ob `values_wdl` den
-            # rohen oder den Platt-entstauchten Bootstrap eingeblendet
-            # bekommt, und das passiert VOR dem Caching (gleiche Falle wie
-            # TD_LAMBDA und value_target_variant oben). Die Umkehr auf
-            # "nativ ist Default" aendert diesen Status fuer JEDE Datei
-            # ausserhalb von LEGACY_STRETCHED_PREFIXES; ohne diesen Marker
-            # wuerde ein v22-Lauf still den Bestandscache mit den
-            # ENTSTAUCHTEN hv2-Zielen weiterbenutzen. Die Blockliste steht
-            # mit im Marker, damit auch eine spaetere Aenderung an IHR den
-            # Cache entwertet.
-            + "+bsnative_default_v1:" + ",".join(sorted(LEGACY_STRETCHED_PREFIXES))
-        )
-        if policy_carrier_set is not None:
-            cache_key_material += "+carriers:" + ",".join(sorted(policy_carrier_set))
-        if carrier_prefixes is not None:
-            # Eigene Komponente (nicht Teil von "+carriers:"): sonst wuerden
-            # zwei Manifeste mit identischem policy_carrier_set aber
-            # unterschiedlichen carrier_prefixes denselben Cache treffen
-            # (Fenster-Kollision, siehe Auftrag Punkt 3).
-            cache_key_material += "+carrier_prefixes:" + ",".join(sorted(carrier_prefixes))
-        if encoder == "2d":
-            # "+enc2d_v2" (2026-08-27, PREREG_special_tile_yield.md par.4a):
-            # NUM_PLANES_CHANNELS 77 -> 79 UND ein neues Packlayout
-            # (`_pack_planes`: 419 statt 347 Byte je Zeile). Der Marker MUSS
-            # mitziehen -- die Kanalzahl steckt in KEINER anderen
-            # Key-Komponente (geprueft 2026-08-27: `cache_key_material` fuehrt
-            # INPUT_SIZE, aber nicht NUM_PLANES_CHANNELS). Ohne den Bump
-            # traefe ein 79er-Lauf den 77er-Bestandscache.
-            cache_key_material += "+enc2d_v2"
-        # Konjunktions-Erweiterung (2026-08-10): die 25 Zusatzlabels je Spieler
-        # haengen HINTEN an den `ownership`-Vektor. Eigener Suffix, NUR wenn
-        # aktiv -- Muster "+enc2d_v1". Bewusst KEIN VALUE_SCHEMA_VERSION-Bump:
-        # die Konjunktionen sind ein optionales Zusatzfeld, ein Bump wuerde den
-        # vorhandenen v21-Cache ohne Not entwerten. Der Suffix verhindert
-        # zugleich das stille Wiederverwenden eines Alt-Caches, dessen
-        # `ownership`-Dataset nur OWNERSHIP_TARGETS breit ist (das Ziel waere
-        # dann vollstaendig maskiert und der Kopf lernte nichts -- ohne
-        # Fehlermeldung).
-        if conjunction_head:
-            cache_key_material += "+conj_v2"
-            if reach_target_k1_active():
-                # Eigener Cache, sonst wuerden alte Realisierungs-Labels still
-                # weiterverwendet (Muster wie "+enc2d_v1").
-                cache_key_material += f"+reachk1_r{REACH_K1_MIN_ROUND}_v1"
-                if reach_buffer_mode():
-                    # Arm P (par.12): eigener Zusatz-Key, sonst wuerden
-                    # boolesche Runde-1-2-Labels aus einem Alt-Cache (reine
-                    # k1-Variante) still weiterverwendet.
-                    cache_key_material += f"+reachbuf_cap{REACH_BUF_CAP}_v1"
-        # Bitpacking (RAM-Optimierung v21, PREREG_v21_window.md "RAM-
-        # Voraussetzung"): planes/masks werden ab jetzt STANDARDMAESSIG
-        # bitgepackt gespeichert (siehe `_pack_bits`-Kommentar oben) --
-        # eigener Suffix erzwingt einen Rebuild ALLER Alt-Caches (flat UND
-        # 2d, masks sind in beiden Modi betroffen), kein stilles
-        # Fehlinterpretieren des alten unkomprimierten Formats. Escape-Hatch
-        # MOSAIC_CACHE_NOPACK=1 (Muster wie MOSAIC_CACHE_F32) erzwingt exakt
-        # das alte Format -- eigener Suffix, damit die beiden Formate nie
-        # denselben Cache-Key treffen (falls die Bitpack-Validierung mal
-        # durchfaellt und zurueckgeschaltet werden muss).
-        cache_nopack = os.environ.get("MOSAIC_CACHE_NOPACK") == "1"
-        cache_key_material += "+nopack_v1" if cache_nopack else "+bitpack_v1"
-        if _IGNORE_PTV:
-            cache_key_material += "+ignore_ptv_v1"
-        # MOSAIC_CACHE_F32 (Befund 2026-08-26): der Knopf entscheidet ueber den
-        # gespeicherten dtype von states/policies (float32 statt float16, siehe
-        # `_f` weiter unten) und der Kommentar dort sagt selbst "NICHT
-        # bit-identisch" -- er stand aber in KEINER Key-Komponente. Ein Lauf
-        # mit dem Notausstieg traf damit den vorhandenen float16-Cache und der
-        # Knopf blieb still wirkungslos, also genau die Fehlerklasse, gegen die
-        # "+nopack_v1"/"+ignore_ptv_v1" gebaut sind. NUR bei gesetztem Knopf
-        # angehaengt: der Default-Key (float16) bleibt unveraendert, kein
-        # Bestands-Cache verfaellt.
-        if _cache_f32_active():
-            cache_key_material += "+f32_v1"
-        cache_key = hashlib.md5(cache_key_material.encode()).hexdigest()[:12]
+        # Fenster-Cache-Schluessel: Dateiliste, Traeger-Manifest, Schema,
+        # Encoder, Zielvarianten, Packmodus. Der Rumpf ist am 2026-08-28 nach
+        # `window_cache_key` (oben) ausgezogen worden, WEIL er ohne
+        # Korpus-Ladung berechenbar sein muss -- `--cache-file` prueft damit
+        # eine vorgelegte Cache-Datei, und `build_cache_parallel.py` praegt
+        # denselben Schluessel dem zusammengefuegten Cache auf. Verhalten
+        # unveraendert: dieselbe Verkettung, dieselbe Reihenfolge, derselbe
+        # md5-Anschnitt.
+        _wk = window_cache_key(data_dir, files, value_target_variant=value_target_variant,
+                               encoder=encoder, conjunction_head=conjunction_head)
+        files = _wk.files
+        policy_carrier_set = _wk.policy_carrier_set
+        carrier_prefixes = _wk.carrier_prefixes
+        cache_nopack = _wk.cache_nopack
+        cache_key = _wk.key
         cache_path_h5 = os.path.join(data_dir, f".cache_{cache_key}.h5")
         cache_path_pt = os.path.join(data_dir, f".cache_{cache_key}.pt")
         # `cache_path_override` (Hebel 4, PREREG_cache_build_time.md par.6):
@@ -501,6 +687,25 @@ class MosaicDataset(Dataset):
         # Altformat-Lesepfad, und ein Datei-Cache wird nie als .pt geschrieben.
         if cache_path_override is not None:
             cache_path_h5 = cache_path_override
+        # `cache_file` (Schlachtplan A0 Schritt 2c, 2026-08-28): ein VORAB
+        # gebauter Fenster-Cache (tools/build_cache_parallel.py) wird direkt
+        # benutzt, statt ihn hier seriell nachzubauen (~2,6 h auf dem vollen
+        # Korpus). Der Unterschied zu `cache_path_override` ist der Waechter:
+        # `cache_path_override` sagt "nimm diesen Pfad, ich weiss was ich tue"
+        # (Datei-Block-Namensraum, Aufrufer haelt den Schluessel selbst), hier
+        # dagegen kommt die Datei von aussen und MUSS sich ausweisen. Deshalb
+        # schliessen sich beide aus.
+        self.cache_file_info = None
+        if cache_file is not None:
+            if cache_path_override is not None:
+                raise ValueError(
+                    "cache_file und cache_path_override schliessen sich aus: der eine "
+                    "prueft den Fenster-Schluessel, der andere umgeht ihn bewusst.")
+            self.cache_file_info = verify_cache_file(cache_file, _wk)
+            cache_path_h5 = cache_file
+            print(f"📦 --cache-file: '{cache_file}' -- Schluessel {_wk.key} bestaetigt "
+                  f"({len(files)} Dateien, {self.cache_file_info['rows']} Zustaende). "
+                  f"Kein Cache-Bau.", flush=True)
         # Nach aussen sichtbar fuer den parallelen Bau
         # (PREREG_cache_build_time.md Hebel 1): die Worker bauen je eine
         # Datei-Teilmenge und geben nur DIESEN Pfad zurueck, statt die
@@ -697,6 +902,10 @@ class MosaicDataset(Dataset):
                 hf.create_dataset('ranking_action_ids',  data=self.ranking_action_ids.numpy(),  compression='lzf')
                 hf.create_dataset('ranking_child_q',     data=self.ranking_child_q.numpy(),     compression='lzf')
                 hf.create_dataset('ranking_mask',        data=self.ranking_mask.numpy(),        compression='lzf')
+                # Gleiche Selbstauskunft wie im regulaeren Schreibweg unten:
+                # die migrierte Datei liegt ohnehin unter `.cache_<key>.h5`,
+                # das Attribut sagt denselben Schluessel nur pruefbar.
+                stamp_cache_key_attrs(hf, _wk)
             os.remove(cache_path_pt)
             self._planes_h5_path = None  # kann hier nur "flat" sein, s.o. Guard
             print(f"Datensatz geladen + migriert: {len(self.states)} Züge. "
@@ -1220,7 +1429,15 @@ class MosaicDataset(Dataset):
                     hf.create_dataset(_planes_key,        data=planes_np,    compression='lzf')
                     if self.bitpacked:
                         hf[_planes_key].attrs['orig_shape'] = planes_orig_shape
-            print(f"✅ Cache gespeichert: {cache_path_h5}")
+                # Selbstauskunft der Datei (2026-08-28): fuer welches Fenster
+                # ist dieser Cache gebaut? Ohne das Attribut kann `--cache-file`
+                # eine vorgelegte Datei nicht pruefen -- und ein ungeprueft
+                # benutzter Cache ist genau der stille Obermengen-Fehler
+                # (Voll-Korpus-Cache gegen ein Val-Split-Fenster). Reines
+                # Zusatz-Attribut: Datasets, dtypes und Werte sind unberuehrt,
+                # jeder Lesepfad sieht dieselbe Datei wie vorher.
+                stamp_cache_key_attrs(hf, _wk)
+            print(f"✅ Cache gespeichert: {cache_path_h5} (Fenster-Schluessel {_wk.key})")
             # RAM-Fix: `planes_np` (die groesste Einzelstruktur, ~3,6 GB beim
             # vollen Korpus, dank Bitpacking jetzt ~450 MB) wird NACH dem
             # Schreiben verworfen statt als `self.planes` fuer die gesamte

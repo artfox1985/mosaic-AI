@@ -720,7 +720,7 @@ naechste Sitzung mitten im Ablauf uebernehmen kann:
 | 1d | Stufe-0-Sonde (par.3b.3): Daempfungs-Verdikt | ERLEDIGT: NICHT bestaetigt (oberster Bin -0,015 gg. +0,05); Arm L bleibt Reserve, TD_LAMBDA 0,5. Beifang: v21-Bootstrap global ~5-7 pp zu optimistisch |
 | 2a | 79er-Cache parallel (~36 min) auf nativ-Kodierung | offen, nach 1d |
 | 2b | Serielle Referenz (~2,6 h) + Bit-Vergleich = Cache-Tor | offen, nach 2a |
-| 2c | Cache-Verdrahtung in train.py | offen, nach 2b |
+| 2c | Cache-Verdrahtung in train.py | GEBAUT (`--cache-file` + harter Schluessel-Waechter, Stempel in beiden Bau-Werkzeugen, tools/stamp_cache_key.py; Ladelauf UNGETESTET). BEFUND: der Voll-Cache passt per Design nicht auf Laeufe mit Val-Split (anderer Fenster-Schluessel, Waechter lehnt korrekt ab) -- v22-b01/b02 fahren den klassischen In-Train-Bau (~2,3 h, einmal; b02 trifft denselben Schluessel). --cache-file nutzt, wer --val-frac 0 faehrt oder ein exakt passendes Fenster baut |
 | 3 | v22-KALTSTART: **v22-b01** = w1-Arm (`MOSAIC_IGNORE_POLICY_TARGET_VALID=1`, `--ownership-weight 1.0`), dann **v22-b02** = w0-Kontrollarm; Plateau-Schedule (Cold-Start-Weg), `--select-by-brier`. Nomenklatur (Nutzer 2026-08-28): fortlaufend v22-bNN wie die v21-b-Serie; Folgearme (Arm K, Surprise, Arm L) reihen sich als b03+ ein | offen |
 | 4 | Spalten-Abnahme-Tor (par.3b.2, drei argmax-Messreihen) | offen, nach 3 |
 | 5 | Wecker-Liste VOR dem v22-Self-Play (`PREREG_v23_window.md` par.4): Implicit-Minimax-Gating, Risiko-A1, `MOSAIC_STACK_DRAW_RESEARCH`, Traeger-Manifest-Generator, 6.550er-Rotation, Startkuppel | offen, nach 4 |

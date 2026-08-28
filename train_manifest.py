@@ -195,6 +195,34 @@ def append_train_laufzeit(version_name, run_timestamp, laufzeit) -> None:
         print(f"  ⚠️  Laufzeit konnte nicht nachgetragen werden ({e!r}).")
 
 
+def append_train_cache_file(version_name, run_timestamp, cache_file_info) -> None:
+    """Traegt den VALIDIERTEN Fenster-Schluessel des vorab gebauten Caches
+    nachtraeglich ins Trainings-Manifest ein (Schlachtplan A0 Schritt 2c).
+
+    Warum nachtraeglich, gleiches Muster wie `append_train_laufzeit`: das
+    Manifest entsteht VOR dem Train/Val-Split, der Schluessel steht erst fest,
+    wenn der Datensatz gebaut ist. `cli_args["cache_file"]` haelt derweil die
+    WAHL fest -- ohne diesen Block wuesste man hinterher nur, dass eine Datei
+    angegeben war, nicht welches Fenster sie trug.
+
+    Muster `--load`-Footgun (Memory feedback_num_actions_change_breaks_old_
+    checkpoints): der Waechter selbst bricht hart ab, deshalb darf DIESE
+    Nachtragung best-effort bleiben -- ein nicht schreibbares Manifest soll
+    kein bereits validiertes Training abbrechen."""
+    path = MODELS_DIR / f"manifest_train_{version_name}_{run_timestamp}.json"
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            manifest = json.load(f)
+        manifest["cache_file"] = cache_file_info
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(manifest, f, indent=2, ensure_ascii=False)
+        print(f"📝 Cache-Datei ins Manifest nachgetragen: {cache_file_info.get('cache_file')} "
+              f"(Schluessel {cache_file_info.get('cache_key')}, "
+              f"{cache_file_info.get('rows')} Zustaende)")
+    except Exception as e:
+        print(f"  ⚠️  Cache-Datei konnte nicht ins Manifest nachgetragen werden ({e!r}).")
+
+
 def write_train_manifest(version_name, cli_args, corpus_composition, run_timestamp,
                           policy_carriers=None) -> None:
     """Schreibt `models/manifest_train_<name>_<timestamp>.json` und loggt die
