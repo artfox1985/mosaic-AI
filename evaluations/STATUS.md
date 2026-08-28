@@ -132,17 +132,17 @@ Tabelle unten bei den drei JSONs.)
 
 ## NAECHSTE SCHRITTE (Stand 2026-08-26, nach Prioritaet)
 
-### VORFALL 2026-08-28: OneDrive-Dateiverlust in models/ (zum zweiten Mal)
+### BERICHTIGT: kein OneDrive-Verlust, der Nutzer raeumte auf (2026-08-28)
 
-Waehrend b01/b02 verschwanden ohne Papierkorb: das Champion-ONNX
-`alphazero_v21_2d_brierbest.onnx` (samt `.pth` und `.onnx.ref.txt`) und
-29 getrackte `manifest_train_*.json`. Wiederhergestellt: das ONNX
-sha256-identisch aus `models/frozen_champions/v21_2d_brierbest/model.onnx`
-(genau der Fall, fuer den die Kapselung gebaut wurde), die 29 Manifeste per
-`git checkout`. **NOCH FEHLEND: die `.pth`- und `.ref.txt`-Begleiter des
-Champions** -- Kandidat: aeltere `models_snapshots`-Zips im Backup-Ordner
-(das 16:57-Zip entstand womoeglich NACH dem Verlust). Braucht erst wieder
-jemand fuer Torch-Diagnosen (platt_fit, Orakel-Referenzen mit .pth).
+Die "verschwundenen" Dateien in models/ waren beabsichtigtes Aufraeumen des
+Nutzers -- meine Fehldiagnose (und die ONNX-Wiederherstellung) kam ihm
+zuvor. Aufgeloest: die 29 Alt-Trainingsmanifeste sind jetzt ordentlich per
+git rm entfernt (`fc92b97`). OFFEN, Nutzer-Entscheid im Gespraech: die
+Champion-`.pth` gehoert kuenftig MIT ins frozen-Artefakt (Torch-Seite fuer
+platt_fit/Warmstarts; Quelle Backup-Zip); Empfehlung ONNX getrackt LASSEN
+(Byte-Beweisstueck, Re-Export aus .pth ist nicht byte-stabil). Haengt daran:
+champion.txt und 9 Suite-Tests laden aus models/ -- soll models/ leer
+werden, muessen sie auf den Artefakt-Pfad umziehen.
 
 ### UMBENENNUNG hv1/hv2: GEBAUT, Wheel-Neubau ausstehend
 
