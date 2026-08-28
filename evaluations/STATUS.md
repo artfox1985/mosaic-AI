@@ -83,9 +83,6 @@ serielle Cache-Referenz, Tor 2b, ist GRUEN abgeschlossen -- A0-Tabelle.)
 
 **Warum dieser Schritt** (par.3b.5 Weg-Wahl Punkt 1): der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-TRAININGSGEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt. Der Tiling-Pol lief bisher NIE mit einem spaltenbewussten Kopf (Gate-C-Nullmessungen: plattenblinde Koepfe).
 
-**16 Commits vor `origin/main`** (`git rev-list --count origin/main..HEAD`,
-gezaehlt 2026-08-28), nicht gepusht -- Push ist ein eigener Nutzer-Entscheid.
-
 ---
 
 ## TRAEGER-MANIFEST-GENERATOR fehlt (offener Kern)
@@ -446,7 +443,7 @@ zwei Punktekarten (`PREREG_heuristic_v2_long_rows.md` par.11-16),
 | **v22 vorbereiten**            | Nutzer-Ansage 2026-08-25: "dafuer muessen wir noch was vorbereiten" -- was genau, ist offen |
 | **Saettigende Score-Utility**  | Verdikt DAZWISCHEN, kein Automatismus vorgesehen                                            |
 | **Stoerungs-Baustein Stufe 2** | gehoert zum Moon-Order-Kopf, keine Einzelentscheidung mehr                                  |
-| **Push**                       | NIE ohne ausdrueckliche Anweisung; Stand wird als "n Commits voraus" gemeldet               |
+| **Push**                       | NIE ohne ausdrueckliche Anweisung; der Ahead-Stand wird im CHAT gemeldet, NICHT in STATUS gefuehrt (verrottet sofort, Nutzer 2026-08-28) |
 | **Asym-Korpus**                | bleibt lokal, Trainingsinput fuer Seeding und UVFA                                          |
 | **Fester Bewertungssatz**      | 300 Dateien / 3000 Partien in `data/holdout/`, fertig 2026-08-18                            |
 
