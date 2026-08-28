@@ -1,5 +1,5 @@
 {
- "artifact_dir": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\frozen_heuristics\\v2huelle_generator",
+ "artifact_dir": "models/frozen_heuristics/v2huelle_generator",
  "champion": null,
  "artefakt": "v2huelle_generator",
  "typ": "heuristik",

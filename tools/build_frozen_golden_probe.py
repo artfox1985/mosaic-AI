@@ -126,11 +126,20 @@ def main() -> int:
                 f"seed={probe_seed} action={resp['action']}"
             )
 
+    # Repo-relativ statt absolut (Codepflege-Audit Befund 25) -- reine
+    # Provenienz-Felder, kein Leser loest darueber Pfade auf.
+    from pathlib import Path as _P
+    _repo = _P(__file__).resolve().parent.parent
+    def _rel(x):
+        try:
+            return str(_P(x).resolve().relative_to(_repo)).replace("\\", "/")
+        except (ValueError, OSError):
+            return str(x)
     out = {
         "n_probes": len(probes),
-        "artifact": str(artifact_dir),
-        "model": model_path,
-        "spec": spec_path,
+        "artifact": _rel(artifact_dir),
+        "model": _rel(model_path),
+        "spec": _rel(spec_path),
         "generator": "tools/build_frozen_golden_probe.py",
         "protocol": "par.8d PER-ENTSCHEIDUNG (state_to_json_exact fuenftes Feld pending_dome_choice_exact, kein rot_seed mehr)",
         "probes": probes,

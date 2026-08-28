@@ -1,8 +1,8 @@
 {
  "n_probes": 10,
- "artifact": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\frozen_champions\\v21_2d_brierbest",
- "model": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\frozen_champions\\v21_2d_brierbest\\model.onnx",
- "spec": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\frozen_champions\\v21_2d_brierbest\\spec.json",
+ "artifact": "models/frozen_champions/v21_2d_brierbest",
+ "model": "models/frozen_champions/v21_2d_brierbest/model.onnx",
+ "spec": "models/frozen_champions/v21_2d_brierbest/spec.json",
  "generator": "tools/build_frozen_golden_probe.py",
  "protocol": "par.8d PER-ENTSCHEIDUNG (state_to_json_exact fuenftes Feld pending_dome_choice_exact, kein rot_seed mehr)",
  "probes": [

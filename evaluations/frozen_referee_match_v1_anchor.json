@@ -1,5 +1,5 @@
 {
- "artifact_dir": "D:\\OneDrive\\Documents\\Projekte\\mosaic-AI\\models\\frozen_heuristics\\v1_anchor",
+ "artifact_dir": "models/frozen_heuristics/v1_anchor",
  "champion": null,
  "artefakt": "v1_anchor",
  "typ": "heuristik",
