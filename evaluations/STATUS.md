@@ -58,34 +58,32 @@ der lastgebremste Erstlauf war PARTIEGLEICH mit dem sauberen Neustart
 hatte gebremst, nicht verfaelscht. Details und Deutung: par.3b.6 der
 Lehrer-Prereg.
 
-**Stufe 2 KOMPLETT GEFAHREN 2026-08-29 (par.3b.7):** b04 = DERSELBE
-Ownership-Kopf (Ziel, Loss, 72er-Ordnung unveraendert), nur die ABLESUNG
-raeumlich statt flach -- kein neuer Kopf, kein Zielwechsel
-(Klarstellung auf Nutzer-Nachfrage 2026-08-29; Uebergangsregel des
-Stufenplans war erfuellt, der flache Kopf zuvor auf beiden Wirkwegen
-negativ vermessen). b04-Training (2,5 h
-CUDA; 2D-Ablesung senkt Own-Val konsistent -3,8 Prozent, Policy/Brier
-gleich) plus Konsument-Sweep w 0/0,5/1,0/2,0. **Tor verfehlt, aber die
-Dosis-Richtung DREHT:** mit 2D-Karte jeder Arm positiv (Gipfel w1,0:
-+0,030 volle Spalten, t +1,38; Quote t +1,71), Punkte unversehrt --
-gegen die durchgehend negative flache Karte (par.3b.6). Die
-Konsumenten-Schiene ist damit beidseitig OHNE Torerfolg gemessen.
-REPLIKATION (Nutzer-Auftrag 2026-08-29) GEFAHREN: Tor verfehlt auch
-gepoolt (20 Blockpaare: volle Spalten t +1,61; Quote t +2,06 knapp
-unter 2,093; kein Punkteschaden) -- kleiner, richtungsstabiler, nicht
-tragfaehiger Effekt bei w=1,0. WARUM-Diagnose par.3b.8
-KOMPLETT GEFAHREN 2026-08-29: Ketten-/Drift-These traegt -- der
-gefrorene LEHRER SELBST wuerde auf den Netz-Brettern die fehlende
-Zeile nur zu 0,21-0,32 bedienen (statistisch wie das Netz); Such-Veto
-widerlegt (sims=1 kollabiert auf 0,0075 Spalten), Karte kalibriert,
-Geometrie sauber geerbt (b04 huellen-treuer als der Lehrer).
-HEBEL-EMPFEHLUNG (Nutzer-Entscheid): On-Policy-Nachschaerfung mit
-Lehrer-Relabeling via frozen-Worker (Instrument existiert, 618
-fehlerfreie Anfragen); Mengen-Form- und Blatt-Pol-Arm zurueckgestellt.
-Details/Zahlen: par.3b.8. Der v22-Self-Play-Start bleibt gestoppt;
-Messdaten selfplay_otw22b04r2* und otw22b04s1* liegen noch in data/. Die Sweep-Messdaten (selfplay_otw22b01w*) sind nach
-Abschluss der Auswertung mit Nutzer-Freigabe vom 2026-08-29 GELOESCHT;
-Manifeste und Artefakt bleiben.
+**STAPELUNG KOMPLETT GEFAHREN 2026-08-29 (par.3b.9/3b.10) -- NEUER
+BESTER STAND: v22-b05.** Der DAgger-Arm (600 eigene b04-Partien, 31.190
+Lehrer-Relabels via frozen-Worker, 10,5-min-Afterburner) verfehlt das
+Spalten-Tor (volle Spalten 0,3375, +0,040, t +1,18), ist aber
+**SIGNIFIKANT staerker: Punkte 37,16, +3,86, t +2,61** -- hoechstes
+Punkteniveau der v22-Familie am argmax-Instrument, bei bestem
+knopffreiem Spaltenwert. Die Gelaender-Leiter (k1-Blatt-Shaping
+0,15/0,30 auf b05) ist H0. Die komplette WARUM-Diagnose (par.3b.8 A-E)
+steht: Drift-These belegt, Karte kalibriert, Geometrie geerbt, Such-Veto
+tot, Chip-VOLUMEN gleich aber ALLOKATION falsch (Mensch 0,8
+Reihe-6-Chip-Abschluesse je Partie, v21 0,1), kosten-gewichtete Huelle
+als Leitkennzahl (Mensch 0,84, Maschinen 0,54-0,60).
+
+**OFFENE NUTZER-ENTSCHEIDE fuer die naechste Sitzung** (alle Optionen in
+den Prereg-Absaetzen registriert): (1) naechster Hebel -- Kandidaten:
+DAgger-Runde 2 auf b05-Partien mit mehr Epochen (E6 zeigte KEIN Plateau,
+Policy sank noch; billig, ~1,5 h Ende-zu-Ende), Chip-ALLOKATIONS-
+Fuehrung (Stufe-E-Befund, Gelaender-Klasse), Huellen-Trimm der
+Ownership-Maske mit r+1-Gewichten, oder b03/Surprise. (2) Elo-Gating
+fuer b05 (informativ, Cross-Aera-Regel steht in der
+Promotions-Checkliste). (3) v22-Self-Play-/Generator-Frage (weiterhin
+gestoppt). (4) Loeschfreigaben: data/selfplay_otw22b04s1_* (10 Dateien,
+Sims-Ablation), data/selfplay_otw22b05*_* (30 Dateien, b05-Messungen);
+der Relabel-Korpus data/onpolicy_v22-b05/ (30 Dateien) wird fuer
+DAgger-Folgerunden noch gebraucht. Erstlauf- und r2-Sweep-Daten sind mit
+Freigabe geloescht.
 
 **Warum dieser Schritt** (par.3b.5 Weg-Wahl Punkt 1): der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-TRAININGSGEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt. Der Tiling-Pol lief bisher NIE mit einem spaltenbewussten Kopf (Gate-C-Nullmessungen: plattenblinde Koepfe).
 
