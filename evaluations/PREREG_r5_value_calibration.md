@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Reagiert der Value-/Punkte-Kopf in Runde 5 proportional richtig auf Wertungsplatten-Aenderungen (Task #27)? | Beleg: Unterkalibrierung bestaetigt (Steigung 0,06-0,09 statt ~1); `archive/history.md` Z. ~7065-7089 -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Reagiert der Value-/Punkte-Kopf in Runde 5 proportional richtig auf Wertungsplatten-Aenderungen (Task #27)? | Beleg: Unterkalibrierung bestaetigt (Steigung 0,06-0,09 statt ~1; archive Z. ~7065). NACHMESSUNG 2026-08-29 auf v22-b05: Steigung 0,0886 -- Daempfung persistiert auf dem spaltenfaehigen Netz, KEIN Korpus-Artefakt; Ordnung dagegen geheilt (Tau +0,338). Punkte-Kopf 0,989. -->
 
 # Vorregistrierung: Runde-5-Value-/Punkte-Kopf-Kalibrierung gegen exakte Ground Truth
 
@@ -378,3 +378,17 @@ fuer v18_best und v19_2d_best bestaetigt (nur ~6-9% der erwarteten
 Reaktion). Belegstelle: archive/history.md, Abschnitt "R5-Value-
 Kalibrierung (Task #27) ABGESCHLOSSEN: Unterkalibrierung BESTAETIGT",
 Zeile ~7065-7089; evaluations/artifacts/r5_value_calibration_result.json.
+
+**NACHMESSUNG 2026-08-29 (Fahrplan Phase 0.1, erste Messung auf der
+b-Serie -- die Steigungen oben stammten aus v18/v19):** v22-b05
+(spaltenfaehigstes Netz, 0,3375 volle Spalten am Instrument, DAgger-
+Linie) misst mit demselben Werkzeug und derselben Anordnung (24
+Zustaende x 6 Kombinationen, 139 gueltige Paare): **Value-Kopf-Steigung
+0,0886** (r2 0,115), Punkte-Kopf-Steigung 0,989 (r2 0,308). **Die
+Plattendaempfung ist damit KEIN Korpus-Artefakt** -- sie persistiert
+exakt im 0,06-0,09-Band, obwohl derselbe Kopf Geschwister inzwischen
+RICHTIG nach Spaltenfortschritt ordnet (Tau +0,338 gegen -0,08/-0,19
+der plattenblinden Netze, b05_value_sibling_check.json): die ORDNUNG
+ist geheilt, die GROESSE fehlt weiter. Konsequenz laut Fahrplan: die
+Phase-3-Bedingung (Ziel-Chirurgie) ist erfuellt. Artefakt:
+evaluations/artifacts/r5_value_calibration_b05.json.

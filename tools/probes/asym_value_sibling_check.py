@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """Teilfrage B des Asym-Curriculums (PREREG_asymmetric_curriculum.md par.6):
-bewertet der VALUE-Kopf des Lehr-Arms (S) Geschwister-Nachfolger mit mehr
+bevaluest der VALUE-Kopf des Lehr-Arms (S) Geschwister-Nachfolger mit mehr
 k1-Spaltenfortschritt hoeher als der Kontroll-Arm (N) -- auf DENSELBEN
 Stellungen?
 
@@ -42,12 +42,23 @@ from neural_net import state_to_planes, state_to_tensor  # noqa: E402
 from reach_target import reach_buffer_columns  # noqa: E402
 from sibling_order_stability import kendall  # noqa: E402
 
-MODELS = {
-    "S": BASIS / "models/alphazero_v21-seedk1_best.onnx",
-    "N": BASIS / "models/alphazero_v21-asymN_best.onnx",
-}
+# Nachzug 2026-08-29 (Fahrplan Phase 0.2): Modelle und Ausgabepfad per CLI
+# uebersteuerbar, Defaults = urspruengliche Messung (par.15). Mit nur EINEM
+# Modell (--model-n '') entfaellt der gepaarte Vergleich; berichtet wird dann
+# die Tau-Verteilung dieses Modells gegen die protokollierten Alt-Werte.
+import argparse
+
+_ap = argparse.ArgumentParser()
+_ap.add_argument("--model-s", default=str(BASIS / "models/alphazero_v21-seedk1_best.onnx"))
+_ap.add_argument("--model-n", default=str(BASIS / "models/alphazero_v21-asymN_best.onnx"))
+_ap.add_argument("--out", default=str(BASIS / "evaluations/artifacts/seedk1_value_sibling_check.json"))
+_args = _ap.parse_args()
+
+MODELS = {"S": Path(_args.model_s)}
+if _args.model_n:
+    MODELS["N"] = Path(_args.model_n)
 DUMP = BASIS / "evaluations/artifacts/probe_sibling_succ_k1_w1.0.json"
-OUT = BASIS / "evaluations/artifacts/seedk1_value_sibling_check.json"
+OUT = Path(_args.out)
 
 
 def value_for_mover(sess, succ: dict, mover: int) -> float:
@@ -63,10 +74,12 @@ def main() -> None:
     sessions = {k: ort.InferenceSession(str(p), providers=["CPUExecutionProvider"])
                 for k, p in MODELS.items()}
 
-    taus = {"S": [], "N": []}
+    arms = list(MODELS)
+    taus = {arm: [] for arm in arms}
     n_pos = 0
     for eintrag in daten:
-        praed, werte = {}, {"S": {}, "N": {}}
+        praed = {}
+        values = {arm: {} for arm in arms}
         for desc, kd in eintrag["kandidaten"].items():
             sj, mover = kd.get("successor_state_json"), kd.get("mover")
             if sj is None or mover is None:
@@ -77,41 +90,47 @@ def main() -> None:
                 continue
             praed[desc] = sum(buf)
             for arm, sess in sessions.items():
-                werte[arm][desc] = value_for_mover(sess, succ, mover)
+                values[arm][desc] = value_for_mover(sess, succ, mover)
         if len(praed) < 3 or len(set(praed.values())) < 2:
             continue
-        t_s = kendall(werte["S"], praed)
-        t_n = kendall(werte["N"], praed)
-        if t_s is None or t_n is None:
+        ts = {arm: kendall(values[arm], praed) for arm in arms}
+        if any(v is None for v in ts.values()):
             continue
         n_pos += 1
-        taus["S"].append(t_s)
-        taus["N"].append(t_n)
-
-    diffs = [a - b for a, b in zip(taus["S"], taus["N"])]
-    m = statistics.mean(diffs)
-    sd = statistics.stdev(diffs) if len(diffs) > 1 else float("nan")
-    t = m / (sd / len(diffs) ** 0.5) if sd and sd > 0 else float("nan")
-    pos = sum(1 for d in diffs if d > 0)
-    neg = sum(1 for d in diffs if d < 0)
-    nz = pos + neg
-    p_sign = min(1.0, 2 * sum(comb(nz, k) for k in range(0, min(pos, neg) + 1)) / 2 ** nz) if nz else 1.0
+        for arm in arms:
+            taus[arm].append(ts[arm])
 
     result = {
         "n_stellungen": n_pos,
-        "tau_mean_S": statistics.mean(taus["S"]),
-        "tau_mean_N": statistics.mean(taus["N"]),
-        "diff_mean": m, "diff_sd": sd, "diff_t": t,
-        "vorzeichen": {"S_besser": pos, "N_besser": neg, "gleich": len(diffs) - nz},
-        "p_vorzeichentest": p_sign,
         "modelle": {k: str(p.name) for k, p in MODELS.items()},
         "dump": DUMP.name,
     }
-    OUT.write_text(json.dumps(result, indent=1, ensure_ascii=False), encoding="utf-8")
+    for arm in arms:
+        result[f"tau_mean_{arm}"] = statistics.mean(taus[arm])
     print(f"Stellungen: {n_pos}")
-    print(f"Tau(Value~k1-Puffer)  S: {result['tau_mean_S']:+.3f}   N: {result['tau_mean_N']:+.3f}")
-    print(f"Differenz S-N: {m:+.3f} (sd {sd:.3f}, t {t:+.2f}); Vorzeichen S/N/= "
-          f"{pos}/{neg}/{len(diffs) - nz}, p(Vorzeichentest) {p_sign:.3f}")
+    print("Tau(Value~k1-Puffer)  " + "   ".join(
+        f"{arm}: {result[f'tau_mean_{arm}']:+.3f}" for arm in arms))
+
+    if len(arms) == 2:
+        a, b = arms
+        diffs = [x - y for x, y in zip(taus[a], taus[b])]
+        m = statistics.mean(diffs)
+        sd = statistics.stdev(diffs) if len(diffs) > 1 else float("nan")
+        t = m / (sd / len(diffs) ** 0.5) if sd and sd > 0 else float("nan")
+        pos = sum(1 for d in diffs if d > 0)
+        neg = sum(1 for d in diffs if d < 0)
+        nz = pos + neg
+        p_sign = min(1.0, 2 * sum(comb(nz, k) for k in range(0, min(pos, neg) + 1)) / 2 ** nz) if nz else 1.0
+        result.update({
+            "diff_mean": m, "diff_sd": sd, "diff_t": t,
+            "vorzeichen": {f"{a}_besser": pos, f"{b}_besser": neg,
+                           "gleich": len(diffs) - nz},
+            "p_vorzeichentest": p_sign,
+        })
+        print(f"Differenz {a}-{b}: {m:+.3f} (sd {sd:.3f}, t {t:+.2f}); Vorzeichen "
+              f"{pos}/{neg}/{len(diffs) - nz}, p(Vorzeichentest) {p_sign:.3f}")
+
+    OUT.write_text(json.dumps(result, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"Ergebnis: {OUT}")
 
 
