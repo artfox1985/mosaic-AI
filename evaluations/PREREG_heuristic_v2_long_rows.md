@@ -1766,6 +1766,56 @@ Folgerung fuer die Hebel-Diskussion: selbst eine perfekte
 Lehrer-Imitation traefe nur die halbe Huelle; der Einhuellenden-Ansatz
 des Nutzers hat oberhalb des hv2-Lehrers messbaren Raum.
 
+**Stufe D2 (registriert 2026-08-29 auf Nutzer-Entscheid, VOR der Messung):
+vier weitere Huellen-Kennzahlen, ueber alle drei Quellen (Lehrer-Korpus,
+b04-Self-Play, Server-Logs) -- damit ist die Sonde ABGESCHLOSSEN.**
+
+1. LEBENDE HUELLE: Anteil toter Zellen (kind=normal, Vorrats-Puffer < 0
+   via mosaic_rust.plate_completability_json) unter den noch leeren
+   Huellen-Zellen, am Ende von Runde 3 und 4. Nur pkl-Quellen (Server-Logs
+   tragen keine Zustaende; Grenze wird ausgewiesen).
+2. FRONTIER-TREUE: Kendall-tau zwischen Lege-RUNDE einer Zelle und ihrer
+   Tiefe d=r+c (finale Orientierung) -- waechst die Huelle von der Ecke
+   her, oder springt der Bau?
+3. HALBZEIT-HUELLE: Fuellstand und Abweichung am Ende von Runde 3
+   (Fruehindikator statt Endbrett-Ergebnis).
+4. ORIENTIERUNGS-STABILITAET: frueheste Runde, ab der die bestpassende
+   Orientierung des Teilbretts final bleibt, plus Anzahl vorher
+   fehlorientiert gelegter Zellen (ausserhalb der finalen Huelle).
+
+Alles Richtwerte, keine Tore. Danach (Nutzer-Entscheid 2026-08-29) folgt
+die STAPELUNG: On-Policy-Nachschaerfung mit Lehrer-Relabeling PLUS die
+Einhuellende als direktes Gelaender -- Zuschnitt wird nach der
+D2-Befundlage als eigene Absaetze registriert.
+
+**STUFE D2 GEFAHREN 2026-08-29 (triangle_hull_coverage_{lehrer,b04r2}.json,
+hull_coverage_server_logs.json; inkl. KOSTEN-GEWICHTUNG r+1 je Zeile auf
+Nutzer-Auftrag, Nenner 56 je Huelle). Die Sonde ist damit ABGESCHLOSSEN.**
+
+| Quelle | Huelle gew. (Ende) | ungew. | Halbzeit gew. | Frontier-tau | tote Huelle R4 |
+| --- | --- | --- | --- | --- | --- |
+| MENSCH | **0,838** | 0,831 | **0,533** | 0,381 | n/a (keine Zustaende) |
+| Lehrer hv2 | 0,600 | 0,645 | 0,340 | 0,325 | 0,006 (gew. 0,010) |
+| b04 | 0,573 | 0,642 | 0,334 | 0,404 | 0,008 (gew. 0,014) |
+| v21 | 0,538 | 0,672 | 0,323 | 0,413 | n/a |
+
+Befunde: (1) Der MENSCH fuellt kosten-NEUTRAL (gewichtet = ungewichtet);
+ALLE Maschinen kaufen ihre Fuellung in den billigen Zeilen (v21 -13,4 pp
+unter Gewichtung, b04 -6,9, auch der Lehrer -4,5). Der wahre
+Mensch-Maschine-Abstand ist gewichtet ~0,24-0,30, nicht ~0,17. (2) In der
+gewichteten Geometrie liegt b04 FAST AUF Lehrer-Niveau (0,573 gegen 0,600;
+Halbzeit 0,334 gegen 0,340) -- die Vollendungsluecke (0,30 gegen 0,74
+Spalten) ist damit KEIN Fuellungs-, sondern ein KONZENTRATIONS-Problem:
+gleicher gewichteter Einsatz, halber Spalten-Ertrag (Konversion
+Spalten je gewichteter Fuellung: Lehrer ~1,23, b04 ~0,52) -- konsistent
+mit der Ketten-Diagnose (Fuellung verstreut sich statt eine Spalte zu
+schliessen). (3) Tote Huelle ueberall unter 1,5 Prozent: der Vorrat
+stirbt NICHT, die teuren Zellen werden nicht bedient (Oekonomie, nicht
+Erreichbarkeit). (4) Frontier-Ordnung und Orientierungs-Stabilitaet
+differenzieren nicht (alle ~0,3-0,4 bzw. stabil ab ~R1).
+LEITKENNZAHL der Einhuellenden ab jetzt: der kosten-gewichtete
+Huellen-Fuellanteil (Mensch-Richtwert 0,84; Halbzeit 0,53).
+
 **par.3b.8 GEFAHREN 2026-08-29, alle Stufen. GESAMTVERDIKT: die Ketten-
 und Drift-These traegt; Karte, Geometrie, Form und Such-Veto scheiden als
 Haupttaeter aus.**
