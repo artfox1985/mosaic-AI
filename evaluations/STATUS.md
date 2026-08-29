@@ -156,12 +156,15 @@ richtig, beziffert ihn aber weiter mit ~9 Prozent des Solls
 (registriert als par.17 der Asym-Prereg). (0.3) Priormasse auf b05 (Korpus vom
 Nutzer zurueckgelegt): ratio-Median 1,23 gegen Champion 0,59 / b18 4,91
 -- Draft-Erbe im Prior da, verduennt (gate_c-Nachtrag). (0.4)
-Mensch-Orakel mit b05: NICHT BESTAETIGT auf allen drei Schwellen
-(primaer >= 2: +0,17 pp, t 0,21; v21 zeigte dort +1,29) -- die
-k1-spezifische Fehlbewertung ist beim spaltenfaehigen Netz WEG
-(par.9 der Orakel-Prereg, jetzt ENTSCHIEDEN). Eine Partie schied als
-Replay-Abweichung aus (Reihe-6-Chip-Vollendung; Untersuchung laeuft
-als eigene Sitzung, Chip task_df257143).
+Mensch-Orakel mit b05: NICHT BESTAETIGT auf allen drei Schwellen,
+nach Replayer-Fix auf voller 12er-Basis praktisch NULL Differenz
+(>= 2: -0,10 pp, t -0,14; v21 zeigte dort +1,29) -- die k1-spezifische
+Fehlbewertung ist beim spaltenfaehigen Netz WEG (par.9, ENTSCHIEDEN).
+Beifang mit Dauerwert (Parallel-Sitzung, cf53aab): Replayer-Greedy-
+Fehler behoben, 14/14 Server-Logs replayen; der Live-"Deadlock" war
+eine FRONTEND-Klickfalle (volle, unplatzierbare Reihen anklickbar,
+GUI-Fix liegt als Nutzer-Entscheid vor); Legalitaets-Sonde muss noch
+auf den run()-Pfad gehoben werden (offen, .py-Sperre).
 
 **PHASE 0 -- Diagnosepaket "Wo steht der Bewerter?" (4 Datenpassagen,
 Werkzeuge existieren alle, zusammen ~halber Tag):** die Weiche fuer
