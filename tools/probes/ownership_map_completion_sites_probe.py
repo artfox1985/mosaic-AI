@@ -45,7 +45,7 @@ sys.path.insert(0, str(_ROOT / "engine" / "py"))
 
 from corpus_io import load_records  # noqa: E402
 
-ARTIFACT = _ROOT / "evaluations" / "artifacts" / "ownership_map_completion_sites.json"
+ARTIFACT_BASE = _ROOT / "evaluations" / "artifacts"
 PREREG = "PREREG_heuristic_v2_long_rows.md par.3b.8 Stufe A"
 MODELS = {
     "b01": _ROOT / "models" / "alphazero_v22-b01_best.onnx",
@@ -81,6 +81,10 @@ def main():
     ap.add_argument("--limit", type=int, default=300,
                     help="Anzahl hv2-Dateien (Default 300, Muster par.3b.5)")
     ap.add_argument("--min-fill", type=int, default=4)
+    ap.add_argument("--pattern", default="selfplay_hv2_*.pkl",
+                    help="Zustandsquelle; On-Policy-Variante: selfplay_otw22b04r2*.pkl")
+    ap.add_argument("--suffix", default="",
+                    help="Artefaktnamens-Suffix, z.B. _onpolicy_b04")
     args = ap.parse_args()
     t0 = time.time()
 
@@ -89,7 +93,7 @@ def main():
     sessions = {k: ort.InferenceSession(str(p), providers=["CPUExecutionProvider"])
                 for k, p in MODELS.items()}
 
-    files = sorted(glob.glob(str(_ROOT / "data" / "selfplay_hv2_*.pkl")))[:args.limit]
+    files = sorted(glob.glob(str(_ROOT / "data" / args.pattern)))[:args.limit]
     # Je (Datei) sammeln, Block-SE auf Dateiebene (stehende Regel).
     per_file = []
     row_missing_hist = {r: 0 for r in range(6)}
@@ -188,6 +192,8 @@ def main():
             },
         }
     result["laufzeit"] = {"wanduhr_s": round(time.time() - t0, 1), "threads": 1}
+    result["pattern"] = args.pattern
+    ARTIFACT = ARTIFACT_BASE / f"ownership_map_completion_sites{args.suffix}.json"
     ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
     ARTIFACT.write_text(json.dumps(result, indent=1, ensure_ascii=False),
                         encoding="utf-8", newline="\n")

@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). Spalten-Tor: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play (par.3b.2); Platzierung verschenkt das Draft-Erbe (par.3b.5). Konsument par.3b.6/3b.7: flache Karte negativ (w2,0 t -2,85), 2D-Ablesung senkt Own-Val -3,8 Prozent und dreht die Richtung positiv, Tor verfehlt, Replikation + Pooling bestaetigen (20 Blockpaare: +0,024, t +1,61; Quote t +2,06 knapp unter Schwelle) -- kleiner echter Effekt, nicht tragfaehig; WARUM-Diagnose par.3b.8 laeuft; Self-Play bleibt gestoppt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). Spalten-Tor: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play (par.3b.2); Platzierung verschenkt das Draft-Erbe (par.3b.5). Konsument par.3b.6/3b.7: flache Karte negativ (w2,0 t -2,85), 2D-Ablesung senkt Own-Val -3,8 Prozent und dreht die Richtung positiv, Tor verfehlt, Replikation + Pooling bestaetigen (20 Blockpaare: +0,024, t +1,61; Quote t +2,06 knapp unter Schwelle) -- kleiner echter Effekt, nicht tragfaehig; WARUM-Diagnose par.3b.8 GEFAHREN: Ketten-/Drift-These traegt (Lehrer selbst wuerde auf Netz-Brettern die Fehlzeile nur zu ~0,25 bedienen), Such-Veto tot, Karte kalibriert, Geometrie geerbt => Hebel-Empfehlung On-Policy-Nachschaerfung mit Lehrer-Relabeling (Nutzer-Entscheid); Self-Play bleibt gestoppt. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1743,7 +1743,56 @@ geometrisch"), kein Tor -- es eicht kuenftige Huellen-Hebel (Trimm der
 Loss-Maske, ggf. Huelle als Netz-Einhuellende) an gemessener Geometrie
 statt an Vermutung.
 
-**Vorab benannte Lesarten:** (i) Karte pessimistisch an 5/6-Zellen =>
+**par.3b.8 GEFAHREN 2026-08-29, alle Stufen. GESAMTVERDIKT: die Ketten-
+und Drift-These traegt; Karte, Geometrie, Form und Such-Veto scheiden als
+Haupttaeter aus.**
+
+* **Stufe A** (ownership_map_completion_sites*.json; 15.903 Stellen
+  Lehrer-Korpus, 1.397 on-policy): Zeilen-Hypothese BESTAETIGT (fehlende
+  Zellen dominant tief, Zeile 6 allein ~35-40 Prozent). Die Karte ist auf
+  Lehrer-Zustaenden KALIBRIERT (p 0,63 gegen real 0,598) und nicht
+  pessimistisch; on-policy faellt die reale Vollendungsrate auf 0,446, die
+  Karte folgt der Richtung, ist aber +9 pp zu optimistisch. Form-Luecke
+  Summe/Menge: 0,82 (Lehrer-Zustaende) bzw. 0,73-0,75 (on-policy) --
+  real, aber zweitrangig.
+* **Stufe C** (Sims-Ablation, 200 Partien sims=1): SUCH-VETO TOT, Vorzeichen
+  umgekehrt -- die rohe Policy kollabiert komplett (0,0075 volle Spalten,
+  11,1 Punkte, init>=4 0,79); die Suche HEBT die Policy auf 0,30, sie
+  unterdrueckt sie nicht.
+* **Stufe D** (triangle_hull_coverage_*.json): Geometrie SAUBER GEERBT --
+  b04 ist huellen-treuer als der Lehrer (neu-in-Huelle R1-3 0,98/0,88/0,80
+  gegen 0,95/0,75/0,77; End-Abweichung 10,67 gegen 11,42). Verbotene Zone
+  strukturgleich bei beiden (Band d=1 dominiert ~47 Prozent, Cluster ~1,
+  SymKorr ~0): flaches Rand-Ueberschwappen, kein Systematik-Unterschied.
+* **Draft-Check on-policy** (onpolicy_teacher_draft_fidelity.json, 618
+  Entscheidungen, 12 Live-Partien, gefrorener Lehrer als Referenz auf
+  b04-Brettern): Zug-Uebereinstimmung je Runde 0,69/0,54/0,55-0,63/
+  0,57-0,58; das Reihenwahl-Profil des Netzes deckt sich mit dem des
+  Lehrers. ENTSCHEIDEND: an Vollendungs-Stellen bedient DER LEHRER SELBST
+  auf den Netz-Brettern die fehlende Zeile nur zu 0,21-0,32 -- statistisch
+  wie das Netz (0,26-0,28). Die spaete Einzelentscheidung ist NICHT der
+  Engpass; die Bretter sind zu diesem Zeitpunkt bereits kompromittiert.
+
+**Lesart (Synthese):** 30-45 Prozent Nicht-Lehrer-Zuege je Entscheidung
+multiplizieren sich ueber die Kette einer Spalte (0,6^k); das Netz landet
+auf Brettern, auf denen auch der Lehrer nicht mehr vollenden wuerde
+(Versorgung verspielt), und genau dort faellt die reale Vollendungsrate
+auf 0,446. Kein einzelner spaeter Fehler, sondern akkumulierte fruehe
+Divergenz -- Hypothesen 1+2 der Diagnose-Diskussion; Hypothese 3 (Suche)
+widerlegt, Hypothese 4 an den Stellen selbst nicht bestaetigt.
+
+**Hebel-Folgerung (Empfehlung, Nutzer-Entscheid):** (1) On-Policy-
+Nachschaerfung mit LEHRER-RELABELING -- der gefrorene Worker kann
+Netz-Zustaende in Masse labeln (DAgger-Muster; das Instrument existiert
+und lief hier fehlerfrei ueber 618 Anfragen); adressiert die Drift direkt.
+(2) Der Konsumenten-Knopf w=1,0 bleibt ein kleiner echter Zusatz, traegt
+aber allein nicht. (3) Vollendungs-Filter (Suche) und b03 bleiben
+nachrangige Alternativen. Mengen-Form-Arm und Blatt-Pol-Arm werden nach
+dieser Befundlage ZURUECKGESTELLT (Formfehler zweitrangig, Konsument nicht
+Haupttaeter) -- Wiedervorlage nur, falls (1) die Vollendung hebt und der
+Konsument dann erneut messbar wird.
+
+**Vorab benannte Lesarten (Registrierungsstand vor den Laeufen):** (i) Karte pessimistisch an 5/6-Zellen =>
 Mengen-Form-Arm (Folge-Registrierung par.3b.9) und ggf. die Zielfrage
 (PREREG_v23_reachability_recheck-Klasse); (ii) Karte ok, Zug kippt
 trotzdem nicht => Skalen-/Formfrage, ebenfalls Mengen-Form-Arm; (iii)
