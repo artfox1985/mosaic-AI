@@ -1874,7 +1874,7 @@ Vollendungszug fehlt in den Kandidaten => Such-/Vorratshebel
 Engpass. Reihenfolge nach Nutzer-Freigabe 2026-08-29: Diagnose ->
 Mengen-Form-Arm -> Blatt-Pol-Arm.
 
-### par.3b.9 Schiene 1 der Stapelung: On-Policy-Nachschaerfung b05 (registriert 2026-08-29, VOR Erzeugung/Training)
+### par.3b.9 Schiene 1 der Stapelung: On-Policy-Nachschaerfung v22-b05 (registriert 2026-08-29, VOR Erzeugung/Training; Namens-Korrektur auf Nutzer-Hinweis: b-Serie zaehlt fortlaufend, kein Buchstaben-Suffix)
 
 **Ziel:** die Ketten-/Drift-Luecke schliessen (par.3b.8): der Lehrer
 relabelt die Draft-Entscheidungen auf den EIGENEN Brettern des Netzes
@@ -1885,7 +1885,7 @@ gehoert dir").
 (--deterministic --no-root-noise, 400 Sims, Seed 20260830, per-file 20,
 Tag `dagger-b04`) -- exakt die Spielverteilung, in der die Vollendung
 scheitert; Partien-Diversitaet kommt aus den Partie-Seeds. Die Dateien
-werden nach der Erzeugung in ein UNTERVERZEICHNIS data/onpolicy_b05/
+werden nach der Erzeugung in ein UNTERVERZEICHNIS data/onpolicy_v22-b05/
 verschoben (ausserhalb des Trainings-Globs; Einbindung nur explizit via
 --extra-data-dir).
 
@@ -1900,13 +1900,14 @@ Lehrerzug unter EINER Determinisierung der verdeckten Information --
 dieselbe Klasse wie determinize_root_hidden_info=true der Suche; kein
 Orakelwissen. Parallelisierung: 8 Worker-Prozesse.
 
-**Training b05a (Afterburner):** Warm-Start von b04_best, NUR der
+**Training v22-b05 (Afterburner):** Warm-Start von b04_best, NUR der
 Relabel-Korpus via --extra-data-dir (das 40:1-Uebergewicht des
 hv2-Korpus wuerde das Korrektursignal ertraenken), wenige Epochen,
 lr 5e-5 + cosine (Standard-Warmstart-Rezept), Arm-B-Env,
 --ownership-weight 1.0, --ownership-head-2d, Seed 20260828. Ein
-gemischter Arm b05b (hv2 + Relabel) ist als Eskalation benannt, falls
-b05a die Policy destabilisiert (Punkte-Einbruch im Instrument).
+gemischter Arm (hv2 + Relabel) ist als Eskalation benannt und wuerde
+als v22-b06 laufen, falls b05 die Policy destabilisiert
+(Punkte-Einbruch im Instrument).
 
 **Messung/Tor:** argmax-Instrument 200 Partien gegen b04-Referenz 0,2975
 (gleiche Seeds 20260828): volle Spalten Block-t > 2,262 ohne
@@ -1924,7 +1925,7 @@ existiert, hatte nie das richtige Netz" wie der Tiling-Pol. Leiter
 w in {0; 0,15; 0,3} (0,3 = validiertes Floor-Shaping-Gewicht als
 Groessenordnungs-Anker), k1-fokussierte Kriteriengewichte, am
 argmax-Instrument, 200 Partien je Arm, auf dem BESTEN Stand aus Schiene 1
-(b05a falls es traegt, sonst b04). Tor wie par.3b.9. Die
+(v22-b05 falls es traegt, sonst b04). Tor wie par.3b.9. Die
 Trainings-Haelfte des Gelaenders (Huellen-Trimm der Ownership-Maske mit
 r+1-Kostengewichten, Nachtrag 6) bleibt benannter Folgearm NACH der
 Leiter.

@@ -16,7 +16,7 @@ Parallelisierung: N Worker-Prozesse, Dateien round-robin.
 
 Aufruf (exklusiv):
     python -X utf8 -u tools/relabel_drafts_with_teacher.py \
-        --in-dir data/onpolicy_b05 --workers 8
+        --in-dir data/onpolicy_v22-b05 --workers 8
 Smoke: --limit-files 1 --workers 1
 """
 from __future__ import annotations
@@ -107,7 +107,7 @@ def relabel_file(path, proc, mr, stats, seed_base):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
-    ap.add_argument("--in-dir", default="data/onpolicy_b05")
+    ap.add_argument("--in-dir", default="data/onpolicy_v22-b05")
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--limit-files", type=int, default=None)
     ap.add_argument("--seed-base", type=int, default=936000)
