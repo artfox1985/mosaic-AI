@@ -1743,6 +1743,29 @@ geometrisch"), kein Tor -- es eicht kuenftige Huellen-Hebel (Trimm der
 Loss-Maske, ggf. Huelle als Netz-Einhuellende) an gemessener Geometrie
 statt an Vermutung.
 
+**Stufe-D-Ergaenzung GEFAHREN 2026-08-29 (Nutzer-Auftrag: Abgleich mit den
+Server-Spiellogs; hull_coverage_server_logs.json, 9 fertige
+Mensch-gegen-v21-Partien, Rekonstruktion ueber die korrektheitsbewiesene
+column_build_structural_probe-Maschinerie):**
+
+| Quelle | Huelle/21 | Abweichung | volle Spalten | Quote |
+| --- | --- | --- | --- | --- |
+| MENSCH (Server-Logs) | **17,44** | **6,00** | **1,78** | **0,727** |
+| v21 (dieselben Partien) | 14,11 | 10,67 | 0,11 | 0,050 |
+| Lehrer hv2 (Self-Play) | 13,55 | 11,42 | 0,74 | 0,347 |
+| b04 (Self-Play) | 13,49 | 10,67 | ~0,30 | ~0,15 |
+
+Der geometrische Richtwert menschlichen Spiels liegt WEIT ueber der
+bisherigen Lehrer-Decke: die Huelle wird zu 17,4/21 gefuellt (Abweichung
+6,0), fast zwei volle Spalten je Partie, Vollendungsquote 0,73. Der
+Abstand Lehrer->Mensch ist damit GROESSER als der Abstand Netz->Lehrer.
+Vorbehalte, wie im Memory registriert: n=9, einseitig (Mensch gewinnt fast
+immer, Gegner ist der plattenblinde v21, andere Farbkonkurrenz als im
+Self-Play) -- als Groessenordnungs-Beleg belastbar, als Verteilung nicht.
+Folgerung fuer die Hebel-Diskussion: selbst eine perfekte
+Lehrer-Imitation traefe nur die halbe Huelle; der Einhuellenden-Ansatz
+des Nutzers hat oberhalb des hv2-Lehrers messbaren Raum.
+
 **par.3b.8 GEFAHREN 2026-08-29, alle Stufen. GESAMTVERDIKT: die Ketten-
 und Drift-These traegt; Karte, Geometrie, Form und Such-Veto scheiden als
 Haupttaeter aus.**
