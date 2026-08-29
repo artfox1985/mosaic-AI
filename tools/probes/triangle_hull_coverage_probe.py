@@ -35,6 +35,11 @@ sys.path.insert(0, str(_ROOT))
 from corpus_io import load_records  # noqa: E402
 
 ARTIFACT_DIR = _ROOT / "evaluations" / "artifacts"
+
+
+def _mr():
+    import mosaic_rust
+    return mosaic_rust
 PREREG = "PREREG_heuristic_v2_long_rows.md par.3b.8 Stufe D"
 
 HULL_LEFT = {(r, c) for r in range(6) for c in range(6) if r + c <= 5}
@@ -64,6 +69,72 @@ def mirror(cell, hull):
     (r,c)->(5-c,5-r); rechte Huelle (r>=c): Hauptdiagonale (r,c)->(c,r)."""
     r, c = cell
     return (5 - c, 5 - r) if hull is HULL_LEFT else (c, r)
+
+
+def row_weight(cell):
+    """Bedien-Kosten der Zelle: Rasterzeile r braucht Musterreihe r, also
+    r+1 Fliesen (Nutzer-Auftrag 2026-08-29: untere Reihen hoeher gewichten).
+    Regel-hergeleitet, nicht gefittet."""
+    return cell[0] + 1
+
+
+def weighted_fill_share(cells, hull):
+    """Kosten-gewichteter Fuellanteil der Huelle in [0,1]; Nenner ist die
+    Gesamtkost der Huelle (56 fuer beide Orientierungen)."""
+    total = sum(row_weight(x) for x in hull)
+    return sum(row_weight(x) for x in (cells & hull)) / total
+
+
+def depth(cell, hull):
+    """Tiefe zur Huellen-Ecke: HULL_LEFT waechst von (0,0), gespiegelt von (0,5)."""
+    r, c = cell
+    return r + c if hull is HULL_LEFT else r + (5 - c)
+
+
+def kendall_tau(pairs):
+    """tau-a ueber ungebundene Paare; None bei < 2 verwertbaren Paaren."""
+    conc = disc = 0
+    n = len(pairs)
+    for i in range(n):
+        for j in range(i + 1, n):
+            dx = pairs[i][0] - pairs[j][0]
+            dy = pairs[i][1] - pairs[j][1]
+            if dx == 0 or dy == 0:
+                continue
+            if dx * dy > 0:
+                conc += 1
+            else:
+                disc += 1
+    total = conc + disc
+    return (conc - disc) / total if total else None
+
+
+def best_hull(cells):
+    return (HULL_LEFT if deviation(cells, HULL_LEFT) <= deviation(cells, HULL_RIGHT)
+            else HULL_RIGHT)
+
+
+def stufe_d2_metrics(boards, hull):
+    """Stufe-D2-Kennzahlen 2-4 (par.3b.8) aus den Runden-Brettern in der
+    FINALEN Orientierung: Frontier-tau, Halbzeit-Huelle, Orientierungs-
+    Stabilitaet. Kennzahl 1 (lebende Huelle) braucht Zustaende und wird vom
+    Aufrufer beigesteuert."""
+    placed_round = {}
+    for r in range(1, 6):
+        for cell in boards[r] - boards[r - 1]:
+            placed_round[cell] = r
+    tau = kendall_tau([(rnd, depth(cell, hull)) for cell, rnd in placed_round.items()])
+    halbzeit = {"fill3": len(boards[3] & hull), "dev3": deviation(boards[3], hull),
+                "fill3_gewichtet": weighted_fill_share(boards[3], hull)}
+    stability = 5
+    for r in range(1, 6):
+        if all(best_hull(boards[k]) is hull for k in range(r, 6)):
+            stability = r
+            break
+    misoriented = sum(1 for cell, rnd in placed_round.items()
+                      if rnd < stability and cell not in hull)
+    return {"frontier_tau": tau, "halbzeit": halbzeit,
+            "stabil_ab_runde": stability, "fehlorientiert_vor_stabil": misoriented}
 
 
 def forbidden_zone_stats(cells, hull):
@@ -123,6 +194,8 @@ def main():
     round_new = {r: [0, 0] for r in range(1, 6)}
     end_hull_fill, end_out_fill, end_dev = [], [], []
     fz_stats = []
+    d2_stats = []
+    end_wfill = []
     games = 0
     for fi, f in enumerate(files):
         recs = load_records(f)
@@ -152,13 +225,39 @@ def main():
                         st = last[gid]
                     boards[r] = occupancy(st["players"][pi]["dome_grid"])
                 final_cells = boards[5]
-                hull = (HULL_LEFT if deviation(final_cells, HULL_LEFT)
-                        <= deviation(final_cells, HULL_RIGHT) else HULL_RIGHT)
+                hull = best_hull(final_cells)
+                d2 = stufe_d2_metrics(boards, hull)
+                # Kennzahl 1 (lebende Huelle): tote unter den LEEREN
+                # Huellen-Zellen am Ende von Runde 3 und 4 (Zustand = erster
+                # Record der Folgerunde; Puffer < 0 bei kind=normal = tot).
+                for r_end, key in ((3, "tot3"), (4, "tot4")):
+                    st_next = first_by_round.get((gid, r_end + 1))
+                    d2[key] = None
+                    d2[key + "_gewichtet"] = None
+                    if st_next is not None:
+                        try:
+                            comp = json.loads(_mr().plate_completability_json(
+                                json.dumps(st_next), pi))
+                            dead = set()
+                            for c6, entries in enumerate(comp["col_open_cells"]):
+                                for e in entries:
+                                    if e.get("kind") == "normal" and e.get("buffer", 0) < 0:
+                                        dead.add((e["r"], c6))
+                            empty_hull = hull - boards[r_end]
+                            if empty_hull:
+                                d2[key] = len(dead & empty_hull) / len(empty_hull)
+                                wtot = sum(row_weight(x) for x in empty_hull)
+                                d2[key + "_gewichtet"] = (
+                                    sum(row_weight(x) for x in (dead & empty_hull)) / wtot)
+                        except Exception:
+                            pass
+                d2_stats.append(d2)
                 for r in range(1, 6):
                     new = boards[r] - boards[r - 1]
                     round_new[r][0] += len(new & hull)
                     round_new[r][1] += len(new)
                 end_hull_fill.append(len(final_cells & hull))
+                end_wfill.append(weighted_fill_share(final_cells, hull))
                 end_out_fill.append(len(final_cells - hull))
                 end_dev.append(deviation(final_cells, hull))
                 fz_stats.append(forbidden_zone_stats(final_cells, hull))
@@ -174,10 +273,29 @@ def main():
             for r in range(1, 6)},
         "endstand": {
             "huelle_fuellstand_mittel_von_21": sum(end_hull_fill) / n,
+            "huelle_fuellanteil_kosten_gewichtet": sum(end_wfill) / n,
             "aussen_fuellstand_mittel_von_15": sum(end_out_fill) / n,
             "dreiecks_abweichung_mittel": sum(end_dev) / n,
         },
         "laufzeit": {"wanduhr_s": round(time.time() - t0, 1), "threads": 1},
+    }
+    # Stufe D2 (par.3b.8): vier Huellen-Kennzahlen
+    taus = [d["frontier_tau"] for d in d2_stats if d["frontier_tau"] is not None]
+    tot3 = [d["tot3"] for d in d2_stats if d["tot3"] is not None]
+    tot4 = [d["tot4"] for d in d2_stats if d["tot4"] is not None]
+    result["stufe_d2"] = {
+        "frontier_tau_mittel": (sum(taus) / len(taus)) if taus else None,
+        "halbzeit_fill_mittel_von_21": sum(d["halbzeit"]["fill3"] for d in d2_stats) / len(d2_stats),
+        "halbzeit_fuellanteil_kosten_gewichtet": sum(d["halbzeit"]["fill3_gewichtet"] for d in d2_stats) / len(d2_stats),
+        "halbzeit_abweichung_mittel": sum(d["halbzeit"]["dev3"] for d in d2_stats) / len(d2_stats),
+        "stabil_ab_runde_mittel": sum(d["stabil_ab_runde"] for d in d2_stats) / len(d2_stats),
+        "stabil_ab_r1_anteil": sum(1 for d in d2_stats if d["stabil_ab_runde"] == 1) / len(d2_stats),
+        "fehlorientiert_vor_stabil_mittel": sum(d["fehlorientiert_vor_stabil"] for d in d2_stats) / len(d2_stats),
+        "tote_huelle_r3_mittel": (sum(tot3) / len(tot3)) if tot3 else None,
+        "tote_huelle_r4_gewichtet_mittel": (lambda v: (sum(v) / len(v)) if v else None)(
+            [d["tot4_gewichtet"] for d in d2_stats if d.get("tot4_gewichtet") is not None]),
+        "tote_huelle_r4_mittel": (sum(tot4) / len(tot4)) if tot4 else None,
+        "tote_huelle_n": [len(tot3), len(tot4)],
     }
     # Struktur der verbotenen Zone (Nutzer-Analyseideen 2026-08-29)
     with_err = [s for s in fz_stats if s["n"] > 0]
