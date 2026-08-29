@@ -41,7 +41,7 @@ FARBE_IDX = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4}
 
 # einseitige 5-%-Quantile der t-Verteilung, df = n_partien - 1
 T_KRIT_EINSEITIG = {2: 2.920, 3: 2.353, 4: 2.132, 5: 2.015, 6: 1.943, 7: 1.895,
-                    8: 1.860, 9: 1.833, 10: 1.812}
+                    8: 1.860, 9: 1.833, 10: 1.812, 11: 1.796, 12: 1.782}
 
 
 def lies_header(log_pfad: Path) -> dict:
@@ -50,14 +50,20 @@ def lies_header(log_pfad: Path) -> dict:
         return json.loads(fh.readline().lstrip("# ").strip())
 
 
-def klassifiziere(mr, state: dict, spieler: int, farbe: str) -> tuple[str, dict]:
-    """'k1' | 'neutral' | 'wild' plus Detail fuer das Protokoll."""
+def klassifiziere(mr, state: dict, spieler: int, farbe: str,
+                  fill_min: int = 0) -> tuple[str, dict]:
+    """'k1' | 'neutral' | 'wild' plus Detail fuer das Protokoll.
+
+    fill_min: Fuellstand-Schwelle der Zielspalte (par.9, 2026-08-29);
+    Default 0 = par.7-Verhalten unveraendert."""
     idx = FARBE_IDX.get(farbe)
     if idx is None:
         return "wild", {}
     d = json.loads(mr.plate_completability_json(json.dumps(state), spieler))
     for c in range(6):
         if not d["columns"][c] or d["col_fill"][c] >= 6:
+            continue
+        if d["col_fill"][c] < fill_min:
             continue
         for z in d["col_open_cells"][c]:
             if z.get("kind") == "normal" and z.get("color_idx") == idx and z.get("need", 0) > 0:
@@ -70,6 +76,11 @@ def main() -> None:
     ap.add_argument("--dumps", required=True,
                     help="Verzeichnis mit game_*.jsonl und oracle_game_*.jsonl")
     ap.add_argument("--logs", default="static/log")
+    ap.add_argument("--fill-min", type=int, default=0,
+                    help="Fuellstand-Schwelle der Zielspalte fuer die "
+                         "k1-Klassifikation (par.9; Default 0 = par.7)")
+    ap.add_argument("--out", default=None,
+                    help="Artefaktpfad (Default: probe_human_oracle_gap_k1.json)")
     a = ap.parse_args()
 
     import mosaic_rust as mr  # noqa: PLC0415
@@ -106,7 +117,8 @@ def main() -> None:
             if rec.get("kind") == "stone" and dump is not None:
                 farbe = (dump.get("fields") or {}).get("color")
                 if farbe is not None:
-                    klasse, det = klassifiziere(mr, dump["state"], mensch, farbe)
+                    klasse, det = klassifiziere(mr, dump["state"], mensch,
+                                                farbe, a.fill_min)
             if klasse == "wild":
                 wild += 1
                 klasse = "neutral"
@@ -169,10 +181,13 @@ def main() -> None:
               f"{'BESTAETIGT' if bestaetigt and len(diffs) >= 5 else 'NICHT BESTAETIGT'}"
               + ("" if len(diffs) >= 5 else f"  (erst {len(diffs)} Partien)"))
 
-    (BASIS / "evaluations" / "artifacts" / "probe_human_oracle_gap_k1.json").write_text(
-        json.dumps({"games": games, "verdikt": verdikt}, indent=1, ensure_ascii=False),
+    out = Path(a.out) if a.out else (
+        BASIS / "evaluations" / "artifacts" / "probe_human_oracle_gap_k1.json")
+    out.write_text(
+        json.dumps({"games": games, "verdikt": verdikt, "fill_min": a.fill_min},
+                   indent=1, ensure_ascii=False),
         encoding="utf-8")
-    print("\n  geschrieben: evaluations/probe_human_oracle_gap_k1.json")
+    print(f"\n  geschrieben: {out}")
 
 
 if __name__ == "__main__":

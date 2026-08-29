@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Lernt der Value-Kopf den Wert des k1-Baus, wenn er ihn in asymmetrischen Partien (EIN Spieler baut, der andere nicht) erstmals als siegentscheidendes Merkmal sieht? | Beleg: Gesamtverdikt par.14-16 (2026-08-22): kein Signal (k1-Rate 12,2 % = Grundrate, Tau-Teilfrage n.s.), aber kein Siegverlust (199/407 gg. 205/407); par.16: implizites Behavior-Cloning drueckte sich nicht aus. Anlass: DOSSIER_ownership_head.md 7(1) -- die Bauer-Arme sind wegsymmetrisiert; externe Spezifikation 2026-08-18. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Lernt der Value-Kopf den Wert des k1-Baus, wenn er ihn in asymmetrischen Partien (EIN Spieler baut, der andere nicht) erstmals als siegentscheidendes Merkmal sieht? | Beleg: Gesamtverdikt par.14-16 (2026-08-22): kein Signal (k1-Rate 12,2 % = Grundrate, Tau-Teilfrage n.s.), aber kein Siegverlust (199/407 gg. 205/407); par.16: implizites Behavior-Cloning drueckte sich nicht aus. Nachmessung par.17 (2026-08-29): v22-b05 ordnet dieselben Geschwister mit Tau +0,338 -- die Ordnung kam ueber die Lehrer-Linie, nicht das Curriculum. Anlass: DOSSIER_ownership_head.md 7(1); externe Spezifikation 2026-08-18. -->
 
 # PREREG: Asymmetrisches Self-Play — den Plattenbau erstmals als Vorteil zeigen
 
@@ -516,3 +516,18 @@ Traeger gesamt 1380). An der Cache-Zeile verifiziert (Arm S): Root-Filter
 Zusammensetzung VOR dem Lade-Filter (asymN faelschlich enthalten, mit
 falscher Spielzahl) -- fuer die Fenster-Wahrheit gilt die Cache-Zeile im
 Log, nicht das Manifest.
+
+## par.17 NACHMESSUNG des Geschwister-Instruments auf v22-b05 (2026-08-29, Fahrplan Phase 0.2)
+
+Dieselbe Sonde (asym_value_sibling_check, seit heute mit
+--model-s/--model-n/--out parametrisierbar; Ein-Modell-Modus ohne
+Paarvergleich), derselbe Dump (probe_sibling_succ_k1_w1.0.json, 33
+gewertete Stellungen): der rohe Value-Kopf von v22-b05 ordnet die
+Geschwister-Nachfolger mit **Tau +0,338** nach k1-Spaltenfortschritt --
+Vorzeichenwechsel gegenueber den plattenblinden Netzen der
+Erstmessung (S -0,077 / N -0,185, par.15). Die Ordnungs-Faehigkeit,
+die das Asym-Curriculum nicht erzeugen konnte, ist ueber die
+DAgger-/Lehrerkorpus-Linie entstanden. Einschraenkung: die GROESSE der
+Reaktion bleibt gedaempft (R5-Steigung 0,0886,
+PREREG_r5_value_calibration Nachmessung) -- Ordnung ja, Betrag nein.
+Artefakt: evaluations/artifacts/b05_value_sibling_check.json.

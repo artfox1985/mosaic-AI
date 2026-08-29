@@ -133,6 +133,20 @@ lief mit 5 Opus-Agenten; tragende Behauptungen stichprobengeprueft
 PREREG_implicit_minimax_backup.md:204, Kopf risk_sensitive, selbst
 geprueft). Erwartungen sind EINSCHAETZUNGEN.
 
+**PHASE 0 GEFAHREN 2026-08-29 (0.1/0.2 fertig, 0.4 laeuft, 0.3
+blockiert) -- VERDIKT: Ordnung geheilt, Betrag nicht; die
+Phase-3-Bedingung ist ERFUELLT.** (0.1) R5-Platten-Steigung auf b05:
+**0,0886** (Punkte-Kopf 0,989) -- die Daempfung persistiert exakt im
+alten Band, KEIN Korpus-Artefakt (r5_value_calibration_b05.json;
+registriert in PREREG_r5_value_calibration). (0.2) Geschwister-Tau auf
+b05: **+0,338** gegen -0,08/-0,19 der plattenblinden Netze auf
+denselben 33 Stellungen -- der Kopf ORDNET Spaltenfortschritt jetzt
+richtig, beziffert ihn aber weiter mit ~9 Prozent des Solls
+(registriert als par.17 der Asym-Prereg). (0.3) Priormasse-Sonde
+BLOCKIERT: ownership_corpus geloescht, Qualifikations-Definition ohne
+Traeger. (0.4) Mensch-Orakel mit b05 laeuft (par.9 registriert,
+Fuellstand-Schwelle >= 2 primaer, 12 Partien).
+
 **PHASE 0 -- Diagnosepaket "Wo steht der Bewerter?" (4 Datenpassagen,
 Werkzeuge existieren alle, zusammen ~halber Tag):** die Weiche fuer
 alles Weitere. (0.1) R5-PLATTEN-Steigung auf b05 nachmessen -- die

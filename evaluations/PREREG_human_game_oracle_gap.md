@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Bewertet der Champion die plattenbauenden Zuege eines Menschen systematisch FALSCH -- also mit dem falschen Vorzeichen, nicht nur zu leise? | Beleg: par.7 (2026-08-19), NICHT BESTAETIGT -- 7 replaybare Partien, gepaarte Differenz +0,60 pp, t 0,78 unter Schwelle 1,943. Staerke-Effekt; die Kampagne bleibt bei "zu leise". -->
+<!-- STATUS: OFFEN | Frage: Bewertet der Champion die plattenbauenden Zuege eines Menschen systematisch FALSCH -- also mit dem falschen Vorzeichen, nicht nur zu leise? | Beleg: par.7 (2026-08-19) am plattenblinden v21: NICHT BESTAETIGT (+0,60 pp, t 0,78). WIEDERVORLAGE registriert und offen (par.9, 2026-08-29): b05-Orakel, 12 Partien, Fuellstand-Schwelle >= 2 primaer. -->
 
 # PREREG: Der Orakel-Abstand in Menschenpartien
 
@@ -174,6 +174,32 @@ aufgegriffen: als EIGENE Vorregistrierung mit Fuellstand-Schwelle, nicht als
 Umdeutung dieser Messung.
 
 ---
+
+## par.9 WIEDERVORLAGE mit b05-Orakel (registriert 2026-08-29, VOR der Messung; Fahrplan Phase 0.4)
+
+**Anlass:** die par.7-Klausel ("falls je wieder aufgegriffen: als EIGENE
+Vorregistrierung mit Fuellstand-Schwelle") plus die Memory-Regel, beim
+ersten plattenbewussten Champion neu zu messen. Das Orakel ist jetzt
+**v22-b05** (bestes spaltenfaehiges Netz, 0,3375 volle Spalten am
+Instrument) statt des plattenblinden v21.
+
+**Anordnung:** alle FERTIGEN, exakt replaybaren Partien aus static/log
+(gezaehlt 2026-08-29: 12 von 13; die unfertige vom 2026-08-20 ist
+ausgeschlossen; Partien mit Replay-Abweichung werden ausgeschlossen und
+gezaehlt). Orakel b05@400 (--model alphazero_v22-b05.onnx, --sims 400),
+Klassifikation wie par.4 -- aber PRIMAER mit **Fuellstand-Schwelle >= 2**
+(die par.4-Definition ist in R1-3 schwach selektiv, par.7); Schwellen
+0 und >= 3 werden SEKUNDAER berichtet. Entscheidungsregel wie par.5:
+gepaarte Differenz k1-relevant gegen neutral je Partie, einseitiger
+t-Test (df = n-1), plus Vorzeichen-Mehrheit. Werkzeug wie par.8, ergaenzt
+um einen --fill-min-Parameter (Default 0 = par.7-Verhalten unveraendert).
+
+**Lesarten vorab:** (i) Differenz signifikant POSITIV beim b05-Orakel =>
+auch das spaltenfaehige Netz unterschaetzt echten Spaltenfortschritt --
+Ziel-Chirurgie (Fahrplan Phase 3) noetig; (ii) Differenz verschwunden
+(und 0.1/0.2 unauffaellig) => Daempfung war Korpus-Artefakt, Phase 3
+entfaellt zugunsten des Generationen-Laufs; (iii) NEGATIV => b05
+uebergewichtet Spaltenzuege -- neuer Befund, eigene Deutung noetig.
 
 ## par.8 UEBERGABE — fuer einen anderen Agenten
 
