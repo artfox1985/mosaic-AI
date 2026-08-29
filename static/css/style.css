@@ -715,12 +715,27 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    gewinnt die Kaskade. Wer den Block verschiebt, verliert den Gradienten --
    Rand und Schatten blieben, der Stein wuerde flach.
    ============================================================================ */
+/* NACHTRAG 2026-08-29 (Nutzer-Auftrag, zwei Haelften):
+     a) KUPPELPLATTEN haptischer -- mehr Tiefe, Materialgefuehl, Mulden.
+        Traeger sind die Plattenkoerper (.dslot.occ, .dgtile, .ptile,
+        .d2x2.lg) und die vier Zellen (.ds.N/.W/.S) als Mulden.
+     b) FLIESEN wie geschliffene EDELSTEINE statt wie Glaskugeln.
+        Traeger sind .tile (Fabriken/Musterreihen/Boden) und .ds.filled.
+   Die FORM bleibt an beiden Stellen unangetastet: .tile und .ds.filled
+   behalten ihren 4px-Radius (rechteckig), die offenen Kuppelfelder ihren
+   10px/14px-Radius (rund). Geaendert wird ausschliesslich das Material. */
 :root{
+  /* Gelegte Fliese = geschliffener Stein. Gegenueber der Fassung vom
+     2026-08-19 zusaetzlich: ein Innenschimmer (deutet Transluzenz an) und
+     eine dritte, harte Kontaktschatten-Lage direkt unter dem Stein -- ohne
+     sie schwebt der weiche Hof, mit ihr sitzt der Stein auf. */
   --relief-up:
-    inset 0 1.5px 0 rgba(255,255,255,.50),
-    inset 1.5px 0 0 rgba(255,255,255,.18),
-    inset -1.5px 0 0 rgba(0,0,0,.22),
-    inset 0 -2.5px 0 rgba(0,0,0,.34),
+    inset 0 1.5px 0 rgba(255,255,255,.72),
+    inset 1.5px 0 0 rgba(255,255,255,.30),
+    inset -1.5px 0 0 rgba(0,0,0,.26),
+    inset 0 -2.5px 0 rgba(0,0,0,.38),
+    inset 0 0 5px rgba(255,255,255,.20),
+    0 1px 1px rgba(0,0,0,.26),
     0 2px 3px -1px rgba(0,0,0,.34),
     0 5px 9px -4px rgba(0,0,0,.34);
   --relief-down:
@@ -728,19 +743,193 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
     inset 0 2px 2px -1px rgba(0,0,0,.22),
     inset 2px 0 3px -2px rgba(0,0,0,.16),
     inset 0 -2px 0 rgba(255,255,255,.92);
-  /* Gewoelbte Steinoberflaeche. Liegt als background-IMAGE ueber der
-     Farbe der Farbklasse, faerbt also nicht selbst. */
-  --stone-face:linear-gradient(165deg,
-    rgba(255,255,255,.38) 0%,
-    rgba(255,255,255,.10) 34%,
-    rgba(0,0,0,.07) 60%,
-    rgba(0,0,0,.24) 100%);
+  /* EDELSTEIN-SCHLIFF der Fliese (frueher --stone-face, ein einzelner
+     Woelbungs-Gradient). Liegt als background-IMAGE ueber der Farbe der
+     Farbklasse, faerbt also nicht selbst -- die fuenf Spielfarben bleiben
+     exakt, sie bekommen nur Licht und Schatten.
+
+     Vier Lagen, oberste zuerst:
+       1. Spekular-Glanzpunkt oben links (klein und hart -- der Unterschied
+          zwischen "poliert" und "milchig").
+       2. TAFEL: helleres Innenrechteck, die geschliffene Deckflaeche. Braucht
+          `background-size` (58% 58%), s. die Nutzerregeln unten -- deshalb
+          steht die Groesse NICHT hier: eine Kurzschreibweise mit `center/58%`
+          ist in `background-image:` nicht erlaubt, nur im `background`-
+          Kurzschreibweise-Kontext. Wer eine Lage ergaenzt oder entfernt, zieht
+          die background-size-Liste in BEIDEN Nutzerregeln mit.
+       3. FACETTEN-Pyramide: vier Dreiecke von der Kante zur Tafel, mit HARTEN
+          Kanten (conic-gradient mit Doppel-Winkel-Stops). Genau das trennt den
+          Schliff von der weichen Glaskugel. Beleuchtung wie im ganzen Brett
+          von oben: obere Facette am hellsten, untere am dunkelsten.
+       4. Grundverlauf oben hell -> unten satt: Tiefe und Koerper.
+     Reihenfolge der Winkel bei `from 45deg`: 0-90deg = rechte Facette,
+     90-180 = untere, 180-270 = linke, 270-360 = obere. */
+  --gem-face:
+    radial-gradient(115% 85% at 24% 15%,
+      rgba(255,255,255,.80) 0%,
+      rgba(255,255,255,.26) 20%,
+      rgba(255,255,255,0) 48%),
+    linear-gradient(rgba(255,255,255,.14),rgba(255,255,255,.14)),
+    conic-gradient(from 45deg at 50% 50%,
+      rgba(0,0,0,.13) 0deg 90deg,
+      rgba(0,0,0,.30) 90deg 180deg,
+      rgba(255,255,255,.15) 180deg 270deg,
+      rgba(255,255,255,.48) 270deg 360deg),
+    linear-gradient(168deg,
+      rgba(255,255,255,.30) 0%,
+      rgba(255,255,255,.05) 30%,
+      rgba(0,0,0,.10) 62%,
+      rgba(0,0,0,.28) 100%);
   --hollow-face:linear-gradient(180deg,rgba(0,0,0,.16),rgba(0,0,0,.02) 60%,rgba(255,255,255,.35) 100%);
+
+  /* --- Kuppelplatte: Material ------------------------------------------- */
+  /* ZIELBILD 2026-08-29 (zweite Fassung, nach Nutzer-Urteil "weit weg vom
+     Ziel" zur ersten): die Platte ist ein handschmeichlerisches PORZELLAN-
+     Objekt -- cremefarben, dick, stark gerundet, mit goldener Eckzier.
+     Die erste Fassung hat nur eine Lichtlage ueber Weiss gelegt und blieb
+     deshalb flach; jetzt traegt die Platte eine eigene Cremefarbe. */
+  --plate-tint:#F6EFE0;
+  /* Joker-Platten: DEUTLICH kraeftigeres Lila als --wild-bg (#EDE9FE).
+     Grund, am Render gemessen: --plate-face legt oben links 95 % Weiss auf und
+     unten noch eine warme Lage; von einem Ton, der selbst schon zu 93 % hell
+     ist, bleibt danach nichts Erkennbares uebrig -- die Joker-Platte sah aus
+     wie eine normale. Der Kennwert des unbelegten JokerFELDS (--wild-bg)
+     bleibt unveraendert, hier geht es nur um die PLATTENFLAECHE unter der
+     Porzellan-Beleuchtung.
+     NACHGESCHAERFT (Nutzer 2026-08-29): "der nutzer will auf einen blick auf
+     die kuppel sehen, wo die jokerplatten liegen" -- #D9CEF8 auf #C3ACF2.
+     Die Hover-/Auswahl-Rueckmeldung bleibt unterscheidbar, weil sie nicht an
+     der Flaeche haengt, sondern am lila RAHMEN und (bei .sel) an der
+     zusaetzlichen Outline. */
+  --plate-tint-wild:#B9A2F0;
+  --plate-face:linear-gradient(158deg,
+    rgba(255,255,255,.95) 0%,
+    rgba(255,252,244,.55) 26%,
+    rgba(212,190,146,.10) 62%,
+    rgba(168,140,86,.20) 100%);
+  /* GOLDENE ECKZIER: je Ecke drei ineinandergeschachtelte Winkel, die dem
+     Eckradius der Platte FOLGEN (deshalb Bogen statt rechtem Winkel -- ein
+     rechtwinkliger Bracket wuerde vom border-radius weggeschnitten).
+
+     Der viewBox ist 58x58, also 1 Einheit = 1px auf dem Brett; auf der
+     80px-Vorschau skaliert alles um 1,38. GEMESSEN, warum die Winkel so weit
+     aussen liegen muessen: der Traeger ist 58px, das Gitter `.d2x2` 48px und
+     zentriert -- sichtbare Plattenflaeche ist also nur der 5px-Ring
+     (4px Innenabstand + 1px Rand) und das 4px-Kreuz zwischen den Mulden. Die
+     `.ds`-Zellen sind Kindelemente und decken alles darueber ab. Die drei
+     Winkel sitzen bei 1,4 / 2,8 / 4,2 px, ihre Arme laufen nur so weit, wie
+     sie im Ring bleiben. Wer den Eckradius (13px, Regel unten) aendert, zieht
+     die drei Bogenradien 11,6 / 10,2 / 8,8 mit -- sie sind 13 minus Abstand. */
+  --plate-corner:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 58 58'%3E%3Cdefs%3E%3Cg id='pc' fill='none' stroke='%23B99A5B' stroke-linecap='round'%3E%3Cpath d='M1.4 22 L1.4 13 A11.6 11.6 0 0 1 13 1.4 L22 1.4' stroke-width='0.62' opacity='0.58'/%3E%3Cpath d='M2.8 19 L2.8 13 A10.2 10.2 0 0 1 13 2.8 L19 2.8' stroke-width='0.55' opacity='0.42'/%3E%3Cpath d='M4.2 16 L4.2 13 A8.8 8.8 0 0 1 13 4.2 L16 4.2' stroke-width='0.5' opacity='0.28'/%3E%3C/g%3E%3C/defs%3E%3Cuse href='%23pc'/%3E%3Cuse href='%23pc' transform='translate(58,0) scale(-1,1)'/%3E%3Cuse href='%23pc' transform='translate(0,58) scale(1,-1)'/%3E%3Cuse href='%23pc' transform='translate(58,58) scale(-1,-1)'/%3E%3C/svg%3E");
+  /* Feine Koernung (gebrannter Ton / Elfenbein), damit die Flaeche nicht wie
+     lackiertes Plastik wirkt. Sehr niedrige Deckkraft: die 8-9px-Labels der
+     Platten muessen lesbar bleiben (gleiche Auflage wie beim Marmor unten).
+     Wird per background-size auf 100% 100% GESTRECKT statt gekachelt --
+     feTurbulence ist nicht kachelbar, gestrecktes Rauschen bleibt Rauschen,
+     eine Kachelnaht waere dagegen auf der 80px-Vorschau sichtbar. */
+  --plate-grain:url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='pg'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' seed='23'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.40 0 0 0 0 0.35 0 0 0 0 0.24 0.10 0 0 0 -0.035'/%3E%3C/filter%3E%3Crect width='120' height='120' filter='url(%23pg)'/%3E%3C/svg%3E");
+  /* WANDSTAERKE + SCHLAGSCHATTEN. Die erste Fassung war zu flach (Nutzer:
+     "wirken weiter voellig flach"). Drei Aenderungen:
+       - `inset 0 -3px 3px -1px` warm-braun = sichtbare Seitenwand unten, das
+         ist das Merkmal, das eine dicke Platte von einem Div trennt;
+       - ein VIERSTUFIGER Schlagschatten (Kontaktkante, nah, mittel, weiter
+         Hof) statt drei, alle warm-grau statt neutral-schwarz;
+       - kraeftigeres Kantenlicht oben (volles Weiss).
+     Der Hof bleibt trotzdem gedeckelt: die Platten liegen im 3x3-Raster nur
+     4px auseinander, ein zu breiter Hof verklebt die Silhouetten zu einem
+     Block (dieselbe Falle wie beim Zellabstand, s. LUECKE bei `.d2x2`). */
+  --plate-relief:
+    inset 0 1.5px 0 rgba(255,255,255,.98),
+    inset 1.5px 0 0 rgba(255,255,255,.50),
+    inset -1.5px 0 0 rgba(140,114,66,.16),
+    inset 0 -3px 3px -1px rgba(140,114,66,.34),
+    0 1px 0 rgba(122,100,60,.20),
+    0 2px 3px rgba(96,78,46,.20),
+    0 5px 8px -2px rgba(96,78,46,.22),
+    0 11px 18px -7px rgba(96,78,46,.30);
+  /* MULDE einer Plattenzelle: TIEFE runde Vertiefung. Weicher Innenschatten
+     oben, heller Reflex an der Unterkante, Rimlicht ausserhalb -- der Stein
+     soll DRIN liegen, nicht drauf.
+     Der Einwand vom 2026-08-19 (breiter Innenschatten verschmutzt die
+     Sollfarbe) ist dadurch erledigt, dass die Sollfarbe seit dieser Fassung
+     NICHT mehr auf der Zelle selbst liegt, sondern auf dem Cabochon
+     (`.ds.N::before`, 1,5px kleiner). Der Schatten faellt also auf den
+     Muldenrand, nicht auf die Farbe. */
+  --well-face:linear-gradient(180deg,
+    rgba(96,76,42,.30) 0%,
+    rgba(96,76,42,.10) 38%,
+    rgba(255,255,255,.20) 78%,
+    rgba(255,255,255,.55) 100%);
+  --well-relief:
+    inset 0 2.5px 3px -1px rgba(74,58,32,.52),
+    inset 0 1px 1px rgba(74,58,32,.32),
+    inset 0 -2px 2px -1px rgba(255,255,255,.85),
+    0 1px 0 rgba(255,255,255,.80);
+  /* LEERES FARBFELD = HOHLFORM DER FLIESE (Nutzer-Referenz 2026-08-29, sechste
+     Fassung): "nimm die fliesenstruktur her, invertiere sie, damit der 3d
+     effekt nach innen geht".
+
+     Vorgeschichte, damit niemand rueckwaerts baut:
+       Fassung 2 = Cabochon (glaenzende Halbkugel). Verworfen: "jetzt schauen
+         die unbelegten fliesenfelder ... belegt aus".
+       Fassung 3 = runde Metallik-Fassung mit conic-Ring. Verworfen: Metallik
+         raus, und die Toene waren zu blass (blau/tuerkis, rot/gelb).
+       Fassung 4 = Quadrat mit randbuendigem Vollfarb-Rahmen. Verworfen: "der
+         ganze 3d effekt des rahmens ist dahin".
+       Fassung 5 = derselbe Rahmen, aber 2,5px eingerueckt. Geometrie richtig,
+         Rahmen aber noch glatt.
+
+     --gem-mold ist die LAGENWEISE INVERTIERTE Kopie von --gem-face. --gem-face
+     selbst bleibt unangetastet (die belegten Fliesen sind abgenommen); wer
+     eine der beiden aendert, zieht die andere gespiegelt mit, sonst passen
+     Fliese und Form nicht mehr zusammen. Vier Lagen, oberste zuerst -- je Lage
+     steht daneben, was sie bei --gem-face war:
+
+       1. was dort der Spekular-Glanzfleck oben links war, ist hier ein
+          SCHWACHER Reflex an der UNTERKANTE: in eine Hohlform faellt kein
+          Glanzlicht, aber die untere Innenwand faengt Streulicht.
+       2. was dort die erhabene TAFEL war, ist hier der vertiefte BODEN --
+          dieselbe 58-Prozent-Flaeche in der Mitte, aber mit der abgenommenen
+          42-Prozent-Fuellung (Kremlage deckt zu 58 %) statt einer Aufhellung.
+       3. FACETTEN mit umgedrehter Lichtrichtung. Bei der Fliese ist die obere
+          Facette die hellste und die untere die dunkelste; in der Hohlform
+          liegt die obere Innenwand im Schatten und die untere im Licht. Die
+          vier Winkelsektoren sind dieselben (`from 45deg`: 0-90 rechts,
+          90-180 unten, 180-270 links, 270-360 oben), nur Hell und Dunkel sind
+          getauscht.
+       4. Grundverlauf gespiegelt: oben dunkel, unten hell (bei der Fliese
+          umgekehrt).
+     Der farbige RAHMEN entsteht dabei von selbst und braucht kein `border`
+     mehr: die vier Facettenwaende tragen die volle Sollfarbe, nur der Boden in
+     der Mitte ist aufgehellt. */
+  --gem-mold:
+    radial-gradient(105% 72% at 50% 104%,
+      rgba(255,255,255,.34) 0%,
+      rgba(255,255,255,.10) 34%,
+      rgba(255,255,255,0) 62%),
+    linear-gradient(rgba(250,246,238,.58),rgba(250,246,238,.58)),
+    conic-gradient(from 45deg at 50% 50%,
+      rgba(255,255,255,.13) 0deg 90deg,
+      rgba(255,255,255,.40) 90deg 180deg,
+      rgba(0,0,0,.15) 180deg 270deg,
+      rgba(0,0,0,.48) 270deg 360deg),
+    linear-gradient(168deg,
+      rgba(0,0,0,.30) 0%,
+      rgba(0,0,0,.06) 30%,
+      rgba(255,255,255,.10) 62%,
+      rgba(255,255,255,.26) 100%);
 }
 
-/* --- Gelegte Steine: erhaben ---------------------------------------------- */
+/* --- Gelegte Steine: erhaben, geschliffen ---------------------------------- */
+/* `background-size` traegt die TAFEL-Lage (zweite Lage in --gem-face, 58 % der
+   Kachel, zentriert); alle uebrigen Lagen fuellen die Kachel. `no-repeat` und
+   `center` gelten fuer alle Lagen -- ohne sie wuerde die Tafel gekachelt und
+   saesse links oben. Wer --gem-face umbaut, zieht diese Liste mit. */
 .tile:not(.empty):not(.phantom){
-  background-image:var(--stone-face);
+  background-image:var(--gem-face);
+  background-size:100% 100%,58% 58%,100% 100%,100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
   border-color:rgba(0,0,0,.30);
   box-shadow:var(--relief-up);
   text-shadow:0 1px 1px rgba(0,0,0,.45)
@@ -834,10 +1023,225 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    (`0 5px 9px -4px`) wegzulassen, statt wieder ein eigenes Relief aufzubauen.
    Die Zellgroesse bleibt 22px (globales box-sizing:border-box). */
 .ds.filled{box-shadow:var(--relief-up);border:1.5px solid rgba(0,0,0,.30);border-radius:4px}
+/* Gleicher Schliff wie auf der Musterreihe (s. Angleichungs-Begruendung oben),
+   inklusive der background-size-Liste fuer die Tafel-Lage. */
 .ds.filled.blau,.ds.filled.gelb,.ds.filled.rot,
 .ds.filled.schwarz,.ds.filled.tuerkis,.ds.filled.special{
-  background-image:var(--stone-face)
+  background-image:var(--gem-face);
+  background-size:100% 100%,58% 58%,100% 100%,100% 100%;
+  background-position:center;
+  background-repeat:no-repeat
 }
+
+/* ============================================================================
+   PLATTEN-HAPTIK (Nutzer-Auftrag 2026-08-29)
+   "die Kuppelplatten sollen haptischer wirken -- mehr Tiefe und
+   Materialgefuehl, der helle Elfenbein-Look bleibt."
+
+   WAS EIN PLATTENKOERPER IST: die Platte besteht aus dem 48px-Gitter (.d2x2,
+   transparent) PLUS dem 4px-Ring ihres Traegers. Sichtbares Material ist also
+   immer der TRAEGER, nicht das Gitter -- seine Flaeche faerbt den Ring UND die
+   vier Luecken zwischen den Zellen. Vier Traeger, gemessen an den Regeln oben:
+     .dslot.occ   58px, belegter Kuppelplatz auf dem Brett (weiss)
+     .dgtile      58px, Auslage (weiss)
+     .ptile       58px, Modal-Pool (Panel-Weiss)
+     .d2x2.lg     80px, grosse Modal-Vorschau -- einziger Fall, in dem Gitter
+                  und Ring DASSELBE Element sind (sie traegt seit dem
+                  Ring-Schritt 2026-08-29 eigenen Innenabstand und Rand).
+   Der LEERE Kuppelplatz (.dslot:not(.occ)) ist bewusst nicht dabei: er ist ein
+   Loch im Brett und behaelt --relief-down.
+
+   WARUM DIE ZUSTAENDE IM SELEKTOR STEHEN (:hover, .sel, .wild-plate): diese
+   Regeln setzen weiter oben `background` in der KURZSCHREIBWEISE und damit
+   `background-image:none`. `.dgtile:hover` (0,2,0) schlaegt ein blosses
+   `.dgtile` (0,1,0) unabhaengig von der Position in der Datei -- ohne den
+   ausgeschriebenen Zustand verloere die Platte beim Ueberfahren ihr Material.
+   ============================================================================ */
+/* ECKRADIUS: das Zielbild verlangt "fast squircle", grob 20-25 % der
+   Kantenlaenge. Gemessen an den Traegermassen oben: 58px * 0,224 = 13px,
+   80px * 0,225 = 18px. Der LEERE Kuppelplatz bekommt denselben Radius -- er
+   ist die Aussparung, in die die Platte passt; blieben dort 6px, saehe das
+   Raster aus wie zwei verschiedene Bauteile. Der Radius der Eckzier haengt
+   an diesen 13px (s. --plate-corner). */
+.dslot,.dgtile,.ptile{border-radius:13px}
+.d2x2.lg{border-radius:18px}
+
+/* MATERIAL, drei Regeln statt einer -- die Aufteilung ist noetig, weil die
+   Bestandsregeln `background` in der KURZSCHREIBWEISE setzen (und damit
+   background-image auf none) und teils hoehere Spezifitaet haben:
+     P1 Grundzustand: Cremefarbe + Zier + Relief.
+     P2 Joker-Platten: behalten ihr Lila (--wild-bg), bekommen aber dasselbe
+        Material. Ohne diese Regel gewaenne P1 (spaeter in der Datei) und die
+        Joker-Platte verloere ihre Kennfarbe.
+     P3 Auswahl/Hover: setzen ABSICHTLICH kein background-color, damit die
+        lila Rueckmeldung von `.dgtile:hover` / `.sel` stehen bleibt -- sie
+        holen sich nur Zier und Relief zurueck, die deren
+        background-Kurzschreibweise geloescht haette. */
+.dslot.occ,.dgtile,.ptile,.d2x2.lg{
+  background-color:var(--plate-tint);
+  background-image:var(--plate-corner),var(--plate-grain),var(--plate-face);
+  background-size:100% 100%,100% 100%,100% 100%;
+  background-repeat:no-repeat;
+  box-shadow:var(--plate-relief);
+  /* Warme Fase statt kaltem Grau. Steht hier und nicht in P3, weil
+     .dgtile:hover/.sel den Rand absichtlich lila faerben. */
+  border-color:#E0D3B4
+}
+.dslot.occ.wild-plate,.dgtile.wild-plate,.ptile.wild-plate,.d2x2.lg.wild-plate{
+  background-color:var(--plate-tint-wild);
+  background-image:var(--plate-corner),var(--plate-grain),var(--plate-face);
+  background-size:100% 100%,100% 100%,100% 100%;
+  background-repeat:no-repeat
+}
+/* Joker-Platten tragen zusaetzlich einen lila Rand -- die Flaeche allein ist
+   auf 58px nur der schmale Ring plus das Kreuz zwischen den Feldern, der Rand
+   verdoppelt also die sichtbare Kennzeichnung.
+   `:not(:hover):not(.sel)` an den beiden klickbaren Traegern ist der Grund,
+   warum diese Regel getrennt steht: `.dgtile:hover` (0,2,0) faerbt den Rand
+   auf das kraeftige --wild (#7C3AED) und steht FRUEHER in der Datei, wuerde
+   also von einem einfachen `.dgtile.wild-plate` (0,2,0, spaeter) ueberstimmt
+   -- die Hover-Rueckmeldung waere weg. Mit dem :not() (0,4,0) greift die
+   Joker-Kennzeichnung nur im Ruhezustand, und Hover/Auswahl bleiben am
+   dunkleren Rand plus Outline erkennbar. */
+.dslot.occ.wild-plate,
+.dgtile.wild-plate:not(:hover):not(.sel),
+.ptile.wild-plate:not(:hover):not(.sel),
+.d2x2.lg.wild-plate{border-color:#9B7BE8}
+.dgtile:hover,.dgtile.sel,.ptile:hover,.ptile.sel{
+  background-image:var(--plate-corner),var(--plate-grain),var(--plate-face);
+  background-size:100% 100%,100% 100%,100% 100%;
+  background-repeat:no-repeat;
+  box-shadow:var(--plate-relief)
+}
+
+/* --- Die vier Mulden der Platte ------------------------------------------- */
+/* KEHRT DEN ENTSCHEID VOM 2026-08-19 UM ("Offene Felder sind ausserdem BEWUSST
+   FLACH", Begruendungsblock bei `.ds.N,.ds.W,.ds.S` oben, der stehen bleibt).
+   Neuer Nutzer-Auftrag 2026-08-29: die Zellen sind MULDEN, in denen ein
+   runder Stein LIEGT.
+
+   Der damalige Einwand -- ein Innenschatten verschmutzt die randlose
+   Sollfarbe -- ist nicht ignoriert, sondern durch die Zweiteilung erledigt:
+   die Sollfarbe liegt seit dieser Fassung auf dem Cabochon (`.ds.N::before`),
+   nicht mehr auf der Zelle. Der Innenschatten faellt damit auf den
+   Muldenrand, nicht auf die Farbe -- und darf deshalb TIEF sein, was die
+   erste Fassung von heute noch vermieden hat.
+
+   FOLGE, bewusst in Kauf genommen: die Sollfarbe fuellt die Zelle nicht mehr
+   randlos (Auftrag 2026-08-19). Sie ist um 1,5px kleiner, weil sonst kein
+   Muldenrand sichtbar bliebe. Wer die randlose Fassung zurueckwill, setzt
+   `inset:0` am Pseudoelement des Farbfelds -- dann faellt der Muldeneindruck
+   weg. Genau das ist in der vierten Fassung passiert und war der Befund
+   "der ganze 3d effekt des rahmens ist dahin"; siehe die Regel unten.
+
+   `.ds.legal-target` animiert box-shadow und ueberstimmt die Mulde waehrend
+   des Pulsierens; das ist der Bestandszustand und so gewollt (die Markierung
+   ist wichtiger als das Relief). */
+.ds.N,.ds.W,.ds.S{box-shadow:var(--well-relief)}
+/* Muldenwand des Farbfelds. Die Sollfarbe liegt nicht auf `.ds.N` selbst,
+   sondern auf dem ::before (Regel unten), das seit der fuenften Fassung 2,5px
+   eingerueckt ist -- rings um den Farbrahmen bleibt also GENAU DIESE Flaeche
+   sichtbar, und sie ist es, die zusammen mit --well-relief die Vertiefung
+   traegt. Der Ton liegt bewusst unter --plate-tint (#F6EFE0): eine Vertiefung
+   im selben Material ist dunkler. */
+.ds.N{background:var(--well-face),#E8DFCB}
+/* `.ds.W` und `.ds.S` bekommen ihre Fuellung als INLINE-Style aus
+   app.js::spaceHTML (`background:#EDE9FE` bzw. `#EAE7E1`, Kurzschreibweise).
+   Inline schlaegt jede Datei-Regel, eine Hintergrundlage kaeme also nie an --
+   deshalb hier ausnahmsweise `!important`, und nur fuer background-image: die
+   Kennfarbe der beiden Sonderfelder bleibt damit unangetastet, sie bekommen
+   nur die Muldenwoelbung darueber. Wer das sauberer will, muss app.js auf
+   `background-color:` umstellen; das war in diesem Auftrag nicht freigegeben. */
+.ds.W,.ds.S{background-image:var(--well-face)!important}
+/* Symbol der leeren Mulde in Gold (Zielbild). Greift beim Textglyph ◎ des
+   freien Spezialfelds. NICHT beim gesperrten Spezialfeld (⭐) und nicht beim
+   Jokerfeld (🌀): das sind Emoji, die ihre Farbe selbst mitbringen, und sie
+   stehen als nackter Textknoten in `.ds` -- ohne einen eigenen Wrapper wie
+   `.wild-glyph` (den app.js nur fuer BELEGTE Felder setzt) gibt es kein
+   Element, auf das ein Umfaerbe-Filter zielen koennte, ohne den Hintergrund
+   der Mulde mitzufiltern. Siehe Bericht: bewusst offene Stelle. */
+.ds.S{color:#A8863F}
+
+/* --- LEERES Farbfeld: Quadrat in Fliesengroesse mit Sollfarben-Rahmen ------ */
+/* WAS HIER UNBELEGT HEISST: `app.js::spaceHTML` vergibt `ds filled <farbe>`
+   fuer ein BELEGTES Feld (app.js:699) und `ds N <farbe>` fuer ein unbelegtes
+   (app.js:719). `.ds.N` ist also per Definition LEER -- alles, was hier nach
+   einem liegenden Stein aussieht, ist ein Fehler.
+
+   FORM: 4px Radius fuer ALLE unbelegten Felder, also dieselbe Silhouette wie
+   `.ds.filled` (Regel weiter oben). Zwei Nutzer-Entscheide stecken darin:
+     - "ein quadrat von der groesse der fliese" fuer die Farbfelder, womit der
+       Auftrag vom 2026-08-19 aufgehoben ist, der die offenen Felder RUND
+       gemacht hatte (10px auf 22px, fast Kreis);
+     - "die sonderfelder kannst mir auch eckig machen", womit `.ds.W` und
+       `.ds.S` nachziehen. Der "lass es so"-Entscheid kurz davor galt nur
+       ihren SYMBOLEN, nicht ihrer Form -- Emoji und Farben bleiben
+       unangetastet, es gibt weiterhin keinen app.js-Eingriff.
+   Der Radius bleibt in BEIDEN Groessenklassen 4px, weil `.ds.filled` ihn auch
+   nicht skaliert: leeres und belegtes Feld sollen in der Modal-Vorschau
+   dieselbe Silhouette haben. Die zweite Zeile ueberstimmt darum die
+   14px-Eichung der `.d2x2.lg`-Regel weiter oben. */
+.ds.N,.ds.W,.ds.S{border-radius:4px}
+.d2x2.lg .ds.N,.d2x2.lg .ds.W,.d2x2.lg .ds.S{border-radius:4px}
+
+/* RAHMEN NACH INNEN (Nutzer-Korrektur: "der ganze 3d effekt des rahmens ist
+   dahin ... du kannst auch nach innen hin den rahmen machen").
+   Die Fassung davor hatte das Pseudoelement randbuendig (`inset:0`) -- der
+   Vollfarb-Rahmen deckte damit genau die Zellkante ab, an der die
+   Muldenschatten sitzen, und das Feld klebte flach wie ein Aufkleber auf der
+   Platte. Jetzt zwei Ebenen:
+     - die ZELLE traegt die Vertiefung (--well-face + --well-relief, Regeln
+       oben): Innenschatten an der Oberkante, heller Reflex unten;
+     - das ::before liegt 2,5px eingerueckt DARIN, so dass ringsum die
+       schattierte Muldenwand sichtbar bleibt.
+   Der Sollplatz sieht damit eingelassen aus statt aufgeklebt. 2,5px ist der
+   schmalste Wert, bei dem die Wand auf einer 22px-Zelle noch als Wand liest;
+   der Radius des Pseudoelements ist entsprechend kleiner (4 - 2,5 = 1,5,
+   aufgerundet auf 2px), damit die Ecken konzentrisch laufen.
+
+   Saettigung und 42-Prozent-Fuellung sind vom Nutzer abgenommen und hier
+   unveraendert uebernommen.
+
+   SECHSTE FASSUNG: der glatte `border` ist raus, die Flaeche traegt jetzt
+   --gem-mold, die invertierte Fliesenstruktur (Herleitung dort). Der Rahmen
+   entsteht aus den vier Facettenwaenden, die die volle Sollfarbe tragen,
+   waehrend nur der Boden in der Mitte aufgehellt ist -- deshalb braucht es
+   keinen eigenen Rahmen mehr. Die `background-size`-Liste hat vier Eintraege
+   fuer die vier Lagen von --gem-mold; der 58-Prozent-Eintrag ist die
+   Bodenflaeche. Wer eine Lage ergaenzt, zieht die Liste mit (gleiche Auflage
+   wie bei --gem-face und `.tile`).
+
+   `saturate(1.25)` haengt am PSEUDOELEMENT und nicht an `.ds.N`: es soll
+   Facetten und Boden anreichern, aber weder den Muldenschatten der Zelle
+   noch die Plattenflaeche dahinter. Anlass ist der Nutzer-Befund, dass sich
+   blau (#2563EB) von tuerkis (#0891B2) und rot (#DC2626) von gelb (#D97706)
+   schlecht trennen liessen -- die Hexwerte kommen als `--slot` inline aus
+   app.js::spaceHTML:710 und sind hier nicht aenderbar, wohl aber ihre
+   Wiedergabe. Der Filter erzeugt auf dem Pseudoelement einen eigenen
+   Stapelkontext; das ist folgenlos, weil darin nichts weiter liegt. */
+.ds.N::before{
+  content:'';
+  position:absolute;
+  inset:2.5px;
+  border-radius:2px;
+  background-color:var(--slot,#999);
+  background-image:var(--gem-mold);
+  background-size:100% 100%,58% 58%,100% 100%,100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
+  /* Schlagschatten nach OBEN: die Hohlform liegt am Grund der Mulde, die
+     Muldenwand faellt also auf ihre Oberkante. Dazu eine dunkle Haarlinie
+     ringsum, damit die Kante der Form scharf bleibt -- das Gegenstueck zur
+     hellen Glanzkante, die die BELEGTE Fliese oben traegt (--relief-up). */
+  box-shadow:
+    0 -1px 1.5px rgba(74,58,32,.32),
+    inset 0 0 0 .5px rgba(0,0,0,.30);
+  filter:saturate(1.25)
+}
+/* Groessenklasse der Modal-Vorschau: 30px-Zelle statt 22px, die Einrueckung
+   waechst proportional mit (2,5 * 30/22 = 3,4). Gleiches Eichmuster wie bei
+   den uebrigen Groessenwerten oben. */
+.d2x2.lg .ds.N::before{inset:3.4px}
 
 /* == MARMOR ANFANG (Block per Marker austauschen, NIE per Regex-Wildcard) == */
 /* MARMOR-FLAECHE der drei Panels (Nutzer-Auftrag 2026-08-19: "statt einer
