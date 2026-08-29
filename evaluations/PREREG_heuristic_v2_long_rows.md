@@ -1947,6 +1947,43 @@ als v22-b06 laufen, falls b05 die Policy destabilisiert
 signifikanten Punkteverlust; dazu die D2-Leitkennzahlen (kosten-
 gewichtete Huelle, Konversion) als Berichtsgroessen.
 
+**par.3b.9 ERZEUGUNG/RELABELING/TRAINING GEFAHREN 2026-08-29:**
+600 dagger-b04-Partien (Instrument-Modus, Seed 20260830) erzeugt und nach
+data/onpolicy_v22-b05/ verschoben; Relabeling **31.190/32.440**
+Draft-Entscheidungen (0 Fehler, 0 unabbildbar; 1.250 mal antwortete der
+Lehrer keinen Stein-Zug -- Original-Ziel behalten, gezaehlt). Zwei
+Werkzeug-Befunde dabei: der frozen-Worker antwortet im ALT-Schema
+(factory_id+source; Uebersetzung 1:1 aus self_play.rs::factory_index),
+und gematcht werden muss gegen valid_actions statt der Gumbel-besuchten
+Policy-Liste. Durchsatz ~5 ms je Label (8 Worker, 66 s gesamt).
+v22-b05-Afterburner: Warm-Start b04_best, 6 Epochen cosine lr 5e-5,
+176.366 Samples, 10,5 min; Policy-Val faellt monoton 1,482 -> 1,405
+(kein Plateau, festgeschriebene 6 Epochen), Brier 0,198, Own-Val 0,386.
+VAL-VORBEHALT registriert: der Val-Split stammt aus dem Relabel-Korpus
+selbst (Warm-Start ohne MOSAIC_VAL_POOL, train.py-Warnung) -- die
+Val-Metriken sind indikativ, das Urteil faellt die ARENA-Messung
+(laeuft, otw22b05w00 gegen b04-Referenz 0,2975).
+
+**par.3b.9 MESSUNG GEFAHREN 2026-08-29 (otw22b05w00, 200 Partien argmax,
+Seeds identisch zur b04-Referenz, Blockpaarung):**
+
+| | b04 (w0) | v22-b05 |
+| --- | --- | --- |
+| volle Spalten | 0,2975 | **0,3375** (+0,040, t +1,18) |
+| Quote (==6/>=4) | 0,154 | 0,170 |
+| init>=4 | 1,94 | 1,99 |
+| Punkte | 33,30 | **37,16 (+3,86, t +2,61 SIGNIFIKANT)** |
+
+**Das registrierte Spalten-Tor ist VERFEHLT** (t 1,18 unter 2,262) --
+aber der Punkte-Waechter schlaegt in die GEGENRICHTUNG aus: b05 ist
+signifikant STAERKER (hoechstes Punkteniveau der v22-Familie an diesem
+Instrument, ueber b01s 34,78) bei zugleich bestem Spaltenwert ohne
+Konsumenten-Knopf. Das On-Policy-Lehrer-Relabeling wirkt also primaer
+als allgemeine Staerkung (Drift-Reparatur), nicht spezifisch auf die
+Spaltenzahl. b05 ist damit der BESTE STAND aus Schiene 1 und traegt die
+Gelaender-Leiter (par.3b.10); die Eskalation v22-b06 (Misch-Arm)
+entfaellt (keine Destabilisierung -- das Gegenteil).
+
 ### par.3b.10 Schiene 2 der Stapelung: Gelaender-Leiter (registriert 2026-08-29, VOR der Messung)
 
 **Ziel:** Konzentrations-Fuehrung zur Suchzeit Richtung Mensch-Richtwert
