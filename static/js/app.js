@@ -1854,6 +1854,20 @@ function openDisplayPicker(tileId) {
   const pi = activePlacingPlayer();
   const p = S.players[pi];
 
+  // Ein bezahlter Stapel-Zug ist VERBINDLICH: liegen gezogene Platten in der
+  // Hand, ist die Auslage fuer diesen Zug gestorben. Ohne diese Sperre kam
+  // man ueber die Auslage-Anzeige des Bretts zurueck in den Auslage-Modus --
+  // mit Vorauswahl und passender Vorschau -- und lief beim Legen in eine
+  // Fehlermeldung der Engine (Nutzer-Bugreport 2026-08-30: ziehen, legen
+  // druecken, am Brett abbrechen, dann Auslage anklicken).
+  if((S.pending_stack_draw || []).length > 0) {
+    showError('Du hast bereits vom Stapel gezogen - dieser Zug ist bezahlt. '
+            + 'Wähle eine deiner gezogenen Platten.');
+    openDomeModal(pi, -1, -1, /*stackOnly=*/true);
+    stackStopAndChoose();
+    return;
+  }
+
   if(AI_ENABLED && pi === AI_PLAYER){ showError('Die KI ist am Zug.'); return; }
   // Normale Runde braucht can_place_dome; Startkuppel (noch nicht gelegt) nicht.
   if(p.start_placed && !p.can_place_dome){
@@ -1903,6 +1917,9 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
   if (AI_THINKING) return;  // KI denkt noch
   const p = S.players[pi];
   const isStart = !p.start_placed;
+  // Sicherheitsnetz zur Sperre in `openDisplayPicker`: wer schon gezogen hat,
+  // bekommt IMMER den Stapel-Dialog, egal ueber welchen Weg er hier landet.
+  if(!isStart && (S.pending_stack_draw || []).length > 0) stackOnly = true;
   // KI-Board sperren: Mensch darf nicht für KI legen
   if(AI_ENABLED && pi === AI_PLAYER) return;
   if(!isStart && pi !== S.current_player) return;
