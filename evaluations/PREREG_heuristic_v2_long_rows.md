@@ -1816,6 +1816,39 @@ differenzieren nicht (alle ~0,3-0,4 bzw. stabil ab ~R1).
 LEITKENNZAHL der Einhuellenden ab jetzt: der kosten-gewichtete
 Huellen-Fuellanteil (Mensch-Richtwert 0,84; Halbzeit 0,53).
 
+**Stufe E (Chip-Nutzung, registriert 2026-08-29 auf Nutzer-Einwand "das
+ist eine essentielle Mechanik", VOR der Korpus-Messung):** Chip-Abschluesse
+je Partie und Musterreihe, drei Quellen. Server-Logs BEREITS GEZAEHLT
+(explizite Log-Zeile, 10 Partien): MENSCH 3,0 je Partie (Reihe 5: 6,
+Reihe 6: 8 -- fast einmal je Partie die teuerste Reihe), v21 2,2 je
+Partie, aber Reihe 6 nur EINMAL in zehn Partien. Der par.3c-Rahmen
+("feuert fast nie") beschrieb die v2-Heuristik und war als
+Mechanik-Aussage irrefuehrend. Korpus-Seite (hv2-Lehrer, b04): gezaehlt
+ueber den BESTANDSABFALL der gehaltenen bonus_chips zwischen
+aufeinanderfolgenden Zustaenden derselben Partie/Seite (Chips werden nur
+fuer Reihen-Abschluesse verbraucht; die Reihe ergibt sich aus der im
+selben Schritt komplettierten pattern_line). Lesart vorab: liegt der
+Lehrer nahe am Menschen und das Netz darunter, ist die Chip-Bewertung ein
+konkreter Vollendungs-Hebel; liegt auch der Lehrer niedrig, fehlt die
+Faehigkeit schon der Referenz und der Hebel gehoert in die
+Gelaender-Schiene.
+
+**Stufe E GEFAHREN 2026-08-29 (chip_usage_sources.json; Korpus-Methode
+einmal korrigiert -- Ausgaben passieren INNERHALB der Tiling-Phase, die
+Records enthalten Tiling-Zustaende, erste Zaehlung an Rundengrenzen war
+blind):** Chips je Partie+Seite ausgegeben: Lehrer 7,74 (2,68
+Ereignisse), b04 7,89 (2,56) -- dieselbe Groessenordnung wie die 3,0
+Abschluesse des Menschen. **Am VOLUMEN liegt es nicht; der Unterschied
+ist die ALLOKATION:** der Mensch schliesst Reihe 6 fast einmal je Partie
+per Chips (0,8), v21 einmal in zehn Partien (Server-Logs; Reihen-
+Attribution in den Korpora nicht moeglich, Grenze registriert). Der
+par.3c-Null-Befund betraf nur den v2-ZUSATZ-Vorzug; der Basis-Solver
+gibt reichlich aus. Hebel-Konsequenz: nicht "Chips nutzen lehren",
+sondern die CHIP-ALLOKATION auf die teuren Reihen lenken -- das ist
+dieselbe Kosten-Scheu wie in Stufe D2 (gewichtete Huelle) und gehoert
+in die Gelaender-Schiene (par.3b.10-Klasse), nicht in einen neuen
+Mechanik-Bau.
+
 **par.3b.8 GEFAHREN 2026-08-29, alle Stufen. GESAMTVERDIKT: die Ketten-
 und Drift-These traegt; Karte, Geometrie, Form und Such-Veto scheiden als
 Haupttaeter aus.**
