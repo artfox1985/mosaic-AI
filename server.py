@@ -141,6 +141,29 @@ _teacher_coach_sims = 400   # Sims für Coach-Feedback OHNE Cache-Treffer (schne
 _teacher_history    = []    # Liste der teacher_feedback-Einträge dieser Partie (für /api/teacher/summary)
 _teacher_cache = {"key": None, "analysis": None}  # (log_len, current_player) -> zuletzt berechnete Analyse
 
+def _champion_onnx_path(name: str) -> Path | None:
+    """ONNX-Datei zu einem Versionsnamen (`v21_2d_brierbest`) oder None.
+
+    Zwei Fundorte, in dieser Reihenfolge:
+
+    1. `models/alphazero_<name>.onnx` -- der Bestandsplatz, den Training und
+       `tools/set_champion.py` bedienen.
+    2. `models/frozen_champions/<name>/model.onnx` -- das EINGEFRORENE
+       Artefakt (docs/working_rules.md: ein Verzeichnis je Referenz). Seit
+       dem Aufraeumen von `models/` liegt der amtierende Champion nur noch
+       dort, und der Server fand ihn nicht mehr.
+
+    Bewusst gehaertet wie `tools/arena.py::_champion_model_path`: kein stiller
+    Ersatz durch ein anderes Modell, sondern None -- der Aufrufer entscheidet
+    (Server: Warnung + Heuristik statt Absturz).
+    """
+    for candidate in (MODELS_DIR / f"alphazero_{name}.onnx",
+                      MODELS_DIR / "frozen_champions" / name / "model.onnx"):
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def _load_champion_model(fallback: str = "v16_best") -> str:
     """Liest den amtierenden Champion aus `models/champion.txt` (EINE Zeile,
     Versionsname wie `v17_best`) -- einzige Quelle der Wahrheit fuer den
@@ -160,9 +183,10 @@ def _load_champion_model(fallback: str = "v16_best") -> str:
     # kommentarlos mit einem falschen/fehlenden Modell starten. Bewusst
     # weiterhin kein Hard-Error beim Serverstart (GUI soll hochkommen),
     # aber die Warnung macht den Zustand sichtbar.
-    if not (MODELS_DIR / f"alphazero_{name}.onnx").exists():
-        print(f"⚠️  WARNUNG: Champion-ONNX 'alphazero_{name}.onnx' fehlt in "
-              f"{MODELS_DIR} -- Modell-Laden wird fehlschlagen "
+    if _champion_onnx_path(name) is None:
+        print(f"⚠️  WARNUNG: Champion-ONNX zu '{name}' fehlt -- weder "
+              f"alphazero_{name}.onnx noch frozen_champions/{name}/model.onnx "
+              f"in {MODELS_DIR}. Modell-Laden wird fehlschlagen "
               f"(champion.txt pruefen, OneDrive-Verlust?).")
     return name
 
@@ -192,15 +216,18 @@ def _resolve_difficulty(difficulty: str, model: str = None, sims: int = None) ->
 
 def _resolve_model_path(model: str | None) -> Path | None:
     """`model` ("v8", "heuristic", None, ...) -> ONNX-Pfad oder None (= Heuristik).
-    Akzeptiert auch einen bereits vollständigen Pfad/Dateinamen."""
+    Akzeptiert auch einen bereits vollständigen Pfad/Dateinamen.
+
+    Versionsnamen loest `_champion_onnx_path` auf (Bestandsplatz zuerst,
+    dann das gefrorene Artefakt)."""
     if not model or model.strip().lower() in ("", "heuristic", "heuristik"):
         return None
     m = model.strip()
-    candidates = [Path(m), MODELS_DIR / m, MODELS_DIR / f"alphazero_{m}.onnx"]
-    for c in candidates:
-        if c.exists() and c.suffix == ".onnx":
+    # Direkte Pfad-/Dateinamen-Angabe hat Vorrang (Bestandsverhalten).
+    for c in (Path(m), MODELS_DIR / m):
+        if c.suffix == ".onnx" and c.exists():
             return c
-    return None
+    return _champion_onnx_path(m)
 
 
 # ── Rust-Helfer ──────────────────────────────────────────────────────────────
@@ -575,7 +602,10 @@ def new_game():
                 _ai_model = None
         else:
             if requested_model and requested_model.strip().lower() not in ("", "heuristic", "heuristik"):
-                model_warning = f"Modell '{requested_model}' nicht gefunden (models/alphazero_{requested_model}.onnx) - spiele gegen Heuristik."
+                model_warning = (f"Modell '{requested_model}' nicht gefunden "
+                                 f"(weder models/alphazero_{requested_model}.onnx noch "
+                                 f"models/frozen_champions/{requested_model}/model.onnx) "
+                                 f"- spiele gegen Heuristik.")
             _ai_model = None
     else:
         _ai_player = None
