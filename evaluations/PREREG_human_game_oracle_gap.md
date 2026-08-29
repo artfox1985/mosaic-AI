@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Bewertet der Champion die plattenbauenden Zuege eines Menschen systematisch FALSCH -- also mit dem falschen Vorzeichen, nicht nur zu leise? | Beleg: par.7 (2026-08-19) am plattenblinden v21: NICHT BESTAETIGT (+0,60 pp, t 0,78). WIEDERVORLAGE GEFAHREN (par.9, 2026-08-29): b05-Orakel, 11 Partien -- NICHT BESTAETIGT auf allen Schwellen (+0,17 pp bei >= 2, t 0,21); die k1-Fehlbewertung ist beim spaltenfaehigen Netz verschwunden, waehrend die Betrags-Daempfung persistiert (0.1). Eine Partie als Replay-Abweichung ausgeschieden (Reihe-6-Chips, Untersuchung laeuft). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Bewertet der Champion die plattenbauenden Zuege eines Menschen systematisch FALSCH -- also mit dem falschen Vorzeichen, nicht nur zu leise? | Beleg: par.7 (2026-08-19) am plattenblinden v21: NICHT BESTAETIGT (+0,60 pp, t 0,78). WIEDERVORLAGE GEFAHREN (par.9, 2026-08-29/30): b05-Orakel, volle 12er-Basis nach Replayer-Fix -- NICHT BESTAETIGT auf allen Schwellen (>= 2: -0,10 pp, t -0,14), Differenz praktisch NULL; die k1-Fehlbewertung ist beim spaltenfaehigen Netz verschwunden, waehrend die Betrags-Daempfung persistiert (R5-Steigung 0,0886). -->
 
 # PREREG: Der Orakel-Abstand in Menschenpartien
 
@@ -212,6 +212,15 @@ Artefakte probe_human_oracle_gap_k1_b05_fill{0,2,3}.json):**
 | >= 2 (PRIMAER) | +0,17 pp | 0,21 | 6/11 | +1,29 pp (explorativ) |
 | 0 | +0,03 pp | 0,06 | 6/11 | +0,60 pp |
 | >= 3 | -0,68 pp | -0,64 | 5/11 | +1,79 pp (explorativ) |
+
+**NACHZUG 2026-08-30, volle 12er-Basis:** die Replay-Abweichung der
+2026-08-23-Partie ist behoben (Chip-Allokations-Bindung der
+Parallel-Sitzung, cf53aab, 14/14 Logs replayen; Paritaets-Fixture
+gruen, Engine-Verhalten unveraendert -- die 11 Bestands-Orakel bleiben
+gueltig, nur die zwoelfte Partie wurde auf dem neuen Wheel bewertet).
+Ergebnis ueber 12 Partien: Schwelle >= 2 -0,10 pp (t -0,14, 6/12),
+Schwelle 0 -0,05 pp (t -0,11), Schwelle >= 3 -0,81 pp (t -0,82) --
+das Verdikt verschaerft sich auf praktisch NULL Differenz.
 
 **NICHT BESTAETIGT auf allen drei Schwellen -- die k1-spezifische
 Fehlbewertung ist beim b05-Orakel VERSCHWUNDEN** (der v21-Trend, der
