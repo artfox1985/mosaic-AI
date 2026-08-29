@@ -1,8 +1,22 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett -- ihr Wert steigt genau dort, wo sie am schwersten erreichbar sind. Laesst sich das heben, und an welchem der beiden Hebel? | Beleg: NICHTS GEBAUT, angelegt 2026-08-25. Luecke: unteres Spezialfeld in ~84 Prozent der Partien leer, oberes in ~13 (par.3). Vermeidungs-Hebel WIDERLEGT -- das Feld ist eine Gratiszelle (par.4/par.4b). Gegenstand ist netzseitig-additiv: zwei 6x6-Kanaele Betrag x Abstand im DRAFTING (par.4a), Frist ist der TRAININGS-Start. Neumessung auf hv2 vor dem Bau (par.5). -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett -- ihr Wert steigt genau dort, wo sie am schwersten erreichbar sind. Laesst sich das heben, und an welchem der beiden Hebel? | Beleg: par.4a GEBAUT 2026-08-28 (e91cd34, Kanaele 77/78 Ertrag x Abstand, features.rs:806-826; in JEDEM v22-b-Modell aktiv), Wirkung nie isoliert gemessen (Kaltstart-Baseline, kein 77-vs-79-A/B). Neumessung GEFAHREN (par.7): Posten LEBT -- auch der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen, Netz ueberall etwas schlechter; par.3-Skala als Korpus-Artefakt bestaetigt. Kopf-Ziel bleibt unbalanciert (untere Reihe ~0,19 positiv); Hebel gehoert in die Gelaender-/Allokations-Familie, Nutzer-Priorisierung offen. Vermeidungs-Hebel WIDERLEGT (Gratiszelle, par.4/4b). -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
 **Angelegt 2026-08-25** auf Nutzer-Auftrag, nichts gebaut.
+
+**NACHGEFUEHRT 2026-08-29 (Nutzer-Nachfrage "was ist damit passiert" --
+der Kopf sagte faelschlich noch NICHTS GEBAUT):** par.4a ist am
+2026-08-28 als Schlachtplan-Schritt 1a GEBAUT worden (`e91cd34`, "Zwei
+Spezialfeld-Eingaben fuers Netz: Ertrag und Abstand zur Ausloesung";
+Kanaele 77/78, NUM_PLANES_CHANNELS 79, features.rs:806-826 mit Verweis
+auf diese Prereg, Tests vorhanden, Paritaets-Hash hielt). Jedes
+v22-b-Modell (b01-b06) traegt die Eingaben seither. NICHT geschehen:
+(1) die par.5-Neumessung auf hv2 (Pflicht vor dem naechsten Schritt,
+alle par.3-Zahlen sind weiterhin plattenblind), (2) eine isolierte
+Wirkungsmessung der Kanaele (b01 war Kaltstart MIT ihnen, es gibt kein
+77-vs-79-A/B; ihr Beitrag ist in der b-Serien-Baseline konfundiert),
+(3) der par.4c-Kopf-Entscheid, der laut par.4c/par.5 auf der Neumessung
+wartet. Wer den naechsten Schritt faehrt, beginnt bei par.5(1).
 
 ## par.1 Warum eine neue Datei (Pruefung vor dem Anlegen)
 
@@ -288,3 +302,32 @@ Strafleistenauslastung, Punkte je Wertungsplatte, eigene Punkte, Margin.
 **Abbruchbedingung:** faellt schon die Neumessung aus par.5(1) so aus, dass
 der Lehrer die unteren Spezialfelder bereits weitgehend abholt, ist der Posten
 klein geworden und der Arm entfaellt -- das waere ein vollwertiges Ergebnis.
+
+## par.7 NEUMESSUNG GEFAHREN 2026-08-29 (par.5(1); special_tile_yield_remeasure.json, Sonde tools/probes/special_tile_yield_measurement.py; 300 hv2-Dateien = 3.000 Partien/6.000 Seiten, dazu die b06-Messdateien = 200 Partien/400 Seiten; Leer-Rate ueber Spezialfelder GELEGTER Platten am Endbrett, Ertragsformel wie par.2)
+
+| | hv2-Lehrer | v22-b06 |
+| --- | --- | --- |
+| Leer-Rate Slot-Reihe oben | 0,499 | 0,535 |
+| Leer-Rate mitte | 0,833 | 0,819 |
+| Leer-Rate unten | **0,807** | **0,881** |
+| ausgeloeste Spezialfelder je Seite | 1,17 | 0,98 |
+| Spezial-Punkte je Seite | 4,02 | 3,15 |
+| k6 je Seite (wenn aktiv) | -9,97 | -11,26 |
+
+**Abbruchbedingung NICHT erfuellt -- der Posten lebt.** Auch der
+spaltenkompetente Lehrer laesst 81 Prozent der unteren Spezialfelder
+liegen (und die liegen dort gehaeuft: 12.375 der ~27.000 gelegten
+Spezialfelder sitzen in der unteren Slot-Reihe); das Netz ist ueberall
+etwas schlechter (unten 0,881, k6 -1,3 schlechter). Zwei Befunde gegen
+die plattenblinde par.3-Basis: (1) die OBERE Reihe ist beim Lehrer viel
+LEERER als damals (0,50 gegen ~0,13) -- der Lehrer tauscht kurze Reihen
+gegen lange, die oberen Slots schliessen seltener; die par.3-Skala ist
+damit endgueltig als Korpus-Artefakt bestaetigt. (2) Unten bewegt sich
+fast nichts (0,81 gegen ~0,84): die teuersten Felder bleiben in JEDEM
+Regime der groesste unabgeholte Posten -- dieselbe Kosten-Scheu wie
+D2-Huelle und Chip-Allokation (par.3b.8 Stufen D2/E der Lehrer-Prereg).
+**Konsequenz fuer par.4c:** das Kopf-Ziel "wird ausgeloest" bleibt auch
+auf dem Lehrer-Korpus stark unbalanciert (untere Reihe ~0,19 positiv);
+der politikabhaengig-Einwand steht. Der Hebel gehoert damit in dieselbe
+Gelaender-/Allokations-Familie wie Chip-Fuehrung und Huellen-Trimm --
+Nutzer-Priorisierung der naechsten Sitzung, kein Automatismus.

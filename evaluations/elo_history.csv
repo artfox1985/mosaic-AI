@@ -5,3 +5,4 @@ date,player_a,sims_a,player_b,sims_b,wins_a,wins_b,n,comment,contract,knobs
 2026-08-20,v21_2d_brierbest,400,v20_2d_opp_brierbest,400,217,183,400,"Neuverankerung Fix-Engine c83fb35 (par.3): Nachbar-Kante, Seed 20260835, n=400 ohne Fruehstopp, exklusiv",a169ebf0a4451e08,
 2026-08-21,v20_2d_opp_brierbest,400,v19_2d_best,400,238,162,400,"Neuverankerung Fix-Engine c83fb35 (par.3): Nachbar-Kante, Seed 20260836, n=400 ohne Fruehstopp, exklusiv",a169ebf0a4451e08,
 2026-08-25,v21_2d_brierbest,400,Heuristik_v2huelle,150,255,152,407,"PREREG_heuristic_v2_long_rows par.10.1: Prio-Huelle als Lehrer, 407 Kampagnen-Seeds, 11 Threads, exklusiv; Parallelitaet als ergebnisneutral belegt (neutral_seq/neutral_par)",a169ebf0a4451e08,
+2026-08-29,v22-b05,400,v21_2d_brierbest,400,16,34,50,"Gepaartes Gating (Task #76), SPRT=H0, p=0.0352, Fruehstopp 25 Paare, informativ (kein Promotionsentscheid), block-size 5",efd564d87bac2722,

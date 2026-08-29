@@ -9,6 +9,16 @@ Zeit oder eine Messung gekostet. Wo daraus eine stehende Regel geworden ist,
 steht sie in `../CLAUDE.md`; hier steht die Herkunft, die sie glaubwuerdig
 macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
 
+- **paired_gating-Default BLOCK_SIZE=25 widerspricht der etablierten
+  Blockgroesse 5** (2026-08-29, vom Nutzer im laufenden b05-Gating
+  abgefangen; Schaden: ein angerechneter Erstblock, neu gestartet).
+  Der Seed faellt JE BLOCK (`paired_gating.py`: `base_seed + block_idx *
+  1_000_000`), alle Paare eines Blocks teilen also die Spiel-Population
+  (Block-Korrelations-Lehre 2026-08-04). Mit dem Default gaebe es bei
+  200 Paaren nur 8 unabhaengige Bloecke; die Praezedenz-Gatings liefen
+  mit `--block-size 5` (Champion-Gating 2026-08-07: 37 Bloecke a 5).
+  Behoben am selben Tag (Nutzer-Entscheid): der Default ist seit
+  2026-08-29 `BLOCK_SIZE = 5`.
 - **CPU-Nebenlast verstuemmelt Arena-Partien** (2026-08-20). Derselbe
   8-Partien-Smoke lieferte unter Last zwei verschiedene Ergebnisse (eine
   Partie endete 3:1), ohne Last dreimal byte-identisch. **Arena-Messungen
