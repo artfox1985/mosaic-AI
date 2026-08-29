@@ -1460,6 +1460,27 @@ fn reset_not_deckel_diagnostics() {
 /// die Tiling-Phase ohne Belang, dort werden keine verdeckten Bestaende
 /// angefasst. Der Seed wird trotzdem durchgereicht, damit Laeufe reproduzierbar
 /// bleiben.
+/// Trainings-Zustand -> exact-Schema (par.3b.9, Relabeling-Bruecke):
+/// `json_to_state` rekonstruiert den Zustand und DETERMINISIERT dabei die
+/// verdeckte Information per Seed (Beutel-/Turm-/Pool-Ordnungen), dann
+/// serialisiert `state_to_json_exact` in das Schema, das der
+/// frozen_champion_worker hart verlangt. Das Ergebnis ist der Zustand unter
+/// EINER Determinisierung -- dieselbe Klasse wie
+/// `determinize_root_hidden_info` der Suche, kein Orakelwissen. Additiv,
+/// kein Bestandsverhalten beruehrt.
+#[pyfunction]
+#[pyo3(signature = (state_json, seed=None))]
+fn state_json_to_exact_json(state_json: String, seed: Option<u64>) -> PyResult<String> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    let mut rng = StdRng::seed_from_u64(seed.unwrap_or(0));
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    Ok(crate::serialize::state_to_json_exact(&state, false).to_string())
+}
+
 #[pyfunction]
 #[pyo3(signature = (state_json, player, k=8, seed=None))]
 fn tiling_candidates_json(
@@ -1793,6 +1814,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bootstrap_horizon_stage0_probe_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(plate_completability_json, m)?)?;
+    m.add_function(wrap_pyfunction!(state_json_to_exact_json, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_shaping_e_json, m)?)?;
     m.add_function(wrap_pyfunction!(ownership_ek_plate_points_json, m)?)?;
     m.add_function(wrap_pyfunction!(selfplay_profile_reset, m)?)?;
