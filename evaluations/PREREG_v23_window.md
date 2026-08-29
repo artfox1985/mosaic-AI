@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (Nutzer 2026-08-25), nichts erzeugt -- das v22-Netz existiert noch nicht. Form 29.450 Partien, neu besetzt aus v22-Self-Play und hv2-Lehrerkorpus; daraus folgt der Umfang des v22-Self-Play: 12.000 Partien (par.1/par.2). RAM unkritisch und Traegerfrage auf ARM B entschieden; OFFEN ist nur der TRAEGER-MANIFEST-GENERATOR, es gibt Leser aber kein schreibendes Werkzeug (par.3). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (Nutzer 2026-08-25), nichts erzeugt -- das v22-Netz existiert noch nicht. Form 29.450 Partien, neu besetzt aus v22-Self-Play und hv2-Lehrerkorpus; daraus folgt der Umfang des v22-Self-Play: 12.000 Partien (par.1/par.2). RAM unkritisch, Traegerfrage entschieden, Traeger-Manifest-Generator seit 2026-08-29 rekonstruiert (tools/generate_carrier_manifest.py). WECKER-ABARBEITUNG registriert (par.4c, 2026-08-30): alle par.4-Entscheide bewusst gefallen, zwei Messungen laufen im Nachtprogramm; Erzeugung startet danach (Generator v22-b05, Tor-Revision Lehrer-Prereg par.3b.12). -->
 
 # Vorregistrierung: v23-Fenster
 
@@ -192,6 +192,30 @@ Entscheide nicht mehr nachziehbar sind (Policy-Ziele = Besuchsverteilung):
 Diese Liste stammt aus der Knopf-Registry und den Preregs. Sie ist KEIN
 vollstaendiger Audit der Erzeugungs-Knoepfe -- wer den Lauf startet, geht sie
 durch und ergaenzt, was fehlt.
+
+## par.4c WECKER-ABARBEITUNG (registriert 2026-08-30, VOR dem Start; Nachtprogramm-Fahrplan)
+
+Jeder Punkt der par.4-Liste bekommt hier einen BEWUSSTEN Entscheid; wo
+eine Messung noetig ist, faehrt sie das Nachtprogramm (Kochrezept
+evaluations/night_run_20260830.md) VOR dem Erzeugungsstart.
+
+| Wecker | Entscheid |
+| --- | --- |
+| Spalten-Abnahme-Tor par.3b.2 | REVIDIERT und erfuellt -- Lehrer-Prereg par.3b.12 (neue Startbedingung 3/3 gruen, Waechter nach Erzeugung bindend) |
+| MOSAIC_IMPLICIT_MINIMAX_A | Gating-Messung im Nachtprogramm nach par.3a der eigenen Prereg; Rueckfall-Regel: ohne auswertbares Ergebnis bleibt der Default 0,0 (bewusst registriert, nicht still) |
+| Risk-Utility A1 | NICHT einbauen fuer Generation 1 -- ungebaut, kein unbeaufsichtigter Nacht-Engine-Bau; Frist ist damit durch bewussten Entscheid gewahrt, Wiedervorlage Generation 2 |
+| MOSAIC_STACK_DRAW_RESEARCH | Arena-Messung im Nachtprogramm nach PREREG_chance_nodes Entscheidungsregel 4; Rueckfall-Regel: ohne auswertbares Ergebnis Default AUS (sammelaufgeloest wie bisher), registriert |
+| --seed-positions | AUS fuer Generation 1: seed_positions_v1.jsonl stammt aus PLATTENBLINDEN Zustaenden (Asym-Aera) -- die Wiedervorlage-Bedingung der Seeding-Prereg verlangt eine plattenbewusste Quelle; Neu-Kuratierung aus hv2/b05-Zustaenden als benannter Gen-2-Posten |
+| Startkuppel-Streuung | Handheuristik BLEIBT fuer Generation 1 (bewusster Entscheid statt Default-Verfall); start_dome Stufe 0 bleibt offen fuer Gen 2 |
+| MOSAIC_STACK_DRAW_RESERVATION | AUS (steht entschieden) |
+| ROUND_TRANSITION_SAMPLING | false (Schritt-0-Entscheid weiter offen, bewusst) |
+| Vollendbarkeits-FILTER | AUS fuer Generation 1 (ungebaut, kein Nacht-Bau); prioritaerer Gen-2-Kandidat |
+| Bootstrap-Horizont | 2 (steht) |
+| --rtv / --pcr-full-prob | AUS (Standard seit v13 bzw. PCR negativ) |
+| --sims / Klassen | Sockel 4.000 @400 mit Root-Noise; Schwarm 8.000 --value-only (v20-Konvention, pcr_cheap_sims 150) |
+| --no-root-noise / --deterministic / --tau-argmax-from-move | NICHT gesetzt (Trainingskorpus braucht Exploration; argmax ist Instrument, nicht Erzeuger) |
+| MOSAIC_WERTUNG_STREUUNG_MAX | Default (unveraendert) |
+| Moon-Kopf | Trainings-Rezept-Entscheid: Gewicht 0 ab dem v23-Training (No-Op-Ziel, train.py:513); Flag-Bau VOR dem Training, nicht heute Nacht |
 
 ## par.4a2 Wecker VOR dem v23-TRAINING: Arm K (Bootstrap-Kohaerenz)
 

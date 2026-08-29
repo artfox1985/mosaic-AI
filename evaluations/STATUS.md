@@ -183,6 +183,16 @@ Registrierung; die Huellen-Richtwerte n=9 wandern bei einem Rerun
 entsprechend mit). Ausgang 0.1/0.2 entscheidet, ob Phase 3
 Ziel-Chirurgie braucht oder der Korpus die Ursache war.
 
+**NACHTPROGRAMM 2026-08-30 LAEUFT (Nutzer-Go "in der nacht gehoert die
+maschine dir"):** Tor-Revision registriert (Lehrer-Prereg par.3b.12,
+Startbedingung 3/3 erfuellt, Korpus-Waechter bindend), Wecker-Liste
+komplett bewusst entschieden (PREREG_v23_window par.4c), Kochrezept in
+evaluations/night_run_20260830.md. Ablauf: Nacht-Agent faehrt die zwei
+offenen Messungen (implicit-Minimax-Gating, Stack-Draw-Arena), danach
+startet der Koordinator die v22-b05-Erzeugung (4.000 Sockel @400 +
+8.000 Schwarm --value-only, Seeds 20260901/20260902). VOR dem
+v23-Training bindend: par.3b.12-Waechter + Arm K + Moon-Gewicht-Flag.
+
 **PHASE 1 -- Vor-Self-Play-Pflichtenheft (Entscheide + kleine
 Laeufe; die Fristen verfallen mit dem Generierungsstart):**
 (1.1) MOON-KOPF-ENTSCHEID (billigster Posten ueberhaupt): das
