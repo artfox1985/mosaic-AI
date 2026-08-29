@@ -111,9 +111,9 @@ Replayer-Greedy-Fehler aus docs/pitfalls.md, Abnahme = Partie vom
 Diagnose des Live-DEADLOCKS in game_20260829_232330 (friert bei
 "komplettiert Reihe 2 mit Bonus-Chips" ein, GUI bot nur Reihe 3;
 Verdacht: Chip-Vollendungs-Grenze im Live-Pfad, gleiche Code-Familie).
-Server-Reloader per Default entschaerft (a4e1fb0, wirksam nach
-manuellem Neustart); Nutzer spielt die Deadlock-Situation bei Bedarf
-nach.
+Server-Reloader per Default entschaerft (a4e1fb0; manueller Neustart
+ERFOLGT 2026-08-30, Entschaerfung aktiv -- Datei-Edits sind waehrend
+Partien wieder unkritisch).
 
 **par.5-NEUMESSUNG SPEZIALFELDER GEFAHREN 2026-08-29
 (PREREG_special_tile_yield par.7, Anlass Nutzer-Nachfrage; dabei
