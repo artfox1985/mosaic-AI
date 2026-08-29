@@ -73,12 +73,17 @@ Konsumenten-Schiene ist damit beidseitig OHNE Torerfolg gemessen.
 REPLIKATION (Nutzer-Auftrag 2026-08-29) GEFAHREN: Tor verfehlt auch
 gepoolt (20 Blockpaare: volle Spalten t +1,61; Quote t +2,06 knapp
 unter 2,093; kein Punkteschaden) -- kleiner, richtungsstabiler, nicht
-tragfaehiger Effekt bei w=1,0. ES LAEUFT die registrierte
-WARUM-Diagnose par.3b.8 (Stufen A Karten-Diagnose, C Sims-Ablation,
-D Huellen-Deckung/geometrischer Richtwert, dazu On-Policy-Lehrer-Treue
-via frozen-Worker). Der v22-Self-Play-Start bleibt gestoppt;
-Erstlauf-Messdaten mit Freigabe geloescht, Replikations-Daten
-(selfplay_otw22b04r2*) bleiben bis nach der Diagnose. Die Sweep-Messdaten (selfplay_otw22b01w*) sind nach
+tragfaehiger Effekt bei w=1,0. WARUM-Diagnose par.3b.8
+KOMPLETT GEFAHREN 2026-08-29: Ketten-/Drift-These traegt -- der
+gefrorene LEHRER SELBST wuerde auf den Netz-Brettern die fehlende
+Zeile nur zu 0,21-0,32 bedienen (statistisch wie das Netz); Such-Veto
+widerlegt (sims=1 kollabiert auf 0,0075 Spalten), Karte kalibriert,
+Geometrie sauber geerbt (b04 huellen-treuer als der Lehrer).
+HEBEL-EMPFEHLUNG (Nutzer-Entscheid): On-Policy-Nachschaerfung mit
+Lehrer-Relabeling via frozen-Worker (Instrument existiert, 618
+fehlerfreie Anfragen); Mengen-Form- und Blatt-Pol-Arm zurueckgestellt.
+Details/Zahlen: par.3b.8. Der v22-Self-Play-Start bleibt gestoppt;
+Messdaten selfplay_otw22b04r2* und otw22b04s1* liegen noch in data/. Die Sweep-Messdaten (selfplay_otw22b01w*) sind nach
 Abschluss der Auswertung mit Nutzer-Freigabe vom 2026-08-29 GELOESCHT;
 Manifeste und Artefakt bleiben.
 
