@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). KEIN v22-Self-Play (par.3b.2); Konsument beidseitig ohne Torerfolg (par.3b.6/3b.7); WARUM geklaert: Drift-These, Chip-Allokation, Kosten-Scheu (par.3b.8 A-E). STAPELUNG gefahren (par.3b.9/3b.10): DAgger-Arm v22-b05 verfehlt das Spalten-Tor, ist aber SIGNIFIKANT staerker (+3,86 Punkte, t 2,61; Spalten 0,3375) -- bester Stand der Familie; Gelaender-Leiter H0. Naechste Hebel als Nutzer-Entscheid registriert. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). KEIN v22-Self-Play (par.3b.2); Konsument beidseitig ohne Torerfolg (par.3b.6/3b.7); WARUM geklaert: Drift-These, Chip-Allokation, Kosten-Scheu (par.3b.8 A-E). STAPELUNG gefahren (par.3b.9/3b.10): DAgger-Arm v22-b05 verfehlt das Spalten-Tor, ist aber SIGNIFIKANT staerker (+3,86 Punkte, t 2,61; Spalten 0,3375) -- bester Stand der Familie; Gelaender-Leiter H0; DAgger-Runde 2 beidseitig H0, Saettigung nach einer Runde, b05 bleibt bester Stand (par.3b.11). -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1766,6 +1766,14 @@ Folgerung fuer die Hebel-Diskussion: selbst eine perfekte
 Lehrer-Imitation traefe nur die halbe Huelle; der Einhuellenden-Ansatz
 des Nutzers hat oberhalb des hv2-Lehrers messbaren Raum.
 
+Nachtrag 2026-08-29: zehnte fertige Partie
+(game_20260829_183516_seed114421, 109:29) als benanntes
+REFERENZBEISPIEL der Einhuellenden -- Mensch fuellt die Huelle 20/21,
+KOSTEN-GEWICHTET 0,946 (ueber dem n=9-Richtwert 0,838), Abweichung 4,
+zwei volle Spalten, zwei Chip-Vollendungen der Reihen 4/5 in R5
+(Stufe-E-Muster). Das n=9-Artefakt bleibt unveraendert; ein kuenftiger
+Sonden-Rerun mittelt ueber 10 Partien und faellt entsprechend hoeher aus.
+
 **Stufe D2 (registriert 2026-08-29 auf Nutzer-Entscheid, VOR der Messung):
 vier weitere Huellen-Kennzahlen, ueber alle drei Quellen (Lehrer-Korpus,
 b04-Self-Play, Server-Logs) -- damit ist die Sonde ABGESCHLOSSEN.**
@@ -1984,6 +1992,20 @@ Spaltenzahl. b05 ist damit der BESTE STAND aus Schiene 1 und traegt die
 Gelaender-Leiter (par.3b.10); die Eskalation v22-b06 (Misch-Arm)
 entfaellt (keine Destabilisierung -- das Gegenteil).
 
+**NACHTRAG 2026-08-29 (Manifest-Diff der Folgesitzung, Regel
+"Lauf-Manifest gegen Referenz"): das b05-Training lief NICHT nur auf dem
+Relabel-Korpus.** manifest_train_v22-b05_20260829_131243.json,
+`corpus_composition`: neben dagger-b04 (600 Partien) lagen otw22b04r2w00,
+otw22b04r2w10 und otw22b04s1 (je 200 Partien, zusammen 600 UNRELABELTE
+On-Policy-Messpartien, darunter die degenerierten sims=1-Partien der
+Stufe C) als Policy-Traeger im Fenster -- MOSAIC_DATA_EXCLUDE traf nur
+`^selfplay_hv2_`, die Messdateien im data-Glob liefen still mit
+(176.366 Samples passen zu 1.200, nicht 600 Partien). Der b05-Effekt ist
+damit KONFUNDIERT: Relabeling PLUS rohe On-Policy-Partien, nachtraeglich
+nicht trennbar. Die Staerke-Messung gegen b04 bleibt davon unberuehrt
+(sie misst das Artefakt, nicht den Mechanismus). Runde 2 (par.3b.11)
+faehrt das registrierte REINE Design auf geraeumtem data-Verzeichnis.
+
 ### par.3b.10 Schiene 2 der Stapelung: Gelaender-Leiter (registriert 2026-08-29, VOR der Messung)
 
 **Ziel:** Konzentrations-Fuehrung zur Suchzeit Richtung Mensch-Richtwert
@@ -2015,6 +2037,95 @@ Hebel noch Schaden. Die Trainings-Haelfte des Gelaenders (Huellen-Trimm
 der Ownership-Maske mit r+1-Kostengewichten) und die Chip-ALLOKATIONS-
 Fuehrung (Stufe-E-Befund) bleiben die benannten offenen Gelaender-Arme --
 Nutzer-Entscheid der naechsten Sitzung.
+
+### par.3b.11 DAgger-Runde 2: On-Policy-Nachschaerfung auf v22-b05 (registriert 2026-08-29, VOR Erzeugung/Training; Nutzer-Go 2026-08-29)
+
+**Ziel:** die Stapelung fortsetzen -- b05 zeigte bei E6 KEIN Plateau
+(Policy-Val fiel monoton 1,482 -> 1,405) und ist signifikant staerker;
+Runde 2 relabelt die EIGENEN b05-Bretter und gibt dem Afterburner mehr
+Epochen. Ergebnisname: **v22-b06** (b-Serie fortlaufend; der in par.3b.9
+als Eskalation reservierte Misch-Arm b06 ist entfallen, der Name ist
+frei; b03 bleibt fuer Surprise-Weighting reserviert).
+
+**Design-Klarstellung nach dem par.3b.9-Nachtrag:** Runde 2 faehrt das
+REGISTRIERTE reine Design -- Trainingsfenster = NUR der neue
+Relabel-Korpus. Das data-Verzeichnis traegt nach den Loeschfreigaben
+2026-08-29 top-level ausschliesslich `selfplay_hv2_*` (geprueft vor dem
+Start); der Exclude greift damit vollstaendig. Benannter Unterschied zum
+b05-IST-Rezept (das 600 rohe Messpartien enthielt): faellt b06 hinter
+b05 zurueck, ist der Roh-Anteil ein benannter Verdaechtiger.
+
+**Erzeugung (Referenz: manifest_dagger-b04_20260829_113736.json, nur
+Modell/Seed/Version geaendert):** `python -u self_play.py --mode network
+--model models/alphazero_v22-b05.onnx --games 600 --sims 400
+--version dagger-b05 --threads 11 --chunk 10 --seed 20260831
+--per-file 20 --no-root-noise --deterministic` (~83 min laut
+Runde-1-Laufzeit). Danach werden die 30 Dateien samt Manifest nach
+`data/onpolicy_v22-b06/` verschoben (ausserhalb des Trainings-Globs).
+
+**Relabeling:** `python -u tools/relabel_drafts_with_teacher.py
+--in-dir data/onpolicy_v22-b06 --workers 8` -- unveraendertes Werkzeug
+aus Runde 1 (Alt-Schema-Uebersetzung und valid_actions-Match geloest,
+749046c); Erwartung ~30k Labels, ~66 s.
+
+**Training v22-b06 (Afterburner):** Warm-Start v22-b05, **12 Epochen**
+(doppeltes Budget, da E6 kein Plateau zeigte), cosine lr 5e-5 mit
+`--lr-t-max 12` (T_max-Falle), Early Stop aktiv wie in Runde 1;
+Env `MOSAIC_IGNORE_POLICY_TARGET_VALID=1`,
+`MOSAIC_DATA_EXCLUDE=^selfplay_hv2_`; Flags wie das b05-Manifest:
+`--extra-data-dir data/onpolicy_v22-b06 --ownership-weight 1.0
+--ownership-head-2d --encoder 2d --value-head wdl
+--value-target-variant nortv --opp-points-head --endgame-head
+--seed 20260828 --lr 5e-5 --lr-schedule cosine`. Val-Vorbehalt wie
+par.3b.9: der Val-Split stammt aus dem Relabel-Korpus, Metriken
+indikativ, das Urteil faellt die Arena-Messung.
+
+**Messung/Tor:** argmax-Instrument, 200 Partien, Tag `otw22b06w00`,
+Seed 20260828 (identisch zur b05-Referenz), 10 Bloecke a 20 Partien,
+Blockpaarung gegen die gespeicherten b05-w0-Bloecke
+(gelaender_ladder_b05.json: volle Spalten 0,3375, Punkte 37,16).
+Tor wie par.3b.9: volle Spalten Block-t > 2,262 OHNE signifikanten
+Punkteverlust; der Punkte-t wird beidseitig berichtet (in Runde 1 war
+er der eigentliche Befund). Berichtsgroessen dazu: Vollendungsquote,
+init>=4, die sechs Standard-Kennzahlen, und die D2-Leitkennzahl
+(kosten-gewichtete Huelle via triangle_hull-Sonde auf den
+Messdateien). Die Messdateien sind nach der Auswertung
+Loeschkandidaten (naechste Freigabe-Runde).
+
+**par.3b.11 KOMPLETT GEFAHREN 2026-08-29 (Erzeugung 5.066,6 s / 8,44 s je
+Partie; Relabeling 31.133/31.996 Labels, 0 Fehler, 119 s, Artefakt
+relabel_v22_b06.json -- der hart verdrahtete Artefaktname des Werkzeugs
+hat dabei das Runde-1-Artefakt ueberschrieben, Werkzeug seitdem auf
+in-dir-abgeleitete Namen gefixt; Training 472 s, 12 Epochen, Fenster
+geprueft REIN: 2.400 hv2 ausgeschlossen, exakt 30 dagger-b05-Traeger;
+Messung otw22b06w00 1.753,7 s; Artefakte dagger_round2_b06.json,
+triangle_hull_coverage_b06.json):**
+
+| | v22-b05 (Referenz) | v22-b06 |
+| --- | --- | --- |
+| volle Spalten | 0,3375 | 0,3500 (+0,0125, t +0,29) |
+| Quote (==6/>=4) | 0,170 | 0,168 |
+| init>=4 | 1,99 | 2,08 |
+| Punkte | 37,16 | 36,24 (-0,91, t -0,72) |
+
+**TOR VERFEHLT, beidseitig H0: Runde 2 traegt NICHT weiter.** Kein
+Spalten-Schub (t +0,29) und kein Punkte-Schub mehr -- der Runde-1-Effekt
+(+3,86 Punkte) wiederholt sich nicht; b06 ist statistisch gleichauf,
+**v22-b05 bleibt bester Stand**. Passend dazu das Trainingsbild:
+Policy-Val flacht schon ab E4-E7 aus (Runde 1: bei E6 noch fallend).
+Lesart: die Drift-Reparatur ist nach EINER Runde weitgehend gesaettigt.
+Benannter Verdaechtiger aus der Design-Klarstellung (nicht trennbar):
+Runde 2 lief REIN (ohne die 600 Roh-Messpartien, die in b05s IST-Korpus
+still mitliefen, par.3b.9-Nachtrag). Nebenbefund Geometrie: b06s
+kosten-gewichtete Huelle 0,620 liegt erstmals UEBER dem Lehrer (0,600;
+b04 0,573; Mensch 0,84) bei Konversion ~0,56 gegen Lehrer ~1,23 -- die
+DAgger-Schiene verbessert die Huellen-Geometrie, nicht die
+Spalten-Konzentration; das stuetzt die Gelaender-/Allokations-Hebel
+(Chip-Allokation, Huellen-Trimm) als naechste Kandidaten.
+Sechs-Kennzahlen im Artefakt (u.a. Strafleiste 6,92 Steine,
+k1 2,45, k6 -11,26). Loeschkandidaten nach Registrierung:
+data/selfplay_otw22b06w00_* (10 Dateien) und -- falls keine Runde 3
+kommt -- data/onpolicy_v22-b06/ (31 Dateien); Nutzer-Freigabe noetig.
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
