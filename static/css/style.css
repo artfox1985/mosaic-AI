@@ -8,6 +8,12 @@
      unterscheidbar; dunkelgrau laesst dem 3D-Effekt Spielraum. */
   --blau:#2563EB;--gelb:#D97706;--rot:#DC2626;--schwarz:#44403C;--tuerkis:#0891B2;
   --wild:#7C3AED;--special:#E7E5E4;
+  /* Fuellfarbe des UNBELEGTEN Jokerfelds (bisher als Hex an mehreren Stellen
+     dupliziert). Quelle des Werts: `.ds.W` weiter unten -- gerendert wird er
+     allerdings vom Inline-Style in app.js::spaceHTML, der `.ds.W` ueberstimmt;
+     beide tragen denselben Ton. Seit 2026-08-29 haengt daran auch der
+     Hintergrund der Joker-Kuppelplatten (.wild-plate). */
+  --wild-bg:#EDE9FE;
   --r:8px;--shadow:0 1px 3px rgba(0,0,0,.08)
 }
 body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);padding:12px;font-size:14px}
@@ -66,9 +72,11 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    das frueher hier stehende `.ds.filled.<farbe>::after`-Overlay ist ersatzlos
    entfernt (Begruendung analog zum Fliesen-Auftrag 2026-08-15: auf dem
    fertigen Stein trennt das Symbol nichts mehr, es verrauscht ihn nur). Das
-   Symbol bleibt genau dort, wo es eine Entscheidung stuetzt: auf den OFFENEN
-   Feldern (`.ds.N::after`, unten). --sym bleibt an der Farbklasse, weil die
-   offenen Felder sie brauchen. ⭐ auf einem gelegten Spezialfeld ist KEIN
+   Symbol blieb damals auf den OFFENEN Feldern (`.ds.N::after`, unten) stehen.
+   NACHTRAG 2026-08-29 (Nutzer): auch dort ist es weg -- die Regel unten ist
+   auskommentiert (nicht geloescht, Begruendung dort). --sym bleibt an der
+   Farbklasse definiert, damit die Rueckkehr eine Zeile ist.
+   ⭐ auf einem gelegten Spezialfeld ist KEIN
    Farbsymbol, sondern der einzige Hinweis, dass dort eine Spezialfliese
    liegt (app.js::spaceHTML setzt es als Textlabel) -- bleibt deshalb. */
 /* Unbelegte Kuppel-Farbfelder: Label-Symbol (spaceHTML) etwas groesser als
@@ -253,13 +261,26 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    verkleinerte Kachel will, dreht 100% 100% zurueck. Die Unterscheidung
    offen/belegt haengt damit nicht mehr an der Flaeche, sondern an drei
    anderen Merkmalen: gestrichelter vs. durchgezogener Rand, Symbol vs. kein
-   Symbol, flach vs. erhaben (Haptik-Block am Dateiende). */
+   Symbol, flach vs. erhaben (Haptik-Block am Dateiende).
+   NACHTRAG 2026-08-29: das Merkmal "Symbol" ist entfallen (die Symbole auf
+   offenen Feldern sind auf Nutzerwunsch auskommentiert). Es tragen jetzt
+   Rand, Radius (offen rund, belegt eckig) und Relief. */
 .ds.N{border-style:dashed;border-color:rgba(0,0,0,.4);
   background:linear-gradient(var(--slot,#999),var(--slot,#999)) center/100% 100% no-repeat,#FAFAF9}
 /* Symbol der Soll-Farbe: Farbklasse liefert --sym (siehe v3-Block oben). */
-.ds.N::after{content:'';position:absolute;inset:0;
-  background:var(--sym) center/12px no-repeat}
-.ds.W{background:#EDE9FE;border-color:var(--wild);border-style:dashed}
+/* AUSKOMMENTIERT 2026-08-29 (Nutzer-Auftrag): auf den LEEREN Feldern der
+   gelegten Kuppelplatten steht kein Farbsymbol mehr. Bewusst nur
+   auskommentiert und NICHT geloescht -- "vielleicht kommen sie mal wieder";
+   wer sie zurueckholt, entfernt genau diese zwei Kommentarzeilen. --sym bleibt
+   deshalb an den Farbklassen definiert (Block oben), auch wenn es damit
+   derzeit nirgends mehr gelesen wird.
+   NICHT betroffen, weil ihre Symbole KEINE Farbsymbole sind, sondern
+   Textlabels aus app.js::spaceHTML: das Spezialfeld (◎ frei / ⭐ gesperrt)
+   und das Jokerfeld (🌀). Belegte Felder tragen seit 2026-08-19 ohnehin
+   keins mehr. */
+/* .ds.N::after{content:'';position:absolute;inset:0;
+  background:var(--sym) center/12px no-repeat} */
+.ds.W{background:var(--wild-bg);border-color:var(--wild);border-style:dashed}
 /* Nutzer 2026-08-09: unbelegtes Spezialfeld weiss und VOLL sichtbar -- in
    beiden Sperrzustaenden. Das fruehere `.ds.S.locked{opacity:.25}` ist
    ersatzlos weg: gedimmt wird nur noch das BELEGTE Feld (ueber
@@ -299,7 +320,16 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    FOLGE, bewusst in Kauf genommen: das unbelegte SPEZIALFELD (.ds.S) ist nur
    getoent und hat keine Aussenkante mehr -- es haengt am Label (◎ frei /
    ⭐ gesperrt, app.js::spaceHTML). */
-.ds.N,.ds.W,.ds.S{border:0;border-radius:10px}
+/* RADIUS RELATIV 2026-08-29 (Nutzer-Auftrag): 10px -> 45%. Der feste
+   Pixelwert war an der 22px-Zelle des Spielbretts geeicht (10/22 = 45,5 %);
+   in der Modal-Vorschau (`.d2x2.lg`, 31px-Zellen) ergaben dieselben 10px nur
+   noch 32 % -- dieselbe Platte las sich dort deutlich eckiger als auf dem
+   Brett. Als Prozentwert skaliert die FORM mit der Kachelgroesse mit
+   (22px -> 9,9px, optisch unveraendert; 31px -> 14,0px). Die Zellen sind
+   quadratisch, ein einzelner Prozentwert bleibt also ein Kreisbogen und
+   wird keine Ellipse. Vorbild fuer das Mitskalieren ist `.d2x2.lg .ds`
+   (font-size 9 -> 14px). */
+.ds.N,.ds.W,.ds.S{border:0;border-radius:45%}
 /* OPACITY 2026-08-19 (Nutzer-Entscheid, TESTWEISE): .6 -> 1.
    Der Beobachtung des Nutzers folgend: die 60 % haben nicht nur die Farbe
    zurueckgenommen, sondern auch das Relief mitgedaempft -- der gelegte Stein
@@ -307,8 +337,9 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 
    Damit faellt die Daempfung als Unterscheidungsmerkmal weg. Sie wird durch
    drei andere getragen, die alle am selben Tag entstanden sind:
-     - Form:   offen 10px Radius (fast Kreis) vs. belegt 4px (Kachel)
+     - Form:   offen 45 % Radius (fast Kreis) vs. belegt 4px (Kachel)
      - Symbol: offen traegt das Farbsymbol, belegt keins
+               (seit 2026-08-29 hinfaellig: auch offen kein Symbol mehr)
      - Relief: offen flach vs. belegt erhaben (Haptik-Block am Dateiende)
 
    Damit ist der Entscheid vom 2026-08-09 ("BELEGTE leicht zurueckgenommen",
@@ -461,8 +492,8 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   box-sizing: border-box;
   width: 58px;
 }
-.dgtile:hover{border-color:var(--wild);background:#EDE9FE}
-.dgtile.sel{border-color:var(--wild);background:#EDE9FE;outline:2px solid var(--wild)}
+.dgtile:hover{border-color:var(--wild);background:var(--wild-bg)}
+.dgtile.sel{border-color:var(--wild);background:var(--wild-bg);outline:2px solid var(--wild)}
 .dglabel{font-size:8px;color:var(--text3);text-align:center;margin-top:2px}
 
 /* Phase + info */
@@ -527,8 +558,21 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   box-sizing: border-box;
   width: 58px;
 }
-.ptile:hover{border-color:var(--wild);background:#EDE9FE}
-.ptile.sel{border-color:var(--wild);background:#EDE9FE;outline:2px solid var(--wild)}
+.ptile:hover{border-color:var(--wild);background:var(--wild-bg)}
+.ptile.sel{border-color:var(--wild);background:var(--wild-bg);outline:2px solid var(--wild)}
+/* JOKER-KUPPELPLATTE 2026-08-29 (Nutzer-Auftrag): eine Platte mit Jokerfeld
+   (bonus_points = 0, s. dome.rs::is_special_type) traegt dieselbe Fuellung wie
+   ein unbelegtes Jokerfeld. Die Klasse setzt app.js::wildPlateClass.
+   Zwei Traeger, weil die Platte an verschiedenen Orten verschieden gerahmt
+   ist: der RAHMEN (Auslage `.dgtile`, Modal-Pool `.ptile`, belegter
+   Kuppelplatz `.dslot.occ`) faerbt den 4px-Rand um die Platte, das GITTER
+   (`.d2x2`) die Luecken zwischen den vier Feldern -- in der Modal-Vorschau
+   gibt es keinen Rahmen, dort ist das Gitter die einzige sichtbare Flaeche.
+   `.dslot.occ.wild-plate` (0,3,0) schlaegt `.dslot{background:#fff}` (0,1,0);
+   der LEERE Kuppelplatz bleibt unberuehrt, er traegt die Klasse nie. */
+.dgtile.wild-plate,.ptile.wild-plate,.dslot.occ.wild-plate,.d2x2.wild-plate{
+  background:var(--wild-bg)
+}
 .chip-pill{display:inline-flex;gap:2px;align-items:center;padding:3px 6px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .1s}
 .chip-pill:hover{border-color:var(--rot);background:#FEE2E2}
 .chip-pill.in-sel{border-color:var(--blau);background:#DBEAFE;outline:1.5px solid var(--blau)}

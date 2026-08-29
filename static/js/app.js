@@ -674,6 +674,19 @@ function stackTopTypeLabel() {
 }
 
 
+// Joker-Kuppelplatte erkennen (Nutzer-Auftrag 2026-08-29): jede der 18 Platten
+// hat genau EINEN Sonder-Space, entweder Special (bonus_points = 3) oder Wild
+// (bonus_points = 0) -- nie beides, nie keins. `bonus` ist damit das
+// eindeutige Unterscheidungsmerkmal (engine/src/dome.rs:120-129, serialisiert
+// in serialize.rs::serialize_dome_tile als "bonus"); dieselbe Pruefung nutzt
+// bereits die Rueckseiten-Anzeige des Stapel-Dialogs (`t.bonus > 0 ? '⭐'`).
+// Rueckgabe ist ein anhaengbares Klassen-Fragment (mit fuehrendem Leerzeichen),
+// die Farbe selbst steht in style.css (.wild-plate -> --wild-bg). Ein leerer
+// Kuppelplatz (`tile` = null) bekommt nichts.
+function wildPlateClass(tile) {
+  return (tile && !(tile.bonus > 0)) ? ' wild-plate' : '';
+}
+
 function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
   const color = sp.color || sp.req_color || sp.color_id || '';
   const nc = normColor(color);
@@ -937,7 +950,10 @@ const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
       ? dome2x2(slot.spaces, pi, sr, sc, isTilingTarget)
       : `<div style="font-size:9px;color:var(--text3);text-align:center;width:100%">+</div>`;
 
-    return `<div class="dslot ${cls}" data-row="${sr}" data-col="${sc}"${ddata}>${inner}</div>`;
+    // Joker-Kuppelplatte: lila Flaeche unter der gelegten Platte (die Luecken
+    // zwischen den vier Feldern zeigen den Hintergrund des .dslot, das
+    // .d2x2-Gitter ist transparent). Leere Plaetze bleiben grau.
+    return `<div class="dslot ${cls}${wildPlateClass(slot)}" data-row="${sr}" data-col="${sc}"${ddata}>${inner}</div>`;
 }).join('')).join('');
 
   // Nutzer-Feedback 2026-08-07: die Farbenblinden-Symbole kollidierten mit
@@ -1269,7 +1285,7 @@ function renderCenter() {
     // Spieler irrelevant (die Platte ist an ihrem Farbmuster erkennbar) --
     // weder Tooltip noch Label zeigen sie mehr. `data-tile-id` bleibt (interne
     // Zuordnung fuer den Klick-Handler, kein sichtbarer Text).
-    return `<div class="dgtile" data-tile-id="${t.id}" title="Kuppelplatte - anklicken zum Legen" onclick="openDisplayPicker(${t.id})" style="cursor:pointer">
+    return `<div class="dgtile${wildPlateClass(t)}" data-tile-id="${t.id}" title="Kuppelplatte - anklicken zum Legen" onclick="openDisplayPicker(${t.id})" style="cursor:pointer">
       <div class="d2x2" style="width:48px; height:48px;">${spaces}</div>
     </div>`;
   }).join('');
@@ -1873,7 +1889,7 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
   if(!stackOnly) {
     S.dome_display.forEach(t=>{
       const div = document.createElement('div');
-      div.className='ptile'; div.dataset.id=t.id;
+      div.className='ptile'+wildPlateClass(t); div.dataset.id=t.id;
       // Punkt 8: keine Platten-ID mehr anzeigen (nur intern per data-id).
       div.innerHTML=`<div class="d2x2" style="width:48px; height:48px;">${t.spaces.map(sp=>spaceHTML(sp)).join('')}</div>`;
       div.addEventListener('click',()=>{
@@ -1929,7 +1945,10 @@ function buildPreview() {
   const ROT = {0:[0,1,2,3], 90:[2,0,3,1], 180:[3,2,1,0], 270:[1,3,0,2]};
   const rotated = ROT[domeModal.rotation||0].map(i => tile.spaces[i]);
   
-  prev.innerHTML = `<div class="d2x2 lg">${rotated.map(sp => spaceHTML(sp)).join('')}</div>`;
+  // In der Vorschau gibt es keinen Plattenrahmen (.ptile/.dslot) -- die Klasse
+  // sitzt deshalb direkt am Gitter, das die Flaeche zwischen den vier Feldern
+  // haelt.
+  prev.innerHTML = `<div class="d2x2 lg${wildPlateClass(tile)}">${rotated.map(sp => spaceHTML(sp)).join('')}</div>`;
 }
 
 // Aktion A (Stapel-Variante), Schritt 1: eine weitere verdeckte Platte ziehen
@@ -2014,7 +2033,7 @@ function stackStopAndChoose() {
 
   (S.pending_stack_draw || []).forEach(t => {
     const div = document.createElement('div');
-    div.className = 'ptile';
+    div.className = 'ptile' + wildPlateClass(t);
     div.dataset.id = t.id;
 
     // Punkt 8: keine Platten-ID mehr anzeigen (nur intern per data-id).
@@ -2081,7 +2100,7 @@ function renderReturnOrderPicker() {
   rest.forEach(t => {
     const div = document.createElement('div');
     const placedAt = order.indexOf(t.id);
-    div.className = 'ptile' + (placedAt !== -1 ? ' sel' : '');
+    div.className = 'ptile' + wildPlateClass(t) + (placedAt !== -1 ? ' sel' : '');
     div.dataset.id = t.id;
     // Punkt 8: keine Platten-ID mehr anzeigen -- der Order-Badge ("#1", "#2", ...)
     // ist keine Platten-ID, sondern die vom Spieler gewaehlte Rueckleg-Position.
@@ -2702,7 +2721,7 @@ function render() {
     const {tile_id, rotation, tile, source, num} = pendingStackPlacement;
     const ROT = {0:[0,1,2,3], 90:[2,0,3,1], 180:[3,2,1,0], 270:[1,3,0,2]};
     const previewHTML = tile
-      ? `<div class="d2x2" style="width:38px;height:38px;">${ROT[rotation||0].map(i=>spaceHTML(tile.spaces[i])).join('')}</div>`
+      ? `<div class="d2x2${wildPlateClass(tile)}" style="width:38px;height:38px;">${ROT[rotation||0].map(i=>spaceHTML(tile.spaces[i])).join('')}</div>`
       : '';
     // Punkt 8: keine Platten-ID mehr im Hinweistext -- previewHTML zeigt das
     // tatsaechliche Farbmuster ohnehin bereits an.
