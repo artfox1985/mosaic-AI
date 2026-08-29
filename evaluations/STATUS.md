@@ -161,10 +161,13 @@ nach Replayer-Fix auf voller 12er-Basis praktisch NULL Differenz
 (>= 2: -0,10 pp, t -0,14; v21 zeigte dort +1,29) -- die k1-spezifische
 Fehlbewertung ist beim spaltenfaehigen Netz WEG (par.9, ENTSCHIEDEN).
 Beifang mit Dauerwert (Parallel-Sitzung, cf53aab): Replayer-Greedy-
-Fehler behoben, 14/14 Server-Logs replayen; der Live-"Deadlock" war
-eine FRONTEND-Klickfalle (volle, unplatzierbare Reihen anklickbar,
-GUI-Fix liegt als Nutzer-Entscheid vor); Legalitaets-Sonde muss noch
-auf den run()-Pfad gehoben werden (offen, .py-Sperre).
+Fehler behoben, 14/14 Server-Logs replayen; der Live-"Deadlock" entpuppte sich
+final als Stapel-Dialog-Fehler (bezahlter Stapel-Zug liess sich in die
+Auslage zurueckdrehen; die Klickfallen-Zwischenthese war falsch) --
+vom Nutzer direkt bei der Parallel-Sitzung beauftragt und behoben
+(bbdbcb0/f9225c8/7277031, inkl. Server nimmt Spieler-Chip-Auswahl an
+und /api/debug/replay_log); Legalitaets-Sonde muss noch auf den
+run()-Pfad gehoben werden (offen).
 
 **PHASE 0 -- Diagnosepaket "Wo steht der Bewerter?" (4 Datenpassagen,
 Werkzeuge existieren alle, zusammen ~halber Tag):** die Weiche fuer
