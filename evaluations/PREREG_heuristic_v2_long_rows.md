@@ -2127,6 +2127,45 @@ k1 2,45, k6 -11,26). Loeschkandidaten nach Registrierung:
 data/selfplay_otw22b06w00_* (10 Dateien) und -- falls keine Runde 3
 kommt -- data/onpolicy_v22-b06/ (31 Dateien); Nutzer-Freigabe noetig.
 
+### par.3b.12 TOR-REVISION fuer den Generationen-Start (registriert 2026-08-30, VOR dem v22-Self-Play; Nutzer-Strategie 2026-08-29 "er soll nur jetzt mal spalten bauen, dann schlaegt er irgendwann hv2 und dann v21", Ausfuehrungs-Go "mach weiter im fahrplan / in der nacht gehoert die maschine dir")
+
+**Was revidiert wird:** das par.3b.2-Tor band den Self-Play-Start an den
+OWNERSHIP-KONSUMENTEN (w1 signifikant ueber w0 plus Vollendungsquote
+ueber 0,53). Diese Frage ist seit par.3b.6/3b.7 NEGATIV beantwortet --
+der Konsument traegt nicht -- und damit prueft das Tor einen Mechanismus,
+der nicht mehr der Weg ist, statt der Generator-Eignung. Eine stille
+Umgehung verbietet die stehende Regel (umgangenes Tor); darum diese
+ausdrueckliche Revision.
+
+**Neue Startbedingung (alle drei am 2026-08-29/30 gemessen erfuellt):**
+
+1. Volle Spalten des Generators am argmax-Instrument >= 3x der
+   Champion-Referenz: b05 0,3375 gegen 0,102 = 3,3x -- ERFUELLT.
+2. Spaltenbau trennt Sieger von Verlierern (Symmetrie-Sonde am
+   Erzeuger-Korpus): +0,573, t 93 -- ERFUELLT (hv2-Korpus; fuer den
+   NEUEN Korpus siehe Waechter unten).
+3. Relative Bewerter-Heilung belegt (Fahrplan Phase 0: Geschwister-Tau
+   +0,338, Mensch-Orakel-Differenz ~0, Prior-Ratio 1,23) -- ERFUELLT.
+
+**Anti-Drift-Anker der Generation:** 1.800 policy-aktive hv2-Partien im
+v23-Fenster (PREREG_v23_window par.1) plus DAgger-Afterburner als
+benannte Reserve, falls die Drift-Waechter anschlagen.
+
+**Waechter NACH der Erzeugung, VOR dem v23-Training (bindend):** auf dem
+neuen Self-Play-Korpus (a) volle Spalten je Partie+Seite >= 0,17 (die
+Haelfte des argmax-Instrumentwerts; Herleitung als Annahme markiert --
+Root-Noise und Temperatur druecken argmax-Werte, ein Einbruch UNTER die
+Haelfte hiesse aber, dass der Generator im Explorationsmodus das
+Spaltenspiel verliert => STOPP und Bericht), (b) Symmetrie-Trennung
+signifikant > 0 (corpus_column_outcome_symmetry_probe). Werkzeuge
+existieren beide.
+
+**Erzeugungs-Zuschnitt (Wecker-Abarbeitung in PREREG_v23_window par.4c
+registriert):** 4.000 Sockel @400 Sims mit Root-Noise (Policy-Klasse) +
+8.000 Schwarm --value-only (v20-Konvention, cheap-sims 150); Dateiname
+nach Generator `v22-b05` (docs/generation_naming.md); Seeds 20260901
+(Sockel) / 20260902 (Schwarm); Manifest-Pflichten wie immer.
+
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
 `plate_builder::v2_chip_vorzug`: vollendet per Bonuschip die Musterreihe, die
