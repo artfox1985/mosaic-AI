@@ -664,6 +664,93 @@ def new_game():
     return jsonify(response)
 
 
+@app.route('/api/debug/replay_log', methods=['POST'])
+def debug_replay_log():
+    """DEBUG-Werkzeug: setzt den Server auf die Stellung einer GELOGGTEN Partie.
+
+    Zweck (Nutzer-Auftrag 2026-08-30): eine gemeldete Situation von Hand
+    nachspielen, statt sie zu erraten. `log` ist ein Dateiname aus
+    `static/log/`, `limit` die Anzahl Logzeilen, bis zu der nachgespielt wird
+    (ohne `limit` bis ans Ende).
+
+    Der Zustand entsteht ueber `tools/analyze_game_log.py::run` -- also ueber
+    dieselben validierten `apply_*`-Aufrufe wie im echten Spiel, mit
+    Zeilen-Gegenprobe. Es wird nichts rekonstruiert oder geraten; weicht auch
+    nur eine Zeile ab, bricht der Aufruf mit Fehler ab.
+
+    Das ORIGINAL-Log bleibt unangetastet: Weiterspielen schreibt in eine neue
+    Datei (`_replay`-Suffix). Das ist wichtig, wenn das Original ein
+    Beweisstueck ist.
+    """
+    global _rust, _rust_logged, _ai_sims, _ai_player, _ai_model, _ai_debug_history, _game_log_path
+    global _teacher_level, _teacher_sims, _teacher_coach_sims, _teacher_history, _teacher_cache
+    global _profile_p0, _profile_p1, _game_rated, _hints_used_this_game
+
+    if _mr is None:
+        return jsonify(err("Rust-Engine (mosaic_rust) ist nicht installiert."))
+    data = request.get_json(silent=True) or {}
+    log_name = (data.get('log') or "").strip()
+    if not log_name or "/" in log_name or "\\" in log_name:
+        return jsonify(err("Parameter 'log' fehlt oder ist kein einfacher Dateiname."))
+    log_path = LOG_DIR / log_name
+    if not log_path.is_file():
+        return jsonify(err(f"Logdatei '{log_name}' nicht gefunden."))
+    limit = data.get('limit')
+    limit = int(limit) if limit is not None else None
+
+    import sys as _sys
+    tools_dir = str(APP_DIR / "tools")
+    if tools_dir not in _sys.path:
+        _sys.path.insert(0, tools_dir)
+    try:
+        import analyze_game_log as _agl
+        rep, lines, li, divergence = _agl.run(
+            log_path, Path("models/dummy.onnx"), 1, 1.0, False, limit
+        )
+    except Exception as e:
+        return jsonify(err(f"Replay fehlgeschlagen: {e}"))
+    if divergence:
+        return jsonify(err(f"Replay divergiert: {divergence}"))
+
+    header = rep.header
+    _rust = rep.g
+    _ai_debug_history = []
+    _ai_player = header.get('ai_player')
+    _ai_sims = int(header.get('ai_sims') or 100)
+    _ai_model = header.get('ai_model') if header.get('ai_model') != "heuristic" else None
+    if _ai_model:
+        model_path = _resolve_model_path(_ai_model)
+        if model_path is not None:
+            try:
+                _rust.load_net(str(model_path))
+            except Exception as e:
+                return jsonify(err(f"Netz '{_ai_model}' nicht ladbar: {e}"))
+    _teacher_level, _teacher_sims, _teacher_coach_sims = 0, 800, 400
+    _teacher_history, _teacher_cache = [], {"key": None, "analysis": None}
+    _profile_p0 = _profile_p1 = None
+    # Nachgestellte Stellung: nie werten, und Hilfen gelten als benutzt.
+    _game_rated, _hints_used_this_game = True, True
+
+    stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+    _game_log_path = LOG_DIR / f"game_{stamp}_replay_{log_path.stem}.log"
+    with open(_game_log_path, 'w', encoding='utf-8') as lf:
+        lf.write("# MOSAIC GAME LOG (nachgestellte Stellung, /api/debug/replay_log)\n")
+        lf.write(f"# {_json.dumps({'quelle': log_name, 'bis_zeile': li, 'seed': rep.seed}, ensure_ascii=False)}\n")
+        lf.write(f"# {'='*60}\n")
+    # Alles bis hierher steht schon im Quell-Log -- nur NEUE Zeilen mitschreiben.
+    _rust_logged = _rust.log_len()
+
+    response = ok()
+    response.update({
+        'quelle': log_name, 'zeilen_nachgespielt': li, 'zeilen_gesamt': len(lines),
+        'ai_enabled': _ai_player is not None, 'ai_player': _ai_player,
+        'ai_model': _ai_model or "heuristic", 'log_file': _game_log_path.name,
+        'phase': _rust.phase(), 'current_player': _rust.current_player(),
+        'chip_plan': getattr(rep, 'chip_plan', {}) or {},
+    })
+    return jsonify(response)
+
+
 @app.route('/api/state', methods=['GET'])
 def get_state():
     if (e := _require_game()) is not None:
@@ -918,8 +1005,36 @@ def tiling_bonus_chips():
     if _rust.phase() != "tiling":
         return jsonify(err("Nicht in der Tiling-Phase"))
     d = request.get_json()
+    pi, row = int(d['player']), int(d['pattern_row'])
+    # Das Chip-Modal laesst den Spieler GENAU auswaehlen, welche Plaettchen er
+    # ausgibt (`chip_uses` = Gruppen mit `chip_ids`). Bis 2026-08-30 hat dieser
+    # Endpunkt die Auswahl weggeworfen und `apply_tiling_chips` gerufen -- das
+    # waehlt GREEDY (round_end.rs::greedy_chip_indices: ohne zwei farbgleiche
+    # die ersten drei der Hand). Der Spieler bekam also andere Plaettchen
+    # abgezogen als er angeklickt hatte, und eine als zweites geplante
+    # Vollendung konnte dadurch unmoeglich werden. Seit der additiven Bindung
+    # `apply_tiling_chips_with` (py.rs) wird die Auswahl respektiert; die
+    # Regelpruefung bleibt in der Engine.
+    groups = d.get('chip_uses') or []
+    chip_ids = [int(cid) for g in groups for cid in (g.get('chip_ids') or [])]
     try:
-        _rust.apply_tiling_chips(int(d['player']), int(d['pattern_row']))
+        if chip_ids:
+            # chip_id -> Position in der Hand; die Serialisierung gibt
+            # `bonus_chips` in genau der Vec-Reihenfolge aus, die
+            # `apply_bonus_chips_with` als Indizes erwartet (serialize.rs:142).
+            hand = _json.loads(_rust.state_json())['players'][pi]['bonus_chips']
+            position = {}
+            for i, chip in enumerate(hand):
+                position.setdefault(int(chip['id']), []).append(i)
+            indices = []
+            for cid in chip_ids:
+                if not position.get(cid):
+                    return jsonify(err(f"Bonusplättchen {cid} liegt nicht (mehr) in deiner Hand."))
+                indices.append(position[cid].pop(0))
+            _rust.apply_tiling_chips_with(pi, row, indices)
+        else:
+            # Kein Auswahl-Mitschnitt (aelterer Client, Skript): Bestandsweg.
+            _rust.apply_tiling_chips(pi, row)
         _flush_game_log()
         return jsonify(ok())
     except Exception as e:
