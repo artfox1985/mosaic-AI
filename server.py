@@ -1652,5 +1652,12 @@ def teacher_summary():
 
 
 if __name__ == '__main__':
-    print("Mosaic-AI Server läuft auf http://localhost:5000")
-    app.run(debug=True, port=5000)
+    # Reloader per Default AUS (Nutzer-Entscheid 2026-08-29): der Werkzeug-
+    # Stat-Reloader beobachtet den ganzen Projektbaum, JEDE .py-Aenderung
+    # (auch reine Doku in tools/) startete den Server mitten in laufenden
+    # Partien neu (docs/pitfalls.md, Vorfall 23:21). Wer beim Entwickeln
+    # Auto-Reload will, setzt MOSAIC_SERVER_RELOAD=1.
+    use_reloader = os.environ.get("MOSAIC_SERVER_RELOAD") == "1"
+    print("Mosaic-AI Server läuft auf http://localhost:5000"
+          + ("" if use_reloader else " (Auto-Reload AUS)"))
+    app.run(debug=True, port=5000, use_reloader=use_reloader)
