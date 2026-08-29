@@ -91,14 +91,96 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    wie bei den Straffeldern in der Zeile darunter. */
 .fslot.marker-empty{background:#fff;border-color:#D6D3D1;color:#E7E5E4;font-weight:700;font-size:13px}
 .fslot.marker-taken{background:#fff;border-style:solid;border-color:#F59E0B;color:#F59E0B;font-weight:700;font-size:13px}
+/* Gezogene, noch verdeckte Kuppelplatten im Stapel-Dialog ("die Hand").
+   Bewusst in Kuppelplatten-Groessenordnung und mit Plattenrahmen: der
+   Spieler soll auf einen Blick sehen, WIE VIELE er hat und welchen Typ --
+   vorher stand das als Emoji-Kette im Fliesstext und ging unter
+   (Nutzer 2026-08-30). Die Rueckseite traegt nur den Typ, nie die Farben. */
+.stack-hand{display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 5px}
+.stack-back{
+  width:34px;height:34px;border-radius:5px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;line-height:1;
+  border:1.5px solid #B9B2A4;
+  background:
+    radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.85) 0%,rgba(255,255,255,0) 55%),
+    linear-gradient(160deg,#F3EFE6 0%,#DCD5C8 52%,#C9C1B2 100%);
+  box-shadow:0 1px 2px rgba(74,58,32,.28),inset 0 0 0 1px rgba(255,255,255,.55);
+}
+/* Spezialfeld-Platte: warmer Goldstich, damit sie sich vom gewoehnlichen
+   Ruecken unterscheidet, ohne die Farben der Vorderseite zu verraten. */
+.stack-back.special{
+  border-color:#D9A441;
+  background:
+    radial-gradient(120% 90% at 50% 0%,rgba(255,255,255,.85) 0%,rgba(255,255,255,0) 55%),
+    linear-gradient(160deg,#FBF1DA 0%,#EFDCAF 52%,#E0C888 100%);
+}
+
 /* Phantom-Fliesen (per Bonuschip virtuell ergänzt, nie real gezogen):
-   weiß gefüllt mit farbigem Rand statt voll gefüllt. */
-.tile.phantom{background:#fff;border-width:2.5px}
-.tile.phantom.blau{border-color:var(--blau)}
-.tile.phantom.gelb{border-color:var(--gelb)}
-.tile.phantom.rot{border-color:var(--rot)}
-.tile.phantom.schwarz{border-color:var(--schwarz)}
-.tile.phantom.tuerkis{border-color:var(--tuerkis)}
+   METALLRING mit sanfter Farbfüllung (Nutzer-Referenz 2026-08-30: "der
+   metallische Ring", nicht die Hohlform). Die Vorlage ist die verworfene
+   Fassung 3 der leeren Kuppelfelder -- dort war der conic-Ring RUND und
+   wurde deshalb verworfen (siehe --gem-mold-Kommentar weiter unten); hier
+   trägt er dieselbe Kachelgeometrie wie jede andere Fliese, ist also
+   quadratisch.
+
+   Bauart: zwei Hintergrund-Lagen mit verschiedenen Boxen. Die Füllung endet
+   an der padding-box, der conic-Verlauf füllt die border-box -- so wird der
+   2,5px-Rand selbst zum Verlauf, ohne Pseudo-Element. `border-color` MUSS
+   dafür transparent bleiben (deshalb keine Farbregeln je Farbe mehr, der
+   frühere farbige Rand ist durch den Ring ersetzt).
+
+   Der Rahmen ist ELOXIERTES ALU in der Fliesenfarbe (Nutzer-Referenz
+   2026-08-30). Ein einzelner Farbverlauf reicht dafür nicht -- der liest
+   sich als glänzender Lack. Drei Lagen tragen den Eindruck, von oben:
+
+     1. BÜRSTUNG: `repeating-linear-gradient` in 112°, Striche im
+        Halb-Pixel-Raster mit sehr geringem Kontrast. Das ist das eigentliche
+        Erkennungsmerkmal von gebürstetem Aluminium -- eine gerichtete,
+        anisotrope Textur. Ohne sie wirkt jede noch so gute Farbwahl glatt.
+     2. LICHTFÜHRUNG: ein weicher 152°-Verlauf, hell an der oberen linken
+        Kante, dunkel an der unteren rechten. Breit und weich, nicht als
+        harter Glanzstreifen: Eloxal streut, es spiegelt nicht.
+     3. GRUNDTON: die entsättigte, mit Alu-Grau gebrochene Farbe (siehe
+        `--alu-base`).
+
+   Die Füllung ist die Reihenfarbe auf ~20 % heruntergemischt (schwarz 17 %, sonst kippt es ins Graue): sanft genug,
+   dass die Phantomfliese nicht wie eine gelegte aussieht, kräftig genug, um
+   die Farbe der Reihe zu zeigen. `color-mix` fehlt nur sehr alten Browsern,
+   die vorangestellte `background-color` ist der Rückfall. */
+.tile.phantom{
+  --hue:#9A9384;                                   /* Rueckfall ohne Farbklasse */
+  /* Eloxiert heisst: die Farbe sitzt IN einer matten Oxidschicht, nicht als
+     Lack auf Chrom. Deshalb ist der Grundton entsaettigt und mit Alu-Grau
+     gebrochen -- eine satte Reinfarbe wuerde nach lackiertem Blech aussehen. */
+  --alu-base:color-mix(in srgb,var(--hue) 58%,#8E887D);
+  --alu-licht:color-mix(in srgb,var(--hue) 26%,#F4F1E9);
+  --alu-schatten:color-mix(in srgb,var(--hue) 68%,#39332B);
+  --phantom-fill:color-mix(in srgb,var(--hue) 18%,#fff);
+  border-width:2.5px;
+  border-color:transparent;
+  background-color:#fff;
+  background-image:
+    linear-gradient(var(--phantom-fill),var(--phantom-fill)),
+    repeating-linear-gradient(112deg,
+      rgba(255,255,255,.13) 0 .35px,
+      rgba(255,255,255,0) .35px .7px,
+      rgba(0,0,0,.09) .7px 1.05px,
+      rgba(0,0,0,0) 1.05px 1.6px),
+    linear-gradient(152deg,
+      var(--alu-licht) 0%,
+      var(--alu-base) 32%,
+      var(--alu-base) 60%,
+      var(--alu-schatten) 100%),
+    linear-gradient(var(--alu-base),var(--alu-base));
+  background-origin:padding-box,border-box,border-box,border-box;
+  background-clip:padding-box,border-box,border-box,border-box;
+}
+.tile.phantom.blau{--hue:var(--blau)}
+.tile.phantom.gelb{--hue:var(--gelb)}
+.tile.phantom.rot{--hue:var(--rot)}
+.tile.phantom.schwarz{--hue:var(--schwarz);--phantom-fill:color-mix(in srgb,var(--hue) 15%,#fff)}
+.tile.phantom.tuerkis{--hue:var(--tuerkis)}
 
 /* Buttons */
 .btn{cursor:pointer;font-family:inherit;font-size:11px;padding:5px 12px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);transition:all .1s}
@@ -940,10 +1022,12 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   box-shadow:var(--relief-up),0 0 0 3px rgba(245,158,11,.3)
 }
 /* Phantom-Fliesen bleiben BEWUSST flach: sie sind per Bonuschip virtuell
-   ergaenzt, liegen also physisch nicht auf dem Brett (siehe .tile.phantom
-   weiter oben). Flach vs. erhaben ist damit zusaetzlich zur Fuellung ein
-   zweites Unterscheidungsmerkmal. */
-.tile.phantom{box-shadow:none}
+   ergaenzt, liegen also physisch nicht auf dem Brett. Kein --relief-up, also
+   keine erhabene Glanzkante -- nur eine feine Innenlinie, die den Metallring
+   (siehe .tile.phantom weiter oben) gegen die Fuellung abgrenzt. Flach vs.
+   erhaben bleibt damit neben Ring und blasser Fuellung das dritte
+   Unterscheidungsmerkmal gegenueber einer gelegten Fliese. */
+.tile.phantom{box-shadow:inset 0 0 0 .5px rgba(74,58,32,.20)}
 
 /* --- Offene Plaetze in den Musterreihen: Vertiefung ----------------------- */
 .tile.empty{

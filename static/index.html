@@ -141,11 +141,12 @@
     <div id="dome-notice" class="info warn" style="display:none"></div>
     <div class="pool-grid" id="dome-pool"></div>
     <div id="dome-stack-section" style="display:none; flex-direction:column; gap:6px; margin-bottom:10px; padding:8px; background:var(--bg); border:1px dashed var(--border); border-radius:6px;">
-      <div style="font-size:11px; font-weight:600;">📦 Vom verdeckten Stapel ziehen</div>
+      <!-- Keine Ueberschrift mehr: der Modal-Titel sagt bereits, dass vom
+           Stapel gezogen wird (Nutzer 2026-08-30, "es sollte klar sein"). -->
       <div id="stack-peek-status" style="font-size:10px; color:var(--text2);"></div>
       <div style="display:flex; gap:4px;">
         <button class="btn" id="stack-peek-more-btn" onclick="stackPeekMore()">Ziehen (−1 Pkt)</button>
-        <button class="btn" id="stack-stop-btn" onclick="stackStopAndChoose()" disabled>Aufhören &amp; wählen</button>
+        <button class="btn" id="stack-stop-btn" onclick="stackStopAndChoose()" disabled>Aufhören &amp; umdrehen</button>
       </div>
     </div>
     
