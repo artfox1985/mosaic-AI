@@ -71,19 +71,38 @@ tot, Chip-VOLUMEN gleich aber ALLOKATION falsch (Mensch 0,8
 Reihe-6-Chip-Abschluesse je Partie, v21 0,1), kosten-gewichtete Huelle
 als Leitkennzahl (Mensch 0,84, Maschinen 0,54-0,60).
 
-**OFFENE NUTZER-ENTSCHEIDE fuer die naechste Sitzung** (alle Optionen in
-den Prereg-Absaetzen registriert): (1) naechster Hebel -- Kandidaten:
-DAgger-Runde 2 auf b05-Partien mit mehr Epochen (E6 zeigte KEIN Plateau,
-Policy sank noch; billig, ~1,5 h Ende-zu-Ende), Chip-ALLOKATIONS-
-Fuehrung (Stufe-E-Befund, Gelaender-Klasse), Huellen-Trimm der
-Ownership-Maske mit r+1-Gewichten, oder b03/Surprise. (2) Elo-Gating
-fuer b05 (informativ, Cross-Aera-Regel steht in der
-Promotions-Checkliste). (3) v22-Self-Play-/Generator-Frage (weiterhin
-gestoppt). (4) Loeschfreigaben: data/selfplay_otw22b04s1_* (10 Dateien,
-Sims-Ablation), data/selfplay_otw22b05*_* (30 Dateien, b05-Messungen);
-der Relabel-Korpus data/onpolicy_v22-b05/ (30 Dateien) wird fuer
-DAgger-Folgerunden noch gebraucht. Erstlauf- und r2-Sweep-Daten sind mit
-Freigabe geloescht.
+**NACHTRAG 2026-08-29 (Manifest-Diff): der b05-Korpus war NICHT rein.**
+manifest_train_v22-b05: neben dagger-b04 (600 Partien) trainierten 600
+UNRELABELTE On-Policy-Messpartien mit (otw22b04r2w00/w10, otw22b04s1
+inkl. der degenerierten sims=1-Partien) -- der Exclude traf nur hv2, die
+Messdateien im data-Glob liefen still mit. b05-Effekt = Relabeling +
+Roh-Partien, konfundiert; Staerke-Messung unberuehrt. Registriert als
+Nachtrag in par.3b.9.
+
+**DAGGER-RUNDE 2 GEFAHREN 2026-08-29 (par.3b.11) -- BEIDSEITIG H0,
+v22-b05 BLEIBT BESTER STAND.** b06 (reines Design: NUR 600 relabelte
+b05-Partien, Fenster geprueft) misst 0,3500 volle Spalten (t +0,29)
+und 36,24 Punkte (t -0,72) gegen b05 -- der Runde-1-Effekt wiederholt
+sich nicht, die Drift-Reparatur ist nach einer Runde gesaettigt
+(Policy-Val-Plateau schon ab E4-E7). Nebenbefund: b06s kosten-gewichtete
+Huelle 0,620 erstmals UEBER dem Lehrer (0,600), Konversion weiter ~halb
+so gut -- stuetzt die Allokations-/Gelaender-Hebel. Details par.3b.11;
+Artefakte dagger_round2_b06.json, triangle_hull_coverage_b06.json.
+
+**ENTSCHIEDEN 2026-08-29 (Nutzer):** (1) Elo-Gating fuer b05: JA
+(informativ, Cross-Aera-Regel Promotions-Checkliste Punkt 3) -- naechster
+Schritt nach der Runde-2-Registrierung. (2) v22-Self-Play-/
+Generator-Frage: weiter gestoppt. (3) Loeschfreigaben ERTEILT UND
+AUSGEFUEHRT: data/selfplay_otw22b04s1_* (10) und data/selfplay_otw22b05*_*
+(30) geloescht.
+
+**OFFENE NUTZER-ENTSCHEIDE:** (1) naechster Hebel nach der
+Runde-2-Saettigung -- Kandidaten: Chip-ALLOKATIONS-Fuehrung
+(Stufe-E-Befund), Huellen-Trimm der Ownership-Maske mit r+1-Gewichten,
+b03/Surprise; eine DAgger-Runde 3 ist nach der Saettigungs-Lesart NICHT
+empfohlen. (2) Loeschfreigaben: data/selfplay_otw22b06w00_* (10 Dateien)
+und -- falls keine Runde 3 -- data/onpolicy_v22-b06/ (31 Dateien);
+data/onpolicy_v22-b05/ (30) haengt an derselben Frage.
 
 **Warum dieser Schritt** (par.3b.5 Weg-Wahl Punkt 1): der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-TRAININGSGEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt. Der Tiling-Pol lief bisher NIE mit einem spaltenbewussten Kopf (Gate-C-Nullmessungen: plattenblinde Koepfe).
 

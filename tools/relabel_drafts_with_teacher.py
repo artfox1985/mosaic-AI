@@ -34,7 +34,12 @@ sys.path.insert(0, str(_ROOT))
 from corpus_io import load_records, dump_records  # noqa: E402
 
 WORKER_ARTIFACT = _ROOT / "models" / "frozen_heuristics" / "hv2_generator"
-ARTIFACT = _ROOT / "evaluations" / "artifacts" / "relabel_dagger_b04.json"
+# Artefaktname folgt dem Eingabeverzeichnis (Lehre 2026-08-29: der harte
+# Name relabel_dagger_b04.json hat in Runde 2 das Runde-1-Artefakt
+# ueberschrieben; untracked, nicht wiederherstellbar).
+def artifact_path(in_dir: str) -> pathlib.Path:
+    slug = pathlib.Path(in_dir).name.replace("onpolicy_", "").replace("-", "_")
+    return _ROOT / "evaluations" / "artifacts" / f"relabel_{slug}.json"
 
 
 def worker_start():
@@ -196,12 +201,13 @@ def main():
               "in_dir": args.in_dir, "dateien": len(files), "workers": n, **agg,
               "laufzeit": {"wanduhr_s": round(time.time() - t0, 1), "threads": n,
                            "s_je_label": round((time.time() - t0) / max(1, agg["relabelt"]), 3)}}
-    ARTIFACT.write_text(json.dumps(result, indent=1, ensure_ascii=False),
+    artifact = artifact_path(args.in_dir)
+    artifact.write_text(json.dumps(result, indent=1, ensure_ascii=False),
                         encoding="utf-8", newline="\n")
     print(f"\nrelabelt {agg['relabelt']}/{agg['kandidaten']} "
           f"(nicht abbildbar {agg['nicht_abbildbar']}, Fehler {agg['fehler']}, "
           f"kein Stone {agg['lehrer_kein_stone']})")
-    print(f"Artefakt: {ARTIFACT}", flush=True)
+    print(f"Artefakt: {artifact}", flush=True)
 
 
 if __name__ == "__main__":
