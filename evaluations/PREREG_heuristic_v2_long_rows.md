@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1; Preis: volle Zeilen 0,432 -> 0,216). v2-Zweig entfernt, beide gefrorenen Artefakte lauffaehig (par.19). Spalten-Tor par.3b.2: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play; par.3b.5 Lesart 3 (die Platzierung verschenkt das Draft-Erbe). par.3b.6 GEFAHREN 2026-08-29: TOR VERFEHLT, Leiter dosisabhaengig negativ (w2,0 t -2,85 unter w0) => Stufe 2 laeuft: par.3b.7 REGISTRIERT 2026-08-29 (Arm v22-b04, 2D-Ablesung STATT flach, Rezept identisch b01), Training gestartet; Self-Play bleibt gestoppt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). Spalten-Tor: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play (par.3b.2); Platzierung verschenkt das Draft-Erbe (par.3b.5). Konsument par.3b.6/3b.7: flache Karte negativ (w2,0 t -2,85), 2D-Ablesung senkt Own-Val -3,8 Prozent und dreht die Richtung positiv, Tor aber verfehlt (Gipfel w1,0 t +1,38) -- Schiene beidseitig ohne Torerfolg, Folgewege Nutzer-Entscheid; Self-Play bleibt gestoppt. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1563,6 +1563,66 @@ verifiziert identisch zum b01-Stand). EINZIGER Unterschied:
 
 Trainings-Freigabe: Nutzer 2026-08-29 ("du darfst bei bedarf weitere
 trainings fuer v22 durchfuehren solang es unserem ziel naeher bringt").
+
+**TRAINING GEFAHREN 2026-08-29 (manifest_train_v22-b04_20260829_012026,
+2,5 h auf CUDA, Cache-Treffer 30,9 s, E17 mit Early Stop, best E7):**
+
+| | b01 (flach) | b04 (2D-Ablesung) |
+| --- | --- | --- |
+| Ownership-Val bester Wert | 0,3901 (E17) | **0,3751 (E11)** |
+| Ownership-Val Epoche 1 | 0,4229 | 0,3975 |
+| Policy-Val bester Wert | 0,9071 (E7) | 0,9140 (E7) |
+| Value-Brier bester Wert | 0,1920 (E1) | 0,1931 (E1) |
+
+**Messgroesse 1 (informativ) ist damit positiv: die 2D-Ablesung senkt den
+Ownership-Val-Loss in JEDER Epoche konsistent** (-0,015, rund -3,8 Prozent;
+b04 erreicht in Epoche 1 fast b01s Endniveau). Policy marginal schlechter
+(+0,005-0,007), Brier praktisch gleich. Ob die schaerfere Karte am
+KONSUMENTEN ankommt, entscheidet Messgroesse 2 -- der Sweep
+(w 0/0,5/1,0 mit `alphazero_v22-b04_best`, Checkpoint-Wahl analog b01)
+laeuft. Der w00-Arm ist zugleich die argmax-Gegenprobe gegen b01s 0,2975.
+
+**NACHTRAG (registriert 2026-08-29, VOR dem Erweiterungslauf): Leiter um
+w=2,0 verlaengert.** Anlass: die kleine Leiter (Ergebnis unten) zeigt eine
+POSITIVE, dosis-monotone Richtung (w05 +0,010, w10 +0,030 volle Spalten,
+Quote t 1,71), aber unterhalb der Schwelle -- und b01s flache Karte hatte
+bei w=2,0 ihr signifikantes NEGATIV. Der w20-Arm prueft, ob der positive
+Trend traegt oder kippt; Instrument identisch, Tor unveraendert
+(signifikant ueber w0 ohne signifikanten Punkteverlust, Schwelle 2,262).
+
+**SWEEP GEFAHREN 2026-08-29 (ownership_tiling_consumer_v22_b04.json, vier
+Arme a 200 Partien, Bloecke sauber 143-154 s): TOR VERFEHLT -- aber die
+Dosis-Richtung DREHT gegenueber der flachen Karte.**
+
+| Arm | volle Spalten | Block-t vs w0 | Quote | Punkte |
+| --- | --- | --- | --- | --- |
+| w0 | 0,2975 +- 0,023 | -- | 0,154 | 33,30 |
+| w0,5 | 0,3075 +- 0,026 | +0,69 | 0,163 | 33,25 |
+| w1,0 | 0,3275 +- 0,032 | +1,38 (Quote +1,71) | 0,174 | 33,26 |
+| w2,0 | 0,3125 +- 0,029 | +0,67 | 0,163 | 33,26 |
+
+Kein Arm ueberschreitet die 2,262-Schwelle; der Gipfel liegt bei w=1,0,
+w=2,0 faellt zurueck. Punkte in allen Armen unversehrt. Kontrast zur
+flachen Karte (par.3b.6): dort war JEDER Arm negativ und w2,0 signifikant
+SCHLECHTER -- mit der 2D-Karte ist jeder Arm positiv. Die schaerfere Karte
+schadet also nicht mehr, traegt aber (bei n=10 Bloecken) nicht belegbar.
+
+Beifaenge: b04-w00 trifft mit 0,2975 zufaellig exakt b01s Wert (die
+Partien sind verschieden -- Punkte 33,30 gegen 34,78); die argmax-
+Gegenprobe zeigt ein um ~1,5 NIEDRIGERES Punkteniveau von b04 gegenueber
+b01 (Signifikanz nicht mehr rechenbar, die b01-Blockrohdaten sind mit
+Nutzer-Freigabe geloescht; der Auswerter schreibt Blockwerte seit diesem
+Lauf mit ins Artefakt).
+
+**Konsequenz nach par.3b.7 Punkt 3: die Konsumenten-Schiene ist mit
+flacher UND raeumlicher Karte ohne Torerfolg gemessen.** Optionen fuer den
+naechsten Schritt (Nutzer-Entscheid, Empfehlungen in der Morgenlage):
+(a) Replikations-Arm w=1,0 mit zweitem Seed fuer mehr Power (der einzige
+positive Kandidat, +1,38/+1,71 knapp unter der Schwelle), (b) der
+registrierte Folgeweg Surprise-Weighting b03 (Vorbehalt aus par.3b.5:
+Draft-Treue ist auf der tragenden Haelfte schon hoch), (c) der
+Vollendungs-Filter in der Suche (v23-Weckerliste) als komplementaerer
+Hebel derselben Engpass-Stelle.
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 

@@ -58,12 +58,13 @@ PREREG = "PREREG_heuristic_v2_long_rows.md par.3b.6"
 # Arm -> (Dateipraefix, gesetztes Env beim Lauf). Das Env steht hier
 # ausdruecklich mit im Artefakt, weil das Lauf-Manifest Env-Knoepfe nicht
 # erfasst (par.3b.6, Waechter 1).
-ARMS = {
-    "w00": ("selfplay_otw22b01w00_", "MOSAIC_OWNERSHIP_TILING_W=0"),
-    "w05": ("selfplay_otw22b01w05_", "MOSAIC_OWNERSHIP_TILING_W=0.5"),
-    "w10": ("selfplay_otw22b01w10_", "MOSAIC_OWNERSHIP_TILING_W=1.0"),
-    "w20": ("selfplay_otw22b01w20_", "MOSAIC_OWNERSHIP_TILING_W=2.0"),
-}
+# --tag waehlt das Modell-Praefix (par.3b.6: otw22b01; par.3b.7: otw22b04).
+# Fehlende Arme (z.B. w20 in der kleinen b04-Leiter) werden uebersprungen.
+ARM_WEIGHTS = {"w00": "0", "w05": "0.5", "w10": "1.0", "w20": "2.0"}
+
+def arms_for_tag(tag):
+    return {name: (f"selfplay_{tag}{name}_", f"MOSAIC_OWNERSHIP_TILING_W={w}")
+            for name, w in ARM_WEIGHTS.items()}
 CONTROL = "w00"
 T_THRESHOLD = 2.262  # df=9, zweiseitig 5 Prozent
 FULL = 6
@@ -237,11 +238,17 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     ap.add_argument("--limit", type=int, default=None,
                     help="nur die ersten N Dateien je Arm (Smoke)")
+    ap.add_argument("--tag", default="otw22b01",
+                    help="Dateipraefix-Stamm des Sweeps (Modellkennung)")
+    ap.add_argument("--model", default="alphazero_v22-b01_best.onnx",
+                    help="Modellname fuers Artefakt (Dokumentation)")
+    ap.add_argument("--out", default=None,
+                    help="Artefaktpfad (Default: ownership_tiling_consumer_v22.json)")
     args = ap.parse_args()
     t0 = time.time()
 
     arms = {}
-    for name, (prefix, env) in ARMS.items():
+    for name, (prefix, env) in arms_for_tag(args.tag).items():
         print(f"Arm {name} ({env}):", flush=True)
         r = eval_arm(prefix, args.limit)
         if r is None:
@@ -252,7 +259,8 @@ def main():
 
     result = {
         "prereg": PREREG,
-        "modell": "alphazero_v22-b01_best.onnx",
+        "modell": args.model,
+        "tag": args.tag,
         "instrument": "self_play.py --mode network --deterministic "
                       "--no-root-noise --sims 400 --games 200 --per-file 20 "
                       "--seed 20260828 --threads 11 (argmax, wie par.3b.2)",
@@ -265,6 +273,10 @@ def main():
     }
     for name, r in arms.items():
         result["arms"][name] = {k: v for k, v in r.items() if k != "_blocks"}
+        # Blockwerte MIT ins Artefakt (Lehre 2026-08-29: nach der Loeschung
+        # der b01-Rohdaten war eine quer-Modell-Blockpaarung nicht mehr
+        # rechenbar -- die Aggregate allein tragen keine Paarung).
+        result["arms"][name]["blocks"] = r["_blocks"]
 
     if CONTROL in arms:
         ctrl = arms[CONTROL]["_blocks"]
@@ -292,17 +304,18 @@ def main():
             result["vergleiche"][name] = cmp_out
 
     result["lauf_manifeste"] = {
-        name: run_manifests(f"otw22b01{name}") for name in arms
+        name: run_manifests(f"{args.tag}{name}") for name in arms
     }
     result["laufzeit_auswertung"] = {
         "wanduhr_s": round(time.time() - t0, 1), "cpu_s": None,
         "threads": 1, "s_je_partie": None,
     }
 
-    ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
-    with open(ARTIFACT, "w", encoding="utf-8") as f:
+    artifact_path = pathlib.Path(args.out) if args.out else ARTIFACT
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(artifact_path, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=1, ensure_ascii=False)
-    print(f"\nArtefakt geschrieben: {ARTIFACT}", flush=True)
+    print(f"\nArtefakt geschrieben: {artifact_path}", flush=True)
 
     for name, cmp_out in result["vergleiche"].items():
         vs = cmp_out.get("volle_spalten_vs_w0")
