@@ -354,6 +354,67 @@ impl PyGame {
         Ok(())
     }
 
+    /// Wie `apply_tiling_chips`, aber mit EXPLIZIT vorgegebener Chip-Auswahl
+    /// (Indizes in `players[player].bonus_chips`).
+    ///
+    /// Warum es das braucht (Vorfall 2026-08-29, `docs/pitfalls.md`): die KI
+    /// waehlt ihre Allokation exakt (`ai_tiling_step` unten, Solver-Schritt
+    /// `TilingStep::Chips` -> `apply_bonus_chips_with`), `apply_tiling_chips`
+    /// dagegen waehlt GREEDY (`round_end.rs::greedy_chip_indices`: ohne zwei
+    /// farbgleiche die ersten drei der Hand). Die 🎫-Logzeile nennt die
+    /// verbrauchten Chips nicht, `tools/analyze_game_log.py` musste geloggte
+    /// KI-Vollendungen deshalb greedy nachspielen -- und verbrannte dabei
+    /// Chips, die die echte KI behalten hatte, bis Runden spaeter eine real
+    /// gespielte Vollendung unmoeglich wurde.
+    ///
+    /// Verhalten: dieselbe Regelpruefung wie beide Bestandspfade
+    /// (`round_end::chips_complete` via `apply_bonus_chips_with`) PLUS die
+    /// Top-down-Sperre, die sonst nur `apply_bonus_chips_to_row` durchsetzt
+    /// (Engine-Audit U1, `round_end.rs:464`) -- diese Bindung ist damit nie
+    /// permissiver als der Menschen-Pfad, sie darf nur waehlen. Logtext
+    /// zeichengleich zu `apply_tiling_chips`, damit die Zeilen-Gegenprobe des
+    /// Replayers beide Pfade gleich sieht.
+    fn apply_tiling_chips_with(
+        &mut self,
+        player: usize,
+        pattern_row: usize,
+        chips: Vec<usize>,
+    ) -> PyResult<()> {
+        if (pattern_row as i32) < self.game.state.players[player].tiled_max_row {
+            return Err(PyValueError::new_err(format!(
+                "Reihe {} ist top-down gesperrt.",
+                pattern_row + 1
+            )));
+        }
+        if !apply_bonus_chips_with(&mut self.game.state.players[player], pattern_row, &chips) {
+            return Err(PyValueError::new_err(format!(
+                "Reihe {} nicht mit dieser Chip-Auswahl komplettierbar.",
+                pattern_row + 1
+            )));
+        }
+        let name = self.game.state.players[player].name.clone();
+        self.game
+            .state
+            .log_event(format!("🎫 {name} komplettiert Reihe {} mit Bonus-Chips!", pattern_row + 1));
+        Ok(())
+    }
+
+    /// Alle Chip-Auswahlen, die Reihe `pattern_row` komplettieren koennten --
+    /// als JSON-Liste von Index-Listen (`round_end::chip_allocations`,
+    /// dedupliziert nach Farb-Signatur). Damit bleibt die REGEL in der Engine:
+    /// Aufrufer (der Replayer) waehlt nur aus, statt `chips_complete`
+    /// nachzubauen. Die Top-down-Sperre wird hier mitgefiltert, damit die
+    /// Kandidatenliste nie etwas anbietet, das `apply_tiling_chips_with`
+    /// anschliessend ablehnt.
+    fn chip_allocations_json(&self, player: usize, pattern_row: usize) -> String {
+        let p = &self.game.state.players[player];
+        if (pattern_row as i32) < p.tiled_max_row {
+            return "[]".to_string();
+        }
+        let allocs = crate::round_end::chip_allocations(p, pattern_row);
+        serde_json::to_string(&allocs).unwrap_or_else(|_| "[]".to_string())
+    }
+
     /// Unplatzierbare Fliesen einer Reihe auf die Strafleiste schieben.
     fn move_row_to_floor(&mut self, player: usize, pattern_row: usize) -> PyResult<()> {
         let p = &mut self.game.state.players[player];
@@ -1090,5 +1151,117 @@ mod tests {
             new_lines.iter().any(|l| l.contains('🎫') && l.contains("komplettiert Reihe")),
             "KI-Chip-Komplettierung sollte geloggt werden, neue Log-Zeilen: {new_lines:?}"
         );
+    }
+
+    /// Der Fall, an dem `tools/analyze_game_log.py` am 2026-08-29 zerbrach
+    /// (Vorfall in `docs/pitfalls.md`): greedy waehlt die ERSTEN drei Chips
+    /// der Hand (`round_end::greedy_chip_indices`) und verbrennt dabei einen,
+    /// den die echte KI behalten hatte. Hier nachgestellt in klein: eine
+    /// Reihe, die greedy so bezahlt, dass die ZWEITE Reihe danach nicht mehr
+    /// zahlbar ist -- waehrend die explizite Auswahl beide schafft.
+    #[test]
+    fn explicit_chip_allocation_survives_where_greedy_starves() {
+        use crate::dome::BonusChip;
+        use crate::tile::TileColor::{Blau, Gelb, Rot, Tuerkis};
+
+        // Hand: 1x blau-Traeger, 2x gelb-Traeger, Rest farbfremd.
+        let hand = || {
+            vec![
+                BonusChip { chip_id: 0, colors: vec![Gelb] },      // gelb-Traeger, steht VORNE
+                BonusChip { chip_id: 1, colors: vec![Tuerkis] },
+                BonusChip { chip_id: 2, colors: vec![Rot] },
+                BonusChip { chip_id: 3, colors: vec![Blau] },      // einziger blau-Traeger
+                BonusChip { chip_id: 4, colors: vec![Gelb] },      // zweiter gelb-Traeger
+            ]
+        };
+        // Reihe 2 (idx 1, cap 2): blau, 1 fehlt. Reihe 3 (idx 2, cap 3): gelb, 1 fehlt.
+        let setup = |pg: &mut PyGame| {
+            pg.game.state.phase = Phase::Tiling;
+            let p = &mut pg.game.state.players[0];
+            p.start_tile_pending = false;
+            p.pattern_lines[1].add_tiles(&[Blau]);
+            p.pattern_lines[2].add_tiles(&[Gelb, Gelb]);
+            p.bonus_chips = hand();
+        };
+
+        // A) Greedy-Pfad: Reihe 2 hat nur EINEN blau-Traeger, zahlt also drei
+        //    beliebige -- und nimmt die ersten drei (0,1,2), darunter einen
+        //    gelb-Traeger. Danach bleiben 3+4, nur noch EIN gelb-Traeger:
+        //    Reihe 3 braucht drei beliebige, es sind aber nur zwei da.
+        let mut greedy = PyGame::new(("P1".into(), "P2".into()), 0, Some(7), None);
+        setup(&mut greedy);
+        // Kein `expect` auf einem `PyErr`: dessen Debug-Ausgabe braucht den
+        // Interpreter, den der Rust-Test nicht haelt -- ein Fehlschlag wuerde
+        // sonst als STATUS_STACK_BUFFER_OVERRUN statt als Testmeldung enden.
+        assert!(greedy.apply_tiling_chips(0, 1).is_ok(), "Reihe 2 ist greedy zahlbar");
+        assert_eq!(
+            greedy.game.state.players[0].bonus_chips.len(),
+            2,
+            "greedy sollte drei beliebige Chips verbraucht haben"
+        );
+        assert!(
+            greedy.apply_tiling_chips(0, 2).is_err(),
+            "Reihe 3 muss nach dem greedy-Verbrauch unbezahlbar sein -- sonst trifft der Test den Vorfall nicht"
+        );
+
+        // B) Explizite Auswahl: Reihe 2 mit 1,2,3 bezahlen (die gelb-Traeger
+        //    schonen), dann traegt Reihe 3 ihre zwei farbgleichen 0,4.
+        let mut exact = PyGame::new(("P1".into(), "P2".into()), 0, Some(7), None);
+        setup(&mut exact);
+        let cands: Vec<Vec<usize>> =
+            serde_json::from_str(&exact.chip_allocations_json(0, 1)).expect("Kandidaten-JSON");
+        assert!(
+            cands.iter().any(|c| c.len() == 3),
+            "Kandidatenliste sollte die Drei-beliebig-Zahlungen enthalten: {cands:?}"
+        );
+        assert!(
+            exact.apply_tiling_chips_with(0, 1, vec![1, 2, 3]).is_ok(),
+            "explizite Auswahl fuer Reihe 2"
+        );
+        // ACHTUNG, gilt auch fuer jeden Aufrufer: `apply_bonus_chips_with`
+        // entfernt die Chips aus dem Vec, die Indizes verschieben sich also.
+        // Aus der Resthand [gelb(war 0), gelb(war 4)] sind das jetzt 0 und 1 --
+        // Kandidatenlisten muessen unmittelbar vor der Anwendung geholt werden.
+        assert!(
+            exact.apply_tiling_chips_with(0, 2, vec![0, 1]).is_ok(),
+            "zwei gelb-Traeger fuer Reihe 3"
+        );
+        assert!(
+            exact.game.state.players[0].bonus_chips.is_empty(),
+            "beide Reihen bezahlt, Hand leer: {:?}",
+            exact.game.state.players[0].bonus_chips
+        );
+        assert_eq!(
+            exact.game.state.log.iter().filter(|l| l.contains('🎫')).count(),
+            2,
+            "beide Vollendungen muessen mit dem Bestands-Wortlaut geloggt sein"
+        );
+    }
+
+    /// Die neue Bindung darf nie permissiver sein als der Menschen-Pfad:
+    /// Top-down-Sperre (Engine-Audit U1) und Regelpruefung gelten weiter.
+    #[test]
+    fn explicit_chip_allocation_rejects_locked_row_and_bad_selection() {
+        use crate::dome::BonusChip;
+        use crate::tile::TileColor::{Blau, Rot};
+
+        let mut pg = PyGame::new(("P1".into(), "P2".into()), 0, Some(7), None);
+        pg.game.state.phase = Phase::Tiling;
+        {
+            let p = &mut pg.game.state.players[0];
+            p.start_tile_pending = false;
+            p.pattern_lines[1].add_tiles(&[Blau]);
+            p.bonus_chips = vec![
+                BonusChip { chip_id: 0, colors: vec![Blau] },
+                BonusChip { chip_id: 1, colors: vec![Blau] },
+                BonusChip { chip_id: 2, colors: vec![Rot] },
+            ];
+        }
+        // Zu wenige Chips fuer die Regel (1 Chip zahlt keine Zelle).
+        assert!(pg.apply_tiling_chips_with(0, 1, vec![0]).is_err(), "eine Zelle kostet mindestens zwei Chips");
+        // Top-down gesperrt: bereits eine spaetere Reihe getilt.
+        pg.game.state.players[0].tiled_max_row = 3;
+        assert!(pg.apply_tiling_chips_with(0, 1, vec![0, 1]).is_err(), "gesperrte Reihe darf nicht zahlbar sein");
+        assert_eq!(pg.chip_allocations_json(0, 1), "[]", "und sie darf keine Kandidaten anbieten");
     }
 }
