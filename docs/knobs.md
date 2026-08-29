@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 87 Knoepfe (50 aktiv, 29 diagnose, 7 tot, 1 geplant).
+Stand: 88 Knoepfe (51 aktiv, 29 diagnose, 7 tot, 1 geplant).
 
 **Status** sagt, ob der Knopf VERDRAHTET ist -- ausdruecklich nicht, ob sein
 Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
@@ -160,6 +160,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_DISPLAY_CAL_A` | -0.0033 | aktiv | - | Platt-A der Anzeige-Kalibrierung, modellspezifisch (server.py:1407) | evaluations/artifacts/platt_fit_v21.json |
 | `MOSAIC_DISPLAY_CAL_B` | 0.9060 | aktiv | - | Platt-B der Anzeige-Kalibrierung, modellspezifisch (server.py:1408) | evaluations/artifacts/platt_fit_v21.json |
 | `MOSAIC_GAME_TIMEOUT_SCALE` | 1.0 (geplant) | geplant | ENTSCHIEDEN | Multiplikator auf den Pro-Partie-Timeout im Self-Play; im Prereg beschrieben, Grep 2026-08-15 findet KEIN Vorkommen in engine/src oder *.py -- nicht verdrahtet | PREREG_gpu_inference_path.md (Deckel-Knopf) |
+| `MOSAIC_SERVER_RELOAD` | aus (Opt-in =1) | aktiv | - | Werkzeug-Auto-Reloader des Spielservers wieder einschalten (server.py, __main__-Block); Default AUS, weil der Stat-Reloader den ganzen Projektbaum beobachtet und jede .py-Aenderung laufende Partien neu startete (Vorfall 2026-08-29, docs/pitfalls.md) | - |
 | `MOSAIC_UNLOCK_SHAPING_W` | - | tot | ENTSCHIEDEN | wirkungslos seit Zusammenfuehrung 2026-08-11, nur noch Warn-Stub (net_mcts.rs:1257) | PREREG_scoring_plate_injection.md |
 | `MOSAIC_UNLOCK_BETA` | - | tot | ENTSCHIEDEN | wirkungslos seit Zusammenfuehrung 2026-08-11, nur noch Warn-Stub (net_mcts.rs:1257) | PREREG_scoring_plate_injection.md |
 | `MOSAIC_ENDAWARE_W` | - | tot | ENTSCHIEDEN | entfernt 2026-08-13 (gemessen wirkungslos), nur noch Kommentar-Erwaehnung (net_mcts.rs:1322) | PREREG_scoring_plate_injection.md N7 |
