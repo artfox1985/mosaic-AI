@@ -386,6 +386,14 @@ class Replayer:
         self.round_scores_crosscheck: list[tuple[int, tuple[int, int]]] = []
         self.silent_chip_gaps: list[tuple[int, int, int]] = []  # (round, actor, pattern_row)
 
+        # Chip-Vollendungen: welche Auswahl wurde getroffen? (siehe
+        # `apply_chip_completion`). `chip_plan` bindet EREIGNIS-NUMMER ->
+        # Chip-Indizes; nicht belegte Ereignisse laufen greedy wie im Bestand.
+        self.chip_plan: dict[int, list[int]] = {}
+        self.chip_event_idx = 0
+        self.chip_events: list[dict] = []   # Protokoll: idx, actor, row, Kandidaten, Wahl
+        self.chip_plan_used = 0             # wie viele Ereignisse eine explizite Wahl bekamen
+
     def _reset_sun_used(self):
         self.sun_used = {1: False, 2: False, 3: False, 4: False, "GF": False}
 
@@ -544,6 +552,45 @@ class Replayer:
         self.action_log.append(("apply_tiling_chips", (actor, pattern_row), {}))
         self.silent_chip_gaps.append((self.g.round_number(), actor, pattern_row))
         return True
+
+    def apply_chip_completion(self, lines: list[LogLine], li: int, actor: int, pattern_row: int) -> int:
+        """Eine geloggte 🎫-Vollendung nachspielen -- die Stelle, an der das
+        Log SCHWEIGT.
+
+        Die Engine kennt zwei Wege, eine Reihe mit Chips zu fuellen, und sie
+        waehlen unterschiedlich: der Menschen-Einstieg `apply_tiling_chips`
+        (py.rs) waehlt GREEDY (`round_end.rs::greedy_chip_indices`: ohne zwei
+        farbgleiche schlicht die ersten drei der Hand), die KI dagegen exakt
+        (Solver-Schritt `TilingStep::Chips` -> `apply_bonus_chips_with`). Die
+        Logzeile nennt nur die Reihe, nie die verbrauchten Chips -- welche
+        Auswahl real getroffen wurde, ist aus dem Log NICHT rekonstruierbar.
+
+        Folge (Vorfall 2026-08-29, `docs/pitfalls.md`): greedy verbrennt
+        Chips, die der echte Spieler behalten hatte, und Runden spaeter wird
+        eine real gespielte Vollendung unmoeglich -- `game_20260823_085652`
+        brach so in Runde 5 ab. Deshalb ist die Wahl hier ein PLAN, den
+        `run()` bei einem spaeteren Fehlschlag revidieren kann; ohne Eintrag
+        bleibt es beim Bestandsverhalten (greedy), damit bisher saubere
+        Partien byte-gleich replayen.
+
+        WICHTIG: Die rekonstruierte Chip-Historie ist damit eine PLAUSIBLE,
+        nicht die tatsaechliche -- sie erfuellt dieselben Regeln und dasselbe
+        Log, aber welche Chips real lagen, bleibt unbekannt. Das ist
+        relevant, weil das Netz Chips als Merkmal sieht (`features.rs`).
+        """
+        k = self.chip_event_idx
+        self.chip_event_idx += 1
+        # Kandidaten VOR der Anwendung holen: `apply_bonus_chips_with`
+        # entfernt die Chips, danach sind alle Indizes verschoben.
+        cands = json.loads(self.g.chip_allocations_json(actor, pattern_row))
+        choice = self.chip_plan.get(k)
+        self.chip_events.append(
+            {"idx": k, "actor": actor, "row": pattern_row, "cands": cands, "choice": choice}
+        )
+        if choice is None:
+            return self.apply(lines, li, "apply_tiling_chips", actor, pattern_row)
+        self.chip_plan_used += 1
+        return self.apply(lines, li, "apply_tiling_chips_with", actor, pattern_row, list(choice))
 
     def apply_end_scoring(self, lines: list[LogLine], li: int) -> int:
         before = self.g.log_len()
@@ -805,29 +852,135 @@ class Replayer:
 # Haupt-Treiber
 # ═══════════════════════════════════════════════════════════════════════════
 
+#: Deckel der Chip-Plan-Suche (siehe `_search_chip_plan`). Jeder Versuch ist
+#: ein kompletter, orakelfreier Replay (Groessenordnung Sekunden); 60 reichen
+#: fuer die real vorkommenden Faelle um Groessenordnungen -- die Partie, an der
+#: die Suche entstand, war beim ERSTEN Rueckzug geloest.
+MAX_CHIP_PLAN_ATTEMPTS = 60
+
+
+def _replay_once(header: dict, lines: list[LogLine], hints: dict, log_name: str,
+                 model_path: Path, sims: int, c_puct: float, do_oracle: bool,
+                 n_lines: int, dump_states: str | None, chip_plan: dict[int, list[int]]):
+    """Ein vollstaendiger Replay-Durchlauf mit vorgegebenem Chip-Plan.
+    Gibt (rep, li, divergence_or_None, chip_failure_or_None) zurueck."""
+    rep = Replayer(header, log_name, str(model_path), sims, c_puct, do_oracle,
+                   dump_path=dump_states)
+    rep.hints = hints
+    rep.chip_plan = dict(chip_plan)
+    try:
+        li = _run_loop(rep, lines, rep.name_to_idx, n_lines, do_oracle, time.time())
+    except ReplayDivergence as e:
+        li_match = re.search(r"Zeile (\d+)", str(e))
+        return rep, (int(li_match.group(1)) if li_match else 0), str(e), None
+    except ValueError as e:
+        # Die Engine lehnt eine geloggte Chip-Vollendung ab -- das ist der
+        # Fall, den die Plan-Suche aufloest (alles andere fliegt weiter).
+        if "mit Chips komplettierbar" not in str(e) and "Chip-Auswahl komplettierbar" not in str(e):
+            raise
+        return rep, 0, None, str(e)
+    return rep, li, None, None
+
+
+def _search_chip_plan(header: dict, lines: list[LogLine], hints: dict, log_name: str,
+                      model_path: Path, n_lines: int, first_rep: "Replayer") -> dict | None:
+    """Sucht eine Chip-Auswahl-Folge, unter der die Partie durchlaeuft.
+
+    Der Fehlschlag zeigt sich IMMER an einem SPAETEREN Ereignis als dem, das
+    ihn verursacht hat (der falsch verbrannte Chip fehlt erst Runden danach),
+    darum wird von hinten zurueckgezogen: das juengste Chip-Ereignis
+    DESSELBEN Spielers vor dem Fehlschlag bekommt der Reihe nach seine
+    Kandidaten (`round_end::chip_allocations`, ueber die Engine geholt -- die
+    Regel wird hier NICHT nachgebaut), spaetere Festlegungen fallen dabei
+    weg, weil ihre Kandidatenlisten sich mit der Hand aendern.
+
+    Die Suchlaeufe sind bewusst orakelfrei und ohne Zustands-Dump: gefunden
+    wird nur der PLAN, den der Aufrufer dann einmal in voller Bestueckung
+    faehrt. Gibt den Plan zurueck oder None, wenn keiner gefunden wurde."""
+    plan: dict[int, list[int]] = {}
+    tried: dict[int, list[list[int]]] = {}
+    events = first_rep.chip_events
+    attempts = 0
+
+    while attempts < MAX_CHIP_PLAN_ATTEMPTS:
+        # Das verursachende Ereignis liegt VOR dem gescheiterten; nur Ereignisse
+        # desselben Spielers koennen dessen Chip-Bestand veraendert haben.
+        failed = events[-1] if events else None
+        if failed is None:
+            return None
+        actor = failed["actor"]
+        target = None
+        for ev in reversed(events[:-1]):
+            if ev["actor"] != actor:
+                continue
+            used = tried.setdefault(ev["idx"], [])
+            untried = [c for c in ev["cands"] if c not in used]
+            if untried:
+                target = (ev["idx"], untried[0])
+                break
+        if target is None:
+            return None
+
+        idx, choice = target
+        tried[idx].append(choice)
+        plan = {k: v for k, v in plan.items() if k < idx}
+        plan[idx] = choice
+        attempts += 1
+        print(f"  Chip-Plan-Suche, Versuch {attempts}: Ereignis {idx} "
+              f"(Spieler {actor}) -> Chips {choice}", flush=True)
+
+        rep, _li, div, chip_fail = _replay_once(
+            header, lines, hints, log_name, model_path, 1, 1.0, False, n_lines, None, plan
+        )
+        if chip_fail is None and div is None:
+            return plan
+        if div is not None:
+            # Eine echte Divergenz ist KEIN Chip-Problem -- nicht weitersuchen.
+            return None
+        events = rep.chip_events
+    return None
+
+
 def run(log_path: Path, model_path: Path, sims: int, c_puct: float, do_oracle: bool,
         limit: int | None, dump_states: str | None = None):
     """Gibt (rep, lines, li_reached, divergence_msg_or_None) zurueck -- wirft
     NICHT bei einer ReplayDivergence, sondern faengt sie ab, damit der
     Aufrufer trotzdem einen (Teil-)Report ueber das bis dahin Erreichte
     schreiben kann (Auftrag: "bei Divergenz praezise abbrechen und
-    berichten", nicht einfach nur crashen)."""
+    berichten", nicht einfach nur crashen).
+
+    Scheitert eine geloggte Chip-Vollendung, wird EINMAL eine Plan-Suche
+    gefahren (`_search_chip_plan`) und der Lauf mit dem gefundenen Plan
+    wiederholt -- ohne Fund bleibt es beim Fehler, nur mit klarer Meldung
+    statt rohem ValueError."""
     header, lines, hints = load_log(log_path)
-    rep = Replayer(header, log_path.name, str(model_path), sims, c_puct, do_oracle,
-                   dump_path=dump_states)
-    rep.hints = hints
-    name_to_idx = rep.name_to_idx
-
     n_lines = len(lines) if limit is None else min(limit, len(lines))
-    t_start = time.time()
 
-    try:
-        li = _run_loop(rep, lines, name_to_idx, n_lines, do_oracle, t_start)
-    except ReplayDivergence as e:
-        li_match = re.search(r"Zeile (\d+)", str(e))
-        li = int(li_match.group(1)) if li_match else 0
-        return rep, lines, li, str(e)
-    return rep, lines, li, None
+    rep, li, div, chip_fail = _replay_once(
+        header, lines, hints, log_path.name, model_path, sims, c_puct, do_oracle,
+        n_lines, dump_states, {}
+    )
+    if chip_fail is None:
+        return rep, lines, li, div
+
+    print(f"  Chip-Vollendung abgelehnt ({chip_fail}) -- suche eine tragfaehige "
+          f"Chip-Auswahl (greedy verbrennt die falschen Chips, siehe docs/pitfalls.md)", flush=True)
+    if rep.dump_fh is not None:
+        rep.dump_fh.close()
+    plan = _search_chip_plan(header, lines, hints, log_path.name, model_path, n_lines, rep)
+    if plan is None:
+        return rep, lines, 0, (
+            f"Chip-Vollendung nicht nachspielbar und keine Auswahl-Folge gefunden "
+            f"(nach bis zu {MAX_CHIP_PLAN_ATTEMPTS} Versuchen): {chip_fail}"
+        )
+    print(f"  Chip-Plan gefunden: {plan} -- finaler Lauf in voller Bestueckung", flush=True)
+    rep, li, div, chip_fail = _replay_once(
+        header, lines, hints, log_path.name, model_path, sims, c_puct, do_oracle,
+        n_lines, dump_states, plan
+    )
+    if chip_fail is not None:
+        return rep, lines, 0, f"Chip-Plan trug im finalen Lauf nicht: {chip_fail}"
+    return rep, lines, li, div
 
 
 def _run_loop(rep: "Replayer", lines: list[LogLine], name_to_idx: dict, n_lines: int, do_oracle: bool, t_start: float) -> int:
@@ -923,7 +1076,7 @@ def _run_loop(rep: "Replayer", lines: list[LogLine], name_to_idx: dict, n_lines:
 
         elif cat == "CHIPS_COMPLETE":
             actor = name_to_idx[m.group("name")]
-            li = rep.apply(lines, li, "apply_tiling_chips", actor, int(m.group("row")) - 1)
+            li = rep.apply_chip_completion(lines, li, actor, int(m.group("row")) - 1)
 
         elif cat in ("ROUND_START", "GAME_OVER", "ROUND_STRAFE", "UNPLACEABLE"):
             rep.round_scores_crosscheck.append((rep.g.round_number(), rep.g.scores()))
