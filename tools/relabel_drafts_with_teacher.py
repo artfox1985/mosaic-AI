@@ -136,8 +136,12 @@ def main():
                  "nicht_abbildbar": 0, "lehrer_kein_stone": 0}
         try:
             for fpath in slot_files:
-                relabel_file(fpath, proc, mr, stats,
-                             args.seed_base + hash(pathlib.Path(fpath).name) % 100000)
+                # zlib.crc32 statt hash(): hash() ist je Prozess gesalzen
+                # (PYTHONHASHSEED) und wuerde die Label-Seeds nicht
+                # reproduzierbar machen.
+                import zlib
+                name_seed = zlib.crc32(pathlib.Path(fpath).name.encode("utf-8")) % 100000
+                relabel_file(fpath, proc, mr, stats, args.seed_base + name_seed)
                 with lock:
                     done_files[0] += 1
                     print(f"  {done_files[0]}/{len(files)} Dateien "
