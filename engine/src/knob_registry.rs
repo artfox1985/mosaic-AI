@@ -152,6 +152,9 @@ pub const KNOBS: &[KnobEntry] = &[
     KnobEntry { name: "MOSAIC_DISPLAY_CAL_B", default: "0.9060", status: KnobStatus::Aktiv, purpose: "Platt-B der Anzeige-Kalibrierung, modellspezifisch (server.py:1408)", prereg: "evaluations/artifacts/platt_fit_v21.json" },
     // ── Geplante Knoepfe (Prereg-beschrieben, im Arbeitsbaum nicht verdrahtet) ──
     KnobEntry { name: "MOSAIC_GAME_TIMEOUT_SCALE", default: "1.0 (geplant)", status: KnobStatus::Geplant, purpose: "Multiplikator auf den Pro-Partie-Timeout im Self-Play; im Prereg beschrieben, Grep 2026-08-15 findet KEIN Vorkommen in engine/src oder *.py -- nicht verdrahtet", prereg: "PREREG_gpu_inference_path.md (Deckel-Knopf)" },
+    // ── Infrastruktur ausserhalb der Engine ─────────────────────────────────
+    KnobEntry { name: "MOSAIC_SERVER_RELOAD", default: "aus (Opt-in =1)", status: KnobStatus::Aktiv, purpose: "Werkzeug-Auto-Reloader des Spielservers wieder einschalten (server.py, __main__-Block); Default AUS, weil der Stat-Reloader den ganzen Projektbaum beobachtet und jede .py-Aenderung laufende Partien neu startete (Vorfall 2026-08-29, docs/pitfalls.md)", prereg: "-" },
+
     // ── Tote Knoepfe (dokumentiert statt geraten) ───────────────────────────
     KnobEntry { name: "MOSAIC_UNLOCK_SHAPING_W", default: "-", status: KnobStatus::Tot, purpose: "wirkungslos seit Zusammenfuehrung 2026-08-11, nur noch Warn-Stub (net_mcts.rs:1257)", prereg: "PREREG_scoring_plate_injection.md" },
     KnobEntry { name: "MOSAIC_UNLOCK_BETA", default: "-", status: KnobStatus::Tot, purpose: "wirkungslos seit Zusammenfuehrung 2026-08-11, nur noch Warn-Stub (net_mcts.rs:1257)", prereg: "PREREG_scoring_plate_injection.md" },
