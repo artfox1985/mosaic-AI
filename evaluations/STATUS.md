@@ -165,14 +165,14 @@ byte-stabil). Kuenftige Einfrierungen legen die .pth mit ab
 champion.txt und 9 Suite-Tests laden aus models/ -- soll models/ leer
 werden, muessen sie auf den Artefakt-Pfad umziehen (Build-Fenster).
 
-### UMBENENNUNG hv1/hv2: GEBAUT, Wheel-Neubau ausstehend
+### UMBENENNUNG hv1/hv2: ABGENOMMEN 2026-08-29, Live-Pfad FREI
 
-Alles traegt die neue Nomenklatur (`f5c60da`, Dialekt-Uebersetzung fuer die
-gefrorenen Wheels via tools/frozen_name_dialect.py). **Bis zum Wheel-Neubau
-ist der Live-Pfad gesperrt** (installiertes Wheel kennt nur "v1", Specs
-sagen "hv1"). Naechstes Fenster: maturin + Paritaets-Hash + Suite gruen +
-Golden-Selbsttests beider Artefakte + frozen_agent_referee_probe
-(Erwartungen [27,15]/159 und [63,27]/163 muessen unveraendert treffen).
+Wheel-Neubau nach Protokoll gefahren und komplett GRUEN: maturin-Build
+installiert, Suite 496/0 (Paritaets-Fixture net_parity_hash explizit ok,
+contract_hash unveraendert efd564d87bac2722), Golden-Selbsttests beider
+gefrorener Artefakte feldgleich, frozen_agent_referee_probe trifft exakt
+[27,15]/159 und [63,27]/163. Der Live-Pfad kennt damit die
+hv1/hv2-Nomenklatur (f5c60da); die Sperre ist aufgehoben.
 
 ### KAMPAGNEN-ZIEL (Nutzer 2026-08-28, nach dem b01-Peek)
 
