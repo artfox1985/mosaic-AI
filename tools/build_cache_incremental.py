@@ -125,7 +125,11 @@ def _build_one_file(args):
         with h5py.File(block_file, "r") as hf:
             n = hf["values"].shape[0] if "values" in hf else 0
         return basename, block_file, n, False
-    import neural_net
+    # C 2026-08-29: beim MosaicDataset-Auszug (C 2026-08-27) wurde hier der
+    # Import vergessen -- der Neubau-Pfad starb seitdem im Worker mit
+    # NameError, nur der Blocks-liegen-schon-Pfad lief. Gefunden durch den
+    # --file-list-Funktions-Smoke.
+    import corpus_dataset
     ds = corpus_dataset.MosaicDataset(data_dir, files=[path_pkl],
                                   cache_path_override=block_file, **kwargs)
     return basename, block_file, len(ds), True
