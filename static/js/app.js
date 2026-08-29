@@ -1181,14 +1181,34 @@ function renderCenter() {
         return {pi: pr.pi, ri: pr.ri, color: row.color, pname: p.name};
       });
 
-    // Unplatzierbare volle Reihen (alle 3 Slots belegt, keine Farbe passend)
-    const unplaceable = placeableRows
-      .filter(pr => pr.placeable === false)
-      .map(pr => {
-        const p = S.players[pr.pi];
-        const row = p.pattern_lines[pr.ri];
-        return {pi: pr.pi, ri: pr.ri, color: row.color, pname: p.name};
-      });
+    // Volle Reihen, die JETZT keinen Zug haben -- und WARUM.
+    //
+    // Frueher stand hier ein Filter auf `placeable === false`. Der konnte nie
+    // feuern: `serialize_valid_tiling_rows` (serialize.rs) pusht ausschliesslich
+    // Eintraege mit `placeable: true`. Der Spieler sah also volle Reihen, die
+    // auf nichts reagierten, ohne je einen Grund zu bekommen (Vorfall
+    // 2026-08-29: drei volle Reihen, eine legale Aktion, Nutzer meldete einen
+    // Deadlock). Die Gruende leiten sich clientseitig ab und folgen der
+    // Pruefreihenfolge der Engine (round_end.rs::validate_tiling_action):
+    //   1. eine FRUEHERE volle Reihe ist selbst noch platzierbar -> die muss
+    //      zuerst gelegt werden (Regelwerk S.7, von oben nach unten),
+    //   2. sonst hat die Reihe kein passendes Kuppelfeld mehr.
+    // STILLGELEGT (Nutzer-Entscheid 2026-08-30: "ich brauch die info nicht,
+    // kannst auskommentieren, vielleicht holen wir sie irgendwann zurueck").
+    // Zum Reaktivieren: diesen Block UND den Anzeige-Block weiter unten
+    // ("stuckRows.length") wieder einkommentieren, sonst fehlt die Variable.
+    //
+    // const stuckRows = [];
+    // S.players.forEach((p, pi) => {
+    //   if (AI_ENABLED && pi === AI_PLAYER) return;
+    //   const risHere = placeableOnly.filter(pr => pr.pi === pi).map(pr => pr.ri);
+    //   p.pattern_lines.forEach((row, ri) => {
+    //     if (!row.tiles.length || row.tiles.length !== row.capacity) return;
+    //     if (risHere.includes(ri)) return;
+    //     const earlier = risHere.filter(r => r < ri);
+    //     stuckRows.push({pi, ri, pname: p.name, blockedBy: earlier.length ? Math.min(...earlier) : null});
+    //   });
+    // });
 
     const hasPending = pending.length > 0;
 
@@ -1237,6 +1257,32 @@ function renderCenter() {
     } else {
       infoHTML = `<div class="info tiling">✓ Alle Reihen abgeschlossen</div>`;
     }
+
+    // STILLGELEGT, Gegenstueck zum stuckRows-Block weiter oben (2026-08-30).
+    // Erklaerte, warum volle Reihen gerade keinen Zug haben: entweder muss
+    // eine fruehere Reihe zuerst an die Kuppel (Reihenfolge von oben nach
+    // unten, round_end.rs::validate_tiling_action) oder es gibt kein freies
+    // Kuppelfeld ihrer Farbe mehr.
+    //
+    // if(stuckRows.length) {
+    //   const nummern = rs => rs.map(x=>x.ri+1).join(' und ');
+    //   const wartend = stuckRows.filter(x => x.blockedBy !== null);
+    //   const ohneFeld = stuckRows.filter(x => x.blockedBy === null);
+    //   const saetze = [];
+    //   if(wartend.length) {
+    //     const blocker = Math.min(...wartend.map(x=>x.blockedBy)) + 1;
+    //     saetze.push(`${wartend.length>1?'Reihen':'Reihe'} ${nummern(wartend)} ${wartend.length>1?'sind':'ist'} voll, `
+    //       + `aber Reihe ${blocker} muss zuerst an die Kuppel (Reihenfolge von oben nach unten).`);
+    //   }
+    //   if(ohneFeld.length) {
+    //     saetze.push(`${ohneFeld.length>1?'Reihen':'Reihe'} ${nummern(ohneFeld)} ${ohneFeld.length>1?'sind':'ist'} voll, `
+    //       + `aber kein freies Kuppelfeld nimmt ${ohneFeld.length>1?'ihre Farben':'ihre Farbe'} auf `
+    //       + `- ${ohneFeld.length>1?'sie bleiben':'sie bleibt'} diese Runde liegen.`);
+    //   }
+    //   infoHTML += `<div class="info warn" style="font-size:10px;margin-top:4px">
+    //     ⓘ ${saetze.join('<br>')}
+    //   </div>`;
+    // }
 
     const btnText = AI_ENABLED ? "Mein Tiling abschließen → KI ist dran" : `Runde ${S.round} beenden ✓`;
     info.innerHTML = infoHTML + (!hasPending ? `
@@ -1424,7 +1470,7 @@ document.getElementById('auslage-area').innerHTML = `
       if (!canStack) return '';
       return `<div class="lbl" style="color:var(--text3);margin-bottom:2px">Stapel: ${S.dome_stack_count}</div>
       <button id="stack-picker-btn" class="btn" onclick="openStackPicker()" style="width:100%;margin-bottom:6px;font-size:11px">
-        ${stackTopTypeIcon()} Ziehen (−1 Pkt/Karte)
+        ${stackTopTypeIcon()} Platte ziehen (je 1 Punkt)
       </button>`;
     })()}
     `;
@@ -1915,7 +1961,12 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
       renderStackPeekState();
     } else {
       const statusEl = document.getElementById('stack-peek-status');
-      if(statusEl) statusEl.textContent = '';
+      if(statusEl) {
+        statusEl.innerHTML = `<div style="font-size:11px;font-weight:600;color:var(--text)">`
+          + `Noch nichts gezogen · ${S.dome_stack_count} Platten im Stapel</div>`
+          + `<div style="font-size:9px;margin-top:1px">Jede Ziehung kostet 1 Punkt. `
+          + `Du siehst zunächst nur die Rückseiten; erst beim Aufhören drehst du alle um und wählst eine.</div>`;
+      }
       renderStackDrawButton();
       const stopBtn = document.getElementById('stack-stop-btn');
       if(stopBtn) stopBtn.disabled = true;
@@ -1923,6 +1974,9 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
   } else {
     stackSec.style.display = 'none';
   }
+  // Im reinen Ziehmodus zeigt der Dialog nur die zwei Stapel-Knoepfe; Rotation
+  // und "Platte legen" kommen erst mit `stackStopAndChoose`.
+  setDomeChoiceUiVisible(!(stackOnly && stackSec.style.display === 'flex'));
 
   document.getElementById('dome-overlay').style.display='flex';
 }
@@ -1976,20 +2030,79 @@ function renderStackDrawButton() {
   const moreBtn = document.getElementById('stack-peek-more-btn');
   if(!moreBtn) return;
   moreBtn.style.display = (S.dome_stack_count > 0) ? '' : 'none';
-  moreBtn.innerHTML = `${stackTopTypeIcon()} Ziehen (−1 Pkt)`;
+  // Klartext statt Kuerzel (Nutzer 2026-08-30): das Symbol ist die Rueckseite
+  // der NAECHSTEN Platte, nicht der eben gezogenen -- deshalb "naechste".
+  const isFirstDraw = (S.pending_stack_draw || []).length === 0;
+  moreBtn.innerHTML = isFirstDraw
+    ? `${stackTopTypeIcon()} Platte ziehen (kostet 1 Punkt)`
+    : `${stackTopTypeIcon()} Noch eine ziehen (kostet 1 Punkt)`;
+}
+
+/* Rotation, Vorschau und "Platte legen" gehoeren zur WAHL, nicht zum Ziehen.
+   Solange gezogen wird, stehen sie nur nutzlos herum und lenken von den zwei
+   Knoepfen ab, um die es geht (Nutzer 2026-08-30: "der Text mit den Buttons
+   ist etwas kryptisch"). `stackStopAndChoose` blendet sie wieder ein. */
+function setDomeChoiceUiVisible(visible) {
+  const value = visible ? '' : 'none';
+  const rotRow = document.getElementById('rotbtns');
+  const preview = document.getElementById('dome-preview');
+  const confirmBtn = document.getElementById('dome-confirm');
+  if(rotRow) rotRow.style.display = value;
+  if(preview) preview.style.display = value;
+  if(confirmBtn) confirmBtn.style.display = value;
 }
 
 function renderStackPeekState() {
   const pending = S.pending_stack_draw || [];
   const n = pending.length;
+
+  // Wurde vom Stapel gezogen, ist die Auslage vom Tisch (Nutzer-Bugreport
+  // 2026-08-30): oeffnet man den Dialog aus der Auslage heraus und zieht
+  // DANN, blieben die Auslage-Platten waehlbar -- man konnte eine anklicken
+  // und lief beim Legen in eine Fehlermeldung. Der Zug ist mit der ersten
+  // Ziehung festgelegt, also sieht der Dialog ab hier genauso aus, als waere
+  // er direkt ueber den Ziehen-Knopf geoeffnet worden.
+  if(n > 0) {
+    const pool = document.getElementById('dome-pool');
+    if(pool) {
+      pool.style.display = 'none';
+      pool.querySelectorAll('.ptile').forEach(e => e.classList.remove('sel'));
+    }
+    if(domeModal) domeModal.tile_id = null;
+    // Die Vorschau haengt an `tile_id` und wird NICHT von selbst leer: ohne
+    // diesen Aufruf zeigte sie weiter die zuvor in der Auslage gewaehlte
+    // Platte, obwohl die gar nicht mehr zur Wahl steht (Nutzer-Bugreport
+    // 2026-08-30, Nachtrag zum Auslage-Fund).
+    buildPreview();
+    const title = document.getElementById('dome-title');
+    if(title) title.textContent = 'Kuppelplatte vom Stapel ziehen';
+    setDomeChoiceUiVisible(false);
+  }
   // Alle bisher gezogenen Rückseiten zeigen, nicht nur die zuletzt gezogene
   // (Nutzer-Anstoss) -- Teil des gemeinsamen `S`-Zustands, also gleichermassen
   // für den Gegenspieler sichtbar, sobald der bzw. die Modal/Anzeige offen ist.
-  const typeIcons = pending.map(t => t.bonus > 0 ? '⭐' : WILD_BACK_ICON).join(' ');
+  // Die gezogenen Ruecksieten sind die WICHTIGSTE Information dieses Dialogs
+  // (Nutzer 2026-08-30: "es geht nicht klar genug hervor, welche Rueckseiten
+  // in der Hand sind") -- deshalb als sichtbare Kachelreihe, nicht als
+  // Emoji im Fliesstext. Ein ⭐ ist eine Spezialfeld-Platte, das Wild-Zeichen
+  // eine gewoehnliche; die FARBEN stehen auf der Vorderseite und bleiben bis
+  // zum Aufhoeren verdeckt.
+  const backCards = pending.map((t, i) => {
+    const special = t.bonus > 0;
+    return `<div class="stack-back${special ? ' special' : ''}"
+                 title="${i+1}. gezogene Platte - ${special ? 'Spezialfeld-Platte' : 'gewöhnliche Platte'}">
+              ${special ? '⭐' : WILD_BACK_ICON}
+            </div>`;
+  }).join('');
   const statusEl = document.getElementById('stack-peek-status');
   if(statusEl) {
-    statusEl.innerHTML = `${n}. Platte gezogen. Rückseiten bisher: ${typeIcons} - bisher −${n} Pkt.<br>
-      <span style="font-size:9px">Vorderseiten siehst du erst, wenn du aufhörst.</span>`;
+    statusEl.innerHTML = `
+      <div class="stack-hand">${backCards}</div>
+      <div style="font-size:11px;font-weight:600;color:var(--text);margin-top:2px">
+        ${n} ${n === 1 ? 'Platte' : 'Platten'} in der Hand · −${n} Pkt bezahlt
+        <span style="font-weight:normal;color:var(--text2)">· noch ${S.dome_stack_count} im Stapel</span>
+      </div>
+      <div style="font-size:9px;margin-top:1px">Das Zeichen ist die Rückseite (Plattentyp) - welche Farben darauf liegen, siehst du erst beim Aufhören.</div>`;
   }
   const stopBtn = document.getElementById('stack-stop-btn');
   // Weiterziehen ist beliebig oft moeglich, solange nur der Stapel reicht --
@@ -2019,17 +2132,25 @@ function stackStopAndChoose() {
   if(cbtn) cbtn.style.display = 'none';
   domeModal.slot_r = -1;
   domeModal.slot_c = -1;
+  // Auch hier keine Alt-Auswahl stehen lassen: gewaehlt wird gleich aus den
+  // AUFGEDECKTEN Platten, alles davor ist hinfaellig.
+  domeModal.tile_id = null;
+  buildPreview();
 
   const stackSec = document.getElementById('dome-stack-section');
   if(stackSec) stackSec.style.display = 'none';
+  setDomeChoiceUiVisible(true);   // ab jetzt wird gewaehlt, nicht mehr gezogen
 
   const notice = document.getElementById('dome-notice');
-  notice.innerHTML = `<strong>Gezogene Platten:</strong> Such dir 1 Platte aus, dann Rotation wählen. Der Rest kommt unter den Stapel. (Kosten bereits bezahlt: −${n} Pkt)<br>
+  notice.innerHTML = `<strong>Deine ${n} ${n === 1 ? 'Platte' : 'Platten'} - jetzt aufgedeckt.</strong>
+                      Eine davon aussuchen, drehen, legen. Die übrigen wandern unter den Stapel.
+                      Bezahlt sind bereits ${n} ${n === 1 ? 'Punkt' : 'Punkte'}.<br>
                       <span style="font-size:10px; font-weight:normal;">Nach dem Bestätigen klickst du das Ziel-Kuppelfeld auf deinem Board an.</span>`;
   notice.style.display = 'block';
 
   const pool = document.getElementById('dome-pool');
   pool.innerHTML = '';
+  pool.style.display = '';   // waehrend des Ziehens ausgeblendet, jetzt traegt er die Auswahl
 
   (S.pending_stack_draw || []).forEach(t => {
     const div = document.createElement('div');
@@ -2136,6 +2257,11 @@ function closeDomeModal() {
   // Abbrechen-Button wieder anzeigen für nächstes Mal
   const cancelBtn = document.querySelector('#dome-overlay .cancel-btn');
   if(cancelBtn) cancelBtn.style.display = '';
+  // Rotation/Vorschau/Bestaetigen wieder freigeben -- der Ziehmodus hatte sie
+  // ausgeblendet, und der naechste Dialog kann ein normales Legen sein.
+  setDomeChoiceUiVisible(true);
+  const pool = document.getElementById('dome-pool');
+  if(pool) pool.style.display = '';
   document.getElementById('dome-overlay').style.display='none';
   domeModal=null;
 }
