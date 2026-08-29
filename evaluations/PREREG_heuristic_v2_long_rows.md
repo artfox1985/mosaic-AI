@@ -1971,6 +1971,19 @@ sofortige Platzierbarkeit fallen selten zusammen. Messbarer
 Anschlusspunkt, falls je relevant: Chip-Bestandsverlauf je Runde
 auszaehlen.
 
+**Zweite Berichtigung im selben Zug (Nutzer-Nachfrage "mehr als eine
+Fliese je Reihe", an der Historie geprueft):** auch die Aussage "die
+Reihe muss auf genau eine fehlende Zelle heruntergefuellt sein" war
+falsch. Der gemessene Vorzug (v2_chip_preference, Stand 65b48af^,
+plate_builder.rs:2570) rief das MEHRZELLFAEHIGE greedy_chip_alloc ohne
+Ein-Zellen-Einschraenkung auf; die Engine-Regel (2 gleiche ODER 3
+beliebige JE fehlender Zelle, 2*missing <= s <= 3*missing) und das
+Netz-Feature chippable_tiling_rows decken Mehrfeld-Fuellung ebenfalls ab.
+Der Ein-Zellen-Fall ist nur der WAHRSCHEINLICHSTE (2 fehlende Zellen
+braeuchten 4-6 gehaltene Chips), keine Voraussetzung. Die gemessenen
+Fakten des Absatzes (0 Feuerungen in 80 Partien, Test der Funktion
+gruen) bleiben unberuehrt -- falsch war zweimal die ERKLAERUNG.
+
 **Kein Ruecknahme-Fall wie par.3a:** der Term kostet nichts (er greift nur,
 wenn er zuschlaegt) und bleibt im Code -- er wird wirksam, sobald ein Korpus
 mehr Chip-Reserven zulaesst oder die Bedingung gelockert wird (z.B. 3
