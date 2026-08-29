@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bewertet der Champion die plattenbauenden Zuege eines Menschen systematisch FALSCH -- also mit dem falschen Vorzeichen, nicht nur zu leise? | Beleg: par.7 (2026-08-19) am plattenblinden v21: NICHT BESTAETIGT (+0,60 pp, t 0,78). WIEDERVORLAGE registriert und offen (par.9, 2026-08-29): b05-Orakel, 12 Partien, Fuellstand-Schwelle >= 2 primaer. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Bewertet der Champion die plattenbauenden Zuege eines Menschen systematisch FALSCH -- also mit dem falschen Vorzeichen, nicht nur zu leise? | Beleg: par.7 (2026-08-19) am plattenblinden v21: NICHT BESTAETIGT (+0,60 pp, t 0,78). WIEDERVORLAGE GEFAHREN (par.9, 2026-08-29): b05-Orakel, 11 Partien -- NICHT BESTAETIGT auf allen Schwellen (+0,17 pp bei >= 2, t 0,21); die k1-Fehlbewertung ist beim spaltenfaehigen Netz verschwunden, waehrend die Betrags-Daempfung persistiert (0.1). Eine Partie als Replay-Abweichung ausgeschieden (Reihe-6-Chips, Untersuchung laeuft). -->
 
 # PREREG: Der Orakel-Abstand in Menschenpartien
 
@@ -200,6 +200,31 @@ Ziel-Chirurgie (Fahrplan Phase 3) noetig; (ii) Differenz verschwunden
 (und 0.1/0.2 unauffaellig) => Daempfung war Korpus-Artefakt, Phase 3
 entfaellt zugunsten des Generationen-Laufs; (iii) NEGATIV => b05
 uebergewichtet Spaltenzuege -- neuer Befund, eigene Deutung noetig.
+
+**par.9 GEFAHREN 2026-08-29 (b05-Orakel@400, 11 von 12 Partien -- die
+Partie vom 2026-08-23 schied als Replay-Abweichung aus, gezaehlt:
+apply_tiling_chips verweigert eine real gespielte
+Reihe-6-Chip-Vollendung, Untersuchung als eigene Sitzung gestartet;
+Artefakte probe_human_oracle_gap_k1_b05_fill{0,2,3}.json):**
+
+| Schwelle | Differenz k1-neutral | t (df=10) | Vorzeichen | v21-Referenz (par.7) |
+| --- | --- | --- | --- | --- |
+| >= 2 (PRIMAER) | +0,17 pp | 0,21 | 6/11 | +1,29 pp (explorativ) |
+| 0 | +0,03 pp | 0,06 | 6/11 | +0,60 pp |
+| >= 3 | -0,68 pp | -0,64 | 5/11 | +1,79 pp (explorativ) |
+
+**NICHT BESTAETIGT auf allen drei Schwellen -- die k1-spezifische
+Fehlbewertung ist beim b05-Orakel VERSCHWUNDEN** (der v21-Trend, der
+mit der Schwelle wuchs, ist weg; bei >= 3 kippt das Vorzeichen leicht).
+Lesarten-Anwendung, ehrlich: es ist die Differenz-Haelfte von Lesart
+(ii), aber 0.1 war NICHT unauffaellig (Steigung 0,0886 persistiert).
+Gesamtdeutung mit 0.1-0.3: b05 beurteilt Spaltenzuege RELATIV richtig
+(Ordnung, Prior, Mensch-Vergleich alle geheilt), beziffert den
+Plattenlohn aber weiter mit ~9 Prozent des Solls. Die Daempfung
+verzerrt damit nicht mehr die Wahl ZWISCHEN aehnlichen Zuegen, sondern
+die ABWAEGUNG des Lohns gegen Kosten anderer Skala (Strafleiste,
+Sofortpunkte) -- exakt die gemessene Kosten-Scheu. Phase 3 bleibt
+gerechtfertigt, praezisiert auf die BETRAGS-Schiene.
 
 ## par.8 UEBERGABE — fuer einen anderen Agenten
 

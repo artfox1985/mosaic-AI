@@ -32,14 +32,26 @@ sys.path.insert(0, str(REPO / "engine" / "py"))
 from neural_net import state_to_tensor, state_to_planes, action_to_id  # noqa: E402
 
 CORPUS_GLOB = str(REPO / "data" / "ownership_corpus" / "selfplay_v21_own_k1_*.pkl")
+# Nachzug 2026-08-29 (Fahrplan Phase 0.3): Modelle per CLI uebersteuerbar
+# (name=pfad), Default = urspruengliche Messung (par.16.1). Die Alt-Modelle
+# stammen aus der 77-Kanal-Aera und laufen am heutigen state_to_planes
+# (79 Kanaele) NICHT mehr -- fuer Nachmessungen aktueller Netze --model
+# setzen und gegen die protokollierten Alt-Werte vergleichen.
+import sys as _sys  # noqa: E402
+
 MODELS = {
     "b18_best": REPO / "models" / "alphazero_v21-b18_best.onnx",
     "champion": REPO / "models" / "alphazero_v21_2d_brierbest.onnx",
 }
-import sys as _sys  # noqa: E402
+_cli_models = [a.split("=", 1) for a in _sys.argv[1:]
+               if a.startswith("--model") is False and "=" in a]
+if _cli_models:
+    MODELS = {name: Path(p) for name, p in _cli_models}
 OUT_JSON = REPO / "evaluations" / (
     "probe_column_build_prior_mass_heldout.json" if "--heldout" in _sys.argv
     else "probe_column_build_prior_mass.json")
+if "--out" in _sys.argv:
+    OUT_JSON = Path(_sys.argv[_sys.argv.index("--out") + 1])
 
 SESS_OPTS = ort.SessionOptions()
 SESS_OPTS.intra_op_num_threads = 2
@@ -249,6 +261,22 @@ def main():
             sub_ratio = [d[f"ratio_{name}"] for d in decisions if d["action_type"] == t]
             by_type[t] = {"mass": describe(sub_mass), "ratio": describe(sub_ratio)}
         result[f"by_action_type_{name}"] = by_type
+
+    # Paar-Auswertung nur, wenn GENAU die beiden Original-Arme laufen
+    # (Nachzug 2026-08-29: mit CLI-Modellen entfaellt sie; Vergleich dann
+    # gegen die protokollierten Alt-Werte im Original-Artefakt).
+    if set(MODELS) != {"b18_best", "champion"}:
+        OUT_JSON.parent.mkdir(parents=True, exist_ok=True)
+        with open(OUT_JSON, "w", encoding="utf-8") as f:
+            json.dump(result, f, indent=2, ensure_ascii=False)
+        print(f"[info] Ergebnis geschrieben (ohne Paar-Teil): {OUT_JSON}", flush=True)
+        print("\n=== ZUSAMMENFASSUNG ===")
+        for name in MODELS:
+            m = result[f"mass_{name}"]
+            r = result[f"ratio_{name}"]
+            print(f"{name}: mass mean={m['mean']:.4f} median={m['median']:.4f} | "
+                  f"ratio(mass/uniform) mean={r['mean']:.2f} median={r['median']:.2f}")
+        return
 
     # gepaarte Differenz je Entscheidung (b18 - champion), auf RATIO (skaleninvariant
     # gegen den je nach Aktionstyp stark schwankenden Legalitaets-Nenner).

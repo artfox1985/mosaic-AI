@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Tor C -- traegt der Ownership-Verbraucher (Blatt-Pol MOSAIC_OWNERSHIP_W + Tiling-Pol MOSAIC_OWNERSHIP_TILING_W, gemeinsam gefahren) in der Arena Plattenpunkte ein, OHNE Siege zu kosten -- und welcher Kopf (F1 eingefroren vs w1-final) traegt ihn? | Beleg: NEGATIV ENTSCHIEDEN 2026-08-16, 970 Partien (par.15): kein Arm hebt k1/k2/k5, und die Siege fallen monoton mit der Dosis (98/89/86/84, D2 und D3 signifikant). Der staerkere Kopf w1-final macht den Verbraucher inert (91:91) -- Kopfguete ist nicht der Engpass. Beide Regler bleiben auf Default 0. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Tor C -- traegt der Ownership-Verbraucher (Blatt-Pol MOSAIC_OWNERSHIP_W + Tiling-Pol MOSAIC_OWNERSHIP_TILING_W, gemeinsam gefahren) in der Arena Plattenpunkte ein, OHNE Siege zu kosten -- und welcher Kopf (F1 eingefroren vs w1-final) traegt ihn? | Beleg: NEGATIV ENTSCHIEDEN 2026-08-16, 970 Partien (par.15): kein Arm hebt k1/k2/k5, und die Siege fallen monoton mit der Dosis (98/89/86/84, D2 und D3 signifikant). Der staerkere Kopf w1-final macht den Verbraucher inert (91:91) -- Kopfguete ist nicht der Engpass. Beide Regler bleiben auf Default 0. Nachtrag 2026-08-29: par.16.1-Sonde auf b05 -- Prior-Ratio Median 1,23 (b18 4,91 / Champion 0,59): Draft-Erbe da, verduennt. -->
 
 # PREREG: TOR C — Regler-Sweep des Ownership-Verbrauchers in der Arena
 
@@ -1145,3 +1145,18 @@ benannt und ohne die anderen Dosen (keine Multiplizitaet). Rund 1,4 h CPU. Das
 wuerde entscheiden, ob k5 und der Siegzuwachs echt sind oder Glueck. Nicht
 gestartet — braucht eine eigene Vorregistrierung und eine Nutzer-Entscheidung.
 
+
+## Nachtrag 2026-08-29: par.16.1-Sonde auf v22-b05 (Fahrplan Phase 0.3)
+
+Dieselbe Sonde (seit heute mit CLI-Modellen name=pfad; die Alt-Modelle
+laufen am 79-Kanal-Encoder nicht mehr, verglichen wird gegen die
+protokollierten Werte), derselbe Korpus (100 Dateien, 33.135
+qualifizierende Entscheidungen, 1.000 Partien; ownership_corpus vom
+Nutzer fuer die Messung zurueckgelegt): **v22-b05 ratio(mass/uniform)
+Median 1,23, Mittel 5,09** (rechtsschief) -- gegen b18_best Median 4,91
+und Champion 0,59 der Erstmessung. Lesart: das Draft-Erbe steht im
+b05-Prior klar UEBER Gleichverteilung (und weit ueber dem plattenblinden
+Champion), aber deutlich verduennter als im reinen Destillat b18.
+Bekannte Grenze der Erstmessung gilt weiter: Zustandsraum aus
+Champion-Self-Play mit Bauer-Override, fuer b05 off-policy. Artefakt:
+evaluations/artifacts/probe_column_build_prior_mass_b05.json.
