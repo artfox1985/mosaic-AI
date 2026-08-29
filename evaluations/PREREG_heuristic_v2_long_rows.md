@@ -1957,6 +1957,20 @@ Farbe tragen UND die Reihe muss auf genau eine fehlende Zelle heruntergefuellt
 sein, damit der Vorzug ueberhaupt greift. Diese Kombination trat in 80
 Partien kein einziges Mal ein.
 
+**BERICHTIGUNG 2026-08-29 (Nutzer-Einwand "deshalb gibt es die 3er-Regel",
+am Code geprueft):** der Erklaerteil oben ist falsch begruendet.
+`greedy_chip_indices` (round_end.rs:487) faellt je fehlender Zelle
+AUTOMATISCH auf 3 beliebige Chips zurueck, wenn keine 2 farbgleichen da
+sind -- die 3er-Regel war im gemessenen Pfad AKTIV, nicht erst
+"zuzulassen". Die Null-Feuerung in 80 Partien erklaert sich damit nicht
+ueber den Farbzufall, sondern (Herleitung, ungemessen) ueber den BESTAND
+zum Entscheidungszeitpunkt: maximal 2 Chips je Runde nehmbar, und der
+Rundenende-Solver verbraucht gehaltene Chips selbst (TilingStep::Chips) --
+drei UNGENUTZTE Chips plus blockierende Reihe im richtigen Zustand plus
+sofortige Platzierbarkeit fallen selten zusammen. Messbarer
+Anschlusspunkt, falls je relevant: Chip-Bestandsverlauf je Runde
+auszaehlen.
+
 **Kein Ruecknahme-Fall wie par.3a:** der Term kostet nichts (er greift nur,
 wenn er zuschlaegt) und bleibt im Code -- er wird wirksam, sobald ein Korpus
 mehr Chip-Reserven zulaesst oder die Bedingung gelockert wird (z.B. 3
