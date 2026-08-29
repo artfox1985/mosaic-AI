@@ -61,6 +61,31 @@ def act_key(a):
     return (a.get("type"), a.get("factory_index"), a.get("color"), a.get("row"))
 
 
+def teacher_factory_index(t_a, state):
+    """Uebersetzt das ALT-Schema des frozen-Workers (factory_id + source) in
+    den factory_index der Trainings-Records. Abbildung 1:1 aus
+    self_play.rs::factory_index (0-3 kleine Fabriken, 4 = grosse Sun,
+    5 = globaler Mond; sonst Position der factory_id in state.factories)."""
+    src = (t_a.get("source") or "").upper()
+    fid = t_a.get("factory_id")
+    factories = state.get("factories") or []
+
+    def pos(f_id):
+        return next((i for i, f in enumerate(factories) if f.get("id") == f_id), 0)
+
+    if src == "LARGE_FACTORY_SUN":
+        return 4
+    if "MOON" in src:
+        return pos(fid) if fid is not None else 5
+    if src == "SMALL_FACTORY_SUN":
+        return pos(fid) if fid is not None else 0
+    return None
+
+
+def teacher_key(t_a, state):
+    return ("stone", teacher_factory_index(t_a, state), t_a.get("color"), t_a.get("row"))
+
+
 def relabel_file(path, proc, mr, stats, seed_base):
     recs = load_records(path)
     changed = 0
@@ -90,14 +115,18 @@ def relabel_file(path, proc, mr, stats, seed_base):
         if t_a.get("type") != "stone":
             stats["lehrer_kein_stone"] += 1
             continue
-        tk = act_key(t_a)
-        match = next((e for e in pol if act_key(e.get("action") or {}) == tk), None)
+        tk = teacher_key(t_a, st)
+        # Gematcht wird gegen valid_actions (die VOLLE Legal-Liste) -- die
+        # Policy-Liste traegt nur die von der Gumbel-Suche besuchten
+        # Aktionen (top_m) und wuerde legale Lehrerzuege verfehlen.
+        candidates = rec.get("valid_actions") or [e.get("action") for e in pol]
+        match = next((a for a in candidates if act_key(a or {}) == tk), None)
         if match is None:
             stats["nicht_abbildbar"] += 1
             continue
-        # One-Hot-Lehrerziel: exakt der Eintrag aus der aufgezeichneten
-        # Policy-Liste (traegt das komplette Action-Dict inkl. moon_order).
-        rec["policy"] = [{"action": match["action"], "prob": 1.0}]
+        # One-Hot-Lehrerziel: das Action-Dict aus der Legal-Liste des Records
+        # (traegt moon_order usw. in der Konvention von action_to_id).
+        rec["policy"] = [{"action": match, "prob": 1.0}]
         stats["relabelt"] += 1
         changed += 1
     if changed:
