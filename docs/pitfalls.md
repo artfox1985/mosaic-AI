@@ -38,6 +38,76 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   Stellungen). Gegenprobe: `long_row_prior_gate.py` hat dasselbe Muster, aber
   einen groesseren Deckel und ist unauffaellig (12/105/82/61) -- die Falle
   haengt am Verhaeltnis Deckel zu Trefferdichte.
+- **Jede .py-Aenderung im Baum startet den Spielserver neu -- auch eine, die
+  er nie importiert** (2026-08-29, 23:21:45; Schaden: die laufende
+  Mensch-gegen-Netz-Partie des Nutzers wurde mitten im Spiel unterbrochen,
+  eine Doku-Berichtigung an einer SONDE hat gereicht). `server.py:1656` ruft
+  `app.run(debug=True, port=5000)`, damit laeuft der Werkzeug-Reloader.
+  Belegkette, gemessen: PID 22944 ist der Reloader-Waechter (seit 23:11:36),
+  sein Arbeits-Kind wurde um 23:21:45 durch PID 29076 ersetzt; die mtime von
+  `tools/probes/column_completion_legality_probe.py` ist auf die Sekunde
+  dieselbe, und ab 23:23:30 laeuft ein neues Spiellog. Die Datei wird von
+  `server.py` NICHT importiert (gegengeprueft, kein Treffer), `watchdog` ist
+  NICHT installiert.
+  **Gegenprobe im selben Zeitfenster:** eine Aenderung an dieser Datei hier
+  (`docs/pitfalls.md`, 23:19:28) hat KEINEN Reload ausgeloest -- das Kind von
+  23:11:36 lief unveraendert weiter. `.md`/`.json` sind unbedenklich, `.py`
+  ist es nicht.
+  Mechanismus HERGELEITET, nicht geprueft (die Werkzeug-Quellen liegen
+  ausserhalb des Projektordners, dort wird nicht nachgelesen -- Nutzer-Regel
+  2026-08-28): der Stat-Reloader beobachtet ueber `sys.path` offenbar den
+  ganzen Baum, und `sys.path[0]` ist das Projektverzeichnis.
+  Regel daraus, zwischen parallelen Sitzungen abgestimmt: **solange eine
+  Server-Partie laeuft, keine `.py`-Aenderung irgendwo im Projektbaum** --
+  auch keine reine Kommentar- oder Docstring-Korrektur. Wer eine plant,
+  fragt vorher, ob gespielt wird.
+  Entschaerft am selben Abend (Nutzer-Auftrag, Commit a4e1fb0): der Reloader
+  ist per Default aus, Opt-in ueber `MOSAIC_SERVER_RELOAD=1`, `debug=True`
+  bleibt fuer Tracebacks. **Die Entschaerfung hat sich beim Einbau selbst
+  vorgefuehrt**: der Edit an `server.py` loeste um 23:38:15 den naechsten
+  Reload aus (Kind 29076 durch 32316 ersetzt, Waechter 22944 unveraendert).
+  Sie wirkt erst nach einem MANUELLEN Serverneustart -- ob der noch laufende
+  Waechter von 23:11 bis dahin weiter watcht, ist NICHT geprueft (waere nur
+  durch eine absichtliche `.py`-Aenderung pruefbar, und die verbietet sich
+  bei laufender Partie). Bis zum manuellen Neustart gilt die Sperre weiter.
+- **Der Replayer raet die Chip-Auswahl -- und raet sich Partien kaputt**
+  (2026-08-29, an `static/log/game_20260823_085652_seed546483.log`; Schaden:
+  eine Mensch-Referenzpartie galt als unreplaybar, die Orakel-Messung lief
+  auf 11 statt 12 Partien). Symptom: `ValueError: Reihe 6 nicht mit Chips
+  komplettierbar` (`engine/src/py.rs:343`) mitten in einer Partie, deren Zug
+  real gespielt und geloggt wurde.
+  Ursache ist eine Pfad-Asymmetrie, KEINE Engine-Aenderung: die KI waehlt
+  ihre Chip-Allokation exakt (`py.rs:911` -> `apply_bonus_chips_with`,
+  `round_end.rs:590`, beliebige gueltige Teilmenge), der Replayer spielt
+  JEDE geloggte Vollendung -- auch die der KI -- ueber den Menschen-Einstieg
+  `apply_tiling_chips` (`analyze_game_log.py:926`), und der ist GREEDY
+  (`round_end.rs:458` -> `:525` -> `:487`: ohne zwei farbgleiche nimmt er
+  `pool.iter().take(3)`, die ersten drei der Hand). Die 🎫-Logzeile
+  (`py.rs:925`) nennt nur die Reihe, nie die verbrauchten Chips -- die
+  Divergenz ist damit UNSICHTBAR und schlaegt erst Runden spaeter zu.
+  Nachgerechnet an der Partie: greedy verbrennt in R2 den Chip
+  türkis+gelb, dem in R4 der zweite gelb-Traeger fehlt (3 statt 2 Chips
+  bezahlt), und in R5 fehlt der KI genau ein Chip fuer Reihe 6 (Hand
+  4 Chips, davon 1 rot-tragend, 2 fehlende Zellen -> unter
+  `chips_complete`, `round_end.rs:514`, unmoeglich). Mit freier
+  Allokationswahl ist dieselbe Partie unter der HEUTIGEN Regel vollstaendig
+  konsistent (erschoepfende Suche ueber alle drei KI-Vollendungen).
+  Mehrzellige Vollendungen sind normal, nicht der Ausloeser: ueber die 13
+  Server-Logs 36x eine fehlende Zelle, 10x zwei, 1x drei.
+  **Wer diese Abbrueche zaehlt, darf sie nicht
+  `maybe_silent_chip_complete` zuschreiben** --
+  `tools/probes/column_completion_legality_probe.py` (Moduldoku und Feld
+  `exception_ursache`) tut genau das; der stille Pfad hat in dieser Partie
+  nachweislich NICHT ausgeloest, der Abbruch kommt aus dem regulaeren
+  `apply`-Pfad.
+  Reparatur (noch offen, braucht Wheel-Neubau): additive Bindung, die eine
+  EXPLIZITE Allokation anwendet (`apply_bonus_chips_with` existiert bereits)
+  plus Kandidaten-Aufzaehlung aus `round_end::chip_allocations`, damit die
+  Regel in der Engine bleibt; der Replayer probiert bei einem spaeteren
+  Fehlschlag frueher getroffene Wahlen neu durch (`_fresh_game()` kann das
+  schon). Die rekonstruierte Chip-Historie ist dann eine PLAUSIBLE, nicht
+  die tatsaechliche -- das gehoert benannt, weil das Netz Chips als Merkmal
+  sieht (`features.rs`).
 - **Python schreibt auf Windows still CRLF** (2026-08-25). Ein Skript mit
   `write_text` wandelte in 137 Dateien LF in CRLF; in einer Datei waren das
   971 Byte Zuwachs bei zwei geaenderten Zeilen. `git diff` zeigte wegen der
