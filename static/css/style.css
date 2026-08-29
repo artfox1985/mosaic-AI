@@ -226,23 +226,45 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    relevante Ansicht kurz vorm Legen -- deutlich groesser als die Auswahl-
    Kacheln im Pool, damit sie die visuell dominante Ansicht ist. */
 /* PROPORTIONEN 2026-08-29 (Nutzer: "die Skalierung schaut allgemein nicht
-   gleichmaessig aus in der Vorschau"): 31px/gap 3px -> 30px/gap 5px. Die
-   Aussenmasse bleiben bei 65px (30 + 5 + 30), das Modal-Layout aendert sich
-   also nicht -- nur das VERHAELTNIS stimmt jetzt.
-   Nachgerechnet an den Bestandswerten der Platte auf dem Brett (`.d2x2`:
-   22px Zelle, 4px Luecke, 48px gesamt): der Vergroesserungsfaktor der
-   Vorschau ist 65/48 = 1,354; damit waeren 22*1,354 = 29,8px Zelle und
-   4*1,354 = 5,4px Luecke richtig. Vorher war die Zelle mit 31px zu gross UND
-   die Luecke mit 3px zu schmal (relativ zur Zelle 9,7 % statt 18,2 %) -- die
-   Vorschau war deshalb keine vergroesserte Platte, sondern eine anders
-   proportionierte. Aufgefallen ist es erst, seit die Joker-Platte eine
-   Flaeche hat und die Luecken sichtbar faerbt. */
+   gleichmaessig aus in der Vorschau"), zwei Schritte an einem Tag:
+
+   SCHRITT 1 -- Gitter: 31px/gap 3px -> 30px/gap 5px. Nachgerechnet an der
+   Platte auf dem Brett (`.d2x2` oben: 22px Zelle, 4px Luecke, 48px gesamt):
+   der Vergroesserungsfaktor der Vorschau ist 65/48 = 1,354, damit sind
+   22*1,354 = 29,8px Zelle und 4*1,354 = 5,4px Luecke richtig. Vorher war die
+   Zelle mit 31px zu gross UND die Luecke mit 3px zu schmal (9,7 % der
+   Zellbreite statt 18,2 % auf dem Brett).
+
+   SCHRITT 2 -- RING (Nutzer-Screenshot: in den Auswahl-Kacheln liegt zwischen
+   den Kreisen und der Aussenkante ein deutlicher Puffer, in der Vorschau
+   stiessen die Kreise direkt an die Kante; die Vorschau war deshalb keine
+   vergroesserte Auswahl-Kachel, sondern wirkte beschnitten). Die Vorschau
+   baut jetzt wie `.ptile` auf: Innenabstand + Rand + Aussenradius.
+
+   GEMESSEN an `.ptile` (Regel weiter unten, nicht geschaetzt): Rand 1,5px,
+   Innenabstand 4px, Radius 7px, Aussenmass 58px um ein 48px-Gitter.
+     Ring     = 1,5 + 4 = 5,5px  (11,5 % der Gitterbreite)
+     Nennmass = 48 + 2*5,5 = 59px; deklariert sind 58px, das Gitter ragt im
+                Bestand also 1px aus der Kachel (`.dslot` mit 1px Rand geht
+                exakt auf). Die Vorschau uebernimmt den Fehler NICHT.
+   SKALIERT mit k = 1,354:
+     Innenabstand 4   * 1,354 = 5,42 -> 5,5px
+     Rand         1,5 * 1,354 = 2,03 -> 2px      (Ring zusammen 7,5px)
+     Radius       7   * 1,354 = 9,48 -> 9,5px
+     Aussenmass   65 + 2*7,5 = 80px; Kontrolle 59 * 1,354 = 79,9px.
+   Die 80px sind der einzige Wert, der waechst (vorher 65px). Er passt: das
+   Modal ist max. 420px breit und `.preview` zentriert nur (flex).
+   box-sizing ist global border-box, der Inhalt bleibt also 80 - 2*2 - 2*5,5
+   = 65px = genau das Gitter. Wer am Ring dreht, zieht die 80px mit. */
 .d2x2.lg {
   grid-template-columns: repeat(2, 30px);
   grid-template-rows: repeat(2, 30px);
   gap: 5px;
-  width: 65px;
-  height: 65px;
+  width: 80px;
+  height: 80px;
+  padding: 5.5px;
+  border: 2px solid var(--border);
+  border-radius: 9.5px;
 }
 .d2x2.lg .ds { font-size: 14px; }
 .ds{position:relative;border-radius:3px;border:1px solid rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700}
@@ -345,8 +367,9 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 
    GEMESSENE Kastengroessen (aus den Regeln `.d2x2` / `.d2x2.lg` oben, nicht
    geschaetzt): `.d2x2` hat grid-template repeat(2,22px) + gap 4px in 48px,
-   `.d2x2.lg` seit heute repeat(2,30px) + gap 5px in 65px. Die `.ds` sind
-   Grid-Items ohne eigene Groesse und fuellen die Spur, sind also exakt
+   `.d2x2.lg` seit heute repeat(2,30px) + gap 5px, also 65px Inhalt in einem
+   80px-Kasten (der Rest ist der Ring). Die `.ds` sind Grid-Items ohne eigene
+   Groesse und fuellen die Spur, sind also exakt
    22x22 bzw. 30x30 px. Andere Klassen gibt es nicht: die Kacheln in Auslage,
    Modal-Pool und Hinweistext nutzen alle das Basis-`.d2x2`.
 
@@ -591,25 +614,33 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    ein unbelegtes Jokerfeld. Die Klasse setzt app.js::wildPlateClass.
    Zwei Traeger, weil die Platte an verschiedenen Orten verschieden gerahmt
    ist: der RAHMEN (Auslage `.dgtile`, Modal-Pool `.ptile`, belegter
-   Kuppelplatz `.dslot.occ`) faerbt den 4px-Rand um die Platte, das GITTER
-   (`.d2x2`) die Luecken zwischen den vier Feldern -- in der Modal-Vorschau
-   gibt es keinen Rahmen, dort ist das Gitter die einzige sichtbare Flaeche.
+   Kuppelplatz `.dslot.occ`) faerbt den 4px-Ring um die Platte, das GITTER
+   (`.d2x2`) die Luecken zwischen den vier Feldern. Die grosse Modal-Vorschau
+   (`.d2x2.lg`) ist beides in einem Element: sie traegt seit dem Ring-Schritt
+   selbst Innenabstand und Rand, ihre Flaeche faerbt also Ring UND Luecken --
+   genau wie bei `.ptile.wild-plate`. Die kleine Vorschau im Hinweistext hat
+   weiterhin keinen Ring, dort ist das Gitter die einzige Flaeche.
    `.dslot.occ.wild-plate` (0,3,0) schlaegt `.dslot{background:#fff}` (0,1,0);
    der LEERE Kuppelplatz bleibt unberuehrt, er traegt die Klasse nie. */
 .dgtile.wild-plate,.ptile.wild-plate,.dslot.occ.wild-plate,.d2x2.wild-plate{
   background:var(--wild-bg)
 }
-/* ECKEN DER PLATTE 2026-08-29 (Nutzer-Report zur ersten Fassung): in der
-   Modal-Vorschau steht die Platte OHNE Rahmen -- ihre Silhouette entsteht
-   allein aus den vier Eckfeldern. Die neue lila Flaeche liegt als Rechteck
-   dahinter und hat deren runde Ecken zu einem harten Quadrat aufgefuellt.
-   Das Gitter bekommt deshalb denselben Radius wie seine ECKZELLE (10px bzw.
-   14px, s. Eichung oben): Flaechenkante und Zellkante fallen dann im selben
-   Bogen zusammen, die Platte ist wieder rund. Betrifft nur die rahmenlosen
-   Orte -- `.dgtile` (6px), `.ptile` (7px) und `.dslot` (6px) bringen ihren
-   Radius selbst mit und sind unveraendert. */
-.d2x2.wild-plate{border-radius:10px}
-.d2x2.lg.wild-plate{border-radius:14px}
+/* ECKEN DER PLATTE 2026-08-29 (Nutzer-Report zur ersten Fassung): wo die
+   Platte OHNE Rahmen steht, entsteht ihre Silhouette allein aus den vier
+   Eckfeldern -- die lila Flaeche liegt als Rechteck dahinter und fuellte
+   deren runde Ecken zu einem harten Quadrat auf. Das Gitter bekommt deshalb
+   denselben Radius wie seine ECKZELLE (10px, s. Eichung oben): Flaechenkante
+   und Zellkante fallen im selben Bogen zusammen.
+
+   Das betrifft nur noch die kleine Vorschau im Hinweistext (app.js, 48px,
+   kein Rahmen). Die GROSSE Modal-Vorschau hat seit dem Ring-Schritt einen
+   eigenen Rahmen samt Aussenradius (`.d2x2.lg`, 9,5px) -- dort waere dieser
+   Zellradius der falsche Wert und wuerde ihn wegen gleicher Spezifitaet und
+   spaeterer Position auch noch ueberstimmen. Genau dagegen steht das
+   `:not(.lg)`: der Aussenradius der Vorschau bleibt an EINER Stelle.
+   `.dgtile` (6px), `.ptile` (7px) und `.dslot` (6px) bringen ihren Radius
+   ohnehin selbst mit. */
+.d2x2.wild-plate:not(.lg){border-radius:10px}
 .chip-pill{display:inline-flex;gap:2px;align-items:center;padding:3px 6px;border-radius:5px;border:1px solid var(--border);background:var(--surface);cursor:pointer;transition:all .1s}
 .chip-pill:hover{border-color:var(--rot);background:#FEE2E2}
 .chip-pill.in-sel{border-color:var(--blau);background:#DBEAFE;outline:1.5px solid var(--blau)}
