@@ -104,7 +104,16 @@ Generator-Frage: weiter gestoppt. (2) Loeschfreigaben ERTEILT UND
 AUSGEFUEHRT: data/selfplay_otw22b04s1_* (10) und data/selfplay_otw22b05*_*
 (30) geloescht. (3) Taktung 2026-08-29 Abend: nach dem Gating noch die
 par.5-Neumessung (PREREG_special_tile_yield), danach NICHTS mehr, was
-die Maschine exklusiv braucht.
+die Maschine exklusiv braucht. (4) Spaetabend: GO fuer die
+Chip-Allokations-Bindung (Wheel, Parallel-Sitzung baut; behebt den
+Replayer-Greedy-Fehler aus docs/pitfalls.md, Abnahme = Partie vom
+2026-08-23 replayt; danach Orakel-Rerun auf 12 Partien) UND fuer die
+Diagnose des Live-DEADLOCKS in game_20260829_232330 (friert bei
+"komplettiert Reihe 2 mit Bonus-Chips" ein, GUI bot nur Reihe 3;
+Verdacht: Chip-Vollendungs-Grenze im Live-Pfad, gleiche Code-Familie).
+Server-Reloader per Default entschaerft (a4e1fb0, wirksam nach
+manuellem Neustart); Nutzer spielt die Deadlock-Situation bei Bedarf
+nach.
 
 **par.5-NEUMESSUNG SPEZIALFELDER GEFAHREN 2026-08-29
 (PREREG_special_tile_yield par.7, Anlass Nutzer-Nachfrage; dabei
