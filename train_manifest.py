@@ -68,8 +68,11 @@ def policy_carrier_report(all_files, selfplay_filename_re=None) -> dict:
         je_praefix[prefix] = je_praefix.get(prefix, 0) + (1 if ist else 0)
         traeger_gesamt += 1 if ist else 0
     return {
-        "carrier_manifest": mf_name,
-        "carrier_manifest_gefunden": mf_path.exists(),
+        "carrier_manifest": mf_name or None,
+        # mf_path ist None, wenn MOSAIC_CARRIER_MANIFEST leer ist (Default
+        # seit 2026-08-29) -- Folge-Fix zum Default-Umbau, der diese Stelle
+        # ungeschuetzt liess (b05-Startabbruch am selben Tag).
+        "carrier_manifest_gefunden": bool(mf_path is not None and mf_path.exists()),
         "carrier_prefixes": carrier_prefixes,
         "gelistete_dateien": len(carrier_set) if carrier_set is not None else None,
         "traeger_dateien_gesamt": traeger_gesamt,
