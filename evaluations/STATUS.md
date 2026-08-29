@@ -144,7 +144,10 @@ plattenblind: -0,08/-0,19). (0.3) column_build_prior_mass auf b05
 (Ausschluss-Dreiklang: Prior bietet den Spaltenzug an, er stirbt im
 Wert-Backup -- gate_c par.16.2). (0.4) human_oracle_gap mit b05 als
 Orakel (registrierte Wiedervorlage samt Fuellstand-Schwelle >=2/>=3;
-7 replaybare Mensch-Partien). Ausgang 0.1/0.2 entscheidet, ob Phase 3
+inzwischen 12 fertige Mensch-Partien, ALLE mit Aktions-IDs replaybar
+-- gezaehlt 2026-08-29, fast doppelte Stichprobe gegenueber der
+Registrierung; die Huellen-Richtwerte n=9 wandern bei einem Rerun
+entsprechend mit). Ausgang 0.1/0.2 entscheidet, ob Phase 3
 Ziel-Chirurgie braucht oder der Korpus die Ursache war.
 
 **PHASE 1 -- Vor-Self-Play-Pflichtenheft (Entscheide + kleine
