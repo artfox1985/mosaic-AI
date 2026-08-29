@@ -116,15 +116,88 @@ gegen -11,26. Die plattenblinde par.3-Skala ist Korpus-Artefakt
 (obere Reihe beim Lehrer 0,50 leer statt 0,13). Der Hebel gehoert in
 die Gelaender-/Allokations-Familie.
 
-**OFFENE NUTZER-ENTSCHEIDE:** (1) naechster Hebel nach der
-Runde-2-Saettigung -- Kandidaten: Chip-ALLOKATIONS-Fuehrung
-(Stufe-E-Befund), Huellen-Trimm der Ownership-Maske mit r+1-Gewichten,
-Spezialfeld-Kopf par.4c (nach par.7 in derselben Allokations-Familie,
-Ziel bleibt unbalanciert), b03/Surprise; eine DAgger-Runde 3 ist nach
-der Saettigungs-Lesart NICHT empfohlen. (2) Loeschfreigaben:
-data/selfplay_otw22b06w00_* (10 Dateien) und -- falls keine Runde 3 --
-data/onpolicy_v22-b06/ (31 Dateien); data/onpolicy_v22-b05/ (30) haengt
-an derselben Frage.
+**OFFENE NUTZER-ENTSCHEIDE:** (1) Fahrplan-Freigabe (Abschnitt
+FAHRPLAN unten; ersetzt die fruehere Einzelhebel-Frage). (2)
+Loeschfreigaben: data/selfplay_otw22b06w00_* (10 Dateien) und -- falls
+keine Runde 3 -- data/onpolicy_v22-b06/ (31 Dateien);
+data/onpolicy_v22-b05/ (30) haengt an derselben Frage.
+
+---
+
+## FAHRPLAN nach dem Faecher-Durchgang (2026-08-29, alle 100 Preregs + 5 Research-Dokumente gesichtet)
+
+**Rahmen (Nutzer-Strategie):** das Netz soll JETZT Spalten bauen; ein
+Generationen-Self-Play hebt es dann ueber hv2 und v21. Der Durchgang
+lief mit 5 Opus-Agenten; tragende Behauptungen stichprobengeprueft
+(moon_nll an p_loss: train.py:513, selbst geprueft; Fristen-Klauseln:
+PREREG_implicit_minimax_backup.md:204, Kopf risk_sensitive, selbst
+geprueft). Erwartungen sind EINSCHAETZUNGEN.
+
+**PHASE 0 -- Diagnosepaket "Wo steht der Bewerter?" (4 Datenpassagen,
+Werkzeuge existieren alle, zusammen ~halber Tag):** die Weiche fuer
+alles Weitere. (0.1) R5-PLATTEN-Steigung auf b05 nachmessen -- die
+0,06-0,09 stammen aus v18/v19-Messungen, fuer die b-Serie NIE erhoben
+(Agenten-Befund Teil 3; Praezedenz: der endgame-Kopf hob die Steigung
+0,086->0,457, PREREG_plate_intervention). (0.2)
+asym_value_sibling_check auf b05 (Tau Value~Spaltenpuffer; bisher nur
+plattenblind: -0,08/-0,19). (0.3) column_build_prior_mass auf b05
+(Ausschluss-Dreiklang: Prior bietet den Spaltenzug an, er stirbt im
+Wert-Backup -- gate_c par.16.2). (0.4) human_oracle_gap mit b05 als
+Orakel (registrierte Wiedervorlage samt Fuellstand-Schwelle >=2/>=3;
+7 replaybare Mensch-Partien). Ausgang 0.1/0.2 entscheidet, ob Phase 3
+Ziel-Chirurgie braucht oder der Korpus die Ursache war.
+
+**PHASE 1 -- Vor-Self-Play-Pflichtenheft (Entscheide + kleine
+Laeufe; die Fristen verfallen mit dem Generierungsstart):**
+(1.1) MOON-KOPF-ENTSCHEID (billigster Posten ueberhaupt): das
+moon_order-Ziel ist ein belegtes No-Op und haengt am Policy-Verlust
+(train.py:513-514, geprueft) -- Empfehlung Gewicht 0 ab dem naechsten
+Training; Nutzer-Entscheid laut implementation_review par.7.
+(1.2) implicit-Minimax-GATING (vorregistrierte Frist VOR dem
+Self-Play, par.3a: danach ist der Knopf still per Default entschieden;
+Arena + spec.json, kein Bau). (1.3) risk_sensitive A1-Entscheid
+(gleiche Fristklasse; kleiner Bau, liest vorhandene wdl_logits).
+(1.4) start_dome_choice STUFE 0 (netzfrei, gepaart, billig; der
+108-Wege-Startzug ist heute ein Handregel-Klon und nur bis zum
+Generierungsstart entscheidbar). (1.5) Stapelzug-Kontrollfluss-Arena
+(MOSAIC_STACK_DRAW_RESEARCH, Wecker aus PREREG_v23_window par.4).
+(1.6) Bau-Entscheid Vollendbarkeits-FILTER im Netz-Aktionsraum
+(Praedikat liegt seit 29fb1f1 als Eingabe vor; Anwendung im
+Aktionsraum ungebaut, Paritaets-Gate Pflicht). (1.7) Arm K wie
+eingetaktet.
+
+**PHASE 2 -- der Generationen-Lauf (Nutzer-Go + Nachtlauf):**
+Tor-Revision als Prereg-Absatz (das par.3b.2-Tor fragte den
+Ownership-Konsumenten; die neue Startbedingung ist die
+Generator-Spaltenrate), dann v22-Self-Play mit b05 (12.000 Partien,
+Zuschnitt PREREG_v23_window par.1; ~15 h, Annahme aus 8,4 s/Partie)
+mit ANTI-DRIFT-PAKET: hv2-Sockel im Fenster, DAgger-Relabeling je
+Generation (~2 min, Werkzeug bereit), --seed-positions (im
+network-Modus bereits verdrahtet; einzige Intervention mit je positivem
+Value-Zustandssignal, p=0,017, Wiedervorlage-Bedingung erfuellt),
+optional AZAL-Muster (Lehrer-Policy-Loss als mitlaufender ZUSATZterm
+-- Research-Fund, Abwertungsgrund durch b01/b05 widerlegt). Danach
+v23-Training und Messkette; die Symmetrie-Sperre ist bereits
+ausgeraeumt (Spalten TRENNEN Sieger von Verlierern, +0,573, t 93).
+
+**PHASE 3 -- Ziel-Chirurgie, KONDITIONAL auf Phase 0:** bleibt die
+Plattendaempfung auf b05 bestehen -> (3.1) Reanalyze-light
+(Value-Relabel gespeicherter Zustaende mit aktuellem Netz bei 64-100
+Sims -- Standard-Anti-Drift der Literatur, im Projekt unbesetzt; das
+gebaute Relabeling laesst Value ausdruecklich unangetastet), danach
+(3.2) Aux-Kopf-/Lambda-Familie (endgame-Kopf-Praezedenz). Unabhaengig
+davon: (3.3) Chip-ALLOKATIONS-Fuehrung als Gelaender-Arm (beste
+Mechanik-Passung der Allokations-Familie: drei Messungen zeigen auf
+dieselbe Kosten-Scheu).
+
+**PARKLISTE (registrierpflichtig vor jedem Bau, nicht eingetaktet):**
+b03/Surprise (Trigger: v23-Training mit echten Such-Zielen),
+PER/WED-Stichprobengewichtung, Optimistic-Policy-Kopf, piKL-Anker,
+AZ_db-Diversitaet, Minimax-Knoten-Prior (O2, additiv), Score-Bounded-
+Schranken, Rzepecki-Referenzwerte (externe Eichgroessen fuer fruehe
+Strafkosten/Eroeffnungsspalten), ownership_corpus Arm B (entblockt),
+placement_side-Sim-Sweep 400/1600/6400. Details: Agenten-Berichte der
+Sitzung 2026-08-29 (Chat), Fundstellen in den jeweiligen Preregs.
 
 **Warum dieser Schritt** (par.3b.5 Weg-Wahl Punkt 1): der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-TRAININGSGEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt. Der Tiling-Pol lief bisher NIE mit einem spaltenbewussten Kopf (Gate-C-Nullmessungen: plattenblinde Koepfe).
 
