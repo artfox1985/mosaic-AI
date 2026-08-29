@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). Spalten-Tor 1(a) verfehlt => KEIN v22-Self-Play (par.3b.2). Konsument mit flacher UND 2D-Karte ohne Torerfolg (par.3b.6/3b.7, gepoolt t +1,61). WARUM geklaert (par.3b.8): Ketten-/Drift-These traegt, Such-Veto tot, Karte kalibriert, Geometrie geerbt => Hebel-Empfehlung On-Policy-Nachschaerfung mit Lehrer-Relabeling (Nutzer-Entscheid); Self-Play bleibt gestoppt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). KEIN v22-Self-Play (par.3b.2); Konsument beidseitig ohne Torerfolg (par.3b.6/3b.7); WARUM geklaert: Drift-These, Chip-Allokation, Kosten-Scheu (par.3b.8 A-E). STAPELUNG gefahren (par.3b.9/3b.10): DAgger-Arm v22-b05 verfehlt das Spalten-Tor, ist aber SIGNIFIKANT staerker (+3,86 Punkte, t 2,61; Spalten 0,3375) -- bester Stand der Familie; Gelaender-Leiter H0. Naechste Hebel als Nutzer-Entscheid registriert. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1999,6 +1999,22 @@ argmax-Instrument, 200 Partien je Arm, auf dem BESTEN Stand aus Schiene 1
 Trainings-Haelfte des Gelaenders (Huellen-Trimm der Ownership-Maske mit
 r+1-Kostengewichten, Nachtrag 6) bleibt benannter Folgearm NACH der
 Leiter.
+
+**par.3b.10 GEFAHREN 2026-08-29 (gelaender_ladder_b05.json, Basis v22-b05,
+je 200 Partien, Blockpaarung gegen b05-w0): H0.**
+
+| Arm | volle Spalten | Block-t vs w0 | Punkte |
+| --- | --- | --- | --- |
+| w0 (b05 pur) | 0,3375 | -- | 37,16 |
+| k1-Shaping 0,15 | 0,3325 | -0,61 | 37,09 |
+| k1-Shaping 0,30 | 0,3475 | +1,50 | 37,21 |
+
+Kein Arm erreicht die Schwelle; 0,30 zeigt eine kleine positive Richtung
+ohne Punkte-Kosten. Das Blatt-Shaping in dieser Dosis ist damit weder
+Hebel noch Schaden. Die Trainings-Haelfte des Gelaenders (Huellen-Trimm
+der Ownership-Maske mit r+1-Kostengewichten) und die Chip-ALLOKATIONS-
+Fuehrung (Stufe-E-Befund) bleiben die benannten offenen Gelaender-Arme --
+Nutzer-Entscheid der naechsten Sitzung.
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
