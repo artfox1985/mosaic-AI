@@ -35,12 +35,22 @@ kein Fork, keine Kopie der Replay-Logik.
 GEMESSENE GRENZE DES REPLAY-PFADS (eigener Befund 2026-08-23, VOR dem
 Hauptlauf an 30 Partien gegengeprobt): ~20% der Arena-Partien brechen NICHT
 mit einer sauberen `ReplayDivergence`, sondern mit einer UNGEFANGENEN
-`ValueError("Reihe N nicht mit Chips komplettierbar")` aus
-`Replayer.maybe_silent_chip_complete` (analyze_game_log.py:543) ab -- ein
-vorbestehender, dokumentierter Luecken-Fall der "stillen Chip-Vervollstaen-
-digung" (Kommentar dort: Ursache ist eine Logging-Asymmetrie zwischen
-Mensch- und KI-Tiling-Pfad), der beim Bau von `PREREG_action_id_logging.md`
-nur an MENSCH-Partien gegengeprobt wurde. Dieses Werkzeug faengt BEIDE
+`ValueError("Reihe N nicht mit Chips komplettierbar")` ab.
+BERICHTIGUNG 2026-08-29 (Diagnose der Parallel-Sitzung an
+game_20260823_085652, docs/pitfalls.md Eintrag "Der Replayer raet die
+Chip-Auswahl"): die Zuschreibung an `maybe_silent_chip_complete` unten
+und im Feld `exception_ursache` war FALSCH -- der Abbruch kommt aus dem
+regulaeren apply-Pfad (`apply_tiling_chips`, analyze_game_log.py:926),
+weil der Replayer die Chip-ALLOKATION greedy raet (round_end.rs:487),
+waehrend die KI sie frei waehlt; die Divergenz schlaegt Runden spaeter
+zu. Die Zaehlung der Ausfaelle bleibt korrekt, nur ihre URSACHEN-
+Etikettierung nicht; Reparatur (explizite Allokations-Bindung) steht im
+pitfalls-Eintrag. Alte Artefakte dieses Werkzeugs tragen das falsche
+Etikett weiter.
+Urspruenglicher (ueberholter) Wortlaut: Ursache sei
+`Replayer.maybe_silent_chip_complete` (analyze_game_log.py:543), ein
+Luecken-Fall der "stillen Chip-Vervollstaendigung", beim Bau von
+`PREREG_action_id_logging.md` nur an MENSCH-Partien gegengeprobt. Dieses Werkzeug faengt BEIDE
 Fehlerarten (nicht nur `ReplayDivergence`), zaehlt sie getrennt aus und
 schliesst betroffene Partien aus der Legalitaets-Stichprobe aus -- KEIN
 Ausweichen auf einen anderen Rekonstruktionspfad (das waere die Quarantaene-
@@ -411,10 +421,12 @@ def main() -> None:
             "n_partien_versucht": n_tried, "n_ok": per_game_stats["ok"],
             "n_divergence": per_game_stats["divergence"], "n_exception": per_game_stats["exception"],
             "rate": replay_ok_rate,
-            "exception_ursache": "vorbestehende Luecke in Replayer.maybe_silent_chip_complete "
-                                  "(analyze_game_log.py:543) -- 'Reihe N nicht mit Chips komplettierbar', "
-                                  "beim Bau von PREREG_action_id_logging.md nur an Mensch-Partien "
-                                  "gegengeprobt, siehe Moduldoku dieser Datei.",
+            "exception_ursache": "Replayer raet die Chip-ALLOKATION greedy statt der freien "
+                                  "KI-Wahl (apply_tiling_chips -> round_end.rs:487); Divergenz "
+                                  "schlaegt Runden spaeter als 'Reihe N nicht mit Chips "
+                                  "komplettierbar' zu. Berichtigung 2026-08-29, docs/pitfalls.md; "
+                                  "aeltere Artefakte tragen die fruehere (falsche) Zuschreibung an "
+                                  "maybe_silent_chip_complete.",
             "exception_beispiele": exception_examples, "divergence_beispiele": divergence_examples,
         },
         "n_ereignisse_geprueft_gesamt": n_events_checked,
