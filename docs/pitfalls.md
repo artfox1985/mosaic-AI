@@ -100,14 +100,20 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   `exception_ursache`) tut genau das; der stille Pfad hat in dieser Partie
   nachweislich NICHT ausgeloest, der Abbruch kommt aus dem regulaeren
   `apply`-Pfad.
-  Reparatur (noch offen, braucht Wheel-Neubau): additive Bindung, die eine
-  EXPLIZITE Allokation anwendet (`apply_bonus_chips_with` existiert bereits)
-  plus Kandidaten-Aufzaehlung aus `round_end::chip_allocations`, damit die
-  Regel in der Engine bleibt; der Replayer probiert bei einem spaeteren
-  Fehlschlag frueher getroffene Wahlen neu durch (`_fresh_game()` kann das
-  schon). Die rekonstruierte Chip-Historie ist dann eine PLAUSIBLE, nicht
-  die tatsaechliche -- das gehoert benannt, weil das Netz Chips als Merkmal
-  sieht (`features.rs`).
+  Repariert am 2026-08-30 (Commit cf53aab): `apply_tiling_chips_with` wendet
+  eine explizite Auswahl an, `chip_allocations_json` zaehlt die zulaessigen
+  auf -- die Regel bleibt in der Engine, der Replayer waehlt nur aus und
+  faehrt ohne Plan weiter greedy (Bestandsverhalten). Bei einem Fehlschlag
+  sucht er rueckwaerts, orakelfrei, und laeuft dann einmal in voller
+  Bestueckung. Abnahme: 14 von 14 Server-Logs, vorher 13.
+  **Zwei Dinge bleiben stehen.** Erstens ist die rekonstruierte
+  Chip-Historie eine PLAUSIBLE, nicht die tatsaechliche -- sie erfuellt
+  dieselbe Regel und dasselbe Log, aber welche Chips real lagen, gibt das
+  Log nicht her; relevant, weil das Netz Chips als Merkmal sieht
+  (`features.rs`). Zweitens erbt das nur, wer ueber `run()` geht:
+  `tools/probes/column_completion_legality_probe.py` baut `Replayer` und
+  `_run_loop` selbst (Zeilen 103/135) und faehrt darum weiter greedy -- ihre
+  ~20% Arena-Ausfaelle bleiben, bis sie auf den `run()`-Pfad gehoben wird.
 - **Python schreibt auf Windows still CRLF** (2026-08-25). Ein Skript mit
   `write_text` wandelte in 137 Dateien LF in CRLF; in einer Datei waren das
   971 Byte Zuwachs bei zwei geaenderten Zeilen. `git diff` zeigte wegen der
