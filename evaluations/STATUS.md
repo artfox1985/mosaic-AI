@@ -59,13 +59,18 @@ der lastgebremste Erstlauf war PARTIEGLEICH mit dem sauberen Neustart
 hatte gebremst, nicht verfaelscht. Details und Deutung: par.3b.6 der
 Lehrer-Prereg.
 
-**Es laeuft: v22-b04-Training (Stufe 2, par.3b.7)** -- 2D-Ablesung des
-Ownership-Kopfs STATT flach (OwnershipHead2D, Permutation an 20
-Endbrettern verifiziert), Kaltstart, Rezept identisch b01, einziger
-Unterschied --ownership-head-2d; Trainings-Freigabe Nutzer 2026-08-29.
-Danach argmax-Gegenprobe gegen b01 (0,2975) und Wiederholung des
-Konsument-Sweeps mit b04-Kopf (w 0/0,5/1,0). Der v22-Self-Play-Start
-bleibt gestoppt und ist weiterhin Nutzer-Entscheid. Die Sweep-Messdaten (selfplay_otw22b01w*) sind nach
+**Stufe 2 KOMPLETT GEFAHREN 2026-08-29 (par.3b.7):** b04-Training (2,5 h
+CUDA; 2D-Ablesung senkt Own-Val konsistent -3,8 Prozent, Policy/Brier
+gleich) plus Konsument-Sweep w 0/0,5/1,0/2,0. **Tor verfehlt, aber die
+Dosis-Richtung DREHT:** mit 2D-Karte jeder Arm positiv (Gipfel w1,0:
++0,030 volle Spalten, t +1,38; Quote t +1,71), Punkte unversehrt --
+gegen die durchgehend negative flache Karte (par.3b.6). Die
+Konsumenten-Schiene ist damit beidseitig OHNE Torerfolg gemessen.
+NAECHSTER SCHRITT = Nutzer-Entscheid (Optionen in par.3b.7: (a)
+Replikations-Arm w1,0 mit zweitem Seed, (b) Surprise-Weighting b03,
+(c) Vollendungs-Filter in der Suche). Der v22-Self-Play-Start bleibt
+gestoppt. Messdaten des b04-Sweeps liegen in data/
+(selfplay_otw22b04w*), Loeschung erst nach Nutzer-Blick. Die Sweep-Messdaten (selfplay_otw22b01w*) sind nach
 Abschluss der Auswertung mit Nutzer-Freigabe vom 2026-08-29 GELOESCHT;
 Manifeste und Artefakt bleiben.
 
