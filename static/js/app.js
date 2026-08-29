@@ -2720,8 +2720,15 @@ function render() {
   if(pendingStackPlacement) {
     const {tile_id, rotation, tile, source, num} = pendingStackPlacement;
     const ROT = {0:[0,1,2,3], 90:[2,0,3,1], 180:[3,2,1,0], 270:[1,3,0,2]};
+    // 38 -> 48px (2026-08-29). Die 38px waren wirkungslos und irrefuehrend:
+    // `.d2x2` hat FESTE Spuren (repeat(2,22px) + 4px gap = 48px, style.css),
+    // die schrumpfen nicht mit dem Kasten -- das Gitter ragte also 10px aus
+    // seiner eigenen Box heraus. Solange die Box unsichtbar war, fiel das
+    // nicht auf; seit die Joker-Platte eine Flaeche hat, lag ein 38px-Rechteck
+    // unter einem 48px-Gitter. 48px ist die Groesse, die hier ohnehin schon
+    // gerendert wurde -- die Vorschau wird dadurch nicht groesser.
     const previewHTML = tile
-      ? `<div class="d2x2${wildPlateClass(tile)}" style="width:38px;height:38px;">${ROT[rotation||0].map(i=>spaceHTML(tile.spaces[i])).join('')}</div>`
+      ? `<div class="d2x2${wildPlateClass(tile)}" style="width:48px;height:48px;">${ROT[rotation||0].map(i=>spaceHTML(tile.spaces[i])).join('')}</div>`
       : '';
     // Punkt 8: keine Platten-ID mehr im Hinweistext -- previewHTML zeigt das
     // tatsaechliche Farbmuster ohnehin bereits an.
