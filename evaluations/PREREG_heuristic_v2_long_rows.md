@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). Spalten-Tor: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play (par.3b.2); Platzierung verschenkt das Draft-Erbe (par.3b.5). Konsument par.3b.6/3b.7: flache Karte negativ (w2,0 t -2,85), 2D-Ablesung senkt Own-Val -3,8 Prozent und dreht die Richtung positiv, Tor aber verfehlt (Gipfel w1,0 t +1,38) -- Schiene beidseitig ohne Torerfolg, Folgewege Nutzer-Entscheid; Self-Play bleibt gestoppt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). Spalten-Tor: 1(b) bestanden, 1(a) verfehlt => KEIN v22-Self-Play (par.3b.2); Platzierung verschenkt das Draft-Erbe (par.3b.5). Konsument par.3b.6/3b.7: flache Karte negativ (w2,0 t -2,85), 2D-Ablesung senkt Own-Val -3,8 Prozent und dreht die Richtung positiv, Tor verfehlt, Replikation + Pooling bestaetigen (20 Blockpaare: +0,024, t +1,61; Quote t +2,06 knapp unter Schwelle) -- kleiner echter Effekt, nicht tragfaehig; WARUM-Diagnose par.3b.8 laeuft; Self-Play bleibt gestoppt. -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1623,6 +1623,134 @@ registrierte Folgeweg Surprise-Weighting b03 (Vorbehalt aus par.3b.5:
 Draft-Treue ist auf der tragenden Haelfte schon hoch), (c) der
 Vollendungs-Filter in der Suche (v23-Weckerliste) als komplementaerer
 Hebel derselben Engpass-Stelle.
+
+**NACHTRAG REPLIKATION (registriert 2026-08-29, VOR dem Lauf;
+Nutzer-Entscheid "mach den replikations arm w=1"):** w=1,0 gegen w=0 mit
+ZWEITEM Seed 20260829 (sonst identisches Instrument, je 200 Partien, 10
+Bloecke, Paarung je Block). Vorab festgelegte Auswertung, in dieser
+Reihenfolge:
+
+1. **Primaeres Tor: gepoolte Analyse ueber alle 20 Blockpaare** (Seed
+   20260828 + 20260829), gepaarter t, Schwelle 2,093 (df=19, zweiseitig
+   5 Prozent) -- plus unveraendert kein signifikanter Punkteverlust.
+   Transparenz-Vermerk: die erste Haelfte war beim Registrieren dieses
+   Nachtrags bereits beobachtet (t +1,38); das Pooling ist ein vorab
+   festgelegtes Anfuegen einer zweiten Charge, kein nachtraegliches
+   Datenwaehlen -- die Charge 2 laeuft blind gegen dieselbe Regel.
+2. Berichtet, entscheidet aber nicht allein: das Replikat fuer sich
+   (10 Bloecke, Schwelle 2,262) und die Vollendungsquote (gepoolt).
+3. Tor bestanden => der Konsument traegt mit 2D-Karte bei w=1,0;
+   Knopf-Aufnahme in die Self-Play-Spec und Start kommen zurueck auf den
+   Tisch (Nutzer-Entscheid). Tor verfehlt => Konsumenten-Schiene zu, die
+   Optionen (b)/(c) aus dem Ergebnisabsatz oben bleiben die Wege.
+
+Die Messdaten des Erstlaufs sind mit Nutzer-Freigabe vom 2026-08-29
+geloescht; die Blockwerte liegen vollstaendig im Artefakt
+`ownership_tiling_consumer_v22_b04.json` (der Auswerter schreibt sie seit
+diesem Lauf mit), die gepoolte Analyse ist damit rechenbar.
+
+**REPLIKATION GEFAHREN 2026-08-29
+(ownership_tiling_consumer_v22_b04_r2.json, Seed 20260829, Bloecke
+sauber): TOR VERFEHLT.** Replikat allein: w10 0,3250 gegen w00 0,3075
+(+0,0175, t +0,83). GEPOOLT ueber alle 20 Blockpaare beider Seeds:
+volle Spalten +0,0237 (t +1,61, Schwelle 2,093), Quote +0,0177
+(t +2,06, KNAPP unter der Schwelle), Punkte -0,16 (t -0,44, kein
+Schaden). Der Effekt ist ueber beide Seeds richtungsstabil, aber das
+vorregistrierte Tor ist nicht genommen; weiteres n-Nachschieben ist
+NICHT registriert und unterbleibt (sequenzielles Testen). Verdikt:
+die Konsumenten-Schiene bleibt OHNE Torerfolg -- ein kleiner, echter,
+fuer sich nicht tragfaehiger Effekt bei w=1,0 mit 2D-Karte. Die
+par.3b.8-Diagnose uebernimmt die WARUM-Frage.
+
+### par.3b.8 Mechanik-Diagnose des Tiling-Pols (registriert 2026-08-29, VOR der Messung)
+
+**Anlass:** par.3b.6/3b.7 messen das WAS (Endbrett-Aggregate), nicht das
+WARUM. Nutzer-Einwand 2026-08-29: registrierte Form ist nicht automatisch
+richtige Form. Form-Kritik (Herleitung, in dieser Registrierung
+festgehalten): die eingebaute SUMMEN-Marginale `Σ wert(f)` unterschaetzt
+den Wert einer ZELLMENGE fuer konjunktive Kriterien systematisch --
+je Spalte mit zwei neuen Zellen ist der echte Mengenwert
+`7·Π_rest·(1-p1·p2)` gegen die Summe `7·Π_rest·(p1+p2-2·p1·p2)`; bei
+p=0,2 je Zelle gibt die Form nur ein Drittel des wahren Werts. Der Fehler
+ist maximal, wenn die Karte den Schwesterzellen misstraut -- ein
+Selbstverstaerker der Pessimismus-Falle, und Tiling-Kandidaten sind
+komplette Rundenabschluesse (viele Zellen je Kandidat).
+
+**Nutzer-Hypothese (2026-08-29, vorab festgelegte Stratifizierung):** der
+Engpass haengt an den Rasterzeilen 5/6 -- dort ist der Preis hoch, solange
+keine vollstaendige Spalte liegt (lange Musterreihen als Vorleistung), und
+menschliches Spiel nimmt den momentanen Punktnachteil fuer das
+SPALTENPOTENTIAL bewusst in Kauf. Erwartung: die fehlenden Zellen
+angefangener Spalten sitzen ueberwiegend in Zeile 5/6, und genau dort ist
+die Eintretens-Karte pessimistisch.
+
+**Stufe A (Datenpassage + ONNX-Vorwaertspaesse, keine Engine):** an
+Vollendungs-Stellen (Spalten >= 4/6 am Zwischenzustand, hv2-Korpus):
+
+1. Zeilenverteilung der fehlenden Spaltenzellen (Soll-Pruefung der
+   Hypothese: Anteil Zeile 5/6).
+2. p_own der fehlenden Zellen und ihrer Schwesterzellen, b01- gegen
+   b04-Karte, stratifiziert nach Zeile -- ist die Karte dort pessimistisch
+   (unter der korpusweiten Fuellrate solcher Zellen)?
+3. Summen- gegen Mengenwert der fehlenden Zellen je Spalte (Formel oben,
+   auf den Kartenwerten) -- quantifiziert die Form-Luecke dort, wo sie
+   zaehlt.
+
+**Stufe B (Engine-Zugvergleich, Choice-Schnittstelle der Golden-Probe-
+Infrastruktur):** an denselben Stellen Lehrerzug gegen Netz-Zug ohne und
+mit Knopf (w=1,0): kippt der Knopf Entscheidungen Richtung Vollendung, und
+falls nein -- fehlt der Vollendungszug schon in der Kandidatenmenge
+(B1-Klasse: Faehigkeit, nicht Wille)?
+
+**Nachtrag (Nutzer-Freigabe 2026-08-29, VOR Stufe B): Draft-Check an
+denselben Stellen.** Anlass: die "Drafting ist intakt"-Evidenz ist
+Prior-Masse auf LEHRER-Zustaenden (off-policy) plus geerbte Initiierung --
+Zug-fuer-Zug-Masse sieht kein TIMING. Deshalb zusaetzlich: steht eine
+Spalte bei 4-5/6 und haengt die fehlende Zelle an Musterreihe 5/6, wird
+verglichen, ob der Lehrer auf diesem Zustand die VERSORGENDE Farbe draftet
+(lange Reihe bedienen trotz momentanem Punktnachteil -- die
+Nutzer-Strategie "Potential der Spalte") und ob das Netz auf demselben
+Zustand dasselbe tut. Berichtet je Zeile der fehlenden Zelle und je Runde.
+
+**Stufe C (Sims-Ablation, registriert auf Nutzer-Freigabe 2026-08-29,
+VOR dem Lauf): testet das Such-Veto isoliert.** Hypothese 3 der
+Diagnose-Diskussion: die 400-Sims-Suche kann den geerbten Lehrerzug per
+Value-Head ueberstimmen (Vorleistung langer Reihen kostet sofortiges
+Strafleisten-Risiko, der Spaltenlohn liegt Runden entfernt). Messung:
+dasselbe argmax-Instrument, b04_best, w=0, aber MINIMALES Sims-Budget
+(--sims 1; degeneriert die Gumbel-Suche daran, die kleinste lauffaehige
+Zahl -- sie wird im Artefakt dokumentiert), 200 Partien, Seed 20260828,
+gegen den vorhandenen 400-Sims-w00-Lauf (0,2975). Lesart: vollendet die
+rohe Policy DEUTLICH mehr Spalten als die gesuchte, ist das Such-Veto
+belegt (Hebel: Such-/Value-Seite, z.B. Vollendungs-Filter); sonst ist es
+nicht der Haupttaeter. Benannter Confound, kein Tor: bei Sims 1 sinkt die
+Spielstaerke insgesamt (beide Seiten); gelesen werden volle Spalten UND
+Quote, als DIAGNOSE.
+
+**Stufe D (Hüllen-Deckung, registriert auf Nutzer-Vorschlag 2026-08-29,
+VOR der Messung): der geometrische Richtwert.** Frage: legt der Lehrer
+seine Steine tatsaechlich IN der Dreiecks-Einhuellenden (erlaubter Bereich
+r+c <= 5, 21 Zellen; Spiegelung je Start-Ecke, gemessen wird die
+besser passende Orientierung; Definition aus heuristic_v2.rs im Stand
+65b48af^, dreiecks_abweichung) -- und wie weit folgen ihm die Netze?
+Reine Datenpassage, je Partie/Seite/RUNDE: Anteil der in der Runde NEU
+belegten Zellen innerhalb der Huelle, Fuellstand Huelle (x/21) gegen
+Aussenbereich (x/15) am Rundenende, Dreiecks-Abweichung. Quellen: (a)
+Lehrer aus dem hv2-Korpus (Erzeugungs-Self-Plays, 300 Dateien wie
+par.3b.5), (b) b04 aus den Replikations-Messdateien (otw22b04r2*).
+Ergebnis ist ein RICHTWERT-Profil je Runde ("wie spielt der Lehrer
+geometrisch"), kein Tor -- es eicht kuenftige Huellen-Hebel (Trimm der
+Loss-Maske, ggf. Huelle als Netz-Einhuellende) an gemessener Geometrie
+statt an Vermutung.
+
+**Vorab benannte Lesarten:** (i) Karte pessimistisch an 5/6-Zellen =>
+Mengen-Form-Arm (Folge-Registrierung par.3b.9) und ggf. die Zielfrage
+(PREREG_v23_reachability_recheck-Klasse); (ii) Karte ok, Zug kippt
+trotzdem nicht => Skalen-/Formfrage, ebenfalls Mengen-Form-Arm; (iii)
+Vollendungszug fehlt in den Kandidaten => Such-/Vorratshebel
+(Vollendungs-Filter, v23-Weckerliste), der Knopf ist dann nicht der
+Engpass. Reihenfolge nach Nutzer-Freigabe 2026-08-29: Diagnose ->
+Mengen-Form-Arm -> Blatt-Pol-Arm.
 
 ### par.3c Bonuschips auf die blockierende Reihe -- gebaut, korrekt, WIRKUNGSLOS (Chip-Knappheit)
 
