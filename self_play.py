@@ -162,7 +162,8 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       add_root_noise, deterministic, record_rtv, pcr_full_prob,
                       pcr_cheap_sims, tau_argmax_from_move, queue, progress_path,
                       heartbeat_path, seed_positions=None, seed_positions_offset=0,
-                      heuristik_variante="hv1"):  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
+                      heuristik_variante="hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
+                      spec=None):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -180,7 +181,14 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     Rust-Seite wird also pro Chunk neu initialisiert -- kein Stale-Value-
     Risiko über Chunks hinweg). `0` (Default) setzt den Wert explizit auf
     "0" -- Rust behandelt das identisch zu "ungesetzt" (AUS), siehe
-    `tau_argmax_from_move`s `n>=1.0`-Prüfung."""
+    `tau_argmax_from_move`s `n>=1.0`-Prüfung.
+    `spec` (PREREG_agent_encapsulation.md par.3/par.4 Punkt 4; von
+    PREREG_implicit_minimax_backup.md par.3a fuer den Self-Play-Arm
+    ausdruecklich verlangt): Pfad einer Such-Spec-Datei
+    `models/<name>.spec.json`, EIN Spec fuer beide Seiten (beide Seiten SIND
+    dasselbe Netz). `None` (Default) reicht `None` an pyo3 durch und damit
+    `SearchConfig::from_env()` -- byte-identisches Bestandsverhalten. Nur im
+    network-Modus wirksam (die anderen beiden Einstiege nehmen kein Spec)."""
     os.environ["MOSAIC_TAU_ARGMAX_FROM_MOVE"] = str(tau_argmax_from_move)
     try:
         import mosaic_rust as mr
@@ -193,6 +201,7 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                 pcr_full_prob=pcr_full_prob, pcr_cheap_sims=pcr_cheap_sims,
                 progress_path=progress_path, heartbeat_path=heartbeat_path,
                 seed_positions_path=seed_positions, seed_positions_offset=seed_positions_offset,
+                spec=spec,
             )
         elif mode == "mcts" and model:
             raw = mr.self_play_games_with_net_labels(
@@ -256,7 +265,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           progress_path, heartbeat_path, heuristik_variante="hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
                           pcr_full_prob=None, pcr_cheap_sims=150,
                           tau_argmax_from_move=0, seed_positions=None,
-                          seed_positions_offset=0) -> str | None:
+                          seed_positions_offset=0, spec=None) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -272,7 +281,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               add_root_noise, deterministic, record_rtv, pcr_full_prob,
               pcr_cheap_sims, tau_argmax_from_move, queue,
               str(progress_path), str(heartbeat_path),
-              seed_positions, seed_positions_offset, heuristik_variante),
+              seed_positions, seed_positions_offset, heuristik_variante, spec),
     )
     proc.start()
     t_start = time.time()
@@ -372,7 +381,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   record_rtv: bool = False,
                   pcr_full_prob: float | None = None, pcr_cheap_sims: int = 150,
                   tau_argmax_from_move: int = 0, seed_positions: str = None,
-                  heuristik_variante: str = "hv1"):  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
+                  heuristik_variante: str = "hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
+                  spec: str | None = None):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -435,6 +445,16 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         "add_root_noise": add_root_noise, "deterministic": deterministic,
         "record_rtv": record_rtv, "tau_argmax_from_move": tau_argmax_from_move,
         "heuristik_variante": heuristik_variante,
+        # Diese vier standen bis 2026-08-30 NICHT im Manifest, obwohl sie den
+        # erzeugten Korpus veraendern -- genau die Falle "ein fehlendes Flag
+        # meldet sich nicht, es ist ein Default" (Nutzer-Regel: vor jeder
+        # Auswertung die cli_args des eigenen Laufs gegen die Referenz diffen;
+        # das geht nur, wenn sie drinstehen). `spec` traegt den Such-Knopf
+        # (implicit_minimax_alpha), das pcr-Paar unterscheidet Sockel von
+        # Schwarm (--value-only setzt pcr_full_prob=0.0), `seed_positions`
+        # die kuratierten Startstellungen.
+        "spec": spec, "pcr_full_prob": pcr_full_prob,
+        "pcr_cheap_sims": pcr_cheap_sims, "seed_positions": seed_positions,
     })
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -498,6 +518,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             pcr_full_prob=pcr_full_prob, pcr_cheap_sims=pcr_cheap_sims,
             tau_argmax_from_move=tau_argmax_from_move,
             seed_positions=seed_positions, seed_positions_offset=pos_offset,
+            spec=spec,
         )
         return raw, progress_path, heartbeat_path
 
@@ -731,7 +752,22 @@ if __name__ == "__main__":
                              "MOSAIC_TAU_ARGMAX_FROM_MOVE für den Rust-Aufruf, siehe net_mcts.rs. "
                              "Nur bei --mode network wirksam; Runde 5 bleibt davon unberührt "
                              "(Alpha-Beta-exakt, round5.rs).")
+    parser.add_argument("--spec", type=str, default=None,
+                        help="Such-Spec-Datei models/<name>.spec.json (Schema: "
+                             "implicit_minimax_alpha, long_row_init_shaping_w, "
+                             "heuristik_variante -- alle PFLICHT, unbekannte Felder sind ein "
+                             "harter Fehler). EIN Spec fuer beide Seiten, weil im Self-Play "
+                             "beide Seiten dasselbe Netz sind. Default None = "
+                             "SearchConfig::from_env(), byte-identisches Bestandsverhalten. "
+                             "Von PREREG_implicit_minimax_backup.md par.3a fuer den "
+                             "Self-Play-Arm verlangt: der Knopf gehoert an den Lauf, nicht in "
+                             "die Prozess-Umgebung. Nur --mode network.")
     args = parser.parse_args()
+
+    if args.spec and args.mode != "network":
+        raise SystemExit("❌ --spec: nur --mode network (die anderen Einstiege nehmen kein Spec).")
+    if args.spec and not os.path.exists(args.spec):
+        raise SystemExit(f"❌ --spec fehlt: {args.spec}")
 
     # --value-only (v20-Zwei-Klassen-Schwarm): expliziter Modus statt
     # Epsilon-Hack -- pcr_full_prob=0.0 heisst "kein Zug voll", das
@@ -771,4 +807,5 @@ if __name__ == "__main__":
         tau_argmax_from_move=args.tau_argmax_from_move,
         seed_positions=args.seed_positions,
         heuristik_variante=args.heuristik_variante,
+        spec=args.spec,
     )
