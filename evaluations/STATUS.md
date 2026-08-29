@@ -89,20 +89,42 @@ Huelle 0,620 erstmals UEBER dem Lehrer (0,600), Konversion weiter ~halb
 so gut -- stuetzt die Allokations-/Gelaender-Hebel. Details par.3b.11;
 Artefakte dagger_round2_b06.json, triangle_hull_coverage_b06.json.
 
-**ENTSCHIEDEN 2026-08-29 (Nutzer):** (1) Elo-Gating fuer b05: JA
-(informativ, Cross-Aera-Regel Promotions-Checkliste Punkt 3) -- naechster
-Schritt nach der Runde-2-Registrierung. (2) v22-Self-Play-/
-Generator-Frage: weiter gestoppt. (3) Loeschfreigaben ERTEILT UND
+**ELO-GATING b05 GEFAHREN 2026-08-29 (informativ): v21 bleibt klar
+Champion.** v22-b05 16:34 gegen v21_2d_brierbest (25 Paare, SPRT-
+Fruehstopp an der unteren Schranke; Bericht-Statistik p=0,035, gepaarte
+Differenz -0,72). Elo-Kante eingetragen: **b05 1084 [961, 1198]** --
+unter dem hv2-Lehrer (1125). Caveat: Fruehstopp unter 150 Paaren, als
+informative Messung mit Vermerk verbucht (fuer einen Promotionsentscheid
+waere Replikation Pflicht). Beifang mit Dauerwirkung: paired_gating
+lief mit Default-Blockgroesse 25 an -- vom Nutzer abgefangen, Default
+jetzt 5 (Praezedenz 2026-08-07; docs/pitfalls.md, Eintrag 2026-08-29).
+
+**ENTSCHIEDEN 2026-08-29 (Nutzer):** (1) v22-Self-Play-/
+Generator-Frage: weiter gestoppt. (2) Loeschfreigaben ERTEILT UND
 AUSGEFUEHRT: data/selfplay_otw22b04s1_* (10) und data/selfplay_otw22b05*_*
-(30) geloescht.
+(30) geloescht. (3) Taktung 2026-08-29 Abend: nach dem Gating noch die
+par.5-Neumessung (PREREG_special_tile_yield), danach NICHTS mehr, was
+die Maschine exklusiv braucht.
+
+**par.5-NEUMESSUNG SPEZIALFELDER GEFAHREN 2026-08-29
+(PREREG_special_tile_yield par.7, Anlass Nutzer-Nachfrage; dabei
+Prereg-Kopf berichtigt, der faelschlich noch NICHTS GEBAUT sagte --
+par.4a-Kanaele 77/78 sind seit e91cd34 in jedem b-Modell):** der Posten
+LEBT -- auch der Lehrer laesst 81 Prozent der unteren Spezialfelder
+liegen (Netz 88), Spezial-Punkte 4,02 gegen 3,15 je Seite, k6 -9,97
+gegen -11,26. Die plattenblinde par.3-Skala ist Korpus-Artefakt
+(obere Reihe beim Lehrer 0,50 leer statt 0,13). Der Hebel gehoert in
+die Gelaender-/Allokations-Familie.
 
 **OFFENE NUTZER-ENTSCHEIDE:** (1) naechster Hebel nach der
 Runde-2-Saettigung -- Kandidaten: Chip-ALLOKATIONS-Fuehrung
 (Stufe-E-Befund), Huellen-Trimm der Ownership-Maske mit r+1-Gewichten,
-b03/Surprise; eine DAgger-Runde 3 ist nach der Saettigungs-Lesart NICHT
-empfohlen. (2) Loeschfreigaben: data/selfplay_otw22b06w00_* (10 Dateien)
-und -- falls keine Runde 3 -- data/onpolicy_v22-b06/ (31 Dateien);
-data/onpolicy_v22-b05/ (30) haengt an derselben Frage.
+Spezialfeld-Kopf par.4c (nach par.7 in derselben Allokations-Familie,
+Ziel bleibt unbalanciert), b03/Surprise; eine DAgger-Runde 3 ist nach
+der Saettigungs-Lesart NICHT empfohlen. (2) Loeschfreigaben:
+data/selfplay_otw22b06w00_* (10 Dateien) und -- falls keine Runde 3 --
+data/onpolicy_v22-b06/ (31 Dateien); data/onpolicy_v22-b05/ (30) haengt
+an derselben Frage.
 
 **Warum dieser Schritt** (par.3b.5 Weg-Wahl Punkt 1): der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-TRAININGSGEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt. Der Tiling-Pol lief bisher NIE mit einem spaltenbewussten Kopf (Gate-C-Nullmessungen: plattenblinde Koepfe).
 

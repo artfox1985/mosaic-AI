@@ -98,8 +98,9 @@ uebernimmt ausschliesslich das "wann aufhoeren" -- die deskriptive
 Fixed-n-Auswertung bleibt unveraendert exakt (`p`, `mean_pair_diff`, `ci95`
 im Ergebnis-JSON).
 
-Bloecke a 25 Paare (= 50 Spiele je Block), harter Deckel 200 Paare
-(= 400 Spiele) falls das SPRT nie entscheidet.
+Bloecke a 5 Paare (= 10 Spiele je Block; Default seit 2026-08-29, vorher
+25 -- Begruendung am BLOCK_SIZE-Konstantenkommentar), harter Deckel
+200 Paare (= 400 Spiele) falls das SPRT nie entscheidet.
 
 ## Nutzung
 
@@ -140,7 +141,13 @@ from arena_trends import append_run  # noqa: E402  (Task #92, Trend-Log-Append)
 from set_champion import set_champion as _set_champion  # noqa: E402  (Nutzer-Anstoss 2026-07-27)
 from runtime_block import laufzeit_block  # noqa: E402  (CLAUDE.md-Pflichtblock, Codepflege-Audit 2026-08-27)
 
-BLOCK_SIZE = 25
+BLOCK_SIZE = 5                  # Nutzer-Entscheid 2026-08-29: der Seed faellt
+                                # JE BLOCK, Paare eines Blocks teilen die
+                                # Spiel-Population (Block-Korrelation
+                                # 2026-08-04) -- kleine Bloecke = viele
+                                # unabhaengige Bloecke. War 25; Praezedenz
+                                # der Gatings ist 5 (37 Bloecke a 5 am
+                                # 2026-08-07). docs/pitfalls.md
 MAX_PAIRS = 200                 # harter Deckel (Nutzer-Anstoss: 150 -> 200)
 DEFAULT_SIMS = 400
 DEFAULT_C_PUCT = 1.5
