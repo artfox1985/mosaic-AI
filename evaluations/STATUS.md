@@ -197,7 +197,18 @@ fruehen Versorgungs-Zuege ist der Haupttaeter; Initiierung bleibt
 intakt, die Kette bricht. Der Blindstart haette 9,3 h in einen
 Waechter-Riss verbrannt.
 
-**VORLAGE (Nutzer-Entscheid, Sockel-Konfiguration der Generation 1):**
+**ENTSCHIEDEN 2026-08-30 (Nutzer: "mach D") -- ROLLEN-GETRENNTE
+MISCHUNG, Erzeugung laeuft:** Sockel/Policy-Klasse 4.000 voll
+gesampelt (Policy-Ziele sind Such-Posterioren, Spalten-Policy kommt
+vom hv2-Anker; einzigartiger Beitrag = Zustandsabdeckung),
+Schwarm/Value-Klasse 8.000 argmax-lastig (6.000 + 2.000 gesampelt) --
+dort sitzt die On-Policy-Vollendungs-Exposition, die der
+Betrags-Heilung fehlt. Waechter-Schwelle 0,17 gilt jetzt auf der
+VALUE-Klasse, die Policy-Klasse wird nur berichtet (par.3b.12
+Zuschnitt-Entscheid). Anlass war der Nutzer-Einwand zum hv2-Anteil des
+Fensters.
+
+**Frueher Vorlage-Stand (historisch, D wurde gewaehlt):**
 (A) **Deterministischer Sockel** (argmax wie die DAgger-Korpora,
 Diversitaet aus 4.000 Partie-Seeds): maximale Spaltenlehre 0,34,
 Preis = keine Zug-Exploration (Verbesserungs-Signal kommt allein aus
