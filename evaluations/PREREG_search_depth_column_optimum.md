@@ -43,6 +43,31 @@ Seed. Ergebnis ist eine Kurve mit lokalisiertem Maximum.
 *Regel:* das Maximum wird BERICHTET, nicht sofort uebernommen -- die
 Uebernahme entscheidet Stufe 3.
 
+**Stufe 2b -- die UNTERE Flanke (Nutzer-Auftrag 2026-08-30, waehrend
+Stufe 2 lief).** Anlass: der 50er-Zwischenstand (0,5179 bei 140
+Partien) setzt den Trend monoton fort, waehrend Sims 1 bei 0,0075
+liegt -- der Absturz sitzt also zwischen 1 und 50, und ohne ihn kennt
+die Kurve nur EINE Flanke. Zusatzarme **25 und 10 Sims**, gleiche
+Anordnung und gleicher Seed. *Lesart:* faellt schon 25 deutlich ab,
+liegt das Maximum bei ~50; traegt auch 10, ist der Absturz sehr steil
+und sitzt knapp ueber 1 -- dann waere die Kurve ueber fast ihre ganze
+Breite fallend in den Sims, was die Deutung (Suche ueberstimmt Prior)
+stuetzt, aber die Betriebsempfehlung NICHT automatisch nach unten
+verschiebt: dafuer entscheidet Stufe 3.
+
+**Zusaetzliche Berichtsgroesse ab Stufe 2 (Nutzer-Hinweis):** volle
+Spalten je STUNDE (Rate x Partien je Stunde), weil fuer die
+Korpus-Erzeugung die Ereignisse pro Zeit zaehlen, nicht pro Partie.
+Gemessene Punkte bisher: 400 Sims 97/h, 150 Sims 300/h, 50 Sims
+~565/h (je Seite).
+
+**Registrierter Gegeneinwand, der bei der Uebernahme mitgelesen werden
+MUSS (`PREREG_v22_window.md` par.4):** "ein ueberwiegend aus
+150-Sim-Partien bestehendes Fenster kalibriert den Value-Kopf auf
+schwaechere Trajektorien". Mehr Vollendungen von einem schwaecher
+spielenden Erzeuger sind nicht automatisch besseres Material -- genau
+deshalb entscheidet die Arena (Stufe 3) und nicht die Spaltenrate.
+
 **Stufe 3 -- der Haertetest (Arena, entscheidet Gewinn gegen Tausch).**
 Gepaarte Arena b05@Optimum gegen b05@400, `tools/paired_gating.py
 --no-promote-winner` (block-size 5 = Default), Seed 20260920.
