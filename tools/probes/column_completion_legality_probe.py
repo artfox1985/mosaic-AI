@@ -29,7 +29,8 @@ Zeilen 364-393) -- diese liegen im Arena-JSON bereits direkt als
 `names`/`first_player`/`game_seed`. Der Adapter baut also `header`/`lines`
 in exakt der Form, die `load_log()` aus einer Datei bauen wuerde (gleiche
 Skip-Regel fuer `#`-Zeilen, gleiches `ROUND_PREFIX`-Matching), OHNE den
-Datei-Umweg -- `Replayer`/`_run_loop` selbst bleiben unveraendert importiert,
+Datei-Umweg -- der Replay-Antrieb selbst bleibt unveraendert importiert
+(seit 2026-08-30 `_replay_once`/`_search_chip_plan`, die auch `run()` fuehrt),
 kein Fork, keine Kopie der Replay-Logik.
 
 GEMESSENE GRENZE DES REPLAY-PFADS (eigener Befund 2026-08-23, VOR dem
@@ -55,6 +56,30 @@ Fehlerarten (nicht nur `ReplayDivergence`), zaehlt sie getrennt aus und
 schliesst betroffene Partien aus der Legalitaets-Stichprobe aus -- KEIN
 Ausweichen auf einen anderen Rekonstruktionspfad (das waere die Quarantaene-
 Verletzung). Die Erfolgsquote wird im Artefakt UND im Bericht ausgewiesen.
+
+REPARATUR ANGEEIGNET 2026-08-30: Commit cf53aab hat die Allokations-Bindung
+gebaut (`apply_tiling_chips_with` + `chip_allocations_json`, die Regel bleibt
+in der Engine), sie hing aber nur an `analyze_game_log.py::run()` -- und das
+ist der DATEI-Pfad, den diese Sonde gar nicht geht. `replay_arena_game` baute
+Replayer/`_run_loop` selbst und blieb darum greedy. Jetzt faehrt sie
+`_replay_once`/`_search_chip_plan`, also DIESELBEN Funktionen wie `run()`,
+nur mit `header`/`lines` aus dem Arena-Adapter statt aus `load_log`. Die
+Quarantaene ist unberuehrt (weiterhin ausschliesslich der replay-exakte Pfad).
+
+Das allein reichte NICHT, und der Grund korrigiert die Diagnose oben ein
+zweites Mal: die Plan-Suche hing nur an `apply_chip_completion`, dem
+GELOGGTEN Pfad -- und Arena-Partien haben davon keinen einzigen. Gemessen an
+20 Partien aus `paired_arena_env_imm_netvnet.json`: in den drei abbrechenden
+Partien 14 stille Chip-Vollendungen, 0 geloggte; alle drei Abbrueche kommen
+aus `maybe_silent_chip_complete`, also aus dem Pfad, den die Berichtigung
+vom 2026-08-29 gerade ausgeschlossen hatte (die galt fuer die eine
+untersuchte Mensch-Partie und war als pauschale Aussage falsch; gemeinsame
+Ursache ist das greedy RATEN hinter beiden Einstiegen). Seither haengt auch
+der stille Pfad am selben `chip_plan` (analyze_game_log.py). Abnahme
+derselben 20 Partien: 17 -> 20 von 20 replaybar.
+
+Die oben genannte ~20%-Quote ist damit HISTORISCH -- was der aktuelle Lauf
+misst, steht in `replay_erfolgsquote` seines eigenen Artefakts.
 
 LEGALITAETS-PRUEFUNG (je Hoehe-5-Ereignis mit `vollendet=False`, je Zug im
 Restfenster): die exakte Zielzelle (slot_row, slot_col, space_index) wird
@@ -100,7 +125,8 @@ sys.path.insert(0, str(ROOT / "tools" / "probes"))
 import mosaic_rust  # noqa: E402
 
 from analyze_game_log import (  # noqa: E402
-    Replayer, ReplayDivergence, LogLine, ROUND_PREFIX, _run_loop, check_prereqs,
+    LogLine, ROUND_PREFIX, check_prereqs,
+    _replay_once, _search_chip_plan, MAX_CHIP_PLAN_ATTEMPTS,
 )
 from plate_points_from_arena import game_list  # noqa: E402
 from column_completion_gap_probe import (  # noqa: E402
@@ -125,24 +151,63 @@ def lines_from_arena_log(log: list) -> list:
     return lines
 
 
+#: Wie oft die Chip-Plan-Suche eine sonst abbrechende Partie gerettet hat
+#: (nur Stdout-Auskunft, KEIN neues Artefaktfeld -- die Ausfallzaehlung
+#: bleibt in `replay_erfolgsquote`).
+CHIP_PLAN_RESCUES = 0
+
+
 def replay_arena_game(sp: dict):
     """Gibt (rep, lines, li_reached, fehlerart, fehlertext) zurueck.
-    `fehlerart` in {None, 'divergence', 'exception'} -- siehe Moduldoku zur
-    gemessenen ~20%-Ausfallquote durch die vorbestehende
-    `maybe_silent_chip_complete`-Luecke (KEIN Ausweichen, nur Zaehlung)."""
+    `fehlerart` in {None, 'divergence', 'exception'}.
+
+    FIX 2026-08-30 (Nachtrag zum pitfalls-Eintrag "Der Replayer raet die
+    Chip-Auswahl"): diese Funktion baute Replayer/`_run_loop` selbst und lief
+    darum weiterhin greedy durch jede geloggte Chip-Vollendung -- die
+    Allokations-Bindung aus Commit cf53aab hing ausschliesslich an
+    `analyze_game_log.py::run()`, und `run()` ist DATEI-basiert (`load_log`),
+    waehrend hier Arena-JSON-Partien vorliegen. Statt die Retry-Logik zu
+    kopieren, laeuft die Sonde jetzt auf DENSELBEN Funktionen wie `run()`:
+    `_replay_once` (ein vollstaendiger Durchlauf mit vorgegebenem Chip-Plan)
+    und `_search_chip_plan` (orakelfreie Rueckwaerts-Suche). Beide nehmen
+    `header`/`lines` direkt entgegen, brauchen also keinen Datei-Umweg -- der
+    Arena-Adapter oben bleibt unveraendert, und es entsteht keine zweite
+    Kopie der Regel.
+
+    Ohne Plan faehrt der erste Durchlauf weiter greedy (Bestandsverhalten):
+    Partien, die vorher sauber replayten, replayen byte-gleich. Erst bei
+    einer abgelehnten Chip-Vollendung wird gesucht; ohne Fund bleibt es beim
+    Ausfall, dann aber als klare Meldung statt rohem ValueError."""
+    global CHIP_PLAN_RESCUES
     lines = lines_from_arena_log(sp.get("log") or [])
     header = {"players": list(sp["names"]), "first_player": sp["first_player"], "seed": sp["game_seed"]}
-    rep = Replayer(header, f"arena_seed{sp.get('game_seed')}", "", 1, 1.5, False)
-    rep.hints = {}
+    log_name = f"arena_seed{sp.get('game_seed')}"
+    n_lines = len(lines)
+    # Bestandsparameter der Sonde: sims=1, c_puct=1.5, kein Orakel, kein Dump.
+    once = lambda plan: _replay_once(header, lines, {}, log_name, "", 1, 1.5, False,  # noqa: E731
+                                      n_lines, None, plan)
     try:
-        li = _run_loop(rep, lines, rep.name_to_idx, len(lines), False, time.time())
-        if li != len(lines):
-            return rep, lines, li, "divergence", f"unvollstaendig: {li}/{len(lines)}"
+        rep, li, div, chip_fail = once({})
+        if chip_fail is not None:
+            print(f"  Chip-Vollendung abgelehnt ({chip_fail}) -- suche eine tragfaehige "
+                  f"Chip-Auswahl (siehe docs/pitfalls.md)", flush=True)
+            plan = _search_chip_plan(header, lines, {}, log_name, "", n_lines, rep)
+            if plan is None:
+                return rep, lines, 0, "exception", (
+                    f"Chip-Vollendung nicht nachspielbar und keine Auswahl-Folge gefunden "
+                    f"(nach bis zu {MAX_CHIP_PLAN_ATTEMPTS} Versuchen): {chip_fail}")
+            rep, li, div, chip_fail = once(plan)
+            if chip_fail is not None:
+                return rep, lines, 0, "exception", f"Chip-Plan trug im finalen Lauf nicht: {chip_fail}"
+            CHIP_PLAN_RESCUES += 1
+            print(f"  Chip-Plan gefunden: {plan} -- Partie laeuft durch", flush=True)
+        if div is not None:
+            return rep, lines, 0, "divergence", div
+        if li != n_lines:
+            return rep, lines, li, "divergence", f"unvollstaendig: {li}/{n_lines}"
         return rep, lines, li, None, None
-    except ReplayDivergence as e:
-        return rep, lines, 0, "divergence", str(e)
     except Exception as e:  # noqa: BLE001 -- siehe Moduldoku: bewusst NICHT nur ReplayDivergence
-        return rep, lines, 0, "exception", f"{type(e).__name__}: {e}"
+        return None, lines, 0, "exception", f"{type(e).__name__}: {e}"
 
 
 # ── Nachspielen des validierten action_log (fuer echte Zustaende/Klone) ─────
@@ -379,6 +444,9 @@ def main() -> None:
     replay_ok_rate = per_game_stats["ok"] / n_tried if n_tried else None
     print(f"\nReplay-Erfolgsquote: {per_game_stats['ok']}/{n_tried} = {replay_ok_rate}")
     print(f"  divergence={per_game_stats['divergence']} exception={per_game_stats['exception']}")
+    # Nur Stdout (kein neues Artefaktfeld): wie oft die Allokations-Bindung
+    # aus cf53aab eine sonst abbrechende Partie gerettet hat.
+    print(f"  davon durch Chip-Plan-Suche gerettet: {CHIP_PLAN_RESCUES}")
 
     # ── Aggregation: echte verpasste Quote je (quelle, rolle, k1_aktiv) ─────
     gruppen = defaultdict(list)
@@ -421,12 +489,17 @@ def main() -> None:
             "n_partien_versucht": n_tried, "n_ok": per_game_stats["ok"],
             "n_divergence": per_game_stats["divergence"], "n_exception": per_game_stats["exception"],
             "rate": replay_ok_rate,
-            "exception_ursache": "Replayer raet die Chip-ALLOKATION greedy statt der freien "
+            "exception_ursache": "Replayer riet die Chip-ALLOKATION greedy statt der freien "
                                   "KI-Wahl (apply_tiling_chips -> round_end.rs:487); Divergenz "
-                                  "schlaegt Runden spaeter als 'Reihe N nicht mit Chips "
+                                  "schlug Runden spaeter als 'Reihe N nicht mit Chips "
                                   "komplettierbar' zu. Berichtigung 2026-08-29, docs/pitfalls.md; "
                                   "aeltere Artefakte tragen die fruehere (falsche) Zuschreibung an "
-                                  "maybe_silent_chip_complete.",
+                                  "maybe_silent_chip_complete. Seit 2026-08-30 faehrt diese Sonde "
+                                  "die Allokations-Bindung aus cf53aab mit "
+                                  "(_replay_once/_search_chip_plan wie analyze_game_log.py::run()): "
+                                  "der erste Durchlauf bleibt greedy, bei einer abgelehnten "
+                                  "Chip-Vollendung wird orakelfrei eine tragfaehige Auswahl gesucht. "
+                                  "Was hier noch als exception steht, hat diese Suche NICHT geloest.",
             "exception_beispiele": exception_examples, "divergence_beispiele": divergence_examples,
         },
         "n_ereignisse_geprueft_gesamt": n_events_checked,
