@@ -7,16 +7,23 @@
     datierte models-Zips), damit beim Umstieg keine Historie verloren geht.
     Danach genuegt tools/mosaic_backup.ps1.
 
-    ZWEI QUELLEN, ZWEI BEHANDLUNGEN:
+    ZWEI QUELLEN, ZWEI BEHANDLUNGEN, IN DIESER REIHENFOLGE:
 
-    1. <BackupRoot>\models_snapshots\models_JJJJ-MM-TT.zip
+    1. <BackupRoot>\mirror -- der Basisstand.
+       Ein Snapshot des Spiegels, mit derselben Ausschlussliste wie der
+       Tageslauf. Der Spiegel enthaelt auch Dateien, die im Arbeitsbaum
+       laengst geloescht sind -- genau dafuer lief er ohne /PURGE, und
+       genau das soll erhalten bleiben.
+
+    2. <BackupRoot>\models_snapshots\models_JJJJ-MM-TT.zip -- die Historie.
        Jedes Zip wird ENTPACKT und als eigener Snapshot mit dem Datum des
        Archivs eingespielt (--time). Das ist der Kern des sauberen Imports:
        ein Zip ist fuer content-defined chunking undurchdringlich. Zwei
        Archive, die sich in einer Datei unterscheiden, haben ab der ersten
        Abweichung durchgehend andere Bytes und dedupen zu praktisch null.
        Entpackt teilen sich die 14 Staende ihre unveraenderten Netze, und
-       sie dedupen zusaetzlich gegen die spaeteren Tageslaeufe.
+       sie dedupen zusaetzlich gegen den Spiegel und die spaeteren
+       Tageslaeufe.
 
        Gemessen am 2026-08-30: models/ ist 627 MB. Als Zips liegen dort
        rund 8 GB fast identischer Archive; entpackt sollte das Repo davon
@@ -24,11 +31,19 @@
        am Ende beide Groessen, damit die Ersparnis nicht behauptet, sondern
        abgelesen wird.
 
-    2. <BackupRoot>\mirror
-       Ein Snapshot des Spiegels, mit derselben Ausschlussliste wie der
-       Tageslauf. Der Spiegel enthaelt auch Dateien, die im Arbeitsbaum
-       laengst geloescht sind -- genau dafuer lief er ohne /PURGE, und
-       genau das soll erhalten bleiben.
+    WARUM DIESE REIHENFOLGE: fuer die Groesse des Repositories ist sie
+    gleichgueltig, weil restic Bloecke ueber ihren Inhalt adressiert -- in
+    jeder Reihenfolge entsteht dieselbe Menge. Sie entscheidet aber, was
+    nach einem Abbruch schon gesichert ist. Der Spiegel ist der aktuelle
+    Stand, die Zips sind Historie; das Wertvollere kommt zuerst. Schlaegt
+    der Spiegel-Import fehl, bricht das Skript ab, statt mit der Historie
+    weiterzumachen.
+
+    DANACH kommt der Arbeitsbaum selbst, ueber tools/mosaic_backup.ps1.
+    Wer ihn frueher will, kann diesen Import zweistufig fahren:
+    zuerst -SkipZips (nur Spiegel), dann den Tageslauf, dann diesen Import
+    erneut ohne Schalter -- schon eingespielte Zip-Staende werden an ihrem
+    Datum erkannt und uebersprungen.
 
     PFADE IM SNAPSHOT: restic speichert den Pfad, aus dem gesichert wurde.
     Die Zip-Snapshots tragen darum den Arbeitsverzeichnis-Pfad, nicht den
@@ -127,7 +142,41 @@ if ($alreadyImported.Count) {
     Write-BackupLog $ctx "Bereits importierte models-Staende: $($alreadyImported.Count)"
 }
 
-# --- 1. models-Zips ---------------------------------------------------------
+# --- 1. Spiegel: der Basisstand ---------------------------------------------
+# Nutzer-Entscheid 2026-08-31: der Spiegel zuerst, dann die Historie.
+#
+# Fuer die GROESSE des Repositories ist die Reihenfolge gleichgueltig -- restic
+# adressiert Bloecke ueber ihren Inhalt, es entsteht in jeder Reihenfolge
+# dieselbe Menge. Sie entscheidet aber, was nach einem Abbruch schon drin ist,
+# und da ist die Rangfolge eindeutig: der Spiegel ist der aktuelle Stand samt
+# der Dateien, die im Arbeitsbaum geloescht wurden; die Zips sind Historie.
+# Das Wertvollere zuerst.
+$mirrorRc = $null
+if (-not $SkipMirror) {
+    if (-not (Test-Path $mirrorDir)) {
+        Write-BackupLog $ctx "HINWEIS: $mirrorDir existiert nicht -- kein Spiegel zu importieren."
+    } else {
+        Write-BackupLog $ctx "Spiegel einspielen (Basisstand): $mirrorDir"
+        $mirrorArgs = @(
+            "backup", $mirrorDir,
+            "--exclude-file", $ctx.ExcludeFile,
+            "--tag", "mosaic-ai",
+            "--tag", "legacy-mirror",
+            "--verbose"
+        )
+        if ($DryRun) { $mirrorArgs += "--dry-run" }
+        & $ctx.ResticExe @mirrorArgs
+        $mirrorRc = $LASTEXITCODE
+        if ($mirrorRc -eq 0 -or $mirrorRc -eq 3) {
+            Write-BackupLog $ctx "Spiegel eingespielt (Exitcode $mirrorRc)."
+        } else {
+            Write-BackupLog $ctx "FEHLER: Spiegel-Import fehlgeschlagen (Exitcode $mirrorRc) -- Abbruch vor den Zips."
+            throw "restic backup fehlgeschlagen fuer den Spiegel."
+        }
+    }
+}
+
+# --- 2. models-Zips: die Historie -------------------------------------------
 $zipImported = 0
 $zipSkipped = 0
 if (-not $SkipZips) {
@@ -192,31 +241,6 @@ if (-not $SkipZips) {
             }
 
             Remove-Item $target -Recurse -Force
-        }
-    }
-}
-
-# --- 2. Spiegel -------------------------------------------------------------
-$mirrorRc = $null
-if (-not $SkipMirror) {
-    if (-not (Test-Path $mirrorDir)) {
-        Write-BackupLog $ctx "HINWEIS: $mirrorDir existiert nicht -- kein Spiegel zu importieren."
-    } else {
-        Write-BackupLog $ctx "Spiegel einspielen: $mirrorDir"
-        $mirrorArgs = @(
-            "backup", $mirrorDir,
-            "--exclude-file", $ctx.ExcludeFile,
-            "--tag", "mosaic-ai",
-            "--tag", "legacy-mirror",
-            "--verbose"
-        )
-        if ($DryRun) { $mirrorArgs += "--dry-run" }
-        & $ctx.ResticExe @mirrorArgs
-        $mirrorRc = $LASTEXITCODE
-        if ($mirrorRc -eq 0 -or $mirrorRc -eq 3) {
-            Write-BackupLog $ctx "Spiegel eingespielt (Exitcode $mirrorRc)."
-        } else {
-            Write-BackupLog $ctx "FEHLER: Spiegel-Import fehlgeschlagen (Exitcode $mirrorRc)."
         }
     }
 }
