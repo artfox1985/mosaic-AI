@@ -2250,13 +2250,65 @@ die Rollenteilung:
   Partien, alle verschieden). Zustands-Diversitaet ist dort geringer als
   bei Sampling; das ist der bewusste Tausch gegen Vollendungs-Labels.
 
-**Waechter-Lesart praezisiert (ersetzt die pauschale Schwelle oben):**
-die 0,17 gilt auf der **VALUE-Klasse** (dort entsteht die
-Vollendungs-Exposition, um die es geht); erwartet ~0,3 aus dem
-argmax-Anteil. Fuer die Policy-Klasse gilt KEINE Spalten-Schwelle --
-ihr Auftrag ist Abdeckung, und ihr Spaltensignal kommt aus hv2 --,
-ihre Rate wird nur BERICHTET. Die Symmetrie-Trennung wird auf beiden
-Klassen geprueft und muss auf der Value-Klasse signifikant > 0 sein.
+**WAECHTER NEU GEFASST 2026-08-30 (Nutzer-Freigabe "bau das so";
+ersetzt die 0,17-Schwelle als Tor).** Anlass ist die Nutzer-Frage
+"woher kommt eigentlich der wert 0.17" und die ehrliche Antwort: die
+Zahl war der halbierte Instrumentwert, von mir gesetzt und als Annahme
+markiert -- eine Faustzahl, die eine 20-Stunden-Entscheidung gesteuert
+haette. Neue Fassung:
+
+1. **PRIMAER (inhaltlich begruendet): Symmetrie-Trennung auf der
+   VALUE-Klasse signifikant > 0** (corpus_column_outcome_symmetry_probe;
+   Referenz hv2-Korpus +0,573, t 93). Begruendung: der Value-Kopf kann
+   per Konstruktion nur lernen, was den AUSGANG trennt -- trennt
+   Spaltenbau im neuen Korpus Sieg nicht von Niederlage, ist das
+   Material fuer die Betrags-Heilung wertlos, unabhaengig von jeder
+   Rate.
+2. **SEKUNDAER: mindestens 1.500 Partien-Seiten mit >= 1 voller Spalte
+   im Value-Korpus** (Zaehlung am Endbrett je Partie und Seite).
+   Herkunft der Zahl: GESETZT, aber an der Lernmaterial-Logik statt an
+   einer Rate orientiert -- eine Rate ignoriert die Korpusgroesse, die
+   Ereigniszahl nicht. Der Posten ist ein STOPP gegen Degeneration
+   (ein Korpus praktisch ohne Vollendungen), KEINE Lernbarkeits-
+   Garantie: der hv2-Korpus enthaelt weit mehr solcher Seiten, und die
+   Daempfung heilte dort trotzdem nicht (off-policy).
+3. **BERICHTSGROESSE, kein Tor:** volle Spalten je Partie+Seite in
+   beiden Klassen (Referenzwerte fuer die Einordnung: argmax 0,3375,
+   gesampelt 0,07-0,11, Champion 0,102). Fuer die Policy-Klasse gilt
+   ohnehin keine Schwelle -- ihr Auftrag ist Zustandsabdeckung, ihr
+   Spaltensignal kommt aus dem hv2-Anker.
+
+**Offene Frage dahinter, jetzt benannt:** wieviel Vollendungsdichte der
+Value-Kopf ueberhaupt braucht, ist im Projekt NIE gemessen worden.
+Erster billiger Test (Nutzer-Vorschlag 2026-08-30, sauberer als mein
+v18/v19-Entwurf): **v21_2d_brierbest gegen v22-b05** -- gleiche Aera,
+gleiche Architektur (2D/WDL), Korpus-Dichte ~0,10 gegen 0,73, also
+Faktor 7 bei sonst gleichen Bedingungen. Bleibt die R5-Platten-Steigung
+gleich (b05: 0,0886), ist die Dichte NICHT der Hebel und die
+Betrags-Daempfung strukturell -- das faellt dann direkt auf Phase 3
+zurueck.
+
+**SIMS-PROBE GEFAHREN 2026-08-30 (VOR dem Schwarm-Start, weil
+`--value-only` das Cheap-Budget an `--sims` koppelt, self_play.py:777 --
+"kleine Sims" gibt es nur ueber ein kleines --sims):** 200 Partien
+argmax value-only mit **150 Sims: 0,4425 +- 0,042 volle Spalten**
+(Quote 0,211, init>=4 2,09, Punkte 41,0) gegen 5,3 s je Partie
+(400 Sims: 12,5 s). **ENTSCHEID: der Schwarm faehrt 150 Sims** -- er
+haelt die Vollendungs-Exposition der Value-Klasse mit Abstand und
+entspricht dem registrierten Zuschnitt ("kleine Sims", Fenster-Prereg
+par.2). Der Policy-Sockel bleibt bei 400 (dort sind die Ziele das
+Produkt, und Zieltiefe kostet dort direkt Qualitaet).
+
+**BEOBACHTUNG mit Caveat, kein Befund:** 0,4425 liegt UEBER dem
+400-Sims-Referenzwert 0,3375 -- aber die beiden stammen aus
+VERSCHIEDENEN Modi (value-only gegen normalen Self-Play), sind also
+nicht sauber vergleichbar; die Kontrollzelle (value-only @400) fehlt.
+Falls sich der Effekt bestaetigt, waere er inhaltlich anschlussfaehig
+an die Phase-0-Diagnose (Policy traegt das Spaltenwissen, der
+gedaempfte Value-Kopf ueberstimmt es mit wachsender Suchtiefe; bei
+sims=1 kollabiert dagegen alles, par.3b.8 Stufe C 0,0075) -- das waere
+ein Optimum mittlerer Tiefe fuer den Spaltenbau und ein eigener
+Messstrang, NICHT hier mitentschieden.
 
 **Dateipraefixe (Generator-Konvention plus Klassen-Suffix):**
 `v22-b05-policy` (Seed 20260901), `v22-b05-value-argmax` (Seed
