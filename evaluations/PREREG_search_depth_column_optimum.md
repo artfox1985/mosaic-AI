@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: WEITGEHEND BEANTWORTET 2026-08-30. PLATEAU 25-100 (~0,6 volle Spalten, frisch-seed-repliziert) gegen 0,34 ab 250 (par.2i). Der Gewinn ist ein TAUSCH: b05@25 verliert 11:29 (p=0,0117), b05@100 verliert 33:47 (n.s., KI knapp die Null) (par.2j). Faktor ist die TIEFE, nicht die Wurzelbreite (par.2k: 400/m6 = 0,3525). Offen nur noch der v21-Vergleich (haengt der Effekt am Prior?). -->
+<!-- STATUS: OFFEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: WEITGEHEND BEANTWORTET 2026-08-30. PLATEAU 25-100 (~0,6 volle Spalten, frisch-seed-repliziert) gegen 0,34 ab 250 (par.2i). Der Gewinn ist ein TAUSCH: b05@25 verliert 11:29 (p=0,0117), b05@100 verliert 33:47 (n.s., KI knapp die Null) (par.2j). Faktor ist die TIEFE, nicht die Wurzelbreite (par.2k: 400/m6 = 0,3525). v21-Vergleich GEFAHREN (par.2l): bei plattenblindem Prior tritt der Effekt NICHT auf (-0,026 statt +0,29) -- die Suche drueckt weg, was der Prior anbietet. STRANG ABGESCHLOSSEN bis auf die optionale Stufe 4 (Mechanismus-Zaehlung). -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -364,6 +364,60 @@ zwischen den beiden Koepfen -- und der Betriebspunkt 400 steht auf der
 Seite des defekten.** Das ist eine Deutung, kein Beleg; pruefbar waere
 sie ueber Stufe 2e (haengt der Effekt am Prior?) und ueber die
 Umkehrprobe nach einer erfolgreichen Phase 3 (kippt die Kurve?).
+
+## par.2l STUFE 2e GEFAHREN: der Effekt haengt am PRIOR -- Deutung bestaetigt
+
+v21_2d_brierbest (plattenblind trainiert, Prior-Ratio 0,59 gegen b05s
+1,23), value-only argmax, Seed 20260941, je 600 Partien, Knopf EIN:
+
+| Netz | 100 Sims | 250 Sims | Differenz |
+| --- | --- | --- | --- |
+| b05 (spaltenkundiger Prior) | 0,6225 | 0,3325 | **+0,2900** |
+| v21 (plattenblind) | 0,1058 +- 0,0096 | 0,1317 +- 0,0100 | **-0,0258** (t -1,89) |
+
+**Bei v21 tritt der Effekt NICHT auf -- er zeigt sogar leicht in die
+Gegenrichtung**, und auch die Punkte bleiben unbewegt (47,23 gegen
+47,53; bei b05 lagen sie 6 Punkte auseinander). Das ist exakt die
+vorab registrierte Falsifikationsbedingung: zeigt v21 denselben
+Sprung, ist die Prior-Deutung widerlegt; bleibt er flach, haengt der
+Effekt am Prior. **Er bleibt flach.**
+
+**Damit steht die Mechanik:** die Suche drueckt weg, was der Prior an
+Spaltenwissen anbietet. Wo nichts angeboten wird, kann nichts
+weggedrueckt werden. Die Suchtiefe wirkt nur, wo Prior und Value-Kopf
+verschiedener Meinung sind.
+
+**Messmethodische Lehre, die dazugehoert:** der 20-Partien-Rauchtest
+hatte fuer v21@100 0,275 gezeigt und mich fast zur Aussage verleitet,
+die Deutung sei widerlegt. Der volle Lauf liefert 0,1058 -- Faktor 2,6
+daneben. Bei n=20 ist der Fehler so gross wie der Effekt; ein
+Rauchtest belegt, dass ein Werkzeug LAEUFT, nie was es misst.
+
+## par.2m ANSCHLUSS an die Einhuellenden-Idee (Nutzer 2026-08-30)
+
+Der Befund stuetzt die Bauform "Einhuellende frueh stark, ueber die
+Runden abklingend" -- vier unabhaengige Gruende:
+
+1. **Frueh entscheidet es sich:** die Ketten-Diagnose (par.3b.8) zeigt,
+   dass sich Abweichungen ueber die Kette multiplizieren (0,6^k); die
+   Versorgung wird in R1-2 verspielt, nicht in R5.
+2. **Dort ist der Bewerter am schwaechsten:** Ownership-Kopf trennt in
+   R1 mit AUC 0,698 gegen 0,886 in R5 (PREREG_ownership_selector par.9.4).
+3. **Spaet braucht es nichts:** ab Runde 5 rechnet die exakte
+   Alpha-Beta-Suche (round5.rs), dort ist nichts zu lenken.
+4. **Die Huelle umgeht den defekten Kanal:** sie ist eine geometrische
+   Vorgabe und braucht keine Bewertung des Plattenlohns.
+
+**Registrierungsstand der Idee (geprueft):** der HUELLEN-TRIMM der
+Ownership-Loss-Maske ist als Nachtrag 6 der Lehrer-Prereg registriert;
+die EINHUELLENDE ALS 2D-EINGABEEBENE steht nur als Merkposten in der
+STATUS-Strangtabelle (Nutzer-Frage 2026-08-24, "nicht registriert");
+das RUNDENABKLINGEN ist neu. **Vorbehalt:** Shaping-Terme auf
+Wertungsplatten waren mehrfach H0 und die Injektionslinie gilt als "zu
+Ende gemessen" -- neu waeren hier zwei Dinge, die Potentialform
+(Ng/Harada/Russell, die einzige nachweislich politik-erhaltende
+Bauform, RESEARCH_heuristic_methodology 4.6) und ein spaltenfaehiges
+Netz als Traeger.
 
 ## par.3 Was dieser Strang NICHT ist
 
