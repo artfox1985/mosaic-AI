@@ -296,10 +296,13 @@ rund 20 liegt.
 
 ### Die Farbanforderungen beider Spieler sind VERSCHIEDEN
 
-Jeder Spieler hat seine eigene Kuppel mit eigenen Kuppelplatten, individuell
-aus der Auslage gezogen, Position und Rotation frei (`engine_manual.md:40-42`,
-`:65`, `:80`). Welche Farben eine Spalte verlangt, bestimmt also das
-individuelle Plattenlayout. **Geteilt sind die KRITERIEN, nicht die Farben.**
+Prämisse aus dem Handbuch (`engine_manual.md:66`, `:91`): jeder Spieler zieht
+seine Kuppelplatten selbst aus der Auslage, **Position und Rotation sind
+unbeschränkt**.
+
+Daraus folgt: welche Farben eine Spalte verlangt, bestimmt das individuelle
+Plattenlayout – **die Farbanforderungen beider Spieler sind verschieden.
+Geteilt sind die KRITERIEN, nicht die Farben.**
 
 Daraus folgt direkt, dass Blockade über Farbe kaum greift – und die Messung
 bestätigt es: „Farbe nie verfügbar, während Zeile offen" wurde mit **0 %**
@@ -436,17 +439,15 @@ Spieler faellt. Die Groessenordnung traegt, die zweite Stelle nicht.
 
 ## 6. Strafleiste
 
-**Regel** (`engine_manual.md:38`, `:161-163`): 4 Slots, die **-1, -2, -3, -4**
-je belegtem Slot zahlen; der Startspielerstein kostet weitere **-2**. Der
-Gesamtpunktestand kann durch Strafen **nie unter 0** fallen -- die Klammer gilt
-bei jeder Abrechnung gegen den laufenden Stand.
+**Regellage** (normativ in `engine_manual.md:38`, `:110-113`, `:161-163`,
+hier nur als Prämisse): 4 Slots à −1/−2/−3/−4, Startspielerstein −2,
+Punktestand nie unter 0; Steine, die nicht mehr passen, fallen auf die Leiste,
+und freiwilliges Ablegen ist ebenfalls erlaubt.
 
-**Beide Wege auf die Leiste sind regelseitig dieselbe Sache**
-(`engine_manual.md` Z.110-113): Steine, die nicht mehr in die gewaehlte
-Musterreihe passen, fallen darauf; sie dort freiwillig abzulegen ist ebenfalls
-erlaubt. **Es gibt keine Regel, die zwischen „abgeladen" und „uebergelaufen"
-unterscheidet** -- oekonomisch sind die Kanaele identisch
-(`PREREG_floor_action_aversion.md` par.2).
+**Was daraus folgt und im Handbuch nicht steht:** es gibt **keine Regel, die
+zwischen „abgeladen" und „übergelaufen" unterscheidet** – die beiden Kanäle
+sind ökonomisch identisch (`PREREG_floor_action_aversion.md` par.2). Wer den
+einen meidet und den anderen nicht, meidet die Aktion, nicht die Kosten.
 
 **Groessenordnung** (407 identische gepaarte Partien, Block-Ebene,
 `tools/probes/penalty_track_probe.py`):
@@ -584,10 +585,12 @@ für Informationsmengen, also für privates Wissen. Wer sie hier misst, misst
 Werkzeug aus der falschen Familie – drei Messungen sind daran gescheitert.
 Quelle: `PREREG_chance_nodes.md`, „Die strukturelle Grundlage".
 
-**Auch der Kuppelplatten-Pool ist ableitbar**: die 18 Designs sind ein offener
-Satz mit je einem Exemplar (`dome.rs:198-226`); wer Auslage und Bretter sieht,
-kennt den Rest durch Subtraktion. `dome_pool_mask` ist abgeleitetes
-öffentliches Wissen, kein Orakel.
+**Auch der Kuppelplatten-Pool ist ableitbar.** Prämisse aus dem Handbuch
+(`engine_manual.md:44-48`): 18 Platten, 9 mit Spezialfeld und 9 mit Wildfeld,
+3 offen in der Auslage, der Rest im verdeckten Stapel. Daraus folgt: es ist
+ein offener Satz mit je einem Exemplar (`dome.rs:198-226`), also kennt den
+Rest durch Subtraktion, wer Auslage und Bretter sieht. `dome_pool_mask` ist
+abgeleitetes öffentliches Wissen, kein Orakel.
 
 ### Der Kuppelstapel ist bis Runde 4 abgetragen
 
