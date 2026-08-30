@@ -78,6 +78,41 @@ Netz), aber nicht notwendig die Richtigkeit. Ein Gewinn ist zu
 erwarten, wenn die Ziele von einem SCHWAECHEREN Vorgaenger stammen --
 genau der Fall im Generationen-Loop, nicht im Erstlauf.
 
+## par.4a DREI Arten von "Relabeln" -- nicht verwechseln (praezisiert 2026-08-30 nach der Sims-Kurve)
+
+Die Kurve (PREREG_search_depth_column_optimum) zwingt zu einer
+Unterscheidung, die par.1 noch nicht scharf hatte: sie gilt auch fuer
+die BESUCHSVERTEILUNG. Eine tiefe Suche besucht denselben Spaltenzug
+seltener als eine flache -- tiefes Nachlabeln holt die
+Spaltenblindheit also ueber die Hintertuer zurueck.
+
+| Variante | Ziele danach | Stand |
+| --- | --- | --- |
+| tief nachlabeln (Reanalyze i.e.S.) | taktisch schaerfer, aber SPALTENAERMER | die Falle; fuer die Policy-Seite kontraproduktiv, solange die Kurve gilt |
+| Lehrer-Relabeln (DAgger) | spaltenreich | gebaut; Runde 2 GESAETTIGT (par.3b.11) |
+| **flach spielen + Lehrer-Relabeln** | spaltenreiche Zustaende UND Ziele | NEU, Nutzer-Vorschlag 2026-08-30 |
+
+**Die dritte Zeile ist die interessante, und sie liefert eine
+Erklaerung fuer die Saettigung:** alle bisherigen DAgger-Runden liefen
+auf Brettern aus 400-Sims-Spiel -- genau den spaltenaermsten, die b05
+produziert. Auf ihnen bedient laut par.3b.8 selbst der LEHRER die
+fehlende Reihe nur zu ~0,25. Mit einem flach gespielten Sockel waeren
+die Bretter spaltenreicher, der Lehrer haette dort wieder etwas zu
+holen. HYPOTHESE, nicht gemessen -- aber sie erklaert die Saettigung
+ohne die Annahme, DAgger sei ausgereizt.
+
+**Fuer die VALUE-Seite gilt der Einwand NICHT.** Dort geht es um
+Bootstrap-Werte, nicht um Zugpraeferenzen; tieferes Nachrechnen ist
+dort unverdaechtig. Daraus die Arbeitsteilung (Nutzer 2026-08-30):
+flach spielen, POLICY per Lehrer relabeln, VALUE tief nachlabeln.
+
+**Zwei Auflagen fuer den Value-Teil, die dabei nicht untergehen
+duerfen:** (1) das Value-Ziel ist KEIN einzelner Suchwert, sondern
+Ausgang plus Bootstrap (TD_LAMBDA 0,5, Horizont 2) -- nachlabeln heisst,
+diese Kette konsistent neu zu rechnen, nicht nur root_q zu ersetzen.
+(2) Kosten grob 0,15 s je Zustand bei 400 Sims; ein voller
+12.000-Partien-Korpus ist damit ein Tagesbudget.
+
 ## par.5 Abgleich mit dem Phasenplan (STATUS)
 
 * **Phase 2 (Generationen-Lauf) geht VOR** -- beide Teile brauchen den
