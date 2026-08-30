@@ -205,6 +205,14 @@ zugunsten von alpha 0,2: Zustandsabdeckung 3.087 auf 3.057 distinkte
 Endbretter 220 zu 220. ENTSCHEID alpha 0,0 (par.3b), gemessen statt
 verfallen.
 
+**Laufzeiten aus der Nacht, fuer die N4-Planung (gemessen, nicht
+geschaetzt):** Netz-Self-Play b05@400 mit Root-Noise, threads 11:
+**8,27 bis 8,73 s je Partie** ueber vier 100er-Laeufe -- die 8,4-s-Annahme
+des Fahrplans ist damit auf der EXAKTEN Sockel-Konfiguration bestaetigt,
+4.000 Sockel-Partien sind rund 9,3 Stunden. Gepaarte Arena b05@400 gegen
+Heuristik@150, threads 10: 3,33 s je Partie (666 s fuer 2 x 100), also
+rund 34 s je Block von 10.
+
 **N2 ERLEDIGT -- Stapelzug-Knopf kommt AN (2026-08-30, Artefakt
 evaluations/artifacts/stack_draw_research_b05.json).** 100 gepaarte Partien
 b05@400 gegen Heuristik@150, je Arm ein eigener Prozess (Spiegelmatch
