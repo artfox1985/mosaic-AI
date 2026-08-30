@@ -183,6 +183,15 @@ def load_torch_model(pth_path: str):
     return model, encoder
 
 
+def _model_plane_channels(model):
+    """Erwartete Planes-Kanalzahl aus dem ersten Conv2d des Modells
+    (weight-Form [out, in, k, k]); None, wenn keiner gefunden wird."""
+    for mod in model.modules():
+        if isinstance(mod, torch.nn.Conv2d):
+            return mod.weight.shape[1]
+    return None
+
+
 def raw_value_points_torch(model, encoder: str, state: dict, combo) -> tuple:
     """(raw_value, raw_points), beide tanh-Skala [-1,1], fuer `state` mit
     `combo` als Wertungsplatten -- direkter Torch-Forward-Pass, KEINE lebende
@@ -194,6 +203,19 @@ def raw_value_points_torch(model, encoder: str, state: dict, combo) -> tuple:
     with torch.no_grad():
         if encoder == "2d":
             x_planes = state_to_planes(s).unsqueeze(0)
+            # Kanal-Kuerzung fuer Alt-Modelle (2026-08-30): der heutige
+            # Encoder liefert 79 Planes, aeltere Checkpoints kennen
+            # weniger (v21: 76). Die Erweiterungen sind ausnahmslos HINTEN
+            # angehaengt (features.rs:818/826/837 -- Reachability 76,
+            # Spezial-Ertrag 77, Spezial-Abstand 78), die vorderen Kanaele
+            # sind also bedeutungsgleich. Dieselbe Kuerzung macht der
+            # Rust-Pfad (net::split_planes_flat_batch_src, "auf die vom
+            # MODELL deklarierte Kanalzahl"; Memory: 2D-Encoder ist
+            # additiv). NUR kuerzen, nie auffuellen: ist das Modell
+            # BREITER als die Eingabe, bleibt es beim harten Fehler.
+            want = _model_plane_channels(model)
+            if want is not None and want < x_planes.shape[1]:
+                x_planes = x_planes[:, :want, :, :]
             out = model(x_planes, x_flat)
         else:
             out = model(x_flat)
