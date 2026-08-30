@@ -199,8 +199,14 @@ genau deshalb lief Stufe 1.
 
 **(1) Der Sockel-Wert 400 war willkuerlich.** Er stand unkommentiert im
 Zuschnitt D, begruendet nur mit "dort sind die Ziele das Produkt". Der
-BESTAND faehrt seit Generationen **600 Sims** fuer den Netz-Sockel
-(PREREG_v21_window.md:15, PREREG_v22_window.md:123, selbst gelesen) --
+BESTAND faehrt **600 Sims** fuer den Netz-Sockel
+(PREREG_v21_window.md:15, Generator v20-Champion, 4.000 Partien) --
+BERICHTIGT 2026-08-30 auf Nutzer-Einwand: ich hatte zusaetzlich
+PREREG_v22_window.md:123 zitiert, aber diese Tabellenzeile gehoert zum
+am 2026-08-25 VERWORFENEN Entwurf (das v22-Fenster IST der
+hv2-Lehrerkorpus, kein Netz-Korpus). Fundstelle gegriffen, ohne ihre
+Gueltigkeit zu pruefen -- die Aussage steht damit auf EINEM Beleg
+statt auf zweien.
 meine Zahl war also weder gemessen noch am Bestand orientiert. Sie ist
 aus der Festlegung raus; die Sockel-Sims gehoeren in dieselbe
 Arena-Entscheidung wie der Schwarm. Hintergrund, der die Sache
@@ -218,6 +224,36 @@ frueher nicht aufgetreten sein -- dort gab es kein Spaltenwissen zu
 ueberstimmen. Die historische Spaltenarmut haengt am fehlenden Lehrer.
 Ein 600er-Arm fuer b05 wurde daraufhin VERWORFEN (Nutzer): er wuerde
 einen Betriebspunkt vermessen, den niemand mehr erwaegt.
+
+## par.2h FOLGEGEDANKE: Spielen und Labeln entkoppeln (registriert 2026-08-30; Idee, KEINE Machbarkeitsaussage)
+
+**Beobachtung, die den Gedanken ausgeloest hat:** der hv2-Korpus TRENNT
+die beiden Rollen -- die Heuristik spielt (spaltenkompetent), das Netz
+labelt mit 600 Sims. Das NETZ-Self-Play kann das nicht: dieselbe Suche
+waehlt den Zug UND liefert das Policy-Ziel. Genau deshalb greift die
+Sims-Kurve dort voll durch.
+
+**Der Gedanke:** sollte sich bestaetigen, dass flache Suche besser
+SPIELT (Spalten, Punkte) und tiefe besser LABELT, waere die saubere
+Loesung eine Entkopplung -- mit flacher Suche spielen, die besuchten
+Zustaende danach mit tieferer Suche nachlabeln. Technisch ist das
+"Reanalyze" (MuZero/ReZero-Muster), im Projekt als Phase-3-Kandidat
+aus der Research-Durchsicht 2026-08-29 benannt und bis heute
+UNREGISTRIERT und ungebaut; das gebaute Relabeling
+(relabel_drafts_with_teacher) ersetzt Policy-Ziele durch LEHRER-Zuege
+und laesst Value-Felder unberuehrt, ist also etwas anderes.
+
+**Zwei Vorbehalte, die dazugehoeren:**
+1. **Machbarkeit ungeprueft.** Ob die Engine gespeicherte Zustaende mit
+   einer zweiten, tieferen Suche nachlabeln kann, ohne die Partie neu
+   zu spielen, habe ich NICHT nachgesehen.
+2. **Die Praemisse "tiefe labelt besser" ist selbst ungeprueft** -- und
+   dieser Strang stellt sie gerade in Frage. Folgt die Suche einem
+   verzerrten Bewerter, koennte tiefere Suche auch SCHLECHTERE Ziele
+   liefern; dann waere die Entkopplung keine Loesung, sondern eine
+   Verdopplung des Fehlers. Der Gedanke haengt also an einer Messung,
+   die es noch nicht gibt (und fuer die es keine neutrale Referenz
+   gibt, siehe par.2 Stufe 3).
 
 ## par.3 Was dieser Strang NICHT ist
 
