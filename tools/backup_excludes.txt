@@ -1,0 +1,50 @@
+# Ausschlussliste fuer tools/mosaic_backup.ps1 (restic --exclude-file).
+#
+# Aufnahmekriterium: nur was REGENERIERBAR ist. Alles andere wird gesichert,
+# auch wenn es gross ist -- die gitignorierten Artefakte (models/*.pth|onnx,
+# data/*.pkl) sind genau das, was git NICHT retten kann.
+#
+# Muster-Semantik (restic-Doku, Abschnitt "Excluding Files"): getestet wird
+# gegen den VOLLEN Pfad, aber nur auf ganzen Pfadkomponenten. "logs" trifft
+# darum jedes Verzeichnis dieses Namens, "engine/target" die Komponentenfolge.
+# Kein Negations-Praefix wie bei .gitignore -- was hier steht, ist draussen.
+
+# --- Build-Ausgaben ---------------------------------------------------------
+engine/target
+dist
+build
+__pycache__
+*.pyc
+*.pyd
+.pytest_cache
+.mypy_cache
+
+# --- Virtuelle Umgebungen ---------------------------------------------------
+# Trifft auch die venv/ INNERHALB eingefrorener Artefakte. Die sind laut
+# .gitignore ausdruecklich ableitbar: sie entstehen aus dem mitgesicherten
+# Wheel neu (33 MB je Artefakt). Das Wheel selbst bleibt drin -- es ist der
+# Traeger des Verhaltens, nicht Build-Abfall.
+venv
+.venv
+env
+
+# --- Trainingscaches --------------------------------------------------------
+# 5.331 MB in 2.551 Dateien, gemessen 2026-08-30. Erzeugt von
+# tools/build_cache_parallel.py bzw. build_cache_serial.py, jederzeit
+# nachbaubar. Ausserhalb von data/ existiert keine einzige .h5 (geprueft),
+# der Pauschalausschluss trifft also nichts anderes.
+#
+# ANLASS: die robocopy-Vorgaengerin schloss nur ".cache*.h5" aus. Das liess
+# 2.760 MB stehen -- darunter .par_full_79.h5 und .ref_serial_79.h5 mit je
+# 874 MB, die taeglich mitkopiert wurden.
+*.h5
+
+# --- Konsolen-Mitschnitte ---------------------------------------------------
+# Die verwertbaren Ergebnisse liegen strukturiert in evaluations/.
+logs
+scratchpad
+
+# --- Betriebssystem ---------------------------------------------------------
+Thumbs.db
+desktop.ini
+.DS_Store
