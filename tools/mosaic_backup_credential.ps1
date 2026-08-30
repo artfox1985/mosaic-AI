@@ -53,8 +53,15 @@
     powershell -File tools\mosaic_backup_credential.ps1 -Generate
 
 .EXAMPLE
-    # Danach dauerhaft bekannt machen:
-    setx RESTIC_PASSWORD_COMMAND "powershell -NoProfile -ExecutionPolicy Bypass -File D:\...\tools\mosaic_backup_credential.ps1"
+    # Danach dauerhaft bekannt machen. Die EINFACHEN Anfuehrungszeichen um den
+    # Pfad sind Pflicht, kein Stil:
+    setx RESTIC_PASSWORD_COMMAND "powershell -NoProfile -ExecutionPolicy Bypass -File 'D:\...\tools\mosaic_backup_credential.ps1'"
+
+    # WARUM: restic zerlegt RESTIC_PASSWORD_COMMAND selbst, ohne Shell, und
+    # behandelt den Backslash als Escape-Zeichen. Ohne Quotierung kommt von
+    # 'D:\Pfad\zum\skript.ps1' bei PowerShell nur 'D:' an, und restic bricht
+    # mit "Resolving password failed" ab. Am 2026-08-31 gemessen: unquotiert
+    # scheitert, einfach quotiert und mit Schraegstrichen funktioniert beides.
 
 .NOTES
     GRENZE DIESES VERFAHRENS -- vor dem Einrichten der geplanten Aufgabe
