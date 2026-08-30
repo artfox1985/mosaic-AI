@@ -197,8 +197,19 @@ fruehen Versorgungs-Zuege ist der Haupttaeter; Initiierung bleibt
 intakt, die Kette bricht. Der Blindstart haette 9,3 h in einen
 Waechter-Riss verbrannt.
 
+**ERZEUGUNG AUSGESETZT 2026-08-30 (Nutzer-Entscheid): erst
+PREREG_search_depth_column_optimum abschliessen.** Anlass: die
+Sims-Probe fuer den Schwarm fand bei 150 Sims 0,4425 volle Spalten --
+mehr als der 400-Sims-Referenzwert 0,3375, allerdings aus einem
+anderen Modus (Punktpaar, kein Befund). Da die Suchtiefe ein
+Betriebsparameter JEDES kuenftigen Laufs ist, wird sie vor der
+Erzeugung geklaert: Stufe 1 (Kontrollzelle value-only@400, 42 min)
+kann den Strang schliessen; sonst Kurve und Arena-Haertetest
+(Gewinn gegen Tausch). Die Erzeugung startet danach mit dem
+gemessenen Betriebspunkt.
+
 **ENTSCHIEDEN 2026-08-30 (Nutzer: "mach D") -- ROLLEN-GETRENNTE
-MISCHUNG, Erzeugung laeuft:** Sockel/Policy-Klasse 4.000 voll
+MISCHUNG, Erzeugung vorbereitet und ausgesetzt:** Sockel/Policy-Klasse 4.000 voll
 gesampelt (Policy-Ziele sind Such-Posterioren, Spalten-Policy kommt
 vom hv2-Anker; einzigartiger Beitrag = Zustandsabdeckung),
 Schwarm/Value-Klasse 8.000 argmax-lastig (6.000 + 2.000 gesampelt) --
