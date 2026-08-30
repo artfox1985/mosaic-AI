@@ -30,11 +30,10 @@ Ein **staerkerer Spieler**, gemessen am direkten Duell. Der benannte Hebel ist
 der **Plattenblick**: rund 10 Punkte je Partie bleiben liegen. Bei jeder
 Priorisierung gilt die Frage -- was traegt das dazu bei?
 
-## FOKUS-REGEL: NUR k1 (Nutzer-Entscheid 2026-08-18)
+## FOKUS-REGEL: NUR k1
 
-Gemessen wird auf **Kriterium 1** (vertikale Reihen, 7 Punkte je Spalte).
-Andere Kriterien nur, wenn ein Zuschnitt sie ausdruecklich braucht -- dann mit
-Begruendung.
+Wortlaut seit 2026-08-30 in `docs/working_rules.md`, Abschnitt "Messen und
+Auswerten".
 
 ---
 
@@ -230,13 +229,9 @@ zugunsten von alpha 0,2: Zustandsabdeckung 3.087 auf 3.057 distinkte
 Endbretter 220 zu 220. ENTSCHEID alpha 0,0 (par.3b), gemessen statt
 verfallen.
 
-**Laufzeiten aus der Nacht, fuer die N4-Planung (gemessen, nicht
-geschaetzt):** Netz-Self-Play b05@400 mit Root-Noise, threads 11:
-**8,27 bis 8,73 s je Partie** ueber vier 100er-Laeufe -- die 8,4-s-Annahme
-des Fahrplans ist damit auf der EXAKTEN Sockel-Konfiguration bestaetigt,
-4.000 Sockel-Partien sind rund 9,3 Stunden. Gepaarte Arena b05@400 gegen
-Heuristik@150, threads 10: 3,33 s je Partie (666 s fuer 2 x 100), also
-rund 34 s je Block von 10.
+**Laufzeiten aus der Nacht:** in `docs/measured_runtimes.md` eingetragen
+(Sockel-Konfiguration 8,27-8,73 s je Partie, 4.000 Partien rund 9,3 h;
+gepaarte b05-Arena 3,33 s je Partie). Planungsfolge fuer N4 steht dort.
 
 **N2 ERLEDIGT -- Stapelzug-Knopf kommt AN (2026-08-30, Artefakt
 evaluations/artifacts/stack_draw_research_b05.json).** 100 gepaarte Partien
@@ -320,7 +315,7 @@ Strafkosten/Eroeffnungsspalten), ownership_corpus Arm B (entblockt),
 placement_side-Sim-Sweep 400/1600/6400. Details: Agenten-Berichte der
 Sitzung 2026-08-29 (Chat), Fundstellen in den jeweiligen Preregs.
 
-**Warum dieser Schritt** (par.3b.5 Weg-Wahl Punkt 1): der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-TRAININGSGEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt. Der Tiling-Pol lief bisher NIE mit einem spaltenbewussten Kopf (Gate-C-Nullmessungen: plattenblinde Koepfe).
+**Warum dieser Schritt** (par.3b.5 Weg-Wahl Punkt 1): der v22-Zyklus hat geliefert: b01 baut 3x so viele Spalten wie der Champion -- der Korpus wirkt. Aber das Ownership-TRAININGSGEWICHT traegt nicht (w0 fast gleichauf), und die Platzierung verschenkt das fast vollstaendig geerbte Draft-Erbe. KEIN v22-Self-Play, bis ein Konsument die Vollendung hebt. **[UEBERHOLT: durch die Tor-Revision par.3b.12 ersetzt, siehe PHASE 2 -- die Startbedingung ist jetzt die Generator-Spaltenrate.]** Der Tiling-Pol lief bisher NIE mit einem spaltenbewussten Kopf (Gate-C-Nullmessungen: plattenblinde Koepfe).
 
 ---
 
@@ -470,7 +465,12 @@ Nacht-Build-Fenster freigegeben (Tabelle in Abschnitt 2), (c) jeder Push.
 
 ### A. Der Leitstern-Pfad -- das Einzige, was den Spieler staerker macht
 
-**Das v22-Training steht weiterhin aus.** Alles an diesem Tag war
+**UEBERHOLT 2026-08-30 -- dieser Abschnitt ist der Stand vom 2026-08-28.**
+Das v22-Training IST gefahren (Arme b01 bis b06, bester Stand b05, Elo 1084);
+der aktuelle Stand steht oben im Abschnitt "STAND JETZT". Der Rest dieses
+Absatzes beschreibt die damals geplante Konfiguration.
+
+~~Das v22-Training steht weiterhin aus.~~ Alles an diesem Tag war
 Infrastruktur; kein Zug ist dadurch besser geworden. Konfiguration
 unveraendert (Herleitung: Archiv-Kapitel 2026-08-25 bis 2026-08-28,
 Abschnitt 1): `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` PLUS
@@ -485,8 +485,9 @@ der Cache laesst sich waehrend der Erzeugung mitbauen (Abschnitt 1b).
 
 **Einschraenkung, ergaenzt 2026-08-27 -- "alles" war zu viel:**
 
-* **Der parallele Cache-Bau ist NICHT in `train.py` verdrahtet.** Er ist ein
-  eigenstaendiges Werkzeug; `train.py` kennt keinen Cache-Pfad-Parameter und
+* **UEBERHOLT (geprueft 2026-08-30): `train.py` kennt `--cache-file`**
+  (train.py:2548, durchgereicht bis train.py:1271). Die Einschraenkung von
+  2026-08-27 galt vor `dc40551`. Es bleibt: wer OHNE `--cache-file` startet,
   baut weiter SERIELL. Wer das Training einfach startet, zahlt also rund
   2,6 h Vorlauf statt der 36,1 min -- die 36,1 min bekommt nur, wer den Cache
   vorher mit dem Werkzeug baut. Das ist Absicht
@@ -495,6 +496,8 @@ der Cache laesst sich waehrend der Erzeugung mitbauen (Abschnitt 1b).
 * **Die serielle Referenz fuer den vollen Cache fehlt** (2,58 h). Belegt ist
   Bit-Identitaet auf 120 Dateien, nicht auf den 4,19 Mio Zustaenden. Solange
   sie fehlt, traegt der volle Cache keine Champion-Entscheidung.
+
+**UEBERHOLT -- ersetzt durch die Tor-Revision par.3b.12 (siehe PHASE 2). Der folgende Absatz beschreibt das ABGELOESTE Tor.**
 
 **Spalten-Abnahme-Tor (par.3b.2 der Lehrer-Prereg, registriert 2026-08-27).**
 Zwischen Training und Self-Play-Start steht ein vorregistriertes Tor mit zwei
@@ -539,8 +542,9 @@ Kapselung gebaut wurde.
 
 ### D. Was NICHT ansteht
 
-* **v2 weiterentwickeln.** Nutzer-Entscheid 2026-08-26: "v2 ist durch". Es ist
-  eingefroren, weil es fertig ist.
+Dauerhafte Eintraege seit 2026-08-30 in `docs/working_rules.md`, Abschnitt
+"Geschlossene Wege". Hier bleibt nur, was an den laufenden Strang gebunden ist:
+
 * **Artefakt gegen Artefakt ausbauen.** Es laeuft (par.10a); ein Messlauf
   braucht nur die Parallelisierung aus B.1.
 
@@ -668,12 +672,8 @@ Zurueckdrehen: `.gitignore`-Zeile entfernen und
 | #31 / #38 / #39                            | –                                                               | geparkt, Arbeitskreis "Spaeter"; Beschreibungen im Archiv                                                                                                                                                                                                                                                                                                                                                     |
 | **v22-Fenster**                            | `PREREG_v22_window.md`                                          | **NEU GEFASST 2026-08-25, ENTSCHIEDEN.** Der alte Rotations-Zuschnitt war fuer einen NETZ-Erzeuger gebaut und ist hinfaellig -- das v22-Fenster IST jetzt der v2-Lehrer-Korpus (24.000 Partien, eine Klasse, kein Altbestand). Frueher stand hier ausdruecklich "nicht zu verwechseln mit dem Lehrer-Korpus"; das gilt nicht mehr                                                                             |
 
-**Geschlossen, nicht neu vorschlagen:** Q-Skalierungs-Option, jeder
-Suchparadigmen-Wechsel (zwei externe Recherchen), Mehrfach-Determinisierung
-(`PREREG_ismcts_determinizations.md`: k=4 faellt unter zwei Anordnungen
-signifikant ab), Phasenfaktor, Vollendbarkeits-Relaxation im Routing und die
-zwei Punktekarten (`PREREG_heuristic_v2_long_rows.md` par.11-16),
-`PREREG_long_row_payoff.md` B1, `PREREG_bootstrap_horizon.md` (beide Arme).
+**Geschlossen, nicht neu vorschlagen:** Liste seit 2026-08-30 in
+`docs/working_rules.md`, Abschnitt "Geschlossene Wege".
 
 ---
 
@@ -722,8 +722,8 @@ zwei Punktekarten (`PREREG_heuristic_v2_long_rows.md` par.11-16),
   2,30 / 1,70 gegen Netz 4,70 / 4,70 / 3,30 / 2,30 / 1,10 / 0,50. **Gleiche
   Summe, andere Verteilung** -- der Mensch tauscht kurze Reihen gegen lange
   (Reihe 5 und 6: Faktor 2,7 bzw. 2,9 gegenueber dem v20-Selbstspiel).
-- **B1-Vorgabe fuer jeden Nachfolge-Arm**: wer die Initiierung hebt, ohne die
-  Vollendungsquote deutlich ueber 0,53 zu bringen, wiederholt B1.
+- **B1-Vorgabe fuer jeden Nachfolge-Arm** (Vollendungsquote ueber 0,53):
+  Wortlaut in `docs/working_rules.md`, Abschnitt "Training und Korpus".
 - **Blindzieh-Regel**: bei Wertungsplatte 6 (Code-Index 6, Spezialfelder --
   das EINZIGE negative Kriterium) laeuft die gebaute Stopp-Regel das
   Punktekonto leer. Ohne Platte 6 haben 92-95 Prozent der Ziehserien Tiefe 1
@@ -732,9 +732,8 @@ zwei Punktekarten (`PREREG_heuristic_v2_long_rows.md` par.11-16),
   optimale Regel 1 sagt. **Spaltenbau behebt das NICHT** -- Kriterium 1 zahlt
   quadratisch `7*(f/6)^2`, das Spezialfeld-Defizit kostet linear -3 je Feld;
   eine volle Spalte gleicht gerade zwei leere Spezialfelder aus.
-- **Methodische Lehre**: aus "Eingriff X in Richtung Y verliert" folgt NICHT
-  "Y ist falsch" -- nur, dass X in diesem Zustand verliert. Es fehlt die
-  Kontrollgruppe: ein Agent, der Y KANN.
+- **Methodische Lehre** (Kontrollgruppe fehlt): Wortlaut in
+  `docs/working_rules.md`, Abschnitt "Messen und Auswerten".
 - **Eine Herleitung aus dem Code ist eine Hypothese, kein Befund.** Am
   2026-08-25 lagen vier davon im Vorzeichen falsch, drei in der
   Parallelsitzung und eine hier (Kriterium 6 "startet bei -27": falsch,

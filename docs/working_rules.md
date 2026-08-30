@@ -43,6 +43,16 @@ Vorfalls-Herkunft steht in `pitfalls.md`.
   Artefakt `models/frozen_heuristics/hv1_anchor`. Herleitung: STATUS,
   Abschnitt "NAECHSTE SCHRITTE / B".
 
+- **FOKUS-REGEL: gemessen wird auf k1** (vertikale Reihen, 7 Punkte je Spalte).
+  Andere Kriterien nur, wenn ein Zuschnitt sie ausdruecklich braucht -- dann
+  mit Begruendung. Nutzer-Entscheid 2026-08-18.
+- **Prozessweite Knoepfe: KEIN Spiegelmatch.** Wer einen prozessglobalen Knopf
+  misst, faehrt je Arm einen EIGENEN Prozess. Ein Spiegelmatch im selben
+  Prozess gibt beiden Seiten dieselbe Knopfstellung und misst nichts.
+- **Aus "Eingriff X in Richtung Y verliert" folgt NICHT "Y ist falsch"** --
+  nur, dass X in diesem Zustand verliert. Es fehlt die Kontrollgruppe: ein
+  Agent, der Y KANN. (Herkunft: STATUS-Strukturbefunde, Stand 2026-08-30.)
+
 ## Training und Korpus
 
 - **Fenster-Pinning: ZWEI Variablen**, nicht eine -- Trainings waehrend
@@ -64,6 +74,26 @@ Vorfalls-Herkunft steht in `pitfalls.md`.
   2026-08-26, Herleitung: STATUS, Abschnitt "C2".
 - **Einfrieren, sobald etwas Referenz WIRD** -- Ausloeser ist die
   Rollenuebernahme (Generator, Anker, Gegner), nicht "sieht fertig aus".
+
+- **Zwei gleichzeitige Aenderungen brauchen den Kontrollarm auf der
+  UNVERAENDERTEN Achse.** Praezedenz: Ownership-Kopf einschalten plus
+  Korpuswechsel -- ohne den w0-Kontrollarm auf DEMSELBEN Korpus sind Kopf und
+  Korpus konfundiert und der Effekt ist nicht zuordenbar. Das ist die eine
+  Bedingung, die nicht wegfallen darf.
+- **Solange die serielle Referenz fuer den vollen Cache fehlt (2,58 h), traegt
+  der Cache KEINE Champion-Entscheidung.** Belegt ist Bit-Identitaet auf 120
+  Dateien, nicht auf den 4,19 Mio Zustaenden.
+- **`--cache-file` nutzt, wer `--val-frac 0` faehrt** oder ein exakt passendes
+  Fenster baut: der Voll-Cache passt per Design nicht auf Laeufe mit Val-Split
+  (anderer Fenster-Schluessel, der Waechter lehnt korrekt ab).
+- **B1-Vorgabe fuer jeden Nachfolge-Arm**: wer die Initiierung langer Reihen
+  hebt, ohne die Vollendungsquote deutlich ueber 0,53 zu bringen, wiederholt
+  B1.
+- **Kuenftige Einfrierungen legen die `.pth` mit ab** -- als `model.pth` IM
+  Artefakt, unversioniert (die globale `*.pth`-Ignore-Regel greift, Schutz ist
+  der Backup-Ordner). Die ONNX bleibt getrackt (Byte-Beweisstueck; ein
+  Re-Export aus der `.pth` ist nicht byte-stabil). Schwesterregel zu "Ein Wheel
+  liegt IM Artefakt" oben.
 
 ## Arbeitsweise
 
@@ -89,3 +119,45 @@ Vorfalls-Herkunft steht in `pitfalls.md`.
   Messwerten: STATUS, Abschnitt "ARCHITEKTUR: B -> C -> A gefahren".
 - **Geprueft oder markiert. Kein Drittes.** REGEL 0, Wortlaut in `CLAUDE.md`
   ganz oben.
+
+## Geschlossene Wege (nicht neu vorschlagen)
+
+**Kanonischer Ort seit 2026-08-30** (aus STATUS.md herausgeloest -- eine
+Verbotsliste im Dokument, das regelmaessig geleert wird, ist die teuerste
+Verlustklasse: verschwindet sie, wird der geschlossene Weg noch einmal
+gemessen).
+
+- Q-Skalierungs-Option
+- jeder Suchparadigmen-Wechsel (zwei externe Recherchen)
+- Mehrfach-Determinisierung (`PREREG_ismcts_determinizations.md`: k=4 faellt
+  unter zwei Anordnungen signifikant ab)
+- Phasenfaktor, Vollendbarkeits-Relaxation im Routing und die zwei
+  Punktekarten (`PREREG_heuristic_v2_long_rows.md` par.11-16)
+- `PREREG_long_row_payoff.md` B1
+- `PREREG_bootstrap_horizon.md` (beide Arme)
+- **v2 weiterentwickeln** -- Nutzer-Entscheid 2026-08-26: "v2 ist durch". Es
+  ist eingefroren, weil es fertig ist.
+
+## Arbeitskonventionen
+
+- **Der Leitstern ist der Priorisierungstest.** Ziel ist ein staerkerer
+  Spieler, gemessen am direkten Duell; der benannte Hebel ist der
+  Plattenblick (rund 10 Punkte je Partie bleiben liegen). Bei jeder
+  Priorisierung gilt die Frage: was traegt das dazu bei?
+- **Registrierpflicht vor jedem Bau.** Was auf der Parkliste steht, wird vor
+  dem Bau vorregistriert, nicht danach.
+- **Zahlen gehoeren in die Registrierung, nicht ins Werkzeug.** Korpus- und
+  Fensterwerkzeuge bekommen Parameter, keine hartkodierten Groessen; der
+  konkrete Aufruf wird bei der Kampagne registriert.
+- **Vor der Sanierung eines EINGEFRORENEN Artefakts klaeren, ob das
+  verify-Tooling die Datei hasht** (Praezedenz: golden_probe-Manifest-Sanierung
+  25a632f). Sonst bricht die Abnahme des Artefakts an der eigenen Reparatur.
+- **Agenten-Kapselung: je Knopf ein Commit mit Paritaets-Gate.**
+- **Messartefakte liegen ungetrackt in `evaluations/artifacts/`**
+  (`.gitignore`). Folge: ein frischer Klon hat sie nicht, Preregs zitieren sie
+  aber als Beleg. Deterministische Sonden sind wiederholbar (belegt: der
+  Wiederholungslauf des Strafleisten-Tors war byte-identisch), alles mit
+  Netz-Zufall nicht ohne Weiteres. Zurueckdrehen: `.gitignore`-Zeile entfernen
+  und `git add -f evaluations/artifacts`.
+- **Der Ahead-Stand wird im CHAT gemeldet, NICHT in STATUS gefuehrt** -- dort
+  verrottet er sofort (Nutzer 2026-08-28).
