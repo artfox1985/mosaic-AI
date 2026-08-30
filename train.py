@@ -390,6 +390,7 @@ class LossSetup:
     value_weight: float
     points_weight: float
     ownership_weight: float
+    moon_loss_weight: float
     mse_loss: object
 
 
@@ -499,19 +500,42 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
         w = pol_w if rw is None else pol_w * rw
         p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
 
-        # Moon-Order Loss direkt zu Policy-Loss — kein extra Hyperparameter.
+        # Moon-Order Loss direkt zu Policy-Loss, seit --moon-loss-weight mit
+        # EINEM Hyperparameter (Default 1.0 = Bestandsverhalten).
         # Plackett-Luce-NLL statt MSE-auf-Rängen: der moon_order_head liefert
         # jetzt echte Präferenz-SCORES, die net_mcts.rs zur Suchzeit direkt als
         # P(Order)-Verteilung nutzt (statt einer bloßen Rang-Regression).
-        moon_targets = moon_targets.to(device)
-        # BUGFIX: sun_mask prüfte zuvor nur Spalte 0 (blau) auf >=0 — das
-        # schloss gültige Sonnenzug-Samples aus, deren Restfarben blau nicht
-        # enthielten (z.B. remaining=[gelb,rot]), und verzerrte den Loss
-        # systematisch zugunsten blau-haltiger Samples. Jetzt: irgendeine Spalte.
-        sun_mask = (moon_targets >= 0).any(dim=1)
-        if sun_mask.any():
-            moon_nll = plackett_luce_moon_loss(pred_moon, moon_targets)
-            p_loss = p_loss + moon_nll[sun_mask].mean()
+        #
+        # Warum abschaltbar (PREREG_implementation_review_unprimed.md Befund 2,
+        # 2026-08-20): `moon_order_target` ist ein belegter No-Op --
+        # `self_play.rs:678-685` bewertet alle Permutationen mit
+        # `solve_round_final_score`, das nur `players[pi]` liest, waehrend die
+        # Mondreihenfolge in `state.factories` lebt; alle Permutationen scoren
+        # identisch, `perms[0]` (rohe Beutelreihenfolge) gewinnt. Der Kopf
+        # trainiert also auf Rauschen und zieht dabei laut Task #38 potenziell
+        # ~1/3 des Policy-Gradienten.
+        #
+        # Bei Gewicht 0.0 wird der Term GANZ uebersprungen (Muster
+        # `ranking_loss_weight` oben: kein zusaetzlicher Device-Transfer, keine
+        # 5-Schritt-Schleife) -- NICHT wegen NaN-Gefahr. GEPRUEFT 2026-08-30 an
+        # einem Batch ohne jeden Sonnenzug: `plackett_luce_moon_loss` selbst
+        # liefert dort saubere Nullen (sie maskiert mit -1e9 statt -inf, eine
+        # vollstaendig maskierte Zeile bleibt ein wohldefiniertes
+        # Gleichverteilungs-Softmax, und `torch.where(has_rank_t, ...)`
+        # verwirft ihren Beitrag). NaN entsteht erst aus `.mean()` einer LEEREN
+        # Auswahl -- und genau davor steht seit jeher der `sun_mask.any()`-
+        # Guard unten. Die Falle ist also real nur OHNE diesen Guard; das
+        # Ueberspringen bei 0.0 ist eine Kosten-, keine Korrektheitsmassnahme.
+        if loss_setup.moon_loss_weight > 0.0:
+            moon_targets = moon_targets.to(device)
+            # BUGFIX: sun_mask prüfte zuvor nur Spalte 0 (blau) auf >=0 -- das
+            # schloss gültige Sonnenzug-Samples aus, deren Restfarben blau nicht
+            # enthielten (z.B. remaining=[gelb,rot]), und verzerrte den Loss
+            # systematisch zugunsten blau-haltiger Samples. Jetzt: irgendeine Spalte.
+            sun_mask = (moon_targets >= 0).any(dim=1)
+            if sun_mask.any():
+                moon_nll = plackett_luce_moon_loss(pred_moon, moon_targets)
+                p_loss = p_loss + loss_setup.moon_loss_weight * moon_nll[sun_mask].mean()
 
         # Value-/Punkte-Aux-Losses: reines Trainings-Zusatzsignal fuer den
         # Trunk (Suche/Self-Play nutzt weiterhin nur die Policy, siehe
@@ -947,7 +971,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
           ranking_loss_weight=0.0, conjunction_head=False, ownership_head_2d=False,
           head_warmstart=True, extra_data_dir=None,
-          freeze_trunk=False, cache_file=None):
+          freeze_trunk=False, cache_file=None, moon_loss_weight=1.0):
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
@@ -971,6 +995,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         sys.exit(
             f"❌ --value-target-lambda {value_target_lambda!r} ausserhalb [0,1] -- Abbruch. "
             f"1.0 = Bestandsverhalten (kein Mix), 0.0 = ausschliesslich root_q."
+        )
+    # PREREG_implementation_review_unprimed.md Befund 2 (Moon-Ziel = No-Op):
+    # harte Vorab-Validierung nach demselben Muster wie --value-target-lambda,
+    # VOR jedem teuren Daten-Laden. Nach oben offen (ein Aufwerten des Terms
+    # ist denkbar), nach unten hart gesperrt -- ein negatives Gewicht wuerde
+    # den Policy-Loss ins Unbegrenzte druecken, statt still "nichts zu tun".
+    if not (moon_loss_weight >= 0.0):
+        sys.exit(
+            f"❌ --moon-loss-weight {moon_loss_weight!r} ungueltig -- Abbruch, erlaubt ist >= 0. "
+            f"1.0 = Bestandsverhalten, 0.0 = Moon-Term abgeschaltet."
         )
     # PREREG_ownership_corpus.md §3.4: additiver Datei-Zugang, hart validiert
     # WIE die anderen CLI-Args oben -- ein Tippfehler im Pfad soll sofort
@@ -1123,6 +1157,11 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "endgame_head": endgame_head,
         "value_head": value_head,
         "ranking_loss_weight": ranking_loss_weight,
+        # `cli_args` ist eine HAND-gepflegte Auswahl, kein automatischer
+        # argparse-Abzug (geprueft 2026-08-30: train_manifest.py:239 legt das
+        # Dict unveraendert ab) -- ein neues Flag MUSS hier eingetragen werden,
+        # sonst schweigt das Manifest ueber den gefahrenen Arm.
+        "moon_loss_weight": moon_loss_weight,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
         # Schlachtplan A0 Schritt 2c: WELCHE vorab gebaute Cache-Datei benutzt
         # wurde. Der VALIDIERTE Schluessel kommt weiter unten nach
@@ -1612,7 +1651,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         wdl_hard_only=wdl_hard_only, wdl_label_smooth=wdl_label_smooth,
         ranking_loss_weight=ranking_loss_weight, exclude_round5=exclude_round5,
         value_weight=effective_value_weight, points_weight=effective_points_weight,
-        ownership_weight=effective_ownership_weight, mse_loss=mse_loss,
+        ownership_weight=effective_ownership_weight, moon_loss_weight=moon_loss_weight,
+        mse_loss=mse_loss,
     )
     for epoch in range(epochs):
         epoch_count_done = epoch + 1
@@ -2417,6 +2457,21 @@ if __name__ == "__main__":
                              "stattdessen 'values_wdl' (Skala [0,1], root_q wird dafuer von [-1,1] "
                              "zurueckgerechnet) -- vorher wirkte λ in dem Fall folgenlos auf "
                              "'values', das der WDL-Kopf gar nicht sieht.")
+    parser.add_argument("--moon-loss-weight", type=float, default=1.0,
+                        help="Gewicht des Moon-Order-Terms im Policy-Loss (train.py: "
+                             "plackett_luce_moon_loss, auf sun_mask gemittelt und auf p_loss "
+                             "addiert). STANDARD 1.0 = byte-identisches Bestandsverhalten. "
+                             "0.0 ueberspringt den Term GANZ (kein Device-Transfer der "
+                             "moon_targets, keine 5-Schritt-Schleife). Anlass: "
+                             "evaluations/PREREG_implementation_review_unprimed.md Befund 2 -- "
+                             "moon_order_target ist ein belegter No-Op (self_play.rs:678-685 "
+                             "scort alle Permutationen identisch, perms[0] gewinnt), der Kopf "
+                             "trainiert auf Rauschen und zieht laut Task #38 potenziell ~1/3 "
+                             "des Policy-Gradienten. Harte Validierung >= 0 (kein stiller Clamp, "
+                             "Muster --value-target-lambda). Aendert den HDF5-Cache-Key NICHT "
+                             "(reiner Loss-Knopf, die Ziele im Cache bleiben unberuehrt); der "
+                             "Kopf selbst bleibt im Modell und im ONNX-Export, nur sein "
+                             "Gradientenbeitrag faellt weg.")
     parser.add_argument("--opp-points-head", action="store_true",
                         help="Task #28 (PREREG_task28_aggression.md): additiven opp_points_head "
                              "aktivieren (reine GEGNER-Punkteprognose, gleiche Architektur wie der "
@@ -2531,4 +2586,5 @@ if __name__ == "__main__":
           value_head=args.value_head,
           ranking_loss_weight=args.ranking_loss_weight,
           head_warmstart=not args.no_head_warmstart, extra_data_dir=args.extra_data_dir,
-          freeze_trunk=args.freeze_trunk, cache_file=args.cache_file)
+          freeze_trunk=args.freeze_trunk, cache_file=args.cache_file,
+          moon_loss_weight=args.moon_loss_weight)

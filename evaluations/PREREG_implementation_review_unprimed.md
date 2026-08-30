@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Findet ein UNGEPRIMTER Reviewer (ohne unsere Hypothesen, Verdachtsflaechen und Schlussfolgerungen) Korrektheitsfehler in der KI selbst -- Suche, Netz-Integration, Self-Play, Trainingsziele? | Beleg: JA (par.7, 2026-08-20): zwei mittlere Befunde, beide am Code bestaetigt -- invertierte Alpha-Beta-Zugsortierung an MIN-Knoten und moon_order_target als No-Op; dazu zwei niedrige Befunde und eine Sauber-Liste. Konsequenzen nach par.3. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Findet ein UNGEPRIMTER Reviewer (ohne unsere Hypothesen, Verdachtsflaechen und Schlussfolgerungen) Korrektheitsfehler in der KI selbst -- Suche, Netz-Integration, Self-Play, Trainingsziele? | Beleg: JA (par.7, 2026-08-20): zwei mittlere Befunde, beide am Code bestaetigt -- invertierte Alpha-Beta-Zugsortierung an MIN-Knoten und moon_order_target als No-Op; dazu zwei niedrige Befunde und eine Sauber-Liste. Konsequenzen nach par.3. Nachtrag Befund 2 (2026-08-30): Knopf gebaut, train.py --moon-loss-weight, Default 1,0 = Bestand, v23 faehrt 0; Befund 1 weiter Nutzer-Entscheid. -->
 
 # PREREG: Ungeprimter Implementierungs-Review der KI
 
@@ -148,3 +148,55 @@ Verhalten, Task-#28-Muster) — der Anker bleibt byte-identisch, Netz-Arme
 koennen den Fix per Env aktivieren und regulaer gaten; eine spaetere
 Default-Umstellung waere ein eigener, vom Nutzer freizugebender Schritt
 mit Neuverankerung der Elo-Leiter.
+
+
+### Nachtrag zu Befund 2 (2026-08-30, Knopf gebaut)
+
+Der par.7-Befund liess offen, "ob und wie der Kopf ein echtes Ziel bekommt
+(oder Gewicht 0)" -- Nutzer-Entscheid: **v23-Training faehrt 0**. Damit das
+ueberhaupt fahrbar ist, gibt es jetzt den Knopf; das ZIEL bleibt unangetastet
+(kein neues Label, keine Engine-Aenderung).
+
+**Gebaut (2026-08-30, reiner Trainings-Knopf, keine Messung):**
+`train.py --moon-loss-weight` (float, Default **1.0 = byte-identisches
+Bestandsverhalten**). Der Wert wandert ueber `LossSetup.moon_loss_weight`
+(train.py:393) in `_train_one_epoch` und multipliziert dort den Summanden, der
+bisher ungewichtet auf `p_loss` addiert wurde. Bei **0.0 wird der Term ganz
+uebersprungen** -- samt Device-Transfer der `moon_targets` und der
+5-Schritt-Plackett-Luce-Schleife (Muster `ranking_loss_weight`, train.py:470).
+Der Kopf selbst bleibt im Modell und im ONNX-Export, nur sein
+Gradientenbeitrag faellt weg; der HDF5-Cache-Key aendert sich NICHT (die Ziele
+im Korpus bleiben unberuehrt). `_validate_one_epoch` rechnet den Moon-Term
+ohnehin nie mit (train.py:743 verwirft `_v_pred_moon`) -- `val_combined`
+bleibt darum ueber Arme hinweg vergleichbar.
+
+**Validierung** nach dem Muster `--value-target-lambda`: harter `sys.exit`
+bei allem, was nicht `>= 0` ist -- VOR jedem teuren Daten-Laden, kein stiller
+Clamp. Die Form `not (w >= 0.0)` faengt `nan` mit ab. Nach oben offen, weil
+ein Aufwerten des Terms denkbar bleibt.
+
+**Manifest:** `cli_args` in `train.py` ist eine HAND-gepflegte Auswahl, KEIN
+automatischer argparse-Abzug (geprueft: `train_manifest.py:239` legt das
+uebergebene Dict unveraendert ab). `moon_loss_weight` ist dort eingetragen --
+ohne diesen Eintrag haette das Manifest ueber den gefahrenen Arm geschwiegen,
+die Fehlerklasse des `MOSAIC_IGNORE_POLICY_TARGET_VALID`-Vorfalls.
+
+**Die im Auftrag vermutete NaN-Falle ist NICHT real** (gemessen 2026-08-30 an
+einem Batch ohne jeden Sonnenzug): `plackett_luce_moon_loss` liefert dort
+saubere Nullen -- sie maskiert mit `-1e9` statt `-inf`, eine vollstaendig
+maskierte Zeile bleibt ein wohldefiniertes Gleichverteilungs-Softmax, und
+`torch.where(has_rank_t, ...)` verwirft ihren Beitrag. NaN entsteht erst aus
+`.mean()` einer LEEREN Auswahl (`moon_nll[sun_mask]` mit leerer Maske ergibt
+gemessen `nan`) -- und davor steht seit jeher der `sun_mask.any()`-Guard. Das
+Ueberspringen bei 0.0 ist damit eine Kosten-, keine Korrektheitsmassnahme.
+
+**Smoke (kein Training gefahren):** `--help` zeigt das Flag;
+`--moon-loss-weight -0.5` und `--moon-loss-weight nan` brechen beide mit
+Exit 1 ab, bevor Daten geladen werden; die Term-Arithmetik gegengeprobt
+(`w=1.0` liefert bitgleich den Bestandswert 2,082033157348633, `w=0.5` die
+Haelfte, `w=0.0` den uebersprungenen Term).
+
+**Was dieser Nachtrag NICHT entscheidet:** ob 0 dem v23-Netz nuetzt. Der
+Knopf ist Infrastruktur; die Wirkung ist ungemessen und braucht ein eigenes
+Gating. Befund 1 (Min-Knoten-Sortierung) bleibt unberuehrt -- er ist
+Nutzer-Entscheid und wartet weiter.
