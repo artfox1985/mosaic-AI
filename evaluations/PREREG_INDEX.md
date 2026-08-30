@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 100 Dateien = 21 OFFEN + 71 ENTSCHIEDEN + 8 UEBERHOLT.**
+**Stand (automatisch generiert): 101 Dateien = 22 OFFEN + 71 ENTSCHIEDEN + 8 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (21)
+## OFFEN (22)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -93,6 +93,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_plate_policy_supervision.md` | Laesst sich "dieser Zug baut die Spalte" als AKTIONS-Signal aus dem Zustand lernen -- und weiss der Ownership-Kopf es schon, ohne dass es die Zugwahl erreicht? | offen, nichts gebaut. Anlass: zwei externe Durchsichten 2026-08-18 plus die vier geschlossenen Wege am Verbraucher. |
 | `PREREG_policy_surprise_weighting.md` | Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten -- also nach KL(Prior gegen Ziel) -- statt jede Stichprobe gleich zu zaehlen? | ENTWURF 2026-08-27, NICHTS GEBAUT. Zeitpunkt (par.8, praezisiert 2026-08-30): der Arm heisst **v23-b03** -- sein Entscheidungsmass verlangt Such-Ziele, die es erst im v23-Fenster gibt; v22-b03 bleibt unbelegt (docs/generation_naming.md). Die Abwertung der Quelle traegt nicht mehr: in v22 ist die Policy der TRANSPORTKANAL des Spaltenbaus (par.2). Zuschnitt: Loss-Gewichtung in train.py, kein Engine-Eingriff (par.3); Entscheidungsmass sind die Orakelmetriken (par.5). |
 | `PREREG_r5_solver_split.md` | Wird der R5-Loeser in einen EINGEFRORENEN Anker-Loeser (Heuristik) und einen frei entwickelbaren Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 gut kalibrieren (Steigungs-Metrik der R5-Kalibrierung)? | Teil A gebaut und abgenommen (par.2c): `round5_anchor.rs` ist aktiv und eingefroren. Teil B entschieden (par.3e): der Value-Kopf gewinnt den Vierer-Vergleich (Tau 0,762 k1-aktiv), der BLEND-WEG ist geschlossen, es bleiben Trainings-Eingriffe. Die R5-Schwaeche ist PLATTEN-Daempfung, nicht Gesamtwert. Offene Punkte in par.4. |
+| `PREREG_reanalyze_label_depth.md` | Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt ein tieferes Nachlabeln der gespeicherten Zustaende (Reanalyze) die Betrags-Daempfung des Value-Kopfs? | ANGELEGT 2026-08-30, nichts gebaut. Zwei unabhaengige Motive (Literatur-Anti-Drift + der gemessene Sims-Effekt), Machbarkeit GEPRUEFT (net_search_state_json, lib.rs:865, freie Sims-Zahl auf gespeicherten Zustaenden). Teil A braucht einen flach gespielten SOCKEL, Teil B zielt auf den Value-Bootstrap. |
 | `PREREG_risk_sensitive_leaf_utility.md` | Bringt eine RISIKOSENSITIVE Blatt-Utility Spielstaerke -- also die Verteilung des Ausgangs statt nur ihres Mittels in die Suche zu ziehen? | NICHTS GEMESSEN. par.1: points_dist ist ABGESCHALTET (POINTS_DIST_BINS = 0), aber value_wdl_logits wird exportiert und von der Suche nie gelesen -- daher Stufe A ohne Training (par.2), Stufe B mit (par.3). Entscheidungsmass ist STAERKE, kein Offline-Mass (par.4). EINGETAKTET fuer v22 (par.5): A1 ja, A2 nur mit Neu-Labeln des fertigen hv2-Korpus. A1-Entscheid faellig VOR dem Start des v22-Self-Play (par.5a). |
 | `PREREG_round_transition_search_sampling.md` | Bringt es SPIELSTAERKE, den Rundenuebergang in der Suche als Zufallsknoten zu bemustern (ROUND_TRANSITION_SAMPLING) statt ihn mit einem einzelnen Netz-Blattwert zu bewerten -- und ist der Preis (Durchsatz UND unschaerfere Paarung in gepaarten Arenen) das wert? | NICHTS GEMESSEN, nichts gebaut; der Schalter steht seit 2026-07 auf false. Die alte Doc-Sperre bindet nicht (par.2). Vorab benannt sind zwei Kosten: Durchsatz (par.4.1) und Determinismus (par.4.2). Messkette bindend in par.5: Kostentor ZUERST, Staerke danach. |
 | `PREREG_rust_data_layer.md` | Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes, spaltenorientiertes Rohformat (Teil B)? | NICHTS GEBAUT, angelegt 2026-08-28; REGISTRIERUNG, kein Arbeitsauftrag. Teuer ist nicht die Sprachaufteilung, sondern die GRENZE: jede Eingabe-Erweiterung ist ein Dreifachbau (par.1). Teil A = Umzug von Hebel 2, Vorbedingung und Bit-Tor wandern mit (par.2); Teil B = Rohformat, rohe Zustaende statt Merkmale (par.3). Ausloesung par.4; Erfolgsmass Irrtumskosten, nicht Elo. |
