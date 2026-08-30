@@ -409,3 +409,34 @@ korrekt geeichtem Plattenanteil muesste mit MEHR Suche MEHR Spalten
 bauen, nicht weniger. Der Test ist billig (zwei Self-Play-Arme a 200
 Partien) und misst die Wirkung dort, wo sie zaehlt -- im gespielten
 Verlauf statt an einer Regressionssteigung.
+
+**WIDERSPRUCH BENANNT 2026-08-30 (Nutzer-Einwand, gegen die bisherige
+Lesart des Koordinators).** Die hier gemessene Steigung ist ein
+AGGREGAT ueber Wertungsplatten-Wechsel, KEINE spaltenspezifische
+Groesse -- sie sagt "der Kopf reagiert auf Plattenwechsel nur mit ~9
+Prozent der wahren Bewegung", nicht "der Kopf unterschaetzt Spalten".
+Diese Gleichsetzung stand mehrfach im Chat und ist so nicht belegt.
+
+**Zwei vorhandene, spaltenSPEZIFISCHE Messungen sprechen sogar
+dagegen:** (1) Geschwister-Ordnung nach k1-Spaltenfortschritt Tau
++0,338 (b05_value_sibling_check.json) -- der Kopf ORDNET richtig.
+(2) PREREG_human_game_oracle_gap par.9: an echtem Menschenspiel
+bewertet b05 k1-relevante Zuege NICHT schlechter als neutrale (alle
+drei Fuellstand-Schwellen H0, ~0 pp Differenz).
+
+**Der Widerspruch, der daraus folgt und offen bleibt:** trotz richtiger
+Ordnung und ohne spezifische Abwertung baut b05 bei 400 Sims nur 0,34
+volle Spalten. Eine Bewertungs-Erklaerung traegt das nicht. Besser
+passt der Befund aus PREREG_placement_side par.14 ("das Material war
+da, der Plan nicht"): eine Spalte verlangt eine MEHRRUNDIGE
+Farbzusage, keine Stellungsbewertung -- ein PLANUNGS-, kein
+Bewertungsproblem. Dazu passt auch der Nutzer-Einwand, dass ein Netz,
+das nach der Dreiecks-Einhuellenden spielt, wertvolle Spalten
+praktisch automatisch bekommt und auf Plattenwechsel gar nicht stark
+reagieren MUSS.
+
+Die kriterienweise Aufschluesselung dieser Messung (Auftrag
+2026-08-30, tools/probes/r5_calibration_per_criterion.py) ist deshalb
+eine ABGRENZUNGS-Messung: ist k1 staerker gedaempft als die uebrigen
+sieben Kriterien, oder ist der Effekt gleichmaessig? Nur der erste
+Fall stuetzte ueberhaupt eine spaltenbezogene Lesart.
