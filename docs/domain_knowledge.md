@@ -173,6 +173,38 @@ Spaltenabschluss zieht, kassiert beide Währungen.
 
 ---
 
+### Die vier Ausschlusspaare, namentlich
+
+`MUTUALLY_EXCLUSIVE_PAIRS` (scoring.rs:60-65, geprüft 2026-08-30):
+
+| Paar (Code-Indizes) | Bedeutung |
+|---|---|
+| (0, 7) | horizontale Reihen ⟷ farbenreiche Reihen |
+| (6, 3) | Spezialfelder ⟷ mehrfarbige Felder |
+| (4, 1) | äußere Felder ⟷ vertikale Reihen |
+| (2, 5) | Diagonalen ⟷ Eckplatten |
+
+Praktische Folge, die man sich merken kann: **bei aktivem k1 ist k4 garantiert
+aus, bei aktivem k2 garantiert kein k5** – und umgekehrt.
+
+### Wie viele Ereignisse jedes Kriterium überhaupt hat
+
+| Kriterium | Atome | je Atom |
+|---|---:|---|
+| k0 horizontale Reihen | 6 | +3 |
+| k1 vertikale Reihen | 6 | +7 |
+| k2 Diagonalen | **2** | +10 |
+| k3 mehrfarbige Felder | 9 | 2 je Wildfeld, nur wenn ALLE belegt |
+| k4 äußere Felder | **20** | +1 |
+| k5 Eckplatten | 4 | +3 / +3 / **+8 / +8** |
+| k6 Spezialfelder | 9 | **−3** je leer geblieben |
+| k7 farbenreiche Reihen | 6 | +4 |
+
+Summe **62 Atome je Spieler** (`PREREG_plate_head.md`, Atomzahl aktualisiert).
+Die Zahl ist für die Priorisierung tragend: k2 ist auf **zwei** Ereignisse
+gedeckelt, k4 hat **zwanzig** additive Chancen. Ein hoher Einzelwert bei
+wenigen Atomen ist etwas anderes als ein kleiner bei vielen.
+
 ### Wie oft ein Kriterium ueberhaupt erreicht wird
 
 **Die Plattenziehung ist bias-frei** (`tools/scoring_tile_distribution.py`,
@@ -482,6 +514,72 @@ unabhängige Wege zu derselben Zahl.
 Daraus die Ziel-Kennzahl: **das MINIMUM der Abschlüsse über die sechs Reihen**,
 nicht deren Summe und nicht die Länge. Jede Vollendung über dem Minimum ist aus
 Spaltensicht Überschuss – **das Zielprofil ist FLACHER, nicht länger.**
+
+## 8. Struktur und Information
+
+### Mosaic ist ein Spiel mit PERFEKTER Information und Zufallsknoten
+
+**Es gibt keine private Information.** Alle Spielerfelder im Zustand sind
+öffentlich (`dome_grid`, `pattern_lines`, `floor`, `bonus_chips`,
+`unused_chip_colors`, `score`), und das Verdeckte steht als **aggregierte
+Zähler** (`bag_colors`, `bag_count`, `tower_colors`, `dome_pool_mask`,
+`dome_wild_remaining_frac`) – symmetrisch für beide Spieler.
+
+**Folge: Backgammon, nicht Poker.** Determinisierung und ISMCTS sind Techniken
+für Informationsmengen, also für privates Wissen. Wer sie hier misst, misst
+Werkzeug aus der falschen Familie – drei Messungen sind daran gescheitert.
+Quelle: `PREREG_chance_nodes.md`, „Die strukturelle Grundlage".
+
+**Auch der Kuppelplatten-Pool ist ableitbar**: die 18 Designs sind ein offener
+Satz mit je einem Exemplar (`dome.rs:198-226`); wer Auslage und Bretter sieht,
+kennt den Rest durch Subtraktion. `dome_pool_mask` ist abgeleitetes
+öffentliches Wissen, kein Orakel.
+
+### Der Kuppelstapel ist bis Runde 4 abgetragen
+
+| Runde | 1 | 2 | 3 | 4 | 5 |
+|---|---:|---:|---:|---:|---:|
+| Median Rest | 13,0 | 8,0 | 4,0 | **0,0** | 0,0 |
+| Anteil ≤ 3 | 0 % | 0 % | 12,5 % | 100 % | 100 % |
+
+Alles, was in Runde 1-3 nach unten wandert, wird also noch gezogen – eine
+zurückgelegte Platte ist nicht aus dem Spiel. Zugleich heißt es: **ab Runde 4
+ist die Kuppelgeometrie festgelegt**, die Formbarkeit endet dort.
+
+### Die Machbarkeitshülle ist ein Dreieck
+
+Erlaubt ist `r + c <= 5`, also 6+5+4+3+2+1 = **21 Zellen** – dieselbe 21, die
+eine volle Spalte kostet (Abschnitt 7). Die Dreiecksform ist damit keine
+ästhetische Wahl. Gespiegelt wird nur um die Spalten-Achse; die unteren
+Orientierungen verlangten eine volle Rasterzeile 5, und die ist strukturell
+unerreichbar – siehe gleich.
+
+### Eine volle Rasterzeile ist ohne Spezialfliese unmöglich
+
+Rasterzeile *r* wird **nur** von Musterreihe *r* gespeist, und die schließt
+höchstens einmal je Runde ab: **fünf Steine für sechs Zellen.** Spalten haben
+das Problem nicht, sie ziehen ihre sechs Zellen aus sechs verschiedenen
+Musterreihen.
+
+Das ist der eigentliche Grund, warum Kriterium 0 (horizontale Reihen, +3)
+praktisch nie angesteuert wird – schärfer als die Ökonomie-Begründung in
+Spielstrategie 7. Der Ausweg existiert: ein ausgelöstes Spezialfeld FÜLLT die
+Rasterzelle, also braucht eine Rasterreihe mit zwei Spezialfeldern nur noch
+vier Lieferungen.
+
+### Wildfelder je Brett: 2 bis 7, nicht konstant
+
+Nachgemessen an 120 Brettern:
+
+| Slots mit Wild-Feld | 2 | 3 | 4 | 5 | 6 | 7 |
+|---|---:|---:|---:|---:|---:|---:|
+| Bretter | 3 | 14 | 43 | 43 | 14 | 3 |
+
+Symmetrisch um 4,5; die gelegentlich zitierten „exakt 50 %" sind ein
+Symmetrieartefakt der Mittelung, kein Konstantwert. **Wild-Slots und
+Wild-FELDER stimmen 1:1 überein.** Für k3 heißt das: typisch 4-5 Felder, also
+8-10 Punkte – aber alle müssen belegt sein, und die Anzahl hängt an der
+eigenen Plattenwahl, ist also gestaltbar.
 
 ## Spielstrategie aus Nutzer-Praxis (2026-08-13, woertlich aufgenommen)
 
