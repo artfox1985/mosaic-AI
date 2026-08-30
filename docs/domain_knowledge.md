@@ -113,13 +113,17 @@ Budgets, also Budget- und keine Policy-Robustheit. Für letztere wäre
   Kuppel-Legungen je Partie. Die Differenz zeigt in die Richtung des
   Unterschätzungs-Vorbehalts.
 
-### Die drei Referenzpunkte
+### Die vier Referenzpunkte
 
 | Punkt | Quelle | Was er sagt |
 |---|---|---|
 | **DECKE** | `tools/pattern_row_availability.py` | wie oft *r* gleichfarbige Steine überhaupt verfügbar sind — policy-unabhängig, reine Versorgung |
 | **BODEN** | Zufalls-Drafting | was ohne Absicht passiert |
 | **IST** | `tools/pattern_row_throughput.py` (dieser Abschnitt) | was der Champion-Korpus tatsächlich schafft |
+| **MENSCH** | `tools/probes/human_row_profile_probe.py`, Abschnitt 9 | was ein plattenbewusster Spieler daraus macht |
+
+Der vierte Punkt fehlte bis 2026-08-30. Er ist der einzige, der zeigt, dass
+die IST-Zeile eine Verhaltens- und keine Versorgungsgrenze beschreibt.
 
 ---
 
@@ -263,6 +267,54 @@ Aus dem Code, nicht geschätzt (`tile.rs`, `state.rs`, `board.rs`):
 Aufnahme je Partie passen zwei Durchgänge (80 %), drei nicht (120 %).
 
 ---
+
+### Die zweite Versorgung: Bonus-Chips
+
+**Es sind nur rund 20 Chips im ganzen Spiel** (`engine_manual.md`: 4 je Runde
+über 5 Runden), geteilt zwischen beiden Spielern, und **maximal 2 je Runde
+sind nehmbar**. Ein einzelner Spieler hält selten mehr als eine Handvoll.
+
+Die Vollendungsregel (`round_end.rs:487`, `greedy_chip_indices`): **2
+farbgleiche ODER 3 beliebige Chips JE fehlender Zelle**, formal
+`2*missing <= s <= 3*missing`. Der Rückfall auf die 3er-Variante geschieht
+automatisch, wenn keine zwei farbgleichen da sind – und die Regel deckt
+Mehrfeld-Füllung ab, nicht nur den Ein-Zellen-Fall.
+
+**Der Engpass ist damit nicht der Farbzufall, sondern der BESTAND zum
+Entscheidungszeitpunkt** (Herleitung der Quelle, ausdrücklich ungemessen): der
+Rundenende-Solver verbraucht gehaltene Chips selbst (`TilingStep::Chips`), und
+drei ungenutzte Chips plus blockierende Reihe im richtigen Zustand plus
+sofortige Platzierbarkeit fallen selten zusammen. In 80 Partien kam keine
+einzige Chip-Vollendung von Rasterreihe 6 zustande.
+
+**Das qualifiziert die Entwarnung in Abschnitt 5** („die KI chippt im
+Self-Play routiniert", 4,92 Abschlüsse je Partie): ohne die Mengenschranke
+liest man 4,92 als Überfluss, obwohl der Vorrat für BEIDE Spieler zusammen bei
+rund 20 liegt.
+
+### Die Farbanforderungen beider Spieler sind VERSCHIEDEN
+
+Jeder Spieler hat seine eigene Kuppel mit eigenen Kuppelplatten, individuell
+aus der Auslage gezogen, Position und Rotation frei (`engine_manual.md:40-42`,
+`:65`, `:80`). Welche Farben eine Spalte verlangt, bestimmt also das
+individuelle Plattenlayout. **Geteilt sind die KRITERIEN, nicht die Farben.**
+
+Daraus folgt direkt, dass Blockade über Farbe kaum greift – und die Messung
+bestätigt es: „Farbe nie verfügbar, während Zeile offen" wurde mit **0 %**
+gemessen. **Farbknappheit ist in diesem Spiel nicht der Engpass.**
+
+### Blindziehung am Kuppelstapel: die optimale Tiefe ist 1
+
+In jedem geprüften Fall ist Tiefe 1 optimal: nach der Pflichtziehung liegt
+bereits eine Platte im Wert von **2,9 bis 9,0 Punkten** in der Hand, und die
+erwartete VERBESSERUNG durch eine weitere Ziehung bleibt unter dem einen
+Punkt, den sie kostet. Das Spielerverhalten deckt sich damit: Mensch 19 von 20
+Serien auf Tiefe 1 (95 %), KI 25 von 25 (100 %).
+
+**Vorbehalt, der mitgehört**: fünf konstruierte Bretter, ein Seed, und die
+Potenzial-Näherung `V` ist eine Näherung. Die Arena-Abnahme (n=200) fand
+KEINEN Stärkeunterschied; die Quelle lässt offen, ob `V` zu niedrig angesetzt
+war. Als Größenordnung belastbar, als Konstante nicht.
 
 ## 5. Weitere gemessene Struktur
 
@@ -580,6 +632,67 @@ Symmetrieartefakt der Mittelung, kein Konstantwert. **Wild-Slots und
 Wild-FELDER stimmen 1:1 überein.** Für k3 heißt das: typisch 4-5 Felder, also
 8-10 Punkte – aber alle müssen belegt sein, und die Anzahl hängt an der
 eigenen Plattenwahl, ist also gestaltbar.
+
+## 9. Der Mensch als Referenz
+
+Zehn Mensch-gegen-Netz-Partien aus `static/log/` sind die einzige
+unkontaminierte empirische Quelle im Repo – ein plattenbewusster Spieler gegen
+ein plattenblindes Netz, gepaart je Partie (beide spielen dieselbe), also ohne
+Ära- oder Seed-Versatz. **Vorbehalt durchgehend: n=10, ein Spieler, schwacher
+Gegner. Als Größenordnung belastbar, als Konstante nicht.**
+
+### Abschlüsse je Musterreihe
+
+| | R1 | R2 | R3 | R4 | R5 | R6 | volle Spalten |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Mensch | 4,00 | 4,10 | 3,40 | 3,20 | **2,50** | **2,20** | **1,80** |
+| Netz | 4,90 | 4,90 | 3,30 | 2,40 | 1,10 | 0,50 | 0,10 |
+| Delta | −0,90 | −0,80 | +0,10 | +0,80 | **+1,40** | **+1,70** | **+1,70** |
+
+**Der Mensch gibt oben ab und kauft unten das Vielfache.** Das ist die direkte
+Gegenmessung zur Durchsatztabelle in Abschnitt 1 – und der Referenzpunkt, der
+dort neben DECKE, BODEN und IST fehlte.
+
+### Platzierungen je Rasterreihe
+
+| Rasterreihe | Mensch | Netz (v21@400) | v20-Selbstspiel | Mensch / v20 |
+|---|---:|---:|---:|---:|
+| 1 | 3,60 | 4,70 | 4,80 | 0,75x |
+| 2 | 3,30 | 4,70 | 4,77 | 0,69x |
+| 3 | 3,20 | 3,30 | 2,84 | 1,13x |
+| 4 | 2,60 | 2,30 | 1,89 | 1,38x |
+| 5 | **2,30** | 1,10 | 0,84 | **2,74x** |
+| 6 | **1,70** | 0,50 | 0,58 | **2,93x** |
+| Summe | 16,70 | 16,60 | – | |
+
+**Die Summe ist praktisch gleich, die Verteilung nicht.** Rund ein Viertel
+weniger in Reihe 1-2, dafür das Zwei- bis Dreifache in Reihe 5-6. Zusammen mit
+Abschnitt 7 ist das der Beleg, dass es ein Verteilungs- und kein
+Mengenproblem ist.
+
+Dazu der gemessene **Realisierungsabschlag je Rasterreihe**: 0,72 / 0,66 /
+0,64 / 0,52 / 0,46 / 0,34 – wie stark eine geplante Zelle in dieser Reihe
+tatsächlich zustande kommt.
+
+### Woher der Vorsprung kommt – und woher nicht
+
+**Die Platzierungspunkte sind ein Gleichstand: 54,9 gegen 55,8.** Der
+Vorsprung sitzt vollständig bei den Spezialfliesen (2,70 gegen 0,50
+Freischaltungen je Partie, 8,50 gegen 0,90 Punkte) und bei den Spalten
+(1,80 gegen 0,10).
+
+Ergänzend gegen den v20-Champion (`watchlist_v20_interim_review.md`, siehe
+Abschnitt 5): Ø +14,5 Punkte, davon 9,0 aus den Spezialpunkten.
+
+### Der Rundenverlauf ist stärke-invariant
+
+An 22 Arena-Logs: nach Runde 1 stehen 4 Punkte auf dem Brett, nach Runde 5
+47,6, nach Endwertung 55,7 (Mensch: 7,0 / 59,2 / 74,4). **Die Niveaus liegen
+33 % auseinander, die Anteile am Endstand stimmen auf 0,02 überein**
+(0,083 · 0,172 · 0,327 · 0,515 · 0,825).
+
+Der VERLAUF ist damit Spielstruktur, nicht Spielstärke – ein festes
+Rundenprofil ist zulässig, ein festes Punkt-NIVEAU nicht.
 
 ## Spielstrategie aus Nutzer-Praxis (2026-08-13, woertlich aufgenommen)
 
