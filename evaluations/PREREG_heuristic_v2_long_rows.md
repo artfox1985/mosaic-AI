@@ -2197,6 +2197,20 @@ vervollstaendigt die Ursachen-Trennung fuer die Morgen-Vorlage;
 Referenzzellen: Noise+Sampling 0,0825, Noise+argmax-spaet ~0,075,
 ohne-Noise+argmax 0,3375 (otw22b05w00).
 
+**DIAGNOSE-ARM GEFAHREN 03:48-04:14: ohne Noise, mit Sampling =
+0,1075 +- 0,017 (Punkte 22,4).** Der 2x2 ist damit komplett und die
+Deutung verschoben: der Root-Noise kostet ~0,03, das SAMPLING selbst
+kostet den Grossteil (0,34 -> 0,11) -- die Vollendungs-Ketten brechen
+an der fruehen Zug-Stochastik (Versorgungs-Entscheide der Runden 1-2),
+nicht am Spaetspiel. Letzte Kandidaten-Zelle, registriert als zweiter
+Diagnose-Arm (Seed 20260916, Tag tlb05nn24, Stack-Draw EIN): ohne
+Noise, Sampling NUR Halbzuege 0-23 (--no-root-noise
+--tau-argmax-from-move 24) -- minimale Exploration frueh, argmax
+danach. Haelt sie >= 0,17, wird sie die EMPFOHLENE Sockel-Konfiguration
+der Morgen-Vorlage; sonst lautet die Vorlage auf den Zielkonflikt
+Exploration gegen Spaltenlehre (Optionen: deterministischer Sockel wie
+die DAgger-Korpora, Misch-Sockel, oder Waechter-Frage an den Nutzer).
+
 **Erzeugungs-Zuschnitt (Wecker-Abarbeitung in PREREG_v23_window par.4c
 registriert):** 4.000 Sockel @400 Sims mit Root-Noise (Policy-Klasse) +
 8.000 Schwarm --value-only (v20-Konvention, cheap-sims 150); Dateiname
