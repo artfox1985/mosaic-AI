@@ -2293,11 +2293,19 @@ zurueck.
 "kleine Sims" gibt es nur ueber ein kleines --sims):** 200 Partien
 argmax value-only mit **150 Sims: 0,4425 +- 0,042 volle Spalten**
 (Quote 0,211, init>=4 2,09, Punkte 41,0) gegen 5,3 s je Partie
-(400 Sims: 12,5 s). **ENTSCHEID: der Schwarm faehrt 150 Sims** -- er
-haelt die Vollendungs-Exposition der Value-Klasse mit Abstand und
-entspricht dem registrierten Zuschnitt ("kleine Sims", Fenster-Prereg
-par.2). Der Policy-Sockel bleibt bei 400 (dort sind die Ziele das
-Produkt, und Zieltiefe kostet dort direkt Qualitaet).
+(400 Sims: 12,5 s). Erst-Entscheid war "Schwarm 150 Sims, Sockel 400".
+
+**BEIDES UEBERHOLT (2026-08-30, nach der vollstaendigen Kurve und der
+Arena, PREREG_search_depth_column_optimum par.2i-2k).** Der neue Stand:
+**BEIDE Klassen fahren 100 Sims** (Nutzer-Entscheid). Begruendung in
+Kuerze: das Plateau liegt bei 25-100 (~0,6 volle Spalten gegen 0,34 ab
+250, frisch-seed-repliziert), der Preis ist ein nicht signifikanter
+Staerkeverlust (@100 gegen @400: 33:47, p=0,144, KI streift die Null;
+@25 dagegen klar unterlegen, 11:29). Die 400 fuer den Sockel war
+zudem willkuerlich gesetzt -- der Bestand fuhr 600
+(PREREG_v21_window.md:15) -- und die Annahme "tiefe Suche labelt
+besser" ist ungeprueft; die Policy-Ziele kommen ohnehin per
+Lehrer-Relabeling, nicht aus der Spiel-Suche.
 
 **BEOBACHTUNG mit Caveat, kein Befund:** 0,4425 liegt UEBER dem
 400-Sims-Referenzwert 0,3375 -- aber die beiden stammen aus

@@ -1160,3 +1160,24 @@ Champion), aber deutlich verduennter als im reinen Destillat b18.
 Bekannte Grenze der Erstmessung gilt weiter: Zustandsraum aus
 Champion-Self-Play mit Bauer-Override, fuer b05 off-policy. Artefakt:
 evaluations/artifacts/probe_column_build_prior_mass_b05.json.
+
+## Nachtrag 2026-08-30: der par.16.2-Ausschluss ist jetzt DIREKT belegt
+
+par.16.2 hat per Ausschluss gefolgert, wo der Spaltenzug verlorengeht:
+der Prior bietet ihn an (b18 Median 4,91x Gleichverteilungsmasse), die
+Formel scheidet aus (PREREG_conjunction_terms par.10) -- "uebrig
+bleiben die Suche (Besuchswettlauf) und die Formel".
+
+**PREREG_search_depth_column_optimum liefert dafuer den direkten
+Beleg:** dasselbe Netz, dieselben Bretter, nur das Suchbudget
+variiert -- b05 baut bei 100 Sims 0,6225 volle Spalten, bei 400 nur
+0,3375 (frisch-seed-repliziert; par.2i). Die Wurzelbreite scheidet als
+Erklaerung aus (400 mit m=6: 0,3525, par.2k), es ist die TIEFE. Damit
+ist der Ausschluss-Befund von der Schlussfolgerung zur Messung
+geworden: der Zug verschwindet TATSAECHLICH in der Suche, und zwar
+umso mehr, je laenger sie rechnet.
+
+Was der Nachtrag NICHT aendert: der Konsumenten-Knopf bleibt negativ
+entschieden (par.15), und der Suchtiefen-Effekt ist ein TAUSCH --
+weniger Suche baut mehr Spalten, spielt aber schwaecher
+(par.2j: 11:29 bei 25 Sims).
