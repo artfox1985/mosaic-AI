@@ -392,3 +392,20 @@ der plattenblinden Netze, b05_value_sibling_check.json): die ORDNUNG
 ist geheilt, die GROESSE fehlt weiter. Konsequenz laut Fahrplan: die
 Phase-3-Bedingung (Ziel-Chirurgie) ist erfuellt. Artefakt:
 evaluations/artifacts/r5_value_calibration_b05.json.
+
+**NACHTRAG 2026-08-30: die Daempfung hat ein SYMPTOM im Spielbetrieb --
+und daraus wird ein neuer Test.** PREREG_search_depth_column_optimum
+misst an b05, dass mehr Suchtiefe WENIGER volle Spalten produziert
+(100 Sims 0,6225 gegen 400 Sims 0,3375, frisch-seed-repliziert; die
+Wurzelbreite scheidet als Erklaerung aus). Deutung (Herleitung, kein
+Beleg): die Gumbel-Wurzelauswahl sortiert nach Q-Werten, mehr
+Simulationen geben also dem Value-Kopf mehr Gewicht gegenueber dem
+Prior -- und dieser Kopf unterbietet den Plattenlohn eben um Faktor
+~11 (Steigung 0,0886, Nachmessung oben).
+
+**Daraus ein Erfolgstest fuer jede kuenftige Kalibrierungs-Reparatur,
+der ueber die Steigung hinausgeht: KIPPT DIE SIMS-KURVE?** Ein Netz mit
+korrekt geeichtem Plattenanteil muesste mit MEHR Suche MEHR Spalten
+bauen, nicht weniger. Der Test ist billig (zwei Self-Play-Arme a 200
+Partien) und misst die Wirkung dort, wo sie zaehlt -- im gespielten
+Verlauf statt an einer Regressionssteigung.

@@ -364,3 +364,22 @@ installierten Modul.
   INNERHALB einer gegebenen Menge getan hat; entscheidungsrelevant ist
   zuerst, ob die MENGE stimmt (Task E). Wird Task F eingetaktet, ist
   die Phasen-Telemetrie eine sinnvolle Beigabe zur Interpretation.
+
+**NACHTRAG 2026-08-30: unabhaengiger Beleg fuer die Q-gegen-Prior-Frage
+aus einer ganz anderen Richtung.** Diese Prereg misst das Verhaeltnis
+sigma:ln(prior) und haelt als Regel fest, dass sich die
+c_visit/c_scale-Familie bei Ueberschreiten von 3 wieder oeffnet
+(zuletzt 2,287 gesamt, R3 2,972).
+
+PREREG_search_depth_column_optimum kommt ohne diesen Regler zum selben
+Thema: variiert man NUR die Suchtiefe, verschiebt sich das faktische
+Gewicht zwischen Q und Prior -- und der Spaltenbau folgt dem sichtbar
+(100 Sims 0,6225 volle Spalten, 400 Sims 0,3375; Wurzelbreite scheidet
+aus, par.2k). Die Suchtiefe wirkt damit als impliziter Q/Prior-Regler,
+und der gemessene Effekt stuetzt die Praemisse dieser Prereg: das
+Verhaeltnis ist wirkungsrelevant, nicht nur eine Kennzahl.
+
+Kein Wiederaufnahme-Antrag: die Schwelle 3 ist nicht ueberschritten,
+und der Suchtiefen-Effekt ist ein TAUSCH (weniger Suche = mehr
+Spalten, aber schwaecheres Spiel, par.2j). Der Nachtrag steht hier,
+damit die naechste Messung des Verhaeltnisses diesen Beleg kennt.
