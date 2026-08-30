@@ -48,7 +48,8 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
 
     Alles Uebrige ist per Datei wirksam und steht darum hier: Schema- und
     Aktionszahlen, Sharpen-Exponent, TD_LAMBDA, Value-Ziel-Variante, Encoder,
-    Konjunktions-/Reachability-Ziele, Bitpacking, ignore_ptv, f32.
+    Konjunktions-/Reachability-Ziele, Bitpacking, ignore_ptv, f32,
+    Arm-K-Bootstrap-Kohaerenz.
     """
     # LOKALE Importe wie in `MosaicDataset.__init__` (dort Zeile "from config
     # import INPUT_SIZE"): `INPUT_SIZE` haengt an der Engine-Konfiguration und
@@ -104,4 +105,11 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
         material += "|ignore_ptv_v1"
     if _cache_f32_active():
         material += "|f32_v1"
+    # Arm K (PREREG_heuristic_v2_long_rows.md par.3b.3): wirkt je Record im
+    # WDL-Ziel, also je DATEI -- gehoert damit in diesen Namensraum genauso
+    # wie in den Fenster-Schluessel. Gleiche Quelle wie die Bauschleife
+    # (corpus_dataset), damit Schluessel und Bauweg nicht auseinanderlaufen.
+    _bs_coherence = _cd._bootstrap_coherence_mode()
+    if _bs_coherence != "off":
+        material += "|bscoh_" + _bs_coherence + "_v1"
     return hashlib.md5(material.encode()).hexdigest()[:12]

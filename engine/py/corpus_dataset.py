@@ -75,6 +75,45 @@ def _destretch_prob(p: float) -> float:
     return 1.0 / (1.0 + math.exp(-(DESTRETCH_A + DESTRETCH_B * z)))
 
 
+def _bootstrap_coherence_mode() -> str:
+    """MOSAIC_BOOTSTRAP_COHERENCE: Arm K -- Kohaerenz der Bootstrap-Haelfte.
+
+    Vorregistriert in `evaluations/PREREG_heuristic_v2_long_rows.md` par.3b.3
+    ("Arm K -- Bootstrap-Kohaerenz"), eingetaktet VOR das v23-Training
+    (`PREREG_v23_window.md` par.4a2, Nutzer-Entscheid 2026-08-29).
+
+    Befund-Basis (Stufe 0, 2026-08-27, bootstrap_plate_damping.json): die
+    beiden gespeicherten `bootstrap_value`-Eintraege eines Zustands summieren
+    sich auf ~1,13-1,14 statt auf 1 -- das Label-Netz ist beidseitig um
+    ~+0,05 zu optimistisch. `MIRROR_OTHER_VAL` steht auf `false`
+    (net_mcts.rs:670), beide Werte kommen also aus zwei unabhaengigen
+    Vorwaertspaessen; nichts zwingt sie auf Summe 1.
+
+    Modi:
+      "off"  -- Default, Bestandsverhalten BIT-IDENTISCH (kein Key-Zusatz).
+      "sum1" -- die beiden Bootstrap-Wahrscheinlichkeiten eines Zustands
+                werden VOR dem TD-Blend auf Summe 1 normiert.
+
+    Warum "sum1" und nicht die ebenfalls registrierte affine Versatz-
+    Korrektur: der Versatz existiert nur auf der LEHRER-Verteilung
+    (platt_fit_v21.json findet auf dem Frozen-Set A=-0,0033, B=0,906, also
+    praktisch keinen). Eine auf hv2 gefittete Konstante auf den v22-b05-
+    Korpus anzuwenden waere genau die Falle "nie auf der falschen Verteilung
+    eichen". Die Summen-Normierung braucht keine gefittete Konstante -- sie
+    erzwingt die Kohaerenz je Zustand aus den Daten dieses Zustands.
+
+    Ein Tippfehler ist ein harter Abbruch, kein stilles "off": ein Knopf, der
+    unbemerkt wirkungslos bleibt, ist die Fehlerklasse, gegen die
+    "+f32_v1"/"+nopack_v1" gebaut sind.
+    """
+    mode = os.environ.get("MOSAIC_BOOTSTRAP_COHERENCE", "off").strip().lower()
+    if mode not in ("off", "sum1"):
+        raise ValueError(
+            f"MOSAIC_BOOTSTRAP_COHERENCE={mode!r} unbekannt -- erlaubt sind "
+            "'off' (Default) und 'sum1' (Arm K, par.3b.3).")
+    return mode
+
+
 def _cache_f32_active() -> bool:
     """MOSAIC_CACHE_F32: float32 statt float16 fuer states/policies im Cache.
 
@@ -463,6 +502,14 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
     # Bestands-Cache verfaellt.
     if _cache_f32_active():
         cache_key_material += "+f32_v1"
+    # Arm K (par.3b.3): die Summen-Normierung wird VOR dem Caching in
+    # `values_wdl` eingerechnet -- dieselbe Falle wie TD_LAMBDA,
+    # value_target_variant und bsnative_default. Die Key-Komponente ist in der
+    # Registrierung ausdruecklich PFLICHT; NUR bei aktivem Knopf angehaengt,
+    # damit kein Bestands-Cache verfaellt.
+    _bs_coherence = _bootstrap_coherence_mode()
+    if _bs_coherence != "off":
+        cache_key_material += "+bscoh_" + _bs_coherence + "_v1"
     digest = hashlib.md5(cache_key_material.encode()).hexdigest()
     return WindowCacheKey(files=files, policy_carrier_set=policy_carrier_set,
                           carrier_prefixes=carrier_prefixes, cache_nopack=cache_nopack,
@@ -925,6 +972,15 @@ class MosaicDataset(Dataset):
             print(f"Lade Daten aus {len(files)} Dateien...")
             t0 = time.time()
             _CIDX = {'blau':0,'gelb':1,'rot':2,'schwarz':3,'türkis':4}
+            # Arm K EINMAL je Korpus-Aufbau aufloesen (nicht je Record): der
+            # Knopf ist eine Zieldefinition, keine Schleifen-Groesse. Die
+            # Ansage im Log ist Pflicht -- ein Label-Umbau, den man dem Lauf
+            # nicht ansieht, ist genau der stille Knopf aus par.3b.3.
+            bootstrap_coherence = _bootstrap_coherence_mode()
+            if bootstrap_coherence != "off":
+                print(f"🔧 Arm K aktiv: MOSAIC_BOOTSTRAP_COHERENCE={bootstrap_coherence} "
+                      f"-- Bootstrap-Paare werden vor dem TD-Blend auf Summe 1 normiert.",
+                      flush=True)
             states_l, policies_l, values_l, masks_l, moon_l = [], [], [], [], []
             polw_l = []  # Policy-Loss-Gewicht je Sample (1=Drafting, 0=Tiling/Start)
             points_l = []  # Aux-Ziel: Punktestand-Prognose (siehe VALUE_SCHEMA_VERSION oben)
@@ -1177,6 +1233,23 @@ class MosaicDataset(Dataset):
                                     bvp = float(bv[p])
                                     if not bootstrap_native:
                                         bvp = _destretch_prob(bvp)
+                                    # Arm K (par.3b.3, `_bootstrap_coherence_mode`):
+                                    # die beiden Bootstrap-Wahrscheinlichkeiten
+                                    # dieses Zustands auf Summe 1 normieren,
+                                    # BEVOR geblendet wird. Der Gegner-Wert
+                                    # durchlaeuft dieselbe Entstauchung wie der
+                                    # eigene -- sonst normierte man zwei Werte
+                                    # verschiedener Skalen gegeneinander.
+                                    if bootstrap_coherence == "sum1":
+                                        bvo = float(bv[1 - p])
+                                        if not bootstrap_native:
+                                            bvo = _destretch_prob(bvo)
+                                        _bsum = bvp + bvo
+                                        # Summe 0 kann nur aus zwei exakten
+                                        # Nullen kommen -- dann gibt es nichts
+                                        # zu normieren, Rohwert bleibt stehen.
+                                        if _bsum > 0.0:
+                                            bvp = bvp / _bsum
                                     value_wdl = TD_LAMBDA * bvp + (1.0 - TD_LAMBDA) * wdl_outcome_val
                                 value_wdl = min(1.0, max(0.0, value_wdl))
                             else:

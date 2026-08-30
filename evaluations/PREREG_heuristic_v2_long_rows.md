@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1); v2-Zweig entfernt, Artefakte lauffaehig (par.19). KEIN v22-Self-Play (par.3b.2); Konsument beidseitig ohne Torerfolg (par.3b.6/3b.7); WARUM geklaert: Drift-These, Chip-Allokation, Kosten-Scheu (par.3b.8 A-E). STAPELUNG gefahren (par.3b.9/3b.10): DAgger-Arm v22-b05 verfehlt das Spalten-Tor, ist aber SIGNIFIKANT staerker (+3,86 Punkte, t 2,61; Spalten 0,3375) -- bester Stand der Familie; Gelaender-Leiter H0; DAgger-Runde 2 beidseitig H0, Saettigung nach einer Runde, b05 bleibt bester Stand (par.3b.11). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen, ohne ihn anzufassen? | Beleg: JA (par.10.1), v2-Zweig entfernt (par.19). Bester Stand v22-b05 (+3,86 Punkte, t 2,61; par.3b.9/3b.10), DAgger-Runde 2 H0 (par.3b.11), WARUM geklaert (par.3b.8). Tor-Revision par.3b.12 loest das alte KEIN-Self-Play ab: Erzeugung laeuft seit 2026-08-30, Waechter (Symmetrie-Trennung, >= 1.500 Seiten) vor dem v23-Training bindend; Arm K gebaut, Default aus (par.3b.3). -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
@@ -1278,6 +1278,58 @@ Nutzniesser -- diese drei sind es.
 **Entscheid faellt der Nutzer.** Bei JA ist der Arm nach dem laufenden
 Kaltstart als v22b-Retrain nachholbar: zwei Arme auf DEMSELBEN Korpus,
 Entscheid an Brier PLUS Arena.
+
+**ARM K GEBAUT 2026-08-30 -- Form: SUMMEN-NORMIERUNG, Default AUS.**
+Einaktung: `PREREG_v23_window.md` par.4a2 (Nutzer-Entscheid 2026-08-29
+"takte es dort ein"), faellig VOR dem v23-Training. Gebaut wurde der
+Knopf, NICHT eine Default-Aenderung -- der Bestandspfad bleibt
+bit-identisch.
+
+* **Gewaehlte Form (Entscheid des Koordinators, hier registriert):** von
+  den beiden registrierten Formen die **Summen-Normierung**
+  (`MOSAIC_BOOTSTRAP_COHERENCE=sum1`), nicht die affine
+  Versatz-Korrektur. Grund ist der Quer-Beleg dieses Absatzes selbst: der
+  Versatz existiert nur auf der LEHRER-Verteilung
+  (`platt_fit_v21.json`: A -0,0033, B 0,906 auf dem Frozen-Set). Eine auf
+  hv2 gefittete Konstante auf den v22-b05-Korpus anzuwenden waere genau
+  die Falle "nie auf der falschen Verteilung eichen". Die Normierung
+  braucht keine gefittete Konstante; sie erzwingt die Kohaerenz je
+  Zustand aus den beiden Werten DIESES Zustands. Die affine Form bleibt
+  registriert und ungebaut.
+* **Eingriffsort** (corpus_dataset.py, WDL-Zweig, vor dem TD-Blend):
+  `bvp <- bvp / (bvp + bvo)`. Der Gegner-Wert durchlaeuft dieselbe
+  Entstauchungs-Fallunterscheidung wie der eigene -- sonst normierte man
+  zwei Werte verschiedener Skalen gegeneinander. Summe 0 laesst den
+  Rohwert stehen.
+* **UMFANG, ausdruecklich:** nur der WDL-Zweig (`values_wdl`), wie
+  registriert. Der [-1,1]-Zweig (`val`/`points_val`/`opp_points_val`)
+  bleibt unangetastet.
+* **Cache-Key-Komponente** (in der Registrierung PFLICHT) in BEIDEN
+  Namensraeumen: `+bscoh_sum1_v1` im Fenster-Schluessel
+  (corpus_dataset.window_cache_key) und `|bscoh_sum1_v1` im
+  Datei-Schluessel (file_cache_key.per_file_cache_key). NUR bei aktivem
+  Knopf angehaengt -- kein Bestands-Cache verfaellt, und der Co-Bau darf
+  weiterlaufen.
+* **Manifest:** `bootstrap_coherence` in `cli_args` (train.py), nach der
+  Regel der Zeile darueber (`ignore_policy_target_valid`): ein Knopf, der
+  die Zieldefinition aendert, gehoert ins Manifest und nicht nur in den
+  Cache-Key.
+* **Tippfehler = Abbruch**, nicht stilles "off"
+  (`_bootstrap_coherence_mode` wirft bei unbekanntem Wert), plus
+  Log-Ansage bei aktivem Arm.
+* **Abnahme gebaut, LAUF STEHT AUS:**
+  `tools/probes/bootstrap_coherence_probe.py` nach dem Muster von
+  `bootstrap_native_default_probe.py` -- (A) off = Bestands-Blend,
+  (A') ungesetzt = off, (B) sum1 = unabhaengig nachgerechneter
+  normierter Blend, (C) Gegenprobe off != sum1, (D) beide Schluessel
+  trennen und off trifft den ungesetzten Schluessel, (E) Berichtsgroessen
+  (Paarsumme, Ziel-Verschiebung). Nicht gefahren, weil die v22-b05-
+  Erzeugung exklusiv laeuft (Regel "Messungen laufen exklusiv"); der Lauf
+  gehoert in dieselbe Stunde wie die Nach-Erzeugungs-Waechter.
+* **Was damit NICHT entschieden ist:** ob das v23-Training mit `sum1`
+  faehrt. Das bleibt die registrierte Arm-Frage (zwei Arme auf DEMSELBEN
+  Korpus, Entscheid an Brier PLUS Arena). Der Bau macht sie
+  entscheidbar; der Default bleibt bis dahin "off".
 
 ### par.3b.4 Symmetrie-Pruefung des Lehrerkorpus (registriert 2026-08-27, VOR der Tor-Auswertung von par.3b.2)
 
