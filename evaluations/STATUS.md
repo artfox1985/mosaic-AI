@@ -196,7 +196,19 @@ des Solls; Phase 3 bleibt faellig, praezisiert auf die BETRAGS-Schiene
 Kosten-Scheu).** Einzelbefunde: (0.1) R5-Platten-Steigung auf b05:
 **0,0886** (Punkte-Kopf 0,989) -- die Daempfung persistiert exakt im
 alten Band, KEIN Korpus-Artefakt (r5_value_calibration_b05.json;
-registriert in PREREG_r5_value_calibration). (0.2) Geschwister-Tau auf
+registriert in PREREG_r5_value_calibration). **NACHTRAG 2026-08-30
+(par.10, r5_calibration_per_criterion.json): kriterienweise
+aufgeloest ist die Daempfung BREIT, nicht spaltenspezifisch.**
+Kriterium 1 (Spalten) ist mit 0,1747 (t 4,19) das am besten belegte
+positive Kriterium und liegt UEBER den uebrigen sieben (+0,094,
+t 1,97); der annahmefreie Tausch aeussere Felder -> Spalten gibt
+0,1996 (t 12,08) gegen 0,0152 (t 0,76) beim plattenblinden v21.
+Die aggregierte Unterkalibrierung bleibt bestaetigt (unabhaengig
+0,0852 auf allen 32 Kombinationen), aber die Lesart "Kopf unterbietet
+den Plattenlohn, DESHALB keine Spalten" traegt in ihrer
+spaltenspezifischen Form nicht -- der Befund ist
+plattensensitiv-schwach. Zu duenn fuer ein Urteil: k2/k4/k7.
+(0.2) Geschwister-Tau auf
 b05: **+0,338** gegen -0,08/-0,19 der plattenblinden Netze auf
 denselben 33 Stellungen -- der Kopf ORDNET Spaltenfortschritt jetzt
 richtig, beziffert ihn aber weiter mit ~9 Prozent des Solls
@@ -264,8 +276,13 @@ unabhaengig davon bei 400 Sims.
 ist die SUCHTIEFE, nicht die Wurzelbreite (400 mit m=6 bleibt bei
 0,3525). Deutung: die Tiefe ist faktisch ein Regler zwischen Policy
 (traegt das Spaltenwissen) und Value-Kopf (unterbietet den Plattenlohn
-um Faktor 11) -- der Betriebspunkt 400 steht auf der Seite des
-defekten Kopfes. **NUTZER-ENTSCHEID: flaches Self-Play (100 Sims) fuer
+IM MITTEL um Faktor 11) -- der Betriebspunkt 400 steht auf der Seite des
+schwaecheren Kopfes. **Praezisierung 2026-08-30 (par.10 der
+R5-Kalibrierungs-Prereg):** dieser Faktor gilt fuer den Plattenlohn INSGESAMT;
+speziell fuer Spalten ist der Kopf mit Faktor ~5 deutlich weniger taub als
+im Mittel. Die Deutung der Sims-Kurve steht damit nicht mehr auf
+"spaltenblinder Kopf", sondern hoechstens auf "durchweg zu leiser Kopf" --
+sie ist damit UNBELEGT und braucht einen eigenen Test. **NUTZER-ENTSCHEID: flaches Self-Play (100 Sims) fuer
 die Erzeugung, Stärkeverlust bewusst in Kauf genommen, um die Spalten
 in den Korpus zu bekommen; ergaenzbar durch einen spaeteren
 Zweitsockel mit hoeherer Tiefe.** Daraus die Arbeitsteilung

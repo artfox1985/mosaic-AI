@@ -1,9 +1,9 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Reagiert der Value-/Punkte-Kopf in Runde 5 proportional richtig auf Wertungsplatten-Aenderungen (Task #27)? | Beleg: Unterkalibrierung bestaetigt (Steigung 0,06-0,09 statt ~1; archive Z. ~7065). NACHMESSUNG 2026-08-29 auf v22-b05: Steigung 0,0886 -- Daempfung persistiert auf dem spaltenfaehigen Netz, KEIN Korpus-Artefakt; Ordnung dagegen geheilt (Tau +0,338). Punkte-Kopf 0,989. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Reagiert der Value-/Punkte-Kopf in Runde 5 proportional richtig auf Wertungsplatten-Aenderungen (Task #27)? | Beleg: Unterkalibrierung bestaetigt und mehrfach repliziert (Gesamtsteigung 0,06-0,09; b05 0,0886, unabhaengig 0,0852 auf allen 32 Kombinationen). KRITERIENWEISE aufgeloest (par.10, 2026-08-30): die Daempfung ist BREIT, NICHT spaltenspezifisch -- Kriterium 1 liegt ueber den uebrigen sieben (Tausch 4 auf 1: 0,1996 bei t 12,1; v21 dort 0,0152). Zu duenn fuer ein Urteil: k2, k4, k7. -->
 
 # Vorregistrierung: Runde-5-Value-/Punkte-Kopf-Kalibrierung gegen exakte Ground Truth
 
 **Angelegt 2026-08-02 (Task #27), VOR dem ersten vollen Lauf.** Nur Design +
-Werkzeug + Rauchtest in diesem Schritt (User-Go dafür liegt vor) — der volle
+Werkzeug + Rauchtest in diesem Schritt (User-Go dafür liegt vor) – der volle
 Lauf folgt NACH der Lambda-/PCR-Auswertung, separat freigegeben. Die Regeln
 unten dürfen nach Sichtung von Zwischenergebnissen nicht mehr geändert werden
 (Präzedenzfall `PREREG_lambda_target.md`).
@@ -14,9 +14,9 @@ unten dürfen nach Sichtung von Zwischenergebnissen nicht mehr geändert werden
 verschiedene Wertungsplatten-Kombinationen bei FESTEM Zustand streut nur
 Ø 0,035–0,043 (`treatment_value_spread_across_combos`, siehe
 `evaluations/artifacts/scoring_tile_sensitivity_v18_best.json`/`_v19_best.json`/
-`_v19_2d_best.json`) — deutlich über dem Baseline-Rauschen, aber der
+`_v19_2d_best.json`) – deutlich über dem Baseline-Rauschen, aber der
 Nutzer-Verdacht ist: **unterkalibriert**, nicht nur "klein, aber real". Eine
-reine Spread-Zahl beantwortet das nicht — dafür fehlt eine GROUND TRUTH, wie
+reine Spread-Zahl beantwortet das nicht – dafür fehlt eine GROUND TRUTH, wie
 groß die Reaktion SEIN SOLLTE. Diese Vorregistrierung baut genau diese Ground
 Truth für Runde 5 (dort exakt berechenbar, kein Zufalls-Rest mehr, siehe
 `round5.rs`-Moduldoku) und regressiert die drei Modell-Köpfe (`v18_best`
@@ -409,6 +409,122 @@ korrekt geeichtem Plattenanteil muesste mit MEHR Suche MEHR Spalten
 bauen, nicht weniger. Der Test ist billig (zwei Self-Play-Arme a 200
 Partien) und misst die Wirkung dort, wo sie zaehlt -- im gespielten
 Verlauf statt an einer Regressionssteigung.
+
+## par.10 KRITERIENWEISE Aufschluesselung (gefahren 2026-08-30)
+
+**Anlass (Nutzer-Einwand).** Aus der Gesamtsteigung 0,0886 war gefolgert
+worden, der Kopf unterbiete den Plattenlohn und baue DESHALB keine Spalten.
+Die Zahl ist aber ein Mittel ueber alle ACHT Kriterien und kann "speziell
+fuer Kriterium 1 taub" (spaltenblind) nicht von "gleichmaessig leise"
+(plattensensitiv-schwach) unterscheiden. Der Nutzer hat zusaetzlich
+eingewandt, dass wer nach der Dreiecks-Einhuellenden baut, wertvolle Spalten
+ohnehin bekommt und auf Plattenwechsel gar nicht stark reagieren muss. Zwei
+vorhandene Messungen sprachen ebenfalls dagegen: Geschwister-Tau +0,338
+(b05_value_sibling_check.json) und PREREG_human_game_oracle_gap par.9 (keine
+spezifische Abwertung menschlicher k1-Zuege, alle drei Schwellen H0).
+
+**Anordnung.** `tools/probes/r5_calibration_per_criterion.py` (neu; importiert
+Ground Truth, Kennlinie und Torch-Pfad aus `tools/r5_value_calibration.py`,
+kein Logik-Fork). Dieselben 24 Runde-5-Zustaende (gleicher Selektor/Seed) und
+dieselbe Kennlinie (a=-0,78786 b=0,39438, McFadden 0,634; in dieser Sitzung
+mit 233 Records unabhaengig nachgefittet, Ergebnis ZIFFERNGLEICH zur
+b05-Messung -- zugleich der Determinismus-Nachweis unter der parallel
+laufenden Erzeugung, ergaenzt um eine 8er-Stichprobe frisch nachgerechneter
+`ab_value`, 8/8 identisch). Unterschied zum Bestandswerkzeug: statt 6
+repraesentativer laufen ALLE 32 gueltigen Kombinationen je Zustand. Nur so
+kommt jedes Kriterium gleich oft vor (12x) und die Indikatormatrix hat vollen
+Spaltenrang 8; mit 6 Kombinationen waere die Frage gar nicht beantwortbar.
+
+Zwei Auswertungen nebeneinander, weil ein EINZELNES Kriterium mit gueltigen
+Kombinationen prinzipiell nicht isolierbar ist (jede Kombination traegt genau
+3 Kriterien aus 3 verschiedenen Ausschluss-Paaren, die symmetrische Differenz
+zweier Kombinationen ist also immer mindestens 2):
+
+- **(a) additive Zerlegung je Zustand**, ohne Achsenabschnitt, anschliessend
+  ueber die acht Kriterien zentriert (das entfernt die stark streuende
+  Grundlast exakt). Mittleres R2 der Zerlegung: `ab_value` 0,990, Value-Kopf
+  0,906, Punkte-Kopf 0,993 -- die Naeherung traegt.
+- **(b) Tausch innerhalb eines Ausschluss-Paares**, ganz ohne
+  Additivitaets-Annahme, 12 Kontraste je Zustand und Paar,
+  Standardfehler je Zustand geclustert (CR1).
+
+**Gueltigkeitsnachweis.** Die Aggregat-Gegenprobe auf der 32er-Menge
+(Referenz gegen alle uebrigen, wie im Bestandswerkzeug) liefert fuer b05
+**0,0852** (SE 0,0426, geclustert, n=744) und die Zerlegung gepoolt 0,0913
+(SE 0,0353) -- die berichteten 0,0886 sind reproduziert, die Aufschluesselung
+haengt nicht an einer anderen Grundgesamtheit.
+
+### Steigungen je Kriterium, VALUE-Kopf, v22-b05 (Soll ~1, n=24 Zustaende)
+
+| k | Kriterium | Steigung | SE | t | R2 | k gegen die uebrigen sieben (Diff, SE, t) |
+|---|-----------|---------:|---:|---:|---:|---|
+| 0 | horizontale Reihen (3 Pkt) | 0,2887 | 0,0890 | 3,24 | 0,323 | +0,213, 0,169, 1,25 |
+| **1** | **vertikale Reihen = SPALTEN (7 Pkt)** | **0,1747** | **0,0417** | **4,19** | **0,443** | **+0,094, 0,048, 1,97** |
+| 2 | Diagonalen (10 Pkt) | -0,2220 | 0,1746 | -1,27 | 0,069 | -0,272, 0,171, -1,59 |
+| 3 | mehrfarbige Felder (2 Pkt) | 0,0807 | 0,0322 | 2,51 | 0,223 | -0,015, 0,030, -0,50 |
+| 4 | aeussere Felder (1 Pkt) | 0,1090 | 0,1042 | 1,05 | 0,047 | +0,004, 0,082, 0,05 |
+| 5 | Eckplatten (3/8 Pkt) | 0,0022 | 0,0656 | 0,03 | 0,000 | -0,084, 0,055, -1,53 |
+| 6 | Spezialfelder (-3 Pkt) | 0,0946 | 0,0444 | 2,13 | 0,171 | -0,012, 0,070, -0,17 |
+| 7 | farbenreiche Reihen (4 Pkt) | -0,1504 | 0,1060 | -1,42 | 0,084 | -0,144, 0,085, -1,71 |
+
+### Tausch innerhalb der Ausschluss-Paare (annahmefrei, n=288, 24 Cluster)
+
+| Tausch | v22-b05 | SE | t | v21 (plattenblind) | SE | t |
+|--------|--------:|---:|---:|-------------------:|---:|---:|
+| 0 -> 7 (horizontal -> farbenreich) | 0,3643 | 0,0460 | 7,91 | -0,0290 | 0,0276 | -1,05 |
+| 6 -> 3 (Spezialfelder -> mehrfarbig) | 0,1164 | 0,0552 | 2,11 | 0,1542 | 0,0393 | 3,92 |
+| **4 -> 1 (aeussere Felder -> SPALTEN)** | **0,1996** | **0,0165** | **12,08** | **0,0152** | **0,0199** | **0,76** |
+| 2 -> 5 (Diagonalen -> Eckplatten) | 0,0254 | 0,0840 | 0,30 | 0,0495 | 0,0264 | 1,88 |
+
+### Verdikt zur Leitfrage
+
+**Kriterium 1 ist NICHT staerker gedaempft als die uebrigen sieben -- eher
+das Gegenteil.** Es ist mit t 4,19 (R2 0,443) das am besten belegte positive
+Kriterium der Zerlegung, liegt im Wechselwirkungstest UEBER den anderen
+sieben (+0,094, t 1,97), und der annahmefreie Tausch 4 -> 1 gibt 0,1996
+(t 12,08) -- gut das Doppelte des gepoolten Niveaus 0,091. Die Daempfung ist
+BREIT: alle acht Kriterien liegen zwischen 0,00 und 0,29 gegen ein Soll von
+~1. Der Befund lautet also **plattensensitiv-schwach, nicht spaltenblind**;
+die Schlusskette "Kopf unterbietet den Plattenlohn, DESHALB keine Spalten"
+traegt in ihrer spaltenspezifischen Form nicht. Die aggregierte
+Unterkalibrierung selbst bleibt unberuehrt und bestaetigt.
+
+**Zu duenn besetzt fuer ein Urteil** (Massstab: der Standardfehler muss "nahe
+null" von "auf dem gepoolten Niveau ~0,09" trennen koennen, also SE unter
+~0,06): **k2 Diagonalen (SE 0,175), k7 farbenreiche Reihen (SE 0,106), k4
+aeussere Felder (SE 0,104)** tragen kein Urteil; **k0 horizontale Reihen
+(SE 0,089)** nur eingeschraenkt. Die Ursache ist am Hebelarm ablesbar, nicht
+an der Fallzahl (die ist bei allen acht gleich, 12 Vorkommen je Kombination):
+die Streuung der wahren Wirkung ueber die Zustaende betraegt bei k2/k7/k4/k0
+nur 0,037/0,040/0,063/0,073 Gewinnprozentpunkte gegen 0,333/0,203/0,140 bei
+k6/k3/k1. Diagonalen und farbenreiche Reihen sind in Runde-5-Endstellungen
+schlicht kaum noch beweglich. **Urteilsfaehig sind k1, k3, k6** (SE < 0,05)
+und k5 als verlaesslich nahe null.
+
+### Nebenbefund: die Gesamtsteigung sagt nicht, WELCHE Platten der Kopf sieht
+
+v21 (plattenblinder Vergleichsstand, `models/frozen_champions/
+v21_2d_brierbest/model.pth`, auf demselben Substrat mitgemessen) hat die
+HOEHERE Aggregat-Steigung: 0,1539 (SE 0,0380) gegen b05s 0,0852. Aufgeloest
+kommt sie aus einer ANDEREN Ecke: v21s staerkstes Kriterium ist k6
+Spezialfelder (0,1479, Wechselwirkung +0,096 bei t 3,07), waehrend seine
+Spalten-Steigung 0,0352 (t 0,95) und sein Spalten-Tausch 0,0152 (t 0,76)
+nicht von null zu unterscheiden sind. b05 bezieht seine Reaktion umgekehrt
+aus der Reihen-/Spalten-Geometrie (k0 0,289, k1 0,175). Die Differenz b05
+minus v21 auf dem Tausch 4 -> 1 betraegt 0,184 (konservativ ungepaart
+gerechnet: SE 0,026, t ~7,1). **Der Spaltenkanal ist genau die Stelle, an der
+b05 gegenueber dem plattenblinden Stand zugelegt hat** -- konsistent mit
+Geschwister-Tau +0,338 und mit par.9 der Mensch-Orakel-Prereg. Fuer kuenftige
+Berichte heisst das: eine einzelne Kalibrierungs-Steigung ist kein Guetemass,
+sie mittelt ueber Kriterien mit voellig verschiedener Traegerschaft.
+
+**Artefakt:** `evaluations/artifacts/r5_calibration_per_criterion.json`
+(enthaelt auch die vollstaendige, modellunabhaengige Ground Truth der 24 x 32
+Alpha-Beta-Aufrufe, damit eine andere Auswertung ohne neuen Rechenlauf
+moeglich ist). Laufzeit: Wanduhr 3.265 s, CPU 2.970 s, 768 frische
+Alpha-Beta-Aufrufe zu 4,25 s je Aufruf, 12 Kerne, parallel laufende
+12.000-Partien-Erzeugung (vom Nutzer freigegeben; Determinismus separat
+belegt, siehe "Anordnung").
 
 **WIDERSPRUCH BENANNT 2026-08-30 (Nutzer-Einwand, gegen die bisherige
 Lesart des Koordinators).** Die hier gemessene Steigung ist ein
