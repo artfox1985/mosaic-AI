@@ -55,6 +55,16 @@ import re
 import sys
 import time
 
+# Fortschrittszeilen tragen Emoji; auf einer cp1252-Konsole (Windows,
+# Hintergrundlauf ohne -X utf8) stirbt sonst der ERSTE Fortschritts-print
+# mit UnicodeEncodeError -- gemessen 2026-08-30, der Watch-Lauf brach nach
+# Sekunden ab. Additiv, aendert nur die Ausgabe-Kodierung.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError):  # noqa: PERF203 -- einmalig beim Start
+        pass
+
 _ROOT = pathlib.Path(__file__).resolve().parent.parent
 # BEIDE Pfade: `neural_net` liegt in engine/py, importiert aber `config` aus
 # der Projektwurzel (gleiche Begruendung wie in build_cache_parallel.py).
