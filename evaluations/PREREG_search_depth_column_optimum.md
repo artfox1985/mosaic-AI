@@ -195,6 +195,30 @@ es aendert das Spiel nicht). Damit war der Anlass-Vergleich aus par.1
 im Ergebnis doch tragfaehig -- was er NICHT war, ist ein Beleg, und
 genau deshalb lief Stufe 1.
 
+## par.2g Zwei Korrekturen aus der Nutzer-Pruefung 2026-08-30 (beide gegen MICH)
+
+**(1) Der Sockel-Wert 400 war willkuerlich.** Er stand unkommentiert im
+Zuschnitt D, begruendet nur mit "dort sind die Ziele das Produkt". Der
+BESTAND faehrt seit Generationen **600 Sims** fuer den Netz-Sockel
+(PREREG_v21_window.md:15, PREREG_v22_window.md:123, selbst gelesen) --
+meine Zahl war also weder gemessen noch am Bestand orientiert. Sie ist
+aus der Festlegung raus; die Sockel-Sims gehoeren in dieselbe
+Arena-Entscheidung wie der Schwarm. Hintergrund, der die Sache
+zuspitzt: beim NETZ-Self-Play sind Spielen und Labeln GEKOPPELT (eine
+Suche liefert Zug und Policy-Ziel), waehrend der hv2-Korpus sie trennt
+(Heuristik spielt, Netz labelt mit 600) -- die Kurve greift also beim
+Sockel voll durch, beim hv2-Korpus nicht.
+
+**(2) "600 Sims erklaeren die historische Spaltenarmut" ist FALSCH und
+zurueckgenommen** (Nutzer-Einwand: die bisherigen Generationen hatten
+keinen Spalten-Lehrer). Die Vermutung war sogar inkonsistent mit der
+eigenen These dieses Strangs: wenn der Effekt daher ruehrt, dass die
+Suche einen spaltenkundigen PRIOR ueberstimmt, kann er bei v21 und
+frueher nicht aufgetreten sein -- dort gab es kein Spaltenwissen zu
+ueberstimmen. Die historische Spaltenarmut haengt am fehlenden Lehrer.
+Ein 600er-Arm fuer b05 wurde daraufhin VERWORFEN (Nutzer): er wuerde
+einen Betriebspunkt vermessen, den niemand mehr erwaegt.
+
 ## par.3 Was dieser Strang NICHT ist
 
 * **Keine Wiederaufnahme der Q-Skalierungs-Familie** (geschlossen). Hier
