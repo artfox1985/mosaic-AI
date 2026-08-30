@@ -26,12 +26,13 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## UEBERGABE 2026-08-30 -- was als NAECHSTES zu tun ist
 
-**DIE ERZEUGUNG LAEUFT SEIT 2026-08-30 19:25** (Hintergrundlauf dieser
-Sitzung; Ausgabe in der Task-Datei, Fortschritt an den Dateien in
-`data/selfplay_v22-b05-*` ablesbar). Stand bei Sitzungsende: Arm 1
-(value-argmax) bei rund 400 von 6.000 Partien, 3,2 s je Partie,
-danach laufen die beiden anderen Klassen automatisch an. Gesamtdauer
-grob 10-11 h. **Wenn der Lauf abgebrochen ist, hier die Befehle zum
+**DIE ERZEUGUNG LAEUFT SEIT 2026-08-30 19:25** (Hintergrundlauf einer
+frueheren Sitzung; Ausgabe in der Task-Datei, Fortschritt an den Dateien in
+`data/selfplay_v22-b05-*` ablesbar). **Stand 2026-08-30 23:19 gezaehlt (nicht
+hochgerechnet, g-Suffix der neuesten Datei): Arm 1 (value-argmax) bei 4.060
+von 6.000 Partien**, 3,45 s je Partie ueber die ersten 4.000 (230 min
+Wanduhr). Danach laufen value-sampled (2.000) und policy (4.000) automatisch
+an. Die Klassen-Reihenfolge steht in den Befehlen unten. **Wenn der Lauf abgebrochen ist, hier die Befehle zum
 Wiederaufsetzen** (fehlende Partien zaehlen, nicht hochrechnen -- das
 g-Suffix im Dateinamen traegt den Stand):
 
@@ -53,15 +54,18 @@ Arena-Messungen beendet) und kann jederzeit wieder gestartet werden:
 --encoder 2d --value-target-variant nortv --workers 2 --watch
 --wartezeit 60 --leerlauf-abbruch 60`. NICHT waehrend Arena-Messungen.
 
-**Aufraeumstand 2026-08-30:** die Messkorpora des Suchtiefen-Strangs
-sind geloescht (121 pkl + 13 Manifeste, Nutzer-Freigabe). In `data/`
-liegen jetzt `selfplay_hv2_*` (2.400, Fenster), die wachsenden
-`selfplay_v22-b05-*` (Erzeugung) und **60 `selfplay_v21depth*`-Dateien
-des ABGESCHLOSSENEN v21-Vergleichs -- die sind ein MESSKORPUS,
-gehoeren NICHT ins Trainingsfenster und koennen geloescht werden**
-(Nutzer: "kommen vor dem Trainingsstart raus"); sonst per
-`MOSAIC_DATA_EXCLUDE` ausschliessen (dieselbe Falle, die bei b05
-zuschlug, als 600 Roh-Messpartien still mitliefen).
+**Aufraeumstand 2026-08-30 (ABGESCHLOSSEN):** die Messkorpora des
+Suchtiefen-Strangs sind geloescht (121 pkl + 13 Manifeste,
+Nutzer-Freigabe), und am Abend kamen die 60
+`selfplay_v21depth100/250_*.pkl` des abgeschlossenen v21-Vergleichs dazu
+(Nutzer-Freigabe 2026-08-30, pfadgenau erfragt). Die zwei zugehoerigen
+`manifest_v21depth*.json` bleiben bewusst liegen -- sie dokumentieren einen
+gelaufenen Vergleich und stehen nicht im `*.pkl`-Glob des Trainings.
+**Damit enthaelt `data/` nur noch, was ins Fenster gehoert:**
+`selfplay_hv2_*` (2.400) und die wachsenden `selfplay_v22-b05-*`. Ein
+`MOSAIC_DATA_EXCLUDE` gegen Messkorpora ist dadurch nicht mehr noetig --
+was NEU dazukommt, ist aber wieder zu pruefen (das ist die Falle, die bei
+b05 zuschlug, als 600 Roh-Messpartien still mitliefen).
 
 **VOR jedem Training bindend** (par.3b.12): Symmetrie-Trennung auf der
 Value-Klasse signifikant > 0 (primaer), >= 1.500 Partien-Seiten mit
@@ -92,13 +96,100 @@ gestuetzt von placement_side par.14). Beide pruefbar ueber Stufe 4:
 verwirft die Suche Policy-Top-1-Zuege, und sind die ueberproportional
 spaltenbauend?
 
+**PUNKT (3) DER LISTE IST ERLEDIGT (2026-08-30, waehrend die Erzeugung
+laeuft -- reiner Bau, keine CPU-Last):**
+
+* **Arm K GEBAUT, Default AUS.** Knopf `MOSAIC_BOOTSTRAP_COHERENCE=sum1`
+  (Summen-Normierung der beiden `bootstrap_value`-Eintraege vor dem
+  TD-Blend, corpus_dataset.py WDL-Zweig), Cache-Key-Komponente in BEIDEN
+  Namensraeumen (`+bscoh_sum1_v1` Fenster, `|bscoh_sum1_v1` Datei),
+  Manifest-Feld `bootstrap_coherence`, harter Abbruch bei unbekanntem Wert.
+  Gewaehlt wurde von den zwei registrierten Formen die Normierung und NICHT
+  die affine Versatz-Korrektur: der Versatz existiert nur auf der
+  Lehrer-Verteilung (platt_fit_v21.json: A -0,0033 auf dem Frozen-Set), eine
+  dort gefittete Konstante auf b05 anzuwenden waere "auf der falschen
+  Verteilung geeicht". Registriert in PREREG_heuristic_v2_long_rows.md
+  par.3b.3 und PREREG_v23_window.md par.4a2. **Abnahme gebaut, LAUF STEHT
+  AUS** (`tools/probes/bootstrap_coherence_probe.py`; Maschine ist belegt).
+  Was NICHT entschieden ist: ob v23 mit `sum1` traint -- das bleibt die
+  Arm-Frage (Brier + Arena auf demselben Korpus).
+* **Moon-Flag geprueft, nicht neu gebaut:** `--moon-loss-weight` existiert
+  (train.py:2460, Default 1,0; Waechter train.py:1004; wirkt in
+  train.py:529/538). Fuer das v23-Training ist `--moon-loss-weight 0` zu
+  setzen -- das ist ein Aufruf-Argument, kein Bau.
+* **`tools/corpus_sanity_check.py` erweitert** (additiv, Bestandsaufrufer
+  unberuehrt): `--pattern` filtert INNERHALB von `data/` (die drei
+  b05-Klassen liegen nebeneinander; der Bestandsweg waere 1,3 GB
+  Datei-Kopie gewesen), `--out` trennt die Artefakte je Klasse, und die
+  Ausgabe traegt jetzt die EREIGNISZAHL `sides_with_full_column` -- genau
+  die Groesse, die Waechter (b) verlangt. **Ungeprueft am Lauf** (Maschine
+  belegt): syntaktisch geprueft, aber weder Sonde noch neue CLI sind
+  ausgefuehrt worden. Der erste Waechter-Lauf ist zugleich ihr Test; bei
+  einem CLI-Fehler dort zuerst dort suchen, nicht am Korpus.
+
+**CACHE-CO-BAU LAEUFT WIEDER SEIT 2026-08-31, kurz nach Mitternacht**
+(Nutzer-Auftrag "wirf mir den cache watcher an"): `tools/build_cache_incremental.py --encoder 2d
+--value-target-variant nortv --workers 2 --watch --wartezeit 60
+--leerlauf-abbruch 60`. Startbild: 2.637 Dateien gesichtet, **2.400 Bloecke
+lagen schon, 237 zu bauen**; die Einstellungen decken sich mit dem letzten
+Trainingsmanifest (manifest_train_v22-b05: encoder 2d, nortv,
+conjunction_head false). Der Bau haelt mit der Erzeugung Schritt (eine neue
+Korpusdatei rund alle 70 s, ein Block in rund 10 s bei zwei Workern; die
+ersten acht Bloecke lagen nach 83 s). **Gemessener Preis an der Erzeugung:**
+3,45 s je Partie vor dem Co-Bau (Partien 1-4.000), 3,6 s je Partie waehrend
+(4.000-4.760) -- rund 5 Prozent langsamer. Das ist die dokumentierte
+Wirkrichtung: Last BREMST, sie verfaelscht nicht (Praezedenz 2026-08-29, der
+lastgebremste Erstlauf war partiegleich mit dem sauberen Neustart).
+
+**TRAEGERSTATUS -- GEPRUEFT 2026-08-31, die laufenden Bloecke PASSEN.**
+Die Sorge war, der Co-Bau baue Bloecke, die ein Traeger-Manifest des
+v23-Fensters wieder entwertet. An den Records nachgezaehlt gilt das fuer die
+NEUEN Dateien NICHT: in
+`selfplay_v22-b05-value-argmax_20260830_1926_g20.pkl` tragen **2.332 von
+2.578 Drafting-Records `policy_target_valid=false`** (dazu 960 Tiling-Zuege,
+die ohnehin `pol_w=0` bekommen) -- die Value-Klasse maskiert sich SELBST
+ueber das Record-Feld, genau wie der Baucode es beschreibt
+(corpus_dataset.py:1330: "v20wdl*-Dateien regeln sich selbst ueber
+`policy_target_valid` (Schwarm)"). Ein Traeger-Manifest fuer die Value-Klasse
+waere redundant; die 237 laufenden Bloecke sind also kein Ausschuss.
+
+**Wo die Frage WIRKLICH sitzt (hv2-Bestand, keine laufende Arbeit):** par.1
+will hv2 ueberwiegend policy-maskiert (1.800 von 24.000 Partien aktiv), und
+das geht NUR ueber ein Manifest -- hv2 tragt gemischte Records (in der ersten
+Datei 715 `false`, 534 `None`, also 534 policy-aktive). Der aufgeloeste
+Traegerstatus steckt im Datei-Schluessel (file_cache_key.py:85,
+`|carrier=`), ein solches Manifest entwertet also die **2.400 bereits
+liegenden** hv2-Bloecke. Die werden gerade NICHT gebaut, es ist ein
+Folgekosten-Punkt des Fensterentscheids, kein laufender Verlust.
+
+**Gleiche Klasse, gleicher Zeitpunkt: Arm K.** `sum1` ist eine
+Zieldefinition und steht im Datei-Schluessel -- ein v23-Training MIT Arm K
+entwertet ALLE Bloecke (hv2 wie b05). Beide Entscheide (Traeger-Manifest,
+Arm K) gehoeren deshalb VOR den Fensterbau, nicht danach.
+
+**DIE WAECHTER NACH DER ERZEUGUNG** (par.3b.12, bindend vor jedem
+v23-Training; erst starten, wenn der Lauf durch ist -- exklusiv):
+
+```
+python -u tools/probes/corpus_column_outcome_symmetry_probe.py --pattern "selfplay_v22-b05-value-*.pkl" --out evaluations/artifacts/corpus_symmetry_v22b05_value.json
+python -X utf8 -u tools/corpus_sanity_check.py data --pattern "selfplay_v22-b05-value-*.pkl" --out evaluations/artifacts/corpus_sanity_v22b05_value.json
+python -X utf8 -u tools/corpus_sanity_check.py data --pattern "selfplay_v22-b05-policy_*.pkl" --out evaluations/artifacts/corpus_sanity_v22b05_policy.json
+python -X utf8 -u tools/probes/bootstrap_coherence_probe.py
+```
+
+Lesart, vorab: (a) PRIMAER Symmetrie-Trennung auf der VALUE-Klasse
+signifikant > 0; (b) SEKUNDAER >= 1.500 Seiten mit voller Spalte in der
+Value-Klasse (`sides_with_full_column`); (c) Spaltenrate beider Klassen nur
+Bericht (Referenz: argmax 0,3375, gesampelt 0,07-0,11, Champion 0,102).
+
 **OFFEN fuer die naechste Sitzung, nach Prioritaet:** (1) die
-Erzeugung ueberwachen und nach Abschluss die Waechter fahren; (2)
-v21depth-Dateien entfernen; (3) Arm K und Moon-Flag vor dem Training;
-(4) danach Phase 3 (Betrags-Schiene) mit dem neuen Erfolgstest "kippt
-die Sims-Kurve?" (PREREG_r5_value_calibration, Nachtrag 2026-08-30);
-(5) optional Stufe 4 des Suchtiefen-Strangs, die die offene Erklaerung
-entscheiden wuerde.
+Erzeugung ueberwachen und nach Abschluss die Waechter oben fahren;
+(2) ERLEDIGT: v21depth-Dateien geloescht (siehe Aufraeumstand); (3) vor dem
+Training den `data/`-Bestand gegen das geplante Fenster diffen -- alles, was
+kein Fenster-Bestandteil ist, gehoert per `MOSAIC_DATA_EXCLUDE` raus; (4) danach Phase 3 (Betrags-Schiene) mit dem
+neuen Erfolgstest "kippt die Sims-Kurve?" (PREREG_r5_value_calibration,
+Nachtrag 2026-08-30); (5) optional Stufe 4 des Suchtiefen-Strangs, die die
+offene Erklaerung entscheiden wuerde.
 
 ## DAS ZIEL (Leitstern)
 
