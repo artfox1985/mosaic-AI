@@ -14,6 +14,26 @@
     powershell.exe, nicht pwsh.
 #>
 
+function Sync-EnvFromRegistry {
+    <#
+    .SYNOPSIS
+        Holt Umgebungsvariablen aus der Registry in den laufenden Prozess.
+    .DESCRIPTION
+        Fuellt nur, was im Prozess noch leer ist -- eine fuer einen einzelnen
+        Lauf vorangestellte Zuweisung ($env:X = "..."; .\skript.ps1) soll
+        gewinnen. Sonst User vor Maschine.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][string[]]$Names)
+
+    foreach ($name in $Names) {
+        if ([Environment]::GetEnvironmentVariable($name)) { continue }
+        $value = [Environment]::GetEnvironmentVariable($name, "User")
+        if (-not $value) { $value = [Environment]::GetEnvironmentVariable($name, "Machine") }
+        if ($value) { [Environment]::SetEnvironmentVariable($name, $value, "Process") }
+    }
+}
+
 function Initialize-BackupContext {
     <#
     .SYNOPSIS
@@ -25,10 +45,28 @@ function Initialize-BackupContext {
         [string]$LogPrefix = "backup"
     )
 
+    # --- Umgebung aus der Registry nachladen --------------------------------
+    # 'setx' schreibt in die Registry, aber bereits laufende Prozesse erben die
+    # alte Umgebung. Wer setx ausfuehrt und dann in DERSELBEN Shell startet,
+    # sieht seine Einstellung nicht -- der Lauf bricht ab, obwohl alles richtig
+    # gesetzt ist. Genau das ist am 2026-08-31 passiert, nachdem
+    # RESTIC_PASSWORD_COMMAND per setx gesetzt worden war.
+    #
+    # Der Prozess gewinnt, wo er etwas gesetzt hat (ein vorangestelltes
+    # $env:X=... fuer einen einzelnen Lauf soll wirken); sonst User vor
+    # Maschine, wie Windows es fuer alles ausser PATH selbst zusammensetzt.
+    #
+    # Die Variablen landen im PROZESS, nicht nur in einer lokalen Variablen --
+    # restic liest RESTIC_PASSWORD_COMMAND selbst aus seiner geerbten Umgebung.
+    Sync-EnvFromRegistry -Names @(
+        "RESTIC_PASSWORD_FILE", "RESTIC_PASSWORD_COMMAND", "RESTIC_PASSWORD",
+        "MOSAIC_RESTIC_REPO", "MOSAIC_BACKUP_DIR", "MOSAIC_RESTIC_EXE"
+    )
+
     # --- restic finden ------------------------------------------------------
-    # winget schreibt seinen Links-Ordner in die Registry-PATH, aber bereits
-    # laufende Prozesse erben die alte Umgebung. Darum hier neu einlesen, sonst
-    # scheitert ein Lauf aus einer Shell, die aelter ist als die Installation.
+    # PATH ist der Sonderfall: er wird aus Maschine UND Benutzer verkettet,
+    # nicht ueberschrieben. winget schreibt seinen Links-Ordner dort hinein,
+    # ebenfalls ohne dass laufende Prozesse es mitbekommen.
     $machinePath = [Environment]::GetEnvironmentVariable("Path", "Machine")
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     $env:PATH = ($machinePath, $userPath | Where-Object { $_ }) -join ";"
@@ -200,13 +238,35 @@ function Confirm-ResticRepo {
 
     # 'cat config' ist die billigste Existenzpruefung: liest genau einen
     # Datensatz und sagt zugleich, ob das Passwort passt.
-    & $Context.ResticExe cat config *> $null
+    $catOut = & $Context.ResticExe cat config 2>&1
     if ($LASTEXITCODE -eq 0) { return }
 
+    # "Resolving password failed" heisst: restic kam gar nicht erst an das
+    # Passwort. Das ist KEIN fehlendes Repository, und ein init darueber wuerde
+    # nur mit derselben Ursache erneut scheitern.
+    #
+    # Haeufigste Ursache unter Windows, am 2026-08-31 gemessen: restic zerlegt
+    # RESTIC_PASSWORD_COMMAND selbst, ohne Shell, und behandelt dabei den
+    # Backslash als Escape-Zeichen. Aus
+    #   ... -File D:\Pfad\zum\skript.ps1
+    # kommt bei PowerShell '-File "D:"' an. Einfache Anfuehrungszeichen um den
+    # Pfad (oder Schraegstriche) loesen es; beide Formen sind geprueft.
+    if ("$catOut" -match "Resolving password failed") {
+        throw "restic konnte das Passwort nicht beschaffen (Quelle: $($Context.PasswordSource)). Bei RESTIC_PASSWORD_COMMAND ist die haeufigste Ursache der unquotierte Windows-Pfad: restic frisst die Backslashes als Escape-Zeichen. Den Skriptpfad in EINFACHE Anfuehrungszeichen setzen. Meldung von restic: $catOut"
+    }
+
     Write-BackupLog $Context "Kein lesbares Repository unter $($Context.RepoPath) -- lege eines an."
-    & $Context.ResticExe init
+    # Ausgabe mitlesen, um den haeufigsten Irrtum sauber zu benennen: 'cat
+    # config' scheitert auch bei FALSCHEM Passwort, nicht nur bei fehlendem
+    # Repository. Ein init darueber kann nichts kaputtmachen -- restic lehnt
+    # ab, sobald eine config existiert --, aber die Meldung waere ohne diese
+    # Unterscheidung irrefuehrend.
+    $initOut = & $Context.ResticExe init 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "restic init fehlgeschlagen (Exitcode $LASTEXITCODE)."
+        if ("$initOut" -match "config file already exists") {
+            throw "Unter $($Context.RepoPath) liegt bereits ein Repository, es laesst sich aber nicht oeffnen -- vermutlich passt das Passwort nicht. Verwendete Quelle: $($Context.PasswordSource)."
+        }
+        throw "restic init fehlgeschlagen (Exitcode $LASTEXITCODE): $initOut"
     }
     Write-BackupLog $Context "Repository angelegt (Format v2, Kompression aktiv)."
 }
