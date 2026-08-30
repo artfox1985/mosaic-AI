@@ -44,6 +44,15 @@ Start: **Manifest-Diff-Pflicht** (night_run_20260830.md N4) und die
 Knopf ~5 Prozent -- der Knopf steht NICHT im Manifest). Parallel der
 Cache-Co-Bau (N4b), aber NICHT waehrend Arena-Messungen.
 
+**Aufraeumstand 2026-08-30:** die Messkorpora des Suchtiefen-Strangs
+sind geloescht (121 pkl + 13 Manifeste, Nutzer-Freigabe); in `data/`
+liegen nur noch `selfplay_hv2_*` (2.400, Fenster) und die
+`v21depth*`-Dateien des laufenden Vergleichs. **Die v21depth-Dateien
+sind ein MESSKORPUS und gehoeren NICHT ins Trainingsfenster** -- vor
+dem Training loeschen oder per `MOSAIC_DATA_EXCLUDE` ausschliessen
+(dieselbe Falle, die bei b05 zuschlug, als 600 Roh-Messpartien still
+mitliefen).
+
 **VOR jedem Training bindend** (par.3b.12): Symmetrie-Trennung auf der
 Value-Klasse signifikant > 0 (primaer), >= 1.500 Partien-Seiten mit
 voller Spalte (sekundaer), Spaltenrate nur Berichtsgroesse. Dazu Arm K
