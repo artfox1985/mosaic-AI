@@ -197,6 +197,17 @@ fruehen Versorgungs-Zuege ist der Haupttaeter; Initiierung bleibt
 intakt, die Kette bricht. Der Blindstart haette 9,3 h in einen
 Waechter-Riss verbrannt.
 
+**WIEDEREINSTIEG NACH DEM SIMS-STRANG (Nutzer 2026-08-30: "wenn das
+thema dann durch ist wieder zurueck zum ursprung, dem v22 self play"):**
+alles fuer die Erzeugung ist entschieden und registriert -- Zuschnitt D
+(par.3b.12), Waechter-Neufassung, Knopf-Entscheide (Stack-Draw EIN,
+implicit-Minimax 0,0), Manifest-Diff-Pflicht, Cache-Co-Bau. OFFEN ist
+allein die SIMS-ZAHL der Value-Klasse; sie faellt mit Stufe 3 des
+Sims-Strangs (Arena entscheidet Uebernahme). Die Befehle stehen
+einsatzbereit in night_run_20260830.md N4, dort nur `<150|400>` durch
+den gemessenen Betriebspunkt ersetzen. Der Policy-Sockel bleibt
+unabhaengig davon bei 400 Sims.
+
 **ERZEUGUNG AUSGESETZT 2026-08-30 (Nutzer-Entscheid): erst
 PREREG_search_depth_column_optimum abschliessen.** Anlass: die
 Sims-Probe fuer den Schwarm fand bei 150 Sims 0,4425 volle Spalten --
