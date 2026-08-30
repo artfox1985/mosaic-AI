@@ -220,3 +220,15 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   `architecture_reference.md`, Abschnitt "Konstanten mit Fallstrick"; hier
   steht der Vorfall. Regel daraus: wer aus dem Code ableitet, markiert es als
   Herleitung, bis eine Messung oder ein zweiter Leser sie bestaetigt.
+- **Cache-Bloecke sind nach ihrem INHALTSSCHLUESSEL benannt, nicht nach
+  ihrer Quelldatei** (2026-08-30, Nutzer-Einwand "das ist fuer mich so
+  nicht handelbar"; Schaden: 100 verwaiste Bloecke mit 83 MB lagen
+  unauffindbar in data/, nachdem die zugehoerigen Messkorpora geloescht
+  waren). `.filecache_<key>.h5` -- die Zuordnung steht NUR in den
+  HDF5-Attributen (`mosaic_files_first`/`_last`, `mosaic_cache_key_full`).
+  Wer Korpusdateien loescht, hinterlaesst damit Bloecke, die niemand
+  mehr zuordnen kann und die nie wieder getroffen werden.
+  **Werkzeug dafuer seit 2026-08-30: `tools/cache_inventory.py`** --
+  listet Zuordnungen (`--list`), findet Waisen (`--orphans`) und druckt
+  auf Wunsch die Loeschliste (`--print-delete-list`); es loescht
+  NICHTS. Nach jeder groesseren Korpus-Loeschung einmal laufen lassen.
