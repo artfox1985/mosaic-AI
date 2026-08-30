@@ -2223,6 +2223,46 @@ Spalten je Partie+Seite, je 200 Partien, Waechter-Schwelle 0,17):**
 | ohne Noise + Sampling nur 0-23 | 0,1025 |
 | ohne Noise + argmax (Instrument-Referenz) | **0,3375** |
 
+**ZUSCHNITT-ENTSCHEID 2026-08-30 (Nutzer: "mach D") -- ROLLEN-GETRENNTE
+MISCHUNG, registriert VOR dem Start.** Anlass war der Nutzer-Einwand,
+dass das v23-Fenster ohnehin viel hv2 traegt (par.1 der Fenster-Prereg:
+1.800 policy-aktive und 15.650 policy-maskierte hv2-Partien). Daraus
+die Rollenteilung:
+
+* **Sockel = Policy-Klasse (4.000, voll gesampelt, Root-Noise an).**
+  Begruendung (HERLEITUNG, als solche markiert): das Policy-ZIEL ist
+  die Besuchsverteilung der Suche, nicht der gespielte Zug -- die
+  Zug-Stochastik aendert also, WELCHE Zustaende besucht werden, nicht
+  die Qualitaet der Ziele an ihnen. Die Spalten-Lehre der Policy deckt
+  ohnehin der hv2-Anker (1.800 Partien a 0,73 volle Spalten). Der
+  einzigartige Beitrag des Sockels ist Zustandsabdeckung.
+* **Schwarm = Value-Klasse (8.000, davon 6.000 argmax + 2.000
+  gesampelt).** Hier liegt der Engpass aus Fahrplan Phase 0: die
+  Betrags-Daempfung (R5-Steigung 0,0886) hat auf hv2-Fenstern NICHT
+  geheilt, obwohl die voller Vollendungen sind -- weil sie off-policy
+  sind. Die Wette der Generation ist ON-POLICY-Exposition: eigene
+  Partien, in denen Vollendungen vorkommen und sich im Ausgang
+  auszahlen. Ein Value-Korpus mit 0,08 Spalten macht genau diese Wette
+  kaputt; die 2.000 gesampelten halten Zustands-Streuung in der Klasse.
+* **Benannter Preis:** die argmax-Partien beziehen ihre Vielfalt
+  ausschliesslich aus den 6.000 Partie-Seeds (Plattenwahl, Beutel,
+  Startspieler) -- Praezedenz sind die DAgger-Korpora (600 argmax-
+  Partien, alle verschieden). Zustands-Diversitaet ist dort geringer als
+  bei Sampling; das ist der bewusste Tausch gegen Vollendungs-Labels.
+
+**Waechter-Lesart praezisiert (ersetzt die pauschale Schwelle oben):**
+die 0,17 gilt auf der **VALUE-Klasse** (dort entsteht die
+Vollendungs-Exposition, um die es geht); erwartet ~0,3 aus dem
+argmax-Anteil. Fuer die Policy-Klasse gilt KEINE Spalten-Schwelle --
+ihr Auftrag ist Abdeckung, und ihr Spaltensignal kommt aus hv2 --,
+ihre Rate wird nur BERICHTET. Die Symmetrie-Trennung wird auf beiden
+Klassen geprueft und muss auf der Value-Klasse signifikant > 0 sein.
+
+**Dateipraefixe (Generator-Konvention plus Klassen-Suffix):**
+`v22-b05-policy` (Seed 20260901), `v22-b05-value-argmax` (Seed
+20260902), `v22-b05-value-sampled` (Seed 20260903); Stack-Draw-Knopf
+EIN in allen dreien (N2-Entscheid), implicit-Minimax 0,0 (N1).
+
 **Verdikt: JEDE gemessene fruehe Zug-Stochastik drueckt die Vollendung
 auf ~0,07-0,11; nur reines argmax haelt 0,34.** Die Initiierung bleibt
 dabei intakt (init>=4 1,4-1,6) -- es bricht die KETTE, nicht der
