@@ -543,13 +543,45 @@ class Replayer:
         nicht voll -- dann hier nachholen (die erzeugte "🎫"-Zeile wird
         bewusst NICHT gegen das Original geprueft, da sie dort fehlt; das
         Ereignis wird stattdessen in `silent_chip_gaps` vermerkt und im
-        Report transparent gemacht)."""
+        Report transparent gemacht).
+
+        NACHTRAG 2026-08-30: dieser Pfad haengt jetzt am SELBEN Chip-Plan wie
+        `apply_chip_completion`. Grund ist eine Messung an 20 Arena-Partien
+        (`paired_arena_env_imm_netvnet.json`): dort laufen ALLE
+        Chip-Vollendungen still (0 geloggte gegen 14 stille in den drei
+        abbrechenden Partien), eben weil KEINE 🎫-Zeile entsteht -- die
+        Plan-Suche aus cf53aab konnte sie darum nie erreichen, obwohl das
+        Problem identisch ist: `apply_tiling_chips` waehlt greedy, die KI
+        waehlt exakt. Ohne Plan-Eintrag bleibt es greedy, Bestandsverhalten
+        also byte-gleich; nur der Fehlerfall bekommt eine zweite Chance.
+        Der Logtext beider Engine-Einstiege ist zeichengleich (py.rs:353 vs
+        :398), die Zeilen-Gegenprobe sieht den Unterschied darum nicht."""
         st = json.loads(self.g.state_json())
         row = st["players"][actor]["pattern_lines"][pattern_row]
         if row["tiles"] and len(row["tiles"]) == row["capacity"]:
             return False
-        self.g.apply_tiling_chips(actor, pattern_row)
-        self.action_log.append(("apply_tiling_chips", (actor, pattern_row), {}))
+        k = self.chip_event_idx
+        self.chip_event_idx += 1
+        # Kandidaten VOR der Anwendung holen (siehe `apply_chip_completion`):
+        # danach sind die Indizes verschoben. Eine LEERE Liste ist hier die
+        # Signatur des Fehlschlags -- dann ist der Chip-Bestand schon
+        # verbrannt, und `_search_chip_plan` muss ein FRUEHERES Ereignis
+        # desselben Spielers revidieren.
+        cands = json.loads(self.g.chip_allocations_json(actor, pattern_row))
+        choice = self.chip_plan.get(k)
+        self.chip_events.append(
+            {"idx": k, "actor": actor, "row": pattern_row, "cands": cands,
+             "choice": choice, "silent": True}
+        )
+        if choice is None:
+            self.g.apply_tiling_chips(actor, pattern_row)
+            self.action_log.append(("apply_tiling_chips", (actor, pattern_row), {}))
+        else:
+            self.chip_plan_used += 1
+            self.g.apply_tiling_chips_with(actor, pattern_row, list(choice))
+            self.action_log.append(
+                ("apply_tiling_chips_with", (actor, pattern_row, list(choice)), {})
+            )
         self.silent_chip_gaps.append((self.g.round_number(), actor, pattern_row))
         return True
 
@@ -585,7 +617,8 @@ class Replayer:
         cands = json.loads(self.g.chip_allocations_json(actor, pattern_row))
         choice = self.chip_plan.get(k)
         self.chip_events.append(
-            {"idx": k, "actor": actor, "row": pattern_row, "cands": cands, "choice": choice}
+            {"idx": k, "actor": actor, "row": pattern_row, "cands": cands,
+             "choice": choice, "silent": False}
         )
         if choice is None:
             return self.apply(lines, li, "apply_tiling_chips", actor, pattern_row)

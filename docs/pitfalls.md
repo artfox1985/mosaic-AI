@@ -94,12 +94,19 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   konsistent (erschoepfende Suche ueber alle drei KI-Vollendungen).
   Mehrzellige Vollendungen sind normal, nicht der Ausloeser: ueber die 13
   Server-Logs 36x eine fehlende Zelle, 10x zwei, 1x drei.
-  **Wer diese Abbrueche zaehlt, darf sie nicht
-  `maybe_silent_chip_complete` zuschreiben** --
-  `tools/probes/column_completion_legality_probe.py` (Moduldoku und Feld
-  `exception_ursache`) tut genau das; der stille Pfad hat in dieser Partie
+  **Wer diese Abbrueche zaehlt, darf sie in DIESER Partie nicht
+  `maybe_silent_chip_complete` zuschreiben** -- der stille Pfad hat hier
   nachweislich NICHT ausgeloest, der Abbruch kommt aus dem regulaeren
   `apply`-Pfad.
+  **Diese Zuschreibung gilt aber NUR fuer Logs mit 🎫-Zeilen** (Mensch- und
+  Server-Partien). Nachgemessen am 2026-08-30 an 20 Arena-Partien aus
+  `paired_arena_env_imm_netvnet.json`: dort laufen **alle** Chip-Vollendungen
+  still (in den drei abbrechenden Partien 14 stille, 0 geloggte), denn der
+  KI-Pfad loggt nicht -- die Abbrueche kommen dort also sehr wohl aus
+  `maybe_silent_chip_complete`. Die Korrektur vom 2026-08-29 war fuer die
+  eine untersuchte Partie richtig und als PAUSCHALE Aussage falsch; die
+  gemeinsame Ursache ist nicht der Einstieg, sondern das Raten
+  (`greedy_chip_indices`) hinter BEIDEN.
   Repariert am 2026-08-30 (Commit cf53aab): `apply_tiling_chips_with` wendet
   eine explizite Auswahl an, `chip_allocations_json` zaehlt die zulaessigen
   auf -- die Regel bleibt in der Engine, der Replayer waehlt nur aus und
@@ -110,10 +117,25 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   Chip-Historie eine PLAUSIBLE, nicht die tatsaechliche -- sie erfuellt
   dieselbe Regel und dasselbe Log, aber welche Chips real lagen, gibt das
   Log nicht her; relevant, weil das Netz Chips als Merkmal sieht
-  (`features.rs`). Zweitens erbt das nur, wer ueber `run()` geht:
-  `tools/probes/column_completion_legality_probe.py` baut `Replayer` und
-  `_run_loop` selbst (Zeilen 103/135) und faehrt darum weiter greedy -- ihre
-  ~20% Arena-Ausfaelle bleiben, bis sie auf den `run()`-Pfad gehoben wird.
+  (`features.rs`). Zweitens erbte das nur, wer ueber `run()` geht.
+  **Beide offenen Enden am 2026-08-30 nachgezogen** (zweiter Punkt erledigt,
+  erster bleibt eine Eigenschaft der Rekonstruktion und kein Fehler):
+  `tools/probes/column_completion_legality_probe.py::replay_arena_game` baut
+  `Replayer`/`_run_loop` nicht mehr selbst, sondern faehrt
+  `_replay_once`/`_search_chip_plan` -- DIESELBEN Funktionen wie `run()`,
+  nur mit `header`/`lines` aus dem Arena-Adapter statt aus `load_log` (`run()`
+  selbst ist datei-basiert und fuer Arena-JSON nicht nutzbar).
+  Das allein reichte NICHT: die Plan-Suche hing nur an `apply_chip_completion`,
+  also am geloggten Pfad, und Arena-Partien haben davon keinen einzigen
+  (siehe Messung oben). Darum haengt jetzt auch `maybe_silent_chip_complete`
+  am selben `chip_plan` -- ohne Plan-Eintrag weiter greedy, Bestandsverhalten
+  byte-gleich, nur der Fehlerfall bekommt eine zweite Chance. Der Logtext
+  beider Engine-Einstiege ist zeichengleich (`py.rs:353` vs `:398`), die
+  Zeilen-Gegenprobe sieht den Unterschied also nicht.
+  Abnahme: dieselben 20 Arena-Partien 17 -> **20 von 20** (gerettet: seeds
+  1000, 1006, 1015); `static/log/*.log` ueber `run()` weiterhin 12 von 12,
+  und `game_20260823_085652_seed546483` findet unveraendert den Plan
+  `{0: [0, 2, 3]}` -- die Abnahme aus cf53aab bleibt bitgleich.
 - **Python schreibt auf Windows still CRLF** (2026-08-25). Ein Skript mit
   `write_text` wandelte in 137 Dateien LF in CRLF; in einer Datei waren das
   971 Byte Zuwachs bei zwei geaenderten Zeilen. `git diff` zeigte wegen der
