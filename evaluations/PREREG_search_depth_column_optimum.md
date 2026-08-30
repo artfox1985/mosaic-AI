@@ -247,13 +247,19 @@ und laesst Value-Felder unberuehrt, ist also etwas anderes.
 1. **Machbarkeit ungeprueft.** Ob die Engine gespeicherte Zustaende mit
    einer zweiten, tieferen Suche nachlabeln kann, ohne die Partie neu
    zu spielen, habe ich NICHT nachgesehen.
-2. **Die Praemisse "tiefe labelt besser" ist selbst ungeprueft** -- und
-   dieser Strang stellt sie gerade in Frage. Folgt die Suche einem
-   verzerrten Bewerter, koennte tiefere Suche auch SCHLECHTERE Ziele
-   liefern; dann waere die Entkopplung keine Loesung, sondern eine
-   Verdopplung des Fehlers. Der Gedanke haengt also an einer Messung,
-   die es noch nicht gibt (und fuer die es keine neutrale Referenz
-   gibt, siehe par.2 Stufe 3).
+2. **Die Praemisse "tiefe labelt besser" ist ungeprueft und nicht mehr
+   selbstverstaendlich** (praezisiert 2026-08-30 auf Nutzer-Nachfrage;
+   die erste Fassung sagte "dieser Strang stellt sie in Frage" und war
+   zu stark). Was DIESER Strang misst, ist SPIELqualitaet je Suchbudget
+   (volle Spalten, Punkte im gespielten Verlauf) -- nicht LABELqualitaet.
+   Der Schluss vom einen aufs andere ist eine HERLEITUNG: folgt die
+   Suche einem verzerrten Bewerter, ist ihre Besuchsverteilung, also
+   das Label, von demselben Bewerter gepraegt. Die Herleitung hat eine
+   Luecke: eine Besuchsverteilung kann taktisch nuetzliche Information
+   tragen, auch wenn der Bewerter im PLATTENanteil verzerrt ist -- das
+   eine schliesst das andere nicht aus. Der Gedanke haengt damit an
+   einer Messung, die es noch nicht gibt (und fuer die es keine
+   neutrale Referenz gibt, siehe par.2 Stufe 3).
 
 ## par.3 Was dieser Strang NICHT ist
 
