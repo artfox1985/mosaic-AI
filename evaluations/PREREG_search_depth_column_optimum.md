@@ -336,6 +336,23 @@ SUCHTIEFE, nicht mehr Suchbudget** -- die par.2c-Auflage ist erfuellt.
 voller Tiefe und schmaler Wurzel Staerke UND Spalten zu bekommen, ist
 widerlegt; der in par.2j gemessene Handel bleibt bestehen.
 
+**GEGENPROBE (100 Sims, m=25) GEFAHREN: 0,4750 +- 0,031** (Punkte
+42,85). Damit ist das 2x2 vollstaendig:
+
+| | m=6 | m=25 |
+| --- | --- | --- |
+| Sims 100 | 0,6225 | **0,4750** |
+| Sims 400 | 0,3525 | 0,3375 |
+
+Beide Zeilen bestaetigen dasselbe: **entlang der TIEFE aendert sich der
+Wert stark** (bei m=6: 0,62 -> 0,35; bei m=25: 0,475 -> 0,3375),
+**entlang der BREITE nur wenig** (bei 400 Sims gar nicht, bei 100 Sims
+0,62 -> 0,475). Die Breite hat also einen kleineren, aber
+gleichgerichteten Nebeneffekt -- schmalere Wurzel = mehr Spalten --,
+der die Tiefe nicht ersetzt. Der Vorbehalt zur Zelle (100, m=25) gilt
+weiter (nur 4 Simulationen je Wurzelkind, Sequential Halving trennt
+dort kaum), sie ist deshalb die schwaechste der vier.
+
 **Mechanische Lesart (Herleitung, konsistent mit Phase 0):** die
 Gumbel-Wurzelauswahl sortiert Kandidaten nach ihrem Q-Wert. Mehr
 Simulationen heissen stabilere Q-Werte und damit mehr Gewicht fuer den
