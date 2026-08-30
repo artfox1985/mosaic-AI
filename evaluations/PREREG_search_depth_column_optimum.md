@@ -113,7 +113,18 @@ bei SE ~0,04 je Punkt und einem halben Dutzend Armen ist ein
 aufsetzen, wird dieser Punkt EINMAL mit frischem Seed wiederholt**
 (200 Partien, sonst identisch). Haelt der Wert, traegt er die
 Folgemessungen; faellt er auf Plateau-Niveau, war es Rauschen und die
-Lesart lautet "Plateau", nicht "Optimum". Dieselbe Logik wie die
+Lesart lautet "Plateau", nicht "Optimum".
+**BERICHTIGUNG im selben Zug (Nutzer-Einwand 2026-08-30):** ein
+Plateau macht die Folgemessungen NICHT gegenstandslos -- so hatte ich
+es zunaechst formuliert, und das war zu eng gedacht. Die tragende
+Frage ist "beeinflusst das Suchbudget die Spaltengenerierung, und
+haengt das am Prior?", nicht "warum gibt es einen Gipfel". Der TREND
+(400: 0,3375 gegen 50-150: ~0,45) ist gemessen und unabhaengig von der
+Feinform. Es aendern sich nur die MESSPUNKTE: im Gipfel-Szenario
+Gipfel gegen Nachbar, im Plateau-Szenario Plateau-Punkt gegen 400.
+Das 2x2 der Faktoren-Trennung ist in beiden Faellen identisch, weil
+die Wurzelbreite ueber denselben Bereich mitwandert (m=3-9 im Plateau
+gegen m=25 bei 400). Dieselbe Logik wie die
 Frisch-Seed-Replikation bei SPRT-Fruehstopps
 (docs/promotion_checklist.md Punkt 2).
 
