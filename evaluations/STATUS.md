@@ -205,7 +205,27 @@ zugunsten von alpha 0,2: Zustandsabdeckung 3.087 auf 3.057 distinkte
 Endbretter 220 zu 220. ENTSCHEID alpha 0,0 (par.3b), gemessen statt
 verfallen.
 
-**WARNUNG AUS DEMSELBEN LAUF, betrifft den Erzeugungs-Zuschnitt:** der
+**N2 ERLEDIGT -- Stapelzug-Knopf kommt AN (2026-08-30, Artefakt
+evaluations/artifacts/stack_draw_research_b05.json).** 100 gepaarte Partien
+b05@400 gegen Heuristik@150, je Arm ein eigener Prozess (Spiegelmatch
+verboten, der Knopf ist prozessweit): Siege 68 ohne gegen 77 mit, McNemar
+p=0,136; auf Blockebene Punkte +2,60 (t 2,04) und Margin +5,43 (t 2,32) --
+kein Staerkeverlust, Richtung sogar positiv. Im Mit-Knopf-Korpus tragen
+136 von 136 `choose_draw_stack_slot`-Datensaetzen ein gueltiges Policy-Ziel
+(Median 6 Kandidaten), ohne Knopf existieren null solche Entscheidungen.
+ENTSCHEID: **MOSAIC_STACK_DRAW_RESEARCH=1 in die Umgebung BEIDER
+Erzeugungslaeufe** (Sockel und Schwarm; der Knopf hat keine
+Spec-Entsprechung, siehe PREREG_chance_nodes par.15).
+
+**NEBENBEFUND, nicht angefasst:** `tools/anchor_arena.py` gibt der
+Heuristik-Seite das NETZ-Verhalten beim Stapelzug --
+`tools/frozen_referee_match.py` ruft `set_apply_modes` nie auf, und
+`RefereeGame` startet auf `[true, true]` (referee.rs:387). Die 20/20-Paritaet
+der Ankerarena wurde mit `(True, False)` gemessen (anchor_referee_parity_probe
+Zeile 96), also nicht auf dem Pfad, den der Treiber faehrt. Eigene Frage an
+den Elo-Anker, kein Nachtlauf-Auftrag.
+
+**WARNUNG AUS DEM N1-LAUF, betrifft den Erzeugungs-Zuschnitt:** der
 Kontroll-Arm IST die geplante Sockel-Konfiguration (b05@400, Root-Noise,
 Sampling), und er baut **0,0825 +- 0,028 volle Spalten je Partie und Seite**
 (200 Partien, tools/corpus_sanity_check.py). Der par.3b.12-Waechter (a)

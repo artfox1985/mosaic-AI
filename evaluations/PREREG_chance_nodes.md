@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: Grossteils geliefert, Rest geparkt. Scharf: die R5-Zufallsknoten seit 2026-08-10, round5.rs ist seitdem Expectiminimax (Vorzeichen-Sonde H0, t=-0,71). Gemessen: Teil C, Weg A, Teil D, Teil E. Entscheidungsregel 4 seit v22 erfuellt, ohne dass der Knopf je gesetzt wurde (par.13). Geparkt: Teil B1 und Teil A1, als Paket mit `PREREG_stack_top_feature.md` zu heben (par.14). -->
+<!-- STATUS: OFFEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: Grossteils geliefert, Rest geparkt (Teil B1 und A1, par.14). Scharf: R5-Zufallsknoten seit 2026-08-10 (Vorzeichen-Sonde H0). Entscheidungsregel 4 am 2026-08-30 auch fuer den NETZ-Pfad entschieden: Knopf EIN fuer die v22-b05-Erzeugung -- kein Staerkeverlust (77:68 gepaart, Punkte Block-t 2,04) und 136 von 136 Slot-Zielen gueltig gegen 0 vorhandene ohne Knopf (par.15). -->
 
 # Vorregistrierung: Wahrscheinlichkeiten statt Welten (Zufallsknoten)
 
@@ -1014,6 +1014,93 @@ Entscheidungsregel 4 war vor diesem Befund **zweimal aufgeschoben** worden:
 einmal beim Ownership-Korpus, einmal beim Asym-Korpus, jeweils mit Verweis
 auf Regel 3 (nicht mit dem Kontrollfluss vermischen). Mit dem Erzeugerwechsel
 oben ist sie **gegenstandslos**, nicht ein drittes Mal offen.
+
+
+## par.15 ERGEBNIS + ENTSCHEID fuer den NETZ-Pfad (2026-08-30, Nachtprogramm; Artefakt `evaluations/artifacts/stack_draw_research_b05.json`, Rohdaten `evaluations/artifacts/paired_arena_env_stackdraw_b05.json`, Werkzeug `tools/probes/stack_draw_research_arena_eval.py`)
+
+par.13 liess genau eine Frage offen: den Kontrollfluss im NETZ-Self-Play.
+Dort steht `apply_via_chosen_action` auf `true`, das Netz erzeugt seine
+Partien also anders, als der Korpus entstanden ist, aus dem es lernt.
+
+### Warum das Instrument die gepaarte Zwei-Arm-Arena ist und nicht die Ankerarena
+
+Der Knopf wird prozessweit per `OnceLock` gelesen (`self_play.rs:649`). In
+einem Spiegelmatch traefe er deshalb BEIDE Seiten -- das Amendment aus
+`PREREG_search_path_remeasurements.md` verbietet solche Messungen. Gefahren
+wurde darum `tools/paired_arena_env_ab.py` (je Arm ein eigener
+Worker-Prozess) gegen die Heuristik@150: auf diesem Pfad traegt die
+Heuristik-Seite `apply_via_chosen_action: false` (`self_play.rs:2554`), der
+Knopf beruehrt also nur die Netz-Seite -- genau par.13s "aendert den SPIELER,
+nicht den MASSSTAB".
+
+**Und ein Befund, der par.13 an einer Stelle berichtigt:** fuer
+`tools/anchor_arena.py` gilt dieser Satz NICHT. Der Treiber
+`tools/frozen_referee_match.py` ruft `set_apply_modes` nirgends auf
+(einziger Aufrufer im Baum ist `tools/probes/anchor_referee_parity_probe.py`,
+Zeile 96), und `RefereeGame` startet mit `[true, true]` (`referee.rs:387`).
+In der Ankerarena loest also AUCH die Heuristik-Seite sammelauf -- ein
+Umschalten des Knopfes haette dort beide Seiten bewegt. Die Ankerarena war
+fuer diese Frage kein taugliches Instrument. NICHT angefasst: das ist eine
+eigene Frage an den Elo-Anker, kein Nachtlauf-Auftrag.
+
+### Staerke (100 gepaarte Partien, b05@400 gegen Heuristik@150, Seed 20260912, Bloecke a 10)
+
+| Groesse | Knopf AUS | Knopf EIN |
+| --- | --- | --- |
+| Siege | 68/100 | 77/100 |
+| Netz-Punkte | 50,98 | 53,58 |
+| Margin | +11,35 | +16,78 |
+| Strafpunkte Netz | -15,51 | -13,55 |
+| volle Spalten Netz | 0,650 | 0,670 |
+
+Gepaart: McNemar b(EIN)=19 / c(AUS)=10, p=0,136 -- nicht signifikant, aber in
+RICHTUNG des Knopfes. Auf Blockebene (10 Bloecke, stehende Regel seit
+2026-08-04): Punkte +2,60 (t 2,04), Margin +5,43 (t 2,32). Die Partienzahl
+ist die Rueckfall-Annahme des Kochrezepts (die Regel nennt keinen Deckel);
+bei n=100 ist die Aufloesung begrenzt -- die Bedingung lautet aber "kein
+signifikanter Staerkeverlust", und alle drei Masse zeigen nach oben, nicht
+nach unten.
+
+Einordnungs-Caveat wie bei par.2c der Minimax-Prereg: gemessen ist gegen die
+HEURISTIK. Ein Netz-gegen-Netz-Vorteil ist damit NICHT belegt, und der
++9-Siege-Vorsprung koennte gegnerspezifisch sein. Fuer die Entscheidungsregel
+reicht es, weil sie kein Plus verlangt, sondern kein Minus.
+
+### Policy-Ziel-Gueltigkeit (je 40 Partien b05@400, Seed 20260913, Muster wie par.13)
+
+| Aktionsart | Knopf AUS | Knopf EIN |
+| --- | --- | --- |
+| `choose_draw_stack_slot` | **0 Datensaetze** | **136 (1,99 %), davon 100 % policy-tragend** |
+| `choose_dome_rotation` | 467 | 640 |
+| `dome_stack_peek` | 79 | 167 |
+| Records gesamt | 6.421 | 6.833 |
+
+Die 136 Slot-Ziele sind keine Platzhalter: Median 6 Kandidaten (min 1,
+max 17), 77,9 Prozent mit mehr als einem Kandidaten, mittlere Top-1-Masse
+0,928. Ohne den Knopf existiert die Entscheidung im Netz-Self-Play gar nicht
+-- dasselbe "0 von 16.322", das der Prereg-Koerper fuer den Bestandskorpus
+notiert hat.
+
+### ENTSCHEID: Knopf EIN fuer die v22-b05-Erzeugung
+
+Die Entscheidungsregel des Nachtprogramms lautet "kein signifikanter
+Staerkeverlust UND gueltige Policy-Ziele => EIN". Beides ist erfuellt. Der
+Knopf repariert genau den Bruch, den par.13 benannt hat: die Suche bewertet
+die Wurzelaktion "Ziehen", und ausgefuehrt wird danach keine Fortsetzung
+mehr, die sie nie gesehen hat. Die Rueckfall-Regel (`PREREG_v23_window.md`
+par.4c: ohne auswertbares Ergebnis AUS) kommt nicht zum Zug.
+
+**Betriebshinweis fuer die Erzeugung:** `MOSAIC_STACK_DRAW_RESEARCH=1` gehoert
+in die Umgebung BEIDER Laeufe (Sockel und Schwarm) -- der Knopf hat keine
+Spec-Datei-Entsprechung (`SearchConfig` kennt nur `implicit_minimax_alpha`,
+`long_row_init_shaping_w`, `heuristik_variante`), und er wird je Prozess
+einmal per OnceLock gelesen. `self_play.py` startet jeden Chunk als frischen
+`mp.Process`, der die Elternumgebung erbt; ein Setzen vor dem Aufruf genuegt
+also. Regel 3 bleibt unberuehrt: `MOSAIC_STACK_DRAW_CHANCE` ist NICHT gesetzt.
+
+**Erzeugte Messdaten** (Loeschkandidaten, gehoeren NICHT ins v23-Fenster):
+`data/selfplay_sdrb05an_*.pkl` und `data/selfplay_sdrb05aus_*.pkl`, je 40
+Partien, plus die zugehoerigen `data/manifest_sdrb05*.json`.
 
 ## par.14 Was offen und GEPARKT ist (Arbeitskreis "Spaeter", Nutzer 2026-08-21)
 

@@ -202,9 +202,9 @@ evaluations/night_run_20260830.md) VOR dem Erzeugungsstart.
 | Wecker | Entscheid |
 | --- | --- |
 | Spalten-Abnahme-Tor par.3b.2 | REVIDIERT und erfuellt -- Lehrer-Prereg par.3b.12 (neue Startbedingung 3/3 gruen, Waechter nach Erzeugung bindend) |
-| MOSAIC_IMPLICIT_MINIMAX_A | Gating-Messung im Nachtprogramm nach par.3a der eigenen Prereg; Rueckfall-Regel: ohne auswertbares Ergebnis bleibt der Default 0,0 (bewusst registriert, nicht still) |
+| MOSAIC_IMPLICIT_MINIMAX_A | GEMESSEN 2026-08-30 (Minimax-Prereg par.3b, je 200 Partien): alpha 0,2 senkt die Zustandsabdeckung (0,990) und laesst die Zielschaerfe unbewegt -> **alpha 0,0**, gemessener Entscheid, nicht Rueckfall |
 | Risk-Utility A1 | NICHT einbauen fuer Generation 1 -- ungebaut, kein unbeaufsichtigter Nacht-Engine-Bau; Frist ist damit durch bewussten Entscheid gewahrt, Wiedervorlage Generation 2 |
-| MOSAIC_STACK_DRAW_RESEARCH | Arena-Messung im Nachtprogramm nach PREREG_chance_nodes Entscheidungsregel 4; Rueckfall-Regel: ohne auswertbares Ergebnis Default AUS (sammelaufgeloest wie bisher), registriert |
+| MOSAIC_STACK_DRAW_RESEARCH | GEMESSEN 2026-08-30 (chance_nodes par.15, 100 gepaarte Partien): kein Staerkeverlust (68:77, Punkte-Block-t 2,04) und 136/136 Slot-Ziele gueltig -> **EIN, in der Umgebung BEIDER Erzeugungslaeufe** (keine Spec-Entsprechung, prozessweiter OnceLock) |
 | --seed-positions | AUS fuer Generation 1: seed_positions_v1.jsonl stammt aus PLATTENBLINDEN Zustaenden (Asym-Aera) -- die Wiedervorlage-Bedingung der Seeding-Prereg verlangt eine plattenbewusste Quelle; Neu-Kuratierung aus hv2/b05-Zustaenden als benannter Gen-2-Posten |
 | Startkuppel-Streuung | Handheuristik BLEIBT fuer Generation 1 (bewusster Entscheid statt Default-Verfall); start_dome Stufe 0 bleibt offen fuer Gen 2 |
 | MOSAIC_STACK_DRAW_RESERVATION | AUS (steht entschieden) |
