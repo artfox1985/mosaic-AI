@@ -102,6 +102,21 @@ einzigem hohen Punkt -- ein einzelner Messpunkt traegt einen Gipfel
 nicht. 75 prueft, ob die Flanke links vom Gipfel glatt ansteigt oder ob
 der 100er-Wert ein Ausreisser ist. Kosten ~13 min.
 
+**Stufe 2f -- FRISCH-SEED-REPLIKATION des Gipfels (registriert
+2026-08-30, VOR den Folgemessungen; bindend).** Mehr Arme loesen die
+KURVENFORM besser auf, aber sie schuetzen NICHT vor dem
+Selektionsbias: wer aus mehreren verrauschten Punkten den hoechsten
+als Gipfel nimmt, ueberschaetzt ihn im Erwartungswert (Winner's Curse;
+bei SE ~0,04 je Punkt und einem halben Dutzend Armen ist ein
+4-SE-Ausschlag nicht selten). Deshalb gilt: **bevor v21-Vergleich
+(2e), Faktoren-Trennung (2c) oder Arena (3) auf einem Gipfelwert
+aufsetzen, wird dieser Punkt EINMAL mit frischem Seed wiederholt**
+(200 Partien, sonst identisch). Haelt der Wert, traegt er die
+Folgemessungen; faellt er auf Plateau-Niveau, war es Rauschen und die
+Lesart lautet "Plateau", nicht "Optimum". Dieselbe Logik wie die
+Frisch-Seed-Replikation bei SPRT-Fruehstopps
+(docs/promotion_checklist.md Punkt 2).
+
 **Stufe 2e -- NETZ-VERGLEICH v21 (Sims-Zahlen erst NACH Stufe 2d
 festlegen, Nutzer-Praezisierung 2026-08-30).** Gefragt ist, ob der
 Gipfel eine Eigenschaft der SUCHE ist oder des spaltenkundigen PRIORS,
