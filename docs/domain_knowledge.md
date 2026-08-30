@@ -62,7 +62,8 @@ Aufteilung je Runde (Mittel je Partie, CI 95 %):
    Bei 0,84 und 0,58 Abschlüssen fehlen die beiden untersten regelmäßig ganz.
    Dazu müssen die sechs Zellen auch noch in DERSELBEN Spalte landen — zweite,
    davon unabhängige Hürde, und sie ist Platzierungswahl, nicht Versorgung.
-   Beides zusammen erklärt die gemessene Spaltenrate von 0,4–1,2 %.
+   **Es gibt eine dritte, die hier lange fehlte: die Farbschranke** (Abschnitt
+   7). Alle drei zusammen erklären die gemessene Spaltenrate von 0,4–1,2 %.
 
 ### Replikation über zwei Suchbudgets — Reihe 5/6 hängt NICHT am Budget
 
@@ -392,6 +393,95 @@ stehen bleiben.
 **Verhaltensbefund, nicht Spielstruktur**: der Champion meidet die AKTION
 massiv (2,88 gegen 6,38 abgeladene Steine) und die KONSEQUENZ gar nicht
 (nur 2,68 Strafpunkte weniger, bei mehr Überlauf und mehr Runden mit Strafe).
+
+## 7. Spaltenbau: warum die Spalte bei 5 von 6 stehenbleibt
+
+Abschnitt 1 nennt zwei Hürden für die volle Spalte. Es sind drei, und die
+Messlage sagt inzwischen ziemlich genau, welche davon trägt.
+
+### Die dritte Hürde: die Farbschranke
+
+**Jede normale Kuppelzelle verlangt GENAU EINE Farbe** (`dome.rs`,
+`required_color`), und **eine Musterreihe trägt nur EINE Farbe**
+(`board.rs`, `PatternLine::color`). Eine Spalte zu schließen heißt damit:
+sechs Zellen, sechs festgelegte Farben, je eine Musterreihe, deren Kapazität
+r+1 Fliesen genau dieser einen Farbe verlangt. Quelle:
+`PREREG_placement_side.md` par.14.
+
+### Die 5/6-Mauer
+
+**In 36 von 57 Partien fehlt EINE Fliese zur vollen Spalte.** Das Netz kommt
+fast immer bis an den Rand und schließt nicht. Der Befund repliziert über vier
+verschiedene Eingriffsmechanismen (`PREREG_provocation.md`).
+
+### Volle Versorgung hebt die Mauer NICHT
+
+Deckenprobe mit dem Knopf „jede Fabrik trägt alle Farben", 20 Partien je Arm:
+
+| Arm | vertikale Plattenpunkte | Verteilung höchster Spaltenstand | volle Spalten |
+|---|---:|---|---:|
+| Netz, normal | 1,05 | 4→6, 5→12, 6→2 | 2/20 |
+| Netz, **volle Versorgung** | 0,70 | 3→1, 4→5, **5→14** | **0/20** |
+
+Die Verteilung verschiebt sich NICHT nach rechts, sie sammelt sich noch
+stärker bei 5 von 6. Die Farbschranke war aufgehoben, jede Farbe jederzeit
+draftbar. Es half nicht: **das Material war da, der Plan nicht.**
+
+### Der Engpass sitzt nicht am Ende
+
+Legalitäts-Sonde (`tools/probes/column_completion_legality_probe.py`,
+2026-08-23): in **0 von 160** stehengelassenen Höhe-5-Fällen existierte im
+Restfenster überhaupt eine legale Platzierung, die die Spalte vollendet hätte.
+**Der Champion verpasst am Ende nichts** – die Entscheidung fiel früher. 128
+der 160 Fälle stammen aus Netz-gegen-Netz-Partien, und die Quote ist in jeder
+Gruppe 0.
+
+Blockade-Zusammensetzung: **Musterreihe noch nicht voll 87/160 (54 %)**,
+Zielfeld ist Spezialfeld 41 (26 %), keine passende Farbe verfügbar 32 (20 %).
+Stehengelassene Höhe-5-Spalten je Partie: 0,55 (Symptom-Maß, kein Tor).
+
+### Wer eine lange Reihe anfängt, bekommt sie nur halb fertig
+
+**Vollendungsquote langer Reihen: 0,534 / 0,514** in beiden Armen einer
+gepaarten Netz-gegen-Netz-Arena (407 Seeds × 2 Sitze = 814 Partien). Wer eine
+Reihe mit Kapazität 5 oder 6 beginnt und sie in der Hälfte der Fälle nicht
+fertigbekommt, spielt lange Reihen schlecht. Zum Vergleich: Heuristik-Lehrer
+0,563, `hv2`-Hülle 0,717.
+
+### Wann das Spiel eine Spalte zumacht
+
+Anteil noch VOLLENDBARER Spalten-Atome je Runde (Held-out-Satz, 150
+Stellungen je Runde, nur beobachtbare Information):
+
+| Runde | 1 | 2 | 3 | 4 | 5 |
+|---|---:|---:|---:|---:|---:|
+| k1 Spalten-Atome | 100,0 % | 98,8 % | **85,1 %** | **55,4 %** | **47,2 %** |
+| „irgendeine Spalte" | 100,0 % | 100,0 % | 100,0 % | 96,0 % | 96,0 % |
+
+**Das Signal sitzt JE SPALTE, nicht in der Aggregation**: „irgendeine Spalte
+vollendbar" bleibt selbst in Runde 5 bei 96 %, während einzelne Spalten bei
+47 % liegen. Es ist eine notwendige Bedingung, also eine obere Schranke – nicht
+„erreichbar bei gutem Spiel".
+
+### Kein Versorgungs-, sondern ein Verteilungsproblem
+
+Eine volle Spalte kostet **1+2+3+4+5+6 = 21 Zellen**, unabhängig von der
+Platzierungsgeschicklichkeit. Über 5 Runden stehen beiden Spielern zusammen
+**105 Fliesen-Platzierungen** zur Verfügung.
+
+| | verbrauchte Zellen | trüge bei Gleichverteilung | erreicht |
+|---|---:|---:|---:|
+| Mensch | 60,9 | 2,90 Spalten | **1,80** |
+| Netz | 42,7 | **2,03 Spalten** | **0,10** |
+
+**Mit den Fliesen, die es heute schon nimmt, wären rund zwei volle Spalten
+drin – es holt 0,1. Keine einzige zusätzliche Fliese nötig.** Gegenprobe des
+Modells: 60,9 + 42,7 = 103,6 der 105 verfügbaren Platzierungen (98,7 %), zwei
+unabhängige Wege zu derselben Zahl.
+
+Daraus die Ziel-Kennzahl: **das MINIMUM der Abschlüsse über die sechs Reihen**,
+nicht deren Summe und nicht die Länge. Jede Vollendung über dem Minimum ist aus
+Spaltensicht Überschuss – **das Zielprofil ist FLACHER, nicht länger.**
 
 ## Spielstrategie aus Nutzer-Praxis (2026-08-13, woertlich aufgenommen)
 
