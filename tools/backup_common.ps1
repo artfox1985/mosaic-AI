@@ -228,6 +228,48 @@ function Write-BackupLog {
     Write-Host $line
 }
 
+function Invoke-ResticCapture {
+    <#
+    .SYNOPSIS
+        Ruft restic auf und gibt Exitcode samt vereinigter Ausgabe zurueck.
+    .DESCRIPTION
+        Es geht hier ausschliesslich um eine PowerShell-Falle, die am
+        2026-08-31 zugeschlagen hat: schreibt ein NATIVES Programm auf stderr
+        und leitet man das mit 2>&1 um, verpackt PowerShell jede solche Zeile
+        in einen ErrorRecord. Unter $ErrorActionPreference = "Stop" wird daraus
+        eine TERMINIERENDE Ausnahme -- der Aufrufer bricht ab, obwohl er die
+        Meldung nur lesen wollte.
+
+        Konkret war das "Fatal: repository does not exist" von 'cat config' auf
+        ein noch nicht angelegtes Repository. Das ist die ERWARTETE Antwort,
+        an der sich entscheidet, ob ein init noetig ist -- und sie hat den Lauf
+        abgeschossen, statt ihn zu steuern.
+
+        Darum die Praeferenz nur fuer den Aufruf herabsetzen und danach
+        zuverlaessig (finally) wiederherstellen. NUR fuer Aufrufe verwenden,
+        deren Ausgabe ausgewertet wird; lange Laeufe wie 'backup' laufen
+        weiterhin ohne Umleitung, damit ihr Fortschritt sichtbar bleibt.
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$Exe,
+        [Parameter(Mandatory = $true)][string[]]$Arguments
+    )
+
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $raw = & $Exe @Arguments 2>&1
+        $code = $LASTEXITCODE
+        return [pscustomobject]@{
+            ExitCode = $code
+            Output   = ($raw | Out-String).Trim()
+        }
+    } finally {
+        $ErrorActionPreference = $previous
+    }
+}
+
 function Confirm-ResticRepo {
     <#
     .SYNOPSIS
@@ -238,8 +280,9 @@ function Confirm-ResticRepo {
 
     # 'cat config' ist die billigste Existenzpruefung: liest genau einen
     # Datensatz und sagt zugleich, ob das Passwort passt.
-    $catOut = & $Context.ResticExe cat config 2>&1
-    if ($LASTEXITCODE -eq 0) { return }
+    $cat = Invoke-ResticCapture -Exe $Context.ResticExe -Arguments @("cat", "config")
+    $catOut = $cat.Output
+    if ($cat.ExitCode -eq 0) { return }
 
     # "Resolving password failed" heisst: restic kam gar nicht erst an das
     # Passwort. Das ist KEIN fehlendes Repository, und ein init darueber wuerde
@@ -261,12 +304,13 @@ function Confirm-ResticRepo {
     # Repository. Ein init darueber kann nichts kaputtmachen -- restic lehnt
     # ab, sobald eine config existiert --, aber die Meldung waere ohne diese
     # Unterscheidung irrefuehrend.
-    $initOut = & $Context.ResticExe init 2>&1
-    if ($LASTEXITCODE -ne 0) {
+    $init = Invoke-ResticCapture -Exe $Context.ResticExe -Arguments @("init")
+    $initOut = $init.Output
+    if ($init.ExitCode -ne 0) {
         if ("$initOut" -match "config file already exists") {
             throw "Unter $($Context.RepoPath) liegt bereits ein Repository, es laesst sich aber nicht oeffnen -- vermutlich passt das Passwort nicht. Verwendete Quelle: $($Context.PasswordSource)."
         }
-        throw "restic init fehlgeschlagen (Exitcode $LASTEXITCODE): $initOut"
+        throw "restic init fehlgeschlagen (Exitcode $($init.ExitCode)): $initOut"
     }
     Write-BackupLog $Context "Repository angelegt (Format v2, Kompression aktiv)."
 }
