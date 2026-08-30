@@ -261,6 +261,59 @@ und laesst Value-Felder unberuehrt, ist also etwas anderes.
    einer Messung, die es noch nicht gibt (und fuer die es keine
    neutrale Referenz gibt, siehe par.2 Stufe 3).
 
+## par.2i STUFEN 2/2b/2d/2f GEFAHREN 2026-08-30: die Kurve, und was von ihr traegt
+
+**Vollstaendige Kurve (value-only, argmax, Seed 20260902, je 200
+Partien, Stack-Draw EIN):**
+
+| Sims | volle Spalten | +- | Punkte |
+| --- | --- | --- | --- |
+| 10 | 0,4531 | 0,014 | 41,49 |
+| 25 | 0,5650 | 0,029 | 43,99 |
+| 50 | 0,4825 | 0,041 | 42,08 |
+| 75 | 0,4750 | 0,037 | 41,75 |
+| 100 | 0,6225 | 0,035 | 46,06 |
+| 150 | 0,4425 | 0,042 | 41,01 |
+| 250 | 0,3325 | 0,021 | 39,99 |
+| 400 | 0,3375 | 0,026 | 38,37 |
+
+**Frisch-Seed-Replikation (Stufe 2f, Seed 20260930):** 25 Sims 0,6600
+(Erst 0,5650), 100 Sims 0,6550 (Erst 0,6225) -- **beide Spitzenwerte
+replizieren, der Effekt ist hart.** Die Feinstruktur dagegen NICHT: 25
+und 100 sind ununterscheidbar (~0,61 gegen ~0,64 bei SE ~0,04), und
+die Seed-Streuung eines einzelnen Punktes betraegt bis 0,095 (25er).
+**Lesart: PLATEAU von etwa 25 bis 100 (~0,6), Absturz auf ~0,34 ab
+250, und eine Untergrenze unterhalb von 25 (10er faellt auf 0,45).**
+Die 50/75-Werte sind vor diesem Hintergrund als Streuung nach unten zu
+lesen, nicht als Struktur. Mein zwischenzeitliches "klarer Gipfel bei
+100" war voreilig; erst der Nutzer-Auflossungsarm (75) und die
+Replikation haben das Bild geradegerueckt.
+
+## par.2j STUFE 3 TEIL 1 GEFAHREN: 25 Sims ist ein TAUSCH, kein Gewinn
+
+Gepaarte Arena b05@25 gegen b05@400 (dasselbe Netz, gleiche Seeds,
+Stack-Draw EIN, exklusiv gefahren): **11:29, SPRT H0 nach 20 Paaren,
+Vorzeichentest p=0,0117, gepaarte Differenz -0,90 [-1,43; -0,37]**
+(paired_gating_result_b05@25_vs_b05@400.json).
+
+**Damit greift die vorab registrierte Tausch-Regel:** der
+Spaltenzuwachs bei 25 Sims ist mit Spielstaerke bezahlt. Fuer den
+SPIELBETRIEB aendert sich nichts, 400 bleibt.
+
+**Der eigentliche Erkenntnisgewinn ist die Trennung zweier Groessen:**
+die Spalten-Kurve ist NICHT die Staerke-Kurve. Weniger Suche baut mehr
+Spalten UND spielt schlechter -- beides gleichzeitig, ohne Widerspruch:
+die Suche korrigiert taktische Fehler des Priors und optimiert
+zugleich seinen Spaltenbau weg. Wer kuenftig "mehr Spalten" misst,
+darf daraus nicht auf "besser" schliessen (und umgekehrt).
+
+Fuer die KORPUS-Erzeugung bleibt die Frage offen und unbequem: ein
+Erzeuger, der 11:29 gegen den Betriebspunkt verliert, ist nicht
+selbstverstaendlich besseres Trainingsmaterial -- genau darauf zielt
+der registrierte Gegeneinwand aus PREREG_v22_window par.4. Deshalb
+laeuft Teil 2 mit dem Kompromiss-Kandidaten 100 Sims (gleiche
+Spaltenrate wie 25, vierfaches Suchbudget).
+
 ## par.3 Was dieser Strang NICHT ist
 
 * **Keine Wiederaufnahme der Q-Skalierungs-Familie** (geschlossen). Hier
