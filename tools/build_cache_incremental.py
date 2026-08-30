@@ -196,6 +196,18 @@ def _pass(data_dir, file_list, kwargs, carrier_set, carrier_prefixes, workers, t
         carrier = _carrier_status(os.path.basename(f), carrier_set, carrier_prefixes)
         jobs.append((data_dir, f, kwargs, _block_path(data_dir, os.path.basename(f),
                                                           kwargs, carrier)))
+    # Robustheit gegen Dateien, die WAEHREND eines Durchgangs verschwinden
+    # (2026-08-30, erster Produktionstest: das Aufraeumen freigegebener
+    # Messkorpora killte den --watch-Lauf mit FileNotFoundError, weil die
+    # Liste am Durchgangsbeginn eingesammelt wird). Nur ueberspringen und
+    # zaehlen -- ein Lauf, der stundenlang neben einer Erzeugung mitlaeuft,
+    # darf an einem `rm` nicht sterben.
+    jobs_alive = [a for a in jobs if os.path.exists(a[1])]
+    n_verschwunden = len(jobs) - len(jobs_alive)
+    if n_verschwunden:
+        print(f"  {n_verschwunden} Datei(en) waehrend des Durchgangs verschwunden "
+              f"-- uebersprungen", flush=True)
+    jobs = jobs_alive
     pending = [a for a in jobs if not os.path.exists(a[3])]
     already_done = len(jobs) - len(pending)
     print(f"📦 {len(jobs)} Dateien: {already_done} Bloecke liegen schon, "
