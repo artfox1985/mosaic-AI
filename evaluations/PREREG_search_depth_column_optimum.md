@@ -102,6 +102,26 @@ einzigem hohen Punkt -- ein einzelner Messpunkt traegt einen Gipfel
 nicht. 75 prueft, ob die Flanke links vom Gipfel glatt ansteigt oder ob
 der 100er-Wert ein Ausreisser ist. Kosten ~13 min.
 
+**Stufe 2e -- NETZ-VERGLEICH v21 (Sims-Zahlen erst NACH Stufe 2d
+festlegen, Nutzer-Praezisierung 2026-08-30).** Gefragt ist, ob der
+Gipfel eine Eigenschaft der SUCHE ist oder des spaltenkundigen PRIORS,
+den nur b05 hat (Prior-Ratio 1,23 gegen 0,59 beim Champion). Gemessen
+werden deshalb **der dann bekannte Gipfelpunkt und der Nachbarpunkt
+mit dem staerksten Kontrast bei b05** -- nach heutigem Stand 100 gegen
+50, aber das haengt am 75er-Arm und wird erst danach eingesetzt. Beide
+Arme MIT Stack-Draw-Knopf (Nutzer: dann ist der Vergleich in sich
+geschlossen und haengt nicht an der Alt-Referenz, die ohne Knopf lief),
+gleiche Seeds, je 600 Partien (Blockfehler ~0,017; noetig, weil v21 auf
+0,102-Niveau liegt und ein relativer Effekt dort absolut klein ist).
+*Lesart:* zeigt v21 denselben Sprung, ist der Gipfel Such-Mechanik und
+die Prior-Deutung widerlegt; bleibt v21 flach, haengt er am Prior --
+mit dem Vorbehalt, dass ein Nullbefund auf niedrigem Niveau schwaecher
+wiegt als ein positiver.
+*Technischer Vorbehalt:* v21 traegt 76 Planes-Kanaele gegen heute 79 --
+der Python-Pfad ist daran schon gescheitert (2026-08-30, seither
+gekuerzt); fuer den Rust-Self-Play ist ein 20-Partien-Rauchtest VOR dem
+Lauf Pflicht.
+
 **Stufe 3 -- der Haertetest (Arena, entscheidet Gewinn gegen Tausch).**
 Gepaarte Arena b05@Optimum gegen b05@400, `tools/paired_gating.py
 --no-promote-winner` (block-size 5 = Default), Seed 20260920.
