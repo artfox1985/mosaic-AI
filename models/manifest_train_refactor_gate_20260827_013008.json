@@ -1,0 +1,123 @@
+{
+  "version": "refactor_gate",
+  "run_timestamp": "20260827_013008",
+  "cli_args": {
+    "name": "refactor_gate",
+    "load": null,
+    "epochs": 2,
+    "hidden": null,
+    "early_stop": false,
+    "show_plot": false,
+    "val_frac": 0.1,
+    "train_file_limit": 6,
+    "lr": null,
+    "lr_schedule": "none",
+    "exclude_round5": false,
+    "ownership_weight": null,
+    "conjunction_head": false,
+    "seed": 4242,
+    "snapshot": false,
+    "value_weight": null,
+    "points_weight": null,
+    "value_target_variant": "nortv",
+    "encoder": "flat",
+    "value_target_lambda": 1.0,
+    "opp_points_head": false,
+    "endgame_head": false,
+    "value_head": "tanh",
+    "ranking_loss_weight": 0.0,
+    "extra_data_dir": null,
+    "freeze_trunk": false,
+    "val_pool": null
+  },
+  "git_commit": "1ebb4eb763c019b7b53338693e3ed39b4d34fe48",
+  "git_dirty": true,
+  "engine_config": {
+    "active_leaf": "Net",
+    "aggr_lambda": 0.0,
+    "bootstrap_horizon_rounds": 2,
+    "contract_hash": "a3f61f246d9bbf5c",
+    "decouple_net_sims_from_actions": true,
+    "determinize_root_hidden_info": true,
+    "engine_version": "0.1.0",
+    "floor_shaping_weight": 0.3,
+    "gumbel_top_m": 16,
+    "input_size": 714,
+    "mirror_other_val": false,
+    "num_actions": 406,
+    "num_planes_channels": 77,
+    "points_utility_w": 0.0,
+    "points_utility_weight": 0.0,
+    "policy_mass_cutoff": 0.95,
+    "round_transition_n_samples_search": 8,
+    "round_transition_sampling": false,
+    "shuffle_stack_peek_in_search": false,
+    "use_gumbel_search": true,
+    "value_cal_a": 0.0,
+    "value_cal_b": 1.0,
+    "value_opp_epsilon": 0.0
+  },
+  "python_constants": {
+    "TD_LAMBDA": 0.5,
+    "POLICY_TARGET_SHARPEN_EXPONENT": 2.0,
+    "VALUE_WEIGHT": 0.2,
+    "POINTS_WEIGHT": 0.5,
+    "VALUE_SCHEMA_VERSION": 20
+  },
+  "corpus_composition": [
+    {
+      "prefix": "hv2",
+      "files": 2400,
+      "games": 24000
+    }
+  ],
+  "policy_carriers": {
+    "carrier_manifest": "policy_carrier_manifest_v20.json",
+    "carrier_manifest_gefunden": false,
+    "carrier_prefixes": null,
+    "gelistete_dateien": null,
+    "traeger_dateien_gesamt": 2400,
+    "traeger_dateien_je_praefix": {
+      "hv2": 2400
+    },
+    "data_exclude": null,
+    "reach_target_k1": null
+  },
+  "epoch_history": [
+    {
+      "epoch": 1,
+      "lr": 0.0004,
+      "policy_loss": 2.1200898617506025,
+      "policy_val_loss": 1.2770724101168665,
+      "value_loss": 0.14805389549583198,
+      "value_val_loss": 0.1885563490826876,
+      "value_val_brier": 0.24684834207229844,
+      "points_loss": 0.11252271998673677,
+      "points_val_loss": 0.13011626902204407,
+      "ownership_val_loss": null,
+      "val_combined": 1.379841814444426
+    },
+    {
+      "epoch": 2,
+      "lr": 0.0004,
+      "policy_loss": 1.9499234884977341,
+      "policy_val_loss": 1.2614491457239203,
+      "value_loss": 0.04780550650320947,
+      "value_val_loss": 0.20115405610714118,
+      "value_val_brier": 0.24781499498970375,
+      "points_loss": 0.04103831867687404,
+      "points_val_loss": 0.11964240504901526,
+      "ownership_val_loss": null,
+      "val_combined": 1.3615011594698563
+    }
+  ],
+  "laufzeit": {
+    "wanduhr_s": 74.2,
+    "cpu_s": 76.2,
+    "datenaufbau_s": 0.2,
+    "threads": 6,
+    "device": "cuda",
+    "epochen": 2,
+    "samples": 10442
+  }
+}
