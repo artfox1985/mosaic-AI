@@ -29,6 +29,20 @@ nicht -- benannt wird das Fenster nach dem Netz, das AUS ihm entsteht.
 `v18_best` heissen `v18_*`. Beides zusammen ist die Stelle, an der der
 Off-by-one entsteht.
 
+## `v22-b03` bleibt UNBELEGT -- die b-Serie hat eine Luecke (Nutzer 2026-08-30)
+
+Die laufende Kette ist `v22-b01, b02, b04, b05, b06` -- **b03 fehlt und
+wird nicht nachbesetzt.** Der Name war fuer den Surprise-Weighting-Arm
+(`PREREG_policy_surprise_weighting.md`) reserviert; dessen
+Entscheidungsmass verlangt aber Policy-Ziele aus einer SUCHE, nicht aus
+dem Lehrer -- die gibt es erst mit dem v23-Fenster. **Der Arm heisst
+darum `v23-b03`, sobald er faellt.**
+
+Merkregel daraus: ein reservierter Name gehoert der GENERATION, in der
+der Arm tatsaechlich faehrt, nicht der, in der die Idee registriert
+wurde. Wer eine Luecke in einer b-Serie findet, sucht hier nach ihrer
+Begruendung statt nach verlorenen Modellen.
+
 ## Heuristik-Varianten heissen `hv1` / `hv2` (Nutzer-Anweisung 2026-08-28)
 
 Die Heuristik-Varianten hiessen bis zum 2026-08-28 `v1` und `v2huelle`. Das
