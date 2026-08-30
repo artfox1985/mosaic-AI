@@ -2182,6 +2182,21 @@ Sockel-Konfiguration; erreicht keiner die Schwelle, STOPP und
 Nutzer-Vorlage am Morgen.** Punkteniveau wird berichtet
 (Beobachtung, kein Tor).
 
+**tau-LEITER GEFAHREN 2026-08-30 03:45 -- BEIDE ARME VERFEHLEN, Regel
+gefeuert: KEIN Sockel-Start, Nutzer-Vorlage am Morgen.** t24: 0,0775
++- 0,018; t60: 0,0725 +- 0,015 (je 200 Partien; Punkte 23,1/21,2) --
+praktisch gleichauf mit dem Voll-Sampling-Kontrollarm (0,0825). Das
+Spaetspiel-Sampling ist damit NICHT der Taeter; der gemeinsame Faktor
+aller drei Arme ist der ROOT-NOISE (Deutung: eine verrauschte
+Entscheidung in der Vollendungs-Kette bricht sie, 0,6^k-Mechanik der
+par.3b.8-Diagnose). Der 2x2 (Noise x Sampling) fehlt eine Zelle --
+Noise aus, Sampling an: als DIAGNOSE-ARM registriert (200 Partien,
+--no-root-noise OHNE --deterministic und ohne tau-Override, Seed
+20260915, Tag tlb05nn, Stack-Draw EIN). Er entscheidet nichts, er
+vervollstaendigt die Ursachen-Trennung fuer die Morgen-Vorlage;
+Referenzzellen: Noise+Sampling 0,0825, Noise+argmax-spaet ~0,075,
+ohne-Noise+argmax 0,3375 (otw22b05w00).
+
 **Erzeugungs-Zuschnitt (Wecker-Abarbeitung in PREREG_v23_window par.4c
 registriert):** 4.000 Sockel @400 Sims mit Root-Noise (Policy-Klasse) +
 8.000 Schwarm --value-only (v20-Konvention, cheap-sims 150); Dateiname
