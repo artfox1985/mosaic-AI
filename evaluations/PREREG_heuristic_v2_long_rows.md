@@ -2160,6 +2160,28 @@ Spaltenspiel verliert => STOPP und Bericht), (b) Symmetrie-Trennung
 signifikant > 0 (corpus_column_outcome_symmetry_probe). Werkzeuge
 existieren beide.
 
+**NACHTRAG 2026-08-30 (VOR dem Sockel-Start, registriert vor der
+Leiter): Vorab-Evidenz gegen die geplante Konfiguration.** Der
+N1-Kontrollarm des Nachtprogramms IST die geplante Sockel-Konfiguration
+(b05@400, Root-Noise, Besuchs-Sampling) und baut nur 0,0825 +- 0,028
+volle Spalten je Partie+Seite (200 Partien,
+implicit_minimax_gating_b05.json; obere KI-Grenze 0,11) -- der
+Waechter (a) verlangt >= 0,17, der Verlust kommt aus
+Exploration/Sampling (argmax-Instrument: 0,65-0,67 gegen Heuristik).
+Ein Blindstart liefe in einen fast sicheren Waechter-Riss. Deshalb,
+als Revision der par.4c-Zeile "--tau-argmax-from-move nicht gesetzt"
+(deren Praemisse damit gefallen ist): **tau-Leiter VOR dem Sockel** --
+je 200 Partien mit --tau-argmax-from-move 24 bzw. 60 (Sampling nur in
+den ersten N Halbzuegen, argmax danach; die Policy-ZIELE bleiben
+unveraendert die Besuchsverteilungen, nur die Zustandsverteilung
+verschiebt sich zur Spaetspiel-Exploitation), Root-Noise an,
+MOSAIC_STACK_DRAW_RESEARCH=1 (N2-Entscheid), Seeds 20260913/20260914,
+Tags tlb05t24/tlb05t60. **Entscheidungsregel (vorab): der KLEINSTE
+tau-Arm mit vollen Spalten je Partie+Seite >= 0,17 wird
+Sockel-Konfiguration; erreicht keiner die Schwelle, STOPP und
+Nutzer-Vorlage am Morgen.** Punkteniveau wird berichtet
+(Beobachtung, kein Tor).
+
 **Erzeugungs-Zuschnitt (Wecker-Abarbeitung in PREREG_v23_window par.4c
 registriert):** 4.000 Sockel @400 Sims mit Root-Noise (Policy-Klasse) +
 8.000 Schwarm --value-only (v20-Konvention, cheap-sims 150); Dateiname
