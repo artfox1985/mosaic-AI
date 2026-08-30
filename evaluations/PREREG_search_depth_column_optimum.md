@@ -64,6 +64,32 @@ ist). *Erwartung bei zutreffender Hypothese:* der Verwerfungsanteil
 steigt mit den Sims, und die verworfenen Zuege sind ueberproportional
 spaltenbauend.
 
+## par.2a STUFE 1 GEFAHREN 2026-08-30: Modus-Erklaerung WIDERLEGT, Effekt bleibt (knapp unter Signifikanz)
+
+value-only, argmax, Seed 20260902, je 200 Partien, 10 Bloecke:
+
+| Sims | volle Spalten | Quote | init>=4 | Punkte |
+| --- | --- | --- | --- | --- |
+| 150 | **0,4425 +- 0,042** | 0,211 | 2,09 | 41,01 |
+| 400 | 0,3375 +- 0,026 | 0,170 | 1,98 | 38,37 |
+
+Gepaart ueber die Bloecke: **volle Spalten +0,1050 (se 0,051, t +2,06)**,
+Punkte +2,64 (t +1,98) -- beide unter der Schwelle 2,262 (df=9), beide
+in dieselbe Richtung.
+
+**Regel-Anwendung:** die Schliessungsbedingung ("@400 liegt auf oder
+ueber @150") ist NICHT eingetreten -- der Strang bleibt offen, Stufe 2
+laeuft. Der Effekt ist damit nicht signifikant, aber auch nicht
+wegerklaert.
+
+**Beifang, der die Anlass-Tabelle repariert:** value-only@400 misst
+0,3375 -- identisch mit dem normalen Self-Play@400 (otw22b05w00,
+anderer Seed). Der MODUS aendert die Spaltenzahl also nicht, was zur
+Mechanik passt (`--value-only` markiert nur Policy-Ziele als ungueltig,
+es aendert das Spiel nicht). Damit war der Anlass-Vergleich aus par.1
+im Ergebnis doch tragfaehig -- was er NICHT war, ist ein Beleg, und
+genau deshalb lief Stufe 1.
+
 ## par.3 Was dieser Strang NICHT ist
 
 * **Keine Wiederaufnahme der Q-Skalierungs-Familie** (geschlossen). Hier
