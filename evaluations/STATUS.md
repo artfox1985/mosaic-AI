@@ -24,6 +24,45 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
+## UEBERGABE 2026-08-30 -- was als NAECHSTES zu tun ist
+
+**Der Erzeugungsbefehl steht startbereit** (nach dem v21-Vergleich, der
+als letzter Punkt des Suchtiefen-Strangs laeuft). Beide Klassen mit
+100 Sims, Stack-Draw-Knopf EIN, implicit-Minimax 0,0 (Default):
+
+```
+export MOSAIC_STACK_DRAW_RESEARCH=1
+python -u self_play.py --mode network --model models/alphazero_v22-b05.onnx --games 6000 --sims 100 --value-only --version v22-b05-value-argmax --threads 11 --chunk 10 --seed 20260902 --per-file 20 --no-root-noise --deterministic
+python -u self_play.py --mode network --model models/alphazero_v22-b05.onnx --games 2000 --sims 100 --value-only --version v22-b05-value-sampled --threads 11 --chunk 10 --seed 20260903 --per-file 20
+python -u self_play.py --mode network --model models/alphazero_v22-b05.onnx --games 4000 --sims 100 --version v22-b05-policy --threads 11 --chunk 10 --seed 20260901 --per-file 20
+```
+
+Erwartete Dauer rund 14 h statt 42 h bei 400 Sims. Direkt nach dem
+Start: **Manifest-Diff-Pflicht** (night_run_20260830.md N4) und die
+**Knopf-Kontrolle an den Daten** (Records mit
+`choose_draw_stack_slot` in `valid_actions`; ohne Knopf sind es 0, mit
+Knopf ~5 Prozent -- der Knopf steht NICHT im Manifest). Parallel der
+Cache-Co-Bau (N4b), aber NICHT waehrend Arena-Messungen.
+
+**VOR jedem Training bindend** (par.3b.12): Symmetrie-Trennung auf der
+Value-Klasse signifikant > 0 (primaer), >= 1.500 Partien-Seiten mit
+voller Spalte (sekundaer), Spaltenrate nur Berichtsgroesse. Dazu Arm K
+(PREREG_v23_window par.4a2) und das Moon-Gewicht auf 0
+(`--moon-loss-weight 0`, seit 2026-08-30 gebaut).
+
+**Danach die naechste Etappe** (Nutzer-Arbeitsteilung, registriert in
+PREREG_reanalyze_label_depth par.4a): POLICY per hv2-Lehrer relabeln
+(NICHT per tiefer Suche -- die drueckt Spalten weg), VALUE tief
+nachlabeln. Die Hypothese dahinter erklaert auch, warum DAgger-Runde 2
+saettigte: alle bisherigen Runden liefen auf 400-Sims-Brettern, den
+spaltenaermsten.
+
+**Offen geblieben:** v21-Vergleich (laeuft/oder nachzuholen: v21@100
+gegen v21@250, je 600 Partien, beide mit Knopf -- haengt der
+Suchtiefen-Effekt am spaltenkundigen Prior?), die Erzeugung selbst, und
+danach Phase 3 (Betrags-Schiene) mit dem neuen Erfolgstest "kippt die
+Sims-Kurve?" (PREREG_r5_value_calibration, Nachtrag 2026-08-30).
+
 ## DAS ZIEL (Leitstern)
 
 Ein **staerkerer Spieler**, gemessen am direkten Duell. Der benannte Hebel ist
