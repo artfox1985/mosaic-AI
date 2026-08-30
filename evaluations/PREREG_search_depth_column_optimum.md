@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Gibt es fuer den Spaltenbau ein OPTIMUM mittlerer Suchtiefe -- baut b05 bei 150 Sims mehr volle Spalten als bei 400, und kostet das Spielstaerke? | Beleg: ANLASS 2026-08-30, ein Punktpaar aus VERSCHIEDENEN Modi (value-only@150 0,4425 gegen self-play@400 0,3375) plus der Sims-1-Kollaps (0,0075, par.3b.8 Stufe C). Nichts entschieden; Stufe 1 schliesst die Modus-Luecke, die Arena entscheidet Gewinn gegen Tausch. -->
+<!-- STATUS: OFFEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: WEITGEHEND BEANTWORTET 2026-08-30. PLATEAU 25-100 (~0,6 volle Spalten, frisch-seed-repliziert) gegen 0,34 ab 250 (par.2i). Der Gewinn ist ein TAUSCH: b05@25 verliert 11:29 (p=0,0117), b05@100 verliert 33:47 (n.s., KI knapp die Null) (par.2j). Faktor ist die TIEFE, nicht die Wurzelbreite (par.2k: 400/m6 = 0,3525). Offen nur noch der v21-Vergleich (haengt der Effekt am Prior?). -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -313,6 +313,40 @@ selbstverstaendlich besseres Trainingsmaterial -- genau darauf zielt
 der registrierte Gegeneinwand aus PREREG_v22_window par.4. Deshalb
 laeuft Teil 2 mit dem Kompromiss-Kandidaten 100 Sims (gleiche
 Spaltenrate wie 25, vierfaches Suchbudget).
+
+## par.2k STUFE 2c GEFAHREN: es ist die TIEFE, nicht die Breite
+
+Schluesselzelle (400 Sims, `MOSAIC_GUMBEL_TOP_M=6`, sonst identisch,
+200 Partien, Seed 20260902): **0,3525 +- 0,0317** (Punkte 39,72,
+init>=4 2,12).
+
+| | m=6 | m=25 |
+| --- | --- | --- |
+| Sims 100 | 0,6225 | (Gegenprobe laeuft) |
+| Sims 400 | **0,3525** | 0,3375 |
+
+**Verdikt: die Wurzelbreite erklaert den Effekt NICHT.** Bei 400 Sims
+liegt der Spaltenwert mit schmaler Wurzel (0,3525) praktisch auf dem
+mit breiter (0,3375); die Differenz ist ein halber Standardfehler.
+Entlang der Tiefe dagegen springt derselbe Wert bei gleicher Breite
+von 0,6225 (100) auf 0,3525 (400). **Der Befund heisst damit ab jetzt
+SUCHTIEFE, nicht mehr Suchbudget** -- die par.2c-Auflage ist erfuellt.
+
+**Praktische Folge: es gibt keine Abkuerzung.** Die Hoffnung, mit
+voller Tiefe und schmaler Wurzel Staerke UND Spalten zu bekommen, ist
+widerlegt; der in par.2j gemessene Handel bleibt bestehen.
+
+**Mechanische Lesart (Herleitung, konsistent mit Phase 0):** die
+Gumbel-Wurzelauswahl sortiert Kandidaten nach ihrem Q-Wert. Mehr
+Simulationen heissen stabilere Q-Werte und damit mehr Gewicht fuer den
+VALUE-Kopf gegenueber dem rohen Prior. Bei wenig Simulationen dominiert
+die Policy, die das Spaltenwissen traegt (Prior-Ratio 1,23); bei vielen
+dominiert der Value-Kopf, der den Plattenlohn um Faktor ~11 unterbietet
+(R5-Steigung 0,0886). **Die Suchtiefe ist damit faktisch ein Regler
+zwischen den beiden Koepfen -- und der Betriebspunkt 400 steht auf der
+Seite des defekten.** Das ist eine Deutung, kein Beleg; pruefbar waere
+sie ueber Stufe 2e (haengt der Effekt am Prior?) und ueber die
+Umkehrprobe nach einer erfolgreichen Phase 3 (kippt die Kurve?).
 
 ## par.3 Was dieser Strang NICHT ist
 
