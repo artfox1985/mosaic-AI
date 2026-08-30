@@ -10,6 +10,7 @@ Endzustand jeder Partie, KEIN Log-Regex.
 
 Aufruf:
     python -X utf8 tools/corpus_sanity_check.py <verzeichnis> [<verzeichnis2> ...]
+    python -X utf8 tools/corpus_sanity_check.py data --pattern 'selfplay_v22-b05-value-*.pkl'         --out evaluations/artifacts/corpus_sanity_v22b05_value.json
 """
 import glob, json, os, pickle, sys
 import pathlib as _pl
@@ -33,8 +34,21 @@ def ci(v):
     return 1.96 * sd / len(v) ** 0.5
 
 
-def auswerten(verzeichnis):
-    dateien = sorted(glob.glob(os.path.join(verzeichnis, "*.pkl")))
+def auswerten(verzeichnis, *, pattern="*.pkl"):
+    """Standard-Kennzahlen eines Korpus-Verzeichnisses.
+
+    `pattern` (2026-08-30) filtert INNERHALB des Verzeichnisses. Grund: die
+    v22-b05-Erzeugung legt drei KLASSEN nebeneinander in `data/`
+    (`selfplay_v22-b05-policy_*`, `-value-argmax_*`, `-value-sampled_*`), und
+    die Waechter aus PREREG_heuristic_v2_long_rows.md par.3b.12 gelten je
+    Klasse. Der Bestandsweg dafuer war `stage_arm` in
+    tools/probes/implicit_minimax_selfplay_corpus_eval.py -- eine KOPIE der
+    Arm-Dateien in ein eigenes Verzeichnis; bei 600 Dateien a 2,2 MB waeren
+    das rund 1,3 GB Kopie fuer eine reine Leseauswertung. Keyword-only und
+    mit Default `*.pkl`, damit der vorhandene Aufrufer (ebendieser
+    stage_arm-Pfad) unveraendert weiterlaeuft.
+    """
+    files = sorted(glob.glob(os.path.join(verzeichnis, pattern)))
     partien = {}       # game_id -> letzter Record
     # (game_id, spieler) -> Summe der groessten Strafleisten-Laenge JE RUNDE.
     # ACHTUNG, Fehler vom 2026-08-26: erst stand hier ein Dict mit dem Schluessel
@@ -43,7 +57,7 @@ def auswerten(verzeichnis):
     # unauffaellig, bei 24.000 laeuft es Stunden. Jetzt wird direkt auf die
     # (Partie, Seite) aggregiert und die Runde nur im Zwischenspeicher gehalten.
     floor_max = {}     # (game_id, spieler, runde) -> groesste Laenge, wird gleich aggregiert
-    for f in dateien:
+    for f in files:
         recs = load_records(f)
         for r in recs:
             gid = r.get("game_id")
@@ -94,8 +108,15 @@ def auswerten(verzeichnis):
     print(f"Partien: {partien_gesamt}   Seiten: {len(punkte)}")
     print(f"1) Reihenauslastung : volle Reihen {mw(zeilen_voll):.3f} +- {ci(zeilen_voll):.3f} "
           f"| mittlerer Fuellstand {mw(zeilen_fuell):.2f}/6")
+    # Waechter (b) aus PREREG_heuristic_v2_long_rows.md par.3b.12: nicht die
+    # RATE, sondern die EREIGNISZAHL -- wieviele Partien-Seiten ueberhaupt
+    # mindestens eine volle Spalte tragen (Schwelle 1.500 auf der
+    # Value-Klasse). Eine Rate ignoriert die Korpusgroesse, die Zahl nicht.
+    sides_with_full_column = sum(1 for x in sp_voll if x >= 1)
     print(f"2) Spaltenauslastung: volle Spalten {mw(sp_voll):.3f} +- {ci(sp_voll):.3f} "
           f"| >=4 {mw(sp_ge4):.2f} | >=3 {mw(sp_ge3):.2f} | hoechste {mw(sp_max):.2f}/6")
+    print(f"   Seiten mit >= 1 voller Spalte: {sides_with_full_column} "
+          f"von {len(sp_voll)}")
     print(f"3) Strafleiste      : {mw(floor_steine):.2f} +- {ci(floor_steine):.2f} Steine je Partie und Seite")
     print(f"5) Eigene Punkte    : {mw(punkte):.2f} +- {ci(punkte):.2f}")
     print(f"6) Margin           : {mw(margin):.2f} (per Konstruktion 0 im Mittel ueber beide Seiten)")
@@ -117,6 +138,7 @@ def auswerten(verzeichnis):
                 zeilen_voll_ci=ci(zeilen_voll), zeilen_fuell=mw(zeilen_fuell),
                 sp_voll_ci=ci(sp_voll), sp_ge4=mw(sp_ge4), sp_ge3=mw(sp_ge3),
                 sp_max=mw(sp_max), floor_ci=ci(floor_steine),
+                sides_with_full_column=sides_with_full_column,
                 punkte_ci=ci(punkte), margin=mw(margin),
                 platten={KRIT[i]: {"aktiv_in_partien": aktiv[i], "punkte": mw(platten[i]),
                                    "punkte_ci": ci(platten[i]),
@@ -126,14 +148,27 @@ def auswerten(verzeichnis):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        raise SystemExit("Aufruf: python -X utf8 tools/corpus_sanity_check.py <verzeichnis> ...")
+    import argparse
     import json
     import pathlib
     import time
 
+    ap = argparse.ArgumentParser(
+        description="Standard-Kennzahlen eines oder mehrerer Korpus-Verzeichnisse.")
+    ap.add_argument("verzeichnisse", nargs="+", help="Korpus-Verzeichnis(se)")
+    # Ein Muster JE Verzeichnis waere die allgemeinere Form, aber jeder heutige
+    # Anwendungsfall wertet EINE Klasse aus -- ein globales Muster reicht und
+    # bleibt in der Kommandozeile lesbar.
+    ap.add_argument("--pattern", default="*.pkl",
+                    help="Dateimuster INNERHALB der Verzeichnisse (Default *.pkl); "
+                         "z.B. 'selfplay_v22-b05-value-*.pkl' fuer eine Korpus-Klasse")
+    ap.add_argument("--out", default="evaluations/artifacts/corpus_sanity_check.json",
+                    help="Artefakt-Pfad; eigener Pfad je Klasse, sonst ueberschreiben "
+                         "sich zwei Laeufe gegenseitig")
+    args = ap.parse_args()
+
     t0 = time.time()
-    ergebnisse = [auswerten(v) for v in sys.argv[1:]]
+    ergebnisse = [auswerten(v, pattern=args.pattern) for v in args.verzeichnisse]
     wand = time.time() - t0
     print(f"\nLaufzeit {wand:.1f} s")
 
@@ -144,13 +179,14 @@ if __name__ == "__main__":
                         "cpu_s": round(time.process_time(), 1),
                         "threads": 1,
                         "s_je_partie": None}}
-    ziel = pathlib.Path("evaluations/artifacts/corpus_sanity_check.json")
-    ziel.parent.mkdir(parents=True, exist_ok=True)
+    erg["pattern"] = args.pattern
+    target = pathlib.Path(args.out)
+    target.parent.mkdir(parents=True, exist_ok=True)
     for _ in range(5):
         try:
-            ziel.write_text(json.dumps(erg, indent=2, ensure_ascii=False),
+            target.write_text(json.dumps(erg, indent=2, ensure_ascii=False),
                             encoding="utf-8", newline="\n")
-            print(f"Artefakt: {ziel}")
+            print(f"Artefakt: {target}")
             break
         except OSError as e:
             print("Retry:", e, flush=True)
