@@ -270,15 +270,17 @@ Aufnahme je Partie passen zwei Durchgänge (80 %), drei nicht (120 %).
 
 ### Die zweite Versorgung: Bonus-Chips
 
-**Es sind nur rund 20 Chips im ganzen Spiel** (`engine_manual.md`: 4 je Runde
-über 5 Runden), geteilt zwischen beiden Spielern, und **maximal 2 je Runde
-sind nehmbar**. Ein einzelner Spieler hält selten mehr als eine Handvoll.
+**Regellage** (normativ in `engine_manual.md:49-51`, `:104-106`, `:154-156`,
+hier nur als Prämisse): 20 Chips im ganzen Spiel, 4 je Runde; jeder Spieler
+nimmt **genau 2 je Runde, und zwar als PFLICHT**, nicht als Obergrenze. Eine
+fehlende Zelle kostet 2 farbgleiche oder 3 beliebige Chips.
 
-Die Vollendungsregel (`round_end.rs:487`, `greedy_chip_indices`): **2
-farbgleiche ODER 3 beliebige Chips JE fehlender Zelle**, formal
-`2*missing <= s <= 3*missing`. Der Rückfall auf die 3er-Variante geschieht
-automatisch, wenn keine zwei farbgleichen da sind – und die Regel deckt
-Mehrfeld-Füllung ab, nicht nur den Ein-Zellen-Fall.
+**Was daraus folgt**: der Vorrat für BEIDE Spieler zusammen liegt bei rund 20,
+ein einzelner hält selten mehr als eine Handvoll. Im Code fällt
+`greedy_chip_indices` (round_end.rs:487) automatisch auf die 3er-Variante
+zurück, wenn keine zwei farbgleichen da sind, und deckt Mehrfeld-Füllung ab
+(`2*missing <= s <= 3*missing`) – der Ein-Zellen-Fall ist nur der
+wahrscheinlichste, nicht der einzige.
 
 **Der Engpass ist damit nicht der Farbzufall, sondern der BESTAND zum
 Entscheidungszeitpunkt** (Herleitung der Quelle, ausdrücklich ungemessen): der
