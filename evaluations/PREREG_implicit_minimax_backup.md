@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: GEBAUT + ABGENOMMEN 2026-08-23 (par.1a). Arena par.2b: kein Staerkeverlust, Score +2,77 signifikant, k1 9,0 auf 16,0 Prozent -- aber par.2c zeigt den Effekt als GEGNERSPEZIFISCH (netz-gegen-netz Paritaet). Fuer die v22-ERZEUGUNG wirkungslos (par.3); fuer das v22-SELF-PLAY ein WECKER: Gating VOR dem Start, sonst Entscheid per Default 0,0 (par.3a). Kein Bau noetig. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Hebt eine Implicit-Minimax-Beimischung im Backup (Q = (1-alpha)*Q_MC + alpha*v_minimax, alpha~0,2) die Ausdrucksfaehigkeit langer Linien in unserer Gumbel-Suche -- messbar an k1-Baurate und Staerke? | Beleg: Gebaut und abgenommen (par.1a); Arena-Erfolg gegen die Heuristik (par.2b) als GEGNERSPEZIFISCH widerlegt (par.2c). Der Self-Play-Arm ist am 2026-08-30 gefahren und NEGATIV: alpha 0,2 senkt die Zustandsabdeckung (Verhaeltnis 0,990, beide Seeds gleichgerichtet) und laesst die Zielschaerfe praktisch unbewegt (Entropie 0,2670 auf 0,2647). ENTSCHEID fuer die v22-b05-Erzeugung: alpha 0,0 (par.3b). -->
 
 # PREREG-SKELETT: Implicit-Minimax-Backup als Laufzeit-Knopf
 
@@ -228,3 +228,59 @@ bekommt mit hoher Wahrscheinlichkeit eine Null, die nichts bedeutet.
 `net_self_play_games` pro Seite ueber `models/<name>.spec.json`
 ueberschreibbar (Knopf-Registry, `MOSAIC_IMPLICIT_MINIMAX_A`). Der Arm kostet
 eine Konfigurationsdatei und die Partien.
+
+### par.3b ERGEBNIS SELF-PLAY-ARM + ENTSCHEID (2026-08-30, Nachtprogramm; Artefakt `evaluations/artifacts/implicit_minimax_gating_b05.json`, Werkzeug `tools/probes/implicit_minimax_selfplay_corpus_eval.py`)
+
+**Anordnung.** Je Arm 200 Partien Self-Play von `alphazero_v22-b05.onnx`
+@400 Sims mit Root-Noise, aufgeteilt auf die zwei Seeds 20260910 und 20260911
+(je 100) -- dieselben Seeds in BEIDEN Armen, damit die Startbedingungen je
+Spielindex gepaart sind und der Seed nicht mit dem Arm verwechselt werden
+kann. Der Knopf kam ueber `models/champion_frozen.spec.json` (alpha 0,0) und
+`models/champion_imm_a02.spec.json` (alpha 0,2) an den Lauf, also auf dem in
+par.3a verlangten Weg und nicht per Umgebungsvariable. Partienzahl und Seeds
+nennt par.3a nicht; sie sind als Annahme des Nachtprogramms ausgewiesen
+(Kochrezept N1.2).
+
+**Zwei Dinge mussten dafuer gebaut werden**, beide additiv und im Default
+byte-identisch: `self_play.py --spec` (die pyo3-Seite nahm `spec` seit Welle 1,
+der Treiber reichte es nicht durch -- der registrierte Weg war vom Repo aus
+nicht fahrbar), und `spec`/`pcr_*`/`seed_positions` im Lauf-Manifest. Dass der
+Knopf ankommt, ist belegt statt angenommen: gleicher Seed 777,
+`--no-root-noise --deterministic`, 336 Zuege bei alpha 0,0 gegen 326 bei 0,2.
+
+**Ergebnis, je Arm 200 Partien / rund 32.200 Records mit Policy-Ziel:**
+
+| Groesse | alpha 0,0 | alpha 0,2 |
+| --- | --- | --- |
+| distinkte (Runde, Brettmaske) | 3.087 | 3.057 (Verhaeltnis 0,990) |
+| distinkte je Record | 0,0957 | 0,0949 |
+| distinkte Endbretter (von 400 Seiten) | 220 | 220 |
+| Top-1-Masse des Policy-Ziels | 0,8992 | 0,9010 |
+| Entropie des Policy-Ziels | 0,2670 | 0,2647 |
+| effektiver Traeger | 1,558 | 1,546 |
+
+Beide Seeds zeigen dieselbe Richtung (Zustands-Verhaeltnis 0,985 und 0,995),
+die Bewegung ist also kein Seed-Ausreisser -- aber sie ist auch kein Gewinn:
+die Zustandsabdeckung faellt leicht, die Zielschaerfe bewegt sich um 0,2 bis
+0,9 Prozent relativ, und die Zahl distinkter Endbretter ist auf beiden Seiten
+gleich. Beilaeufig, nicht das Kriterium: volle Spalten je Partie und Seite
+0,0825 gegen 0,0500 und eigene Punkte 18,89 gegen 18,00, beides zuungunsten
+von alpha 0,2.
+
+**ENTSCHEID: alpha 0,0 fuer die v22-b05-Erzeugung.** Das registrierte Mass
+(par.3a: Zielschaerfe UND Zustandsabdeckung) zeigt auf keiner der beiden
+Haelften eine Verbesserung; die Abdeckung geht in beiden Seeds zurueck. Die
+Rueckfall-Regel aus `PREREG_v23_window.md` par.4c ("ohne auswertbares Ergebnis
+bleibt der Default 0,0") haette dasselbe ergeben -- hier ist es aber ein
+gemessener Entscheid, kein Verfall.
+
+**Was NICHT gemessen ist:** das dritte Glied der par.3a-Kette, die
+Orakelmetriken an einem aus dem jeweiligen Korpus trainierten Netz. Das
+braeuchte zwei Trainingslaeufe auf Vollkorpora. Wer den Knopf spaeter wieder
+aufmacht, faengt dort an, nicht bei einer Wiederholung dieser Messung.
+
+**Erzeugte Messdaten** (Loeschkandidaten, nichts davon gehoert ins
+v23-Fenster): `data/selfplay_imxb05a00_s1*.pkl` und
+`data/selfplay_imxb05a02_s1*.pkl`, je 10 Dateien a 200 Partien, zusammen rund
+40 MB, plus die vier `data/manifest_imxb05a0*.json`. Beim Fensterbau per
+`MOSAIC_DATA_EXCLUDE` auf `selfplay_imxb05` ausschliessen.

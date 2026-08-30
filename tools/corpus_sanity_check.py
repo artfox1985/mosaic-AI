@@ -107,8 +107,22 @@ def auswerten(verzeichnis):
         anteil = 100.0 * sum(1 for x in v if x > 0) / len(v)
         print(f"     {KRIT[i]:18s} aktiv in {aktiv[i]:4d} Partien | "
               f"{mw(v):+7.2f} +- {ci(v):.2f} Pkt | mit Ertrag > 0: {anteil:5.1f} %")
+    # Die vier Bestandsfelder bleiben unveraendert (Aufrufer haengen daran);
+    # der Rest kommt DAZU, weil die Funktion ihn ohnehin ausrechnet und bisher
+    # nur druckte -- ein Artefakt mit vier von sechs Standard-Kennzahlen ist
+    # kein Beleg, sondern eine Erinnerungsstuetze.
     return dict(zeilen_voll=mw(zeilen_voll), sp_voll=mw(sp_voll),
-                floor=mw(floor_steine), punkte=mw(punkte))
+                floor=mw(floor_steine), punkte=mw(punkte),
+                verzeichnis=verzeichnis, partien=partien_gesamt, seiten=len(punkte),
+                zeilen_voll_ci=ci(zeilen_voll), zeilen_fuell=mw(zeilen_fuell),
+                sp_voll_ci=ci(sp_voll), sp_ge4=mw(sp_ge4), sp_ge3=mw(sp_ge3),
+                sp_max=mw(sp_max), floor_ci=ci(floor_steine),
+                punkte_ci=ci(punkte), margin=mw(margin),
+                platten={KRIT[i]: {"aktiv_in_partien": aktiv[i], "punkte": mw(platten[i]),
+                                   "punkte_ci": ci(platten[i]),
+                                   "anteil_ertrag_positiv":
+                                       100.0 * sum(1 for x in platten[i] if x > 0) / len(platten[i])}
+                         for i in range(8) if platten[i]})
 
 
 if __name__ == "__main__":

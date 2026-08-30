@@ -196,6 +196,25 @@ startet der Koordinator die v22-b05-Erzeugung (4.000 Sockel @400 +
 8.000 Schwarm --value-only, Seeds 20260901/20260902). VOR dem
 v23-Training bindend: par.3b.12-Waechter + Arm K + Moon-Gewicht-Flag.
 
+**N1 ERLEDIGT -- implicit Minimax bleibt AUS (2026-08-30, Artefakt
+evaluations/artifacts/implicit_minimax_gating_b05.json).** Je 200 Partien
+b05@400 mit Root-Noise, gepaart auf den Seeds 20260910/20260911, Knopf per
+spec.json. Das registrierte Mass (Minimax-Prereg par.3a) bewegt sich nicht
+zugunsten von alpha 0,2: Zustandsabdeckung 3.087 auf 3.057 distinkte
+(Runde, Brettmaske), Entropie des Policy-Ziels 0,2670 auf 0,2647, distinkte
+Endbretter 220 zu 220. ENTSCHEID alpha 0,0 (par.3b), gemessen statt
+verfallen.
+
+**WARNUNG AUS DEMSELBEN LAUF, betrifft den Erzeugungs-Zuschnitt:** der
+Kontroll-Arm IST die geplante Sockel-Konfiguration (b05@400, Root-Noise,
+Sampling), und er baut **0,0825 +- 0,028 volle Spalten je Partie und Seite**
+(200 Partien, tools/corpus_sanity_check.py). Der par.3b.12-Waechter (a)
+verlangt nach der Erzeugung **>= 0,17** -- die Vorschau liegt bei 49 Prozent
+davon, obere KI-Grenze 0,11. Das ist genau der Fall "Einbruch UNTER die
+Haelfte", den der Waechter mit STOPP beantwortet. Die Zahl stammt aus 200
+statt 4.000 Partien und ist kein Waechter-Urteil, aber der Koordinator sollte
+sie kennen, BEVOR er 15 Stunden Erzeugung startet.
+
 **PHASE 1 -- Vor-Self-Play-Pflichtenheft (Entscheide + kleine
 Laeufe; die Fristen verfallen mit dem Generierungsstart):**
 (1.1) MOON-KOPF-ENTSCHEID (billigster Posten ueberhaupt): das

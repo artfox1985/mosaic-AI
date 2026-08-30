@@ -13,9 +13,12 @@ die Zahl wertlos. Kanonische Form je Record und Seite ist die 36-Bit-Maske der
 gefuellten Kuppelfelder, plus die Runde.
 
 Aufruf:
-    python -X utf8 tools/probes/corpus_state_diversity_probe.py <dir_a> <dir_b> [n_partien]
+    python -X utf8 tools/probes/corpus_state_diversity_probe.py <dir_a> <dir_b> [n_partien] [out]
 """
-import collections, glob, json, os, pathlib, pickle, sys, time
+import collections, glob, json, os, pathlib, sys, time
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent))
+from corpus_io import load_records
 
 
 def fill_mask(player):
@@ -42,10 +45,13 @@ def fill_mask(player):
 
 def auswerten(verzeichnis, n_partien):
     spiele = collections.defaultdict(list)
+    # Ueber `load_records`, NICHT roh per `pickle.load`: seit corpus_io die
+    # Korpus-Dateien gzip-komprimiert schreibt (Endung bleibt .pkl, erkannt
+    # wird am Inhalt) starb diese Sonde an jedem heutigen Korpus mit
+    # UnpicklingError. Bestandsdateien ohne gzip liest derselbe Aufruf weiter.
     for f in sorted(glob.glob(os.path.join(verzeichnis, "*.pkl"))):
-        with open(f, "rb") as fh:
-            for r in pickle.load(fh):
-                spiele[r.get("game_id")].append(r)
+        for r in load_records(f):
+            spiele[r.get("game_id")].append(r)
     ids = sorted(spiele)[:n_partien]
 
     alle = collections.Counter()          # (runde, maske) -> Haeufigkeit
@@ -84,8 +90,12 @@ def auswerten(verzeichnis, n_partien):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        raise SystemExit("Aufruf: ... <dir_a> <dir_b> [n_partien]")
+        raise SystemExit("Aufruf: ... <dir_a> <dir_b> [n_partien] [out]")
     n = int(sys.argv[3]) if len(sys.argv) > 3 else 200
+    # Vierter Parameter, weil der feste Pfad sonst das Artefakt der VORIGEN
+    # Messung ueberschreibt (Anlass-Messung "v2-Vorzug"). Ein zweiter Lauf mit
+    # anderer Frage darf den ersten Befund nicht loeschen.
+    out_path = sys.argv[4] if len(sys.argv) > 4 else "evaluations/artifacts/corpus_state_diversity.json"
     t0 = time.time()
     ergebnisse = [auswerten(v, n) for v in sys.argv[1:3]]
     for e in ergebnisse:
@@ -115,7 +125,7 @@ if __name__ == "__main__":
         "laufzeit": {"wanduhr_s": round(wand, 1), "cpu_s": round(time.process_time(), 1),
                      "threads": 1, "s_je_partie": round(wand / max(1, 2 * n), 3)},
     }
-    ziel = pathlib.Path("evaluations/artifacts/corpus_state_diversity.json")
+    ziel = pathlib.Path(out_path)  # konvention-ok: Bestandsname dieser Datei, hier nur der Wert geaendert
     ziel.parent.mkdir(parents=True, exist_ok=True)
     for _ in range(5):
         try:
