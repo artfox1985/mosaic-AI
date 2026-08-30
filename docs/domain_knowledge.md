@@ -172,6 +172,41 @@ Spaltenabschluss zieht, kassiert beide Währungen.
 
 ---
 
+### Wie oft ein Kriterium ueberhaupt erreicht wird
+
+**Die Plattenziehung ist bias-frei** (`tools/scoring_tile_distribution.py`,
+kompletter v16-Korpus, 600 Dateien = 6.000 Spiele): jede der 8 Platten liegt
+in **37,0-37,9 %** der Partien im Spiel (Erwartung 3/8 = 37,5 %), je
+Ausschlusspaar kommt jede Seite in 49,7-50,5 % in den Pool, alle 32 moeglichen
+3er-Kombinationen treten auf, 0 Ausschluss-Konflikte. Fuer jede
+Erwartungswert-Rechnung heisst das: **ein Kriterium kostet oder zahlt nur in
+gut einem Drittel der Partien.**
+
+**Erreichungsraten im Normalspiel.** Zwei Erhebungen mit VERSCHIEDENEN
+Nennern, deshalb getrennt zu lesen:
+
+| Kriterium | je Partie mind. 1x (Arm A, 3.000 Partien) | je Atom (b19_best, 1.500 Partien) |
+|---|---|---|
+| k0 Zeilen voll | 764 (25 %) | 4,278 % |
+| k1 Spalten voll | 95 (**3,2 %**) | **0,517 %** |
+| k2 Diagonalen | 11 (0,4 %) | 0,117 % (nur 7 Positive) |
+| k3 alle Joker | 1.193 (40 %) | 39,800 % |
+| k5 Ecken (3er) | 2.786 (93 %) | 26,650 % |
+| k5 Ecken (8er) | 6 (**0,2 %**) | – |
+| k6 offene Spezialfelder | 3,72 je Partie | – |
+| k7 farbenreiche Reihen | 191 (6 %) | 1,017 % |
+
+Quellen: `PREREG_ownership_corpus.md` §8 (Deckungsbericht Arm A, Seite p0,
+p0/p1 nahezu symmetrisch) und `archive/history.md` (Runde-3-Zustaende,
+3.000 Bretter). **Die beiden Spalten sind konsistent**: 6 Spalten je Brett mal
+0,517 % ergibt rund 3,1 % Bretter mit mindestens einer -- gemessen 3,2 %.
+
+**Vorbehalt, der nicht weggelassen werden darf**: beide Erhebungen laufen auf
+Netzen, die die Wertungsplatten nicht beruecksichtigen. Das ist der IST-Zustand
+plattenblinden Spiels, **keine Koennensgrenze** -- der `hv2`-Lehrer erreicht
+0,73-0,798 volle Spalten je Partie gegen die 0,086-0,10 des Champions. Zur
+Einordnung siehe „Nie auf plattenblindes Spiel eichen" in `working_rules.md`.
+
 ## 4. Versorgung — die harten Zahlen
 
 Aus dem Code, nicht geschätzt (`tile.rs`, `state.rs`, `board.rs`):
@@ -311,6 +346,52 @@ Runde, das innerhalb einer Runde schwankt), und die Zeilen-n der Log-Reihe
 schwanken zwischen 14 und 22, weil nicht in jeder Runde eine Punktezeile je
 Spieler faellt. Die Groessenordnung traegt, die zweite Stelle nicht.
 
+
+## 6. Strafleiste
+
+**Regel** (`engine_manual.md:38`, `:161-163`): 4 Slots, die **-1, -2, -3, -4**
+je belegtem Slot zahlen; der Startspielerstein kostet weitere **-2**. Der
+Gesamtpunktestand kann durch Strafen **nie unter 0** fallen -- die Klammer gilt
+bei jeder Abrechnung gegen den laufenden Stand.
+
+**Beide Wege auf die Leiste sind regelseitig dieselbe Sache**
+(`engine_manual.md` Z.110-113): Steine, die nicht mehr in die gewaehlte
+Musterreihe passen, fallen darauf; sie dort freiwillig abzulegen ist ebenfalls
+erlaubt. **Es gibt keine Regel, die zwischen „abgeladen" und „uebergelaufen"
+unterscheidet** -- oekonomisch sind die Kanaele identisch
+(`PREREG_floor_action_aversion.md` par.2).
+
+**Groessenordnung** (407 identische gepaarte Partien, Block-Ebene,
+`tools/probes/penalty_track_probe.py`):
+
+| je Partie | Champion | Heuristik |
+|---|---|---|
+| Strafpunkte | **16,91** | **19,59** |
+| abgeladene Steine (Ziel = Strafleiste) | 2,88 | 6,38 |
+| Überlauf-Steine | 2,21 | 1,78 |
+| Runden mit Strafe | 4,25 | 3,81 |
+
+Bei einem Niveau von rund 47-55 eigenen Punkten frisst die Leiste damit etwa
+ein Drittel des Bruttoscores. **Sie ist der groesste einzelne Abzugsposten des
+Spiels** und war bis 2026-08-30 in diesem Dokument nur in Strategie-Prosa
+vertreten.
+
+**Auslastung** (600 Partien, 97.970 Entscheidungsschritte, `selfplay_v20wdlsw_*`,
+CI 95 %): ein reiner Strafleisten-Zug ist TOP-Aktion in **4,40 ± 0,19**
+Schritten je Partie -- davon **3,31 erzwungen** (keine legale Reihe) und nur
+**1,09 freiwillig**. Eine Reihe MIT Überlauf ist TOP-Aktion in **5,51 ± 0,21**
+Schritten (6,17 übergelaufene Steine je Partie). Bezogen auf die 89,08
+Schritte je Partie, in denen überhaupt ein Stein-Zug angeboten wird, sind das
+4,9 % bzw. 6,2 %, zusammen rund **11 % aller Stein-Entscheidungen**.
+
+**Folge für Aktionsfilter**: ein harter Filter „Strafleisten-Ziel und Überlauf
+raus" wäre nicht wirkungslos, er träfe rund 11 % der Entscheidungen. Drei
+Viertel der Strafleisten-Fälle sind allerdings erzwungen und müssten ohnehin
+stehen bleiben.
+
+**Verhaltensbefund, nicht Spielstruktur**: der Champion meidet die AKTION
+massiv (2,88 gegen 6,38 abgeladene Steine) und die KONSEQUENZ gar nicht
+(nur 2,68 Strafpunkte weniger, bei mehr Überlauf und mehr Runden mit Strafe).
 
 ## Spielstrategie aus Nutzer-Praxis (2026-08-13, woertlich aufgenommen)
 
