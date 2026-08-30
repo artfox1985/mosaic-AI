@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (Nutzer 2026-08-25), nichts erzeugt -- das v22-Netz existiert noch nicht. Form 29.450 Partien, neu besetzt aus v22-Self-Play und hv2-Lehrerkorpus; daraus folgt der Umfang des v22-Self-Play: 12.000 Partien (par.1/par.2). RAM unkritisch, Traegerfrage entschieden, Traeger-Manifest-Generator seit 2026-08-29 rekonstruiert (tools/generate_carrier_manifest.py). WECKER-ABARBEITUNG registriert (par.4c, 2026-08-30): alle par.4-Entscheide bewusst gefallen, zwei Messungen laufen im Nachtprogramm; Erzeugung startet danach (Generator v22-b05, Tor-Revision Lehrer-Prereg par.3b.12). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (par.1/par.2, Nutzer 2026-08-25): Form 29.450 Partien, davon 12.000 v22-Self-Play. Rollen-Zuschnitt D und Betriebspunkt 100 Sims entschieden (Lehrer-Prereg par.3b.12); ERZEUGUNG LAEUFT seit 2026-08-30 (Generator v22-b05, drei Klassen). Wecker par.4c abgearbeitet, Arm K gebaut mit Default aus (par.4a2). Offen: Waechter nach der Erzeugung, dann Fensterbau. -->
 
 # Vorregistrierung: v23-Fenster
 
@@ -230,6 +230,15 @@ ein Konsument Absolutwerte des Value-Kopfs liest (risikosensitive
 Blatt-Utility, Kalibrierungs-Schwellen). Grund der Platzierung: die
 Transformation wirkt beim Labeln, und ein unkorrigierter Versatz vererbt
 sich per Bootstrap in die naechste Generation.
+
+**GEBAUT 2026-08-30, Default AUS** (Registrierung und Begruendung der
+gewaehlten Form in `PREREG_heuristic_v2_long_rows.md` par.3b.3, Abschnitt
+"ARM K GEBAUT"): Knopf `MOSAIC_BOOTSTRAP_COHERENCE=sum1`, Summen-Normierung
+der beiden Bootstrap-Werte vor dem TD-Blend, Cache-Key-Komponente in beiden
+Namensraeumen, Manifest-Feld `bootstrap_coherence`, Abnahmesonde
+`tools/probes/bootstrap_coherence_probe.py` (Lauf steht aus, Maschine ist
+bis zum Erzeugungsende belegt). Damit ist der Wecker BAUSEITIG erledigt;
+offen bleibt nur der Arm-Entscheid (mit oder ohne) fuer das v23-Training.
 
 ## par.4b Wecker NACH dem v23-Training
 

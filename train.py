@@ -160,7 +160,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "engine" / "py"))
 from train_manifest import (policy_carrier_report, corpus_composition,
                             write_train_manifest, append_train_cache_file,
                             _SELFPLAY_FILENAME_RE)
-from corpus_dataset import MosaicDataset
+from corpus_dataset import MosaicDataset, _bootstrap_coherence_mode
 from neural_net import (
     MosaicNet, Mosaic2DNet, TD_LAMBDA, POLICY_TARGET_SHARPEN_EXPONENT,
     VALUE_SCHEMA_VERSION, encoder_from_state_dict, VALUE_HEAD_VARIANTS,
@@ -1182,6 +1182,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # rein dokumentierend, kein Verhalten haengt daran.
         "ignore_policy_target_valid":
             _os.environ.get("MOSAIC_IGNORE_POLICY_TARGET_VALID") == "1",
+        # Arm K (MOSAIC_BOOTSTRAP_COHERENCE, PREREG_heuristic_v2_long_rows.md
+        # par.3b.3): dieselbe Regel wie die Zeile darueber -- ein Knopf, der
+        # die ZIELDEFINITION aendert, gehoert ins Manifest und nicht nur in
+        # den Cache-Key. Aufgeloest ueber die EINE Quelle (corpus_dataset),
+        # damit Manifest und Labelbau nicht auseinanderlaufen koennen.
+        "bootstrap_coherence": _bootstrap_coherence_mode(),
     }
     # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
     # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf
