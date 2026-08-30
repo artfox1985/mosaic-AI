@@ -26,9 +26,14 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## UEBERGABE 2026-08-30 -- was als NAECHSTES zu tun ist
 
-**Der Erzeugungsbefehl steht startbereit** (nach dem v21-Vergleich, der
-als letzter Punkt des Suchtiefen-Strangs laeuft). Beide Klassen mit
-100 Sims, Stack-Draw-Knopf EIN, implicit-Minimax 0,0 (Default):
+**DIE ERZEUGUNG LAEUFT SEIT 2026-08-30 19:25** (Hintergrundlauf dieser
+Sitzung; Ausgabe in der Task-Datei, Fortschritt an den Dateien in
+`data/selfplay_v22-b05-*` ablesbar). Stand bei Sitzungsende: Arm 1
+(value-argmax) bei rund 400 von 6.000 Partien, 3,2 s je Partie,
+danach laufen die beiden anderen Klassen automatisch an. Gesamtdauer
+grob 10-11 h. **Wenn der Lauf abgebrochen ist, hier die Befehle zum
+Wiederaufsetzen** (fehlende Partien zaehlen, nicht hochrechnen -- das
+g-Suffix im Dateinamen traegt den Stand):
 
 ```
 export MOSAIC_STACK_DRAW_RESEARCH=1
@@ -37,21 +42,26 @@ python -u self_play.py --mode network --model models/alphazero_v22-b05.onnx --ga
 python -u self_play.py --mode network --model models/alphazero_v22-b05.onnx --games 4000 --sims 100 --version v22-b05-policy --threads 11 --chunk 10 --seed 20260901 --per-file 20
 ```
 
-Erwartete Dauer rund 14 h statt 42 h bei 400 Sims. Direkt nach dem
-Start: **Manifest-Diff-Pflicht** (night_run_20260830.md N4) und die
-**Knopf-Kontrolle an den Daten** (Records mit
-`choose_draw_stack_slot` in `valid_actions`; ohne Knopf sind es 0, mit
-Knopf ~5 Prozent -- der Knopf steht NICHT im Manifest). Parallel der
-Cache-Co-Bau (N4b), aber NICHT waehrend Arena-Messungen.
+**Beide Startpflichten sind ERLEDIGT** (2026-08-30): Manifest-Diff
+gegen die Referenz sauber (nur erwartete Abweichungen, engine_config
+unveraendert), und die Knopf-Kontrolle an den Daten bestanden -- 185
+von 3.584 Records tragen `choose_draw_stack_slot` in `valid_actions`
+(5,2 Prozent; ohne Knopf waeren es 0, denn der Knopf steht NICHT im
+Manifest). Der Cache-Co-Bau (N4b) ist derzeit GESTOPPT (wurde fuer die
+Arena-Messungen beendet) und kann jederzeit wieder gestartet werden:
+`PYTHONIOENCODING=utf-8 python -X utf8 -u tools/build_cache_incremental.py
+--encoder 2d --value-target-variant nortv --workers 2 --watch
+--wartezeit 60 --leerlauf-abbruch 60`. NICHT waehrend Arena-Messungen.
 
 **Aufraeumstand 2026-08-30:** die Messkorpora des Suchtiefen-Strangs
-sind geloescht (121 pkl + 13 Manifeste, Nutzer-Freigabe); in `data/`
-liegen nur noch `selfplay_hv2_*` (2.400, Fenster) und die
-`v21depth*`-Dateien des laufenden Vergleichs. **Die v21depth-Dateien
-sind ein MESSKORPUS und gehoeren NICHT ins Trainingsfenster** -- vor
-dem Training loeschen oder per `MOSAIC_DATA_EXCLUDE` ausschliessen
-(dieselbe Falle, die bei b05 zuschlug, als 600 Roh-Messpartien still
-mitliefen).
+sind geloescht (121 pkl + 13 Manifeste, Nutzer-Freigabe). In `data/`
+liegen jetzt `selfplay_hv2_*` (2.400, Fenster), die wachsenden
+`selfplay_v22-b05-*` (Erzeugung) und **60 `selfplay_v21depth*`-Dateien
+des ABGESCHLOSSENEN v21-Vergleichs -- die sind ein MESSKORPUS,
+gehoeren NICHT ins Trainingsfenster und koennen geloescht werden**
+(Nutzer: "kommen vor dem Trainingsstart raus"); sonst per
+`MOSAIC_DATA_EXCLUDE` ausschliessen (dieselbe Falle, die bei b05
+zuschlug, als 600 Roh-Messpartien still mitliefen).
 
 **VOR jedem Training bindend** (par.3b.12): Symmetrie-Trennung auf der
 Value-Klasse signifikant > 0 (primaer), >= 1.500 Partien-Seiten mit
@@ -66,11 +76,29 @@ nachlabeln. Die Hypothese dahinter erklaert auch, warum DAgger-Runde 2
 saettigte: alle bisherigen Runden liefen auf 400-Sims-Brettern, den
 spaltenaermsten.
 
-**Offen geblieben:** v21-Vergleich (laeuft/oder nachzuholen: v21@100
-gegen v21@250, je 600 Partien, beide mit Knopf -- haengt der
-Suchtiefen-Effekt am spaltenkundigen Prior?), die Erzeugung selbst, und
-danach Phase 3 (Betrags-Schiene) mit dem neuen Erfolgstest "kippt die
-Sims-Kurve?" (PREREG_r5_value_calibration, Nachtrag 2026-08-30).
+**Der Suchtiefen-Strang ist ABGESCHLOSSEN** (2026-08-30, alle Stufen
+ausser der optionalen Mechanismus-Zaehlung). Kurzfassung: Plateau
+25-100 Sims bei ~0,6 vollen Spalten gegen 0,34 ab 250, frisch-seed-
+repliziert; es ist die TIEFE, nicht die Wurzelbreite; es ist ein
+TAUSCH (@25 verliert 11:29, @100 verliert 33:47 n.s.); und der Effekt
+haengt am PRIOR -- bei v21 (plattenblind) tritt er nicht auf. **Die
+Erklaerung dafuer ist NOCH OFFEN:** meine Deutung "der Value-Kopf
+sieht Spalten nicht" ist durch die kriterienweise Zerlegung widerlegt
+(k1 ist am WENIGSTEN gedaempft, 0,1747 bei t 4,19). Zwei Hypothesen
+registriert (par.2n des Suchtiefen-Strangs): Skalenproblem (Spalten
+sind mit 7 Punkten das teuerste Kriterium, absolut also der groesste
+Verlust) oder Planungsproblem (mehrrundige Farbzusage, Nutzer-Lesart,
+gestuetzt von placement_side par.14). Beide pruefbar ueber Stufe 4:
+verwirft die Suche Policy-Top-1-Zuege, und sind die ueberproportional
+spaltenbauend?
+
+**OFFEN fuer die naechste Sitzung, nach Prioritaet:** (1) die
+Erzeugung ueberwachen und nach Abschluss die Waechter fahren; (2)
+v21depth-Dateien entfernen; (3) Arm K und Moon-Flag vor dem Training;
+(4) danach Phase 3 (Betrags-Schiene) mit dem neuen Erfolgstest "kippt
+die Sims-Kurve?" (PREREG_r5_value_calibration, Nachtrag 2026-08-30);
+(5) optional Stufe 4 des Suchtiefen-Strangs, die die offene Erklaerung
+entscheiden wuerde.
 
 ## DAS ZIEL (Leitstern)
 
