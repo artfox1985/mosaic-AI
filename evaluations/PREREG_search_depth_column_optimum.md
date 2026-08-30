@@ -419,6 +419,43 @@ Ende gemessen" -- neu waeren hier zwei Dinge, die Potentialform
 Bauform, RESEARCH_heuristic_methodology 4.6) und ein spaltenfaehiges
 Netz als Traeger.
 
+## par.2n BERICHTIGUNG der mechanischen Deutung (2026-08-30, nach der kriterienweisen Aufschluesselung)
+
+par.2k begruendet den Suchtiefen-Effekt damit, dass die Suche einem
+Value-Kopf folgt, der "den Plattenlohn um Faktor ~11 unterbietet". Die
+kriterienweise Zerlegung (PREREG_r5_value_calibration par.10, Auftrag
+des Nutzers) zeigt: **so stimmt das nicht.** Die Daempfung ist BREIT
+(alle acht Kriterien zwischen 0,00 und 0,29 gegen Soll ~1), und
+ausgerechnet **k1 (Spalten) ist am WENIGSTEN gedaempft** -- 0,1747
+(t 4,19), im Wechselwirkungstest ueber den uebrigen sieben, im
+annahmefreien Paar-Tausch 4->1 sogar 0,1996 bei t 12,08 (v21 dort
+0,0152). Der Kopf ist also **plattensensitiv-schwach, nicht
+spaltenblind**.
+
+**Was bestehen bleibt:** der Suchtiefen-Effekt selbst (gemessen) und
+seine Prior-Abhaengigkeit (v21-Kontrast, par.2l). **Was faellt:** die
+Begruendung "die Suche folgt einem Kopf, der Spalten nicht sieht".
+
+**Zwei Kandidaten-Erklaerungen, beide UNGEPRUEFT und als Hypothese
+markiert:**
+1. **Skalenproblem statt Blindheit.** Die Daempfung ist breit, aber
+   Spalten sind mit 7 Punkten das TEUERSTE Kriterium: bei Steigung
+   0,175 nimmt der Kopf davon 1,2 Punkte wahr statt 7 -- absolut der
+   groesste Verlust aller Kriterien, obwohl relativ der kleinste.
+   Gegen Kosten anderer Skala (Strafleiste, Sofortpunkte) verliert die
+   Spalte damit trotzdem.
+2. **Planungsproblem statt Bewertungsproblem** (Nutzer-Lesart, gestuetzt
+   von PREREG_placement_side par.14 "das Material war da, der Plan
+   nicht"): eine Spalte verlangt eine mehrrundige Farbzusage; tiefere
+   Suche findet mehr gleichwertig bewertete Alternativen, die den Plan
+   zerlegen, ohne dass eine einzelne Bewertung falsch waere. Dazu passt,
+   dass Ordnung (Tau +0,338), k1-Sensitivitaet und Mensch-Orakel alle
+   unauffaellig sind.
+
+Beide sind mit vorhandenen Mitteln pruefbar (Stufe 4 dieses Strangs:
+verwirft die Suche Policy-Top-1-Zuege, und sind die ueberproportional
+spaltenbauend?).
+
 ## par.3 Was dieser Strang NICHT ist
 
 * **Keine Wiederaufnahme der Q-Skalierungs-Familie** (geschlossen). Hier
