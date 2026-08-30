@@ -186,7 +186,32 @@ Registrierung; die Huellen-Richtwerte n=9 wandern bei einem Rerun
 entsprechend mit). Ausgang 0.1/0.2 entscheidet, ob Phase 3
 Ziel-Chirurgie braucht oder der Korpus die Ursache war.
 
-**NACHTPROGRAMM 2026-08-30 LAEUFT (Nutzer-Go "in der nacht gehoert die
+**NACHTPROGRAMM 2026-08-30 GEFAHREN -- ERZEUGUNG PER REGEL GESTOPPT,
+NUTZER-VORLAGE:** N1/N2 gemessen (implicit-Minimax AUS, Korpus-Masse
+ohne Gewinn; Stack-Draw-Kontrollfluss EIN, erstmals 100 Prozent
+gueltige Stapelzug-Policy-Ziele, Staerke +2,6 Punkte t 2,04). Dann der
+zentrale Nacht-Befund (par.3b.12-Nachtraege, fuenf Leiter-Arme a 200
+Partien): **jede fruehe Zug-Stochastik drueckt die Spalten-Vollendung
+des Generators auf 0,07-0,11 (Waechter verlangt 0,17); nur reines
+argmax haelt 0,3375.** Noise ist Nebentaeter (~0,03), das SAMPLING der
+fruehen Versorgungs-Zuege ist der Haupttaeter; Initiierung bleibt
+intakt, die Kette bricht. Der Blindstart haette 9,3 h in einen
+Waechter-Riss verbrannt.
+
+**VORLAGE (Nutzer-Entscheid, Sockel-Konfiguration der Generation 1):**
+(A) **Deterministischer Sockel** (argmax wie die DAgger-Korpora,
+Diversitaet aus 4.000 Partie-Seeds): maximale Spaltenlehre 0,34,
+Preis = keine Zug-Exploration (Verbesserungs-Signal kommt allein aus
+den Such-Posterioren je Zug). (B) **Misch-Sockel 50/50** (2.000 argmax
++ 2.000 ohne-Noise-Sampling): erwartet ~0,22 im Mittel, haelt den
+Waechter rechnerisch, behaelt Exploration -- MEINE EMPFEHLUNG als
+Einschaetzung markiert. (C) Design-Neufassung (Sockel klein +
+DAgger-Relabeling als Policy-Quelle o.ae.) -- teurer, neu zu
+registrieren. Schwarm folgt derselben Wahl. Alle Leiter-Korpora
+(5x200 Partien, Tags tlb05*/imxb05*/sdrb05*) sind Loeschkandidaten
+und beim Fensterbau auszuschliessen.
+
+**NACHTPROGRAMM 2026-08-30 LIEF (Nutzer-Go "in der nacht gehoert die
 maschine dir"):** Tor-Revision registriert (Lehrer-Prereg par.3b.12,
 Startbedingung 3/3 erfuellt, Korpus-Waechter bindend), Wecker-Liste
 komplett bewusst entschieden (PREREG_v23_window par.4c), Kochrezept in

@@ -2211,6 +2211,27 @@ der Morgen-Vorlage; sonst lautet die Vorlage auf den Zielkonflikt
 Exploration gegen Spaltenlehre (Optionen: deterministischer Sockel wie
 die DAgger-Korpora, Misch-Sockel, oder Waechter-Frage an den Nutzer).
 
+**ZWEITER DIAGNOSE-ARM GEFAHREN 04:17-04:43: 0,1025 +- 0,014 (Punkte
+25,98, init>=4 1,62) -- VERFEHLT. Endstand der Nacht-Leiter (volle
+Spalten je Partie+Seite, je 200 Partien, Waechter-Schwelle 0,17):**
+
+| Konfiguration | volle Spalten |
+| --- | --- |
+| Noise + Voll-Sampling (geplanter Sockel) | 0,0825 |
+| Noise + argmax ab 24 / ab 60 | 0,0775 / 0,0725 |
+| ohne Noise + Voll-Sampling | 0,1075 |
+| ohne Noise + Sampling nur 0-23 | 0,1025 |
+| ohne Noise + argmax (Instrument-Referenz) | **0,3375** |
+
+**Verdikt: JEDE gemessene fruehe Zug-Stochastik drueckt die Vollendung
+auf ~0,07-0,11; nur reines argmax haelt 0,34.** Die Initiierung bleibt
+dabei intakt (init>=4 1,4-1,6) -- es bricht die KETTE, nicht der
+Anfang; die Versorgungs-Entscheide der ersten Runden vertragen bei
+diesem Netz keine Abweichung von der argmax-Linie (konsistent mit
+par.3b.8). KEIN Sockel-Start per Regel; die Optionen (deterministischer
+Sockel / Misch-Sockel / Design-Neufassung) liegen als Nutzer-Vorlage
+in STATUS.
+
 **Erzeugungs-Zuschnitt (Wecker-Abarbeitung in PREREG_v23_window par.4c
 registriert):** 4.000 Sockel @400 Sims mit Root-Noise (Policy-Klasse) +
 8.000 Schwarm --value-only (v20-Konvention, cheap-sims 150); Dateiname
