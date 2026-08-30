@@ -208,6 +208,23 @@ einsatzbereit in night_run_20260830.md N4, dort nur `<150|400>` durch
 den gemessenen Betriebspunkt ersetzen. Der Policy-Sockel bleibt
 unabhaengig davon bei 400 Sims.
 
+**SUCHTIEFEN-STRANG WEITGEHEND BEANTWORTET 2026-08-30
+(PREREG_search_depth_column_optimum):** b05 baut bei 25-100 Sims
+~0,6 volle Spalten gegen 0,34 ab 250 (Plateau, frisch-seed-repliziert)
+-- aber es ist ein TAUSCH: @25 verliert 11:29 gegen @400 (p=0,0117),
+@100 verliert 33:47 (nicht signifikant, KI streift die Null). Faktor
+ist die SUCHTIEFE, nicht die Wurzelbreite (400 mit m=6 bleibt bei
+0,3525). Deutung: die Tiefe ist faktisch ein Regler zwischen Policy
+(traegt das Spaltenwissen) und Value-Kopf (unterbietet den Plattenlohn
+um Faktor 11) -- der Betriebspunkt 400 steht auf der Seite des
+defekten Kopfes. **NUTZER-ENTSCHEID: flaches Self-Play (100 Sims) fuer
+die Erzeugung, Stärkeverlust bewusst in Kauf genommen, um die Spalten
+in den Korpus zu bekommen; ergaenzbar durch einen spaeteren
+Zweitsockel mit hoeherer Tiefe.** Daraus die Arbeitsteilung
+(Nutzer 2026-08-30, registriert in PREREG_reanalyze_label_depth par.4a):
+flach spielen, POLICY per hv2-Lehrer relabeln (nicht per tiefer Suche
+-- die drueckt Spalten weg), VALUE tief nachlabeln.
+
 **ERZEUGUNG AUSGESETZT 2026-08-30 (Nutzer-Entscheid): erst
 PREREG_search_depth_column_optimum abschliessen.** Anlass: die
 Sims-Probe fuer den Schwarm fand bei 150 Sims 0,4425 volle Spalten --
