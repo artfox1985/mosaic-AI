@@ -77,6 +77,21 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   bei laufender Partie sind damit wieder unkritisch, solange der Server
   ohne diese Variable laeuft. Die oben genannte Fundstelle `server.py:1656`
   ist der Stand des Vorfalls und beschreibt nicht mehr den heutigen Code.
+- **Emoji-Fortschrittszeilen killen Hintergrundlaeufe auf cp1252**
+  (2026-08-30, `tools/build_cache_incremental.py --watch`; Schaden: der
+  Cache-Co-Bau der v22-b05-Erzeugung starb nach Sekunden, der erste
+  Produktionstest des Watch-Modus waere ohne Kontrolle ausgefallen).
+  `UnicodeEncodeError: 'charmap' codec can't encode character
+  '\U0001f4e6'` beim ERSTEN Fortschritts-print: im Hintergrundlauf ohne
+  `-X utf8` ist stdout cp1252, und die Werkzeuge dieses Projekts drucken
+  Emoji. Zwei Ausweege, beide gebaut: `PYTHONIOENCODING=utf-8` bzw.
+  `python -X utf8` beim Aufruf, UND dauerhaft
+  `sys.stdout.reconfigure(encoding="utf-8", errors="replace")` am
+  Modulanfang (in build_cache_incremental seit 2026-08-30). Wer ein neues
+  Werkzeug mit Emoji-Ausgabe schreibt, macht das gleich mit -- sonst
+  faellt es genau dann aus, wenn es unbeaufsichtigt laufen soll.
+  Verwandt, aber NICHT dasselbe: `subprocess text=True` dekodiert
+  EINGEHENDE Ausgabe als cp1252 (eigener Eintrag/Memory).
 - **Der Replayer raet die Chip-Auswahl -- und raet sich Partien kaputt**
   (2026-08-29, an `static/log/game_20260823_085652_seed546483.log`; Schaden:
   eine Mensch-Referenzpartie galt als unreplaybar, die Orakel-Messung lief
