@@ -68,6 +68,8 @@ wer eine Generation abschliesst, zieht diese Tabelle nach.
 Zuschnitt des v23-Fensters ist seit 2026-08-25 festgelegt
 (`PREREG_v23_window.md`): 29.450 Partien, davon 12.000 aus dem v22-Self-Play
 (4.000 Sockel + 8.000 Schwarm `--value-only`) und 17.450 aus hv2 (6.550
-rotieren aus). Offen dort (Stand 2026-08-28): der Traeger-Manifest-GENERATOR
-(Werkzeug fehlt) und die seed-bestimmte Wahl der 6.550 ausrotierenden
-Partien; die Traegerfrage selbst ist auf Arm B entschieden.
+rotieren aus). Offen dort (Stand 2026-08-30): die seed-bestimmte Wahl der 6.550
+ausrotierenden Partien; der Traeger-Manifest-GENERATOR ist seit
+2026-08-29 GEBAUT (`tools/generate_carrier_manifest.py`, geprueft
+2026-08-30) -- offen ist dort nur noch der konkrete v23-Aufruf.
+Die Traegerfrage selbst ist auf Arm B entschieden.

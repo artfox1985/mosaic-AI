@@ -69,7 +69,14 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   Sie wirkt erst nach einem MANUELLEN Serverneustart -- ob der noch laufende
   Waechter von 23:11 bis dahin weiter watcht, ist NICHT geprueft (waere nur
   durch eine absichtliche `.py`-Aenderung pruefbar, und die verbietet sich
-  bei laufender Partie). Bis zum manuellen Neustart gilt die Sperre weiter.
+  bei laufender Partie).
+  **Sperre aufgehoben am 2026-08-30, am Code geprueft:** `use_reloader`
+  haengt an `MOSAIC_SERVER_RELOAD == "1"` und geht so an `app.run`
+  (server.py:1775/1778) -- ohne die Variable ist der Reloader AUS. Der
+  manuelle Neustart ist am 2026-08-30 erfolgt (STATUS). `.py`-Aenderungen
+  bei laufender Partie sind damit wieder unkritisch, solange der Server
+  ohne diese Variable laeuft. Die oben genannte Fundstelle `server.py:1656`
+  ist der Stand des Vorfalls und beschreibt nicht mehr den heutigen Code.
 - **Der Replayer raet die Chip-Auswahl -- und raet sich Partien kaputt**
   (2026-08-29, an `static/log/game_20260823_085652_seed546483.log`; Schaden:
   eine Mensch-Referenzpartie galt als unreplaybar, die Orakel-Messung lief
@@ -190,3 +197,11 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   Datei-Groessen-Ratsche hat 10-mal die Basislinie neu gelegt und **null**
   Zerlegungen bewirkt; sie ist deshalb WARNUNG statt Blocker. Waechter an
   Ausloesungen-gegen-Wirkung messen, nicht am blossen Vorhandensein.
+- **Eine Herleitung aus dem Code ist eine Hypothese, kein Befund**
+  (2026-08-25; Schaden: vier Herleitungen lagen am selben Tag im VORZEICHEN
+  falsch, drei in der Parallelsitzung und eine hier). Der Fall hier: Kriterium
+  6 "startet bei -27" -- falsch, `special_empty` zaehlt nur Spezialfelder auf
+  bereits GELEGTEN Platten, das Konto startet bei 0. Die Code-Seite steht in
+  `architecture_reference.md`, Abschnitt "Konstanten mit Fallstrick"; hier
+  steht der Vorfall. Regel daraus: wer aus dem Code ableitet, markiert es als
+  Herleitung, bis eine Messung oder ein zweiter Leser sie bestaetigt.

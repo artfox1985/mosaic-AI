@@ -198,14 +198,35 @@ Aufnahme je Partie passen zwei Durchgänge (80 %), drei nicht (120 %).
 
 ## 5. Weitere gemessene Struktur
 
-- **Slot-Gradient der Spezialfelder**: in der unteren Slot-Reihe bleibt das
-  Spezialfeld in ~84 % der Partien leer, in der oberen in ~13 % — monoton, und
-  über zwei Generator-Ären deckungsgleich, also **Spielstruktur statt
-  Champion-Verhalten**. Zusammen mit Abschnitt 2 heißt das: die KI lässt die
-  **teuersten** Spezialfelder liegen (untere Reihe = 5–6 Punkte).
-  Nutzer-Taktik „keine Spezialkuppeln in Slot-Reihe 3" ist deshalb eine
-  ERWARTUNGSWERT-Aussage: hoher Wert, aber von den langsamsten Musterreihen
-  gefüttert.
+- **Slot-Gradient der Spezialfelder**: die Slot-Reihe hängt starr an den
+  Musterreihen, `pattern_row = slot_row * 2 + sp_idx / 2` (round_end.rs:361,
+  geprüft 2026-08-30). Obere Slots werden von den Musterreihen 1-2 gespeist,
+  mittlere von 3-4, untere von 5-6; der Trigger zahlt `pattern_row + 1`, also
+  1-2 oben und 5-6 unten. **Struktur ist diese Achse.** Die Leer-Raten darauf
+  sind REGIMEABHÄNGIG:
+
+  | Leer-Rate je Slot-Reihe | plattenblinde Netze (par.3) | hv2-Lehrer | v22-b06 |
+  | --- | --- | --- | --- |
+  | oben | ~0,13 | 0,499 | 0,535 |
+  | mitte | – | 0,833 | 0,819 |
+  | unten | ~0,84 | 0,807 | 0,881 |
+
+  **Berichtigt 2026-08-30.** Hier stand, der Gradient sei „monoton, und über
+  zwei Generator-Ären deckungsgleich, also Spielstruktur statt
+  Champion-Verhalten". Das Argument trägt nicht: BEIDE Ären waren
+  plattenblind, und Übereinstimmung zwischen zwei Agenten mit demselben
+  blinden Fleck belegt keine Spieleigenschaft. Die Neumessung am
+  spaltenkompetenten Lehrer hebt die obere Rate von ~0,13 auf 0,499 – er
+  tauscht kurze Reihen gegen lange, also schließen die oberen Slots seltener.
+  Quelle: `PREREG_special_tile_yield.md` par.7 (3.000 hv2-Partien, 200
+  b06-Partien).
+
+  **Was über alle drei Regime hält**: die untere Reihe bewegt sich kaum
+  (0,84 / 0,807 / 0,881). Die teuersten Spezialfelder bleiben in jedem bisher
+  gemessenen Regime der größte unabgeholte Posten. Zur Frage, wann man sie
+  meiden sollte und wann nicht, siehe Spielstrategie 8 (gilt nur bei aktivem
+  Kriterium 6).
+
 - **Startkuppel-Platzierung ist deterministisch** (`self_play.rs::choose_start_placement`):
   der Farb-Score ist positions- und rotationsunabhängig, der Eckbonus für alle
   vier Ecken identisch → immer Ecke (0,0), immer 0°. Position und Rotation sind
@@ -234,8 +255,8 @@ Aufnahme je Partie passen zwei Durchgänge (80 %), drei nicht (120 %).
   ZURÜCKGEZOGEN — der Korpus ist voll mit Chip-Abschlüssen (4,92 je Partie im
   v18-Korpus, 4,85 in frischen v19wdl-Sockeln). Die KI chippt im Self-Play
   routiniert.
-- **Mensch gegen Champion** (10 gewertete Partien, `watchlist_v20_interim_review.md`):
-  Mensch 7:3, Ø +14,5 Punkte. Größter Einzelposten sind die Spezialpunkte —
+- **Mensch gegen Champion v20** (10 gewertete Partien,
+  `watchlist_v20_interim_review.md`): Mensch 7:3, Ø +14,5 Punkte. Größter Einzelposten sind die Spezialpunkte —
   **10,3 gegen 1,3 je Partie**, also 9,0 der 14,5 Punkte Differenz. Die KI
   schaltet in **6 von 10** Partien kein einziges Spezialfeld frei, der Mensch in
   9 von 10 schon in Runde 2.
@@ -414,6 +435,12 @@ vermeiden. dann normaler spielaufbau um die strafpunkte auszugleichen. aber wenn
 die nahme der kuppelplatten priorisiert wird dann gibt es mehr strafpunkte beim
 gegner."*
 
+**GELTUNGSBEREICH (ergaenzt 2026-08-30, Nutzer-Bestaetigung): die drei Hebel
+gelten, WENN die Spezialfelder-Wertungsplatte (Kriterium 6) im Spiel ist.**
+Ohne sie kostet ein offenes Spezialfeld nichts, und die Rechnung dreht sich --
+siehe die Anmerkung an Hebel 2. Die Platte liegt nicht in jeder Partie: aus
+4 Ausschlusspaaren kommen 3 von 8 Platten ins Spiel.
+
 Kriterium 6 (-3 je offenem Spezialfeld) wird also nicht ueber Fliesen gespielt,
 sondern ueber die KUPPELWAHL -- drei Hebel:
 
@@ -424,6 +451,15 @@ sondern ueber die KUPPELWAHL -- drei Hebel:
    Nachbarzellen des Slots, und obere Slots haengen an den billigen Musterreihen
    (1-2 Kopien) -- oben schliesst ein Spezialfeld fast von selbst, unten (Reihen
    5-6, 5-6 Kopien) bleibt es offen und kostet.
+   **Nur unter Kriterium 6.** Nutzer-Korrektur 2026-08-25
+   (`PREREG_special_tile_yield.md` par.4a): *"die regel ist falsch"* /
+   *"ohne der spezialkuppel dort unten werden zwei spalten eher schwer"*. Ohne
+   k6 ist das Spezialfeld eine GRATISZELLE -- es entriegelt und fuellt sich in
+   derselben Aktion, sobald die drei Nachbarzellen stehen (round_end.rs:275/316),
+   ohne eigenen Zug und ohne Stein. In der unteren Slot-Reihe, wo die anderen
+   drei Zellen an den Musterreihen 5/6 haengen, ist es damit die BILLIGSTE der
+   sechs Zellen einer Spalte; wer die Platte dort vermeidet, macht die beiden
+   Spalten durch diesen Slot schwerer.
 3. **Kuppeldraft als Stoerung**: wer die Jokerkuppeln priorisiert wegnimmt,
    laesst dem Gegner die spezial-lastigen Platten -- dessen offene Spezialfelder
    werden zu SEINEN Strafpunkten. Zweiter Stoerkanal neben der Farbzaehlung

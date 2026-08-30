@@ -92,3 +92,29 @@ gefehlt: die Kanalzahl war beim Uebertrag ueberholt (siehe unten).
   Elo-Anker-Term und haengt NUR an der Heuristik; das Netz hat ihn nie
   bekommen. Nicht anfassen. Die parametrisierte Schwester daneben ist
   ABSICHTLICH eine eigene Funktion (Kommentar scoring.rs:186-194).
+
+## Env-Knoepfe: Fallstricke beim Lesen (aus STATUS herausgeloest 2026-08-30)
+
+- **SECHS Dialekte fuer "ist dieser Bool-Knopf an?"** (shaping.rs:999,
+  state.rs:209, tiling_solver.rs:374/386, net_mcts.rs:230): `X=true` schaltet
+  je nach Knopf AN oder AUS. Schadensbild: ein A/B-Arm laeuft still als
+  Kontrollarm. Geplanter Fix: ein `read_bool_env` neben `read_f64_env`,
+  ~18 Stellen.
+- **Drei stille Env-Verschlucker** -- `MOSAIC_INTERLEAVE_BATCH_MAX` ausser
+  Range (net_batcher.rs:249), `MOSAIC_R5_NODE_BUDGET=0` oder Tippfehler
+  (round5.rs:199), `MOSAIC_PLATTENKOPF_GAMES`-Parse (scoring.rs:1508): alle
+  fallen wortlos auf den Default. Schadensbild: die Messung glaubt Knopf X und
+  faehrt Default. Verwandt mit der Falle "Ein fehlendes Flag meldet sich nicht"
+  in `pitfalls.md`, aber anderer Mechanismus (Parse-Fehler statt fehlendem
+  Flag).
+- **Der Value-Spread-Pfad verkleinert bei eval-Fehlern still den Pool** und
+  liefert bei Serialisierungsfehler `"{}"` (self_play.rs:4607/4666).
+- **Zwei verschiedene `w`, zwei verschiedene Messungen** (Klarstellung
+  2026-08-27): das ROUTING-Gewicht der Huelle auf den Ownership-Marginalen im
+  Tiling-Loeser (Verbraucherseite) ist NICHT das Trainings-Loss-Gewicht
+  `OWNERSHIP_WEIGHT` / `--ownership-weight`.
+- **Das endgame-Ziel ist `root_q` in der R5-Drafting-Zone**
+  (corpus_dataset.py:1000-1012), und `root_q` schreibt nur der
+  `NetSelfPlayAgent` (self_play.rs:1324). Ein Heuristik-Korpus traegt es
+  strukturell nicht, die Maske ist dort komplett 0 -- **kein Bug**. Einmal als
+  solcher fehlgedeutet (Endgame-Loss 0,0000 in v22-b01/b02).
