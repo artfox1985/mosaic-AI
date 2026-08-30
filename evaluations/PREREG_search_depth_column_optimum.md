@@ -68,6 +68,40 @@ schwaechere Trajektorien". Mehr Vollendungen von einem schwaecher
 spielenden Erzeuger sind nicht automatisch besseres Material -- genau
 deshalb entscheidet die Arena (Stufe 3) und nicht die Spaltenrate.
 
+**Stufe 2c -- FAKTOREN-TRENNUNG Tiefe gegen Breite (registriert
+2026-08-30 auf Nutzer-Auftrag, VOR der Messung).** Anlass: mit `--sims`
+variiert gekoppelt die Wurzelbreite, weil `MOSAIC_GUMBEL_TOP_M` auf
+Default 0 steht und die Formel `m = sims/16` greift (Registratur;
+net_mcts.rs:2514) -- der Gipfel bei 100 Sims hat m=6, der 400er-Punkt
+m=25. Bis zur Trennung heisst der Befund SUCHBUDGET, nicht Suchtiefe.
+
+Vorab entschieden ist eines: das VERHAELTNIS scheidet als Erklaerung
+aus, weil die Formel Sims-je-Wurzelkind ueber alle Messpunkte bei ~16
+konstant haelt (100/6, 400/25, 50/3) -- eine Groesse, die nicht
+variiert, kann keinen Gipfel erzeugen.
+
+2x2 mit zwei bereits gemessenen Zellen, `MOSAIC_GUMBEL_TOP_M` explizit:
+
+| | m=6 | m=25 |
+| --- | --- | --- |
+| sims 100 | 0,6225 (gemessen) | NEU |
+| sims 400 | NEU | 0,3375 (gemessen) |
+
+*Lesart:* liegt (400, m=6) beim Gipfelwert, war es die BREITE; bleibt
+es beim 400er-Niveau, war es die TIEFE. (100, m=25) spiegelt das.
+*Benanntes Degenerationsrisiko:* (100, m=25) laesst nur 4 Simulationen
+je Wurzelkind -- Sequential Halving trennt dort kaum noch; ein Absturz
+dieser Zelle ist deshalb nicht eindeutig der Breite zuzuschreiben.
+(400, m=6) mit 66 je Kind ist die aussagekraeftigere Zelle.
+Umfang je Zelle 200 Partien, gleiche Seeds, sonst identisch.
+
+**Stufe 2d -- Aufloesung am Gipfel (Nutzer-Auftrag 2026-08-30, VOR dem
+v21-Vergleich):** ein Arm bei **75 Sims**, gleiche Anordnung. Grund: der
+Gipfel steht zwischen 50 (0,4825) und 150 (0,4425) mit 100 (0,6225) als
+einzigem hohen Punkt -- ein einzelner Messpunkt traegt einen Gipfel
+nicht. 75 prueft, ob die Flanke links vom Gipfel glatt ansteigt oder ob
+der 100er-Wert ein Ausreisser ist. Kosten ~13 min.
+
 **Stufe 3 -- der Haertetest (Arena, entscheidet Gewinn gegen Tausch).**
 Gepaarte Arena b05@Optimum gegen b05@400, `tools/paired_gating.py
 --no-promote-winner` (block-size 5 = Default), Seed 20260920.
