@@ -188,6 +188,33 @@ Nebenlast gefahrene Lauf markiert das in seinem `laufzeit`-Block, sonst
 wandern gebremste Zahlen als Planungsgroessen nach
 `../docs/measured_runtimes.md`.
 
+### 2.3c ABNAHME DER GENERATION v23 (Nutzer-Anweisung 2026-08-31)
+
+Wortlaut: *"mindestens genauso viel Affinitaet zum Spaltenbau wie v22-b05.
+Mehr nehm ich gern. Und muss v22-b05 besiegen. Gating Kriterien wie bei einem
+Spiel gegen den Champ. Trifft das fuer ein Modell der v23 Generation zu,
+koennen wir in die self plays fuer v24 gehen."*
+
+| Tor | Bezug v22-b05 | Zuschnitt |
+| --- | --- | --- |
+| **1: Siege** | Elo 1084 | gepaarte Arena, **Champion-Strenge**: n >= 150 Paare oder Replikation mit eigenem Seed. Ein SPRT-Fruehstopp darunter ist informativ, KEIN Tor-Ergebnis |
+| **2: Spalten** | **0,3375** volle Spalten je Partie+Seite | am REGISTRIERTEN argmax-Instrument (deterministisch, ohne Root-Noise, gleiche Sims wie die Referenz) -- nicht am Erzeugungs-Betriebspunkt |
+
+**Punktschaetzer entscheidet Tor 2:** liegt der Kandidat darunter, ist es
+gerissen, auch bei nicht signifikantem Abstand. Dann Vorlage mit beiden
+Zahlen samt Signifikanz.
+
+**Was das Bestehen freigibt:** das Self-Play fuer **v24**. Die Promotion zum
+Champion ist eine ANDERE Frage und faellt erst mit der Kante gegen
+v21_2d_brierbest (1215). Eine Linie darf mehrere Generationen ratschen, bevor
+sie den Champion einholt -- Verfahren in `../docs/generation_loop.md`.
+
+**Achtung beim Messen von Tor 2:** die Referenz 0,3375 stammt vom
+argmax-Instrument bei 400 Sims. Die Erzeugung lief bei 100 Sims und der
+Korpus zeigt dort 0,481 -- dieselbe Groesse liegt je nach Suchtiefe um mehr
+als das Doppelte auseinander. Kandidat und Referenz muessen am GLEICHEN
+Betriebspunkt gemessen werden, sonst misst das Tor die Sims-Zahl.
+
 ### 2.4 Tore und Messkette danach
 
 Verfahren: `../docs/generation_loop.md`. Fuer diesen Durchlauf ist der Bezug

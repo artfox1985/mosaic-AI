@@ -43,10 +43,17 @@ bis v22 wurde jeder Schritt einzeln entschieden.
 | 6. Spaltenprofil des Kandidaten | argmax-Instrument | **Tor 2** |
 | 7. Kante gegen den amtierenden Champion messen und berichten | `tools/paired_gating.py` / `tools/elo_tracker.py` | -- |
 | 8. Promotion, falls die Champion-Kante faellt | `promotion_checklist.md` | -- |
-| 9. Der beste Stand von N erzeugt Generation N+1 | zurueck zu 1 | -- |
+| 9. Self-Play fuer N+1 starten | `self_play.py` | **erst wenn Tor 1 UND Tor 2 halten** |
 
 Schritt 7 faellt IMMER an, auch wenn Schritt 8 ausbleibt: ohne ihn weiss die
 naechste Generation nicht, wie weit ihre Linie vom Champion entfernt ist.
+
+**Zwei Freigaben, die nicht verwechselt werden duerfen** (Nutzer-Anweisung
+2026-08-31): Tor 1 und Tor 2 geben die **naechste Generation** frei -- haelt
+ein Modell aus N beides, darf das Self-Play fuer N+1 starten. Die
+**Promotion** zum Champion ist davon unabhaengig und faellt erst, wenn die
+Kante gegen den amtierenden Champion faellt (Schritt 8). Eine Linie darf also
+mehrere Generationen ratschen, bevor sie den Champion einholt.
 
 ## Tor 0 -- traegt der Korpus das Signal?
 
@@ -68,12 +75,16 @@ Wortlaut und Herleitung: `PREREG_heuristic_v2_long_rows.md` par.3b.12
 gepaarten Arena, signifikant.** Instrument `tools/paired_gating.py` (SPRT,
 Blockgroesse 5 seit 2026-08-29).
 
-**Auflage, Praezedenz 2026-08-29:** ein SPRT-Fruehstopp unter 150 Paaren ist
-eine INFORMATIVE Messung, kein Promotionsentscheid. Fuer eine Promotion gilt
-n >= 150 Paare oder eine Replikation mit eigenem Seed. Grund: der Seed bewegt
-die Metrik in diesem Projekt 4- bis 6-mal staerker als jeder Knopf, und bei
-n=400 wurden 5,75 Prozentpunkte Streuung fuer IDENTISCHE Konfiguration
-gemessen.
+**IN CHAMPION-STRENGE (Nutzer-Anweisung 2026-08-31: "Gating Kriterien wie bei
+einem Spiel gegen den Champ").** Das Ratschen-Tor wird also NICHT lockerer
+gefahren, nur weil der Gegner aus der eigenen Linie kommt: ein
+SPRT-Fruehstopp unter 150 Paaren ist eine INFORMATIVE Messung und **kein
+Tor-Ergebnis**. Es gilt n >= 150 Paare oder eine Replikation mit eigenem
+Seed. Grund: der Seed bewegt die Metrik in diesem Projekt 4- bis 6-mal
+staerker als jeder Knopf, und bei n=400 wurden 5,75 Prozentpunkte Streuung
+fuer IDENTISCHE Konfiguration gemessen. Praezedenz ist die b05-Kante, die
+mit 25 Paaren fruehgestoppt hat und deshalb nur als informativ verbucht
+wurde.
 
 ## Tor 2 -- die Kampagnen-Groesse darf nicht fallen (das Richtungs-Tor)
 
@@ -84,7 +95,16 @@ wechselt die Kampagne ihr Ziel, wechselt die Groesse mit -- das Tor bleibt.
 
 **Den Bezugswert holt man sich, indem man die Vor-Generation am selben
 Instrument misst**, nicht aus dem Gedaechtnis und nicht aus einem Bericht mit
-anderem Betriebspunkt. Fuer die erste Generation einer neuen Linie gibt es
+anderem Betriebspunkt. Das ist keine Formalie: dieselbe Groesse liegt je nach
+Sims-Zahl um mehr als das Doppelte auseinander (25-100 Sims ~0,6 gegen 0,34
+ab 250).
+
+**"Mindestens genauso viel" ist der Punktschaetzer** (Nutzer-Anweisung
+2026-08-31: "mindestens genauso viel Affinitaet zum Spaltenbau wie der
+Vorgaenger. Mehr nehm ich gern."). Liegt der Kandidat darunter, ist das Tor
+gerissen -- auch wenn der Abstand nicht signifikant ist. Was dann passiert,
+steht unten: Vorlage mit beiden Zahlen samt Signifikanz, keine stille
+Promotion. Fuer die erste Generation einer neuen Linie gibt es
 keinen Vorgaenger: dann ist der Bezug der Gruendungswert, und er wird beim
 Start der Linie festgehalten.
 
