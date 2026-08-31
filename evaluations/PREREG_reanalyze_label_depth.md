@@ -151,6 +151,24 @@ relabelte Fenster wird ein gepaarter Arm darauf -- ein Faktor, identische
 Spiele. Das ist die Bauform, die diese Kampagne sonst nachtraeglich
 herzustellen versucht.
 
+**GEFAHREN 2026-08-31, Policy-Seite:** die Kopie liegt als
+`data/relabeled_v23/selfplay_v22-b05relab-policy_*` (200 Dateien, 4.000
+Partien, 404 MB). Ergebnis: **204.008 von 210.529 Draft-Entscheidungen
+relabelt, 0 Fehler, 0 nicht abbildbar**, 6.521 uebersprungen, weil der
+Lehrerzug kein Steinzug war (`type != "stone"`, also Stapel-/Sonderzuege --
+sie bleiben unveraendert stehen). 744 s mit 4 Workern, neben dem
+b01-Datenaufbau, also unter Nebenlast.
+
+**NUR die Policy-Klasse, nicht der Schwarm** -- eine Praezisierung gegenueber
+par.4b ("nur der NEUE Korpus"): das Traeger-Manifest listet die Value-Klasse
+nicht, ihre Policy-Ziele haben im Training Gewicht 0. Sie zu relabeln waere
+dreimal so teuer und am Training wirkungslos. Fuer den Schwarm ist das
+VALUE-Nachlabeln vorgesehen (Teil B), und das ist eine andere Operation.
+
+Damit liegen roher und relabelter Sockel auf DENSELBEN 4.000 Partien
+nebeneinander. Der Vergleich ist ein gepaarter Arm nach b01/b02, kein
+Bestandteil von b01.
+
 ## par.5 Abgleich mit dem Phasenplan (STATUS)
 
 * **Phase 2 (Generationen-Lauf) geht VOR** -- beide Teile brauchen den
