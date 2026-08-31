@@ -111,6 +111,26 @@ sobald der SPRT signifikant ausfaellt. Das waere eine stille Promotion gegen
 die eigene Regel gewesen (Champion ist v21; b01-gegen-b05 ist das
 Ratschen-Tor). Mit `--no-promote-winner` gefahren.
 
+## 1b2. ELO-KANTEN UND b02 (Stand 2026-08-31 abends)
+
+| Kante | Ergebnis | Lesart |
+| --- | --- | --- |
+| gegen **v22-b05** | 119:61 (zwei Seeds) | **signifikant** -- Tor 1 |
+| gegen **v21** (Champion) | 219:181, p = 0,084, KI [-0,013, +0,393] | **nicht belegt besser**, aber auf Augenhoehe. **v21 bleibt Champion** |
+| gegen **hv1** (Anker) | laeuft (nach der R5-Messung) | verankert die Linie |
+
+Rund **+33 Elo** ueber v21 als Punktschaetzer (Herleitung aus 54,75 Prozent).
+Die Linie stand zu Beginn dieser Generation bei 1084 gegen 1215 -- 131 Punkte
+Rueckstand, jetzt im Bereich des Champions.
+
+**`v23-b02` (Kaltstart) fertig:** Early Stop nach Epoche 15/40, **4,22 h**
+(Datenaufbau 32 s dank Cache-Treffer) gegen b01s 5,97 h. Ein Kaltstart kostet
+also NICHT mehr als ein Warmstart, sobald der Fenster-Cache steht.
+**Offen: sein brierbestes Modell liegt bei Epoche 1** -- dasselbe Muster wie
+bei den v22-Kaltstarts. Eine gepaarte Arena `b02_best` gegen `b02_brierbest`
+entscheidet den Kandidaten des Arms, bevor er gegen b01 antritt
+(`PREREG_v23_window.md` par.2g).
+
 ## 1c. BERICHTIGUNG: der generelle Hebel ist die PLATTENVERTEILUNG (Nutzer 2026-08-31)
 
 Der Koordinator hatte die Spezialfelder als groessten unabgeholten Posten

@@ -213,6 +213,57 @@ wurde.
 Schritt 9). NICHT freigegeben ist die Promotion: die faellt erst mit der
 Kante gegen `v21_2d_brierbest` (1215), und die steht noch aus.
 
+## par.2f CHAMPION-KANTE: AUGENHOEHE, NICHT UEBERHOLT (2026-08-31)
+
+`v23-b01_brierbest` gegen `v21_2d_brierbest`, beide @400, 200 Paare (harter
+Deckel erreicht):
+
+```
+219:181 (54,75 Prozent), KEIN SPRT-Entscheid (LLR +0,741)
+Vorzeichentest p = 0,0842
+gepaarte Differenz +0,190, 95%-KI [-0,013, +0,393]
+```
+
+**Lesart:** b01 fuehrt, aber das KI schliesst die Null ein -- **nicht belegt
+besser**, und ebenso wenig schlechter. **v21 bleibt Champion**, die Promotion
+faellt nicht. Das ist genau die Trennung, die
+`docs/generation_loop.md` am selben Tag festgeschrieben hat: die Tore geben
+das v24-Self-Play frei, die Promotion haengt an dieser Kante.
+
+**Warum kein SPRT-Verdikt:** das Instrument testet H1 p = 0,65 gegen H0
+p = 0,5, ist also auf rund +100 Elo geeicht. Ein echter Vorsprung von ~5
+Prozentpunkten endet dort am Deckel ohne Entscheid -- das heisst NICHT
+"gleich stark", sondern "ein +100-Elo-Vorsprung ist nicht belegt".
+
+**Groessenordnung, als Herleitung markiert:** 54,75 Prozent entsprechen rund
+**+33 Elo** ueber v21. Die Linie startete diese Generation mit b05 bei 1084
+gegen 1215 -- sie hat also einen Rueckstand von 131 Punkten geschlossen und
+liegt jetzt im Bereich des Champions. Die belastbare Verankerung liefert erst
+die Anker-Kante.
+
+## par.2g v23-b02 (KALTSTART): fertig, mit einem Checkpoint-Problem
+
+Early Stop nach **Epoche 15 von 40** (Plateau auf Policy UND Brier seit E10,
+Patience 5). Laufzeit **4,22 h**, davon 32 s Datenaufbau -- der Fenster-Cache
+von b01 traf, was die 3,45 h Aufbau erspart hat. **Damit ist die nie
+gemessene Zahl da:** ein Kaltstart auf vollem Fenster kostet gegenueber dem
+Warmstart (5,97 h) NICHT mehr, sondern weniger, sobald der Cache steht.
+
+**Aber:** b02s brierbestes Modell liegt bei **Epoche 1** (val_brier 0,1881
+gegen b01s 0,1934 bei E5). Dasselbe Muster zeigten die v22-Kaltstarts (dort
+ebenfalls brierbest bei E1), und es ist heikel: `--select-by-brier` wurde
+laut eigener Hilfe eingefuehrt, damit die Auswahl NICHT "einen praktisch
+untrainierten frischen Kopf" nimmt -- bei einem Kaltstart tut sie nach einer
+Epoche womoeglich genau das. Bezeichnend: v22 hat den Kaltstart b04 ueber
+`_best` weitergefuehrt, nicht ueber brierbest.
+
+**Vorab registrierte Aufloesung (Nutzer-Freigabe 2026-08-31):** eine kurze
+gepaarte Arena `v23-b02_best` gegen `v23-b02_brierbest` entscheidet, welcher
+Checkpoint der Kandidat des Arms ist; dieser tritt dann gegen b01 an. Es ist
+eine INTERNE Auswahl, kein Tor -- gibt der SPRT kein Verdikt, entscheidet der
+Punktschaetzer. So scheitert die Warm-gegen-Kalt-Frage nicht an einer
+Checkpoint-Regel statt am Startmodus.
+
 ## par.3 Drei Punkte, die benannt gehoeren -- keiner ist geloest
 
 **(1) G-1 und G-2 kommen aus DEMSELBEN Korpus.** Im alten Schema waren das
