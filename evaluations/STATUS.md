@@ -160,10 +160,36 @@ beider Tore **v22-b05** (volle Spalten 0,3375 am argmax-Instrument, Punkte
 `v21_2d_brierbest` (1215) und wird gemessen und berichtet, auch wenn keine
 Promotion folgt.
 
+**ELO-EINSCHAETZUNG FUER b01: drei Kanten (Nutzer-Auftrag 2026-08-31).**
+Nicht eine Messung, sondern der Kader aus der Promotions-Checkliste -- eine
+einzelne Kante traegt keine Schaetzung (v21 lag nach dem Gating bei +-90
+Punkten CI):
+
+| Kante | Gegner | Zuschnitt |
+| --- | --- | --- |
+| **Anker** | `Heuristik_hv1_anchor`@150 | festes **n=150 ohne Fruehstopp**, exklusiv, Knoepfe aus dessen `spec.json` (`elo_tracker --knobs`) |
+| **Champion** | `v21_2d_brierbest`@400 | n=400 ohne Fruehstopp (Muster der Nachbar-Kanten in elo_history.csv) |
+| **Vorgaenger** | `v22-b05`@400 | `tools/paired_gating.py`, Blockgroesse 5 -- **das ist zugleich Tor 1 der Schleife**; Fruehstopp unter 150 Paaren bleibt informativ, fuer eine Promotion braucht es n >= 150 oder eine Replikation |
+
+Alle drei mit b01 auf **400 Sims**: die Leiter ist auf diesen Betriebspunkt
+geeicht. Dass die ERZEUGUNG mit 100 Sims laeuft, aendert daran nichts --
+Messen und Erzeugen sind verschiedene Betriebspunkte, und Kanten ueber
+verschiedene Punkte sind nicht vergleichbar. Kanten ueber die R5-Fix-Grenze
+nie mischen.
+
+Kostenschaetzung (HERLEITUNG aus 3,33 s je Partie gepaarter b05-Arena): Anker
+rund 8 min, Champion rund 22 min, Vorgaenger je nach SPRT-Verlauf bis rund
+17 min -- zusammen unter einer Stunde, exklusiv zu fahren.
+
+Faellt die Wahl spaeter auf b02 statt b01 (Kaltstart gegen Warmstart), gelten
+dieselben drei Kanten fuer den Arm, der weitergeht.
+
 Danach: Phase 3 (Betrags-Schiene, `PREREG_r5_value_calibration.md`,
 Erfolgstest "kippt die Sims-Kurve?"), Erreichbarkeits-Nachpruefung Stufe 0
 (`PREREG_v23_reachability_recheck.md`), optional Stufe 4 des
-Suchtiefen-Strangs.
+Suchtiefen-Strangs. Bei einem Champion-Wechsel die vollstaendige
+`docs/promotion_checklist.md` abarbeiten (Pflicht-Diagnostiken,
+Anzeige-Kalibrierung in server.py, sigma-Prior-Waechter).
 
 ---
 
