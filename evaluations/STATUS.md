@@ -18,7 +18,8 @@ Verweis stehen.
 Langzeitgedaechtnis -- dauerhaftes Prozesswissen verrottet hier ins Archiv).
 Kanonisch liegen ab jetzt in `../docs/`:
 `promotion_checklist.md`, `working_rules.md`, `pitfalls.md`,
-`generation_naming.md`, `measured_runtimes.md`, `architecture_reference.md`.
+`generation_naming.md`, `measured_runtimes.md`, `architecture_reference.md`,
+`generation_loop.md`.
 Die betreffenden Abschnitte unten sind auf einen Verweis eingedampft; wer an
 diesen Inhalten etwas aendert, aendert es DORT.
 
@@ -99,7 +100,13 @@ spaltenbauend?
 **PUNKT (3) DER LISTE IST ERLEDIGT (2026-08-30, waehrend die Erzeugung
 laeuft -- reiner Bau, keine CPU-Last):**
 
-* **Arm K GEBAUT, Default AUS.** Knopf `MOSAIC_BOOTSTRAP_COHERENCE=sum1`
+* **Arm K GEBAUT, Default AUS -- und am 2026-08-31 bewusst SPAET eingetaktet
+  (Nutzer: "den wuerd ich relativ spaet eintakten und die vorhandenen caches
+  erstmal ausnutzen"): b01 bis b04 fahren OHNE ihn**, Arm K kommt danach als
+  eigener Arm auf demselben Korpus und zahlt den Block-Neubau allein. Was
+  sonst noch alle Bloecke entwertet und darum in b01-b04 unangetastet bleibt:
+  Traeger-Manifest, MOSAIC_IGNORE_POLICY_TARGET_VALID, TD_LAMBDA (Arm L),
+  value_target_variant, MOSAIC_CACHE_F32, MOSAIC_CACHE_NOPACK. Knopf `MOSAIC_BOOTSTRAP_COHERENCE=sum1`
   (Summen-Normierung der beiden `bootstrap_value`-Eintraege vor dem
   TD-Blend, corpus_dataset.py WDL-Zweig), Cache-Key-Komponente in BEIDEN
   Namensraeumen (`+bscoh_sum1_v1` Fenster, `|bscoh_sum1_v1` Datei),
@@ -167,6 +174,46 @@ Zieldefinition und steht im Datei-Schluessel -- ein v23-Training MIT Arm K
 entwertet ALLE Bloecke (hv2 wie b05). Beide Entscheide (Traeger-Manifest,
 Arm K) gehoeren deshalb VOR den Fensterbau, nicht danach.
 
+**DIE GENERATIONEN-SCHLEIFE STEHT JETZT IN `../docs/generation_loop.md`**
+(Nutzer-Auftrag 2026-08-31: "erstmal generationen schleife erstellen die
+idealerweise spaltenverstaerkend ist und immer besser wird von den siegen als
+die vorgaenger generation"). Sie ist eine Schwesterdatei zur
+Promotions-Checkliste, KEINE Prereg -- stehendes Prozesswissen, kein
+registriertes Experiment mit Verdikt (Nutzer-Korrektur am selben Tag; die
+kurzzeitig angelegte PREREG_generation_loop.md ist geloescht, sie war nie
+committet). Die Mechanik war gebaut, die TORE nicht -- v22 hat jeden Schritt
+einzeln entschieden. Jetzt stehen sie vorab:
+
+* **Tor 0 (Korpus)** = die par.3b.12-Waechter unten.
+* **Tor 1 (Siege)** = gepaarte Arena gegen den besten Stand der
+  VOR-Generation, signifikant; Fruehstopp unter 150 Paaren ist informativ,
+  nicht promotionsfaehig (b05-Vorfall).
+* **Tor 2 (Kampagnen-Groesse)** = die Groesse, um die es der Kampagne geht --
+  derzeit volle Spalten am argmax-Instrument -- darf nicht unter den Wert der
+  Vor-Generation fallen. Eigenes Tor, weil die Sims-Kurve einen TAUSCH belegt:
+  ein reines Sieg-Tor zoege die Schleife zurueck in die spaltenarme Ecke.
+
+**Fuer den KONKRETEN Durchlauf v23 gilt:** Bezug beider Tore ist der beste
+Stand von v22, also **v22-b05** (volle Spalten 0,3375 am argmax-Instrument,
+Punkte 37,16, Elo 1084); die Champion-Kante (Schritt 7) geht gegen
+v21_2d_brierbest (1215). Diese Zahlen stehen bewusst HIER und nicht in
+docs/generation_loop.md -- die Datei beschreibt das Verfahren fuer eine
+beliebige Generation N, der Stand gehoert nach STATUS.
+* **Reissregeln stehen** (Abschnitt "Wenn ein Tor reisst"). Der gefaehrlichste Fall ist Tor 2
+  reisst / Tor 1 haelt -- dort ist eine stille Promotion ausdruecklich
+  ausgeschlossen.
+* **Zwei Messfallen benannt**: "Vorgaenger" ist NICHT "Champion" (die
+  Linie ratscht gegen b05 1084, die Kante gegen v21 1215 wird berichtet, nicht
+  getort), und "Generator" ist NICHT "Kandidat".
+
+**ARM K VERSCHOBEN (Nutzer 2026-08-31: "der hat mich noch nicht
+ueberzeugt").** Bleibt gebaut, Default aus, ausloeserbasiert in Reserve. Das
+Argument steht in par.3b.3a der Lehrer-Prereg: er korrigiert einen VERSATZ,
+das gemessene Problem ist eine STEIGUNG (0,0886); seine drei benannten
+Nutzniesser sind ungebaut; und er ist der einzige Arm, der alle Cache-Bloecke
+entwertet. Vorrang haben Phase 3 (Betrags-Schiene), das tiefe Value-Nachlabeln
+und die On-Policy-Exposition des laufenden Korpus.
+
 **DIE WAECHTER NACH DER ERZEUGUNG** (par.3b.12, bindend vor jedem
 v23-Training; erst starten, wenn der Lauf durch ist -- exklusiv):
 
@@ -181,6 +228,50 @@ Lesart, vorab: (a) PRIMAER Symmetrie-Trennung auf der VALUE-Klasse
 signifikant > 0; (b) SEKUNDAER >= 1.500 Seiten mit voller Spalte in der
 Value-Klasse (`sides_with_full_column`); (c) Spaltenrate beider Klassen nur
 Bericht (Referenz: argmax 0,3375, gesampelt 0,07-0,11, Champion 0,102).
+
+**WECKER-DURCHSICHT 2026-08-31 (Nutzer-Auftrag "geh mal die offenen preregs
+durch"): die Liste steht jetzt registriert in PREREG_v23_window par.4a3.**
+Durchgesehen wurden alle 23 Preregs mit Kopf OFFEN plus die Wecker-Verweise
+der entschiedenen. Bekannt waren Waechter, Arm K und Moon-Gewicht. NEU
+gefunden -- drei Posten und eine Reihenfolge-Auflage:
+
+1. **Kaltstart oder Warmstart -- am 2026-08-31 vom Nutzer ENTSCHIEDEN,
+   und zwar als eigene Arme.** Der v23-Zyklus ist damit vorab benannt
+   (docs/generation_naming.md): **b01 Warmstart aus den Self-Plays, b02
+   KALTSTART, b03 Ueberraschungs-Gewichtung.** Der Kaltstart oeffnet das
+   Rumpfbreiten-Fenster (PREREG_capacity_sim_frontier par.9), statt es still
+   verfallen zu lassen. Kosten geprueft: ein Kaltstart auf vollem Fenster
+   kostet mit vorgebautem Cache rund **2,5 h** (v22-b02 2,56 h, b04 2,52 h;
+   b01 lag nur wegen des In-Train-Cache-Baus bei 5,43 h). Die Warmstart-Seite
+   ist auf dem VOLLEN Fenster nie gemessen worden -- die einzigen Warmstarts
+   der jungen Historie sind die DAgger-Afterburner auf 600 Zusatzpartien --,
+   b01 gegen b02 liefert diese Zahl also nebenbei mit.
+   **Breite entschieden (Nutzer 2026-08-31): b02 faehrt die BESTANDSBREITE**
+   -- ein Faktor gegen b01 -- **und b04 ist als Breiten-Arm vorregistriert**
+   (par.10 dort). Beim Nachsehen im Code kam heraus, dass "Breite" im
+   2D-Netz zwei Knoepfe sind: der Flach-Zweig `hidden_size` 512 ist ohne Bau
+   fahrbar (`--hidden` existiert, der Lader holt die Breite aus dem
+   Checkpoint), der Conv-Zweig `conv_channels` 48 / `conv_layers` 2 dagegen
+   NICHT -- keine Flags, kein Checkpoint-Feld, keine Ableitung beim Laden;
+   ein conv-breiterer Checkpoint waere heute nicht ladbar. Welcher Zweig
+   verbreitert wird, ist der naechste Entscheid und steht in par.10.
+2. **Der Endgame-Kopf wird mit diesem Training erstmals scharf.** Auf hv2 war
+   seine Maske komplett 0 (root_q schreibt nur der NetSelfPlayAgent); im
+   neuen Korpus ist root_q da -- gezaehlt: 2.332 von 3.538 Records, davon 314
+   R5-Drafting. Der offene Flag-Entscheid betrifft jetzt ein Ziel, das
+   tatsaechlich lernt.
+3. **Die Policy-Ueberraschungs-Gewichtung heisst v23-b03** -- vom Nutzer
+   2026-08-31 im Zyklus-Zuschnitt bestaetigt (par.4a dort). Ungebaut, eine
+   Loss-Gewichtung in train.py; sie kann gebaut werden, WAEHREND b01/b02
+   rechnen.
+
+**Reihenfolge-Auflage (am Code geprueft, sonst still falsch trainiert):**
+`relabel_drafts_with_teacher.py` schreibt die pkl IN PLACE (Zeile 138), und
+`build_cache_incremental.py` erkennt einen Block ALLEIN am Dateinamen -- kein
+mtime, kein Inhalt. Wer relabelt, NACHDEM der Block gebaut ist, trainiert
+still auf den alten Policy-Zielen. Also: relabeln auf eine Kopie mit eigenem
+Praefix (wie der DAgger-Lauf in data/onpolicy_v22-b05/), oder die betroffenen
+`.filecache_*.h5` im selben Zug loeschen.
 
 **OFFEN fuer die naechste Sitzung, nach Prioritaet:** (1) die
 Erzeugung ueberwachen und nach Abschluss die Waechter oben fahren;
