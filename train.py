@@ -1083,31 +1083,6 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # uebergreifendes Benchmark dienen (das leistet schon die Arena vs.
     # Champion/Heuristik).
     all_files = sorted(glob.glob(str(DATA_DIR / "*.pkl")))
-    # --file-list (2026-08-31): das Fenster als EXPLIZITE Dateiliste, ein
-    # Basename je Zeile. Gegenstueck zu `build_cache_incremental --file-list`.
-    # Anlass: das v23-Fenster nimmt 1.745 von 2.400 hv2-Dateien (par.2 der
-    # Fenster-Prereg, seed-gezogene Rotation) -- mit MOSAIC_DATA_EXCLUDE waere
-    # das ein Regex aus 655 Alternativen, also unlesbar und im Manifest
-    # unbrauchbar. Fehlende Eintraege brechen HART ab: ein stillschweigend
-    # kleineres Fenster ist genau die Klasse Fehler, gegen die das
-    # Fenster-Pinning gebaut ist.
-    if file_list:
-        _wanted = []
-        for _line in open(file_list, encoding="utf-8"):
-            _line = _line.strip()
-            if _line and not _line.startswith("#"):
-                _wanted.append(os.path.basename(_line))
-        _have = {os.path.basename(f): f for f in all_files}
-        _missing = [n for n in _wanted if n not in _have]
-        if _missing:
-            raise SystemExit(
-                f"❌ --file-list {file_list}: {len(_missing)} Eintraege fehlen in "
-                f"{DATA_DIR}, z.B. {_missing[:3]} -- Abbruch statt kleinerem Fenster.")
-        if len(set(_wanted)) != len(_wanted):
-            raise SystemExit(f"❌ --file-list {file_list}: doppelte Eintraege.")
-        all_files = sorted(_have[n] for n in _wanted)
-        print(f"📄 --file-list {file_list}: {len(all_files)} Dateien als Fenster gesetzt "
-              f"(von {len(_have)} im Ordner).", flush=True)
     # MOSAIC_DATA_EXCLUDE (Fenster-Pinning, 2026-08-07): MUSS VOR dem
     # Train/Val-Split greifen -- data/ waechst waehrend laufender
     # Generierungen, und schon die SPLIT-Partition haengt an der
@@ -1136,6 +1111,37 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         extra_files = sorted(glob.glob(str(Path(extra_data_dir) / "*.pkl")))
         print(f"➕ --extra-data-dir {extra_data_dir!r}: {len(extra_files)} zusaetzliche Datei(en) gefunden.")
         all_files = sorted(all_files + extra_files)
+
+    # REIHENFOLGE (2026-08-31 verschoben): der --file-list-Filter laeuft NACH
+    # dem --extra-data-dir-Zusammenzug. Grund: die Relabel-Kopie des Sockels
+    # liegt in einem Unterordner, und ein Fenster muss sie adressieren koennen,
+    # ohne dass die Dateien in data/ liegen. Vorher stand der Block direkt
+    # hinter dem data/-Glob und haette solche Eintraege als "fehlt" abgelehnt.
+    # --file-list (2026-08-31): das Fenster als EXPLIZITE Dateiliste, ein
+    # Basename je Zeile. Gegenstueck zu `build_cache_incremental --file-list`.
+    # Anlass: das v23-Fenster nimmt 1.745 von 2.400 hv2-Dateien (par.2 der
+    # Fenster-Prereg, seed-gezogene Rotation) -- mit MOSAIC_DATA_EXCLUDE waere
+    # das ein Regex aus 655 Alternativen, also unlesbar und im Manifest
+    # unbrauchbar. Fehlende Eintraege brechen HART ab: ein stillschweigend
+    # kleineres Fenster ist genau die Klasse Fehler, gegen die das
+    # Fenster-Pinning gebaut ist.
+    if file_list:
+        _wanted = []
+        for _line in open(file_list, encoding="utf-8"):
+            _line = _line.strip()
+            if _line and not _line.startswith("#"):
+                _wanted.append(os.path.basename(_line))
+        _have = {os.path.basename(f): f for f in all_files}
+        _missing = [n for n in _wanted if n not in _have]
+        if _missing:
+            raise SystemExit(
+                f"❌ --file-list {file_list}: {len(_missing)} Eintraege fehlen in "
+                f"{DATA_DIR}, z.B. {_missing[:3]} -- Abbruch statt kleinerem Fenster.")
+        if len(set(_wanted)) != len(_wanted):
+            raise SystemExit(f"❌ --file-list {file_list}: doppelte Eintraege.")
+        all_files = sorted(_have[n] for n in _wanted)
+        print(f"📄 --file-list {file_list}: {len(all_files)} Dateien als Fenster gesetzt "
+              f"(von {len(_have)} im Ordner).", flush=True)
 
     # Lauf-Manifest + Korpus-Log (#64 Teil 2) -- siehe Funktionskommentare
     # oben. Additiv, rührt die train_file_limit-Logik unten nicht an.

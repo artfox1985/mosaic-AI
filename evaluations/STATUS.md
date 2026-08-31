@@ -126,9 +126,27 @@ Brettgeometrie festlegt, haelt Spezialfelder fuer wertlos und optimiert
 Farbnachschub. Aendern darf man sie nicht, sie ist der Elo-Anker; der Weg
 fuehrt ueber den 108-Wege-Aktionsraum auf der Netz-Seite.
 
-**Zeitpunkt erreicht:** par.4c hatte die Startkuppel fuer Generation 1
-bewusst bei der Handheuristik belassen und Stufe 0 auf Generation 2
-verschoben. Mit den bestandenen v23-Toren ist Generation 2 da.
+**ABER ZURUECKGESTELLT (Nutzer 2026-08-31, im selben Zug):** *"das ist
+Optimierung mit ungewissem Ausgang. zuerst Fokus auf die Brocken."* Der
+Strang bleibt registriert und die Wiedervorlage-Bedingung erfuellt -- er wird
+nur nicht in diesen Zyklus eingetaktet.
+
+## 1d. ZUSCHNITT DER GENERATION v23 (Nutzer-Entscheid 2026-08-31)
+
+*"ich wuerd gern noch den relabelten Sockel, b02, b03 sowie Phase 3, die
+Betrags-Schiene in dieser Generation unterbringen. dann weiter zu v24."*
+
+| Posten | Stand | Was fehlt |
+| --- | --- | --- |
+| **b02** (Kaltstart) | trainiert | nur noch fertig werden |
+| **relabelter Sockel** | Daten fertig (204.008 Lehrerzuege) | Fenster-Liste, Traeger-Manifest, Bloecke, dann ein Training |
+| **b03** (Ueberraschungs-Gewichtung) | registriert, UNGEBAUT | Loss-Gewichtung in train.py; Form (Kappung, Temperierung, Batch-Normierung) ist par.3 dort noch offen |
+| **Phase 3, Betrags-Schiene** | Diagnose steht, Eingriff offen | R5-Steigung auf b01 messen, dann der Eingriff; Erfolgstest "kippt die Sims-Kurve?" |
+
+**Nicht in diesem Zyklus:** Kuppelplatten-Verteilung (par.6a, s.o.), Arm K,
+b04-Breite, das geometrische Gelaender. Alle vier bleiben registriert.
+
+
 
 ## 2. WAS ALS NAECHSTES ZU TUN IST
 
