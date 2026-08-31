@@ -131,6 +131,30 @@ bei den v22-Kaltstarts. Eine gepaarte Arena `b02_best` gegen `b02_brierbest`
 entscheidet den Kandidaten des Arms, bevor er gegen b01 antritt
 (`PREREG_v23_window.md` par.2g).
 
+## 1b3. PHASE 3: die Daempfung bleibt -- der Korpus heilt sie nicht (2026-08-31)
+
+R5-Platten-Steigung, beide Netze im selben Lauf auf denselben 139 Paaren:
+
+| Netz | Value-Steigung | Punkte-Kopf |
+| --- | --- | --- |
+| **v23-b01_brierbest** | **0,0859** | 0,9728 |
+| v22-b05 | 0,0886 | 0,9888 |
+
+**Die Wette von Zuschnitt D ist nicht aufgegangen.** Die
+On-Policy-Vollendungsexposition sollte die Betrags-Daempfung heilen; die
+Steigung steht unveraendert bei ~0,086 statt ~1.
+
+Wertvoll ist der Befund trotzdem: b01 wurde in derselben Generation deutlich
+staerker und baut 66 Prozent mehr Spalten -- **ohne dass der Bewerter
+repariert wurde**. Der Fortschritt kam von woanders, der Hebel liegt
+unbenutzt da. Und die Diagnose bleibt scharf: der PUNKTE-Kopf trifft dieselbe
+Groesse mit 0,97, das Netz kann sie also darstellen -- es ist spezifisch der
+Gewinnwahrscheinlichkeits-Kopf.
+
+Damit ist die Frage "richtet es der Korpus?" beantwortet und der Eingriff
+faellig (`PREREG_r5_value_calibration.md` par.11, Erfolgstest "kippt die
+Sims-Kurve?").
+
 ## 1c. BERICHTIGUNG: der generelle Hebel ist die PLATTENVERTEILUNG (Nutzer 2026-08-31)
 
 Der Koordinator hatte die Spezialfelder als groessten unabgeholten Posten
