@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (par.1/par.2, Nutzer 2026-08-25): Form 29.450 Partien, davon 12.000 v22-Self-Play. Rollen-Zuschnitt D und Betriebspunkt 100 Sims entschieden (Lehrer-Prereg par.3b.12); ERZEUGUNG LAEUFT seit 2026-08-30 (Generator v22-b05, drei Klassen). Wecker par.4c abgearbeitet, Arm K gebaut mit Default aus (par.4a2). Offen: Waechter nach der Erzeugung, dann Fensterbau. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (par.1/par.2): Form 29.450 Partien, davon 12.000 v22-Self-Play; Rollen-Zuschnitt D und 100 Sims entschieden (Lehrer-Prereg par.3b.12). ERZEUGUNG LAEUFT seit 2026-08-30. Wecker VOR dem Self-Play abgearbeitet (par.4c); Wecker VOR dem TRAINING als Liste registriert (par.4a3, Durchsicht aller offenen Preregs) -- offen darin: Arm K ja/nein, Kaltstart/Warmstart, Endgame-Flag, Traeger-Manifest, Fensterauswahl. -->
 
 # Vorregistrierung: v23-Fenster
 
@@ -213,7 +213,7 @@ evaluations/night_run_20260830.md) VOR dem Erzeugungsstart.
 | Bootstrap-Horizont | 2 (steht) |
 | --rtv / --pcr-full-prob | AUS (Standard seit v13 bzw. PCR negativ) |
 | --sims / Klassen | Sockel 4.000 @400 mit Root-Noise; Schwarm 8.000 --value-only (v20-Konvention, pcr_cheap_sims 150) |
-| --no-root-noise / --deterministic / --tau-argmax-from-move | NICHT gesetzt (Trainingskorpus braucht Exploration; argmax ist Instrument, nicht Erzeuger) |
+| --no-root-noise / --deterministic / --tau-argmax-from-move | **UEBERHOLT durch Zuschnitt D** (Lehrer-Prereg par.3b.12, Nutzer "mach D"): die Nacht-Leiter hat gezeigt, dass JEDE fruehe Zug-Stochastik die Vollendung auf 0,07-0,11 drueckt. Gefahren wird jetzt Value-argmax (6.000, --no-root-noise --deterministic) + Value-gesampelt (2.000) + Policy voll gesampelt (4.000) |
 | MOSAIC_WERTUNG_STREUUNG_MAX | Default (unveraendert) |
 | Moon-Kopf | Trainings-Rezept-Entscheid: Gewicht 0 ab dem v23-Training (No-Op-Ziel, train.py:513); Flag-Bau VOR dem Training, nicht heute Nacht |
 
@@ -239,6 +239,42 @@ Namensraeumen, Manifest-Feld `bootstrap_coherence`, Abnahmesonde
 `tools/probes/bootstrap_coherence_probe.py` (Lauf steht aus, Maschine ist
 bis zum Erzeugungsende belegt). Damit ist der Wecker BAUSEITIG erledigt;
 offen bleibt nur der Arm-Entscheid (mit oder ohne) fuer das v23-Training.
+
+## par.4a3 WECKERLISTE VOR DEM v23-TRAINING (Durchsicht aller offenen Preregs, 2026-08-31)
+
+Gegenstueck zu par.4/par.4c, aber fuer den TRAININGS-Start statt den
+Erzeugungs-Start. Anlass ist die Nutzer-Frage "sonst ist nichts zu tun vor dem
+training?"; durchgesehen wurden alle 23 Preregs mit Statuskopf OFFEN plus die
+Wecker-Verweise der entschiedenen. Was hier NICHT steht, ist geprueft und
+gehoert nicht auf die Liste (implicit-Minimax, Stack-Draw, Seed-Positionen,
+Startkuppel, Round-Transition-Sampling, Vollendbarkeits-Filter,
+Bootstrap-Horizont: alle in par.4c bewusst entschieden, Fristen gewahrt).
+
+| Wecker | Quelle | Stand |
+| --- | --- | --- |
+| **Korpus-Waechter** (Symmetrie-Trennung Value-Klasse, >= 1.500 Seiten mit voller Spalte) | Lehrer-Prereg par.3b.12 | BINDEND, faellt direkt nach dem Lauf |
+| **Arm K** -- mit oder ohne Summen-Normierung trainieren | par.4a2 | gebaut, Default aus. **EINGETAKTET 2026-08-31 (Nutzer): SPAET, nach b04** -- b01 bis b04 fahren ohne ihn, damit die vorhandenen Bloecke gueltig bleiben; Arm K zahlt den Block-Neubau dann allein (Lehrer-Prereg par.3b.3, Abschnitt EINTAKTUNG) |
+| **Moon-Gewicht 0** | par.4c-Zeile Moon-Kopf | Flag existiert (train.py:2460); nur noch am Aufruf zu setzen |
+| **Kaltstart oder Warmstart?** | `PREREG_capacity_sim_frontier.md` par.9/par.10 | **ENTSCHIEDEN 2026-08-31 (Nutzer): BEIDES als eigene Arme, gleiche Breite** -- b01 Warmstart, b02 Kaltstart auf BESTANDSBREITE (ein Faktor), b04 vorregistriert als Breiten-Arm. Kaltstart ~2,5 h mit vorgebautem Cache. Der Conv-Zweig braucht fuer b04 erst zwei Flags und eine Checkpoint-Ableitung (par.10) |
+| **Endgame-Kopf-Flag** | STATUS-Zeile zum v22-Kaltstart (b01/b02) | **wird mit diesem Training erstmals scharf.** Auf hv2 war die Endgame-Maske komplett 0 (root_q schreibt nur der NetSelfPlayAgent); im neuen Korpus ist root_q da -- gezaehlt am 2026-08-31: 2.332 von 3.538 Records, davon 314 R5-Drafting. Der offene Flag-Entscheid (konstant lassen vs. false auf Heuristik-Korpora) betrifft jetzt ein Ziel, das tatsaechlich lernt |
+| **Policy-Ueberraschungs-Gewichtung** | `PREREG_policy_surprise_weighting.md` par.4a | **v23-b03**, vom Nutzer 2026-08-31 im Zyklus-Zuschnitt bestaetigt. Ungebaut (Loss-Gewichtung in train.py); baubar, waehrend b01/b02 rechnen |
+| **Relabeling-Etappe** | `PREREG_reanalyze_label_depth.md` par.4a | registriert: flach spielen, POLICY per hv2-Lehrer relabeln, VALUE tief nachlabeln. Reihenfolge-Auflage siehe unten |
+| **Fenster-Zuschnitt** | par.2 dieser Datei | offen ist, WELCHE 6.550 hv2-Partien rausrotieren; die Auswahl soll seed-bestimmt und im Manifest festgehalten sein |
+| **Traeger-Manifest** | par.1 dieser Datei | par.1 will hv2 ueberwiegend policy-maskiert; entwertet die 2.400 liegenden hv2-Bloecke. Die NEUE Value-Klasse braucht dafuer kein Manifest (sie maskiert sich ueber `policy_target_valid`, gezaehlt 2026-08-31: 2.332 von 2.578 Drafting-Records) |
+| **Monolith gegen Val-Split** | `PREREG_cache_build_time.md` Hebel 4 | `train.py --cache-file` prueft den FENSTER-Schluessel; ein Lauf mit `--val-frac > 0` bildet einen anderen Schluessel und der Waechter lehnt korrekt ab. Wer den Monolithen nutzen will, faehrt `--val-frac 0` oder baut ihn passend |
+
+**REIHENFOLGE-AUFLAGE, am Code geprueft 2026-08-31 (sonst still falsch
+trainiert):** `tools/relabel_drafts_with_teacher.py` schreibt die pkl IN
+PLACE (Zeile 138, `dump_records(path, recs)`), und
+`tools/build_cache_incremental.py` erkennt einen vorhandenen Block ALLEIN am
+Dateinamen -- kein mtime-, kein Inhaltsvergleich. Wer eine Korpusdatei
+relabelt, NACHDEM ihr Block gebaut ist, traniert still auf den alten
+Policy-Zielen. Der DAgger-Lauf ist dem nur entkommen, weil er in einem
+eigenen Verzeichnis unter eigenem Praefix lief (`data/onpolicy_v22-b05/`,
+Praefix `dagger-b04`). **Regel fuer diesen Zyklus:** relabeln auf eine Kopie
+mit eigenem Praefix, ODER die betroffenen `.filecache_*.h5` im selben Zug
+loeschen. Ein Waechter dagegen (Quellgroesse/mtime im Block-Attribut, Warnung
+bei Abweichung) ist NICHT gebaut -- benannt, nicht entschieden.
 
 ## par.4b Wecker NACH dem v23-Training
 

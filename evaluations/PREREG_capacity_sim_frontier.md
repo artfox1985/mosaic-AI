@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse (Rumpfbreite) und Sim-Budget? | Beleg: ENTWURF 2026-08-27, NICHTS GEBAUT, Nutzer-Entscheid ueber den Bau offen. Zeitpunkt entschieden (par.8): eher v23 oder v24, NICHT im v22-Zyklus. Die Registrierung faellt trotzdem jetzt, weil nur ein KALTSTART das Rumpfbreiten-Fenster oeffnet (par.3). Das Head-Widening-Negativ schliesst den Arm nicht (par.4); das Kostentor ist Pflicht und kommt zuerst (par.5). -->
+<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse (Rumpfbreite) und Sim-Budget? | Beleg: NICHTS GEBAUT, aber der Zyklus ist zugeschnitten (par.9/par.10, Nutzer 2026-08-31): **v23-b02 Kaltstart auf BESTANDSBREITE** (oeffnet das Fenster, ein Faktor gegen b01), **v23-b04 vorregistriert als Breiten-Arm**. Kaltstart kostet ~2,5 h mit vorgebautem Cache. OFFEN: welcher Zweig verbreitert wird -- `hidden_size` geht ohne Bau, der Conv-Zweig braucht Flags plus Checkpoint-Ableitung (par.10). Kostentor Pflicht und zuerst (par.5). -->
 
 # Vorregistrierung: Kapazitaets-Sim-Frontier
 
@@ -113,3 +113,82 @@ entschieden: NICHT im v22-Zyklus. Die Registrierung bleibt trotzdem jetzt
 stehen, damit das Kaltstart-Fenster beim naechsten Anlass nicht wieder
 unbemerkt zufaellt (par.3) -- wer v23/v24 plant, prueft an dieser Stelle, ob
 der Lauf ein Kaltstart wird, und entscheidet DANN ueber den Bau.
+
+## par.9 KALTSTART-ARM FUER v23 EROEFFNET (Nutzer-Entscheid 2026-08-31)
+
+Nutzer: *"ich haette fuer diesen prereg einen arm mit coldstart eroeffnet.
+der braucht nicht wirklich laenger als der warmstart"* -- und im selben Zug
+die Arm-Benennung: **v23-b01 Warmstart aus den Self-Plays, v23-b02 Kaltstart,
+v23-b03 Ueberraschungs-Gewichtung** (`PREREG_policy_surprise_weighting.md`
+par.8, deren Arm-Name damit bestaetigt ist).
+
+Damit faellt der par.8-Vorbehalt weg: der Punkt ist nicht still zugunsten des
+Bestands entschieden, sondern ausdruecklich.
+
+**Die Kostenaussage, an den Manifesten geprueft (2026-08-31):** die drei
+v22-Kaltstarts liefen mit Epochenbudget 40 und Early Stop --
+b01 **5,43 h** (19.536,6 s, darin 2,55 h In-Train-Cache-Bau; Stop bei E17),
+b02 **2,56 h** (9.223,5 s, Cache-Treffer; Stop bei E16), b04 **2,52 h**
+(9.056,5 s). Mit vorgebautem Cache -- den der laufende Co-Bau liefert --
+kostet ein Kaltstart auf dem vollen Fenster also rund **2,5 h**.
+**Die Gegenseite ist NICHT gemessen:** einen Warmstart auf dem VOLLEN Fenster
+gibt es in der jungen Historie nicht; die einzigen Warmstarts sind die
+DAgger-Afterburner auf 600 Zusatzpartien (b05 634 s, b06 472 s) und damit
+kein Vergleichsmass. Die Nutzer-Einschaetzung ist mit dem Vorliegenden
+vertraeglich -- die Kosten je Epoche haengen am Korpus, nicht am Startmodus,
+der Unterschied ist allein die Epochenzahl -- aber sie ist eine
+EINSCHAETZUNG, bis b01 die fehlende Zahl liefert. **Nebennutzen des Plans:
+b01 gegen b02 misst Warmstart gegen Kaltstart auf DEMSELBEN Fenster, eine
+Frage, die dieses Projekt nie sauber gemessen hat.**
+
+**Was der Kaltstart-Arm liefert und was NICHT:** er OEFFNET das
+Rumpfbreiten-Fenster (par.3), er MISST die Frontier nicht. Ein Kaltstart bei
+unveraenderter Breite ist kein Frontier-Punkt. Die Breiten-Variation braucht
+mindestens einen zweiten Kaltstart mit anderer Rumpfbreite plus die auf
+Wanduhr normierte Arena aus par.5/par.7 -- und die konkreten Breiten sind
+weiter offen (par.6). Ob b02 auf der Bestandsbreite oder gleich breiter
+faehrt, ist der naechste Entscheid; die saubere Bauform ist erst b01/b02 auf
+gleicher Breite (ein Faktor: Startmodus), die Breite danach als eigener Arm --
+sonst tragen zwei Aenderungen ein Ergebnis.
+
+## par.10 b02 faehrt die BESTANDSBREITE, b04 ist der Breiten-Arm (Nutzer-Entscheid 2026-08-31)
+
+Nutzer: *"mach die bestands rumpfbreite und registrier b04 vor fuer die andere
+breite."* Damit steht der Zuschnitt:
+
+| Arm | Startmodus | Breite | Was er misst |
+| --- | --- | --- | --- |
+| `v23-b01` | Warmstart | Bestand | Referenz; liefert nebenbei die nie gemessene Warmstart-Zahl auf vollem Fenster |
+| `v23-b02` | **Kaltstart** | **Bestand** | EIN Faktor gegen b01: der Startmodus. Kein Frontier-Punkt, aber der saubere Bezugspunkt fuer b04 |
+| `v23-b04` | Kaltstart | **andere Breite** | der eigentliche Frontier-Punkt; gegen b02 gepaart, auf gleiche Wanduhr normiert (par.5) |
+
+**WELCHE Breite -- am Code geprueft 2026-08-31, und die Antwort ist nicht eine
+Zahl, sondern zwei Knoepfe.** `Mosaic2DNet` (neural_net.py:1579-1581) hat
+einen Conv-Zweig und einen Flach-Zweig:
+
+* **Flach-Zweig `hidden_size` = 512** (config.py:53). Fahrbar OHNE Bau:
+  `--hidden` existiert (train.py:2302), und der Lader holt die Breite aus dem
+  Checkpoint-Feld `hidden_size` (neural_net.py:1799) -- ein abweichend breites
+  Netz laedt also.
+* **Conv-Zweig `conv_channels` = 48, `conv_layers` = 2**
+  (neural_net.py:1581). **Nicht fahrbar ohne Bau:** es gibt keine CLI-Flags
+  dafuer, die Werte stehen in KEINEM Checkpoint-Feld, und
+  `build_model_from_checkpoint` leitet nur `planes_channels` aus
+  `conv.0.weight` ab (Eingangsdimension), nicht die Ausgangsbreite. Ein
+  conv-breiterer Checkpoint waere heute schlicht nicht ladbar.
+
+**Daraus die Auflage fuer b04, damit sie nicht erst im Lauf auffaellt:** faellt
+die Wahl auf den CONV-Zweig, gehoert ein kleiner Bau davor -- zwei Flags,
+beide Werte ins Checkpoint-Dict, Ableitung beim Laden nach dem Muster von
+`hidden_size`/`planes_channels`, dazu ONNX-Export und Paritaets-Gate. Faellt
+sie auf `hidden_size`, ist b04 ohne Bau fahrbar. **Welcher Zweig die
+interessantere Breite ist, ist NICHT entschieden** -- inhaltlich spricht fuer
+den Conv-Zweig, dass die raeumliche Struktur (Spalten, Nachbarschaften) genau
+dort verarbeitet wird und der Kampagnen-Engpass raeumlich ist; fuer
+`hidden_size` spricht, dass es null Bauarbeit kostet. Beides ist eine
+EINSCHAETZUNG, keine Messung.
+
+**Unveraendert gilt par.5:** das Kostentor kommt ZUERST -- Wanduhr je Zug
+gemessen, Frontier auf gleiche Wanduhr je Partie normiert. Eine Breite, die
+ihr Sim-Budget unter die Arena-Aufloesung druckt, faellt aus der Frontier und
+wird berichtet, nicht durch Budget-Aufstockung geheilt.
