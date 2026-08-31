@@ -40,10 +40,16 @@ erreichbaren Zielbild dienen.
 legal bebaubar; das Dreieck `r + c <= 5` (21 Zellen, Zeilen 6/5/4/3/2/1)
 beschreibt, was praktisch erreichbar ist: die gemessenen Fuellraten je
 Rasterzeile sind 4,88 / 4,70 / 2,88 / 2,23 / 1,71 / 1,31 und haben exakt
-dieselbe Neigung (`PREREG_heuristic_v2_long_rows.md` par.3a). Es gibt **vier
-Orientierungen** (je 21 Zellen, je eine volle Zeile plus eine volle Spalte an
-ihrer Ecke); praktisch bedienbar sind oben-links und oben-rechts, also
-Spalte 0 und Spalte 5 als Anker.
+dieselbe Neigung (`PREREG_heuristic_v2_long_rows.md` par.3a).
+
+**Es gibt GENAU ZWEI Huellen, gespiegelt ueber die SPALTEN-Achse**
+(Nutzer-Berichtigung 2026-08-31): Anker in Spalte 0 oder in Spalte 5. Die
+Spiegelung ueber die ZEILEN-Achse ergibt zwar geometrisch ebenfalls
+21-Zellen-Dreiecke, aber keine spielbare Huelle -- sie legte die breite Zeile
+nach UNTEN, und genau dagegen stehen die Fuellraten: 4,88 oben gegen 1,31
+unten. Die Huelle ist nach oben verankert, weil die oberen Musterreihen
+zuverlaessig liefern und die unteren nicht. Wer hier vier Orientierungen
+zaehlt, zaehlt geometrische Konstruktionen und nicht Optionen des Spielers.
 
 | Baustein | Stand |
 | --- | --- |
@@ -72,9 +78,11 @@ schon implizit kennt. Faellt das positiv aus, ist (b) erledigt, bevor
 irgendetwas gebaut wird.
 
 **Die Orientierung ist der zweite Grund, warum die Ebene nicht konstant
-ist:** welche der vier Huellen ein Spieler verfolgt, ist eine WAHL. Vier
-Ebenen (oder zwei fuer die bedienbaren) plus der Brettzustand sagen etwas
-ueber Passung, nicht nur ueber Geometrie.
+ist:** welche der ZWEI Huellen ein Spieler verfolgt, ist eine WAHL -- und die
+faellt frueh, mit den ersten Platzierungen. Zwei Ebenen (Anker Spalte 0,
+Anker Spalte 5) plus der Brettzustand sagen damit etwas ueber PASSUNG, nicht
+nur ueber Geometrie: welche der beiden Huellen zum bereits gebauten Brett
+passt, ist eine Zustandsfrage, keine Konstante.
 
 ## par.4 PFLICHT-AUFLAGEN (ohne sie wird nichts gebaut)
 
@@ -110,8 +118,8 @@ dem Netz nicht die Geometrie, sondern ihre Bewertung, und der Strang faellt
 zurueck auf die Betrags-Schiene. Instrumente vorhanden
 (`tools/probes/ownership_column_intent.py`, `column_build_prior_mass.py`).
 
-**Stufe 1 -- Eingabeebene (b).** Zwei bis vier binaere Ebenen
-(Orientierungen), additiv. Tor: **Paritaets-Gate zuerst** (Netz ohne die
+**Stufe 1 -- Eingabeebene (b).** ZWEI binaere Ebenen (Anker Spalte 0, Anker
+Spalte 5), additiv. Tor: **Paritaets-Gate zuerst** (Netz ohne die
 Ebenen bitgleich), dann Offline-Vergleich auf demselben Fenster; ein
 Staerkeurteil faellt erst in Stufe 3.
 

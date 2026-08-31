@@ -82,6 +82,13 @@ def main():
                     help="Manifest-Dateiname (landet in --data-dir)")
     ap.add_argument("--list-out", default=None,
                     help="zusaetzlich eine --file-list-kompatible Textdatei der Auswahl")
+    ap.add_argument("--include-glob", default=None,
+                    help="Glob, dessen Treffer VOLLSTAENDIG als Traeger dazukommen -- "
+                         "ohne Stichprobe, zusaetzlich zur gestreuten Auswahl. Gedacht "
+                         "fuer eine Korpus-Klasse, die per Design komplett Policy traegt "
+                         "(v23: die Sockel-/Policy-Klasse). Ohne das wuerde ein Manifest "
+                         "sie stillschweigend maskieren, denn Nicht-Gelistete sind "
+                         "Nicht-Traeger (corpus_dataset._is_policy_carrier)")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
@@ -99,6 +106,22 @@ def main():
 
     picked = stratified_pick(candidates, a.n_files, a.seed)
 
+    # Vollstaendig uebernommene Klasse (kein Ziehen): getrennt gehalten, damit
+    # `design` ehrlich bleibt -- die Stichprobe betrifft nur `picked`.
+    included = []
+    if a.include_glob:
+        included = sorted(os.path.basename(f)
+                          for f in glob.glob(os.path.join(a.data_dir, a.include_glob)))
+        if not included:
+            raise SystemExit(f"--include-glob {a.include_glob!r}: kein Treffer in {a.data_dir} "
+                             "-- laut statt still, sonst maskiert das Manifest die Klasse")
+        overlap = sorted(set(included) & set(picked))
+        if overlap:
+            raise SystemExit(f"--include-glob ueberschneidet die Stichprobe ({len(overlap)} "
+                             f"Dateien, z.B. {overlap[:3]}) -- Kandidatenmenge trennen")
+        print(f"{len(included)} Dateien vollstaendig uebernommen (--include-glob "
+              f"{a.include_glob})")
+
     manifest = {
         "generator": "tools/generate_carrier_manifest.py",
         "erzeugt": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -107,7 +130,8 @@ def main():
                    f"{len(candidates)} sortierte Kandidaten ({a.pattern}"
                    + (f", eingeschraenkt per {os.path.basename(a.from_list)}" if a.from_list else "")
                    + "), je Stratum eine Datei via random.Random(seed)"),
-        "policy_carrier_files": picked,
+        "include_glob": a.include_glob,
+        "policy_carrier_files": sorted(picked + included),
     }
     print(f"{len(picked)} von {len(candidates)} Dateien gewaehlt "
           f"(Seed {a.seed}); erste/letzte: {picked[0]} / {picked[-1]}")
