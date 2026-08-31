@@ -211,6 +211,14 @@ schärfer wird –, nicht „hilft künftig allgemein".
 
 ## Messungen laufen EXKLUSIV — und ein Build ist Nebenlast (2026-08-25)
 
+**PRAEZISIERT 2026-08-31 (Nutzer): GPU und CPU duerfen parallel ausgelastet
+werden** — ein Training auf der GPU und EIN CPU-Auftrag daneben (Arena, Sonde,
+Relabeling, Cache-Bau). Zwei CPU-Messungen gegeneinander bleiben verboten.
+Thread-Budget, Beleg und die Markierungspflicht fuer gebremste Laufzeiten:
+`docs/working_rules.md`, Abschnitt "Auslastung: GPU und CPU duerfen parallel
+laufen". Der folgende Abschnitt gilt unveraendert fuer alles, was sich dieselbe
+Ressource teilt.
+
 **Während eine Arena, ein Self-Play oder eine netz-/suchgestützte Sonde läuft,
 darf nichts anderes Rechenlast erzeugen.** CPU-Nebenlast verstümmelt Partien
 nichtdeterministisch; die Signatur, an der es einmal aufgefallen ist, war ein
