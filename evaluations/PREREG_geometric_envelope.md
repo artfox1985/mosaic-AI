@@ -157,6 +157,56 @@ Anker Spalte 5) plus der Brettzustand sagen damit etwas ueber PASSUNG, nicht
 nur ueber Geometrie: welche der beiden Huellen zum bereits gebauten Brett
 passt, ist eine Zustandsfrage, keine Konstante.
 
+## par.3c GEGENGLEICHE GEWICHTUNG: Huelle runter, Value-Kopf rauf (Nutzer 2026-08-31)
+
+Nutzer: *"Der Tiling-Solver hat eigentlich den Value-Head als Faktor fuer die
+Weitsicht bekommen. Das hat aber bis dato nur wenig durchgeschlagen. Mit der
+Einhuellenden, deren Einfluss ueber die Runden abnimmt, und dem Value-Head,
+dessen Gewicht dann gegengleich zunimmt, laesst sich das vermutlich sauber
+adressieren."*
+
+**Der Value-Kopf IST verdrahtet, und warum er wenig durchschlaegt, steht im
+Code (geprueft 2026-08-31):** `NET_TILING_TIEBREAK_ENABLED = true`
+(tiling_solver.rs:857) multipliziert `punkte * value` ueber die
+`NET_TILING_TOPK = 12` besten Abschluesse. Der zugehoerige Befund
+(`tiling_candidate_spread.json`, v18_best, 142 Stellungen aus den Runden 2-4
+mit mehr als einem Kandidaten, 51 Faelle mit Auswahlaenderung): die
+Multiplikation hat in **0 von 51 Faellen** einen echten Punktvorsprung
+ueberstimmt; die mediane Value-Spreizung unter den Top-12 liegt bei **0,017**
+(IQR 0,010 bis 0,028). Der Kommentar im Code sagt es selbst: sie wirkt
+"ausschliesslich als Stichentscheid zwischen Abschluessen mit (nahezu)
+IDENTISCHEN Punkten".
+
+**Daraus folgt mehr als eine Gewichtsfrage:** ein Faktor, der 0,017 breit
+ist, kann einen Punkt nicht kippen -- egal, mit welchem Gewicht man ihn
+versieht. Wer den Value-Kopf spaet WIRKLICH entscheiden lassen will, muss die
+KOMBINATIONSFORM aendern (additiv auf vergleichbarer Skala oder als
+Rangkriterium), nicht nur einen Multiplikator drehen. Das ist der Grund,
+warum "mehr Value-Gewicht" bisher nicht durchschlug, und er ist gemessen,
+nicht vermutet.
+
+**Der Zuschnitt, den der Nutzer vorschlaegt, passt genau auf die gemessenen
+Kurven:**
+
+| Runde | Sofortpunkte | Value-Kopf | Huelle |
+| --- | --- | --- | --- |
+| 1-2 | klein und strukturell blind (Spalten zahlen erst bei Vollendung, Platten erst am Ende) | am schwaechsten (Spalten-AUC 0,698) | **traegt** |
+| 3-4 | wachsend | wird verlaesslich | klingt ab |
+| 5 | Endwertung faellt | AUC 0,886 -- aber der exakte Loeser rechnet ohnehin | **null** |
+
+Die beiden Gewichte sind damit nicht zwei unabhaengige Knoepfe, sondern EIN
+Regler: die Huelle vertritt die Weitsicht dort, wo der Bewerter sie noch
+nicht hat, und tritt ab, sobald er sie hat. Das ist zugleich die
+inhaltliche Begruendung fuer das Abklingprofil aus par.4.1 -- es folgt der
+Verlaesslichkeitskurve des Kopfes, nicht einer gewaehlten Zahl.
+
+**Was daran zu registrieren bleibt, bevor gebaut wird:** die Kombinationsform
+(par.4.2 verlangt Potentialform fuer alles, was ins ZIEL geht -- ein
+Auswahlkriterium im Loeser ist etwas anderes und braucht seine eigene
+Begruendung), die Stuetzstellen des Profils, und ob der Punkte-Term frueh
+ueberhaupt bleiben soll. Alle drei sind eigene Entscheide, keine
+Implementierungsdetails.
+
 ## par.4 PFLICHT-AUFLAGEN (ohne sie wird nichts gebaut)
 
 1. **Abklingen bis NULL in Runde 5.** Der exakte Loeser bekommt keinen
