@@ -2341,23 +2341,54 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
 
 def _snapshot_models_to_backup(version_name: str) -> None:
-    """Zippt den kompletten models/-Ordner als datierten, nach dem Training
-    benannten Snapshot nach <OneDrive>\\Backups\\mosaic-AI\\models_snapshots\\."""
+    """Sichert den models/-Ordner als benannten restic-Snapshot.
+
+    Der ANLASS ist unveraendert der vom 2026-07-24 (Modellverlust): der
+    Tageslauf um 12:00 haelt nur den Stand EINES Zeitpunkts fest, zwei
+    Trainings am selben Tag waeren darin nicht getrennt zu sehen. Dieser
+    ereignisgesteuerte Snapshot haelt einen Zustand fest, den der Tageslauf
+    strukturell nicht sehen kann.
+
+    Geaendert hat sich am 2026-08-31 nur die FORM. Vorher entstand hier je
+    Lauf ein Zip-Archiv des ganzen models/-Ordners (0,3 bis 1,1 GB) unter
+    <OneDrive>\\Backups\\mosaic-AI\\models_snapshots\\. Ein Archiv ist fuer
+    content-defined chunking undurchdringlich -- zwei Zips, die sich in
+    einer Datei unterscheiden, dedupen zu praktisch null, also kostete jeder
+    Lauf den vollen Betrag. Als restic-Snapshot kostet er nur die
+    tatsaechlich neuen Netze.
+
+    Die Beschriftung, die frueher im Dateinamen stand, ist jetzt die Marke
+    "run:<version>"; wiederfinden mit
+    `restic snapshots --tag "run:v22-b05"`. Siehe docs/backup_restore.md.
+
+    Ein Fehlschlag bleibt eine WARNUNG: ein fertiges Training darf nicht an
+    seiner Sicherung scheitern.
+    """
     try:
-        import os
-        import shutil
-        from datetime import datetime
-        onedrive = os.environ.get("OneDrive")
-        if not onedrive:
-            print("⚠️  Modell-Snapshot übersprungen: OneDrive-Umgebungsvariable nicht gesetzt.")
+        import subprocess
+        script = Path(__file__).resolve().parent / "tools" / "snapshot_models.ps1"
+        if not script.is_file():
+            print(f"⚠️  Modell-Snapshot übersprungen: {script} fehlt.")
             return
-        snap_dir = Path(onedrive) / "Backups" / "mosaic-AI" / "models_snapshots"
-        snap_dir.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y-%m-%d_%H%M")
-        target = snap_dir / f"models_{stamp}_{version_name}"
-        archive = shutil.make_archive(str(target), "zip", str(MODELS_DIR))
-        size_mb = os.path.getsize(archive) / 1e6
-        print(f"💾 Modell-Snapshot gesichert: {archive} ({size_mb:.0f} MB)")
+        # encoding explizit: ohne das dekodiert Python die Ausgabe als cp1252
+        # und zerlegt sich an Umlauten (Projektfalle 2026-08-xx).
+        # timeout, damit ein haengender Aufruf kein Training festhaelt.
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+             "-File", str(script),
+             "-Version", version_name,
+             "-Path", str(MODELS_DIR)],
+            capture_output=True, text=True, encoding="utf-8", errors="replace",
+            timeout=1800,
+        )
+        if result.returncode == 0:
+            print(f"💾 Modell-Snapshot gesichert (restic, Marke run:{version_name}).")
+        else:
+            print(f"⚠️  Modell-Snapshot fehlgeschlagen (Training davon unberührt), "
+                  f"Exitcode {result.returncode}:")
+            for stream in (result.stdout, result.stderr):
+                for line in (stream or "").splitlines()[-5:]:
+                    print(f"    {line}")
     except Exception as e:
         print(f"⚠️  Modell-Snapshot fehlgeschlagen (Training davon unberührt): {e}")
 
