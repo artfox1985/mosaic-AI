@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten -- also nach KL(Prior gegen Ziel) -- statt jede Stichprobe gleich zu zaehlen? | Beleg: ENTWURF 2026-08-27, NICHTS GEBAUT. Zeitpunkt (par.8, praezisiert 2026-08-30): der Arm heisst **v23-b03** -- sein Entscheidungsmass verlangt Such-Ziele, die es erst im v23-Fenster gibt; v22-b03 bleibt unbelegt (docs/generation_naming.md). Die Abwertung der Quelle traegt nicht mehr: in v22 ist die Policy der TRANSPORTKANAL des Spaltenbaus (par.2). Zuschnitt: Loss-Gewichtung in train.py, kein Engine-Eingriff (par.3); Entscheidungsmass sind die Orakelmetriken (par.5). -->
+<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten -- also nach KL(Prior gegen Ziel) -- statt jede Stichprobe gleich zu zaehlen? | Beleg: NICHTS GEBAUT. Der Arm ist **v23-b03**, vom Nutzer am 2026-08-31 im Zyklus-Zuschnitt bestaetigt (par.4a: b01 Warmstart, b02 Kaltstart, b03 dieser Arm); sein Entscheidungsmass braucht Such-Ziele, die es erst im v23-Fenster gibt. Zuschnitt: Loss-Gewichtung in train.py, kein Engine-Eingriff (par.3); Entscheidungsmass sind die Orakelmetriken (par.5). -->
 
 # Vorregistrierung: Policy-Surprise-Weighting
 
@@ -82,6 +82,21 @@ eigene Entscheide beim Bau.
 er wird zum **v22b**-Retrain auf demselben Korpus -- also ein zweiter
 Trainingslauf statt einer Variante im ersten. Das ist kein Ausschlussgrund; es
 ist der Preis, und er gehoert vor dem Entscheid genannt.
+
+## par.4a BESTAETIGT 2026-08-31: der Arm ist v23-b03
+
+Nutzer-Zuschnitt des v23-Zyklus (im selben Zug wie der Kaltstart-Arm,
+`PREREG_capacity_sim_frontier.md` par.9): **b01 Warmstart aus den Self-Plays,
+b02 Kaltstart, b03 Ueberraschungs-Gewichtung.** Damit ist die par.8-Empfehlung
+angenommen und der Platz im Zyklus vergeben; par.4 ("Frist: Trainingsstart des
+v22-Kaltstarts") ist erledigt -- der Arm ist nicht verfallen, er ist
+verschoben und benannt.
+
+Was das an Arbeit bedeutet: der Zuschnitt aus par.3 (Loss-Gewichtung in
+train.py, kein Engine-Eingriff) ist weiterhin UNGEBAUT. Er kann gebaut
+werden, waehrend b01/b02 rechnen -- der Bau ist reine Python-Arbeit am
+Trainer, und das Entscheidungsmass (par.5) braucht ohnehin erst den
+fertigen b01/b02-Vergleich als Bezug.
 
 ## par.5 Entscheidungsmass, VORAB festgelegt
 

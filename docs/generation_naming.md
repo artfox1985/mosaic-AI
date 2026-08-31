@@ -43,6 +43,19 @@ der Arm tatsaechlich faehrt, nicht der, in der die Idee registriert
 wurde. Wer eine Luecke in einer b-Serie findet, sucht hier nach ihrer
 Begruendung statt nach verlorenen Modellen.
 
+## Der v23-Zyklus ist vorab benannt (Nutzer 2026-08-31)
+
+| Arm | Was |
+| --- | --- |
+| `v23-b01` | Warmstart aus den v22-b05-Self-Plays (Standardrezept) |
+| `v23-b02` | **Kaltstart** -- oeffnet das Rumpfbreiten-Fenster (`PREREG_capacity_sim_frontier.md` par.9); b01 gegen b02 misst nebenbei Warm- gegen Kaltstart auf DEMSELBEN Fenster, was nie gemessen wurde |
+| `v23-b03` | Ueberraschungs-Gewichtung (`PREREG_policy_surprise_weighting.md` par.4a) -- der oben reservierte Name, jetzt belegt |
+| `v23-b04` | **vorregistriert** (Nutzer 2026-08-31): Kaltstart mit ANDERER Rumpfbreite, der eigentliche Frontier-Punkt (`PREREG_capacity_sim_frontier.md` par.10). Welcher Zweig verbreitert wird, ist offen -- `hidden_size` geht ohne Bau, der Conv-Zweig braucht erst Flags und eine Checkpoint-Ableitung |
+| spaeter | **Arm K** (Bootstrap-Kohaerenz, `MOSAIC_BOOTSTRAP_COHERENCE=sum1`): bewusst NACH b04 eingetaktet (Nutzer 2026-08-31), weil er als einziger Arm alle Cache-Bloecke entwertet. Nummer folgt der Ausfuehrungsreihenfolge |
+
+Der Zuschnitt steht VOR dem ersten Lauf, damit die Namen nicht nachtraeglich
+vergeben werden -- die b03-Luecke oben ist genau daraus entstanden.
+
 ## Heuristik-Varianten heissen `hv1` / `hv2` (Nutzer-Anweisung 2026-08-28)
 
 Die Heuristik-Varianten hiessen bis zum 2026-08-28 `v1` und `v2huelle`. Das
