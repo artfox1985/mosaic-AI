@@ -971,7 +971,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           value_target_lambda=1.0, opp_points_head=False, endgame_head=False, value_head="tanh",
           ranking_loss_weight=0.0, conjunction_head=False, ownership_head_2d=False,
           head_warmstart=True, extra_data_dir=None,
-          freeze_trunk=False, cache_file=None, moon_loss_weight=1.0):
+          freeze_trunk=False, cache_file=None, moon_loss_weight=1.0,
+          file_list=None):
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
@@ -1082,6 +1083,31 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # uebergreifendes Benchmark dienen (das leistet schon die Arena vs.
     # Champion/Heuristik).
     all_files = sorted(glob.glob(str(DATA_DIR / "*.pkl")))
+    # --file-list (2026-08-31): das Fenster als EXPLIZITE Dateiliste, ein
+    # Basename je Zeile. Gegenstueck zu `build_cache_incremental --file-list`.
+    # Anlass: das v23-Fenster nimmt 1.745 von 2.400 hv2-Dateien (par.2 der
+    # Fenster-Prereg, seed-gezogene Rotation) -- mit MOSAIC_DATA_EXCLUDE waere
+    # das ein Regex aus 655 Alternativen, also unlesbar und im Manifest
+    # unbrauchbar. Fehlende Eintraege brechen HART ab: ein stillschweigend
+    # kleineres Fenster ist genau die Klasse Fehler, gegen die das
+    # Fenster-Pinning gebaut ist.
+    if file_list:
+        _wanted = []
+        for _line in open(file_list, encoding="utf-8"):
+            _line = _line.strip()
+            if _line and not _line.startswith("#"):
+                _wanted.append(os.path.basename(_line))
+        _have = {os.path.basename(f): f for f in all_files}
+        _missing = [n for n in _wanted if n not in _have]
+        if _missing:
+            raise SystemExit(
+                f"❌ --file-list {file_list}: {len(_missing)} Eintraege fehlen in "
+                f"{DATA_DIR}, z.B. {_missing[:3]} -- Abbruch statt kleinerem Fenster.")
+        if len(set(_wanted)) != len(_wanted):
+            raise SystemExit(f"❌ --file-list {file_list}: doppelte Eintraege.")
+        all_files = sorted(_have[n] for n in _wanted)
+        print(f"📄 --file-list {file_list}: {len(all_files)} Dateien als Fenster gesetzt "
+              f"(von {len(_have)} im Ordner).", flush=True)
     # MOSAIC_DATA_EXCLUDE (Fenster-Pinning, 2026-08-07): MUSS VOR dem
     # Train/Val-Split greifen -- data/ waechst waehrend laufender
     # Generierungen, und schon die SPLIT-Partition haengt an der
@@ -1168,6 +1194,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # (`append_train_cache_file`) -- hier steht nur die Wahl, denn das
         # Manifest wird geschrieben, bevor der Datensatz gebaut ist.
         "cache_file": cache_file,
+        "file_list": file_list,
         "val_pool": _val_pool_env,
         "val_pool_guard": _val_pool_guard,
         # MOSAIC_IGNORE_POLICY_TARGET_VALID definiert einen Trainings-ARM
@@ -2463,6 +2490,12 @@ if __name__ == "__main__":
                              "stattdessen 'values_wdl' (Skala [0,1], root_q wird dafuer von [-1,1] "
                              "zurueckgerechnet) -- vorher wirkte λ in dem Fall folgenlos auf "
                              "'values', das der WDL-Kopf gar nicht sieht.")
+    parser.add_argument("--file-list", type=str, default=None,
+                        help="Fenster als explizite Dateiliste (ein Basename je Zeile, "
+                             "#-Kommentare erlaubt). Fehlende Eintraege = harter Abbruch. "
+                             "Gegenstueck zu build_cache_incremental --file-list; gedacht "
+                             "fuer rotierende Fenster, die sich nicht als Regex schreiben "
+                             "lassen.")
     parser.add_argument("--moon-loss-weight", type=float, default=1.0,
                         help="Gewicht des Moon-Order-Terms im Policy-Loss (train.py: "
                              "plackett_luce_moon_loss, auf sun_mask gemittelt und auf p_loss "
@@ -2593,4 +2626,4 @@ if __name__ == "__main__":
           ranking_loss_weight=args.ranking_loss_weight,
           head_warmstart=not args.no_head_warmstart, extra_data_dir=args.extra_data_dir,
           freeze_trunk=args.freeze_trunk, cache_file=args.cache_file,
-          moon_loss_weight=args.moon_loss_weight)
+          moon_loss_weight=args.moon_loss_weight, file_list=args.file_list)

@@ -53,6 +53,45 @@ liefert eine byte-gleiche Liste. 2.400 hv2-Dateien a 10 Partien = 24.000;
 gehen glatt auf. Die Liste liegt in `data/` (ungetrackt); reproduzierbar ist
 sie aus Regel plus Seed.
 
+## par.2a FENSTER GEBAUT UND GEZAEHLT (2026-08-31)
+
+Das Fenster steht als explizite Dateiliste `data/window_v23.txt`: **1.745
+hv2-Dateien** (Seed 20260920) plus **600 v22-b05-Dateien** = 2.345 Dateien.
+Vom Trainingslauf selbst nachgezaehlt und gegen par.1 geprueft:
+
+| Praefix | Dateien | Partien | Policy-Traeger |
+| --- | --- | --- | --- |
+| hv2 | 1.745 | 17.450 | 180 |
+| v22-b05-value-argmax | 300 | 6.000 | 0 |
+| v22-b05-value-sampled | 100 | 2.000 | 0 |
+| v22-b05-policy | 200 | 4.000 | 200 |
+| **Summe** | **2.345** | **29.450** | 380 |
+
+Das ist par.1 auf die Partie genau -- 29.450, davon 12.000 aus dem
+v22-Self-Play. Die Generationenstruktur ist wie registriert besetzt: NEU ist
+v22-b05, **G-1 und G-2 kommen beide aus hv2** (Nutzer-Bestaetigung
+2026-08-31; par.3 haelt fest, dass das ein bewusster Platzhalter ist).
+
+**Zwei Werkzeuge mussten dafuer nachgeruestet werden:**
+
+1. **`train.py --file-list`.** Der Trainer kannte nur `glob(data/*.pkl)`
+   minus `MOSAIC_DATA_EXCLUDE`. Eine seed-gezogene Rotation von 1.745 aus
+   2.400 Dateien waere als Regex ein Ausdruck aus 655 Alternativen gewesen --
+   unlesbar und im Manifest unbrauchbar. Jetzt gibt es das Gegenstueck zu
+   `build_cache_incremental --file-list`, mit hartem Abbruch bei fehlenden
+   Eintraegen: ein stillschweigend kleineres Fenster ist genau die
+   Fehlerklasse, gegen die das Fenster-Pinning gebaut ist.
+2. **Partienzahl je Praefix bei TEILMENGEN berichtigt**
+   (`train_manifest.corpus_composition`). Die kumulative Rechnung ueber die
+   `g`-Suffixe stimmt fuer vollstaendige Laeufe, aber nicht fuer ein
+   rotierendes Fenster: faellt eine Datei heraus, erbt ihre Nachfolgerin die
+   Spanne, und die Summe bleibt `max(g)`. Der erste b01-Lauf hat hv2 deshalb
+   noch als "24000 Spiele" ausgewiesen statt 17.450. Der Ersatz nimmt die
+   Datei-Granularitaet (kleinster positiver g-Abstand) mal der Dateizahl; die
+   alte Zahl bleibt als `games_cumulative` mit einem `subset_of_run`-Merker
+   im Manifest stehen. **Das b01-Manifest vom 2026-08-31 traegt noch die alte
+   Zahl** -- der Lauf war beim Fix schon gestartet.
+
 ## par.3 Drei Punkte, die benannt gehoeren -- keiner ist geloest
 
 **(1) G-1 und G-2 kommen aus DEMSELBEN Korpus.** Im alten Schema waren das
