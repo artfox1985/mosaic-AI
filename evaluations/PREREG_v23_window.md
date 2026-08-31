@@ -92,6 +92,47 @@ v22-b05, **G-1 und G-2 kommen beide aus hv2** (Nutzer-Bestaetigung
    im Manifest stehen. **Das b01-Manifest vom 2026-08-31 traegt noch die alte
    Zahl** -- der Lauf war beim Fix schon gestartet.
 
+## par.2b ERGEBNIS v23-b01 -- TOR 2a BESTANDEN (2026-08-31)
+
+**Training:** Warmstart von `v22-b05` auf dem Fenster oben, 12 Epochen,
+lr 5e-5 mit Cosine, `--moon-loss-weight 0`, Endgame-Kopf an, Val-Pool auf
+die neuen Partien beschraenkt. Laufzeit 21.488,8 s (5,97 h), davon 12.434,5 s
+Datenaufbau. Kandidat ist `v23-b01_brierbest` (Epoche 5, val_brier 0,1934);
+Plateau ab Epoche 10.
+
+**Tor 2a (Spaltenbau im Self-Play), argmax-Instrument @400, je 200 Partien,
+GLEICHER Seed 20260931 -- also gepaart:**
+
+| Kennzahl je Partie und Seite | `v23-b01_brierbest` | `v22-b05` |
+| --- | --- | --- |
+| **volle Spalten** | **0,5150** | 0,3100 |
+| Seiten mit >= 1 voller Spalte | 168 / 400 | 95 / 400 |
+| eigene Punkte | 46,80 | 42,10 |
+| Strafleiste | 5,74 Steine | 6,61 |
+| volle Reihen | 0,147 | 0,233 |
+
+**Gepaarte Differenz +0,2050 +- 0,0898 (SE 0,0458, t +4,47, 200 Paare)** --
+plus 66 Prozent Spaltenbau, das Konfidenzintervall haelt die Null deutlich
+draussen. Tor 2a verlangt "nicht unter dem Vorgaenger"; erreicht ist das
+Doppelte des Geforderten.
+
+**Warum BEIDE Seiten frisch gemessen wurden:** die registrierte Referenz
+0,3375 stammt vom 2026-08-29, also von VOR dem Stack-Draw-Entscheid, der seit
+dem 2026-08-30 in jeder Erzeugung steckt. Ein Vergleich dagegen haette den
+Knopf mitgemessen. Nebenbefund: die frische b05-Messung liegt bei 0,310, der
+Knopf bewegt die Groesse also kaum -- das wusste man vorher aber nicht.
+
+**Zwei Beobachtungen ohne Torfunktion:** b01 tauscht REIHEN gegen Spalten
+(0,147 gegen 0,233) -- die registrierte Richtung, denn eine volle Rasterzeile
+ist ohne Spezialfliese unmoeglich. Und der Spaltenbau kostet hier nichts: 4,7
+Punkte MEHR bei 0,9 Strafsteinen weniger. Das unterscheidet ihn vom
+Sims-Tausch, wo mehr Spalten Staerke gekostet haben.
+
+**Offen bleiben Tor 1** (gepaartes Gating in Champion-Strenge, laeuft) **und
+Tor 2b** (Spalten gegen Widerstand, Arena mit --log-games plus
+`tools/probes/arena_column_probe.py`). Erst beide zusammen geben das
+v24-Self-Play frei.
+
 ## par.3 Drei Punkte, die benannt gehoeren -- keiner ist geloest
 
 **(1) G-1 und G-2 kommen aus DEMSELBEN Korpus.** Im alten Schema waren das
