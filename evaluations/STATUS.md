@@ -24,42 +24,36 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-08-31, 03:07)
+## 1. STAND DER ERZEUGUNG: FERTIG, TOR 0 BESTANDEN (2026-08-31)
 
-**Erzeugung des v23-Fensterkorpus, Generator `v22-b05`, seit 2026-08-30
-19:25.** Eine Hintergrund-Shell faehrt alle drei Klassen mit `&&`
-hintereinander (`MOSAIC_STACK_DRAW_RESEARCH=1` exportiert, Abschluss-Echo
-"ERZEUGUNG KOMPLETT"):
+**Der v23-Fensterkorpus ist erzeugt** (Generator `v22-b05`, 2026-08-30 19:25
+bis 2026-08-31 07:20, rund 12 h): 6.000 value-argmax + 2.000 value-sampled +
+4.000 policy, alle drei Klassen vollzaehlig. Der Cache-Co-Bau hat mitgehalten
+-- **3.000 Bloecke liegen, 0 offen**; dank des Traeger-Umbaus
+(`PREREG_cache_build_time.md` par.10) ueberleben sie das Manifest.
 
-| Klasse | Ziel | Stand | Konfiguration |
-| --- | --- | --- | --- |
-| `v22-b05-value-argmax` | 6.000 | **fertig (6.000)** | 100 Sims, `--value-only --no-root-noise --deterministic`, Seed 20260902 |
-| `v22-b05-value-sampled` | 2.000 | **1.540** | 100 Sims, `--value-only`, Seed 20260903 |
-| `v22-b05-policy` | 4.000 | 0 | 100 Sims, voll gesampelt, Seed 20260901 |
+**Tor 0 GEFAHREN 2026-08-31, beide Wächter bestanden** (Registrierung und
+Einordnung: Lehrer-Prereg par.3b.12):
 
-Gemessenes Tempo: 3,45 s je Partie ohne Cache-Co-Bau, 3,6 s mit.
+| Waechter | Ergebnis |
+| --- | --- |
+| primaer: Symmetrie-Trennung Value-Klasse | **+0,4041 +- 0,0192, t 41,26** (398 Bloecke) -- TRENNT |
+| sekundaer: Seiten mit voller Spalte | **5.629 von 16.000**, Schwelle 1.500 -- 3,75-fach |
+| Bericht: volle Spalten je Partie+Seite | Value **0,481**, Policy 0,129 |
 
-**Cache-Co-Bau laeuft mit** (`build_cache_incremental.py --encoder 2d
---value-target-variant nortv --workers 2 --watch --wartezeit 60
---leerlauf-abbruch 60`): 2.776 Bloecke liegen. Einstellungen decken sich mit
-`manifest_train_v22-b05` (2d, nortv, conjunction_head false), die Bloecke
-treffen also das geplante Training.
+**Der Berichtswert ist ein eigener Befund:** 0,481 liegt UEBER dem
+argmax-Instrumentwert 0,3375 -- genau wie die Sims-Kurve es vorhersagt.
+Nachgerechnet aus den registrierten Vorbefunden (6.000 argmax bei ~0,6 plus
+2.000 gesampelt bei ~0,10) erwartet man 0,475, gemessen sind es 0,481. Zwei
+auf 200-Partien-Stichproben registrierte Befunde treffen damit auf 8.000
+Partien.
 
-**Wenn der Lauf abgebrochen ist** -- fehlende Partien am g-Suffix ZAEHLEN,
-nicht hochrechnen:
+**Traeger-Manifest gebaut:** `data/policy_carrier_manifest_v23.json`, 380
+Eintraege -- 180 hv2-Dateien (1.800 Partien, Seed 20260921 aus dem Fenster
+von Seed 20260920) plus die Policy-Klasse vollstaendig (200 Dateien). Die
+Value-Klasse ist bewusst nicht gelistet.
 
-```
-export MOSAIC_STACK_DRAW_RESEARCH=1
-python -u self_play.py --mode network --model models/alphazero_v22-b05.onnx --games 6000 --sims 100 --value-only --version v22-b05-value-argmax --threads 11 --chunk 10 --seed 20260902 --per-file 20 --no-root-noise --deterministic
-python -u self_play.py --mode network --model models/alphazero_v22-b05.onnx --games 2000 --sims 100 --value-only --version v22-b05-value-sampled --threads 11 --chunk 10 --seed 20260903 --per-file 20
-python -u self_play.py --mode network --model models/alphazero_v22-b05.onnx --games 4000 --sims 100 --version v22-b05-policy --threads 11 --chunk 10 --seed 20260901 --per-file 20
-```
-
-`data/` enthaelt sonst nur noch `selfplay_hv2_*` (2.400 Dateien, Fenster);
-die Messkorpora sind geloescht (Nutzer-Freigaben 2026-08-30, zuletzt die 60
-`selfplay_v21depth*`).
-
----
+**Damit ist der Weg frei fuer den Fensterbau und das v23-Training.**
 
 ## 2. WAS ALS NAECHSTES ZU TUN IST
 
