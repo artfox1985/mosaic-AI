@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und ueber die Runden abklingend --, wenn es in SUCHE und TILING eingreift und nicht nur Netz-Eingabe ist? | Beleg: NICHTS GEBAUT, angelegt 2026-08-31. Motiv: Spalten-AUC 0,698 in R1 gegen 0,886 in R5, und die Punkte fallen spaet -- **ab Runde 4 fallen 52,8 Prozent** (gemessen, 160 Partie-Seiten), fruehe Sofortpunkte sind also klein, waehrend der Tiling-Loeser genau nach ihnen waehlt. Fuenf Bausteine (par.3/3b), Potentialform Pflicht (par.4), Stufenplan (par.5). -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und ueber die Runden abklingend --, wenn es in SUCHE und TILING eingreift und nicht nur Netz-Eingabe ist? | Beleg: NICHTS GEBAUT, angelegt 2026-08-31. Motiv: Spalten-AUC 0,698 in R1 gegen 0,886 in R5; die Platten zahlen EINMAL nach Spielende (4,67 von 44,23 Punkten je Seite, gemessen), waehrend der Tiling-Loeser Zug fuer Zug nach Sofortpunkten waehlt -- und k1 ist eine Stufe: fuenf Zellen null, die sechste sieben. Fuenf Bausteine (par.3/3b), Potentialform Pflicht (par.4). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -77,18 +77,32 @@ Befund, den der Split-Test als kleinere Haelfte des Durchbruchs ausgewiesen
 hat. Wer die Huelle ins Netz gibt, aber den Loeser weiter auf Sofortpunkte
 optimieren laesst, baut zwei Instanzen mit gegenlaeufigem Ziel.
 
-**Die Punkte fallen SPAET -- gemessen 2026-08-31** (160 Partie-Seiten aus vier
-`v22-b05-value-argmax`-Dateien; Punktestand je Runde und Seite, Zuwachs zur
-Vorrunde; Artefakt `round_point_profile_b05.json`):
+**WANN die Punkte fallen -- gemessen 2026-08-31, und in zwei Anlaeufen
+richtig gestellt** (80 Partien / 160 Seiten aus `v22-b05-value-argmax`;
+Artefakt `round_point_profile_b05.json`):
 
-| Runde | 1 | 2 | 3 | 4 | 5 |
-| --- | --- | --- | --- | --- | --- |
-| Zuwachs | 7,26 | 6,16 | 6,62 | 8,78 | **13,61** |
-| Anteil | 17,1 % | 14,5 % | 15,6 % | 20,7 % | **32,1 %** |
+Der erste Anlauf hat den Punktestand je Runde gebinnt und kam auf "ab Runde 4
+fallen 52,8 Prozent". **Diese Zahl ist zurueckgezogen**: die
+Wertungsplatten werden erst NACH Spielende gebucht (`apply_end_scoring`,
+game.rs:981, Nutzer-Hinweis), ihre Pauschale steckt also im
+Runde-5-Zuwachs. Die Kurve vermischte damit Platzierungspunkte und
+Endwertung.
 
-**Ab Runde 4 fallen 52,8 Prozent aller Punkte**, Runde 5 allein bringt
-doppelt so viel wie eine einzelne fruehe Runde. Einschraenkung: EIN Spieler,
-EIN Korpus -- als Groessenordnung belastbar, nicht als Konstante.
+Direkt gemessen, ueber die Summe von `scoring_tile_points` auf den AKTIVEN
+`scoring_tile_ids`:
+
+| Groesse | je Seite |
+| --- | --- |
+| Endstand | 44,23 |
+| davon **Endwertung (Platten)** | **4,67 = 10,6 Prozent** |
+| davon k1 (Spalten), wenn aktiv | 3,98 (in 58 von 160 Seiten) |
+
+**Das ist die eigentliche Pointe fuer diesen Arm, und sie ist schaerfer als
+die Rundenkurve:** die Platten zahlen **einmal, ganz am Ende**. Waehrend der
+Runden 1 bis 4 wird von ihrem Wert NICHTS gebucht -- ein Zug-fuer-Zug-
+Punktemaximierer sieht das ganze Spiel ueber kein Plattensignal, und fuer
+Spalten ist es zusaetzlich eine Stufe (siehe unten). Die 10,6 Prozent decken
+sich mit dem Leitstern ("rund 10 Punkte je Partie bleiben liegen").
 
 **Die Regelmechanik erklaert es, und zwar schaerfer als eine glatte Kurve
 (Nutzer-Berichtigung 2026-08-31):** k1 der ENGINE ist eine STUFE, kein
