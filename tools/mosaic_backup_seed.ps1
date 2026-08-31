@@ -21,13 +21,18 @@
        ein Zip ist fuer content-defined chunking undurchdringlich. Zwei
        Archive, die sich in einer Datei unterscheiden, haben ab der ersten
        Abweichung durchgehend andere Bytes und dedupen zu praktisch null.
-       Entpackt teilen sich die 14 Staende ihre unveraenderten Netze, und
+       Entpackt teilen sich die Staende ihre unveraenderten Netze, und
        sie dedupen zusaetzlich gegen den Spiegel und die spaeteren
        Tageslaeufe.
 
-       Gemessen am 2026-08-30: models/ ist 627 MB. Als Zips liegen dort
-       rund 8 GB fast identischer Archive; entpackt sollte das Repo davon
-       ungefaehr eine Kopie plus die Zuwaechse behalten. Das Skript druckt
+       GEZAEHLT am 2026-08-31: 12 Zips mit zusammen 8,7 GiB, verteilt auf
+       nur 6 Tage -- neben den Tages-Zips liegen dort von Hand angelegte,
+       beschriftete Staende (hv2sanity, v22-b01, -b02, -b04, -b05, -b06).
+       Nicht 14, wie zuvor aus dem 14-Tage-Vorhaltefenster des alten
+       Skripts GESCHLOSSEN worden war; die Zahl war nie nachgezaehlt.
+       Ergebnis nach dem Import: alle 12 Staende plus Spiegel plus
+       Arbeitsbaum stehen mit 115,4 GiB logisch in 9,7 GiB belegt.
+       Das Skript druckt
        am Ende beide Groessen, damit die Ersparnis nicht behauptet, sondern
        abgelesen wird.
 

@@ -155,9 +155,36 @@ macOS und FreeBSD beschraenkt. Es bleibt bei `find`, `ls`, `dump`,
 `tools/mosaic_backup_seed.ps1` war der einmalige Import und wird im
 Normalbetrieb nicht mehr gebraucht.
 
+`tools/verify_backup.ps1` prueft die Sicherung in fuenf Stufen und sagt, ob
+etwas geloescht werden DARF; es loescht selbst nichts. Nach `-Deep` fragen,
+bevor eine Quelle wegfaellt.
+
 **Der Lauf erzeugt I/O-Last ueber den ganzen Projektordner** und faellt
 damit unter die Regel "Messungen laufen EXKLUSIV" (`../CLAUDE.md`): nicht
 parallel zu einer Arena, einem Self-Play oder einer Sonde.
+
+## Stand der Umstellung (2026-08-31)
+
+Der Altbestand ist uebernommen und der Uebergang belegt, nicht behauptet:
+
+- **Spiegel** vollstaendig abgedeckt: erneutes `backup --dry-run` meldete
+  0 neu / 0 geaendert bei 19.098 Dateien.
+- **12 models-Zips** (8,7 GiB, auf nur 6 Tage verteilt, darunter sechs von
+  Hand beschriftete Staende) einzeln wiederhergestellt und Datei fuer Datei
+  per SHA-256 gegen ihren Archiv-Eintrag gestellt: 0 Abweichungen; was im
+  Zip fehlte, lag restlos unterhalb `venv\`.
+- **`check --read-data`** ueber das ganze Repository gruen.
+- Belegung: **115,4 GiB logisch in 9,7 GiB**.
+
+**Welche Stufe was traegt** -- der Punkt, an dem eine fruehere Fassung
+dieses Textes zu grob war: Stufe 4 stellt die models-Snapshots vollstaendig
+wieder her und liest ihre Nutzdaten dabei ohnehin, sie ist fuer die Zips
+also selbst schon der Integritaetsnachweis. `-Deep` deckt das ab, was Stufe
+4 nicht anfasst -- `daily` und `legacy-mirror`. Es ist damit Voraussetzung
+fuer das Entfernen des SPIEGELS, nicht fuer das der Zips.
+
+Die Zip-Pruefung ist nur moeglich, **solange die Zips existieren**. Nach
+ihrem Loeschen gibt es keinen zweiten Versuch.
 
 ## Fallen, die schon zugeschlagen haben (alle 2026-08-31)
 

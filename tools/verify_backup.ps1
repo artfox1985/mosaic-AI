@@ -506,9 +506,16 @@ if ($Zips) {
 # --- Stufe 5: Tiefenpruefung -------------------------------------------------
 if ($Deep) {
     Write-BackupLog $ctx "--- Stufe 5: Tiefenpruefung (check --read-data, liest das ganze Repository) ---"
-    $deepCheck = Invoke-ResticCapture -Exe $ctx.ResticExe -Arguments @("check", "--read-data")
-    if ($deepCheck.ExitCode -ne 0) {
-        Add-Failure "check --read-data meldet Exitcode $($deepCheck.ExitCode): $($deepCheck.Output)"
+    # BEWUSST OHNE Invoke-ResticCapture. Diese Stufe laeuft ueber Stunden, und
+    # eine eingesammelte Ausgabe waere bis zum Ende unsichtbar -- genau das,
+    # was die Projektregel "Lange Laeufe NIE in eine Pipe" verbietet. restic
+    # druckt hier einen Fortschrittsbalken; der gehoert auf den Schirm.
+    # Ausgewertet wird ohnehin nur der Exitcode, der Text stand dann schon da.
+    Write-BackupLog $ctx "Fortschritt erscheint direkt von restic; das kann bei diesem Repository Stunden dauern."
+    & $ctx.ResticExe check --read-data
+    $deepRc = $LASTEXITCODE
+    if ($deepRc -ne 0) {
+        Add-Failure "check --read-data meldet Exitcode $deepRc (Meldungen stehen oben in der Ausgabe)."
     } else {
         Write-BackupLog $ctx "Alle Pack-Bytes gelesen und geprueft."
     }
@@ -538,6 +545,12 @@ if ($failures.Count) {
 }
 
 Write-BackupLog $ctx "VERDIKT: alle gefahrenen Stufen gruen."
-if (-not $Zips) { Write-BackupLog $ctx "OFFEN: ohne -Zips ist der Import der models-Staende unbelegt. Vor dem Loeschen von models_snapshots\ nachholen -- danach geht es nicht mehr." }
+# Die Zip-Mahnung nur, solange es Zips gibt. Sind sie fort, ist entweder
+# geprueft worden oder die Gelegenheit ist ohnehin vorbei -- in beiden Faellen
+# ist die Zeile nur noch Rauschen, und eine Mahnung, die man wegsehen lernt,
+# taugt beim naechsten Mal nichts mehr.
+if (-not $Zips -and $ctx.BackupRoot -and (Test-Path (Join-Path $ctx.BackupRoot "models_snapshots"))) {
+    Write-BackupLog $ctx "OFFEN: ohne -Zips ist der Import der models-Staende unbelegt. Vor dem Loeschen von models_snapshots\ nachholen -- danach geht es nicht mehr."
+}
 if (-not $Deep) { Write-BackupLog $ctx "OFFEN: ohne -Deep ist kein stiller Datenfehler ausgeschlossen. Vor dem Loeschen nachholen." }
 exit 0
