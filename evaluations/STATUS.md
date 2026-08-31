@@ -293,6 +293,24 @@ Registrierung): `plate_policy_supervision`, `saturating_score_utility`,
 `stack_top_feature`, `chance_nodes` (Teil B1/A1 geparkt),
 `floor_shaping_scale`, `rust_data_layer` (Registrierung, kein Auftrag).
 
+**OHNE PREREG, nur Merkposten -- und darum beim Index-Abgleich durchgefallen
+(berichtigt 2026-08-31):** die Neufassung hat Abschnitt 5 aus dem
+Prereg-Index gebaut, und damit faellt per Konstruktion alles heraus, was
+offen ist, aber keine Prereg hat. Wieder aufgenommen:
+
+* **Einhuellende als 2D-Eingabeebene** (Nutzer-Frage 2026-08-24): eine
+  zusaetzliche Ebene "Dreiecks-Zugehoerigkeit je Zelle", additiv moeglich.
+  Zusammen mit dem **Rundenabklingen** (frueh stark, ueber die Runden
+  abfallend) inzwischen inhaltlich begruendet in
+  `PREREG_search_depth_column_optimum.md` par.2m -- vier Gruende, aber
+  weiterhin NICHT registriert. Der HUELLEN-TRIMM der Ownership-Loss-Maske
+  ist dagegen registriert (Lehrer-Prereg, Nachtrag 6).
+* **#31 / #38 / #39**: geparkt, Arbeitskreis "Spaeter", Beschreibungen im
+  Archiv.
+
+Wer Abschnitt 5 kuenftig aus dem Index erzeugt, traegt diese Liste HIER
+nach -- der Index kennt nur, was eine Datei hat.
+
 **Verschoben, nicht verworfen:** Arm K (Bootstrap-Kohaerenz,
 `PREREG_heuristic_v2_long_rows.md` par.3b.3/3b.3a) -- gebaut, Default aus,
 ausloeserbasiert. Er korrigiert einen VERSATZ, das gemessene Problem ist eine
