@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 88 Knoepfe (51 aktiv, 29 diagnose, 7 tot, 1 geplant).
+Stand: 89 Knoepfe (52 aktiv, 29 diagnose, 7 tot, 1 geplant).
 
 **Status** sagt, ob der Knopf VERDRAHTET ist -- ausdruecklich nicht, ob sein
 Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
@@ -14,14 +14,14 @@ Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
 trennen "aus, weil noch niemand ihn eingeschaltet hat" von "aus, weil die
 Messung ihn erledigt hat" -- in der Registratur allein sehen die gleich aus.
 
-**50 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
+**52 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
 
 Der Statuskopf sagt ENTSCHIEDEN, aber NICHT die Richtung -- deshalb die
 Trennung nach Default. Kein Loeschauftrag: ein negatives Ergebnis kann
 "falscher Hebel, richtiges Ziel" heissen (`PREREG_long_row_payoff` ist
 genau so ein Fall). Es ist die Liste, an der die Frage stellbar wird.
 
-**Beantwortet UND Default aus (35)** -- hier lohnt die Nachfrage,
+**Beantwortet UND Default aus (36)** -- hier lohnt die Nachfrage,
 ob der Knopf noch etwas offen haelt:
 
 - `MOSAIC_POINTS_UTILITY_W` (ENTSCHIEDEN, PREREG_task28_aggression.md)
@@ -39,6 +39,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_DENIAL_TIEBREAK_EPS` (ENTSCHIEDEN, PREREG_denial_tiebreak.md)
 - `MOSAIC_DENIAL_UNCERT_Z` (ENTSCHIEDEN, PREREG_denial_tiebreak.md)
 - `MOSAIC_COLOR_DENIAL_PROBE_Z` (UEBERHOLT, PREREG_opponent_disruption_v2.md par.5.2)
+- `MOSAIC_IMPLICIT_MINIMAX_A` (ENTSCHIEDEN, PREREG_implicit_minimax_backup.md par.1; PREREG_agent_encapsulation.md par.4)
 - `MOSAIC_PHASE_AMP` (ENTSCHIEDEN, PREREG_heuristic_v2_long_rows.md par.13)
 - `MOSAIC_ORT_CUDA_ENABLED` (ENTSCHIEDEN, PREREG_gpu_inference_path.md par.11)
 - `MOSAIC_INTERLEAVE_ENABLED` (ENTSCHIEDEN, PREREG_async_search.md)
@@ -60,7 +61,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_CACHE_NOPACK` (ENTSCHIEDEN, PREREG_v21_window.md)
 - `MOSAIC_VAL_POOL` (ENTSCHIEDEN, PREREG_v22_window.md par.6)
 
-**Beantwortet, Default AN (15)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
+**Beantwortet, Default AN (16)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
 
 - `MOSAIC_FLOOR_SHAPING_W` = 0.3 (ENTSCHIEDEN, PREREG_search_path_remeasurements.md M1)
 - `MOSAIC_FLOOR_SHAPING_OPP_BIAS` = 1.0 (ENTSCHIEDEN, PREREG_aggression_style_measurement.md E2)
@@ -77,6 +78,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_TILING_PLATTEN_GEW` = 1.0 (1 oder 8 Werte) (ENTSCHIEDEN, PREREG_placement_side.md)
 - `MOSAIC_DATA_DIR` = <repo>/data (ENTSCHIEDEN, PREREG_corpus_dose.md)
 - `MOSAIC_CARRIER_MANIFEST` = LEER (kein Manifest, jede Datei traegt Policy) (ENTSCHIEDEN, PREREG_v21_window.md)
+- `MOSAIC_BOOTSTRAP_COHERENCE` = off (einziger Alternativwert: sum1) (ENTSCHIEDEN, PREREG_heuristic_v2_long_rows.md par.3b.3)
 
 | Knopf | Default | Status | Verdikt | Zweck | Beleg |
 |---|---|---|---|---|---|
@@ -106,7 +108,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_DENIAL_MIN_VISIT_FRAC` | 0.5 | aktiv | ENTSCHIEDEN | Mindest-Besuchsanteil f des E3b-Besuchs-Gates (net_mcts.rs:2579) | PREREG_denial_tiebreak.md |
 | `MOSAIC_COLOR_DENIAL_PROBE_Z` | 0.0 (aus) | diagnose | UEBERHOLT | z-Schwelle des Stoerfenster-ZAEHLMODUS -- zaehlt nur, aendert die gespielte Aktion nicht (net_mcts.rs, color_denial_probe_with) | PREREG_opponent_disruption_v2.md par.5.2 |
 | `MOSAIC_COLOR_DENIAL_PROBE_MIN_VISIT_FRAC` | 0.5 | diagnose | UEBERHOLT | Mindest-Besuchsanteil des Stoerfenster-Zaehlmodus (net_mcts.rs, color_denial_probe_min_visit_frac) | PREREG_opponent_disruption_v2.md par.5.2 |
-| `MOSAIC_IMPLICIT_MINIMAX_A` | 0.0 (aus) | aktiv | ENTSCHIEDEN/OFFEN | Mischgewicht alpha der Implicit-Minimax-Backups (Baier/Winands): Selektions-Q der Tiefe-≥1-Gumbel-Auswahl wird (1-alpha)*Q_MC + alpha*v_IM, v_IM per Minimax ueber besuchte Kinder rueckpropagiert. Welle-1-Pilot der Agenten-Kapselung (PREREG_agent_encapsulation.md): liest ueber SearchConfig::from_env() (net_mcts.rs) statt eines prozessglobalen OnceLock -- der Knopf bleibt die Default-Quelle, pro-Seite ueberschreibbar per Spec-Datei (models/<name>.spec.json) an net_arena_match/net_vs_net_arena_match/net_self_play_games | PREREG_implicit_minimax_backup.md par.1; PREREG_agent_encapsulation.md par.4 |
+| `MOSAIC_IMPLICIT_MINIMAX_A` | 0.0 (aus) | aktiv | ENTSCHIEDEN | Mischgewicht alpha der Implicit-Minimax-Backups (Baier/Winands): Selektions-Q der Tiefe-≥1-Gumbel-Auswahl wird (1-alpha)*Q_MC + alpha*v_IM, v_IM per Minimax ueber besuchte Kinder rueckpropagiert. Welle-1-Pilot der Agenten-Kapselung (PREREG_agent_encapsulation.md): liest ueber SearchConfig::from_env() (net_mcts.rs) statt eines prozessglobalen OnceLock -- der Knopf bleibt die Default-Quelle, pro-Seite ueberschreibbar per Spec-Datei (models/<name>.spec.json) an net_arena_match/net_vs_net_arena_match/net_self_play_games | PREREG_implicit_minimax_backup.md par.1; PREREG_agent_encapsulation.md par.4 |
 | `MOSAIC_LONG_ROW_INIT_W` | 0.0 (aus) | aktiv | ENTSCHIEDEN/OFFEN | Gewicht des Langreihen-INITIIERUNGS-Additivs am Netz-Blattwert: (begonnene lange Reihen ego - begonnene lange Reihen gegner) / LONG_ROW_INIT_SHAPING_SCALE, tanh-gesaettigt, additiv wie das Floor-Shaping. Stufenfunktion am Uebergang 0->1 in Musterreihe 5/6, KEIN Fuellstands-Anteil -- PREREG_long_row_payoff.md par.2a hat gemessen, dass die Luecke zum Heuristik-Lehrer im BEGINNEN sitzt (Policy-Masse 11,5 % gegen 25,2 %, Faktor ~3, flach ueber R1-4), nicht im Fortsetzen. Nenner 10 statt 50, damit der maximale Blattwert-Shift (0,059 bei w=0,3) dem Floor-Term entspricht statt fuenfmal schwaecher zu sein (PREREG_floor_shaping_scale.md). Liest ueber SearchConfig, pro Seite per Spec-Datei ueberschreibbar | PREREG_long_row_payoff.md par.3/B1; PREREG_floor_shaping_scale.md par.2 |
 | `MOSAIC_PHASE_STAGE` | both | diagnose | ENTSCHIEDEN | Auf welchen Entscheidungsstellen der Phasenfaktor wirkt: draft/tiling/both (plate_builder.rs::phase_wirkt_auf) -- trennt Rang-Entscheidung im Drafting von der Summen-Entscheidung im Tiling | PREREG_heuristic_v2_long_rows.md par.14 |
 | `MOSAIC_PHASE_AMP` | unset (= feste Tabelle SPALTEN_PHASE) | diagnose | ENTSCHIEDEN | Gipfelhoehe des Phasenfaktors auf die Spalten-Stufen der v2-Zielkarte (plate_builder.rs::spalten_phase); 1.0 = wirkungslos, dient im Sweep als Nullpunkt | PREREG_heuristic_v2_long_rows.md par.13 |
@@ -152,6 +154,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_CARRIER_MANIFEST` | LEER (kein Manifest, jede Datei traegt Policy) | aktiv | ENTSCHIEDEN | Dateiname des Policy-Traeger-Manifests im Korpus-Ordner; Default seit 2026-08-29 leer, der alte v20-Default war tot (corpus_dataset.py, MosaicDataset.__init__) | PREREG_v21_window.md |
 | `MOSAIC_IGNORE_POLICY_TARGET_VALID` | aus (nur =1) | aktiv | ENTSCHIEDEN | Traeger-A/B Arm B: setzt GENAU die Policy-Maskierung aus `policy_target_valid=false` aus, sodass der Policy-Kopf auch die Vorzugszuege des v2-Lehrers sieht (Wirkstelle corpus_dataset.py, MosaicDataset.__init__). Einmal beim Import gelesen (neural_net.py, `_IGNORE_PTV`), damit derselbe Prozess die Semantik nicht auf halber Strecke wechselt, und im Cache-Schluessel (`+ignore_ptv_v1` in corpus_dataset.py, `|ignore_ptv_v1` in file_cache_key.py) -- sonst zoege der zweite Lauf still den Cache des ersten. Die anderen Nullsetzungen (Tiling/Start, Traeger-Manifest, PCR) bleiben unberuehrt | PREREG_v22_window.md par.4 |
 | `MOSAIC_CACHE_NOPACK` | aus (nur =1) | aktiv | ENTSCHIEDEN | erzwingt unkomprimiertes Cache-Format statt Bitpacking, eigener Cache-Key (corpus_dataset.py; Cache-Key in file_cache_key.py, per_file_cache_key) | PREREG_v21_window.md |
+| `MOSAIC_BOOTSTRAP_COHERENCE` | off (einziger Alternativwert: sum1) | aktiv | ENTSCHIEDEN | Arm K: normiert die beiden gespeicherten bootstrap_value-Eintraege eines Zustands auf Summe 1, BEVOR sie ins WDL-Ziel geblendet werden (corpus_dataset.py, _bootstrap_coherence_mode). Befund-Basis: die Paarsumme liegt bei ~1,13-1,14 statt 1, das Label-Netz ist beidseitig ~+5 pp zu optimistisch. Zieldefinition, also im Cache-Schluessel BEIDER Namensraeume (+bscoh_<modus>_v1 im Fenster-Key, |bscoh_<modus>_v1 im Datei-Key) und im Trainings-Manifest (bootstrap_coherence); ein unbekannter Wert bricht ab, statt still auf off zu fallen. Default aus, Eintaktung bewusst spaet -- er entwertet als einziger Arm alle Cache-Bloecke | PREREG_heuristic_v2_long_rows.md par.3b.3 |
 | `MOSAIC_CACHE_F32` | aus (nur =1) | aktiv | - | float32 statt float16 fuer states/policies im Cache, Notausstieg (corpus_dataset.py, _cache_f32_active) | - |
 | `MOSAIC_PLANES_LAZY` | aus (nur =1) | aktiv | - | lazy HDF5-Pro-Index-Zugriff statt Planes-in-RAM, nur fuer knappes RAM (corpus_dataset.py, _maybe_load_planes_eager) | - |
 | `MOSAIC_PLANES_H5_DIR` | unset | diagnose | - | Planes-HDF5 aus anderem Ordner oeffnen, OneDrive-Ausschlusstest (corpus_dataset.py) | - |
