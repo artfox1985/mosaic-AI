@@ -304,6 +304,27 @@ Anlass: der Lehrer-Test am 2026-08-25 lief 27 Minuten ohne jede ablesbare
 Zwischeninformation, weil er als `python -u ... 2>&1 | tail -26` gestartet
 wurde. Die Regel stand vorher nur im Gedächtnis und hat dort nicht gegriffen.
 
+## Nach jeder Engine-Aenderung: Anker-Invarianz pruefen (Nutzer-Anweisung 2026-08-31)
+
+Die Elo-Leiter haengt an EINEM Fixpunkt, und der ist seit dem 2026-08-31 das
+eingefrorene Artefakt `models/frozen_heuristics/hv1_anchor` (`ANCHOR_NAME` in
+`tools/elo_tracker.py`). Der lebende Heuristik-Pfad ist eine
+ENTWICKLUNGSUMGEBUNG, kein Vergleichswert: er wird weiterentwickelt und darf
+sich bewegen. Ein Fixpunkt, der sich bewegen darf, ist keiner.
+
+**Regel: Wer die Spiel-Engine aendert und das Wheel neu baut, vergleicht
+danach den Anker ZUG FUER ZUG** -- hv1 auf dem Live-Wheel gegen dasselbe
+Rezept auf dem Artefakt-Wheel, gleiche Seeds, Record fuer Record. Ein Match
+der beiden gegeneinander taugt NICHT: zwei identische Spieler ergeben per
+Konstruktion 50 Prozent. Kosten gemessen: 22,2 s (Drift) und 13,4 s
+(Konservierung).
+
+ROT heisst nicht "reparieren", sondern Nutzer-Entscheid: Anker bewusst neu
+setzen und ein neues Leitersegment aufmachen, oder die Aenderung
+zuruecknehmen. Praezedenz ist die R5-Fix-Grenze, ueber die nie gemischt wird.
+
+**Der Ablauf dazu: `/mosaic-anchor-invariance`.** Die Regeln stehen HIER.
+
 ## Push scheitert am pre-push-Hook: examples/ und benches/ (wiederkehrend)
 
 Der pre-push-Hook laeuft `cargo test --release`, und das kompiliert **auch
