@@ -391,6 +391,7 @@ class LossSetup:
     points_weight: float
     ownership_weight: float
     moon_loss_weight: float
+    surprise_alpha: float
     mse_loss: object
 
 
@@ -498,6 +499,38 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
         rw = (s_rounds.to(device) != 5).float() if loss_setup.exclude_round5 else None
 
         w = pol_w if rw is None else pol_w * rw
+
+        # UEBERRAECHUNGS-GEWICHTUNG (v23-b03, PREREG_policy_surprise_weighting.md
+        # par.3a). Stichproben, an denen das Netz JETZT danebenliegt, zaehlen
+        # mehr. Bei alpha = 0.0 wird der Block GANZ uebersprungen -- dann ist
+        # der Pfad bit-identisch zum Bestand (Muster wie moon_loss_weight).
+        #
+        # Die Ueberraschung kostet nichts Zusaetzliches: der Policy-Verlust IST
+        # die Kreuzentropie, und CE = H(target) + KL(target || netz). Also ist
+        # `kl = per_sample_ce - H(target)`, und H(target) ist eine reine
+        # Funktion des gespeicherten Ziels. KEIN neues Feld, KEINE
+        # Cache-Key-Komponente, alle Bloecke bleiben gueltig.
+        if loss_setup.surprise_alpha > 0.0:
+            with torch.no_grad():
+                # H(target) mit 0*log0 = 0; `targets_p` ist bereits normiert.
+                t_ent = -(targets_p * torch.log(targets_p.clamp(min=1e-12))).sum(dim=1)
+                kl = (per_sample_ce.detach() - t_ent).clamp(min=0.0)
+                # Bezug ist der Mittelwert ueber die GUELTIGEN Samples (w > 0):
+                # maskierte Zeilen duerfen den Massstab nicht verschieben.
+                wsum = w.sum().clamp(min=1e-6)
+                kl_mean = (kl * w).sum() / wsum
+                raw = (kl / kl_mean.clamp(min=1e-6)) ** loss_setup.surprise_alpha
+                # Kappung: ein verrauschtes Ziel darf keinen Batch dominieren.
+                w_surp = raw.clamp(0.25, 4.0)
+                # Normierung auf Mittel 1 ueber die gueltigen Samples -- haelt
+                # die Loss-SKALA und damit die effektive Lernrate konstant.
+                # Ohne sie waere der Arm mit einem LR-Wechsel konfundiert.
+                w_surp = w_surp / ((w_surp * w).sum() / wsum).clamp(min=1e-6)
+            # `w_surp` ist detached (no_grad): flösse der Gradient durch das
+            # Gewicht, koennte das Netz den Verlust senken, indem es das
+            # Gewicht dort drueckt, wo die CE hoch ist -- eine Abkuerzung
+            # statt Lernen.
+            w = w * w_surp
         p_loss = (per_sample_ce * w).sum() / w.sum().clamp(min=1e-6)
 
         # Moon-Order Loss direkt zu Policy-Loss, seit --moon-loss-weight mit
@@ -972,7 +1005,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           ranking_loss_weight=0.0, conjunction_head=False, ownership_head_2d=False,
           head_warmstart=True, extra_data_dir=None,
           freeze_trunk=False, cache_file=None, moon_loss_weight=1.0,
-          file_list=None):
+          file_list=None, surprise_alpha=0.0):
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
@@ -1194,6 +1227,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Dict unveraendert ab) -- ein neues Flag MUSS hier eingetragen werden,
         # sonst schweigt das Manifest ueber den gefahrenen Arm.
         "moon_loss_weight": moon_loss_weight,
+        "surprise_alpha": surprise_alpha,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
         # Schlachtplan A0 Schritt 2c: WELCHE vorab gebaute Cache-Datei benutzt
         # wurde. Der VALIDIERTE Schluessel kommt weiter unten nach
@@ -1691,6 +1725,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         ranking_loss_weight=ranking_loss_weight, exclude_round5=exclude_round5,
         value_weight=effective_value_weight, points_weight=effective_points_weight,
         ownership_weight=effective_ownership_weight, moon_loss_weight=moon_loss_weight,
+        surprise_alpha=surprise_alpha,
         mse_loss=mse_loss,
     )
     for epoch in range(epochs):
@@ -2502,6 +2537,12 @@ if __name__ == "__main__":
                              "Gegenstueck zu build_cache_incremental --file-list; gedacht "
                              "fuer rotierende Fenster, die sich nicht als Regex schreiben "
                              "lassen.")
+    parser.add_argument("--surprise-alpha", type=float, default=0.0,
+                        help="Ueberraschungs-Gewichtung des Policy-Verlusts (v23-b03, "
+                             "PREREG_policy_surprise_weighting.md par.3a): Gewicht je Sample "
+                             "= (KL(Ziel||Netz) / Batch-Mittel)^alpha, gekappt auf [0,25; 4,0] "
+                             "und auf Mittel 1 normiert. 0.0 (Default) = bestandsidentisch, "
+                             "der Block wird dann ganz uebersprungen.")
     parser.add_argument("--moon-loss-weight", type=float, default=1.0,
                         help="Gewicht des Moon-Order-Terms im Policy-Loss (train.py: "
                              "plackett_luce_moon_loss, auf sun_mask gemittelt und auf p_loss "
@@ -2632,4 +2673,5 @@ if __name__ == "__main__":
           ranking_loss_weight=args.ranking_loss_weight,
           head_warmstart=not args.no_head_warmstart, extra_data_dir=args.extra_data_dir,
           freeze_trunk=args.freeze_trunk, cache_file=args.cache_file,
-          moon_loss_weight=args.moon_loss_weight, file_list=args.file_list)
+          moon_loss_weight=args.moon_loss_weight, file_list=args.file_list,
+          surprise_alpha=args.surprise_alpha)
