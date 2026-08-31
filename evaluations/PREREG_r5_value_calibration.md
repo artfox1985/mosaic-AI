@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Reagiert der Value-/Punkte-Kopf in Runde 5 proportional richtig auf Wertungsplatten-Aenderungen (Task #27)? | Beleg: Unterkalibrierung bestaetigt und mehrfach repliziert (Gesamtsteigung 0,06-0,09; b05 0,0886, unabhaengig 0,0852 auf allen 32 Kombinationen). KRITERIENWEISE aufgeloest (par.10, 2026-08-30): die Daempfung ist BREIT, NICHT spaltenspezifisch -- Kriterium 1 liegt ueber den uebrigen sieben (Tausch 4 auf 1: 0,1996 bei t 12,1; v21 dort 0,0152). Zu duenn fuer ein Urteil: k2, k4, k7. -->
+<!-- STATUS: OFFEN | Frage: Unterbietet der Value-Kopf den Plattenlohn, und laesst sich das heilen? | Beleg: JA, und der KORPUS heilt es NICHT (par.11, 2026-08-31): v23-b01 misst 0,0859 gegen b05s 0,0886 auf denselben 139 Paaren -- die On-Policy-Wette von Zuschnitt D ist nicht aufgegangen, obwohl b01 deutlich staerker wurde und 66 Prozent mehr Spalten baut. Der Punkte-Kopf trifft dieselbe Groesse mit 0,97, es ist also spezifisch der Value-Kopf. Der Eingriff ist damit faellig; Erfolgstest 'kippt die Sims-Kurve?'. -->
 
 # Vorregistrierung: Runde-5-Value-/Punkte-Kopf-Kalibrierung gegen exakte Ground Truth
 
@@ -556,3 +556,39 @@ Die kriterienweise Aufschluesselung dieser Messung (Auftrag
 eine ABGRENZUNGS-Messung: ist k1 staerker gedaempft als die uebrigen
 sieben Kriterien, oder ist der Effekt gleichmaessig? Nur der erste
 Fall stuetzte ueberhaupt eine spaltenbezogene Lesart.
+
+## par.11 v23-b01 GEMESSEN: die Daempfung bleibt -- der Korpus heilt sie NICHT (2026-08-31)
+
+Gefahren mit demselben Zuschnitt wie die b05-Messung (frozen_eval_set, 24
+Zustaende x 6 Plattenkombinationen, 400 Sims, Seed 1000), **beide Netze im
+SELBEN Lauf** auf denselben 139 Zustands-Kombinations-Paaren -- gepaart, nicht
+gegen eine gespeicherte Zahl verglichen (Artefakt
+`r5_value_calibration_v23b01.json`):
+
+| Netz | Value-Steigung | R2 | Punkte-Kopf |
+| --- | --- | --- | --- |
+| `v23-b01_brierbest` | **0,0859** | 0,147 | 0,9728 |
+| `v22-b05` | 0,0886 | 0,115 | 0,9888 |
+
+**Verdikt: die Wette von Zuschnitt D ist NICHT aufgegangen.** Der neue Korpus
+sollte die Betrags-Daempfung ueber ON-POLICY-Vollendungsexposition heilen --
+eigene Partien, in denen Vollendungen vorkommen und sich im Ausgang
+auszahlen. Genau das war die Begruendung, den Schwarm argmax-lastig zu
+fahren. Die Steigung steht danach bei 0,0859 statt bei ~1: unveraendert.
+
+**Was das WERTVOLL macht, statt nur enttaeuschend:** b01 ist in derselben
+Generation deutlich staerker geworden (119:61 gegen b05, Augenhoehe mit dem
+Champion) und baut 66 Prozent mehr Spalten -- **ohne dass der Bewerter
+repariert wurde**. Der Fortschritt kam also vollstaendig von woanders, und
+der Hebel liegt weiterhin unbenutzt da. Die Betrags-Schiene ist damit nicht
+erledigt, sondern erst richtig faellig.
+
+**Und die Diagnose bleibt scharf:** der PUNKTE-Kopf trifft den Plattenlohn mit
+Steigung 0,97 fast perfekt. Das Netz KANN die Groesse darstellen -- es ist
+spezifisch der Gewinnwahrscheinlichkeits-Kopf, der sie unterbietet. Ein
+Kapazitaets- oder Eingabeproblem ist damit weiterhin ausgeschlossen.
+
+**Folge fuer den Strang:** die naechste Stufe ist nicht mehr "abwarten, ob der
+Korpus es richtet" -- diese Frage ist beantwortet. Es braucht den Eingriff,
+mit dem registrierten Erfolgstest "kippt die Sims-Kurve?" (Nachtrag
+2026-08-30).
