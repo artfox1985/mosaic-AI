@@ -1393,6 +1393,54 @@ Spaltenblindheits-Einwand ausdruecklich nicht); (3) die On-Policy-Exposition,
 die der laufende Korpus liefert (die Wette von Zuschnitt D). Arm K steht
 hinter allen dreien.
 
+**WAECHTER GEFAHREN 2026-08-31 NACH DER ERZEUGUNG -- BEIDE BESTANDEN, GO
+FUER DAS v23-TRAINING.** Korpus: 12.000 Partien des Generators v22-b05
+(6.000 value-argmax + 2.000 value-sampled + 4.000 policy), erzeugt
+2026-08-30 19:25 bis 2026-08-31 07:20.
+
+**(a) PRIMAER, Symmetrie-Trennung auf der VALUE-Klasse: TRENNT.**
+Punkt-biseriale Korrelation der vollen Spalten mit dem Ausgang, Block-Ebene
+ueber 398 Dateien: **+0,4041 +- 0,0192 (SE 0,0098, t 41,26)**; Sieger minus
+Verlierer +0,3940 (t 33,11). Nebengroesse Fuellstands-Summe +0,5361 (t 71,47).
+8.000 von 8.000 Partien gewertet, 1.399.446 Records, kein Ausfall
+(corpus_symmetry_v22b05_value.json, 346 s). **Einordnung, ehrlich:** der
+hv2-Lehrerkorpus lag bei +0,573 (t 93) -- die Trennung ist SCHWAECHER als
+beim Lehrer, was zur niedrigeren Vollendungsrate passt (b05 baut weniger
+Spalten, also entscheidet die Groesse seltener die Partie). Das Tor fragt
+nach "signifikant > 0", und das ist mit t 41 nicht knapp.
+
+**(b) SEKUNDAER, Ereigniszahl: 5.629 von 16.000 Partien-Seiten der
+Value-Klasse tragen mindestens eine volle Spalte** -- Schwelle 1.500, also
+das **3,75-fache**. Kein Degenerations-Fall.
+
+**(c) BERICHTSGROESSEN, und eine davon ist ein eigener Befund.** Volle
+Spalten je Partie und Seite: Value-Klasse **0,481**, Policy-Klasse 0,129
+(Referenzen: argmax@400 0,3375, gesampelt@400 0,07-0,11, Champion 0,102).
+
+Die 0,481 der Value-Klasse liegt UEBER dem argmax-Instrumentwert, und das
+ist keine Anomalie, sondern die Vorhersage der Sims-Kurve: sie besagt
+~0,6 volle Spalten bei 25-100 Sims gegen 0,34 ab 250. Nachgerechnet aus den
+beiden registrierten Vorbefunden -- 6.000 argmax bei ~0,6 plus 2.000
+gesampelt bei ~0,10 -- ergibt (6000*0,6 + 2000*0,10)/8000 = **0,475**
+erwartet gegen **0,481** gemessen. Sims-Kurve und Sampling-Leiter, beide auf
+200-Partien-Stichproben registriert, treffen damit auf 8.000 Partien
+unabhaengig zu.
+
+Weitere Kennzahlen (Value / Policy): eigene Punkte 39,42 / 22,37,
+Strafleiste 7,14 / 10,42 Steine, volle Reihen 0,141 / 0,094, k1-Punkte
+3,55 / 0,86, k6 Spezialfelder -10,51 / -11,42. **Der Preis des Samplings ist
+in der Policy-Klasse deutlich sichtbar** -- 17 Punkte weniger und drei
+Strafsteine mehr je Seite. Das ist der bewusste Zuschnitt-D-Handel
+(Zustandsabdeckung gegen Spielqualitaet), aber der Abstand ist groesser als
+die Leiter mit 200 Partien vermuten liess.
+
+**Traeger-Manifest gebaut** (`data/policy_carrier_manifest_v23.json`):
+180 hv2-Dateien (Seed 20260921, aus den 1.745 Fensterdateien von Seed
+20260920) = 1.800 policy-aktive Lehrerpartien, plus die Policy-Klasse
+VOLLSTAENDIG (200 Dateien = 4.000 Partien) ueber `--include-glob`. Die
+Value-Klasse ist bewusst NICHT gelistet. Geprueft: 380 Eintraege, Policy-
+Klasse vollzaehlig, alle hv2-Traeger im Fenster, kein `carrier_prefixes`.
+
 ### par.3b.4 Symmetrie-Pruefung des Lehrerkorpus (registriert 2026-08-27, VOR der Tor-Auswertung von par.3b.2)
 
 **Der Mechanismus ist in diesem Projekt schon einmal aufgetreten.**
