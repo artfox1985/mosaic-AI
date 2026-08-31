@@ -66,6 +66,34 @@ alle 600 Basenames und damit ihre Cache-Bloecke aendern, und b01 traint
 bereits darauf. Wiedervorlage nach b01, falls die groebere Granularitaet
 beim naechsten Fensterschnitt stoert.
 
+## 1b. v23-b01 STEHT, TOR 2a BESTANDEN (2026-08-31)
+
+`v23-b01` ist trainiert (Warmstart von b05, 5,97 h, Kandidat
+`v23-b01_brierbest`, Epoche 5, val_brier 0,1934). **Tor 2a ist bestanden, und
+zwar mit Abstand** -- Herleitung und Tabelle in `PREREG_v23_window.md`
+par.2b:
+
+| je Partie und Seite | v23-b01 | v22-b05 |
+| --- | --- | --- |
+| **volle Spalten** | **0,5150** | 0,3100 |
+| Punkte | 46,80 | 42,10 |
+| Strafleiste | 5,74 | 6,61 |
+
+Gepaart (gleicher Seed, 200 Paare): **+0,2050 +- 0,0898, t +4,47** -- plus
+66 Prozent. Der Spaltenbau kostet hier NICHTS: mehr Punkte bei weniger
+Strafsteinen.
+
+**Laufend:** Tor 1 (gepaartes Gating b01 gegen b05, Champion-Strenge,
+`--no-promote-winner`) auf der CPU, `v23-b02` (Kaltstart) auf der GPU.
+**Danach:** Tor 2b (Arena mit `--log-games` +
+`tools/probes/arena_column_probe.py`) und die drei Elo-Kanten.
+
+**Beim Aufsetzen von Tor 1 abgefangen:** `paired_gating.py --promote-winner`
+steht per Default auf AN und haette `models/champion.txt` auf b01 gesetzt,
+sobald der SPRT signifikant ausfaellt. Das waere eine stille Promotion gegen
+die eigene Regel gewesen (Champion ist v21; b01-gegen-b05 ist das
+Ratschen-Tor). Mit `--no-promote-winner` gefahren.
+
 ## 2. WAS ALS NAECHSTES ZU TUN IST
 
 ### 2.1 Sofort nach dem Lauf: Tor 0 (bindend, exklusiv)
