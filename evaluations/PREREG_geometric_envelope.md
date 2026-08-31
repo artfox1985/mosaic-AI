@@ -90,11 +90,25 @@ Vorrunde; Artefakt `round_point_profile_b05.json`):
 doppelt so viel wie eine einzelne fruehe Runde. Einschraenkung: EIN Spieler,
 EIN Korpus -- als Groessenordnung belastbar, nicht als Konstante.
 
-**Die Regelmechanik erklaert es:** k1 zahlt `7*(f/6)^2` je Spalte
-(scoring.rs:166). Die sechste Zelle einer Spalte ist damit 2,14 Punkte wert,
-die erste 0,19. Fruehe Platzierungen zahlen also strukturell wenig -- ihr
-Wert liegt darin, WO sie liegen, nicht was sie sofort bringen. Genau das
-kann ein Sofortpunkt-Loeser nicht sehen.
+**Die Regelmechanik erklaert es, und zwar schaerfer als eine glatte Kurve
+(Nutzer-Berichtigung 2026-08-31):** k1 der ENGINE ist eine STUFE, kein
+Verlauf. `score_vertical_rows` zaehlt die VOLLSTAENDIGEN Spalten und zahlt
+7 Punkte je Stueck (scoring.rs:709-712) -- die ersten fuenf Zellen einer
+Spalte bringen exakt **null**, die sechste bringt **alle sieben**.
+
+Der quadratische Ausdruck `7*(f/6)^2` steht in `scoring_progress`
+(scoring.rs:160-166) und ist ein SHAPING-Term, nicht die Wertung: ein
+glatter Fortschritts-Ersatz, dessen Exponent 2 laut Funktionskommentar EINE
+fast fertige Linie gegenueber vielen halbfertigen bevorzugt. Er ist zudem der
+eingefrorene Elo-Anker-Term und wird nicht angefasst. Wer ihn mit der Regel
+verwechselt, unterschaetzt den Effekt: die echte Auszahlung ist nicht
+"frueh wenig", sondern **frueh nichts**.
+
+Damit ist die Aussage nicht mehr nur quantitativ, sondern kategorisch: ein
+Loeser, der nach Sofortpunkten waehlt, sieht beim Spaltenbau bis zur
+Vollendung UEBERHAUPT KEIN Signal. Er kann die Huelle nicht beruecksichtigen,
+weil sie in seiner Zielfunktion gar nicht vorkommt -- genau deshalb ist (d)
+Pflicht und nicht Kuer.
 
 **Folge fuer das Abklingprofil (par.4.1):** es ist nicht frei waehlbar,
 sondern soll der gemessenen Kurve folgen -- Huelle dominiert, solange die
