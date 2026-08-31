@@ -23,8 +23,10 @@
        Muster ".cache*.h5" liess 2.760 MB Trainingscache stehen, darunter
        zwei Dateien mit je 874 MB.
 
-    Der Bestand der alten Sicherung wird EINMALIG mit
-    tools/mosaic_backup_seed.ps1 uebernommen; danach genuegt dieses Skript.
+    Der Bestand der alten Sicherung (Spiegel plus datierte models-Zips) ist
+    am 2026-08-31 einmalig uebernommen und geprueft worden; das Werkzeug
+    dafuer ist danach entfallen, es steht in der Historie. Seitdem genuegt
+    dieses Skript allein.
 
     LOESCHEN PASSIERT NUR AUF ANSAGE. `forget` und `prune` laufen
     ausschliesslich mit dem Schalter -Prune. Ohne ihn waechst das
