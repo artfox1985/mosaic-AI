@@ -55,6 +55,17 @@ Value-Klasse ist bewusst nicht gelistet.
 
 **Damit ist der Weg frei fuer den Fensterbau und das v23-Training.**
 
+**OFFEN AUS DIESER ERZEUGUNG (Nutzer-Anweisung 2026-08-31):** die
+b05-Dateien tragen **20 Partien statt der geregelten 10**. Der Wert kam aus
+dem Nachtrezept (`night_run_20260830.md`, Vorsitzung) und wanderte ueber die
+Uebergabe in die gefahrenen Befehle; `self_play.py` steht per Default auf 10.
+Regel ab jetzt: nicht ueberschreiben (`docs/working_rules.md`, Abschnitt
+"Korpusdateien tragen 10 Partien"). **Fuer den laufenden Korpus bleibt es bei
+20** -- ein Umpacken (`tools/repack_corpus.py`) waere moeglich, wuerde aber
+alle 600 Basenames und damit ihre Cache-Bloecke aendern, und b01 traint
+bereits darauf. Wiedervorlage nach b01, falls die groebere Granularitaet
+beim naechsten Fensterschnitt stoert.
+
 ## 2. WAS ALS NAECHSTES ZU TUN IST
 
 ### 2.1 Sofort nach dem Lauf: Tor 0 (bindend, exklusiv)

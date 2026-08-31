@@ -133,6 +133,26 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   Re-Export aus der `.pth` ist nicht byte-stabil). Schwesterregel zu "Ein Wheel
   liegt IM Artefakt" oben.
 
+### Korpusdateien tragen 10 Partien -- immer (Nutzer-Anweisung 2026-08-31)
+
+Nutzer: *"ich will eigentlich immer 10 dateien pro pkl. dann laesst es sich
+sauberer aufsplitten."* `self_play.py --per-file` steht per Default auf 10
+(self_play.py:715); **die Regel ist, ihn nicht zu ueberschreiben.**
+
+Warum die Granularitaet zaehlt: Fenster und Splits arbeiten auf DATEI-Ebene,
+nicht auf Partie-Ebene. Bei 10 Partien je Datei rotiert ein Fenster in
+10er-Schritten und ein Val-Split zieht in 10er-Schritten; bei 20 ist jede
+Entscheidung doppelt so grob. Konkret im v23-Fenster: die hv2-Seite (10 je
+Datei) liess sich auf 17.450 Partien genau treffen, die b05-Seite (20 je
+Datei) haette nur 20er-Spruenge erlaubt.
+
+**Praezedenz, damit es nicht wieder passiert:** die v22-b05-Erzeugung lief mit
+`--per-file 20`. Der Wert stand im Nachtrezept
+`evaluations/night_run_20260830.md` und wanderte von dort ueber die
+STATUS-Uebergabe in die gefahrenen Befehle -- ohne dass irgendwo eine
+Begruendung dafuer steht. Ein ueberschriebener Default ohne Begruendung ist
+genau die Sorte Detail, die eine Uebergabe unbemerkt weitertraegt.
+
 ## Arbeitsweise
 
 - **Loeschen nur mit expliziter, pfadgenauer Rueckfrage.** Eine Frage ist
