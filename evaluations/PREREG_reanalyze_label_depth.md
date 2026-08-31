@@ -113,6 +113,44 @@ diese Kette konsistent neu zu rechnen, nicht nur root_q zu ersetzen.
 (2) Kosten grob 0,15 s je Zustand bei 400 Sims; ein voller
 12.000-Partien-Korpus ist damit ein Tagesbudget.
 
+## par.4b Wo relabelt wird: KOPIE mit eigenem Praefix (Nutzer-Entscheid 2026-08-31)
+
+Nutzer: *"da relabeling anscheinend die pkl daten aendert, mach einfach einen
+subordner mit dem gesamten kopierten fenster. das wird dann gelabelt und
+stoert keinen."* Richtig, mit einer Praezisierung, ohne die die Isolation
+nicht haelt:
+
+**Der Unterordner allein trennt den Cache NICHT.** Der Datei-Cache-Schluessel
+wird aus dem BASENAME gebildet, nicht aus dem Pfad (file_cache_key.py:81,
+`"filecache_v1|" + basename`). Gleiche Dateinamen in einem anderen Ordner
+ergeben denselben Schluessel; die relabelte Kopie traefe also den Block des
+Originals -- genau die stille Falle, gegen die die Kopie gebaut wird.
+`tools/relabel_drafts_with_teacher.py` schreibt in place (Zeile 138), und
+`build_cache_incremental.py` erkennt einen Block allein am Dateinamen (kein
+mtime, kein Inhalt).
+
+**Also: Kopie MIT eigenem Praefix.** Form (am Code geprueft 2026-08-31: das
+Dateinamen-Regex in train.py liest die Klasse korrekt heraus, und der Praefix
+faellt unter keine Blockliste -- weder `LEGACY_STRETCHED_PREFIXES` noch
+`V20_CARRIER_SHORTCUT_PREFIXES`):
+
+```
+data/relabeled_v23/selfplay_v22-b05relab-<klasse>_<datum>_g<N>.pkl
+```
+
+**Kopiert wird nur der NEUE Korpus, nicht das ganze Fenster.** Die
+hv2-Haelfte ist der Lehrerkorpus -- ihre Policy-Ziele SIND schon die des
+Lehrers; sie mitzukopieren waere bestenfalls ein No-op und wuerde ihre 2.400
+Cache-Bloecke entwerten. Umfang: rund 600 Dateien a 2,35 MB = 1,4 GB
+(Platte ist kein Argument, 1,7 T frei).
+
+**Was das an der Reihenfolge-Frage aendert:** sie loest sich auf. Roh und
+relabelt liegen nebeneinander auf DENSELBEN Partien. Das v23-Training faehrt
+zuerst das rohe Fenster (die reine On-Policy-Wette des Zuschnitts D), und das
+relabelte Fenster wird ein gepaarter Arm darauf -- ein Faktor, identische
+Spiele. Das ist die Bauform, die diese Kampagne sonst nachtraeglich
+herzustellen versucht.
+
 ## par.5 Abgleich mit dem Phasenplan (STATUS)
 
 * **Phase 2 (Generationen-Lauf) geht VOR** -- beide Teile brauchen den

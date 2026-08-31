@@ -69,7 +69,6 @@ die Messkorpora sind geloescht (Nutzer-Freigaben 2026-08-30, zuletzt die 60
 python -u tools/probes/corpus_column_outcome_symmetry_probe.py --pattern "selfplay_v22-b05-value-*.pkl" --out evaluations/artifacts/corpus_symmetry_v22b05_value.json
 python -X utf8 -u tools/corpus_sanity_check.py data --pattern "selfplay_v22-b05-value-*.pkl" --out evaluations/artifacts/corpus_sanity_v22b05_value.json
 python -X utf8 -u tools/corpus_sanity_check.py data --pattern "selfplay_v22-b05-policy_*.pkl" --out evaluations/artifacts/corpus_sanity_v22b05_policy.json
-python -X utf8 -u tools/probes/bootstrap_coherence_probe.py
 ```
 
 Lesart vorab (`PREREG_heuristic_v2_long_rows.md` par.3b.12): **primaer**
@@ -78,25 +77,46 @@ Symmetrie-Trennung auf der VALUE-Klasse signifikant > 0; **sekundaer**
 beider Klassen nur Bericht (Referenz: argmax 0,3375, gesampelt 0,07-0,11,
 Champion 0,102). Reisst Tor 0: kein Training, Vorlage.
 
-Die vierte Zeile ist die Arm-K-Abnahme und zugleich der erste Test der am
-2026-08-31 erweiterten `corpus_sanity_check`-CLI (`--pattern`/`--out`,
-`sides_with_full_column`) -- beides ist syntaxgeprueft, aber **nie
-ausgefuehrt**. Bei einem Fehler dort zuerst dort suchen, nicht am Korpus.
+**Beide Befehlszeilen sind am 2026-08-31 smoke-geprueft** (je zwei bis drei
+Sekunden auf einem Kern, Ausgabe in den Scratchpad): die erweiterte
+`corpus_sanity_check`-CLI filtert wie gewollt (`--pattern` auf eine Datei:
+20 Partien, 40 Seiten), schreibt `pattern` und den `laufzeit`-Block ins
+Artefakt, die Bestandsfelder bleiben, und `sides_with_full_column` zaehlt
+(14 von 40). Die Symmetrie-Sonde nimmt `--pattern` und `--out` in der hier
+notierten Form an. Ein Tippfehler kann den Waechter-Lauf also nicht mehr
+aufhalten.
+
+**Beifang aus dem Smoke, ausdruecklich KEIN Torbefund:** auf zwei Dateien
+der argmax-Klasse (40 Partien) trennt der Spaltenbau den Ausgang bereits
+deutlich (+0,50, t 3,48 auf zwei Bloecken). Das ist ein Hinweis, kein
+Verdikt -- der Waechter laeuft auf der ganzen Value-Klasse, und zwei Bloecke
+tragen keine Aussage.
 
 ### 2.2 Fensterbau
 
-* **Welche 6.550 hv2-Partien rotieren raus?** Offen (`PREREG_v23_window.md`
-  par.2): die Auswahl soll seed-bestimmt und im Manifest festgehalten sein,
-  nicht "die letzten Dateien".
-* **Traeger-Manifest ja/nein** -- offener Nutzer-Entscheid, siehe Abschnitt 4.
-* **REIHENFOLGE-AUFLAGE, am Code geprueft:**
-  `tools/relabel_drafts_with_teacher.py` schreibt die pkl IN PLACE (Zeile
-  138), und `build_cache_incremental.py` erkennt einen vorhandenen Block
-  ALLEIN am Dateinamen -- kein mtime, kein Inhalt. Wer relabelt, NACHDEM der
-  Block gebaut ist, trainiert still auf den alten Policy-Zielen. Also:
-  relabeln auf eine Kopie mit eigenem Praefix (wie
-  `data/onpolicy_v22-b05/`), oder die betroffenen `.filecache_*.h5` im selben
-  Zug loeschen.
+* **hv2-Auswahl GEZOGEN 2026-08-31** (Nutzer: "such dir per seed zufaellig
+  welche aus"): 1.745 von 2.400 Dateien, Seed **20260920**, Liste in
+  `data/window_v23_hv2.txt`. Regel des Werkzeugs ist seed-zufaellig mit
+  zeitlicher Streuung; bei 1.745 aus 2.400 sind die Straten 1-2 Dateien
+  breit, also praktisch gleichverteilt. Wiederholungslauf byte-gleich. Die
+  Zahlen gehen glatt auf: 1.745 x 10 = 17.450 Partien, 655 Dateien
+  = 6.550 rotieren aus.
+* **Traeger-Manifest ja/nein** -- offener Nutzer-Entscheid, Abschnitt 4. Wenn
+  JA: **die Policy-Klasse MUSS ausdruecklich mitgelistet werden** (180 hv2 +
+  200 b05-policy = 380 Eintraege) oder das Manifest traegt
+  `carrier_prefixes: ["selfplay_v22-b05-policy_"]`. Sonst setzt es `pol_w=0`
+  fuer den GESAMTEN neuen Korpus: der v20-Kurzschluss deckt nur
+  `selfplay_v19wdl`/`selfplay_v20wdl` (neural_net.py:796), und der Generator
+  schreibt `carrier_prefixes` bewusst nicht. Gegenprobe vor dem Training:
+  `policy_carriers.traeger_dateien_je_praefix` im Trainingsmanifest.
+* **Relabeling laeuft auf einer KOPIE mit eigenem Praefix**
+  (Nutzer-Entscheid 2026-08-31, `PREREG_reanalyze_label_depth.md` par.4b):
+  `data/relabeled_v23/selfplay_v22-b05relab-<klasse>_*`. Der Unterordner
+  allein reicht NICHT -- der Datei-Cache-Schluessel haengt am Basename, nicht
+  am Pfad (file_cache_key.py:81), die Kopie traefe sonst den Block des
+  Originals. Kopiert wird nur der neue Korpus (rund 600 Dateien, 1,4 GB),
+  nicht hv2. Folge: roh und relabelt liegen auf denselben Partien nebeneinander
+  -- das Relabeling wird ein gepaarter Arm statt einer Reihenfolge-Frage.
 * Monolith gegen Val-Split: `train.py --cache-file` prueft den
   FENSTER-Schluessel; ein Lauf mit `--val-frac > 0` bildet einen anderen
   Schluessel, der Waechter lehnt korrekt ab.
@@ -111,8 +131,20 @@ ausgefuehrt**. Bei einem Fehler dort zuerst dort suchen, nicht am Korpus.
 | `v23-b04` | Kaltstart mit anderer Rumpfbreite (`PREREG_capacity_sim_frontier.md` par.10) | vorregistriert; Zweig-Entscheid offen |
 
 Fuer alle Arme gilt: **`--moon-loss-weight 0`** (Flag existiert,
-train.py:2460), Encoder 2d, `nortv`, `wdl`, `ownership_head_2d` -- und
-**ohne Arm K**, damit die vorhandenen Bloecke gueltig bleiben. Kaltstart
+train.py:2460), Encoder 2d, `nortv`, `wdl`, `ownership_head_2d`,
+**Endgame-Kopf AN** (Nutzer-Entscheid 2026-08-31) -- und **ohne Arm K**,
+damit die vorhandenen Bloecke gueltig bleiben.
+
+**Zum Endgame-Kopf, mit berichtigter Zahl:** er ist seit 2026-08-08
+Standard-Rezept, und mit diesem Korpus bekommt er zum ersten Mal ein Ziel
+(root_q: 2.332 von 3.538 Records einer b05-Datei, davon 314 R5-Drafting; auf
+hv2 war die Maske komplett 0). Sein damaliger Beitrag zur R5-Steigung war
+**+0,108 gegenueber dem Champion** (0,349 -> 0,457, rund 2 Seed-Sigma), die
+vorregistrierte 0,5-Schwelle wurde KNAPP VERFEHLT und die **Arena war H0
+(97:103)**; der Verlauf 0,086 -> 0,457 geht ueber mehrere Generationen, nicht
+auf sein Konto (PREREG_plate_intervention par.79-102). Er bleibt an, weil er
+Standard ist und offline genau die Groesse bewegt, gegen die Phase 3 antritt
+-- nicht, weil er Staerke belegt haette. Kaltstart
 kostet mit vorgebautem Cache rund 2,5 h (v22-b02 2,56 h, b04 2,52 h).
 
 **Was ausser Arm K sonst noch ALLE Bloecke entwertet** und darum in b01-b04
@@ -178,7 +210,6 @@ Stack-Draw-Kontrollfluss EIN, Bootstrap-Horizont 2, Seed-Positionen AUS
 | --- | --- |
 | **Traeger-Manifest fuer hv2** | `PREREG_v23_window.md` par.1 will hv2 ueberwiegend policy-maskiert (1.800 von 24.000 Partien aktiv). Das geht nur per Manifest, und das entwertet die 2.400 liegenden hv2-Bloecke. Ohne Manifest traegt jeder hv2-Record mit `policy_target_valid != false` Policy (gezaehlt: 534 von 1.733 in einer Datei) -- der Cache bleibt, aber das Fenster weicht bewusst von par.1 ab und das gehoert dann registriert |
 | **b04: welcher Zweig wird breiter** | Flach-Zweig `hidden_size` 512 ist ohne Bau fahrbar; Conv-Zweig `conv_channels` 48 / `conv_layers` 2 braucht zwei Flags, ein Checkpoint-Feld und eine Ableitung beim Laden -- sonst ist der Checkpoint nicht ladbar (`PREREG_capacity_sim_frontier.md` par.10) |
-| **Endgame-Kopf-Flag** | wird mit diesem Training erstmals scharf: auf hv2 war die Maske komplett 0 (root_q schreibt nur der NetSelfPlayAgent), im neuen Korpus sind es 2.332 von 3.538 Records, davon 314 R5-Drafting. Entscheid: konstant lassen oder auf Heuristik-Korpora false |
 | **Loeschfreigaben** | `data/onpolicy_v22-b06/` (31 Dateien) und -- falls keine DAgger-Runde 3 -- `data/onpolicy_v22-b05/` (30) |
 | **Messartefakte tracked?** | `evaluations/artifacts/` ist ungetrackt; Preregs zitieren die JSONs als Beleg, ein frischer Klon hat sie nicht. Zurueckdrehen: `.gitignore`-Zeile raus, `git add -f` |
 | **Push** | NIE ohne ausdrueckliche Anweisung; der Ahead-Stand wird im CHAT gemeldet, nicht hier gefuehrt |
