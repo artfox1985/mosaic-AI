@@ -198,7 +198,16 @@ koennen wir in die self plays fuer v24 gehen."*
 | Tor | Bezug v22-b05 | Zuschnitt |
 | --- | --- | --- |
 | **1: Siege** | Elo 1084 | gepaarte Arena, **Champion-Strenge**: n >= 150 Paare oder Replikation mit eigenem Seed. Ein SPRT-Fruehstopp darunter ist informativ, KEIN Tor-Ergebnis |
-| **2: Spalten** | **0,3375** volle Spalten je Partie+Seite | am REGISTRIERTEN argmax-Instrument (deterministisch, ohne Root-Noise, gleiche Sims wie die Referenz) -- nicht am Erzeugungs-Betriebspunkt |
+| **2a: Spalten im SELF-PLAY** | **0,3375** volle Spalten je Partie+Seite | am REGISTRIERTEN argmax-Instrument (deterministisch, ohne Root-Noise, gleiche Sims wie die Referenz) -- nicht am Erzeugungs-Betriebspunkt |
+| **2b: Spalten in der ARENA** | k1-Punkte von b05 aus demselben Lauf | gepaarte Arena gegen b05 mit `--log-games`, ausgewertet ueber `tools/plate_points_from_arena.py`. Beide Seiten stammen aus DENSELBEN Partien, eine getrennte Referenz braucht es nicht |
+
+**Warum zwei Flaechen (Nutzer-Anweisung 2026-08-31):** im Self-Play
+konkurriert niemand um die Farben. 2a sagt, was der Generator in den
+v24-Korpus schreiben wuerde; 2b sagt, ob er Spalten auch gegen Widerstand
+baut. Ein Netz kann das eine koennen und das andere nicht. Achtung bei 2b:
+das Partie-Log traegt die Endwertung je Kriterium, NICHT das Endbrett -- die
+ANZAHL voller Spalten ist daraus nicht rekonstruierbar, k1-Punkte sind der
+monotone Ersatz und duerfen nicht als Anzahl gelesen werden.
 
 **Punktschaetzer entscheidet Tor 2:** liegt der Kandidat darunter, ist es
 gerissen, auch bei nicht signifikantem Abstand. Dann Vorlage mit beiden

@@ -90,8 +90,31 @@ wurde.
 
 **Die Groesse, um die es der Kampagne geht, gemessen am gleichen Instrument
 wie bei der Vor-Generation, darf nicht unter deren Wert fallen.** Aktuell ist
-das der Spaltenbau (volle Spalten je Partie und Seite, argmax-Instrument);
-wechselt die Kampagne ihr Ziel, wechselt die Groesse mit -- das Tor bleibt.
+das der Spaltenbau; wechselt die Kampagne ihr Ziel, wechselt die Groesse mit
+-- das Tor bleibt.
+
+**AUF ZWEI FLAECHEN messen (Nutzer-Anweisung 2026-08-31), sie koennen
+auseinanderlaufen:**
+
+| Flaeche | Kennzahl | Quelle | Was sie beantwortet |
+| --- | --- | --- | --- |
+| **Self-Play** (argmax-Instrument) | volle Spalten je Partie und Seite | `self_play.py --deterministic --no-root-noise` + `tools/corpus_sanity_check.py` | Was der Generator in den NAECHSTEN Korpus schreibt |
+| **Arena** (gegen den Vorgaenger) | Punkte je Kriterium, k1 = Spalten | gepaarte Arena mit `--log-games` + `tools/plate_points_from_arena.py` / `tools/arena_compact.py` | Ob er Spalten auch GEGEN Widerstand baut |
+
+Warum beide: im Self-Play konkurriert niemand um die Farben, die man
+braucht. Ein Netz kann gegen sich selbst sauber Spalten bauen und daran
+scheitern, sobald ein Gegner die Auslage leerraeumt -- und umgekehrt kann ein
+arenastarker Spaltenbauer einen spaltenarmen Korpus hinterlassen und damit die
+naechste Generation aushungern. Die Self-Play-Zahl ist die
+Korpus-Eigenschaft, die Arena-Zahl die Spiel-Eigenschaft.
+
+**Was die Arena NICHT hergibt, und warum es die Punkte statt der Anzahl
+sind:** das Partie-Log traegt die Endwertung je Kriterium, nicht das Endbrett.
+Die ANZAHL voller Spalten laesst sich daraus nicht rekonstruieren (dieselbe
+Luecke, wegen der `long_rows_started` eigens als Feld nachgeruestet wurde).
+k1 zahlt `7*(f/6)^2` je Spalte, ist also monoton im Fuellstand und fuer den
+Vergleich zweier Seiten DERSELBEN Partien brauchbar -- als Anzahl darf man es
+nicht lesen.
 
 **Den Bezugswert holt man sich, indem man die Vor-Generation am selben
 Instrument misst**, nicht aus dem Gedaechtnis und nicht aus einem Bericht mit
