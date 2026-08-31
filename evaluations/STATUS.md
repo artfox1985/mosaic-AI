@@ -282,6 +282,7 @@ sagte "v22-Self-Play per Tor-Regel gestoppt" (es laeuft seit dem 2026-08-30).
 | `search_depth_column_optimum` | weitgehend beantwortet; offen bleibt die ERKLAERUNG (optionale Stufe 4) |
 | `special_tile_yield` | Kanaele 77/78 gebaut, ihre Wirkung nie isoliert |
 | `cache_build_time` | Hebel (3) offen; serielle Vollreferenz fehlt |
+| `geometric_envelope` | Gelaender fuer die fruehen Runden -- Stufe 0 ist netzfrei und kann VOR dem v23-Training laufen |
 
 **Registriert, nicht eingetaktet** (jeder Bau braucht vorher eine
 Registrierung): `plate_policy_supervision`, `saturating_score_utility`,
@@ -298,13 +299,10 @@ Registrierung): `plate_policy_supervision`, `saturating_score_utility`,
 Prereg-Index gebaut, und damit faellt per Konstruktion alles heraus, was
 offen ist, aber keine Prereg hat. Wieder aufgenommen:
 
-* **Einhuellende als 2D-Eingabeebene** (Nutzer-Frage 2026-08-24): eine
-  zusaetzliche Ebene "Dreiecks-Zugehoerigkeit je Zelle", additiv moeglich.
-  Zusammen mit dem **Rundenabklingen** (frueh stark, ueber die Runden
-  abfallend) inzwischen inhaltlich begruendet in
-  `PREREG_search_depth_column_optimum.md` par.2m -- vier Gruende, aber
-  weiterhin NICHT registriert. Der HUELLEN-TRIMM der Ownership-Loss-Maske
-  ist dagegen registriert (Lehrer-Prereg, Nachtrag 6).
+* **Einhuellende / geometrisches Gelaender: seit 2026-08-31 REGISTRIERT**
+  als `PREREG_geometric_envelope.md` (Nutzer-Auftrag) -- damit ist der
+  Merkposten von 2026-08-24 abgeloest. Steht in Abschnitt 5 oben bei den
+  Straengen am laufenden Fahrplan.
 * **#31 / #38 / #39**: geparkt, Arbeitskreis "Spaeter", Beschreibungen im
   Archiv.
 
