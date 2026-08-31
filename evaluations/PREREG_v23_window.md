@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (par.1/par.2): Form 29.450 Partien, davon 12.000 v22-Self-Play; Rollen-Zuschnitt D und 100 Sims entschieden (Lehrer-Prereg par.3b.12). ERZEUGUNG LAEUFT seit 2026-08-30. Wecker VOR dem Self-Play abgearbeitet (par.4c); Wecker VOR dem TRAINING als Liste registriert (par.4a3, Durchsicht aller offenen Preregs) -- offen darin: Arm K ja/nein, Kaltstart/Warmstart, Endgame-Flag, Traeger-Manifest, Fensterauswahl. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: ZUSCHNITT FESTGELEGT (par.1/par.2): 29.450 Partien, davon 12.000 v22-Self-Play; Rollen-Zuschnitt D und 100 Sims entschieden. ERZEUGUNG LAEUFT seit 2026-08-30. **hv2-Auswahl gezogen 2026-08-31** (1.745 von 2.400 Dateien, Seed 20260920, determinismus-geprueft). Wecker vor dem Self-Play (par.4c) und vor dem Training (par.4a3) registriert; dort auch die Traeger-Falle. Offen: Traeger-Manifest ja/nein, dann Fensterbau. -->
 
 # Vorregistrierung: v23-Fenster
 
@@ -36,9 +36,22 @@ Sims). Beide Klassen sind im NETZ-Modus verfuegbar -- anders als bei hv2, wo
 `--value-only` nicht existiert.
 
 **Aus hv2 werden 17.450 der 24.000 Partien gezogen; 6.550 rotieren aus.**
-Welche 6.550, ist offen und sollte seed-bestimmt und im Manifest festgehalten
-werden, nicht "die letzten Dateien" -- sonst ist die Auswahl eine
-Reihenfolge-Artefakt-Falle wie das "erste N je Datei" vom selben Tag.
+Welche 6.550, war offen und sollte seed-bestimmt festgehalten werden, nicht
+"die letzten Dateien" -- sonst ist die Auswahl eine Reihenfolge-Artefakt-Falle
+wie das "erste N je Datei" vom selben Tag.
+
+**ENTSCHIEDEN UND AUSGEFUEHRT 2026-08-31 (Nutzer: "such dir per seed
+zufaellig welche aus"):** `tools/generate_carrier_manifest.py --pattern
+"selfplay_hv2_*.pkl" --n-files 1745 --seed 20260920 --list-out
+data/window_v23_hv2.txt`. Die dokumentierte Regel des Werkzeugs ist
+seed-zufaellig MIT zeitlicher Streuung (je Zeit-Stratum eine Datei); bei
+1.745 aus 2.400 sind die Straten 1-2 Dateien breit, die Auswahl ist also
+praktisch gleichverteilt und zugleich ueber die Erzeugungszeit gestreut.
+**Determinismus gegengeprueft:** ein zweiter Lauf mit denselben Argumenten
+liefert eine byte-gleiche Liste. 2.400 hv2-Dateien a 10 Partien = 24.000;
+1.745 Dateien = 17.450 Partien, 655 Dateien = 6.550 rotieren aus -- die Zahlen
+gehen glatt auf. Die Liste liegt in `data/` (ungetrackt); reproduzierbar ist
+sie aus Regel plus Seed.
 
 ## par.3 Drei Punkte, die benannt gehoeren -- keiner ist geloest
 
@@ -262,6 +275,23 @@ Bootstrap-Horizont: alle in par.4c bewusst entschieden, Fristen gewahrt).
 | **Fenster-Zuschnitt** | par.2 dieser Datei | offen ist, WELCHE 6.550 hv2-Partien rausrotieren; die Auswahl soll seed-bestimmt und im Manifest festgehalten sein |
 | **Traeger-Manifest** | par.1 dieser Datei | par.1 will hv2 ueberwiegend policy-maskiert; entwertet die 2.400 liegenden hv2-Bloecke. Die NEUE Value-Klasse braucht dafuer kein Manifest (sie maskiert sich ueber `policy_target_valid`, gezaehlt 2026-08-31: 2.332 von 2.578 Drafting-Records) |
 | **Monolith gegen Val-Split** | `PREREG_cache_build_time.md` Hebel 4 | `train.py --cache-file` prueft den FENSTER-Schluessel; ein Lauf mit `--val-frac > 0` bildet einen anderen Schluessel und der Waechter lehnt korrekt ab. Wer den Monolithen nutzen will, faehrt `--val-frac 0` oder baut ihn passend |
+
+**TRAEGER-FALLE, am Code geprueft 2026-08-31 -- wer ein Manifest einfuehrt,
+maskiert versehentlich die NEUE Policy-Klasse mit.** `_is_policy_carrier`
+(corpus_dataset.py) kennt drei Faelle: kein Manifest -> jede Datei traegt;
+Manifest OHNE `carrier_prefixes` -> Traeger ist, wer gelistet ist ODER unter
+den eingefrorenen v20-Kurzschluss faellt; Manifest MIT `carrier_prefixes` ->
+gelistet oder Praefix-Treffer. Der Kurzschluss ist
+`V20_CARRIER_SHORTCUT_PREFIXES = ("selfplay_v19wdl", "selfplay_v20wdl")`
+(neural_net.py:796) -- die v22-b05-Dateien fallen NICHT darunter, und
+`tools/generate_carrier_manifest.py` schreibt `carrier_prefixes` bewusst
+nicht. Ein Manifest, das nur die 180 hv2-Traegerdateien listet, setzt damit
+`pol_w = 0` fuer den GESAMTEN neuen Korpus -- auch fuer die 200 Dateien der
+Policy-Klasse, um die das ganze Fenster gebaut ist. **Auflage:** das
+v23-Manifest listet die Policy-Klasse ausdruecklich mit (180 hv2 + 200
+b05-policy = 380 Eintraege), oder es traegt
+`carrier_prefixes: ["selfplay_v22-b05-policy_"]`. Vor dem Training gegen
+`policy_carriers.traeger_dateien_je_praefix` im Trainingsmanifest pruefen.
 
 **REIHENFOLGE-AUFLAGE, am Code geprueft 2026-08-31 (sonst still falsch
 trainiert):** `tools/relabel_drafts_with_teacher.py` schreibt die pkl IN
