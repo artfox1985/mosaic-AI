@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite: Modell + Such-/Blattwert-Konfiguration), sodass ein eingefrorener Champion samt Verhalten sauber gegen ein anderes Konstrukt im selben Prozess messbar ist? | Beleg: FRAGE BEANTWORTET. Welle 1 abgenommen (par.4a/4b), Welle 3 nach sieben roten Runden GRUEN -- 8/8 Partien byte-identisch (par.8f), Pilot par.6b netz-gegen-netz PARITAET. Welle Heuristik par.9, Referee-Pfad geschlossen par.10 (Suite 531/0). Offen nur der Ausbau der restlichen ~31 Knoepfe (par.4). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Engine von prozessglobalem Zustand geloest (AgentSpec je Seite), sodass ein eingefrorener Champion sauber messbar ist? | Beleg: FRAGE BEANTWORTET -- Welle 3 GRUEN mit 8/8 byte-identischen Partien (par.8f), Welle Heuristik (par.9), Referee-Pfad zu (par.10). Offen: Ausbau der ~31 Knoepfe (par.4). **par.12: Remis-Regelfehler im Schiedsrichter behoben** (Anker-Kante 127:23 statt 124:23:3). **par.13: der Anker IST das Artefakt** (ANCHOR_NAME auf hv1_anchor, Altnamen aliasiert, Drift/Konservierung Zug fuer Zug gruen) -- Leiter wieder verbunden, b01 1263. -->
 
 # PREREG-SKELETT: Agenten-Kapselung (AgentSpec statt Prozess-Global)
 
@@ -807,3 +807,124 @@ Entscheidungen unter aktuellen Regeln, Vergleich gegen die Aufzeichnung). Er
 wuerde bei einer Regelaenderung divergierende Partien melden -- das sagt aber
 der Commit, der die Regel aendert, ohnehin. Er faengt keine STILLE
 Fehlerklasse, sondern bestaetigt eine laute.
+
+## par.12 REGELFEHLER IM SCHIEDSRICHTER: es gibt kein Remis (2026-08-31)
+
+**Nutzer-Hinweis waehrend der v23-b01-Anker-Kante: "es gibt kein remis".** Am
+Regelwerk geprueft, `game.rs:586-601`:
+
+```rust
+pub fn determine_winner(state: &GameState) -> usize {
+    ...  // bei Gleichstand:
+    state.first_player_next_round   // wer den Startspielerstein zuletzt nahm
+}
+```
+
+**Was der Schiedsrichter stattdessen tat.** `frozen_referee_match.py:380`
+rechnete den Sieger selbst aus den Punkten und meldete `-1` bei Gleichstand,
+Zeile 662 zaehlte das als Remis. Die Regel wurde also nicht abgebildet,
+sondern ersetzt -- genau die Fehlerklasse, gegen die dieser Prereg-Strang
+gebaut ist (das Artefakt soll spielen wie am Einfriertag, und der Treiber
+soll es nicht umdeuten).
+
+**Reichweite, gegreppt:** die Rust-Einstiege sind sauber, sie rufen
+`determine_winner` (fuenf Stellen in `self_play.rs`). Betroffen ist allein
+der Python-Schiedsrichterpfad, also die Anker-Kanten und die
+Kernbeweis-Laeufe. In den Artefakten: `anchor_arena_v23b01` (3 von 150) und
+drei `frozen_kernbeweis_referee_*` (je 1 von 8).
+
+**Warum es lange unauffaellig blieb:** `RefereeGame` gibt `scores()` und
+`steps()` nach Python, aber keinen Sieger (referee.rs:409-424). Der Treiber
+MUSSTE ihn also selbst bilden -- und hat dabei die einzige Regel uebersehen,
+die nicht aus den Punkten folgt.
+
+**Behoben ohne Engine-Bau.** Der Zustand fuehrt das Feld laengst mit:
+`state_to_json` schreibt `first_player_next_round` (serialize.rs:287), und
+`RefereeGame::state_json` geht ueber `state_to_json_exact` genau dort durch.
+Der Schiedsrichter liest es jetzt, statt zu raten. Kein Wheel-Neubau, kein
+Paritaets-Gate, keine Aenderung am Artefakt.
+
+**Gegenprobe** (`artifacts/anchor_v23b01_tiebreak_check.referee.json`, vier
+Seeds mit erhaltenen Index-Paritaeten -- `first_player` und `board_a` haengen
+an der LISTENPOSITION, nicht am Seed):
+
+| Seed | Punkte | winner vorher | winner jetzt | Partie identisch |
+| --- | --- | --- | --- | --- |
+| 900113 | 59 : 59 | -1 (Remis) | 0 (= board_a) | ja, Log fuer Log |
+| 900110 | 49 : 49 | -1 (Remis) | 1 (= board_a) | ja |
+| 900111 | 57 : 46 | 0 | 0 | ja |
+| 900116 | 39 : 39 | -1 (Remis) | 1 (= board_a) | ja |
+
+**Folge fuer die Kante:** `v23-b01_brierbest` gegen `hv1_anchor` lautet
+**127:23 aus 150** (84,7 Prozent), nicht 124:23 bei 3 Remis (83,7). So
+eingetragen in `elo_history.csv` und `arena_trends.csv`.
+
+**Praezedenz derselben Verwechslung:** am 2026-07-27 zeigte das
+Endergebnis-Modal der GUI "Unentschieden gewinnt!", weil dort
+`players[].marker` gelesen wurde -- das Flag loescht `score_penalty` bei
+JEDER Rundenwertung, auch in Runde 5 (Kommentar in serialize.rs:280-286).
+Zweimal dieselbe Falle, zwei verschiedene Oberflaechen.
+
+**Merksatz fuer den Strang:** wo der Treiber eine Groesse SELBST bildet, die
+die Engine schon kennt, ist die Kapselung unvollstaendig. Die anderen
+Kandidaten dieser Bauform gehoeren durchgesehen (Rundenzahl, Phase,
+Erlaubtheit von Zuegen) -- gemessen ist das NICHT, es ist eine Vermutung.
+
+## par.13 DER ANKER IST DAS ARTEFAKT (Nutzer-Entscheid 2026-08-31)
+
+**Nutzer:** *"wenn ich den Anker bei 1000 einfriere, bleibt der auch dort
+immer"* -- und, zur Frage, wogegen man ihn haelt: *"die In-Process-Heuristik
+ist kein guter Vergleichswert. die ist eigentlich eine
+Entwicklungsumgebung."*
+
+**Was schief lag.** `tools/elo_tracker.py` verankerte auf den LITERALEN Namen
+`Heuristik` (also den In-Process-Pfad), waehrend `docs/promotion_checklist.md`
+seit dem 2026-08-28 `Heuristik_hv1_anchor` in die Zeile schreibt. Jede
+Anker-Kante seither erzeugte damit einen ZWEITEN, unverankerten Knoten.
+`_mm_fit` zentriert ankerlose Komponenten auf das geometrische Mittel; die
+gedruckten Zahlen trugen nur noch ihre Differenz. Sichtbar geworden beim
+Eintragen der v23-b01-Kante: b01 1148, hv1_anchor 852, Summe exakt 2000, beide
+mit dem Vermerk "NICHT mit Anker verbunden!".
+
+**Der Entscheid.** `ANCHOR_NAME = "Heuristik_hv1_anchor"`, plus
+`ANCHOR_ALIASES = {"Heuristik": ANCHOR_NAME}` fuer die Zeilen vor der
+Umbenennung. Begruendung ist nicht Buchhaltung, sondern die Rollenfrage: der
+lebende Heuristik-Pfad wird WEITERENTWICKELT, er darf sich bewegen. Ein
+Fixpunkt, der sich bewegen darf, ist keiner. Der Anker gehoert an das
+Artefakt, das seine Unbeweglichkeit selbst beweisen kann.
+
+**Vorher gemessen, nicht angenommen** (Nutzer-Vorgabe: nicht gegeneinander
+spielen lassen, sondern Zug fuer Zug vergleichen -- ein Match zweier
+identischer Spieler ergibt per Konstruktion 50 Prozent und beweist nichts):
+
+| Pruefung | Werkzeug | Ergebnis |
+| --- | --- | --- |
+| Drift (lebendes Wheel gegen Artefakt-Rezept) | `verify_frozen_heuristic.py` | GRUEN, 1.763 Schritte Feld fuer Feld, 22,2 s |
+| Konservierung (Artefakt-Wheel) | dito `--venv` | GRUEN, dieselben 1.763 Schritte, 13,4 s |
+| Referee-Pfad gegen In-Process-Pfad | `anchor_referee_parity_probe.py` | GRUEN, 20/20 beide Modi, 0 Abweichungen |
+
+**Die Leiter danach** (`python tools/elo_tracker.py report`): kein einziger
+"NICHT verbunden"-Vermerk mehr; Anker fix 1000 mit 600 Partien. Mit der
+Anker-Kante allein stand `v23-b01_brierbest` bei 1297 [1227, 1382]; nach
+Eintragung der Champion-Kante (219:181, Nutzer-Anweisung im selben Zug) sind es
+**1266** [1225, 1311] bei 550 Partien. Mit den zwei Tor-1-Kanten gegen b05 (im
+selben Zug eingetragen) sind es **1263** [1223, 1311] bei 730 Partien; v21 1227,
+v20 1194, v19 1142, hv2-Lehrer 1137, v22-b05 1136 (dessen Intervall schrumpft von
+228 auf 124 Punkte, weil es vorher an einer einzigen fruehgestoppten Kante hing). Die beiden Kanten implizierten einzeln 1297 und rund 1259 --
+der gemeinsame Fit legt sich dazwischen, die KI von b01 und v21 ueberlappen.
+
+**Die eine Fuge, die unbelegt bleibt und darum hier steht:** der Alias faltet
+die Anker-Kanten vom 2026-08-20 auf ein am 2026-08-26 eingefrorenes Artefakt.
+Fuer diese sechs Tage gibt es kein Wheel im Baum, die Gleichheit ist also fuer
+sie NICHT geprueft. Waere der Anker dort verschoben worden, mischte der Alias
+zwei Spieler in einem Knoten. Benannt statt stillschweigend gefaltet.
+
+**Im selben Zug eingetragen (Nutzer: "ist ja ein valides match"):** die
+Champion-Kante 219:181 gegen v21 (`artifacts/gating_v23b01_vs_v21.json`), als
+informative Zeile ohne Promotionsentscheid. b01 ruht damit nicht mehr auf einer
+einzigen Kante. Die Leiter bleibt in sich stimmig: die Anker-Kante allein
+implizierte 1297, die Champion-Kante rund 1259, der gemeinsame Fit gibt 1266 --
+die Spannung ist damit klein und liegt innerhalb der Konfidenzintervalle.
+
+**Verwandt:** der Ablauf, der das kuenftig absichert, liegt als Skill
+`mosaic-anchor-invariance` (nach jeder Engine-Aenderung, eine halbe Minute).

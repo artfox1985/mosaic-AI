@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse (Rumpfbreite) und Sim-Budget? | Beleg: NICHTS GEBAUT, aber der Zyklus ist zugeschnitten (par.9/par.10, Nutzer 2026-08-31): **v23-b02 Kaltstart auf BESTANDSBREITE** (oeffnet das Fenster, ein Faktor gegen b01), **v23-b04 vorregistriert als Breiten-Arm**. Kaltstart kostet ~2,5 h mit vorgebautem Cache. OFFEN: welcher Zweig verbreitert wird -- `hidden_size` geht ohne Bau, der Conv-Zweig braucht Flags plus Checkpoint-Ableitung (par.10). Kostentor Pflicht und zuerst (par.5). -->
+<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse (Rumpfbreite) und Sim-Budget? | Beleg: Kaltstart-Arm v23-b02 GEBAUT (par.11): 4,22 h gegen b01s 5,97 h, also BILLIGER als der Warmstart; Kandidat `_brierbest` (33:47, SPRT H0). Die Frontier misst das nicht -- offen bleiben die Arm-Frage b02 gegen b01 und der Breiten-Arm b04, dessen Zweig der Nutzer waehlt (par.10: `hidden_size` ohne Bau, Conv-Zweig braucht Flags plus Checkpoint-Ableitung). Kostentor Pflicht und zuerst (par.5). -->
 
 # Vorregistrierung: Kapazitaets-Sim-Frontier
 
@@ -192,3 +192,27 @@ EINSCHAETZUNG, keine Messung.
 gemessen, Frontier auf gleiche Wanduhr je Partie normiert. Eine Breite, die
 ihr Sim-Budget unter die Arena-Aufloesung druckt, faellt aus der Frontier und
 wird berichtet, nicht durch Budget-Aufstockung geheilt.
+
+## par.11 v23-b02 IST GEBAUT -- und sein Kandidat ist `_brierbest` (2026-08-31)
+
+**Der Kaltstart-Arm steht.** Early Stop nach Epoche 15 von 40, Laufzeit
+**4,22 h** (Manifest `models/manifest_train_v23-b02_20260831_170152.json`),
+davon 32 s Datenaufbau, weil der Fenster-Cache von b01 traf.
+
+**Damit ist die par.9-Einschaetzung gemessen und BESTAETIGT, in der starken
+Form:** ein Kaltstart auf dem vollen Fenster kostet mit stehendem Cache nicht
+etwa gleich viel wie der Warmstart, sondern WENIGER -- 4,22 h gegen b01s
+5,97 h. Die in par.9 als fehlend markierte Gegenzahl (Warmstart auf vollem
+Fenster) liefert b01 damit ebenfalls.
+
+**Checkpoint-Auswahl (Registrierung in `PREREG_v23_window.md` par.2g/par.2h):**
+`_best` gegen `_brierbest`, beide @400, 33:47 aus 40 Paaren, SPRT H0,
+Vorzeichentest p = 0,189, gepaarte Differenz -0,350 [-0,791, +0,091], Punkte
+37,53 gegen 42,33. Nach der vorab registrierten Regel (interne Auswahl, kein
+Tor -- ohne Verdikt entscheidet der Punktschaetzer) ist der Kandidat des Arms
+**`v23-b02_brierbest`**, obwohl er aus Epoche 1 stammt.
+
+**Was damit noch NICHT gemessen ist:** die Arm-Frage selbst. `v23-b02_brierbest`
+gegen `v23-b01_brierbest` (Warm gegen Kalt, ein Faktor, dasselbe Fenster)
+steht aus. Und die Frontier misst dieser Arm ohnehin nicht -- dafuer ist b04
+zustaendig (par.10), dessen Breiten-Entscheid weiter beim Nutzer liegt.

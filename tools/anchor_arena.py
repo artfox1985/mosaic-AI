@@ -178,6 +178,12 @@ def main() -> int:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(out, indent=2, ensure_ascii=False), encoding="utf-8", newline="\n")
 
+    # Der Kommentar sagt, was WAR: bis 2026-08-31 stand hier hart "Handshake gruen" --
+    # auch wenn der Lauf mit --force-cross-era gegen einen ROTEN Handshake lief. Eine
+    # Elo-Zeile, die ihre eigenen Bedingungen falsch protokolliert, ist schlimmer als
+    # eine ohne Kommentar (Nutzer-Fund 2026-08-31).
+    hs = d.get("handshake") or {}
+    hs_text = "gruen" if hs.get("ok") else "ROT (Cross-Aera, --force-cross-era)"
     print(f"\n{net_name}@{a.net_sims} gegen {anchor_name}@{a.anchor_sims}")
     print(f"  {d['wins_a']} : {d['wins_b']} bei n={d['n_games']} "
           f"({100 * d['wins_a'] / max(1, d['n_games']):.1f} % fuer das Netz)")
@@ -187,7 +193,7 @@ def main() -> int:
           f"--player-b {anchor_name} --sims-b {a.anchor_sims} "
           f"--wins-a {d['wins_a']} --wins-b {d['wins_b']} --n {d['n_games']} "
           f"--knobs \"spec:{anchor.name}/spec.json\" "
-          f"--comment \"Anker aus dem Artefakt (B2), Handshake gruen\"")
+          f"--comment \"Anker aus dem Artefakt (B2), Handshake {hs_text}\"")
     print(f"\nArtefakt: {target}")
     return 0
 
