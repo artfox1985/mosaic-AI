@@ -377,7 +377,22 @@ def play_one_game(
             worker_wait_s += worker.total_wait_s - before_wait
             rg.drafting_apply_external(json.dumps(action))
     scores = rg.scores()
-    winner = 0 if scores[0] > scores[1] else (1 if scores[1] > scores[0] else -1)
+    # ES GIBT KEIN REMIS (Nutzer-Hinweis 2026-08-31, Regel geprueft an
+    # game.rs::determine_winner): bei Punktgleichstand gewinnt, wer den
+    # Startspielerstein zuletzt genommen hat. Bis hierher hat diese Stelle
+    # `-1` gemeldet und die Partie als Remis gezaehlt -- in der Anker-Kante
+    # v23-b01 traf das 3 von 150 Partien, alle drei gehen an Seite A.
+    # `players[].marker` taugt fuer den Tie-Break NICHT (score_penalty loescht
+    # es bei JEDER Rundenwertung); massgeblich ist `first_player_next_round`,
+    # das der Zustand mitfuehrt (serialize.rs:287, ueber state_to_json_exact
+    # auch in `state_json()`). Genau diese Verwechslung hat 2026-07-27 schon
+    # das Endergebnis-Modal der GUI falsch anzeigen lassen.
+    if scores[0] > scores[1]:
+        winner = 0
+    elif scores[1] > scores[0]:
+        winner = 1
+    else:
+        winner = int(json.loads(rg.state_json())["first_player_next_round"])
     return {
         "scores": list(scores),
         "winner": winner,

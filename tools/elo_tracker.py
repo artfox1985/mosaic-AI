@@ -108,15 +108,53 @@ CSV_PATH = str(Path(__file__).resolve().parent.parent / "evaluations" / "elo_his
 HEADER = ["date", "player_a", "sims_a", "player_b", "sims_b", "wins_a", "wins_b", "n",
           "comment", "contract", "knobs"]
 
-ANCHOR_NAME = "Heuristik"
+# DER ANKER IST DAS EINGEFRORENE ARTEFAKT (Nutzer-Entscheid 2026-08-31).
+#
+# Vorher stand hier "Heuristik", also der IN-PROCESS-Pfad. Der ist aber eine
+# ENTWICKLUNGSUMGEBUNG (Nutzer: "die in process heuristik ist kein guter
+# vergleichswert") -- er wird weiterentwickelt und darf sich bewegen. Ein
+# Fixpunkt, der sich bewegen darf, ist keiner. Der Anker gehoert deshalb an
+# `models/frozen_heuristics/hv1_anchor`, das sich per Konstruktion nicht
+# bewegen kann und seine Konservierung selbst beweist
+# (`tools/verify_frozen_heuristic.py --venv`).
+#
+# WAS DAS REPARIERT: die Promotions-Checkliste schreibt seit dem 2026-08-28
+# `Heuristik_hv1_anchor` in die Zeile, verankert war aber der LITERALE Name
+# "Heuristik". Jede Anker-Kante seither erzeugte damit einen ZWEITEN, freien
+# Knoten; `fit_all` zentriert ankerlose Komponenten auf das geometrische
+# Mittel, und die gedruckten Zahlen trugen nur noch ihre Differenz (am
+# 2026-08-31: v23-b01 1148 / hv1_anchor 852, Summe exakt 2000).
+ANCHOR_NAME = "Heuristik_hv1_anchor"
 # Korrigendum 2026-07-25: Anker lief faktisch IMMER mit HEUR_SIMS=150
 # (nominal; dynamic_sims -> real Ø~330) -- Label war faelschlich 200.
 ANCHOR_SIMS = 150
 ANCHOR_ELO = 1000.0
+
+# Zeilen VOR der Umbenennung (2026-08-28) fuehren den Anker als "Heuristik".
+# Sie werden auf denselben Knoten gefaltet, sonst zerfaellt die Leiter in zwei
+# Haelften: die Anker-Kanten von v19/v20/v21 haengen an dem alten Namen.
+#
+# GEDECKT durch Messung, aber NICHT vollstaendig: am 2026-08-31 wurde
+# geprueft, dass der lebende hv1 und das Artefakt Zug fuer Zug dasselbe
+# spielen (1.763 Schritte, Feld fuer Feld, beide Wheels gruen;
+# `artifacts/anchor_drift_live_wheel_20260831.json`), und am 2026-08-27, dass
+# Referee-Pfad und In-Process-Pfad dieselben Partien liefern (20/20).
+# UNGEPRUEFT bleibt die Strecke 2026-08-20 (Datum der v19/v20/v21-Kanten) bis
+# zum Einfriertag 2026-08-26: dafuer gibt es kein Wheel jener Tage im Baum.
+# Waere der Anker DORT verschoben worden, mischte dieser Alias zwei Spieler in
+# einem Knoten. Das ist die einzige unbelegte Fuge der Leiter -- sie gehoert
+# benannt, nicht stillschweigend gefaltet.
+#
+# NICHT aliasiert wird `Heuristik_v2huelle`: das ist der hv2-Lehrer, ein
+# ANDERER Spieler (Elo 1125 aus eigener Kante).
+ANCHOR_ALIASES = {"Heuristik": ANCHOR_NAME}
 LN10_OVER_400 = math.log(10) / 400.0
 
 
 def node_key(player, sims):
+    # Alias VOR der Schluesselbildung: sonst haette derselbe Spieler unter zwei
+    # Namen zwei Knoten (siehe ANCHOR_ALIASES).
+    player = ANCHOR_ALIASES.get(str(player), player)
     sims = "" if sims in (None, "") else str(int(sims))
     return f"{player}@{sims}" if sims else str(player)
 

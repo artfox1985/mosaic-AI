@@ -1,5 +1,5 @@
 ---
-name: mosaic-messlauf
+name: mosaic-measurement-run
 description: Ablauf fuer jeden Messlauf in diesem Projekt - Arena, Self-Play, Gating, Sonde, Trainingslauf. Nutze das, BEVOR du einen Lauf startest, und noch einmal beim Auswerten. Deckt ab - Staffelstab und Exklusivitaet, Lauf-Manifest gegen Referenz, Start ohne Pipe mit sichtbarem Fortschritt, laufzeit-Block im Artefakt, die sechs Standard-Kennzahlen, Auswertung auf Block-Ebene.
 ---
 

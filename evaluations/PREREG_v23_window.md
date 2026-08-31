@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: GEBAUT UND GEFAHREN. 29.450 Partien wie in par.1 zugeschnitten (17.450 hv2 + 12.000 v22-b05), Auswahl seed-gezogen (par.2a), Traeger-Manifest mit 380 Eintraegen. Alle vier Tore bestanden (par.2b-2e), Champion-Kante auf Augenhoehe ohne Promotion (par.2f). Die Arme des Zyklus laufen weiter, das FENSTER ist entschieden. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: GEBAUT UND GEFAHREN. 29.450 Partien wie in par.1 zugeschnitten (17.450 hv2 + 12.000 v22-b05), Auswahl seed-gezogen (par.2a), Traeger-Manifest mit 380 Eintraegen. Alle vier Tore bestanden (par.2b-2e), Champion-Kante auf Augenhoehe ohne Promotion (par.2f). Kaltstart-Arm b02: Kandidat ist `_brierbest` (par.2h, 33:47). Die Arme des Zyklus laufen weiter, das FENSTER ist entschieden. -->
 
 # Vorregistrierung: v23-Fenster
 
@@ -263,6 +263,45 @@ Checkpoint der Kandidat des Arms ist; dieser tritt dann gegen b01 an. Es ist
 eine INTERNE Auswahl, kein Tor -- gibt der SPRT kein Verdikt, entscheidet der
 Punktschaetzer. So scheitert die Warm-gegen-Kalt-Frage nicht an einer
 Checkpoint-Regel statt am Startmodus.
+
+## par.2h CHECKPOINT-ARENA AUFGELOEST: Kandidat ist `_brierbest` (2026-08-31)
+
+Die in par.2g vorab registrierte interne Auswahl ist gefahren:
+`v23-b02_best` gegen `v23-b02_brierbest`, beide @400, gepaartes Gating
+(Block 5, Deckel 100 Paare, Seed 20260970, threads 10).
+
+```
+33:47 aus 40 Paaren, SPRT-Entscheid H0 (LLR -3,157)
+Vorzeichentest p = 0,189
+gepaarte Differenz -0,350, 95%-KI [-0,791, +0,091]
+Punkte 37,53 gegen 42,33; Strafpunkte 11,68 gegen 11,80
+```
+
+**Lesart nach der Vorab-Regel** (interne Auswahl, kein Tor; ohne Verdikt
+zugunsten von A zaehlt der Punktschaetzer): beide Kennzahlen zeigen auf
+`_brierbest`, die Marge ist NICHT signifikant. **Kandidat des Kaltstart-Arms
+ist `v23-b02_brierbest`.** Das SPRT-Verdikt H0 heisst hier "kein Beleg, dass
+`_best` besser ist" -- das Instrument testet gegen p = 0,65, also rund
++100 Elo; es ist kein Beleg fuer Gleichstand.
+
+**Die Sorge aus par.2g ist damit nicht bestaetigt** (ein brierbester
+Checkpoint aus Epoche 1 spielt hier nicht schlechter, numerisch besser) --
+widerlegt ist sie ebenso wenig, dazu ist die Marge zu klein.
+
+Artefakt: `artifacts/gating_b02_best_vs_brierbest.json`; `laufzeit` 1.235,7 s
+Wanduhr / 5.160,9 s CPU / threads 10 / 15,45 s je Partie. **Unter Nebenlast
+gemessen** (das b03-Training lief seit 21:33 auf der GPU) -- die 15,45 s je
+Partie liegen darum ueber den 12,2-13,7 s der Gatings vom selben Tag und sind
+als Planungsgroesse nach oben abgerundet, nicht nach unten.
+
+**Zu den sechs Standard-Kennzahlen:** das Artefakt traegt Punkte, Margin und
+Strafleiste; Reihen-, Spalten- und Plattenpunkt-Kennzahlen fehlen, weil der
+Lauf ohne Partie-Logs gefahren wurde. Das ist hier vertretbar, weil die
+Entscheidungsmetrik dieser INTERNEN Auswahl vorab die Siegzahl war; fuer die
+eigentliche Arm-Frage (b02_brierbest gegen b01) sind sie zu erheben.
+
+**Offen bleibt die Arm-Frage selbst:** `v23-b02_brierbest` gegen
+`v23-b01_brierbest` -- Warmstart gegen Kaltstart auf demselben Fenster.
 
 ## par.3 Drei Punkte, die benannt gehoeren -- keiner ist geloest
 

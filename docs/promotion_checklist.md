@@ -23,7 +23,9 @@ Gedaechtnis:
    Fruehstopp** (Praezedenz v18/v19/v20-Verankerung). Seit der Kapselung:
    Anker-Identitaet in der Zeile als `Heuristik_hv1_anchor` fuehren (seit der
    Umbenennung am 2026-08-28; aeltere CSV-Zeilen tragen `Heuristik_v2huelle`
-   bzw. `Heuristik` und werden NICHT umgeschrieben); die
+   bzw. `Heuristik` und werden NICHT umgeschrieben -- seit dem 2026-08-31 faltet
+   `ANCHOR_ALIASES` in `tools/elo_tracker.py` sie auf denselben Knoten, und der
+   Anker IST dieser Knoten: `ANCHOR_NAME = "Heuristik_hv1_anchor"`); die
    Knoepfe liegen in dessen `spec.json` (elo_tracker `--knobs`).
 
    **Aera-Regel (Nutzer-Entscheid 2026-08-29): Cross-Aera ist der

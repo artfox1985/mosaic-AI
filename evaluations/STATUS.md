@@ -29,10 +29,38 @@ diesen Inhalten etwas aendert, aendert es DORT.
 | Ressource | Lauf | Was damit zu tun ist |
 | --- | --- | --- |
 | **GPU** | `v23-b03` -- b01-Rezept plus `--surprise-alpha 0.5` | Wenn fertig: Orakelmetriken gegen b01 (das IST der Kontrollarm, gleicher Seed/Val-Pool). Entscheidungsmass steht in `PREREG_policy_surprise_weighting.md` par.5 -- **nicht** val_combined, **nicht** policy_top3 |
-| **CPU** | Kette: `b02_best` gegen `b02_brierbest`, danach **Anker-Kante** b01 gegen hv1 (n=150, `--force-cross-era`) | Checkpoint-Arena entscheidet den Kandidaten des Kaltstart-Arms (interne Auswahl, kein Tor -- ohne SPRT-Verdikt zaehlt der Punktschaetzer). Dann tritt der Gewinner gegen b01 an: die Warm-gegen-Kalt-Frage |
+| **CPU** | **frei** (seit 22:42) | Zuletzt: Anker-Kante fertig (22:39, Sitzung `mosaic-ai-7f`) plus Determinismus-Probe (22:42, diese Sitzung). Naechste Kandidaten: die 200 Cache-Bloecke des Relabel-Arms, oder Warm gegen Kalt (`b02_brierbest` gegen `b01_brierbest`) |
+
+**WARNUNG Doppellauf (2026-08-31, 22:02:55 bis 22:26):** zwei Sitzungen haben denselben
+Anker-Lauf gestartet -- byte-gleiche Argumente, gleicher `--seed-base 900001`, gleiche
+Zieldatei. Der zweite (Sitzung `mosaic-ai-fc`) ist auf Nutzer-Anweisung gestoppt worden und
+hat nichts geschrieben; der erste laeuft weiter. Fuer rund 23 Minuten lagen 2x10 Arena-Worker
+plus 2x19 eingefrorene Anker-Worker auf 12 Kernen: der `laufzeit`-Block des ueberlebenden
+Laufs ist als **unter Nebenlast gemessen** zu markieren. **Lehre fuer Abschnitt 1:** die
+Zeile sagt, WAS zu tun ist, aber nicht, WER es schon tut -- wer einen Lauf startet, traegt
+Startzeit und Sitzungsnamen hier ein, bevor er startet.
+
+**AUFGELOEST (22:42):** drei Seeds aus dem Lastfenster (900021/22/23, Paritaeten
+erhalten) exklusiv nachgespielt -- **byte-gleich bis auf den letzten Zug**, auch die
+vollen Partie-Logs (325/332/314 Zeilen, Zeile fuer Zeile). Die Ergebnisse des Laufs
+sind damit FREIGEGEBEN; nebenbei ist Parallel-gegen-Seriell am Anker-Instrument
+bestaetigt (Lauf 10 Prozesse, Probe 1). Der `laufzeit`-Vorbehalt bleibt. Herleitung,
+nicht gemessen: dass diese drei im Fenster lagen, folgt aus der gestreiften
+Blockaufteilung -- Zeitstempel je Partie gibt es nicht. Vermerk:
+`artifacts/anchor_arena_v23b01_load_contamination.md`.
+
+**Erledigt seit der letzten Fassung:** die Checkpoint-Arena des Kaltstart-Arms
+(`b02_best` 33:47 `b02_brierbest`, SPRT H0, p = 0,189) -- **Kandidat ist
+`v23-b02_brierbest`**, obwohl aus Epoche 1. Registriert in
+`PREREG_v23_window.md` par.2h und `PREREG_capacity_sim_frontier.md` par.11.
 
 **Danach frei:** die GPU fuer den Relabel-Arm, die CPU fuer dessen 200
-Cache-Bloecke.
+Cache-Bloecke. In der CPU-Warteschlange steht ausserdem die Arm-Frage selbst:
+`b02_brierbest` gegen `b01_brierbest`, Warmstart gegen Kaltstart auf demselben
+Fenster. Fuer die sechs Standard-Kennzahlen dann ueber
+`tools/paired_arena_env_ab.py --model-b ... --log-games` (das Tor-2b-Instrument);
+`paired_gating.py` hat KEIN Log-Flag (geprueft an seiner Argumentliste), es
+liefert nur Punkte, Margin und Strafleiste.
 
 ---
 
@@ -65,7 +93,11 @@ damit faellig**, Erfolgstest "kippt die Sims-Kurve?".
 **`v23-b02` (Kaltstart):** Early Stop nach Epoche 15/40, **4,22 h** gegen
 b01s 5,97 h -- ein Kaltstart kostet mit stehendem Fenster-Cache WENIGER als
 ein Warmstart. Sein brierbestes Modell liegt allerdings bei Epoche 1
-(par.2g), daher die laufende Checkpoint-Arena.
+(par.2g) -- die Checkpoint-Arena hat es trotzdem zum Kandidaten gemacht:
+**33:47 fuer `_brierbest`** (SPRT H0, Vorzeichentest p = 0,189, gepaarte
+Differenz -0,350 [-0,791, +0,091], Punkte 42,33 gegen 37,53). Nicht
+signifikant, aber die vorab registrierte Regel laesst hier den Punktschaetzer
+entscheiden (par.2h).
 
 ---
 
@@ -124,15 +156,100 @@ solcher markiert.
 
 ## 3. STAND JETZT
 
-**Champion:** `v21_2d_brierbest`, Elo **1215** [1170, 1259] auf der
-R5-Fix-Leiter. Kanten ueber die Fix-Grenze nie mischen.
+**Champion:** `v21_2d_brierbest`, Elo **1226** [1188, 1269] auf der R5-Fix-Leiter
+(Stand 2026-08-31, nach Eintragung der Anker- und der Champion-Kante von b01; der
+fruehere Wert 1215 stammt aus dem Fit ohne diese beiden Zeilen). Kanten ueber die
+Fix-Grenze nie mischen. **Staerkster Knoten der Leiter ist inzwischen NICHT der
+Champion:** `v23-b01_brierbest` steht bei 1263 -- die KI ueberlappen, die
+Promotionsregel haengt an der Champion-Kante, und die war nicht signifikant.
 
 **Bester Stand der Spalten-Linie: `v23-b01_brierbest`** (seit 2026-08-31) --
 volle Spalten 0,5150 am argmax-Instrument, 119:61 gegen den Vorgaenger b05,
-gegen den Champion 219:181 (nicht signifikant). Elo als HERLEITUNG rund
-+33 ueber v21; die belastbare Verankerung liefert die laufende Anker-Kante.
-Vorgaenger `v22-b05`: Elo 1084 [961, 1198] aus einem Fruehstopp unter 150
-Paaren, also informativ. Der hv2-Lehrer liegt mit 1125 dazwischen.
+gegen den Champion 219:181 (nicht signifikant). **Anker-Kante gefochten
+(2026-08-31, 22:39): 127:23 aus 150 = 84,7 Prozent** gegen
+`Heuristik_hv1_anchor`@150, Cross-Aera, Golden-Selbsttest gruen, Ergebnisse per
+Determinismus-Probe freigegeben. **ES GIBT KEIN REMIS** (Nutzer-Hinweis, Regel an
+`game.rs:586` geprueft: bei Gleichstand gewinnt, wer den Startspielerstein zuletzt
+nahm): der Schiedsrichter meldete drei Partien faelschlich als Remis, alle drei gehen
+an b01. `frozen_referee_match.py:380` liest den Tie-Break jetzt aus dem Zustand
+(`first_player_next_round`), Gegenprobe auf denselben Seeds bestaetigt es. Die
+Rust-Arenen waren nie betroffen. Kennzahlen je Seite: volle Spalten 0,953 gegen
+0,027, Punkte 53,97 gegen 36,13, Margin +17,84, Strafpunkte -14,31 gegen -20,17.
+Elo als HERLEITUNG: rund +297 ueber dem Anker (aus 84,7 Prozent), und rund +33 ueber
+v21 aus der Champion-Kante. Beide Kanten sind seit dem 2026-08-31 in
+`elo_history.csv` und die Anker-Kante zusaetzlich in `arena_trends.csv`. Zum
+Vergleich, ueber zwei Instrumente hinweg (Paritaet 20/20 belegt): v21 kam am Anker
+auf 116 von 150 (77,3 Prozent, Remis dort nicht ausgewiesen).
+
+**EINGETRAGEN am 2026-08-31** in `elo_history.csv` und `arena_trends.csv`.
+Beim Eintragen fiel auf, dass der Tracker auf den LITERALEN Namen `Heuristik`
+verankerte, waehrend die Checkliste `Heuristik_hv1_anchor` vorschreibt -- die Kante
+landete dadurch in einer eigenen, freien Komponente (b01 1148 / Anker 852, Summe
+exakt 2000). BEHOBEN, siehe unten; Herleitung in `PREREG_agent_encapsulation.md`
+par.13.
+
+**Die Vorbedingung ist inzwischen GEMESSEN (2026-08-31, Nutzer-Vorgabe: nicht
+gegeneinander spielen lassen, sondern Zug fuer Zug vergleichen).**
+`tools/verify_frozen_heuristic.py` in beiden Modi, hv1-Rezept aus dem Manifest
+(10 Partien, 600 Sims, Seed 20260826):
+
+| Modus | Verdikt | verglichen | Wanduhr |
+| --- | --- | --- | --- |
+| Live-Wheel (Drift) | **GRUEN** | 1.763 Schritte, Feld fuer Feld, keine Abweichung | 22,2 s |
+| Artefakt-Wheel (Konservierung) | **GRUEN** | dieselben 1.763 Schritte | 13,4 s |
+
+Dazu die Referee-Paritaet neu gefahren (`anchor_referee_parity_20260831.json`):
+20/20 identisch in beiden Modi, 0 Abweichungen. **Der lebende Code spielt hv1 also
+Zug fuer Zug wie das Artefakt** -- die Engine-Aenderungen seit dem Einfrieren haben
+den Anker nicht bewegt. Ab jetzt Pflicht nach jeder Engine-Aenderung, als Skill
+`mosaic-anchor-invariance` abgelegt.
+
+**Nutzer-Klarstellung dazu:** die In-Process-Heuristik ist eine
+ENTWICKLUNGSUMGEBUNG, kein Vergleichswert. Der Fixpunkt gehoert an das Artefakt;
+"der Anker ist gedriftet" ist keine moegliche Diagnose, ein rotes Ergebnis hiesse,
+der lebende Code hat sich bewegt.
+
+**GESETZT (Nutzer-Anweisung 2026-08-31): der Anker IST das Artefakt.**
+`ANCHOR_NAME = "Heuristik_hv1_anchor"` in `tools/elo_tracker.py`, dazu
+`ANCHOR_ALIASES = {"Heuristik": ...}` fuer die Zeilen vor der Umbenennung.
+`Heuristik_v2huelle` bleibt ein eigener Spieler. Registriert in
+`PREREG_agent_encapsulation.md` par.13, Ablauf als Skill
+`mosaic-anchor-invariance`, Checkliste nachgezogen.
+
+**Die Leiter danach** (`python tools/elo_tracker.py report`, 11 Zeilen, kein
+einziger "NICHT verbunden"-Vermerk mehr; eingetragen sind seither auch die
+beiden Tor-1-Gatings gegen b05):
+
+| Modell | Elo | 95%-KI | Partien |
+| --- | --- | --- | --- |
+| **v23-b01_brierbest@400** | **1263** | [1223, 1311] | 730 |
+| v21_2d_brierbest@400 | 1227 | [1191, 1269] | 1407 |
+| v20_2d_opp_brierbest@400 | 1194 | [1158, 1235] | 950 |
+| v19_2d_best@400 | 1142 | [1103, 1186] | 550 |
+| Heuristik_v2huelle@150 | 1137 | [1086, 1190] | 407 |
+| v22-b05@400 | 1136 | [1074, 1198] | 230 |
+| Heuristik_hv1_anchor@150 | 1000 | fix | 600 |
+
+**Beide Kanten sind drin (Nutzer-Anweisung 2026-08-31, "ist ja ein valides
+match"): die Champion-Kante 219:181 gegen v21 ist als 9. Zeile eingetragen** --
+informativ, kein Promotionsentscheid. Sie zieht b01 von 1297 (Anker-Kante allein)
+auf 1266; mit den beiden b05-Kanten dazu steht er bei **1263** ueber 730 Partien.
+Anker- und Champion-Kante implizierten einzeln 1297 und rund 1259, der gemeinsame
+Fit legt sich dazwischen. Die KI von b01 [1223, 1311] und v21 [1191, 1269]
+ueberlappen -- dieselbe Aussage wie die
+Champion-Kante selbst: Augenhoehe, nicht belegt besser, keine Promotion.
+
+**Was noch offen BLEIBT:** der Alias faltet die Anker-Kanten vom 2026-08-20 auf ein am 2026-08-26
+   eingefrorenes Artefakt. Fuer diese sechs Tage liegt kein Wheel im Baum, die
+   Zug-Gleichheit ist dort also NICHT geprueft. Einzige unbelegte Fuge der
+   Leiter.
+
+Vorgaenger `v22-b05`: Elo **1136** [1074, 1198] -- und das ist eine ANDERE Zahl als
+die 1084, die hier bis zum 2026-08-31 stand. Grund ist nicht eine neue Partie,
+sondern die Datenlage: b05 hing bis dahin an einer einzigen fruehgestoppten Kante
+(16:34 gegen v21, n=50). Mit den beiden Tor-1-Gatings gegen b01 (52:28 und 67:33)
+kommen 180 Partien dazu, das Intervall schrumpft von 228 auf 124 Punkte. Der
+hv2-Lehrer liegt mit **1137** jetzt gleichauf statt 40 Punkte darueber.
 
 **Wheel:** 79-Kanal-Build (`e91cd34`), Vertragshash `efd564d87bac2722`,
 Paritaets-Hash `8c6684ff...` gemessen unveraendert.
@@ -158,7 +275,6 @@ widerlegt.
 Stack-Draw-Kontrollfluss EIN, Bootstrap-Horizont 2, Seed-Positionen AUS
 (Quelle plattenblind), Startkuppel Handheuristik, Vollendbarkeits-Filter AUS
 (ungebaut). Vollstaendig in `PREREG_v23_window.md` par.4c.
-
 ---
 
 ## 4. OFFENE ENTSCHEIDUNGEN (Nutzer)

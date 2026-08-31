@@ -41,7 +41,7 @@ Stellen, an denen es in der Vergangenheit schiefging.
 
 ## Randbedingungen
 
-- Jede Kante ist ein Messlauf: Skill `mosaic-messlauf` gilt (Exklusivitaet,
+- Jede Kante ist ein Messlauf: Skill `mosaic-measurement-run` gilt (Exklusivitaet,
   laufzeit-Block, Block-Ebene).
 - Ein Wheel und die `.pth` liegen IM Artefakt, das sie ausfuehren
   (`frozen_champions/<name>/`), kein Sammelordner.
