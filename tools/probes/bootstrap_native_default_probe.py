@@ -189,7 +189,7 @@ def main() -> int:
 
     # --- D) Cache-Schluessel unterscheidet die Zieldefinition
     kw = dict(value_target_variant="default", encoder="flat",
-              conjunction_head=False, policy_carrier=True)
+              conjunction_head=False)
     k_native = neural_net.per_file_cache_key(NATIVE_NAME, bootstrap_native=True, **kw)
     k_legacy = neural_net.per_file_cache_key(NATIVE_NAME, bootstrap_native=False, **kw)
     key_ok = k_native != k_legacy

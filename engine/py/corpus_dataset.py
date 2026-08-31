@@ -1004,6 +1004,14 @@ class MosaicDataset(Dataset):
             # wertetragenden Spezialfeld-Kanaele am Ende.
             planes_l = [] if self.encoder == "2d" else None
 
+            # TRAEGERAGNOSTISCHER BLOCK (2026-08-31, Nutzer-Auftrag): baut diese
+            # Instanz EINEN Datei-Block (`cache_path_override`), dann traegt der
+            # Block `pol_w` ohne Traeger-Maske. Die Maske gehoert zum FENSTER und
+            # wird beim Zusammenfuegen angewandt -- sonst entwertet jeder
+            # Manifest-Wechsel den ganzen Blockbestand, obwohl sich an den Daten
+            # nichts aendert. Im Fenster-Modus (kein Override) gilt die Maske
+            # unveraendert hier.
+            _block_mode = cache_path_override is not None
             for f in files:
                 # `bootstrap_value` ist eine NATIVE [0,1]-Gewinnwahrschein-
                 # lichkeit -- das ist seit 2026-08-27 der DEFAULT. Nur die
@@ -1023,7 +1031,7 @@ class MosaicDataset(Dataset):
                 # v21-Manifest (`carrier_prefixes` gesetzt) nur die
                 # gelisteten Dateien plus explizite Praefix-Treffer -- der
                 # v20-Kurzschluss greift dann NICHT mehr.
-                file_policy_carrier = _is_policy_carrier(
+                file_policy_carrier = True if _block_mode else _is_policy_carrier(
                     os.path.basename(f), policy_carrier_set, carrier_prefixes, v20_wdl_generator)
                 with open(f, "rb") as file:
                     # corpus_io: erkennt gzip am INHALT (Magic-Bytes), nicht an
@@ -1330,6 +1338,13 @@ class MosaicDataset(Dataset):
                         # sich selbst ueber `policy_target_valid` (Schwarm).
                         if not file_policy_carrier:
                             pol_w = 0.0
+                        # Umbau 2026-08-31: im DATEI-BLOCK-Modus wird nicht
+                        # maskiert -- `file_policy_carrier` ist dort per
+                        # Konstruktion True (siehe Bindung oben), die Maske
+                        # kommt erst beim Zusammenfuegen des Fensters
+                        # (build_cache_parallel.merge). Der Block bleibt damit
+                        # traegeragnostisch und ueberlebt jeden
+                        # Manifest-Wechsel.
                         # PCR (Task #14): Cheap-Suche-Zuege tragen ein explizites
                         # `policy_target_valid=false` (self_play.rs, Feld nur bei
                         # aktivem PCR vorhanden) -- ihr Visit-Ziel stammt aus einer

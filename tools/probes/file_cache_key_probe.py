@@ -37,8 +37,7 @@ sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "engine" / "py"))
 
 BASIS = dict(value_target_variant="default", encoder="flat",
-             conjunction_head=False, policy_carrier=True,
-             bootstrap_native=True)
+             conjunction_head=False, bootstrap_native=True)
 
 # Je Eintrag: Anzeigename, wie die Abweichung erzeugt wird.
 #   ("arg", name, wert)  -> Aufrufargument aendern
@@ -48,7 +47,11 @@ DIVERGENCES = [
     ("value_target_variant", "arg", "value_target_variant", "nortv"),
     ("encoder",              "arg", "encoder",              "2d"),
     ("conjunction_head",     "arg", "conjunction_head",     True),
-    ("policy_carrier",       "arg", "policy_carrier",       False),
+    # 2026-08-31 ENTFALLEN: der Traegerstatus ist kein Schluessel-Bestandteil
+    # mehr. Der Block ist traegeragnostisch, die Maske kommt beim
+    # Zusammenfuegen (build_cache_parallel.merge). Ein Divergenz-Fall dafuer
+    # waere jetzt gegenstandslos -- die Invariante prueft
+    # tools/probes/carrier_mask_at_merge_probe.py.
     # 2026-08-27: Zieldefinition je Datei (roher vs. Platt-entstauchter
     # Bootstrap in `values_wdl`) -- muss einen MISS erzeugen, sonst zieht ein
     # Lauf nach der Semantik-Umkehr still die entstauchten Bestands-Bloecke.

@@ -59,7 +59,12 @@ def _bau_teilmenge(args):
     return idx, ds.cache_path_h5, len(ds)
 
 
-def merge(parts, target, window_key=None):
+# Felder, die die Traeger-Maske betreffen (2026-08-31). `ranking_mask` gehoert
+# dazu, weil sie in der Bauschleife an `pol_w > 0` haengt.
+CARRIER_MASKED_FIELDS = ("policy_weights", "ranking_mask")
+
+
+def merge(parts, target, window_key=None, mask_parts=None):
     """Konkateniert die Teil-Caches in Blockreihenfolge zu einem Cache.
 
     Hiess bis 2026-08-28 `zusammenfuegen`; `build_cache_incremental.py:219`
@@ -73,6 +78,15 @@ def merge(parts, target, window_key=None):
     `corpus_dataset.verify_cache_file`. NICHT aus den Teil-Caches uebernehmbar:
     deren Schluessel gehoert je zu einer TEILMENGE der Dateien, nicht zum
     Fenster.
+
+    `mask_parts` (2026-08-31, Traeger-Umbau): Menge von Teil-Pfaden, deren
+    Policy-Gewichte beim Schreiben auf 0 gesetzt werden -- die Traeger-Maske.
+    Sie steht seit dem Umbau NICHT mehr im Datei-Block (der ist
+    traegeragnostisch, siehe `file_cache_key.per_file_cache_key`), sondern
+    gehoert zum FENSTER und wird hier angewandt. Betroffen sind `policy_weights`
+    UND `ranking_mask`: die Ranking-Maske haengt in der Bauschleife an
+    `pol_w > 0` (corpus_dataset.py), sie muss also mitmaskiert werden, sonst
+    lernte der Ranking-Loss auf Zuegen, deren Policy-Ziel maskiert ist.
 
     WIRKLICH streamend: das Zielfeld wird mit seiner ENDGUELTIGEN Form angelegt
     und dann Block fuer Block in seinen Schnitt geschrieben. Die erste Fassung
@@ -109,6 +123,8 @@ def merge(parts, target, window_key=None):
             for t in parts:
                 with h5py.File(t, "r") as hf:
                     blk = np.array(hf[k])
+                if mask_parts and t in mask_parts and k in CARRIER_MASKED_FIELDS:
+                    blk = np.zeros_like(blk)
                 d[off:off + blk.shape[0]] = blk
                 off += blk.shape[0]
                 del blk

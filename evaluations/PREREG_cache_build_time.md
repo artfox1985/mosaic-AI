@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Der Cache-Bau des Trainings dauert rund 70 min fuer 890.000 Zustaende (AUSGANGSZAHL, ueberhoeht -- par.7 weist sie selbst zurueck: sie wurde unter Nebenlast und mit OMP_NUM_THREADS=2 beobachtet; der belastbare serielle Wert sind 2,22 ms je Zustand, also ~33 min fuer dieselben 890.000) und liegt damit vor JEDER Trainingsfrage. Welche Hebel verkuerzen ihn -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: Hebel (1)+(4) abgenommen (par.7/par.9), Bit-Tor am vollen Korpus GRUEN (par.8). **Verdrahtung BERICHTIGT 2026-08-31: `--cache-file` existiert (train.py:2554, seit dc40551)** -- es bleibt, dass ein Lauf OHNE das Flag seriell baut und dass der Monolith per Design nicht auf Laeufe mit Val-Split passt. (2) umgezogen, (3) offen, GPU verworfen (par.5a). -->
+<!-- STATUS: OFFEN | Frage: Welche Hebel verkuerzen den Cache-Bau des Trainings -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: Hebel (1)+(4) abgenommen (par.7/par.9), Bit-Tor am vollen Korpus GRUEN (par.8); `--cache-file` existiert (train.py:2554). **TRAEGER-UMBAU 2026-08-31 (par.10): der Block ist jetzt traegeragnostisch, die Maske kommt beim Zusammenfuegen** -- ein Manifest-Wechsel entwertet keine Bloecke mehr (Bestand nachweislich stabil, Abnahme 4/4 gruen). (2) umgezogen, (3) offen, GPU verworfen (par.5a). -->
 
 # Vorregistrierung: Zeit des Cache-Baus
 
@@ -431,3 +431,52 @@ Funktion (`_cache_f32_active`).
 
 **Nicht verdrahtet in `train.py`** -- wie bei Hebel (1) Absicht: das Werkzeug
 steht fuer sich, bis es auf dem vollen Korpus gelaufen ist.
+
+## par.10 TRAEGER-UMBAU: die Maske wandert aus dem Block ins Fenster (2026-08-31)
+
+**Nutzer-Auftrag**, ausgeloest von seiner Frage: *"irgendwie versteh ich die
+logik noch nicht warum ich nochmal einen cache bauen muss wenn die daten
+gleich geblieben sind ich aber nur weniger auslese."* Die Frage war
+berechtigt.
+
+**Der Befund:** der aufgeloeste Traegerstatus stand im Datei-Schluessel, weil
+er den Block-INHALT aenderte -- `pol_w` wurde beim Bauen auf 0 gesetzt
+(corpus_dataset.py). Ein Manifest aendert also nicht, WELCHE Dateien gelesen
+werden (das macht die Fensterliste), sondern was in ihren Bloecken steht.
+Folge: jeder Traeger-Wechsel entwertete den Bestand -- fuer das v23-Fenster
+rund 2.600 Bloecke und nach dem gemessenen Tempo (~10 s je Block, zwei
+Worker) etwa sieben Stunden, obwohl sich an den DATEN nichts aendert.
+
+**Der Umbau:** der Datei-Block ist jetzt **traegeragnostisch** und traegt
+`pol_w` nur nach der datei-inhaerenten Regel (Drafting/Tiling/
+`policy_target_valid`). Die Traeger-Maske wird beim ZUSAMMENFUEGEN angewandt
+(`build_cache_parallel.merge(..., mask_parts=...)`), betrifft dort
+`policy_weights` UND `ranking_mask` (letztere haengt in der Bauschleife an
+`pol_w > 0`) und macht den Traegerstatus damit zu dem, was er inhaltlich ist:
+eine FENSTER-Eigenschaft wie die Dateiliste. Der Fenster-Schluessel enthaelt
+ihn weiterhin, der Monolith ist also nach wie vor traeger-spezifisch.
+
+**Warum der Bestand ueberlebt:** das Schluesselmaterial behaelt das Literal
+`|carrier=1`. Alle vorhandenen Bloecke sind ohne Manifest gebaut, also mit
+`carrier=1`; ihre Hashes bleiben identisch. Gegengeprueft an 100 Dateien aus
+`data/`: **99 Treffer, 1 Fehlschlag** -- und der Fehlschlag war eine
+Korpusdatei, die 52 Sekunden vorher gelandet war und deren Block der laufende
+Co-Bau noch nicht erreicht hatte. Ein etwaiger Alt-Block mit `carrier=0`
+traegt einen Hash, den die Funktion nie mehr erzeugt: er wird nicht falsch
+gelesen, sondern gar nicht mehr adressiert.
+
+**ABGENOMMEN, vier Pruefungen gruen**
+(`tools/probes/carrier_mask_at_merge_probe.py`, Artefakt
+`carrier_mask_at_merge_probe.json`, drei hv2-Dateien, 10.404 verglichene
+Werte): (A) Monolith aus agnostischen Bloecken plus Merge-Maske ist
+**elementweise identisch** mit dem direkt gebauten Fenster mit Manifest
+(max|delta| 0,000e+00); (B) ohne Manifest sind beide Wege identisch und die
+Maske bleibt leer; (C) Gegenprobe, dass die Maske ueberhaupt wirkt (mit gegen
+ohne unterscheidet sich, max|delta| 1,0) -- ohne sie waere der Test auch bei
+einer wirkungslosen Maske gruen; (D) der Datei-Schluessel ist mit und ohne
+Manifest derselbe, was der ganze Zweck des Umbaus ist.
+
+**Was der Umbau NICHT anfasst:** den In-Train-Fensterbau (dort gilt die Maske
+unveraendert in der Bauschleife -- der Weg kennt keine Bloecke) und den
+Fenster-Schluessel. Und `file_cache_key_probe` verliert seinen
+`policy_carrier`-Divergenzfall: er waere jetzt gegenstandslos.
