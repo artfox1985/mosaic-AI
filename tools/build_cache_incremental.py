@@ -108,16 +108,18 @@ def _load_manifest(data_dir):
     return frozenset(m["policy_carrier_files"]), prefixes, path
 
 
-def _block_path(data_dir, basename, kwargs, carrier):
+def _block_path(data_dir, basename, kwargs):
     import neural_net
     import corpus_dataset  # C 2026-08-27: MosaicDataset ist ausgezogen
     key = neural_net.per_file_cache_key(
         basename, value_target_variant=kwargs["value_target_variant"],
         encoder=kwargs["encoder"], conjunction_head=kwargs["conjunction_head"],
-        policy_carrier=carrier,
-        # Gleiche Regel wie beim Traegerstatus: DIESELBE Quelle wie die
-        # Bauschleife (corpus_dataset), damit Schluessel und Bauweg nicht
-        # auseinanderlaufen koennen.
+        # Traegerstatus steht seit 2026-08-31 NICHT mehr im Schluessel: der Block
+        # ist traegeragnostisch, die Maske kommt beim Zusammenfuegen
+        # (merge(..., mask_parts=...)), siehe file_cache_key.per_file_cache_key.
+        # Fuer `bootstrap_native` gilt die alte Regel weiter: DIESELBE Quelle wie
+        # die Bauschleife (corpus_dataset), damit Schluessel und Bauweg nicht
+        # auseinanderlaufen.
         bootstrap_native=not basename.startswith(neural_net.LEGACY_STRETCHED_PREFIXES))
     return os.path.join(data_dir, f".filecache_{key}.h5")
 
@@ -193,9 +195,9 @@ def _pass(data_dir, file_list, kwargs, carrier_set, carrier_prefixes, workers, t
     """Ein Durchgang ueber alle bekannten Dateien. Gibt (ergebnisse, n_neu)."""
     jobs = []
     for f in file_list:
-        carrier = _carrier_status(os.path.basename(f), carrier_set, carrier_prefixes)
-        jobs.append((data_dir, f, kwargs, _block_path(data_dir, os.path.basename(f),
-                                                          kwargs, carrier)))
+        # Traegerstatus wird hier nicht mehr gebraucht: der Block ist
+        # traegeragnostisch (2026-08-31), die Maske kommt beim Zusammenfuegen.
+        jobs.append((data_dir, f, kwargs, _block_path(data_dir, os.path.basename(f), kwargs)))
     # Robustheit gegen Dateien, die WAEHREND eines Durchgangs verschwinden
     # (2026-08-30, erster Produktionstest: das Aufraeumen freigegebener
     # Messkorpora killte den --watch-Lauf mit FileNotFoundError, weil die
@@ -294,14 +296,22 @@ def main():
     if a.merge_out:
         from build_cache_parallel import merge
         import corpus_dataset
-        parts = []
+        parts, mask_parts = [], set()
         for f in all_entries:
             b = os.path.basename(f)
-            c = _carrier_status(b, carrier_set, carrier_prefixes)
-            p = _block_path(a.data_dir, b, kwargs, c)
+            p = _block_path(a.data_dir, b, kwargs)
             if not os.path.exists(p):
                 raise SystemExit(f"Block fehlt: {p} (zu {b}) -- erst bauen, dann zusammensetzen.")
             parts.append(p)
+            # Traeger-Maske (2026-08-31): der Block ist agnostisch, die
+            # Maskierung passiert HIER, beim Fensterbau. Ohne Manifest ist
+            # `_carrier_status` ueberall True und die Menge bleibt leer --
+            # bestandsidentisch.
+            if not _carrier_status(b, carrier_set, carrier_prefixes):
+                mask_parts.add(p)
+        if mask_parts:
+            print(f"🔒 Traeger-Maske: {len(mask_parts)} von {len(parts)} Bloecken werden "
+                  f"beim Zusammenfuegen policy-maskiert", flush=True)
         # Fenster-Schluessel der zusammengesetzten Datei (2026-08-28): ohne ihn
         # lehnt `train.py --cache-file` das Ergebnis ab. Die Datei-Bloecke
         # tragen ihn nicht -- ihr Schluessel gehoert je zu EINER Datei
@@ -310,7 +320,8 @@ def main():
             a.data_dir, all_entries, value_target_variant=a.value_target_variant,
             encoder=a.encoder, conjunction_head=a.conjunction_head)
         t1 = time.time()
-        fields = merge(parts, a.merge_out, window_key=window_key)
+        fields = merge(parts, a.merge_out, window_key=window_key,
+                      mask_parts=mask_parts)
         merge_s = time.time() - t1
         print(f"⏱️  Zusammenfuegen: {merge_s:.1f}s ({len(fields)} Felder) -> {a.merge_out} "
               f"(Fenster-Schluessel {window_key.key})", flush=True)

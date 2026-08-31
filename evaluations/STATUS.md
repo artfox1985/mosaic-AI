@@ -101,10 +101,22 @@ tragen keine Aussage.
   breit, also praktisch gleichverteilt. Wiederholungslauf byte-gleich. Die
   Zahlen gehen glatt auf: 1.745 x 10 = 17.450 Partien, 655 Dateien
   = 6.550 rotieren aus.
-* **Traeger-Manifest ja/nein** -- offener Nutzer-Entscheid, Abschnitt 4. Wenn
-  JA: **die Policy-Klasse MUSS ausdruecklich mitgelistet werden** (180 hv2 +
+* **Traeger-Manifest: JA (Nutzer-Entscheid 2026-08-31), und es kostet keine
+  Bloecke mehr.** Der Traegerstatus ist seit dem Umbau vom 2026-08-31 KEIN
+  Bestandteil des Datei-Schluessels mehr (`PREREG_cache_build_time.md`
+  par.10): der Block ist traegeragnostisch, die Maske kommt beim
+  Zusammenfuegen. Die ~2.600 befuerchteten Neubauten entfallen ersatzlos;
+  Bestand nachweislich stabil (99 von 100 Schluesseln treffen, der eine
+  Fehlschlag war eine 52 Sekunden alte Datei), Abnahme 4/4 gruen
+  (`carrier_mask_at_merge_probe.json`). **Gezogen ist beides:** Fenster 1.745
+  Dateien (Seed 20260920, `data/window_v23_hv2.txt`), Traeger 180 davon
+  (Seed 20260921, `data/carriers_v23_hv2.txt`, = 1.800 Partien).
+  **Zusammengebaut wird das Manifest, sobald die policy-Klasse fertig ist** --
+  denn: **die Policy-Klasse MUSS ausdruecklich mitgelistet werden** (180 hv2 +
   200 b05-policy = 380 Eintraege) oder das Manifest traegt
-  `carrier_prefixes: ["selfplay_v22-b05-policy_"]`. Sonst setzt es `pol_w=0`
+  `carrier_prefixes: ["selfplay_v22-b05-policy_"]`; der Generator hat dafuer
+  seit 2026-08-31 `--include-glob` (leerer Glob = harter Abbruch). Sonst setzt
+  es `pol_w=0`
   fuer den GESAMTEN neuen Korpus: der v20-Kurzschluss deckt nur
   `selfplay_v19wdl`/`selfplay_v20wdl` (neural_net.py:796), und der Generator
   schreibt `carrier_prefixes` bewusst nicht. Gegenprobe vor dem Training:
@@ -253,7 +265,6 @@ Stack-Draw-Kontrollfluss EIN, Bootstrap-Horizont 2, Seed-Positionen AUS
 
 | Punkt | Worum es geht |
 | --- | --- |
-| **Traeger-Manifest fuer hv2** | `PREREG_v23_window.md` par.1 will hv2 ueberwiegend policy-maskiert (1.800 von 24.000 Partien aktiv). Das geht nur per Manifest, und das entwertet die 2.400 liegenden hv2-Bloecke. Ohne Manifest traegt jeder hv2-Record mit `policy_target_valid != false` Policy (gezaehlt: 534 von 1.733 in einer Datei) -- der Cache bleibt, aber das Fenster weicht bewusst von par.1 ab und das gehoert dann registriert |
 | **b04: welcher Zweig wird breiter** | Flach-Zweig `hidden_size` 512 ist ohne Bau fahrbar; Conv-Zweig `conv_channels` 48 / `conv_layers` 2 braucht zwei Flags, ein Checkpoint-Feld und eine Ableitung beim Laden -- sonst ist der Checkpoint nicht ladbar (`PREREG_capacity_sim_frontier.md` par.10) |
 | **Loeschfreigaben** | `data/onpolicy_v22-b06/` (31 Dateien) und -- falls keine DAgger-Runde 3 -- `data/onpolicy_v22-b05/` (30) |
 | **Messartefakte tracked?** | `evaluations/artifacts/` ist ungetrackt; Preregs zitieren die JSONs als Beleg, ein frischer Klon hat sie nicht. Zurueckdrehen: `.gitignore`-Zeile raus, `git add -f` |

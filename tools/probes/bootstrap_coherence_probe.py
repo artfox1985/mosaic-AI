@@ -120,7 +120,7 @@ def keys_for(mode, name):
         import corpus_dataset
         k_file = neural_net.per_file_cache_key(
             name, value_target_variant="default", encoder="flat",
-            conjunction_head=False, policy_carrier=True, bootstrap_native=True)
+            conjunction_head=False, bootstrap_native=True)
         k_win = corpus_dataset.window_cache_key(
             data_dir="data", files=[name], value_target_variant="default",
             encoder="flat", conjunction_head=False).key

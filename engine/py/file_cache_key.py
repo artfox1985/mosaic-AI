@@ -16,8 +16,7 @@ sehen wie die Bauschleife. Nebenbei vermeidet es den Ringschluss --
 
 
 def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str,
-                       conjunction_head: bool, policy_carrier: bool,
-                       bootstrap_native: bool) -> str:
+                       conjunction_head: bool, bootstrap_native: bool) -> str:
     """Schluessel EINER Korpusdatei (PREREG_cache_build_time.md par.6, Hebel 4).
 
     EIGENER NAMENSRAUM, nicht der Fenster-Schluessel: dieser hier deckt nur
@@ -27,15 +26,25 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
     unnoetig mit: ein neues Fenster verwirft sonst Bloecke, deren Inhalt sich
     nicht geaendert hat.
 
-    DIE EINE STELLE, an der das Manifest doch einfliesst, ist `policy_carrier`
-    -- der AUFGELOESTE Traegerstatus DIESER Datei (`_is_policy_carrier`), nicht
-    der Manifest-Inhalt. Zwei Manifeste, die fuer diese Datei dasselbe
-    ergeben, duerfen denselben Block benutzen; eines, das den Status kippt,
-    darf es nicht. Wer hier den Manifest-Inhalt einsetzt, baut den heutigen
-    Zustand nach; wer den Status weglaesst, baut die stille Falle aus par.6.
+    **DER TRAEGERSTATUS IST SEIT 2026-08-31 NICHT MEHR TEIL DES SCHLUESSELS**
+    (Nutzer-Auftrag). Vorher war er "die eine Stelle, an der das Manifest doch
+    einfliesst" -- und genau das war teuer: er aenderte den BLOCK-INHALT
+    (`pol_w` wurde beim Bauen auf 0 gesetzt), also entwertete jeder
+    Traeger-Wechsel den gesamten Bestand. Beim v23-Fenster waeren das rund
+    2.600 Bloecke gewesen, obwohl sich an den DATEN nichts aendert.
 
-    Der Aufrufer muss `policy_carrier` mit `_is_policy_carrier` bilden (nicht
-    von Hand), sonst koennen Schluessel und Bauschleife auseinanderlaufen.
+    Neue Aufteilung: der Block ist **traegeragnostisch** -- er traegt `pol_w`
+    nach der datei-inhaerenten Regel (Drafting/Tiling/`policy_target_valid`)
+    --, und die Traeger-Maske wird beim ZUSAMMENFUEGEN des Fensters angewandt
+    (`build_cache_parallel.merge(..., mask_parts=...)`). Damit ist der
+    Traegerstatus eine FENSTER-Eigenschaft wie die Dateiliste, also genau
+    dort, wo der Kopf dieser Datei ihn ohnehin verortet.
+
+    **Warum das den Bestand NICHT entwertet:** das Material behaelt das
+    Literal `|carrier=1`. Alle vorhandenen Bloecke sind ohne Manifest gebaut,
+    also mit `carrier=1` -- ihre Hashes bleiben exakt dieselben. Ein etwaiger
+    Alt-Block mit `carrier=0` traegt einen Hash, den diese Funktion nie mehr
+    erzeugt: er wird nicht falsch gelesen, sondern gar nicht mehr adressiert.
 
     `bootstrap_native` (2026-08-27, PREREG_heuristic_v2_long_rows.md par.3b.3
     Punkt 3) ist nach derselben Regel gebaut: der AUFGELOESTE Status DIESER
@@ -83,7 +92,10 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
         + "|" + str(INPUT_SIZE) + "|" + str(NUM_ACTIONS) + "|" + str(VALUE_SCHEMA_VERSION)
         + "|" + str(POLICY_TARGET_SHARPEN_EXPONENT) + "|" + str(TD_LAMBDA)
         + "|" + str(value_target_variant) + "|" + str(encoder)
-        + "|carrier=" + ("1" if policy_carrier else "0")
+        # Literal statt Parameter (2026-08-31, Begruendung im Kopf): haelt den
+        # Hash aller vorhandenen Bloecke stabil, waehrend der Traegerstatus aus
+        # dem Block-Inhalt herauswandert.
+        + "|carrier=1"
         + "|bsnative=" + ("1" if bootstrap_native else "0")
         + "|rounds_v1+own_v1"
     )
