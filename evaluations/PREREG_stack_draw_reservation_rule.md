@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem. Eine Stopp-Regel IST gebaut (self_play.rs:500-545, Default-Pfad) -- ist sie die richtige? | Beleg: NEIN, sie zieht ZU OFT (par.5b): optimale Tiefe ist ueberall 1, die gebaute Regel zieht bei negativem Brettniveau 9-11 mal. Ursache ist der Einheitenbruch (par.1c), nicht der Optionswert-Fehler. Knopf gebaut, Default AUS (par.5c); Abnahme n=200 zeigt KEINEN Staerkeunterschied in beide Richtungen (par.5d). Wiedervorlage nach v22 nur unter zwei Bedingungen (par.5e). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem -- ist die gebaute Stopp-Regel die richtige? | Beleg: NEIN (par.5b): optimale Tiefe ist ueberall 1, die gebaute Regel zieht bei negativem Brettniveau 9-11 mal; Ursache ist der Einheitenbruch (par.1c). Knopf gebaut, **Default AUS** (par.5c), Abnahme n=200 ohne Staerkeunterschied in beide Richtungen (par.5d). Wiedervorlage nur unter den zwei benannten Bedingungen aus par.5e -- beide ungebaut. -->
 
 # PREREG: Reservationswert-Regel fuer die Blindziehung (`stack_draw_reservation_rule`)
 
