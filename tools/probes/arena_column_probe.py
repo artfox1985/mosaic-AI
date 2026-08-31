@@ -134,6 +134,7 @@ def main() -> int:
                 continue
 
             per_name: dict[str, list[int]] = {}
+            per_game: list[dict] = []
             ok = diverged = 0
             errors: list[str] = []
             for i, g in enumerate(games):
@@ -146,14 +147,20 @@ def main() -> int:
                     continue
                 ok += 1
                 names = g.get("names") or ["seite0", "seite1"]
+                cols = [_full_columns(state, pi) for pi in (0, 1)]
                 for pi in (0, 1):
-                    per_name.setdefault(names[pi], []).append(_full_columns(state, pi))
+                    per_name.setdefault(names[pi], []).append(cols[pi])
+                # Je Partie mitschreiben: nur so laesst sich spaeter GEPAART
+                # rechnen (beide Seiten aus DERSELBEN Partie), statt zwei
+                # Mittelwerte mit unabhaengigen SEs zu vergleichen.
+                per_game.append({"index": i, "seed": g.get("game_seed"),
+                                 "names": names, "volle_spalten": cols})
                 if (i + 1) % 25 == 0:
                     print(f"  {arm}: {i + 1}/{len(games)} replayt "
                           f"({time.time() - t_wall:.0f}s)", flush=True)
 
             arm_out = {"partien_mit_log": len(games), "replayt": ok, "divergiert": diverged,
-                       "fehler_beispiele": errors, "seiten": {}}
+                       "fehler_beispiele": errors, "seiten": {}, "je_partie": per_game}
             for name, vals in sorted(per_name.items()):
                 mean = sum(vals) / len(vals)
                 se = (st.stdev(vals) / len(vals) ** 0.5) if len(vals) > 1 else None

@@ -159,6 +159,60 @@ signifikant ausfaellt. Das waere eine stille Promotion gegen die eigene
 Trennung gewesen (Champion ist v21; b01-gegen-b05 ist das Ratschen-Tor).
 Beide Laeufe mit `--no-promote-winner`.
 
+## par.2d TOR 2b BESTANDEN -- Spalten auch GEGEN Widerstand (2026-08-31)
+
+Gemessen mit `tools/probes/arena_column_probe.py` aus den Partie-Logs zweier
+Arenen b01 gegen b05 (je 80 Partien @400, `--log-games`, Basis-Seed
+20260951), also aus der Brettgeometrie und **unabhaengig von den
+Wertungsplatten** -- Nutzer-Vorgabe: "Ich brauch keine k1 Punkte."
+
+| | volle Spalten je Seite |
+| --- | --- |
+| `v23-b01_brierbest` | **0,6456** |
+| `v22-b05` | 0,4304 |
+
+**Gepaart je Partie ueber beide Laeufe: +0,2152 +- 0,1616 (SE 0,0825,
+t +2,61, n=158).** Beide Seiten stammen aus DERSELBEN Partie, die Paarung ist
+also exakt.
+
+**Der Vorsprung ist praktisch derselbe wie im Self-Play** (+0,215 gegen
++0,205) -- der Spaltenbau ueberlebt den Widerstand eines Gegners. Genau das
+war die Luecke, die Tor 2a allein nicht schliessen konnte.
+
+**Drei Vorbehalte, die dazugehoeren:**
+
+1. **Schwaechere Signifikanz als im Self-Play** (t 2,61 gegen 4,47) -- 158
+   statt 400 Partien, und die beiden Orientierungen streuen erheblich
+   (Orientierung 1: 0,5443 gegen 0,5316, praktisch gleichauf; Orientierung 2:
+   0,7468 gegen 0,3291). Die Heterogenitaet ist bei diesen SEs mit Rauschen
+   vertraeglich, aber sie ist da.
+2. **Je eine Partie pro Lauf war nicht replaybar** (Chip-Vollendung), die
+   Zahlen stehen auf 79 von 80 je Orientierung. Von der Sonde ausgewiesen,
+   nicht still uebersprungen.
+3. **Beide Netze bauen gegen einen GEGNER mehr Spalten als gegen sich
+   selbst** (0,646 gegen 0,515 bzw. 0,430 gegen 0,310). Unerklaert, als
+   Beobachtung festgehalten -- eine Erklaerung waere ein eigener Strang.
+
+**Ueberfluessiger Aufwand, benannt:** die zweite Orientierung war nicht
+noetig. `run_net_vs_net_arena` alterniert den Startspieler bereits innerhalb
+eines Laufs (self_play.rs:2722), das Brett ist nur ein Etikett. Der Swap-Lauf
+hat eine Verzerrung neutralisiert, die die Engine schon neutralisiert -- er
+hat die Stichprobe verdoppelt, aber nicht aus dem Grund, aus dem er gefahren
+wurde.
+
+## par.2e GESAMTVERDIKT v23: ALLE VIER TORE STEHEN
+
+| Tor | Ergebnis |
+| --- | --- |
+| 0 Korpus traegt das Signal | Symmetrie-Trennung +0,4041, t 41,26; 5.629 Seiten mit voller Spalte |
+| 1 Siege gegen den Vorgaenger | 119:61 aus zwei unabhaengigen Seeds |
+| 2a Spalten im Self-Play | +0,2050, t +4,47 |
+| 2b Spalten in der Arena | +0,2152, t +2,61 |
+
+**Damit ist das v24-Self-Play freigegeben** (`docs/generation_loop.md`,
+Schritt 9). NICHT freigegeben ist die Promotion: die faellt erst mit der
+Kante gegen `v21_2d_brierbest` (1215), und die steht noch aus.
+
 ## par.3 Drei Punkte, die benannt gehoeren -- keiner ist geloest
 
 **(1) G-1 und G-2 kommen aus DEMSELBEN Korpus.** Im alten Schema waren das

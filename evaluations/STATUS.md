@@ -90,9 +90,18 @@ Replikation nach der Champion-Strenge Pflicht -- damit ist die Auflage
 erfuellt. In Lauf 1 gewann b05 KEIN einziges Paar doppelt (A-Sweeps 12,
 B-Sweeps 0). Herleitung: `PREREG_v23_window.md` par.2c.
 
-**Laufend:** Tor 2b (Arena b01 gegen b05 mit `--log-games`, BEIDE
-Orientierungen, danach `arena_column_probe`) auf der CPU, `v23-b02`
-(Kaltstart) auf der GPU.
+**TOR 2b BESTANDEN (2026-08-31): +0,2152 +- 0,1616 (t +2,61, n=158)** volle
+Spalten je Seite, gepaart je Partie, aus den Arena-Logs rekonstruiert und
+damit plattenunabhaengig (b01 0,6456 gegen b05 0,4304). Der Vorsprung ist
+praktisch derselbe wie im Self-Play -- der Spaltenbau ueberlebt den
+Widerstand. Vorbehalte in `PREREG_v23_window.md` par.2d.
+
+**ALLE VIER TORE STEHEN -- das v24-Self-Play ist freigegeben** (par.2e).
+NICHT freigegeben ist die Promotion; dafuer fehlt die Kante gegen
+`v21_2d_brierbest` (1215).
+
+**Laufend:** `v23-b02` (Kaltstart) auf der GPU. **Als Naechstes auf der CPU:**
+Anker-Kante (festes n=150) und Champion-Kante gegen v21.
 **Danach:** Tor 2b (Arena mit `--log-games` +
 `tools/probes/arena_column_probe.py`) und die drei Elo-Kanten.
 
