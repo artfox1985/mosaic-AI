@@ -171,7 +171,30 @@ def corpus_composition(all_files: list[str]) -> list[dict]:
         for g in sorted(counts):
             total_games += (g - prev_g) * counts[g]
             prev_g = g
-        composition.append({"prefix": prefix, "files": len(entries), "games": total_games})
+        # TEILMENGEN-BERICHTIGUNG (2026-08-31, mit `train.py --file-list`):
+        # die kumulative Rechnung oben stimmt fuer VOLLSTAENDIGE Laeufe, aber
+        # nicht fuer ein rotierendes Fenster. Faellt eine Datei heraus, erbt
+        # ihre Nachfolgerin deren Spanne, und die Summe bleibt max(g) -- das
+        # v23-Fenster nimmt 1.745 von 2.400 hv2-Dateien und wurde so als
+        # "24000 Spiele" statt 17.450 ausgewiesen (b01-Manifest vom
+        # 2026-08-31 traegt noch die alte Zahl).
+        # Robuster Ersatz: die Datei-Granularitaet ist der KLEINSTE positive
+        # Abstand zwischen benachbarten g-Werten (bei gleichmaessiger
+        # Aufteilung genau `--per-file`), und die Partienzahl ist
+        # Dateien x Granularitaet. Beide Zahlen bleiben im Manifest, damit
+        # ein Leser den Unterschied sieht statt ihn zu raten.
+        _gs = sorted(counts)
+        _diffs = [b - a for a, b in zip(_gs, _gs[1:]) if b > a]
+        stride = min(_diffs) if _diffs else (_gs[0] if _gs else 0)
+        games_by_stride = len(entries) * stride if stride else None
+        entry = {"prefix": prefix, "files": len(entries),
+                 "games": games_by_stride if games_by_stride is not None else total_games,
+                 "games_cumulative": total_games, "stride": stride}
+        if games_by_stride is not None and games_by_stride != total_games:
+            # Kein Fehler, sondern der Normalfall bei einem rotierenden
+            # Fenster -- aber er gehoert sichtbar ins Manifest.
+            entry["subset_of_run"] = True
+        composition.append(entry)
     composition.sort(key=lambda c: -c["files"])
     if unmatched:
         composition.append({"prefix": "_unmatched", "files": unmatched, "games": None})
