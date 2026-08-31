@@ -7,6 +7,12 @@ bis dato nicht konsequent umgesetzt"), Langform bis dahin in
 `archive/history.md` (~Z. 14402). Wer hier etwas aendert, aendert HIER --
 STATUS.md verweist nur noch auf diese Datei.
 
+**Schwesterdatei `generation_loop.md`** (2026-08-31): dort steht, wie eine
+Generation zustande kommt und an welchen zwei Toren sie gemessen wird. Ein
+Champion-Wechsel ist Schritt 7 jener Schleife -- und faellt nur, wenn die
+Kante gegen den AMTIERENDEN Champion faellt, nicht schon beim Ratschen-Tor
+gegen die Vor-Generation.
+
 Bei JEDEM Champion-Wechsel vollstaendig abarbeiten, nicht aus dem
 Gedaechtnis:
 
