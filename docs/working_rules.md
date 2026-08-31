@@ -53,6 +53,37 @@ Vorfalls-Herkunft steht in `pitfalls.md`.
   nur, dass X in diesem Zustand verliert. Es fehlt die Kontrollgruppe: ein
   Agent, der Y KANN. (Herkunft: STATUS-Strukturbefunde, Stand 2026-08-30.)
 
+### Auslastung: GPU und CPU duerfen parallel laufen (Nutzer-Entscheid 2026-08-31)
+
+Nutzer: *"ich will eine auslastung von gpu und cpu und nicht alles seriell
+fahren."* Das praezisiert die Exklusivitaets-Regel aus `CLAUDE.md`
+("Messungen laufen EXKLUSIV"), es hebt sie nicht auf.
+
+**Was parallel darf:** ein Training auf der GPU und EIN CPU-Auftrag daneben
+(Arena, Sonde, Relabeling, Cache-Bau). Die Ressourcen sind verschieden, und
+die Sorge der Ursprungsregel -- verstuemmelte Partien -- ist fuer unsere
+Arenen gemessen ausgeraeumt: am 2026-08-29 war der lastgebremste Erstlauf
+PARTIEGLEICH mit dem sauberen Neustart (nur die `game_id`-Zeitstempel
+differierten). Last bremst, sie verfaelscht nicht, solange die Suche
+sim-budgetiert und seed-getrieben ist -- und das ist sie ueberall im Baum
+(es gibt kein Zeitbudget in der Suche).
+
+**Was weiter EXKLUSIV bleibt:** zwei CPU-Messungen gegeneinander. Ein
+Self-Play neben einer Arena, zwei Arenen nebeneinander, eine Sonde neben
+einem Self-Play -- das teilt dieselbe Ressource und macht beide Laufzeiten
+wertlos, ohne dass ein zweiter Kern frei wuerde.
+
+**Thread-Budget (12 Kerne).** Ein Training zieht rund 6 Kerne fuer die
+DataLoader-Worker. Der CPU-Auftrag daneben bekommt deshalb **hoechstens 5
+Threads** -- `paired_gating.py` steht per Default auf 10 und muss
+heruntergesetzt werden, sonst buchen sich beide gegenseitig ueber.
+
+**Pflicht dabei:** der `laufzeit`-Block eines unter Nebenlast gefahrenen
+Laufs ist KEINE Planungsgroesse und wird im Artefakt als *unter Nebenlast*
+markiert. Sonst wandern gebremste Zahlen in `measured_runtimes.md` und die
+naechste Sitzung plant falsch. Die Gegenprobe bei Zweifeln ist billig: einen
+Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
+
 ## Training und Korpus
 
 - **Fenster-Pinning: ZWEI Variablen**, nicht eine -- Trainings waehrend

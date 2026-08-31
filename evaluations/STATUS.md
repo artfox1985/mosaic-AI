@@ -152,6 +152,25 @@ unangetastet bleibt: Traeger-Manifest, `MOSAIC_IGNORE_POLICY_TARGET_VALID`,
 `TD_LAMBDA` (Arm L), `value_target_variant`, `MOSAIC_CACHE_F32`,
 `MOSAIC_CACHE_NOPACK`.
 
+### 2.3b BELEGUNGSPLAN: GPU und CPU parallel (Nutzer-Entscheid 2026-08-31)
+
+Nicht seriell fahren, was sich nicht dieselbe Ressource teilt. Regel und
+Thread-Budget: `../docs/working_rules.md`, Abschnitt "Auslastung". Fuer diese
+Kette heisst das konkret:
+
+| GPU | CPU daneben (<= 5 Threads) |
+| --- | --- |
+| -- (Erzeugung laeuft) | Cache-Co-Bau -- laeuft bereits so |
+| b01 trainiert | Relabel-Kopie anlegen und Policy-Relabeling fahren; danach die Bloecke der Kopie bauen |
+| b02 trainiert (Kaltstart) | **b01s drei Elo-Kanten** (Abschnitt 2.4) |
+| b03/b04 trainieren | tiefes Value-Nachlabeln (Tagesbudget, `PREREG_reanalyze_label_depth.md`) |
+
+Zwei CPU-Auftraege gegeneinander bleiben verboten -- sie teilen dieselbe
+Ressource, bremsen sich und machen beide Laufzeiten wertlos. Und jeder unter
+Nebenlast gefahrene Lauf markiert das in seinem `laufzeit`-Block, sonst
+wandern gebremste Zahlen als Planungsgroessen nach
+`../docs/measured_runtimes.md`.
+
 ### 2.4 Tore und Messkette danach
 
 Verfahren: `../docs/generation_loop.md`. Fuer diesen Durchlauf ist der Bezug
