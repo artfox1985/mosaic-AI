@@ -130,9 +130,15 @@ $alreadyImported = @()
 $snapOut = & $ctx.ResticExe snapshots --tag models-snapshot --json 2>$null
 if ($LASTEXITCODE -eq 0 -and $snapOut) {
     try {
+        # Wiedererkennung am DATEINAMEN, nicht am Datum. Am Datum war sie
+        # falsch: am 2026-08-29 liegen vier Zips (Tages-Zip plus v22-b04,
+        # -b05, -b06), die sich nur im Namen unterscheiden. Ein datumsbasierter
+        # Abgleich haette drei davon fuer "schon da" gehalten.
         $snaps = ConvertFrom-Json ($snapOut -join "`n")
         foreach ($s in $snaps) {
-            $alreadyImported += ([datetime]$s.time).ToString("yyyy-MM-dd")
+            foreach ($t in $s.tags) {
+                if ($t -like "zip:*") { $alreadyImported += $t.Substring(4) }
+            }
         }
     } catch {
         Write-BackupLog $ctx "HINWEIS: vorhandene Snapshots nicht lesbar, importiere alle Zips."
@@ -193,14 +199,19 @@ if (-not $SkipZips) {
         $index = 0
         foreach ($zip in $zips) {
             $index++
-            if ($zip.Name -notmatch '(\d{4}-\d{2}-\d{2})') {
+            # [regex]::Match statt "-notmatch" plus $Matches: die automatische
+            # Variable wird bei -notmatch nicht verlaesslich aktualisiert, was
+            # am 2026-08-31 zwei aufeinander folgende Dateien auf dasselbe
+            # Datum abgebildet hat.
+            $m = [regex]::Match($zip.Name, '(\d{4}-\d{2}-\d{2})')
+            if (-not $m.Success) {
                 Write-BackupLog $ctx "[$index/$($zips.Count)] UEBERSPRUNGEN (kein Datum im Namen): $($zip.Name)"
                 $zipSkipped++
                 continue
             }
-            $stamp = $Matches[1]
-            if ($alreadyImported -contains $stamp) {
-                Write-BackupLog $ctx "[$index/$($zips.Count)] $stamp bereits im Repo -- uebersprungen."
+            $stamp = $m.Groups[1].Value
+            if ($alreadyImported -contains $zip.Name) {
+                Write-BackupLog $ctx "[$index/$($zips.Count)] $($zip.Name) bereits im Repo -- uebersprungen."
                 $zipSkipped++
                 continue
             }
@@ -225,10 +236,19 @@ if (-not $SkipZips) {
             $backupArgs = @(
                 "backup", $target,
                 "--exclude-file", $ctx.ExcludeFile,
-                "--time", "$stamp 12:00:00",
+                # Zeitstempel aus der Datei, nicht "$stamp 12:00:00".
+                # ANLASS 2026-08-31: die flache Mittagszeit hat die vier
+                # beschrifteten Staende vom 2026-08-29 (v22-b04, -b05, -b06
+                # plus Tages-Zip) auf EINEN Zeitpunkt abgebildet und damit
+                # ununterscheidbar gemacht.
+                "--time", $zip.LastWriteTime.ToString("yyyy-MM-dd HH:mm:ss"),
                 "--tag", "mosaic-ai",
                 "--tag", "models-snapshot",
-                "--tag", "from-zip"
+                "--tag", "from-zip",
+                # Der Dateiname ist die einzige Stelle, an der die Beschriftung
+                # eines Standes steht ("_1322_v22-b05"). Ohne diese Marke ist
+                # sie nach dem Loeschen der Zips unwiederbringlich.
+                "--tag", ("zip:" + $zip.Name)
             )
             & $ctx.ResticExe @backupArgs
             $rc = $LASTEXITCODE
