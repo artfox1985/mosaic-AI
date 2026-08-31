@@ -14,14 +14,14 @@ Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
 trennen "aus, weil noch niemand ihn eingeschaltet hat" von "aus, weil die
 Messung ihn erledigt hat" -- in der Registratur allein sehen die gleich aus.
 
-**52 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
+**53 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
 
 Der Statuskopf sagt ENTSCHIEDEN, aber NICHT die Richtung -- deshalb die
 Trennung nach Default. Kein Loeschauftrag: ein negatives Ergebnis kann
 "falscher Hebel, richtiges Ziel" heissen (`PREREG_long_row_payoff` ist
 genau so ein Fall). Es ist die Liste, an der die Frage stellbar wird.
 
-**Beantwortet UND Default aus (36)** -- hier lohnt die Nachfrage,
+**Beantwortet UND Default aus (37)** -- hier lohnt die Nachfrage,
 ob der Knopf noch etwas offen haelt:
 
 - `MOSAIC_POINTS_UTILITY_W` (ENTSCHIEDEN, PREREG_task28_aggression.md)
@@ -52,6 +52,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_SPALTENBAU_SICHERHEITSNETZ` (ENTSCHIEDEN, PREREG_provocation.md par.15)
 - `MOSAIC_SPALTENBAU_JACKPOT` (ENTSCHIEDEN, PREREG_provocation.md par.15)
 - `MOSAIC_SPALTENBAU_SPECIAL` (ENTSCHIEDEN, PREREG_provocation.md par.16)
+- `MOSAIC_STACK_DRAW_RESERVATION` (ENTSCHIEDEN, PREREG_stack_draw_reservation_rule.md par.5b)
 - `MOSAIC_PROVOKATION_SPALTE` (ENTSCHIEDEN, PREREG_provocation.md par.4)
 - `MOSAIC_VORZUG_SPALTE` (ENTSCHIEDEN, PREREG_provocation.md)
 - `MOSAIC_OPPONENT_DISRUPTION` (ENTSCHIEDEN, PREREG_opponent_disruption.md par.3)
@@ -138,7 +139,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_SPALTENBAU_SICHERHEITSNETZ` | aus (Opt-in =1) | diagnose | ENTSCHIEDEN | Baustein 1 Vollendbarkeits-Filter, seit par.15 default AUS (column_build.rs:134) | PREREG_provocation.md par.15 |
 | `MOSAIC_SPALTENBAU_JACKPOT` | aus (Opt-in =1) | diagnose | ENTSCHIEDEN | Baustein 3a dominante Jackpot-Gewichtung, seit par.15 default AUS (column_build.rs:151) | PREREG_provocation.md par.15 |
 | `MOSAIC_SPALTENBAU_SPECIAL` | aus (Opt-in =1) | diagnose | ENTSCHIEDEN | par.16 Special-Zellen-Erweiterung des Spaltenbauers (column_build.rs:204) | PREREG_provocation.md par.16 |
-| `MOSAIC_STACK_DRAW_RESERVATION` | aus (Opt-in =1) | diagnose | OFFEN | reparierte Blindzieh-Stopp-Regel: erwartete VERBESSERUNG in einer Einheit statt Niveau gegen Typmittelwert (self_play.rs::resolve_and_apply_stack_draw) | PREREG_stack_draw_reservation_rule.md par.5b |
+| `MOSAIC_STACK_DRAW_RESERVATION` | aus (Opt-in =1) | diagnose | ENTSCHIEDEN | reparierte Blindzieh-Stopp-Regel: erwartete VERBESSERUNG in einer Einheit statt Niveau gegen Typmittelwert (self_play.rs::resolve_and_apply_stack_draw) | PREREG_stack_draw_reservation_rule.md par.5b |
 | `MOSAIC_UPDATE_FEATURE_FIXTURE` | aus (Opt-in =1) | diagnose | - | schreibt die Feature-Golden-Fixture neu statt zu pruefen; NUR fuer gewollte Feature-Aenderungen (features.rs::maybe_update_fixture) | - |
 | `MOSAIC_UPDATE_NET_PARITY_FIXTURE` | aus (Opt-in =1) | diagnose | - | schreibt die Netz-Paritaets-Fixture (engine/tests/fixtures/net_parity_champion.txt) neu statt zu pruefen; Pflicht-Schritt bei jedem Champion-Wechsel, siehe docs/promotion_checklist.md 5d (self_play.rs::maybe_update_net_parity_fixture) | - |
 | `MOSAIC_SPALTENBAU_TRACE` | aus | diagnose | - | [SB]-Entscheidungs-Spur im Logstrom, additiv (column_build.rs:1081) | - |
