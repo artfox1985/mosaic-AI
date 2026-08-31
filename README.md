@@ -273,13 +273,22 @@ Analysis/oracle evaluation of these logs is in progress
 
 ## Backup
 
-A daily, non-destructive OneDrive mirror of the repo runs as a scheduled
-task. In addition, `train.py` automatically writes a named model snapshot
-after every training run to
-`<OneDrive>\Backups\mosaic-AI\models_snapshots\` (event-driven, introduced
-after the model loss on 2026-07-24; fails silently with a warning if the
-`OneDrive` environment variable is missing, but does not abort training
-itself).
+Backups go to a restic repository at `<OneDrive>\Backups\mosaic-AI`
+(content-defined chunking, so identical blocks are stored once). A daily
+scheduled task snapshots the whole project tree. In addition, `train.py`
+writes a named snapshot of `models/` after every training run, tagged
+`run:<version>` (event-driven, introduced after the model loss on
+2026-07-24; a failure is reported as a warning and never aborts the
+training itself).
+
+Until 2026-08-31 that per-run snapshot was a zip archive of the entire
+`models/` folder, 0.3 to 1.1 GB each. Archives are opaque to chunking --
+two zips differing in one file share almost no blocks -- so every run cost
+the full amount. As a snapshot it costs only the genuinely new weights.
+
+Restoring individual files, and the operational rules, are documented in
+`docs/backup_restore.md`. `tools/verify_backup.ps1` checks the repository
+before anything is deleted; it never deletes by itself.
 
 ---
 
