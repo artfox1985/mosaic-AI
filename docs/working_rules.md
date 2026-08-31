@@ -73,10 +73,17 @@ Self-Play neben einer Arena, zwei Arenen nebeneinander, eine Sonde neben
 einem Self-Play -- das teilt dieselbe Ressource und macht beide Laufzeiten
 wertlos, ohne dass ein zweiter Kern frei wuerde.
 
-**Thread-Budget (12 Kerne).** Ein Training zieht rund 6 Kerne fuer die
-DataLoader-Worker. Der CPU-Auftrag daneben bekommt deshalb **hoechstens 5
-Threads** -- `paired_gating.py` steht per Default auf 10 und muss
-heruntergesetzt werden, sonst buchen sich beide gegenseitig ueber.
+**Thread-Budget (12 Kerne), GEMESSEN statt geschaetzt.** Ein Training zieht
+rund **EINEN Kern**: `cpu_s / wanduhr_s` liegt ueber vier v22-Laeufe bei
+0,92 bis 0,98 (b02 und b04 sind Cache-Treffer, also reines Training). Der
+`DataLoader` wird ohne `num_workers` gebaut (train.py:1323), laeuft also im
+Hauptprozess -- es gibt gar keine Worker-Prozesse. Die `threads`-Zahl im
+Manifest ist `torch.get_num_threads()` (train.py:2268), eine KAPAZITAET, keine
+Last; in `measured_runtimes.md` stand sie faelschlich als "6 (DataLoader)".
+
+Der CPU-Auftrag daneben kann also **rund 10 Threads** bekommen -- das ist der
+Default von `paired_gating.py`, es muss nichts heruntergesetzt werden. Einen
+Kern fuer das Training, einen fuer das Betriebssystem.
 
 **Pflicht dabei:** der `laufzeit`-Block eines unter Nebenlast gefahrenen
 Laufs ist KEINE Planungsgroesse und wird im Artefakt als *unter Nebenlast*

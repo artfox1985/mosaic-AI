@@ -158,7 +158,7 @@ Nicht seriell fahren, was sich nicht dieselbe Ressource teilt. Regel und
 Thread-Budget: `../docs/working_rules.md`, Abschnitt "Auslastung". Fuer diese
 Kette heisst das konkret:
 
-| GPU | CPU daneben (<= 5 Threads) |
+| GPU | CPU daneben (rund 10 Threads -- ein Training belegt gemessen nur EINEN Kern) |
 | --- | --- |
 | -- (Erzeugung laeuft) | Cache-Co-Bau -- laeuft bereits so |
 | b01 trainiert | Relabel-Kopie anlegen und Policy-Relabeling fahren; danach die Bloecke der Kopie bauen |

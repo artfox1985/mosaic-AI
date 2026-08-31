@@ -43,7 +43,7 @@ Heuristik bzw. Netz gegen Heuristik, gleiche Sims), nicht das Werkzeug.
 | Cache-Bau voller Korpus, parallel | 4.186.112 Zustaende | – | **36,1 min** (seriell 2,58 h, Faktor ~4,3) |
 | Wheel-Bau (`maturin build --release`) plus Installation | – | – | **~30 s** |
 | Netz-Self-Play argmax @400 (par.3b.2/3b.6-Instrument, `self_play.py --deterministic --no-root-noise`) | 200 Partien | 11 | **~20 min** = 0,15-0,17 Partien/s (Neustart 2026-08-29: Bloecke 107-145 s je 20 Partien; Tiling-Pol-Knopf kostet dabei praktisch nichts) |
-| v22-Kaltstart-Training (b01, CUDA, inkl. In-Train-Cache-Bau 2,55 h) | 17 Epochen, 3,77 Mio Samples | 6 (DataLoader) | **5,43 h** gesamt = ~10 min je Epoche nach dem Datenaufbau (manifest_train_v22-b01) |
+| v22-Kaltstart-Training (b01, CUDA, inkl. In-Train-Cache-Bau 2,55 h) | 17 Epochen, 3,77 Mio Samples | 6 = `torch.get_num_threads()`, KAPAZITAET; gemessene Last rund **1 Kern** (`cpu_s/wanduhr_s` 0,92-0,98 ueber b01/b02/b04/b05). Der DataLoader laeuft ohne `num_workers` im Hauptprozess (train.py:1323) -- die fruehere Angabe "6 (DataLoader)" war falsch, berichtigt 2026-08-31 | **5,43 h** gesamt = ~10 min je Epoche nach dem Datenaufbau (manifest_train_v22-b01) |
 | Lehrer-Relabeling via frozen-Worker (relabel_drafts_with_teacher) | 31.190 Labels / 600 Partien | 8 Worker | **66 s** = ~5 ms je Label (Huellen-Vorzug antwortet quasi instant) |
 | DAgger-Afterburner (v22-b05: Warm-Start, 6 Epochen, 176k Samples) | 600 Partien extra-dir | CUDA | **10,6 min** (davon Datenaufbau 6,6 min) |
 | DAgger-Afterburner (v22-b06: Warm-Start, 12 Epochen, 89k Samples, reines Fenster) | 600 Partien extra-dir | CUDA | **7,9 min** (davon Datenaufbau 3,7 min) |
