@@ -111,6 +111,25 @@ sobald der SPRT signifikant ausfaellt. Das waere eine stille Promotion gegen
 die eigene Regel gewesen (Champion ist v21; b01-gegen-b05 ist das
 Ratschen-Tor). Mit `--no-promote-winner` gefahren.
 
+## 1c. BERICHTIGUNG: der generelle Hebel ist die PLATTENVERTEILUNG (Nutzer 2026-08-31)
+
+Der Koordinator hatte die Spezialfelder als groessten unabgeholten Posten
+bezeichnet. **Das ist ein Randfall:** k6 zahlt nur, wenn die Platte gezogen
+wurde -- gemessen in 3.028 von 8.000 Partien-Seiten, gut einem Drittel.
+
+**Generell wirkt die Verteilung der Kuppelplatten**, denn sie legt in JEDER
+Partie fest, welche Zellen es gibt, welche Farbe sie tragen und wo Spezial-
+und Wild-Felder liegen. Dazu der Code-Befund vom 2026-08-31
+(`PREREG_start_dome_choice.md` par.6a): `start_placement_kandidaten` bewertet
+`SpaceType::Special` mit **0.0** -- die Handheuristik, die seit jeher die
+Brettgeometrie festlegt, haelt Spezialfelder fuer wertlos und optimiert
+Farbnachschub. Aendern darf man sie nicht, sie ist der Elo-Anker; der Weg
+fuehrt ueber den 108-Wege-Aktionsraum auf der Netz-Seite.
+
+**Zeitpunkt erreicht:** par.4c hatte die Startkuppel fuer Generation 1
+bewusst bei der Handheuristik belassen und Stufe 0 auf Generation 2
+verschoben. Mit den bestandenen v23-Toren ist Generation 2 da.
+
 ## 2. WAS ALS NAECHSTES ZU TUN IST
 
 ### 2.1 Sofort nach dem Lauf: Tor 0 (bindend, exklusiv)

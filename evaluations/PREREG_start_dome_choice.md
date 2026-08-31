@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid (Auslage x Slot x Rotation) und legt die Brettgeometrie fest -- gelegt wird sie aber seit jeher von einer Handheuristik, und das Trainingsziel ist ein one-hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. Am Code geprueft (par.1): die volle 108er-Aktionsmenge steht in valid_actions, das Policy-Ziel ist ein one-hot auf die Handheuristik. Der naive Zuschnitt ist am schwachen fruehen Value-Kopf erledigt (par.2), Ausweg waere der Ownership-Kopf (par.2a). Zuerst laeuft Stufe 0, netzfrei und gepaart (par.4). -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid (Auslage x Slot x Rotation) und legt die Brettgeometrie fest -- gelegt wird sie aber von einer Handheuristik, und das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. **Nutzer 2026-08-31: die Plattenverteilung ist der GENERELLE Hebel** (k6 ist nur in einem Drittel der Partien aktiv). Dazu der Code-Befund par.6a: die Handheuristik bewertet Spezialfelder mit NULL -- sie optimiert Farbnachschub, nicht Ertrag. Aendern darf man sie nicht (Elo-Anker), der Weg fuehrt ueber die Netz-Seite. Stufe 0 ist jetzt faellig (Generation 2). -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -130,6 +130,48 @@ Startverteilung der Arena folgt der des Self-Play** -- am billigsten
 seed-abgeleitet, dann bekommen beide Arme automatisch dieselbe Startstellung
 (`PREREG_search_rng_split.md`). Stratifiziert (`slot = partie_index mod 9`)
 statt gezogen senkt die Varianz zusaetzlich und kostet nichts.
+
+## par.6a DIE PLATTENWAHL IST DER GENERELLE HEBEL -- und sie sieht Spezialfelder als NULL (Nutzer 2026-08-31)
+
+Nutzer, als Berichtigung einer Prioritaeten-Aussage des Koordinators: *"das
+ist ein Randfall wenn k6 aktiv ist. das hilft nicht im generellen spiel. da
+gilt es eher die Kuppelplatten richtig und aggressiv zu verteilen."*
+
+**Die Berichtigung trifft.** Der Koordinator hatte die Spezialfelder als
+groessten unabgeholten Posten bezeichnet. k6 zahlt aber nur, wenn die Platte
+gezogen wurde -- im v23-Value-Korpus in **3.028 von 8.000 Partien-Seiten**,
+also gut einem Drittel. Ein Hebel, der in zwei von drei Partien gar nicht
+existiert, ist kein genereller Hebel. Die PLATTENVERTEILUNG dagegen wirkt in
+jeder Partie: sie legt fest, welche Zellen es ueberhaupt gibt, welche Farbe
+sie tragen und wo die Spezial- und Wild-Felder liegen.
+
+**Und hier der Code-Befund, der den Punkt scharf macht (geprueft
+2026-08-31):** `start_placement_kandidaten` (self_play.rs, gelesen ueber
+`choose_start_placement`) bewertet jede Kandidaten-Platzierung als Summe ueber
+ihre Zellen:
+
+* `SpaceType::Normal` -> Anzahl dieser Farbe im Vorrat,
+* `SpaceType::Wild` -> das Maximum ueber alle Farben,
+* **`SpaceType::Special` -> 0.0.**
+
+Die Handheuristik, die seit jeher die Brettgeometrie festlegt, bewertet
+Spezialfelder also mit **null** -- ausgerechnet die Felder, an denen der
+Mensch seinen gemessenen Vorsprung holt (Spezial-Punkte 4,02 gegen 3,15 je
+Seite, PREREG_special_tile_yield par.7). Sie optimiert Farbnachschub, nicht
+Ertragspotenzial.
+
+**Was daraus NICHT folgt:** die Heuristik zu aendern. Der Funktionskommentar
+sagt "byte-identisch zum Bestand, das ist der Elo-Anker" -- dieselbe Sperre
+wie bei `scoring_progress`. Der Weg fuehrt ueber die NETZ-Seite, also genau
+ueber den 108-Wege-Aktionsraum, den diese Prereg registriert: das Netz waehlt
+die Platzierung, statt ein One-Hot auf die Handregel zu lernen.
+
+**Zeitpunkt:** die Wecker-Abarbeitung (`PREREG_v23_window.md` par.4c) hat die
+Startkuppel-Streuung fuer Generation 1 bewusst bei der Handheuristik
+gelassen und Stufe 0 auf Generation 2 verschoben. **Generation 2 ist jetzt**
+-- die v23-Tore stehen, das v24-Self-Play ist freigegeben. Damit ist die
+Wiedervorlage-Bedingung erfuellt, und Stufe 0 (par.4, netzfrei und gepaart)
+ist der naechste Schritt dieses Strangs.
 
 ## par.7 Wecker
 

@@ -98,6 +98,11 @@ def main() -> int:
     ap.add_argument("--workers", type=int, default=6)
     ap.add_argument("--artifact-dir", default=str(ANCHOR))
     ap.add_argument("--out", default="evaluations/artifacts/anchor_arena.json")
+    ap.add_argument("--force-cross-era", action="store_true",
+                    help="Reicht --force-cross-era an frozen_referee_match durch. Noetig, "
+                         "seit der Motor-Vertragshash vom eingefrorenen Anker abweicht; die "
+                         "Aera-Regel (2026-08-29) erklaert Cross-Aera zum Normalfall fuer "
+                         "Anker-Kanten. Der Golden-Selbsttest laeuft weiter.")
     a = ap.parse_args()
 
     anchor = pathlib.Path(a.artifact_dir)
@@ -116,6 +121,23 @@ def main() -> int:
            "--workers", str(a.workers), "--out", str(roh_out)]
     if a.spec:
         cmd += ["--spec-a", a.spec]
+    if a.force_cross_era:
+        # AERA-REGEL (Nutzer-Entscheid 2026-08-29, docs/promotion_checklist.md
+        # Punkt 3): "Cross-Aera ist der Normalfall". Das Wheel im Artefakt wird
+        # NICHT bei jedem Motorschritt nachgezogen -- es ist das
+        # Selbst-Invarianz-Instrument des Ankers, kein Bestandteil der Leiter;
+        # Anker-Kanten laufen regulaer gegen den aktuellen Live-Motor.
+        # `frozen_referee_match` setzt noch die aeltere, strengere Politik
+        # durch und verweigert bei abweichendem contract_hash. Dieser
+        # Durchreicher macht den registrierten Normalfall fahrbar, OHNE die
+        # Sperre abzuschaffen: sie bleibt der Default, und der Golden-
+        # Selbsttest des Ankers laeuft auch mit Override weiter.
+        #
+        # NICHT anwenden, wenn sich Spielregeln oder Wertung geaendert haben
+        # oder die Golden-Probe kippt -- dann braucht es ein neues
+        # Leiter-Segment (Praezedenz: R5-Fix-Grenze, Kanten darueber nie
+        # mischen).
+        cmd += ["--force-cross-era"]
     r = subprocess.run(cmd, cwd=str(_ROOT), text=True, encoding="utf-8")
     if r.returncode != 0:
         raise SystemExit(f"Referee-Serie fehlgeschlagen (Code {r.returncode}).")
