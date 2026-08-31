@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und ueber die Runden abklingend -- dort, wo der Value-Kopf am wenigsten weiss (Runde 1-2)? | Beleg: NICHTS GEBAUT, angelegt 2026-08-31 auf Nutzer-Auftrag. Motiv: Spalten-AUC 0,698 in R1 gegen 0,886 in R5, Abweichungen multiplizieren sich (0,6^k), und ab R5 rechnet round5.rs exakt -- das Gelaender UMGEHT den gedaempften Plattenlohn-Kanal, statt ihn zu reparieren. Drei Bausteine (par.3), Pflicht-Auflagen inkl. Potentialform (par.4), Stufenplan mit Toren (par.5). -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und ueber die Runden abklingend --, wenn es in SUCHE und TILING eingreift und nicht nur Netz-Eingabe ist? | Beleg: NICHTS GEBAUT, angelegt 2026-08-31. Motiv: Spalten-AUC 0,698 in R1 gegen 0,886 in R5, und die Punkte fallen spaet -- **ab Runde 4 fallen 52,8 Prozent** (gemessen, 160 Partie-Seiten), fruehe Sofortpunkte sind also klein, waehrend der Tiling-Loeser genau nach ihnen waehlt. Fuenf Bausteine (par.3/3b), Potentialform Pflicht (par.4), Stufenplan (par.5). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -56,6 +56,51 @@ zaehlt, zaehlt geometrische Konstruktionen und nicht Optionen des Spielers.
 | **(a) Huellen-Trimm der Ownership-Loss-Maske** | REGISTRIERT (Lehrer-Prereg, Nachtrag 6) -- nicht Gegenstand dieser Datei |
 | **(b) Einhuellende als 2D-Eingabeebene** | Merkposten seit 2026-08-24, hier erstmals registriert |
 | **(c) Rundenabklingendes Gelaender** | neu (par.2m des Suchtiefen-Strangs), hier erstmals registriert |
+| **(d) Huelle als TILING-Ziel** in den fruehen Runden statt Sofortpunkte | neu (Nutzer 2026-08-31), par.3b |
+| **(e) Huelle als Eingriff in die SUCHE** (Prior/Utility auf Platzierungszuege) | neu (Nutzer 2026-08-31), par.3b |
+
+## par.3b DIE HUELLE MUSS IN DIE SUCHE UND INS TILING GREIFEN (Nutzer 2026-08-31)
+
+Nutzer: *"diese muss aktiv in die Suche wie auch das Tiling eingreifen.
+Maximieren der Tiling-Punkte in den ersten 2-3 Runden bringt nicht wirklich
+was. Die meisten Punkte kommen ab Runde 4."*
+
+**Damit sind es fuenf Bausteine, nicht drei** -- (d) Tiling-Ziel und (e)
+Such-Eingriff kommen dazu. Und sie sind nicht optional: eine Huelle, die nur
+als Eingabeebene existiert, kann vom Loeser ueberstimmt werden, der danach
+platziert.
+
+**Die Mechanik, die sie ueberstimmt, ist benannt und gemessen:**
+`best_first_step_inner` waehlt nach reinen SOFORTPUNKTEN
+(`tiling_solver.rs:49-56`) und wirft draft-seitige Absicht weg -- derselbe
+Befund, den der Split-Test als kleinere Haelfte des Durchbruchs ausgewiesen
+hat. Wer die Huelle ins Netz gibt, aber den Loeser weiter auf Sofortpunkte
+optimieren laesst, baut zwei Instanzen mit gegenlaeufigem Ziel.
+
+**Die Punkte fallen SPAET -- gemessen 2026-08-31** (160 Partie-Seiten aus vier
+`v22-b05-value-argmax`-Dateien; Punktestand je Runde und Seite, Zuwachs zur
+Vorrunde; Artefakt `round_point_profile_b05.json`):
+
+| Runde | 1 | 2 | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- | --- |
+| Zuwachs | 7,26 | 6,16 | 6,62 | 8,78 | **13,61** |
+| Anteil | 17,1 % | 14,5 % | 15,6 % | 20,7 % | **32,1 %** |
+
+**Ab Runde 4 fallen 52,8 Prozent aller Punkte**, Runde 5 allein bringt
+doppelt so viel wie eine einzelne fruehe Runde. Einschraenkung: EIN Spieler,
+EIN Korpus -- als Groessenordnung belastbar, nicht als Konstante.
+
+**Die Regelmechanik erklaert es:** k1 zahlt `7*(f/6)^2` je Spalte
+(scoring.rs:166). Die sechste Zelle einer Spalte ist damit 2,14 Punkte wert,
+die erste 0,19. Fruehe Platzierungen zahlen also strukturell wenig -- ihr
+Wert liegt darin, WO sie liegen, nicht was sie sofort bringen. Genau das
+kann ein Sofortpunkt-Loeser nicht sehen.
+
+**Folge fuer das Abklingprofil (par.4.1):** es ist nicht frei waehlbar,
+sondern soll der gemessenen Kurve folgen -- Huelle dominiert, solange die
+Sofortpunkte klein sind (Runden 1-3), und tritt zurueck, wenn die Wertung
+selbst die richtige Richtung vorgibt (ab Runde 4, exakt 0 in Runde 5, wo der
+Loeser exakt rechnet).
 
 ## par.3a Warum (b) NICHT trivial ist -- und wo der Einwand sitzt
 
