@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und ueber die Runden abklingend --, wenn es in SUCHE und TILING eingreift und nicht nur Netz-Eingabe ist? | Beleg: NICHTS GEBAUT, angelegt 2026-08-31. Motiv: Spalten-AUC 0,698 in R1 gegen 0,886 in R5; die Platten zahlen EINMAL nach Spielende (4,67 von 44,23 Punkten je Seite, gemessen), waehrend der Tiling-Loeser Zug fuer Zug nach Sofortpunkten waehlt -- und k1 ist eine Stufe: fuenf Zellen null, die sechste sieben. Fuenf Bausteine (par.3/3b), Potentialform Pflicht (par.4). -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, Zuschnitt vollstaendig registriert (par.3d: Kombinationsform, Profil-Stuetzstellen, Punkte-Term). Kern-Befund: der Value-Kopf ist im Loeser schon verdrahtet, aber multiplikativ und mit 0,017 Spreizung -- er hat in 0 von 51 Faellen einen Punktvorsprung gekippt. Naechster Schritt ist eine Spreizungs-Messung auf b01, dann Stufe 0. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -206,6 +206,69 @@ Auswahlkriterium im Loeser ist etwas anderes und braucht seine eigene
 Begruendung), die Stuetzstellen des Profils, und ob der Punkte-Term frueh
 ueberhaupt bleiben soll. Alle drei sind eigene Entscheide, keine
 Implementierungsdetails.
+
+## par.3d DER REGLER, SAUBER ZUGESCHNITTEN (registriert 2026-08-31)
+
+Auf Nutzer-Auftrag ("dann halt das mal sauber fest") wird aus der Idee ein
+entscheidbarer Zuschnitt. Die Auswahl unter den `top_k_tilings`-Kandidaten
+bekommt die Form
+
+```
+score(kandidat, runde r) = w_p(r) * punkte + w_e(r) * huelle + w_v(r) * value
+```
+
+mit der harten Auflage **w_e(5) = 0** (in Runde 5 rechnet `round5.rs`
+exakt) und der Leitidee, dass w_e und w_v gegenlaeufig verlaufen.
+
+### (i) Kombinationsform -- der Kern, und er ist NICHT frei
+
+| Form | Stand |
+| --- | --- |
+| **A: multiplikativ** (`punkte * value`, heutiger Bestand) | **AUSGESCHLOSSEN** fuer eine echte Value-Fuehrung: gemessen 0 von 51 Faellen, in denen sie einen Punktvorsprung ueberstimmt haette (par.3c). Sie bleibt, was sie ist -- ein Stichentscheid unter Punktgleichheit |
+| **B: additiv auf ANGEGLICHENER Skala** | der Kandidat. Punkte sind ganzzahlig und je Stellung verschieden gespreizt, `value` liegt in [0,1] mit ~0,017 Spannweite -- ein Gewicht auf rohen Skalen waere Willkuer. Angleichung je Stellung ueber die Spannweite INNERHALB der Kandidatenmenge (beide Groessen auf ihre eigene Spreizung normiert), dann ist w_v interpretierbar |
+| **C: lexikografisch mit Toleranzband** | Punkte entscheiden, solange der Vorsprung ueber einer Schwelle liegt; darunter entscheidet Value/Huelle. Einfacher zu begruenden, aber die Schwelle ist ein weiterer freier Parameter |
+
+**Vor der Wahl steht eine Messung, und sie ist billig:** die 0,017 stammen
+von `v18_best`, einem PLATTENBLINDEN Netz
+(`evaluations/artifacts/tiling_candidate_spread.json`). Ob ein
+spaltenfaehiger Kopf unter denselben Kandidaten breiter streut, ist offen
+und mit dem vorhandenen Werkzeug in einem Lauf zu klaeren:
+`tools/tiling_candidate_spread.py --model v23-b01_brierbest --k 12`.
+**Vorab festgelegte Lesart:** bleibt die Spreizung in derselben
+Groessenordnung (unter ~0,05), ist Form A endgueltig tot und B oder C
+Pflicht; waechst sie deutlich, koennte schon eine Skalen-Angleichung ohne
+Formwechsel reichen.
+
+### (ii) Das Profil -- Stuetzstellen statt Kurvenanpassung
+
+w_e faellt monoton von Runde 1 auf 0 in Runde 5, w_v steigt gegenlaeufig.
+Registriert werden STUETZSTELLEN, keine Formel: je Runde ein Wertepaar, das
+im Lauf-Manifest steht und damit nachpruefbar ist. Die Form folgt der
+gemessenen Verlaesslichkeit des Kopfes (Spalten-AUC 0,698 in R1 gegen 0,886
+in R5), nicht einer gewaehlten Funktion -- ein Vorschlag als Ausgangspunkt,
+zu bestaetigen oder zu ersetzen:
+
+| Runde | 1 | 2 | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- | --- |
+| w_e | 1,0 | 0,75 | 0,5 | 0,25 | **0** |
+| w_v | 0 | 0,25 | 0,5 | 0,75 | 1,0 |
+
+### (iii) Bleibt der Punkte-Term frueh?
+
+Offen, und bewusst nicht vorentschieden. Dafuer spricht, dass Sofortpunkte
+auch frueh nicht wertlos sind (Strafleisten-Vermeidung haengt daran);
+dagegen, dass sie beim Spaltenbau bis zur Vollendung nachweislich NULL
+Information tragen und die Huelle genau dort fuehren soll. Ein Arm mit
+w_p(1..2) = 0 ist die schaerfste Fassung der Nutzer-These
+("Maximieren der Tiling-Punkte in den ersten 2-3 Runden bringt nicht
+wirklich was") und waere als eigener Arm zu fahren, nicht als Default.
+
+### (iv) Reihenfolge
+
+1. Spreizungs-Messung auf b01 (oben, ein Lauf, entscheidet (i)).
+2. Stufe 0 aus par.5 (weiss der Kopf die Huelle schon?).
+3. Erst dann bauen -- Form, Profil und Punkte-Frage sind dann alle drei
+   entschieden statt geraten.
 
 ## par.4 PFLICHT-AUFLAGEN (ohne sie wird nichts gebaut)
 
