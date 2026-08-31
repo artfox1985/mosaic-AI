@@ -24,370 +24,101 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. STAND DER ERZEUGUNG: FERTIG, TOR 0 BESTANDEN (2026-08-31)
+## 1. WAS GERADE LAEUFT (Stand 2026-08-31, abends)
 
-**Der v23-Fensterkorpus ist erzeugt** (Generator `v22-b05`, 2026-08-30 19:25
-bis 2026-08-31 07:20, rund 12 h): 6.000 value-argmax + 2.000 value-sampled +
-4.000 policy, alle drei Klassen vollzaehlig. Der Cache-Co-Bau hat mitgehalten
--- **3.000 Bloecke liegen, 0 offen**; dank des Traeger-Umbaus
-(`PREREG_cache_build_time.md` par.10) ueberleben sie das Manifest.
+| Ressource | Lauf | Was damit zu tun ist |
+| --- | --- | --- |
+| **GPU** | `v23-b03` -- b01-Rezept plus `--surprise-alpha 0.5` | Wenn fertig: Orakelmetriken gegen b01 (das IST der Kontrollarm, gleicher Seed/Val-Pool). Entscheidungsmass steht in `PREREG_policy_surprise_weighting.md` par.5 -- **nicht** val_combined, **nicht** policy_top3 |
+| **CPU** | Kette: `b02_best` gegen `b02_brierbest`, danach **Anker-Kante** b01 gegen hv1 (n=150, `--force-cross-era`) | Checkpoint-Arena entscheidet den Kandidaten des Kaltstart-Arms (interne Auswahl, kein Tor -- ohne SPRT-Verdikt zaehlt der Punktschaetzer). Dann tritt der Gewinner gegen b01 an: die Warm-gegen-Kalt-Frage |
 
-**Tor 0 GEFAHREN 2026-08-31, beide Wächter bestanden** (Registrierung und
-Einordnung: Lehrer-Prereg par.3b.12):
+**Danach frei:** die GPU fuer den Relabel-Arm, die CPU fuer dessen 200
+Cache-Bloecke.
 
-| Waechter | Ergebnis |
+---
+
+## 2. WAS DIE GENERATION v23 ERGEBEN HAT
+
+**Alle vier Tore bestanden -- das v24-Self-Play ist freigegeben**
+(`docs/generation_loop.md` Schritt 9). Herleitungen in
+`PREREG_v23_window.md` par.2b bis par.2g.
+
+| Tor | Ergebnis |
 | --- | --- |
-| primaer: Symmetrie-Trennung Value-Klasse | **+0,4041 +- 0,0192, t 41,26** (398 Bloecke) -- TRENNT |
-| sekundaer: Seiten mit voller Spalte | **5.629 von 16.000**, Schwelle 1.500 -- 3,75-fach |
-| Bericht: volle Spalten je Partie+Seite | Value **0,481**, Policy 0,129 |
+| 0 Korpus traegt das Signal | Symmetrie-Trennung +0,4041 (t 41,26), 5.629 von 16.000 Seiten mit voller Spalte |
+| 1 Siege gegen b05 | **119:61** aus zwei unabhaengigen Seeds (Champion-Strenge erfuellt) |
+| 2a Spalten im Self-Play | 0,5150 gegen 0,3100, gepaart **+0,2050** (t 4,47) |
+| 2b Spalten in der Arena | 0,6456 gegen 0,4304, gepaart **+0,2152** (t 2,61) |
 
-**Der Berichtswert ist ein eigener Befund:** 0,481 liegt UEBER dem
-argmax-Instrumentwert 0,3375 -- genau wie die Sims-Kurve es vorhersagt.
-Nachgerechnet aus den registrierten Vorbefunden (6.000 argmax bei ~0,6 plus
-2.000 gesampelt bei ~0,10) erwartet man 0,475, gemessen sind es 0,481. Zwei
-auf 200-Partien-Stichproben registrierte Befunde treffen damit auf 8.000
-Partien.
+| Elo-Kante | Ergebnis |
+| --- | --- |
+| gegen **v22-b05** | 119:61 -- signifikant |
+| gegen **v21** (Champion) | 219:181, p = 0,084, KI [-0,013, +0,393] -- **nicht belegt besser**, Augenhoehe. **KEINE Promotion**, v21 bleibt Champion |
+| gegen **hv1** (Anker) | laeuft |
 
-**Traeger-Manifest gebaut:** `data/policy_carrier_manifest_v23.json`, 380
-Eintraege -- 180 hv2-Dateien (1.800 Partien, Seed 20260921 aus dem Fenster
-von Seed 20260920) plus die Policy-Klasse vollstaendig (200 Dateien). Die
-Value-Klasse ist bewusst nicht gelistet.
+**Phase 3 gemessen, NEGATIV (par.11 der R5-Kalibrierung):** die
+Betrags-Daempfung ist unveraendert -- b01 0,0859 gegen b05 0,0886 auf
+denselben 139 Paaren. Der Korpus heilt sie nicht. b01 wurde also deutlich
+staerker und baut 66 Prozent mehr Spalten, OHNE dass der Bewerter repariert
+wurde; der Punkte-Kopf trifft dieselbe Groesse mit 0,97. **Der Eingriff ist
+damit faellig**, Erfolgstest "kippt die Sims-Kurve?".
 
-**Damit ist der Weg frei fuer den Fensterbau und das v23-Training.**
+**`v23-b02` (Kaltstart):** Early Stop nach Epoche 15/40, **4,22 h** gegen
+b01s 5,97 h -- ein Kaltstart kostet mit stehendem Fenster-Cache WENIGER als
+ein Warmstart. Sein brierbestes Modell liegt allerdings bei Epoche 1
+(par.2g), daher die laufende Checkpoint-Arena.
 
-**OFFEN AUS DIESER ERZEUGUNG (Nutzer-Anweisung 2026-08-31):** die
-b05-Dateien tragen **20 Partien statt der geregelten 10**. Der Wert kam aus
-dem Nachtrezept (`night_run_20260830.md`, Vorsitzung) und wanderte ueber die
-Uebergabe in die gefahrenen Befehle; `self_play.py` steht per Default auf 10.
-Regel ab jetzt: nicht ueberschreiben (`docs/working_rules.md`, Abschnitt
-"Korpusdateien tragen 10 Partien"). **Fuer den laufenden Korpus bleibt es bei
-20** -- ein Umpacken (`tools/repack_corpus.py`) waere moeglich, wuerde aber
-alle 600 Basenames und damit ihre Cache-Bloecke aendern, und b01 traint
-bereits darauf. Wiedervorlage nach b01, falls die groebere Granularitaet
-beim naechsten Fensterschnitt stoert.
+---
 
-## 1b. v23-b01 STEHT, TOR 2a BESTANDEN (2026-08-31)
+## 3. WAS ALS NAECHSTES ZU TUN IST
 
-`v23-b01` ist trainiert (Warmstart von b05, 5,97 h, Kandidat
-`v23-b01_brierbest`, Epoche 5, val_brier 0,1934). **Tor 2a ist bestanden, und
-zwar mit Abstand** -- Herleitung und Tabelle in `PREREG_v23_window.md`
-par.2b:
+**Nutzer-Zuschnitt fuer diese Generation (2026-08-31):** relabelter Sockel,
+b02, b03, Phase 3 -- dann v24. Nicht in diesem Zyklus: Kuppelplatten-
+Verteilung, Arm K, b04-Breite, geometrisches Gelaender (alle registriert).
 
-| je Partie und Seite | v23-b01 | v22-b05 |
-| --- | --- | --- |
-| **volle Spalten** | **0,5150** | 0,3100 |
-| Punkte | 46,80 | 42,10 |
-| Strafleiste | 5,74 | 6,61 |
+### 3.1 Relabel-Arm (Daten fertig, Fenster fertig)
 
-Gepaart (gleicher Seed, 200 Paare): **+0,2050 +- 0,0898, t +4,47** -- plus
-66 Prozent. Der Spaltenbau kostet hier NICHTS: mehr Punkte bei weniger
-Strafsteinen.
+Fenster `data/window_v23_relab.txt` und Manifest
+`policy_carrier_manifest_v23_relab.json` liegen: dieselben 2.345 Dateien wie
+b01, nur die 200 Policy-Dateien durch ihre lehrer-relabelten Kopien ersetzt
+(204.008 Lehrerzuege, 0 Fehler). **Ein Faktor, dieselben Partien**, b01 ist
+die Kontrolle.
 
-**TOR 1 BESTANDEN (2026-08-31), mit Replikation:** 52:28 (40 Paare,
-p = 0,0005) und 67:33 (50 Paare, p = 0,0015) aus zwei unabhaengigen Seeds,
-zusammen **119:61**. Beide Laeufe stoppten unter 150 Paaren, deshalb war die
-Replikation nach der Champion-Strenge Pflicht -- damit ist die Auflage
-erfuellt. In Lauf 1 gewann b05 KEIN einziges Paar doppelt (A-Sweeps 12,
-B-Sweeps 0). Herleitung: `PREREG_v23_window.md` par.2c.
-
-**TOR 2b BESTANDEN (2026-08-31): +0,2152 +- 0,1616 (t +2,61, n=158)** volle
-Spalten je Seite, gepaart je Partie, aus den Arena-Logs rekonstruiert und
-damit plattenunabhaengig (b01 0,6456 gegen b05 0,4304). Der Vorsprung ist
-praktisch derselbe wie im Self-Play -- der Spaltenbau ueberlebt den
-Widerstand. Vorbehalte in `PREREG_v23_window.md` par.2d.
-
-**ALLE VIER TORE STEHEN -- das v24-Self-Play ist freigegeben** (par.2e).
-NICHT freigegeben ist die Promotion; dafuer fehlt die Kante gegen
-`v21_2d_brierbest` (1215).
-
-**Laufend:** `v23-b02` (Kaltstart) auf der GPU. **Als Naechstes auf der CPU:**
-Anker-Kante (festes n=150) und Champion-Kante gegen v21.
-**Danach:** Tor 2b (Arena mit `--log-games` +
-`tools/probes/arena_column_probe.py`) und die drei Elo-Kanten.
-
-**Beim Aufsetzen von Tor 1 abgefangen:** `paired_gating.py --promote-winner`
-steht per Default auf AN und haette `models/champion.txt` auf b01 gesetzt,
-sobald der SPRT signifikant ausfaellt. Das waere eine stille Promotion gegen
-die eigene Regel gewesen (Champion ist v21; b01-gegen-b05 ist das
-Ratschen-Tor). Mit `--no-promote-winner` gefahren.
-
-## 1b2. ELO-KANTEN UND b02 (Stand 2026-08-31 abends)
-
-| Kante | Ergebnis | Lesart |
-| --- | --- | --- |
-| gegen **v22-b05** | 119:61 (zwei Seeds) | **signifikant** -- Tor 1 |
-| gegen **v21** (Champion) | 219:181, p = 0,084, KI [-0,013, +0,393] | **nicht belegt besser**, aber auf Augenhoehe. **v21 bleibt Champion** |
-| gegen **hv1** (Anker) | laeuft (nach der R5-Messung) | verankert die Linie |
-
-Rund **+33 Elo** ueber v21 als Punktschaetzer (Herleitung aus 54,75 Prozent).
-Die Linie stand zu Beginn dieser Generation bei 1084 gegen 1215 -- 131 Punkte
-Rueckstand, jetzt im Bereich des Champions.
-
-**`v23-b02` (Kaltstart) fertig:** Early Stop nach Epoche 15/40, **4,22 h**
-(Datenaufbau 32 s dank Cache-Treffer) gegen b01s 5,97 h. Ein Kaltstart kostet
-also NICHT mehr als ein Warmstart, sobald der Fenster-Cache steht.
-**Offen: sein brierbestes Modell liegt bei Epoche 1** -- dasselbe Muster wie
-bei den v22-Kaltstarts. Eine gepaarte Arena `b02_best` gegen `b02_brierbest`
-entscheidet den Kandidaten des Arms, bevor er gegen b01 antritt
-(`PREREG_v23_window.md` par.2g).
-
-## 1b3. PHASE 3: die Daempfung bleibt -- der Korpus heilt sie nicht (2026-08-31)
-
-R5-Platten-Steigung, beide Netze im selben Lauf auf denselben 139 Paaren:
-
-| Netz | Value-Steigung | Punkte-Kopf |
-| --- | --- | --- |
-| **v23-b01_brierbest** | **0,0859** | 0,9728 |
-| v22-b05 | 0,0886 | 0,9888 |
-
-**Die Wette von Zuschnitt D ist nicht aufgegangen.** Die
-On-Policy-Vollendungsexposition sollte die Betrags-Daempfung heilen; die
-Steigung steht unveraendert bei ~0,086 statt ~1.
-
-Wertvoll ist der Befund trotzdem: b01 wurde in derselben Generation deutlich
-staerker und baut 66 Prozent mehr Spalten -- **ohne dass der Bewerter
-repariert wurde**. Der Fortschritt kam von woanders, der Hebel liegt
-unbenutzt da. Und die Diagnose bleibt scharf: der PUNKTE-Kopf trifft dieselbe
-Groesse mit 0,97, das Netz kann sie also darstellen -- es ist spezifisch der
-Gewinnwahrscheinlichkeits-Kopf.
-
-Damit ist die Frage "richtet es der Korpus?" beantwortet und der Eingriff
-faellig (`PREREG_r5_value_calibration.md` par.11, Erfolgstest "kippt die
-Sims-Kurve?").
-
-## 1c. BERICHTIGUNG: der generelle Hebel ist die PLATTENVERTEILUNG (Nutzer 2026-08-31)
-
-Der Koordinator hatte die Spezialfelder als groessten unabgeholten Posten
-bezeichnet. **Das ist ein Randfall:** k6 zahlt nur, wenn die Platte gezogen
-wurde -- gemessen in 3.028 von 8.000 Partien-Seiten, gut einem Drittel.
-
-**Generell wirkt die Verteilung der Kuppelplatten**, denn sie legt in JEDER
-Partie fest, welche Zellen es gibt, welche Farbe sie tragen und wo Spezial-
-und Wild-Felder liegen. Dazu der Code-Befund vom 2026-08-31
-(`PREREG_start_dome_choice.md` par.6a): `start_placement_kandidaten` bewertet
-`SpaceType::Special` mit **0.0** -- die Handheuristik, die seit jeher die
-Brettgeometrie festlegt, haelt Spezialfelder fuer wertlos und optimiert
-Farbnachschub. Aendern darf man sie nicht, sie ist der Elo-Anker; der Weg
-fuehrt ueber den 108-Wege-Aktionsraum auf der Netz-Seite.
-
-**ABER ZURUECKGESTELLT (Nutzer 2026-08-31, im selben Zug):** *"das ist
-Optimierung mit ungewissem Ausgang. zuerst Fokus auf die Brocken."* Der
-Strang bleibt registriert und die Wiedervorlage-Bedingung erfuellt -- er wird
-nur nicht in diesen Zyklus eingetaktet.
-
-## 1d. ZUSCHNITT DER GENERATION v23 (Nutzer-Entscheid 2026-08-31)
-
-*"ich wuerd gern noch den relabelten Sockel, b02, b03 sowie Phase 3, die
-Betrags-Schiene in dieser Generation unterbringen. dann weiter zu v24."*
-
-| Posten | Stand | Was fehlt |
-| --- | --- | --- |
-| **b02** (Kaltstart) | trainiert | nur noch fertig werden |
-| **relabelter Sockel** | Daten fertig (204.008 Lehrerzuege) | Fenster-Liste, Traeger-Manifest, Bloecke, dann ein Training |
-| **b03** (Ueberraschungs-Gewichtung) | registriert, UNGEBAUT | Loss-Gewichtung in train.py; Form (Kappung, Temperierung, Batch-Normierung) ist par.3 dort noch offen |
-| **Phase 3, Betrags-Schiene** | Diagnose steht, Eingriff offen | R5-Steigung auf b01 messen, dann der Eingriff; Erfolgstest "kippt die Sims-Kurve?" |
-
-**Nicht in diesem Zyklus:** Kuppelplatten-Verteilung (par.6a, s.o.), Arm K,
-b04-Breite, das geometrische Gelaender. Alle vier bleiben registriert.
-
-
-
-## 2. WAS ALS NAECHSTES ZU TUN IST
-
-### 2.1 Sofort nach dem Lauf: Tor 0 (bindend, exklusiv)
+Es fehlen die 200 Cache-Bloecke der Kopie, dann der Lauf:
 
 ```
-python -u tools/probes/corpus_column_outcome_symmetry_probe.py --pattern "selfplay_v22-b05-value-*.pkl" --out evaluations/artifacts/corpus_symmetry_v22b05_value.json
-python -X utf8 -u tools/corpus_sanity_check.py data --pattern "selfplay_v22-b05-value-*.pkl" --out evaluations/artifacts/corpus_sanity_v22b05_value.json
-python -X utf8 -u tools/corpus_sanity_check.py data --pattern "selfplay_v22-b05-policy_*.pkl" --out evaluations/artifacts/corpus_sanity_v22b05_policy.json
+PYTHONIOENCODING=utf-8 python -X utf8 -u tools/build_cache_incremental.py --data-dir data/relabeled_v23 --encoder 2d --value-target-variant nortv --workers 6
 ```
 
-Lesart vorab (`PREREG_heuristic_v2_long_rows.md` par.3b.12): **primaer**
-Symmetrie-Trennung auf der VALUE-Klasse signifikant > 0; **sekundaer**
->= 1.500 Seiten mit voller Spalte (`sides_with_full_column`); Spaltenrate
-beider Klassen nur Bericht (Referenz: argmax 0,3375, gesampelt 0,07-0,11,
-Champion 0,102). Reisst Tor 0: kein Training, Vorlage.
+```
+export MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v23_relab.json MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_VAL_POOL='^selfplay_v22-b05'
+python -u train.py --name v23-b05 --load v22-b05 --file-list data/window_v23_relab.txt --extra-data-dir data/relabeled_v23 --encoder 2d --value-target-variant nortv --value-head wdl --ownership-head-2d --ownership-weight 1.0 --endgame-head --opp-points-head --moon-loss-weight 0 --select-by-brier --val-frac 0.05 --epochs 12 --lr 5e-5 --lr-schedule cosine --lr-t-max 12 --seed 20260828
+```
 
-**Beide Befehlszeilen sind am 2026-08-31 smoke-geprueft** (je zwei bis drei
-Sekunden auf einem Kern, Ausgabe in den Scratchpad): die erweiterte
-`corpus_sanity_check`-CLI filtert wie gewollt (`--pattern` auf eine Datei:
-20 Partien, 40 Seiten), schreibt `pattern` und den `laufzeit`-Block ins
-Artefakt, die Bestandsfelder bleiben, und `sides_with_full_column` zaehlt
-(14 von 40). Die Symmetrie-Sonde nimmt `--pattern` und `--out` in der hier
-notierten Form an. Ein Tippfehler kann den Waechter-Lauf also nicht mehr
-aufhalten.
+**Vor dem Start pruefen:** der Val-Pool-Regex muss die relabelten Dateien
+treffen (`^selfplay_v22-b05` deckt beide Praefixe), und die
+Korpus-Zusammensetzung im Log muss 200 relabelte Traeger zeigen, nicht 200
+rohe.
 
-**Beifang aus dem Smoke, ausdruecklich KEIN Torbefund:** auf zwei Dateien
-der argmax-Klasse (40 Partien) trennt der Spaltenbau den Ausgang bereits
-deutlich (+0,50, t 3,48 auf zwei Bloecken). Das ist ein Hinweis, kein
-Verdikt -- der Waechter laeuft auf der ganzen Value-Klasse, und zwei Bloecke
-tragen keine Aussage.
+### 3.2 Phase 3, der Eingriff
 
-### 2.2 Fensterbau
+Die Diagnose ist vollstaendig: Daempfung strukturell, Punkte-Kopf sauber,
+Korpus heilt nicht. Der Eingriff selbst ist in
+`PREREG_r5_value_calibration.md` zu registrieren, bevor er gebaut wird.
 
-* **hv2-Auswahl GEZOGEN 2026-08-31** (Nutzer: "such dir per seed zufaellig
-  welche aus"): 1.745 von 2.400 Dateien, Seed **20260920**, Liste in
-  `data/window_v23_hv2.txt`. Regel des Werkzeugs ist seed-zufaellig mit
-  zeitlicher Streuung; bei 1.745 aus 2.400 sind die Straten 1-2 Dateien
-  breit, also praktisch gleichverteilt. Wiederholungslauf byte-gleich. Die
-  Zahlen gehen glatt auf: 1.745 x 10 = 17.450 Partien, 655 Dateien
-  = 6.550 rotieren aus.
-* **Traeger-Manifest: JA (Nutzer-Entscheid 2026-08-31), und es kostet keine
-  Bloecke mehr.** Der Traegerstatus ist seit dem Umbau vom 2026-08-31 KEIN
-  Bestandteil des Datei-Schluessels mehr (`PREREG_cache_build_time.md`
-  par.10): der Block ist traegeragnostisch, die Maske kommt beim
-  Zusammenfuegen. Die ~2.600 befuerchteten Neubauten entfallen ersatzlos;
-  Bestand nachweislich stabil (99 von 100 Schluesseln treffen, der eine
-  Fehlschlag war eine 52 Sekunden alte Datei), Abnahme 4/4 gruen
-  (`carrier_mask_at_merge_probe.json`). **Gezogen ist beides:** Fenster 1.745
-  Dateien (Seed 20260920, `data/window_v23_hv2.txt`), Traeger 180 davon
-  (Seed 20260921, `data/carriers_v23_hv2.txt`, = 1.800 Partien).
-  **Zusammengebaut wird das Manifest, sobald die policy-Klasse fertig ist** --
-  denn: **die Policy-Klasse MUSS ausdruecklich mitgelistet werden** (180 hv2 +
-  200 b05-policy = 380 Eintraege) oder das Manifest traegt
-  `carrier_prefixes: ["selfplay_v22-b05-policy_"]`; der Generator hat dafuer
-  seit 2026-08-31 `--include-glob` (leerer Glob = harter Abbruch). Sonst setzt
-  es `pol_w=0`
-  fuer den GESAMTEN neuen Korpus: der v20-Kurzschluss deckt nur
-  `selfplay_v19wdl`/`selfplay_v20wdl` (neural_net.py:796), und der Generator
-  schreibt `carrier_prefixes` bewusst nicht. Gegenprobe vor dem Training:
-  `policy_carriers.traeger_dateien_je_praefix` im Trainingsmanifest.
-* **Relabeling laeuft auf einer KOPIE mit eigenem Praefix**
-  (Nutzer-Entscheid 2026-08-31, `PREREG_reanalyze_label_depth.md` par.4b):
-  `data/relabeled_v23/selfplay_v22-b05relab-<klasse>_*`. Der Unterordner
-  allein reicht NICHT -- der Datei-Cache-Schluessel haengt am Basename, nicht
-  am Pfad (file_cache_key.py:81), die Kopie traefe sonst den Block des
-  Originals. Kopiert wird nur der neue Korpus (rund 600 Dateien, 1,4 GB),
-  nicht hv2. Folge: roh und relabelt liegen auf denselben Partien nebeneinander
-  -- das Relabeling wird ein gepaarter Arm statt einer Reihenfolge-Frage.
-* Monolith gegen Val-Split: `train.py --cache-file` prueft den
-  FENSTER-Schluessel; ein Lauf mit `--val-frac > 0` bildet einen anderen
-  Schluessel, der Waechter lehnt korrekt ab.
+### 3.3 Dann v24
 
-### 2.3 Der v23-Zyklus (Arme vorab benannt, `docs/generation_naming.md`)
+Generator ist der beste Stand von v23 (heute: b01). Verfahren:
+`docs/generation_loop.md`. Der Korpus-Zuschnitt wird in einer eigenen
+`PREREG_v24_window.md` registriert -- **mit `--per-file 10`**
+(`docs/working_rules.md`).
 
-| Arm | Was | Stand |
-| --- | --- | --- |
-| `v23-b01` | Warmstart aus den Self-Plays | offen |
-| `v23-b02` | **Kaltstart**, Bestands-Rumpfbreite -- oeffnet das Rumpfbreiten-Fenster, ein Faktor gegen b01 | offen |
-| `v23-b03` | Ueberraschungs-Gewichtung (`PREREG_policy_surprise_weighting.md`) | ungebaut, baubar waehrend b01/b02 rechnen |
-| `v23-b04` | Kaltstart mit anderer Rumpfbreite (`PREREG_capacity_sim_frontier.md` par.10) | vorregistriert; Zweig-Entscheid offen |
+### 3.4 Belegungsplan (GPU und CPU parallel)
 
-Fuer alle Arme gilt: **`--moon-loss-weight 0`** (Flag existiert,
-train.py:2460), Encoder 2d, `nortv`, `wdl`, `ownership_head_2d`,
-**Endgame-Kopf AN** (Nutzer-Entscheid 2026-08-31) -- und **ohne Arm K**,
-damit die vorhandenen Bloecke gueltig bleiben.
-
-**Zum Endgame-Kopf, mit berichtigter Zahl:** er ist seit 2026-08-08
-Standard-Rezept, und mit diesem Korpus bekommt er zum ersten Mal ein Ziel
-(root_q: 2.332 von 3.538 Records einer b05-Datei, davon 314 R5-Drafting; auf
-hv2 war die Maske komplett 0). Sein damaliger Beitrag zur R5-Steigung war
-**+0,108 gegenueber dem Champion** (0,349 -> 0,457, rund 2 Seed-Sigma), die
-vorregistrierte 0,5-Schwelle wurde KNAPP VERFEHLT und die **Arena war H0
-(97:103)**; der Verlauf 0,086 -> 0,457 geht ueber mehrere Generationen, nicht
-auf sein Konto (PREREG_plate_intervention par.79-102). Er bleibt an, weil er
-Standard ist und offline genau die Groesse bewegt, gegen die Phase 3 antritt
--- nicht, weil er Staerke belegt haette. Kaltstart
-kostet mit vorgebautem Cache rund 2,5 h (v22-b02 2,56 h, b04 2,52 h).
-
-**Was ausser Arm K sonst noch ALLE Bloecke entwertet** und darum in b01-b04
-unangetastet bleibt: Traeger-Manifest, `MOSAIC_IGNORE_POLICY_TARGET_VALID`,
-`TD_LAMBDA` (Arm L), `value_target_variant`, `MOSAIC_CACHE_F32`,
-`MOSAIC_CACHE_NOPACK`.
-
-### 2.3b BELEGUNGSPLAN: GPU und CPU parallel (Nutzer-Entscheid 2026-08-31)
-
-Nicht seriell fahren, was sich nicht dieselbe Ressource teilt. Regel und
-Thread-Budget: `../docs/working_rules.md`, Abschnitt "Auslastung". Fuer diese
-Kette heisst das konkret:
-
-| GPU | CPU daneben (rund 10 Threads -- ein Training belegt gemessen nur EINEN Kern) |
-| --- | --- |
-| -- (Erzeugung laeuft) | Cache-Co-Bau -- laeuft bereits so |
-| b01 trainiert | Relabel-Kopie anlegen und Policy-Relabeling fahren; danach die Bloecke der Kopie bauen |
-| b02 trainiert (Kaltstart) | **b01s drei Elo-Kanten** (Abschnitt 2.4) |
-| b03/b04 trainieren | tiefes Value-Nachlabeln (Tagesbudget, `PREREG_reanalyze_label_depth.md`) |
-
-Zwei CPU-Auftraege gegeneinander bleiben verboten -- sie teilen dieselbe
-Ressource, bremsen sich und machen beide Laufzeiten wertlos. Und jeder unter
-Nebenlast gefahrene Lauf markiert das in seinem `laufzeit`-Block, sonst
-wandern gebremste Zahlen als Planungsgroessen nach
-`../docs/measured_runtimes.md`.
-
-### 2.3c ABNAHME DER GENERATION v23 (Nutzer-Anweisung 2026-08-31)
-
-Wortlaut: *"mindestens genauso viel Affinitaet zum Spaltenbau wie v22-b05.
-Mehr nehm ich gern. Und muss v22-b05 besiegen. Gating Kriterien wie bei einem
-Spiel gegen den Champ. Trifft das fuer ein Modell der v23 Generation zu,
-koennen wir in die self plays fuer v24 gehen."*
-
-| Tor | Bezug v22-b05 | Zuschnitt |
-| --- | --- | --- |
-| **1: Siege** | Elo 1084 | gepaarte Arena, **Champion-Strenge**: n >= 150 Paare oder Replikation mit eigenem Seed. Ein SPRT-Fruehstopp darunter ist informativ, KEIN Tor-Ergebnis |
-| **2a: Spalten im SELF-PLAY** | **0,3375** volle Spalten je Partie+Seite | am REGISTRIERTEN argmax-Instrument (deterministisch, ohne Root-Noise, gleiche Sims wie die Referenz) -- nicht am Erzeugungs-Betriebspunkt |
-| **2b: Spalten in der ARENA** | k1-Punkte von b05 aus demselben Lauf | gepaarte Arena gegen b05 mit `--log-games`, ausgewertet ueber `tools/plate_points_from_arena.py`. Beide Seiten stammen aus DENSELBEN Partien, eine getrennte Referenz braucht es nicht |
-
-**Warum zwei Flaechen (Nutzer-Anweisung 2026-08-31):** im Self-Play
-konkurriert niemand um die Farben. 2a sagt, was der Generator in den
-v24-Korpus schreiben wuerde; 2b sagt, ob er Spalten auch gegen Widerstand
-baut. Ein Netz kann das eine koennen und das andere nicht. Achtung bei 2b:
-das Partie-Log traegt die Endwertung je Kriterium, NICHT das Endbrett -- die
-ANZAHL voller Spalten ist daraus nicht rekonstruierbar, k1-Punkte sind der
-monotone Ersatz und duerfen nicht als Anzahl gelesen werden.
-
-**Punktschaetzer entscheidet Tor 2:** liegt der Kandidat darunter, ist es
-gerissen, auch bei nicht signifikantem Abstand. Dann Vorlage mit beiden
-Zahlen samt Signifikanz.
-
-**Was das Bestehen freigibt:** das Self-Play fuer **v24**. Die Promotion zum
-Champion ist eine ANDERE Frage und faellt erst mit der Kante gegen
-v21_2d_brierbest (1215). Eine Linie darf mehrere Generationen ratschen, bevor
-sie den Champion einholt -- Verfahren in `../docs/generation_loop.md`.
-
-**Achtung beim Messen von Tor 2:** die Referenz 0,3375 stammt vom
-argmax-Instrument bei 400 Sims. Die Erzeugung lief bei 100 Sims und der
-Korpus zeigt dort 0,481 -- dieselbe Groesse liegt je nach Suchtiefe um mehr
-als das Doppelte auseinander. Kandidat und Referenz muessen am GLEICHEN
-Betriebspunkt gemessen werden, sonst misst das Tor die Sims-Zahl.
-
-### 2.4 Tore und Messkette danach
-
-Verfahren: `../docs/generation_loop.md`. Fuer diesen Durchlauf ist der Bezug
-beider Tore **v22-b05** (volle Spalten 0,3375 am argmax-Instrument, Punkte
-37,16, Elo 1084); die Champion-Kante (Schritt 7 der Schleife) geht gegen
-`v21_2d_brierbest` (1215) und wird gemessen und berichtet, auch wenn keine
-Promotion folgt.
-
-**ELO-EINSCHAETZUNG FUER b01: drei Kanten (Nutzer-Auftrag 2026-08-31).**
-Nicht eine Messung, sondern der Kader aus der Promotions-Checkliste -- eine
-einzelne Kante traegt keine Schaetzung (v21 lag nach dem Gating bei +-90
-Punkten CI):
-
-| Kante | Gegner | Zuschnitt |
-| --- | --- | --- |
-| **Anker** | `Heuristik_hv1_anchor`@150 | festes **n=150 ohne Fruehstopp**, exklusiv, Knoepfe aus dessen `spec.json` (`elo_tracker --knobs`) |
-| **Champion** | `v21_2d_brierbest`@400 | n=400 ohne Fruehstopp (Muster der Nachbar-Kanten in elo_history.csv) |
-| **Vorgaenger** | `v22-b05`@400 | `tools/paired_gating.py`, Blockgroesse 5 -- **das ist zugleich Tor 1 der Schleife**; Fruehstopp unter 150 Paaren bleibt informativ, fuer eine Promotion braucht es n >= 150 oder eine Replikation |
-
-Alle drei mit b01 auf **400 Sims**: die Leiter ist auf diesen Betriebspunkt
-geeicht. Dass die ERZEUGUNG mit 100 Sims laeuft, aendert daran nichts --
-Messen und Erzeugen sind verschiedene Betriebspunkte, und Kanten ueber
-verschiedene Punkte sind nicht vergleichbar. Kanten ueber die R5-Fix-Grenze
-nie mischen.
-
-Kostenschaetzung (HERLEITUNG aus 3,33 s je Partie gepaarter b05-Arena): Anker
-rund 8 min, Champion rund 22 min, Vorgaenger je nach SPRT-Verlauf bis rund
-17 min -- zusammen unter einer Stunde, exklusiv zu fahren.
-
-Faellt die Wahl spaeter auf b02 statt b01 (Kaltstart gegen Warmstart), gelten
-dieselben drei Kanten fuer den Arm, der weitergeht.
-
-Danach: Phase 3 (Betrags-Schiene, `PREREG_r5_value_calibration.md`,
-Erfolgstest "kippt die Sims-Kurve?"), Erreichbarkeits-Nachpruefung Stufe 0
-(`PREREG_v23_reachability_recheck.md`), optional Stufe 4 des
-Suchtiefen-Strangs. Bei einem Champion-Wechsel die vollstaendige
-`docs/promotion_checklist.md` abarbeiten (Pflicht-Diagnostiken,
-Anzeige-Kalibrierung in server.py, sigma-Prior-Waechter).
+Regel und Thread-Budget: `../docs/working_rules.md`, Abschnitt "Auslastung".
+Ein Training belegt gemessen rund EINEN Kern, der CPU-Auftrag daneben darf
+also rund 10 Threads nehmen. Zwei CPU-Messungen gegeneinander bleiben
+verboten, und ein unter Nebenlast gefahrener `laufzeit`-Block wird als
+solcher markiert.
 
 ---
 
@@ -396,18 +127,20 @@ Anzeige-Kalibrierung in server.py, sigma-Prior-Waechter).
 **Champion:** `v21_2d_brierbest`, Elo **1215** [1170, 1259] auf der
 R5-Fix-Leiter. Kanten ueber die Fix-Grenze nie mischen.
 
-**Bester Stand der Spalten-Linie:** `v22-b05` -- volle Spalten 0,3375 am
-argmax-Instrument (3,3x Champion), Punkte 37,16 (+3,86, t 2,61), Elo
-**1084** [961, 1198] aus einem SPRT-Fruehstopp unter 150 Paaren (informativ,
-nicht promotionsfaehig). Der hv2-Lehrer liegt mit 1125 dazwischen.
+**Bester Stand der Spalten-Linie: `v23-b01_brierbest`** (seit 2026-08-31) --
+volle Spalten 0,5150 am argmax-Instrument, 119:61 gegen den Vorgaenger b05,
+gegen den Champion 219:181 (nicht signifikant). Elo als HERLEITUNG rund
++33 ueber v21; die belastbare Verankerung liefert die laufende Anker-Kante.
+Vorgaenger `v22-b05`: Elo 1084 [961, 1198] aus einem Fruehstopp unter 150
+Paaren, also informativ. Der hv2-Lehrer liegt mit 1125 dazwischen.
 
 **Wheel:** 79-Kanal-Build (`e91cd34`), Vertragshash `efd564d87bac2722`,
 Paritaets-Hash `8c6684ff...` gemessen unveraendert.
 
 **Was ueber den Value-Kopf gemessen ist:** relativ geheilt, im Betrag
-gedaempft. Geschwister-Tau auf b05 **+0,338** (gegen -0,08/-0,19 der
-plattenblinden Netze), Mensch-Orakel-Differenz praktisch null -- aber
-R5-Platten-Steigung **0,0886** statt ~1. Kriterienweise aufgeloest ist die
+gedaempft -- und die Daempfung ist auf v23-b01 unveraendert (0,0859 gegen
+b05s 0,0886, par.11). Geschwister-Tau auf b05 **+0,338** (gegen -0,08/-0,19
+der plattenblinden Netze), Mensch-Orakel-Differenz praktisch null. Kriterienweise aufgeloest ist die
 Daempfung BREIT, nicht spaltenspezifisch (k1 mit 0,1747 am wenigsten
 gedaempft). Daraus die Betrags-Schiene als Phase 3.
 
