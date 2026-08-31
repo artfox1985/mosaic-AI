@@ -3,9 +3,9 @@
     Gemeinsame Aufloesung von restic-Binary, Repository, Passwort und Log.
 
 .DESCRIPTION
-    Wird von tools/mosaic_backup.ps1 (Tageslauf) und
-    tools/mosaic_backup_seed.ps1 (einmaliger Import des robocopy-Bestands)
-    per Dot-Sourcing eingebunden. Zweck: die Ziel- und Passwortaufloesung
+    Wird von tools/mosaic_backup.ps1 (Tageslauf) und tools/verify_backup.ps1
+    (Pruefung) per Dot-Sourcing eingebunden.
+    Zweck: die Ziel- und Passwortaufloesung
     steht an EINER Stelle. Zwei Kopien waeren genau die Sorte Drift, bei der
     der Import in ein anderes Repository laeuft als der Tageslauf.
 

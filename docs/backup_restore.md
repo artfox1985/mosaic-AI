@@ -152,8 +152,11 @@ macOS und FreeBSD beschraenkt. Es bleibt bei `find`, `ls`, `dump`,
 - `-DryRun` -- zeigt, was gesichert wuerde. Nach jeder Aenderung an der
   Ausschlussliste.
 
-`tools/mosaic_backup_seed.ps1` war der einmalige Import und wird im
-Normalbetrieb nicht mehr gebraucht.
+Das Import-Werkzeug `tools/mosaic_backup_seed.ps1` ist am 2026-08-31
+entfallen. Es las den Spiegel und die datierten models-Zips; beide sind
+uebernommen, geprueft und geloescht, damit hatte es keine Quelle mehr. Wer
+den Ablauf nachlesen will, findet die Datei in der Historie (zuletzt in
+Commit a5f10ab).
 
 `tools/verify_backup.ps1` prueft die Sicherung in fuenf Stufen und sagt, ob
 etwas geloescht werden DARF; es loescht selbst nichts. Nach `-Deep` fragen,
