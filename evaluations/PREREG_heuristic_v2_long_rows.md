@@ -1331,6 +1331,68 @@ bit-identisch.
   Korpus, Entscheid an Brier PLUS Arena). Der Bau macht sie
   entscheidbar; der Default bleibt bis dahin "off".
 
+**EINTAKTUNG ENTSCHIEDEN 2026-08-31 (Nutzer): VERSCHOBEN, nicht verworfen --
+"der hat mich noch nicht ueberzeugt".** Der Arm bleibt gebaut und
+auslöserbasiert in Reserve; die vorhandenen Caches werden zuerst
+ausgenutzt. Das inhaltliche Argument fuer die Zurueckstufung steht in
+par.3b.3a.** Nutzer: *"den wuerd ich relativ spaet
+eintakten und die vorhandenen caches erstmal ausnutzen."* Konkret:
+
+* `v23-b01` (Warmstart), `v23-b02` (Kaltstart, Bestandsbreite), `v23-b03`
+  (Ueberraschungs-Gewichtung) und `v23-b04` (Breite) fahren **ohne** Arm K --
+  `MOSAIC_BOOTSTRAP_COHERENCE` bleibt ungesetzt, der Datei-Schluessel
+  unveraendert, die 2.400 hv2- und alle b05-Bloecke bleiben gueltig.
+* Arm K wird ein **eigener, spaeter Arm auf DEMSELBEN Korpus** -- genau die
+  Bauform, die dieser Absatz von Anfang an vorgesehen hat ("zwei Arme auf
+  demselben Korpus, Entscheid an Brier PLUS Arena"). Der Name folgt der
+  Ausfuehrungsreihenfolge (heute geplant: nach b04).
+* Der Preis ist benannt und akzeptiert: sein Lauf zahlt den Block-Neubau
+  allein (alle Bloecke bekommen `+bscoh_sum1_v1`). Das ist der Grund fuer die
+  spaete Eintaktung, nicht ein Zweifel am Arm.
+
+**Was sonst noch Bloecke entwertet, damit es niemand versehentlich
+mitfaehrt** (aus dem Schluesselmaterial, file_cache_key.py:80-106): ein
+Traeger-Manifest (`carrier`), `MOSAIC_IGNORE_POLICY_TARGET_VALID`, eine
+geaenderte `TD_LAMBDA` (Arm L), ein anderer `value_target_variant`,
+`MOSAIC_CACHE_F32`, `MOSAIC_CACHE_NOPACK`. Wer Cache-Ausnutzung will, laesst
+diese sechs in b01-b04 unangetastet.
+
+### par.3b.3a Warum Arm K NICHT oben auf der Value-Liste steht (2026-08-31)
+
+Nutzer: *"arm K hoert sich von der prioritaet nicht hoch an wenn ich unsere
+anderen preregs in bezug auf die value head thematik ansehe"* -- und das
+laesst sich schaerfer sagen als nach Gefuehl:
+
+1. **Arm K korrigiert einen VERSATZ, das gemessene Problem ist eine
+   STEIGUNG.** Die R5-Kalibrierung misst 0,0886 statt ~1. Ein fuer beide
+   Seiten gleicher additiver Optimismus verschiebt den Achsenabschnitt, nicht
+   die Steigung; Arm K kann die Betrags-Daempfung per Konstruktion nicht
+   heilen.
+2. **Seine benannten Nutzniesser existieren nicht.** Die Registrierung nennt
+   risikosensitive Blatt-Utility, saettigende Score-Utility und die
+   WDL-Klassen -- alle drei ungebaut. Ein Hygiene-Fix fuer Leser, die es noch
+   nicht gibt.
+3. **Er ist der einzige Arm, der ALLE Cache-Bloecke entwertet** (eigene
+   Key-Komponente in beiden Namensraeumen). Der Preis faellt also voll auf
+   seinen Lauf.
+
+**Nuance, als Herleitung markiert, damit die Zurueckstufung nicht mehr
+behauptet als sie darf:** ganz steigungsneutral ist die Summen-Normierung
+nicht. Stufe 0 fand das Residuum nach Spaltenfuellstand gebinnt MONOTON
+(-0,0685 bis -0,0150) -- spaltenreiche Stellungen sind am besten kalibriert.
+Der Versatz ist also nicht exakt konstant; ihn herauszurechnen traefe
+spaltenarme Zustaende staerker, der Rest-Effekt auf die Steigung waere klein,
+aber nicht null. Die Abnahmesonde weist das in Kennzahl E aus, sobald sie
+laeuft.
+
+**Vorrang stattdessen** (nach dem, was gemessen ist): (1) Phase 3,
+Betrags-Schiene (`PREREG_r5_value_calibration.md`, Erfolgstest "kippt die
+Sims-Kurve?"); (2) Value tief nachlabeln
+(`PREREG_reanalyze_label_depth.md` Teil B -- fuer die VALUE-Seite gilt der
+Spaltenblindheits-Einwand ausdruecklich nicht); (3) die On-Policy-Exposition,
+die der laufende Korpus liefert (die Wette von Zuschnitt D). Arm K steht
+hinter allen dreien.
+
 ### par.3b.4 Symmetrie-Pruefung des Lehrerkorpus (registriert 2026-08-27, VOR der Tor-Auswertung von par.3b.2)
 
 **Der Mechanismus ist in diesem Projekt schon einmal aufgetreten.**
