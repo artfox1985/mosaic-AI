@@ -83,8 +83,16 @@ Gepaart (gleicher Seed, 200 Paare): **+0,2050 +- 0,0898, t +4,47** -- plus
 66 Prozent. Der Spaltenbau kostet hier NICHTS: mehr Punkte bei weniger
 Strafsteinen.
 
-**Laufend:** Tor 1 (gepaartes Gating b01 gegen b05, Champion-Strenge,
-`--no-promote-winner`) auf der CPU, `v23-b02` (Kaltstart) auf der GPU.
+**TOR 1 BESTANDEN (2026-08-31), mit Replikation:** 52:28 (40 Paare,
+p = 0,0005) und 67:33 (50 Paare, p = 0,0015) aus zwei unabhaengigen Seeds,
+zusammen **119:61**. Beide Laeufe stoppten unter 150 Paaren, deshalb war die
+Replikation nach der Champion-Strenge Pflicht -- damit ist die Auflage
+erfuellt. In Lauf 1 gewann b05 KEIN einziges Paar doppelt (A-Sweeps 12,
+B-Sweeps 0). Herleitung: `PREREG_v23_window.md` par.2c.
+
+**Laufend:** Tor 2b (Arena b01 gegen b05 mit `--log-games`, BEIDE
+Orientierungen, danach `arena_column_probe`) auf der CPU, `v23-b02`
+(Kaltstart) auf der GPU.
 **Danach:** Tor 2b (Arena mit `--log-games` +
 `tools/probes/arena_column_probe.py`) und die drei Elo-Kanten.
 

@@ -133,6 +133,32 @@ Tor 2b** (Spalten gegen Widerstand, Arena mit --log-games plus
 `tools/probes/arena_column_probe.py`). Erst beide zusammen geben das
 v24-Self-Play frei.
 
+## par.2c TOR 1 BESTANDEN -- in Champion-Strenge, mit Replikation (2026-08-31)
+
+`v23-b01_brierbest` gegen `v22-b05`, beide @400, gepaartes Gating
+(`tools/paired_gating.py`, Blockgroesse 5, `--no-promote-winner`):
+
+| Lauf | Seed | Ergebnis | Paare | Vorzeichentest | gepaarte Differenz |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 20260940 | 52:28 | 40 | p = 0,0005 | +0,600 [+0,312, +0,888] |
+| 2 (Replikation) | 20260941 | 67:33 | 50 | p = 0,0015 | +0,680 [+0,315, +1,045] |
+| zusammen | -- | **119:61** | 90 | -- | -- |
+
+Beide Laeufe erreichen die obere SPRT-Schranke, beide unter 150 Paaren --
+**deshalb war die Replikation Pflicht** (Champion-Strenge,
+`docs/generation_loop.md` Tor 1; Praezedenz ist die b05-Kante, die mit 25
+Paaren fruehstoppte und nur informativ verbucht wurde). Mit zwei
+unabhaengigen Seeds ist die Auflage erfuellt.
+
+**Beifang aus Lauf 1:** A-Sweeps 12, **B-Sweeps 0** -- b05 hat in keinem
+einzigen Paar beide Partien gewonnen. In Lauf 2 dann 22 zu 5.
+
+**Falle beim Aufsetzen abgefangen:** `--promote-winner` steht per Default auf
+AN und haette `models/champion.txt` auf b01 gesetzt, sobald der SPRT
+signifikant ausfaellt. Das waere eine stille Promotion gegen die eigene
+Trennung gewesen (Champion ist v21; b01-gegen-b05 ist das Ratschen-Tor).
+Beide Laeufe mit `--no-promote-winner`.
+
 ## par.3 Drei Punkte, die benannt gehoeren -- keiner ist geloest
 
 **(1) G-1 und G-2 kommen aus DEMSELBEN Korpus.** Im alten Schema waren das
