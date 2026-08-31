@@ -54,6 +54,9 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
 
 ## Prereg-Statuskopf und Index (Nutzer-Anweisung 2026-08-23)
 
+**Der Ablauf dazu: `/mosaic-prereg`.** Die Regeln stehen HIER, der Skill
+ist nur der Handgriff -- bei Widerspruch gilt dieser Abschnitt.
+
 - Jede `evaluations/PREREG_*.md` traegt in Zeile 1 den parsebaren
   Status-Kopf (`<!-- STATUS: ... -->`); `evaluations/PREREG_INDEX.md`
   wird daraus GENERIERT (tools/generate_prereg_index.py). Der
@@ -84,6 +87,8 @@ Geplantes, "addiert" nur für Gebautes-und-Aktives.
   jeden Prompt, der Prereg-Registrierungen schreibt.
 
 ## Standard-Kennzahlen jedes Messberichts (Nutzer-Anweisung 2026-08-23)
+
+**Der Ablauf dazu: `/mosaic-measurement-run`.** Die Regeln stehen HIER.
 
 **Zusaetzlich** zu dem, was die jeweilige Prereg verlangt, will der Nutzer in
 JEDEM Messbericht (Arena, Sonde, Gating, Self-Play-Abnahme) diese sechs
@@ -210,6 +215,9 @@ BENANNTEN Nutznießer – eine konkrete Messung, die dadurch möglich oder
 schärfer wird –, nicht „hilft künftig allgemein".
 
 ## Messungen laufen EXKLUSIV — und ein Build ist Nebenlast (2026-08-25)
+
+**Der Ablauf dazu: `/mosaic-measurement-run`** -- vor dem Start UND beim
+Auswerten. Die Regeln stehen HIER.
 
 **PRAEZISIERT 2026-08-31 (Nutzer): GPU und CPU duerfen parallel ausgelastet
 werden** — ein Training auf der GPU und EIN CPU-Auftrag daneben (Arena, Sonde,
@@ -393,3 +401,13 @@ still stehen — dieser Fehler ist am 2026-08-17 zweimal passiert.
 - Für Commits gilt: Kurzbeschreibung im Titel, dann in der Beschreibung das warum. Das was steckt im diff der Dateien.
 - Wenn Unklarheiten bei den Spielregeln bestehen, frage kurz nach, anstatt Annahmen zu treffen.
 - Schau in vorhandene scripts ob dort bereits relevante funktionen vorhanden sind bevor du was neues baust (zb arena.py war schon da, aber du hast dir selbst noch eine gebaut)
+- Bevor ein Kandidat amtierender Champion wird: `/mosaic-champion-promotion`
+  (kanonische Liste: `docs/promotion_checklist.md`).
+
+**Zu diesen Zeigern:** ein Skill wird NICHT automatisch ausgeloest -- der
+Harness zeigt nur Name und Beschreibung, das Zugreifen ist eine Einschaetzung.
+Deshalb stehen die Zeiger hier, wo sie in jedem Zug mitgelesen werden. Sie
+tragen ABLAEUFE; die Regeln bleiben in dieser Datei. Dass ein genannter Skill
+auch existiert, prueft `tools/check_conventions.py` (Regel 6) -- Anlass war die
+Umbenennung mosaic-messlauf -> mosaic-measurement-run am 2026-08-31, die einen
+Verweis still ins Leere hatte zeigen lassen.

@@ -800,6 +800,71 @@ def check_identifiers_english(staged_only: bool, staged_files: set[str]) -> list
 # Main
 # --------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Regel 6: In CLAUDE.md genannte Skills existieren auch
+# ---------------------------------------------------------------------------
+# ANLASS 2026-08-31: `mosaic-messlauf` wurde nach `mosaic-measurement-run`
+# umbenannt (Dateinamen-Konvention). Ein Verweis in CLAUDE.md haette danach
+# STILL ins Leere gezeigt -- niemand meldet das, und ausgerechnet der Zeiger
+# auf den Messlauf-Ablauf waere unbemerkt tot gewesen.
+#
+# Warum die Zeiger ueberhaupt in CLAUDE.md stehen: ein Skill wird NICHT
+# automatisch ausgeloest. Der Harness zeigt dem Modell nur Name und
+# Beschreibung, das Zugreifen ist eine Einschaetzung -- und die angebotene
+# Liste schwankt. CLAUDE.md liegt dagegen in jedem Zug vor. Der Zeiger dort
+# ist die Absicherung; diese Regel sichert den Zeiger.
+#
+# Geprueft wird NUR die Richtung, die still verrottet: genannt -> muss
+# existieren. Die Gegenrichtung (ein Skill ohne Erwaehnung) ist kein Fehler,
+# nicht jeder Ablauf braucht einen Zeiger.
+#
+# Das Muster verlangt die Backtick-Slash-Form `/mosaic-...`, damit die
+# Begruendung oben -- die den ALTEN Namen als Fliesstext nennt -- nicht
+# selbst anschlaegt.
+SKILL_REF_RE = re.compile(r"`/(mosaic-[a-z0-9-]+)`")
+SKILLS_DIR = REPO_ROOT / ".claude" / "skills"
+
+
+def check_claude_md_skill_refs(staged_only: bool, staged_files: set[str]) -> list[str]:
+    # Ausloeser ist NICHT nur eine Aenderung an CLAUDE.md: der haeufigere Fall
+    # ist, dass jemand einen Skill umbenennt oder loescht, ohne CLAUDE.md
+    # anzufassen. Darum auch bei jeder Aenderung unter .claude/skills/ pruefen.
+    if staged_only:
+        touched = "CLAUDE.md" in staged_files or any(
+            f.startswith(".claude/skills/") for f in staged_files
+        )
+        if not touched:
+            return []
+        text = get_staged_content("CLAUDE.md")
+        if text is None:  # CLAUDE.md selbst nicht gestagt -> Ist-Stand lesen
+            path = REPO_ROOT / "CLAUDE.md"
+            text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else None
+    else:
+        path = REPO_ROOT / "CLAUDE.md"
+        text = path.read_text(encoding="utf-8", errors="replace") if path.exists() else None
+    if text is None:
+        return []
+
+    violations = []
+    for name in sorted(set(SKILL_REF_RE.findall(text))):
+        if (SKILLS_DIR / name / "SKILL.md").is_file():
+            continue
+        vorhanden = (
+            sorted(d.name for d in SKILLS_DIR.iterdir() if d.is_dir())
+            if SKILLS_DIR.is_dir() else []
+        )
+        violations.append(
+            f"REGEL 6 (Skill-Verweis): CLAUDE.md nennt `/{name}`, aber "
+            f".claude/skills/{name}/SKILL.md fehlt.\n"
+            "  Konsequenz: der Zeiger zeigt ins Leere, und zwar lautlos -- niemand merkt, "
+            "dass der Ablauf nicht mehr erreichbar ist. Genau dafuer gibt es diese Regel "
+            "(Umbenennung des Messlauf-Skills am 2026-08-31).\n"
+            f"  Vorhanden sind: {', '.join(vorhanden) if vorhanden else '(keine)'}\n"
+            "  Ausweg: den Namen in CLAUDE.md nachziehen, oder den Skill wieder anlegen."
+        )
+    return violations
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Konventions-Linter (A5) -- siehe docs/DESIGN_conventions_as_checks.md"
@@ -839,6 +904,7 @@ def main() -> int:
     violations += check_prereg_index_consistency(staged_mode, staged_files)
     violations += check_knob_docs_current(staged_mode, staged_files)
     violations += check_identifiers_english(staged_mode, staged_files)
+    violations += check_claude_md_skill_refs(staged_mode, staged_files)
     warn_silent_test_skips(staged_mode, staged_files)  # Regel 5: nur Warnung, kein Exit-1
 
     if violations:
