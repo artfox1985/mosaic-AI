@@ -29,7 +29,7 @@ diesen Inhalten etwas aendert, aendert es DORT.
 | Ressource | Lauf | Was damit zu tun ist |
 | --- | --- | --- |
 | **GPU** | `v23-b03` -- b01-Rezept plus `--surprise-alpha 0.5` | Wenn fertig: Orakelmetriken gegen b01 (das IST der Kontrollarm, gleicher Seed/Val-Pool). Entscheidungsmass steht in `PREREG_policy_surprise_weighting.md` par.5 -- **nicht** val_combined, **nicht** policy_top3 |
-| **CPU** | **frei** (seit 22:42) | Zuletzt: Anker-Kante fertig (22:39, Sitzung `mosaic-ai-7f`) plus Determinismus-Probe (22:42, diese Sitzung). Naechste Kandidaten: die 200 Cache-Bloecke des Relabel-Arms, oder Warm gegen Kalt (`b02_brierbest` gegen `b01_brierbest`) |
+| **CPU** | **frei** -- Phase 3 Stufe 0 ist durch (vier Arme, ~1,5 h) | Naechstes: `frozen_v3` erzeugen (400 b01-Partien, Sockel-Konfiguration, ~22 min), dann Satz und Orakel-Labels |
 
 **WARNUNG Doppellauf (2026-08-31, 22:02:55 bis 22:26):** zwei Sitzungen haben denselben
 Anker-Lauf gestartet -- byte-gleiche Argumente, gleicher `--seed-base 900001`, gleiche
@@ -48,6 +48,32 @@ bestaetigt (Lauf 10 Prozesse, Probe 1). Der `laufzeit`-Vorbehalt bleibt. Herleit
 nicht gemessen: dass diese drei im Fenster lagen, folgt aus der gestreiften
 Blockaufteilung -- Zeitstempel je Partie gibt es nicht. Vermerk:
 `artifacts/anchor_arena_v23b01_load_contamination.md`.
+
+**WARM GEGEN KALT ENTSCHIEDEN (2026-09-01, par.12/13 der Kapazitaets-Prereg):** auf
+DEMSELBEN Fenster, mit derselben Breite, baut der Kaltstart nur **ein Drittel** der
+Spalten -- bei statistisch nicht unterscheidbarer Staerke.
+
+| Vergleich (je 160 Partien, gepaart, beide Rollen) | Siege | p | Spalten b01 | Spalten b02 |
+| --- | --- | --- | --- | --- |
+| b01 gegen `b02_brierbest` | 85:75 | 0,56 | 0,619 | **0,169** |
+| b01 gegen `b02_best` | 92:68 | 0,081 | 0,563 | **0,225** |
+
+Der Checkpoint erklaert es NICHT (beide b02-Staende liegen bei einem Drittel).
+
+**Die Einordnung dazu, im selben Instrument (Arena, Spalten je Partie):** b05 0,4304
+(Tor 2b), b01 0,6456, b02 0,169-0,225. Das Fenster HEBT also einen bereits
+spaltenbewussten Spieler klar an (+66 Prozent von b05 auf b01, Tor 2a und 2b
+unabhaengig) -- aber ein Kaltstart darauf landet unter b05, also unter dem Stand,
+den die Linie schon hatte. **Es ist keine Alternative "lehrt oder erhaelt", sondern
+eine SCHWELLE:** die Policy-Dosis des Fensters (1.800 Lehrer- plus 4.000
+Netz-Partien, `PREREG_v23_window` par.1) reicht zum Verstaerken, nicht zum Aufbauen.
+Zum Vergleich: v22-b01 lernte es als Kaltstart aus 24.000 Partien Lehrer-Policy
+(alle 2.400 Dateien Traeger -- weil sein Traeger-Manifest NICHT gefunden wurde und
+der Rueckfall griff, Manifest `manifest_train_v22-b01`).
+
+**Nicht eingetaktet (Nutzer 2026-09-01: "der Kaltstart interessiert mich weniger"):**
+eine Dosis-Reihe der Lehrer-Policy. Der Befund steht in `capacity_sim_frontier`
+par.12/13, die Frage bleibt offen, aber ohne Arm.
 
 **Erledigt seit der letzten Fassung:** die Checkpoint-Arena des Kaltstart-Arms
 (`b02_best` 33:47 `b02_brierbest`, SPRT H0, p = 0,189) -- **Kandidat ist
@@ -131,11 +157,33 @@ treffen (`^selfplay_v22-b05` deckt beide Praefixe), und die
 Korpus-Zusammensetzung im Log muss 200 relabelte Traeger zeigen, nicht 200
 rohe.
 
-### 3.2 Phase 3, der Eingriff
+### 3.2 Phase 3: GESCHLOSSEN ohne Bau (2026-09-01)
 
-Die Diagnose ist vollstaendig: Daempfung strukturell, Punkte-Kopf sauber,
-Korpus heilt nicht. Der Eingriff selbst ist in
-`PREREG_r5_value_calibration.md` zu registrieren, bevor er gebaut wird.
+Stufe 0 der Prereg (`PREREG_r5_value_calibration` par.12) hat die Praemisse
+GEPRUEFT, bevor etwas gebaut wurde -- und sie faellt:
+
+| Arm (je 200 Partien, argmax, Seed 20260931) | volle Spalten | gegen Kontrolle |
+| --- | --- | --- |
+| @100 Sims | **0,7200** | +0,205 (t 3,97) |
+| @400 Sims (Kontrolle) | 0,5150 | -- |
+| @400, `VALUE_CAL_B=2,0` | 0,3900 | -0,125 (t -2,7) |
+| @400, `VALUE_CAL_B=0,5` | 0,5325 | +0,018 (n.s.) |
+| @400, `POINTS_UTILITY_W=0,1` | 0,4850 | -0,030 (n.s.) |
+
+**Die Delle gibt es auch bei b01** (0,205, vorher nur an b05 gemessen), **aber
+keine Einstellung des Value-Kopfs holt sie zurueck.** Verstaerken schadet,
+Daempfen tut nichts, Punkte-Beimischung tut nichts. Die Betrags-Daempfung ist
+damit ein registrierter Befund OHNE benannten Nutzniesser -- der Eingriff
+entfaellt, der Trainingslauf ist gespart. Die Ursachenfrage erbt
+`PREREG_search_depth_column_optimum` Stufe 4: sie liegt nicht in der Skalierung
+des Blattwerts und nicht in fehlender Punkte-Information, sondern in dem, was die
+tiefere Suche mit den Kandidaten TUT.
+
+**Nebenbefund zu einem Nutzer-Einwand:** die vier fruher geschlossenen Wege am
+Verbraucher wurden alle auf plattenBLINDEM v21 gemessen. Der billigste davon
+(Punkte-Blend) ist hier auf b01 wiederholt worden und traegt auch dort nicht --
+fuer die SPALTEN. Fuer die Staerke sagt der Arm nichts, die alte Schliessung war
+eine Staerke-Messung.
 
 ### 3.3 Dann v24
 
@@ -282,7 +330,8 @@ Stack-Draw-Kontrollfluss EIN, Bootstrap-Horizont 2, Seed-Positionen AUS
 | Punkt | Worum es geht |
 | --- | --- |
 | **b04: welcher Zweig wird breiter** | Flach-Zweig `hidden_size` 512 ist ohne Bau fahrbar; Conv-Zweig `conv_channels` 48 / `conv_layers` 2 braucht zwei Flags, ein Checkpoint-Feld und eine Ableitung beim Laden -- sonst ist der Checkpoint nicht ladbar (`PREREG_capacity_sim_frontier.md` par.10) |
-| **Loeschfreigaben** | `data/onpolicy_v22-b06/` (31 Dateien) und -- falls keine DAgger-Runde 3 -- `data/onpolicy_v22-b05/` (30) |
+| **frozen_v3: woher die Zustaende** | (a) Bestand `selfplay_tor2a-v23b01_*` (200 Partien, 0 Kosten) -- aber argmax-deterministisch, ohne Wurzelrauschen, also eine ENGERE Verteilung als das Spiel, fuer das geeicht wird. (b) frische Sockel-Partien mit Rauschen, rund 1 h fuer 400. Empfehlung (b): der Zweck der Abloesung ist, die Verteilungsluecke zu schliessen, nicht sie zu ersetzen (`PREREG_frozen_v3_eval_set.md` par.3) |
+| ~~Loeschfreigaben~~ ERLEDIGT 2026-09-01 | `data/onpolicy_v22-b05/` und `-b06/` auf Nutzer-Freigabe geloescht (je 31 Dateien, 32 + 34 MB). Vorher geprueft: KEINE Fenster- oder Traegerdatei verweist darauf. Die Preregs `heuristic_v2_long_rows` (DAgger-Runden) und `v23_window` zitieren sie im TEXT -- die Herleitungen bleiben lesbar, die Rohpartien sind weg |
 | **Messartefakte tracked?** | `evaluations/artifacts/` ist ungetrackt; Preregs zitieren die JSONs als Beleg, ein frischer Klon hat sie nicht. Zurueckdrehen: `.gitignore`-Zeile raus, `git add -f` |
 | **Push** | NIE ohne ausdrueckliche Anweisung; der Ahead-Stand wird im CHAT gemeldet, nicht hier gefuehrt |
 
@@ -309,6 +358,7 @@ sagte "v22-Self-Play per Tor-Regel gestoppt" (es laeuft seit dem 2026-08-30).
 | `search_depth_column_optimum` | weitgehend beantwortet; offen bleibt die ERKLAERUNG (optionale Stufe 4) |
 | `special_tile_yield` | Kanaele 77/78 gebaut, ihre Wirkung nie isoliert |
 | `cache_build_time` | Hebel (3) offen; serielle Vollreferenz fehlt |
+| `frozen_v3_eval_set` | **NEU 2026-08-31 (Nutzer):** das Eval-Set stammt aus der plattenBLINDEN Aera (v1 = v10b/v12, v2 = v18/v19); Abloesung aus `v23-b01`. Zustandssatz und Orakel-Labels registriert, nichts gebaut. Vor dem Bau faellt ein Entscheid, siehe Abschnitt 4 |
 | `geometric_envelope` | Gelaender fuer die fruehen Runden -- Stufe 0 ist netzfrei und kann VOR dem v23-Training laufen |
 
 **Registriert, nicht eingetaktet** (jeder Bau braucht vorher eine

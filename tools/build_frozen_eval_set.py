@@ -142,6 +142,10 @@ def _git_commit() -> str | None:
         return None
 
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from corpus_io import load_records_fh  # noqa: E402
+
+
 def _candidate_files(name: str) -> list[str]:
     """Liefert die Kandidaten-Dateiliste je Korpus-Name (nur Existenz-Filter,
     keine Zeit-/Reihenfolge-Auswahl -- das passiert im Aufrufer)."""
@@ -179,8 +183,14 @@ def _eligible_steps(file_path: str):
     """Liest eine .pkl-Datei read-only und liefert alle Steps, die
     offline_diagnosis.py::load_val_samples ebenfalls verwenden wuerde
     (Filter: 'scores' und 'winner' vorhanden)."""
+    # Korpusdateien werden seit dem Sommer KOMPRIMIERT geschrieben; dieses
+    # Werkzeug stammt vom 2026-07-24 und las bis 2026-09-01 mit rohem
+    # `pickle.load`, was an frischen Dateien mit `UnpicklingError: invalid
+    # load key, ''` (Gzip-Magic) starb. `corpus_io.load_records_fh` ist
+    # der kanonische Leser und behandelt BEIDE Formate -- frozen_v1 bleibt
+    # damit unveraendert reproduzierbar.
     with open(file_path, "rb") as fh:
-        game_data = pickle.load(fh)
+        game_data = load_records_fh(fh)
     out = []
     for step in game_data:
         if "scores" not in step or "winner" not in step:

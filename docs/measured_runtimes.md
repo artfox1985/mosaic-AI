@@ -41,6 +41,9 @@ Heuristik bzw. Netz gegen Heuristik, gleiche Sims), nicht das Werkzeug.
 | Split-Arm Heuristik (`v2_envelope_arena.py --tiling`) | 160 Partien | 0 = alle Kerne | **~22 s** |
 | dito, Bloecke liegen schon (anderes Fenster) | 120 Dateien | 6 | **7,9 s** |
 | Cache-Bau voller Korpus, parallel | 4.186.112 Zustaende | – | **36,1 min** (seriell 2,58 h, Faktor ~4,3) |
+| Training auf NEUER Fenster-Zusammensetzung (v23-b05 Relabel), Datenaufbau EINKERNIG | 2.345 Dateien, 4,72 Mio Samples | 6 = `torch.get_num_threads()`, tatsaechlich **ein** Kern im Aufbau | **7,42 h gesamt, davon 4,98 h Datenaufbau** -- zum Vergleich: b02 auf STEHENDEM Fenster-Cache 32 s, b01 (baut Bloecke selbst) 3,45 h. **Vermeidbar:** Fenster-Cache mit `build_cache_incremental.py --merge-out` parallel vorbauen, dann `train.py --cache-file` (seit dc40551) |
+| Orakel-Labels bauen (`build_frozen_oracle_labels.py`, 5000 Sims, 2D-Netz) | 1.144 Labels | 1 | **88,8 min** = 0,21 Labels/s |
+| Frozen-Set erzeugen (400 Partien Sockel-Konfiguration, sims 100, Rauschen) | 400 Partien | 10 | **~22 min** |
 | Wheel-Bau (`maturin build --release`) plus Installation | – | – | **~30 s** |
 | Netz-Self-Play argmax @400 (par.3b.2/3b.6-Instrument, `self_play.py --deterministic --no-root-noise`) | 200 Partien | 11 | **~20 min** = 0,15-0,17 Partien/s (Neustart 2026-08-29: Bloecke 107-145 s je 20 Partien; Tiling-Pol-Knopf kostet dabei praktisch nichts) |
 | v22-Kaltstart-Training (b01, CUDA, inkl. In-Train-Cache-Bau 2,55 h) | 17 Epochen, 3,77 Mio Samples | 6 = `torch.get_num_threads()`, KAPAZITAET; gemessene Last rund **1 Kern** (`cpu_s/wanduhr_s` 0,92-0,98 ueber b01/b02/b04/b05). Der DataLoader laeuft ohne `num_workers` im Hauptprozess (train.py:1323) -- die fruehere Angabe "6 (DataLoader)" war falsch, berichtigt 2026-08-31 | **5,43 h** gesamt = ~10 min je Epoche nach dem Datenaufbau (manifest_train_v22-b01) |

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse (Rumpfbreite) und Sim-Budget? | Beleg: Kaltstart-Arm v23-b02 GEBAUT (par.11): 4,22 h gegen b01s 5,97 h, also BILLIGER als der Warmstart; Kandidat `_brierbest` (33:47, SPRT H0). Die Frontier misst das nicht -- offen bleiben die Arm-Frage b02 gegen b01 und der Breiten-Arm b04, dessen Zweig der Nutzer waehlt (par.10: `hidden_size` ohne Bau, Conv-Zweig braucht Flags plus Checkpoint-Ableitung). Kostentor Pflicht und zuerst (par.5). -->
+<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse und Sim-Budget? | Beleg: Kaltstart-Arm gemessen. **par.12/13: gleich stark, aber nur ein DRITTEL der Spalten** (b01 0,62 gegen 0,17 fuer `_brierbest` und 0,56 gegen 0,23 fuer `_best`, Staerke 85:75 bzw. 92:68) -- der Checkpoint erklaert es nicht, das Spaltenwissen sitzt in der LINIE, nicht im Korpus allein. Frontier selbst weiter OFFEN: Breiten-Arm b04, Zweig-Entscheid beim Nutzer (par.10), Kostentor zuerst (par.5). -->
 
 # Vorregistrierung: Kapazitaets-Sim-Frontier
 
@@ -216,3 +216,109 @@ Tor -- ohne Verdikt entscheidet der Punktschaetzer) ist der Kandidat des Arms
 gegen `v23-b01_brierbest` (Warm gegen Kalt, ein Faktor, dasselbe Fenster)
 steht aus. Und die Frontier misst dieser Arm ohnehin nicht -- dafuer ist b04
 zustaendig (par.10), dessen Breiten-Entscheid weiter beim Nutzer liegt.
+
+## par.12 WARM GEGEN KALT GEMESSEN: gleich stark, aber NICHT gleich gebaut (2026-09-01)
+
+Die Arm-Frage aus par.9/par.10 ist gefahren: `v23-b02_brierbest` (Kaltstart)
+gegen `v23-b01_brierbest` (Warmstart), beide @400, **dasselbe Fenster, ein
+Faktor**. Gepaart mit getauschten Rollen auf DENSELBEN Seeds (Basis 20260980,
+2 x 80 Partien, `paired_arena_env_ab --log-games`, threads 10), wie der
+Tor-2b-Praezedenzfall.
+
+**Staerke: kein Unterschied.**
+
+```
+b01 85 : 75 b02 aus 160 Partien
+Paare: b01 beide 26, geteilt 33, b02 beide 21
+gepaarte Differenz +0,125, 95%-KI [-0,212, +0,462]
+Vorzeichentest auf 47 informativen Paaren: p = 0,56
+Punkte 47,04 gegen 44,04, Margin +3,01
+```
+
+**Spalten: Faktor 3,7 -- und zwar in BEIDEN Rollen** (`arena_column_probe`,
+160 von 160 Partien nachspielbar, 0 Divergenzen):
+
+| Lauf | b01 | b02 |
+| --- | --- | --- |
+| A = b02 | 0,625 (SE 0,086) | 0,125 (SE 0,037) |
+| A = b01 | 0,613 (SE 0,086) | 0,212 (SE 0,046) |
+| Mittel | **0,619** | **0,169** |
+
+**Das ist der Befund: derselbe Korpus, dieselbe Breite, dieselbe Staerke --
+und trotzdem baut der Kaltstart kaum Spalten.** Die Deutung "der Korpus
+wirkt" (par.2b des Fensters, b01 gegen den Champion) ist damit zu praezisieren:
+der Korpus allein reicht NICHT. Was b01 traegt, kommt aus dem Warmstart, also
+aus der Linie v22-b05, die bereits auf dem Spaltenkorpus trainiert war.
+
+**Der Konfundierer, und er ist ernst:** b02s Kandidat ist sein
+BRIERBESTER Checkpoint, und der liegt bei **Epoche 1** (par.2g des
+Fensters). Ein praktisch untrainierter Policy-Kopf wuerde ebenfalls wenige
+Spalten bauen -- ohne dass der Startmodus etwas damit zu tun haette. Die
+interne Checkpoint-Arena hat `_brierbest` zwar vor `_best` gesetzt (47:33),
+aber nicht signifikant (p = 0,19), und sie hat auf SIEGE geschaut, nicht auf
+Spalten.
+
+**Vorab registrierte Aufloesung (gefahren im selben Zug):** DIESELBE Arena
+noch einmal, nur mit `v23-b02_best` statt `_brierbest` -- gleicher Gegner
+(b01), gleicher Seed 20260980, beide Rollen, `--log-games`, danach
+`arena_column_probe`. Faellt `_best` deutlich hoeher aus, war es der
+Checkpoint; bleibt er unten, ist es der Startmodus.
+
+**Warum diese Bauform und nicht das argmax-Instrument** (das zuerst hier
+stand): die Zahl muss mit den 0,619 gegen 0,169 vergleichbar sein, die die
+Frage aufgeworfen haben -- dasselbe Instrument, derselbe Gegner, dieselben
+Seeds. Ein Self-Play-Wert waere mit den Tor-2a-Zahlen vergleichbar, aber nicht
+mit dieser Messung, und er kostet das Doppelte (2 x 200 Partien gegen
+2 x 80).
+
+**Was in beiden Faellen schon feststeht:** ein Kaltstart auf dem vollen
+Fenster ist billiger (4,22 h gegen 5,97 h, par.11) und gleich stark -- aber er
+ist KEIN Ersatz fuer die Linie, solange die Spalten das Ziel sind.
+Artefakte: `paired_arena_env_warm_vs_cold_b0{1,2}first.json`,
+`warm_vs_cold_columns_b0{1,2}first.json`.
+
+## par.13 KONFUNDIERER AUSGERAEUMT: es ist der Startmodus, nicht der Checkpoint (2026-09-01)
+
+Dieselbe Arena noch einmal, nur mit `v23-b02_best` statt `_brierbest` --
+gleicher Gegner, gleicher Seed 20260980, beide Rollen, `--log-games`.
+
+**Staerke:**
+
+```
+b01 92 : 68 b02_best aus 160 Partien
+Paare: b01 beide 26, geteilt 40, b02 beide 14
+gepaarte Differenz +0,300, 95%-KI [-0,005, +0,605]
+Vorzeichentest auf 40 informativen Paaren: p = 0,081
+Punkte 45,38 gegen 38,34, Margin +7,03
+```
+
+**Spalten je Partie und Seite:**
+
+| Vergleich | b01 | b02-Checkpoint |
+| --- | --- | --- |
+| gegen `_brierbest` (Epoche 1) | 0,619 | **0,169** |
+| gegen `_best` | 0,563 | **0,225** |
+
+**Damit ist die Frage entschieden: der Checkpoint erklaert es nicht.** Der
+Wechsel von Epoche 1 auf den besten Checkpoint hebt den Spaltenbau von 0,169
+auf 0,225 -- eine Bewegung in der erwarteten Richtung, aber sie schliesst
+nicht einmal ein Fuenftel der Luecke zu b01s rund 0,6. **Beide** b02-Staende
+bauen rund ein Drittel dessen, was der Warmstart baut.
+
+**Der Befund lautet also:** auf DEMSELBEN Fenster, mit DERSELBEN Breite, bei
+statistisch nicht unterscheidbarer bis leicht unterlegener Spielstaerke baut
+ein Kaltstart nur ein Drittel der Spalten. Das Spaltenwissen sitzt nicht im
+Korpus allein, sondern in der LINIE -- b01 erbt es aus v22-b05, das seinerseits
+auf dem Spaltenkorpus trainiert wurde.
+
+**Nebenbefund, konsistent mit der Checkpoint-Arena:** `_best` steht gegen b01
+schlechter da als `_brierbest` (68 gegen 75 Siege), was die dortige Auswahl
+(47:33 fuer `_brierbest`) im Vorzeichen bestaetigt -- diesmal aus einer
+unabhaengigen Stichprobe.
+
+**Was das fuer die Kampagne heisst** (Deutung, ausdruecklich als solche
+markiert): ein Kaltstart ist billiger und kostet keine Staerke, aber er
+verliert die strukturelle Eigenschaft, um die der ganze Zyklus gefuehrt wird.
+Wer die Spalten will, faehrt Warmstarts -- und die naechste Generation muss
+sich fragen, ob der Korpus die Eigenschaft ueberhaupt LEHRT oder sie nur
+ERHAELT.

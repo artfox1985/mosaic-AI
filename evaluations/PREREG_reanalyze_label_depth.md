@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt ein tieferes Nachlabeln der gespeicherten Zustaende (Reanalyze) die Betrags-Daempfung des Value-Kopfs? | Beleg: ANGELEGT 2026-08-30, nichts gebaut. Zwei unabhaengige Motive (Literatur-Anti-Drift + der gemessene Sims-Effekt), Machbarkeit GEPRUEFT (net_search_state_json, lib.rs:865, freie Sims-Zahl auf gespeicherten Zustaenden). Teil A braucht einen flach gespielten SOCKEL, Teil B zielt auf den Value-Bootstrap. -->
+<!-- STATUS: OFFEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt tieferes Nachlabeln die Betrags-Daempfung? | Beleg: **Teil A GEBAUT und GEMESSEN (par.A1, 2026-09-01)**: `v23-b05` = Policy per hv2-Lehrer nachgelabelt, ein Faktor gegen b01. Arena 85:75 fuer b05, aber p = 0,53 -- nicht belegt besser; offline widersprechen sich drei Orakel auf winzigen Differenzen. b01 bleibt Generator fuer v24. Teil B (Value tief) bleibt UNGEBAUT. -->
 
 # Vorregistrierung: Reanalyze -- Spielen und Labeln entkoppeln
 
@@ -184,3 +184,55 @@ Bestandteil von b01.
   (Stufe 3) gegen die flache Suche aus, entfaellt Motiv (2) -- Teil A
   bleibt dann nur als Label-Frage bestehen, mit deutlich geringerer
   Dringlichkeit.
+
+## par.A1 TEIL A GEBAUT UND GEMESSEN: `v23-b05` (2026-09-01)
+
+**Was gebaut wurde.** Der Relabel-Arm der v23-Generation: dieselben 2.345
+Fensterdateien wie die Kontrolle `v23-b01`, aber die 200 Policy-Dateien durch
+ihre lehrer-relabelten Kopien ersetzt (204.008 hv2-Lehrerzuege, 0 Fehler).
+**Ein Faktor, dieselben Partien.**
+
+| | Wert |
+| --- | --- |
+| Laufzeit | 26.695 s (7,42 h), davon **17.934 s (4,98 h) einkerniger Datenaufbau** |
+| Epochen / Samples | 12 / 4,72 Mio |
+| val_brier (E12) | 0,1954 |
+| Korpus-Pruefung im Log | 200 relabelte Traeger (nicht 200 rohe), Traeger gesamt 380, Manifest gefunden |
+
+**Arena gegen die Kontrolle** (2 x 80 Partien, getauschte Rollen, gleicher
+Seed 20260995, `paired_arena_env_ab --log-games`):
+
+```
+b05 85 : 75 b01
+Paare: b05 beide 23, geteilt 39, b01 beide 18
+gepaarte Differenz +0,125, 95%-KI [-0,190, +0,440]
+Vorzeichentest auf 41 informativen Paaren: p = 0,53
+Punkte 46,72 gegen 46,62, Margin +0,10
+```
+
+**Offline auf drei Orakeln** (dieselben zwei Netze):
+
+| Orakel | top3mass b05 / b01 | tau b05 / b01 | Richtung |
+| --- | --- | --- | --- |
+| v18 auf `frozen_v1` | **0,5538** / 0,5308 | 0,2320 / 0,2296 | b05 |
+| b01 auf `frozen_v3` | 0,6423 / **0,6455** | 0,2115 / **0,2219** | b01 (zirkulaer, siehe `PREREG_frozen_v3_eval_set` par.9) |
+| v21 auf `frozen_v3` | 0,4580 / **0,4644** | **0,1460** / 0,1363 | gemischt |
+
+**Verdikt: der Relabel-Arm ist NICHT belegt besser -- und auch nicht
+schlechter.** Er ist der einzige Arm dieser Generation mit positivem
+Vorzeichen in der Arena (85:75), aber die Marge ist dieselbe, die b02 und b03
+in die Gegenrichtung erzeugt haben; bei n=160 ist das die Rauschgrenze des
+Instruments. Offline widersprechen sich drei Orakel auf winzigen Differenzen.
+
+**Folge fuer v24:** `v23-b01` bleibt Generator. Der Vorbehalt aus
+`PREREG_v24_window.md` par.4 ist damit AUFGELOEST, ohne dass sich am Zuschnitt
+etwas aendert.
+
+**Was der Arm trotzdem gebracht hat, und es ist nicht wenig:** er hat den
+`frozen_v3`-Zirkularitaetsbefund ausgeloest (par.9 dort) -- der erste echte
+Anwendungsfall des neuen Satzes hat gezeigt, dass sein Orakel als Richter ueber
+b01 untauglich war. Und die Laufzeit-Zeile oben hat die 5-Stunden-Falle des
+einkernigen Fenster-Aufbaus sichtbar gemacht (`docs/measured_runtimes.md`,
+Ausweg: `--merge-out` parallel plus `train.py --cache-file`).
+
+**Teil B (Value tief nachlabeln) bleibt UNGEBAUT.**

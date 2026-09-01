@@ -122,7 +122,14 @@ def _parse_cli():
         if not FROZEN_PKL.exists():
             raise SystemExit(f"Frozen-Set nicht gefunden: {FROZEN_PKL}")
     if a.model:
-        MODEL_PATH = ROOT / "models" / f"alphazero_{a.model}.onnx"
+        # Ein PFAD ist auch erlaubt (2026-09-01): der amtierende Champion
+        # v21_2d_brierbest liegt NICHT mehr als models/alphazero_<name>.onnx,
+        # sondern nur noch im getrackten Artefakt
+        # models/frozen_champions/v21_2d_brierbest/model.onnx. Ein Gegen-Orakel
+        # aus einem eingefrorenen Netz muss darauf zeigen koennen, ohne dass
+        # eine 9-MB-Kopie mit zweifelhafter Herkunft in models/ landet.
+        MODEL_PATH = (ROOT / a.model if (a.model.endswith(".onnx") or "/" in a.model)
+                      else ROOT / "models" / f"alphazero_{a.model}.onnx")
         if not MODEL_PATH.exists():
             raise SystemExit(f"Modell nicht gefunden: {MODEL_PATH}")
     if a.out:
