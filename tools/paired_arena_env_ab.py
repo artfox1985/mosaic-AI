@@ -198,7 +198,13 @@ def main() -> None:
                     help="Explizite Pro-Partie-Seeds, kommagetrennt ODER "
                          "Datei-Pfad (eine Zahl je Zeile) -- ersetzt --seed "
                          "UND --n-games")
-    ap.add_argument("--block-size", type=int, default=25)
+    # Blockgroesse 5 = Projektstandard (paired_gating seit 2026-08-29). Hier stand
+    # bis 2026-09-01 der Default 25: 80 Partien ergaben Bloecke 25/25/25/5, also
+    # ungleiche und nur vier Bloecke fuer die Block-KI. Der Nutzer hat es im
+    # laufenden b05/b01-Lauf abgefangen (zweites Mal dieselbe Falle, pitfalls.md).
+    # Der Seed faellt je Block (`base_seed + block_idx * 1_000_000`); wer alte
+    # Laeufe mit 25 reproduziert, gibt --block-size 25 EXPLIZIT an.
+    ap.add_argument("--block-size", type=int, default=5)
     ap.add_argument("--threads", type=int, default=10)
     ap.add_argument("--out-prefix", required=True)
     # 2026-08-11: Partie-Logs je Arm mitfuehren (reicht `--log-games` an den

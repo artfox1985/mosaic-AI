@@ -48,21 +48,53 @@ sys.path.insert(0, str(ROOT / "engine" / "py"))
 import numpy as np  # noqa: E402
 import torch  # noqa: E402
 
-from config import INPUT_SIZE, MODELS_DIR, NUM_ACTIONS  # noqa: E402
-from neural_net import (MosaicNet, points_dist_bins_from_state,  # noqa: E402
+from config import MODELS_DIR  # noqa: E402
+from neural_net import (build_model_from_checkpoint, state_to_planes,  # noqa: E402
                         state_to_tensor)
 
-FROZEN_PKL = ROOT / "evaluations" / "frozen_eval_set.pkl"
+# 2026-09-01 (PREREG_geometric_envelope.md par.3e): das Werkzeug konnte nur den
+# Flach-Encoder (`MosaicNet`) laden; die registrierte Messung auf dem
+# spaltenfaehigen 2D-Netz b01 war damit nicht fahrbar. Jetzt baut
+# `build_model_from_checkpoint` Flach- ODER 2D-Netz aus dem Checkpoint (dieselbe
+# Stelle wie r5_value_calibration/oracle_metrics), und der Satz ist waehlbar:
+# frozen_v1 (Bestand, Vergleichbarkeit zur Erstmessung) oder frozen_v3
+# (b01-Aera). Der Forward-Pass uebernimmt die Kanal-Kuerzung fuer Alt-Modelle
+# aus tools/r5_value_calibration.py (2D-Encoder ist additiv).
+FROZEN_SETS = {
+    "v1": ROOT / "evaluations" / "frozen_eval_set.pkl",
+    "v2": ROOT / "evaluations" / "frozen_eval_set_v2.pkl",
+    "v3": ROOT / "evaluations" / "frozen_eval_set_v3.pkl",
+}
 
 
 def load_model(name: str):
-    ckpt = torch.load(str(MODELS_DIR / f"alphazero_{name}.pth"), map_location="cpu")
-    m = MosaicNet(input_size=INPUT_SIZE, num_actions=NUM_ACTIONS,
-                  hidden_size=ckpt.get("hidden_size", 512),
-                  points_dist_bins=points_dist_bins_from_state(ckpt["model_state"]))
-    m.load_state_dict(ckpt["model_state"], strict=False)
-    m.eval()
-    return m
+    ckpt = torch.load(str(MODELS_DIR / f"alphazero_{name}.pth"), map_location="cpu",
+                      weights_only=False)
+    model, encoder = build_model_from_checkpoint(ckpt)
+    model.eval()
+    return model, encoder
+
+
+def _model_plane_channels(model):
+    for mod in model.modules():
+        if isinstance(mod, torch.nn.Conv2d):
+            return mod.weight.shape[1]
+    return None
+
+
+def value_batch(model, encoder: str, states):
+    """Roh-Value (tanh-Skala [-1,1]) je Zustand, Flach- oder 2D-Netz."""
+    x_flat = torch.stack([state_to_tensor(st) for st in states])
+    with torch.no_grad():
+        if encoder == "2d":
+            x_planes = torch.stack([state_to_planes(st) for st in states])
+            want = _model_plane_channels(model)
+            if want is not None and want < x_planes.shape[1]:
+                x_planes = x_planes[:, :want, :, :]
+            out = model(x_planes, x_flat)
+        else:
+            out = model(x_flat)
+    return out[1].reshape(len(states)).numpy()
 
 
 def q(xs, p):
@@ -81,7 +113,10 @@ def main() -> None:
     ap.add_argument("--k", type=int, default=12)
     ap.add_argument("--max-states", type=int, default=400)
     ap.add_argument("--out", default="evaluations/artifacts/tiling_candidate_spread.json")
+    ap.add_argument("--frozen", default="v1", choices=sorted(FROZEN_SETS),
+                    help="Zustandssatz: v1 (Bestand), v2, v3 (b01-Aera)")
     args = ap.parse_args()
+    FROZEN_PKL = FROZEN_SETS[args.frozen]
 
     import mosaic_rust as mr
 
@@ -92,8 +127,9 @@ def main() -> None:
         raise SystemExit("Keine Tiling-Stellungen im frozen set -- Messung nicht moeglich.")
     step = max(1, len(tiling) // args.max_states)
     picked = tiling[::step][:args.max_states]
-    model = load_model(args.model)
-    print(f"Modell {args.model} | k={args.k} | {len(picked)} Stellungen\n")
+    model, encoder = load_model(args.model)
+    print(f"Modell {args.model} ({encoder}) | Satz frozen_{args.frozen} | k={args.k} | "
+          f"{len(picked)} Stellungen" + chr(10), flush=True)
 
     n_multi = 0            # Stellungen mit >1 Kandidat (nur dort ist etwas zu entscheiden)
     r5_diff, r5_gain = 0, []          # Task #21
@@ -131,10 +167,7 @@ def main() -> None:
         # --- Task #20: Punkte x Value ---
         if 2 <= rnd <= 4:
             n_r24 += 1
-            with torch.no_grad():
-                batch = torch.stack([state_to_tensor(c["state"]) for c in cands])
-                out = model(batch)
-                v = out[1].squeeze(-1).numpy()          # tanh in [-1,1]
+            v = value_batch(model, encoder, [c["state"] for c in cands])  # tanh in [-1,1]
             wp = (v + 1.0) / 2.0                        # -> Gewinnwahrscheinlichkeit
             val_spread.append(float(wp.max() - wp.min()))
             prod = [pts[j] * float(wp[j]) for j in range(len(cands))]
@@ -174,7 +207,8 @@ def main() -> None:
 
     out = ROOT / args.out
     out.write_text(json.dumps({
-        "model": args.model, "k": args.k, "n_states": len(picked), "n_multi": n_multi,
+        "model": args.model, "encoder": encoder, "frozen_set": args.frozen,
+        "k": args.k, "n_states": len(picked), "n_multi": n_multi,
         "by_round": by_round, "n_skipped": skipped,
         "round5_diff": r5_diff, "round5_n": n5,
         "round5_gain_median": q(r5_gain, 0.5) if r5_gain else None,

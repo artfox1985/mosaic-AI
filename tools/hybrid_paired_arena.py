@@ -58,7 +58,7 @@ from paired_gating import mcnemar_exact_p, paired_ci  # noqa: E402  (Wiederverwe
 DEFAULT_SIMS = 400
 DEFAULT_C_PUCT = 1.5
 DEFAULT_THREADS = 10
-BLOCK_SIZE = 25
+BLOCK_SIZE = 5  # 2026-09-01: Projektstandard 5 (war 25); alte Laeufe explizit mit --block-size 25 reproduzieren
 
 
 def play_pair_block_plain(mr, model_a, model_b, sims, c_puct, n, seed, threads):

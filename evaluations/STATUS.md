@@ -34,9 +34,11 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 1. **Die Generation v23 ist vollstaendig durchgemessen.** Kein Arm ist belegt
    besser als `v23-b01`: b02 (Kaltstart) 75:85, b03 (Ueberraschung) 75:85,
-   b05 (Relabel) 85:75 bei p = 0,53. Bei n=160 ist +-10 Siege die
-   Rauschgrenze dieses Instruments -- dass alle drei dort landen, ist der
-   Beleg dafuer. **b01 bleibt Generator fuer v24.**
+   b05 (Relabel) **246:234 auf 240 Paaren, p = 0,65** (auf Nutzer-Wunsch von
+   80 auf 240 Paare verlaengert, 2026-09-02; der dritte Seed drehte das
+   Vorzeichen). Spalten b05 0,676 gegen 0,642, KI schliesst Null ein.
+   **b01 bleibt Generator fuer v24** -- jetzt nicht mehr per
+   Gleichstandsregel, sondern per Nullbefund (`reanalyze_label_depth` par.A3).
 2. **Der Kaltstart baut bei gleicher Staerke nur ein DRITTEL der Spalten**
    (0,17-0,23 gegen 0,62), und der Checkpoint erklaert es nicht. Das
    Spaltenwissen sitzt in der LINIE, nicht im Korpus allein
@@ -123,10 +125,10 @@ Verteilung, Arm K, b04-Breite, geometrisches Gelaender (alle registriert).
 
 ### 3.1 Relabel-Arm: GEFAHREN (2026-09-01)
 
-`v23-b05` (Policy-Klasse per hv2-Lehrer relabelt, sonst wie b01): Arena 85:75
-fuer b05, p = 0,53, Spalten 0,679 gegen 0,635 (beide Richtungen vorn,
-nachgetragen 2026-09-01), Punkte gleich. Nicht belegt besser, b01 bleibt
-Generator. Herleitung `PREREG_reanalyze_label_depth.md` par.A1; die dortige
+`v23-b05` (Policy-Klasse per hv2-Lehrer relabelt, sonst wie b01): Arena auf
+240 Paare verlaengert (2026-09-02): **246:234 fuer b05, p = 0,65**, dritter
+Seed 75:85; Spalten 0,676 gegen 0,642, KI [-0,06, +0,13]. Weder Gewinn noch
+Schaden, b01 bleibt Generator (par.A3). Herleitung `PREREG_reanalyze_label_depth.md` par.A1; die dortige
 Zeile-1-Frage (Spielen gegen Labeln bei Suchtiefe) ist damit NICHT gemessen,
 gefahren wurde die Lehrer-Variante. Laufzeit 7,42 h, davon 4,98 h einkerniger
 Datenaufbau (`cache_build_time` par.11).

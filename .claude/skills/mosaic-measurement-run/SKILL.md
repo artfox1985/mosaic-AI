@@ -27,6 +27,10 @@ dort, nicht hier.** Diese Datei ist der Ablauf, nicht die Quelle.
 5. **Vorregistrierung.** Steht die Entscheidungsmetrik vorher fest? Wenn der
    Lauf etwas entscheiden soll, gehoert er in eine Prereg (Skill
    `mosaic-prereg`).
+6. **Blockgroesse 5 bei jeder gepaarten Arena** -- Partienzahl durch 5
+   teilbar, `--block-size` im Befehl pruefen, nicht dem Werkzeug-Default
+   vertrauen (zweimal passiert, `docs/pitfalls.md`). Wortlaut:
+   `docs/working_rules.md`, "Blockgroesse 5".
 
 ## Beim Start
 

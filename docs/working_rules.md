@@ -16,6 +16,13 @@ Vorfalls-Herkunft steht in `pitfalls.md`.
 
 - **Score-Auswertungen IMMER auf Block-Ebene.** Paar-SEs werden sonst massiv
   unterschaetzt, und Extrembloecke erzeugen Artefakte.
+- **Blockgroesse 5 in JEDER gepaarten Arena** (Nutzer, 2026-08-29 und erneut
+  2026-09-01). Der Seed faellt je Block, alle Paare eines Blocks teilen die
+  Spiel-Population; 5 gibt bei 80 Partien 16 gleiche Bloecke statt 25/25/25/5.
+  Seit 2026-09-01 ist 5 der Default in `paired_gating.py`,
+  `paired_arena_env_ab.py`, `hybrid_paired_arena.py`, `paired_arena_plate_ab.py`
+  und `paired_arena_shrink_ab.py`; eine andere Blockgroesse wird EXPLIZIT
+  gesetzt und in der Prereg genannt. Vorfaelle in `pitfalls.md`.
 - **Aufloesung schlaegt Sparsamkeit.** Bei n=400 streut dieselbe Konfiguration
   um 5,75 Prozentpunkte; der Seed bewegt die Metrik 4- bis 6-mal staerker als
   jeder Knopf. Keine Spar-Schwelle auf ein blindes Mass bauen.

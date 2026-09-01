@@ -65,7 +65,7 @@ from column_build_structural_probe import (  # noqa: E402
 
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "artifacts" / "long_row_init_arena_eval.json"
-BLOCK = 25  # `paired_arena_env_ab.py --block-size` Default, so gefahren
+BLOCK = 25  # so wurden DIESE Laeufe gefahren (damaliger Default von paired_arena_env_ab; seit 2026-09-01 ist der Default 5)
 
 K1_TILE_ID = 1
 K1_NAME = "Vertikale Reihen"
