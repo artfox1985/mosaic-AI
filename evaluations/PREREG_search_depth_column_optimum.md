@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (b05-Kurve par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH: @25 verliert 11:29 (signifikant), @100 33:47 (p = 0,14, Tendenz, par.2j2). Faktor ist die TIEFE, nicht die Breite (par.2k; m=25-Praemisse in par.2c am 2026-09-01 berichtigt, Clamp ist 16). Betriebspunkt 100 Sims gefahren. **OFFEN: Stufe 4** -- Teil A (par.6) war auf 89 distinkten statt 200 Zustaenden gerechnet, Wiederholung par.6b; Teil B ungebaut. -->
+<!-- STATUS: OFFEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (b05-Kurve par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH: @25 verliert 11:29 (signifikant), @100 33:47 (p = 0,14, Tendenz, par.2j2). Faktor ist die TIEFE, nicht die Breite (par.2k; m=25-Praemisse in par.2c berichtigt, Clamp ist 16). Stufe 4 Teil A auf 200 distinkten Zustaenden wiederholt (par.6b): Verwerfung 0,825 @400 gegen 0,490 @100, 70:3 diskordant, p = 1,4e-17. **OFFEN: Teil B** (Spalten-Etikett, zweiter Trace-Durchgang). -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -653,6 +653,39 @@ Kuppelzelle, die ihre Vollendung fuellen wuerde. Die `description` der
 Kandidaten nennt die Reihe ("... -> Reihe 6 [5/6]"), die Zielzelle haengt aber
 an Farbe und Slot-Belegung. Diese Zuordnung wird an der Quelle geprueft, nicht
 geraten -- sonst steht am Ende ein Etikett, das die Frage selbst beantwortet.
+
+## par.6b STUFE 4 TEIL A WIEDERHOLT auf 200 DISTINKTEN Zustaenden: Verdikt haelt (2026-09-01, abends)
+
+**Zustandssatz neu erzeugt**, weil im Baum kein b01-Korpus bei Default-Knoepfen
+mehr lag: 80 Partien `v23-b01_brierbest` argmax @400, `--deterministic
+--no-root-noise`, Seed 20260907, `--per-file 10`, `MOSAIC_STACK_DRAW_RESEARCH=1`
+(`data/manifest_s4states-v23b01_20260901_222208.json`, Dateien
+`selfplay_s4states-v23b01_*.pkl`, 8 Dateien; 1.161 s, 14,5 s je Partie unter
+leichter Nebenlast). Die Sonde dedupliziert seit heute ueber einen
+Zustands-Hash (auch innerhalb einer Datei: 32 Duplikate uebersprungen) und
+schreibt den exakten McNemar-Test ins Artefakt
+(`evaluations/artifacts/search_depth_rejection_v2.json`, Seed 20260931,
+25 Zustaende je Datei, Runden 2-4, Laufzeit 1.924 s einkernig).
+
+| Sims | Verwerfungsanteil | Block-SE (8 Dateien) |
+| --- | --- | --- |
+| 100 | 0,4900 | 0,0398 |
+| **400** | **0,8250** | 0,0199 |
+
+**Gepaart, 200 distinkte Paare:** beide verwerfen 95-mal, **nur @400 70-mal,
+nur @100 3-mal**; Differenz +0,335 (SE 0,036); McNemar exakt auf 73
+diskordanten Paaren **p = 1,4e-17**.
+
+**Verdikt unveraendert, jetzt auf sauberer Basis:** die tiefere Suche
+verwirft den Prior-Top-1 fast doppelt so oft; in 70 von 73 diskordanten
+Faellen ist es die tiefere Stufe. Die Erstfassung (par.6) hatte dieselben
+Anteile aus doppelt gezaehlten Zustaenden; ihre Kennzahlen sind durch diese
+ersetzt, wo sie zitiert werden (STATUS, Kopf). Der Vorbehalt aus par.6 bleibt:
+alle Zustaende liegen auf Trajektorien der tiefen Suche.
+
+**Teil B** (Spalten-Etikett) faehrt auf DIESEM Zustandssatz, mit der
+Definition aus par.6a, und braucht den zweiten Trace-Durchgang mit
+Reihennummer.
 
 ## par.6a DEFINITION VON "SPALTENRELEVANT" BERICHTIGT (2026-09-01)
 
