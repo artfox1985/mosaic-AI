@@ -99,7 +99,7 @@ auseinanderlaufen:**
 | Flaeche | Kennzahl | Quelle | Was sie beantwortet |
 | --- | --- | --- | --- |
 | **Self-Play** (argmax-Instrument) | volle Spalten je Partie und Seite | `self_play.py --deterministic --no-root-noise` + `tools/corpus_sanity_check.py` | Was der Generator in den NAECHSTEN Korpus schreibt |
-| **Arena** (gegen den Vorgaenger) | Punkte je Kriterium, k1 = Spalten | gepaarte Arena mit `--log-games` + `tools/plate_points_from_arena.py` / `tools/arena_compact.py` | Ob er Spalten auch GEGEN Widerstand baut |
+| **Arena** (gegen den Vorgaenger) | volle Spalten je Seite, aus der Brettgeometrie der Partie-Logs | gepaarte Arena mit `--log-games` + `tools/probes/arena_column_probe.py` (seit 2026-08-31; Punkte je Kriterium via `tools/plate_points_from_arena.py` nur noch als Berichtsgroesse) | Ob er Spalten auch GEGEN Widerstand baut |
 
 Warum beide: im Self-Play konkurriert niemand um die Farben, die man
 braucht. Ein Netz kann gegen sich selbst sauber Spalten bauen und daran
@@ -108,13 +108,16 @@ arenastarker Spaltenbauer einen spaltenarmen Korpus hinterlassen und damit die
 naechste Generation aushungern. Die Self-Play-Zahl ist die
 Korpus-Eigenschaft, die Arena-Zahl die Spiel-Eigenschaft.
 
-**Was die Arena NICHT hergibt, und warum es die Punkte statt der Anzahl
-sind:** das Partie-Log traegt die Endwertung je Kriterium, nicht das Endbrett.
-Die ANZAHL voller Spalten laesst sich daraus nicht rekonstruieren (dieselbe
-Luecke, wegen der `long_rows_started` eigens als Feld nachgeruestet wurde).
-k1 zahlt `7*(f/6)^2` je Spalte, ist also monoton im Fuellstand und fuer den
-Vergleich zweier Seiten DERSELBEN Partien brauchbar -- als Anzahl darf man es
-nicht lesen.
+**Instrument der Arena-Flaeche, berichtigt 2026-09-01:** die erste Fassung
+dieses Abschnitts behauptete, die ANZAHL voller Spalten sei aus den
+Partie-Logs nicht rekonstruierbar, und setzte deshalb k1-Punkte als
+Kennzahl. Das war falsch: `tools/probes/arena_column_probe.py` liest die
+Spalten aus der Brettgeometrie der Logs, und Tor 2b von v23 wurde damit
+gemessen (`PREREG_v23_window.md` par.2d, 0,6456 gegen 0,4304; Nutzer-Vorgabe
+"Ich brauch keine k1 Punkte"). k1 zahlt `7*(f/6)^2` je Spalte, ist monoton im
+Fuellstand und bleibt als Berichtsgroesse brauchbar, aber nicht als Tor-Mass.
+Die Doku stand einen Tag hinter der Messung; wer das Tor-Instrument wechselt,
+zieht diese Datei im selben Zug nach.
 
 **Den Bezugswert holt man sich, indem man die Vor-Generation am selben
 Instrument misst**, nicht aus dem Gedaechtnis und nicht aus einem Bericht mit
@@ -161,6 +164,28 @@ Vorab festgelegt, damit es nicht im Einzelfall verhandelt wird.
   keine Nebenwirkung.
 * **Beide reissen:** Generation verworfen, Ursachenanalyse vor dem naechsten
   Erzeugungslauf.
+
+## Generatorwahl unter Armen (Luecke, gefunden 2026-09-01)
+
+"Generator = bester Stand von N-1" reicht, solange eine Generation EINEN
+Kandidaten hat. v23 hatte vier (b01, b02, b03, b05), und die Wahl fiel am
+Messtag nach einer Regel, die nirgends vorab stand ("nicht belegt besser,
+also bleibt der Amtsinhaber"; `PREREG_v24_window.md` par.4, Nachtrag). Dabei
+wurde die Kampagnen-Groesse fuer zwei der drei Herausforderer gar nicht
+gemessen. Damit das nicht wieder im Einzelfall verhandelt wird, gilt ab v24:
+
+* **Jeder Arm bekommt sein Spaltenprofil am argmax-Instrument**, bevor er als
+  Generator ausscheidet. Ein Arm ohne Tor-2-Messung ist kein Kandidat und kein
+  Ausgeschiedener, sondern ungemessen.
+* **Arena-Vergleiche zwischen Armen sind erst ab n >= 150 Paaren oder mit
+  Replikation ein Entscheid** (dieselbe Strenge wie Tor 1). 80 Paare sind
+  informativ; wer daraus "gleich stark" liest, sagt dazu, dass das Instrument
+  bei dieser Groesse +-10 Siege nicht aufloest.
+* **Welche Regel bei Gleichstand gilt** (Amtsinhaber bleibt, Punktschaetzer
+  entscheidet wie bei Tor 2, oder Spaltenprofil entscheidet), ist ein
+  **OFFENER Nutzer-Entscheid**; er wird VOR der ersten Arm-Arena von v24 in
+  `PREREG_v24_window.md` eingetragen. Bis dahin ist keine der drei Lesarten
+  Default.
 
 ## Zwei Fallen, die die Schleife von selbst stellt
 

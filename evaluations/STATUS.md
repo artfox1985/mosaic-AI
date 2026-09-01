@@ -59,7 +59,7 @@ committet bis `c6c6eae`; ungepusht.
 
 | Was | Kosten | Anmerkung |
 | --- | --- | --- |
-| **v24-Erzeugung** | rund 23 h CPU | 12.000 b01-Partien (4.000 Sockel mit Rauschen, 8.000 Schwarm), `--per-file 10`. Zuschnitt steht in `PREREG_v24_window.md`, der hv2-Anteil wird UNVERAENDERT weiterverwendet |
+| **v24-Erzeugung** | **11,9 h** bei threads 11 (aus den v23-Manifesten, 100 Sims; die fruehere Zahl 23 h war ein 400-Sims-Richtwert) | 12.000 b01-Partien (4.000 Sockel gesampelt mit Rauschen, 6.000 Schwarm argmax, 2.000 Schwarm gesampelt), `--per-file 10`. **Rezept vollstaendig in `PREREG_v24_window.md` par.6** (Befehle, Seeds, Stack-Draw-Env, Traeger-Manifest 580, Tor-0-Schwelle); der hv2-Anteil wird UNVERAENDERT weiterverwendet. Vor der ersten Arm-Arena: Gleichstandsregel fuer die Generatorwahl (Nutzer-Entscheid, `docs/generation_loop.md`) |
 | **Vor dem v24-Training**: Fenster-Cache parallel vorbauen | spart rund 4 h | `build_cache_incremental.py --merge-out` plus `train.py --cache-file`. Gemessen: ein neues Fenster kostet sonst 4,98 h einkernig (`cache_build_time` par.11) |
 | **Stufe 4 Teil B** | rund 20 min | Spalten-Etikett der verworfenen Zuege, Definition berichtigt und registriert (`search_depth_column_optimum` par.6a). Braucht einen zweiten Trace-Durchgang, weil der erste die Reihennummer nicht mitschrieb |
 | Push | -- | 3 Commits ungepusht, `cargo test --release --no-run` ist gruen |

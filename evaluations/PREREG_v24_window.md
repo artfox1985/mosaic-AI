@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v24-Trainingsfenster zugeschnitten? | Beleg: ZUSCHNITT VOM NUTZER FESTGELEGT (2026-09-01), nichts erzeugt. Form wie v23 (Policy 5.800, Value 23.650, Summe 29.450), neu besetzt: Netz-Anteil von v23-b01 statt v22-b05, hv2-Anteil UNVERAENDERT weiterverwendet (par.2 -- nur 12.000 Partien sind neu zu erzeugen). Begruendung des Nutzers: hv2 baut weiter die meisten Spalten, und ab wann sich die Rotation selbst verstaerkt, ist offen (par.3). Generator STEHT (par.4, 2026-09-01): b01 -- kein Arm der Generation ist belegt besser (b02/b03 75:85, b05 85:75 bei p = 0,53). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v24-Trainingsfenster zugeschnitten? | Beleg: ZUSCHNITT VOM NUTZER FESTGELEGT (2026-09-01), nichts erzeugt. Form wie v23 (29.450 Partien), hv2-Anteil UNVERAENDERT, neu nur 12.000 Partien von `v23-b01` (par.2). Generator b01 STEHT (par.4; Gleichstandsregel war nicht vorab registriert). **Erzeugungsrezept seit 2026-09-01 VOLLSTAENDIG (par.6):** 100 Sims, Zuschnitt D, `--per-file 10`, Stack-Draw-Env, Seeds, Traeger-Manifest 580 Eintraege, Tor-0-Schwelle 1.500 Seiten, Tore mit Bezugswerten. Gemessene Kosten 11,9 h. -->
 
 # Vorregistrierung: v24-Fenster
 
@@ -33,18 +33,27 @@ Lehrerspiel neu erzeugt werden**; die Traeger-Auswahl (180 Dateien =
 1.800 Partien) kann aus `data/carriers_v23_hv2.txt` uebernommen werden.
 
 **Neu zu erzeugen sind 12.000 Partien mit `v23-b01`**: 4.000 fuer den Sockel
-(mit Wurzelrauschen, wie die Sockel-Erzeugung von v23) und 8.000 fuer den
-Schwarm. **Mit `--per-file 10`** (`docs/working_rules.md`, in STATUS 3.3
-festgehalten).
+(gesampelt, mit Wurzelrauschen) und 8.000 fuer den Schwarm (6.000 argmax plus
+2.000 gesampelt, beide `--value-only`). Das vollstaendige Rezept mit allen
+Knoepfen steht in **par.6**; der fruehere Verweis "wie die Sockel-Erzeugung
+von v23" zeigte auf `PREREG_v23_window.md` par.4c, und die dortige Zeile
+"Sockel @400" ist FALSCH (gefahren wurden 100 Sims, dort seit 2026-09-01
+berichtigt). **Mit `--per-file 10`** (`docs/working_rules.md`).
 
-**Kostenschaetzung aus gemessenen Zahlen** (`docs/measured_runtimes.md`,
-als HERLEITUNG markiert, nicht fuer diesen Zuschnitt gemessen):
+**Kosten, aus den drei v23-Erzeugungs-Manifesten abgelesen** (`data/manifest_v22-b05-*.json`,
+Feld `laufzeit`, threads 11, 100 Sims; die fruehere Schaetzung "rund 23 h"
+stammte aus einem 400-Sims-Richtwert und ist am 2026-09-01 ersetzt worden):
 
-| Posten | Grundlage | Dauer |
-| --- | --- | --- |
-| 4.000 Sockel-Partien mit Rauschen | 8,27-8,73 s je Partie, threads 11 | rund 9,3 h |
-| 8.000 Schwarm-Partien | v23 fuhr 6.000 argmax + 2.000 sampled; argmax rund 0,15-0,17 Partien/s | rund 13-14 h |
-| Summe | | **rund 23 h CPU** |
+| Posten | gemessen v23 | s je Partie | Dauer |
+| --- | --- | --- | --- |
+| 4.000 Sockel-Partien (gesampelt, Rauschen) | 13.459,5 s | 3,365 | 3,74 h |
+| 6.000 Schwarm argmax | 22.041,4 s | 3,674 | 6,12 h |
+| 2.000 Schwarm gesampelt | 7.306,5 s | 3,653 | 2,03 h |
+| Summe | 42.807 s | | **11,9 h** bei threads 11 |
+
+`--per-file` aendert an der Dauer nichts, nur an der Dateizahl (1.200 statt
+600). Als HERLEITUNG markiert: derselbe Generator-Typ, gleiche Sims, anderes
+Netz; die Zahl gilt, bis das erste v24-Manifest sie ersetzt.
 
 Der Lehreranteil kostet nichts, weil er liegt -- das ist der praktische
 Hauptvorteil dieses Zuschnitts.
@@ -54,9 +63,17 @@ Hauptvorteil dieses Zuschnitts.
 *"hv2 baut noch immer am meisten spalten und es ist noch nicht geklaert ab
 wann sich die rotation selbst verstaerkt"*
 
-Beides ist am Bestand belegbar: der Lehrer erreicht im Drafting-Split 0,756
-volle Spalten gegen 0,044 ohne Huelle, waehrend der beste Netzstand b01 bei
-0,5150 (argmax-Self-Play) bzw. 0,6456 (Arena) liegt. Und die Selbstverstaerkung
+Beides ist am Bestand belegbar, aber NUR am gleichen Instrument (berichtigt
+2026-09-01; die erste Fassung dieses Absatzes setzte drei Betriebspunkte in
+einen Satz, was `docs/generation_loop.md` ausdruecklich verbietet): der volle
+hv2 erreicht in der gekoppelten Arena gegen hv1 bei 150 Sims 0,975 volle
+Spalten je Partie, der Arm "nur Drafting" 0,756 (`PREREG_v22_window.md`
+par.5, Split-Test). Der beste Netzstand b01 liegt am argmax-Instrument bei
+0,5150 (@400) und 0,7200 (@100, `PREREG_r5_value_calibration.md` par.12),
+in der Arena gegen b05 @400 bei 0,6456. Ein direkter Vergleich Lehrer gegen
+b01 am SELBEN Instrument (gleiche Sims, gleicher Gegner) liegt NICHT vor;
+die Aussage "hv2 baut am meisten Spalten" ist damit plausibel, aber
+ungemessen. Und die Selbstverstaerkung
 ist tatsaechlich offen: die Nacht auf den 2026-09-01 hat gezeigt, dass die
 Policy-Dosis dieses Fensters einen bereits spaltenbewussten Spieler um 66
 Prozent anhebt, einen Kaltstart aber nicht einmal auf den Stand des
@@ -81,6 +98,19 @@ mit 85:75 bei p = 0,53. Bei n=160 gepaarten Partien ist +-10 Siege die
 Rauschgrenze dieses Instruments; dass alle drei Arme dort landen, ist der Beleg
 dafuer und nicht drei knappe Entscheidungen. Am Zuschnitt aendert sich nichts.
 
+**Nachtrag 2026-09-01 (Pruefung der Preregs): diese Regel stand nicht vorab.**
+`docs/generation_loop.md` definiert den Generator nur als "bester Stand von
+N-1" und kennt keine Gleichstandsregel; "nicht belegt besser, also bleibt der
+Amtsinhaber" ist am Messtag formuliert worden. Dazu wurde fuer b03 und b05 die
+Kampagnen-Groesse (volle Spalten) NICHT gemessen, nur fuer b02
+(`PREREG_capacity_sim_frontier.md` par.12/13); b03 und b05 sind allein ueber
+Siege bei 80 Paaren beurteilt. Nach dem Punktschaetzer-Massstab des
+Richtungs-Tors fuehrte b05 (85:75). Der Entscheid fuer b01 bleibt (dem Nutzer
+am 2026-09-01 im Pruefbericht vorgelegt), die Luecke ist benannt: fuer v25
+gilt die Regel in `docs/generation_loop.md`, Abschnitt "Generatorwahl unter
+Armen", und jeder Arm bekommt sein Spaltenprofil am argmax-Instrument, bevor
+er als Generator ausscheidet.
+
 ## par.5 Was dieser Zuschnitt NICHT beantwortet
 
 - **Die Dosisfrage.** Ob 1.800 Lehrer-Policy-Partien das Optimum sind, ist
@@ -92,4 +122,120 @@ dafuer und nicht drei knappe Entscheidungen. Am Zuschnitt aendert sich nichts.
   echte Generationsvielfalt entstuende erst, wenn ein frueherer NETZ-Stand
   einen eigenen Schwarm beisteuerte.
 - **Ob das Fenster ueberhaupt der Hebel ist.** Die Phase-3-Schiene
-  (Betrags-Daempfung des Value-Kopfs) laeuft unabhaengig davon weiter.
+  (Betrags-Daempfung des Value-Kopfs) ist am 2026-09-01 OHNE Bau geschlossen
+  worden (`PREREG_r5_value_calibration.md` par.12); die Ursachenfrage der
+  Tiefen-Delle liegt bei `PREREG_search_depth_column_optimum.md` Stufe 4 und
+  ist vom Fenster unabhaengig.
+
+## par.6 ERZEUGUNGSREZEPT, VOLLSTAENDIG (registriert 2026-09-01, VOR dem Start)
+
+Anlass: die Pruefung vom 2026-09-01 fand, dass diese Prereg nur Anzahlen,
+Wurzelrauschen und `--per-file` festlegte. Alles Weitere waere beim Start
+still auf einen Default gefallen. Quelle jeder Zeile hier ist das
+Manifest des entsprechenden v23-Laufs (`data/manifest_v22-b05-policy_20260831_033448.json`,
+`..._value-argmax_20260830_192533.json`, `..._value-sampled_20260831_013258.json`),
+nicht der Text von `PREREG_v23_window.md` par.4c, der in der Sims-Zeile falsch war.
+
+### par.6a Generator und Knoepfe
+
+| Was | Wert | Quelle / Grund |
+| --- | --- | --- |
+| Generator | `models/alphazero_v23-b01_brierbest.onnx` | Kandidat, der Tor 1 und Tor 2 bestanden hat (v23 par.2b-2e); Datei vom 2026-08-31 16:59 |
+| Sims | **100** in allen drei Laeufen | gefahrener v23-Betriebspunkt (Manifeste); Suchtiefen-Strang: 100 baut 0,7200 gegen 0,5150 @400 |
+| Zuschnitt D | Policy-Klasse gesampelt mit Rauschen; Value-Klasse 6.000 argmax ohne Rauschen plus 2.000 gesampelt | Lehrer-Prereg par.3b.12, v23 par.4c |
+| `--value-only` | beide Schwarm-Laeufe | setzt `pcr_full_prob 0.0` und `pcr_cheap_sims = sims` (self_play.py:777-783); im Manifest NUR daran erkennbar, das Flag selbst wird nicht geschrieben |
+| `--per-file` | **10** | `docs/working_rules.md` (v23 fuhr noch 20) |
+| `--threads` / `--chunk` | 11 / 10 | wie v23; Thread-Budget bei GPU-Parallelbetrieb: `docs/working_rules.md` |
+| Seeds | 20260904 (policy), 20260905 (argmax), 20260906 (sampled) | neu gewaehlt, Datumsform wie v23 (20260901/02/03); je Lauf ein eigener Seed, keiner aus v23 wiederverwendet |
+| `MOSAIC_STACK_DRAW_RESEARCH=1` | in der Umgebung ALLER DREI Laeufe | chance_nodes par.15; hat keine Spec-Entsprechung und steht NICHT im Manifest, Kontrolle an den Daten (par.6c) |
+| `MOSAIC_IMPLICIT_MINIMAX_A` | nicht setzen (0,0) | gemessener Entscheid v23 par.4c |
+| `--seed-positions`, `--rtv`, `--pcr-full-prob`, `--spec` | nicht setzen | v23 par.4c; `spec: null` in allen drei v23-Manifesten |
+| Bootstrap-Horizont, Startkuppel, `ROUND_TRANSITION_SAMPLING`, Reservation-Regel | Default (2, Handheuristik, false, aus) | unveraendert seit v23, `engine_config` der Manifeste |
+| Wheel | 79-Kanal-Build, Vertragshash `efd564d87bac2722` | `engine_config.contract_hash` der v23-Manifeste; muss im v24-Manifest gleich sein, sonst Anker-Invarianz pruefen |
+
+### par.6b Die drei Befehle
+
+```
+export MOSAIC_STACK_DRAW_RESEARCH=1
+python -u self_play.py --mode network --model models/alphazero_v23-b01_brierbest.onnx --games 4000 --sims 100 --version v23-b01-policy --threads 11 --chunk 10 --seed 20260904 --per-file 10
+python -u self_play.py --mode network --model models/alphazero_v23-b01_brierbest.onnx --games 6000 --sims 100 --value-only --version v23-b01-value-argmax --threads 11 --chunk 10 --seed 20260905 --per-file 10 --no-root-noise --deterministic
+python -u self_play.py --mode network --model models/alphazero_v23-b01_brierbest.onnx --games 2000 --sims 100 --value-only --version v23-b01-value-sampled --threads 11 --chunk 10 --seed 20260906 --per-file 10
+```
+
+Die Dateien heissen nach dem GENERATOR (`selfplay_v23-b01-*`), nicht nach dem
+Fenster (`docs/generation_naming.md`). Start ohne Pipe und ohne Umleitung,
+Fortschritt am g-Suffix zaehlen.
+
+### par.6c Pflichtpruefungen direkt nach dem Start und nach dem Lauf
+
+1. **Manifest-Diff gegen die v23-Referenz** (stehende Regel): erwartete
+   Unterschiede sind GENAU `model`, `version`, `seed`, `per_file` (20 -> 10)
+   und bei der Policy-Klasse `pcr_cheap_sims` (150 Default gegen 100; ohne
+   PCR wirkungslos). Jeder weitere Unterschied stoppt den Lauf.
+2. **Stack-Draw-Kontrolle an den Daten**, weil der Knopf nicht im Manifest
+   steht: Records mit `choose_draw_stack_slot` in `valid_actions` muessen
+   vorkommen (v23-Messung: 5,16 Prozent; ohne Knopf exakt 0).
+3. **Tor 0 auf der Value-Klasse** (`docs/generation_loop.md`; die Schwelle
+   gehoert laut Schleife HIERHER):
+   - primaer: Symmetrie-Trennung signifikant > 0
+     (`tools/probes/corpus_column_outcome_symmetry_probe.py --pattern "selfplay_v23-b01-value-*.pkl"`);
+     v23-Wert 0,4041 bei t 41,26 ist die Berichtsgroesse, kein Mindestwert.
+   - sekundaer: **mindestens 1.500 Partien-Seiten mit voller Spalte** in den
+     16.000 Seiten der Value-Klasse (`tools/corpus_sanity_check.py data --pattern "selfplay_v23-b01-value-*.pkl"`,
+     Feld `sides_with_full_column`). Herleitung der Schwelle: Lehrer-Prereg
+     par.3b.12 (Stopp gegen Degeneration, keine Rate); v23 lag bei 5.629.
+   - Reisst Tor 0: kein Training, Vorlage.
+
+### par.6d Fenster, Traeger und Cache
+
+- **Dateiliste `data/window_v24.txt`** = die 1.745 hv2-Dateien aus
+  `data/window_v23_hv2.txt` UNVERAENDERT plus alle 1.200 `selfplay_v23-b01-*`-Dateien
+  (400 policy, 600 value-argmax, 200 value-sampled). Summe 2.945 Dateien,
+  29.450 Partien. `train.py --file-list` bricht bei fehlenden Eintraegen hart ab.
+- **Traeger-Manifest `data/policy_carrier_manifest_v24.json`: 180 hv2 + 400
+  policy = 580 Eintraege.** `data/carriers_v23_hv2.txt` allein reicht NICHT:
+  sie listet nur die 180 hv2-Dateien, und ein Manifest ohne die neue
+  Policy-Klasse setzt deren `pol_w` still auf 0 (Traeger-Falle,
+  `PREREG_v23_window.md` par.4a3, am Code geprueft). Aufruf wie v23, mit
+  demselben Seed, damit dieselben 180 hv2-Traeger herauskommen:
+
+```
+python tools/generate_carrier_manifest.py --from-list data/window_v23_hv2.txt --n-files 180 --seed 20260921 --include-glob "selfplay_v23-b01-policy_*.pkl" --out data/policy_carrier_manifest_v24.json
+```
+
+  Pruefung: die 180 hv2-Eintraege muessen mit `data/carriers_v23_hv2.txt`
+  uebereinstimmen (Diff leer), `policy_carrier_files` hat 580 Eintraege, und
+  im Trainingsmanifest zeigt `policy_carriers.traeger_dateien_je_praefix`
+  180 + 400.
+- **Cache**: nur die 1.200 neuen Dateien brauchen Bloecke
+  (`tools/build_cache_incremental.py --data-dir data --encoder 2d --value-target-variant nortv --workers 6 --file-list data/window_v24.txt`),
+  die 1.745 hv2-Bloecke liegen. **Vor dem Training den Fenster-Monolithen
+  parallel bauen** (`--merge-out` plus `train.py --cache-file`), sonst kostet
+  das Zusammenfuegen 4,98 h einkernig (`PREREG_cache_build_time.md` par.11).
+  Achtung Hebel 4: der Monolith traegt den Fenster-Schluessel; `--val-frac`
+  muss beim Bau und beim Training gleich sein.
+
+### par.6e Trainingsrezept `v24-b01` und die Tore
+
+Standardrezept wie `v23-b01` (Manifest `models/manifest_train_v23-b01_20260831_110246.json`),
+geaendert sind nur Startgewicht, Fensterliste, Manifest und Val-Pool:
+
+```
+export MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v24.json MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_VAL_POOL='^selfplay_v23-b01-'
+python -u train.py --name v24-b01 --load v23-b01_brierbest --file-list data/window_v24.txt --encoder 2d --value-target-variant nortv --value-head wdl --ownership-head-2d --ownership-weight 1.0 --endgame-head --opp-points-head --moon-loss-weight 0 --select-by-brier --val-frac 0.05 --epochs 12 --lr 5e-5 --lr-schedule cosine --lr-t-max 12 --seed 20260828
+```
+
+`--load v23-b01_brierbest` ist ein ENTSCHEID, kein Erbe: v23 lud `v22-b05`
+(den Generator-Stand, nicht dessen `_brierbest`); hier ist der Generator der
+`_brierbest`-Checkpoint, also wird der geladen. Wer davon abweicht,
+registriert es.
+
+| Tor | Instrument | Bezugswert (Vor-Generation am SELBEN Instrument) |
+| --- | --- | --- |
+| 1 | `tools/paired_gating.py` gegen `v23-b01_brierbest` @400, Champion-Strenge (n >= 150 Paare oder Replikation mit eigenem Seed) | -- |
+| 2a | argmax-Instrument @400, 200 Partien (`self_play.py --deterministic --no-root-noise`) | b01 **0,5150** (`evaluations/artifacts/tor2a_v23b01.json`) |
+| 2b | gepaarte Arena gegen b01 mit `--log-games`, `tools/probes/arena_column_probe.py` (Anzahl voller Spalten aus der Brettgeometrie) | b01-Seite DERSELBEN Arena; zum Vergleich b01 gegen b05: 0,6456 |
+| Champion-Kante | gegen `v21_2d_brierbest` @400, berichten, Promotion nur nach `promotion_checklist.md` | 219:181 war die v23-Kante |
+
+Jeder weitere Arm dieser Generation bekommt VOR seinem Ausscheiden als
+Generator sein Spaltenprofil am argmax-Instrument (Lehre aus par.4).
