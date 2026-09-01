@@ -55,7 +55,7 @@ committet bis `c6c6eae`; ungepusht.
    frischem Zustandssatz: par.6b dort.
 6. **Die Elo-Leiter ist repariert** (Anker ist das eingefrorene Artefakt),
    der Remis-Regelfehler im Schiedsrichter behoben, vier Kanten eingetragen:
-   b01 steht bei **1263** ueber 730 Partien, der Champion v21 bei 1226.
+   b01 steht bei **1263** ueber 730 Partien, der Champion v21 bei 1227.
 7. **`frozen_v3` ist gebaut** -- und hat gleich bewiesen, warum ein Orakel nie
    aus dem geprueften Netz gebaut werden darf. Einschraenkung (2026-09-01):
    die Bruecke deckt nur Runden 1-4 ab (`oracle_metrics.py` schliesst R5 aus).
@@ -216,9 +216,10 @@ solcher markiert.
 
 ## 4. STAND JETZT
 
-**Champion:** `v21_2d_brierbest`, Elo **1226** [1188, 1269] auf der R5-Fix-Leiter
-(Stand 2026-08-31, nach Eintragung der Anker- und der Champion-Kante von b01; der
-fruehere Wert 1215 stammt aus dem Fit ohne diese beiden Zeilen). Kanten ueber die
+**Champion:** `v21_2d_brierbest`, Elo **1227** [1191, 1269] auf der R5-Fix-Leiter
+(`python tools/elo_tracker.py report`, nachgefuehrt 2026-09-01; die Zahl 1226 [1188, 1269]
+stand hier aus dem Fit vor den beiden b05-Tor-1-Kanten, der fruehere Wert 1215
+aus dem Fit ohne Anker- und Champion-Kante von b01). Kanten ueber die
 Fix-Grenze nie mischen. **Staerkster Knoten der Leiter ist inzwischen NICHT der
 Champion:** `v23-b01_brierbest` steht bei 1263 -- die KI ueberlappen, die
 Promotionsregel haengt an der Champion-Kante, und die war nicht signifikant.

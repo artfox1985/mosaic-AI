@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: NICHT-ERFOLG (par.16, 2026-08-20): der Zielwechsel traegt nicht (k1 +0,23, Block-t 1,11), kein Siegverlust; Engpass bleibt die Policy-Seite. WIEDERVORLAGE ausgelagert (par.17): eigene Prereg PREREG_v23_reachability_recheck.md, faellig NACH dem v23-Training. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird der Ownership-Kopf brauchbar, wenn sein Ziel von REALISIERUNG auf VOLLENDBARKEIT wechselt -- gelabelt mit dem vorhandenen Vorrats-Praedikat statt mit dem Endbrett der gespielten Partie? | Beleg: NICHT-ERFOLG (par.16, 2026-08-20): der Zielwechsel traegt nicht (k1 +0,23, Block-t 1,11), kein Siegverlust; Engpass bleibt die Policy-Seite. WIEDERVORLAGE ausgelagert (par.17) in PREREG_v23_reachability_recheck.md -- dort am 2026-09-01 ENTSCHIEDEN: der v23-Kopf ist strenger als das Praedikat und hat recht, Stufe 1 nicht eroeffnet. -->
 
 # PREREG: Zielwechsel des Ownership-Kopfes — Vollendbarkeit statt Realisierung
 

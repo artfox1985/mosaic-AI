@@ -2,9 +2,16 @@
 """PREREG_search_depth_column_optimum.md Stufe 4 Teil A -- Verwerfungsanteil.
 
 FRAGE: wie oft weicht die Zugwahl der Suche vom Prior-Top-1 ab, und STEIGT der
-Anteil mit der Suchtiefe? Das ist die letzte verbliebene Erklaerung fuer die
-Tiefen-Delle im Spaltenbau (0,7200 volle Spalten bei 100 Sims gegen 0,5150 bei
-400), nachdem vier Eingriffe an der Wurzel gemessen wirkungslos blieben.
+Anteil mit der Suchtiefe? Anlass ist die Tiefen-Delle im Spaltenbau (b01:
+0,7200 volle Spalten bei 100 Sims gegen 0,5150 bei 400), nachdem ein Eingriff
+an der Wurzelbalance und drei an der Blattwert-Skala gemessen wirkungslos
+blieben (Zuordnung berichtigt 2026-09-01).
+
+DEDUPE (seit 2026-09-01): der Erstlauf las zwei identische Paritaetslaeufe und
+zaehlte jeden Zustand doppelt (89 distinkte von 200). Seither wird jeder
+Zustand ueber einen Hash seines JSON nur einmal gezaehlt, auch innerhalb einer
+Datei; Anzahl der uebersprungenen Duplikate steht im Artefakt. Dazu der exakte
+zweiseitige Binomialtest auf den diskordanten Paaren (McNemar exakt).
 
 INSTRUMENT: `net_search_state_json_trace` liefert `top_m_selection` (je
 Wurzelkandidat `prior`, `ln_prior`, `description`) und `final_selection` (die
@@ -18,6 +25,7 @@ Block-SE auf Dateiebene (Lehre aus dem Reachability-Erstlauf).
 """
 import argparse
 import glob
+import hashlib
 import json
 import math
 import os
@@ -66,6 +74,8 @@ def main():
     ap.add_argument("--rounds", nargs="+", type=int, default=[2, 3, 4])
     ap.add_argument("--seed", type=int, default=20260931)
     ap.add_argument("--out", default="evaluations/artifacts/search_depth_rejection.json")
+    ap.add_argument("--no-dedupe", dest="dedupe", action="store_false",
+                    help="Duplikat-Zustaende NICHT ueberspringen (Verhalten des Erstlaufs)")
     a = ap.parse_args()
 
     import mosaic_rust as mr
@@ -79,6 +89,8 @@ def main():
     paired = []                                  # (rejected@sims0, rejected@sims1) je Zustand
     n_states_done = 0
     n_no_trace = 0
+    seen_states = set()
+    n_duplicates = 0
 
     for f in files:
         if n_states_done >= a.n_states:
@@ -92,6 +104,12 @@ def main():
             if state.get("round") not in a.rounds or state.get("phase") != "drafting":
                 continue
             state_json = json.dumps(state)
+            if a.dedupe:
+                h = hashlib.md5(json.dumps(state, sort_keys=True).encode("utf-8")).hexdigest()
+                if h in seen_states:
+                    n_duplicates += 1
+                    continue
+                seen_states.add(h)
             per_state = {}
             for sims in a.sims:
                 out = json.loads(mr.net_search_state_json_trace(
@@ -120,6 +138,8 @@ def main():
         "prereg": "PREREG_search_depth_column_optimum.md Stufe 4 Teil A (par.5)",
         "pattern": a.pattern, "model": a.model, "seed": a.seed,
         "n_states": n_states_done, "n_ohne_trace": n_no_trace,
+        "dedupe": a.dedupe, "n_duplikate_uebersprungen": n_duplicates,
+        "n_dateien_gelesen": len([f for f in files]),
         "rounds": a.rounds, "sims_stufen": a.sims, "je_stufe": {},
     }
     for sims in a.sims:
@@ -134,10 +154,15 @@ def main():
         both = sum(1 for c, b in paired if c and b)
         only_hi = sum(1 for c, b in paired if b and not c)
         only_lo = sum(1 for c, b in paired if c and not b)
+        n_disc = only_hi + only_lo
+        k = min(only_hi, only_lo)
+        p_exact = (min(1.0, 2.0 * sum(math.comb(n_disc, i) for i in range(k + 1)) / 2 ** n_disc)
+                   if n_disc else None)
         result["gepaart"] = {
             "sims_niedrig": lo, "sims_hoch": hi, "n_paare": len(paired),
             "differenz_hoch_minus_niedrig": mean, "se": se,
             "beide_verworfen": both, "nur_hoch": only_hi, "nur_niedrig": only_lo,
+            "mcnemar_exakt_p": p_exact, "n_diskordant": n_disc,
         }
     result["laufzeit"] = {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
                           "threads": 1, "s_je_partie": None}
@@ -157,7 +182,7 @@ def main():
               + ", nur@" + str(g["sims_hoch"]) + " " + str(g["nur_hoch"])
               + ", nur@" + str(g["sims_niedrig"]) + " " + str(g["nur_niedrig"]), flush=True)
     print("Zustaende " + str(n_states_done) + " (ohne Trace: " + str(n_no_trace)
-          + "), Artefakt: " + target_path)
+          + ", Duplikate uebersprungen: " + str(n_duplicates) + "), Artefakt: " + target_path)
     return 0
 
 

@@ -1333,9 +1333,9 @@ bit-identisch.
 
 **EINTAKTUNG ENTSCHIEDEN 2026-08-31 (Nutzer): VERSCHOBEN, nicht verworfen --
 "der hat mich noch nicht ueberzeugt".** Der Arm bleibt gebaut und
-auslöserbasiert in Reserve; die vorhandenen Caches werden zuerst
+ausloeserbasiert in Reserve; die vorhandenen Caches werden zuerst
 ausgenutzt. Das inhaltliche Argument fuer die Zurueckstufung steht in
-par.3b.3a.** Nutzer: *"den wuerd ich relativ spaet
+par.3b.3a. Nutzer: *"den wuerd ich relativ spaet
 eintakten und die vorhandenen caches erstmal ausnutzen."* Konkret:
 
 * `v23-b01` (Warmstart), `v23-b02` (Kaltstart, Bestandsbreite), `v23-b03`
