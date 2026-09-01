@@ -374,7 +374,7 @@ sagte "v22-Self-Play per Tor-Regel gestoppt" (es laeuft seit dem 2026-08-30).
 | `reanalyze_label_depth` | Relabel-Etappe: Policy per hv2-Lehrer, Value tief -- Abschnitt 2.2 |
 | ~~`r5_solver_split`~~ | Teil B war Phase 3 -- GESCHLOSSEN ohne Bau (2026-09-01) |
 | `v23_reachability_recheck` | Stufe 0 NACH dem v23-Training |
-| `search_depth_column_optimum` | weitgehend beantwortet; offen bleibt die ERKLAERUNG (optionale Stufe 4) |
+| `search_depth_column_optimum` | **Stufe 4 Teil A GEMESSEN (par.6)**: die tiefere Suche verwirft den Prior-Top-1 in 83 statt 49 Prozent der Faelle (74:6 diskordant, p = 5,4e-16) -- die Delle sitzt im BAUM, nicht an der Wurzelgewichtung. **Offen: Teil B** (Spalten-Etikett der verworfenen Zuege, Definition in par.6a berichtigt), rund 20 min, braucht einen zweiten Trace-Durchgang |
 | `special_tile_yield` | Kanaele 77/78 gebaut, ihre Wirkung nie isoliert |
 | `cache_build_time` | Hebel (3) hat seit 2026-09-01 einen Nutzniesser: **4,98 h** einkerniges Zusammenfuegen bei neuer Fenster-Zusammensetzung (par.11). Die vermisste serielle Vollreferenz liegt damit auch vor |
 | `frozen_v3_eval_set` | **NEU 2026-08-31 (Nutzer):** das Eval-Set stammt aus der plattenBLINDEN Aera (v1 = v10b/v12, v2 = v18/v19); Abloesung aus `v23-b01`. Zustandssatz und Orakel-Labels registriert, nichts gebaut. Vor dem Bau faellt ein Entscheid, siehe Abschnitt 4 |
