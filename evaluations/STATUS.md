@@ -24,71 +24,45 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-08-31, abends)
+## 1. WAS GERADE LAEUFT (Stand 2026-09-01, abends)
 
-| Ressource | Lauf | Was damit zu tun ist |
+**NICHTS.** GPU und CPU sind frei, kein Hintergrundlauf offen. Der Baum ist
+committet bis `c6c6eae`; ungepusht.
+
+### Was diese Sitzung ergeben hat -- der Bogen in sieben Zeilen
+
+1. **Die Generation v23 ist vollstaendig durchgemessen.** Kein Arm ist belegt
+   besser als `v23-b01`: b02 (Kaltstart) 75:85, b03 (Ueberraschung) 75:85,
+   b05 (Relabel) 85:75 bei p = 0,53. Bei n=160 ist +-10 Siege die
+   Rauschgrenze dieses Instruments -- dass alle drei dort landen, ist der
+   Beleg dafuer. **b01 bleibt Generator fuer v24.**
+2. **Der Kaltstart baut bei gleicher Staerke nur ein DRITTEL der Spalten**
+   (0,17-0,23 gegen 0,62), und der Checkpoint erklaert es nicht. Das
+   Spaltenwissen sitzt in der LINIE, nicht im Korpus allein
+   (`capacity_sim_frontier` par.12/13).
+3. **Phase 3 ist geschlossen, ohne Bau.** Die Betrags-Daempfung des
+   Value-Kopfs ist real, erklaert den Spaltenverlust in der Tiefe aber nicht.
+4. **Die WURZEL-Ebene ist als Ort der Tiefen-Delle erledigt:** vier Eingriffe
+   (Value lauter/leiser, Punkte-Blend, Prior/Value-Balance) bewegen sie nicht.
+   Der neue Knopf `MOSAIC_GUMBEL_C_SCALE` hat dabei die Erklaerung widerlegt,
+   fuer die er gebaut wurde.
+5. **Stufe 4 Teil A hat die Delle verortet:** die tiefere Suche ueberstimmt
+   den Prior massiv haeufiger (83 gegen 49 Prozent, 74:6 diskordant,
+   p = 5,4e-16). Es passiert im BAUM, nicht an der Wurzelgewichtung.
+6. **Die Elo-Leiter ist repariert** (Anker ist das eingefrorene Artefakt),
+   der Remis-Regelfehler im Schiedsrichter behoben, vier Kanten eingetragen:
+   b01 steht bei **1263** ueber 730 Partien, der Champion v21 bei 1226.
+7. **`frozen_v3` ist gebaut** -- und hat gleich bewiesen, warum ein Orakel nie
+   aus dem geprueften Netz gebaut werden darf.
+
+### Was als Naechstes ansteht, in dieser Reihenfolge
+
+| Was | Kosten | Anmerkung |
 | --- | --- | --- |
-| **GPU** | `v23-b03` -- b01-Rezept plus `--surprise-alpha 0.5` | Wenn fertig: Orakelmetriken gegen b01 (das IST der Kontrollarm, gleicher Seed/Val-Pool). Entscheidungsmass steht in `PREREG_policy_surprise_weighting.md` par.5 -- **nicht** val_combined, **nicht** policy_top3 |
-| **CPU** | **frei** | Die Wurzel-Ebene ist als Ort der Tiefen-Delle ERLEDIGT (vier Eingriffe wirkungslos, `PREREG_gumbel_c_scale_arm` par.5). Naechstes waere die v24-Erzeugung: 12.000 b01-Partien, rund 23 h |
-
-**WARNUNG Doppellauf (2026-08-31, 22:02:55 bis 22:26):** zwei Sitzungen haben denselben
-Anker-Lauf gestartet -- byte-gleiche Argumente, gleicher `--seed-base 900001`, gleiche
-Zieldatei. Der zweite (Sitzung `mosaic-ai-fc`) ist auf Nutzer-Anweisung gestoppt worden und
-hat nichts geschrieben; der erste laeuft weiter. Fuer rund 23 Minuten lagen 2x10 Arena-Worker
-plus 2x19 eingefrorene Anker-Worker auf 12 Kernen: der `laufzeit`-Block des ueberlebenden
-Laufs ist als **unter Nebenlast gemessen** zu markieren. **Lehre fuer Abschnitt 1:** die
-Zeile sagt, WAS zu tun ist, aber nicht, WER es schon tut -- wer einen Lauf startet, traegt
-Startzeit und Sitzungsnamen hier ein, bevor er startet.
-
-**AUFGELOEST (22:42):** drei Seeds aus dem Lastfenster (900021/22/23, Paritaeten
-erhalten) exklusiv nachgespielt -- **byte-gleich bis auf den letzten Zug**, auch die
-vollen Partie-Logs (325/332/314 Zeilen, Zeile fuer Zeile). Die Ergebnisse des Laufs
-sind damit FREIGEGEBEN; nebenbei ist Parallel-gegen-Seriell am Anker-Instrument
-bestaetigt (Lauf 10 Prozesse, Probe 1). Der `laufzeit`-Vorbehalt bleibt. Herleitung,
-nicht gemessen: dass diese drei im Fenster lagen, folgt aus der gestreiften
-Blockaufteilung -- Zeitstempel je Partie gibt es nicht. Vermerk:
-`artifacts/anchor_arena_v23b01_load_contamination.md`.
-
-**WARM GEGEN KALT ENTSCHIEDEN (2026-09-01, par.12/13 der Kapazitaets-Prereg):** auf
-DEMSELBEN Fenster, mit derselben Breite, baut der Kaltstart nur **ein Drittel** der
-Spalten -- bei statistisch nicht unterscheidbarer Staerke.
-
-| Vergleich (je 160 Partien, gepaart, beide Rollen) | Siege | p | Spalten b01 | Spalten b02 |
-| --- | --- | --- | --- | --- |
-| b01 gegen `b02_brierbest` | 85:75 | 0,56 | 0,619 | **0,169** |
-| b01 gegen `b02_best` | 92:68 | 0,081 | 0,563 | **0,225** |
-
-Der Checkpoint erklaert es NICHT (beide b02-Staende liegen bei einem Drittel).
-
-**Die Einordnung dazu, im selben Instrument (Arena, Spalten je Partie):** b05 0,4304
-(Tor 2b), b01 0,6456, b02 0,169-0,225. Das Fenster HEBT also einen bereits
-spaltenbewussten Spieler klar an (+66 Prozent von b05 auf b01, Tor 2a und 2b
-unabhaengig) -- aber ein Kaltstart darauf landet unter b05, also unter dem Stand,
-den die Linie schon hatte. **Es ist keine Alternative "lehrt oder erhaelt", sondern
-eine SCHWELLE:** die Policy-Dosis des Fensters (1.800 Lehrer- plus 4.000
-Netz-Partien, `PREREG_v23_window` par.1) reicht zum Verstaerken, nicht zum Aufbauen.
-Zum Vergleich: v22-b01 lernte es als Kaltstart aus 24.000 Partien Lehrer-Policy
-(alle 2.400 Dateien Traeger -- weil sein Traeger-Manifest NICHT gefunden wurde und
-der Rueckfall griff, Manifest `manifest_train_v22-b01`).
-
-**Nicht eingetaktet (Nutzer 2026-09-01: "der Kaltstart interessiert mich weniger"):**
-eine Dosis-Reihe der Lehrer-Policy. Der Befund steht in `capacity_sim_frontier`
-par.12/13, die Frage bleibt offen, aber ohne Arm.
-
-**Erledigt seit der letzten Fassung:** die Checkpoint-Arena des Kaltstart-Arms
-(`b02_best` 33:47 `b02_brierbest`, SPRT H0, p = 0,189) -- **Kandidat ist
-`v23-b02_brierbest`**, obwohl aus Epoche 1. Registriert in
-`PREREG_v23_window.md` par.2h und `PREREG_capacity_sim_frontier.md` par.11.
-
-**Danach frei:** die GPU fuer den Relabel-Arm, die CPU fuer dessen 200
-Cache-Bloecke. In der CPU-Warteschlange steht ausserdem die Arm-Frage selbst:
-`b02_brierbest` gegen `b01_brierbest`, Warmstart gegen Kaltstart auf demselben
-Fenster. Fuer die sechs Standard-Kennzahlen dann ueber
-`tools/paired_arena_env_ab.py --model-b ... --log-games` (das Tor-2b-Instrument);
-`paired_gating.py` hat KEIN Log-Flag (geprueft an seiner Argumentliste), es
-liefert nur Punkte, Margin und Strafleiste.
-
----
+| **v24-Erzeugung** | rund 23 h CPU | 12.000 b01-Partien (4.000 Sockel mit Rauschen, 8.000 Schwarm), `--per-file 10`. Zuschnitt steht in `PREREG_v24_window.md`, der hv2-Anteil wird UNVERAENDERT weiterverwendet |
+| **Vor dem v24-Training**: Fenster-Cache parallel vorbauen | spart rund 4 h | `build_cache_incremental.py --merge-out` plus `train.py --cache-file`. Gemessen: ein neues Fenster kostet sonst 4,98 h einkernig (`cache_build_time` par.11) |
+| **Stufe 4 Teil B** | rund 20 min | Spalten-Etikett der verworfenen Zuege, Definition berichtigt und registriert (`search_depth_column_optimum` par.6a). Braucht einen zweiten Trace-Durchgang, weil der erste die Reihennummer nicht mitschrieb |
+| Push | -- | 3 Commits ungepusht, `cargo test --release --no-run` ist gruen |
 
 ## 2. WAS DIE GENERATION v23 ERGEBEN HAT
 
@@ -207,12 +181,29 @@ markiert.
 20 Partien, im Lauf-Manifest sichtbar). Er kostet nichts und macht die naechste
 Frage an die Prior/Value-Balance ohne Bau messbar.
 
-### 3.3 Dann v24
+### 3.3 Dann v24 -- Zuschnitt STEHT (2026-09-01)
 
-Generator ist der beste Stand von v23 (heute: b01). Verfahren:
-`docs/generation_loop.md`. Der Korpus-Zuschnitt wird in einer eigenen
-`PREREG_v24_window.md` registriert -- **mit `--per-file 10`**
-(`docs/working_rules.md`).
+`PREREG_v24_window.md` ist angelegt und der Generator entschieden: **b01**,
+weil kein Arm belegt besser ist. Form wie v23, neu besetzt:
+
+| Klasse | Posten | Partien |
+| --- | --- | --- |
+| Sockel (Policy) | `v23-b01` Self-Play | 4.000 |
+| Sockel (Policy) | `hv2`, policy-aktiv | 1.800 |
+| Schwarm (Value) | `v23-b01` Self-Play | 8.000 |
+| Schwarm (Value) | `hv2`, policy-maskiert | 15.650 |
+
+**Summe 29.450.** Der hv2-Anteil ist identisch mit dem von v23 (1.745 Dateien
+a 10 Partien) und wird UNVERAENDERT weiterverwendet -- **es muss kein einziges
+Lehrerspiel neu erzeugt werden**, die Traegerauswahl kommt aus
+`data/carriers_v23_hv2.txt`. Neu sind allein die 12.000 b01-Partien, mit
+`--per-file 10` (`docs/working_rules.md`). Verfahren: `docs/generation_loop.md`.
+
+**Die Daten der Vorgeneration sind archiviert** (Nutzer, 2026-09-01): in
+`data/` stehen nur noch die 1.745 hv2-Dateien des Fensters plus ihre Bloecke.
+Alles andere liegt im Archiv, samt einer README, die festhaelt, welche
+Korpora BELEGE laufender Preregs sind (frozen_v3-Quelle, die vier
+Phase-3-Arme, der Tor-2a-Referenzlauf).
 
 ### 3.4 Belegungsplan (GPU und CPU parallel)
 

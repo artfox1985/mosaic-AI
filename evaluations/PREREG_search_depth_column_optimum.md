@@ -524,9 +524,10 @@ Ein Drafting-Zug fuellt Musterreihen, keine Kuppelzellen -- "spaltenbauend"
 ist an der Wurzel nicht direkt ablesbar. Die Definition wird deshalb HIER
 festgelegt, vor jeder Messung:
 
-**Ein Zug heisst SPALTENRELEVANT, wenn er eine Musterreihe `r` bedient, deren
-Vollendung eine Kuppelzelle in einer Spalte mit Fuellstand >= 4 fuellen
-wuerde** (Fuellstand aus `col_fill` des Zustands, Zeilenzuordnung ueber die
+**DEFINITION BERICHTIGT 2026-09-01, an der Regelquelle geprueft (par.6a
+unten). Urspruenglich stand hier:** "wenn er eine Musterreihe `r` bedient,
+deren Vollendung eine Kuppelzelle in einer Spalte mit Fuellstand >= 4 fuellen
+wuerde"** (Fuellstand aus `col_fill` des Zustands, Zeilenzuordnung ueber die
 bestehende Spalten-Abbildung `2*tc + si%2`, wie in
 `column_build_structural_probe`). Die Schwelle 4 uebernimmt bewusst die
 `--min-fill`-Konvention des Bestandswerkzeugs
@@ -548,3 +549,83 @@ Teil A zuerst: rund 200 Zustaende x 2 Sims-Stufen, geschaetzt 10-20 min
 (Trace bei 400 Sims rund 1-2 s je Zustand, einkernig). Teil B rechnet auf
 denselben Traces, kostet also nur Auswertung. **Faellt Teil A flach aus, ist
 Teil B gegenstandslos** -- ohne Verwerfungen gibt es nichts zu etikettieren.
+
+## par.6 STUFE 4 TEIL A GEMESSEN: die tiefere Suche ueberstimmt den Prior massiv (2026-09-01)
+
+Werkzeug: `tools/probes/search_depth_rejection_probe.py` (neu). 200
+Drafting-Zustaende (Runden 2-4) aus b01-Self-Play bei Default-Knoepfen, jeder
+Zustand ZWEIMAL getract mit gleichem Seed 20260931.
+
+| Sims | Verwerfungsanteil (Zugwahl != Prior-Top-1) | Block-SE |
+| --- | --- | --- |
+| 100 | 0,4900 | 0,0173 |
+| **400** | **0,8300** | 0,0058 |
+
+**Gepaart, 200 Paare:** beide Stufen verwerfen 92-mal, **nur bei 400 Sims 74-mal,
+nur bei 100 Sims 6-mal**. Differenz +0,34 (SE 0,038), McNemar auf den 80
+diskordanten Paaren **p = 5,4e-16**.
+
+**Die vorab registrierte Erwartung ist damit bestaetigt, und zwar deutlich:**
+der Verwerfungsanteil steigt mit der Suchtiefe. In fuenf von sechs Zustaenden,
+in denen sich die beiden Stufen unterscheiden, ist es die TIEFERE, die den
+Prior-Vorschlag verwirft.
+
+**Warum das die Delle verortet, ohne sie zu erklaeren:** der Prior traegt das
+Spaltenwissen (par.2l: bei plattenblindem Prior tritt der Tiefeneffekt gar
+nicht auf). Vier Eingriffe an der GEWICHTUNG des Priors gegen den Value-Term
+sind wirkungslos (`PREREG_gumbel_c_scale_arm` par.5). Hier zeigt sich, dass
+die tiefere Suche den Prior nicht leiser hoert, sondern haeufiger UEBERSTIMMT
+-- das passiert im Baum, nicht an der Wurzelgewichtung.
+
+**Was es NICHT zeigt:** dass die Suche unrecht hat. Die Tiefe gewinnt die
+Arena (@25 verliert 11:29, @100 verliert 33:47). 83 Prozent Verwerfung sind
+fuer sich genommen die normale Arbeitsweise einer Suche, die besser sein soll
+als ihr Prior.
+
+**Einschraenkung, benannt:** die 200 Zustaende stammen aus vier Dateien (die
+groesseren b01-Korpora bei Default-Knoepfen sind archiviert), die Block-SE
+ruht also auf vier Bloecken. Bei diesem Effektabstand (0,49 gegen 0,83, 74:6
+diskordant) aendert das am Verdikt nichts; fuer eine knappe Zahl waere es zu
+duenn.
+
+**Teil B (Spalten-Etikett) bleibt offen** und braucht eine Zutat, die im
+Trace nicht steht: die Abbildung von der bedienten MUSTERREIHE auf die
+Kuppelzelle, die ihre Vollendung fuellen wuerde. Die `description` der
+Kandidaten nennt die Reihe ("... -> Reihe 6 [5/6]"), die Zielzelle haengt aber
+an Farbe und Slot-Belegung. Diese Zuordnung wird an der Quelle geprueft, nicht
+geraten -- sonst steht am Ende ein Etikett, das die Frage selbst beantwortet.
+
+## par.6a DEFINITION VON "SPALTENRELEVANT" BERICHTIGT (2026-09-01)
+
+Die in par.5 vorab festgelegte Definition sprach von der Kuppelzelle, "die
+die Vollendung der Musterreihe fuellen wuerde". **Am Regelwerk geprueft
+(`docs/engine_manual.md`, Abschnitt "Phase 2: Tiling") ist diese Zelle zum
+Drafting-Zeitpunkt NICHT bestimmt:**
+
+* Die ZEILE steht fest -- Musterreihe `r` gehoert zur Kuppelzeile `r` ("all 3
+  Kuppelplatten of a row's dome row").
+* Die SPALTE nicht: platziert wird, wo die Farbe der Reihe auf eine freie
+  passende Zelle einer Kuppelplatte trifft; liegen mehrere passende Zellen
+  vor, entscheidet die Tiling-Wahl (eigener Einstieg
+  `tiling_choice_state_json`), und ob ueberhaupt platziert wird, haengt an der
+  Plattenbelegung der Zeile.
+
+**Berichtigte Definition, weiterhin VOR jeder Messung festgelegt:**
+
+> Ein Zug heisst SPALTENRELEVANT, wenn er eine Musterreihe `r` bedient, deren
+> Kuppelzeile `r` mindestens eine offene Zelle in einer Spalte mit Fuellstand
+> >= 4 hat.
+
+Also "kann eine fast volle Spalte voranbringen" statt "wird sie
+voranbringen". Das ist schwaecher, aber es ist die staerkste Aussage, die der
+Zustand zum Zeitpunkt der Zugwahl hergibt -- und sie bleibt aus `col_fill` und
+`col_open_cells` des Praedikats berechenbar, ohne Engine-Nachbau.
+
+**Warum das die Frage nicht vorwegnimmt:** die Definition kennt weder Prior
+noch Suchwahl. Sie etikettiert Zuege allein aus dem Zustand; welcher Zug
+verworfen wurde, entscheidet der Trace.
+
+**Teil B bleibt damit fahrbar**, kostet aber einen zweiten Durchgang: die
+Traces von par.6 haben die `description` der Kandidaten gespeichert, nicht die
+Zeilennummer -- der naechste Lauf muss sie mitschreiben (Reihe steht im
+Klartext der Beschreibung, z.B. "-> Reihe 6 [5/6]").
