@@ -716,6 +716,7 @@ fn engine_config_json() -> String {
         "active_leaf": active_leaf,
         "use_gumbel_search": USE_GUMBEL_SEARCH,
         "gumbel_top_m": GUMBEL_TOP_M,
+        "gumbel_c_scale": crate::net_mcts::gumbel_c_scale(),
         "decouple_net_sims_from_actions": DECOUPLE_NET_SIMS_FROM_ACTIONS,
         "floor_shaping_weight": FLOOR_SHAPING_WEIGHT,
         "points_utility_weight": POINTS_UTILITY_WEIGHT,

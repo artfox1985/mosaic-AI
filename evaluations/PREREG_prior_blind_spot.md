@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | Beleg: **ENTSCHIEDEN**: E Miss-Rate 1,21% ⇒ Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (Verhaeltnis 1,232 -> 2,287), Schwelle 3 nicht erreicht ⇒ keine Wiedereroeffnung, aber Pflicht-Diagnostik je Champion. `evaluations/artifacts/t_e_prior_blind_spot.json`, `evaluations/artifacts/t_g_gumbel_scale_v21.json` -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | Beleg: **ENTSCHIEDEN**: E Miss-Rate 1,21% ⇒ Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (Verhaeltnis 1,232 -> 2,287), Schwelle 3 nicht erreicht (par.G3, 2026-09-01: b01 misst 2,814 @400 und 2,135 @100 -- das Verhaeltnis waechst MIT der Suchtiefe und erklaert die Spalten-Delle mechanisch) ⇒ keine Wiedereroeffnung, aber Pflicht-Diagnostik je Champion. `evaluations/artifacts/t_e_prior_blind_spot.json`, `evaluations/artifacts/t_g_gumbel_scale_v21.json` -->
 
 # Vorregistrierung: Prior-Blindfleck & Wurzelbreite (externes Review R2)
 
@@ -383,3 +383,56 @@ Kein Wiederaufnahme-Antrag: die Schwelle 3 ist nicht ueberschritten,
 und der Suchtiefen-Effekt ist ein TAUSCH (weniger Suche = mehr
 Spalten, aber schwaecheres Spiel, par.2j). Der Nachtrag steht hier,
 damit die naechste Messung des Verhaeltnisses diesen Beleg kennt.
+
+## par.G3 TEIL G AM SPALTEN-CHAMPION: das Verhaeltnis steigt weiter (2026-09-01)
+
+Faellig je Champion (Promotions-Checkliste Punkt 5c), hier auf
+`v23-b01_brierbest`, 300 Zustaende, `tools/gumbel_scale_calibration.py`:
+
+| | @100 Sims | @400 Sims |
+| --- | --- | --- |
+| `delta_q_median` | 0,0180 | 0,0168 |
+| `delta_lnprior_median` | 0,665 | 0,875 |
+| `max_N_median` | 35 | 96 |
+| **`ratio_sigma_over_prior_median`** | **2,135** | **2,814** |
+| `c_scale` fuer Gleichgewicht | 0,468 | 0,355 |
+| n_used / n_skipped | 233 / 67 | 233 / 67 |
+
+**Die Aera-Reihe setzt sich fort:** 1,232 -> 2,287 -> **2,814**. Die
+vorab registrierte Schwelle 3 ist weiterhin NICHT erreicht; nach der Regel
+dieses Strangs folgt daraus **keine Aktion**. Das bleibt so, und die
+folgende Beobachtung aendert es nicht -- sie eroeffnet nur eine Frage, die
+bei der Festlegung der Schwelle nicht auf dem Tisch lag.
+
+**Neu ist der Zusammenhang zur Suchtiefe.** Das Verhaeltnis ist keine
+Konstante des Netzes, sondern waechst MIT den Sims, weil `max_N` im Faktor
+steckt: `sigma = (50 + max_N) * c_scale * q`. Zwischen 100 und 400 Sims
+steigt es von 2,135 auf 2,814, waehrend `delta_q` praktisch gleich bleibt
+(0,0180 gegen 0,0168) -- der Kopf wird nicht klueger, er wird nur lauter.
+
+**NACHTRAG 2026-09-01: die folgende Erklaerung ist GEPRUEFT UND WIDERLEGT.** Der Arm
+`PREREG_gumbel_c_scale_arm.md` hat `c_scale` auf den Gleichgewichtswert 0,36 gesetzt --
+der Spaltenbau blieb unveraendert (0,5000 gegen 0,5150). Die Groesse ist real, ihre
+kausale Rolle war eine Herleitung und ist gefallen. Der Absatz bleibt als das stehen,
+was er war:
+
+**Warum das die Tiefen-Delle SCHEINBAR mechanisch erklaerte** (`PREREG_r5_value_
+calibration.md` par.12, `PREREG_search_depth_column_optimum.md`): der Prior
+traegt das Spaltenwissen, der Value-Kopf unterscheidet die Geschwisterzuege
+mit 0,017 kaum -- und je tiefer gesucht wird, desto staerker uebertoent
+genau dieses fast leere Signal den Prior. Bei 400 Sims baut b01 0,5150 volle
+Spalten, bei 100 Sims 0,7200. Die beiden Zahlenreihen passen zusammen, ohne
+dass man dem Kopf eine Praeferenz gegen Spalten unterstellen muesste.
+
+**Was daraus NICHT folgt:** dass ein kleineres `c_scale` die Staerke hebt.
+Weniger Spalten bei mehr Suche ist ein TAUSCH, und die Tiefe gewinnt ihn
+(@25 verliert 11:29, @100 verliert 33:47). Ein Eingriff an `c_scale` wuerde
+den Regler in Richtung des flacheren Spiels drehen -- was die Spalten hebt
+und moeglicherweise die Staerke kostet. Das ist eine Arena-Frage, keine
+Kalibrierungs-Frage.
+
+**Kostenhinweis fuer den Fall, dass jemand es doch fahren will:**
+`GUMBEL_C_SCALE` ist eine Konstante (net_mcts.rs:2059), kein Laufzeit-Knopf.
+Ein Arm braucht Engine-Aenderung, Wheel-Neubau und Paritaets-Gate -- und
+vorher eine eigene Registrierung mit Arena-Zweig, nicht nur der
+Spalten-Messung.

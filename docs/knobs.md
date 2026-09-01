@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 89 Knoepfe (52 aktiv, 29 diagnose, 7 tot, 1 geplant).
+Stand: 90 Knoepfe (53 aktiv, 29 diagnose, 7 tot, 1 geplant).
 
 **Status** sagt, ob der Knopf VERDRAHTET ist -- ausdruecklich nicht, ob sein
 Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
@@ -14,7 +14,7 @@ Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
 trennen "aus, weil noch niemand ihn eingeschaltet hat" von "aus, weil die
 Messung ihn erledigt hat" -- in der Registratur allein sehen die gleich aus.
 
-**53 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
+**54 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
 
 Der Statuskopf sagt ENTSCHIEDEN, aber NICHT die Richtung -- deshalb die
 Trennung nach Default. Kein Loeschauftrag: ein negatives Ergebnis kann
@@ -62,8 +62,9 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_CACHE_NOPACK` (ENTSCHIEDEN, PREREG_v21_window.md)
 - `MOSAIC_VAL_POOL` (ENTSCHIEDEN, PREREG_v22_window.md par.6)
 
-**Beantwortet, Default AN (16)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
+**Beantwortet, Default AN (17)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
 
+- `MOSAIC_GUMBEL_C_SCALE` = 1.0 (ENTSCHIEDEN, PREREG_prior_blind_spot.md par.G3)
 - `MOSAIC_FLOOR_SHAPING_W` = 0.3 (ENTSCHIEDEN, PREREG_search_path_remeasurements.md M1)
 - `MOSAIC_FLOOR_SHAPING_OPP_BIAS` = 1.0 (ENTSCHIEDEN, PREREG_aggression_style_measurement.md E2)
 - `MOSAIC_NUM_DETERMINIZATIONS` = 1 (ENTSCHIEDEN, PREREG_ismcts_determinizations.md)
@@ -87,6 +88,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_AGGR_LAMBDA` | 0.0 | aktiv | ENTSCHIEDEN | Denial-Gewicht lambda (Gegner-Punkte-Abzug im Utility-Blend); GUI-Regler wie oben (net_mcts.rs:164) | PREREG_task28_aggression.md |
 | `MOSAIC_VALUE_CAL_A` | 0.0 | aktiv | - | Logit-Shift A der monotonen Value-Kalibrierung (net_mcts.rs:321) | STATUS.md Task #30 |
 | `MOSAIC_VALUE_CAL_B` | 1.0 | aktiv | - | Logit-Streckung B der Value-Kalibrierung (net_mcts.rs:327) | STATUS.md Task #30 |
+| `MOSAIC_GUMBEL_C_SCALE` | 1.0 | aktiv | ENTSCHIEDEN | Gewicht des sigma(q)-Terms gegen ln(prior) in der Gumbel-Wurzelauswahl -- war bis 2026-09-01 die Konstante GUMBEL_C_SCALE (net_mcts.rs) | PREREG_prior_blind_spot.md par.G3 |
 | `MOSAIC_ROOT_CHILD_Q` | an (=0 schaltet ab) | aktiv | - | Wurzelkind-Q-Logging ins Self-Play-JSON (net_mcts.rs:219) | STATUS.md Task #35 |
 | `MOSAIC_FLOOR_SHAPING_W` | 0.3 | aktiv | ENTSCHIEDEN | Gewicht der Floor-Straf-Korrektur am Netz-Blattwert (net_mcts.rs:405) | PREREG_search_path_remeasurements.md M1 |
 | `MOSAIC_FLOOR_SHAPING_OPP_BIAS` | 1.0 | aktiv | ENTSCHIEDEN | Gegner-Gewichtung des Floor-Shapings, >1 belohnt Zuschieben (net_mcts.rs:422) | PREREG_aggression_style_measurement.md E2 |

@@ -29,7 +29,7 @@ diesen Inhalten etwas aendert, aendert es DORT.
 | Ressource | Lauf | Was damit zu tun ist |
 | --- | --- | --- |
 | **GPU** | `v23-b03` -- b01-Rezept plus `--surprise-alpha 0.5` | Wenn fertig: Orakelmetriken gegen b01 (das IST der Kontrollarm, gleicher Seed/Val-Pool). Entscheidungsmass steht in `PREREG_policy_surprise_weighting.md` par.5 -- **nicht** val_combined, **nicht** policy_top3 |
-| **CPU** | **frei** -- Phase 3 Stufe 0 ist durch (vier Arme, ~1,5 h) | Naechstes: `frozen_v3` erzeugen (400 b01-Partien, Sockel-Konfiguration, ~22 min), dann Satz und Orakel-Labels |
+| **CPU** | **frei** | Die Wurzel-Ebene ist als Ort der Tiefen-Delle ERLEDIGT (vier Eingriffe wirkungslos, `PREREG_gumbel_c_scale_arm` par.5). Naechstes waere die v24-Erzeugung: 12.000 b01-Partien, rund 23 h |
 
 **WARNUNG Doppellauf (2026-08-31, 22:02:55 bis 22:26):** zwei Sitzungen haben denselben
 Anker-Lauf gestartet -- byte-gleiche Argumente, gleicher `--seed-base 900001`, gleiche
@@ -185,6 +185,28 @@ Verbraucher wurden alle auf plattenBLINDEM v21 gemessen. Der billigste davon
 fuer die SPALTEN. Fuer die Staerke sagt der Arm nichts, die alte Schliessung war
 eine Staerke-Messung.
 
+### 3.2b Die Tiefen-Delle: vier Wurzel-Eingriffe gemessen, alle wirkungslos
+
+| Eingriff (b01, argmax @400, je 200 Partien) | volle Spalten |
+| --- | --- |
+| Kontrolle | 0,5150 |
+| `VALUE_CAL_B = 2,0` | 0,3900 (-0,125, schaedlich) |
+| `VALUE_CAL_B = 0,5` | 0,5325 (n.s.) |
+| `POINTS_UTILITY_W = 0,1` | 0,4850 (n.s.) |
+| `MOSAIC_GUMBEL_C_SCALE = 0,36` | 0,5000 (n.s.) |
+| zum Vergleich: 100 statt 400 Sims | **0,7200** |
+
+Weder Betrag noch Balance noch Zusatzinformation am Blattwert bewegen die Delle --
+nur die Suchtiefe selbst tut es. **Was bleibt, liegt tiefer im Baum:** was die Suche
+in den Fortsetzungen findet und nach oben propagiert (`search_depth_column_optimum`
+Stufe 4). Die quantitativ saubere Erklaerung ueber das sigma/Prior-Verhaeltnis (2,81)
+ist gepruft und WIDERLEGT -- sie steht in `prior_blind_spot` par.G3 als solche
+markiert.
+
+**Neuer Knopf, bleibt:** `MOSAIC_GUMBEL_C_SCALE` (Default 1,0, paritaetsgeprueft an
+20 Partien, im Lauf-Manifest sichtbar). Er kostet nichts und macht die naechste
+Frage an die Prior/Value-Balance ohne Bau messbar.
+
 ### 3.3 Dann v24
 
 Generator ist der beste Stand von v23 (heute: b01). Verfahren:
@@ -339,7 +361,13 @@ Stack-Draw-Kontrollfluss EIN, Bootstrap-Horizont 2, Seed-Positionen AUS
 
 ## 5. OFFENE STRAENGE -- abgeglichen mit dem Prereg-Index (2026-08-31)
 
-Der Index zaehlt **22 OFFEN, 71 ENTSCHIEDEN, 8 UEBERHOLT**. Beim Abgleich
+Der Index zaehlt (Stand 2026-09-01, nachgezaehlt) **21 OFFEN, 75 ENTSCHIEDEN,
+8 UEBERHOLT**. Beim Durchgang an diesem Tag (Nutzer-Verdacht: "mir kommt vor es ist
+nicht alles vom Status aktuell") sind DREI Koepfe berichtigt worden, die gegen den
+eigenen Stand standen: `policy_surprise_weighting` sagte "NICHTS GEBAUT", waehrend
+b03 gebaut UND gemessen war; `cache_build_time` fuehrte Hebel (3) ohne Nutzniesser,
+obwohl der b05-Lauf ihn geliefert hat; `r5_solver_split` verwies auf
+"Trainings-Eingriffe", die Phase 3 am selben Tag ausgeschlossen hat. Beim Abgleich
 sind zwei Koepfe berichtigt worden, die gegen ihren eigenen Stand standen:
 `cache_build_time` sagte "nicht in train.py verdrahtet" (`--cache-file`
 existiert seit `dc40551`, train.py:2554), und `v23_reachability_recheck`
@@ -351,13 +379,13 @@ sagte "v22-Self-Play per Tor-Regel gestoppt" (es laeuft seit dem 2026-08-30).
 | --- | --- |
 | `v23_window` | Fensterbau -- Abschnitt 2.2 |
 | `capacity_sim_frontier` | b02/b04 -- Abschnitt 2.3 |
-| `policy_surprise_weighting` | b03 -- ungebaut |
+| ~~`policy_surprise_weighting`~~ | ENTSCHIEDEN 2026-09-01: b03 traegt nicht (Orakel Gleichstand, Arena 75:85) |
 | `reanalyze_label_depth` | Relabel-Etappe: Policy per hv2-Lehrer, Value tief -- Abschnitt 2.2 |
-| `r5_solver_split` | Teil B = R5-Value-Kalibrierung, Phase 3 |
+| ~~`r5_solver_split`~~ | Teil B war Phase 3 -- GESCHLOSSEN ohne Bau (2026-09-01) |
 | `v23_reachability_recheck` | Stufe 0 NACH dem v23-Training |
 | `search_depth_column_optimum` | weitgehend beantwortet; offen bleibt die ERKLAERUNG (optionale Stufe 4) |
 | `special_tile_yield` | Kanaele 77/78 gebaut, ihre Wirkung nie isoliert |
-| `cache_build_time` | Hebel (3) offen; serielle Vollreferenz fehlt |
+| `cache_build_time` | Hebel (3) hat seit 2026-09-01 einen Nutzniesser: **4,98 h** einkerniges Zusammenfuegen bei neuer Fenster-Zusammensetzung (par.11). Die vermisste serielle Vollreferenz liegt damit auch vor |
 | `frozen_v3_eval_set` | **NEU 2026-08-31 (Nutzer):** das Eval-Set stammt aus der plattenBLINDEN Aera (v1 = v10b/v12, v2 = v18/v19); Abloesung aus `v23-b01`. Zustandssatz und Orakel-Labels registriert, nichts gebaut. Vor dem Bau faellt ein Entscheid, siehe Abschnitt 4 |
 | `geometric_envelope` | Gelaender fuer die fruehen Runden -- Stufe 0 ist netzfrei und kann VOR dem v23-Training laufen |
 

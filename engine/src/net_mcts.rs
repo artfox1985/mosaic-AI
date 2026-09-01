@@ -2056,7 +2056,32 @@ const GUMBEL_C_VISIT: f64 = 50.0;
 /// LEHRE: bei einer engine-weiten Aenderung, die BEIDE Seiten trifft, ist die
 /// Siegquote im Champion-gegen-Vorgaenger-Duell KEIN gueltiges Staerkemass. Der
 /// absolute Ø-Score ist hier das entscheidende Signal gewesen.
-const GUMBEL_C_SCALE: f64 = 1.0;
+/// Laufzeit-Zelle fuer `MOSAIC_GUMBEL_C_SCALE` (Nutzer-Auftrag 2026-09-01:
+/// "dann mach daraus einen knopf. damit wir uns das in der arena ansehen
+/// koennen"). Vorher eine Konstante `1.0`.
+///
+/// ANLASS, gemessen: `tools/gumbel_scale_calibration.py` auf
+/// `v23-b01_brierbest` (PREREG_prior_blind_spot par.G3) findet
+/// `delta_q_median` 0,017 zwischen Geschwisterzuegen, waehrend
+/// `delta_lnprior_median` bei 0,875 liegt -- der sigma-Term uebertoent den
+/// Prior um Faktor 2,81 bei 400 Sims und 2,14 bei 100. Fuer Gleichgewicht
+/// waere `c_scale` rund 0,36. Weil `max_N` im Faktor steckt, WAECHST das
+/// Uebergewicht mit der Suchtiefe -- die mechanische Erklaerung dafuer, dass
+/// tiefere Suche weniger Spalten baut (der Prior traegt das Spaltenwissen).
+///
+/// EINSCHRAENKUNG, ausdruecklich: prozessglobal, also NICHT pro Seite
+/// setzbar. Eine Netz-gegen-Netz-Arena mit verschiedenen c_scale je Seite
+/// braucht die Migration in `SearchConfig` (Praezedenz:
+/// `implicit_minimax_alpha`, PREREG_agent_encapsulation par.1). Bis dahin
+/// wird der Knopf ARMWEISE gemessen: beide Seiten eines Arms teilen ihn,
+/// verglichen werden Arme gegen einen gemeinsamen Gegner.
+static GUMBEL_C_SCALE_CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+
+/// Laufzeit-Wert von `c_scale`, einmalig aus `MOSAIC_GUMBEL_C_SCALE` gelesen
+/// und gecacht. Default `1.0` = byte-identisches Bestandsverhalten.
+pub(crate) fn gumbel_c_scale() -> f64 {
+    *GUMBEL_C_SCALE_CELL.get_or_init(|| read_f64_env("MOSAIC_GUMBEL_C_SCALE", 1.0))
+}
 
 /// Anzahl der per Gumbel-Top-m an der Wurzel gezogenen Kandidaten (vor
 /// Sequential Halving). Paper-/mctx-Standardwert, aus Go/Schach-Experimenten
@@ -2255,7 +2280,7 @@ fn sample_gumbel<R: Rng + ?Sized>(rng: &mut R) -> f64 {
 
 /// `σ(q) = (c_visit + max_N) · c_scale · q` -- siehe Modul-Kommentar.
 fn gumbel_sigma(q: f64, max_n: u32) -> f64 {
-    (GUMBEL_C_VISIT + max_n as f64) * GUMBEL_C_SCALE * q
+    (GUMBEL_C_VISIT + max_n as f64) * gumbel_c_scale() * q
 }
 
 /// Eigener Netz-/DFS-Blattwert von `nid`, aus der Sicht des an DIESEM Knoten
@@ -5310,7 +5335,7 @@ mod tests {
     fn gumbel_sigma_matches_formula_directly() {
         let q = 0.7;
         let max_n = 30u32;
-        let expected = (GUMBEL_C_VISIT + max_n as f64) * GUMBEL_C_SCALE * q;
+        let expected = (GUMBEL_C_VISIT + max_n as f64) * gumbel_c_scale() * q;
         assert!((gumbel_sigma(q, max_n) - expected).abs() < 1e-12);
     }
 
