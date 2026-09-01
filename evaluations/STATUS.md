@@ -42,18 +42,30 @@ committet bis `c6c6eae`; ungepusht.
    (`capacity_sim_frontier` par.12/13).
 3. **Phase 3 ist geschlossen, ohne Bau.** Die Betrags-Daempfung des
    Value-Kopfs ist real, erklaert den Spaltenverlust in der Tiefe aber nicht.
-4. **Die WURZEL-Ebene ist als Ort der Tiefen-Delle erledigt:** vier Eingriffe
-   (Value lauter/leiser, Punkte-Blend, Prior/Value-Balance) bewegen sie nicht.
-   Der neue Knopf `MOSAIC_GUMBEL_C_SCALE` hat dabei die Erklaerung widerlegt,
-   fuer die er gebaut wurde.
-5. **Stufe 4 Teil A hat die Delle verortet:** die tiefere Suche ueberstimmt
-   den Prior massiv haeufiger (83 gegen 49 Prozent, 74:6 diskordant,
-   p = 5,4e-16). Es passiert im BAUM, nicht an der Wurzelgewichtung.
+4. **Wurzelbalance und Blattwert-Skala sind als Ort der Tiefen-Delle je mit
+   einem Messpunkt erledigt** (Value lauter/leiser, Punkte-Blend,
+   Prior/Value-Balance). BERICHTIGT 2026-09-01: nur `c_scale` ist ein
+   Wurzel-Eingriff, `VALUE_CAL_B`/`POINTS_UTILITY_W` wirken am Blattwert im
+   ganzen Baum; "was bleibt, liegt tiefer im Baum" folgt daraus nicht. Der
+   neue Knopf `MOSAIC_GUMBEL_C_SCALE` hat die sigma/Prior-Erklaerung widerlegt.
+5. **Stufe 4 Teil A: die tiefere Suche ueberstimmt den Prior haeufiger (83
+   gegen 49 Prozent)** -- aber die Erstfassung zaehlte jeden Zustand doppelt
+   (zwei identische Paritaetslaeufe, 89 distinkte statt 200 Zustaende;
+   `search_depth_column_optimum` par.6, Berichtigung). Wiederholung mit
+   frischem Zustandssatz: par.6b dort.
 6. **Die Elo-Leiter ist repariert** (Anker ist das eingefrorene Artefakt),
    der Remis-Regelfehler im Schiedsrichter behoben, vier Kanten eingetragen:
    b01 steht bei **1263** ueber 730 Partien, der Champion v21 bei 1226.
 7. **`frozen_v3` ist gebaut** -- und hat gleich bewiesen, warum ein Orakel nie
-   aus dem geprueften Netz gebaut werden darf.
+   aus dem geprueften Netz gebaut werden darf. Einschraenkung (2026-09-01):
+   die Bruecke deckt nur Runden 1-4 ab (`oracle_metrics.py` schliesst R5 aus).
+8. **Pruefung aller seit dem 29.08. geaenderten Preregs (2026-09-01):** die
+   Befunde sind in den Dateien selbst als Berichtigungen registriert; die
+   groessten: v23-Erzeugung lief mit 100, nicht 400 Sims (par.4c war falsch),
+   der Kaltstart-Vergleich war nicht einfaktoriell (LR-Rezept), Stufe 4 Teil
+   A doppelt gezaehlt, b03/b05 hatten kein Spaltenprofil (nachgeholt: b05
+   0,679 gegen b01 0,635, b03 0,500 gegen 0,631), v24-Rezept war unvollstaendig
+   (jetzt `PREREG_v24_window.md` par.6).
 
 ### Was als Naechstes ansteht, in dieser Reihenfolge
 
@@ -81,7 +93,7 @@ committet bis `c6c6eae`; ungepusht.
 | --- | --- |
 | gegen **v22-b05** | 119:61 -- signifikant |
 | gegen **v21** (Champion) | 219:181, p = 0,084, KI [-0,013, +0,393] -- **nicht belegt besser**, Augenhoehe. **KEINE Promotion**, v21 bleibt Champion |
-| gegen **hv1** (Anker) | laeuft |
+| gegen **hv1** (Anker) | 127:23 aus 150 (84,7 Prozent), eingetragen (Abschnitt 4) |
 
 **Phase 3 gemessen, NEGATIV (par.11 der R5-Kalibrierung):** die
 Betrags-Daempfung ist unveraendert -- b01 0,0859 gegen b05 0,0886 auf
@@ -104,32 +116,19 @@ entscheiden (par.2h).
 ## 3. WAS ALS NAECHSTES ZU TUN IST
 
 **Nutzer-Zuschnitt fuer diese Generation (2026-08-31):** relabelter Sockel,
-b02, b03, Phase 3 -- dann v24. Nicht in diesem Zyklus: Kuppelplatten-
+b02, b03, Phase 3 -- dann v24. **Stand 2026-09-01: alle vier erledigt**, es
+bleibt v24 (Abschnitt 1, Rezept in `PREREG_v24_window.md` par.6). Nicht in diesem Zyklus: Kuppelplatten-
 Verteilung, Arm K, b04-Breite, geometrisches Gelaender (alle registriert).
 
-### 3.1 Relabel-Arm (Daten fertig, Fenster fertig)
+### 3.1 Relabel-Arm: GEFAHREN (2026-09-01)
 
-Fenster `data/window_v23_relab.txt` und Manifest
-`policy_carrier_manifest_v23_relab.json` liegen: dieselben 2.345 Dateien wie
-b01, nur die 200 Policy-Dateien durch ihre lehrer-relabelten Kopien ersetzt
-(204.008 Lehrerzuege, 0 Fehler). **Ein Faktor, dieselben Partien**, b01 ist
-die Kontrolle.
-
-Es fehlen die 200 Cache-Bloecke der Kopie, dann der Lauf:
-
-```
-PYTHONIOENCODING=utf-8 python -X utf8 -u tools/build_cache_incremental.py --data-dir data/relabeled_v23 --encoder 2d --value-target-variant nortv --workers 6
-```
-
-```
-export MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v23_relab.json MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_VAL_POOL='^selfplay_v22-b05'
-python -u train.py --name v23-b05 --load v22-b05 --file-list data/window_v23_relab.txt --extra-data-dir data/relabeled_v23 --encoder 2d --value-target-variant nortv --value-head wdl --ownership-head-2d --ownership-weight 1.0 --endgame-head --opp-points-head --moon-loss-weight 0 --select-by-brier --val-frac 0.05 --epochs 12 --lr 5e-5 --lr-schedule cosine --lr-t-max 12 --seed 20260828
-```
-
-**Vor dem Start pruefen:** der Val-Pool-Regex muss die relabelten Dateien
-treffen (`^selfplay_v22-b05` deckt beide Praefixe), und die
-Korpus-Zusammensetzung im Log muss 200 relabelte Traeger zeigen, nicht 200
-rohe.
+`v23-b05` (Policy-Klasse per hv2-Lehrer relabelt, sonst wie b01): Arena 85:75
+fuer b05, p = 0,53, Spalten 0,679 gegen 0,635 (beide Richtungen vorn,
+nachgetragen 2026-09-01), Punkte gleich. Nicht belegt besser, b01 bleibt
+Generator. Herleitung `PREREG_reanalyze_label_depth.md` par.A1; die dortige
+Zeile-1-Frage (Spielen gegen Labeln bei Suchtiefe) ist damit NICHT gemessen,
+gefahren wurde die Lehrer-Variante. Laufzeit 7,42 h, davon 4,98 h einkerniger
+Datenaufbau (`cache_build_time` par.11).
 
 ### 3.2 Phase 3: GESCHLOSSEN ohne Bau (2026-09-01)
 
@@ -215,7 +214,7 @@ solcher markiert.
 
 ---
 
-## 3. STAND JETZT
+## 4. STAND JETZT
 
 **Champion:** `v21_2d_brierbest`, Elo **1226** [1188, 1269] auf der R5-Fix-Leiter
 (Stand 2026-08-31, nach Eintragung der Anker- und der Champion-Kante von b01; der
@@ -338,47 +337,47 @@ Stack-Draw-Kontrollfluss EIN, Bootstrap-Horizont 2, Seed-Positionen AUS
 (ungebaut). Vollstaendig in `PREREG_v23_window.md` par.4c.
 ---
 
-## 4. OFFENE ENTSCHEIDUNGEN (Nutzer)
+## 5. OFFENE ENTSCHEIDUNGEN (Nutzer)
 
 | Punkt | Worum es geht |
 | --- | --- |
 | **b04: welcher Zweig wird breiter** | Flach-Zweig `hidden_size` 512 ist ohne Bau fahrbar; Conv-Zweig `conv_channels` 48 / `conv_layers` 2 braucht zwei Flags, ein Checkpoint-Feld und eine Ableitung beim Laden -- sonst ist der Checkpoint nicht ladbar (`PREREG_capacity_sim_frontier.md` par.10) |
-| **frozen_v3: woher die Zustaende** | (a) Bestand `selfplay_tor2a-v23b01_*` (200 Partien, 0 Kosten) -- aber argmax-deterministisch, ohne Wurzelrauschen, also eine ENGERE Verteilung als das Spiel, fuer das geeicht wird. (b) frische Sockel-Partien mit Rauschen, rund 1 h fuer 400. Empfehlung (b): der Zweck der Abloesung ist, die Verteilungsluecke zu schliessen, nicht sie zu ersetzen (`PREREG_frozen_v3_eval_set.md` par.3) |
+| ~~frozen_v3: woher die Zustaende~~ ERLEDIGT 2026-09-01 | Weg (b) gefahren: 400 frische Sockel-Partien (24,2 min), Satz und zwei Orakel-Label-Saetze gebaut (`PREREG_frozen_v3_eval_set.md` par.7-9). Quelldateien liegen im restic-Backup (`archive_pre_v24/`) |
+| **Generatorwahl bei Gleichstand der Arme** | v23 hatte vier Arme; "nicht belegt besser => Amtsinhaber bleibt" stand nicht vorab, und b05 fuehrte im Punktschaetzer bei Siegen UND Spalten. Regel fuer v24 VOR der ersten Arm-Arena festlegen: Amtsinhaber, Punktschaetzer wie Tor 2, oder Spaltenprofil (`docs/generation_loop.md`, Abschnitt "Generatorwahl unter Armen") |
 | ~~Loeschfreigaben~~ ERLEDIGT 2026-09-01 | `data/onpolicy_v22-b05/` und `-b06/` auf Nutzer-Freigabe geloescht (je 31 Dateien, 32 + 34 MB). Vorher geprueft: KEINE Fenster- oder Traegerdatei verweist darauf. Die Preregs `heuristic_v2_long_rows` (DAgger-Runden) und `v23_window` zitieren sie im TEXT -- die Herleitungen bleiben lesbar, die Rohpartien sind weg |
 | **Messartefakte tracked?** | `evaluations/artifacts/` ist ungetrackt; Preregs zitieren die JSONs als Beleg, ein frischer Klon hat sie nicht. Zurueckdrehen: `.gitignore`-Zeile raus, `git add -f` |
 | **Push** | NIE ohne ausdrueckliche Anweisung; der Ahead-Stand wird im CHAT gemeldet, nicht hier gefuehrt |
 
 ---
 
-## 5. OFFENE STRAENGE -- abgeglichen mit dem Prereg-Index (2026-08-31)
+## 6. OFFENE STRAENGE -- abgeglichen mit dem Prereg-Index (2026-08-31, nachgefuehrt 2026-09-01)
 
-Der Index zaehlt (Stand 2026-09-01, nachgezaehlt) **21 OFFEN, 75 ENTSCHIEDEN,
-8 UEBERHOLT**. Beim Durchgang an diesem Tag (Nutzer-Verdacht: "mir kommt vor es ist
-nicht alles vom Status aktuell") sind DREI Koepfe berichtigt worden, die gegen den
-eigenen Stand standen: `policy_surprise_weighting` sagte "NICHTS GEBAUT", waehrend
-b03 gebaut UND gemessen war; `cache_build_time` fuehrte Hebel (3) ohne Nutzniesser,
-obwohl der b05-Lauf ihn geliefert hat; `r5_solver_split` verwies auf
-"Trainings-Eingriffe", die Phase 3 am selben Tag ausgeschlossen hat. Beim Abgleich
-sind zwei Koepfe berichtigt worden, die gegen ihren eigenen Stand standen:
-`cache_build_time` sagte "nicht in train.py verdrahtet" (`--cache-file`
-existiert seit `dc40551`, train.py:2554), und `v23_reachability_recheck`
-sagte "v22-Self-Play per Tor-Regel gestoppt" (es laeuft seit dem 2026-08-30).
+Der Index zaehlt (Stand 2026-09-01 abends, aus dem Generator) **20 OFFEN, 77 ENTSCHIEDEN, 8 UEBERHOLT** (`search_depth_column_optimum` ist wieder OFFEN, `frozen_v3_eval_set` und `v23_reachability_recheck` sind ENTSCHIEDEN)****.
+Koepfe, die gegen ihren eigenen Koerper standen, sind an drei Tagen berichtigt
+worden: am 2026-08-31 `cache_build_time` und `v23_reachability_recheck`, am
+2026-09-01 frueh `policy_surprise_weighting`, `cache_build_time` (Hebel 3
+hat einen Nutzniesser) und `r5_solver_split`, am 2026-09-01 abends bei der
+Pruefung aller geaenderten Preregs `prior_blind_spot` (Kopf behauptete die
+widerlegte Erklaerung), `heuristic_v2_long_rows` (Erzeugung "laeuft"),
+`v23_window` (Arm-Frage offen), `search_depth_column_optimum` (jetzt OFFEN,
+Stufe 4), `capacity_sim_frontier`, `reanalyze_label_depth`,
+`policy_surprise_weighting` (Kennzahlen).
 
 **Am laufenden Strang, mit Platz im Fahrplan:**
 
 | Prereg | Wo es haengt |
 | --- | --- |
-| `v23_window` | Fensterbau -- Abschnitt 2.2 |
-| `capacity_sim_frontier` | b02/b04 -- Abschnitt 2.3 |
+| ~~`v23_window`~~ | ENTSCHIEDEN: Fenster gebaut, alle Tore und alle Arme gemessen |
+| `capacity_sim_frontier` | b02 gemessen (ein Drittel der Spalten, Vergleich NICHT einfaktoriell: LR-Rezept, par.12); b04 wartet auf den Zweig-Entscheid (Abschnitt 5) |
 | ~~`policy_surprise_weighting`~~ | ENTSCHIEDEN 2026-09-01: b03 traegt nicht (Orakel Gleichstand, Arena 75:85) |
-| `reanalyze_label_depth` | Relabel-Etappe: Policy per hv2-Lehrer, Value tief -- Abschnitt 2.2 |
+| `reanalyze_label_depth` | Teil A (Lehrer-Relabeln) gefahren, Abschnitt 3.1; die Zeile-1-Frage (flach gegen tief nachgelabelt) und Teil B (Value tief) UNGEMESSEN |
 | ~~`r5_solver_split`~~ | Teil B war Phase 3 -- GESCHLOSSEN ohne Bau (2026-09-01) |
-| `v23_reachability_recheck` | Stufe 0 NACH dem v23-Training |
-| `search_depth_column_optimum` | **Stufe 4 Teil A GEMESSEN (par.6)**: die tiefere Suche verwirft den Prior-Top-1 in 83 statt 49 Prozent der Faelle (74:6 diskordant, p = 5,4e-16) -- die Delle sitzt im BAUM, nicht an der Wurzelgewichtung. **Offen: Teil B** (Spalten-Etikett der verworfenen Zuege, Definition in par.6a berichtigt), rund 20 min, braucht einen zweiten Trace-Durchgang |
+| ~~`v23_reachability_recheck`~~ | ENTSCHIEDEN 2026-09-01: 14,64 Prozent tot-kartiert gegen 13,89 beim Vorgaenger, Stufe 1 wird NICHT eroeffnet; Quelldateien im restic-Backup |
+| `search_depth_column_optimum` | **Stufe 4 Teil A (par.6) war auf 89 distinkten statt 200 Zustaenden gerechnet** (zwei identische Paritaetslaeufe als vier Bloecke gezaehlt); Verdikt 0,49 gegen 0,83 haelt, Kennzahlen nicht. **Wiederholung mit frischem Zustandssatz: par.6b.** Dazu berichtigt: m=25-Praemisse (Clamp ist 16), "@100 33:47" ist n.s. (par.2j2), drei der "vier Wurzel-Eingriffe" waren Blatt-Eingriffe. Offen: Teil B (zweiter Trace-Durchgang mit Reihennummer) |
 | `special_tile_yield` | Kanaele 77/78 gebaut, ihre Wirkung nie isoliert |
 | `cache_build_time` | Hebel (3) hat seit 2026-09-01 einen Nutzniesser: **4,98 h** einkerniges Zusammenfuegen bei neuer Fenster-Zusammensetzung (par.11). Die vermisste serielle Vollreferenz liegt damit auch vor |
-| `frozen_v3_eval_set` | **NEU 2026-08-31 (Nutzer):** das Eval-Set stammt aus der plattenBLINDEN Aera (v1 = v10b/v12, v2 = v18/v19); Abloesung aus `v23-b01`. Zustandssatz und Orakel-Labels registriert, nichts gebaut. Vor dem Bau faellt ein Entscheid, siehe Abschnitt 4 |
-| `geometric_envelope` | Gelaender fuer die fruehen Runden -- Stufe 0 ist netzfrei und kann VOR dem v23-Training laufen |
+| `frozen_v3_eval_set` | ENTSCHIEDEN und GEBAUT 2026-09-01 (Satz 1.800 Zustaende, Orakel aus b01 und v21, Zirkularitaet belegt, par.7-9). Nachgetragen: die Bruecke gilt nur fuer Runden 1-4; Quelldateien im restic-Backup; Artefakte ohne `laufzeit`-Block |
+| `geometric_envelope` | Gelaender fuer die fruehen Runden. Naechster Schritt laut par.3d: Spreizungs-Messung auf b01 (`tiling_candidate_spread.py`), dann Stufe 0 (Vorwaertspaesse noetig, nicht netzfrei). Das zitierte Artefakt `tiling_candidate_spread.json` (0,017 / 0 von 51) liegt NICHT im Baum |
 
 **Registriert, nicht eingetaktet** (jeder Bau braucht vorher eine
 Registrierung): `plate_policy_supervision`, `saturating_score_utility`,
@@ -413,7 +412,7 @@ einzige Arm, der alle Cache-Bloecke entwertet.
 
 ---
 
-## 6. MERKLISTE CODEPFLEGE (Audit 2026-08-27, bewusst verschoben)
+## 7. MERKLISTE CODEPFLEGE (Audit 2026-08-27, bewusst verschoben)
 
 **Naechstes Build-Fenster** (brauchen cargo, Paritaets-Gate): sechs Dialekte
 fuer "ist dieser Bool-Knopf an?" (Befund 4); drei stille Env-Verschlucker
@@ -431,7 +430,7 @@ Fundstellen im Audit-Bericht; Details im Archiv-Kapitel.
 
 ---
 
-## 7. STRUKTURBEFUNDE, die weitergelten
+## 8. STRUKTURBEFUNDE, die weitergelten
 
 - **Der Champion vollendet keine Spalten**, und der Grund ist Verteilung,
   nicht Versorgung: eine volle Spalte kostet 21 Zellen, das Netz verbraucht

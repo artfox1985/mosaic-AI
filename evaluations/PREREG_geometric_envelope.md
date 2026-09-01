@@ -230,7 +230,11 @@ exakt) und der Leitidee, dass w_e und w_v gegenlaeufig verlaufen.
 
 **Vor der Wahl steht eine Messung, und sie ist billig:** die 0,017 stammen
 von `v18_best`, einem PLATTENBLINDEN Netz
-(`evaluations/artifacts/tiling_candidate_spread.json`). Ob ein
+(`evaluations/artifacts/tiling_candidate_spread.json` -- **diese Datei liegt
+NICHT im Baum** (Pruefung 2026-09-01; nur das Werkzeug
+`tools/tiling_candidate_spread.py` existiert). Die Zahlen 0,017 und "0 von 51"
+sind damit im Repo unbelegt; warum sie nicht einfach neu erzeugt werden
+koennen, steht in par.3e). Ob ein
 spaltenfaehiger Kopf unter denselben Kandidaten breiter streut, ist offen
 und mit dem vorhandenen Werkzeug in einem Lauf zu klaeren:
 `tools/tiling_candidate_spread.py --model v23-b01_brierbest --k 12`.
@@ -341,3 +345,25 @@ ihn davon unterscheidet, ist zweierlei und nicht mehr -- die Potentialform
 ueberhaupt bauen kann. Faellt der Arm negativ aus, ist das der Befund: dann
 traegt auch die geometrische Umgehung den fruehen Engpass nicht, und es
 bleibt die Betrags-Schiene.
+
+## par.3e Das Spreizungs-Artefakt fehlt, und das Werkzeug kann b01 nicht laden (Pruefung 2026-09-01)
+
+`evaluations/artifacts/tiling_candidate_spread.json` existiert im Baum nicht;
+`tools/tiling_candidate_spread.py` existiert. Zwei Gruende, warum die Zahl
+nicht einfach nachgemessen wurde:
+
+1. **Der Checkpoint fehlt:** das Werkzeug laedt `models/alphazero_<name>.pth`
+   (Zeile 59); `alphazero_v18_best.pth` liegt nicht mehr in `models/`. Die
+   Erstmessung (0,017 Spreizung, 0 von 51 gekippt) ist damit im Repo nicht
+   reproduzierbar und gilt als UNBELEGTE Erinnerung, nicht als Befund.
+2. **Das Werkzeug ist flach:** es baut `MosaicNet` mit `state_to_tensor`
+   (Zeilen 51-62), also den Flach-Encoder. `v23-b01_brierbest` ist ein
+   `Mosaic2DNet`; die registrierte Messung "Spreizung auf b01" (par.3d iv)
+   braucht daher zuerst eine kleine Werkzeug-Anpassung (2D-Encoder laden,
+   Eingabeform vom Modell nehmen). Das ist ein Bau, kein Handgriff, und wird
+   hier nicht nebenbei erledigt.
+
+Folge fuer par.3d (i): Form A ist NICHT "gemessen ausgeschlossen", sondern
+aufgrund einer nicht mehr belegbaren Messung an einem plattenblinden Netz
+als unwahrscheinlich eingestuft. Die Entscheidung zwischen A, B und C faellt
+erst nach der b01-Messung; bis dahin ist keine Form gesetzt.

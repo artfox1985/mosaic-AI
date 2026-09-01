@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: GEBAUT UND GEFAHREN. 29.450 Partien wie in par.1 zugeschnitten (17.450 hv2 + 12.000 v22-b05), Auswahl seed-gezogen (par.2a), Traeger-Manifest mit 380 Eintraegen. Alle vier Tore bestanden (par.2b-2e), Champion-Kante auf Augenhoehe ohne Promotion (par.2f). Kaltstart-Arm b02: Kandidat ist `_brierbest` (par.2h, 33:47). Die Arme des Zyklus laufen weiter, das FENSTER ist entschieden. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v23-Trainingsfenster zugeschnitten, wenn zum ersten Mal ein HEURISTIK-Lehrerkorpus und ein NETZ-Korpus in dasselbe Fenster sollen? | Beleg: GEBAUT UND GEFAHREN. 29.450 Partien wie in par.1 (17.450 hv2 + 12.000 v22-b05, alle drei Laeufe @100 Sims; par.4c berichtigt 2026-09-01), Auswahl seed-gezogen (par.2a), Traeger-Manifest 380 Eintraege. Alle vier Tore bestanden (par.2b-2e), Champion-Kante Augenhoehe ohne Promotion (par.2f). Alle Arme gemessen (b02/b03/b05, par.2h), keiner belegt besser: b01 ist Generator fuer v24. -->
 
 # Vorregistrierung: v23-Fenster
 
@@ -300,8 +300,13 @@ Lauf ohne Partie-Logs gefahren wurde. Das ist hier vertretbar, weil die
 Entscheidungsmetrik dieser INTERNEN Auswahl vorab die Siegzahl war; fuer die
 eigentliche Arm-Frage (b02_brierbest gegen b01) sind sie zu erheben.
 
-**Offen bleibt die Arm-Frage selbst:** `v23-b02_brierbest` gegen
-`v23-b01_brierbest` -- Warmstart gegen Kaltstart auf demselben Fenster.
+~~**Offen bleibt die Arm-Frage selbst:** `v23-b02_brierbest` gegen
+`v23-b01_brierbest` -- Warmstart gegen Kaltstart auf demselben Fenster.~~
+**ERLEDIGT 2026-09-01:** gleich stark (85:75 fuer b01), aber b02 baut nur ein
+Drittel der Spalten (`PREREG_capacity_sim_frontier.md` par.12/13, mit dem
+dort nachgetragenen Vorbehalt zum Lernraten-Rezept). Auch b03 und b05 sind
+gemessen; kein Arm ist belegt besser, b01 ist Generator fuer v24
+(`PREREG_v24_window.md` par.4).
 
 ## par.3 Drei Punkte, die benannt gehoeren -- keiner ist geloest
 

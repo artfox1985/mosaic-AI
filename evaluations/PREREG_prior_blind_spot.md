@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | Beleg: **ENTSCHIEDEN**: E Miss-Rate 1,21% ⇒ Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (Verhaeltnis 1,232 -> 2,287), Schwelle 3 nicht erreicht (par.G3, 2026-09-01: b01 misst 2,814 @400 und 2,135 @100 -- das Verhaeltnis waechst MIT der Suchtiefe und erklaert die Spalten-Delle mechanisch) ⇒ keine Wiedereroeffnung, aber Pflicht-Diagnostik je Champion. `evaluations/artifacts/t_e_prior_blind_spot.json`, `evaluations/artifacts/t_g_gumbel_scale_v21.json` -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verpasst die fixe Gumbel-Wurzelmenge gute Zuege (Task E), hilft groessere Wurzelbreite (F), und wie steht die sigma/Prior-Balance in der WDL-Aera (G)? | Beleg: ENTSCHIEDEN: E Miss-Rate 1,21% => Regel 1, F nicht eingetaktet; G Aera-Effekt bestaetigt (1,232 -> 2,287), Schwelle 3 nicht erreicht. par.G3: b01 misst 2,814 @400 gegen 2,135 @100 -- die kausale Rolle fuer die Spalten-Delle ist aber GEPRUEFT UND WIDERLEGT (`gumbel_c_scale_arm` par.5). Keine Wiedereroeffnung, Pflicht-Diagnostik je Champion bleibt. Artefakte `t_e_prior_blind_spot.json`, `t_g_gumbel_scale_v21.json` -->
 
 # Vorregistrierung: Prior-Blindfleck & Wurzelbreite (externes Review R2)
 
@@ -431,8 +431,10 @@ den Regler in Richtung des flacheren Spiels drehen -- was die Spalten hebt
 und moeglicherweise die Staerke kostet. Das ist eine Arena-Frage, keine
 Kalibrierungs-Frage.
 
-**Kostenhinweis fuer den Fall, dass jemand es doch fahren will:**
-`GUMBEL_C_SCALE` ist eine Konstante (net_mcts.rs:2059), kein Laufzeit-Knopf.
+**Kostenhinweis fuer den Fall, dass jemand es doch fahren will** (Stand vor
+dem 2026-09-01; seither ist `MOSAIC_GUMBEL_C_SCALE` ein Laufzeit-Knopf,
+`net_mcts.rs:2059-2083`, und der Arm ist gefahren, `PREREG_gumbel_c_scale_arm`):
+`GUMBEL_C_SCALE` war eine Konstante (net_mcts.rs:2059), kein Laufzeit-Knopf.
 Ein Arm braucht Engine-Aenderung, Wheel-Neubau und Paritaets-Gate -- und
 vorher eine eigene Registrierung mit Arena-Zweig, nicht nur der
 Spalten-Messung.

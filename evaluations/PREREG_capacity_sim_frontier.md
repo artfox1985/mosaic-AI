@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse und Sim-Budget? | Beleg: Kaltstart-Arm gemessen. **par.12/13: gleich stark, aber nur ein DRITTEL der Spalten** (b01 0,62 gegen 0,17 fuer `_brierbest` und 0,56 gegen 0,23 fuer `_best`, Staerke 85:75 bzw. 92:68) -- der Checkpoint erklaert es nicht, das Spaltenwissen sitzt in der LINIE, nicht im Korpus allein. Frontier selbst weiter OFFEN: Breiten-Arm b04, Zweig-Entscheid beim Nutzer (par.10), Kostentor zuerst (par.5). -->
+<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse und Sim-Budget? | Beleg: Kaltstart-Arm gemessen, **par.12/13: gleich stark (85:75), aber nur ein DRITTEL der Spalten** (0,17 gegen 0,62); der Checkpoint erklaert es nicht. VORBEHALT 2026-09-01: NICHT einfaktoriell (b02 mit Default-LR ohne Cosine, 40 Epochen; Manifest-Diff par.12). Frontier selbst OFFEN: Breiten-Arm b04, Zweig-Entscheid beim Nutzer (par.10), Kostentor zuerst (par.5). -->
 
 # Vorregistrierung: Kapazitaets-Sim-Frontier
 
@@ -220,8 +220,16 @@ zustaendig (par.10), dessen Breiten-Entscheid weiter beim Nutzer liegt.
 ## par.12 WARM GEGEN KALT GEMESSEN: gleich stark, aber NICHT gleich gebaut (2026-09-01)
 
 Die Arm-Frage aus par.9/par.10 ist gefahren: `v23-b02_brierbest` (Kaltstart)
-gegen `v23-b01_brierbest` (Warmstart), beide @400, **dasselbe Fenster, ein
-Faktor**. Gepaart mit getauschten Rollen auf DENSELBEN Seeds (Basis 20260980,
+gegen `v23-b01_brierbest` (Warmstart), beide @400, **dasselbe Fenster** --
+~~ein Faktor~~ **BERICHTIGT 2026-09-01: NICHT ein Faktor.** Der Manifest-Diff
+`models/manifest_train_v23-b01_*` gegen `..._v23-b02_*` (`cli_args`) zeigt
+neben `load` vier weitere Unterschiede: `lr 5e-05 -> None` (Config-Default,
+train.py: 0,0004), `lr_schedule cosine -> none`, `epochs 12 -> 40`,
+`lr_t_max 12 -> None`. Der Kaltstart lief also mit rund achtfacher Lernrate
+ohne Cosine und anderem Epochenbudget. Das ist fuer einen Kaltstart ein
+uebliches Rezept, aber der Vergleich trennt "Startgewicht" nicht von
+"Lernraten-Rezept"; die Folgerung unten ("das Spaltenwissen sitzt in der
+LINIE") gilt unter diesem Vorbehalt. Gepaart mit getauschten Rollen auf DENSELBEN Seeds (Basis 20260980,
 2 x 80 Partien, `paired_arena_env_ab --log-games`, threads 10), wie der
 Tor-2b-Praezedenzfall.
 
@@ -307,7 +315,9 @@ bauen rund ein Drittel dessen, was der Warmstart baut.
 
 **Der Befund lautet also:** auf DEMSELBEN Fenster, mit DERSELBEN Breite, bei
 statistisch nicht unterscheidbarer bis leicht unterlegener Spielstaerke baut
-ein Kaltstart nur ein Drittel der Spalten. Das Spaltenwissen sitzt nicht im
+ein Kaltstart nur ein Drittel der Spalten -- mit dem Vorbehalt aus par.12,
+dass Kalt- und Warmstart auch im Lernraten-Rezept verschieden waren (ein
+Kaltstart mit 5e-5/Cosine/12 Epochen ist ungemessen). Das Spaltenwissen sitzt nicht im
 Korpus allein, sondern in der LINIE -- b01 erbt es aus v22-b05, das seinerseits
 auf dem Spaltenkorpus trainiert wurde.
 

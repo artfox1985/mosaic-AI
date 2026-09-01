@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt tieferes Nachlabeln die Betrags-Daempfung? | Beleg: **Teil A GEBAUT und GEMESSEN (par.A1, 2026-09-01)**: `v23-b05` = Policy per hv2-Lehrer nachgelabelt, ein Faktor gegen b01. Arena 85:75 fuer b05, aber p = 0,53 -- nicht belegt besser; offline widersprechen sich drei Orakel auf winzigen Differenzen. b01 bleibt Generator fuer v24. Teil B (Value tief) bleibt UNGEBAUT. -->
+<!-- STATUS: OFFEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt tieferes Nachlabeln die Betrags-Daempfung? | Beleg: Zeile-1-Frage UNGEMESSEN (par.3 A1/A2 nie gefahren). Gefahren wurde stattdessen Lehrer-Relabeln (par.4a): `v23-b05`, Arena 85:75 fuer b05, p = 0,53, Spalten 0,679 gegen 0,635 (par.A1, Kennzahlen nachgetragen 2026-09-01) -- nicht belegt besser, b01 bleibt Generator fuer v24. Teil B (Value tief) UNGEBAUT. -->
 
 # Vorregistrierung: Reanalyze -- Spielen und Labeln entkoppeln
 
@@ -187,10 +187,23 @@ Bestandteil von b01.
 
 ## par.A1 TEIL A GEBAUT UND GEMESSEN: `v23-b05` (2026-09-01)
 
+**Vorab, nachgetragen 2026-09-01:** dieser Absatz misst NICHT den in par.3
+registrierten Teil A (A1 flach gegen A2 tief nachgelabelt). Gefahren wurde die
+Variante aus par.4a/par.4b, Lehrer-Relabeln der Policy-Klasse -- der Schwenk
+ist dort vor der Messung begruendet, par.3 blieb aber unveraendert stehen.
+Die Zeile-1-Frage "reagieren Spielen und Labeln unterschiedlich auf
+Suchtiefe" ist damit weiterhin UNGEMESSEN.
+
 **Was gebaut wurde.** Der Relabel-Arm der v23-Generation: dieselben 2.345
 Fensterdateien wie die Kontrolle `v23-b01`, aber die 200 Policy-Dateien durch
 ihre lehrer-relabelten Kopien ersetzt (204.008 hv2-Lehrerzuege, 0 Fehler).
-**Ein Faktor, dieselben Partien.**
+**Ein Faktor, dieselben Partien** -- Manifest-Diff `cli_args` b01 gegen b05
+(nachgetragen 2026-09-01): `file_list window_v23.txt -> window_v23_relab.txt`,
+`extra_data_dir None -> data/relabeled_v23`, `name`, `surprise_alpha None ->
+0.0` (Default, wirkungsgleich) und `val_pool '^selfplay_v22-b05-' ->
+'^selfplay_v22-b05'` (Regex ohne Bindestrich, damit die relabelten Kopien
+mit in den Val-Pool fallen; sachlich noetig, aber ein zweiter Unterschied im
+Validierungssatz).
 
 | | Wert |
 | --- | --- |
@@ -217,6 +230,27 @@ Punkte 46,72 gegen 46,62, Margin +0,10
 | v18 auf `frozen_v1` | **0,5538** / 0,5308 | 0,2320 / 0,2296 | b05 |
 | b01 auf `frozen_v3` | 0,6423 / **0,6455** | 0,2115 / **0,2219** | b01 (zirkulaer, siehe `PREREG_frozen_v3_eval_set` par.9) |
 | v21 auf `frozen_v3` | 0,4580 / **0,4644** | **0,1460** / 0,1363 | gemischt |
+
+**Standard-Kennzahlen, nachgetragen 2026-09-01** (aus den Arena-Artefakten
+`paired_arena_env_relabel_b05_first.json` / `_b01_first.json` und
+`tools/probes/arena_column_probe.py`, Artefakte `columns_relabel_*.json`;
+159 von 160 Partien nachspielbar):
+
+| Kennzahl | b05 | b01 |
+| --- | --- | --- |
+| volle Spalten je Seite, b05 zuerst (n=79) | **0,6962** | 0,6329 |
+| volle Spalten je Seite, b01 zuerst (n=80) | **0,6625** | 0,6375 |
+| volle Spalten gepoolt (n=159) | **0,679** | 0,635 |
+| lange Reihen begonnen / vollendet je Seite | 4,52 / 2,97 | 4,40 / 2,96 |
+| Strafleiste (`total_floor`) je Seite | 8,86 | 9,88 |
+| Punkte / Margin | 46,72 / +0,10 | 46,62 |
+
+Punkte je Kriterium fehlen: `tools/plate_points_from_arena.py` nimmt
+Arena-Kuerzel, nicht dieses Artefakt-Format; Spalten sind ueber die
+Brettgeometrie abgedeckt. **Lesart:** der Relabel-Arm liegt in BEIDEN
+Richtungen auch bei den Spalten vorn (+0,044 gepoolt), ohne Signifikanzpruefung
+auf Block-Ebene; fuer den Generator-Entscheid (par.4 der v24-Prereg) lag diese
+Zahl am Entscheidungstag nicht vor.
 
 **Verdikt: der Relabel-Arm ist NICHT belegt besser -- und auch nicht
 schlechter.** Er ist der einzige Arm dieser Generation mit positivem

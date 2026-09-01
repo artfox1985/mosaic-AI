@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA. Plateau 25-100 (~0,6 gegen 0,34 ab 250, par.2i), aber ein TAUSCH (@25 verliert 11:29, @100 33:47). Faktor ist die TIEFE, nicht die Breite; bei plattenblindem Prior tritt der Effekt nicht auf. Betriebspunkt 100 Sims gefahren. **OFFEN: Stufe 4, seit 2026-09-01 konkret zugeschnitten (par.5)** -- jetzt die einzige verbliebene Erklaerung, nachdem vier Wurzel-Eingriffe gemessen wirkungslos sind. -->
+<!-- STATUS: OFFEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (b05-Kurve par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH: @25 verliert 11:29 (signifikant), @100 33:47 (p = 0,14, Tendenz, par.2j2). Faktor ist die TIEFE, nicht die Breite (par.2k; m=25-Praemisse in par.2c am 2026-09-01 berichtigt, Clamp ist 16). Betriebspunkt 100 Sims gefahren. **OFFEN: Stufe 4** -- Teil A (par.6) war auf 89 distinkten statt 200 Zustaenden gerechnet, Wiederholung par.6b; Teil B ungebaut. -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -62,7 +62,7 @@ Gemessene Punkte bisher: 400 Sims 97/h, 150 Sims 300/h, 50 Sims
 ~565/h (je Seite).
 
 **Registrierter Gegeneinwand, der bei der Uebernahme mitgelesen werden
-MUSS (`PREREG_v22_window.md` par.4):** "ein ueberwiegend aus
+MUSS (`PREREG_v22_window.md` par.5, Zeilen 153-154; Verweis am 2026-09-01 berichtigt, par.4 dort handelt vom Vorzug):** "ein ueberwiegend aus
 150-Sim-Partien bestehendes Fenster kalibriert den Value-Kopf auf
 schwaechere Trajektorien". Mehr Vollendungen von einem schwaecher
 spielenden Erzeuger sind nicht automatisch besseres Material -- genau
@@ -75,10 +75,23 @@ Default 0 steht und die Formel `m = sims/16` greift (Registratur;
 net_mcts.rs:2514) -- der Gipfel bei 100 Sims hat m=6, der 400er-Punkt
 m=25. Bis zur Trennung heisst der Befund SUCHBUDGET, nicht Suchtiefe.
 
-Vorab entschieden ist eines: das VERHAELTNIS scheidet als Erklaerung
+**BERICHTIGT 2026-09-01, am Code geprueft:** die Formel ist
+`clamp(round(sims/16), 4, GUMBEL_TOP_M)` mit `GUMBEL_TOP_M = 16`
+(`net_mcts.rs:2097`, `gumbel_top_m_for_budget` `net_mcts.rs:2135-2141`).
+Der 400er-Punkt hat also **m=16, nicht 25**, und die Sims je Wurzelkind sind
+NICHT konstant: 400/16 = 25, 100/6 = 16,7, 50/4 = 12,5, 25/4 = 6,25,
+10/4 = 2,5. Die folgende "vorab entschiedene" Ausschlussbegruendung steht
+damit auf einer falschen Praemisse; sie wird nicht geloescht, sondern als
+falsch markiert. Das Verdikt von par.2k (Tiefe, nicht Breite) traegt
+trotzdem, weil die Schluesselzelle (400, m=6) gegen (400, m=16) misst und
+dort keine Bewegung zeigt; die Spalte "m=25" der 2x2-Tabellen unten heisst
+in der 400er-Zeile real "m=16 (Default)", und die Zelle (100, m=25) ist ein
+Override UEBER die Code-Obergrenze, die 2x2 also nicht symmetrisch.
+
+~~Vorab entschieden ist eines: das VERHAELTNIS scheidet als Erklaerung
 aus, weil die Formel Sims-je-Wurzelkind ueber alle Messpunkte bei ~16
 konstant haelt (100/6, 400/25, 50/3) -- eine Groesse, die nicht
-variiert, kann keinen Gipfel erzeugen.
+variiert, kann keinen Gipfel erzeugen.~~ (falsche Praemisse, siehe oben)
 
 2x2 mit zwei bereits gemessenen Zellen, `MOSAIC_GUMBEL_TOP_M` explizit:
 
@@ -310,9 +323,21 @@ darf daraus nicht auf "besser" schliessen (und umgekehrt).
 Fuer die KORPUS-Erzeugung bleibt die Frage offen und unbequem: ein
 Erzeuger, der 11:29 gegen den Betriebspunkt verliert, ist nicht
 selbstverstaendlich besseres Trainingsmaterial -- genau darauf zielt
-der registrierte Gegeneinwand aus PREREG_v22_window par.4. Deshalb
-laeuft Teil 2 mit dem Kompromiss-Kandidaten 100 Sims (gleiche
-Spaltenrate wie 25, vierfaches Suchbudget).
+der registrierte Gegeneinwand aus PREREG_v22_window par.5. Deshalb
+lief Teil 2 mit dem Kompromiss-Kandidaten 100 Sims (gleiche
+Spaltenrate wie 25, vierfaches Suchbudget); Ergebnis in par.2j2 unten.
+
+## par.2j2 STUFE 3 TEIL 2 GEFAHREN: @100 verliert 33:47, NICHT signifikant (2026-08-30, nachregistriert 2026-09-01)
+
+Dieser Absatz fehlte: das Ergebnis stand nur im Kopf und in par.6.
+`evaluations/paired_gating_result_b05at100_vs_b05at400.json` (seit
+2026-09-01 eingecheckt): 40 Paare, SPRT-Verdikt H0, **33:47**, McNemar
+p = 0,1435, 95%-KI der gepaarten Differenz [-0,744, +0,044] -- das KI
+enthaelt die Null. **Base-Seed 20260921**, nicht der in Stufe 3 registrierte
+20260920 (den hat der @25-Lauf); der Seedwechsel war nicht registriert und
+wird hier nachgetragen. Lesart: Richtung wie beim @25-Arm (11:29, p = 0,0117,
+signifikant), aber fuer sich genommen kein Beleg. Wo im Text "@100 verliert
+33:47" als Beleg steht, gilt: Tendenz, nicht Befund.
 
 ## par.2k STUFE 2c GEFAHREN: es ist die TIEFE, nicht die Breite
 
@@ -374,6 +399,12 @@ v21_2d_brierbest (plattenblind trainiert, Prior-Ratio 0,59 gegen b05s
 | --- | --- | --- | --- |
 | b05 (spaltenkundiger Prior) | 0,6225 | 0,3325 | **+0,2900** |
 | v21 (plattenblind) | 0,1058 +- 0,0096 | 0,1317 +- 0,0100 | **-0,0258** (t -1,89) |
+
+*Nachtrag 2026-09-01:* die b05-Zeile stammt aus par.2i (Seed 20260902, je
+200 Partien, ohne SE in dieser Tabelle), die v21-Zeile aus Seed 20260941 mit
+je 600 Partien -- Stufe 2e hatte "gleiche Seeds, je 600 Partien" registriert.
+Der Kontrast ist qualitativ eindeutig (Vorzeichen und Groessenordnung), aber
+kein Vergleich unter gleichen Bedingungen.
 
 **Bei v21 tritt der Effekt NICHT auf -- er zeigt sogar leicht in die
 Gegenrichtung**, und auch die Punkte bleiben unbewegt (47,23 gegen
@@ -445,8 +476,8 @@ markiert:**
    Gegen Kosten anderer Skala (Strafleiste, Sofortpunkte) verliert die
    Spalte damit trotzdem.
 2. **Planungsproblem statt Bewertungsproblem** (Nutzer-Lesart, gestuetzt
-   von PREREG_placement_side par.14 "das Material war da, der Plan
-   nicht"): eine Spalte verlangt eine mehrrundige Farbzusage; tiefere
+   von PREREG_placement_side, Schlussabschnitt, "das Material war da, der Plan
+   nicht"; die Datei hat kein par.-Schema, Verweis berichtigt 2026-09-01): eine Spalte verlangt eine mehrrundige Farbzusage; tiefere
    Suche findet mehr gleichwertig bewertete Alternativen, die den Plan
    zerlegen, ohne dass eine einzelne Bewertung falsch waere. Dazu passt,
    dass Ordnung (Tau +0,338), k1-Sensitivitaet und Mensch-Orakel alle
@@ -483,13 +514,19 @@ beruehrt.
 
 ## par.5 STUFE 4 KONKRETISIERT -- Zuschnitt vor dem Bau (2026-09-01)
 
-**Warum jetzt:** vier Eingriffe an der WURZEL sind gemessen wirkungslos oder
-schaedlich (`PREREG_r5_value_calibration` par.12, `PREREG_gumbel_c_scale_arm`
-par.5): Value lauter (-0,125), Value leiser (n.s.), Punkte-Blend (n.s.),
-Prior/Value-Balance auf Gleichgewicht (n.s.). Nur die Suchtiefe selbst bewegt
-den Spaltenbau (0,7200 bei 100 Sims gegen 0,5150 bei 400). **Die Frage dieser
-Stufe ist damit nicht mehr eine von mehreren, sondern die einzige
-verbliebene.**
+**Warum jetzt:** vier Eingriffe sind gemessen wirkungslos oder schaedlich
+(`PREREG_r5_value_calibration` par.12, `PREREG_gumbel_c_scale_arm` par.5):
+Value lauter (-0,125), Value leiser (n.s.), Punkte-Blend (n.s.),
+Prior/Value-Balance auf Gleichgewicht (n.s.). **Berichtigt 2026-09-01:** nur
+der letzte davon ist ein WURZEL-Eingriff (`c_scale`, `net_mcts.rs:2281`);
+`VALUE_CAL_B` und `POINTS_UTILITY_W` greifen in `blended_leaf_win_prob`
+(`net_mcts.rs:1381`), also baumweit am Blattwert jedes Knotens. Aus "eine
+baumweite Blattwert-Transformation bewegt nichts" folgt nicht "die Ursache
+liegt tiefer im Baum" -- es folgt nur, dass weder Skala noch Wurzelbalance
+den Effekt tragen. Nur die Suchtiefe selbst bewegt den Spaltenbau (b01:
+0,7200 bei 100 Sims gegen 0,5150 bei 400; die Kurve dieser Prereg, par.2i,
+ist an b05 gemessen: 0,6225 gegen 0,3375). Die Frage dieser Stufe ist damit
+die naechstliegende offene, nicht "die einzige verbliebene".
 
 **Instrument, ohne Bau verfuegbar:** `net_search_state_json_trace`
 (lib.rs:928) liefert je Wurzelkandidat `prior`, `ln_prior`, `gumbel_g`,
@@ -546,15 +583,34 @@ bestehende Spalten-Abbildung `2*tc + si%2`, wie in
 ### Kosten und Reihenfolge
 
 Teil A zuerst: rund 200 Zustaende x 2 Sims-Stufen, geschaetzt 10-20 min
-(Trace bei 400 Sims rund 1-2 s je Zustand, einkernig). Teil B rechnet auf
-denselben Traces, kostet also nur Auswertung. **Faellt Teil A flach aus, ist
-Teil B gegenstandslos** -- ohne Verwerfungen gibt es nichts zu etikettieren.
+(Trace bei 400 Sims rund 1-2 s je Zustand, einkernig; gemessen 1.020 s).
+~~Teil B rechnet auf denselben Traces, kostet also nur Auswertung.~~
+(UEBERHOLT durch par.6a: der erste Trace-Durchgang hat die Reihennummer nicht
+mitgeschrieben, Teil B braucht einen zweiten Durchgang.) **Faellt Teil A flach
+aus, ist Teil B gegenstandslos** -- ohne Verwerfungen gibt es nichts zu
+etikettieren.
 
 ## par.6 STUFE 4 TEIL A GEMESSEN: die tiefere Suche ueberstimmt den Prior massiv (2026-09-01)
 
+**BERICHTIGUNG 2026-09-01 (Pruefung der Preregs), VOR dem Lesen der Zahlen:**
+die "200 Zustaende aus vier Dateien" sind keine 200. Das Artefakt
+(`evaluations/artifacts/search_depth_rejection.json`, Muster
+`selfplay_paritycheck-*.pkl`) liest zwei Paritaetslaeufe mit identischer
+Konfiguration (20 Partien, 400 Sims, Seed 20260931, deterministisch, gleiches
+Modell; `data/manifest_paritycheck-alt_*.json` und `-cscale_*.json`).
+Nachgerechnet: die ersten 50 Drafting-Zustaende von `alt_g10` sind
+zustandsgleich mit denen von `cscale_g10`, ebenso `g20`; ueber alle 200
+Eintraege sind **89 verschieden**. Damit sind die vier "Bloecke" zwei
+doppelt gezaehlte, die 200 Paare real hoechstens 100, die 74:6 real 37:3,
+und p = 5,4e-16 (korrekt gerechnet fuer 80 diskordante Paare) real rund
+2e-8 fuer 40. Das Verdikt (0,49 gegen 0,83) ueberlebt; die berichteten
+Kennzahlen nicht. **Die Messung wird mit einem distinkten Zustandssatz
+wiederholt (par.6b).** Die Zahlen unten bleiben als Erstfassung stehen.
+
 Werkzeug: `tools/probes/search_depth_rejection_probe.py` (neu). 200
 Drafting-Zustaende (Runden 2-4) aus b01-Self-Play bei Default-Knoepfen, jeder
-Zustand ZWEIMAL getract mit gleichem Seed 20260931.
+Zustand ZWEIMAL getract mit gleichem Seed 20260931. Artefakt:
+`evaluations/artifacts/search_depth_rejection.json` (Zeiger nachgetragen).
 
 | Sims | Verwerfungsanteil (Zugwahl != Prior-Top-1) | Block-SE |
 | --- | --- | --- |
@@ -572,21 +628,24 @@ Prior-Vorschlag verwirft.
 
 **Warum das die Delle verortet, ohne sie zu erklaeren:** der Prior traegt das
 Spaltenwissen (par.2l: bei plattenblindem Prior tritt der Tiefeneffekt gar
-nicht auf). Vier Eingriffe an der GEWICHTUNG des Priors gegen den Value-Term
-sind wirkungslos (`PREREG_gumbel_c_scale_arm` par.5). Hier zeigt sich, dass
-die tiefere Suche den Prior nicht leiser hoert, sondern haeufiger UEBERSTIMMT
--- das passiert im Baum, nicht an der Wurzelgewichtung.
+nicht auf). Ein Eingriff an der Wurzelgewichtung (`c_scale`) und drei an der
+Skala des Blattwerts sind wirkungslos (`PREREG_gumbel_c_scale_arm` par.5;
+Zuordnung berichtigt 2026-09-01, siehe par.5). Hier zeigt sich, dass die
+tiefere Suche den Prior haeufiger UEBERSTIMMT -- wo im Baum das entsteht, sagt
+Teil A nicht.
 
 **Was es NICHT zeigt:** dass die Suche unrecht hat. Die Tiefe gewinnt die
-Arena (@25 verliert 11:29, @100 verliert 33:47). 83 Prozent Verwerfung sind
+Arena (@25 verliert 11:29, signifikant; @100 verliert 33:47, p = 0,14, nur
+Tendenz, par.2j2). 83 Prozent Verwerfung sind
 fuer sich genommen die normale Arbeitsweise einer Suche, die besser sein soll
 als ihr Prior.
 
-**Einschraenkung, benannt:** die 200 Zustaende stammen aus vier Dateien (die
-groesseren b01-Korpora bei Default-Knoepfen sind archiviert), die Block-SE
-ruht also auf vier Bloecken. Bei diesem Effektabstand (0,49 gegen 0,83, 74:6
-diskordant) aendert das am Verdikt nichts; fuer eine knappe Zahl waere es zu
-duenn.
+**Einschraenkung, benannt -- und in der Erstfassung FALSCH benannt:** hier
+stand "vier Dateien, vier Bloecke". Real waren es zwei identische Laeufe
+(siehe Berichtigung oben). Dazu kommt, was auch fuer die Wiederholung gilt:
+alle Zustaende liegen auf Trajektorien der TIEFEN Suche (argmax @400); der
+100-Sims-Arm wird auf Stellungen befragt, die er selbst nicht unbedingt
+erreicht haette.
 
 **Teil B (Spalten-Etikett) bleibt offen** und braucht eine Zutat, die im
 Trace nicht steht: die Abbildung von der bedienten MUSTERREIHE auf die
