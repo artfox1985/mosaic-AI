@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Hebel verkuerzen den Cache-Bau des Trainings -- und bleibt der Cache dabei BIT-IDENTISCH? | Beleg: Hebel (1)+(4) abgenommen (par.7/par.9), Bit-Tor am vollen Korpus GRUEN (par.8); `--cache-file` existiert (train.py:2554). **TRAEGER-UMBAU 2026-08-31 (par.10): der Block ist jetzt traegeragnostisch, die Maske kommt beim Zusammenfuegen** -- ein Manifest-Wechsel entwertet keine Bloecke mehr (Bestand nachweislich stabil, Abnahme 4/4 gruen). (2) umgezogen, (3) offen, GPU verworfen (par.5a). -->
+<!-- STATUS: OFFEN | Frage: Welche Hebel verkuerzen den Cache-Bau des Trainings -- und bleibt der Cache BIT-IDENTISCH? | Beleg: Hebel (1)+(4) abgenommen, Bit-Tor gruen, Traeger-Umbau 2026-08-31 (par.7-10). **par.11 (2026-09-01): der Nutzniesser fuer Hebel (3) ist da** -- ein Lauf auf NEUER Fenster-Zusammensetzung kostet 4,98 h einkerniges Zusammenfuegen (v23-b05), gegen 32 s bei Cache-Treffer. Ausweg gebaut und ungenutzt: `--merge-out` plus `train.py --cache-file`. Damit liegt auch die vermisste serielle Vollreferenz vor. -->
 
 # Vorregistrierung: Zeit des Cache-Baus
 
@@ -480,3 +480,41 @@ Manifest derselbe, was der ganze Zweck des Umbaus ist.
 unveraendert in der Bauschleife -- der Weg kennt keine Bloecke) und den
 Fenster-Schluessel. Und `file_cache_key_probe` verliert seinen
 `policy_carrier`-Divergenzfall: er waere jetzt gegenstandslos.
+
+## par.11 GEMESSEN, was ein NEUES Fenster kostet -- und es ist die teuerste Zahl des Strangs (2026-09-01)
+
+Der Relabel-Lauf `v23-b05` hat zum ersten Mal eine Fenster-Zusammensetzung
+trainiert, fuer die noch KEIN Fenster-Cache lag (200 von 2.345 Dateien durch
+relabelte Kopien ersetzt). Die Blockdateien lagen alle vor -- die 200 neuen
+waren am Vorabend mit `build_cache_incremental.py --workers 6` in 391 s gebaut.
+
+| Lauf | Fenster-Cache | Datenaufbau |
+| --- | --- | --- |
+| `v23-b01` | keiner, baut auch die Bloecke | 3,45 h |
+| `v23-b02` | TRAF (identisches Fenster wie b01) | **32 s** |
+| `v23-b03` | TRAF | 45,6 s |
+| **`v23-b05`** | **fehlte** (neue Zusammensetzung) | **4,98 h** (17.934 s) |
+
+**Die Zusammenfuegung der Bloecke zum Fenster-Cache laeuft EINKERNIG.**
+Gemessen waehrend des Laufs: 97 Prozent eines Kerns ueber Stunden, Speicher
+bis 15,7 GB, keine neue Blockdatei in `data/` -- es baut nichts neu, es fuegt
+zusammen.
+
+**Das ist der Nutzniesser, den Hebel (3) gebraucht hat.** Bisher stand dem
+Strang nur die Erstbau-Zeit gegenueber; die hier ist wiederkehrend, denn JEDE
+neue Fenster-Zusammensetzung zahlt sie erneut -- und ein Zyklus schneidet sein
+Fenster per Definition neu.
+
+**Der Ausweg existiert bereits und ist ungenutzt:**
+`build_cache_incremental.py --merge-out <datei>` fuegt die Bloecke mit Workern
+zusammen, `train.py --cache-file <datei>` nimmt das Ergebnis (seit `dc40551`,
+train.py:2554). Beides ist gebaut, beides ist abgenommen -- die beiden Schritte
+wurden bei `v23-b05` schlicht nicht benutzt, weil die STATUS-Kommandozeile
+sie nicht enthielt.
+
+**Empfehlung fuer den naechsten Lauf mit neuem Fenster (nicht gemessen,
+Herleitung):** Fenster-Cache vorbauen und uebergeben. Die parallele
+Vollreferenz aus par.8 (36,1 min fuer 4,19 Mio Zustaende) legt nahe, dass aus
+den 4,98 h deutlich weniger als eine Stunde wird. **Die serielle
+Vollreferenz, die dieser Strang als fehlend fuehrt, liegt damit uebrigens
+vor** -- unfreiwillig, aber sauber gemessen.

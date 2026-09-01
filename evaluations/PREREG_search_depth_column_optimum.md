@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA. Plateau 25-100 (~0,6 volle Spalten gegen 0,34 ab 250, par.2i), aber ein TAUSCH: @25 verliert 11:29, @100 33:47 n.s. (par.2j). Faktor ist die TIEFE, nicht die Breite (par.2k); bei plattenblindem Prior tritt der Effekt gar nicht auf (par.2l). Betriebspunkt 100 Sims entschieden UND gefahren (v23-Erzeugung). OFFEN bleibt allein die optionale Stufe 4 (Mechanismus-Zaehlung), sie aendert den Betriebspunkt nicht. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA. Plateau 25-100 (~0,6 gegen 0,34 ab 250, par.2i), aber ein TAUSCH (@25 verliert 11:29, @100 33:47). Faktor ist die TIEFE, nicht die Breite; bei plattenblindem Prior tritt der Effekt nicht auf. Betriebspunkt 100 Sims gefahren. **OFFEN: Stufe 4, seit 2026-09-01 konkret zugeschnitten (par.5)** -- jetzt die einzige verbliebene Erklaerung, nachdem vier Wurzel-Eingriffe gemessen wirkungslos sind. -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -480,3 +480,71 @@ zusammen ~3 h) tritt nur ein, wenn der Effekt real ist; dann ist er
 auch die Kosten wert, weil er einen Betriebsparameter betrifft, der
 JEDEN kuenftigen Lauf und moeglicherweise die Spielstaerke selbst
 beruehrt.
+
+## par.5 STUFE 4 KONKRETISIERT -- Zuschnitt vor dem Bau (2026-09-01)
+
+**Warum jetzt:** vier Eingriffe an der WURZEL sind gemessen wirkungslos oder
+schaedlich (`PREREG_r5_value_calibration` par.12, `PREREG_gumbel_c_scale_arm`
+par.5): Value lauter (-0,125), Value leiser (n.s.), Punkte-Blend (n.s.),
+Prior/Value-Balance auf Gleichgewicht (n.s.). Nur die Suchtiefe selbst bewegt
+den Spaltenbau (0,7200 bei 100 Sims gegen 0,5150 bei 400). **Die Frage dieser
+Stufe ist damit nicht mehr eine von mehreren, sondern die einzige
+verbliebene.**
+
+**Instrument, ohne Bau verfuegbar:** `net_search_state_json_trace`
+(lib.rs:928) liefert je Wurzelkandidat `prior`, `ln_prior`, `gumbel_g`,
+`score`, `selected_top_m`, dazu je Halbierungsphase `q`, `sigma_q`, `visits`,
+`raw_value`, `points_forecast`, `opp_points_forecast`, `eliminated` und die
+Finalisten mit `successor_state_json`. An 400 Sims verifiziert (2026-09-01).
+**Korrektur einer eigenen Fehlmeldung:** bei sehr wenigen Sims kann der Trace
+leer bleiben, ich hatte das voreilig als Instrumentenluecke gemeldet -- er ist
+vollstaendig.
+
+### Teil A -- Verwerfungsanteil (messbar, kein Bau, kein Entwurfsspielraum)
+
+**Frage:** wie oft weicht die Zugwahl der Suche vom Prior-Top-1 ab, und
+steigt der Anteil mit den Sims?
+
+* **Zustaende:** 200 Drafting-Zustaende aus b01-Self-Play bei
+  DEFAULT-Knoepfen (`gumbel_c_scale` 1,0), Runden 2-4, ueber Dateien gestreut
+  (Lehre aus dem Reachability-Erstlauf: `--je-datei`, sonst keine Block-SE).
+* **Je Zustand zweimal**: `sims=100` und `sims=400`, gleicher Seed --
+  gepaart, derselbe Zustand.
+* **Messgroesse:** Anteil der Zustaende, in denen der Finalist mit den
+  meisten `visits` NICHT der Kandidat mit dem hoechsten `prior` ist.
+  Block-SE auf Dateiebene.
+* **Vorab registrierte Erwartung** (aus der urspruenglichen Stufe-4-Fassung):
+  der Anteil STEIGT mit den Sims. Faellt er oder bleibt gleich, ist auch diese
+  Erzaehlung falsch -- dann verwirft die tiefere Suche nicht oefter, sondern
+  ANDERS.
+
+### Teil B -- ist das Verworfene spaltenrelevant? (braucht eine DEFINITION)
+
+Ein Drafting-Zug fuellt Musterreihen, keine Kuppelzellen -- "spaltenbauend"
+ist an der Wurzel nicht direkt ablesbar. Die Definition wird deshalb HIER
+festgelegt, vor jeder Messung:
+
+**Ein Zug heisst SPALTENRELEVANT, wenn er eine Musterreihe `r` bedient, deren
+Vollendung eine Kuppelzelle in einer Spalte mit Fuellstand >= 4 fuellen
+wuerde** (Fuellstand aus `col_fill` des Zustands, Zeilenzuordnung ueber die
+bestehende Spalten-Abbildung `2*tc + si%2`, wie in
+`column_build_structural_probe`). Die Schwelle 4 uebernimmt bewusst die
+`--min-fill`-Konvention des Bestandswerkzeugs
+`ownership_map_completion_sites_probe`, statt eine neue zu erfinden.
+
+* **Messgroesse:** unter den Zustaenden mit Verwerfung -- wie oft ist der
+  Prior-Top-1 spaltenrelevant und die Suchwahl nicht? Und umgekehrt? Je
+  Sims-Stufe.
+* **Was ein Treffer waere:** bei 400 Sims wird ueberproportional oft ein
+  spaltenrelevanter Prior-Top-1 zugunsten eines nicht-spaltenrelevanten Zuges
+  verworfen, bei 100 Sims nicht.
+* **Was es NICHT beantwortet:** ob die Suche damit RECHT hat. Die Tiefe
+  gewinnt die Arena (@25 verliert 11:29, @100 verliert 33:47) -- ein
+  bestaetigter Befund waere eine Beschreibung des Tauschs, kein Fehlerbeweis.
+
+### Kosten und Reihenfolge
+
+Teil A zuerst: rund 200 Zustaende x 2 Sims-Stufen, geschaetzt 10-20 min
+(Trace bei 400 Sims rund 1-2 s je Zustand, einkernig). Teil B rechnet auf
+denselben Traces, kostet also nur Auswertung. **Faellt Teil A flach aus, ist
+Teil B gegenstandslos** -- ohne Verwerfungen gibt es nichts zu etikettieren.

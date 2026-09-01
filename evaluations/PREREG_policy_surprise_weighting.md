@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten -- KL(Ziel gegen Netz) -- statt jede gleich zu zaehlen? | Beleg: NICHTS GEBAUT, aber die FORM ist jetzt ausgearbeitet (par.3a, Nutzer-Auftrag 2026-08-31): kl = per_sample_ce - H(target), also ohne jedes Zusatzfeld und ohne Cache-Auflage; detached, auf Mittel 1 normiert, gekappt [0,25; 4,0], alpha 0,5 im ersten Arm. Der Arm heisst v23-b03, Kontrollarm ist b01 ohne Zusatzlauf. Entscheidungsmass: Orakelmetriken (par.5). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: NEIN, gemessen (par.9, 2026-09-01): `v23-b03` mit alpha 0,5, einfaktoriell gegen b01. Orakelmetriken Gleichstand weit unter Aufloesung (top3mass -0,0064, tau +0,0004), Arena 75:85 zurueck. Der Knopf bleibt gebaut mit Default 0 und geht NICHT ins Standardrezept. Andere alpha-Werte ungeprueft, ohne Nutzniesser. -->
 
 # Vorregistrierung: Policy-Surprise-Weighting
 
@@ -221,3 +221,47 @@ Stattdessen zwei benannte Zeitfenster:
    Form (Suchverteilung gegen Prior) ohne Sonderfall gilt.
 
 Im v22-Erstlauf ist der Knopf damit ausdruecklich AUS.
+
+## par.9 GEBAUT UND GEMESSEN: `v23-b03`, alpha 0,5 (2026-09-01)
+
+**Der Arm lief in der Nacht auf den 2026-09-01** und ist gegen die Kontrolle
+`v23-b01` EINFAKTORIELL -- der Manifest-Diff der beiden `cli_args` zeigt genau
+zwei Unterschiede: `name` und `surprise_alpha: None -> 0.5`.
+
+| | Wert |
+| --- | --- |
+| Laufzeit | 12.948 s (3,60 h), Datenaufbau nur 45,6 s (Fenster-Cache-Treffer) |
+| Epochen / Samples | 12 / 4,72 Mio |
+| val_combined | 0,5202 (E1) bis 0,5293 (E11/E12) -- ausdruecklich NICHT das Entscheidungsmass (par.5) |
+
+**Entscheidungsmass nach par.5, die beiden validierten Orakelmetriken**
+(n=952 Zustaende, `frozen_v1`, Orakel aus v18):
+
+| Metrik | v23-b03 | v23-b01 (Kontrolle) | Differenz |
+| --- | --- | --- | --- |
+| `prior_mass_on_oracle_top3` | 0,5244 | **0,5308** | -0,0064 fuer b03 |
+| `kendall_tau` | **0,2300** | 0,2296 | +0,0004 fuer b03 |
+
+**Gleichstand, und zwar weit unter der Aufloesung** -- eine Metrik zeigt
+minimal auf die Kontrolle, die andere auf den Arm. Bezeichnend fuer die Grobheit
+des Satzes an dieser Stelle: `prior_recall_at_16` ist bei BEIDEN Netzen exakt
+0,8750.
+
+**Nach par.5 entscheidet dann die Arena** (2 x 80 Partien, getauschte Rollen,
+gleicher Seed 20260990, `paired_arena_env_ab`):
+
+```
+b03 75 : 85 b01   (37:43 und 38:42 in den beiden Richtungen)
+```
+
+**VERDIKT: der Arm traegt nicht.** Kein Vorteil offline, in der Arena
+zurueck. Die Marge ist dieselbe, die b02 in dieselbe Richtung und b05 in die
+Gegenrichtung erzeugt hat -- bei n=160 die Rauschgrenze des Instruments; ein
+Beleg fuer SCHADEN ist es also ebenso wenig.
+
+**Was mit dem Knopf geschieht:** `--surprise-alpha` bleibt gebaut und
+dokumentiert, Default 0 (aus). Er wird nicht ins Standardrezept uebernommen.
+
+**Was NICHT geprueft wurde:** andere alpha-Werte. Eine Dosis-Reihe waere ein
+eigener Zuschnitt und braucht ihre eigene Registrierung -- nach dieser Messung
+ohne benannten Nutzniesser.

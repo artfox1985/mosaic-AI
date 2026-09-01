@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Untersagt der erste auf SELF-PLAY-Eigenpartien trainierte spaltenkompetente Ownership-Kopf (v23) Zellen, die laut Vorrats-Praedikat noch vollendbar waeren -- und lohnt dann der Zielwechsel auf Vollendbarkeit am Konsument-Instrument? | Beleg: NICHTS GEMESSEN. Ausloeser noch nicht eingetreten, aber NAEHER (Stand 2026-08-31): das v22-Self-Play laeuft seit dem 2026-08-30 (Tor-Revision par.3b.12 hat die alte Stopp-Regel abgeloest), v23 ist nicht trainiert. Registriert 2026-08-28 auf Nutzer-Entscheid als eigene Prereg (vorher par.17 der Erreichbarkeits-Prereg); faellig NACH dem v23-Training. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Untersagt der spaltenkompetente Ownership-Kopf (v23) Zellen, die laut Vorrats-Praedikat noch vollendbar waeren? | Beleg: NEIN (par.5, 2026-09-01): 14,64 Prozent tot-kartiert bei tau=0,10 (Block-SE 0,005), Vorgaenger b05 bei 13,89 -- beide Bedingungen der vorab registrierten Abbruchregel erfuellt (<20 Prozent, <5 Punkte Abstand). Von den totkartierten Zellen wurden nur 7 Prozent doch noch gefuellt: der Kopf ist strenger als das Praedikat und hat recht. Stufe 1 wird NICHT eroeffnet. -->
 
 # PREREG: Erreichbarkeits-Nachpruefung am v23-Kopf (Wiedervorlage aus PREREG_reachability_target.md par.17)
 
@@ -60,3 +60,86 @@ Keine Wiedereroeffnung von `PREREG_reachability_target.md` -- deren par.16
 bleibt ENTSCHIEDEN (die dortige Frage war die Alt-Aera-Frage). Diese Datei
 traegt die NEUE Frage der neuen Aera und wird nach dem v23-Training
 konkretisiert (Schwellen, Stichprobe), dann gefahren.
+
+## par.4 STUFE 0: Schwelle und Stichprobe, VOR dem Lauf registriert (2026-09-01)
+
+**Der Ausloeser ist eingetreten:** `v23-b01_brierbest` ist der erste auf
+Self-Play-Eigenpartien trainierte spaltenkompetente Stand (0,5150 volle
+Spalten am argmax-Instrument gegen 0,3100 des Vorgaengers).
+
+**Machbarkeit geprueft, kein Bau noetig.** Die Praedikat-Seite ist bereits
+nach Python exponiert: `plate_completability_json(state_json, player)`
+(lib.rs:1176) ruft `column_build::cell_is_completable` (column_build.rs:563 --
+der Prereg-Text nennt noch den alten deutschen Namen `ist_zelle_vollendbar`,
+umbenannt mit der Bezeichner-Konvention). Die Kartenseite liefert der
+Bestandspfad aus `tools/probes/ownership_map_completion_sites_probe.py`.
+
+**Stichprobe:** 300 Zustaende aus `data/selfplay_frozenv3-b01_*.pkl` -- frische
+b01-Sockel-Partien (100 Sims, Wurzelrauschen), also die Verteilung, in der das
+Netz tatsaechlich spielt, und NICHT das argmax-Instrument. Je Zustand beide
+Spielerseiten. Block-SE ueber Dateien.
+
+**Arme:** `v23-b01_brierbest` (der neue Kopf) gegen `v22-b05` (der Kopf der
+Vor-Generation), gleiche Zustaende.
+
+**Messgroesse:** Anteil der Spaltenzellen, die das Praedikat noch als
+vollendbar fuehrt, deren Kartenwert `p_own` aber unter der Schwelle liegt --
+"vom Kopf als tot kartiert".
+
+**Schwelle, vorab und schlicht:** **tau = 0,10** als PRIMAERES Mass. Dazu wird
+die ganze Kurve berichtet (Anteile unter 0,05 / 0,10 / 0,20), damit das
+Verdikt nicht an einem Schnitt haengt. Die Prereg warnt zu Recht davor, eine
+Schwelle gegen eine unbekannte Verteilung zu raten; die Antwort darauf ist
+nicht, sie nach den Daten zu waehlen, sondern einen schlichten,
+interpretierbaren Schnitt zu nehmen (der Kopf gibt der Zelle unter zehn
+Prozent) und die Empfindlichkeit mitzuliefern.
+
+**Entscheidungsregel, vorab:**
+
+* **"klein" -- Wiedervorlage schliesst OHNE Training**, wenn der Anteil
+  totkartierter, aber vollendbarer Zellen bei b01 **unter 20 Prozent** liegt
+  UND sich von b05 um **weniger als 5 Prozentpunkte** unterscheidet.
+* Andernfalls ist Stufe 1 (Zielwechsel am Konsument-Instrument, par.3)
+  eroeffnet.
+
+**Zusatz, weil er nichts kostet:** dieselbe Kalibrierung, die das
+Bestandswerkzeug schon rechnet -- wurde die als tot kartierte Zelle im
+weiteren Partieverlauf TATSAECHLICH noch gefuellt? Das trennt "der Kopf irrt"
+von "der Kopf hat recht, das Praedikat ist zu grosszuegig", und ohne diese
+Trennung waere ein hoher Anteil nicht interpretierbar.
+
+## par.5 STUFE 0 GEMESSEN -- WIEDERVORLAGE SCHLIESST OHNE TRAINING (2026-09-01)
+
+Werkzeug: `tools/probes/reachability_stage0_probe.py` (neu, im Repo).
+300 Zustaende aus `selfplay_frozenv3-b01_*` (Runden 2-4, je 8 Zustaende aus 38
+Dateien), beide Spielerseiten, 40.718 offene Zellen vollendbarer Spalten.
+
+| Arm | tot-kartiert (tau=0,10) | Block-SE | Kurve 0,05 / 0,10 / 0,20 | davon spaeter doch gefuellt |
+| --- | --- | --- | --- | --- |
+| `v23-b01_brierbest` | **0,1464** | 0,0051 | 0,0376 / 0,1460 / 0,2775 | 0,0696 |
+| `v22-b05` | 0,1389 | 0,0047 | 0,0278 / 0,1382 / 0,2773 | 0,0707 |
+
+**Beide Bedingungen der Abbruchregel aus par.4 sind erfuellt:** der Anteil
+liegt mit 14,64 Prozent unter 20, und der Abstand zum Vorgaenger betraegt 0,75
+Punkte statt der kritischen 5. **Die Wiedervorlage schliesst damit OHNE
+Training; Stufe 1 wird NICHT eroeffnet.**
+
+**Die Kalibrierung stuetzt das Verdikt zusaetzlich:** von den als tot
+kartierten Zellen wurden nur **7 Prozent** im weiteren Partieverlauf doch noch
+gefuellt. Der Kopf irrt also in der grossen Mehrheit NICHT -- er ist strenger
+als das Vorrats-Praedikat, und die Wirklichkeit gibt ihm recht. Genau diese
+Trennung war der Zweck des Kalibrierungs-Zusatzes; ohne sie waeren 14,6
+Prozent nicht interpretierbar gewesen.
+
+**Der neue Kopf ist nicht strenger als der alte.** b01 und b05 liegen
+innerhalb einer halben Standardabweichung beieinander (0,1464 gegen 0,1389
+bei SE 0,005). Die Sorge, ausgerechnet der spaltenkompetente Kopf koennte
+Vollendbarkeit unterschaetzen, ist damit gegenstandslos.
+
+**Methodischer Fehler im Erstlauf, korrigiert und benannt:** der erste Lauf
+zog alle 300 Zustaende aus der ERSTEN Datei (`n_dateien = 1`) und lieferte
+deshalb keine Block-SE -- und mit 22,3 Prozent eine deutlich andere Zahl,
+weil eine einzelne Partienserie keine repraesentative Stichprobe ist. Die
+Sonde streut die Zustaende jetzt ueber die Dateien (`--per-file`, Default 8);
+die Zahlen oben stammen aus dem korrigierten Lauf. Der fehlerhafte Erstlauf
+ist nicht in die Bewertung eingegangen.
