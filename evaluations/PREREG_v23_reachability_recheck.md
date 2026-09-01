@@ -61,7 +61,10 @@ bleibt ENTSCHIEDEN (die dortige Frage war die Alt-Aera-Frage). Diese Datei
 traegt die NEUE Frage der neuen Aera und wird nach dem v23-Training
 konkretisiert (Schwellen, Stichprobe), dann gefahren.
 
-## par.4 STUFE 0: Schwelle und Stichprobe, VOR dem Lauf registriert (2026-09-01)
+## par.4a STUFE 0: Schwelle und Stichprobe, VOR dem Lauf registriert (2026-09-01)
+
+*(Nummer am 2026-09-01 von par.4 auf par.4a berichtigt, weil die Datei zwei
+Absaetze par.4 hatte; Verweise auf die Abbruchregel meinen diesen Absatz.)*
 
 **Der Ausloeser ist eingetreten:** `v23-b01_brierbest` ist der erste auf
 Self-Play-Eigenpartien trainierte spaltenkompetente Stand (0,5150 volle
@@ -143,3 +146,14 @@ weil eine einzelne Partienserie keine repraesentative Stichprobe ist. Die
 Sonde streut die Zustaende jetzt ueber die Dateien (`--per-file`, Default 8);
 die Zahlen oben stammen aus dem korrigierten Lauf. Der fehlerhafte Erstlauf
 ist nicht in die Bewertung eingegangen.
+
+## par.6 Fundort der Zustandsquelle (nachgetragen 2026-09-01)
+
+Das Artefakt `evaluations/artifacts/reachability_stage0.json` und der Default
+der Sonde (`tools/probes/reachability_stage0_probe.py:69`) nennen als Muster
+`archive_pre_v24/selfplay_frozenv3-b01_*.pkl`. Dieses Verzeichnis liegt NICHT
+im Baum: die Dateien sind am 2026-09-01 mit dem uebrigen Vorgenerations-
+Material in das restic-Backup gewandert (`MOSAIC_BACKUP_DIR`, Snapshot-Pfad
+`archive_pre_v24/`; Wiederherstellung nach `docs/backup_restore.md`). Wer die
+Messung wiederholen will, stellt sie zuerst wieder her; par.5 bleibt als
+Ergebnis gueltig, ist aber ohne diesen Schritt nicht reproduzierbar.

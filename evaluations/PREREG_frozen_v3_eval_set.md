@@ -124,9 +124,9 @@ Auftrags, aber benannt.
 
 | Schritt | Ergebnis |
 | --- | --- |
-| Zustandsquelle | 400 frische `v23-b01`-Partien, Sockel-Konfiguration (100 Sims, Wurzelrauschen, Seed 20260902), 22 min |
+| Zustandsquelle | 400 frische `v23-b01`-Partien, Sockel-Konfiguration (100 Sims, Wurzelrauschen, Seed 20260902), 24,2 min (`data/manifest_frozenv3-b01_20260901_100837.json`, `laufzeit.wanduhr_s` 1450,4; berichtigt 2026-09-01, vorher "22 min"). **Die Quelldateien `selfplay_frozenv3-b01_*.pkl` liegen seit dem 2026-09-01 NICHT mehr im Baum**, sondern im restic-Backup (`MOSAIC_BACKUP_DIR`, Snapshot-Pfad `archive_pre_v24/`, Wiederherstellung nach `docs/backup_restore.md`); die Auflage par.4 Punkt 2 (Neubau aus denselben Dateien) ist nur nach Wiederherstellung einloesbar |
 | Satz | `evaluations/frozen_eval_set_v3.pkl`, **1.800 Zustaende, exakt 360 je Runde**, Manifest daneben |
-| Orakel-Labels | `artifacts/frozen_v3_oracle_labels.json`, **1.144 Labels** mit `v23-b01_brierbest` @5000 Sims, 88,8 min, 0 Mismatches, 0 Fehler |
+| Orakel-Labels | `evaluations/artifacts/frozen_v3_oracle_labels.json`, **1.144 Labels** mit `v23-b01_brierbest` @5000 Sims, 88,8 min, 0 Mismatches, 0 Fehler |
 
 **Reparatur unterwegs:** `build_frozen_eval_set.py` (vom 2026-07-24) las die
 Korpusdateien mit rohem `pickle` und starb an frischen Dateien mit
@@ -138,9 +138,23 @@ reproduzierbar.
 ### Die Ueberbrueckungs-Messung (par.4 Punkt 3, Pflicht)
 
 Dieselben zwei Netze auf allen drei Saetzen. Als Paar dienen `v23-b01_brierbest`
-und `v22-b05` -- die Checkpoints von v19/v20/v21 liegen nicht mehr in `models/`,
-und dieses Paar ist ohnehin das bestvermessene (Elo 1263 gegen 1136, b01 baut
-66 Prozent mehr Spalten).
+und `v22-b05` -- ~~die Checkpoints von v19/v20/v21 liegen nicht mehr in
+`models/`~~ (Begruendung berichtigt 2026-09-01: der Champion liegt seit dem
+2026-08-23 in `models/frozen_champions/v21_2d_brierbest/model.onnx`, par.8
+benutzt ihn selbst; die Bruecke haette von Anfang an gegen ihn gefahren
+werden koennen), und dieses Paar ist das bestvermessene (Elo 1263 gegen
+1136, b01 baut 66 Prozent mehr Spalten).
+
+**Geltungsbereich der Bruecke, nachgetragen 2026-09-01:** die Metriken unten
+decken NUR Runden 1-4 ab. `tools/oracle_metrics.py:288-298` schliesst Runde 5
+aus, weil die Suche dort auf den exakten Loeser faellt und Prior-Metriken
+keinen Sinn haben; `bridge_frozen_v3.json` fuehrt je Netz `overall.n = 915`
+und `by_round["5"].n = 0`, obwohl der Satz 360 R5-Zustaende und die
+Orakel-Labels 229 R5-Eintraege tragen. Die Bruecken-, Zirkularitaets- und
+Relabel-Aussagen (par.7-9) sind damit R1-R4-Aussagen; die Kampagnenfrage der
+Betrags-Daempfung sitzt in Runde 5 und ist ueber diese Bruecke nicht
+adressiert. Die Bruecken- und Relabel-Artefakte tragen ausserdem keinen
+`laufzeit`-Block (Pflichtfeld), die Orakel-Dateien nur `total_elapsed_seconds`.
 
 | Satz | Netz | top3mass | tau | recall@16 | value_pearson |
 | --- | --- | ---: | ---: | ---: | ---: |
@@ -212,7 +226,7 @@ nicht mehr existiert -- der Champion liegt nur noch im getrackten Artefakt
 `models/frozen_champions/v21_2d_brierbest/model.onnx`. Die Alternative waere
 eine 9-MB-Kopie mit zweifelhafter Herkunft in `models/` gewesen.
 
-Ziel: `artifacts/frozen_v3_oracle_labels_v21.json` (eigener Dateiname, die
+Ziel: `evaluations/artifacts/frozen_v3_oracle_labels_v21.json` (eigener Dateiname, die
 b01-Labels bleiben unveraendert -- Orakel-Labels sind nach Fertigstellung
 unveraenderlich). Kosten nach der heutigen Messung: rund 90 min fuer 1.144
 Labels.
@@ -225,7 +239,7 @@ nicht an der Zirkularitaet.
 
 ## par.9 GEGEN-ORAKEL GEFAHREN: die Zirkularitaet ist BELEGT (2026-09-01)
 
-`artifacts/frozen_v3_oracle_labels_v21.json`, 1.144 Labels mit dem
+`evaluations/artifacts/frozen_v3_oracle_labels_v21.json`, 1.144 Labels mit dem
 eingefrorenen Champion `v21_2d_brierbest` @5000 Sims -- plattenblind, ohne
 gemeinsame Vorgeschichte mit b01 oder b05.
 

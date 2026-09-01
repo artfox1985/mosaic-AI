@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: NEIN, gemessen (par.9, 2026-09-01): `v23-b03` mit alpha 0,5, einfaktoriell gegen b01. Orakelmetriken Gleichstand weit unter Aufloesung (top3mass -0,0064, tau +0,0004), Arena 75:85 zurueck. Der Knopf bleibt gebaut mit Default 0 und geht NICHT ins Standardrezept. Andere alpha-Werte ungeprueft, ohne Nutzniesser. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: NEIN, gemessen (par.9, 2026-09-01): `v23-b03` mit alpha 0,5, einfaktoriell gegen b01. Orakelmetriken Gleichstand (top3mass -0,0064, tau +0,0004), Arena 75:85 (p = 0,47), Spalten 0,500 gegen 0,631, Punkte -3,32 (Kennzahlen nachgetragen). Der Knopf bleibt gebaut mit Default 0 und geht NICHT ins Standardrezept. Andere alpha-Werte ungeprueft, ohne Nutzniesser. -->
 
 # Vorregistrierung: Policy-Surprise-Weighting
 
@@ -252,7 +252,28 @@ gleicher Seed 20260990, `paired_arena_env_ab`):
 
 ```
 b03 75 : 85 b01   (37:43 und 38:42 in den beiden Richtungen)
+Paare: b03 beide 13, geteilt 49, b01 beide 18
+Vorzeichentest auf 31 informativen Paaren: p = 0,47
+Punkte 45,70 gegen 49,02, Margin -3,32
 ```
+
+**Standard-Kennzahlen, nachgetragen 2026-09-01** (die Erstfassung trug nur
+die Siegzahl; Quelle `paired_arena_env_surprise_b03_first.json` /
+`_b01_first.json`, Spalten per `tools/probes/arena_column_probe.py`,
+Artefakte `columns_surprise_*.json`, 160 von 160 nachspielbar):
+
+| Kennzahl | b03 | b01 |
+| --- | --- | --- |
+| volle Spalten je Seite, b03 zuerst | 0,5750 | **0,7875** |
+| volle Spalten je Seite, b01 zuerst | 0,4250 | **0,4750** |
+| volle Spalten gepoolt (n=160) | 0,500 | **0,631** |
+| lange Reihen begonnen / vollendet je Seite | 4,19 / 2,83 | 4,30 / 2,96 |
+| Strafleiste (`total_floor`) je Seite | 10,12 | 9,28 |
+
+Punkte je Kriterium fehlen (Werkzeug-Format, siehe reanalyze par.A1). b03
+baut in beiden Richtungen WENIGER Spalten als die Kontrolle (-0,13 gepoolt)
+und macht mehr Strafpunkte -- das Verdikt "traegt nicht" wird dadurch
+gestuetzt, nicht nur die Siegzahl.
 
 **VERDIKT: der Arm traegt nicht.** Kein Vorteil offline, in der Arena
 zurueck. Die Marge ist dieselbe, die b02 in dieselbe Richtung und b05 in die

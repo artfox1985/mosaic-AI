@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Holt ein kleineres `c_scale` den Spaltenbau in der Tiefe zurueck? | Beleg: NEIN (par.5, 2026-09-01): 0,5000 gegen die Kontrolle 0,5150, Schwelle 0,618 klar verfehlt, Staerke-Arm entfaellt regelgemaess. Damit ist die WURZEL-Ebene als Ort der Tiefen-Delle erledigt -- vier Eingriffe (Value lauter, leiser, Punkte-Blend, Prior/Value-Balance) bewegen sie nicht. Der Knopf `MOSAIC_GUMBEL_C_SCALE` bleibt gebaut mit Default 1,0, paritaetsgeprueft. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Holt ein kleineres `c_scale` den Spaltenbau in der Tiefe zurueck? | Beleg: NEIN (par.5, 2026-09-01): 0,5000 gegen die Kontrolle 0,5150, Schwelle 0,618 klar verfehlt, Staerke-Arm entfaellt regelgemaess. Die sigma/Prior-Erklaerung ist damit widerlegt. Zusammen mit VALUE_CAL_B und POINTS_UTILITY_W (Blattwert-Skala, nicht Wurzel; berichtigt 2026-09-01) sind Wurzelbalance und Blattwert-Skala je mit EINEM Messpunkt erledigt; "was bleibt, liegt tiefer im Baum" folgt daraus NICHT zwingend. Knopf `MOSAIC_GUMBEL_C_SCALE` bleibt, Default 1,0. -->
 
 # Vorregistrierung: `c_scale` als Regler zwischen Prior und Value-Kopf
 
@@ -107,8 +107,12 @@ Prior uebertoent, je tiefer gesucht wird. **Setzt man das Verhaeltnis auf
 Gleichgewicht, aendert sich am Spaltenbau NICHTS.** Die Groesse ist real, ihre
 kausale Rolle war eine Hypothese, und sie ist gefallen.
 
-**Damit ist die Wurzel-Ebene als Ort der Tiefen-Delle ERLEDIGT.** Vier
-Eingriffe an ihr sind gemessen wirkungslos oder schaedlich:
+**Damit sind Wurzelbalance UND Blattwert-Skala als Ort der Tiefen-Delle
+erledigt -- je EIN Messpunkt, kein Sweep** (berichtigt 2026-09-01: die
+Erstfassung sprach von "vier Eingriffen an der Wurzel"; nur `c_scale` ist
+wurzellokal, `net_mcts.rs:2281`; `VALUE_CAL_B` und `POINTS_UTILITY_W` wirken
+in `blended_leaf_win_prob`, `net_mcts.rs:1381`, also an jedem Blatt im Baum).
+Die vier Messpunkte:
 
 | Eingriff | Wirkung auf volle Spalten @400 |
 | --- | --- |
@@ -118,11 +122,14 @@ Eingriffe an ihr sind gemessen wirkungslos oder schaedlich:
 | `c_scale = 0,36` (Prior/Value ins Gleichgewicht) | 0,5000 (-0,015, n.s.) |
 
 Weder Betrag noch Balance noch Zusatzinformation am Blattwert bewegen die
-Delle. **Was bleibt, liegt TIEFER im Baum**: nicht die Gewichtung der
-Wurzelkandidaten, sondern was die Suche in den Fortsetzungen findet und nach
-oben propagiert. Das ist die Frage, die
-`PREREG_search_depth_column_optimum.md` Stufe 4 stellt -- und sie ist jetzt
-enger gefasst, weil vier Wurzel-Erklaerungen ausgeschlossen sind.
+Delle in Richtung des flachen Spiels; Streckung schadet sogar (-0,125), die
+Balance wirkt also messbar, nur nicht in die erhoffte Richtung. **Was daraus
+FOLGT, ist weniger, als die Erstfassung behauptete:** aus "eine baumweite
+Skalierung des Blattwerts bewegt nichts" folgt nicht, dass die Ursache tiefer
+im Baum liegt -- nur, dass sie weder an der Skala noch an der Wurzelbalance
+haengt. `PREREG_search_depth_column_optimum.md` Stufe 4 ist die naechste
+offene Frage, nicht die einzige verbliebene. Und: vier Knoepfe zu je einem
+Punkt sind kein Sweep; par.4 dieser Prereg sagt das selbst.
 
 **Der Knopf bleibt, mit Default 1,0.** Er kostet nichts (Paritaet an 20
 Partien belegt), er ist im Manifest sichtbar, und die naechste Frage an die

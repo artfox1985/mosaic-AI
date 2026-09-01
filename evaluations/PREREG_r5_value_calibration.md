@@ -608,7 +608,7 @@ Entwurf dort NICHT ansetzt:**
 | eigener Plattenkopf | gebaut und wieder entfernt (`PREREG_plate_head.md`, UEBERHOLT) |
 | Endgame-/Platten-Aux-Kopf | Arena H0, wurde Trainings-Upgrade (`plate_intervention`) |
 | Platten in die Blattbewertung injizieren | NEGATIV ueber den ganzen Dosis-Sweep (`scoring_plate_injection`) |
-| Punkte-Kopf in den Blattwert mischen | SCHAEDLICH: w=0,1 verliert 300:321 (`points_blend_w`) |
+| Punkte-Kopf in den Blattwert mischen | Richtung schaedlich, NICHT signifikant: w=0,1 verliert 300:321, McNemar p = 0,053 (`points_blend_w`; `paired_arena_env_points_blend_w.json`; Wortlaut berichtigt 2026-09-01) |
 
 Vier Wege, alle am selben Punkt: dem Blattwert mehr Platteninformation
 zufuettern.
@@ -785,6 +785,17 @@ Verdikt, sondern erzeugt die naechste Vorregistrierung.
 
 Je 200 Partien, gleicher Seed 20260931, argmax-Instrument, Messweg gegen den
 Tor-2a-Lauf validiert (0,5150 zifferngleich).
+
+**Fehlermodell, benannt 2026-09-01 (Pruefung der Preregs):** die SE-Spalte ist
+`1,96*sd/sqrt(n)/1,96` ueber die 400 SEITEN je Arm (`tools/corpus_sanity_check.py`
+Zeilen 29-34), die t-Werte sind die UNGEPAARTE Quadratsumme zweier solcher SE
+(0,205/sqrt(0,0396^2+0,0332^2) = 3,97). Zwei Seiten derselben Partie sind
+nicht unabhaengig, und die Arme teilen den Seed, waren also gepaart
+auswertbar -- so wie par.2a des Suchtiefen-Strangs es blockgepaart tut. Die
+Rechnung hier ist damit optimistischer als die Projektregel (Block-Ebene)
+erlaubt. Fuer das Verdikt aendert das nichts: die Schwelle 0,618 verlangt
++0,10 ueber der Kontrolle, und kein Arm liegt auch nur im Punktschaetzer
+darueber; die t-Werte sind als Naeherung zu lesen, nicht als Test.
 
 **Verdikt: die Schwelle 0,618 wird von KEINEM Arm erreicht.** Nach der
 Abbruchregel (Stufe 2) wird Phase 3 damit geschlossen und NICHT gebaut; der
