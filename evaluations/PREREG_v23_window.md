@@ -475,7 +475,7 @@ evaluations/night_run_20260830.md) VOR dem Erzeugungsstart.
 | Vollendbarkeits-FILTER | AUS fuer Generation 1 (ungebaut, kein Nacht-Bau); prioritaerer Gen-2-Kandidat |
 | Bootstrap-Horizont | 2 (steht) |
 | --rtv / --pcr-full-prob | AUS (Standard seit v13 bzw. PCR negativ) |
-| --sims / Klassen | Sockel 4.000 @400 mit Root-Noise; Schwarm 8.000 --value-only (v20-Konvention, pcr_cheap_sims 150) |
+| --sims / Klassen | ~~Sockel 4.000 @400 mit Root-Noise; Schwarm 8.000 --value-only (v20-Konvention, pcr_cheap_sims 150)~~ **BERICHTIGT 2026-09-01: gefahren wurden ALLE DREI Laeufe mit `--sims 100`** (Manifeste `data/manifest_v22-b05-*.json`, Feld `cli_args.sims`; Betriebspunkt aus `PREREG_search_depth_column_optimum.md`, Sims-Probe vor dem Schwarm). Der Schwarm lief `--value-only` (erkennbar an `pcr_full_prob 0.0`, `pcr_cheap_sims 100`), der Sockel ohne. Diese Zeile stand bis zur Pruefung am 2026-09-01 unberichtigt und hat `PREREG_v24_window.md` par.2 eine falsche Referenz geliefert |
 | --no-root-noise / --deterministic / --tau-argmax-from-move | **UEBERHOLT durch Zuschnitt D** (Lehrer-Prereg par.3b.12, Nutzer "mach D"): die Nacht-Leiter hat gezeigt, dass JEDE fruehe Zug-Stochastik die Vollendung auf 0,07-0,11 drueckt. Gefahren wird jetzt Value-argmax (6.000, --no-root-noise --deterministic) + Value-gesampelt (2.000) + Policy voll gesampelt (4.000) |
 | MOSAIC_WERTUNG_STREUUNG_MAX | Default (unveraendert) |
 | Moon-Kopf | Trainings-Rezept-Entscheid: Gewicht 0 ab dem v23-Training (No-Op-Ziel, train.py:513); Flag-Bau VOR dem Training, nicht heute Nacht |
