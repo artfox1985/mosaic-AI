@@ -332,3 +332,36 @@ verliert die strukturelle Eigenschaft, um die der ganze Zyklus gefuehrt wird.
 Wer die Spalten will, faehrt Warmstarts -- und die naechste Generation muss
 sich fragen, ob der Korpus die Eigenschaft ueberhaupt LEHRT oder sie nur
 ERHAELT.
+
+## par.14 VORREGISTRIERT: `v23-b06`, Kaltstart mit dem b01-Rezept (2026-09-01, 23:50, VOR dem Start)
+
+**Anlass:** par.12/13 vergleichen Warm- gegen Kaltstart, aber der Kaltstart
+b02 lief mit Default-Lernrate ohne Cosine und 40 Epochen (Manifest-Diff in
+par.12). "Das Spaltenwissen sitzt in der LINIE" ist deshalb mit dem
+Lernraten-Rezept konfundiert. `v23-b06` trennt das: Kaltstart, sonst EXAKT das
+b01-Manifest (`models/manifest_train_v23-b01_20260831_110246.json`) --
+lr 5e-5, Cosine, `lr_t_max 12`, 12 Epochen, `--file-list data/window_v23.txt`,
+Traeger-Manifest `policy_carrier_manifest_v23.json`, Val-Pool
+`^selfplay_v22-b05-`, Seed 20260828. Erwarteter Manifest-Diff gegen b01: GENAU
+`name`, `load` (v22-b05 -> None) und `cache_file` (Monolith, Hebel 3 der
+Cache-Prereg, erster Einsatz). Gegen b02 unterscheidet er sich GENAU im
+Lernraten-Rezept (`lr`, `lr_schedule`, `lr_t_max`, `epochs`) plus `cache_file`.
+
+**Daten:** das v23-Fenster liegt seit dem Restore aus dem restic-Backup wieder
+im Baum (Nachtprogramm `night_run_20260901.md` N2); die 600 v22-b05-Bloecke
+werden neu gebaut, die 1.745 hv2-Bloecke liegen.
+
+**Entscheidungsmass, vorab (Punktschaetzer mit Block-KI, kein Tor):**
+1. Spaltenprofil am argmax-Instrument @400, 200 Partien, Seed 20260931 (wie
+   Phase 3 und `tor2a`): Bezug b01 0,5150, b02 0,17-0,23.
+2. Staerke: gepaarte Arena gegen `v23-b01_brierbest`, 2 x 80 Partien mit
+   `--log-games`, Seed 20260998, dazu Spalten aus den Logs.
+
+| b06 liegt bei den Spalten ... | Lesart |
+| --- | --- |
+| nahe b02 (unter ~0,3) | Kaltstart ist die Ursache; par.12/13 halten, Vorbehalt entfaellt |
+| nahe b01 (ueber ~0,45) | das Lernraten-Rezept war die Ursache; par.12/13 werden berichtigt, "Linie" ist widerlegt |
+| dazwischen | beides traegt; Anteil wird als Bereich festgehalten, kein Verdikt |
+
+Kandidat ist `_brierbest` (Regel aus par.2h des v23-Fensters). Kosten:
+rund 5 h GPU inklusive Monolith; laeuft nachts neben den CPU-Auftraegen.

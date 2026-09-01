@@ -94,7 +94,7 @@ MODEL_OPPONENT = str((MAIN_CHECKOUT / "models" / "alphazero_v17_best.onnx").reso
 SIMS = 400
 C_PUCT = 1.5
 DEFAULT_N_GAMES = 100
-DEFAULT_BLOCK_SIZE = 25
+DEFAULT_BLOCK_SIZE = 5  # 2026-09-01: Projektstandard 5 (war 25); alte Laeufe explizit mit --block-size 25 reproduzieren
 DEFAULT_THREADS = 10
 ARM_TIMEOUT_SECS = 3 * 3600
 

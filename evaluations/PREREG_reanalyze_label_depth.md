@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt tieferes Nachlabeln die Betrags-Daempfung? | Beleg: Zeile-1-Frage UNGEMESSEN (par.3 A1/A2 nie gefahren). Gefahren wurde stattdessen Lehrer-Relabeln (par.4a): `v23-b05`, Arena 85:75 fuer b05, p = 0,53, Spalten 0,679 gegen 0,635 (par.A1, Kennzahlen nachgetragen 2026-09-01) -- nicht belegt besser, b01 bleibt Generator fuer v24. Teil B (Value tief) UNGEBAUT. -->
+<!-- STATUS: OFFEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt tieferes Nachlabeln die Betrags-Daempfung? | Beleg: Zeile-1-Frage UNGEMESSEN (par.3 A1/A2 nie gefahren). Gefahren wurde Lehrer-Relabeln (par.4a): `v23-b05`. **par.A3 (2026-09-02): 240 Paare, 246:234 fuer b05, p = 0,65, dritter Seed dreht um; Spalten 0,676 gegen 0,642, KI schliesst Null ein -- weder Gewinn noch Schaden, b01 bleibt Generator fuer v24.** Teil B UNGEBAUT. -->
 
 # Vorregistrierung: Reanalyze -- Spielen und Labeln entkoppeln
 
@@ -270,3 +270,96 @@ einkernigen Fenster-Aufbaus sichtbar gemacht (`docs/measured_runtimes.md`,
 Ausweg: `--merge-out` parallel plus `train.py --cache-file`).
 
 **Teil B (Value tief nachlabeln) bleibt UNGEBAUT.**
+
+## par.A2 VORREGISTRIERT: Arena b05 gegen b01 auf Champion-Strenge verlaengern (2026-09-01, VOR dem Start)
+
+**Anlass (Nutzer):** *"ich wuerd mehr arena spiele von b05 und b01 eintakten.
+dann laesst sich das besser abschaetzen."* Die 80 Paare aus par.A1 loesen
++-10 Siege nicht auf; `docs/generation_loop.md` verlangt fuer einen ENTSCHEID
+n >= 150 Paare oder Replikation mit eigenem Seed.
+
+**Aufbau, identisch zu par.A1 bis auf den Seed:** `tools/paired_arena_env_ab.py`,
+Netz gegen Netz @400/@400, `--env-name MOSAIC_STACK_DRAW_RESEARCH --arms 1
+--control 1`, `--log-games`, threads 10, je Richtung 80 Partien (Brett-Tausch
+per zweitem Lauf mit vertauschten `--model/--model-b`). **Zwei neue Basis-Seeds
+20260996 und 20260997**, jeweils beide Richtungen: +160 Paare, zusammen mit
+par.A1 (Seed 20260995) **240 Paare = 480 Partien**. Artefakte
+`paired_arena_env_relabel2_{b05,b01}_first_s{96,97}.json`.
+
+**Entscheidungsmetrik, vorab:**
+1. **Siege:** gepoolt ueber alle drei Seeds (240 Paare), Vorzeichentest auf
+   den informativen Paaren (ein Paar = derselbe Spielindex in beiden
+   Richtungen: 2:0 informativ, 1:1 geteilt) und gepaarte Siegdifferenz mit
+   95%-KI auf Block-Ebene. **Blockgroesse 5** (16 gleiche Bloecke je Lauf;
+   Projektstandard seit 2026-08-29, `paired_gating`). Berichtigt 2026-09-01
+   um 23:55 auf Nutzer-Hinweis, BEVOR ein Artefakt geschrieben war: die erste
+   Kette lief mit dem Werkzeug-Default 25 (80 Partien = Bloecke 25/25/25/5),
+   wurde gestoppt, als der erste Lauf gerade fertig war, und komplett neu
+   gestartet. Sein Artefakt liegt als
+   `paired_arena_env_relabel2_b05_first_s96_blk25_verworfen.json` beiseite
+   und fliesst NICHT ein (andere Seed-Ableitung je Block, nur eine Richtung). Die par.A1-Laeufe (Seed
+   20260995) tragen keine Blockgroesse im Artefakt und werden fuer die
+   Block-KI in 5er-Gruppen nach Spielindex gefasst. Dazu je Seed einzeln als
+   Replikationspruefung: zeigen alle drei Seeds dasselbe Vorzeichen?
+2. **Spalten:** `tools/probes/arena_column_probe.py` auf jedem Artefakt,
+   gepoolt je Netz ueber 480 Partien; Bezug ist der Punktschaetzer wie bei
+   Tor 2 (par.A1: b05 0,679 gegen b01 0,635).
+3. **Standard-Kennzahlen** wie in par.A1 (Reihen, Strafleiste, Punkte, Margin).
+
+**Was das Ergebnis ausloest -- als Vorlage, nicht als Automatik:** der
+Generator fuer v24 ist Nutzer-Entscheid (`PREREG_v24_window.md` par.4).
+- b05 signifikant vorn bei den Siegen (p < 0,05 auf 240 Paaren) UND nicht
+  unter b01 bei den Spalten: Vorlage "Generator-Wechsel auf b05" mit beiden
+  Zahlen.
+- b05 nicht signifikant vorn, oder vorn bei Siegen und hinten bei Spalten:
+  b01 bleibt Generator, der Befund wird als Marge mit KI festgehalten.
+- b01 signifikant vorn: b01 bleibt, Relabel-Arm als negativ registriert.
+
+**Kosten, aus par.A1 abgelesen:** 806 s je 80 Partien bei threads 10
+(10,1 s je Partie), also rund **54 min** fuer die vier Laeufe. Laeuft
+EXKLUSIV, nichts parallel.
+
+## par.A3 GEMESSEN: 240 Paare, b05 NICHT belegt besser -- b01 bleibt Generator (2026-09-02, 01:00)
+
+Vier neue Laeufe nach par.A2 (Seeds 20260996/97, beide Richtungen, je 80
+Partien, **Blockgroesse 5**, `--log-games`; Artefakte
+`paired_arena_env_relabel2_{b05,b01}_first_s{96,97}.json`, Spalten in
+`columns_relabel2_*.json`), gepoolt mit par.A1 (Seed 20260995):
+
+| Seed | b05 : b01 | informative Paare (b05 beide / b01 beide) | p Vorzeichen |
+| --- | --- | --- | --- |
+| 20260995 (par.A1) | 85 : 75 | 41 (23 / 18) | 0,53 |
+| 20260996 | 86 : 74 | 44 (25 / 19) | 0,45 |
+| 20260997 | **75 : 85** | 37 (16 / 21) | 0,51 |
+| **gepoolt** | **246 : 234** | 122 (64 / 58) | **0,65** |
+
+Gepaarte Siegdifferenz je Partie +0,025, Block-SE 0,044 (48 Bloecke a 5),
+95%-KI [-0,064, +0,114], t 0,57. **Der dritte Seed dreht das Vorzeichen um**
+-- genau die Seed-Streuung, die `docs/generation_loop.md` als Grund fuer die
+150-Paare-Regel nennt.
+
+**Standard-Kennzahlen, gepoolt ueber 480 Partien** (Spalten aus 478 Logs,
+eine Partie nicht nachspielbar):
+
+| Kennzahl | b05 | b01 |
+| --- | --- | --- |
+| volle Spalten je Seite | 0,6757 | 0,6423 |
+| Spaltendifferenz je Partie, Block-KI (95 Bloecke) | +0,034 [-0,063, +0,131], t 0,68 | |
+| Punkte / Margin | 46,97 / -0,34 | 47,31 |
+| Strafleiste (`total_floor`) | 9,40 | 9,83 |
+| lange Reihen begonnen / vollendet | 4,39 / 2,97 | 4,38 / 2,94 |
+
+Punkte je Kriterium wie in par.A1 nicht berechnet (Werkzeug-Format).
+
+**Verdikt nach der vorab registrierten Regel (par.A2, Fall 2):** b05 ist
+weder bei den Siegen noch bei den Spalten signifikant vorn; der
+Punktschaetzer liegt bei beiden knapp ueber Null, das KI schliesst Null ein.
+**b01 bleibt Generator fuer v24**, der Befund steht als Marge mit KI. Der
+Relabel-Arm ist damit weder Gewinn noch Schaden: 200 lehrer-relabelte
+Policy-Dateien im Fenster bewegen den Nachfolger nicht messbar. Laufzeit der
+vier Laeufe zusammen 3.649 s (10 Threads, rund 11,4 s je Partie, im Artefakt).
+
+Damit ist die Vorlage fuer die Gleichstandsregel der Generatorwahl
+(`docs/generation_loop.md`) gegenstandslos geworden, soweit sie an b05 hing:
+bei 240 Paaren gibt es keinen Gleichstand mehr zu entscheiden, sondern einen
+Nullbefund. Die Regel selbst bleibt fuer kuenftige Generationen offen.

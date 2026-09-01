@@ -19,6 +19,14 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   mit `--block-size 5` (Champion-Gating 2026-08-07: 37 Bloecke a 5).
   Behoben am selben Tag (Nutzer-Entscheid): der Default ist seit
   2026-08-29 `BLOCK_SIZE = 5`.
+- **Dieselbe Falle ein zweites Mal, anderes Werkzeug** (2026-09-01):
+  `paired_arena_env_ab.py` hatte weiter Default 25; die b05/b01-Arena lief
+  damit 80 Partien in Bloecken 25/25/25/5, vom Nutzer nach dem ersten Lauf
+  abgefangen (Schaden: ein Lauf von 16 min verworfen, Kette neu gestartet).
+  Lehre: ein Default wird in ALLEN Werkzeugen derselben Familie umgestellt,
+  nicht nur im gerade benutzten. Seit 2026-09-01 steht 5 in allen fuenf
+  gepaarten Arena-Werkzeugen (`working_rules.md`, "Blockgroesse 5"), und der
+  Messlauf-Skill fragt es vor dem Start ab.
 - **CPU-Nebenlast verstuemmelt Arena-Partien** (2026-08-20). Derselbe
   8-Partien-Smoke lieferte unter Last zwei verschiedene Ergebnisse (eine
   Partie endete 3:1), ohne Last dreimal byte-identisch. **Arena-Messungen
