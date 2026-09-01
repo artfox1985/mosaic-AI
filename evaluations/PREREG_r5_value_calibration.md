@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Unterbietet der Value-Kopf den Plattenlohn, und laesst sich das heilen? | Beleg: JA, und der KORPUS heilt es NICHT (par.11, 2026-08-31): v23-b01 misst 0,0859 gegen b05s 0,0886 auf denselben 139 Paaren -- die On-Policy-Wette von Zuschnitt D ist nicht aufgegangen, obwohl b01 deutlich staerker wurde und 66 Prozent mehr Spalten baut. Der Punkte-Kopf trifft dieselbe Groesse mit 0,97, es ist also spezifisch der Value-Kopf. Der Eingriff ist damit faellig; Erfolgstest 'kippt die Sims-Kurve?'. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Unterbietet der Value-Kopf den Plattenlohn, und laesst sich das heilen? | Beleg: JA und NEIN -- die Daempfung ist real und stabil (b01 0,0859, Punkte-Kopf trifft dieselbe Groesse mit 0,97), aber **par.12 (2026-09-01) widerlegt ihre Rolle**: keine Einstellung des Kopfes holt den Spaltenbau in der Tiefe zurueck (B=2,0 schadet -0,125, B=0,5 und Punkte-Blend bewegen nichts; Delle @100 gegen @400 = 0,205). Phase 3 GESCHLOSSEN ohne Bau, Trainingslauf gespart; die Ursache erbt `search_depth_column_optimum` Stufe 4. -->
 
 # Vorregistrierung: Runde-5-Value-/Punkte-Kopf-Kalibrierung gegen exakte Ground Truth
 
@@ -592,3 +592,227 @@ Kapazitaets- oder Eingabeproblem ist damit weiterhin ausgeschlossen.
 Korpus es richtet" -- diese Frage ist beantwortet. Es braucht den Eingriff,
 mit dem registrierten Erfolgstest "kippt die Sims-Kurve?" (Nachtrag
 2026-08-30).
+
+## par.12 PHASE 3, ENTWURF DES EINGRIFFS (2026-09-01, Nutzer-Auftrag "dann entwirf was")
+
+**Ausgangslage.** Die Daempfung ist gemessen und stabil (Steigung 0,0859 auf
+b01 gegen 0,0886 auf b05, par.11), sie ist BREIT ueber die Kriterien (k1 mit
+0,1747 am wenigsten gedaempft, par.10), und die Information liegt im Rumpf:
+der Punkte-Kopf trifft dieselbe Groesse mit **0,97**.
+
+**Was am Verbraucher bereits gemessen geschlossen ist -- und warum der
+Entwurf dort NICHT ansetzt:**
+
+| Weg | Ergebnis |
+| --- | --- |
+| eigener Plattenkopf | gebaut und wieder entfernt (`PREREG_plate_head.md`, UEBERHOLT) |
+| Endgame-/Platten-Aux-Kopf | Arena H0, wurde Trainings-Upgrade (`plate_intervention`) |
+| Platten in die Blattbewertung injizieren | NEGATIV ueber den ganzen Dosis-Sweep (`scoring_plate_injection`) |
+| Punkte-Kopf in den Blattwert mischen | SCHAEDLICH: w=0,1 verliert 300:321 (`points_blend_w`) |
+
+Vier Wege, alle am selben Punkt: dem Blattwert mehr Platteninformation
+zufuettern.
+
+**EINWAND DES NUTZERS (2026-09-01), und er sticht:** *"die sind aber alle auf
+einem plattenblinden spiel gemessen worden. vielleicht hat das einen
+einfluss."* An den Quellen geprueft -- alle vier stammen aus dem 9. bis 11.
+August und liefen auf `v21_2d_brierbest`:
+
+| Weg | Datum | gemessen an |
+| --- | --- | --- |
+| Punkte-Blend | 2026-08-10 | `alphazero_v21_2d_brierbest.onnx`, 400 Partien (Artefakt `paired_arena_env_points_blend_w.json`) |
+| Platten-Injektion | 2026-08-11 | Champion `v21_2d_brierbest`@400 gegen Heuristik@150 |
+| Aux-Kopf (`endgame_margin`) | 2026-08 | Gating gegen den Champion, 97:103 |
+| eigener Plattenkopf | 2026-08-09/10 | vor jeder Spalten-Linie gebaut und entfernt |
+
+**v21 schliesst rund 0,10 volle Spalten je Partie, b01 rund 0,6.** Alle vier
+Messungen haben also gefragt, ob mehr Platteninformation im Blattwert einem
+Agenten hilft, der die Konsequenz daraus gar nicht ziehen kann. Das ist genau
+die Fehlerform, die dieses Projekt als Regel notiert hat: *aus "Eingriff X in
+Richtung Y verliert" folgt NICHT "Y ist falsch" -- es fehlt die
+Kontrollgruppe: ein Agent, der Y KANN.*
+
+**Folge fuer diesen Entwurf:** die vier Wege sind fuer plattenBLINDE Netze
+geschlossen, fuer `v23-b01` sind sie UNGEMESSEN. Der billigste davon ist ein
+reiner Laufzeit-Knopf und kostet dasselbe wie Stufe 0 -- er wird deshalb dort
+mitgefahren, statt einen fuenften Weg zu erfinden.
+
+### Stufe 0 -- der ERFOLGSTEST zuerst, ohne einen einzigen Bau
+
+Der registrierte Erfolgstest lautet "kippt die Sims-Kurve?". **Er ist
+fahrbar, BEVOR irgendetwas gebaut wird** -- und er prueft die Kausalkette,
+auf der die ganze Phase ruht: dass der flache Value-Kopf der Grund ist,
+warum tiefere Suche den Spaltenbau zerstoert (Plateau 25-100 Sims bei ~0,6
+volle Spalten, ab 250 Sims 0,34).
+
+**Instrument:** `MOSAIC_VALUE_CAL_B`, die Laufzeit-Logit-Streckung des
+Value-Kopfs (net_mcts.rs:329-340, aktiver Knopf). Eine Streckung B>1 macht den
+Kopf in genau der Groesse steiler, in der er zu flach misst.
+
+**Wichtige Abgrenzung:** dieser Knopf ist als STAERKE-Hebel bereits
+ENTSCHIEDEN (`PREREG_value_scale_correction.md`: Erstlauf +6pp n.s.,
+Replikation ohne Effekt). Er wird hier NICHT als Heilmittel vorgeschlagen,
+sondern als **Messinstrument fuer eine Mechanismus-Frage**. Das ist zulaessig,
+weil die alte Messung "hebt es die Spielstaerke?" gefragt hat, nicht "haengt
+der Spaltenbau bei hoher Suchtiefe daran?".
+
+**Anordnung:** argmax-Instrument @400 Sims (dort, wo der Spaltenbau
+zusammenbricht), 200 Partien je Arm, gleicher Seed, alles auf `v23-b01` --
+also erstmals an einem Agenten, der Spalten bauen KANN.
+
+| Arm | Knopf | Frage |
+| --- | --- | --- |
+| Kontrolle Tiefe | `VALUE_CAL_B=1,0` @400 | **liegt bereits vor**: Tor-2a-Lauf `tor2a-v23b01`, gleicher Seed 20260931, gleiches Instrument -- **0,5150** |
+| Kontrolle flach | `VALUE_CAL_B=1,0` @**100** | **hat b01 die Tiefen-Delle ueberhaupt?** Die Kurve 0,6 gegen 0,34 ist an **b05** gemessen (`search_depth_column_optimum` par.2i), nicht an b01. b01 liegt bei 400 schon bei 0,5150 -- moeglicherweise gibt es bei ihm nichts zu kippen |
+| Streckung | `VALUE_CAL_B=2,0` / `3,0` | macht ein steilerer Value-Kopf die Tiefe wieder spaltenfreundlich? |
+| **Blend-Wiedervorlage** | `POINTS_UTILITY_W=0,1` | traegt der Punkte-Blend, wenn der Agent die Konsequenz ziehen kann? (auf v21 schaedlich, siehe Einwand oben) |
+
+Kosten: rund 31 min je Arm; da der 400er-Kontrollarm bereits vorliegt, sind **drei
+Arme zu fahren, zusammen ~1,6 h**, kein Bau, kein Wheel.
+
+**Berichtigung im selben Zug (2026-09-01):** der Entwurf nannte zuerst 0,34 als
+Erwartung des Kontrollarms. Das ist b05s Wert bei hoher Tiefe. b01 misst am selben
+Instrument 0,5150. **Die erste Frage ist damit nicht "kippt die Kurve", sondern ob
+b01 ueberhaupt eine Delle hat** -- deshalb der flache Kontrollarm bei 100 Sims. Faellt
+@100 nicht deutlich ueber @400 aus, ist die Praemisse von Phase 3 fuer den aktuellen
+Stand hinfaellig, noch bevor ein Knopf gedreht wird. Der Blend-Arm faehrt dieselbe Dosis w=0,1 wie die alte Messung -- eine
+andere Dosis waere ein zweiter Faktor.
+
+**Entscheidungsmass, vorab:** volle Spalten je Partie und Seite am
+argmax-Instrument.
+
+**Schwelle NACHGEZOGEN am 2026-09-01, nach dem Kontrollarm und VOR jedem
+Eingriffsarm** (die urspruengliche stammte aus b05s Kurve und passte nicht auf
+b01): der flache Kontrollarm ist gefahren und misst
+
+```
+b01 @100 Sims : 0,7200 (SE 0,0396, 200 Partien)
+b01 @400 Sims : 0,5150 (SE 0,0332, Tor-2a-Lauf, gleicher Seed)
+Delle also 0,205, t rund 3,97 -- b01 HAT sie, in derselben Groessenordnung
+wie b05 (0,6 gegen 0,34)
+```
+
+**"Kippt" heisst damit: mindestens die halbe Delle geschlossen, also
+>= 0,618 volle Spalten bei 400 Sims**, bei mindestens einem Arm. Die
+Zeitpunkt-Angabe steht hier ausdruecklich, weil eine nach den Behandlungsarmen
+verschobene Schwelle wertlos waere; die Behandlungsarme laufen erst nach
+diesem Absatz.
+
+**Messweg, validiert:** volle Spalten aus dem letzten Record je Partie
+(`col_fill_py` je Spieler, Spalte voll bei fill == 6). Gegenprobe: auf dem
+Tor-2a-Korpus liefert der Weg **0,5150** und damit die registrierte Zahl
+ZIFFERNGLEICH -- kein eigenes Mass, sondern dasselbe. Zusaetzlich als Waechter eine kurze
+gepaarte Arena des besten B gegen B=1 -- eine Streckung, die Spalten bringt
+und Staerke kostet, ist kein Erfolg, sondern ein Tausch (und der ist als
+Muster schon zweimal aufgetreten).
+
+**Und der Wert eines NULL-Ergebnisses ist hier hoeher als der eines
+positiven:** faellt Stufe 0 flach aus, ist die Deutung "der gedaempfte
+Value-Kopf zerstoert den Spaltenbau in der Tiefe" WIDERLEGT -- und Phase 3
+wird geschlossen, statt ein Training zu kosten. Ein positives Ergebnis
+lokalisiert dagegen nur grob (eine globale Streckung schaerft ALLE
+Wertunterschiede, nicht nur den Plattenanteil).
+
+### Stufe 1 -- nur bei positivem Stufe-0-Befund: Betrags-Bindung im TRAINING
+
+Kein neuer Konsument, sondern eine Konsistenz-Bedingung zwischen zwei
+vorhandenen Koepfen. Der Punkte-Kopf sagt die Marge mit 0,97 voraus, die
+Kennlinie (a=-0,78786, b=0,39438, McFadden 0,634) bildet Marge auf
+Gewinnwahrscheinlichkeit ab. Zusatzverlust:
+
+```
+L_cal = ( sigmoid(a + b * m_punkte) - p_value )^2
+```
+
+Der Value-Kopf muss also mit der Vorhersage seines eigenen Punkte-Kopfes
+uebereinstimmen. Das fuegt KEINE Information hinzu -- es zwingt den Kopf,
+die vorhandene auszudruecken. Kosten: ein Trainingslauf (b01-Rezept, 4-6 h)
+plus Gating; ein Faktor gegen b01.
+
+**Risiko, benannt:** die Bedingung koennte den Value-Kopf in Richtung des
+Punkte-Kopfes ziehen und damit die WDL-Semantik beschaedigen (Remis-Zone,
+Endspiel-Sicherheit). Waechter: Brier auf dem Val-Pool darf nicht schlechter
+werden als b01s 0,1934.
+
+### Stufe 2 -- Abbruchregel
+
+Faellt Stufe 0 flach aus, wird Phase 3 **geschlossen und nicht gebaut**. Die
+Daempfung bleibt dann ein registrierter Befund ohne benannten Nutzniesser --
+und genau das ist die Regel, die dieses Projekt fuer Infrastruktur- und
+Reparaturvorschlaege gesetzt hat.
+
+### Stufe-0-Ergebnisse, laufend registriert (2026-09-01)
+
+| Arm | volle Spalten je Seite | SE | n Partien |
+| --- | --- | --- | --- |
+| @400, `B=1,0` (Kontrolle Tiefe, Tor-2a-Lauf) | 0,5150 | 0,0332 | 200 |
+| @100, `B=1,0` (Kontrolle flach) | **0,7200** | 0,0396 | 200 |
+| @400, `B=2,0` (Streckung) | **0,3900** | 0,0314 | 200 |
+
+**Befund 1: b01 HAT die Delle.** 0,7200 gegen 0,5150, Differenz 0,205
+(t rund 3,97). Die Praemisse von Phase 3 gilt also fuer den aktuellen Stand,
+nicht nur fuer b05 -- das war vor dem Lauf offen, weil die Kurve an b05
+gemessen worden war.
+
+**Befund 2: Streckung macht es SCHLECHTER, nicht besser.** 0,3900 gegen
+0,5150, Differenz -0,125 (SE der Differenz rund 0,046, t rund 2,7). Die
+Schwelle 0,618 ist damit klar verfehlt, und zwar in der falschen Richtung.
+
+**Was das an der Deutung aendert -- und das ist der eigentliche Ertrag:** die
+Erzaehlung war "der Kopf ist zu leise, deshalb setzt sich in der Tiefe sein
+gedaempftes Urteil gegen das Spaltenwissen der Policy durch". Waere das der
+Mechanismus, muesste eine Streckung dem Spaltenbau helfen oder wenigstens
+nichts tun. Sie schadet. **Die Praeferenz des Value-Kopfs zeigt in der Tiefe
+GEGEN den Spaltenbau, und Verstaerkung verstaerkt genau das.** Nicht der
+Betrag ist das Problem, sondern die Richtung.
+
+**Daraus ein nachtraeglich hinzugefuegter Arm, ausdruecklich als solcher
+gekennzeichnet:** `B=0,5` (Stauchung) bei 400 Sims. Wenn Streckung schadet,
+sollte Stauchung helfen -- und das waere zugleich die Erklaerung dafuer, warum
+wenige Sims mehr Spalten bauen (weniger Value-Einfluss auf die Auswahl). Die
+Schwelle 0,618 bleibt unveraendert; der Arm ist explorativ und traegt kein
+Verdikt, sondern erzeugt die naechste Vorregistrierung.
+
+### STUFE 0 VOLLSTAENDIG -- PHASE 3 WIRD GESCHLOSSEN (2026-09-01)
+
+| Arm | volle Spalten | SE | gegen Kontrolle |
+| --- | --- | --- | --- |
+| @100, `B=1,0` | 0,7200 | 0,0396 | +0,205 (t 3,97) |
+| @400, `B=1,0` (Kontrolle) | 0,5150 | 0,0332 | -- |
+| @400, `B=2,0` | 0,3900 | 0,0314 | -0,125 (t -2,7) |
+| @400, `B=0,5` (explorativ) | 0,5325 | 0,0337 | +0,018 (t 0,37) |
+| @400, `w=0,1` Punkte-Blend | 0,4850 | 0,0339 | -0,030 (t -0,63) |
+
+Je 200 Partien, gleicher Seed 20260931, argmax-Instrument, Messweg gegen den
+Tor-2a-Lauf validiert (0,5150 zifferngleich).
+
+**Verdikt: die Schwelle 0,618 wird von KEINEM Arm erreicht.** Nach der
+Abbruchregel (Stufe 2) wird Phase 3 damit geschlossen und NICHT gebaut; der
+Trainingslauf der Stufe 1 entfaellt.
+
+**Was gelernt ist, und es ist mehr als ein Nein:**
+
+1. **Die Delle existiert auch fuer b01** (0,205), nicht nur fuer b05 -- das war
+   vor diesem Lauf offen.
+2. **Sie haengt NICHT an der Skala des Value-Kopfs.** Stauchen (B=0,5) muesste
+   in Richtung des 100-Sims-Verhaltens ziehen, wenn "zu lautes Value-Urteil in
+   der Tiefe" der Mechanismus waere. Es tut nichts.
+3. **Streckung schadet asymmetrisch** (-0,125 bei B=2,0, waehrend B=0,5 nichts
+   bewegt). Der Kopf traegt in der Tiefe eine Praeferenz GEGEN den Spaltenbau;
+   Verstaerkung legt sie frei, Daempfung ersetzt sie aber nicht durch die
+   Policy-Praeferenz.
+4. **Der Punkte-Blend traegt auch auf einem plattenBEWUSSTEN Netz nicht**
+   (Nutzer-Einwand vom selben Tag). Einschraenkung: die alte Schliessung war
+   eine STAERKE-Messung, diese hier misst Spalten -- fuer die Staerke sagt
+   dieser Arm nichts.
+
+**Die Daempfung bleibt ein registrierter Befund ohne benannten Nutzniesser.**
+Sie ist gemessen, stabil und spezifisch fuer den Value-Kopf (Punkte-Kopf 0,97)
+-- aber sie erklaert den Spaltenverlust in der Tiefe nicht, und ein Eingriff
+ohne benannten Nutzniesser wird in diesem Projekt nicht gebaut.
+
+**Was die Frage erbt:** die optionale Stufe 4 aus
+`PREREG_search_depth_column_optimum.md` (Mechanismus-Zaehlung). Diese Messung
+grenzt sie ein: die Ursache liegt nicht in der Skalierung des Blattwerts und
+nicht in fehlender Punkte-Information, sondern in dem, was die tiefere Suche
+mit den Kandidaten TUT.
