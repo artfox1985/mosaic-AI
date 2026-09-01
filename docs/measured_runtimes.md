@@ -51,7 +51,11 @@ Heuristik bzw. Netz gegen Heuristik, gleiche Sims), nicht das Werkzeug.
 | Lehrer-Relabeling via frozen-Worker (v23-Sockel, 200 Dateien) | 204.008 Labels / 4.000 Partien | 4 Worker | **744 s** = 3,6 ms je Label. **UNTER NEBENLAST gemessen** (lief neben dem b01-Datenaufbau) -- als Planungsgroesse nach oben abgerundet, nicht nach unten |
 | DAgger-Afterburner (v22-b05: Warm-Start, 6 Epochen, 176k Samples) | 600 Partien extra-dir | CUDA | **10,6 min** (davon Datenaufbau 6,6 min) |
 | DAgger-Afterburner (v22-b06: Warm-Start, 12 Epochen, 89k Samples, reines Fenster) | 600 Partien extra-dir | CUDA | **7,9 min** (davon Datenaufbau 3,7 min) |
-| Netz-Self-Play b05@400 MIT Root-Noise (Sockel-Konfiguration) | 4 x 100 Partien | 11 | **8,27-8,73 s je Partie** = 4.000 Sockel-Partien rund 9,3 h |
+| Netz-Self-Play b05@400 MIT Root-Noise (Sockel-Konfiguration) | 4 x 100 Partien | 11 | **8,27-8,73 s je Partie** = 4.000 Sockel-Partien rund 9,3 h. **ACHTUNG: die v23-Erzeugung fuhr @100, nicht @400** -- diese Zeile hat am 2026-09-01 eine falsche v24-Kostenschaetzung (23 h) ausgeloest, die richtigen Zeilen stehen darunter |
+| v23-Erzeugung Sockel, b05@100 gesampelt mit Rauschen (`manifest_v22-b05-policy_20260831_033448.json`) | 4.000 Partien | 11 | **3,365 s je Partie** = 13.459,5 s (3,74 h) |
+| v23-Erzeugung Schwarm argmax, b05@100 `--value-only --deterministic --no-root-noise` (`manifest_v22-b05-value-argmax_20260830_192533.json`) | 6.000 Partien | 11 | **3,674 s je Partie** = 22.041,4 s (6,12 h) |
+| v23-Erzeugung Schwarm gesampelt, b05@100 `--value-only` (`manifest_v22-b05-value-sampled_20260831_013258.json`) | 2.000 Partien | 11 | **3,653 s je Partie** = 7.306,5 s (2,03 h); alle drei zusammen **11,9 h** |
+| Netz-Self-Play b01@400 argmax (`manifest_s4states-v23b01_20260901_222208.json`, Zustandssatz Stufe 4) | 80 Partien | 11 | **14,5 s je Partie** (1.161 s), mit leichter Nebenlast (Log-Replays) gemessen |
 | Gepaarte Arena b05@400 gegen Heuristik@150 | 2 x 100 Partien | 10 | **3,33 s je Partie** (666 s), rund 34 s je Block von 10 |
 
 **Parallelisierung ist ergebnisneutral, gemessen statt angenommen** (20 Seeds
