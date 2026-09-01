@@ -26,8 +26,9 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-01, abends)
 
-**NICHTS.** GPU und CPU sind frei, kein Hintergrundlauf offen. Der Baum ist
-committet bis `c6c6eae`; ungepusht.
+**NICHTS.** GPU und CPU sind frei, kein Hintergrundlauf offen (Stand 2026-09-01,
+23:20). In `data/` liegen zusaetzlich die 8 Dateien `selfplay_s4states-v23b01_*`
+(Zustandssatz Stufe 4, 80 Partien); sie gehoeren in KEIN Fenster. Ungepusht.
 
 ### Was diese Sitzung ergeben hat -- der Bogen in sieben Zeilen
 
@@ -48,11 +49,11 @@ committet bis `c6c6eae`; ungepusht.
    Wurzel-Eingriff, `VALUE_CAL_B`/`POINTS_UTILITY_W` wirken am Blattwert im
    ganzen Baum; "was bleibt, liegt tiefer im Baum" folgt daraus nicht. Der
    neue Knopf `MOSAIC_GUMBEL_C_SCALE` hat die sigma/Prior-Erklaerung widerlegt.
-5. **Stufe 4 Teil A: die tiefere Suche ueberstimmt den Prior haeufiger (83
-   gegen 49 Prozent)** -- aber die Erstfassung zaehlte jeden Zustand doppelt
-   (zwei identische Paritaetslaeufe, 89 distinkte statt 200 Zustaende;
-   `search_depth_column_optimum` par.6, Berichtigung). Wiederholung mit
-   frischem Zustandssatz: par.6b dort.
+5. **Stufe 4 Teil A: die tiefere Suche ueberstimmt den Prior haeufiger**,
+   auf 200 DISTINKTEN Zustaenden wiederholt (par.6b): 0,825 @400 gegen 0,490
+   @100, 70:3 diskordant, p = 1,4e-17, 8 Bloecke. Die Erstfassung hatte
+   jeden Zustand doppelt gezaehlt (zwei identische Paritaetslaeufe); das
+   Verdikt hielt, die Kennzahlen sind ersetzt.
 6. **Die Elo-Leiter ist repariert** (Anker ist das eingefrorene Artefakt),
    der Remis-Regelfehler im Schiedsrichter behoben, vier Kanten eingetragen:
    b01 steht bei **1263** ueber 730 Partien, der Champion v21 bei 1227.
@@ -73,7 +74,7 @@ committet bis `c6c6eae`; ungepusht.
 | --- | --- | --- |
 | **v24-Erzeugung** | **11,9 h** bei threads 11 (aus den v23-Manifesten, 100 Sims; die fruehere Zahl 23 h war ein 400-Sims-Richtwert) | 12.000 b01-Partien (4.000 Sockel gesampelt mit Rauschen, 6.000 Schwarm argmax, 2.000 Schwarm gesampelt), `--per-file 10`. **Rezept vollstaendig in `PREREG_v24_window.md` par.6** (Befehle, Seeds, Stack-Draw-Env, Traeger-Manifest 580, Tor-0-Schwelle); der hv2-Anteil wird UNVERAENDERT weiterverwendet. Vor der ersten Arm-Arena: Gleichstandsregel fuer die Generatorwahl (Nutzer-Entscheid, `docs/generation_loop.md`) |
 | **Vor dem v24-Training**: Fenster-Cache parallel vorbauen | spart rund 4 h | `build_cache_incremental.py --merge-out` plus `train.py --cache-file`. Gemessen: ein neues Fenster kostet sonst 4,98 h einkernig (`cache_build_time` par.11) |
-| **Stufe 4 Teil B** | rund 20 min | Spalten-Etikett der verworfenen Zuege, Definition berichtigt und registriert (`search_depth_column_optimum` par.6a). Braucht einen zweiten Trace-Durchgang, weil der erste die Reihennummer nicht mitschrieb |
+| **Stufe 4 Teil B** | rund 35 min (Teil A brauchte 1.924 s) | Spalten-Etikett der verworfenen Zuege auf dem Zustandssatz `selfplay_s4states-v23b01_*` (par.6b), Definition par.6a. Braucht einen zweiten Trace-Durchgang mit Reihennummer |
 | Push | -- | 3 Commits ungepusht, `cargo test --release --no-run` ist gruen |
 
 ## 2. WAS DIE GENERATION v23 ERGEBEN HAT
@@ -374,7 +375,7 @@ Stufe 4), `capacity_sim_frontier`, `reanalyze_label_depth`,
 | `reanalyze_label_depth` | Teil A (Lehrer-Relabeln) gefahren, Abschnitt 3.1; die Zeile-1-Frage (flach gegen tief nachgelabelt) und Teil B (Value tief) UNGEMESSEN |
 | ~~`r5_solver_split`~~ | Teil B war Phase 3 -- GESCHLOSSEN ohne Bau (2026-09-01) |
 | ~~`v23_reachability_recheck`~~ | ENTSCHIEDEN 2026-09-01: 14,64 Prozent tot-kartiert gegen 13,89 beim Vorgaenger, Stufe 1 wird NICHT eroeffnet; Quelldateien im restic-Backup |
-| `search_depth_column_optimum` | **Stufe 4 Teil A (par.6) war auf 89 distinkten statt 200 Zustaenden gerechnet** (zwei identische Paritaetslaeufe als vier Bloecke gezaehlt); Verdikt 0,49 gegen 0,83 haelt, Kennzahlen nicht. **Wiederholung mit frischem Zustandssatz: par.6b.** Dazu berichtigt: m=25-Praemisse (Clamp ist 16), "@100 33:47" ist n.s. (par.2j2), drei der "vier Wurzel-Eingriffe" waren Blatt-Eingriffe. Offen: Teil B (zweiter Trace-Durchgang mit Reihennummer) |
+| `search_depth_column_optimum` | Stufe 4 Teil A **wiederholt auf 200 distinkten Zustaenden (par.6b): 0,825 gegen 0,490, 70:3, p = 1,4e-17** -- die Erstfassung (par.6) hatte doppelt gezaehlt (89 distinkte), Verdikt hielt. Dazu berichtigt: m=25-Praemisse (Clamp ist 16), "@100 33:47" ist n.s. (par.2j2), drei der "vier Wurzel-Eingriffe" waren Blatt-Eingriffe. **Offen: Teil B** auf demselben Zustandssatz |
 | `special_tile_yield` | Kanaele 77/78 gebaut, ihre Wirkung nie isoliert |
 | `cache_build_time` | Hebel (3) hat seit 2026-09-01 einen Nutzniesser: **4,98 h** einkerniges Zusammenfuegen bei neuer Fenster-Zusammensetzung (par.11). Die vermisste serielle Vollreferenz liegt damit auch vor |
 | `frozen_v3_eval_set` | ENTSCHIEDEN und GEBAUT 2026-09-01 (Satz 1.800 Zustaende, Orakel aus b01 und v21, Zirkularitaet belegt, par.7-9). Nachgetragen: die Bruecke gilt nur fuer Runden 1-4; Quelldateien im restic-Backup; Artefakte ohne `laufzeit`-Block |
