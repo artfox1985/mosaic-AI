@@ -124,7 +124,7 @@ Auftrags, aber benannt.
 
 | Schritt | Ergebnis |
 | --- | --- |
-| Zustandsquelle | 400 frische `v23-b01`-Partien, Sockel-Konfiguration (100 Sims, Wurzelrauschen, Seed 20260902), 24,2 min (`data/manifest_frozenv3-b01_20260901_100837.json`, `laufzeit.wanduhr_s` 1450,4; berichtigt 2026-09-01, vorher "22 min"). **Die Quelldateien `selfplay_frozenv3-b01_*.pkl` liegen seit dem 2026-09-01 NICHT mehr im Baum**, sondern im restic-Backup (`MOSAIC_BACKUP_DIR`, Snapshot-Pfad `archive_pre_v24/`, Wiederherstellung nach `docs/backup_restore.md`); die Auflage par.4 Punkt 2 (Neubau aus denselben Dateien) ist nur nach Wiederherstellung einloesbar |
+| Zustandsquelle | 400 frische `v23-b01`-Partien, Sockel-Konfiguration (100 Sims, Wurzelrauschen, Seed 20260902), 24,2 min (`data/manifest_frozenv3-b01_20260901_100837.json`, `laufzeit.wanduhr_s` 1450,4; berichtigt 2026-09-01, vorher "22 min"). **Die Quelldateien `selfplay_frozenv3-b01_*.pkl` liegen seit dem 2026-09-01 NICHT mehr im Baum**, sondern als Klartext unter `<Sicherungswurzel>/archive_pre_v24/` (seit 2026-09-02; aus dem restic-Snapshot `e77c2d7c` zurueckgeholt, dann auf Nutzer-Wunsch aus `data/` herausverschoben) und im restic-Repository selbst; die Auflage par.4 Punkt 2 (Neubau aus denselben Dateien) ist damit einloesbar, indem der Ordner nach `data/archive_pre_v24/` zurueckkopiert wird |
 | Satz | `evaluations/frozen_eval_set_v3.pkl`, **1.800 Zustaende, exakt 360 je Runde**, Manifest daneben |
 | Orakel-Labels | `evaluations/artifacts/frozen_v3_oracle_labels.json`, **1.144 Labels** mit `v23-b01_brierbest` @5000 Sims, 88,8 min, 0 Mismatches, 0 Fehler |
 
