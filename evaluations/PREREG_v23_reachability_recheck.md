@@ -157,3 +157,17 @@ Material in das restic-Backup gewandert (`MOSAIC_BACKUP_DIR`, Snapshot-Pfad
 `archive_pre_v24/`; Wiederherstellung nach `docs/backup_restore.md`). Wer die
 Messung wiederholen will, stellt sie zuerst wieder her; par.5 bleibt als
 Ergebnis gueltig, ist aber ohne diesen Schritt nicht reproduzierbar.
+
+## par.7 REPRODUZIERT aus dem Backup (2026-09-02, 02:20, Nachtprogramm N5)
+
+Die Quelldateien (`selfplay_frozenv3-b01_*.pkl`, 40 Dateien) sind aus dem
+restic-Snapshot vom 2026-09-01 12:00 nach `data/archive_pre_v24/`
+zurueckgeholt und die Sonde mit Default-Muster neu gefahren
+(`evaluations/artifacts/reachability_stage0_repro.json`, 23,3 s). **Alle 26
+Kennwerte sind zifferngleich** mit `reachability_stage0.json` (0,14641302 /
+0,13895 / Block-SE 0,0051246 / 38 Dateien / 300 Zustaende / 40.718 Zellen);
+verschieden sind nur zwei Schluesselnamen, die seit dem Erstlauf ins Englische
+umbenannt wurden (`n_zustaende` -> `n_states_done`, `n_zellen` -> `n_cells`,
+`kurve` -> `curve`). Die Auflage aus par.6 ist damit eingeloest, par.5 ist
+reproduzierbar. Nach N8b liegen die Quelldateien unter
+`<Sicherungswurzel>/archive_pre_v24/` (dann `--pattern` mit Pfad).

@@ -518,3 +518,36 @@ Vollreferenz aus par.8 (36,1 min fuer 4,19 Mio Zustaende) legt nahe, dass aus
 den 4,98 h deutlich weniger als eine Stunde wird. **Die serielle
 Vollreferenz, die dieser Strang als fehlend fuehrt, liegt damit uebrigens
 vor** -- unfreiwillig, aber sauber gemessen.
+
+## par.12 HEBEL 3 ERSTMALS EINGESETZT -- zwei Bedingungen, die vorher nirgends standen (2026-09-02, Nachtprogramm N3)
+
+Anlass: `v23-b06` (Kaltstart mit b01-Rezept) braucht das v23-Fenster neu
+zusammengefuegt; die Bloecke waren nach dem Archivieren weg, das Fenster kam
+aus dem Backup zurueck. Beim ersten echten Einsatz von `--merge-out` fielen
+zwei Bedingungen auf, ohne die der Monolith wertlos ist:
+
+1. **Der Monolith gehoert zum TRAININGSANTEIL, nicht zum Fenster.** train.py
+   sucht `data/.cache_<key>.h5` fuer `train_files` = Fenster minus Val-Split
+   (val_frac 0,05 aus dem `MOSAIC_VAL_POOL`, Seed 20260707, train.py:1273-1305).
+   Ein Monolith ueber alle Fensterdateien traegt einen anderen Schluessel und
+   wird nie gefunden; der Vorschlag "dann `--val-frac 0` fahren" (par.4a3 des
+   v23-Fensters) aendert das Rezept. Neu: `tools/window_train_split.py`
+   bildet den Split vorab nach, schreibt die Trainingsliste und nennt den
+   Schluessel; `--merge-out` wird direkt auf `data/.cache_<key>.h5` gelegt,
+   train.py laedt ihn OHNE `--cache-file` (Ladepfad corpus_dataset.py:733).
+   Fuer das v23-Fenster: 2.228 Trainingsdateien, Schluessel `29e6903028d2`.
+2. **Der Block-Bau muss unter DERSELBEN Umgebung laufen wie das Training.**
+   `ignore_ptv` (MOSAIC_IGNORE_POLICY_TARGET_VALID) und die
+   Bootstrap-Kohaerenz sind Teil von `per_file_cache_key`
+   (file_cache_key.py:18-70). Ein Block-Bau ohne die Variable liefert Bloecke,
+   die ein Training mit der Variable nie adressiert; genau das ist um 01:20
+   passiert (600 Bloecke, 1.072 s, unbenutzt). Wer Bloecke vorbaut, setzt die
+   Trainings-Umgebung davor, wie beim Training selbst.
+
+**Gemessen (02:11, `cache_build_incremental.json`):** 2.156 Bloecke neu in
+2.280 s gesamt (6 Worker, davon Zusammenfuegen **344,2 s** fuer 2.228
+Dateien, 21 Felder, 1,14 GB), Traeger-Maske 1.889 von 2.228 Bloecken. Gegen
+die 17.934 s (4,98 h) des einkernigen Zusammenfuegens im b05-Lauf (par.11) ist
+das der Faktor 52 auf dem Merge-Schritt; mit Block-Neubau zusammen Faktor
+7,9. Das ist die Zahl, die Hebel (3) gebraucht hat. Ob train.py den so
+benannten Monolithen trifft, steht im b06-Manifest (`datenaufbau_s`).

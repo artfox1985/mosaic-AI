@@ -721,3 +721,21 @@ verworfen wurde, entscheidet der Trace.
 Traces von par.6 haben die `description` der Kandidaten gespeichert, nicht die
 Zeilennummer -- der naechste Lauf muss sie mitschreiben (Reihe steht im
 Klartext der Beschreibung, z.B. "-> Reihe 6 [5/6]").
+
+**Operationalisierung, VOR dem Lauf festgelegt (2026-09-02, 01:30,
+`tools/probes/search_depth_column_label_probe.py`):**
+- Reihe k aus der `description` per Regex "Reihe (\d)" (execution.rs
+  `dest_label`: k = row_index + 1); "Strafleiste" hat keine Reihe und ist nie
+  spaltenrelevant.
+- Kuppelzeile = Musterreihe im Index: `plate_completability_json` (lib.rs)
+  ordnet Zelle (r, c) der `pattern_lines[r]` zu, also Kuppelzeile r = k - 1.
+- `col_fill` und `col_open_cells` aus demselben Praedikat fuer den Spieler am
+  Zug. Offene Zelle = Eintrag mit `kind != "empty_slot"` (ohne Kuppelplatte
+  kann die Zelle eine Reihenvollendung nicht aufnehmen); die Variante MIT
+  leeren Slots wird als Sensitivitaet mitgezaehlt.
+- Zustandssatz: `selfplay_s4states-v23b01_*` wie par.6b (200 distinkte
+  Zustaende, 8 Bloecke), gleicher Seed 20260931, 100 und 400 Sims gepaart.
+- Messgroesse: Ereignis E = "Prior-Top-1 spaltenrelevant UND Suchwahl nicht"
+  unter den Verwerfungen je Stufe, dazu die Gegenrichtung, "beide" und
+  "keine"; gepaart ueber die Stufen als McNemar exakt auf E. Treffer laut
+  par.5 Teil B: E bei 400 Sims ueberproportional gegenueber 100.

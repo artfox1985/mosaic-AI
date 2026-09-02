@@ -82,9 +82,26 @@ def _model_plane_channels(model):
     return None
 
 
+def _model_flat_width(model):
+    """Eingangsbreite des Flach-Zweigs aus dem ersten Linear (weight [out, in])."""
+    for name, mod in model.named_modules():
+        if isinstance(mod, torch.nn.Linear) and ("flat" in name or name.startswith("fc")):
+            return mod.weight.shape[1]
+    for mod in model.modules():
+        if isinstance(mod, torch.nn.Linear):
+            return mod.weight.shape[1]
+    return None
+
+
 def value_batch(model, encoder: str, states):
-    """Roh-Value (tanh-Skala [-1,1]) je Zustand, Flach- oder 2D-Netz."""
+    """Roh-Value (tanh-Skala [-1,1]) je Zustand, Flach- oder 2D-Netz.
+    Alt-Modelle mit schmalerer Flach-Eingabe (v18_2d: 708 gegen heute 714)
+    bekommen die Eingabe wie im Rust-Pfad (net.rs, "auf die Modellbreite
+    kuerzen") HINTEN gekuerzt -- der Flach-Encoder ist additiv. Nie auffuellen."""
     x_flat = torch.stack([state_to_tensor(st) for st in states])
+    want_flat = _model_flat_width(model)
+    if want_flat is not None and want_flat < x_flat.shape[1]:
+        x_flat = x_flat[:, :want_flat]
     with torch.no_grad():
         if encoder == "2d":
             x_planes = torch.stack([state_to_planes(st) for st in states])
@@ -134,6 +151,12 @@ def main() -> None:
     n_multi = 0            # Stellungen mit >1 Kandidat (nur dort ist etwas zu entscheiden)
     r5_diff, r5_gain = 0, []          # Task #21
     val_spread, mult_diff, n_r24 = [], 0, 0   # Task #20
+    # 2026-09-02: `mult_diff` zaehlt auch Wechsel zwischen PUNKTGLEICHEN
+    # Kandidaten (argmax nimmt den ersten). Die Frage der Gelaender-Prereg ist
+    # aber, ob der Value einen PUNKTVORSPRUNG kippt -- das zaehlt
+    # `strict_override` (gewaehlter Kandidat hat WENIGER Punkte als das
+    # Maximum), mit der gekippten Punktdifferenz.
+    strict_override, override_margins = 0, []
     by_round = {}
     skipped = 0
 
@@ -171,8 +194,12 @@ def main() -> None:
             wp = (v + 1.0) / 2.0                        # -> Gewinnwahrscheinlichkeit
             val_spread.append(float(wp.max() - wp.min()))
             prod = [pts[j] * float(wp[j]) for j in range(len(cands))]
-            if max(range(len(cands)), key=lambda j: prod[j]) != best_pts_i:
+            j_star = max(range(len(cands)), key=lambda j: prod[j])
+            if j_star != best_pts_i:
                 mult_diff += 1
+                if pts[j_star] < pts[best_pts_i]:
+                    strict_override += 1
+                    override_margins.append(pts[best_pts_i] - pts[j_star])
         if (i + 1) % 50 == 0:
             print(f"  {i+1}/{len(picked)} ...", flush=True)
 
@@ -200,6 +227,9 @@ def main() -> None:
         print(f"  Value-Spreizung unter den Kandidaten: Median {q(val_spread,0.5):.4f}, "
               f"IQR [{q(val_spread,0.25):.4f}, {q(val_spread,0.75):.4f}], Max {max(val_spread):.4f}")
         print(f"  andere Wahl als punktegierig: {mult_diff}/{n_r24} ({mult_diff/max(n_r24,1):.1%})")
+        print(f"  davon ECHTE Kippungen eines Punktvorsprungs: {strict_override}/{n_r24} "
+              f"(Rest sind Wechsel unter punktgleichen Kandidaten)"
+              + (f", gekippte Differenz Median {q(override_margins,0.5):.1f}, Max {max(override_margins)}" if override_margins else ""))
         m = q(val_spread, 0.5)
         print(f"  Einordnung: eine Spreizung von {m:.3f} kippt bei einem 20-Punkte-Tiling "
               f"~{20 - 20/((0.5+m/2)/(0.5-m/2)) if m < 1 else float('nan'):.1f} Punkte")
@@ -216,6 +246,9 @@ def main() -> None:
         "value_spread_median": q(val_spread, 0.5) if val_spread else None,
         "value_spread_iqr": [q(val_spread, 0.25), q(val_spread, 0.75)] if val_spread else None,
         "mult_changes_choice": mult_diff, "n_rounds_2_4": n_r24,
+        "strict_point_lead_overrides": strict_override,
+        "override_margin_median": q(override_margins, 0.5) if override_margins else None,
+        "override_margin_max": max(override_margins) if override_margins else None,
     }, indent=2), encoding="utf-8")
     print(f"\nErgebnis: {out}")
 

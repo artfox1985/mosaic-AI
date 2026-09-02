@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, Zuschnitt vollstaendig registriert (par.3d: Kombinationsform, Profil-Stuetzstellen, Punkte-Term). Kern-Befund: der Value-Kopf ist im Loeser schon verdrahtet, aber multiplikativ und mit 0,017 Spreizung -- er hat in 0 von 51 Faellen einen Punktvorsprung gekippt. Naechster Schritt ist eine Spreizungs-Messung auf b01, dann Stufe 0. -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, Zuschnitt registriert (par.3d). **Spreizung gemessen (par.3f, 2026-09-02):** b01 0,048/0,065 gegen v18_2d 0,018, aber die multiplikative Form kippt in 1 von 142 bzw. 4 von 192 Stellungen einen Punktvorsprung -- Form A endgueltig tot, B oder C Pflicht. Naechster Schritt: Stufe 0 (weiss der Kopf es schon?) mit Formwahl B/C. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -367,3 +367,36 @@ Folge fuer par.3d (i): Form A ist NICHT "gemessen ausgeschlossen", sondern
 aufgrund einer nicht mehr belegbaren Messung an einem plattenblinden Netz
 als unwahrscheinlich eingestuft. Die Entscheidung zwischen A, B und C faellt
 erst nach der b01-Messung; bis dahin ist keine Form gesetzt.
+
+## par.3f SPREIZUNG GEMESSEN: b01 streut 2,6- bis 3,6-mal breiter, kippt aber trotzdem fast nie einen Punktvorsprung (2026-09-02, Nachtprogramm N6)
+
+`tools/tiling_candidate_spread.py` (seit 2026-09-01 2D-faehig, Flach-Eingabe
+wird wie im Rust-Pfad auf die Modellbreite gekuerzt; seit 2026-09-02 zaehlt
+es ECHTE Kippungen eines Punktvorsprungs getrennt von Wechseln unter
+punktgleichen Kandidaten), k=12, 400 Stellungen je Satz. Artefakte
+`evaluations/artifacts/tiling_candidate_spread_{b01_v1,b01_v3,v18_2d_v1}.json`.
+
+| Netz | Satz | Stellungen mit Auswahl (R2-4) | Value-Spreizung Median [IQR] | Wechsel Punkte x Value | davon echte Kippungen eines Punktvorsprungs |
+| --- | --- | --- | --- | --- | --- |
+| `v18_2d` (plattenblind, aus dem Backup) | frozen_v1 | 142 | **0,018** [0,011, 0,033] | 51 | **0** |
+| `v23-b01_brierbest` | frozen_v1 | 142 | **0,048** [0,023, 0,089] | 48 | **1** (1 Punkt) |
+| `v23-b01_brierbest` | frozen_v3 | 192 | **0,065** [0,028, 0,110] | 83 | **4** (Median 1, Max 2 Punkte) |
+
+**Die Erstmessung ist damit rekonstruiert:** die "0,017 Spreizung, 0 von 51"
+aus par.3c waren 0,018 und "51 Wechsel, 0 echte Kippungen" an einem
+plattenblinden Netz derselben Aera (dort `v18_best`, hier `v18_2d`; der flache
+Checkpoint existiert nicht mehr). Die Formulierung "0 von 51 Faellen einen
+Punktvorsprung gekippt" war in der Sache richtig, aber die 51 waren Wechsel
+zwischen PUNKTGLEICHEN Kandidaten, kein Nenner aus Vorspruengen.
+
+**Verdikt nach der vorab festgelegten Lesart (par.3d i):** die Spreizung des
+spaltenfaehigen Kopfs liegt mit 0,05-0,065 an der registrierten Grenze
+(~0,05), also in derselben Groessenordnung, nicht "deutlich groesser". Und der
+entscheidende Punkt steht in der letzten Spalte: selbst mit dreifacher
+Spreizung kippt die multiplikative Form in 1 von 142 bzw. 4 von 192
+Stellungen einen Punktvorsprung, und nur um 1-2 Punkte. **Form A ist als
+Value-Fuehrung endgueltig tot; B (additiv auf angeglichener Skala) oder C
+(lexikografisch mit Toleranzband) ist Pflicht.** Eine reine Skalen-Angleichung
+ohne Formwechsel reicht nicht. Nebenbefund: b01 streut auf dem eigenen
+Aera-Satz (v3) breiter als auf dem alten (v1), also hat der Satzwechsel
+(`frozen_v3`) hier Substanz.
