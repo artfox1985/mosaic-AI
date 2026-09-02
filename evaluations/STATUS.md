@@ -27,10 +27,17 @@ diesen Inhalten etwas aendert, aendert es DORT.
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-02, 05:30, nach dem Nachtprogramm)
 
 **NICHTS.** GPU und CPU sind frei. Der Baum ist committet, ungepusht. In
-`data/` liegen wieder die 600 `selfplay_v22-b05-*`-Dateien des v23-Fensters
-(aus dem Backup zurueckgeholt) plus 8 `selfplay_s4states-v23b01_*`, 20
-`selfplay_tor2a-v23b06_*`; keine Unterordner (`archive_pre_v24` und
-`relabeled_v23` liegen in `<Sicherungswurzel>/archive_pre_v24/`).
+`data/` liegen die 1.745 hv2-Dateien des Fensters plus 8
+`selfplay_s4states-v23b01_*` und 20 `selfplay_tor2a-v23b06_*` (1.797 pkl);
+keine Unterordner. **Alles Restaurierte liegt wieder draussen** (Nutzer,
+2026-09-02 frueh): `archive_pre_v24`, `relabeled_v23` und die 600
+v22-b05-Dateien samt Manifesten unter `<Sicherungswurzel>/archive_pre_v24/`
+(die b05-Dateien im Unterordner `v23_window_b05`). Damit sind
+`window_v23.txt` und `window_v23_relab.txt` ohne Rueckkopie nicht fahrbar.
+**Toter Cache in `data/`:** der Monolith `.cache_29e6903028d2.h5` (1,14 GB)
+und rund 1.200 Bloecke der v22-b05-Dateien (600 ohne, 600 mit
+`ignore_ptv`-Schluessel) haben keinen Verbraucher mehr; Loeschen nur auf
+Freigabe. Plattenplatz ist kein Thema (1,9 TB frei).
 
 ### Was die Nacht 2026-09-01/02 ergeben hat (Chronik: `night_run_20260901.md`)
 
