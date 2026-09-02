@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Das Eval-Set stammt aus der plattenBLINDEN Aera -- wie sieht die Abloesung aus? | Beleg: GEBAUT (par.7): 1.800 Zustaende aus frischen b01-Sockel-Partien, Ordnung auf allen drei Saetzen stabil, Niveaus stark verschoben. **par.9: die Zirkularitaet ist BELEGT** -- mit einem Orakel aus b01 saettigt b01s recall@16 bei 1,0000, mit dem v21-Gegen-Orakel faellt es auf 0,7825 und die Rangfolge dreht auf 2 von 3 Metriken. **Default fuer frozen_v3 ist ab sofort das v21-Orakel**; ein Orakel wird nie aus einem Netz gebaut, das daran gemessen wird. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Das Eval-Set stammt aus der plattenBLINDEN Aera -- wie sieht die Abloesung aus? | Beleg: GEBAUT (par.7): 1.800 Zustaende aus 400 frischen b01-Sockelpartien, Orakel aus b01 (1.144 Labels @5000) und v21 (par.8/9). Zirkularitaet BELEGT (par.9): das b01-Orakel saettigt b01s recall@16 auf 1,0, das v21-Orakel nicht. Bruecke deckt seit par.10 (2026-09-02) auch Runde 5 ab (exaktes Orakel, eigener Block): b01 Value-Korrelation 0,84 gegen b05 0,76, Prior-tau aber 0,12 gegen 0,14. Quelldateien in <Sicherungswurzel>/archive_pre_v24/. -->
 
 # Vorregistrierung: `frozen_v3` -- Eval-Set der plattenbewussten Aera
 
@@ -271,3 +271,37 @@ das aus dem gepruefeten Netz selbst gebaut ist, schmeichelt ihm messbar.
 b01 bleiben unter jeder Aufloesung (top3mass +0,006 fuer b01, tau +0,010 und
 recall +0,012 fuer b05). Drei Orakel, drei Bilder, alle winzig -- offline ist
 zwischen den beiden nicht zu entscheiden.
+
+## par.10 RUNDE 5 IN DER BRUECKE (2026-09-02, Nutzer: "mach das")
+
+`tools/oracle_metrics.py` schloss Runde 5 aus, weil dort der exakte Loeser
+statt der Netz-Suche antwortet und die Label-Kandidaten kein `action`-Dict
+tragen. Seit heute fuehrt das Werkzeug Runde 5 als EIGENE Orakel-Art
+(`oracle_kind: exact_r5`): Kandidaten-Rang nach `ab_value` (exakte
+Endmarge), Orakel-Wert des Zustands = `mcts_q` des besten Zugs
+(Siegwahrscheinlichkeit aus der Marge), Zuordnung ueber `action_id` als Index
+in `valid_actions` des Records -- an allen 229 R5-Labels geprueft
+(`num_actions == recorded_valid_actions_len`, `root_candidates_mismatch`
+False, `action_id` 0..n-1 lueckenlos). Die R1-4-Aggregate (`overall`,
+`by_round 1-4`) bleiben BITGLEICH (geprueft gegen `bridge_frozen_v3.json`);
+neu sind `r5_exact` und `overall_incl_r5`. Artefakte
+`bridge_frozen_v3_r5.json` (b01-Orakel) und `bridge_frozen_v3_v21orakel_r5.json`.
+
+**Was Runde 5 zeigt (229 Zustaende, exaktes Orakel, damit unabhaengig vom
+Orakel-Netz -- die R5-Zahlen sind unter beiden Label-Saetzen identisch):**
+
+| Netz | recall@16 | top3mass | tau (n 184) | value_pearson | value_spearman |
+| --- | --- | --- | --- | --- | --- |
+| `v23-b01_brierbest` | 0,8996 | 0,5960 | **0,1201** | **0,8364** | 0,8831 |
+| `v22-b05` | **0,9170** | 0,5952 | **0,1406** | 0,7558 | 0,8162 |
+
+Zwei Lesarten, beide neu: (1) der Value-Kopf von b01 korreliert in Runde 5
+staerker mit dem exakten Loeser als der von b05 (0,84 gegen 0,76) -- die
+Betrags-Daempfung (par.11/12 der R5-Kalibrierung) ist eine Skalenfrage, die
+Rangordnung stimmt besser. (2) Der PRIOR von b01 stimmt in Runde 5 SCHLECHTER
+mit dem exakten Loeser ueberein als der von b05 (tau 0,120 gegen 0,141,
+recall 0,90 gegen 0,92), waehrend er in Runden 1-4 klar vorn liegt (0,222
+gegen 0,174). Das passt zur Nutzer-These vom 2026-09-02 (Problem sitzt im
+Value-Kopf, nicht in der Policy) nur zur Haelfte und ist als Befund
+festgehalten, nicht gedeutet: in Runde 5 entscheidet ohnehin der Loeser, der
+Prior traegt dort nur ueber die Kandidatenauswahl.
