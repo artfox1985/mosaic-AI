@@ -106,10 +106,12 @@ Kampagnen-Groesse (volle Spalten) NICHT gemessen, nur fuer b02
 (`PREREG_capacity_sim_frontier.md` par.12/13); b03 und b05 sind allein ueber
 Siege bei 80 Paaren beurteilt. Nach dem Punktschaetzer-Massstab des
 Richtungs-Tors fuehrte b05 (85:75). Der Entscheid fuer b01 bleibt (dem Nutzer
-am 2026-09-01 im Pruefbericht vorgelegt), die Luecke ist benannt: fuer v25
-gilt die Regel in `docs/generation_loop.md`, Abschnitt "Generatorwahl unter
-Armen", und jeder Arm bekommt sein Spaltenprofil am argmax-Instrument, bevor
-er als Generator ausscheidet.
+am 2026-09-01 im Pruefbericht vorgelegt). **Die Regel steht seit 2026-09-02**
+(`docs/generation_loop.md`, "Generatorwahl unter Armen": Staerke schliesst
+aus, Spaltenprofil entscheidet, sonst Amtsinhaber); rueckwirkend auf v23
+angewandt ergibt sie dieselbe Wahl (b05 +0,034 Spalten bei Block-SE 0,05,
+Stufe 3, Amtsinhaber). Jeder Arm bekommt sein Spaltenprofil am
+argmax-Instrument, bevor er als Generator ausscheidet.
 
 ## par.5 Was dieser Zuschnitt NICHT beantwortet
 

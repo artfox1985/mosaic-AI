@@ -181,11 +181,21 @@ gemessen. Damit das nicht wieder im Einzelfall verhandelt wird, gilt ab v24:
   Replikation ein Entscheid** (dieselbe Strenge wie Tor 1). 80 Paare sind
   informativ; wer daraus "gleich stark" liest, sagt dazu, dass das Instrument
   bei dieser Groesse +-10 Siege nicht aufloest.
-* **Welche Regel bei Gleichstand gilt** (Amtsinhaber bleibt, Punktschaetzer
-  entscheidet wie bei Tor 2, oder Spaltenprofil entscheidet), ist ein
-  **OFFENER Nutzer-Entscheid**; er wird VOR der ersten Arm-Arena von v24 in
-  `PREREG_v24_window.md` eingetragen. Bis dahin ist keine der drei Lesarten
-  Default.
+* **Die Regel bei Gleichstand (Nutzer-Entscheid 2026-09-02), in drei Stufen:**
+  1. **Staerke ist Ausschlusskriterium, kein Rangmass.** Ein Arm, der gegen
+     den besten Stand signifikant verliert (n >= 150 Paare oder Replikation),
+     scheidet als Generator aus, egal wie viele Spalten er baut -- dieselbe
+     Logik wie Tor 1, Schutz vor dem gemessenen Tausch (flach sucht
+     spaltenreich und verliert).
+  2. **Unter den nicht unterscheidbaren Armen entscheidet der Punktschaetzer
+     der Kampagnen-Groesse** am argmax-Instrument, also das Mass von Tor 2.
+     Grund ist Falle (2) unten: das Profil des Generators bestimmt, was im
+     naechsten Korpus vorkommt. Punktschaetzer ohne Signifikanzforderung, wie
+     bei Tor 2.
+  3. **Liegt die Differenz dort unter der Block-SE, bleibt der Amtsinhaber.**
+     Kein Wechsel ohne Grund.
+  Rueckblick v23: b05 lag bei den Spalten +0,034 vorn bei Block-SE 0,05, also
+  Stufe 3, Amtsinhaber b01 -- dieselbe Wahl, jetzt mit Regel.
 
 ## Zwei Fallen, die die Schleife von selbst stellt
 
