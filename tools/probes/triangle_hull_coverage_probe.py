@@ -43,7 +43,16 @@ def _mr():
 PREREG = "PREREG_heuristic_v2_long_rows.md par.3b.8 Stufe D"
 
 HULL_LEFT = {(r, c) for r in range(6) for c in range(6) if r + c <= 5}
-HULL_RIGHT = {(r, c) for r in range(6) for c in range(6) if r >= c}
+# BERICHTIGT 2026-09-03 (Nutzer-Frage "unterscheidet es linke und rechte
+# Huelle?"): die zweite Huelle ist die Spiegelung an der SENKRECHTEN Achse,
+# volle Zeile 0 und volle Spalte 5, also r + (5 - c) <= 5 <=> r <= c
+# (heuristic_v2.rs im Stand 65b48af^, `triangle_deviation`, Zeilen 507-508;
+# die Reihen-Spiegelung ist dort ausdruecklich ausgeschlossen). Hier stand
+# bis heute `r >= c` (volle Spalte 0, volle Zeile 5) -- genau die
+# ausgeschlossene Form. Alle Messungen mit dieser Sonde vor dem 2026-09-03
+# haben rechts-orientierte Bretter falsch klassifiziert; Neurechnung in
+# PREREG_heuristic_v2_long_rows.md (Stufe D2, Berichtigung).
+HULL_RIGHT = {(r, c) for r in range(6) for c in range(6) if r <= c}
 
 
 def occupancy(dome_grid):
@@ -65,8 +74,10 @@ def deviation(cells, hull):
 
 
 def mirror(cell, hull):
-    """Spiegelung an der Huellen-Kante. Linke Huelle (r+c<=5): Anti-Diagonale
-    (r,c)->(5-c,5-r); rechte Huelle (r>=c): Hauptdiagonale (r,c)->(c,r)."""
+    """Spiegelung an der Huellen-Kante (Hypotenuse). Linke Huelle (r+c<=5):
+    Anti-Diagonale (r,c)->(5-c,5-r); rechte Huelle (r<=c, berichtigt
+    2026-09-03): Hauptdiagonale (r,c)->(c,r) -- die Hypotenuse von r<=c ist
+    r=c, die Spiegelung daran vertauscht r und c."""
     r, c = cell
     return (5 - c, 5 - r) if hull is HULL_LEFT else (c, r)
 
@@ -86,7 +97,10 @@ def weighted_fill_share(cells, hull):
 
 
 def depth(cell, hull):
-    """Tiefe zur Huellen-Ecke: HULL_LEFT waechst von (0,0), gespiegelt von (0,5)."""
+    """Tiefe zur Huellen-Ecke: HULL_LEFT waechst von (0,0), gespiegelt von (0,5).
+    (Diese Funktion war schon vor der Berichtigung 2026-09-03 auf die
+    senkrechte Spiegelung geschrieben -- ein Hinweis, dass HULL_RIGHT nie so
+    gemeint war.)"""
     r, c = cell
     return r + c if hull is HULL_LEFT else r + (5 - c)
 

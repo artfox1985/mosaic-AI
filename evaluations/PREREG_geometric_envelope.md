@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, Zuschnitt registriert (par.3d). Spreizung gemessen (par.3f): Form A tot, B oder C Pflicht. **Stufe 0 (par.5b, 2026-09-03): der Ownership-Kopf kennt die Huelle** (AUC b01 0,73 in R1, 0,85 in R2; plattenblind 0,53-0,61) -- die Geometrie fehlt nicht, sie zaehlt nicht. Naechster Schritt: Baustein (c), Gelaender in Suche und Tiling, Formwahl B/C, eigene Registrierung vor dem Bau. -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, Zuschnitt registriert (par.3d). Spreizung gemessen (par.3f): Form A tot, B oder C Pflicht. **Stufe 0 (par.5c, 2026-09-03, berichtigte Huelle): der Ownership-Kopf kennt die Huelle ab Runde 1** (AUC b01 0,90 / 0,85 in R1/R2, plattenblind 0,52) -- Baustein (b) gegenstandslos, direkt zu (c): Gelaender in Suche und Tiling, Formwahl B/C, eigene Registrierung vor dem Bau. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -431,7 +431,16 @@ innen/aussen.
   alle innen oder aussen), nicht Gelerntes -- dann ist die Groesse als
   Stufe-0-Mass untauglich und wird als solche registriert.
 
-## par.5b STUFE 0 GEMESSEN: der Kopf kennt die Huelle ab Runde 2 klar, in Runde 1 knapp unter der Schwelle (2026-09-03, 00:55)
+## par.5b STUFE 0 GEMESSEN, ERSTFASSUNG MIT FALSCHER ZWEITER HUELLE (2026-09-03, 00:41; berichtigt in par.5c)
+
+**Diese Tabelle ist ueberholt:** sie wurde mit `HULL_RIGHT = r >= c` gerechnet
+(Reihen-Spiegelung), die Quelle definiert `r <= c` (Spalten-Spiegelung);
+Nutzer-Frage "unterscheidet es linke und rechte Huelle?" hat es aufgedeckt.
+Mit der falschen Huelle war die Vereinigung beider Orientierungen fast das
+ganze Brett, weshalb in Runde 1 nur 190 Bretter zaehlbar waren. Gueltig ist
+par.5c. Der Text bleibt als Erstfassung stehen.
+
+### Erstfassung (falsche zweite Huelle)
 
 `evaluations/artifacts/envelope_head_discrimination.json` (48 s, frozen_v3,
 1.800 Zustaende; 539 Bretter je Netz ohne beide Klassen, meist leere oder
@@ -467,3 +476,40 @@ Runde 1 scheitert, wo die Trennung am schwaechsten ist.
 Gelaenders als Potentialform mit Stuetzstellen nach par.3d (ii), Formwahl B
 oder C, Paritaets-Gate, dann Arena. Das ist ein Bau und braucht eine eigene
 Registrierung vor dem ersten Handgriff.
+
+## par.5c STUFE 0 MIT BERICHTIGTER HUELLE: der Kopf kennt die Huelle schon in Runde 1 (2026-09-03, 01:00)
+
+`evaluations/artifacts/envelope_head_discrimination_v2.json`; zweite Huelle
+`r <= c` (heuristic_v2.rs `triangle_deviation`, Stand 65b48af^, Zeilen
+507-508), Orientierung je Brett bestpassend, dazu die AUC je Orientierung.
+
+| Runde | Bretter | b01 AUC (Block-SE) | b05 | v18_2d | Orientierung (links / rechts / gleich / leer) | b01 AUC links / rechts |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 472 | **0,899** (0,009) | 0,910 | 0,522 | 29 / 1 / 50 / 640 | 0,886 / (n=1) |
+| 2 | 711 | **0,851** (0,007) | 0,852 | 0,523 | 369 / 27 / 324 / 0 | 0,858 / 0,699 |
+| 3 | 720 | 0,795 (0,009) | 0,786 | 0,557 | 552 / 66 / 102 | 0,804 / 0,789 |
+| 4 | 720 | 0,796 (0,005) | 0,781 | 0,541 | 578 / 77 / 65 | 0,805 / 0,791 |
+| 5 | 720 | 0,732 (0,006) | 0,724 | 0,527 | 563 / 125 / 32 | 0,735 / 0,733 |
+
+**Verdikt nach par.5a, jetzt eindeutig:** AUC 0,90 in Runde 1 und 0,85 in
+Runde 2, beide ueber 0,75, Kontrolle plattenblind bei 0,52. **Der
+Ownership-Kopf kennt die Huelle von der ersten Runde an**, bei b05 wie bei
+b01. Auch die rechte Huelle: sobald ein Brett sie erkennbar macht (ab Runde
+3, 66 bis 125 Bretter), trennt der Kopf dort genauso (0,79 gegen 0,80); in
+Runde 2 mit 27 Brettern schwaecher (0,70). Rechts-orientierte Bretter sind
+in dieser Aera selten (17 Prozent in Runde 5): die Handheuristik der
+Startkuppel und die Linie bauen ueberwiegend links.
+
+**Folge fuer den Stufenplan:** Baustein (b) (Huellen-Ebenen als Eingabe) ist
+nach der vorab festgelegten Lesart GEGENSTANDSLOS -- dem Netz fehlt nicht
+die Geometrie, sondern ihre Bewertung. Der Strang geht direkt zu Baustein
+(c), dem rundenabklingenden Gelaender in Suche und Tiling, mit Formwahl B
+oder C (par.3f). Stufe 1 entfaellt, Stufe 2 wird die naechste Registrierung.
+
+**Nebenfund mit Reichweite:** die falsche zweite Huelle steckte seit dem
+2026-08-29 in `tools/probes/triangle_hull_coverage_probe.py` und damit in
+den Stufe-D2-Zahlen der Lehrer-Prereg (kosten-gewichtete Huelle Mensch
+0,838, Lehrer 0,600, b04 0,573, b06 0,620) und in `hull_coverage_server_logs`.
+Betroffen sind nur Bretter, deren bestpassende Orientierung rechts ist;
+Neurechnung fuer Lehrer und Mensch-Logs laeuft, b04r2 und b06 liegen nicht
+mehr im Baum (Berichtigung in `PREREG_heuristic_v2_long_rows.md`).
