@@ -139,6 +139,9 @@ def main():
     ap.add_argument("--batch-size", type=int, default=256)
     ap.add_argument("--workers", type=int, default=8)
     ap.add_argument("--limit-files", type=int, default=None)
+    ap.add_argument("--skip-existing", action="store_true",
+                    help="Dateien ueberspringen, deren Ausgabe in --out-dir schon liegt (Wiederaufnahme "
+                         "eines abgebrochenen Laufs; 2026-09-03)")
     ap.add_argument("--out", default=None, help="Artefakt (Default: evaluations/artifacts/relabel_net_<out-dir-name>.json)")
     a = ap.parse_args()
 
@@ -149,6 +152,20 @@ def main():
         raise SystemExit("Keine Dateien fuer " + a.pattern + " in " + a.in_dir)
     out_dir = os.path.join(str(_ROOT), a.out_dir)
     os.makedirs(out_dir, exist_ok=True)
+    n_skipped = 0
+    if a.skip_existing:
+        keep = []
+        for f in files:
+            base = os.path.basename(f)
+            done_path = os.path.join(out_dir, NEW_PREFIX + base[len(OLD_PREFIX):]) if base.startswith(OLD_PREFIX) else None
+            if done_path and os.path.exists(done_path):
+                n_skipped += 1
+            else:
+                keep.append(f)
+        files = keep
+        print("--skip-existing: " + str(n_skipped) + " Dateien liegen schon, " + str(len(files)) + " offen", flush=True)
+        if not files:
+            raise SystemExit("Nichts mehr zu tun.")
     model = os.path.join(str(_ROOT), a.model)
     t0 = time.monotonic()
     agg = {"dateien": 0, "records": 0, "kandidaten": 0, "relabelt": 0, "keine_besuche": 0,
@@ -171,7 +188,7 @@ def main():
     wall = round(time.monotonic() - t0, 1)
     result = {"prereg": "PREREG_reanalyze_label_depth.md par.A4 (Teil A2, Reanalyze i.e.S.)",
               "in_dir": a.in_dir, "pattern": a.pattern, "out_dir": a.out_dir, "model": a.model,
-              "sims": a.sims, "c_puct": a.c_puct, "workers": n_workers, **agg,
+              "sims": a.sims, "c_puct": a.c_puct, "workers": n_workers, "uebersprungen_vorhanden": n_skipped, **agg,
               "laufzeit": {"wanduhr_s": wall, "cpu_s": None, "threads": n_workers,
                            "s_je_partie": None,
                            "s_je_zustand": round(wall * n_workers / max(1, agg["kandidaten"]), 4)}}
