@@ -973,6 +973,64 @@ fn net_search_states_json_batch(
     Ok(out)
 }
 
+/// Stapel-Einstieg fuer das SELF-PLAY-Policy-Ziel (2026-09-02, PREREG_reanalyze_label_depth.md
+/// par.A4, Teil A2): ruft je Zustand genau `self_play::net_drafting_policy` -- dieselbe Funktion,
+/// die im Netz-Self-Play das `policy`-Feld der Records schreibt (Gumbel-verbesserte Policy ueber
+/// ALLE legalen Drafting-Aktionen, `completed_q_policy`), nur mit `sims` statt dem Erzeugungs-
+/// Budget, OHNE Wurzelrauschen (Reanalyze ist Analyse, keine Exploration) und mit
+/// `deterministic=true` (die Zugwahl wird verworfen, nur das Ziel zaehlt; der tau-Zweig ist damit
+/// unerreichbar). `SearchConfig::from_env()` wie im Self-Play ohne Spec. Rueckgabe je Zustand ein
+/// JSON-String `{"policy": [{"action": ..., "prob": ...}, ...], "root_q": f64|null,
+/// "n_actions": usize}`; `policy` ist leer fuer Zustaende ohne oder mit nur einer legalen
+/// Drafting-Aktion (dort schreibt das Self-Play One-Hot, hier soll der Aufrufer das Original
+/// stehen lassen). Netz einmal je Prozess geladen. Rein additiv.
+#[pyfunction]
+#[pyo3(signature = (states_json, model_path, sims=400, c_puct=1.5, seeds=None))]
+fn net_drafting_policy_states_json_batch(
+    states_json: Vec<String>,
+    model_path: String,
+    sims: u32,
+    c_puct: f64,
+    seeds: Option<Vec<u64>>,
+) -> PyResult<Vec<String>> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    let seeds: Vec<u64> = match seeds {
+        Some(v) => {
+            if v.len() != states_json.len() {
+                return Err(PyValueError::new_err(format!(
+                    "seeds ({}) und states_json ({}) sind verschieden lang",
+                    v.len(),
+                    states_json.len()
+                )));
+            }
+            v
+        }
+        None => (0..states_json.len()).map(|_| rand::random()).collect(),
+    };
+    let net = crate::net::Net::load_auto(&model_path)
+        .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
+    let search_config = crate::net_mcts::SearchConfig::from_env();
+    let mut out = Vec::with_capacity(states_json.len());
+    for (sj, seed) in states_json.iter().zip(seeds.iter()) {
+        let mut rng = StdRng::seed_from_u64(*seed);
+        let parsed: serde_json::Value = serde_json::from_str(sj)
+            .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+        let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+        let actions = crate::game::drafting_actions(&state);
+        if state.phase != crate::state::Phase::Drafting || actions.len() < 2 {
+            out.push(json!({ "policy": [], "root_q": serde_json::Value::Null, "n_actions": actions.len() }).to_string());
+            continue;
+        }
+        let (_chosen, policy, root_q, _child_q) = crate::self_play::net_drafting_policy(
+            &net, &state, &actions, sims, c_puct, &mut rng, false, true, 0, &search_config,
+        );
+        out.push(json!({ "policy": policy, "root_q": root_q, "n_actions": actions.len() }).to_string());
+    }
+    Ok(out)
+}
+
 /// Wie [`net_search_state_json`], aber mit `collect_trace=true` (Task #95)
 /// -- liefert zusätzlich `value_debug` (Root-Value-Breakdown) und
 /// `gumbel_trace` (Top-m-Auswahl + jede Sequential-Halving-Phase mit
@@ -1873,6 +1931,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json_trace, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_states_json_batch, m)?)?;
+    m.add_function(wrap_pyfunction!(net_drafting_policy_states_json_batch, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
     m.add_function(wrap_pyfunction!(advance_after_tiling_json, m)?)?;
     m.add_function(wrap_pyfunction!(resample_round_transition_json, m)?)?;

@@ -3031,7 +3031,7 @@ pub fn run_net_vs_net_arena_hybrid(
 /// Aufrufer (`mean_rollout_diff`, `deterministic=true`) wird `0` als
 /// bedeutungsloser Platzhalter uebergeben -- der `deterministic`-Zweig hat
 /// dort ohnehin Vorrang, der τ-Zweig ist unerreichbar.
-fn net_drafting_policy<R: Rng + ?Sized>(
+pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
     actions: &[Action],

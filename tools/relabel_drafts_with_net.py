@@ -4,7 +4,7 @@ Draft-Policy-Ziele eines Korpus mit dem AKTUELLEN Netz bei tieferer Suche
 nachrechnen.
 
 Muster: tools/relabel_drafts_with_teacher.py (dort labelt der hv2-Lehrer per
-One-Hot; hier labelt das Netz per Besuchsverteilung der Suche). Value-Felder
+One-Hot; hier labelt das Netz selbst mit tieferer Suche). Value-Felder
 bleiben unveraendert (Partieausgang).
 
 Ablauf je Datei:
@@ -13,14 +13,18 @@ Ablauf je Datei:
      Datei-Cache-Schluessel (Basename!) nicht mit dem Original kollidiert
      (par.4b der Prereg).
   2. Draft-Records der Runden 1-4 des Spielers am Zug einsammeln, Zustaende
-     in EINEM Stapel an `mosaic_rust.net_search_states_json_batch` geben
-     (Netz wird einmal je Prozess geladen; der Einzel-Einstieg lud es je
-     Aufruf und brauchte Sekunden je Zustand).
-  3. Policy-Ziel = Besuchsanteile der Suche ueber ihre Kandidaten
-     (`mcts_visits` / Summe), Kandidaten per `action_to_id` auf die
-     `valid_actions` des Records abgebildet. Kein Treffer oder keine Besuche
-     -> Record bleibt UNVERAENDERT und wird gezaehlt (stilles Wegwerfen ist
-     ein Regelbruch).
+     in Stapeln an die Engine geben (Netz wird einmal je Prozess geladen; der
+     Einzel-Einstieg lud es je Aufruf und brauchte Sekunden je Zustand).
+  3. Policy-Ziel = GENAU das Self-Play-Ziel bei `--sims`: die Gumbel-
+     verbesserte Policy ueber alle legalen Drafting-Aktionen aus
+     `mosaic_rust.net_drafting_policy_states_json_batch` (ruft
+     `self_play::net_drafting_policy`, ohne Wurzelrauschen). Relabelt werden
+     nur Records, deren Original-Ziel ein Stein-Zug ist (`type == "stone"`);
+     Kuppel-, Stapel-, Chip- und Pass-Records bleiben unveraendert (Smoke
+     2026-09-02: die "drafting"-Phase enthaelt sie alle). Liefert die Suche
+     keine Policy (0 oder 1 legale Aktion) oder passt keine Aktion in die
+     `valid_actions` des Records, bleibt der Record UNVERAENDERT und wird
+     gezaehlt (stilles Wegwerfen ist ein Regelbruch).
 
 Parallelisierung: N Worker-Prozesse ueber Dateien (jeder laedt das Netz
 einmal). Aufruf (exklusiv, CPU):
@@ -61,7 +65,8 @@ def relabel_file(args):
     from neural_net import action_to_id
     recs = load_records(path)
     stats = {"records": len(recs), "kandidaten": 0, "relabelt": 0, "keine_besuche": 0,
-             "nicht_abbildbar": 0, "keine_kandidaten": 0}
+             "nicht_abbildbar": 0, "keine_kandidaten": 0, "kein_steinzug": 0,
+             "aktionen_ausserhalb_valid": 0}
     idx, sjs, seeds = [], [], []
     for i, rec in enumerate(recs):
         st = rec.get("state") or {}
@@ -72,46 +77,46 @@ def relabel_file(args):
             continue
         if not rec.get("policy") or not rec.get("valid_actions"):
             continue
+        top = max(rec["policy"], key=lambda e: e.get("prob", 0.0)).get("action") or {}
+        if top.get("type") != "stone":
+            stats["kein_steinzug"] += 1
+            continue
         sj = json.dumps(st)
         idx.append(i); sjs.append(sj); seeds.append(state_seed(sj))
     stats["kandidaten"] = len(idx)
     t0 = time.monotonic()
     for start in range(0, len(idx), batch_size):
         chunk = slice(start, start + batch_size)
-        outs = mr.net_search_states_json_batch(sjs[chunk], model, sims, c_puct, seeds[chunk])
+        outs = mr.net_drafting_policy_states_json_batch(sjs[chunk], model, sims, c_puct, seeds[chunk])
         for i, out_s in zip(idx[chunk], outs):
             rec = recs[i]
-            moves = (json.loads(out_s) or {}).get("moves") or []
-            if not moves:
+            policy = (json.loads(out_s) or {}).get("policy") or []
+            if not policy:
                 stats["keine_kandidaten"] += 1
                 continue
-            by_id = {}
+            valid_ids = set()
             for a in rec["valid_actions"]:
                 try:
-                    by_id.setdefault(action_to_id(a), a)
+                    valid_ids.add(action_to_id(a))
                 except Exception:
                     continue
-            visits = []
-            for m in moves:
-                if m.get("action") is None:
-                    continue
-                v = m.get("mcts_visits") or 0
-                if v <= 0:
-                    continue
+            kept, dropped = [], 0
+            for e in policy:
                 try:
-                    aid = action_to_id(m["action"])
+                    aid = action_to_id(e["action"])
                 except Exception:
+                    dropped += 1
                     continue
-                if aid in by_id:
-                    visits.append((by_id[aid], float(v)))
-            if not visits:
-                if all((m.get("mcts_visits") or 0) <= 0 for m in moves):
-                    stats["keine_besuche"] += 1
+                if aid in valid_ids:
+                    kept.append(e)
                 else:
-                    stats["nicht_abbildbar"] += 1
+                    dropped += 1
+            stats["aktionen_ausserhalb_valid"] += dropped
+            total = sum(float(e.get("prob", 0.0)) for e in kept)
+            if not kept or not total > 0:
+                stats["nicht_abbildbar"] += 1
                 continue
-            total = sum(v for _, v in visits)
-            rec["policy"] = [{"action": a, "prob": v / total} for a, v in visits]
+            rec["policy"] = [{"action": e["action"], "prob": float(e["prob"]) / total} for e in kept]
             stats["relabelt"] += 1
     stats["suche_s"] = round(time.monotonic() - t0, 1)
     base = os.path.basename(path)
@@ -147,7 +152,8 @@ def main():
     model = os.path.join(str(_ROOT), a.model)
     t0 = time.monotonic()
     agg = {"dateien": 0, "records": 0, "kandidaten": 0, "relabelt": 0, "keine_besuche": 0,
-           "nicht_abbildbar": 0, "keine_kandidaten": 0}
+           "nicht_abbildbar": 0, "keine_kandidaten": 0, "kein_steinzug": 0,
+           "aktionen_ausserhalb_valid": 0}
     jobs = [(f, out_dir, model, a.sims, a.c_puct, a.batch_size) for f in files]
     n_workers = max(1, min(a.workers, len(files)))
     done = 0
