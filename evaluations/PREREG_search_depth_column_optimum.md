@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (b05-Kurve par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH: @25 verliert 11:29 (signifikant), @100 33:47 (p = 0,14, Tendenz, par.2j2). Faktor ist die TIEFE, nicht die Breite (par.2k; m=25-Praemisse in par.2c berichtigt, Clamp ist 16). Stufe 4 Teil A auf 200 distinkten Zustaenden wiederholt (par.6b): Verwerfung 0,825 @400 gegen 0,490 @100, 70:3 diskordant, p = 1,4e-17. **OFFEN: Teil B** (Spalten-Etikett, zweiter Trace-Durchgang). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (b05-Kurve par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH: @25 verliert 11:29 (signifikant), @100 33:47 (n.s., par.2j2). Faktor TIEFE, nicht Breite (par.2k). Stufe 4 gemessen: die tiefere Suche verwirft den Prior-Top-1 doppelt so oft (par.6b, 0,825 gegen 0,490; auf Draft-Zuegen 0,88 gegen 0,41), spaltenrelevante Vorschlaege aber im GLEICHEN Anteil wie alle anderen (par.7) -- Spaltenverlust als Nebenwirkung flaechendeckender Ueberstimmung, kein gezieltes Verwerfen. Betriebspunkt 100 Sims bleibt. -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -739,3 +739,65 @@ Klartext der Beschreibung, z.B. "-> Reihe 6 [5/6]").
   unter den Verwerfungen je Stufe, dazu die Gegenrichtung, "beide" und
   "keine"; gepaart ueber die Stufen als McNemar exakt auf E. Treffer laut
   par.5 Teil B: E bei 400 Sims ueberproportional gegenueber 100.
+
+## par.7 STUFE 4 TEIL B GEMESSEN: die tiefere Suche verwirft spaltenrelevante Vorschlaege HAEUFIGER, aber nicht UEBERPROPORTIONAL (2026-09-02, Nachtprogramm N7)
+
+Werkzeug `tools/probes/search_depth_column_label_probe.py` (Operationalisierung
+par.6a), Zustandssatz `selfplay_s4states-v23b01_*` wie par.6b, 200 distinkte
+Zustaende, Seed 20260931, 100 gegen 400 Sims gepaart; Artefakte
+`search_depth_column_label.json` (Erstlauf, 1.221 s) und
+`search_depth_column_label_raw.json` (zweiter Lauf mit Rohdaten je Zustand,
+1.181 s; alle Zahlen unten daraus).
+
+**Befund 0, vorweg, weil er auch Teil A betrifft:** "Drafting-Phase" heisst
+nicht "Draft-Zug". Von den 200 Zustaenden ist der Prior-Top-1 in 129 ein
+Draft-Zug (Steine in eine Reihe oder die Strafleiste), in 21 eine
+Kuppelplatzierung, in 21 ein Stapelzug, in 25 eine Bonuschip-Entscheidung, in
+4 ein Pass. Die Verwerfungsrate aus par.6b (0,49 gegen 0,825) mischt diese
+Typen. **Nur auf den 129 Draft-Zuegen:** 53 von 129 (0,41) @100 gegen 113 von
+129 (0,88) @400, gepaart 60:0 diskordant, McNemar p 1,7e-18 -- der Teil-A-
+Befund ist auf Draft-Zuegen also noch schaerfer. Kuppel 14/21 gegen 19/21,
+Stapel 12/21 gegen 14/21, Bonuschip 19/25 gegen 19/25, Pass 0/4 beidseitig.
+Alle Teil-B-Zahlen unten beziehen sich auf die 129 Draft-Zustaende.
+
+**Befund 1, die registrierte Schwelle (Fuellstand >= 4) hat keine Basisrate:**
+in Runden 2-4 haben nur 6 von 129 Zustaenden ueberhaupt eine spaltenrelevante
+Reihe (maximaler Spaltenfuellstand je Zustand: 1 in 73, 2 in 84, 3 in 37, 4
+in 4, 5 in 2 der 200 Zustaende). Ereignis E (Top-1 spaltenrelevant, Suchwahl
+nicht): 2 @400, 0 @100, McNemar p 0,5. **Mit der vorab festgelegten Schwelle
+ist Teil B nicht messbar**; die Schwelle stammte aus der
+`--min-fill`-Konvention eines Endbrett-Werkzeugs und passt nicht zu
+Drafting-Zustaenden der Runden 2-4.
+
+**Befund 2, Sensitivitaet ueber die Schwelle (NACHTRAEGLICH, aus den
+Rohdaten, als solche markiert):**
+
+| Fuellstand >= | Zustaende mit rel. Reihe | E @100 (von 53 Verwerfungen) | E @400 (von 113) | Anteil an Verwerfungen @100 / @400 | gepaart nur@400 : nur@100 | McNemar |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 129 | 18 | 37 | 34 % / 33 % | 21 : 2 | 6,6e-5 |
+| 2 | 85 | 14 | 28 | 26 % / 25 % | 15 : 1 | 5,2e-4 |
+| 3 | 31 | 4 | 12 | 8 % / 11 % | 8 : 0 | 0,0078 |
+| 4 (registriert) | 6 | 0 | 2 | 0 % / 2 % | 2 : 0 | 0,5 |
+
+Gegenrichtung (Top-1 nicht relevant, Suchwahl relevant) je Schwelle: 2/5,
+4/8, 3/4, 0/0. Variante mit leeren Kuppel-Slots als "offen": zifferngleich bis
+auf +-2.
+
+**Verdikt nach der Lesart aus par.5 Teil B:** ein Treffer waere gewesen, dass
+400 Sims **ueberproportional** oft einen spaltenrelevanten Prior-Top-1
+zugunsten eines nicht-relevanten Zugs verwerfen. Das ist NICHT der Fall: der
+ANTEIL der spaltenrelevanten Verwerfungen an allen Verwerfungen ist bei 100
+und 400 Sims gleich (rund ein Drittel bei Schwelle 1, ein Viertel bei 2). Was
+steigt, ist die ABSOLUTE Zahl -- weil die tiefere Suche insgesamt doppelt so
+oft verwirft (Teil A). Die tiefere Suche behandelt spaltenrelevante
+Vorschlaege also nicht anders als andere; sie ueberstimmt den Prior
+flaechendeckend, und die Spalten fallen mit. Das passt zum Tausch-Befund
+(Tiefe gewinnt die Arena) besser als jede Spalten-spezifische Erklaerung: der
+Spaltenverlust in der Tiefe ist die Nebenwirkung einer allgemein staerkeren
+Ueberstimmung des spaltentragenden Priors, kein gezieltes Verwerfen von
+Spaltenzuegen.
+
+**Was offen bleibt:** ob die verworfenen spaltenrelevanten Zuege mit dem
+Ergebnis zusammenhaengen (Spaltenzahl am Ende), laesst sich an Traces nicht
+ablesen -- das braeuchte ausgespielte Fortsetzungen. Stufe 4 ist damit
+gemessen; die Tiefen-Delle bleibt beschrieben, nicht behoben.
