@@ -909,6 +909,70 @@ fn net_search_state_json(
     Ok(analysis.to_string())
 }
 
+/// Stapelvariante von [`net_search_state_json`] (2026-09-02, PREREG_reanalyze_label_depth.md
+/// par.A4, Teil A2): EIN Netz-Ladevorgang fuer viele Zustaende. Der Einzel-Einstieg laedt das
+/// ONNX-Netz bei JEDEM Aufruf neu (`Net::load_auto`), was einen Zustand auf mehrere Sekunden
+/// bringt -- fuer 200.000 Draft-Zustaende unbrauchbar. Hier wird das Netz einmal geladen und
+/// dann je Zustand exakt dieselbe Maschinerie wie im Einzel-Einstieg gefahren (eigener
+/// `StdRng` je Zustand aus `seeds[i]`, `add_root_noise=false`, kein Trace). Rueckgabe: je
+/// Zustand derselbe Analyse-JSON-String wie bei `net_search_state_json` (inkl. `root_value`,
+/// `phase`, `round`), in Eingabereihenfolge. Rein additiv: keine Aenderung an Suche, RNG-Strom
+/// oder Bestandsfunktionen. `seeds` muss so lang sein wie `states_json`.
+#[pyfunction]
+#[pyo3(signature = (states_json, model_path, sims=400, c_puct=1.5, seeds=None))]
+fn net_search_states_json_batch(
+    states_json: Vec<String>,
+    model_path: String,
+    sims: u32,
+    c_puct: f64,
+    seeds: Option<Vec<u64>>,
+) -> PyResult<Vec<String>> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    let seeds: Vec<u64> = match seeds {
+        Some(v) => {
+            if v.len() != states_json.len() {
+                return Err(PyValueError::new_err(format!(
+                    "seeds ({}) und states_json ({}) sind verschieden lang",
+                    v.len(),
+                    states_json.len()
+                )));
+            }
+            v
+        }
+        None => (0..states_json.len()).map(|_| rand::random()).collect(),
+    };
+    let net = crate::net::Net::load_auto(&model_path)
+        .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;
+    let mut out = Vec::with_capacity(states_json.len());
+    for (sj, seed) in states_json.iter().zip(seeds.iter()) {
+        let mut rng = StdRng::seed_from_u64(*seed);
+        let parsed: serde_json::Value = serde_json::from_str(sj)
+            .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+        let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+        let (_chosen, analysis) =
+            crate::net_mcts::net_search_with_tree(&net, &state, sims, c_puct, false, &mut rng, None, false);
+        let mut analysis = if analysis.is_null() {
+            json!({ "has_net": true, "simulations": sims, "moves": [], "ai_action": serde_json::Value::Null })
+        } else {
+            analysis
+        };
+        if let Some(obj) = analysis.as_object_mut() {
+            let root_value = obj
+                .get("tree")
+                .and_then(|t| t.get("win_pct"))
+                .and_then(|w| w.as_f64())
+                .map(|w| w / 100.0);
+            obj.insert("root_value".to_string(), json!(root_value));
+            obj.insert("phase".to_string(), json!(state.phase.as_str()));
+            obj.insert("round".to_string(), json!(state.round_number));
+        }
+        out.push(analysis.to_string());
+    }
+    Ok(out)
+}
+
 /// Wie [`net_search_state_json`], aber mit `collect_trace=true` (Task #95)
 /// -- liefert zusätzlich `value_debug` (Root-Value-Breakdown) und
 /// `gumbel_trace` (Top-m-Auswahl + jede Sequential-Halving-Phase mit
@@ -1808,6 +1872,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(reset_color_denial_probe_stats, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json_trace, m)?)?;
+    m.add_function(wrap_pyfunction!(net_search_states_json_batch, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
     m.add_function(wrap_pyfunction!(advance_after_tiling_json, m)?)?;
     m.add_function(wrap_pyfunction!(resample_round_transition_json, m)?)?;
