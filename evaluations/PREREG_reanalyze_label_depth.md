@@ -387,14 +387,27 @@ hat:** EIN Spielkorpus, ZWEI Label-Varianten.
   Arm informativ: liefert tiefes Nachlabeln trotzdem einen staerkeren oder
   gleich spaltenfaehigen Nachfolger?
 
-**Werkzeug:** `mosaic_rust.net_search_states_json_batch` (neu, laedt das Netz
-EINMAL je Prozess; der Einzel-Einstieg lud es je Aufruf und brauchte
-Sekunden je Zustand) plus `tools/relabel_drafts_with_net.py` (Muster von
-`relabel_drafts_with_teacher.py`: Draft-Records der Runden 1-4 des Spielers
-am Zug, Policy-Ziel = Besuchsanteile ueber die Kandidaten der Suche,
-abgebildet auf `valid_actions` per `action_to_id`; Records ohne Treffer
-bleiben unveraendert und werden gezaehlt). Engine-Aenderung ist rein
-additiv, trotzdem Wheel-Neubau und danach Anker-Invarianz (Regel).
+**Werkzeug:** `tools/relabel_drafts_with_net.py` ueber
+`mosaic_rust.net_drafting_policy_states_json_batch` (neu; ruft je Zustand
+GENAU `self_play::net_drafting_policy`, also die Funktion, die im Self-Play
+das `policy`-Feld schreibt: Gumbel-verbesserte Policy ueber ALLE legalen
+Drafting-Aktionen, hier bei 400 Sims, ohne Wurzelrauschen; Netz einmal je
+Prozess geladen). **Zielform-Entscheid nach dem Smoke (2026-09-02):** der
+erste Entwurf nahm die Besuchsanteile der 16 Wurzelkandidaten -- das ist
+eine ANDERE Zielform als im Self-Play (dessen Records tragen die verbesserte
+Policy ueber bis zu 300 Aktionen); die Zeile-1-Frage verlangt aber "wie
+gespielt, nur tiefer gelabelt", also dieselbe Zielform. Relabelt werden nur
+Records mit Stein-Zug als Original-Ziel; Kuppel-, Stapel-, Chip- und
+Pass-Records (Smoke: rund 14 Prozent der "drafting"-Records) bleiben
+unveraendert. Engine-Aenderungen sind rein additiv (zwei Stapel-Einstiege),
+trotzdem Wheel-Neubau und Anker-Invarianz (erster Einstieg: GRUEN,
+`anchor_drift_20260902_batchentry.json`; zweiter: siehe Chronik).
+
+**Kosten, gemessen im Smoke** (`relabel_net_smoke.json`, Besuchsanteil-
+Variante): 0,21 s je Zustand einkernig bei 400 Sims, 2.209 Kandidaten je
+Datei (20 Partien). Hochgerechnet 200 Dateien rund 440.000 Zustaende, mit 8
+Workern rund 3 h -- dreimal die Herleitung oben, weil die Kandidatenzahl je
+Partie (110) hoeher liegt als die 51 Lehrer-Relabels der b05-Kopie.
 
 **Entscheidungsmass, vorab (par.3):** die arena-validierten Orakelmetriken
 (`prior_mass_on_oracle_top3`, `kendall_tau`) auf `frozen_v1` mit v18-Orakel
@@ -426,3 +439,15 @@ Tieferes Nachrechnen von `root_q` haette damit keinen Verbraucher. Teil B
 wird erst wieder aktuell, wenn ein Zuschnitt lambda < 1 faehrt
 (`PREREG_lambda_v18only.md`: lambda 0,7 war einmal arena-signifikant, die
 b-Serie faehrt 1,0). Registriert als Bedingung, nicht als Verzicht.
+
+**Smoke mit der Self-Play-Zielform (2026-09-02, `relabel_net_smoke2.json`):**
+Anker-Invarianz nach dem zweiten Wheel-Neubau GRUEN
+(`anchor_drift_20260902_policybatch.json`, 1.763 Schritte). Eine Datei (20
+Partien): 2.209 Draft-Records des Spielers am Zug, davon **1.173 kein
+Steinzug** (Kuppel, Stapel, Chip, Pass -- bleiben unveraendert), 1.036
+Kandidaten, **1.012 relabelt**, 24 ohne Kandidaten (0 oder 1 legale Aktion),
+0 nicht abbildbar, 0 Aktionen ausserhalb der Legal-Liste. Zielform identisch
+zum Original (z.B. 305 Eintraege, Summe 1,0); der Top-1 bleibt in 494 von
+1.012 relabelten Records derselbe. **0,267 s je Zustand einkernig**;
+hochgerechnet rund 207.000 Zustaende, mit 8 Workern rund 2 h. Voller Lauf
+gestartet, Ausgabe `data/relabeled_v23_deep/selfplay_v22-b05deep-policy_*`.
