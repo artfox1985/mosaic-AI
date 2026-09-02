@@ -95,7 +95,7 @@ wer eine Generation abschliesst, zieht diese Tabelle nach.
 | dessen Self-Play (12.000 Partien) | fuellt **das v23-Fenster** |
 | daraus trainiert (Arme `v23-b01`/`b02`/`b03`/`b05`) | **v23-Netz**; bester Stand `v23-b01_brierbest` (Tor 1 und Tor 2 bestanden, 2026-08-31) |
 | dessen Self-Play (12.000 Partien, `selfplay_v23-b01-*`) | fuellt **das v24-Fenster** (`PREREG_v24_window.md` par.6, hv2-Anteil unveraendert) |
-| daraus trainiert (`v24-b01`, weitere Arme offen) | **v24-Netz** |
+| daraus trainiert: `v24-b01` (Standard), `v24-b02` (lambda 0,7), `v24-b03` (Seeding-Schwarm); dazu drei Such-Knoepfe ohne Training (Margen-Saettigung, Risiko-Utility, Gelaender) -- `PREREG_v24_window.md` par.8 | **v24-Netz** |
 
 Zuschnitt des v23-Fensters ist seit 2026-08-25 festgelegt
 (`PREREG_v23_window.md`): 29.450 Partien, davon 12.000 aus dem v22-Self-Play

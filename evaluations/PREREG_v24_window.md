@@ -241,3 +241,47 @@ registriert es.
 
 Jeder weitere Arm dieser Generation bekommt VOR seinem Ausscheiden als
 Generator sein Spaltenprofil am argmax-Instrument (Lehre aus par.4).
+
+## par.8 ARME UND KNOEPFE DER GENERATION v24 (Nutzer 2026-09-03: "wir sollten uns alle Themen mit v24 ansehen")
+
+Ausgangslage: der Generator steht (b01), das Material steht (par.6), die
+Rezept-Knoepfe der Policy-Seite sind in v23 ausgemessen (b03, b05, b07:
+Nullbefunde bzw. laufend). Die Arbeitshypothese seit 2026-09-02 ist der
+MASSSTAB des Value-Kopfs (`capacity_sim_frontier` par.15,
+`saturating_score_utility` par.6b). v24 prueft deshalb die fuenf offenen
+Hebel, die daran oder an der Datenseite ansetzen -- getrennt nach dem, was
+ein Training braucht, und dem, was ein Suchknopf am fertigen Netz ist.
+
+### Trainings-Arme (GPU, je rund 2,5 h mit Monolith; Namen vorab, `generation_naming.md`)
+
+| Arm | Was | Prereg | Einziger Faktor gegen b01 |
+| --- | --- | --- | --- |
+| `v24-b01` | Standardrezept, Warmstart aus `v23-b01_brierbest`, Fenster par.1/par.6 | diese Datei | Kontrolle |
+| `v24-b02` | **lambda 0,7** im Value-Ziel (`--value-target-lambda 0.7`): Partieausgang mit Bootstrap-Anteil `root_q` gemischt | `lambda_v18only` (0,7 war 227:173 arena-signifikant, WDL-Aera-Grenze) | `value_target_lambda` |
+| `v24-b03` | **Seeding-Schwarm**: zusaetzliche Value-Klasse aus Startstellungen mit halbfertigen Spalten, kuratiert aus b01-Zustaenden (plattenbewusste Quelle, Wiedervorlage-Bedingung erfuellt) | `start_position_seeding` par.4d/par.5 | Fensterzusammensetzung (Zusatz-Schwarm), sonst b01 |
+
+Reanalyze Teil B (Value tief nachrechnen) wird erst fuer b02 zum Werkzeug
+mit Verbraucher (lambda < 1); ob er nachgezogen wird, entscheidet sich nach
+b02, nicht vorher (`reanalyze_label_depth` par.A4, Kostenlage 15 h je
+Sockel-Relabel).
+
+### Such-Knoepfe (kein Training; Bau in der Engine, Default aus, Paritaets-Gate, dann Arena am besten v24-Netz)
+
+| Knopf | Was | Prereg | Messung |
+| --- | --- | --- | --- |
+| K1 Margen-Saettigung | Blattwert aus Siegwahrscheinlichkeit UND saettigender, re-zentrierter Marge aus Punkte- minus Gegnerpunkte-Kopf | `saturating_score_utility` par.6b (kein neuer Kopf) | gepaarte Arena gegen dasselbe Netz ohne Knopf, Spalten aus Logs |
+| K2 Risiko-Utility | Verteilung des WDL-Kopfs statt seines Mittels im Blattwert (Stufe A, kein Training) | `risk_sensitive_leaf_utility` par.2 | dito |
+| K3 Gelaender (c) | rundenabklingendes Dreiecks-Potential in Suche und Tiling, Form B oder C, Stufe 0 bestanden (Kopf kennt die Huelle) | `geometric_envelope` par.5c, par.3d | dito, zusaetzlich argmax-Spaltenprofil |
+
+**Reihenfolge und Kosten:** Erzeugung (11,9 h CPU) -> b01 (GPU) -> parallel
+zur GPU die drei Engine-Bauten mit Paritaets-Gate (CPU, je Bau plus Arena
+rund 1,5-2 h) -> b02, b03 (GPU) -> Abnahme aller Arme mit Tor 1, Tor 2a/2b
+und der Generatorwahl-Regel (`generation_loop.md`). Knoepfe, die am
+v24-b01-Netz tragen, werden am Gewinner-Arm wiederholt, bevor sie ins
+Rezept gehen (ein Knopf, ein Netz, eine Messung -- keine Kreuzprodukte ohne
+Anlass).
+
+**Was vorab an Registrierung noch fehlt:** je Knopf ein Bau-Absatz mit
+Formel, Parametern, Paritaets-Gate und Entscheidungsmetrik in der jeweiligen
+Prereg; fuer b03 die Kuratierungsregel der Seed-Stellungen. Nichts davon
+wird vor seiner Registrierung angefasst.
