@@ -1016,6 +1016,28 @@ auf Regel 3 (nicht mit dem Kontrollfluss vermischen). Mit dem Erzeugerwechsel
 oben ist sie **gegenstandslos**, nicht ein drittes Mal offen.
 
 
+*(Absatzreihenfolge 2026-09-02 berichtigt: par.14 stand hinter par.15.)*
+
+## par.14 Was offen und GEPARKT ist (Arbeitskreis "Spaeter", Nutzer 2026-08-21)
+
+Aus dem Statuskopf in den Koerper gezogen 2026-08-28, damit der Kopf kurz
+bleibt und nichts verloren geht.
+
+**Geparkt, nicht verworfen:**
+
+- **Teil B1** (`MOSAIC_STACK_DRAW_CHANCE`, Ein-Schritt-Erwartung an der
+  Peek-Aktion, oben beschrieben): **nie gebaut**, null Code-Treffer auf den
+  Knopfnamen.
+- **Teil A1** (Bekannt-Segment-Zaehler, TEIL A oben): ebenfalls nicht gebaut.
+
+**Als Paket zu heben, zusammen mit `PREREG_stack_top_feature.md`.** Beide
+zielen auf dieselbe blinde Zone von zwei Seiten: das Merkmal gibt dem NETZ
+die oberste Rueckseite, B1 gibt der SUCHE die korrekte Peek-Bewertung.
+
+**Nebenvermerk zur Ankerlage:** der round5-Min-Knoten-Fix `c83fb35` lebt in
+genau dem Loeser, der hier scharfgeschaltet wurde -- wer die R5-Zufallsknoten
+anfasst, fasst dieselbe Datei an.
+
 ## par.15 ERGEBNIS + ENTSCHEID fuer den NETZ-Pfad (2026-08-30, Nachtprogramm; Artefakt `evaluations/artifacts/stack_draw_research_b05.json`, Rohdaten `evaluations/artifacts/paired_arena_env_stackdraw_b05.json`, Werkzeug `tools/probes/stack_draw_research_arena_eval.py`)
 
 par.13 liess genau eine Frage offen: den Kontrollfluss im NETZ-Self-Play.
@@ -1101,23 +1123,3 @@ also. Regel 3 bleibt unberuehrt: `MOSAIC_STACK_DRAW_CHANCE` ist NICHT gesetzt.
 **Erzeugte Messdaten** (Loeschkandidaten, gehoeren NICHT ins v23-Fenster):
 `data/selfplay_sdrb05an_*.pkl` und `data/selfplay_sdrb05aus_*.pkl`, je 40
 Partien, plus die zugehoerigen `data/manifest_sdrb05*.json`.
-
-## par.14 Was offen und GEPARKT ist (Arbeitskreis "Spaeter", Nutzer 2026-08-21)
-
-Aus dem Statuskopf in den Koerper gezogen 2026-08-28, damit der Kopf kurz
-bleibt und nichts verloren geht.
-
-**Geparkt, nicht verworfen:**
-
-- **Teil B1** (`MOSAIC_STACK_DRAW_CHANCE`, Ein-Schritt-Erwartung an der
-  Peek-Aktion, oben beschrieben): **nie gebaut**, null Code-Treffer auf den
-  Knopfnamen.
-- **Teil A1** (Bekannt-Segment-Zaehler, TEIL A oben): ebenfalls nicht gebaut.
-
-**Als Paket zu heben, zusammen mit `PREREG_stack_top_feature.md`.** Beide
-zielen auf dieselbe blinde Zone von zwei Seiten: das Merkmal gibt dem NETZ
-die oberste Rueckseite, B1 gibt der SUCHE die korrekte Peek-Bewertung.
-
-**Nebenvermerk zur Ankerlage:** der round5-Min-Knoten-Fix `c83fb35` lebt in
-genau dem Loeser, der hier scharfgeschaltet wurde -- wer die R5-Zufallsknoten
-anfasst, fasst dieselbe Datei an.
