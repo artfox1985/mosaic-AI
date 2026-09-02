@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse und Sim-Budget? | Beleg: Kaltstart-Arm gemessen, **par.12/13: gleich stark (85:75), aber nur ein DRITTEL der Spalten** (0,17 gegen 0,62); der Checkpoint erklaert es nicht. VORBEHALT 2026-09-01: NICHT einfaktoriell (b02 mit Default-LR ohne Cosine, 40 Epochen; Manifest-Diff par.12). Frontier selbst OFFEN: Breiten-Arm b04, Zweig-Entscheid beim Nutzer (par.10), Kostentor zuerst (par.5). -->
+<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse und Sim-Budget? | Beleg: Warm gegen Kalt ist EINFAKTORIELL belegt: `v23-b06` (Kaltstart mit exakt dem b01-Rezept, par.14) baut 0,18 volle Spalten gegen b01 0,515 und verliert 65:95 (p = 0,024); der LR-Vorbehalt aus par.12 entfaellt, das Spaltenwissen sitzt in der LINIE. Frontier selbst OFFEN: Breiten-Arm b04, Zweig-Entscheid beim Nutzer (par.10), Kostentor zuerst (par.5). -->
 
 # Vorregistrierung: Kapazitaets-Sim-Frontier
 
@@ -365,3 +365,47 @@ werden neu gebaut, die 1.745 hv2-Bloecke liegen.
 
 Kandidat ist `_brierbest` (Regel aus par.2h des v23-Fensters). Kosten:
 rund 5 h GPU inklusive Monolith; laeuft nachts neben den CPU-Auftraegen.
+
+### par.14a TRAINIERT (2026-09-02, 02:14-04:28)
+
+`models/manifest_train_v23-b06_20260902_021224.json`: 12 Epochen, 8.164 s
+(2,27 h), Datenaufbau 31,2 s ueber den Fenster-Monolithen
+(`cache_build_time` par.12), 4.722.910 Samples wie b01. **Manifest-Diff
+gegen b01 (`cli_args`): GENAU `name`, `load` (v22-b05 -> None) und
+`surprise_alpha` (None -> 0.0, Default, wirkungsgleich; derselbe Eintrag wie
+beim b05-Diff).** Gegen b02: `lr`, `lr_schedule`, `lr_t_max`, `epochs` plus
+`surprise_alpha`. Der Arm ist damit so einfaktoriell, wie es das Manifest
+zeigen kann. (`cache_file` taucht nicht auf, weil train.py den Monolithen
+ueber den Fenster-Schluessel gefunden hat, nicht per Flag.)
+
+Kandidat nach Regel: `v23-b06_brierbest` = **Epoche 1** (val_brier 0,1894;
+b01: Epoche 5 mit 0,1934), `_best` nach val_combined Epoche 4 (0,5986).
+Dasselbe Bild wie bei b02 (brierbest Epoche 1): der Brier-Kopf ist beim
+Kaltstart nach einer Epoche am besten und wird dann schlechter, waehrend
+val_combined bis Epoche 4 faellt. Abnahme (Spaltenprofil argmax @400, Arena
+gegen b01) laeuft, Ergebnis folgt in par.14b.
+
+### par.14b ABGENOMMEN: der Kaltstart ist die Ursache, nicht das Lernraten-Rezept (2026-09-02, 05:25)
+
+| Mass | `v23-b06_brierbest` | Bezug |
+| --- | --- | --- |
+| volle Spalten, argmax @400, 200 Partien, Seed 20260931 (`tor2a_v23b06.json`, 1.396 s) | **0,180** (Seiten mit voller Spalte 71 von 400; >= 4: 1,93; hoechste 4,78) | b02 0,17-0,23, b01 0,5150 |
+| Arena gegen `v23-b01_brierbest`, 2 x 80, Seed 20260998, Blockgroesse 5 (`paired_arena_env_b06_b01_{first,second}_s98.json`) | **65 : 95**, Paare b06 beide 12 / geteilt 41 / b01 beide 27, Vorzeichentest p = 0,024; Siegdifferenz je Partie -0,19, Block-SE 0,078 (16 Bloecke) | b02 gegen b01: 75 : 85 |
+| Spalten in der Arena (`columns_b06_b01_*.json`, 157 von 160 Partien nachspielbar) | b06 **0,134** gegen b01 0,605; Differenz -0,48, Block-SE 0,079 (31 Bloecke) | |
+| Punkte / Strafleiste / lange Reihen vollendet | 42,51 / 11,34 / 2,79 | b01: 49,05 / 8,67 / 2,89 |
+
+**Verdikt nach der Tabelle in par.14 (erste Zeile):** b06 liegt bei den
+Spalten bei 0,18, also klar "nahe b02, unter 0,3". **Der Kaltstart ist die
+Ursache; par.12/13 halten, der Vorbehalt zum Lernraten-Rezept entfaellt.**
+Mit dem b01-Rezept ist der Kaltstart sogar schwaecher als b02 (65:95
+signifikant gegen 75:85 n.s.) und baut in der Arena nur ein Fuenftel der
+Spalten von b01. Damit steht: dasselbe Fenster, dasselbe Rezept, nur ohne
+das Startgewicht aus der Spalten-Linie -- und das Spaltenwissen ist weg.
+"Das Spaltenwissen sitzt in der LINIE" ist jetzt einfaktoriell belegt.
+
+Nebenbefund zum Checkpoint: bei beiden Kaltstarts liegt `_brierbest` in
+Epoche 1 und der Brier-Wert (0,1894) UNTER dem des Warmstarts (0,1934) --
+ein besserer Brier auf dem b05-Val-Pool bei deutlich schwaecherem Spiel. Der
+Val-Pool aus v22-b05-Partien misst also nicht das, was in der Arena zaehlt;
+fuer die Checkpoint-Wahl bei Kaltstarts ist `--select-by-brier` damit
+fraglich (Merkposten, keine Aenderung).

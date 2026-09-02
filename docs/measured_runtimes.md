@@ -56,6 +56,10 @@ Heuristik bzw. Netz gegen Heuristik, gleiche Sims), nicht das Werkzeug.
 | v23-Erzeugung Schwarm argmax, b05@100 `--value-only --deterministic --no-root-noise` (`manifest_v22-b05-value-argmax_20260830_192533.json`) | 6.000 Partien | 11 | **3,674 s je Partie** = 22.041,4 s (6,12 h) |
 | v23-Erzeugung Schwarm gesampelt, b05@100 `--value-only` (`manifest_v22-b05-value-sampled_20260831_013258.json`) | 2.000 Partien | 11 | **3,653 s je Partie** = 7.306,5 s (2,03 h); alle drei zusammen **11,9 h** |
 | Netz-Self-Play b01@400 argmax (`manifest_s4states-v23b01_20260901_222208.json`, Zustandssatz Stufe 4) | 80 Partien | 11 | **14,5 s je Partie** (1.161 s), mit leichter Nebenlast (Log-Replays) gemessen |
+| Netz-Self-Play b06@400 argmax, exklusiv (`manifest_tor2a-v23b06_*.json`) | 200 Partien | 11 | **6,98 s je Partie** (1.396 s) -- die 14,5 s oben waren Nebenlast |
+| Gepaarte Arena Netz@400 gegen Netz@400 (`paired_arena_env_ab`, Blockgroesse 5, `--log-games`) | 80 Partien | 10 | **rund 11,4 s je Partie** (900-920 s je Lauf, 2026-09-02) |
+| Cache-Bloecke neu bauen (`build_cache_incremental`, 2D/nortv) | 2.156 Dateien | 6 Worker | **2.280 s** inkl. Zusammenfuegen; **Zusammenfuegen allein 344 s** fuer 2.228 Dateien (Hebel 3, gegen 17.934 s einkernig in train.py) |
+| Training Kaltstart 12 Epochen, b01-Rezept, Monolith-Treffer (`manifest_train_v23-b06_20260902_021224.json`) | 4,72 Mio Samples | CUDA | **8.164 s** (2,27 h), Datenaufbau 31 s |
 | Gepaarte Arena b05@400 gegen Heuristik@150 | 2 x 100 Partien | 10 | **3,33 s je Partie** (666 s), rund 34 s je Block von 10 |
 
 **Parallelisierung ist ergebnisneutral, gemessen statt angenommen** (20 Seeds

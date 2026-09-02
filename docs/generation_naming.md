@@ -52,7 +52,7 @@ Begruendung statt nach verlorenen Modellen.
 | `v23-b03` | Ueberraschungs-Gewichtung (`PREREG_policy_surprise_weighting.md` par.4a) -- der oben reservierte Name, jetzt belegt |
 | `v23-b04` | **vorregistriert** (Nutzer 2026-08-31): Kaltstart mit ANDERER Rumpfbreite, der eigentliche Frontier-Punkt (`PREREG_capacity_sim_frontier.md` par.10). Welcher Zweig verbreitert wird, ist offen -- `hidden_size` geht ohne Bau, der Conv-Zweig braucht erst Flags und eine Checkpoint-Ableitung |
 | `v23-b05` | **Relabel-Arm** (nachgetragen 2026-09-01, gefahren 2026-09-01): dieselben Fensterdateien wie b01, die 200 Policy-Dateien durch hv2-lehrer-relabelte Kopien ersetzt (`PREREG_reanalyze_label_depth.md` par.A1). b04 blieb unbelegt (Zweig-Entscheid offen), darum die Luecke |
-| `v23-b06` | **Kaltstart mit dem b01-Rezept** (registriert 2026-09-01, `PREREG_capacity_sim_frontier.md` par.14): trennt Startgewicht von Lernraten-Rezept, weil b02 mit Default-LR lief. Nachtprogramm 2026-09-01/02 |
+| `v23-b06` | **Kaltstart mit dem b01-Rezept** (`PREREG_capacity_sim_frontier.md` par.14, gefahren 2026-09-02): trennt Startgewicht von Lernraten-Rezept. Ergebnis: 0,18 volle Spalten, 65:95 gegen b01 -- der Kaltstart ist die Ursache, die Linie traegt das Spaltenwissen |
 | spaeter | **Arm K** (Bootstrap-Kohaerenz, `MOSAIC_BOOTSTRAP_COHERENCE=sum1`): bewusst NACH b04 eingetaktet (Nutzer 2026-08-31), weil er als einziger Arm alle Cache-Bloecke entwertet. Nummer folgt der Ausfuehrungsreihenfolge |
 
 Der Zuschnitt steht VOR dem ersten Lauf, damit die Namen nicht nachtraeglich
