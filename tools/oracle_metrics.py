@@ -295,25 +295,54 @@ def compute_for_model(model_name: str, oracle_labels: list[dict], states_by_idx:
         # Prior-/Value-Korrelations-Metriken hier daher konsequent
         # ausgeschlossen (nicht nur ein Datenloch), analog zur bereits beim
         # Oracle-Labeling ausgeschlossenen Startkuppel-Platzierung.
-        if lbl["round"] >= 5 or lbl.get("root_value") is None or not moves or moves[0].get("action") is None:
+        # Runde 5 seit 2026-09-02 (PREREG_frozen_v3_eval_set.md par.10) NICHT
+        # mehr ausgeschlossen, sondern als EIGENE Orakel-Art gefuehrt: das
+        # Orakel ist dort der exakte Loeser, die Kandidaten tragen `ab_value`
+        # (exakte Endmarge) und `mcts_q` (Siegwahrscheinlichkeit daraus),
+        # aber kein `action`-Dict. `action_id` ist der Index in
+        # `valid_actions` des Records -- an allen 229 R5-Labels von frozen_v3
+        # geprueft: num_actions == recorded_valid_actions_len,
+        # root_candidates_mismatch False, action_id 0..n-1 lueckenlos. Die
+        # R1-4-Zahlen bleiben bitgleich (eigener Zweig, eigene Aggregate).
+        if not moves:
             continue
-        # Oracle-Bestaktion: hoechste mcts_visits unter den betrachteten Kandidaten
-        # (identisch zur "chosen"-Markierung, robust auch ohne sie).
-        best_move = max(moves, key=lambda m: m["mcts_visits"])
-        best_id = action_to_id(best_move["action"])
+        is_r5 = lbl["round"] >= 5
+        if is_r5:
+            if (any(m.get("ab_value") is None for m in moves)
+                    or len(rec["valid_actions"]) != lbl.get("num_actions")
+                    or lbl.get("root_candidates_mismatch")):
+                continue
+            def mv_action(m, _va=rec["valid_actions"]):
+                return _va[m["action_id"]]
+            def rank_key(m):
+                return m["ab_value"]
+            best_move = max(moves, key=rank_key)
+            oracle_root_value = float(best_move["mcts_q"])
+        else:
+            if lbl.get("root_value") is None or moves[0].get("action") is None:
+                continue
+            def mv_action(m):
+                return m["action"]
+            def rank_key(m):
+                return m["mcts_visits"]
+            # Oracle-Bestaktion: hoechste mcts_visits unter den betrachteten Kandidaten
+            # (identisch zur "chosen"-Markierung, robust auch ohne sie).
+            best_move = max(moves, key=rank_key)
+            oracle_root_value = lbl["root_value"]
+        best_id = action_to_id(mv_action(best_move))
 
         # Top-16 des Kandidaten-Netzes ueber die VOLLE legale Aktionsmenge.
         top16_ids = set(np.argsort(-prior)[:16].tolist())
         recall16_hit = best_id in top16_ids
 
         # Oracle-Top-3 (nach mcts_visits unter den betrachteten Kandidaten).
-        top3_moves = sorted(moves, key=lambda m: -m["mcts_visits"])[:3]
-        top3_ids = [action_to_id(m["action"]) for m in top3_moves]
+        top3_moves = sorted(moves, key=rank_key, reverse=True)[:3]
+        top3_ids = [action_to_id(mv_action(m)) for m in top3_moves]
         prior_mass_top3 = float(sum(prior[aid] for aid in top3_ids))
 
         # Kendall-Tau ueber die vom Oracle betrachteten Kandidaten: Kandidat-
         # Prior-Rang vs. Oracle-Q-Rang. Braucht >=2 Kandidaten mit Varianz.
-        cand_ids = [action_to_id(m["action"]) for m in moves]
+        cand_ids = [action_to_id(mv_action(m)) for m in moves]
         cand_prior = [float(prior[aid]) for aid in cand_ids]
         cand_q = [float(m["mcts_q"]) for m in moves]
         tau = None
@@ -324,7 +353,8 @@ def compute_for_model(model_name: str, oracle_labels: list[dict], states_by_idx:
             "record_index": lbl["record_index"],
             "round": lbl["round"],
             "value_pred": float(pred_v[i]),
-            "oracle_root_value": lbl["root_value"],
+            "oracle_root_value": oracle_root_value,
+            "oracle_kind": "exact_r5" if is_r5 else "net_search",
             "recall16_hit": recall16_hit,
             "prior_mass_top3": prior_mass_top3,
             "kendall_tau": tau,
@@ -395,8 +425,15 @@ def aggregate(per_state: list[dict], rounds=range(1, 6)) -> dict:
             "n_kendall_tau_states": len(taus),
         }
 
-    result = {"overall": block(per_state)}
+    # `overall` bleibt wie bisher der Netz-Such-Anteil (Runden 1-4), damit
+    # alle Bestandszahlen (Bruecken, Gating-Retrospektive, Elo-Korrelation)
+    # bitgleich bleiben; Runde 5 kommt additiv als eigener Block dazu.
+    net_rows = [x for x in per_state if x.get("oracle_kind", "net_search") == "net_search"]
+    r5_rows = [x for x in per_state if x.get("oracle_kind") == "exact_r5"]
+    result = {"overall": block(net_rows)}
     result["by_round"] = {str(r): block([x for x in per_state if x["round"] == r]) for r in rounds}
+    result["r5_exact"] = block(r5_rows)
+    result["overall_incl_r5"] = block(per_state)
     return result
 
 

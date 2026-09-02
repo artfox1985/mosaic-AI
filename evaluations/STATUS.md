@@ -74,9 +74,10 @@ Freigabe. Plattenplatz ist kein Thema (1,9 TB frei).
 | Was | Kosten | Anmerkung |
 | --- | --- | --- |
 | ~~Generatorwahl-Regel bei Gleichstand~~ | -- | ENTSCHIEDEN 2026-09-02 (Nutzer): Staerke schliesst aus, Spaltenprofil entscheidet, sonst Amtsinhaber (`docs/generation_loop.md`, "Generatorwahl unter Armen") |
+| **Reanalyze-Arm `v23-b07`** (eingetaktet 2026-09-02) | Relabel rund 1 h CPU, Training rund 2,5 h GPU, Abnahme rund 1 h CPU | Draft-Policy-Ziele der 200 Sockeldateien mit b01 @400 nachgerechnet (`reanalyze_label_depth` par.A4). Relabel und Abnahme VOR dem v24-Self-Play, Training darf parallel auf die GPU. Teil B (Value) hat bei lambda 1,0 keinen Verbraucher |
 | **v24-Erzeugung** | 11,9 h bei threads 11 | Rezept vollstaendig in `PREREG_v24_window.md` par.6; Generator `v23-b01_brierbest`. Startet NUR auf Nutzer-Anweisung |
 | Vor dem v24-Training: Monolith fuer den Trainingsanteil | rund 45 min | `tools/window_train_split.py` -> `build_cache_incremental.py --merge-out` unter der Trainings-Umgebung (`cache_build_time` par.12) |
-| b04-Zweig | Nutzer-Entscheid | unveraendert |
+| ~~b04-Zweig~~ | -- | GEPARKT 2026-09-02 (Nutzer): das Problem sitzt im Value-Kopf, nicht in Policy, Breite oder Merkmalsform (`capacity_sim_frontier` par.15). Der Fahrplan traegt die These ab jetzt als Arbeitshypothese |
 | Merkposten: `--select-by-brier` bei Kaltstarts | -- | b02 und b06 haben `_brierbest` in Epoche 1 mit BESSEREM Brier als b01 bei schwaecherem Spiel; der b05-Val-Pool misst nicht, was in der Arena zaehlt (`capacity_sim_frontier` par.14b) |
 | Push | -- | nie ohne Anweisung; Commits der Nacht sind lokal |
 

@@ -363,3 +363,66 @@ Damit ist die Vorlage fuer die Gleichstandsregel der Generatorwahl
 (`docs/generation_loop.md`) gegenstandslos geworden, soweit sie an b05 hing:
 bei 240 Paaren gibt es keinen Gleichstand mehr zu entscheiden, sondern einen
 Nullbefund. Die Regel selbst bleibt fuer kuenftige Generationen offen.
+
+## par.A4 EINGETAKTET (Nutzer 2026-09-02): Teil A als Arm `v23-b07`, Teil B ohne Verbraucher
+
+**Teil A (Zeile-1-Frage) wird jetzt so gefahren, wie par.3 es registriert
+hat:** EIN Spielkorpus, ZWEI Label-Varianten.
+
+- **A1 = `v23-b01`** (Labels wie gespielt, Sockel flach @100). Liegt vor.
+- **A2 = `v23-b07`:** dieselben 2.345 Fensterdateien, nur die 200 Policy-Dateien
+  ersetzt durch Kopien, deren Draft-Policy-Ziele mit dem AKTUELLEN Generator
+  `v23-b01_brierbest` bei **400 Sims** nachgerechnet sind (Besuchsverteilung
+  der Suche, `add_root_noise=false`, Seed je Zustand hash-abgeleitet). Kopie
+  mit eigenem Praefix wie par.4b: `selfplay_v22-b05deep-policy_*` in
+  `data/relabeled_v23_deep/`. Training exakt das b01-Rezept
+  (`--load v22-b05`, 12 Epochen, lr 5e-5, Cosine, Val-Pool `^selfplay_v22-b05`
+  wie beim Relabel-Arm b05); Manifest-Diff gegen b01 muss GENAU `name`,
+  `file_list`, `extra_data_dir` und den Val-Pool-Regex zeigen.
+- **Unterschied zu b05:** dort labelte der hv2-LEHRER (anderer Spieler), hier
+  labelt dasselbe Netz mit TIEFERER Suche -- das ist Reanalyze im engeren
+  Sinn und beantwortet die Zeile-1-Frage; par.4a nannte es "die Falle",
+  weil die tiefere Suche spaltenaermer waehlt (par.7 des Suchtiefen-Strangs:
+  sie verwirft flaechendeckend, Spalten fallen mit). Genau deshalb ist der
+  Arm informativ: liefert tiefes Nachlabeln trotzdem einen staerkeren oder
+  gleich spaltenfaehigen Nachfolger?
+
+**Werkzeug:** `mosaic_rust.net_search_states_json_batch` (neu, laedt das Netz
+EINMAL je Prozess; der Einzel-Einstieg lud es je Aufruf und brauchte
+Sekunden je Zustand) plus `tools/relabel_drafts_with_net.py` (Muster von
+`relabel_drafts_with_teacher.py`: Draft-Records der Runden 1-4 des Spielers
+am Zug, Policy-Ziel = Besuchsanteile ueber die Kandidaten der Suche,
+abgebildet auf `valid_actions` per `action_to_id`; Records ohne Treffer
+bleiben unveraendert und werden gezaehlt). Engine-Aenderung ist rein
+additiv, trotzdem Wheel-Neubau und danach Anker-Invarianz (Regel).
+
+**Entscheidungsmass, vorab (par.3):** die arena-validierten Orakelmetriken
+(`prior_mass_on_oracle_top3`, `kendall_tau`) auf `frozen_v1` mit v18-Orakel
+und auf `frozen_v3` mit v21-Orakel (das b01-Orakel ist per par.9 als Richter
+ueber b01-Nachfolger verbrannt); bei Gleichstand die Arena gegen b01, 2 x 80,
+Blockgroesse 5, `--log-games`, dazu das Spaltenprofil am argmax-Instrument
+(Generatorwahl-Regel, `generation_loop.md`). Lesart: liegt b07 bei
+Orakel/Arena vorn UND nicht unter b01 bei den Spalten, ist tiefes Nachlabeln
+ein Gewinn und wandert ins v24-Rezept als Option; liegt er bei den Spalten
+klar darunter (Richtung b02/b06), ist par.4a bestaetigt: Reanalyze traegt
+die Spaltenblindheit der Tiefe ins Ziel. Beides ist ein Befund.
+
+**Kosten (Herleitung):** rund 204.000 Draft-Zustaende @400 Sims; im Spiel
+kostet ein 400-Sims-Zug rund 0,1-0,15 s (Arena 11,4 s je Partie a ~80
+Zuege), mit 8 Worker-Prozessen also grob 1 h; Smoke mit einer Datei vorab,
+Zahl ins Artefakt. Training rund 2,5 h GPU mit Monolith (Trainingsanteil
+per `tools/window_train_split.py`, Umgebung wie das Training). Arena und
+Instrument rund 1 h CPU.
+
+**Reihenfolge zu v24:** Relabel und Instrument sind CPU und laufen VOR dem
+v24-Self-Play; das Training darf parallel zum Self-Play auf die GPU.
+
+**Teil B (Value-Reanalyze) wird NICHT eingetaktet, und zwar aus einem Grund,
+der erst jetzt sauber benannt ist:** das Trainingsrezept faehrt
+`value_target_lambda 1.0` (b01-Manifest; Trainingslog: "kein Mix,
+Bestandsverhalten, 23,5 % der Samples HAETTEN root_q"). Das Value-Ziel ist
+der reine Partieausgang, der Bootstrap-Anteil `root_q` geht NICHT ein.
+Tieferes Nachrechnen von `root_q` haette damit keinen Verbraucher. Teil B
+wird erst wieder aktuell, wenn ein Zuschnitt lambda < 1 faehrt
+(`PREREG_lambda_v18only.md`: lambda 0,7 war einmal arena-signifikant, die
+b-Serie faehrt 1,0). Registriert als Bedingung, nicht als Verzicht.

@@ -409,3 +409,19 @@ ein besserer Brier auf dem b05-Val-Pool bei deutlich schwaecherem Spiel. Der
 Val-Pool aus v22-b05-Partien misst also nicht das, was in der Arena zaehlt;
 fuer die Checkpoint-Wahl bei Kaltstarts ist `--select-by-brier` damit
 fraglich (Merkposten, keine Aenderung).
+
+## par.15 NUTZER-ENTSCHEID 2026-09-02: der Breiten-Arm b04 wird NICHT gefahren
+
+Nutzer: *"der b04 zweig mit dem breiteren netz ueberzeugt mich nicht; meine
+these: unser problem ist nicht die policy oder die vorhandene form der
+features sondern der value head."* Der Frontier-Teil dieser Prereg (b04,
+Zweig-Entscheid par.10, Kostentor par.5) ist damit geparkt, nicht widerlegt.
+Was fuer die These spricht, steht gemessen in anderen Straengen: die
+Betrags-Daempfung des Value-Kopfs ist breit und persistiert ueber Korpora
+(`r5_value_calibration` par.10-12), die tiefere Suche ueberstimmt den
+spaltentragenden Prior flaechendeckend, also ueber den Value-Term
+(`search_depth_column_optimum` par.7), und bei 400 Sims traegt der Value-Kopf
+die Staerke (Hybrid-Kopf-Attribution). Der Kaltstart b06 zeigt, dass das
+Spaltenwissen an der Linie haengt -- an dem, was der Kopf gelernt hat, nicht
+an Breite oder Merkmalsform. Diese Prereg bleibt OFFEN nur noch fuer die
+Frage, ob ein Frontier-Punkt spaeter wieder aufgenommen wird.
