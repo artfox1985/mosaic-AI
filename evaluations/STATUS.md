@@ -24,60 +24,54 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-09-01, abends)
+## 1. WAS GERADE LAEUFT (Stand 2026-09-02, 05:30, nach dem Nachtprogramm)
 
-**NICHTS.** GPU und CPU sind frei, kein Hintergrundlauf offen (Stand 2026-09-01,
-23:20). In `data/` liegen zusaetzlich die 8 Dateien `selfplay_s4states-v23b01_*`
-(Zustandssatz Stufe 4, 80 Partien); sie gehoeren in KEIN Fenster. Ungepusht.
+**NICHTS.** GPU und CPU sind frei. Der Baum ist committet, ungepusht. In
+`data/` liegen wieder die 600 `selfplay_v22-b05-*`-Dateien des v23-Fensters
+(aus dem Backup zurueckgeholt) plus 8 `selfplay_s4states-v23b01_*`, 20
+`selfplay_tor2a-v23b06_*`; keine Unterordner (`archive_pre_v24` und
+`relabeled_v23` liegen in `<Sicherungswurzel>/archive_pre_v24/`).
 
-### Was diese Sitzung ergeben hat -- der Bogen in sieben Zeilen
+### Was die Nacht 2026-09-01/02 ergeben hat (Chronik: `night_run_20260901.md`)
 
-1. **Die Generation v23 ist vollstaendig durchgemessen.** Kein Arm ist belegt
-   besser als `v23-b01`: b02 (Kaltstart) 75:85, b03 (Ueberraschung) 75:85,
-   b05 (Relabel) **246:234 auf 240 Paaren, p = 0,65** (auf Nutzer-Wunsch von
-   80 auf 240 Paare verlaengert, 2026-09-02; der dritte Seed drehte das
-   Vorzeichen). Spalten b05 0,676 gegen 0,642, KI schliesst Null ein.
-   **b01 bleibt Generator fuer v24** -- jetzt nicht mehr per
-   Gleichstandsregel, sondern per Nullbefund (`reanalyze_label_depth` par.A3).
-2. **Der Kaltstart baut bei gleicher Staerke nur ein DRITTEL der Spalten**
-   (0,17-0,23 gegen 0,62), und der Checkpoint erklaert es nicht. Das
-   Spaltenwissen sitzt in der LINIE, nicht im Korpus allein
-   (`capacity_sim_frontier` par.12/13).
-3. **Phase 3 ist geschlossen, ohne Bau.** Die Betrags-Daempfung des
-   Value-Kopfs ist real, erklaert den Spaltenverlust in der Tiefe aber nicht.
-4. **Wurzelbalance und Blattwert-Skala sind als Ort der Tiefen-Delle je mit
-   einem Messpunkt erledigt** (Value lauter/leiser, Punkte-Blend,
-   Prior/Value-Balance). BERICHTIGT 2026-09-01: nur `c_scale` ist ein
-   Wurzel-Eingriff, `VALUE_CAL_B`/`POINTS_UTILITY_W` wirken am Blattwert im
-   ganzen Baum; "was bleibt, liegt tiefer im Baum" folgt daraus nicht. Der
-   neue Knopf `MOSAIC_GUMBEL_C_SCALE` hat die sigma/Prior-Erklaerung widerlegt.
-5. **Stufe 4 Teil A: die tiefere Suche ueberstimmt den Prior haeufiger**,
-   auf 200 DISTINKTEN Zustaenden wiederholt (par.6b): 0,825 @400 gegen 0,490
-   @100, 70:3 diskordant, p = 1,4e-17, 8 Bloecke. Die Erstfassung hatte
-   jeden Zustand doppelt gezaehlt (zwei identische Paritaetslaeufe); das
-   Verdikt hielt, die Kennzahlen sind ersetzt.
-6. **Die Elo-Leiter ist repariert** (Anker ist das eingefrorene Artefakt),
-   der Remis-Regelfehler im Schiedsrichter behoben, vier Kanten eingetragen:
-   b01 steht bei **1263** ueber 730 Partien, der Champion v21 bei 1227.
-7. **`frozen_v3` ist gebaut** -- und hat gleich bewiesen, warum ein Orakel nie
-   aus dem geprueften Netz gebaut werden darf. Einschraenkung (2026-09-01):
-   die Bruecke deckt nur Runden 1-4 ab (`oracle_metrics.py` schliesst R5 aus).
-8. **Pruefung aller seit dem 29.08. geaenderten Preregs (2026-09-01):** die
-   Befunde sind in den Dateien selbst als Berichtigungen registriert; die
-   groessten: v23-Erzeugung lief mit 100, nicht 400 Sims (par.4c war falsch),
-   der Kaltstart-Vergleich war nicht einfaktoriell (LR-Rezept), Stufe 4 Teil
-   A doppelt gezaehlt, b03/b05 hatten kein Spaltenprofil (nachgeholt: b05
-   0,679 gegen b01 0,635, b03 0,500 gegen 0,631), v24-Rezept war unvollstaendig
-   (jetzt `PREREG_v24_window.md` par.6).
+1. **Relabel-Arm b05 auf 240 Paaren: Nullbefund.** 246:234 fuer b05, p = 0,65,
+   der dritte Seed dreht um; Spalten 0,676 gegen 0,642, KI schliesst Null ein.
+   Weder Gewinn noch Schaden. **b01 bleibt Generator fuer v24**, jetzt per
+   Nullbefund statt per nachtraeglicher Gleichstandsregel
+   (`reanalyze_label_depth` par.A3).
+2. **Kaltstart ist die Ursache, nicht das Lernraten-Rezept.** `v23-b06`
+   (Kaltstart mit exakt dem b01-Rezept) baut 0,18 volle Spalten und verliert
+   65:95 gegen b01 (p = 0,024). "Spaltenwissen sitzt in der LINIE" ist damit
+   einfaktoriell belegt (`capacity_sim_frontier` par.14b).
+3. **Stufe 4 komplett.** Teil A auf 200 distinkten Zustaenden (0,825 gegen
+   0,490 Verwerfung, 70:3); Teil B: die tiefere Suche verwirft
+   spaltenrelevante Vorschlaege im GLEICHEN Anteil wie alle anderen, nur
+   doppelt so oft insgesamt -- Spaltenverlust als Nebenwirkung, kein gezieltes
+   Verwerfen (`search_depth_column_optimum` par.7, ENTSCHIEDEN).
+4. **Spreizung des Value-Kopfs im Tiling gemessen:** b01 0,048/0,065 gegen
+   plattenblind 0,018, aber die multiplikative Form kippt in 1 von 142 bzw. 4
+   von 192 Stellungen einen Punktvorsprung. Form A tot, B oder C Pflicht
+   (`geometric_envelope` par.3f).
+5. **Phase 3 auf Block-Ebene bestaetigt** (t 3,25 und -2,87 fuer die beiden
+   signifikanten Arme; `r5_value_calibration` par.12), **Reachability
+   zifferngleich reproduziert** (par.7 dort).
+6. **Hebel 3 der Cache-Prereg abgenommen:** Zusammenfuegen 344 s statt 4,98 h,
+   Datenaufbau im Training 31 s. Zwei Bedingungen waren vorher unbekannt
+   (Monolith fuer den TRAININGSANTEIL, Block-Bau unter der Trainings-Umgebung;
+   `cache_build_time` par.12, Werkzeug `tools/window_train_split.py`).
+7. **Blockgroesse 5 ist Default in allen fuenf Arena-Werkzeugen** (Nutzer,
+   zweiter Vorfall; `working_rules.md`, `pitfalls.md`).
 
-### Was als Naechstes ansteht, in dieser Reihenfolge
+### Was als Naechstes ansteht
 
 | Was | Kosten | Anmerkung |
 | --- | --- | --- |
-| **v24-Erzeugung** | **11,9 h** bei threads 11 (aus den v23-Manifesten, 100 Sims; die fruehere Zahl 23 h war ein 400-Sims-Richtwert) | 12.000 b01-Partien (4.000 Sockel gesampelt mit Rauschen, 6.000 Schwarm argmax, 2.000 Schwarm gesampelt), `--per-file 10`. **Rezept vollstaendig in `PREREG_v24_window.md` par.6** (Befehle, Seeds, Stack-Draw-Env, Traeger-Manifest 580, Tor-0-Schwelle); der hv2-Anteil wird UNVERAENDERT weiterverwendet. Vor der ersten Arm-Arena: Gleichstandsregel fuer die Generatorwahl (Nutzer-Entscheid, `docs/generation_loop.md`) |
-| **Vor dem v24-Training**: Fenster-Cache parallel vorbauen | spart rund 4 h | `build_cache_incremental.py --merge-out` plus `train.py --cache-file`. Gemessen: ein neues Fenster kostet sonst 4,98 h einkernig (`cache_build_time` par.11) |
-| **Stufe 4 Teil B** | rund 35 min (Teil A brauchte 1.924 s) | Spalten-Etikett der verworfenen Zuege auf dem Zustandssatz `selfplay_s4states-v23b01_*` (par.6b), Definition par.6a. Braucht einen zweiten Trace-Durchgang mit Reihennummer |
-| Push | -- | 3 Commits ungepusht, `cargo test --release --no-run` ist gruen |
+| **Nutzer-Entscheid: Generatorwahl-Regel bei Gleichstand** | -- | fuer v24 gegenstandslos (Nullbefund), fuer kuenftige Generationen offen (`docs/generation_loop.md`, "Generatorwahl unter Armen") |
+| **v24-Erzeugung** | 11,9 h bei threads 11 | Rezept vollstaendig in `PREREG_v24_window.md` par.6; Generator `v23-b01_brierbest`. Startet NUR auf Nutzer-Anweisung |
+| Vor dem v24-Training: Monolith fuer den Trainingsanteil | rund 45 min | `tools/window_train_split.py` -> `build_cache_incremental.py --merge-out` unter der Trainings-Umgebung (`cache_build_time` par.12) |
+| b04-Zweig | Nutzer-Entscheid | unveraendert |
+| Merkposten: `--select-by-brier` bei Kaltstarts | -- | b02 und b06 haben `_brierbest` in Epoche 1 mit BESSEREM Brier als b01 bei schwaecherem Spiel; der b05-Val-Pool misst nicht, was in der Arena zaehlt (`capacity_sim_frontier` par.14b) |
+| Push | -- | nie ohne Anweisung; Commits der Nacht sind lokal |
 
 ## 2. WAS DIE GENERATION v23 ERGEBEN HAT
 
@@ -372,16 +366,16 @@ Stufe 4), `capacity_sim_frontier`, `reanalyze_label_depth`,
 | Prereg | Wo es haengt |
 | --- | --- |
 | ~~`v23_window`~~ | ENTSCHIEDEN: Fenster gebaut, alle Tore und alle Arme gemessen |
-| `capacity_sim_frontier` | b02 gemessen (ein Drittel der Spalten, Vergleich NICHT einfaktoriell: LR-Rezept, par.12); b04 wartet auf den Zweig-Entscheid (Abschnitt 5) |
+| `capacity_sim_frontier` | Warm gegen Kalt einfaktoriell belegt (b06, par.14b: 0,18 Spalten, 65:95); b04 wartet auf den Zweig-Entscheid (Abschnitt 5) |
 | ~~`policy_surprise_weighting`~~ | ENTSCHIEDEN 2026-09-01: b03 traegt nicht (Orakel Gleichstand, Arena 75:85) |
-| `reanalyze_label_depth` | Teil A (Lehrer-Relabeln) gefahren, Abschnitt 3.1; die Zeile-1-Frage (flach gegen tief nachgelabelt) und Teil B (Value tief) UNGEMESSEN |
+| `reanalyze_label_depth` | Teil A (Lehrer-Relabeln) auf 240 Paaren: Nullbefund (par.A3); die Zeile-1-Frage (flach gegen tief nachgelabelt) und Teil B (Value tief) UNGEMESSEN |
 | ~~`r5_solver_split`~~ | Teil B war Phase 3 -- GESCHLOSSEN ohne Bau (2026-09-01) |
 | ~~`v23_reachability_recheck`~~ | ENTSCHIEDEN 2026-09-01: 14,64 Prozent tot-kartiert gegen 13,89 beim Vorgaenger, Stufe 1 wird NICHT eroeffnet; Quelldateien im restic-Backup |
-| `search_depth_column_optimum` | Stufe 4 Teil A **wiederholt auf 200 distinkten Zustaenden (par.6b): 0,825 gegen 0,490, 70:3, p = 1,4e-17** -- die Erstfassung (par.6) hatte doppelt gezaehlt (89 distinkte), Verdikt hielt. Dazu berichtigt: m=25-Praemisse (Clamp ist 16), "@100 33:47" ist n.s. (par.2j2), drei der "vier Wurzel-Eingriffe" waren Blatt-Eingriffe. **Offen: Teil B** auf demselben Zustandssatz |
+| ~~`search_depth_column_optimum`~~ | ENTSCHIEDEN 2026-09-02: Stufe 4 komplett (par.6b, par.7); Tiefen-Delle beschrieben, nicht behoben |
 | `special_tile_yield` | Kanaele 77/78 gebaut, ihre Wirkung nie isoliert |
 | `cache_build_time` | Hebel (3) hat seit 2026-09-01 einen Nutzniesser: **4,98 h** einkerniges Zusammenfuegen bei neuer Fenster-Zusammensetzung (par.11). Die vermisste serielle Vollreferenz liegt damit auch vor |
 | `frozen_v3_eval_set` | ENTSCHIEDEN und GEBAUT 2026-09-01 (Satz 1.800 Zustaende, Orakel aus b01 und v21, Zirkularitaet belegt, par.7-9). Nachgetragen: die Bruecke gilt nur fuer Runden 1-4; Quelldateien im restic-Backup; Artefakte ohne `laufzeit`-Block |
-| `geometric_envelope` | Gelaender fuer die fruehen Runden. Naechster Schritt laut par.3d: Spreizungs-Messung auf b01 (`tiling_candidate_spread.py`), dann Stufe 0 (Vorwaertspaesse noetig, nicht netzfrei). Das zitierte Artefakt `tiling_candidate_spread.json` (0,017 / 0 von 51) liegt NICHT im Baum |
+| `geometric_envelope` | Spreizung gemessen (par.3f): Form A tot, B oder C Pflicht. Naechster Schritt Stufe 0 mit Formwahl (Vorwaertspaesse noetig, nicht netzfrei) |
 
 **Registriert, nicht eingetaktet** (jeder Bau braucht vorher eine
 Registrierung): `plate_policy_supervision`, `saturating_score_utility`,
