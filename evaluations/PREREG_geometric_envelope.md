@@ -400,3 +400,33 @@ Value-Fuehrung endgueltig tot; B (additiv auf angeglichener Skala) oder C
 ohne Formwechsel reicht nicht. Nebenbefund: b01 streut auf dem eigenen
 Aera-Satz (v3) breiter als auf dem alten (v1), also hat der Satzwechsel
 (`frozen_v3`) hier Substanz.
+
+## par.5a STUFE 0 OPERATIONALISIERT, VOR dem Lauf (2026-09-02, 22:55)
+
+Anlass: Nutzer 2026-09-02, *"von der einhuellenden erwart ich mir einiges"*;
+mit par.3f (Form A tot) ist Stufe 0 der naechste Schritt und netzfrei bis auf
+Vorwaertspaesse.
+
+**Werkzeug:** `tools/probes/envelope_head_discrimination_probe.py`.
+Zustaende `frozen_eval_set_v3.pkl` (b01-Aera, 360 je Runde), Netze als ONNX:
+`v23-b01_brierbest` (spaltenfaehig), `v22-b05` (Vorgaenger), `v18_2d`
+(plattenblind, Referenz). Je Zustand und Brett: Belegung aus `dome_grid`,
+Huellen-Orientierung bestpassend (HULL_LEFT r+c<=5 oder HULL_RIGHT r>=c,
+kleinere Abweichung; leeres Brett: Vereinigung beider), Ownership-Kopf
+(36 Werte je Seite, Sigmoid). **Messgroesse:** AUC von P(belegt) unter den
+OFFENEN Zellen, innen gegen aussen, je Runde gemittelt ueber die Bretter;
+Block-SE ueber die Quelldateien der frozen-Records; dazu die Mittelwerte
+innen/aussen.
+
+**Lesart, vorab festgelegt (Praezisierung von par.5 "hoch"):**
+- AUC >= 0,75 in Runde 1 UND 2 beim spaltenfaehigen b01: der Kopf kennt die
+  Geometrie bereits -- Baustein (b) (Huellen-Ebenen als Eingabe) ist
+  gegenstandslos, der Strang geht direkt zu (c), dem rundenabklingenden
+  Gelaender in Suche und Tiling (par.3b/3d), und zur Formwahl B/C.
+- AUC <= 0,60 in Runde 1-2: die Geometrie fehlt dem Kopf, (b) bleibt Stufe 1.
+- dazwischen: teilweise; (b) und (c) bleiben beide auf dem Plan, Reihenfolge
+  nach par.3d (iv).
+- Kontrolle: liegt v18_2d (plattenblind) in derselben Hoehe wie b01, misst
+  die AUC nur Brettgeometrie (offene Zellen liegen bei fruehen Brettern fast
+  alle innen oder aussen), nicht Gelerntes -- dann ist die Groesse als
+  Stufe-0-Mass untauglich und wird als solche registriert.
