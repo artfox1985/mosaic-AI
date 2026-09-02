@@ -3875,3 +3875,45 @@ offen. (Vermerk 2026-08-28, aus dem Statuskopf hierher verschoben.)
   Das ist der eigentliche Beleg der Kapselung: v2 ist aus dem Quellstand
   verschwunden, und das v2-Artefakt spielt trotzdem Zug fuer Zug dieselbe
   Partie -- weil es sein eigenes Wheel mitbringt.
+
+## par.3b.14 BERICHTIGUNG der Huellen-Kennzahlen (Stufe D/D2): die zweite Huelle war falsch gespiegelt (2026-09-03)
+
+`tools/probes/triangle_hull_coverage_probe.py` (und darauf
+`hull_coverage_server_logs.py`) fuehrte als gespiegelte Huelle `r >= c`
+(volle Spalte 0, volle Zeile 5). Die Quelle, `heuristic_v2.rs`
+`triangle_deviation` im Stand 65b48af^ (Zeilen 507-508), spiegelt an der
+SENKRECHTEN Achse: `r + (5 - c) <= 5`, also `r <= c` (volle Zeile 0, volle
+Spalte 5); die Reihen-Spiegelung ist dort ausdruecklich ausgeschlossen,
+weil eine volle Rasterzeile 5 strukturell unerreichbar ist. Aufgedeckt durch
+die Nutzer-Frage vom 2026-09-03, ob die Stufe-0-Sonde der Einhuellenden
+linke und rechte Huelle unterscheidet. Betroffen sind alle Bretter, deren
+bestpassende Orientierung rechts ist (in der b01-Aera 4 bis 17 Prozent je
+Runde, `envelope_head_discrimination_v2.json`); fuer sie wurde eine nie
+erreichbare Form als Huelle gewertet, also der Fuellanteil UNTERschaetzt.
+
+**Neurechnung mit berichtigter Huelle** (`triangle_hull_coverage_lehrer_hullfix.json`,
+300 Dateien; `hull_coverage_server_logs.json` neu geschrieben, inzwischen 13
+statt 9 Mensch-Partien in `static/log`):
+
+| Quelle | Kennzahl | alt (par.3b.12 D2) | neu |
+| --- | --- | --- | --- |
+| Lehrer hv2 | Huelle gewichtet (Ende) | 0,600 | **0,680** |
+| Lehrer hv2 | Huelle ungewichtet, Zellen von 21 | 13,55 | 14,62 |
+| Lehrer hv2 | aussen, Zellen von 15 | 3,97 | 2,91 |
+| Lehrer hv2 | Halbzeit gewichtet | 0,340 | 0,398 |
+| Lehrer hv2 | Frontier-tau | 0,325 | 0,346 |
+| Lehrer hv2 | tote Huelle R4 | 0,006 | 0,005 |
+| Mensch (Logs) | Huelle gewichtet (Ende) | 0,838 (n 9) | **0,860** (n 13) |
+| Netz in denselben Logs | Huelle gewichtet (Ende) | -- | 0,570 (n 13) |
+
+**Was sich an den Befunden aendert:** der Lehrer fuellte die Huelle deutlich
+besser als registriert (0,68 statt 0,60), der Mensch-Maschine-Abstand beim
+Lehrer schrumpft von 0,24 auf 0,18. Die Aussage "alle Maschinen kaufen ihre
+Fuellung in den billigen Zeilen" bleibt fuer die Netze (v21 0,538, b04
+0,573, b06 0,620 -- diese drei Korpora liegen nicht mehr im Baum, nur im
+restic-Snapshot, und sind NICHT neu gerechnet; ihre Werte sind vermutlich
+ebenfalls zu niedrig, in unbekanntem Mass). Der Konzentrationsbefund
+(gleicher Einsatz, halber Spalten-Ertrag) ist damit fuer den Vergleich
+b04 gegen Lehrer nicht mehr sauber belegt, bis b04 neu gerechnet ist. Die
+Leitkennzahl bleibt der kosten-gewichtete Huellen-Fuellanteil, die
+Richtwerte lauten ab jetzt **Mensch 0,86, Lehrer 0,68**.

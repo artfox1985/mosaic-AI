@@ -456,8 +456,10 @@ Fundstellen im Audit-Bericht; Details im Archiv-Kapitel.
   bei GLEICHEN Platzierungspunkten. Der Vorsprung sitzt bei den
   Spezialfliesen; der Mensch tauscht kurze Reihen gegen lange.
 - **Chip-Allokation, nicht Chip-Volumen:** Mensch 0,8 Reihe-6-Chip-
-  Abschluesse je Partie, v21 0,1. Kosten-gewichtete Huelle Mensch 0,84,
-  Maschinen 0,54-0,62.
+  Abschluesse je Partie, v21 0,1. Kosten-gewichtete Huelle Mensch 0,86,
+  Lehrer 0,68 (berichtigt 2026-09-03: die zweite Huelle war falsch
+  gespiegelt, `heuristic_v2_long_rows` par.3b.14); Netz-Werte 0,54-0,62
+  stammen noch aus der falschen Rechnung und sind vermutlich zu niedrig.
 - **Blindzieh-Regel:** bei Wertungsplatte 6 laeuft die gebaute Stopp-Regel das
   Punktekonto leer (58-66 Prozent der Serien enden bei 0). Spaltenbau behebt
   das NICHT -- k1 zahlt quadratisch, das Spezialfeld-Defizit kostet linear -3
