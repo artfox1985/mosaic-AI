@@ -105,6 +105,8 @@ def main():
                     "choice_strafleiste": 0} for s in a.sims}
     per_sims_sens = {s: {"verworfen": 0, "top1_rel_choice_nicht": 0, "top1_nicht_choice_rel": 0} for s in a.sims}
     paired = []   # je Zustand: {sims: (verworfen, top1_rel, choice_rel)}
+    raw = []      # 2026-09-02: Rohdaten je Zustand fuer nachtraegliche Schwellen-Sensitivitaet
+                  # (min_fill 1..5, mit/ohne leere Slots), ohne die Traces neu zu rechnen
     per_file_share = {s: [] for s in a.sims}   # Anteil "spaltenrelevanter Top-1 verworfen" je Datei (Block)
 
     for f in files:
@@ -145,6 +147,17 @@ def main():
             if rel:
                 n_states_with_relevant_row += 1
             entry = {}
+            raw.append({"file": os.path.basename(f), "round": st.get("round"),
+                        "col_fill": pred.get("col_fill"),
+                        "open_rows_by_col": [sorted({int(c["r"]) + 1 for c in cells if c.get("kind") != "empty_slot"})
+                                             for cells in (pred.get("col_open_cells") or [])],
+                        "open_rows_by_col_incl_empty": [sorted({int(c["r"]) + 1 for c in cells})
+                                                        for cells in (pred.get("col_open_cells") or [])],
+                        "top1_row": {str(sm): row_of(t1) for sm, (t1, ch) in per_state.items()},
+                        "choice_row": {str(sm): row_of(ch) for sm, (t1, ch) in per_state.items()},
+                        "top1_desc": {str(sm): t1 for sm, (t1, ch) in per_state.items()},
+                        "choice_desc": {str(sm): ch for sm, (t1, ch) in per_state.items()},
+                        "verworfen": {str(sm): int(t1 != ch) for sm, (t1, ch) in per_state.items()}})
             for sims, (t1, ch) in per_state.items():
                 d = per_sims[sims]
                 d["n"] += 1
@@ -209,6 +222,7 @@ def main():
         result["gepaart_ereignis_E"] = {"sims_niedrig": lo, "sims_hoch": hi, "beide": both,
                                         "nur_hoch": only_hi, "nur_niedrig": only_lo,
                                         "mcnemar_exakt_p": mcnemar_exact(only_hi, only_lo)}
+    result["rohdaten_je_zustand"] = raw
     result["laufzeit"] = {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
                           "threads": 1, "s_je_partie": None}
     path = os.path.join(_ROOT, a.out)
