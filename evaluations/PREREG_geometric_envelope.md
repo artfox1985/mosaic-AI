@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, Zuschnitt registriert (par.3d). **Spreizung gemessen (par.3f, 2026-09-02):** b01 0,048/0,065 gegen v18_2d 0,018, aber die multiplikative Form kippt in 1 von 142 bzw. 4 von 192 Stellungen einen Punktvorsprung -- Form A endgueltig tot, B oder C Pflicht. Naechster Schritt: Stufe 0 (weiss der Kopf es schon?) mit Formwahl B/C. -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, Zuschnitt registriert (par.3d). Spreizung gemessen (par.3f): Form A tot, B oder C Pflicht. **Stufe 0 gemessen (par.5b, 2026-09-03): der Ownership-Kopf kennt die Huelle** (AUC innen/aussen b01 0,73 in R1, 0,85 in R2; plattenblind 0,53-0,61) -- die Geometrie fehlt nicht, sie zaehlt nicht. Naechster Schritt: Baustein (c), das Gelaender in Suche und Tiling, Formwahl B/C, eigene Registrierung vor dem Bau. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -430,3 +430,40 @@ innen/aussen.
   die AUC nur Brettgeometrie (offene Zellen liegen bei fruehen Brettern fast
   alle innen oder aussen), nicht Gelerntes -- dann ist die Groesse als
   Stufe-0-Mass untauglich und wird als solche registriert.
+
+## par.5b STUFE 0 GEMESSEN: der Kopf kennt die Huelle ab Runde 2 klar, in Runde 1 knapp unter der Schwelle (2026-09-03, 00:55)
+
+`evaluations/artifacts/envelope_head_discrimination.json` (48 s, frozen_v3,
+1.800 Zustaende; 539 Bretter je Netz ohne beide Klassen, meist leere oder
+volle Bretter, ausgelassen):
+
+| Runde | Bretter | b01 AUC (Block-SE) | b05 AUC | v18_2d AUC (plattenblind) | b01 P(belegt) innen / aussen |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 190 | **0,728** (0,016) | 0,746 | 0,607 (0,027) | 0,66 / 0,42 |
+| 2 | 711 | **0,850** (0,008) | 0,853 | 0,526 | 0,66 / 0,35 |
+| 3 | 720 | 0,775 (0,009) | 0,769 | 0,571 | 0,54 / 0,29 |
+| 4 | 720 | 0,771 (0,006) | 0,757 | 0,562 | 0,40 / 0,17 |
+| 5 | 720 | 0,713 (0,007) | 0,709 | 0,549 | 0,24 / 0,09 |
+
+**Kontrolle bestanden:** das plattenblinde v18_2d liegt bei 0,53-0,61 mit
+P(belegt) rund 0,50 auf beiden Seiten -- sein Ownership-Kopf ist
+uninformativ, die AUC misst also Gelerntes, nicht Brettgeometrie.
+
+**Verdikt nach par.5a:** Runde 2 liegt mit 0,850 klar ueber 0,75, Runde 1 mit
+0,728 knapp darunter (Block-SE 0,016, also nicht signifikant unter der
+Schwelle, aber auch nicht darueber). Formal "dazwischen": (b) und (c)
+bleiben auf dem Plan. Inhaltlich ist das Bild eindeutig genug, um die
+Reihenfolge zu setzen: **der Kopf kennt die Huelle** -- er gibt Zellen
+innerhalb der Dreiecks-Huelle ab Runde 2 rund die doppelte
+Belegungswahrscheinlichkeit wie Zellen ausserhalb, und zwar bei b05 genauso
+wie bei b01 (das Wissen kam mit der Spalten-Linie, nicht erst mit v23).
+Damit ist Baustein (b) (Huellen-Ebenen als Eingabe) der schwaechere Hebel:
+was fehlt, ist nicht die Geometrie, sondern dass sie in Suche und Tiling
+ZAEHLT -- also Baustein (c), das rundenabklingende Gelaender, mit Formwahl
+B oder C aus par.3f. (b) bleibt registriert fuer den Fall, dass (c) an
+Runde 1 scheitert, wo die Trennung am schwaechsten ist.
+
+**Naechster Schritt (Stufe 2 vorgezogen vor Stufe 1):** Registrierung des
+Gelaenders als Potentialform mit Stuetzstellen nach par.3d (ii), Formwahl B
+oder C, Paritaets-Gate, dann Arena. Das ist ein Bau und braucht eine eigene
+Registrierung vor dem ersten Handgriff.
