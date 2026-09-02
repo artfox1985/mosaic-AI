@@ -10,7 +10,7 @@ AUFBAU (netzfrei bis auf Vorwaertspaesse, kein Bau):
   360 je Runde), Modelle als ONNX aus `models/`.
 * Je Zustand und Spielerbrett: Belegung aus `dome_grid` (wie
   `triangle_hull_coverage_probe.occupancy`), Huellen-Orientierung =
-  bestpassend am Brett (HULL_LEFT r+c<=5 oder HULL_RIGHT r>=c, kleinere
+  bestpassend am Brett (HULL_LEFT r+c<=5 oder HULL_RIGHT r<=c, kleinere
   Abweichung; bei leerem Brett BEIDE Orientierungen als moeglich, Zelle gilt
   als "innen", wenn sie in einer der beiden liegt).
 * Ownership-Kopf: 36 Werte je Seite (slot-major `grid_index`, Seite 0 =
@@ -102,6 +102,8 @@ def main():
         per_round_in = collections.defaultdict(list)
         per_round_out = collections.defaultdict(list)
         per_file_round_auc = collections.defaultdict(lambda: collections.defaultdict(list))
+        orient_count = collections.defaultdict(collections.Counter)   # Runde -> Orientierung -> Bretter
+        per_orient_auc = collections.defaultdict(list)                # (Runde, Orientierung) -> [auc]
         n_boards = collections.Counter()
         skipped_empty_side = 0
         for rec in records:
@@ -124,10 +126,14 @@ def main():
                 grid = player.get("dome_grid") or []
                 filled = occupancy(grid)
                 if filled:
-                    hull = HULL_LEFT if deviation(filled, HULL_LEFT) <= deviation(filled, HULL_RIGHT) else HULL_RIGHT
+                    dl, dr = deviation(filled, HULL_LEFT), deviation(filled, HULL_RIGHT)
+                    hull = HULL_LEFT if dl <= dr else HULL_RIGHT
+                    orient = "links" if dl < dr else ("rechts" if dr < dl else "gleich")
                     inside = hull
                 else:
                     inside = HULL_LEFT | HULL_RIGHT
+                    orient = "leer"
+                orient_count[rnd][orient] += 1
                 pos, neg = [], []
                 for r in range(6):
                     for c in range(6):
@@ -140,6 +146,7 @@ def main():
                     continue
                 val = auc(pos, neg)
                 per_round_auc[rnd].append(val)
+                per_orient_auc[(rnd, orient)].append(val)
                 per_round_in[rnd].append(sum(pos) / len(pos))
                 per_round_out[rnd].append(sum(neg) / len(neg))
                 per_file_round_auc[rec.get("source_file", "?")][rnd].append(val)
@@ -152,8 +159,12 @@ def main():
             rounds[str(rnd)] = {"n_bretter": n_boards[rnd], "auc_mittel": m_auc,
                                 "auc_block_se": se_blk, "n_bloecke": len(blocks),
                                 "p_belegt_innen": mean_se(per_round_in[rnd])[0],
-                                "p_belegt_aussen": mean_se(per_round_out[rnd])[0]}
-            print(f"  {m} R{rnd}: AUC {m_auc:.3f} (Block-SE {se_blk if se_blk is None else round(se_blk,3)}, {n_boards[rnd]} Bretter), P innen {rounds[str(rnd)]['p_belegt_innen']:.3f} aussen {rounds[str(rnd)]['p_belegt_aussen']:.3f}", flush=True)
+                                "p_belegt_aussen": mean_se(per_round_out[rnd])[0],
+                                "orientierung_bretter": dict(orient_count[rnd]),
+                                "auc_je_orientierung": {o: mean_se(per_orient_auc[(rnd, o)])[0]
+                                                        for o in ("links", "rechts", "gleich", "leer")
+                                                        if per_orient_auc.get((rnd, o))}}
+            print(f"  {m} R{rnd}: AUC {m_auc:.3f} (Block-SE {se_blk if se_blk is None else round(se_blk,3)}, {n_boards[rnd]} Bretter), P innen {rounds[str(rnd)]['p_belegt_innen']:.3f} aussen {rounds[str(rnd)]['p_belegt_aussen']:.3f} | Orientierung {dict(orient_count[rnd])} | AUC je Orientierung { {k: round(v,3) for k,v in rounds[str(rnd)]['auc_je_orientierung'].items()} }", flush=True)
         result["modelle"][m] = {"runden": rounds, "bretter_ohne_beide_klassen": skipped_empty_side,
                                 "planes_kanaele_modell": want_planes, "flat_breite_modell": want_flat}
     result["laufzeit"] = {"wanduhr_s": round(time.monotonic() - t0, 1), "cpu_s": None,
