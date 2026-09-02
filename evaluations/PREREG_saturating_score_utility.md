@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score, integriert ueber die Score-Verteilung) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die vorhandene lineare Mischung gescheitert ist? | Beleg: Nichts gebaut. Tor par.3a gefahren: Verdikt DAZWISCHEN (r(pts,wr)=0,74) -- Nutzer-Entscheid zum sigma-Ziel noetig. Beide Bau-Blocker entschieden: Skalenwechsel auf [-1,1] (par.4a) und eigener additiver Margen-Kopf mit MARGIN_SCALE=20 (par.6a) -->
+<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die lineare Mischung gescheitert ist? | Beleg: Nichts gebaut. Tor par.3a: DAZWISCHEN (r(pts,wr) 0,74), sigma-Ziel offen (par.12). Skalenwechsel [-1,1] entschieden (par.4a). **par.6b (Nutzer 2026-09-03): KEIN neuer Margen-Kopf** -- die Marge kommt aus Punkte- und Gegnerpunkte-Kopf (Steigung 0,97 auf Plattenpunkten, Ziele unter nortv/lambda 1,0 ohne TD-Blend); offen ist nur die FORM der Verwendung im Blattwert. Naechster Schritt: Engine-Bau registrieren. -->
 
 # Vorregistrierung: Gesaettigte, re-zentrierte Score-Utility
 
@@ -409,7 +409,7 @@ Drei Fallen dabei.
    Entscheids -- ein Nullbefund waere sonst zwischen Utility und einem
    unbelegten Hilfskopf nicht auftrennbar gewesen.
 
-## par.6a Der Margen-Kopf (Nutzer-Entscheid 2026-08-23)
+## par.6a Der Margen-Kopf (Nutzer-Entscheid 2026-08-23) -- UEBERHOLT durch par.6b (2026-09-03)
 
 Ein **additiver** Kopf `score_margin`, nach dem im Projekt etablierten
 Muster fuer optionale Ausgaben (`opp_points`, `points_dist`,
@@ -662,3 +662,40 @@ stehen hier nur als Merkposten.
   entscheidet) und par.8 (Marge-in-Siege als vorregistrierter Falsifikator).
   Die dortige Z. 7 ("tanh-gestauchte Punktedifferenz") ist am 2026-08-23
   als falsch korrigiert; #12 lief eigenseitig.
+
+## par.6b BERICHTIGUNG: KEIN neuer Kopf -- die Marge liegt schon in zwei vorhandenen Koepfen (Nutzer 2026-09-03)
+
+Nutzer: *"Noch ein Kopf? Wir haben own points und opp points. Somit hast die
+Marge doch schon."* Richtig, und die Begruendung von par.6a fuer einen
+eigenen Kopf traegt im heutigen Rezept nicht mehr:
+
+1. **"Ohne rtv-Zweig und ohne TD-Blend"** war das Argument fuer einen
+   eigenen Kopf. Die b-Serie faehrt `value_target_variant nortv` und
+   `value_target_lambda 1.0` (b01-Manifest `cli_args`; Trainingslog: "kein
+   Mix, Bestandsverhalten"). Punkte- und Gegnerpunkte-Ziel sind damit der
+   reine Endstand, genau das, was par.6a fuer den Margen-Kopf verlangte.
+2. **Aufloesung:** der Punkte-Kopf trifft die Plattenpunkte mit Steigung
+   0,97 bis 0,99 (`PREREG_r5_value_calibration.md` par.11), also die
+   Groesse, an der der Value-Kopf mit 0,09 scheitert. Die Marge
+   `50 * atanh(p_own) - 50 * atanh(p_opp)` (Ruecktransformation wie
+   `tools/r5_value_calibration.py` `points_to_pts`) hat damit die Skala des
+   Spiels; die MARGIN_SCALE-Ueberlegung aus par.6a betraf nur die
+   tanh-Kompression eines EIGENEN Kopfes und entfaellt.
+3. **Der Verbraucher existiert:** `blended_leaf_win_prob_with` liest beide
+   Koepfe heute schon (net_mcts.rs:1381, Parameter `points`, `opp_points`).
+   Die lineare Mischung dort ist gemessen wertlos (w = 0,1: 300:321 bei
+   p = 0,053, Spalten unbewegt, Phase 3). Was diese Prereg vorschlaegt, ist
+   die FORM der Verwendung -- Saettigung um den re-zentrierten Wurzelwert
+   statt linearer Beimischung -- an derselben Stelle, mit denselben Koepfen.
+
+**Was damit aus dem Zuschnitt faellt:** der Kopf-Bau, der Cache-Neubau und
+der Trainingslauf aus par.6a. **Was bleibt:** ein Engine-Bau in
+`blended_leaf_win_prob_with` (Knopf, Default aus, Paritaets-Gate, Wheel,
+Anker-Invarianz), der Skalenwechsel par.4a, und die offene Frage par.12 zum
+sigma-Ziel. Ein Arm braucht damit keine Trainingszeit, nur Arena.
+
+**Einordnung (Nutzer-These 2026-09-02):** der Value-Kopf sieht die Platten,
+sein Massstab ist falsch; der Punkte-Kopf hat den richtigen Massstab. Diese
+Prereg ist der Weg, den richtigen Massstab in die Suche zu bringen, ohne den
+Value-Kopf umzuerziehen. Registrierung des Baus als eigener Absatz VOR dem
+ersten Handgriff.
