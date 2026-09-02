@@ -797,6 +797,24 @@ erlaubt. Fuer das Verdikt aendert das nichts: die Schwelle 0,618 verlangt
 +0,10 ueber der Kontrolle, und kein Arm liegt auch nur im Punktschaetzer
 darueber; die t-Werte sind als Naeherung zu lesen, nicht als Test.
 
+**Block-Ebene NACHGERECHNET (2026-09-02, 01:15, Korpora aus dem Backup
+wiederhergestellt; `tools/probes/phase3_block_level_probe.py`, Artefakt
+`evaluations/artifacts/phase3_block_level.json`).** Alle fuenf Laeufe tragen
+Seed 20260931 (Manifeste geprueft), je Datei ein Block von 10 Partien, 20
+Bloecke je Arm, gepaarte Differenz je Block gegen die `tor2a`-Kontrolle:
+
+| Arm | volle Spalten | Differenz | Block-SE | t gepaart (df 19) | t Erstfassung |
+| --- | --- | --- | --- | --- | --- |
+| @100 (`s100`) | 0,7200 | +0,205 | 0,063 | **3,25** | 3,97 |
+| @400 `B=2,0` | 0,3900 | -0,125 | 0,044 | **-2,87** | -2,74 |
+| @400 `B=0,5` | 0,5325 | +0,018 | 0,048 | 0,36 | 0,37 |
+| @400 `w=0,1` | 0,4850 | -0,030 | 0,033 | -0,90 | -0,63 |
+
+Punktschaetzer zifferngleich mit der Erstfassung (Messweg bestaetigt), die
+Streckung bleibt auch gepaart signifikant schaedlich, die Tiefen-Delle
+bleibt signifikant. Das Verdikt von Stufe 0 steht damit auf dem Fehlermodell,
+das die Projektregel verlangt.
+
 **Verdikt: die Schwelle 0,618 wird von KEINEM Arm erreicht.** Nach der
 Abbruchregel (Stufe 2) wird Phase 3 damit geschlossen und NICHT gebaut; der
 Trainingslauf der Stufe 1 entfaellt.
