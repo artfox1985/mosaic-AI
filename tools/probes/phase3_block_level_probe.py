@@ -65,7 +65,9 @@ def mean_sd(xs):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--data-dir", default="data/archive_pre_v24")
+    ap.add_argument("--data-dir", default="data/archive_pre_v24",
+                    help="Korpus-Ordner; seit 2026-09-02 liegen die Phase-3-Korpora unter "
+                         "<Sicherungswurzel>/archive_pre_v24 (absoluten Pfad uebergeben)")
     ap.add_argument("--out", default="evaluations/artifacts/phase3_block_level.json")
     a = ap.parse_args()
     t0 = time.monotonic()

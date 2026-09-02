@@ -169,5 +169,9 @@ Kennwerte sind zifferngleich** mit `reachability_stage0.json` (0,14641302 /
 verschieden sind nur zwei Schluesselnamen, die seit dem Erstlauf ins Englische
 umbenannt wurden (`n_zustaende` -> `n_states_done`, `n_zellen` -> `n_cells`,
 `kurve` -> `curve`). Die Auflage aus par.6 ist damit eingeloest, par.5 ist
-reproduzierbar. Nach N8b liegen die Quelldateien unter
-`<Sicherungswurzel>/archive_pre_v24/` (dann `--pattern` mit Pfad).
+reproduzierbar. **Seit 2026-09-02, 03:05 liegen die Quelldateien unter
+`<Sicherungswurzel>/archive_pre_v24/`** (Sicherungswurzel = `MOSAIC_BACKUP_DIR`,
+sonst `Backups/mosaic-AI` im OneDrive; neben dem restic-Repository, ausserhalb
+der Backup-Quelle; Nutzer-Wunsch: keine Unterordner in `data/` vor dem
+Tageslauf). Fuer eine Wiederholung den Ordner nach `data/archive_pre_v24/`
+zurueckkopieren oder der Sonde ein `--pattern` mit absolutem Pfad geben.
