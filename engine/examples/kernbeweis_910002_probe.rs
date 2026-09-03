@@ -86,6 +86,7 @@ fn main() {
         envelope_search_c: 0.0,
         envelope_tiling_w: 0.0,
         envelope_profile: mosaic_rust::envelope::ENVELOPE_PROFILE_DEFAULT,
+        envelope_tiling_value_w: 0.0,
     };
     let actions = drafting_actions(&state1);
     println!(

@@ -957,8 +957,16 @@ impl PyGame {
                 // K3 (d): GUI-Sitzung liest die Knoepfe aus der Umgebung (kein
                 // Spec-Pfad hier), wie jeder andere Env-Knopf des Spielbetriebs.
                 let sc = crate::net_mcts::SearchConfig::from_env();
+                let envelope = crate::envelope::EnvelopeTilingParams {
+                    w_tile: sc.envelope_tiling_w,
+                    w_val: sc.envelope_tiling_value_w,
+                    profile: sc.envelope_profile,
+                };
+                let margin_evaluator = |final_state: &GameState| {
+                    crate::self_play::net_tiling_margin_value(net, final_state, pi)
+                };
                 best_first_step_exact_or_valued_envelope(
-                    &self.game.state, pi, Some(&evaluator), own.as_ref(), sc.envelope_tiling_w, &sc.envelope_profile,
+                    &self.game.state, pi, Some(&evaluator), own.as_ref(), &envelope, Some(&margin_evaluator),
                 )
             }
             None => best_first_step_exact_or_valued(&self.game.state, pi, None),

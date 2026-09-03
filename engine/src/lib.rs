@@ -746,6 +746,7 @@ fn engine_config_json() -> String {
         "envelope_search_c": crate::net_mcts::SearchConfig::from_env().envelope_search_c,
         "envelope_tiling_w": crate::net_mcts::SearchConfig::from_env().envelope_tiling_w,
         "envelope_profile": crate::net_mcts::SearchConfig::from_env().envelope_profile.to_vec(),
+        "envelope_tiling_value_w": crate::net_mcts::SearchConfig::from_env().envelope_tiling_value_w,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,

@@ -164,6 +164,42 @@ pub fn adjusted_tiling_score(points: f64, w_tile: f64, w_e: f64, cost_delta: f64
     points + w_tile * w_e * cost_delta
 }
 
+/// par.8.6 (Nutzer-Entscheid 2026-09-03, "Mach das so"): Tiling-Score mit
+/// Value-Anteil in PUNKTEN. `margin` ist die vom Netz vorhergesagte Endmarge
+/// nach dem Abschluss (`50 * atanh(p_own) - 50 * atanh(p_opp)`, Punkte- und
+/// Gegnerpunkte-Kopf am Endzustand des Kandidaten), `w_v = 1 - w_e` das
+/// Komplement des Profils: in Runde 1 fuehrt die Geometrie, in Runde 4 die
+/// Vorhersage, in Runde 5 rechnet der Loeser exakt. Fehlt die Marge (Netz
+/// ohne Koepfe), zaehlt der Term 0.
+#[inline]
+pub fn adjusted_tiling_score_with_value(
+    points: f64, w_tile: f64, w_e: f64, cost_delta: f64, w_val: f64, margin: Option<f64>,
+) -> f64 {
+    points + w_tile * w_e * cost_delta + w_val * (1.0 - w_e) * margin.unwrap_or(0.0)
+}
+
+/// Knoepfe des Tiling-Eingriffs EINER Seite (par.8.3 und par.8.6), aus der
+/// `SearchConfig` der Seite kopiert. `OFF` ist der Bestandspfad.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EnvelopeTilingParams {
+    /// `W_TILE` (par.8.3), Punkte je Zellenkosten-Einheit.
+    pub w_tile: f64,
+    /// `W_VAL` (par.8.6), Punkte je vorhergesagtem Endpunkt.
+    pub w_val: f64,
+    /// `w_e(Runde 1..5)`.
+    pub profile: [f64; 5],
+}
+
+impl EnvelopeTilingParams {
+    pub const OFF: EnvelopeTilingParams =
+        EnvelopeTilingParams { w_tile: 0.0, w_val: 0.0, profile: ENVELOPE_PROFILE_DEFAULT };
+
+    #[inline]
+    pub fn is_off(&self) -> bool {
+        self.w_tile == 0.0 && self.w_val == 0.0
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -268,5 +304,18 @@ mod tests {
         assert!((tiling_cost_delta(&before, &after_inside) - 3.0).abs() < 1e-9);
         assert!((tiling_cost_delta(&before, &after_outside) + 6.0).abs() < 1e-9);
         assert_eq!(adjusted_tiling_score(4.0, 0.5, 0.92, 3.0), 4.0 + 0.5 * 0.92 * 3.0);
+    }
+
+    /// par.8.6: der Value-Term zaehlt mit `w_v = 1 - w_e`; ohne Marge 0; bei
+    /// `w_val = 0` exakt der par.8.3-Score.
+    #[test]
+    fn value_term_uses_profile_complement_and_zero_without_margin() {
+        let base = adjusted_tiling_score(4.0, 0.5, 0.92, 3.0);
+        assert_eq!(adjusted_tiling_score_with_value(4.0, 0.5, 0.92, 3.0, 0.0, Some(10.0)), base);
+        assert_eq!(adjusted_tiling_score_with_value(4.0, 0.5, 0.92, 3.0, 1.0, None), base);
+        let with = adjusted_tiling_score_with_value(4.0, 0.5, 0.92, 3.0, 1.0, Some(10.0));
+        assert!((with - (base + 0.08 * 10.0)).abs() < 1e-12, "{with}");
+        assert!(EnvelopeTilingParams::OFF.is_off());
+        assert!(!EnvelopeTilingParams { w_val: 0.5, ..EnvelopeTilingParams::OFF }.is_off());
     }
 }

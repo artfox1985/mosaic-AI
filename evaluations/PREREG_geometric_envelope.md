@@ -592,8 +592,16 @@ Punkteeinheiten ist damit KEIN Stichentscheid, sondern ein Entscheider, und
 Kandidaten nicht auseinander, der Punkte-Kopf schon -- der Massstab, nicht
 das Sehen.)
 
-**Status:** VORSCHLAG, Vorpruefung bestanden. Wird gebaut, sobald der Nutzer
-ihn bestaetigt; bis dahin gilt 8.3 mit Stichentscheid.
+**Status: ENTSCHIEDEN (Nutzer 2026-09-03, 16:50: "Mach das so").** Gebaut
+als Knopf `MOSAIC_ENVELOPE_TILING_VALUE_W` (= `W_VAL`, Default 0, Spec-
+Pflichtfeld `envelope_tiling_value_w`), zusaetzlich zu 8.3 (nicht statt):
+`score(k) = Punkte + W_TILE * w_e * dH + W_VAL * (1 - w_e) * M(k)`, `M(k)`
+aus `self_play::net_tiling_margin_value` (Punkte- und Gegnerpunkte-Kopf am
+Endzustand des Kandidaten, `50 * atanh`, ein Vorwaertspass je Kandidat),
+Runde 1-4, bei `W_VAL > 0` ohne multiplikativen Stichentscheid. Arme: **V**
+(`W_VAL` 0,5 / 1,0, `W_TILE` 0) und **T+V** (`W_TILE` 1,0 mit `W_VAL` 1,0);
+Instrumente und Verdikte wie 8.4. Messung nach der K3-Kette (S/T/S+T) und
+der K1-Champion-Kante.
 
 ## par.8 BAU-ABSATZ K3 fuer v24: das Gelaender in Suche (e) und Tiling (d), Stufe 2 vorgezogen (registriert 2026-09-03, VOR dem Bau)
 

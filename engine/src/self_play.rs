@@ -986,6 +986,20 @@ fn tiling_env_actions(state: &GameState, pi: usize) -> Vec<Value> {
 /// Python-Bindungspfad, `PyGame` mit `self.net`) dieselbe Formel braucht --
 /// eine zweite, driftende Implementierung waere hier riskanter als eine
 /// Modulgrenze zu ueberschreiten.
+/// par.8.6: vorhergesagte ENDMARGE (Punkte, ego zu `pi`) am Endzustand eines
+/// Tiling-Kandidaten aus Punkte- und Gegnerpunkte-Kopf,
+/// `50 * atanh(p_own) - 50 * atanh(p_opp)` (`net_mcts::score_margin_points`,
+/// dieselbe Ruecktransformation wie K1). `None` bei einem Netz ohne einen
+/// der beiden Koepfe -- dann zaehlt der Term 0 (`adjusted_tiling_score_with_value`).
+/// Perspektive: `final_state.current_player == pi` strukturell (siehe
+/// `net_tiling_tiebreak_value`), die Koepfe sind also `pi`s eigene.
+pub(crate) fn net_tiling_margin_value(net: &Net, final_state: &GameState, pi: usize) -> Option<f64> {
+    debug_assert_eq!(final_state.current_player, pi);
+    let feats = crate::features::features_for_net(net, final_state);
+    let (_logits, _value, _moon, points, opp_points, _own) = net.eval_ex(&feats).ok()?;
+    crate::net_mcts::score_margin_points(&points, &opp_points).map(|(m, _)| m)
+}
+
 pub(crate) fn net_tiling_tiebreak_value(net: &Net, final_state: &GameState, pi: usize) -> f64 {
     debug_assert_eq!(
         final_state.current_player, pi,
@@ -1152,7 +1166,7 @@ fn warne_unbrauchbaren_ownership_kopf_einmal(len: usize) {
 }
 
 pub(crate) fn resolve_tiling_step(state: &GameState, pi: usize, net: Option<&Net>) -> TilingStep {
-    resolve_tiling_step_with(state, pi, net, 0.0, &crate::envelope::ENVELOPE_PROFILE_DEFAULT)
+    resolve_tiling_step_with(state, pi, net, &crate::envelope::EnvelopeTilingParams::OFF)
 }
 
 /// Wie [`resolve_tiling_step`], zusaetzlich mit `W_TILE` und Profil der
@@ -1162,16 +1176,17 @@ pub(crate) fn resolve_tiling_step_with(
     state: &GameState,
     pi: usize,
     net: Option<&Net>,
-    envelope_tiling_w: f64,
-    envelope_profile: &[f64; 5],
+    envelope: &crate::envelope::EnvelopeTilingParams,
 ) -> TilingStep {
     match net {
         Some(n) => {
             // Ownership-Pol Teil 2: EINMAL je Zug, VOR der Kandidatenschleife.
             let own = ownership_tiling_marginals(n, state, pi);
             let evaluator = |final_state: &GameState| net_tiling_tiebreak_value(n, final_state, pi);
+            let margin_evaluator =
+                |final_state: &GameState| net_tiling_margin_value(n, final_state, pi);
             best_first_step_exact_or_valued_envelope(
-                state, pi, Some(&evaluator), own.as_ref(), envelope_tiling_w, envelope_profile,
+                state, pi, Some(&evaluator), own.as_ref(), envelope, Some(&margin_evaluator),
             )
         }
         // Ohne Netz gibt es keine Ownership-Karte -- der Pol ist auf allen
@@ -1189,7 +1204,7 @@ fn tiling_step<R: Rng + ?Sized>(
     net: Option<&Net>,
     rng: &mut R,
 ) -> Map<String, Value> {
-    tiling_step_with(game, net, rng, 0.0, &crate::envelope::ENVELOPE_PROFILE_DEFAULT)
+    tiling_step_with(game, net, rng, &crate::envelope::EnvelopeTilingParams::OFF)
 }
 
 /// Wie [`tiling_step`], mit `W_TILE`/Profil der Seite (K3 (d)); der
@@ -1198,13 +1213,12 @@ fn tiling_step_with<R: Rng + ?Sized>(
     game: &mut Game,
     net: Option<&Net>,
     rng: &mut R,
-    envelope_tiling_w: f64,
-    envelope_profile: &[f64; 5],
+    envelope: &crate::envelope::EnvelopeTilingParams,
 ) -> Map<String, Value> {
     let pi = game.state.current_player;
     let state_json = state_to_json(&game.state, true);
     let valid_actions = tiling_env_actions(&game.state, pi);
-    let step = resolve_tiling_step_with(&game.state, pi, net, envelope_tiling_w, envelope_profile);
+    let step = resolve_tiling_step_with(&game.state, pi, net, envelope);
 
     let chosen_env: Value = match &step {
         TilingStep::Place(ta) => json!({
@@ -1655,6 +1669,8 @@ struct PlayerLoopConfig<'a> {
     /// gegen dasselbe Netz ohne Gelaender messbar ist (kein Spiegelmatch).
     envelope_tiling_w: f64,
     envelope_profile: [f64; 5],
+    /// par.8.6: `W_VAL` dieser Seite (Value-Anteil im Tiling-Score).
+    envelope_tiling_value_w: f64,
     /// `true` -> `apply_chosen_action` (sequenzielle Stapel-Zieh-Aufloesung,
     /// Netz-Spielpfade), `false` -> `game.apply_drafting` (Heuristik-Seiten;
     /// dort reicht die Einzelaktion, Folge-Entscheidungen kommen ueber den
@@ -1665,6 +1681,17 @@ struct PlayerLoopConfig<'a> {
     /// bisher NUR die Netz-Seite von `play_net_game`; `trace_line` selbst
     /// ist No-Op ohne `MOSAIC_SPALTENBAU_TRACE`/`MOSAIC_SPALTENBAU`.
     column_build_trace: bool,
+}
+
+impl PlayerLoopConfig<'_> {
+    /// Tiling-Knoepfe dieser Seite als Buendel (par.8.3/8.6).
+    fn envelope_params(&self) -> crate::envelope::EnvelopeTilingParams {
+        crate::envelope::EnvelopeTilingParams {
+            w_tile: self.envelope_tiling_w,
+            w_val: self.envelope_tiling_value_w,
+            profile: self.envelope_profile,
+        }
+    }
 }
 
 /// Gesamt-Konfiguration der vereinheitlichten Schleife.
@@ -1966,9 +1993,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 if recording {
                     // Self-Play-Pfade: Tiling MIT Trainings-Record; `tiling_net`
                     // je Spieler-Konfiguration (Task #20, siehe Feld-Doku).
-                    records.push(tiling_step_with(
-                        &mut game, pcfg.tiling_net, rng, pcfg.envelope_tiling_w, &pcfg.envelope_profile,
-                    ));
+                    records.push(tiling_step_with(&mut game, pcfg.tiling_net, rng, &pcfg.envelope_params()));
                 } else {
                     // Arena-Pfade: Tiling ohne Aufzeichnung. Spaltenbau-Trace:
                     // `tiling_preference` separat (rein lesend) NUR fuer die
@@ -1985,9 +2010,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     } else {
                         None
                     };
-                    let step = resolve_tiling_step_with(
-                        &game.state, pi, pcfg.tiling_net, pcfg.envelope_tiling_w, &pcfg.envelope_profile,
-                    );
+                    let step = resolve_tiling_step_with(&game.state, pi, pcfg.tiling_net, &pcfg.envelope_params());
                     let trace = if pcfg.column_build_trace {
                         crate::column_build::trace_line(
                             &game.state, pi, "Tiling",
@@ -2171,6 +2194,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
         tiling_net: None,
         envelope_tiling_w: 0.0,
         envelope_profile: crate::envelope::ENVELOPE_PROFILE_DEFAULT,
+        envelope_tiling_value_w: 0.0,
         apply_via_chosen_action: false,
         column_build_trace: false,
     };
@@ -2587,6 +2611,7 @@ fn play_net_game<R: Rng + ?Sized>(
         tiling_net: Some(net),
         envelope_tiling_w: search_config.envelope_tiling_w,
         envelope_profile: search_config.envelope_profile,
+        envelope_tiling_value_w: search_config.envelope_tiling_value_w,
         apply_via_chosen_action: true,
         column_build_trace: true,};
     let heur_player = PlayerLoopConfig {
@@ -2594,6 +2619,7 @@ fn play_net_game<R: Rng + ?Sized>(
         tiling_net: None,
         envelope_tiling_w: 0.0,
         envelope_profile: crate::envelope::ENVELOPE_PROFILE_DEFAULT,
+        envelope_tiling_value_w: 0.0,
         apply_via_chosen_action: false,
         column_build_trace: false,
     };
@@ -2747,6 +2773,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 tiling_net: Some(net_a),
                 envelope_tiling_w: search_config_a.envelope_tiling_w,
                 envelope_profile: search_config_a.envelope_profile,
+                envelope_tiling_value_w: search_config_a.envelope_tiling_value_w,
                 apply_via_chosen_action: true,
                 column_build_trace: false,},
             PlayerLoopConfig {
@@ -2754,6 +2781,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 tiling_net: Some(net_b),
                 envelope_tiling_w: search_config_b.envelope_tiling_w,
                 envelope_profile: search_config_b.envelope_profile,
+                envelope_tiling_value_w: search_config_b.envelope_tiling_value_w,
                 apply_via_chosen_action: true,
                 column_build_trace: false,},
         ],
@@ -3454,6 +3482,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         tiling_net: Some(net),
         envelope_tiling_w: search_config.envelope_tiling_w,
         envelope_profile: search_config.envelope_profile,
+        envelope_tiling_value_w: search_config.envelope_tiling_value_w,
         apply_via_chosen_action: true,
         column_build_trace: false,};
     let player1 = PlayerLoopConfig {
@@ -3461,6 +3490,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         tiling_net: Some(net),
         envelope_tiling_w: search_config.envelope_tiling_w,
         envelope_profile: search_config.envelope_profile,
+        envelope_tiling_value_w: search_config.envelope_tiling_value_w,
         apply_via_chosen_action: true,
         column_build_trace: false,};
     // par.5: Greif-Zaehler nur angelegt und verdrahtet, wenn der Knopf aktiv
@@ -5297,6 +5327,7 @@ pub(crate) mod tests {
                 tiling_net: None,
                 envelope_tiling_w: 0.0,
                 envelope_profile: crate::envelope::ENVELOPE_PROFILE_DEFAULT,
+        envelope_tiling_value_w: 0.0,
                 apply_via_chosen_action: false,
                 column_build_trace: false,};
             let cfg = GameLoopConfig {
