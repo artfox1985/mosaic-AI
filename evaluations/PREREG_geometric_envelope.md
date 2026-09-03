@@ -758,3 +758,96 @@ fuenf Arme rund 5 h CPU.
 
    Damit ist K3 vollstaendig baureif; kein Punkt dieses Absatzes ist mehr
    offen.
+
+## par.8.7 K3-P: das Potential auf dem PROJIZIERTEN Brett (Nutzer 2026-09-03, 21:00: "die Huelle wird kommen ... hast du noch nicht den richtigen Hebel gefunden")
+
+**Warum (e) nichts bewegt hat (strukturell, am Code geprueft):** `H(brett)`
+liest die BELEGTEN Zellen des Kuppelrasters (`envelope::occupancy`,
+`DomeSpace::is_filled`). Zellen werden nur in der Tiling-Phase gefuellt
+(`DomeGrid::place_tile`, aufgerufen aus dem Tiling); waehrend des Draftings
+wandern Steine in die MUSTERREIHEN, das Raster bleibt gleich. Ein Suchbaum
+ueber Draft-Zuege sieht also an allen Blaettern dasselbe `H0 - H1` (bis auf
+Blaetter jenseits des Rundenendes), das Potential ist im Baum konstant und
+die Selektion sieht nichts davon -- gemessen in par.9: S 0,1 in allen 160
+Partien mit demselben Sieger wie die Kontrolle. Das ist kein Nullbefund der
+Huelle, sondern der falsche Hebel (dieselbe Lehre wie B1 bei den langen
+Reihen: Initiierung erzwingbar, Vollendung nicht -- hier: das Raster ist
+das Ergebnis, die Musterreihen sind die Entscheidung).
+
+**Der Hebel:** dieselbe Groesse auf dem projizierten Brett. Musterreihe `r`
+mit Farbe `c` und `k` von `r + 1` Steinen landet beim Tiling in Rasterzeile
+`r`, in einer Zelle, die `c` annimmt (`DomeSpace::accepts`: Normal mit
+`required_color == c` oder Wild, leer, nicht gesperrt). Projektion:
+
+```
+occ_proj(r, c') = 1                             fuer belegte Zellen
+                = (k / (r + 1)) / n             fuer jede der n annehmenden Zellen der Reihe r
+                                                (Musterreihe r nicht leer, Farbe c, n >= 1)
+H_proj          = H nach par.8.1 ueber occ_proj (gebrochene Belegung: Abweichung
+                  Summe |Huelle - occ|, Anteile Summe occ * (r + 1) / 56)
+```
+
+Ein Draft-Zug, der eine Reihe innerhalb der Huelle beginnt oder fuellt,
+hebt `H_proj` sofort um `(k/(r+1)) * (r+1)/56 = k/56` je Stein (bei n = 1);
+ausserhalb senkt er es. Das Potential aendert sich also mit JEDEM Draft-Zug,
+und die Differenz zur Wurzel ist genau der Beitrag des Zugs zur Huelle.
+
+**Bau:** `envelope::projected_occupancy`/`envelope_score_projected`, Schalter
+`MOSAIC_ENVELOPE_PROJECTED=1` (prozessweit, OnceLock; unkritisch fuer den
+Spiegelmatch, weil der Term je Seite ueber `envelope_search_c` aus der
+SearchConfig gegated ist -- die Kontrollseite mit `c = 0` sieht ihn nie),
+der Such-Term (e) rechnet dann `H_proj` statt `H`. Der Tiling-Term (d)
+bleibt auf dem Raster (dort ist die Projektion ohnehin realisiert).
+Default 0 = Bestand (byte-identisch), Paritaets-Gate wie par.8.4.
+
+**Arme (vorab):** `C_HULL` **0,2 / 0,5 / 1,0** mit `MOSAIC_ENVELOPE_PROJECTED=1`,
+Profil unveraendert. Groessenordnung: ein Stein bewegt `H_proj` um 1/56 =
+0,018, eine ganze Reihe 5 um 0,09; bei `C = 0,5` ergibt eine Reihe innerhalb
+gegen ausserhalb der Huelle rund 0,09 Blattwert -- die Groesse einer
+Spalte im K1-Term. Instrumente und Verdikte wie par.8.4; primaer das
+argmax-Spaltenprofil (b01 0,515), dazu Huellen-Deckung H und Runden-1/2-
+Stabilitaet (Nutzer-Ziel: "die ersten Runden stabiler") als H am Ende von
+Runde 2 aus den Arena-Logs.
+
+## par.8.8 K3-B: die Huelle als Vorzugsschicht, inklusive Kuppelplatten (Nutzer 2026-09-03, 21:15: "Werden die Kuppelplatten entsprechend gelegt, um die Huelle zu unterstuetzen?")
+
+**Antwort auf die Frage: bisher NEIN.** K3 (par.8.2/8.3) und K3-P (par.8.7)
+lassen die Kuppelplatten-Wahl unberuehrt; sie wirkt nur mittelbar (eine
+Platte in der Huelle schafft annehmende Zielzellen, die H_proj heben). Die
+Maschinerie fuer eine direkte Lenkung gibt es aber seit dem Plattenbauer
+(`plate_builder.rs`, Nutzer-Vorgabe 2026-08-24: "die notwendigen/
+vorteilhaften kuppelplatten sollten dann ebenfalls dementsprechend gelegt
+werden"): `dome_preference_for_cells_weighted` bewertet Slot und Rotation
+einer Platte danach, welche ihrer vier Zellen in der Zielmenge liegen, wie
+die Zielkarte sie gewichtet und ob die geforderte Farbe zur Farbe der
+zugehoerigen Musterreihe passt (`column_build::cell_value`, Jackpot bei
+Uebereinstimmung). Dasselbe fuer Draft (`preference_move_for_cells_weighted`)
+und Tiling (`tiling_preference_for_cells_weighted`).
+
+**Bau: `MOSAIC_PLATTENBAU=8` = Huellen-Bauer.** Zielmenge = die 21 Zellen der
+bestpassenden Dreiecks-Huelle (Orientierung per Kostenvergleich der beiden
+Kandidaten wie bei jedem Bauer, `target_index_generic`, Seed-Streuung bei
+Gleichstand), Zielkarte = Zellenkosten `r + 1` (par.8.1: Zeile 5 zaehlt
+sechsfach). Alle drei Vorzuege ueber die generische Zellen-Mechanik, kein
+neuer Code in den Bewertungen. Wie jeder Bauer ist das eine
+UEBERSTEUERUNG des Netzzugs, wo der Bauer einen Vorschlag hat (Runde 1-4),
+kein Blattwert-Term -- das ist bewusst die Bauform des hv2-Lehrers, dessen
+Huelle 0,68 Deckung erreicht (Lehrer-Prereg par.3b.14).
+
+**Messung (vorab):** prozessweiter Knopf, also NICHT Netz-gegen-Netz im
+selben Prozess (Spiegel). Instrumente: (1) argmax-Profil @400, 200 Partien,
+Seed 20260931 (b01 0,515 volle Spalten, H am Ende rund 0,49 in der Arena):
+volle Spalten, Huellen-Deckung H am Ende und **nach Runde 2** (Nutzer-Ziel:
+stabile fruehe Runden), Punkte; (2) Staerke gegen `Heuristik_hv1_anchor`@150
+per `net_arena_match` (die Heuristik-Seite kennt den Bauer nicht) mit und
+ohne Bauer, gleiche Seeds, 2 x 80, Blockgroesse 5; (3) als Generator-Frage:
+liefert der Bauer ein Korpus, das dem Netz die Huelle beibringt -- das ist
+die Frage von v24 (Arm b02/b03 der v24-Prereg), nicht dieser Messung.
+Verdikt wie par.8.4; zusaetzlich: steigt H nach Runde 2 signifikant ohne
+Punktverlust, ist der Bauer der Kandidat fuer die v24-Erzeugung
+("stabilere erste Runden"), auch wenn die Spalten unbewegt bleiben.
+
+Reihenfolge: K3-P (par.8.7) und K3-B (par.8.8) werden nach der Nachtkette
+gebaut (Wheel-Wechsel waehrend laufender Laeufe ist nicht moeglich) und in
+EINEM Bau mit Paritaets-Gate abgenommen; dann Messung beider.
+
