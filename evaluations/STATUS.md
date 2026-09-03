@@ -24,20 +24,64 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-09-02, 05:30, nach dem Nachtprogramm)
+## 1. WAS GERADE LAEUFT (Uebergabe 2026-09-03, 09:00 -- Sitzungswechsel wegen Kontextende)
 
-**NICHTS.** GPU und CPU sind frei. Der Baum ist committet, ungepusht. In
-`data/` liegen die 1.745 hv2-Dateien des Fensters plus 8
-`selfplay_s4states-v23b01_*` und 20 `selfplay_tor2a-v23b06_*` (1.797 pkl);
-keine Unterordner. **Alles Restaurierte liegt wieder draussen** (Nutzer,
-2026-09-02 frueh): `archive_pre_v24`, `relabeled_v23` und die 600
-v22-b05-Dateien samt Manifesten unter `<Sicherungswurzel>/archive_pre_v24/`
-(die b05-Dateien im Unterordner `v23_window_b05`). Damit sind
-`window_v23.txt` und `window_v23_relab.txt` ohne Rueckkopie nicht fahrbar.
-**Toter Cache in `data/`:** der Monolith `.cache_29e6903028d2.h5` (1,14 GB)
-und rund 1.200 Bloecke der v22-b05-Dateien (600 ohne, 600 mit
-`ignore_ptv`-Schluessel) haben keinen Verbraucher mehr; Loeschen nur auf
-Freigabe. Plattenplatz ist kein Thema (1,9 TB frei).
+**LAEUFT: der Reanalyze-Relabel fuer `v23-b07`** (`tools/relabel_drafts_with_net.py`,
+8 Worker, seit 2026-09-02 22:37; Stand 09:00: 184 von 200 Dateien in
+`data/relabeled_v23_deep/`, Ende gegen 09:45). Er schreibt am Ende
+`evaluations/artifacts/relabel_net_relabeled_v23_deep.json`. **Er liest die
+200 Policy-Quelldateien aus `<Sicherungswurzel>/archive_pre_v24/v23_window_b05/`;
+der Ordner bleibt, bis der Lauf durch ist.** GPU frei. Baum committet,
+ungepusht (rund 40 Commits seit dem 2026-09-01).
+
+### ERSTE AUFGABE DER NEUEN SITZUNG (Nutzer-Freigabe 2026-09-03: alles ausser der v24-Erzeugung selbststaendig)
+
+1. **Watcher bauen** (Monitor mit until-Schleife, kein Sleep-Polling): fertig,
+   wenn `ls data/relabeled_v23_deep/selfplay_v22-b05deep-policy_*.pkl | wc -l`
+   gleich 200 ist UND `evaluations/artifacts/relabel_net_relabeled_v23_deep.json`
+   existiert. Dann die Kennzahlen des Artefakts in
+   `PREREG_reanalyze_label_depth.md` par.A4 nachtragen (relabelt / kein
+   Steinzug / nicht abbildbar / Laufzeit) und den Nutzer informieren.
+2. **b07-Kette starten:** `bash tools/night_b07_chain.sh` im Hintergrund
+   (Kopie der 200 Deep-Dateien nach `data/`, Traeger-Manifest 380, Bloecke
+   unter der Trainings-Umgebung, Split, Monolith unter dem train.py-Schluessel,
+   Training 12 Epochen auf der GPU, rund 2,5 h). Manifest-Diff gegen b01
+   danach: erwartet GENAU `name`, `file_list`, `val_pool`, `surprise_alpha`.
+3. **Waehrend b07 trainiert (ein CPU-Auftrag neben der GPU):** K1 bauen und
+   am `v23-b01_brierbest` messen, Bauvorlage `PREREG_saturating_score_utility.md`
+   par.14 (alles entschieden: Marge aus Punkte- und Gegnerpunkte-Kopf,
+   `x0` Wurzelmarge, `b = 20`, Klammerung, Knoepfe `MOSAIC_SCORE_UTILITY_C/_B`
+   Default 0, Paritaets-Gate, Anker-Invarianz, env-A/B-Arena c 0,1/0,2/0,3,
+   Blockgroesse 5, n >= 150 Paare, argmax-Spaltenprofil).
+4. **Nach dem Training:** b07 abnehmen (`night_run_20260902.md` N3: Orakel
+   auf frozen_v1/v18 und frozen_v3/v21, argmax @400 Seed 20260931, Arena 2 x 80
+   Seed 20260999 Blockgroesse 5, `arena_column_probe`), registrieren als
+   par.A5, Kopf, `generation_naming.md`.
+5. **K3 bauen** nach `PREREG_geometric_envelope.md` par.8 (Profil aus par.8.5,
+   Gewichte 0,1/0,2 und 0,5/1,0). **Vorher beim Nutzer klaeren:** par.8.6
+   (Value-Anteil im Tiling als Margen-Vorhersage in Punkten, Vorpruefung
+   bestanden) ist VORSCHLAG -- bestaetigt er, ersetzt 8.6 den Absatz 8.3 samt
+   Stichentscheid; sonst 8.3.
+6. **v24-Material-Pilot** (`night_run_20260902.md` N2) in einem freien
+   CPU-Fenster; registrieren in `PREREG_v24_window.md` par.7.
+7. **Aufraeumen:** die 400 `selfplay_v22-b05-value-*` in `data/` sind eine
+   Kopie fuer das b07-Training; nach b07 wieder entfernen (Original in
+   `<Sicherungswurzel>/archive_pre_v24/v23_window_b05/`). Danach kann der
+   ganze Ordner `archive_pre_v24` weg (alles im restic-Snapshot e77c2d7c);
+   dann Fundorte in Reachability-, frozen_v3- und Lehrer-Prereg auf den
+   Snapshot stellen.
+8. **NICHT:** die v24-Erzeugung (`PREREG_v24_window.md` par.6) -- nur auf
+   Nutzer-Anweisung.
+
+### Stand der v24-Vorbereitung (vollstaendig registriert)
+
+`PREREG_v24_window.md` par.6 (Rezept) und par.8 (Arme b01/b02/b03, Knoepfe
+K1/K3; K2 gegenstandslos), `generation_loop.md` (Gleichstandsregel),
+`start_position_seeding` par.7 (b03-Kuratierung), `saturating_score_utility`
+par.14 (K1 baureif), `geometric_envelope` par.8 (K3 baureif, 8.6 offen).
+Index: 18 OFFEN, 79 ENTSCHIEDEN, 8 UEBERHOLT. Chronik der letzten Naechte:
+`night_run_20260901.md`, `night_run_20260902.md`.
+
 
 ### Was die Nacht 2026-09-01/02 ergeben hat (Chronik: `night_run_20260901.md`)
 
