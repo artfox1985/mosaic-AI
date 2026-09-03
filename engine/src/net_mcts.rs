@@ -366,6 +366,24 @@ pub struct SearchConfig {
     /// dagegen um Faktor ~3 (Policy-Masse 11,5 % gegen 25,2 %, flach ueber
     /// R1-4). Deshalb Stufenfunktion 0->1, kein Rampenterm.
     pub long_row_init_shaping_w: f64,
+    /// K1 (`PREREG_saturating_score_utility.md` par.14): Gewicht `c` der
+    /// saettigenden, re-zentrierten Margen-Utility am Netz-Blattwert,
+    /// `u = c * (2/pi) * atan((x - x0) / b)` mit `x` der Punktemarge des
+    /// Blatts (Punkte- minus Gegnerpunkte-Kopf, Punkteeinheiten) und `x0`
+    /// derselben Marge an der Wurzel. Default `0.0` = aus, byte-identisches
+    /// Bestandsverhalten (der Block wird komplett uebersprungen).
+    pub score_utility_c: f64,
+    /// Breite `b` der Saettigung in Punkten (par.14.1: Referenzsetzung 20,
+    /// Nutzer-Entscheid 2026-09-03). Nur wirksam bei `score_utility_c != 0`.
+    pub score_utility_b: f64,
+    /// Wurzelmarge `x0` in Punkten, ABSOLUT (Spieler 0 minus Spieler 1),
+    /// beim Wurzelaufbau in `build_gumbel_tree`/`build_net_tree` aus dem
+    /// Wurzel-Forecast gesetzt (`with_root_margin`) und ueber die Config an
+    /// jedes Blatt gereicht -- bewusst KEIN prozessweiter Cache (Regel
+    /// "prozessweite Knoepfe: kein Spiegelmatch"). `None` ausserhalb einer
+    /// Suche, bei `c == 0` oder wenn das Netz keinen der beiden Koepfe hat;
+    /// dann ist der Term aus.
+    pub score_utility_root_margin: Option<f64>,
 }
 
 impl SearchConfig {
@@ -390,6 +408,9 @@ impl SearchConfig {
         Self {
             implicit_minimax_alpha: read_f64_env("MOSAIC_IMPLICIT_MINIMAX_A", 0.0),
             long_row_init_shaping_w: read_f64_env("MOSAIC_LONG_ROW_INIT_W", 0.0),
+            score_utility_c: read_f64_env("MOSAIC_SCORE_UTILITY_C", 0.0),
+            score_utility_b: read_f64_env("MOSAIC_SCORE_UTILITY_B", SCORE_UTILITY_B_DEFAULT),
+            score_utility_root_margin: None,
         }
     }
 
@@ -408,8 +429,13 @@ impl SearchConfig {
         let obj = value
             .as_object()
             .ok_or_else(|| format!("Spec-Datei {path}: JSON-Wurzel muss ein Objekt sein"))?;
-        const KNOWN_FIELDS: &[&str] =
-            &["implicit_minimax_alpha", "long_row_init_shaping_w", "heuristik_variante"];
+        const KNOWN_FIELDS: &[&str] = &[
+            "implicit_minimax_alpha",
+            "long_row_init_shaping_w",
+            "score_utility_c",
+            "score_utility_b",
+            "heuristik_variante",
+        ];
         for key in obj.keys() {
             if !KNOWN_FIELDS.contains(&key.as_str()) {
                 return Err(format!(
@@ -434,6 +460,13 @@ impl SearchConfig {
         // die "beweisbar identisch"-Zusage aushebeln.
         let implicit_minimax_alpha = get_required("implicit_minimax_alpha")?;
         let long_row_init_shaping_w = get_required("long_row_init_shaping_w")?;
+        // K1 (PREREG_saturating_score_utility.md par.14): dieselbe Pflicht-
+        // Regel. Eine Spec aus der Zeit vor K1 wird damit abgelehnt -- das
+        // ist gewollt (siehe oben: eingefrorene Artefakte laufen auf ihrem
+        // mitgelieferten Wheel); die lebenden `models/*.spec.json` tragen die
+        // beiden Felder seit dem K1-Bau.
+        let score_utility_c = get_required("score_utility_c")?;
+        let score_utility_b = get_required("score_utility_b")?;
         // Das Feld bleibt PFLICHT, obwohl es seit 2026-08-26 nur noch einen
         // gueltigen Wert hat: die Specs der eingefrorenen Artefakte tragen es,
         // und ein weggelassenes Pflichtfeld waere ein stiller Vertragsbruch.
@@ -472,7 +505,13 @@ impl SearchConfig {
                  weiter auf seinem mitgelieferten Wheel."
             ));
         }
-        Ok(Self { implicit_minimax_alpha, long_row_init_shaping_w })
+        Ok(Self {
+            implicit_minimax_alpha,
+            long_row_init_shaping_w,
+            score_utility_c,
+            score_utility_b,
+            score_utility_root_margin: None,
+        })
     }
 }
 
@@ -1431,6 +1470,138 @@ fn blended_leaf_win_prob_with(
     (1.0 - w) * wr + w * u_pts
 }
 
+// ── K1: saettigende, re-zentrierte Margen-Utility im Blattwert ─────────────
+// PREREG_saturating_score_utility.md par.14 (registriert 2026-09-03, VOR dem
+// Bau). Formel:
+//     x  = 50*atanh(clamp(p_own)) - 50*atanh(clamp(p_opp))   (Punkte, ego)
+//     x0 = dieselbe Rechnung an der Wurzel, einmal je Suche
+//     u  = c * (2/pi) * atan((x - x0) / b)                    in [-c, +c]
+//     U  = clamp(wr + u, 0, 1)                                (K1-A, Klammerung)
+// `u` ist antisymmetrisch um `x0`: ein Blatt, das genau die Wurzelerwartung
+// haelt, bekommt `u = 0` und damit exakt den heutigen Blattwert. Der Term
+// wirkt NUR auf netzbewertete Blaetter (`node_from_net_outputs`); der
+// Round-5-Anker (`round5_anchor.rs`) und `POINTS_UTILITY_WEIGHT`/Task-#28-`w`
+// bleiben unberuehrt (Waechter 1 und 2, par.10).
+
+/// Referenzsetzung `b = 20` Punkte (par.14.5 Punkt 2, Nutzer 2026-09-03).
+pub const SCORE_UTILITY_B_DEFAULT: f64 = 20.0;
+/// Punkte je tanh-Einheit der Punkte-Koepfe -- dieselbe Ruecktransformation
+/// wie `tools/r5_value_calibration.py::points_to_pts` (`50 * atanh(p)`).
+pub const SCORE_UTILITY_MARGIN_SCALE: f64 = 50.0;
+/// Klammerung vor `atanh` (par.14.1): 0,995 entspricht |Marge| ~150 Punkten,
+/// jenseits jedes Endstands; der Anteil geklammerter Blaetter wird gezaehlt.
+pub const SCORE_UTILITY_M_MAX: f64 = 0.995;
+
+static SCORE_UTILITY_LEAVES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static SCORE_UTILITY_MARGIN_CLAMPED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static SCORE_UTILITY_UNIT_CLAMPED: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+static WARNED_NO_HEADS_SCORE_UTILITY: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+
+/// Einmalige Warnung (Muster `warn_missing_opp_head_once`): `c != 0`
+/// konfiguriert, aber das Netz hat keinen `points`- oder `opp_points`-Kopf
+/// -- der Term ist dann aus (`u = 0`), kein stilles Ignorieren.
+fn warn_missing_heads_score_utility_once() {
+    WARNED_NO_HEADS_SCORE_UTILITY.get_or_init(|| {
+        eprintln!(
+            "⚠️  MOSAIC_SCORE_UTILITY_C != 0 gesetzt, aber das geladene Netz hat keinen \
+             points- oder opp_points-Kopf -- Margen-Utility aus (u = 0, \
+             PREREG_saturating_score_utility.md par.14.3)."
+        );
+    });
+}
+
+/// Punktemarge `x` eines Blatts aus Punkte- und Gegnerpunkte-Kopf (beide
+/// tanh-Skala, EGO-perspektivisch wie die Koepfe selbst), in Punkten.
+/// Rueckgabe `(x, geklammert)`; `None`, wenn einer der Koepfe fehlt.
+pub(crate) fn score_margin_points(points: &[f32], opp_points: &[f32]) -> Option<(f64, bool)> {
+    let p_own = *points.first()? as f64;
+    let p_opp = *opp_points.first()? as f64;
+    let clamped = p_own.abs() > SCORE_UTILITY_M_MAX || p_opp.abs() > SCORE_UTILITY_M_MAX;
+    let own = SCORE_UTILITY_MARGIN_SCALE * p_own.clamp(-SCORE_UTILITY_M_MAX, SCORE_UTILITY_M_MAX).atanh();
+    let opp = SCORE_UTILITY_MARGIN_SCALE * p_opp.clamp(-SCORE_UTILITY_M_MAX, SCORE_UTILITY_M_MAX).atanh();
+    Some((own - opp, clamped))
+}
+
+/// Reiner Term `u = c * (2/pi) * atan((x - x0) / b)` -- ohne Zustand, ohne
+/// Env, direkt testbar (`u(x0) = 0`, Antisymmetrie, Saettigung bei `|c|`).
+pub(crate) fn score_utility_term(x: f64, x0: f64, c: f64, b: f64) -> f64 {
+    c * std::f64::consts::FRAC_2_PI * ((x - x0) / b).atan()
+}
+
+/// Wendet K1 auf den Blattwert `[Spieler 0, Spieler 1]` an. `points`/
+/// `opp_points` sind die Rohausgaben des MOVER-Passes (ego zu
+/// `state.current_player`); die Marge wird auf die absolute Perspektive
+/// (Spieler 0 minus Spieler 1) gedreht, damit sie mit `x0` (ebenfalls
+/// absolut, siehe `with_root_margin`) vergleichbar ist. Nullsummen-Additiv
+/// wie das Floor-Shaping, danach Klammerung auf [0, 1] (K1-A). Bei
+/// fehlendem `x0` oder fehlenden Koepfen: unveraendert.
+fn apply_score_utility(
+    mut v: [f64; 2],
+    state: &GameState,
+    points: &[f32],
+    opp_points: &[f32],
+    cfg: &SearchConfig,
+) -> [f64; 2] {
+    let Some(x0) = cfg.score_utility_root_margin else {
+        return v;
+    };
+    let Some((x_ego, margin_clamped)) = score_margin_points(points, opp_points) else {
+        warn_missing_heads_score_utility_once();
+        return v;
+    };
+    let x_abs = if state.current_player == 0 { x_ego } else { -x_ego };
+    let u = score_utility_term(x_abs, x0, cfg.score_utility_c, cfg.score_utility_b);
+    let raw0 = v[0] + u;
+    let raw1 = v[1] - u;
+    let unit_clamped = !(0.0..=1.0).contains(&raw0) || !(0.0..=1.0).contains(&raw1);
+    SCORE_UTILITY_LEAVES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    if margin_clamped {
+        SCORE_UTILITY_MARGIN_CLAMPED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    if unit_clamped {
+        SCORE_UTILITY_UNIT_CLAMPED.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    v[0] = raw0.clamp(0.0, 1.0);
+    v[1] = raw1.clamp(0.0, 1.0);
+    v
+}
+
+/// Setzt `x0` fuer die laufende Suche aus dem Wurzel-Forecast
+/// (`Node::points_forecast`/`opp_points_forecast`, ego zum Wurzelspieler,
+/// hier auf absolut gedreht). Bei `c == 0` wird die Config UNVERAENDERT
+/// kopiert (`x0` bleibt `None`): kein Rechenpfad, byte-identisch. Fehlt ein
+/// Kopf, bleibt `x0` `None` und der Term ist fuer die ganze Suche aus (die
+/// Warnung faellt dann am ersten Blatt).
+fn with_root_margin(cfg: &SearchConfig, root: &Node) -> SearchConfig {
+    if cfg.score_utility_c == 0.0 {
+        return *cfg;
+    }
+    let margin = match (root.points_forecast, root.opp_points_forecast) {
+        (Some(p), Some(o)) => score_margin_points(&[p], &[o])
+            .map(|(x, _)| if root.state.current_player == 0 { x } else { -x }),
+        _ => None,
+    };
+    SearchConfig { score_utility_root_margin: margin, ..*cfg }
+}
+
+/// Snapshot `(blaetter, marge_geklammert, einheit_geklammert)` der K1-Zaehler
+/// (par.14.1/14.2: "Anteil geklammerter Blaetter wird gezaehlt und
+/// berichtet"). Muster `denial_tiebreak_stats`.
+pub fn score_utility_stats() -> (u64, u64, u64) {
+    (
+        SCORE_UTILITY_LEAVES.load(std::sync::atomic::Ordering::Relaxed),
+        SCORE_UTILITY_MARGIN_CLAMPED.load(std::sync::atomic::Ordering::Relaxed),
+        SCORE_UTILITY_UNIT_CLAMPED.load(std::sync::atomic::Ordering::Relaxed),
+    )
+}
+
+/// Setzt die drei K1-Zaehler zurueck (Muster `reset_denial_tiebreak_stats`).
+pub fn reset_score_utility_stats() {
+    SCORE_UTILITY_LEAVES.store(0, std::sync::atomic::Ordering::Relaxed);
+    SCORE_UTILITY_MARGIN_CLAMPED.store(0, std::sync::atomic::Ordering::Relaxed);
+    SCORE_UTILITY_UNIT_CLAMPED.store(0, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Verschraenkung (Weg V, `net_batcher.rs`): versucht `feats`s EINZELNE Zeile
 /// ueber den fuer `net` registrierten Sammel-Faden auszuwerten (4-Tupel,
 /// gleicher Vertrag wie `Net::eval`) statt ueber `Net::eval` direkt. `None`
@@ -1870,6 +2041,15 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             }
             let mut today_value =
                 if state.current_player == 0 { [mover_val, other_val] } else { [other_val, mover_val] };
+
+            // K1 (PREREG_saturating_score_utility.md par.14.3): re-zentrierte
+            // Margen-Utility ADDITIV direkt hinter dem Rueckgabewert von
+            // `blended_leaf_win_prob` (`U = clamp(wr + u, 0, 1)`), VOR
+            // Shrinkage und den Zustands-Additiven. Bei `c == 0` (Default)
+            // wird der Block KOMPLETT uebersprungen: byte-identisch.
+            if search_config.score_utility_c != 0.0 {
+                today_value = apply_score_utility(today_value, &state, &points, &opp_points, search_config);
+            }
 
             // Task #78 (v12c Shrinkage) -- NACH blended_leaf_win_prob (oben),
             // aber VOR dem Floor-Shaping-Additiv (unten): das exakte
@@ -3531,6 +3711,10 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
     let root_player = root_state.current_player;
     let mut nodes =
         vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)];
+    // K1: `x0` einmal je Suche aus dem Wurzel-Forecast; alle weiteren Knoten
+    // dieser Suche lesen die Kopie mit gesetzter Wurzelmarge.
+    let root_config = with_root_margin(search_config, &nodes[0]);
+    let search_config = &root_config;
 
     if let Some(t) = trace.as_deref_mut() {
         t.determinize_active = DETERMINIZE_ROOT_HIDDEN_INFO;
@@ -3945,6 +4129,9 @@ fn build_net_tree<R: Rng + ?Sized>(
     let root_player = root_state.current_player;
     let mut nodes =
         vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)];
+    // K1: siehe `build_gumbel_tree`.
+    let root_config = with_root_margin(search_config, &nodes[0]);
+    let search_config = &root_config;
 
     macro_rules! logln {
         ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
@@ -5973,8 +6160,8 @@ mod tests {
         nodes[0].children.push(1);
         nodes[0].children.push(2);
 
-        let cfg_off = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0 };
-        let cfg_on = SearchConfig { implicit_minimax_alpha: 1.0, long_row_init_shaping_w: 0.0 };
+        let cfg_off = SearchConfig { implicit_minimax_alpha: 0.0, ..search_config_off() };
+        let cfg_on = SearchConfig { implicit_minimax_alpha: 1.0, ..search_config_off() };
         let idx_off = gumbel_select_child(&nodes, 0, &cfg_off);
         let idx_on = gumbel_select_child(&nodes, 0, &cfg_on);
         assert_ne!(
@@ -5991,6 +6178,18 @@ mod tests {
     // folgenden Tests untereinander, gleiches Kompromiss-Muster wie
     // `DENIAL_TIEBREAK_TEST_LOCK`/`AGGRESSION_TEST_LOCK`.
     static SEARCH_CONFIG_ENV_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// Alle Knoepfe aus, env-unabhaengig (Bestandsverhalten) -- fuer Tests,
+    /// die eine Config brauchen, ohne die Umgebung zu lesen.
+    fn search_config_off() -> SearchConfig {
+        SearchConfig {
+            implicit_minimax_alpha: 0.0,
+            long_row_init_shaping_w: 0.0,
+            score_utility_c: 0.0,
+            score_utility_b: SCORE_UTILITY_B_DEFAULT,
+            score_utility_root_margin: None,
+        }
+    }
 
     // ── Langreihen-Initiierungs-Additiv (PREREG_long_row_payoff.md par.3/B1) ──
 
@@ -6099,7 +6298,7 @@ mod tests {
     fn search_config_from_spec_file_rejects_hv2_variant() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_hv2_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "hv2"}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "heuristik_variante": "hv2"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "eine hv2-Spec darf in diesem Build NICHT still als hv1 laufen");
         let msg = result.unwrap_err();
@@ -6125,7 +6324,7 @@ mod tests {
             std::fs::write(
                 &path,
                 format!(
-                    r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "{old}"}}"#
+                    r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "heuristik_variante": "{old}"}}"#
                 ),
             )
             .unwrap();
@@ -6143,12 +6342,150 @@ mod tests {
     fn search_config_from_spec_file_accepts_hv1() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_hv1_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.25, "long_row_init_shaping_w": 0.3, "heuristik_variante": "hv1"}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.25, "long_row_init_shaping_w": 0.3, "score_utility_c": 0.0, "score_utility_b": 20.0, "heuristik_variante": "hv1"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         std::fs::remove_file(&path).ok();
         let cfg = result.expect("hv1 muss angenommen werden");
         assert_eq!(cfg.implicit_minimax_alpha, 0.25);
         assert_eq!(cfg.long_row_init_shaping_w, 0.3);
+        assert_eq!(cfg.score_utility_c, 0.0);
+        assert_eq!(cfg.score_utility_b, 20.0);
+        assert_eq!(cfg.score_utility_root_margin, None, "x0 kommt nie aus einer Spec");
+    }
+
+    /// K1: eine Spec OHNE die beiden Score-Utility-Felder wird abgelehnt
+    /// (Pflichtfeld-Regel, gleiche Zusage wie fuer `long_row_init_shaping_w`).
+    #[test]
+    fn search_config_from_spec_file_requires_score_utility_fields() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_k1missing_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "hv1"}"#).unwrap();
+        let result = SearchConfig::from_spec_file(path.to_str().unwrap());
+        std::fs::remove_file(&path).ok();
+        let msg = result.expect_err("Spec ohne score_utility_c muss scheitern");
+        assert!(msg.contains("score_utility_c"), "Meldung muss das fehlende Feld nennen: {msg}");
+    }
+
+    /// K1-Knoepfe aus der Umgebung: Defaults `c = 0` (aus) und `b = 20`.
+    #[test]
+    fn search_config_from_env_score_utility_defaults() {
+        let _guard = SEARCH_CONFIG_ENV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        std::env::remove_var("MOSAIC_SCORE_UTILITY_C");
+        std::env::remove_var("MOSAIC_SCORE_UTILITY_B");
+        let cfg = SearchConfig::from_env();
+        assert_eq!(cfg.score_utility_c, 0.0);
+        assert_eq!(cfg.score_utility_b, SCORE_UTILITY_B_DEFAULT);
+        assert_eq!(cfg.score_utility_root_margin, None);
+    }
+
+    /// K1-Knoepfe aus der Umgebung: gesetzte Werte kommen an (kein Cache).
+    #[test]
+    fn search_config_from_env_score_utility_reads_set_values() {
+        let _guard = SEARCH_CONFIG_ENV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let prev_c = std::env::var("MOSAIC_SCORE_UTILITY_C").ok();
+        let prev_b = std::env::var("MOSAIC_SCORE_UTILITY_B").ok();
+        std::env::set_var("MOSAIC_SCORE_UTILITY_C", "0.2");
+        std::env::set_var("MOSAIC_SCORE_UTILITY_B", "10");
+        let cfg = SearchConfig::from_env();
+        assert_eq!(cfg.score_utility_c, 0.2);
+        assert_eq!(cfg.score_utility_b, 10.0);
+        for (name, prev) in [("MOSAIC_SCORE_UTILITY_C", prev_c), ("MOSAIC_SCORE_UTILITY_B", prev_b)] {
+            match prev {
+                Some(v) => std::env::set_var(name, v),
+                None => std::env::remove_var(name),
+            }
+        }
+    }
+
+    /// K1 par.14.3, Paritaets-Gate Teil 1: `u(x0) = 0` (ein Blatt, das genau
+    /// die Wurzelerwartung haelt, behaelt exakt den heutigen Blattwert) und
+    /// Antisymmetrie um `x0`.
+    #[test]
+    fn score_utility_term_is_zero_at_root_margin_and_antisymmetric() {
+        for x0 in [-30.0, 0.0, 12.5] {
+            assert_eq!(score_utility_term(x0, x0, 0.2, 20.0), 0.0);
+            for d in [0.5, 7.0, 30.0, 400.0] {
+                let plus = score_utility_term(x0 + d, x0, 0.2, 20.0);
+                let minus = score_utility_term(x0 - d, x0, 0.2, 20.0);
+                assert!((plus + minus).abs() < 1e-12, "u({x0}+{d}) + u({x0}-{d}) = {}", plus + minus);
+                assert!(plus > 0.0 && plus <= 0.2, "u in (0, c]: {plus}");
+            }
+        }
+    }
+
+    /// par.14.1, Zahlenbeispiel: +7 Punkte (eine Spalte) bei b = 20 und
+    /// c = 0,2 ergeben 0,043; +30 Punkte "0,127" -- exakt sind es 0,1251
+    /// (0,2 * 2/pi * atan(1,5)); die Prereg-Zahl ist gerundet, deshalb
+    /// Toleranz 0,002. Nie mehr als 0,2.
+    #[test]
+    fn score_utility_term_matches_prereg_examples() {
+        let u7 = score_utility_term(7.0, 0.0, 0.2, 20.0);
+        let u30 = score_utility_term(30.0, 0.0, 0.2, 20.0);
+        let u_inf = score_utility_term(1.0e9, 0.0, 0.2, 20.0);
+        assert!((u7 - 0.043).abs() < 0.001, "u(+7) = {u7}");
+        assert!((u30 - 0.1251).abs() < 0.0005, "u(+30) = {u30}");
+        assert!((u_inf - 0.2).abs() < 1e-6 && u_inf <= 0.2, "Saettigung bei c: {u_inf}");
+    }
+
+    /// Margen-Ruecktransformation: `50 * atanh(p)` je Kopf, Differenz in
+    /// Punkten; Klammerung bei |p| > 0,995 wird gemeldet; fehlender Kopf
+    /// ergibt `None`.
+    #[test]
+    fn score_margin_points_matches_points_to_pts_and_flags_clamp() {
+        let (x, clamped) = score_margin_points(&[0.2], &[-0.1]).unwrap();
+        let expect = 50.0 * (0.2f32 as f64).atanh() - 50.0 * (-0.1f32 as f64).atanh();
+        assert!((x - expect).abs() < 1e-12, "{x} vs {expect}");
+        assert!(!clamped);
+        let (_, clamped) = score_margin_points(&[0.999], &[0.0]).unwrap();
+        assert!(clamped, "|p| > m_max muss als geklammert zaehlen");
+        assert_eq!(score_margin_points(&[0.2], &[]), None);
+        assert_eq!(score_margin_points(&[], &[0.2]), None);
+    }
+
+    /// Paritaets-Gate Teil 2: `with_root_margin` bei `c == 0` ist die
+    /// unveraenderte Kopie (`x0` bleibt `None`); bei `c != 0` wird `x0` aus
+    /// dem Wurzel-Forecast gesetzt und auf Spieler-0-Perspektive gedreht.
+    #[test]
+    fn with_root_margin_is_identity_when_c_is_zero_and_flips_for_player_one() {
+        let mut root = gumbel_test_node(0.0, 0, 0.0, 0);
+        root.points_forecast = Some(0.2);
+        root.opp_points_forecast = Some(-0.1);
+        let off = search_config_off();
+        assert_eq!(with_root_margin(&off, &root), off);
+        let on = SearchConfig { score_utility_c: 0.2, ..off };
+        let (x_ego, _) = score_margin_points(&[0.2], &[-0.1]).unwrap();
+        root.state.current_player = 0;
+        assert_eq!(with_root_margin(&on, &root).score_utility_root_margin, Some(x_ego));
+        root.state.current_player = 1;
+        assert_eq!(with_root_margin(&on, &root).score_utility_root_margin, Some(-x_ego));
+        root.opp_points_forecast = None;
+        assert_eq!(with_root_margin(&on, &root).score_utility_root_margin, None, "ohne Kopf kein x0");
+    }
+
+    /// `apply_score_utility`: Nullsummen-Additiv, Perspektivdrehung fuer
+    /// Spieler 1, Klammerung auf [0, 1] mit Zaehlung; ohne `x0` unveraendert.
+    #[test]
+    fn apply_score_utility_is_zero_sum_perspective_aware_and_clamped() {
+        let mut state = gumbel_test_node(0.0, 0, 0.0, 0).state;
+        let cfg_no_x0 = SearchConfig { score_utility_c: 0.2, ..search_config_off() };
+        assert_eq!(apply_score_utility([0.4, 0.6], &state, &[0.5], &[0.0], &cfg_no_x0), [0.4, 0.6]);
+        let cfg = SearchConfig { score_utility_root_margin: Some(0.0), ..cfg_no_x0 };
+        let (x, _) = score_margin_points(&[0.5], &[0.0]).unwrap();
+        let u = score_utility_term(x, 0.0, 0.2, 20.0);
+        assert!(u > 0.0);
+        state.current_player = 0;
+        let v0 = apply_score_utility([0.4, 0.6], &state, &[0.5], &[0.0], &cfg);
+        assert!((v0[0] - (0.4 + u)).abs() < 1e-12 && (v0[1] - (0.6 - u)).abs() < 1e-12, "{v0:?}");
+        state.current_player = 1;
+        let v1 = apply_score_utility([0.4, 0.6], &state, &[0.5], &[0.0], &cfg);
+        assert!((v1[0] - (0.4 - u)).abs() < 1e-12 && (v1[1] - (0.6 + u)).abs() < 1e-12, "{v1:?}");
+        state.current_player = 0;
+        let before = score_utility_stats();
+        let vc = apply_score_utility([0.95, 0.05], &state, &[0.5], &[0.0], &cfg);
+        assert_eq!(vc, [1.0, 0.0], "Klammerung auf [0, 1]");
+        let after = score_utility_stats();
+        assert_eq!(after.0 - before.0, 1);
+        assert_eq!(after.2 - before.2, 1, "Einheits-Klammerung muss gezaehlt werden");
     }
 
     /// Ein unbekannter Variantenname ist ein harter Fehler, kein Rueckfall
@@ -6158,7 +6495,7 @@ mod tests {
     fn search_config_from_spec_file_rejects_unknown_variant() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_badvariant_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "heuristik_variante": "hv2_tippfehler"}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "heuristik_variante": "hv2_tippfehler"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "unbekannte Variante muss abgewiesen werden");
         assert!(result.unwrap_err().contains("nicht mehr spielbar"));
@@ -6171,7 +6508,7 @@ mod tests {
     fn search_config_from_spec_file_requires_variant_field() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_novariant_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "fehlende heuristik_variante muss abgewiesen werden");
         std::fs::remove_file(&path).ok();
@@ -6183,7 +6520,7 @@ mod tests {
     fn search_config_from_spec_file_rejects_unknown_field() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_unknown_field_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "long_row_init_shaping_w": 0.0, "tpyo_feld": 1.0}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "tpyo_feld": 1.0}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "unbekanntes Feld muss einen Fehler ergeben, nicht still ignoriert werden");
         std::fs::remove_file(&path).ok();

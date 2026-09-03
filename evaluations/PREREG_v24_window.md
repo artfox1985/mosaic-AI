@@ -202,7 +202,7 @@ Fortschritt am g-Suffix zaehlen.
   demselben Seed, damit dieselben 180 hv2-Traeger herauskommen:
 
 ```
-python tools/generate_carrier_manifest.py --from-list data/window_v23_hv2.txt --n-files 180 --seed 20260921 --include-glob "selfplay_v23-b01-policy_*.pkl" --out data/policy_carrier_manifest_v24.json
+python tools/generate_carrier_manifest.py --from-list data/window_v23_hv2.txt --n-files 180 --seed 20260921 --include-glob "selfplay_v23-b01-policy_*.pkl" --out policy_carrier_manifest_v24.json
 ```
 
   Pruefung: die 180 hv2-Eintraege muessen mit `data/carriers_v23_hv2.txt`

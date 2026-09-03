@@ -77,7 +77,13 @@ fn main() {
     // `long_row_init_shaping_w: 0.0` = Bestandsverhalten (Term aus) --
     // diese Sonde ist ein Byte-Identitaets-Nachweis, ihr Suchverhalten
     // MUSS unveraendert bleiben.
-    let search_config = SearchConfig { implicit_minimax_alpha: 0.0, long_row_init_shaping_w: 0.0 };
+    let search_config = SearchConfig {
+        implicit_minimax_alpha: 0.0,
+        long_row_init_shaping_w: 0.0,
+        score_utility_c: 0.0,
+        score_utility_b: 20.0,
+        score_utility_root_margin: None,
+    };
     let actions = drafting_actions(&state1);
     println!(
         "Kandidaten (Reihenfolge aus drafting_actions, n={}):",

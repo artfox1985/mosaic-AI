@@ -18,7 +18,7 @@ cp -n data/relabeled_v23_deep/selfplay_v22-b05deep-policy_*.pkl data/
 echo "in data/: $(ls data/selfplay_v22-b05deep-policy_*.pkl | wc -l)"
 
 echo "== 1) Traeger-Manifest (180 hv2 + 200 deep)"
-python -X utf8 tools/generate_carrier_manifest.py --from-list data/window_v23_hv2.txt --n-files 180 --seed 20260921 --include-glob "selfplay_v22-b05deep-policy_*.pkl" --out data/policy_carrier_manifest_v23_deep.json
+python -X utf8 tools/generate_carrier_manifest.py --from-list data/window_v23_hv2.txt --n-files 180 --seed 20260921 --include-glob "selfplay_v22-b05deep-policy_*.pkl" --out policy_carrier_manifest_v23_deep.json
 python - <<'EOF'
 import json
 d=json.load(open('data/policy_carrier_manifest_v23_deep.json',encoding='utf-8'))

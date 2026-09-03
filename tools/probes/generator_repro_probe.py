@@ -103,8 +103,11 @@ def _first_divergence(a, b, ignore=IDENTITY_FIELDS):
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--referenz", required=True, help="Korpusdatei aus dem Originallauf")
-    ap.add_argument("--neu", required=True, help="frisch erzeugte Datei mit demselben Rezept")
+    # Flags bleiben deutsch (Doku oben), die Bezeichner im Code englisch (Regel
+    # 2026-08-24): seit 809b41d las main() `a.reference`/`a.new`, argparse lieferte
+    # aber `a.referenz`/`a.neu` -- die Sonde brach beim ersten Aufruf ab (2026-09-03).
+    ap.add_argument("--referenz", dest="reference", required=True, help="Korpusdatei aus dem Originallauf")
+    ap.add_argument("--neu", dest="new", required=True, help="frisch erzeugte Datei mit demselben Rezept")
     ap.add_argument("--out", default="evaluations/artifacts/generator_repro.json")
     a = ap.parse_args()
 

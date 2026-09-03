@@ -105,6 +105,7 @@ def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int
         n_games = len(seeds)
 
     games: list[dict] = []
+    score_utility_stats: dict[str, int] = {}
     done, block_idx = 0, 0
     gegner = (f"{os.path.basename(model_b)}@{sims_b or net_sims}" if model_b
               else f"Heuristik@{heur_sims}(dyn)")
@@ -155,12 +156,18 @@ def run_arm(env_name: str, value: str, model: str, net_sims: int, heur_sims: int
                                f"rc={proc.returncode}: {proc.stderr[-2000:]}")
         block = json.loads(proc.stdout)
         games.extend(block)
+        # K1-Zaehler des Workers (stderr-Zeile, siehe paired_arena_arm_worker.py)
+        for line in proc.stderr.splitlines():
+            if line.startswith("SCORE_UTILITY_STATS "):
+                st = json.loads(line[len("SCORE_UTILITY_STATS "):])
+                for k, v in st.items():
+                    score_utility_stats[k] = score_utility_stats.get(k, 0) + v
         done += n
         block_idx += 1
         wins = sum(1 for g in games if g["winner"] == 0)
         print(f"  [{value}] Block {block_idx} ({block_label}, n={n}, "
               f"{time.time()-t0:.1f}s): Netz kumulativ {wins}/{done}", flush=True)
-    return games
+    return games, score_utility_stats
 
 
 def main() -> None:
@@ -235,8 +242,9 @@ def main() -> None:
     t_wall0 = time.monotonic()
 
     results: dict[str, list[dict]] = {}
+    su_stats: dict[str, dict[str, int]] = {}
     for v in args.arms:
-        results[v] = run_arm(args.env_name, v, model, args.net_sims,
+        results[v], su_stats[v] = run_arm(args.env_name, v, model, args.net_sims,
                              args.heur_sims, args.n_games, args.seed,
                              args.block_size, args.threads,
                              log_games=args.log_games, seeds=seeds,
@@ -252,6 +260,9 @@ def main() -> None:
         "n_games": n_games, "base_seed": args.seed,
         "seeds": seeds,
         "arm_wins": {}, "comparisons": {},
+        # K1: (blaetter, marge_geklammert, einheit_geklammert) je Arm, leer
+        # wenn der Knopf aus war (par.14: Klammer-Anteil wird berichtet).
+        "score_utility_stats": {v: su_stats[v] for v in args.arms},
         "games": {v: results[v] for v in args.arms},
     }
     ctrl = results[args.control]

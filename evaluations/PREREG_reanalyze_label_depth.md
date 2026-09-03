@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt tieferes Nachlabeln die Betrags-Daempfung? | Beleg: Zeile-1-Frage UNGEMESSEN (par.3 A1/A2 nie gefahren). Gefahren wurde Lehrer-Relabeln (par.4a): `v23-b05`. **par.A3 (2026-09-02): 240 Paare, 246:234 fuer b05, p = 0,65, dritter Seed dreht um; Spalten 0,676 gegen 0,642, KI schliesst Null ein -- weder Gewinn noch Schaden, b01 bleibt Generator fuer v24.** Teil B UNGEBAUT. -->
+<!-- STATUS: OFFEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt tieferes Nachlabeln die Betrags-Daempfung? | Beleg: Zeile-1-Frage im Arm `v23-b07` IM LAUF (par.A4): Relabel der 200 Policy-Dateien mit b01 @400 durch (2026-09-03, 205.854 von 210.529 Steinzug-Records relabelt, 11,0 h), Training b07 gestartet, Abnahme folgt als par.A5. Lehrer-Relabeln (par.4a) `v23-b05`: par.A3 Nullbefund (246:234, p = 0,65), b01 bleibt Generator. Teil B UNGEBAUT (kein Verbraucher bei lambda 1,0). -->
 
 # Vorregistrierung: Reanalyze -- Spielen und Labeln entkoppeln
 
@@ -451,3 +451,26 @@ zum Original (z.B. 305 Eintraege, Summe 1,0); der Top-1 bleibt in 494 von
 1.012 relabelten Records derselbe. **0,267 s je Zustand einkernig**;
 hochgerechnet rund 207.000 Zustaende, mit 8 Workern rund 2 h. Voller Lauf
 gestartet, Ausgabe `data/relabeled_v23_deep/selfplay_v22-b05deep-policy_*`.
+
+**Voller Relabel DURCH (2026-09-03, 09:36; `relabel_net_relabeled_v23_deep.json`,
+8 Worker, Quelle `<Sicherungswurzel>/archive_pre_v24/v23_window_b05`):**
+
+| Kennzahl | Wert |
+| --- | --- |
+| Dateien / Records gesamt | 200 / 685.865 |
+| kein Steinzug (Kuppel, Stapel, Chip, Pass; unveraendert) | 231.442 |
+| Kandidaten (Steinzug-Records des Spielers am Zug) | 210.529 |
+| **relabelt** | **205.854** (97,8 % der Kandidaten) |
+| keine Kandidaten (0 oder 1 legale Aktion) | 4.675 |
+| nicht abbildbar / keine Besuche / Aktionen ausserhalb der Legal-Liste | 0 / 0 / 0 |
+| Laufzeit (`laufzeit`-Block) | Wanduhr **39.569,5 s = 11,0 h**, threads 8, `s_je_zustand` 1,50 |
+
+Die Wanduhr je Kandidat liegt bei 0,188 s (39.569,5 / 210.529, Herleitung),
+also rund das 1,4-fache der einkernigen Smoke-Zahl (0,267 s) statt des
+Achtfachen: die 8 Worker haben sich die 6 Kerne mit der rayon-Suche geteilt
+(Chronik `night_run_20260902.md`, 00:33). Die Kette b07 (`tools/night_b07_chain.sh`:
+Kopie nach `data/`, Traeger-Manifest 380, Bloecke, Trainingsanteil, Monolith,
+Training) ist um 09:37 gestartet; Abweichung zum Text oben: die Deep-Dateien
+liegen als Kopie in `data/` statt ueber `--extra-data-dir`, der Manifest-Diff
+gegen b01 zeigt dann `name`, `file_list`, `val_pool`, `surprise_alpha` (kein
+`extra_data_dir`). Abnahme folgt als par.A5.
