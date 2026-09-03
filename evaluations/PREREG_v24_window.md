@@ -258,7 +258,7 @@ ein Training braucht, und dem, was ein Suchknopf am fertigen Netz ist.
 | --- | --- | --- | --- |
 | `v24-b01` | Standardrezept, Warmstart aus `v23-b01_brierbest`, Fenster par.1/par.6 | diese Datei | Kontrolle |
 | `v24-b02` | **lambda 0,7** im Value-Ziel (`--value-target-lambda 0.7`): Partieausgang mit Bootstrap-Anteil `root_q` gemischt | `lambda_v18only` (0,7 war 227:173 arena-signifikant, WDL-Aera-Grenze) | `value_target_lambda` |
-| `v24-b03` | **Seeding-Schwarm**: zusaetzliche Value-Klasse aus Startstellungen mit halbfertigen Spalten, kuratiert aus b01-Zustaenden (plattenbewusste Quelle, Wiedervorlage-Bedingung erfuellt) | `start_position_seeding` par.4d/par.5 | Fensterzusammensetzung (Zusatz-Schwarm), sonst b01 |
+| `v24-b03` | **Seeding-Schwarm**: 1.500 Stellungen aus der v24-Value-Klasse (Spieler am Zug, R2-4, Spaltenfortschritt 3-5), k = 4, 6.000 Partien `--value-only` @100 als Zusatz-Schwarm; Regel und Kosten (rund 3 h) in `start_position_seeding` par.7 | `start_position_seeding` par.7 | Fensterzusammensetzung (Zusatz-Schwarm), sonst b01 |
 
 Reanalyze Teil B (Value tief nachrechnen) wird erst fuer b02 zum Werkzeug
 mit Verbraucher (lambda < 1); ob er nachgezogen wird, entscheidet sich nach
@@ -281,7 +281,9 @@ v24-b01-Netz tragen, werden am Gewinner-Arm wiederholt, bevor sie ins
 Rezept gehen (ein Knopf, ein Netz, eine Messung -- keine Kreuzprodukte ohne
 Anlass).
 
-**Was vorab an Registrierung noch fehlt:** je Knopf ein Bau-Absatz mit
-Formel, Parametern, Paritaets-Gate und Entscheidungsmetrik in der jeweiligen
-Prereg; fuer b03 die Kuratierungsregel der Seed-Stellungen. Nichts davon
-wird vor seiner Registrierung angefasst.
+**Registrierungsstand (2026-09-03):** K1 baureif (`saturating_score_utility`
+par.14), K3 baureif (`geometric_envelope` par.8), K2 gegenstandslos
+(`risk_sensitive_leaf_utility` par.6), b03-Kuratierungsregel registriert
+(`start_position_seeding` par.7). Nichts wird vor seiner Registrierung
+angefasst; alles Registrierte darf laufen, ausser der Erzeugung selbst
+(Nutzer 2026-09-03).
