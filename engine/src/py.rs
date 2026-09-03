@@ -22,7 +22,7 @@ use crate::round_end::generate_tiling_actions;
 use crate::scoring::{has_exclusion_conflict, sample_valid_scoring_ids};
 use crate::serialize::{serialize_stack_peek, state_to_json, tiling_action_to_dict};
 use crate::tiling_solver::{
-    best_first_step_exact_or_valued, best_first_step_exact_or_valued_ex, solve_round_final_score,
+    best_first_step_exact_or_valued, best_first_step_exact_or_valued_envelope, solve_round_final_score,
     TilingStep,
 };
 use crate::state::{GameState, Phase};
@@ -954,7 +954,12 @@ impl PyGame {
                 let own = crate::self_play::ownership_tiling_marginals(net, &self.game.state, pi);
                 let evaluator =
                     |final_state: &GameState| crate::self_play::net_tiling_tiebreak_value(net, final_state, pi);
-                best_first_step_exact_or_valued_ex(&self.game.state, pi, Some(&evaluator), own.as_ref())
+                // K3 (d): GUI-Sitzung liest die Knoepfe aus der Umgebung (kein
+                // Spec-Pfad hier), wie jeder andere Env-Knopf des Spielbetriebs.
+                let sc = crate::net_mcts::SearchConfig::from_env();
+                best_first_step_exact_or_valued_envelope(
+                    &self.game.state, pi, Some(&evaluator), own.as_ref(), sc.envelope_tiling_w, &sc.envelope_profile,
+                )
             }
             None => best_first_step_exact_or_valued(&self.game.state, pi, None),
         };
