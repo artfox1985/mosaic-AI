@@ -892,3 +892,65 @@ sind par.8.7 (Potential auf dem projizierten Brett) und par.8.8 (Huellen-
 Bauer mit Kuppel-Vorzug). par.7 ("geometrische Umgehung traegt den fruehen
 Engpass nicht") bleibt damit OFFEN, nicht bestaetigt.
 
+### 8.7a ERSTE ZAHLEN K3-P (2026-09-03, 23:25; argmax @400, 200 Partien, Seed 20260931; Staerke folgt)
+
+| Arm | volle Spalten (b01 0,515) | Punkte | Huelle H_end kosten-gew. | Halbzeit H | aussen je Seite | neu in Huelle R1 / R2 | stabil ab R1 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Kontrolle (K3 S 0,1 = b01-identisch) | 0,510 | 46,3 | 0,659 | 0,389 | 2,92 | 0,978 / 0,905 | 0,92 |
+| K3-P C 0,2 | 0,455 | 46,3 | 0,665 | 0,413 | 2,65 | 0,991 / 0,936 | 0,94 |
+| K3-P C 0,5 | 0,480 | 47,7 | 0,687 | 0,432 | 2,38 | 0,987 / 0,965 | 0,94 |
+| **K3-P C 1,0** | **0,555** | **47,7** | **0,703** | **0,444** | **2,15** | 0,999 / 0,984 | 0,95 |
+| Huellen-Bauer (par.8.8) | 0,275 | 40,4 | 0,677 | 0,398 | 2,27 | 0,940 / 0,873 | 0,54 |
+
+Artefakte `tor2a_k3p{02,05,10}_v23b01.json`, `tor2a_k3b_v23b01.json`,
+`triangle_hull_coverage_tor2a-*.json`. Lesart vorlaeufig: das projizierte
+Potential bewegt die Huelle monoton mit C (Ende +0,044, Halbzeit +0,055,
+Runde-2-Neusteine in der Huelle 0,905 -> 0,984) und kostet weder Spalten noch
+Punkte; das ist der erste Hebel dieser Prereg, der in die gewuenschte
+Richtung wirkt. Der Huellen-Bauer (8.8) als Uebersteuerung hebt die Huelle
+ebenfalls, zerstoert aber Spalten, Punkte und Staerke (gegen hv1@150 von
+131:29 auf 68:92) -- als Ersatz des Netzzugs zu grob; die Kuppelplatten-
+Lenkung gehoert als Bewertung in die Suche (siehe Erreichbarkeit, 8.9).
+Verdikt nach der K3-P-Arena (Kette B Schritt 8).
+
+## par.8.9 K3-R: Erreichbarkeit als dritte Projektion (Nutzer 2026-09-03, 23:30: "und macht Erreichbarkeit nicht ebenfalls Sinn?")
+
+**Ja, und sie ist die Groesse, die das Drafting wirklich entscheidet.** Drei
+Projektionen desselben H stehen nebeneinander:
+
+| Projektion | liest | misst | Stand |
+| --- | --- | --- | --- |
+| Raster (par.8.1/8.2) | belegte Zellen | was schon liegt | im Draft-Suchbaum konstant, wirkungslos (par.9) |
+| Musterreihen (par.8.7, K3-P) | belegte + anteilig gebundene Zellen | was das gesammelte Material werden wird | bewegt die Huelle monoton (8.7a) |
+| Ownership-Kopf (K3-O, geplant) | 36 gelernte Feldwahrscheinlichkeiten | was das Netz bei seinem Spiel legen WIRD (Eintreten) | Kopf kennt die Huelle ab Runde 1 (par.5c, AUC 0,90) |
+| **Erreichbarkeit (K3-R)** | belegte + gebundene + noch VOLLENDBARE Zellen | was dem Tiling noch offensteht | berechnetes Praedikat vorhanden (`column_build::cell_is_completable`, `plate_builder::achievable_column_fill`, "Erreichbarkeit als Mass statt als Tor") |
+
+**Bekannte Befunde zur Erreichbarkeit als Ziel:** `reachability_target`
+(ENTSCHIEDEN 2026-08-20): der Ownership-Kopf mit Vollendbarkeits-Ziel statt
+Endbrett trug nicht (k1 +0,23, Block-t 1,11). `v23_reachability_recheck`
+(ENTSCHIEDEN 2026-09-01): der v23-Kopf kartiert 14,6 Prozent der laut
+Praedikat vollendbaren Zellen tot, und nur 7 Prozent davon werden doch
+gefuellt -- der Kopf ist strenger als das Praedikat und hat recht. Also: als
+TRAININGSZIEL war Erreichbarkeit kein Gewinn; als POTENTIAL im Blattwert ist
+sie ungemessen, und dort sitzt der Unterschied zum Eintreten: ein Potential
+auf "Eintreten" belohnt, was das Netz ohnehin tut; ein Potential auf
+"Erreichbarkeit" belohnt, die Huelle OFFEN zu halten -- keine Farbe in
+Zeile r zu binden, die dort keine Huellenzelle bedient, und Kuppelplatten so
+zu legen, dass Huellenzellen die noch verfuegbaren Farben annehmen. **Das ist
+die Bewertungs-Form der Kuppelplatten-Lenkung** (par.8.8 hat sie als
+Uebersteuerung versucht und die Staerke zerstoert).
+
+**Bau (vorab):** `occ_reach(r, c)` = 1 belegt; `k/(r+1)/n` gebunden (wie
+8.7); fuer leere Huellenzellen ohne gebundene Reihe `w_r`, wenn
+`cell_is_completable(player, r, c, verbleibend)` (Kuppelplatte liegt, Farbe
+noch im Vorrat, Musterreihe frei oder farbgleich), sonst 0; Zellen ausserhalb
+der Huelle nur belegt/gebunden (Erreichbarkeit ausserhalb ist kein Verlust).
+`w_r` = 0,25 (Vorschlag: eine offene Option zaehlt ein Viertel eines Steins;
+Nutzer-Entscheid). Schalter `MOSAIC_ENVELOPE_PROJECTED=2`, Arme C 0,5 / 1,0.
+Instrumente wie 8.7a plus "tote Huelle Runde 3/4" aus der Sonde
+(`tote_huelle_r4_gewichtet_mittel`: heute 0,013).
+
+**K3-O** (Ownership-Projektion, `MOSAIC_ENVELOPE_PROJECTED=3`): `occ_own` =
+sigmoid der 36 Ego-Logits, dieselbe H-Rechnung; misst, ob das Netz seine
+eigene Vorhersage in die Huelle lenken kann. Beide nach der K3-P-Arena.
+
