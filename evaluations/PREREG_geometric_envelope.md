@@ -556,8 +556,25 @@ T, S+T aus 8.4, plus **T+V** als gemeinsamer Tiling-Arm; dieselben
 Instrumente und Verdikte. Damit trennt der Zuschnitt, ob im Tiling die
 Geometrie, die Margen-Vorhersage oder beides traegt.
 
-**Status:** VORSCHLAG. Wird gebaut, sobald der Nutzer ihn bestaetigt oder
-aendert; bis dahin gilt 8.3 mit Stichentscheid.
+**Vorpruefung, PFLICHT vor dem Bau (Nutzer-Einwand 2026-09-03):** die
+Schwaeche der Form A war nicht die Skala allein, sondern die Streuung --
+P(Sieg) liegt unter den zwoelf Abschluessen derselben Stellung nur 0,02 bis
+0,07 auseinander (par.3f), weil alle zwoelf dieselbe Partie fortsetzen. Ob
+die Margen-Vorhersage `M(k)` unter denselben zwoelf Kandidaten um MEHR als
+einen Punkt streut, ist ungemessen. Deshalb vorab: `tools/tiling_candidate_
+spread.py` um die Marge aus Punkte- und Gegnerpunkte-Kopf erweitern (Ausgaben
+3 und 6 des Netzes, Ruecktransformation `50 * atanh`) und auf frozen_v1 und
+frozen_v3 mit b01 messen: Median und IQR der Spreizung von `M` unter den
+Top-12, und wie oft `Punkte + M` einen anderen Kandidaten waehlt als `Punkte`
+allein (echte Kippungen eines Punktvorsprungs, wie in par.3f gezaehlt).
+**Lesart vorab:** Median-Spreizung von `M` unter 1 Punkt heisst, Form B in
+Punkteeinheiten ist ebenso ein Stichentscheid wie Form A -- dann bleibt fuer
+den Value im Tiling nur Form C (lexikografisch mit Toleranzband) oder der
+Verzicht, und 8.6 wird nicht gebaut. Spreizung von mehreren Punkten heisst,
+der Term kann Punktvorspruenge kippen, und 8.6 geht in den Bau.
+
+**Status:** VORSCHLAG mit Vorpruefung. Wird gebaut, wenn der Nutzer ihn
+bestaetigt UND die Vorpruefung besteht; bis dahin gilt 8.3 mit Stichentscheid.
 
 ## par.8 BAU-ABSATZ K3 fuer v24: das Gelaender in Suche (e) und Tiling (d), Stufe 2 vorgezogen (registriert 2026-09-03, VOR dem Bau)
 
