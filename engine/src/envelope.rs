@@ -147,8 +147,32 @@ pub fn envelope_score(board: &PlayerBoard) -> f64 {
 /// `SearchConfig::envelope_search_c` gegated ist -- die Kontrollseite mit
 /// `c = 0` sieht ihn nie. Default aus = Bestand.
 pub fn projected_mode() -> bool {
-    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| std::env::var("MOSAIC_ENVELOPE_PROJECTED").map(|v| v.trim() == "1").unwrap_or(false))
+    projection_mode() == 1
+}
+
+/// Projektions-Modus des Such-Terms (e), `MOSAIC_ENVELOPE_PROJECTED`:
+/// 0 = Raster (par.8.1, Bestand), 1 = Musterreihen (par.8.7, K3-P),
+/// 2 = Erreichbarkeit (par.8.9, K3-R), 3 = Ownership-Kopf (par.8.9, K3-O).
+/// Ungueltig -> 0 mit einmaliger Warnung.
+pub fn projection_mode() -> u8 {
+    static CELL: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_ENVELOPE_PROJECTED") {
+        Err(_) => 0,
+        Ok(raw) => match raw.trim().parse::<u8>() {
+            Ok(m) if m <= 3 => m,
+            _ => {
+                eprintln!("⚠️  MOSAIC_ENVELOPE_PROJECTED={raw:?} ungueltig (0..3) -- Raster-Modus 0 gilt.");
+                0
+            }
+        },
+    })
+}
+
+/// `w_r` (par.8.9, Nutzer-Entscheid 2026-09-03: 0,25): Gewicht einer leeren,
+/// noch vollendbaren Huellenzelle in der Erreichbarkeits-Projektion.
+pub fn reach_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| crate::net_mcts::read_f64_env("MOSAIC_ENVELOPE_REACH_W", 0.25))
 }
 
 /// Gebrochene Belegung des projizierten Bretts (`[zeile][spalte]` in [0, 1]).
@@ -220,6 +244,103 @@ pub fn envelope_score_frac(occ: &[[f64; 6]; 6]) -> f64 {
 /// Musterreihen exakt `envelope_score` (gleiche Huelle, gleiche Anteile).
 pub fn envelope_score_projected(board: &PlayerBoard) -> f64 {
     envelope_score_frac(&projected_occupancy(board))
+}
+
+/// `H` fuer eine FESTE Orientierung ueber eine gebrochene Belegung.
+pub fn envelope_score_frac_for(occ: &[[f64; 6]; 6], hull: Hull) -> f64 {
+    let (mut inside, mut outside) = (0.0, 0.0);
+    for (r, row) in occ.iter().enumerate() {
+        for (c, &v) in row.iter().enumerate() {
+            if v > 0.0 {
+                if hull.contains(r, c) {
+                    inside += v * row_cost(r);
+                } else {
+                    outside += v * row_cost(r);
+                }
+            }
+        }
+    }
+    (inside - outside) / HULL_TOTAL_COST
+}
+
+// ── par.8.9 K3-R: Erreichbarkeit als Projektion ──────────────────────────────
+// "Was dem Tiling noch offensteht": belegte und gebundene Zellen wie K3-P,
+// dazu jede LEERE Huellenzelle ohne gebundene Reihe mit `w_r`, wenn sie laut
+// Vorrats-Praedikat noch vollendbar ist (`column_build::cell_is_completable`:
+// Kuppelplatte fehlt noch ODER liegt und die geforderte Farbe ist im Restvorrat
+// noch oft genug da). Zellen ausserhalb der Huelle nur belegt/gebunden.
+// Je Orientierung eigene Belegung, H mit fester Orientierung, Maximum der
+// beiden: die beste Huelle, die noch offen ist.
+
+/// `H_reach(brett)` (par.8.9).
+pub fn envelope_score_reach(board: &PlayerBoard, remaining: &[i64; 5], w_r: f64) -> f64 {
+    let base = projected_occupancy(board);
+    let mut best = f64::NEG_INFINITY;
+    for hull in [Hull::Left, Hull::Right] {
+        let mut occ = base;
+        for r in 0..6 {
+            for c in 0..6 {
+                if hull.contains(r, c) && occ[r][c] == 0.0
+                    && crate::column_build::cell_is_completable(board, r, c, remaining)
+                {
+                    occ[r][c] = w_r;
+                }
+            }
+        }
+        best = best.max(envelope_score_frac_for(&occ, hull));
+    }
+    best
+}
+
+// ── par.8.9 K3-O: der Ownership-Kopf als Projektion ──────────────────────────
+
+/// `H_own` aus 36 Feld-Logits (eine Spielerhaelfte des Ownership-Kopfs,
+/// Reihenfolge `scoring::ownership_index_for_grid`): Sigmoid je Zelle,
+/// dieselbe H-Rechnung wie K3-P. `None`, wenn die Haelfte fehlt.
+pub fn envelope_score_ownership(logits_half: &[f32]) -> Option<f64> {
+    if logits_half.len() < 36 {
+        return None;
+    }
+    let mut occ = [[0.0f64; 6]; 6];
+    for r in 0..6 {
+        for c in 0..6 {
+            let z = logits_half[crate::scoring::ownership_index_for_grid(r, c)] as f64;
+            occ[r][c] = 1.0 / (1.0 + (-z).exp());
+        }
+    }
+    Some(envelope_score_frac(&occ))
+}
+
+/// Such-Term (e) im gewaehlten Projektions-Modus (`projection_mode`), aus
+/// Sicht von Spieler 0. `ownership` sind die rohen Kopf-Logits des Mover-
+/// Passes (`[0:36]` ego = `state.current_player`, `[36:72]` der andere);
+/// im Modus 3 ohne Kopf: 0 (einmalige Warnung).
+pub fn search_shift_state(state: &crate::state::GameState, c_hull: f64, profile: &[f64; 5], ownership: &[f32]) -> f64 {
+    let b0 = &state.players[0];
+    let b1 = &state.players[1];
+    let (h0, h1) = match projection_mode() {
+        1 => (envelope_score_projected(b0), envelope_score_projected(b1)),
+        2 => {
+            let remaining = crate::provocation::remaining_colors(state);
+            let w = reach_weight();
+            (envelope_score_reach(b0, &remaining, w), envelope_score_reach(b1, &remaining, w))
+        }
+        3 => {
+            if ownership.len() < 72 {
+                static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+                WARNED.get_or_init(|| {
+                    eprintln!("⚠️  MOSAIC_ENVELOPE_PROJECTED=3, aber das Netz hat keinen Ownership-Kopf -- Term aus.");
+                });
+                return 0.0;
+            }
+            let ego = envelope_score_ownership(&ownership[0..36]).unwrap_or(0.0);
+            let other = envelope_score_ownership(&ownership[36..72]).unwrap_or(0.0);
+            if state.current_player == 0 { (ego, other) } else { (other, ego) }
+        }
+        _ => (envelope_score(b0), envelope_score(b1)),
+    };
+    let phi = profile_weight(profile, state.round_number) * (h0 - h1);
+    c_hull * phi.tanh()
 }
 
 /// `w_e(runde)` aus dem Profil: Index `runde - 1`, Runde 0 wie Runde 1,
@@ -433,6 +554,42 @@ mod tests {
         board.pattern_lines[5].tiles = vec![crate::tile::TileColor::Rot; 4];
         let expect_out = expect - (4.0 / 6.0) * 6.0 / 56.0;
         assert!((envelope_score_projected(&board) - expect_out).abs() < 1e-12, "{}", envelope_score_projected(&board));
+    }
+
+    /// par.8.9: Erreichbarkeit -- leere vollendbare Huellenzellen zaehlen w_r,
+    /// belegte ausserhalb bleiben Abzug; ohne offene Zellen (w_r = 0) gleich
+    /// dem Maximum der beiden festen Orientierungen von H_proj.
+    #[test]
+    fn reach_projection_counts_open_hull_cells_with_w_r() {
+        let board = board_with(&[(0, 0), (0, 1)]);
+        let remaining = [10i64; 5];
+        let h0 = envelope_score_reach(&board, &remaining, 0.0);
+        let hp = [Hull::Left, Hull::Right]
+            .iter()
+            .map(|&h| envelope_score_frac_for(&projected_occupancy(&board), h))
+            .fold(f64::NEG_INFINITY, f64::max);
+        assert!((h0 - hp).abs() < 1e-12);
+        // Alle 21 Huellenzellen sind Wild (Testgitter) und damit vollendbar:
+        // 19 leere Huellenzellen (Kosten 56 - 1 - 1 = 54) zaehlen w_r.
+        let h = envelope_score_reach(&board, &remaining, 0.25);
+        assert!((h - (2.0 + 0.25 * 54.0) / 56.0).abs() < 1e-12, "{h}");
+    }
+
+    /// par.8.9: Ownership-Projektion -- Logits +8 innen / -8 aussen ergeben
+    /// H nahe 1; fehlende Haelfte -> None.
+    #[test]
+    fn ownership_projection_reads_sigmoid_per_cell() {
+        let mut logits = vec![-8.0f32; 36];
+        for r in 0..6 {
+            for c in 0..6 {
+                if Hull::Left.contains(r, c) {
+                    logits[crate::scoring::ownership_index_for_grid(r, c)] = 8.0;
+                }
+            }
+        }
+        let h = envelope_score_ownership(&logits).unwrap();
+        assert!(h > 0.99 && h <= 1.0, "{h}");
+        assert_eq!(envelope_score_ownership(&logits[..10]), None);
     }
 
     /// par.8.6: der Value-Term zaehlt mit `w_v = 1 - w_e`; ohne Marge 0; bei
