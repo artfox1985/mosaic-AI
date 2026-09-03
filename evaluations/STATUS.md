@@ -26,15 +26,17 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-03, 14:30 -- Sitzung mosaic-ai-6d, Tagprogramm nach der Uebergabe von 09:00)
 
-**LAEUFT: Nachtkette `night_chain_0903.sh`** (Sitzungs-Scratch; Start 17:40,
-CPU exklusiv, GPU frei): 1) K3-Arena zweite Richtung (Seed 20261002; die
-erste liegt: `paired_arena_env_k3_b01_first_s02.json`), 2) Spaltensonden K3,
-3) argmax je K3-Arm (5 x 28 min), 4) Bau des par.8.6-Wheels mit Tests,
-Install, Anker-Drift und Netz-Pfad-Paritaet (Kette haelt bei ROT), 5) Champion-
-Kante b01 + K1 c = 0,2 gegen `v21_2d_brierbest` (200 Paare, Seed 20261004),
-6) Bezugskante b01 ohne Knopf, gleicher Seed, 7) par.8.6-Arena (V 0,5 / V 1,0 /
-T+V, beide Richtungen, Seed 20261005) plus Sonden, 8) argmax je 8.6-Arm,
-9) v24-Material-Pilot. Ende gegen 04:00. Baum committet, ungepusht.
+**LAEUFT: Nachtkette B `night_chain_0903b.sh`** (Sitzungs-Scratch; Start
+22:05, CPU exklusiv, GPU frei): 0) Install des Wheels mit par.8.6 (Value-
+Anteil im Tiling), par.8.7 (K3-P, projiziertes Brett) und par.8.8 (Huellen-
+Bauer `MOSAIC_PLATTENBAU=8`), Anker-Drift, Netz-Pfad-Paritaet; 1) K3-P argmax
+C 0,2/0,5/1,0; 2) K3-B argmax; 3) K3-B Arena gegen hv1@150 ohne/mit Bauer;
+4) 8.6-Arena (V 0,5/1,0, T+V) plus Sonden; 5) 8.6-argmax; 6) Champion-Kante
+b01 + K1 c = 0,2 gegen v21 (200 Paare, Seed 20261004); 7) Bezugskante ohne
+Knopf; 8) K3-P-Arena; 9) v24-Material-Pilot. Ende gegen 09:00. Kette A
+(K3 S/T/S+T) ist durch: par.9 registriert (Nullbefund der Bauform, Huelle
+OFFEN, Nutzer-Entscheid: Huelle kommt, Hebel gesucht). Baum committet,
+ungepusht.
 
 ### Was das Tagprogramm 2026-09-03 bis 14:30 ergeben hat (Chronik: `night_run_20260902.md`, ab 09:08)
 

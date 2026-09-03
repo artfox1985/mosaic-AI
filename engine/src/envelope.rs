@@ -132,6 +132,96 @@ pub fn envelope_score(board: &PlayerBoard) -> f64 {
     envelope_score_of(&occupancy(board))
 }
 
+// ── par.8.7 K3-P: das projizierte Brett ─────────────────────────────────────
+// Zellen werden nur im Tiling gefuellt; waehrend des Draftings aendert sich
+// das Raster nicht, und das Potential (e) ist im Suchbaum konstant (par.9:
+// S 0,1 in allen 160 Partien ohne Wirkung). Die Projektion rechnet die
+// Musterreihen anteilig auf ihre Zielzellen um: Musterreihe `r` mit Farbe
+// `c` und `k` von `r + 1` Steinen landet in Rasterzeile `r` in einer Zelle,
+// die `c` annimmt (`DomeSpace::accepts`); jede der `n` annehmenden Zellen
+// bekommt `(k / (r + 1)) / n`.
+
+/// Prozessweiter Schalter `MOSAIC_ENVELOPE_PROJECTED=1`: der Such-Term (e)
+/// rechnet `H` auf dem projizierten Brett. Prozessweit ist hier unkritisch
+/// (kein Spiegelmatch-Problem), weil der Term je Seite ueber
+/// `SearchConfig::envelope_search_c` gegated ist -- die Kontrollseite mit
+/// `c = 0` sieht ihn nie. Default aus = Bestand.
+pub fn projected_mode() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| std::env::var("MOSAIC_ENVELOPE_PROJECTED").map(|v| v.trim() == "1").unwrap_or(false))
+}
+
+/// Gebrochene Belegung des projizierten Bretts (`[zeile][spalte]` in [0, 1]).
+pub fn projected_occupancy(board: &PlayerBoard) -> [[f64; 6]; 6] {
+    let occ = occupancy(board);
+    let mut out = [[0.0f64; 6]; 6];
+    for r in 0..6 {
+        for c in 0..6 {
+            if occ[r][c] {
+                out[r][c] = 1.0;
+            }
+        }
+    }
+    for (r, line) in board.pattern_lines.iter().enumerate().take(6) {
+        let (Some(color), k) = (line.color, line.tiles.len()) else { continue };
+        if k == 0 {
+            continue;
+        }
+        let targets: Vec<usize> = (0..6)
+            .filter(|&c| board.dome_grid.get_space(r, c).is_some_and(|sp| sp.accepts(color)))
+            .collect();
+        if targets.is_empty() {
+            continue;
+        }
+        let share = (k as f64 / (r + 1) as f64) / targets.len() as f64;
+        for c in targets {
+            out[r][c] += share;
+        }
+    }
+    out
+}
+
+/// Ungewichtete Abweichung fuer gebrochene Belegung: Summe |Huelle - occ|.
+pub fn deviation_frac(occ: &[[f64; 6]; 6], hull: Hull) -> f64 {
+    let mut d = 0.0;
+    for (r, row) in occ.iter().enumerate() {
+        for (c, &v) in row.iter().enumerate() {
+            let h = if hull.contains(r, c) { 1.0 } else { 0.0 };
+            d += (h - v).abs();
+        }
+    }
+    d
+}
+
+/// `H` nach par.8.1 ueber eine gebrochene Belegung (bestpassende Huelle nach
+/// `deviation_frac`, Gleichstand LINKS; Anteile `Summe occ * (r + 1) / 56`).
+pub fn envelope_score_frac(occ: &[[f64; 6]; 6]) -> f64 {
+    let hull = if deviation_frac(occ, Hull::Left) <= deviation_frac(occ, Hull::Right) {
+        Hull::Left
+    } else {
+        Hull::Right
+    };
+    let (mut inside, mut outside) = (0.0, 0.0);
+    for (r, row) in occ.iter().enumerate() {
+        for (c, &v) in row.iter().enumerate() {
+            if v > 0.0 {
+                if hull.contains(r, c) {
+                    inside += v * row_cost(r);
+                } else {
+                    outside += v * row_cost(r);
+                }
+            }
+        }
+    }
+    (inside - outside) / HULL_TOTAL_COST
+}
+
+/// `H_proj(brett)` (par.8.7): `H` auf dem projizierten Brett. Bei leeren
+/// Musterreihen exakt `envelope_score` (gleiche Huelle, gleiche Anteile).
+pub fn envelope_score_projected(board: &PlayerBoard) -> f64 {
+    envelope_score_frac(&projected_occupancy(board))
+}
+
 /// `w_e(runde)` aus dem Profil: Index `runde - 1`, Runde 0 wie Runde 1,
 /// Runden >= 5 lesen den letzten Eintrag (per Auflage 0).
 pub fn profile_weight(profile: &[f64; 5], round: u32) -> f64 {
@@ -144,7 +234,12 @@ pub fn profile_weight(profile: &[f64; 5], round: u32) -> f64 {
 /// addiert `shift` auf Spieler 0 und subtrahiert ihn von Spieler 1
 /// (Nullsumme) und klammert beide auf [0, 1]. Reine Zustandsfunktion.
 pub fn search_shift(board0: &PlayerBoard, board1: &PlayerBoard, round: u32, c_hull: f64, profile: &[f64; 5]) -> f64 {
-    let phi = profile_weight(profile, round) * (envelope_score(board0) - envelope_score(board1));
+    let (h0, h1) = if projected_mode() {
+        (envelope_score_projected(board0), envelope_score_projected(board1))
+    } else {
+        (envelope_score(board0), envelope_score(board1))
+    };
+    let phi = profile_weight(profile, round) * (h0 - h1);
     c_hull * phi.tanh()
 }
 
@@ -304,6 +399,40 @@ mod tests {
         assert!((tiling_cost_delta(&before, &after_inside) - 3.0).abs() < 1e-9);
         assert!((tiling_cost_delta(&before, &after_outside) + 6.0).abs() < 1e-9);
         assert_eq!(adjusted_tiling_score(4.0, 0.5, 0.92, 3.0), 4.0 + 0.5 * 0.92 * 3.0);
+    }
+
+    /// par.8.7: leere Musterreihen -> `H_proj == H`; eine halb volle Reihe 2
+    /// (Farbe Rot, genau eine annehmende Zelle in Zeile 2 innerhalb der linken
+    /// Huelle) hebt `H_proj` um `(2/3) * 3 / 56`; eine Reihe ausserhalb senkt.
+    #[test]
+    fn projected_occupancy_maps_pattern_lines_to_accepting_cells_by_fill_share() {
+        let mut board = board_with(&[(0, 0), (0, 1)]);
+        assert_eq!(envelope_score_projected(&board), envelope_score(&board));
+        // Zeile 2: nur (2, 0) nimmt Rot an (Normal-Farbe), alle anderen Blau.
+        for c in 0..6 {
+            let sp = board.dome_grid.get_space_mut(2, c).unwrap();
+            sp.space_type = SpaceType::Normal;
+            sp.required_color = Some(if c == 0 { crate::tile::TileColor::Rot } else { crate::tile::TileColor::Blau });
+        }
+        board.pattern_lines[2].color = Some(crate::tile::TileColor::Rot);
+        board.pattern_lines[2].tiles = vec![crate::tile::TileColor::Rot; 2];
+        let occ = projected_occupancy(&board);
+        assert!((occ[2][0] - 2.0 / 3.0).abs() < 1e-12, "{}", occ[2][0]);
+        assert_eq!(occ[2][1], 0.0);
+        let expect = envelope_score(&board) + (2.0 / 3.0) * 3.0 / 56.0;
+        assert!((envelope_score_projected(&board) - expect).abs() < 1e-12);
+        // Zweite Reihe (5, vier von sechs Steinen) mit Zielzelle (5, 1), die in
+        // KEINER Huelle liegt (5 + 1 > 5 und 5 > 1): senkt um (4/6) * 6 / 56;
+        // die Orientierung bleibt LINKS (beide Abweichungen gleich, Gleichstand).
+        for c in 0..6 {
+            let sp = board.dome_grid.get_space_mut(5, c).unwrap();
+            sp.space_type = SpaceType::Normal;
+            sp.required_color = Some(if c == 1 { crate::tile::TileColor::Rot } else { crate::tile::TileColor::Blau });
+        }
+        board.pattern_lines[5].color = Some(crate::tile::TileColor::Rot);
+        board.pattern_lines[5].tiles = vec![crate::tile::TileColor::Rot; 4];
+        let expect_out = expect - (4.0 / 6.0) * 6.0 / 56.0;
+        assert!((envelope_score_projected(&board) - expect_out).abs() < 1e-12, "{}", envelope_score_projected(&board));
     }
 
     /// par.8.6: der Value-Term zaehlt mit `w_v = 1 - w_e`; ohne Marge 0; bei
