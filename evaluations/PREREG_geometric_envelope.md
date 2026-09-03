@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, Zuschnitt registriert (par.3d). Spreizung gemessen (par.3f): Form A tot, B oder C Pflicht. **Stufe 0 (par.5c, 2026-09-03, berichtigte Huelle): der Ownership-Kopf kennt die Huelle ab Runde 1** (AUC b01 0,90 / 0,85 in R1/R2, plattenblind 0,52) -- Baustein (b) gegenstandslos, direkt zu (c): Gelaender in Suche und Tiling, Formwahl B/C, eigene Registrierung vor dem Bau. -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, aber BAUREIF bis auf zwei Werte (par.8, 2026-09-03): Form A tot (par.3f), Kopf kennt die Huelle ab R1 (par.5c) -- Baustein (b) entfaellt; K3 = Potential am Blattwert (MOSAIC_ENVELOPE_SEARCH_C) plus Huellen-Gewinn im Tiling (MOSAIC_ENVELOPE_TILING_W), Profil 1/0,75/0,5/0,25/0, Defaults aus. Messung: argmax-Spalten, Arena gegen dasselbe Netz, Huellen-Abdeckung. Offen: Gewichte und Profil bestaetigen. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -513,3 +513,112 @@ den Stufe-D2-Zahlen der Lehrer-Prereg (kosten-gewichtete Huelle Mensch
 Betroffen sind nur Bretter, deren bestpassende Orientierung rechts ist;
 Neurechnung fuer Lehrer und Mensch-Logs laeuft, b04r2 und b06 liegen nicht
 mehr im Baum (Berichtigung in `PREREG_heuristic_v2_long_rows.md`).
+
+## par.8 BAU-ABSATZ K3 fuer v24: das Gelaender in Suche (e) und Tiling (d), Stufe 2 vorgezogen (registriert 2026-09-03, VOR dem Bau)
+
+Kontext: `PREREG_v24_window.md` par.8, Such-Knopf K3; Stufe 0 (par.5c) hat
+Baustein (b) erledigt, par.3f die Formfrage (A tot). Dieser Absatz legt
+fest, was gebaut wird, bevor ein Handgriff passiert. Zwei Werte sind
+Vorschlaege und als Nutzer-Entscheid markiert (par.8.5).
+
+### 8.1 Die Groesse, die das Gelaender liest
+
+`H(brett)` = kosten-gewichteter Huellen-Fuellanteil in [0, 1]: Summe der
+Zeilengewichte `r + 1` ueber die belegten Zellen INNERHALB der bestpassenden
+Huelle, geteilt durch 56 (Gesamtkost einer Huelle), MINUS Summe der
+Zeilengewichte der belegten Zellen AUSSERHALB, geteilt durch 56. Beide
+Orientierungen (`r + c <= 5` und `r <= c`, par.5c-Berichtigung), die mit der
+kleineren Abweichung zaehlt; leeres Brett: `H = 0`. Das ist die Leitkennzahl
+der Einhuellenden (Lehrer-Prereg par.3b.14: Lehrer 0,68, Mensch 0,86), in
+der Engine neu als `envelope.rs` mit denselben Definitionen wie die
+Python-Sonde und einem Paritaetstest gegen deren Zahlen auf drei Brettern.
+
+### 8.2 (e) Such-Eingriff: Potential am Blattwert, zero-sum, abklingend
+
+Bauform wie die bestehenden Blatt-Additive (`floor_shaping`,
+`long_row_init_shaping_w`, net_mcts.rs:1885-1920): eine reine
+Zustandsfunktion, die am netzbewerteten Blatt addiert wird, Nullsumme
+zwischen den Spielern, geklammert auf [0, 1], bei Gewicht 0 vollstaendig
+uebersprungen (byte-identisch).
+
+```
+phi(s)   = w_e(runde(s)) * (H(brett_0) - H(brett_1))          # aus Sicht Spieler 0
+shift    = C_HULL * tanh(phi(s))
+value_0 += shift ; value_1 -= shift ; beide clamp(0, 1)
+```
+
+- Profil `w_e` nach par.3d (ii), als Stuetzstellen im Manifest:
+  R1 1,0 / R2 0,75 / R3 0,5 / R4 0,25 / **R5 0** (Pflicht-Auflage par.4.1:
+  der exakte Loeser bekommt nichts).
+- Potentialform (Pflicht-Auflage par.4.2): `phi` haengt nur vom Zustand ab,
+  nicht vom Zug; die Differenz zur Wurzel ist das, was die Suche sieht. Das
+  ist die Form, in der dieses Projekt seine Shaping-Terme baut; dass sie in
+  einer SUCHE nicht dieselbe Politik-Erhaltung garantiert wie PBRS auf
+  Returns, ist eine Herleitung und wird als Vorbehalt registriert -- deshalb
+  entscheidet die Arena, nicht die Theorie.
+- Knopf `MOSAIC_ENVELOPE_SEARCH_C` (= `C_HULL`), Default **0.0 = aus**;
+  Profil `MOSAIC_ENVELOPE_PROFILE` als fuenf Kommazahlen, Default
+  `1,0.75,0.5,0.25,0`. Beide in `SearchConfig::from_env`, Knopf-Registratur,
+  `engine_config` des Manifests.
+- Arme: `C_HULL` **0,1 / 0,2** (Groessenordnung des Floor-Terms 0,3 und der
+  K1-Zuschlaege; eine volle Huellen-Differenz bewegt den Blattwert dann um
+  hoechstens 0,1 bzw. 0,2).
+
+### 8.3 (d) Tiling-Eingriff: Huellen-Gewinn neben den Sofortpunkten
+
+Ort: `best_first_step_exact_or_valued` (tiling_solver.rs:1388-1400), als
+neuer Zweig vor dem Netz-Stichentscheid, Runden 1-4, Bauform wie Task #100
+(`best_first_step_plate_valued`: Punkte plus gewichtete Zusatzgroesse, dann
+Argmax):
+
+```
+score(kandidat) = punkte(kandidat) + W_TILE * w_e(runde) * dH_kosten(kandidat)
+dH_kosten       = Summe (r+1) der NEU gefuellten Zellen innerhalb der Huelle
+                  - Summe (r+1) der NEU gefuellten Zellen ausserhalb
+```
+
+- `dH_kosten` ist in Zellenkosten-Einheiten (eine Zelle der Zeile 6 kostet 6,
+  der Zeile 1 kostet 1); `W_TILE` uebersetzt Kosten in Punkte-Aequivalente.
+- Knopf `MOSAIC_ENVELOPE_TILING_W` (= `W_TILE`), Default **0.0 = aus**
+  (dann Bestandspfad, byte-identisch); Arme **0,5 / 1,0** Punkte je
+  Kosteneinheit. Der Netz-Stichentscheid (`NET_TILING_TIEBREAK_ENABLED`)
+  bleibt fuer punktgleiche Kandidaten dahinter bestehen.
+- Der Punkte-Term bleibt in allen Runden (par.3d iii, Default); der
+  schaerfere Arm `w_p(R1..R2) = 0` ist ein eigener Arm K3-P0 und wird nur
+  gefahren, wenn (d) mit Punkten traegt.
+
+### 8.4 Messung und Verdikt (vorab, par.6)
+
+Drei Arme gegen denselben Traeger ohne Gelaender (`v23-b01_brierbest`, spaeter
+das beste v24-Netz): **S** (nur Suche, `C_HULL` 0,1 und 0,2), **T** (nur
+Tiling, `W_TILE` 0,5 und 1,0), **S+T** (0,1 mit 1,0). Je Arm:
+
+1. **Primaer:** volle Spalten je Partie und Seite am argmax-Instrument
+   @400, 200 Partien, Seed 20260931, gepaart gegen die Kontrolle (Block-SE,
+   Bezug b01 0,5150). Das ist Tor 2.
+2. **Staerke:** gepaarte Arena, dasselbe Netz mit gegen ohne Gelaender
+   (`paired_arena_env_ab --env-name MOSAIC_ENVELOPE_SEARCH_C ...`), 2 x 80,
+   Blockgroesse 5, `--log-games`, n >= 150 Paare oder Replikation. Das ist
+   der Tausch-Waechter aus der Suchtiefe (mehr Spalten, weniger Siege).
+3. **Mechanismus:** kosten-gewichtete Huellen-Abdeckung aus den Logs
+   (berichtigte Sonde). Steigen Spalten ohne Huelle, wirkt etwas anderes.
+4. Sechs Standard-Kennzahlen, `laufzeit`-Block, Paritaets-Gate vorab: alle
+   Knoepfe 0 muessen Golden-Selbsttest und Anker-Invarianz bitgleich lassen.
+
+| Befund | Verdikt |
+| --- | --- |
+| Spalten signifikant ueber Kontrolle UND Siege nicht signifikant darunter, Huelle steigt | K3 traegt; Kandidat fuer das v24-Erzeugungsrezept (Generator baut spaltenreicher) UND fuer den Spielbetrieb, getrennt zu entscheiden |
+| Spalten steigen, Siege fallen signifikant | Tausch, wie bei der Suchtiefe; registrieren, nicht uebernehmen; Profil-Frage (schnelleres Abklingen) als Folgearm |
+| Spalten unbewegt | par.7: die geometrische Umgehung traegt den fruehen Engpass nicht, es bleibt die Betrags-Schiene (K1) |
+| S traegt, T nicht (oder umgekehrt) | der tragende Baustein geht allein weiter; der andere wird geschlossen |
+
+Kosten: Bau rund 3 bis 4 h (Modul `envelope.rs`, zwei Knoepfe, Profil,
+Tests, Wheel, Anker); je Arm rund 25 min argmax plus 30 min Arena;
+fuenf Arme rund 5 h CPU.
+
+### 8.5 Offen vor dem ersten Handgriff (Nutzer-Entscheid)
+
+1. **Gewichte:** `C_HULL` 0,1 / 0,2 und `W_TILE` 0,5 / 1,0 wie oben, oder
+   andere Werte. Kein Sweep darueber hinaus.
+2. **Profil:** die Stuetzstellen 1 / 0,75 / 0,5 / 0,25 / 0 aus par.3d (ii)
+   bestaetigen. Alternative aus par.3b: bis R3 voll, R4 halb, R5 null.
