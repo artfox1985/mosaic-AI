@@ -26,10 +26,10 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-03, 14:30 -- Sitzung mosaic-ai-6d, Tagprogramm nach der Uebergabe von 09:00)
 
-**LAEUFT: K1-Replikation c = 0,2** (`paired_arena_env_ab`, Seed 20261003,
-Kontrolle plus c = 0,2, 2 x 80 mit Brett-Tausch, Blockgroesse 5, gestartet
-14:20, Ende gegen 15:35; Auswertung haengt dran:
-`k1_b01_swap_eval_s03.json`). GPU frei. Baum committet, ungepusht.
+**LAEUFT: K3-Arena** (`k3_arena.sh`: sechs Arme S 0,1/0,2, T 0,5/1,0,
+S+T 0,1+1,0 plus Kontrolle, je 2 x 80 mit Brett-Tausch gegen Spec aus, Seed
+20261002, Blockgroesse 5, gestartet 15:28, Ende gegen 19:00; danach argmax
+je Arm). GPU frei. Baum committet, ungepusht.
 
 ### Was das Tagprogramm 2026-09-03 bis 14:30 ergeben hat (Chronik: `night_run_20260902.md`, ab 09:08)
 
@@ -49,9 +49,12 @@ Kontrolle plus c = 0,2, 2 x 80 mit Brett-Tausch, Blockgroesse 5, gestartet
    identisch. Arena am b01 (160 Paare je Arm, Knopf-Seite gegen dasselbe Netz
    ohne Knopf): **c = 0,2 gewinnt 104:56 (p = 0,006, Margin +4,9)**, c = 0,1
    und 0,3 Nullbefunde -- aber Spalten darunter (Arena -0,13, argmax 0,36
-   gegen 0,52). Spiegel des Suchtiefen-Tauschs. Verdikt wartet auf die
-   laufende Replikation. Fuer die Generatorwahl kein Kandidat; fuer den
-   Spielbetrieb nach der Replikation zu pruefen.
+   gegen 0,52). **Replikation (Seed 20261003): 83:77, p = 0,82; gepoolt
+   187:133, p = 0,03, Seeds uneins (z 1,8); Margin in jedem Lauf +2 bis +5.**
+   Verdikt par.16, ENTSCHIEDEN: Marge wird zu Punkten, nicht stabil zu
+   Siegen, Spalten darunter -- K1 geht NICHT ins v24-Rezept, Skalenwechsel
+   par.4b entfaellt. Champion-Kante mit c = 0,2 fuer den Spielbetrieb waere
+   ein eigener Nutzer-Entscheid.
 4. **K3 gebaut** (`geometric_envelope` par.8.2/8.3, Commit e69aec3): Modul
    `envelope.rs`, drei Knoepfe, Tiling-Zweig vor dem Stichentscheid, W_TILE je
    Seite. Anker-Drift und Netz-Pfad-Paritaet bei allen Knoepfen 0 GRUEN.
@@ -66,15 +69,15 @@ Kontrolle plus c = 0,2, 2 x 80 mit Brett-Tausch, Blockgroesse 5, gestartet
 
 1. ~~Watcher, Relabel-Kennzahlen~~ ERLEDIGT 09:36.
 2. ~~b07-Kette, Manifest-Diff~~ ERLEDIGT 09:52.
-3. ~~K1 bauen und am b01 messen~~ ERLEDIGT (par.15); **Replikation c = 0,2
-   LAEUFT**, danach Verdikt in par.15 nachtragen (Kopf!). argmax-Profile fuer
-   c = 0,1 und 0,3 sind offen (Nullbefunde bei der Staerke, niedrige
-   Prioritaet).
+3. ~~K1 bauen, messen, replizieren~~ ERLEDIGT (par.15/16, ENTSCHIEDEN).
+   argmax-Profile fuer c = 0,1 und 0,3 entfallen (Nullbefunde, Verdikt
+   steht).
 4. ~~b07 abnehmen~~ ERLEDIGT (par.A5).
-5. **K3 messen** nach par.8.4 (Skript `k3_arena.sh` in der Sitzungs-Scratch:
-   Arme S 0,1/0,2, T 0,5/1,0, S+T 0,1+1,0 gegen Spec aus, 2 x 80 je Arm,
-   rund 3,5 h CPU; danach argmax je Arm rund 28 min). par.8.6 nur nach
-   Nutzer-Bestaetigung.
+5. **K3 messen** nach par.8.4: Arena LAEUFT (siehe oben); danach argmax je
+   Arm (`argmax_profile.sh`, rund 28 min je Arm, Seed 20260931, Tags
+   `tor2a-k3s01`, `tor2a-k3s02`, `tor2a-k3t05`, `tor2a-k3t10`, `tor2a-k3st`),
+   Spaltensonde auf den Arena-Logs, Registrierung als par.9 samt Kopf.
+   par.8.6 nur nach Nutzer-Bestaetigung.
 6. **v24-Material-Pilot** (`night_run_20260902.md` N2) in einem freien
    CPU-Fenster; registrieren in `PREREG_v24_window.md` par.7.
 7. Aufraeumen: die 200 Deep-Kopien in `data/` sind NICHT angekuendigt, bleiben
