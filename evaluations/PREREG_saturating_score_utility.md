@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die lineare Mischung gescheitert ist? | Beleg: GEBAUT (par.14/15, 2026-09-03, Anker und Netz-Pfad-Paritaet GRUEN). Erstmessung am `v23-b01_brierbest` (par.15): c = 0,2 gewinnt 104:56 gegen die Spiegel-Basislinie (160 Paare, McNemar p = 0,006, Margin +4,9), c = 0,1/0,3 Nullbefunde; ABER Spalten darunter (Arena -0,13, argmax 0,36 gegen 0,52). Replikation c = 0,2 mit eigenem Seed OFFEN, dann Verdikt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die lineare Mischung gescheitert ist? | Beleg: NICHT VERLAESSLICH (par.15/16, 2026-09-03, gebaut, Anker und Paritaet GRUEN): c = 0,2 am `v23-b01` 104:56 (p = 0,006), Replikation 83:77 (p = 0,82), gepoolt 187:133 (p = 0,03); Margin +2 bis +5 in jedem Lauf, aber Spalten darunter (Arena -0,08, argmax 0,36 gegen 0,52). Marge wird zu Punkten, nicht stabil zu Siegen; kein v24-Rezept, Skalenwechsel par.4b entfaellt. -->
 
 # Vorregistrierung: Gesaettigte, re-zentrierte Score-Utility
 
@@ -899,4 +899,43 @@ Generatorwahl (`generation_loop.md`, Spaltenprofil entscheidet) ist c = 0,2
 nach diesem Stand KEIN Kandidat; fuer den SPIELBETRIEB (Champion-Kante) ist er
 nach der Replikation zu pruefen -- zwei getrennte Entscheide, wie in
 par.8.4 der Einhuellenden-Prereg vorgesehen.
+
+## par.16 REPLIKATION c = 0,2 und VERDIKT (2026-09-03, 15:20): der Staerkegewinn repliziert nicht, die Spalten bleiben darunter -- K1 ist kein Rezept-Kandidat
+
+**Replikation** (Seed 20261003, Kontrolle plus c = 0,2, 2 x 80 mit Brett-
+Tausch, sonst wie par.15; `paired_arena_env_k1_b01_{first,second}_s03.json`,
+`k1_b01_swap_eval_s03.json`, `columns_k1_b01_{first,second}_s03.json`,
+Laufzeit 2 x rund 17 min exklusiv): Knopf-Seite **83 : 77** gegen die
+Basislinie 80 : 80, diskordant 39 / 36, McNemar p = 0,82, Block-Differenz
++0,019 (SE 0,045); Punkte 46,77, **Margin +2,03** (Block-SE 2,52);
+Einheits-Klammerung 7,2 Prozent der Blaetter. Spalten der Knopf-Seite
+0,494 gegen 0,532 (gepaart -0,036, Block-SE 0,079, t -0,46); H -0,009.
+
+**Gepoolt ueber beide Seeds (320 Paare):** 187 : 133, diskordant 87 / 60,
+McNemar p = 0,032, Block-Differenz +0,084 (SE 0,037, t 2,31, 64 Bloecke);
+Margin +3,48 (SE 1,53). Die beiden Seeds unterscheiden sich in der
+Siegdifferenz um z = 1,79 (+0,150 gegen +0,019) -- die erste Stichprobe
+traegt den gepoolten Befund allein. Spalten gepoolt rund -0,08 je Partie
+(-0,130 und -0,036); argmax-Instrument 0,3575 gegen 0,515 (par.15,
+ungepaart, KIs ohne Ueberlappung).
+
+**Verdikt (Tabelle par.14.4):** Zeile 1 faellt (Spalten unter der Kontrolle
+in beiden Instrumenten). Zeile 4 faellt (keine monotone Verschlechterung:
+alle Arme bei Siegen >= Basislinie, Margin in fuenf von fuenf Arm-Laeufen
+positiv). Was bleibt, ist der Spiegel von Zeile 2: **die re-zentrierte
+Margen-Utility macht die Suche margensensitiver (Margin +2 bis +5 in jedem
+Lauf) und kauft das mit weniger Spalten; in Siegen ist der Gewinn klein und
+nicht stabil** (einmal p = 0,006, einmal p = 0,82). Der Zuschnitt beantwortet
+die Zeile-1-Frage damit so: die Punktemarge wird zu Punkten, nicht
+verlaesslich zu Siegen. **K1 geht NICHT ins v24-Rezept** (Generatorwahl-
+Regel: Spaltenprofil entscheidet, und das faellt), der Skalenwechsel par.4b
+wird NICHT nachgezogen, der sigma-Folgearm und die Breitenprobe b = 10
+entfallen (par.14.1: nur, wenn K1 traegt). Der Knopf bleibt gebaut
+(Default 0, byte-identisch) und dokumentiert; eine Champion-Kante fuer den
+SPIELBETRIEB mit c = 0,2 ist ein eigener, optionaler Nutzer-Entscheid, kein
+Teil dieser Prereg. Einordnung zu par.11: die Familie "Score-Utility im
+Blattwert" ist nicht geschlossen, aber die beiden gemessenen Formen (linear
+par.8-10, saettigend-rezentriert hier) haben beide keinen verlaesslichen
+Siegzuwachs gebracht -- weitere Formen brauchen eine neue Idee, nicht ein
+neues Gewicht.
 
