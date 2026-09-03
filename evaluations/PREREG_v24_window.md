@@ -270,7 +270,7 @@ Sockel-Relabel).
 | Knopf | Was | Prereg | Messung |
 | --- | --- | --- | --- |
 | K1 Margen-Saettigung | Blattwert aus Siegwahrscheinlichkeit UND saettigender, re-zentrierter Marge aus Punkte- minus Gegnerpunkte-Kopf | `saturating_score_utility` par.6b (kein neuer Kopf) | gepaarte Arena gegen dasselbe Netz ohne Knopf, Spalten aus Logs |
-| K2 Risiko-Utility | Verteilung des WDL-Kopfs statt seines Mittels im Blattwert (Stufe A, kein Training) | `risk_sensitive_leaf_utility` par.2 | dito |
+| ~~K2 Risiko-Utility~~ | GESTRICHEN 2026-09-03: der WDL-Kopf hat zwei Klassen, kein Remis; Stufe A waere eine affine Umskalierung des Siegwerts (`risk_sensitive_leaf_utility` par.6). Bleibt als bedingter TRAININGS-Folgearm (Streuungs- oder Verteilungskopf) hinter K1 | -- | -- |
 | K3 Gelaender (c) | rundenabklingendes Dreiecks-Potential in Suche und Tiling, Form B oder C, Stufe 0 bestanden (Kopf kennt die Huelle) | `geometric_envelope` par.5c, par.3d | dito, zusaetzlich argmax-Spaltenprofil |
 
 **Reihenfolge und Kosten:** Erzeugung (11,9 h CPU) -> b01 (GPU) -> parallel

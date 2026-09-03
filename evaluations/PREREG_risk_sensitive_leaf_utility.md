@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt eine RISIKOSENSITIVE Blatt-Utility Spielstaerke -- also die Verteilung des Ausgangs statt nur ihres Mittels in die Suche zu ziehen? | Beleg: NICHTS GEMESSEN. par.1: points_dist ist ABGESCHALTET (POINTS_DIST_BINS = 0), aber value_wdl_logits wird exportiert und von der Suche nie gelesen -- daher Stufe A ohne Training (par.2), Stufe B mit (par.3). Entscheidungsmass ist STAERKE, kein Offline-Mass (par.4). EINGETAKTET fuer v22 (par.5): A1 ja, A2 nur mit Neu-Labeln des fertigen hv2-Korpus. A1-Entscheid faellig VOR dem Start des v22-Self-Play (par.5a). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Bringt eine RISIKOSENSITIVE Blatt-Utility Spielstaerke -- also die Verteilung des Ausgangs statt nur ihres Mittels in die Suche zu ziehen? | Beleg: Stufe A GEGENSTANDSLOS (par.6, 2026-09-03): der WDL-Kopf hat zwei Logits und das Spiel kein Remis, P(Niederlage) = 1 - P(Sieg); der registrierte Risiko-Term ist eine affine Umskalierung des Siegwerts, wirkungsgleich mit c_scale (gemessen wirkungslos). Eine Verteilungsform gibt es im Netz nicht. Stufe B (Verteilung, Training) bleibt als bedingter Folgearm hinter K1 (`saturating_score_utility` par.14.1), nicht eingetaktet. -->
 
 # PREREG: Risikosensitive Blatt-Utility
 
@@ -185,3 +185,45 @@ Wurzel-Besuchsverteilung, und eine veraenderte Blatt-Utility verschiebt sie.
 **A1 ist also nicht generell label-neutral, sondern nur gegenueber
 HEURISTISCHER Erzeugung.** Gleiche Auflage wie beim implicit-minimax-Arm: der
 Entscheid muss vor dem Start des v22-Self-Play fallen, nicht danach.
+
+## par.6 STUFE A IST GEGENSTANDSLOS: der WDL-Kopf hat keine dritte Klasse (Befund beim Schreiben des K2-Bau-Absatzes, 2026-09-03)
+
+Nutzer-Auftrag war der Bau-Absatz fuer K2 (`PREREG_v24_window.md` par.8).
+Beim Pruefen der Eingangsgroesse am Code faellt Stufe A weg:
+
+- **Der "WDL"-Kopf ist ein ZWEI-Klassen-Kopf.** `neural_net.py:934` ("2-Logit-
+  Softmax-Klassifikationskopf auf `values_wdl`"), `:1295` ("2 ROHE Logits"),
+  `:1424` (`p_win = softmax(logits)[:, 1:2]`); die ONNX-Ausgabe
+  `value_wdl_logits` von `v23-b01_brierbest` hat Form `[batch, 2]`. Das Spiel
+  kennt kein Remis (`game.rs:586` `determine_winner`, Startspielerstein-
+  Regel; STATUS "ES GIBT KEIN REMIS"). Eine Remis-Klasse, die par.2 als
+  Traeger der Zusatzinformation annahm ("70 % Sieg / 25 % Remis / 5 %
+  Niederlage"), existiert weder im Ziel noch im Kopf.
+- **Folge:** `P(Niederlage) = 1 - P(Sieg)` exakt. Der registrierte Term
+  `utility - LAMBDA * P(Niederlage)` wird zu `(1 + LAMBDA) * wr - LAMBDA`,
+  einer affinen Umskalierung des Siegwerts. Sie aendert keine Ordnung
+  zwischen Blaettern; in der Gumbel-Auswahl wirkt sie wie eine Aenderung der
+  sigma-Skalierung, also wie `MOSAIC_GUMBEL_C_SCALE`, und der ist gemessen
+  wirkungslos (`PREREG_gumbel_c_scale_arm.md` par.5, 0,5000 gegen 0,5150).
+  Stufe A misst damit nichts, was nicht schon gemessen ist.
+- **Was par.2 im Kopf hatte, gibt es im Netz nicht:** "die Verteilung des
+  Ausgangs statt nur ihres Mittels" setzt eine Ausgabe voraus, die mehr als
+  einen Freiheitsgrad hat. Vorhanden sind: `value` (Skalar), `points`,
+  `opp_points`, `endgame_margin` (je Skalar), `value_wdl_logits` (zwei
+  Logits, ein Freiheitsgrad). Der Bestand traegt keine Streuung, wie par.5
+  der Saettigungs-Prereg schon festgestellt hat.
+
+**Verdikt fuer Stufe A: gegenstandslos, nicht negativ.** Sie wird nicht
+gebaut und nicht gemessen; das Eingetaktete aus dem unteren par.5 (Arm A1
+fuer v22) ist damit ebenfalls hinfaellig -- es wurde nie gefahren, was im
+Rueckblick richtig war.
+
+**Was von K2 bleibt:** die Frage selbst (traegt die FORM des Ausgangs in der
+Blattbewertung?) ist nur mit einer Streuungs- oder Verteilungsausgabe
+messbar, also Stufe B oder ein sigma-Kopf. Beides ist ein Trainingsarm und
+faellt mit dem Folgearm zusammen, den `PREREG_saturating_score_utility.md`
+par.14.1 fuer den Fall registriert, dass K1 traegt und an `b` haengt. K2
+wird deshalb in `PREREG_v24_window.md` par.8 von den Such-Knoepfen gestrichen
+und als bedingter Trainingsarm hinter K1 gefuehrt. Ein Bau-Absatz entsteht
+erst dann, mit der Verteilungsform aus par.3 oder dem sigma-Kopf aus der
+Saettigungs-Prereg par.5 (Weg S) als Eingang.
