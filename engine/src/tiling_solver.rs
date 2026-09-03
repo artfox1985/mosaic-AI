@@ -1519,7 +1519,7 @@ pub fn best_first_step_exact_or_valued_ex(
     own_marg: Option<&[f64; crate::scoring::OWNERSHIP_FIELDS]>,
 ) -> TilingStep {
     best_first_step_exact_or_valued_envelope(
-        state, pi, evaluator, own_marg, 0.0, &crate::envelope::ENVELOPE_PROFILE_DEFAULT,
+        state, pi, evaluator, own_marg, &crate::envelope::EnvelopeTilingParams::OFF, None,
     )
 }
 
@@ -1536,13 +1536,19 @@ pub fn best_first_step_exact_or_valued_ex(
 /// `score * P(Sieg)`, Modus 1 bleibt `P(Sieg)`; Runde 2-4, Evaluator
 /// vorhanden). Bei `W_TILE == 0` oder Runde >= 5 wird dieser Zweig nicht
 /// betreten: bitgleich zum Bestand.
+///
+/// par.8.6 (Nutzer 2026-09-03): mit `W_VAL > 0` kommt der Value-Anteil in
+/// Punkten dazu, `W_VAL * (1 - w_e) * M(k)` mit `M(k)` aus
+/// `margin_evaluator` (vorhergesagte Endmarge am Endzustand des Kandidaten,
+/// `self_play::net_tiling_margin_value`); der multiplikative Stichentscheid
+/// entfaellt dann (Gleichstand -> erster Kandidat).
 pub fn best_first_step_exact_or_valued_envelope(
     state: &GameState,
     pi: usize,
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
     own_marg: Option<&[f64; crate::scoring::OWNERSHIP_FIELDS]>,
-    envelope_tiling_w: f64,
-    envelope_profile: &[f64; 5],
+    envelope: &crate::envelope::EnvelopeTilingParams,
+    margin_evaluator: Option<&dyn Fn(&GameState) -> Option<f64>>,
 ) -> TilingStep {
     // Spaltenbau (MOSAIC_SPALTENBAU, eigene Entscheidung siehe column_build.rs-
     // Moduldoku): PRUEFT ZUERST, damit das dynamisch gewaehlte Ziel der
@@ -1586,9 +1592,11 @@ pub fn best_first_step_exact_or_valued_envelope(
     }
     // Zweig 1b (K3 (d), par.8.3): Huellen-bereinigter Score, Runden 1-4, VOR
     // dem Netz-Stichentscheid; dieser entscheidet dann nur noch Gleichstaende.
-    if envelope_tiling_w != 0.0 && (1..=4).contains(&state.round_number) {
-        let w_e = crate::envelope::profile_weight(envelope_profile, state.round_number);
-        if let Some(step) = best_first_step_envelope_valued(state, pi, envelope_tiling_w, w_e, evaluator) {
+    if !envelope.is_off() && (1..=4).contains(&state.round_number) {
+        let w_e = crate::envelope::profile_weight(&envelope.profile, state.round_number);
+        if let Some(step) = best_first_step_envelope_valued(
+            state, pi, envelope.w_tile, envelope.w_val, w_e, evaluator, margin_evaluator,
+        ) {
             return step;
         }
     }
@@ -1613,8 +1621,10 @@ pub(crate) fn best_first_step_envelope_valued(
     state: &GameState,
     pi: usize,
     w_tile: f64,
+    w_val: f64,
     w_e: f64,
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
+    margin_evaluator: Option<&dyn Fn(&GameState) -> Option<f64>>,
 ) -> Option<TilingStep> {
     let cands = top_k_tilings(state, pi, NET_TILING_TOPK);
     if cands.is_empty() {
@@ -1624,15 +1634,28 @@ pub(crate) fn best_first_step_envelope_valued(
     let scored: Vec<(f64, TilingOutcome)> = cands
         .into_iter()
         .map(|c| {
-            let delta = crate::envelope::HULL_TOTAL_COST
-                * (crate::envelope::envelope_score(&c.final_state.players[pi]) - before);
-            (crate::envelope::adjusted_tiling_score(f64::from(c.points), w_tile, w_e, delta), c)
+            let delta = if w_tile != 0.0 {
+                crate::envelope::HULL_TOTAL_COST
+                    * (crate::envelope::envelope_score(&c.final_state.players[pi]) - before)
+            } else {
+                0.0
+            };
+            // par.8.6: EIN Vorwaertspass je Kandidat (derselbe, der heute
+            // P(Sieg) liefert), nur bei W_VAL != 0.
+            let margin = if w_val != 0.0 { margin_evaluator.and_then(|m| m(&c.final_state)) } else { None };
+            (
+                crate::envelope::adjusted_tiling_score_with_value(
+                    f64::from(c.points), w_tile, w_e, delta, w_val, margin,
+                ),
+                c,
+            )
         })
         .collect();
     let best = scored.iter().map(|(s, _)| *s).fold(f64::NEG_INFINITY, f64::max);
     let tied: Vec<&(f64, TilingOutcome)> =
         scored.iter().filter(|(s, _)| (s - best).abs() <= crate::envelope::ENVELOPE_TIE_EPS).collect();
-    if tied.len() >= 2 && NET_TILING_TIEBREAK_ENABLED && (2..=4).contains(&state.round_number) {
+    // par.8.6: bei W_VAL > 0 kein multiplikativer Stichentscheid mehr.
+    if w_val == 0.0 && tied.len() >= 2 && NET_TILING_TIEBREAK_ENABLED && (2..=4).contains(&state.round_number) {
         if let Some(eval) = evaluator {
             let mode = tiling_select_mode_env();
             let mut best_c: Option<(f64, &TilingStep)> = None;
