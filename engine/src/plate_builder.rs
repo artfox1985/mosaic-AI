@@ -90,7 +90,8 @@ fn mode_env() -> Modus {
                 Modus::Auto
             } else {
                 match v.parse::<usize>() {
-                    Ok(k) if k <= 7 => Modus::Fest(k),
+                    // 0..7 = Wertungskriterien, 8 = Huellen-Bauer (par.8.8).
+                    Ok(k) if k <= 8 => Modus::Fest(k),
                     _ => {
                         eprintln!(
                             "WARNUNG: MOSAIC_PLATTENBAU={raw:?} ungueltig \
@@ -225,6 +226,9 @@ fn builder_for(kriterium: usize) -> &'static dyn Plattenbauer {
         5 => &ECKENBAUER,
         6 => &SPEZIALBAUER,
         7 => &FARBENREICHBAUER,
+        // par.8.8 der Einhuellenden-Prereg (Nutzer 2026-09-03): kein Wertungs-
+        // kriterium, sondern die Huelle selbst als Zielgeometrie.
+        8 => &HULL_BUILDER,
         _ => &ZEILENBAUER, // defensiv; active_criterion liefert nie >7.
     }
 }
@@ -748,6 +752,71 @@ fn cells_corner(idx: usize) -> Vec<(usize, usize)> {
     }
     v
 }
+
+// ── par.8.8: Huellen-Bauer (MOSAIC_PLATTENBAU=8) ─────────────────────────────
+//
+// Nutzer 2026-09-03: "die Huelle wird kommen, um die ersten Runden stabiler
+// zu gestalten" und "werden die Kuppelplatten entsprechend gelegt, um die
+// Huelle zu unterstuetzen?" -- bisher nicht. Dieser Bauer legt die drei
+// Vorzuege des Plattenbauers (Draft, Kuppelplatte, Tiling) auf die Zellen
+// der bestpassenden Dreiecks-Huelle (`envelope::Hull`, Definitionen wie die
+// Sonde), mit Zielkarte = Zellenkosten `r + 1` (par.8.1): eine Zelle der
+// Rasterzeile 5 zaehlt sechsmal so viel wie eine der Zeile 0, und genau die
+// Kuppelplatten, deren Zellen in der Huelle liegen UND zur Farbe der
+// zugehoerigen Musterreihe passen, bekommen den Kuppel-Vorzug
+// (`dome_preference_for_cells_weighted` mit `legacy_cell_value`).
+// Orientierung: wie jeder Bauer per Kostenvergleich der beiden Kandidaten
+// (`target_index_generic`, Seed-Streuung bei Gleichstand), NICHT per
+// Abweichungsregel der Sonde -- auf dem leeren Brett gaebe die sonst immer
+// LINKS.
+
+struct HullBuilder;
+impl HullBuilder {
+    fn hull_cells(hull: crate::envelope::Hull) -> Vec<(usize, usize)> {
+        let mut v = Vec::with_capacity(21);
+        for r in 0..6 {
+            for c in 0..6 {
+                if hull.contains(r, c) {
+                    v.push((r, c));
+                }
+            }
+        }
+        v
+    }
+
+    fn cells(&self, state: &GameState, pi: usize) -> Option<Vec<(usize, usize)>> {
+        let kand = vec![
+            Self::hull_cells(crate::envelope::Hull::Left),
+            Self::hull_cells(crate::envelope::Hull::Right),
+        ];
+        let idx = target_index_generic(state, pi, &kand)?;
+        Some(kand[idx].clone())
+    }
+
+    /// Zielkarte par.8.1: Zellenkosten `r + 1` auf den Huellenzellen, 0 sonst.
+    fn target_map(cells: &[(usize, usize)]) -> Zielkarte {
+        let mut k = [[0.0f64; 6]; 6];
+        for &(r, c) in cells {
+            k[r][c] = crate::envelope::row_cost(r);
+        }
+        k
+    }
+}
+impl Plattenbauer for HullBuilder {
+    fn drafting_preference(&self, state: &GameState) -> Option<Action> {
+        let z = self.cells(state, state.current_player)?;
+        preference_move_for_cells_weighted(state, &z, &Self::target_map(&z))
+    }
+    fn dome_preference(&self, state: &GameState) -> Option<Action> {
+        let z = self.cells(state, state.current_player)?;
+        dome_preference_for_cells_weighted(state, &z, &Self::target_map(&z), legacy_cell_value)
+    }
+    fn tiling_preference(&self, state: &GameState, pi: usize) -> Option<TilingStep> {
+        let z = self.cells(state, pi)?;
+        tiling_preference_for_cells_weighted(state, pi, &z, &Self::target_map(&z))
+    }
+}
+static HULL_BUILDER: HullBuilder = HullBuilder;
 
 // ── Kriterium 0: Zeilen (Horizontale Reihen, 3 Pkt) ──────────────────────────
 
@@ -1401,6 +1470,18 @@ mod tests {
         set_mode_override_for_test(None);
     }
 
+
+    /// par.8.8: beide Huellen haben 21 Zellen mit Gesamtkost 56, die Zielkarte
+    /// traegt genau die Zellenkosten r + 1 auf den Huellenzellen.
+    #[test]
+    fn hull_builder_cells_and_map_match_par_8_1() {
+        for hull in [crate::envelope::Hull::Left, crate::envelope::Hull::Right] {
+            let z = HullBuilder::hull_cells(hull);
+            assert_eq!(z.len(), 21);
+            let k = HullBuilder::target_map(&z);
+            let total: f64 = z.iter().map(|&(r, c)| k[r][c]).sum();
+            assert_eq!(total, crate::envelope::HULL_TOTAL_COST);
+            assert_eq!(k[5][5], if hull == crate::envelope::Hull::Right { 6.0 } else { 0.0 });
+        }
+    }
 }
-
-

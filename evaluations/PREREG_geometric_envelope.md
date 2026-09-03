@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, aber BAUREIF (par.8, 2026-09-03): Form A tot (par.3f), Kopf kennt die Huelle ab R1 (par.5c) -- Baustein (b) entfaellt; K3 = Potential am Blattwert (MOSAIC_ENVELOPE_SEARCH_C) plus Huellen-Gewinn im Tiling (MOSAIC_ENVELOPE_TILING_W), Profil aus der Verlaesslichkeit des Value-Kopfs je Runde (b01: 1/0,92/0,67/0,33/0, par.8.5), Defaults aus. Messung: argmax-Spalten, Arena gegen dasselbe Netz, Huellen-Abdeckung. BAUREIF, nichts mehr offen. -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: K3 in der Bauform par.8.2/8.3 GEMESSEN (par.9, 2026-09-03): Siege, Spalten und Huelle unbewegt -- falscher Hebel, nicht falsches Ziel: im Draft-Suchbaum ist H konstant (Raster fuellt sich nur im Tiling). Fortsetzung gebaut: par.8.6 Value-Anteil im Tiling (Nutzer), par.8.7 Potential auf dem projizierten Brett, par.8.8 Huellen-Bauer mit Kuppel-Vorzug; Messung laeuft. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -850,4 +850,36 @@ Punktverlust, ist der Bauer der Kandidat fuer die v24-Erzeugung
 Reihenfolge: K3-P (par.8.7) und K3-B (par.8.8) werden nach der Nachtkette
 gebaut (Wheel-Wechsel waehrend laufender Laeufe ist nicht moeglich) und in
 EINEM Bau mit Paritaets-Gate abgenommen; dann Messung beider.
+
+## par.9 GEMESSEN (2026-09-03): K3 in der Bauform par.8.2/8.3 bewegt nichts -- falscher Hebel, nicht falsches Ziel
+
+**Aufbau:** wie par.8.4, am `v23-b01_brierbest` gegen dasselbe Netz mit Spec
+"alle Knoepfe 0" (`k1_off.spec.json`), Brett-Tausch per zweitem Lauf, Seed
+20261002, 6 Arme x 2 x 80, Blockgroesse 5, `MOSAIC_STACK_DRAW_RESEARCH=1`,
+Profil = b01-Kurve (par.8.5). Artefakte `paired_arena_env_k3_b01_{first,second}_s02.json`
+(5.523 + rund 5.500 s exklusiv), `k3_b01_swap_eval_s02.json`,
+`columns_k3_b01_{first,second}_s02.json`, `tor2a_k3{s01,s02,t05,t10,st}_v23b01.json`
+(je rund 1.510 s). Abbruch-Vorfall der zweiten Richtung (Spec-Datei
+waehrend des Laufs geaendert): Chronik 17:32, Neustart identisch.
+
+| Arm | Siege Knopf : Basislinie (160 Paare) | diskordant | Margin (Block-SE) | Spalten Arena, Knopf minus Kontrolle (Block-SE) | H Arena (SE) | argmax volle Spalten (b01 0,515) |
+| --- | --- | --- | --- | --- | --- | --- |
+| S 0,1 | 80 : 80 | **0 / 0** | -0,07 (0,32) | +0,019 (0,019) | +0,005 (0,003) | 0,510 |
+| S 0,2 | 78 : 82 | 0 / 2 | -0,29 (0,43) | +0,019 (0,014) | +0,010 (0,003) | 0,525 |
+| T 0,5 | 78 : 82 | 5 / 7 | -0,38 (0,85) | -0,031 (0,029) | -0,002 (0,008) | 0,517 |
+| T 1,0 | 81 : 79 | 8 / 7 | -0,32 (0,98) | -0,019 (0,032) | 0,000 (0,010) | 0,512 |
+| S+T | 81 : 79 | 8 / 7 | -0,67 (1,17) | -0,019 (0,032) | +0,003 (0,011) | 0,505 |
+
+**Verdikt (par.8.4, Zeile 3): Spalten unbewegt, Siege unbewegt, Huelle
+unbewegt.** Der Such-Eingriff (e) aendert bei C_HULL 0,1 in KEINER der 160
+Partien den Sieger und bei 0,2 in zweien; der Grund ist strukturell (par.8.7):
+das Raster fuellt sich nur im Tiling, im Draft-Suchbaum ist H konstant, das
+Potential faellt in der Differenz zur Wurzel weg. Der Tiling-Eingriff (d)
+kippt 12-15 von 160 Partien ohne Richtung, weil er nur unter Fast-
+Gleichstaenden der Sofortpunkte entscheidet. **Das ist KEIN Verdikt ueber die
+Huelle** (Nutzer 2026-09-03: "die Huelle wird kommen ... noch nicht den
+richtigen Hebel gefunden"), sondern ueber diese zwei Hebel; die Fortsetzung
+sind par.8.7 (Potential auf dem projizierten Brett) und par.8.8 (Huellen-
+Bauer mit Kuppel-Vorzug). par.7 ("geometrische Umgehung traegt den fruehen
+Engpass nicht") bleibt damit OFFEN, nicht bestaetigt.
 
