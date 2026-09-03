@@ -514,6 +514,51 @@ Betroffen sind nur Bretter, deren bestpassende Orientierung rechts ist;
 Neurechnung fuer Lehrer und Mensch-Logs laeuft, b04r2 und b06 liegen nicht
 mehr im Baum (Berichtigung in `PREREG_heuristic_v2_long_rows.md`).
 
+
+## par.8.6 VORSCHLAG (zu bestaetigen): der Value-Anteil im Tiling wird Form B in Punkteeinheiten (Nutzer 2026-09-03: "die momentane implementierung des value heads im tiling ist schwach")
+
+Heute (par.3f): `Punkte * P(Sieg)` unter den Top-12, faktisch ein
+Stichentscheid unter Punktgleichen, weil P(Sieg) unter den Kandidaten nur
+0,02 bis 0,07 streut. Das ist Form A, und sie ist tot. par.3d (i) verlangt B
+(additiv auf angeglichener Skala) oder C (lexikografisch mit Toleranzband).
+Die angeglichene Skala gibt es seit `saturating_score_utility` par.6b ohne
+neuen Kopf: die **Margen-Vorhersage in Punkten**,
+`M(s) = 50 * atanh(p_own(s)) - 50 * atanh(p_opp(s))` aus Punkte- und
+Gegnerpunkte-Kopf (Steigung 0,97 auf Plattenpunkten), ausgewertet am
+Endzustand jedes Tiling-Kandidaten -- derselbe Forward-Pass, der heute
+P(Sieg) liefert.
+
+**Vorgeschlagene Tiling-Zielfunktion in Runde 1-4 (ersetzt 8.3 und den
+Stichentscheid):**
+
+```
+score(k) = Punkte(k) + W_TILE * w_e(r) * dH_kosten(k) + W_VAL * w_v(r) * M(k)
+w_v(r)   = 1 - w_e(r)                        # gegenlaeufig, par.3c; Profil bleibt
+```
+
+- Alle drei Terme in Punkten: Sofortpunkte des Abschlusses, Huellen-Gewinn
+  (in Kosteneinheiten, per `W_TILE` in Punkte uebersetzt), vorhergesagte
+  Endmarge nach dem Abschluss. `W_VAL = 1` heisst: ein vorhergesagter
+  Endpunkt zaehlt wie ein sofortiger; Arme **0,5 / 1,0**.
+- Profil unveraendert (Nutzer): `w_e` aus der Verlaesslichkeit des
+  Value-Kopfs (par.8.5), `w_v` sein Komplement. In Runde 1 fuehrt die
+  Geometrie (w_v 0), in Runde 4 die Vorhersage (w_v 0,67), in Runde 5
+  rechnet der Loeser exakt (beide 0).
+- Der multiplikative Stichentscheid `NET_TILING_TIEBREAK_ENABLED` wird bei
+  `W_VAL > 0` nicht mehr gebraucht und uebersprungen; bei `W_VAL = 0` und
+  `W_TILE = 0` bleibt der Bestandspfad bitgleich.
+- Knopf `MOSAIC_ENVELOPE_TILING_VALUE_W` (= `W_VAL`), Default 0.
+- Was M NICHT kann: Streuung. Das ist derselbe bedingte Folgearm wie bei
+  K1 (sigma-Kopf), nicht Voraussetzung.
+
+**Messung:** ein zusaetzlicher Arm **V** (nur `W_VAL`, ohne Huelle) neben S,
+T, S+T aus 8.4, plus **T+V** als gemeinsamer Tiling-Arm; dieselben
+Instrumente und Verdikte. Damit trennt der Zuschnitt, ob im Tiling die
+Geometrie, die Margen-Vorhersage oder beides traegt.
+
+**Status:** VORSCHLAG. Wird gebaut, sobald der Nutzer ihn bestaetigt oder
+aendert; bis dahin gilt 8.3 mit Stichentscheid.
+
 ## par.8 BAU-ABSATZ K3 fuer v24: das Gelaender in Suche (e) und Tiling (d), Stufe 2 vorgezogen (registriert 2026-09-03, VOR dem Bau)
 
 Kontext: `PREREG_v24_window.md` par.8, Such-Knopf K3; Stufe 0 (par.5c) hat
