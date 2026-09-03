@@ -26,17 +26,30 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-03, 14:30 -- Sitzung mosaic-ai-6d, Tagprogramm nach der Uebergabe von 09:00)
 
-**LAEUFT: Nachtkette B `night_chain_0903b.sh`** (Sitzungs-Scratch; Start
-22:05, CPU exklusiv, GPU frei): 0) Install des Wheels mit par.8.6 (Value-
-Anteil im Tiling), par.8.7 (K3-P, projiziertes Brett) und par.8.8 (Huellen-
-Bauer `MOSAIC_PLATTENBAU=8`), Anker-Drift, Netz-Pfad-Paritaet; 1) K3-P argmax
-C 0,2/0,5/1,0; 2) K3-B argmax; 3) K3-B Arena gegen hv1@150 ohne/mit Bauer;
-4) 8.6-Arena (V 0,5/1,0, T+V) plus Sonden; 5) 8.6-argmax; 6) Champion-Kante
-b01 + K1 c = 0,2 gegen v21 (200 Paare, Seed 20261004); 7) Bezugskante ohne
-Knopf; 8) K3-P-Arena; 9) v24-Material-Pilot. Ende gegen 09:00. Kette A
-(K3 S/T/S+T) ist durch: par.9 registriert (Nullbefund der Bauform, Huelle
-OFFEN, Nutzer-Entscheid: Huelle kommt, Hebel gesucht). Baum committet,
-ungepusht.
+**LAEUFT: Nachtkette B `night_chain_0903b.sh`** (Start 21:25, CPU exklusiv,
+GPU frei; Schritte 0-3 durch: Wheel mit 8.6 + K3-P + Huellen-Bauer
+installiert, Anker-Drift und Netz-Pfad-Paritaet GRUEN; K3-P argmax C 0,2/0,5/
+1,0; Huellen-Bauer argmax und Arena gegen hv1). Seit 23:11: 4) 8.6-Arena
+(V 0,5/1,0, T+V) plus Sonden, 5) 8.6-argmax, 6) Champion-Kante b01 + K1 c = 0,2
+gegen v21 (200 Paare, Seed 20261004), 7) Bezugskante ohne Knopf, 8) K3-P-Arena
+(C 0,2/0,5/1,0 projiziert, Seed 20261007), 9) v24-Material-Pilot. Ende gegen
+09:00. **Dahinter wartet ein PowerShell-Auftrag:** `cargo test --release`
+und Wheel-Bau fuer K3-R/K3-O (Commit 10d19e3), dann **Kette C**
+`night_chain_0903c.sh` (Install, Anker, Paritaet, argmax K3-R C 0,5/1,0 und
+K3-O C 0,5/1,0, Huellen-Sonden, Arena K3-R/K3-O Seed 20261008), Ende gegen
+14:00. Baum committet, ungepusht.
+
+**Befunde des Abends (Einhuellende, `geometric_envelope`):** par.9 K3 in der
+Bauform 8.2/8.3 bewegt nichts (falscher Hebel: H liest das Raster, das sich
+im Draft nicht aendert; Nutzer-Berichtigung: das Drafting ENTSCHEIDET, was dem
+Tiling zur Verfuegung steht). par.8.7a K3-P (Musterreihen projiziert) hebt die
+Huelle monoton mit C (Ende 0,659 -> 0,703, Halbzeit +0,055, Runde-2-Steine in
+der Huelle 0,905 -> 0,984) bei 0,555 Spalten und 47,7 Punkten (C 1,0) --
+erster Hebel in die gewuenschte Richtung, Staerke offen (Schritt 8).
+Huellen-Bauer (par.8.8, Uebersteuerung): Huelle +0,07, aber 68:92 gegen hv1
+statt 131:29, Spalten 0,275 -- unbrauchbar als Ersatz des Netzzugs.
+par.8.9 (Nutzer): Erreichbarkeit (K3-R, w_r 0,25) und Ownership (K3-O) als
+weitere Projektionen gebaut, Messung in Kette C.
 
 ### Was das Tagprogramm 2026-09-03 bis 14:30 ergeben hat (Chronik: `night_run_20260902.md`, ab 09:08)
 
