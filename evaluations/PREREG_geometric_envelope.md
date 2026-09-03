@@ -761,9 +761,11 @@ fuenf Arme rund 5 h CPU.
 
 ## par.8.7 K3-P: das Potential auf dem PROJIZIERTEN Brett (Nutzer 2026-09-03, 21:00: "die Huelle wird kommen ... hast du noch nicht den richtigen Hebel gefunden")
 
-**Warum (e) nichts bewegt hat (strukturell, am Code geprueft):** `H(brett)`
-liest die BELEGTEN Zellen des Kuppelrasters (`envelope::occupancy`,
-`DomeSpace::is_filled`). Zellen werden nur in der Tiling-Phase gefuellt
+**Warum (e) nichts bewegt hat (strukturell, am Code geprueft) -- und was
+das NICHT heisst:** Das Drafting legt fest, was dem Tiling zur Verfuegung
+steht (Nutzer 2026-09-03); dort wird die Huelle entschieden. `H(brett)` in
+par.8.1 liest aber nur die BELEGTEN Zellen des Kuppelrasters
+(`envelope::occupancy`, `DomeSpace::is_filled`). Zellen werden nur in der Tiling-Phase gefuellt
 (`DomeGrid::place_tile`, aufgerufen aus dem Tiling); waehrend des Draftings
 wandern Steine in die MUSTERREIHEN, das Raster bleibt gleich. Ein Suchbaum
 ueber Draft-Zuege sieht also an allen Blaettern dasselbe `H0 - H1` (bis auf
@@ -874,7 +876,14 @@ waehrend des Laufs geaendert): Chronik 17:32, Neustart identisch.
 unbewegt.** Der Such-Eingriff (e) aendert bei C_HULL 0,1 in KEINER der 160
 Partien den Sieger und bei 0,2 in zweien; der Grund ist strukturell (par.8.7):
 das Raster fuellt sich nur im Tiling, im Draft-Suchbaum ist H konstant, das
-Potential faellt in der Differenz zur Wurzel weg. Der Tiling-Eingriff (d)
+Potential faellt in der Differenz zur Wurzel weg. **Berichtigung (Nutzer
+2026-09-03, 21:40): daraus folgt NICHT, dass die Huelle im Drafting
+wirkungslos waere -- das Gegenteil gilt: im Drafting wird festgelegt, was
+dem Tiling zur Verfuegung steht (welche Farbe in welcher Musterreihe, also
+welche Rasterzelle ueberhaupt erreichbar wird). Wirkungslos war der
+MESSFUEHLER, der nur das Raster las und die Draft-Entscheidung deshalb nicht
+sah. Der Hebel gehoert ins Drafting: par.8.7 projiziert die Musterreihen in
+H, par.8.8 setzt den Draft-Vorzug direkt auf die Huellenzellen.** Der Tiling-Eingriff (d)
 kippt 12-15 von 160 Partien ohne Richtung, weil er nur unter Fast-
 Gleichstaenden der Sofortpunkte entscheidet. **Das ist KEIN Verdikt ueber die
 Huelle** (Nutzer 2026-09-03: "die Huelle wird kommen ... noch nicht den
