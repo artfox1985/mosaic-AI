@@ -1,5 +1,7 @@
 {
   "implicit_minimax_alpha": 0.2,
   "long_row_init_shaping_w": 0.0,
+  "score_utility_c": 0.0,
+  "score_utility_b": 20.0,
   "heuristik_variante": "hv1"
 }

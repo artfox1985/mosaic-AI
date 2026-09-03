@@ -736,6 +736,11 @@ fn engine_config_json() -> String {
         // (byte-identisches Bestandsverhalten).
         "value_cal_a": value_cal_a(),
         "value_cal_b": value_cal_b(),
+        // K1 (PREREG_saturating_score_utility.md par.14.3): Env-Defaults der
+        // beiden Knoepfe, damit sie im Lauf-Manifest sichtbar sind. Pro Seite
+        // ueberschreibbar per Spec-Datei (dann steht der Spec-Wert dort).
+        "score_utility_c": crate::net_mcts::SearchConfig::from_env().score_utility_c,
+        "score_utility_b": crate::net_mcts::SearchConfig::from_env().score_utility_b,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,
@@ -803,6 +808,20 @@ fn get_aggression_params() -> (f64, f64) {
 #[pyfunction]
 fn denial_tiebreak_stats() -> (u64, u64) {
     crate::net_mcts::denial_tiebreak_stats()
+}
+
+/// K1-Zaehler `(blaetter, marge_geklammert, einheit_geklammert)`
+/// (PREREG_saturating_score_utility.md par.14: Klammer-Anteil wird gezaehlt
+/// und berichtet). Prozessweit, Muster `denial_tiebreak_stats`.
+#[pyfunction]
+fn score_utility_stats() -> (u64, u64, u64) {
+    crate::net_mcts::score_utility_stats()
+}
+
+/// Setzt die K1-Zaehler zurueck (vor einem zu messenden Lauf).
+#[pyfunction]
+fn reset_score_utility_stats() {
+    crate::net_mcts::reset_score_utility_stats()
 }
 
 /// Setzt den Denial-Tie-Break-Debug-Zaehler zurueck -- vor einem zu
@@ -1926,6 +1945,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(get_aggression_params, m)?)?;
     m.add_function(wrap_pyfunction!(denial_tiebreak_stats, m)?)?;
     m.add_function(wrap_pyfunction!(reset_denial_tiebreak_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(score_utility_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(reset_score_utility_stats, m)?)?;
     m.add_function(wrap_pyfunction!(color_denial_probe_stats, m)?)?;
     m.add_function(wrap_pyfunction!(reset_color_denial_probe_stats, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;

@@ -135,6 +135,15 @@ def main() -> None:
             seed=args.seed, num_threads=args.threads,
             c=args.c, c_puct=args.c_puct, log_games=args.log_games, seeds=seeds,
         )
+    # K1 (PREREG_saturating_score_utility.md par.14): Klammer-Anteil der
+    # Margen-Utility, prozessweit gezaehlt -- auf STDERR, damit stdout das
+    # rohe JSON bleibt; der Orchestrator sammelt die Zeile je Arm ein.
+    if hasattr(mr, "score_utility_stats"):
+        leaves, margin_clamped, unit_clamped = mr.score_utility_stats()
+        if leaves:
+            print("SCORE_UTILITY_STATS " + json.dumps({
+                "leaves": leaves, "margin_clamped": margin_clamped,
+                "unit_clamped": unit_clamped}), file=sys.stderr, flush=True)
     # NUR das rohe JSON auf stdout -- der Orchestrator parsed es 1:1.
     sys.stdout.write(raw)
 
