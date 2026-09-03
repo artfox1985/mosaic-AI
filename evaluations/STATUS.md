@@ -26,10 +26,15 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-03, 14:30 -- Sitzung mosaic-ai-6d, Tagprogramm nach der Uebergabe von 09:00)
 
-**LAEUFT: K3-Arena** (`k3_arena.sh`: sechs Arme S 0,1/0,2, T 0,5/1,0,
-S+T 0,1+1,0 plus Kontrolle, je 2 x 80 mit Brett-Tausch gegen Spec aus, Seed
-20261002, Blockgroesse 5, gestartet 15:28, Ende gegen 19:00; danach argmax
-je Arm). GPU frei. Baum committet, ungepusht.
+**LAEUFT: Nachtkette `night_chain_0903.sh`** (Sitzungs-Scratch; Start 17:40,
+CPU exklusiv, GPU frei): 1) K3-Arena zweite Richtung (Seed 20261002; die
+erste liegt: `paired_arena_env_k3_b01_first_s02.json`), 2) Spaltensonden K3,
+3) argmax je K3-Arm (5 x 28 min), 4) Bau des par.8.6-Wheels mit Tests,
+Install, Anker-Drift und Netz-Pfad-Paritaet (Kette haelt bei ROT), 5) Champion-
+Kante b01 + K1 c = 0,2 gegen `v21_2d_brierbest` (200 Paare, Seed 20261004),
+6) Bezugskante b01 ohne Knopf, gleicher Seed, 7) par.8.6-Arena (V 0,5 / V 1,0 /
+T+V, beide Richtungen, Seed 20261005) plus Sonden, 8) argmax je 8.6-Arm,
+9) v24-Material-Pilot. Ende gegen 04:00. Baum committet, ungepusht.
 
 ### Was das Tagprogramm 2026-09-03 bis 14:30 ergeben hat (Chronik: `night_run_20260902.md`, ab 09:08)
 
