@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, aber BAUREIF bis auf zwei Werte (par.8, 2026-09-03): Form A tot (par.3f), Kopf kennt die Huelle ab R1 (par.5c) -- Baustein (b) entfaellt; K3 = Potential am Blattwert (MOSAIC_ENVELOPE_SEARCH_C) plus Huellen-Gewinn im Tiling (MOSAIC_ENVELOPE_TILING_W), Profil 1/0,75/0,5/0,25/0, Defaults aus. Messung: argmax-Spalten, Arena gegen dasselbe Netz, Huellen-Abdeckung. Offen: Gewichte und Profil bestaetigen. -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: NICHTS GEBAUT, aber BAUREIF (par.8, 2026-09-03): Form A tot (par.3f), Kopf kennt die Huelle ab R1 (par.5c) -- Baustein (b) entfaellt; K3 = Potential am Blattwert (MOSAIC_ENVELOPE_SEARCH_C) plus Huellen-Gewinn im Tiling (MOSAIC_ENVELOPE_TILING_W), Profil aus der Verlaesslichkeit des Value-Kopfs je Runde (b01: 1/0,92/0,67/0,33/0, par.8.5), Defaults aus. Messung: argmax-Spalten, Arena gegen dasselbe Netz, Huellen-Abdeckung. BAUREIF, nichts mehr offen. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -618,7 +618,42 @@ fuenf Arme rund 5 h CPU.
 
 ### 8.5 Offen vor dem ersten Handgriff (Nutzer-Entscheid)
 
-1. **Gewichte:** `C_HULL` 0,1 / 0,2 und `W_TILE` 0,5 / 1,0 wie oben, oder
-   andere Werte. Kein Sweep darueber hinaus.
-2. **Profil:** die Stuetzstellen 1 / 0,75 / 0,5 / 0,25 / 0 aus par.3d (ii)
-   bestaetigen. Alternative aus par.3b: bis R3 voll, R4 halb, R5 null.
+1. ~~**Gewichte**~~ **ENTSCHIEDEN (Nutzer 2026-09-03): `C_HULL` 0,1 / 0,2 und
+   `W_TILE` 0,5 / 1,0 bleiben.**
+2. ~~**Profil** bestaetigen~~ **ENTSCHIEDEN (Nutzer 2026-09-03): "ich wuerd
+   das profil abhaengig machen vom value head."** Also keine Hand-
+   Stuetzstellen, sondern eine Regel, die aus der gemessenen
+   Verlaesslichkeit des Value-Kopfs je Runde folgt:
+
+   ```
+   rho(r)  = Spearman(Value-Kopf, tatsaechliche Endmarge) in Runde r,
+             Spieler am Zug, auf frozen_v3 (360 Zustaende je Runde)
+   w_e(r)  = (rho(5) - rho(r)) / (rho(5) - rho(1))      # R1 = 1, R5 = 0
+   ```
+
+   Gemessen am Traeger `v23-b01_brierbest`
+   (`evaluations/artifacts/value_head_reliability_by_round.json`, kein
+   Orakel, Bezug ist der echte Ausgang der gespielten Partie):
+
+   | Runde | rho (Value vs Endmarge) | w_e |
+   | --- | --- | --- |
+   | 1 | 0,143 | **1,00** |
+   | 2 | 0,201 | **0,92** |
+   | 3 | 0,390 | **0,67** |
+   | 4 | 0,641 | **0,33** |
+   | 5 | 0,881 | **0** (Auflage par.4.1) |
+
+   Der Kopf traegt frueh fast nichts (0,14 in Runde 1), ab Runde 4 viel
+   (0,64) und in Runde 5 fast alles (0,88); das Gelaender tritt genau
+   gegenlaeufig zurueck. b05 hat dieselbe Kurve (0,17 / 0,17 / 0,37 / 0,65 /
+   0,84), die Form ist also eine Eigenschaft der Linie, nicht eines
+   Checkpoints. **Regel:** das Profil wird JE TRAEGER aus dieser Messung neu
+   berechnet (ein Lauf, unter einer Minute), steht als fuenf Zahlen in
+   `MOSAIC_ENVELOPE_PROFILE` und damit im Manifest; ein Hand-Profil ist kein
+   Default mehr. **Vorbehalt, registriert:** die niedrige Korrelation in
+   Runde 1-2 misst teils echte Spielunsicherheit, nicht nur Kopfschwaeche;
+   fuer den Zweck des Gelaenders (dort fuehren, wo der Kopf nicht traegt) ist
+   das dieselbe Sache.
+
+   Damit ist K3 vollstaendig baureif; kein Punkt dieses Absatzes ist mehr
+   offen.
