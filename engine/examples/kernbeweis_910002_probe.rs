@@ -83,6 +83,9 @@ fn main() {
         score_utility_c: 0.0,
         score_utility_b: 20.0,
         score_utility_root_margin: None,
+        envelope_search_c: 0.0,
+        envelope_tiling_w: 0.0,
+        envelope_profile: mosaic_rust::envelope::ENVELOPE_PROFILE_DEFAULT,
     };
     let actions = drafting_actions(&state1);
     println!(

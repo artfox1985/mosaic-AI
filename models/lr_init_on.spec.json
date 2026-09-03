@@ -3,5 +3,8 @@
   "long_row_init_shaping_w": 0.3,
   "score_utility_c": 0.0,
   "score_utility_b": 20.0,
+  "envelope_search_c": 0.0,
+  "envelope_tiling_w": 0.0,
+  "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0],
   "heuristik_variante": "hv1"
 }

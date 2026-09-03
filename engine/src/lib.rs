@@ -9,6 +9,7 @@ use serde_json::json;
 // Reiner Rust-Kern (PyO3-frei, mit `cargo test` testbar).
 pub mod board;
 pub mod dome;
+pub mod envelope;
 pub mod execution;
 pub mod factory;
 pub mod features;
@@ -741,6 +742,10 @@ fn engine_config_json() -> String {
         // ueberschreibbar per Spec-Datei (dann steht der Spec-Wert dort).
         "score_utility_c": crate::net_mcts::SearchConfig::from_env().score_utility_c,
         "score_utility_b": crate::net_mcts::SearchConfig::from_env().score_utility_b,
+        // K3 (PREREG_geometric_envelope.md par.8): Env-Defaults der drei Knoepfe.
+        "envelope_search_c": crate::net_mcts::SearchConfig::from_env().envelope_search_c,
+        "envelope_tiling_w": crate::net_mcts::SearchConfig::from_env().envelope_tiling_w,
+        "envelope_profile": crate::net_mcts::SearchConfig::from_env().envelope_profile.to_vec(),
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,

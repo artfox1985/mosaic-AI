@@ -175,6 +175,8 @@ def main() -> int:
     # --- Spec: was der Agent IST
     spec = {"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0,
             "score_utility_c": 0.0, "score_utility_b": 20.0,  # K1 aus (par.14, 2026-09-03)
+            "envelope_search_c": 0.0, "envelope_tiling_w": 0.0,  # K3 aus (geometric_envelope par.8)
+            "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0],
             "heuristik_variante": a.variante}
     (target / "spec.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n",
                                     encoding="utf-8", newline="\n")

@@ -1518,6 +1518,32 @@ pub fn best_first_step_exact_or_valued_ex(
     evaluator: Option<&dyn Fn(&GameState) -> f64>,
     own_marg: Option<&[f64; crate::scoring::OWNERSHIP_FIELDS]>,
 ) -> TilingStep {
+    best_first_step_exact_or_valued_envelope(
+        state, pi, evaluator, own_marg, 0.0, &crate::envelope::ENVELOPE_PROFILE_DEFAULT,
+    )
+}
+
+/// K3 (d), `PREREG_geometric_envelope.md` par.8.3: Huellen-Gewinn neben den
+/// Sofortpunkten. Bereinigter Score je Kandidat (Top-12 wie der Netz-
+/// Stichentscheid):
+///
+/// ```text
+/// score(k) = punkte(k) + W_TILE * w_e(runde) * dH_kosten(k)
+/// ```
+///
+/// Argmax darueber; der bestehende Netz-Stichentscheid (Zweig 2) greift NUR
+/// noch unter Kandidaten mit gleichem bereinigtem Score (Modus 0 wird
+/// `score * P(Sieg)`, Modus 1 bleibt `P(Sieg)`; Runde 2-4, Evaluator
+/// vorhanden). Bei `W_TILE == 0` oder Runde >= 5 wird dieser Zweig nicht
+/// betreten: bitgleich zum Bestand.
+pub fn best_first_step_exact_or_valued_envelope(
+    state: &GameState,
+    pi: usize,
+    evaluator: Option<&dyn Fn(&GameState) -> f64>,
+    own_marg: Option<&[f64; crate::scoring::OWNERSHIP_FIELDS]>,
+    envelope_tiling_w: f64,
+    envelope_profile: &[f64; 5],
+) -> TilingStep {
     // Spaltenbau (MOSAIC_SPALTENBAU, eigene Entscheidung siehe column_build.rs-
     // Moduldoku): PRUEFT ZUERST, damit das dynamisch gewaehlte Ziel der
     // Drafting-Seite (column_build::target_column) auch beim Tiling-Routing
@@ -1558,6 +1584,14 @@ pub fn best_first_step_exact_or_valued_ex(
             }
         }
     }
+    // Zweig 1b (K3 (d), par.8.3): Huellen-bereinigter Score, Runden 1-4, VOR
+    // dem Netz-Stichentscheid; dieser entscheidet dann nur noch Gleichstaende.
+    if envelope_tiling_w != 0.0 && (1..=4).contains(&state.round_number) {
+        let w_e = crate::envelope::profile_weight(envelope_profile, state.round_number);
+        if let Some(step) = best_first_step_envelope_valued(state, pi, envelope_tiling_w, w_e, evaluator) {
+            return step;
+        }
+    }
     // Zweig 2 (Task #20): Netz-Stichentscheid, Runden 2-4.
     if NET_TILING_TIEBREAK_ENABLED && (2..=4).contains(&state.round_number) {
         if let Some(eval) = evaluator {
@@ -1568,6 +1602,54 @@ pub fn best_first_step_exact_or_valued_ex(
     }
     // Zweig 3: reine Punktemaximierung (deckt Runde >= 5 selbst ab).
     best_first_step_exact(state, pi)
+}
+
+/// Auswahlkern von K3 (d), OHNE Env-Zugriff (`w_tile`, `w_e` als Parameter,
+/// direkt testbar): bereinigter Score ueber die Top-12, Argmax, Netz-
+/// Stichentscheid nur unter Gleichen (Toleranz `ENVELOPE_TIE_EPS`); ohne
+/// Evaluator oder in Runde 1 gewinnt bei Gleichstand der ZUERST gefundene
+/// Kandidat (dieselbe Regel wie `select_best_tiling_candidate`).
+pub(crate) fn best_first_step_envelope_valued(
+    state: &GameState,
+    pi: usize,
+    w_tile: f64,
+    w_e: f64,
+    evaluator: Option<&dyn Fn(&GameState) -> f64>,
+) -> Option<TilingStep> {
+    let cands = top_k_tilings(state, pi, NET_TILING_TOPK);
+    if cands.is_empty() {
+        return None;
+    }
+    let before = crate::envelope::envelope_score(&state.players[pi]);
+    let scored: Vec<(f64, TilingOutcome)> = cands
+        .into_iter()
+        .map(|c| {
+            let delta = crate::envelope::HULL_TOTAL_COST
+                * (crate::envelope::envelope_score(&c.final_state.players[pi]) - before);
+            (crate::envelope::adjusted_tiling_score(f64::from(c.points), w_tile, w_e, delta), c)
+        })
+        .collect();
+    let best = scored.iter().map(|(s, _)| *s).fold(f64::NEG_INFINITY, f64::max);
+    let tied: Vec<&(f64, TilingOutcome)> =
+        scored.iter().filter(|(s, _)| (s - best).abs() <= crate::envelope::ENVELOPE_TIE_EPS).collect();
+    if tied.len() >= 2 && NET_TILING_TIEBREAK_ENABLED && (2..=4).contains(&state.round_number) {
+        if let Some(eval) = evaluator {
+            let mode = tiling_select_mode_env();
+            let mut best_c: Option<(f64, &TilingStep)> = None;
+            for (score, c) in &tied {
+                let p_win = eval(&c.final_state);
+                let val = match mode {
+                    1 => p_win,
+                    _ => score * p_win,
+                };
+                if best_c.as_ref().is_none_or(|(bv, _)| val > *bv) {
+                    best_c = Some((val, &c.first_step));
+                }
+            }
+            return best_c.map(|(_, s)| s.clone());
+        }
+    }
+    Some(tied[0].1.first_step.clone())
 }
 
 /// Greedy-Variante (Hot-Path / Tests).
