@@ -175,3 +175,5 @@ sonst `Backups/mosaic-AI` im OneDrive; neben dem restic-Repository, ausserhalb
 der Backup-Quelle; Nutzer-Wunsch: keine Unterordner in `data/` vor dem
 Tageslauf). Fuer eine Wiederholung den Ordner nach `data/archive_pre_v24/`
 zurueckkopieren oder der Sonde ein `--pattern` mit absolutem Pfad geben.
+
+**Seit 2026-09-03, 16:40 (Nutzer-Freigabe) ist `<Sicherungswurzel>/archive_pre_v24/` GELOESCHT.** Einziger Fundort ist der restic-Snapshot `e77c2d7c` (2026-09-01 12:00, Pfade unter `<Projektordner>/data/...` bzw. `data/relabeled_v23/...`; fuenf Stichproben vor dem Loeschen per `restic find` bestaetigt). Wiederherstellung: `docs/backup_restore.md`.

@@ -233,18 +233,25 @@ _sprt_bounds_selftest()
 
 def play_pair_block(mr, model_a: str, model_b: str, sims_a: int, sims_b: int,
                      c_puct_a: float, c_puct_b: float, n: int, seed: int,
-                     threads: int) -> tuple[list[dict], list[dict]]:
+                     threads: int, spec_a: str | None = None,
+                     spec_b: str | None = None) -> tuple[list[dict], list[dict]]:
     """Spielt EINEN Block von `n` gepaarten Seeds -- je Seed zwei Spiele mit
     getauschten Brettern (siehe Modul-Docstring). `g1[i]`/`g2[i]` teilen sich
     denselben abgeleiteten Pro-Spiel-Seed (identisches `seed`+`n_games`,
     Index `i`), nur die Modell-Brett-Zuordnung ist vertauscht."""
+    # 2026-09-03 (Champion-Kante mit Such-Knopf, PREREG_saturating_score_utility
+    # par.16): per-Seite SearchConfig-Spec, damit ein Env-Knopf NUR auf einer
+    # Seite wirkt (ohne Spec lesen beide Seiten from_env -> Spiegelmatch).
+    # `None` je Seite = Bestandsverhalten (byte-identisch).
     raw1 = mr.net_vs_net_arena_match(
         model_a, model_b, sims_a=sims_a, sims_b=sims_b, n_games=n, seed=seed,
         num_threads=threads, c_puct_a=c_puct_a, c_puct_b=c_puct_b,
+        spec_a=spec_a, spec_b=spec_b,
     )
     raw2 = mr.net_vs_net_arena_match(
         model_b, model_a, sims_a=sims_b, sims_b=sims_a, n_games=n, seed=seed,
         num_threads=threads, c_puct_a=c_puct_b, c_puct_b=c_puct_a,
+        spec_a=spec_b, spec_b=spec_a,
     )
     return json.loads(raw1), json.loads(raw2)
 
@@ -256,7 +263,8 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                        max_pairs: int = MAX_PAIRS, sprt_p1: float = SPRT_P1,
                        sprt_alpha: float = SPRT_ALPHA, sprt_beta: float = SPRT_BETA,
                        base_seed: int | None = None, threads: int = DEFAULT_THREADS,
-                       promote_winner: bool = False) -> dict:
+                       promote_winner: bool = False, spec_a: str | None = None,
+                       spec_b: str | None = None) -> dict:
     """Orchestriert das volle gepaarte Gating (siehe Modul-Docstring). Die
     STOPP-Entscheidung ist ein Wald-SPRT auf den informativen Paaren (b/c);
     bricht NACH einem VOLLSTAENDIGEN Block ab, sobald die LLR eine der beiden
@@ -317,7 +325,7 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         seed = base_seed + block_idx * 1_000_000
         t0 = time.time()
         g1, g2 = play_pair_block(mr, model_a, model_b, sims_a, sims_b, c_puct_a, c_puct_b,
-                                  n, seed, threads)
+                                  n, seed, threads, spec_a=spec_a, spec_b=spec_b)
         dur = time.time() - t0
 
         for i in range(n):
@@ -401,6 +409,7 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     zerozero_anteil = zerozero_count / n_games_total if n_games_total else None
     result = {
         "name_a": name_a, "name_b": name_b, "model_a": model_a, "model_b": model_b,
+        "spec_a": spec_a, "spec_b": spec_b,
         "sims_a": sims_a, "sims_b": sims_b, "c_puct_a": c_puct_a, "c_puct_b": c_puct_b,
         "done_pairs": done_pairs, "n_games_total": n_games_total,
         "a_wins_total": a_wins_total, "b_wins_total": b_wins_total,
@@ -486,6 +495,8 @@ def main() -> None:
     p.add_argument("--sprt-alpha", type=float, default=SPRT_ALPHA)
     p.add_argument("--sprt-beta", type=float, default=SPRT_BETA)
     p.add_argument("--seed", type=int, default=None)
+    p.add_argument("--spec-a", default=None, help="SearchConfig-Spec (JSON) fuer Modell A, alle Bretter")
+    p.add_argument("--spec-b", default=None, help="SearchConfig-Spec (JSON) fuer Modell B, alle Bretter")
     p.add_argument("--threads", type=int, default=DEFAULT_THREADS)
     p.add_argument("--out", default=None, help="Ziel-JSON-Pfad (Default: evaluations/paired_gating_result_<a>_vs_<b>.json)")
     p.add_argument("--promote-winner", dest="promote_winner", action="store_true", default=True,
@@ -510,6 +521,7 @@ def main() -> None:
         block_size=args.block_size, max_pairs=args.max_pairs, sprt_p1=args.sprt_p1,
         sprt_alpha=args.sprt_alpha, sprt_beta=args.sprt_beta,
         base_seed=args.seed, threads=args.threads, promote_winner=args.promote_winner,
+        spec_a=args.spec_a, spec_b=args.spec_b,
     )
 
     out_path = Path(args.out) if args.out else (
