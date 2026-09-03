@@ -424,6 +424,10 @@ still stehen — dieser Fehler ist am 2026-08-17 zweimal passiert.
 - Schau in vorhandene scripts ob dort bereits relevante funktionen vorhanden sind bevor du was neues baust (zb arena.py war schon da, aber du hast dir selbst noch eine gebaut)
 - Bevor ein Kandidat amtierender Champion wird: `/mosaic-champion-promotion`
   (kanonische Liste: `docs/promotion_checklist.md`).
+- Sitzungswechsel (Kontext fast voll, Nachtprogramm laeuft weiter):
+  `/mosaic-handover`. Eine neue Sitzung ist ein Arbeitsauftrag-Chip im
+  Projektordner, KEIN Subagent (Nutzer-Anweisung 2026-09-03); vorher STATUS
+  Abschnitt 1 als Uebergabe, Scratchpad-Skripte in den Baum, eigene Wecker aus.
 
 **Zu diesen Zeigern:** ein Skill wird NICHT automatisch ausgeloest -- der
 Harness zeigt nur Name und Beschreibung, das Zugreifen ist eine Einschaetzung.
