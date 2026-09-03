@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die lineare Mischung gescheitert ist? | Beleg: Nichts gebaut. Tor par.3a: DAZWISCHEN (r(pts,wr) 0,74), sigma-Ziel offen (par.12). Skalenwechsel [-1,1] entschieden (par.4a). **par.6b (Nutzer 2026-09-03): KEIN neuer Margen-Kopf** -- die Marge kommt aus Punkte- und Gegnerpunkte-Kopf (Steigung 0,97 auf Plattenpunkten, Ziele unter nortv/lambda 1,0 ohne TD-Blend); offen ist nur die FORM der Verwendung im Blattwert. Naechster Schritt: Engine-Bau registrieren. -->
+<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die lineare Mischung gescheitert ist? | Beleg: Nichts gebaut, aber BAUREIF (par.14, 2026-09-03): Marge aus Punkte- und Gegnerpunkte-Kopf (par.6b, kein neuer Kopf), x0 = Wurzelmarge je Suche, b = 20 (Referenz, Nutzer), c-Arme 0,1/0,2/0,3, Klammerung als Messvariante vor dem Skalenwechsel (Nutzer), Knopf MOSAIC_SCORE_UTILITY_C Default 0. Messung: env-A/B-Arena am selben Netz, n >= 150 Paare, Blockgroesse 5, plus Spaltenprofil. v24-Knopf K1. -->
 
 # Vorregistrierung: Gesaettigte, re-zentrierte Score-Utility
 
@@ -804,9 +804,13 @@ Partien rund 1,5 h CPU plus Replikation, Spaltenprofil 3 x 23 min.
 
 ### 14.5 Offen vor dem ersten Handgriff (Nutzer-Entscheid)
 
-1. **K1-A (Klammerung) als Messvariante vor dem Skalenwechsel**, oder direkt
-   der Skalenwechsel nach par.4a/4b (Umbau ueber Engine, Korpusformat und
-   Trainer, geschaetzt mehrere Tage).
+1. ~~**K1-A (Klammerung) als Messvariante vor dem Skalenwechsel**, oder direkt
+   der Skalenwechsel nach par.4a/4b~~ **ENTSCHIEDEN (Nutzer 2026-09-03):
+   Klammerung als Messvariante.** `U = clamp(wr + u, 0, 1)`, Klammer-Anteil
+   wird gezaehlt und berichtet. Der Skalenwechsel aus par.4a bleibt der
+   registrierte Weg fuer den Fall, dass K1 traegt, und wird dann VOR der
+   Rezeptaufnahme als eigener Bau nachgezogen (par.4b). Damit sind alle
+   Punkte dieses Absatzes entschieden; K1 ist baureif.
 2. ~~**Referenz b = 20** bestaetigen oder eine andere Referenz nennen~~
    **ENTSCHIEDEN (Nutzer 2026-09-03): b = 20.** Begruendung des Nutzers:
    *"20 punkte marge kommt schon gut hin bei einem gleichwertigen basisspiel
