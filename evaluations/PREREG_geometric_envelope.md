@@ -945,8 +945,12 @@ Uebersteuerung versucht und die Staerke zerstoert).
 `cell_is_completable(player, r, c, verbleibend)` (Kuppelplatte liegt, Farbe
 noch im Vorrat, Musterreihe frei oder farbgleich), sonst 0; Zellen ausserhalb
 der Huelle nur belegt/gebunden (Erreichbarkeit ausserhalb ist kein Verlust).
-`w_r` = 0,25 (Vorschlag: eine offene Option zaehlt ein Viertel eines Steins;
-Nutzer-Entscheid). Schalter `MOSAIC_ENVELOPE_PROJECTED=2`, Arme C 0,5 / 1,0.
+`w_r` = 0,25 (eine offene Option zaehlt ein Viertel eines Steins; **ENTSCHIEDEN,
+Nutzer 2026-09-03, 23:40: "passt"**; Knopf `MOSAIC_ENVELOPE_REACH_W`). Orientierung:
+je Huelle eigene Belegung, H mit fester Orientierung, Maximum der beiden
+(die beste noch offene Huelle). GEBAUT 2026-09-03 (`envelope_score_reach`,
+`envelope_score_ownership`, `search_shift_state`, Modus 0..3), Bau-Abnahme
+und Messung nach Kette B. Schalter `MOSAIC_ENVELOPE_PROJECTED=2`, Arme C 0,5 / 1,0.
 Instrumente wie 8.7a plus "tote Huelle Runde 3/4" aus der Sonde
 (`tote_huelle_r4_gewichtet_mittel`: heute 0,013).
 

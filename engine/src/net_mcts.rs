@@ -2189,9 +2189,11 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // (Auflage par.4.1: der exakte Loeser bekommt nichts).
             let env_c = search_config.envelope_search_c;
             if env_c != 0.0 {
-                let shift = crate::envelope::search_shift(
-                    &state.players[0], &state.players[1], state.round_number, env_c,
-                    &search_config.envelope_profile,
+                // Projektions-Modus (par.8.7/8.9): 0 Raster, 1 Musterreihen,
+                // 2 Erreichbarkeit, 3 Ownership-Kopf (`ownership` = rohe Logits
+                // des Mover-Passes, ego = `state.current_player`).
+                let shift = crate::envelope::search_shift_state(
+                    &state, env_c, &search_config.envelope_profile, &ownership,
                 );
                 today_value[0] = (today_value[0] + shift).clamp(0.0, 1.0);
                 today_value[1] = (today_value[1] - shift).clamp(0.0, 1.0);
