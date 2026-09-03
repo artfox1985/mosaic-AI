@@ -699,3 +699,113 @@ sein Massstab ist falsch; der Punkte-Kopf hat den richtigen Massstab. Diese
 Prereg ist der Weg, den richtigen Massstab in die Suche zu bringen, ohne den
 Value-Kopf umzuerziehen. Registrierung des Baus als eigener Absatz VOR dem
 ersten Handgriff.
+
+## par.14 BAU-ABSATZ K1 fuer v24: saettigende, re-zentrierte Margen-Utility im Blattwert (registriert 2026-09-03, VOR dem Bau)
+
+Kontext: `PREREG_v24_window.md` par.8, Such-Knopf K1; Nutzer-Auftrag
+"schreib den Bau-Absatz gleich mit". Dieser Absatz ersetzt fuer den Bau die
+Teile von par.4 bis par.6a, die durch par.6b (kein neuer Kopf) und die
+heutige Codelage ueberholt sind. Er registriert Formel, Herkunft jeder
+Groesse, Knoepfe, Paritaets-Gate, Messung und Verdikt. Zwei Punkte bleiben
+ausdruecklich Nutzer-Entscheid (unten, "Offen vor dem ersten Handgriff").
+
+### 14.1 Formel und Herkunft jeder Groesse
+
+```
+x    = 50 * atanh(clamp(p_own, -m_max, m_max)) - 50 * atanh(clamp(p_opp, -m_max, m_max))   # Marge in Punkten
+x0   = dieselbe Rechnung am WURZEL-Knoten, einmal je Suche
+u    = c * (2/pi) * atan((x - x0) / b)                                                     # in [-c, +c]
+U    = wr + u                                                                               # Blattwert
+```
+
+| Groesse | Herkunft | Beleg |
+| --- | --- | --- |
+| `p_own`, `p_opp` | Punkte- und Gegnerpunkte-Kopf des Blatts, tanh-Skala (`points`, `opp_points` in `blended_leaf_win_prob_with`, net_mcts.rs:1398) | par.6b; Ruecktransformation wie `tools/r5_value_calibration.py` `points_to_pts` |
+| `wr` | Siegwahrscheinlichkeit wie heute: `calibrate_win_prob_with(value_to_win_prob(value), cal_a, cal_b)` (net_mcts.rs:1409) | unveraendert |
+| `x0` | Marge aus denselben Koepfen am Wurzelknoten der laufenden Suche (`Node::points_forecast` / `opp_points_forecast` der Wurzel, net_mcts.rs:1217-1223), einmal je Suche gesetzt | par.3 (Re-Zentrierung) |
+| `b` | Breite der Saettigung in Punkten, Referenzsetzung **b = 20** (RMS-Marge der Mensch-Referenz, par.6a-Tabelle: ~21; Self-Play-Gegenprobe std 19,98 ist NICHT die Quelle) | par.6a, par.12 |
+| `c` | Gewicht, Arme 0,1 / 0,2 / 0,3 (KataGo-Bereich, par.4) | par.4 |
+| `m_max` | Klammerung vor `atanh`: 0,995 (entspricht |Marge| 150 Punkte, jenseits jedes Endstands); Anteil geklammerter Blaetter wird gezaehlt und berichtet | par.12 |
+
+`u` ist antisymmetrisch um `x0`: ein Blatt, das genau die Wurzelerwartung
+haelt, bekommt `u = 0`, der Blattwert ist dann exakt der heutige. Nur
+ABWEICHUNGEN von der Wurzelmarge zaehlen, gesaettigt: +7 Punkte (eine
+Spalte) ergeben bei b = 20 und c = 0,2 einen Zuschlag von 0,043 auf `wr`;
++30 Punkte 0,127, nie mehr als 0,2.
+
+**Kein Verteilungskopf (Nutzer-Frage 2026-09-03):** die Integration ueber
+eine Score-Verteilung (par.5, Weg S/V) glaettet `u` nahe `x0` und macht `b`
+stellungsabhaengig. Den Haupteffekt, die Re-Zentrierung, braucht sie nicht;
+mit festem `b` glaettet der arctan bereits. Ein sigma-Kopf ist damit ein
+FOLGEARM fuer den Fall, dass K1 traegt und die Wirkung stark an `b` haengt
+(Sensitivitaet: die drei `c`-Arme bei b = 20, dazu EIN Arm c = 0,2 bei
+b = 10 als Breitenprobe). Vorher wird er nicht gebaut.
+
+### 14.2 Skala: was par.4a entschieden hat, und die Frage davor
+
+par.4a hat am 2026-08-23 den **Skalenwechsel** der ganzen Blattbewertung auf
+[-1, 1] entschieden ("die sauberste Form, der Preis wird bezahlt"). par.4b
+hat den Preis kartiert: fuenf Erzeuger der [0,1]-Skala, die
+Platt-Kalibrierung, und VIER Korpusfelder (`root_q`, `root_child_q`,
+`round_transition_value`, `bootstrap_value`), an denen Trainingsziele
+haengen. Das ist ein Umbau ueber Engine, Korpusformat und Trainer, kein
+Knopf -- und fuer die MESSFRAGE "traegt die re-zentrierte Marge?" nicht
+noetig: `U = wr + u` verlaesst [0,1] nur, wenn `wr > 1 - c` bzw. `wr < c`,
+also in schon entschiedenen Stellungen.
+
+**Vorschlag fuer K1 (Nutzer-Entscheid, siehe unten):** Messvariante
+**K1-A, Klammerung** `U = clamp(wr + u, 0, 1)` mit gezaehltem und
+berichtetem Klammer-Anteil. Traegt K1-A, wird der Skalenwechsel nach par.4b
+als eigener Bau nachgezogen, BEVOR der Knopf ins Rezept geht; traegt K1-A
+nicht, ist der Skalenwechsel gespart. Damit wird par.4a nicht aufgehoben,
+sondern hinter die Messung gestellt.
+
+### 14.3 Bau, Knoepfe, Paritaets-Gate
+
+- Ort: `blended_leaf_win_prob_with` (net_mcts.rs:1398) bekommt den Term
+  ADDITIV hinter dem heutigen Rueckgabewert; `POINTS_UTILITY_WEIGHT` und der
+  Task-#28-Pfad `w` bleiben unberuehrt (Waechter 2, par.10). `x0` wird beim
+  Wurzelaufbau in `net_search_with_tree` aus dem Wurzel-Forecast gesetzt und
+  ueber den Suchkontext an das Blatt gereicht (nicht ueber einen
+  prozessweiten Cache, Regel "prozessweite Knoepfe: kein Spiegelmatch").
+- Knoepfe: `MOSAIC_SCORE_UTILITY_C` (Default **0.0 = aus**, byte-identisch),
+  `MOSAIC_SCORE_UTILITY_B` (Default 20), beide in `SearchConfig::from_env`
+  und in die Knopf-Registratur (`knob_registry.rs`, `docs/knobs.md`), beide
+  im Lauf-Manifest (`engine_config`) sichtbar. Fehlt ein Kopf
+  (`points`/`opp_points` leer): `u = 0`, einmalige Warnung wie
+  `warn_missing_opp_head_once`.
+- Paritaets-Gate: mit `C = 0` muss die Golden-Selbstpruefung bitgleich
+  bleiben (bestehende Tests `blended_leaf_win_prob_with_*`, Anker-Invarianz
+  nach dem Wheel-Neubau, `/mosaic-anchor-invariance`); ein neuer Test prueft
+  `u(x0) = 0` und die Antisymmetrie.
+- Waechter 1 (par.10) unveraendert: `round5_anchor.rs` bleibt unberuehrt;
+  der Term wirkt nur auf netzbewertete Blaetter.
+
+### 14.4 Messung und Verdikt (vorab)
+
+Instrument: `tools/paired_arena_env_ab.py --env-name MOSAIC_SCORE_UTILITY_C
+--arms 0 0.1 0.2 0.3 --control 0`, Netz gegen dasselbe Netz ohne Knopf
+(`--model-b`), zuerst am `v23-b01_brierbest` (verfuegbar, Bau kann vor v24
+gemessen werden), dann am besten v24-Netz; @400 gegen @400, **Blockgroesse
+5**, `--log-games`, **n >= 150 Paare je Arm oder Replikation mit eigenem
+Seed** (Champion-Strenge, `generation_loop.md`). Dazu je Arm das
+argmax-Spaltenprofil (200 Partien, Seed 20260931) und die sechs
+Standard-Kennzahlen aus den Logs (`arena_column_probe`).
+
+| Befund | Verdikt |
+| --- | --- |
+| ein `c`-Arm signifikant vorn bei den Siegen UND nicht unter der Kontrolle bei den Spalten | K1 traegt; Skalenwechsel par.4b nachziehen, dann Rezept-Kandidat; Breitenprobe b = 10 entscheidet, ob ein sigma-Folgearm lohnt |
+| Spalten steigen, Siege fallen | Tausch wie bei der Suchtiefe; registrieren, kein Rezept |
+| alle Arme H0 auf 150 Paaren | kein Beleg, Zuschnitt ruht (par.11) |
+| Staerke faellt monoton mit `c` | die Familie "Score-Utility im Blattwert" ist geschlossen, nicht nur die naive Form (par.11, wichtigster moeglicher Befund) |
+
+Kosten: Bau rund 2 h (Engine, Tests, Wheel, Anker), Arena 3 Arme x 2 x 80
+Partien rund 1,5 h CPU plus Replikation, Spaltenprofil 3 x 23 min.
+
+### 14.5 Offen vor dem ersten Handgriff (Nutzer-Entscheid)
+
+1. **K1-A (Klammerung) als Messvariante vor dem Skalenwechsel**, oder direkt
+   der Skalenwechsel nach par.4a/4b (Umbau ueber Engine, Korpusformat und
+   Trainer, geschaetzt mehrere Tage).
+2. **Referenz b = 20** bestaetigen oder eine andere Referenz nennen; die
+   Regel "nicht an heutiger Netzstreuung eichen" gilt weiter.
