@@ -573,8 +573,27 @@ den Value im Tiling nur Form C (lexikografisch mit Toleranzband) oder der
 Verzicht, und 8.6 wird nicht gebaut. Spreizung von mehreren Punkten heisst,
 der Term kann Punktvorspruenge kippen, und 8.6 geht in den Bau.
 
-**Status:** VORSCHLAG mit Vorpruefung. Wird gebaut, wenn der Nutzer ihn
-bestaetigt UND die Vorpruefung besteht; bis dahin gilt 8.3 mit Stichentscheid.
+**Vorpruefung GEFAHREN (2026-09-03, `tiling_candidate_spread_b01_{v1,v3}_margin.json`,
+Werkzeug um `margin_batch` erweitert): BESTANDEN.**
+
+| Satz | Stellungen R2-4 | Spreizung M unter Top-12, Median [IQR] | `Punkte + M` kippt Punktvorsprung | zum Vergleich: P(Sieg)-Spreizung, Kippungen |
+| --- | --- | --- | --- | --- |
+| frozen_v1 | 142 | **6,8 Punkte** [2,9; 12,0], Max 53 | **22 von 142** (Median 1 Punkt) | 0,048, 1 von 142 |
+| frozen_v3 | 192 | **9,9 Punkte** [5,0; 15,7], Max 61 | **25 von 192** (Median 1 Punkt) | 0,065, 4 von 192 |
+
+Die Margen-Vorhersage streut unter denselben zwoelf Abschluessen um 7 bis 10
+Punkte, waehrend P(Sieg) um 0,05 streut -- derselbe Forward-Pass, zwei Koepfe,
+und nur einer davon unterscheidet die Kandidaten. `Punkte + M` waehlt in 13
+bis 15 Prozent der Stellungen einen anderen Abschluss als die Sofortpunkte
+allein und kippt dabei Vorspruenge von typischerweise einem Punkt; das ist
+die Grössenordnung, in der ein Tiling-Term ueberhaupt wirken kann. Form B in
+Punkteeinheiten ist damit KEIN Stichentscheid, sondern ein Entscheider, und
+8.6 ist bauwuerdig. (Nebenbefund zur Nutzer-These: der Value-Kopf sieht die
+Kandidaten nicht auseinander, der Punkte-Kopf schon -- der Massstab, nicht
+das Sehen.)
+
+**Status:** VORSCHLAG, Vorpruefung bestanden. Wird gebaut, sobald der Nutzer
+ihn bestaetigt; bis dahin gilt 8.3 mit Stichentscheid.
 
 ## par.8 BAU-ABSATZ K3 fuer v24: das Gelaender in Suche (e) und Tiling (d), Stufe 2 vorgezogen (registriert 2026-09-03, VOR dem Bau)
 

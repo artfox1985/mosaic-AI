@@ -114,6 +114,35 @@ def value_batch(model, encoder: str, states):
     return out[1].reshape(len(states)).numpy()
 
 
+def margin_batch(model, encoder: str, states):
+    """Vorhergesagte Endmarge in PUNKTEN je Zustand (2026-09-03, PREREG_geometric_envelope par.8.6
+    Vorpruefung): 50*atanh(points) - 50*atanh(opp_points) aus den Ausgaben 3 und 6 des
+    Forward-Tupels (Reihenfolge: policy, value, moon, points, ownership, [wdl], opp_points, ...;
+    neural_net.py forward). None, wenn das Modell keinen Gegnerpunkte-Kopf hat."""
+    if not getattr(model, "has_opp_points_head", False):
+        return None
+    x_flat = torch.stack([state_to_tensor(st) for st in states])
+    want_flat = _model_flat_width(model)
+    if want_flat is not None and want_flat < x_flat.shape[1]:
+        x_flat = x_flat[:, :want_flat]
+    with torch.no_grad():
+        if encoder == "2d":
+            x_planes = torch.stack([state_to_planes(st) for st in states])
+            want = _model_plane_channels(model)
+            if want is not None and want < x_planes.shape[1]:
+                x_planes = x_planes[:, :want, :, :]
+            out = model(x_planes, x_flat)
+        else:
+            out = model(x_flat)
+    n_fixed = 5
+    idx_opp = n_fixed + (1 if getattr(model, "points_dist_bins", 0) else 0) + (1 if len(out) > n_fixed and out[n_fixed].shape[-1] == 2 else 0)
+    pts = out[3].reshape(len(states)).numpy().astype(float)
+    opp = out[idx_opp].reshape(len(states)).numpy().astype(float)
+    import numpy as _np
+    pts = _np.clip(pts, -0.995, 0.995); opp = _np.clip(opp, -0.995, 0.995)
+    return 50.0 * _np.arctanh(pts) - 50.0 * _np.arctanh(opp)
+
+
 def q(xs, p):
     if not xs:
         return float("nan")
@@ -157,6 +186,9 @@ def main() -> None:
     # `strict_override` (gewaehlter Kandidat hat WENIGER Punkte als das
     # Maximum), mit der gekippten Punktdifferenz.
     strict_override, override_margins = 0, []
+    # par.8.6-Vorpruefung: Spreizung der Margen-Vorhersage M (Punkte) unter den Kandidaten und
+    # echte Kippungen eines Punktvorsprungs durch `Punkte + M` (W_VAL = 1).
+    m_spread, m_strict_override, m_override_margins, n_m = [], 0, [], 0
     by_round = {}
     skipped = 0
 
@@ -191,6 +223,15 @@ def main() -> None:
         if 2 <= rnd <= 4:
             n_r24 += 1
             v = value_batch(model, encoder, [c["state"] for c in cands])  # tanh in [-1,1]
+            M = margin_batch(model, encoder, [c["state"] for c in cands])
+            if M is not None:
+                n_m += 1
+                m_spread.append(float(M.max() - M.min()))
+                comb = [pts[j] + float(M[j]) for j in range(len(cands))]
+                j_m = max(range(len(cands)), key=lambda j: comb[j])
+                if j_m != best_pts_i and pts[j_m] < pts[best_pts_i]:
+                    m_strict_override += 1
+                    m_override_margins.append(pts[best_pts_i] - pts[j_m])
             wp = (v + 1.0) / 2.0                        # -> Gewinnwahrscheinlichkeit
             val_spread.append(float(wp.max() - wp.min()))
             prod = [pts[j] * float(wp[j]) for j in range(len(cands))]
@@ -227,6 +268,10 @@ def main() -> None:
         print(f"  Value-Spreizung unter den Kandidaten: Median {q(val_spread,0.5):.4f}, "
               f"IQR [{q(val_spread,0.25):.4f}, {q(val_spread,0.75):.4f}], Max {max(val_spread):.4f}")
         print(f"  andere Wahl als punktegierig: {mult_diff}/{n_r24} ({mult_diff/max(n_r24,1):.1%})")
+        if m_spread:
+            print(f"  Margen-Vorhersage M (Punkte): Spreizung Median {q(m_spread,0.5):.2f}, IQR [{q(m_spread,0.25):.2f}, {q(m_spread,0.75):.2f}], Max {max(m_spread):.2f}; "
+                  f"Punkte+M kippt Punktvorsprung in {m_strict_override}/{n_m}"
+                  + (f" (Median {q(m_override_margins,0.5):.1f} Punkte)" if m_override_margins else ""))
         print(f"  davon ECHTE Kippungen eines Punktvorsprungs: {strict_override}/{n_r24} "
               f"(Rest sind Wechsel unter punktgleichen Kandidaten)"
               + (f", gekippte Differenz Median {q(override_margins,0.5):.1f}, Max {max(override_margins)}" if override_margins else ""))
@@ -247,6 +292,12 @@ def main() -> None:
         "value_spread_iqr": [q(val_spread, 0.25), q(val_spread, 0.75)] if val_spread else None,
         "mult_changes_choice": mult_diff, "n_rounds_2_4": n_r24,
         "strict_point_lead_overrides": strict_override,
+        "margin_forecast_spread_median": q(m_spread, 0.5) if m_spread else None,
+        "margin_forecast_spread_iqr": [q(m_spread, 0.25), q(m_spread, 0.75)] if m_spread else None,
+        "margin_forecast_spread_max": max(m_spread) if m_spread else None,
+        "points_plus_margin_strict_overrides": m_strict_override,
+        "points_plus_margin_override_margin_median": q(m_override_margins, 0.5) if m_override_margins else None,
+        "n_states_with_margin": n_m,
         "override_margin_median": q(override_margins, 0.5) if override_margins else None,
         "override_margin_max": max(override_margins) if override_margins else None,
     }, indent=2), encoding="utf-8")
