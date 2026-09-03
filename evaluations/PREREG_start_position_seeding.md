@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Spalten-Stellungen aus FREI weiterspielt (Startpositions-Seeding, KataGo-startPoses-Muster) -- also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: Kette komplett durchgemessen. Arena-Verdikt par.4c: KEIN k1-Signal (14,1 % gegen die 22-%-Schwelle), aber auch kein Siegverlust. Mechanik-Sonde par.4d: erstes POSITIVES Zustandssignal (p=0,017) -- Mechanik bewegt, Verhalten noch nicht. Reihenfolge entschieden (par.5): erst v22, dann Seeding; davor Engine-Arbeit. -->
+<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Spalten-Stellungen aus FREI weiterspielt (Startpositions-Seeding, KataGo-startPoses-Muster) -- also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: Kette v1 durchgemessen: Arena kein k1-Signal, kein Siegverlust (par.4c); Mechanik-Sonde erstes POSITIVES Zustandssignal (p = 0,017, par.4d). **Wiedervorlage registriert als v24-Arm b03 (par.7, 2026-09-03):** 1.500 Stellungen aus der b01-Value-Klasse, k = 4, 6.000 Seeding-Partien als Zusatz-Schwarm, Regel und Werkzeugaenderung festgelegt; laeuft nach der v24-Erzeugung. -->
 
 # PREREG-SKELETT: Startpositions-Seeding -- frei weiterspielen ab halbfertigen Spalten
 
@@ -363,3 +363,64 @@ unregistriert und wartet weiter auf einen eigenen Zuschnitt.
 plattenbewussten Korpus als Stellungsquelle UND als Vergleichsanker. Der
 Vergleich gegen die alten Zahlen aus par.4c ist dann ausdruecklich KEIN
 gepaarter Vergleich -- verschiedene Regime, verschiedene Stellungsquelle.
+
+## par.7 WIEDERVORLAGE als v24-Arm `v24-b03`: Kuratierungsregel des Seeding-Schwarms (registriert 2026-09-03, VOR der Erzeugung)
+
+Die Wiedervorlage-Bedingung aus dem unteren par.5 ist erfuellt: es gibt eine
+plattenbewusste Linie (`v23-b01`, 0,515 volle Spalten am argmax-Instrument,
+Elo 1263), und v24 wird aus ihr erzeugt (`PREREG_v24_window.md` par.6/par.8).
+b03 ist der Arm, der das positive Zustandssignal aus par.4d (Tau +0,14 gegen
+-0,19, p = 0,017) unter plattenbewussten Bedingungen wiederholt -- diesmal als
+ZUSATZ zum Fenster, nicht als eigener Korpus.
+
+**Stellungsquelle (neu, Nutzer-Bedingung "plattenbewusst"):** die Value-Klasse
+der v24-Erzeugung selbst, `selfplay_v23-b01-value-argmax_*` (6.000 Partien
+b01 @100, argmax, ohne Rauschen; par.6b der v24-Prereg). Nicht der Sockel
+(gesampelt) und nicht die alten Asym-Korpora. Damit sind Stellungsquelle und
+Weiterspiel-Netz dieselbe Linie; der Vergleich zu par.4c ist ausdruecklich
+kein gepaarter (unteres par.5).
+
+**Kandidaten, Auswahl, Umfang** (Regel aus par.2, ohne Zwangsseite):
+- Zustand des Spielers AM ZUG (beide Seiten kommen vor), Runde in {2, 3, 4},
+  `max(col_fill)` des Spielers am Zug in {3, 4, 5}; Spaltenzaehlung in Python
+  mit Pflicht-Gegenprobe gegen `mosaic_rust.plate_completability_json`
+  (`--verify 500`, 0 Abweichungen oder Abbruch, wie 2026-08-22).
+- Stratifiziert ueber Runde x Fortschritt (9 Straten), hoechstens EINE
+  Stellung je Partie, deterministisch mit Seed **20260912**.
+- Zielumfang **1.500 Stellungen** wie v1; Kuratierungs-Bericht VOR der
+  Erzeugung (Verteilung Runde x Fortschritt x aktive Platten, k1-aktiv-Anteil,
+  Restlaenge) als `seed_positions_curation_report_v2.json`, Satz als
+  `data/seed_positions/seed_positions_v2.jsonl`.
+- Werkzeug: `tools/seed_position_curation.py` bekommt `--korpus-glob` und
+  den Modus "Spieler am Zug statt Zwangsseite" (kleine Aenderung, Muster
+  bleibt; die Zwangsseiten-Map wird dann nicht gelesen).
+
+**Erzeugung des Seeding-Schwarms:** `self_play.py --mode network --model
+models/alphazero_v23-b01_brierbest.onnx --sims 100 --value-only
+--seed-positions data/seed_positions/seed_positions_v2.jsonl --per-file 10
+--threads 11 --chunk 10 --seed 20260913 --version v23-b01-seedvalue`, mit
+`MOSAIC_STACK_DRAW_RESEARCH=1`; **k = 4 Fortsetzungen je Stellung, also
+6.000 Partien** (Dosis wie der kleinste Arm aus par.2, Kosten-Herleitung: rund
+3,65 s je Partie bei threads 11 wie die v23-Value-Klasse, Restlaenge rund 44
+Prozent einer Vollpartie, also grob 3 h). Gesampelt mit Wurzelrauschen, weil
+vier Fortsetzungen derselben Stellung sonst identisch waeren. Das
+`--value-only`-Flag haelt die Policy-Ziele ungueltig; die Partien sind reiner
+Value-Stoff, wie der uebrige Schwarm.
+
+**Fenster b03** = Fenster b01 (par.1 der v24-Prereg, 29.450 Partien) PLUS die
+6.000 Seeding-Partien als weitere Value-Klasse (Dateiliste
+`data/window_v24_b03.txt`, Traeger-Manifest unveraendert, weil die Klasse
+keine Policy traegt). **Einziger Faktor gegen b01: der Zusatz-Schwarm.** Dass
+damit auch die Datenmenge steigt, ist Teil des Faktors und wird nicht
+getrennt (Dosis-Folgearm bleibt unregistriert).
+
+**Entscheidungsmass:** wie fuer jeden v24-Arm Tor 1 (Arena gegen b01,
+Champion-Strenge), Tor 2a/2b (Spalten) und die Generatorwahl-Regel; dazu die
+Mechanik-Sonde aus par.4d (Geschwister-Tau des Value-Kopfs auf denselben 33
+Stellungen), weil dort das einzige positive Signal herkam. Lesart: hebt b03
+die Spalten oder die Siege gegen b01, traegt on-policy Wertstoff aus
+halbfertigen Spalten; bewegt sich nur der Tau, ist es wieder "Mechanik
+bewegt, Verhalten nicht" (par.4d), und der Dosis-Folgearm wird registriert.
+
+**Reihenfolge:** Kuratierung erst NACH der v24-Erzeugung (die Quelle entsteht
+dort), Seeding-Schwarm danach (rund 3 h CPU), b03-Training nach b01 und b02.
