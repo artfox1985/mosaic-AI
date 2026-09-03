@@ -42,6 +42,7 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "engine" / "py"))
 sys.path.insert(0, str(_ROOT / "tools"))
+sys.path.insert(0, str(_ROOT / "tools" / "probes"))
 
 PREREG = "docs/generation_loop.md, Tor 2b (Spalten in der Arena)"
 
@@ -105,6 +106,47 @@ def _full_columns(state: dict, player_index: int) -> int:
     return sum(1 for x in (geo.get("col_fill") or []) if x >= 6)
 
 
+def _side_extras(state: dict, game: dict, player_index: int) -> dict:
+    """Standard-Kennzahlen je Seite (CLAUDE.md, sechs Kennzahlen) plus die
+    Huellen-Deckung `H` nach PREREG_geometric_envelope.md par.8.1 -- alles
+    aus DERSELBEN Partie wie die Siegquote (Nutzer-Regel 2026-08-23).
+    Reihen/Spalten/Spezialfelder aus `score_geo` des replayten Endzustands,
+    Punkte/Strafleiste/lange Reihen aus dem Arena-Record selbst.
+    `H`: kosten-gewichteter Fuellanteil der bestpassenden Huelle minus
+    Steine ausserhalb (Definitionen der berichtigten Sonde
+    `triangle_hull_coverage_probe`, identisch zu `engine/src/envelope.rs`)."""
+    import triangle_hull_coverage_probe as hull
+    pl = state["players"][player_index]
+    geo = pl.get("score_geo") or {}
+    cols = geo.get("col_fill") or []
+    rows = geo.get("row_fill") or []
+    cells = hull.occupancy(pl.get("dome_grid") or [])
+    h = hull.best_hull(cells)
+    inside = hull.weighted_fill_share(cells, h)
+    outside = sum(hull.row_weight(x) for x in (cells - h)) / 56.0
+    scores = game.get("scores") or [None, None]
+    own = scores[player_index]
+    opp = scores[1 - player_index]
+    out = {
+        "spalten_max_hoehe": max(cols) if cols else None,
+        "spalten_ge4": sum(1 for x in cols if x >= 4),
+        "spalten_ge3": sum(1 for x in cols if x >= 3),
+        "zeilen_voll": sum(1 for x in rows if x >= 6),
+        "zeilen_fuellung_summe": sum(rows) if rows else None,
+        "spezialfelder_belegt": (geo.get("special_total") or 0) - (geo.get("special_empty") or 0),
+        "huelle_H": inside - outside,
+        "huelle_innen": inside,
+        "huelle_aussen": outside,
+        "huelle_orientierung": "links" if h is hull.HULL_LEFT else "rechts",
+        "punkte": own,
+        "margin": (own - opp) if own is not None and opp is not None else None,
+        "strafleiste_gesamt": (game.get("total_floor") or [None, None])[player_index],
+        "lange_reihen_vollendet": (game.get("long_rows_completed") or [None, None])[player_index],
+        "lange_reihen_begonnen": (game.get("long_rows_started") or [None, None])[player_index],
+    }
+    return out
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[1])
     ap.add_argument("--artifact", required=True,
@@ -134,6 +176,7 @@ def main() -> int:
                 continue
 
             per_name: dict[str, list[int]] = {}
+            per_name_extra: dict[str, list[dict]] = {}
             per_game: list[dict] = []
             ok = diverged = 0
             errors: list[str] = []
@@ -148,13 +191,16 @@ def main() -> int:
                 ok += 1
                 names = g.get("names") or ["seite0", "seite1"]
                 cols = [_full_columns(state, pi) for pi in (0, 1)]
+                extras = [_side_extras(state, g, pi) for pi in (0, 1)]
                 for pi in (0, 1):
                     per_name.setdefault(names[pi], []).append(cols[pi])
+                    per_name_extra.setdefault(names[pi], []).append(extras[pi])
                 # Je Partie mitschreiben: nur so laesst sich spaeter GEPAART
                 # rechnen (beide Seiten aus DERSELBEN Partie), statt zwei
                 # Mittelwerte mit unabhaengigen SEs zu vergleichen.
                 per_game.append({"index": i, "seed": g.get("game_seed"),
-                                 "names": names, "volle_spalten": cols})
+                                 "names": names, "volle_spalten": cols,
+                                 "kennzahlen": extras})
                 if (i + 1) % 25 == 0:
                     print(f"  {arm}: {i + 1}/{len(games)} replayt "
                           f"({time.time() - t_wall:.0f}s)", flush=True)
@@ -166,6 +212,22 @@ def main() -> int:
                 se = (st.stdev(vals) / len(vals) ** 0.5) if len(vals) > 1 else None
                 arm_out["seiten"][name] = {"n": len(vals), "volle_spalten": mean,
                                            "se": se, "ci95": (1.96 * se) if se else None}
+                # Standard-Kennzahlen (Mittel je Seite) -- numerische Felder.
+                ex = per_name_extra.get(name, [])
+                means = {}
+                for key in ex[0].keys() if ex else []:
+                    nums = [e[key] for e in ex if isinstance(e.get(key), (int, float))]
+                    if nums:
+                        means[key] = sum(nums) / len(nums)
+                arm_out["seiten"][name]["kennzahlen_mittel"] = means
+                if means:
+                    print(f"  {arm} | {name:28s} H {means.get('huelle_H', float('nan')):.3f}"
+                          f"  Punkte {means.get('punkte', float('nan')):.2f}"
+                          f"  Margin {means.get('margin', float('nan')):+.2f}"
+                          f"  Strafleiste {means.get('strafleiste_gesamt', float('nan')):.2f}"
+                          f"  Spalten>=4 {means.get('spalten_ge4', float('nan')):.2f}"
+                          f"  lange Reihen {means.get('lange_reihen_vollendet', float('nan')):.2f}",
+                          flush=True)
                 print(f"  {arm} | {name:28s} volle Spalten {mean:.4f}"
                       + (f" +- {1.96 * se:.4f}" if se else "") + f"  (n={len(vals)})",
                       flush=True)

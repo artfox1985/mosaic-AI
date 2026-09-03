@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die lineare Mischung gescheitert ist? | Beleg: Nichts gebaut, aber BAUREIF (par.14, 2026-09-03): Marge aus Punkte- und Gegnerpunkte-Kopf (par.6b, kein neuer Kopf), x0 = Wurzelmarge je Suche, b = 20 (Referenz, Nutzer), c-Arme 0,1/0,2/0,3, Klammerung als Messvariante vor dem Skalenwechsel (Nutzer), Knopf MOSAIC_SCORE_UTILITY_C Default 0. Messung: env-A/B-Arena am selben Netz, n >= 150 Paare, Blockgroesse 5, plus Spaltenprofil. v24-Knopf K1. -->
+<!-- STATUS: OFFEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die lineare Mischung gescheitert ist? | Beleg: GEBAUT (par.14/15, 2026-09-03, Anker und Netz-Pfad-Paritaet GRUEN). Erstmessung am `v23-b01_brierbest` (par.15): c = 0,2 gewinnt 104:56 gegen die Spiegel-Basislinie (160 Paare, McNemar p = 0,006, Margin +4,9), c = 0,1/0,3 Nullbefunde; ABER Spalten darunter (Arena -0,13, argmax 0,36 gegen 0,52). Replikation c = 0,2 mit eigenem Seed OFFEN, dann Verdikt. -->
 
 # Vorregistrierung: Gesaettigte, re-zentrierte Score-Utility
 
@@ -819,3 +819,84 @@ Partien rund 1,5 h CPU plus Replikation, Spaltenprofil 3 x 23 min.
    erzeugt; genau die Groesse, die der Term sichtbar machen soll. Damit ist
    `b` eine Referenzsetzung aus dem Spielverstaendnis, wie `VALUE_SCALE` und
    `MARGIN_SCALE`, nicht aus einer Netzverteilung. Offen bleibt allein Punkt 1.
+
+## par.15 ERSTMESSUNG K1 am `v23-b01_brierbest` (2026-09-03): c = 0,2 gewinnt Partien und Punkte, baut aber weniger Spalten -- Replikation offen
+
+**Bau (Commit 8ffb2e4, Wheel Kontrakt-Hash `efd564d87bac2722` unveraendert):**
+wie par.14, mit EINER registrierten Abweichung: der Term sitzt nicht in der
+reinen Funktion `blended_leaf_win_prob_with`, sondern an deren Aufrufstelle in
+`node_from_net_outputs` (`apply_score_utility`), weil `x0` absolut (Spieler 0
+minus Spieler 1) gefuehrt wird und die Perspektivdrehung den Zustand braucht;
+Bauform ist das Nullsummen-Additiv der Floor-/Langreihen-Terme, danach
+Klammerung auf [0, 1] (K1-A). `x0` wird je Suche in
+`build_gumbel_tree`/`build_net_tree` gesetzt (`with_root_margin`), bei `c = 0`
+ist die Config eine unveraenderte Kopie. Paritaets-Gate: 506 Tests gruen
+(`u(x0) = 0`, Antisymmetrie, Saettigung, Ruecktransformation, Nullsummen-
+Anwendung mit Klammerzaehlung; das Zahlenbeispiel "+30 Punkte = 0,127" in
+par.14.1 ist gerundet, exakt 0,1251), Anker-Drift GRUEN
+(`anchor_drift_20260903_k1.json`, 1.763 Schritte), **Netz-Pfad bei `c = 0`
+Record fuer Record identisch** mit dem b06-Instrument (Chunk 0 neu erzeugt,
+1.733 Schritte, `k1_net_path_parity_repro.json`) -- der Heuristik-Anker allein
+durchlaeuft den Netz-Blattpfad nicht. Spec-Pflichtfelder `score_utility_c`/
+`score_utility_b` (vier lebende Specs nachgezogen, Artefakt-Specs unberuehrt).
+Hinweis: die Messung lief auf dem Wheel des K3-Baus (e69aec3, Paritaet dort
+ebenfalls GRUEN, `k3_net_path_parity_repro.json`), weil die erste Arena an
+einer waehrend des Laufs geaenderten Spec-Datei abbrach (Chronik
+`night_run_20260902.md`, 10:18).
+
+**Aufbau:** `tools/paired_arena_env_ab.py`, Netz gegen dasselbe Netz @400/@400,
+Env-Arm auf einem Brett, `models/k1_off.spec.json` (alle Knoepfe 0) auf dem
+anderen, Brett-Tausch per zweitem Lauf (`--spec-a` statt `--spec-b`), Seed
+20261001, 4 Arme x 2 Richtungen x 80 Partien, Blockgroesse 5, `--log-games`,
+`MOSAIC_STACK_DRAW_RESEARCH=1` in allen Armen (Konvention der b05/b06-Arenen;
+Kontrolle an den b06-Instrumentdaten: 111 von 3.468 Records mit
+Stapelzug-Option). Gepoolt per `tools/probes/env_ab_swap_eval.py`
+(Knopf-Seite gegen Kontrolle desselben Spielindex, McNemar exakt, Bloecke je
+Richtung). Artefakte `paired_arena_env_k1_b01_{first,second}_s01.json`,
+`k1_b01_swap_eval_s01.json`, `columns_k1_b01_{first,second}_s01.json`,
+`tor2a_k1c02_v23b01.json`. Laufzeit UNTER NEBENLAST (b07-Training auf der
+GPU): 4.207 + 4.334 s fuer 640 Partien (13,3 s je Partie, threads 10);
+argmax-Instrument 1.702,8 s (8,51 s je Partie, threads 11) -- keine
+Planungsgroessen.
+
+| Arm | Knopf-Seite : Basislinie (160 Paare) | diskordant Knopf/Kontrolle, McNemar p | Block-Diff Siege (SE, t) | Punkte Knopf | Margin (Block-SE) | Klammer Einheit |
+| --- | --- | --- | --- | --- | --- | --- |
+| Kontrolle (0) | 80 : 80 (Spiegelmatch, per Konstruktion) | -- | -- | 48,58 | 0 | -- |
+| c = 0,1 | 83 : 77 | 40 / 37, p = 0,82 | +0,019 (0,057; 0,33) | 48,36 | +3,12 (2,12) | 4,4 % |
+| **c = 0,2** | **104 : 56** | **48 / 24, p = 0,0063** | **+0,150 (0,058; 2,61)** | 47,53 | **+4,94 (1,73)** | 5,6 % |
+| c = 0,3 | 90 : 70 | 48 / 38, p = 0,33 | +0,062 (0,065; 0,96) | 49,46 | +3,19 (2,04) | 10,3 % |
+
+Margen-Klammerung (`m_max`): 0 Blaetter in allen Armen. Die Einheits-
+Klammerung (`wr + u` ausserhalb [0, 1]) trifft 4 bis 10 Prozent der
+netzbewerteten Blaetter und waechst mit `c` -- der Preis der Messvariante
+K1-A, den par.4b (Skalenwechsel) abschaffen wuerde.
+
+**Spalten (Arena-Logs, 315 von 320 Partien replaybar, gepaart je Spielindex
+und Brett, 32 Bloecke):** volle Spalten der Knopf-Seite minus Kontrolle
+c = 0,1 +0,025 (SE 0,092), **c = 0,2 -0,130 (SE 0,070, t -1,85)**, c = 0,3
+-0,094 (SE 0,076); Huellen-Deckung H (par.8.1 der Einhuellenden-Prereg)
+c = 0,2 -0,042 (SE 0,019). Kontrolle 0,600 / 0,550 volle Spalten je Brett.
+**argmax-Instrument @400, 200 Partien, Seed 20260931, c = 0,2
+(`tor2a_k1c02_v23b01.json`): 0,3575 +- 0,059 volle Spalten gegen b01
+0,5150 +- 0,065** (`tor2a_v23b01.json`; ungepaart, die b01-Dateien liegen im
+Archiv), Seiten mit voller Spalte 116 gegen 168 von 400; volle Reihen 0,2025
+gegen 0,1475; Punkte 46,15 gegen 46,80; Strafleiste 5,85 gegen 5,74.
+
+**Lesart (vorlaeufig, gegen die Tabelle in par.14.4):** kein Arm erfuellt
+Zeile 1 (signifikant vorn UND Spalten nicht unter der Kontrolle): c = 0,2 ist
+bei Siegen und Margin signifikant vorn, liegt bei den Spalten aber in beiden
+Instrumenten darunter (Arena t -1,85, argmax -0,16 bei getrennten KIs, die
+sich nicht ueberlappen). Das ist der SPIEGEL des Suchtiefen-Tauschs
+(`search_depth_column_optimum`: mehr Tiefe = staerker, weniger Spalten):
+der Term macht den Blattwert margensensitiver, und die Suche kauft Punkte
+dort, wo sie schneller liegen als in einer Spalte. Zeile 4 (Staerke faellt
+monoton) ist widerlegt: 0,1 und 0,3 sind Nullbefunde, 0,2 ist vorn -- die
+Familie ist NICHT geschlossen, aber die Nicht-Monotonie mahnt zur
+Replikation. **Verdikt steht aus, bis c = 0,2 mit eigenem Seed repliziert
+ist** (`generation_loop.md`: 160 Paare erfuellen die Zahl, die
+Nicht-Monotonie ueber c verlangt trotzdem die zweite Stichprobe). Fuer die
+Generatorwahl (`generation_loop.md`, Spaltenprofil entscheidet) ist c = 0,2
+nach diesem Stand KEIN Kandidat; fuer den SPIELBETRIEB (Champion-Kante) ist er
+nach der Replikation zu pruefen -- zwei getrennte Entscheide, wie in
+par.8.4 der Einhuellenden-Prereg vorgesehen.
+
