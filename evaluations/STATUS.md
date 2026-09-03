@@ -24,52 +24,63 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Uebergabe 2026-09-03, 09:00 -- Sitzungswechsel wegen Kontextende)
+## 1. WAS GERADE LAEUFT (Stand 2026-09-03, 14:30 -- Sitzung mosaic-ai-6d, Tagprogramm nach der Uebergabe von 09:00)
 
-**LAEUFT: der Reanalyze-Relabel fuer `v23-b07`** (`tools/relabel_drafts_with_net.py`,
-8 Worker, seit 2026-09-02 22:37; Stand 09:00: 184 von 200 Dateien in
-`data/relabeled_v23_deep/`, Ende gegen 09:45). Er schreibt am Ende
-`evaluations/artifacts/relabel_net_relabeled_v23_deep.json`. **Er liest die
-200 Policy-Quelldateien aus `<Sicherungswurzel>/archive_pre_v24/v23_window_b05/`;
-der Ordner bleibt, bis der Lauf durch ist.** GPU frei. Baum committet,
-ungepusht (rund 40 Commits seit dem 2026-09-01).
+**LAEUFT: K1-Replikation c = 0,2** (`paired_arena_env_ab`, Seed 20261003,
+Kontrolle plus c = 0,2, 2 x 80 mit Brett-Tausch, Blockgroesse 5, gestartet
+14:20, Ende gegen 15:35; Auswertung haengt dran:
+`k1_b01_swap_eval_s03.json`). GPU frei. Baum committet, ungepusht.
 
-### ERSTE AUFGABE DER NEUEN SITZUNG (Nutzer-Freigabe 2026-09-03: alles ausser der v24-Erzeugung selbststaendig)
+### Was das Tagprogramm 2026-09-03 bis 14:30 ergeben hat (Chronik: `night_run_20260902.md`, ab 09:08)
 
-1. **Watcher bauen** (Monitor mit until-Schleife, kein Sleep-Polling): fertig,
-   wenn `ls data/relabeled_v23_deep/selfplay_v22-b05deep-policy_*.pkl | wc -l`
-   gleich 200 ist UND `evaluations/artifacts/relabel_net_relabeled_v23_deep.json`
-   existiert. Dann die Kennzahlen des Artefakts in
-   `PREREG_reanalyze_label_depth.md` par.A4 nachtragen (relabelt / kein
-   Steinzug / nicht abbildbar / Laufzeit) und den Nutzer informieren.
-2. **b07-Kette starten:** `bash tools/night_b07_chain.sh` im Hintergrund
-   (Kopie der 200 Deep-Dateien nach `data/`, Traeger-Manifest 380, Bloecke
-   unter der Trainings-Umgebung, Split, Monolith unter dem train.py-Schluessel,
-   Training 12 Epochen auf der GPU, rund 2,5 h). Manifest-Diff gegen b01
-   danach: erwartet GENAU `name`, `file_list`, `val_pool`, `surprise_alpha`.
-3. **Waehrend b07 trainiert (ein CPU-Auftrag neben der GPU):** K1 bauen und
-   am `v23-b01_brierbest` messen, Bauvorlage `PREREG_saturating_score_utility.md`
-   par.14 (alles entschieden: Marge aus Punkte- und Gegnerpunkte-Kopf,
-   `x0` Wurzelmarge, `b = 20`, Klammerung, Knoepfe `MOSAIC_SCORE_UTILITY_C/_B`
-   Default 0, Paritaets-Gate, Anker-Invarianz, env-A/B-Arena c 0,1/0,2/0,3,
-   Blockgroesse 5, n >= 150 Paare, argmax-Spaltenprofil).
-4. **Nach dem Training:** b07 abnehmen (`night_run_20260902.md` N3: Orakel
-   auf frozen_v1/v18 und frozen_v3/v21, argmax @400 Seed 20260931, Arena 2 x 80
-   Seed 20260999 Blockgroesse 5, `arena_column_probe`), registrieren als
-   par.A5, Kopf, `generation_naming.md`.
-5. **K3 bauen** nach `PREREG_geometric_envelope.md` par.8 (Profil aus par.8.5,
-   Gewichte 0,1/0,2 und 0,5/1,0). **Vorher beim Nutzer klaeren:** par.8.6
-   (Value-Anteil im Tiling als Margen-Vorhersage in Punkten, Vorpruefung
-   bestanden) ist VORSCHLAG -- bestaetigt er, ersetzt 8.6 den Absatz 8.3 samt
-   Stichentscheid; sonst 8.3.
+1. **Reanalyze-Relabel durch** (09:36): 200 Dateien, 205.854 von 210.529
+   Steinzug-Records mit b01 @400 nachgelabelt, 11,0 h Wanduhr
+   (`reanalyze_label_depth` par.A4).
+2. **`v23-b07` trainiert und ABGENOMMEN** (par.A5, ENTSCHIEDEN): Arena 75:85
+   gegen b01 (p = 0,55, Margin -1,4), argmax-Spalten 0,445 gegen 0,515,
+   Arena-Spalten -0,08/-0,14, Orakel 4/4 knapp vorn, Value-Kopf unbewegt.
+   Tiefes Nachlabeln bringt keine Staerke und kostet Spalten (par.4a, mild).
+   **b01 bleibt Generator fuer v24.** Manifest-Diff gegen b01 exakt die vier
+   erwarteten Felder. Die 400 Value-Kopien sind aus `data/` entfernt (STATUS
+   Punkt 7 der Uebergabe); die 200 Deep-Kopien `selfplay_v22-b05deep-policy_*`
+   liegen noch in `data/` (Original in `data/relabeled_v23_deep/`).
+3. **K1 gebaut und erstgemessen** (`saturating_score_utility` par.15, Commits
+   8ffb2e4/d5e687c): Anker-Drift GRUEN, Netz-Pfad bei c = 0 Record fuer Record
+   identisch. Arena am b01 (160 Paare je Arm, Knopf-Seite gegen dasselbe Netz
+   ohne Knopf): **c = 0,2 gewinnt 104:56 (p = 0,006, Margin +4,9)**, c = 0,1
+   und 0,3 Nullbefunde -- aber Spalten darunter (Arena -0,13, argmax 0,36
+   gegen 0,52). Spiegel des Suchtiefen-Tauschs. Verdikt wartet auf die
+   laufende Replikation. Fuer die Generatorwahl kein Kandidat; fuer den
+   Spielbetrieb nach der Replikation zu pruefen.
+4. **K3 gebaut** (`geometric_envelope` par.8.2/8.3, Commit e69aec3): Modul
+   `envelope.rs`, drei Knoepfe, Tiling-Zweig vor dem Stichentscheid, W_TILE je
+   Seite. Anker-Drift und Netz-Pfad-Paritaet bei allen Knoepfen 0 GRUEN.
+   **Noch nicht gemessen.** par.8.6 wartet auf den Nutzer.
+5. Werkzeuge: `tools/probes/env_ab_swap_eval.py` (gepoolte Knopf-Seiten-
+   Auswertung mit Brett-Tausch), `arena_column_probe.py` liefert jetzt die
+   sechs Standard-Kennzahlen und die Huellen-Deckung H je Seite;
+   `generator_repro_probe.py` repariert; `night_b07_chain.sh` und v24-Rezept
+   par.6d: `generate_carrier_manifest.py --out` ist relativ zu `data/`.
+
+### Reihenfolge fuer den Rest des Tages (Nutzer-Freigabe 2026-09-03: alles ausser der v24-Erzeugung)
+
+1. ~~Watcher, Relabel-Kennzahlen~~ ERLEDIGT 09:36.
+2. ~~b07-Kette, Manifest-Diff~~ ERLEDIGT 09:52.
+3. ~~K1 bauen und am b01 messen~~ ERLEDIGT (par.15); **Replikation c = 0,2
+   LAEUFT**, danach Verdikt in par.15 nachtragen (Kopf!). argmax-Profile fuer
+   c = 0,1 und 0,3 sind offen (Nullbefunde bei der Staerke, niedrige
+   Prioritaet).
+4. ~~b07 abnehmen~~ ERLEDIGT (par.A5).
+5. **K3 messen** nach par.8.4 (Skript `k3_arena.sh` in der Sitzungs-Scratch:
+   Arme S 0,1/0,2, T 0,5/1,0, S+T 0,1+1,0 gegen Spec aus, 2 x 80 je Arm,
+   rund 3,5 h CPU; danach argmax je Arm rund 28 min). par.8.6 nur nach
+   Nutzer-Bestaetigung.
 6. **v24-Material-Pilot** (`night_run_20260902.md` N2) in einem freien
    CPU-Fenster; registrieren in `PREREG_v24_window.md` par.7.
-7. **Aufraeumen:** die 400 `selfplay_v22-b05-value-*` in `data/` sind eine
-   Kopie fuer das b07-Training; nach b07 wieder entfernen (Original in
-   `<Sicherungswurzel>/archive_pre_v24/v23_window_b05/`). Danach kann der
-   ganze Ordner `archive_pre_v24` weg (alles im restic-Snapshot e77c2d7c);
-   dann Fundorte in Reachability-, frozen_v3- und Lehrer-Prereg auf den
-   Snapshot stellen.
+7. Aufraeumen: die 200 Deep-Kopien in `data/` sind NICHT angekuendigt, bleiben
+   bis zur Nutzer-Freigabe. `archive_pre_v24` in der Sicherungswurzel: Freigabe
+   beim Nutzer einholen (Relabel ist durch), dann Fundorte in Reachability-,
+   frozen_v3- und Lehrer-Prereg auf den restic-Snapshot e77c2d7c stellen.
 8. **NICHT:** die v24-Erzeugung (`PREREG_v24_window.md` par.6) -- nur auf
    Nutzer-Anweisung.
 
@@ -118,7 +129,7 @@ Index: 18 OFFEN, 79 ENTSCHIEDEN, 8 UEBERHOLT. Chronik der letzten Naechte:
 | Was | Kosten | Anmerkung |
 | --- | --- | --- |
 | ~~Generatorwahl-Regel bei Gleichstand~~ | -- | ENTSCHIEDEN 2026-09-02 (Nutzer): Staerke schliesst aus, Spaltenprofil entscheidet, sonst Amtsinhaber (`docs/generation_loop.md`, "Generatorwahl unter Armen") |
-| **Reanalyze-Arm `v23-b07`** (eingetaktet 2026-09-02) | Relabel rund 1 h CPU, Training rund 2,5 h GPU, Abnahme rund 1 h CPU | Draft-Policy-Ziele der 200 Sockeldateien mit b01 @400 nachgerechnet (`reanalyze_label_depth` par.A4). Relabel und Abnahme VOR dem v24-Self-Play, Training darf parallel auf die GPU. Teil B (Value) hat bei lambda 1,0 keinen Verbraucher. **Stand 2026-09-02, 06:45 (PAUSE, Maschine schlaeft):** Engine-Einstieg `net_search_states_json_batch` gebaut, Wheel installiert, Anker-Invarianz GRUEN (1.763 Schritte identisch, `anchor_drift_20260902_batchentry.json`), Werkzeug `tools/relabel_drafts_with_net.py` geschrieben, **Smoke noch NICHT gelaufen**. Wiedereinstieg: Smoke mit `--limit-files 1 --workers 1` gegen `<Sicherungswurzel>/archive_pre_v24/v23_window_b05` (dort liegen die 200 Policy-Dateien), dann voller Lauf mit 8 Workern nach `data/relabeled_v23_deep/` |
+| ~~Reanalyze-Arm `v23-b07`~~ | -- | ABGENOMMEN 2026-09-03 (`reanalyze_label_depth` par.A5): 75:85 gegen b01, Spalten 0,445 gegen 0,515 -- keine Staerke, weniger Spalten; b01 bleibt Generator. Reanalyze geht NICHT ins v24-Rezept |
 | **v24-Erzeugung** | 11,9 h bei threads 11 | Rezept vollstaendig in `PREREG_v24_window.md` par.6; Generator `v23-b01_brierbest`. Startet NUR auf Nutzer-Anweisung |
 | Vor dem v24-Training: Monolith fuer den Trainingsanteil | rund 45 min | `tools/window_train_split.py` -> `build_cache_incremental.py --merge-out` unter der Trainings-Umgebung (`cache_build_time` par.12) |
 | ~~b04-Zweig~~ | -- | GEPARKT 2026-09-02 (Nutzer): das Problem sitzt im Value-Kopf, nicht in Policy, Breite oder Merkmalsform (`capacity_sim_frontier` par.15). Der Fahrplan traegt die These ab jetzt als Arbeitshypothese |
@@ -420,14 +431,14 @@ Stufe 4), `capacity_sim_frontier`, `reanalyze_label_depth`,
 | ~~`v23_window`~~ | ENTSCHIEDEN: Fenster gebaut, alle Tore und alle Arme gemessen |
 | `capacity_sim_frontier` | Warm gegen Kalt einfaktoriell belegt (b06, par.14b: 0,18 Spalten, 65:95); b04 wartet auf den Zweig-Entscheid (Abschnitt 5) |
 | ~~`policy_surprise_weighting`~~ | ENTSCHIEDEN 2026-09-01: b03 traegt nicht (Orakel Gleichstand, Arena 75:85) |
-| `reanalyze_label_depth` | Teil A (Lehrer-Relabeln) auf 240 Paaren: Nullbefund (par.A3); die Zeile-1-Frage (flach gegen tief nachgelabelt) und Teil B (Value tief) UNGEMESSEN |
+| `reanalyze_label_depth` | ENTSCHIEDEN 2026-09-03 (par.A5): Lehrer-Relabel b05 Nullbefund (par.A3), Reanalyze b07 keine Staerke und weniger Spalten -- b01 bleibt Generator; Teil B ohne Verbraucher bei lambda 1,0 |
 | ~~`r5_solver_split`~~ | Teil B war Phase 3 -- GESCHLOSSEN ohne Bau (2026-09-01) |
 | ~~`v23_reachability_recheck`~~ | ENTSCHIEDEN 2026-09-01: 14,64 Prozent tot-kartiert gegen 13,89 beim Vorgaenger, Stufe 1 wird NICHT eroeffnet; Quelldateien im restic-Backup |
 | ~~`search_depth_column_optimum`~~ | ENTSCHIEDEN 2026-09-02: Stufe 4 komplett (par.6b, par.7); Tiefen-Delle beschrieben, nicht behoben |
 | `special_tile_yield` | Kanaele 77/78 gebaut, ihre Wirkung nie isoliert |
 | `cache_build_time` | Hebel (3) hat seit 2026-09-01 einen Nutzniesser: **4,98 h** einkerniges Zusammenfuegen bei neuer Fenster-Zusammensetzung (par.11). Die vermisste serielle Vollreferenz liegt damit auch vor |
 | `frozen_v3_eval_set` | ENTSCHIEDEN und GEBAUT 2026-09-01 (Satz 1.800 Zustaende, Orakel aus b01 und v21, Zirkularitaet belegt, par.7-9). Nachgetragen: die Bruecke gilt nur fuer Runden 1-4; Quelldateien im restic-Backup; Artefakte ohne `laufzeit`-Block |
-| `geometric_envelope` | Spreizung gemessen (par.3f): Form A tot, B oder C Pflicht. Naechster Schritt Stufe 0 mit Formwahl (Vorwaertspaesse noetig, nicht netzfrei) |
+| `geometric_envelope` | K3 GEBAUT 2026-09-03 (par.8.2/8.3, Anker und Paritaet GRUEN), Messung nach par.8.4 offen; par.8.6 (Value-Anteil im Tiling, Vorpruefung bestanden) wartet auf den Nutzer |
 
 **Registriert, nicht eingetaktet** (jeder Bau braucht vorher eine
 Registrierung): `plate_policy_supervision`, `saturating_score_utility`,

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt tieferes Nachlabeln die Betrags-Daempfung? | Beleg: Zeile-1-Frage im Arm `v23-b07` IM LAUF (par.A4): Relabel der 200 Policy-Dateien mit b01 @400 durch (2026-09-03, 205.854 von 210.529 Steinzug-Records relabelt, 11,0 h), Training b07 gestartet, Abnahme folgt als par.A5. Lehrer-Relabeln (par.4a) `v23-b05`: par.A3 Nullbefund (246:234, p = 0,65), b01 bleibt Generator. Teil B UNGEBAUT (kein Verbraucher bei lambda 1,0). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Reagieren SPIELEN und LABELN unterschiedlich auf Suchtiefe -- und heilt tieferes Nachlabeln die Betrags-Daempfung? | Beleg: NEIN (par.A5, 2026-09-03): Arm `v23-b07` (200 Policy-Dateien mit b01 @400 nachgelabelt, sonst b01-Rezept) gegen b01: Arena 75:85 (p = 0,55), argmax-Spalten 0,445 gegen 0,515, Arena-Spalten -0,08/-0,14, Orakel 4/4 knapp vorn, Value-Kopf unbewegt. Tiefes Nachlabeln traegt die Spaltenaermut der Tiefe ins Ziel (par.4a, mild); b01 bleibt Generator. Lehrer-Relabel b05: par.A3 Nullbefund. Teil B ohne Verbraucher. -->
 
 # Vorregistrierung: Reanalyze -- Spielen und Labeln entkoppeln
 
@@ -474,3 +474,50 @@ Training) ist um 09:37 gestartet; Abweichung zum Text oben: die Deep-Dateien
 liegen als Kopie in `data/` statt ueber `--extra-data-dir`, der Manifest-Diff
 gegen b01 zeigt dann `name`, `file_list`, `val_pool`, `surprise_alpha` (kein
 `extra_data_dir`). Abnahme folgt als par.A5.
+
+## par.A5 ABGENOMMEN (2026-09-03): tiefes Nachlabeln macht b07 nicht staerker und kostet Spalten -- par.4a bestaetigt, mild; b01 bleibt Generator
+
+**Training** (`manifest_train_v23-b07_20260903_095253.json`): b01-Rezept,
+Warmstart `v22-b05`, 12 Epochen, 12.494 s Wanduhr (3,47 h, GPU; Datenaufbau
+31,7 s ueber den Monolithen des Trainingsanteils, 4.721.817 Zustaende).
+Manifest-Diff gegen b01 in `cli_args` GENAU `name`, `file_list`, `val_pool`,
+`surprise_alpha` (die Deep-Dateien lagen als Kopie in `data/`, kein
+`extra_data_dir`; uebrige Unterschiede sind Formatfelder des neueren
+Trainers, Chronik 09:52). `v23-b07_brierbest` = Epoche 7, val_brier 0,1939
+(b01: Epoche 5, 0,1934); Val-R2 Value 0,379-0,383 flach ueber alle Epochen.
+
+**Ergebnis gegen die Lesart aus par.A4** (Bezug `v23-b01_brierbest`):
+
+| Mass | b07 | b01 | Quelle |
+| --- | --- | --- | --- |
+| Orakel frozen_v1 / v18: top3mass, tau | **0,5332, 0,2454** | 0,5308, 0,2296 | `reanalyze_b07_vs_b01_frozenv1.json` (n 952) |
+| Orakel frozen_v3 / v21: top3mass, tau | **0,4690, 0,1558** | 0,4644, 0,1363 | `..._frozenv3_v21orakel.json` (n 915) |
+| Value-Spearman (v1 / v3) | 0,628 / 0,680 | 0,634 / 0,681 | dieselben |
+| Arena 2 x 80, Seed 20260999, Blockgroesse 5 | **75 : 85**; Paare b07 beide 20 / geteilt 35 / b01 beide 25, Vorzeichentest p = 0,55; Siegdifferenz je Partie -0,062, Block-SE 0,071 (32 Bloecke); Margin -1,40 (Block-SE 1,63) | | `paired_arena_env_b07_b01_{first,second}_s99.json` |
+| volle Spalten, argmax @400, 200 Partien, Seed 20260931 | **0,445 +- 0,065** (Seiten mit voller Spalte 139 von 400; >= 4: 2,17; hoechste 5,19) | 0,515 +- 0,065 (168) | `tor2a_v23b07.json`, 1.507 s (7,54 s je Partie, threads 11) |
+| volle Spalten in der Arena (gepaart je Partie) | b07 minus b01 **-0,075** (Block-SE 0,133) und **-0,138** (0,150); Seiten 0,5375 / 0,475 | 0,6125 / 0,6125 | `columns_b07_b01_{first,second}_s99.json`, 160 von 160 replaybar |
+| Huellen-Deckung H (Arena) | 0,454 / 0,454 | 0,462 / 0,459 | dieselben |
+| Punkte / Strafleiste / lange Reihen vollendet (Arena, Mittel beider Richtungen) | 47,58 / 9,68 / 2,85 | 49,0 / 9,20 / 2,89 | dieselben |
+| Reihen (argmax): volle Reihen, Fuellstand | 0,158, 2,91/6 | 0,148, 2,92/6 | `tor2a_*.json` |
+| Strafleiste (argmax) | 5,75 | 5,74 | |
+| eigene Punkte (argmax) | 45,49 | 46,80 | |
+
+Laufzeiten: Arena 931 + 920 s (11,6 s je Partie, threads 10, CPU exklusiv,
+GPU frei), argmax 1.507 s, Orakel-Laeufe unter einer Minute.
+
+**Verdikt (Lesart par.A4):** b07 liegt bei den beiden arena-validierten
+Policy-Metriken auf beiden Orakeln vorn (4 von 4, Abstaende 0,002-0,020),
+in der Arena aber NICHT (75:85, p = 0,55, Margin -1,4), und bei den Spalten
+in beiden Instrumenten darunter (argmax 0,445 gegen 0,515; Arena -0,075 und
+-0,138, jeweils innerhalb einer Block-SE). Das ist die milde Form von par.4a:
+tiefes Nachlabeln mit demselben Netz traegt die Spaltenaermut der Tiefe
+(`search_depth_column_optimum` par.7) ins Ziel, ohne Staerke zu bringen --
+weit weniger drastisch als der Kaltstart b06 (0,18), aber in dieselbe
+Richtung. **Zeile-1-Frage beantwortet: Spielen und Labeln reagieren NICHT
+unterschiedlich auf Suchtiefe -- beides wird spaltenaermer, und die
+Betrags-Daempfung heilt das Nachlabeln nicht** (Value-Spearman und Val-R2
+unbewegt). Nach der Generatorwahl-Regel (`generation_loop.md`: Staerke
+schliesst nicht aus, Spaltenprofil entscheidet) **bleibt b01 Generator fuer
+v24**; Reanalyze wandert NICHT ins v24-Rezept. Teil B (Value) bleibt ohne
+Verbraucher (lambda 1,0).
+
