@@ -581,8 +581,20 @@ dH_kosten       = Summe (r+1) der NEU gefuellten Zellen innerhalb der Huelle
   der Zeile 1 kostet 1); `W_TILE` uebersetzt Kosten in Punkte-Aequivalente.
 - Knopf `MOSAIC_ENVELOPE_TILING_W` (= `W_TILE`), Default **0.0 = aus**
   (dann Bestandspfad, byte-identisch); Arme **0,5 / 1,0** Punkte je
-  Kosteneinheit. Der Netz-Stichentscheid (`NET_TILING_TIEBREAK_ENABLED`)
-  bleibt fuer punktgleiche Kandidaten dahinter bestehen.
+  Kosteneinheit.
+- **Reihenfolge gegenueber dem Netz-Stichentscheid (Nutzer-Hinweis
+  2026-09-03):** heute waehlt `NET_TILING_TIEBREAK_ENABLED` in Runde 2-4 unter
+  den Top-12 nach `Punkte * P(Sieg)` (Modus 0) bzw. `P(Sieg)` (Modus 1), und
+  par.3f hat gemessen, dass das nur ein Stichentscheid unter punktgleichen
+  Abschluessen ist. Mit K3 gilt: **zuerst** der huellen-bereinigte Score
+  `Punkte + W_TILE * w_e * dH_kosten` (Argmax), **danach** der bestehende
+  Stichentscheid nur noch unter Kandidaten mit gleichem bereinigtem Score
+  (Modus 0 wird zu `score * P(Sieg)`, Modus 1 bleibt `P(Sieg)`). Der Value-
+  Stichentscheid rueckt damit hinter die Geometrie, nicht davor; da der
+  Huellen-Term echte Gleichstaende seltener macht, bekommt er weniger zu
+  entscheiden -- gewollt, weil er nach par.3f ohnehin nie einen
+  Punktvorsprung kippt. Bei `W_TILE = 0` und in Runde 5 ist der Pfad
+  bitgleich zum Bestand.
 - Der Punkte-Term bleibt in allen Runden (par.3d iii, Default); der
   schaerfere Arm `w_p(R1..R2) = 0` ist ein eigener Arm K3-P0 und wird nur
   gefahren, wenn (d) mit Punkten traegt.
