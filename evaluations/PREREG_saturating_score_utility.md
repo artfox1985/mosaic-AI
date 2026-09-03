@@ -807,5 +807,11 @@ Partien rund 1,5 h CPU plus Replikation, Spaltenprofil 3 x 23 min.
 1. **K1-A (Klammerung) als Messvariante vor dem Skalenwechsel**, oder direkt
    der Skalenwechsel nach par.4a/4b (Umbau ueber Engine, Korpusformat und
    Trainer, geschaetzt mehrere Tage).
-2. **Referenz b = 20** bestaetigen oder eine andere Referenz nennen; die
-   Regel "nicht an heutiger Netzstreuung eichen" gilt weiter.
+2. ~~**Referenz b = 20** bestaetigen oder eine andere Referenz nennen~~
+   **ENTSCHIEDEN (Nutzer 2026-09-03): b = 20.** Begruendung des Nutzers:
+   *"20 punkte marge kommt schon gut hin bei einem gleichwertigen basisspiel
+   und ein spieler schaut mehr auf die wertungsplatten"* -- also die Marge,
+   die der Plattenblick allein zwischen sonst gleich starken Spielern
+   erzeugt; genau die Groesse, die der Term sichtbar machen soll. Damit ist
+   `b` eine Referenzsetzung aus dem Spielverstaendnis, wie `VALUE_SCALE` und
+   `MARGIN_SCALE`, nicht aus einer Netzverteilung. Offen bleibt allein Punkt 1.
