@@ -80,10 +80,12 @@ je Arm). GPU frei. Baum committet, ungepusht.
    par.8.6 nur nach Nutzer-Bestaetigung.
 6. **v24-Material-Pilot** (`night_run_20260902.md` N2) in einem freien
    CPU-Fenster; registrieren in `PREREG_v24_window.md` par.7.
-7. Aufraeumen: die 200 Deep-Kopien in `data/` sind NICHT angekuendigt, bleiben
-   bis zur Nutzer-Freigabe. `archive_pre_v24` in der Sicherungswurzel: Freigabe
-   beim Nutzer einholen (Relabel ist durch), dann Fundorte in Reachability-,
-   frozen_v3- und Lehrer-Prereg auf den restic-Snapshot e77c2d7c stellen.
+7. ~~Aufraeumen~~ `archive_pre_v24` am 2026-09-03 16:40 auf Nutzer-Freigabe
+   GELOESCHT (1,7 GB; fuenf Stichproben vorher per `restic find` im Snapshot
+   e77c2d7c bestaetigt -- Pfade dort unter `data/`), Fundorte in
+   `v23_reachability_recheck` par.7, `frozen_v3_eval_set` par.7-Tabelle und
+   `reanalyze_label_depth` par.A4 nachgezogen. Die 200 Deep-Kopien
+   `selfplay_v22-b05deep-policy_*` in `data/` bleiben (nicht angekuendigt).
 8. **NICHT:** die v24-Erzeugung (`PREREG_v24_window.md` par.6) -- nur auf
    Nutzer-Anweisung.
 

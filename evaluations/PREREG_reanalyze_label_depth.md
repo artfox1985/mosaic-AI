@@ -453,7 +453,7 @@ hochgerechnet rund 207.000 Zustaende, mit 8 Workern rund 2 h. Voller Lauf
 gestartet, Ausgabe `data/relabeled_v23_deep/selfplay_v22-b05deep-policy_*`.
 
 **Voller Relabel DURCH (2026-09-03, 09:36; `relabel_net_relabeled_v23_deep.json`,
-8 Worker, Quelle `<Sicherungswurzel>/archive_pre_v24/v23_window_b05`):**
+8 Worker, Quelle `<Sicherungswurzel>/archive_pre_v24/v23_window_b05`; dieser Ordner ist seit 2026-09-03 geloescht, Fundort restic-Snapshot `e77c2d7c` unter `data/`):**
 
 | Kennzahl | Wert |
 | --- | --- |
