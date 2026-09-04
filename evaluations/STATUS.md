@@ -43,7 +43,7 @@ Huelle H_end 0,659):
 | K3 S/T/S+T (Raster) | 80:80 ... 81:79 | 0,51-0,53 / 0 | 0 / 0 | ENTSCHIEDEN: falscher Hebel (par.9) |
 | 8.6 Value im Tiling | 82:78 / 84:76 / 80:80 | 0,49 / 0 | 0 / 0 | Nullbefund (8.6a) |
 | Huellen-Bauer (Vorzug) | gegen hv1 68:92 statt 131:29 | 0,275 / -- | 0,677 / +0,07 | unbrauchbar als Uebersteuerung (8.7a) |
-| **K3-P projiziert C 0,2 / 0,5 / 1,0** | **88 / 92 / 95 : 80** (p 0,38 / 0,21 / 0,11) | 0,455 / 0,480 / **0,555** und Arena +0,06 / +0,11 / +0,10 | H_end 0,665 / 0,687 / **0,703**; Arena +0,00 / **+0,08 / +0,10** (t 3,5 / 6,2) | erster Hebel, bei dem alles in eine Richtung zeigt; Siege noch nicht signifikant (8.7a/8.7b) |
+| **K3-P projiziert C 0,2 / 0,5 / 1,0** | **88 / 92 / 95 : 80** (p 0,38 / 0,21 / 0,11) | 0,455 / 0,480 / **0,555** und Arena +0,06 / +0,11 / +0,10 | H_end 0,665 / 0,687 / **0,703**; Arena +0,00 / **+0,08 / +0,10** (t 3,5 / 6,2) | **REPLIZIERT (8.7c): C 1,0 gepoolt 191:129 auf 320 Paaren, p = 0,014, Seeds deckungsgleich; Huelle Arena +0,16 im zweiten Seed. K3 traegt; C 2,0 schwaecher (88:72)** |
 | K3-R Erreichbarkeit C 0,5 / 1,0 | 82 / 91 : 80 | 0,49 / **0,39** und Arena -0,11 / -0,14 | H_end 0,674 / 0,683; Arena +0,04 / +0,07 | hebt Huelle, kostet Spalten (8.9a) |
 | K3-O Ownership C 0,5 / 1,0 | 86 / 87 : 80 | 0,475 / 0,470 | H_end 0,660 / 0,665 | kaum Huelle, kostet Punkte 43,9 (8.9a) |
 | Material-Pilot v24 | -- | Value-Klasse 0,726, 50 % Seiten mit voller Spalte (v23 35 %) | -- | Tor 0 fuer b01 @100 vorab belegt (v24 par.7) |

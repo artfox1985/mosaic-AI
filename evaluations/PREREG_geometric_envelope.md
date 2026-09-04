@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: K3 in der Bauform par.8.2/8.3 GEMESSEN (par.9, 2026-09-03): Siege, Spalten und Huelle unbewegt -- falscher Hebel, nicht falsches Ziel: im Draft-Suchbaum ist H konstant (Raster fuellt sich nur im Tiling). Fortsetzung gebaut: par.8.6 Value-Anteil im Tiling (Nutzer), par.8.7 Potential auf dem projizierten Brett, par.8.8 Huellen-Bauer mit Kuppel-Vorzug; Messung laeuft. -->
+<!-- STATUS: OFFEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: JA in der Bauform par.8.7 (K3-P, Potential auf dem PROJIZIERTEN Brett, C 1,0): gepoolt 191:129 auf 320 Paaren (p = 0,014, beide Seeds gleich), Spalten +0,09 Arena / 0,555 argmax (b01 0,515), Huelle +0,10 bis +0,16 Arena, Punkte +3. Raster-Form (par.8.2/8.3, par.9), Value im Tiling (8.6a), Erreichbarkeit/Ownership (8.9a) und Huellen-Bauer (8.8) tragen nicht. Offen: Betriebspunkt @100 und Champion-Kante; Wiedervorlage v24 par.8.9b. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -1074,4 +1074,30 @@ werden deshalb als v24-ARME registriert (par.8 der v24-Prereg), gemessen
 am v24-Netz mit dem v24-Material -- nicht mehr am b01. Bau je Baustein unter
 einer Stunde (dieselbe Projektions-Mechanik, Modus 4 und 5), Messung wie
 8.7a/8.7b. Nichts davon wird vor dem v24-Start gebaut.
+
+### 8.7c K3-P REPLIKATION C 1,0 (2026-09-04, 11:39-13:15, Kette D; Seed 20261009, Kontrolle / C 1,0 / C 2,0, 2 x 80, Blockgroesse 5, gegen Spec aus)
+
+| Arm | Siege Knopf : Basislinie (160 Paare) | diskordant, p | Block-Diff Siege (SE, t) | Punkte Knopf (45,3) | Margin (SE) | Spalten Arena (SE) | H Arena (SE) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| C 1,0 | **96 : 64** | 46 / 30, 0,085 | +0,100 (0,051; 1,97) | 49,4 | +3,74 (2,16) | +0,088 (0,077) | **+0,162 (0,018)** |
+| C 2,0 | 88 : 72 | 45 / 37, 0,44 | +0,050 (0,059; 0,85) | 48,4 | +3,38 (2,21) | +0,022 (0,073) | +0,179 (0,015) |
+
+**C 1,0 gepoolt ueber beide Seeds (20261007 + 20261009, 320 Paare): 191 : 129
+gegen 160 : 160, diskordant 91 / 60, McNemar p = 0,014, Block-Differenz
++0,097 je Partie (SE 0,038, t 2,54, 64 Bloecke), Margin +3,48 (SE 1,48);
+die beiden Seeds sind deckungsgleich (+0,094 und +0,100, z = -0,08).**
+Artefakte `paired_arena_env_k3p_b01_{first,second}_s09.json`,
+`k3p_b01_swap_eval_s09.json`, `columns_k3p_b01_*_s09.json`.
+
+**Verdikt nach par.8.4, Zeile 1, ERFUELLT fuer K3-P C 1,0:** Siege signifikant
+vorn (p = 0,014 auf 320 Paaren, beide Seeds gleich), Spalten NICHT unter der
+Kontrolle (Arena +0,10 und +0,09, argmax 0,555 gegen 0,515), Huelle steigt
+(Arena +0,10 und +0,16, argmax 0,703 gegen 0,659), Punkte +2 bis +4.
+**K3 traegt -- in der Bauform "Potential auf dem projizierten Brett",
+C_HULL 1,0, Profil aus dem Value-Kopf.** Kandidat fuer das v24-
+Erzeugungsrezept UND fuer den Spielbetrieb (getrennt zu entscheiden, par.8.4);
+C 2,0 ist bei den Siegen schwaecher (88:72) bei noch hoeherer Huelle -- die
+Monotonie endet zwischen 1,0 und 2,0, C 1,0 bleibt der Arm. Offen vor dem
+Rezept: der Betriebspunkt @100 (Kette D Schritt 3) und die Champion-Kante
+(Spielbetrieb).
 
