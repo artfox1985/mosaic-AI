@@ -219,6 +219,13 @@ ihrem Loeschen gibt es keinen zweiten Versuch.
   interaktiv einwandfrei laeuft. In dem Fall ist `RESTIC_PASSWORD_FILE` der
   richtige Weg.
 
+- **`restic find` druckt Windows-Pfade mit Schraegstrichen** (2026-09-04):
+  `/D/OneDrive/Documents/Projekte/mosaic-AI/data/...`, nicht `D:\...`. Ein
+  Filter auf Backslashes findet nichts und meldet "0 Treffer", obwohl alles
+  da ist. Fuer den Handaufruf ohne Skript-Kontext: `. tools/backup_common.ps1`
+  und `Initialize-BackupContext -ToolsDir <repo>	ools` liefern `ResticExe`
+  und `RepoPath` (der Parameter ist Pflicht).
+
 ## Wenn das Passwort weg ist
 
 Dann ist das Repository weg. restic hat keine Hintertuer. Der Eintrag im
