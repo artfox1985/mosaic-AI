@@ -109,10 +109,15 @@ neu gebaut. Kosten: Zusammenfuegen des Trainingsanteils, gemessen am
 v23-Fenster 344 s (`PREREG_cache_build_time.md` par.12), unter der
 Trainings-Umgebung.
 
-**Merkposten fuer das Diagramm:** `docs/window_generation.svg` sagt noch
-"Manifest-Inhalt steckt im Cache-Key" -- seit dem Traeger-Umbau vom
-2026-08-31 stimmt das nicht mehr (Maske beim Fensterbau). Beim naechsten
-Anfassen des SVG berichtigen.
+**Berichtigung (2026-09-04, 23:40, am Code geprueft):** die erste Fassung
+dieses Absatzes nannte den Satz "Manifest-Inhalt steckt im Cache-Key" in
+`docs/window_generation.svg` veraltet. Das war falsch: der FENSTER-Schluessel
+(`corpus_dataset.window_cache_key`, engine/py/corpus_dataset.py:324 ff.)
+traegt den Manifest-INHALT (`policy_carrier_set`) weiterhin -- ein anderer
+Traegersatz ist ein anderer Monolith. Nur der DATEI-Block-Schluessel
+(`file_cache_key.per_file_cache_key`) kennt den Traegerstatus seit dem
+2026-08-31 nicht mehr. Das Diagramm ist richtig; fuer v25 heisst das: neuer
+Traegersatz = neuer Monolith (344 s), Bloecke bleiben.
 
 ## par.6 Was noch offen ist
 
