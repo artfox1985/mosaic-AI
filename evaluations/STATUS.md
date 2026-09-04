@@ -24,105 +24,85 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-09-03, 14:30 -- Sitzung mosaic-ai-6d, Tagprogramm nach der Uebergabe von 09:00)
+## 1. WAS GERADE LAEUFT (Uebergabe 2026-09-04, 20:40 -- Sitzungswechsel per Arbeitsauftrag-Chip; Sitzung mosaic-ai-6d uebergibt)
 
-**LAEUFT: Kette D `night_chain_0903d.sh`** (Start 2026-09-04 11:38, CPU
-exklusiv): K3-P-Arena Replikation Kontrolle / C 1,0 / C 2,0 (Seed 20261009,
-2 x 80), argmax C 2,0 plus Huellen-Sonde, dann K3-P im Erzeugungs-
-Betriebspunkt @100 (Pilot-Rezept, 400 Partien, Seed 20260910, Tag
-`pilot24k3p`) mit Symmetrie-Sonde und Huellen-Sonde gegen den Piloten.
-Ende gegen 15:30. Kette C (K3-R/K3-O) ist durch: 8.9a. **Champion-Kante b01 + K3-P C 1,0 gegen v21: 38:12 (Seed 20261004, Fruehstopp) und Replikation 221:179 (Seed 20261010, 200 Paare, p 0,055); gepoolt 259:191 auf 225 Paaren, p = 0,003 (par.10/10a). b01 ohne Knopf: 214:186. NICHTS LAEUFT MEHR -- Maschine frei, Baum push-bereit.**
+**LAEUFT: Golden Probe des neuen Champion-Artefakts**
+(`tools/build_frozen_golden_probe.py --artifact-dir models/frozen_champions/v23-b01_k3p10 --seed-base 916001`,
+gestartet 20:00, Einzelkern, Ziel `models/frozen_champions/v23-b01_k3p10/golden_probe.json`;
+liest `model.onnx` und `spec.json` in diesem Ordner -- NICHT anfassen). Stand
+20:40: Datei liegt noch nicht vor. Sonst laeuft NICHTS: keine Arena, kein
+Training, GPU frei. Baum sauber, 58 Commits ungepusht (Push ist Nutzer-Sache,
+der pre-push-Hook setzt den Python-DLL-Pfad selbst).
 
-**Kette B (2026-09-03 21:25 bis 2026-09-04 07:02) ist durch.** Ergebnisse
-je Hebel, alle am `v23-b01_brierbest`, Bezug b01 (argmax 0,515 Spalten,
-Huelle H_end 0,659):
+**Champion seit 19:33: `v23-b01_k3p10`** (b01 mit projiziertem Huellen-
+Potential; Abschnitt 4, `PREREG_geometric_envelope.md` par.11). Der Nutzer
+hat sechs Server-Partien gegen ihn gespielt (4:2 fuer den Menschen, Chronik
+20:35).
 
-| Hebel | Siege (160 Paare) | Spalten argmax / Arena | Huelle argmax / Arena | Verdikt |
-| --- | --- | --- | --- | --- |
-| K1 c = 0,2 (Margen-Utility) | 104:56 dann 83:77; gegen v21 77:83 (b01: 88:72) | 0,36 / -0,08 | -- | ENTSCHIEDEN: kein Rezept, keine Kante (par.15-17) |
-| K3 S/T/S+T (Raster) | 80:80 ... 81:79 | 0,51-0,53 / 0 | 0 / 0 | ENTSCHIEDEN: falscher Hebel (par.9) |
-| 8.6 Value im Tiling | 82:78 / 84:76 / 80:80 | 0,49 / 0 | 0 / 0 | Nullbefund (8.6a) |
-| Huellen-Bauer (Vorzug) | gegen hv1 68:92 statt 131:29 | 0,275 / -- | 0,677 / +0,07 | unbrauchbar als Uebersteuerung (8.7a) |
-| **K3-P projiziert C 0,2 / 0,5 / 1,0** | **88 / 92 / 95 : 80** (p 0,38 / 0,21 / 0,11) | 0,455 / 0,480 / **0,555** und Arena +0,06 / +0,11 / +0,10 | H_end 0,665 / 0,687 / **0,703**; Arena +0,00 / **+0,08 / +0,10** (t 3,5 / 6,2) | **REPLIZIERT (8.7c): C 1,0 gepoolt 191:129 auf 320 Paaren, p = 0,014, Seeds deckungsgleich; Huelle Arena +0,16 im zweiten Seed. K3 traegt; C 2,0 schwaecher (88:72)** |
-| K3-R Erreichbarkeit C 0,5 / 1,0 | 82 / 91 : 80 | 0,49 / **0,39** und Arena -0,11 / -0,14 | H_end 0,674 / 0,683; Arena +0,04 / +0,07 | hebt Huelle, kostet Spalten (8.9a) |
-| K3-O Ownership C 0,5 / 1,0 | 86 / 87 : 80 | 0,475 / 0,470 | H_end 0,660 / 0,665 | kaum Huelle, kostet Punkte 43,9 (8.9a) |
-| **K3-P im Betriebspunkt @100** (Pilot-Rezept) | -- | 0,775 gegen 0,726; 55 % gegen 50 % Seiten mit voller Spalte; Punkte 51,0 gegen 49,7 | H_end 0,718 gegen 0,685; Halbzeit 0,456 gegen 0,413 | haelt in der Erzeugung (8.7d); C 2,0 am Instrument 0,635 Spalten |
-| Material-Pilot v24 | -- | Value-Klasse 0,726, 50 % Seiten mit voller Spalte (v23 35 %) | -- | Tor 0 fuer b01 @100 vorab belegt (v24 par.7) |
+### ERSTE AUFGABE DER NEUEN SITZUNG
 
-**Nutzer-Entscheid 2026-09-04, 13:20: v24 bekommt KEINE weiteren Arme.**
-v24 traegt Generator b01 @100, Knopf-Kandidat K3-P (Kette D entscheidet),
-Arme b02/b03 (Seeding-Kuratierung, `start_position_seeding` par.7) und die
-Huellen-Wiedervorlage (`geometric_envelope` par.8.9b). Die uebrigen offenen
-Preregs (Stand: 16 OFFEN, 81 ENTSCHIEDEN, 8 UEBERHOLT) werden bei Bedarf in
-v25 und folgenden Generationen bearbeitet; **Ziel des Nutzers: die offenen
-Preregs im Lauf der naechsten Generationen auf rund 7 abarbeiten** -- neue
-Preregs nur gegen geschlossene alte, Arme je Generation so waehlen, dass sie
-Offenes ENTSCHEIDEN.
+Nutzer-Freigaben, woertlich: 2026-09-03 *"mach im programm selbststaendig
+weiter, ausser der fenster erzeugung"*; 2026-09-04 *"Die Freigabe fuer Das
+Rezept mit Knopf haengt an der Arena. Aber ich tendiere zu ja"* (die Arena
+hat gehalten: par.10a) -- **die v24-Erzeugung startet trotzdem NUR auf
+ausdrueckliche Nutzer-Anweisung**; *"viel mehr will ich in v24 nicht
+eintakten"*; Loeschungen nur auf pfadgenaue Freigabe (2026-09-04 19:45
+erledigt); **kein Push**.
 
-**Fuer die v24-Erzeugung heisst das (Nutzer-Entscheid):** Generator bleibt
-b01 @100; offen ist, ob K3-P (C 1,0, projiziert) als Rezept-Knopf in die
-Erzeugung geht -- dafuer fehlen die Replikation der Siege und die Frage, ob
-der Effekt bei 100 Sims (Erzeugung) so gross ist wie bei 400 (Instrument).
+1. **WATCHER Golden Probe:** fertig, wenn
+   `models/frozen_champions/v23-b01_k3p10/golden_probe.json` existiert UND kein
+   `build_frozen_golden_probe`-Python-Prozess mehr laeuft; Stillstand melden,
+   wenn nach 60 min nichts da ist (dann Werkzeug im Vordergrund neu starten,
+   `--max-games 40`). Danach `manifest.json` im Artefakt pruefen (Feld
+   `golden_probe.source` von "laeuft" auf den Befund stellen) und mit
+   `python -X utf8 -u tools/frozen_referee_match.py --artifact-dir models/frozen_champions/v23-b01_k3p10 --n-games 2 --skip-golden`
+   NICHT arbeiten -- Abnahme braucht den Golden-Test; stattdessen den
+   Referee-Selbsttest laut `frozen_referee_match.py`-Kopf fahren (Artefakt-
+   venv fehlt noch: `worker_python` im Manifest; bei Bedarf venv aus dem
+   Wheel `mosaic_rust_k3p_20260904.whl` bauen).
+2. **v24-Erzeugung, NUR auf Nutzer-Anweisung:** Rezept `PREREG_v24_window.md`
+   par.6b' (par.6b plus `MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0`
+   in allen drei Laeufen). Der Sockel (4.000 Partien) laeuft auf einer ANDEREN
+   Maschine des Nutzers (Befehle im Chat 2026-09-04 14:10, im Kern par.6b'); hier
+   die beiden Value-Laeufe (6.000 argmax, 2.000 gesampelt, rund 8 h bei
+   3,3 s je Partie). Pflichtpruefungen par.6c (Manifest-Diff: erwartete
+   Felder plus `envelope_projection_mode` 1 und `envelope_search_c` 1.0;
+   Stack-Draw-Kontrolle; Tor 0). Vor dem Training: Monolith fuer den
+   Trainingsanteil (`cache_build_time` par.12, `tools/window_train_split.py`),
+   Traeger-Manifest 580 (par.6d, `--out` RELATIV zu data/).
+3. **Nach dem naechsten restic-Tages-Snapshot (12:00):** die zwei
+   Korpora `selfplay_tor2a-k3p20-v23b01_*` und `selfplay_pilot24k3p-value-argmax_*`
+   in `data/` duerfen weg (Nutzer-Freigabe 2026-09-04 19:45 "loesch das
+   genannte", diese beiden waren nur wegen des fehlenden Snapshots
+   zurueckgestellt; vorher `restic find` je einer Datei).
+4. **Wiedervorlagen fuer v24-Arme** (nicht vor dem v24-Start bauen):
+   `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
+   Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
+   (b03). Nutzer-Ziel: offene Preregs (16) ueber v25+ auf rund 7.
+5. **Offene Nutzer-Entscheide:** v20_2d_opp_brierbest aus restic zurueckholen
+   fuer die "richtige" Champion-2-Kante (heute v22-b05 ersatzweise, par.11);
+   Verwendung der sechs Server-Logs (Anzeige-Fit auf Mensch-Zustaenden oder
+   Mensch-Huelle in der Lehrer-Prereg neu rechnen).
 
-### Was das Tagprogramm 2026-09-03 bis 14:30 ergeben hat (Chronik: `night_run_20260902.md`, ab 09:08)
+Blockaden (Kettenfehler, unerwarteter Manifest-Diff, Anker ROT): anhalten,
+Zustand sichern, Nutzer fragen. Nach jedem Schritt Chronik
+(`night_run_20260902.md` fortschreiben oder `night_run_20260904.md` anlegen),
+STATUS Abschnitt 1 nachziehen, committen (deutsch, Warum in der
+Beschreibung, Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>).
 
-1. **Reanalyze-Relabel durch** (09:36): 200 Dateien, 205.854 von 210.529
-   Steinzug-Records mit b01 @400 nachgelabelt, 11,0 h Wanduhr
-   (`reanalyze_label_depth` par.A4).
-2. **`v23-b07` trainiert und ABGENOMMEN** (par.A5, ENTSCHIEDEN): Arena 75:85
-   gegen b01 (p = 0,55, Margin -1,4), argmax-Spalten 0,445 gegen 0,515,
-   Arena-Spalten -0,08/-0,14, Orakel 4/4 knapp vorn, Value-Kopf unbewegt.
-   Tiefes Nachlabeln bringt keine Staerke und kostet Spalten (par.4a, mild).
-   **b01 bleibt Generator fuer v24.** Manifest-Diff gegen b01 exakt die vier
-   erwarteten Felder. Die 400 Value-Kopien sind aus `data/` entfernt (STATUS
-   Punkt 7 der Uebergabe); die 200 Deep-Kopien `selfplay_v22-b05deep-policy_*`
-   liegen noch in `data/` (Original in `data/relabeled_v23_deep/`).
-3. **K1 gebaut und erstgemessen** (`saturating_score_utility` par.15, Commits
-   8ffb2e4/d5e687c): Anker-Drift GRUEN, Netz-Pfad bei c = 0 Record fuer Record
-   identisch. Arena am b01 (160 Paare je Arm, Knopf-Seite gegen dasselbe Netz
-   ohne Knopf): **c = 0,2 gewinnt 104:56 (p = 0,006, Margin +4,9)**, c = 0,1
-   und 0,3 Nullbefunde -- aber Spalten darunter (Arena -0,13, argmax 0,36
-   gegen 0,52). **Replikation (Seed 20261003): 83:77, p = 0,82; gepoolt
-   187:133, p = 0,03, Seeds uneins (z 1,8); Margin in jedem Lauf +2 bis +5.**
-   Verdikt par.16, ENTSCHIEDEN: Marge wird zu Punkten, nicht stabil zu
-   Siegen, Spalten darunter -- K1 geht NICHT ins v24-Rezept, Skalenwechsel
-   par.4b entfaellt. Champion-Kante mit c = 0,2 fuer den Spielbetrieb waere
-   ein eigener Nutzer-Entscheid.
-4. **K3 gebaut** (`geometric_envelope` par.8.2/8.3, Commit e69aec3): Modul
-   `envelope.rs`, drei Knoepfe, Tiling-Zweig vor dem Stichentscheid, W_TILE je
-   Seite. Anker-Drift und Netz-Pfad-Paritaet bei allen Knoepfen 0 GRUEN.
-   **Noch nicht gemessen.** par.8.6 wartet auf den Nutzer.
-5. Werkzeuge: `tools/probes/env_ab_swap_eval.py` (gepoolte Knopf-Seiten-
-   Auswertung mit Brett-Tausch), `arena_column_probe.py` liefert jetzt die
-   sechs Standard-Kennzahlen und die Huellen-Deckung H je Seite;
-   `generator_repro_probe.py` repariert; `night_b07_chain.sh` und v24-Rezept
-   par.6d: `generate_carrier_manifest.py --out` ist relativ zu `data/`.
+### Was seit der Uebergabe von 2026-09-03 09:00 passiert ist (Kurzform; Chronik ab 09:08)
 
-### Reihenfolge fuer den Rest des Tages (Nutzer-Freigabe 2026-09-03: alles ausser der v24-Erzeugung)
-
-1. ~~Watcher, Relabel-Kennzahlen~~ ERLEDIGT 09:36.
-2. ~~b07-Kette, Manifest-Diff~~ ERLEDIGT 09:52.
-3. ~~K1 bauen, messen, replizieren~~ ERLEDIGT (par.15/16, ENTSCHIEDEN).
-   argmax-Profile fuer c = 0,1 und 0,3 entfallen (Nullbefunde, Verdikt
-   steht).
-4. ~~b07 abnehmen~~ ERLEDIGT (par.A5).
-5. **K3 messen** nach par.8.4: Arena LAEUFT (siehe oben); danach argmax je
-   Arm (`argmax_profile.sh`, rund 28 min je Arm, Seed 20260931, Tags
-   `tor2a-k3s01`, `tor2a-k3s02`, `tor2a-k3t05`, `tor2a-k3t10`, `tor2a-k3st`),
-   Spaltensonde auf den Arena-Logs, Registrierung als par.9 samt Kopf.
-   par.8.6 nur nach Nutzer-Bestaetigung.
-6. **v24-Material-Pilot** (`night_run_20260902.md` N2) in einem freien
-   CPU-Fenster; registrieren in `PREREG_v24_window.md` par.7.
-7. ~~Aufraeumen~~ `archive_pre_v24` am 2026-09-03 16:40 auf Nutzer-Freigabe
-   GELOESCHT (1,7 GB; fuenf Stichproben vorher per `restic find` im Snapshot
-   e77c2d7c bestaetigt -- Pfade dort unter `data/`), Fundorte in
-   `v23_reachability_recheck` par.7, `frozen_v3_eval_set` par.7-Tabelle und
-   `reanalyze_label_depth` par.A4 nachgezogen. **2026-09-04 19:45 (Nutzer):**
-   Instrument-Korpora, Deep-Kopien und -Original, Monolithe und die Modelle
-   der entschiedenen Arme geloescht (Chronik; alles im restic-Repo). `data/`
-   9,1 GB, `models/` 369 MB. Cache-Bloecke und hv2 bleiben.
-8. **NICHT:** die v24-Erzeugung (`PREREG_v24_window.md` par.6) -- nur auf
-   Nutzer-Anweisung.
+Relabel durch, b07 trainiert und abgenommen (par.A5: keine Staerke, weniger
+Spalten, b01 bleibt Generator). K1 gebaut, gemessen, repliziert, Champion-
+Kante: ENTSCHIEDEN, kein Rezept (par.15-17). K3 Raster-Form wirkungslos
+(par.9); Nutzer: "die Huelle wird kommen, Hebel gesucht"; K3-P (projiziertes
+Brett) gebaut, traegt (8.7a-d: gepoolt 191:129, Betriebspunkt @100 0,775
+gegen 0,726 Spalten); Huellen-Bauer als Uebersteuerung unbrauchbar (8.8);
+8.6 Value im Tiling Nullbefund (8.6a); K3-R/K3-O gebaut und gemessen (8.9a,
+Konstruktionsfehler 8.9b als v24-Wiedervorlage). Material-Pilot (v24 par.7):
+Tor 0 vorab belegt. Champion-Kante K3-P 38:12 und 221:179 -> Promotion
+v23-b01_k3p10 (par.11, Elo 1292). Aufraeumen (Chronik 19:45). Alle Zahlen in
+den Preregs und der Tabelle in Abschnitt 1 der Uebergabe von 07:00 (Chronik).
 
 ### Stand der v24-Vorbereitung (vollstaendig registriert)
 

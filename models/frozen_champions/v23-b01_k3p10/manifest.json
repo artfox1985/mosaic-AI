@@ -1,0 +1,74 @@
+{
+  "champion": "v23-b01_k3p10",
+  "freeze_date": "2026-09-04",
+  "model_file": "model.onnx",
+  "model_source": "models/alphazero_v23-b01_brierbest.onnx (Kopie als models/alphazero_v23-b01_k3p10.onnx)",
+  "pth_file": "model.pth",
+  "spec_file": "spec.json",
+  "spec_source": "models/v23-b01_k3p10.spec.json",
+  "spec_content": {
+    "implicit_minimax_alpha": 0.0,
+    "long_row_init_shaping_w": 0.0,
+    "score_utility_c": 0.0,
+    "score_utility_b": 20.0,
+    "envelope_search_c": 1.0,
+    "envelope_tiling_w": 0.0,
+    "envelope_profile": [
+      1.0,
+      0.92,
+      0.67,
+      0.33,
+      0.0
+    ],
+    "envelope_tiling_value_w": 0.0,
+    "envelope_projection_mode": 1,
+    "heuristik_variante": "hv1"
+  },
+  "elo": {
+    "value": 1292,
+    "ci95": [
+      1253,
+      1335
+    ],
+    "condition": "v23-b01_k3p10@400 auf der R5-Fix-Leiter, vier Kanten (Gating 38:12 und 221:179 gegen v21, Anker 128:22 n=150, Champion-2 32:8 gegen v22-b05)",
+    "source": "evaluations/elo_history.csv, elo_tracker report 2026-09-04 20:15"
+  },
+  "contract_hash": "efd564d87bac2722",
+  "engine_version": "0.1.0",
+  "wheels": {
+    "champion_behavior_artifact": {
+      "file": "mosaic_rust_k3p_20260904.whl",
+      "source": "engine/target/wheels, gebaut 2026-09-04 19:30 aus Commit 0e87ddd (Projektions-Modus als Spec-Feld)",
+      "role": "Verhalten, auf dem die Elo-Messung 1292 beruht"
+    }
+  },
+  "knobs": "Alle Knoepfe in spec.json; Spielbetrieb: server.py uebersetzt die Spec in Env-Knoepfe (MOSAIC_ENVELOPE_PROJECTED=1, MOSAIC_ENVELOPE_SEARCH_C=1.0, Profil 1,0.92,0.67,0.33,0)",
+  "golden_probe": {
+    "file": "golden_probe.json",
+    "source": "tools/build_frozen_golden_probe.py --seed-base 916001, gestartet 2026-09-04 20:00; Datei liegt vor, sobald das Werkzeug fertig ist (Pruefen!)"
+  },
+  "parity_fixture": "engine/tests/fixtures/net_parity_champion.txt Hash a274e3ad68f4ad91 (2026-09-04)",
+  "display_calibration": {
+    "A": -0.108,
+    "B": 0.5587,
+    "eval_set": "frozen_eval_set_v3.pkl",
+    "trend_frozen_v1": {
+      "A": 0.2678,
+      "B": 0.6092
+    }
+  },
+  "gumbel_balance": {
+    "overall": 2.92,
+    "by_round": [
+      2.57,
+      2.83,
+      3.88,
+      2.99
+    ],
+    "source": "evaluations/artifacts/gumbel_scale_calibration_v23-b01_k3p10.json"
+  },
+  "worker_python": {
+    "interpreter_note": "kein venv angelegt (2026-09-04); fuer frozen_referee_match im Artefakt-Modus bei Bedarf venv aus dem Wheel bauen (docs/backup_restore.md, verify_frozen_heuristic --build-venv als Vorbild)"
+  },
+  "prereg": "evaluations/PREREG_geometric_envelope.md par.8.7, 10, 10a, 11"
+}
