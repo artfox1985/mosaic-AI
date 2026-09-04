@@ -749,7 +749,7 @@ fn engine_config_json() -> String {
         "envelope_tiling_value_w": crate::net_mcts::SearchConfig::from_env().envelope_tiling_value_w,
         // par.8.7/8.9: Projektions-Modus (prozessweit, MOSAIC_ENVELOPE_PROJECTED) und
         // w_r -- muessen im Lauf-Manifest stehen (Lehre vom Stack-Draw-Knopf, v24 par.6c).
-        "envelope_projection_mode": crate::envelope::projection_mode(),
+        "envelope_projection_mode": crate::net_mcts::SearchConfig::from_env().envelope_projection_mode,
         "envelope_reach_w": crate::envelope::reach_weight(),
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,

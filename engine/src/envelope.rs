@@ -141,11 +141,10 @@ pub fn envelope_score(board: &PlayerBoard) -> f64 {
 // die `c` annimmt (`DomeSpace::accepts`); jede der `n` annehmenden Zellen
 // bekommt `(k / (r + 1)) / n`.
 
-/// Prozessweiter Schalter `MOSAIC_ENVELOPE_PROJECTED=1`: der Such-Term (e)
-/// rechnet `H` auf dem projizierten Brett. Prozessweit ist hier unkritisch
-/// (kein Spiegelmatch-Problem), weil der Term je Seite ueber
-/// `SearchConfig::envelope_search_c` gegated ist -- die Kontrollseite mit
-/// `c = 0` sieht ihn nie. Default aus = Bestand.
+/// Env-Schalter `MOSAIC_ENVELOPE_PROJECTED` (Default der `SearchConfig`;
+/// seit der Promotion 2026-09-04 ist der Modus ein Spec-Feld je Seite,
+/// `SearchConfig::envelope_projection_mode`, und der Such-Term liest ihn
+/// von dort). Dieser Getter bleibt fuer `from_env` und `engine_config`.
 pub fn projected_mode() -> bool {
     projection_mode() == 1
 }
@@ -315,10 +314,16 @@ pub fn envelope_score_ownership(logits_half: &[f32]) -> Option<f64> {
 /// Sicht von Spieler 0. `ownership` sind die rohen Kopf-Logits des Mover-
 /// Passes (`[0:36]` ego = `state.current_player`, `[36:72]` der andere);
 /// im Modus 3 ohne Kopf: 0 (einmalige Warnung).
-pub fn search_shift_state(state: &crate::state::GameState, c_hull: f64, profile: &[f64; 5], ownership: &[f32]) -> f64 {
+pub fn search_shift_state(
+    state: &crate::state::GameState,
+    c_hull: f64,
+    profile: &[f64; 5],
+    ownership: &[f32],
+    mode: u8,
+) -> f64 {
     let b0 = &state.players[0];
     let b1 = &state.players[1];
-    let (h0, h1) = match projection_mode() {
+    let (h0, h1) = match mode {
         1 => (envelope_score_projected(b0), envelope_score_projected(b1)),
         2 => {
             let remaining = crate::provocation::remaining_colors(state);
@@ -355,6 +360,8 @@ pub fn profile_weight(profile: &[f64; 5], round: u32) -> f64 {
 /// addiert `shift` auf Spieler 0 und subtrahiert ihn von Spieler 1
 /// (Nullsumme) und klammert beide auf [0, 1]. Reine Zustandsfunktion.
 pub fn search_shift(board0: &PlayerBoard, board1: &PlayerBoard, round: u32, c_hull: f64, profile: &[f64; 5]) -> f64 {
+    // Nur noch von Tests/Altpfaden benutzt; der Such-Term geht ueber
+    // `search_shift_state` mit dem Modus aus der SearchConfig.
     let (h0, h1) = if projected_mode() {
         (envelope_score_projected(board0), envelope_score_projected(board1))
     } else {
