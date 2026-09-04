@@ -1602,8 +1602,11 @@ def ai_start_tile():
 # (`python tools/platt_fit.py --models models/alphazero_<neu>.pth`) und hier
 # eintragen -- steht als Punkt in der Promotions-Checkliste (STATUS.md).
 # Abschalten: MOSAIC_DISPLAY_CAL=0. Ueberschreiben: MOSAIC_DISPLAY_CAL_A/_B.
-_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.0033"))
-_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.9060"))
+# Promotion 2026-09-04, Champion v23-b01_k3p10: Anzeige-Fit auf frozen_v3 (zeitgemaesse
+# Zustaende, Caveat der Checkliste): A=-0.1080, B=0.5587 (evaluations/platt_fit_v23-b01_k3p10_frozenv3.json);
+# Trendmetrik frozen_v1: B=0.6092, A=+0.2678. Vorgaenger v21: A=-0.0033, B=0.9060.
+_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.1080"))
+_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.5587"))
 _DISPLAY_CAL_ON = os.environ.get("MOSAIC_DISPLAY_CAL", "1") != "0"
 
 
