@@ -89,6 +89,14 @@ def main():
                          "(v23: die Sockel-/Policy-Klasse). Ohne das wuerde ein Manifest "
                          "sie stillschweigend maskieren, denn Nicht-Gelistete sind "
                          "Nicht-Traeger (corpus_dataset._is_policy_carrier)")
+    ap.add_argument("--pick", action="append", default=[], metavar="QUELLE:N",
+                    help="seed-bestimmte TEILauswahl einer weiteren Klasse, wiederholbar "
+                         "(PREREG_v25_window.md par.3). QUELLE ist ein Glob in --data-dir "
+                         "oder eine .txt-Dateiliste; N Dateien werden wie die Hauptauswahl "
+                         "zeitlich gestreut gezogen (random.Random(seed + 1000*i) fuer den "
+                         "i-ten --pick, damit die Auswahlen unabhaengig und byte-gleich "
+                         "wiederholbar sind). Kandidaten duerfen sich nicht mit --from-list/"
+                         "--pattern oder --include-glob ueberschneiden")
     ap.add_argument("--dry-run", action="store_true")
     a = ap.parse_args()
 
@@ -122,6 +130,42 @@ def main():
         print(f"{len(included)} Dateien vollstaendig uebernommen (--include-glob "
               f"{a.include_glob})")
 
+    # Weitere Klassen als seed-bestimmte Teilauswahl (v25: 135 von 400
+    # G-1-Policy-Dateien, 45 von 180 hv2-Traegern). Eigener Seed je --pick,
+    # damit die Hauptauswahl (picked) byte-gleich bleibt, wenn ein --pick
+    # dazukommt -- sonst waere das v24-Manifest nicht mehr reproduzierbar.
+    picks = []
+    taken = set(picked) | set(included)
+    for i, spec in enumerate(a.pick):
+        if ":" not in spec:
+            raise SystemExit(f"--pick {spec!r}: Form QUELLE:N erwartet")
+        src, n_txt = spec.rsplit(":", 1)
+        try:
+            n_pick = int(n_txt)
+        except ValueError:
+            raise SystemExit(f"--pick {spec!r}: N ist keine Zahl")
+        if src.lower().endswith(".txt"):
+            pool = sorted(load_candidate_list(src))
+            missing = [b for b in pool if not os.path.exists(os.path.join(a.data_dir, b))]
+            if missing:
+                raise SystemExit(f"--pick {src}: {len(missing)} Eintraege fehlen in {a.data_dir}, "
+                                 f"z.B. {missing[:3]}")
+        else:
+            pool = sorted(os.path.basename(f) for f in glob.glob(os.path.join(a.data_dir, src)))
+        if not pool:
+            raise SystemExit(f"--pick {src!r}: keine Kandidaten in {a.data_dir}")
+        overlap = sorted(set(pool) & taken)
+        if overlap:
+            raise SystemExit(f"--pick {src!r} ueberschneidet eine andere Auswahl ({len(overlap)} "
+                             f"Dateien, z.B. {overlap[:3]}) -- Kandidatenmengen trennen")
+        chosen = stratified_pick(pool, n_pick, a.seed + 1000 * (i + 1))
+        taken |= set(chosen)
+        picks.append({"quelle": src, "kandidaten": len(pool), "n": n_pick,
+                      "seed": a.seed + 1000 * (i + 1), "dateien": sorted(chosen)})
+        print(f"--pick {src}: {n_pick} von {len(pool)} Dateien gewaehlt "
+              f"(Seed {a.seed + 1000 * (i + 1)}); erste/letzte: {chosen[0]} / {chosen[-1]}")
+    pick_files = [b for p in picks for b in p["dateien"]]
+
     manifest = {
         "generator": "tools/generate_carrier_manifest.py",
         "erzeugt": time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -131,8 +175,12 @@ def main():
                    + (f", eingeschraenkt per {os.path.basename(a.from_list)}" if a.from_list else "")
                    + "), je Stratum eine Datei via random.Random(seed)"),
         "include_glob": a.include_glob,
-        "policy_carrier_files": sorted(picked + included),
+        "policy_carrier_files": sorted(picked + included + pick_files),
     }
+    if picks:
+        # Additives Feld: Leser (corpus_dataset._is_policy_carrier) kennen nur
+        # policy_carrier_files; `picks` ist Herkunft, kein Steuerfeld.
+        manifest["picks"] = picks
     print(f"{len(picked)} von {len(candidates)} Dateien gewaehlt "
           f"(Seed {a.seed}); erste/letzte: {picked[0]} / {picked[-1]}")
     if a.dry_run:
