@@ -46,6 +46,7 @@ Huelle H_end 0,659):
 | **K3-P projiziert C 0,2 / 0,5 / 1,0** | **88 / 92 / 95 : 80** (p 0,38 / 0,21 / 0,11) | 0,455 / 0,480 / **0,555** und Arena +0,06 / +0,11 / +0,10 | H_end 0,665 / 0,687 / **0,703**; Arena +0,00 / **+0,08 / +0,10** (t 3,5 / 6,2) | **REPLIZIERT (8.7c): C 1,0 gepoolt 191:129 auf 320 Paaren, p = 0,014, Seeds deckungsgleich; Huelle Arena +0,16 im zweiten Seed. K3 traegt; C 2,0 schwaecher (88:72)** |
 | K3-R Erreichbarkeit C 0,5 / 1,0 | 82 / 91 : 80 | 0,49 / **0,39** und Arena -0,11 / -0,14 | H_end 0,674 / 0,683; Arena +0,04 / +0,07 | hebt Huelle, kostet Spalten (8.9a) |
 | K3-O Ownership C 0,5 / 1,0 | 86 / 87 : 80 | 0,475 / 0,470 | H_end 0,660 / 0,665 | kaum Huelle, kostet Punkte 43,9 (8.9a) |
+| **K3-P im Betriebspunkt @100** (Pilot-Rezept) | -- | 0,775 gegen 0,726; 55 % gegen 50 % Seiten mit voller Spalte; Punkte 51,0 gegen 49,7 | H_end 0,718 gegen 0,685; Halbzeit 0,456 gegen 0,413 | haelt in der Erzeugung (8.7d); C 2,0 am Instrument 0,635 Spalten |
 | Material-Pilot v24 | -- | Value-Klasse 0,726, 50 % Seiten mit voller Spalte (v23 35 %) | -- | Tor 0 fuer b01 @100 vorab belegt (v24 par.7) |
 
 **Nutzer-Entscheid 2026-09-04, 13:20: v24 bekommt KEINE weiteren Arme.**
