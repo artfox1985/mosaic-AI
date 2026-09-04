@@ -1190,3 +1190,25 @@ verbessert das Material und kostet keine Staerke); fuer eine PROMOTION
 (Spielbetrieb) bleibt der Nutzer-Entscheid samt Checkliste und dem
 Projektions-Modus als Spec-Feld.
 
+## par.11 PROMOTION: `v23-b01_k3p10` ist Champion (Nutzer 2026-09-04, 19:20; abgearbeitet nach `docs/promotion_checklist.md`)
+
+| Schritt | Ergebnis |
+| --- | --- |
+| Bau | Projektions-Modus als Spec-Pflichtfeld `envelope_projection_mode` (519 Tests gruen, Commit 0e87ddd); Server uebersetzt die Champion-Spec in Env-Knoepfe; Anker-Drift GRUEN, Netz-Pfad-Paritaet REPRODUZIERT (`anchor_drift_20260904_promotion.json`, `promotion_net_path_parity_repro.json`) |
+| 1 set_champion | `models/champion.txt`: v21_2d_brierbest -> **v23-b01_k3p10**; Modell = Kopie von b01_brierbest, Spec Modus 1 / C 1,0 / Profil b01-Kurve |
+| 2 Gating-Kanten | 38:12 (Seed 20261004, SPRT nach 25 Paaren) und Replikation 221:179 (Seed 20261010, 200 Paare) gegen v21, beide in `elo_history.csv` |
+| 3 Anker-Kante | **128:22 gegen Heuristik_hv1_anchor@150** (n=150 fest, Seed-Basis 900001, Cross-Aera; `anchor_arena_v23-b01_k3p10.json`); b01 ohne Knopf: 127:23 |
+| 4 Champion-2-Kante | **32:8 gegen v22-b05** (SPRT nach 20 Paaren, p 0,0005, Seed 20261011; `paired_gating_result_v23-b01_k3p10_vs_v22-b05.json`). Abweichung: v20_2d_opp_brierbest liegt nicht im Baum, v22-b05 ist der Elo-Knoten mit zwei Kanten zu b01 |
+| Elo | **1292 [1253, 1335]**, alle Knoten mit dem Anker verbunden; v21 1232, b01 ohne Knopf 1263 |
+| 5b Anzeige-Kalibrierung | frozen_v3 (Anzeige-Fit): A -0,1080, B 0,5587; frozen_v1 (Trend): B 0,6092, A +0,2678 (`platt_fit_v23-b01_k3p10_frozenv{1,3}.json`); in `server.py` eingetragen |
+| 5c sigma/Prior-Balance | Gesamt **2,92** (Schwelle 3 nicht ueberschritten, c_visit/c_scale-Familie bleibt zu); je Runde 2,57 / 2,83 / 3,88 / 2,99 (`gumbel_scale_calibration_v23-b01_k3p10.json`) |
+| 5d Paritaets-Fixture | neu erzeugt, Hash `a274e3ad68f4ad91`, im frischen Prozess gruen |
+| Artefakt | `models/frozen_champions/v23-b01_k3p10/` mit model.onnx/.pth, spec.json, Wheel `mosaic_rust_k3p_20260904.whl`; Golden Probe (Tool `build_frozen_golden_probe.py`, Seed-Basis 916001) und manifest.json folgen |
+| 6 Docs | STATUS Abschnitt 4, `archive/history.md`, diese Prereg, Chronik |
+
+**Einordnung:** der erste Champion-Wechsel seit v21 (2026-08-20) und der
+erste, der nicht aus einem neuen Netz, sondern aus einem SUCH-Knopf am
+bestehenden Generator-Netz kommt. `v23-b01_brierbest` selbst blieb auf
+Augenhoehe mit v21 (214:186); der Knopf hebt es auf 259:191 gepoolt. Fuer
+Erzeugung (v24 par.6b') und Spielbetrieb gilt dieselbe Konfiguration.
+
