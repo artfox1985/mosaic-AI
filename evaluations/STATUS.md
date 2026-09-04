@@ -27,9 +27,8 @@ diesen Inhalten etwas aendert, aendert es DORT.
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-04, 21:05 -- Sitzung nach dem Chip-Wechsel von 20:40)
 
 **LAEUFT: NICHTS** (keine Arena, kein Training, keine Sonde; GPU und CPU
-frei). Der Nutzer hat um ~20:55 einen manuellen restic-Backup-Lauf
-gestartet; sobald der Snapshot da ist, folgt Punkt 3 (Loeschung der zwei
-Korpora nach `restic find`-Beleg). Baum: Commits lokal, nicht gepusht (Push
+frei). Manueller restic-Snapshot des Nutzers d775926d (20:53) liegt vor,
+Punkt 3 damit erledigt. Baum: Commits lokal, nicht gepusht (Push
 ist Nutzer-Sache, der pre-push-Hook setzt den Python-DLL-Pfad selbst).
 
 **Champion-Artefakt `models/frozen_champions/v23-b01_k3p10/` ist KOMPLETT
@@ -67,12 +66,14 @@ erledigt); **kein Push**.
    Stack-Draw-Kontrolle; Tor 0). Vor dem Training: Monolith fuer den
    Trainingsanteil (`cache_build_time` par.12, `tools/window_train_split.py`),
    Traeger-Manifest 580 (par.6d, `--out` RELATIV zu data/).
-3. **Nach dem manuellen restic-Lauf des Nutzers (gestartet ~20:55; sonst
-   Tages-Snapshot 12:00):** die zwei
-   Korpora `selfplay_tor2a-k3p20-v23b01_*` und `selfplay_pilot24k3p-value-argmax_*`
-   in `data/` duerfen weg (Nutzer-Freigabe 2026-09-04 19:45 "loesch das
-   genannte", diese beiden waren nur wegen des fehlenden Snapshots
-   zurueckgestellt; vorher `restic find` je einer Datei).
+3. ~~**Loeschung der zwei nachgestellten Korpora**~~ ERLEDIGT 21:15:
+   `selfplay_tor2a-k3p20-v23b01_*` (20 Dateien) und
+   `selfplay_pilot24k3p-value-argmax_*` (40 Dateien) per `restic find`
+   vollstaendig im manuellen Snapshot **d775926d** (2026-09-04 20:53:15,
+   daily) belegt und aus `data/` entfernt. Ihre zwei Manifest-JSONs
+   (`manifest_tor2a-k3p20-v23b01_20260904_131517.json`,
+   `manifest_pilot24k3p-value-argmax_20260904_134257.json`) liegen noch in
+   `data/` (nicht in der Freigabe genannt, je wenige KB).
 4. **Wiedervorlagen fuer v24-Arme** (nicht vor dem v24-Start bauen):
    `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
    Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
