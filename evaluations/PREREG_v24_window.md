@@ -168,6 +168,35 @@ Die Dateien heissen nach dem GENERATOR (`selfplay_v23-b01-*`), nicht nach dem
 Fenster (`docs/generation_naming.md`). Start ohne Pipe und ohne Umleitung,
 Fortschritt am g-Suffix zaehlen.
 
+### par.6b' REZEPT-VARIANTE MIT KNOPF K3-P (registriert 2026-09-04, 14:35 -- VORBEHALT: Nutzer "die Freigabe haengt an der Arena, aber ich tendiere zu ja")
+
+Alle drei Befehle aus par.6b UNVERAENDERT, zusaetzlich in der Umgebung ALLER
+DREI Laeufe (Sockel und beide Value-Laeufe, einheitliches Fenster):
+
+```
+export MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0
+```
+
+Herleitung: `PREREG_geometric_envelope.md` par.8.7 (Bau), 8.7a-c (Instrument
+und Arena, gepoolt 191:129 auf 320 Paaren, p = 0,014), 8.7d (Betriebspunkt
+@100 mit dem Pilot-Rezept: 0,775 gegen 0,726 Spalten, 55 gegen 50 Prozent
+Seiten mit voller Spalte, Huelle 0,718 gegen 0,685, Trennung +0,46), par.10
+(Champion-Kante, Replikation laeuft). Profil = b01-Kurve (Default), Modus 1
+(Musterreihen projiziert), `C_HULL` 1,0 -- C 2,0 ist am Instrument
+spaltenreicher (0,635), in der Arena aber schwaecher; v24 faehrt 1,0.
+
+**Manifest-Diff (par.6c Punkt 1) erwartet dann ZUSAETZLICH:**
+`engine_config.envelope_projection_mode` 0 -> 1 und
+`engine_config.envelope_search_c` 0.0 -> 1.0 (seit Commit a6789ed im
+Manifest). Sonst nichts. Die Dateinamen bleiben `selfplay_v23-b01-*`
+(Generator-Regel, `generation_naming.md`); dass der Knopf an war, steht im
+Manifest, nicht im Namen.
+
+**Freigabe:** faellt der Vorbehalt (Replikation par.10 haelt den Vorsprung,
+Nutzer sagt ja), gilt 6b' als DAS Rezept; sonst 6b. Der Sockel darf auf
+einer anderen Maschine laufen (Nutzer 2026-09-04; Befehle im Chat), die
+Dateien und das Manifest kommen danach nach `data/`.
+
 ### par.6c Pflichtpruefungen direkt nach dem Start und nach dem Lauf
 
 1. **Manifest-Diff gegen die v23-Referenz** (stehende Regel): erwartete
