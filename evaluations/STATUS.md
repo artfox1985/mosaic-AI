@@ -46,11 +46,15 @@ in `data/selfplay_v23-b01-value-*.pkl` zaehlen. Referenz ohne Nebenlast:
 Watchers, dann Tor 0 -> Manifest 580 -> `window_v24.txt` -> Bloecke -> Split
 und Monolith -> Training **v24-b01** -> Training **v24-b02** (lambda 0,7).
 Artefakte `artifacts/v24_{symmetry,sanity}_*.json`, `v24_split.txt`. Gates
-stoppen mit Exit 10-13 (Vorlage an den Nutzer, kein Training). Danach
-getrennt: Abnahmen (Tor 1 gegen `v23-b01_brierbest` @400, beide Seiten
-Champion-Spec, `--no-promote-winner`; Tor 2a argmax; Tor 2b Arena-Spalten),
-b03 (Kuratierung + Seeding-Schwarm 6.000 @100, rund 3 h CPU), hv2-Fenster-
-Kennzahl. **Der Sockel liegt seit 23:19 in `data/`** (400 Dateien plus Manifest,
+stoppen mit Exit 10-13 (Vorlage an den Nutzer, kein Training). Dazu seit 23:37
+**Kette b03** (`tools/night_v24_b03_chain.sh`): wartet auf das laufende
+b01-Training, dann Kuratierung (1.500 Stellungen, Spieler am Zug, Seed
+20260912) und Seeding-Schwarm (6.000 Partien @100, Knopf wie 6b', Seeding-
+Prereg par.7 Nachtrag) als der eine CPU-Auftrag, Bloecke/Monolith neben b02,
+Training **v24-b03** nach b02. Danach getrennt: Abnahmen (Tor 1 gegen
+`v23-b01_brierbest` @400, beide Seiten Champion-Spec, `--no-promote-winner`;
+Tor 2a argmax; Tor 2b Arena-Spalten) und die hv2-Fenster-Kennzahl (1.745
+Dateien, erst wenn kein anderer CPU-Auftrag laeuft). **Der Sockel liegt seit 23:19 in `data/`** (400 Dateien plus Manifest,
 1,48 s je Partie auf dem anderen Rechner; par.6c Punkte 1 und 2 gruen,
 Chronik); der Watcher baut seine Bloecke.
 
