@@ -232,10 +232,10 @@ Laufzeit des Laufs ist darum unter Nebenlast gemessen.
 
 **Nachtrag 21:40: Sitzungsneustart, argmax-Lauf nach Chunk 4 gestorben.** Die
 5 fertigen Dateien (Chunks 0-4) bleiben; der Rest laeuft als eigener Lauf mit
- (= base_seed + 5, self_play.py:515), der die
+`--games 5950 --seed 20260910` (= base_seed + 5, self_play.py:515), der die
 Chunks 5-599 deterministisch identisch erzeugt. Fuer par.6c Punkt 1 gilt darum
-fuer die Value-argmax-Klasse ZUSAETZLICH erwartet:  5950 und
- 20260910 im zweiten Manifest; die Klasse hat zwei Manifeste.
+fuer die Value-argmax-Klasse ZUSAETZLICH erwartet: `cli_args.games` 5950 und
+`cli_args.seed` 20260910 im zweiten Manifest; die Klasse hat zwei Manifeste.
 
 ### par.6d Fenster, Traeger und Cache
 
