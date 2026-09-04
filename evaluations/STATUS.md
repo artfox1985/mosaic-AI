@@ -45,7 +45,7 @@ Nutzer) kommt danach mit Manifest nach `data/`.
 
 Die vier Dateien des Fehlstarts von 21:27 (Chronik) sind auf Nutzer-Freigabe
 vor dem Start entfernt worden; der echte Lauf begann bei Null.
-**par.6c Punkte 1 und 2 GRUEN am echten argmax-Manifest** (Chronik 21:50);
+**par.6c Punkte 1 und 2 GRUEN am echten argmax-Manifest** (Chronik 21:34);
 Tor 0 (Punkt 3) nach dem Lauf. **Champion-Artefakt `models/frozen_champions/v23-b01_k3p10/` ist KOMPLETT
 (21:00):** Golden Probe (10 Sonden, 20:27:53-20:50), venv aus dem
 Artefakt-Wheel (nicht versioniert), Referee-Selbsttest 10/10 gruen plus zwei

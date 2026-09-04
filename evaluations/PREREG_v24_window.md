@@ -217,7 +217,7 @@ Dateien und das Manifest kommen danach nach `data/`.
      par.3b.12 (Stopp gegen Degeneration, keine Rate); v23 lag bei 5.629.
    - Reisst Tor 0: kein Training, Vorlage.
 
-### par.6c' GEFAHREN fuer den argmax-Lauf (2026-09-04, 21:50; Chronik `night_run_20260902.md`)
+### par.6c' GEFAHREN fuer den argmax-Lauf (2026-09-04, 21:34; Chronik `night_run_20260902.md`)
 
 Start 21:31 nach par.6b' (Nutzer-Freigabe; Sockel laeuft seit ~21:10 auf dem
 anderen Rechner des Nutzers, Kontrakt dort `efd564d87bac2722`). Punkt 1:
