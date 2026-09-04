@@ -958,3 +958,46 @@ Instrumente wie 8.7a plus "tote Huelle Runde 3/4" aus der Sonde
 sigmoid der 36 Ego-Logits, dieselbe H-Rechnung; misst, ob das Netz seine
 eigene Vorhersage in die Huelle lenken kann. Beide nach der K3-P-Arena.
 
+### 8.6a GEMESSEN (2026-09-04, 07:00): der Value-Anteil im Tiling bewegt nichts
+
+Aufbau wie 8.4 am `v23-b01_brierbest` gegen Spec aus, Seed 20261005, Arme V
+0,5 / V 1,0 / T+V (W_TILE 1,0 + W_VAL 1,0), 2 x 80, Blockgroesse 5; argmax
+@400 Seed 20260931. Artefakte `paired_arena_env_k3v_b01_{first,second}_s05.json`,
+`k3v_b01_swap_eval_s05.json`, `columns_k3v_b01_*_s05.json`,
+`tor2a_k3v{05,10}_v23b01.json`, `tor2a_k3tv_v23b01.json`.
+
+| Arm | Siege Knopf : Basislinie | diskordant, p | Margin (Block-SE) | Spalten Arena (SE) | H Arena (SE) | argmax Spalten (b01 0,515) | Punkte argmax |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| V 0,5 | 82 : 78 | 6 / 4, 0,75 | -0,42 (0,56) | -0,019 (0,014) | +0,001 (0,007) | 0,4925 | 46,5 |
+| V 1,0 | 84 : 76 | 8 / 4, 0,39 | +0,19 (0,66) | -0,006 (0,017) | -0,001 (0,007) | 0,485 | 46,6 |
+| T+V | 80 : 80 | 9 / 9, 1,00 | -0,52 (0,76) | 0,000 (0,024) | +0,021 (0,010) | 0,4975 | 47,0 |
+
+**Verdikt:** Nullbefund in allen Groessen; der Term kippt 10-18 von 160
+Partien ohne Richtung. Die Vorpruefung (Spreizung 7-10 Punkte) hat gezeigt,
+dass die Marge die Kandidaten UNTERSCHEIDET -- die Wahl nach ihr fuehrt aber
+zu keinem anderen Ergebnis als die Sofortpunkte. Im Tiling ist zu wenig zu
+entscheiden (par.3f: Fast-Gleichstaende), und der Entscheid liegt im Draft.
+8.6 bleibt gebaut (Default 0) und geht nicht ins Rezept.
+
+### 8.7b K3-P ARENA (2026-09-04, 04:12-07:00; Seed 20261007, 3 Arme x 2 x 80, Blockgroesse 5, gegen Spec aus)
+
+| Arm | Siege Knopf : Basislinie (160 Paare) | diskordant, McNemar p | Block-Diff Siege (SE, t) | Punkte Knopf (Kontrolle 48,3) | Margin (Block-SE) | Spalten Arena, Knopf minus Kontrolle (SE) | H Arena (SE) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| C 0,2 | 88 : 72 | 36 / 28, 0,38 | +0,050 (0,047; 1,07) | 48,6 | +1,51 (1,97) | +0,062 (0,068) | +0,002 (0,019) |
+| C 0,5 | 92 : 68 | 44 / 32, 0,21 | +0,075 (0,054; 1,40) | 51,6 | +3,35 (2,33) | +0,111 (0,066) | **+0,077 (0,022)** |
+| C 1,0 | 95 : 65 | 45 / 30, 0,11 | +0,094 (0,057; 1,65) | 50,1 | +3,23 (2,04) | +0,102 (0,060) | **+0,102 (0,017)** |
+
+Artefakte `paired_arena_env_k3p_b01_{first,second}_s07.json`,
+`k3p_b01_swap_eval_s07.json`, `columns_k3p_b01_{first,second}_s07.json`.
+
+**Lesart (vorlaeufig, gegen 8.4):** alle drei Groessen zeigen in dieselbe
+Richtung und wachsen mit C: Siege +8 / +12 / +15 von 160 (einzeln nicht
+signifikant, monoton), Margin +1,5 / +3,4 / +3,2, Spalten in der Arena
++0,06 / +0,11 / +0,10 (t 0,9-1,7), Huelle in der Arena +0,08 / +0,10 bei
+C 0,5 / 1,0 (t 3,5 und 6,2) -- zusammen mit 8.7a (argmax: Huelle +0,044,
+Spalten 0,555, Punkte +0,9 bei C 1,0). Das ist der erste Hebel dieser Prereg,
+bei dem Huelle, Spalten, Punkte und Siege gemeinsam steigen. Fuer Zeile 1
+der Tabelle fehlt die Signifikanz bei den Siegen: naechster Schritt
+Replikation C 1,0 mit eigenem Seed und ein Arm C 2,0 (Monotonie ausreizen),
+dazu K3-R/K3-O (Kette C). Kein Tausch: nichts faellt.
+
