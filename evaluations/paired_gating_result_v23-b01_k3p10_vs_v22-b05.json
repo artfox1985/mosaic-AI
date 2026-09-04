@@ -1,0 +1,283 @@
+{
+  "name_a": "v23-b01_k3p10",
+  "name_b": "v22-b05",
+  "model_a": "models/alphazero_v23-b01_k3p10.onnx",
+  "model_b": "models/alphazero_v22-b05.onnx",
+  "spec_a": "models/v23-b01_k3p10.spec.json",
+  "spec_b": "models/k3v_off.spec.json",
+  "sims_a": 400,
+  "sims_b": 400,
+  "c_puct_a": 1.5,
+  "c_puct_b": 1.5,
+  "done_pairs": 20,
+  "n_games_total": 40,
+  "a_wins_total": 32,
+  "b_wins_total": 8,
+  "pair_a_sweeps_b": 12,
+  "pair_b_sweeps_c": 0,
+  "pair_splits": 8,
+  "sprt_verdict": "v23-b01_k3p10",
+  "sprt_llr": 3.1483711736098936,
+  "sprt_bounds": [
+    -2.9444389791664403,
+    2.9444389791664403
+  ],
+  "sprt_p0": 0.5,
+  "sprt_p1": 0.65,
+  "sprt_alpha": 0.05,
+  "sprt_beta": 0.05,
+  "report_mcnemar_p": 0.00048828125,
+  "mean_pair_diff": 1.2,
+  "ci95": [
+    0.7594300342319711,
+    1.6405699657680288
+  ],
+  "base_seed": 20261011,
+  "blocks": [
+    {
+      "block": 1,
+      "seed": 20261011,
+      "n_pairs_block": 5,
+      "done_pairs": 5,
+      "a_wins_total": 9,
+      "b_wins_total": 1,
+      "pair_a_sweeps_b": 4,
+      "pair_b_sweeps_c": 0,
+      "pair_splits": 1,
+      "llr": 1.0494570578699642,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.125,
+      "mean_pair_diff": 1.6,
+      "ci95": [
+        0.8160000000000001,
+        2.3840000000000003
+      ],
+      "duration_s": 105.40416717529297
+    },
+    {
+      "block": 2,
+      "seed": 21261011,
+      "n_pairs_block": 5,
+      "done_pairs": 10,
+      "a_wins_total": 17,
+      "b_wins_total": 3,
+      "pair_a_sweeps_b": 7,
+      "pair_b_sweeps_c": 0,
+      "pair_splits": 3,
+      "llr": 1.8365498512724374,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.015625,
+      "mean_pair_diff": 1.4,
+      "ci95": [
+        0.8012101091924368,
+        1.998789890807563
+      ],
+      "duration_s": 120.493643283844
+    },
+    {
+      "block": 3,
+      "seed": 22261011,
+      "n_pairs_block": 5,
+      "done_pairs": 15,
+      "a_wins_total": 24,
+      "b_wins_total": 6,
+      "pair_a_sweeps_b": 9,
+      "pair_b_sweeps_c": 0,
+      "pair_splits": 6,
+      "llr": 2.3612783802074198,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.00390625,
+      "mean_pair_diff": 1.2,
+      "ci95": [
+        0.686751522164946,
+        1.7132484778350539
+      ],
+      "duration_s": 124.27192449569702
+    },
+    {
+      "block": 4,
+      "seed": 23261011,
+      "n_pairs_block": 5,
+      "done_pairs": 20,
+      "a_wins_total": 32,
+      "b_wins_total": 8,
+      "pair_a_sweeps_b": 12,
+      "pair_b_sweeps_c": 0,
+      "pair_splits": 8,
+      "llr": 3.1483711736098936,
+      "sprt_bounds": [
+        -2.9444389791664403,
+        2.9444389791664403
+      ],
+      "report_mcnemar_p": 0.00048828125,
+      "mean_pair_diff": 1.2,
+      "ci95": [
+        0.7594300342319711,
+        1.6405699657680288
+      ],
+      "duration_s": 120.6418821811676
+    }
+  ],
+  "avg_score_a": 48.25,
+  "avg_score_b": 36.0,
+  "per_pair_scores": [
+    {
+      "pair_index": 0,
+      "block_seed": 20261011,
+      "a_score": 107,
+      "b_score": 76,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 1,
+      "block_seed": 20261011,
+      "a_score": 96,
+      "b_score": 63,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 2,
+      "block_seed": 20261011,
+      "a_score": 87,
+      "b_score": 87,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 3,
+      "block_seed": 20261011,
+      "a_score": 100,
+      "b_score": 92,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 4,
+      "block_seed": 20261011,
+      "a_score": 38,
+      "b_score": 9,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 5,
+      "block_seed": 21261011,
+      "a_score": 118,
+      "b_score": 110,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 6,
+      "block_seed": 21261011,
+      "a_score": 76,
+      "b_score": 32,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 7,
+      "block_seed": 21261011,
+      "a_score": 99,
+      "b_score": 35,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 8,
+      "block_seed": 21261011,
+      "a_score": 93,
+      "b_score": 78,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 9,
+      "block_seed": 21261011,
+      "a_score": 106,
+      "b_score": 101,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 10,
+      "block_seed": 22261011,
+      "a_score": 110,
+      "b_score": 81,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 11,
+      "block_seed": 22261011,
+      "a_score": 91,
+      "b_score": 95,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 12,
+      "block_seed": 22261011,
+      "a_score": 86,
+      "b_score": 123,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 13,
+      "block_seed": 22261011,
+      "a_score": 117,
+      "b_score": 71,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 14,
+      "block_seed": 22261011,
+      "a_score": 129,
+      "b_score": 62,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 15,
+      "block_seed": 23261011,
+      "a_score": 141,
+      "b_score": 85,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 16,
+      "block_seed": 23261011,
+      "a_score": 80,
+      "b_score": 91,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 17,
+      "block_seed": 23261011,
+      "a_score": 114,
+      "b_score": 37,
+      "a_wins_pair": 2
+    },
+    {
+      "pair_index": 18,
+      "block_seed": 23261011,
+      "a_score": 28,
+      "b_score": 39,
+      "a_wins_pair": 1
+    },
+    {
+      "pair_index": 19,
+      "block_seed": 23261011,
+      "a_score": 114,
+      "b_score": 73,
+      "a_wins_pair": 2
+    }
+  ],
+  "avg_floor_a": 11.925,
+  "avg_floor_b": 12.7,
+  "zerozero_anteil": 0.0,
+  "laufzeit": {
+    "wanduhr_s": 470.8,
+    "cpu_s": 2105.0,
+    "threads": 10,
+    "s_je_partie": 11.77
+  }
+}
