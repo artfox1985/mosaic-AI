@@ -117,8 +117,10 @@ der Effekt bei 100 Sims (Erzeugung) so gross ist wie bei 400 (Instrument).
    GELOESCHT (1,7 GB; fuenf Stichproben vorher per `restic find` im Snapshot
    e77c2d7c bestaetigt -- Pfade dort unter `data/`), Fundorte in
    `v23_reachability_recheck` par.7, `frozen_v3_eval_set` par.7-Tabelle und
-   `reanalyze_label_depth` par.A4 nachgezogen. Die 200 Deep-Kopien
-   `selfplay_v22-b05deep-policy_*` in `data/` bleiben (nicht angekuendigt).
+   `reanalyze_label_depth` par.A4 nachgezogen. **2026-09-04 19:45 (Nutzer):**
+   Instrument-Korpora, Deep-Kopien und -Original, Monolithe und die Modelle
+   der entschiedenen Arme geloescht (Chronik; alles im restic-Repo). `data/`
+   9,1 GB, `models/` 369 MB. Cache-Bloecke und hv2 bleiben.
 8. **NICHT:** die v24-Erzeugung (`PREREG_v24_window.md` par.6) -- nur auf
    Nutzer-Anweisung.
 
