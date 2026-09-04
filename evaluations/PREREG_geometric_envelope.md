@@ -1136,3 +1136,33 @@ Zeile "Knoepfe": `MOSAIC_ENVELOPE_PROJECTED=1`, `MOSAIC_ENVELOPE_SEARCH_C=1.0`
 in der Umgebung der Value-Laeufe; ob auch die Sockel-Klasse, ist Nutzer-
 Entscheid). Champion-Kante fuer den Spielbetrieb laeuft.
 
+## par.10 CHAMPION-KANTE mit K3-P (Nutzer-Wunsch 2026-09-04, 13:30; gefahren 14:06-14:14)
+
+`tools/paired_gating.py`, `v23-b01_brierbest` mit `MOSAIC_ENVELOPE_PROJECTED=1
+MOSAIC_ENVELOPE_SEARCH_C=1.0` (Profil b01-Kurve) gegen `v21_2d_brierbest` mit
+Spec "alle Knoepfe 0" (`k3v_off.spec.json`), @400/@400, Blockgroesse 5, SPRT
+H1 p = 0,65, Deckel 200 Paare, **Seed 20261004 = Seed der Bezugskante ohne
+Knopf** (`saturating_score_utility` par.17: 214:186 nach 200 Paaren).
+Artefakt `paired_gating_result_v23-b01_k3p10_vs_v21_2d_brierbest.json`.
+
+| Kante | Ergebnis | Paare | SPRT | Vorzeichentest p | gepaarte Differenz, 95%-KI |
+| --- | --- | --- | --- | --- | --- |
+| **b01 + K3-P C 1,0 gegen v21** | **38 : 12** | 25 (Fruehstopp, LLR +3,22 > +2,94) | **signifikant besser** | 0,0023 | +1,04 [+0,53, +1,55] |
+| b01 ohne Knopf, dieselben ersten 25 Paare | 30 : 20 | 25 | -- | -- | -- |
+| b01 ohne Knopf, volle Kante | 214 : 186 | 200 | kein Entscheid | 0,20 | +0,14 [-0,06, +0,34] |
+| zum Vergleich b01 + K1 (par.17 dort) | 77 : 83 | 80 | H0 | 0,77 | -0,08 |
+
+Laufzeit 492 s (9,8 s je Partie, threads 10, exklusiv). Informative Paare:
+A gewinnt beide 15, B beide 2, geteilt 8.
+
+**Lesart:** die erste Kante, die den Champion SCHLAEGT statt auf Augenhoehe
+zu stehen -- allerdings ein Fruehstopp nach 25 Paaren; `promotion_checklist.md`
+Punkt 2 verlangt bei Fruehstopp unter 150 Paaren eine Replikations-Zeile
+mit eigenem Seed (laeuft: Seed 20261010, Artefakt `..._s10.json`). Erst
+danach ist die Kante ein Beleg. **Vor einer Promotion** braeuchte es
+ausserdem: den Projektions-Modus als Feld der `SearchConfig`/Spec-Datei
+(heute prozessweiter Env-Knopf `MOSAIC_ENVELOPE_PROJECTED`; ein Champion ist
+Modell PLUS Spec, und eine Spec muss das Suchverhalten VOLLSTAENDIG
+festlegen), die Anker-Kante mit festem n = 150 und die uebrigen Punkte der
+Checkliste. Nutzer-Entscheid.
+
