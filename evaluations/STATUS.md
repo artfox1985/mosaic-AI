@@ -27,10 +27,8 @@ diesen Inhalten etwas aendert, aendert es DORT.
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-04, 21:05 -- Sitzung nach dem Chip-Wechsel von 20:40)
 
 **LAEUFT: NICHTS** (keine Arena, kein Training, keine Sonde; GPU und CPU
-frei). **ACHTUNG Fehlstart 21:27** (Chronik): in `data/` liegen vier Dateien
-eines abgebrochenen Value-argmax-Laufs (`selfplay_v23-b01-value-argmax_20260904_2127_g10.pkl`,
-Manifest, Heartbeat, Progress) -- VOR einem echten Start entfernen, sonst
-doppeltes erstes Zehnerpaket. **Der Sockel (4.000 Policy-Partien) laeuft seit
+frei). Die vier Dateien des Fehlstarts von 21:27 (Chronik) sind auf
+Nutzer-Freigabe 21:40 entfernt, `data/` ist wieder sauber. **Der Sockel (4.000 Policy-Partien) laeuft seit
 ~21:10 auf dem anderen Rechner des Nutzers** (Kontrakt dort `efd564d87bac2722`
 nach `--force-reinstall`; Nutzer: rund 100 min). Manueller restic-Snapshot des Nutzers d775926d (20:53) liegt vor,
 Punkt 3 damit erledigt. Baum: Commits lokal, nicht gepusht (Push
