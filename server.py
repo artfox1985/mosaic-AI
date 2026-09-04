@@ -192,6 +192,55 @@ def _load_champion_model(fallback: str = "v16_best") -> str:
 
 _CHAMPION_MODEL = _load_champion_model()
 
+
+# Spec-Knoepfe des Champions -> Umgebung (Promotion 2026-09-04, v23-b01_k3p10):
+# ein Champion ist Modell PLUS Spec (`models/<name>.spec.json`, Schema
+# `net_mcts::SearchConfig::from_spec_file`). Der GUI-Suchpfad (`py.rs`) liest
+# seine SearchConfig aus der Umgebung (`SearchConfig::from_env`), deshalb
+# werden die Spec-Felder hier EINMAL beim Start in die Env-Knoepfe
+# uebersetzt -- nur, wo der Nutzer den Knopf nicht schon selbst gesetzt hat
+# (explizite Umgebung gewinnt, und sie wird laut gemeldet). Ohne Spec-Datei
+# bleibt alles beim Bestand. Knopf-Namen: engine/src/knob_registry.rs.
+_SPEC_TO_ENV = {
+    "implicit_minimax_alpha": "MOSAIC_IMPLICIT_MINIMAX_A",
+    "long_row_init_shaping_w": "MOSAIC_LONG_ROW_INIT_W",
+    "score_utility_c": "MOSAIC_SCORE_UTILITY_C",
+    "score_utility_b": "MOSAIC_SCORE_UTILITY_B",
+    "envelope_search_c": "MOSAIC_ENVELOPE_SEARCH_C",
+    "envelope_tiling_w": "MOSAIC_ENVELOPE_TILING_W",
+    "envelope_tiling_value_w": "MOSAIC_ENVELOPE_TILING_VALUE_W",
+    "envelope_projection_mode": "MOSAIC_ENVELOPE_PROJECTED",
+    "envelope_profile": "MOSAIC_ENVELOPE_PROFILE",
+}
+
+
+def _apply_champion_spec_env(name: str) -> None:
+    spec_path = MODELS_DIR / f"{name}.spec.json"
+    if not spec_path.exists():
+        return
+    try:
+        spec = _json.loads(spec_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        print(f"⚠️  Champion-Spec {spec_path} nicht lesbar ({e}) -- Env-Defaults gelten.")
+        return
+    gesetzt, ueberstimmt = [], []
+    for field, env_name in _SPEC_TO_ENV.items():
+        if field not in spec:
+            continue
+        value = spec[field]
+        text = ",".join(str(v) for v in value) if isinstance(value, list) else str(value)
+        if env_name in os.environ and os.environ[env_name] != text:
+            ueberstimmt.append(f"{env_name}={os.environ[env_name]} (Spec: {text})")
+            continue
+        os.environ[env_name] = text
+        gesetzt.append(f"{env_name}={text}")
+    print(f"Champion-Spec {spec_path.name}: " + (", ".join(gesetzt) if gesetzt else "nichts gesetzt"))
+    if ueberstimmt:
+        print("⚠️  Umgebung ueberstimmt die Champion-Spec: " + ", ".join(ueberstimmt))
+
+
+_apply_champion_spec_env(_CHAMPION_MODEL)
+
 # Difficulty Presets — Format: {"model": "<version>", "sims": <int>}
 DIFFICULTY_PRESETS = {
     # medium/hard/expert/_default zeigen alle auf denselben amtierenden

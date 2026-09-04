@@ -178,6 +178,7 @@ def main() -> int:
             "envelope_search_c": 0.0, "envelope_tiling_w": 0.0,  # K3 aus (geometric_envelope par.8)
             "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0],
             "envelope_tiling_value_w": 0.0,  # par.8.6 aus
+            "envelope_projection_mode": 0,  # Raster (Promotion 2026-09-04: Spec-Feld)
             "heuristik_variante": a.variante}
     (target / "spec.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n",
                                     encoding="utf-8", newline="\n")
