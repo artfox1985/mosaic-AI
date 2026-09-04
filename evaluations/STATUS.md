@@ -31,7 +31,7 @@ exklusiv): K3-P-Arena Replikation Kontrolle / C 1,0 / C 2,0 (Seed 20261009,
 2 x 80), argmax C 2,0 plus Huellen-Sonde, dann K3-P im Erzeugungs-
 Betriebspunkt @100 (Pilot-Rezept, 400 Partien, Seed 20260910, Tag
 `pilot24k3p`) mit Symmetrie-Sonde und Huellen-Sonde gegen den Piloten.
-Ende gegen 15:30. Kette C (K3-R/K3-O) ist durch: 8.9a.
+Ende gegen 15:30. Kette C (K3-R/K3-O) ist durch: 8.9a. **Dahinter (Nutzer 13:30): Champion-Kante b01 + K3-P C 1,0 gegen v21, 200 Paare, Seed 20261004 (Bezugskante ohne Knopf: 214:186), rund 1,2 h.**
 
 **Kette B (2026-09-03 21:25 bis 2026-09-04 07:02) ist durch.** Ergebnisse
 je Hebel, alle am `v23-b01_brierbest`, Bezug b01 (argmax 0,515 Spalten,
