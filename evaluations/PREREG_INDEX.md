@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 105 Dateien = 16 OFFEN + 81 ENTSCHIEDEN + 8 UEBERHOLT.**
+**Stand (automatisch generiert): 106 Dateien = 17 OFFEN + 81 ENTSCHIEDEN + 8 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (16)
+## OFFEN (17)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -102,6 +102,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_uncertainty_guided_selfplay.md` | Bringt es Staerke, Self-Play-Startstellungen dort zu waehlen, wo das Netz nachweislich unsicher ist UND diese Unsicherheit die Zugwahl kippen kann, statt kuratiert oder zufaellig? | nichts gebaut, Entwurf angelegt 2026-08-23. Anschluss an PREREG_start_position_seeding par.4d (Tau +0,14 gegen -0,19, p=0,017); Tor G entscheidet vor jedem Eingriff, ob das Unsicherheitsmass ueberhaupt taugt (par.3). Stufe 1 braucht keine Engine-Aenderung: Entscheidungsnaehe aus root_q/root_child_q, in 65,2 % der Datensaetze (par.4). Abdeckungsmass und Waechter: par.6. |
 | `PREREG_uvfa_plate_regime.md` | Lernt das Netz SELEKTIVEN Plattenbau, wenn das Bau-Regime als NETZ-EINGABE konditioniert wird (UVFA-Muster: Zwangsseite=1/frei=0 auf dem vorhandenen Asym-Korpus), statt als unsichtbarer Kontext -- und wird das Flag zur Spielzeit ein tragfaehiger Stil-Regler? | ENTWURF 2026-08-22, nichts gebaut. Anlass: Asym-Kampagne ohne Signal plus Klon-Befund (par.14-16); Primaerarm UVFA, Baustein-Abhaengigkeit: additiver Input-Mechanismus aus PREREG_stack_top_feature.md par.6. |
 | `PREREG_v24_window.md` | Wie wird das v24-Trainingsfenster zugeschnitten? | Zuschnitt vom Nutzer festgelegt (2026-09-01), Rezept vollstaendig (par.6), Generator b01 @100 (par.4, Nullbefund b05/b07). Material-Pilot par.7 (2026-09-04): Value-Klasse 50 % Seiten mit voller Spalte (v23 35 %), Symmetrie-Trennung +0,51 (v23 +0,40) -- Tor 0 vorab belegt. Arme/Knoepfe par.8: K1 raus (kein Rezept), K3-P (projiziertes Huellen-Potential) als einziger Knopf-Kandidat, Replikation laeuft. Nichts erzeugt; Start nur auf Nutzer-Anweisung. |
+| `PREREG_v25_window.md` | Wie wird das v25-Trainingsfenster zugeschnitten (stationaere Rotation aus docs/window_generation.svg, G = v24), und wie wird dabei der Spaltenbau gegen schleichendes Verlernen gesichert? | Zuschnitt vom Nutzer festgelegt (2026-09-04, 21:50), nichts gebaut: Sockel 4.000 G + 1.350 G-1 + 450 G-2, Schwarm 8.000 G + 8.000 G-1 + 2.650 Sockel-Rest G-1 + 3.550 + 1.450 G-2 (par.1); hv2 als G-2 braucht eine Uebergangsabbildung wie v21 (par.2, Vorschlag); Manifest-Generator braucht eine seedbare Teilauswahl je Klasse (par.3); Spalten-Waechter auf drei Flaechen (par.7). Bedingung: v24 nimmt die Champion-Kante, sonst Generatorwahl-Regel (par.4). |
 
 ## ENTSCHIEDEN (81)
 
