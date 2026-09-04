@@ -220,7 +220,7 @@ ihrem Loeschen gibt es keinen zweiten Versuch.
   richtige Weg.
 
 - **`restic find` druckt Windows-Pfade mit Schraegstrichen** (2026-09-04):
-  `/D/OneDrive/Documents/Projekte/mosaic-AI/data/...`, nicht `D:\...`. Ein
+  `/D/<Projektordner ohne Laufwerk>/data/...`, nicht `D:\<Projektordner>\data\...`. Ein
   Filter auf Backslashes findet nichts und meldet "0 Treffer", obwohl alles
   da ist. Fuer den Handaufruf ohne Skript-Kontext: `. tools/backup_common.ps1`
   und `Initialize-BackupContext -ToolsDir <repo>\tools` liefern `ResticExe`
