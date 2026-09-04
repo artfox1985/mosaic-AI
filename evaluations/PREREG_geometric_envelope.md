@@ -1031,3 +1031,47 @@ K3-R und K3-O bleiben gebaut (Modus 2/3, Default 0), gehen nicht weiter.
 Naechster Schritt: Kette D (Replikation K3-P C 1,0, Arm C 2,0,
 Betriebspunkt @100).
 
+### 8.9b WIEDERVORLAGE v24 (Nutzer 2026-09-04, 13:05: "das Erreichbarkeits-Potential ist noch nicht so implementiert, dass es einen sauberen Effekt generiert -- wird erst mit v24 schlagend")
+
+**Der Konstruktionsfehler von K3-R, am Code abgelesen** (`envelope_score_reach`:
+eine leere, vollendbare Huellenzelle bekommt `w_r` NUR, solange
+`occ[r][c] == 0`; sobald die Reihe `r` gebunden ist, zaehlt die Zelle
+`k/(r+1)/n` und verliert das `w_r`): der ERSTE Stein in Reihe `r` (n = 1)
+aendert das Potential um `1/(r+1) - w_r`, bei `w_r = 0,25` also
++0,75 / +0,25 / +0,08 / **0 / -0,05 / -0,08** fuer die Reihen 0..5. Das
+Potential BESTRAFT das Beginnen der langen Reihen 4 und 5 innerhalb der
+Huelle -- genau der Zellen, die Spalten vollenden. Das erklaert, warum K3-R
+die Huelle hebt (Optionen bleiben offen) und die Spalten senkt (argmax 0,393,
+Arena -0,14). Erreichbarkeit als eigenstaendige Belohnung honoriert
+Optionalitaet; der Engpass "Vollendung" braucht das Gegenteil.
+
+**Was Erreichbarkeit stattdessen leisten kann (drei Bausteine, fuer v24):**
+
+1. **Als Modulator des gebundenen Materials, nicht als Belohnung leerer
+   Zellen (K3-P2).** Belohnt wird weiter nur Material, das gebunden ist
+   (K3-P). Erreichbarkeit entscheidet, WO es zaehlt: eine gebundene Reihe
+   `r`, deren Huellenzellen noch keine Kuppelplatte tragen, zaehlt auf den
+   leeren Huellenzellen der Zeile mit `w_slot` (Vorschlag 0,5 -- die
+   passende Platte kann noch kommen), statt wie heute 0 (keine annehmende
+   Zelle). Damit wird das Beginnen einer Huellenreihe VOR der Platte
+   belohnt, und das Legen einer passenden Platte hebt das Potential sofort
+   von `w_slot` auf 1 (die Bewertungs-Form der Kuppelplatten-Lenkung, ohne
+   Uebersteuerung). Kein Term fuer leere Reihen.
+2. **Tote Huellenzellen als Abzug (K3-D).** Eine Huellenzelle, die durch
+   eine Platte mit falscher Farbe oder durch den Restvorrat unerfuellbar
+   wird (`cell_is_completable == false`), zaehlt `-w_dead * (r+1)/56`.
+   Bestraft nur Zerstoerung, belohnt keine Optionalitaet. Heute selten
+   (tote Huelle Runde 4 kosten-gewichtet 0,013 bei b01), also klein --
+   aber genau der Fall, den eine falsch gelegte Kuppelplatte erzeugt.
+3. **Runden-Profil fuer die Erreichbarkeit umkehren.** Offene Optionen
+   sind in Runde 1-2 wertvoll und ab Runde 4 wertlos (nichts kommt mehr
+   nach); die Vollendung ist es umgekehrt. Falls 1 nicht reicht: `w_slot`
+   mit `w_e(r)` abklingen lassen, waehrend der K3-P-Anteil bleibt.
+
+**Warum erst v24:** K3-P (C 1,0) ist der Rezept-Kandidat fuer die
+v24-Erzeugung; die Bausteine 1-3 aendern das, was im v24-Korpus steht, und
+werden deshalb als v24-ARME registriert (par.8 der v24-Prereg), gemessen
+am v24-Netz mit dem v24-Material -- nicht mehr am b01. Bau je Baustein unter
+einer Stunde (dieselbe Projektions-Mechanik, Modus 4 und 5), Messung wie
+8.7a/8.7b. Nichts davon wird vor dem v24-Start gebaut.
+
