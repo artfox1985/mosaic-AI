@@ -70,10 +70,9 @@ erledigt); **kein Push**.
    `selfplay_tor2a-k3p20-v23b01_*` (20 Dateien) und
    `selfplay_pilot24k3p-value-argmax_*` (40 Dateien) per `restic find`
    vollstaendig im manuellen Snapshot **d775926d** (2026-09-04 20:53:15,
-   daily) belegt und aus `data/` entfernt. Ihre zwei Manifest-JSONs
-   (`manifest_tor2a-k3p20-v23b01_20260904_131517.json`,
-   `manifest_pilot24k3p-value-argmax_20260904_134257.json`) liegen noch in
-   `data/` (nicht in der Freigabe genannt, je wenige KB).
+   daily) belegt und aus `data/` entfernt; ihre zwei Manifest-JSONs auf
+   Nutzer-Freigabe 21:30 ("kannst loeschen") ebenso, nach `restic find`-Beleg
+   im selben Snapshot.
 4. **Wiedervorlagen fuer v24-Arme** (nicht vor dem v24-Start bauen):
    `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
    Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
