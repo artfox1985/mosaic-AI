@@ -230,6 +230,13 @@ wirkt nur im Modus 2, `envelope.rs:330`); `contract_hash` gleich. Punkt 2:
 mitlaufend (`build_cache_incremental.py --watch`, Cache-Prereg par.6), die
 Laufzeit des Laufs ist darum unter Nebenlast gemessen.
 
+**Nachtrag 21:40: Sitzungsneustart, argmax-Lauf nach Chunk 4 gestorben.** Die
+5 fertigen Dateien (Chunks 0-4) bleiben; der Rest laeuft als eigener Lauf mit
+ (= base_seed + 5, self_play.py:515), der die
+Chunks 5-599 deterministisch identisch erzeugt. Fuer par.6c Punkt 1 gilt darum
+fuer die Value-argmax-Klasse ZUSAETZLICH erwartet:  5950 und
+ 20260910 im zweiten Manifest; die Klasse hat zwei Manifeste.
+
 ### par.6d Fenster, Traeger und Cache
 
 - **Dateiliste `data/window_v24.txt`** = die 1.745 hv2-Dateien aus
