@@ -26,12 +26,12 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-03, 14:30 -- Sitzung mosaic-ai-6d, Tagprogramm nach der Uebergabe von 09:00)
 
-**LAEUFT: Kette C `night_chain_0903c.sh`** (Start 2026-09-04 07:10, CPU
-exklusiv, GPU frei): Install des Wheels mit K3-R/K3-O (518 Tests gruen),
-Anker-Drift, Netz-Pfad-Paritaet, argmax K3-R C 0,5/1,0 und K3-O C 0,5/1,0
-(Seed 20260931), Huellen-Sonden, Arena K3-R/K3-O gegen Spec aus (Seed
-20261008, 5 Arme x 2 x 80). Ende gegen 12:30. Dahinter geplant (Kette D):
-Replikation K3-P C 1,0 mit eigenem Seed und Arm C 2,0.
+**LAEUFT: Kette D `night_chain_0903d.sh`** (Start 2026-09-04 11:38, CPU
+exklusiv): K3-P-Arena Replikation Kontrolle / C 1,0 / C 2,0 (Seed 20261009,
+2 x 80), argmax C 2,0 plus Huellen-Sonde, dann K3-P im Erzeugungs-
+Betriebspunkt @100 (Pilot-Rezept, 400 Partien, Seed 20260910, Tag
+`pilot24k3p`) mit Symmetrie-Sonde und Huellen-Sonde gegen den Piloten.
+Ende gegen 15:30. Kette C (K3-R/K3-O) ist durch: 8.9a.
 
 **Kette B (2026-09-03 21:25 bis 2026-09-04 07:02) ist durch.** Ergebnisse
 je Hebel, alle am `v23-b01_brierbest`, Bezug b01 (argmax 0,515 Spalten,
@@ -44,6 +44,8 @@ Huelle H_end 0,659):
 | 8.6 Value im Tiling | 82:78 / 84:76 / 80:80 | 0,49 / 0 | 0 / 0 | Nullbefund (8.6a) |
 | Huellen-Bauer (Vorzug) | gegen hv1 68:92 statt 131:29 | 0,275 / -- | 0,677 / +0,07 | unbrauchbar als Uebersteuerung (8.7a) |
 | **K3-P projiziert C 0,2 / 0,5 / 1,0** | **88 / 92 / 95 : 80** (p 0,38 / 0,21 / 0,11) | 0,455 / 0,480 / **0,555** und Arena +0,06 / +0,11 / +0,10 | H_end 0,665 / 0,687 / **0,703**; Arena +0,00 / **+0,08 / +0,10** (t 3,5 / 6,2) | erster Hebel, bei dem alles in eine Richtung zeigt; Siege noch nicht signifikant (8.7a/8.7b) |
+| K3-R Erreichbarkeit C 0,5 / 1,0 | 82 / 91 : 80 | 0,49 / **0,39** und Arena -0,11 / -0,14 | H_end 0,674 / 0,683; Arena +0,04 / +0,07 | hebt Huelle, kostet Spalten (8.9a) |
+| K3-O Ownership C 0,5 / 1,0 | 86 / 87 : 80 | 0,475 / 0,470 | H_end 0,660 / 0,665 | kaum Huelle, kostet Punkte 43,9 (8.9a) |
 | Material-Pilot v24 | -- | Value-Klasse 0,726, 50 % Seiten mit voller Spalte (v23 35 %) | -- | Tor 0 fuer b01 @100 vorab belegt (v24 par.7) |
 
 **Fuer die v24-Erzeugung heisst das (Nutzer-Entscheid):** Generator bleibt

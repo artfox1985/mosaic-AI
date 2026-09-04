@@ -1001,3 +1001,33 @@ der Tabelle fehlt die Signifikanz bei den Siegen: naechster Schritt
 Replikation C 1,0 mit eigenem Seed und ein Arm C 2,0 (Monotonie ausreizen),
 dazu K3-R/K3-O (Kette C). Kein Tausch: nichts faellt.
 
+### 8.9a GEMESSEN (2026-09-04, 07:05-11:38, Kette C): Erreichbarkeit und Ownership heben die Huelle, kosten aber Spalten oder Punkte -- K3-P bleibt der beste Hebel
+
+Wheel mit K3-R/K3-O (518 Tests gruen), Anker-Drift GRUEN
+(`anchor_drift_20260904_k3ro.json`), Netz-Pfad-Paritaet REPRODUZIERT
+(`k3ro_net_path_parity_repro.json`). argmax @400, 200 Partien, Seed 20260931
+(je rund 1.600 s); Arena Seed 20261008, 4 Arme x 2 x 80 gegen Spec aus
+(`paired_arena_env_k3ro_b01_{first,second}_s08.json`, `k3ro_b01_swap_eval_s08.json`,
+`columns_k3ro_b01_*_s08.json`); Huellen-Sonden `triangle_hull_coverage_tor2a-k3{r,o}{05,10}-v23b01.json`.
+
+| Arm | Spalten argmax (b01 0,515) | Punkte argmax (46,5) | H_end (0,659) | Halbzeit H (0,389) | aussen (2,92) | Siege (160 Paare) | Margin (SE) | Spalten Arena (SE) | H Arena (SE) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| K3-R C 0,5 (w_r 0,25) | 0,492 | 45,5 | 0,674 | 0,416 | 2,48 | 82 : 78 | -0,01 (1,70) | -0,108 (0,107) | +0,038 (0,022) |
+| K3-R C 1,0 | **0,393** | 45,0 | 0,683 | 0,434 | 2,19 | 91 : 69 (p 0,25) | +0,02 (2,05) | **-0,138 (0,092)** | +0,072 (0,020) |
+| K3-O C 0,5 | 0,475 | **43,9** | 0,660 | 0,400 | 2,68 | 86 : 74 | +1,91 (2,31) | -0,042 (0,094) | +0,022 (0,023) |
+| K3-O C 1,0 | 0,470 | **43,9** | 0,665 | 0,413 | 2,56 | 87 : 73 | +1,54 (2,61) | +0,041 (0,104) | +0,037 (0,020) |
+| zum Vergleich K3-P C 1,0 (8.7a/b) | **0,555** | **47,7** | **0,703** | **0,444** | **2,15** | 95 : 65 (p 0,11) | +3,23 (2,04) | +0,102 (0,060) | +0,102 (0,017) |
+
+**Lesart:** Die Erreichbarkeits-Projektion hebt die Huelle (Arena +0,07 bei
+C 1,0, t 3,6) und die Siege leicht (91:69), kauft das aber mit Spalten
+(argmax 0,393, Arena -0,14): das Potential belohnt OFFENE Huellenzellen und
+haelt damit Optionen offen, statt sie zu einer Spalte zu verdichten -- das
+Gegenteil dessen, was der Engpass "Vollendung" braucht. Die Ownership-
+Projektion bewegt die Huelle kaum (+0,001 bis +0,006 am Ende) und kostet
+Punkte (43,9): sie belohnt, was das Netz ohnehin erwartet (Eintreten), und
+das ist wenig. **K3-P (gebundenes Material projiziert) bleibt der einzige
+Hebel, bei dem Huelle, Spalten, Punkte und Siege gemeinsam steigen.**
+K3-R und K3-O bleiben gebaut (Modus 2/3, Default 0), gehen nicht weiter.
+Naechster Schritt: Kette D (Replikation K3-P C 1,0, Arm C 2,0,
+Betriebspunkt @100).
+
