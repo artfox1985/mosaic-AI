@@ -41,7 +41,16 @@ sind KEINE Planungsgroesse** (`working_rules.md`). Fortschritt am g-Suffix
 in `data/selfplay_v23-b01-value-*.pkl` zaehlen. Referenz ohne Nebenlast:
 3,27 s je Partie (8.7d); gemessen unter Nebenlast nach 20 Partien 0,26 Partien/s
 (3,8 s je Partie) -> rund 8,5 h fuer 8.000 Partien, Ende gegen 06:00
-(Herleitung aus den ersten 20 Partien, nicht gemessen). **Der Sockel liegt seit 23:19 in `data/`** (400 Dateien plus Manifest,
+(Herleitung aus den ersten 20 Partien, nicht gemessen). **NACHTKETTE `tools/night_v24_chain.sh` laeuft seit 23:26** (Nutzer-Freigabe
+23:30 fuer die Trainingsarme): wartet auf das Ende der Value-Laeufe und des
+Watchers, dann Tor 0 -> Manifest 580 -> `window_v24.txt` -> Bloecke -> Split
+und Monolith -> Training **v24-b01** -> Training **v24-b02** (lambda 0,7).
+Artefakte `artifacts/v24_{symmetry,sanity}_*.json`, `v24_split.txt`. Gates
+stoppen mit Exit 10-13 (Vorlage an den Nutzer, kein Training). Danach
+getrennt: Abnahmen (Tor 1 gegen `v23-b01_brierbest` @400, beide Seiten
+Champion-Spec, `--no-promote-winner`; Tor 2a argmax; Tor 2b Arena-Spalten),
+b03 (Kuratierung + Seeding-Schwarm 6.000 @100, rund 3 h CPU), hv2-Fenster-
+Kennzahl. **Der Sockel liegt seit 23:19 in `data/`** (400 Dateien plus Manifest,
 1,48 s je Partie auf dem anderen Rechner; par.6c Punkte 1 und 2 gruen,
 Chronik); der Watcher baut seine Bloecke.
 
