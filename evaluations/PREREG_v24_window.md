@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v24-Trainingsfenster zugeschnitten? | Beleg: ZUSCHNITT VOM NUTZER FESTGELEGT (2026-09-01), nichts erzeugt. Form wie v23 (29.450 Partien), hv2-Anteil UNVERAENDERT, neu nur 12.000 Partien von `v23-b01` (par.2). Generator b01 STEHT (par.4; Gleichstandsregel war nicht vorab registriert). **Erzeugungsrezept seit 2026-09-01 VOLLSTAENDIG (par.6):** 100 Sims, Zuschnitt D, `--per-file 10`, Stack-Draw-Env, Seeds, Traeger-Manifest 580 Eintraege, Tor-0-Schwelle 1.500 Seiten, Tore mit Bezugswerten. Gemessene Kosten 11,9 h. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v24-Trainingsfenster zugeschnitten? | Beleg: ZUSCHNITT VOM NUTZER FESTGELEGT (2026-09-01), nichts erzeugt. Form wie v23 (29.450 Partien), hv2-Anteil UNVERAENDERT, neu nur 12.000 Partien von `v23-b01` (par.2). Generator b01 STEHT (par.4; Gleichstandsregel war nicht vorab registriert). **Erzeugungsrezept seit 2026-09-01 VOLLSTAENDIG (par.6):** 100 Sims, Zuschnitt D, `--per-file 10`, Stack-Draw-Env, Seeds, Traeger-Manifest 580 Eintraege, Tor-0-Schwelle 1.500 Seiten, Tore mit Bezugswerten. Gemessene Kosten 11,9 h. Material-Pilot par.7 (2026-09-04): Value-Klasse 50 % Seiten mit voller Spalte (v23: 35 %), Symmetrie-Trennung +0,51 (v23: +0,40) -- Tor 0 fuer b01 @100 vorab belegt. -->
 
 # Vorregistrierung: v24-Fenster
 
@@ -241,6 +241,36 @@ registriert es.
 
 Jeder weitere Arm dieser Generation bekommt VOR seinem Ausscheiden als
 Generator sein Spaltenprofil am argmax-Instrument (Lehre aus par.4).
+
+## par.7 MATERIAL-PILOT (Nachtprogramm N2, gefahren 2026-09-04, 05:30-06:55): das v24-Material ist spaltenreicher und signaltragender als das v23-Material
+
+Rezept exakt par.6b, nur klein und mit eigenen Seeds und Tag `pilot24`
+(gehoert in KEIN Fenster): Value-Klasse 400 Partien argmax @100
+(`--value-only --no-root-noise --deterministic`, Seed 20260910,
+`MOSAIC_STACK_DRAW_RESEARCH=1`, 1.342 s = 3,36 s je Partie, threads 11) und
+Sockel-Klasse 200 Partien gesampelt @100 (Seed 20260911, 659 s). Artefakte
+`pilot24_symmetry_value_argmax.json`, `pilot24_sanity_value_argmax.json`,
+`pilot24_sanity_policy.json`.
+
+| Groesse (Value-Klasse) | Pilot v24 (b01 @100) | Bezug v23-Material (b05 @100) | Lesart N2 |
+| --- | --- | --- | --- |
+| Seiten mit voller Spalte | **403 von 800 = 50,4 %** | 5.629 von 16.000 = 35,2 % | ueber 35 % -> mindestens so spaltenreich |
+| volle Spalten je Seite | **0,726 +- 0,056** | 0,72 (par.2i der v23-Prereg, b01 @100) | wie erwartet |
+| Symmetrie-Trennung (Sieger minus Verlierer, volle Spalten, Block-Mittel) | **+0,513** (Block-SE 0,047, t 11,0, 40 Bloecke) | +0,404 (t 41,26) | nicht unter 0,40 -> signaltragend |
+| Korrelation volle Spalten mit Ausgang (Block-Mittel) | 0,505 (t 13,9) | -- | |
+| Punkte / Strafleiste je Seite | 49,7 / 5,40 | -- | |
+
+Sockel-Klasse (gesampelt, Rauschen): 0,188 volle Spalten, 27,2 Punkte,
+Strafleiste 9,46 -- das ist die erwartete Rauschklasse (v23-Sockel lag in
+derselben Groessenordnung; sie traegt die Policy, nicht die Spalten).
+
+**Verdikt nach der vorab benannten Lesart (N2):** beide Schwellen erfuellt
+(50 Prozent Seiten mit voller Spalte gegen 35, Trennung 0,51 gegen 0,40).
+Das v24-Material waere mindestens so spaltenreich und so signaltragend wie
+das v23-Material -- Tor 0 ist fuer den Generator `v23-b01_brierbest` @100
+VORAB belegt. Das beantwortet die Nutzer-Frage vom 2026-09-02 ("welche
+Evidenz haben wir, dass v24 besser wird") fuer das MATERIAL; die Frage nach
+dem Knopf im Rezept (K3-P, par.8) bleibt davon unberuehrt.
 
 ## par.8 ARME UND KNOEPFE DER GENERATION v24 (Nutzer 2026-09-03: "wir sollten uns alle Themen mit v24 ansehen")
 

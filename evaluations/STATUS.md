@@ -26,30 +26,30 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-03, 14:30 -- Sitzung mosaic-ai-6d, Tagprogramm nach der Uebergabe von 09:00)
 
-**LAEUFT: Nachtkette B `night_chain_0903b.sh`** (Start 21:25, CPU exklusiv,
-GPU frei; Schritte 0-3 durch: Wheel mit 8.6 + K3-P + Huellen-Bauer
-installiert, Anker-Drift und Netz-Pfad-Paritaet GRUEN; K3-P argmax C 0,2/0,5/
-1,0; Huellen-Bauer argmax und Arena gegen hv1). Seit 23:11: 4) 8.6-Arena
-(V 0,5/1,0, T+V) plus Sonden, 5) 8.6-argmax, 6) Champion-Kante b01 + K1 c = 0,2
-gegen v21 (200 Paare, Seed 20261004), 7) Bezugskante ohne Knopf, 8) K3-P-Arena
-(C 0,2/0,5/1,0 projiziert, Seed 20261007), 9) v24-Material-Pilot. Ende gegen
-09:00. **Dahinter wartet ein PowerShell-Auftrag:** `cargo test --release`
-und Wheel-Bau fuer K3-R/K3-O (Commit 10d19e3), dann **Kette C**
-`night_chain_0903c.sh` (Install, Anker, Paritaet, argmax K3-R C 0,5/1,0 und
-K3-O C 0,5/1,0, Huellen-Sonden, Arena K3-R/K3-O Seed 20261008), Ende gegen
-14:00. Baum committet, ungepusht.
+**LAEUFT: Kette C `night_chain_0903c.sh`** (Start 2026-09-04 07:10, CPU
+exklusiv, GPU frei): Install des Wheels mit K3-R/K3-O (518 Tests gruen),
+Anker-Drift, Netz-Pfad-Paritaet, argmax K3-R C 0,5/1,0 und K3-O C 0,5/1,0
+(Seed 20260931), Huellen-Sonden, Arena K3-R/K3-O gegen Spec aus (Seed
+20261008, 5 Arme x 2 x 80). Ende gegen 12:30. Dahinter geplant (Kette D):
+Replikation K3-P C 1,0 mit eigenem Seed und Arm C 2,0.
 
-**Befunde des Abends (Einhuellende, `geometric_envelope`):** par.9 K3 in der
-Bauform 8.2/8.3 bewegt nichts (falscher Hebel: H liest das Raster, das sich
-im Draft nicht aendert; Nutzer-Berichtigung: das Drafting ENTSCHEIDET, was dem
-Tiling zur Verfuegung steht). par.8.7a K3-P (Musterreihen projiziert) hebt die
-Huelle monoton mit C (Ende 0,659 -> 0,703, Halbzeit +0,055, Runde-2-Steine in
-der Huelle 0,905 -> 0,984) bei 0,555 Spalten und 47,7 Punkten (C 1,0) --
-erster Hebel in die gewuenschte Richtung, Staerke offen (Schritt 8).
-Huellen-Bauer (par.8.8, Uebersteuerung): Huelle +0,07, aber 68:92 gegen hv1
-statt 131:29, Spalten 0,275 -- unbrauchbar als Ersatz des Netzzugs.
-par.8.9 (Nutzer): Erreichbarkeit (K3-R, w_r 0,25) und Ownership (K3-O) als
-weitere Projektionen gebaut, Messung in Kette C.
+**Kette B (2026-09-03 21:25 bis 2026-09-04 07:02) ist durch.** Ergebnisse
+je Hebel, alle am `v23-b01_brierbest`, Bezug b01 (argmax 0,515 Spalten,
+Huelle H_end 0,659):
+
+| Hebel | Siege (160 Paare) | Spalten argmax / Arena | Huelle argmax / Arena | Verdikt |
+| --- | --- | --- | --- | --- |
+| K1 c = 0,2 (Margen-Utility) | 104:56 dann 83:77; gegen v21 77:83 (b01: 88:72) | 0,36 / -0,08 | -- | ENTSCHIEDEN: kein Rezept, keine Kante (par.15-17) |
+| K3 S/T/S+T (Raster) | 80:80 ... 81:79 | 0,51-0,53 / 0 | 0 / 0 | ENTSCHIEDEN: falscher Hebel (par.9) |
+| 8.6 Value im Tiling | 82:78 / 84:76 / 80:80 | 0,49 / 0 | 0 / 0 | Nullbefund (8.6a) |
+| Huellen-Bauer (Vorzug) | gegen hv1 68:92 statt 131:29 | 0,275 / -- | 0,677 / +0,07 | unbrauchbar als Uebersteuerung (8.7a) |
+| **K3-P projiziert C 0,2 / 0,5 / 1,0** | **88 / 92 / 95 : 80** (p 0,38 / 0,21 / 0,11) | 0,455 / 0,480 / **0,555** und Arena +0,06 / +0,11 / +0,10 | H_end 0,665 / 0,687 / **0,703**; Arena +0,00 / **+0,08 / +0,10** (t 3,5 / 6,2) | erster Hebel, bei dem alles in eine Richtung zeigt; Siege noch nicht signifikant (8.7a/8.7b) |
+| Material-Pilot v24 | -- | Value-Klasse 0,726, 50 % Seiten mit voller Spalte (v23 35 %) | -- | Tor 0 fuer b01 @100 vorab belegt (v24 par.7) |
+
+**Fuer die v24-Erzeugung heisst das (Nutzer-Entscheid):** Generator bleibt
+b01 @100; offen ist, ob K3-P (C 1,0, projiziert) als Rezept-Knopf in die
+Erzeugung geht -- dafuer fehlen die Replikation der Siege und die Frage, ob
+der Effekt bei 100 Sims (Erzeugung) so gross ist wie bei 400 (Instrument).
 
 ### Was das Tagprogramm 2026-09-03 bis 14:30 ergeben hat (Chronik: `night_run_20260902.md`, ab 09:08)
 

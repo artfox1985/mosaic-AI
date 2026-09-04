@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die lineare Mischung gescheitert ist? | Beleg: NICHT VERLAESSLICH (par.15/16, 2026-09-03, gebaut, Anker und Paritaet GRUEN): c = 0,2 am `v23-b01` 104:56 (p = 0,006), Replikation 83:77 (p = 0,82), gepoolt 187:133 (p = 0,03); Margin +2 bis +5 in jedem Lauf, aber Spalten darunter (Arena -0,08, argmax 0,36 gegen 0,52). Marge wird zu Punkten, nicht stabil zu Siegen; kein v24-Rezept, Skalenwechsel par.4b entfaellt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Verwandelt eine KataGo-treue Score-Utility (Saettigung um den RE-ZENTRIERTEN Wurzel-Score) die gemessene, aber wertlose Punktemarge in Siege -- dort, wo die lineare Mischung gescheitert ist? | Beleg: NEIN (par.15-17, 2026-09-03/04, gebaut, Anker und Paritaet GRUEN): c = 0,2 am b01 einmal 104:56, Replikation 83:77, gepoolt 187:133 (p = 0,03); Margin +2 bis +5, aber Spalten darunter (argmax 0,36 gegen 0,52) und gegen den Champion v21 77:83 statt 88:72 auf denselben Seeds. Kein Rezept, keine Champion-Kante, Skalenwechsel par.4b entfaellt. -->
 
 # Vorregistrierung: Gesaettigte, re-zentrierte Score-Utility
 
@@ -938,4 +938,26 @@ Blattwert" ist nicht geschlossen, aber die beiden gemessenen Formen (linear
 par.8-10, saettigend-rezentriert hier) haben beide keinen verlaesslichen
 Siegzuwachs gebracht -- weitere Formen brauchen eine neue Idee, nicht ein
 neues Gewicht.
+
+## par.17 CHAMPION-KANTE mit c = 0,2 (Nutzer-Wunsch 2026-09-03; gefahren 2026-09-04, 02:33-04:12): K1 kostet gegen den Champion
+
+`tools/paired_gating.py` (seit heute mit `--spec-a/--spec-b`), `v23-b01_brierbest`
+mit `MOSAIC_SCORE_UTILITY_C=0.2` gegen `v21_2d_brierbest` mit Spec "alle Knoepfe
+0" (`k3v_off.spec.json`), @400/@400, Blockgroesse 5, Seed 20261004, SPRT
+H1 p = 0,65, Deckel 200 Paare; Bezugskante b01 OHNE Knopf gegen denselben
+Champion, GLEICHER Seed. Artefakte `paired_gating_result_v23-b01_k1c02_vs_v21_2d_brierbest.json`,
+`paired_gating_result_v23-b01_vs_v21_2d_brierbest_s04.json`.
+
+| Kante | Ergebnis | Paare | SPRT | Vorzeichentest p | gepaarte Differenz, 95%-KI |
+| --- | --- | --- | --- | --- | --- |
+| b01 + K1 c = 0,2 gegen v21 | **77 : 83** | 80 (Fruehstopp H0, LLR -3,05) | kein Beleg | 0,77 | -0,075 [-0,405, +0,255] |
+| b01 ohne Knopf gegen v21 | **214 : 186** | 200 (Deckel) | kein Entscheid | 0,20 | +0,140 [-0,059, +0,339] |
+| dieselben ersten 80 Paare, b01 ohne Knopf | 88 : 72 | 80 | -- | -- | -- |
+
+**Verdikt:** auf denselben 80 Seeds faellt b01 mit K1 von 88:72 auf 77:83
+gegen den Champion; die Bezugskante bestaetigt die v23-Kante vom 2026-08-31
+(219:181) mit 214:186. **Keine Champion-Kante mit K1**; der Knopf bleibt
+Default 0. Kein Elo-Eintrag (K1-Konfiguration ist kein Spieler der Leiter;
+die Bezugskante ist eine Replikation der bestehenden Kante, nicht neu
+eingetragen -- Promotions-Checkliste greift nicht, kein Champion-Wechsel).
 
