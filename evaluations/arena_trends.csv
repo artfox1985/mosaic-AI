@@ -83,3 +83,4 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-08-31T22:53:18,anchor_arena,v23-b01_brierbest,Heuristik_hv1_anchor,400,150,0.8467,53.967,36.127,,,
 2026-09-04T03:00:45,paired_gating,v23-b01_k1c02,v21_2d_brierbest,400,160,0.4813,48.456,48.919,11.856,11.25,0.0
 2026-09-04T04:12:27,paired_gating,v23-b01_brierbest,v21_2d_brierbest,400,400,0.535,50.483,47.515,10.92,12.162,0.0
+2026-09-04T14:15:36,paired_gating,v23-b01_k3p10,v21_2d_brierbest,400,50,0.76,57.76,48.08,10.8,11.5,0.0
