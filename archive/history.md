@@ -16611,6 +16611,25 @@ Zahlen stehen ohnehin je Lauf im Artefakt (`laufzeit`-Block, Pflichtfeld seit
 
 ---
 
+## Champion-Wechsel 2026-09-04: `v23-b01_k3p10` (b01 mit projiziertem Huellen-Potential)
+
+Der erste Champion-Wechsel seit v21 (2026-08-20). Kandidat ist kein neues
+Netz, sondern `v23-b01_brierbest` mit dem Such-Knopf K3-P
+(`PREREG_geometric_envelope.md` par.8.7: Huellen-Potential auf dem
+projizierten Brett, Modus 1, C_HULL 1,0, Profil aus der Verlaesslichkeit des
+Value-Kopfs). Weg dorthin am selben Tag: K3 auf dem Raster wirkungslos
+(par.9), Nutzer-Berichtigung "das Drafting entscheidet die Huelle", K3-P am
+Instrument (0,555 Spalten, Huelle 0,703) und in der Arena (gepoolt 191:129
+auf 320 Paaren, p 0,014) belegt, Champion-Kante 38:12 und Replikation
+221:179 gegen v21. Promotion nach `docs/promotion_checklist.md`: Anker-Kante
+128:22 (n=150), Champion-2-Kante 32:8 gegen v22-b05 (v20 nicht im Baum), Elo
+1292 [1253, 1335], Anzeige-Kalibrierung A -0,1080 / B 0,5587 (frozen_v3),
+Balance 2,92, Fixture `a274e3ad68f4ad91`, Artefakt
+`models/frozen_champions/v23-b01_k3p10/`. Bau-Voraussetzung: der
+Projektions-Modus wurde Spec-Pflichtfeld, der Server uebersetzt die
+Champion-Spec in die Env-Knoepfe des GUI-Suchpfads. Details: Prereg par.10,
+10a, 11; Chronik `evaluations/night_run_20260902.md`.
+
 ## FALLEN (aus echten Vorfaellen)
 
 **Kanonisch in `../docs/pitfalls.md`** (seit 2026-08-28 aus STATUS

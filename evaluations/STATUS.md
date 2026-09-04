@@ -316,13 +316,20 @@ solcher markiert.
 
 ## 4. STAND JETZT
 
-**Champion:** `v21_2d_brierbest`, Elo **1227** [1191, 1269] auf der R5-Fix-Leiter
-(`python tools/elo_tracker.py report`, nachgefuehrt 2026-09-01; die Zahl 1226 [1188, 1269]
-stand hier aus dem Fit vor den beiden b05-Tor-1-Kanten, der fruehere Wert 1215
-aus dem Fit ohne Anker- und Champion-Kante von b01). Kanten ueber die
-Fix-Grenze nie mischen. **Staerkster Knoten der Leiter ist inzwischen NICHT der
-Champion:** `v23-b01_brierbest` steht bei 1263 -- die KI ueberlappen, die
-Promotionsregel haengt an der Champion-Kante, und die war nicht signifikant.
+**Champion seit 2026-09-04, 19:33: `v23-b01_k3p10`** (= `v23-b01_brierbest`
+mit K3-P: projiziertes Huellen-Potential, Modus 1, C_HULL 1,0, Spec
+`models/v23-b01_k3p10.spec.json`; Server-Default `models/champion.txt`, die
+GUI uebernimmt die Spec beim Start in die Env-Knoepfe). Elo **1292**
+[1253, 1335] auf der R5-Fix-Leiter (`elo_tracker.py report`, alle Knoten mit
+dem Anker verbunden) aus vier Kanten: Gating 38:12 und 221:179 gegen v21,
+Anker 128:22 (n=150, Cross-Aera), Champion-2 32:8 gegen v22-b05 (v20 nicht im
+Baum). Vorgaenger `v21_2d_brierbest` 1232 [1199, 1265]; `v23-b01_brierbest`
+ohne Knopf 1263 [1226, 1305]. Anzeige-Kalibrierung server.py A=-0,1080 /
+B=0,5587 (frozen_v3); sigma/Prior-Balance 2,92 (unter der 3er-Schwelle, Runde
+3 3,88); Paritaets-Fixture `a274e3ad68f4ad91` (frischer Prozess gruen).
+Promotion nach `docs/promotion_checklist.md`, Artefakt
+`models/frozen_champions/v23-b01_k3p10/`. Kanten ueber die Fix-Grenze nie
+mischen.
 
 **Bester Stand der Spalten-Linie: `v23-b01_brierbest`** (seit 2026-08-31) --
 volle Spalten 0,5150 am argmax-Instrument, 119:61 gegen den Vorgaenger b05,
