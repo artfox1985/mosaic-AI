@@ -87,6 +87,15 @@ G-Policy-Dateien. Bau vor dem v25-Training: eine wiederholbare Option
 Dazu die Dateiliste `data/window_v25.txt` (2.945 Zeilen) aus denselben
 Auswahlen; `train.py --file-list` bricht bei fehlenden Eintraegen hart ab.
 
+**GEBAUT 2026-09-04, 23:50:** `--pick QUELLE:N` (wiederholbar; Glob oder
+.txt-Liste; Seed je --pick = `seed + 1000*i`, damit die Hauptauswahl
+byte-gleich bleibt; Ueberschneidung mit anderen Auswahlen bricht hart ab;
+Herkunft im additiven Manifest-Feld `picks`). Trockenlaeufe: der v24-Aufruf
+liefert unveraendert die 180 hv2-Traeger (erste/letzte Datei = Bestandsliste),
+die v25-Form (`--from-list carriers_v23_hv2.txt --n-files 45 --pick
+"selfplay_v23-b01-policy_*.pkl:135"`) waehlt 45 + 135, eine ueberschneidende
+Quelle wird abgewiesen.
+
 ## par.4 Bedingung und Generator
 
 Der Zuschnitt gilt, **wenn v24-b01 die Champion-Kante nimmt** (Nutzer:
