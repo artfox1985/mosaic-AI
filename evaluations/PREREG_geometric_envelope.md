@@ -1114,7 +1114,9 @@ Rezept: der Betriebspunkt @100 (Kette D Schritt 3) und die Champion-Kante
 | dito Huelle H_end / Halbzeit / aussen / neu in Huelle R2 / stabil ab R1 | 0,685 / 0,413 / 2,82 / 0,907 / 0,91 | **0,718 / 0,456 / 2,36 / 0,974 / 0,95** | -- |
 | dito Symmetrie-Trennung (Sieger minus Verlierer, Block-Mittel, SE) | +0,512 (0,047) | +0,455 (0,044) | -- |
 
-Artefakte `tor2a_k3p20_v23b01.json`, `triangle_hull_coverage_tor2a-k3p20-v23b01.json`,
+Rohkorpora `selfplay_tor2a-k3p20-v23b01_*` und `selfplay_pilot24k3p-value-argmax_*`
+liegen seit dem 2026-09-04 21:15 nur noch im restic-Snapshot d775926d
+(Nutzer-Freigabe 19:45, Beleg per `restic find`). Artefakte `tor2a_k3p20_v23b01.json`, `triangle_hull_coverage_tor2a-k3p20-v23b01.json`,
 `pilot24k3p_sanity_value_argmax.json`, `pilot24k3p_symmetry_value_argmax.json`,
 `triangle_hull_coverage_pilot24{,k3p}-value-argmax.json`; Laufzeiten 1.636 s
 (argmax) und 1.309 s (400 Partien @100, 3,27 s je Partie, threads 11).
