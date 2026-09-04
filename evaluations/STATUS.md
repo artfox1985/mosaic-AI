@@ -27,8 +27,9 @@ diesen Inhalten etwas aendert, aendert es DORT.
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-04, 21:05 -- Sitzung nach dem Chip-Wechsel von 20:40)
 
 **LAEUFT: v24-ERZEUGUNG (Nutzer-Freigabe fuer die Value-Laeufe hier;
-Sockel seit ~21:10 auf dem anderen Rechner des Nutzers).** Hier seit **21:31** (Manifest-Zeitstempel 213124) in
-EINER Hintergrundkette: 6.000 argmax (`v23-b01-value-argmax`, Seed 20260905)
+Sockel seit ~21:10 auf dem anderen Rechner des Nutzers).** Hier seit **21:31** (Manifest-Zeitstempel 213124; der Sitzungsneustart hat den
+Lauf nach Chunk 4 getoetet, Tail seit 21:40 als eigener Lauf `--games 5950
+--seed 20260910`, Chronik) in EINER Hintergrundkette: 6.000 argmax (`v23-b01-value-argmax`, Seed 20260905)
 und danach 2.000 gesampelt (`v23-b01-value-sampled`, Seed 20260906), Rezept
 `PREREG_v24_window.md` par.6b' (Umgebung `MOSAIC_STACK_DRAW_RESEARCH=1
 MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0`, threads 11).
