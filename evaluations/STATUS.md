@@ -31,7 +31,7 @@ exklusiv): K3-P-Arena Replikation Kontrolle / C 1,0 / C 2,0 (Seed 20261009,
 2 x 80), argmax C 2,0 plus Huellen-Sonde, dann K3-P im Erzeugungs-
 Betriebspunkt @100 (Pilot-Rezept, 400 Partien, Seed 20260910, Tag
 `pilot24k3p`) mit Symmetrie-Sonde und Huellen-Sonde gegen den Piloten.
-Ende gegen 15:30. Kette C (K3-R/K3-O) ist durch: 8.9a. **Champion-Kante b01 + K3-P C 1,0 gegen v21: 38:12, SPRT nach 25 Paaren (par.10; b01 ohne Knopf dort 30:20, volle Kante 214:186). LAEUFT seit 14:16: Replikation mit Seed 20261010 (Fruehstopp-Regel der Promotions-Checkliste).**
+Ende gegen 15:30. Kette C (K3-R/K3-O) ist durch: 8.9a. **Champion-Kante b01 + K3-P C 1,0 gegen v21: 38:12 (Seed 20261004, Fruehstopp) und Replikation 221:179 (Seed 20261010, 200 Paare, p 0,055); gepoolt 259:191 auf 225 Paaren, p = 0,003 (par.10/10a). b01 ohne Knopf: 214:186. NICHTS LAEUFT MEHR -- Maschine frei, Baum push-bereit.**
 
 **Kette B (2026-09-03 21:25 bis 2026-09-04 07:02) ist durch.** Ergebnisse
 je Hebel, alle am `v23-b01_brierbest`, Bezug b01 (argmax 0,515 Spalten,

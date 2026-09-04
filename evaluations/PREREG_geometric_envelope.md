@@ -1166,3 +1166,27 @@ Modell PLUS Spec, und eine Spec muss das Suchverhalten VOLLSTAENDIG
 festlegen), die Anker-Kante mit festem n = 150 und die uebrigen Punkte der
 Checkliste. Nutzer-Entscheid.
 
+### 10a REPLIKATION der Champion-Kante (2026-09-04, 14:16-15:23, Seed 20261010, Deckel 200 Paare)
+
+| Kante | Ergebnis | Paare | SPRT | Vorzeichentest p | gepaarte Differenz, 95%-KI | Punkte A / B |
+| --- | --- | --- | --- | --- | --- | --- |
+| b01 + K3-P C 1,0 gegen v21, Seed 20261010 | **221 : 179** (55,3 %) | 200 (Deckel) | kein Entscheid (LLR +1,36) | 0,055 | +0,21 [+0,01, +0,41] | 50,0 / 47,4 |
+| dieselbe Kante, Seed 20261004 (par.10) | 38 : 12 | 25 (Fruehstopp) | signifikant | 0,002 | +1,04 | 57,8 / 48,1 |
+| **gepoolt, beide Seeds** | **259 : 191 (57,6 %)** | 225 | -- | **0,003** (informativ 80 / 46) | -- | -- |
+| Bezug: b01 ohne Knopf gegen v21, Seed 20261004 | 214 : 186 (53,5 %) | 200 | kein Entscheid | 0,20 | +0,14 [-0,06, +0,34] | 50,5 / 47,5 |
+
+Artefakt `paired_gating_result_v23-b01_k3p10_vs_v21_2d_brierbest_s10.json`
+(4.150 s, 10,4 s je Partie, threads 10, exklusiv).
+
+**Verdikt:** Der 38:12-Start war eine gluecklich gezogene Stichprobe; mit
+eigenem Seed liegt die Kante bei 55 Prozent, das KI der gepaarten Differenz
+schliesst die Null knapp aus, und gepoolt ueber 225 Paare ist der Vorsprung
+gegen den Champion signifikant (p = 0,003) -- Champion-Strenge (n >= 150
+Paare) erfuellt. Gegenueber b01 ohne Knopf (53,5 %) ist der Zuwachs klein
+(rund 2 bis 4 Prozentpunkte) und auf dieser Basis nicht getrennt belegbar;
+belegt ist: b01 + K3-P schlaegt v21, b01 allein steht auf Augenhoehe.
+Fuer das v24-REZEPT reicht das (`PREREG_v24_window.md` par.6b': der Knopf
+verbessert das Material und kostet keine Staerke); fuer eine PROMOTION
+(Spielbetrieb) bleibt der Nutzer-Entscheid samt Checkliste und dem
+Projektions-Modus als Spec-Feld.
+
