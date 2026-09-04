@@ -283,10 +283,10 @@ registriert es.
 
 | Tor | Instrument | Bezugswert (Vor-Generation am SELBEN Instrument) |
 | --- | --- | --- |
-| 1 | `tools/paired_gating.py` gegen `v23-b01_brierbest` @400, Champion-Strenge (n >= 150 Paare oder Replikation mit eigenem Seed) | -- |
+| 1 | `tools/paired_gating.py` gegen `v23-b01_brierbest` @400, Champion-Strenge (n >= 150 Paare oder Replikation mit eigenem Seed); beide Seiten dieselbe Spec (Vorschlag: Champion-Spec mit Knopf, Nutzer-Entscheid vor dem Tor) | -- |
 | 2a | argmax-Instrument @400, 200 Partien (`self_play.py --deterministic --no-root-noise`) | b01 **0,5150** (`evaluations/artifacts/tor2a_v23b01.json`) |
 | 2b | gepaarte Arena gegen b01 mit `--log-games`, `tools/probes/arena_column_probe.py` (Anzahl voller Spalten aus der Brettgeometrie) | b01-Seite DERSELBEN Arena; zum Vergleich b01 gegen b05: 0,6456 |
-| Champion-Kante | gegen `v21_2d_brierbest` @400, berichten, Promotion nur nach `promotion_checklist.md` | 219:181 war die v23-Kante |
+| Champion-Kante | gegen den AMTIERENDEN Champion `v23-b01_k3p10` (b01 + K3-P C 1,0, seit 2026-09-04 19:33; die urspruengliche Zeile nannte v21) @400, **beide Seiten mit derselben Spec** (Knopf an), sonst misst die Kante den Knopf statt das Netz; berichten, Promotion nur nach `promotion_checklist.md` | b01 + K3-P gegen v21 259:191 gepoolt (`geometric_envelope` par.10a); b01 ohne Knopf gegen v21 214:186 |
 
 Jeder weitere Arm dieser Generation bekommt VOR seinem Ausscheiden als
 Generator sein Spaltenprofil am argmax-Instrument (Lehre aus par.4).

@@ -89,7 +89,11 @@ erledigt); **kein Push**.
    daily) belegt und aus `data/` entfernt; ihre zwei Manifest-JSONs auf
    Nutzer-Freigabe 21:30 ("kannst loeschen") ebenso, nach `restic find`-Beleg
    im selben Snapshot.
-4. **Wiedervorlagen fuer v24-Arme** (nicht vor dem v24-Start bauen):
+4. **v25-Zuschnitt registriert** (`PREREG_v25_window.md`, Nutzer 21:50,
+   stationaere Rotation G = v24 / G-1 = heutiges Material / G-2 = hv2; par.7
+   Spalten-Waechter auf drei Flaechen, Nutzer 21:55; offen: hv2-Abbildung
+   par.2, Teilauswahl-Option im Manifest-Generator par.3). **Wiedervorlagen
+   fuer v24-Arme** (nicht vor dem v24-Start bauen):
    `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
    Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
    (b03). Nutzer-Ziel: offene Preregs (16) ueber v25+ auf rund 7.
