@@ -1101,3 +1101,38 @@ Monotonie endet zwischen 1,0 und 2,0, C 1,0 bleibt der Arm. Offen vor dem
 Rezept: der Betriebspunkt @100 (Kette D Schritt 3) und die Champion-Kante
 (Spielbetrieb).
 
+### 8.7d C 2,0 am Instrument und K3-P im ERZEUGUNGS-Betriebspunkt @100 (2026-09-04, 13:15-14:06, Kette D)
+
+| Messung | ohne Knopf | K3-P C 1,0 | K3-P C 2,0 |
+| --- | --- | --- | --- |
+| argmax @400, 200 Partien, Seed 20260931: volle Spalten | 0,515 | 0,555 | **0,635** (+-0,068; Seiten mit voller Spalte 203 von 400) |
+| dito Punkte / volle Reihen | 46,8 / 0,148 | 47,7 / 0,193 | 49,7 / 0,205 |
+| dito Huelle H_end / Halbzeit / aussen | 0,659 / 0,389 / 2,92 | 0,703 / 0,444 / 2,15 | 0,731 / 0,463 / 1,83 |
+| **Erzeugungs-Betriebspunkt @100** (Pilot-Rezept par.6b, 400 Partien value-argmax, Seed 20260910): volle Spalten | **0,726** (Pilot, v24 par.7) | **0,775** (+-0,055) | -- |
+| dito Seiten mit voller Spalte | 403 von 800 (50 %) | **440 von 800 (55 %)** | -- |
+| dito Punkte / volle Reihen / Strafleiste | 49,7 / 0,094 / 5,40 | 51,0 / 0,143 / 5,61 | -- |
+| dito Huelle H_end / Halbzeit / aussen / neu in Huelle R2 / stabil ab R1 | 0,685 / 0,413 / 2,82 / 0,907 / 0,91 | **0,718 / 0,456 / 2,36 / 0,974 / 0,95** | -- |
+| dito Symmetrie-Trennung (Sieger minus Verlierer, Block-Mittel, SE) | +0,512 (0,047) | +0,455 (0,044) | -- |
+
+Artefakte `tor2a_k3p20_v23b01.json`, `triangle_hull_coverage_tor2a-k3p20-v23b01.json`,
+`pilot24k3p_sanity_value_argmax.json`, `pilot24k3p_symmetry_value_argmax.json`,
+`triangle_hull_coverage_pilot24{,k3p}-value-argmax.json`; Laufzeiten 1.636 s
+(argmax) und 1.309 s (400 Partien @100, 3,27 s je Partie, threads 11).
+
+**Lesart:** Am Instrument steigen Spalten und Huelle mit C weiter (C 2,0:
+0,635 Spalten, Huelle 0,731), in der Arena sind die Siege bei C 2,0 aber
+schwaecher als bei C 1,0 (8.7c) -- fuer den SPIELBETRIEB ist C 1,0 der Arm,
+fuer den GENERATOR koennte C 2,0 das spaltenreichere Material liefern; das
+ist eine v24-Frage (par.8.9b-Liste), nicht mehr diese Messung. **Im
+Erzeugungs-Betriebspunkt @100 haelt der Effekt:** +0,05 Spalten je Seite,
++5 Prozentpunkte Seiten mit voller Spalte, +1,3 Punkte, Huelle +0,033 am
+Ende und +0,043 zur Halbzeit, Runde-2-Steine in der Huelle 0,907 -> 0,974,
+Orientierung stabil ab Runde 1 0,91 -> 0,95 (Nutzer-Ziel "stabile erste
+Runden"). Die Symmetrie-Trennung sinkt leicht (0,51 -> 0,46, innerhalb einer
+SE), weil BEIDE Seiten mehr bauen; Tor 0 (Trennung > 0, Seiten mit voller
+Spalte > 35 %) bleibt weit erfuellt. **K3-P C 1,0 ist damit
+Rezept-Kandidat fuer die v24-Erzeugung** (`PREREG_v24_window.md` par.6a,
+Zeile "Knoepfe": `MOSAIC_ENVELOPE_PROJECTED=1`, `MOSAIC_ENVELOPE_SEARCH_C=1.0`
+in der Umgebung der Value-Laeufe; ob auch die Sockel-Klasse, ist Nutzer-
+Entscheid). Champion-Kante fuer den Spielbetrieb laeuft.
+

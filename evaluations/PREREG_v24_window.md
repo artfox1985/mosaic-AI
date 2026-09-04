@@ -268,7 +268,16 @@ derselben Groessenordnung; sie traegt die Policy, nicht die Spalten).
 (50 Prozent Seiten mit voller Spalte gegen 35, Trennung 0,51 gegen 0,40).
 Das v24-Material waere mindestens so spaltenreich und so signaltragend wie
 das v23-Material -- Tor 0 ist fuer den Generator `v23-b01_brierbest` @100
-VORAB belegt. Das beantwortet die Nutzer-Frage vom 2026-09-02 ("welche
+VORAB belegt.
+
+**Nachtrag 2026-09-04, 14:06 (K3-P im Betriebspunkt, `geometric_envelope` 8.7d):**
+dasselbe Pilot-Rezept mit `MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0`
+(Tag `pilot24k3p`, gleicher Seed): 0,775 Spalten je Seite (gegen 0,726),
+440 von 800 Seiten mit voller Spalte (55 gegen 50 Prozent), 51,0 Punkte,
+Huelle 0,718 (gegen 0,685), Trennung +0,455 (gegen +0,512, innerhalb einer
+SE). Der Knopf verbessert das Material in der Erzeugung selbst; als
+Rezept-Knopf der Value-Laeufe (par.6a) Kandidat -- Nutzer-Entscheid vor dem
+Start, dazu ob auch die Sockel-Klasse ihn traegt. Das beantwortet die Nutzer-Frage vom 2026-09-02 ("welche
 Evidenz haben wir, dass v24 besser wird") fuer das MATERIAL; die Frage nach
 dem Knopf im Rezept (K3-P, par.8) bleibt davon unberuehrt.
 
