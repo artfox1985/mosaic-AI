@@ -24,15 +24,20 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Uebergabe 2026-09-04, 20:40 -- Sitzungswechsel per Arbeitsauftrag-Chip; Sitzung mosaic-ai-6d uebergibt)
+## 1. WAS GERADE LAEUFT (Stand 2026-09-04, 21:05 -- Sitzung nach dem Chip-Wechsel von 20:40)
 
-**LAEUFT: Golden Probe des neuen Champion-Artefakts**
-(`tools/build_frozen_golden_probe.py --artifact-dir models/frozen_champions/v23-b01_k3p10 --seed-base 916001`,
-gestartet 20:00, Einzelkern, Ziel `models/frozen_champions/v23-b01_k3p10/golden_probe.json`;
-liest `model.onnx` und `spec.json` in diesem Ordner -- NICHT anfassen). Stand
-20:40: Datei liegt noch nicht vor. Sonst laeuft NICHTS: keine Arena, kein
-Training, GPU frei. Baum sauber, 58 Commits ungepusht (Push ist Nutzer-Sache,
-der pre-push-Hook setzt den Python-DLL-Pfad selbst).
+**LAEUFT: NICHTS** (keine Arena, kein Training, keine Sonde; GPU und CPU
+frei). Der Nutzer hat um ~20:55 einen manuellen restic-Backup-Lauf
+gestartet; sobald der Snapshot da ist, folgt Punkt 3 (Loeschung der zwei
+Korpora nach `restic find`-Beleg). Baum: Commits lokal, nicht gepusht (Push
+ist Nutzer-Sache, der pre-push-Hook setzt den Python-DLL-Pfad selbst).
+
+**Champion-Artefakt `models/frozen_champions/v23-b01_k3p10/` ist KOMPLETT
+(21:00):** Golden Probe (10 Sonden, 20:27:53-20:50), venv aus dem
+Artefakt-Wheel (nicht versioniert), Referee-Selbsttest 10/10 gruen plus zwei
+Echtpartien (`artifacts/frozen_referee_match_v23-b01_k3p10_selftest.json`),
+Manifest vollstaendig (`name_dialect` hv, `worker_python.interpreter_relative`,
+Wheel-sha256 = live installiertes Wheel). Chronik 20:45-21:05.
 
 **Champion seit 19:33: `v23-b01_k3p10`** (b01 mit projiziertem Huellen-
 Potential; Abschnitt 4, `PREREG_geometric_envelope.md` par.11). Der Nutzer
@@ -49,17 +54,9 @@ ausdrueckliche Nutzer-Anweisung**; *"viel mehr will ich in v24 nicht
 eintakten"*; Loeschungen nur auf pfadgenaue Freigabe (2026-09-04 19:45
 erledigt); **kein Push**.
 
-1. **WATCHER Golden Probe:** fertig, wenn
-   `models/frozen_champions/v23-b01_k3p10/golden_probe.json` existiert UND kein
-   `build_frozen_golden_probe`-Python-Prozess mehr laeuft; Stillstand melden,
-   wenn nach 60 min nichts da ist (dann Werkzeug im Vordergrund neu starten,
-   `--max-games 40`). Danach `manifest.json` im Artefakt pruefen (Feld
-   `golden_probe.source` von "laeuft" auf den Befund stellen) und mit
-   `python -X utf8 -u tools/frozen_referee_match.py --artifact-dir models/frozen_champions/v23-b01_k3p10 --n-games 2 --skip-golden`
-   NICHT arbeiten -- Abnahme braucht den Golden-Test; stattdessen den
-   Referee-Selbsttest laut `frozen_referee_match.py`-Kopf fahren (Artefakt-
-   venv fehlt noch: `worker_python` im Manifest; bei Bedarf venv aus dem
-   Wheel `mosaic_rust_k3p_20260904.whl` bauen).
+1. ~~**WATCHER Golden Probe**~~ ERLEDIGT 21:00: Sonde, venv, Referee-
+   Selbsttest 10/10 gruen, Manifest nachgezogen (siehe oben; Chronik
+   20:45-21:05).
 2. **v24-Erzeugung, NUR auf Nutzer-Anweisung:** Rezept `PREREG_v24_window.md`
    par.6b' (par.6b plus `MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0`
    in allen drei Laeufen). Der Sockel (4.000 Partien) laeuft auf einer ANDEREN
@@ -70,7 +67,8 @@ erledigt); **kein Push**.
    Stack-Draw-Kontrolle; Tor 0). Vor dem Training: Monolith fuer den
    Trainingsanteil (`cache_build_time` par.12, `tools/window_train_split.py`),
    Traeger-Manifest 580 (par.6d, `--out` RELATIV zu data/).
-3. **Nach dem naechsten restic-Tages-Snapshot (12:00):** die zwei
+3. **Nach dem manuellen restic-Lauf des Nutzers (gestartet ~20:55; sonst
+   Tages-Snapshot 12:00):** die zwei
    Korpora `selfplay_tor2a-k3p20-v23b01_*` und `selfplay_pilot24k3p-value-argmax_*`
    in `data/` duerfen weg (Nutzer-Freigabe 2026-09-04 19:45 "loesch das
    genannte", diese beiden waren nur wegen des fehlenden Snapshots
@@ -79,10 +77,12 @@ erledigt); **kein Push**.
    `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
    Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
    (b03). Nutzer-Ziel: offene Preregs (16) ueber v25+ auf rund 7.
-5. **Offene Nutzer-Entscheide:** v20_2d_opp_brierbest aus restic zurueckholen
-   fuer die "richtige" Champion-2-Kante (heute v22-b05 ersatzweise, par.11);
-   Verwendung der sechs Server-Logs (Anzeige-Fit auf Mensch-Zustaenden oder
-   Mensch-Huelle in der Lehrer-Prereg neu rechnen).
+5. **Keine offenen Nutzer-Entscheide mehr** (beide am 2026-09-04, 20:50
+   geklaert): v20_2d_opp_brierbest wird NICHT aus restic zurueckgeholt, die
+   Champion-2-Kante gegen v22-b05 bleibt (par.11); die sechs Server-Logs vom
+   2026-09-04 waren eine INFORMATION (wie das Netz gegen einen Menschen spielt,
+   nicht nur gegen sich selbst oder Peers), kein Auftrag -- sie bleiben als
+   Mensch-Referenz liegen, nichts daraus neu rechnen.
 
 Blockaden (Kettenfehler, unerwarteter Manifest-Diff, Anker ROT): anhalten,
 Zustand sichern, Nutzer fragen. Nach jedem Schritt Chronik

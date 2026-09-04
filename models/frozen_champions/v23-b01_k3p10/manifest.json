@@ -1,6 +1,8 @@
 {
   "champion": "v23-b01_k3p10",
   "freeze_date": "2026-09-04",
+  "name_dialect": "hv",
+  "name_dialect_hinweis": "Das mitgelieferte Wheel (2026-09-04) kennt NUR die neuen Variantennamen (hv1 / hv2) und weist 'v1' hart ab (Worker-Fehler am 2026-09-04 20:58, als das Feld noch fehlte und der Treiber deshalb auf 'legacy' zurueckuebersetzte). Keine Uebersetzung an der Prozessgrenze (tools/frozen_name_dialect.py).",
   "model_file": "model.onnx",
   "model_source": "models/alphazero_v23-b01_brierbest.onnx (Kopie als models/alphazero_v23-b01_k3p10.onnx)",
   "pth_file": "model.pth",
@@ -39,13 +41,27 @@
     "champion_behavior_artifact": {
       "file": "mosaic_rust_k3p_20260904.whl",
       "source": "engine/target/wheels, gebaut 2026-09-04 19:30 aus Commit 0e87ddd (Projektions-Modus als Spec-Feld)",
-      "role": "Verhalten, auf dem die Elo-Messung 1292 beruht"
+      "role": "Verhalten, auf dem die Elo-Messung 1292 beruht; TATSAECHLICH in venv/ installiert (Worker-Wheel) und zugleich das live installierte Wheel, mit dem die Golden Probe erzeugt wurde.",
+      "sha256": "5ad83093fed6e8cdaa887be22f91a852f52a2522834802ed4f9bde8549879590",
+      "sha256_quelle": "= Hash des am 2026-09-04 19:30 live installierten Wheels (site-packages direct_url.json) UND des in venv/ installierten Wheels; dieses eine Wheel traegt Golden Probe, Elo-Messung und Worker-Verhalten."
     }
   },
   "knobs": "Alle Knoepfe in spec.json; Spielbetrieb: server.py uebersetzt die Spec in Env-Knoepfe (MOSAIC_ENVELOPE_PROJECTED=1, MOSAIC_ENVELOPE_SEARCH_C=1.0, Profil 1,0.92,0.67,0.33,0)",
   "golden_probe": {
     "file": "golden_probe.json",
-    "source": "tools/build_frozen_golden_probe.py --seed-base 916001, gestartet 2026-09-04 20:00; Datei liegt vor, sobald das Werkzeug fertig ist (Pruefen!)"
+    "source": "10 LIVE RefereeGame-Zustaende (state_to_json_exact, tools/build_frozen_golden_probe.py --seed-base 916001, 2 je Runde 1-5, Partie-Seeds 916001+, Sonden-Seeds 916101-916110, sims 400, c_puct 1.5), erzeugt 2026-09-04 20:27:53-20:50 (rund 22 min, Einzelkern) auf dem live installierten Wheel, das byte-identisch zum Artefakt-Wheel ist (sha256 5ad83093fed6e8cdaa887be22f91a852f52a2522834802ed4f9bde8549879590, direct_url.json der site-packages). 1 von 10 Sonden mit pending_dome_choice gesetzt (Runde 1, Aktion dome_rotation 270).",
+    "n_probes": 10,
+    "rounds_covered": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "pending_dome_choice_probes": 1,
+    "sims": 400,
+    "c_puct": 1.5,
+    "note": "Selbsttest gegen einen frisch gestarteten Worker-Prozess in der Artefakt-venv: 10/10 gruen, 0 Abweichungen (tools/frozen_referee_match.py, 2026-09-04 21:00, Handshake gruen efd564d87bac2722, dazu 2 Echtpartien Seeds 900001/900002 fehlerfrei, 327 Schritte in 76 s; evaluations/artifacts/frozen_referee_match_v23-b01_k3p10_selftest.json). Zwei Manifest-Luecken hat der Selbsttest dabei aufgedeckt und sie sind behoben: worker_python.interpreter_relative fehlte (KeyError), name_dialect fehlte (Treiber uebersetzte hv1 -> v1, Wheel wies ab)."
   },
   "parity_fixture": "engine/tests/fixtures/net_parity_champion.txt Hash a274e3ad68f4ad91 (2026-09-04)",
   "display_calibration": {
@@ -68,7 +84,8 @@
     "source": "evaluations/artifacts/gumbel_scale_calibration_v23-b01_k3p10.json"
   },
   "worker_python": {
-    "interpreter_note": "kein venv angelegt (2026-09-04); fuer frozen_referee_match im Artefakt-Modus bei Bedarf venv aus dem Wheel bauen (docs/backup_restore.md, verify_frozen_heuristic --build-venv als Vorbild)"
+    "interpreter_relative": "venv/Scripts/python.exe",
+    "interpreter_note": "Relativ zu diesem Verzeichnis (models/frozen_champions/v23-b01_k3p10/). Windows-venv, Python 3.14, angelegt 2026-09-04 20:55 aus mosaic_rust_k3p_20260904.whl (pip install --no-deps ueber eine Kopie unter kanonischem Dateinamen mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl, weil pip den umbenannten Dateinamen ablehnt; Beleg: sha256 in venv/Lib/site-packages/mosaic_rust-0.1.0.dist-info/direct_url.json = 5ad83093fed6e8cdaa887be22f91a852f52a2522834802ed4f9bde8549879590 = sha256 des Artefakt-Wheels). Nicht versioniert (.gitignore venv/), aus dem Wheel neu herstellbar."
   },
   "prereg": "evaluations/PREREG_geometric_envelope.md par.8.7, 10, 10a, 11"
 }
