@@ -26,15 +26,27 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-04, 21:05 -- Sitzung nach dem Chip-Wechsel von 20:40)
 
-**LAEUFT: NICHTS** (keine Arena, kein Training, keine Sonde; GPU und CPU
-frei). Die vier Dateien des Fehlstarts von 21:27 (Chronik) sind auf
-Nutzer-Freigabe 21:40 entfernt, `data/` ist wieder sauber. **Der Sockel (4.000 Policy-Partien) laeuft seit
-~21:10 auf dem anderen Rechner des Nutzers** (Kontrakt dort `efd564d87bac2722`
-nach `--force-reinstall`; Nutzer: rund 100 min). Manueller restic-Snapshot des Nutzers d775926d (20:53) liegt vor,
-Punkt 3 damit erledigt. Baum: Commits lokal, nicht gepusht (Push
-ist Nutzer-Sache, der pre-push-Hook setzt den Python-DLL-Pfad selbst).
+**LAEUFT: v24-ERZEUGUNG (Nutzer-Freigabe fuer die Value-Laeufe hier;
+Sockel seit ~21:10 auf dem anderen Rechner des Nutzers).** Hier seit **21:31** (Manifest-Zeitstempel 213124) in
+EINER Hintergrundkette: 6.000 argmax (`v23-b01-value-argmax`, Seed 20260905)
+und danach 2.000 gesampelt (`v23-b01-value-sampled`, Seed 20260906), Rezept
+`PREREG_v24_window.md` par.6b' (Umgebung `MOSAIC_STACK_DRAW_RESEARCH=1
+MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0`, threads 11).
+Daneben der **Cache-Watcher** (`build_cache_incremental.py --watch --workers 1`,
+2D/nortv, `MOSAIC_IGNORE_POLICY_TARGET_VALID=1`, `MOSAIC_DATA_EXCLUDE='^selfplay_(hv2|tor2a)'`,
+Ende 30 min nach der letzten neuen Datei) -- Cache-Prereg par.6, Hebel 4.
+**Laufzeiten der Value-Laeufe entstehen damit unter Nebenlast (1 Worker) und
+sind KEINE Planungsgroesse** (`working_rules.md`). Fortschritt am g-Suffix
+in `data/selfplay_v23-b01-value-*.pkl` zaehlen. Referenz ohne Nebenlast:
+3,27 s je Partie (8.7d); gemessen unter Nebenlast nach 20 Partien 0,26 Partien/s
+(3,8 s je Partie) -> rund 8,5 h fuer 8.000 Partien, Ende gegen 06:00
+(Herleitung aus den ersten 20 Partien, nicht gemessen). Der Sockel (4.000 Partien, rund 100 min laut
+Nutzer) kommt danach mit Manifest nach `data/`.
 
-**Champion-Artefakt `models/frozen_champions/v23-b01_k3p10/` ist KOMPLETT
+Die vier Dateien des Fehlstarts von 21:27 (Chronik) sind auf Nutzer-Freigabe
+vor dem Start entfernt worden; der echte Lauf begann bei Null.
+**par.6c Punkte 1 und 2 GRUEN am echten argmax-Manifest** (Chronik 21:50);
+Tor 0 (Punkt 3) nach dem Lauf. **Champion-Artefakt `models/frozen_champions/v23-b01_k3p10/` ist KOMPLETT
 (21:00):** Golden Probe (10 Sonden, 20:27:53-20:50), venv aus dem
 Artefakt-Wheel (nicht versioniert), Referee-Selbsttest 10/10 gruen plus zwei
 Echtpartien (`artifacts/frozen_referee_match_v23-b01_k3p10_selftest.json`),

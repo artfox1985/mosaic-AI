@@ -217,6 +217,19 @@ Dateien und das Manifest kommen danach nach `data/`.
      par.3b.12 (Stopp gegen Degeneration, keine Rate); v23 lag bei 5.629.
    - Reisst Tor 0: kein Training, Vorlage.
 
+### par.6c' GEFAHREN fuer den argmax-Lauf (2026-09-04, 21:50; Chronik `night_run_20260902.md`)
+
+Start 21:31 nach par.6b' (Nutzer-Freigabe; Sockel laeuft seit ~21:10 auf dem
+anderen Rechner des Nutzers, Kontrakt dort `efd564d87bac2722`). Punkt 1:
+`cli_args`-Diff GENAU model / version / seed / per_file; `engine_config`
+Modus 1 und C 1,0 wie 6b', dazu sieben seit dem 30.08. neu exportierte
+Knopf-Felder auf Default (kein Rezeptunterschied; `envelope_reach_w` 0,25
+wirkt nur im Modus 2, `envelope.rs:330`); `contract_hash` gleich. Punkt 2:
+101 von 3.526 Records der ersten zwei Dateien mit `choose_draw_stack_slot`
+(2,86 %) -- Knopf an. Punkt 3 (Tor 0) nach dem Lauf. Cache-Bloecke entstehen
+mitlaufend (`build_cache_incremental.py --watch`, Cache-Prereg par.6), die
+Laufzeit des Laufs ist darum unter Nebenlast gemessen.
+
 ### par.6d Fenster, Traeger und Cache
 
 - **Dateiliste `data/window_v24.txt`** = die 1.745 hv2-Dateien aus
