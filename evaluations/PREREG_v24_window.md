@@ -237,6 +237,15 @@ Chunks 5-599 deterministisch identisch erzeugt. Fuer par.6c Punkt 1 gilt darum
 fuer die Value-argmax-Klasse ZUSAETZLICH erwartet: `cli_args.games` 5950 und
 `cli_args.seed` 20260910 im zweiten Manifest; die Klasse hat zwei Manifeste.
 
+**Nachtrag 23:19, Sockel (Policy-Klasse) GRUEN:** 400 Dateien vom anderen
+Rechner des Nutzers in `data/`, Manifest `manifest_v23-b01-policy_20260904_212036.json`,
+1,481 s je Partie bei threads 11 (Core Ultra 7 255H). Diff gegen die
+v23-Policy-Referenz: `cli_args` genau model / version / seed / per_file
+(`pcr_cheap_sims` in beiden 150, kein Unterschied), `engine_config` wie beim
+Value-Lauf, Kontrakt gleich. Stack-Draw an 30 Dateien 2,87 %. Damit sind
+Punkte 1 und 2 fuer alle drei Laeufe belegt; Punkt 3 (Tor 0) nach den
+Value-Laeufen.
+
 ### par.6d Fenster, Traeger und Cache
 
 - **Dateiliste `data/window_v24.txt`** = die 1.745 hv2-Dateien aus

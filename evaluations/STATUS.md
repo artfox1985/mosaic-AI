@@ -41,8 +41,9 @@ sind KEINE Planungsgroesse** (`working_rules.md`). Fortschritt am g-Suffix
 in `data/selfplay_v23-b01-value-*.pkl` zaehlen. Referenz ohne Nebenlast:
 3,27 s je Partie (8.7d); gemessen unter Nebenlast nach 20 Partien 0,26 Partien/s
 (3,8 s je Partie) -> rund 8,5 h fuer 8.000 Partien, Ende gegen 06:00
-(Herleitung aus den ersten 20 Partien, nicht gemessen). Der Sockel (4.000 Partien, rund 100 min laut
-Nutzer) kommt danach mit Manifest nach `data/`.
+(Herleitung aus den ersten 20 Partien, nicht gemessen). **Der Sockel liegt seit 23:19 in `data/`** (400 Dateien plus Manifest,
+1,48 s je Partie auf dem anderen Rechner; par.6c Punkte 1 und 2 gruen,
+Chronik); der Watcher baut seine Bloecke.
 
 Die vier Dateien des Fehlstarts von 21:27 (Chronik) sind auf Nutzer-Freigabe
 vor dem Start entfernt worden; der echte Lauf begann bei Null.
