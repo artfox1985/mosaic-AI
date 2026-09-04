@@ -48,6 +48,16 @@ Huelle H_end 0,659):
 | K3-O Ownership C 0,5 / 1,0 | 86 / 87 : 80 | 0,475 / 0,470 | H_end 0,660 / 0,665 | kaum Huelle, kostet Punkte 43,9 (8.9a) |
 | Material-Pilot v24 | -- | Value-Klasse 0,726, 50 % Seiten mit voller Spalte (v23 35 %) | -- | Tor 0 fuer b01 @100 vorab belegt (v24 par.7) |
 
+**Nutzer-Entscheid 2026-09-04, 13:20: v24 bekommt KEINE weiteren Arme.**
+v24 traegt Generator b01 @100, Knopf-Kandidat K3-P (Kette D entscheidet),
+Arme b02/b03 (Seeding-Kuratierung, `start_position_seeding` par.7) und die
+Huellen-Wiedervorlage (`geometric_envelope` par.8.9b). Die uebrigen offenen
+Preregs (Stand: 16 OFFEN, 81 ENTSCHIEDEN, 8 UEBERHOLT) werden bei Bedarf in
+v25 und folgenden Generationen bearbeitet; **Ziel des Nutzers: die offenen
+Preregs im Lauf der naechsten Generationen auf rund 7 abarbeiten** -- neue
+Preregs nur gegen geschlossene alte, Arme je Generation so waehlen, dass sie
+Offenes ENTSCHEIDEN.
+
 **Fuer die v24-Erzeugung heisst das (Nutzer-Entscheid):** Generator bleibt
 b01 @100; offen ist, ob K3-P (C 1,0, projiziert) als Rezept-Knopf in die
 Erzeugung geht -- dafuer fehlen die Replikation der Siege und die Frage, ob
