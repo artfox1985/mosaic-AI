@@ -178,6 +178,37 @@ Index: 18 OFFEN, 79 ENTSCHIEDEN, 8 UEBERHOLT. Chronik der letzten Naechte:
 7. **Blockgroesse 5 ist Default in allen fuenf Arena-Werkzeugen** (Nutzer,
    zweiter Vorfall; `working_rules.md`, `pitfalls.md`).
 
+### Prereg-Bestand: Schliessungsvorschlag (Nutzer-Ziel 2026-09-04: 16 OFFEN -> rund 7 ueber v25+)
+
+Stand 2026-09-05 00:05: **16 OFFEN** (die Einhuellenden-Prereg ist seit dem
+Champion-Wechsel ENTSCHIEDEN, Kopf nachgezogen). Vorschlag, was wodurch
+schliesst -- ENTSCHEIDET DER NUTZER, nichts davon ist umgesetzt:
+
+| Prereg | Vorschlag | Wodurch / wann |
+| --- | --- | --- |
+| `v24_window` | bleibt OFFEN bis zur Abnahme | Tor 0/1/2 der Arme b01/b02/b03, Generatorwahl (diese Nacht/morgen) |
+| `v25_window` | bleibt OFFEN | aktiv (Zuschnitt, Spalten-Waechter) |
+| `start_position_seeding` | schliesst mit b03 | Tor 1/2 und Mechanik-Sonde von v24-b03 |
+| `cache_build_time` | ENTSCHIEDEN nach der Nachtkette | Hebel 3 erstmals im Regelbetrieb (Monolith v24); Hebel 2 lebt in `rust_data_layer` weiter |
+| `chance_nodes` | ENTSCHIEDEN | grossteils geliefert, Knopf seit v23 im Rezept; Rest (B1/A1) als Merkposten in der Datei |
+| `r5_solver_split` | ENTSCHIEDEN | Teil A und B entschieden, Trainings-Eingriff seit 2026-09-01 vom Tisch; par.4-Reste als Merkposten |
+| `capacity_sim_frontier` | ENTSCHIEDEN (Teilantwort) oder UEBERHOLT | Warm/Kalt belegt; Frontier-Arm b04 vom Nutzer geparkt (Problem sitzt im Value-Kopf) |
+| `floor_shaping_scale` | UEBERHOLT | Strukturbefund: W und 1/SCALE sind derselbe Knopf, zweimal H0; nur SCALE < 10 waere neu, kein Nutzniesser benannt |
+| `plate_policy_supervision` | UEBERHOLT | der Hebel sitzt in der Suche (K3-P), nicht im Aktions-Signal; Ownership-Kopf geschlossen |
+| `uvfa_plate_regime` | UEBERHOLT | Asym-Korpora geloescht, Regime-Konditionierung durch K3-P-Weg ueberholt |
+| `uncertainty_guided_selfplay` | in `start_position_seeding` falten | Stufe 1 haengt am b03-Befund (par.4d); eigene Datei erst, wenn b03 traegt |
+| `stack_top_feature` | UEBERHOLT (geparkt "Spaeter") | Sichtgleichheit ohne Staerkeziel; als Merkposten in `docs/` statt als Prereg |
+| `rust_data_layer` | bleibt OFFEN (Infrastruktur, Irrtumskosten) oder nach `docs/architecture_reference.md` | Registrierung, kein Auftrag; Ausloesung par.4 |
+| `round_transition_search_sampling` | bleibt OFFEN als v25-Such-Knopf | Kostentor zuerst (par.5), billig zu messen; sonst UEBERHOLT |
+| `special_tile_yield` | bleibt OFFEN als v25-Hebel | Posten lebt (81 % liegen); gehoert zur Gelaender-Familie (8.9b) |
+| `start_dome_choice` | bleibt OFFEN als v25-Hebel | Stufe 0 faellig; Plattenverteilung als genereller Hebel (Nutzer 2026-08-31) |
+
+Ergebnis des Vorschlags: 7 OFFEN (`v24_window` bis zur Abnahme, `v25_window`,
+`start_position_seeding` bis b03, `rust_data_layer`, `round_transition_search_sampling`,
+`special_tile_yield`, `start_dome_choice`), 4 ENTSCHIEDEN, 5 UEBERHOLT/gefaltet.
+Jede Schliessung: Kopf nachziehen, Index generieren, ein Satz Verdikt im
+Dateikoerper (`/mosaic-prereg`).
+
 ### Was als Naechstes ansteht
 
 | Was | Kosten | Anmerkung |
