@@ -85,6 +85,23 @@ Gedaechtnis:
    `v20_2d_opp_brierbest` und ist am 2026-08-28 geschlossen worden).
 
 6. STATUS-Champion-Zeile + history-Kapitel nachziehen.
+7. **Eingefrorenes Artefakt `models/frozen_champions/<neu>/`** (seit v21,
+   `PREREG_agent_encapsulation.md` par.8): `model.onnx`, `model.pth`,
+   `spec.json`, das Wheel, `manifest.json`, `golden_probe.json`
+   (`tools/build_frozen_golden_probe.py --seed-base 916001`, rund 22 min
+   einkernig @400), dann venv aus dem Wheel (pip lehnt umbenannte
+   Wheel-Dateinamen ab: Kopie unter kanonischem Namen installieren,
+   `--no-deps` reicht fuer den Champion-Worker) und der Referee-Selbsttest
+   `tools/frozen_referee_match.py --artifact-dir ... --model-a <Artefakt>/model.onnx --spec-a <Artefakt>/spec.json --n-games 2`
+   (Handshake, Golden-Selbsttest 10/10, zwei Echtpartien). **Das Manifest
+   braucht ZWEI Felder, ohne die der Referee ohne Befund scheitert**
+   (Vorfall 2026-09-04 bei v23-b01_k3p10, drei Anlaeufe):
+   `name_dialect: "hv"` (sonst uebersetzt der Treiber `hv1 -> v1`, und das
+   Wheel weist ab -- sichtbar nur als Broken Pipe) und
+   `worker_python.interpreter_relative: "venv/Scripts/python.exe"` (sonst
+   KeyError). Dazu die Wheel-sha256 und der Beleg, dass das live installierte
+   Wheel dasselbe ist (`site-packages/.../direct_url.json`), sonst ist unklar,
+   auf welchem Wheel die Golden Probe entstand.
 
 **Merkregel aus einem echten Vorfall:** Elo-Fragen am Primaerregister
 `evaluations/elo_history.csv` pruefen, nicht an Chronik-Texten -- eine
