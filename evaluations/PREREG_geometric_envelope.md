@@ -1608,3 +1608,57 @@ erzwingbar, Vollendung nicht") von der Reihen-Seite gesehen: die Reihe ist
 begonnen, aber die Geometrie (Platte) fehlt. Sie gehoert zu Bedingung 1 des
 Schliesskriteriums (par.12: sauber implementiert).
 
+## par.8.14 BAUSTEIN K3-F "REIHE FREIRAEUMEN" (Nutzer-Vorgabe 2026-09-06, 00:32; registriert, nicht gebaut)
+
+**Nutzer, woertlich:** *"es laesst sich ja ablesen ob mit der momentan gelegten
+musterreihe die huelle geschlossen werden kann oder nicht. wenn nicht -> prio
+fuers schliessen dieser reihe damit sie rasch wieder so bespielt werden kann
+um in die huelle zu passen."*
+
+**Das Praedikat "Reihe kann die Huelle noch bedienen" (aus vorhandenen
+Bausteinen):** fuer eine gebundene Musterreihe `r` mit Farbe `c` und die
+Orientierung der bestpassenden Huelle:
+1. Es gibt in Rasterzeile `r` eine Huellenzelle, die `c` heute annimmt
+   (`DomeSpace::accepts`, wie in `projected_occupancy`) -> JA.
+2. Sonst: es gibt in Zeile `r` eine Huellenzelle OHNE Kuppelplatte
+   (`get_space == None`, wie in `projected_occupancy_slot`, K3-P2) UND eine
+   Platte mit `c`-annehmender Zelle an dieser Position kann noch kommen
+   (Vorrat: `dome_pool_mask` / Restpool; Praedikat fuer Platten analog
+   `column_build::cell_is_completable` fuer Steine -- UNGEPRUEFT, ob es das
+   fuer Platten schon gibt) -> JA, mit Wartezeit.
+3. Sonst -> NEIN: die Reihe ist fuer die Huelle verloren, solange sie liegt.
+   Jeder weitere Stein darin und jede Runde Wartezeit blockiert die Zeile.
+
+**Der Term (Vorschlag):** fuer Reihen mit Praedikat NEIN wird das Potential
+umgepolt, von "Huellenbeitrag" auf "Freiraeumen":
+- ihre Masse `k/(r+1)` zaehlt NICHT mehr als Beitrag zur Huelle (heute: 0,
+  weil keine annehmende Huellenzelle; mit K3-P2: `w_slot` auf plattenlosen
+  Zellen -- das waere hier falsch, siehe par.8.13),
+- Steine, die eine solche Reihe VOLLENDEN oder ihr naeherbringen, zaehlen
+  positiv mit `w_flush * k/(r+1)` (Fuellgrad in Stein-Einheiten wie die
+  Projektion, Kosten `r+1` wie ueberall), gleichgueltig, WO der Stein am
+  Rundenende landet -- der Aussen-Abzug von H entfaellt fuer diese Steine
+  (par.8.13 Punkt 2, Nutzer: "auch hier ist es legitim/besser wenn
+  ausserhalb der einhuellenden gelegt wird").
+- Ergebnis: die Suche bevorzugt Draft-Zuege, die die blockierte Reihe
+  schliessen (auch mit "falscher" Farbe fuer die Huelle), damit sie am
+  Rundenende geraeumt wird und in der naechsten Runde wieder fuer die Huelle
+  bespielbar ist. Genau die Prioritaet, die der Nutzer beschreibt.
+
+**Wo es hingehoert:** dieselbe Projektions-Mechanik wie K3-P/K3-P2
+(`envelope.rs`, Zeilen-Schleife ueber `pattern_lines`), als eigener Knopf
+`MOSAIC_ENVELOPE_FLUSH_W` (w_flush, Default 0 = bitidentisch), wirksam in den
+Modi 1 und 4; Spec-Pflichtfeld je Seite, Registry, Paritaets-Gate. Bau rund
+eine Stunde plus cargo test; K3-P2 und K3-F gemeinsam an einem Netz messen
+ist ein Kreuzprodukt -- Reihenfolge: K3-P2 allein, dann K3-F allein, dann
+beide, jeweils mit der Kennzahl "offene lange Reihen am Ende" aus den
+Arena-Records (par.8.13) neben Spalten und Siegen.
+
+**Vorher messen (billig, aus vorhandenen Logs):** wie oft liegt am Rundenende
+eine gebundene Reihe 5/6 mit Praedikat NEIN, wie viele Runden bleibt sie,
+Mensch gegen KI (Server-Logs) -- Ergaenzung der Tiling-Geometrie-Sonde, Lauf
+nach der laufenden Sonde. Ohne diese Zahl ist die Dosis `w_flush` geraten.
+
+**Offen beim Nutzer:** bauen jetzt (Code ohne Rechenlast, cargo test erst im
+CPU-freien Fenster) oder erst nach der Messung.
+
