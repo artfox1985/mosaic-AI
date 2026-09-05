@@ -56,7 +56,7 @@ weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
 | Abnahme b04 | `tools/night_v24_b04_acceptance_744venv.sh` (venv_measure744, 744er-Wheel) | 21:49 | Tor 1 MIT Knopf laeuft seit 00:16 (Stand 00:36: 49:31 nach 40 Paaren); danach ggf. Replikation, dann Tor 2b. Elo-Kante ohne Knopf (218:182) am 2026-09-06 00:45 nachgetragen | rund 02:30 | `models/alphazero_v24-b04_brierbest.onnx`, Champion-Spec, `k3v_off.spec.json` | `tor2a_v24b04*.json`, `paired_gating_result_v24-b04_*`, `paired_arena_env_v24b04_*`, `columns_v24b04_*`, `points_v24b04_vs_b01_s14.json` |
 | Tiling-Geometrie-Sonde | `tools/cpu_queue_after_b04.sh` | 22:xx (wartet) | wartet auf Ende der b04-Abnahme | rund 02:45 | `static/log/game_*.log`, `paired_arena_env_v24b01_vs_b01_*_s14.json` | `tiling_geometry_probe_human.json`, `tiling_geometry_probe_arena.json` |
 | Abnahme b05 | `tools/night_v24_b05_acceptance_wait.sh` (Basis-python, Wheel 744 installiert 00:24) | 00:24 (wartet) | wartet auf freie CPU (b04-Abnahme, Sonde) | Start rund 02:45, Ende rund 06:45 | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
-| Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:08 (wartet) | wartet auf b03-Modell UND freie CPU | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
+| Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:58 (wartet) | wartet auf b03-Modell UND freie CPU; sein Wartemuster kennt Sonde, `cpu_queue_after_b04` und b05-Wartelauf NICHT -- deshalb haelt `tools/night_v24_after_b05_chain_hold.sh` (seit 00:53, Prozess nur wartend) es fest, bis Sonde und b05-Abnahme durch sind (Chronik 00:53) | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
 
 **Baum:** HEAD b472171 plus Uebergabe-Commit; 41 Commits vor origin/main, **kein Push**.
 **`config.py` ist ABSICHTLICH ungetrackt geaendert (INPUT_SIZE 714, HEAD hat 744)**, solange
@@ -93,10 +93,14 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
 3. **Tiling-Geometrie-Sonde auswerten** (`tiling_geometry_probe_human.json`,
    `..._arena.json`): Ergebnis in `PREREG_geometric_envelope.md` par.8.12
    (Mensch gegen KI gegen Loeser: Anteil punkt-bester Abschluss, Punktkosten
-   und Nachbarschaftsgewinn des geometrie-besten). Danach die Sonde um das
-   Reihen-Alter (par.8.13/8.14: gebundene Reihe 5/6 ohne annehmende
-   Huellenzelle, Runden liegen, Mensch gegen KI) ergaenzen und im naechsten
-   CPU-freien Fenster fahren.
+   und Nachbarschaftsgewinn des geometrie-besten). **Die Sonde ist am
+   2026-09-06 00:58 um das Reihen-Alter ERGAENZT** (par.8.13/8.14: Praedikat
+   ja / ja_wartend / nein je gebundener Reihe 5/6 und Rundenende, Episoden mit
+   Alter, voll oder am Ende offen, Aussen-Legen moeglich; additiv in
+   try/except, synthetisch getestet, kein Engine-Lauf) -- der eingereihte Lauf
+   (`cpu_queue_after_b04.sh`) faehrt sie mit; Block `reihen_alter` im selben
+   Artefakt. Beide Teile auswerten und in par.8.12 UND par.8.14 registrieren;
+   DANN K3-F bauen (Nutzer 00:50).
 4. **Mini-Fenster-Test Fall D (Pause)** im naechsten GPU-freien Fenster
    (nach b03): `bash tools/tests/train_resume_pause_test.sh` -- muss GRUEN
    werden (Testhaken `MOSAIC_PAUSE_TEST_STOP_AT_EPOCH` ist gebaut, Lauf fehlt).
