@@ -481,3 +481,18 @@ nicht vom "anders geeicht" zu trennen.
 3. v25-Zuschnitt unveraendert (hv2 sinkt auf 18 %); der Materialmix ist nach
    dieser Analyse NICHT die Ursache (Sockel v24 besser als v23, argmax-Klasse
    spaltenreich, ohne Knopf kein Rueckschritt).
+
+**Nachtrag par.9b, 13:47 -- Tor 1 OHNE Knopf (beide Seiten `k3v_off.spec.json`,
+Seed 20261015, `paired_gating_result_v24-b01_vs_v23-b01_noknob_s15.json`):
+v24-b01 216:184 nach 200 Paaren (harter Deckel, kein SPRT-Entscheid, LLR
++0,90), McNemar p 0,105, gepaarte Differenz +0,16 [-0,02, +0,34], Punkte 45,9
+gegen 43,1, Strafleiste 10,2 gegen 11,1; 6.422 s.** Zusammen mit den Knopf-
+Kanten (83:107): ohne Knopf mindestens gleichauf, mit Knopf klar dahinter --
+die Knopf-Wechselwirkung kostet v24-b01 rund 15 Prozentpunkte Siegquote gegen
+denselben Gegner. Die Ratsche (signifikant besser) ist NICHT genommen; die
+Groessenordnung entspricht der v23-Champion-Kante b01 gegen v21 (214:186).
+Elo-Register: die beiden Knopf-Kanten von heute Morgen sind auf die Knoten
+`v24-b01_k3p10` / `v23-b01_k3p10` umbenannt (Knopf = eigener Spieler,
+Praezedenz Champion-Knoten), die knopflose Kante steht unter `v24-b01` /
+`v23-b01_brierbest`. Offen (CPU-Reihenfolge): argmax v24-b01 bei C 0,5
+(Dosis).
