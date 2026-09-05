@@ -71,7 +71,10 @@ Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
 **Entscheide des Nutzers heute:** v25-Zuschnitt par.1 (hv2-Abbildung par.2
 angenommen; Value-Klasse zu argmax, Zahl 8.000/0 oder 7.000/1.000 offen);
 Prereg-Bestand 9 OFFEN; Sicht-Arm mit 30 Werten; Historie kein Merkposten;
-mehr Sims im Sockel kein Hebel; b03 bleibt 714. **Push:** 2 Commits vor
+mehr Sims im Sockel kein Hebel; b03 bleibt 714; **Richtung je Generation:**
+spaltenverstaerkend UND siegverstaerkend in der Arena, Saettigung erwartet
+bei 1-2 Spalten und rund 100 Punkten, danach Hebel = Gegner stoeren
+(`docs/generation_loop.md`, "Richtung je Generation"). **Push:** 2 Commits vor
 origin/main (Stand 16:50), Push nur auf Anweisung.
 
 **Regeln fuer den Rest des Tages:** kein Training ausser den Ketten, keine

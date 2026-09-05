@@ -147,6 +147,31 @@ Generation erreichbar ist -- die zweite DAgger-Runde war bereits gesaettigt.
 Ein Tor, das Unmoegliches verlangt, wird umgangen; ein Tor gegen Rueckschritt
 haelt.
 
+## Richtung je Generation und erwartete Saettigung (Nutzer 2026-09-05)
+
+**Jede Generation soll in der Arena SPALTENVERSTAERKEND und SIEGVERSTAERKEND
+sein** -- das ist die Richtung, die Tor 1 (Siege) und Tor 2 (Spalten, auf
+beiden Flaechen) gemeinsam absichern; keines der beiden allein reicht
+(Praezedenzfall oben: flach gesucht mehr Spalten und weniger Siege).
+
+**Erwartete Saettigung (Schaetzungen des Nutzers, nicht gemessen):** volle
+Spalten saettigen irgendwo zwischen 1 und 2 je Partie und Seite, die Punkte
+um die 100. Tor 2 ist deshalb als NICHT-FALLEN formuliert: ab der Saettigung
+ist "mehr Spalten" kein erreichbares Ziel mehr, und ein Tor, das dann eine
+Steigerung verlangt, wuerde umgangen.
+
+**Was danach traegt:** ist der eigene Bau gesaettigt, wird das Netz vermutlich
+nur noch besser, indem es den Gegenspieler effektiv STOERT -- Farben aus der
+Auslage nehmen, die er braucht, Kuppelplatten und Bonusplaettchen wegnehmen,
+seine Spalten offen halten. Das ist der Zeitpunkt, an dem Denial-Ideen
+(Bonuschip-Denial, heute zurueckgestellt) vom Nebenposten zum Hebel werden
+und die Kampagnen-Groesse von Tor 2 wechseln kann (der Abschnitt oben sagt
+ausdruecklich: wechselt das Ziel, wechselt die Groesse, das Tor bleibt).
+Messgroesse fuer "stoert effektiv" waere dann die GEGNER-Seite derselben
+Instrumente (Spalten, Punkte, Kuppel-Bonus des Gegners in der Arena), nicht
+die eigene. Heute ist keine der Saettigungen erreicht: v24-b01 baut 0,6-0,7
+volle Spalten je Seite in der Arena bei 45-48 Punkten.
+
 ## Wenn ein Tor reisst
 
 Vorab festgelegt, damit es nicht im Einzelfall verhandelt wird.
