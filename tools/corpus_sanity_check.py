@@ -34,7 +34,7 @@ def ci(v):
     return 1.96 * sd / len(v) ** 0.5
 
 
-def auswerten(verzeichnis, *, pattern="*.pkl"):
+def auswerten(verzeichnis, *, pattern="*.pkl", files=None):
     """Standard-Kennzahlen eines Korpus-Verzeichnisses.
 
     `pattern` (2026-08-30) filtert INNERHALB des Verzeichnisses. Grund: die
@@ -48,7 +48,7 @@ def auswerten(verzeichnis, *, pattern="*.pkl"):
     mit Default `*.pkl`, damit der vorhandene Aufrufer (ebendieser
     stage_arm-Pfad) unveraendert weiterlaeuft.
     """
-    files = sorted(glob.glob(os.path.join(verzeichnis, pattern)))
+    files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(verzeichnis, pattern)))
     partien = {}       # game_id -> letzter Record
     # (game_id, spieler) -> Summe der groessten Strafleisten-Laenge JE RUNDE.
     # ACHTUNG, Fehler vom 2026-08-26: erst stand hier ein Dict mit dem Schluessel
@@ -162,13 +162,26 @@ if __name__ == "__main__":
     ap.add_argument("--pattern", default="*.pkl",
                     help="Dateimuster INNERHALB der Verzeichnisse (Default *.pkl); "
                          "z.B. 'selfplay_v22-b05-value-*.pkl' fuer eine Korpus-Klasse")
+    ap.add_argument("--file-list", default=None,
+                    help="Textdatei mit Dateinamen (eine je Zeile, relativ zum ERSTEN Verzeichnis oder absolut); "
+                         "wertet genau diese Dateien aus statt des Musters. Anlass 2026-09-05: Traeger-Kennzahl "
+                         "des Fensters ueber die 580 Traeger-Dateien des Manifests (PREREG_v25_window.md par.9a).")
     ap.add_argument("--out", default="evaluations/artifacts/corpus_sanity_check.json",
                     help="Artefakt-Pfad; eigener Pfad je Klasse, sonst ueberschreiben "
                          "sich zwei Laeufe gegenseitig")
     args = ap.parse_args()
 
     t0 = time.time()
-    ergebnisse = [auswerten(v, pattern=args.pattern) for v in args.verzeichnisse]
+    if args.file_list:
+        base = args.verzeichnisse[0]
+        names = [l.strip() for l in open(args.file_list, encoding="utf-8") if l.strip() and not l.startswith("#")]
+        files = [n if os.path.isabs(n) else os.path.join(base, n) for n in names]
+        missing = [f for f in files if not os.path.exists(f)]
+        if missing:
+            raise SystemExit(f"--file-list: {len(missing)} Dateien fehlen, z.B. {missing[0]}")
+        ergebnisse = [auswerten(base, pattern=args.pattern, files=files)]
+    else:
+        ergebnisse = [auswerten(v, pattern=args.pattern) for v in args.verzeichnisse]
     wand = time.time() - t0
     print(f"\nLaufzeit {wand:.1f} s")
 
