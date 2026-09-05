@@ -6482,15 +6482,23 @@ mod tests {
         assert_eq!(cfg.envelope_projection_mode, 0);
     }
 
-    /// Promotion 2026-09-04: der Projektions-Modus ist Spec-Feld; 4 wird abgelehnt.
+    /// Promotion 2026-09-04: der Projektions-Modus ist Spec-Feld; ein Wert
+    /// jenseits von `PROJECTION_MODE_MAX` wird abgelehnt (seit K3-P2, 2026-09-05,
+    /// ist 4 gueltig -- geprueft wird `MAX + 1`), und 4 wird angenommen.
     #[test]
     fn search_config_from_spec_file_rejects_projection_mode_out_of_range() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_projmode_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 4, "heuristik_variante": "hv1"}"#).unwrap();
+        let too_big = crate::envelope::PROJECTION_MODE_MAX + 1;
+        std::fs::write(&path, format!(r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": {too_big}, "heuristik_variante": "hv1"}}"#)).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         std::fs::remove_file(&path).ok();
-        assert!(result.expect_err("Modus 4 muss scheitern").contains("envelope_projection_mode"));
+        assert!(result.expect_err("Modus jenseits MAX muss scheitern").contains("envelope_projection_mode"));
+        // K3-P2: Modus 4 ist gueltig und landet unveraendert in der Config.
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 4, "heuristik_variante": "hv1"}"#).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("Modus 4 (K3-P2) ist gueltig");
+        std::fs::remove_file(&path).ok();
+        assert_eq!(cfg.envelope_projection_mode, 4);
     }
 
     /// K3: das Profil muss genau fuenf Zahlen haben.
