@@ -8,7 +8,7 @@
 #   3) config.INPUT_SIZE 744 -> 714 (Nutzer: "lass b03 auf 714"; der Block-Schluessel traegt INPUT_SIZE,
 #      der 714er-Monolith 299283d4df61 liegt), Training v24-b03 (b03-Rezept) im HINTERGRUND (GPU),
 #      --fast-loader nur, wenn 2b GRUEN war
-#   4) parallel auf der CPU: Abnahmen b04, dann b05 (night_v24_acceptance_chain.sh), je danach die
+#   4) parallel auf der CPU: Abnahme b05 (b04 lief vorab in venv_measure744), danach die
 #      Kuppel-Bonus-Sonde auf die Tor-2b-Artefakte
 #   5) nach dem b03-Training: config.INPUT_SIZE zurueck auf 744
 # Aufruf (Projektordner, Hintergrund, ohne Pipe):  bash tools/night_v24_after_b05_chain.sh
@@ -80,7 +80,9 @@ TRAIN_PID=$!
 echo "   b03-Training laeuft (PID $TRAIN_PID); bei Abbruch: derselbe Befehl plus --resume (config muss dabei 714 sein)"
 
 if [ "$ANCHOR_RC" = "0" ]; then
-  for ARM in b04 b05; do
+  # b04 laeuft seit 2026-09-05 22:05 vorab in der Mess-venv venv_measure744 (gleiches Wheel,
+  # Anker unter 744 GRUEN um 22:02); hier nur noch b05.
+  for ARM in b05; do
     echo "== 4) Abnahme $ARM (CPU, parallel zum b03-Training) $(date +%H:%M:%S)"
     bash tools/night_v24_acceptance_chain.sh "$ARM"; rc=$?
     echo "   Abnahme $ARM Exit $rc ($(date +%H:%M:%S))"
