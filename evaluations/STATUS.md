@@ -71,8 +71,9 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
 6. **Offener Nutzer-Entscheid (18:55): Sicht der Suche auf das Tiling.**
    Leitsatz "Drafting muss das Tiling kennen" registriert
    (`architecture_reference.md`, `round_transition_search_sampling` par.7);
-   offen: par.4.2 (Paarungs-Schaerfe) und ob Variante B (Tiling im Blatt,
-   eine Neubefuellung) registriert wird. Bau erst nach den v24-Abnahmen.
+   par.4.2 ENTSCHIEDEN 19:45 als Bauvorgabe (stellungsgebundener Seed der
+   Blatt-Stichprobe, Paarung bleibt); offen nur noch, ob Variante B (Tiling
+   im Blatt, eine Neubefuellung) registriert wird. Bau nach den v24-Abnahmen.
 Noch nicht eingetaktet: argmax v24-b01 bei C 0,5 (Knopf-Dosis, par.9b);
 Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
 2 min GPU, erst wenn keine CPU-Messung laeuft).
