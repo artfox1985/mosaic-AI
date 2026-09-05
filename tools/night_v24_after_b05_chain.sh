@@ -80,8 +80,8 @@ TRAIN_PID=$!
 echo "   b03-Training laeuft (PID $TRAIN_PID); bei Abbruch: derselbe Befehl plus --resume (config muss dabei 714 sein)"
 
 if [ "$ANCHOR_RC" = "0" ]; then
-  # b04 laeuft seit 2026-09-05 22:05 vorab in der Mess-venv venv_measure744 (gleiches Wheel,
-  # Anker unter 744 GRUEN um 22:02); hier nur noch b05.
+  # b04 laeuft seit 2026-09-05 21:49 vorab in der Mess-venv venv_measure744 (gleiches Wheel,
+  # Anker unter 744 GRUEN um 21:45); hier nur noch b05.
   for ARM in b05; do
     echo "== 4) Abnahme $ARM (CPU, parallel zum b03-Training) $(date +%H:%M:%S)"
     bash tools/night_v24_acceptance_chain.sh "$ARM"; rc=$?
