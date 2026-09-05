@@ -392,6 +392,7 @@ class LossSetup:
     ownership_weight: float
     moon_loss_weight: float
     surprise_alpha: float
+    surprise_confidence_min: float
     mse_loss: object
 
 
@@ -522,6 +523,18 @@ def _train_one_epoch(model, dataloader, dataset, optimizer, device, encoder, n_b
                 raw = (kl / kl_mean.clamp(min=1e-6)) ** loss_setup.surprise_alpha
                 # Kappung: ein verrauschtes Ziel darf keinen Batch dominieren.
                 w_surp = raw.clamp(0.25, 4.0)
+                # SICHERHEITS-TOR (v24-b05, PREREG_policy_surprise_weighting.md
+                # par.10, Nutzer 2026-09-05): die Ueberraschung zaehlt nur dort,
+                # wo die SUCHE sich sicher ist -- Top-1 des (geschaerften)
+                # Ziels >= Schwelle. Alle anderen Stichproben behalten Gewicht 1.
+                # Grund: bei 100 Sims mit Wurzelrauschen liegen die groessten
+                # Abweichungen Ziel/Netz in derselben Ecke wie die verrauschtesten
+                # Ziele (v23-b03, alpha 0,5 ohne Tor: Spalten 0,500 gegen 0,631);
+                # das Tor trennt Geschenk von Laerm. 0.0 (Default) = kein Tor,
+                # bit-identisch zum v23-b03-Pfad.
+                if loss_setup.surprise_confidence_min > 0.0:
+                    conf_gate = (targets_p.max(dim=1).values >= loss_setup.surprise_confidence_min)
+                    w_surp = torch.where(conf_gate, w_surp, torch.ones_like(w_surp))
                 # Normierung auf Mittel 1 ueber die gueltigen Samples -- haelt
                 # die Loss-SKALA und damit die effektive Lernrate konstant.
                 # Ohne sie waere der Arm mit einem LR-Wechsel konfundiert.
@@ -1005,7 +1018,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           ranking_loss_weight=0.0, conjunction_head=False, ownership_head_2d=False,
           head_warmstart=True, extra_data_dir=None,
           freeze_trunk=False, cache_file=None, moon_loss_weight=1.0,
-          file_list=None, surprise_alpha=0.0):
+          file_list=None, surprise_alpha=0.0, surprise_confidence_min=0.0):
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
@@ -1228,6 +1241,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # sonst schweigt das Manifest ueber den gefahrenen Arm.
         "moon_loss_weight": moon_loss_weight,
         "surprise_alpha": surprise_alpha,
+        "surprise_confidence_min": surprise_confidence_min,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
         # Schlachtplan A0 Schritt 2c: WELCHE vorab gebaute Cache-Datei benutzt
         # wurde. Der VALIDIERTE Schluessel kommt weiter unten nach
@@ -1726,6 +1740,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         value_weight=effective_value_weight, points_weight=effective_points_weight,
         ownership_weight=effective_ownership_weight, moon_loss_weight=moon_loss_weight,
         surprise_alpha=surprise_alpha,
+        surprise_confidence_min=surprise_confidence_min,
         mse_loss=mse_loss,
     )
     for epoch in range(epochs):
@@ -2574,6 +2589,12 @@ if __name__ == "__main__":
                              "= (KL(Ziel||Netz) / Batch-Mittel)^alpha, gekappt auf [0,25; 4,0] "
                              "und auf Mittel 1 normiert. 0.0 (Default) = bestandsidentisch, "
                              "der Block wird dann ganz uebersprungen.")
+    parser.add_argument("--surprise-confidence-min", type=float, default=0.0,
+                        help="Sicherheits-Tor fuer --surprise-alpha (v24-b05, "
+                             "PREREG_policy_surprise_weighting.md par.10): die Ueberraschungs-"
+                             "gewichtung greift nur bei Stichproben, deren (geschaerftes) Policy-"
+                             "Ziel eine Top-1-Wahrscheinlichkeit >= Schwelle hat; alle anderen "
+                             "behalten Gewicht 1 (vor der Normierung). 0.0 (Default) = kein Tor.")
     parser.add_argument("--moon-loss-weight", type=float, default=1.0,
                         help="Gewicht des Moon-Order-Terms im Policy-Loss (train.py: "
                              "plackett_luce_moon_loss, auf sun_mask gemittelt und auf p_loss "
@@ -2705,4 +2726,5 @@ if __name__ == "__main__":
           head_warmstart=not args.no_head_warmstart, extra_data_dir=args.extra_data_dir,
           freeze_trunk=args.freeze_trunk, cache_file=args.cache_file,
           moon_loss_weight=args.moon_loss_weight, file_list=args.file_list,
-          surprise_alpha=args.surprise_alpha)
+          surprise_alpha=args.surprise_alpha,
+          surprise_confidence_min=args.surprise_confidence_min)
