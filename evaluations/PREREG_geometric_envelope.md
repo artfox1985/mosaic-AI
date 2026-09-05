@@ -1267,3 +1267,13 @@ messen. Zusaetzlich denkbar, nicht registriert: Punkte im Tiling mit
 Punkte ohnehin erst ab Runde 3 fallen; die Obergrenze oben gilt aber auch
 dafuer.
 
+**Nachtrag par.8.10 (14:53), Abgleich mit den Server-Logs und `docs/domain_knowledge.md`
+Abschnitt 2/9:** der Abstand zum Menschen liegt nicht in den Platzierungspunkten
+(54,9 gegen 56,8 je Partie ueber 19 Logs), sondern bei Kuppel-Bonus (8,9 gegen
+1,6) und Endwertung (19,7 gegen 4,2; Spalten 9,6 gegen 0,7, Eckplatten 5,1
+gegen 1,4). Beides ist Geometrie, die die Plattenwahl (Draft) und die
+Spaltenvollendung festlegen -- nicht die Zellwahl im Tiling (Obergrenze oben).
+Der Mechanismus, den der Nutzer sucht, sitzt also bei den Kuppelplatten:
+Typ-Sicht (v24-b04) fuer den Bonus, K3-P2 (8.9b) fuer die Plattenwahl in
+Runde 1-2, K3-P (bestehend) fuer das Material.
+
