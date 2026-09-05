@@ -132,12 +132,12 @@ Traegersatz = neuer Monolith (344 s), Bloecke bleiben.
 ## par.6 Was noch offen ist
 
 1. ~~Nutzer-Entscheid zu par.2~~ gefallen 2026-09-05 (Vorschlag angenommen).
-2. ~~Val-Pool-Regex fuer v25~~ ENTSCHIEDEN 2026-09-05, 20:05 (Nutzer: "par.6
+2. ~~Val-Pool-Regex fuer v25~~ ENTSCHIEDEN 2026-09-05, 18:35 (Nutzer: "par.6
    defaults passen"): analog v24 auf den v24-GENERATOR, also
    `^selfplay_v24-<generator>-` (Dateien heissen nach dem Generator; der
    Name haengt an der Generatorwahl nach den Abnahmen, v24-b01 ist nur der
    Platzhalter).
-3. ~~Startgewicht des v25-Trainings~~ ENTSCHIEDEN 2026-09-05, 20:05: der
+3. ~~Startgewicht des v25-Trainings~~ ENTSCHIEDEN 2026-09-05, 18:35: der
    Generator-Checkpoint (v24-Regel), also das `_brierbest` des gewaehlten
    v24-Arms.
 
@@ -231,7 +231,7 @@ Preis der Verschiebung. **Offen (Nutzer):** 8.000/0 (maximal, Vorschlag) oder
 7.000/1.000 (Streuung teilweise erhalten). Gilt fuer die v25-ERZEUGUNG
 (G-Material); das G-1-Material bleibt, wie es liegt.
 
-### par.9a EINWAND DES NUTZERS zur Value-Klasse (2026-09-05, 20:05): "die Spalten kommen aus der Policy"
+### par.9a EINWAND DES NUTZERS zur Value-Klasse (2026-09-05, 18:35): "die Spalten kommen aus der Policy"
 
 Nutzer: *"bei v25 value klasse bin ich noch nicht vollkommen ueberzeugt. da
 hast gesagt die spalten kommen aus der policy."* Der Einwand trifft die

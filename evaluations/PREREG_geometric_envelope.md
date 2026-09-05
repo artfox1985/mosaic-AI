@@ -1277,7 +1277,7 @@ Der Mechanismus, den der Nutzer sucht, sitzt also bei den Kuppelplatten:
 Typ-Sicht (v24-b04) fuer den Bonus, K3-P2 (8.9b) fuer die Plattenwahl in
 Runde 1-2, K3-P (bestehend) fuer das Material.
 
-## par.8.11 K3-P2 GEBAUT (2026-09-05, 17:45; Nutzer: "ja bau k3-p2"), Messung OFFEN
+## par.8.11 K3-P2 GEBAUT (2026-09-05, 17:22; Nutzer: "ja bau k3-p2"), Messung OFFEN
 
 **Bauform (par.8.9b Baustein 1, exakt wie registriert):** Projektions-Modus
 `envelope_projection_mode = 4` (`MOSAIC_ENVELOPE_PROJECTED=4`,
@@ -1330,7 +1330,7 @@ installiert (744-Kontrakt `20b442a8164f748d`).
 (`points_v24b01_vs_b01_s14.json`, 2 x 80 Partien, beide Seiten K3-P C 1,0):**
 siehe Artefakt; Mensch-Referenz aus den Server-Logs 8,9 je Partie (par.8.10).
 
-## par.12 SCHLIESSKRITERIUM (Nutzer 2026-09-05, 18:05; Kopf wieder OFFEN)
+## par.12 SCHLIESSKRITERIUM (Nutzer 2026-09-05, 17:43; Kopf wieder OFFEN)
 
 Der Kopf stand seit 2026-09-04 23:39 auf ENTSCHIEDEN, weil die urspruengliche
 Frage ("hilft ein geometrisches Gelaender?") mit K3-P bejaht war. Der Nutzer
