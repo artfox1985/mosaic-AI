@@ -246,6 +246,12 @@ Value-Lauf, Kontrakt gleich. Stack-Draw an 30 Dateien 2,87 %. Damit sind
 Punkte 1 und 2 fuer alle drei Laeufe belegt; Punkt 3 (Tor 0) nach den
 Value-Laeufen.
 
+**Nachtrag 2026-09-05, 04:02:** argmax-Klasse komplett (600 Dateien; Tail
+5.950 Partien in 21.937,9 s, 3,687 s je Partie unter Nebenlast). Gesampelter
+Lauf seit 03:46, Punkte 1 und 2 GRUEN (Diff genau model / version / seed /
+per_file, Modus 1 und C 1,0, Kontrakt gleich; Stack-Draw 3,11 %). Damit sind
+Punkte 1 und 2 fuer alle vier Manifeste der Erzeugung belegt.
+
 ### par.6d Fenster, Traeger und Cache
 
 - **Dateiliste `data/window_v24.txt`** = die 1.745 hv2-Dateien aus
