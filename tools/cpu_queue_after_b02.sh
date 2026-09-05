@@ -14,7 +14,16 @@ cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
 
 busy() {
-  powershell -NoProfile -Command "(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match 'night_v24_acceptance_chain' -and \$_.Name -match 'bash' }).Count" 2>/dev/null | tr -d '\r'
+  # Zaehlt Prozesse, deren Kommandozeile auf das Muster passt. Eine LEERE oder
+  # unlesbare Antwort (PowerShell-Fehler, Timeout) heisst NICHT "frei": nach
+  # drei Versuchen 999 zurueckgeben, damit der Aufrufer weiter wartet. Falle
+  # 2026-09-05: ein leerer Wert waere ueber ${n:-0} als 0 = frei gelesen worden.
+  local out
+  for _try in 1 2 3; do
+    out=$(powershell -NoProfile -Command "(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match 'night_v24_acceptance_chain' -and \$_.Name -match 'python|bash|cargo' }).Count" 2>/dev/null | tr -d '\r[:space:]')
+    case "$out" in ''|*[!0-9]*) sleep 5 ;; *) echo "$out"; return 0 ;; esac
+  done
+  echo 999
 }
 
 echo "== 0) Warten auf das Ende der Abnahme-Kette ($(date +%H:%M:%S); Deckel 12 h)"

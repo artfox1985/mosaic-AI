@@ -22,7 +22,16 @@ EOF
 [ $? = 0 ] || { echo "STOPP: Mess-venv liefert nicht das 714er-Champion-Wheel"; exit 81; }
 
 procs() {
-  powershell -NoProfile -Command "(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '$1' -and \$_.Name -match 'python|bash|cargo' }).Count" 2>/dev/null | tr -d '\r'
+  # Zaehlt Prozesse, deren Kommandozeile auf das Muster passt. Eine LEERE oder
+  # unlesbare Antwort (PowerShell-Fehler, Timeout) heisst NICHT "frei": nach
+  # drei Versuchen 999 zurueckgeben, damit der Aufrufer weiter wartet. Falle
+  # 2026-09-05: ein leerer Wert waere ueber ${n:-0} als 0 = frei gelesen worden.
+  local out
+  for _try in 1 2 3; do
+    out=$(powershell -NoProfile -Command "(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '$1' -and \$_.Name -match 'python|bash|cargo' }).Count" 2>/dev/null | tr -d '\r[:space:]')
+    case "$out" in ''|*[!0-9]*) sleep 5 ;; *) echo "$out"; return 0 ;; esac
+  done
+  echo 999
 }
 echo "== 0) Warten auf b03-Modell, Ende der Nachtkette und aller CPU-Messungen ($(date +%H:%M:%S); Deckel 40 h)"
 tick=0
