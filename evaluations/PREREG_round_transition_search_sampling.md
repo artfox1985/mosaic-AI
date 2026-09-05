@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es SPIELSTAERKE, den Rundenuebergang in der Suche als Zufallsknoten zu bemustern (ROUND_TRANSITION_SAMPLING) statt ihn mit einem einzelnen Netz-Blattwert zu bewerten -- und ist der Preis (Durchsatz UND unschaerfere Paarung in gepaarten Arenen) das wert? | Beleg: NICHTS GEMESSEN, nichts gebaut; der Schalter steht seit 2026-07 auf false. Die alte Doc-Sperre bindet nicht (par.2). Vorab benannt sind zwei Kosten: Durchsatz (par.4.1) und Determinismus (par.4.2). Messkette bindend in par.5: Kostentor ZUERST, Staerke danach. 2026-09-05: Nutzer-Leitsatz (Drafting muss das Tiling kennen) und Aufspaltung A/B/C als Vorschlag in par.7; Entscheid par.4.2 offen. -->
+<!-- STATUS: OFFEN | Frage: Bringt es SPIELSTAERKE, den Rundenuebergang in der Suche als Zufallsknoten zu bemustern (ROUND_TRANSITION_SAMPLING) statt ihn mit einem einzelnen Netz-Blattwert zu bewerten -- und ist der Preis (Durchsatz UND unschaerfere Paarung in gepaarten Arenen) das wert? | Beleg: NICHTS GEMESSEN, nichts gebaut; der Schalter steht seit 2026-07 auf false. Die alte Doc-Sperre bindet nicht (par.2). Vorab benannt sind zwei Kosten: Durchsatz (par.4.1) und Determinismus (par.4.2). Messkette bindend in par.5: Kostentor ZUERST, Staerke danach. 2026-09-05: Nutzer-Leitsatz (Drafting muss das Tiling kennen), Aufspaltung A/B/C in par.7; par.4.2 ENTSCHIEDEN als Bauvorgabe (stellungsgebundener Seed der Blatt-Stichprobe: Paarung und Zustands-Determinismus bleiben). Offen: ob Variante B registriert wird. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -119,6 +119,37 @@ sauber -- verkehrt herum. Self-Play ist ohnehin absichtlich zufaellig
 Paarungs-Trennschaerfe fuer diesen Arm hingenommen wird, und ob der
 Paritaets-Hash unter scharfem Schalter ueberhaupt noch gelten soll oder ob
 die Sonde den Schalter explizit aus erzwingt.
+
+**ENTSCHIEDEN 2026-09-05, 19:45 (Nutzer: "ja, trag das als bauvorgabe ein"):
+der Tausch wird NICHT in Kauf genommen, sondern per Bauvorgabe vermieden.**
+Die Stichprobe am Rundenende-Blatt (gezogene Fabrik-Neubefuellung, bei
+Variante A alle N, bei Variante B die eine) zieht ihren Seed NICHT aus dem
+laufenden Suchstrom, sondern **stellungsgebunden**: Seed = Hash des
+Blatt-Zustands (Bretter, Musterreihen, Strafleisten, Chips, Beutel-/Turm-
+Zaehler, Runde, Spieler am Zug) verknuepft mit dem abgeleiteten Such-Seed
+der Partie. Folgen, die dadurch gelten:
+
+| Eigenschaft | Mit stellungsgebundenem Seed |
+| --- | --- |
+| Wiederholbarkeit | bleibt |
+| Zustands-Determinismus (gleiche Stellung -> gleicher Zug, pfadunabhaengig) | **bleibt** (dieselbe Stellung zieht dieselbe Neubefuellung) |
+| Kraft der Paarung | **bleibt** (beide Arme ziehen in derselben Stellung dieselbe Stichprobe) |
+| Paritaetssonde / Hash `8c6684ff` | gilt weiter, ohne den Schalter erzwungen ausschalten zu muessen |
+
+Preis: ein Zustands-Hash je Rundenende-Blatt. Die Engine hat heute KEINE
+Hash-Funktion fuer Zustaende (2026-09-05 gegrept: kein Zobrist, kein
+`state_hash`); Kandidat ist FNV-1a (`lib.rs::fnv1a_64`, bereits fuer den
+Vertragshash im Baum) ueber eine kanonische Serialisierung der oben
+genannten Felder. Kosten UNGEPRUEFT, vermutlich klein gegen den
+Tiling-Loeser, der am selben Blatt laeuft; das Kostentor par.4.1 misst sie
+mit. Schritt 1 der Messkette (par.5) misst die Block-Streuung TROTZDEM gegen
+die Referenz 5,75 Prozentpunkte bei n = 400 -- die Vorgabe ist eine
+Konstruktion, kein Beleg, dass die Streuung wirklich gleich bleibt.
+
+**Bereits gebaute Praezedenz fuer deterministisch gemachte Zufallsschritte in
+der Suche** (nicht stellungsgebunden, aber derselbe Gedanke): Stapel-Peek und
+Rundensimulation mischen den verdeckten Restpool einmalig mit dem Suchstrom
+(net_mcts.rs um 4314, `round_transition_deep::simulate_one_round`).
 
 ### par.4.3 ZUSATZ aus der externen Recherche: robuste Aggregatoren (registriert 2026-08-27)
 
