@@ -59,7 +59,9 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
 4. Danach: Wheel 744 installieren (`engine/target/wheels`, gebaut 13:50,
    Kontrakt `20b442a8164f748d`), Anker-Drift (`verify_frozen_heuristic.py`),
    Abnahmen b03, b04, b05.
-Noch nicht eingetaktet: argmax v24-b01 bei C 0,5 (Knopf-Dosis, par.9b).
+Noch nicht eingetaktet: argmax v24-b01 bei C 0,5 (Knopf-Dosis, par.9b);
+Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
+2 min GPU, erst wenn keine CPU-Messung laeuft).
 
 **Entscheide des Nutzers heute:** v25-Zuschnitt par.1 (hv2-Abbildung par.2
 angenommen; Value-Klasse zu argmax, Zahl 8.000/0 oder 7.000/1.000 offen);
