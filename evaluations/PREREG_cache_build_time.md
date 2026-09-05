@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Hebel verkuerzen den Cache-Bau des Trainings -- und bleibt der Cache BIT-IDENTISCH? | Beleg: Hebel (1)+(4) abgenommen, Bit-Tor gruen, Traeger-Umbau 2026-08-31 (par.7-10). **par.11 (2026-09-01): der Nutzniesser fuer Hebel (3) ist da** -- ein Lauf auf NEUER Fenster-Zusammensetzung kostet 4,98 h einkerniges Zusammenfuegen (v23-b05), gegen 32 s bei Cache-Treffer. Ausweg gebaut und ungenutzt: `--merge-out` plus `train.py --cache-file`. Damit liegt auch die vermisste serielle Vollreferenz vor. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Welche Hebel verkuerzen den Cache-Bau des Trainings -- und bleibt der Cache BIT-IDENTISCH? | Beleg: Hebel (1)+(4) abgenommen, Bit-Tor gruen (par.7-10); Hebel (3) am 2026-09-05 erstmals im Regelbetrieb: v24-Monolith in 450 s zusammengefuegt, Datenaufbau im Training 35,2 s statt 4,98 h (par.12, par.13). Hebel (2) lebt in PREREG_rust_data_layer.md weiter. Nutzer-Entscheid 2026-09-05. -->
 
 # Vorregistrierung: Zeit des Cache-Baus
 
@@ -551,3 +551,7 @@ die 17.934 s (4,98 h) des einkernigen Zusammenfuegens im b05-Lauf (par.11) ist
 das der Faktor 52 auf dem Merge-Schritt; mit Block-Neubau zusammen Faktor
 7,9. Das ist die Zahl, die Hebel (3) gebraucht hat. Ob train.py den so
 benannten Monolithen trifft, steht im b06-Manifest (`datenaufbau_s`).
+
+## par.13 VERDIKT (2026-09-05, Nutzer-Entscheid: "setz die mal auf entschieden")
+
+Alle vier Hebel sind beantwortet: (1) und (4) abgenommen mit Bit-Identitaet (par.7, par.9), (3) im Regelbetrieb der v24-Nachtkette (`tools/night_v24_chain.sh`: Monolith des Trainingsanteils 2.798 Dateien, Schluessel 976b1ef66843, Zusammenfuegen 450,4 s; Datenaufbau im Training v24-b01 35,2 s, `models/manifest_train_v24-b01_20260905_061205.json`), (2) ist als Teil A nach `PREREG_rust_data_layer.md` gewandert. Die Frage dieser Prereg ist damit geschlossen; was am Cache noch offen ist, gehoert zur Datenschicht-Prereg.

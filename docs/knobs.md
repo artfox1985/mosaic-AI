@@ -14,14 +14,14 @@ Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
 trennen "aus, weil noch niemand ihn eingeschaltet hat" von "aus, weil die
 Messung ihn erledigt hat" -- in der Registratur allein sehen die gleich aus.
 
-**60 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
+**64 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
 
 Der Statuskopf sagt ENTSCHIEDEN, aber NICHT die Richtung -- deshalb die
 Trennung nach Default. Kein Loeschauftrag: ein negatives Ergebnis kann
 "falscher Hebel, richtiges Ziel" heissen (`PREREG_long_row_payoff` ist
 genau so ein Fall). Es ist die Liste, an der die Frage stellbar wird.
 
-**Beantwortet UND Default aus (40)** -- hier lohnt die Nachfrage,
+**Beantwortet UND Default aus (41)** -- hier lohnt die Nachfrage,
 ob der Knopf noch etwas offen haelt:
 
 - `MOSAIC_POINTS_UTILITY_W` (ENTSCHIEDEN, PREREG_task28_aggression.md)
@@ -49,6 +49,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_TILING_SELECT` (ENTSCHIEDEN, PREREG_t37_tiling_criterion.md)
 - `MOSAIC_TILING_PLATTEN_W` (ENTSCHIEDEN, PREREG_placement_side.md)
 - `MOSAIC_OWNERSHIP_CONJ` (ENTSCHIEDEN, PREREG_conjunction_terms.md par.4)
+- `MOSAIC_STACK_DRAW_RESEARCH` (ENTSCHIEDEN, PREREG_chance_nodes.md)
 - `MOSAIC_ASYM_VORZUG` (ENTSCHIEDEN, PREREG_asymmetric_curriculum.md par.3)
 - `MOSAIC_PROFILE_SELFPLAY` (ENTSCHIEDEN, PREREG_gpu_offloading.md)
 - `MOSAIC_SPALTENBAU` (ENTSCHIEDEN, PREREG_provocation.md par.11ff)
@@ -65,7 +66,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_CACHE_NOPACK` (ENTSCHIEDEN, PREREG_v21_window.md)
 - `MOSAIC_VAL_POOL` (ENTSCHIEDEN, PREREG_v22_window.md par.6)
 
-**Beantwortet, Default AN (20)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
+**Beantwortet, Default AN (23)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
 
 - `MOSAIC_GUMBEL_C_SCALE` = 1.0 (ENTSCHIEDEN, PREREG_prior_blind_spot.md par.G3)
 - `MOSAIC_FLOOR_SHAPING_W` = 0.3 (ENTSCHIEDEN, PREREG_search_path_remeasurements.md M1)
@@ -81,6 +82,9 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_ENVELOPE_REACH_W` = 0.25 (ENTSCHIEDEN, PREREG_geometric_envelope.md par.8.9)
 - `MOSAIC_PHASE_STAGE` = both (ENTSCHIEDEN, PREREG_heuristic_v2_long_rows.md par.14)
 - `MOSAIC_PHASE_PEAK` = 2.5 (nur wirksam wenn MOSAIC_PHASE_AMP gesetzt) (ENTSCHIEDEN, PREREG_heuristic_v2_long_rows.md par.13)
+- `MOSAIC_R5_CHANCE_NODES` = an (=0 Altverhalten) (ENTSCHIEDEN, PREREG_chance_nodes.md)
+- `MOSAIC_R5_NET_SOLVER` = an (=0 Gegenprobe Netz) (ENTSCHIEDEN, PREREG_chance_nodes.md Teil E)
+- `MOSAIC_R5_NODE_BUDGET` = 200 (ENTSCHIEDEN, PREREG_chance_nodes.md)
 - `MOSAIC_INTERLEAVE_BATCH_MAX` = 128 (= EVAL_BATCH_MAX_N) (ENTSCHIEDEN, PREREG_async_search.md)
 - `MOSAIC_INTERLEAVE_FILL_TIMEOUT_US` = 200 (ENTSCHIEDEN, PREREG_async_search.md)
 - `MOSAIC_TILING_PLATTEN_GEW` = 1.0 (1 oder 8 Werte) (ENTSCHIEDEN, PREREG_placement_side.md)
@@ -130,9 +134,9 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_PHASE_STAGE` | both | diagnose | ENTSCHIEDEN | Auf welchen Entscheidungsstellen der Phasenfaktor wirkt: draft/tiling/both (plate_builder.rs::phase_wirkt_auf) -- trennt Rang-Entscheidung im Drafting von der Summen-Entscheidung im Tiling | PREREG_heuristic_v2_long_rows.md par.14 |
 | `MOSAIC_PHASE_AMP` | unset (= feste Tabelle SPALTEN_PHASE) | diagnose | ENTSCHIEDEN | Gipfelhoehe des Phasenfaktors auf die Spalten-Stufen der v2-Zielkarte (plate_builder.rs::spalten_phase); 1.0 = wirkungslos, dient im Sweep als Nullpunkt | PREREG_heuristic_v2_long_rows.md par.13 |
 | `MOSAIC_PHASE_PEAK` | 2.5 (nur wirksam wenn MOSAIC_PHASE_AMP gesetzt) | diagnose | ENTSCHIEDEN | Gipfel-Runde des Phasenfaktors (plate_builder.rs::spalten_phase) | PREREG_heuristic_v2_long_rows.md par.13 |
-| `MOSAIC_R5_CHANCE_NODES` | an (=0 Altverhalten) | aktiv | OFFEN | Zufallsknoten fuer verdeckte Bonuschips im R5-Loeser, scharf seit 2026-08-10 (round5.rs:159) | PREREG_chance_nodes.md |
-| `MOSAIC_R5_NET_SOLVER` | an (=0 Gegenprobe Netz) | aktiv | OFFEN | Netzpfad nutzt in Runde 5 den exakten Loeser statt des Netz-Blattwerts (round5.rs:183) | PREREG_chance_nodes.md Teil E |
-| `MOSAIC_R5_NODE_BUDGET` | 200 | aktiv | OFFEN | Knotenbudget je R5-Entscheidung (round5.rs:199, NODE_BUDGET round5.rs:88) | PREREG_chance_nodes.md |
+| `MOSAIC_R5_CHANCE_NODES` | an (=0 Altverhalten) | aktiv | ENTSCHIEDEN | Zufallsknoten fuer verdeckte Bonuschips im R5-Loeser, scharf seit 2026-08-10 (round5.rs:159) | PREREG_chance_nodes.md |
+| `MOSAIC_R5_NET_SOLVER` | an (=0 Gegenprobe Netz) | aktiv | ENTSCHIEDEN | Netzpfad nutzt in Runde 5 den exakten Loeser statt des Netz-Blattwerts (round5.rs:183) | PREREG_chance_nodes.md Teil E |
+| `MOSAIC_R5_NODE_BUDGET` | 200 | aktiv | ENTSCHIEDEN | Knotenbudget je R5-Entscheidung (round5.rs:199, NODE_BUDGET round5.rs:88) | PREREG_chance_nodes.md |
 | `MOSAIC_ORT_CUDA_ENABLED` | aus | aktiv | ENTSCHIEDEN | Weg B: ORT-CUDA-Backend fuer eval_batch; wirkt nur mit Feature ort_cuda_probe (net_ort.rs:132) | PREREG_gpu_inference_path.md par.11 |
 | `MOSAIC_INTERLEAVE_ENABLED` | aus | aktiv | ENTSCHIEDEN | Weg V: Sammel-Faden-Verschraenkung mehrerer Suchfaeden zu einem Batch (net_batcher.rs:217) | PREREG_async_search.md |
 | `MOSAIC_INTERLEAVE_BATCH_MAX` | 128 (= EVAL_BATCH_MAX_N) | aktiv | ENTSCHIEDEN | Obergrenze der Sammel-Fuellung je eval_batch-Aufruf (net_batcher.rs, configured_batch_max) | PREREG_async_search.md |
@@ -145,7 +149,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_TILING_PUNKTE_W` | 0.0 (aus) | aktiv | - | Punkte-Kopf-Blend im Netz-Tiling-Stichentscheid; gemessen wirkungslos (self_play.rs:985; archive/history.md:10715) | - |
 | `MOSAIC_OWNERSHIP_TILING_W` | 0.0 (aus) | aktiv | ENTSCHIEDEN/UEBERHOLT | Ownership-Pol der Tiling-Zugwahl R1-4: marginale Feldwerte aus der Wurzelkarte, additiv zum Plattenterm (tiling_solver.rs, ownership_tiling_weight) | PREREG_heuristic_v2_long_rows.md par.3b.6 (vorher PREREG_ownership_consumer.md par.3) |
 | `MOSAIC_OWNERSHIP_CONJ` | 0 (aus, Produktform) | aktiv | ENTSCHIEDEN | FORMumschaltung, keine Dosis: die konjunktiven Kriterien (k0/k1/k2/k3/k5/k7) kommen aus den gelernten Konjunktions-Atomen statt aus dem Produkt der Feldwahrscheinlichkeiten; additive k4/k6 bleiben auf den Feldlabels. Braucht den 140er-Kopf, sonst Rueckfall MIT Warnung (shaping.rs, ownership_conj) | PREREG_conjunction_terms.md par.4 |
-| `MOSAIC_STACK_DRAW_RESEARCH` | aus | diagnose | OFFEN | Stapelzug nicht sammelaufloesen: nur der Peek wird angewandt, danach neue Suche (self_play.rs:609) | PREREG_chance_nodes.md |
+| `MOSAIC_STACK_DRAW_RESEARCH` | aus | diagnose | ENTSCHIEDEN | Stapelzug nicht sammelaufloesen: nur der Peek wird angewandt, danach neue Suche (self_play.rs:609) | PREREG_chance_nodes.md |
 | `MOSAIC_ASYM_VORZUG` | aus | diagnose | ENTSCHIEDEN | Baustein 1 (Arm S): je Self-Play-Partie bekommt GENAU EINE Seite den Bauer-Vorzug (vorzug:true), Seitenwahl deterministisch aus dem Partie-Seed 50/50; dome_preference faehrt in derselben Kette mit (self_play.rs, asym_preference_active/asym_preference_side) | PREREG_asymmetric_curriculum.md par.3 |
 | `MOSAIC_PROFILE_SELFPLAY` | aus (nur =1) | diagnose | ENTSCHIEDEN | Self-Play-Zeitprofil je Kategorie (profiling.rs:493) | PREREG_gpu_offloading.md |
 | `MOSAIC_DATA_DIR` | <repo>/data | aktiv | ENTSCHIEDEN | Korpus-Ordner-Override fuer train/self_play/server (config.py:28; Kommentar-Erwaehnung net_mcts.rs:177) | PREREG_corpus_dose.md |

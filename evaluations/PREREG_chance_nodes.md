@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: Grossteils geliefert, Rest geparkt (Teil B1 und A1, par.14). Scharf: R5-Zufallsknoten seit 2026-08-10 (Vorzeichen-Sonde H0). Entscheidungsregel 4 am 2026-08-30 auch fuer den NETZ-Pfad entschieden: Knopf EIN fuer die v22-b05-Erzeugung -- kein Staerkeverlust (77:68 gepaart, Punkte Block-t 2,04) und 136 von 136 Slot-Zielen gueltig gegen 0 vorhandene ohne Knopf (par.15). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: Grossteils geliefert: R5-Zufallsknoten scharf seit 2026-08-10, Stack-Draw-Knopf seit der v23-Erzeugung im Rezept (par.15, v24 ebenso). Rest (Teil B1, A1) geparkt als Merkposten par.14. Nutzer-Entscheid 2026-09-05. -->
 
 # Vorregistrierung: Wahrscheinlichkeiten statt Welten (Zufallsknoten)
 
@@ -1123,3 +1123,7 @@ also. Regel 3 bleibt unberuehrt: `MOSAIC_STACK_DRAW_CHANCE` ist NICHT gesetzt.
 **Erzeugte Messdaten** (Loeschkandidaten, gehoeren NICHT ins v23-Fenster):
 `data/selfplay_sdrb05an_*.pkl` und `data/selfplay_sdrb05aus_*.pkl`, je 40
 Partien, plus die zugehoerigen `data/manifest_sdrb05*.json`.
+
+## VERDIKT (2026-09-05, Nutzer-Entscheid: "setz die mal auf entschieden")
+
+Die Frage ist beantwortet, soweit sie einen Verbraucher hat: R5-Zufallsknoten und Stack-Draw-Knopf sind gebaut, gemessen und im Erzeugungsrezept (v23, v24: `MOSAIC_STACK_DRAW_RESEARCH=1`, Stack-Draw-Kontrolle 2,9-3,1 % der Records). Die geparkten Teile B1 und A1 (par.14) bleiben als Merkposten in dieser Datei; wer sie aufnimmt, registriert sie neu.
