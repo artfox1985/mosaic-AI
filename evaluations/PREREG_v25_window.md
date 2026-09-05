@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v25-Trainingsfenster zugeschnitten (stationaere Rotation aus docs/window_generation.svg, G = v24), und wie wird dabei der Spaltenbau gegen schleichendes Verlernen gesichert? | Beleg: Zuschnitt vom Nutzer festgelegt (2026-09-04, 21:50), nichts gebaut: Sockel 4.000 G + 1.350 G-1 + 450 G-2, Schwarm 8.000 G + 8.000 G-1 + 2.650 Sockel-Rest G-1 + 3.550 + 1.450 G-2 (par.1); hv2 als G-2 braucht eine Uebergangsabbildung wie v21 (par.2, Vorschlag); Manifest-Generator braucht eine seedbare Teilauswahl je Klasse (par.3); Spalten-Waechter auf drei Flaechen (par.7). Bedingung: v24 nimmt die Champion-Kante, sonst Generatorwahl-Regel (par.4). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v25-Trainingsfenster zugeschnitten (stationaere Rotation aus docs/window_generation.svg, G = v24), und wie wird dabei der Spaltenbau gegen schleichendes Verlernen gesichert? | Beleg: Zuschnitt vom Nutzer festgelegt (2026-09-04, 21:50), nichts gebaut: Sockel 4.000 G + 1.350 G-1 + 450 G-2, Schwarm 8.000 G + 8.000 G-1 + 2.650 Sockel-Rest G-1 + 3.550 + 1.450 G-2 (par.1); hv2-Uebergangsabbildung ENTSCHIEDEN (par.2: 45 Traeger + 135 Ex-Traeger + 365 Schwarm); Manifest-Generator --pick gebaut (par.3); Spalten-Waechter auf drei Flaechen (par.7). Bedingung: v24 nimmt die Champion-Kante, sonst Generatorwahl-Regel (par.4). -->
 
 # Vorregistrierung: das v25-Trainingsfenster
 
@@ -46,7 +46,7 @@ dieselbe Groesse wie das v24-Fenster (`PREREG_v24_window.md` par.6d: 2.945
 Dateien). Traegeranteil 5.800 wie v24. Der hv2-Anteil faellt von 17.450 auf
 5.450 Partien; G-3 und aelter (hier: nichts mehr) rotieren vollstaendig aus.
 
-## par.2 hv2 als G-2: Uebergangsabbildung (VORSCHLAG, Nutzer-Entscheid offen)
+## par.2 hv2 als G-2: Uebergangsabbildung (ENTSCHIEDEN 2026-09-05, 10:45 -- Nutzer: "nimm deinen vorschlag aus par.2")
 
 Die Diagramm-Zahlen setzen voraus, dass G-2 ein Zwei-Klassen-Korpus mit
 4.000-Sockel war: Sockel-Rest G-2 = 4.000 - 450 = 3.550. **hv2 hatte im
@@ -69,8 +69,9 @@ Praktisch sind Sockel-Rest G-2 und Schwarm G-2 beide maskiert und beide hv2;
 die Trennung ist Buchfuehrung: 45 Traeger plus 500 maskierte hv2-Dateien,
 davon 135 ehemalige Traeger und 365 aus dem bisherigen Schwarm. Alle 545 aus
 `data/window_v23_hv2.txt` (1.745 Dateien), Auswahl mit festem Seed, damit die
-Liste reproduzierbar ist. **Alternative**, falls der Nutzer die Ex-Traeger
-lieber ganz ausrotieren will: 45 Traeger plus 500 aus dem bisherigen Schwarm.
+Liste reproduzierbar ist. Die Alternative (45 Traeger plus 500 nur aus dem
+bisherigen Schwarm) ist vom Nutzer NICHT gewaehlt worden; es gilt die Tabelle
+oben: 45 + 135 + 220 + 145 = 545 hv2-Dateien.
 
 ## par.3 Werkzeug-Luecke: seedbare Teilauswahl je Klasse
 
@@ -130,7 +131,7 @@ Traegersatz = neuer Monolith (344 s), Bloecke bleiben.
 
 ## par.6 Was noch offen ist
 
-1. Nutzer-Entscheid zu par.2 (welche 500 maskierten hv2-Dateien).
+1. ~~Nutzer-Entscheid zu par.2~~ gefallen 2026-09-05 (Vorschlag angenommen).
 2. Val-Pool-Regex fuer v25 (v24: `^selfplay_v23-b01-`; v25 analog
    `^selfplay_v24-b01-`, Dateien heissen nach dem Generator).
 3. Startgewicht des v25-Trainings (v24-Regel: der Generator-Checkpoint).
