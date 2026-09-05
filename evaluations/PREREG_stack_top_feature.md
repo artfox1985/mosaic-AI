@@ -1,4 +1,4 @@
-<!-- STATUS: UEBERHOLT | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | Beleg: Nichts gebaut; Ziel war Sichtgleichheit (offen liegende Rueckseite der obersten Stapelplatte), kein Staerkeziel. Geparkt seit 2026-08-20; als Merkposten nach docs/architecture_reference.md verschoben (2026-09-05). Nutzer-Entscheid 2026-09-05: UEBERHOLT. -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | Beleg: nichts gebaut. Ziel ist SICHTGLEICHHEIT, kein Staerkegewinn (Nutzer 2026-08-20, bekraeftigt 2026-09-05: am 2026-09-05 kurz auf UEBERHOLT gesetzt und auf Nutzer-Anweisung wieder geoeffnet). Stufe 0 Sicht-Inventar (par.5), Stufe 1 additiver Input-Zuschnitt (par.6); Prioritaet Arbeitskreis "Spaeter". -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -210,6 +210,11 @@ Teil A1) zu heben — dieselbe blinde Zone am Kuppelstapel, zwei Seiten:
 dieses Merkmal gibt dem NETZ die oberste Rueckseite, B1 gibt der SUCHE
 die korrekte Ein-Schritt-Erwartung am Peek.
 
-## VERDIKT (2026-09-05, Nutzer-Entscheid: "durchfuehren wie vorgeschlagen")
+## Nachtrag 2026-09-05: kurz geschlossen, auf Nutzer-Anweisung WIEDER OFFEN
 
-UEBERHOLT als Prereg, erhalten als Merkposten: Sichtgleichheit zwischen Spieler und Netz bleibt ein berechtigtes Ziel, hat aber kein Staerke-Kriterium und keinen Arm. Das Sicht-Inventar (par.5) und der additive Input-Zuschnitt (par.6) stehen als Merkposten in docs/architecture_reference.md; wer sie baut, registriert neu.
+Am 2026-09-05 um 11:05 war diese Datei im Zuge der Prereg-Bereinigung auf
+UEBERHOLT gesetzt worden (Begruendung: kein Staerkeziel). Der Nutzer hat das
+um 11:15 zurueckgenommen: *"da geht es nicht um staerke sondern um
+sichtgleichheit."* Sichtgleichheit ist das Kriterium dieser Prereg (par.1),
+nicht Elo; sie bleibt OFFEN mit der Prioritaet aus par.9. Der Merkposten in
+`docs/architecture_reference.md` verweist hierher zurueck.

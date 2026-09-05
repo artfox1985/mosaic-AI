@@ -124,7 +124,9 @@ gefehlt: die Kanalzahl war beim Uebertrag ueberholt (siehe unten).
 Hierher wandert, was als Prereg keinen Verbraucher mehr hat, aber nicht
 vergessen werden soll. Wer einen Punkt aufnimmt, registriert ihn neu.
 
-- **Sichtgleichheit Spieler/Netz** (`PREREG_stack_top_feature.md`, UEBERHOLT):
+- **Sichtgleichheit Spieler/Netz** (`PREREG_stack_top_feature.md`, OFFEN --
+  Nutzer 2026-09-05: Sichtgleichheit ist das Ziel, nicht Staerke; der Eintrag
+  hier ist nur der Zeiger):
   die offen liegende Rueckseite der obersten Kuppelstapel-Platte sieht der
   Spieler am Tisch, das Netz nicht (par.3 dort). Stufe 0 waere ein
   Sicht-Inventar in beide Richtungen (par.5), Stufe 1 ein ADDITIVER

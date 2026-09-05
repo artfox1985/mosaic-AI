@@ -159,11 +159,11 @@ Index: 18 OFFEN, 79 ENTSCHIEDEN, 8 UEBERHOLT. Chronik der letzten Naechte:
 
 ### Prereg-Bestand
 
-Stand 2026-09-05, 11:05: **7 OFFEN** (Nutzer-Ziel erreicht): `v24_window`,
-`v25_window`, `start_position_seeding`, `special_tile_yield`,
-`start_dome_choice`, `round_transition_search_sampling`, `rust_data_layer`.
-Am 2026-09-05 vier auf ENTSCHIEDEN und fuenf auf UEBERHOLT/gefaltet gesetzt
-(`PREREG_INDEX.md`).
+Stand 2026-09-05, 11:15: **8 OFFEN**: `v24_window`, `v25_window`,
+`start_position_seeding`, `special_tile_yield`, `start_dome_choice`,
+`round_transition_search_sampling`, `rust_data_layer`, `stack_top_feature`
+(Nutzer: Sichtgleichheit, kein Staerkeziel, bleibt offen). Am 2026-09-05 vier
+auf ENTSCHIEDEN und vier auf UEBERHOLT/gefaltet gesetzt (`PREREG_INDEX.md`).
 
 ### Was als Naechstes ansteht
 
