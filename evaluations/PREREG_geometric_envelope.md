@@ -1608,7 +1608,7 @@ erzwingbar, Vollendung nicht") von der Reihen-Seite gesehen: die Reihe ist
 begonnen, aber die Geometrie (Platte) fehlt. Sie gehoert zu Bedingung 1 des
 Schliesskriteriums (par.12: sauber implementiert).
 
-## par.8.14 BAUSTEIN K3-F "REIHE FREIRAEUMEN" (Nutzer-Vorgabe 2026-09-06, 00:32; registriert, nicht gebaut)
+## par.8.14 BAUSTEIN K3-F "REIHE FREIRAEUMEN" (Nutzer-Vorgabe 2026-09-06, 00:32; registriert, Bau NACH der Messung, Nutzer 00:50)
 
 **Nutzer, woertlich:** *"es laesst sich ja ablesen ob mit der momentan gelegten
 musterreihe die huelle geschlossen werden kann oder nicht. wenn nicht -> prio
@@ -1659,6 +1659,10 @@ eine gebundene Reihe 5/6 mit Praedikat NEIN, wie viele Runden bleibt sie,
 Mensch gegen KI (Server-Logs) -- Ergaenzung der Tiling-Geometrie-Sonde, Lauf
 nach der laufenden Sonde. Ohne diese Zahl ist die Dosis `w_flush` geraten.
 
-**Offen beim Nutzer:** bauen jetzt (Code ohne Rechenlast, cargo test erst im
-CPU-freien Fenster) oder erst nach der Messung.
+**ENTSCHIEDEN (Nutzer 2026-09-06, 00:50, woertlich "bau k3 f nach der
+messung"):** Bau ERST nach der Messung. Reihenfolge damit: (1) Tiling-
+Geometrie-Sonde um Alter und Haeufigkeit blockierter Reihen 5/6 (Praedikat
+NEIN) ergaenzen, Mensch gegen KI, Lauf im naechsten CPU-freien Fenster;
+(2) Zahlen hier in par.8.14 registrieren; (3) dann K3-F bauen (Dosis
+`w_flush` aus der Messung, nicht geraten).
 
