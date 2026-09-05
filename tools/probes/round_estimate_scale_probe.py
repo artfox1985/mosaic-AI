@@ -121,6 +121,7 @@ def main() -> int:
     t0 = time.time()
     samples: list = []
     games_done = 0
+    diverged: list = []
     with tempfile.TemporaryDirectory() as tmp:
         for path in a.artifact:
             art = json.load(open(path, encoding="utf-8"))
@@ -129,7 +130,16 @@ def main() -> int:
             if a.limit:
                 lst = lst[:a.limit]
             for i, sp in enumerate(lst):
-                n = replay_collect(sp, tmp, games_done, mr, samples)
+                before = len(samples)
+                try:
+                    replay_collect(sp, tmp, games_done + len(diverged), mr, samples)
+                except RuntimeError as e:
+                    # Replay-Divergenz (Chip-Plan nicht rekonstruierbar): Partie
+                    # auslassen, ihre Teil-Zustaende verwerfen, zaehlen -- wie
+                    # `arena_column_probe` (Feld `divergiert`), nicht abbrechen.
+                    del samples[before:]
+                    diverged.append({"artefakt": path, "index": i, "grund": str(e)[:160]})
+                    continue
                 games_done += 1
                 if games_done % 10 == 0:
                     print(f"  {games_done} Partien, {len(samples)} Draft-Zustaende ({time.time() - t0:.0f}s)", flush=True)
@@ -137,7 +147,8 @@ def main() -> int:
     for s in samples:
         by_round[s["round"]].append(s)
     out = {"prereg": "PREREG_round_estimate_leaf_term.md par.4", "artefakte": a.artifact,
-           "partien": games_done, "draft_zustaende": len(samples), "je_runde": {}}
+           "partien": games_done, "divergiert": len(diverged), "divergenzen": diverged,
+           "draft_zustaende": len(samples), "je_runde": {}}
     all_abs = []
     for r in sorted(by_round):
         rows = by_round[r]
@@ -168,7 +179,7 @@ def main() -> int:
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
     with open(a.out, "w", encoding="utf-8", newline="\n") as fh:
         json.dump(out, fh, ensure_ascii=False, indent=1)
-    print(f"Artefakt: {a.out}")
+    print(f"Partien {games_done}, divergiert {len(diverged)} | Artefakt: {a.out}")
     return 0
 
 
