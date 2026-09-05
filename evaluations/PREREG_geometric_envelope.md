@@ -1309,9 +1309,10 @@ gebundene Reihe 2 ohne Platte -> `H_slot = 1/56`, mit passender Platte ->
 (`envelope_slot_w`), Spec-Datei `models/k3p2_c10.spec.json` (Champion-Spec
 mit Modus 4, C 1,0). Der Vertragshash aendert sich NICHT (er haengt nur an
 INPUT_SIZE, Planes, Aktionen, Koepfen; lib.rs `contract_canonical_string`).
-**`cargo test` und Wheel stehen aus** (Rechenlast neben der laufenden
-b02-Abnahme verboten); das Wheel wird ohnehin erst nach den v24-Trainings
-installiert (744-Kontrakt `20b442a8164f748d`).
+**`cargo test` GRUEN (21:01, 522 Tests, darunter der neue Modus-4-Test; der Spec-Waechter-Test
+musste von 'Modus 4 scheitert' auf 'MAX+1 scheitert, 4 wird angenommen' umgestellt werden),
+Wheel 744 mit K3-P2 gebaut 21:01 (`engine/target/wheels`), Installation ueber die Nachtkette
+nach dem b05-Training (744-Kontrakt `20b442a8164f748d`).
 
 **Messplan (vorregistriert, Knopf = eigener Spieler wie beim Champion-Knoten):**
 1. argmax-Instrument @400, 200 Partien, Seed 20260931, am Siegernetz der
