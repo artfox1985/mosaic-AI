@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | Beleg: Stufe 0 GEFAHREN 2026-09-05 (par.10): acht Asymmetrien, alle Netz-sieht-weniger; gewichtigste NEU: Typ (Wild/Spezial) der drei ausliegenden Kuppelplatten, nicht ableitbar (Design 2 = Design 8 in den Farben, dome.rs:211/217); Stapel-Rueckseite (par.3) bestaetigt; Netz sieht nichts Verdecktes. Eingetaktet als v24-Arm v24-b04 (Sicht-Arm, +8 Flachwerte, INPUT_SIZE 714 -> 722), Bau nach dem b03-Training. Kriterium Sichtgleichheit, nicht Staerke (Nutzer 2026-09-05). -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | Beleg: Stufe 0 GEFAHREN 2026-09-05 (par.10): acht Asymmetrien, alle Netz-sieht-weniger; gewichtigste NEU: Typ (Wild/Spezial) der drei ausliegenden Kuppelplatten, nicht ableitbar (Design 2 = Design 8 in den Farben, dome.rs:211/217); Stapel-Rueckseite (par.3) bestaetigt; Netz sieht nichts Verdecktes. Eingetaktet als v24-Arm v24-b04 (Sicht-Arm: Plattentyp 8, Strafleisten-Farben 10, Phantom-Anteile 12 = +30 Flachwerte, INPUT_SIZE 714 -> 744), Bau nach dem b03-Training. Kriterium Sichtgleichheit, nicht Staerke (Nutzer 2026-09-05). -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -247,9 +247,9 @@ GUI `static/js/app.js`, Regeln `docs/engine_manual.md`.
    -- alles Relevante liegt am Brett, das Log dient dem Menschen zur
    Nachschau der KI-Zuege; eine Historie im Eingang bringt nichts.
 5. Farben der Strafleisten-Fliesen (`features.rs:212-213` nur Anzahl); sie
-   fehlen im `bag+tower`-Zaehler.
-6. Phantom-Fliesen in Musterreihen (`serialize.rs:180`), Ableitbarkeit ueber
-   `chips_taken` ungeprueft.
+   fehlen im `bag+tower`-Zaehler. **In b04 aufgenommen (Nutzer 11:35).**
+6. Phantom-Fliesen in Musterreihen (`serialize.rs:180`): GEPRUEFT 11:45, nicht
+   rueckrechenbar, Netz haelt sie fuer echte Fliesen. **In b04 aufgenommen.**
 7. Phasenaufloesung (`features.rs:65`: start_placement/drafting/scoring = 0),
    vermutlich durch die Zugmaske folgenlos, ungeprueft.
 8. ~~Formal: nur der erste Mondstapel je Fabrik, oberste 3 Steine~~
@@ -268,23 +268,38 @@ Wissen); die Bonuschip-Farben haengen korrekt an `chip_revealed`
 (`features.rs:154-167`). Ungeprueft: ob die Aufteilung Beutel/Turm fuer den
 Menschen vollstaendig rekonstruierbar ist (kodiert wird nur die Summe).
 
-**Eintaktung als Arm `v24-b04` (Sicht-Arm), Zuschnitt:** Stufe 1 aus par.6
-plus Punkt 1 des Inventars, beides Typ-Sicht auf Kuppelplatten, ADDITIV am
-Ende des Flachvektors: `[top_is_special, top_is_wild]` (2 Werte, leerer
-Stapel 0/0) und je Auslage-Slot `[has_special, has_wild]` (3 x 2 = 6 Werte,
-leerer Slot 0/0). `INPUT_SIZE` 714 -> 722, Indizes 0..713 unveraendert.
+**Eintaktung als Arm `v24-b04` (Sicht-Arm), Zuschnitt (erweitert 2026-09-05,
+11:35-11:45 auf Nutzer-Anweisung um Punkte 5 und 6):** ADDITIV am Ende des
+Flachvektors, Indizes 0..713 unveraendert, `INPUT_SIZE` 714 -> **744**:
+- Abschnitt 12, Plattentyp (8): `[top_is_special, top_is_wild]` (leerer
+  Stapel 0/0) und je Auslage-Slot `[has_special, has_wild]` (3 x 2; leerer
+  Slot 0/0).
+- Abschnitt 13, Strafleisten-Farben (10): je Spieler in Zugreihenfolge
+  fuenf Farbzaehler /4 (Nutzer: "farben koennen wir hinzunehmen, sollte dann
+  leichter sein fuers netz rueckschluesse zu ziehen welche farben im
+  beutel/turm sind").
+- Abschnitt 14, Phantom-Anteil je Musterreihe (12): `phantom_count /
+  capacity` fuer sechs Reihen je Spieler in Zugreihenfolge. Befund am Code
+  (Nutzer-Auftrag "pruef das genauer"): `features.rs:203` zaehlt `tiles` samt
+  Phantomen, `phantom_count` wird nirgends kodiert; fuer die Vollendung sind
+  Phantome echt, am Rundenende verschwinden sie statt in den Turm zu wandern
+  (`round_end.rs:257-259`). Ohne das Merkmal haelt das Netz Phantome fuer
+  echte Fliesen und ueberschaetzt Brettbestand und Ruecklauf; aus
+  `chips_taken` (nur die Summe je Spieler und Runde) ist die Reihe nicht
+  rueckrechenbar.
 Abweichung von par.8 (ein Merkmal je Stufe) bewusst: das Kriterium ist
 Sichtgleichheit, nicht Attribution; die Arena ist Waechter (par.7), und die
 beiden Merkmale sind dieselbe Informationsart (Plattentyp). Ziehserie (3)
-und Kleinposten (5-7) bleiben Merkposten fuer spaetere Stufen (8 ist geklaert); Historie (4)
+und Phasenaufloesung (7) bleiben Merkposten fuer spaetere Stufen (5 und 6 sind in
+b04, 8 ist geklaert); Historie (4)
 ist auf Nutzer-Entscheid kein Merkposten.
 
 Bau (par.6 Punkte 2-5): drei Encoder-Stellen append-only (JSON-Pfad,
 Direktpfad, `neural_net.py`), `features_for_layout` kuerzt den Flachteil auf
 die vom Modell deklarierte Laenge (nur kuerzen, nie auffuellen),
 `config.INPUT_SIZE`, Laengen-Assertion der Paritaetstests, Fingerprint
-`lib.rs:642`; Sichtgleichheits-Test (>= 500 Zustaende gegen
-`dome_stack_top_type` und `dome_display`-Typen) und Regressionstest
+`lib.rs:642`; Sichtgleichheits-Test (>= 300 Zustaende gegen
+`dome_stack_top_type`, `dome_display`-Typen, `floor` und `phantom_count`) und Regressionstest
 (714er-Layout bekommt exakt den alten Vektor); `cargo test --release`, Wheel,
 Anker-Invarianz (`/mosaic-anchor-invariance`), Netz-Pfad-Paritaet des Champions
 (Zahlengleichheit bei gleichen Seeds ist Pflicht, nicht Alarm: das Champion-
@@ -292,9 +307,9 @@ Modell deklariert 714 und darf die neuen Werte nie sehen).
 
 Training `v24-b04`: b01-Rezept (`PREREG_v24_window.md` par.6e), Fenster
 `window_v24.txt`, Warmstart aus `v23-b01_brierbest` mit null-initialisierten
-acht neuen Spalten von `flat_branch.0.weight` (par.7), Bloecke fuer das ganze
+30 neuen Spalten von `flat_branch.0.weight` (par.7), Bloecke fuer das ganze
 Fenster neu (`INPUT_SIZE` steckt im Block-Schluessel, rund 36 min bei 6
-Workern), Monolith neu. **Einziger Faktor gegen b01: die acht Sichtwerte.**
+Workern), Monolith neu. **Einziger Faktor gegen b01: die 30 Sichtwerte.**
 Abnahme wie die anderen Arme (`night_v24_acceptance_chain.sh b04`), Lesart
 par.7: Gleichstand -> Merkmalsstand uebernehmen, Regression -> Fehlersuche.
 
