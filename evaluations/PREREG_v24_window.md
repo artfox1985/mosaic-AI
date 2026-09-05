@@ -382,6 +382,7 @@ Sockel-Relabel).
 | K1 Margen-Saettigung | Blattwert aus Siegwahrscheinlichkeit UND saettigender, re-zentrierter Marge aus Punkte- minus Gegnerpunkte-Kopf | `saturating_score_utility` par.6b (kein neuer Kopf) | gepaarte Arena gegen dasselbe Netz ohne Knopf, Spalten aus Logs |
 | ~~K2 Risiko-Utility~~ | GESTRICHEN 2026-09-03: der WDL-Kopf hat zwei Klassen, kein Remis; Stufe A waere eine affine Umskalierung des Siegwerts (`risk_sensitive_leaf_utility` par.6). Bleibt als bedingter TRAININGS-Folgearm (Streuungs- oder Verteilungskopf) hinter K1 | -- | -- |
 | K3 Gelaender (c) | rundenabklingendes Dreiecks-Potential in Suche und Tiling, Form B oder C, Stufe 0 bestanden (Kopf kennt die Huelle) | `geometric_envelope` par.5c, par.3d | dito, zusaetzlich argmax-Spaltenprofil |
+| K3-P2 Platzhalter (Nutzer 2026-09-05: "ja bau k3-p2") | K3-P plus Platzhalter-Regel: gebundene Reihe ohne annehmende Zielzelle zaehlt mit w_slot 0,5 auf den plattenlosen Huellenzellen ihrer Zeile (Modus 4) -- Lenkung der Plattenwahl R1-2 | `geometric_envelope` par.8.9b, par.8.11 (gebaut, cargo/Wheel ausstehend) | argmax @400 und gepaarte Arena am v24-Siegernetz gegen K3-P, plus Kuppel-Bonus je Partie (`arena_points_probe.py`) |
 
 **Reihenfolge und Kosten:** Erzeugung (11,9 h CPU) -> b01 (GPU) -> parallel
 zur GPU die drei Engine-Bauten mit Paritaets-Gate (CPU, je Bau plus Arena

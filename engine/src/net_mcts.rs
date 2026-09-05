@@ -533,9 +533,11 @@ impl SearchConfig {
         let envelope_tiling_value_w = get_required("envelope_tiling_value_w")?;
         let envelope_projection_mode = {
             let v = get_required("envelope_projection_mode")?;
-            if v.fract() != 0.0 || !(0.0..=3.0).contains(&v) {
+            let max = f64::from(crate::envelope::PROJECTION_MODE_MAX);
+            if v.fract() != 0.0 || !(0.0..=max).contains(&v) {
                 return Err(format!(
-                    "Spec-Datei {path}: 'envelope_projection_mode' muss 0, 1, 2 oder 3 sein, ist {v}"
+                    "Spec-Datei {path}: 'envelope_projection_mode' muss eine ganze Zahl 0..{max} sein \
+                     (0 Raster, 1 K3-P, 2 K3-R, 3 K3-O, 4 K3-P2), ist {v}"
                 ));
             }
             v as u8

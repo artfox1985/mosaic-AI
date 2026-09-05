@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: JA, in der Bauform K3-P (Potential auf dem PROJIZIERTEN Brett, C 1,0, par.8.7): gepoolt 191:129 auf 320 Paaren (p = 0,014), Betriebspunkt @100 0,775 gegen 0,726 Spalten (8.7d), Champion-Kante 38:12 und 221:179 gegen v21 (par.10/10a); seit 2026-09-04 Champion `v23-b01_k3p10`, Elo 1292 (par.11) und Knopf im v24-Rezept. Raster-Form (par.9), Value im Tiling (8.6a), Erreichbarkeit/Ownership (8.9a), Huellen-Bauer (8.8) tragen nicht. Wiedervorlage als v24/v25-Arme: par.8.9b (Modulator, tote Zellen, Profil), C 2,0 als Generator-Arm (8.7d). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: JA, in der Bauform K3-P (Potential auf dem PROJIZIERTEN Brett, C 1,0, par.8.7): gepoolt 191:129 auf 320 Paaren (p = 0,014), Betriebspunkt @100 0,775 gegen 0,726 Spalten (8.7d), Champion-Kante 38:12 und 221:179 gegen v21 (par.10/10a); seit 2026-09-04 Champion `v23-b01_k3p10`, Elo 1292 (par.11) und Knopf im v24-Rezept. Raster-Form (par.9), Value im Tiling (8.6a), Erreichbarkeit/Ownership (8.9a), Huellen-Bauer (8.8) tragen nicht. Wiedervorlage als v24/v25-Arme: par.8.9b (Modulator, tote Zellen, Profil), C 2,0 als Generator-Arm (8.7d). K3-P2 gebaut 2026-09-05, Messung offen (par.8.11). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -1276,4 +1276,57 @@ Spaltenvollendung festlegen -- nicht die Zellwahl im Tiling (Obergrenze oben).
 Der Mechanismus, den der Nutzer sucht, sitzt also bei den Kuppelplatten:
 Typ-Sicht (v24-b04) fuer den Bonus, K3-P2 (8.9b) fuer die Plattenwahl in
 Runde 1-2, K3-P (bestehend) fuer das Material.
+
+## par.8.11 K3-P2 GEBAUT (2026-09-05, 17:45; Nutzer: "ja bau k3-p2"), Messung OFFEN
+
+**Bauform (par.8.9b Baustein 1, exakt wie registriert):** Projektions-Modus
+`envelope_projection_mode = 4` (`MOSAIC_ENVELOPE_PROJECTED=4`,
+`envelope.rs::projected_occupancy_slot` / `envelope_score_projected_slot`).
+Wie K3-P (Modus 1) legt jede gebundene Musterreihe `r` mit `k` Steinen ihre
+Masse `k/(r+1)` gleich verteilt auf die annehmenden Zielzellen der
+Rasterzeile `r`. Hat die Reihe KEINE annehmende Zelle (die Kuppelplatte fuer
+diese Zellen liegt noch nicht oder passt nicht), zaehlt sie statt 0 mit dem
+Faktor `w_slot` (`MOSAIC_ENVELOPE_SLOT_W`, Default 0,5, Vorschlag aus
+par.8.9b) gleich verteilt auf die Zellen der Zeile `r`, die in der Huelle
+liegen und noch keine Kuppelplatte tragen. Je Orientierung eigene Belegung,
+`H` darauf wie K3-P (Huellenwahl nach `deviation_frac`), Maximum ueber beide
+Orientierungen (wie K3-R: die beste Huelle, die noch offen ist). Leere Reihen
+bekommen nichts; tragen alle Huellenzellen der Zeile nicht passende Platten,
+zaehlt die Reihe 0 wie in K3-P (das ist der K3-D-Fall, Baustein 2, nicht
+gebaut). Greift die Regel nirgends, ist `H_slot` bitgleich `H_proj`;
+`w_slot = 0` ist exakt K3-P.
+
+**Warum diese Form (par.8.10):** das Beginnen einer Huellenreihe VOR der
+passenden Platte wird belohnt, das Legen der passenden Platte hebt das
+Potential von `w_slot` auf 1 -- die Lenkung der Plattenwahl in Runde 1-2 in
+Bewertungsform, ohne die Uebersteuerung des Huellen-Bauers (par.8.8).
+
+**Gebaut:** `envelope.rs` (Modus 4, `slot_weight`, Unit-Test
+`slot_projection_counts_bound_row_without_target_on_tileless_hull_cells`:
+gebundene Reihe 2 ohne Platte -> `H_slot = 1/56`, mit passender Platte ->
+`H_slot == H_proj = 2/56`, `w_slot = 0` == K3-P), Spec-Waechter `net_mcts.rs`
+(0..4), `knob_registry.rs` (`MOSAIC_ENVELOPE_SLOT_W`), `engine_config`
+(`envelope_slot_w`), Spec-Datei `models/k3p2_c10.spec.json` (Champion-Spec
+mit Modus 4, C 1,0). Der Vertragshash aendert sich NICHT (er haengt nur an
+INPUT_SIZE, Planes, Aktionen, Koepfen; lib.rs `contract_canonical_string`).
+**`cargo test` und Wheel stehen aus** (Rechenlast neben der laufenden
+b02-Abnahme verboten); das Wheel wird ohnehin erst nach den v24-Trainings
+installiert (744-Kontrakt `20b442a8164f748d`).
+
+**Messplan (vorregistriert, Knopf = eigener Spieler wie beim Champion-Knoten):**
+1. argmax-Instrument @400, 200 Partien, Seed 20260931, am Siegernetz der
+   v24-Arme (Generatorwahl-Regel), Spec `k3p2_c10` gegen Spec `v23-b01_k3p10`
+   (K3-P, C 1,0) und gegen `k3v_off`; Kennzahlen wie Tor 2a (volle Spalten,
+   Punkte, Zeilen, Strafleiste, Huelle) PLUS Kuppel-Bonus je Partie.
+2. Gepaarte Arena 2 x 80 in beiden Richtungen (Seed 20261014, Blockgroesse
+   5), K3-P2 gegen K3-P am selben Netz; Spalten aus `arena_column_probe.py`,
+   Punktbilanz aus `tools/probes/arena_points_probe.py` (neu: Kuppel-Bonus,
+   Tiling, Strafe, Endwertung nach Kategorie je Seite aus den Partie-Logs).
+3. Entscheid: K3-P2 ersetzt K3-P im Spielbetrieb nur, wenn die Arena haelt
+   UND der Kuppel-Bonus oder die vollen Spalten steigen; Vorlage an den
+   Nutzer. Dosis `w_slot` erst danach (0,25 / 0,5 / 1,0), nicht vorab.
+
+**Kennzahl Kuppel-Bonus je Partie, Referenz aus den b01-Tor-2b-Logs
+(`points_v24b01_vs_b01_s14.json`, 2 x 80 Partien, beide Seiten K3-P C 1,0):**
+siehe Artefakt; Mensch-Referenz aus den Server-Logs 8,9 je Partie (par.8.10).
 

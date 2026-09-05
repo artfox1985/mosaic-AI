@@ -59,6 +59,11 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
 4. Danach: Wheel 744 installieren (`engine/target/wheels`, gebaut 13:50,
    Kontrakt `20b442a8164f748d`), Anker-Drift (`verify_frozen_heuristic.py`),
    Abnahmen b03, b04, b05.
+5. **K3-P2 (Modus 4, `models/k3p2_c10.spec.json`) ist gebaut, aber ungetestet:**
+   `cargo test --release` im ersten CPU-freien Fenster (Python-DLL in PATH),
+   dann Wheel 744 neu bauen (enthaelt K3-P2) und mit Kette 4 installieren;
+   Messung am v24-Siegernetz nach par.8.11 (argmax @400 und gepaarte Arena
+   gegen K3-P, Kuppel-Bonus je Partie mit `tools/probes/arena_points_probe.py`).
 Noch nicht eingetaktet: argmax v24-b01 bei C 0,5 (Knopf-Dosis, par.9b);
 Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
 2 min GPU, erst wenn keine CPU-Messung laeuft).
@@ -112,8 +117,9 @@ erledigt); **kein Push**.
    `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
    Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
    (b03). Nutzer-Ziel: offene Preregs (16) ueber v25+ auf rund 7.
-5. **OFFENER NUTZER-ENTSCHEID (Frage der alten Sitzung 14:53, durch den
-   Absturz unbeantwortet): K3-P2 jetzt bauen?** Plattenwahl in Runde 1-2
+5. **ENTSCHIEDEN 17:35 (Nutzer: "ja bau k3-p2"), GEBAUT 17:45, `cargo test`
+   und Wheel ausstehend (`geometric_envelope` par.8.11).** Die Frage war:
+   K3-P2 jetzt bauen? Plattenwahl in Runde 1-2
    ueber die Huelle steuern (`geometric_envelope` par.8.9b Baustein 1: eine
    begonnene Reihe zaehlt auf leeren Huellenzellen ihrer Zeile mit halbem
    Gewicht, die passende Platte hebt sie auf voll) -- Suchknopf, kein
