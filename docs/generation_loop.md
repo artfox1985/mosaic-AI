@@ -166,8 +166,15 @@ Denial-Hebel nach Groesse (Nutzer 2026-09-05):** (1) Fliesen aus den
 Fabriken -- die Farben nehmen, die der Gegner fuer seine Reihen braucht, in
 jedem Zug moeglich; (2) Kuppelplatten -- die Platte wegnehmen, die seine
 Spalte oder seinen Kuppel-Bonus vollenden wuerde; (3) erst weit dahinter die
-Bonusplaettchen (Chip-Denial, rund 20 Chips je Partie, eigene Chip-Vollendung
-feuert fast nie -- der kleinste Hebel, zurueckgestellt). Das ist der
+Bonusplaettchen -- als FARB-Denial, nicht als Mengen-Denial (Nutzer-
+Praezisierung 2026-09-05): jeder Spieler nimmt je Runde genau zwei Chips
+(Pflicht, `engine_manual.md` Abschnitt D), die Zahl ist also nicht zu
+verweigern; aber eine fehlende Zelle kostet 2 passende oder 3 beliebige
+Chips, und wer dem Gegner die Chips seiner Reihenfarbe wegnimmt, verteuert
+ihm jede Zelle um einen Chip. Die drei Hebel sind eine KETTE: was der Gegner
+nicht mehr aus der Auslage bekommt (1), muss er mit Chips ersetzen, und wenn
+auch die passenden Chips fehlen (3), ist der Abschluss seiner Musterreihe so
+teuer wie moeglich. Das ist der
 Zeitpunkt, an dem die Kampagnen-Groesse von Tor 2 wechseln kann (der
 Abschnitt oben sagt ausdruecklich: wechselt das Ziel, wechselt die Groesse,
 das Tor bleibt).
