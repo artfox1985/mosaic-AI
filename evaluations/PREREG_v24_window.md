@@ -437,3 +437,46 @@ gehen auseinander. Naechste Messungen (CPU frei, sobald die Ketten es
 zulassen): argmax v24-b01 OHNE Knopf (trennt Netz von Knopf-Wechselwirkung),
 Huellen-Sonde auf `tor2a-v24b01`, hv2-Fenster-Kennzahl, v23-Sockel als
 Vergleich fuer die Policy-Klasse.
+
+### par.9b Ursachenanalyse v24-b01 (11:55): das Netz hat nicht verlernt, der Knopf kippt
+
+| Messung (argmax @400, 200 Partien, Seed 20260931) | volle Spalten (KI) | Punkte | volle Reihen |
+| --- | --- | --- | --- |
+| b01 ohne Knopf (Kontrolle K3 S 0,1) | 0,510 (+-0,065) | 46,5 | 0,150 |
+| b01 + K3-P C 1,0 | **0,555** (+-0,067) | 47,7 | 0,193 |
+| **v24-b01 ohne Knopf** (`tor2a_v24b01nk.json`) | **0,518** (+-0,072) | 46,8 | 0,200 |
+| v24-b01 + K3-P C 1,0 (`tor2a_v24b01.json`) | **0,443** (+-0,063) | 45,7 | 0,175 |
+
+Huellen-Sonde des v24-b01-Korpus mit Knopf (`triangle_hull_coverage_tor2a-v24b01.json`):
+Huelle am Ende 0,693, Halbzeit 0,446, aussen 2,18 -- identisch mit b01 + Knopf
+(0,703 / 0,444 / 2,15). Die Huelle wird also gleich gefuellt, nur die
+VOLLENDUNG fehlt.
+
+**Lesart:** v24-b01 spielt ohne Knopf spaltengleich zu b01 (+0,008, weit
+innerhalb der KI). Der Knopf, der b01 um +0,045 hebt, senkt v24-b01 um
+-0,075: die Wechselwirkung Knopf x Netz hat das Vorzeichen gewechselt. Passende
+Erklaerung (Hypothese, nicht belegt): das v24-Material ist mit Knopf erzeugt,
+das Netz hat die Huellen-Praeferenz in Policy und Value bereits aufgenommen;
+der Knopf obendrauf verschiebt die Blaetter ein zweites Mal in dieselbe
+Richtung, die Suche verteilt Steine in der Huelle statt Spalten zu vollenden
+(dasselbe Muster wie K3-R in 8.9a: Huelle rauf, Vollendung runter).
+
+**Folgen fuer die Messungen dieser Generation:** Tor 1 und Tor 2a wurden mit
+Knopf auf beiden Seiten gefahren (par.6e-Berichtigung vom 2026-09-04) und
+messen damit auch die Knopf-Wechselwirkung, nicht nur das Netz. Nachzuholen
+(eingetaktet): **Tor 1 OHNE Knopf** (beide Seiten `k3v_off.spec.json`) und
+das argmax-Instrument fuer v24-b01 bei C 0,5. Fuer b02/b03/b04 gilt: Tor 2a
+und Tor 1 beidseitig OHNE Knopf zusaetzlich fahren, sonst ist "schwaecher"
+nicht vom "anders geeicht" zu trennen.
+
+**Gegenmassnahmen (Vorschlag, Nutzer-Entscheid):**
+1. Knopf-Dosis je Generation neu eichen statt fest 1,0: fuer ein Netz, das
+   auf Knopf-Material trainiert ist, C am argmax-Instrument ueber 0 / 0,5 /
+   1,0 messen und den Betriebspunkt waehlen (billig: 3 x 27 min).
+2. Material weiter MIT Knopf erzeugen (das ist die Spaltenquelle: 0,75 in der
+   argmax-Klasse), den Knopf im SPIELBETRIEB des trainierten Netzes aber als
+   abklingende Dosis fuehren (Generation n: C_n <= C_(n-1)), analog zum
+   Rundenprofil.
+3. v25-Zuschnitt unveraendert (hv2 sinkt auf 18 %); der Materialmix ist nach
+   dieser Analyse NICHT die Ursache (Sockel v24 besser als v23, argmax-Klasse
+   spaltenreich, ohne Knopf kein Rueckschritt).
