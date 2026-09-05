@@ -1087,7 +1087,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           head_warmstart=True, extra_data_dir=None,
           freeze_trunk=False, cache_file=None, moon_loss_weight=1.0,
           file_list=None, surprise_alpha=0.0, surprise_confidence_min=0.0,
-          resume=False, epoch_checkpoint=True):
+          resume=False, epoch_checkpoint=True, fast_loader=False):
     # Zwischenstand je Epoche / Wiederaufnahme (siehe resume_path()). Der
     # Zwischenstand wird VOR dem teuren Daten-Laden gelesen: fehlt er, soll
     # der Abbruch sofort kommen, nicht nach 100 s Datenaufbau.
@@ -1491,9 +1491,43 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # drop_last=True: ohne das kann die letzte Batch einer Epoche zufällig auf
     # Größe 1 fallen (Datensatzgröße mod BATCH_SIZE == 1) — BatchNorm im Netz
     # verlangt >1 Sample pro Kanal im Training und crasht sonst hart.
-    dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
-    val_dataloader = (DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
-                      if val_dataset is not None else None)
+    if fast_loader:
+        # --fast-loader (2026-09-05): batchweises Holen statt 256 x __getitem__
+        # je Batch (Begruendung: corpus_dataset.py::get_batch). Gleiche
+        # Batch-Folge wie der Bestandspfad: DataLoader(shuffle=True) baut intern
+        # genau RandomSampler(dataset) + BatchSampler(BATCH_SIZE, drop_last) --
+        # dieselben Objekte, dieselben RNG-Zuege aus dem globalen torch-RNG,
+        # also dieselbe Permutation. `batch_size=None` schaltet den Auto-
+        # Collate ab; der Sampler liefert Index-LISTEN, das Dataset-Fenster
+        # holt daraus einen fertigen Batch. `pin_memory` beschleunigt nur die
+        # Host->Device-Kopie, aendert keine Zahl.
+        from torch.utils.data import BatchSampler, RandomSampler, SequentialSampler
+
+        class _BatchView(torch.utils.data.Dataset):
+            def __init__(self, ds):
+                self.ds = ds
+
+            def __len__(self):
+                return len(self.ds)
+
+            def __getitem__(self, indices):
+                return self.ds.get_batch(indices)
+
+        dataloader = DataLoader(
+            _BatchView(dataset), batch_size=None,
+            sampler=BatchSampler(RandomSampler(dataset), BATCH_SIZE, drop_last=True),
+            pin_memory=torch.cuda.is_available(),
+        )
+        val_dataloader = (DataLoader(
+            _BatchView(val_dataset), batch_size=None,
+            sampler=BatchSampler(SequentialSampler(val_dataset), BATCH_SIZE, drop_last=False),
+            pin_memory=torch.cuda.is_available(),
+        ) if val_dataset is not None else None)
+        print("   Lader         : --fast-loader (batchweises Indizieren, pin_memory)")
+    else:
+        dataloader = DataLoader(dataset, batch_size=BATCH_SIZE, shuffle=True, drop_last=True)
+        val_dataloader = (DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+                          if val_dataset is not None else None)
 
     # 2. Hardware Setup
     # Reproduzierbarkeit (Task #9, 2026-07-28): bis dahin setzte train.py
@@ -2699,6 +2733,13 @@ if __name__ == "__main__":
                              "`touch models/alphazero_<name>.stop` waehrend des Laufs -- er "
                              "speichert nach der laufenden Epoche, loescht die Stopp-Datei und "
                              f"endet mit Exit-Code {PAUSE_EXIT_CODE}; Fortsetzung wie oben.")
+    parser.add_argument("--fast-loader", action="store_true",
+                        help="Batchweises Holen der Trainingsdaten (EIN Index-Tensor je Feld statt "
+                             "256 x __getitem__ plus Collate; corpus_dataset.py::get_batch) und "
+                             "pin_memory. Gleiche Batch-Folge und gleiche Zahlen wie der Bestand "
+                             "(Beleg: tools/tests/train_resume_pause_test.sh Fall E); Default AUS, "
+                             "bis der Beleg fuer das Vollfenster steht. Anlass 2026-09-05: GPU beim "
+                             "b04-Training zur Haelfte arbeitslos, Datenpfad auf einem Kern.")
     parser.add_argument("--no-epoch-checkpoint", action="store_true",
                         help="Zwischenstand je Epoche NICHT schreiben (Default: schreiben, "
                              "rund 35 MB, atomar, nach erfolgreichem Ende geloescht). Aendert "
@@ -3018,4 +3059,5 @@ if __name__ == "__main__":
           moon_loss_weight=args.moon_loss_weight, file_list=args.file_list,
           surprise_alpha=args.surprise_alpha,
           surprise_confidence_min=args.surprise_confidence_min,
-          resume=args.resume, epoch_checkpoint=not args.no_epoch_checkpoint)
+          resume=args.resume, epoch_checkpoint=not args.no_epoch_checkpoint,
+          fast_loader=args.fast_loader)
