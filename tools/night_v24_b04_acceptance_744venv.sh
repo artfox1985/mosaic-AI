@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Abnahme des 744er-Arms v24-b04 VOR der Installation des 744er-Wheels (2026-09-05, 22:05):
+# Abnahme des 744er-Arms v24-b04 VOR der Installation des 744er-Wheels (2026-09-05, 21:49):
 # laeuft in der Mess-venv `venv_measure744/` mit dem frisch gebauten Wheel (engine/target/wheels,
 # 21:01, Kontrakt 20b442a8164f748d, K3-P2 enthalten, Default aus). So kann die CPU messen, waehrend
-# b05 auf der GPU trainiert und das alte Wheel haelt. Anker-Drift unter diesem Wheel: GRUEN (22:02,
+# b05 auf der GPU trainiert und das alte Wheel haelt. Anker-Drift unter diesem Wheel: GRUEN (21:45,
 # frozen_verify_hv1_anchor.json). `python` im PATH zeigt auf die venv, die Abnahme-Kette laeuft unveraendert.
 # Aufruf (Projektordner, Hintergrund, ohne Pipe):  bash tools/night_v24_b04_acceptance_744venv.sh
 set -uo pipefail
