@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v25-Trainingsfenster zugeschnitten (stationaere Rotation aus docs/window_generation.svg, G = v24), und wie wird dabei der Spaltenbau gegen schleichendes Verlernen gesichert? | Beleg: Zuschnitt vom Nutzer festgelegt (2026-09-04, 21:50), nichts gebaut: Sockel 4.000 G + 1.350 G-1 + 450 G-2, Schwarm 8.000 G + 8.000 G-1 + 2.650 Sockel-Rest G-1 + 3.550 + 1.450 G-2 (par.1); hv2-Uebergangsabbildung ENTSCHIEDEN (par.2: 45 Traeger + 135 Ex-Traeger + 365 Schwarm); Manifest-Generator --pick gebaut (par.3); Spalten-Waechter auf drei Flaechen (par.7). Bedingung: v24 nimmt die Champion-Kante, sonst Generatorwahl-Regel (par.4). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v25-Trainingsfenster zugeschnitten (stationaere Rotation aus docs/window_generation.svg, G = v24), und wie wird dabei der Spaltenbau gegen schleichendes Verlernen gesichert? | Beleg: Zuschnitt vom Nutzer festgelegt (2026-09-04, 21:50), nichts gebaut: Sockel 4.000 G + 1.350 G-1 + 450 G-2, Schwarm 8.000 G + 8.000 G-1 + 2.650 Sockel-Rest G-1 + 3.550 + 1.450 G-2 (par.1); hv2-Uebergangsabbildung ENTSCHIEDEN (par.2: 45 Traeger + 135 Ex-Traeger + 365 Schwarm); Manifest-Generator --pick gebaut (par.3); Spalten-Waechter auf drei Flaechen (par.7; v24-Fenster 44,8 % Seiten mit voller Spalte, hv2 ist spaltenreich 0,73, die gesampelten Klassen 0,19). Value-Klasse zu argmax verschoben (Nutzer 2026-09-05, par.9: 8.000/0 oder 7.000/1.000 offen). Bedingung: v24 nimmt die Champion-Kante, sonst Generatorwahl-Regel (par.4). -->
 
 # Vorregistrierung: das v25-Trainingsfenster
 
@@ -35,7 +35,7 @@ dem Gedaechtnis entsteht.
 
 | Posten | Quelle | Partien | Dateien |
 | --- | --- | --- | --- |
-| Schwarm NEU | G = v24 Self-Play, `--value-only` (6.000 argmax + 2.000 gesampelt) | 8.000 | 800 |
+| Schwarm NEU | G = v24 Self-Play, `--value-only`; **Nutzer-Entscheid 2026-09-05, 12:10: staerker zu argmax verschoben** -- Vorschlag 8.000 argmax + 0 gesampelt (Alternative 7.000 + 1.000, siehe par.9) | 8.000 | 800 |
 | Schwarm G-1 (komplett) | alle 800 `selfplay_v23-b01-value-*` | 8.000 | 800 |
 | Sockel-Rest G-1 (Nicht-Traeger) | die 265 uebrigen `selfplay_v23-b01-policy_*` | 2.650 | 265 |
 | Sockel-Rest G-2 (vollstaendig) | hv2, siehe par.2 | 3.550 | 355 |
@@ -189,3 +189,37 @@ Training (Ownership-Gewicht, Tiling-Uebersteuerung, Huellen-Bauer) -- alle
 gemessen ohne Staerke oder mit Zusammenbruch (`ownership_head` geschlossen,
 `geometric_envelope` 8.8). Der Hebel bleibt das MATERIAL (par.1) und der
 Such-Knopf des Generators (K3-P), der Waechter misst nur.
+
+## par.9 Value-Klasse zu argmax verschoben (Nutzer-Entscheid 12:04: "Wir werden die value klasse staerker zu argmax verschieben")
+
+Anlass: par.7-Berichtigung (hv2 0,73 Spalten je Seite, die gesampelten Klassen
+0,19). Fenster-Kennzahl je Variante (Herleitung mit den gemessenen v24-Klassen-
+werten, G-Material = G-1-Werte angenommen; Seiten mit voller Spalte /
+volle Spalten je Seite):
+
+| Fenster | Seiten mit voller Spalte | volle Spalten je Seite |
+| --- | --- | --- |
+| v24 gemessen | 44,8 % | 0,624 |
+| v25, G-Schwarm 6.000 argmax + 2.000 gesampelt (bisher) | 37,7 % | 0,517 |
+| v25, G-Schwarm 7.000 + 1.000 | 38,9 % | 0,536 |
+| v25, G-Schwarm 8.000 argmax + 0 gesampelt | 40,1 % | 0,555 |
+| dazu Sockel G mit 0,40 statt 0,19 (Annahme, ungeprueft) | 42,0 % | 0,584 |
+
+**Lesart:** die Verschiebung hebt die Kennzahl um bis zu 2,4 Punkte, haelt
+aber die Flaeche 3 aus par.7 (nicht unter 44,8 %) NICHT allein, weil die
+Rotation 12.000 hv2-Partien mit 0,73 abgibt. Die uebrigen Hebel: (a) der
+Sockel (Policy-Klasse, Rauschen noetig fuer die Policy-Ziele) bleibt mit 0,19
+die spaltenaermste Klasse -- weniger Rauschen oder eine Gewichtung waere ein
+eigener Arm; (b) weniger hv2 abbauen (z.B. G-2 nicht auf 5.450, sondern auf
+rund 11.000) wuerde die Kennzahl halten, aendert aber die stationaere Form;
+(c) das G-Material selbst spaltenreicher (v24-Arme, Knopf-Dosis par.9b der
+v24-Prereg).
+
+**Was die 2.000 gesampelten leisten sollten** (`PREREG_heuristic_v2_long_rows.md`
+Zeilen 2401-2408): Zustands-Streuung in der Value-Klasse, damit der Value-Kopf
+nicht nur argmax-Trajektorien sieht. Argmax-Partien streuen ueber Seeds,
+Wertungsplatten und Auslagen weiter, aber enger als gesampelte; das ist der
+Preis der Verschiebung. **Offen (Nutzer):** 8.000/0 (maximal, Vorschlag) oder
+7.000/1.000 (Streuung teilweise erhalten). Gilt fuer die v25-ERZEUGUNG
+(G-Material); das G-1-Material bleibt, wie es liegt.
+
