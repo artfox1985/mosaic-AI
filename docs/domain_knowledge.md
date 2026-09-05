@@ -689,6 +689,36 @@ Freischaltungen je Partie, 8,50 gegen 0,90 Punkte) und bei den Spalten
 Ergänzend gegen den v20-Champion (`watchlist_v20_interim_review.md`, siehe
 Abschnitt 5): Ø +14,5 Punkte, davon 9,0 aus den Spezialpunkten.
 
+### Replikation 2026-09-05 an allen 19 Server-Partien (13 gegen v21_2d_brierbest, 6 gegen den Champion v23-b01_k3p10)
+
+Sonde `tools/probes/server_log_points_probe.py` (Artefakte
+`server_log_points_probe.json`, `..._k3p10.json`), Kategorien aus den
+Logzeilen: Platzierungspunkte (🎯), Kuppel-Bonus (⭐), Strafleiste, Ziehkosten,
+Startspielerstein, Endwertung nach Kategorie.
+
+| je Partie | Mensch (19) | KI (19) | Mensch (6, Champion) | Champion (6) |
+|---|---:|---:|---:|---:|
+| Endstand | 72,9 | 55,2 | 58,7 | 57,2 |
+| Platzierungspunkte R1-R5 | 54,9 | 56,8 | 47,3 | 59,5 |
+| Kuppel-Bonus | **8,9** | **1,6** | **8,3** | **2,3** |
+| Endwertung gesamt | **19,7** | **4,2** | **12,7** | **4,5** |
+| davon vertikale Reihen | 9,6 | 0,7 | 2,3 | 1,2 |
+| davon Eckplatten | 5,1 | 1,4 | 6,0 | 1,5 |
+| davon Diagonale | 2,1 | 0,0 | 1,7 | 0,0 |
+| Strafleiste | -13,4 | -9,1 | | |
+| Anteil Runde 1+2 netto am Endstand | 4 % | 15 % | | |
+
+**Lesart, deckungsgleich mit oben:** die Platzierungspunkte sind kein
+Vorsprung des Menschen (das Netz holt sogar mehr, und frueher: Runde 2 9,8
+gegen 7,8). Der gesamte Abstand sitzt bei Kuppel-Bonus (rund 7 Punkte) und
+Endwertung (rund 15, davon Spalten 9 und Eckplatten 4). Gegen den Champion
+ist der Endstand ausgeglichen (58,7 gegen 57,2, Mensch 4:2 in Siegen), aber die
+STRUKTUR des Abstands ist unveraendert: Kuppel-Bonus 8,3 gegen 2,3, Eckplatten
+6,0 gegen 1,5; das Netz gleicht das mit 12 Platzierungspunkten mehr aus. Der
+Kuppel-Bonus ist dabei der Rasterreihe gleich (Abschnitt 2, 1..6), also in den
+unteren Reihen am teuersten -- und das Netz konnte Spezial- von Jokerplatten
+bis zum 2026-09-05 nicht unterscheiden (PREREG_stack_top_feature.md par.10).
+
 ### Der Rundenverlauf ist stärke-invariant
 
 An 22 Arena-Logs: nach Runde 1 stehen 4 Punkte auf dem Brett, nach Runde 5

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; ihr Wert steigt dort, wo sie am schwersten erreichbar sind. Laesst sich das heben, und an welchem Hebel? | Beleg: Kanaele 77/78 gebaut (par.4a, e91cd34, in jedem v22-b-Modell aktiv), Wirkung nie isoliert gemessen. Neumessung par.7: Posten LEBT -- auch der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen, Netz ueberall etwas schlechter. Vermeidungs-Hebel widerlegt (par.4/4b). Hebel gehoert in die Gelaender-/Allokations-Familie, Nutzer-Priorisierung offen. -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; ihr Wert steigt dort, wo sie am schwersten erreichbar sind. Laesst sich das heben, und an welchem Hebel? | Beleg: Kanaele 77/78 gebaut (par.4a, e91cd34, in jedem v22-b-Modell aktiv), Wirkung nie isoliert gemessen. Neumessung par.7: Posten LEBT -- auch der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen, Netz ueberall etwas schlechter. Vermeidungs-Hebel widerlegt (par.4/4b). Hebel gehoert in die Gelaender-/Allokations-Familie. par.8 (2026-09-05, 19 Server-Partien): Kuppel-Bonus Mensch 8,9 gegen Netz 1,6 je Partie, Endwertung 19,7 gegen 4,2 -- der gesamte Abstand zum Menschen; Platzierungspunkte gleich. Messgroesse fuer v24-b04: Kuppel-Bonus je Partie aus Arena-Logs. -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
@@ -331,3 +331,19 @@ auf dem Lehrer-Korpus stark unbalanciert (untere Reihe ~0,19 positiv);
 der politikabhaengig-Einwand steht. Der Hebel gehoert damit in dieselbe
 Gelaender-/Allokations-Familie wie Chip-Fuehrung und Huellen-Trimm --
 Nutzer-Priorisierung der naechsten Sitzung, kein Automatismus.
+
+## par.8 Der Posten am Tisch, 19 Server-Partien (14:53): Kuppel-Bonus 8,9 gegen 1,6 je Partie
+
+`tools/probes/server_log_points_probe.py` ueber alle Server-Logs (13 gegen v21,
+6 gegen den Champion v23-b01_k3p10), Tabelle in `docs/domain_knowledge.md`
+Abschnitt 9 (Replikation). Der Mensch holt 8,9 Kuppel-Bonus-Punkte je Partie,
+das Netz 1,6 (Champion 2,3); dazu Endwertung 19,7 gegen 4,2 (Spalten 9,6 gegen
+0,7, Eckplatten 5,1 gegen 1,4). Die Platzierungspunkte sind gleich (54,9 gegen
+56,8). Der Kuppel-Bonus ist gleich der Rasterreihe (1..6): der Posten sitzt
+unten, wo par.7 die 81 Prozent liegen gebliebenen Spezialfelder gemessen hat.
+Zusammenhang mit dem Sicht-Arm: das Netz konnte Spezial- und Jokerplatten in
+der Auslage nicht unterscheiden (`PREREG_stack_top_feature.md` par.10); ob die
+Sicht allein den Posten hebt, zeigt die Abnahme von v24-b04 -- Messgroesse
+dafuer hier: Kuppel-Bonus je Partie aus den Arena-Logs (Zeile ⭐), nicht nur
+die k6-Wertung.
+
