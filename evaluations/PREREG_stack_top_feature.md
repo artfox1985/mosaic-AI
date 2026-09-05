@@ -252,9 +252,14 @@ GUI `static/js/app.js`, Regeln `docs/engine_manual.md`.
    `chips_taken` ungeprueft.
 7. Phasenaufloesung (`features.rs:65`: start_placement/drafting/scoring = 0),
    vermutlich durch die Zugmaske folgenlos, ungeprueft.
-8. Formal: nur der erste Mondstapel je Fabrik, oberste 3 Steine
-   (`features.rs:717-718`); in gueltigen Stellungen deckungsgleich, Randfall
-   ungeprueft.
+8. ~~Formal: nur der erste Mondstapel je Fabrik, oberste 3 Steine~~
+   GEKLAERT 2026-09-05 (Nutzer: kleine Fabriken haben genau einen Stapel, die
+   grosse einen Pool mit hoechstens 4 Steinen; am Code: eine kleine Fabrik
+   traegt 4 Fliesen (`state.rs`, `TILES_PER_SMALL_FACTORY`), `take_from_sun`
+   nimmt mindestens eine und leert die Sonnenseite (`factory.rs:42-58`), der
+   Rest wird EIN Stapel mit hoechstens 3 Steinen (`place_on_moon`,
+   `factory.rs:61-66`); der Pool der grossen Fabrik ist als 5 Farbzaehler
+   vollstaendig kodiert). Kein Randfall, keine Luecke.
 
 **Netz sieht MEHR:** keine verdeckte Information gefunden. `dome_pool_mask`,
 `dome_wild_remaining_frac`, `bag+tower` je Farbe und die Wertungs-/Geometrie-
@@ -271,7 +276,7 @@ leerer Slot 0/0). `INPUT_SIZE` 714 -> 722, Indizes 0..713 unveraendert.
 Abweichung von par.8 (ein Merkmal je Stufe) bewusst: das Kriterium ist
 Sichtgleichheit, nicht Attribution; die Arena ist Waechter (par.7), und die
 beiden Merkmale sind dieselbe Informationsart (Plattentyp). Ziehserie (3)
-und Kleinposten (5-8) bleiben Merkposten fuer spaetere Stufen; Historie (4)
+und Kleinposten (5-7) bleiben Merkposten fuer spaetere Stufen (8 ist geklaert); Historie (4)
 ist auf Nutzer-Entscheid kein Merkposten.
 
 Bau (par.6 Punkte 2-5): drei Encoder-Stellen append-only (JSON-Pfad,
