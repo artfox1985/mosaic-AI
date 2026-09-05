@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es SPIELSTAERKE, den Rundenuebergang in der Suche als Zufallsknoten zu bemustern (ROUND_TRANSITION_SAMPLING) statt ihn mit einem einzelnen Netz-Blattwert zu bewerten -- und ist der Preis (Durchsatz UND unschaerfere Paarung in gepaarten Arenen) das wert? | Beleg: NICHTS GEMESSEN, nichts gebaut; der Schalter steht seit 2026-07 auf false. Die alte Doc-Sperre bindet nicht (par.2). Vorab benannt sind zwei Kosten: Durchsatz (par.4.1) und Determinismus (par.4.2). Messkette bindend in par.5: Kostentor ZUERST, Staerke danach. -->
+<!-- STATUS: OFFEN | Frage: Bringt es SPIELSTAERKE, den Rundenuebergang in der Suche als Zufallsknoten zu bemustern (ROUND_TRANSITION_SAMPLING) statt ihn mit einem einzelnen Netz-Blattwert zu bewerten -- und ist der Preis (Durchsatz UND unschaerfere Paarung in gepaarten Arenen) das wert? | Beleg: NICHTS GEMESSEN, nichts gebaut; der Schalter steht seit 2026-07 auf false. Die alte Doc-Sperre bindet nicht (par.2). Vorab benannt sind zwei Kosten: Durchsatz (par.4.1) und Determinismus (par.4.2). Messkette bindend in par.5: Kostentor ZUERST, Staerke danach. 2026-09-05: Nutzer-Leitsatz (Drafting muss das Tiling kennen) und Aufspaltung A/B/C als Vorschlag in par.7; Entscheid par.4.2 offen. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -179,3 +179,40 @@ Wertungsplatte, eigene Punkte, Marge.
   innerhalb der Runde, ZU BAUEN).
 - **Kein Trainingsziel-Eingriff.** Der TD-Bootstrap bleibt unangetastet; er
   ist die Label-Seite und laut `PREREG_chance_nodes.md` erledigt.
+
+## par.7 LEITSATZ DES NUTZERS UND AUFSPALTUNG DES ARMS (2026-09-05, 18:55; Vorschlag, NICHT entschieden)
+
+**Nutzer, woertlich:** *"drafting und tiling gehen hand in hand. das
+drafting muss zum teil schon wissen wie das tiling agieren wird um die
+fliesen zu legen und punkte zu generieren."* Und davor: *"mir kommt diese
+fehlende sicht der suche auf das tiling als schwachpunkt vor."*
+
+**Was der Schalter dieser Prereg dazu leistet und was nicht:** er buendelt
+ZWEI Dinge. (a) `resolve_to_pre_chance` spielt das Tiling BEIDER Seiten mit
+dem exakten Loeser durch -- das ist die Sicht, die der Nutzer meint, und sie
+ist deterministisch. (b) `sample_round_transition_value` bemustert danach
+die Fabrik-Neubefuellung (8 Stichproben, 8 Netzaufrufe) -- das ist der
+Zufallsanteil, an dem Kostentor (par.4.1) und Paarungs-Schaerfe (par.4.2)
+haengen. Die Kosten der Prereg stammen fast ganz aus (b).
+
+**Vorschlag Variante B (zu registrieren, falls der Nutzer zustimmt):**
+(a) wie gebaut, dann EINE gezogene Neubefuellung und EIN Netzaufruf. Kosten je
+Rundenende-Blatt: zwei Loeser-Laeufe, Netzaufrufe wie heute. Der Blattwert ist
+dann eine Stichprobe statt eines Mittels; die Suche mittelt ueber Besuche.
+Paarungs-Schaerfe (par.4.2) ist genauso betroffen wie bei A (der RNG wird
+gezogen), das Kostentor vermutlich nicht gerissen -- UNGEPRUEFT, der
+Loeser hat bei mehreren chippable Reihen ein Knotenbudget
+(`tiling_solver.rs`, Haenger-Vorfall), eine greedy Variante fuer das Blatt
+waere der billigere Ersatz. Beide Varianten (A, B) laufen durch dieselbe
+Messkette par.5: Schritt 0 Nutzer-Entscheid par.4.2, Schritt 1 Kostentor
+und Anteil der Rundenende-Blaetter je Suche, Schritt 2 Staerke im
+gepaarten Duell desselben Netzes mit gegen ohne Schalter.
+
+**Dritte Variante C, ausserhalb dieser Prereg (Encoder-Seite):** dem Netz
+das projizierte Nach-Tiling-Raster und den erwarteten Kuppel-Bonus als
+Eingabe geben (Richtung des Sicht-Arms v24-b04). Kostet in der Suche nichts,
+braucht ein Training, bleibt eine Schaetzung statt des gespielten Tilings.
+
+**Offen beim Nutzer:** par.4.2 (unschaerfere Paarung in Kauf nehmen?) und ob
+B registriert wird. Bau fruehestens nach den v24-Abnahmen (Maschine belegt).
+
