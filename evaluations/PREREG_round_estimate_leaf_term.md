@@ -1,0 +1,150 @@
+<!-- STATUS: OFFEN | Frage: Traegt ein additiver Rundenschaetzer-Term am Netz-Blattwert (Solver-Rundenscore plus Strafleisten-Busse, Differenz beider Seiten, tanh mit gemessener Skala, Runde 5 null) Spielstaerke und Spalten am v24-Siegernetz? | Beleg: Nichts gebaut, nichts gemessen. Angelegt 2026-09-05 auf Nutzer-Auftrag (Leitsatz: Drafting muss das Tiling kennen). Skala B_est wird VOR dem Bau aus der Differenzverteilung gemessen (par.4). Messkette par.5, Bau nach den v24-Abnahmen. -->
+
+# Vorregistrierung: Rundenschaetzer als additiver Term am Netz-Blattwert (Such-Knopf K4)
+
+**Angelegt 2026-09-05, 19:20, auf Nutzer-Auftrag ("leg die prereg an. die
+strafleisten busse kannst als schaetzer mitaufnehmen"). Nichts gebaut.**
+
+## par.1 Anlass und Leitsatz
+
+Nutzer 2026-09-05, woertlich: *"drafting und tiling gehen hand in hand. das
+drafting muss zum teil schon wissen wie das tiling agieren wird um die
+fliesen zu legen und punkte zu generieren."* Und: *"wobei wir haben schon
+einen point estimator implementiert. die heuristik verwendet ihn. vielleicht
+kann/sollte das netz ihn auch verwenden."* Nutzer-Entscheid: *"additiver term
+ist denk ich gut."*
+
+## par.2 Was heute ist (Code geprueft 2026-09-05)
+
+- Die Netz-Suche bewertet ein Blatt mit dem Netz auf dem Zustand VOR dem
+  Tiling; am Rundenende wird kein Stein gelegt
+  (`ROUND_TRANSITION_SAMPLING = false`, net_mcts.rs:95). Kontext:
+  `PREREG_round_transition_search_sampling.md` par.7,
+  `docs/architecture_reference.md` (Leitsatz).
+- Der Punktschaetzer der Heuristik ist `mcts.rs::player_total`
+  (mcts.rs:81-85): `solve_round_final_score(state, pi)` (exakter DFS-Loeser
+  der Tiling-Phase, GREEDY-Chip-Politik) plus `scoring_progress`
+  (Wertungsplatten-Fortschritt) plus `projected_unplaceable_penalty` (die
+  Strafleisten-Busse, die bereits unplatzierbare Musterreihen am Rundenende
+  verursachen). Normalisiert per `tanh(score / 50)` (mcts.rs:88-105,
+  `VALUE_SCALE = 50` -- Skala des ABSOLUTEN Gesamtscores).
+- Das Netz bekommt den Solver-Rundenscore bereits als EINGABE:
+  `solve_round_final_score(state, pi) - score` je Spieler (features.rs:690),
+  OHNE die Strafleisten-Busse. Ob das Netz dieses Merkmal ausreichend
+  gewichtet, ist unbekannt.
+- Im Netz-Blattwert taucht der Schaetzer nirgends direkt auf (net_mcts.rs
+  nutzt `player_total` nur im ausgeschlossenen Dfs-Zweig, Zeile 2275).
+  Additive Terme derselben Bauform existieren fuer K1 (`apply_score_utility`,
+  aus den Punkte-KOEPFEN, nicht aus dem Solver) und K3 (Huelle).
+
+## par.3 Bauform (registriert, VOR dem Bau)
+
+Schaetzer je Spieler `pi`, in Punkten:
+
+```
+E(pi) = solve_round_final_score(state, pi) - score(pi)
+        + projected_unplaceable_penalty(player pi)        (Vorzeichen wie in player_total)
+```
+
+Der Rundenscore-Anteil und die Busse werden getrennt mitgeloggt (par.5,
+Kennzahl), aber als EIN Schaetzer verrechnet. `scoring_progress` geht NICHT
+hinein (Wertungsplatten-Fortschritt ist Geometrie, nicht Rundenpunkte, und
+ist ueber K3 / die Plattenkoepfe anders adressiert).
+
+Term am Netz-Blattwert, aus Sicht von Spieler 0, Nullsumme, geklammert
+(gleiche Bauform wie K1/K3, dieselbe Stelle im Blatt-Pfad hinter dem
+K3-Term):
+
+```
+shift = C_est * tanh( (E(0) - E(1)) / B_est )      fuer Runde 1..4
+shift = 0                                         in Runde 5
+today_value[0] += shift;  today_value[1] -= shift;  beide auf [0, 1] geklammert
+```
+
+**Kein Runden-Profil** (Nutzer-Rueckfrage 2026-09-05, Antwort registriert):
+der Schaetzer ist in jeder Runde gleich exakt, sein Betrag skaliert von
+selbst mit den Rundenpunkten; ein Profil wuerde eine Eichung vorwegnehmen,
+die es erst nach dem ersten Lauf gibt. Nur Runde 5 ist zwingend null, weil
+dort der exakte Loeser samt Endwertung rechnet (dieselbe Auflage wie K3,
+`geometric_envelope` par.4.1). Ein Profil wird erst dann eine Variante, wenn
+der Basisarm frueh und spaet auseinanderlaeuft.
+
+**Knoepfe:** `MOSAIC_ROUND_EST_C` (C_est, Default 0,0 = aus, byte-identisch)
+und `MOSAIC_ROUND_EST_B` (B_est, Default = gemessener Wert aus par.4, VOR dem
+Bau eingetragen). Beide als Spec-Pflichtfelder je Seite
+(`round_est_c`, `round_est_b`), wie `envelope_search_c`; Registry-Eintrag,
+`engine_config`, Manifest.
+
+**Kosten:** der Solver laeuft fuer die Merkmale ohnehin je Netzaufruf fuer
+beide Spieler (features.rs:690). Ob der Blatt-Pfad diesen Wert wiederverwenden
+kann oder zwei weitere Solver-Aufrufe braucht, ist UNGEPRUEFT und wird beim
+Bau geklaert; im zweiten Fall gilt das Kostentor aus par.5.
+
+## par.4 Skala B_est: gemessen, nicht gesetzt
+
+Die 50 der Heuristik passen nicht (Nutzer: "keiner macht 50 punkte in einer
+runde" -- sie normalisiert den Gesamtscore einer Partie). Die Differenz zweier
+Rundenschaetzer lebt auf der Skala weniger Punkte (Arena-Logs 2026-09-05:
+rund 50 Tiling-Punkte je Partie und Seite, also etwa 10 je Runde).
+
+**Messung (VOR dem Bau, billig, CPU-Kern, Minuten):** ueber die Draft-
+Zustaende echter Partien (Replay der Arena-Logs
+`paired_arena_env_v24b01_vs_b01_*_s14.json` per `analyze_game_log.Replayer`,
+2 x 80 Partien) die Verteilung von `E(0) - E(1)` je Runde 1..4 aufnehmen:
+Median, 90. Perzentil, Maximum des Betrags; Rundenscore-Anteil und Busse
+getrennt. **Regel fuer B_est:** das 90. Perzentil des Betrags soll bei
+`tanh = 0,75` landen, also `B_est = P90 / atanh(0,75) = P90 / 0,973`. Ein
+Wert wird erst NACH dieser Messung hier eingetragen; Erwartung (Schaetzung,
+keine Zahl fuer den Bau): zwischen 5 und 10.
+
+## par.5 Messkette (Reihenfolge bindend)
+
+1. **Skala** (par.4), Artefakt `round_estimate_scale_probe.json`.
+2. **Bau** mit Paritaetsgate: `C_est = 0` ist byte-identisch zum Bestand
+   (gleicher Nachweis wie bei K1/K3: gleiche Seeds, gleiche Zuege).
+3. **Kostentor:** Wanduhr je Partie mit gegen ohne Knopf, Schwelle 25
+   Prozent (uebernommen aus `round_transition_search_sampling` par.4.1 /
+   `bootstrap_horizon`). Nur relevant, falls der Blatt-Pfad den Solver
+   zusaetzlich aufrufen muss.
+4. **argmax-Instrument** @400, 200 Partien, Seed 20260931, am
+   v24-Siegernetz (Generatorwahl-Regel), C_est in zwei Dosen (Vorschlag 0,5
+   und 1,0 -- Betrag wie K3, weil tanh-Skala gleich), jeweils auf dem
+   Champion-Knopfsatz (K3-P C 1,0) obendrauf UND einmal ohne K3: trennt
+   Term-Wirkung von Knopf-Wechselwirkung (Lehre v24 par.9b).
+5. **Gepaarte Arena** 2 x 80 in beiden Richtungen, Blockgroesse 5, dasselbe
+   Netz mit gegen ohne Knopf (Spec je Seite), Seed 20261014, `--log-games`.
+   **Entscheidungsmass: Siegquote und Punktemarge auf Block-Ebene**, dazu die
+   sechs Standard-Kennzahlen je Seite und als Differenz (Reihen-, Spalten-,
+   Strafleistenauslastung, Punkte je Wertungsplatte, eigene Punkte, Marge;
+   `arena_column_probe.py`, `arena_points_probe.py` mit Kuppel-Bonus und
+   Strafe je Partie).
+6. **Verdikt:** in den Spielbetrieb nur, wenn die Arena haelt UND die
+   Spalten nicht fallen (Tor-2-Logik, Nicht-Fallen). Vorlage an den Nutzer,
+   keine stille Aufnahme ins Rezept.
+
+**Falsifikator:** keine signifikante Staerke auf Block-Ebene bei beiden
+Dosen -> der Term traegt nicht; dann gilt: das Netz nutzt das Merkmal aus
+features.rs:690 bereits ausreichend, und die Sicht auf das Tiling muss ueber
+die Geometrie kommen (`round_transition_search_sampling` par.7 Variante B/C),
+nicht ueber Punkte.
+
+## par.6 Was dieser Term NICHT ist
+
+- Keine Wiederbelebung des DFS-Blatts: das Netz bleibt der Blattwert, der
+  Term ist ein Regler daneben ([[feedback_dfs_leaf_ruled_out]]).
+- Keine Sicht auf die Tiling-GEOMETRIE: der Schaetzer misst Rundenpunkte.
+  Spaltenvollendung als Endwertung, Huellen-Form, Kuppelplatten-Lage sieht
+  er nur, soweit sie schon Rundenpunkte sind (Kuppel-Bonus ja, Spalten-
+  Endwertung nein). Dafuer stehen K3-P/K3-P2 und
+  `round_transition_search_sampling` par.7.
+- Kein Ersatz fuer die Rundenweitsicht: der Solver ist rundenblind und
+  greedy bei den Chips; als alleiniger Wert war das der Grund fuer Stufe 2,
+  als Zusatz neben dem Netz ist es unproblematisch.
+
+## par.7 Einordnung und Reihenfolge
+
+Such-Knopf K4 in der Zaehlung von `PREREG_v24_window.md` par.8 (K1 Marge, K2
+gestrichen, K3 Huelle, K3-P2 Platzhalter). Gemessen wird am v24-Siegernetz,
+nach den v24-Abnahmen; vorher laeuft nur die Skalen-Messung (par.4), sobald
+die CPU frei ist. Bei Erfolg Kandidat fuer den v25-Knopfsatz zusammen mit
+K3-P2; Kreuzprodukte nur mit Anlass (ein Knopf, ein Netz, eine Messung).
