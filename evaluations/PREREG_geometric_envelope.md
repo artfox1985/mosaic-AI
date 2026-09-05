@@ -1256,8 +1256,8 @@ gesammelt werden, legt der Draft fest. Beides passiert in der Engine in der
 Drafting-Phase (waehrend des Tilings werden keine Platten gelegt,
 tiling_solver.rs Modulkopf) und wird vom K3-P-Potential erreicht.
 
-**Konsequenz:** ein staerkerer Tiling-Term ist kein Hebel (Obergrenze
-gemessen). Der Hebel fuer "Geometrie frueh, Punkte spaet" ist die
+**Konsequenz (EINGESCHRAENKT 2026-09-05, par.8.12):** ein staerkerer H-Term im Tiling ist kein Hebel (Obergrenze
+gemessen) -- das gilt fuer die Huellen-Form H, nicht fuer die Nachbarschafts-Geometrie, siehe par.8.12. Der Hebel fuer "Geometrie frueh, Punkte spaet" ist die
 Plattenwahl in Runde 1-2, und dafuer ist par.8.9b Baustein 1 (K3-P2,
 Modulator: gebundene Reihe ohne annehmende Huellenzelle zaehlt mit `w_slot`
 auf den leeren Huellenzellen ihrer Zeile, die passende Platte hebt sie auf 1)
@@ -1479,4 +1479,71 @@ und Tor 2 beurteilt.
 `value_head_reliability_by_round.json` ist beim naechsten Lauf zu benennen --
 das Artefakt nennt sein Werkzeug nicht), Block-Bootstrap als kleine Sonde
 (zu bauen, reine Arithmetik), Arena-Block-SD aus den JSON-Artefakten.
+
+## par.8.12 NUTZER-KORREKTUR ZUM TILING (22:25, 2026-09-05): rundenmyopisch, Punkte fallen spaet -- par.8.10 gilt nur fuer H
+
+**Nutzer, woertlich:** *"tiling ist greedy und geht immer auf punktemaximierung.
+die meisten punkte fallen erst in runde 4-5. sprich tiling muss hier mehr auf
+die geometrie und die potentiellen nachbarn gehen als auf die reinen punkte."*
+
+**Am Code und an den Logs geprueft:**
+- Der Tiling-Loeser maximiert den RUNDENscore der laufenden Runde
+  (`tiling_solver.rs`, `solve_round_final_score` / `best_first_step_exact`:
+  exakter DFS ueber Platzierungen und Chips, Ziel = Punkte dieser Runde). Er
+  sieht keine Folgerunde. Der Eingriff aus par.8.3 (W_TILE) und par.8.6 (W_VAL)
+  bewertet nur die Top-K-Abschluesse dieses Loesers um; die Punkte bleiben der
+  fuehrende Term.
+- Platzierungspunkte je Runde und Seite in den Abnahme-Arenen 2026-09-05
+  (`points_v24b01_vs_b01_s14.json`, `points_v24b02_vs_b01_s14.json`, je 80
+  Partien, vier Seiten):
+
+| Runde | 1 | 2 | 3 | 4 | 5 | Endwertung |
+| --- | --- | --- | --- | --- | --- | --- |
+| Tiling-Punkte je Seite | 2,7-2,8 | 8,2-8,5 | 11,2-11,5 | 11,4-13,3 | 15,6-16,8 | 4,4-7,0 |
+| Kuppel-Bonus | 0 | 0,1 | 0,5-0,9 | 1,3-1,8 | 1,2-1,6 | |
+
+  Runden 4-5 tragen rund 55 % der Platzierungspunkte, Runden 1-2 rund 22 %.
+  Die Punkte einer Platzierung kommen aus der NACHBARSCHAFT ("+3 Pkt, 3
+  vertikal"): was in Runde 1-2 gelegt wird, bestimmt, welche Nachbarn in
+  Runde 4-5 zaehlen. Ein Loeser, der in Runde 1 die 2,7 Punkte maximiert,
+  optimiert den kleinsten Posten und legt dabei die Geometrie des groessten
+  fest.
+
+**Was par.8.10 gesagt hat und was nicht:** dort wurde gemessen, wie weit die
+HUELLE H im Tiling bewegt werden kann (Obergrenze rund +0,01 H je Partie).
+Das gilt fuer H -- eine kosten-gewichtete Dreiecks-Form -- und nur innerhalb
+der Top-12 punktnahen Abschluesse. Es sagt NICHTS ueber die Nachbarschafts-
+Geometrie (welche Zellen spaeter zusammenhaengende Cluster bilden) und
+nichts ueber Abschluesse, die in Runde 1-2 bewusst Punkte liegen lassen.
+Meine Konsequenz "der Hebel liegt nicht im Tiling" war zu weit gefasst;
+korrigiert.
+
+**Was daraus zu bauen und VORHER zu messen waere (Vorschlag, nichts
+entschieden):**
+1. **Messung zuerst (Sonde, Minuten CPU):** an den Draft-Endzustaenden echter
+   Partien (Replayer, Runde 1-3) alle punktnahen UND alle punktfernen
+   Abschluesse aufzaehlen (`top_k_tilings` mit grossem K) und je Abschluss
+   ein Nachbarschafts-Potential berechnen: fuer jede neu belegte Zelle die
+   Zahl der noch fuellbaren Nachbarzellen (`cell_is_completable`, Restvorrat)
+   in Zeile und Spalte, gewichtet mit den Punkten, die ein spaeterer Stein
+   dort durch diese Nachbarschaft erhielte. Frage: wie oft weicht der
+   potential-beste Abschluss vom punkt-besten ab, wie viele Punkte kostet er
+   HEUTE, und wie viele Nachbarn gewinnt er? Referenz: die Mensch-Logs
+   (`static/log/`), in denen die Endwertung 19,7 gegen 4,2 liegt (par.8.10).
+2. **Bauform, falls die Sonde Spielraum zeigt:** Score(k) = (1 - w_e) x Punkte(k)
+   + w_e x G(k) mit G als Nachbarschafts-Potential in Punkt-Einheiten und dem
+   bestehenden Rundenprofil w_e (frueh Geometrie, spaet Punkte, Runde 5 exakt).
+   Das ist die Umkehr des heutigen Terms: heute Punkte plus kleiner
+   Geometrie-Zuschlag, dann Geometrie mit Punkte-Zuschlag in Runde 1-2. Knopf
+   je Seite ueber die Spec (`envelope_tiling_geo_w`), Default aus, Paritaets-
+   Gate, Messung wie par.8.3 (argmax-Instrument, gepaarte Arena, Kuppel-Bonus
+   und Endwertung je Partie aus `arena_points_probe.py`).
+3. **Warum der Value-Kopf das nicht ersetzt (par.8.6a):** W_VAL liess das Netz
+   die Kandidaten bewerten und blieb ein Nullbefund -- der Kopf ist in Runde
+   1-2 am unzuverlaessigsten (rho 0,14 / 0,20, par.8.5), also genau dort
+   blind, wo die Geometrie entschieden wird.
+
+**Einordnung zum Schliesskriterium par.12:** "sauber implementiert" (Bedingung
+1) schliesst damit den Tiling-Eingriff ein -- nicht als H-Zuschlag, sondern als
+Geometrie-fuehrende Auswahl in den fruehen Runden.
 
