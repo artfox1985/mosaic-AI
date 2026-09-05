@@ -407,7 +407,7 @@ Policy-Klasse (Bericht, v25 par.7): 1.319 von 8.000 Seiten, 0,189, Punkte
 
 | Arm | Training | Tor 2a (argmax @400, Knopf an; Bezug b01 + K3-P 0,555) | Tor 1 (gegen `v23-b01_brierbest`, beide Seiten Champion-Spec) | Tor 2b | Stand |
 | --- | --- | --- | --- | --- | --- |
-| `v24-b01` | 06:12-08:58, 9.973 s, `_brierbest` Epoche 2 (val_brier 0,1919, Val-Pool v24) | **0,4425** (KI +-0,063), Punkte 45,7 -> **GERISSEN** | 34:46 (40 Paare, SPRT H0) und 49:61 (55 Paare, H0), gepoolt 83:107, Elo informativ 1219 [1160, 1283] -> **GERISSEN** | laeuft | scheidet als Generator aus (`generation_loop.md`, "Wenn ein Tor reisst"); Vorlage |
+| `v24-b01` | 06:12-08:58, 9.973 s, `_brierbest` Epoche 2 (val_brier 0,1919, Val-Pool v24) | **0,4425** (KI +-0,063), Punkte 45,7 -> **GERISSEN** | 34:46 (40 Paare, SPRT H0) und 49:61 (55 Paare, H0), gepoolt 83:107, Elo informativ 1219 [1160, 1283] -> **GERISSEN** (kein Beleg besser; "schwaecher" ist damit NICHT belegt, siehe Tor 2b) | **93:67** ueber beide Richtungen (v24 auf Brett 0: 52:28, auf Brett 1: 41:39; Seed 20261014, je 80, Spec beide Seiten); Spalten v24 **0,696 / 0,600** gegen b01 0,494 / 0,575 (SE 0,07-0,09), Punkte 48,4 / 45,5 gegen 41,9 / 44,6, Huelle gleich (0,55) -> **NICHT GEFALLEN** | Tor 1 und 2a gerissen, 2b gehalten und den beiden anderen entgegengesetzt; scheidet als Generator aus (kein Beleg besser); Ursachenanalyse par.9a |
 | `v24-b02` (lambda 0,7) | seit 08:58 | -- | -- | -- | Training |
 | `v24-b03` (Seeding-Schwarm) | Kuratierung 1.500 (0 Abweichungen), Schwarm 6.000 in 8.908 s (1,485 s je Partie), Monolith gebaut | -- | -- | -- | wartet auf b02 |
 
@@ -416,3 +416,23 @@ Self-Play), das daraus warm gestartete Netz spielt am Instrument @400 mit
 Knopf spaltenaermer (0,44) als sein Lehrer ohne Knopf (0,515); `_brierbest`
 fiel auf Epoche 2, die Val-Kennzahlen liegen auf einem neuen Val-Pool.
 Ursachenanalyse nach b02/b03 (Generatorwahl-Regel), nicht je Arm.
+
+### par.9a Widerspruch der Instrumente bei v24-b01 (11:05, offen)
+
+Tor 1 (`paired_gating`, 190 Partien): 83:107, Punkte 44,9/45,8 gegen 46,0/48,2.
+Tor 2b (`paired_arena_env_ab --log-games`, 160 Partien, dieselbe Spec beide
+Seiten): 93:67, Punkte 48,4/45,5 gegen 41,9/44,6, Spalten +0,20 / +0,03.
+Differenz der Siegquoten 14 Prozentpunkte (43,7 gegen 58,1 %), naiv 2,7 SE;
+gegen die gemessene Seed-Streuung des Projekts (5,75 Prozentpunkte bei n = 400
+fuer identische Konfiguration, `docs/working_rules.md`) bei n rund 175 je
+Instrument aber innerhalb dessen, was zwei Seeds auseinanderbringen. Gepoolt
+176:174. Spec-Weitergabe beider Werkzeuge am Code geprueft: beide reichen
+`spec_a`/`spec_b` an `net_vs_net_arena_match` (paired_gating.py:249/254,
+paired_arena_arm_worker.py:122-129); Unterschied: der Arena-Worker setzt
+zusaetzlich `MOSAIC_ENVELOPE_SEARCH_C=1.0` prozessweit. Lesart: v24-b01 ist
+gegen b01 NICHT belegt besser (Tor 1 gerissen als Ratsche) und NICHT belegt
+schwaecher; das argmax-Instrument (0,44) und die Arena-Spalten (0,60-0,70)
+gehen auseinander. Naechste Messungen (CPU frei, sobald die Ketten es
+zulassen): argmax v24-b01 OHNE Knopf (trennt Netz von Knopf-Wechselwirkung),
+Huellen-Sonde auf `tor2a-v24b01`, hv2-Fenster-Kennzahl, v23-Sockel als
+Vergleich fuer die Policy-Klasse.
