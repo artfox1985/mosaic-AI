@@ -28,9 +28,9 @@ echo "== B2) --resume"
 python -X utf8 -u train.py --name rtest_b $COMMON --resume || fail=1
 [ -f models/alphazero_rtest_b_resume.pth ] && { echo "FEHLER: Zwischenstand b nach Ende nicht geloescht"; fail=1; }
 echo "== D1) Pause per Stopp-Datei nach Epoche 1 (Datei vor dem Start anlegen ist verboten, also im Hintergrund nach dem Start)"
-( sleep 20; touch models/alphazero_rtest_d.stop ) &
-python -X utf8 -u train.py --name rtest_d $COMMON; rc=$?
-wait
+# Testhaken in train.py legt die Stopp-Datei nach Epoche 1 selbst an (ein von aussen nach
+# 20 s angelegter Stopp kam am 2026-09-06 zu spaet: der Mini-Lauf mit Cache war in 12 s fertig).
+MOSAIC_PAUSE_TEST_STOP_AT_EPOCH=1 python -X utf8 -u train.py --name rtest_d $COMMON; rc=$?
 [ "$rc" = "75" ] || { echo "FEHLER: D1 Exit $rc, erwartet 75"; fail=1; }
 [ -f models/alphazero_rtest_d.stop ] && { echo "FEHLER: Stopp-Datei nicht geloescht"; fail=1; }
 [ -f models/alphazero_rtest_d_resume.pth ] || { echo "FEHLER: kein Zwischenstand nach Pause"; fail=1; }
