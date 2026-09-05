@@ -151,16 +151,19 @@ pub fn projected_mode() -> bool {
 
 /// Projektions-Modus des Such-Terms (e), `MOSAIC_ENVELOPE_PROJECTED`:
 /// 0 = Raster (par.8.1, Bestand), 1 = Musterreihen (par.8.7, K3-P),
-/// 2 = Erreichbarkeit (par.8.9, K3-R), 3 = Ownership-Kopf (par.8.9, K3-O).
+/// 2 = Erreichbarkeit (par.8.9, K3-R), 3 = Ownership-Kopf (par.8.9, K3-O),
+/// 4 = Musterreihen mit Platzhalter-Regel (par.8.9b Baustein 1, K3-P2).
 /// Ungueltig -> 0 mit einmaliger Warnung.
+pub const PROJECTION_MODE_MAX: u8 = 4;
+
 pub fn projection_mode() -> u8 {
     static CELL: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| match std::env::var("MOSAIC_ENVELOPE_PROJECTED") {
         Err(_) => 0,
         Ok(raw) => match raw.trim().parse::<u8>() {
-            Ok(m) if m <= 3 => m,
+            Ok(m) if m <= PROJECTION_MODE_MAX => m,
             _ => {
-                eprintln!("⚠️  MOSAIC_ENVELOPE_PROJECTED={raw:?} ungueltig (0..3) -- Raster-Modus 0 gilt.");
+                eprintln!("⚠️  MOSAIC_ENVELOPE_PROJECTED={raw:?} ungueltig (0..{PROJECTION_MODE_MAX}) -- Raster-Modus 0 gilt.");
                 0
             }
         },
@@ -291,6 +294,90 @@ pub fn envelope_score_reach(board: &PlayerBoard, remaining: &[i64; 5], w_r: f64)
     best
 }
 
+// ── par.8.9b Baustein 1, K3-P2: Erreichbarkeit als MODULATOR des gebundenen
+// Materials, nicht als Belohnung leerer Zellen. K3-P (Modus 1) legt die Masse
+// einer gebundenen Musterreihe `r` auf ihre annehmenden Zielzellen; gibt es
+// KEINE (die Kuppelplatte fuer diese Zellen liegt noch nicht oder passt nicht),
+// zaehlt die Reihe heute 0. K3-P2 legt sie in diesem Fall mit dem Faktor
+// `w_slot` auf die Huellenzellen der Zeile `r`, die noch KEINE Kuppelplatte
+// tragen ("die passende Platte kann noch kommen"). Das Beginnen einer
+// Huellenreihe VOR der Platte wird so belohnt, und das Legen einer passenden
+// Platte hebt das Potential sofort von `w_slot` auf 1 -- die Bewertungs-Form
+// der Kuppelplatten-Lenkung ohne Uebersteuerung (par.8.8). Leere Reihen
+// bekommen NICHTS (der Konstruktionsfehler von K3-R, par.8.9b).
+
+/// `w_slot` (par.8.9b, Vorschlag 0,5): Faktor, mit dem eine gebundene Reihe
+/// ohne annehmende Zielzelle auf den plattenlosen Huellenzellen ihrer Zeile
+/// zaehlt. `MOSAIC_ENVELOPE_SLOT_W`, nur im Modus 4 wirksam.
+pub fn slot_weight() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| crate::net_mcts::read_f64_env("MOSAIC_ENVELOPE_SLOT_W", 0.5))
+}
+
+/// Projiziertes Brett fuer EINE Huellen-Orientierung mit Platzhalter-Regel
+/// (K3-P2). Wie [`projected_occupancy`], nur dass eine gebundene Musterreihe
+/// `r` OHNE annehmende Zielzelle ihre Masse `k / (r + 1)` mit dem Faktor
+/// `w_slot` gleich verteilt auf die Zellen der Zeile `r` legt, die in `hull`
+/// liegen und noch keine Kuppelplatte tragen (`get_space == None`). Gibt
+/// zusaetzlich zurueck, ob die Regel fuer mindestens eine Reihe gegriffen hat.
+pub fn projected_occupancy_slot(board: &PlayerBoard, hull: Hull, w_slot: f64) -> ([[f64; 6]; 6], bool) {
+    let occ = occupancy(board);
+    let mut out = [[0.0f64; 6]; 6];
+    let mut used = false;
+    for r in 0..6 {
+        for c in 0..6 {
+            if occ[r][c] {
+                out[r][c] = 1.0;
+            }
+        }
+    }
+    for (r, line) in board.pattern_lines.iter().enumerate().take(6) {
+        let (Some(color), k) = (line.color, line.tiles.len()) else { continue };
+        if k == 0 {
+            continue;
+        }
+        let mass = k as f64 / (r + 1) as f64;
+        let targets: Vec<usize> = (0..6)
+            .filter(|&c| board.dome_grid.get_space(r, c).is_some_and(|sp| sp.accepts(color)))
+            .collect();
+        if !targets.is_empty() {
+            let share = mass / targets.len() as f64;
+            for c in targets {
+                out[r][c] += share;
+            }
+            continue;
+        }
+        // Platzhalter-Regel: keine annehmende Zelle -> plattenlose Huellenzellen der Zeile.
+        let slots: Vec<usize> = (0..6)
+            .filter(|&c| hull.contains(r, c) && board.dome_grid.get_space(r, c).is_none())
+            .collect();
+        if slots.is_empty() {
+            continue; // alle Huellenzellen der Zeile tragen Platten, die nicht passen: 0 wie K3-P
+        }
+        used = true;
+        let share = w_slot * mass / slots.len() as f64;
+        for c in slots {
+            out[r][c] += share;
+        }
+    }
+    (out, used)
+}
+
+/// `H_slot(brett)` (K3-P2): je Orientierung eigene Belegung nach
+/// [`projected_occupancy_slot`], `H` darauf wie K3-P (Huellenwahl nach
+/// `deviation_frac`), Maximum ueber beide Orientierungen ("die beste Huelle,
+/// die noch offen ist", wie K3-R). Greift die Platzhalter-Regel nirgends,
+/// sind beide Belegungen gleich [`projected_occupancy`] und das Ergebnis ist
+/// exakt [`envelope_score_projected`].
+pub fn envelope_score_projected_slot(board: &PlayerBoard, w_slot: f64) -> f64 {
+    let mut best = f64::NEG_INFINITY;
+    for hull in [Hull::Left, Hull::Right] {
+        let (occ, _) = projected_occupancy_slot(board, hull, w_slot);
+        best = best.max(envelope_score_frac(&occ));
+    }
+    best
+}
+
 // ── par.8.9 K3-O: der Ownership-Kopf als Projektion ──────────────────────────
 
 /// `H_own` aus 36 Feld-Logits (eine Spielerhaelfte des Ownership-Kopfs,
@@ -341,6 +428,10 @@ pub fn search_shift_state(
             let ego = envelope_score_ownership(&ownership[0..36]).unwrap_or(0.0);
             let other = envelope_score_ownership(&ownership[36..72]).unwrap_or(0.0);
             if state.current_player == 0 { (ego, other) } else { (other, ego) }
+        }
+        4 => {
+            let w = slot_weight();
+            (envelope_score_projected_slot(b0, w), envelope_score_projected_slot(b1, w))
         }
         _ => (envelope_score(b0), envelope_score(b1)),
     };
@@ -580,6 +671,45 @@ mod tests {
         // 19 leere Huellenzellen (Kosten 56 - 1 - 1 = 54) zaehlen w_r.
         let h = envelope_score_reach(&board, &remaining, 0.25);
         assert!((h - (2.0 + 0.25 * 54.0) / 56.0).abs() < 1e-12, "{h}");
+    }
+
+    /// par.8.9b Baustein 1 (K3-P2): eine gebundene Reihe 2 (Rot, 2 von 3)
+    /// ohne annehmende Zelle -- die Kuppelplatte fuer (2,0)/(2,1) fehlt, die
+    /// uebrigen Zellen der Zeile nehmen nur Blau -- zaehlt in K3-P 0, in K3-P2
+    /// `w_slot * (2/3)` auf den beiden plattenlosen LINKEN Huellenzellen, also
+    /// `H_slot = 0,5 * (2/3) * 3 / 56 = 1/56` (RECHTS hat dort keine
+    /// plattenlosen Huellenzellen und bleibt 0). Liegt die passende Platte,
+    /// greift die Regel nicht mehr und `H_slot == H_proj` (2/56). `w_slot = 0`
+    /// ergibt exakt K3-P.
+    #[test]
+    fn slot_projection_counts_bound_row_without_target_on_tileless_hull_cells() {
+        let mut board = board_with(&[]);
+        for c in 2..6 {
+            let sp = board.dome_grid.get_space_mut(2, c).unwrap();
+            sp.space_type = SpaceType::Normal;
+            sp.required_color = Some(crate::tile::TileColor::Blau);
+        }
+        board.pattern_lines[2].color = Some(crate::tile::TileColor::Rot);
+        board.pattern_lines[2].tiles = vec![crate::tile::TileColor::Rot; 2];
+        // Platte fuer Zeilen 2-3, Spalten 0-1 herausnehmen (Kuppelraster 3x3: Slot (1, 0)).
+        let tile = board.dome_grid.dome_slots[1][0].take().expect("Testgitter hat alle neun Platten");
+        assert!(board.dome_grid.get_space(2, 0).is_none() && board.dome_grid.get_space(2, 1).is_none());
+        assert_eq!(envelope_score_projected(&board), 0.0, "K3-P: keine annehmende Zelle -> 0");
+        let (occ_l, used_l) = projected_occupancy_slot(&board, Hull::Left, 0.5);
+        assert!(used_l);
+        assert!((occ_l[2][0] - 0.5 * (2.0 / 3.0) / 2.0).abs() < 1e-12 && occ_l[2][0] == occ_l[2][1]);
+        let (_, used_r) = projected_occupancy_slot(&board, Hull::Right, 0.5);
+        assert!(!used_r, "RECHTS: (2,0)/(2,1) liegen nicht in der Huelle, keine Platzhalter");
+        let h = envelope_score_projected_slot(&board, 0.5);
+        assert!((h - 1.0 / 56.0).abs() < 1e-12, "{h}");
+        assert_eq!(envelope_score_projected_slot(&board, 0.0), envelope_score_projected(&board), "w_slot = 0 ist K3-P");
+        // Passende Platte gelegt (Wild nimmt Rot an): Regel greift nicht mehr, H_slot == H_proj.
+        board.dome_grid.dome_slots[1][0] = Some(tile);
+        let hp = envelope_score_projected(&board);
+        assert!((hp - 2.0 / 56.0).abs() < 1e-12, "{hp}");
+        assert_eq!(envelope_score_projected_slot(&board, 0.5), hp);
+        let (_, used) = projected_occupancy_slot(&board, Hull::Left, 0.5);
+        assert!(!used);
     }
 
     /// par.8.9: Ownership-Projektion -- Logits +8 innen / -8 aussen ergeben
