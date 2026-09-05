@@ -13,6 +13,20 @@ gefehlt: die Kanalzahl war beim Uebertrag ueberholt (siehe unten).
 
 - `ACTIVE_LEAF = LeafEval::Net`; Stufe 1 (DFS-Blatt) liegt dormant, Rueckfall
   ist ausgeschlossen (Rundenweitsicht ist harte Anforderung).
+- **Leitsatz (Nutzer 2026-09-05): Drafting und Tiling gehen Hand in Hand --
+  das Drafting muss zum Teil schon wissen, wie das Tiling agieren wird, um
+  Fliesen zu legen und Punkte zu erzeugen.** Stand der Engine dazu: der
+  Suchbaum laeuft nur INNERHALB einer Runde; das Blatt am Uebergang Drafting
+  -> Tiling ist pseudo-terminal und bekommt EINEN Netzwert auf dem Zustand
+  VOR dem Tiling (`ROUND_TRANSITION_SAMPLING = false`, net_mcts.rs:95). Kein
+  Stein wird im Baum gelegt; das Tiling erreicht die Suche nur ueber das Netz
+  (Eingaben: gebundene Reihen, annehmende Zellen, `solve_round_final_score`
+  je Spieler als Punkt-Schaetzer mit greedy Chips, features.rs:690) und ueber
+  die K3-P-Projektion fuer die Huelle. Ausnahme Runde 5 (exakter Loeser samt
+  Endwertung). Das ist der bekannte Schwachpunkt hinter K3-P (par.9 der
+  Einhuellenden-Prereg: H im Draft-Baum konstant) und Gegenstand von
+  `PREREG_round_transition_search_sampling.md` (par.7: Aufspaltung in
+  deterministisches Tiling im Blatt gegen Neubefuellungs-Sampling).
 - Gumbel-Suche aktiv: `GUMBEL_TOP_M = 16`, `GUMBEL_C_SCALE = 1,0`,
   `DEFAULT_C_PUCT = 1,5`, `floor_shaping_weight = 0,3`.
 - `VALUE_SHRINK_ENABLED = false`, `ROUND_TRANSITION_SAMPLING = false`,
