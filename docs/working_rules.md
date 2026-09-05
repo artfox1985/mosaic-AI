@@ -133,7 +133,11 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   train.py speichert nach der laufenden Epoche, loescht die Stopp-Datei und
   endet mit Exit-Code 75; ein Kill kostet dagegen die angefangene Epoche.
   Test beider Wege: `tools/tests/train_resume_pause_test.sh` (Mini-Fenster,
-  rund 2 min GPU; NICHT neben einer laufenden Messung starten).
+  rund 2 min GPU; NICHT neben einer laufenden CPU-Messung starten).
+  **`--fast-loader`** (batchweises Indizieren, 2026-09-05): auf dem Mini-Fenster
+  bitgleiche Gewichte zum Standardpfad (max dW 0,0) bei 9,2 s gegen 18,0 s
+  Wanduhr fuer drei Epochen (Test E, 2026-09-06 00:26); erster Volllauf v24-b03.
+  Default bleibt aus, bis der Volllauf die Epochenzeit belegt.
 
 - **Zwei gleichzeitige Aenderungen brauchen den Kontrollarm auf der
   UNVERAENDERTEN Achse.** Praezedenz: Ownership-Kopf einschalten plus

@@ -2231,6 +2231,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # --no-epoch-checkpoint) und der Prozess endet geordnet mit
         # PAUSE_EXIT_CODE. Wiederaufnahme: derselbe Befehl plus --resume. So
         # kann die GPU ohne Verlust einer Teil-Epoche freigeraeumt werden.
+        # Testhaken (tools/tests/train_resume_pause_test.sh, Fall D): legt die
+        # Stopp-Datei nach der genannten Epoche selbst an, damit der Pause-Pfad
+        # unabhaengig vom Tempo des Laufs geprueft wird (2026-09-06: ein von
+        # aussen nach 20 s angelegter Stopp kam zu spaet, der Mini-Lauf war fertig).
+        _stop_at = os.environ.get("MOSAIC_PAUSE_TEST_STOP_AT_EPOCH")
+        if _stop_at and int(_stop_at) == epoch + 1 and not _stop_file.exists():
+            _stop_file.write_text("MOSAIC_PAUSE_TEST_STOP_AT_EPOCH\n", encoding="utf-8")
+            print(f"🧪 MOSAIC_PAUSE_TEST_STOP_AT_EPOCH={_stop_at}: Stopp-Datei angelegt.", flush=True)
         _pause_requested = _stop_file.exists()
         if epoch_checkpoint or _pause_requested:
             _rs = {
