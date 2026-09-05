@@ -240,3 +240,16 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   listet Zuordnungen (`--list`), findet Waisen (`--orphans`) und druckt
   auf Wunsch die Loeschliste (`--print-delete-list`); es loescht
   NICHTS. Nach jeder groesseren Korpus-Loeschung einmal laufen lassen.
+
+- **Ein Harness-Stopp trifft Hintergrundaufgaben ungleich (2026-09-05, 19:39,
+  ohne Nutzeraktion):** ein direkt in der Hintergrund-Shell gestartetes
+  `python train.py` starb (Epoche 9/12), waehrend `bash tools/<kette>.sh`-
+  Skripte als verwaiste Prozesse WEITERLIEFEN und weiter in ihre
+  Ausgabedateien schrieben, obwohl der Harness "[killed]" gemeldet hatte.
+  Folgen: (1) nach einer Stopp-Meldung ZUERST die Prozessliste pruefen
+  (`Get-CimInstance Win32_Process`), sonst startet man eine laufende Kette
+  doppelt; nur wartende Ketten beenden und neu starten, laufende Messungen
+  stehen lassen. (2) Trainings per `--resume` fortsetzen (Zwischenstand je
+  Epoche, working_rules "Abgebrochenes Training FORTSETZEN") -- hier eine
+  halbe Epoche Verlust statt zwei Stunden. (3) Lange Trainings eher ueber ein
+  Ketten-Skript starten als nackt (Beobachtung aus einem Fall, kein Beleg).
