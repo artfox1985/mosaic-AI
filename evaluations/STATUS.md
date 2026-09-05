@@ -45,7 +45,8 @@ Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
   01:17), Replikation Seed 20261013 laeuft, dann Tor 2b.
 - v24-b05 (b04 plus Ueberraschungsgewichtung): trainiert (brierbest Epoche 4,
   0,1925), Abnahme wartet.
-- v24-b03 (Seeding-Schwarm, 714): Training laeuft seit 00:27 mit `--fast-loader`.
+- v24-b03 (Seeding-Schwarm, 714): trainiert 00:27-01:56 mit `--fast-loader` (5.344 s,
+  `_brierbest` Epoche 4, 0,1868); Abnahme wartet auf Sonde und b05.
 
 **LAEUFT (Hintergrundaufgaben der alten Sitzung; laufen als eigene Prozesse
 weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
@@ -53,16 +54,15 @@ weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
 
 | Lauf | Werkzeug | Start | Stand 00:36 | erwartetes Ende | liest | Artefakte |
 | --- | --- | --- | --- | --- | --- | --- |
-| Training v24-b03 (714, fast-loader) | `tools/night_v24_b03_fast.sh` (nacktes train.py darin) | 00:27 | Epoche 2 fertig 00:43:39, **460 s je Epoche GEMESSEN** (Zwischenstand `models/alphazero_v24-b03_resume.pth`), Val-Brier 0,1876/0,1875 | rund 02:00 (hergeleitet aus 12 x 460 s ab 00:28:33) | `data/window_v24_b03.txt`, Monolith `.cache_299283d4df61.h5`, config.py mit INPUT_SIZE 714 | `models/alphazero_v24-b03*.onnx`, Manifest `manifest_train_v24-b03_20260906_002718.json`; **setzt config.py am Ende auf 744 zurueck** |
+| ~~Training v24-b03 (714, fast-loader)~~ | `tools/night_v24_b03_fast.sh` | 00:27 | **FERTIG 01:56** (5.344 s, `_brierbest` Epoche 4 0,1868; config.py wieder 744, `git diff config.py` leer; Manifest mit Lader-Nachtrag committet) | -- | `data/window_v24_b03.txt`, Monolith `.cache_299283d4df61.h5`, config.py mit INPUT_SIZE 714 | `models/alphazero_v24-b03*.onnx`, Manifest `manifest_train_v24-b03_20260906_002718.json`; **setzt config.py am Ende auf 744 zurueck** |
 | Abnahme b04 | `tools/night_v24_b04_acceptance_744venv.sh` (venv_measure744, 744er-Wheel) | 21:49 | Tor 1 MIT Knopf 135:135 nach 135 Paaren, H0 (01:17, Kante im Elo-Register); Replikation Seed 20261013 laeuft seit 01:17, dann Tor 2b (2 x 80) | rund 02:30 | `models/alphazero_v24-b04_brierbest.onnx`, Champion-Spec, `k3v_off.spec.json` | `tor2a_v24b04*.json`, `paired_gating_result_v24-b04_*`, `paired_arena_env_v24b04_*`, `columns_v24b04_*`, `points_v24b04_vs_b01_s14.json` |
 | Tiling-Geometrie-Sonde | `tools/cpu_queue_after_b04.sh` | 22:xx (wartet) | wartet auf Ende der b04-Abnahme | rund 02:45 | `static/log/game_*.log`, `paired_arena_env_v24b01_vs_b01_*_s14.json` | `tiling_geometry_probe_human.json`, `tiling_geometry_probe_arena.json` |
 | Abnahme b05 | `tools/night_v24_b05_acceptance_wait.sh` (Basis-python, Wheel 744 installiert 00:24) | 00:24 (wartet) | wartet auf freie CPU (b04-Abnahme, Sonde) | Start rund 02:45, Ende rund 06:45 | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
 | Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:58 (wartet) | wartet auf b03-Modell UND freie CPU; sein Wartemuster kennt Sonde, `cpu_queue_after_b04` und b05-Wartelauf NICHT -- deshalb haelt `tools/night_v24_after_b05_chain_hold.sh` (seit 00:53, Prozess nur wartend) es fest, bis Sonde und b05-Abnahme durch sind (Chronik 00:53) | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
 
 **Baum:** HEAD b472171 plus Uebergabe-Commit; 41 Commits vor origin/main, **kein Push**.
-**`config.py` ist ABSICHTLICH ungetrackt geaendert (INPUT_SIZE 714, HEAD hat 744)**, solange
-das b03-Training laeuft; `night_v24_b03_fast.sh` setzt es am Ende zurueck. NICHT committen,
-NICHT zuruecksetzen, solange train.py laeuft. Danach `git diff config.py` muss leer sein.
+`config.py` steht seit 01:56 wieder auf 744 (`git diff config.py` leer; das b03-Training hat es
+selbst zurueckgesetzt). Die GPU ist frei.
 Wheel 744 (Kontrakt `20b442a8164f748d`, mit K3-P2, Default aus) ist in der Basis installiert;
 Anker-Drift darunter GRUEN (2026-09-05 21:45). Mess-venvs: `venv_measure714/`, `venv_measure744/`
 (gitignored).
@@ -86,11 +86,8 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    (`tools/elo_tracker.py add`, Knopf = eigener Knoten `v24-bXX_k3p10` gegen
    `v23-b01_k3p10`, ohne Knopf `v24-bXX` gegen `v23-b01_brierbest`, Knoepfe
    per `--knobs "spec:..."`), Kuppel-Bonus aus `points_v24bXX_vs_b01_s14.json`.
-2. **b03-Training beobachten:** Epochenzeit GEMESSEN 460 s (00:46, in
-   `working_rules.md` und `measured_runtimes.md` eingetragen). Bei Abbruch: derselbe Befehl aus
-   `night_v24_b03_fast.sh` plus `--resume`, config MUSS dabei 714 sein. Nach
-   dem Ende: `config.py` wieder 744 (Skript macht es), `git diff config.py`
-   leer, Manifest `manifest_train_v24-b03_*.json` committen.
+2. ~~b03-Training beobachten~~ ERLEDIGT 01:56: 5.344 s, rund 440 s je Epoche
+   (`measured_runtimes.md`), config zurueck auf 744, Manifest committet.
 3. **Tiling-Geometrie-Sonde auswerten** (`tiling_geometry_probe_human.json`,
    `..._arena.json`): Ergebnis in `PREREG_geometric_envelope.md` par.8.12
    (Mensch gegen KI gegen Loeser: Anteil punkt-bester Abschluss, Punktkosten
@@ -102,10 +99,10 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    (`cpu_queue_after_b04.sh`) faehrt sie mit; Block `reihen_alter` im selben
    Artefakt. Beide Teile auswerten und in par.8.12 UND par.8.14 registrieren;
    DANN K3-F bauen (Nutzer 00:50).
-4. **Mini-Fenster-Test Fall D (Pause)** im naechsten GPU-freien Fenster
-   (nach b03): `bash tools/tests/train_resume_pause_test.sh` -- muss GRUEN
-   werden (Testhaken `MOSAIC_PAUSE_TEST_STOP_AT_EPOCH` ist gebaut, Lauf fehlt).
-   Dann `--fast-loader` als Default erwaegen (Nutzer-Entscheid).
+4. **Mini-Fenster-Test Fall D (Pause)**: LAEUFT seit 01:59 (GPU frei; als
+   der eine GPU-Auftrag neben der b04-Replikation, Laufzeiten darum
+   "gebremst"). Muss GRUEN werden. Dann `--fast-loader` als Default erwaegen
+   (Nutzer-Entscheid).
 5. **Nach allen fuenf Abnahmen (gegen 11:00): VORLAGE Generatorwahl v24 an den
    Nutzer** nach `docs/generation_loop.md` "Generatorwahl unter Armen" (Staerke
    schliesst aus, Spaltenprofil entscheidet, sonst Amtsinhaber) -- mit der
