@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4, Plattenwahl R1-2) gebaut 2026-09-05, Messung am v24-Siegernetz offen (par.8.11). WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12; Messgroessen als Vorschlag par.12a, Nutzer-Entscheid offen). -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4, Plattenwahl R1-2) gebaut 2026-09-05, Messung am v24-Siegernetz offen (par.8.11). WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12; Messgroessen par.12a, Schwellen werden aus dem Rauschboden GEMESSEN, Verfahren par.12b, Zahlen offen). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -1380,15 +1380,15 @@ gegen Zirkularitaet das v21-Orakel, par.9 dort), Runden 1-2 als Ziel, Runden
 Netz, Knopf an gegen aus):**
 - **A1 Orakel-Treffer der Suche:** Anteil der Zustaende, in denen der Zug der
   Suche (@400, argmax der Besuche, Champion-Sims) in den Top-3 des Orakels
-  liegt, je Runde. Kriterium: Runde 1 UND Runde 2 mit Knopf um mindestens
-  **+5 Prozentpunkte** hoeher, Block-KI (Bloecke a 5 Zustaende) schliesst 0
-  aus; Runde 3-4 nicht schlechter als -2 Prozentpunkte. Werkzeug: die Orakel-
+  liegt, je Runde. Kriterium: Runde 1 UND Runde 2 mit Knopf hoeher als der
+  GEMESSENE Rauschboden dieser Groesse (par.12b), Runde 3-4 nicht unter den
+  Rauschboden gefallen. Werkzeug: die Orakel-
   Bruecke von `frozen_v3` misst heute PRIOR gegen Orakel (`tools/oracle_metrics.py`,
   `prior_mass_on_oracle_top3`, Kendall-tau); die SUCH-Variante (Besuchsverteilung
   statt Prior) ist zu ergaenzen -- ein Schalter, kein Neubau (UNGEPRUEFT).
 - **A2 Wurzelwert gegen Orakelwert:** Spearman zwischen dem Wurzelwert der Suche
   und dem Orakel-Wert @5000 je Runde, mit gegen ohne Knopf. Kriterium: in
-  Runde 1-2 hoeher, nicht niedriger in 3-4. Nimmt den Ausgang aus der Rechnung
+  Runde 1-2 ueber dem Rauschboden hoeher, in 3-4 nicht darunter gefallen. Nimmt den Ausgang aus der Rechnung
   (par.8.5 Zeile 36: Runde 1-2 misst teils echte Spielunsicherheit, nicht nur
   Kopfschwaeche -- gegen den Ausgang hat rho(1) eine Decke, gegen das Orakel
   nicht in gleichem Mass).
@@ -1397,23 +1397,23 @@ Netz, Knopf an gegen aus):**
 - **B1 rho(r) = Spearman(Value-Kopf, Endmarge)** je Runde auf `frozen_v3`,
   genau die Groesse aus par.8.5 (`value_head_reliability_by_round.json`,
   Bezug `v23-b01_brierbest`: 0,143 / 0,201 / 0,390 / 0,641 / 0,881). Kriterium:
-  rho(1) UND rho(2) des auf Knopf-Material trainierten Netzes um mindestens
-  **+0,05** ueber dem Vorgaenger, bei unveraendertem oder besserem rho(3..5).
+  rho(1) UND rho(2) des auf Knopf-Material trainierten Netzes ueber dem
+  Vorgaenger um mehr als den Rauschboden (par.12b), rho(3..5) nicht darunter.
   SOFORT messbar, ohne Bau: v24-b01 und v24-b02 sind auf K3-P-Material
   trainiert; Bezug ist v23-b01. Zwei Arme sind zwei Rezepte, keine Seeds --
-  die Streuung des Masses ist deshalb VORHER aus zwei Bewertungen desselben
-  Netzes mit verschiedenen Zustands-Teilmengen (Bloecke) zu schaetzen.
+  deshalb zuerst par.12b.
 - **B2 rho_orakel(r) = Spearman(Value-Kopf, Orakel-Wert @5000)** je Runde,
-  gleiche Netze, gleiches Kriterium +0,05. Trennt "Kopf kennt die Stellung"
+  gleiche Netze, gleiches Kriterium (Rauschboden par.12b). Trennt "Kopf kennt die Stellung"
   von "die Stellung ist noch offen".
 
 **Bedingung 3 -- stabiler:**
 - **C1 Streuung statt Mittel:** in den gepaarten Abnahme-Arenen (2 x 80,
   Blockgroesse 5) die Block-Standardabweichung der gepaarten Punktemarge und
   der vollen Spalten je Seite, Knopf an gegen aus. Kriterium: mit Knopf nicht
-  groesser (Verhaeltnis <= 1,0 bei gleicher Partienzahl; Referenz fuer
-  identische Konfiguration 5,75 Prozentpunkte Siegquote bei n = 400,
-  `working_rules.md`).
+  groesser als ohne, gemessen an derselben Partienzahl; die Aufloesung dieses
+  Vergleichs (wie stark zwei Streuungen identischer Konfiguration voneinander
+  abweichen) wird in par.12b aus vorhandenen Arena-Artefakten bestimmt, nicht
+  gesetzt.
 - **C2 Vorzeichen-Konsistenz der Knopf-Wechselwirkung:** die Differenz der
   vollen Spalten am argmax-Instrument (Knopf an minus aus) hat fuer ALLE Arme
   einer Generation dasselbe Vorzeichen. Stand 2026-09-05: b01 +0,045, v24-b01
@@ -1422,16 +1422,60 @@ Netz, Knopf an gegen aus):**
 - **C3 Seed-Streuung des argmax-Instruments:** drei Seeds je Arm, Spannweite
   der vollen Spalten mit Knopf nicht groesser als ohne.
 
-**Reihenfolge und Kosten (Vorschlag):** B1/B2 zuerst (vorhandene Netze,
-vorhandener Satz, Minuten CPU je Netz), dann C2 aus den laufenden Abnahmen
-(faellt ohnehin an), dann A1/A2 und C1/C3 im Zug der K3-P2- und K4-Messungen
-am v24-Siegernetz (par.8.11 bzw. `round_estimate_leaf_term` par.5). Die
-Schwellen (+5 Prozentpunkte, +0,05, Verhaeltnis 1,0) sind VORSCHLAEGE und
-werden vor der ersten Messung vom Nutzer bestaetigt oder ersetzt; danach
-gelten sie als Ratsche, nicht als Richtwert.
+**Reihenfolge und Kosten (Vorschlag):** par.12b (Rauschboden) zuerst, dann
+B1/B2 (vorhandene Netze, vorhandener Satz, Minuten CPU je Netz), dann C2 aus
+den laufenden Abnahmen (faellt ohnehin an), dann A1/A2 und C1/C3 im Zug der
+K3-P2- und K4-Messungen am v24-Siegernetz (par.8.11 bzw.
+`round_estimate_leaf_term` par.5). **Schwellen werden GEMESSEN, nicht
+gesetzt** (Nutzer 20:44: "die schwellen muessten wir messen nicht raten");
+die erste Fassung dieses Absatzes trug geratene Zahlen (+5 Prozentpunkte,
++0,05, Verhaeltnis 1,0), sie sind gestrichen.
 
 **Was par.12a NICHT ist:** kein Ersatz fuer Tor 1 und Tor 2. Ein Knopf, der
 diese Groessen bewegt und Siege oder Spalten kostet, schliesst die Prereg
 nicht (Klausel des Leitsterns: ein Plattenzuwachs, der Siege kostet, ist kein
 Erfolg).
+
+### par.12b RAUSCHBODEN DER MESSGROESSEN (zu messen VOR der ersten Knopf-Bewertung; Verfahren registriert 20:44, Zahlen offen)
+
+Jede Groesse aus par.12a bekommt ihre Schwelle aus zwei gemessenen
+Streuungen, und die Schwelle ist die groessere von beiden:
+
+1. **Zustands-Rauschen (Stichprobe):** dieselbe Bewertung desselben Netzes
+   auf `frozen_v3`, Block-Bootstrap ueber die 360 Zustaende je Runde (36
+   Bloecke a 10 Zustaende in Satz-Reihenfolge, 1.000 Ziehungen). Liefert je
+   Groesse und Runde die Standardabweichung des Masses; die Schwelle fuer eine
+   DIFFERENZ zweier Bewertungen ist die 95-Prozent-Spanne dieser Differenz
+   unter der Nullhypothese (gleiches Netz, zwei Block-Ziehungen). Kosten: die
+   Bewertung selbst (Minuten je Netz), der Bootstrap ist reine Arithmetik.
+2. **Netz-zu-Netz-Rauschen ohne Zieleffekt:** die Spannweite der Groesse
+   ueber Netze, die NICHT gebaut wurden, um den fruehen Value-Kopf zu
+   veraendern, und deren fruehe Runden deshalb als "gleich bis auf Rezept-
+   Rauschen" gelten: `v23-b01_brierbest`, `v23-b05`, `v23-b07` (Relabel),
+   dazu die v24-Arme mit gleichem Material und verschiedenem Zielrezept
+   (`v24-b01`, `v24-b02`). Das ist eine OBERE Schranke des Rauschens (die
+   Netze unterscheiden sich im Rezept), keine Seed-Streuung -- echte Seed-
+   Paare desselben Rezepts gibt es fuer diese Groesse nicht
+   ([[project_training_seed_variance]]: Seed wirkt 4-6x staerker als Knoepfe).
+   Wer diese Schranke ueberschreitet, hat mehr bewegt als jeder Rezeptwechsel
+   der Linie.
+3. **Arena-Streuung (C1):** aus den vorhandenen gepaarten Arena-Artefakten
+   identischer Konfiguration (Referenz 5,75 Prozentpunkte Siegquote bei
+   n = 400, `working_rules.md`) die Block-Standardabweichung der Marge und der
+   vollen Spalten je Seite berechnen; die Aufloesung eines Streuungs-
+   VERGLEICHS ist die Spannweite dieser Block-SD ueber die vorhandenen
+   Artefakte gleicher Konfiguration.
+
+**Regel:** eine Groesse gilt erst dann als bewegt, wenn ihre Differenz beide
+Rauschboeden (1 und 2) ueberschreitet; C1 gilt als "nicht groesser", wenn das
+Verhaeltnis innerhalb der Spannweite aus 3 liegt. Die gemessenen Zahlen
+werden HIER eingetragen, bevor K3-P2 oder K4 an diesen Groessen bewertet
+werden; ein Knopf, der vor der Rauschboden-Messung laeuft, wird nur an Tor 1
+und Tor 2 beurteilt.
+
+**Werkzeuge:** Bewertung auf `frozen_v3` (Orakel-Bruecke der
+`frozen_v3_eval_set`-Prereg, `tools/oracle_metrics.py`; der Erzeuger von
+`value_head_reliability_by_round.json` ist beim naechsten Lauf zu benennen --
+das Artefakt nennt sein Werkzeug nicht), Block-Bootstrap als kleine Sonde
+(zu bauen, reine Arithmetik), Arena-Block-SD aus den JSON-Artefakten.
 
