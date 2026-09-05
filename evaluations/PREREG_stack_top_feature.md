@@ -243,7 +243,9 @@ GUI `static/js/app.js`, Regeln `docs/engine_manual.md`.
    `serialize.rs:307`): nur indirekt ueber die schrumpfende 18er-Maske. par.3
    zweite Luecke, unveraendert; par.8: eigene Stufe.
 4. Historie: kein Zug- oder Rundenkontext im Eingang (Mensch: 30 Logzeilen
-   und Gedaechtnis).
+   und Gedaechtnis). **Nutzer-Entscheid 2026-09-05, 11:30: KEIN Merkposten**
+   -- alles Relevante liegt am Brett, das Log dient dem Menschen zur
+   Nachschau der KI-Zuege; eine Historie im Eingang bringt nichts.
 5. Farben der Strafleisten-Fliesen (`features.rs:212-213` nur Anzahl); sie
    fehlen im `bag+tower`-Zaehler.
 6. Phantom-Fliesen in Musterreihen (`serialize.rs:180`), Ableitbarkeit ueber
@@ -268,8 +270,9 @@ Stapel 0/0) und je Auslage-Slot `[has_special, has_wild]` (3 x 2 = 6 Werte,
 leerer Slot 0/0). `INPUT_SIZE` 714 -> 722, Indizes 0..713 unveraendert.
 Abweichung von par.8 (ein Merkmal je Stufe) bewusst: das Kriterium ist
 Sichtgleichheit, nicht Attribution; die Arena ist Waechter (par.7), und die
-beiden Merkmale sind dieselbe Informationsart (Plattentyp). Ziehserie (3),
-Historie (4) und Kleinposten (5-8) bleiben Merkposten fuer spaetere Stufen.
+beiden Merkmale sind dieselbe Informationsart (Plattentyp). Ziehserie (3)
+und Kleinposten (5-8) bleiben Merkposten fuer spaetere Stufen; Historie (4)
+ist auf Nutzer-Entscheid kein Merkposten.
 
 Bau (par.6 Punkte 2-5): drei Encoder-Stellen append-only (JSON-Pfad,
 Direktpfad, `neural_net.py`), `features_for_layout` kuerzt den Flachteil auf
