@@ -498,5 +498,13 @@ Groessenordnung entspricht der v23-Champion-Kante b01 gegen v21 (214:186).
 Elo-Register: die beiden Knopf-Kanten von heute Morgen sind auf die Knoten
 `v24-b01_k3p10` / `v23-b01_k3p10` umbenannt (Knopf = eigener Spieler,
 Praezedenz Champion-Knoten), die knopflose Kante steht unter `v24-b01` /
-`v23-b01_brierbest`. Offen (CPU-Reihenfolge): argmax v24-b01 bei C 0,5
-(Dosis).
+`v23-b01_brierbest`.
+
+**Nachtrag par.9b, 21:30 -- Knopf-Dosis v24-b01 bei C 0,5 (`tor2a_v24b01c05.json`, argmax @400,
+200 Partien, Seed 20260931, Lauf 21:01-21:30): volle Spalten 0,450 (KI +-0,063), Punkte 46,4,
+Zeilen 0,195, Strafleiste 5,9.** Damit die Dosisreihe fuer v24-b01: C 0 -> 0,518, C 0,5 -> 0,450,
+C 1,0 -> 0,443. Die halbe Dosis kostet dieselben rund 0,07 Spalten wie die volle -- kein
+Dosis-Effekt, sondern ein Schalter: sobald der Knopf an ist, verteilt die Suche bei diesem Netz
+Steine in der Huelle statt Spalten zu vollenden. Gegenmassnahme 1 (Dosis je Generation neu
+eichen) traegt fuer v24-b01 also NICHT; offen bleibt Gegenmassnahme 2 (Material mit Knopf,
+Spielbetrieb ohne oder mit anderem Knopf) und die Frage, warum b02 anders reagiert (+0,095).
