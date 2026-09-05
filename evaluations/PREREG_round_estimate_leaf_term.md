@@ -97,6 +97,28 @@ getrennt. **Regel fuer B_est:** das 90. Perzentil des Betrags soll bei
 Wert wird erst NACH dieser Messung hier eingetragen; Erwartung (Schaetzung,
 keine Zahl fuer den Bau): zwischen 5 und 10.
 
+**GEMESSEN 2026-09-05, 21:38 (`round_estimate_scale_probe.json`, 159 von 160 Partien
+replayt, 1 Divergenz; 38.073 Draft-Zustaende R1-R4):**
+
+| Runde | n | Median D | P90 von abs(D) | Max | Potenzial-Mittel je Seite | Busse ungleich 0 | B_est = P90/0,973 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 10.698 | 0 | 3 | 7 | 1,4 | 0,0 % | 3,1 |
+| 2 | 9.441 | 0 | 8 | 22 | 3,2 | 1,8 % | 8,2 |
+| 3 | 9.184 | 0 | 10 | 25 | 6,0 | 2,2 % | 10,3 |
+| 4 | 8.750 | 0 | 12 | 33 | 7,5 | 9,7 % | 12,3 |
+| 5 (nur zur Kenntnis, Term dort 0) | 5.007 | 1 | 14 | 31 | 12,7 | 3,6 % | 14,4 |
+| **R1-R4 gepoolt** | 38.073 | | **9** | | | | **9,25** |
+
+**Befund:** die Differenz waechst mit der Runde um den Faktor 4 (P90 3 in Runde 1, 12 in
+Runde 4), die Strafleisten-Busse ist selten (unter 10 % der Seiten, Runde 4 am haeufigsten)
+und klein. Mit EINER Skala B_est 9,25 ist der Term in Runde 1 praktisch aus (tanh(3/9,25) =
+0,31 am P90) und in Runde 4 nahe der Saettigung. Das ist genau die Frage aus par.3 (kein
+Profil) von der anderen Seite: nicht das Gewicht, die SKALA ist rundenabhaengig. Vorschlag,
+Nutzer-Entscheid: (a) B_est je Runde aus dieser Tabelle (3 / 8 / 10 / 12), damit der Term in
+jeder Runde dieselbe Aufloesung hat, oder (b) eine Skala 9,25 und in Kauf nehmen, dass der
+Term frueh kaum wirkt. Die Zahlen stammen aus b01-gegen-v24-b01-Partien mit K3-P C 1,0
+beidseitig; am v24-Siegernetz vor dem Bau erneut messen (Minuten).
+
 ## par.5 Messkette (Reihenfolge bindend)
 
 1. **Skala** (par.4), Artefakt `round_estimate_scale_probe.json`.
