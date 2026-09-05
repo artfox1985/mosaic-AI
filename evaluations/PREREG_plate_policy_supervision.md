@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Laesst sich "dieser Zug baut die Spalte" als AKTIONS-Signal aus dem Zustand lernen -- und weiss der Ownership-Kopf es schon, ohne dass es die Zugwahl erreicht? | Beleg: offen, nichts gebaut. Anlass: zwei externe Durchsichten 2026-08-18 plus die vier geschlossenen Wege am Verbraucher. -->
+<!-- STATUS: UEBERHOLT | Frage: Laesst sich "dieser Zug baut die Spalte" als AKTIONS-Signal aus dem Zustand lernen -- und weiss der Ownership-Kopf es schon, ohne dass es die Zugwahl erreicht? | Beleg: Nichts gebaut. Der Hebel fuer den Spaltenbau sitzt in der SUCHE (K3-P, PREREG_geometric_envelope.md par.8.7/11: Champion seit 2026-09-04), nicht im Aktions-Signal; der Ownership-Kopf ist geschlossen (Gewicht 0). Nutzer-Entscheid 2026-09-05: UEBERHOLT. -->
 
 # PREREG: Plattenziel auf AKTIONS-Ebene — Prototyp k1, Runde 5
 
@@ -335,3 +335,6 @@ vor den Zielwechsel gesetzt hatte, und tauscht mit ihm den Platz.
 - **Der Held-out-Satz stammt aus Bauer-Partien.** In Partien mit noch weniger
   Spaltenfortschritt waere das Ergebnis dasselbe oder deutlicher, nicht schwaecher.
 
+## VERDIKT (2026-09-05, Nutzer-Entscheid: "durchfuehren wie vorgeschlagen")
+
+UEBERHOLT: die Frage setzte voraus, dass "dieser Zug baut die Spalte" als Aktions-Signal ins Training muss. Die Kampagne hat den Hebel woanders gefunden: das projizierte Huellen-Potential in der Suche (K3-P) hebt Spalten, Huelle und Siege gemeinsam und ist seit dem 2026-09-04 Champion-Bestandteil, waehrend der Ownership-Kopf als Trainingsziel mit Gewicht 0 geschlossen wurde. Ein Aktions-Signal haette heute keinen Verbraucher.

@@ -118,3 +118,20 @@ gefehlt: die Kanalzahl war beim Uebertrag ueberholt (siehe unten).
   `NetSelfPlayAgent` (self_play.rs:1324). Ein Heuristik-Korpus traegt es
   strukturell nicht, die Maske ist dort komplett 0 -- **kein Bug**. Einmal als
   solcher fehlgedeutet (Endgame-Loss 0,0000 in v22-b01/b02).
+
+## Merkposten ohne Arm (aus geschlossenen Preregs, 2026-09-05)
+
+Hierher wandert, was als Prereg keinen Verbraucher mehr hat, aber nicht
+vergessen werden soll. Wer einen Punkt aufnimmt, registriert ihn neu.
+
+- **Sichtgleichheit Spieler/Netz** (`PREREG_stack_top_feature.md`, UEBERHOLT):
+  die offen liegende Rueckseite der obersten Kuppelstapel-Platte sieht der
+  Spieler am Tisch, das Netz nicht (par.3 dort). Stufe 0 waere ein
+  Sicht-Inventar in beide Richtungen (par.5), Stufe 1 ein ADDITIVER
+  Input-Zuschnitt (par.6: neue Kanaele ans Ende, Alt-ONNX bleiben spielbar,
+  Input-Shape kommt vom Modell). Kein Staerkeziel; Anlass war eine
+  Nutzer-Frage nach der GUI-Aenderung am Stapel-Dialog (Commit 94b9090).
+- **Additiver Input-Mechanismus als Baustein** (dieselbe Prereg par.6, von
+  `PREREG_uvfa_plate_regime.md` als Abhaengigkeit genannt): jede
+  Regime- oder Sicht-Konditionierung des Netzes braucht ihn zuerst.
+

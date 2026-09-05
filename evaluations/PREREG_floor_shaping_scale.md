@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: FLOOR_SHAPING_SCALE steht auf 50, geerbt von VALUE_SCALE, obwohl sein Zaehler nur ueber -10 bis 0 laeuft statt ueber 0 bis 100+. Der Term verlaesst damit nie den linearen Bereich der tanh -- ist die Konstante falsch kalibriert, und bringt eine Kalibrierung etwas? | Beleg: nichts gebaut, angelegt 2026-08-24. Strukturbefund (par.2/par.3): im linearen Bereich sind W und 1/SCALE DERSELBE Knopf -- der W-Sweep deckte SCALE 100/50/25 schon ab, zweimal H0. NEU ist nur SCALE unter etwa 10 (Saettigung), zweidimensional zu kalibrieren (par.5). Praezedenzfall par.4 mahnt. -->
+<!-- STATUS: UEBERHOLT | Frage: FLOOR_SHAPING_SCALE steht auf 50, geerbt von VALUE_SCALE, obwohl sein Zaehler nur ueber -10 bis 0 laeuft statt ueber 0 bis 100+. Der Term verlaesst damit nie den linearen Bereich der tanh -- ist die Konstante falsch kalibriert, und bringt eine Kalibrierung etwas? | Beleg: Nichts gebaut. Strukturbefund par.2/3: im linearen Bereich sind W und 1/SCALE derselbe Knopf, der W-Sweep deckte SCALE 100/50/25 ab, zweimal H0; nur SCALE < 10 waere neu und hat keinen benannten Nutzniesser. Nutzer-Entscheid 2026-09-05: UEBERHOLT. -->
 
 # Vorregistrierung: Kalibrierung von `FLOOR_SHAPING_SCALE`
 
@@ -172,3 +172,7 @@ Staerkewirkung erwartet wird.
 - **`PREREG_long_row_payoff.md`** par.3/B1: erbt die Lehre aus par.2 --
   dort laeuft der Zaehler nur ueber 0-2, der Nenner darf also erst recht
   nicht ungeprueft von 50 uebernommen werden.
+
+## VERDIKT (2026-09-05, Nutzer-Entscheid: "durchfuehren wie vorgeschlagen")
+
+UEBERHOLT ohne Bau: W und 1/SCALE sind im linearen Bereich derselbe Knopf (par.2/3), der W-Sweep hat die Frage zweimal mit H0 beantwortet, und fuer den einzigen neuen Bereich (SCALE unter etwa 10, Saettigung) gibt es keinen benannten Nutzniesser (CLAUDE.md: Infrastruktur und Knoepfe brauchen einen). Wer den Saettigungsbereich doch messen will, registriert neu mit par.5 als Plan.

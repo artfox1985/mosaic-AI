@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | Beleg: nichts gebaut. Anlass: Nutzer-Frage 2026-08-20 nach der GUI-Aenderung am Stapel-Dialog (Commit 94b9090); Ziel ist Sichtgleichheit, nicht ein Staerkegewinn. Prioritaet: geparkt, Arbeitskreis "Spaeter" wie Task #38. -->
+<!-- STATUS: UEBERHOLT | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | Beleg: Nichts gebaut; Ziel war Sichtgleichheit (offen liegende Rueckseite der obersten Stapelplatte), kein Staerkeziel. Geparkt seit 2026-08-20; als Merkposten nach docs/architecture_reference.md verschoben (2026-09-05). Nutzer-Entscheid 2026-09-05: UEBERHOLT. -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -209,3 +209,7 @@ von `PREREG_chance_nodes.md` (Teil B1 `MOSAIC_STACK_DRAW_CHANCE` +
 Teil A1) zu heben — dieselbe blinde Zone am Kuppelstapel, zwei Seiten:
 dieses Merkmal gibt dem NETZ die oberste Rueckseite, B1 gibt der SUCHE
 die korrekte Ein-Schritt-Erwartung am Peek.
+
+## VERDIKT (2026-09-05, Nutzer-Entscheid: "durchfuehren wie vorgeschlagen")
+
+UEBERHOLT als Prereg, erhalten als Merkposten: Sichtgleichheit zwischen Spieler und Netz bleibt ein berechtigtes Ziel, hat aber kein Staerke-Kriterium und keinen Arm. Das Sicht-Inventar (par.5) und der additive Input-Zuschnitt (par.6) stehen als Merkposten in docs/architecture_reference.md; wer sie baut, registriert neu.
