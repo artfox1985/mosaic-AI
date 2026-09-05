@@ -410,7 +410,7 @@ Policy-Klasse (Bericht, v25 par.7): 1.319 von 8.000 Seiten, 0,189, Punkte
 | Arm | Training | Tor 2a (argmax @400, Knopf an; Bezug b01 + K3-P 0,555) | Tor 1 (gegen `v23-b01_brierbest`, beide Seiten Champion-Spec) | Tor 2b | Stand |
 | --- | --- | --- | --- | --- | --- |
 | `v24-b01` | 06:12-08:58, 9.973 s, `_brierbest` Epoche 2 (val_brier 0,1919, Val-Pool v24) | **0,4425** (KI +-0,063), Punkte 45,7 -> **GERISSEN** | 34:46 (40 Paare, SPRT H0) und 49:61 (55 Paare, H0), gepoolt 83:107, Elo informativ 1219 [1160, 1283] -> **GERISSEN** (kein Beleg besser; "schwaecher" ist damit NICHT belegt, siehe Tor 2b) | **93:67** ueber beide Richtungen (v24 auf Brett 0: 52:28, auf Brett 1: 41:39; Seed 20261014, je 80, Spec beide Seiten); Spalten v24 **0,696 / 0,600** gegen b01 0,494 / 0,575 (SE 0,07-0,09), Punkte 48,4 / 45,5 gegen 41,9 / 44,6, Huelle gleich (0,55) -> **NICHT GEFALLEN** | Tor 1 und 2a gerissen, 2b gehalten und den beiden anderen entgegengesetzt; scheidet als Generator aus (kein Beleg besser); Ursachenanalyse par.9a |
-| `v24-b02` (lambda 0,7) | seit 08:58 | -- | -- | -- | Training |
+| `v24-b02` (lambda 0,7) | 08:58-12:21, 12.166 s (Datenaufbau 71 s), `_brierbest` Epoche 2 (val_brier 0,1923), `_best` Epoche 1; Val-R2 Value 0,47 (anderes Ziel, nicht mit b01 vergleichbar), Plateau-Muster wie b01 | -- | -- | -- | Abnahme wartet auf CPU (Reihenfolge: Gating b01 ohne Knopf, cargo/Wheel, b04-Bloecke) |
 | `v24-b03` (Seeding-Schwarm) | Kuratierung 1.500 (0 Abweichungen), Schwarm 6.000 in 8.908 s (1,485 s je Partie), Monolith gebaut | -- | -- | -- | wartet auf b02 |
 
 Beobachtung ohne Verdikt: das Material ist spaltenreich (0,61 @100 im
