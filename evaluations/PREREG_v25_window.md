@@ -258,9 +258,18 @@ Herleitung von par.9 an einer Stelle, die dort uebergangen war:
   Spalten-Waechter par.7 bekommt eine VIERTE Zeile: **Traeger-Kennzahl**
   (Seiten mit voller Spalte und volle Spalten je Seite NUR ueber die
   Traeger-Dateien des Fensters, `corpus_sanity_check.py` ueber die
-  Traeger-Liste des Manifests). Bezug v24: aus den 580 Traegern noch zu messen
-  (UNGEMESSEN; die Klassenwerte oben legen einen niedrigen Wert nahe, weil 400
-  der 580 Sockel-Dateien sind).
+  Traeger-Liste des Manifests). **Bezug v24 GEMESSEN 21:42 (`v24_sanity_carriers.json`,
+  `corpus_sanity_check.py data --file-list data/carriers_v24_manifest.txt`, 580 Dateien =
+  5.800 Partien = 11.600 Seiten): volle Spalten 0,356 (+-0,011) je Seite, 3.165 von 11.600
+  Seiten mit voller Spalte (27,3 %), Punkte 32,2, Strafleiste 8,3.** Zum Vergleich das ganze
+  v24-Fenster 0,624 / 44,7 % und die argmax-Klasse 0,748 / 52,5 %: die Policy lernt aus dem
+  spaltenaermsten Drittel des Fensters. Rechnerisch passt der Wert zur Zusammensetzung
+  (400 Sockel-Dateien bei 0,19 plus 180 hv2-Traeger bei 0,73 ergeben 0,357).
+  **Herleitung (nicht gemessen) fuer den v25-Zuschnitt aus par.1:** Traeger = 4.000 Sockel NEU
+  + 1.350 G-1-Sockel + 450 hv2. Bleibt der Sockel NEU beim Erzeugungs-Betriebspunkt des
+  v24-Sockels (0,19), faellt die Traeger-Kennzahl auf rund (5.350 x 0,19 + 450 x 0,73) / 5.800
+  = **0,23** -- ein Drittel unter v24. Der Waechter ("nicht fallen") wuerde damit schon
+  auf dem Papier reissen; das ist der Hebel, nicht die Value-Klasse.
 - **Hebel fuer die Policy, zu pruefen statt der 8.000/0-Frage** (Vorschlaege,
   nichts entschieden): (a) den Sockel NEU spaltenreicher erzeugen (weniger
   Rauschen oder hoehere Temperatur-Abklingung, Betriebspunkt messen), (b)
