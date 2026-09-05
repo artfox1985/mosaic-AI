@@ -424,6 +424,11 @@ still stehen — dieser Fehler ist am 2026-08-17 zweimal passiert.
 - Schau in vorhandene scripts ob dort bereits relevante funktionen vorhanden sind bevor du was neues baust (zb arena.py war schon da, aber du hast dir selbst noch eine gebaut)
 - Bevor ein Kandidat amtierender Champion wird: `/mosaic-champion-promotion`
   (kanonische Liste: `docs/promotion_checklist.md`).
+- Generationswechsel, VOR dem Start des Self-Plays der naechsten Generation:
+  `/mosaic-generation-turnover` (Nutzer-Auftrag 2026-09-05): Maschine frei,
+  Einfrieren, daily-Snapshot mit restic-Beleg, obsolete Ketten-Skripte,
+  tote Self-Plays/Bloecke/Monolithe, Modelle nur nach Ruecksprache,
+  STATUS-Neufassung mit Auslagerung nach archive/history.md.
 - Sitzungswechsel (Kontext fast voll, Nachtprogramm laeuft weiter):
   `/mosaic-handover`. Eine neue Sitzung ist ein Arbeitsauftrag-Chip im
   Projektordner, KEIN Subagent (Nutzer-Anweisung 2026-09-03); vorher STATUS
