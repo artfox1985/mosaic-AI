@@ -136,8 +136,15 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   rund 2 min GPU; NICHT neben einer laufenden CPU-Messung starten).
   **`--fast-loader`** (batchweises Indizieren, 2026-09-05): auf dem Mini-Fenster
   bitgleiche Gewichte zum Standardpfad (max dW 0,0) bei 9,2 s gegen 18,0 s
-  Wanduhr fuer drei Epochen (Test E, 2026-09-06 00:26); erster Volllauf v24-b03.
-  Default bleibt aus, bis der Volllauf die Epochenzeit belegt.
+  Wanduhr fuer drei Epochen (Test E, 2026-09-06 00:26). **Volllauf v24-b03
+  (2026-09-06, Fenster `window_v24_b03`, Samples im End-Manifest):
+  460 s je Epoche** (Zwischenstaende 00:35:59 -> 00:43:39, `wall_s_so_far`
+  520,7 -> 980,7 s), gemessen NEBEN einer laufenden Arena mit 10 Threads;
+  Standard-Lader: 16 min (b04, neben Arena) bzw. 13,9 min (b01, ohne Nachbar;
+  Chronik 2026-09-05 19:07). Faktor rund 2. Default bleibt aus bis zum
+  Nutzer-Entscheid; das Manifest traegt den Lader seit 2026-09-06 in
+  `cli_args.fast_loader` und `laufzeit.lader` (das b03-Manifest 002718 noch
+  nicht: Lauf startete vor dem Fix).
 
 - **Zwei gleichzeitige Aenderungen brauchen den Kontrollarm auf der
   UNVERAENDERTEN Achse.** Praezedenz: Ownership-Kopf einschalten plus

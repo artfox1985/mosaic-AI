@@ -60,6 +60,7 @@ Heuristik bzw. Netz gegen Heuristik, gleiche Sims), nicht das Werkzeug.
 | Gepaarte Arena Netz@400 gegen Netz@400 (`paired_arena_env_ab`, Blockgroesse 5, `--log-games`) | 80 Partien | 10 | **rund 11,4 s je Partie** (900-920 s je Lauf, 2026-09-02) |
 | Cache-Bloecke neu bauen (`build_cache_incremental`, 2D/nortv) | 2.156 Dateien | 6 Worker | **2.280 s** inkl. Zusammenfuegen; **Zusammenfuegen allein 344 s** fuer 2.228 Dateien (Hebel 3, gegen 17.934 s einkernig in train.py) |
 | Training Kaltstart 12 Epochen, b01-Rezept, Monolith-Treffer (`manifest_train_v23-b06_20260902_021224.json`) | 4,72 Mio Samples | CUDA | **8.164 s** (2,27 h), Datenaufbau 31 s |
+| Training Warm-Start 12 Epochen, b01-Rezept, `--fast-loader`, Monolith-Treffer (v24-b03, 2026-09-06, aus den Zwischenstaenden `alphazero_v24-b03_resume.pth`) | Fenster `window_v24_b03` (Samples im End-Manifest) | CUDA, daneben Arena mit 10 Threads | **460 s je Epoche** (00:35:59 -> 00:43:39; `wall_s_so_far` 520,7 -> 980,7 s) gegen 16 min (b04, Standard-Lader neben Arena) und 13,9 min (b01, Standard-Lader ohne Nachbar); Gesamtdauer nach dem Lauf aus dem Manifest |
 | Gepaarte Arena b05@400 gegen Heuristik@150 | 2 x 100 Partien | 10 | **3,33 s je Partie** (666 s), rund 34 s je Block von 10 |
 
 **Parallelisierung ist ergebnisneutral, gemessen statt angenommen** (20 Seeds
