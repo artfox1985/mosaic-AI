@@ -33,8 +33,8 @@ procs() {
 echo "== 0) Warten auf b05-Modell, Ende aller Trainings und der CPU-Messungen ($(date +%H:%M:%S); Deckel 30 h)"
 tick=0
 while true; do
-  t=$(procs 'train\.py'); t=${t:-0}
-  m=$(procs 'night_v24_acceptance_chain|cpu_queue_after_b02|self_play\.py|paired_gating|paired_arena|maturin|cargo '); m=${m:-0}
+  t=$(procs 'train\.py'); t=${t:-999}
+  m=$(procs 'night_v24_acceptance_chai[n]|b04_acceptance_744ven[v]|cpu_queue_after_b0[0-9]|tiling_geometry_prob[e]|self_play\.py|paired_gating|paired_arena|maturin|cargo '); m=${m:-999}
   if [ -f models/alphazero_v24-b05_brierbest.onnx ] && [ "$t" = "0" ] && [ "$m" = "0" ]; then break; fi
   tick=$((tick+1)); [ "$tick" -gt 1800 ] && { echo "STOPP: 30 h ohne Bedingung"; exit 70; }
   [ $((tick % 30)) -eq 0 ] && echo "   warte: b05=$([ -f models/alphazero_v24-b05_brierbest.onnx ] && echo da || echo fehlt), train.py=$t, CPU-Messung=$m ($(date +%H:%M:%S))"
