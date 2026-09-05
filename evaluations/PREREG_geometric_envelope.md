@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4, Plattenwahl R1-2) gebaut 2026-09-05, Messung am v24-Siegernetz offen (par.8.11). WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12). -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4, Plattenwahl R1-2) gebaut 2026-09-05, Messung am v24-Siegernetz offen (par.8.11). WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12; Messgroessen als Vorschlag par.12a, Nutzer-Entscheid offen). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -1365,4 +1365,73 @@ Kopf wieder auf ENTSCHIEDEN geht:
 
 Was bis dahin gilt: K3-P bleibt Champion-Knopf und Rezeptbestandteil
 (par.11), die Prereg ist OFFEN mit der Frage aus dem Kopf.
+
+### par.12a MESSGROESSEN FUER DAS SCHLIESSKRITERIUM (VORSCHLAG 20:39, 2026-09-05; Nutzer-Entscheid offen)
+
+Ein Such-Knopf aendert den Value-Kopf nicht; "entlasten" muss deshalb auf ZWEI
+Kanaelen gemessen werden -- an der Suche desselben Netzes (Knopf an gegen aus)
+und am Kopf der FOLGEGENERATION, die auf Knopf-Material trainiert wurde.
+Alle Groessen auf dem eingefrorenen Bewertungssatz `frozen_v3`
+(`PREREG_frozen_v3_eval_set.md`: 1.800 Zustaende, 360 je Runde, Orakel @5000;
+gegen Zirkularitaet das v21-Orakel, par.9 dort), Runden 1-2 als Ziel, Runden
+3-4 als Gegenprobe, Runde 5 ausgenommen (exakter Loeser).
+
+**Bedingung 2, Kanal A -- die Suche entscheidet in Runde 1-2 besser (gleiches
+Netz, Knopf an gegen aus):**
+- **A1 Orakel-Treffer der Suche:** Anteil der Zustaende, in denen der Zug der
+  Suche (@400, argmax der Besuche, Champion-Sims) in den Top-3 des Orakels
+  liegt, je Runde. Kriterium: Runde 1 UND Runde 2 mit Knopf um mindestens
+  **+5 Prozentpunkte** hoeher, Block-KI (Bloecke a 5 Zustaende) schliesst 0
+  aus; Runde 3-4 nicht schlechter als -2 Prozentpunkte. Werkzeug: die Orakel-
+  Bruecke von `frozen_v3` misst heute PRIOR gegen Orakel (`tools/oracle_metrics.py`,
+  `prior_mass_on_oracle_top3`, Kendall-tau); die SUCH-Variante (Besuchsverteilung
+  statt Prior) ist zu ergaenzen -- ein Schalter, kein Neubau (UNGEPRUEFT).
+- **A2 Wurzelwert gegen Orakelwert:** Spearman zwischen dem Wurzelwert der Suche
+  und dem Orakel-Wert @5000 je Runde, mit gegen ohne Knopf. Kriterium: in
+  Runde 1-2 hoeher, nicht niedriger in 3-4. Nimmt den Ausgang aus der Rechnung
+  (par.8.5 Zeile 36: Runde 1-2 misst teils echte Spielunsicherheit, nicht nur
+  Kopfschwaeche -- gegen den Ausgang hat rho(1) eine Decke, gegen das Orakel
+  nicht in gleichem Mass).
+
+**Bedingung 2, Kanal B -- der Kopf der Folgegeneration ist frueh verlaesslicher:**
+- **B1 rho(r) = Spearman(Value-Kopf, Endmarge)** je Runde auf `frozen_v3`,
+  genau die Groesse aus par.8.5 (`value_head_reliability_by_round.json`,
+  Bezug `v23-b01_brierbest`: 0,143 / 0,201 / 0,390 / 0,641 / 0,881). Kriterium:
+  rho(1) UND rho(2) des auf Knopf-Material trainierten Netzes um mindestens
+  **+0,05** ueber dem Vorgaenger, bei unveraendertem oder besserem rho(3..5).
+  SOFORT messbar, ohne Bau: v24-b01 und v24-b02 sind auf K3-P-Material
+  trainiert; Bezug ist v23-b01. Zwei Arme sind zwei Rezepte, keine Seeds --
+  die Streuung des Masses ist deshalb VORHER aus zwei Bewertungen desselben
+  Netzes mit verschiedenen Zustands-Teilmengen (Bloecke) zu schaetzen.
+- **B2 rho_orakel(r) = Spearman(Value-Kopf, Orakel-Wert @5000)** je Runde,
+  gleiche Netze, gleiches Kriterium +0,05. Trennt "Kopf kennt die Stellung"
+  von "die Stellung ist noch offen".
+
+**Bedingung 3 -- stabiler:**
+- **C1 Streuung statt Mittel:** in den gepaarten Abnahme-Arenen (2 x 80,
+  Blockgroesse 5) die Block-Standardabweichung der gepaarten Punktemarge und
+  der vollen Spalten je Seite, Knopf an gegen aus. Kriterium: mit Knopf nicht
+  groesser (Verhaeltnis <= 1,0 bei gleicher Partienzahl; Referenz fuer
+  identische Konfiguration 5,75 Prozentpunkte Siegquote bei n = 400,
+  `working_rules.md`).
+- **C2 Vorzeichen-Konsistenz der Knopf-Wechselwirkung:** die Differenz der
+  vollen Spalten am argmax-Instrument (Knopf an minus aus) hat fuer ALLE Arme
+  einer Generation dasselbe Vorzeichen. Stand 2026-09-05: b01 +0,045, v24-b01
+  -0,075, v24-b02 +0,095 -- **verletzt**. Ein Knopf, der je Netz neu geeicht
+  werden muss, ist nicht stabil (par.12 Bedingung 3).
+- **C3 Seed-Streuung des argmax-Instruments:** drei Seeds je Arm, Spannweite
+  der vollen Spalten mit Knopf nicht groesser als ohne.
+
+**Reihenfolge und Kosten (Vorschlag):** B1/B2 zuerst (vorhandene Netze,
+vorhandener Satz, Minuten CPU je Netz), dann C2 aus den laufenden Abnahmen
+(faellt ohnehin an), dann A1/A2 und C1/C3 im Zug der K3-P2- und K4-Messungen
+am v24-Siegernetz (par.8.11 bzw. `round_estimate_leaf_term` par.5). Die
+Schwellen (+5 Prozentpunkte, +0,05, Verhaeltnis 1,0) sind VORSCHLAEGE und
+werden vor der ersten Messung vom Nutzer bestaetigt oder ersetzt; danach
+gelten sie als Ratsche, nicht als Richtwert.
+
+**Was par.12a NICHT ist:** kein Ersatz fuer Tor 1 und Tor 2. Ein Knopf, der
+diese Groessen bewegt und Siege oder Spalten kostet, schliesst die Prereg
+nicht (Klausel des Leitsterns: ein Plattenzuwachs, der Siege kostet, ist kein
+Erfolg).
 
