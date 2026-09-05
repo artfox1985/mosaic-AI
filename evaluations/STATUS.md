@@ -24,153 +24,119 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-09-05, 17:05)
+## 1. WAS GERADE LAEUFT (UEBERGABE 2026-09-06, 00:36; Anlass: Kontextfenster der Sitzung vom 2026-09-05 zu 75 % voll)
 
-**Champion:** `v23-b01_k3p10` (Elo 1292, Artefakt komplett). **Generation v24
-in der Abnahme, fuenf Arme:** b01 und b02 trainiert, **b03-Training durch den
-Maschinen-Neustart 16:04 VERLOREN** (Epoche 12/12, Batch 18.000/20.827, kein
-gespeicherter Stand), b04 (Sicht-Arm, `INPUT_SIZE` 744) und b05 (gegatete
-Ueberraschung) noch nicht trainiert. Alle Ergebnisse: `PREREG_v24_window.md`
-par.9/9a/9b; Chronik des Absturzes `night_run_20260902.md` 16:04.
+**Champion:** `v23-b01_k3p10` (Elo 1292). **Generation v24 in der Abnahme, fuenf
+Arme:** b01, b02, b04, b05 trainiert; b03 (714er-Arm) trainiert gerade neu
+(Verlust durch Maschinen-Neustart 2026-09-05 16:04). Alle Zahlen:
+`PREREG_v24_window.md` par.9/9a/9b; Chronik `night_run_20260902.md` (ab
+Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
 
-**v24-b01:** Tor 1 MIT Knopf gerissen (83:107), OHNE Knopf 216:184 nach 200
-Paaren (p 0,105, Ratsche nicht genommen, "schwaecher" widerlegt); Tor 2a mit
-Knopf 0,443 gegen 0,555, ohne Knopf 0,518 gegen 0,510; Tor 2b gehalten (93:67,
-Spalten +0,20/+0,03). Befund par.9b: das Netz hat nicht verlernt, der Knopf
-(K3-P C 1,0) kippt bei v24-b01 ins Negative. Elo informativ: v24-b01 ohne
-Knopf 1291, mit Knopf 1248 (eigene Knoten seit 13:50).
+**Stand der Arme (Kurzform, Details par.9):**
+- v24-b01: Tor 1 mit Knopf gerissen (83:107), ohne Knopf 216:184 (kein
+  Entscheid); Tor 2a mit Knopf 0,443, ohne 0,518; Tor 2b gehalten (93:67).
+  Knopf-Dosis C 0,5 = 0,450: Schalter, kein Regler (par.9b).
+- v24-b02 (lambda 0,7): Tor 1 ohne Knopf 209:161 (SPRT), mit Knopf 101:69 und
+  91:59 (zwei Seeds, Champion-Strenge); Tor 2a mit Knopf 0,525 (Bezug 0,555,
+  KI schliesst ein), ohne 0,430 gerissen; Tor 2b gerissen (Siege 87:73, aber
+  Spalten 0,550/0,475 gegen 0,688/0,562). Staerker, spaltenaermer.
+- v24-b04 (Sicht 744): Tor 2a ohne Knopf 0,4125 (gerissen), mit Knopf 0,5325;
+  Tor 1 ohne Knopf 218:182 (kein Entscheid); Tor 1 MIT Knopf LAEUFT.
+- v24-b05 (b04 plus Ueberraschungsgewichtung): trainiert (brierbest Epoche 4,
+  0,1925), Abnahme wartet.
+- v24-b03 (Seeding-Schwarm, 714): Training laeuft seit 00:27 mit `--fast-loader`.
 
-**Neu seit dem Neustart: train.py schreibt je Epoche einen Zwischenstand**
-(`models/alphazero_<name>_resume.pth`, Default an, atomar, nach Ende geloescht)
-und nimmt mit `--resume` dort wieder auf (Fingerabdruck-Waechter gegen
-Rezeptwechsel). Anlass: der b03-Verlust. Ein abgebrochenes Training wird ab
-jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
+**LAEUFT (Hintergrundaufgaben der alten Sitzung; laufen als eigene Prozesse
+weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
+`pitfalls.md` "Harness-Stopp"):**
 
-**Laufende Ketten / Reihenfolge (Nutzer-Entscheide 16:55):**
-1. **CPU: Abnahme b02** (`night_v24_acceptance_chain.sh b02`, seit 16:56; je
-   Tor 2a und Tor 1 OHNE und MIT Knopf, Tor 2b). Der erste Anlauf 15:07 brach
-   bei 120/200 argmax-Partien mit vier Herzschlag-Ausfaellen ab (Ursache
-   ungeklaert, Hypothese RAM-Not neben dem Training); Teil-Dateien geloescht.
-2. **GPU: Training b04** (b04-Kette Schritt 4, Monolith `85a75d76dfab` liegt),
-   danach b05 (`night_v24_b05_chain.sh`).
-3./4. **Nachtkette `tools/night_v24_after_b05_chain.sh`** (gestartet 19:55, wartet
-   auf b05-Modell, Ende aller Trainings und CPU-Messungen): Wheel 744 mit K3-P2
-   installieren, Anker-Drift (ROT = Abnahmen ausgesetzt, Nutzer-Entscheid),
-   Mini-Fenster-Test (resume/Pause/fast-loader), dann `config.INPUT_SIZE` 744 ->
-   714 und Training b03 (714er-Arm, `--fast-loader` nur bei gruenem Test) im
-   Hintergrund; parallel auf der CPU Abnahmen b04 dann b05 samt Kuppel-Bonus-
-   Sonde; nach b03 config zurueck auf 744. Bei Abbruch des b03-Trainings:
-   `--resume` MIT config 714. **b03-Abnahme (Nutzer-Idee 20:08): Folgekette
-   `night_v24_b03_acceptance_714.sh` in der Mess-venv `venv_measure714/` mit dem
-   Champion-Artefakt-Wheel (byte-identisch zum Live-714er, sha256 fb553c93bf38baa2),
-   wartet auf b03-Modell und Ende der Nachtkette.
-5. **K3-P2 (Modus 4, `models/k3p2_c10.spec.json`) ist gebaut, aber ungetestet:**
-   `cargo test --release` im ersten CPU-freien Fenster (Python-DLL in PATH),
-   dann Wheel 744 neu bauen (enthaelt K3-P2) und mit Kette 4 installieren;
-   Messung am v24-Siegernetz nach par.8.11 (argmax @400 und gepaarte Arena
-   gegen K3-P, Kuppel-Bonus je Partie mit `tools/probes/arena_points_probe.py`).
-7. **K4 Rundenschaetzer-Term registriert** (`PREREG_round_estimate_leaf_term.md`,
-   Nutzer 18:20): erster Schritt ist die Skalen-Sonde (par.4, Replay der
-   b01-Tor-2b-Logs, Minuten CPU) sobald die CPU frei ist; Bau und Messung am
-   v24-Siegernetz nach den Abnahmen.
-6. **Offener Nutzer-Entscheid (18:08): Sicht der Suche auf das Tiling.**
-   Leitsatz "Drafting muss das Tiling kennen" registriert
-   (`architecture_reference.md`, `round_transition_search_sampling` par.7);
-   par.4.2 ENTSCHIEDEN 18:28 als Bauvorgabe (stellungsgebundener Seed der
-   Blatt-Stichprobe, Paarung bleibt); Variante B REGISTRIERT 18:35 als Basisarm.
-   Bau nach den v24-Abnahmen, Reihenfolge K3-P2, K4, B.
-8. **CPU-Warteschlange nach der b02-Abnahme** (`tools/cpu_queue_after_b02.sh`,
-   gestartet 18:37, wartet auf das Ende der Abnahme-Kette): cargo test und
-   Wheel 744 mit K3-P2 (nicht installiert), dann argmax v24-b01 bei K3-P C 0,5
-   (Knopf-Dosis, par.9b; Nutzer 18:35: "knopf dosis kannst eintakten").
-9. **`--fast-loader` gebaut, ungetestet** (train.py, corpus_dataset.get_batch):
-   Mini-Fenster-Test Fall E im CPU-freien Fenster (bitgleich gegen A?), dann
-   fuer b03 einschalten; Erwartung Epoche deutlich unter 16 min (GPU war zur
-   Haelfte arbeitslos). b05 laeuft mit Default aus, exakt wie b04.
-Gemessen 21:42: Traeger-Kennzahl v24 0,356 Spalten je Seite (Fenster 0,624; v25 nach
-par.1 rechnerisch 0,23 -- v25 par.9a), K4-Skala P90 3/8/10/12 je Runde (K4 par.4);
-Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
-2 min GPU, erst wenn keine CPU-Messung laeuft).
+| Lauf | Werkzeug | Start | Stand 00:36 | erwartetes Ende | liest | Artefakte |
+| --- | --- | --- | --- | --- | --- | --- |
+| Training v24-b03 (714, fast-loader) | `tools/night_v24_b03_fast.sh` (nacktes train.py darin) | 00:27 | Epoche 1, Batch 14.000/20.827; Zwischenstand je Epoche `models/alphazero_v24-b03_resume.pth` | rund 02:30 bei 10 min je Epoche (UNGEMESSEN, erste Epoche laeuft) | `data/window_v24_b03.txt`, Monolith `.cache_299283d4df61.h5`, config.py mit INPUT_SIZE 714 | `models/alphazero_v24-b03*.onnx`, Manifest `manifest_train_v24-b03_20260906_002606.json`; **setzt config.py am Ende auf 744 zurueck** |
+| Abnahme b04 | `tools/night_v24_b04_acceptance_744venv.sh` (venv_measure744, 744er-Wheel) | 21:49 | Tor 1 MIT Knopf, Block 8: 49:31 nach 40 Paaren; danach ggf. Replikation, dann Tor 2b | rund 02:30 | `models/alphazero_v24-b04_brierbest.onnx`, Champion-Spec, `k3v_off.spec.json` | `tor2a_v24b04*.json`, `paired_gating_result_v24-b04_*`, `paired_arena_env_v24b04_*`, `columns_v24b04_*`, `points_v24b04_vs_b01_s14.json` |
+| Tiling-Geometrie-Sonde | `tools/cpu_queue_after_b04.sh` | 22:xx (wartet) | wartet auf Ende der b04-Abnahme | rund 02:45 | `static/log/game_*.log`, `paired_arena_env_v24b01_vs_b01_*_s14.json` | `tiling_geometry_probe_human.json`, `tiling_geometry_probe_arena.json` |
+| Abnahme b05 | `tools/night_v24_b05_acceptance_wait.sh` (Basis-python, Wheel 744 installiert 00:24) | 00:24 (wartet) | wartet auf freie CPU (b04-Abnahme, Sonde) | Start rund 02:45, Ende rund 06:45 | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
+| Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:08 (wartet) | wartet auf b03-Modell UND freie CPU | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
 
-**Entscheide des Nutzers heute:** v25-Zuschnitt par.1 (hv2-Abbildung par.2
-angenommen; Value-Klasse zu argmax, Zahl 8.000/0 oder 7.000/1.000 OFFEN --
-Nutzer 18:35 nicht ueberzeugt, "die Spalten kommen aus der Policy"; Einwand
-und Traeger-Kennzahl als vierte Waechter-Flaeche in v25 par.9a; par.6
-Defaults angenommen);
-Prereg-Bestand 9 OFFEN; Sicht-Arm mit 30 Werten; Historie kein Merkposten;
-mehr Sims im Sockel kein Hebel; b03 bleibt 714; **Richtung je Generation:**
-spaltenverstaerkend UND siegverstaerkend in der Arena, Saettigung erwartet
-bei 1-2 Spalten und rund 100 Punkten, danach Hebel = Gegner stoeren
-(`docs/generation_loop.md`, "Richtung je Generation"). **Push:** 2 Commits vor
-origin/main (Stand 16:50), Push nur auf Anweisung.
-
-**Regeln fuer den Rest des Tages:** kein Training ausser den Ketten, keine
-Loeschung ohne pfadgenaue Freigabe, kein Push durch mich; Wheel-Install erst,
-wenn kein train.py das alte Wheel haelt.
+**Baum:** HEAD b472171 plus Uebergabe-Commit; 41 Commits vor origin/main, **kein Push**.
+**`config.py` ist ABSICHTLICH ungetrackt geaendert (INPUT_SIZE 714, HEAD hat 744)**, solange
+das b03-Training laeuft; `night_v24_b03_fast.sh` setzt es am Ende zurueck. NICHT committen,
+NICHT zuruecksetzen, solange train.py laeuft. Danach `git diff config.py` muss leer sein.
+Wheel 744 (Kontrakt `20b442a8164f748d`, mit K3-P2, Default aus) ist in der Basis installiert;
+Anker-Drift darunter GRUEN (2026-09-05 21:45). Mess-venvs: `venv_measure714/`, `venv_measure744/`
+(gitignored).
 
 ### ERSTE AUFGABE DER NEUEN SITZUNG
 
-Nutzer-Freigaben, woertlich: 2026-09-03 *"mach im programm selbststaendig
-weiter, ausser der fenster erzeugung"*; 2026-09-04 *"Die Freigabe fuer Das
-Rezept mit Knopf haengt an der Arena. Aber ich tendiere zu ja"* (die Arena
-hat gehalten: par.10a) -- **die v24-Erzeugung startet trotzdem NUR auf
-ausdrueckliche Nutzer-Anweisung**; *"viel mehr will ich in v24 nicht
-eintakten"*; Loeschungen nur auf pfadgenaue Freigabe (2026-09-04 19:45
-erledigt); **kein Push**.
+**Nutzer-Freigaben und Verbote, woertlich:** 2026-09-03 *"mach im programm
+selbststaendig weiter, ausser der fenster erzeugung"*; 2026-09-05 *"kein Push"*
+(steht seit Tagen); Loeschungen nur auf pfadgenaue Freigabe; die v25-ERZEUGUNG
+startet NUR auf ausdrueckliche Nutzer-Anweisung; b03 bleibt 714 (*"lass b03 auf
+714"*); Bash-Ausgaben knapp (head/tail/grep, Read mit offset), lange Laeufe
+ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
+2026-09-05).
 
-1. ~~**WATCHER Golden Probe**~~ ERLEDIGT 21:00: Sonde, venv, Referee-
-   Selbsttest 10/10 gruen, Manifest nachgezogen (siehe oben; Chronik
-   20:45-21:05).
-2. **v24-Erzeugung, NUR auf Nutzer-Anweisung:** Rezept `PREREG_v24_window.md`
-   par.6b' (par.6b plus `MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0`
-   in allen drei Laeufen). Der Sockel (4.000 Partien) laeuft auf einer ANDEREN
-   Maschine des Nutzers (Befehle im Chat 2026-09-04 14:10, im Kern par.6b'); hier
-   die beiden Value-Laeufe (6.000 argmax, 2.000 gesampelt, rund 8 h bei
-   3,3 s je Partie). Pflichtpruefungen par.6c (Manifest-Diff: erwartete
-   Felder plus `envelope_projection_mode` 1 und `envelope_search_c` 1.0;
-   Stack-Draw-Kontrolle; Tor 0). Vor dem Training: Monolith fuer den
-   Trainingsanteil (`cache_build_time` par.12, `tools/window_train_split.py`),
-   Traeger-Manifest 580 (par.6d, `--out` RELATIV zu data/).
-3. ~~**Loeschung der zwei nachgestellten Korpora**~~ ERLEDIGT 21:15:
-   `selfplay_tor2a-k3p20-v23b01_*` (20 Dateien) und
-   `selfplay_pilot24k3p-value-argmax_*` (40 Dateien) per `restic find`
-   vollstaendig im manuellen Snapshot **d775926d** (2026-09-04 20:53:15,
-   daily) belegt und aus `data/` entfernt; ihre zwei Manifest-JSONs auf
-   Nutzer-Freigabe 21:30 ("kannst loeschen") ebenso, nach `restic find`-Beleg
-   im selben Snapshot.
-4. **v25-Zuschnitt registriert** (`PREREG_v25_window.md`, Nutzer 21:50,
-   stationaere Rotation G = v24 / G-1 = heutiges Material / G-2 = hv2; par.7
-   Spalten-Waechter auf drei Flaechen, Nutzer 21:55; hv2-Abbildung par.2 vom
-   Nutzer angenommen 2026-09-05, `--pick` gebaut; offen nur noch Val-Pool und
-   Startgewicht, par.6). **Wiedervorlagen
-   fuer v24-Arme** (nicht vor dem v24-Start bauen):
-   `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
-   Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
-   (b03). Nutzer-Ziel: offene Preregs (16) ueber v25+ auf rund 7.
-5. **ENTSCHIEDEN 17:15 (Nutzer: "ja bau k3-p2"), GEBAUT 17:22, `cargo test`
-   und Wheel ausstehend (`geometric_envelope` par.8.11).** Die Frage war:
-   K3-P2 jetzt bauen? Plattenwahl in Runde 1-2
-   ueber die Huelle steuern (`geometric_envelope` par.8.9b Baustein 1: eine
-   begonnene Reihe zaehlt auf leeren Huellenzellen ihrer Zeile mit halbem
-   Gewicht, die passende Platte hebt sie auf voll) -- Suchknopf, kein
-   Training, Messung am Siegernetz der v24-Arme; Wheel erst nach den
-   Trainings installierbar. Dazu der Vorschlag, den Kuppel-Bonus je Partie
-   als Kennzahl in die Abnahmen zu nehmen (Server-Logs: `server_log_points_
-   probe.py`; ob die Arena-Logs dieselbe Zeile tragen, ist UNGEPRUEFT).
-   Herleitung: Server-Logs 19 Partien, Abstand Mensch/KI sitzt bei
-   Kuppel-Bonus (8,9 gegen 1,6) und Endwertung (19,7 gegen 4,2), nicht bei
-   den Platzierungspunkten (Commit 3088f39, `domain_knowledge.md` 9).
-   Die beiden Entscheide vom 2026-09-04, 20:50 bleiben geklaert: v20_2d_opp_brierbest wird NICHT aus restic zurueckgeholt, die
-   Champion-2-Kante gegen v22-b05 bleibt (par.11); die sechs Server-Logs vom
-   2026-09-04 waren eine INFORMATION (wie das Netz gegen einen Menschen spielt,
-   nicht nur gegen sich selbst oder Peers), kein Auftrag -- sie bleiben als
-   Mensch-Referenz liegen, nichts daraus neu rechnen.
+1. **WATCHER auf die fuenf Laeufe oben** (nicht neu starten, sie laufen!):
+   Prozessliste pruefen (`Get-CimInstance Win32_Process`, Muster `train.py`,
+   `night_v24_`, `cpu_queue_`, `paired_`), nicht die Task-Meldungen. Bei
+   Stillstand > 30 min ohne neue Artefakt-Datei: Chronik-Eintrag, Nutzer
+   fragen. **Ergebnisse SOFORT registrieren** (Lehre 2026-09-05): je Tor in
+   die par.9-Tabelle (`PREREG_v24_window.md`), Tor-1-Kanten ins Elo-Register
+   (`tools/elo_tracker.py add`, Knopf = eigener Knoten `v24-bXX_k3p10` gegen
+   `v23-b01_k3p10`, ohne Knopf `v24-bXX` gegen `v23-b01_brierbest`, Knoepfe
+   per `--knobs "spec:..."`), Kuppel-Bonus aus `points_v24bXX_vs_b01_s14.json`.
+2. **b03-Training beobachten:** Epochenzeit gegen 16 min (Standard-Lader)
+   messen und in `working_rules.md` ("--fast-loader") sowie
+   `measured_runtimes.md` eintragen. Bei Abbruch: derselbe Befehl aus
+   `night_v24_b03_fast.sh` plus `--resume`, config MUSS dabei 714 sein. Nach
+   dem Ende: `config.py` wieder 744 (Skript macht es), `git diff config.py`
+   leer, Manifest `manifest_train_v24-b03_*.json` committen.
+3. **Tiling-Geometrie-Sonde auswerten** (`tiling_geometry_probe_human.json`,
+   `..._arena.json`): Ergebnis in `PREREG_geometric_envelope.md` par.8.12
+   (Mensch gegen KI gegen Loeser: Anteil punkt-bester Abschluss, Punktkosten
+   und Nachbarschaftsgewinn des geometrie-besten). Danach die Sonde um das
+   Reihen-Alter (par.8.13/8.14: gebundene Reihe 5/6 ohne annehmende
+   Huellenzelle, Runden liegen, Mensch gegen KI) ergaenzen und im naechsten
+   CPU-freien Fenster fahren.
+4. **Mini-Fenster-Test Fall D (Pause)** im naechsten GPU-freien Fenster
+   (nach b03): `bash tools/tests/train_resume_pause_test.sh` -- muss GRUEN
+   werden (Testhaken `MOSAIC_PAUSE_TEST_STOP_AT_EPOCH` ist gebaut, Lauf fehlt).
+   Dann `--fast-loader` als Default erwaegen (Nutzer-Entscheid).
+5. **Nach allen fuenf Abnahmen (gegen 11:00): VORLAGE Generatorwahl v24 an den
+   Nutzer** nach `docs/generation_loop.md` "Generatorwahl unter Armen" (Staerke
+   schliesst aus, Spaltenprofil entscheidet, sonst Amtsinhaber) -- mit der
+   Tabelle aller Arme und Tore, der Knopf-Wechselwirkung (b01 kippt, b02/b04
+   heben) und den offenen langen Reihen (par.8.13). KEINE stille Wahl.
+6. **Danach VORLAGE v25-Zuschnitt** (`PREREG_v25_window.md` par.9/9a): Traeger-
+   Kennzahl v24 0,356 gegen Fenster 0,624; v25 nach par.1 rechnerisch 0,23.
+   Hebel: Sockel-Betriebspunkt (Pilot: 400 Sockel-Partien in 2-3 Rausch-
+   Einstellungen, rund 2-3 h CPU, NUR mit Nutzer-Freigabe, es ist Erzeugung
+   im Kleinen), Traeger-Anteile, argmax policy-tragend. Value-Klasse 8.000/0
+   bleibt OFFEN (Nutzer nicht ueberzeugt).
+7. **Such-Knoepfe am v24-Siegernetz, Reihenfolge K3-P2, K4, Variante B**
+   (`geometric_envelope` par.8.11/8.13/8.14, `round_estimate_leaf_term`
+   par.4/5, `round_transition_search_sampling` par.7): K3-P2 ist gebaut und
+   im Wheel (Spec `models/k3p2_c10.spec.json`); vor dem Verdikt die Zahl der
+   offenen langen Reihen mit gegen ohne Knopf (par.8.13). K4-Skala gemessen
+   (P90 3/8/10/12 je Runde; Entscheid je Runde oder eine offen). K3-F
+   (par.8.14) registriert, Bau offen (Nutzer: jetzt oder nach der Messung).
+   Vorher par.12b Rauschboden messen (Block-Bootstrap auf frozen_v3), sonst
+   nur Tor 1/2.
 
-Blockaden (Kettenfehler, unerwarteter Manifest-Diff, Anker ROT): anhalten,
-Zustand sichern, Nutzer fragen. Nach jedem Schritt Chronik
-(`night_run_20260902.md` fortschreiben oder `night_run_20260904.md` anlegen),
-STATUS Abschnitt 1 nachziehen, committen (deutsch, Warum in der
-Beschreibung, Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>).
+**Offene Nutzer-Entscheide (Fundstellen):** K4-Skala je Runde oder gemeinsam
+(`round_estimate_leaf_term` par.4); K3-F jetzt bauen oder nach Messung
+(`geometric_envelope` par.8.14); par.12a/12b Messgroessen und Rauschboden
+(`geometric_envelope`); v25 Value-Klasse 8.000/0 (`v25_window` par.9/9a);
+`--fast-loader` als Default; Push.
+
+**Blockaden:** Anker ROT, Kettenfehler, unerwarteter Manifest-Diff, zweite
+CPU-Last neben einer Messung -> anhalten, Zustand sichern, Nutzer fragen.
+Nach jedem Schritt Chronik (`night_run_20260902.md` fortschreiben oder
+`night_run_20260906.md` anlegen), STATUS Abschnitt 1 nachziehen, committen
+(deutsch, Warum in der Beschreibung, Co-Authored-By: Claude Fable 5.1
+<noreply@anthropic.com>). Skills: `/mosaic-measurement-run`, `/mosaic-prereg`,
+`/mosaic-anchor-invariance`, `/mosaic-generation-turnover` (vor v25-Self-Play),
+`/mosaic-handover`.
 
 ### Was seit der Uebergabe von 2026-09-03 09:00 passiert ist (Kurzform; Chronik ab 09:08)
 
