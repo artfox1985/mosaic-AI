@@ -41,7 +41,8 @@ Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
   KI schliesst ein), ohne 0,430 gerissen; Tor 2b gerissen (Siege 87:73, aber
   Spalten 0,550/0,475 gegen 0,688/0,562). Staerker, spaltenaermer.
 - v24-b04 (Sicht 744): Tor 2a ohne Knopf 0,4125 (gerissen), mit Knopf 0,5325;
-  Tor 1 ohne Knopf 218:182 (kein Entscheid); Tor 1 MIT Knopf LAEUFT.
+  Tor 1 ohne Knopf 218:182 (kein Entscheid); Tor 1 MIT Knopf 135:135 nach 135 Paaren (H0,
+  01:17), Replikation Seed 20261013 laeuft, dann Tor 2b.
 - v24-b05 (b04 plus Ueberraschungsgewichtung): trainiert (brierbest Epoche 4,
   0,1925), Abnahme wartet.
 - v24-b03 (Seeding-Schwarm, 714): Training laeuft seit 00:27 mit `--fast-loader`.
@@ -53,7 +54,7 @@ weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
 | Lauf | Werkzeug | Start | Stand 00:36 | erwartetes Ende | liest | Artefakte |
 | --- | --- | --- | --- | --- | --- | --- |
 | Training v24-b03 (714, fast-loader) | `tools/night_v24_b03_fast.sh` (nacktes train.py darin) | 00:27 | Epoche 2 fertig 00:43:39, **460 s je Epoche GEMESSEN** (Zwischenstand `models/alphazero_v24-b03_resume.pth`), Val-Brier 0,1876/0,1875 | rund 02:00 (hergeleitet aus 12 x 460 s ab 00:28:33) | `data/window_v24_b03.txt`, Monolith `.cache_299283d4df61.h5`, config.py mit INPUT_SIZE 714 | `models/alphazero_v24-b03*.onnx`, Manifest `manifest_train_v24-b03_20260906_002718.json`; **setzt config.py am Ende auf 744 zurueck** |
-| Abnahme b04 | `tools/night_v24_b04_acceptance_744venv.sh` (venv_measure744, 744er-Wheel) | 21:49 | Tor 1 MIT Knopf laeuft seit 00:16 (Stand 00:36: 49:31 nach 40 Paaren); danach ggf. Replikation, dann Tor 2b. Elo-Kante ohne Knopf (218:182) am 2026-09-06 00:45 nachgetragen | rund 02:30 | `models/alphazero_v24-b04_brierbest.onnx`, Champion-Spec, `k3v_off.spec.json` | `tor2a_v24b04*.json`, `paired_gating_result_v24-b04_*`, `paired_arena_env_v24b04_*`, `columns_v24b04_*`, `points_v24b04_vs_b01_s14.json` |
+| Abnahme b04 | `tools/night_v24_b04_acceptance_744venv.sh` (venv_measure744, 744er-Wheel) | 21:49 | Tor 1 MIT Knopf 135:135 nach 135 Paaren, H0 (01:17, Kante im Elo-Register); Replikation Seed 20261013 laeuft seit 01:17, dann Tor 2b (2 x 80) | rund 02:30 | `models/alphazero_v24-b04_brierbest.onnx`, Champion-Spec, `k3v_off.spec.json` | `tor2a_v24b04*.json`, `paired_gating_result_v24-b04_*`, `paired_arena_env_v24b04_*`, `columns_v24b04_*`, `points_v24b04_vs_b01_s14.json` |
 | Tiling-Geometrie-Sonde | `tools/cpu_queue_after_b04.sh` | 22:xx (wartet) | wartet auf Ende der b04-Abnahme | rund 02:45 | `static/log/game_*.log`, `paired_arena_env_v24b01_vs_b01_*_s14.json` | `tiling_geometry_probe_human.json`, `tiling_geometry_probe_arena.json` |
 | Abnahme b05 | `tools/night_v24_b05_acceptance_wait.sh` (Basis-python, Wheel 744 installiert 00:24) | 00:24 (wartet) | wartet auf freie CPU (b04-Abnahme, Sonde) | Start rund 02:45, Ende rund 06:45 | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
 | Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:58 (wartet) | wartet auf b03-Modell UND freie CPU; sein Wartemuster kennt Sonde, `cpu_queue_after_b04` und b05-Wartelauf NICHT -- deshalb haelt `tools/night_v24_after_b05_chain_hold.sh` (seit 00:53, Prozess nur wartend) es fest, bis Sonde und b05-Abnahme durch sind (Chronik 00:53) | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
