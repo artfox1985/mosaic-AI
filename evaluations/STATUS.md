@@ -118,12 +118,13 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    im Wheel (Spec `models/k3p2_c10.spec.json`); vor dem Verdikt die Zahl der
    offenen langen Reihen mit gegen ohne Knopf (par.8.13). K4-Skala gemessen
    (P90 3/8/10/12 je Runde; Entscheid je Runde oder eine offen). K3-F
-   (par.8.14) registriert, Bau offen (Nutzer: jetzt oder nach der Messung).
+   (par.8.14) registriert; **Nutzer 2026-09-06 00:50: Bau NACH der Messung**
+   (Sonden-Ergaenzung Reihen-Alter aus Aufgabe 3 zuerst).
    Vorher par.12b Rauschboden messen (Block-Bootstrap auf frozen_v3), sonst
    nur Tor 1/2.
 
 **Offene Nutzer-Entscheide (Fundstellen):** K4-Skala je Runde oder gemeinsam
-(`round_estimate_leaf_term` par.4); K3-F jetzt bauen oder nach Messung
+(`round_estimate_leaf_term` par.4); ~~K3-F jetzt bauen oder nach Messung~~ ENTSCHIEDEN 2026-09-06 00:50: nach der Messung
 (`geometric_envelope` par.8.14); par.12a/12b Messgroessen und Rauschboden
 (`geometric_envelope`); v25 Value-Klasse 8.000/0 (`v25_window` par.9/9a);
 `--fast-loader` als Default; Push.
