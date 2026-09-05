@@ -24,13 +24,14 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-09-05, 13:52)
+## 1. WAS GERADE LAEUFT (Stand 2026-09-05, 17:05)
 
 **Champion:** `v23-b01_k3p10` (Elo 1292, Artefakt komplett). **Generation v24
-in der Abnahme, fuenf Arme:** b01 und b02 trainiert, b03 trainiert (GPU,
-Epoche 3/12 um 13:51), b04 (Sicht-Arm, `INPUT_SIZE` 744) und b05 (gegatete
-Ueberraschung) in Ketten dahinter. Alle Ergebnisse: `PREREG_v24_window.md`
-par.9/9a/9b.
+in der Abnahme, fuenf Arme:** b01 und b02 trainiert, **b03-Training durch den
+Maschinen-Neustart 16:04 VERLOREN** (Epoche 12/12, Batch 18.000/20.827, kein
+gespeicherter Stand), b04 (Sicht-Arm, `INPUT_SIZE` 744) und b05 (gegatete
+Ueberraschung) noch nicht trainiert. Alle Ergebnisse: `PREREG_v24_window.md`
+par.9/9a/9b; Chronik des Absturzes `night_run_20260902.md` 16:04.
 
 **v24-b01:** Tor 1 MIT Knopf gerissen (83:107), OHNE Knopf 216:184 nach 200
 Paaren (p 0,105, Ratsche nicht genommen, "schwaecher" widerlegt); Tor 2a mit
@@ -39,26 +40,36 @@ Spalten +0,20/+0,03). Befund par.9b: das Netz hat nicht verlernt, der Knopf
 (K3-P C 1,0) kippt bei v24-b01 ins Negative. Elo informativ: v24-b01 ohne
 Knopf 1291, mit Knopf 1248 (eigene Knoten seit 13:50).
 
-**Laufende Ketten (alle warten selbst auf ihre Bedingung, Reihenfolge CPU):**
-1. `night_v24_b04_chain.sh` -- Bloecke unter 744 (seit 13:50, rund 85 min bei
-   diesem Tempo), Split, Monolith; Training b04 nach b03.
-2. Abnahmen b02 dann b03 (`night_v24_acceptance_chain.sh`, je Tor 2a und Tor 1
-   OHNE und MIT Knopf, Tor 2b) -- nach den b04-Bloecken.
-3. `night_v24_b05_chain.sh` -- Training b05 nach b04 (GPU).
-4. Nach b05: Wheel 744 installieren (`engine/target/wheels`, gebaut 13:50,
+**Neu seit dem Neustart: train.py schreibt je Epoche einen Zwischenstand**
+(`models/alphazero_<name>_resume.pth`, Default an, atomar, nach Ende geloescht)
+und nimmt mit `--resume` dort wieder auf (Fingerabdruck-Waechter gegen
+Rezeptwechsel). Anlass: der b03-Verlust. Ein abgebrochenes Training wird ab
+jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
+
+**Laufende Ketten / Reihenfolge (Nutzer-Entscheide 16:55):**
+1. **CPU: Abnahme b02** (`night_v24_acceptance_chain.sh b02`, seit 16:56; je
+   Tor 2a und Tor 1 OHNE und MIT Knopf, Tor 2b). Der erste Anlauf 15:07 brach
+   bei 120/200 argmax-Partien mit vier Herzschlag-Ausfaellen ab (Ursache
+   ungeklaert, Hypothese RAM-Not neben dem Training); Teil-Dateien geloescht.
+2. **GPU: Training b04** (b04-Kette Schritt 4, Monolith `85a75d76dfab` liegt),
+   danach b05 (`night_v24_b05_chain.sh`).
+3. **b03 NEU als 714er-Arm** (Nutzer: "lass b03 auf 714"): nach b05
+   `config.INPUT_SIZE` vorueebergehend auf 714, Training mit dem b03-Rezept
+   (Monolith `299283d4df61`, `window_v24_b03.txt`), danach zurueck auf 744.
+4. Danach: Wheel 744 installieren (`engine/target/wheels`, gebaut 13:50,
    Kontrakt `20b442a8164f748d`), Anker-Drift (`verify_frozen_heuristic.py`),
-   Abnahmen b04 und b05.
+   Abnahmen b03, b04, b05.
 Noch nicht eingetaktet: argmax v24-b01 bei C 0,5 (Knopf-Dosis, par.9b).
 
 **Entscheide des Nutzers heute:** v25-Zuschnitt par.1 (hv2-Abbildung par.2
 angenommen; Value-Klasse zu argmax, Zahl 8.000/0 oder 7.000/1.000 offen);
 Prereg-Bestand 9 OFFEN; Sicht-Arm mit 30 Werten; Historie kein Merkposten;
-mehr Sims im Sockel kein Hebel. **Push:** Baum sauber seit e49eb3c, Hook
-gruen (521 Tests), 43 Commits vor origin/main.
+mehr Sims im Sockel kein Hebel; b03 bleibt 714. **Push:** 2 Commits vor
+origin/main (Stand 16:50), Push nur auf Anweisung.
 
 **Regeln fuer den Rest des Tages:** kein Training ausser den Ketten, keine
-Loeschung, kein Push durch mich; Wheel-Install erst, wenn kein train.py das
-alte Wheel haelt (Kette 4 prueft das).
+Loeschung ohne pfadgenaue Freigabe, kein Push durch mich; Wheel-Install erst,
+wenn kein train.py das alte Wheel haelt.
 
 ### ERSTE AUFGABE DER NEUEN SITZUNG
 

@@ -1005,6 +1005,59 @@ def _validate_one_epoch(model, val_dataloader, val_dataset, device, encoder, los
     return {"epoch_val_ploss": epoch_val_ploss, "epoch_val_vloss": epoch_val_vloss, "epoch_val_pointsloss": epoch_val_pointsloss, "epoch_val_value_r2": epoch_val_value_r2, "epoch_val_points_r2": epoch_val_points_r2, "epoch_val_opp_pointsloss": epoch_val_opp_pointsloss, "epoch_val_opp_points_r2": epoch_val_opp_points_r2, "epoch_val_endgame_mse": epoch_val_endgame_mse, "epoch_val_ranking_acc": epoch_val_ranking_acc, "epoch_val_brier": epoch_val_brier, "epoch_val_ownloss": epoch_val_ownloss}
 
 
+def resume_path(version_name: str) -> Path:
+    """Pfad des Zwischenstands je Epoche (`models/alphazero_<name>_resume.pth`).
+
+    Anlass 2026-09-05: das Training v24-b03 starb durch einen Neustart der
+    Maschine in Epoche 12 von 12, Batch 18.000 von 20.827 -- rund 3 h 40 min
+    GPU ohne eine einzige gespeicherte Gewichtsdatei, weil train.py bis dahin
+    NUR am Ende speicherte (`torch.save` im Abschnitt 6). Seither schreibt
+    jede Epoche ihren vollstaendigen Stand hierher; `--resume` nimmt dort
+    wieder auf. Die Datei ist ein TRANSIENT: nach erfolgreichem Ende wird sie
+    geloescht, ein Lauf gleichen Namens findet sie sonst beim naechsten
+    `--resume` und wuerde einen fremden Stand fortsetzen.
+    """
+    return MODELS_DIR / f"alphazero_{version_name}_resume.pth"
+
+
+def save_resume_state(path: Path, state: dict) -> float:
+    """Schreibt den Zwischenstand ATOMAR (tmp + os.replace).
+
+    Ein Absturz waehrend des Schreibens darf den vorherigen Stand nicht
+    zerstoeren -- genau dann braucht man ihn. Gibt die Schreibdauer zurueck.
+    """
+    t0 = time.time()
+    tmp = path.with_suffix(".pth.tmp")
+    torch.save(state, str(tmp))
+    os.replace(str(tmp), str(path))
+    return time.time() - t0
+
+
+def load_resume_state(path: Path) -> dict:
+    """Laedt den Zwischenstand; harter Abbruch, wenn er fehlt (kein stiller
+    Neustart von vorn -- Muster des --load-Waechters)."""
+    if not path.exists():
+        sys.exit(f"❌ --resume: kein Zwischenstand unter {path} -- Abbruch. "
+                 f"Ohne --resume startet der Lauf von vorn.")
+    state = torch.load(str(path), map_location="cpu", weights_only=False)
+    fp = state.get("fingerprint", {})
+    print(f"🔁 Zwischenstand gefunden: {path.name} -- Epoche {state['epochs_done']} von "
+          f"{fp.get('epochs', '?')} abgeschlossen, gespeichert {state.get('saved_at', '?')}, "
+          f"Lauf-Zeitstempel {state.get('run_timestamp', '?')}")
+    return state
+
+
+def check_resume_fingerprint(saved: dict, current: dict) -> None:
+    """Der Zwischenstand passt nur zu DEMSELBEN Rezept: gleiche Daten, gleiche
+    Knoepfe, gleiche Netzform. Jede Abweichung ist ein harter Abbruch mit
+    beiden Werten im Text (Lauf-Manifest-gegen-Referenz-Regel)."""
+    diffs = [(k, saved.get(k), current.get(k))
+             for k in sorted(set(saved) | set(current)) if saved.get(k) != current.get(k)]
+    if diffs:
+        lines = "\n".join(f"   {k}: Zwischenstand={a!r}  jetzt={b!r}" for k, a, b in diffs)
+        sys.exit(f"❌ --resume: Rezept passt nicht zum Zwischenstand -- Abbruch.\n{lines}")
+
+
 def train(version_name, load_version=None, input_epoch=None, hidden_size=None, early_stop=True,
           select_by_brier=False, wdl_hard_only=False,
           wdl_label_smooth=0.0, wdl_bootstrap_destretch=False,
@@ -1018,7 +1071,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           ranking_loss_weight=0.0, conjunction_head=False, ownership_head_2d=False,
           head_warmstart=True, extra_data_dir=None,
           freeze_trunk=False, cache_file=None, moon_loss_weight=1.0,
-          file_list=None, surprise_alpha=0.0, surprise_confidence_min=0.0):
+          file_list=None, surprise_alpha=0.0, surprise_confidence_min=0.0,
+          resume=False, epoch_checkpoint=True):
+    # Zwischenstand je Epoche / Wiederaufnahme (siehe resume_path()). Der
+    # Zwischenstand wird VOR dem teuren Daten-Laden gelesen: fehlt er, soll
+    # der Abbruch sofort kommen, nicht nach 100 s Datenaufbau.
+    _resume_file = resume_path(version_name)
+    _resume = load_resume_state(_resume_file) if resume else None
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
@@ -1191,9 +1250,18 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     # Lauf-Manifest + Korpus-Log (#64 Teil 2) -- siehe Funktionskommentare
     # oben. Additiv, rührt die train_file_limit-Logik unten nicht an.
-    _run_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Bei --resume behaelt der Lauf den Zeitstempel des ERSTEN Starts: das
+    # Manifest bleibt damit dieselbe Datei, die Fortsetzung wird dort als
+    # eigener Block vermerkt (Abschnitt 6/9), statt ein zweites Manifest
+    # neben das erste zu stellen.
+    _run_timestamp = (_resume["run_timestamp"] if _resume is not None
+                      else datetime.now().strftime("%Y%m%d_%H%M%S"))
     _t_start_train = time.time()
     _t_daten_fertig = None
+    # Wanduhr der abgeschlossenen Epochen frueherer Segmente (0 ohne --resume);
+    # die verlorene Teil-Epoche zaehlt bewusst nicht mit -- sie hat kein Ergebnis.
+    _prev_wall_s = float(_resume["wall_s_so_far"]) if _resume is not None else 0.0
+    _prev_segments = list(_resume.get("segments", [])) if _resume is not None else []
     # Val-Pool-Waechter (2026-08-27): MOSAIC_VAL_POOL schuetzt den Val-Split
     # beim Warm-Start heute nur, wenn man daran DENKT -- ohne die Variable
     # zieht der Split still frei (Mechanismus und die ~21 Prozent
@@ -1758,7 +1826,78 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         surprise_confidence_min=surprise_confidence_min,
         mse_loss=mse_loss,
     )
-    for epoch in range(epochs):
+    # ── Zwischenstand je Epoche und Wiederaufnahme (resume_path()) ──────────
+    # Alles, was die Schleife von Epoche zu Epoche traegt, steht in diesen
+    # Listen und Skalaren. Die Listen werden IN PLACE befuellt (lst[:] = ...),
+    # damit die lokalen Namen weiter auf dieselben Objekte zeigen.
+    _resume_lists = {
+        "policy_history": policy_history, "epoch_history": epoch_history,
+        "value_history": value_history, "points_history": points_history,
+        "opp_points_history": opp_points_history, "endgame_history": endgame_history,
+        "ranking_loss_history": ranking_loss_history, "total_history": total_history,
+        "val_ploss_history": val_ploss_history, "val_vloss_history": val_vloss_history,
+        "val_pointsloss_history": val_pointsloss_history,
+        "val_value_r2_history": val_value_r2_history, "val_points_r2_history": val_points_r2_history,
+        "val_opp_pointsloss_history": val_opp_pointsloss_history,
+        "val_opp_points_r2_history": val_opp_points_r2_history,
+        "val_endgame_mse_history": val_endgame_mse_history,
+        "val_ranking_acc_history": val_ranking_acc_history,
+        "val_brier_history": val_brier_history, "val_ownloss_history": val_ownloss_history,
+    }
+    # Fingerabdruck des Rezepts: Daten (Zahl der Batches/Zuege/Val-Zuege,
+    # Eingangsbreite), Netzform und alle Knoepfe, die den Verlauf aendern.
+    _resume_fingerprint = {
+        "version_name": version_name, "load_version": load_version, "epochs": epochs,
+        "lr": effective_lr, "lr_schedule": lr_schedule, "lr_t_max": lr_t_max, "seed": seed,
+        "encoder": encoder, "value_head": value_head, "hidden_size": hs,
+        "value_target_variant": value_target_variant, "value_target_lambda": value_target_lambda,
+        "value_weight": effective_value_weight, "points_weight": effective_points_weight,
+        "ownership_weight": effective_ownership_weight, "moon_loss_weight": moon_loss_weight,
+        "surprise_alpha": surprise_alpha, "surprise_confidence_min": surprise_confidence_min,
+        "select_by_brier": bool(select_by_brier), "freeze_trunk": bool(freeze_trunk),
+        "early_stop": bool(early_stop), "file_list": file_list, "val_frac": val_frac,
+        "n_batches": n_batches, "num_samples": len(dataset),
+        "num_val_samples": len(val_dataset) if val_dataset is not None else 0,
+        "input_size": dataset.input_size, "num_actions": NUM_ACTIONS, "batch_size": BATCH_SIZE,
+    }
+    start_epoch = 0
+    if _resume is not None:
+        check_resume_fingerprint(_resume["fingerprint"], _resume_fingerprint)
+        model.load_state_dict({k: v.to(device) for k, v in _resume["model_state"].items()})
+        optimizer.load_state_dict(_resume["optimizer_state"])
+        if lr_scheduler is not None and _resume.get("lr_scheduler_state") is not None:
+            lr_scheduler.load_state_dict(_resume["lr_scheduler_state"])
+        for _k, _lst in _resume_lists.items():
+            _lst[:] = _resume["lists"][_k]
+        best_combined_metric = _resume["best_combined_metric"]
+        best_epoch = _resume["best_epoch"]
+        best_state_dict = _resume["best_state_dict"]
+        best_brier_metric = _resume["best_brier_metric"]
+        best_brier_epoch = _resume["best_brier_epoch"]
+        best_brier_state_dict = _resume["best_brier_state_dict"]
+        policy_plateau_since = _resume["policy_plateau_since"]
+        value_plateau_since = _resume["value_plateau_since"]
+        # Zufallszustaende NACH dem Datenaufbau zuruecksetzen: der DataLoader
+        # zieht seinen Shuffle-Seed je Epoche aus dem globalen torch-RNG, die
+        # Batch-Reihenfolge der Fortsetzung entspricht so der eines
+        # ununterbrochenen Laufs.
+        torch.set_rng_state(_resume["rng"]["torch"])
+        if torch.cuda.is_available() and _resume["rng"].get("cuda") is not None:
+            torch.cuda.set_rng_state_all(_resume["rng"]["cuda"])
+        random.setstate(_resume["rng"]["python"])
+        start_epoch = int(_resume["epochs_done"])
+        epoch_count_done = start_epoch
+        print(f"🔁 Fortsetzung ab Epoche {start_epoch + 1}/{epochs} "
+              f"(bisher {_prev_wall_s:.0f} s Wanduhr in {len(_prev_segments)} Segment(en); "
+              f"bestes val_combined Epoche {best_epoch}, bester Brier Epoche {best_brier_epoch})")
+        if start_epoch >= epochs:
+            print("   Alle Epochen lagen schon vor -- es folgen nur Zusammenfassung, Speichern und Export.")
+    # Falls die Schleife gar nicht laeuft (Fortsetzung nach der letzten Epoche),
+    # braucht der Abschluss unten den letzten Epochenwert aus der Historie.
+    epoch_ploss = policy_history[-1] if policy_history else None
+    _segment_started = datetime.now().isoformat(timespec="seconds")
+
+    for epoch in range(start_epoch, epochs):
         epoch_count_done = epoch + 1
         _t = _train_one_epoch(
             model, dataloader, dataset, optimizer, device, encoder,
@@ -2026,6 +2165,53 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             else:
                 lr_scheduler.step()
 
+        # ── Zwischenstand dieser Epoche (resume_path()): Gewichte, Optimizer,
+        # Scheduler, Historien, Best-Tracker, Plateau-Zaehler, RNG. Nach dem
+        # Scheduler-Schritt, damit die Fortsetzung die LR der NAECHSTEN Epoche
+        # traegt; vor dem Early-Stopping-Abbruch, der ohnehin zum regulaeren
+        # Ende fuehrt (dort wird die Datei geloescht).
+        if epoch_checkpoint:
+            _rs = {
+                "version": version_name,
+                "run_timestamp": _run_timestamp,
+                "saved_at": datetime.now().isoformat(timespec="seconds"),
+                "epochs_done": epoch + 1,
+                "fingerprint": _resume_fingerprint,
+                "model_state": {k: v.detach().cpu() for k, v in model.state_dict().items()},
+                "optimizer_state": optimizer.state_dict(),
+                "lr_scheduler_state": lr_scheduler.state_dict() if lr_scheduler is not None else None,
+                "lists": {k: list(v) for k, v in _resume_lists.items()},
+                "best_combined_metric": best_combined_metric,
+                "best_epoch": best_epoch,
+                "best_state_dict": best_state_dict,
+                "best_brier_metric": best_brier_metric,
+                "best_brier_epoch": best_brier_epoch,
+                "best_brier_state_dict": best_brier_state_dict,
+                "policy_plateau_since": policy_plateau_since,
+                "value_plateau_since": value_plateau_since,
+                "rng": {
+                    "torch": torch.get_rng_state(),
+                    "cuda": torch.cuda.get_rng_state_all() if torch.cuda.is_available() else None,
+                    "python": random.getstate(),
+                },
+                "wall_s_so_far": _prev_wall_s + (time.time() - _t_start_train),
+                "segments": _prev_segments + [{
+                    "start": _segment_started, "von_epoche": start_epoch + 1, "bis_epoche": epoch + 1}],
+            }
+            try:
+                _dt = save_resume_state(_resume_file, _rs)
+                print(f"💾 Zwischenstand Epoche {epoch + 1} gespeichert ({_resume_file.name}, {_dt:.1f} s)",
+                      flush=True)
+            except Exception as e:
+                print(f"  ⚠️  Zwischenstand Epoche {epoch + 1} NICHT gespeichert ({e!r}) -- Training laeuft weiter.",
+                      flush=True)
+            # Testhaken fuer die Wiederaufnahme (tools/tests): bricht nach dem
+            # Speichern der genannten Epoche hart ab, wie ein Absturz.
+            _abort_after = os.environ.get("MOSAIC_RESUME_TEST_ABORT_AFTER_EPOCH")
+            if _abort_after and int(_abort_after) == epoch + 1:
+                print(f"🧪 MOSAIC_RESUME_TEST_ABORT_AFTER_EPOCH={_abort_after}: simulierter Absturz.", flush=True)
+                os._exit(99)
+
         # ── Early Stopping: BEIDE Koepfe muessen plateauen (Task #34) ──
         if policy_plateau_since is not None and value_plateau_since is not None:
             since = (epoch + 1) - max(policy_plateau_since, value_plateau_since)
@@ -2037,6 +2223,8 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 stop_reason = "plateau"
                 break
 
+    if not policy_history:
+        sys.exit("❌ Keine Epoche gelaufen (--epochs 0?) -- nichts zu speichern.")
     max_loss = math.log(NUM_ACTIONS)
     final_p = epoch_ploss
     pct = final_p / max_loss * 100
@@ -2144,6 +2332,17 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     try:
         _m = json.loads(_mpath.read_text(encoding="utf-8"))
         _m["epoch_history"] = epoch_history
+        if _resume is not None:
+            # Fortsetzung sichtbar machen: welche Epochen aus welchem Segment
+            # stammen. Die Epochen 1..start_epoch sind aus dem Zwischenstand
+            # uebernommen, nicht in diesem Prozess gerechnet.
+            _m["fortsetzung"] = {
+                "resume_file": _resume_file.name,
+                "fortgesetzt_ab_epoche": start_epoch + 1,
+                "segmente": _prev_segments + [{
+                    "start": _segment_started, "von_epoche": start_epoch + 1,
+                    "bis_epoche": epoch_count_done}],
+            }
         _mpath.write_text(json.dumps(_m, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"📝 Epochen-Verlauf ({len(epoch_history)} Epochen) ins Manifest nachgetragen.")
     except Exception as e:
@@ -2359,7 +2558,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     #    niemand sagen konnte, ob er arbeitet oder haengt.
     from train_manifest import append_train_laufzeit
     append_train_laufzeit(version_name, _run_timestamp, {
-        "wanduhr_s": round(time.time() - _t_start_train, 1),
+        # Bei --resume: Summe ueber alle Segmente OHNE die verlorene Teil-Epoche
+        # (sie hat kein Ergebnis); `segment_wanduhr_s` ist nur dieser Prozess,
+        # `cpu_s` und `datenaufbau_s` ebenfalls (Prozessgroessen).
+        "wanduhr_s": round(_prev_wall_s + (time.time() - _t_start_train), 1),
+        "segment_wanduhr_s": round(time.time() - _t_start_train, 1) if _resume is not None else None,
+        "fortgesetzt_ab_epoche": (start_epoch + 1) if _resume is not None else None,
         "cpu_s": round(time.process_time(), 1),
         "datenaufbau_s": round(_t_daten_fertig - _t_start_train, 1)
         if _t_daten_fertig is not None else None,
@@ -2368,6 +2572,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         "epochen": epoch_count_done,
         "samples": len(dataset) if dataset is not None else None,
     })
+
+    # 10. Zwischenstand loeschen: der Lauf ist vollstaendig gespeichert und
+    #     exportiert; ein liegen gebliebener Zwischenstand wuerde beim
+    #     naechsten `--resume` desselben Namens einen fremden Lauf fortsetzen.
+    if _resume_file.exists():
+        try:
+            _resume_file.unlink()
+            print(f"🧹 Zwischenstand {_resume_file.name} geloescht (Lauf vollstaendig).")
+        except OSError as e:
+            print(f"  ⚠️  Zwischenstand {_resume_file.name} nicht loeschbar ({e!r}).")
 
 
 def _snapshot_models_to_backup(version_name: str) -> None:
@@ -2428,6 +2642,19 @@ if __name__ == "__main__":
     parser.add_argument("--name", type=str, required=True, help="Name der neuen Version, z.B. v2")
     parser.add_argument("--load", type=str, default=None, help="Name der alten Version für Warm Start, z.B. v1")
     parser.add_argument("--epochs", type=int, default=15, help="Wieviele Epochen")
+    parser.add_argument("--resume", action="store_true",
+                        help="Abgebrochenen Lauf gleichen Namens am Zwischenstand "
+                             "models/alphazero_<name>_resume.pth fortsetzen (Gewichte, Optimizer, "
+                             "Scheduler, Historien, Best-Tracker, RNG der letzten abgeschlossenen "
+                             "Epoche). Alle uebrigen Flags MUESSEN denen des abgebrochenen Laufs "
+                             "entsprechen (Fingerabdruck-Waechter, harter Abbruch bei Abweichung). "
+                             "Fehlt der Zwischenstand: harter Abbruch, kein stiller Neustart. "
+                             "Anlass: v24-b03 starb 2026-09-05 in Epoche 12/12 durch einen "
+                             "Maschinen-Neustart ohne gespeicherten Stand.")
+    parser.add_argument("--no-epoch-checkpoint", action="store_true",
+                        help="Zwischenstand je Epoche NICHT schreiben (Default: schreiben, "
+                             "rund 35 MB, atomar, nach erfolgreichem Ende geloescht). Aendert "
+                             "keine Trainingszahl -- nur fuer Laeufe, bei denen die Datei stoert.")
     parser.add_argument("--hidden", type=int, default=None, help="Hidden Layer Größe (Standard: aus config.py)")
     parser.add_argument("--no-early-stop", action="store_true", help="Early Stopping deaktivieren")
     parser.add_argument("--select-by-brier", action="store_true",
@@ -2742,4 +2969,5 @@ if __name__ == "__main__":
           freeze_trunk=args.freeze_trunk, cache_file=args.cache_file,
           moon_loss_weight=args.moon_loss_weight, file_list=args.file_list,
           surprise_alpha=args.surprise_alpha,
-          surprise_confidence_min=args.surprise_confidence_min)
+          surprise_confidence_min=args.surprise_confidence_min,
+          resume=args.resume, epoch_checkpoint=not args.no_epoch_checkpoint)

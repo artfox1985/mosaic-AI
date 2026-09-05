@@ -119,6 +119,16 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   2026-08-26, Herleitung: STATUS, Abschnitt "C2".
 - **Einfrieren, sobald etwas Referenz WIRD** -- Ausloeser ist die
   Rollenuebernahme (Generator, Anker, Gegner), nicht "sieht fertig aus".
+- **Abgebrochenes Training FORTSETZEN, nicht neu starten.** train.py schreibt
+  seit 2026-09-05 nach jeder Epoche `models/alphazero_<name>_resume.pth`
+  (Gewichte, Optimizer, Scheduler, Historien, Best-Tracker, RNG; atomar;
+  Default an, `--no-epoch-checkpoint` schaltet ab) und loescht die Datei nach
+  erfolgreichem Ende. Wiederaufnahme: derselbe Befehl plus `--resume`; ein
+  Fingerabdruck-Waechter bricht bei jeder Rezept-Abweichung hart ab. Belegt:
+  Fortsetzung nach simuliertem Absturz liefert bitgleiche Gewichte und
+  Epochenwerte wie der ununterbrochene Lauf (3 Epochen, 12 Dateien, GPU).
+  Anlass: v24-b03 starb durch einen Maschinen-Neustart in Epoche 12/12 ohne
+  gespeicherten Stand (3 h 40 min GPU).
 
 - **Zwei gleichzeitige Aenderungen brauchen den Kontrollarm auf der
   UNVERAENDERTEN Achse.** Praezedenz: Ownership-Kopf einschalten plus
