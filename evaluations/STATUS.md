@@ -24,32 +24,41 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-09-04, 21:05 -- Sitzung nach dem Chip-Wechsel von 20:40)
+## 1. WAS GERADE LAEUFT (Stand 2026-09-05, 13:52)
 
-**LAEUFT (Stand 10:37): Training `v24-b02` auf der GPU (seit 08:58, Epoche 7/12
-um 10:34, Ende gegen 11:45), daneben die Abnahme b01 (Tor 2b, Arena mit Logs);
-Kette b03 wartet auf das Ende von b02 und trainiert dann `v24-b03` (Monolith
-liegt).** Erzeugung komplett (1.200 Dateien), Tor 0 GRUEN, Manifest 580,
-`window_v24.txt`, Monolith 976b1ef66843.
+**Champion:** `v23-b01_k3p10` (Elo 1292, Artefakt komplett). **Generation v24
+in der Abnahme, fuenf Arme:** b01 und b02 trainiert, b03 trainiert (GPU,
+Epoche 3/12 um 13:51), b04 (Sicht-Arm, `INPUT_SIZE` 744) und b05 (gegatete
+Ueberraschung) in Ketten dahinter. Alle Ergebnisse: `PREREG_v24_window.md`
+par.9/9a/9b.
 
-**v24-b01: Tor 1 und Tor 2a GERISSEN** (`PREREG_v24_window.md` par.9): argmax
-0,4425 gegen 0,555; Gating 34:46 und 49:61 (beide SPRT H0), Elo informativ
-1219. Nach `generation_loop.md` scheidet b01 als Generator aus; Entscheid
-ueber die Generation erst nach b02/b03 (Generatorwahl-Regel), Ursachenanalyse
-dann. Abnahme b02/b03: `bash tools/night_v24_acceptance_chain.sh b02` (bzw.
-b03), sobald das Modell da ist und kein CPU-Auftrag laeuft.
+**v24-b01:** Tor 1 MIT Knopf gerissen (83:107), OHNE Knopf 216:184 nach 200
+Paaren (p 0,105, Ratsche nicht genommen, "schwaecher" widerlegt); Tor 2a mit
+Knopf 0,443 gegen 0,555, ohne Knopf 0,518 gegen 0,510; Tor 2b gehalten (93:67,
+Spalten +0,20/+0,03). Befund par.9b: das Netz hat nicht verlernt, der Knopf
+(K3-P C 1,0) kippt bei v24-b01 ins Negative. Elo informativ: v24-b01 ohne
+Knopf 1291, mit Knopf 1248 (eigene Knoten seit 13:50).
 
-**Champion-Artefakt `models/frozen_champions/v23-b01_k3p10/` ist KOMPLETT
-(21:00):** Golden Probe (10 Sonden, 20:27:53-20:50), venv aus dem
-Artefakt-Wheel (nicht versioniert), Referee-Selbsttest 10/10 gruen plus zwei
-Echtpartien (`artifacts/frozen_referee_match_v23-b01_k3p10_selftest.json`),
-Manifest vollstaendig (`name_dialect` hv, `worker_python.interpreter_relative`,
-Wheel-sha256 = live installiertes Wheel). Chronik 20:45-21:05.
+**Laufende Ketten (alle warten selbst auf ihre Bedingung, Reihenfolge CPU):**
+1. `night_v24_b04_chain.sh` -- Bloecke unter 744 (seit 13:50, rund 85 min bei
+   diesem Tempo), Split, Monolith; Training b04 nach b03.
+2. Abnahmen b02 dann b03 (`night_v24_acceptance_chain.sh`, je Tor 2a und Tor 1
+   OHNE und MIT Knopf, Tor 2b) -- nach den b04-Bloecken.
+3. `night_v24_b05_chain.sh` -- Training b05 nach b04 (GPU).
+4. Nach b05: Wheel 744 installieren (`engine/target/wheels`, gebaut 13:50,
+   Kontrakt `20b442a8164f748d`), Anker-Drift (`verify_frozen_heuristic.py`),
+   Abnahmen b04 und b05.
+Noch nicht eingetaktet: argmax v24-b01 bei C 0,5 (Knopf-Dosis, par.9b).
 
-**Champion seit 19:33: `v23-b01_k3p10`** (b01 mit projiziertem Huellen-
-Potential; Abschnitt 4, `PREREG_geometric_envelope.md` par.11). Der Nutzer
-hat sechs Server-Partien gegen ihn gespielt (4:2 fuer den Menschen, Chronik
-20:35).
+**Entscheide des Nutzers heute:** v25-Zuschnitt par.1 (hv2-Abbildung par.2
+angenommen; Value-Klasse zu argmax, Zahl 8.000/0 oder 7.000/1.000 offen);
+Prereg-Bestand 9 OFFEN; Sicht-Arm mit 30 Werten; Historie kein Merkposten;
+mehr Sims im Sockel kein Hebel. **Push:** Baum sauber seit e49eb3c, Hook
+gruen (521 Tests), 43 Commits vor origin/main.
+
+**Regeln fuer den Rest des Tages:** kein Training ausser den Ketten, keine
+Loeschung, kein Push durch mich; Wheel-Install erst, wenn kein train.py das
+alte Wheel haelt (Kette 4 prueft das).
 
 ### ERSTE AUFGABE DER NEUEN SITZUNG
 
