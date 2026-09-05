@@ -64,6 +64,10 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
    dann Wheel 744 neu bauen (enthaelt K3-P2) und mit Kette 4 installieren;
    Messung am v24-Siegernetz nach par.8.11 (argmax @400 und gepaarte Arena
    gegen K3-P, Kuppel-Bonus je Partie mit `tools/probes/arena_points_probe.py`).
+7. **K4 Rundenschaetzer-Term registriert** (`PREREG_round_estimate_leaf_term.md`,
+   Nutzer 19:20): erster Schritt ist die Skalen-Sonde (par.4, Replay der
+   b01-Tor-2b-Logs, Minuten CPU) sobald die CPU frei ist; Bau und Messung am
+   v24-Siegernetz nach den Abnahmen.
 6. **Offener Nutzer-Entscheid (18:55): Sicht der Suche auf das Tiling.**
    Leitsatz "Drafting muss das Tiling kennen" registriert
    (`architecture_reference.md`, `round_transition_search_sampling` par.7);
@@ -206,7 +210,7 @@ Index: 18 OFFEN, 79 ENTSCHIEDEN, 8 UEBERHOLT. Chronik der letzten Naechte:
 
 ### Prereg-Bestand
 
-Stand 2026-09-05, 18:05: **10 OFFEN** (`policy_surprise_weighting` fuer b05 und `geometric_envelope` mit Schliesskriterium par.12 wieder offen). Stand 11:15 war: **8 OFFEN**: `v24_window`, `v25_window`,
+Stand 2026-09-05, 19:25: **11 OFFEN** (`policy_surprise_weighting` fuer b05 und `geometric_envelope` mit Schliesskriterium par.12 wieder offen; NEU `round_estimate_leaf_term`, Such-Knopf K4, Nutzer-Auftrag 19:20). Stand 11:15 war: **8 OFFEN**: `v24_window`, `v25_window`,
 `start_position_seeding`, `special_tile_yield`, `start_dome_choice`,
 `round_transition_search_sampling`, `rust_data_layer`, `stack_top_feature`
 (Nutzer: Sichtgleichheit, kein Staerkeziel, bleibt offen). Am 2026-09-05 vier
