@@ -198,7 +198,7 @@ Index: 18 OFFEN, 79 ENTSCHIEDEN, 8 UEBERHOLT. Chronik der letzten Naechte:
 
 ### Prereg-Bestand
 
-Stand 2026-09-05, 11:15: **8 OFFEN**: `v24_window`, `v25_window`,
+Stand 2026-09-05, 18:05: **10 OFFEN** (`policy_surprise_weighting` fuer b05 und `geometric_envelope` mit Schliesskriterium par.12 wieder offen). Stand 11:15 war: **8 OFFEN**: `v24_window`, `v25_window`,
 `start_position_seeding`, `special_tile_yield`, `start_dome_choice`,
 `round_transition_search_sampling`, `rust_data_layer`, `stack_top_feature`
 (Nutzer: Sichtgleichheit, kein Staerkeziel, bleibt offen). Am 2026-09-05 vier
