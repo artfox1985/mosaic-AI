@@ -367,6 +367,7 @@ ein Training braucht, und dem, was ein Suchknopf am fertigen Netz ist.
 | `v24-b01` | Standardrezept, Warmstart aus `v23-b01_brierbest`, Fenster par.1/par.6 | diese Datei | Kontrolle |
 | `v24-b02` | **lambda 0,7** im Value-Ziel (`--value-target-lambda 0.7`): Partieausgang mit Bootstrap-Anteil `root_q` gemischt | `lambda_v18only` (0,7 war 227:173 arena-signifikant, WDL-Aera-Grenze) | `value_target_lambda` |
 | `v24-b03` | **Seeding-Schwarm**: 1.500 Stellungen aus der v24-Value-Klasse (Spieler am Zug, R2-4, Spaltenfortschritt 3-5), k = 4, 6.000 Partien `--value-only` @100 als Zusatz-Schwarm; Regel und Kosten (rund 3 h) in `start_position_seeding` par.7 | `start_position_seeding` par.7 | Fensterzusammensetzung (Zusatz-Schwarm), sonst b01 |
+| `v24-b04` | **Sicht-Arm** (Nutzer 2026-09-05): acht additive Flachwerte fuer den Plattentyp (Rueckseite der obersten Stapelplatte 2, Wild/Spezial der drei Auslage-Platten 6), `INPUT_SIZE` 714 -> 722, Warmstart mit null-initialisierten neuen Spalten; Kriterium Sichtgleichheit, Arena als Waechter | `stack_top_feature` par.10 | Eingabe (+8 Werte), sonst b01 |
 
 Reanalyze Teil B (Value tief nachrechnen) wird erst fuer b02 zum Werkzeug
 mit Verbraucher (lambda < 1); ob er nachgezogen wird, entscheidet sich nach
