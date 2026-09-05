@@ -1214,3 +1214,56 @@ bestehenden Generator-Netz kommt. `v23-b01_brierbest` selbst blieb auf
 Augenhoehe mit v21 (214:186); der Knopf hebt es auf 259:191 gepoolt. Fuer
 Erzeugung (v24 par.6b') und Spielbetrieb gilt dieselbe Konfiguration.
 
+## par.8.10 TILING-WAHLFREIHEIT GEMESSEN (14:48): die Huelle laesst sich im Tiling kaum bewegen, der Hebel liegt bei den Kuppelplatten
+
+Anlass: Nutzer 2026-09-05, "Huelle nur im Drafting hat keinen Sinn, ueberleg
+dir einen Mechanismus, der im Tiling ebenfalls wirkt", und "die meisten Punkte
+kommen ab Runde 3" (Server-Logs: nach zwei Runden 5-10 Punkte je Seite,
+Endstaende 37-84, Endwertung allein 4-30).
+
+**Sonde** `tools/probes/tiling_hull_choice_probe.py` (Artefakt
+`tiling_hull_choice_probe.json`): 200 Tiling-Zustaende (erster je Partie,
+Runde, Spieler) aus zwei argmax-Dateien der v24-Erzeugung, alle Abschluesse
+des Loesers je Zustand (`tiling_candidates_json`, k 64), je Abschluss Punkte
+und H (Raster nach dem Rundentiling, wie der gemessene W_TILE-Zweig).
+
+| Runde | Zustaende mit Wahl (>= 2 Abschluesse) | huellenbester Abschluss weicht vom punktbesten ab | davon ausserhalb der Top-12 nach Punkten | Punktkosten des huellenbesten (Mittel / max) | Huellengewinn (Kosteneinheiten, Mittel) |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 8 von 40 | 0 | 0 | -- | -- |
+| 2 | 37 von 40 | 10 | 0 | 1,8 / 5 | 3,1 |
+| 3 | 40 von 40 | 11 | 3 | 2,6 / 8 | 2,2 |
+| 4 | 38 von 40 | 3 | 2 | 9,3 / 12 | 8,7 |
+| 5 | 34 von 40 | 10 | 2 | 2,8 / 8 | 4,5 (Runde 5 ist per Profil aus) |
+
+Volle Spalten unterscheiden sich zwischen huellen- und punktbestem Abschluss
+in 2 von 200 Zustaenden (die Spaltensumme ist per Konstruktion invariant:
+jeder Stein geht in irgendeine Spalte).
+
+**Lesart.** (1) In Runde 1 gibt es im Tiling nichts zu lenken: 8 von 40
+Zustaenden haben ueberhaupt eine Wahl, und nie weicht der huellenbeste
+Abschluss ab. (2) In Runde 2-3 weicht er in rund einem Viertel der Zustaende
+ab, kostet dort 2-3 Punkte und bringt 2-3 Kosteneinheiten Huelle (von 56).
+Der gemessene W_TILE-Zweig (8.7b: T 0,5 / 1,0) hat mit `1,0 * w_e * dH` in
+Runde 2 rund 3 Punkte Bonus je Kosteneinheit gezahlt, also diese Faelle sehr
+wahrscheinlich gekippt -- und in der Arena trotzdem nichts bewegt (81:79,
+Spalten -0,019, H 0,000). Die Obergrenze erklaert das: rund 10 von 40
+Zustaenden je Runde x rund 3 von 56 Kosteneinheiten = **etwa +0,01 H je
+Partie**, gegen +0,16 H, die K3-P in der Suche bewegt. Das Top-12-Filter
+kostet fast nichts (0-3 Faelle je Runde ausserhalb). (3) Das Tiling
+entscheidet nur, in WELCHE annehmende Zelle einer Zeile der Stein geht; welche
+Zellen welche Farbe annehmen, legen die KUPPELPLATTEN fest, und welche Farben
+gesammelt werden, legt der Draft fest. Beides passiert in der Engine in der
+Drafting-Phase (waehrend des Tilings werden keine Platten gelegt,
+tiling_solver.rs Modulkopf) und wird vom K3-P-Potential erreicht.
+
+**Konsequenz:** ein staerkerer Tiling-Term ist kein Hebel (Obergrenze
+gemessen). Der Hebel fuer "Geometrie frueh, Punkte spaet" ist die
+Plattenwahl in Runde 1-2, und dafuer ist par.8.9b Baustein 1 (K3-P2,
+Modulator: gebundene Reihe ohne annehmende Huellenzelle zaehlt mit `w_slot`
+auf den leeren Huellenzellen ihrer Zeile, die passende Platte hebt sie auf 1)
+die registrierte Form -- als v25-Such-Knopf am Siegernetz der v24-Arme zu
+messen. Zusaetzlich denkbar, nicht registriert: Punkte im Tiling mit
+`(1 - w_e)` daempfen (Runde 1-2 fast punktblind, Runde 4-5 Punkte), weil die
+Punkte ohnehin erst ab Runde 3 fallen; die Obergrenze oben gilt aber auch
+dafuer.
+
