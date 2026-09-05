@@ -26,47 +26,20 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (Stand 2026-09-04, 21:05 -- Sitzung nach dem Chip-Wechsel von 20:40)
 
-**LAEUFT: v24-ERZEUGUNG (Nutzer-Freigabe fuer die Value-Laeufe hier;
-Sockel seit ~21:10 auf dem anderen Rechner des Nutzers).** Hier seit **21:31** (Manifest-Zeitstempel 213124; der Sitzungsneustart hat den
-Lauf nach Chunk 4 getoetet, Tail seit 21:40 als eigener Lauf `--games 5950
---seed 20260910`, Chronik) in EINER Hintergrundkette: 6.000 argmax (`v23-b01-value-argmax`, Seed 20260905)
-und danach 2.000 gesampelt (`v23-b01-value-sampled`, Seed 20260906), Rezept
-`PREREG_v24_window.md` par.6b' (Umgebung `MOSAIC_STACK_DRAW_RESEARCH=1
-MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0`, threads 11).
-Daneben der **Cache-Watcher** (`build_cache_incremental.py --watch --workers 1`,
-2D/nortv, `MOSAIC_IGNORE_POLICY_TARGET_VALID=1`, `MOSAIC_DATA_EXCLUDE='^selfplay_(hv2|tor2a)'`,
-Ende 30 min nach der letzten neuen Datei) -- Cache-Prereg par.6, Hebel 4.
-**Laufzeiten der Value-Laeufe entstehen damit unter Nebenlast (1 Worker) und
-sind KEINE Planungsgroesse** (`working_rules.md`). Fortschritt am g-Suffix
-in `data/selfplay_v23-b01-value-*.pkl` zaehlen. Referenz ohne Nebenlast:
-3,27 s je Partie (8.7d); gemessen unter Nebenlast nach 20 Partien 0,26 Partien/s
-(3,8 s je Partie) -> rund 8,5 h fuer 8.000 Partien, Ende gegen 06:00
-(Herleitung aus den ersten 20 Partien, nicht gemessen). **NACHTKETTE `tools/night_v24_chain.sh` laeuft seit 23:26** (Nutzer-Freigabe
-23:30 fuer die Trainingsarme): wartet auf das Ende der Value-Laeufe und des
-Watchers, dann Tor 0 -> Manifest 580 -> `window_v24.txt` -> Bloecke -> Split
-und Monolith -> Training **v24-b01** -> Training **v24-b02** (lambda 0,7).
-Artefakte `artifacts/v24_{symmetry,sanity}_*.json`, `v24_split.txt`. Gates
-stoppen mit Exit 10-13 (Vorlage an den Nutzer, kein Training). Dazu seit 23:37
-**Kette b03** (`tools/night_v24_b03_chain.sh`): wartet auf das laufende
-b01-Training, dann Kuratierung (1.500 Stellungen, Spieler am Zug, Seed
-20260912) und Seeding-Schwarm (6.000 Partien @100, Knopf wie 6b', Seeding-
-Prereg par.7 Nachtrag) als der eine CPU-Auftrag, Bloecke/Monolith neben b02,
-Training **v24-b03** nach b02. Dazu seit 23:42 die
-**Abnahmekette b01** (`tools/night_v24_acceptance_chain.sh b01`): wartet auf
-`alphazero_v24-b01_brierbest.onnx` und drei Minuten ohne Self-Play-/Cache-
-Prozess, dann Tor 2a (argmax @400, Knopf an, Bezug 0,555), Tor 1
-(`paired_gating` gegen `v23-b01_brierbest`, beide Seiten Champion-Spec,
-`--no-promote-winner`, Replikation bei Fruehstopp < 150), Tor 2b (Arena 2 x 80
-mit Logs, Spaltensonde). Fuer b02/b03 dieselbe Kette mit Argument. Verdikt und
-Generatorwahl registriert der Koordinator. Noch offen: hv2-Fenster-Kennzahl
-(1.745 Dateien, erst wenn kein anderer CPU-Auftrag laeuft). **Der Sockel liegt seit 23:19 in `data/`** (400 Dateien plus Manifest,
-1,48 s je Partie auf dem anderen Rechner; par.6c Punkte 1 und 2 gruen,
-Chronik); der Watcher baut seine Bloecke.
+**LAEUFT (Stand 10:37): Training `v24-b02` auf der GPU (seit 08:58, Epoche 7/12
+um 10:34, Ende gegen 11:45), daneben die Abnahme b01 (Tor 2b, Arena mit Logs);
+Kette b03 wartet auf das Ende von b02 und trainiert dann `v24-b03` (Monolith
+liegt).** Erzeugung komplett (1.200 Dateien), Tor 0 GRUEN, Manifest 580,
+`window_v24.txt`, Monolith 976b1ef66843.
 
-Die vier Dateien des Fehlstarts von 21:27 (Chronik) sind auf Nutzer-Freigabe
-vor dem Start entfernt worden; der echte Lauf begann bei Null.
-**par.6c Punkte 1 und 2 GRUEN am echten argmax-Manifest** (Chronik 21:34);
-Tor 0 (Punkt 3) nach dem Lauf. **Champion-Artefakt `models/frozen_champions/v23-b01_k3p10/` ist KOMPLETT
+**v24-b01: Tor 1 und Tor 2a GERISSEN** (`PREREG_v24_window.md` par.9): argmax
+0,4425 gegen 0,555; Gating 34:46 und 49:61 (beide SPRT H0), Elo informativ
+1219. Nach `generation_loop.md` scheidet b01 als Generator aus; Entscheid
+ueber die Generation erst nach b02/b03 (Generatorwahl-Regel), Ursachenanalyse
+dann. Abnahme b02/b03: `bash tools/night_v24_acceptance_chain.sh b02` (bzw.
+b03), sobald das Modell da ist und kein CPU-Auftrag laeuft.
+
+**Champion-Artefakt `models/frozen_champions/v23-b01_k3p10/` ist KOMPLETT
 (21:00):** Golden Probe (10 Sonden, 20:27:53-20:50), venv aus dem
 Artefakt-Wheel (nicht versioniert), Referee-Selbsttest 10/10 gruen plus zwei
 Echtpartien (`artifacts/frozen_referee_match_v23-b01_k3p10_selftest.json`),
