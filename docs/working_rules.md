@@ -129,6 +129,11 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   Epochenwerte wie der ununterbrochene Lauf (3 Epochen, 12 Dateien, GPU).
   Anlass: v24-b03 starb durch einen Maschinen-Neustart in Epoche 12/12 ohne
   gespeicherten Stand (3 h 40 min GPU).
+  **Pause auf Zuruf statt Kill:** `touch models/alphazero_<name>.stop` --
+  train.py speichert nach der laufenden Epoche, loescht die Stopp-Datei und
+  endet mit Exit-Code 75; ein Kill kostet dagegen die angefangene Epoche.
+  Test beider Wege: `tools/tests/train_resume_pause_test.sh` (Mini-Fenster,
+  rund 2 min GPU; NICHT neben einer laufenden Messung starten).
 
 - **Zwei gleichzeitige Aenderungen brauchen den Kontrollarm auf der
   UNVERAENDERTEN Achse.** Praezedenz: Ownership-Kopf einschalten plus

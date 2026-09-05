@@ -1020,6 +1020,21 @@ def resume_path(version_name: str) -> Path:
     return MODELS_DIR / f"alphazero_{version_name}_resume.pth"
 
 
+PAUSE_EXIT_CODE = 75   # EX_TEMPFAIL: geordnet pausiert, Fortsetzung mit --resume moeglich
+
+
+def stop_path(version_name: str) -> Path:
+    """Stopp-Datei fuer die Pause auf Zuruf (`models/alphazero_<name>.stop`).
+
+    Anlegen (Inhalt egal), waehrend der Lauf rechnet:
+        touch models/alphazero_<name>.stop
+    train.py prueft sie nach jeder Epoche, schreibt den Zwischenstand, loescht
+    die Stopp-Datei und endet mit PAUSE_EXIT_CODE. Fortsetzung: derselbe Befehl
+    plus --resume. Anders als ein Kill kostet die Pause keine Teil-Epoche.
+    """
+    return MODELS_DIR / f"alphazero_{version_name}.stop"
+
+
 def save_resume_state(path: Path, state: dict) -> float:
     """Schreibt den Zwischenstand ATOMAR (tmp + os.replace).
 
@@ -1078,6 +1093,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # der Abbruch sofort kommen, nicht nach 100 s Datenaufbau.
     _resume_file = resume_path(version_name)
     _resume = load_resume_state(_resume_file) if resume else None
+    # Stopp-Datei fuer die Pause auf Zuruf (siehe stop_path()). Liegt sie
+    # schon beim Start, ist das entweder ein Rest oder ein Missverstaendnis --
+    # in beiden Faellen harter Abbruch statt einer stillen Pause nach Epoche 1.
+    _stop_file = stop_path(version_name)
+    if _stop_file.exists():
+        sys.exit(f"❌ Stopp-Datei {_stop_file} liegt schon vor dem Start -- entfernen und neu "
+                 f"starten (sie wuerde den Lauf sonst nach der ersten Epoche pausieren).")
     # PREREG_frozen_trunk_head.md: harte Vorab-Validierung des Freeze-Modus,
     # VOR jedem teuren Daten-Laden (Muster --value-target-lambda unten).
     validate_freeze_args(freeze_trunk, ownership_weight, load_version, val_frac)
@@ -2170,7 +2192,13 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Scheduler-Schritt, damit die Fortsetzung die LR der NAECHSTEN Epoche
         # traegt; vor dem Early-Stopping-Abbruch, der ohnehin zum regulaeren
         # Ende fuehrt (dort wird die Datei geloescht).
-        if epoch_checkpoint:
+        # Pause auf Zuruf (Nutzer 2026-09-05): liegt die Stopp-Datei vor, wird
+        # der Zwischenstand dieser Epoche auf jeden Fall geschrieben (auch bei
+        # --no-epoch-checkpoint) und der Prozess endet geordnet mit
+        # PAUSE_EXIT_CODE. Wiederaufnahme: derselbe Befehl plus --resume. So
+        # kann die GPU ohne Verlust einer Teil-Epoche freigeraeumt werden.
+        _pause_requested = _stop_file.exists()
+        if epoch_checkpoint or _pause_requested:
             _rs = {
                 "version": version_name,
                 "run_timestamp": _run_timestamp,
@@ -2203,8 +2231,25 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                 print(f"💾 Zwischenstand Epoche {epoch + 1} gespeichert ({_resume_file.name}, {_dt:.1f} s)",
                       flush=True)
             except Exception as e:
-                print(f"  ⚠️  Zwischenstand Epoche {epoch + 1} NICHT gespeichert ({e!r}) -- Training laeuft weiter.",
-                      flush=True)
+                if _pause_requested:
+                    # Ohne gesicherten Stand darf die Pause NICHT greifen -- ein
+                    # Abbruch jetzt waere derselbe Verlust wie ein Absturz.
+                    print(f"  ⚠️  Zwischenstand Epoche {epoch + 1} NICHT gespeichert ({e!r}) -- Pause "
+                          f"verweigert, Training laeuft weiter; Stopp-Datei bleibt liegen.", flush=True)
+                    _pause_requested = False
+                else:
+                    print(f"  ⚠️  Zwischenstand Epoche {epoch + 1} NICHT gespeichert ({e!r}) -- Training laeuft weiter.",
+                          flush=True)
+            if _pause_requested:
+                try:
+                    _stop_file.unlink()     # Auftrag ist ausgefuehrt, nicht liegen lassen
+                except OSError as e:
+                    print(f"  ⚠️  Stopp-Datei {_stop_file.name} nicht loeschbar ({e!r}) -- vor dem "
+                          f"--resume von Hand entfernen, sonst pausiert der Lauf nach der naechsten Epoche erneut.")
+                print(f"\n⏸️  PAUSE nach Epoche {epoch + 1}/{epochs} (Stopp-Datei {_stop_file.name}). "
+                      f"Zwischenstand: {_resume_file}\n   Fortsetzen: derselbe Befehl plus --resume "
+                      f"(Exit-Code {PAUSE_EXIT_CODE}).", flush=True)
+                sys.exit(PAUSE_EXIT_CODE)
             # Testhaken fuer die Wiederaufnahme (tools/tests): bricht nach dem
             # Speichern der genannten Epoche hart ab, wie ein Absturz.
             _abort_after = os.environ.get("MOSAIC_RESUME_TEST_ABORT_AFTER_EPOCH")
@@ -2650,7 +2695,10 @@ if __name__ == "__main__":
                              "entsprechen (Fingerabdruck-Waechter, harter Abbruch bei Abweichung). "
                              "Fehlt der Zwischenstand: harter Abbruch, kein stiller Neustart. "
                              "Anlass: v24-b03 starb 2026-09-05 in Epoche 12/12 durch einen "
-                             "Maschinen-Neustart ohne gespeicherten Stand.")
+                             "Maschinen-Neustart ohne gespeicherten Stand. PAUSE auf Zuruf: "
+                             "`touch models/alphazero_<name>.stop` waehrend des Laufs -- er "
+                             "speichert nach der laufenden Epoche, loescht die Stopp-Datei und "
+                             f"endet mit Exit-Code {PAUSE_EXIT_CODE}; Fortsetzung wie oben.")
     parser.add_argument("--no-epoch-checkpoint", action="store_true",
                         help="Zwischenstand je Epoche NICHT schreiben (Default: schreiben, "
                              "rund 35 MB, atomar, nach erfolgreichem Ende geloescht). Aendert "
