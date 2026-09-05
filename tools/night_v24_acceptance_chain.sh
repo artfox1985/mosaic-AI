@@ -31,6 +31,42 @@ while true; do
   sleep 60
 done
 echo "   Abnahme $ARM beginnt $(date +%H:%M:%S)"
+# Encoder-Waechter (Sicht-Arm, PREREG_stack_top_feature.md par.10): ein Modell mit 744
+# Flachwerten braucht das Wheel mit INPUT_SIZE 744 -- ein 714er-Wheel wuerde es NICHT
+# kuerzen, sondern die Eingabe zu kurz liefern (nur kuerzen, nie auffuellen).
+python - "$NEW" <<'EOF'
+import json, sys, onnx
+import mosaic_rust as mr
+m = onnx.load(sys.argv[1])
+dims = [i for i in m.graph.input]
+flat = None
+for i in dims:
+    shape = [d.dim_value for d in i.type.tensor_type.shape.dim]
+    if len(shape) == 2:
+        flat = shape[1]
+eng = json.loads(mr.engine_config_json()).get("input_size")
+print(f"Modell-Flachbreite {flat}, Engine INPUT_SIZE {eng}")
+if flat is not None and eng is not None and flat > eng:
+    raise SystemExit(f"STOPP: Modell verlangt {flat} Flachwerte, installiertes Wheel liefert {eng} -- Wheel installieren, dann Abnahme neu starten")
+EOF
+
+echo "== 1a) Tor 2a OHNE Knopf (par.9b: trennt Netz von Knopf-Wechselwirkung; Bezug b01 ohne Knopf 0,510 / v24-b01 0,518)"
+bash tools/argmax_profile.sh "tor2a-v24${ARM}nk" "$NEW"
+python - "$ARM" <<'EOF'
+import json,sys
+arm=sys.argv[1]
+a=json.load(open(f'evaluations/artifacts/tor2a_v24{arm}nk.json',encoding='utf-8'))['arme'][0]
+print(f"TOR 2a OHNE KNOPF v24-{arm}: volle Spalten {a['sp_voll']:.4f} (KI +-{a['sp_voll_ci']:.4f}), Punkte {a['punkte']:.2f}, Zeilen {a['zeilen_voll']:.4f} -- Bezug b01 ohne Knopf 0,510")
+EOF
+
+echo "== 1b) Tor 1 OHNE Knopf (beide Seiten k3v_off; par.9b), Deckel 200 Paare, keine Promotion"
+python -X utf8 -u tools/paired_gating.py --model-a "$NEW" --model-b "$REF" --name-a "v24-${ARM}" --name-b "v23-b01_brierbest" --spec-a models/k3v_off.spec.json --spec-b models/k3v_off.spec.json --sims 400 --max-pairs 200 --seed 20261016 --no-promote-winner --out "$ART/paired_gating_result_v24-${ARM}_vs_v23-b01_noknob_s16.json"
+python - "$ARM" <<'EOF'
+import json,sys
+arm=sys.argv[1]
+d=json.load(open(f'evaluations/artifacts/paired_gating_result_v24-{arm}_vs_v23-b01_noknob_s16.json',encoding='utf-8'))
+print(f"TOR 1 OHNE KNOPF (Seed 20261016): {d['a_wins_total']}:{d['b_wins_total']} nach {d['done_pairs']} Paaren, SPRT {d['sprt_verdict']}, McNemar p {d['report_mcnemar_p']:.4f}, Diff {d['mean_pair_diff']:+.2f}, Punkte {d['avg_score_a']:.1f} gegen {d['avg_score_b']:.1f}")
+EOF
 
 echo "== 1) Tor 2a: argmax-Instrument @400, 200 Partien, Seed 20260931, Knopf wie Spielbetrieb (Bezug b01 + K3-P: 0,555; b01 ohne Knopf 0,515)"
 bash tools/argmax_profile.sh "tor2a-v24${ARM}" "$NEW" MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0
