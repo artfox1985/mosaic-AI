@@ -87,8 +87,8 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
    Mini-Fenster-Test Fall E im CPU-freien Fenster (bitgleich gegen A?), dann
    fuer b03 einschalten; Erwartung Epoche deutlich unter 16 min (GPU war zur
    Haelfte arbeitslos). b05 laeuft mit Default aus, exakt wie b04.
-Noch nicht eingetaktet: Traeger-Kennzahl v24 (v25 par.9a); K4-Skala-Sonde ist
-gebaut (`tools/probes/round_estimate_scale_probe.py`, Lauf im CPU-freien Fenster);
+Gemessen 21:42: Traeger-Kennzahl v24 0,356 Spalten je Seite (Fenster 0,624; v25 nach
+par.1 rechnerisch 0,23 -- v25 par.9a), K4-Skala P90 3/8/10/12 je Runde (K4 par.4);
 Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
 2 min GPU, erst wenn keine CPU-Messung laeuft).
 
