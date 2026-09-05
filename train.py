@@ -1359,6 +1359,14 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # den Cache-Key. Aufgeloest ueber die EINE Quelle (corpus_dataset),
         # damit Manifest und Labelbau nicht auseinanderlaufen koennen.
         "bootstrap_coherence": _bootstrap_coherence_mode(),
+        # 2026-09-06: beide fehlten hier -- das b03-Manifest (002718) schweigt
+        # darum ueber den gefahrenen Lader (Regel "Lauf-Manifest gegen
+        # Referenz": ein fehlendes Flag ist ein stiller Default). Bewusst NICHT
+        # im Resume-Fingerabdruck: der Lader ist bitgleich zum Standardpfad
+        # (Mini-Fenster-Test E), und ein laufender Zwischenstand ohne den
+        # Schluessel muss fortsetzbar bleiben.
+        "select_by_brier": bool(select_by_brier),
+        "fast_loader": bool(fast_loader),
     }
     # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
     # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf
@@ -2656,6 +2664,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         if _t_daten_fertig is not None else None,
         "threads": torch.get_num_threads(),
         "device": str(device),
+        "lader": "fast" if fast_loader else "standard",
         "epochen": epoch_count_done,
         "samples": len(dataset) if dataset is not None else None,
     })
