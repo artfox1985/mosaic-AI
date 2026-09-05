@@ -161,12 +161,16 @@ ist "mehr Spalten" kein erreichbares Ziel mehr, und ein Tor, das dann eine
 Steigerung verlangt, wuerde umgangen.
 
 **Was danach traegt:** ist der eigene Bau gesaettigt, wird das Netz vermutlich
-nur noch besser, indem es den Gegenspieler effektiv STOERT -- Farben aus der
-Auslage nehmen, die er braucht, Kuppelplatten und Bonusplaettchen wegnehmen,
-seine Spalten offen halten. Das ist der Zeitpunkt, an dem Denial-Ideen
-(Bonuschip-Denial, heute zurueckgestellt) vom Nebenposten zum Hebel werden
-und die Kampagnen-Groesse von Tor 2 wechseln kann (der Abschnitt oben sagt
-ausdruecklich: wechselt das Ziel, wechselt die Groesse, das Tor bleibt).
+nur noch besser, indem es den Gegenspieler effektiv STOERT. **Rangfolge der
+Denial-Hebel nach Groesse (Nutzer 2026-09-05):** (1) Fliesen aus den
+Fabriken -- die Farben nehmen, die der Gegner fuer seine Reihen braucht, in
+jedem Zug moeglich; (2) Kuppelplatten -- die Platte wegnehmen, die seine
+Spalte oder seinen Kuppel-Bonus vollenden wuerde; (3) erst weit dahinter die
+Bonusplaettchen (Chip-Denial, rund 20 Chips je Partie, eigene Chip-Vollendung
+feuert fast nie -- der kleinste Hebel, zurueckgestellt). Das ist der
+Zeitpunkt, an dem die Kampagnen-Groesse von Tor 2 wechseln kann (der
+Abschnitt oben sagt ausdruecklich: wechselt das Ziel, wechselt die Groesse,
+das Tor bleibt).
 Messgroesse fuer "stoert effektiv" waere dann die GEGNER-Seite derselben
 Instrumente (Spalten, Punkte, Kuppel-Bonus des Gegners in der Arena), nicht
 die eigene. Heute ist keine der Saettigungen erreicht: v24-b01 baut 0,6-0,7
