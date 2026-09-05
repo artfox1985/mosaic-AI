@@ -252,6 +252,11 @@ Lauf seit 03:46, Punkte 1 und 2 GRUEN (Diff genau model / version / seed /
 per_file, Modus 1 und C 1,0, Kontrakt gleich; Stack-Draw 3,11 %). Damit sind
 Punkte 1 und 2 fuer alle vier Manifeste der Erzeugung belegt.
 
+**Nachtrag 2026-09-05, 05:16: ERZEUGUNG KOMPLETT.** 1.200 Dateien (400 policy,
+600 argmax, 200 sampled). Laufzeiten: Sockel 1,481 s je Partie (andere
+Maschine), argmax 3,687 s (unter Nebenlast), sampled 2,684 s (nur Watcher),
+alle threads 11. Tor 0 folgt in der Nachtkette.
+
 ### par.6d Fenster, Traeger und Cache
 
 - **Dateiliste `data/window_v24.txt`** = die 1.745 hv2-Dateien aus
