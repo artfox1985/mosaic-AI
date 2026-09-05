@@ -253,3 +253,7 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   Epoche, working_rules "Abgebrochenes Training FORTSETZEN") -- hier eine
   halbe Epoche Verlust statt zwei Stunden. (3) Lange Trainings eher ueber ein
   Ketten-Skript starten als nackt (Beobachtung aus einem Fall, kein Beleg).
+  Wahrscheinliche Ursache (Nutzer, nicht belegt): die Sitzung lief als
+  Hintergrundauftrag einer parallelen Bedienanwendung, die geschlossen wurde;
+  deren Kindprozesse gingen mit. Solange Laeufe an einer Sitzung haengen,
+  die Anwendung offen lassen.
