@@ -1547,3 +1547,64 @@ entschieden):**
 1) schliesst damit den Tiling-Eingriff ein -- nicht als H-Zuschlag, sondern als
 Geometrie-fuehrende Auswahl in den fruehen Runden.
 
+## par.8.13 NUTZER-BEOBACHTUNG (2026-09-06, 00:25): angefangene lange Reihen ohne passende Kuppelplatte bleiben liegen
+
+**Nutzer, woertlich (aus einer Server-Partie):** *"es scheint dass das netz etwas
+feststeckt wenn es anfaengt die unteren reihen zu fuellen aber dann noch keine
+passende kuppelplatte hat um die musterreihe abzulegen. sprich da liegt dann 5
+runden lang eine angefangene musterreihe in reihe 5 und/oder 6. das ist nicht
+sinn und zweck der uebung. damit blockiert der eine falsche zug die zukuenftigen
+zuege. auch hier ist es legitim/besser wenn ausserhalb der einhuellenden gelegt
+wird um die musterreihen 5/6 rasch wieder voll zu bekommen fuer die einhuellende."*
+
+**Zahlen aus den Abnahme-Arenen 2026-09-05** (Record-Felder `long_rows_started`,
+`long_rows_completed`, `long_rows_cleared_unplaceable` je Partie und Seite,
+2 x 80 Partien je Paar; Definition "lange Reihe" im Motor, hier nicht neu
+geprueft):
+
+| Seite | begonnen | vollendet | unplatzierbar geraeumt | am Partieende offen |
+| --- | --- | --- | --- | --- |
+| v23-b01 (vier Sitze) | 4,24-4,35 | 2,67-2,83 | 0,21-0,36 | 1,16-1,29 |
+| v24-b01 (zwei Sitze) | 4,20-4,33 | 2,60-2,88 | 0,33-0,35 | 1,13-1,25 |
+| v24-b02 (zwei Sitze) | 4,15-4,39 | 2,60-2,80 | 0,35-0,36 | 1,20-1,23 |
+
+Je Seite und Partie bleiben rund **1,2 begonnene lange Reihen bis zum Ende
+offen** und 0,3 werden als unplatzierbar geraeumt: von 4,3 begonnenen werden
+2,7 vollendet, also **rund 35 % der begonnenen langen Reihen nie**. Das ist
+ueber alle drei Netze gleich, unabhaengig vom Knopf -- der Befund liegt also
+nicht am Knopf, sondern am Zusammenspiel Reihenstart und Plattenwahl. Wie
+lange eine offene Reihe im Mittel liegt (Runden), ist NICHT gemessen
+(Record-Felder zaehlen nur Endstaende).
+
+**Warum das die Einhuellende betrifft, in beide Richtungen:**
+1. **Risiko K3-P2 (par.8.11):** die Platzhalter-Regel belohnt genau den Zustand
+   "Reihe begonnen, Platte fehlt noch" mit `w_slot` -- und zwar in JEDER Runde,
+   in der die Reihe liegt. Kommt die passende Platte nie, zahlt der Term
+   weiter fuer eine blockierte Reihe. K3-P2 koennte den beobachteten Fehler
+   also VERSTAERKEN. Messpflicht vor jedem Verdikt zu K3-P2: Zahl der am
+   Ende offenen langen Reihen und der unplatzierbar geraeumten mit gegen ohne
+   Knopf (die Felder liegen in jedem Arena-Record, keine neue Sonde noetig);
+   steigt sie, ist die Regel so nicht tragfaehig -- Variante dann: der
+   Platzhalter klingt mit dem Alter der Reihe ab (Runden ohne annehmende
+   Zelle) oder kippt nach einer Runde ins Negative.
+2. **Ausserhalb legen ist legitim (Nutzer):** heute bestraft H jeden Stein
+   ausserhalb der Huelle (Anteil ausserhalb geht negativ ein, par.8.1). Fuer
+   eine blockierte Reihe 5/6 ist das Legen ausserhalb aber der Weg, die Reihe
+   fuer die Huelle wieder frei zu bekommen. Vorschlag (nicht registriert als
+   Bau): der Aussen-Abzug entfaellt fuer Steine, die eine seit >= 1 Runde
+   annahmelose gebundene Reihe schliessen -- oder allgemeiner, der Term
+   bewertet das Freiwerden der Reihe (Kapazitaet fuer die naechste Runde)
+   statt nur die Zelle.
+3. **Was zuerst zu messen ist (Replayer, wie par.8.12):** je Rundenende und
+   Reihe 5/6: Alter der offenen Reihe in Runden, ob eine annehmende Zelle
+   existiert, ob eine passende Platte in Auslage oder Stapel sichtbar ist;
+   Vergleich Mensch gegen KI aus den Server-Logs (der Mensch raeumt nach
+   Nutzer-Beobachtung schneller). Ergaenzung der Tiling-Geometrie-Sonde
+   um diese Felder, Lauf im naechsten CPU-freien Fenster nach der laufenden.
+
+**Einordnung:** das ist die Vollendungs-Luecke aus
+[[project_column_completion_structural_weakness]] und B1 ("Initiierung
+erzwingbar, Vollendung nicht") von der Reihen-Seite gesehen: die Reihe ist
+begonnen, aber die Geometrie (Platte) fehlt. Sie gehoert zu Bedingung 1 des
+Schliesskriteriums (par.12: sauber implementiert).
+
