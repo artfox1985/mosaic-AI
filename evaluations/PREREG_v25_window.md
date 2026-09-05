@@ -209,8 +209,11 @@ volle Spalten je Seite):
 aber die Flaeche 3 aus par.7 (nicht unter 44,8 %) NICHT allein, weil die
 Rotation 12.000 hv2-Partien mit 0,73 abgibt. Die uebrigen Hebel: (a) der
 Sockel (Policy-Klasse, Rauschen noetig fuer die Policy-Ziele) bleibt mit 0,19
-die spaltenaermste Klasse -- weniger Rauschen oder eine Gewichtung waere ein
-eigener Arm; (b) weniger hv2 abbauen (z.B. G-2 nicht auf 5.450, sondern auf
+die spaltenaermste Klasse -- weniger Rauschen, Generator-Arm C 2,0
+(`geometric_envelope` 8.7d: 0,635 am Instrument) oder eine Gewichtung waere
+ein eigener Arm. **Nicht mehr Sims** (Nutzer 2026-09-05, 12:15: "hatten wir
+schon durch, bringt nur weniger Spalten"; `search_depth_column_optimum`:
+25-100 Sims rund 0,6, ab 250 Sims 0,34 volle Spalten); (b) weniger hv2 abbauen (z.B. G-2 nicht auf 5.450, sondern auf
 rund 11.000) wuerde die Kennzahl halten, aendert aber die stationaere Form;
 (c) das G-Material selbst spaltenreicher (v24-Arme, Knopf-Dosis par.9b der
 v24-Prereg).
