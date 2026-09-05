@@ -78,6 +78,10 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
    gestartet 18:37, wartet auf das Ende der Abnahme-Kette): cargo test und
    Wheel 744 mit K3-P2 (nicht installiert), dann argmax v24-b01 bei K3-P C 0,5
    (Knopf-Dosis, par.9b; Nutzer 18:35: "knopf dosis kannst eintakten").
+9. **`--fast-loader` gebaut, ungetestet** (train.py, corpus_dataset.get_batch):
+   Mini-Fenster-Test Fall E im CPU-freien Fenster (bitgleich gegen A?), dann
+   fuer b03 einschalten; Erwartung Epoche deutlich unter 16 min (GPU war zur
+   Haelfte arbeitslos). b05 laeuft mit Default aus, exakt wie b04.
 Noch nicht eingetaktet: Traeger-Kennzahl v24 (v25 par.9a), K4-Skala-Sonde;
 Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
 2 min GPU, erst wenn keine CPU-Messung laeuft).

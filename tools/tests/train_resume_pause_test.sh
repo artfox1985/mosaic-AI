@@ -7,6 +7,7 @@
 # Prueft:  A) ununterbrochen  B) simulierter Absturz nach Epoche 1 + --resume  (bitgleich zu A)
 #          C) Fingerabdruck-Waechter (falsches Rezept bricht hart ab)
 #          D) Pause per Stopp-Datei nach Epoche 1 (Exit 75) + --resume  (bitgleich zu A)
+#          E) --fast-loader (batchweises Indizieren, pin_memory)          (bitgleich zu A; Laufzeit im Manifest vergleichen)
 set -uo pipefail
 cd "$(dirname "$0")/../.."
 export PYTHONIOENCODING=utf-8 OMP_NUM_THREADS=2 MKL_NUM_THREADS=2
@@ -35,12 +36,15 @@ wait
 [ -f models/alphazero_rtest_d_resume.pth ] || { echo "FEHLER: kein Zwischenstand nach Pause"; fail=1; }
 echo "== D2) --resume nach Pause"
 python -X utf8 -u train.py --name rtest_d $COMMON --resume || fail=1
+echo "== E) --fast-loader (batchweises Indizieren) gegen A: Gewichte bitgleich? Epochenzeit?"
+python -X utf8 -u train.py --name rtest_e $COMMON --fast-loader || fail=1
 echo "== Vergleich A gegen B und D (Gewichte bitgleich?)"
 python - <<'PY' || fail=1
 import torch, json, glob, sys
 a=torch.load('models/alphazero_rtest_a.pth',map_location='cpu',weights_only=False)
+ma=json.load(open(sorted(glob.glob('models/manifest_train_rtest_a_*.json'))[-1],encoding='utf-8')); print('rtest_a laufzeit =', ma.get('laufzeit'))
 bad=0
-for n in ('b','d'):
+for n in ('b','d','e'):
     try:
         x=torch.load(f'models/alphazero_rtest_{n}.pth',map_location='cpu',weights_only=False)
     except Exception as e:
@@ -48,7 +52,7 @@ for n in ('b','d'):
     mx=max(float((a['model_state'][k].float()-x['model_state'][k].float()).abs().max())
            for k in a['model_state'] if a['model_state'][k].dtype.is_floating_point)
     m=json.load(open(sorted(glob.glob(f'models/manifest_train_rtest_{n}_*.json'))[-1],encoding='utf-8'))
-    print(f"rtest_{n}: epochs {x['epochs']}, max|dW| gegen A = {mx}, fortsetzung = {json.dumps(m.get('fortsetzung'),ensure_ascii=False)}")
+    print(f"rtest_{n}: epochs {x['epochs']}, max|dW| gegen A = {mx}, fortsetzung = {json.dumps(m.get('fortsetzung'),ensure_ascii=False)}, laufzeit = {m.get('laufzeit')}")
     if mx != 0.0 or x['epochs'] != a['epochs']: bad=1
 sys.exit(bad)
 PY

@@ -1772,3 +1772,41 @@ class MosaicDataset(Dataset):
         if self.encoder == "2d":
             return (self._get_planes_tensor(idx),) + base
         return base
+
+    # Batchweises Holen (train.py --fast-loader, 2026-09-05). Anlass: die GPU
+    # war beim v24-b04-Training zur Haelfte arbeitslos (Auslastung 5-42 %),
+    # weil der DataLoader je Sample `__getitem__` (19 Tensoren) aufruft und
+    # der Collate 256 x 19 Einzeltensoren stapelt -- rund 5.000 Python-
+    # Aufrufe je Batch auf EINEM Kern. Hier schneidet EIN Index-Tensor jedes
+    # Feld in einer C-Operation. Ergebnis ist per Konstruktion dasselbe wie
+    # `torch.stack([self[i] for i in indices])` (Fancy-Indexing stapelt in
+    # Index-Reihenfolge, Dtype bleibt) -- die Bitidentitaet gegen den
+    # Bestandspfad belegt `tools/tests/train_resume_pause_test.sh` (Fall E).
+    _BATCH_FIELDS = ("states", "policies", "values", "masks", "moon_order_targets",
+                     "policy_weights", "points_forecast", "rounds", "ownership",
+                     "opp_points_forecast", "opp_points_mask", "values_wdl", "wdl_outcome",
+                     "endgame_margin", "endgame_mask",
+                     "ranking_action_ids", "ranking_child_q", "ranking_mask")
+
+    def get_batch(self, indices):
+        """Dasselbe Tupel wie `__getitem__`, aber fuer eine INDEX-LISTE gestapelt
+        (Batch-Dimension vorn). Reihenfolge der Felder identisch zu
+        `__getitem__`, `planes` bei encoder='2d' vorangestellt (gepackt, wie
+        dort -- train.py entpackt batchweise)."""
+        from torch.utils.data import default_collate
+        idx = torch.as_tensor(indices, dtype=torch.long)
+
+        def take(field):
+            if torch.is_tensor(field):
+                return field[idx]
+            # Nicht-Tensor-Feld (sollte nicht vorkommen): exakt der Bestandsweg.
+            return default_collate([field[int(i)] for i in idx.tolist()])
+
+        base = tuple(take(getattr(self, name)) for name in self._BATCH_FIELDS)
+        if self.encoder == "2d":
+            if self._planes_eager_tensor is not None:
+                planes = self._planes_eager_tensor[idx]
+            else:
+                planes = torch.stack([self._get_planes_tensor(int(i)) for i in idx.tolist()])
+            return (planes,) + base
+        return base
