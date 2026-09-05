@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse und Sim-Budget? | Beleg: Warm gegen Kalt ist EINFAKTORIELL belegt: `v23-b06` (Kaltstart mit exakt dem b01-Rezept, par.14) baut 0,18 volle Spalten gegen b01 0,515 und verliert 65:95 (p = 0,024); der LR-Vorbehalt aus par.12 entfaellt, das Spaltenwissen sitzt in der LINIE. Frontier selbst OFFEN: Breiten-Arm b04, Zweig-Entscheid beim Nutzer (par.10), Kostentor zuerst (par.5). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Ist das Netz fuer sein Rechenbudget zu KLEIN -- und wo liegt bei fixem WANDUHR-Budget das Optimum aus Netzgroesse und Sim-Budget? | Beleg: Teilantwort: Warm gegen Kalt einfaktoriell belegt (v23-b06, par.14: 0,18 gegen 0,515 Spalten, 65:95, p 0,024) -- das Spaltenwissen sitzt in der Linie. Die Frontier selbst (Breiten-Arm b04, Kostentor par.5) ist vom Nutzer 2026-09-02 geparkt: das Problem sitzt im Value-Kopf (par.15). Nutzer-Entscheid 2026-09-05. -->
 
 # Vorregistrierung: Kapazitaets-Sim-Frontier
 
@@ -425,3 +425,7 @@ die Staerke (Hybrid-Kopf-Attribution). Der Kaltstart b06 zeigt, dass das
 Spaltenwissen an der Linie haengt -- an dem, was der Kopf gelernt hat, nicht
 an Breite oder Merkmalsform. Diese Prereg bleibt OFFEN nur noch fuer die
 Frage, ob ein Frontier-Punkt spaeter wieder aufgenommen wird.
+
+## VERDIKT (2026-09-05, Nutzer-Entscheid: "setz die mal auf entschieden", Teilantwort)
+
+Beantwortet ist der Teil, der gemessen wurde: Warm gegen Kalt (par.14, einfaktoriell). Die eigentliche Frontier-Frage (Netzgroesse gegen Sim-Budget bei fixer Wanduhr) wird nicht weiterverfolgt, weil der Nutzer den Breiten-Arm b04 am 2026-09-02 geparkt hat (par.15: das Problem sitzt im Value-Kopf, nicht in Breite oder Merkmalsform). Wer die Frontier wieder aufnimmt, registriert sie neu mit dem Kostentor aus par.5 voran.

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird der R5-Loeser in einen eingefrorenen Anker-Loeser und einen freien Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 kalibrieren? | Beleg: Teil A gebaut und abgenommen (par.2c, `round5_anchor.rs` aktiv und eingefroren). Teil B entschieden (par.3e): Value-Kopf gewinnt den Vierer-Vergleich, Blend-Weg zu; die R5-Schwaeche ist Platten-Daempfung. **Auch der Trainings-Eingriff ist seit 2026-09-01 vom Tisch** (`r5_value_calibration` par.12, Phase 3 ohne Bau geschlossen). Offene Punkte: par.4. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird der R5-Loeser in einen eingefrorenen Anker-Loeser und einen freien Netz-Loeser getrennt -- und laesst sich der Value-Kopf fuer Runde 5 kalibrieren? | Beleg: Teil A gebaut und abgenommen (par.2c, round5_anchor.rs eingefroren), Teil B entschieden (par.3e: Value-Kopf gewinnt, Blend-Weg zu), Trainings-Eingriff seit 2026-09-01 vom Tisch (r5_value_calibration par.12). par.4-Reste als Merkposten. Nutzer-Entscheid 2026-09-05. -->
 
 # PREREG-SKELETT: R5-Loeser-Trennung (Anker eingefroren) + R5-Value-Kalibrierung
 
@@ -313,3 +313,7 @@ sein sollte (par.3-Erwartung widerlegt).
    es dort nicht -- nur die Zwischenueberschrift "par.7-Schwellen" innerhalb
    von par.4b, und die traegt die Schwellen, nicht das Verdikt. Das Verdikt
    steht in par.4c: Schwellen VERFEHLT, kein k1-Signal, kein Staerkepreis).
+
+## VERDIKT (2026-09-05, Nutzer-Entscheid: "setz die mal auf entschieden")
+
+Beide Teile der Frage sind beantwortet: der R5-Loeser ist in Anker-Loeser (eingefroren) und Netz-Loeser getrennt (par.2c), und die Kalibrierung des Value-Kopfs fuer Runde 5 ist als Blend (par.3e) und als Trainings-Eingriff (`PREREG_r5_value_calibration.md` par.12) geschlossen. Die offenen Punkte aus par.4 bleiben als Merkposten stehen, ohne eigenen Arm.
