@@ -148,16 +148,34 @@ der einzelne Wert:
 | --- | --- | --- | --- | --- |
 | **Generator** (Self-Play) | volle Spalten je Seite, argmax @400, 200 Partien, Seed 20260931 | Tor 2a der Schleife (`docs/generation_loop.md`), `tools/corpus_sanity_check.py` | b01 0,515; b01 + K3-P 0,555 (`geometric_envelope` 8.7a) | nicht fallen (Punktschaetzer), Tor 2 |
 | **Arena** (gegen Vorgaenger) | volle Spalten je Seite aus der Brettgeometrie | Tor 2b, `tools/probes/arena_column_probe.py` | b01-Seite derselben Arena; v23: 0,6456 gegen 0,4304 | nicht fallen, Tor 2 |
-| **Fenster** (Korpus-Eigenschaft, NEU hier) | Seiten mit voller Spalte je Klasse UND ueber das ganze Fenster (Partien-gewichtet) | `tools/corpus_sanity_check.py data --pattern <Klasse>` je Posten aus par.1, dann gewichtete Summe | v24-Fenster: Value-Klasse `selfplay_v23-b01-value-*` (Tor 0 nach der Erzeugung), hv2-Anteil und Policy-Klasse beim Fensterbau messen | das v25-Fenster darf in der Fenster-Kennzahl NICHT unter dem v24-Fenster liegen |
+| **Fenster** (Korpus-Eigenschaft, NEU hier) | Seiten mit voller Spalte je Klasse UND ueber das ganze Fenster (Partien-gewichtet) | `tools/corpus_sanity_check.py data --pattern <Klasse>` je Posten aus par.1, dann gewichtete Summe | **v24-Fenster gemessen 2026-09-05: 44,7 % / 0,624** (hv2 51,8 % / 0,732; argmax 52,5 % / 0,748; sampled 16,2 % / 0,191; Sockel 16,5 % / 0,189) | das v25-Fenster darf in der Fenster-Kennzahl NICHT unter dem v24-Fenster liegen (Herleitung par.1 mit G = G-1: 37,7 % / 0,517 -- wuerde reissen, siehe Berichtigung unten) |
 
 Warum die dritte Flaeche: die beiden Tor-2-Flaechen messen das NETZ; die
-Rotation aendert aber, WOVON es lernt. hv2-Material ist spaltenaermer als
-das heutige (Value-Klasse v23 35,2 % Seiten mit voller Spalte gegen v24-Pilot
-50,4 / 55 %, `PREREG_v24_window.md` par.7 und `geometric_envelope` 8.7d), die
-Rotation von hv2 nach G-Material hebt die Fenster-Kennzahl also von selbst --
-solange G nicht spaltenaermer spielt als G-1. Faellt die Fenster-Kennzahl
-trotz Rotation, hat der Generator verlernt, bevor Tor 2 es an 200 Partien
-sieht.
+Rotation aendert aber, WOVON es lernt.
+
+**BERICHTIGUNG 12:00 (gemessen, `corpus_sanity_check` ueber alle 1.745
+hv2-Dateien, `sanity_hv2_window.json`):** die erste Fassung dieses Absatzes
+nannte hv2-Material spaltenaermer als das heutige und stuetzte das auf die
+v23-VALUE-Klasse (35,2 %). Das war ein Fehlschluss: jene Klasse war
+b05-Material, nicht hv2. **hv2 ist spaltenreich: 0,732 volle Spalten je Seite,
+51,8 % Seiten mit voller Spalte (18.091 von 34.900), 46,1 Punkte** -- auf
+Augenhoehe mit der v24-argmax-Klasse (0,748 / 52,5 % / 49,8) und weit ueber
+den gesampelten Klassen (Sockel 0,189 / 16,5 %, sampled 0,191 / 16,2 %).
+
+Fenster-Kennzahl v24, partiengewichtet: **44,7 % Seiten mit voller Spalte,
+0,624 volle Spalten je Seite.** Herleitung fuer v25 nach par.1, wenn das
+G-Material die Klassenwerte von G-1 traegt: **37,7 % / 0,517** -- die Rotation
+von hv2 (0,73) nach G-Material mit seinen zwei gesampelten Klassen (0,19)
+SENKT die Fenster-Kennzahl um 7 Punkte, und die dritte Flaeche dieses par.7
+wuerde reissen. Das ist kein Argument gegen die Rotation als solche (hv2 ist
+plattenblinder Lehrer-Stoff), aber gegen die Annahme, sie hebe die Spalten
+von selbst. Konsequenzen zur Entscheidung (Nutzer): (a) die gesampelten
+Klassen sind die Spaltenarmut des Fensters -- Sockel (Policy-Traeger) und
+sampled-Schwarm bauen 0,19; (b) die argmax-Klasse traegt die Spalten; eine
+Verschiebung der Value-Klasse zu mehr argmax (oder ein Sockel mit weniger
+Rauschen) haelt die Kennzahl, ein reiner hv2-Abbau nicht. Faellt die
+Fenster-Kennzahl trotz Rotation, hat entweder G verlernt oder der Mix ist
+spaltenaermer geworden -- beides sieht diese Flaeche vor Tor 2.
 
 **Die Reihe, die fortgeschrieben wird** (Generator-Flaeche @400, gleiches
 Instrument; "schleichend verbessert" heisst: monoton, nicht signifikant je
