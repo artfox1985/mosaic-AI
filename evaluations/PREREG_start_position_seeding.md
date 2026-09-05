@@ -424,3 +424,39 @@ bewegt, Verhalten nicht" (par.4d), und der Dosis-Folgearm wird registriert.
 
 **Reihenfolge:** Kuratierung erst NACH der v24-Erzeugung (die Quelle entsteht
 dort), Seeding-Schwarm danach (rund 3 h CPU), b03-Training nach b01 und b02.
+
+**Nachtrag 2026-09-05, 11:05 (gefahren in der Nacht 2026-09-04/05; der
+Schreibversuch vom 2026-09-04 23:58 war hinter einem gescheiterten Commit
+nicht ausgefuehrt worden, Chronik):** Werkzeug
+`tools/seed_position_curation.py --mode am-zug --korpus-glob ... --out-set
+... --out-report ...` (Seite = `state.current_player`, im Korpus identisch
+mit `record.player`); Kette `tools/night_v24_b03_chain.sh`. **Kuratierung
+(06:12-06:27):** Quelle 600 argmax-Dateien, 5.998 Partien mit Kandidat,
+`--verify 500` 0 Abweichungen, **1.500 Stellungen**, Seiten 734/766, k1 aktiv
+549, Restlaenge im Mittel 0,439 (Median 0,450); Straten r2_p3 184, r2_p4 8,
+r2_p5 0, r3_p3 234, r3_p4 246, r3_p5 188, r4_p3 174, r4_p4 212, r4_p5 254
+(`seed_positions_curation_report_v2.json`). **Seeding-Schwarm (06:28-08:56):**
+6.000 Partien in 8.908,1 s = 1,485 s je Partie bei threads 11
+(`manifest_v23-b01-seedvalue_20260905_062758.json`), 600 Dateien
+`selfplay_v23-b01-seedvalue_*`. **Abweichung vom Befehl oben, registriert:**
+zusaetzlich `MOSAIC_ENVELOPE_PROJECTED=1 MOSAIC_ENVELOPE_SEARCH_C=1.0`, weil
+der Schwarm der vierte Lauf derselben Erzeugung ist und `PREREG_v24_window.md`
+par.6b' den Knopf fuer alle Laeufe der Generation setzt; ohne Knopf waere er
+ein zweiter Faktor gegen b01. Fenster b03 `data/window_v24_b03.txt` 3.545
+Dateien, 600 Bloecke in 300,6 s, Monolith 3.368 Trainingsdateien Schluessel
+299283d4df61 in 672,7 s. Training v24-b03 nach b02 (Kette).
+
+## par.8 GEFALTET: Unsicherheits-gefuehrtes Seeding (aus PREREG_uncertainty_guided_selfplay.md, 2026-09-05)
+
+Die Prereg zum unsicherheits-gefuehrten Self-Play ist am 2026-09-05 auf
+UEBERHOLT gesetzt und hierher gefaltet (Nutzer-Entscheid). Ihr Kern: statt
+kuratierter oder zufaelliger Startstellungen die waehlen, bei denen das Netz
+nachweislich unsicher ist UND die Unsicherheit die Zugwahl kippen kann;
+Tor G (taugt das Mass?), Stufe 1 als Offline-Warteschlange aus
+`root_q`/`root_child_q` (in 65,2 % der Datensaetze vorhanden), Waechter und
+Entscheidungsmetrik stehen dort in par.3, 4, 6, 7. **Bedingung fuer die
+Wiederaufnahme:** der b03-Befund (par.7) zeigt, dass Seeding Verhalten bewegt
+(Tor 1 oder Tor 2 fuer b03, nicht nur der Tau). Traegt b03 nicht, ist auch
+die Auswahlregel der Startstellungen kein Hebel, und der Baustein bleibt
+gefaltet.
+

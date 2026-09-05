@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Lernt das Netz SELEKTIVEN Plattenbau, wenn das Bau-Regime als NETZ-EINGABE konditioniert wird (UVFA-Muster: Zwangsseite=1/frei=0 auf dem vorhandenen Asym-Korpus), statt als unsichtbarer Kontext -- und wird das Flag zur Spielzeit ein tragfaehiger Stil-Regler? | Beleg: ENTWURF 2026-08-22, nichts gebaut. Anlass: Asym-Kampagne ohne Signal plus Klon-Befund (par.14-16); Primaerarm UVFA, Baustein-Abhaengigkeit: additiver Input-Mechanismus aus PREREG_stack_top_feature.md par.6. -->
+<!-- STATUS: UEBERHOLT | Frage: Lernt das Netz SELEKTIVEN Plattenbau, wenn das Bau-Regime als NETZ-EINGABE konditioniert wird (UVFA-Muster: Zwangsseite=1/frei=0 auf dem vorhandenen Asym-Korpus), statt als unsichtbarer Kontext -- und wird das Flag zur Spielzeit ein tragfaehiger Stil-Regler? | Beleg: Entwurf, nichts gebaut. Die Asym-Korpora (Zwangsseite) sind geloescht (2026-09-01/04), und der Weg zum selektiven Plattenbau laeuft ueber die Suche (K3-P), nicht ueber eine Regime-Konditionierung des Netzes. Nutzer-Entscheid 2026-09-05: UEBERHOLT. -->
 
 # PREREG-SKELETT: Platten-Regime als Netz-Eingabe (UVFA) -- der Policy-Seiten-Zuschnitt
 
@@ -168,3 +168,7 @@ einfuehren.
 Praezedenz-Referenz aus der Recherche: AZ_db-One-Hot-Konditionierung
 (+29,6 bis +50,3 Elo bei exakt 400 Sims), AlphaStar-z, KataGo-Regel-/
 Komi-Inputkanaele.
+
+## VERDIKT (2026-09-05, Nutzer-Entscheid: "durchfuehren wie vorgeschlagen")
+
+UEBERHOLT: der Primaerarm (UVFA-Konditionierung auf dem Asym-Korpus) hat sein Material verloren -- die Asym-Korpora sind aus data/ entfernt und liegen nur noch im restic-Snapshot -- und seine Frage ist durch K3-P (Suche) statt durch Netz-Eingabe beantwortet worden. Der Baustein "additiver Input-Mechanismus" aus PREREG_stack_top_feature.md par.6 bleibt als Merkposten in docs/architecture_reference.md.

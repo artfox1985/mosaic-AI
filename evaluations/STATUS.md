@@ -157,14 +157,13 @@ Index: 18 OFFEN, 79 ENTSCHIEDEN, 8 UEBERHOLT. Chronik der letzten Naechte:
 7. **Blockgroesse 5 ist Default in allen fuenf Arena-Werkzeugen** (Nutzer,
    zweiter Vorfall; `working_rules.md`, `pitfalls.md`).
 
-### Prereg-Bestand (Nutzer-Ziel: rund 7 OFFEN ueber v25+)
+### Prereg-Bestand
 
-Stand 2026-09-05, 10:55: **12 OFFEN**. Vier am 2026-09-05 auf ENTSCHIEDEN
-gesetzt (Nutzer): `cache_build_time`, `chance_nodes`, `r5_solver_split`,
-`capacity_sim_frontier`. Offener Vorschlag im Chat vom 2026-09-05: fuenf
-weitere als UEBERHOLT/gefaltet (`floor_shaping_scale`,
-`plate_policy_supervision`, `uvfa_plate_regime`, `uncertainty_guided_selfplay`,
-`stack_top_feature`); bleiben wuerden 7.
+Stand 2026-09-05, 11:05: **7 OFFEN** (Nutzer-Ziel erreicht): `v24_window`,
+`v25_window`, `start_position_seeding`, `special_tile_yield`,
+`start_dome_choice`, `round_transition_search_sampling`, `rust_data_layer`.
+Am 2026-09-05 vier auf ENTSCHIEDEN und fuenf auf UEBERHOLT/gefaltet gesetzt
+(`PREREG_INDEX.md`).
 
 ### Was als Naechstes ansteht
 

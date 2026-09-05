@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es Staerke, Self-Play-Startstellungen dort zu waehlen, wo das Netz nachweislich unsicher ist UND diese Unsicherheit die Zugwahl kippen kann, statt kuratiert oder zufaellig? | Beleg: nichts gebaut, Entwurf angelegt 2026-08-23. Anschluss an PREREG_start_position_seeding par.4d (Tau +0,14 gegen -0,19, p=0,017); Tor G entscheidet vor jedem Eingriff, ob das Unsicherheitsmass ueberhaupt taugt (par.3). Stufe 1 braucht keine Engine-Aenderung: Entscheidungsnaehe aus root_q/root_child_q, in 65,2 % der Datensaetze (par.4). Abdeckungsmass und Waechter: par.6. -->
+<!-- STATUS: UEBERHOLT | Frage: Bringt es Staerke, Self-Play-Startstellungen dort zu waehlen, wo das Netz nachweislich unsicher ist UND diese Unsicherheit die Zugwahl kippen kann, statt kuratiert oder zufaellig? | Beleg: Entwurf, nichts gebaut; GEFALTET in PREREG_start_position_seeding.md par.8 (2026-09-05): Stufe 1 (Warteschlange offline aus root_q/root_child_q, Tor G) haengt am b03-Befund des Seeding-Schwarms; eine eigene Datei entsteht erst, wenn b03 traegt. Nutzer-Entscheid 2026-09-05. -->
 
 # Vorregistrierung: Unsicherheitsgesteuertes Self-Play
 
@@ -274,3 +274,7 @@ oben muss das ausweisen und nicht stillschweigend addieren.
 - Verteilungskoepfe fuer die Blattbewertung (Task #12, Nach-#34-Paket Arm 1)
   sind **nicht** Gegenstand. Die Bootstrap-Koepfe hier dienen der
   Datenauswahl, nicht der Blattbewertung.
+
+## VERDIKT (2026-09-05, Nutzer-Entscheid: "durchfuehren wie vorgeschlagen")
+
+GEFALTET, nicht verworfen: der Anschluss war von Anfang an das Seeding (par.1 verweist auf start_position_seeding par.4d). Ob ein Unsicherheitsmass die Startstellungen besser waehlt als die Kuratierungsregel, laesst sich erst beantworten, wenn der v24-Arm b03 zeigt, dass Seeding ueberhaupt Verhalten bewegt. Die Bausteine (Tor G par.3, Stufe 1 par.4, Waechter par.6, Metrik par.7) stehen hier und werden aus PREREG_start_position_seeding.md par.8 referenziert.
