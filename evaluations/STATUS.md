@@ -53,12 +53,14 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
    ungeklaert, Hypothese RAM-Not neben dem Training); Teil-Dateien geloescht.
 2. **GPU: Training b04** (b04-Kette Schritt 4, Monolith `85a75d76dfab` liegt),
    danach b05 (`night_v24_b05_chain.sh`).
-3. **b03 NEU als 714er-Arm** (Nutzer: "lass b03 auf 714"): nach b05
-   `config.INPUT_SIZE` vorueebergehend auf 714, Training mit dem b03-Rezept
-   (Monolith `299283d4df61`, `window_v24_b03.txt`), danach zurueck auf 744.
-4. Danach: Wheel 744 installieren (`engine/target/wheels`, gebaut 13:50,
-   Kontrakt `20b442a8164f748d`), Anker-Drift (`verify_frozen_heuristic.py`),
-   Abnahmen b03, b04, b05.
+3./4. **Nachtkette `tools/night_v24_after_b05_chain.sh`** (gestartet 19:55, wartet
+   auf b05-Modell, Ende aller Trainings und CPU-Messungen): Wheel 744 mit K3-P2
+   installieren, Anker-Drift (ROT = Abnahmen ausgesetzt, Nutzer-Entscheid),
+   Mini-Fenster-Test (resume/Pause/fast-loader), dann `config.INPUT_SIZE` 744 ->
+   714 und Training b03 (714er-Arm, `--fast-loader` nur bei gruenem Test) im
+   Hintergrund; parallel auf der CPU Abnahmen b04 dann b05 samt Kuppel-Bonus-
+   Sonde; nach b03 config zurueck auf 744. b03-Abnahme braucht das 714er-Wheel:
+   offen (Nutzer). Bei Abbruch des b03-Trainings: `--resume` MIT config 714.
 5. **K3-P2 (Modus 4, `models/k3p2_c10.spec.json`) ist gebaut, aber ungetestet:**
    `cargo test --release` im ersten CPU-freien Fenster (Python-DLL in PATH),
    dann Wheel 744 neu bauen (enthaelt K3-P2) und mit Kette 4 installieren;
@@ -82,7 +84,8 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
    Mini-Fenster-Test Fall E im CPU-freien Fenster (bitgleich gegen A?), dann
    fuer b03 einschalten; Erwartung Epoche deutlich unter 16 min (GPU war zur
    Haelfte arbeitslos). b05 laeuft mit Default aus, exakt wie b04.
-Noch nicht eingetaktet: Traeger-Kennzahl v24 (v25 par.9a), K4-Skala-Sonde;
+Noch nicht eingetaktet: Traeger-Kennzahl v24 (v25 par.9a); K4-Skala-Sonde ist
+gebaut (`tools/probes/round_estimate_scale_probe.py`, Lauf im CPU-freien Fenster);
 Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
 2 min GPU, erst wenn keine CPU-Messung laeuft).
 
