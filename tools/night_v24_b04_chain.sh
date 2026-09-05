@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # v24-Arm b04 (Sicht-Arm, PREREG_stack_top_feature.md par.10; PREREG_v24_window.md par.8):
-# Bloecke fuer das ganze v24-Fenster unter INPUT_SIZE 722 (der Block-Schluessel traegt INPUT_SIZE),
-# Split und Monolith, dann Training v24-b04 mit Warmstart aus v23-b01_brierbest (acht neue
-# Eingangsspalten null-initialisiert, train.py). Einziger Faktor gegen b01: die acht Sichtwerte.
+# Bloecke fuer das ganze v24-Fenster unter INPUT_SIZE 744 (der Block-Schluessel traegt INPUT_SIZE),
+# Split und Monolith, dann Training v24-b04 mit Warmstart aus v23-b01_brierbest (30 neue
+# Eingangsspalten null-initialisiert, train.py). Einziger Faktor gegen b01: die 30 Sichtwerte.
 # Aufruf (Projektordner, Hintergrund, ohne Pipe):  bash tools/night_v24_b04_chain.sh
-# Voraussetzungen, die die Kette selbst prueft: config.INPUT_SIZE == 722 (Python-Patch angewendet,
+# Voraussetzungen, die die Kette selbst prueft: config.INPUT_SIZE == 744 (Python-Patch angewendet,
 # NACH dem Start des b03-Trainings), kein Self-Play- und kein Cache-Bau-Prozess (der Block-Bau ist
 # der eine CPU-Auftrag neben dem GPU-Training), Training erst, wenn kein train.py mehr laeuft.
 set -euo pipefail
@@ -21,7 +21,7 @@ python - <<'EOF'
 import config, sys
 sys.path.insert(0, "engine/py")
 print("config.INPUT_SIZE =", config.INPUT_SIZE)
-raise SystemExit(0 if config.INPUT_SIZE == 722 else 40)
+raise SystemExit(0 if config.INPUT_SIZE == 744 else 40)
 EOF
 tick=0
 while true; do
@@ -34,7 +34,7 @@ done
 
 export MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v24.json MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_VAL_POOL='^selfplay_v23-b01-'
 
-echo "== 1) Bloecke fuer das v24-Fenster unter INPUT_SIZE 722 (alle 2.945 neu; Bezug 36 min bei 6 Workern) $(date +%H:%M:%S)"
+echo "== 1) Bloecke fuer das v24-Fenster unter INPUT_SIZE 744 (alle 2.945 neu; Bezug 36 min bei 6 Workern) $(date +%H:%M:%S)"
 python -X utf8 -u tools/build_cache_incremental.py --data-dir data --encoder 2d --value-target-variant nortv --workers 6 --file-list data/window_v24.txt
 python - <<'EOF'
 import json
@@ -58,7 +58,7 @@ while true; do
   sleep 120
 done
 
-echo "== 4) Training v24-b04 (b01-Rezept, Fenster v24, INPUT_SIZE 722, Warmstart mit null-initialisierten Sichtspalten) $(date +%H:%M:%S)"
+echo "== 4) Training v24-b04 (b01-Rezept, Fenster v24, INPUT_SIZE 744, Warmstart mit null-initialisierten Sichtspalten, 30 Werte) $(date +%H:%M:%S)"
 python -X utf8 -u train.py --name v24-b04 --load v23-b01_brierbest --file-list data/window_v24.txt --encoder 2d --value-target-variant nortv --value-head wdl --ownership-head-2d --ownership-weight 1.0 --endgame-head --opp-points-head --moon-loss-weight 0 --select-by-brier --val-frac 0.05 --epochs 12 --lr 5e-5 --lr-schedule cosine --lr-t-max 12 --seed 20260828
 
-echo "== KETTE b04 FERTIG $(date +%H:%M:%S): Abnahme mit tools/night_v24_acceptance_chain.sh b04 (braucht das neue Wheel, Encoder 722)."
+echo "== KETTE b04 FERTIG $(date +%H:%M:%S): Abnahme mit tools/night_v24_acceptance_chain.sh b04 (braucht das neue Wheel, Encoder 744)."
