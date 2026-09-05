@@ -65,26 +65,26 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
    Messung am v24-Siegernetz nach par.8.11 (argmax @400 und gepaarte Arena
    gegen K3-P, Kuppel-Bonus je Partie mit `tools/probes/arena_points_probe.py`).
 7. **K4 Rundenschaetzer-Term registriert** (`PREREG_round_estimate_leaf_term.md`,
-   Nutzer 19:20): erster Schritt ist die Skalen-Sonde (par.4, Replay der
+   Nutzer 18:20): erster Schritt ist die Skalen-Sonde (par.4, Replay der
    b01-Tor-2b-Logs, Minuten CPU) sobald die CPU frei ist; Bau und Messung am
    v24-Siegernetz nach den Abnahmen.
-6. **Offener Nutzer-Entscheid (18:55): Sicht der Suche auf das Tiling.**
+6. **Offener Nutzer-Entscheid (18:08): Sicht der Suche auf das Tiling.**
    Leitsatz "Drafting muss das Tiling kennen" registriert
    (`architecture_reference.md`, `round_transition_search_sampling` par.7);
-   par.4.2 ENTSCHIEDEN 19:45 als Bauvorgabe (stellungsgebundener Seed der
-   Blatt-Stichprobe, Paarung bleibt); Variante B REGISTRIERT 20:05 als Basisarm.
+   par.4.2 ENTSCHIEDEN 18:28 als Bauvorgabe (stellungsgebundener Seed der
+   Blatt-Stichprobe, Paarung bleibt); Variante B REGISTRIERT 18:35 als Basisarm.
    Bau nach den v24-Abnahmen, Reihenfolge K3-P2, K4, B.
 8. **CPU-Warteschlange nach der b02-Abnahme** (`tools/cpu_queue_after_b02.sh`,
-   gestartet 20:10, wartet auf das Ende der Abnahme-Kette): cargo test und
+   gestartet 18:37, wartet auf das Ende der Abnahme-Kette): cargo test und
    Wheel 744 mit K3-P2 (nicht installiert), dann argmax v24-b01 bei K3-P C 0,5
-   (Knopf-Dosis, par.9b; Nutzer 20:05: "knopf dosis kannst eintakten").
+   (Knopf-Dosis, par.9b; Nutzer 18:35: "knopf dosis kannst eintakten").
 Noch nicht eingetaktet: Traeger-Kennzahl v24 (v25 par.9a), K4-Skala-Sonde;
 Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
 2 min GPU, erst wenn keine CPU-Messung laeuft).
 
 **Entscheide des Nutzers heute:** v25-Zuschnitt par.1 (hv2-Abbildung par.2
 angenommen; Value-Klasse zu argmax, Zahl 8.000/0 oder 7.000/1.000 OFFEN --
-Nutzer 20:05 nicht ueberzeugt, "die Spalten kommen aus der Policy"; Einwand
+Nutzer 18:35 nicht ueberzeugt, "die Spalten kommen aus der Policy"; Einwand
 und Traeger-Kennzahl als vierte Waechter-Flaeche in v25 par.9a; par.6
 Defaults angenommen);
 Prereg-Bestand 9 OFFEN; Sicht-Arm mit 30 Werten; Historie kein Merkposten;
@@ -137,7 +137,7 @@ erledigt); **kein Push**.
    `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
    Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
    (b03). Nutzer-Ziel: offene Preregs (16) ueber v25+ auf rund 7.
-5. **ENTSCHIEDEN 17:35 (Nutzer: "ja bau k3-p2"), GEBAUT 17:45, `cargo test`
+5. **ENTSCHIEDEN 17:15 (Nutzer: "ja bau k3-p2"), GEBAUT 17:22, `cargo test`
    und Wheel ausstehend (`geometric_envelope` par.8.11).** Die Frage war:
    K3-P2 jetzt bauen? Plattenwahl in Runde 1-2
    ueber die Huelle steuern (`geometric_envelope` par.8.9b Baustein 1: eine
@@ -218,7 +218,7 @@ Index: 18 OFFEN, 79 ENTSCHIEDEN, 8 UEBERHOLT. Chronik der letzten Naechte:
 
 ### Prereg-Bestand
 
-Stand 2026-09-05, 19:25: **11 OFFEN** (`policy_surprise_weighting` fuer b05 und `geometric_envelope` mit Schliesskriterium par.12 wieder offen; NEU `round_estimate_leaf_term`, Such-Knopf K4, Nutzer-Auftrag 19:20). Stand 11:15 war: **8 OFFEN**: `v24_window`, `v25_window`,
+Stand 2026-09-05, 18:22: **11 OFFEN** (`policy_surprise_weighting` fuer b05 und `geometric_envelope` mit Schliesskriterium par.12 wieder offen (17:43); NEU `round_estimate_leaf_term`, Such-Knopf K4, Nutzer-Auftrag 18:20). Stand 11:15 war: **8 OFFEN**: `v24_window`, `v25_window`,
 `start_position_seeding`, `special_tile_yield`, `start_dome_choice`,
 `round_transition_search_sampling`, `rust_data_layer`, `stack_top_feature`
 (Nutzer: Sichtgleichheit, kein Staerkeziel, bleibt offen). Am 2026-09-05 vier

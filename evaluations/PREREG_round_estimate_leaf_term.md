@@ -2,7 +2,7 @@
 
 # Vorregistrierung: Rundenschaetzer als additiver Term am Netz-Blattwert (Such-Knopf K4)
 
-**Angelegt 2026-09-05, 19:20, auf Nutzer-Auftrag ("leg die prereg an. die
+**Angelegt 2026-09-05, 18:20, auf Nutzer-Auftrag ("leg die prereg an. die
 strafleisten busse kannst als schaetzer mitaufnehmen"). Nichts gebaut.**
 
 ## par.1 Anlass und Leitsatz

@@ -120,7 +120,7 @@ Paarungs-Trennschaerfe fuer diesen Arm hingenommen wird, und ob der
 Paritaets-Hash unter scharfem Schalter ueberhaupt noch gelten soll oder ob
 die Sonde den Schalter explizit aus erzwingt.
 
-**ENTSCHIEDEN 2026-09-05, 19:45 (Nutzer: "ja, trag das als bauvorgabe ein"):
+**ENTSCHIEDEN 2026-09-05, 18:28 (Nutzer: "ja, trag das als bauvorgabe ein"):
 der Tausch wird NICHT in Kauf genommen, sondern per Bauvorgabe vermieden.**
 Die Stichprobe am Rundenende-Blatt (gezogene Fabrik-Neubefuellung, bei
 Variante A alle N, bei Variante B die eine) zieht ihren Seed NICHT aus dem
@@ -211,7 +211,7 @@ Wertungsplatte, eigene Punkte, Marge.
 - **Kein Trainingsziel-Eingriff.** Der TD-Bootstrap bleibt unangetastet; er
   ist die Label-Seite und laut `PREREG_chance_nodes.md` erledigt.
 
-## par.7 LEITSATZ DES NUTZERS UND AUFSPALTUNG DES ARMS (2026-09-05, 18:55; Vorschlag, NICHT entschieden)
+## par.7 LEITSATZ DES NUTZERS UND AUFSPALTUNG DES ARMS (2026-09-05, 18:08; Aufspaltung)
 
 **Nutzer, woertlich:** *"drafting und tiling gehen hand in hand. das
 drafting muss zum teil schon wissen wie das tiling agieren wird um die
@@ -226,7 +226,7 @@ die Fabrik-Neubefuellung (8 Stichproben, 8 Netzaufrufe) -- das ist der
 Zufallsanteil, an dem Kostentor (par.4.1) und Paarungs-Schaerfe (par.4.2)
 haengen. Die Kosten der Prereg stammen fast ganz aus (b).
 
-**Variante B -- REGISTRIERT 2026-09-05, 20:05 (Nutzer: "ja registrier B"); Basisarm VOR Variante A:**
+**Variante B -- REGISTRIERT 2026-09-05, 18:35 (Nutzer: "ja registrier B"); Basisarm VOR Variante A:**
 (a) wie gebaut, dann EINE gezogene Neubefuellung und EIN Netzaufruf. Kosten je
 Rundenende-Blatt: zwei Loeser-Laeufe, Netzaufrufe wie heute. Der Blattwert ist
 dann eine Stichprobe statt eines Mittels; die Suche mittelt ueber Besuche.
