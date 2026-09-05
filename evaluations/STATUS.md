@@ -112,8 +112,19 @@ erledigt); **kein Push**.
    `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
    Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
    (b03). Nutzer-Ziel: offene Preregs (16) ueber v25+ auf rund 7.
-5. **Keine offenen Nutzer-Entscheide mehr** (beide am 2026-09-04, 20:50
-   geklaert): v20_2d_opp_brierbest wird NICHT aus restic zurueckgeholt, die
+5. **OFFENER NUTZER-ENTSCHEID (Frage der alten Sitzung 14:53, durch den
+   Absturz unbeantwortet): K3-P2 jetzt bauen?** Plattenwahl in Runde 1-2
+   ueber die Huelle steuern (`geometric_envelope` par.8.9b Baustein 1: eine
+   begonnene Reihe zaehlt auf leeren Huellenzellen ihrer Zeile mit halbem
+   Gewicht, die passende Platte hebt sie auf voll) -- Suchknopf, kein
+   Training, Messung am Siegernetz der v24-Arme; Wheel erst nach den
+   Trainings installierbar. Dazu der Vorschlag, den Kuppel-Bonus je Partie
+   als Kennzahl in die Abnahmen zu nehmen (Server-Logs: `server_log_points_
+   probe.py`; ob die Arena-Logs dieselbe Zeile tragen, ist UNGEPRUEFT).
+   Herleitung: Server-Logs 19 Partien, Abstand Mensch/KI sitzt bei
+   Kuppel-Bonus (8,9 gegen 1,6) und Endwertung (19,7 gegen 4,2), nicht bei
+   den Platzierungspunkten (Commit 3088f39, `domain_knowledge.md` 9).
+   Die beiden Entscheide vom 2026-09-04, 20:50 bleiben geklaert: v20_2d_opp_brierbest wird NICHT aus restic zurueckgeholt, die
    Champion-2-Kante gegen v22-b05 bleibt (par.11); die sechs Server-Logs vom
    2026-09-04 waren eine INFORMATION (wie das Netz gegen einen Menschen spielt,
    nicht nur gegen sich selbst oder Peers), kein Auftrag -- sie bleiben als
