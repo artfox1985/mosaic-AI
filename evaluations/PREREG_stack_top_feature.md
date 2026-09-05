@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | Beleg: nichts gebaut. Ziel ist SICHTGLEICHHEIT, kein Staerkegewinn (Nutzer 2026-08-20, bekraeftigt 2026-09-05: am 2026-09-05 kurz auf UEBERHOLT gesetzt und auf Nutzer-Anweisung wieder geoeffnet). Stufe 0 Sicht-Inventar (par.5), Stufe 1 additiver Input-Zuschnitt (par.6); Prioritaet Arbeitskreis "Spaeter". -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? Konkret zuerst: die offen liegende Rueckseite der obersten Kuppelstapel-Platte, die dem Netz heute fehlt. | Beleg: Stufe 0 GEFAHREN 2026-09-05 (par.10): acht Asymmetrien, alle Netz-sieht-weniger; gewichtigste NEU: Typ (Wild/Spezial) der drei ausliegenden Kuppelplatten, nicht ableitbar (Design 2 = Design 8 in den Farben, dome.rs:211/217); Stapel-Rueckseite (par.3) bestaetigt; Netz sieht nichts Verdecktes. Eingetaktet als v24-Arm v24-b04 (Sicht-Arm, +8 Flachwerte, INPUT_SIZE 714 -> 722), Bau nach dem b03-Training. Kriterium Sichtgleichheit, nicht Staerke (Nutzer 2026-09-05). -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -218,3 +218,81 @@ um 11:15 zurueckgenommen: *"da geht es nicht um staerke sondern um
 sichtgleichheit."* Sichtgleichheit ist das Kriterium dieser Prereg (par.1),
 nicht Elo; sie bleibt OFFEN mit der Prioritaet aus par.9. Der Merkposten in
 `docs/architecture_reference.md` verweist hierher zurueck.
+
+## par.10 STUFE 0 GEFAHREN und Eintaktung als v24-Arm `v24-b04` (Nutzer 2026-09-05: "takte ... fuer diese generation ein")
+
+**Sicht-Inventar (Agent, Kernpunkte vom Koordinator am Code nachgeprueft, 11:09):**
+Quellen Encoder `engine/src/features.rs` (flach 85-419 JSON-Pfad, 504-782
+Direktpfad, 2D 784-1055; die Planes tragen keine Zustandsinformation, die der
+Flachvektor nicht auch hat), Serialisierung `engine/src/serialize.rs:239-319`,
+GUI `static/js/app.js`, Regeln `docs/engine_manual.md`.
+
+**Netz sieht WENIGER als der Mensch** (nach Gewicht):
+
+1. **Typ der drei ausliegenden Kuppelplatten (Wild gegen Spezial, damit die
+   3 Bonuspunkte und die Spezialfeld-Wertung).** `features.rs:369-390`
+   kodiert je Feld nur `belegt` und `color_id`; Wild- und Spezialfelder fallen
+   beide auf Farbe 0. NICHT ableitbar: Design 2 `(Tuerkis, Rot, Blau, wild)`
+   und Design 8 `(Tuerkis, Rot, Blau, special)` (`engine/src/dome.rs:211/217`)
+   sind in den 24 kodierten Werten identisch. Der Mensch sieht den Typ
+   (`app.js:686-688, 708`). Betrifft fast jede Runde. NEU gefunden.
+2. **Rueckseite der obersten Stapelplatte** (`serialize.rs:300-302`,
+   `dome_stack_top_type`; in `features.rs` und `neural_net.py` null Treffer):
+   par.3 gilt unveraendert.
+3. Laufende Ziehserie (gezogene, noch nicht gewaehlte Platten,
+   `serialize.rs:307`): nur indirekt ueber die schrumpfende 18er-Maske. par.3
+   zweite Luecke, unveraendert; par.8: eigene Stufe.
+4. Historie: kein Zug- oder Rundenkontext im Eingang (Mensch: 30 Logzeilen
+   und Gedaechtnis).
+5. Farben der Strafleisten-Fliesen (`features.rs:212-213` nur Anzahl); sie
+   fehlen im `bag+tower`-Zaehler.
+6. Phantom-Fliesen in Musterreihen (`serialize.rs:180`), Ableitbarkeit ueber
+   `chips_taken` ungeprueft.
+7. Phasenaufloesung (`features.rs:65`: start_placement/drafting/scoring = 0),
+   vermutlich durch die Zugmaske folgenlos, ungeprueft.
+8. Formal: nur der erste Mondstapel je Fabrik, oberste 3 Steine
+   (`features.rs:717-718`); in gueltigen Stellungen deckungsgleich, Randfall
+   ungeprueft.
+
+**Netz sieht MEHR:** keine verdeckte Information gefunden. `dome_pool_mask`,
+`dome_wild_remaining_frac`, `bag+tower` je Farbe und die Wertungs-/Geometrie-
+Aggregate sind Funktionen des oeffentlichen Zustands (Buchfuehrung, kein
+Wissen); die Bonuschip-Farben haengen korrekt an `chip_revealed`
+(`features.rs:154-167`). Ungeprueft: ob die Aufteilung Beutel/Turm fuer den
+Menschen vollstaendig rekonstruierbar ist (kodiert wird nur die Summe).
+
+**Eintaktung als Arm `v24-b04` (Sicht-Arm), Zuschnitt:** Stufe 1 aus par.6
+plus Punkt 1 des Inventars, beides Typ-Sicht auf Kuppelplatten, ADDITIV am
+Ende des Flachvektors: `[top_is_special, top_is_wild]` (2 Werte, leerer
+Stapel 0/0) und je Auslage-Slot `[has_special, has_wild]` (3 x 2 = 6 Werte,
+leerer Slot 0/0). `INPUT_SIZE` 714 -> 722, Indizes 0..713 unveraendert.
+Abweichung von par.8 (ein Merkmal je Stufe) bewusst: das Kriterium ist
+Sichtgleichheit, nicht Attribution; die Arena ist Waechter (par.7), und die
+beiden Merkmale sind dieselbe Informationsart (Plattentyp). Ziehserie (3),
+Historie (4) und Kleinposten (5-8) bleiben Merkposten fuer spaetere Stufen.
+
+Bau (par.6 Punkte 2-5): drei Encoder-Stellen append-only (JSON-Pfad,
+Direktpfad, `neural_net.py`), `features_for_layout` kuerzt den Flachteil auf
+die vom Modell deklarierte Laenge (nur kuerzen, nie auffuellen),
+`config.INPUT_SIZE`, Laengen-Assertion der Paritaetstests, Fingerprint
+`lib.rs:642`; Sichtgleichheits-Test (>= 500 Zustaende gegen
+`dome_stack_top_type` und `dome_display`-Typen) und Regressionstest
+(714er-Layout bekommt exakt den alten Vektor); `cargo test --release`, Wheel,
+Anker-Invarianz (`/mosaic-anchor-invariance`), Netz-Pfad-Paritaet des Champions
+(Zahlengleichheit bei gleichen Seeds ist Pflicht, nicht Alarm: das Champion-
+Modell deklariert 714 und darf die neuen Werte nie sehen).
+
+Training `v24-b04`: b01-Rezept (`PREREG_v24_window.md` par.6e), Fenster
+`window_v24.txt`, Warmstart aus `v23-b01_brierbest` mit null-initialisierten
+acht neuen Spalten von `flat_branch.0.weight` (par.7), Bloecke fuer das ganze
+Fenster neu (`INPUT_SIZE` steckt im Block-Schluessel, rund 36 min bei 6
+Workern), Monolith neu. **Einziger Faktor gegen b01: die acht Sichtwerte.**
+Abnahme wie die anderen Arme (`night_v24_acceptance_chain.sh b04`), Lesart
+par.7: Gleichstand -> Merkmalsstand uebernehmen, Regression -> Fehlersuche.
+
+**Reihenfolge und Zeitplan:** Rust-Bau und Tests, sobald die CPU frei ist;
+`config.py`/`neural_net.py` und Wheel-Install erst NACH dem Start des
+b03-Trainings (train.py liest `config.INPUT_SIZE` beim Start; eine Aenderung
+davor liesse b03 seinen Monolithen nicht finden) und nach dem Ende des
+b03-Trainings, wenn das laufende Training das Wheel geladen haelt.
+
