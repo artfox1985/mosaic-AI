@@ -395,3 +395,24 @@ par.14), K3 baureif (`geometric_envelope` par.8), K2 gegenstandslos
 (`start_position_seeding` par.7). Nichts wird vor seiner Registrierung
 angefasst; alles Registrierte darf laufen, ausser der Erzeugung selbst
 (Nutzer 2026-09-03).
+
+## par.9 ERGEBNISSE DER ARME (ab 2026-09-05; Werkzeuge `tools/night_v24_chain.sh`, `night_v24_b03_chain.sh`, `night_v24_acceptance_chain.sh`)
+
+**Tor 0 (Value-Klasse, 10:37 registriert): GRUEN.** Symmetrie-Sonde TRENNT
+(`artifacts/v24_symmetry_value_class.json`), 6.945 von 16.000 Seiten mit
+voller Spalte (Schwelle 1.500; v23 5.629), volle Spalten 0,6085 je Seite,
+Punkte 44,0 (`v24_sanity_value_class.json`). Fenster-Kennzahl der
+Policy-Klasse (Bericht, v25 par.7): 1.319 von 8.000 Seiten, 0,189, Punkte
+26,0 (`v24_sanity_policy_class.json`).
+
+| Arm | Training | Tor 2a (argmax @400, Knopf an; Bezug b01 + K3-P 0,555) | Tor 1 (gegen `v23-b01_brierbest`, beide Seiten Champion-Spec) | Tor 2b | Stand |
+| --- | --- | --- | --- | --- | --- |
+| `v24-b01` | 06:12-08:58, 9.973 s, `_brierbest` Epoche 2 (val_brier 0,1919, Val-Pool v24) | **0,4425** (KI +-0,063), Punkte 45,7 -> **GERISSEN** | 34:46 (40 Paare, SPRT H0) und 49:61 (55 Paare, H0), gepoolt 83:107, Elo informativ 1219 [1160, 1283] -> **GERISSEN** | laeuft | scheidet als Generator aus (`generation_loop.md`, "Wenn ein Tor reisst"); Vorlage |
+| `v24-b02` (lambda 0,7) | seit 08:58 | -- | -- | -- | Training |
+| `v24-b03` (Seeding-Schwarm) | Kuratierung 1.500 (0 Abweichungen), Schwarm 6.000 in 8.908 s (1,485 s je Partie), Monolith gebaut | -- | -- | -- | wartet auf b02 |
+
+Beobachtung ohne Verdikt: das Material ist spaltenreich (0,61 @100 im
+Self-Play), das daraus warm gestartete Netz spielt am Instrument @400 mit
+Knopf spaltenaermer (0,44) als sein Lehrer ohne Knopf (0,515); `_brierbest`
+fiel auf Epoche 2, die Val-Kennzahlen liegen auf einem neuen Val-Pool.
+Ursachenanalyse nach b02/b03 (Generatorwahl-Regel), nicht je Arm.
