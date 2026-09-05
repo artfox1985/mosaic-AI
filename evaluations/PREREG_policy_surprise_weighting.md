@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: NEIN, gemessen (par.9, 2026-09-01): `v23-b03` mit alpha 0,5, einfaktoriell gegen b01. Orakelmetriken Gleichstand (top3mass -0,0064, tau +0,0004), Arena 75:85 (p = 0,47), Spalten 0,500 gegen 0,631, Punkte -3,32 (Kennzahlen nachgetragen). Der Knopf bleibt gebaut mit Default 0 und geht NICHT ins Standardrezept. Andere alpha-Werte ungeprueft, ohne Nutzniesser. -->
+<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: alpha 0,5 ohne Tor: NEIN (par.9, v23-b03: Arena 75:85, Spalten 0,500 gegen 0,631). WIEDER OFFEN 2026-09-05 als v24-Arm v24-b05 (par.10, Nutzer): Ueberraschung nur bei SICHERER Suche (Top-1 des Ziels >= 0,5), Knopf --surprise-confidence-min gebaut, Default 0 = bitidentisch; Training nach b04, einziger Faktor gegen b04. -->
 
 # Vorregistrierung: Policy-Surprise-Weighting
 
@@ -286,3 +286,43 @@ dokumentiert, Default 0 (aus). Er wird nicht ins Standardrezept uebernommen.
 **Was NICHT geprueft wurde:** andere alpha-Werte. Eine Dosis-Reihe waere ein
 eigener Zuschnitt und braucht ihre eigene Registrierung -- nach dieser Messung
 ohne benannten Nutzniesser.
+
+## par.10 WIEDERVORLAGE als v24-Arm `v24-b05`: Ueberraschung nur bei sicherer Suche (Nutzer 2026-09-05, 12:19: "Dann takte den Arm ein")
+
+**Anlass.** Nutzer-Frage: "Die Zuege, in denen Suche und Netz auseinanderdriften,
+sind ja die echten Geschenke?" Am Code: der Policy-Verlust ist die
+Kreuzentropie zwischen dem Gumbel-completed-Q-Ziel (geschaerft, Exponent 2)
+und den maskierten Logits; sie zerfaellt in Zielentropie plus KL(Ziel gegen
+Netz), die Abweichung traegt also schon ohne Zusatzgewicht den groessten
+Gradienten. Die explizite Verstaerkung (par.3a, alpha 0,5) hat in v23-b03
+nichts gebracht und Spalten gekostet (par.9). Hypothese (unbelegt): bei 100
+Sims mit Wurzelrauschen liegen die groessten Abweichungen in derselben Ecke
+wie die verrauschtesten Ziele; die Gewichtung hebt Geschenk und Laerm
+zugleich.
+
+**Der Arm.** Dieselbe Gewichtung wie par.3a, aber nur dort, wo die Suche
+sicher ist: Stichproben, deren (geschaerftes) Policy-Ziel eine Top-1-
+Wahrscheinlichkeit >= 0,5 hat, bekommen `(KL / Mittel)^alpha` (gekappt auf
+[0,25; 4,0]); alle anderen behalten Gewicht 1; danach die bestehende
+Normierung auf Mittel 1 (Loss-Skala konstant). Schalter
+`--surprise-confidence-min` (train.py, Default 0,0 = kein Tor = bitidentisch
+zu par.3a; zusammen mit alpha 0,0 bitidentisch zum Bestand), im
+Trainingsmanifest als `cli_args.surprise_confidence_min`. Kein neues Feld,
+keine Cache-Komponente (Top-1 des Ziels ist eine Funktion des gespeicherten
+Ziels). Parameter: alpha 0,5 (wie v23-b03, damit der Unterschied allein das
+Tor ist), Schwelle 0,5 (nach Schaerfung Exponent 2 entspricht das einem
+rohen Top-1 von rund 0,71 bei zwei Kandidaten; Herleitung, nicht gemessen).
+
+**Zuschnitt.** Rezept, Fenster, Monolith und `INPUT_SIZE` wie `v24-b04`
+(744; der Python-Encoder des Sicht-Arms ist zu diesem Zeitpunkt der
+Bestand). **Einziger Faktor gegen b04: das gegatete Gewicht.** Zweiter Bezug
+b01 (mit b04 als Zwischenglied). Kette `tools/night_v24_b05_chain.sh`
+(Training nach b04, GPU), Abnahme `tools/night_v24_acceptance_chain.sh b05`
+plus Tor 1/2a ohne Knopf (`PREREG_v24_window.md` par.9b).
+
+**Entscheidungsmass** wie par.7 (Orakelmetriken, Tor 1, Tor 2a/2b);
+zusaetzlich der Anteil gegateter Stichproben je Epoche (aus dem Trainingslog
+nachzutragen: wie viele Samples ueber der Schwelle lagen). Liegt er unter 10
+Prozent, kann der Arm nichts zeigen und wird als "Tor zu eng" registriert,
+nicht als Nullbefund.
+
