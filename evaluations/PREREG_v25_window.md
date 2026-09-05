@@ -132,9 +132,14 @@ Traegersatz = neuer Monolith (344 s), Bloecke bleiben.
 ## par.6 Was noch offen ist
 
 1. ~~Nutzer-Entscheid zu par.2~~ gefallen 2026-09-05 (Vorschlag angenommen).
-2. Val-Pool-Regex fuer v25 (v24: `^selfplay_v23-b01-`; v25 analog
-   `^selfplay_v24-b01-`, Dateien heissen nach dem Generator).
-3. Startgewicht des v25-Trainings (v24-Regel: der Generator-Checkpoint).
+2. ~~Val-Pool-Regex fuer v25~~ ENTSCHIEDEN 2026-09-05, 20:05 (Nutzer: "par.6
+   defaults passen"): analog v24 auf den v24-GENERATOR, also
+   `^selfplay_v24-<generator>-` (Dateien heissen nach dem Generator; der
+   Name haengt an der Generatorwahl nach den Abnahmen, v24-b01 ist nur der
+   Platzhalter).
+3. ~~Startgewicht des v25-Trainings~~ ENTSCHIEDEN 2026-09-05, 20:05: der
+   Generator-Checkpoint (v24-Regel), also das `_brierbest` des gewaehlten
+   v24-Arms.
 
 ## par.7 SPALTEN-WAECHTER: nicht schleichend verlernen (Nutzer, 2026-09-04, 21:55)
 
@@ -225,4 +230,44 @@ Wertungsplatten und Auslagen weiter, aber enger als gesampelte; das ist der
 Preis der Verschiebung. **Offen (Nutzer):** 8.000/0 (maximal, Vorschlag) oder
 7.000/1.000 (Streuung teilweise erhalten). Gilt fuer die v25-ERZEUGUNG
 (G-Material); das G-1-Material bleibt, wie es liegt.
+
+### par.9a EINWAND DES NUTZERS zur Value-Klasse (2026-09-05, 20:05): "die Spalten kommen aus der Policy"
+
+Nutzer: *"bei v25 value klasse bin ich noch nicht vollkommen ueberzeugt. da
+hast gesagt die spalten kommen aus der policy."* Der Einwand trifft die
+Herleitung von par.9 an einer Stelle, die dort uebergangen war:
+
+- **Die Frage 8.000/0 gegen 7.000/1.000 betrifft NUR die Value-Klasse**, und
+  die ist policy-maskiert (par.1: Schwarm, `--value-only`). Was die POLICY
+  lernt, kommt aus den Traegern: Sockel NEU 4.000 (v24, gesampelt mit
+  Rauschen), 1.350 aus G-1, 450 hv2-Traeger. Im v24-Material hat genau diese
+  Sockel-Klasse 0,19 volle Spalten je Seite (par.7-Tabelle), obwohl sie MIT
+  K3-P C 1,0 erzeugt wurde; die spaltenreichen Klassen (argmax 0,75, hv2 0,73)
+  sind entweder maskiert oder rotieren aus (hv2-Traeger von 180 auf 45
+  Dateien).
+- **Was gemessen ist:** flache Suche (Prior-dominiert) baut rund 0,6 volle
+  Spalten, tiefe Suche 0,34 -- die Spalten-PRAEFERENZ sitzt im Prior, der
+  Value-Kopf daempft sie mit der Tiefe (`search_depth_column_optimum`,
+  Merkposten [[project_search_depth_column_tradeoff]]); bei 400 Sims traegt
+  der Value-Kopf die STAERKE. Beide Klassen haben also eine Rolle: die
+  Value-Klasse dafuer, dass der Kopf spaltenreiche Zustaende richtig
+  bewertet (Phase 3, Betrag), die Traeger dafuer, dass der Prior die Spalten
+  ueberhaupt vorschlaegt.
+- **Folge fuer par.9:** die Fenster-Kennzahl (44,8 % -> 40,1 %) mischt beide
+  Klassen und ist deshalb fuer die Policy-Frage das falsche Mass. Der
+  Spalten-Waechter par.7 bekommt eine VIERTE Zeile: **Traeger-Kennzahl**
+  (Seiten mit voller Spalte und volle Spalten je Seite NUR ueber die
+  Traeger-Dateien des Fensters, `corpus_sanity_check.py` ueber die
+  Traeger-Liste des Manifests). Bezug v24: aus den 580 Traegern noch zu messen
+  (UNGEMESSEN; die Klassenwerte oben legen einen niedrigen Wert nahe, weil 400
+  der 580 Sockel-Dateien sind).
+- **Hebel fuer die Policy, zu pruefen statt der 8.000/0-Frage** (Vorschlaege,
+  nichts entschieden): (a) den Sockel NEU spaltenreicher erzeugen (weniger
+  Rauschen oder hoehere Temperatur-Abklingung, Betriebspunkt messen), (b)
+  mehr hv2- oder argmax-Traeger im Sockel als die 450, (c) die argmax-Klasse
+  teilweise policy-tragend machen (Besuchsverteilung @100 als Ziel, scharf).
+  Jeder Hebel braucht den Traeger-Bezugswert zuerst.
+
+**Stand:** 8.000/0 bleibt OFFEN (Nutzer nicht ueberzeugt); die
+Traeger-Kennzahl v24 wird gemessen, sobald die CPU frei ist, dann Vorlage.
 

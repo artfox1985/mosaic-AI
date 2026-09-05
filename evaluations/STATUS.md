@@ -72,14 +72,21 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
    Leitsatz "Drafting muss das Tiling kennen" registriert
    (`architecture_reference.md`, `round_transition_search_sampling` par.7);
    par.4.2 ENTSCHIEDEN 19:45 als Bauvorgabe (stellungsgebundener Seed der
-   Blatt-Stichprobe, Paarung bleibt); offen nur noch, ob Variante B (Tiling
-   im Blatt, eine Neubefuellung) registriert wird. Bau nach den v24-Abnahmen.
-Noch nicht eingetaktet: argmax v24-b01 bei C 0,5 (Knopf-Dosis, par.9b);
+   Blatt-Stichprobe, Paarung bleibt); Variante B REGISTRIERT 20:05 als Basisarm.
+   Bau nach den v24-Abnahmen, Reihenfolge K3-P2, K4, B.
+8. **CPU-Warteschlange nach der b02-Abnahme** (`tools/cpu_queue_after_b02.sh`,
+   gestartet 20:10, wartet auf das Ende der Abnahme-Kette): cargo test und
+   Wheel 744 mit K3-P2 (nicht installiert), dann argmax v24-b01 bei K3-P C 0,5
+   (Knopf-Dosis, par.9b; Nutzer 20:05: "knopf dosis kannst eintakten").
+Noch nicht eingetaktet: Traeger-Kennzahl v24 (v25 par.9a), K4-Skala-Sonde;
 Laufzeit-Test der Pause auf Zuruf (`tools/tests/train_resume_pause_test.sh`,
 2 min GPU, erst wenn keine CPU-Messung laeuft).
 
 **Entscheide des Nutzers heute:** v25-Zuschnitt par.1 (hv2-Abbildung par.2
-angenommen; Value-Klasse zu argmax, Zahl 8.000/0 oder 7.000/1.000 offen);
+angenommen; Value-Klasse zu argmax, Zahl 8.000/0 oder 7.000/1.000 OFFEN --
+Nutzer 20:05 nicht ueberzeugt, "die Spalten kommen aus der Policy"; Einwand
+und Traeger-Kennzahl als vierte Waechter-Flaeche in v25 par.9a; par.6
+Defaults angenommen);
 Prereg-Bestand 9 OFFEN; Sicht-Arm mit 30 Werten; Historie kein Merkposten;
 mehr Sims im Sockel kein Hebel; b03 bleibt 714; **Richtung je Generation:**
 spaltenverstaerkend UND siegverstaerkend in der Arena, Saettigung erwartet

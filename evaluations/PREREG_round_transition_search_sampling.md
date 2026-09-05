@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es SPIELSTAERKE, den Rundenuebergang in der Suche als Zufallsknoten zu bemustern (ROUND_TRANSITION_SAMPLING) statt ihn mit einem einzelnen Netz-Blattwert zu bewerten -- und ist der Preis (Durchsatz UND unschaerfere Paarung in gepaarten Arenen) das wert? | Beleg: NICHTS GEMESSEN, nichts gebaut; der Schalter steht seit 2026-07 auf false. Die alte Doc-Sperre bindet nicht (par.2). Vorab benannt sind zwei Kosten: Durchsatz (par.4.1) und Determinismus (par.4.2). Messkette bindend in par.5: Kostentor ZUERST, Staerke danach. 2026-09-05: Nutzer-Leitsatz (Drafting muss das Tiling kennen), Aufspaltung A/B/C in par.7; par.4.2 ENTSCHIEDEN als Bauvorgabe (stellungsgebundener Seed der Blatt-Stichprobe: Paarung und Zustands-Determinismus bleiben). Offen: ob Variante B registriert wird. -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern -- bringt das Spielstaerke zu vertretbarem Preis (Durchsatz, Paarung)? | Beleg: nichts gebaut, nichts gemessen. 2026-09-05: Nutzer-Leitsatz 'Drafting muss das Tiling kennen'; par.4.2 ENTSCHIEDEN als Bauvorgabe (stellungsgebundener Seed, Paarung bleibt); Variante B (Tiling im Blatt, EINE Neubefuellung) REGISTRIERT als Basisarm (par.7), Kostentor 25 % zuerst (par.5). Bau nach den v24-Abnahmen, Reihenfolge K3-P2, K4, B. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -226,7 +226,7 @@ die Fabrik-Neubefuellung (8 Stichproben, 8 Netzaufrufe) -- das ist der
 Zufallsanteil, an dem Kostentor (par.4.1) und Paarungs-Schaerfe (par.4.2)
 haengen. Die Kosten der Prereg stammen fast ganz aus (b).
 
-**Vorschlag Variante B (zu registrieren, falls der Nutzer zustimmt):**
+**Variante B -- REGISTRIERT 2026-09-05, 20:05 (Nutzer: "ja registrier B"); Basisarm VOR Variante A:**
 (a) wie gebaut, dann EINE gezogene Neubefuellung und EIN Netzaufruf. Kosten je
 Rundenende-Blatt: zwei Loeser-Laeufe, Netzaufrufe wie heute. Der Blattwert ist
 dann eine Stichprobe statt eines Mittels; die Suche mittelt ueber Besuche.
@@ -244,6 +244,10 @@ das projizierte Nach-Tiling-Raster und den erwarteten Kuppel-Bonus als
 Eingabe geben (Richtung des Sicht-Arms v24-b04). Kostet in der Suche nichts,
 braucht ein Training, bleibt eine Schaetzung statt des gespielten Tilings.
 
-**Offen beim Nutzer:** par.4.2 (unschaerfere Paarung in Kauf nehmen?) und ob
-B registriert wird. Bau fruehestens nach den v24-Abnahmen (Maschine belegt).
+**Entschieden (Nutzer, 2026-09-05):** par.4.2 als Bauvorgabe (stellungsgebundener
+Seed, oben), Variante B registriert und als Basisarm gesetzt; A folgt nur, wenn B
+traegt und die Mittelung ueber N Stichproben eine eigene Frage wird. Bau
+fruehestens nach den v24-Abnahmen (Maschine belegt); Reihenfolge der
+Such-Knoepfe am v24-Siegernetz: K3-P2 (gebaut), K4 Rundenschaetzer
+(`round_estimate_leaf_term`), dann B -- ein Knopf, ein Netz, eine Messung.
 
