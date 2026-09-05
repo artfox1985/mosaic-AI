@@ -83,8 +83,9 @@ erledigt); **kein Push**.
    im selben Snapshot.
 4. **v25-Zuschnitt registriert** (`PREREG_v25_window.md`, Nutzer 21:50,
    stationaere Rotation G = v24 / G-1 = heutiges Material / G-2 = hv2; par.7
-   Spalten-Waechter auf drei Flaechen, Nutzer 21:55; offen: hv2-Abbildung
-   par.2, Teilauswahl-Option im Manifest-Generator par.3). **Wiedervorlagen
+   Spalten-Waechter auf drei Flaechen, Nutzer 21:55; hv2-Abbildung par.2 vom
+   Nutzer angenommen 2026-09-05, `--pick` gebaut; offen nur noch Val-Pool und
+   Startgewicht, par.6). **Wiedervorlagen
    fuer v24-Arme** (nicht vor dem v24-Start bauen):
    `geometric_envelope` par.8.9b (Erreichbarkeit als Modulator, tote Zellen,
    Profil), C 2,0 als Generator-Arm (8.7d), `start_position_seeding` par.7
