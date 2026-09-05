@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Hilft ein GEOMETRISCHES Gelaender -- die Dreiecks-Einhuellende, frueh stark und gegenlaeufig zum Value-Kopf abklingend --, wenn es in SUCHE und TILING eingreift statt nur Netz-Eingabe zu sein? | Beleg: JA, in der Bauform K3-P (Potential auf dem PROJIZIERTEN Brett, C 1,0, par.8.7): gepoolt 191:129 auf 320 Paaren (p = 0,014), Betriebspunkt @100 0,775 gegen 0,726 Spalten (8.7d), Champion-Kante 38:12 und 221:179 gegen v21 (par.10/10a); seit 2026-09-04 Champion `v23-b01_k3p10`, Elo 1292 (par.11) und Knopf im v24-Rezept. Raster-Form (par.9), Value im Tiling (8.6a), Erreichbarkeit/Ownership (8.9a), Huellen-Bauer (8.8) tragen nicht. Wiedervorlage als v24/v25-Arme: par.8.9b (Modulator, tote Zellen, Profil), C 2,0 als Generator-Arm (8.7d). K3-P2 gebaut 2026-09-05, Messung offen (par.8.11). -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4, Plattenwahl R1-2) gebaut 2026-09-05, Messung am v24-Siegernetz offen (par.8.11). WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -1329,4 +1329,40 @@ installiert (744-Kontrakt `20b442a8164f748d`).
 **Kennzahl Kuppel-Bonus je Partie, Referenz aus den b01-Tor-2b-Logs
 (`points_v24b01_vs_b01_s14.json`, 2 x 80 Partien, beide Seiten K3-P C 1,0):**
 siehe Artefakt; Mensch-Referenz aus den Server-Logs 8,9 je Partie (par.8.10).
+
+## par.12 SCHLIESSKRITERIUM (Nutzer 2026-09-05, 18:05; Kopf wieder OFFEN)
+
+Der Kopf stand seit 2026-09-04 23:39 auf ENTSCHIEDEN, weil die urspruengliche
+Frage ("hilft ein geometrisches Gelaender?") mit K3-P bejaht war. Der Nutzer
+hat das am 2026-09-05 zurueckgenommen und das Ziel praezisiert, woertlich:
+
+> "der prereg wird erst dann geschlossen wenn die einhuellende wirklich
+> sauber implementiert ist und den value head messbar entlastet in den
+> ersten runden und dadurch stabiler spielt"
+
+Daraus folgen drei Bedingungen, die ALLE erfuellt sein muessen, bevor der
+Kopf wieder auf ENTSCHIEDEN geht:
+
+1. **Sauber implementiert.** Die Bausteine aus par.8.9b sind gebaut und
+   gemessen, nicht nur K3-P: K3-P2 (gebaut, par.8.11), tote Huellenzellen
+   K3-D (Baustein 2, offen), Rundenprofil der Erreichbarkeit (Baustein 3,
+   nur falls 1 nicht reicht). Kein Konstruktionsfehler der Art von K3-R
+   (par.8.9b: Bestrafung des Beginnens langer Reihen) bleibt im aktiven
+   Modus.
+2. **Entlastet den Value-Kopf in den ersten Runden messbar.** Zu messen als
+   Zustandsgroesse, nicht nur als Arena-Ergebnis: die Verlaesslichkeit des
+   Value-Kopfs je Runde (par.8.5, `value_head_reliability_by_round.json`,
+   rho(1..2)) und die Uebereinstimmung Suche gegen Kopf in Runde 1-2 mit
+   Knopf gegen ohne Knopf, am selben Netz. Die konkreten Groessen und
+   Schwellen werden VOR der Messung hier registriert (par.12a, noch nicht
+   geschrieben) -- nichts davon ist heute festgelegt.
+3. **Spielt dadurch stabiler.** Stabilitaet heisst geringere Streuung, nicht
+   nur hoehere Siegquote: Streuung des Endstands und der vollen Spalten je
+   Partie ueber Seeds, sowie die Knopf-Wechselwirkung, die bei v24-b01 das
+   Vorzeichen gewechselt hat (v24 par.9b: +0,045 bei b01, -0,075 bei
+   v24-b01). Ein Knopf, der je Netz neu geeicht werden muss, ist nicht
+   stabil.
+
+Was bis dahin gilt: K3-P bleibt Champion-Knopf und Rezeptbestandteil
+(par.11), die Prereg ist OFFEN mit der Frage aus dem Kopf.
 
