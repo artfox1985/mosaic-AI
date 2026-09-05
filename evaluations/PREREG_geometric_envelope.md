@@ -1659,6 +1659,23 @@ eine gebundene Reihe 5/6 mit Praedikat NEIN, wie viele Runden bleibt sie,
 Mensch gegen KI (Server-Logs) -- Ergaenzung der Tiling-Geometrie-Sonde, Lauf
 nach der laufenden Sonde. Ohne diese Zahl ist die Dosis `w_flush` geraten.
 
+**Messinstrument GEBAUT (2026-09-06, 00:58; `tools/probes/tiling_geometry_probe.py`,
+Block `reihen_alter`, additiv zur par.8.12-Messung):** an jedem Rundenende
+(Zustand vor dem Tiling) fuer jede gebundene, unvollstaendige Reihe 5/6 das
+Praedikat oben, in Python nachgebaut: `ja` = Huellenzelle der Zeile nimmt die
+Farbe heute an (`DomeSpace::accepts`-Logik auf dem State-JSON); `ja_wartend`
+= plattenlose Huellenzelle der Zeile UND eine Platte, deren Zelle an dieser
+Position die Farbe annimmt, liegt noch in Auslage, angefangenem Stapelzug
+oder verdecktem Stapel (`dome_pool_mask` gegen den 18er-Katalog aus dome.rs);
+sonst `nein`. Huelle = bestpassende Orientierung je Rundenende. Dazu
+Episoden je Reihe (Beginn, Alter in Rundenenden, Ende `voll` / `offen_am_ende`),
+je blockierter Episode: ab welcher Runde, wie viele Rundenenden blockiert,
+ob eine Zelle der Zeile AUSSERHALB der Huelle die Farbe angenommen haette
+(Aussen-Legen, par.8.13). Zusammenfassung je Seite (Mensch, KI, NetzA/B) und
+Reihenlaenge. Der eingereihte Lauf (`cpu_queue_after_b04.sh`: 19 Mensch-Logs,
+dann b01-Arena 160 Partien) faehrt die Ergaenzung mit; Zahlen folgen hier.
+Reihenfolge (Nutzer 00:50): erst diese Zahlen, dann K3-F.
+
 **ENTSCHIEDEN (Nutzer 2026-09-06, 00:50, woertlich "bau k3 f nach der
 messung"):** Bau ERST nach der Messung. Reihenfolge damit: (1) Tiling-
 Geometrie-Sonde um Alter und Haeufigkeit blockierter Reihen 5/6 (Praedikat

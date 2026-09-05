@@ -26,6 +26,16 @@ ab, was kostet er an Rundenpunkten, was gewinnt er an Nachbarschaft? Und spielt
 der Mensch den punkt-besten Abschluss oder laesst er Punkte fuer Geometrie
 liegen -- im Vergleich zur KI-Seite und zu den Netz-Arenen?
 
+ERGAENZUNG 2026-09-06 (par.8.13/8.14, Nutzer: "bau k3 f nach der messung"): Alter und
+Haeufigkeit BLOCKIERTER langer Reihen. An jedem Rundenende wird fuer jede gebundene,
+unvollstaendige Musterreihe 5/6 (Index 4/5) das Praedikat "Reihe kann die Huelle noch
+bedienen" aus par.8.14 berechnet (JA: Huellenzelle der Zeile nimmt die Farbe heute an;
+JA_WARTEND: plattenlose Huellenzelle der Zeile UND eine Platte mit passender Zelle an
+dieser Position ist noch in Auslage/Stapel; sonst NEIN), Reihen-Episoden ueber die
+Rundenenden verfolgt (Beginn, Alter in Rundenenden, voll geworden oder am Ende offen)
+und nach Seite und Reihenlaenge zusammengefasst (`reihen_alter`). Rein additiv: die
+par.8.12-Messung bleibt unveraendert, ein Fehler hier bricht sie nicht.
+
 Aufruf (CPU-Kern, Minuten; NICHT neben einer laufenden Messung):
     python -X utf8 -u tools/probes/tiling_geometry_probe.py --server-logs "static/log/game_*.log" \
         --out evaluations/artifacts/tiling_geometry_probe_human.json
@@ -119,11 +129,203 @@ def complete_with_actual(state_json: str, open_records: list):
                          "is_pbest": after == rec["pbest"]["after"], "is_gbest": after == rec["gbest"]["after"]}
 
 
-def replay(log_path: pathlib.Path, mr, k: int, meta: dict, records: list) -> str | None:
+
+# ---------------------------------------------------------------------------
+# par.8.13/8.14: Reihen-Alter blockierter langer Reihen (2026-09-06)
+# ---------------------------------------------------------------------------
+# Katalog der 18 Kuppelplatten, Reihenfolge der Zellen oben-links, oben-rechts,
+# unten-links, unten-rechts -- abgeschrieben aus engine/src/dome.rs
+# `build_dome_tile_pool` (Stand 2026-09-06). ("N", farbe) normal, ("W",) bunt,
+# ("S",) Spezialfeld. Farbnamen wie TileColor::value() (tile.rs:26).
+_N, _W, _S = "N", "W", "S"
+DOME_DESIGNS = [
+    ((_N, "gelb"), (_N, "schwarz"), (_N, "türkis"), (_S,)),
+    ((_W,), (_N, "blau"), (_N, "türkis"), (_N, "schwarz")),
+    ((_N, "türkis"), (_N, "rot"), (_N, "blau"), (_W,)),
+    ((_N, "schwarz"), (_N, "gelb"), (_N, "rot"), (_W,)),
+    ((_N, "schwarz"), (_S,), (_N, "türkis"), (_N, "rot")),
+    ((_N, "türkis"), (_N, "gelb"), (_W,), (_N, "schwarz")),
+    ((_S,), (_N, "schwarz"), (_N, "rot"), (_N, "blau")),
+    ((_N, "gelb"), (_N, "blau"), (_N, "schwarz"), (_S,)),
+    ((_N, "türkis"), (_N, "rot"), (_N, "blau"), (_S,)),
+    ((_N, "gelb"), (_N, "rot"), (_W,), (_N, "blau")),
+    ((_N, "gelb"), (_S,), (_N, "schwarz"), (_N, "rot")),
+    ((_N, "türkis"), (_N, "schwarz"), (_N, "rot"), (_W,)),
+    ((_N, "blau"), (_N, "schwarz"), (_S,), (_N, "türkis")),
+    ((_N, "rot"), (_N, "türkis"), (_N, "gelb"), (_W,)),
+    ((_N, "türkis"), (_N, "blau"), (_W,), (_N, "gelb")),
+    ((_S,), (_N, "türkis"), (_N, "gelb"), (_N, "blau")),
+    ((_N, "rot"), (_W,), (_N, "blau"), (_N, "schwarz")),
+    ((_S,), (_N, "gelb"), (_N, "blau"), (_N, "rot")),
+]
+LONG_ROWS = (4, 5)  # Index 4 = Reihe 5 (5 Steine), Index 5 = Reihe 6
+ROW_COLORS = ("blau", "gelb", "rot", "schwarz", "türkis")
+
+
+def space_accepts(sp, color: str) -> bool:
+    """DomeSpace::accepts (dome.rs:62) auf dem JSON von serialize_space (serialize.rs:82)."""
+    if not sp or sp.get("filled") is not None or sp.get("locked"):
+        return False
+    t = sp.get("type")
+    if t == "NORMAL":
+        return sp.get("color") == color
+    return t == "WILD"
+
+
+def design_accepts_at(design, pos: int, color: str) -> bool:
+    d = design[pos]
+    return d[0] == _W or (d[0] == _N and d[1] == color)
+
+
+def cell_slot_and_space(dome_grid, r: int, c: int):
+    """(Platte-JSON oder None, Space-JSON oder None) fuer Rasterzelle (r, c); Abbildung wie
+    triangle_hull_coverage_probe.occupancy: Slot (r//2, c//2), Zelle (r%2)*2 + c%2."""
+    row = dome_grid[r // 2] if r // 2 < len(dome_grid) else []
+    slot = row[c // 2] if c // 2 < len(row) else None
+    if not slot:
+        return None, None
+    spaces = slot.get("spaces") or []
+    pos = (r % 2) * 2 + (c % 2)
+    return slot, (spaces[pos] if pos < len(spaces) else None)
+
+
+def tile_can_still_come(state: dict, pos: int, color: str) -> bool:
+    """Gibt es in Auslage (`dome_display`), im angefangenen Stapelzug (`pending_stack_draw`) oder im
+    verdeckten Stapel (`dome_pool_mask`, Design-Ids) eine Platte, deren Zelle `pos` `color` annimmt?"""
+    for t in (state.get("dome_display") or []) + (state.get("pending_stack_draw") or []):
+        sps = t.get("spaces") or []
+        if pos < len(sps) and space_accepts(sps[pos], color):
+            return True
+    mask = state.get("dome_pool_mask") or []
+    for tid, present in enumerate(mask):
+        if present and tid < len(DOME_DESIGNS) and design_accepts_at(DOME_DESIGNS[tid], pos, color):
+            return True
+    return False
+
+
+def row_predicate(state: dict, pi: int, r: int, color: str, hull) -> dict:
+    """par.8.14, Praedikat "Reihe kann die Huelle noch bedienen" fuer Musterreihe r mit Farbe color.
+    Rueckgabe: {"pred": "ja" | "ja_wartend" | "nein" | "unbekannt", "annehmend_ausserhalb": bool,
+    "plattenlos_huelle": int}. `annehmend_ausserhalb`: eine Zelle der Zeile AUSSERHALB der Huelle
+    nimmt die Farbe heute an (Aussen-Legen moeglich, par.8.13)."""
+    if color not in ROW_COLORS:
+        return {"pred": "unbekannt", "annehmend_ausserhalb": False, "plattenlos_huelle": 0}
+    grid = state["players"][pi].get("dome_grid") or []
+    accept_in, accept_out, slots_free = False, False, []
+    for c in range(6):
+        slot, sp = cell_slot_and_space(grid, r, c)
+        in_hull = (r, c) in hull
+        if slot is None:
+            if in_hull:
+                slots_free.append(c)
+            continue
+        if space_accepts(sp, color):
+            if in_hull:
+                accept_in = True
+            else:
+                accept_out = True
+    if accept_in:
+        pred = "ja"
+    elif slots_free and any(tile_can_still_come(state, (r % 2) * 2 + (c % 2), color) for c in slots_free):
+        pred = "ja_wartend"
+    else:
+        pred = "nein"
+    return {"pred": pred, "annehmend_ausserhalb": accept_out, "plattenlos_huelle": len(slots_free)}
+
+
+def track_row_ages(state: dict, rnd: int, ctx_rows: dict, episodes: list, meta: dict):
+    """Ein Rundenende (Zustand vor dem Tiling): Episoden der langen Reihen fortschreiben.
+    ctx_rows: (pi, r) -> offene Episode. Eine Episode beginnt, wenn die Reihe gebunden ist, und endet,
+    wenn sie am Rundenende VOLL ist (wird jetzt getilet) oder das Spiel endet (offen)."""
+    import triangle_hull_coverage_probe as hullmod
+    for pi in (0, 1):
+        pl = state["players"][pi]
+        hull = hullmod.best_hull(hullmod.occupancy(pl.get("dome_grid") or []))
+        lines = pl.get("pattern_lines") or []
+        for r in LONG_ROWS:
+            if r >= len(lines):
+                continue
+            line = lines[r]
+            k = len(line.get("tiles") or [])
+            cap = int(line.get("capacity") or (r + 1))
+            color = line.get("color")
+            ep = ctx_rows.get((pi, r))
+            if k == 0 or color is None:
+                if ep is not None:  # sollte nicht vorkommen (Reihen leeren sich nur im Tiling)
+                    ep["ende"] = "leer_unerklaert"; ep["ende_runde"] = rnd
+                    episodes.append(ep); ctx_rows.pop((pi, r), None)
+                continue
+            if ep is not None and (ep["color"] != color or k < ep["k_letzt"] or ep.get("voll_runde") is not None):
+                # neue Episode: die alte war voll (getilet) oder ist anders belegt
+                ep["ende"] = "voll" if ep.get("voll_runde") is not None else "ersetzt"; ep["ende_runde"] = rnd
+                episodes.append(ep); ep = None; ctx_rows.pop((pi, r), None)
+            if ep is None:
+                ep = {**meta, "pi": pi, "r": r, "reihe": r + 1, "color": color, "start_runde": rnd,
+                      "rundenenden": 0, "praedikate": [], "blockiert_rundenenden": 0,
+                      "aussen_moeglich_rundenenden": 0, "voll_runde": None, "k_letzt": 0}
+                ctx_rows[(pi, r)] = ep
+            ep["rundenenden"] += 1
+            ep["k_letzt"] = k
+            if k >= cap:
+                ep["voll_runde"] = rnd  # wird in diesem Tiling gelegt (oder geraeumt) -- Episode endet
+                ep["praedikate"].append("voll")
+                continue
+            pr = row_predicate(state, pi, r, color, hull)
+            ep["praedikate"].append(pr["pred"])
+            if pr["pred"] == "nein":
+                ep["blockiert_rundenenden"] += 1
+                if pr["annehmend_ausserhalb"]:
+                    ep["aussen_moeglich_rundenenden"] += 1
+                ep.setdefault("blockiert_ab_runde", rnd)
+
+
+def close_row_ages(ctx_rows: dict, episodes: list, final_round: int):
+    for key, ep in list(ctx_rows.items()):
+        ep["ende"] = "voll" if ep.get("voll_runde") is not None else "offen_am_ende"
+        ep["ende_runde"] = final_round
+        episodes.append(ep)
+    ctx_rows.clear()
+
+
+def summarize_row_ages(episodes: list, side_of) -> dict:
+    out = {}
+    groups = defaultdict(list)
+    for ep in episodes:
+        groups[(side_of(ep), ep["reihe"])].append(ep)
+    for (side, row_len), eps in sorted(groups.items()):
+        n = len(eps)
+        blocked = [e for e in eps if e["blockiert_rundenenden"] > 0]
+        never = [e for e in eps if e["blockiert_rundenenden"] == 0]
+        full_eps = [e for e in eps if e["ende"] == "voll"]
+        open_eps = [e for e in eps if e["ende"] == "offen_am_ende"]
+
+        def rate(sub, pred):
+            return round(sum(1 for e in sub if pred(e)) / len(sub), 3) if sub else None
+        out.setdefault(side, {})[f"Reihe{row_len}"] = {
+            "episoden": n,
+            "voll_anteil": rate(eps, lambda e: e["ende"] == "voll"),
+            "offen_am_ende_anteil": rate(eps, lambda e: e["ende"] == "offen_am_ende"),
+            "alter_bis_voll_mittel_rundenenden": round(statistics.mean(e["rundenenden"] for e in full_eps), 2) if full_eps else None,
+            "alter_offen_mittel_rundenenden": round(statistics.mean(e["rundenenden"] for e in open_eps), 2) if open_eps else None,
+            "je_blockiert_anteil": rate(eps, lambda e: e["blockiert_rundenenden"] > 0),
+            "blockiert_rundenenden_mittel": round(statistics.mean(e["blockiert_rundenenden"] for e in blocked), 2) if blocked else None,
+            "blockiert_voll_anteil": rate(blocked, lambda e: e["ende"] == "voll"),
+            "nie_blockiert_voll_anteil": rate(never, lambda e: e["ende"] == "voll"),
+            "blockiert_aussen_moeglich_anteil": (round(sum(e["aussen_moeglich_rundenenden"] for e in blocked)
+                                                        / sum(e["blockiert_rundenenden"] for e in blocked), 3) if blocked else None),
+            "praedikat_je_rundenende": {p: sum(e["praedikate"].count(p) for e in eps)
+                                        for p in ("ja", "ja_wartend", "nein", "unbekannt", "voll")},
+            "blockiert_ab_runde_verteilung": {str(k): sum(1 for e in blocked if e.get("blockiert_ab_runde") == k)
+                                              for k in range(1, 6)},
+        }
+    return out
+
+
+def replay(log_path: pathlib.Path, mr, k: int, meta: dict, records: list, episodes: list | None = None) -> str | None:
     import analyze_game_log as agl
     orig_apply = agl.Replayer.apply
     orig_amb = agl.Replayer.apply_ambiguous
-    ctx = {"in_tiling": False, "open": []}
+    ctx = {"in_tiling": False, "open": [], "rows": {}, "last_round": 0}
 
     def before_method(self, method):
         try:
@@ -135,6 +337,13 @@ def replay(log_path: pathlib.Path, mr, k: int, meta: dict, records: list) -> str
             start = len(records)
             analyze_round_end(mr, sj, k, records, meta)
             ctx["open"] = records[start:]
+            if episodes is not None:  # par.8.13/8.14, additiv
+                try:
+                    st = json.loads(sj)
+                    ctx["last_round"] = int(st.get("round", 0) or 0)
+                    track_row_ages(st, ctx["last_round"], ctx["rows"], episodes, meta)
+                except Exception as e:
+                    ctx["row_err"] = str(e)[:120]
         elif method in DRAFT_METHODS and ctx["in_tiling"]:
             ctx["in_tiling"] = False
             complete_with_actual(sj, ctx["open"])
@@ -156,6 +365,13 @@ def replay(log_path: pathlib.Path, mr, k: int, meta: dict, records: list) -> str
         if ctx["open"]:
             try:
                 complete_with_actual(rep.g.state_json(), ctx["open"])
+            except Exception:
+                pass
+        if episodes is not None:
+            try:
+                close_row_ages(ctx["rows"], episodes, ctx["last_round"])
+                if ctx.get("row_err"):
+                    episodes.append({**meta, "fehler": ctx["row_err"]})
             except Exception:
                 pass
     finally:
@@ -203,6 +419,7 @@ def main() -> int:
     import mosaic_rust as mr
     t0 = time.time()
     records: list = []
+    episodes: list = []  # par.8.13/8.14 Reihen-Alter
     divergences = []
     games = 0
     with tempfile.TemporaryDirectory() as tmp:
@@ -221,7 +438,7 @@ def main() -> int:
                 except Exception:
                     pass
                 meta = {"quelle": os.path.basename(f), "names": names or ["Spieler 1", "KI"]}
-                div = replay(pathlib.Path(f), mr, a.k, meta, records)
+                div = replay(pathlib.Path(f), mr, a.k, meta, records, episodes)
                 games += 1
                 if div:
                     divergences.append({"quelle": meta["quelle"], "grund": str(div)[:120]})
@@ -239,7 +456,7 @@ def main() -> int:
                 p.write_text("# " + json.dumps(header, ensure_ascii=False) + "\n" + "\n".join(sp["log"]) + "\n",
                              encoding="utf-8", newline="\n")
                 meta = {"quelle": os.path.basename(path), "names": header["players"], "index": i}
-                div = replay(p, mr, a.k, meta, records)
+                div = replay(p, mr, a.k, meta, records, episodes)
                 games += 1
                 if div:
                     divergences.append({"quelle": meta["quelle"], "index": i, "grund": str(div)[:120]})
@@ -268,6 +485,31 @@ def main() -> int:
             print(f"{side} {rnd}: n {v['n']} | gbest != pbest {v['anteil_gbest_ungleich_pbest']} | kostet {v['punktkosten_gbest_mittel']} Pkt, "
                   f"gewinnt Gline {v['gline_gewinn_gbest_mittel']} | gespielt = pbest {v['actual_ist_pbest']} ({v['actual_zugeordnet']} zugeordnet), "
                   f"Punkte gegen pbest {v['actual_punkte_minus_pbest']}, Gline gegen pbest {v['actual_gline_minus_pbest']}", flush=True)
+    # par.8.13/8.14: Reihen-Alter (additiv, Fehler brechen die par.8.12-Messung nicht)
+    try:
+        eps_ok = [e for e in episodes if "reihe" in e]
+        ra = summarize_row_ages(eps_ok, side_of)
+        out["reihen_alter"] = {
+            "prereg": "PREREG_geometric_envelope.md par.8.13/8.14", "version": "2026-09-06",
+            "definitionen": {
+                "episode": "gebundene Musterreihe 5/6 von ihrem ersten Rundenende bis sie am Rundenende voll ist (Tiling) oder das Spiel endet",
+                "praedikat": "ja = Huellenzelle der Zeile nimmt die Farbe heute an; ja_wartend = plattenlose Huellenzelle UND passende Platte noch in Auslage/Stapel (Katalog dome.rs); nein = Reihe kann die Huelle nicht mehr bedienen (par.8.14)",
+                "huelle": "bestpassende Orientierung je Rundenende (triangle_hull_coverage_probe.best_hull)",
+                "alter": "Zahl der Rundenenden, an denen die Reihe gebunden lag (die volle zaehlt mit)",
+                "aussen_moeglich": "an einem blockierten Rundenende nimmt eine Zelle der Zeile AUSSERHALB der Huelle die Farbe an",
+            },
+            "episoden": len(eps_ok), "fehler": [e for e in episodes if "fehler" in e][:20],
+            "zusammenfassung": ra,
+        }
+        for side, rows in ra.items():
+            for row_key, v in rows.items():
+                print(f"{side} {row_key}: Episoden {v['episoden']} | voll {v['voll_anteil']} | offen am Ende {v['offen_am_ende_anteil']} | "
+                      f"je blockiert {v['je_blockiert_anteil']} ({v['blockiert_rundenenden_mittel']} Rundenenden) | "
+                      f"voll wenn blockiert {v['blockiert_voll_anteil']} gegen nie blockiert {v['nie_blockiert_voll_anteil']} | "
+                      f"Praedikate {v['praedikat_je_rundenende']}", flush=True)
+    except Exception as e:
+        out["reihen_alter"] = {"fehler": str(e)[:200]}
+        print(f"  Reihen-Alter-Auswertung fehlgeschlagen: {e!r}", flush=True)
     out["laufzeit"] = {"wanduhr_s": round(time.time() - t0, 1), "cpu_s": round(time.process_time(), 1), "threads": 1,
                        "s_je_partie": round((time.time() - t0) / max(1, games), 2)}
     os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
