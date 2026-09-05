@@ -141,3 +141,6 @@ scratchpad/
 # Auch diese Negation MUSS nach '*.pkl' stehen -- letzte passende Regel gewinnt.
 !/models/frozen_champions/**/golden_probe/*.pkl
 !/models/frozen_heuristics/**/golden_probe/*.pkl
+
+# Mess-venv mit dem 714er-Champion-Wheel (Abnahme des 714er-Arms v24-b03 nach dem 744er-Wheel-Install, 2026-09-05)
+venv_measure714/

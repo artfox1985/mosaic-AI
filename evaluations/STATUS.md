@@ -59,8 +59,11 @@ jetzt mit demselben Befehl plus `--resume` fortgesetzt, nicht neu gestartet.
    Mini-Fenster-Test (resume/Pause/fast-loader), dann `config.INPUT_SIZE` 744 ->
    714 und Training b03 (714er-Arm, `--fast-loader` nur bei gruenem Test) im
    Hintergrund; parallel auf der CPU Abnahmen b04 dann b05 samt Kuppel-Bonus-
-   Sonde; nach b03 config zurueck auf 744. b03-Abnahme braucht das 714er-Wheel:
-   offen (Nutzer). Bei Abbruch des b03-Trainings: `--resume` MIT config 714.
+   Sonde; nach b03 config zurueck auf 744. Bei Abbruch des b03-Trainings:
+   `--resume` MIT config 714. **b03-Abnahme (Nutzer-Idee 20:08): Folgekette
+   `night_v24_b03_acceptance_714.sh` in der Mess-venv `venv_measure714/` mit dem
+   Champion-Artefakt-Wheel (byte-identisch zum Live-714er, sha256 fb553c93bf38baa2),
+   wartet auf b03-Modell und Ende der Nachtkette.
 5. **K3-P2 (Modus 4, `models/k3p2_c10.spec.json`) ist gebaut, aber ungetestet:**
    `cargo test --release` im ersten CPU-freien Fenster (Python-DLL in PATH),
    dann Wheel 744 neu bauen (enthaelt K3-P2) und mit Kette 4 installieren;
