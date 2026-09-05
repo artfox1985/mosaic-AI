@@ -15,7 +15,7 @@ use crate::tiling_solver::solve_round_final_score;
 /// Feature-Vektor-Länge (= `config.INPUT_SIZE`). EINZIGE Quelle der Wahrheit
 /// für die ONNX-Eingabegröße — bei jeder Feature-Änderung hier UND in
 /// config.py aktualisieren (sonst `Net::load`-Shape-Mismatch beim Inferieren).
-pub const INPUT_SIZE: usize = 714;
+pub const INPUT_SIZE: usize = 744; // 714 + 8 Plattentyp-Sicht + 10 Strafleisten-Farben + 12 Phantom-Anteile (Abschnitte 12-14, v24-b04, 2026-09-05)
 
 /// Per-Kriterium-Normalisierung der 8 Wertungsplatten-Punkte (= `SCORE_NORM`).
 const SCORE_NORM: [f32; 8] = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0];
@@ -415,6 +415,94 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
         }
     }
 
+    // 12. Plattentyp-Sicht (PREREG_stack_top_feature.md par.6/par.10, v24-b04,
+    // 2026-09-05): acht Werte ANS ENDE, Indizes 0..713 unveraendert.
+    //   [top_is_special, top_is_wild]  -- Rueckseite der obersten Stapelplatte
+    //                                     (`dome_stack_top_type`, offen sichtbar
+    //                                     laut engine_manual.md:85); leerer
+    //                                     Stapel oder altes JSON ohne Feld: 0/0.
+    //   je Auslage-Slot [has_special, has_wild] -- der Typ des einen
+    //                                     Nicht-Normal-Feldes der Platte; die
+    //                                     Farbkodierung oben (Abschnitt 9) faellt
+    //                                     fuer WILD und SPECIAL beide auf 0 und
+    //                                     kann Design 2 und 8 nicht trennen
+    //                                     (dome.rs). Leerer Slot: 0/0.
+    // Altmodelle (714) sehen die Werte nie: `net.rs::build_inputs` kuerzt auf
+    // die Modellbreite.
+    {
+        let top = v.get("dome_stack_top_type").and_then(|x| x.as_str());
+        f.push(if top == Some("special") { 1.0 } else { 0.0 });
+        f.push(if top == Some("wild") { 1.0 } else { 0.0 });
+        let display = v.get("dome_display").and_then(|x| x.as_array());
+        for slot_idx in 0..3 {
+            let spaces = display
+                .and_then(|d| d.get(slot_idx))
+                .and_then(|p| if p.is_null() { None } else { p.get("spaces") })
+                .and_then(|x| x.as_array());
+            let (mut has_special, mut has_wild) = (0.0f32, 0.0f32);
+            if let Some(spaces) = spaces {
+                for sp in spaces {
+                    match sp.get("type").and_then(|t| t.as_str()) {
+                        Some("SPECIAL") => has_special = 1.0,
+                        Some("WILD") => has_wild = 1.0,
+                        _ => {}
+                    }
+                }
+            }
+            f.push(has_special);
+            f.push(has_wild);
+        }
+    }
+
+    // 13. Strafleisten-Farben (Nutzer 2026-09-05, PREREG_stack_top_feature.md
+    // par.10): je Spieler in Zugreihenfolge (erst der Spieler am Zug, dann
+    // der Gegner, wie Abschnitt 5) fuenf Farbzaehler der `floor`-Liste, /4
+    // (MAX_BROKEN). Diese Fliesen wandern am Rundenende in den Turm und fehlen
+    // bis dahin im Beutel+Turm-Zaehler (Abschnitt 1); mit den Farben kann das
+    // Netz den Umlauf schliessen. Sichtbar fuer jeden am Tisch.
+    // 14. Phantom-Anteil je Musterreihe (Nutzer 2026-09-05): `phantom_count /
+    // capacity` fuer jede der sechs Reihen, je Spieler in Zugreihenfolge.
+    // Abschnitt 5 zaehlt Phantome im Fuellgrad mit (fuer die Vollendung sind
+    // sie echt), sie kehren am Rundenende aber NICHT in den Turm zurueck
+    // (round_end.rs); ohne dieses Merkmal ueberschaetzt das Netz die Fliesen
+    // auf den Brettern und den Ruecklauf. Die GUI zeigt Phantome weiss mit
+    // farbigem Rand.
+    {
+        let curr_pi = v.get("current_player").and_then(|x| x.as_i64()).unwrap_or(0) as usize;
+        let players = v.get("players").and_then(|x| x.as_array());
+        let order = [curr_pi.min(1), 1 - curr_pi.min(1)];
+        for pi in order {
+            let mut counts = [0f32; 5];
+            if let Some(floor) = players
+                .and_then(|ps| ps.get(pi))
+                .and_then(|p| p.get("floor"))
+                .and_then(|x| x.as_array())
+            {
+                for t in floor {
+                    let id = color_idx(t.as_str());
+                    if id >= 0 {
+                        counts[id as usize] += 1.0;
+                    }
+                }
+            }
+            for c in counts {
+                f.push(c / 4.0);
+            }
+        }
+        for pi in order {
+            let rows = players
+                .and_then(|ps| ps.get(pi))
+                .and_then(|p| p.get("pattern_lines"))
+                .and_then(|x| x.as_array());
+            for r in 0..6 {
+                let row = rows.and_then(|rs| rs.get(r));
+                let cap = row.and_then(|x| x.get("capacity")).and_then(|x| x.as_f64()).unwrap_or(1.0).max(1.0);
+                let ph = row.and_then(|x| x.get("phantom_count")).and_then(|x| x.as_f64()).unwrap_or(0.0);
+                f.push((ph / cap) as f32);
+            }
+        }
+    }
+
     f
 }
 
@@ -775,6 +863,66 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
         );
         for c in 0..6usize {
             f.push((f_max[c] / 6.0) as f32);
+        }
+    }
+
+    // 12. Plattentyp-Sicht -- siehe JSON-Pfad; dieselben acht Werte aus dem
+    // Zustand selbst. `is_special_type()` ist die Quelle, aus der auch
+    // `serialize.rs` das Feld `dome_stack_top_type` bildet; die Auslage-Typen
+    // kommen aus `DomeSpace::space_type` (serialize_space schreibt daraus
+    // `type`). Die `direct_matches_json_path_*`-Tests bewachen die Gleichheit.
+    {
+        let top = state.dome_tile_pool.first();
+        f.push(if top.map_or(false, |t| t.is_special_type()) { 1.0 } else { 0.0 });
+        f.push(if top.map_or(false, |t| !t.is_special_type()) { 1.0 } else { 0.0 });
+        for slot_idx in 0..3 {
+            let (mut has_special, mut has_wild) = (0.0f32, 0.0f32);
+            if let Some(tile) = state.dome_display.get(slot_idx) {
+                for sp in &tile.spaces {
+                    match sp.space_type {
+                        crate::dome::SpaceType::Special => has_special = 1.0,
+                        crate::dome::SpaceType::Wild => has_wild = 1.0,
+                        crate::dome::SpaceType::Normal => {}
+                    }
+                }
+            }
+            f.push(has_special);
+            f.push(has_wild);
+        }
+    }
+
+    // 13. Strafleisten-Farben (Nutzer 2026-09-05, PREREG_stack_top_feature.md
+    // par.10): je Spieler in Zugreihenfolge (erst der Spieler am Zug, dann
+    // der Gegner, wie Abschnitt 5) fuenf Farbzaehler der Strafleiste, /4
+    // (MAX_BROKEN). Diese Fliesen wandern am Rundenende in den Turm und fehlen
+    // bis dahin im Beutel+Turm-Zaehler (Abschnitt 1); mit den Farben kann das
+    // Netz den Umlauf vollstaendig schliessen. Sichtbar fuer jeden am Tisch.
+    {
+        let cur = state.current_player;
+        for pi in [cur, 1 - cur] {
+            let mut counts = [0f32; 5];
+            for t in &state.players[pi].broken_tiles {
+                let id = color_idx_direct(*t);
+                if id >= 0 {
+                    counts[id as usize] += 1.0;
+                }
+            }
+            for c in counts {
+                f.push(c / 4.0);
+            }
+        }
+        // 14. Phantom-Anteil je Musterreihe -- siehe JSON-Pfad.
+        for pi in [cur, 1 - cur] {
+            let rows = &state.players[pi].pattern_lines;
+            for r in 0..6 {
+                match rows.get(r) {
+                    Some(row) => {
+                        let cap = (row.capacity() as f64).max(1.0);
+                        f.push((row.phantom_count as f64 / cap) as f32);
+                    }
+                    None => f.push(0.0),
+                }
+            }
         }
     }
 
@@ -1206,6 +1354,101 @@ mod tests {
         assert_eq!(direct.len(), INPUT_SIZE, "{ctx}: Laenge != INPUT_SIZE");
         for (i, (a, b)) in direct.iter().zip(via_json.iter()).enumerate() {
             assert_eq!(a, b, "{ctx}: Feature #{i} weicht ab (direct={a} json={b})");
+        }
+    }
+
+    /// Sichtgleichheits-Test (PREREG_stack_top_feature.md par.6/par.10): die
+    /// acht Plattentyp-Werte am Ende des Vektors tragen in JEDEM Zustand
+    /// genau das, was die GUI im selben Zustand anzeigt (`dome_stack_top_type`
+    /// und die `type`-Felder der Auslage-Platten aus `state_to_json`), und
+    /// eine ausgelegte Platte hat genau EIN Nicht-Normal-Feld.
+    #[test]
+    fn plate_type_sight_matches_gui_json() {
+        let base = INPUT_SIZE - 30;
+        let mut checked = 0usize;
+        // 8 Seeds x 60 Schritte ergaben 224 Zustaende (Drafting endet frueher);
+        // 12 Seeds decken die geforderten >= 300 ab.
+        for seed in 0..12u64 {
+            for (i, s) in random_drafting_states(seed, 60).into_iter().enumerate() {
+                let ctx = format!("seed={seed} step={i}");
+                let v = state_to_json(&s, true);
+                let f = state_to_features_direct(&s);
+                let top = v.get("dome_stack_top_type").and_then(|x| x.as_str());
+                let (exp_special, exp_wild) = match top {
+                    Some("special") => (1.0, 0.0),
+                    Some("wild") => (0.0, 1.0),
+                    None => (0.0, 0.0),
+                    other => panic!("{ctx}: unerwarteter dome_stack_top_type {other:?}"),
+                };
+                assert_eq!(f[base], exp_special, "{ctx}: top_is_special");
+                assert_eq!(f[base + 1], exp_wild, "{ctx}: top_is_wild");
+                assert_eq!(s.dome_tile_pool.is_empty(), top.is_none(), "{ctx}: leerer Stapel <-> kein Typ");
+                let display = v.get("dome_display").and_then(|x| x.as_array()).expect("dome_display");
+                for slot in 0..3 {
+                    let plate = display.get(slot).filter(|p| !p.is_null());
+                    let (mut exp_s, mut exp_w) = (0.0f32, 0.0f32);
+                    if let Some(p) = plate {
+                        for sp in p.get("spaces").and_then(|x| x.as_array()).expect("spaces") {
+                            match sp.get("type").and_then(|t| t.as_str()) {
+                                Some("SPECIAL") => exp_s = 1.0,
+                                Some("WILD") => exp_w = 1.0,
+                                Some("NORMAL") => {}
+                                other => panic!("{ctx}: unerwarteter Feldtyp {other:?}"),
+                            }
+                        }
+                        assert_eq!(exp_s + exp_w, 1.0, "{ctx}: Platte in Slot {slot} hat nicht genau ein Nicht-Normal-Feld");
+                    }
+                    assert_eq!(f[base + 2 + 2 * slot], exp_s, "{ctx}: Slot {slot} has_special");
+                    assert_eq!(f[base + 3 + 2 * slot], exp_w, "{ctx}: Slot {slot} has_wild");
+                }
+                // 13./14.: Strafleisten-Farben und Phantom-Anteile gegen das GUI-JSON,
+                // in Zugreihenfolge (Spieler am Zug zuerst).
+                let cur = v.get("current_player").and_then(|x| x.as_i64()).unwrap_or(0) as usize;
+                let players = v.get("players").and_then(|x| x.as_array()).expect("players");
+                for (k, pi) in [cur, 1 - cur].into_iter().enumerate() {
+                    let floor = players[pi].get("floor").and_then(|x| x.as_array()).expect("floor");
+                    let mut exp = [0f32; 5];
+                    for t in floor {
+                        let id = color_idx(t.as_str());
+                        assert!(id >= 0, "{ctx}: Strafleisten-Fliese ohne Normalfarbe {t}");
+                        exp[id as usize] += 1.0;
+                    }
+                    assert!(floor.len() <= 4, "{ctx}: Strafleiste ueber MAX_BROKEN");
+                    for c in 0..5 {
+                        assert_eq!(f[base + 8 + 5 * k + c], exp[c] / 4.0, "{ctx}: Strafleiste Spieler {pi} Farbe {c}");
+                    }
+                    let rows = players[pi].get("pattern_lines").and_then(|x| x.as_array()).expect("pattern_lines");
+                    assert_eq!(rows.len(), 6, "{ctx}: sechs Musterreihen");
+                    for r in 0..6 {
+                        let cap = rows[r].get("capacity").and_then(|x| x.as_f64()).unwrap();
+                        let ph = rows[r].get("phantom_count").and_then(|x| x.as_f64()).unwrap();
+                        assert_eq!(f[base + 18 + 6 * k + r], (ph / cap) as f32, "{ctx}: Phantome Spieler {pi} Reihe {r}");
+                    }
+                }
+                checked += 1;
+            }
+        }
+        assert!(checked >= 300, "zu wenige Zustaende geprueft: {checked}");
+    }
+
+    /// Regressionsschutz fuer Altmodelle: ein 714er-Layout bekommt ueber
+    /// `net.rs::build_inputs` exakt die ersten 714 Werte -- die neuen acht
+    /// haengen dahinter und aendern keinen Index davor.
+    #[test]
+    fn plate_type_sight_is_appended_after_old_vector() {
+        let states = random_drafting_states(11, 30);
+        let s = states.last().expect("mind. ein Zustand");
+        let f = state_to_features_direct(s);
+        assert_eq!(f.len(), INPUT_SIZE);
+        // Der Anhang (Abschnitte 12-14) ist genau 30 Werte lang und haengt hinter
+        // den 714 Altwerten; alle Anhangswerte liegen in [0, 1].
+        let old_len = INPUT_SIZE - 30;
+        assert_eq!(old_len, 714, "Anhang ist genau 30 Werte lang");
+        for x in &f[old_len..old_len + 8] {
+            assert!(*x == 0.0 || *x == 1.0, "Plattentyp-Werte sind One-hot: {x}");
+        }
+        for x in &f[old_len..] {
+            assert!((0.0..=1.0).contains(x), "Anhangswert ausserhalb [0, 1]: {x}");
         }
     }
 

@@ -2035,11 +2035,25 @@ mod contract_stamp_tests {
     /// Flat-Block ab `features::NUM_PLANES_VALUES` gelesen wird. Ein
     /// 77-Kanal-Altmodell sieht dadurch Wert fuer Wert dieselben Eingaben
     /// wie vorher und spielt bitgleich weiter; das v22-Training benutzt 79.
+    ///
+    /// **Neu gesetzt 2026-09-05** (vorher `efd564d87bac2722`), Anlass:
+    /// `evaluations/PREREG_stack_top_feature.md` par.10 (Sicht-Arm v24-b04) --
+    /// `INPUT_SIZE` 714 -> 744 (+30 Flachwerte am ENDE: Plattentyp der
+    /// obersten Stapelplatte und der drei Auslage-Platten 8, Strafleisten-
+    /// Farben 10, Phantom-Anteil je Musterreihe 12). `NUM_PLANES_CHANNELS`
+    /// bleibt 79, `NUM_ACTIONS` 406, Kopf-Liste unveraendert. Additiv wie die
+    /// Schritte davor: `net.rs::build_inputs` kuerzt den Flat-Block auf die
+    /// MODELL-Breite (Flat(n) und PlanesPlusFlat); der Champion `v23-b01_k3p10`
+    /// (714) spielt bitgleich weiter -- belegt durch
+    /// `net_parity_hash_matches_champion_fixture`, das im selben Lauf GRUEN
+    /// blieb, in dem dieser Waechter rot wurde. Der eingefrorene Champion
+    /// traegt den alten Hash im Manifest; sein Referee-Handshake ist ab jetzt
+    /// eine Cross-Aera-Messung (Aera-Regel 2026-08-29).
     #[test]
     fn contract_hash_matches_pinned_literal() {
         assert_eq!(
             contract_hash(),
-            "efd564d87bac2722",
+            "20b442a8164f748d",
             "A2-Vertragshash hat sich veraendert -- Bestandschampions bekommen \
              andere Eingaben (siehe Testdoku)"
         );
