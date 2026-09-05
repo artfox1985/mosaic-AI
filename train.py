@@ -1520,6 +1520,21 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             old_state = {k: v for k, v in old_state.items() if k not in drop}
 
         old_state = apply_head_warmstart(old_state, new_state, head_warmstart)
+        # Additive Eingabe-Erweiterung (PREREG_stack_top_feature.md par.7, v24-b04,
+        # 2026-09-05): ist die erste Linear-Schicht des Flach-Zweigs im
+        # Checkpoint SCHMALER als im neuen Modell, werden die fehlenden
+        # Eingangsspalten mit NULL aufgefuellt statt die Schicht frisch zu
+        # starten -- das Netz ist im ersten Schritt exakt das alte, die neuen
+        # Merkmale wirken erst, wenn das Training sie ankoppelt. Nur Verbreiterung
+        # (neue Merkmale haengen hinten), nie Verengung.
+        for _k in ("flat_branch.0.weight", "body.0.weight"):
+            if _k in old_state and _k in new_state:
+                _o, _n = old_state[_k], new_state[_k]
+                if _o.dim() == 2 and _n.dim() == 2 and _o.shape[0] == _n.shape[0] and _o.shape[1] < _n.shape[1]:
+                    _pad = torch.zeros(_n.shape[0], _n.shape[1] - _o.shape[1], dtype=_o.dtype, device=_o.device)
+                    old_state[_k] = torch.cat([_o, _pad], dim=1)
+                    print(f"   ↔ {_k}: Eingangsbreite {_o.shape[1]} -> {_n.shape[1]}, "
+                          f"{_n.shape[1] - _o.shape[1]} neue Spalten null-initialisiert (additive Eingabe)")
         skipped = [k for k in old_state if k in new_state and old_state[k].shape != new_state[k].shape]
         if skipped:
             print(f"   ⚠️  Shape-Mismatch, startet frisch: {', '.join(skipped)}")

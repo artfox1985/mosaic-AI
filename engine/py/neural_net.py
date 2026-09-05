@@ -291,6 +291,57 @@ def state_to_tensor(data):
     for _c in range(6):
         features.append(float(_f_max[_c]) / 6.0 if _c < len(_f_max) else 0.0)
 
+    # 12. Plattentyp-Sicht (PREREG_stack_top_feature.md par.6/par.10, v24-b04,
+    # 2026-09-05), spiegelbildlich zu features.rs Abschnitt 12: acht Werte ANS
+    # ENDE, Indizes 0..713 unveraendert. [top_is_special, top_is_wild] aus
+    # `dome_stack_top_type` (offen sichtbare Rueckseite der obersten
+    # Stapelplatte; leer oder altes JSON ohne Feld: 0/0), dann je Auslage-Slot
+    # [has_special, has_wild] aus den `type`-Feldern der Platte (die
+    # Farbkodierung in Abschnitt 9 kann WILD und SPECIAL nicht trennen).
+    _top = data.get("dome_stack_top_type")
+    features.append(1.0 if _top == "special" else 0.0)
+    features.append(1.0 if _top == "wild" else 0.0)
+    for _slot_idx in range(3):
+        _has_special = 0.0
+        _has_wild = 0.0
+        if _slot_idx < len(dome_display) and dome_display[_slot_idx]:
+            for _sp in dome_display[_slot_idx].get("spaces", []) or []:
+                _t = _sp.get("type")
+                if _t == "SPECIAL":
+                    _has_special = 1.0
+                elif _t == "WILD":
+                    _has_wild = 1.0
+        features.append(_has_special)
+        features.append(_has_wild)
+
+    # 13. Strafleisten-Farben (Nutzer 2026-09-05): je Spieler in Zugreihenfolge
+    # (Spieler am Zug zuerst, wie Abschnitt 5) fuenf Farbzaehler der Strafleiste
+    # /4 -- diese Fliesen wandern am Rundenende in den Turm und fehlen bis dahin
+    # im Beutel+Turm-Zaehler.
+    # 14. Phantom-Anteil je Musterreihe (Nutzer 2026-09-05): phantom_count /
+    # capacity fuer die sechs Reihen je Spieler in Zugreihenfolge; Phantome
+    # zaehlen im Fuellgrad (Abschnitt 5) mit, kehren aber nicht in den Turm
+    # zurueck (round_end.rs).
+    _cur = min(int(data.get("current_player", 0)), 1)
+    _order = [_cur, 1 - _cur]
+    for _pi in _order:
+        _counts = [0.0] * 5
+        _pl = _spieler[_pi] if _pi < len(_spieler) else {}
+        for _t in _pl.get("floor", []) or []:
+            _cid = COLOR_ID_MAP.get(_t, 0) - 1
+            if 0 <= _cid < 5:
+                _counts[_cid] += 1.0
+        features.extend(c / 4.0 for c in _counts)
+    for _pi in _order:
+        _pl = _spieler[_pi] if _pi < len(_spieler) else {}
+        _rows = _pl.get("pattern_lines", []) or []
+        for _r in range(6):
+            if _r < len(_rows):
+                _cap = max(float(_rows[_r].get("capacity", 1) or 1), 1.0)
+                features.append(float(_rows[_r].get("phantom_count", 0) or 0) / _cap)
+            else:
+                features.append(0.0)
+
     return torch.tensor(features, dtype=torch.float32)
 
 

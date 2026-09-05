@@ -35,7 +35,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- NETZWERK PARAMETER ---
-INPUT_SIZE = 714        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers)
+INPUT_SIZE = 744        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers; +8 Plattentyp-Sicht, +10 Strafleisten-Farben, +12 Phantom-Anteile -- PREREG_stack_top_feature.md par.10, 2026-09-05)
                         # (redundantes unused_chip_colors-Feature entfernt: -10; bag_count ergänzt: +1;
                         #  floor-Normierung /7.0 -> /4.0 korrigiert (kein Dim-Effekt);
                         #  Bonuschip-Farbmaske je Fabrik ergänzt: +5*4=+20; 673 -> 664 -> 684;
