@@ -192,6 +192,19 @@ def tile_str(t: dict) -> str:
     return f"#{t['id']}[{''.join(cell_char(s) for s in sp[:2])}/{''.join(cell_char(s) for s in sp[2:4])}]{'+' + str(t['bonus']) if t.get('bonus') else ''}"
 
 
+# Farb-Zaehlfelder der Engine (`bag_colors`, `tower_colors`): LISTE von 5 Zaehlern in der
+# Reihenfolge TileColor::NORMAL (serialize.rs:309, color_counts), kein Dict.
+NORMAL_ORDER = ("blau", "gelb", "rot", "schwarz", "türkis")
+
+
+def counts_str(counts) -> str:
+    if isinstance(counts, dict):
+        return " ".join(f"{COLORS.get(k, '?')}{v}" for k, v in counts.items()) or "-"
+    if isinstance(counts, list):
+        return " ".join(f"{COLORS[c]}{n}" for c, n in zip(NORMAL_ORDER, counts)) or "-"
+    return "-"
+
+
 def colors_str(lst) -> str:
     return "".join(COLORS.get(c, "?") for c in lst) or "-"
 
@@ -202,7 +215,7 @@ def render(st: dict, m: dict, tiles_catalog: dict) -> str:
     L.append(f"Runde {st.get('round')} | Phase {st.get('phase')} | am Zug: Spieler {st.get('current_player')} ({'CLAUDE' if st.get('current_player') == me else 'KI'})")
     ids = st.get("scoring_tile_ids") or []
     L.append("Wertungsplatten: " + "; ".join(f"{i} {tiles_catalog.get(i, {}).get('name', '?')} ({tiles_catalog.get(i, {}).get('description', '')})" for i in ids))
-    L.append(f"Beutel {colors_str(sorted(k for k, v in (st.get('bag_colors') or {}).items() for _ in range(v)))} | Turm {colors_str(sorted(k for k, v in (st.get('tower_colors') or {}).items() for _ in range(v)))} | Stapel {st.get('dome_stack_count')} (oben: {st.get('dome_stack_top_type')})")
+    L.append(f"Beutel {counts_str(st.get('bag_colors'))} | Turm {counts_str(st.get('tower_colors'))} | Stapel {st.get('dome_stack_count')} (oben: {st.get('dome_stack_top_type')})")
     L.append("Auslage Kuppelplatten: " + "  ".join(tile_str(t) for t in st.get("dome_display", [])) + (f"  | gezogen: {'  '.join(tile_str(t) for t in st.get('pending_stack_draw', []))}" if st.get("pending_stack_draw") else ""))
     for f in st.get("factories", []):
         chip = f.get("bonus_chip")
@@ -402,7 +415,12 @@ def cmd_move(a) -> int:
     m = load_manifest(a.game)
     mr, g = rebuild_game(a.game, m)
     since = g.log_len()
-    out = [apply_move(g, m, a.move)]
+    try:
+        out = [apply_move(g, m, a.move)]
+    except (ValueError, RuntimeError, IndexError) as e:
+        print(f"ZUG ABGEWIESEN ({a.move!r}): {e}
+Die legalen Zuege stehen unter 'show' -- Kurzform genau so uebernehmen (auch mond:...).")
+        return 1
     m["moves_claude"] = m.get("moves_claude", 0) + 1
     save_manifest(a.game, m)
     since = append_log(a.game, g, since)
