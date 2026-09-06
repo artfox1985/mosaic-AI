@@ -1,12 +1,12 @@
 {
-  "champion": "v24-b06_k3p10",
+  "champion": "v24-b06",
   "freeze_date": "2026-09-06",
   "name_dialect": "hv",
   "model_file": "model.onnx",
-  "model_source": "models/alphazero_v24-b06_brierbest.onnx (Kopie als models/alphazero_v24-b06_k3p10.onnx; Training v24-b06 = b02-Rezept lambda 0,7 auf Sicht 744, manifest_train_v24-b06_20260906_114705.json, _brierbest Epoche 4)",
+  "model_source": "models/alphazero_v24-b06_brierbest.onnx (Training v24-b06 = b02-Rezept lambda 0,7 auf Sicht 744, manifest_train_v24-b06_20260906_114705.json, _brierbest Epoche 4)",
   "pth_file": "model.pth",
   "spec_file": "spec.json",
-  "spec_source": "models/v24-b06_k3p10.spec.json (Kopie der Champion-Spec v23-b01_k3p10: Modus 1, C 1,0, Profil 1/0,92/0,67/0,33/0, envelope_flush_w 0)",
+  "spec_source": "models/v24-b06_brierbest.spec.json (Kopie der Champion-Spec: Modus 1, C 1,0, Profil 1/0,92/0,67/0,33/0, envelope_flush_w 0)",
   "spec_content": {
     "implicit_minimax_alpha": 0.0,
     "long_row_init_shaping_w": 0.0,
@@ -89,5 +89,6 @@
     "tor2b": "91:69, Spalten 0,575/0,725 gegen 0,650/0,625 (gleichauf)",
     "source": "PREREG_v24_window.md par.9"
   },
-  "prereg": "evaluations/PREREG_v24_window.md par.9/9c; docs/promotion_checklist.md; Chronik night_run_20260902.md 2026-09-06"
+  "prereg": "evaluations/PREREG_v24_window.md par.9/9c; docs/promotion_checklist.md; Chronik night_run_20260902.md 2026-09-06",
+  "champion_note": "Nutzer 2026-09-06 20:35: Champion-Namen bleiben reine vN-bXX (docs/generation_naming.md); models/champion.txt = v24-b06_brierbest (train.py-Auswahl, Epoche 4), Spec models/v24-b06_brierbest.spec.json; Elo-Knoten heisst weiter v24-b06_k3p10 (Netz mit K3-P)."
 }
