@@ -47,7 +47,8 @@ Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
   gegen 3,6/3,9). Abnahme komplett 03:04.
 - v24-b05 (b04 plus Ueberraschungsgewichtung): trainiert (brierbest Epoche 4,
   0,1925); Abnahme laeuft seit 03:08. Tor 2a ohne Knopf 0,4825 (Bezug 0,510, KI
-  schliesst ein; b04 0,4125).
+  schliesst ein; b04 0,4125); **Tor 1 ohne Knopf 66:34 nach 50 Paaren, SPRT fuer b05**
+  (p 0,004; Fruehstopp < 150, kein zweiter Seed in der Kette).
 - v24-b03 (Seeding-Schwarm, 714): trainiert 00:27-01:56 mit `--fast-loader` (5.344 s,
   `_brierbest` Epoche 4, 0,1868); Abnahme wartet auf Sonde und b05.
 
