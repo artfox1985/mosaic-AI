@@ -1024,6 +1024,10 @@ pub(crate) fn test_model_path_opt(name: &str) -> Option<std::path::PathBuf> {
 }
 
 /// Pfad zu einem Testmodell -- EINZIGE Stelle, an der Testcode weiss, WO
+/// Modelle liegen. Seit 2026-09-06 ist das feste Engine-Fixture
+/// `models/engine_test.onnx` (Nutzer: "benenn es um auf engine_test.onnx"):
+/// das fruehere v21_2d_brierbest-Modell (714 breit, untrainierter 72er
+/// Ownership-Kopf), getrackt, unabhaengig vom amtierenden Champion.
 /// Modelle liegen (vorher: 22 duplizierte `../models/...`-Pfadbauten in sechs
 /// Dateien).
 ///
@@ -1189,7 +1193,7 @@ mod tests {
     /// jetzt: existierendes Modell + harter Fehler statt Skip (Nutzer-Regel:
     /// nie leer gruen; Präzedenz `self_play.rs::load_test_net_for_gating`).
     fn load_test_net() -> Net {
-        let path = test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let path = test_model_path("engine_test.onnx");
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht \
              leer-gruen bestehen (Nutzer-Regel: nie leer gruen). Lokales models/-Checkpoint \
@@ -1248,7 +1252,7 @@ mod tests {
     }
 
     fn load_eval_batch_test_net() -> Net {
-        let path = test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let path = test_model_path("engine_test.onnx");
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht \
              leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
