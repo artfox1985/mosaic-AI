@@ -181,7 +181,8 @@ Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (fa
     Bezug Tor 2a mit Knopf 0,4975): Rauschboden par.12b Punkte 1-2, dann K3-P2, K3-F 1,0,
     K3-F 0,5, beide; rund 3,7 h. Die alte Kette am v23-Champion (`night_k3_knobs_champion.sh`)
     haengt an der Halte-Marke und laeuft in ihren 12-h-Deckel (Exit 65), sie misst nichts.
-    Registrierung par.8.11 / 8.14 / 12b je Arm. Danach die neun Partien des Subagenten.
+    Registrierung par.8.11 / 8.14 / 12b je Arm. Rauschboden Punkte 1-2 GEMESSEN (20:46, par.12b:
+    Schwelle B1 +-0,13, B2 +-0,06; v24-Arme unbewegt). Danach die neun Partien des Subagenten.
 
 11. **Champion-Promotion v24-b06_k3p10** (Nutzer 17:05 "Mach vor dem agenten spiel die
     Champion Promotion lt. Skill"): `tools/promote_v24_b06.sh` gestartet 17:21, wartet auf das
