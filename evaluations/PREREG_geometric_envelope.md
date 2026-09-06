@@ -1834,6 +1834,19 @@ b05-Abnahme; `cargo test` und Wheel im CPU-freien Fenster nach der b03-Abnahme):
   traf einen Spec-String ohne Folgekomma (Feld rutschte in ein `assert!`,
   rustfmt prueft Makro-Inhalte nicht); der bash-PATH braucht die Python-DLL
   in POSIX-Form (`cygpath -u`), sonst STATUS_DLL_NOT_FOUND.
+- **EINGETAKTET (2026-09-06, 13:55; Nutzer 13:15: "miss den rauschboden mit, starte mit
+  dem champion ... vier arme sind ok"):** `tools/night_k3_knobs_champion.sh`, wartet
+  hinter der b06-Abnahme auf freie CPU. Schritt 0: Rauschboden par.12b Punkte 1-2
+  (`tools/probes/value_head_reliability_probe.py`: rho je Runde auf frozen_v3
+  fuer v23-b01 und die sechs v24-Arme, Block-Bootstrap 36 x 10 mit 1.000
+  Ziehungen, B2 gegen das Orakel, Netz-Spannweite). Dann vier Arme am Champion
+  (`alphazero_v23-b01_brierbest.onnx` mit Champion-Spec als Kontrolle): K3-P2
+  (`k3p2_c10`), K3-F 1,0 (`k3f_w10`), K3-F 0,5 (`k3f_w05`), beide (`k3p2f_w10`),
+  je argmax-Instrument @400 (200 Partien, Seed 20260931; Bezug 0,555) und gepaarte
+  Arena 2 x 80 mit Logs (Seed 20261014), Spalten- und Kuppel-Bonus-Sonden;
+  Kennzahlen Siege, Spalten, Kuppel-Bonus, lange Reihen begonnen/vollendet.
+  Erwartet rund 3,7 h CPU. Welches v24-Netz danach nachgezogen wird, entscheidet
+  der Nutzer (b05 als Generator spielt ohne K3-P; Kandidat b06 nach Abnahme).
 - Messplan (unveraendert par.8.14 oben): K3-P2 allein, K3-F allein, beide,
   am v24-Siegernetz, Kennzahl "offene lange Reihen am Ende" neben Spalten und
   Siegen; Dosis-Vorschlag aus der Messung: `w_flush` 1,0 (die Reihe zaehlt,
