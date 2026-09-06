@@ -25,7 +25,7 @@
 //!
 //! Aufruf:
 //!   cargo run --release --example ort_cuda_batch_probe --features ort_cuda_probe \
-//!     -- models/alphazero_v21_2d_brierbest.onnx evaluations/ort_cuda_batch_throughput.json
+//!     -- models/engine_test.onnx evaluations/ort_cuda_batch_throughput.json
 
 use std::env;
 use std::fs;
@@ -96,7 +96,7 @@ fn main() -> ort::Result<()> {
     let mut args = env::args().skip(1);
     let model_path = args
         .next()
-        .unwrap_or_else(|| "models/alphazero_v21_2d_brierbest.onnx".to_string());
+        .unwrap_or_else(|| "models/engine_test.onnx".to_string());
     let out_path = args
         .next()
         .unwrap_or_else(|| "evaluations/artifacts/ort_cuda_batch_throughput.json".to_string());
