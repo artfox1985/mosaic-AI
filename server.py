@@ -211,6 +211,7 @@ _SPEC_TO_ENV = {
     "envelope_tiling_value_w": "MOSAIC_ENVELOPE_TILING_VALUE_W",
     "envelope_projection_mode": "MOSAIC_ENVELOPE_PROJECTED",
     "envelope_profile": "MOSAIC_ENVELOPE_PROFILE",
+    "envelope_flush_w": "MOSAIC_ENVELOPE_FLUSH_W",
 }
 
 

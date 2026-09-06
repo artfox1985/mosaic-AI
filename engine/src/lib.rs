@@ -752,6 +752,7 @@ fn engine_config_json() -> String {
         "envelope_projection_mode": crate::net_mcts::SearchConfig::from_env().envelope_projection_mode,
         "envelope_reach_w": crate::envelope::reach_weight(),
         "envelope_slot_w": crate::envelope::slot_weight(),
+        "envelope_flush_w": crate::net_mcts::SearchConfig::from_env().envelope_flush_w,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,

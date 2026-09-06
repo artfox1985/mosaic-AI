@@ -363,6 +363,115 @@ pub fn projected_occupancy_slot(board: &PlayerBoard, hull: Hull, w_slot: f64) ->
     (out, used)
 }
 
+// ── par.8.14 K3-F: Reihe freiraeumen ─────────────────────────────────────────
+
+/// `w_flush` (par.8.14, K3-F): Env-DEFAULT der `SearchConfig`
+/// (`MOSAIC_ENVELOPE_FLUSH_W`, Default 0 = aus, bitidentisch). Seit dem Bau
+/// ein Spec-Pflichtfeld je Seite (`envelope_flush_w`), damit der Knopf in der
+/// gepaarten Arena einseitig messbar ist; dieser Getter dient `from_env` und
+/// `engine_config`.
+pub fn flush_weight() -> f64 {
+    crate::net_mcts::read_f64_env("MOSAIC_ENVELOPE_FLUSH_W", 0.0)
+}
+
+/// Praedikat par.8.14 "Reihe kann die Huelle noch bedienen" fuer Musterreihe
+/// `r` mit Farbe `color` und Orientierung `hull`: JA, wenn eine Huellenzelle
+/// der Rasterzeile `r` die Farbe heute annimmt (`DomeSpace::accepts`) ODER
+/// eine Huellenzelle der Zeile noch keine Kuppelplatte traegt (JA mit
+/// Wartezeit; ob die passende Platte noch kommen kann, prueft die Engine hier
+/// NICHT -- die Sonde `tiling_geometry_probe.py` tut es, `ja_wartend`); sonst
+/// NEIN. Fuer Zeile 6 hat jede Orientierung genau EINE Huellenzelle.
+pub fn row_can_serve_hull(board: &PlayerBoard, r: usize, color: crate::tile::TileColor, hull: Hull) -> bool {
+    (0..6).any(|c| {
+        hull.contains(r, c)
+            && match board.dome_grid.get_space(r, c) {
+                None => true,
+                Some(sp) => sp.accepts(color),
+            }
+    })
+}
+
+/// Projektion mit Freiraeum-Regel (K3-F) fuer eine FESTE Orientierung:
+/// wie [`projected_occupancy`] (Modus 1) bzw. [`projected_occupancy_slot`]
+/// (Modus 4), aber eine gebundene Reihe mit Praedikat NEIN legt ihre Masse
+/// `k/(r+1)` NICHT aufs Brett (kein Aussen-Abzug fuer Steine, die sie
+/// vollenden) und liefert stattdessen `w_flush * k/(r+1) * (r+1) / 56`
+/// als Bonus -- Vollenden zaehlt positiv, gleichgueltig wo der Stein am
+/// Rundenende landet (Nutzer par.8.13: "auch hier ist es legitim/besser wenn
+/// ausserhalb der einhuellenden gelegt wird"). Rueckgabe `(occ, bonus, used)`.
+pub fn projected_occupancy_flush(
+    board: &PlayerBoard,
+    hull: Hull,
+    mode: u8,
+    w_slot: f64,
+    w_flush: f64,
+) -> ([[f64; 6]; 6], f64, bool) {
+    let occ = occupancy(board);
+    let mut out = [[0.0f64; 6]; 6];
+    let mut bonus = 0.0;
+    let mut used = false;
+    for r in 0..6 {
+        for c in 0..6 {
+            if occ[r][c] {
+                out[r][c] = 1.0;
+            }
+        }
+    }
+    for (r, line) in board.pattern_lines.iter().enumerate().take(6) {
+        let (Some(color), k) = (line.color, line.tiles.len()) else { continue };
+        if k == 0 {
+            continue;
+        }
+        let mass = k as f64 / (r + 1) as f64;
+        if !row_can_serve_hull(board, r, color, hull) {
+            // par.8.14: fuer die Huelle verloren -> Freiraeumen statt Huellenbeitrag.
+            bonus += w_flush * mass * row_cost(r) / HULL_TOTAL_COST;
+            used = true;
+            continue;
+        }
+        let targets: Vec<usize> = (0..6)
+            .filter(|&c| board.dome_grid.get_space(r, c).is_some_and(|sp| sp.accepts(color)))
+            .collect();
+        if !targets.is_empty() {
+            let share = mass / targets.len() as f64;
+            for c in targets {
+                out[r][c] += share;
+            }
+            continue;
+        }
+        if mode == 4 {
+            // Platzhalter-Regel K3-P2 (die Reihe kann die Huelle noch bedienen, also gibt es
+            // eine plattenlose Huellenzelle in der Zeile).
+            let slots: Vec<usize> = (0..6)
+                .filter(|&c| hull.contains(r, c) && board.dome_grid.get_space(r, c).is_none())
+                .collect();
+            if !slots.is_empty() {
+                let share = w_slot * mass / slots.len() as f64;
+                for c in slots {
+                    out[r][c] += share;
+                }
+            }
+        }
+    }
+    (out, bonus, used)
+}
+
+/// `H_flush(brett)` (K3-F): je Orientierung [`projected_occupancy_flush`],
+/// `H` fuer diese feste Orientierung plus Bonus, Maximum ueber beide
+/// Orientierungen (wie K3-P2: "die beste Huelle, die noch offen ist").
+/// Nur aufgerufen, wenn `w_flush > 0`; bei `w_flush = 0` bleibt der
+/// Such-Term auf den Bestandspfaden (Modus 1 waehlt die Huelle dort nach
+/// `deviation_frac`, nicht nach dem Maximum -- deshalb ist diese Funktion
+/// KEIN Ersatz fuer [`envelope_score_projected`] bei `w_flush = 0`).
+pub fn envelope_score_flush(board: &PlayerBoard, mode: u8, w_slot: f64, w_flush: f64) -> f64 {
+    let mut best = f64::NEG_INFINITY;
+    for hull in [Hull::Left, Hull::Right] {
+        let (occ, bonus, _) = projected_occupancy_flush(board, hull, mode, w_slot, w_flush);
+        best = best.max(envelope_score_frac_for(&occ, hull) + bonus);
+    }
+    best
+}
+
 /// `H_slot(brett)` (K3-P2): je Orientierung eigene Belegung nach
 /// [`projected_occupancy_slot`], `H` darauf wie K3-P (Huellenwahl nach
 /// `deviation_frac`), Maximum ueber beide Orientierungen ("die beste Huelle,
@@ -407,10 +516,17 @@ pub fn search_shift_state(
     profile: &[f64; 5],
     ownership: &[f32],
     mode: u8,
+    flush_w: f64,
 ) -> f64 {
     let b0 = &state.players[0];
     let b1 = &state.players[1];
     let (h0, h1) = match mode {
+        // par.8.14 K3-F: nur in den Musterreihen-Modi 1 und 4 und nur bei w_flush > 0;
+        // bei 0 laufen exakt die Bestandspfade darunter (bitidentisch).
+        1 | 4 if flush_w > 0.0 => {
+            let ws = if mode == 4 { slot_weight() } else { 0.0 };
+            (envelope_score_flush(b0, mode, ws, flush_w), envelope_score_flush(b1, mode, ws, flush_w))
+        }
         1 => (envelope_score_projected(b0), envelope_score_projected(b1)),
         2 => {
             let remaining = crate::provocation::remaining_colors(state);
@@ -710,6 +826,48 @@ mod tests {
         assert_eq!(envelope_score_projected_slot(&board, 0.5), hp);
         let (_, used) = projected_occupancy_slot(&board, Hull::Left, 0.5);
         assert!(!used);
+    }
+
+    /// par.8.14 K3-F: Reihe 6 (Rot, 3 von 6) -- die einzige Huellenzelle der
+    /// Zeile je Orientierung ((5,0) links, (5,5) rechts) nimmt nur Blau, die
+    /// uebrigen Zellen der Zeile nehmen Rot. K3-P legt die Masse 0,5 auf vier
+    /// Zellen AUSSERHALB (Abzug 3/56); K3-F erkennt "kann die Huelle nicht
+    /// mehr bedienen", legt nichts aufs Brett und zaehlt w_flush * 3/56 positiv.
+    #[test]
+    fn flush_projection_rewards_completing_rows_that_cannot_serve_hull() {
+        let mut board = board_with(&[]);
+        for c in 0..6 {
+            let sp = board.dome_grid.get_space_mut(5, c).unwrap();
+            sp.space_type = SpaceType::Normal;
+            sp.required_color = Some(if c == 0 || c == 5 { crate::tile::TileColor::Blau } else { crate::tile::TileColor::Rot });
+        }
+        board.pattern_lines[5].color = Some(crate::tile::TileColor::Rot);
+        board.pattern_lines[5].tiles = vec![crate::tile::TileColor::Rot; 3];
+        assert!(!row_can_serve_hull(&board, 5, crate::tile::TileColor::Rot, Hull::Left));
+        assert!(!row_can_serve_hull(&board, 5, crate::tile::TileColor::Rot, Hull::Right));
+        let hp = envelope_score_projected(&board);
+        assert!((hp + 3.0 / 56.0).abs() < 1e-12, "K3-P: Aussen-Abzug, {hp}");
+        let (occ, bonus, used) = projected_occupancy_flush(&board, Hull::Left, 1, 0.0, 1.0);
+        assert!(used && occ[5].iter().all(|&v| v == 0.0));
+        assert!((bonus - 3.0 / 56.0).abs() < 1e-12, "{bonus}");
+        let hf = envelope_score_flush(&board, 1, 0.0, 1.0);
+        assert!((hf - 3.0 / 56.0).abs() < 1e-12, "{hf}");
+        // Halbe Dosis, halber Bonus; Modus 4 ohne plattenlose Zellen gleich Modus 1.
+        assert!((envelope_score_flush(&board, 1, 0.0, 0.5) - 1.5 / 56.0).abs() < 1e-12);
+        assert_eq!(envelope_score_flush(&board, 4, 0.5, 1.0), hf);
+        // (5,0) nimmt Rot an: LINKS kann die Reihe die Huelle bedienen (Masse wie K3-P,
+        // 0,1 je Zelle auf (5,0)..(5,4), netto (0,1 - 0,4) * 6 / 56), RECHTS nicht
+        // (Bonus 3/56) -- das Maximum ist RECHTS.
+        board.dome_grid.get_space_mut(5, 0).unwrap().required_color = Some(crate::tile::TileColor::Rot);
+        assert!(row_can_serve_hull(&board, 5, crate::tile::TileColor::Rot, Hull::Left));
+        let (occ_l, bonus_l, used_l) = projected_occupancy_flush(&board, Hull::Left, 1, 0.0, 1.0);
+        assert!(!used_l && bonus_l == 0.0 && (occ_l[5][0] - 0.1).abs() < 1e-12);
+        assert!((envelope_score_flush(&board, 1, 0.0, 1.0) - 3.0 / 56.0).abs() < 1e-12);
+        // Plattenlose Huellenzelle: Praedikat JA (mit Wartezeit), kein Bonus.
+        let _tile = board.dome_grid.dome_slots[2][2].take().expect("Testgitter hat alle neun Platten");
+        assert!(row_can_serve_hull(&board, 5, crate::tile::TileColor::Rot, Hull::Right));
+        let (_, bonus_r, used_r) = projected_occupancy_flush(&board, Hull::Right, 1, 0.0, 1.0);
+        assert!(!used_r && bonus_r == 0.0);
     }
 
     /// par.8.9: Ownership-Projektion -- Logits +8 innen / -8 aussen ergeben

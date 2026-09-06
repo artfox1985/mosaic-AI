@@ -88,6 +88,7 @@ fn main() {
         envelope_profile: mosaic_rust::envelope::ENVELOPE_PROFILE_DEFAULT,
         envelope_tiling_value_w: 0.0,
         envelope_projection_mode: 0,
+        envelope_flush_w: 0.0,
     };
     let actions = drafting_actions(&state1);
     println!(
