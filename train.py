@@ -2406,9 +2406,21 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     # 5b. Netzauslastung (Dead Neurons + Effective Rank)
     try:
-        sample_batch = next(iter(dataloader))[0][:512].to(device)
+        _cb = next(iter(dataloader))
+        if encoder == "2d":
+            # 2026-09-06: bis dahin sprang dieser Schritt bei JEDEM 2D-Netz mit
+            # "Auslastungsanalyse uebersprungen" ueber (seit v19 fuer jeden
+            # Champion). Batch-Aufbau wie in der Trainingsschleife (planes
+            # gepackt -> entpacken, dann Cast/Device).
+            _pl = _cb[0][:512]
+            if dataset.bitpacked:
+                _pl = unpack_planes_batch(_pl)
+            sample_batch = _cb[1][:512].float().to(device)
+            _pl = _pl.float().to(device)
+        else:
+            sample_batch = _cb[0][:512].float().to(device)
         if sample_batch.shape[0] >= 2:
-            cap = model.analyze_capacity(sample_batch)
+            cap = model.analyze_capacity(_pl, sample_batch) if encoder == "2d" else model.analyze_capacity(sample_batch)
             print(f"\n{'='*55}")
             print(f"  NETZAUSLASTUNG (Hidden Size: {hs})")
             print(f"{'─'*55}")
@@ -2416,7 +2428,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             print(f"  {'─'*51}")
             for ln, m in cap.items():
                 dead_str = f"{m['dead']}/{m['n_neurons']} ({m['dead_ratio']*100:.0f}%)"
-                rank_str = f"{m['eff_rank']:.0f}/{m['n_neurons']} ({m['rank_pct']*100:.0f}%)"
+                rank_str = f"{m['eff_rank']:.0f}/{m.get('rank_base', m['n_neurons'])} ({m['rank_pct']*100:.0f}%)"
                 print(f"  {ln:<9} {dead_str:>11} {m['active_rate']*100:>11.0f}% {rank_str:>15}")
             print(f"  {'─'*51}")
             avg_dead = sum(m['dead_ratio'] for m in cap.values()) / len(cap)

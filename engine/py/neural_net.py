@@ -1782,6 +1782,70 @@ class Mosaic2DNet(nn.Module):
             )
 
 
+    def analyze_capacity(self, x_planes, x_flat):
+        """Netzauslastung wie `MosaicNet.analyze_capacity`, fuer den 2D-Encoder
+        (2026-09-06; bis dahin sprang train.py Schritt 5b bei jedem 2D-Netz
+        mit "Auslastungsanalyse uebersprungen" ueber, also seit v19 fuer jeden
+        Champion). Je ReLU-Schicht: Dead-Ratio (Einheit fuer ALLE Samples 0),
+        Aktiv-Rate und effektiver Rang der zentrierten Aktivierungen. Im
+        Conv-Zweig ist die Einheit der KANAL (ueber Samples und die 36 Zellen),
+        der Rang wird auf [B, C*36] gerechnet. Schluessel: conv1.., flat,
+        fusion1, fusion2."""
+        self.eval()
+        acts = []
+        with torch.no_grad():
+            h = x_planes
+            k = 0
+            for layer in self.conv:
+                h = layer(h)
+                if isinstance(layer, nn.ReLU):
+                    k += 1
+                    acts.append((f"conv{k}", h))
+            c = h.flatten(1)
+            f = x_flat
+            for layer in self.flat_branch:
+                f = layer(f)
+                if isinstance(layer, nn.ReLU):
+                    acts.append(("flat", f))
+            z = torch.cat([c, f], dim=1)
+            k = 0
+            for layer in self.fusion:
+                z = layer(z)
+                if isinstance(layer, nn.ReLU):
+                    k += 1
+                    acts.append((f"fusion{k}", z))
+        results = {}
+        for name, a in acts:
+            if a.dim() == 4:  # [B, C, 6, 6]: Einheit = Kanal
+                per_unit_active = (a > 1e-6).flatten(2).any(dim=2).any(dim=0)
+                n_units = a.shape[1]
+                a2 = a.flatten(1)
+            else:
+                per_unit_active = (a > 1e-6).any(dim=0)
+                n_units = a.shape[1]
+                a2 = a
+            dead = int((~per_unit_active).sum().item())
+            active_rate = (a > 1e-6).float().mean().item()
+            a_centered = (a2 - a2.mean(dim=0, keepdim=True)).float()
+            try:
+                sv = torch.linalg.svdvals(a_centered)
+                sv = sv[sv > 1e-10]
+                if len(sv) > 0:
+                    pr = sv / sv.sum()
+                    eff_rank = torch.exp(-(pr * torch.log(pr)).sum()).item()
+                else:
+                    eff_rank = 0.0
+            except Exception:
+                eff_rank = float("nan")
+            rank_base = min(a2.shape[0], a2.shape[1])
+            results[name] = {
+                "n_neurons": n_units, "dead": dead, "dead_ratio": dead / n_units if n_units else 0.0,
+                "active_rate": active_rate, "eff_rank": eff_rank,
+                "rank_pct": eff_rank / rank_base if rank_base else 0.0,
+                "rank_base": rank_base,
+            }
+        return results
+
     def forward(self, x_planes, x_flat=None):
         if x_flat is None:
             x_flat = torch.zeros(
