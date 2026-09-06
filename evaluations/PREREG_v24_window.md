@@ -501,7 +501,12 @@ Platten mit Spezialfeld). Die 744er-Bloecke wurden aus denselben Records neu
 gebaut (2.945 Bloecke, Chronik 2026-09-05 16:04) -- nichts fiel still auf 0.
 
 **ENTSCHIEDEN (Nutzer 2026-09-06, 11:40): Generator v25 = b05, Erzeugung OHNE K3-P**
-(registriert in `PREREG_v25_window.md` par.4). Champion-Frage offen, siehe unten.
+(registriert in `PREREG_v25_window.md` par.4). **Champion-Frage (Nutzer 11:45: "self plays
+eigentlich nur mit champion"): Kante in SPIELKONFIGURATION, b05 `k3v_off` gegen
+v23-b01 Champion-Spec, Seed 20261012 (12:17, `paired_gating_result_v24-b05nk_vs_v23-b01_k3p10_s12.json`):
+58:72 nach 65 Paaren, SPRT H0 (LLR -3,82), McNemar p 0,31, Diff -0,22 [-0,57, +0,14],
+Punkte 42,9 gegen 44,8; 1.804 s. Kein Beleg fuer b05 gegen den Champion; Seed 20261013
+laeuft. Rueckfall B (v24-b06 = b02-Rezept auf 744) trainiert seit 11:47.**
 
 **Was der Entscheid mitentscheidet:** (1) Knopf in der v25-Erzeugung ja/nein
 (par.6b'); (2) Generator; (3) ob der v24-Sieger den Champion-Knoten herausfordert
