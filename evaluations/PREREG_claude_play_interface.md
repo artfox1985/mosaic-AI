@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: Nichts gebaut, nichts gespielt. Angelegt 2026-09-06 auf Nutzer-Auftrag (temporaeres Interface, Claude spielt gegen das Netz; der Nutzer ist bei Bedarf das ausfuehrende Organ im Server-Spiel). Bauform par.3, Messgroessen par.4, Kosten par.5, Nutzer-Entscheide par.8. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: Nichts gespielt; Bau von tools/claude_play.py laeuft seit 2026-09-06 12:40. Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -199,15 +199,15 @@ als Traeger" waere eine eigene Prereg).
 
 Noch nichts gespielt.
 
-## par.8 Offene Nutzer-Entscheide
+## par.8 Nutzer-Entscheide (2026-09-06, 12:40, woertlich: "partienanzahl 10 ist ok, gegner champ @400 ist ok, uebereinstimmungsmessung nein, werkzeug bleibt dann in tools.")
 
-1. **Zahl der Partien** (Vorschlag: 10, je fuenf als Erst- und Zweitspieler;
-   bei zwei Partien pro Sitzungstag reichen fuenf Tage).
-2. **Gegner:** Champion `v23-b01_k3p10` @400 wie "expert" (Vorschlag), oder der
-   Generator b05 ohne Knopf, oder ein Kandidat (b06) nach seiner Abnahme.
-3. **Tiling:** Loeser-Kandidaten als Normalfall und freies Legen als Ausnahme
-   (Vorschlag), oder immer frei.
-4. **Uebereinstimmungs-Messung** (par.4.3) einschalten, ja/nein.
-5. **Weg 2 nur als Rueckfall** (Vorschlag) oder von Anfang an gemischt.
-6. **Verbleib des Werkzeugs** nach par.7: entfernen (temporaer, wie beauftragt)
-   oder als Sonde behalten.
+1. **Zahl der Partien: 10**, je fuenf als Erst- und Zweitspieler. ENTSCHIEDEN.
+2. **Gegner: Champion `v23-b01_k3p10` @400** (wie "expert"). ENTSCHIEDEN.
+3. **Tiling:** Loeser-Kandidaten als Normalfall, freies Legen als Ausnahme
+   (Vorschlag; gilt, solange der Nutzer nichts anderes sagt).
+4. **Uebereinstimmungs-Messung (par.4.3): NEIN.** ENTSCHIEDEN; par.4.3 entfaellt,
+   die Netz-Vorschlaege werden nicht berechnet.
+5. **Weg 2 nur als Rueckfall** (Vorschlag; gilt, solange der Nutzer nichts anderes
+   sagt).
+6. **Verbleib: das Werkzeug bleibt in `tools/`** (`tools/claude_play.py`).
+   ENTSCHIEDEN; par.3.5 entsprechend: kein Abbau nach par.7.
