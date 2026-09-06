@@ -84,7 +84,7 @@ Pipe im Hintergrund.
    (`rm evaluations/artifacts/claude_play/.playing`). Je Partie in par.7 registrieren
    (Endstand, Zuege, Beobachtungen als Sondenkandidaten), Werkzeugfehler nicht vom Agenten
    reparieren lassen. Kosten rund 30 min und rund 250.000 Opus-Token je Partie.
-5. **Vorlage v25-Zuschnitt** (`PREREG_v25_window.md` par.4/9/9a): Generator-Frage b05 gegen
+5. **GESTELLT 2026-09-07, 00:55 (`v25_window` par.11: Generator, Value-Klasse, Traeger-Kennzahl, K3-F-Klasse, Huellenform). Vorlage v25-Zuschnitt** (`PREREG_v25_window.md` par.4/9/9a): Generator-Frage b05 gegen
    b06 (Nutzer-Prinzip Generator = Champion; b06 hat die Champion-Kante, b05 nicht:
    202:218 in Spielkonfiguration), Knopf in der Erzeugung (b06 spielt MIT K3-P, b05 ohne),
    Traeger-Kennzahl 0,356 gegen Fenster 0,624, Value-Klasse 8.000/0 offen. KEINE stille Wahl.
