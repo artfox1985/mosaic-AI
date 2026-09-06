@@ -181,6 +181,14 @@ Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (fa
     wartet hinter b06): Rauschboden par.12b Punkte 1-2, dann K3-P2, K3-F 1,0, K3-F 0,5,
     beide; rund 3,7 h ab rund 16:30. Registrierung par.8.11 / 8.14 / 12b je Arm.
 
+11. **Champion-Promotion v24-b06_k3p10** (Nutzer 17:05 "Mach vor dem agenten spiel die
+    Champion Promotion lt. Skill"): `tools/promote_v24_b06.sh` gestartet 17:21, wartet auf das
+    Ende der b06-Abnahme; Umfang wie 2026-09-04 (set_champion, Anker n=150, Champion-2
+    gegen v21, Balance, Platt v3/v1, Paritaets-Fixture, Artefakt mit venv und Golden
+    Probe). Danach von Hand: Manifest, Referee-Selbsttest, server.py A/B, Elo-Zeilen,
+    STATUS/History. Reihenfolge danach: Subagent-Partie, dann Knopf-Kette (Halte-Marke
+    `evaluations/artifacts/claude_play/.playing` liegt seit 17:21).
+
 **Offene Nutzer-Entscheide (Fundstellen):** K4-Skala je Runde oder gemeinsam
 (`round_estimate_leaf_term` par.4); ~~K3-F jetzt bauen oder nach Messung~~ ENTSCHIEDEN 2026-09-06 00:50: nach der Messung
 (`geometric_envelope` par.8.14); par.12a/12b Messgroessen und Rauschboden
