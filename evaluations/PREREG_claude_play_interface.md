@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: Nichts gespielt; Bau von tools/claude_play.py laeuft seit 2026-09-06 12:40. Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: Werkzeug tools/claude_play.py gebaut 2026-09-06 13:30 (py_compile, Import), Rauchtest steht aus (CPU belegt), nichts gespielt. Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -197,17 +197,25 @@ als Traeger" waere eine eigene Prereg).
 
 ## par.7 Ergebnisse (leer bis zum ersten Spiel)
 
-Noch nichts gespielt.
+**Werkzeug gebaut 2026-09-06, 13:30: `tools/claude_play.py`** (Befehle `new`, `show`,
+`move`, `note`; Zustand je Aufruf per `analyze_game_log.run` aus `game.log`,
+Gegner-Spec als Env vor dem Engine-Import wie `server.py`, Netz-Zuege ueber
+`ai_step_net_json` / `ai_start_tile_json`, Endwertung ueber `end_scoring_json`,
+Manifest je Partie mit Seed, Erstspieler, Modell, Sims, Spec, Kontrakt-Hash;
+Partien unter `evaluations/artifacts/claude_play/<id>/`). Nur `py_compile` und
+Import geprueft; **Rauchtest steht aus**, weil die CPU belegt ist (Champion-Kante
+A, danach b06-Abnahme). Noch nichts gespielt.
 
 ## par.8 Nutzer-Entscheide (2026-09-06, 12:40, woertlich: "partienanzahl 10 ist ok, gegner champ @400 ist ok, uebereinstimmungsmessung nein, werkzeug bleibt dann in tools.")
 
 1. **Zahl der Partien: 10**, je fuenf als Erst- und Zweitspieler. ENTSCHIEDEN.
 2. **Gegner: Champion `v23-b01_k3p10` @400** (wie "expert"). ENTSCHIEDEN.
-3. **Tiling:** Loeser-Kandidaten als Normalfall, freies Legen als Ausnahme
-   (Vorschlag; gilt, solange der Nutzer nichts anderes sagt).
+3. **Tiling: Claude legt SELBST** (Nutzer 12:50: "tiling spielst selber"). ENTSCHIEDEN;
+   par.3.1 entsprechend: freies Legen je Stein (`tile <reihe> <r> <c>`), Chips und
+   Raeumen ausdruecklich, KEINE Loeser-Kandidaten in der Anzeige (sie wuerden die
+   eigene Wahl anleiten).
 4. **Uebereinstimmungs-Messung (par.4.3): NEIN.** ENTSCHIEDEN; par.4.3 entfaellt,
    die Netz-Vorschlaege werden nicht berechnet.
-5. **Weg 2 nur als Rueckfall** (Vorschlag; gilt, solange der Nutzer nichts anderes
-   sagt).
+5. **Weg 2 nur als Rueckfall** (Nutzer 12:50: "weg 2 als rueckfall ist ok"). ENTSCHIEDEN.
 6. **Verbleib: das Werkzeug bleibt in `tools/`** (`tools/claude_play.py`).
    ENTSCHIEDEN; par.3.5 entsprechend: kein Abbau nach par.7.
