@@ -53,7 +53,8 @@ Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
   SPRT-Entscheid, p 0,067); Tor 2b GEHALTEN (98:62, Spalten 0,650/0,557 gegen 0,500/0,570).
   Abnahme komplett 05:54 -- einziger Arm mit Tor 1 (ohne Knopf) UND Tor 2b.
 - v24-b03 (Seeding-Schwarm, 714): trainiert 00:27-01:56 mit `--fast-loader` (5.344 s,
-  `_brierbest` Epoche 4, 0,1868); Abnahme wartet auf Sonde und b05.
+  `_brierbest` Epoche 4, 0,1868); Abnahme laeuft seit 05:55. Tor 2a ohne Knopf 0,490
+  (Bezug 0,510, KI schliesst ein).
 
 **LAEUFT (Hintergrundaufgaben der alten Sitzung; laufen als eigene Prozesse
 weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
