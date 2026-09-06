@@ -57,7 +57,9 @@ Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
   (Bezug 0,510, KI schliesst ein); Tor 1 ohne Knopf 215:185 (kein Entscheid, p 0,155);
   Tor 2a mit Knopf 0,5025 (Bezug 0,555, KI schliesst ein); **Tor 1 MIT Knopf 75:45 nach 60
   Paaren, SPRT fuer b03** (p 0,008) und Replikation 139:101 (p 0,016), gepoolt 214:146 --
-  Champion-Strenge mit Knopf erfuellt. Tor 2b laeuft seit 08:54.
+  Champion-Strenge mit Knopf erfuellt. Tor 2b: 83:77, Spalten 0,675/0,628 gegen 0,575/0,692
+  (gleichauf), Kuppel-Bonus 4,2 gegen 3,5-3,6. Abnahme komplett 09:20. **ALLE FUENF ARME
+  ABGENOMMEN.**
 
 **LAEUFT (Hintergrundaufgaben der alten Sitzung; laufen als eigene Prozesse
 weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
@@ -69,7 +71,7 @@ weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
 | ~~Abnahme b04~~ | `tools/night_v24_b04_acceptance_744venv.sh` (venv_measure744, 744er-Wheel) | 21:49 | **FERTIG 03:04**, alle Tore in par.9 registriert | rund 02:30 | `models/alphazero_v24-b04_brierbest.onnx`, Champion-Spec, `k3v_off.spec.json` | `tor2a_v24b04*.json`, `paired_gating_result_v24-b04_*`, `paired_arena_env_v24b04_*`, `columns_v24b04_*`, `points_v24b04_vs_b01_s14.json` |
 | ~~Tiling-Geometrie-Sonde~~ | `tools/cpu_queue_after_b04.sh` | 22:31 | **FERTIG 03:07** (9,8 s + 70 s), registriert par.8.12a / 8.14 | rund 02:45 | `static/log/game_*.log`, `paired_arena_env_v24b01_vs_b01_*_s14.json` | `tiling_geometry_probe_human.json`, `tiling_geometry_probe_arena.json` |
 | ~~Abnahme b05~~ | `tools/night_v24_b05_acceptance_wait.sh` | 00:24 | **FERTIG 05:54** (03:08-05:54), alle Tore in par.9 | -- | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
-| Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:58 (wartet) | **FREIGEGEBEN 05:54:41** durch den Halte-Prozess (beendet), Start der Kette innerhalb einer Minute erwartet, Ende rund 09:00-09:30 (hergeleitet aus b05: 2 h 46 min); Wartemuster kannte Sonde, `cpu_queue_after_b04` und b05-Wartelauf NICHT -- deshalb hielt `tools/night_v24_after_b05_chain_hold.sh` (seit 00:53, Prozess nur wartend) es fest, bis Sonde und b05-Abnahme durch sind (Chronik 00:53) | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
+| Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:58 (wartet) | **FERTIG 09:20** (05:55-09:20, 3 h 25 min); Wartemuster kannte Sonde, `cpu_queue_after_b04` und b05-Wartelauf NICHT -- deshalb hielt `tools/night_v24_after_b05_chain_hold.sh` (seit 00:53, Prozess nur wartend) es fest, bis Sonde und b05-Abnahme durch sind (Chronik 00:53) | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
 
 **Baum:** HEAD b472171 plus Uebergabe-Commit; 41 Commits vor origin/main, **kein Push**.
 `config.py` steht seit 01:56 wieder auf 744 (`git diff config.py` leer; das b03-Training hat es
