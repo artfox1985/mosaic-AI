@@ -6,9 +6,11 @@ Siehe docs/DESIGN_conventions_as_checks.md, Abschnitt
 (tools/hooks/pre-commit), Budget < 3 s -- daher NUR textnahe Pruefungen:
 keine Compilierung, kein Netz, keine Korpus-/Modell-Dateien.
 
-Fuenf harte Regeln, jede mit eigener Fehlermeldung (Konsequenz + Ausweg),
-plus eine Warn-Regel 5 (stille Test-Skips, nur stderr -- Heuristik zu grob
-fuer einen Commit-Blocker, siehe dortiger Kommentar):
+Harte Regeln (2, 3, 4, 6, 7) blocken den Commit; Warn-Regeln (1, 5, 8) melden
+nur auf stderr und lassen durch -- jede mit eigener Meldung aus Konsequenz und
+Ausweg. Zur Nummerierung: die 6 ist DOPPELT vergeben (Knopf-Doku und
+Skill-Verweis), historisch gewachsen und hier bewusst nicht umnummeriert, weil
+die Nummern in Meldungen, docs/ und Commit-Nachrichten zitiert werden.
   1. Datei-Groessen-Ratsche   -- WARNUNG, kein Blocker (Nutzer-Entscheid
                                   2026-08-27). Sie war 10 Auslesungen lang rot
                                   und hat NULL Zerlegungen bewirkt: wer sie
@@ -47,6 +49,17 @@ fuer einen Commit-Blocker, siehe dortiger Kommentar):
                                   Registratur aendert, zieht die Doku im
                                   selben Commit nach (gleiche Bauform wie
                                   Regel 4, Generator per Import).
+  8. Spec-Pflichtfelder       -- WARNUNG. models/*.spec.json gegen
+                                  KNOWN_FIELDS in net_mcts.rs
+                                  (SearchConfig::from_spec_file), in BEIDE
+                                  Richtungen: fehlendes Feld und unbekanntes
+                                  Feld weist das Wheel gleich hart ab, aber
+                                  erst beim naechsten Partie-Start. Kein
+                                  Blocker, weil das Nachziehen an einem
+                                  Zeitfenster haengt (siehe Regel-Kopf und
+                                  tools/spec_add_field.py). Eingefrorene
+                                  Artefakte bleiben aussen vor. Gemessen
+                                  2026-09-06: 3,5 ms bei 8 lebenden Specs.
 
 CLI:
     python tools/check_conventions.py                    # ganzes Repo (manueller Lauf)
@@ -75,6 +88,8 @@ PREREG_INDEX_PATH = REPO_ROOT / "evaluations" / "PREREG_INDEX.md"
 PREREG_DIR = REPO_ROOT / "evaluations"
 KNOB_REGISTRY_PATH = REPO_ROOT / "engine" / "src" / "knob_registry.rs"
 KNOB_DOCS_PATH = REPO_ROOT / "docs" / "knobs.md"
+NET_MCTS_PATH = REPO_ROOT / "engine" / "src" / "net_mcts.rs"
+LIVE_SPEC_GLOB = "models/*.spec.json"  # nur LEBENDE Specs; models/frozen_*/** bleibt aussen vor
 
 # Ab welcher Groesse eine Datei ueberhaupt geratscht wird -- unterhalb darf sie
 # frei wachsen. Der Wert ist GESETZT, nicht hergeleitet: das Design-Dok begruendet
@@ -865,6 +880,96 @@ def check_claude_md_skill_refs(staged_only: bool, staged_files: set[str]) -> lis
     return violations
 
 
+# --------------------------------------------------------------------------
+# Regel 8: lebende Spec-Dateien gegen KNOWN_FIELDS (nur WARNUNG)
+# --------------------------------------------------------------------------
+#
+# ANLASS (2026-09-06, K3-F): ein neuer Such-Knopf ist nach der Welle-1-Regel
+# ein Spec-PFLICHTFELD -- `SearchConfig::from_spec_file` (net_mcts.rs) kennt
+# keinen stillen Default UND weist unbekannte Felder hart ab. Beide Richtungen
+# brechen einen laufenden Messlauf, und zwar erst beim naechsten Partie-Start,
+# nicht beim Commit: eine Spec ohne das neue Feld scheitert am neuen Wheel,
+# eine Spec mit dem Feld scheitert am alten. `tools/spec_add_field.py --check`
+# kann genau das pruefen, wurde aber von nichts GERUFEN.
+#
+# WARNUNG, kein Blocker -- mit Absicht: das Nachziehen der Specs haengt an
+# einem ZEITFENSTER (Docstring spec_add_field.py: erst wenn kein Lauf mehr mit
+# dem alten Wheel darauf zugreift, aber vor der Installation des neuen). Ein
+# Blocker verhinderte genau den Commit, der das Feld einfuehrt, und waere
+# damit ein Tor, das man routinemaessig umgeht (Begruendung wie bei Regel 1).
+#
+# Eingefrorene Artefakte (models/frozen_*/**) sind AUSGENOMMEN: sie laufen auf
+# ihrem mitgelieferten Wheel und behalten ihren Feldsatz.
+
+KNOWN_FIELDS_RE = re.compile(
+    r"const\s+KNOWN_FIELDS\s*:\s*&\[&str\]\s*=\s*&\[(?P<body>.*?)\]\s*;", re.S
+)
+
+
+def _spec_known_fields() -> set[str] | None:
+    """Feldnamen aus `SearchConfig::from_spec_file`, oder None wenn nicht parsebar."""
+    if not NET_MCTS_PATH.is_file():
+        return None
+    m = KNOWN_FIELDS_RE.search(NET_MCTS_PATH.read_text(encoding="utf-8", errors="replace"))
+    if m is None:
+        return None
+    return set(re.findall(r'"([^"]+)"', m.group("body"))) or None
+
+
+def warn_live_specs_match_known_fields(staged_only: bool, staged_files: set[str]) -> None:
+    known = _spec_known_fields()
+    if known is None:
+        print(
+            "[WARNUNG, Regel 8 -- Spec-Pflichtfelder] KNOWN_FIELDS in "
+            "engine/src/net_mcts.rs nicht parsebar -- die Pruefung der lebenden "
+            "Spec-Dateien faellt aus. Format-Vertrag: EINE Liste "
+            "`const KNOWN_FIELDS: &[&str] = &[...];`.",
+            file=sys.stderr,
+        )
+        return
+    for path in sorted(REPO_ROOT.glob(LIVE_SPEC_GLOB)):
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        try:
+            spec = json.loads(path.read_text(encoding="utf-8"))
+        except Exception as e:  # eine kaputte Spec ist auch ohne diese Regel schon rot
+            print(
+                f"[WARNUNG, Regel 8 -- Spec-Pflichtfelder] {rel} nicht lesbar: "
+                f"{type(e).__name__}: {e}",
+                file=sys.stderr,
+            )
+            continue
+        if not isinstance(spec, dict):
+            print(
+                f"[WARNUNG, Regel 8 -- Spec-Pflichtfelder] {rel}: JSON-Wurzel ist kein Objekt.",
+                file=sys.stderr,
+            )
+            continue
+        missing = sorted(known - set(spec))
+        unknown = sorted(set(spec) - known)
+        if not missing and not unknown:
+            continue
+        message_lines = [
+            f"[WARNUNG, Regel 8 -- Spec-Pflichtfelder] {rel} passt nicht zu KNOWN_FIELDS "
+            "(net_mcts.rs, SearchConfig::from_spec_file):"
+        ]
+        if missing:
+            message_lines.append("  FEHLT: " + ", ".join(missing))
+        if unknown:
+            message_lines.append("  UNBEKANNT: " + ", ".join(unknown))
+        message_lines.append(
+            "  Konsequenz: das Wheel weist die Datei beim naechsten Partie-Start ab -- ein "
+            "fehlendes Feld ebenso hart wie ein unbekanntes. Der Lauf stirbt also spaeter "
+            "und woanders als der Commit."
+        )
+        message_lines.append(
+            "  Kein Blocker: das Nachziehen haengt an einem Zeitfenster (Docstring "
+            "tools/spec_add_field.py). Handgriff, sobald es offen ist:"
+        )
+        message_lines.append("    python tools/spec_add_field.py <feld> <wert>          # setzen")
+        message_lines.append("    python tools/spec_add_field.py <feld> <wert> --check  # nur pruefen")
+        print("\n".join(message_lines), file=sys.stderr)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Konventions-Linter (A5) -- siehe docs/DESIGN_conventions_as_checks.md"
@@ -906,6 +1011,7 @@ def main() -> int:
     violations += check_identifiers_english(staged_mode, staged_files)
     violations += check_claude_md_skill_refs(staged_mode, staged_files)
     warn_silent_test_skips(staged_mode, staged_files)  # Regel 5: nur Warnung, kein Exit-1
+    warn_live_specs_match_known_fields(staged_mode, staged_files)  # Regel 8: nur Warnung
 
     if violations:
         print(f"\n{len(violations)} Konventions-Verstoss/Verstoesse:\n", file=sys.stderr)
