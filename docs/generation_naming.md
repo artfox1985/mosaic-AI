@@ -104,3 +104,21 @@ rotieren aus). Beides ist seit 2026-08-31 ERLEDIGT: Rotation seed-gezogen
 (20260920, `data/window_v23_hv2.txt`), Traeger-Manifest mit 380 Eintraegen
 (`data/policy_carrier_manifest_v23.json`, `PREREG_v23_window.md` par.2a).
 Dieser Absatz stand bis zum 2026-09-01 auf dem Stand vom 2026-08-30.
+
+## Champion-Namen bleiben reine `vN-bXX` (Nutzer-Anweisung 2026-09-06, 20:40)
+
+Der Champion vom 2026-09-04 hiess `v23-b01_k3p10` (Netz plus Knopf-Suffix), und die
+Promotion vom 2026-09-06 hat das Muster als `v24-b06_k3p10` fortgeschrieben. Nutzer,
+woertlich: *"Bleib bei reinem vN-bXX."* Ab jetzt:
+
+* **Modell-, Spec- und Artefaktnamen tragen KEINEN Knopf-Suffix.** Der Champion heisst
+  `v24-b06`; seine Such-Knoepfe stehen in `models/v24-b06.spec.json`, nirgends im Namen.
+  `models/champion.txt` traegt den reinen Namen.
+* **Elo-Knoten duerfen einen Knopf-Zusatz tragen**, weil das Register Knoten als
+  `Name@Sims` fuehrt und dasselbe Netz mit und ohne Knopf zwei verschieden starke Spieler
+  sind (b06: 1261 ohne, 1309 mit K3-P). Der Zusatz ist eine Messgroesse des Registers,
+  kein Name des Netzes; die `knobs`-Spalte traegt die Spec.
+* `_best` / `_brierbest` sind Checkpoint-Auswahlen von train.py (Rezeptbestandteil
+  `--select-by-brier`), keine Knopf-Suffixe; das Champion-Modell `alphazero_<name>.onnx`
+  ist die gewaehlte Auswahl (fuer v24-b06: `_brierbest`, Epoche 4).
+
