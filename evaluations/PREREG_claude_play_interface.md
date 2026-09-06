@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: g01 gespielt 2026-09-06 (Subagent Opus): Claude 72:42 gegen Champion v24-b06 @400, sechs Beobachtungen als Sondenkandidaten (par.7); Werkzeug nach drei Blockern (Farbzaehler, globaler Mondzug, Pass ohne Log) stabil. 9 Partien offen. Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: g01 gespielt 2026-09-06 (Subagent Opus): Claude 72:42 gegen Champion v24-b06 @400, sechs Beobachtungen als Sondenkandidaten (par.7); Werkzeug nach drei Blockern (Farbzaehler, globaler Mondzug, Pass ohne Log) stabil. Restprogramm 9 Partien PAUSIERT (Nutzer 2026-09-06 23:45: vermutlich erst mit dem v25-Champion weiter). Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -227,6 +227,11 @@ Platz, Chips zu frueh ausgegeben, Slots (1,2)/(2,1) bis Runde 4 frei gelassen (-
 Spezialfelder). Werkzeug-Maengel notiert: `KI:`-Zeile zeigt Aktionsbeschreibung mit
 falschen Zaehlern, gefuelltes Spezialfeld nicht vom leeren unterscheidbar.
 Restprogramm: 9 Partien (4 als Erst-, 5 als Zweitspieler).
+**PAUSIERT (Nutzer 2026-09-06, 23:45, woertlich: "die kannst pausieren, die machen wir
+vermutlich mit v25 weiter"):** die neun Partien laufen nicht gegen v24-b06; Wiederaufnahme
+voraussichtlich gegen den v25-Champion, Aufruf und Agenten-Auftrag wie in STATUS
+Abschnitt 1 der Uebergabe vom 2026-09-06 21:46 beschrieben (g02-g05 `--claude-side 0`,
+g06-g10 `--claude-side 1 --first-player 0`, Halter davor, Marke danach loeschen).
 
 ## par.8 Nutzer-Entscheide (2026-09-06, 12:40, woertlich: "partienanzahl 10 ist ok, gegner champ @400 ist ok, uebereinstimmungsmessung nein, werkzeug bleibt dann in tools.")
 
