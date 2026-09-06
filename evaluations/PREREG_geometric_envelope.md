@@ -1759,14 +1759,29 @@ Reihenfolge (Nutzer 00:50): erst diese Zahlen, dann K3-F.
   Fuer den Mensch-Vergleich ist die Kennzahl deshalb nur mit Vorsicht lesbar;
   fuer die Netze (die mit K3-P auf die Huelle bauen) traegt sie.
 
-**VORBEHALT (Klassifikation der Episodenenden, naechste Fassung):** "voll"
-zaehlt nur Reihen, die an einem Rundenende VOR dem Tiling voll sind. Reihen,
-die erst im Tiling per Bonus-Chip vollendet werden (`apply_tiling_chips`),
-oder die als unplatzierbar geraeumt werden, erscheinen als "Rest" (35-56 %
-der Episoden!). Die naechste Fassung der Sonde trennt das am Zellgewinn der
-Rasterzeile zwischen zwei Rundenenden (gelegt gegen geraeumt); Lauf im
-naechsten CPU-freien Fenster (rund 80 s). Die Spalten "je blockiert",
-"Anteil nein" und "Aussen-Legen" sind davon NICHT betroffen.
+**FASSUNG 2 (gefahren 2026-09-06, 09:22, `tiling_geometry_probe_{human,arena}_v2.json`; Episodenende am
+Zellgewinn der Rasterzeile klassifiziert, ersetzt die Spalten "voll" / "Rest" der Tabelle oben):**
+
+| Seite | Reihe | Episoden | gelegt gesamt | davon voll am Rundenende | davon erst per Chip im Tiling | geraeumt (unplatzierbar) | am Ende offen | gelegt wenn je blockiert / nie blockiert |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Mensch | 5 | 85 | 0,92 | 0,61 | 0,32 | 0,01 | 0,07 | 0,64 / 0,97 |
+| Mensch | 6 | 72 | 0,69 | 0,31 | **0,40** | 0,21 | 0,10 | 0,60 / 0,91 |
+| KI (Server) | 5 | 85 | 0,66 | 0,33 | 0,33 | 0,18 | 0,17 | 0,14 / 0,91 |
+| KI (Server) | 6 | 44 | 0,27 | 0,23 | 0,07 | **0,39** | 0,34 | 0,13 / 0,35 |
+| Netze A / B | 5 | 665 / 709 | 0,70 / 0,65 | 0,54 / 0,46 | 0,22 / 0,26 | 0,18 / 0,21 | 0,12 / 0,14 | 0,32 / 0,80 und 0,23 / 0,76 |
+| Netze A / B | 6 | 547 / 493 | 0,53 / 0,50 | 0,43 / 0,43 | 0,15 / 0,17 | 0,28 / 0,30 | 0,19 / 0,20 | **0,27 / 0,90 und 0,22 / 0,86** |
+
+Lesart: (1) Die Chip-Vollendung im Tiling ist ein grosser Posten (Netze 15-26 %
+der Episoden, Mensch bei Reihe 6 sogar 40 %) -- Fassung 1 hatte sie als "Rest"
+verdeckt. (2) **Eine je blockierte 6er-Reihe wird bei den Netzen nur zu 22-27 %
+gelegt, eine nie blockierte zu 86-90 %**; bei Reihe 5 0,23-0,32 gegen
+0,76-0,80. Das ist die Zahl, die K3-F begruendet: die Blockade (Praedikat NEIN)
+ist der Praediktor dafuer, ob die Reihe ueberhaupt noch ins Raster kommt. (3)
+Geraeumt (voll, aber unplatzierbar) werden bei den Netzen 28-30 % der 6er-
+Episoden, beim Menschen 21 %, bei der Server-KI 39 %. (4) Der Mensch legt
+blockierte 6er trotzdem zu 60 % (Netze 22-27 %) -- er raeumt frei, genau die
+Prioritaet, die der Nutzer in par.8.14 beschreibt; die Netze lassen sie liegen.
+Vorbehalt fuer den Mensch-Vergleich wie oben (Huellen-Orientierung).
 
 **GEBAUT (Code, 2026-09-06 03:25; UNGETESTET -- kein Rust-Build neben der laufenden
 b05-Abnahme; `cargo test` und Wheel im CPU-freien Fenster nach der b03-Abnahme):**
