@@ -1367,6 +1367,19 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Schluessel muss fortsetzbar bleiben.
         "select_by_brier": bool(select_by_brier),
         "fast_loader": bool(fast_loader),
+        # 2026-09-06 (Audit): acht Verhaltens-Flags standen in keinem Manifest.
+        # Der Test tools/tests/test_train_manifest_flags.py haelt seither jedes
+        # argparse-Flag gegen diese Auswahl (Ausnahmen nur fuer Negationen und
+        # Prozess-Schalter, dort namentlich).
+        "wdl_hard_only": bool(wdl_hard_only),
+        "wdl_label_smooth": wdl_label_smooth,
+        "wdl_bootstrap_destretch": bool(wdl_bootstrap_destretch),
+        "destretch_a": destretch_a,
+        "destretch_b": destretch_b,
+        "reinit_points_head": bool(reinit_points_head),
+        "points_dist_bins": points_dist_bins,
+        "head_warmstart": bool(head_warmstart),
+        "epoch_checkpoint": bool(epoch_checkpoint),
     }
     # Manifest auf der GEFILTERTEN Liste (Fix 2026-08-21): neural_net.py:1217
     # wendet MOSAIC_DATA_EXCLUDE beim Laden auf die GESAMTE Liste an, auch auf

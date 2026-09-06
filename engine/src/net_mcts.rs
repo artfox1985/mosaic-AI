@@ -7831,6 +7831,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(not(feature = "plate_shaping"))]
     fn plate_shaping_disabled_search_matches_pre_task93_tree() {
         // End-zu-Ende-Parität auf Baum-Ebene: solange `PLATE_SHAPING_ENABLED`
         // (Standard) `false` ist, muss `build_net_tree` exakt dieselben
@@ -7838,18 +7839,10 @@ mod tests {
         // `apply_plate_shaping` bei ENABLED=false reine Identität ist (siehe
         // `plate_shaping_disabled_is_exact_identity`), reicht hier der
         // Determinismus-Nachweis: zwei Läufe mit identischem Seed müssen
-        // uebereinstimmen. Bei aktivem Mess-Wheel-Arm (`ENABLED=true`, temporär
-        // fürs A/B) ist dieser Test KEIN Paritätsnachweis mehr -- übersprungen
-        // statt fehlzuschlagen, damit `cargo test --release` in BEIDEN
-        // Toggle-Zuständen grün bleibt (Konvention wie `apply_value_shrink`s
-        // Tests, die ebenfalls beide Zustände vertragen statt nur einen).
-        if PLATE_SHAPING_ENABLED {
-            eprintln!(
-                "  ⚠️  PLATE_SHAPING_ENABLED=true (Mess-Wheel-Arm) -- \
-                 Paritätstest übersprungen, kein Paritätsnachweis in diesem Zustand."
-            );
-            return;
-        }
+        // uebereinstimmen. Im Mess-Wheel-Arm (`--features plate_shaping`) ist
+        // dieser Test KEIN Paritätsnachweis und wird per `#[cfg]` gar nicht
+        // erst gebaut (2026-09-06, Nutzer: "#[cfg] statt if" -- der fruehere
+        // Laufzeit-Skip war ein Dauer-Fehlalarm der Konventions-Regel 5).
         let net = load_test_net();
         let mut setup_rng = StdRng::seed_from_u64(9300);
         let mut checked = 0;
@@ -9104,7 +9097,8 @@ mod tests {
 
     /// Entscheidungsgleichheit tract<->ORT-CUDA: Argmax + Gumbel-Top-m auf
     /// denselben 1148 Zustaenden wie die fruehere Weg-A-Wirkungsmessung,
-    /// dasselbe Modell `alphazero_v20_2d_opp_brierbest.onnx`, ZUSAETZLICH
+    /// das eingefrorene Champion-Modell (`test_champion_model_path`; bis 2026-09-06
+    /// hart `alphazero_v20_2d_opp_brierbest.onnx`, ausrotiert), ZUSAETZLICH
     /// die maximale Rohwert-Abweichung je Kopf.
     ///
     /// KEIN Urteil hier -- nur Zahlen. Weicht die Entscheidung ab: BERICHTEN,
@@ -9136,7 +9130,7 @@ mod tests {
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty(), "leere Zustandsliste -- Export fehlgeschlagen?");
 
-        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
+        let onnx_path = crate::net::test_champion_model_path();
         let net = Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -9319,7 +9313,7 @@ mod tests {
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty());
 
-        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
+        let onnx_path = crate::net::test_champion_model_path();
         let net = Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -9605,7 +9599,7 @@ mod tests {
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty());
 
-        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
+        let onnx_path = crate::net::test_champion_model_path();
         let net = Arc::new(Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         )));
@@ -9994,7 +9988,7 @@ mod tests {
         let records: Vec<Value> = serde_json::from_str(&raw).expect("JSON-Array erwartet");
         assert!(!records.is_empty());
 
-        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
+        let onnx_path = crate::net::test_champion_model_path();
         let net = Arc::new(Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         )));
@@ -10169,7 +10163,7 @@ mod tests {
         use std::sync::Arc;
         use std::time::Instant;
 
-        let onnx_path = crate::net::test_model_path("alphazero_v20_2d_opp_brierbest.onnx");
+        let onnx_path = crate::net::test_champion_model_path();
         let net = Arc::new(Net::load_auto(onnx_path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{onnx_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         )));

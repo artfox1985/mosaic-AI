@@ -134,7 +134,12 @@ pub const PLATE_SHAPING_WEIGHT: f64 = 0.3;
 /// für ON -- nur Ersteres fehlt hier klar. Bleibt daher AUS. Details:
 /// `evaluations/STATUS.md` Abschnitt "Wertungsplatten-Shaping A/B (Task #93,
 /// 2026-07-25)".
-pub const PLATE_SHAPING_ENABLED: bool = false;
+/// Seit 2026-09-06 an das Cargo-Feature `plate_shaping` gebunden (Default aus):
+/// derselbe compile-time-Wert wie zuvor `false`, aber Tests koennen den Zustand
+/// per `#[cfg(feature = "plate_shaping")]` unterscheiden statt zur Laufzeit zu
+/// ueberspringen (net_mcts.rs `plate_shaping_disabled_search_matches_pre_task93_tree`).
+/// Mess-Wheel-Arm: `cargo build --features plate_shaping`.
+pub const PLATE_SHAPING_ENABLED: bool = cfg!(feature = "plate_shaping");
 
 /// Exakte, JETZT SCHON feststehende Wertungsplatten-Fortschritts-Differenz
 /// (Spieler0 minus Spieler1) -- reine State-Funktion

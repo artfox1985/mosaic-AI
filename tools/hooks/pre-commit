@@ -19,6 +19,14 @@ command -v python >/dev/null 2>&1 || PYTHON_BIN="python3"
 
 "$PYTHON_BIN" tools/check_conventions.py --staged
 STATUS=$?
+# 2026-09-06 (Nutzer-Auftrag nach dem Test-Audit): reine Python-Tests ohne Wheel,
+# Korpus oder Netz (tools/tests/test_*.py; Manifest-Flags, Reihen-Alter-Sonde,
+# spec_add_field). Laufzeit unter einer Sekunde; rot blockiert wie Regel 2-7.
+if [ "$STATUS" -eq 0 ]; then
+    "$PYTHON_BIN" -X utf8 -m unittest discover -s tools/tests -p "test_*.py" -q
+    STATUS=$?
+    [ "$STATUS" -ne 0 ] && echo "pre-commit: Python-Tests (tools/tests) rot -- Commit abgebrochen." >&2
+fi
 
 if [ "$STATUS" -ne 0 ]; then
     echo "" >&2

@@ -148,21 +148,17 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    Vorher par.12b Rauschboden messen (Block-Bootstrap auf frozen_v3), sonst
    nur Tor 1/2.
 
-**Aus dem Test- und Hook-Audit (Subagent Opus, 2026-09-06 10:25; Befunde vom Koordinator
-nachgeprueft): offen beim Nutzer:** (a) `net_mcts.rs:7851` -- Regel 5 meldet bei jedem
-Commit einen Zweig, der nur bei `PLATE_SHAPING_ENABLED = true` (shaping.rs:137, const
-false) laeuft: `#[cfg]` statt Laufzeit-`if`, oder Ausnahme-Syntax fuer Regel 5; (b) fuenf
-`#[ignore]`-Tests in net_mcts.rs laden `alphazero_v20_2d_opp_brierbest.onnx`, das
-nirgends mehr liegt: auf `test_champion_model_path()` nachziehen oder streichen; (c)
-train.py: 8 Verhaltens-Flags (`--wdl-label-smooth`, `--wdl-bootstrap-destretch`,
-`--destretch-a/-b`, `--wdl-hard-only`, `--reinit-points-head`, `--points-dist-bins`,
-`--no-head-warmstart`) stehen in keinem Manifest -- Vorschlag: Test, der argparse-Flags
-gegen `_cli_args` haelt (Ausnahmeliste fuer Negationen); (d) Python-Tests fuer
-`tiling_geometry_probe.py` (reine Funktionen) und `spec_add_field.py` in `tools/tests/`,
-pre-commit-tauglich; (e) `tools/parity_probe.py` ist abgeloest (self_play.rs:5623),
-Loeschung nur auf Freigabe. Erledigt und committet: Groessen-Basislinie nachgezogen
-(87 -> 111 Dateien), Regel 8 (lebende Specs gegen KNOWN_FIELDS, Warnung, 3,5 ms),
-`tools/hooks/python_dll_path.sh`, Hook-README berichtigt.
+**Test- und Hook-Audit (Subagent Opus, 2026-09-06 10:23, Befunde nachgeprueft) -- vom Nutzer
+entschieden und UMGESETZT (10:45, cargo test 523 gruen, 16 Python-Tests gruen):** (a) Regel-5-
+Fehlalarm: Cargo-Feature `plate_shaping`, `PLATE_SHAPING_ENABLED = cfg!(feature)`, Paritaetstest
+per `#[cfg(not(feature))]` statt Laufzeit-Skip; (b) fuenf ignore-Tests auf
+`test_champion_model_path()` umgezogen; (c) train.py: neun Schluessel in `_cli_args` nachgetragen
+(acht Verhaltens-Flags plus `epoch_checkpoint`), Test `tools/tests/test_train_manifest_flags.py`;
+(d) `tools/tests/test_tiling_geometry_probe.py`, `test_spec_add_field.py`, pre-commit faehrt
+`unittest discover tools/tests`; (e) `tools/parity_probe.py` geloescht (Freigabe 10:30). Vorher
+bereits: Groessen-Basislinie nachgezogen, Regel 8 (lebende Specs gegen KNOWN_FIELDS),
+`tools/hooks/python_dll_path.sh`. Das installierte Wheel (10:06) bleibt gueltig: die
+Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (false).
 
 **Offene Nutzer-Entscheide (Fundstellen):** K4-Skala je Runde oder gemeinsam
 (`round_estimate_leaf_term` par.4); ~~K3-F jetzt bauen oder nach Messung~~ ENTSCHIEDEN 2026-09-06 00:50: nach der Messung
