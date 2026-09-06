@@ -123,8 +123,9 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
 5. ~~Vorlage Generatorwahl~~ **GESTELLT 09:24** (`PREREG_v24_window.md` par.9c):
    Gabelung an der Knopf-Frage -- Erzeugung MIT K3-P: b03 (214:146 mit Knopf,
    Spalten gleichauf, Kuppel-Bonus 4,2); OHNE K3-P: b05 (66:34, zweiter Seed
-   laeuft, Tor 2b gehalten). b02 staerkster Beleg, aber spaltenaermer. KEINE
-   stille Wahl -- Nutzer-Entscheid offen.
+   laeuft, Tor 2b gehalten). b02 staerkster Beleg, aber spaltenaermer. **Nutzer 09:40:
+   "744er bleibt fix drinnen"** -- Kandidaten damit b04/b05; Records tragen die 744er-
+   Schluessel (geprueft, par.9c). Generator-Entscheid offen.
 6. **Danach VORLAGE v25-Zuschnitt** (`PREREG_v25_window.md` par.9/9a): Traeger-
    Kennzahl v24 0,356 gegen Fenster 0,624; v25 nach par.1 rechnerisch 0,23.
    Hebel: Sockel-Betriebspunkt (Pilot: 400 Sockel-Partien in 2-3 Rausch-

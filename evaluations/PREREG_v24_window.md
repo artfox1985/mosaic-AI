@@ -486,6 +486,20 @@ v25-Erzeugung heisst das:
 (2,8-2,9), b05 am wenigsten (2,5-2,6). Kein Arm loest den Engpass; K3-F ist
 dafuer gebaut (par.8.14 der Einhuellenden), Messung am Siegernetz offen.
 
+**Nutzer-Entscheid (09:40): "744er bleibt fix drinnen. ist die korrektere
+variante."** Die Sicht 744 ist gesetzt; die Gabelung reduziert sich damit auf
+die 744er-Arme b04 und b05 (b03 scheidet als 714er-Netz aus, b01/b02 ebenso).
+Nachgeprueft auf Nutzer-Frage ("konnte das 744er netz ueberhaupt mit den
+vorhandenen self plays bedient werden?"): die 30 Zusatzwerte rechnet der
+Python-Encoder (`engine/py/neural_net.py:296-341`) aus dem State-Dict jedes
+Records (`dome_stack_top_type`, `type` der Auslage-Platten, `floor`-Farben,
+`phantom_count`); in vier Dateien aller Fensterklassen (policy, hv2 vom
+2026-08-25, seedvalue, value-argmax; 1.269-1.784 Schritte je Datei) fehlt
+KEIN Schluessel, und die Werte streuen (Stapel-Rueckseite wild/special/leer
+rund 40/35/25 %, 46-170 Reihen mit Phantomen je Datei, 877-995 Auslage-
+Platten mit Spezialfeld). Die 744er-Bloecke wurden aus denselben Records neu
+gebaut (2.945 Bloecke, Chronik 2026-09-05 16:04) -- nichts fiel still auf 0.
+
 **Was der Entscheid mitentscheidet:** (1) Knopf in der v25-Erzeugung ja/nein
 (par.6b'); (2) Generator; (3) ob der v24-Sieger den Champion-Knoten herausfordert
 (Kante gegen `v23-b01_k3p10` = Tor 1 mit Knopf: b02 192:128 und b03 214:146
