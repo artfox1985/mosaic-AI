@@ -352,7 +352,7 @@ impl PyGame {
         }
         let name = self.game.state.players[player].name.clone();
         self.game.state.log_event(format!(
-            "🎫 {name} komplettiert Reihe {} mit Bonus-Chips ({label})!",
+            "🎴 {name} komplettiert Reihe {} mit Bonus-Chips ({label})!",
             pattern_row + 1
         ));
         Ok(())
@@ -365,7 +365,7 @@ impl PyGame {
     /// waehlt ihre Allokation exakt (`ai_tiling_step` unten, Solver-Schritt
     /// `TilingStep::Chips` -> `apply_bonus_chips_with`), `apply_tiling_chips`
     /// dagegen waehlt GREEDY (`round_end.rs::greedy_chip_indices`: ohne zwei
-    /// farbgleiche die ersten drei der Hand). Die 🎫-Logzeile nennt die
+    /// farbgleiche die ersten drei der Hand). Die 🎴-Logzeile nannte die
     /// verbrauchten Chips nicht, `tools/analyze_game_log.py` musste geloggte
     /// KI-Vollendungen deshalb greedy nachspielen -- und verbrannte dabei
     /// Chips, die die echte KI behalten hatte, bis Runden spaeter eine real
@@ -399,7 +399,7 @@ impl PyGame {
         }
         let name = self.game.state.players[player].name.clone();
         self.game.state.log_event(format!(
-            "🎫 {name} komplettiert Reihe {} mit Bonus-Chips ({label})!",
+            "🎴 {name} komplettiert Reihe {} mit Bonus-Chips ({label})!",
             pattern_row + 1
         ));
         Ok(())
@@ -991,11 +991,11 @@ impl PyGame {
                 // der Menschen-Pfad `apply_tiling_chips` (oben, ~Zeile 298) loggt
                 // die Reihen-Komplettierung per Bonuschip, dieser KI-Pfad (Solver-
                 // Schritt `TilingStep::Chips`) tat es bisher NICHT -- identischer
-                // Wortlaut wie dort, damit `analyze_game_log.py`s 🎫-Regex beide
+                // Wortlaut wie dort, damit `analyze_game_log.py`s 🎴-Regex beide
                 // Akteure gleich erfasst.
                 let name = self.game.state.players[pi].name.clone();
                 self.game.state.log_event(format!(
-                    "🎫 {name} komplettiert Reihe {} mit Bonus-Chips ({label})!",
+                    "🎴 {name} komplettiert Reihe {} mit Bonus-Chips ({label})!",
                     row + 1
                 ));
                 ("use_chips", format!("Chips R{}", row + 1), "chip", json!({ "type": "use_chips", "pattern_row": row }))
@@ -1162,7 +1162,7 @@ mod tests {
         pg.ai_tiling_step().expect("KI-Tiling-Schritt sollte gelingen");
         let new_lines = &pg.game.state.log[before..];
         assert!(
-            new_lines.iter().any(|l| l.contains('🎫') && l.contains("komplettiert Reihe")),
+            new_lines.iter().any(|l| l.contains('🎴') && l.contains("komplettiert Reihe")),
             "KI-Chip-Komplettierung sollte geloggt werden, neue Log-Zeilen: {new_lines:?}"
         );
     }
@@ -1246,7 +1246,7 @@ mod tests {
             exact.game.state.players[0].bonus_chips
         );
         assert_eq!(
-            exact.game.state.log.iter().filter(|l| l.contains('🎫')).count(),
+            exact.game.state.log.iter().filter(|l| l.contains('🎴')).count(),
             2,
             "beide Vollendungen muessen mit dem Bestands-Wortlaut geloggt sein"
         );

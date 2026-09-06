@@ -134,7 +134,10 @@ PATTERNS: dict[str, re.Pattern] = {
     "TILING_SCORE": re.compile(
         r"^🎯 (?P<name>.+?): \+(?P<pts>\d+) Pkt \(Reihe (?P<row>\d+) → Kuppel (?P<sr>\d+)/(?P<sc>\d+) - (?P<expl>.+)\)$"
     ),
-    "CHIPS_COMPLETE": re.compile(r"^🎫 (?P<name>.+?) komplettiert Reihe (?P<row>\d+)"),
+    # Symbol: die Engine schreibt seit 2026-09-07 durchgaengig 🎴 (Nutzer), Altlogs
+    # tragen 🎫 -- beide muessen treffen, sonst faellt jede aeltere Partie aus der
+    # Klassifikation.
+    "CHIPS_COMPLETE": re.compile(r"^[🎫🎴] (?P<name>.+?) komplettiert Reihe (?P<row>\d+)"),
     # Seit 2026-09-07 (Nutzer) nennt die Zeile die verbrauchten Plaettchen:
     # "... mit Bonus-Chips (3 Plättchen: rot, gelb+blau, schwarz)!". Der Regex
     # oben ist nicht am Zeilenende verankert und trifft weiter; dieser hier
@@ -381,7 +384,8 @@ class Replayer:
         # `hints[i]` = `#a`-Nutzlasten unmittelbar vor Textzeile i.
         self.hints: dict[int, list[dict]] = {}
         self.emoji_toleriert = 0  # Zeilen, die nur am ☀️/🌙-Praefix abwichen
-        self.chip_zusatz_toleriert = 0  # 🎫-Zeilen ohne den Plaettchen-Zusatz (Logs vor 2026-09-07)
+        self.chip_zusatz_toleriert = 0  # Chip-Zeilen ohne den Plaettchen-Zusatz (Logs vor 2026-09-07)
+        self.chip_symbol_toleriert = 0  # Chip-Zeilen mit dem alten Symbol 🎫 statt 🎴
         self.hint_used = 0      # Zuege, die ueber die ID aufgeloest wurden
         self.hint_missing = 0   # Stein-Zuege ohne Hinweis (Textweg)
         self.action_log: list[tuple[str, tuple, dict]] = []
@@ -438,16 +442,26 @@ class Replayer:
             if rest_o.startswith(a) and rest_r.startswith(b)                     and rest_o[len(a):].lstrip() == rest_r[len(b):].lstrip():
                 self.emoji_toleriert += 1
                 return True
-        # Zweite datierte Toleranz (2026-09-07, Nutzer-Auftrag "das Passen und den
-        # Chip-Verbrauch sauber im Log"): die 🎫-Zeile nennt seither die
-        # verbrauchten Plaettchen in Klammern. Ein Log VON DAVOR hat den Zusatz
-        # nicht, die heutige Engine schreibt ihn -- ohne diese Toleranz waere jede
-        # aeltere Partie mit einer Chip-Vollendung unreplaybar. Eng gehalten: nur
-        # wenn der Rest der Zeile zeichengleich ist und nur der Klammer-Zusatz
-        # fehlt.
-        if rest_r.startswith("🎫") and rest_o.startswith("🎫"):
+        # Zweite und dritte datierte Toleranz, beide vom 2026-09-07 und beide aus
+        # demselben Nutzer-Auftrag ("den Chip-Verbrauch sauber im Log", "fuer das
+        # bonuschip symbol ueberall 🎴"): die Chip-Zeile hat seither (a) das Symbol
+        # 🎴 statt 🎫 und (b) die verbrauchten Plaettchen in Klammern. Ein Log VON
+        # DAVOR hat beides nicht. Ohne diese Toleranzen waere jede aeltere Partie
+        # mit einer Chip-Vollendung unreplaybar. Eng gehalten: nur auf der
+        # Chip-Zeile, und der Rest muss zeichengleich bleiben.
+        if rest_o.startswith("🎫") and rest_r.startswith("🎴"):
+            rest_o_norm = "🎴" + rest_o[len("🎫"):]
+            symbol_toleriert = True
+        else:
+            rest_o_norm = rest_o
+            symbol_toleriert = False
+        if rest_r.startswith("🎴") and rest_o_norm.startswith("🎴"):
+            if rest_o_norm == rest_r:
+                self.chip_symbol_toleriert += symbol_toleriert
+                return True
             m_use = PATTERNS["_CHIP_USE"].search(rest_r)
-            if m_use and rest_r[:m_use.start()].rstrip() + rest_r[m_use.end():] == rest_o:
+            if m_use and rest_r[:m_use.start()].rstrip() + rest_r[m_use.end():] == rest_o_norm:
+                self.chip_symbol_toleriert += symbol_toleriert
                 self.chip_zusatz_toleriert += 1
                 return True
         return False
@@ -562,12 +576,12 @@ class Replayer:
 
     def maybe_silent_chip_complete(self, actor: int, pattern_row: int) -> bool:
         """Entdeckte Logging-Asymmetrie: der MENSCH-Pfad `apply_tiling_chips`
-        (py.rs) loggt "🎫 ... komplettiert Reihe N ...", aber der KI-Pfad
+        (py.rs) loggt "🎴 ... komplettiert Reihe N ...", aber der KI-Pfad
         (`ai_tiling_step` -> `TilingStep::Chips` -> `apply_bonus_chips_with`,
         round_end.rs) tut das NICHT -- die KI kann also eine Musterreihe
         per Bonuschip vervollstaendigen, OHNE dass eine Log-Zeile dafuer
         entsteht. Erkennung: Zielreihe der kommenden Tiling-Aktion ist noch
-        nicht voll -- dann hier nachholen (die erzeugte "🎫"-Zeile wird
+        nicht voll -- dann hier nachholen (die erzeugte "🎴"-Zeile wird
         bewusst NICHT gegen das Original geprueft, da sie dort fehlt; das
         Ereignis wird stattdessen in `silent_chip_gaps` vermerkt und im
         Report transparent gemacht).
@@ -576,7 +590,7 @@ class Replayer:
         `apply_chip_completion`. Grund ist eine Messung an 20 Arena-Partien
         (`paired_arena_env_imm_netvnet.json`): dort laufen ALLE
         Chip-Vollendungen still (0 geloggte gegen 14 stille in den drei
-        abbrechenden Partien), eben weil KEINE 🎫-Zeile entsteht -- die
+        abbrechenden Partien), eben weil KEINE Chip-Zeile entsteht -- die
         Plan-Suche aus cf53aab konnte sie darum nie erreichen, obwohl das
         Problem identisch ist: `apply_tiling_chips` waehlt greedy, die KI
         waehlt exakt. Ohne Plan-Eintrag bleibt es greedy, Bestandsverhalten
@@ -613,7 +627,7 @@ class Replayer:
         return True
 
     def apply_chip_completion(self, lines: list[LogLine], li: int, actor: int, pattern_row: int) -> int:
-        """Eine geloggte 🎫-Vollendung nachspielen -- die Stelle, an der das
+        """Eine geloggte Chip-Vollendung nachspielen -- die Stelle, an der das
         Log SCHWEIGT.
 
         Die Engine kennt zwei Wege, eine Reihe mit Chips zu fuellen, und sie

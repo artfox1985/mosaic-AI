@@ -912,7 +912,7 @@ impl Game {
                 }
                 let name = self.state.players[*player].name.clone();
                 self.state.log_event(format!(
-                    "🎫 {name} komplettiert Reihe {} vollständig mit Bonus-Chips ({label})!",
+                    "🎴 {name} komplettiert Reihe {} vollständig mit Bonus-Chips ({label})!",
                     pattern_row + 1
                 ));
                 Ok(())
