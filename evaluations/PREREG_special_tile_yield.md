@@ -401,3 +401,28 @@ Gelaender-Familie (Default aus, bitidentisch; Spec-Pflichtfeld je Seite wie
 Reihenfolge: NACH den vier K3-Armen am Champion (Kette laeuft 2026-09-06),
 damit die Knoepfe nicht zusammenfallen; Bau nach den K3-Ergebnissen.
 
+**GEZAEHLT (2026-09-06, 23:35; Nutzer-Frage "ist das auch ein verstaerker oder wieder ein
+neues verhalten?"; Log-Zeilen `+N Spezial-Punkte (Kuppel-Bonus)`, N = Rasterzeile der
+Spezialfliese; Quellen: b06-Arenen `paired_arena_env_v24b06_vs_b01_{first,second}_s14.json`
+und `..._k3p2_b06_vs_k3p_{first,second}_s14.json` (je 160 Seiten je Spec), Server-Logs
+`static/log/game_*.log` (22 Partien mit Endwertung; das `ai_model` wechselt ueber die Logs):**
+
+| Seite | Seiten | Aktivierungen je Partie | davon Zeile 6 (+6) je Partie | Zeile 5 (+5) | Verteilung Zeile 1..6 |
+| --- | --- | --- | --- | --- | --- |
+| Mensch | 22 | 2,55 (8,8 Punkte) | **0,68** | 0,14 | 6 / 22 / 2 / 8 / 3 / 15 |
+| Server-KI gegen Mensch | 22 | 0,50 (1,5 Punkte) | 0,05 | 0,00 | 2 / 4 / 0 / 4 / 0 / 1 |
+| v24-b06 Champion-Spec (Arena) | 160 | 1,16 | **0,29** | 0,00 | 41 / 45 / 5 / 49 / 0 / 46 |
+| v24-b06 mit K3-P2 (Arena) | 160 | 1,11 | 0,29 | 0,00 | 42 / 46 / 7 / 36 / 0 / 47 |
+| v23-b01 Champion-Spec (Arena) | 160 | 1,21 | 0,35 | 0,00 | 41 / 45 / 3 / 49 / 0 / 56 |
+
+Lesart: **K5 ist ueberwiegend ein VERSTAERKER.** Die Netze aktivieren in rund jeder dritten
+Partie ein Spezialfeld in Zeile 6 (0,29-0,35 je Partie) und 1,1-1,2 Spezialfelder je Partie
+insgesamt; das Verhalten liegt also im Korpus, nur seltener als beim Menschen (0,68 und
+2,55). Neu waere die Kopplung an die Huelle (Spezialfeld auf der Huellenzelle der Zeile 6,
+par.9 Punkt 1) und die Plattenwahl nach Spezialfeld statt nach Sofortpassung. Zwei
+Nebenbefunde: (1) in 640 Netz-Seiten KEINE Aktivierung in Zeile 5 (Mensch 3 von 22
+Partien) -- ob das Geometrie (Spezialfeld einer Platte im unteren Slot liegt in Zeile 5
+oder 6, je nach Rotation) oder Vermeidung ist, ist ungeprueft; (2) die Server-KI gegen den
+Menschen aktiviert deutlich weniger (0,50) als dieselbe Spec in der Netz-Arena (1,21) --
+Gegnerabhaengigkeit der Plattenverfuegbarkeit, nicht weiter verfolgt.
+
