@@ -15,7 +15,8 @@ Aufrufe (Projektordner; Netz-Zuege sind CPU-Auftraege -> NICHT neben einer Arena
 
 Zugnotation (par.3.3), Farben blau gelb rot schwarz tuerkis (auch B G R S T):
     s <quelle> <farbe> <reihe|floor> [mond:<farbe,...>]   Stein; Quelle = 1-4 (Sonnenseite der Fabrik),
-                                                          m1-m4 (Mondstapel der Fabrik), gf / gm (grosse
+                                                          m1-m4 (Mondstapel der Fabrik), m (globaler
+                                                          Mondzug, Aktion C), gf / gm (grosse
                                                           Fabrik Sonne / Mond); <reihe> 0-5 oder "floor";
                                                           die Anzeige nennt zu jedem legalen Zug die Kurzform
     d <platte> <slot_r> <slot_c> [rot]                    Kuppelplatte aus der Auslage (rot 0/90/180/270)
@@ -243,7 +244,9 @@ def legal_moves_text(st: dict, m: dict) -> str:
     L = ["Legale Zuege:"]
     stones = [v for v in vm if v["type"] == "stone"]
     for v in stones:
-        src = {"SMALL_FACTORY_SUN": f"{v.get('factory_id')}", "SMALL_FACTORY_MOON": f"m{v.get('factory_id')}",
+        fid = v.get("factory_id")
+        # Aktion C (globaler Mondzug): SMALL_FACTORY_MOON ohne Fabrik-Id (moves.rs:39) -> Kurzform "m".
+        src = {"SMALL_FACTORY_SUN": f"{fid}", "SMALL_FACTORY_MOON": ("m" if fid is None else f"m{fid}"),
                "LARGE_FACTORY_SUN": "gf", "LARGE_FACTORY_MOON": "gm"}.get(v["source"], v["source"])
         L.append(f"  s {src} {v['color']} {v['row'] if v['row'] >= 0 else 'floor'}" + (f" mond:{','.join(v['moon_order'])}" if v.get("moon_order") else ""))
     domes = {}
@@ -307,7 +310,7 @@ def apply_move(g, m: dict, text: str) -> str:
         elif s_ == "gm":
             g.apply_stone("LARGE_FACTORY_MOON", color, row_i, None, moon or None)
         elif s_.startswith("m"):
-            g.apply_stone("SMALL_FACTORY_MOON", color, row_i, int(s_[1:]), moon or None)
+            g.apply_stone("SMALL_FACTORY_MOON", color, row_i, (int(s_[1:]) if len(s_) > 1 else None), moon or None)
         else:
             g.apply_stone("SMALL_FACTORY_SUN", color, row_i, int(s_), moon or None)
         return f"Claude: Stein {color} aus {src} nach {'Strafleiste' if row_i < 0 else 'R' + str(row_i)}"
