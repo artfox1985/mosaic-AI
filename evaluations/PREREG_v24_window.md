@@ -424,6 +424,74 @@ Knopf spaltenaermer (0,44) als sein Lehrer ohne Knopf (0,515); `_brierbest`
 fiel auf Epoche 2, die Val-Kennzahlen liegen auf einem neuen Val-Pool.
 Ursachenanalyse nach b02/b03 (Generatorwahl-Regel), nicht je Arm.
 
+### par.9c VORLAGE GENERATORWAHL v24 (2026-09-06, 09:24; alle fuenf Arme abgenommen; ENTSCHEID OFFEN beim Nutzer)
+
+Regel: `docs/generation_loop.md` "Generatorwahl unter Armen" (Staerke schliesst
+aus, Spaltenprofil entscheidet, sonst Amtsinhaber) und "Richtung je Generation"
+(spalten- UND siegverstaerkend). Amtsinhaber `v23-b01_brierbest` (Champion-Knopf
+K3-P C 1,0 = `v23-b01_k3p10`, Elo 1292). Alle Zahlen aus der par.9-Tabelle.
+
+| Arm | Tor 2a ohne Knopf (Bezug 0,510) | Tor 2a mit Knopf (Bezug 0,555) | Tor 1 ohne Knopf | Tor 1 mit Knopf | Tor 2b Siege | Tor 2b Spalten Arm gegen b01 (Brett 0 / Brett 1) | Kuppel-Bonus Arm gegen b01 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| v24-b01 | 0,518 | 0,4425 gerissen | 216:184 kein Beleg | 83:107 (2 Seeds, H0) | 93:67 | 0,696 / 0,600 gegen 0,494 / 0,575 GEHALTEN | 3,8 gegen 3,6 |
+| v24-b02 (lambda 0,7) | 0,430 | 0,525 (KI ein) | **209:161 SPRT** (185 Paare) | **101:69 + 91:59 SPRT** (2 Seeds) | 87:73 | 0,550 / 0,475 gegen 0,688 / 0,562 GERISSEN | 4,0 / 3,5 gegen 4,1 / 3,8 |
+| v24-b03 (Seeding, 714) | 0,490 (KI ein) | 0,5025 (KI ein) | 215:185 kein Beleg | **75:45 + 139:101 SPRT** (2 Seeds) | 83:77 | 0,675 / 0,628 gegen 0,575 / 0,692 GLEICHAUF | **4,2 / 4,2 gegen 3,5 / 3,6** |
+| v24-b04 (Sicht 744) | 0,4125 gerissen | 0,5325 (KI ein) | 218:182 kein Beleg | 135:135 H0 + 221:179 kein Beleg | 92:68 | 0,684 / 0,738 gegen 0,608 / 0,525 GEHALTEN | 3,9 / 4,3 gegen 3,6 / 3,9 |
+| v24-b05 (b04 + Ueberraschung) | 0,4825 (KI ein) | 0,4975 (KI ein) | **66:34 SPRT** (50 Paare; zweiter Seed laeuft seit 09:23) | 219:181 kein Beleg | 98:62 | 0,650 / 0,557 gegen 0,500 / 0,570 GEHALTEN (Brett 1 gleichauf) | 3,8 / 3,7 gegen 3,5 / 4,1 |
+
+**Regel Schritt 1 (Staerke schliesst aus):** kein Arm verliert signifikant gegen
+den Amtsinhaber (b01 mit Knopf 83:107 ist H0, p 0,31 / 0,33, kein Verlust-Beleg).
+Umgekehrt BELEGT staerker (Tor 1, SPRT): **b02** (beide Fassungen, je zwei Seeds),
+**b03** (mit Knopf, zwei Seeds), **b05** (ohne Knopf, ein Seed; Champion-Strenge
+verlangt den zweiten, er laeuft). b01 und b04 haben in keiner Fassung einen Beleg.
+
+**Regel Schritt 2 (Spaltenprofil, Punktschaetzer Tor 2a):** mit Knopf b04 0,5325 >
+b02 0,525 > b03 0,5025 > b05 0,4975 > b01 0,4425, alle unter dem Amtsinhaber
+0,555, die ersten vier innerhalb einer Block-SE (rund 0,035); ohne Knopf b01 0,518 >
+b03 0,490 > b05 0,4825 > b02 0,430 > b04 0,4125 (Bezug 0,510). Im Spielbetrieb
+(Tor 2b, beide Seiten Champion-Spec): b01, b04, b05 halten, b03 gleichauf, b02
+reisst in beiden Richtungen.
+
+**Regel Schritt 3 (unter Block-SE: Amtsinhaber):** mechanisch angewandt bliebe
+v23-b01 Generator, weil kein Arm ihn am Instrument uebertrifft. Das widerspricht
+dem Zweck der Ratsche (drei Arme sind belegt staerker); die Regel wurde fuer die
+Wahl UNTER Armen geschrieben, nicht gegen den Amtsinhaber. Vorlage deshalb als
+Gabelung an der Knopf-Frage, die der Nutzer ohnehin entscheiden muss:
+
+**Die Knopf-Wechselwirkung ist der Kern.** Mit K3-P auf beiden Seiten (so wurde
+v24 erzeugt, par.6b') halten nur b02 und b03 ihren Vorsprung; b01 kippt, b04 und
+b05 verlieren den Beleg. Ohne Knopf nehmen b02 und b05, b03 nicht. Fuer die
+v25-Erzeugung heisst das:
+
+- **Faehrt die Erzeugung MIT K3-P (wie v24): Vorschlag b03.** Belegt staerker
+  mit Knopf (214:146, zwei Seeds), Spalten gleichauf mit dem Amtsinhaber (2b) und
+  innerhalb der KI am Instrument (0,5025 gegen 0,555), hoechster Kuppel-Bonus der
+  Generation (4,2 gegen 3,5-3,6: der Seeding-Schwarm hat Plattenwahl gesaet).
+  Nicht spaltenverstaerkend, aber nicht spaltenaermer. Zu beachten: b03 ist ein
+  714er-Netz, die Erzeugung liefe auf dem 714er-Artefakt-Wheel; das v25-Fenster
+  laesst sich trotzdem 744 kodieren (die b04-Kette hat 744er-Bloecke aus denselben
+  Records gebaut, Chronik 2026-09-05 16:04 (c)). Alternative in dieser Gabel:
+  b02 (staerkster Beleg, 4 Seeds), aber spaltenaermer in 2a ohne Knopf UND 2b in
+  beiden Richtungen -- gegen die Richtungsregel.
+- **Faehrt die Erzeugung OHNE K3-P: Vorschlag b05.** Belegt staerker ohne Knopf
+  (66:34; zweiter Seed laeuft, Ergebnis vor dem Entscheid abwarten), Tor 2b
+  gehalten (98:62, gepoolt 0,60 gegen 0,54), Instrument innerhalb der KI. Der
+  einzige Arm, der Tor 1 UND 2b nimmt -- aber nur in der Knopf-losen Fassung.
+- **Nicht vorgeschlagen:** b04 (kein Tor-1-Beleg in beiden Fassungen, trotz
+  bestem Instrumentwert mit Knopf), b01 (kippt mit Knopf), Amtsinhaber
+  (Schritt-3-Mechanik gegen drei belegte Ratschen).
+
+**Offene lange Reihen (par.8.13) in den 2b-Arenen:** je Seite 4,0-4,5 begonnen,
+2,5-2,9 vollendet, bei allen Armen gleich; b03 und b04 vollenden am meisten
+(2,8-2,9), b05 am wenigsten (2,5-2,6). Kein Arm loest den Engpass; K3-F ist
+dafuer gebaut (par.8.14 der Einhuellenden), Messung am Siegernetz offen.
+
+**Was der Entscheid mitentscheidet:** (1) Knopf in der v25-Erzeugung ja/nein
+(par.6b'); (2) Generator; (3) ob der v24-Sieger den Champion-Knoten herausfordert
+(Kante gegen `v23-b01_k3p10` = Tor 1 mit Knopf: b02 192:128 und b03 214:146
+liegen vor, `/mosaic-champion-promotion`); (4) Reihenfolge der Knopf-Messungen
+K3-P2 / K3-F am Siegernetz (par.8.11/8.14).
+
 ### par.9a Widerspruch der Instrumente bei v24-b01 (11:05, offen)
 
 Tor 1 (`paired_gating`, 190 Partien): 83:107, Punkte 44,9/45,8 gegen 46,0/48,2.
