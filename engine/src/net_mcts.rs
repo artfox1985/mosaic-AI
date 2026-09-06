@@ -6707,9 +6707,9 @@ mod tests {
     fn search_config_from_spec_file_requires_variant_field() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_novariant_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
-        assert!(result.is_err(), "envelope_flush_w": 0.0, "fehlende heuristik_variante muss abgewiesen werden");
+        assert!(result.is_err(), "fehlende heuristik_variante muss abgewiesen werden");
         std::fs::remove_file(&path).ok();
     }
 
