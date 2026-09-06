@@ -98,7 +98,8 @@ Pipe im Hintergrund.
    (nicht gelaufen).
 
 **Offene Nutzer-Entscheide (Fundstellen):** Generator v25 b05 oder b06 und Knopf in der
-Erzeugung (`v25_window` par.4, `v24_window` par.9c); welches v24-Netz die Knopf-Messung
+Erzeugung (`v25_window` par.4, `v24_window` par.9c); Knoepfe in der ERZEUGUNG als Idee, K3-F und
+Kandidaten, Bauform A/B/C (`v25_window` par.10, Nutzer 22:45); welches v24-Netz die Knopf-Messung
 nachzieht (`geometric_envelope` par.8.14); K4-Skala je Runde oder gemeinsam
 (`round_estimate_leaf_term` par.4); Value-Klasse 8.000/0 (`v25_window` par.9/9a);
 `--fast-loader` als Default (`working_rules.md`: Volllauf 440 s gegen 16 min, bitgleich);

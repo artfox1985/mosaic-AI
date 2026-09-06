@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v25-Trainingsfenster zugeschnitten (stationaere Rotation aus docs/window_generation.svg, G = v24), und wie wird dabei der Spaltenbau gegen schleichendes Verlernen gesichert? | Beleg: Zuschnitt vom Nutzer festgelegt (2026-09-04, 21:50), nichts gebaut: Sockel 4.000 G + 1.350 G-1 + 450 G-2, Schwarm 8.000 G + 8.000 G-1 + 2.650 Sockel-Rest G-1 + 3.550 + 1.450 G-2 (par.1); hv2-Uebergangsabbildung ENTSCHIEDEN (par.2: 45 Traeger + 135 Ex-Traeger + 365 Schwarm); Manifest-Generator --pick gebaut (par.3); Spalten-Waechter auf drei Flaechen (par.7; v24-Fenster 44,8 % Seiten mit voller Spalte, hv2 ist spaltenreich 0,73, die gesampelten Klassen 0,19). Value-Klasse zu argmax verschoben (Nutzer 2026-09-05, par.9: 8.000/0 oder 7.000/1.000 offen). Bedingung: v24 nimmt die Champion-Kante, sonst Generatorwahl-Regel (par.4). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v25-Trainingsfenster zugeschnitten (stationaere Rotation aus docs/window_generation.svg, G = v24), und wie wird dabei der Spaltenbau gegen schleichendes Verlernen gesichert? | Beleg: Zuschnitt vom Nutzer festgelegt (2026-09-04, 21:50), nichts gebaut: Sockel 4.000 G + 1.350 G-1 + 450 G-2, Schwarm 8.000 G + 8.000 G-1 + 2.650 Sockel-Rest G-1 + 3.550 + 1.450 G-2 (par.1); hv2-Uebergangsabbildung ENTSCHIEDEN (par.2: 45 Traeger + 135 Ex-Traeger + 365 Schwarm); Manifest-Generator --pick gebaut (par.3); Spalten-Waechter auf drei Flaechen (par.7; v24-Fenster 44,8 % Seiten mit voller Spalte, hv2 ist spaltenreich 0,73, die gesampelten Klassen 0,19). Value-Klasse zu argmax verschoben (Nutzer 2026-09-05, par.9: 8.000/0 oder 7.000/1.000 offen). Generator ENTSCHIEDEN 2026-09-06 11:40: b05 ohne K3-P (par.4), seit 17:05 offen gegen b06 = Champion (Elo 1309, Nutzer: Self-Plays nur vom Champion). par.10 (22:50): Knoepfe in der ERZEUGUNG als Idee -- K3-F (Mechanik wirkt, Suche allein negativ) und Kandidatenliste mit Kriterium, drei Bauformen, nichts entschieden. -->
 
 # Vorregistrierung: das v25-Trainingsfenster
 
@@ -293,4 +293,72 @@ Herleitung von par.9 an einer Stelle, die dort uebergangen war:
 
 **Stand:** 8.000/0 bleibt OFFEN (Nutzer nicht ueberzeugt); die
 Traeger-Kennzahl v24 wird gemessen, sobald die CPU frei ist, dann Vorlage.
+
+## par.10 KNOEPFE IN DER ERZEUGUNG: Idee und Kandidaten (Nutzer 2026-09-06, 22:45)
+
+**Nutzer, woertlich:** *"vielleicht muessen wir den arm dann mit der champ konfiguration
+kombinieren"* -> auf die Rueckfrage (der K3-F-Arm IST Champion-Spec plus ein Feld;
+Spec-Diff: nur `envelope_flush_w` 0,0 gegen 1,0) die dritte Lesart bestaetigt: *"ja nimm es
+also idee fuer das v25 fenster mit. vielleicht haben wir auch gleich andere kandidaten bei
+denen es sich auszahlen wuerde sie ins self play zu werfen."*
+
+**Anlass (gemessen, `PREREG_geometric_envelope.md` par.8.14):** K3-F 1,0 am Champion b06
+vollendet je Seite 0,3-0,4 lange Reihen mehr und raeumt weniger unplatzierbar (die
+Mechanik tut, was sie soll), verliert aber 74:86 und liegt 2,4-2,8 Punkte je Seite unter
+der Kontrolle. **These (Herleitung, nicht gemessen):** ein Such-Knopf zwingt der Suche
+ein Verhalten auf, dessen Folgezustaende das Netz nie gesehen hat; der Value-Kopf
+bewertet sie darum falsch, und der Prior schlaegt die Fortsetzung nicht vor. Steht der
+Knopf beim GENERATOR, lernt das Netz die Folgezustaende (Value) und die Zuege (Policy),
+und der Preis in Punkten kann verschwinden -- oder er bleibt, dann war es die Mechanik.
+Praezedenz in der Kampagne: der Spaltenbau kam aus dem KORPUS (v22: b01 verdreifacht
+Spalten ueber das Material, das Trainingsgewicht trug nicht; `PREREG_heuristic_v2_long_rows.md`
+par.3b, aus dem Gedaechtnis der Kampagne zitiert, Fundstelle in dieser Sitzung nicht
+neu gelesen), nicht aus einem Such-Knopf.
+
+**Kriterium fuer einen Kandidaten (Vorschlag):**
+1. Die Mechanik bewegt eine Verhaltensgroesse in den Records nachweisbar (sonst gibt es
+   nichts zu lernen);
+2. die Kosten in der Suche allein sind Punkte oder Siege, NICHT ein Spaltenverlust ohne
+   Gegenwert (Richtungsregel `generation_loop.md`: spalten- UND siegverstaerkend);
+3. das Verhalten liegt auf der Kampagnen-Richtung (Plattenblick, Vollendung, Kuppel-Bonus);
+4. Welle-1-Bauform: Spec-Pflichtfeld je Seite, bitidentisch bei 0, damit die Erzeugung es
+   je Seite und je Klasse setzen kann.
+
+**Kandidaten (Stand am Knopf-Register `docs/knobs.md` und am Prereg-Index, geprueft 22:47):**
+
+| Knopf | Stand | Kriterium 1 (Mechanik) | Kosten in der Suche | Kandidat |
+| --- | --- | --- | --- | --- |
+| K3-P (Modus 1, C 1,0) | Champion-Knopf seit 2026-09-04; in der v24-Erzeugung auf beiden Seiten (v24 par.6b') | Spalten am Instrument (8.7) | keine (Champion-Kante) | gesetzt; offen ist nur b05 ohne / b06 mit (par.4) |
+| **K3-F w_flush 1,0** | 8.14: NEGATIV 74:86 | **ja**: lange Reihen vollendet +0,3-0,4, geraeumt weniger | -2,4/-2,8 Punkte, Spalten leicht | **JA (Nutzer-Idee)**; Dosis 0,5 und Kombination laufen |
+| K3-P2 (Modus 4) | 8.11a: NEGATIV 71:89 | nein: Kuppel-Bonus und lange Reihen unveraendert | Siege | nein (Kriterium 1) |
+| K3-P2 + K3-F | 8.14a laeuft (Ende rund 00:10) | offen | offen | nach Ergebnis |
+| K1 Score-Utility c 0,2 | ENTSCHIEDEN, kein Rezept (`saturating_score_utility` par.15-17) | Marge +2 bis +5 | Siege an der Champion-Kante | schwach: die Marge lernt der Value-Kopf ohnehin aus den Endstaenden; kein neues Verhalten |
+| K3 (d) Tiling W_VAL | 8.6a: bewegt nichts | nein | -- | nein |
+| K3 (d) Tiling W_TILE | par.8.3 (Stand in dieser Sitzung nicht nachgelesen, UNGEPRUEFT) | -- | -- | offen |
+| K4 Rundenschaetzer | nicht gebaut (`round_estimate_leaf_term`) | -- | -- | erst Such-Messung |
+| **K5 Reihe-6-Spezialfeld** | nicht gebaut (`special_tile_yield` par.9) | Kuppel-Bonus Netze 3,5-4,3 gegen Mensch 8,9: genau ein nie gesehenes Verhalten | -- | Kandidat NACH der Such-Messung (Bau nach den K3-Armen) |
+| Seeding-Schwarm (b03) | `start_position_seeding` par.7; b03 hoechster Kuppel-Bonus 4,2 (v24 par.9c) | ja (Plattenwahl gesaet) | kein Such-Knopf | ist bereits ein Erzeugungs-Hebel; b03 ist 714er |
+| LONG_ROW_INIT_W | ENTSCHIEDEN/UEBERHOLT (`long_row_payoff` B1: Initiierung erzwingbar, Vollendung nicht) | Initiierung ja, Vollendung nein | -- | nein |
+
+**Drei Bauformen (Vorschlag, nichts entschieden):**
+- **A, Generator-Spec traegt den Knopf auf beiden Seiten** (wie K3-P in v24): einfach,
+  alle Klassen tragen ihn. Konflikt: der Nutzer will Self-Plays nur vom Champion
+  (17:05), und ein Generator mit K3-F verliert 74:86 gegen die Champion-Spec -- Stufe 1
+  der Generatorwahl (Staerke schliesst aus) spraeche dagegen, wenn man den Knopf-
+  Generator als eigenen Arm liest.
+- **B, Knopf-Klasse:** nur ein Teil des Sockels (Traeger, policy-aktiv, gesampelt) mit
+  dem Knopf, der Rest Champion-Spec -- Vorbild Seeding-Schwarm b03. Zum Beispiel 1.000
+  der 4.000 Sockel-NEU-Partien; eigener Dateiname nach Generator und Knopf
+  (`feedback_selfplay_naming_convention`), Manifest-Kennzeichnung, Fenster-Pinning.
+  Messbar je Klasse: Traeger-Kennzahl (par.9a) und lange Reihen vollendet. Der
+  Champion bleibt Generator der uebrigen Klassen.
+- **C, eine Seite je Partie** (Muster `MOSAIC_ASYM_VORZUG`, Spec je Seite): der Gegner
+  sieht das Verhalten, der Value-Kopf lernt beide Seiten, keine zusaetzlichen Partien.
+  Halbiert die Dosis im Material.
+
+**Was vorher zu klaeren ist:** (1) Dosis aus der laufenden Kette (K3-F 0,5, Kombination
+par.8.14a); (2) Bauform A/B/C und Anteil; (3) der Spalten-Waechter par.7 gilt unveraendert,
+Bezug bleibt der Generator ohne Knopf-Klasse; (4) dieser Absatz ist die IDEE -- vor der
+Erzeugung bekommt die Knopf-Klasse eine Zeile in der par.1-Tabelle und einen Arm-Namen.
+Erzeugung startet NUR auf Nutzer-Anweisung.
 
