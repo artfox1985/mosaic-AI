@@ -109,6 +109,20 @@ dieselbe -- nur heisst G dann nicht v24. Ob die v25-Erzeugung mit K3-P C 1,0
 oder mit einem der v24-Arme (`PREREG_geometric_envelope.md` par.8.9b) faehrt,
 ist eine eigene Frage der v24-Abnahme, nicht dieses Zuschnitts.
 
+**ENTSCHIEDEN (Nutzer 2026-09-06, 09:40 und 11:40): Generator der v25-Erzeugung
+ist `v24-b05` (`models/alphazero_v24-b05_brierbest.onnx`, INPUT_SIZE 744), und
+die Erzeugung faehrt OHNE K3-P** (Spec `models/k3v_off.spec.json`, nicht par.6b'
+der v24-Prereg). Begruendung aus der Abnahme (`PREREG_v24_window.md` par.9/9c):
+"744er bleibt fix" schliesst die 714er-Arme aus; unter den 744er-Armen hat nur
+b05 einen Tor-1-Beleg, und nur in der Knopf-losen Fassung (66:34 und 112:78,
+zwei Seeds; mit Knopf 219:181 ohne Entscheid), Tor 2b gehalten (98:62,
+Spalten 0,650 / 0,557 gegen 0,500 / 0,570). Folgen: das Rezept par.6 der
+v24-Prereg gilt mit `--spec models/k3v_off.spec.json` statt der Champion-Spec;
+der Spalten-Waechter par.7 bekommt als Generator-Bezug b05 ohne Knopf 0,4825
+(Tor 2a, `tor2a_v24b05nk.json`) statt 0,555; Wheel 744 (Kontrakt
+20b442a8164f748d, mit K3-P2 und K3-F, beide Default aus). Start der Erzeugung
+NUR auf Nutzer-Anweisung.
+
 ## par.5 Cache-Kosten: nur der Monolith
 
 Alle G-1- und hv2-Bloecke liegen (Watcher der v24-Erzeugung, 4.849

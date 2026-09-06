@@ -126,7 +126,9 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    Spalten gleichauf, Kuppel-Bonus 4,2); OHNE K3-P: b05 (66:34, zweiter Seed
    laeuft, Tor 2b gehalten). b02 staerkster Beleg, aber spaltenaermer. **Nutzer 09:40:
    "744er bleibt fix drinnen"** -- Kandidaten damit b04/b05; Records tragen die 744er-
-   Schluessel (geprueft, par.9c). Generator-Entscheid offen.
+   Schluessel (geprueft, par.9c). **Nutzer 11:40: Generator v25 = b05, Erzeugung OHNE
+   K3-P** (v25 par.4). Champion-Frage offen (b05 gegen v23-b01_k3p10 in Spielkonfiguration
+   nicht gemessen). Erzeugung startet NUR auf Anweisung.
 6. **Danach VORLAGE v25-Zuschnitt** (`PREREG_v25_window.md` par.9/9a): Traeger-
    Kennzahl v24 0,356 gegen Fenster 0,624; v25 nach par.1 rechnerisch 0,23.
    Hebel: Sockel-Betriebspunkt (Pilot: 400 Sockel-Partien in 2-3 Rausch-
