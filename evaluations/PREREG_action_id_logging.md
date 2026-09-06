@@ -256,7 +256,17 @@ angefasst -- par.6 schliesst genau das aus.
 
 **Zwei bewusste Luecken, beide markiert und beide vom Rueckfall gedeckt:**
 
-1. **`Pass` schreibt nichts** -- weder im Mensch- noch im KI-Pfad. Es ist der
+1. **`Pass` schreibt nichts** -- weder im Mensch- noch im KI-Pfad. **GESCHLOSSEN
+   2026-09-07 (Nutzer 00:00: "fuege in den logs das passen als eigenen schritt ein.
+   dann haben wir das immer sauber drinnen"):** `game.rs` schreibt je Pass die
+   Textzeile `⏭️ <Name>: passt`, `py.rs` dazu die `#a`-Zeile (ID 0) in beiden
+   Pfaden; der Replayer liest die Kategorie `PASS` und rekonstruiert implizite
+   Paesse nur noch fuer Logs von davor (`ensure_drafting_actor` duldet genau
+   die eine Pass-Zeile). `tools/claude_play.py` braucht `trailing_pass` (Blocker
+   3 der Spiel-Prereg) fuer neue Partien nicht mehr. Anker-Records tragen kein
+   Log (geprueft am Golden-Probe-Record: Schluessel ohne `log`), Arena-Artefakte
+   mit `--log-games` bekommen die Zeile zusaetzlich. Test `pass_writes_its_own_log_line`.
+   Der urspruengliche Befund bleibt als Chronik: Es ist der
    einzige Drafting-Zug ohne Logzeile, und `Replayer.ensure_drafting_actor`
    bricht ab, wenn `apply_pass` die Log-Laenge veraendert. Passes rekonstruiert
    der Replay ohnehin aus dem Spielerwechsel. (Der Heuristik-KI-Pfad hat das im

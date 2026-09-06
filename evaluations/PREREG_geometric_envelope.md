@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt (8.7 gepoolt 191:129, Champion-Knopf seit 2026-09-04, par.11). Am Champion v24-b06 gemessen 2026-09-06: K3-P2 NEGATIV (8.11a, 71:89), K3-F 1,0 NEGATIV (8.14, 74:86, vollendet +0,3 lange Reihen, zahlt Punkte), K3-F 0,5 NEGATIV (8.14, 77:83, Arena-Spalten darunter); Kombination laeuft (8.14a). par.8.15: Huellenform (gemessene Huelle, zweite Zelle in Zeile 6 als Knopf) registriert, Bau laeuft. Schliesskriterium par.12 (Value-Entlastung, Rauschboden par.12b gemessen) offen. -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt (8.7 gepoolt 191:129, Champion-Knopf seit 2026-09-04, par.11). Am Champion v24-b06 gemessen 2026-09-06: K3-P2 NEGATIV (8.11a, 71:89), K3-F 1,0 NEGATIV (8.14, 74:86, vollendet +0,3 lange Reihen, zahlt Punkte), K3-F 0,5 NEGATIV (8.14, 77:83, Arena-Spalten darunter), K3-P2 + K3-F 1,0 NEGATIV (8.14a, 69:91, Punkte -5,7/-1,9): alle vier Knopf-Arme am Champion negativ. par.8.15: Huellenform (gemessene Huelle, zweite Zelle in Zeile 6 als Knopf) registriert, Bau laeuft. Schliesskriterium par.12 (Value-Entlastung, Rauschboden par.12b gemessen) offen. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -2044,4 +2044,31 @@ am Champion negativ; als Such-Knopf allein ist es kein Rezept. Weiterverfolgt wi
 als Erzeugungs-Knopf (`PREREG_v25_window.md` par.10, Nutzer 22:45) und (b) auf der Huellenform
 mit zweiter Zelle in Zeile 6 (par.8.15 Teil B), weil die Blockade der Reihe 6 an der
 Ein-Zellen-Spitze des Dreiecks haengt. Kombination K3-P2 + K3-F 1,0 (par.8.14a) laeuft.
+
+### par.8.14a KOMBINATION K3-P2 + K3-F 1,0 AM CHAMPION v24-b06 (gefahren 2026-09-06/07, 23:20-00:22; Arm = Spec `k3p2f_w10`: Modus 4, w_slot 0,5, `envelope_flush_w` 1,0; Kontrolle Champion-Spec; Instrument `k3_p2f10_v24b06.json`, Arena `paired_arena_env_k3p2f10_b06_vs_k3p_{first,second}_s14.json`; Auswerter `k3_arm_summary.py p2f10`)
+
+| Groesse | K3-P2 + K3-F 1,0 | Kontrolle K3-P |
+| --- | --- | --- |
+| argmax @400, volle Spalten (200 Partien, Seed 20260931) | **0,4400** (KI +-0,064), Punkte 46,7, Strafleiste 5,8 | 0,4975 (`tor2a_v24b06.json`) |
+| Arena 2 x 80, Siege | **69 : 91** (Brett 0: 33:47, Brett 1: 36:44; Vorzeichentest p 0,10) | |
+| Arena, volle Spalten je Seite (Brett 0 / Brett 1) | 0,412 / 0,487 (SE 0,08) | 0,512 / 0,537 |
+| Arena, Punkte | 40,4 / 43,1 | 46,1 / 45,1 (Marge -5,7 / -1,9 gegen den Arm) |
+| Arena, Strafleiste | 12,6 / 12,0 | 9,3 / 10,9 |
+| Kuppel-Bonus je Partie | 3,1 / 3,7 | 2,9 / 3,6 |
+| lange Reihen begonnen / vollendet / geraeumt (Records, je Seite) | 4,53 / **3,04** / 0,25 und 4,42 / **3,12** / 0,19 | 4,15 / 2,45 / 0,31 und 3,98 / 2,36 / 0,31 |
+
+**Verdikt (Tor 1/2):** die Kombination ist der schwaechste der vier Arme: 69:91, Punkte bis
+5,7 je Seite darunter, Strafleiste 1-3 Steine hoeher, Spalten in beiden Richtungen und am
+Instrument (-0,0575, am Rand der KI) darunter. Die Reihen-Mechanik ist am staerksten
+sichtbar (vollendet +0,6 / +0,8 je Seite), und sie kostet am meisten. Die Effekte von K3-P2
+und K3-F addieren sich in den Kosten, nicht im Nutzen.
+
+**Bilanz der vier Knopf-Arme am Champion v24-b06 (par.8.11a, 8.14, 8.14a):** K3-P2 71:89,
+K3-F 1,0 74:86, K3-F 0,5 77:83, beide 69:91 -- kein Arm gewinnt, keiner haelt die Spalten
+der Kontrolle. Der Champion-Knopf bleibt K3-P (Modus 1, C 1,0) allein. Die Reihen-
+Vollendung laesst sich per Such-Knopf erzwingen (+0,3 bis +0,8 je Seite), wird aber in
+jeder Dosis mit Punkten bezahlt; Konsequenz und Nutzer-Lesart in `PREREG_v25_window.md`
+par.10 (Such-Knopf als Verstaerker, nicht als Lehrer; K3-F als Erzeugungs-Kandidat) und
+par.8.15 (Huellenform als naechster Arm). Rauschboden-Bezug: C1 (par.12) wird an keinem
+der vier Arme bewertet, weil alle an Tor 1/2 scheitern (Regel par.12b).
 
