@@ -219,3 +219,9 @@ A, danach b06-Abnahme). Noch nichts gespielt.
 5. **Weg 2 nur als Rueckfall** (Nutzer 12:50: "weg 2 als rueckfall ist ok"). ENTSCHIEDEN.
 6. **Verbleib: das Werkzeug bleibt in `tools/`** (`tools/claude_play.py`).
    ENTSCHIEDEN; par.3.5 entsprechend: kein Abbau nach par.7.
+7. **Wer spielt: ein SUBAGENT** (Nutzer 16:46: "Wichtig ist nur dass das Spiel gegen dich
+   via subagent gestartet wird. Dein Modell ist zu teuer fuer diese spielerein").
+   ENTSCHIEDEN: die Partien fuehrt ein Subagent (Modell Opus, mittlerer Aufwand,
+   CLAUDE.md-Vorgabe) ueber `tools/claude_play.py`; der Koordinator startet ihn im
+   CPU-freien Fenster, prueft sein Protokoll (par.4.4) nach Regel 0 und registriert
+   hier. "Claude" in dieser Prereg meint ab jetzt den Subagenten.
