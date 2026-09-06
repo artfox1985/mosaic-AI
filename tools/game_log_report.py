@@ -292,11 +292,11 @@ def build_report(header: dict, log_path: Path, rep: "Replayer", divergence: str 
     if rep.silent_chip_gaps:
         gaps = ", ".join(f"R{r} {players[a]} Reihe {pr + 1}" for r, a, pr in rep.silent_chip_gaps)
         P(f"- **Entdeckte Logging-Luecke (KI-Bonuschips)**: der Mensch-Pfad `apply_tiling_chips` "
-          f"(py.rs) loggt \"🎫 ... komplettiert Reihe N ...\", der KI-Pfad (`ai_tiling_step` -> "
+          f"(py.rs) loggt \"🎴 ... komplettiert Reihe N ...\", der KI-Pfad (`ai_tiling_step` -> "
           f"`TilingStep::Chips` -> `apply_bonus_chips_with`, round_end.rs) tut das NICHT. "
           f"Betroffen in dieser Partie: {gaps}. Das Replay-Werkzeug erkennt die unvollstaendige "
           f"Zielreihe und holt die Chip-Komplettierung automatisch nach (ohne die dabei "
-          f"entstehende, im Original fehlende \"🎫\"-Zeile gegen das Log zu pruefen).")
+          f"entstehende, im Original fehlende \"🎴\"-Zeile gegen das Log zu pruefen).")
     P("- **Determinisierung**: `net_search_state_json` rekonstruiert verdeckte Information "
       "(Beutel/Turm/Kuppelstapel/Bonuschip-Pool) aus Zählern/Masken und mischt sie NEU mit "
       "einem festen, aus dem Zugindex abgeleiteten Seed -- das Oracle sieht also, wie ein "

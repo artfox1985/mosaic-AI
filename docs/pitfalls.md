@@ -112,7 +112,7 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   JEDE geloggte Vollendung -- auch die der KI -- ueber den Menschen-Einstieg
   `apply_tiling_chips` (`analyze_game_log.py:926`), und der ist GREEDY
   (`round_end.rs:458` -> `:525` -> `:487`: ohne zwei farbgleiche nimmt er
-  `pool.iter().take(3)`, die ersten drei der Hand). Die 🎫-Logzeile
+  `pool.iter().take(3)`, die ersten drei der Hand). Die Chip-Logzeile
   (`py.rs:925`) nennt nur die Reihe, nie die verbrauchten Chips -- die
   Divergenz ist damit UNSICHTBAR und schlaegt erst Runden spaeter zu.
   Nachgerechnet an der Partie: greedy verbrennt in R2 den Chip
@@ -128,7 +128,7 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   `maybe_silent_chip_complete` zuschreiben** -- der stille Pfad hat hier
   nachweislich NICHT ausgeloest, der Abbruch kommt aus dem regulaeren
   `apply`-Pfad.
-  **Diese Zuschreibung gilt aber NUR fuer Logs mit 🎫-Zeilen** (Mensch- und
+  **Diese Zuschreibung gilt aber NUR fuer Logs mit Chip-Zeilen** (Mensch- und
   Server-Partien). Nachgemessen am 2026-08-30 an 20 Arena-Partien aus
   `paired_arena_env_imm_netvnet.json`: dort laufen **alle** Chip-Vollendungen
   still (in den drei abbrechenden Partien 14 stille, 0 geloggte), denn der
@@ -257,3 +257,11 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   Hintergrundauftrag einer parallelen Bedienanwendung, die geschlossen wurde;
   deren Kindprozesse gingen mit. Solange Laeufe an einer Sitzung haengen,
   die Anwendung offen lassen.
+
+**NACHTRAG 2026-09-07 (Nutzer):** die Chip-Zeile traegt seither das Symbol 🎴 (vorher
+🎫; 🎴 stand schon fuer "Bonusplaettchen aufgedeckt", execution.rs) UND die verbrauchten
+Plaettchen in Klammern -- `🎴 <Name> komplettiert Reihe N mit Bonus-Chips (3 Plättchen:
+rot, gelb+blau, schwarz)!`. Damit ist der oben beschriebene Schaden an der Wurzel behoben:
+welche Chips real verbraucht wurden, steht jetzt im Log. Altlogs tragen weder Symbol noch
+Zusatz; `tools/analyze_game_log.py` traegt dafuer zwei datierte Toleranzen
+(`chip_symbol_toleriert`, `chip_zusatz_toleriert`) und einen Regex, der beide Symbole trifft.
