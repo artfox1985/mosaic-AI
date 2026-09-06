@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt (8.7 gepoolt 191:129, Champion-Knopf seit 2026-09-04, par.11). Am Champion v24-b06 gemessen 2026-09-06: K3-P2 NEGATIV (8.11a, 71:89), K3-F 1,0 NEGATIV (8.14, 74:86, vollendet +0,3 lange Reihen, zahlt Punkte), K3-F 0,5 NEGATIV (8.14, 77:83, Arena-Spalten darunter), K3-P2 + K3-F 1,0 NEGATIV (8.14a, 69:91, Punkte -5,7/-1,9): alle vier Knopf-Arme am Champion negativ. par.8.15: Huellenform (gemessene Huelle, zweite Zelle in Zeile 6 als Knopf) registriert, Bau laeuft. Schliesskriterium par.12 (Value-Entlastung, Rauschboden par.12b gemessen) offen. -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt (8.7 gepoolt 191:129, Champion-Knopf seit 2026-09-04, par.11). Am Champion v24-b06 gemessen 2026-09-06: K3-P2 NEGATIV (8.11a, 71:89), K3-F 1,0 NEGATIV (8.14, 74:86, vollendet +0,3 lange Reihen, zahlt Punkte), K3-F 0,5 NEGATIV (8.14, 77:83, Arena-Spalten darunter), K3-P2 + K3-F 1,0 NEGATIV (8.14a, 69:91, Punkte -5,7/-1,9): alle vier Knopf-Arme am Champion negativ. par.8.15: Huellenform 2 (zweite Zelle in Zeile 6) ist der ERSTE positive Arm (8.15b): Spalten 0,787/0,700 gegen 0,625/0,550, Kuppel-Bonus 4,7/4,6 gegen 3,8/3,6, Siege 85:75 (p 0,48, nicht belegt); Replikation offen. Schliesskriterium par.12 (Value-Entlastung, Rauschboden par.12b gemessen) offen. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -2120,3 +2120,66 @@ registriert; die 56er-Rechnung liefert zusaetzlich einen Kandidaten fuer eine dr
 Vorbehalt: die Mensch-Zahlen stammen aus 22 Partien gegen wechselnde KI-Staerken, und die
 Rucksack-Rechnung optimiert die Haeufigkeitssumme, nicht den Punktertrag.
 
+### par.8.15b ERGEBNIS TEIL B: Huellenform 2 am Champion v24-b06 -- der erste Arm, der traegt (gefahren 2026-09-07, 00:55-01:49, `tools/hull_form_arm.sh`)
+
+Netz `alphazero_v24-b06_brierbest.onnx` auf beiden Seiten; Arm = Spec `hullform2` (Champion-Spec
+plus `envelope_hull_form` 2, sonst zeichengleich), Kontrolle = Champion-Spec (Form 1).
+Instrument `k3_hull2_v24b06.json`, Arena `paired_arena_env_k3hull2_b06_vs_k3p_{first,second}_s14.json`,
+Sonden `columns_...`, `points_...`, `tiling_geometry_hull2_v2.json`; Auswerter `k3_arm_summary.py hull2`.
+
+| Groesse | Huellenform 2 | Kontrolle (Dreieck) |
+| --- | --- | --- |
+| argmax @400, volle Spalten (200 Partien, Seed 20260931) | **0,5725** (KI +-0,071), Punkte 48,7, Strafleiste 5,8 | 0,4975 (`tor2a_v24b06.json`) |
+| Arena 2 x 80, Siege | **85 : 75** (Brett 0: 46:34, Brett 1: 39:41; Vorzeichentest p 0,48) | |
+| Arena, volle Spalten je Seite (Brett 0 / Brett 1) | **0,787 / 0,700** (SE 0,090) | 0,625 / 0,550 (SE 0,086 / 0,087) |
+| Arena, Punkte | 49,5 / 45,5 | 47,5 / 46,2 (Marge +2,0 / -0,8) |
+| **Kuppel-Bonus je Partie** | **4,7 / 4,6** | 3,8 / 3,6 |
+| lange Reihen begonnen / vollendet / geraeumt | 4,53 / **2,99** / 0,20 und 4,51 / **3,01** / 0,34 | 4,09 / 2,71 / 0,17 und 4,12 / 2,55 / 0,26 |
+| offen am Ende (Herleitung) | 1,34 / 1,16 | 1,21 / 1,31 |
+
+**Verdikt: der erste positive Arm der Knopf-Kette.** Alle vier vorherigen Arme (K3-P2 71:89,
+K3-F 1,0 74:86, K3-F 0,5 77:83, beide 69:91) lagen bei den Siegen UND den Spalten unter der
+Kontrolle. Die Huellenform 2 dreht beides:
+
+1. **Volle Spalten in BEIDEN Richtungen deutlich darueber**: +0,162 und +0,150. Das ist die
+   Groesse, um die die ganze Kampagne gefuehrt wird, und der erste Knopf, der sie hebt statt
+   sie zu kosten. Vorbehalt zur Signifikanz: die Standardfehler je Seite sind rund 0,09, die
+   Differenz zweier Seiten traegt damit rund 0,125 -- die Einzelrichtung ist NICHT
+   signifikant, aber beide Richtungen zeigen gleich stark in dieselbe Richtung, und der
+   Rauschboden par.12b Punkt 3 nennt fuer die Block-SD der Spalten eine Spannweite von
+   0,23 bis 0,46 ueber identische Aufbauten (Verhaeltnis 2,0).
+2. **Kuppel-Bonus +0,9 bis +1,0 je Partie** (4,7/4,6 gegen 3,8/3,6). Das ist der groesste
+   Sprung dieser Groesse in der ganzen Generation -- die sechs v24-Arme lagen alle zwischen
+   3,5 und 4,3 (`special_tile_yield` par.9), der Mensch bei 8,9. **Mechanisch erwartbar:**
+   die zweite Huellenzelle in Zeile 6 gibt der Spezialplatte einen zweiten Zielplatz, und
+   genau das war die Begruendung fuer K5 (par.9 Punkt 1 dort). Die Form liefert also einen
+   Teil dessen, wofuer K5 gebaut werden sollte, ohne eigenen Term.
+3. **Lange Reihen vollendet +0,28 bis +0,46** je Seite, ohne den Punktepreis, den K3-F dafuer
+   zahlte. Die Reihe 6 passt jetzt mit zwei Farben in die Huelle statt mit einer.
+4. **Siege 85:75, nicht signifikant** (p 0,48), aber erstmals auf der richtigen Seite; Punkte
+   in einer Richtung +2,0, in der anderen -0,8.
+5. **Instrument +0,075** gegen Bezug 0,4975 -- knapp ueber der eigenen KI von 0,071, also am
+   Rand der Aufloesung, und in derselben Richtung wie die Arena. Bei den vier
+   Vorgaenger-Armen widersprachen sich Instrument und Arena regelmaessig (K3-F 0,5:
+   Instrument +0,048, Arena -0,19).
+
+**Was NICHT belegt ist, ausdruecklich:** die Siege. 85:75 ist ein Zufallsbefund im Sinne der
+Projekt-Strenge (n >= 150 Paare ODER Replikation, `generation_loop.md`), und die
+Spalten-Differenz je Einzelrichtung liegt unter ihrem Standardfehler. Der Befund traegt, weil
+DREI unabhaengige Groessen (Spalten, Kuppel-Bonus, Reihen-Vollendung) in beiden Richtungen
+gleichsinnig zeigen -- nicht weil eine davon fuer sich signifikant waere.
+
+**Ein Messfehler im eigenen Aufbau, benannt:** die Reihen-Alter-Sonde
+(`tiling_geometry_hull2_v2.json`) rechnet ihr Blockade-Praedikat mit der DREIECKS-Huelle
+(Python-Nachbau in `tiling_geometry_probe.py`), sie kennt Form 2 nicht; ausserdem mischt der
+Lauf ueber beide Arena-Richtungen Arm und Kontrolle je Seitenname. Ihre Zahlen (Reihe 6 je
+blockiert 0,69 / 0,67) sind darum fuer den ARM-Vergleich unbrauchbar und stehen hier nur als
+Kontext. Wer die Blockade-Wirkung der Form messen will, muss das Praedikat der Sonde um die
+Form erweitern -- registriert als Nacharbeit, nicht gemacht.
+
+**Naechster Schritt (Vorschlag, Nutzer-Entscheid):** Replikation mit einem zweiten Seed
+(20261013, rund 28 min) -- das ist die Champion-Strenge und der billigste Weg, aus einem
+gleichsinnigen Dreiklang einen Beleg zu machen. Traegt sie, ist die Form ein Kandidat fuer
+die Champion-Spec (wie K3-P am 2026-09-04) und fuer die v25-Erzeugung
+(`PREREG_v25_window.md` par.11 E). Danach erst K5, weil die Form einen Teil seiner Wirkung
+schon liefert und der Baustein sonst gegen einen bewegten Bezug gemessen wuerde.
