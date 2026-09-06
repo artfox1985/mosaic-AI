@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4) gebaut 2026-09-05, K3-F (Reihe freiraeumen, Spec-Feld envelope_flush_w) Code gebaut 2026-09-06 nach der Reihen-Alter-Messung (par.8.14: Reihe 6 bei den Netzen in 57-58 % der Episoden blockiert); Messung beider am v24-Siegernetz offen (par.8.11/8.14). WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12; Messgroessen par.12a, Schwellen werden aus dem Rauschboden GEMESSEN, Verfahren par.12b, Zahlen offen). -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4) gebaut 2026-09-05, K3-F (Reihe freiraeumen, Spec-Feld envelope_flush_w) gebaut, getestet und installiert 2026-09-06 nach der Reihen-Alter-Messung (par.8.14: blockierte 6er-Reihen werden zu 22-27 % gelegt gegen 86-90 %), Anker GRUEN; Messung beider am v24-Siegernetz offen (par.8.11/8.14). WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12; Messgroessen par.12a, Schwellen werden aus dem Rauschboden GEMESSEN, Verfahren par.12b, Zahlen offen). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -1656,7 +1656,7 @@ erzwingbar, Vollendung nicht") von der Reihen-Seite gesehen: die Reihe ist
 begonnen, aber die Geometrie (Platte) fehlt. Sie gehoert zu Bedingung 1 des
 Schliesskriteriums (par.12: sauber implementiert).
 
-## par.8.14 BAUSTEIN K3-F "REIHE FREIRAEUMEN" (Nutzer-Vorgabe 2026-09-06, 00:32; Messung 03:12, Code GEBAUT 03:25, cargo test und Wheel ausstehend)
+## par.8.14 BAUSTEIN K3-F "REIHE FREIRAEUMEN" (Nutzer-Vorgabe 2026-09-06, 00:32; Messung 03:12/09:22, GEBAUT und GETESTET 10:06, Wheel installiert, Anker GRUEN; Messung am Siegernetz offen)
 
 **Nutzer, woertlich:** *"es laesst sich ja ablesen ob mit der momentan gelegten
 musterreihe die huelle geschlossen werden kann oder nicht. wenn nicht -> prio
@@ -1807,6 +1807,19 @@ b05-Abnahme; `cargo test` und Wheel im CPU-freien Fenster nach der b03-Abnahme):
   714er-/744er-Wheel lehnt ein unbekanntes Feld hart ab. Bis dahin: KEIN
   Wheel aus HEAD bauen und installieren. Eingefrorene Artefakt-Specs
   bleiben unangetastet (eigenes Wheel).
+- **GETESTET UND INSTALLIERT (2026-09-06, 10:06):** `cargo test --release` GRUEN
+  (523 Tests, darunter `flush_projection_rewards_completing_rows_that_cannot_serve_hull`),
+  Wheel `mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl` (10:06) in die Basis
+  installiert, Kontrakt unveraendert `20b442a8164f748d` (w_flush ist kein
+  Vertragsbestandteil), `engine_config` traegt `envelope_flush_w` 0,0.
+  **Anker-Drift GRUEN** (`anchor_drift_live_wheel_20260906_k3f.json`, 1.763
+  Schritte Feld fuer Feld gleich) und **Konservierung GRUEN**
+  (`anchor_conservation_artifact_wheel_20260906.json`). Die acht lebenden
+  `models/*.spec.json` tragen `envelope_flush_w: 0.0` (`tools/spec_add_field.py`).
+  Zwei Bau-Stolperer, behoben: der Regex-Nachzug in den Inline-Test-Specs
+  traf einen Spec-String ohne Folgekomma (Feld rutschte in ein `assert!`,
+  rustfmt prueft Makro-Inhalte nicht); der bash-PATH braucht die Python-DLL
+  in POSIX-Form (`cygpath -u`), sonst STATUS_DLL_NOT_FOUND.
 - Messplan (unveraendert par.8.14 oben): K3-P2 allein, K3-F allein, beide,
   am v24-Siegernetz, Kennzahl "offene lange Reihen am Ende" neben Spalten und
   Siegen; Dosis-Vorschlag aus der Messung: `w_flush` 1,0 (die Reihe zaehlt,
