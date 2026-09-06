@@ -36,6 +36,10 @@ ort = { version = "=2.0.0-rc.12", optional = true, features = ["cuda"] }
 # Zaehlt GameState-Klone im Such-Hot-Path (mcts.rs/net_mcts.rs) via AtomicUsize.
 # Nur fuers Profiling gedacht -- im Normalbetrieb aus (Zero-Cost, da wegkompiliert).
 clone_profiling = []
+# Wertungsplatten-Shaping (Task #93, shaping.rs PLATE_SHAPING_ENABLED): Mess-Wheel-Arm. Im
+# Normalbetrieb AUS; der Paritaetstest in net_mcts.rs ist per #[cfg(not(feature = ...))]
+# an diesen Zustand gebunden statt zur Laufzeit zu ueberspringen (Regel-5-Fehlalarm 2026-09-06).
+plate_shaping = []
 # Schaltet die optionale ort-Abhaengigkeit frei (siehe Kommentar oben).
 ort_cuda_probe = ["dep:ort"]
 

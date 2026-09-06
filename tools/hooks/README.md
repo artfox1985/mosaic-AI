@@ -179,3 +179,13 @@ git push --no-verify
 Das ist beabsichtigt (siehe Design-Dok): ein Haken, der bei jedem
 Fehlalarm eine Debatte erzwingt, wird irgendwann pauschal umgangen. Diese
 Haken sind ein Werkzeug gegen VERSEHEN, nicht gegen Absicht.
+
+## Python-Tests im pre-commit (seit 2026-09-06)
+
+Nach dem Konventions-Check faehrt `pre-commit` `python -m unittest discover -s
+tools/tests -p "test_*.py"` (rund 0,3 s, rot blockiert). Dort liegen nur Tests
+ohne Wheel, Korpus oder Netz: `test_train_manifest_flags.py` (jedes argparse-Flag
+von train.py mit Verhaltenswirkung steht in `_cli_args`, Ausnahmen namentlich),
+`test_tiling_geometry_probe.py` (Reihen-Alter-Sonde, reine Logik),
+`test_spec_add_field.py`. Der Shell-Test `train_resume_pause_test.sh` (GPU,
+Minuten) bleibt Handstart.
