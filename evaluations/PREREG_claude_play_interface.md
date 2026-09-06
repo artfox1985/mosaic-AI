@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: Werkzeug tools/claude_play.py gebaut 2026-09-06 13:12 (py_compile, Import), Rauchtest steht aus (CPU belegt), nichts gespielt. Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: g01 gespielt 2026-09-06 (Subagent Opus): Claude 72:42 gegen Champion v24-b06 @400, sechs Beobachtungen als Sondenkandidaten (par.7); Werkzeug nach drei Blockern (Farbzaehler, globaler Mondzug, Pass ohne Log) stabil. 9 Partien offen. Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -204,7 +204,29 @@ Gegner-Spec als Env vor dem Engine-Import wie `server.py`, Netz-Zuege ueber
 Manifest je Partie mit Seed, Erstspieler, Modell, Sims, Spec, Kontrakt-Hash;
 Partien unter `evaluations/artifacts/claude_play/<id>/`). Nur `py_compile` und
 Import geprueft; **Rauchtest steht aus**, weil die CPU belegt ist (Champion-Kante
-A, danach b06-Abnahme). Noch nichts gespielt.
+A, danach b06-Abnahme). **g01 (2026-09-06, 18:46-19:5x, drei Agenten-Laeufe wegen zweier Werkzeug-Blocker; Seed
+20260906, Claude Spieler 0 und Erstspieler, Gegner Champion `v24-b06` mit K3-P @400):
+Claude 72 : 42 Netz, Claude gewinnt.** 78 Claude-Zuege; Endwertung Claude Diagonale +10,
+Aussenfelder +9, Spezialfelder -9; Netz Diagonale 0, Aussenfelder +11, Spezialfelder -12.
+Log `evaluations/artifacts/claude_play/g01/game.log` (433 Zeilen, Server-Format), Notizen
+`notes.md` (13 Zeilen). Protokoll des Agenten (Behauptungen, vom Koordinator noch nicht
+am Log nachgeprueft):
+1. Runde 1 und 3: das Netz zog verdeckt vom Stapel, bis der Punktestand von 5 auf 0 bzw.
+   6 auf 1 fiel (je 5 Punkte fuer eine Platte); bei Stand 0 sind weitere Zuege gratis.
+2. Runde 1-3: Reihe 2 (rot 3/3) lag unplatzierbar, das Netz legte zwei Platten in die
+   Kuppelzeile 2 ohne rot-Zelle (Rotation ohne Ruecksicht auf die wartende volle Reihe).
+3. Runde 3: Kachel 7 auf Slot (1,1) rot 180 setzte das gesperrte Spezialfeld auf z2c2,
+   eine Zelle der eigenen Hauptdiagonale bei ausliegender Diagonal-Wertungsplatte;
+   Diagonale des Netzes damit strukturell tot (0 gegen 10 Punkte).
+4. Runde 3: fast fertige Reihe 6 (tuerkis 5/6) nicht geschlossen, obwohl genau ein
+   tuerkis auf dem Tisch lag (in die 1er-Reihe gelegt).
+5. Runde 5: Chipwahl ohne Ruecksicht auf die kuerzeste Luecke (zwei ungenutzte Chips).
+6. Partieende mit drei angefangenen langen Reihen (par.8.13-Muster).
+Eigene Fehler des Agenten: Startplatte mit Spezialfeld auf dem unwahrscheinlichsten
+Platz, Chips zu frueh ausgegeben, Slots (1,2)/(2,1) bis Runde 4 frei gelassen (-9
+Spezialfelder). Werkzeug-Maengel notiert: `KI:`-Zeile zeigt Aktionsbeschreibung mit
+falschen Zaehlern, gefuelltes Spezialfeld nicht vom leeren unterscheidbar.
+Restprogramm: 9 Partien (4 als Erst-, 5 als Zweitspieler).
 
 ## par.8 Nutzer-Entscheide (2026-09-06, 12:40, woertlich: "partienanzahl 10 ist ok, gegner champ @400 ist ok, uebereinstimmungsmessung nein, werkzeug bleibt dann in tools.")
 
