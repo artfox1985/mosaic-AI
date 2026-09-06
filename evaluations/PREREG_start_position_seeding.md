@@ -460,3 +460,84 @@ Wiederaufnahme:** der b03-Befund (par.7) zeigt, dass Seeding Verhalten bewegt
 die Auswahlregel der Startstellungen kein Hebel, und der Baustein bleibt
 gefaltet.
 
+## par.9 VERZWEIGEN (Branching): Machbarkeit am Code geprueft (2026-09-07, 01:50; Nutzer-Auftrag "schau ob branching auch fuer uns baubar waere")
+
+**Woher die Frage kommt.** Nutzer 01:05: das Self-Play zerstoert die Spalten frueh, der
+Zufall sollte weniger aus der Temperatur und mehr aus dem Spiel kommen; 01:25 praezisiert:
+argmax spielen, dann x Zuege mit Temperatur simulieren, dann wieder argmax -- "so sieht das
+Netz beides". Externer Stand (Web-Recherche 2026-09-07, Quelle
+[Wu 2019, arXiv:1902.10565](https://arxiv.org/pdf/1902.10565)): **KataGo macht genau das.**
+In 5 % der Partien wird nach r Zuegen verzweigt (r exponentiell verteilt), 3 bis 10 Zuege
+werden GLEICHVERTEILT gezogen, jeder bekommt EINE Netzbewertung, der beste davon wird
+gespielt; ein zufaelliges Viertel dieser Zweige laeuft rekursiv einen Zug weiter. Zweck laut
+Paper: ein kleiner Anteil Trainingsdaten darueber, wie man auf Zuege antwortet, die eine
+volle Suche nie spielen wuerde. **Unsere eigene Recherche
+(`RESEARCH_alphazero_improvements_2026-08-01.md`) hat aus derselben Arbeit die Playout Cap
+Randomization als Fund 6 uebernommen (gebaut, A/B negativ), das Verzweigen aber nicht --
+das Wort kommt dort nicht vor (geprueft: 0 Treffer).**
+
+**Der wichtige Unterschied zur Temperatur:** KataGo streut BREIT und filtert sofort mit
+einer einzelnen Netzbewertung. Es erzwingt keinen erkennbar schlechten Zug, sondern nur
+einen ungewoehnlichen. Temperatur-Sampling nimmt dagegen den zweitbesten Zug in Kauf -- und
+genau das zerstoert die halbfertige Spalte (Anlass von Messung 3-V,
+`PREREG_search_path_remeasurements.md`).
+
+### Baubarkeit: JA, und billiger als `PREREG_uncertainty_guided_selfplay.md` par.5 annimmt
+
+Dort steht, echtes Verzweigen "bricht die heutige lineare Erzeugungsschleife (unabhaengige
+Partien auf Kerne verteilt) und braucht eine Warteschlange plus Arbeiter" und sei "der
+groesste Engineering-Posten des Zuschnitts". **Am Code geprueft (2026-09-07) stimmt das so
+nicht**, weil der Zweig synchron in derselben Rayon-Closure laufen kann:
+
+| Baustein | Stand | Aufwand |
+| --- | --- | --- |
+| Partie ab beliebigem Zustand starten | **liegt fertig**: `GameLoopConfig.start_state: Option<GameState>` (self_play.rs:1737), Bestandspfad des Seedings, mit b03 abgenommen | 0 |
+| Zustand mitten in der Partie klonen | **`GameState` ist `Clone`** (state.rs:45) | 0 |
+| Nebenausgabe aus der Schleife heraus | Muster liegt vor: `vorzug_greift: Option<&Cell<[u64;2]>>` (self_play.rs:1730) -- analog `branch_states: Option<&RefCell<Vec<GameState>>>` | klein |
+| Zweig spielen und Records anhaengen | in der `play`-Closure von `run_net_self_play` (self_play.rs:2244-2266) NACH der Hauptpartie, gleicher Thread, gleicher abgeleiteter Seed; `game_id` `{prefix}_g{i}_b{j}` | klein |
+| Parallelisierung | **unberuehrt** -- `into_par_iter().map(play)` bleibt, der Zweig ist Teil derselben Aufgabe | 0 |
+
+**Geschaetzt (nicht gemessen): 60 bis 100 Zeilen Rust plus zwei Python-Flags und
+Manifest-Felder, dazu Tests.** Keine Warteschlange, kein Arbeiter-Pool, kein neuer Prozess.
+Der Grund, warum par.5 teurer schaetzte: dort war an ASYNCHRONES Verzweigen gedacht (Zweige
+in eine Warteschlange, andere Arbeiter holen sie ab). Synchron im selben Thread ist die
+Reihenfolge egal, weil die Partien ohnehin unabhaengig sind.
+
+### Kosten in Rechenzeit
+
+Ein Zweig ist eine Restpartie. Gemessen am Seeding-Schwarm (par.7): Restlaenge rund 44 %
+einer Vollpartie bei Verzweigung in Runde 2 bis 4, rund 3,65 s je Partie bei threads 11.
+Bei KataGos Rate von 5 % waeren das rund +2 % Wanduhr; bei einem Zweig je Partie rund
++44 %. Die Dosis ist also ein freier Regler, kein Sprung.
+
+### Vier Entscheidungen VOR einem Bau (keine davon getroffen)
+
+1. **Wo verzweigen?** Zufaellig wie KataGo, oder gezielt -- nach Spaltenfortschritt (wie die
+   b03-Kuratierung, par.7) oder nach Unsicherheit (gefaltete Prereg, Stufe 1). Der
+   Waechter aus `PREREG_uncertainty_guided_selfplay.md` par.6 gilt unveraendert: NUR
+   epistemisch auswaehlen, nie auf aleatorische Breite.
+2. **Wie abweichen?** KataGo-Form (breit ziehen, mit einer Netzbewertung filtern) oder
+   Temperatur-Sampling. Fuer unser Spaltenproblem spricht die KataGo-Form, weil sie den
+   offensichtlich schlechten Zug ausschliesst.
+3. **Was liefert der Zweig?** Value-only wie der Seeding-Schwarm, oder auch Policy-Ziele.
+   Die Zwei-Klassen-Struktur des Fensters (`PREREG_v25_window.md` par.1) legt value-only
+   nahe; Policy-Ziele aus Zweigen waeren eine eigene Frage.
+4. **Determinismus.** Der Zweig-Seed MUSS aus `partie_seed` abgeleitet werden (Muster
+   `PREREG_search_rng_split.md`), sonst ist die Erzeugung nicht mehr reproduzierbar.
+
+### Ein Einwand, der vorab benannt gehoert
+
+**Haupt- und Nebenpartie teilen Wertungsplatten, Startspieler und die halbe Vorgeschichte.**
+Die Records eines Zweigs sind damit hoch korreliert mit denen seiner Hauptpartie -- die
+Zahl der Records steigt schneller als die Zahl der UNABHAENGIGEN Stichproben. Das ist
+dieselbe Falle, die im Projekt fuer Arena-Auswertungen als Block-Korrelation bekannt ist
+([[feedback_arena_block_correlation]], `working_rules.md`). Folge fuer jede spaetere
+Bewertung: Zweige und ihre Hauptpartie bilden EINEN Block, und Fehlerbalken werden ueber
+Bloecke gerechnet, nicht ueber Records. Fuer das TRAINING ist die Korrelation kein Fehler
+(mehr Stellungen aus derselben Gegend sind genau der Zweck), fuer jede Messung an diesem
+Material schon.
+
+**Stand: nichts gebaut, nichts entschieden.** Die Reihenfolge bleibt: erst Messung 3-V
+(was kostet die Temperatur an Spalten und an Vielfalt), dann die Wahl zwischen
+"Temperatur senken und gerichtet ersetzen" (Verzweigen, dieser Absatz) und "Temperatur
+lassen".
