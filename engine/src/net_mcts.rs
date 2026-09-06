@@ -5273,7 +5273,7 @@ mod tests {
         use rand::SeedableRng;
         use std::time::{Duration, Instant};
 
-        let path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let path = crate::net::test_model_path("engine_test.onnx");
         let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Sonden-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -6983,7 +6983,7 @@ mod tests {
         // mehr gibt (NUM_ACTIONS-Wechsel hat Alt-Checkpoints entwertet). Hier
         // wird der aktuelle Champion gebraucht, weil die Messung seine
         // Eval-Kosten betrifft.
-        let path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let path = crate::net::test_model_path("engine_test.onnx");
         let net = Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Sonden-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ));
@@ -7056,7 +7056,7 @@ mod tests {
     /// Jetzt: amtierender Champion + harter Fehler statt Skip (Nutzer-Regel:
     /// nie leer gruen; Praezedenz `self_play.rs::load_test_net_for_gating`).
     fn load_test_net() -> Net {
-        let path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let path = crate::net::test_model_path("engine_test.onnx");
         Net::load_auto(path.to_str().unwrap()).unwrap_or_else(|e| panic!(
             "{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
         ))
