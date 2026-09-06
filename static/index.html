@@ -150,18 +150,48 @@
       </div>
     </div>
     
-    <div class="rotbtns" id="rotbtns">
-      <div class="rotbtn act" data-rot="0">0°</div>
-      <div class="rotbtn" data-rot="90">90°</div>
-      <div class="rotbtn" data-rot="180">180°</div>
-      <div class="rotbtn" data-rot="270">270°</div>
-    </div>
+    <!-- Punkt 9 (Nutzer 2026-09-06): gedreht wird ZULETZT und AUF DEM
+         KUPPELFELD. Die Drehknoepfe sassen bis dahin hier, also vor der
+         Feldwahl; jetzt liegt die Platte nach dem Feld-Klick im Kuppelplatz
+         und dreht sich dort (Leiste #place-toolbar). Hier bleibt nur die
+         Vorschau der gewaehlten Platte (ungedreht). -->
     <div class="preview" id="dome-preview"></div>
     <button class="confirm" id="dome-confirm" disabled onclick="confirmDome()">Platte legen</button>
     <button class="cancel-btn" onclick="closeDomeModal()">Abbrechen</button>
   </div>
 </div>
 
+
+<!-- Punkt 9 (Nutzer 2026-09-06, praezisiert am selben Tag): letzter Schritt
+     der Kuppelplatten-Aktion. Reihenfolge: Platte waehlen -> Kuppelfeld
+     anklicken -> AUF DIESEM FELD drehen -> legen. Die Platte liegt dabei
+     wirklich auf dem gewaehlten Kuppelplatz (renderBoard zeichnet sie als
+     `.dslot.ghost-place`) und dreht sich dort; diese Leiste haengt sich
+     daneben (updatePlaceToolbar) und traegt nur die Bedienung. Ein Klick auf
+     die Platte selbst dreht sie ebenfalls um 90°. Erst "Legen" schickt den
+     Zug an den Server. -->
+<div id="place-toolbar" style="display:none">
+  <button class="btn" onclick="rotatePlacement(-90)" title="90° gegen den Uhrzeigersinn">↺</button>
+  <span id="place-rot-label">0°</span>
+  <button class="btn" onclick="rotatePlacement(90)" title="90° im Uhrzeigersinn">↻</button>
+  <button class="btn pri" onclick="confirmRotation()">Legen ✓</button>
+  <button class="btn" onclick="cancelRotation()" title="Platte wieder vom Feld nehmen">✕</button>
+</div>
+
+<!-- Punkt 1 (Nutzer 2026-09-06): der Bestaetigungsknopf fuer den Tiling-Start
+     der KI sass ganz rechts in der Info-Spalte (#center ist die rechte
+     Layout-Spalte, style.css:22). Er liegt jetzt als eigenes, zentrales
+     Fenster ueber dem Brett. Der Rahmen ist BEWUSST klickdurchlaessig
+     (pointer-events:none, nur die Karte selbst faengt Klicks) -- Punkt 10
+     braucht das: solange dieses Fenster offen ist, bleibt die letzte
+     Musterreihe korrigierbar. -->
+<div id="tiling-finish-overlay" class="finish-veil" style="display:none">
+  <div class="finish-card">
+    <div class="finish-title" id="tiling-finish-title">Tiling abschließen</div>
+    <div class="finish-sub" id="tiling-finish-sub"></div>
+    <button class="confirm" id="tiling-finish-btn" onclick="finishHumanTiling()">Abschließen</button>
+  </div>
+</div>
 
 <div class="overlay" id="newgame-overlay" style="display:none">
   <div class="modal" style="max-width:420px">
@@ -330,18 +360,18 @@
   </div>
 </div>
 
-<div id="ai-thinking-overlay" style="display:none;position:fixed;inset:0;
-     background:rgba(0,0,0,0.25);z-index:9999;align-items:center;justify-content:center;
-     pointer-events:all">
-  <div style="background:var(--panel,#1e1e2e);border:1px solid var(--border,#333);
-       border-radius:12px;padding:18px 28px;display:flex;align-items:center;gap:12px;
-       box-shadow:0 8px 32px rgba(0,0,0,0.4)">
-    <div style="width:18px;height:18px;border:3px solid var(--blau,#3b82f6);
-         border-top-color:transparent;border-radius:50%;animation:spin .8s linear infinite"></div>
-    <span style="font-size:13px;font-weight:600">KI denkt...</span>
+<!-- Punkt 7 (Nutzer 2026-09-06): das Fenster war das einzige DUNKLE Element
+     der Oberflaeche -- es griff auf `var(--panel,#1e1e2e)` und
+     `var(--border,#333)` zurueck, und `--panel` gibt es in style.css gar
+     nicht, es zog also immer den dunklen Rueckfall. Jetzt dieselbe Sprache
+     wie die uebrigen Dialoge (Papierflaeche, heller Schleier, Akzent in
+     --blau); Styles in style.css unter "KI denkt". -->
+<div id="ai-thinking-overlay" class="thinking-veil" style="display:none">
+  <div class="thinking-card">
+    <div class="thinking-spinner"></div>
+    <span class="thinking-text">KI denkt</span>
   </div>
 </div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <script src="/static/js/app.js"></script>
 

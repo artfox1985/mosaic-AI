@@ -9,6 +9,39 @@ let domeModal = null;  // {pi, slot_r, slot_c, tile_id, rotation, is_start}
 let pendingStackPlacement = null;
 let tilingPi = null, tilingRow = null;
 let humanTilingDone = false;
+
+// -- VORGEMERKTE TILING-PLATZIERUNG (Punkt 10, Nutzer 2026-09-06) ------------
+// Der Klick auf ein Kuppelfeld schickt den Zug NICHT mehr sofort an den
+// Server: die Fliese liegt erst einmal nur vorgemerkt auf dem Feld
+// (`pendingTiling`, gezeichnet als `.ds.pending-place`). Bestaetigt wird per
+// Klick auf die Musterreihe -- oder nach TILING_CONFIRM_MS von selbst. Bis
+// dahin ist ein anderes Feld waehlbar (verschieben) bzw. dasselbe Feld noch
+// einmal (zuruecknehmen).
+//
+// Die LETZTE Musterreihe bekommt bewusst KEINEN Ablauf (Nutzer: "in reihe 6
+// ist ein reset des setzens der fliese moeglich bis das tiling fuer die KI
+// freigegeben ist"): dort haelt die Vormerkung, bis der Abschluss-Knopf
+// gedrueckt wird, der sie dann mitsendet (siehe finishHumanTiling).
+const TILING_CONFIRM_MS = 5000;
+let pendingTiling = null;      // {pi, ri, sr, sc, si}
+let _tilingTicker = null;
+let _tilingDeadline = 0;
+
+// -- LOG-ZUSAETZE DER OBERFLAECHE (Punkt 8) ---------------------------------
+// Das Passen erzeugt in der Engine BEWUSST keine Log-Zeile: der Replay
+// (tools/analyze_game_log.py::Replayer.ensure_drafting_actor) rekonstruiert es
+// aus dem Spielerwechsel und bricht ab, wenn `apply_pass` die Log-Laenge
+// veraendert (engine/src/py.rs:310-317). Damit der Mensch trotzdem sieht, dass
+// ein Zug uebersprungen wurde, fuehrt die Oberflaeche eine eigene, rein
+// anzeigende Spur: `at` ist die Log-Laenge zum Zeitpunkt des Eintrags, die
+// Zeile wird beim Zeichnen an genau dieser Stelle eingeblendet. Engine-Log und
+// Log-Datei bleiben unberuehrt.
+let uiLogExtras = [];
+
+function addUiLog(text) {
+  if(!S) return;
+  uiLogExtras.push({at: (S.log || []).length, text});
+}
 // Nutzer-Feedback (2026-07-29, Folgeauftrag): Reihenfolge-Regel gilt nur fuer
 // die PLATZIERUNG voller Reihen -- eine nur-per-Chips-komplettierbare Reihe
 // darf der Mensch bewusst ueberspringen, um eine SPAETERE chip-faehige Reihe
@@ -212,6 +245,9 @@ async function startNewGame() {
   const d = await api('/new_game', body);
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; domeModal=null; tilingPi=null; tilingRow=null;
+  clearTilingPending();
+  uiLogExtras = [];
+  _autoPassChain = 0;
   window._gameEndLogged = false;
   _chipGhosts = {0: [], 1: []}; _prevBonusChips = {0: null, 1: null};
   // Spielerprofile: vom Server aufgeloeste Profil-/KI-Rating-Info fuer die
@@ -275,6 +311,13 @@ async function triggerAIMove() {
         break;
       }
       S = d.state;
+      // Punkt 8: auch das Passen der KI stand nirgends -- die Engine schreibt
+      // dafuer bewusst keine Log-Zeile (py.rs:310-317, Replay-Vertrag), die
+      // gespielte Aktion kommt aber in der Antwort mit
+      // (mcts.rs:709 -> {"type":"pass"}).
+      if (d.ai_action && d.ai_action.type === 'pass') {
+        addUiLog(`⏸ ${S.players[AI_PLAYER].name} passt (keine Aktion möglich)`);
+      }
       render();
       if (aiIsDue()) await new Promise(r => setTimeout(r, 350));
     }
@@ -538,14 +581,53 @@ async function endTiling() {
 }
 
 async function finishHumanTiling() {
+  // Punkt 10: die letzte Musterreihe darf bis hierher vorgemerkt bleiben --
+  // erst der Abschluss schickt sie ab. `advance=false`, weil danach ohnehin
+  // das Tiling endet und keine Reihe mehr angewaehlt werden soll.
+  if(pendingTiling) await commitPendingTiling(false);
   if (!AI_ENABLED) {
     // Normales Rundenende, wenn zwei Menschen spielen
-    endTiling();
+    await endTiling();
   } else {
     // Mensch ist fertig, wir übergeben an die KI!
     humanTilingDone = true;
-	endTiling();
+    await endTiling();
   }
+}
+
+// -- PASSEN UEBERSPRINGEN (Punkt 8) -----------------------------------------
+// `can_pass` ist genau dann wahr, wenn dem Spieler am Zug KEINE der vier
+// Aktionen mehr offensteht (engine/src/serialize.rs::compute_can_pass) -- es
+// gibt also nichts zu entscheiden. Der Zug wird deshalb ohne Klick
+// weitergereicht und in der Anzeige-Spur vermerkt.
+//
+// Die Kette laeuft ueber setTimeout, damit sie nie im render()-Aufruf steckt,
+// aus dem sie kommt. `_autoPassChain` ist die Reissleine: bliebe `can_pass`
+// trotz Passen bestehen (Server lehnt ab, Zustand haengt), wird nach zehn
+// Versuchen aufgehoert statt endlos zu tickern.
+let _autoPassBusy = false;
+let _autoPassChain = 0;
+
+function maybeAutoPass() {
+  if(!S || AI_THINKING || _autoPassBusy) return;
+  if(S.phase !== 'drafting' || !S.can_pass) { _autoPassChain = 0; return; }
+  if(AI_ENABLED && S.current_player === AI_PLAYER) return;
+  if(!S.players.every(p => p.start_placed)) return;
+  if(pendingStackPlacement) return;
+  if(_autoPassChain >= 10) return;
+  _autoPassBusy = true;
+  _autoPassChain++;
+  addUiLog(`⏸ ${S.players[S.current_player].name} passt (keine Aktion möglich)`);
+  render();
+  setTimeout(async () => {
+    try { await passMove(); }
+    finally {
+      _autoPassBusy = false;
+      // Nach dem Zug der Gegenseite kann sofort wieder nur Passen moeglich
+      // sein -- dann greift die Kette hier erneut.
+      maybeAutoPass();
+    }
+  }, 500);
 }
 
 async function passMove() {
@@ -740,22 +822,65 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
     tdata += ` data-tiling="${pi},${sr},${sc},${si}"`;
     cls += ' click';
     bg += 'cursor:pointer;';
+    // Punkt 10: hier liegt die vorgemerkte, noch nicht abgeschickte Fliese.
+    // Sie wird wie eine gelegte gezeichnet (Farbe der Musterreihe), traegt
+    // aber den gestrichelten Ring aus `.ds.pending-place` (style.css).
+    if(pendingTiling && pendingTiling.pi===pi && pendingTiling.sr===sr
+       && pendingTiling.sc===sc && pendingTiling.si===si) {
+      const pendColor = normColor(S.players[pendingTiling.pi]
+        .pattern_lines[pendingTiling.ri].color || '');
+      return `<div class="ds filled ${pendColor} click pending-place" `
+           + `style="cursor:pointer;" title="Vorgemerkt - Klick auf die Musterreihe legt sie, `
+           + `Klick hierher nimmt sie zurueck"${tdata}></div>`;
+    }
     // Nutzer-Auftrag 2026-08-13: nach dem Reihen-Klick pulsieren die LEGALEN
     // Zielfelder (Halo-Sprache wie die Lehrermodus-Tipps). Regel exakt aus
     // round_end.rs::row_has_open_matching_slot: Musterreihe ri gehoert zu
     // Slot-Reihe ri/2 und Zellen-Teilreihe ri%2 (si = 2*(ri%2) oder +1);
     // die Zelle muss leer/entsperrt sein und die Reihenfarbe akzeptieren
     // (Normal = exakte Farbe, Wild = immer, Special = nie, dome.rs::accepts).
-    if (tilingRow !== null && sr === Math.floor(tilingRow/2) && Math.floor(si/2) === tilingRow % 2) {
-      const rowColor = normColor(S.players[tilingPi].pattern_lines[tilingRow].color || '');
-      const isNormal = sp.type === 'N' || !sp.type || sp.type === 'NORMAL';
-      const legal = !sp.filled && !sp.locked
-        && (sp.type === 'WILD' || (isNormal && nc !== '' && nc === rowColor));
-      if (legal) cls += ' legal-target';
+    if (tilingRow !== null && tilingSpaceLegal(sp, si, tilingPi, sr, tilingRow)) {
+      cls += ' legal-target';
     }
   }
   
   return `<div class="${cls}" style="${bg}"${tdata}>${lbl}</div>`;
+}
+
+// Darf die volle Musterreihe `ri` des Spielers `pi` auf dieses Kuppelfeld?
+// Regel exakt aus round_end.rs::row_has_open_matching_slot: Musterreihe ri
+// gehoert zu Slot-Reihe ri/2 und Zellen-Teilreihe ri%2 (si = 2*(ri%2) oder +1);
+// die Zelle muss leer/entsperrt sein und die Reihenfarbe akzeptieren
+// (Normal = exakte Farbe, Wild = immer, Special = nie, dome.rs::accepts).
+//
+// Bis 2026-09-06 stand diese Pruefung nur als Halo-Markierung in spaceHTML,
+// waehrend der Klick JEDES Feld der richtigen Kuppelreihe an den Server gab.
+// Seit die Platzierung vorgemerkt wird (Punkt 10), faellt ein Fehlgriff sonst
+// erst beim Abschicken auf -- deshalb eine Funktion fuer beide Stellen.
+function tilingSpaceLegal(sp, si, pi, sr, ri) {
+  if(!sp || pi < 0 || ri === null || ri === undefined) return false;
+  if(sr !== Math.floor(ri/2) || Math.floor(si/2) !== ri % 2) return false;
+  const rowColor = normColor(S.players[pi].pattern_lines[ri].color || '');
+  const nc = normColor(sp.color || sp.req_color || sp.color_id || '');
+  const isNormal = sp.type === 'N' || !sp.type || sp.type === 'NORMAL';
+  return !sp.filled && !sp.locked
+      && (sp.type === 'WILD' || (isNormal && nc !== '' && nc === rowColor));
+}
+
+// Rotationstabelle der Kuppelplatte: die vier Felder werden UMSORTIERT, nicht
+// per CSS gedreht (sonst staenden die Symbole auf dem Kopf). Dieselbe Tabelle
+// nutzen buildPreview() und die Brett-Darstellung der schwebenden Platte.
+const DOME_ROT = {0:[0,1,2,3], 90:[2,0,3,1], 180:[3,2,1,0], 270:[1,3,0,2]};
+
+// Die noch nicht abgeschickte Platte, wie sie im gewaehlten Kuppelplatz liegt
+// (Punkt 9): gezeichnet wie eine gelegte Platte, aber im Ring aus
+// `.dslot.ghost-place`.
+function placementGhostHTML() {
+  const pend = pendingStackPlacement;
+  if(!pend || !pend.tile) return '';
+  const rotated = DOME_ROT[pend.rotation||0].map(i => pend.tile.spaces[i]);
+  return `<div class="d2x2${wildPlateClass(pend.tile)}" style="width:48px;height:48px;">`
+       + rotated.map(sp => spaceHTML(sp)).join('') + `</div>`;
 }
 
 function dome2x2(spaces, pi=-1, sr=-1, sc=-1, tiling=false) {
@@ -939,15 +1064,22 @@ function renderBoard(pi) {
 const domeHTML = p.dome_grid.map((row,sr)=>row.map((slot,sc)=>{
     // Prüfe: Gibt es einen aktiven Platzierungsprozess (Start, Display oder Stapel) für diesen Spieler?
     const isPending = pendingStackPlacement && pendingStackPlacement.pi === pi;
-    
+    // Punkt 9 (Nutzer 2026-09-06): ist ein Feld gewaehlt, LIEGT die Platte
+    // dort -- gedreht wird an genau dieser Stelle, nicht in einem Dialog.
+    const isGhostSlot = isPending && !slot
+      && pendingStackPlacement.slot_r === sr && pendingStackPlacement.slot_c === sc;
+
     // Hervorhebung (cando) nur, wenn eine Karte zum Legen bereit liegt.
     // In der Vorbereitungsphase bleibt isPending hier false, solange keine Karte gewählt ist.
-    let cls = slot ? 'occ' : (isPending ? 'cando' : '');
+    let cls = slot ? 'occ' : (isGhostSlot ? 'ghost-place' : isPending ? 'cando' : '');
     let ddata = isPending ? ` data-dome="${pi},${sr},${sc}"` : '';
+    if(isGhostSlot) cls += wildPlateClass(pendingStackPlacement.tile);
 
     const isTilingTarget = isTiling && tilingPi===pi && tilingRow!==null;
     const inner = slot
       ? dome2x2(slot.spaces, pi, sr, sc, isTilingTarget)
+      : isGhostSlot
+      ? placementGhostHTML()
       : `<div style="font-size:9px;color:var(--text3);text-align:center;width:100%">+</div>`;
 
     // Joker-Kuppelplatte: lila Flaeche unter der gelegten Platte (die Luecken
@@ -1128,6 +1260,16 @@ function toggleValidMovesCollapsed() {
 applyValidMovesCollapsed(validMovesCollapsed);
 
 // -- RENDER CENTER -------------------------------------------------------------
+// Punkt 3 (Nutzer 2026-09-06): ist gerade eine Mondfarbe gewaehlt? Traegt die
+// Markierung ALLER Fliesen, die der Zug mitnimmt -- oberste Stapelfliesen der
+// kleinen Fabriken und der ganze Mondpool der grossen Fabrik. Die Farbnamen
+// kommen aus verschiedenen Quellen (Auswahl vs. Zustand), deshalb ueber
+// `normColor` verglichen und nicht per ===.
+function moonPickSelected(color) {
+  return !!sel && sel.source === 'SMALL_FACTORY_MOON'
+      && normColor(sel.color) === normColor(color);
+}
+
 function renderCenter() {
   const badge = document.getElementById('phase-badge');
   badge.className = 'phase-badge'+(S.phase==='tiling'?' tiling':S.phase==='end'?' end':'');
@@ -1210,7 +1352,23 @@ function renderCenter() {
     //   });
     // });
 
-    const hasPending = pending.length > 0;
+    // Eine vorgemerkte Reihe zaehlt hier NUR DANN als erledigt, wenn sie die
+    // LETZTE Musterreihe ist -- sonst geht das Abschluss-Fenster fuer sie nie
+    // auf (sie hat keinen 5-Sekunden-Ablauf, der sie von selbst abschickt,
+    // und genau dort soll die Korrektur bis zuletzt moeglich bleiben,
+    // Punkt 10).
+    //
+    // BUGFIX (Nutzer 2026-09-06: "beim spieler 2 kommt das runde beenden pop
+    // up nach jeder reihe"): ohne die Einschraenkung auf die letzte Reihe
+    // sprang das Fenster nach JEDER Platzierung auf. Grund ist die
+    // Oben-nach-unten-Regel der Engine -- `validate_tiling_action`
+    // (round_end.rs:171-175) sperrt jede spaetere Reihe, solange eine
+    // fruehere volle Reihe offen ist, also steht in `valid_tiling_rows` je
+    // Spieler immer nur EINE Reihe. Wird die vorgemerkt, war die Liste leer
+    // und das Fenster ging auf, obwohl noch drei Reihen warteten.
+    const hasPending = pending.some(x =>
+      !(pendingTiling && pendingTiling.pi === x.pi && pendingTiling.ri === x.ri
+        && isLastPatternRow(pendingTiling.pi, pendingTiling.ri)));
 
     // Nur Reihen die der Server als chippable markiert hat
     const chippableRows2 = S.chippable_tiling_rows || [];
@@ -1227,26 +1385,40 @@ function renderCenter() {
     // Reihen lebt jetzt in renderBoard() direkt unter dem Bonuschips-Kasten
     // der Spieler-Sidebar (nicht mehr hier in der zentralen Info-Spalte).
 
+    // Punkt 4 (Nutzer 2026-09-06): in der Tiling-Phase stehen hier KEINE
+    // Knoepfe mehr. Gespielt wird ausschliesslich ueber Auswahl und Klick am
+    // Brett (Musterreihe -> Kuppelfeld -> Musterreihe); der Kasten traegt nur
+    // noch Text. Die frueheren gruenen Reihen-Pillen waren Knoepfe mit
+    // onclick, die Abwahl sass auf einem ✕ -- beides ist ersetzt: die Reihe
+    // selbst waehlt an und ab (onTilingRowClick).
     let infoHTML = '';
     if(tilingRow!==null) {
       const col = S.players[tilingPi].pattern_lines[tilingRow].color;
-      infoHTML = `<div class="info tiling" style="display:flex;align-items:center;justify-content:space-between">
-        <span>→ <strong>${S.players[tilingPi].name}</strong> Reihe ${tilingRow+1}
-          <span class="tile sm ${normColor(col)}" style="vertical-align:middle;margin:0 2px"></span>
-          - passendes Kuppelfeld anklicken
-        </span>
-        <button class="btn" onclick="tilingPi=null;tilingRow=null;render()" style="font-size:10px;flex-shrink:0">✕</button>
-      </div>`;
+      const tileSpan = `<span class="tile sm ${normColor(col)}" style="vertical-align:middle;margin:0 2px"></span>`;
+      const head = `→ <strong>${S.players[tilingPi].name}</strong> Reihe ${tilingRow+1} ${tileSpan}`;
+      infoHTML = pendingTiling
+        ? `<div class="info tiling">
+            ${head} - liegt vorgemerkt auf dem Kuppelfeld.
+            <div style="font-size:10px;margin-top:3px">
+              Klick auf die Musterreihe schließt sie ab<span id="tiling-countdown"></span>.
+              Anderes Feld = verschieben, dasselbe Feld noch einmal = zurücknehmen.
+            </div>
+          </div>`
+        : `<div class="info tiling">
+            ${head} - passendes Kuppelfeld anklicken.
+            <div style="font-size:10px;margin-top:3px">
+              Erneuter Klick auf die Reihe hebt die Auswahl wieder auf.
+            </div>
+          </div>`;
     } else if(hasPending) {
       const rows = pending.map(x=>
-        `<span style="cursor:pointer;display:inline-flex;align-items:center;gap:2px;padding:1px 4px;border-radius:4px;background:#D1FAE5;border:1px solid #34D399"
-          onclick="tilingPi=${x.pi};tilingRow=${x.ri};render()">
+        `<span style="display:inline-flex;align-items:center;gap:2px;padding:1px 4px;border-radius:4px;background:#D1FAE5;border:1px solid #34D399">
           <span class="tile sm ${normColor(x.color)}"></span>
           R${x.ri+1} ${x.pname}
         </span>`
       ).join(' ');
       infoHTML = `<div class="info tiling">
-        <div style="font-size:10px;margin-bottom:5px;font-weight:600">Vollständige Reihen - anklicken zum Legen:</div>
+        <div style="font-size:10px;margin-bottom:5px;font-weight:600">Vollständige Reihen - auf dem Brett anklicken:</div>
         <div style="display:flex;gap:4px;flex-wrap:wrap">${rows}</div>
       </div>`;
     } else if(chippable.length>0) {
@@ -1284,11 +1456,11 @@ function renderCenter() {
     //   </div>`;
     // }
 
-    const btnText = AI_ENABLED ? "Mein Tiling abschließen → KI ist dran" : `Runde ${S.round} beenden ✓`;
-    info.innerHTML = infoHTML + (!hasPending ? `
-      <button class="btn pri" onclick="finishHumanTiling()" style="width:100%;margin-top:6px">
-        ${btnText}
-      </button>` : '');
+    info.innerHTML = infoHTML;
+    // Punkt 1: der Abschluss-Knopf sass hier ganz rechts in der Info-Spalte
+    // (#center ist die rechte Layout-Spalte, style.css:22) und liegt jetzt
+    // als eigenes, zentrales Fenster ueber dem Brett.
+    renderTilingFinishPopup(hasPending);
   } else if(S.phase==='end' || S.phase==='final') {
     const [p0,p1]=S.players;
     // Bei Punktegleichstand gewinnt, wer die Startspielerfliese haelt --
@@ -1311,13 +1483,17 @@ function renderCenter() {
       const names = pending.map(p=>p.name).join(' und ');
       info.innerHTML = `<div class="info warn">
         ⚠ <strong>Vorbereitung:</strong> ${names} ${pending.length>1?'müssen':'muss'} noch die erste Kuppelplatte legen.<br>
-        <span style="font-size:10px;color:var(--text2)">Eine Kuppelplatte unten anklicken, Rotation wählen, dann ein violett markiertes Kuppelfeld anklicken.</span>
+        <span style="font-size:10px;color:var(--text2)">Eine Kuppelplatte in der Auslage anklicken, dann ein violett markiertes Kuppelfeld - gedreht wird zuletzt.</span>
       </div>`;
     } else {
       if(S.can_pass) {
-        info.innerHTML = `<div class="info warn" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <span>⏸ Keine Aktion möglich</span>
-          <button class="btn danger" onclick="passMove()" style="white-space:nowrap">Passen</button>
+        // Punkt 8 (Nutzer 2026-09-06): "Passen" ist keine Entscheidung --
+        // `can_pass` ist genau dann wahr, wenn KEINE der vier Aktionen mehr
+        // moeglich ist (engine/src/serialize.rs::compute_can_pass). Der Zug
+        // wird deshalb uebersprungen (maybeAutoPass, am Ende von render) und
+        // im Log vermerkt; hier steht nur noch der Hinweis.
+        info.innerHTML = `<div class="info warn">
+          ⏸ Keine Aktion möglich - der Zug wird übersprungen.
         </div>`;
       } else {
         info.innerHTML = '';
@@ -1384,6 +1560,14 @@ function renderCenter() {
     // oben/sichtbar (siehe engine/src/factory.rs::place_on_moon/take_from_moon).
     // Darstellung: pro Stapel eine leicht ueberlappende Mini-Kachel-Kolonne,
     // unterste Fliese zuerst, oberste (ziehbare) zuletzt/oben + hervorgehoben.
+    //
+    // Punkt 3 (Nutzer 2026-09-06): die OBERSTE Fliese jedes Stapels ist selbst
+    // Klickziel fuer Aktion C -- vorher ging das nur ueber den gemeinsamen
+    // Kasten "Geteilte Mondfliesen". Gewaehlt wird dabei exakt dieselbe
+    // Aktion (data-src SMALL_FACTORY_MOON, fid ALL): der Zug nimmt den GANZEN
+    // Mondpool dieser Farbe, nicht nur die angeklickte Fliese. Damit das vor
+    // dem Zug sichtbar ist, tragen ALLE mitgenommenen Fliesen die Markierung
+    // `.moon-take` -- auf allen Fabriken und im Pool der grossen Fabrik.
     const nonEmptyStacks = f.moon.filter(stack => stack && stack.length);
     const moonTiles = nonEmptyStacks.length
       ? `<div class="moon-area" style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap">
@@ -1391,7 +1575,21 @@ function renderCenter() {
           ${nonEmptyStacks.map(stack => {
             const topDown = [...stack].reverse(); // topDown[0] = oben/ziehbar ... letzter = unten
             return `<div style="display:flex;flex-direction:column" title="Stapel (oben→unten): ${topDown.join(' → ')}">
-              ${topDown.map((c,i)=>`<div class="tile sm ${normColor(c)}" style="margin-top:${i===0?'0':'-9px'};z-index:${topDown.length-i};${i===0?'outline:1.5px solid var(--text)':'opacity:.85'}"></div>`).join('')}
+              ${topDown.map((c,i)=>{
+                const isTop = i === 0;
+                const take = isTop && moonPickSelected(c);
+                // Die weisse Konturlinie der obersten Fliese weicht der
+                // Auswahl-Markierung: zwei Outlines auf einem Element gibt es
+                // nicht, und der Inline-Stil schlaegt die Klasse.
+                const style = `margin-top:${isTop?'0':'-9px'};z-index:${topDown.length-i};`
+                  + (isTop ? (take ? '' : 'outline:1.5px solid var(--text);') : 'opacity:.85;');
+                const data = isTop
+                  ? ` data-src="SMALL_FACTORY_MOON" data-fid="ALL" data-color="${c}"`
+                    + ` title="Alle obersten ${c}-Mondfliesen nehmen"`
+                  : '';
+                return `<div class="tile sm ${normColor(c)}${isTop?' moon-pick':''}${take?' moon-take':''}"`
+                     + ` style="${style}"${data}></div>`;
+              }).join('')}
             </div>`;
           }).join('')}
          </div>` : '';
@@ -1419,21 +1617,25 @@ function renderCenter() {
   // Zug-Erzeugung (validation.rs:214) kennt nur die Vereinigungsform, das Netz
   // spielt also regelkonform.
   //
-  // Der GF-Mondbereich wird deshalb nur noch ANGEZEIGT. Genommen wird
-  // ausschliesslich ueber "Geteilte Mondfliesen" (data-src SMALL_FACTORY_MOON,
-  // fid ALL) -- und `moon_top_counts` enthaelt den GF-Pool bereits
-  // (serialize.rs:226), es geht also keine Fliese verloren. Die kleinen Stapel
-  // waren nie klickbar und bleiben es nicht.
+  // Der GF-Mondbereich war deshalb eine Zeit lang nur noch ANGEZEIGT.
+  //
+  // NACHTRAG Punkt 3 (Nutzer 2026-09-06): er ist wieder klickbar -- aber mit
+  // der VEREINIGUNGS-Aktion (data-src SMALL_FACTORY_MOON, fid ALL), nicht mit
+  // dem alten Teilzug 'LARGE_FACTORY_MOON'. Der Fehler von 2026-08-18 kommt
+  // damit nicht zurueck: ausgeloest wird nur noch die Aktion, die den ganzen
+  // Pool der Farbe nimmt, und die Markierung zeigt vorher, was alles mitkommt.
   const lMoon = [...new Set(lf.moon)].map(c => {
     const n = lf.moon.filter(x=>x===c).length;
-    const tiles = Array.from({length: n}, () => `<div class="tile ${normColor(c)}"></div>`).join('');
-    // BEWUSST OHNE die Klasse `cgroup`: die traegt `cursor:pointer` und
-    // `:hover .tile{transform:scale(1.12)}` (style.css:320/321). Mit ihr sah die
-    // Gruppe weiter klickbar aus und hob sich beim Anklicken hervor, ohne zu
-    // selektieren -- Nutzer-Befund 2026-08-18. Layout hier inline, ohne Zeiger
-    // und ohne Hover-Effekt.
-    return `<div style="display:flex;align-items:center;gap:2px;padding:2px;cursor:default" `
-         + `title="${n}× ${c} - Entnahme ueber &quot;Geteilte Mondfliesen&quot;">${tiles}</div>`;
+    const take = moonPickSelected(c);
+    const tiles = Array.from({length: n},
+      () => `<div class="tile ${normColor(c)} moon-pick${take?' moon-take':''}"></div>`).join('');
+    // BEWUSST OHNE die Klasse `cgroup`: die traegt einen Hover-Effekt auf ALLE
+    // Kinder (style.css:602/603) und wuerde die Gruppe als Einheit
+    // vergroessern. Zeiger und Hover sitzen jetzt an den Fliesen selbst
+    // (`.tile.moon-pick`).
+    return `<div data-src="SMALL_FACTORY_MOON" data-fid="ALL" data-color="${c}" `
+         + `style="display:flex;align-items:center;gap:2px;padding:2px;cursor:pointer" `
+         + `title="Alle ${c}-Mondfliesen nehmen (${n}× hier + oberste Stapelfliesen der Fabriken)">${tiles}</div>`;
   }).join('');
 
   const moonTopCounts = S.moon_top_counts || {};
@@ -1495,7 +1697,20 @@ document.getElementById('auslage-area').innerHTML = `
     </div>
     </div>`;
 
-  document.getElementById('log').innerHTML = [...S.log].reverse().map(e=>{
+  // Punkt 8: die rein anzeigenden Zeilen der Oberflaeche (bisher nur das
+  // Passen) werden an der Stelle eingeblendet, an der sie entstanden sind --
+  // `uiLogExtras[i].at` ist die Log-Laenge von damals. Alles, was ueber die
+  // aktuelle Log-Laenge hinausweist, haengt hinten dran (kann nach einem
+  // Spielwechsel vorkommen, bevor `uiLogExtras` zurueckgesetzt ist).
+  const rawLog = S.log || [];
+  const mergedLog = [];
+  for(let i = 0; i <= rawLog.length; i++) {
+    uiLogExtras
+      .filter(x => (i < rawLog.length ? x.at === i : x.at >= i))
+      .forEach(x => mergedLog.push(x.text));
+    if(i < rawLog.length) mergedLog.push(rawLog[i]);
+  }
+  document.getElementById('log').innerHTML = [...mergedLog].reverse().map(e=>{
     let cls='le';
     let style='';
     if(e.includes('🟡')||e.includes('+')&&e.includes('Pkt')&&!e.includes('−')){
@@ -1663,10 +1878,122 @@ function onTilingRowClick(pi, ri) {
   if (AI_THINKING) return;
   // Mensch darf nicht für KI tilen
   if (AI_ENABLED && pi === AI_PLAYER) return;
+  // Punkt 10: liegt eine Fliese dieser Reihe vorgemerkt auf einem Kuppelfeld,
+  // ist der Klick auf die Reihe der ABSCHLUSS -- das ersetzt den frueheren
+  // sofortigen Server-Aufruf beim Feld-Klick.
+  if(pendingTiling && pendingTiling.pi === pi && pendingTiling.ri === ri) {
+    commitPendingTiling();
+    return;
+  }
   const row = S.players[pi].pattern_lines[ri];
   if(row.tiles.length !== row.capacity) return;
+  // Punkt 4: die Abwahl sass bis 2026-09-06 auf einem ✕ im Info-Kasten. Jetzt
+  // hebt ein zweiter Klick auf dieselbe Reihe die Auswahl auf.
+  if(tilingPi === pi && tilingRow === ri) {
+    tilingPi = null; tilingRow = null;
+    render();
+    return;
+  }
   tilingPi=pi; tilingRow=ri;
   render();
+}
+
+// -- VORGEMERKTE TILING-PLATZIERUNG: Ablauf (Punkt 10) -----------------------
+// Reihenfolge am Brett: Musterreihe anklicken -> Kuppelfeld anklicken (die
+// Fliese liegt jetzt VORGEMERKT dort) -> Musterreihe anklicken (abschliessen).
+// Ohne den letzten Klick uebernimmt der 5-Sekunden-Ablauf -- ausser in der
+// letzten Musterreihe, die bis zum Abschluss-Fenster korrigierbar bleibt.
+
+function isLastPatternRow(pi, ri) {
+  return ri >= (S.players[pi].pattern_lines.length - 1);
+}
+
+function clearTilingTicker() {
+  if(_tilingTicker) { clearInterval(_tilingTicker); _tilingTicker = null; }
+  _tilingDeadline = 0;
+}
+
+function clearTilingPending() {
+  clearTilingTicker();
+  pendingTiling = null;
+}
+
+function startTilingTicker() {
+  clearTilingTicker();
+  if(!pendingTiling) return;
+  if(isLastPatternRow(pendingTiling.pi, pendingTiling.ri)) return;
+  _tilingDeadline = Date.now() + TILING_CONFIRM_MS;
+  // 200 ms statt 1 s: die Restsekunden sollen sichtbar herunterlaufen, nicht
+  // springen. Der Zaehler schreibt nur in EIN Textfeld (#tiling-countdown) --
+  // ein voller render() alle 200 ms wuerde die Auswahl am Brett stoeren.
+  _tilingTicker = setInterval(() => {
+    const left = _tilingDeadline - Date.now();
+    const el = document.getElementById('tiling-countdown');
+    if(el) el.textContent = left > 0 ? ` (von selbst in ${Math.ceil(left/1000)} s)` : '';
+    if(left <= 0) { clearTilingTicker(); commitPendingTiling(); }
+  }, 200);
+}
+
+function setPendingTiling(pi, ri, sr, sc, si) {
+  if(pendingTiling && pendingTiling.pi===pi && pendingTiling.sr===sr
+     && pendingTiling.sc===sc && pendingTiling.si===si) {
+    clearTilingPending();          // dasselbe Feld noch einmal = zuruecknehmen
+  } else {
+    pendingTiling = {pi, ri, sr, sc, si};
+    startTilingTicker();
+  }
+  render();
+}
+
+async function commitPendingTiling(advance=true) {
+  const pend = pendingTiling;
+  if(!pend) return;
+  clearTilingPending();
+  await tilingMove(pend.pi, pend.ri, pend.sr, pend.sc, pend.si);
+  if(advance) advanceTilingRow(pend.pi);
+}
+
+// "wechsel in die naechste reihe" (Nutzer 2026-09-06): nach dem Abschluss ist
+// die naechste faellige Reihe gleich angewaehlt -- aber nur, wenn sie sich
+// wirklich an die Kuppel legen laesst. Eine nur per Bonuschips
+// komplettierbare Reihe bleibt unangetastet, die laeuft ueber den
+// Chip-Kasten.
+function advanceTilingRow(pi) {
+  if(!S || S.phase !== 'tiling') return;
+  const {playerPlaceableRis, currentTilingRi} = getTilingRowState(pi);
+  if(currentTilingRi !== null && playerPlaceableRis.includes(currentTilingRi)) {
+    tilingPi = pi; tilingRow = currentTilingRi;
+  } else {
+    tilingPi = null; tilingRow = null;
+  }
+  render();
+}
+
+// -- ZENTRALES ABSCHLUSS-FENSTER (Punkt 1) ----------------------------------
+function hideTilingFinishPopup() {
+  const ov = document.getElementById('tiling-finish-overlay');
+  if(ov) ov.style.display = 'none';
+}
+
+function renderTilingFinishPopup(hasPending) {
+  const ov = document.getElementById('tiling-finish-overlay');
+  if(!ov) return;
+  // `humanTilingDone` haelt das Fenster zu, waehrend die KI tilt (die Phase
+  // ist dann weiter 'tiling', offene Reihen hat der Mensch aber keine mehr).
+  const show = !!S && S.phase === 'tiling' && !hasPending
+            && !AI_THINKING && !humanTilingDone;
+  ov.style.display = show ? 'flex' : 'none';
+  if(!show) return;
+  const title = document.getElementById('tiling-finish-title');
+  const sub   = document.getElementById('tiling-finish-sub');
+  const btn   = document.getElementById('tiling-finish-btn');
+  if(title) title.textContent = AI_ENABLED ? 'Dein Tiling ist fertig' : `Runde ${S.round} beenden`;
+  if(sub) sub.textContent = pendingTiling
+    ? 'Die vorgemerkte Fliese wird dabei gelegt. Solange dieses Fenster offen ist, '
+      + 'kannst du sie noch auf ein anderes Kuppelfeld schieben oder zurücknehmen.'
+    : (AI_ENABLED ? 'Danach ist die KI mit ihrem Tiling dran.'
+                  : 'Danach wird die Runde gewertet.');
+  if(btn) btn.textContent = AI_ENABLED ? 'Abschließen → KI ist dran' : 'Runde beenden ✓';
 }
 
 // -- CHIP-REIHE UEBERSPRINGEN (Nutzer-Folgeauftrag 2026-07-29) -----------------
@@ -1788,11 +2115,21 @@ function renderChipModal() {
   const have=row.tiles.length+confirmedGroups.length;
   const cap=row.capacity;
   const preview=document.getElementById('chip-row-preview');
-  preview.innerHTML=Array.from({length:cap},(_,i)=>
-    i>=cap-have
-      ?`<div class="tile sm ${normColor(color)}"></div>`
-      :`<div class="tile sm empty"></div>`
-  ).join('')+`<span style="font-size:10px;color:var(--text2);margin-left:6px">${have}/${cap}${have===cap?' ✓':''}</span>`;
+  // Punkt 5 (Nutzer 2026-09-06): die per Chips ergaenzten Fliesen sind
+  // PHANTOME und werden hier genauso gezeichnet wie in der Musterreihe
+  // (.tile.phantom, style.css) -- vorher standen sie als volle Steine da und
+  // sahen aus wie bereits gezogene Fliesen. Zaehlweise identisch zu
+  // renderBoard(): die Reihe fuellt sich von rechts, `tileIdx` zaehlt darum
+  // von rechts nach links, und die zuletzt ergaenzten (= Phantome) liegen
+  // ganz links.
+  const phantomTotal = (row.phantom_count || 0) + confirmedGroups.length;
+  preview.innerHTML=Array.from({length:cap},(_,i)=>{
+    const emptyCount = cap - have;
+    if(i < emptyCount) return `<div class="tile sm empty"></div>`;
+    const tileIdx = cap - 1 - i;
+    const isPhantom = tileIdx >= have - phantomTotal;
+    return `<div class="tile sm ${normColor(color)}${isPhantom ? ' phantom' : ''}"></div>`;
+  }).join('')+`<span style="font-size:10px;color:var(--text2);margin-left:6px">${have}/${cap}${have===cap?' ✓':''}</span>`;
 
   document.getElementById('chip-confirm').disabled = confirmedGroups.length!==missing;
 }
@@ -1935,7 +2272,9 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
   domeModal = {pi, slot_r:sr, slot_c:sc, tile_id:null, rotation:0, is_start:isStart, stack_only:stackOnly};
   const notice = document.getElementById('dome-notice');
   if(isStart) {
-    notice.textContent='Rotation für die Kuppelplatte wählen, dann ein violett markiertes Kuppelfeld anklicken.';
+    // Punkt 9 (Nutzer 2026-09-06): gedreht wird ZULETZT -- erst Platte, dann
+    // Feld, dann Drehung.
+    notice.textContent='Kuppelplatte wählen, dann ein violett markiertes Kuppelfeld anklicken. Gedreht wird danach.';
     notice.style.display='block';
   } else notice.style.display='none';
 
@@ -1967,7 +2306,8 @@ function openDomeModal(pi, sr, sc, stackOnly=false) {
   }
 
   document.getElementById('dome-confirm').disabled=true;
-  document.getElementById('rotbtns').querySelectorAll('.rotbtn').forEach((b,i)=>b.classList.toggle('act',i===0));
+  // Gedreht wird seit Punkt 9 erst AUF dem Kuppelfeld (rotatePlacement, Leiste
+  // #place-toolbar) -- hier gibt es keine Drehknoepfe mehr.
   buildPreview();
 
   const stackSec = document.getElementById('dome-stack-section');
@@ -2034,6 +2374,13 @@ async function stackPeekMore() {
   clearHintHighlights();
   showTeacherFeedback(d.teacher_feedback);
   renderStackPeekState();
+  // Punkt 6 (Nutzer 2026-09-06): ist der Stapel jetzt leer, kann gar nicht
+  // mehr gezogen werden -- "Aufhoeren & umdrehen" waere der einzig moegliche
+  // Klick und damit ein leerer. Also direkt aufdecken. Liegt dann nur EINE
+  // Platte in der Hand, gibt es auch bei der Wahl nichts zu entscheiden:
+  // stackStopAndChoose waehlt sie selbst aus und bestaetigt, der Zug geht
+  // sofort in die Feldwahl.
+  if(!(S.dome_stack_count > 0)) stackStopAndChoose();
 }
 
 // Der Ziehen-Knopf im Stapel-Dialog traegt die Rueckseite der Platte, die als
@@ -2055,16 +2402,17 @@ function renderStackDrawButton() {
     : `${stackTopTypeIcon()} Noch eine ziehen (kostet 1 Punkt)`;
 }
 
-/* Rotation, Vorschau und "Platte legen" gehoeren zur WAHL, nicht zum Ziehen.
-   Solange gezogen wird, stehen sie nur nutzlos herum und lenken von den zwei
-   Knoepfen ab, um die es geht (Nutzer 2026-08-30: "der Text mit den Buttons
-   ist etwas kryptisch"). `stackStopAndChoose` blendet sie wieder ein. */
+/* Vorschau und "Platte legen" gehoeren zur WAHL, nicht zum Ziehen. Solange
+   gezogen wird, stehen sie nur nutzlos herum und lenken von den zwei Knoepfen
+   ab, um die es geht (Nutzer 2026-08-30: "der Text mit den Buttons ist etwas
+   kryptisch"). `stackStopAndChoose` blendet sie wieder ein.
+
+   Drehknoepfe kommen hier seit Punkt 9 nicht mehr vor: gedreht wird auf dem
+   Kuppelfeld, mit der Leiste #place-toolbar. */
 function setDomeChoiceUiVisible(visible) {
   const value = visible ? '' : 'none';
-  const rotRow = document.getElementById('rotbtns');
   const preview = document.getElementById('dome-preview');
   const confirmBtn = document.getElementById('dome-confirm');
-  if(rotRow) rotRow.style.display = value;
   if(preview) preview.style.display = value;
   if(confirmBtn) confirmBtn.style.display = value;
 }
@@ -2160,9 +2508,9 @@ function stackStopAndChoose() {
 
   const notice = document.getElementById('dome-notice');
   notice.innerHTML = `<strong>Deine ${n} ${n === 1 ? 'Platte' : 'Platten'} - jetzt aufgedeckt.</strong>
-                      Eine davon aussuchen, drehen, legen. Die übrigen wandern unter den Stapel.
+                      Eine davon aussuchen. Die übrigen wandern unter den Stapel.
                       Bezahlt sind bereits ${n} ${n === 1 ? 'Punkt' : 'Punkte'}.<br>
-                      <span style="font-size:10px; font-weight:normal;">Nach dem Bestätigen klickst du das Ziel-Kuppelfeld auf deinem Board an.</span>`;
+                      <span style="font-size:10px; font-weight:normal;">Nach dem Bestätigen klickst du das Ziel-Kuppelfeld auf deinem Board an - gedreht wird zuletzt.</span>`;
   notice.style.display = 'block';
 
   const pool = document.getElementById('dome-pool');
@@ -2201,6 +2549,14 @@ function stackStopAndChoose() {
 
     pool.appendChild(div);
   });
+
+  // Punkt 6: eine einzige aufgedeckte Platte ist keine Wahl. Der Klick wird
+  // ausgeloest (gleicher Handler, damit Vorschau/Rueckgabereihenfolge
+  // identisch laufen) und der Zug geht direkt in die Feldwahl.
+  if(n === 1) {
+    const only = pool.querySelector('.ptile');
+    if(only) { only.click(); confirmDome(); }
+  }
 }
 
 // Zwischenschritt von stackStopAndChoose, nur bei 2+ Restplatten: Reihenfolge
@@ -2325,7 +2681,11 @@ async function confirmDome() {
     pendingStackPlacement = {
       source: 'stack', pi, tile_id: stack_draw.chosen_id, rotation,
       tile: chosenTile, chosen_id: stack_draw.chosen_id,
-      return_order: stack_draw.return_order || []
+      return_order: stack_draw.return_order || [],
+      // `num` = Anzahl gezogener Platten = bereits bezahlte Punkte. Der
+      // Hinweistext in render() liest es ("-N Pkt"); bis 2026-09-06 wurde es
+      // nie gesetzt und dort stand "-undefined Pkt".
+      num: (S.pending_stack_draw || []).length,
     };
   } else {
     const chosenTile = (S.dome_display || []).find(t => t.id === tile_id);
@@ -2337,21 +2697,89 @@ async function confirmDome() {
   render();  // Board neu zeichnen (markiert freie Slots, zeigt Hinweis)
 }
 
+// Punkt 9 (Nutzer 2026-09-06): der Feld-Klick schickt den Zug NICHT mehr ab.
+// Die Platte LEGT SICH auf das Feld (renderBoard zeichnet sie dort als
+// `.dslot.ghost-place`) und wird an dieser Stelle gedreht. Ein Klick auf ein
+// anderes freies Feld schiebt sie dorthin, ein Klick auf die liegende Platte
+// dreht sie um 90°. Abgeschickt wird erst mit "Legen".
 async function submitDomePlacement(sr, sc) {
-  // Legt die schwebende Karte (Start, Display oder Stapel) auf den Slot.
   const pend = pendingStackPlacement;
   if(!pend) return;
   if(sr < 0 || sr > 2 || sc < 0 || sc > 2) {
     showError('Bitte ein freies Kuppelfeld auf deinem Board anklicken.');
     return;
   }
-  if(pend.source === 'stack') {
-    await submitStackDraw(pend.chosen_id, sr, sc, pend.rotation, pend.return_order);
-  } else if(pend.source === 'start') {
-    await submitStartTile(pend.pi, pend.tile_id, sr, sc, pend.rotation);
-  } else {
-    await submitDisplayDome(pend.tile_id, sr, sc, pend.rotation);
+  if(pend.slot_r === sr && pend.slot_c === sc) {
+    rotatePlacement(90);          // dieselbe Stelle noch einmal = drehen
+    return;
   }
+  pend.slot_r = sr;
+  pend.slot_c = sc;
+  if(pend.rotation === undefined) pend.rotation = 0;
+  render();
+}
+
+// -- DREHEN AN ORT UND STELLE (Punkt 9) --------------------------------------
+function rotatePlacement(delta) {
+  const pend = pendingStackPlacement;
+  if(!pend || !(pend.slot_r >= 0)) return;
+  pend.rotation = (((pend.rotation||0) + delta) % 360 + 360) % 360;
+  render();
+}
+
+// Die Bedienleiste haengt am gewaehlten Kuppelfeld statt in der Bildmitte --
+// gedreht wird dort, wo die Platte liegt. Position aus dem Slot-Rechteck;
+// passt sie darunter nicht mehr, klappt sie darueber.
+function updatePlaceToolbar() {
+  const bar = document.getElementById('place-toolbar');
+  if(!bar) return;
+  const pend = pendingStackPlacement;
+  if(!pend || !(pend.slot_r >= 0)) { bar.style.display = 'none'; return; }
+  const slotEl = document.querySelector(
+    `#dome${pend.pi} .dslot[data-row="${pend.slot_r}"][data-col="${pend.slot_c}"]`);
+  if(!slotEl) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  const lbl = document.getElementById('place-rot-label');
+  if(lbl) lbl.textContent = `${pend.rotation||0}°`;
+  const r = slotEl.getBoundingClientRect();
+  const bw = bar.offsetWidth, bh = bar.offsetHeight;
+  let left = r.left + r.width/2 - bw/2;
+  let top  = r.bottom + 8;
+  if(top + bh > window.innerHeight - 6) top = r.top - bh - 8;
+  bar.style.left = Math.max(6, Math.min(left, window.innerWidth - bw - 6)) + 'px';
+  bar.style.top  = Math.max(6, top) + 'px';
+}
+
+function closeRotateStep() {
+  const bar = document.getElementById('place-toolbar');
+  if(bar) bar.style.display = 'none';
+}
+
+async function confirmRotation() {
+  const pend = pendingStackPlacement;
+  if(!pend) return;
+  const {slot_r:sr, slot_c:sc, rotation} = pend;
+  if(sr === undefined || sr < 0) { closeRotateStep(); return; }
+  closeRotateStep();
+  if(pend.source === 'stack') {
+    await submitStackDraw(pend.chosen_id, sr, sc, rotation, pend.return_order);
+  } else if(pend.source === 'start') {
+    await submitStartTile(pend.pi, pend.tile_id, sr, sc, rotation);
+  } else {
+    await submitDisplayDome(pend.tile_id, sr, sc, rotation);
+  }
+}
+
+// Platte wieder vom Feld nehmen -- sie bleibt gewaehlt, nur das Ziel ist
+// wieder offen. (Ein bezahlter Stapelzug bleibt verbindlich: die Platte bleibt
+// in der Hand, es wird nur ein anderes Feld gewaehlt.)
+function cancelRotation() {
+  closeRotateStep();
+  if(pendingStackPlacement) {
+    pendingStackPlacement.slot_r = -1;
+    pendingStackPlacement.slot_c = -1;
+  }
+  render();
 }
 
 async function submitStartTile(pi, tile_id, sr, sc, rotation) {
@@ -2397,7 +2825,12 @@ async function submitStackDraw(chosen_id, sr, sc, rotation, return_order) {
 let moonModal = null; 
 
 function openMoonOrderModal(remaining, callback) {
-  if(remaining.length <= 1) { callback(remaining); return; }
+  // Punkt 2 (Nutzer 2026-09-06): bei EINER Restfliese gab es nie etwas zu
+  // waehlen -- bei mehreren GLEICHFARBIGEN genauso wenig: jede Reihenfolge
+  // ergibt denselben Stapel. Das Modal bleibt in beiden Faellen zu und die
+  // Reihenfolge wird unveraendert durchgereicht.
+  const distinct = new Set(remaining.map(normColor));
+  if(remaining.length <= 1 || distinct.size <= 1) { callback(remaining); return; }
   const items = remaining.map((color, i) => ({uid: i, color}));
   moonModal = {items, ordered: [], callback};
   renderMoonModal();
@@ -2818,16 +3251,20 @@ document.addEventListener('click', e=>{
         showError(`Reihe ${tilingRow+1} gehört zur Kuppelreihe ${expectedDomeRow}, nicht ${sr}`);
         return;
       }
-      tilingMove(pi, tilingRow, sr, sc, si);
+      // Ein bereits vorgemerktes Feld nimmt den Klick immer an (er nimmt die
+      // Fliese zurueck) -- auch wenn es selbst kein legales Ziel mehr waere.
+      const isPending = pendingTiling && pendingTiling.pi===pi
+        && pendingTiling.sr===sr && pendingTiling.sc===sc && pendingTiling.si===si;
+      const slot = S.players[pi].dome_grid[sr][sc];
+      const sp = slot && slot.spaces ? slot.spaces[si] : null;
+      if(!isPending && !tilingSpaceLegal(sp, si, pi, sr, tilingRow)) {
+        showError(`Dieses Feld nimmt Reihe ${tilingRow+1} nicht auf - die hervorgehobenen Felder sind legal.`);
+        return;
+      }
+      // Punkt 10: NICHT sofort senden, sondern vormerken.
+      setPendingTiling(pi, tilingRow, sr, sc, si);
     }
     return;
-  }
-
-  const rb = e.target.closest('.rotbtn');
-  if(rb && domeModal) {
-    domeModal.rotation=+rb.dataset.rot;
-    document.querySelectorAll('.rotbtn').forEach(b=>b.classList.toggle('act',b===rb));
-    buildPreview(); return;
   }
 
   const dgt = e.target.closest('[data-tile-id]');
@@ -2845,6 +3282,13 @@ function render() {
   if(!S) return;
 
   if (S.phase === 'drafting') humanTilingDone = false;
+  // Vorgemerkte Tiling-Fliese und Abschluss-Fenster leben nur in der
+  // Tiling-Phase (Punkte 1/10) -- sonst blieben Zaehler und Fenster nach
+  // einem Rundenwechsel stehen.
+  if (S.phase !== 'tiling') {
+    clearTilingPending();
+    hideTilingFinishPopup();
+  }
   // Nutzer-Feedback (2026-07-29): uebersprungene Chip-Reihen leben nur fuer
   // die Dauer EINER Tiling-Phase -- verlassen wir sie (naechste Runde,
   // Rundenende, neues Spiel), muss der Session-Zustand weg statt in die
@@ -2858,6 +3302,9 @@ function render() {
   renderBoard(1);
   renderCenter();
   updateTeacherUI();
+
+  // Punkt 8: ist gar keine Aktion mehr moeglich, wird der Zug uebersprungen.
+  maybeAutoPass();
 
   // Platzierungs-Modus: gewählte Karte (Display oder Stapel) wartet auf Slot-Klick.
   if(pendingStackPlacement) {
@@ -2875,11 +3322,15 @@ function render() {
       : '';
     // Punkt 8: keine Platten-ID mehr im Hinweistext -- previewHTML zeigt das
     // tatsaechliche Farbmuster ohnehin bereits an.
-    const msg = source === 'stack'
-      ? `📦 Platte gezogen - klick auf ein freies Kuppelfeld zum Legen (−${num} Pkt)`
+    const placed = pendingStackPlacement.slot_r >= 0;
+    const icon = source === 'stack' ? '📦' : source === 'start' ? '🏁' : '🧩';
+    const msg = placed
+      ? `${icon} Platte liegt auf dem Kuppelfeld - dort drehen (↺ ↻) und legen.`
+      : source === 'stack'
+      ? `${icon} Platte gezogen - klick auf ein freies Kuppelfeld zum Legen (−${num} Pkt)`
       : source === 'start'
-      ? `🏁 Startplatte gewählt - klick auf ein freies Kuppelfeld zum Legen`
-      : `🧩 Platte gewählt - klick auf ein freies Kuppelfeld zum Legen`;
+      ? `${icon} Startplatte gewählt - klick auf ein freies Kuppelfeld zum Legen`
+      : `${icon} Platte gewählt - klick auf ein freies Kuppelfeld zum Legen`;
       
     document.getElementById('info-area').innerHTML = `
       <div class="info warn" style="display:flex; flex-direction:column; gap:8px;">
@@ -2890,6 +3341,10 @@ function render() {
         </div>
       </div>`;
   }
+
+  // Die Bedienleiste haengt an einem Kuppelfeld und muss deshalb NACH dem
+  // Neuzeichnen des Bretts positioniert werden.
+  updatePlaceToolbar();
 }
 
 function cancelStackPlacement() {
@@ -2900,6 +3355,7 @@ function cancelStackPlacement() {
   // Zugmodus (dort waeren andere Aktionen ohnehin engine-seitig gesperrt).
   const wasStack = pendingStackPlacement && pendingStackPlacement.source === 'stack';
   pendingStackPlacement = null;
+  closeRotateStep();
   document.getElementById('info-area').innerHTML = '';
   if (wasStack && (S.pending_stack_draw || []).length > 0) {
     openDomeModal(S.current_player, -1, -1, true);
@@ -2950,6 +3406,9 @@ function makeDraggable(overlayId) {
 }
 
 // -- START ---------------------------------------------------------------------
+window.addEventListener('scroll', updatePlaceToolbar, true);
+window.addEventListener('resize', updatePlaceToolbar);
+
 makeDraggable('dome-overlay');
 makeDraggable('moon-overlay');
 makeDraggable('chip-overlay');
