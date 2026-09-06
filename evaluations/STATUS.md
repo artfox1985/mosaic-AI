@@ -90,7 +90,7 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    per `--knobs "spec:..."`), Kuppel-Bonus aus `points_v24bXX_vs_b01_s14.json`.
 2. ~~b03-Training beobachten~~ ERLEDIGT 01:56: 5.344 s, rund 440 s je Epoche
    (`measured_runtimes.md`), config zurueck auf 744, Manifest committet.
-3. ~~Tiling-Geometrie-Sonde auswerten~~ **REGISTRIERT 03:20** (`geometric_envelope`
+3. ~~Tiling-Geometrie-Sonde auswerten~~ **REGISTRIERT 03:12** (`geometric_envelope`
    par.8.12a: Mensch laesst Punkte liegen, kauft an G4/Gline aber keine
    Nachbarschaft; par.8.14: Reihe 6 bei den Netzen in 57-58 % der Episoden
    blockiert, blockierte 6er werden zu 15 % voll gegen 48-65 %, Aussen-Legen
