@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4, Plattenwahl R1-2) gebaut 2026-09-05, Messung am v24-Siegernetz offen (par.8.11). WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12; Messgroessen par.12a, Schwellen werden aus dem Rauschboden GEMESSEN, Verfahren par.12b, Zahlen offen). -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4) gebaut 2026-09-05, K3-F (Reihe freiraeumen, Spec-Feld envelope_flush_w) Code gebaut 2026-09-06 nach der Reihen-Alter-Messung (par.8.14: Reihe 6 bei den Netzen in 57-58 % der Episoden blockiert); Messung beider am v24-Siegernetz offen (par.8.11/8.14). WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12; Messgroessen par.12a, Schwellen werden aus dem Rauschboden GEMESSEN, Verfahren par.12b, Zahlen offen). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -1656,7 +1656,7 @@ erzwingbar, Vollendung nicht") von der Reihen-Seite gesehen: die Reihe ist
 begonnen, aber die Geometrie (Platte) fehlt. Sie gehoert zu Bedingung 1 des
 Schliesskriteriums (par.12: sauber implementiert).
 
-## par.8.14 BAUSTEIN K3-F "REIHE FREIRAEUMEN" (Nutzer-Vorgabe 2026-09-06, 00:32; registriert, Bau NACH der Messung, Nutzer 00:50)
+## par.8.14 BAUSTEIN K3-F "REIHE FREIRAEUMEN" (Nutzer-Vorgabe 2026-09-06, 00:32; Messung 03:12, Code GEBAUT 03:25, cargo test und Wheel ausstehend)
 
 **Nutzer, woertlich:** *"es laesst sich ja ablesen ob mit der momentan gelegten
 musterreihe die huelle geschlossen werden kann oder nicht. wenn nicht -> prio
@@ -1767,6 +1767,35 @@ der Episoden!). Die naechste Fassung der Sonde trennt das am Zellgewinn der
 Rasterzeile zwischen zwei Rundenenden (gelegt gegen geraeumt); Lauf im
 naechsten CPU-freien Fenster (rund 80 s). Die Spalten "je blockiert",
 "Anteil nein" und "Aussen-Legen" sind davon NICHT betroffen.
+
+**GEBAUT (Code, 2026-09-06 03:25; UNGETESTET -- kein Rust-Build neben der laufenden
+b05-Abnahme; `cargo test` und Wheel im CPU-freien Fenster nach der b03-Abnahme):**
+- `envelope.rs`: `row_can_serve_hull` (Praedikat: annehmende ODER plattenlose
+  Huellenzelle in der Rasterzeile; die Vorrats-Pruefung "Platte kann noch
+  kommen" macht die Engine NICHT, nur die Sonde), `projected_occupancy_flush`
+  (Modi 1 und 4, feste Orientierung: NEIN-Reihen legen nichts aufs Brett, Bonus
+  `w_flush * k/(r+1) * (r+1)/56`), `envelope_score_flush` (Maximum ueber beide
+  Orientierungen wie K3-P2), Zweig in `search_shift_state` nur bei `w_flush > 0`
+  (bei 0 exakt die Bestandspfade: bitidentisch), Unit-Test
+  `flush_projection_rewards_completing_rows_that_cannot_serve_hull` (Reihe 6
+  Rot, K3-P -3/56 gegen K3-F +3/56, halbe Dosis, JA-Fall, plattenloser Fall).
+- Knopf: **Spec-PFLICHTFELD `envelope_flush_w` je Seite** (Welle-1-Regel,
+  wie `envelope_projection_mode`; anders als K3-P2, dessen `w_slot` nur ein
+  Env-Knopf ist -- K3-F braucht die Seite, weil beide Seiten denselben Modus
+  fahren koennen), Env-Default `MOSAIC_ENVELOPE_FLUSH_W` 0,0 fuer
+  `SearchConfig::from_env`; Registry, `engine_config`, `knobs.md`,
+  `freeze_heuristic.py`, `server.py`-Abbildung nachgezogen; Inline-Specs der
+  Tests und das Beispiel `kernbeweis_910002_probe.rs` tragen das Feld.
+- **Offen, bewusst:** die lebenden `models/*.spec.json` bekommen das Feld ERST
+  nach der b03-Abnahme (`tools/spec_add_field.py envelope_flush_w 0.0`) --
+  die laufenden Ketten lesen die Specs bei jedem Start neu, und das alte
+  714er-/744er-Wheel lehnt ein unbekanntes Feld hart ab. Bis dahin: KEIN
+  Wheel aus HEAD bauen und installieren. Eingefrorene Artefakt-Specs
+  bleiben unangetastet (eigenes Wheel).
+- Messplan (unveraendert par.8.14 oben): K3-P2 allein, K3-F allein, beide,
+  am v24-Siegernetz, Kennzahl "offene lange Reihen am Ende" neben Spalten und
+  Siegen; Dosis-Vorschlag aus der Messung: `w_flush` 1,0 (die Reihe zaehlt,
+  als laege sie in der Huelle) und 0,5 als zweiter Arm -- Nutzer-Entscheid.
 
 **ENTSCHIEDEN (Nutzer 2026-09-06, 00:50, woertlich "bau k3 f nach der
 messung"):** Bau ERST nach der Messung. Reihenfolge damit: (1) Tiling-

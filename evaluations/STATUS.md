@@ -125,9 +125,16 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    par.4/5, `round_transition_search_sampling` par.7): K3-P2 ist gebaut und
    im Wheel (Spec `models/k3p2_c10.spec.json`); vor dem Verdikt die Zahl der
    offenen langen Reihen mit gegen ohne Knopf (par.8.13). K4-Skala gemessen
-   (P90 3/8/10/12 je Runde; Entscheid je Runde oder eine offen). K3-F
-   (par.8.14) registriert; **Nutzer 2026-09-06 00:50: Bau NACH der Messung**
-   (Sonden-Ergaenzung Reihen-Alter aus Aufgabe 3 zuerst).
+   (P90 3/8/10/12 je Runde; Entscheid je Runde oder eine offen). **K3-F
+   (par.8.14) als Code GEBAUT 03:25 nach der Reihen-Alter-Messung** (Nutzer
+   00:50: "bau k3 f nach der messung"), UNGETESTET.
+   **ACHTUNG, HEAD-Engine verlangt das Spec-Pflichtfeld `envelope_flush_w`:**
+   die lebenden `models/*.spec.json` bekommen es ERST nach der b03-Abnahme
+   (`python tools/spec_add_field.py envelope_flush_w 0.0`), weil laufende
+   Ketten die Specs neu lesen und die alten Wheels ein unbekanntes Feld hart
+   ablehnen. Reihenfolge im CPU-freien Fenster: Specs nachziehen, `cargo test
+   --release` (Python-DLL im PATH), Wheel bauen und installieren, Anker-Drift
+   (`/mosaic-anchor-invariance`), dann Messung K3-P2 / K3-F / beide.
    Vorher par.12b Rauschboden messen (Block-Bootstrap auf frozen_v3), sonst
    nur Tor 1/2.
 
