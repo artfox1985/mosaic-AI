@@ -1547,6 +1547,54 @@ entschieden):**
 1) schliesst damit den Tiling-Eingriff ein -- nicht als H-Zuschlag, sondern als
 Geometrie-fuehrende Auswahl in den fruehen Runden.
 
+### par.8.12a ERGEBNIS DER TILING-GEOMETRIE-SONDE (gefahren 2026-09-06, 03:06; `tiling_geometry_probe_human.json`, `..._arena.json`)
+
+Sonde `tools/probes/tiling_geometry_probe.py` (K 32, exakter Loeser): 20 Server-Partien
+Mensch gegen KI (340 Rundenenden, 0 Divergenzen, 9,8 s) und die b01-Arena der
+b01-Abnahme (160 Partien, 2.885 Rundenenden, 1 Divergenz, 70 s; Seiten NetzA/NetzB
+sind je Richtung v24-b01 und b01 GEMISCHT, weil die Sonde nach Brett zaehlt).
+Masse: G4 (leere 4-Nachbarn der neuen Zellen), Gline (leere Zellen in Zeile und Spalte)
+-- Obergrenzen-NAEHERUNG ohne Farb- und Vorratspruefung.
+
+| Seite | Runde | punktbester Abschluss: Punkte | geometriebester weicht ab | kostet Pkt / gewinnt Gline | gespielt: Pkt gegen pbest | gespielt: Gline gegen pbest | gespielt = pbest (zugeordnet) |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Mensch | 1 | 5,4 | 35 % | 2,3 / +4,0 | -0,03 | +0,18 | 0,94 (34/34) |
+| Mensch | 2 | 8,6 | 74 % | 2,2 / +4,1 | **-1,39** | **+0,55** | 0,30 (33/34) |
+| Mensch | 3 | 14,8 | 41 % | 6,3 / +3,6 | -0,85 | -0,85 | 0,73 (33/34) |
+| Mensch | 4 | 22,9 | 85 % | 12,2 / +4,6 | -0,33 | -0,30 | 0,89 (27/34) |
+| Mensch | 5 | 18,8 | 79 % | 7,6 / +2,3 | -0,58 | -0,21 | 0,74 (19/34) |
+| KI (Server) | 1 | 3,0 | 91 % | 1,0 / +2,0 | 0,00 | -0,12 | 0,85 (34/34) |
+| KI (Server) | 2 | 9,2 | 94 % | 3,3 / +2,8 | 0,00 | 0,00 | 1,00 (34/34) |
+| KI (Server) | 3 | 14,3 | 94 % | 3,6 / +1,8 | 0,00 | -0,09 | 0,94 (34/34) |
+| KI (Server) | 4 | 17,1 | 85 % | 3,3 / +2,8 | -0,12 | -0,21 | 0,94 (34/34) |
+| KI (Server) | 5 | 16,2 | 27 % | 3,0 / +2,8 | -0,33 | +0,11 | 0,78 (18/34) |
+| Netze A / B | 1 | 2,9 / 2,6 | 45 / 30 % | 1,1 / +2,1 und 1,0 / +2,0 | 0,00 / 0,00 | -0,38 / -0,01 | 0,73 / 0,90 (309/309) |
+| Netze A / B | 2 | 8,6 / 8,6 | 65 / 66 % | 3,5 / +3,4 und 3,6 / +3,0 | -0,01 / 0,00 | -0,11 / -0,25 | 0,89 / 0,80 |
+| Netze A / B | 3 | 12,2 / 12,1 | 82 / 74 % | 5,4 / +3,9 und 5,2 / +3,6 | -0,07 / -0,08 | +0,02 / -0,71 | 0,87 / 0,80 |
+| Netze A / B | 4 | 14,7 / 15,0 | 66 / 61 % | 5,4 / +3,5 und 4,8 / +3,7 | -0,20 / -0,24 | -0,43 / -0,06 | 0,84 / 0,88 (203 bzw. 205 von 308) |
+| Netze A / B | 5 | 18,6 / 17,8 | 62 / 46 % | 5,4 / +3,2 und 5,5 / +3,0 | -0,30 / -0,20 | -0,08 / -0,08 | 0,87 / 0,84 (156 bzw. 157 von 207) |
+
+**Lesart (Sonde, keine Entscheidung):**
+- Der Server-KI und den Netzen kostet der gespielte Abschluss in Runde 1-3
+  praktisch nichts gegen den punktbesten (0,00 bis -0,08); in Runde 4-5
+  0,1-0,3 Punkte (dort bleiben 30-50 % der Abschluesse unzugeordnet, weil
+  der Endzustand nach Runde 5 die Zellen bis zum Spielende einschliesst).
+- **Der Mensch laesst Punkte liegen, aber kauft damit nach diesen Massen
+  KEINE Nachbarschaft:** -1,39 Punkte in Runde 2 bei +0,55 Gline, in Runde
+  3-5 -0,3 bis -0,9 Punkte bei NEGATIVEM Gline gegen den punktbesten. Nur
+  Runde 1-2 zeigt das erwartete Muster (Gline +0,18 / +0,55), klein und bei
+  n = 34 Rundenenden je Runde. Die These "der Mensch optimiert im Tiling die
+  Geometrie statt der Punkte" traegt an G4/Gline NICHT; was der Mensch in der
+  Endwertung gewinnt (par.8.10: 19,7 gegen 4,2), muss anders zustande kommen
+  (Drafting, Plattenwahl, Reihenwahl -- nicht der Tiling-Abschluss).
+- Der geometriebeste Abschluss ist im Angebot fast immer ein anderer als der
+  punktbeste (Netze 45-82 %), und er kostet in Runde 1-2 nur 1-3,6 Punkte fuer
+  +2 bis +3,4 Gline; ab Runde 3 5 Punkte und mehr. Wenn ueberhaupt, liegt der
+  Spielraum fuer Punkt 2 aus par.8.12 in Runde 1-2.
+- VORBEHALT: G4/Gline zaehlen leere Zellen ohne Farb- und Vorratspruefung;
+  ein Nachbarschafts-Potential mit `cell_is_completable` (Vorschlag Punkt 1)
+  ist nicht gemessen. Verdikt zur Bauform (Punkt 2): offen beim Nutzer.
+
 ## par.8.13 NUTZER-BEOBACHTUNG (2026-09-06, 00:25): angefangene lange Reihen ohne passende Kuppelplatte bleiben liegen
 
 **Nutzer, woertlich (aus einer Server-Partie):** *"es scheint dass das netz etwas
@@ -1675,6 +1723,50 @@ ob eine Zelle der Zeile AUSSERHALB der Huelle die Farbe angenommen haette
 Reihenlaenge. Der eingereihte Lauf (`cpu_queue_after_b04.sh`: 19 Mensch-Logs,
 dann b01-Arena 160 Partien) faehrt die Ergaenzung mit; Zahlen folgen hier.
 Reihenfolge (Nutzer 00:50): erst diese Zahlen, dann K3-F.
+
+**ERGEBNIS (gefahren 2026-09-06, 03:06, im selben Lauf wie par.8.12a; Block
+`reihen_alter` in `tiling_geometry_probe_human.json` und `..._arena.json`):**
+
+| Seite | Reihe | Episoden | am Rundenende voll | am Ende offen | Rest (siehe Vorbehalt) | Episoden je blockiert | blockierte Rundenenden je blockierter Episode | voll wenn je blockiert / nie blockiert | Anteil `nein` an den unvollstaendigen Rundenenden | Aussen-Legen bei `nein` moeglich | blockiert ab Runde 1 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Mensch | 5 | 85 | 0,52 | 0,13 | 0,35 | 0,17 | 1,0 | 0,36 / 0,55 | 14 von 89 = 0,16 | 0,93 | 0 von 14 |
+| Mensch | 6 | 72 | 0,29 | 0,15 | 0,56 | **0,69** | 1,7 | 0,14 / 0,64 | **87 von 114 = 0,76** | 1,00 | 1 von 50 (17 ab Runde 2) |
+| KI (Server) | 5 | 85 | 0,31 | 0,19 | 0,51 | 0,33 | 1,3 | 0,00 / 0,46 | 36 von 123 = 0,29 | 0,86 | 1 von 28 |
+| KI (Server) | 6 | 44 | 0,20 | 0,39 | 0,41 | 0,34 | 1,9 | 0,07 / 0,28 | 29 von 113 = 0,26 | 0,69 | 2 von 15 |
+| Netze A / B | 5 | 665 / 709 | 0,47 / 0,42 | 0,15 / 0,16 | 0,38 / 0,42 | 0,21 / 0,20 | 1,7 / 1,4 | 0,32 / 0,51 und 0,13 / 0,49 | 238 von 974 = 0,24 und 204 von 1.042 = 0,20 | 0,61 / 0,73 | 5 von 142 und 4 von 144 |
+| Netze A / B | 6 | 547 / 493 | 0,37 / 0,29 | 0,23 / 0,23 | 0,41 / 0,48 | **0,58 / 0,57** | 2,1 / 2,2 | **0,16 / 0,65 und 0,15 / 0,48** | **665 von 1.085 = 0,61 und 602 von 1.059 = 0,57** | 0,71 / 0,69 | 60 von 317 und 59 von 279 |
+
+**Lesart fuer K3-F:**
+- **Reihe 6 ist der Fall.** Bei den Netzen ist mehr als jede zweite
+  6er-Episode irgendwann blockiert (Praedikat `nein`), an rund 60 % ihrer
+  unvollstaendigen Rundenenden kann die Reihe die Huelle nicht mehr bedienen,
+  und eine je blockierte 6er-Reihe wird am Rundenende nur zu 15-16 % voll
+  gegen 48-65 % bei nie blockierten. Geometrisch zwingend: die Dreiecks-
+  Huelle hat in Zeile 6 genau EINE Zelle, die Reihe passt also nur mit einer
+  Farbe (oder Wild) in die Huelle. Reihe 5 ist zu rund 20 % betroffen.
+- Blockade beginnt frueh: rund ein Fuenftel der blockierten 6er-Episoden ist
+  schon ab Runde 1 blockiert (60 von 317, 59 von 279), die Reihen liegen dann
+  2,1-2,2 blockierte Rundenenden. Das ist der Hebel des Freiraeumens.
+- **Aussen-Legen ist fast immer moeglich:** an 61-73 % (Netze) bzw. 86-100 %
+  (Mensch, KI) der blockierten Rundenenden nimmt eine Zelle der Zeile
+  AUSSERHALB der Huelle die Farbe an -- der Nutzer-Vorschlag aus par.8.13
+  ("ausserhalb legen, um die Reihe freizubekommen") hat also fast immer einen
+  Ort; K3-F darf den Aussen-Abzug fuer diese Steine fallen lassen.
+- Mensch gegen KI: der Mensch blockiert die 6er-Reihe nach diesem Praedikat
+  SEHR oft (0,69 der Episoden, 0,76 der Rundenenden) -- VORBEHALT: das
+  Praedikat setzt die bestpassende Dreiecks-Huelle voraus; wer nicht auf die
+  Huelle baut, hat eine willkuerliche Orientierung und darum haeufig `nein`.
+  Fuer den Mensch-Vergleich ist die Kennzahl deshalb nur mit Vorsicht lesbar;
+  fuer die Netze (die mit K3-P auf die Huelle bauen) traegt sie.
+
+**VORBEHALT (Klassifikation der Episodenenden, naechste Fassung):** "voll"
+zaehlt nur Reihen, die an einem Rundenende VOR dem Tiling voll sind. Reihen,
+die erst im Tiling per Bonus-Chip vollendet werden (`apply_tiling_chips`),
+oder die als unplatzierbar geraeumt werden, erscheinen als "Rest" (35-56 %
+der Episoden!). Die naechste Fassung der Sonde trennt das am Zellgewinn der
+Rasterzeile zwischen zwei Rundenenden (gelegt gegen geraeumt); Lauf im
+naechsten CPU-freien Fenster (rund 80 s). Die Spalten "je blockiert",
+"Anteil nein" und "Aussen-Legen" sind davon NICHT betroffen.
 
 **ENTSCHIEDEN (Nutzer 2026-09-06, 00:50, woertlich "bau k3 f nach der
 messung"):** Bau ERST nach der Messung. Reihenfolge damit: (1) Tiling-

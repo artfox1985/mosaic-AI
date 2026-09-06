@@ -58,8 +58,8 @@ weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
 | --- | --- | --- | --- | --- | --- | --- |
 | ~~Training v24-b03 (714, fast-loader)~~ | `tools/night_v24_b03_fast.sh` | 00:27 | **FERTIG 01:56** (5.344 s, `_brierbest` Epoche 4 0,1868; config.py wieder 744, `git diff config.py` leer; Manifest mit Lader-Nachtrag committet) | -- | `data/window_v24_b03.txt`, Monolith `.cache_299283d4df61.h5`, config.py mit INPUT_SIZE 714 | `models/alphazero_v24-b03*.onnx`, Manifest `manifest_train_v24-b03_20260906_002718.json`; **setzt config.py am Ende auf 744 zurueck** |
 | ~~Abnahme b04~~ | `tools/night_v24_b04_acceptance_744venv.sh` (venv_measure744, 744er-Wheel) | 21:49 | **FERTIG 03:04**, alle Tore in par.9 registriert | rund 02:30 | `models/alphazero_v24-b04_brierbest.onnx`, Champion-Spec, `k3v_off.spec.json` | `tor2a_v24b04*.json`, `paired_gating_result_v24-b04_*`, `paired_arena_env_v24b04_*`, `columns_v24b04_*`, `points_v24b04_vs_b01_s14.json` |
-| Tiling-Geometrie-Sonde (par.8.12 + Reihen-Alter par.8.13/8.14) | `tools/cpu_queue_after_b04.sh` | 22:31 (wartete) | LAEUFT seit 03:06:30: erst 19 Mensch-Logs, dann b01-Arena 160 Partien | rund 02:45 | `static/log/game_*.log`, `paired_arena_env_v24b01_vs_b01_*_s14.json` | `tiling_geometry_probe_human.json`, `tiling_geometry_probe_arena.json` |
-| Abnahme b05 | `tools/night_v24_b05_acceptance_wait.sh` (Basis-python, Wheel 744 installiert 00:24) | 00:24 (wartet) | wartet auf freie CPU (b04-Abnahme, Sonde) | Start rund 02:45, Ende rund 06:45 | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
+| ~~Tiling-Geometrie-Sonde~~ | `tools/cpu_queue_after_b04.sh` | 22:31 | **FERTIG 03:07** (9,8 s + 70 s), registriert par.8.12a / 8.14 | rund 02:45 | `static/log/game_*.log`, `paired_arena_env_v24b01_vs_b01_*_s14.json` | `tiling_geometry_probe_human.json`, `tiling_geometry_probe_arena.json` |
+| Abnahme b05 | `tools/night_v24_b05_acceptance_wait.sh` (Basis-python, Wheel 744 installiert 00:24) | 00:24 | **LAEUFT seit 03:08:44** (Kette: Tor 2a ohne Knopf, Tor 1 ohne Knopf, Tor 2a mit Knopf, Tor 1 mit Knopf, ggf. Replikation, Tor 2b, Kuppel-Bonus) | rund 07:00-07:30 (hergeleitet aus b04: 21:49-03:04) | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
 | Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:58 (wartet) | wartet auf b03-Modell UND freie CPU; sein Wartemuster kennt Sonde, `cpu_queue_after_b04` und b05-Wartelauf NICHT -- deshalb haelt `tools/night_v24_after_b05_chain_hold.sh` (seit 00:53, Prozess nur wartend) es fest, bis Sonde und b05-Abnahme durch sind (Chronik 00:53) | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
 
 **Baum:** HEAD b472171 plus Uebergabe-Commit; 41 Commits vor origin/main, **kein Push**.
@@ -90,8 +90,13 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    per `--knobs "spec:..."`), Kuppel-Bonus aus `points_v24bXX_vs_b01_s14.json`.
 2. ~~b03-Training beobachten~~ ERLEDIGT 01:56: 5.344 s, rund 440 s je Epoche
    (`measured_runtimes.md`), config zurueck auf 744, Manifest committet.
-3. **Tiling-Geometrie-Sonde auswerten** (`tiling_geometry_probe_human.json`,
-   `..._arena.json`): Ergebnis in `PREREG_geometric_envelope.md` par.8.12
+3. ~~Tiling-Geometrie-Sonde auswerten~~ **REGISTRIERT 03:20** (`geometric_envelope`
+   par.8.12a: Mensch laesst Punkte liegen, kauft an G4/Gline aber keine
+   Nachbarschaft; par.8.14: Reihe 6 bei den Netzen in 57-58 % der Episoden
+   blockiert, blockierte 6er werden zu 15 % voll gegen 48-65 %, Aussen-Legen
+   an 61-73 % der blockierten Rundenenden moeglich). Offen: Klassifikation
+   Chip-Vollendung/Raeumung (Rest 35-56 %), Sonden-Fassung 2 im naechsten
+   CPU-freien Fenster (80 s). Alter Text: Ergebnis in `PREREG_geometric_envelope.md` par.8.12
    (Mensch gegen KI gegen Loeser: Anteil punkt-bester Abschluss, Punktkosten
    und Nachbarschaftsgewinn des geometrie-besten). **Die Sonde ist am
    2026-09-06 00:58 um das Reihen-Alter ERGAENZT** (par.8.13/8.14: Praedikat
