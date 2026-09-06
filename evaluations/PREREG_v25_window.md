@@ -377,3 +377,91 @@ Huelle selbst das Problem ist (die Dreiecks-Huelle hat in Zeile 6 nur eine Zelle
 laesst sich an K3-F 0,5 und der Kombination nicht klaeren; das braeuchte eine andere
 Huellenform als eigenen Arm.
 
+## par.11 VORLAGE v25-ZUSCHNITT (2026-09-07, 00:55; alle offenen Punkte gebuendelt, ENTSCHEID BEIM NUTZER)
+
+Die Erzeugung startet nur auf Anweisung. Diese Vorlage sammelt, was vorher zu entscheiden
+ist, mit Empfehlung je Punkt. Keine stille Wahl: was hier offen bleibt, bleibt offen.
+
+### A. Generator: `v24-b05` (Stand par.4) oder `v24-b06` (amtierender Champion)
+
+| Kriterium | b05 ohne K3-P | b06 mit K3-P |
+| --- | --- | --- |
+| Tor 1 gegen v23-b01, gleiche Spec | **66:34 + 112:78 SPRT**, zwei Seeds | 117:83 + 202:158 SPRT, zwei Seeds |
+| Kante gegen den DAMALIGEN Champion in Spielkonfiguration | 202:218 aus 210 Paaren, gleichauf, kein Beleg | dieselbe Messung wie Tor 1: **319:241, Champion-Kante genommen** |
+| Amt | -- | **Champion seit 2026-09-06 18:42, Elo 1309** |
+| Tor 2a (Spalten-Bezug des Waechters) | 0,4825 ohne Knopf | 0,4975 mit Knopf |
+| Tor 2b Spalten | gehalten (0,650 / 0,557 gegen 0,500 / 0,570) | gleichauf (0,575 / 0,725 gegen 0,650 / 0,625) |
+
+**Empfehlung: b06 mit K3-P.** Grund: der Nutzer-Grundsatz "Self-Plays nur mit dem Champion"
+(2026-09-06, 17:05) und der Umstand, dass b05 gegen den Champion nur gleichauf liegt
+(202:218) -- der Vorsprung von b05 ist gegen v23-b01 in gleicher Spec gemessen, nicht gegen
+das, was heute spielt. Das Material entstuende dann in derselben Konfiguration, in der auch
+gespielt wird. Kosten der Umstellung gegenueber par.4: der Waechter-Bezug wird 0,4975 statt
+0,4825, der Val-Pool-Regex `^selfplay_v24-b06-`, sonst nichts. **Gegenargument, das der
+Nutzer kennen muss:** b05 ist der einzige 744er-Arm mit einem Tor-1-Beleg OHNE Knopf, und
+eine knopflose Erzeugung haelt das Material naeher an dem, was ein knopfloses Netz spaeter
+sieht. Wer das hoeher gewichtet, bleibt bei par.4.
+
+### B. Value-Klasse: 8.000 argmax / 0 gesampelt, oder 7.000 / 1.000 (par.9, offen seit 2026-09-05)
+
+**Empfehlung: 8.000 / 0.** Die Streuung, die die 1.000 gesampelten liefern sollten, kostet
+in der Fenster-Kennzahl rund 2 Punkte (0,536 gegen 0,555, par.9), und der Einwand aus
+par.9a bleibt gueltig: die Value-Klasse ist policy-maskiert, die Spalten kommen aus den
+Traegern. Wer Streuung will, holt sie billiger ueber Seeds und Wertungsplatten als ueber
+gesampelte Zuege. **Der unwichtigste Punkt dieser Vorlage** -- er bewegt eine Kennzahl, die
+nach par.9a ohnehin das falsche Mass ist.
+
+### C. Der eigentliche Engpass: die Traeger-Kennzahl faellt auf rund 0,23 (par.9a)
+
+Gemessen v24: **0,356 volle Spalten je Seite ueber die 580 Traeger-Dateien**
+(`v24_sanity_carriers.json`), gegen 0,624 ueber das ganze Fenster. Hergeleitet (nicht
+gemessen) fuer den v25-Zuschnitt aus par.1: (5.350 x 0,19 + 450 x 0,73) / 5.800 = **0,23**.
+Der Waechter par.7 reisst damit auf dem Papier, bevor eine einzige Partie gespielt ist --
+weil der Sockel NEU (4.000 Partien, policy-aktiv, gesampelt mit Rauschen) mit 0,19 die
+spaltenaermste Klasse ist und die spaltenreichen hv2-Traeger von 180 auf 45 Dateien
+ausrotieren.
+
+**Vorschlaege (Nutzer waehlt, mehrere kombinierbar):**
+1. **Mehr hv2-Traeger behalten**: 450 -> 900 Partien (90 statt 45 Dateien), Sockel NEU
+   entsprechend 3.550. Rechnung: (4.900 x 0,19 + 900 x 0,73) / 5.800 = 0,27. Kostet keine
+   Rechenzeit, verlangsamt aber die Rotation des Lehrer-Materials.
+2. **Sockel NEU spaltenreicher erzeugen**: weniger Rauschen oder schnellere
+   Temperatur-Abklingung; Betriebspunkt vorher messen (eine argmax-Sonde je Kandidat, rund
+   10 min). Der einzige Hebel, der die 0,19 selbst angreift.
+3. **Einen Teil der argmax-Klasse policy-tragend machen** (Besuchsverteilung @100 als
+   scharfes Ziel). Groesster Eingriff, eigener Arm, nicht in diesem Zuschnitt.
+
+**Empfehlung: 1 und 2 vor dem Start, 2 zuerst messen.** Punkt 2 ist die Ursache, Punkt 1 der
+Verband. Ohne beides startet die Generation mit einem gerissenen Waechter.
+
+### D. K3-F als Knopf in der ERZEUGUNG (par.10, Nutzer-Idee 2026-09-06, 22:45)
+
+Stand der Messung: alle vier Such-Knopf-Arme am Champion sind negativ
+(`geometric_envelope` par.8.11a / 8.14 / 8.14a), K3-F verschiebt aber die Endbretter
+messbar in die Nutzer-Form (par.8.15a: Zelle (5,1) zu 0,525 gegen 0,362 der Kontrolle) und
+vollendet 0,3 bis 0,8 lange Reihen mehr je Seite.
+
+**Vorschlag (Bauform B aus par.10): 1.200 der 4.000 Sockel-NEU-Partien mit
+`envelope_flush_w` 1,0**, also 30 % des neuen Sockels und rund 20 % aller Traeger --
+dieselbe Groessenordnung wie der hv2-Traeger-Anteil in v24 (1.800 von 5.800, 31 %), der die
+Traeger-Kennzahl nachweislich getragen hat. Ersetzen statt ergaenzen, damit die Traegerzahl
+5.800 bleibt und keine Rechenzeit dazukommt. Dosis 1,0 statt 0,5, weil bei 0,5 die
+Reihen-Wirkung in der Arena schon kaum mehr sichtbar war (par.8.14). Eigener Dateiname nach
+Generator und Knopf, Manifest-Kennzeichnung, Fenster-Pinning. **Vor dem Training messbar:**
+lange Reihen vollendet und Traeger-Kennzahl je Klasse -- sieht das Material anders aus als
+der Rest, hat der Knopf gewirkt; sieht es gleich aus, ist der Arm tot, bevor er trainiert
+wird. **Untergrenze:** unter rund 500 Partien (unter 10 % der Traeger) ist nicht zu
+erwarten, dass es das Netz erreicht (Herleitung aus dem hv2-Anteil, nicht gemessen).
+
+### E. Huellenform in der Erzeugung (par.8.15 Teil B, Messung steht aus)
+
+Haengt am Arm-Ergebnis. Traegt Form 2 in der Suche, gehoert sie in die Generator-Spec, und
+K3-F bekaeme in der Erzeugungs-Klasse die neue Form dazu (mit zwei Huellenzellen in Zeile 6
+hat die Freiraeum-Regel ein zweites Ziel und muss seltener "NEIN" sagen). Traegt sie nicht,
+bleibt es bei D auf dem Dreieck. **Kein Entscheid noetig, bis der Arm gefahren ist.**
+
+### Was NICHT offen ist (damit es nicht neu verhandelt wird)
+
+Zuschnitt und Groesse des Fensters (par.1: 29.450 Partien, 2.945 Dateien), die
+hv2-Uebergangsabbildung (par.2), Val-Pool-Regex und Startgewicht (par.6), die Form des
+Waechters (par.7). Die Erzeugung startet NUR auf Nutzer-Anweisung.
