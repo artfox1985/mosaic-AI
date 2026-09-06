@@ -38,6 +38,19 @@ let _tilingDeadline = 0;
 // Log-Datei bleiben unberuehrt.
 let uiLogExtras = [];
 
+// Seit Commit 1bb4ea6 (2026-09-07) schreibt die Engine den Pass selbst ins
+// Log ("⏭️ {name}: passt", game.rs, beide Pfade). Das installierte Wheel kann
+// aelter sein -- die Oberflaeche schaut deshalb nach, statt es anzunehmen: ist
+// an der Stelle, an der der Pass stand, schon eine Zeile mit "passt", schreibt
+// sie keine zweite. So steht der Pass mit jedem Wheel genau EINMAL im Log.
+function _enginePassLogged(at) {
+  const l = S && S.log ? S.log : [];
+  for(let i = at; i < Math.min(l.length, at + 2); i++) {
+    if(/passt/i.test(l[i])) return true;
+  }
+  return false;
+}
+
 function addUiLog(text, at) {
   if(!S) return;
   // `at` ausdruecklich mitgeben, wenn die Zeile NACH dem Zug geschrieben wird,
@@ -305,6 +318,7 @@ async function triggerAIMove() {
     // Loop: KI zieht solange sie dran ist (max 20 Züge gegen Endlosloop)
     let safety = 0;
     while (aiIsDue() && safety++ < 20) {
+      const logVorZug = (S.log || []).length;
       const d = await api('/ai/move');
       if (!d.ok) {
         // Kein Fehler anzeigen wenn KI einfach nicht dran ist
@@ -320,8 +334,8 @@ async function triggerAIMove() {
       // dafuer bewusst keine Log-Zeile (py.rs:310-317, Replay-Vertrag), die
       // gespielte Aktion kommt aber in der Antwort mit
       // (mcts.rs:709 -> {"type":"pass"}).
-      if (d.ai_action && d.ai_action.type === 'pass') {
-        addUiLog(`⏸ ${S.players[AI_PLAYER].name} passt (keine Aktion möglich)`);
+      if (d.ai_action && d.ai_action.type === 'pass' && !_enginePassLogged(logVorZug)) {
+        addUiLog(`⏸ ${S.players[AI_PLAYER].name} passt (keine Aktion möglich)`, logVorZug);
       }
       render();
       if (aiIsDue()) await new Promise(r => setTimeout(r, 350));
@@ -651,8 +665,9 @@ function maybeAutoPass() {
     finally {
       if(durch) {
         // Der Zug ist durch. Die Zeile gehoert an die Stelle VOR die
-        // Log-Zeilen, die die Gegenseite inzwischen erzeugt hat.
-        addUiLog(`⏸ ${name} passt (keine Aktion möglich)`, at);
+        // Log-Zeilen, die die Gegenseite inzwischen erzeugt hat -- und faellt
+        // ganz weg, wenn die Engine sie selbst geschrieben hat.
+        if(!_enginePassLogged(at)) addUiLog(`⏸ ${name} passt (keine Aktion möglich)`, at);
         _autoPassStuck = 0;
       } else {
         _autoPassStuck++;
