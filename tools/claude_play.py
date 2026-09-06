@@ -418,8 +418,8 @@ def cmd_move(a) -> int:
     try:
         out = [apply_move(g, m, a.move)]
     except (ValueError, RuntimeError, IndexError) as e:
-        print(f"ZUG ABGEWIESEN ({a.move!r}): {e}
-Die legalen Zuege stehen unter 'show' -- Kurzform genau so uebernehmen (auch mond:...).")
+        print(f"ZUG ABGEWIESEN ({a.move!r}): {e}")
+        print("Die legalen Zuege stehen unter 'show' -- Kurzform genau so uebernehmen (auch mond:...).")
         return 1
     m["moves_claude"] = m.get("moves_claude", 0) + 1
     save_manifest(a.game, m)
