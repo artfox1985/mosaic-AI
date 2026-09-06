@@ -362,3 +362,18 @@ Bezug bleibt der Generator ohne Knopf-Klasse; (4) dieser Absatz ist die IDEE -- 
 Erzeugung bekommt die Knopf-Klasse eine Zeile in der par.1-Tabelle und einen Arm-Namen.
 Erzeugung startet NUR auf Nutzer-Anweisung.
 
+**Nutzer-Einwand (2026-09-06, 22:49, woertlich): *"das ist eventuell ein allgemeines problem
+mit der huelle oder aufgezwungenen knoepfen."*** Was die Kampagne dazu hergibt (Stand der
+Preregs, Herleitung markiert): aufgezwungene Such-Knoepfe haben getragen, wo sie ein
+Verhalten VERSTAERKEN, das das Netz aus dem Korpus schon kann (K3-P: Spalten in der
+Huelle, gepoolt 191:129, Champion-Kante 221:179), und sie haben Punkte oder Siege
+gekostet, wo sie ein Verhalten VERLANGEN, das im Korpus fehlt (K3-F: Freiraeumen; K3-R/K3-O:
+Erreichbarkeit, par.8.9a; B1 Langreihen-Initiierung: erzwingbar, Vollendung nicht; K1:
+Marge ohne Siege). Lesart als Hypothese: ein Such-Knopf ist ein Verstaerker, kein
+Lehrer -- Lehren geht nur ueber das Material (Bauformen oben). Das ist genau der Grund,
+K3-F in die Erzeugung zu nehmen, und zugleich die Erwartung fuer K5: als Such-Knopf
+allein wahrscheinlich Punkte-negativ, als Erzeugungs-Klasse der eigentliche Test. Ob die
+Huelle selbst das Problem ist (die Dreiecks-Huelle hat in Zeile 6 nur eine Zelle, par.8.14),
+laesst sich an K3-F 0,5 und der Kombination nicht klaeren; das braeuchte eine andere
+Huellenform als eigenen Arm.
+
