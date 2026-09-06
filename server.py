@@ -212,6 +212,7 @@ _SPEC_TO_ENV = {
     "envelope_projection_mode": "MOSAIC_ENVELOPE_PROJECTED",
     "envelope_profile": "MOSAIC_ENVELOPE_PROFILE",
     "envelope_flush_w": "MOSAIC_ENVELOPE_FLUSH_W",
+    "envelope_hull_form": "MOSAIC_ENVELOPE_HULL_FORM",
 }
 
 
