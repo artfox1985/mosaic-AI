@@ -93,7 +93,7 @@ def main() -> int:
     players = [int(r["player"]) for r in recs]
     margin = np.array([float(r["scores_unclamped"][p] - r["scores_unclamped"][1 - p]) for r, p in zip(recs, players)])
     win = np.array([1.0 if r["winner"] == p else 0.0 for r, p in zip(recs, players)])
-    oracle_v = np.array([oracle.get(i, np.nan) for i in range(len(recs))])
+    oracle_v = np.array([(v if isinstance(v, (int, float)) else np.nan) for v in (oracle.get(i) for i in range(len(recs)))], dtype=float)
     device = "cuda" if torch.cuda.is_available() else "cpu"
     planes = torch.stack([state_to_planes(r["state"]).float() for r in recs])
     flat_full = torch.stack([state_to_tensor(r["state"]) for r in recs])

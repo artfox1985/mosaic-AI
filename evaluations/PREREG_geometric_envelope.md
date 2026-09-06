@@ -1481,6 +1481,35 @@ Block-SD der Marge gilt erst ab Faktor 1,34, eine der Spalten erst ab Faktor
 identischer Aufbauten. Punkte 1 und 2 (frozen_v3) folgen in der
 Knopf-Messkette am Champion (Nutzer 13:15: "miss den rauschboden mit").
 
+**GEMESSEN, Punkte 1 und 2 (2026-09-06, 20:46; `tools/probes/value_head_reliability_probe.py`,
+`value_head_reliability_par12b.json`; frozen_v3 1.800 Zustaende, 360 je Runde, Block-
+Bootstrap 36 x 10 mit 1.000 Ziehungen; sieben Netze v23-b01, v24-b01..b06, alle
+`_brierbest`; 66 s auf der GPU, neben dem deterministischen argmax-Schritt der
+Knopf-Kette):**
+
+| Runde | rho(Value, Marge) v23-b01 | Bootstrap-SD | 95-%-Spanne einer Differenz (H0) | Netz-Spannweite ueber 7 Netze | rho(Value, Orakel @5000) v23-b01 | SD | Differenz-Spanne | Netz-Spannweite |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0,190 | 0,047 | [-0,13, +0,13] | 0,020 | 0,802 (n 236) | 0,026 | [-0,06, +0,07] | 0,018 |
+| 2 | 0,293 | 0,043 | [-0,12, +0,12] | 0,032 | 0,908 (n 237) | 0,020 | [-0,05, +0,06] | 0,029 |
+| 3 | 0,485 | 0,045 | [-0,13, +0,14] | 0,016 | 0,929 (n 215) | 0,016 | [-0,05, +0,04] | 0,011 |
+| 4 | 0,695 | 0,030 | [-0,08, +0,08] | 0,021 | 0,933 (n 227) | 0,012 | [-0,03, +0,03] | 0,009 |
+| 5 | 0,857 | 0,016 | [-0,04, +0,04] | 0,013 | (Orakel ausgenommen) | | | |
+
+Lesart: (1) **Schwelle fuer B1 (rho gegen Marge) in Runde 1-2: rund +-0,13** (die
+groessere der beiden Streuungen ist das Zustands-Rauschen; die Netz-Spannweite
+ueber sieben Netze ist mit 0,02-0,03 kleiner als eine Bootstrap-SD -- die
+Warmstart-Linie hat in dieser Groesse praktisch keine Netz-zu-Netz-Streuung,
+passend zum Kapazitaetsbefund identischer Trunks). (2) **Schwelle fuer B2 (rho gegen
+Orakel): rund +-0,06 in Runde 1-2, +-0,04 in Runde 3-4.** (3) Damit gilt: kein v24-Arm
+bewegt rho(1..2) ueber den Rauschboden hinaus (Spannweite 0,02-0,03 gegen Schwelle
+0,13); B1/B2 sind fuer die v24-Generation NICHT bewegt.
+**VORBEHALT:** die rho-Werte dieser Sonde (v23-b01 0,190 / 0,293 / 0,485 / 0,695 /
+0,857) weichen vom Altartefakt `value_head_reliability_by_round.json` (0,143 / 0,201 /
+0,390 / 0,641 / 0,881) ab; dessen Erzeuger liegt nicht im Baum, seine Definition
+(Marge geklammert oder nicht, Value-Ausgabe, Sicht) ist nicht rekonstruierbar. Der
+Rauschboden gilt INNERHALB dieser Sonde; par.8.5 (w_e-Profil) bleibt auf dem
+Altartefakt, bis der Unterschied geklaert ist.
+
 **Regel:** eine Groesse gilt erst dann als bewegt, wenn ihre Differenz beide
 Rauschboeden (1 und 2) ueberschreitet; C1 gilt als "nicht groesser", wenn das
 Verhaeltnis innerhalb der Spannweite aus 3 liegt. Die gemessenen Zahlen
