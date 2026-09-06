@@ -80,3 +80,47 @@ class ChipLineTest(unittest.TestCase):
         old = "[R2] 🎫 KI komplettiert Reihe 5 mit Bonus-Chips!"
         new = "[R3] 🎴 KI komplettiert Reihe 5 mit Bonus-Chips (2 Plättchen: rot, rot)!"
         self.assertFalse(self.rep._lines_equal(old, new))
+
+
+class ChipChoiceFromLogTest(unittest.TestCase):
+    """Die Chip-Wahl kommt aus dem Log statt aus dem Raten (Nutzer 2026-09-07)."""
+
+    def setUp(self):
+        self.rep = agl.Replayer.__new__(agl.Replayer)
+        self.rep.chip_log_mehrdeutig = 0
+
+    def test_label_matches_engine_format(self):
+        hand = [{"colors": ["rot"]}, {"colors": ["gelb", "blau"]}, {"colors": ["schwarz"]}]
+        self.assertEqual(
+            agl.Replayer._chip_label_from_hand(hand, [0, 1, 2]),
+            "3 Plättchen: rot, gelb+blau, schwarz",
+        )
+        self.assertEqual(agl.Replayer._chip_label_from_hand(hand, [2, 0]), "2 Plättchen: rot, schwarz")
+
+    def test_choice_is_recovered_from_the_line(self):
+        hand = [{"colors": ["rot"]}, {"colors": ["gelb", "blau"]}, {"colors": ["schwarz"]}]
+        self.rep.g = type("G", (), {"state_json": lambda self_: __import__("json").dumps(
+            {"players": [{"bonus_chips": hand}, {"bonus_chips": []}]})})()
+        body = "🎴 KI komplettiert Reihe 5 mit Bonus-Chips (2 Plättchen: rot, schwarz)!"
+        got = self.rep._chip_choice_from_log(body, 0, [[0, 1], [0, 2], [1, 2]])
+        self.assertEqual(got, [0, 2])
+
+    def test_old_line_without_addition_returns_none(self):
+        self.rep.g = type("G", (), {"state_json": lambda self_: '{"players":[{"bonus_chips":[]}]}'})()
+        self.assertIsNone(self.rep._chip_choice_from_log("🎫 KI komplettiert Reihe 5 mit Bonus-Chips!", 0, [[0]]))
+
+    def test_no_matching_candidate_returns_none(self):
+        hand = [{"colors": ["rot"]}, {"colors": ["blau"]}]
+        self.rep.g = type("G", (), {"state_json": lambda self_: __import__("json").dumps(
+            {"players": [{"bonus_chips": hand}]})})()
+        body = "🎴 KI komplettiert Reihe 5 mit Bonus-Chips (2 Plättchen: gelb, gelb)!"
+        self.assertIsNone(self.rep._chip_choice_from_log(body, 0, [[0, 1]]))
+
+    def test_ambiguous_signature_is_counted(self):
+        hand = [{"colors": ["rot"]}, {"colors": ["rot"]}, {"colors": ["rot"]}]
+        self.rep.g = type("G", (), {"state_json": lambda self_: __import__("json").dumps(
+            {"players": [{"bonus_chips": hand}]})})()
+        body = "🎴 KI komplettiert Reihe 5 mit Bonus-Chips (2 Plättchen: rot, rot)!"
+        got = self.rep._chip_choice_from_log(body, 0, [[0, 1], [0, 2], [1, 2]])
+        self.assertEqual(got, [0, 1])
+        self.assertEqual(self.rep.chip_log_mehrdeutig, 1)
