@@ -44,12 +44,17 @@ def fill_mask(player):
 
 
 def auswerten(verzeichnis, n_partien):
+    """`verzeichnis` ist ein Pfad oder `pfad::glob` (Muster 2026-09-07: mehrere
+    Chargen liegen im selben `data/` und unterscheiden sich nur im Dateinamen)."""
+    pattern = "*.pkl"
+    if "::" in verzeichnis:
+        verzeichnis, pattern = verzeichnis.split("::", 1)
     spiele = collections.defaultdict(list)
     # Ueber `load_records`, NICHT roh per `pickle.load`: seit corpus_io die
     # Korpus-Dateien gzip-komprimiert schreibt (Endung bleibt .pkl, erkannt
     # wird am Inhalt) starb diese Sonde an jedem heutigen Korpus mit
     # UnpicklingError. Bestandsdateien ohne gzip liest derselbe Aufruf weiter.
-    for f in sorted(glob.glob(os.path.join(verzeichnis, "*.pkl"))):
+    for f in sorted(glob.glob(os.path.join(verzeichnis, pattern))):
         for r in load_records(f):
             spiele[r.get("game_id")].append(r)
     ids = sorted(spiele)[:n_partien]
@@ -76,6 +81,7 @@ def auswerten(verzeichnis, n_partien):
     geteilt = sum(1 for k, v in alle.items() if v > 1)
     return {
         "verzeichnis": verzeichnis,
+        "muster": pattern,
         "partien": len(ids),
         "records": records,
         "distinkte_zustaende": len(alle),
@@ -90,14 +96,39 @@ def auswerten(verzeichnis, n_partien):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        raise SystemExit("Aufruf: ... <dir_a> <dir_b> [n_partien] [out]")
-    n = int(sys.argv[3]) if len(sys.argv) > 3 else 200
+        raise SystemExit(
+            "Aufruf: ... <arm_a> <arm_b> [<arm_c> ...] [--n N] [--out PFAD]\n"
+            "  Arm = <verzeichnis> oder <verzeichnis>::<glob>"
+        )
+    # Neue Flags, damit mehr als zwei Arme moeglich sind; die alte Positionsform
+    # (<a> <b> [n] [out]) bleibt gueltig.
+    argv = sys.argv[1:]
+    n = None
+    out_flag = None
+    arms = []
+    i = 0
+    while i < len(argv):
+        if argv[i] == "--n":
+            n = int(argv[i + 1]); i += 2
+        elif argv[i] == "--out":
+            out_flag = argv[i + 1]; i += 2
+        else:
+            arms.append(argv[i]); i += 1
+    if n is None and len(arms) > 2 and arms[2].isdigit():
+        n = int(arms[2])
+        rest = arms[3:]
+        arms = arms[:2]
+        if rest and out_flag is None:
+            out_flag = rest[0]
+    if n is None:
+        n = 200
+    sys.argv = [sys.argv[0]] + arms
     # Vierter Parameter, weil der feste Pfad sonst das Artefakt der VORIGEN
     # Messung ueberschreibt (Anlass-Messung "v2-Vorzug"). Ein zweiter Lauf mit
     # anderer Frage darf den ersten Befund nicht loeschen.
-    out_path = sys.argv[4] if len(sys.argv) > 4 else "evaluations/artifacts/corpus_state_diversity.json"
+    out_path = out_flag or "evaluations/artifacts/corpus_state_diversity.json"
     t0 = time.time()
-    ergebnisse = [auswerten(v, n) for v in sys.argv[1:3]]
+    ergebnisse = [auswerten(v, n) for v in arms]
     for e in ergebnisse:
         print(f"\n=== {e['verzeichnis']} ===")
         print(f"  Partien {e['partien']}, Records {e['records']}")
@@ -108,9 +139,13 @@ if __name__ == "__main__":
         print(f"  distinkte je Record                : {e['distinkte_je_record']:.3f}")
         print(f"  distinkte ENDbretter (von {2*e['partien']} Seiten): {e['distinkte_endbretter']:,} "
               f"= {100*e['endbretter_je_seite']:.1f} %")
-    a, b = ergebnisse
-    print(f"\nVerhaeltnis A/B distinkte Zustaende : {a['distinkte_zustaende']/b['distinkte_zustaende']:.3f}")
-    print(f"Verhaeltnis A/B je Record          : {a['distinkte_je_record']/b['distinkte_je_record']:.3f}")
+    a = ergebnisse[0]
+    for b in ergebnisse[1:]:
+        print(f"\nVerhaeltnis {b['muster']} / {a['muster']} distinkte Zustaende : "
+              f"{b['distinkte_zustaende']/a['distinkte_zustaende']:.3f}")
+        print(f"Verhaeltnis je Record          : {b['distinkte_je_record']/a['distinkte_je_record']:.3f}")
+        print(f"Verhaeltnis distinkte Endbretter: {b['distinkte_endbretter']/max(1,a['distinkte_endbretter']):.3f}")
+    b = ergebnisse[1]
     wand = time.time() - t0
     print(f"\nLaufzeit {wand:.1f} s")
 
