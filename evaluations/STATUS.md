@@ -73,7 +73,7 @@ Pipe im Hintergrund.
    oder `PYDIR=$(cygpath -u "$(python -c 'import sys;print(sys.base_prefix)')"); export
    PATH="$PYDIR:$PATH"`) -- prueft das umbenannte Fixture `models/engine_test.onnx`
    (13 Verweise, Commits e6b04ec/4bc4313/77975d2, ungetestet). Erwartung 523 gruen.
-4. **Neun Partien Subagent gegen Champion** (`PREREG_claude_play_interface.md` par.7/8:
+4. **PAUSIERT (Nutzer 23:45: erst mit v25 weiter). Neun Partien Subagent gegen Champion** (`PREREG_claude_play_interface.md` par.7/8:
    Restprogramm 4 als Erst-, 5 als Zweitspieler; je Partie ein Agent mit Modell Opus, Auftrag
    wie in der Chronik 18:55/19:29 beschrieben: `python -X utf8 tools/claude_play.py new --game
    g02 --seed 20260907 --first-player 0 --claude-side 0`, ab g06 `--claude-side 1
