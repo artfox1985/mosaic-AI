@@ -72,6 +72,8 @@ weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
 | ~~Abnahme b04~~ | `tools/night_v24_b04_acceptance_744venv.sh` (venv_measure744, 744er-Wheel) | 21:49 | **FERTIG 03:04**, alle Tore in par.9 registriert | rund 02:30 | `models/alphazero_v24-b04_brierbest.onnx`, Champion-Spec, `k3v_off.spec.json` | `tor2a_v24b04*.json`, `paired_gating_result_v24-b04_*`, `paired_arena_env_v24b04_*`, `columns_v24b04_*`, `points_v24b04_vs_b01_s14.json` |
 | ~~Tiling-Geometrie-Sonde~~ | `tools/cpu_queue_after_b04.sh` | 22:31 | **FERTIG 03:07** (9,8 s + 70 s), registriert par.8.12a / 8.14 | rund 02:45 | `static/log/game_*.log`, `paired_arena_env_v24b01_vs_b01_*_s14.json` | `tiling_geometry_probe_human.json`, `tiling_geometry_probe_arena.json` |
 | ~~Abnahme b05~~ | `tools/night_v24_b05_acceptance_wait.sh` | 00:24 | **FERTIG 05:54** (03:08-05:54), alle Tore in par.9 | -- | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
+| **Champion-Kante b05 (A)** | `tools/champion_edge_b05.sh` | 11:48 | b05 k3v_off gegen v23-b01 Champion-Spec, Seed 20261012, dann 20261013 (je Deckel 200 Paare, keine Promotion) | rund 2 x 70 min, bis rund 14:30 | `models/alphazero_v24-b05_brierbest.onnx`, beide Specs | `paired_gating_result_v24-b05nk_vs_v23-b01_k3p10_s12.json`, `_s13.json` |
+| **Training v24-b06 (B)** | `tools/night_v24_b06_chain.sh` (nacktes train.py darin) | 11:48 | b02-Rezept (lambda 0,7) auf Sicht 744, `--fast-loader`; danach wartet die Kette auf freie CPU und faehrt `night_v24_acceptance_chain.sh b06` plus Kuppel-Bonus | Training rund 1,5 h (b03: 5.344 s), Abnahme rund 3 h nach A | `data/window_v24.txt`, Monolith `.cache_85a75d76dfab.h5` | `models/alphazero_v24-b06*`, `manifest_train_v24-b06_*`, `tor2a_v24b06*`, `paired_gating_result_v24-b06_*`, `paired_arena_env_v24b06_*`, `points_v24b06_vs_b01_s14.json` |
 | Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:58 (wartet) | **FERTIG 09:20** (05:55-09:20, 3 h 25 min); Wartemuster kannte Sonde, `cpu_queue_after_b04` und b05-Wartelauf NICHT -- deshalb hielt `tools/night_v24_after_b05_chain_hold.sh` (seit 00:53, Prozess nur wartend) es fest, bis Sonde und b05-Abnahme durch sind (Chronik 00:53) | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
 
 **Baum:** gepusht 2026-09-06 10:12 (origin/main = bc4f1b1, Nutzer); danach nur die Hook-Kuratierung offen.
@@ -127,8 +129,9 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    laeuft, Tor 2b gehalten). b02 staerkster Beleg, aber spaltenaermer. **Nutzer 09:40:
    "744er bleibt fix drinnen"** -- Kandidaten damit b04/b05; Records tragen die 744er-
    Schluessel (geprueft, par.9c). **Nutzer 11:40: Generator v25 = b05, Erzeugung OHNE
-   K3-P** (v25 par.4). Champion-Frage offen (b05 gegen v23-b01_k3p10 in Spielkonfiguration
-   nicht gemessen). Erzeugung startet NUR auf Anweisung.
+   K3-P** (v25 par.4). **Nutzer 11:48: "self plays eigentlich nur mit champion" -> A: Champion-Kante
+   b05 in Spielkonfiguration laeuft; B: v24-b06 (b02-Rezept auf 744) trainiert als Rueckfall-
+   Kandidat.** Erzeugung startet NUR auf Anweisung, nach dem Champion-Entscheid.
 6. **Danach VORLAGE v25-Zuschnitt** (`PREREG_v25_window.md` par.9/9a): Traeger-
    Kennzahl v24 0,356 gegen Fenster 0,624; v25 nach par.1 rechnerisch 0,23.
    Hebel: Sockel-Betriebspunkt (Pilot: 400 Sockel-Partien in 2-3 Rausch-
