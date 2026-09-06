@@ -100,3 +100,4 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-09-06T07:28:59,paired_gating,v24-b03,v23-b01_brierbest,400,400,0.5375,46.84,44.188,9.473,11.088,0.0
 2026-09-06T08:13:20,paired_gating,v24-b03,v23-b01_brierbest,400,120,0.625,47.867,41.983,9.733,11.017,0.0
 2026-09-06T08:54:24,paired_gating,v24-b03,v23-b01_brierbest,400,240,0.5792,49.533,44.533,9.912,11.863,0.0
+2026-09-06T09:58:33,paired_gating,v24-b05,v23-b01_brierbest,400,190,0.5895,48.805,43.605,10.358,10.584,0.0

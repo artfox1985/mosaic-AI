@@ -48,7 +48,8 @@ Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
 - v24-b05 (b04 plus Ueberraschungsgewichtung): trainiert (brierbest Epoche 4,
   0,1925); Abnahme laeuft seit 03:08. Tor 2a ohne Knopf 0,4825 (Bezug 0,510, KI
   schliesst ein; b04 0,4125); **Tor 1 ohne Knopf 66:34 nach 50 Paaren, SPRT fuer b05**
-  (p 0,004; Fruehstopp < 150, kein zweiter Seed in der Kette); Tor 2a mit Knopf 0,4975
+  (p 0,004) und Replikation 112:78 (p 0,021), gepoolt 178:112, Champion-Strenge ohne
+  Knopf erfuellt (09:58); Tor 2a mit Knopf 0,4975
   (Bezug 0,555, KI schliesst ein; Knopf hebt nur +0,015); Tor 1 mit Knopf 219:181 (kein
   SPRT-Entscheid, p 0,067); Tor 2b GEHALTEN (98:62, Spalten 0,650/0,557 gegen 0,500/0,570).
   Abnahme komplett 05:54 -- einziger Arm mit Tor 1 (ohne Knopf) UND Tor 2b.
