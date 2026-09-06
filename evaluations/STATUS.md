@@ -80,8 +80,8 @@ weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
 `config.py` steht seit 01:56 wieder auf 744 (`git diff config.py` leer; das b03-Training hat es
 selbst zurueckgesetzt). Die GPU ist frei.
 Wheel 744 (Kontrakt `20b442a8164f748d`, mit K3-P2, Default aus) ist in der Basis installiert;
-Anker-Drift darunter GRUEN (2026-09-05 21:45). Mess-venvs: `venv_measure714/`, `venv_measure744/`
-(gitignored).
+Anker-Drift darunter GRUEN (2026-09-05 21:45); seit 2026-09-06 10:06 das Wheel mit K3-F (gleicher
+Kontrakt, Anker GRUEN). Mess-venvs 714/744 am 2026-09-06 geloescht (Nutzer-Freigabe).
 
 ### ERSTE AUFGABE DER NEUEN SITZUNG
 
