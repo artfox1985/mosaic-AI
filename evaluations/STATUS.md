@@ -55,7 +55,8 @@ Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
 - v24-b03 (Seeding-Schwarm, 714): trainiert 00:27-01:56 mit `--fast-loader` (5.344 s,
   `_brierbest` Epoche 4, 0,1868); Abnahme laeuft seit 05:55. Tor 2a ohne Knopf 0,490
   (Bezug 0,510, KI schliesst ein); Tor 1 ohne Knopf 215:185 (kein Entscheid, p 0,155);
-  Tor 2a mit Knopf 0,5025 (Bezug 0,555, KI schliesst ein).
+  Tor 2a mit Knopf 0,5025 (Bezug 0,555, KI schliesst ein); **Tor 1 MIT Knopf 75:45 nach 60
+  Paaren, SPRT fuer b03** (p 0,008; Replikation Seed 20261013 laeuft seit 08:13).
 
 **LAEUFT (Hintergrundaufgaben der alten Sitzung; laufen als eigene Prozesse
 weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
