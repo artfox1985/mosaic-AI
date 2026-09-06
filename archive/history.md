@@ -16674,7 +16674,7 @@ Champion-Kante in Spielkonfiguration ueber zwei Seeds (117:83 und 202:158 gegen
 `v23-b01_k3p10`). Promotion nach `docs/promotion_checklist.md` (18:42): Anker-Kante
 116:34 (n=150, Cross-Aera), Champion-2 76:44 gegen v21_2d_brierbest, Balance 2,60,
 Platt frozen_v3 A -0,0961 / B 0,5875 (server.py), Paritaets-Fixture, Artefakt
-`models/frozen_champions/v24-b06_k3p10/` (Wheel mit K3-F, Kontrakt 20b442a8164f748d,
+`models/frozen_champions/v24-b06/` (Wheel mit K3-F, Kontrakt 20b442a8164f748d,
 venv, Golden Probe, Referee-Selbsttest). Elo 1309 [1271, 1350]; Vorgaenger 1276.
 Nicht gemessen: R5/R4b-Sonden. Kuppel-Bonus des Champions 3,6 / 4,2 je Partie
 gegen Mensch 8,9 (PREREG_special_tile_yield.md par.9).

@@ -15,7 +15,7 @@
 # record_rtv=false, Startspieler alternierend. Nicht gehashte Label-Felder:
 # ["round_transition_value", "bootstrap_value"] (siehe NET_PARITY_EXCLUDED_FIELDS in self_play.rs).
 # Hash-Verfahren: FNV-1a-64 ueber die Record-JSONs.
-champion	v24-b06_k3p10
+champion	v24-b06_brierbest
 erzeugt	2026-09-06
 engine	0.1.0
 hash	71b6e5d4de190682

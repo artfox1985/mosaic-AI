@@ -26,7 +26,7 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (UEBERGABE 2026-09-06, 00:36; Anlass: Kontextfenster der Sitzung vom 2026-09-05 zu 75 % voll)
 
-**Champion seit 2026-09-06 18:42: `v24-b06_k3p10` (Elo 1309 [1271, 1350]; b02-Rezept auf Sicht 744 mit K3-P C 1,0; Vorgaenger `v23-b01_k3p10` jetzt 1276). Generator v25 = b05 (Nutzer 11:40) -- Nutzer-Prinzip "Self-Plays nur vom Champion" spricht fuer b06, Entscheid offen.** **Generation v24 abgenommen, sechs
+**Champion seit 2026-09-06 18:42: `v24-b06` (Modell `alphazero_v24-b06_brierbest.onnx`, Spec `v24-b06_brierbest.spec.json` mit K3-P; Elo-Knoten `v24-b06_k3p10` 1309 [1271, 1350]; Nutzer 20:35: Namen bleiben reine vN-bXX, `generation_naming.md`; b02-Rezept auf Sicht 744 mit K3-P C 1,0; Vorgaenger `v23-b01_k3p10` jetzt 1276). Generator v25 = b05 (Nutzer 11:40) -- Nutzer-Prinzip "Self-Plays nur vom Champion" spricht fuer b06, Entscheid offen.** **Generation v24 abgenommen, sechs
 Arme:** b01, b02, b04, b05 trainiert; b03 (714er-Arm) trainiert gerade neu
 (Verlust durch Maschinen-Neustart 2026-09-05 16:04). Alle Zahlen:
 `PREREG_v24_window.md` par.9/9a/9b; Chronik `night_run_20260902.md` (ab
@@ -177,9 +177,11 @@ Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (fa
    b05 GRUEN (Dead 2 %, Eff.Rank 61 %), identisch mit v23-b01/b03/b04/b06 samt
    denselben 42 toten fusion2-Einheiten: Warmstart-Linie, Trunk bewegt sich kaum.
 
-10. **Knopf-Messkette am Champion** (`tools/night_k3_knobs_champion.sh`, gestartet 13:33,
-    wartet hinter b06): Rauschboden par.12b Punkte 1-2, dann K3-P2, K3-F 1,0, K3-F 0,5,
-    beide; rund 3,7 h ab rund 16:30. Registrierung par.8.11 / 8.14 / 12b je Arm.
+10. **Knopf-Messkette am NEUEN Champion b06** (`tools/night_k3_knobs_b06.sh`, gestartet 20:43,
+    Bezug Tor 2a mit Knopf 0,4975): Rauschboden par.12b Punkte 1-2, dann K3-P2, K3-F 1,0,
+    K3-F 0,5, beide; rund 3,7 h. Die alte Kette am v23-Champion (`night_k3_knobs_champion.sh`)
+    haengt an der Halte-Marke und laeuft in ihren 12-h-Deckel (Exit 65), sie misst nichts.
+    Registrierung par.8.11 / 8.14 / 12b je Arm. Danach die neun Partien des Subagenten.
 
 11. **Champion-Promotion v24-b06_k3p10** (Nutzer 17:05 "Mach vor dem agenten spiel die
     Champion Promotion lt. Skill"): `tools/promote_v24_b06.sh` gestartet 17:21, wartet auf das
@@ -188,7 +190,7 @@ Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (fa
     Probe). Danach von Hand: Manifest, Referee-Selbsttest, server.py A/B, Elo-Zeilen,
     STATUS/History. **FERTIG 18:42:** Anker 116:34 (n=150), Champion-2 76:44 gegen v21 (SPRT),
     Balance 2,60, Platt v3 A -0,0961 / B 0,5875 (server.py), Fixture neu, Artefakt
-    `models/frozen_champions/v24-b06_k3p10/` mit venv, Golden Probe 10 Sonden, Referee-
+    `models/frozen_champions/v24-b06/` mit venv, Golden Probe 10 Sonden, Referee-
     Selbsttest gruen. Elo 1309. Danach Subagent-Partie, dann Knopf-Kette (Halte-Marke).
 
 12. **K5 "Reihe-6-Spezialfeld"** (17:43, Nutzer-Regel, `special_tile_yield` par.9):
