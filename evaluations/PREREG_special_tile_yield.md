@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; ihr Wert steigt dort, wo sie am schwersten erreichbar sind. Laesst sich das heben, und an welchem Hebel? | Beleg: Kanaele 77/78 gebaut (par.4a, e91cd34, in jedem v22-b-Modell aktiv), Wirkung nie isoliert gemessen. Neumessung par.7: Posten LEBT -- auch der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen, Netz ueberall etwas schlechter. Vermeidungs-Hebel widerlegt (par.4/4b). Hebel gehoert in die Gelaender-/Allokations-Familie. par.8 (2026-09-05, 19 Server-Partien): Kuppel-Bonus Mensch 8,9 gegen Netz 1,6 je Partie, Endwertung 19,7 gegen 4,2 -- der gesamte Abstand zum Menschen; Platzierungspunkte gleich. Messgroesse fuer v24-b04: Kuppel-Bonus je Partie aus Arena-Logs. -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; ihr Wert steigt dort, wo sie am schwersten erreichbar sind. Laesst sich das heben, und an welchem Hebel? | Beleg: Kanaele 77/78 gebaut (par.4a, e91cd34, in jedem v22-b-Modell aktiv), Wirkung nie isoliert gemessen. Neumessung par.7: Posten LEBT -- auch der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen, Netz ueberall etwas schlechter. Vermeidungs-Hebel widerlegt (par.4/4b). Hebel gehoert in die Gelaender-/Allokations-Familie. par.8 (2026-09-05, 19 Server-Partien): Kuppel-Bonus Mensch 8,9 gegen Netz 1,6 je Partie, Endwertung 19,7 gegen 4,2 -- der gesamte Abstand zum Menschen; Platzierungspunkte gleich. Sicht 744 hebt den Kuppel-Bonus NICHT (v24-Abnahmen 3,5-4,3 je Partie gegen Mensch 8,9; par.9). Nutzer-Regel 2026-09-06: EINE Spezialfliese in Reihe 6 je Partie -- als Baustein K5 registriert (par.9), Bau nach den K3-Armen. -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
@@ -346,4 +346,49 @@ der Auslage nicht unterscheiden (`PREREG_stack_top_feature.md` par.10); ob die
 Sicht allein den Posten hebt, zeigt die Abnahme von v24-b04 -- Messgroesse
 dafuer hier: Kuppel-Bonus je Partie aus den Arena-Logs (Zeile ⭐), nicht nur
 die k6-Wertung.
+
+## par.9 NUTZER-REGEL "EINE SPEZIALFLIESE IN REIHE 6" (2026-09-06, 17:43) und der Stand nach den v24-Abnahmen
+
+**Nutzer, woertlich:** *"Vereinfacht gesprochen: soweit moeglich wuerd ich immer eine
+spezialfliese in Reihe 6 aktivieren. Mehr geht sich nicht aus."* Vorher (17:35):
+*"Die koennte den spalten und Punkten ebenfalls helfen."*
+
+**Mechanik, am Code und im Handbuch geprueft:** das Spezialfeld einer Platte
+schaltet in der Tiling-Phase frei, sobald die drei anderen Zellen der Platte
+gefuellt sind (`round_end.rs:275` `try_unlock_special`, `docs/engine_manual.md`
+Abschnitt 5); die Spezialfliese kommt sofort und automatisch aus dem Vorrat und
+zahlt Punkte gleich der Rasterzeile (1 bis 6), zaehlt danach als belegte Zelle
+(Spalten, Nachbarschaft). "Reihe 6" heisst: eine Spezialplatte im unteren Slot
+(Slot-Zeile 2) so gedreht, dass ihr Spezialfeld in Rasterzeile 6 liegt, und ihre
+drei Normalzellen gefuellt -- Ertrag +6 Kuppel-Bonus, zwei Spaltenzellen in den
+Zeilen 5/6 und das Feld selbst. Neun der 18 Platten tragen ein Spezialfeld
+(`dome.rs` Katalog: Designs 0, 4, 6, 7, 8, 10, 12, 15, 17); welche in Reihe 6
+liegt, entscheidet die Draft-Phase (Plattenwahl und Rotation, `apply_dome`),
+ob sie freischaltet, entscheiden Draft (Farben fuer Reihen 5/6) und Tiling.
+
+**Stand nach den sechs v24-Abnahmen (Kuppel-Bonus je Partie aus den Tor-2b-Arenen,
+`points_v24bXX_vs_b01_s14.json`, beide Richtungen):** v24-b01 3,8 (b01 3,6),
+b02 4,0 / 3,5 (4,1 / 3,8), b03 4,15 / 4,16 (3,5 / 3,6), b04 3,9 / 4,3 (3,6 / 3,9),
+b05 3,8 / 3,7 (3,5 / 4,1), b06 3,6 / 4,2 (4,0 / 4,5). Mensch am Tisch 8,9 (par.8).
+**Die Sicht 744 (b04, b05, b06) hebt den Posten nicht** -- die offene Frage aus
+par.8 ist damit mit nein beantwortet; der Abstand zum Menschen bleibt bei rund
+fuenf Punkten je Partie. Der Seeding-Arm b03 liegt mit 4,2 am hoechsten.
+
+**Baustein K5 "Reihe-6-Spezialfeld" (registriert, NICHT gebaut):** ein Knopf der
+Gelaender-Familie (Default aus, bitidentisch; Spec-Pflichtfeld je Seite wie
+`envelope_flush_w`), der die Nutzer-Regel in die Suche traegt:
+1. **Plattenwahl (Draft):** eine Spezialplatte in einem unteren Slot mit dem
+   Spezialfeld in Rasterzeile 6 bekommt einen Zuschlag am Blattwert (Groesse in
+   Punkten, ueber `tanh` skaliert wie K4), solange noch KEINE solche Platte liegt
+   -- "mehr geht sich nicht aus": die zweite zaehlt nichts.
+2. **Fuellen (Draft und Tiling):** die drei Normalzellen dieser einen Platte
+   bekommen in der Projektion (K3-P-Mechanik, `projected_occupancy`) ein hoeheres
+   Gewicht, damit Reihen 5/6 mit den passenden Farben bevorzugt werden; die
+   Freischaltung selbst macht die Engine.
+3. **Messung** wie die K3-Arme (par.8.11 der Einhuellenden): argmax-Instrument
+   und gepaarte Arena am Champion, Kennzahlen Siege, Punkte, volle Spalten,
+   Kuppel-Bonus je Partie (Zeile 6 getrennt), lange Reihen begonnen/vollendet.
+   Entscheidungsmass bleibt par.6 (Punkte und Marge, nicht die Quote).
+Reihenfolge: NACH den vier K3-Armen am Champion (Kette laeuft 2026-09-06),
+damit die Knoepfe nicht zusammenfallen; Bau nach den K3-Ergebnissen.
 
