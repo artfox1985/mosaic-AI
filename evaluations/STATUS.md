@@ -56,7 +56,8 @@ Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
   `_brierbest` Epoche 4, 0,1868); Abnahme laeuft seit 05:55. Tor 2a ohne Knopf 0,490
   (Bezug 0,510, KI schliesst ein); Tor 1 ohne Knopf 215:185 (kein Entscheid, p 0,155);
   Tor 2a mit Knopf 0,5025 (Bezug 0,555, KI schliesst ein); **Tor 1 MIT Knopf 75:45 nach 60
-  Paaren, SPRT fuer b03** (p 0,008; Replikation Seed 20261013 laeuft seit 08:13).
+  Paaren, SPRT fuer b03** (p 0,008) und Replikation 139:101 (p 0,016), gepoolt 214:146 --
+  Champion-Strenge mit Knopf erfuellt. Tor 2b laeuft seit 08:54.
 
 **LAEUFT (Hintergrundaufgaben der alten Sitzung; laufen als eigene Prozesse
 weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
