@@ -149,7 +149,7 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    nur Tor 1/2.
 
 **Test- und Hook-Audit (Subagent Opus, 2026-09-06 10:23, Befunde nachgeprueft) -- vom Nutzer
-entschieden und UMGESETZT (10:45, cargo test 523 gruen, 16 Python-Tests gruen):** (a) Regel-5-
+entschieden und UMGESETZT (11:05, cargo test 523 gruen, 16 Python-Tests gruen):** (a) Regel-5-
 Fehlalarm: Cargo-Feature `plate_shaping`, `PLATE_SHAPING_ENABLED = cfg!(feature)`, Paritaetstest
 per `#[cfg(not(feature))]` statt Laufzeit-Skip; (b) fuenf ignore-Tests auf
 `test_champion_model_path()` umgezogen; (c) train.py: neun Schluessel in `_cli_args` nachgetragen
