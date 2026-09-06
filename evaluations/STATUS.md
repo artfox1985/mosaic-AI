@@ -189,6 +189,9 @@ Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (fa
     STATUS/History. Reihenfolge danach: Subagent-Partie, dann Knopf-Kette (Halte-Marke
     `evaluations/artifacts/claude_play/.playing` liegt seit 17:21).
 
+12. **K5 "Reihe-6-Spezialfeld"** (17:43, Nutzer-Regel, `special_tile_yield` par.9):
+    registriert, nicht gebaut; Reihenfolge nach den vier K3-Armen.
+
 **Offene Nutzer-Entscheide (Fundstellen):** K4-Skala je Runde oder gemeinsam
 (`round_estimate_leaf_term` par.4); ~~K3-F jetzt bauen oder nach Messung~~ ENTSCHIEDEN 2026-09-06 00:50: nach der Messung
 (`geometric_envelope` par.8.14); par.12a/12b Messgroessen und Rauschboden
