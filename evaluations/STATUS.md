@@ -46,7 +46,8 @@ Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
   Tor 2b GEHALTEN (92:68, Spalten 0,684/0,738 gegen 0,608/0,525, Kuppel-Bonus 3,9/4,3
   gegen 3,6/3,9). Abnahme komplett 03:04.
 - v24-b05 (b04 plus Ueberraschungsgewichtung): trainiert (brierbest Epoche 4,
-  0,1925), Abnahme wartet.
+  0,1925); Abnahme laeuft seit 03:08. Tor 2a ohne Knopf 0,4825 (Bezug 0,510, KI
+  schliesst ein; b04 0,4125).
 - v24-b03 (Seeding-Schwarm, 714): trainiert 00:27-01:56 mit `--fast-loader` (5.344 s,
   `_brierbest` Epoche 4, 0,1868); Abnahme wartet auf Sonde und b05.
 
