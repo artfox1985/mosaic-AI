@@ -386,6 +386,8 @@ class Replayer:
         self.emoji_toleriert = 0  # Zeilen, die nur am ☀️/🌙-Praefix abwichen
         self.chip_zusatz_toleriert = 0  # Chip-Zeilen ohne den Plaettchen-Zusatz (Logs vor 2026-09-07)
         self.chip_symbol_toleriert = 0  # Chip-Zeilen mit dem alten Symbol 🎫 statt 🎴
+        self.chip_aus_log = 0        # Vollendungen, deren Chip-Wahl AUS DEM LOG kam
+        self.chip_log_mehrdeutig = 0  # davon: mehrere Kandidaten mit gleicher Farbsignatur
         self.hint_used = 0      # Zuege, die ueber die ID aufgeloest wurden
         self.hint_missing = 0   # Stein-Zuege ohne Hinweis (Textweg)
         self.action_log: list[tuple[str, tuple, dict]] = []
@@ -626,6 +628,47 @@ class Replayer:
         self.silent_chip_gaps.append((self.g.round_number(), actor, pattern_row))
         return True
 
+    @staticmethod
+    def _chip_label_from_hand(hand: list, indices) -> str:
+        """Gegenstueck zu `round_end::chips_label` (engine/src/round_end.rs): aus der
+        Hand (Liste von {"colors": [...]}) und den Handindizes die Beschriftung bauen,
+        die die Engine in die Logzeile schreibt. Aufsteigende Indizes, mehrfarbige
+        Chips mit `+`."""
+        idx = sorted(set(indices))
+        parts = []
+        for i in idx:
+            if 0 <= i < len(hand):
+                parts.append("+".join((hand[i] or {}).get("colors") or []))
+        return f"{len(parts)} Plättchen: {', '.join(parts)}"
+
+    def _chip_choice_from_log(self, body: str, actor: int, cands: list) -> list | None:
+        """Die im Log genannte Chip-Auswahl unter den Kandidaten wiederfinden.
+
+        Seit 2026-09-07 (Nutzer) nennt die Vollendungs-Zeile die verbrauchten
+        Plaettchen. Damit entfaellt fuer neue Logs das Raten samt Backtracking, das
+        `chip_plan` betreibt -- und mit ihm der Vorfall vom 2026-08-29, bei dem
+        greedy Chips verbrannte, die der echte Spieler behalten hatte. Gibt `None`
+        zurueck, wenn die Zeile keinen Zusatz traegt (Altlog) oder keine eindeutige
+        Zuordnung moeglich ist; dann bleibt es beim Bestandsverhalten.
+        """
+        m = PATTERNS["_CHIP_USE"].search(body)
+        if not m or not cands:
+            return None
+        want = f"{m.group('n')} Plättchen: {m.group('colors')}"
+        try:
+            hand = (json.loads(self.g.state_json())["players"][actor].get("bonus_chips") or [])
+        except Exception:
+            return None
+        matches = [c for c in cands if self._chip_label_from_hand(hand, c) == want]
+        if not matches:
+            return None
+        # Mehrere Kandidaten koennen dieselbe FARB-Signatur haben (zwei rote Chips
+        # sind fuer Regel und Log ununterscheidbar). Fuer den Replay ist das
+        # gleichwertig; der erste wird genommen, und die Zahl wird berichtet.
+        if len(matches) > 1:
+            self.chip_log_mehrdeutig += 1
+        return matches[0]
+
     def apply_chip_completion(self, lines: list[LogLine], li: int, actor: int, pattern_row: int) -> int:
         """Eine geloggte Chip-Vollendung nachspielen -- die Stelle, an der das
         Log SCHWEIGT.
@@ -656,10 +699,14 @@ class Replayer:
         # Kandidaten VOR der Anwendung holen: `apply_bonus_chips_with`
         # entfernt die Chips, danach sind alle Indizes verschoben.
         cands = json.loads(self.g.chip_allocations_json(actor, pattern_row))
-        choice = self.chip_plan.get(k)
+        # Vorrang: was im Log steht (seit 2026-09-07), dann der Plan, dann greedy.
+        aus_log = self._chip_choice_from_log(lines[li].body if li < len(lines) else "", actor, cands)
+        choice = aus_log if aus_log is not None else self.chip_plan.get(k)
+        if aus_log is not None:
+            self.chip_aus_log += 1
         self.chip_events.append(
             {"idx": k, "actor": actor, "row": pattern_row, "cands": cands,
-             "choice": choice, "silent": False}
+             "choice": choice, "silent": False, "aus_log": aus_log is not None}
         )
         if choice is None:
             return self.apply(lines, li, "apply_tiling_chips", actor, pattern_row)

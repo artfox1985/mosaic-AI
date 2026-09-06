@@ -115,6 +115,20 @@ def build_report(header: dict, log_path: Path, rep: "Replayer", divergence: str 
           "(☀️/🌙) ueberein. Das ist die benannte Toleranz fuer die Korrektur vom "
           "2026-08-18 (`execution.rs:59`) -- alte Logs tragen ☀️ fuer eine "
           "Teil-Entnahme aus dem Mondbereich, die heutige Engine schreibt 🌙.")
+    # Zweite und dritte Toleranz (2026-09-07, Nutzer): Symbol und Plaettchen-Zusatz
+    # der Chip-Zeile. Wie oben gilt: benennen, nicht verschweigen.
+    if getattr(rep, "chip_symbol_toleriert", 0) or getattr(rep, "chip_zusatz_toleriert", 0):
+        P("")
+        P(f"⚠️ Chip-Zeile: {rep.chip_symbol_toleriert} Zeile(n) nur beim Symbol toleriert "
+          f"(altes 🎫 gegen heutiges 🎴), {rep.chip_zusatz_toleriert} nur beim fehlenden "
+          "Plaettchen-Zusatz. Beides sind die benannten Toleranzen fuer Logs von vor dem "
+          "2026-09-07; die heutige Engine schreibt `🎴 ... (3 Plättchen: rot, ...)`.")
+    if getattr(rep, "chip_aus_log", 0):
+        P("")
+        P(f"Chip-Wahl aus dem LOG uebernommen: {rep.chip_aus_log} Vollendung(en) "
+          f"({rep.chip_log_mehrdeutig} davon mit mehreren farbgleichen Kandidaten, dort "
+          "ist die Wahl fuer Regel und Log ununterscheidbar). Fuer diese Ereignisse "
+          "entfaellt das Raten samt Backtracking (`chip_plan`, Vorfall 2026-08-29).")
     P("")
 
     per_player = {}
