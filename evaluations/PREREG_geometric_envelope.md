@@ -1523,6 +1523,29 @@ und Tor 2 beurteilt.
 das Artefakt nennt sein Werkzeug nicht), Block-Bootstrap als kleine Sonde
 (zu bauen, reine Arithmetik), Arena-Block-SD aus den JSON-Artefakten.
 
+### par.8.11a K3-P2 AM CHAMPION v24-b06 (gefahren 2026-09-06, 20:43-21:35, Kette `night_k3_knobs_b06.sh`)
+
+Netz `alphazero_v24-b06_brierbest.onnx` auf beiden Seiten; Arm = Spec `k3p2_c10`
+(Modus 4, w_slot 0,5), Kontrolle = Champion-Spec (Modus 1); Instrument
+`k3_p2_v24b06.json`, Arena `paired_arena_env_k3p2_b06_vs_k3p_{first,second}_s14.json`.
+
+| Groesse | K3-P2 | Kontrolle K3-P |
+| --- | --- | --- |
+| argmax @400, volle Spalten (200 Partien, Seed 20260931) | **0,4525** (KI +-0,065), Punkte 46,4 | 0,4975 (`tor2a_v24b06.json`) |
+| Arena 2 x 80, Siege | **71 : 89** (Brett 0: 34:46, Brett 1: 37:43) | |
+| Arena, volle Spalten je Seite (Brett 0 / Brett 1) | 0,700 / 0,551 | 0,637 / 0,705 |
+| Arena, Punkte | 47,3 / 44,4 | 47,0 / 47,8 |
+| Kuppel-Bonus je Partie | 3,9 / 3,4 | 3,7 / 4,0 |
+| lange Reihen begonnen / vollendet | 4,28/2,80 und 4,24/2,72 | 4,29/2,73 und 4,18/2,69 |
+
+**Verdikt (Tor 1/2, Rauschboden par.12b Punkt 3 fuer C1):** K3-P2 traegt am Champion
+b06 NICHT -- weniger Siege (71:89), am Instrument -0,045 Spalten (innerhalb der KI),
+in der Arena eine Richtung darueber, eine darunter, Kuppel-Bonus und lange Reihen
+unveraendert. Die Platzhalter-Regel ist damit am 744er-Champion so wirkungslos wie
+die Raster-Form (par.9) und schwaecher als K3-P allein. Ob b05 oder ein anderes
+v24-Netz anders reagiert, ist Nutzer-Entscheid (13:15: "wir ueberlegen uns ob und
+welches v24 netz wir dann nachziehen").
+
 ## par.8.12 NUTZER-KORREKTUR ZUM TILING (22:25, 2026-09-05): rundenmyopisch, Punkte fallen spaet -- par.8.10 gilt nur fuer H
 
 **Nutzer, woertlich:** *"tiling ist greedy und geht immer auf punktemaximierung.
