@@ -30,7 +30,7 @@
 use std::io::Write;
 
 const GOLDEN_SEED: u64 = 20260814;
-const DEFAULT_MODEL: &str = "../models/alphazero_v21_2d_brierbest.onnx";
+const DEFAULT_MODEL: &str = "../models/engine_test.onnx";
 
 fn write_out(outdir: &str, name: &str, payload: &str) {
     let path = std::path::Path::new(outdir).join(format!("{name}.json"));
