@@ -377,10 +377,19 @@ fuenf Punkten je Partie. Der Seeding-Arm b03 liegt mit 4,2 am hoechsten.
 **Baustein K5 "Reihe-6-Spezialfeld" (registriert, NICHT gebaut):** ein Knopf der
 Gelaender-Familie (Default aus, bitidentisch; Spec-Pflichtfeld je Seite wie
 `envelope_flush_w`), der die Nutzer-Regel in die Suche traegt:
-1. **Plattenwahl (Draft):** eine Spezialplatte in einem unteren Slot mit dem
-   Spezialfeld in Rasterzeile 6 bekommt einen Zuschlag am Blattwert (Groesse in
-   Punkten, ueber `tanh` skaliert wie K4), solange noch KEINE solche Platte liegt
-   -- "mehr geht sich nicht aus": die zweite zaehlt nichts.
+1. **Plattenwahl (Draft), in SYMBIOSE mit der Einhuellenden** (Nutzer 17:43: "Das
+   kannst bei der kuppelplatzierung eventuell ebenfalls Priorisieren in Symbiose
+   mit der einhuellenden"): die Dreiecks-Huelle hat in Rasterzeile 6 genau EINE
+   Zelle, links (5,0) bzw. rechts (5,5) (`envelope.rs` `Hull::contains`); der
+   Zielplatz ist daher der untere Eckslot der bestpassenden Orientierung, das
+   Spezialfeld per Rotation auf diese Huellenzelle. Eine so gelegte Spezialplatte
+   erfuellt die Huelle und den Bonus mit derselben Platte. Bauform: Erweiterung
+   der K3-P-Projektion (`projected_occupancy`-Familie), nicht ein zweiter Term --
+   das Spezialfeld auf der Huellenzelle zaehlt als kuenftig belegt mit Gewicht
+   `w_k5` (wird gefuellt, sobald die drei Normalzellen gefuellt sind), solange
+   noch KEINE solche Platte liegt; "mehr geht sich nicht aus": die zweite zaehlt
+   nichts. Damit zieht der bestehende Such-Term (e) die Platte an den richtigen
+   Platz, ohne neuen Blattwert-Zuschlag.
 2. **Fuellen (Draft und Tiling):** die drei Normalzellen dieser einen Platte
    bekommen in der Projektion (K3-P-Mechanik, `projected_occupancy`) ein hoeheres
    Gewicht, damit Reihen 5/6 mit den passenden Farben bevorzugt werden; die
