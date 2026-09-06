@@ -508,6 +508,15 @@ v23-b01 Champion-Spec, Seed 20261012 (12:17, `paired_gating_result_v24-b05nk_vs_
 58:72 nach 65 Paaren, SPRT H0 (LLR -3,82), McNemar p 0,31, Diff -0,22 [-0,57, +0,14],
 Punkte 42,9 gegen 44,8; 1.804 s. **Seed 20261013 (13:20, `..._s13.json`): 144:146 nach 145 Paaren, H0 (LLR -3,00), McNemar p 1,0, Diff -0,01 [-0,22, +0,19], Punkte 48,7 gegen 48,6; 3.816 s. Gepoolt 202:218 aus 210 Paaren: b05 in Spielkonfiguration GLEICHAUF mit dem Champion, kein Champion-Beleg.** Rueckfall B: v24-b06 (b02-Rezept auf 744) trainiert 11:47-13:07, Abnahme laeuft seit 13:21; wird b06 Champion-Kandidat (Tor 1 mit Knopf, zwei Seeds), ist die Kante b06 gegen den Champion dieselbe Messung wie sein Tor 1 mit Knopf.**
 
+**CHAMPION-WECHSEL (18:42, Nutzer 17:05 "Mach vor dem agenten spiel die Champion Promotion lt.
+Skill"): `v24-b06_k3p10` ist Champion (Elo 1309 [1271, 1350]).** Kanten: Gating 117:83
+und 202:158 gegen v23-b01_k3p10, Anker 116:34 (n=150, Cross-Aera), Champion-2 76:44
+gegen v21_2d_brierbest (SPRT nach 60 Paaren, p 0,007); Balance 2,60 (v23: 2,92); Platt
+frozen_v3 A -0,0961 / B 0,5875; Paritaets-Fixture neu; Artefakt mit Wheel
+(sha256 f883168efc1396fc..., Kontrakt 20b442a8164f748d), venv, Golden Probe 10 Sonden,
+Referee-Selbsttest gruen (`frozen_referee_match_v24-b06_k3p10_selftest.json`). Nicht
+Teil der Kette (wie am 2026-09-04): R5- und R4b-Sonden.
+
 **Was der Entscheid mitentscheidet:** (1) Knopf in der v25-Erzeugung ja/nein
 (par.6b'); (2) Generator; (3) ob der v24-Sieger den Champion-Knoten herausfordert
 (Kante gegen `v23-b01_k3p10` = Tor 1 mit Knopf: b02 192:128 und b03 214:146
