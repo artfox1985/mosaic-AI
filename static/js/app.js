@@ -38,9 +38,12 @@ let _tilingDeadline = 0;
 // Log-Datei bleiben unberuehrt.
 let uiLogExtras = [];
 
-function addUiLog(text) {
+function addUiLog(text, at) {
   if(!S) return;
-  uiLogExtras.push({at: (S.log || []).length, text});
+  // `at` ausdruecklich mitgeben, wenn die Zeile NACH dem Zug geschrieben wird,
+  // aber VOR dessen Log-Zeilen gehoert (Passen: erst nach der Antwort steht
+  // fest, dass er wirklich stattgefunden hat, s. maybeAutoPass).
+  uiLogExtras.push({at: at !== undefined ? at : (S.log || []).length, text});
 }
 // Nutzer-Feedback (2026-07-29, Folgeauftrag): Reihenfolge-Regel gilt nur fuer
 // die PLATZIERUNG voller Reihen -- eine nur-per-Chips-komplettierbare Reihe
@@ -247,9 +250,11 @@ async function startNewGame() {
   S=d.state; sel=null; domeModal=null; tilingPi=null; tilingRow=null;
   clearTilingPending();
   uiLogExtras = [];
-  _autoPassChain = 0;
+  _autoPassStuck = 0;
   window._gameEndLogged = false;
   _chipGhosts = {0: [], 1: []}; _prevBonusChips = {0: null, 1: null};
+  _ghostKey = _ghostStoreKey(d.log_file);
+  _persistChipGhosts();
   // Spielerprofile: vom Server aufgeloeste Profil-/KI-Rating-Info fuer die
   // laufende Partie merken (Rating-Anzeige am Spielernamen, s. renderBoard()).
   // hints_used=true kommt vom Server schon HIER, wenn Coach-Stufe 3 gewaehlt
@@ -323,6 +328,9 @@ async function triggerAIMove() {
     }
   } finally {
     setAIThinking(false);
+    // Erst hier ist AI_THINKING wieder falsch -- und nur ein Zeichnen danach
+    // gibt maybeAutoPass() die Gelegenheit zu greifen (siehe Kommentar dort).
+    render();
   }
 }
 
@@ -601,28 +609,56 @@ async function finishHumanTiling() {
 // gibt also nichts zu entscheiden. Der Zug wird deshalb ohne Klick
 // weitergereicht und in der Anzeige-Spur vermerkt.
 //
-// Die Kette laeuft ueber setTimeout, damit sie nie im render()-Aufruf steckt,
-// aus dem sie kommt. `_autoPassChain` ist die Reissleine: bliebe `can_pass`
-// trotz Passen bestehen (Server lehnt ab, Zustand haengt), wird nach zehn
-// Versuchen aufgehoert statt endlos zu tickern.
+// Die Kette laeuft ueber setTimeout, damit sie nie in dem render()-Aufruf
+// steckt, aus dem sie kommt.
+//
+// WICHTIG (Nutzer-Bugreport 2026-09-07, Spiel gegen die KI): maybeAutoPass
+// greift nur, wenn nach dem Zug der Gegenseite ueberhaupt noch einmal
+// gezeichnet wird. `triggerAIMove` zeichnete zuletzt INNERHALB seiner
+// Schleife, also mit AI_THINKING === true -- da ist diese Funktion gesperrt --
+// und `setAIThinking(false)` zeichnet nicht. Der Mensch stand dann vor
+// "wird uebersprungen", ohne dass etwas passierte, und einen Passen-Knopf
+// gibt es seit Punkt 4 nicht mehr. Deshalb der render() im finally von
+// triggerAIMove; wer hier etwas aendert, prueft diesen Pfad mit.
+//
+// Reissleine ist die ANTWORT DES SERVERS, nicht eine Obergrenze an Versuchen.
+// Nicht, weil viele Passen am Stueck haeufig waeren -- sie sind eng begrenzt:
+// ist `can_pass` wahr, sind Sonne und Mond leer (die Pruefung ist global,
+// serialize.rs::compute_can_pass), der Gegenseite bleiben also nur die
+// spielerabhaengigen Aktionen, und die sind gedeckelt auf 2 Kuppelplatten und
+// 2 Bonuschips je Runde (board.rs:237-240). Hoechstens VIER Pass-Zuege
+// hintereinander. Der Grund ist ein anderer: ein Zaehler, der ERFOLGREICHE
+// Pass-Zuege mitzaehlt, misst die falsche Groesse. Gezaehlt wird darum, was
+// `passMove` mit false quittiert -- der Server hat den Zug abgelehnt. Drei
+// davon, und die Oberflaeche gibt den Knopf wieder her, statt still
+// weiterzuticken.
 let _autoPassBusy = false;
-let _autoPassChain = 0;
+let _autoPassStuck = 0;
 
 function maybeAutoPass() {
   if(!S || AI_THINKING || _autoPassBusy) return;
-  if(S.phase !== 'drafting' || !S.can_pass) { _autoPassChain = 0; return; }
+  if(S.phase !== 'drafting' || !S.can_pass) { _autoPassStuck = 0; return; }
   if(AI_ENABLED && S.current_player === AI_PLAYER) return;
   if(!S.players.every(p => p.start_placed)) return;
   if(pendingStackPlacement) return;
-  if(_autoPassChain >= 10) return;
+  if(_autoPassStuck >= 3) return;
   _autoPassBusy = true;
-  _autoPassChain++;
-  addUiLog(`⏸ ${S.players[S.current_player].name} passt (keine Aktion möglich)`);
-  render();
+  const name = S.players[S.current_player].name;
+  const at   = (S.log || []).length;
   setTimeout(async () => {
-    try { await passMove(); }
+    let durch = false;
+    try { durch = await passMove(); }
     finally {
+      if(durch) {
+        // Der Zug ist durch. Die Zeile gehoert an die Stelle VOR die
+        // Log-Zeilen, die die Gegenseite inzwischen erzeugt hat.
+        addUiLog(`⏸ ${name} passt (keine Aktion möglich)`, at);
+        _autoPassStuck = 0;
+      } else {
+        _autoPassStuck++;
+      }
       _autoPassBusy = false;
+      render();
       // Nach dem Zug der Gegenseite kann sofort wieder nur Passen moeglich
       // sein -- dann greift die Kette hier erneut.
       maybeAutoPass();
@@ -630,15 +666,22 @@ function maybeAutoPass() {
   }, 500);
 }
 
+// Rueckgabe: hat der Server den Pass angenommen? `maybeAutoPass` haengt seine
+// Reissleine daran. Am ZUSTAND darf man das nicht festmachen -- bis diese
+// Funktion zurueckkehrt, hat die KI laengst gezogen und den Zug
+// zurueckgegeben, und passt sie ihrerseits, ist nicht einmal die Log-Laenge
+// gewachsen (apply_pass schreibt bewusst nichts, py.rs:310-317). Genau daran
+// ist die erste Fassung dieser Reissleine gescheitert.
 async function passMove() {
-  if (AI_THINKING) return;
-  if (AI_ENABLED && S.current_player === AI_PLAYER) return;
+  if (AI_THINKING) return false;
+  if (AI_ENABLED && S.current_player === AI_PLAYER) return false;
   const d = await api('/move/pass', {});
-  if(!d.ok){showError(d.error);return;}
+  if(!d.ok){showError(d.error);return false;}
   S=d.state; sel=null; render();
 	if (AI_ENABLED && aiIsDue()) {
     await triggerAIMove();
   }
+  return true;
 }
 
 async function tilingBonusChips(pi, pattern_row, chip_uses) {
@@ -912,11 +955,54 @@ function estimatedRoundScore(p) {
 // naechsten Spielstart, siehe startNewGame) in _chipGhosts.
 let _chipGhosts = {0: [], 1: []};
 let _prevBonusChips = {0: null, 1: null};
+
+// Der Diff lebt im Speicher der Seite -- und war damit nach jedem Neuladen
+// weg: die Engine haelt verbrauchte Chips nicht vor (sie entfernt sie aus
+// `bonus_chips`), es gibt also nichts, woraus sie sich nachtraeglich
+// rekonstruieren liessen (Nutzer-Bugreport 2026-09-07: "warum seh ich die
+// verwendeten bonusplaettchen nicht mehr"). Sie werden deshalb je Partie im
+// Browser abgelegt; Schluessel ist der Dateiname des Spiel-Logs (/log_info),
+// der eine Partie eindeutig benennt und ein Neuladen ueberlebt.
+let _ghostKey = null;
+
+function _ghostStoreKey(logFile) {
+  return logFile ? 'mosaic:chipghosts:' + logFile : null;
+}
+
+function _persistChipGhosts() {
+  if (!_ghostKey) return;
+  try { localStorage.setItem(_ghostKey, JSON.stringify(_chipGhosts)); } catch (e) {}
+}
+
+// Beim Laden: Schluessel bestimmen, abgelegte Ghosts zurueckholen, Reste
+// aelterer Partien wegraeumen. Muss VOR dem ersten render() laufen.
+async function initChipGhostStore() {
+  let logFile = window._gameLogFile;
+  if (!logFile) {
+    try { const d = await api('/log_info'); if (d.ok) logFile = d.log_file; } catch (e) {}
+  }
+  _ghostKey = _ghostStoreKey(logFile);
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.startsWith('mosaic:chipghosts:') && k !== _ghostKey) localStorage.removeItem(k);
+    }
+    const raw = _ghostKey && localStorage.getItem(_ghostKey);
+    if (raw) {
+      const g = JSON.parse(raw);
+      _chipGhosts = {0: g[0] || [], 1: g[1] || []};
+    }
+  } catch (e) {}
+}
+
 function trackChipGhosts(pi, chips) {
   const prev = _prevBonusChips[pi];
   if (prev) {
     const stillHeld = new Set(chips.map(c => c.id));
-    prev.filter(c => !stillHeld.has(c.id)).forEach(c => _chipGhosts[pi].push(c));
+    const weg = prev.filter(c => !stillHeld.has(c.id));
+    if (weg.length) {
+      weg.forEach(c => _chipGhosts[pi].push(c));
+      _persistChipGhosts();
+    }
   }
   _prevBonusChips[pi] = chips;
 }
@@ -1017,9 +1103,24 @@ function renderBoard(pi) {
     // der Fokus bis zur Platzierung auf der gewaehlten Reihe bleibt. Das
     // fruehere .nodrop (35 %, nur volle Reihen) entfaellt in dieser Phase.
     if(isTiling && tilingRow===null && row.tiles.length===row.capacity && ri===currentTilingRi && isPlaceable) cls='drop';
+    // Nutzer 2026-09-07: die chip-vervollstaendigbare Reihe IST die aktuelle
+    // Reihe -- sie wurde frueher trotzdem mit 60 % gedimmt wie die inaktiven.
+    // Sie bleibt jetzt voll sichtbar; ihre eigene Markierung steckt in
+    // `.prow.chip-target` (blasse Flaeche + 🎴 in der Pfeilspalte). Bewusst
+    // NICHT `.drop`: die Reihe fuehrt hier zu einem anderen Ziel (dem
+    // Bonuschip-Fenster statt der Kuppelfeld-Wahl), und das darf man ihr
+    // ansehen. Klickbar ist sie seit heute so oder so (isChipRow, s. unten).
+    else if(isTiling && tilingRow===null && ri===currentTilingRi) cls='';
     else if(isTiling && tilingRow===null && currentTilingRi!==null) cls='dim';
     else if(isTiling && tilingPi===pi && tilingRow!==null) cls = (ri===tilingRow) ? 'drop' : 'dim';
-    const onclick = cls==='drop'
+    // Nutzer 2026-09-07 (Widerspruch): die hervorgehobene Chip-Reihe war nicht
+    // klickbar -- bedient wurde nur der Bonuschips-Kasten. Eine Markierung,
+    // die einen Klick verspricht, den es nicht gibt, ist ein Fehler; und
+    // Punkt 4 verlangt ohnehin, dass die Aktionen ueber die Musterreihe
+    // laufen. Die Reihe oeffnet deshalb selbst das Bonuschip-Fenster
+    // (onTilingRowClick), der Kasten bleibt als zweiter Weg bestehen.
+    const isChipRow = isTiling && ri === currentTilingRi && activeChippableRis.includes(ri);
+    const onclick = (cls==='drop' || isChipRow)
       ? `onclick="${isActive&&sel ? `onRowClick(${ri})` : `onTilingRowClick(${pi},${ri})`}"`
       : '';
     const phantomCount = row.phantom_count || 0;
@@ -1036,28 +1137,29 @@ function renderBoard(pi) {
       const isPhantom = tileIdx >= row.tiles.length - phantomCount;
       return `<div class="tile sm ${normColor(row.color)}${isPhantom ? ' phantom' : ''}"></div>`;
     }).join('');
-    // Naechste faellige Tiling-Reihe: `isNextTiling` bleibt fuer die
-    // Chip-Ziel-Markierung unten noetig. Bugfix (2026-07-29): gilt auch, wenn
-    // die einzige offene Aktion eine Chip-Komplettierung ist (Reihe also noch
-    // nicht voll ist) -- vorher war `isNextTiling` durch
-    // `row.tiles.length===row.capacity` fest an volle Reihen gekoppelt, eine
-    // nur-per-Chips-komplettierbare Reihe wurde nie erkannt.
+    // Nutzer 2026-09-07: liegt die Fliese dieser Reihe vorgemerkt auf der
+    // Kuppel, ist die Reihe selbst das naechste Klickziel -- sie bekommt
+    // deshalb dieselbe Art Markierung wie die legalen Kuppelfelder
+    // (pulsierender Hof, `.prow.confirm-ready` in style.css).
+    const confirmCls = (pendingTiling && pendingTiling.pi === pi && pendingTiling.ri === ri)
+      ? ' confirm-ready' : '';
+    const chipTargetCls = isChipRow ? ' chip-target' : '';
+    // Die Chip-Reihe traegt ihr Zeichen an der Stelle, an der sonst der Pfeil
+    // steht (`.rowlabel` hat feste Mindestbreite) -- damit kostet die
+    // Markierung KEINEN Platz und verschiebt nichts, die Lehre aus dem
+    // Layout-Sprung des frueheren blauen Punkts (2026-08-02).
     //
-    // Nutzer-Feedback (2026-08-02): der frueher hier gerenderte blaue Punkt
-    // (visueller Zusatzindikator "diese Reihe ist dran") ist ERSATZLOS
-    // entfernt -- er verursachte beim Erscheinen einen Layout-Sprung
-    // (Musterreihen ruckten ein) und war ohnehin redundant zur bereits
-    // vorhandenen blauen Reihen-Hervorhebung (.prow.drop Hintergrund, siehe
-    // style.css) bzw. der gestrichelten Chip-Ziel-Markierung (.prow.chip-target).
-    const isNextTiling = isTiling && ri === currentTilingRi;
-    // Dezente Zusatzmarkierung: wenn die aktuelle Reihe nur per Bonuschips
-    // komplettierbar ist, bekommt die Reihe selbst denselben Hinweis-Ton wie
-    // der Bonuschips-Kasten (.chips-usable), damit der Bezug Kasten->Reihe
-    // sichtbar ist (Nutzer-Anforderung 2026-07-29).
-    const chipTargetCls = (isNextTiling && activeChippableRis.includes(ri)) ? ' chip-target' : '';
-    return `<div class="prow ${cls}${chipTargetCls}" data-ri="${ri}" ${onclick}>
+    // ZEICHEN (Nutzer 2026-09-07): 🎴 ist das Bonusplaettchen selbst -- so
+    // schreibt es die Engine, wenn eines aufgedeckt wird
+    // (execution.rs:161/176/224, "🎴 F4: Bonusplättchen aufgedeckt!"). 🎫
+    // gehoert NICHT dem Plaettchen, sondern der Handlung: die Engine setzt es
+    // vor "komplettiert Reihe N mit Bonus-Chips" (game.rs:908, py.rs:351).
+    const rowLabel = chipTargetCls
+      ? `<span class="rowlabel chip-label" title="Diese Reihe lässt sich mit Bonusplättchen vervollständigen - Reihe oder Bonuschips-Kasten anklicken">🎴</span>`
+      : `<span class="rowlabel" style="color:var(--text3)">→</span>`;
+    return `<div class="prow ${cls}${chipTargetCls}${confirmCls}" data-ri="${ri}" ${onclick}>
       <span class="rownum">${ri+1}</span>${cells}
-      <span class="rowlabel" style="color:var(--text3)">→</span>
+      ${rowLabel}
     </div>`;
   }).join('');
 
@@ -1396,18 +1498,21 @@ function renderCenter() {
       const col = S.players[tilingPi].pattern_lines[tilingRow].color;
       const tileSpan = `<span class="tile sm ${normColor(col)}" style="vertical-align:middle;margin:0 2px"></span>`;
       const head = `→ <strong>${S.players[tilingPi].name}</strong> Reihe ${tilingRow+1} ${tileSpan}`;
+      const letzte = pendingTiling && isLastPatternRow(tilingPi, tilingRow);
       infoHTML = pendingTiling
         ? `<div class="info tiling">
             ${head} - liegt vorgemerkt auf dem Kuppelfeld.
             <div style="font-size:10px;margin-top:3px">
-              Klick auf die Musterreihe schließt sie ab<span id="tiling-countdown"></span>.
+              ${letzte
+                ? 'Gelegt wird sie erst beim Abschließen des Tilings.'
+                : `Klick auf die Musterreihe schließt sie ab<span id="tiling-countdown"></span>.`}
               Anderes Feld = verschieben, dasselbe Feld noch einmal = zurücknehmen.
             </div>
           </div>`
         : `<div class="info tiling">
             ${head} - passendes Kuppelfeld anklicken.
             <div style="font-size:10px;margin-top:3px">
-              Erneuter Klick auf die Reihe hebt die Auswahl wieder auf.
+              Die pulsierenden Felder nehmen die Fliese auf.
             </div>
           </div>`;
     } else if(hasPending) {
@@ -1422,8 +1527,12 @@ function renderCenter() {
         <div style="display:flex;gap:4px;flex-wrap:wrap">${rows}</div>
       </div>`;
     } else if(chippable.length>0) {
+      // Der Text sprach von einem "🎫-Button" -- den gibt es seit dem
+      // 2026-07-27 nicht mehr (er wich dem klickbaren Bonuschips-Kasten,
+      // s. style.css .chips-usable), und das Zeichen war ohnehin das der
+      // Handlung statt des Plaettchens (Nutzer 2026-09-07).
       infoHTML = `<div class="info warn" style="font-size:10px">
-        💡 Reihen mit 🎫-Button können mit Bonusplättchen vervollständigt werden<br>
+        💡 Die mit 🎴 markierte Reihe lässt sich mit Bonusplättchen vervollständigen - Reihe anklicken<br>
         <span style="color:var(--text2)">2 gleichfarbige oder 3 beliebige Chips = 1 fehlende Fliese</span>
       </div>`;
     } else {
@@ -1492,9 +1601,18 @@ function renderCenter() {
         // moeglich ist (engine/src/serialize.rs::compute_can_pass). Der Zug
         // wird deshalb uebersprungen (maybeAutoPass, am Ende von render) und
         // im Log vermerkt; hier steht nur noch der Hinweis.
-        info.innerHTML = `<div class="info warn">
-          ⏸ Keine Aktion möglich - der Zug wird übersprungen.
-        </div>`;
+        //
+        // Bleibt das Uebergehen dreimal wirkungslos, ist etwas anderes im
+        // Argen -- dann gibt die Oberflaeche den Knopf wieder her, statt den
+        // Spieler ohne Ausweg stehen zu lassen.
+        info.innerHTML = _autoPassStuck >= 3
+          ? `<div class="info warn" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <span>⏸ Keine Aktion möglich - Überspringen greift nicht.</span>
+              <button class="btn danger" onclick="passMove()" style="white-space:nowrap">Passen</button>
+            </div>`
+          : `<div class="info warn">
+              ⏸ Keine Aktion möglich - der Zug wird übersprungen.
+            </div>`;
       } else {
         info.innerHTML = '';
       }
@@ -1727,7 +1845,10 @@ document.getElementById('auslage-area').innerHTML = `
       style='color:#059669'; 
     } else if(e.includes('☀️')||e.includes('🌙')){
       style='color:var(--text2)';
-    } else if(e.includes('🎫')){
+    } else if(e.includes('🎫') || e.includes('🎴')){
+      // 🎫 traegt die Engine vor "komplettiert Reihe N mit Bonus-Chips"
+      // (game.rs:908), 🎴 vor "Bonusplättchen aufgedeckt" (execution.rs:161).
+      // Zwei Zeichen, eine Sache -- also auch eine Farbe.
       style='color:#7C3AED';
     }
     return `<div class="le" style="${style}">${mapFactoryNamesInText(e)}</div>`;
@@ -1881,19 +2002,32 @@ function onTilingRowClick(pi, ri) {
   // Punkt 10: liegt eine Fliese dieser Reihe vorgemerkt auf einem Kuppelfeld,
   // ist der Klick auf die Reihe der ABSCHLUSS -- das ersetzt den frueheren
   // sofortigen Server-Aufruf beim Feld-Klick.
+  //
+  // AUSNAHME letzte Musterreihe (Nutzer 2026-09-07): dort schliesst das
+  // Abschluss-Fenster ab, nicht der Reihen-Klick. Sie hat bewusst keinen
+  // 5-Sekunden-Ablauf, damit sie bis zur Freigabe des Tilings korrigierbar
+  // bleibt -- ein zweiter Weg, sie vorher festzuschreiben, wuerde genau das
+  // wieder aushebeln (und zwar durch einen Klick, den man beim Verschieben
+  // leicht daneben setzt).
   if(pendingTiling && pendingTiling.pi === pi && pendingTiling.ri === ri) {
-    commitPendingTiling();
+    if(!isLastPatternRow(pi, ri)) commitPendingTiling();
+    return;
+  }
+  // Chip-Reihe: sie ist nicht voll und laesst sich nicht an die Kuppel legen,
+  // ihr Klick oeffnet das Bonuschip-Fenster fuer genau diese Reihe -- dasselbe,
+  // was der Bonuschips-Kasten tut (renderBoard, .chips-usable).
+  const rowState = getTilingRowState(pi);
+  if(rowState.currentTilingRi === ri && rowState.isChipOnly) {
+    openChipModal(pi, ri);
     return;
   }
   const row = S.players[pi].pattern_lines[ri];
   if(row.tiles.length !== row.capacity) return;
-  // Punkt 4: die Abwahl sass bis 2026-09-06 auf einem ✕ im Info-Kasten. Jetzt
-  // hebt ein zweiter Klick auf dieselbe Reihe die Auswahl auf.
-  if(tilingPi === pi && tilingRow === ri) {
-    tilingPi = null; tilingRow = null;
-    render();
-    return;
-  }
+  // Eine Abwahl gibt es nicht mehr (Nutzer 2026-09-07): die faellige Reihe
+  // waehlt sich selbst an (autoSelectTilingRow), eine Abwahl waere im
+  // naechsten Zeichnen ohnehin rueckgaengig gemacht. Der Klick auf eine
+  // bereits gewaehlte Reihe ohne vorgemerkte Fliese tut deshalb nichts.
+  if(tilingPi === pi && tilingRow === ri) return;
   tilingPi=pi; tilingRow=ri;
   render();
 }
@@ -1953,11 +2087,34 @@ async function commitPendingTiling(advance=true) {
   if(advance) advanceTilingRow(pend.pi);
 }
 
+// Die faellige Reihe waehlt sich selbst an, damit die legalen Kuppelfelder
+// SOFORT pulsieren (Nutzer 2026-09-07: "ich muss dafuer aber erst die
+// musterreihe einmal anklicken. das macht nicht so viel sinn, da ich sowieso
+// immer nur jede reihe nacheinander abarbeiten kann"). Bis dahin geschah das
+// nur nach einer Platzierung (advanceTilingRow) -- ab Reihe 2 fuehlte es sich
+// darum richtig an, am Anfang der Tiling-Phase und nach einer
+// Chip-Vervollstaendigung fehlte es.
+//
+// Angewaehlt wird nur eine Reihe, die sich WIRKLICH an die Kuppel legen
+// laesst. Eine nur per Bonuschips komplettierbare Reihe bleibt unangetastet:
+// ihr Klick fuehrt ins Chip-Fenster, nicht in die Feldwahl.
+function autoSelectTilingRow() {
+  if(!S || S.phase !== 'tiling') return;
+  if(tilingRow !== null || AI_THINKING || humanTilingDone) return;
+  const kandidaten = AI_ENABLED ? [1 - AI_PLAYER] : [0, 1];
+  for(const pi of kandidaten) {
+    const {playerPlaceableRis, currentTilingRi} = getTilingRowState(pi);
+    if(currentTilingRi !== null && playerPlaceableRis.includes(currentTilingRi)) {
+      tilingPi = pi; tilingRow = currentTilingRi;
+      return;
+    }
+  }
+}
+
 // "wechsel in die naechste reihe" (Nutzer 2026-09-06): nach dem Abschluss ist
-// die naechste faellige Reihe gleich angewaehlt -- aber nur, wenn sie sich
-// wirklich an die Kuppel legen laesst. Eine nur per Bonuschips
-// komplettierbare Reihe bleibt unangetastet, die laeuft ueber den
-// Chip-Kasten.
+// die naechste faellige Reihe gleich angewaehlt. Deckt sich inzwischen mit
+// autoSelectTilingRow; die Funktion bleibt, weil sie die Auswahl auch
+// AUFRAEUMT, wenn nichts mehr faellig ist.
 function advanceTilingRow(pi) {
   if(!S || S.phase !== 'tiling') return;
   const {playerPlaceableRis, currentTilingRi} = getTilingRowState(pi);
@@ -1969,10 +2126,72 @@ function advanceTilingRow(pi) {
   render();
 }
 
-// -- ZENTRALES ABSCHLUSS-FENSTER (Punkt 1) ----------------------------------
+// -- ABSCHLUSS-FENSTER (Punkt 1) --------------------------------------------
+// Vom Nutzer verschobene Lage. Bleibt bestehen, solange die Seite laeuft --
+// wer das Fenster einmal beiseite geschoben hat, will es nicht bei jedem
+// Zeichnen zurueckspringen sehen.
+let _finishPopupPos = null;
+
 function hideTilingFinishPopup() {
   const ov = document.getElementById('tiling-finish-overlay');
   if(ov) ov.style.display = 'none';
+}
+
+// Nutzer 2026-09-07: NICHT in der Bildmitte -- dort verdeckt es je nach
+// Fenstergroesse ausgerechnet die letzte Musterreihe, die es korrigierbar
+// halten soll. Oberkante buendig mit Musterreihe 1 des menschlichen Bretts,
+// waagerecht mittig ueber diesem Brett.
+function positionTilingFinishPopup() {
+  const card = document.querySelector('#tiling-finish-overlay .finish-card');
+  if(!card) return;
+  const cw = card.offsetWidth, ch = card.offsetHeight;
+  let left, top;
+  if(_finishPopupPos) {
+    ({left, top} = _finishPopupPos);
+  } else {
+    const pi = AI_ENABLED ? (1 - AI_PLAYER) : 0;
+    const row1  = document.querySelector(`#plines${pi} .prow[data-ri="0"]`);
+    const board = document.getElementById('board' + pi);
+    if(row1 && board) {
+      const r = row1.getBoundingClientRect();
+      const b = board.getBoundingClientRect();
+      top  = r.top;
+      left = b.left + b.width/2 - cw/2;
+    } else {
+      top  = window.innerHeight/2 - ch/2;
+      left = window.innerWidth/2  - cw/2;
+    }
+  }
+  card.style.left = Math.max(6, Math.min(left, window.innerWidth  - cw - 6)) + 'px';
+  card.style.top  = Math.max(6, Math.min(top,  window.innerHeight - ch - 6)) + 'px';
+}
+
+// Verschieben am Titel, wie bei den uebrigen Dialogen (makeDraggable taugt
+// hier nicht: das Fenster ist kein `.modal` in einem `.overlay`, und sein
+// Rahmen ist bewusst klickdurchlaessig).
+function initTilingFinishDrag() {
+  const card = document.querySelector('#tiling-finish-overlay .finish-card');
+  const handle = document.getElementById('tiling-finish-title');
+  if(!card || !handle) return;
+  let unten = false, startX = 0, startY = 0, startL = 0, startT = 0;
+  handle.addEventListener('mousedown', e => {
+    unten = true;
+    startX = e.clientX; startY = e.clientY;
+    const r = card.getBoundingClientRect();
+    startL = r.left; startT = r.top;
+    card.classList.add('dragging');
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if(!unten) return;
+    _finishPopupPos = {left: startL + (e.clientX - startX), top: startT + (e.clientY - startY)};
+    positionTilingFinishPopup();
+  });
+  document.addEventListener('mouseup', () => {
+    if(!unten) return;
+    unten = false;
+    card.classList.remove('dragging');
+  });
 }
 
 function renderTilingFinishPopup(hasPending) {
@@ -1982,7 +2201,7 @@ function renderTilingFinishPopup(hasPending) {
   // ist dann weiter 'tiling', offene Reihen hat der Mensch aber keine mehr).
   const show = !!S && S.phase === 'tiling' && !hasPending
             && !AI_THINKING && !humanTilingDone;
-  ov.style.display = show ? 'flex' : 'none';
+  ov.style.display = show ? 'block' : 'none';
   if(!show) return;
   const title = document.getElementById('tiling-finish-title');
   const sub   = document.getElementById('tiling-finish-sub');
@@ -1994,6 +2213,9 @@ function renderTilingFinishPopup(hasPending) {
     : (AI_ENABLED ? 'Danach ist die KI mit ihrem Tiling dran.'
                   : 'Danach wird die Runde gewertet.');
   if(btn) btn.textContent = AI_ENABLED ? 'Abschließen → KI ist dran' : 'Runde beenden ✓';
+  // Nach dem Fuellen -- die Lage haengt an der Kartenhoehe, und die steht erst
+  // fest, wenn der Text drin ist.
+  positionTilingFinishPopup();
 }
 
 // -- CHIP-REIHE UEBERSPRINGEN (Nutzer-Folgeauftrag 2026-07-29) -----------------
@@ -3297,6 +3519,10 @@ function render() {
     skippedChipRows = {0: new Set(), 1: new Set()};
   }
 
+  // Vor dem Zeichnen: die faellige Musterreihe anwaehlen, damit ihre legalen
+  // Kuppelfelder ohne Vorklick pulsieren (Nutzer 2026-09-07).
+  autoSelectTilingRow();
+
   document.getElementById('round-lbl').textContent=`Runde ${S.round}/5`;
   renderBoard(0);
   renderBoard(1);
@@ -3408,6 +3634,8 @@ function makeDraggable(overlayId) {
 // -- START ---------------------------------------------------------------------
 window.addEventListener('scroll', updatePlaceToolbar, true);
 window.addEventListener('resize', updatePlaceToolbar);
+window.addEventListener('resize', positionTilingFinishPopup);
+initTilingFinishDrag();
 
 makeDraggable('dome-overlay');
 makeDraggable('moon-overlay');
@@ -3439,10 +3667,15 @@ makeDraggable('scoring-overlay');
       AI_ENABLED = false;
     }
 
-    // 3. UI zeichnen
+    // 3. Verbrauchte Bonusplaettchen der laufenden Partie zurueckholen
+    //    (rein clientseitige Spur, siehe trackChipGhosts) -- VOR dem ersten
+    //    Zeichnen, sonst fehlen sie im ersten Bild.
+    await initChipGhostStore();
+
+    // 4. UI zeichnen
     render();
     
-    // 4. Stupser für die KI: Falls sie vor dem Reload dran war, muss sie jetzt ziehen!
+    // 5. Stupser für die KI: Falls sie vor dem Reload dran war, muss sie jetzt ziehen!
 	if (AI_ENABLED && aiIsDue()) {
     await triggerAIMove();
   }
