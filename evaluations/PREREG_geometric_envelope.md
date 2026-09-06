@@ -1940,3 +1940,81 @@ freiraeumen" ihre Vollendungen mit Punkten (Aussen-Legen ohne Huellenbeitrag) un
 Spalten, und der Vorteil "Zeile wieder bespielbar" kommt in der Partie nicht mehr zu
 Geld. Kuppel-Bonus unveraendert. Dosis 0,5 und die Kombination mit K3-P2 (par.8.14a)
 folgen aus der Kette; C1 (par.12) wird an diesem Arm nicht bewertet (Tor 1/2 negativ).
+
+## par.8.15 HUELLENFORM: gemessene Huelle und zweite Zelle in Zeile 6 (Nutzer 2026-09-06, 23:05)
+
+**Anlass:** K3-F 1,0 am Champion (par.8.14) vollendet mehr lange Reihen, zahlt aber mit
+Punkten; Nutzer 22:49: *"das ist eventuell ein allgemeines problem mit der huelle oder
+aufgezwungenen knoepfen."* Auf die Frage, welche Huellenform noetig ist, um das zu trennen,
+wurden drei Kontrollen vorgeschlagen (gemessene Huelle aus den Logs; Form mit zwei Zellen in
+Zeile 6 bei gleichen Kosten; Placebo-Huelle). **Nutzer, woertlich (23:05):** *"ja mach die
+gemessene huelle. und ich wuerde sagen wir koennen die form etwas anpassen. du nimmst einfach
+die zweite zelle in reihe 6 hinzu. sollte das thema gut entschaerfen. spielt dann auch noch
+mit den spezialfliesen zusammen."*
+
+**Hintergrund (par.3, `envelope.rs:44-63`):** die Huelle ist das Dreieck `r + c <= 5`
+(links) bzw. `r <= c` (rechts), 21 Zellen, Kosten 56 (Summe r+1), hergeleitet aus den
+Fuellraten je Rasterzeile 4,88 / 4,70 / 2,88 / 2,23 / 1,71 / 1,31 -- also aus ZEILENSUMMEN;
+die Verteilung innerhalb der Zeile ist nirgends belegt. In Zeile 6 hat das Dreieck genau eine
+Zelle ((5,0) bzw. (5,5)); die Reihe passt nur mit einer Farbe, und genau dort waren bei den
+Netzen 57-58 % der Episoden blockiert (par.8.14).
+
+### Teil A: Sonde "gemessene Huelle" (reine Log-Arithmetik, Lauf im naechsten CPU-freien Fenster)
+
+`tools/probes/measured_hull_probe.py` (gebaut 2026-09-06, synthetisch getestet):
+- Quellen: Server-Logs Mensch gegen KI (`static/log/game_*.log`, 22 Partien mit Endwertung
+  laut Verzeichnis) und Arena-Artefakte mit Logs (`paired_arena_env_*_s14.json`: b06 Tor 2b
+  gegen b01 und die Knopf-Arme am Champion, je Seite mit Spec-Etikett). Endzustand je Partie
+  per Replayer (`analyze_game_log.run`, wie `tiling_geometry_probe.py`).
+- Je Seite: Belegung des 6x6-Rasters am Spielende (`triangle_hull_coverage_probe.occupancy`),
+  Orientierung = kleinere Dreiecks-Abweichung, rechts-orientierte Bretter an der senkrechten
+  Achse gespiegelt (c -> 5-c, wie par.3: die zwei Huellen sind Spiegelbilder ueber die
+  Spalten-Achse). Dann Fuellhaeufigkeit je Zelle, Gruppen Mensch / KI / Netz je Spec /
+  Gewinner / Verlierer / alle.
+- **Gemessene Huelle** = die Zellmenge mit maximaler Summe der Fuellhaeufigkeit unter der
+  Kostenschranke 56 (exakter 0/1-Rucksack ueber 36 Zellen, Kosten r+1), dazu dieselbe
+  Rechnung bei 62 (= Dreieck plus eine Zelle in Zeile 6). Bericht: Ueberdeckung mit dem
+  Dreieck, welche Zellen hinzukommen und wegfallen, Haeufigkeit der Zeile-6-Zellen (5,0),
+  (5,1), (5,2) und der Zeile-5-Zellen, P((5,1) belegt | (5,0) belegt), Zeilensummen gegen
+  die par.3-Raten als Plausibilitaetspruefung.
+- **Lesart (vorab):** kommt bei 56 das Dreieck heraus (>= 19 von 21 Zellen gleich), ist die
+  Form nicht das Problem, und Teil B ist ein Arm ohne Datenrueckhalt. Liegt (5,1) in der
+  62er-Huelle oder verdraengt (5,1) eine Dreieckszelle schon bei 56, stuetzt die Messung die
+  Nutzer-Form. Kein Tor, ein Richtwert; Mensch-Zahlen mit dem Vorbehalt aus par.8.14
+  (Orientierung des Menschen ist nicht huellengetrieben).
+
+### Teil B: Huellenform mit zweiter Zelle in Zeile 6, als KNOPF (nicht als stille Aenderung)
+
+**Nutzer-Form:** Dreieck plus die zweite Zelle der Rasterzeile 6, links (5,1), rechts (5,4);
+22 Zellen, Kosten 62. Nichts faellt weg (Nutzer: "einfach hinzu").
+
+**Bauform (Koordinator-Entscheid, Begruendung unten):** `MOSAIC_ENVELOPE_HULL_FORM`, 1 =
+Dreieck (Default, bitidentisch), 2 = Nutzer-Form; **Spec-Pflichtfeld je Seite
+`envelope_hull_form`** (Welle-1-Regel wie `envelope_projection_mode`), Registry,
+`engine_config`, `knobs.md`, `server.py`, `freeze_heuristic.py`, `claude_play.py`, Inline-
+Test-Specs, Beispiel; lebende Specs bekommen das Feld im Bau-Fenster per
+`tools/spec_add_field.py envelope_hull_form 1`. Wirksam im Such-Term (e) auf allen
+Projektions-Modi (Orientierungswahl, Abweichung, Anteile, Platzhalter K3-P2, Freiraeumen
+K3-F, Normierung 56 -> 62). Der Tiling-Zweig (d) und der Huellen-Bauer (`plate_builder.rs`,
+Modus 8) bleiben auf dem Dreieck (beide nicht im Champion aktiv; Nachzug als eigener Schritt,
+wenn Teil B traegt). Warum Knopf statt Aenderung: Champion `v24-b06`, sein Elo-Knoten und
+der Tor-2a-Bezug 0,4975 sind mit dem Dreieck gemessen; eine stille Formaenderung wuerde
+jede Knopf-Messung ab morgen gegen einen anderen Bezug laufen lassen (Regel: Tor-Aenderungen
+werden registriert, nie still). Als Arm ist die Form gegen das Dreieck messbar wie die
+K3-Arme; traegt sie, wird sie Champion-Spec wie K3-P (par.11).
+
+**Messung (nach dem Bau, exklusiv; Muster par.8.11a):** Arm = Champion-Spec mit
+`envelope_hull_form` 2 gegen Champion-Spec (Form 1) am selben Netz, argmax-Instrument @400
+(200 Partien, Seed 20260931, Bezug 0,4975) und gepaarte Arena 2 x 80 (Seed 20261014, Logs);
+Kennzahlen Siege, Punkte, volle Spalten, Kuppel-Bonus, lange Reihen begonnen/vollendet/
+geraeumt, **dazu die Blockade-Quote der Reihe 6 aus der Reihen-Alter-Sonde (par.8.14,
+Praedikat mit der jeweiligen Huellenform)** -- das ist die Groesse, die die Form direkt
+bewegen soll. Danach K3-F 0,5 auf der neuen Form als Kreuzarm, falls K3-F 0,5 allein
+(par.8.14) nicht traegt. **Zusammenspiel mit K5** (`special_tile_yield` par.9): mit zwei
+Huellenzellen in Zeile 6 hat das Spezialfeld zwei Kandidatenplaetze statt einem; K5 bekommt
+die Form als Parameter, Bau nach den K3-Armen wie registriert.
+
+**Reihenfolge:** Teil A und `cargo test`/Wheel/Anker fuer Teil B im CPU-freien Fenster nach
+der Knopf-Kette (rund 00:10), Code fuer Teil B vorher (Subagent, ohne Build). Dann Messung
+Teil B (rund 50 min) VOR den neun Partien oder danach -- Nutzer-Entscheid, sonst danach.
+
