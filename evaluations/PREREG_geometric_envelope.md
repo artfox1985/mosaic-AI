@@ -1834,7 +1834,7 @@ b05-Abnahme; `cargo test` und Wheel im CPU-freien Fenster nach der b03-Abnahme):
   traf einen Spec-String ohne Folgekomma (Feld rutschte in ein `assert!`,
   rustfmt prueft Makro-Inhalte nicht); der bash-PATH braucht die Python-DLL
   in POSIX-Form (`cygpath -u`), sonst STATUS_DLL_NOT_FOUND.
-- **EINGETAKTET (2026-09-06, 13:55; Nutzer 13:15: "miss den rauschboden mit, starte mit
+- **EINGETAKTET (2026-09-06, 13:33; Nutzer 13:15: "miss den rauschboden mit, starte mit
   dem champion ... vier arme sind ok"):** `tools/night_k3_knobs_champion.sh`, wartet
   hinter der b06-Abnahme auf freie CPU. Schritt 0: Rauschboden par.12b Punkte 1-2
   (`tools/probes/value_head_reliability_probe.py`: rho je Runde auf frozen_v3

@@ -177,7 +177,7 @@ Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (fa
    b05 GRUEN (Dead 2 %, Eff.Rank 61 %), identisch mit v23-b01/b03/b04/b06 samt
    denselben 42 toten fusion2-Einheiten: Warmstart-Linie, Trunk bewegt sich kaum.
 
-10. **Knopf-Messkette am Champion** (`tools/night_k3_knobs_champion.sh`, gestartet 13:55,
+10. **Knopf-Messkette am Champion** (`tools/night_k3_knobs_champion.sh`, gestartet 13:33,
     wartet hinter b06): Rauschboden par.12b Punkte 1-2, dann K3-P2, K3-F 1,0, K3-F 0,5,
     beide; rund 3,7 h ab rund 16:30. Registrierung par.8.11 / 8.14 / 12b je Arm.
 
