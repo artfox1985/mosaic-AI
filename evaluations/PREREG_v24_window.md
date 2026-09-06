@@ -500,6 +500,9 @@ rund 40/35/25 %, 46-170 Reihen mit Phantomen je Datei, 877-995 Auslage-
 Platten mit Spezialfeld). Die 744er-Bloecke wurden aus denselben Records neu
 gebaut (2.945 Bloecke, Chronik 2026-09-05 16:04) -- nichts fiel still auf 0.
 
+**ENTSCHIEDEN (Nutzer 2026-09-06, 11:40): Generator v25 = b05, Erzeugung OHNE K3-P**
+(registriert in `PREREG_v25_window.md` par.4). Champion-Frage offen, siehe unten.
+
 **Was der Entscheid mitentscheidet:** (1) Knopf in der v25-Erzeugung ja/nein
 (par.6b'); (2) Generator; (3) ob der v24-Sieger den Champion-Knoten herausfordert
 (Kante gegen `v23-b01_k3p10` = Tor 1 mit Knopf: b02 192:128 und b03 214:146
