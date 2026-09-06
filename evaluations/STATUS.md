@@ -26,7 +26,7 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. WAS GERADE LAEUFT (UEBERGABE 2026-09-06, 00:36; Anlass: Kontextfenster der Sitzung vom 2026-09-05 zu 75 % voll)
 
-**Champion:** `v23-b01_k3p10` (Elo 1292). **Generation v24 in der Abnahme, fuenf
+**Champion seit 2026-09-06 18:42: `v24-b06_k3p10` (Elo 1309 [1271, 1350]; b02-Rezept auf Sicht 744 mit K3-P C 1,0; Vorgaenger `v23-b01_k3p10` jetzt 1276). Generator v25 = b05 (Nutzer 11:40) -- Nutzer-Prinzip "Self-Plays nur vom Champion" spricht fuer b06, Entscheid offen.** **Generation v24 abgenommen, sechs
 Arme:** b01, b02, b04, b05 trainiert; b03 (714er-Arm) trainiert gerade neu
 (Verlust durch Maschinen-Neustart 2026-09-05 16:04). Alle Zahlen:
 `PREREG_v24_window.md` par.9/9a/9b; Chronik `night_run_20260902.md` (ab
@@ -186,8 +186,10 @@ Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (fa
     Ende der b06-Abnahme; Umfang wie 2026-09-04 (set_champion, Anker n=150, Champion-2
     gegen v21, Balance, Platt v3/v1, Paritaets-Fixture, Artefakt mit venv und Golden
     Probe). Danach von Hand: Manifest, Referee-Selbsttest, server.py A/B, Elo-Zeilen,
-    STATUS/History. Reihenfolge danach: Subagent-Partie, dann Knopf-Kette (Halte-Marke
-    `evaluations/artifacts/claude_play/.playing` liegt seit 17:21).
+    STATUS/History. **FERTIG 18:42:** Anker 116:34 (n=150), Champion-2 76:44 gegen v21 (SPRT),
+    Balance 2,60, Platt v3 A -0,0961 / B 0,5875 (server.py), Fixture neu, Artefakt
+    `models/frozen_champions/v24-b06_k3p10/` mit venv, Golden Probe 10 Sonden, Referee-
+    Selbsttest gruen. Elo 1309. Danach Subagent-Partie, dann Knopf-Kette (Halte-Marke).
 
 12. **K5 "Reihe-6-Spezialfeld"** (17:43, Nutzer-Regel, `special_tile_yield` par.9):
     registriert, nicht gebaut; Reihenfolge nach den vier K3-Armen.

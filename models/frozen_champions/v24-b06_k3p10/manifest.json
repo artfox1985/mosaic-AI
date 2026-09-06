@@ -1,0 +1,93 @@
+{
+  "champion": "v24-b06_k3p10",
+  "freeze_date": "2026-09-06",
+  "name_dialect": "hv",
+  "model_file": "model.onnx",
+  "model_source": "models/alphazero_v24-b06_brierbest.onnx (Kopie als models/alphazero_v24-b06_k3p10.onnx; Training v24-b06 = b02-Rezept lambda 0,7 auf Sicht 744, manifest_train_v24-b06_20260906_114705.json, _brierbest Epoche 4)",
+  "pth_file": "model.pth",
+  "spec_file": "spec.json",
+  "spec_source": "models/v24-b06_k3p10.spec.json (Kopie der Champion-Spec v23-b01_k3p10: Modus 1, C 1,0, Profil 1/0,92/0,67/0,33/0, envelope_flush_w 0)",
+  "spec_content": {
+    "implicit_minimax_alpha": 0.0,
+    "long_row_init_shaping_w": 0.0,
+    "score_utility_c": 0.0,
+    "score_utility_b": 20.0,
+    "envelope_search_c": 1.0,
+    "envelope_tiling_w": 0.0,
+    "envelope_profile": [
+      1.0,
+      0.92,
+      0.67,
+      0.33,
+      0.0
+    ],
+    "envelope_tiling_value_w": 0.0,
+    "envelope_projection_mode": 1,
+    "envelope_flush_w": 0.0,
+    "heuristik_variante": "hv1"
+  },
+  "input_size": 744,
+  "contract_hash": "20b442a8164f748d",
+  "engine_version": "0.1.0",
+  "elo": {
+    "value": 1309,
+    "ci95": [
+      1271,
+      1350
+    ],
+    "condition": "v24-b06_k3p10@400 auf der R5-Fix-Leiter, vier Kanten (Gating 117:83 und 202:158 gegen v23-b01_k3p10, Anker 116:34 n=150, Champion-2 76:44 gegen v21_2d_brierbest)",
+    "source": "evaluations/elo_history.csv, elo_tracker report 2026-09-06 18:40"
+  },
+  "wheels": {
+    "champion_behavior_artifact": {
+      "file": "mosaic_rust_k3f_20260906.whl",
+      "source": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl, gebaut 2026-09-06 10:06 aus Commit 696aa07 (K3-F, envelope_flush_w als Spec-Pflichtfeld)",
+      "role": "Verhalten, auf dem die Elo-Messung 1309 beruht; in venv/ installiert (Worker-Wheel) und zugleich das live installierte Basis-Wheel, mit dem Abnahme, Anker-Kante und Golden Probe liefen",
+      "sha256": "f883168efc1396fc81b0fe8dd4b3c786850b35c075de9940f9f4c4365cc32283",
+      "contract_hash": "20b442a8164f748d"
+    }
+  },
+  "knobs": "Alle Knoepfe in spec.json; Spielbetrieb: server.py uebersetzt die Spec in Env-Knoepfe (MOSAIC_ENVELOPE_PROJECTED=1, MOSAIC_ENVELOPE_SEARCH_C=1.0, Profil 1,0.92,0.67,0.33,0, MOSAIC_ENVELOPE_FLUSH_W=0)",
+  "golden_probe": {
+    "file": "golden_probe.json",
+    "source": "tools/build_frozen_golden_probe.py --seed-base 916001 (2 je Runde 1-5, Sonden-Seeds 916101+, sims 400, c_puct 1.5), erzeugt 2026-09-06 18:18-18:36 auf dem live installierten Wheel (sha256 wie oben)",
+    "n_probes": 10
+  },
+  "parity_fixture": "engine/tests/fixtures/net_parity_champion.txt, neu geschrieben 2026-09-06 18:17 (MOSAIC_UPDATE_NET_PARITY_FIXTURE=1), frischer Lauf gruen",
+  "display_calibration": {
+    "A": -0.0961,
+    "B": 0.5875,
+    "brier": 0.23221,
+    "eval_set": "frozen_eval_set_v3.pkl",
+    "trend_frozen_v1": {
+      "A": 0.3281,
+      "B": 0.6497,
+      "brier": 0.24657
+    },
+    "in_server_py": true
+  },
+  "gumbel_balance": {
+    "ratio_sigma_over_prior_median": 2.603,
+    "by_round": [
+      1.84,
+      3.56,
+      2.88,
+      2.34
+    ],
+    "source": "evaluations/artifacts/gumbel_scale_calibration_v24-b06_k3p10.json",
+    "regel": "unter 3: c_visit/c_scale-Familie bleibt geschlossen (v23-b01_k3p10: 2,92)"
+  },
+  "worker_python": {
+    "interpreter_relative": "venv/Scripts/python.exe",
+    "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, angelegt 2026-09-06 18:17 per pip install --no-deps aus dem kanonisch benannten Wheel plus onnx/numpy; engine_config_json in der venv: contract 20b442a8164f748d"
+  },
+  "acceptance": {
+    "tor2a_ohne_knopf": 0.475,
+    "tor2a_mit_knopf": 0.4975,
+    "tor1_ohne_knopf": "216:184 (kein Entscheid)",
+    "tor1_mit_knopf": "117:83 + 202:158 (SPRT, zwei Seeds)",
+    "tor2b": "91:69, Spalten 0,575/0,725 gegen 0,650/0,625 (gleichauf)",
+    "source": "PREREG_v24_window.md par.9"
+  },
+  "prereg": "evaluations/PREREG_v24_window.md par.9/9c; docs/promotion_checklist.md; Chronik night_run_20260902.md 2026-09-06"
+}
