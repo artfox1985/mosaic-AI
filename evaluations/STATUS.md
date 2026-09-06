@@ -120,11 +120,11 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
 4. ~~Mini-Fenster-Test Fall D (Pause)~~ **GRUEN 02:00** (alle Faelle A-E
    bitgleich, `working_rules.md`). Offen beim Nutzer: `--fast-loader` als
    Default (Volllauf b03: 440 s je Epoche gegen 16 min, bitgleich).
-5. **Nach allen fuenf Abnahmen (gegen 11:00): VORLAGE Generatorwahl v24 an den
-   Nutzer** nach `docs/generation_loop.md` "Generatorwahl unter Armen" (Staerke
-   schliesst aus, Spaltenprofil entscheidet, sonst Amtsinhaber) -- mit der
-   Tabelle aller Arme und Tore, der Knopf-Wechselwirkung (b01 kippt, b02/b04
-   heben) und den offenen langen Reihen (par.8.13). KEINE stille Wahl.
+5. ~~Vorlage Generatorwahl~~ **GESTELLT 09:24** (`PREREG_v24_window.md` par.9c):
+   Gabelung an der Knopf-Frage -- Erzeugung MIT K3-P: b03 (214:146 mit Knopf,
+   Spalten gleichauf, Kuppel-Bonus 4,2); OHNE K3-P: b05 (66:34, zweiter Seed
+   laeuft, Tor 2b gehalten). b02 staerkster Beleg, aber spaltenaermer. KEINE
+   stille Wahl -- Nutzer-Entscheid offen.
 6. **Danach VORLAGE v25-Zuschnitt** (`PREREG_v25_window.md` par.9/9a): Traeger-
    Kennzahl v24 0,356 gegen Fenster 0,624; v25 nach par.1 rechnerisch 0,23.
    Hebel: Sockel-Betriebspunkt (Pilot: 400 Sockel-Partien in 2-3 Rausch-
