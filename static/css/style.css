@@ -1378,3 +1378,119 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 #factories-panel{background-position:0 0,center top}
 #center{background-position:0 0,right center}
 /* == MARMOR ENDE == */
+
+
+/* ============================================================================
+   GUI-Runde 2026-09-06 (Nutzer-Punkte 1, 7, 10)
+   ========================================================================== */
+
+/* -- "KI denkt" (Punkt 7) ---------------------------------------------------
+   War das einzige dunkle Element der Oberflaeche: das Markup griff auf
+   `var(--panel,#1e1e2e)` zurueck, und `--panel` ist in dieser Datei nirgends
+   definiert -- gezogen wurde also immer der dunkle Rueckfall. Jetzt dieselben
+   Mittel wie `.modal` (Papierflaeche, --border, weicher Schatten), Schleier
+   in der Grundfarbe des Bretts statt Schwarz. */
+.thinking-veil{
+  position:fixed;inset:0;z-index:9999;
+  display:none;                      /* per JS auf flex geschaltet */
+  align-items:center;justify-content:center;
+  background:rgba(247,246,242,.55);
+  backdrop-filter:blur(1.5px);
+}
+.thinking-card{
+  display:flex;align-items:center;gap:12px;
+  padding:16px 26px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  box-shadow:0 10px 50px rgba(0,0,0,.18);
+  font-size:13px;font-weight:600;color:var(--text);
+}
+.thinking-spinner{
+  width:18px;height:18px;border-radius:50%;
+  border:3px solid var(--border2);
+  border-top-color:var(--blau);
+  animation:spin .8s linear infinite;
+}
+/* Nutzer 2026-09-06: keine mitlaufenden Punkte hinter "KI denkt" -- das
+   drehende Rad zeigt bereits, dass etwas laeuft. */
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* -- Zentrales Tiling-Abschluss-Fenster (Punkt 1) ---------------------------
+   `pointer-events:none` auf dem Rahmen ist tragend, kein Feinschliff: das
+   Fenster liegt ueber dem ganzen Brett, und Punkt 10 verlangt, dass die
+   letzte Musterreihe korrigierbar bleibt, SOLANGE es offen ist. Nur die
+   Karte selbst faengt Klicks. */
+.finish-veil{
+  position:fixed;inset:0;z-index:120;
+  display:none;                      /* per JS auf flex geschaltet */
+  align-items:center;justify-content:center;
+  pointer-events:none;
+}
+.finish-card{
+  pointer-events:auto;
+  min-width:260px;max-width:340px;
+  padding:16px 18px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:12px;
+  box-shadow:0 10px 50px rgba(0,0,0,.25);
+  text-align:center;
+}
+.finish-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.finish-sub{font-size:10px;color:var(--text2);margin-bottom:10px;line-height:1.4}
+
+/* -- Vorgemerkte Tiling-Fliese (Punkt 10) -----------------------------------
+   Die Fliese liegt sichtbar auf dem Zielfeld, ist aber noch NICHT an den
+   Server geschickt: bis zur Bestaetigung (Klick auf die Musterreihe oder
+   Ablauf der 5 s) laesst sie sich auf ein anderes Feld schieben oder ganz
+   zuruecknehmen. Der gestrichelte Amber-Ring ist dieselbe Sprache wie die
+   Fliesen-Auswahl (`.tile.sel`), das Pulsieren dasselbe wie bei den legalen
+   Zielfeldern. */
+.ds.pending-place{
+  outline:2.5px dashed var(--gelb);
+  outline-offset:1px;
+  opacity:.85;
+  animation:pending-pulse 1.1s ease-in-out infinite;
+}
+@keyframes pending-pulse{0%,100%{opacity:.85}50%{opacity:.55}}
+
+/* -- Mondstapel auf den Fabriken (Punkt 3) ----------------------------------
+   Die oberste Fliese jedes Stapels ist selbst Klickziel fuer Aktion C. Die
+   Hervorhebung markiert ALLE Fliesen, die der Zug mitnimmt -- auch auf den
+   anderen Fabriken und im Pool der grossen Fabrik. */
+.tile.moon-pick{cursor:pointer}
+.tile.moon-pick:hover{transform:scale(1.18)}
+.tile.moon-take{outline:3px solid var(--gelb);box-shadow:var(--relief-up),0 0 0 3px rgba(245,158,11,.3)}
+
+
+/* -- Platte auf dem gewaehlten Kuppelfeld (Punkt 9) -------------------------
+   Nutzer 2026-09-06: "ich will sie wirklich auf der kuppelposition sehen und
+   auf dieser gewaehlten position will ich sie dann rotieren". Die Platte liegt
+   also im Kuppelplatz, noch nicht abgeschickt -- gleiche Sprache wie die
+   vorgemerkte Tiling-Fliese (gestrichelter Amber-Ring, leichtes Pulsieren). */
+.dslot.ghost-place{
+  border-color:var(--gelb);
+  outline:2.5px dashed var(--gelb);
+  outline-offset:1px;
+  cursor:pointer;
+  animation:pending-pulse 1.1s ease-in-out infinite;
+}
+
+/* Bedienleiste dazu: haengt am Kuppelfeld (Position aus getBoundingClientRect,
+   siehe app.js::updatePlaceToolbar), deshalb `fixed` -- sie soll neben der
+   Platte stehen und nicht mitten im Bildschirm. */
+#place-toolbar{
+  position:fixed;
+  z-index:130;
+  display:flex;
+  align-items:center;
+  gap:4px;
+  padding:5px 7px;
+  background:var(--surface);
+  border:1px solid var(--border);
+  border-radius:9px;
+  box-shadow:0 6px 22px rgba(0,0,0,.20);
+}
+#place-toolbar .btn{padding:3px 8px;font-size:12px;line-height:1.2}
+#place-rot-label{font-size:10px;color:var(--text2);min-width:26px;text-align:center}
