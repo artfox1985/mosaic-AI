@@ -5983,8 +5983,8 @@ pub(crate) mod tests {
         // `alphazero_v10_best.onnx`, das im aktuellen Modell-Bestand nicht
         // mehr vorhanden ist, siehe `pcr_full_prob_gates_...`-Test weiter
         // unten fuer denselben Workaround) -- `champion.txt` verweist lokal
-        // auf `alphazero_v21_2d_brierbest.onnx`, das existiert.
-        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
+        // auf `engine_test.onnx` (ex v21_2d_brierbest, seit 2026-09-06), das existiert.
+        let model_path = crate::net::test_model_path("engine_test.onnx");
         let model_path = model_path.to_str().unwrap();
         if let Err(e) = Net::load_auto(model_path) {
             panic!(
@@ -6229,7 +6229,7 @@ pub(crate) mod tests {
     #[test]
     #[ignore]
     fn sync_only_repeatability_after_rng_split() {
-        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let model_path = crate::net::test_model_path("engine_test.onnx");
         let model_path = model_path.to_str().unwrap();
         let net = Net::load_auto(model_path).unwrap_or_else(|e| panic!(
             "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
@@ -6449,7 +6449,7 @@ pub(crate) mod tests {
         // v18_best (inzwischen ebenfalls aus dem Bestand gefallen) -- der Test
         // lief dadurch bis 2026-08-15 still leer-gruen. Jetzt: amtierender
         // Champion, und unten harter Fehler statt Skip.
-        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let model_path = crate::net::test_model_path("engine_test.onnx");
         let model_path = model_path.to_str().unwrap();
         if let Err(e) = Net::load_auto(model_path) {
             panic!(
@@ -6610,7 +6610,7 @@ pub(crate) mod tests {
     fn root_child_q_present_for_real_decisions_absent_for_shortcuts_and_tiling() {
         // Fixture bis 2026-08-15: v18_best (aus dem Bestand gefallen, Test lief
         // still leer-gruen) -- jetzt amtierender Champion + harter Fehler.
-        let model_path = crate::net::test_model_path("alphazero_v21_2d_brierbest.onnx");
+        let model_path = crate::net::test_model_path("engine_test.onnx");
         let model_path = model_path.to_str().unwrap();
         if let Err(e) = Net::load_auto(model_path) {
             panic!(
