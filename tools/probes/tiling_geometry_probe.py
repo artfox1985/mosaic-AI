@@ -240,7 +240,8 @@ def track_row_ages(state: dict, rnd: int, ctx_rows: dict, episodes: list, meta: 
     import triangle_hull_coverage_probe as hullmod
     for pi in (0, 1):
         pl = state["players"][pi]
-        hull = hullmod.best_hull(hullmod.occupancy(pl.get("dome_grid") or []))
+        occ = hullmod.occupancy(pl.get("dome_grid") or [])
+        hull = hullmod.best_hull(occ)
         lines = pl.get("pattern_lines") or []
         for r in LONG_ROWS:
             if r >= len(lines):
@@ -249,23 +250,35 @@ def track_row_ages(state: dict, rnd: int, ctx_rows: dict, episodes: list, meta: 
             k = len(line.get("tiles") or [])
             cap = int(line.get("capacity") or (r + 1))
             color = line.get("color")
+            occ_row = frozenset(c for (rr, c) in occ if rr == r)
             ep = ctx_rows.get((pi, r))
+            # Fassung 2 (2026-09-06): Ende einer Episode am Zellgewinn der Rasterzeile r seit dem
+            # letzten Rundenende klassifizieren. Musterreihe r legt in Rasterzeile r (envelope.rs
+            # projected_occupancy: get_space(r, c)). Gewinn -> die Reihe wurde GELEGT (auch wenn sie
+            # erst im Tiling per Bonus-Chip voll wurde); kein Gewinn -> geraeumt (unplatzierbar) oder
+            # anders geleert. Fassung 1 zaehlte nur "am Rundenende voll" und liess 35-56 % als Rest.
+            if ep is not None:
+                gained = bool(occ_row - ep["occ_row_letzt"])
+                ends = (k == 0 or color is None or ep["color"] != color or k < ep["k_letzt"]
+                        or ep.get("voll_runde") is not None)
+                if ends:
+                    if ep.get("voll_runde") is not None:
+                        ep["ende"] = "voll_gelegt" if gained else "voll_geraeumt"
+                    else:
+                        ep["ende"] = "chip_gelegt" if gained else "geraeumt_oder_unklar"
+                    ep["ende_runde"] = rnd
+                    episodes.append(ep); ep = None; ctx_rows.pop((pi, r), None)
             if k == 0 or color is None:
-                if ep is not None:  # sollte nicht vorkommen (Reihen leeren sich nur im Tiling)
-                    ep["ende"] = "leer_unerklaert"; ep["ende_runde"] = rnd
-                    episodes.append(ep); ctx_rows.pop((pi, r), None)
                 continue
-            if ep is not None and (ep["color"] != color or k < ep["k_letzt"] or ep.get("voll_runde") is not None):
-                # neue Episode: die alte war voll (getilet) oder ist anders belegt
-                ep["ende"] = "voll" if ep.get("voll_runde") is not None else "ersetzt"; ep["ende_runde"] = rnd
-                episodes.append(ep); ep = None; ctx_rows.pop((pi, r), None)
             if ep is None:
                 ep = {**meta, "pi": pi, "r": r, "reihe": r + 1, "color": color, "start_runde": rnd,
                       "rundenenden": 0, "praedikate": [], "blockiert_rundenenden": 0,
-                      "aussen_moeglich_rundenenden": 0, "voll_runde": None, "k_letzt": 0}
+                      "aussen_moeglich_rundenenden": 0, "voll_runde": None, "k_letzt": 0,
+                      "occ_row_letzt": occ_row}
                 ctx_rows[(pi, r)] = ep
             ep["rundenenden"] += 1
             ep["k_letzt"] = k
+            ep["occ_row_letzt"] = occ_row
             if k >= cap:
                 ep["voll_runde"] = rnd  # wird in diesem Tiling gelegt (oder geraeumt) -- Episode endet
                 ep["praedikate"].append("voll")
@@ -279,9 +292,22 @@ def track_row_ages(state: dict, rnd: int, ctx_rows: dict, episodes: list, meta: 
                 ep.setdefault("blockiert_ab_runde", rnd)
 
 
-def close_row_ages(ctx_rows: dict, episodes: list, final_round: int):
-    for key, ep in list(ctx_rows.items()):
-        ep["ende"] = "voll" if ep.get("voll_runde") is not None else "offen_am_ende"
+def close_row_ages(ctx_rows: dict, episodes: list, final_round: int, final_state: dict | None = None):
+    """Spielende: offene Episoden schliessen. Mit `final_state` (Zustand NACH dem letzten Tiling)
+    wird auch die letzte Runde am Zellgewinn klassifiziert; ohne ihn bleibt "voll" / "offen_am_ende"."""
+    import triangle_hull_coverage_probe as hullmod
+    for (pi, r), ep in list(ctx_rows.items()):
+        gained = None
+        if final_state is not None:
+            try:
+                occ = hullmod.occupancy(final_state["players"][pi].get("dome_grid") or [])
+                gained = bool(frozenset(c for (rr, c) in occ if rr == r) - ep["occ_row_letzt"])
+            except Exception:
+                gained = None
+        if ep.get("voll_runde") is not None:
+            ep["ende"] = "voll" if gained is None else ("voll_gelegt" if gained else "voll_geraeumt")
+        else:
+            ep["ende"] = "offen_am_ende" if not gained else "chip_gelegt"
         ep["ende_runde"] = final_round
         episodes.append(ep)
     ctx_rows.clear()
@@ -296,21 +322,29 @@ def summarize_row_ages(episodes: list, side_of) -> dict:
         n = len(eps)
         blocked = [e for e in eps if e["blockiert_rundenenden"] > 0]
         never = [e for e in eps if e["blockiert_rundenenden"] == 0]
-        full_eps = [e for e in eps if e["ende"] == "voll"]
+        laid = ("voll", "voll_gelegt", "chip_gelegt")  # Reihe wurde ins Raster gelegt
+        full_eps = [e for e in eps if e["ende"] in laid]
         open_eps = [e for e in eps if e["ende"] == "offen_am_ende"]
 
         def rate(sub, pred):
             return round(sum(1 for e in sub if pred(e)) / len(sub), 3) if sub else None
         out.setdefault(side, {})[f"Reihe{row_len}"] = {
             "episoden": n,
-            "voll_anteil": rate(eps, lambda e: e["ende"] == "voll"),
+            "enden": {k: sum(1 for e in eps if e["ende"] == k) for k in
+                      ("voll", "voll_gelegt", "voll_geraeumt", "chip_gelegt", "geraeumt_oder_unklar", "offen_am_ende")},
+            "gelegt_anteil": rate(eps, lambda e: e["ende"] in laid),
+            "voll_am_rundenende_anteil": rate(eps, lambda e: e["ende"] in ("voll", "voll_gelegt", "voll_geraeumt")),
+            "chip_gelegt_anteil": rate(eps, lambda e: e["ende"] == "chip_gelegt"),
+            "geraeumt_anteil": rate(eps, lambda e: e["ende"] in ("voll_geraeumt", "geraeumt_oder_unklar")),
             "offen_am_ende_anteil": rate(eps, lambda e: e["ende"] == "offen_am_ende"),
-            "alter_bis_voll_mittel_rundenenden": round(statistics.mean(e["rundenenden"] for e in full_eps), 2) if full_eps else None,
+            "alter_bis_gelegt_mittel_rundenenden": round(statistics.mean(e["rundenenden"] for e in full_eps), 2) if full_eps else None,
             "alter_offen_mittel_rundenenden": round(statistics.mean(e["rundenenden"] for e in open_eps), 2) if open_eps else None,
             "je_blockiert_anteil": rate(eps, lambda e: e["blockiert_rundenenden"] > 0),
             "blockiert_rundenenden_mittel": round(statistics.mean(e["blockiert_rundenenden"] for e in blocked), 2) if blocked else None,
-            "blockiert_voll_anteil": rate(blocked, lambda e: e["ende"] == "voll"),
-            "nie_blockiert_voll_anteil": rate(never, lambda e: e["ende"] == "voll"),
+            "blockiert_gelegt_anteil": rate(blocked, lambda e: e["ende"] in laid),
+            "nie_blockiert_gelegt_anteil": rate(never, lambda e: e["ende"] in laid),
+            "blockiert_offen_am_ende_anteil": rate(blocked, lambda e: e["ende"] == "offen_am_ende"),
+            "nie_blockiert_offen_am_ende_anteil": rate(never, lambda e: e["ende"] == "offen_am_ende"),
             "blockiert_aussen_moeglich_anteil": (round(sum(e["aussen_moeglich_rundenenden"] for e in blocked)
                                                         / sum(e["blockiert_rundenenden"] for e in blocked), 3) if blocked else None),
             "praedikat_je_rundenende": {p: sum(e["praedikate"].count(p) for e in eps)
@@ -369,7 +403,11 @@ def replay(log_path: pathlib.Path, mr, k: int, meta: dict, records: list, episod
                 pass
         if episodes is not None:
             try:
-                close_row_ages(ctx["rows"], episodes, ctx["last_round"])
+                try:
+                    final_state = json.loads(rep.g.state_json())
+                except Exception:
+                    final_state = None
+                close_row_ages(ctx["rows"], episodes, ctx["last_round"], final_state)
                 if ctx.get("row_err"):
                     episodes.append({**meta, "fehler": ctx["row_err"]})
             except Exception:
@@ -490,12 +528,13 @@ def main() -> int:
         eps_ok = [e for e in episodes if "reihe" in e]
         ra = summarize_row_ages(eps_ok, side_of)
         out["reihen_alter"] = {
-            "prereg": "PREREG_geometric_envelope.md par.8.13/8.14", "version": "2026-09-06",
+            "prereg": "PREREG_geometric_envelope.md par.8.13/8.14", "version": "2026-09-06 Fassung 2 (Episodenende am Zellgewinn der Rasterzeile)",
             "definitionen": {
                 "episode": "gebundene Musterreihe 5/6 von ihrem ersten Rundenende bis sie am Rundenende voll ist (Tiling) oder das Spiel endet",
                 "praedikat": "ja = Huellenzelle der Zeile nimmt die Farbe heute an; ja_wartend = plattenlose Huellenzelle UND passende Platte noch in Auslage/Stapel (Katalog dome.rs); nein = Reihe kann die Huelle nicht mehr bedienen (par.8.14)",
                 "huelle": "bestpassende Orientierung je Rundenende (triangle_hull_coverage_probe.best_hull)",
                 "alter": "Zahl der Rundenenden, an denen die Reihe gebunden lag (die volle zaehlt mit)",
+                "enden": "voll_gelegt = am Rundenende voll und danach Zellgewinn in Rasterzeile r; voll_geraeumt = voll, aber kein Zellgewinn (unplatzierbar); chip_gelegt = nicht voll am Rundenende, aber Zellgewinn (Bonus-Chip im Tiling); geraeumt_oder_unklar = Reihe weg ohne Zellgewinn; offen_am_ende = am Spielende unvollstaendig; voll = voll am letzten Rundenende ohne Endzustand",
                 "aussen_moeglich": "an einem blockierten Rundenende nimmt eine Zelle der Zeile AUSSERHALB der Huelle die Farbe an",
             },
             "episoden": len(eps_ok), "fehler": [e for e in episodes if "fehler" in e][:20],
@@ -503,9 +542,9 @@ def main() -> int:
         }
         for side, rows in ra.items():
             for row_key, v in rows.items():
-                print(f"{side} {row_key}: Episoden {v['episoden']} | voll {v['voll_anteil']} | offen am Ende {v['offen_am_ende_anteil']} | "
+                print(f"{side} {row_key}: Episoden {v['episoden']} | gelegt {v['gelegt_anteil']} (voll am Rundenende {v['voll_am_rundenende_anteil']}, per Chip {v['chip_gelegt_anteil']}) | geraeumt {v['geraeumt_anteil']} | offen am Ende {v['offen_am_ende_anteil']} | "
                       f"je blockiert {v['je_blockiert_anteil']} ({v['blockiert_rundenenden_mittel']} Rundenenden) | "
-                      f"voll wenn blockiert {v['blockiert_voll_anteil']} gegen nie blockiert {v['nie_blockiert_voll_anteil']} | "
+                      f"gelegt wenn blockiert {v['blockiert_gelegt_anteil']} gegen nie blockiert {v['nie_blockiert_gelegt_anteil']} | "
                       f"Praedikate {v['praedikat_je_rundenende']}", flush=True)
     except Exception as e:
         out["reihen_alter"] = {"fehler": str(e)[:200]}
