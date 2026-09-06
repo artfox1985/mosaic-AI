@@ -24,193 +24,105 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (UEBERGABE 2026-09-06, 00:36; Anlass: Kontextfenster der Sitzung vom 2026-09-05 zu 75 % voll)
+## 1. WAS GERADE LAEUFT (UEBERGABE 2026-09-06, 21:46; Anlass: Nutzer /mosaic-handover, Kontextfenster der Tagessitzung zu rund 80 % voll)
 
-**Champion seit 2026-09-06 18:42: `v24-b06` (Modell `alphazero_v24-b06_brierbest.onnx`, Spec `v24-b06_brierbest.spec.json` mit K3-P; Elo-Knoten `v24-b06_k3p10` 1309 [1271, 1350]; Nutzer 20:35: Namen bleiben reine vN-bXX, `generation_naming.md`; b02-Rezept auf Sicht 744 mit K3-P C 1,0; Vorgaenger `v23-b01_k3p10` jetzt 1276). Generator v25 = b05 (Nutzer 11:40) -- Nutzer-Prinzip "Self-Plays nur vom Champion" spricht fuer b06, Entscheid offen.** **Generation v24 abgenommen, sechs
-Arme:** b01, b02, b04, b05 trainiert; b03 (714er-Arm) trainiert gerade neu
-(Verlust durch Maschinen-Neustart 2026-09-05 16:04). Alle Zahlen:
-`PREREG_v24_window.md` par.9/9a/9b; Chronik `night_run_20260902.md` (ab
-Eintrag 16:04 des 2026-09-05 ist alles von der uebergebenden Sitzung).
+**Champion seit 2026-09-06 18:42: `v24-b06`** (Modell `alphazero_v24-b06_brierbest.onnx`, Spec
+`models/v24-b06_brierbest.spec.json` = K3-P C 1,0 Modus 1; Elo-Knoten `v24-b06_k3p10` 1309
+[1271, 1350]; Vorgaenger `v23-b01_k3p10` 1276; Artefakt `models/frozen_champions/v24-b06/`;
+`champion.txt` = `v24-b06_brierbest`). Namen bleiben reine `vN-bXX` (`docs/generation_naming.md`).
+**Generation v24 komplett abgenommen (sechs Arme, `PREREG_v24_window.md` par.9, Vorlage par.9c).
+Generator v25 = b05 ohne K3-P (Nutzer 11:40, v25 par.4) -- ODER b06, weil der Nutzer Self-Plays
+nur vom Champion will (17:05); das ist der erste offene Entscheid. Erzeugung startet NUR auf
+Nutzer-Anweisung.** Chronik: `night_run_20260902.md` ab Eintrag 00:46 des 2026-09-06 (alles
+von der uebergebenden Sitzung).
 
-**Stand der Arme (Kurzform, Details par.9):**
-- v24-b01: Tor 1 mit Knopf gerissen (83:107), ohne Knopf 216:184 (kein
-  Entscheid); Tor 2a mit Knopf 0,443, ohne 0,518; Tor 2b gehalten (93:67).
-  Knopf-Dosis C 0,5 = 0,450: Schalter, kein Regler (par.9b).
-- v24-b02 (lambda 0,7): Tor 1 ohne Knopf 209:161 (SPRT), mit Knopf 101:69 und
-  91:59 (zwei Seeds, Champion-Strenge); Tor 2a mit Knopf 0,525 (Bezug 0,555,
-  KI schliesst ein), ohne 0,430 gerissen; Tor 2b gerissen (Siege 87:73, aber
-  Spalten 0,550/0,475 gegen 0,688/0,562). Staerker, spaltenaermer.
-- v24-b04 (Sicht 744): Tor 2a ohne Knopf 0,4125 (gerissen), mit Knopf 0,5325;
-  Tor 1 ohne Knopf 218:182 (kein Entscheid); Tor 1 MIT Knopf 135:135 (H0) und Replikation
-  221:179 (kein SPRT-Entscheid, p 0,046), gepoolt 356:314 -- Ratsche nicht genommen;
-  Tor 2b GEHALTEN (92:68, Spalten 0,684/0,738 gegen 0,608/0,525, Kuppel-Bonus 3,9/4,3
-  gegen 3,6/3,9). Abnahme komplett 03:04.
-- v24-b05 (b04 plus Ueberraschungsgewichtung): trainiert (brierbest Epoche 4,
-  0,1925); Abnahme laeuft seit 03:08. Tor 2a ohne Knopf 0,4825 (Bezug 0,510, KI
-  schliesst ein; b04 0,4125); **Tor 1 ohne Knopf 66:34 nach 50 Paaren, SPRT fuer b05**
-  (p 0,004) und Replikation 112:78 (p 0,021), gepoolt 178:112, Champion-Strenge ohne
-  Knopf erfuellt (09:58); Tor 2a mit Knopf 0,4975
-  (Bezug 0,555, KI schliesst ein; Knopf hebt nur +0,015); Tor 1 mit Knopf 219:181 (kein
-  SPRT-Entscheid, p 0,067); Tor 2b GEHALTEN (98:62, Spalten 0,650/0,557 gegen 0,500/0,570).
-  Abnahme komplett 05:54 -- einziger Arm mit Tor 1 (ohne Knopf) UND Tor 2b.
-- v24-b03 (Seeding-Schwarm, 714): trainiert 00:27-01:56 mit `--fast-loader` (5.344 s,
-  `_brierbest` Epoche 4, 0,1868); Abnahme laeuft seit 05:55. Tor 2a ohne Knopf 0,490
-  (Bezug 0,510, KI schliesst ein); Tor 1 ohne Knopf 215:185 (kein Entscheid, p 0,155);
-  Tor 2a mit Knopf 0,5025 (Bezug 0,555, KI schliesst ein); **Tor 1 MIT Knopf 75:45 nach 60
-  Paaren, SPRT fuer b03** (p 0,008) und Replikation 139:101 (p 0,016), gepoolt 214:146 --
-  Champion-Strenge mit Knopf erfuellt. Tor 2b: 83:77, Spalten 0,675/0,628 gegen 0,575/0,692
-  (gleichauf), Kuppel-Bonus 4,2 gegen 3,5-3,6. Abnahme komplett 09:20. **ALLE FUENF ARME
-  ABGENOMMEN.**
+**LAEUFT (eigene Prozesse, ueberleben die Sitzung):**
 
-**LAEUFT (Hintergrundaufgaben der alten Sitzung; laufen als eigene Prozesse
-weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
-`pitfalls.md` "Harness-Stopp"):**
-
-| Lauf | Werkzeug | Start | Stand 00:36 | erwartetes Ende | liest | Artefakte |
+| Lauf | Werkzeug (PID) | Start | Stand 21:46 | erwartetes Ende | liest | Artefakte |
 | --- | --- | --- | --- | --- | --- | --- |
-| ~~Training v24-b03 (714, fast-loader)~~ | `tools/night_v24_b03_fast.sh` | 00:27 | **FERTIG 01:56** (5.344 s, `_brierbest` Epoche 4 0,1868; config.py wieder 744, `git diff config.py` leer; Manifest mit Lader-Nachtrag committet) | -- | `data/window_v24_b03.txt`, Monolith `.cache_299283d4df61.h5`, config.py mit INPUT_SIZE 714 | `models/alphazero_v24-b03*.onnx`, Manifest `manifest_train_v24-b03_20260906_002718.json`; **setzt config.py am Ende auf 744 zurueck** |
-| ~~Abnahme b04~~ | `tools/night_v24_b04_acceptance_744venv.sh` (venv_measure744, 744er-Wheel) | 21:49 | **FERTIG 03:04**, alle Tore in par.9 registriert | rund 02:30 | `models/alphazero_v24-b04_brierbest.onnx`, Champion-Spec, `k3v_off.spec.json` | `tor2a_v24b04*.json`, `paired_gating_result_v24-b04_*`, `paired_arena_env_v24b04_*`, `columns_v24b04_*`, `points_v24b04_vs_b01_s14.json` |
-| ~~Tiling-Geometrie-Sonde~~ | `tools/cpu_queue_after_b04.sh` | 22:31 | **FERTIG 03:07** (9,8 s + 70 s), registriert par.8.12a / 8.14 | rund 02:45 | `static/log/game_*.log`, `paired_arena_env_v24b01_vs_b01_*_s14.json` | `tiling_geometry_probe_human.json`, `tiling_geometry_probe_arena.json` |
-| ~~Abnahme b05~~ | `tools/night_v24_b05_acceptance_wait.sh` | 00:24 | **FERTIG 05:54** (03:08-05:54), alle Tore in par.9 | -- | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
-| **Champion-Kante b05 (A)** | `tools/champion_edge_b05.sh` | 11:48 | **FERTIG 13:20**: 58:72 (H0) und 144:146 (H0), gepoolt 202:218 -- b05 gleichauf mit dem Champion, kein Kandidat; beide Kanten im Register | rund 2 x 70 min, bis rund 14:30 | `models/alphazero_v24-b05_brierbest.onnx`, beide Specs | `paired_gating_result_v24-b05nk_vs_v23-b01_k3p10_s12.json`, `_s13.json` |
-| **Training v24-b06 (B)** | `tools/night_v24_b06_chain.sh` (nacktes train.py darin) | 11:48 | **FERTIG 17:30** (Training 11:47-13:07, Abnahme 13:22-17:30), alle Tore in par.9 | -- | `data/window_v24.txt`, Monolith `.cache_85a75d76dfab.h5` | `models/alphazero_v24-b06*`, `manifest_train_v24-b06_*`, `tor2a_v24b06*`, `paired_gating_result_v24-b06_*`, `paired_arena_env_v24b06_*`, `points_v24b06_vs_b01_s14.json` |
-| Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:58 (wartet) | **FERTIG 09:20** (05:55-09:20, 3 h 25 min); Wartemuster kannte Sonde, `cpu_queue_after_b04` und b05-Wartelauf NICHT -- deshalb hielt `tools/night_v24_after_b05_chain_hold.sh` (seit 00:53, Prozess nur wartend) es fest, bis Sonde und b05-Abnahme durch sind (Chronik 00:53) | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
+| Knopf-Kette am Champion b06 | `tools/night_k3_knobs_b06.sh` (PID 29036) | 20:43 | Arm K3-P2 fertig (registriert par.8.11a: NEGATIV, 71:89); **Arm K3-F 1,0 laeuft seit 21:35** (argmax-Instrument, Korpus `data/selfplay_k3-f10-v24b06_*`, 20 Dateien = fertig heisst 200 Partien), danach K3-F 0,5 und beide | rund 00:30 (je Arm rund 50 min) | `models/alphazero_v24-b06_brierbest.onnx`, `models/k3f_w10.spec.json`, `k3f_w05.spec.json`, `k3p2f_w10.spec.json`, `v24-b06_brierbest.spec.json` | `k3_f10_v24b06.json`, `k3_f05_v24b06.json`, `k3_p2f10_v24b06.json`; `paired_arena_env_k3<arm>_b06_vs_k3p_{first,second}_s14.json`, `columns_...`, `points_k3<arm>_b06_vs_k3p_s14.json` |
+| Halte-Prozess | `tools/claude_play_hold.sh` (PID 28984) | 21:22 | wartet auf Marke `evaluations/artifacts/claude_play/.playing`; Deckel 4 h -> **endet 01:22 und entfernt die Marke** | 01:22 | Marke | -- |
+| ALTE Knopf-Kette am v23-Champion | `tools/night_k3_knobs_champion.sh` (PID 4124) | 13:33 | wartet auf freie CPU UND Marke weg; **darf NICHT messen** (misst am abgeloesten Champion); ihr 12-h-Deckel endet 01:33 mit Exit 65 | 01:33 | -- | keine (wenn sie nicht startet) |
 
-**Baum:** gepusht 2026-09-06 10:12 (origin/main = bc4f1b1, Nutzer); danach nur die Hook-Kuratierung offen.
-`config.py` steht seit 01:56 wieder auf 744 (`git diff config.py` leer; das b03-Training hat es
-selbst zurueckgesetzt). Die GPU ist frei.
-Wheel 744 (Kontrakt `20b442a8164f748d`, mit K3-P2, Default aus) ist in der Basis installiert;
-Anker-Drift darunter GRUEN (2026-09-05 21:45); seit 2026-09-06 10:06 das Wheel mit K3-F (gleicher
-Kontrakt, Anker GRUEN). Mess-venvs 714/744 am 2026-09-06 geloescht (Nutzer-Freigabe).
+**Falle daraus:** zwischen 01:22 (Halter endet) und 01:33 (Deckel der alten Kette) koennte die
+alte Kette anspringen, falls die b06-Kette fertig ist und sonst nichts laeuft. Abhilfe: vor
+01:20 `bash tools/claude_play_hold.sh` im Hintergrund neu starten (haelt 4 h), ODER der Nutzer
+beendet PID 4124 (`Stop-Process -Id 4124 -Force`; die Sitzung selbst darf keine Prozesse
+beenden, Berechtigungsfilter 2026-09-06 00:50).
 
 ### ERSTE AUFGABE DER NEUEN SITZUNG
 
-**Nutzer-Freigaben und Verbote, woertlich:** 2026-09-03 *"mach im programm
-selbststaendig weiter, ausser der fenster erzeugung"*; 2026-09-05 *"kein Push"*
-(steht seit Tagen); Loeschungen nur auf pfadgenaue Freigabe; die v25-ERZEUGUNG
-startet NUR auf ausdrueckliche Nutzer-Anweisung; b03 bleibt 714 (*"lass b03 auf
-714"*); Bash-Ausgaben knapp (head/tail/grep, Read mit offset), lange Laeufe
-ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
-2026-09-05).
+**Nutzer-Freigaben und Verbote, woertlich:** 2026-09-03 *"mach im programm selbststaendig
+weiter, ausser der fenster erzeugung"*; *"kein Push"* (Nutzer pusht selbst; 42 Commits vor
+origin/main); Loeschungen nur auf pfadgenaue Freigabe; v25-Erzeugung NUR auf Anweisung;
+Namen reine `vN-bXX`; Subagenten mit Modell Opus (Partien: *"Dein Modell ist zu teuer fuer
+diese spielerein"*); Uhrzeiten ABLESEN (`date`), nie fortschreiben (fuenfmal falsch am
+2026-09-06); Messungen exklusiv (ein CPU-Auftrag neben dem GPU-Training); lange Laeufe ohne
+Pipe im Hintergrund.
 
-1. **WATCHER auf die fuenf Laeufe oben** (nicht neu starten, sie laufen!):
-   Prozessliste pruefen (`Get-CimInstance Win32_Process`, Muster `train.py`,
-   `night_v24_`, `cpu_queue_`, `paired_`), nicht die Task-Meldungen. Bei
-   Stillstand > 30 min ohne neue Artefakt-Datei: Chronik-Eintrag, Nutzer
-   fragen. **Ergebnisse SOFORT registrieren** (Lehre 2026-09-05): je Tor in
-   die par.9-Tabelle (`PREREG_v24_window.md`), Tor-1-Kanten ins Elo-Register
-   (`tools/elo_tracker.py add`, Knopf = eigener Knoten `v24-bXX_k3p10` gegen
-   `v23-b01_k3p10`, ohne Knopf `v24-bXX` gegen `v23-b01_brierbest`, Knoepfe
-   per `--knobs "spec:..."`), Kuppel-Bonus aus `points_v24bXX_vs_b01_s14.json`.
-2. ~~b03-Training beobachten~~ ERLEDIGT 01:56: 5.344 s, rund 440 s je Epoche
-   (`measured_runtimes.md`), config zurueck auf 744, Manifest committet.
-3. ~~Tiling-Geometrie-Sonde auswerten~~ **REGISTRIERT 03:12** (`geometric_envelope`
-   par.8.12a: Mensch laesst Punkte liegen, kauft an G4/Gline aber keine
-   Nachbarschaft; par.8.14: Reihe 6 bei den Netzen in 57-58 % der Episoden
-   blockiert, blockierte 6er werden zu 15 % voll gegen 48-65 %, Aussen-Legen
-   an 61-73 % der blockierten Rundenenden moeglich). Offen: Klassifikation
-   Chip-Vollendung/Raeumung (Rest 35-56 %), Sonden-Fassung 2 im naechsten
-   CPU-freien Fenster (80 s). Alter Text: Ergebnis in `PREREG_geometric_envelope.md` par.8.12
-   (Mensch gegen KI gegen Loeser: Anteil punkt-bester Abschluss, Punktkosten
-   und Nachbarschaftsgewinn des geometrie-besten). **Die Sonde ist am
-   2026-09-06 00:58 um das Reihen-Alter ERGAENZT** (par.8.13/8.14: Praedikat
-   ja / ja_wartend / nein je gebundener Reihe 5/6 und Rundenende, Episoden mit
-   Alter, voll oder am Ende offen, Aussen-Legen moeglich; additiv in
-   try/except, synthetisch getestet, kein Engine-Lauf) -- der eingereihte Lauf
-   (`cpu_queue_after_b04.sh`) faehrt sie mit; Block `reihen_alter` im selben
-   Artefakt. Beide Teile auswerten und in par.8.12 UND par.8.14 registrieren;
-   DANN K3-F bauen (Nutzer 00:50).
-4. ~~Mini-Fenster-Test Fall D (Pause)~~ **GRUEN 02:00** (alle Faelle A-E
-   bitgleich, `working_rules.md`). Offen beim Nutzer: `--fast-loader` als
-   Default (Volllauf b03: 440 s je Epoche gegen 16 min, bitgleich).
-5. ~~Vorlage Generatorwahl~~ **GESTELLT 09:24** (`PREREG_v24_window.md` par.9c):
-   Gabelung an der Knopf-Frage -- Erzeugung MIT K3-P: b03 (214:146 mit Knopf,
-   Spalten gleichauf, Kuppel-Bonus 4,2); OHNE K3-P: b05 (66:34, zweiter Seed
-   laeuft, Tor 2b gehalten). b02 staerkster Beleg, aber spaltenaermer. **Nutzer 09:40:
-   "744er bleibt fix drinnen"** -- Kandidaten damit b04/b05; Records tragen die 744er-
-   Schluessel (geprueft, par.9c). **Nutzer 11:40: Generator v25 = b05, Erzeugung OHNE
-   K3-P** (v25 par.4). **Nutzer 11:48: "self plays eigentlich nur mit champion" -> A: Champion-Kante
-   b05 in Spielkonfiguration: 202:218 gepoolt, GLEICHAUF, kein Champion-Beleg (13:20); B: v24-b06
-   (b02-Rezept auf 744) trainiert, Abnahme laeuft seit 13:22: Tor 2a ohne Knopf 0,475; Tor 1 ohne Knopf 216:184 ohne Entscheid; Tor 2a mit Knopf 0,4975; **Tor 1 mit Knopf 117:83 nach 100 Paaren, SPRT fuer b06 = Champion-Kante** und Replikation 202:158 (17:04), gepoolt 319:241, Champion-Strenge erfuellt; Tor 2b GLEICHAUF (91:69, Spalten 0,575/0,725 gegen 0,650/0,625). Abnahme komplett 17:30; Promotion laeuft.** Erzeugung startet NUR auf
-   Anweisung, nach dem Champion-Entscheid.
-6. **Danach VORLAGE v25-Zuschnitt** (`PREREG_v25_window.md` par.9/9a): Traeger-
-   Kennzahl v24 0,356 gegen Fenster 0,624; v25 nach par.1 rechnerisch 0,23.
-   Hebel: Sockel-Betriebspunkt (Pilot: 400 Sockel-Partien in 2-3 Rausch-
-   Einstellungen, rund 2-3 h CPU, NUR mit Nutzer-Freigabe, es ist Erzeugung
-   im Kleinen), Traeger-Anteile, argmax policy-tragend. Value-Klasse 8.000/0
-   bleibt OFFEN (Nutzer nicht ueberzeugt).
-7. **Such-Knoepfe am v24-Siegernetz, Reihenfolge K3-P2, K4, Variante B**
-   (`geometric_envelope` par.8.11/8.13/8.14, `round_estimate_leaf_term`
-   par.4/5, `round_transition_search_sampling` par.7): K3-P2 ist gebaut und
-   im Wheel (Spec `models/k3p2_c10.spec.json`); vor dem Verdikt die Zahl der
-   offenen langen Reihen mit gegen ohne Knopf (par.8.13). K4-Skala gemessen
-   (P90 3/8/10/12 je Runde; Entscheid je Runde oder eine offen). **K3-F
-   (par.8.14) als Code GEBAUT 03:25 nach der Reihen-Alter-Messung** (Nutzer
-   00:50: "bau k3 f nach der messung"). **10:06: cargo test GRUEN (523), Wheel
-   gebaut und installiert, Specs tragen `envelope_flush_w: 0.0`, Anker-Drift und
-   Konservierung GRUEN** (par.8.14). Offen: Messung K3-P2 / K3-F / beide am
-   Siegernetz (Dosis-Vorschlag w_flush 1,0 und 0,5, Nutzer-Entscheid), Spec
-   `models/k3f_*.spec.json` dafuer noch anzulegen.
-   Vorher par.12b Rauschboden messen (Block-Bootstrap auf frozen_v3), sonst
-   nur Tor 1/2.
+1. **WATCHER Knopf-Kette b06:** je Arm sofort registrieren wie par.8.11a (Instrument
+   `k3_<arm>_v24b06.json` gegen 0,4975; Arena Siege, Spalten je Seite, Kuppel-Bonus, lange
+   Reihen; Verdikt an Tor 1/2, C1 gegen par.12b Punkt 3): K3-F 1,0 in
+   `geometric_envelope` par.8.14, K3-F 0,5 ebenda, beide als par.8.14a. Stillstand
+   > 30 min ohne neue Datei in `data/selfplay_k3-*` oder `evaluations/artifacts/*k3*b06*`:
+   Chronik, Nutzer fragen. Danach Kopf der Prereg nachziehen, `python
+   tools/generate_prereg_index.py`, committen.
+2. **Halter vor 01:20 erneuern** (siehe Falle oben) oder Nutzer-Kill abwarten.
+3. **Nach der Kette, CPU frei (rund 00:30): `cargo test --release --lib`** aus `engine/`
+   mit Python-DLL im PATH (`. tools/hooks/python_dll_path.sh; mosaic_prepend_python_dll_path`
+   oder `PYDIR=$(cygpath -u "$(python -c 'import sys;print(sys.base_prefix)')"); export
+   PATH="$PYDIR:$PATH"`) -- prueft das umbenannte Fixture `models/engine_test.onnx`
+   (13 Verweise, Commits e6b04ec/4bc4313/77975d2, ungetestet). Erwartung 523 gruen.
+4. **Neun Partien Subagent gegen Champion** (`PREREG_claude_play_interface.md` par.7/8:
+   Restprogramm 4 als Erst-, 5 als Zweitspieler; je Partie ein Agent mit Modell Opus, Auftrag
+   wie in der Chronik 18:55/19:29 beschrieben: `python -X utf8 tools/claude_play.py new --game
+   g02 --seed 20260907 --first-player 0 --claude-side 0`, ab g06 `--claude-side 1
+   --first-player 0`; Zuege GENAU aus der Liste, Tiling selbst, `note` fuer bis zu drei
+   Netz-Fehlstellen, Bericht unter 60 Zeilen). VOR der ersten Partie
+   `bash tools/claude_play_hold.sh` im Hintergrund starten (Marke haelt die alte Kette und
+   spaetere Ketten fern), NACH der letzten Partie die Marke loeschen
+   (`rm evaluations/artifacts/claude_play/.playing`). Je Partie in par.7 registrieren
+   (Endstand, Zuege, Beobachtungen als Sondenkandidaten), Werkzeugfehler nicht vom Agenten
+   reparieren lassen. Kosten rund 30 min und rund 250.000 Opus-Token je Partie.
+5. **Vorlage v25-Zuschnitt** (`PREREG_v25_window.md` par.4/9/9a): Generator-Frage b05 gegen
+   b06 (Nutzer-Prinzip Generator = Champion; b06 hat die Champion-Kante, b05 nicht:
+   202:218 in Spielkonfiguration), Knopf in der Erzeugung (b06 spielt MIT K3-P, b05 ohne),
+   Traeger-Kennzahl 0,356 gegen Fenster 0,624, Value-Klasse 8.000/0 offen. KEINE stille Wahl.
+6. **K5 "Reihe-6-Spezialfeld"** (`special_tile_yield` par.9): Bau nach den K3-Ergebnissen,
+   als Erweiterung der K3-P-Projektion (Huellenzelle der Zeile 6), Spec-Pflichtfeld je Seite
+   wie `envelope_flush_w` (Werkzeug `tools/spec_add_field.py`; lebende Specs erst nachziehen,
+   wenn kein Lauf mehr mit dem alten Wheel laeuft; Wheel-Build nur exklusiv; danach
+   `/mosaic-anchor-invariance`).
+7. **Aus dem Test-Audit noch offen** (STATUS Punkt 9/Audit): nichts Blockierendes; die
+   `#[ignore]`-Tests mit `test_champion_model_path()` folgen jetzt dem 744er-Champion
+   (nicht gelaufen).
 
-**Test- und Hook-Audit (Subagent Opus, 2026-09-06 10:23, Befunde nachgeprueft) -- vom Nutzer
-entschieden und UMGESETZT (11:05, cargo test 523 gruen, 16 Python-Tests gruen):** (a) Regel-5-
-Fehlalarm: Cargo-Feature `plate_shaping`, `PLATE_SHAPING_ENABLED = cfg!(feature)`, Paritaetstest
-per `#[cfg(not(feature))]` statt Laufzeit-Skip; (b) fuenf ignore-Tests auf
-`test_champion_model_path()` umgezogen; (c) train.py: neun Schluessel in `_cli_args` nachgetragen
-(acht Verhaltens-Flags plus `epoch_checkpoint`), Test `tools/tests/test_train_manifest_flags.py`;
-(d) `tools/tests/test_tiling_geometry_probe.py`, `test_spec_add_field.py`, pre-commit faehrt
-`unittest discover tools/tests`; (e) `tools/parity_probe.py` geloescht (Freigabe 10:30). Vorher
-bereits: Groessen-Basislinie nachgezogen, Regel 8 (lebende Specs gegen KNOWN_FIELDS),
-`tools/hooks/python_dll_path.sh`. Das installierte Wheel (10:06) bleibt gueltig: die
-Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (false).
+**Offene Nutzer-Entscheide (Fundstellen):** Generator v25 b05 oder b06 und Knopf in der
+Erzeugung (`v25_window` par.4, `v24_window` par.9c); welches v24-Netz die Knopf-Messung
+nachzieht (`geometric_envelope` par.8.14); K4-Skala je Runde oder gemeinsam
+(`round_estimate_leaf_term` par.4); Value-Klasse 8.000/0 (`v25_window` par.9/9a);
+`--fast-loader` als Default (`working_rules.md`: Volllauf 440 s gegen 16 min, bitgleich);
+Loeschung `models/attic_20260906_k3p10_copies/` (Duplikate).
 
-8. **Spiel-Interface Claude gegen Netz** (`PREREG_claude_play_interface.md`, Nutzer-
-   Auftrag 12:30): `tools/claude_play.py` gebaut 13:12, Entscheide par.8 komplett
-   (10 Partien 5/5, Champion @400, Tiling selbst, keine Uebereinstimmungsmessung,
-   Weg 2 Rueckfall, Werkzeug bleibt). Offen: Rauchtest gegen Heuristik im
-   CPU-freien Fenster, dann die erste Partie; Protokoll je Partie in par.7.
+**Blockaden:** Anker ROT, Kettenfehler, Manifest-Diff, zweite CPU-Last neben einer Messung
+-> anhalten, sichern, Nutzer fragen. Skills: `/mosaic-measurement-run`, `/mosaic-prereg`,
+`/mosaic-anchor-invariance`, `/mosaic-champion-promotion`, `/mosaic-generation-turnover`
+(vor v25-Self-Play), `/mosaic-handover`.
 
-9. **Netzauslastung** (13:35): Kapazitaetscheck fuer 2D-Netze nachgeruestet
-   (`Mosaic2DNet.analyze_capacity`, train.py, `tools/probes/net_capacity_probe.py`);
-   b05 GRUEN (Dead 2 %, Eff.Rank 61 %), identisch mit v23-b01/b03/b04/b06 samt
-   denselben 42 toten fusion2-Einheiten: Warmstart-Linie, Trunk bewegt sich kaum.
+### Was die Tagessitzung 2026-09-06 (00:38-21:46) ergeben hat (Kurzform; alles in Preregs und Chronik)
 
-10. **Knopf-Messkette am NEUEN Champion b06** (`tools/night_k3_knobs_b06.sh`, gestartet 20:43,
-    Bezug Tor 2a mit Knopf 0,4975): Rauschboden par.12b Punkte 1-2, dann K3-P2, K3-F 1,0,
-    K3-F 0,5, beide; rund 3,7 h. Die alte Kette am v23-Champion (`night_k3_knobs_champion.sh`)
-    haengt an der Halte-Marke und laeuft in ihren 12-h-Deckel (Exit 65), sie misst nichts.
-    Registrierung par.8.11 / 8.14 / 12b je Arm. Rauschboden Punkte 1-2 GEMESSEN (20:46, par.12b:
-    Schwelle B1 +-0,13, B2 +-0,06; v24-Arme unbewegt). Danach die neun Partien des Subagenten.
-
-11. **Champion-Promotion v24-b06_k3p10** (Nutzer 17:05 "Mach vor dem agenten spiel die
-    Champion Promotion lt. Skill"): `tools/promote_v24_b06.sh` gestartet 17:21, wartet auf das
-    Ende der b06-Abnahme; Umfang wie 2026-09-04 (set_champion, Anker n=150, Champion-2
-    gegen v21, Balance, Platt v3/v1, Paritaets-Fixture, Artefakt mit venv und Golden
-    Probe). Danach von Hand: Manifest, Referee-Selbsttest, server.py A/B, Elo-Zeilen,
-    STATUS/History. **FERTIG 18:42:** Anker 116:34 (n=150), Champion-2 76:44 gegen v21 (SPRT),
-    Balance 2,60, Platt v3 A -0,0961 / B 0,5875 (server.py), Fixture neu, Artefakt
-    `models/frozen_champions/v24-b06/` mit venv, Golden Probe 10 Sonden, Referee-
-    Selbsttest gruen. Elo 1309. Danach Subagent-Partie, dann Knopf-Kette (Halte-Marke).
-
-12. **K5 "Reihe-6-Spezialfeld"** (17:43, Nutzer-Regel, `special_tile_yield` par.9):
-    registriert, nicht gebaut; Reihenfolge nach den vier K3-Armen.
-
-**Offene Nutzer-Entscheide (Fundstellen):** K4-Skala je Runde oder gemeinsam
-(`round_estimate_leaf_term` par.4); ~~K3-F jetzt bauen oder nach Messung~~ ENTSCHIEDEN 2026-09-06 00:50: nach der Messung
-(`geometric_envelope` par.8.14); par.12a/12b Messgroessen und Rauschboden
-(`geometric_envelope`); v25 Value-Klasse 8.000/0 (`v25_window` par.9/9a);
-`--fast-loader` als Default; Push.
-
-**Blockaden:** Anker ROT, Kettenfehler, unerwarteter Manifest-Diff, zweite
-CPU-Last neben einer Messung -> anhalten, Zustand sichern, Nutzer fragen.
-Nach jedem Schritt Chronik (`night_run_20260902.md` fortschreiben oder
-`night_run_20260906.md` anlegen), STATUS Abschnitt 1 nachziehen, committen
-(deutsch, Warum in der Beschreibung, Co-Authored-By: Claude Fable 5.1
-<noreply@anthropic.com>). Skills: `/mosaic-measurement-run`, `/mosaic-prereg`,
-`/mosaic-anchor-invariance`, `/mosaic-generation-turnover` (vor v25-Self-Play),
-`/mosaic-handover`.
+Alle sechs v24-Arme abgenommen (par.9): b02 und b03 nehmen Tor 1 mit Knopf, b05 ohne Knopf,
+b06 (b02-Rezept auf 744) mit Knopf ueber zwei Seeds = Champion-Kante -> Promotion nach
+Checkliste, Elo 1309. Knopf-Wechselwirkung je Arm verschieden (par.9c). Tiling-Sonde: Mensch
+laesst Punkte liegen, kauft an G4/Gline nichts (par.8.12a); Reihen-Alter: blockierte 6er
+werden zu 22-27 % gelegt gegen 86-90 % (par.8.14, Fassung 2). K3-F gebaut, getestet,
+installiert (Spec-Pflichtfeld `envelope_flush_w`), Anker gruen; K3-P2 am Champion b06
+negativ (par.8.11a). Rauschboden par.12b komplett (Schwelle B1 +-0,13, B2 +-0,06, Arena-SD
+Marge 10,7-14,3, Spalten 0,23-0,46). Netzauslastung 2D nachgeruestet: alle Netze gruen,
+Trunk der Warmstart-Linie identisch. Test-/Hook-Audit umgesetzt (Manifest-Test, Python-Tests
+im pre-commit, Regel 8, Basislinie, v20-Tests, Regel-5-Fehlalarm). Spiel-Interface
+`tools/claude_play.py` gebaut; g01 72:42 fuer den Agenten. fast-loader 440 s je Epoche.
+Laufzeiten: `measured_runtimes.md`.
 
 ### Was seit der Uebergabe von 2026-09-03 09:00 passiert ist (Kurzform; Chronik ab 09:08)
 
