@@ -2072,3 +2072,51 @@ par.10 (Such-Knopf als Verstaerker, nicht als Lehrer; K3-F als Erzeugungs-Kandid
 par.8.15 (Huellenform als naechster Arm). Rauschboden-Bezug: C1 (par.12) wird an keinem
 der vier Arme bewertet, weil alle an Tor 1/2 scheitern (Regel par.12b).
 
+### par.8.15a ERGEBNIS TEIL A: die gemessene Huelle (gefahren 2026-09-07, 00:26-00:28, 124 s; `tools/probes/measured_hull_probe.py`, `measured_hull_probe.json`)
+
+502 Partien = 1.004 Seiten: 22 Server-Partien (Mensch gegen KI) und sechs b06-Arena-Artefakte
+(Tor 2b gegen b01, K3-P2-Arm, K3-F-1,0-Arm; je Seite mit Spec-Etikett). Endbrett je Seite,
+Orientierung nach kleinerer Dreiecks-Abweichung (links 475 von 492 bei den Gewinnern),
+rechts an der senkrechten Achse gespiegelt. "Gemessene Huelle" = Zellmenge mit maximaler
+Summe der Fuellhaeufigkeit unter Kostenschranke (exakter Rucksack, Kosten r+1).
+
+| Gruppe | Seiten | Huelle bei Kosten 56: gleich mit Dreieck | hinzu / weg | Huelle bei 62: hinzu / weg | (5,1) drin | (5,0) | (5,1) | P((5,1) \| (5,0)) |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Mensch | 22 | 20 / 21 | (1,5) / (2,3) | **(1,5), (5,1) / (2,3)** | **ja** | **0,955** | **0,909** | **0,952** |
+| Server-KI | 22 | 20 / 21 | (1,5), (2,4) / (5,0) | (1,5), (2,4), (2,5), (3,4) / (5,0) | nein | 0,318 | 0,136 | -- |
+| Netz v24-b06 Champion-Spec | 320 | 20 / 21 | (1,5) / (2,3) | (1,5), (2,5) / -- | nein | 0,616 | 0,362 | 0,528 |
+| Netz mit K3-F 1,0 | 160 | 19 / 21 | (1,5), **(5,1)** / (2,3), (5,0) | (1,5), **(5,1)** / (2,3) | **ja** | 0,500 | **0,525** | 0,637 |
+| Netz v23-b01 Champion-Spec | 320 | 20 / 21 | (1,5), (2,5) / (5,0) | (1,5), (2,5) / -- | nein | 0,622 | 0,444 | -- |
+| alle | 1.004 | 20 / 21 | (1,5) / (2,3) | (1,5), (2,5) / -- | nein | 0,598 | 0,424 | 0,595 |
+| Gewinnerseiten | 492 | 20 / 21 | (1,5) / (2,3) | (1,5), (2,5) / -- | nein | 0,687 | 0,516 | -- |
+
+**Befund 1: die Dreiecksform ist bestaetigt, nicht widerlegt.** Bei Kosten 56 deckt sich die
+gemessene Huelle in 20 von 21 Zellen mit dem Dreieck; getauscht wird durchgaengig (2,3) gegen
+(1,5), also eine Zelle innerhalb der oberen Zeilen. Die Zeilensummen (alle: 4,53 / 4,59 /
+3,00 / 2,38 / 1,79 / 1,29) reproduzieren die par.3-Raten (4,88 / 4,70 / 2,88 / 2,23 / 1,71 /
+1,31) auf 0,1 bis 0,35 genau. Die Herleitung aus Zeilensummen hat also auch innerhalb der
+Zeile getroffen.
+
+**Befund 2: die zweite Zelle der Zeile 6 ist MENSCH-Verhalten, nicht Netz-Verhalten.** Der
+Mensch belegt (5,0) zu 0,955 und (5,1) zu 0,909 und hat, wenn (5,0) liegt, in 95 % der
+Partien auch (5,1) -- seine 62er-Huelle enthaelt (5,1). Die Netze belegen (5,0) zu 0,62 und
+(5,1) nur zu 0,36 (bedingt 0,53); ihr Rucksack kauft bei 62 lieber (2,5) in Zeile 3
+(Kosten 3) als (5,1) (Kosten 6). Der Mensch baut die linken zwei Spalten praktisch voll
+(Spalte 0: 1,00/1,00/1,00/0,95/0,95/0,95; Spalte 1: 1,00/1,00/0,86/0,91/1,00/0,91), die
+Netze fallen nach unten ab (Spalte 0: 0,97 bis 0,62; Spalte 1: 0,97 bis 0,36).
+**Damit ist die Nutzer-Form ein ZIEL, keine Beschreibung des Ist-Zustands** -- sie bildet
+ab, was der Mensch tut und die Netze nicht. Das ist genau die Rolle, die K3-P fuer die
+Spalten hatte, und der Grund, sie als Knopf zu messen statt sie aus der Messung abzuleiten.
+
+**Befund 3: K3-F 1,0 verschiebt die Endbretter messbar in die Nutzer-Form.** Der einzige
+Netz-Arm, dessen gemessene 62er-Huelle (5,1) enthaelt, ist der mit K3-F: (5,1) 0,525 gegen
+0,362 der Kontrolle, (5,0) dafuer 0,500 gegen 0,616. Der Knopf verlagert also Masse von der
+Spitze auf das Paar -- genau die Mechanik, die par.8.14 beschreibt. Er hat es in der Arena
+nur mit Punkten bezahlt. Die Form ohne den Knopf zu geben ist der naechste Arm (Teil B).
+
+**Folgerung fuer Teil B (keine Aenderung am Plan):** die Form 2 wird gemessen wie
+registriert; die 56er-Rechnung liefert zusaetzlich einen Kandidaten fuer eine dritte Form
+(Dreieck ohne (2,3), dafuer (1,5) -- kostenneutral, 21 Zellen), der hier NICHT gebaut wird.
+Vorbehalt: die Mensch-Zahlen stammen aus 22 Partien gegen wechselnde KI-Staerken, und die
+Rucksack-Rechnung optimiert die Haeufigkeitssumme, nicht den Punktertrag.
+

@@ -20,7 +20,9 @@
 use crate::board::PlayerBoard;
 
 /// Gesamtkost einer Huelle: Summe `r + 1` ueber ihre 21 Zellen (beide
-/// Orientierungen: 6 + 10 + 12 + 12 + 10 + 6).
+/// Orientierungen: 6 + 10 + 12 + 12 + 10 + 6). Das ist die DREIECKS-Form;
+/// der Such-Term normiert seit par.8.15 Teil B mit [`hull_total_cost`] und
+/// bekommt bei [`HullForm::Row6Pair`] 62.
 pub const HULL_TOTAL_COST: f64 = 56.0;
 
 /// Runden-Profil `w_e(r)` aus der Verlaesslichkeit des Value-Kopfs je Runde
@@ -56,6 +58,85 @@ impl Hull {
             Hull::Right => r <= c,
         }
     }
+
+    /// Zugehoerigkeit in der gewaehlten Huellenform (par.8.15 Teil B).
+    /// [`HullForm::Triangle`] ist EXAKT [`Hull::contains`] (bitidentisch),
+    /// [`HullForm::Row6Pair`] nimmt die zweite Zelle der Rasterzeile 6 hinzu:
+    /// LINKS (5,1), RECHTS (5,4). Es faellt nichts weg.
+    #[inline]
+    pub fn contains_in(self, form: HullForm, r: usize, c: usize) -> bool {
+        match form {
+            HullForm::Triangle => self.contains(r, c),
+            HullForm::Row6Pair => {
+                self.contains(r, c)
+                    || match self {
+                        Hull::Left => r == 5 && c == 1,
+                        Hull::Right => r == 5 && c == 4,
+                    }
+            }
+        }
+    }
+}
+
+/// Huellenform des Such-Terms (e), par.8.15 Teil B (Nutzer 2026-09-06 23:05:
+/// "du nimmst einfach die zweite zelle in reihe 6 hinzu"): das Dreieck wie
+/// bisher (21 Zellen, Gesamtkosten 56) oder das Dreieck plus die zweite Zelle
+/// der Rasterzeile 6 (22 Zellen, Gesamtkosten 62). Knopf statt stiller
+/// Aenderung, weil Champion, Elo-Knoten und Tor-Bezug auf dem Dreieck
+/// gemessen sind.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HullForm {
+    /// Dreieck (Bestand, Default): LINKS `r + c <= 5`, RECHTS `r <= c`.
+    Triangle,
+    /// Dreieck plus zweite Zelle der Zeile 6: LINKS (5,1), RECHTS (5,4).
+    Row6Pair,
+}
+
+/// Groesster gueltiger Wert des Spec-Felds `envelope_hull_form` (1 Dreieck,
+/// 2 Zeile-6-Paar).
+pub const HULL_FORM_MAX: u8 = 2;
+
+impl HullForm {
+    /// `1 -> Triangle`, `2 -> Row6Pair`, sonst `None`.
+    #[inline]
+    pub fn from_u8(v: u8) -> Option<HullForm> {
+        match v {
+            1 => Some(HullForm::Triangle),
+            2 => Some(HullForm::Row6Pair),
+            _ => None,
+        }
+    }
+}
+
+/// Gesamtkost einer Huelle in der gegebenen Form: 56 (Dreieck, exakt
+/// [`HULL_TOTAL_COST`]) bzw. 62 (`Row6Pair`: plus `5 + 1` fuer die zweite
+/// Zelle der Zeile 6). Normierung aller H-Groessen des Such-Terms.
+#[inline]
+pub fn hull_total_cost(form: HullForm) -> f64 {
+    match form {
+        HullForm::Triangle => HULL_TOTAL_COST,
+        HullForm::Row6Pair => 62.0,
+    }
+}
+
+/// Env-DEFAULT der `SearchConfig` fuer die Huellenform
+/// (`MOSAIC_ENVELOPE_HULL_FORM`, Default 1 = Dreieck, bitidentisch). Seit dem
+/// Bau ein Spec-Pflichtfeld je Seite (`envelope_hull_form`), damit der Knopf
+/// in der gepaarten Arena einseitig messbar ist; dieser Getter dient
+/// `from_env` und `engine_config`. Ungueltig -> 1 mit einmaliger Warnung
+/// (gleiche Bauform wie [`projection_mode`]).
+pub fn hull_form() -> u8 {
+    static CELL: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| match std::env::var("MOSAIC_ENVELOPE_HULL_FORM") {
+        Err(_) => 1,
+        Ok(raw) => match raw.trim().parse::<u8>() {
+            Ok(v) if HullForm::from_u8(v).is_some() => v,
+            _ => {
+                eprintln!("⚠️  MOSAIC_ENVELOPE_HULL_FORM={raw:?} ungueltig (1 Dreieck, 2 Zeile-6-Paar) -- Form 1 gilt.");
+                1
+            }
+        },
+    })
 }
 
 /// Bedien-Kosten einer Rasterzelle: `r + 1` (regel-hergeleitet, nicht gefittet).
@@ -77,12 +158,19 @@ pub fn occupancy(board: &PlayerBoard) -> [[bool; 6]; 6] {
 }
 
 /// Ungewichtete Abweichung: leere Huellenzellen plus Steine ausserhalb
-/// (`deviation` der Sonde).
+/// (`deviation` der Sonde), Dreieck. Der Tiling-Zweig (d) und der
+/// Huellen-Bauer bleiben auf dieser Form -- par.8.15 sieht ihren Nachzug als
+/// EIGENEN Schritt vor, falls Teil B traegt.
 pub fn deviation(occ: &[[bool; 6]; 6], hull: Hull) -> usize {
+    deviation_in(occ, hull, HullForm::Triangle)
+}
+
+/// Wie [`deviation`], in der gewaehlten Huellenform (par.8.15 Teil B).
+pub fn deviation_in(occ: &[[bool; 6]; 6], hull: Hull, form: HullForm) -> usize {
     let mut d = 0;
     for (r, row) in occ.iter().enumerate() {
         for (c, &filled) in row.iter().enumerate() {
-            if hull.contains(r, c) != filled {
+            if hull.contains_in(form, r, c) != filled {
                 d += 1;
             }
         }
@@ -91,9 +179,14 @@ pub fn deviation(occ: &[[bool; 6]; 6], hull: Hull) -> usize {
 }
 
 /// Bestpassende Huelle: kleinere Abweichung, bei Gleichstand LINKS
-/// (`best_hull` der Sonde, `<=`).
+/// (`best_hull` der Sonde, `<=`). Dreieck.
 pub fn best_hull(occ: &[[bool; 6]; 6]) -> Hull {
-    if deviation(occ, Hull::Left) <= deviation(occ, Hull::Right) {
+    best_hull_in(occ, HullForm::Triangle)
+}
+
+/// Wie [`best_hull`], in der gewaehlten Huellenform.
+pub fn best_hull_in(occ: &[[bool; 6]; 6], form: HullForm) -> Hull {
+    if deviation_in(occ, Hull::Left, form) <= deviation_in(occ, Hull::Right, form) {
         Hull::Left
     } else {
         Hull::Right
@@ -102,13 +195,19 @@ pub fn best_hull(occ: &[[bool; 6]; 6]) -> Hull {
 
 /// `(innen, aussen)`: kosten-gewichtete Belegung innerhalb bzw. ausserhalb
 /// der Huelle, jeweils geteilt durch [`HULL_TOTAL_COST`]. `innen` ist genau
-/// `weighted_fill_share` der Sonde.
+/// `weighted_fill_share` der Sonde. Dreieck.
 pub fn weighted_shares(occ: &[[bool; 6]; 6], hull: Hull) -> (f64, f64) {
+    weighted_shares_in(occ, hull, HullForm::Triangle)
+}
+
+/// Wie [`weighted_shares`], in der gewaehlten Huellenform; normiert mit
+/// [`hull_total_cost`] (Dreieck: exakt 56).
+pub fn weighted_shares_in(occ: &[[bool; 6]; 6], hull: Hull, form: HullForm) -> (f64, f64) {
     let (mut inside, mut outside) = (0.0, 0.0);
     for (r, row) in occ.iter().enumerate() {
         for (c, &filled) in row.iter().enumerate() {
             if filled {
-                if hull.contains(r, c) {
+                if hull.contains_in(form, r, c) {
                     inside += row_cost(r);
                 } else {
                     outside += row_cost(r);
@@ -116,20 +215,31 @@ pub fn weighted_shares(occ: &[[bool; 6]; 6], hull: Hull) -> (f64, f64) {
             }
         }
     }
-    (inside / HULL_TOTAL_COST, outside / HULL_TOTAL_COST)
+    (inside / hull_total_cost(form), outside / hull_total_cost(form))
 }
 
-/// `H(brett)` nach par.8.1 fuer eine gegebene Belegung.
+/// `H(brett)` nach par.8.1 fuer eine gegebene Belegung (Dreieck).
 pub fn envelope_score_of(occ: &[[bool; 6]; 6]) -> f64 {
-    let hull = best_hull(occ);
-    let (inside, outside) = weighted_shares(occ, hull);
+    envelope_score_of_in(occ, HullForm::Triangle)
+}
+
+/// Wie [`envelope_score_of`], in der gewaehlten Huellenform.
+pub fn envelope_score_of_in(occ: &[[bool; 6]; 6], form: HullForm) -> f64 {
+    let hull = best_hull_in(occ, form);
+    let (inside, outside) = weighted_shares_in(occ, hull, form);
     inside - outside
 }
 
 /// `H(brett)` nach par.8.1: Leitkennzahl der Einhuellenden in [-1, 1]
-/// (praktisch [0, 1]; Lehrer 0,68, Mensch 0,86 am Partieende).
+/// (praktisch [0, 1]; Lehrer 0,68, Mensch 0,86 am Partieende). Dreieck --
+/// der Tiling-Zweig (d, `tiling_solver.rs`) liest genau diese Fassung.
 pub fn envelope_score(board: &PlayerBoard) -> f64 {
     envelope_score_of(&occupancy(board))
+}
+
+/// Wie [`envelope_score`], in der gewaehlten Huellenform (Such-Term, Modus 0).
+pub fn envelope_score_in(board: &PlayerBoard, form: HullForm) -> f64 {
+    envelope_score_of_in(&occupancy(board), form)
 }
 
 // ── par.8.7 K3-P: das projizierte Brett ─────────────────────────────────────
@@ -207,12 +317,18 @@ pub fn projected_occupancy(board: &PlayerBoard) -> [[f64; 6]; 6] {
     out
 }
 
-/// Ungewichtete Abweichung fuer gebrochene Belegung: Summe |Huelle - occ|.
+/// Ungewichtete Abweichung fuer gebrochene Belegung: Summe |Huelle - occ|
+/// (Dreieck).
 pub fn deviation_frac(occ: &[[f64; 6]; 6], hull: Hull) -> f64 {
+    deviation_frac_in(occ, hull, HullForm::Triangle)
+}
+
+/// Wie [`deviation_frac`], in der gewaehlten Huellenform.
+pub fn deviation_frac_in(occ: &[[f64; 6]; 6], hull: Hull, form: HullForm) -> f64 {
     let mut d = 0.0;
     for (r, row) in occ.iter().enumerate() {
         for (c, &v) in row.iter().enumerate() {
-            let h = if hull.contains(r, c) { 1.0 } else { 0.0 };
+            let h = if hull.contains_in(form, r, c) { 1.0 } else { 0.0 };
             d += (h - v).abs();
         }
     }
@@ -221,8 +337,15 @@ pub fn deviation_frac(occ: &[[f64; 6]; 6], hull: Hull) -> f64 {
 
 /// `H` nach par.8.1 ueber eine gebrochene Belegung (bestpassende Huelle nach
 /// `deviation_frac`, Gleichstand LINKS; Anteile `Summe occ * (r + 1) / 56`).
+/// Dreieck.
 pub fn envelope_score_frac(occ: &[[f64; 6]; 6]) -> f64 {
-    let hull = if deviation_frac(occ, Hull::Left) <= deviation_frac(occ, Hull::Right) {
+    envelope_score_frac_in(occ, HullForm::Triangle)
+}
+
+/// Wie [`envelope_score_frac`], in der gewaehlten Huellenform (Normierung
+/// [`hull_total_cost`]).
+pub fn envelope_score_frac_in(occ: &[[f64; 6]; 6], form: HullForm) -> f64 {
+    let hull = if deviation_frac_in(occ, Hull::Left, form) <= deviation_frac_in(occ, Hull::Right, form) {
         Hull::Left
     } else {
         Hull::Right
@@ -231,7 +354,7 @@ pub fn envelope_score_frac(occ: &[[f64; 6]; 6]) -> f64 {
     for (r, row) in occ.iter().enumerate() {
         for (c, &v) in row.iter().enumerate() {
             if v > 0.0 {
-                if hull.contains(r, c) {
+                if hull.contains_in(form, r, c) {
                     inside += v * row_cost(r);
                 } else {
                     outside += v * row_cost(r);
@@ -239,22 +362,33 @@ pub fn envelope_score_frac(occ: &[[f64; 6]; 6]) -> f64 {
             }
         }
     }
-    (inside - outside) / HULL_TOTAL_COST
+    (inside - outside) / hull_total_cost(form)
 }
 
 /// `H_proj(brett)` (par.8.7): `H` auf dem projizierten Brett. Bei leeren
 /// Musterreihen exakt `envelope_score` (gleiche Huelle, gleiche Anteile).
+/// Dreieck.
 pub fn envelope_score_projected(board: &PlayerBoard) -> f64 {
     envelope_score_frac(&projected_occupancy(board))
 }
 
-/// `H` fuer eine FESTE Orientierung ueber eine gebrochene Belegung.
+/// Wie [`envelope_score_projected`], in der gewaehlten Huellenform.
+pub fn envelope_score_projected_in(board: &PlayerBoard, form: HullForm) -> f64 {
+    envelope_score_frac_in(&projected_occupancy(board), form)
+}
+
+/// `H` fuer eine FESTE Orientierung ueber eine gebrochene Belegung (Dreieck).
 pub fn envelope_score_frac_for(occ: &[[f64; 6]; 6], hull: Hull) -> f64 {
+    envelope_score_frac_for_in(occ, hull, HullForm::Triangle)
+}
+
+/// Wie [`envelope_score_frac_for`], in der gewaehlten Huellenform.
+pub fn envelope_score_frac_for_in(occ: &[[f64; 6]; 6], hull: Hull, form: HullForm) -> f64 {
     let (mut inside, mut outside) = (0.0, 0.0);
     for (r, row) in occ.iter().enumerate() {
         for (c, &v) in row.iter().enumerate() {
             if v > 0.0 {
-                if hull.contains(r, c) {
+                if hull.contains_in(form, r, c) {
                     inside += v * row_cost(r);
                 } else {
                     outside += v * row_cost(r);
@@ -262,7 +396,7 @@ pub fn envelope_score_frac_for(occ: &[[f64; 6]; 6], hull: Hull) -> f64 {
             }
         }
     }
-    (inside - outside) / HULL_TOTAL_COST
+    (inside - outside) / hull_total_cost(form)
 }
 
 // ── par.8.9 K3-R: Erreichbarkeit als Projektion ──────────────────────────────
@@ -274,22 +408,32 @@ pub fn envelope_score_frac_for(occ: &[[f64; 6]; 6], hull: Hull) -> f64 {
 // Je Orientierung eigene Belegung, H mit fester Orientierung, Maximum der
 // beiden: die beste Huelle, die noch offen ist.
 
-/// `H_reach(brett)` (par.8.9).
+/// `H_reach(brett)` (par.8.9), Dreieck.
 pub fn envelope_score_reach(board: &PlayerBoard, remaining: &[i64; 5], w_r: f64) -> f64 {
+    envelope_score_reach_in(board, remaining, w_r, HullForm::Triangle)
+}
+
+/// Wie [`envelope_score_reach`], in der gewaehlten Huellenform.
+pub fn envelope_score_reach_in(
+    board: &PlayerBoard,
+    remaining: &[i64; 5],
+    w_r: f64,
+    form: HullForm,
+) -> f64 {
     let base = projected_occupancy(board);
     let mut best = f64::NEG_INFINITY;
     for hull in [Hull::Left, Hull::Right] {
         let mut occ = base;
         for r in 0..6 {
             for c in 0..6 {
-                if hull.contains(r, c) && occ[r][c] == 0.0
+                if hull.contains_in(form, r, c) && occ[r][c] == 0.0
                     && crate::column_build::cell_is_completable(board, r, c, remaining)
                 {
                     occ[r][c] = w_r;
                 }
             }
         }
-        best = best.max(envelope_score_frac_for(&occ, hull));
+        best = best.max(envelope_score_frac_for_in(&occ, hull, form));
     }
     best
 }
@@ -321,6 +465,16 @@ pub fn slot_weight() -> f64 {
 /// liegen und noch keine Kuppelplatte tragen (`get_space == None`). Gibt
 /// zusaetzlich zurueck, ob die Regel fuer mindestens eine Reihe gegriffen hat.
 pub fn projected_occupancy_slot(board: &PlayerBoard, hull: Hull, w_slot: f64) -> ([[f64; 6]; 6], bool) {
+    projected_occupancy_slot_in(board, hull, w_slot, HullForm::Triangle)
+}
+
+/// Wie [`projected_occupancy_slot`], in der gewaehlten Huellenform.
+pub fn projected_occupancy_slot_in(
+    board: &PlayerBoard,
+    hull: Hull,
+    w_slot: f64,
+    form: HullForm,
+) -> ([[f64; 6]; 6], bool) {
     let occ = occupancy(board);
     let mut out = [[0.0f64; 6]; 6];
     let mut used = false;
@@ -349,7 +503,7 @@ pub fn projected_occupancy_slot(board: &PlayerBoard, hull: Hull, w_slot: f64) ->
         }
         // Platzhalter-Regel: keine annehmende Zelle -> plattenlose Huellenzellen der Zeile.
         let slots: Vec<usize> = (0..6)
-            .filter(|&c| hull.contains(r, c) && board.dome_grid.get_space(r, c).is_none())
+            .filter(|&c| hull.contains_in(form, r, c) && board.dome_grid.get_space(r, c).is_none())
             .collect();
         if slots.is_empty() {
             continue; // alle Huellenzellen der Zeile tragen Platten, die nicht passen: 0 wie K3-P
@@ -382,8 +536,22 @@ pub fn flush_weight() -> f64 {
 /// NICHT -- die Sonde `tiling_geometry_probe.py` tut es, `ja_wartend`); sonst
 /// NEIN. Fuer Zeile 6 hat jede Orientierung genau EINE Huellenzelle.
 pub fn row_can_serve_hull(board: &PlayerBoard, r: usize, color: crate::tile::TileColor, hull: Hull) -> bool {
+    row_can_serve_hull_in(board, r, color, hull, HullForm::Triangle)
+}
+
+/// Wie [`row_can_serve_hull`], in der gewaehlten Huellenform. In
+/// [`HullForm::Row6Pair`] hat Zeile 6 ZWEI Huellenzellen je Orientierung --
+/// genau die Stelle, an der par.8.15 Teil B die Blockade-Quote der Reihe 6
+/// bewegen soll.
+pub fn row_can_serve_hull_in(
+    board: &PlayerBoard,
+    r: usize,
+    color: crate::tile::TileColor,
+    hull: Hull,
+    form: HullForm,
+) -> bool {
     (0..6).any(|c| {
-        hull.contains(r, c)
+        hull.contains_in(form, r, c)
             && match board.dome_grid.get_space(r, c) {
                 None => true,
                 Some(sp) => sp.accepts(color),
@@ -406,6 +574,18 @@ pub fn projected_occupancy_flush(
     w_slot: f64,
     w_flush: f64,
 ) -> ([[f64; 6]; 6], f64, bool) {
+    projected_occupancy_flush_in(board, hull, mode, w_slot, w_flush, HullForm::Triangle)
+}
+
+/// Wie [`projected_occupancy_flush`], in der gewaehlten Huellenform.
+pub fn projected_occupancy_flush_in(
+    board: &PlayerBoard,
+    hull: Hull,
+    mode: u8,
+    w_slot: f64,
+    w_flush: f64,
+    form: HullForm,
+) -> ([[f64; 6]; 6], f64, bool) {
     let occ = occupancy(board);
     let mut out = [[0.0f64; 6]; 6];
     let mut bonus = 0.0;
@@ -423,9 +603,9 @@ pub fn projected_occupancy_flush(
             continue;
         }
         let mass = k as f64 / (r + 1) as f64;
-        if !row_can_serve_hull(board, r, color, hull) {
+        if !row_can_serve_hull_in(board, r, color, hull, form) {
             // par.8.14: fuer die Huelle verloren -> Freiraeumen statt Huellenbeitrag.
-            bonus += w_flush * mass * row_cost(r) / HULL_TOTAL_COST;
+            bonus += w_flush * mass * row_cost(r) / hull_total_cost(form);
             used = true;
             continue;
         }
@@ -443,7 +623,7 @@ pub fn projected_occupancy_flush(
             // Platzhalter-Regel K3-P2 (die Reihe kann die Huelle noch bedienen, also gibt es
             // eine plattenlose Huellenzelle in der Zeile).
             let slots: Vec<usize> = (0..6)
-                .filter(|&c| hull.contains(r, c) && board.dome_grid.get_space(r, c).is_none())
+                .filter(|&c| hull.contains_in(form, r, c) && board.dome_grid.get_space(r, c).is_none())
                 .collect();
             if !slots.is_empty() {
                 let share = w_slot * mass / slots.len() as f64;
@@ -464,10 +644,21 @@ pub fn projected_occupancy_flush(
 /// `deviation_frac`, nicht nach dem Maximum -- deshalb ist diese Funktion
 /// KEIN Ersatz fuer [`envelope_score_projected`] bei `w_flush = 0`).
 pub fn envelope_score_flush(board: &PlayerBoard, mode: u8, w_slot: f64, w_flush: f64) -> f64 {
+    envelope_score_flush_in(board, mode, w_slot, w_flush, HullForm::Triangle)
+}
+
+/// Wie [`envelope_score_flush`], in der gewaehlten Huellenform.
+pub fn envelope_score_flush_in(
+    board: &PlayerBoard,
+    mode: u8,
+    w_slot: f64,
+    w_flush: f64,
+    form: HullForm,
+) -> f64 {
     let mut best = f64::NEG_INFINITY;
     for hull in [Hull::Left, Hull::Right] {
-        let (occ, bonus, _) = projected_occupancy_flush(board, hull, mode, w_slot, w_flush);
-        best = best.max(envelope_score_frac_for(&occ, hull) + bonus);
+        let (occ, bonus, _) = projected_occupancy_flush_in(board, hull, mode, w_slot, w_flush, form);
+        best = best.max(envelope_score_frac_for_in(&occ, hull, form) + bonus);
     }
     best
 }
@@ -479,10 +670,15 @@ pub fn envelope_score_flush(board: &PlayerBoard, mode: u8, w_slot: f64, w_flush:
 /// sind beide Belegungen gleich [`projected_occupancy`] und das Ergebnis ist
 /// exakt [`envelope_score_projected`].
 pub fn envelope_score_projected_slot(board: &PlayerBoard, w_slot: f64) -> f64 {
+    envelope_score_projected_slot_in(board, w_slot, HullForm::Triangle)
+}
+
+/// Wie [`envelope_score_projected_slot`], in der gewaehlten Huellenform.
+pub fn envelope_score_projected_slot_in(board: &PlayerBoard, w_slot: f64, form: HullForm) -> f64 {
     let mut best = f64::NEG_INFINITY;
     for hull in [Hull::Left, Hull::Right] {
-        let (occ, _) = projected_occupancy_slot(board, hull, w_slot);
-        best = best.max(envelope_score_frac(&occ));
+        let (occ, _) = projected_occupancy_slot_in(board, hull, w_slot, form);
+        best = best.max(envelope_score_frac_in(&occ, form));
     }
     best
 }
@@ -493,6 +689,12 @@ pub fn envelope_score_projected_slot(board: &PlayerBoard, w_slot: f64) -> f64 {
 /// Reihenfolge `scoring::ownership_index_for_grid`): Sigmoid je Zelle,
 /// dieselbe H-Rechnung wie K3-P. `None`, wenn die Haelfte fehlt.
 pub fn envelope_score_ownership(logits_half: &[f32]) -> Option<f64> {
+    envelope_score_ownership_in(logits_half, HullForm::Triangle)
+}
+
+/// Wie [`envelope_score_ownership`], in der gewaehlten Huellenform (die Form
+/// steckt in der H-Rechnung `envelope_score_frac_in`, nicht in den Logits).
+pub fn envelope_score_ownership_in(logits_half: &[f32], form: HullForm) -> Option<f64> {
     if logits_half.len() < 36 {
         return None;
     }
@@ -503,13 +705,16 @@ pub fn envelope_score_ownership(logits_half: &[f32]) -> Option<f64> {
             occ[r][c] = 1.0 / (1.0 + (-z).exp());
         }
     }
-    Some(envelope_score_frac(&occ))
+    Some(envelope_score_frac_in(&occ, form))
 }
 
 /// Such-Term (e) im gewaehlten Projektions-Modus (`projection_mode`), aus
 /// Sicht von Spieler 0. `ownership` sind die rohen Kopf-Logits des Mover-
 /// Passes (`[0:36]` ego = `state.current_player`, `[36:72]` der andere);
 /// im Modus 3 ohne Kopf: 0 (einmalige Warnung).
+/// `hull_form` ist die Huellenform der Seite (par.8.15 Teil B, Spec-Feld
+/// `envelope_hull_form`); bei [`HullForm::Triangle`] laufen exakt die
+/// Bestandsrechnungen (bitidentisch).
 pub fn search_shift_state(
     state: &crate::state::GameState,
     c_hull: f64,
@@ -517,21 +722,29 @@ pub fn search_shift_state(
     ownership: &[f32],
     mode: u8,
     flush_w: f64,
+    hull_form: HullForm,
 ) -> f64 {
     let b0 = &state.players[0];
     let b1 = &state.players[1];
+    let f = hull_form;
     let (h0, h1) = match mode {
         // par.8.14 K3-F: nur in den Musterreihen-Modi 1 und 4 und nur bei w_flush > 0;
         // bei 0 laufen exakt die Bestandspfade darunter (bitidentisch).
         1 | 4 if flush_w > 0.0 => {
             let ws = if mode == 4 { slot_weight() } else { 0.0 };
-            (envelope_score_flush(b0, mode, ws, flush_w), envelope_score_flush(b1, mode, ws, flush_w))
+            (
+                envelope_score_flush_in(b0, mode, ws, flush_w, f),
+                envelope_score_flush_in(b1, mode, ws, flush_w, f),
+            )
         }
-        1 => (envelope_score_projected(b0), envelope_score_projected(b1)),
+        1 => (envelope_score_projected_in(b0, f), envelope_score_projected_in(b1, f)),
         2 => {
             let remaining = crate::provocation::remaining_colors(state);
             let w = reach_weight();
-            (envelope_score_reach(b0, &remaining, w), envelope_score_reach(b1, &remaining, w))
+            (
+                envelope_score_reach_in(b0, &remaining, w, f),
+                envelope_score_reach_in(b1, &remaining, w, f),
+            )
         }
         3 => {
             if ownership.len() < 72 {
@@ -541,15 +754,15 @@ pub fn search_shift_state(
                 });
                 return 0.0;
             }
-            let ego = envelope_score_ownership(&ownership[0..36]).unwrap_or(0.0);
-            let other = envelope_score_ownership(&ownership[36..72]).unwrap_or(0.0);
+            let ego = envelope_score_ownership_in(&ownership[0..36], f).unwrap_or(0.0);
+            let other = envelope_score_ownership_in(&ownership[36..72], f).unwrap_or(0.0);
             if state.current_player == 0 { (ego, other) } else { (other, ego) }
         }
         4 => {
             let w = slot_weight();
-            (envelope_score_projected_slot(b0, w), envelope_score_projected_slot(b1, w))
+            (envelope_score_projected_slot_in(b0, w, f), envelope_score_projected_slot_in(b1, w, f))
         }
-        _ => (envelope_score(b0), envelope_score(b1)),
+        _ => (envelope_score_in(b0, f), envelope_score_in(b1, f)),
     };
     let phi = profile_weight(profile, state.round_number) * (h0 - h1);
     c_hull * phi.tanh()
@@ -584,6 +797,10 @@ pub fn search_shift(board0: &PlayerBoard, board1: &PlayerBoard, round: u32, c_hu
 /// gefuellten Zellen innerhalb der Huelle minus Summe ausserhalb"; kippt die
 /// bestpassende Huelle durch den Abschluss, zaehlt die Umorientierung mit
 /// (gewollt: die Groesse ist die Fuellung der BESTPASSENDEN Huelle).
+///
+/// Bleibt auf dem DREIECK: der Knopf `envelope_hull_form` (par.8.15 Teil B)
+/// wirkt nur im Such-Term (e); der Nachzug des Tiling-Zweigs (d) ist dort als
+/// eigener Schritt vorgesehen, falls Teil B traegt.
 pub fn tiling_cost_delta(before: &PlayerBoard, after: &PlayerBoard) -> f64 {
     HULL_TOTAL_COST * (envelope_score(after) - envelope_score(before))
 }
@@ -696,6 +913,164 @@ mod tests {
                 .filter(|&(r, c)| hull.contains(r, c)).map(|(r, _)| row_cost(r)).sum();
             assert_eq!(sum, HULL_TOTAL_COST);
         }
+    }
+
+    /// par.8.15 Teil B: `Row6Pair` nimmt GENAU eine Zelle hinzu (LINKS (5,1),
+    /// RECHTS (5,4)) -- 22 Zellen, Gesamtkosten 62; `Triangle` bleibt bei 21
+    /// Zellen und 56, und `contains_in(Triangle, ..)` ist Zelle fuer Zelle
+    /// `contains`.
+    #[test]
+    fn row6_pair_form_adds_exactly_one_cell_per_orientation_and_costs_62() {
+        for hull in [Hull::Left, Hull::Right] {
+            let extra = match hull {
+                Hull::Left => (5usize, 1usize),
+                Hull::Right => (5usize, 4usize),
+            };
+            let mut added = Vec::new();
+            for r in 0..6 {
+                for c in 0..6 {
+                    assert_eq!(hull.contains_in(HullForm::Triangle, r, c), hull.contains(r, c));
+                    if hull.contains_in(HullForm::Row6Pair, r, c) && !hull.contains(r, c) {
+                        added.push((r, c));
+                    }
+                }
+            }
+            assert_eq!(added, vec![extra], "{hull:?}: genau eine neue Zelle");
+            assert!(!hull.contains(extra.0, extra.1), "die neue Zelle lag nicht im Dreieck");
+            for form in [HullForm::Triangle, HullForm::Row6Pair] {
+                let cells: Vec<(usize, usize)> = (0..6)
+                    .flat_map(|r| (0..6).map(move |c| (r, c)))
+                    .filter(|&(r, c)| hull.contains_in(form, r, c))
+                    .collect();
+                let sum: f64 = cells.iter().map(|&(r, _)| row_cost(r)).sum();
+                let (want_n, want_cost) = match form {
+                    HullForm::Triangle => (21, 56.0),
+                    HullForm::Row6Pair => (22, 62.0),
+                };
+                assert_eq!(cells.len(), want_n, "{hull:?} {form:?}");
+                assert_eq!(sum, want_cost, "{hull:?} {form:?}");
+                assert_eq!(hull_total_cost(form), want_cost);
+            }
+        }
+        assert_eq!(hull_total_cost(HullForm::Triangle), HULL_TOTAL_COST);
+        assert_eq!(HullForm::from_u8(1), Some(HullForm::Triangle));
+        assert_eq!(HullForm::from_u8(2), Some(HullForm::Row6Pair));
+        assert_eq!(HullForm::from_u8(0), None);
+        assert_eq!(HullForm::from_u8(HULL_FORM_MAX + 1), None);
+    }
+
+    /// par.8.15 Teil B, Bitidentitaet: mit `Triangle` liefern die
+    /// `*_in`-Fassungen EXAKT (`assert_eq` auf f64) die Zahlen der bisherigen
+    /// Signaturen -- geprueft auf den Brettern A/B/C des Paritaetstests, plus
+    /// die fest eingetragenen Erwartungswerte von dort (0,053571 / 0,410714 /
+    /// 1,0). Mit `Row6Pair` aendert sich der Wert dort, wo die neue Zelle
+    /// zaehlt: Brett B hat (5,5) belegt und (5,4) leer -- RECHTS bleibt
+    /// dieselbe Orientierung, aber die Normierung geht auf 62.
+    #[test]
+    fn triangle_form_is_bit_identical_to_the_previous_signatures() {
+        let boards = [
+            board_with(&[(0, 0), (0, 1), (1, 0), (2, 0), (1, 1), (5, 5)]),
+            board_with(&[(0, 5), (1, 5), (0, 4), (2, 5), (3, 5), (4, 5), (5, 5), (0, 0)]),
+            board_with(&[(0, 0), (0, 1)]),
+        ];
+        let remaining = [10i64; 5];
+        for board in &boards {
+            let occ = occupancy(board);
+            let occ_f = projected_occupancy(board);
+            for hull in [Hull::Left, Hull::Right] {
+                assert_eq!(deviation_in(&occ, hull, HullForm::Triangle), deviation(&occ, hull));
+                assert_eq!(weighted_shares_in(&occ, hull, HullForm::Triangle), weighted_shares(&occ, hull));
+                assert_eq!(
+                    deviation_frac_in(&occ_f, hull, HullForm::Triangle),
+                    deviation_frac(&occ_f, hull)
+                );
+                assert_eq!(
+                    envelope_score_frac_for_in(&occ_f, hull, HullForm::Triangle),
+                    envelope_score_frac_for(&occ_f, hull)
+                );
+            }
+            assert_eq!(best_hull_in(&occ, HullForm::Triangle), best_hull(&occ));
+            assert_eq!(envelope_score_of_in(&occ, HullForm::Triangle), envelope_score_of(&occ));
+            assert_eq!(envelope_score_in(board, HullForm::Triangle), envelope_score(board));
+            assert_eq!(
+                envelope_score_projected_in(board, HullForm::Triangle),
+                envelope_score_projected(board)
+            );
+            assert_eq!(
+                envelope_score_projected_slot_in(board, 0.5, HullForm::Triangle),
+                envelope_score_projected_slot(board, 0.5)
+            );
+            assert_eq!(
+                envelope_score_flush_in(board, 1, 0.0, 1.0, HullForm::Triangle),
+                envelope_score_flush(board, 1, 0.0, 1.0)
+            );
+            assert_eq!(
+                envelope_score_reach_in(board, &remaining, 0.25, HullForm::Triangle),
+                envelope_score_reach(board, &remaining, 0.25)
+            );
+        }
+        // Feste Erwartungswerte aus dem Paritaetstest gegen die Python-Sonde.
+        assert!((envelope_score_in(&boards[0], HullForm::Triangle) - 0.053571).abs() < 1e-6);
+        assert!((envelope_score_in(&boards[1], HullForm::Triangle) - 0.410714).abs() < 1e-6);
+        let full_left: Vec<(usize, usize)> =
+            (0..6).flat_map(|r| (0..6).map(move |c| (r, c))).filter(|&(r, c)| r + c <= 5).collect();
+        let c = board_with(&full_left);
+        assert_eq!(envelope_score_in(&c, HullForm::Triangle), 1.0);
+        // Row6Pair: dieselbe volle linke Dreiecksflaeche ist jetzt unvollstaendig
+        // ((5,1) fehlt), also 56/62 statt 1; die Orientierung bleibt LINKS.
+        assert_eq!(best_hull_in(&occupancy(&c), HullForm::Row6Pair), Hull::Left);
+        assert_eq!(envelope_score_in(&c, HullForm::Row6Pair), 56.0 / 62.0);
+        // Brett B (RECHTS, innen 23 Kostenpunkte): Form 2 aendert nur die Normierung,
+        // weil (5,4) leer ist.
+        assert_eq!(best_hull_in(&occupancy(&boards[1]), HullForm::Row6Pair), Hull::Right);
+        assert_eq!(envelope_score_in(&boards[1], HullForm::Row6Pair), 23.0 / 62.0);
+    }
+
+    /// par.8.15 Teil B, der gemeinte Fall: Reihe 6 (Rot) findet in der
+    /// Rasterzeile 5 nur bei (5,1) eine annehmende Zelle. Im Dreieck liegt
+    /// (5,1) in KEINER Orientierung ((5,0) links, (5,5) rechts) -- die Reihe
+    /// kann die Huelle nicht mehr bedienen. Mit `Row6Pair` ist (5,1) die
+    /// zweite LINKE Huellenzelle, und das Praedikat kippt auf JA.
+    #[test]
+    fn row6_pair_form_lets_a_blocked_row_six_serve_the_left_hull() {
+        let mut board = board_with(&[]);
+        for c in 0..6 {
+            let sp = board.dome_grid.get_space_mut(5, c).unwrap();
+            sp.space_type = SpaceType::Normal;
+            sp.required_color =
+                Some(if c == 1 { crate::tile::TileColor::Rot } else { crate::tile::TileColor::Blau });
+        }
+        board.pattern_lines[5].color = Some(crate::tile::TileColor::Rot);
+        board.pattern_lines[5].tiles = vec![crate::tile::TileColor::Rot; 3];
+        let rot = crate::tile::TileColor::Rot;
+        for hull in [Hull::Left, Hull::Right] {
+            assert!(
+                !row_can_serve_hull_in(&board, 5, rot, hull, HullForm::Triangle),
+                "Dreieck {hull:?}: Reihe 6 ist blockiert"
+            );
+            assert!(!row_can_serve_hull(&board, 5, rot, hull), "Wrapper = Dreieck");
+        }
+        assert!(
+            row_can_serve_hull_in(&board, 5, rot, Hull::Left, HullForm::Row6Pair),
+            "Row6Pair: (5,1) ist die zweite linke Huellenzelle"
+        );
+        assert!(
+            !row_can_serve_hull_in(&board, 5, rot, Hull::Right, HullForm::Row6Pair),
+            "Row6Pair RECHTS: (5,4) nimmt Blau, (5,5) auch"
+        );
+        // Folge im K3-F-Pfad: im Dreieck zaehlt LINKS der Freiraeum-Bonus
+        // (w_flush * 0,5 * 6 / 56), in Form 2 legt die Reihe ihre Masse auf (5,1)
+        // INNERHALB der Huelle (0,5 * 6 / 62).
+        let (_, bonus_tri, used_tri) =
+            projected_occupancy_flush_in(&board, Hull::Left, 1, 0.0, 1.0, HullForm::Triangle);
+        assert!(used_tri && (bonus_tri - 3.0 / 56.0).abs() < 1e-12, "{bonus_tri}");
+        let (occ2, bonus2, used2) =
+            projected_occupancy_flush_in(&board, Hull::Left, 1, 0.0, 1.0, HullForm::Row6Pair);
+        assert!(!used2 && bonus2 == 0.0, "Row6Pair: kein Freiraeumen mehr");
+        assert!((occ2[5][1] - 0.5).abs() < 1e-12, "{}", occ2[5][1]);
+        assert!(
+            (envelope_score_frac_for_in(&occ2, Hull::Left, HullForm::Row6Pair) - 3.0 / 62.0).abs() < 1e-12
+        );
     }
 
     #[test]

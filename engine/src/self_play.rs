@@ -5753,6 +5753,16 @@ pub(crate) mod tests {
                 for f in NET_PARITY_EXCLUDED_FIELDS {
                     m.remove(f);
                 }
+                // Seit 2026-09-07 (Pass als eigene Log-Zeile, Nutzer-Auftrag) traegt
+                // der Record-Zustand Textzeilen, die keine Zugwahl sind: `state.log`
+                // ist Anzeige (letzte 30 Zeilen, serialize.rs), kein Spielverhalten.
+                // Der Hash misst Zuege, darum bleibt der Text draussen -- geprueft
+                // 2026-09-07 00:45: mit Pass-Zeile aus stimmte der alte Hash Zug
+                // fuer Zug (Fixture 71b6e5d4de190682), mit Pass-Zeile an wich nur
+                // dieser Text ab.
+                if let Some(Value::Object(st)) = m.get_mut("state") {
+                    st.remove("log");
+                }
                 buf.push_str(&Value::Object(m).to_string());
                 buf.push('\n');
             }

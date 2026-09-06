@@ -439,6 +439,13 @@ pub struct SearchConfig {
     /// Modi 1 und 4 wirksam; `0.0` = aus, bitidentisch. Spec-Pflichtfeld je
     /// Seite (`envelope_flush_w`), Env-Default `MOSAIC_ENVELOPE_FLUSH_W`.
     pub envelope_flush_w: f64,
+    /// Huellenform des Such-Terms (e) (par.8.15 Teil B, gebaut 2026-09-06):
+    /// 1 = Dreieck wie bisher (Default, bitidentisch), 2 = Dreieck plus die
+    /// zweite Zelle der Rasterzeile 6 (LINKS (5,1), RECHTS (5,4); 22 Zellen,
+    /// Gesamtkosten 62). Wirkt in ALLEN Projektions-Modi; Tiling-Zweig (d)
+    /// und Huellen-Bauer bleiben auf dem Dreieck. Spec-Pflichtfeld je Seite
+    /// (`envelope_hull_form`), Env-Default `MOSAIC_ENVELOPE_HULL_FORM`.
+    pub envelope_hull_form: u8,
 }
 
 impl SearchConfig {
@@ -472,6 +479,7 @@ impl SearchConfig {
             envelope_tiling_value_w: read_f64_env("MOSAIC_ENVELOPE_TILING_VALUE_W", 0.0),
             envelope_projection_mode: crate::envelope::projection_mode(),
             envelope_flush_w: crate::envelope::flush_weight(),
+            envelope_hull_form: crate::envelope::hull_form(),
         }
     }
 
@@ -501,6 +509,7 @@ impl SearchConfig {
             "envelope_tiling_value_w",
             "envelope_projection_mode",
             "envelope_flush_w",
+            "envelope_hull_form",
             "heuristik_variante",
         ];
         for key in obj.keys() {
@@ -559,6 +568,19 @@ impl SearchConfig {
                 "Spec-Datei {path}: 'envelope_flush_w' muss >= 0 sein, ist {envelope_flush_w}"
             ));
         }
+        // K3 par.8.15 Teil B (Huellenform): dieselbe Pflicht-Regel; gueltig sind
+        // 1 (Dreieck, Bestand) und 2 (plus zweite Zelle der Zeile 6).
+        let envelope_hull_form = {
+            let v = get_required("envelope_hull_form")?;
+            let max = f64::from(crate::envelope::HULL_FORM_MAX);
+            if v.fract() != 0.0 || !(1.0..=max).contains(&v) {
+                return Err(format!(
+                    "Spec-Datei {path}: 'envelope_hull_form' muss eine ganze Zahl 1..{max} sein \
+                     (1 Dreieck, 2 Dreieck plus zweite Zelle der Zeile 6), ist {v}"
+                ));
+            }
+            v as u8
+        };
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -629,6 +651,7 @@ impl SearchConfig {
             envelope_tiling_value_w,
             envelope_projection_mode,
             envelope_flush_w,
+            envelope_hull_form,
         })
     }
 }
@@ -2229,10 +2252,17 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
                 // Projektions-Modus (par.8.7/8.9): 0 Raster, 1 Musterreihen,
                 // 2 Erreichbarkeit, 3 Ownership-Kopf (`ownership` = rohe Logits
                 // des Mover-Passes, ego = `state.current_player`).
+                // Huellenform (par.8.15 Teil B): 1 = Dreieck (Bestand, bitidentisch),
+                // 2 = plus zweite Zelle der Zeile 6. Ein ungueltiger Wert kann hier
+                // nicht ankommen (Spec-Parser und Env-Getter pruefen), der Fallback
+                // ist das Dreieck.
+                let hull_form = crate::envelope::HullForm::from_u8(search_config.envelope_hull_form)
+                    .unwrap_or(crate::envelope::HullForm::Triangle);
                 let shift = crate::envelope::search_shift_state(
                     &state, env_c, &search_config.envelope_profile, &ownership,
                     search_config.envelope_projection_mode,
                     search_config.envelope_flush_w,
+                    hull_form,
                 );
                 today_value[0] = (today_value[0] + shift).clamp(0.0, 1.0);
                 today_value[1] = (today_value[1] - shift).clamp(0.0, 1.0);
@@ -6332,6 +6362,7 @@ mod tests {
             envelope_tiling_value_w: 0.0,
             envelope_projection_mode: 0,
             envelope_flush_w: 0.0,
+            envelope_hull_form: 1,
         }
     }
 
@@ -6442,7 +6473,7 @@ mod tests {
     fn search_config_from_spec_file_rejects_hv2_variant() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_hv2_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "heuristik_variante": "hv2"}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "heuristik_variante": "hv2"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "eine hv2-Spec darf in diesem Build NICHT still als hv1 laufen");
         let msg = result.unwrap_err();
@@ -6468,7 +6499,7 @@ mod tests {
             std::fs::write(
                 &path,
                 format!(
-                    r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "heuristik_variante": "{old}"}}"#
+                    r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "heuristik_variante": "{old}"}}"#
                 ),
             )
             .unwrap();
@@ -6486,7 +6517,7 @@ mod tests {
     fn search_config_from_spec_file_accepts_hv1() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_hv1_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.25, "long_row_init_shaping_w": 0.3, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "heuristik_variante": "hv1"}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.25, "long_row_init_shaping_w": 0.3, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "heuristik_variante": "hv1"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         std::fs::remove_file(&path).ok();
         let cfg = result.expect("hv1 muss angenommen werden");
@@ -6510,15 +6541,47 @@ mod tests {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_projmode_{}.json", std::process::id()));
         let too_big = crate::envelope::PROJECTION_MODE_MAX + 1;
-        std::fs::write(&path, format!(r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": {too_big}, "envelope_flush_w": 0.0, "heuristik_variante": "hv1"}}"#)).unwrap();
+        std::fs::write(&path, format!(r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": {too_big}, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "heuristik_variante": "hv1"}}"#)).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         std::fs::remove_file(&path).ok();
         assert!(result.expect_err("Modus jenseits MAX muss scheitern").contains("envelope_projection_mode"));
         // K3-P2: Modus 4 ist gueltig und landet unveraendert in der Config.
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 4, "envelope_flush_w": 0.0, "heuristik_variante": "hv1"}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 4, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "heuristik_variante": "hv1"}"#).unwrap();
         let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("Modus 4 (K3-P2) ist gueltig");
         std::fs::remove_file(&path).ok();
         assert_eq!(cfg.envelope_projection_mode, 4);
+    }
+
+    /// K3 par.8.15 Teil B: `envelope_hull_form` ist Pflichtfeld und nur 1
+    /// (Dreieck) oder 2 (plus zweite Zelle der Zeile 6) gueltig.
+    #[test]
+    fn search_config_from_spec_file_validates_envelope_hull_form() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_hullform_{}.json", std::process::id()));
+        let spec = |form: &str| {
+            format!(
+                r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 1, "envelope_flush_w": 0.0{form}, "heuristik_variante": "hv1"}}"#
+            )
+        };
+        // Fehlt ganz -> Pflichtfeld-Fehler.
+        std::fs::write(&path, spec("")).unwrap();
+        let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect_err("Spec ohne envelope_hull_form muss scheitern");
+        assert!(msg.contains("envelope_hull_form"), "{msg}");
+        // 0 und MAX + 1 sind ungueltig.
+        for bad in [0u8, crate::envelope::HULL_FORM_MAX + 1] {
+            std::fs::write(&path, spec(format!(", \"envelope_hull_form\": {bad}").as_str())).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("Form ausserhalb 1..2 muss scheitern");
+            assert!(msg.contains("envelope_hull_form"), "{msg}");
+        }
+        // 1 und 2 kommen unveraendert an.
+        for good in [1u8, 2u8] {
+            std::fs::write(&path, spec(format!(", \"envelope_hull_form\": {good}").as_str())).unwrap();
+            let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("1 und 2 sind gueltig");
+            assert_eq!(cfg.envelope_hull_form, good);
+        }
+        std::fs::remove_file(&path).ok();
     }
 
     /// K3: das Profil muss genau fuenf Zahlen haben.
@@ -6526,7 +6589,7 @@ mod tests {
     fn search_config_from_spec_file_rejects_short_envelope_profile() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_k3profile_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.5], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "heuristik_variante": "hv1"}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.5], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "heuristik_variante": "hv1"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         std::fs::remove_file(&path).ok();
         let msg = result.expect_err("Profil mit 2 Zahlen muss scheitern");
@@ -6694,7 +6757,7 @@ mod tests {
     fn search_config_from_spec_file_rejects_unknown_variant() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_badvariant_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "heuristik_variante": "hv2_tippfehler"}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "heuristik_variante": "hv2_tippfehler"}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "unbekannte Variante muss abgewiesen werden");
         assert!(result.unwrap_err().contains("nicht mehr spielbar"));
@@ -6707,7 +6770,7 @@ mod tests {
     fn search_config_from_spec_file_requires_variant_field() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_novariant_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "envelope_hull_form": 1}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "fehlende heuristik_variante muss abgewiesen werden");
         std::fs::remove_file(&path).ok();
@@ -6719,7 +6782,7 @@ mod tests {
     fn search_config_from_spec_file_rejects_unknown_field() {
         let dir = std::env::temp_dir();
         let path = dir.join(format!("mosaic_test_spec_unknown_field_{}.json", std::process::id()));
-        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "tpyo_feld": 1.0}"#).unwrap();
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.2, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "tpyo_feld": 1.0}"#).unwrap();
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "unbekanntes Feld muss einen Fehler ergeben, nicht still ignoriert werden");
         std::fs::remove_file(&path).ok();

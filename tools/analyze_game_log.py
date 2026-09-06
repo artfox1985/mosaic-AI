@@ -118,6 +118,7 @@ PATTERNS: dict[str, re.Pattern] = {
         r"(?P<srcs>.+?) → (?P<dest>Reihe \d+|Strafleiste)(?: \[(?P<fill>\d+)/(?P<cap>\d+)\])?"
         r"(?: \(\+(?P<overflow>\d+) Strafleiste\))?$"
     ),
+    "PASS": re.compile(r"^⏭️\s*(?P<name>.+?): passt$"),
     "CHIP_TAKE": re.compile(
         r"^(?P<name>.+?): Bonusplättchen von Fabrik (?P<fid>\d+) genommen \[(?P<used>\d+)/2 diese Runde\]$"
     ),
@@ -168,7 +169,7 @@ PATTERNS: dict[str, re.Pattern] = {
 # Primaere Aktionszeilen: loesen einen (oder mehrere) apply_*-Aufrufe aus.
 PRIMARY_CATEGORIES = {
     "GAME_START", "SCORING_CHOICE", "START_TILE", "SUN_TAKE", "MOON_GLOBAL_TAKE",
-    "CHIP_TAKE", "STACK_PEEK", "DOME_PLACE", "TILING_PLACE", "CHIPS_COMPLETE",
+    "CHIP_TAKE", "STACK_PEEK", "DOME_PLACE", "TILING_PLACE", "CHIPS_COMPLETE", "PASS",
     "ROUND_START", "GAME_OVER", "ROUND_STRAFE", "UNPLACEABLE", "FINAL_SCORE",
 }
 
@@ -495,8 +496,16 @@ class Replayer:
                 raise ReplayDivergence(f"Zeile {li}: ensure_drafting_actor: Spieler {target} nach {guard} Pass-Versuchen nicht erreicht.")
             before = self.g.log_len()
             self.g.apply_pass()
-            if self.g.log_len() != before:
-                raise ReplayDivergence(f"Zeile {li}: apply_pass() hat unerwartet Log-Zeilen erzeugt.")
+            # Seit 2026-09-07 schreibt die Engine den Pass als eigene Zeile
+            # (game.rs Action::Pass, Kategorie PASS). Hier wird ein IMPLIZITER
+            # Pass nachgespielt (altes Log ohne Pass-Zeilen); seine Zeile steht
+            # nicht im Original und bleibt darum ausserhalb des Vergleichs --
+            # `_call_and_check` misst ab dem naechsten `log_len()`. Alles andere
+            # als genau diese eine Pass-Zeile (oder keine, altes Wheel) ist Drift.
+            extra = [l for l in self.g.log_since(before) if not l.startswith("#a ")]
+            body = (ROUND_PREFIX.match(extra[0]).group(2) if extra and ROUND_PREFIX.match(extra[0]) else (extra[0] if extra else ""))
+            if extra and not (len(extra) == 1 and classify(body)[0] == "PASS"):
+                raise ReplayDivergence(f"Zeile {li}: apply_pass() hat unerwartet Log-Zeilen erzeugt: {extra!r}")
             self.action_log.append(("apply_pass", (), {}))
 
     def end_tiling_cascade(self, lines: list[LogLine], li: int) -> int:
@@ -1088,6 +1097,14 @@ def _run_loop(rep: "Replayer", lines: list[LogLine], name_to_idx: dict, n_lines:
             rep.maybe_oracle(actor, kind, cur.body, fields)
             li = rep.resolve_dome(lines, li, int(m.group("tile")), int(m.group("r")), int(m.group("c")), int(m.group("rot")))
             n_oracle_done += 1
+
+        elif cat == "PASS":
+            # Eigene Pass-Zeile (Engine seit 2026-09-07). Der Spieler muss dran
+            # sein; sonst ist das Log inkonsistent, kein impliziter Pass davor.
+            actor = name_to_idx[m.group("name")]
+            if rep.g.phase() != "drafting" or rep.g.current_player() != actor:
+                raise ReplayDivergence(f"Zeile {li}: Pass-Zeile von {m.group('name')!r}, aber nicht am Zug.")
+            li = rep.apply(lines, li, "apply_pass")
 
         elif cat == "CHIP_TAKE":
             actor = name_to_idx[m.group("name")]

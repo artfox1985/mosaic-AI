@@ -61,7 +61,7 @@ sys.path.insert(0, str(HERE.parent.parent))
 
 TILING_METHODS = {"apply_tiling", "apply_tiling_chips", "apply_tiling_chips_with"}
 DRAFT_METHODS = {"apply_stone", "apply_dome", "apply_dome_stack_peek",
-                 "apply_dome_stack_choose", "apply_bonus_chip", "apply_start_tile"}
+                 "apply_dome_stack_choose", "apply_bonus_chip", "apply_start_tile", "apply_pass"}
 
 
 def occ_of(state: dict, pi: int) -> frozenset:

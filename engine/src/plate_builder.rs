@@ -769,6 +769,11 @@ fn cells_corner(idx: usize) -> Vec<(usize, usize)> {
 // (`target_index_generic`, Seed-Streuung bei Gleichstand), NICHT per
 // Abweichungsregel der Sonde -- auf dem leeren Brett gaebe die sonst immer
 // LINKS.
+//
+// Der Bauer bleibt auf dem DREIECK (`Hull::contains`): der Knopf
+// `envelope_hull_form` (par.8.15 Teil B) wirkt nur im Such-Term (e); der
+// Nachzug des Huellen-Bauers ist dort als eigener Schritt vorgesehen, falls
+// Teil B traegt.
 
 struct HullBuilder;
 impl HullBuilder {
