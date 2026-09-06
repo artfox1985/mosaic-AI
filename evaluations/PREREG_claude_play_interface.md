@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: Werkzeug tools/claude_play.py gebaut 2026-09-06 13:30 (py_compile, Import), Rauchtest steht aus (CPU belegt), nichts gespielt. Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: Werkzeug tools/claude_play.py gebaut 2026-09-06 13:12 (py_compile, Import), Rauchtest steht aus (CPU belegt), nichts gespielt. Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -197,7 +197,7 @@ als Traeger" waere eine eigene Prereg).
 
 ## par.7 Ergebnisse (leer bis zum ersten Spiel)
 
-**Werkzeug gebaut 2026-09-06, 13:30: `tools/claude_play.py`** (Befehle `new`, `show`,
+**Werkzeug gebaut 2026-09-06, 13:12: `tools/claude_play.py`** (Befehle `new`, `show`,
 `move`, `note`; Zustand je Aufruf per `analyze_game_log.run` aus `game.log`,
 Gegner-Spec als Env vor dem Engine-Import wie `server.py`, Netz-Zuege ueber
 `ai_step_net_json` / `ai_start_tile_json`, Endwertung ueber `end_scoring_json`,

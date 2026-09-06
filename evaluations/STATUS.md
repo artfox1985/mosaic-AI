@@ -166,7 +166,7 @@ bereits: Groessen-Basislinie nachgezogen, Regel 8 (lebende Specs gegen KNOWN_FIE
 Rust-Aenderungen betreffen Tests und einen const-Ausdruck mit demselben Wert (false).
 
 8. **Spiel-Interface Claude gegen Netz** (`PREREG_claude_play_interface.md`, Nutzer-
-   Auftrag 12:30): `tools/claude_play.py` gebaut 13:30, Entscheide par.8 komplett
+   Auftrag 12:30): `tools/claude_play.py` gebaut 13:12, Entscheide par.8 komplett
    (10 Partien 5/5, Champion @400, Tiling selbst, keine Uebereinstimmungsmessung,
    Weg 2 Rueckfall, Werkzeug bleibt). Offen: Rauchtest gegen Heuristik im
    CPU-freien Fenster, dann die erste Partie; Protokoll je Partie in par.7.
