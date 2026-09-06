@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt: gepoolt 191:129 (8.7), Champion-Kante 221:179 (10a), seit 2026-09-04 Champion-Knopf v23-b01_k3p10 (par.11). K3-P2 (Modus 4) gebaut 2026-09-05, K3-F (Reihe freiraeumen, Spec-Feld envelope_flush_w) gebaut, getestet und installiert 2026-09-06 nach der Reihen-Alter-Messung (par.8.14: blockierte 6er-Reihen werden zu 22-27 % gelegt gegen 86-90 %), Anker GRUEN; Am Champion v24-b06 gemessen: K3-P2 NEGATIV (8.11a, 71:89), K3-F 1,0 NEGATIV (8.14: 74:86, Instrument 0,4625 gegen 0,4975; lange Reihen vollendet +0,3-0,4, bezahlt mit Punkten und Spalten); K3-F 0,5 und beide laufen. WIEDER OFFEN 2026-09-05 (Nutzer): geschlossen wird erst, wenn die Einhuellende sauber implementiert ist UND den Value-Kopf in den ersten Runden messbar entlastet (par.12; Messgroessen par.12a, Schwellen werden aus dem Rauschboden GEMESSEN, Verfahren par.12b, Zahlen offen). -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt (8.7 gepoolt 191:129, Champion-Knopf seit 2026-09-04, par.11). Am Champion v24-b06 gemessen 2026-09-06: K3-P2 NEGATIV (8.11a, 71:89), K3-F 1,0 NEGATIV (8.14, 74:86, vollendet +0,3 lange Reihen, zahlt Punkte), K3-F 0,5 NEGATIV (8.14, 77:83, Arena-Spalten darunter); Kombination laeuft (8.14a). par.8.15: Huellenform (gemessene Huelle, zweite Zelle in Zeile 6 als Knopf) registriert, Bau laeuft. Schliesskriterium par.12 (Value-Entlastung, Rauschboden par.12b gemessen) offen. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -2017,4 +2017,31 @@ die Form als Parameter, Bau nach den K3-Armen wie registriert.
 **Reihenfolge:** Teil A und `cargo test`/Wheel/Anker fuer Teil B im CPU-freien Fenster nach
 der Knopf-Kette (rund 00:10), Code fuer Teil B vorher (Subagent, ohne Build). Dann Messung
 Teil B (rund 50 min) VOR den neun Partien oder danach -- Nutzer-Entscheid, sonst danach.
+
+**GEMESSEN AM CHAMPION v24-b06, Arm K3-F 0,5 (gefahren 2026-09-06, 22:27-23:20; Arm = Spec
+`k3f_w05` (`envelope_flush_w` 0,5), sonst wie oben; Instrument `k3_f05_v24b06.json`, Arena
+`paired_arena_env_k3f05_b06_vs_k3p_{first,second}_s14.json`; Auswerter `k3_arm_summary.py f05`):**
+
+| Groesse | K3-F 0,5 | Kontrolle K3-P |
+| --- | --- | --- |
+| argmax @400, volle Spalten (200 Partien, Seed 20260931) | **0,5450** (KI +-0,071), Punkte 49,2, Strafleiste 5,6 | 0,4975 (`tor2a_v24b06.json`) |
+| Arena 2 x 80, Siege | **77 : 83** (Brett 0: 40:40, Brett 1: 37:43; Vorzeichentest p 0,69) | |
+| Arena, volle Spalten je Seite (Brett 0 / Brett 1) | **0,487 / 0,525** (SE 0,08) | 0,675 / 0,600 |
+| Arena, Punkte | 44,2 / 42,9 | 45,9 / 47,0 (Marge -1,7 / -4,2 gegen den Arm) |
+| Kuppel-Bonus je Partie | 3,8 / 3,7 | 3,6 / 3,9 |
+| lange Reihen begonnen / vollendet / geraeumt (Records, je Seite) | 4,38 / 2,83 / 0,19 und 4,54 / 3,01 / 0,26 | 4,29 / 2,81 / 0,33 und 3,94 / 2,56 / 0,19 |
+| offen am Ende (Herleitung) | 1,36 / 1,27 | 1,15 / 1,19 |
+
+**Verdikt (Tor 1/2):** K3-F 0,5 traegt am Champion b06 NICHT: Siege gleichauf bis leicht
+dagegen (77:83), Punkte 1,7-4,2 je Seite darunter, und in der Arena liegen die vollen
+Spalten in BEIDEN Richtungen unter der Kontrolle (Brett 0 -0,19, mehr als zwei SE). Das
+argmax-Instrument (beide Seiten K3-F 0,5) zeigt dagegen +0,0475 ueber dem Bezug (innerhalb
+der KI +-0,071) -- Instrument und Arena widersprechen sich hier in der Richtung; die Arena
+(Arm gegen Kontrolle am selben Netz) ist das Mass von Tor 2b, das Instrument das von Tor 2a.
+Die Reihen-Wirkung ist bei halber Dosis nur noch in einer Richtung sichtbar (vollendet
+3,01 gegen 2,56 auf Brett 1, 2,83 gegen 2,81 auf Brett 0). Damit ist K3-F in beiden Dosen
+am Champion negativ; als Such-Knopf allein ist es kein Rezept. Weiterverfolgt wird es (a)
+als Erzeugungs-Knopf (`PREREG_v25_window.md` par.10, Nutzer 22:45) und (b) auf der Huellenform
+mit zweiter Zelle in Zeile 6 (par.8.15 Teil B), weil die Blockade der Reihe 6 an der
+Ein-Zellen-Spitze des Dreiecks haengt. Kombination K3-P2 + K3-F 1,0 (par.8.14a) laeuft.
 
