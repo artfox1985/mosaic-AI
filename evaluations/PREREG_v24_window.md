@@ -506,8 +506,7 @@ gebaut (2.945 Bloecke, Chronik 2026-09-05 16:04) -- nichts fiel still auf 0.
 eigentlich nur mit champion"): Kante in SPIELKONFIGURATION, b05 `k3v_off` gegen
 v23-b01 Champion-Spec, Seed 20261012 (12:17, `paired_gating_result_v24-b05nk_vs_v23-b01_k3p10_s12.json`):
 58:72 nach 65 Paaren, SPRT H0 (LLR -3,82), McNemar p 0,31, Diff -0,22 [-0,57, +0,14],
-Punkte 42,9 gegen 44,8; 1.804 s. Kein Beleg fuer b05 gegen den Champion; Seed 20261013
-laeuft. Rueckfall B (v24-b06 = b02-Rezept auf 744) trainiert seit 11:47.**
+Punkte 42,9 gegen 44,8; 1.804 s. **Seed 20261013 (13:20, `..._s13.json`): 144:146 nach 145 Paaren, H0 (LLR -3,00), McNemar p 1,0, Diff -0,01 [-0,22, +0,19], Punkte 48,7 gegen 48,6; 3.816 s. Gepoolt 202:218 aus 210 Paaren: b05 in Spielkonfiguration GLEICHAUF mit dem Champion, kein Champion-Beleg.** Rueckfall B: v24-b06 (b02-Rezept auf 744) trainiert 11:47-13:07, Abnahme laeuft seit 13:21; wird b06 Champion-Kandidat (Tor 1 mit Knopf, zwei Seeds), ist die Kante b06 gegen den Champion dieselbe Messung wie sein Tor 1 mit Knopf.**
 
 **Was der Entscheid mitentscheidet:** (1) Knopf in der v25-Erzeugung ja/nein
 (par.6b'); (2) Generator; (3) ob der v24-Sieger den Champion-Knoten herausfordert

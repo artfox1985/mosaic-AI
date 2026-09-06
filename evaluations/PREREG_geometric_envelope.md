@@ -1467,6 +1467,20 @@ Streuungen, und die Schwelle ist die groessere von beiden:
    VERGLEICHS ist die Spannweite dieser Block-SD ueber die vorhandenen
    Artefakte gleicher Konfiguration.
 
+**GEMESSEN, Punkt 3 (2026-09-06, 13:20; `tools/probes/arena_block_sd_probe.py`,
+`arena_block_sd_par12b.json`, reine Arithmetik ueber vorhandene Artefakte,
+Bloecke a 5):** ueber 17 gepaarte Gating-Artefakte (@400, Deckel 200 Paare,
+v24-Abnahmen und Champion-Kanten) liegt die Block-SD der gepaarten Punktemarge
+bei **10,7 bis 14,3 Punkten (Median 12,0; Verhaeltnis max/min 1,34)**, die
+Block-SD des Paarsieg-Anteils bei 0,21 bis 0,35; ueber 20 Seiten der
+Tor-2b-Arenen (2 x 80, Seed 20261014, `columns_*_s14.json`) liegt die Block-SD
+der vollen Spalten je Seite bei **0,23 bis 0,46 (Median 0,33; Verhaeltnis
+max/min 2,0)**. Aufloesung eines Streuungs-VERGLEICHS (C1) damit: eine
+Block-SD der Marge gilt erst ab Faktor 1,34, eine der Spalten erst ab Faktor
+2,0 als verschieden -- alles darunter ist innerhalb der Spannweite
+identischer Aufbauten. Punkte 1 und 2 (frozen_v3) folgen in der
+Knopf-Messkette am Champion (Nutzer 13:15: "miss den rauschboden mit").
+
 **Regel:** eine Groesse gilt erst dann als bewegt, wenn ihre Differenz beide
 Rauschboeden (1 und 2) ueberschreitet; C1 gilt als "nicht groesser", wenn das
 Verhaeltnis innerhalb der Spannweite aus 3 liegt. Die gemessenen Zahlen
