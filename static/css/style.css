@@ -237,12 +237,21 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    60 %, waehrend die aktuelle/gewaehlte Reihe die volle .drop-Hervorhebung
    traegt -- gilt vor UND nach dem Reihen-Klick (app.js renderBoard). */
 .prow.dim{opacity:.6}
-/* Nutzer-Feedback (2026-07-29): dezente Markierung der aktuellen Reihe, wenn
-   sie nur per Bonuschips (nicht direkt) komplettierbar ist -- kein cursor:
-   pointer, die Reihe selbst ist nicht klickbar, nur der Bonuschips-Kasten
-   (.chips-usable) ist es. Gestrichelter Rahmen statt Vollflaeche grenzt das
-   optisch von .drop (direkt klickbar) ab. */
-.prow.chip-target{outline:1.5px dashed var(--blau);outline-offset:-1px;border-radius:5px}
+/* Markierung der aktuellen Reihe, wenn sie nur per Bonuschips (nicht direkt)
+   komplettierbar ist. Die Reihe oeffnet damit das Bonuschip-Fenster, nicht
+   die Kuppelfeld-Wahl -- die eigene Farbe sagt genau das.
+
+   NEUFASSUNG 2026-09-07 (Nutzer: "find ich nicht stimmig"): vorher ein
+   duenner blau gestrichelter Rahmen. Der stand quer zur Sprache des Bretts --
+   dort heisst BLAU + Rahmen/Flaeche durchweg "hier klicken" (.chips-usable,
+   .floor-usable, .prow.drop), und ausgerechnet das Element, das damals NICHT
+   klickbar war, trug die duenne Variante davon. Beides ist jetzt aufgeloest:
+   blasse Flaeche in derselben Farbfamilie wie der Kasten, dem die Reihe
+   zugeordnet ist -- und die Reihe ist wirklich klickbar. Das Zeichen dazu
+   setzt app.js in die Pfeilspalte (.chip-label). */
+.prow.chip-target{background:rgba(219,234,254,.55);border-radius:5px;cursor:pointer}
+.prow.chip-target:hover{background:#DBEAFE}
+.rowlabel.chip-label{font-size:11px;line-height:1;filter:saturate(.85)}
 .rownum{font-size:9px;color:var(--text3);min-width:14px;text-align:right}
 .rowlabel{font-size:8px;color:var(--text3);min-width:16px;text-align:left;margin-left:2px}
 .prow:nth-child(2), .prow:nth-child(4) {
@@ -495,10 +504,13 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 }
 
 /* Bonus-Chips */
-/* Nutzer-Feedback (2026-07-27): der Bonuschip-Bereich selbst wird klickbar/
-   hervorgehoben, sobald mind. 1 Musterreihe chip-vervollstaendigbar ist --
-   ersetzt den bisherigen einzelnen 🎫-Reihen-Button. */
-.chips-usable{background:#DBEAFE;outline:2.5px solid var(--blau);box-shadow:0 0 0 3px rgba(59,130,246,.22)}
+/* Der Bonuschip-Kasten ist klickbar, sobald die aktuelle Musterreihe per Chips
+   vervollstaendigt werden kann (app.js setzt Klasse, Zeiger und onclick).
+   HERVORGEHOBEN wird er seit dem 2026-09-07 nicht mehr (Nutzer: "die
+   hervorhebung bei den bonuschips verschwindet, nur die musterreihen werden
+   hervorgehoben"): die Markierung sitzt jetzt allein an der Reihe, um die es
+   geht (.prow.chip-target). Der Kasten bleibt der zweite Weg zum selben
+   Fenster und meldet sich nur noch beim Ueberfahren. */
 .chips-usable:hover{background:#BFDBFE}
 .chips-grid {
   display: grid;
@@ -1423,11 +1435,15 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
    Karte selbst faengt Klicks. */
 .finish-veil{
   position:fixed;inset:0;z-index:120;
-  display:none;                      /* per JS auf flex geschaltet */
-  align-items:center;justify-content:center;
+  display:none;                      /* per JS auf block geschaltet */
   pointer-events:none;
 }
+/* Nutzer 2026-09-07: nicht mehr per Flex zentriert, sondern ausdruecklich
+   positioniert (app.js::positionTilingFinishPopup) -- buendig mit Musterreihe
+   1 und mit der Maus verschiebbar. Sonst kann das Fenster ausgerechnet die
+   letzte Musterreihe verdecken, die es korrigierbar halten soll. */
 .finish-card{
+  position:absolute;
   pointer-events:auto;
   min-width:260px;max-width:340px;
   padding:16px 18px;
@@ -1437,7 +1453,8 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   box-shadow:0 10px 50px rgba(0,0,0,.25);
   text-align:center;
 }
-.finish-title{font-size:14px;font-weight:600;margin-bottom:4px}
+.finish-title{font-size:14px;font-weight:600;margin-bottom:4px;cursor:grab;user-select:none}
+.finish-card.dragging .finish-title{cursor:grabbing}
 .finish-sub{font-size:10px;color:var(--text2);margin-bottom:10px;line-height:1.4}
 
 /* -- Vorgemerkte Tiling-Fliese (Punkt 10) -----------------------------------
@@ -1494,3 +1511,20 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 }
 #place-toolbar .btn{padding:3px 8px;font-size:12px;line-height:1.2}
 #place-rot-label{font-size:10px;color:var(--text2);min-width:26px;text-align:center}
+
+
+/* -- Reihe ist abschlussbereit (Nutzer 2026-09-07) --------------------------
+   Die Fliese liegt vorgemerkt auf der Kuppel, der Klick auf die Musterreihe
+   schliesst sie ab. Dieselbe Sprache wie die legalen Zielfelder auf den
+   Kuppelplatten (`.ds.legal-target`): Rahmen plus pulsierender Hof -- hier in
+   Amber, weil die Markierung zu der vorgemerkten Fliese gehoert
+   (`.ds.pending-place`), nicht zur Zielsuche. */
+.prow.confirm-ready{
+  outline:2px solid var(--gelb);
+  outline-offset:-1px;
+  animation:confirm-pulse 1.2s ease-in-out infinite;
+}
+@keyframes confirm-pulse{
+  0%,100%{box-shadow:0 0 0 2px rgba(245,158,11,.25)}
+  50%{box-shadow:0 0 0 5px rgba(245,158,11,.55)}
+}
