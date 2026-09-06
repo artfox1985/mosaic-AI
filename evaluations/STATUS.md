@@ -99,10 +99,9 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    (`cpu_queue_after_b04.sh`) faehrt sie mit; Block `reihen_alter` im selben
    Artefakt. Beide Teile auswerten und in par.8.12 UND par.8.14 registrieren;
    DANN K3-F bauen (Nutzer 00:50).
-4. **Mini-Fenster-Test Fall D (Pause)**: LAEUFT seit 01:59 (GPU frei; als
-   der eine GPU-Auftrag neben der b04-Replikation, Laufzeiten darum
-   "gebremst"). Muss GRUEN werden. Dann `--fast-loader` als Default erwaegen
-   (Nutzer-Entscheid).
+4. ~~Mini-Fenster-Test Fall D (Pause)~~ **GRUEN 02:00** (alle Faelle A-E
+   bitgleich, `working_rules.md`). Offen beim Nutzer: `--fast-loader` als
+   Default (Volllauf b03: 440 s je Epoche gegen 16 min, bitgleich).
 5. **Nach allen fuenf Abnahmen (gegen 11:00): VORLAGE Generatorwahl v24 an den
    Nutzer** nach `docs/generation_loop.md` "Generatorwahl unter Armen" (Staerke
    schliesst aus, Spaltenprofil entscheidet, sonst Amtsinhaber) -- mit der
