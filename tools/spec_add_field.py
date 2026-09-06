@@ -14,6 +14,7 @@ Aufruf (Projektordner):
     python tools/spec_add_field.py envelope_flush_w 0.0            # alle models/*.spec.json
     python tools/spec_add_field.py envelope_flush_w 0.0 --check    # nur pruefen, Exit 1 wenn etwas fehlt
     python tools/spec_add_field.py envelope_flush_w 0.5 models/k3f_c10.spec.json  # gezielt
+    python tools/spec_add_field.py envelope_hull_form 1             # par.8.15 Teil B (Bau-Fenster)
 
 Das Feld wird VOR "heuristik_variante" eingefuegt (Konvention der Spec-Dateien:
 Knoepfe zuerst, Variante zuletzt); vorhandene Werte werden nicht ueberschrieben.

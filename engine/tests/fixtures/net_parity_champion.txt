@@ -18,4 +18,4 @@
 champion	v24-b06_brierbest
 erzeugt	2026-09-06
 engine	0.1.0
-hash	71b6e5d4de190682
+hash	fc802accd3f83a1b

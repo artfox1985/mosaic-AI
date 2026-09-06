@@ -1630,6 +1630,9 @@ pub(crate) fn best_first_step_envelope_valued(
     if cands.is_empty() {
         return None;
     }
+    // K3 (d) bleibt auf dem DREIECK: der Knopf `envelope_hull_form`
+    // (PREREG_geometric_envelope.md par.8.15 Teil B) wirkt nur im Such-Term (e);
+    // der Nachzug des Tiling-Zweigs ist dort als eigener Schritt vorgesehen.
     let before = crate::envelope::envelope_score(&state.players[pi]);
     let scored: Vec<(f64, TilingOutcome)> = cands
         .into_iter()

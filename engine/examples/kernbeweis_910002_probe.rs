@@ -89,6 +89,7 @@ fn main() {
         envelope_tiling_value_w: 0.0,
         envelope_projection_mode: 0,
         envelope_flush_w: 0.0,
+        envelope_hull_form: 1,
     };
     let actions = drafting_actions(&state1);
     println!(

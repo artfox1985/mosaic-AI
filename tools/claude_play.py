@@ -61,6 +61,7 @@ SPEC_TO_ENV = {
     "envelope_projection_mode": "MOSAIC_ENVELOPE_PROJECTED",
     "envelope_profile": "MOSAIC_ENVELOPE_PROFILE",
     "envelope_flush_w": "MOSAIC_ENVELOPE_FLUSH_W",
+    "envelope_hull_form": "MOSAIC_ENVELOPE_HULL_FORM",
 }
 
 
@@ -108,11 +109,11 @@ def rebuild_game(name: str, m: dict):
     if div:
         raise SystemExit(f"Replay-Divergenz in {log_path.name}: {div}")
     g = rep.g
-    # Ein Pass schreibt keine Log-Zeile (game.rs Action::Pass, py.rs:786); der Replayer
-    # rekonstruiert ihn aus dem Spielerwechsel der NAECHSTEN Aktion -- als LETZTE Aktion
-    # geht er verloren. Darum merkt sich das Manifest den letzten Pass und spielt ihn nach.
+    # Seit 2026-09-07 schreibt die Engine den Pass als eigene Log-Zeile, der Replayer
+    # spielt ihn nach; das Manifest-Feld `trailing_pass` (Blocker 3 von g01) ist damit
+    # nur noch fuer Logs aus der Zeit davor von Bedeutung und wird nicht mehr gesetzt.
     tp = m.get("trailing_pass")
-    if tp is not None and json.loads(g.state_json()).get("phase") == "drafting" and g.current_player() == tp:
+    if tp is not None and not m.get("engine_logs_pass", False)             and json.loads(g.state_json()).get("phase") == "drafting" and g.current_player() == tp:
         g.apply_pass()
     if m["opponent"] != "heuristic":
         g.load_net(str(REPO / m["model_path"]))
@@ -158,7 +159,7 @@ def drive_ai(name: str, m: dict, g, since: int, out: list[str]) -> int:
                 out.append(f"KI konnte nicht ziehen: {res.get('reason')}")
                 return append_log(name, g, since)
             a = res.get("action") or {}
-            m["trailing_pass"] = ai if a.get("type") == "pass" else None
+            m["trailing_pass"] = None; m["engine_logs_pass"] = True
             save_manifest(name, m)
             out.append(f"KI: {a.get('description') or json.dumps(a, ensure_ascii=False)[:160]}")
             continue
@@ -433,7 +434,7 @@ def cmd_move(a) -> int:
         print("Die legalen Zuege stehen unter 'show' -- Kurzform genau so uebernehmen (auch mond:...).")
         return 1
     m["moves_claude"] = m.get("moves_claude", 0) + 1
-    m["trailing_pass"] = m["me"] if a.move.strip().lower() == "pass" else None
+    m["trailing_pass"] = None; m["engine_logs_pass"] = True
     save_manifest(a.game, m)
     since = append_log(a.game, g, since)
     drive_ai(a.game, m, g, since, out)

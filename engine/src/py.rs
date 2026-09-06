@@ -308,13 +308,11 @@ impl PyGame {
     }
 
     fn apply_pass(&mut self) -> PyResult<()> {
-        // BEWUSST OHNE `#a`-Zeile (PREREG_action_id_logging.md S2): `Pass` ist
-        // der einzige Drafting-Zug, der NICHTS ins Log schreibt, und der
-        // Replay verlaesst sich darauf -- `Replayer.ensure_drafting_actor`
-        // (tools/analyze_game_log.py) bricht ab, wenn `apply_pass` die
-        // Log-Laenge veraendert. Passes werden dort ohnehin aus dem Spieler-
-        // wechsel rekonstruiert, nicht aus dem Log gelesen.
-        map_err(self.game.apply_drafting(&Action::Pass))
+        // Seit 2026-09-07 (Nutzer: Pass als eigener Schritt im Log) wie jede
+        // andere Aktion: `#a`-Zeile (ID 0, `action_to_id`) plus die Textzeile
+        // aus game.rs. Die Luecke 1 aus PREREG_action_id_logging.md S2 ist
+        // damit geschlossen; der Replayer liest die Kategorie PASS.
+        map_err(self.log_and_apply(&Action::Pass, json!({ "type": "pass" })))
     }
 
     #[pyo3(signature = (player, tile_id, slot_row, slot_col, rotation=0))]
@@ -778,21 +776,14 @@ impl PyGame {
         // wie die menschliche -- sonst waere nur die halbe Partie exakt
         // replaybar. `action_to_env_dict` liefert die kanonischen Felder, die
         // `action_to_id` konsumiert (Rueckfallebene, par.5).
-        // `Pass` bleibt aussen vor -- gleiche Begruendung wie bei `apply_pass`
-        // (er erzeugt keine Textzeile, und der Replay rekonstruiert ihn aus dem
-        // Spielerwechsel). Ohne diese Ausnahme schriebe die KI eine `#a`-Zeile
-        // fuer einen Zug, den der Mensch-Pfad still laesst.
+        // Seit 2026-09-07 auch fuer `Pass` (eigene Text- und `#a`-Zeile, wie
+        // im Mensch-Pfad `apply_pass`); die fruehere Ausnahme ist weg.
         let mark_len = self.game.state.log.len();
-        let geloggt = !matches!(a, Action::Pass);
-        if geloggt {
-            let id = crate::self_play::action_to_id_direct(&self.game.state, a);
-            let ui = crate::self_play::action_to_env_dict(&self.game.state, a);
-            self.push_action_id_line(id, ui);
-        }
+        let id = crate::self_play::action_to_id_direct(&self.game.state, a);
+        let ui = crate::self_play::action_to_env_dict(&self.game.state, a);
+        self.push_action_id_line(id, ui);
         if let Err(e) = self.game.apply_drafting(a) {
-            if geloggt
-                && self.game.state.log.get(mark_len).is_some_and(|l| l.starts_with("#a "))
-            {
+            if self.game.state.log.get(mark_len).is_some_and(|l| l.starts_with("#a ")) {
                 self.game.state.log.remove(mark_len);
             }
             return Err(PyValueError::new_err(e));

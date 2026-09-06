@@ -814,6 +814,14 @@ impl Game {
                 self.state.switch_player();
             }
             Action::Pass => {
+                // Nutzer 2026-09-07 ("fuege in den logs das passen als eigenen schritt
+                // ein"): der Pass steht als eigene Zeile im Log wie jede andere
+                // Aktion. Der Replayer (tools/analyze_game_log.py, Kategorie PASS)
+                // liest ihn; alte Logs ohne die Zeile rekonstruiert er weiter aus
+                // dem Spielerwechsel. Die Suche (net_mcts/round5) laeuft auf Kopien
+                // und liest das Log nie; Anker-Records tragen kein Log.
+                let name = self.state.players[self.state.current_player].name.clone();
+                self.state.log_event(format!("⏭️ {name}: passt"));
                 self.state.switch_player();
             }
         }
@@ -1082,6 +1090,25 @@ mod tests {
         assert_eq!(determine_winner(&game.state), 0);
         game.state.first_player_next_round = 1;
         assert_eq!(determine_winner(&game.state), 1);
+    }
+
+    /// Nutzer 2026-09-07: ein Pass schreibt GENAU eine eigene Log-Zeile mit dem
+    /// Namen des Passenden, danach ist der andere Spieler dran.
+    #[test]
+    fn pass_writes_its_own_log_line() {
+        let mut rng = StdRng::seed_from_u64(9);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        game.state.current_player = 0;
+        let before = game.state.log.len();
+        let who = game.state.players[0].name.clone();
+        game.apply_drafting(&Action::Pass).expect("Pass ohne offene Teilzuege ist anwendbar");
+        let new: Vec<&String> = game.state.log[before..].iter().collect();
+        assert_eq!(new.len(), 1, "genau eine Zeile: {new:?}");
+        assert_eq!(new[0], &format!("[R{}] ⏭️ {who}: passt", game.state.round_number));
+        assert_eq!(game.state.current_player, 1);
     }
 
     #[test]

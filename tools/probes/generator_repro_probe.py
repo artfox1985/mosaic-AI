@@ -73,6 +73,18 @@ def _games(records):
 # verdeckt, dass alles dahinter uebereinstimmt. Gefunden an genau diesem Fall:
 # die Selbstkontrolle zweier frischer Laeufe fiel nur hierueber.
 IDENTITY_FIELDS = ("game_id",)
+# Unterfelder des Record-Zustands, die Anzeige sind und keine Zugwahl: `state.log`
+# (letzte 30 Textzeilen, serialize.rs). Seit 2026-09-07 schreibt die Engine auch den
+# Pass als Zeile (Nutzer-Auftrag); ein Vergleich, der den Text mitliest, meldet dann
+# Drift, wo Zug fuer Zug alles gleich ist. Geprueft am Paritaets-Hash des Champions
+# (self_play.rs net_parity_hash, 2026-09-07 00:45).
+STATE_IGNORED_SUBFIELDS = ("log",)
+
+
+def _strip_state(v):
+    if isinstance(v, dict):
+        return {k: x for k, x in v.items() if k not in STATE_IGNORED_SUBFIELDS}
+    return v
 
 
 def _first_divergence(a, b, ignore=IDENTITY_FIELDS):
@@ -90,6 +102,8 @@ def _first_divergence(a, b, ignore=IDENTITY_FIELDS):
             if f not in ra or f not in rb:
                 return i, f, "FEHLT" if f not in ra else "da", "FEHLT" if f not in rb else "da"
             va, vb = ra[f], rb[f]
+            if f == "state":
+                va, vb = _strip_state(va), _strip_state(vb)
             try:
                 same = bool(np.array_equal(np.asarray(va), np.asarray(vb)))
             except Exception:
@@ -132,7 +146,7 @@ def main() -> int:
         "erste_abweichung": None if div is None else {
             "schritt": div[0], "feld": div[1], "referenz": div[2], "neu": div[3],
         },
-        "ignorierte_felder": list(IDENTITY_FIELDS),
+        "ignorierte_felder": list(IDENTITY_FIELDS) + [f"state.{x}" for x in STATE_IGNORED_SUBFIELDS],
         "hinweis": ("Verglichen wurden RECORDS ueber corpus_io, nicht Dateibytes -- der Korpus "
                     "ist umgepackt, die Bytes sind darum ohnehin verschieden. `game_id` traegt "
                     "einen Zeitstempel und ist Lauf-Identitaet, kein Verhalten."),
