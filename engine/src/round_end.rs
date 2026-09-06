@@ -585,6 +585,29 @@ pub fn chip_allocations(player: &PlayerBoard, row_idx: usize) -> Vec<Vec<usize>>
     out
 }
 
+/// Beschriftung der Chips, die eine Vollendung kostet, fuer die Logzeile
+/// (Nutzer 2026-09-07: *"aus dem Log allein ist der Verbrauch nicht
+/// rekonstruierbar"* -- eine Vollendung kostet 2 farbgleiche ODER 3 beliebige
+/// Plaettchen, und welcher Fall vorlag, stand nirgends). Format:
+/// `"3 Plättchen: rot, gelb+blau, schwarz"`, mehrfarbige Chips mit `+`
+/// verbunden, Reihenfolge = aufsteigende Handindizes.
+///
+/// Wird VOR dem Anwenden gerufen (danach sind die Chips aus der Hand
+/// entfernt); `indices` sind Indizes in `player.bonus_chips`. Unbekannte
+/// Indizes werden uebersprungen, damit die Beschriftung nie panikt --
+/// die Regelpruefung macht [`apply_bonus_chips_with`].
+pub fn chips_label(player: &PlayerBoard, indices: &[usize]) -> String {
+    let mut idx: Vec<usize> = indices.to_vec();
+    idx.sort_unstable();
+    idx.dedup();
+    let labels: Vec<String> = idx
+        .iter()
+        .filter_map(|&i| player.bonus_chips.get(i))
+        .map(|c| c.colors.iter().map(|x| x.value()).collect::<Vec<_>>().join("+"))
+        .collect();
+    format!("{} Plättchen: {}", labels.len(), labels.join(", "))
+}
+
 /// Komplettiert Reihe `row_idx` mit GENAU den angegebenen Chips (Indizes in
 /// `player.bonus_chips`). Gibt false, wenn die Auswahl ungültig ist.
 pub fn apply_bonus_chips_with(player: &mut PlayerBoard, row_idx: usize, chip_indices: &[usize]) -> bool {

@@ -135,6 +135,11 @@ PATTERNS: dict[str, re.Pattern] = {
         r"^🎯 (?P<name>.+?): \+(?P<pts>\d+) Pkt \(Reihe (?P<row>\d+) → Kuppel (?P<sr>\d+)/(?P<sc>\d+) - (?P<expl>.+)\)$"
     ),
     "CHIPS_COMPLETE": re.compile(r"^🎫 (?P<name>.+?) komplettiert Reihe (?P<row>\d+)"),
+    # Seit 2026-09-07 (Nutzer) nennt die Zeile die verbrauchten Plaettchen:
+    # "... mit Bonus-Chips (3 Plättchen: rot, gelb+blau, schwarz)!". Der Regex
+    # oben ist nicht am Zeilenende verankert und trifft weiter; dieser hier
+    # liest den Zusatz, wenn er da ist.
+    "_CHIP_USE": re.compile(r"\((?P<n>\d+) Plättchen: (?P<colors>[^)]*)\)"),
     "ROUND_START": re.compile(r"^Runde (?P<rn>\d+) beginnt\. (?P<starter>.+?) ist Startspieler\.$"),
     "GAME_OVER": re.compile(r"^Das Spiel ist beendet!$"),
     "ROUND_STRAFE": re.compile(r"^(?P<name>.+?): Strafe (?P<pen>-?\d+) Pkt → (?P<score>-?\d+) Gesamt$"),
@@ -376,6 +381,7 @@ class Replayer:
         # `hints[i]` = `#a`-Nutzlasten unmittelbar vor Textzeile i.
         self.hints: dict[int, list[dict]] = {}
         self.emoji_toleriert = 0  # Zeilen, die nur am ☀️/🌙-Praefix abwichen
+        self.chip_zusatz_toleriert = 0  # 🎫-Zeilen ohne den Plaettchen-Zusatz (Logs vor 2026-09-07)
         self.hint_used = 0      # Zuege, die ueber die ID aufgeloest wurden
         self.hint_missing = 0   # Stein-Zuege ohne Hinweis (Textweg)
         self.action_log: list[tuple[str, tuple, dict]] = []
@@ -431,6 +437,18 @@ class Replayer:
         for a, b in (("☀️ ", "🌙"), ("☀️", "🌙")):
             if rest_o.startswith(a) and rest_r.startswith(b)                     and rest_o[len(a):].lstrip() == rest_r[len(b):].lstrip():
                 self.emoji_toleriert += 1
+                return True
+        # Zweite datierte Toleranz (2026-09-07, Nutzer-Auftrag "das Passen und den
+        # Chip-Verbrauch sauber im Log"): die 🎫-Zeile nennt seither die
+        # verbrauchten Plaettchen in Klammern. Ein Log VON DAVOR hat den Zusatz
+        # nicht, die heutige Engine schreibt ihn -- ohne diese Toleranz waere jede
+        # aeltere Partie mit einer Chip-Vollendung unreplaybar. Eng gehalten: nur
+        # wenn der Rest der Zeile zeichengleich ist und nur der Klammer-Zusatz
+        # fehlt.
+        if rest_r.startswith("🎫") and rest_o.startswith("🎫"):
+            m_use = PATTERNS["_CHIP_USE"].search(rest_r)
+            if m_use and rest_r[:m_use.start()].rstrip() + rest_r[m_use.end():] == rest_o:
+                self.chip_zusatz_toleriert += 1
                 return True
         return False
 

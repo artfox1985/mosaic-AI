@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Beleg: Eigener Ergebnis-Abschnitt in der Datei ("MESSUNG-3-ERGEBNIS"); alle 3 Messungen H0, Status quo bestaetigt -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Beleg: alle 3 Messungen H0, Status quo bestaetigt (Abschnitt "MESSUNG-3-ERGEBNIS"; tau-Annealing 112:118, p 0,78, v20-Aera, Mass war STAERKE). NACHTRAG 2026-09-07: Vorstufe 3-V offen (Nutzer: das Sampling zerstoert Spalten) -- dieselbe Mechanik, aber Mass SPALTEN und VIELFALT im Material statt Staerke nach Training, v24-Aera. -->
 
 # Vorregistrierung: Suchpfad-Nachmessungen (Floor-Gewicht, m-Formel, τ-Annealing)
 
@@ -105,3 +105,84 @@ wird OHNE --tau-argmax-from-move generiert.** Der Knopf bleibt als
 inertes Werkzeug. Damit sind Messung 1-3 KOMPLETT: dreimal Status quo
 bestaetigt (Floor-W 0,3; m-Formel; tau=1) -- der Suchpfad ist in der
 WDL-Aera vollstaendig re-validiert.
+
+## Messung 3-V (Vorstufe): Was kostet die Temperatur an Spalten, und was an Vielfalt? (registriert 2026-09-07, 01:20, VOR der Messung; Nutzer-Freigabe "ja, fahr den vergleich nach dem arm")
+
+**Anlass (Nutzer 2026-09-07, 01:05):** *"das self play zerstoert die spalten schon frueh.
+vielleicht holen wir uns den zufall weniger ueber die temperature als mehr ueber den zufall
+des spiels."* Dazu der eigene Einwand des Nutzers (01:12) mit Verweis auf
+`PREREG_uncertainty_guided_selfplay.md` par.2: der Zufall des Spiels ist ALEATORISCH und
+damit kein Lernsignal; wer auf aleatorische Breite auswaehlt, sucht die zufaelligsten
+Stellungen auf, also die mit dem geringsten Lernwert. Der Ersatz fuer gesenkte Temperatur
+muesste GERICHTET sein (Stufe 1 dort). Diese Vorstufe klaert, wie gross die zu ersetzende
+Luecke ueberhaupt ist -- ohne Training, ohne Engine-Aenderung.
+
+**WAS SCHON GEMESSEN IST, und warum das die Frage nicht erledigt:** Messung 3 oben ist
+GEFAHREN (2026-08-08): Arm B mit 2.000 Sockel-Partien `--tau-argmax-from-move 30` gegen den
+Champion, 112:118 nach 115 Paaren, SPRT-H0, p 0,78 -- durchgehendes Sampling blieb Standard.
+Drei Unterschiede machen die Frage trotzdem offen: (a) gemessen wurde STAERKE nach einem
+Training, nicht der Spaltenbau IM MATERIAL -- der Spaltenstrang der Kampagne begann erst mit
+v22; (b) die Aera war v20/WDL, das heutige Netz ist v24 auf Sicht 744 mit K3-P; (c) H0 auf
+115 Paaren schliesst einen Spalten-Effekt nicht aus, es sagt nur, dass die Siegquote sich
+nicht bewegte. Diese Vorstufe misst darum eine ANDERE Groesse an einer BILLIGEREN Stelle;
+sie kann Messung 3 nicht widerlegen und will es nicht.
+
+**Mechanik (am Code geprueft 2026-09-07):** `drafting_policy` (`self_play.rs:349-378`)
+trennt beides schon heute: das Policy-ZIEL kommt aus den Besuchszahlen der Wurzel, der
+GESPIELTE Zug wird mit `play_temp` daraus gesampelt ("PLAY: moderate Temperatur ->
+gespielte Aktion sampeln (Zustandsvielfalt)"). Das Sampling verdirbt also nicht die
+Lernziele, sondern die Stellungen -- ein zweitbester Zug in eine halbfertige Spalte, und die
+Struktur steht ab da nicht mehr. Der Regler dagegen ist gebaut:
+`MOSAIC_TAU_ARGMAX_FROM_MOVE` / `--tau-argmax-from-move N` (argmax ab Halbzug N,
+`net_mcts.rs:2523`), Default 0 = aus.
+
+**Aufbau (drei Chargen, gepaart):** derselbe Generator, dieselben Seeds, dieselbe
+Sockel-Konfiguration wie die v24-Erzeugung (`--sims 100`, mit Wurzelrauschen, gesampelt,
+policy-aktiv, `--threads 11 --chunk 10 --per-file 10`), 200 Partien je Charge:
+
+| Charge | `--tau-argmax-from-move` | Rolle |
+| --- | --- | --- |
+| A | 0 (aus) | Bestand, Kontrolle |
+| B | 12 | argmax ab Halbzug 12 (rund ab Runde 2) |
+| C | 30 | argmax ab Halbzug 30 (Schwelle der registrierten Messung 3) |
+
+Generator `v24-b06_brierbest` mit Champion-Spec (der amtierende Champion; die
+Generatorfrage fuer v25 ist offen, `PREREG_v25_window.md` par.11 A, und beruehrt diese
+Messung nicht -- gefragt ist die Wirkung der Temperatur, nicht die des Netzes).
+
+**Messgroessen, VOR der Messung festgelegt (je Charge):**
+1. **Volle Spalten je Seite** und Seiten mit voller Spalte (`tools/corpus_sanity_check.py`),
+   dazu Punkte und Strafleiste -- die Groesse, um die es dem Nutzer geht.
+2. **Zustandsvielfalt** (`tools/probes/corpus_state_diversity_probe.py`, gebaut 2026-08-25
+   fuer genau diese Frage): distinkte 36-Bit-Belegungsmasken der Kuppel je Runde, distinkte
+   Endbretter, Masken je Partie. Das ist der Preis, den die gesenkte Temperatur kostet.
+3. **Lange Reihen** begonnen/vollendet je Seite, soweit die Korpus-Sonde sie ausweist
+   (Nebenbefund, keine Entscheidungsgroesse).
+
+**Lesart, vorab festgelegt:**
+- **B oder C hebt die Spalten deutlich UND verliert wenig Vielfalt** (Richtwert: Spalten
+  +0,1 oder mehr, distinkte Endbretter nicht unter 90 % von A): die These des Nutzers
+  traegt, und der Sockel-Betriebspunkt der v25-Erzeugung ist ein Kandidat fuer die Aenderung.
+- **Spalten steigen, Vielfalt bricht ein** (Endbretter deutlich unter 90 % von A): die
+  Luecke ist real und muss gerichtet ersetzt werden -- das ist der Anschluss an
+  `PREREG_start_position_seeding.md` par.8 (Stufe 1 der Unsicherheits-Prereg, deren
+  Faltungsbedingung durch den b03-Befund erfuellt ist: Tor 1 mit Knopf ueber zwei Seeds,
+  214:146, hoechster Kuppel-Bonus 4,2).
+- **Spalten bewegen sich nicht**: die Temperatur ist nicht die Ursache des Spaltenverlusts
+  im Sockel, und die 0,19 der Sockel-Klasse haben einen anderen Grund. Dann faellt dieser
+  Strang, und par.11 C der v25-Prereg bleibt unbeantwortet. Das waere zugleich die
+  Bestaetigung des Messung-3-Befunds von 2026-08-08 auf der Materialseite.
+
+**Verhaeltnis zur registrierten Messung 3:** traegt 3-V, ist Messung 3 NICHT automatisch
+ueberholt -- sie hat gezeigt, dass Annealing die Staerke nicht bewegt, und das bleibt wahr.
+Eine Wiederholung mit Training waere ein eigener Arm mit eigenem Go, weil sie zwei
+Trainings plus Gating kostet (Schaetzung von 2026-08-06: rund ein halber Maschinentag).
+
+**Was diese Messung NICHT beantwortet:** ob ein daraus trainiertes Netz staerker spielt oder
+in der ARENA mehr Spalten baut (Nutzer 2026-09-07, 01:00: *"zum schluss brauch ich in der
+arena mehr spalte"*). Sie misst das MATERIAL. Der Schritt von Material zu Arena ist die
+registrierte Messung 3 oben (zwei Trainings plus Gating) und braucht ein eigenes Go.
+
+**Kosten (aus `docs/measured_runtimes.md`, gemessen):** 3,365 s je Sockel-Partie bei
+threads 11, also rund 11 min je Charge, 34 min fuer drei; die beiden Sonden sind
+Sekunden. Laeuft exklusiv nach dem Huellenform-Arm (par.8.15 Teil B).

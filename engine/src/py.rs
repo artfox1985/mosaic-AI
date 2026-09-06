@@ -339,6 +339,11 @@ impl PyGame {
 
     /// Reihe in der Tiling-Phase mit Bonusplättchen komplettieren.
     fn apply_tiling_chips(&mut self, player: usize, pattern_row: usize) -> PyResult<()> {
+        // Beschriftung VOR dem Anwenden (Nutzer 2026-09-07): greedy waehlt hier,
+        // dieselbe Funktion auf demselben Zustand nennt die Auswahl.
+        let label = crate::round_end::greedy_chip_alloc(&self.game.state.players[player], pattern_row)
+            .map(|idx| crate::round_end::chips_label(&self.game.state.players[player], &idx))
+            .unwrap_or_default();
         if !apply_bonus_chips_to_row(&mut self.game.state.players[player], pattern_row) {
             return Err(PyValueError::new_err(format!(
                 "Reihe {} nicht mit Chips komplettierbar.",
@@ -346,9 +351,10 @@ impl PyGame {
             )));
         }
         let name = self.game.state.players[player].name.clone();
-        self.game
-            .state
-            .log_event(format!("🎫 {name} komplettiert Reihe {} mit Bonus-Chips!", pattern_row + 1));
+        self.game.state.log_event(format!(
+            "🎫 {name} komplettiert Reihe {} mit Bonus-Chips ({label})!",
+            pattern_row + 1
+        ));
         Ok(())
     }
 
@@ -384,6 +390,7 @@ impl PyGame {
                 pattern_row + 1
             )));
         }
+        let label = crate::round_end::chips_label(&self.game.state.players[player], &chips);
         if !apply_bonus_chips_with(&mut self.game.state.players[player], pattern_row, &chips) {
             return Err(PyValueError::new_err(format!(
                 "Reihe {} nicht mit dieser Chip-Auswahl komplettierbar.",
@@ -391,9 +398,10 @@ impl PyGame {
             )));
         }
         let name = self.game.state.players[player].name.clone();
-        self.game
-            .state
-            .log_event(format!("🎫 {name} komplettiert Reihe {} mit Bonus-Chips!", pattern_row + 1));
+        self.game.state.log_event(format!(
+            "🎫 {name} komplettiert Reihe {} mit Bonus-Chips ({label})!",
+            pattern_row + 1
+        ));
         Ok(())
     }
 
@@ -975,6 +983,7 @@ impl PyGame {
             }
             TilingStep::Chips { row, chips } => {
                 // Exakt die vom Solver gewählte Plättchen-Allokation anwenden.
+                let label = crate::round_end::chips_label(&self.game.state.players[pi], &chips);
                 if !apply_bonus_chips_with(&mut self.game.state.players[pi], row, &chips) {
                     return Err(PyValueError::new_err("KI: Chip-Komplettierung fehlgeschlagen."));
                 }
@@ -985,9 +994,10 @@ impl PyGame {
                 // Wortlaut wie dort, damit `analyze_game_log.py`s 🎫-Regex beide
                 // Akteure gleich erfasst.
                 let name = self.game.state.players[pi].name.clone();
-                self.game
-                    .state
-                    .log_event(format!("🎫 {name} komplettiert Reihe {} mit Bonus-Chips!", row + 1));
+                self.game.state.log_event(format!(
+                    "🎫 {name} komplettiert Reihe {} mit Bonus-Chips ({label})!",
+                    row + 1
+                ));
                 ("use_chips", format!("Chips R{}", row + 1), "chip", json!({ "type": "use_chips", "pattern_row": row }))
             }
             TilingStep::End => {

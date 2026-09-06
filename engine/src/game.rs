@@ -900,12 +900,19 @@ impl Game {
                 Ok(())
             }
             TilingMove::UseChips { player, pattern_row } => {
+                // Chips VOR dem Anwenden beschriften (danach sind sie aus der Hand):
+                // `apply_bonus_chips_to_row` waehlt ueber `greedy_chip_alloc`, dieselbe
+                // Funktion auf demselben Zustand liefert hier also genau die Auswahl,
+                // die gleich verbraucht wird.
+                let label = crate::round_end::greedy_chip_alloc(&self.state.players[*player], *pattern_row)
+                    .map(|idx| crate::round_end::chips_label(&self.state.players[*player], &idx))
+                    .unwrap_or_default();
                 if !apply_bonus_chips_to_row(&mut self.state.players[*player], *pattern_row) {
                     return Err(format!("Reihe {} nicht mit Chips komplettierbar.", pattern_row + 1));
                 }
                 let name = self.state.players[*player].name.clone();
                 self.state.log_event(format!(
-                    "🎫 {name} komplettiert Reihe {} vollständig mit Bonus-Chips!",
+                    "🎫 {name} komplettiert Reihe {} vollständig mit Bonus-Chips ({label})!",
                     pattern_row + 1
                 ));
                 Ok(())
