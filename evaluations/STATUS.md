@@ -74,7 +74,7 @@ weiter, auch wenn die Sitzung endet -- ausser dem nackten Training, siehe
 | ~~Abnahme b05~~ | `tools/night_v24_b05_acceptance_wait.sh` | 00:24 | **FERTIG 05:54** (03:08-05:54), alle Tore in par.9 | -- | `models/alphazero_v24-b05_brierbest.onnx` | `tor2a_v24b05*.json`, `paired_gating_result_v24-b05_*`, `paired_arena_env_v24b05_*`, `points_v24b05_vs_b01_s14.json` |
 | Abnahme b03 (714) | `tools/night_v24_b03_acceptance_714.sh` (venv_measure714, Champion-Artefakt-Wheel, byte-identisch zum alten Live-Wheel) | 20:58 (wartet) | **FERTIG 09:20** (05:55-09:20, 3 h 25 min); Wartemuster kannte Sonde, `cpu_queue_after_b04` und b05-Wartelauf NICHT -- deshalb hielt `tools/night_v24_after_b05_chain_hold.sh` (seit 00:53, Prozess nur wartend) es fest, bis Sonde und b05-Abnahme durch sind (Chronik 00:53) | Start rund 06:45, Ende rund 10:45 | `models/alphazero_v24-b03_brierbest.onnx` | `tor2a_v24b03*.json`, `paired_gating_result_v24-b03_*`, `paired_arena_env_v24b03_*`, `points_v24b03_vs_b01_s14.json` |
 
-**Baum:** HEAD b472171 plus Uebergabe-Commit; 41 Commits vor origin/main, **kein Push**.
+**Baum:** gepusht 2026-09-06 10:12 (origin/main = bc4f1b1, Nutzer); danach nur die Hook-Kuratierung offen.
 `config.py` steht seit 01:56 wieder auf 744 (`git diff config.py` leer; das b03-Training hat es
 selbst zurueckgesetzt). Die GPU ist frei.
 Wheel 744 (Kontrakt `20b442a8164f748d`, mit K3-P2, Default aus) ist in der Basis installiert;
@@ -147,6 +147,22 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    `models/k3f_*.spec.json` dafuer noch anzulegen.
    Vorher par.12b Rauschboden messen (Block-Bootstrap auf frozen_v3), sonst
    nur Tor 1/2.
+
+**Aus dem Test- und Hook-Audit (Subagent Opus, 2026-09-06 10:25; Befunde vom Koordinator
+nachgeprueft): offen beim Nutzer:** (a) `net_mcts.rs:7851` -- Regel 5 meldet bei jedem
+Commit einen Zweig, der nur bei `PLATE_SHAPING_ENABLED = true` (shaping.rs:137, const
+false) laeuft: `#[cfg]` statt Laufzeit-`if`, oder Ausnahme-Syntax fuer Regel 5; (b) fuenf
+`#[ignore]`-Tests in net_mcts.rs laden `alphazero_v20_2d_opp_brierbest.onnx`, das
+nirgends mehr liegt: auf `test_champion_model_path()` nachziehen oder streichen; (c)
+train.py: 8 Verhaltens-Flags (`--wdl-label-smooth`, `--wdl-bootstrap-destretch`,
+`--destretch-a/-b`, `--wdl-hard-only`, `--reinit-points-head`, `--points-dist-bins`,
+`--no-head-warmstart`) stehen in keinem Manifest -- Vorschlag: Test, der argparse-Flags
+gegen `_cli_args` haelt (Ausnahmeliste fuer Negationen); (d) Python-Tests fuer
+`tiling_geometry_probe.py` (reine Funktionen) und `spec_add_field.py` in `tools/tests/`,
+pre-commit-tauglich; (e) `tools/parity_probe.py` ist abgeloest (self_play.rs:5623),
+Loeschung nur auf Freigabe. Erledigt und committet: Groessen-Basislinie nachgezogen
+(87 -> 111 Dateien), Regel 8 (lebende Specs gegen KNOWN_FIELDS, Warnung, 3,5 ms),
+`tools/hooks/python_dll_path.sh`, Hook-README berichtigt.
 
 **Offene Nutzer-Entscheide (Fundstellen):** K4-Skala je Runde oder gemeinsam
 (`round_estimate_leaf_term` par.4); ~~K3-F jetzt bauen oder nach Messung~~ ENTSCHIEDEN 2026-09-06 00:50: nach der Messung

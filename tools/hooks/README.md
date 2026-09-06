@@ -13,15 +13,20 @@ laufen als Teil von `cargo test --release`, also im `pre-push`-Haken:
 
 | | Waechter | Fundstelle |
 |---|---|---|
-| A1 | Testbestand als Regressionsnetz | `cargo test --release` (Zaehlung: der Lauf selbst; Attribut-Zaehlung Stand 2026-08-27: 518 `#[test]` / 23 `#[ignore` in `engine/src`) |
-| A2 | Laufzeit-Vertragsstempel | `engine/src/lib.rs:647` (`contract_stamp_input`-Doku), Stempel exponiert in `engine_config_json()` (`lib.rs:741`) |
-| A3 | Feature-Golden-Hash | `engine/src/features.rs:1473` (`feature_golden_hash_matches_fixture`) |
-| A4 | Heuristik-Anker-Verhaltenstest | `engine/src/mcts.rs:1521` (`heuristic_anchor_choices_match_fixture`), plus `mcts.rs:1612` fuer die R5/v2-Variante |
+| A1 | Testbestand als Regressionsnetz | `cargo test --release` (Zaehlung: der Lauf selbst; Attribut-Zaehlung Stand 2026-09-06: 548 `#[test]` / 23 `#[ignore]` in `engine/src`, davon 2 mit Begruendungstext am Attribut) |
+| A2 | Laufzeit-Vertragsstempel | `engine/src/lib.rs:639` (`contract_canonical_string`, Doku ab `lib.rs:618`), Hash in `contract_hash()` (`lib.rs:681`), exponiert in `engine_config_json()` (`lib.rs:715`) |
+| A3 | Feature-Golden-Hash | `engine/src/features.rs:2021` (`feature_golden_hash_matches_fixture`) |
+| A4 | Heuristik-Anker-Verhaltenstest | `engine/src/mcts.rs:1392` (`heuristic_anchor_choices_match_fixture`), plus `mcts.rs:1484` (`heuristic_anchor_r5_choice_matches_fixture_v2`) fuer die R5/v2-Variante |
 
 Die Fundstellen sind `datei:zeile` und driften mit jedem Refactoring -- der
 stabile Teil ist der Testname bzw. der Dateiname. Zwischen 2026-08-21 und
 2026-08-26 sind alle vier verrutscht (A3 um 98 Zeilen, A4 um 250), ohne dass
 etwas kaputt war.
+
+Am 2026-09-06 waren alle vier erneut verrutscht (A3 um 548 Zeilen, A4 um 129),
+und A2 zeigte zusaetzlich auf einen Namen, den es nicht mehr gibt
+(`contract_stamp_input` -> `contract_canonical_string`). Die Zeilen oben sind an
+diesem Tag nachgezogen.
 
 ## Aktivierung
 
@@ -73,8 +78,29 @@ Reihenfolge des Laufs:
    deutsche Altbestand blockt nichts, ein neuer deutscher Name schon. Python
    ueber `ast` (sieht Strings und Kommentare gar nicht), Rust ueber Muster.
    Ausweg je Zeile: `konvention-ok: <Grund>` ans Zeilenende.
+   Regel 5 kennt diesen Ausweg NICHT -- dort sind die Auswege `panic!`
+   oder `#[ignore = "Grund"]`.
+8. Spec-Pflichtfelder (`models/*.spec.json` <-> `KNOWN_FIELDS` in
+   `engine/src/net_mcts.rs`, `SearchConfig::from_spec_file`) -- **nur Warnung,
+   kein Commit-Blocker.** Geprueft wird in BEIDE Richtungen: ein fehlendes
+   Pflichtfeld und ein unbekanntes Feld weist das Wheel gleich hart ab, und
+   zwar erst beim naechsten Partie-Start -- der Lauf stirbt also spaeter und
+   woanders als der Commit. Kein Blocker, weil das Nachziehen an ein
+   ZEITFENSTER gebunden ist (Docstring `tools/spec_add_field.py`: erst wenn
+   kein Lauf mehr auf dem alten Wheel darauf zugreift, aber vor der
+   Installation des neuen) -- ein Blocker verhinderte genau den Commit, der
+   das Feld einfuehrt. Eingefrorene Artefakte (`models/frozen_*/**`) sind
+   ausgenommen. **Gemessen 2026-09-06: 3,5 ms** bei 8 lebenden Specs.
+   Handgriff: `python tools/spec_add_field.py <feld> <wert> [--check]`.
+
+**Zur Nummerierung:** die **6 ist doppelt vergeben** (Knopf-Doku und
+Skill-Verweis, `check_claude_md_skill_refs`). Historisch gewachsen, bewusst
+nicht umnummeriert -- die Nummern werden in Meldungen, `docs/` und
+Commit-Nachrichten zitiert.
 
 **Budget: < 3 s.** Keine Compilierung, kein Netz, keine Korpus-/Modelldateien.
+**Gemessen 2026-09-06** (voller Repo-Lauf ohne `--staged`, also die teuerste
+Form): 3,6 s. Der Hook-Modus prueft weniger.
 
 ## `pre-push` -- zwei Pruefungen
 
@@ -118,6 +144,27 @@ siehe Tabelle oben).
 Testlaufzeit**, dazu die Kompilierung bei kaltem `target/`. Das Budget ist
 damit knapp gerissen; kein Handlungsbedarf, aber die Zahl steht hier, statt
 geschaetzt zu werden (CLAUDE.md "Laufzeiten messen, nicht schaetzen").
+
+## `python_dll_path.sh` -- gemeinsame Herleitung, kein Haken
+
+`tools/hooks/python_dll_path.sh` ist KEIN Git-Haken, sondern eine Bibliothek zum
+Einbinden per `.` (source). Sie liefert `mosaic_python_dll_dir` und
+`mosaic_prepend_python_dll_path`: das Verzeichnis mit der `python3*.dll`, ohne
+das `cargo test --release` mit `STATUS_DLL_NOT_FOUND` (0xc0000135) abbricht.
+
+```sh
+. "$(git rev-parse --show-toplevel)/tools/hooks/python_dll_path.sh"
+mosaic_prepend_python_dll_path || true
+```
+
+Anlass: dieselbe Herleitung (`sys.base_prefix`, dann `cygpath -u`, dann Test auf
+`python3*.dll`) stand am 2026-09-06 in SECHS Kopien im Baum -- `pre-push`,
+`tools/cpu_queue_after_b02.sh`, `tools/k3f_build_window.sh`,
+`tools/run_longrow_teacher_arena.sh`, `tools/run_lr_init_arena.sh`,
+`tools/run_v2_teacher_arena.sh`. Die beiden Stolperfallen (venv-Pfad, POSIX-PATH
+am Doppelpunkt) sind im Skript kommentiert. **Die Bestandsskripte sind bewusst
+NICHT umgestellt** (mehrere davon liefen zum Zeitpunkt der Anlage); der Umbau ist
+eine eigene Entscheidung des Koordinators.
 
 ## Fehlalarm? `--no-verify`
 
