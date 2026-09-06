@@ -131,7 +131,7 @@ ohne Pipe; Uhrzeiten ABLESEN (`date`), nicht fortschreiben (zweimal falsch am
    Schluessel (geprueft, par.9c). **Nutzer 11:40: Generator v25 = b05, Erzeugung OHNE
    K3-P** (v25 par.4). **Nutzer 11:48: "self plays eigentlich nur mit champion" -> A: Champion-Kante
    b05 in Spielkonfiguration: 202:218 gepoolt, GLEICHAUF, kein Champion-Beleg (13:20); B: v24-b06
-   (b02-Rezept auf 744) trainiert, Abnahme laeuft seit 13:21.** Erzeugung startet NUR auf
+   (b02-Rezept auf 744) trainiert, Abnahme laeuft seit 13:22: Tor 2a ohne Knopf 0,475 (13:50).** Erzeugung startet NUR auf
    Anweisung, nach dem Champion-Entscheid.
 6. **Danach VORLAGE v25-Zuschnitt** (`PREREG_v25_window.md` par.9/9a): Traeger-
    Kennzahl v24 0,356 gegen Fenster 0,624; v25 nach par.1 rechnerisch 0,23.
