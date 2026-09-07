@@ -583,8 +583,10 @@ zurueck zu Stellung A -> simulation via argmax -> Stellung B."* Der Zweig ist al
 AUSFLUG: von Stellung A wird explorativ simuliert, dann kehrt die Erzeugung nach A zurueck
 und spielt von dort mit argmax weiter nach B. Die Hauptpartie bleibt vollstaendig sauber,
 der Zweig ist eine zusaetzliche Datenquelle und keine Abzweigung der gespielten Linie.
-Das entspricht KataGos Seitenpartien genauer als meine Fassung oben, und es aendert an der
-Baubarkeit (par.9) nichts: die dort beschriebene Bauform klont den Zustand und spielt den
+**BERICHTIGT 02:40 (Nutzer-Frage "ist b nun das katago branching?"): NEIN, und die Aussage
+"das entspricht KataGos Seitenpartien genauer" war falsch** -- siehe par.9c, wo Anhang D des
+Papers nachgelesen ist. KataGo erzeugt KEINE zweite Trajektorie. An der
+Baubarkeit (par.9) aendert Weg B nichts: die dort beschriebene Bauform klont den Zustand und spielt den
 Zweig in derselben Rayon-Closure -- die Hauptpartie laeuft davon unberuehrt weiter. Was sich
 aendert, ist die Erwartung an die Kosten: der Ausflug kommt ZUSAETZLICH zur vollen
 Hauptpartie, waehrend eine Abzweigung sie ersetzt haette.
@@ -631,3 +633,53 @@ von der Kuer zur Pflicht, weil die Streuung dann anderswo herkommen muss. Die al
 Messung 3 (2026-08-08, Umschaltpunkt 30) war auf Staerke H0 -- sie kannte den hier besseren
 Punkt 12 aber nicht. **Die Arena-Frage zu A ist damit der naechste Entscheid, nicht die
 Wahl zwischen A und B.**
+
+### par.9c WAS KATAGO WIRKLICH MACHT -- am Paper nachgelesen (2026-09-07, 02:40; Anhang D, ar5iv-Fassung von arXiv:1902.10565)
+
+**Anlass:** Nutzer-Frage *"ist b nun das katago branching?"* Der Koordinator hatte in par.9a
+behauptet, Weg B entspreche KataGos Seitenpartien. **Das ist falsch.** Der Wortlaut aus
+Anhang D:
+
+> "In 5% of games, the game is branched after the first r turns where r is drawn from an
+> exponential distribution with mean 0.025*b^2. Between 3 and 10 moves are chosen uniformly
+> at random, each given a single neural net evaluation, and the best one is played."
+
+und danach: *"the game is then played to completion as normal"*. Ausgewertet:
+
+1. **EINE Trajektorie, keine Nebenpartie.** Der abweichende Zug ERSETZT den, den die Suche
+   gespielt haette; die Partie laeuft von dort normal weiter. KataGos "branch" ist eine
+   Abweichung IN der Partie, kein Ausflug daneben.
+2. **Genau EIN Zug weicht ab** (rekursiv wird bei einem zufaelligen Viertel ein weiterer
+   angehaengt), nicht k Zuege.
+3. **Die Abweichung ist nicht Temperatur:** 3 bis 10 Zuege werden GLEICHVERTEILT gezogen,
+   jeder bekommt EINE Netzbewertung, der BESTE davon wird gespielt. Breit ziehen, billig
+   filtern -- kein offensichtlich schlechter Zug.
+4. **Die Stelle ist zufaellig, exponentiell verteilt** -- meist frueh, mit langem Schwanz
+   bis in die spaete Partie.
+5. **Policy UND Value:** an der Stelle wird eine volle Suche gefahren, die ein
+   Policy-Trainingsziel liefert; Value-/Score-/Ownership-Ziele entstehen normal.
+
+**Damit sind es DREI Wege, nicht zwei:**
+
+| | Trajektorien | Wo abgewichen wird | Wie | Wie lang | Zusatzkosten | Stand bei uns |
+| --- | --- | --- | --- | --- | --- | --- |
+| **A** | eine | nur Partieanfang | Temperatur (Besuchsverteilung) | k Zuege | keine | **gemessen** (Messung 3-V: Spalten verdoppelt) |
+| **B** (Nutzer) | zwei | frei waehlbar | Temperatur | k Zuege | eine Restpartie je Ausflug | Mechanik da (par.7/9), Auswahlregel offen |
+| **C** (KataGo) | eine | zufaellige Stelle, exponentiell | breit ziehen, EINE Netzbewertung filtert | ein Zug | keine | nicht gebaut |
+
+**Geaenderte Empfehlung (ersetzt par.9b Punkt 3 der Reihenfolge, nicht seine Begruendung):
+A, dann C, dann B.**
+- **A zuerst**: gemessen, gratis, repariert den Betriebspunkt.
+- **C vor B**: C kostet ebenfalls NICHTS (eine Linie) und schliesst genau die Luecke von A --
+  Streuung auch in SPAETEN Stellungen, weil die Abweichungsstelle exponentiell verteilt ist
+  statt auf den Anfang beschraenkt. Dazu vermeidet die Filterung per Netzbewertung den
+  offensichtlich schlechten Zug, der bei uns die Spalte zerstoert (Messung 3-V).
+- **B danach**: sein Alleinstellungsmerkmal ist das ZIELEN (Stelle waehlbar, z.B. nach
+  Unsicherheit oder Spaltenfortschritt). Das ist teurer und lohnt erst, wenn zufaelliges
+  Streuen nachweislich nicht reicht.
+
+**Baukosten C (geschaetzt, nicht gemessen):** in der Draft-Phase der Erzeugungsschleife mit
+Wahrscheinlichkeit p an Halbzug r: n Kandidaten aus `valid_drafting_actions` ziehen, je EINE
+Netzbewertung (die Engine hat den Vorwaertspass ohnehin), den besten spielen statt des
+Suchergebnisses. Rund 40 Zeilen in `unified_game_loop`, zwei Flags, ein Manifest-Feld.
+Deutlich weniger als B, weil weder Zustands-Klon noch zweite Partie noetig sind.
