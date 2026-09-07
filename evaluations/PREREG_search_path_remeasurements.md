@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Beleg: alle 3 Messungen H0, Status quo bestaetigt (Abschnitt "MESSUNG-3-ERGEBNIS"; tau-Annealing 112:118, p 0,78, v20-Aera, Mass war STAERKE). NACHTRAG 2026-09-07: Vorstufe 3-V offen (Nutzer: das Sampling zerstoert Spalten) -- dieselbe Mechanik, aber Mass SPALTEN und VIELFALT im Material statt Staerke nach Training, v24-Aera. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Beleg: alle 3 Messungen H0, Status quo bestaetigt (Abschnitt "MESSUNG-3-ERGEBNIS"; tau-Annealing 112:118, p 0,78, v20-Aera, Mass war STAERKE). NACHTRAG 2026-09-07: Vorstufe 3-V GEFAHREN -- das Sampling der Zugwahl kostet dem Sockel mehr als die HAELFTE seines Spaltenbaus (0,195 gegen 0,4225 bei argmax ab Halbzug 12) und liefert dafuer praktisch keine Vielfalt (399 von 400 Endbrettern distinkt in beiden Faellen). Die 0,19 der Sockel-Klasse sind ein Temperatur-Artefakt. Arena-Wirkung offen. -->
 
 # Vorregistrierung: Suchpfad-Nachmessungen (Floor-Gewicht, m-Formel, τ-Annealing)
 
@@ -186,3 +186,66 @@ registrierte Messung 3 oben (zwei Trainings plus Gating) und braucht ein eigenes
 **Kosten (aus `docs/measured_runtimes.md`, gemessen):** 3,365 s je Sockel-Partie bei
 threads 11, also rund 11 min je Charge, 34 min fuer drei; die beiden Sonden sind
 Sekunden. Laeuft exklusiv nach dem Huellenform-Arm (par.8.15 Teil B).
+
+### MESSUNG-3-V-ERGEBNIS (gefahren 2026-09-07, 01:51-02:21; drei Chargen je 200 Partien, Generator `v24-b06` mit Champion-Spec, `--sims 100`, Wurzelrauschen an, Basis-Seed 20260931 fuer alle drei)
+
+**Die These des Nutzers traegt, und deutlicher als die vorab festgelegte Schwelle verlangt.**
+
+| Charge | `--tau-argmax-from-move` | volle Spalten je Seite | Punkte | Strafleiste | Seiten mit voller Spalte |
+| --- | --- | --- | --- | --- | --- |
+| A (Bestand) | 0 (aus) | **0,1950** (KI +-0,047) | 28,3 | 9,41 | 64 von 400 |
+| B | 12 | **0,4225** (KI +-0,062) | 38,5 | 7,54 | 138 von 400 |
+| C | 30 | **0,3000** (KI +-0,053) | 36,5 | 7,80 | 103 von 400 |
+
+**Und die Vielfalt bleibt** (`state_diversity_temperature.json`, gleiche 200 Partien):
+
+| Charge | distinkte Endbretter (von 400 Seiten) | distinkte Zustaende je Record | distinkte je Partie |
+| --- | --- | --- | --- |
+| A | 400 | 0,1726 | 38,3 |
+| B | 399 | 0,1784 | 40,1 |
+| C | 398 | 0,1758 | 39,6 |
+
+**Bedingte Vielfalt** (`paired_corpus_divergence_probe.py`, neu gebaut fuer diese Frage;
+200 gepaarte Spielindizes, bei denen Wertungsplatten, Startspieler und Auslagen-Ziehung
+identisch sind): **6 von 6 moeglichen distinkten Endbrettern je Spielindex** -- bei
+identischen Startbedingungen erzeugen die drei Konfigurationen durchweg verschiedene
+Bretter. Divergenz-Halbzug im Median 15 (A gegen B) bzw. 39 (A gegen C), keine einzige
+Partie identisch, Endbrett-Hamming-Abstand 21 bzw. 18 von 36 Bit.
+
+**Policy-Entropie der Ziele: 0,628 / 0,644 / 0,660 nats** (A / B / C). Sie STEIGT leicht mit
+mehr argmax, statt zu fallen. Die naheliegende Sorge -- argmax mache die Lernziele
+einseitig -- trifft also nicht zu; die Ziele kommen ohnehin aus den Besuchszahlen und
+nicht aus der Zugwahl (`self_play.rs:349-378`), und in den besser gespielten Stellungen
+gibt es offenbar eher mehr gleichwertige Fortsetzungen als weniger (Deutung, nicht gemessen).
+
+**Verdikt nach der vorab festgelegten Lesart:** Fall 1 ist eingetreten -- "Spalten deutlich
+hoeher UND wenig Vielfalt verloren" (Richtwert war +0,1 Spalten und mindestens 90 % der
+Endbretter). Erreicht: **+0,2275 Spalten (mehr als eine Verdopplung) bei 99,75 % der
+Endbretter.** Das Sampling der ZUGWAHL kostet dem Sockel also mehr als die Haelfte seines
+Spaltenbaus und liefert dafuer praktisch keine zusaetzliche Zustandsvielfalt.
+
+**Was das fuer die 0,19 der Sockel-Klasse heisst.** Die Zahl, die in
+`PREREG_v25_window.md` par.7 als "spaltenaermste Klasse des Fensters" gefuehrt wird
+(0,189), ist hier mit 0,1950 unabhaengig reproduziert -- und sie ist ein Artefakt der
+Temperatur, keine Eigenschaft des Materials oder des Netzes. Damit ist der Einwand des
+Nutzers vom 2026-09-07, 00:5x ("keine von deinen loesungen ueberzeugt mich, du misst das
+self play und nicht die arena") an der Wurzel beantwortet: es gab nichts am Mix zu
+reparieren, der Betriebspunkt der Erzeugung war der Fehler.
+
+**Offen, ausdruecklich:** ob ein aus diesem Material trainiertes Netz staerker spielt oder
+in der ARENA mehr Spalten baut. Diese Messung misst das MATERIAL. Der Schritt von Material
+zu Arena ist die registrierte Messung 3 oben, und die hat 2026-08-08 in der v20-Aera fuer
+argmax ab Zug 30 H0 auf die STAERKE ergeben (112:118). Dass B (Zug 12) hier besser
+abschneidet als C (Zug 30), war damals nicht im Bild -- gemessen wurde nur Zug 30.
+
+**Folgefragen, die sich aus der Kurve ergeben (nichts entschieden):**
+1. **Wo liegt das Optimum?** B (12) schlaegt C (30) um 0,12 Spalten. Ein vierter Punkt bei
+   1 (praktisch durchgehend argmax) wuerde zeigen, ob es weiter steigt oder ob es ein
+   Zwischenoptimum gibt. Kosten: rund 10 min.
+2. **Wieviel Streuung braucht die Policy wirklich?** Bei durchgehendem argmax bleibt als
+   Streuquelle nur das Wurzelrauschen. Die Endbretter-Zahl sagt, dass das reicht -- aber
+   sie misst Bretter, nicht Policy-Abdeckung.
+3. **Anschluss an das Verzweigen** (`PREREG_start_position_seeding.md` par.9/9a): wenn
+   argmax die Spalten verdoppelt, ohne Vielfalt zu kosten, ist der gerichtete Ersatz der
+   Streuung weniger dringend als angenommen -- aber er bleibt der Weg, um GEZIELT in
+   selten besuchte Stellungen zu kommen.

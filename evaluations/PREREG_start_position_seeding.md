@@ -541,3 +541,53 @@ Material schon.
 (was kostet die Temperatur an Spalten und an Vielfalt), dann die Wahl zwischen
 "Temperatur senken und gerichtet ersetzen" (Verzweigen, dieser Absatz) und "Temperatur
 lassen".
+
+### par.9a PRAEZISIERUNG DES NUTZERS (2026-09-07, 02:20): der Zweig hat ZWEI Phasen
+
+**Nutzer, woertlich:** *"ich spiele argmax zug -> simuliere die naechsten zuege via
+temperature (nur fuer die exploration) -> simuliere die naechsten zuege via argmax ->
+spiele den naechsten argmax zug. so haette ich es ca. im kopf gehabt."*
+
+par.9 oben hat den Zweig als DURCHGEHEND verrauscht beschrieben. Das war zu grob. Der
+Entwurf des Nutzers ist zweiphasig, und der Unterschied ist inhaltlich:
+
+| | Zweig durchgehend Temperatur (par.9 oben) | Zweig zweiphasig (Nutzer) |
+| --- | --- | --- |
+| Abweichung | ueber die ganze Restpartie | nur die ersten k Zuege |
+| Rest der Fortsetzung | gesampelt | argmax |
+| Value-Ziel des Zweigs | Wert von SCHLECHTEM Spiel | Wert der abgewichenen Stellung unter GUTEM Spiel |
+| Bezug zur Literatur | -- | genau der Punkt von Willemsen/Baier/Kaisers (`RESEARCH_alphazero_improvements_2026-08-01.md` Fund 1): `z` ist durch Explorationszuege im Pfad verzerrt |
+
+**Die zweite Form ist die richtige**, und zwar aus demselben Grund, aus dem die
+Zielmischung ueberhaupt gebaut wurde: ein Ergebnis, in dessen Pfad Explorationszuege
+liegen, misst nicht den Wert der Stellung. Wird nach der Abweichung sauber ausgespielt,
+ist das Ziel wieder die gesuchte Groesse.
+
+**Bausteine: vollstaendig vorhanden, keine neue Mechanik noetig.**
+- Zweig ab Stellung: `GameLoopConfig.start_state` (par.3/par.7, mit b03 abgenommen).
+- Umschaltpunkt Temperatur -> argmax: `MOSAIC_TAU_ARGMAX_FROM_MOVE` /
+  `--tau-argmax-from-move` (net_mcts.rs:2523; zaehlt echte Drafting-Halbzuege, 1-basiert).
+  Ein Zweig, der bei Halbzug `m` abzweigt und `tau_argmax_from_move = m + k` bekommt,
+  spielt GENAU k Zuege mit Temperatur und danach argmax.
+- Saubere Hauptlinie: derselbe Regler auf einen frueher Wert.
+
+**BERICHTIGUNG derselben Stunde (Nutzer 02:30): die Hauptlinie wird gar nicht beruehrt.**
+Woertlich: *"meine idee war: Stellung A -> simulation mit temperature (exploration) ->
+zurueck zu Stellung A -> simulation via argmax -> Stellung B."* Der Zweig ist also ein
+AUSFLUG: von Stellung A wird explorativ simuliert, dann kehrt die Erzeugung nach A zurueck
+und spielt von dort mit argmax weiter nach B. Die Hauptpartie bleibt vollstaendig sauber,
+der Zweig ist eine zusaetzliche Datenquelle und keine Abzweigung der gespielten Linie.
+Das entspricht KataGos Seitenpartien genauer als meine Fassung oben, und es aendert an der
+Baubarkeit (par.9) nichts: die dort beschriebene Bauform klont den Zustand und spielt den
+Zweig in derselben Rayon-Closure -- die Hauptpartie laeuft davon unberuehrt weiter. Was sich
+aendert, ist die Erwartung an die Kosten: der Ausflug kommt ZUSAETZLICH zur vollen
+Hauptpartie, waehrend eine Abzweigung sie ersetzt haette.
+
+**Neue Frage, die der zweiphasige Entwurf aufwirft:** liefern die k Temperatur-Zuege selbst
+Trainingsdaten, oder nur die argmax-Fortsetzung? Der Nutzer sagt "nur fuer die
+exploration" -- dann waeren ihre Records auszuschliessen, und das Material bestuende aus
+sauber gespielten Stellungen, die lediglich an einer ungewoehnlichen Stelle beginnen.
+KataGo verfaehrt sinngemaess so (die zufaellig gewaehlten Zuege werden gespielt, die
+Trainingsdaten kommen aus dem, was folgt). **Offen, vor einem Bau zu entscheiden**, zusammen
+mit k (Zahl der Temperatur-Zuege), der Verzweigungsrate und der Frage aus par.9 Punkt 3
+(value-only oder policy-tragend).
