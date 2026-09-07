@@ -166,6 +166,12 @@ am Doppelpunkt) sind im Skript kommentiert. **Die Bestandsskripte sind bewusst
 NICHT umgestellt** (mehrere davon liefen zum Zeitpunkt der Anlage); der Umbau ist
 eine eigene Entscheidung des Koordinators.
 
+**Stand 2026-09-07:** mit der Loeschung der obsoleten Ketten-Skripte
+(Nutzer-Freigabe, `evaluations/cleanup_proposal_shell_scripts.md`) sind
+`cpu_queue_after_b02.sh` und `k3f_build_window.sh` weg -- die Duplikation ist
+damit auf VIER Kopien geschrumpft. Neu gebaute Skripte rufen die Sammelstelle auf
+(`tools/wegb_temp2_build_window.sh` tut es), statt die Herleitung zu wiederholen.
+
 ## Fehlalarm? `--no-verify`
 
 Beide Haken laufen nur lokal und sind mit dem Standard-Git-Ausweg
