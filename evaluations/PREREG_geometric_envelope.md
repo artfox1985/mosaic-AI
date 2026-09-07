@@ -2313,36 +2313,44 @@ nicht eingetragen. `paired_gating` schlaegt den Befehl vor; ob eine Spec-Variant
 eigenen Leiterknoten bekommt, ist ein Nutzer-Entscheid (Praezedenz: die K3-P-Kante wurde
 eingetragen).
 
-### par.8.15f AUFGENOMMEN: beide Knoepfe stehen in der Champion-Spec (Nutzer-Freigabe 2026-09-07, "rein in die spec")
+### par.8.15f AUFGENOMMEN als EIGENE Entitaet `v24-b07` (Nutzer-Freigabe 2026-09-07 "rein in die spec", Namensregel vom selben Tag)
 
-`models/v24-b06_brierbest.spec.json` traegt jetzt `envelope_hull_form: 2` und
-`special_row6_w: 1.0`. Vor dem Schreiben geprueft und danach gegengeprueft: die Datei ist
-**inhaltsgleich** mit dem gemessenen Arm `models/hullform2_k5w10.spec.json` -- die Spec, die
-v25 erzeugt, ist damit exakt die, die 391:329 gegen den alten Champion gespielt hat und die
-im Instrument 0,6900 volle Spalten baut (Bezug 0,4975).
+**Erster Anlauf war falsch und ist zurueckgenommen.** Der Koordinator hat die beiden Felder
+zunaechst IN `models/v24-b06_brierbest.spec.json` geschrieben. Nutzer dazu: *"tja jetzt
+weisst warum ich eigentlich immer eigene bxx nummern wollt. damit sowas nicht passiert."*
+Der Einwand trifft: ein Champion ist Modell PLUS Spec, also haette derselbe Name
+`v24-b06` -- der Name an einem Elo-Knoten mit 1309 und an jedem Artefakt dieser Nacht --
+ploetzlich einen anderen Spieler bezeichnet. Die b06-Spec ist auf ihren Messzustand
+zurueckgesetzt (`envelope_hull_form: 1`, `special_row6_w: 0.0`, geprueft).
 
-**Der eingefrorene Champion ist NICHT betroffen.** `models/frozen_champions/v24-b06/`
-traegt eine eigene `spec.json` PLUS den Inhalt im Manifest (geprueft 2026-09-07); die
-Aenderung an der lebenden Datei erreicht ihn nicht. Sein Spec-Inhalt kennt die beiden Felder
-gar nicht -- er wurde eingefroren, bevor es sie gab, und spielt damit auf den Defaults
-(Dreieck, kein K5). Das ist richtig so: er ist der Beleg dessen, was gemessen wurde.
+**Die neue Konfiguration heisst `v24-b07`** und ist selbsttragend:
 
-### Die Folge fuer die Elo-Leiter, die eine Entscheidung braucht
+| Artefakt | Inhalt |
+| --- | --- |
+| `models/alphazero_v24-b07_brierbest.onnx` | **bytegleiche Kopie** von b06 (SHA-256-Praefix `3a8e2bc1580ed876`, geprueft) |
+| `models/v24-b07_brierbest.spec.json` | b06-Spec plus `envelope_hull_form: 2` und `special_row6_w: 1.0`; **inhaltsgleich mit dem gemessenen Arm** `hullform2_k5w10.spec.json`, nach dem Schreiben gegengeprueft |
 
-**Ein Champion ist Modell PLUS Spec.** Der Leiterknoten `v24-b06` mit Elo 1309 ist mit der
-ALTEN Spec gemessen. Seit dieser Aenderung bezeichnet derselbe Name im lebenden Baum einen
-ANDEREN Spieler -- einen, der nach eigener Messung rund 54 Prozent gegen den alten gewinnt.
+**b07 hat KEINE eigene `.pth`.** Sie waere eine Luege: b07 ist kein Trainingsblock, sondern
+dieselben Gewichte unter anderer Spec. Wer die Gewichte trainieren will, nimmt b06.
 
-Damit sind zwei Dinge offen, beide Nutzer-Entscheid:
+**Die Belege, die an b07 haengen** (alle gegen b06 mit seiner eigenen Spec gemessen):
+Huellenform 391:329 ueber drei Seeds, p 0,023, KI der Siegquote [0,507; 0,579]; K5
+siegneutral ueber 500 Partien; Instrument 0,6900 volle Spalten gegen 0,4975 des Champions.
 
-1. **Bekommt die neue Konfiguration einen eigenen Knoten?** `paired_gating` hat die Kante
-   fertig ausgerechnet (`v24-b06_hf2vschamp_arm` 214:186 gegen `..._ctl`). Praezedenz:
-   die K3-P-Kante wurde eingetragen (par.10a). Dagegen spricht, dass die Leiter dann zwei
-   Knoten fuer dasselbe Modell traegt.
-2. **Muss die Paritaets-Fixture neu?** `docs/promotion_checklist.md` 5d verlangt sie bei
-   jedem CHAMPION-Wechsel. Ein Spec-Wechsel ohne Modellwechsel ist in der Checkliste nicht
-   vorgesehen -- die Fixture prueft ausdruecklich die DEFAULT-Knopfstellung, und die hat
+**Der eingefrorene Champion ist unberuehrt.** `models/frozen_champions/v24-b06/` traegt eine
+eigene `spec.json` plus den Inhalt im Manifest (geprueft); sein Spec-Inhalt kennt die beiden
+Felder gar nicht und spielt auf den Defaults. Das ist richtig: er ist der Beleg dessen, was
+gemessen wurde.
+
+### Was daraus folgt und noch offen ist
+
+1. **Elo-Knoten `v24-b07`.** Die Kante gegen b06 ist gemessen (214:186 aus dem Gating,
+   Seed 20261015). Eintragen aendert die Leiter und ist **Nutzer-Entscheid**; der Befehl
+   waere `python tools/elo_tracker.py add --player-a v24-b07 --sims-a 400 --player-b
+   v24-b06 --sims-b 400 --wins-a 214 --wins-b 186 --n 400`.
+2. **Paritaets-Fixture.** `docs/promotion_checklist.md` 5d verlangt sie bei jedem
+   CHAMPION-Wechsel. Ob b07 einer ist -- gleiche Gewichte, andere Spec --, ist in der
+   Checkliste nicht vorgesehen. Die Fixture prueft die DEFAULT-Knopfstellung, und die hat
    sich nicht bewegt. **Ungeprueft; vor dem naechsten Push zu klaeren.**
-
-**Was damit fuer v25 feststeht:** die Spec ist geschlossen. Nach `PREREG_v25_window.md`
-par.18 aendert sich bis v27 kein spec-pflichtiger Generator-Knopf mehr.
+3. **v25 erzeugt mit b07**, nicht mit b06. Die Befehle in `PREREG_v25_window.md` sind
+   nachgezogen.
