@@ -1492,13 +1492,6 @@ fn sanitize_deviate_prob(raw: f64) -> Option<f64> {
     (0.0..=1.0).contains(&raw).then_some(raw)
 }
 
-/// Gueltigkeitspruefung von `MOSAIC_DEVIATE_MEAN_MOVE` -- `None` = ungueltig.
-/// Ein Mittelwert <= 0 hat keine Exponentialverteilung, `NaN`/`inf` ebenso
-/// wenig eine brauchbare Halbzugnummer.
-fn sanitize_deviate_mean_move(raw: f64) -> Option<f64> {
-    (raw.is_finite() && raw > 0.0).then_some(raw)
-}
-
 /// Gueltigkeitspruefung von `MOSAIC_DEVIATE_CANDIDATES` -- `None` = ungueltig.
 /// Unter 2 Kandidaten gibt es nichts zu filtern (der einzige gezogene Zug
 /// waere automatisch der "beste"), das ist keine Abweichungsregel mehr.
@@ -1509,7 +1502,7 @@ fn sanitize_deviate_candidates(raw: f64) -> Option<usize> {
 /// Wahrscheinlichkeit je Partie, dass ueberhaupt abgewichen wird
 /// (`MOSAIC_DEVIATE_PROB`). Default `0.0` = AUS = byte-identisches
 /// Bestandsverhalten, und zwar im starken Sinn: bei `0.0` wird KEINE einzige
-/// Zufallszahl zusaetzlich gezogen (siehe [`deviation_move`]s Fruehausstieg),
+/// Zufallszahl zusaetzlich gezogen (siehe [`deviation_site`]s Fruehausstieg),
 /// der Zufallsstrom der Partie verschiebt sich also nicht. KataGo faehrt 0,05.
 /// Ausserhalb `[0,1]` -> Default mit EINMALIGER Warnung (OnceLock).
 fn deviate_prob() -> f64 {
@@ -1519,27 +1512,6 @@ fn deviate_prob() -> f64 {
         sanitize_deviate_prob(raw).unwrap_or_else(|| {
             eprintln!("⚠️  MOSAIC_DEVIATE_PROB={raw} liegt nicht in [0,1] -- Abweichung bleibt AUS (0.0).");
             0.0
-        })
-    })
-}
-
-/// Mittelwert der Exponentialverteilung, aus der die Halbzugnummer der
-/// Abweichung gezogen wird (`MOSAIC_DEVIATE_MEAN_MOVE`, Default `30.0`).
-/// Gezaehlt wird wie `move_number` in [`unified_game_loop`]: echte
-/// Drafting-Entscheide, 1-basiert, beide Spieler zusammen. KataGo zieht
-/// `r ~ Exp(mean = 0,025*b^2)` und weicht NACH den ersten `r` Zuegen ab; 30
-/// entspricht bei uns grob dem Ende von Runde 1 (`evaluations/
-/// actions_per_round.md`: rund 11 Zuege je Runde und Spieler), mit dem langen
-/// Schwanz der Exponentialverteilung bis in die spaete Partie -- genau die
-/// Eigenschaft, wegen der par.9c Weg C vor Weg A empfiehlt.
-/// Nicht-positiv/nicht endlich -> Default mit EINMALIGER Warnung.
-fn deviate_mean_move() -> f64 {
-    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| {
-        let raw = crate::net_mcts::read_f64_env("MOSAIC_DEVIATE_MEAN_MOVE", 30.0);
-        sanitize_deviate_mean_move(raw).unwrap_or_else(|| {
-            eprintln!("⚠️  MOSAIC_DEVIATE_MEAN_MOVE={raw} ist nicht > 0 -- verwende Default 30.0.");
-            30.0
         })
     })
 }
@@ -1570,28 +1542,129 @@ fn deviate_candidates() -> usize {
     })
 }
 
-/// An welchem Halbzug DIESER Partie abgewichen wird (`None` = gar nicht).
-/// Reine Funktion von `(game_seed, prob, mean_move)` -- ohne Netz, ohne
-/// Spielzustand, ohne fremden RNG, deshalb isoliert testbar.
+/// Rundenmassen der Abweichungsstelle (`PREREG_start_position_seeding.md`
+/// par.9h): Rundenprofil mal gemessene Aktionsmasse der Runde, normiert auf
+/// Summe 1. Index 0 = Runde 1.
 ///
-/// DETERMINISMUS (`PREREG_search_rng_split.md`-Muster): die beiden Ziehungen
-/// (ob / wo) kommen aus einem AUS `game_seed` ABGELEITETEN Strom --
-/// `derive_search_seed` auf den mit [`DEVIATE_SEED_DISTINGUISHER`] verxorten
-/// Seed, Zaehler `0` (der Zaehler der Suche ist `move_number` und 1-basiert,
-/// die 0 ist also frei). Der Partie-RNG bleibt damit auch bei AKTIVER
-/// Abweichung voellig unberuehrt; ein Lauf mit gleichem Seed bleibt
-/// reproduzierbar, und was sich unterscheidet, ist ausschliesslich die
-/// gespielte Aktion.
+/// HERKUNFT DIESER ZEHN ZAHLEN (eigene Messung 2026-09-07, zusammen mit
+/// [`DEVIATE_DECAY`] darunter; Sonde
+/// `tools/probes/action_count_profile_probe.py`, Artefakt
+/// `evaluations/artifacts/action_count_profile.json`):
+/// - **Grundmenge:** Records mit `phase == "drafting"` OHNE die
+///   Eroeffnungsplatzierung (Nutzer-Vorgabe 2026-09-07 "den eroeffnungszug
+///   lass aussen vor"; erkennbar daran, dass der einzige Aktionstyp `dome`
+///   ist).
+/// - **Einheit:** `len(valid_actions)` je Entscheidung.
+/// - **n = 501.914** Entscheide aus **4.000 Partien** des Korpus
+///   `v23-b01-policy` (Netz-Self-Play mit aktiver Policy).
+///
+/// Runde 5 hat Masse 0, weil das Rundenprofil dort 0 ist (dort rechnet
+/// ohnehin der exakte Loeser) -- [`deviation_round`] schliesst
+/// Null-Massen STRUKTURELL aus, nicht nur statistisch.
+///
+/// Ersetzt seit 2026-09-07 die Exponentialverteilung mit Mittelwert 30
+/// (Knopf ersatzlos entfallen, Name im Registry-Eintrag von
+/// `MOSAIC_DEVIATE_PROB`): fuer die 30 gab es keine Herleitung, diese zehn
+/// Zahlen sind gemessen.
+const DEVIATE_ROUND_MASS: [f64; 5] = [0.448, 0.280, 0.189, 0.083, 0.0];
+
+/// Geometrischer Zerfall der Aktionszahl INNERHALB der Runde, je Runde
+/// (`PREREG_start_position_seeding.md` par.9h). Index 0 = Runde 1.
+///
+/// Herkunft: dieselbe Messung wie [`DEVIATE_ROUND_MASS`] (Grundmenge,
+/// Einheit und n stehen dort). Die Rate kommt je Runde aus einer Regression
+/// auf den LOGARITHMUS der Median-Aktionszahl je Index; R2 liegt zwischen
+/// 0,966 und 0,990.
+///
+/// Die Form ist weitgehend SPIELERUNABHAENGIG (Gegenprobe an zwei weiteren
+/// Korpora, je 4.000 Partien): hv2 (Heuristik) liefert 0,1650 / 0,1604 /
+/// 0,1438 / 0,1604 / 0,2526 bei Massen 0,417 / 0,291 / 0,206 / 0,086; der
+/// argmax-Wertkorpus weicht nur in Runde 1 ab (lambda 0,1016, R2 0,698).
+/// Runde 5 ist ueber alle drei Korpora stabil bei 0,252 bis 0,255 -- sie
+/// wird ueber die Masse 0 aber ohnehin nie gezogen; ihr Eintrag steht nur
+/// da, damit die beiden Tabellen dieselbe Form haben.
+const DEVIATE_DECAY: [f64; 5] = [0.1676, 0.1530, 0.1485, 0.1483, 0.2518];
+
+/// Zieht die RUNDE der Abweichungsstelle proportional zu `mass`
+/// (1-basierte Rundennummer). Reine Funktion, isoliert testbar.
+///
+/// Runden mit Masse `<= 0` werden UEBERSPRUNGEN, nicht nur unwahrscheinlich
+/// gemacht: der `continue` schliesst sie strukturell aus. Das ist der
+/// Unterschied zu [`weighted_index`], dessen Rueckfall-Zweig
+/// (`weights.len()-1`) bei Gleitkomma-Rest ausgerechnet die LETZTE Runde
+/// liefern wuerde -- und die hat hier Masse 0.
+///
+/// `None` nur bei durchweg nicht-positiven Massen (kann mit
+/// [`DEVIATE_ROUND_MASS`] nicht vorkommen, ist aber als Parameter moeglich).
+fn deviation_round<R: Rng + ?Sized>(mass: &[f64; 5], rng: &mut R) -> Option<u32> {
+    let total: f64 = mass.iter().filter(|w| **w > 0.0).sum();
+    if !(total > 0.0) {
+        return None;
+    }
+    let mut r = rng.random::<f64>() * total;
+    let mut last_positive: Option<usize> = None;
+    for (i, &w) in mass.iter().enumerate() {
+        if w <= 0.0 {
+            continue;
+        }
+        last_positive = Some(i);
+        r -= w;
+        if r <= 0.0 {
+            return Some(i as u32 + 1);
+        }
+    }
+    // Gleitkomma-Rest: die letzte Runde MIT positiver Masse gewinnt.
+    last_positive.map(|i| i as u32 + 1)
+}
+
+/// Zieht den 1-BASIERTEN Index der Abweichungsstelle INNERHALB der Runde,
+/// geometrisch mit Rate `decay`. Reine Funktion, isoliert testbar.
+///
+/// `floor(Exp(rate)) + 1` ist genau die geometrische Verteilung auf
+/// `{1,2,3,...}` mit `P(X = 1) = 1 - exp(-rate)` -- dieselbe
+/// Inversionsmethode wie in der abgeloesten Exponential-Fassung: `u ~
+/// U[0,1)`, `1-u` liegt in `(0,1]`, `ln` davon ist nie `-inf`.
+///
+/// Ein Index JENSEITS des Rundenendes ist zulaessig und bedeutet: diese
+/// Partie weicht nicht ab (par.9h). Der Aufrufer prueft das nicht, die
+/// Spielschleife trifft die Stelle dann schlicht nie. Groessenordnung
+/// (HERGELEITET aus den Konstanten, nicht gemessen): `exp(-rate * indizes)`,
+/// bei Rate 0,168 und typisch 26 Indizes rund 1 %.
+fn deviation_index_in_round<R: Rng + ?Sized>(decay: f64, rng: &mut R) -> u64 {
+    debug_assert!(decay > 0.0, "Zerfallsrate muss positiv sein, war {decay}");
+    let u: f64 = rng.random::<f64>();
+    let x = -(1.0 - u).ln() / decay;
+    (x.floor().max(0.0) as u64).saturating_add(1)
+}
+
+/// WO in DIESER Partie abgewichen wird: `Some((runde, index_in_runde))`,
+/// `None` = gar nicht. Reine Funktion von `(game_seed, prob)` -- ohne Netz,
+/// ohne Spielzustand, ohne fremden RNG, deshalb isoliert testbar.
+///
+/// `index_in_runde` zaehlt wie `round_move_index` in [`unified_game_loop`]:
+/// echte Drafting-Entscheide INNERHALB der Runde, 1-basiert, beide Spieler
+/// zusammen, OHNE die Eroeffnungsplatzierung (sie laeuft im
+/// `start_tile_pending`-Zweig und erhoeht keinen der beiden Zaehler) --
+/// exakt die Grundmenge und Einheit, ueber der [`DEVIATE_ROUND_MASS`] und
+/// [`DEVIATE_DECAY`] gemessen sind.
+///
+/// DETERMINISMUS (`PREREG_search_rng_split.md`-Muster): alle drei Ziehungen
+/// (ob / welche Runde / welcher Index) kommen aus EINEM aus `game_seed`
+/// ABGELEITETEN Strom -- `derive_search_seed` auf den mit
+/// [`DEVIATE_SEED_DISTINGUISHER`] verxorten Seed, Zaehler `0` (der Zaehler
+/// der Suche ist `move_number` und 1-basiert, die 0 ist also frei). Der
+/// Partie-RNG bleibt damit auch bei AKTIVER Abweichung voellig unberuehrt;
+/// ein Lauf mit gleichem Seed bleibt reproduzierbar, und was sich
+/// unterscheidet, ist ausschliesslich die gespielte Aktion.
 ///
 /// `prob <= 0.0` (Default): `None` OHNE jede Ziehung -- der Fruehausstieg
 /// steht VOR dem `StdRng`-Aufbau. Das ist die wichtigste Eigenschaft dieser
 /// Aenderung (Bestand bleibt bitidentisch).
 ///
-/// Zaehlweise: KataGo weicht "after the first r turns" ab, der abweichende
-/// Halbzug ist also der `r+1`-te. `move_number` ist 1-basiert, das Ergebnis
-/// daher `floor(r) + 1`. Sehr grosse `r` (langer Schwanz) bedeuten schlicht,
-/// dass die Partie vorher endet -- dann weicht sie nicht ab.
-fn deviation_move(game_seed: u64, prob: f64, mean_move: f64) -> Option<u64> {
+/// Erreicht die Partie die gezogene Runde nicht oder endet die Runde vor dem
+/// gezogenen Index, weicht diese Partie NICHT ab -- zulaessig und gewollt
+/// (par.9h, rund 1 %).
+fn deviation_site(game_seed: u64, prob: f64) -> Option<(u32, u64)> {
     if !(prob > 0.0) {
         return None;
     }
@@ -1602,11 +1675,9 @@ fn deviation_move(game_seed: u64, prob: f64, mean_move: f64) -> Option<u64> {
     if rng.random::<f64>() >= prob {
         return None;
     }
-    // Exponentialverteilung per Inversionsmethode: r = -mean * ln(1-u) mit
-    // u ~ U[0,1). `1-u` liegt in (0,1], `ln` davon ist nie -inf.
-    let u: f64 = rng.random::<f64>();
-    let r = -mean_move * (1.0 - u).ln();
-    Some((r.floor().max(0.0) as u64).saturating_add(1))
+    let round = deviation_round(&DEVIATE_ROUND_MASS, &mut rng)?;
+    let index = deviation_index_in_round(DEVIATE_DECAY[round as usize - 1], &mut rng);
+    Some((round, index))
 }
 
 /// Zieht `want` VERSCHIEDENE legale Aktionen gleichverteilt (ohne
@@ -1696,10 +1767,19 @@ fn deviation_best_action<R: Rng + ?Sized>(
 // ZWEITE, vollstaendige Partie: an GENAU EINER Stelle wird der Zustand
 // geklont ("Stellung A"), die Hauptpartie laeuft von dort UNBEIRRT weiter,
 // und vom Klon laeuft (NACH der Hauptpartie, im selben Thread, siehe
-// `run_net_self_play`) eine eigene Partie bis zum regulaeren Ende -- die
-// ersten `MOSAIC_EXCURSION_TAU_MOVES` Halbzuege AB IHREM START gesampelt
-// (Exploration), danach greedy (par.9a: das Value-Ziel des Ausflugs soll der
-// Wert der abgewichenen Stellung unter GUTEM Spiel sein).
+// `run_net_self_play`) eine eigene Partie bis zum regulaeren Ende.
+//
+// UMBAU 2026-09-07 (Nutzer-Auftrag): der Ausflug SAMPELT NICHT MEHR. Er
+// weicht an seinem ERSTEN Halbzug GENAU EINMAL ab (`deviation_best_action`,
+// dieselbe Funktion wie Weg C) und spielt danach greedy bis zum echten
+// Partieende. Vorher sampelte er zwoelf (den Default seines eigenen
+// tau-Knopfs, ersatzlos entfallen -- der Name steht im Registry-Eintrag von
+// `MOSAIC_EXCURSION_PROB`)
+// Halbzuege ab seinem Start -- das verfehlte den Zweck: das Value-Ziel des
+// Ausflugs soll der Wert der abgewichenen Stellung unter GUTEM Spiel sein
+// (par.9a/par.17), und jeder gesampelte Halbzug nach der Abzweigung verzerrt
+// genau das. Der Knopf ist ersatzlos entfallen, siehe
+// `EXCURSION_TAU_ARGMAX_FROM_MOVE`.
 //
 // Die Abzweigstelle wird waehrend der Hauptschleife per GEWICHTETEM
 // Reservoir-Sampling gezogen (Nutzer-Spezifikation 2026-09-07 09:20):
@@ -1748,43 +1828,62 @@ fn excursion_prob() -> f64 {
     })
 }
 
-/// Gueltigkeitspruefung von `MOSAIC_EXCURSION_TAU_MOVES` -- `None` = ungueltig.
-fn sanitize_excursion_tau_moves(raw: f64) -> Option<usize> {
-    (raw.is_finite() && raw >= 0.0).then(|| raw.round() as usize)
+/// Halbzug, an dem der Ausflug seine EINE erzwungene Abweichung setzt --
+/// sein ERSTER (`move_number` beginnt bei JEDEM `unified_game_loop`-Aufruf
+/// bei 1, auch mit `start_state`, siehe `GameLoopConfig::deviate_net`-Doku).
+///
+/// Warum genau hier (Nutzer-Auftrag 2026-09-07): der Zweck des Ausflugs ist
+/// ein UNVERZERRTES Wertziel fuer die abgewichene Stellung (par.9a/par.17).
+/// Jeder GESAMPELTE Halbzug nach der Abzweigung verzerrt genau das -- die
+/// abgeloeste Fassung sampelte zwoelf Halbzuege (Default ihres eigenen
+/// tau-Knopfs: ungemessen, nur aus einer KataGo-Analogie) und hat damit dem
+/// Wertziel zwoelf Zufallszuege beigemischt. Neu: EINE Abweichung, danach
+/// bestes Spiel.
+const EXCURSION_DEVIATION_MOVE: u64 = 1;
+
+/// Umschaltpunkt, den der Ausflug seinem eigenen `NetSelfPlayAgent` als
+/// `tau_argmax_override` mitgibt: ab seinem ERSTEN Halbzug argmax statt
+/// Sampling (`net_drafting_policy`s Guard ist `move_number >= n`).
+///
+/// EIGENE Konstante neben [`EXCURSION_DEVIATION_MOVE`], obwohl beide `1`
+/// sind: die eine sagt, WO abgewichen wird, die andere, ab wann NICHT MEHR
+/// gesampelt wird. Zusammen ergeben sie die beauftragte Bauform "einmal
+/// abweichen, danach greedy bis zum echten Partieende".
+///
+/// Ersetzt den frueheren Ausflug-tau-Knopf (ersatzlos entfallen, Name im
+/// Registry-Eintrag von `MOSAIC_EXCURSION_PROB`). Der
+/// Umschaltpunkt ist damit KEIN Knopf mehr, sondern folgt aus dem Zweck;
+/// unabhaengig vom globalen `MOSAIC_TAU_ARGMAX_FROM_MOVE` (Weg A, wirkt auf
+/// die HAUPTPARTIE) bleibt er wie zuvor.
+const EXCURSION_TAU_ARGMAX_FROM_MOVE: usize = 1;
+
+/// Reservierter Zaehlerwert fuer den Zufallsstrom der ERZWUNGENEN
+/// Ausflug-Abweichung (Kandidatenziehung in [`deviation_best_action`]).
+///
+/// Eigener Zaehler, weil der Ausflug im Ausflug-Strom
+/// ([`EXCURSION_SEED_DISTINGUISHER`]) sonst mit dem Reservoir-Zug desselben
+/// Halbzugs kollidierte (Zaehler = `move_number`, der erzwungene Halbzug ist
+/// die 1): zwei verschiedene Ziehungen aus bit-gleichem Seed. Kollidiert
+/// auch nicht mit [`EXCURSION_GAME_SEED_COUNTER`] (`u64::MAX`).
+const EXCURSION_DEVIATION_COUNTER: u64 = u64::MAX - 1;
+
+/// Weg B: `tau_argmax_override` fuer den Ausflug-eigenen
+/// `NetSelfPlayAgent`. `true` (nur der Ausflug-Aufruf in
+/// `run_net_self_play`) -> ab Halbzug 1 argmax; `false` (alle uebrigen
+/// Aufrufer) -> `None` und damit byte-identisches Bestandsverhalten (das
+/// globale `MOSAIC_TAU_ARGMAX_FROM_MOVE` entscheidet weiter allein).
+/// Eigene Funktion, damit die Verdrahtung ohne Netz und ohne Partie
+/// testbar ist.
+fn excursion_tau_argmax_override(is_excursion: bool) -> Option<usize> {
+    is_excursion.then_some(EXCURSION_TAU_ARGMAX_FROM_MOVE)
 }
 
-/// Wie viele Halbzuege der Ausflug AB SEINEM EIGENEN START sampelt, bevor er
-/// greedy wird (`MOSAIC_EXCURSION_TAU_MOVES`, Default `12`).
-///
-/// **Der Default ist UNGEMESSEN.** Seine einzige Stuetze ist die Analogie zu
-/// KataGos Temperatur-Halbwertszeit (Brettbreite, rund 8 % der Partielaenge;
-/// 8 % von 162 Drafting-Halbzuegen sind rund 13, par.9d). Die fruehere
-/// Begruendung an dieser Stelle -- "Messung 3-V hat 12 als besten
-/// Umschaltpunkt gemessen" -- ist FALSCH und am 2026-09-07 gestrichen: mit dem
-/// vierten Punkt ist die Reihe monoton, k = 1 baut die meisten Spalten
-/// (0,5325 gegen 0,4225 bei k = 12).
-///
-/// Der Sockel-Umschaltpunkt und dieses k heissen gleich und machen
-/// Verschiedenes: dort, wie lange die GANZE Partie sampelt -- weniger ist
-/// besser; hier, wie weit sich der Ausflug von der Abzweigstelle entfernt,
-/// bevor er sauber weiterspielt -- k = 1 hiesse keine Abweichung und verfehlte
-/// den Zweck. Das Sockel-Optimum darf hier NICHT eingesetzt werden.
-/// RELATIV, nicht absolut: der Ausflug bekommt einen eigenen
-/// `NetSelfPlayAgent` mit `tau_argmax_override = Some(k)`, ausgewertet gegen
-/// SEINEN EIGENEN `move_number`-Zaehler -- der bei JEDEM
-/// `unified_game_loop`-Aufruf, auch mit `start_state`, bei 1 beginnt (siehe
-/// `GameLoopConfig::deviate_net`-Doku). Unabhaengig von
-/// `MOSAIC_TAU_ARGMAX_FROM_MOVE` (Weg A, wirkt auf die HAUPTPARTIE). `< 0`/
-/// nicht endlich -> Default mit EINMALIGER Warnung.
-fn excursion_tau_moves() -> usize {
-    static CELL: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
-    *CELL.get_or_init(|| {
-        let raw = crate::net_mcts::read_f64_env("MOSAIC_EXCURSION_TAU_MOVES", 12.0);
-        sanitize_excursion_tau_moves(raw).unwrap_or_else(|| {
-            eprintln!("⚠️  MOSAIC_EXCURSION_TAU_MOVES={raw} ist < 0 oder unlesbar -- verwende Default 12.");
-            12
-        })
-    })
+/// Weg B: greift an DIESEM Halbzug die erzwungene Ausflug-Abweichung?
+/// Genau einmal je Ausflug (`move_number == `[`EXCURSION_DEVIATION_MOVE`]),
+/// nie in der Hauptpartie. Eigene Funktion aus demselben Grund wie
+/// [`excursion_tau_argmax_override`].
+fn excursion_deviates_here(is_excursion: bool, move_number: u64) -> bool {
+    is_excursion && move_number == EXCURSION_DEVIATION_MOVE
 }
 
 /// Rundenprofil der Abzweig-Gewichte (`MOSAIC_EXCURSION_PROFILE`, Default
@@ -1818,12 +1917,12 @@ fn excursion_profile_env() -> [f64; 5] {
 
 /// Weg B (par.9f): ob DIESE Partie per Bernoulli einen Ausflug bekommt.
 /// `prob <= 0.0` (Default): `false` OHNE jede Ziehung -- exakt derselbe
-/// Fruehausstieg wie [`deviation_move`] (Determinismus-Vorgabe: bei
+/// Fruehausstieg wie [`deviation_site`] (Determinismus-Vorgabe: bei
 /// `MOSAIC_EXCURSION_PROB=0` bleibt der Partie-RNG UND jeder abgeleitete
 /// Strom vollstaendig unberuehrt). Eigener, aus `game_seed` abgeleiteter
 /// Strom, Zaehler `0` -- der Zaehler der Reservoir-Zuege ist `move_number`
 /// und faengt bei 1 an, die 0 ist also frei (gleiches Muster wie
-/// `deviation_move`).
+/// `deviation_site`).
 fn excursion_gate(game_seed: u64) -> bool {
     let prob = excursion_prob();
     if !(prob > 0.0) {
@@ -1855,7 +1954,7 @@ fn excursion_gate(game_seed: u64) -> bool {
 /// ein bereits korrekt verteilter Kandidat bleibt mit Wahrscheinlichkeit
 /// `1 - w_i/S_i` erhalten, skaliert seine Gewinnwahrscheinlichkeit also exakt
 /// auf `w_j/S_i` fuer `j<i`). Reine Funktion, isoliert testbar -- gleiches
-/// Prinzip wie [`deviation_move`].
+/// Prinzip wie [`deviation_site`].
 fn reservoir_step<R: Rng + ?Sized>(weight_sum_before: f64, w: f64, rng: &mut R) -> (bool, f64) {
     if w <= 0.0 {
         return (false, weight_sum_before);
@@ -2098,10 +2197,11 @@ struct NetSelfPlayAgent<'n> {
     search_config: crate::net_mcts::SearchConfig,
     /// Weg B (`PREREG_start_position_seeding.md` par.9f): Ausflug-eigener
     /// τ-Umschaltpunkt, RELATIV zu diesem Agenten (siehe
-    /// `excursion_tau_moves`-Doku). `None` (alle Aufrufer ausser dem
-    /// Ausflug in `run_net_self_play`) -> `net_drafting_policy` faellt auf
-    /// das GLOBALE `MOSAIC_TAU_ARGMAX_FROM_MOVE` zurueck (Weg A,
-    /// byte-identisches Bestandsverhalten).
+    /// [`excursion_tau_argmax_override`]). Beim Ausflug `Some(1)` -- ab
+    /// seinem ersten Halbzug argmax. `None` (alle uebrigen Aufrufer) ->
+    /// `net_drafting_policy` faellt auf das GLOBALE
+    /// `MOSAIC_TAU_ARGMAX_FROM_MOVE` zurueck (Weg A, byte-identisches
+    /// Bestandsverhalten).
     tau_argmax_override: Option<usize>,
 }
 
@@ -2263,12 +2363,35 @@ struct GameLoopConfig<'a> {
     /// und der Heuristik-Self-Play setzen `None` und lesen die
     /// `MOSAIC_DEVIATE_*`-Knoepfe damit gar nicht erst. Auch im Self-Play ist
     /// der Default (`MOSAIC_DEVIATE_PROB=0`) byte-identisch zum Bestand,
-    /// siehe [`deviation_move`].
+    /// siehe [`deviation_site`].
     ///
-    /// Zaehlung bei geseedetem Start (`start_state`): `move_number` beginnt
-    /// auch dort bei 1, die Abweichungsstelle zaehlt also ab dem ERSTEN Zug
-    /// der Fortsetzung, nicht ab dem Anfang der Ursprungspartie.
+    /// Zaehlung bei geseedetem Start (`start_state`): `move_number` UND
+    /// `round_move_index` beginnen auch dort bei 1, die Abweichungsstelle
+    /// zaehlt also ab dem ERSTEN Zug der Fortsetzung, nicht ab dem Anfang
+    /// der Ursprungspartie. Bei `round_move_index` heisst das ausserdem:
+    /// eine mitten in einer Runde geseedete Fortsetzung zaehlt ihre erste
+    /// Entscheidung als Index 1, nicht als den Index, den sie in der
+    /// Ursprungspartie haette.
     deviate_net: Option<&'a Net>,
+    /// Weg B (`PREREG_start_position_seeding.md` par.9f): ist DIESER Aufruf
+    /// selbst ein Ausflug? `true` NUR fuer den Ausflug-Aufruf in
+    /// `run_net_self_play` -- dann weicht die Schleife an Halbzug
+    /// [`EXCURSION_DEVIATION_MOVE`] ERZWUNGEN ab (siehe
+    /// [`excursion_deviates_here`]), unabhaengig von `MOSAIC_DEVIATE_PROB`.
+    /// `false` (alle uebrigen Aufrufer) = byte-identisches
+    /// Bestandsverhalten: der Zweig wird nie betreten, es wird keine
+    /// Zufallszahl gezogen.
+    is_excursion: bool,
+    /// Weg B: meldet zurueck, ob die erzwungene Abweichung TATSAECHLICH
+    /// stattgefunden hat. Sie kann ausfallen -- der Vorzugs-Waechter greift
+    /// (`d.vorzug.is_some()`), oder `deviation_best_action` findet bei weniger
+    /// als zwei Aktionen keinen Kandidaten. Dann spielt der Ausflug die
+    /// Abzweigstellung nur GREEDY nach; weil die Hauptpartie in den
+    /// Weg-B-Klassen ebenfalls greedy laeuft (`--tau-argmax-from-move 1`),
+    /// waere sein Ergebnis eine exakte DUBLETTE ihrer Fortsetzung. Solche
+    /// Ausfluege verwirft der Aufrufer, statt den Korpus mit Kopien zu
+    /// fuellen. `None` fuer alle Nicht-Ausflug-Aufrufe.
+    excursion_deviated: Option<&'a std::cell::Cell<bool>>,
     /// Weg B (`PREREG_start_position_seeding.md` par.9f): Nebenausgabe des
     /// per gewichtetem Reservoir-Sampling gezogenen Ausflug-Kandidaten
     /// (Cell-Muster wie `vorzug_greift` oben). Die Schleife BESCHREIBT die
@@ -2325,22 +2448,35 @@ fn unified_game_loop<R: Rng + ?Sized>(
     // Spieler zusammen; StartPlacement/Tiling erhoehen ihn nicht) -- Seed-
     // Zaehler der Self-Play-Pfade.
     let mut move_number: u64 = 0;
+    // Weg C (`PREREG_start_position_seeding.md` par.9h): 1-BASIERTER Zaehler
+    // der echten Drafting-Entscheide INNERHALB der laufenden Runde (beide
+    // Spieler zusammen, Rundenwechsel setzt zurueck). Die
+    // Eroeffnungsplatzierung zaehlt NICHT mit -- sie laeuft im
+    // `start_tile_pending`-Zweig, der auch `move_number` nicht erhoeht, und
+    // ist als Abzweigstelle fuer BEIDE Wege ausgeschlossen. Genau die
+    // Grundmenge und Einheit, ueber der `DEVIATE_ROUND_MASS`/`DEVIATE_DECAY`
+    // gemessen sind. Reiner Zaehler ohne Nebenwirkung: er kostet nichts,
+    // wenn kein Knopf aktiv ist (kein RNG-Griff, kein Klon).
+    let mut round_move_index: u64 = 0;
+    // Runde, auf die sich `round_move_index` gerade bezieht (0 = noch keine).
+    let mut round_of_move_index: u32 = 0;
     // Alle-Schritte-Zaehler der Arena-Pfade (StartPlacement+Drafting+Tiling);
     // im Summary-Modus zugleich das `steps`-Ausgabefeld.
     let mut steps = 0u32;
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
     let recording = matches!(cfg.mode, LoopMode::Records { .. });
-    // Weg C (`PREREG_start_position_seeding.md` par.9c): an welchem Halbzug
-    // DIESER Partie genau ein Drafting-Zug von der Suche abweicht. Nur der
+    // Weg C (`PREREG_start_position_seeding.md` par.9c/par.9h): AN WELCHER
+    // STELLE dieser Partie genau ein Drafting-Zug von der Suche abweicht --
+    // als PAAR (Runde, Index innerhalb der Runde), gezogen aus der gemessenen
+    // Verteilung (`DEVIATE_ROUND_MASS` x `DEVIATE_DECAY`). Nur der
     // Netz-Self-Play setzt `deviate_net`; bei `None` werden die
     // `MOSAIC_DEVIATE_*`-Getter gar nicht aufgerufen, und bei Default-AUS
-    // (`MOSAIC_DEVIATE_PROB=0`) liefert `deviation_move` `None`, OHNE eine
+    // (`MOSAIC_DEVIATE_PROB=0`) liefert `deviation_site` `None`, OHNE eine
     // einzige Zufallszahl zu ziehen -- weder der Partie-RNG noch ein
     // abgeleiteter Strom wird beruehrt.
-    let deviate_at: Option<u64> = cfg
-        .deviate_net
-        .and_then(|_| deviation_move(cfg.game_seed, deviate_prob(), deviate_mean_move()));
+    let deviate_at: Option<(u32, u64)> =
+        cfg.deviate_net.and_then(|_| deviation_site(cfg.game_seed, deviate_prob()));
     // Weg B (`PREREG_start_position_seeding.md` par.9f): ob DIESE Partie
     // ueberhaupt einen Ausflug-Kandidaten sammelt. Nur der Netz-Self-Play
     // setzt `excursion_branch`; bei `None` wird `excursion_gate` gar nicht
@@ -2401,6 +2537,15 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // dieser Partie ist Zug 1 (1-basiert, Konvention aus
                     // `evaluations/actions_per_round.md`).
                     move_number += 1;
+                    // Weg C (par.9h): Index INNERHALB der Runde, gleiche
+                    // "erst erhoehen, dann verwenden"-Konvention wie
+                    // `move_number`. Rundenwechsel setzt zurueck; der erste
+                    // Entscheid einer Runde ist Index 1.
+                    if game.state.round_number != round_of_move_index {
+                        round_of_move_index = game.state.round_number;
+                        round_move_index = 0;
+                    }
+                    round_move_index += 1;
                     let player = game.state.current_player;
                     let pcfg = &cfg.players[player];
                     let actions = drafting_actions(&game.state);
@@ -2430,7 +2575,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                             cell.set(counts);
                         }
                     }
-                    // Weg C (par.9c): GENAU EIN Halbzug je Partie weicht ab.
+                    // Abweichung: GENAU EIN Halbzug je Partie weicht ab.
                     // Ersetzt AUSSCHLIESSLICH die gespielte Aktion --
                     // `d.policy` bleibt die Besuchsverteilung der regulaeren
                     // Suche (die ohnehin gelaufen ist), es entsteht kein
@@ -2439,7 +2584,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // der Spaltenbau-Trace lesen `d.chosen`, und beide sollen
                     // die TATSAECHLICH gespielte Aktion beschreiben.
                     // Zufallsquelle: eigener, aus `game_seed` abgeleiteter
-                    // Strom (siehe `deviation_move`) -- die Kandidatenziehung
+                    // Strom (siehe `deviation_site`) -- die Kandidatenziehung
                     // verschiebt weder den Partie-RNG noch den Such-RNG dieses
                     // Halbzugs, aus dem gleich `moon_order_target` zieht.
                     // WAECHTER (Koordinator 2026-09-07, nach dem Bau-Bericht): greift der
@@ -2450,37 +2595,78 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // wird NICHT abgewichen; die Partie hat dann keine Abweichung, was
                     // die Rate leicht unter den eingestellten Wert druecken kann (im
                     // Bericht je Lauf sichtbar, weil die `[deviate]`-Zeile fehlt).
-                    if deviate_at == Some(move_number) && d.vorzug.is_none() {
-                        if let Some(net) = cfg.deviate_net {
-                            let want = deviate_candidates();
-                            let mut deviate_rng =
-                                StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
-                                    cfg.game_seed ^ DEVIATE_SEED_DISTINGUISHER,
-                                    move_number,
-                                ));
-                            if let Some(a) = deviation_best_action(
-                                net,
-                                &game.state,
-                                &actions,
-                                player,
-                                want,
-                                &mut deviate_rng,
-                            ) {
-                                // Zuordnung als Log-Zeile, nicht als
-                                // Record-Feld -- derselbe Praezedenzfall wie
-                                // `[seed_position]`/`[asym_vorzug]` (par.6:
-                                // das Record-Schema hat mehrere
-                                // Python-Konsumenten). Nur bei aktivem Knopf,
-                                // also hoechstens einmal je Partie.
-                                eprintln!(
-                                    "[deviate] seed={} move={} player={} legal={} kandidaten={}",
-                                    cfg.game_seed,
-                                    move_number,
+                    // GILT AUCH FUER DEN AUSFLUG: greift an seinem ersten
+                    // Halbzug der Vorzug, weicht er nicht ab und spielt die
+                    // Stellung nur greedy nach. Weil die Vorzugsketten
+                    // thread-lokalen Zustand fuehren und der Ausflug in einem
+                    // FRISCHEN Thread laeuft, ist das nicht dadurch
+                    // ausgeschlossen, dass die Abzweigstelle in der
+                    // Hauptpartie vorzugsfrei war.
+                    //
+                    // ZWEI Quellen, EIN Mechanismus (Umbau 2026-09-07): Weg C
+                    // trifft die aus der gemessenen Verteilung gezogene Stelle
+                    // (Runde UND Index innerhalb der Runde muessen passen),
+                    // Weg B erzwingt sie am ERSTEN Halbzug des Ausflugs. Bei
+                    // Gleichstand (nur moeglich, wenn BEIDE Knoepfe aktiv sind
+                    // und Weg C zufaellig auf Runde/Index des Ausflug-Starts
+                    // faellt) gewinnt der Ausflug -- er ist die Existenzgrund-
+                    // lage dieses Partie-Aufrufs. Beide Quellen haben ihren
+                    // EIGENEN Zufallsstrom (Distinguisher + Zaehler), damit
+                    // sie sich nicht ins Gehege kommen.
+                    let deviate_stream: Option<(u64, u64, &'static str)> =
+                        if excursion_deviates_here(cfg.is_excursion, move_number) {
+                            Some((
+                                EXCURSION_SEED_DISTINGUISHER,
+                                EXCURSION_DEVIATION_COUNTER,
+                                "ausflug",
+                            ))
+                        } else if deviate_at == Some((game.state.round_number, round_move_index)) {
+                            Some((DEVIATE_SEED_DISTINGUISHER, move_number, "wegc"))
+                        } else {
+                            None
+                        };
+                    if let Some((distinguisher, seed_counter, quelle)) = deviate_stream {
+                        if d.vorzug.is_none() {
+                            if let Some(net) = cfg.deviate_net {
+                                let want = deviate_candidates();
+                                let mut deviate_rng =
+                                    StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+                                        cfg.game_seed ^ distinguisher,
+                                        seed_counter,
+                                    ));
+                                if let Some(a) = deviation_best_action(
+                                    net,
+                                    &game.state,
+                                    &actions,
                                     player,
-                                    actions.len(),
-                                    want.max(2).min(actions.len())
-                                );
-                                d.chosen = a;
+                                    want,
+                                    &mut deviate_rng,
+                                ) {
+                                    if quelle == "ausflug" {
+                                        if let Some(cell) = cfg.excursion_deviated {
+                                            cell.set(true);
+                                        }
+                                    }
+                                    // Zuordnung als Log-Zeile, nicht als
+                                    // Record-Feld -- derselbe Praezedenzfall
+                                    // wie `[seed_position]`/`[asym_vorzug]`
+                                    // (par.6: das Record-Schema hat mehrere
+                                    // Python-Konsumenten). Nur bei aktivem
+                                    // Knopf, also hoechstens einmal je Partie.
+                                    eprintln!(
+                                        "[deviate] quelle={} seed={} move={} runde={} index={} \
+                                         player={} legal={} kandidaten={}",
+                                        quelle,
+                                        cfg.game_seed,
+                                        move_number,
+                                        game.state.round_number,
+                                        round_move_index,
+                                        player,
+                                        actions.len(),
+                                        want.max(2).min(actions.len())
+                                    );
+                                    d.chosen = a;
+                                }
                             }
                         }
                     }
@@ -2875,8 +3061,11 @@ pub fn play_one_game<R: Rng + ?Sized>(
         // Abweichung filtert per NETZBEWERTUNG des Folgezustands, dieser
         // Pfad hat dafuer keinen Drafting-Netzpfad.
         deviate_net: None,
-        // Weg B (par.9f): kein Ausflug-Tracking ausserhalb des Netz-Self-Play.
+        // Weg B (par.9f): kein Ausflug-Tracking ausserhalb des Netz-Self-Play,
+        // und dieser Aufruf IST kein Ausflug.
         excursion_branch: None,
+        is_excursion: false,
+        excursion_deviated: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -3308,6 +3497,8 @@ fn play_net_game<R: Rng + ?Sized>(
         deviate_net: None,
         // Weg B (par.9f): dito -- kein Ausflug im Arena-Pfad.
         excursion_branch: None,
+        is_excursion: false,
+        excursion_deviated: None,
     };
     let mut result = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -3465,6 +3656,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
         deviate_net: None,
         // Weg B (par.9f): dito -- kein Ausflug im Arena-Pfad.
         excursion_branch: None,
+        is_excursion: false,
+        excursion_deviated: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -4152,14 +4345,20 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // PREREG_agent_encapsulation.md par.3/par.4 Punkt 4: EIN Spec fuer beide
     // Seiten (beide Seiten SIND dasselbe Netz).
     search_config: crate::net_mcts::SearchConfig,
-    // Weg B (`PREREG_start_position_seeding.md` par.9f): `Some(k)` NUR fuer
-    // den Ausflug-eigenen Aufruf (`run_net_self_play`s `play`-Abschluss) --
-    // ersetzt dort den GLOBALEN `MOSAIC_TAU_ARGMAX_FROM_MOVE` (Weg A) durch
-    // einen Ausflug-relativen Umschaltpunkt. `None` fuer die Hauptpartie
-    // (byte-identisches Bestandsverhalten, siehe `net_drafting_policy`s
-    // gleichnamiger Parameter).
-    tau_argmax_override: Option<usize>,
-) -> (Vec<Value>, Option<GameState>) {
+    // Weg B (`PREREG_start_position_seeding.md` par.9f, Bauform seit dem
+    // Umbau 2026-09-07): `true` NUR fuer den Ausflug-eigenen Aufruf
+    // (`run_net_self_play`s `play`-Abschluss). Der Ausflug bekommt damit
+    // BEIDES auf einmal, weil beides zusammengehoert:
+    //   1. `tau_argmax_override = Some(1)` -- ab seinem ersten Halbzug
+    //      argmax statt Sampling, unabhaengig vom GLOBALEN
+    //      `MOSAIC_TAU_ARGMAX_FROM_MOVE` (Weg A, wirkt auf die Hauptpartie);
+    //   2. `GameLoopConfig::is_excursion = true` -- an genau diesem ersten
+    //      Halbzug EINE erzwungene Abweichung (`deviation_best_action`).
+    // EIN Parameter statt zweier, damit die beiden Haelften nicht
+    // auseinanderlaufen koennen. `false` fuer die Hauptpartie und alle
+    // uebrigen Aufrufer = byte-identisches Bestandsverhalten.
+    excursion_run: bool,
+) -> (Vec<Value>, Option<GameState>, bool) {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // EIN NetSelfPlayAgent fuer beide Seiten (beide Seiten SIND das Netz),
     // Vorzug BEIDSEITIG (PREREG_ownership_corpus.md §3.1, seit 5992f38 --
@@ -4182,6 +4381,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     let vorzug_seite = if asym { Some(asym_preference_side(game_seed)) } else { None };
     let vorzug_p0 = vorzug_seite.map(|s| s == 0).unwrap_or(true);
     let vorzug_p1 = vorzug_seite.map(|s| s == 1).unwrap_or(true);
+    // Weg B: `Some(1)` genau dann, wenn dieser Aufruf ein Ausflug ist --
+    // sonst `None` (globales Verhalten, byte-identisch zum Bestand).
+    let tau_argmax_override = excursion_tau_argmax_override(excursion_run);
     let agent0 = NetSelfPlayAgent {
         net,
         base_sims,
@@ -4231,6 +4433,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // (`excursion_gate`s Fruehausstieg bei `MOSAIC_EXCURSION_PROB<=0`), nicht
     // hier ueber einen Bool-Parameter.
     let excursion_cell: std::cell::Cell<Option<GameState>> = std::cell::Cell::new(None);
+    // Weg B (Umbau 2026-09-07): nur fuer den Ausflug-Aufruf selbst -- er meldet
+    // hierher zurueck, ob seine erzwungene Abweichung wirklich zustande kam.
+    let excursion_deviated: std::cell::Cell<bool> = std::cell::Cell::new(false);
     let cfg = GameLoopConfig {
         timeout_secs: net_game_timeout_secs(base_sims)
             + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS,
@@ -4246,6 +4451,10 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         // (`MOSAIC_DEVIATE_PROB=0`) ist byte-identisch zum Bestand.
         deviate_net: Some(net),
         excursion_branch: Some(&excursion_cell),
+        // Weg B (Umbau 2026-09-07): NUR der Ausflug-Aufruf selbst erzwingt
+        // an seinem ersten Halbzug eine Abweichung -- die Hauptpartie nicht.
+        is_excursion: excursion_run,
+        excursion_deviated: if excursion_run { Some(&excursion_deviated) } else { None },
     };
     let out = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -4266,7 +4475,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
             counts[0], counts[1]
         );
     }
-    (out, excursion_cell.take())
+    // Dritter Rueckgabewert: taugt dieser Ausflug? Fuer Nicht-Ausflug-Aufrufe
+    // bedeutungslos (immer `false`), der Aufrufer wertet ihn nur beim Ausflug aus.
+    (out, excursion_cell.take(), excursion_deviated.get())
 }
 
 /// Zusätzliche Sicherheitsmarge (über `net_game_timeout_secs +
@@ -4519,13 +4730,13 @@ pub fn run_net_self_play(
                     play_net_self_play_game(
                         &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise,
                         deterministic, record_rtv, Some(&move_counter_thread), pcr_full_prob, pcr_cheap_sims,
-                        partie_seed, start_state, search_config, None,
+                        partie_seed, start_state, search_config, false,
                     )
                 },
             )
         });
         let (mut steps, excursion_branch) = match result {
-            Some((v, b)) => (v, b),
+            Some((v, b, _)) => (v, b),
             None => {
                 eprintln!(
                     "⚠️  [Watchdog] Spiel {gid} ueberschritt die harte {watchdog_deadline:?}-Deadline -- \
@@ -4544,7 +4755,9 @@ pub fn run_net_self_play(
         }
         // Weg B (`PREREG_start_position_seeding.md` par.9f): der Ausflug
         // laeuft NACH der Hauptpartie, im GLEICHEN Thread dieser rayon-
-        // Closure -- die Parallelisierung ueber `into_par_iter` (unten)
+        // Closure (letztes Argument `true` = `excursion_run`: EINE erzwungene
+        // Abweichung an seinem ersten Halbzug, danach argmax bis zum echten
+        // Partieende) -- die Parallelisierung ueber `into_par_iter` (unten)
         // bleibt unberuehrt, der Ausflug ist Teil derselben Aufgabe `i`.
         // `excursion_branch` ist nur bei aktivem `MOSAIC_EXCURSION_PROB` UND
         // erfolgreichem Bernoulli-Gate `Some` (`excursion_gate`) -- Default
@@ -4587,19 +4800,35 @@ pub fn run_net_self_play(
                             &net_ex, base_sims, c_puct, ex_ids, ex_names, ex_first, &ex_gid_thread,
                             &mut ex_rng, add_root_noise, deterministic, record_rtv,
                             Some(&move_counter_ex), pcr_full_prob, pcr_cheap_sims, excursion_seed,
-                            Some(branch_state), search_config, Some(excursion_tau_moves()),
+                            Some(branch_state), search_config, true,
                         )
                     },
                 )
             });
             match ex_result {
-                Some((ex_steps, _)) if !ex_steps.is_empty() => {
+                // Der Ausflug zaehlt NUR, wenn seine erzwungene Abweichung
+                // wirklich zustande kam. Faellt sie aus -- Vorzugs-Waechter
+                // greift, oder `deviation_best_action` findet bei weniger als
+                // zwei Aktionen keinen Kandidaten --, hat der Ausflug die
+                // Abzweigstellung bloss greedy nachgespielt. Da die Hauptpartie
+                // in den Weg-B-Klassen ebenfalls greedy laeuft, waere das eine
+                // exakte DUBLETTE ihrer Fortsetzung: dieselben Zuege, dieselben
+                // Wertziele, nur unter anderer `game_id`. Solche Kopien blaehen
+                // den Korpus und taeuschen dem Value-Kopf Evidenz vor, die es
+                // nicht gibt -- deshalb verworfen, mit Zeile im Log.
+                Some((ex_steps, _, true)) if !ex_steps.is_empty() => {
                     eprintln!(
                         "[excursion] game_id={ex_gid} seed={excursion_seed} records={}",
                         ex_steps.len()
                     );
                     append_game_progress(&progress_file, &ex_steps);
                     steps.extend(ex_steps);
+                }
+                Some((ex_steps, _, false)) if !ex_steps.is_empty() => {
+                    eprintln!(
+                        "[excursion] game_id={ex_gid} VERWORFEN: Abweichung kam nicht zustande                          (Vorzug oder zu wenige Aktionen), {} Records waeren eine Dublette                          der Hauptpartie",
+                        ex_steps.len()
+                    );
                 }
                 Some(_) => {}
                 None => {
@@ -6157,6 +6386,8 @@ pub(crate) mod tests {
                 start_state: Some(state),
                 deviate_net: None,
                 excursion_branch: None,
+                is_excursion: false,
+                excursion_deviated: None,
             };
             match unified_game_loop(vec![], ["A".into(), "B".into()], 0, &mut r, cfg) {
                 LoopOutput::Records(out) => serde_json::to_string(&out).unwrap(),
@@ -6541,7 +6772,7 @@ pub(crate) mod tests {
             let mut rng = StdRng::seed_from_u64(seed);
             let ids = sample_valid_scoring_ids(3, &mut rng);
             let names = ["Netz".to_string(), "Netz".to_string()];
-            let (records, _excursion) = play_net_self_play_game(
+            let (records, _excursion, _deviated) = play_net_self_play_game(
                 net,
                 NET_PARITY_SIMS,
                 crate::net_mcts::DEFAULT_C_PUCT,
@@ -6559,7 +6790,7 @@ pub(crate) mod tests {
                 seed,  // game_seed
                 None,  // start_state
                 crate::net_mcts::SearchConfig::from_env(),
-                None, // tau_argmax_override (Weg B, par.9f)
+                false, // excursion_run (Weg B, par.9f) -- keine Ausflug-Partie
             );
             assert!(
                 !records.is_empty(),
@@ -7067,10 +7298,10 @@ pub(crate) mod tests {
             let mut rng = StdRng::seed_from_u64(seed);
             let ids = sample_valid_scoring_ids(3, &mut rng);
             let names = ["Netz".to_string(), "Netz".to_string()];
-            let (records, _excursion) = play_net_self_play_game(
+            let (records, _excursion, _deviated) = play_net_self_play_game(
                 net, 60, crate::net_mcts::DEFAULT_C_PUCT, ids, names, 0, "gate_b_repro", &mut rng,
                 true, false, true, None, None, 0, seed, None, crate::net_mcts::SearchConfig::from_env(),
-                None,
+                false,
             );
             records
         }
@@ -7893,7 +8124,7 @@ pub(crate) mod tests {
     /// Test (1) der Auftragsliste, DEFAULT-AUS-Haelfte: bei ungesetzten
     /// Env-Vars ist die Abweichung aus, und dann wird KEINE einzige
     /// Zufallszahl gezogen. Der zweite Teil ist hier strukturell und nicht
-    /// nur statistisch: `deviation_move` steigt bei `prob <= 0.0` VOR dem
+    /// nur statistisch: `deviation_site` steigt bei `prob <= 0.0` VOR dem
     /// `StdRng`-Aufbau aus (Fruehausstieg im Funktionsrumpf), es gibt also
     /// gar keinen Strom, der sich verschieben koennte -- und der Partie-RNG
     /// wird ohnehin nie angefasst, weil die Funktion keinen entgegennimmt.
@@ -7906,21 +8137,53 @@ pub(crate) mod tests {
             "MOSAIC_DEVIATE_PROB muss ungesetzt 0.0 (= AUS) sein"
         );
         assert_eq!(
-            deviate_mean_move(),
-            30.0,
-            "MOSAIC_DEVIATE_MEAN_MOVE-Default ist 30.0"
-        );
-        assert_eq!(
             deviate_candidates(),
             6,
             "MOSAIC_DEVIATE_CANDIDATES-Default ist 6"
         );
         for seed in 0..5_000u64 {
             assert_eq!(
-                deviation_move(seed, deviate_prob(), deviate_mean_move()),
+                deviation_site(seed, deviate_prob()),
                 None,
                 "Seed {seed}: bei Default-AUS darf keine Abweichungsstelle entstehen"
             );
+        }
+    }
+
+    /// Auftrags-Test (1), STRUKTUR-Haelfte fuer BEIDE Wege zusammen: bei
+    /// Default-AUS betritt die Spielschleife keinen der beiden
+    /// Abweichungs-Zweige, es kann also gar keine zusaetzliche Zufallszahl
+    /// gezogen werden. Geprueft an genau den Praedikaten, die die Schleife
+    /// auswertet (`deviate_stream` in `unified_game_loop` ist ein
+    /// `if excursion_deviates_here(..) {..} else if deviate_at == Some(..) {..}
+    /// else { None }`), nicht an einer Kopie davon.
+    #[test]
+    fn both_deviation_paths_are_structurally_inert_when_off() {
+        // Weg B: `is_excursion` ist nur im Ausflug-Aufruf `true`, und ein
+        // Ausflug entsteht nur bei `MOSAIC_EXCURSION_PROB > 0`.
+        for move_number in [1u64, 2, 7, 42, 200] {
+            assert!(
+                !excursion_deviates_here(false, move_number),
+                "move_number={move_number}: ohne Ausflug darf nie erzwungen abgewichen werden"
+            );
+        }
+        assert_eq!(
+            excursion_tau_argmax_override(false),
+            None,
+            "ohne Ausflug bleibt der globale Umschaltpunkt allein zustaendig"
+        );
+        // Weg C: `deviation_site` liefert bei Default-AUS `None`, und
+        // `None == Some(..)` ist immer falsch -- der Vergleich der Schleife
+        // kann bei keiner Runde und keinem Index anschlagen.
+        let deviate_at: Option<(u32, u64)> = deviation_site(4711, deviate_prob());
+        assert_eq!(deviate_at, None, "Default-AUS muss `None` liefern");
+        for round in 1..=5u32 {
+            for index in 1..=60u64 {
+                assert!(
+                    deviate_at != Some((round, index)),
+                    "runde={round} index={index}: Default-AUS darf nie treffen"
+                );
+            }
         }
     }
 
@@ -7929,56 +8192,136 @@ pub(crate) mod tests {
     /// Seed -> gleiche Stelle, und ueber viele Seeds ist die Stelle nicht
     /// konstant (sonst waere der abgeleitete Strom entartet).
     #[test]
-    fn deviation_move_is_deterministic_per_game_seed_and_spreads() {
+    fn deviation_site_is_deterministic_per_game_seed_and_spreads() {
         let mut distinct = std::collections::BTreeSet::new();
         for seed in 0..2_000u64 {
-            let a = deviation_move(seed, 1.0, 30.0);
-            let b = deviation_move(seed, 1.0, 30.0);
+            let a = deviation_site(seed, 1.0);
+            let b = deviation_site(seed, 1.0);
             assert_eq!(
                 a, b,
                 "Seed {seed}: Abweichungsstelle muss deterministisch sein"
             );
-            let m = a.expect("prob=1.0 muss immer eine Stelle liefern");
-            assert!(m >= 1, "Halbzugnummern sind 1-basiert, war {m}");
-            distinct.insert(m);
+            let (round, index) = a.expect("prob=1.0 muss immer eine Stelle liefern");
+            assert!((1..=5).contains(&round), "Runde ausserhalb 1..5: {round}");
+            assert!(index >= 1, "Indizes sind 1-basiert, war {index}");
+            distinct.insert((round, index));
         }
         assert!(
             distinct.len() > 50,
-            "Abweichungsstelle streut zu wenig ({} verschiedene Werte ueber 2000 Seeds)",
+            "Abweichungsstelle streut zu wenig ({} verschiedene Paare ueber 2000 Seeds)",
             distinct.len()
         );
     }
 
-    /// Die Rate trifft `prob`, und die Stelle folgt der Exponentialverteilung
-    /// mit dem eingestellten Mittelwert. Beides zusammen belegt, dass die
-    /// beiden Ziehungen in `deviation_move` in der richtigen Reihenfolge und
-    /// mit der richtigen Bedeutung verdrahtet sind (eine vertauschte
-    /// Reihenfolge wuerde die Rate kippen).
+    /// Auftrags-Test (2): die gezogene RUNDE folgt ueber viele Seeds den
+    /// gemessenen Massen `DEVIATE_ROUND_MASS` (par.9h). Zugleich Beleg, dass
+    /// die drei Ziehungen in `deviation_site` in der richtigen Reihenfolge
+    /// stehen -- eine vertauschte Reihenfolge kippte die Rundenverteilung.
+    /// Toleranz 3 Prozentpunkte bei 20.000 Ziehungen (Auftragsvorgabe; der
+    /// Standardfehler eines Anteils liegt hier bei rund 0,35 Prozentpunkten,
+    /// die Toleranz ist also bewusst grosszuegig).
     #[test]
-    fn deviation_move_rate_and_mean_match_the_knobs() {
+    fn deviation_round_follows_the_measured_round_mass() {
+        let n = 20_000u64;
+        let mut counts = [0u64; 5];
+        for seed in 0..n {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let round = deviation_round(&DEVIATE_ROUND_MASS, &mut rng)
+                .expect("DEVIATE_ROUND_MASS hat positive Eintraege");
+            counts[round as usize - 1] += 1;
+        }
+        let total: f64 = DEVIATE_ROUND_MASS.iter().sum();
+        for (i, &c) in counts.iter().enumerate() {
+            let got = c as f64 / n as f64;
+            let want = DEVIATE_ROUND_MASS[i] / total;
+            assert!(
+                (got - want).abs() < 0.03,
+                "Runde {}: Anteil {got:.4} weicht zu stark von der Masse {want:.4} ab",
+                i + 1
+            );
+        }
+    }
+
+    /// Auftrags-Test (3): der Index INNERHALB der Runde ist geometrisch
+    /// verteilt -- der Anteil bei Index 1 liegt nahe `1 - exp(-lambda)`.
+    /// Geprueft je Runde mit DEREN Rate, damit ein vertauschter
+    /// `DEVIATE_DECAY`-Index auffaellt. Toleranz 1,5 Prozentpunkte bei
+    /// 20.000 Ziehungen (rund vier Standardfehler).
+    #[test]
+    fn deviation_index_in_round_is_geometric_with_the_round_rate() {
+        let n = 20_000u64;
+        for (i, &lambda) in DEVIATE_DECAY.iter().enumerate() {
+            let mut at_one = 0u64;
+            let mut min_seen = u64::MAX;
+            for seed in 0..n {
+                let mut rng = StdRng::seed_from_u64(seed);
+                let idx = deviation_index_in_round(lambda, &mut rng);
+                assert!(idx >= 1, "Indizes sind 1-basiert, war {idx}");
+                min_seen = min_seen.min(idx);
+                if idx == 1 {
+                    at_one += 1;
+                }
+            }
+            assert_eq!(min_seen, 1, "Runde {}: Index 1 muss vorkommen", i + 1);
+            let got = at_one as f64 / n as f64;
+            let want = 1.0 - (-lambda).exp();
+            assert!(
+                (got - want).abs() < 0.015,
+                "Runde {}: Anteil bei Index 1 ist {got:.4}, erwartet 1-exp(-{lambda}) = {want:.4}",
+                i + 1
+            );
+        }
+    }
+
+    /// Auftrags-Test (4): Runde 5 hat Masse 0 und wird NIE gezogen.
+    /// STRUKTURELL geprueft, nicht nur statistisch: `deviation_round`
+    /// ueberspringt Null-Massen per `continue` und kann sie deshalb weder
+    /// ueber den Hauptzweig noch ueber den Gleitkomma-Rueckfall liefern
+    /// (der auf die letzte POSITIVE Masse zeigt) -- genau der Unterschied
+    /// zu `weighted_index`, dessen Rueckfall die letzte Runde nehmen wuerde.
+    /// Die Schleife darueber ist die statistische Gegenprobe.
+    #[test]
+    fn deviation_round_never_draws_round_five() {
+        assert_eq!(
+            DEVIATE_ROUND_MASS[4], 0.0,
+            "Runde 5 muss Masse 0 haben (Rundenprofil ist dort 0, par.9g)"
+        );
+        for seed in 0..20_000u64 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let round = deviation_round(&DEVIATE_ROUND_MASS, &mut rng).expect("positive Massen");
+            assert_ne!(round, 5, "Seed {seed}: Runde 5 hat Masse 0 und darf nie fallen");
+        }
+        // Auch der Extremfall "nur die letzte Runde traegt Masse" bleibt
+        // korrekt -- der Rueckfall zeigt auf die letzte POSITIVE Masse.
+        let only_last = [0.0, 0.0, 0.0, 0.0, 1.0];
+        let mut rng = StdRng::seed_from_u64(1);
+        assert_eq!(deviation_round(&only_last, &mut rng), Some(5));
+        let all_zero = [0.0f64; 5];
+        let mut rng = StdRng::seed_from_u64(1);
+        assert_eq!(
+            deviation_round(&all_zero, &mut rng),
+            None,
+            "ohne positive Masse gibt es keine Runde"
+        );
+    }
+
+    /// Die Rate trifft `prob`: von `n` Partien weicht rund `prob * n` ab.
+    /// Belegt zusammen mit den beiden Verteilungs-Tests darueber, dass die
+    /// drei Ziehungen in `deviation_site` richtig verdrahtet sind.
+    #[test]
+    fn deviation_site_rate_matches_the_knob() {
         let n = 40_000u64;
         let prob = 0.05;
-        let mean = 30.0;
         let mut hits = 0u64;
-        let mut sum = 0u64;
         for seed in 0..n {
-            if let Some(m) = deviation_move(seed, prob, mean) {
+            if deviation_site(seed, prob).is_some() {
                 hits += 1;
-                sum += m;
             }
         }
         let rate = hits as f64 / n as f64;
         assert!(
             (rate - prob).abs() < 0.006,
             "Abweichungsrate {rate:.4} weicht zu stark von MOSAIC_DEVIATE_PROB={prob} ab"
-        );
-        // Erwartungswert von floor(Exp(mean)) + 1 ist rund `mean` + 0,5
-        // (exakt: e^-1/m/(1-e^-1/m) + 1, fuer m=30 also 30,50). Toleranz 4,0
-        // ist damit rund 5 Standardfehler des Mittelwerts (30/sqrt(2000)).
-        let avg = sum as f64 / hits as f64;
-        assert!(
-            (avg - mean).abs() < 4.0,
-            "mittlere Abweichungsstelle {avg:.2} passt nicht zu MOSAIC_DEVIATE_MEAN_MOVE={mean}"
         );
     }
 
@@ -7997,11 +8340,6 @@ pub(crate) mod tests {
         assert_eq!(sanitize_deviate_prob(-0.1), None);
         assert_eq!(sanitize_deviate_prob(1.5), None);
         assert_eq!(sanitize_deviate_prob(f64::NAN), None);
-
-        assert_eq!(sanitize_deviate_mean_move(30.0), Some(30.0));
-        assert_eq!(sanitize_deviate_mean_move(0.0), None);
-        assert_eq!(sanitize_deviate_mean_move(-5.0), None);
-        assert_eq!(sanitize_deviate_mean_move(f64::INFINITY), None);
 
         assert_eq!(sanitize_deviate_candidates(6.0), Some(6));
         assert_eq!(sanitize_deviate_candidates(2.0), Some(2));
@@ -8144,11 +8482,6 @@ pub(crate) mod tests {
             0.0,
             "MOSAIC_EXCURSION_PROB muss ungesetzt 0.0 (= AUS) sein"
         );
-        assert_eq!(
-            excursion_tau_moves(),
-            12,
-            "MOSAIC_EXCURSION_TAU_MOVES-Default ist 12"
-        );
         for seed in 0..5_000u64 {
             assert!(
                 !excursion_gate(seed),
@@ -8162,7 +8495,7 @@ pub(crate) mod tests {
     /// (der Trial-Index IST der Seed, der Testlauf ist damit reproduzierbar)
     /// -- die Uniformitaet selbst ist eine Verteilungsaussage und deshalb
     /// nur ueber viele unabhaengige Ziehungen zeigbar, gleiches Prinzip wie
-    /// `deviation_move_rate_and_mean_match_the_knobs` oben.
+    /// `deviation_site_rate_matches_the_knob` oben.
     #[test]
     fn reservoir_step_is_uniform_at_equal_weights() {
         let n_items = 5usize;
@@ -8228,53 +8561,92 @@ pub(crate) mod tests {
         }
     }
 
-    /// Test (4) der Auftragsliste: der Umschaltpunkt des Ausflugs gilt
-    /// RELATIV zu seinem eigenen Start. `tau_argmax_override` ersetzt in
-    /// `net_drafting_policy` das GLOBALE `MOSAIC_TAU_ARGMAX_FROM_MOVE` (in
-    /// der Testumgebung ungesetzt, siehe `tau_argmax_from_move_defaults_to_
-    /// off_regardless_of_move_number` oben) -- exakt dieselbe Guard-
-    /// Bedingung wie dort im `else if`-Zweig, hier direkt geprueft (kein
-    /// Netz noetig, gleiches Prinzip wie jener Test). "Relativ zu seinem
-    /// Start" bedeutet konkret: der Ausflug bekommt einen EIGENEN
-    /// `NetSelfPlayAgent` mit `tau_argmax_override=Some(k)`, und
-    /// `move_number` beginnt bei JEDEM `unified_game_loop`-Aufruf bei 1 --
-    /// auch mit `start_state` (`GameLoopConfig::deviate_net`-Doku) --, der
-    /// Schwellenwert `k` zaehlt also ab dem ERSTEN Halbzug des Ausflugs,
-    /// nicht ab einer absoluten Stelle der Hauptpartie.
+    /// Auftrags-Test (5): der Ausflug weicht an seinem ERSTEN Halbzug ab und
+    /// spielt danach argmax.
+    ///
+    /// Geprueft an genau den beiden Funktionen, die die Schleife und
+    /// `play_net_self_play_game` auswerten -- `excursion_deviates_here` (der
+    /// erste Zweig von `deviate_stream` in `unified_game_loop`) und
+    /// `excursion_tau_argmax_override` (die Quelle von
+    /// `NetSelfPlayAgent::tau_argmax_override`) --, kombiniert mit der
+    /// woertlichen Guard-Bedingung aus `net_drafting_policy`
+    /// (`is_some_and(|n| move_number >= n)`). Ohne Netz und ohne Partie
+    /// pruefbar, gleiches Prinzip wie der abgeloeste Test dieser Stelle.
+    ///
+    /// "Relativ zu seinem eigenen Start" bedeutet konkret: `move_number`
+    /// beginnt bei JEDEM `unified_game_loop`-Aufruf bei 1, auch mit
+    /// `start_state` (`GameLoopConfig::deviate_net`-Doku) -- der erste
+    /// Halbzug des Ausflugs ist also `move_number == 1`.
     #[test]
-    fn tau_argmax_override_switches_relative_to_its_own_move_number() {
+    fn excursion_deviates_once_at_its_first_move_and_then_plays_argmax() {
         assert_eq!(
             crate::net_mcts::tau_argmax_from_move(),
             None,
             "Testumgebung: MOSAIC_TAU_ARGMAX_FROM_MOVE muss ungesetzt sein"
         );
-        let k = 12usize;
-        let override_active: Option<usize> = Some(k);
-        for move_number in [0u64, 1, 11, 12, 13, 200] {
-            let triggers = override_active
-                .or_else(crate::net_mcts::tau_argmax_from_move)
-                .is_some_and(|n| move_number as usize >= n);
-            assert_eq!(
-                triggers,
-                move_number as usize >= k,
-                "move_number={move_number}, k={k}: Umschaltpunkt muss exakt bei \
-                 move_number>=k greifen (relativ zum eigenen Start des Ausflugs)"
+        // (a) GENAU EINE erzwungene Abweichung, und zwar am ersten Halbzug.
+        assert!(
+            excursion_deviates_here(true, 1),
+            "der Ausflug muss an seinem ersten Halbzug abweichen"
+        );
+        for move_number in [2u64, 3, 12, 13, 200] {
+            assert!(
+                !excursion_deviates_here(true, move_number),
+                "move_number={move_number}: der Ausflug weicht nur EINMAL ab"
             );
         }
-        // `None` (Hauptpartie, Weg A ohne Override): faellt weiter auf das
-        // GLOBALE (hier: AUS) Verhalten zurueck -- byte-identisches
-        // Bestandsverhalten fuer alle Aufrufer ausser dem Ausflug.
-        let override_inactive: Option<usize> = None;
-        for move_number in [1u64, 12, 200] {
-            let triggers = override_inactive
+        // (b) Ab genau diesem Halbzug argmax statt Sampling -- also auch
+        // schon AN ihm; die Abweichung ersetzt dort ohnehin die gespielte
+        // Aktion, gesampelt wird ab da nirgends mehr.
+        let excursion_override = excursion_tau_argmax_override(true);
+        assert_eq!(excursion_override, Some(1), "Ausflug schaltet ab Halbzug 1");
+        for move_number in [1u64, 2, 12, 200] {
+            let argmax = excursion_override
                 .or_else(crate::net_mcts::tau_argmax_from_move)
                 .is_some_and(|n| move_number as usize >= n);
             assert!(
-                !triggers,
+                argmax,
+                "move_number={move_number}: der Ausflug muss ab seinem ersten \
+                 Halbzug greedy spielen (unverzerrtes Wertziel, par.9a/par.17)"
+            );
+        }
+        // (c) Hauptpartie: kein Override, keine erzwungene Abweichung --
+        // byte-identisches Bestandsverhalten fuer alle Aufrufer ausser dem
+        // Ausflug (der globale Schwellenwert ist hier ungesetzt).
+        let main_override = excursion_tau_argmax_override(false);
+        assert_eq!(main_override, None);
+        for move_number in [1u64, 12, 200] {
+            let argmax = main_override
+                .or_else(crate::net_mcts::tau_argmax_from_move)
+                .is_some_and(|n| move_number as usize >= n);
+            assert!(
+                !argmax,
                 "move_number={move_number}: ohne Override und ohne globalen \
                  Schwellenwert darf nie argmax erzwungen werden"
             );
         }
+    }
+
+    /// Die beiden Ausflug-Zufallsstroeme duerfen sich nicht ueberschneiden:
+    /// der erzwungenen Abweichung ist im Ausflug-Strom ein EIGENER Zaehler
+    /// reserviert (`EXCURSION_DEVIATION_COUNTER`), sonst zoege sie aus
+    /// bit-gleichem Seed wie der Reservoir-Zug desselben Halbzugs
+    /// (Zaehler = `move_number`, und der erzwungene Halbzug ist die 1).
+    #[test]
+    fn excursion_seed_counters_do_not_collide() {
+        assert_ne!(EXCURSION_DEVIATION_COUNTER, EXCURSION_GAME_SEED_COUNTER);
+        assert!(
+            EXCURSION_DEVIATION_COUNTER > 100_000,
+            "der Zaehler der Reservoir-Zuege ist `move_number` -- der reservierte \
+             Wert muss weit ausserhalb realistischer Halbzugzahlen liegen"
+        );
+        let seed = 4711u64 ^ EXCURSION_SEED_DISTINGUISHER;
+        assert_ne!(
+            crate::net_mcts::derive_search_seed(seed, EXCURSION_DEVIATION_COUNTER),
+            crate::net_mcts::derive_search_seed(seed, EXCURSION_DEVIATION_MOVE),
+        );
+        // Und Weg B und Weg C ziehen ohnehin aus verschiedenen Stroemen.
+        assert_ne!(EXCURSION_SEED_DISTINGUISHER, DEVIATE_SEED_DISTINGUISHER);
     }
 }
 

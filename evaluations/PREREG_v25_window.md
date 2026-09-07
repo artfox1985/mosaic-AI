@@ -1336,9 +1336,9 @@ par.17 legt fuer diese Haelfte nur "Wurzelrauschen aus" fest. Die Begruendung do
 aber: *"die Abweichung ist gewollt, alles danach soll bestes Spiel sein."* Ohne diesen
 Schalter wuerde die HAUPTPARTIE weiter proportional zu den Besuchen sampeln, also gerade
 nicht bestes Spiel -- und das Wertziel waere wieder verzerrt. Der Ausflug selbst ist davon
-unberuehrt: er faehrt seinen eigenen Umschaltpunkt (`excursion_tau_moves`, Default 12) ueber
-`tau_argmax_override`, sampelt also 12 Halbzuege ab der Abzweigstelle und spielt danach
-greedy. **Wer das anders will, streicht den Schalter -- dann ist die Haelfte b eine zweite
+unberuehrt: er weicht an seinem ersten Halbzug genau EINMAL ab und spielt danach greedy bis zum
+Partieende (par.9i, Umbau 2026-09-07 -- die frueher hier beschriebene gesampelte Phase
+von 12 Halbzuegen ist ersatzlos entfallen). **Wer das anders will, streicht den Schalter -- dann ist die Haelfte b eine zweite
 temperierte Klasse und ihr Zweck faellt.**
 
 ### Zusammenstellung und Kosten
