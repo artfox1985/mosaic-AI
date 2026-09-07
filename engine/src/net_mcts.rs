@@ -2528,6 +2528,54 @@ pub(crate) fn tau_argmax_from_move() -> Option<usize> {
     })
 }
 
+/// Gueltigkeitspruefung von `MOSAIC_ACTION_TEMP` -- `None` = ungueltig.
+/// Eigene reine Funktion, damit die Pruefung isoliert testbar bleibt: der
+/// Getter darunter cached prozessweit (OnceLock), zwei Werte im selben
+/// Testprozess sind ueber ihn nicht pruefbar (gleiches Muster wie
+/// `self_play::sanitize_deviate_prob`).
+pub(crate) fn sanitize_action_temp(raw: f64) -> Option<bool> {
+    if raw == 0.0 {
+        Some(false)
+    } else if raw == 1.0 {
+        Some(true)
+    } else {
+        None
+    }
+}
+
+/// Aktionsabhaengige Temperatur der Self-Play-Zugwahl im NETZ-Pfad via
+/// `MOSAIC_ACTION_TEMP` (`evaluations/PREREG_v25_window.md` par.14, Arme S2
+/// und S5). `0`/nicht gesetzt/nicht parsbar = `false` = AUS
+/// (Bestandsverhalten: `self_play::net_drafting_policy` sampelt weiter
+/// proportional zu den ROHEN Besuchszahlen, also fest τ = 1). `1` = AN: die
+/// Gewichte der Zugwahl werden zu `visits^(1/T(n))`, mit der Staffel aus
+/// `self_play::action_temp_for` (`n` = Zahl der legalen Aktionen) -- genau
+/// die Formel, die der HEURISTIK-Pfad seit dem Port von `self_play.py:172`
+/// faehrt. Einmalig gelesen (OnceLock, #30-Muster), einmalige Warnung bei
+/// ungueltigem Wert (`sanitize_action_temp` oben).
+///
+/// SCHALTER statt Skalierungsfaktor: par.14 registriert GENAU EIN Regime
+/// (S2 = "variabel ueber die Zahl der gueltigen Aktionen", dieselbe Staffel
+/// wie die Heuristik). Ein freier Faktor waere ein zweiter, nicht
+/// vorregistrierter Freiheitsgrad, und gemessen werden soll die Staffel
+/// selbst, nicht ihre Skalierung.
+///
+/// Wirkt NUR im Self-Play-Pfad (`self_play::net_drafting_policy`) und dort
+/// NUR im Sampling-Zweig: `deterministic` und der τ-Zweig
+/// (`tau_argmax_from_move`) spielen argmax und bleiben unberuehrt -- eine
+/// streng monotone Transformation aendert keinen argmax. Der Arena-/GUI-Pfad
+/// ruft `net_drafting_policy` gar nicht auf (siehe `tau_argmax_from_move`).
+pub(crate) fn action_temp_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let raw = read_f64_env("MOSAIC_ACTION_TEMP", 0.0);
+        sanitize_action_temp(raw).unwrap_or_else(|| {
+            eprintln!("⚠️  MOSAIC_ACTION_TEMP={raw} ist weder 0 (aus) noch 1 (an) -- bleibt AUS.");
+            false
+        })
+    })
+}
+
 /// ε-Fenster des Denial-Tie-Breaks (PREREG_denial_tiebreak.md, Task E3) via
 /// `MOSAIC_DENIAL_TIEBREAK_EPS` -- Default `0.0` = AUS = byte-identisches
 /// Bestandsverhalten (`apply_denial_tiebreak`s Fruehausstieg liest diesen

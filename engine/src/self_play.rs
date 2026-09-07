@@ -409,6 +409,57 @@ fn argmax_index(weights: &[f64]) -> usize {
     best_i
 }
 
+/// Aktionsabhaengige Temperatur `T(n)` der Zugwahl: je weniger legale
+/// Aktionen zur Wahl stehen, desto schaerfer wird gesampelt. Port von
+/// `self_play.py:172`; `n` ist die Zahl der LEGALEN AKTIONEN
+/// (`actions.len()`), nicht die Zahl der Wurzelkinder der Suche.
+///
+/// EINZIGE Quelle der Staffel fuer beide Pfade: den Heuristik-Pfad
+/// (`HeuristicSelfPlayAgent::decide` -> `drafting_policy`s `play_temp`) und,
+/// hinter dem Knopf `MOSAIC_ACTION_TEMP`, den Netz-Pfad
+/// (`net_drafting_policy`, `evaluations/PREREG_v25_window.md` par.14, Arme
+/// S2/S5). Vorher stand die Staffel als Literal-Kette im Heuristik-Agenten;
+/// zentralisiert, damit "genau dieselbe Staffel" eine Eigenschaft des Codes
+/// ist und nicht eine Zusage in einem Kommentar. Werte unveraendert.
+fn action_temp_for(n: usize) -> f64 {
+    if n > 50 {
+        0.7
+    } else if n > 15 {
+        0.4
+    } else {
+        0.15
+    }
+}
+
+/// Zugwahl-Gewichte des NETZ-Pfads unter aktionsabhaengiger Temperatur
+/// (`evaluations/PREREG_v25_window.md` par.14, Arme S2/S5): `visits^(1/T(n))`
+/// statt der rohen Besuchszahlen, zusammen mit deren Summe -- [`weighted_index`]
+/// verlangt als `total` die Summe GENAU der Gewichte, aus denen gezogen wird.
+///
+/// `enabled = false` (Default des Knopfs `MOSAIC_ACTION_TEMP`) gibt sofort
+/// `None` zurueck: der Aufrufer sampelt dann unveraendert aus den rohen
+/// Besuchszahlen, ohne eine einzige zusaetzliche Fliesskomma-Operation und
+/// ohne zusaetzliche Zufallszahl. Das ist die Bitidentitaet bei AUS.
+///
+/// `None` auch, wenn die transformierte Summe unbrauchbar wird (nicht endlich
+/// oder nicht > 0) -- dann faellt die Zugwahl auf die rohen Besuche zurueck,
+/// gleiche Schutzrichtung wie `drafting_policy`s Visits-Fallback in
+/// `weights_for`. Ein Ueberlauf ist bei realistischen Besuchszahlen nicht zu
+/// erwarten (`1/T <= 6,67`, es braeuchte `visits > 1e46`): Vorsicht, kein
+/// beobachteter Fall.
+///
+/// Reine Funktion -- der Knopfzustand kommt als Parameter, kein Env-Zugriff,
+/// kein Netz, kein Suchbaum; deshalb direkt unit-testbar.
+fn action_temp_weights(visits: &[f64], n_actions: usize, enabled: bool) -> Option<(Vec<f64>, f64)> {
+    if !enabled {
+        return None;
+    }
+    let inv = 1.0 / action_temp_for(n_actions);
+    let w: Vec<f64> = visits.iter().map(|v| v.powf(inv)).collect();
+    let s: f64 = w.iter().sum();
+    (s.is_finite() && s > 0.0).then_some((w, s))
+}
+
 // ── Stapel-Zieh-Aufloesung (Aktion A: weiterziehen oder aufhoeren?) ─────────
 //
 // Regelwerk (Nutzer-Fund): beim Ziehen zeigt die RUECKSEITE nur den TYP der
@@ -1656,8 +1707,12 @@ impl DraftingAgent for HeuristicSelfPlayAgent {
         _move_number: u64,
     ) -> DraftingDecision {
         let n = actions.len();
-        // Aktionsabhängige Temperatur (Port self_play.py:172).
-        let temp = if n > 50 { 0.7 } else if n > 15 { 0.4 } else { 0.15 };
+        // Aktionsabhängige Temperatur (Port self_play.py:172) -- seit
+        // PREREG_v25_window.md par.14 in `action_temp_for` zentralisiert,
+        // damit Heuristik- und Netz-Pfad (Knopf `MOSAIC_ACTION_TEMP`)
+        // nachweislich dieselbe Staffel fahren. Werte unveraendert:
+        // n > 50 -> 0,7; n > 15 -> 0,4; sonst 0,15.
+        let temp = action_temp_for(n);
         let (chosen, policy) = if n == 1 {
             let a = actions[0].clone();
             let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
@@ -3412,6 +3467,11 @@ pub fn run_net_vs_net_arena_hybrid(
 /// `deterministic=true`: dann wird wie in der Arena immer der meistbesuchte
 /// Zug gespielt. Nur das aufgezeichnete Policy-Ziel ändert sich, nicht die
 /// Selbstspiel-Trajektorie/Explorationsvielfalt.
+/// Zwei Knoepfe koennen die ZUGWAHL (und nur sie) davon abbringen, beide
+/// Default AUS: `MOSAIC_TAU_ARGMAX_FROM_MOVE` (argmax ab Halbzug N) und
+/// `MOSAIC_ACTION_TEMP` (aktionsabhaengige Temperatur `visits^(1/T(n))`,
+/// PREREG_v25_window.md par.14) -- Reihenfolge und Begruendung an der
+/// `idx`-Berechnung unten.
 /// Rückgabe seit dem Root-Q-Logging (v19-Vorbereitung, siehe
 /// `net_mcts::net_root_child_stats_and_policy`-Doku): drittes Element ist
 /// der Wurzel-Q-Wert der Suche (`Some`, außer bei leerer/fehlgeschlagener
@@ -3536,6 +3596,33 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
         // bleibt dieser `else if` immer falsch -- Parität gilt nur fuer
         // Default AUS, siehe `net_mcts::tau_argmax_from_move`-Doku.
         argmax_index(&weights)
+    } else if let Some((tempered, tempered_total)) =
+        action_temp_weights(&weights, actions.len(), crate::net_mcts::action_temp_enabled())
+    {
+        // Aktionsabhaengige Temperatur (PREREG_v25_window.md par.14, Arme
+        // S2/S5, Knopf `MOSAIC_ACTION_TEMP`): gesampelt wird aus
+        // `visits^(1/T(n))` statt aus den rohen Besuchen, mit der Staffel des
+        // Heuristik-Pfads (`action_temp_for`, n = `actions.len()`).
+        //
+        // REIHENFOLGE (bewusst NICHT geaendert): `deterministic` und der
+        // τ-Zweig oben haben Vorrang. Ist der Umschaltpunkt erreicht, wird
+        // argmax gespielt -- und dort ist die Temperatur ohnehin wirkungslos,
+        // weil `x^(1/T)` fuer `x >= 0` und `T > 0` streng monoton steigt: die
+        // Rangfolge der Gewichte und damit `argmax_index` (Gleichstand: erster
+        // Eintrag) bleiben gleich. Deshalb wird sie dort gar nicht erst
+        // berechnet.
+        //
+        // TRAININGSZIEL UNBERUEHRT: `policy` stammt oben aus
+        // `completed_q_policy` (Gumbels completed-Q-Softmax aus
+        // `net_root_child_stats_and_policy`) und wird aus `weights` NICHT
+        // gespeist; `root_q`/`child_q` ebenso wenig. Die Temperatur veraendert
+        // ausschliesslich die GESPIELTE Aktion -- exakt wie der
+        // `deterministic`- und der τ-Zweig.
+        //
+        // RNG: es bleibt bei GENAU EINEM `weighted_index`-Zug wie im
+        // Bestandszweig darunter, der Zufallsstrom verschiebt sich also nicht
+        // (anders als im τ-Zweig, der den Zug ganz entfallen laesst).
+        weighted_index(&tempered, tempered_total, rng)
     } else {
         weighted_index(&weights, total, rng)
     };
@@ -7061,6 +7148,89 @@ pub(crate) mod tests {
                 "bei ungesetzter Env-Var muss der τ-Zweig fuer move_number={move_number} unerreichbar bleiben"
             );
         }
+    }
+
+    // ── Aktionsabhaengige Temperatur im Netz-Pfad (PREREG_v25_window.md par.14)
+
+    /// (1) Die Staffel `T(n)` selbst -- genau die Werte, die der
+    /// Heuristik-Pfad seit dem Port von `self_play.py:172` faehrt. Die
+    /// Stufenkanten sind mitgeprueft (streng groesser, nicht groesser-gleich):
+    /// an ihnen wuerde ein Tippfehler beim Zentralisieren sitzen.
+    #[test]
+    fn action_temp_for_matches_heuristic_staircase() {
+        assert_eq!(action_temp_for(60), 0.7);
+        assert_eq!(action_temp_for(20), 0.4);
+        assert_eq!(action_temp_for(5), 0.15);
+        assert_eq!(action_temp_for(51), 0.7);
+        assert_eq!(action_temp_for(50), 0.4);
+        assert_eq!(action_temp_for(16), 0.4);
+        assert_eq!(action_temp_for(15), 0.15);
+        assert_eq!(action_temp_for(1), 0.15);
+    }
+
+    /// (2) Knopf AUS = Bestandsverhalten: `action_temp_weights` liefert
+    /// `None`, der Aufrufer sampelt damit aus den UNVERAENDERTEN rohen
+    /// Besuchszahlen (Gleichheit auf f64, kein `powf`, keine neue Summe).
+    #[test]
+    fn action_temp_off_keeps_raw_visit_weights() {
+        let visits: Vec<f64> = vec![37.0, 12.0, 5.0, 1.0, 0.0];
+        assert!(action_temp_weights(&visits, visits.len(), false).is_none());
+        // Env-Var in der Testumgebung ungesetzt -> Knopf aus (gleiche
+        // Parity-Assertion wie beim τ-Zweig oben).
+        assert!(!crate::net_mcts::action_temp_enabled());
+        let enabled = crate::net_mcts::action_temp_enabled();
+        // Exakt der Ausdruck aus `net_drafting_policy`s `else if let`:
+        // `None` -> der Bestandszweig mit `weights`/`total`.
+        let (play_weights, play_total) = match action_temp_weights(&visits, visits.len(), enabled) {
+            Some((w, s)) => (w, s),
+            None => (visits.clone(), visits.iter().sum::<f64>()),
+        };
+        assert_eq!(play_weights, visits, "AUS darf die Gewichte nicht anfassen");
+        assert_eq!(play_total, 55.0);
+    }
+
+    /// (3) Knopf AN und wenige Aktionen (`n <= 15`, also `T = 0,15`): der
+    /// meistbesuchte Zug bekommt RELATIV mehr Masse als bei rohen Besuchen.
+    /// Mitgeprueft: die milde Stufe (`n > 50`, `T = 0,7`) schaerft weniger,
+    /// die zurueckgegebene Summe ist die der TRANSFORMIERTEN Gewichte
+    /// (Vertrag von `weighted_index`), und der argmax bleibt derselbe --
+    /// deshalb ist die Temperatur im τ-Zweig wirkungslos.
+    #[test]
+    fn action_temp_on_sharpens_toward_most_visited_move() {
+        let visits: Vec<f64> = vec![30.0, 10.0, 5.0];
+        let raw_total: f64 = visits.iter().sum();
+        let raw_share = visits[0] / raw_total;
+        let (w, s) = action_temp_weights(&visits, visits.len(), true).expect("Knopf an");
+        assert_eq!(w.len(), visits.len());
+        let sharp_share = w[0] / s;
+        assert!(sharp_share > raw_share, "Schaerfung erwartet: {sharp_share} > {raw_share}");
+        let recomputed: f64 = w.iter().sum();
+        assert_eq!(s, recomputed, "total muss die Summe der transformierten Gewichte sein");
+        assert_eq!(argmax_index(&w), argmax_index(&visits));
+        let (w_mild, s_mild) = action_temp_weights(&visits, 60, true).expect("Knopf an");
+        let mild_share = w_mild[0] / s_mild;
+        assert!(
+            mild_share > raw_share && mild_share < sharp_share,
+            "T=0,7 muss zwischen roh und T=0,15 liegen: {raw_share} < {mild_share} < {sharp_share}"
+        );
+    }
+
+    /// (4) Der Getter parst seine Env-Variable und faellt bei Unsinn auf AUS
+    /// zurueck. Geprueft an der reinen Pruefstelle
+    /// `net_mcts::sanitize_action_temp`: der Getter selbst cached prozessweit
+    /// (OnceLock), zwei Werte im selben Testprozess sind ueber ihn nicht
+    /// pruefbar (gleiches Muster wie `sanitize_deviate_*`).
+    #[test]
+    fn action_temp_env_parsing_falls_back_to_off() {
+        use crate::net_mcts::sanitize_action_temp;
+        assert_eq!(sanitize_action_temp(0.0), Some(false));
+        assert_eq!(sanitize_action_temp(1.0), Some(true));
+        for junk in [0.5, 2.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(sanitize_action_temp(junk), None, "{junk} ist kein gueltiger Knopfwert");
+        }
+        // Nicht als Zahl lesbare Werte fangen schon in `read_f64_env` ab
+        // (Warnung + Default 0.0), und 0.0 ist AUS.
+        assert!(!crate::net_mcts::action_temp_enabled());
     }
 
     /// Provokations-Pflichttest 1 (`evaluations/PREREG_provocation.md`,
