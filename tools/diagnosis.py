@@ -19,6 +19,11 @@ from collections import Counter
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 # Netz/Dataset (PyTorch) liegen jetzt neben der Rust-Engine in engine/py/.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine" / "py"))
+# Korpusdateien sind gzip-komprimiert (Endung bleibt .pkl); roher pickle.load stirbt
+# daran mit UnpicklingError -- dieselbe Falle wie in
+# tools/probes/corpus_state_diversity_probe.py (hier gefunden 2026-09-07 auf die
+# Nutzer-Frage nach den Diversitaets-Werkzeugen; alle sechs Lesestellen umgestellt).
+from corpus_io import load_records
 from corpus_dataset import MosaicDataset
 from neural_net import MosaicNet, action_to_id, unpack_masks_batch
 from config import DATA_DIR, INPUT_SIZE, NUM_ACTIONS
@@ -116,8 +121,7 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
     action_id_dist = Counter()
 
     for f in files:
-        with open(f, 'rb') as fh:
-            data = pickle.load(fh)
+        data = load_records(f)
 
         for step in data:
             policy = step.get('policy', [])
@@ -195,8 +199,7 @@ def run_policy_quality(data_dir: str, label: str, max_files: int = 100):
     stone_id_dist = Counter()
 
     for f in files:
-        with open(f, 'rb') as fh:
-            data = pickle.load(fh)
+        data = load_records(f)
         for step in data:
             policy = step.get('policy', [])
             if not policy:
@@ -442,8 +445,7 @@ def run_penalty_bias(data_dir: str, label: str, max_files: int = 100):
     kat2_cases = []           # Details je Kategorie-2-Fall (für Aufschlüsselung)
 
     for f in files:
-        with open(f, 'rb') as fh:
-            data = pickle.load(fh)
+        data = load_records(f)
         for step in data:
             policy = step.get('policy', [])
             if not policy:
@@ -598,8 +600,7 @@ def run_policy_cutoff_exclusion(data_dir: str, label: str, max_files: int = 100)
     n_excluded = 0         # ... davon: farbgleiche Reihen-Alt. existierte, aber NICHT in policy
 
     for f in files:
-        with open(f, 'rb') as fh:
-            data = pickle.load(fh)
+        data = load_records(f)
         for step in data:
             policy = step.get('policy', [])
             valid_actions = step.get('valid_actions')
@@ -672,8 +673,7 @@ def run_penalty_score_by_round(data_dir: str, label: str, max_files: int = 100):
 
     peak = {}  # (game_id, player_idx, round) -> maximaler floor-Füllstand
     for f in files:
-        with open(f, 'rb') as fh:
-            data = pickle.load(fh)
+        data = load_records(f)
         for step in data:
             state = step.get('state')
             gid = step.get('game_id')
@@ -753,8 +753,7 @@ def run_value_simulation(data_dir: str, label: str, max_files: int = 100):
     # Rohe Spielergebnisse sammeln
     results_dict = {}
     for f in files:
-        with open(f, 'rb') as fh:
-            data = pickle.load(fh)
+        data = load_records(f)
 
         for step in data:
             if "game_id" in step and "scores" in step and "winner" in step:
