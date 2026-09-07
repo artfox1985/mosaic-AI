@@ -731,3 +731,21 @@ dienen nur der Reihenfolge und dem Nachweis, dass die Knoepfe ueberhaupt gewirkt
    in den Lauf-Bericht jeder Charge.
 
 **Nicht entschieden, Start nur auf Anweisung.**
+
+### par.14a GENERATOR ENTSCHIEDEN (Nutzer 2026-09-07, 03:35: "generator wird b06")
+
+**Generator der v25-Erzeugung ist `v24-b06_brierbest`**, der amtierende Champion
+(Elo 1309), mit seiner Champion-Spec `models/v24-b06_brierbest.spec.json` -- also MIT
+K3-P (Modus 1, C 1,0) und `envelope_hull_form` 1. Damit ist par.11 A entschieden und der
+Stand von par.4 (b05 ohne K3-P, Nutzer 2026-09-06 11:40) ueberholt.
+
+**Was daraus folgt:**
+- Val-Pool-Regex `^selfplay_v24-b06-` (par.6 Punkt 2: Dateien heissen nach dem Generator).
+- Startgewicht des Trainings: `alphazero_v24-b06_brierbest.pth` (par.6 Punkt 3).
+- Spalten-Waechter-Bezug (par.7, Generator-Flaeche): **0,4975** (Tor 2a mit Knopf,
+  `tor2a_v24b06.json`), nicht 0,4825.
+- Das Material entsteht MIT dem Champion-Knopf -- konsistent mit dem Grundsatz
+  "Self-Plays nur vom Champion" (Nutzer 2026-09-06, 17:05).
+
+**Ebenfalls entschieden (03:35): S2 und S5 werden gebaut**, also die aktionsabhaengige
+Temperatur im Netz-Pfad (par.14). Damit sind alle fuenf Arme baubar.
