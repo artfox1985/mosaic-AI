@@ -1074,8 +1074,8 @@ beschrieben.
 | Klasse | Partien | Erzeugungsregel | Wurzelrauschen |
 | --- | --- | --- | --- |
 | Sockel NEU (G) -- **Traeger** | 4.000 | Umschaltpunkt 1 + Weg C | an |
-| Sockel G-1 -- **Traeger** | 1.350 | (aus der Vorgeneration, dort Umschaltpunkt 1 + Weg C) | -- |
-| G-2 -- **Traeger** | 450 | (aus G-2) | -- |
+| Sockel G-1 -- **Traeger** | 1.350 | Umschaltpunkt 1 + Weg C (in der Vorgeneration so erzeugt) | an |
+| Sockel G-2 -- **Traeger** | 450 | Umschaltpunkt 1 + Weg C (zwei Generationen zurueck) | an |
 | Schwarm G, Haelfte a | 4.000 | variable Temperatur + Weg C | **an** |
 | Schwarm G, Haelfte b | 4.000 | **Weg B** (Ausfluege) | **aus** |
 | Schwarm G-1, Haelfte a | 4.000 | variable Temperatur + Weg C | an |
@@ -1121,3 +1121,32 @@ das es noch gar nicht geben kann.
 Zustand oben ist unterstellt, dass er es TUT (die 4.000 "Weg B" sind 4.000 Ausfluege, nicht
 4.000 Hauptpartien mit je einem Ausflug). Andernfalls verdoppelt sich die Zeile und das
 Fenster waere groesser als 29.450.
+
+### par.17a DIE TRAEGER IM STATIONAEREN ZUSTAND (Nutzer 2026-09-07, 09:29)
+
+**Alle 5.800 Traeger sind dann einheitlich erzeugt: Umschaltpunkt 1 plus Weg C**, egal aus
+welcher Generation sie stammen. Das ist der Unterschied zu heute, wo die drei Traeger-Quellen
+drei verschiedene Erzeugungsarten haben.
+
+| | Traeger-Kennzahl (volle Spalten je Seite) |
+| --- | --- |
+| v24 GEMESSEN (`v24_sanity_carriers.json`) | 0,356 |
+| v25 (G neu mit k=1, G-1 alt mit 0,189, hv2 0,732) | 0,468 (a) |
+| **stationaer, alle drei Quellen mit k=1 + C** | **0,5325** (a) |
+
+(a) hergeleitet aus dem gemessenen Sockel-Wert 0,5325 (Messung 3-V, vierter Punkt); der
+Beitrag von Weg C zu dieser Zahl ist nicht gemessen und hier mit null angesetzt.
+
+**Bemerkenswert:** im Uebergang rotiert die spaltenREICHSTE Traeger-Quelle aus, naemlich die
+hv2-Traeger mit 0,732. Die Kennzahl steigt trotzdem, weil der Sprung der Sockel-Quellen von
+0,189 auf 0,5325 schwerer wiegt als der Verlust von 0,732 auf 0,5325. **Das entkraeftet
+nachtraeglich die Sorge, die den ganzen Strang ausgeloest hatte** (par.9a: die Traeger-Kennzahl
+werde auf 0,23 fallen, sobald hv2 ausrotiert) -- sie fiel nur, solange der Sockel sein
+Temperatur-Artefakt trug.
+
+**Damit ist die Reihe des Spalten-Waechters (par.7) fuer die Traeger-Flaeche vollstaendig:**
+v22-b05 0,4304 -> v23-b01 0,515 -> v23-b01 + K3-P 0,555 -> v24 gemessen 0,356 (Traeger) ->
+v25 0,468 -> stationaer 0,5325. **Vorsicht beim Lesen:** die ersten drei Werte sind
+Generator-Instrumente (argmax @400), die letzten drei Traeger-Kennzahlen des Korpus. Das
+sind verschiedene Groessen und gehoeren in getrennte Zeilen -- die Waechter-Tabelle in par.7
+fuehrt sie bereits als getrennte Flaechen.
