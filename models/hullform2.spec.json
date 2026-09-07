@@ -16,5 +16,6 @@
   "envelope_projection_mode": 1,
   "envelope_flush_w": 0.0,
   "envelope_hull_form": 2,
+  "special_row6_w": 0.0,
   "heuristik_variante": "hv1"
 }

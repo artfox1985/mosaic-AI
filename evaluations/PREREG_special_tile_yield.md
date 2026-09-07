@@ -457,3 +457,43 @@ Spalten zu kosten, ist es ein Kandidat fuer die Champion-Spec. Bleibt der Bonus 
 die Geometrie den Posten bereits gehoben und der gezielte Zuschlag ist entbehrlich -- dann
 faellt K5 wie die vier Knopf-Arme der Nacht. Kostet er Siege oder Spalten, faellt er
 ebenfalls.
+
+### par.9b K5 GEBAUT UND GEPRUEFT (2026-09-07, 09:20; Subagent, Koordinator hat Bericht und Kernstellen geprueft)
+
+**Knopf `MOSAIC_SPECIAL_ROW6_W` / Spec-Pflichtfeld `special_row6_w`** (Default 0,0 = aus,
+bitidentisch), Bauform parallel zu `envelope_flush_w`. **`cargo test --release --lib`:
+543 Tests, 0 rot.** Wheel gebaut und installiert, Kontrakt unveraendert
+`20b442a8164f748d`; die 13 lebenden Specs tragen das Feld
+(`tools/spec_add_field.py special_row6_w 0.0`). **Anker-Drift und Konservierung je GRUEN**
+(`anchor_drift_20260907_k5.json`, `anchor_conservation_20260907_k5.json`).
+
+**Wirkung, wie in par.9 Punkt 1 verlangt (Erweiterung der Projektion, kein eigener
+Blattwert-Term):** auf der fertigen Belegung je Orientierung (a) die Huellenzelle der
+Zeile 6 zaehlt mit `w_k5` als kuenftig belegt, (b) die noch leeren Normalzellen derselben
+Platte, die IN der Huelle liegen, werden mit `1 + w_k5` verstaerkt, gedeckelt auf 1.
+Zellen ausserhalb der Huelle bleiben unberuehrt, weil eine Verstaerkung dort den
+Aussen-Abzug vertiefen wuerde.
+
+**Der tragende Befund des Baus, am Code geprueft:** beide Huellenzellen der Zeile 6 einer
+Orientierung liegen im SELBEN Slot (`cell_to_dome_space(5,0)` und `(5,1)` -> Slot (2,0)).
+**Form 2 gibt K5 also zwei ROTATIONSLAGEN derselben Platte, nicht zwei Platten.** Damit ist
+die Kopplung zwischen Huellenform und K5 enger als in par.9 angenommen: die Form erweitert
+nicht die Plattenwahl, sondern die Zahl der Drehungen, mit denen dieselbe Platte ihr
+Spezialfeld ins Ziel bringt. Ausserdem verifiziert: 9 der 18 Designs tragen ein Spezialfeld
+(Indizes 0, 4, 6, 7, 8, 10, 12, 15, 17, `dome.rs:209-227`), Freischaltung
+`dome.rs:140 try_unlock_special`.
+
+**Ein-Platten-Regel** ("mehr geht sich nicht aus"): `row6_special_target` liefert genau EINE
+Spalte je Orientierung und gibt `None`, sobald auf einer Huellenzelle der Zeile 6 bereits
+eine Spezialfliese LIEGT.
+
+**Vom Bau benannte Unsicherheiten (uebernommen, nicht ausgeraeumt):** (a) die Verstaerkung
+wirkt multiplikativ auf projizierte Masse, greift also erst nach dem ersten Stein in
+Reihe 5/6; ein additiver Sockel waere der Alternativentwurf, haette aber die LEERE Platte
+belohnt. (b) In Modus 4 laeuft die Orientierungswahl auf der bereits K5-veraenderten
+Belegung, K5 kann dort die Huellenwahl kippen (in Modus 1 nicht). (c) Die
+Laufzeit-Gegenprobe der Bitidentitaet am echten Suchpfad steht aus -- der Anker deckt sie
+indirekt ab (hv1 ist netzlos, laeuft also nicht durch diesen Zweig), eine gezielte Probe
+waere ein argmax-Instrument mit `w = 0` gegen den Bestandswert 0,4975.
+
+**Messung** wie in par.9a festgelegt: Arm = Form 2 plus K5 gegen Kontrolle = Form 2 allein.
