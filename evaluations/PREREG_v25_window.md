@@ -1150,3 +1150,45 @@ v25 0,468 -> stationaer 0,5325. **Vorsicht beim Lesen:** die ersten drei Werte s
 Generator-Instrumente (argmax @400), die letzten drei Traeger-Kennzahlen des Korpus. Das
 sind verschiedene Groessen und gehoeren in getrennte Zeilen -- die Waechter-Tabelle in par.7
 fuehrt sie bereits als getrennte Flaechen.
+
+### par.14d ZWEITE TEMPERATUR-FORM: glatt von 0,2 bis 0,8 (Nutzer 2026-09-07, 09:36)
+
+**Der gebaute Knopf faehrt die Heuristik-Staffel** (`action_temp_for`, self_play.rs:424:
+`n > 50 -> 0,7`, `n > 15 -> 0,4`, sonst `0,15`). Der Nutzer-Vorschlag war eine glatte Kurve
+von 0,8 bis 0,2 ueber die Aktionszahl. Beides wird als Wert des Knopfs waehlbar:
+`MOSAIC_ACTION_TEMP` 0 = aus, 1 = Staffel (Bestand), **2 = glatt**.
+
+**Gemessene Verteilung der Aktionszahl** (6.602 Drafting-Entscheide aus einer frischen
+b06-Charge): Median **4**, Dezile 1 / 1 / 2 / 3 / 4 / 8 / 15 / 30 / 64, Maximum 151;
+**70 % der Entscheide haben hoechstens 15 Aktionen**, 13 % mehr als 50. Die Staffel wirkt
+damit in der grossen Mehrheit als 0,15, also fast greedy.
+
+**Nutzer-Erklaerung dazu (2026-09-07, 09:37), die den Anker begruendet:** *"die hohe
+aktionszahl kommt nur solange kuppelplatten gelegt und rotiert werden kann."* Die Aktionszahl
+ist also kein blosser Zaehler, sondern ein Anzeiger dafuer, ob die Plattenwahl noch offen ist
+-- und genau dort, wo Platten und Rotationen zur Wahl stehen, ist die Entscheidung
+folgenreich und die Exploration wertvoll. Das rechtfertigt die Kopplung.
+
+**Die glatte Form:** `T(n) = 0,2 + 0,6 * (ln n - ln 2) / (ln 64 - ln 2)`, gekappt auf
+[0,2; 0,8]. Logarithmisch, weil die Verteilung stark schief ist -- linear laege fast alles
+am unteren Ende und die Kurve waere praktisch eine Stufe. Anker aus den gemessenen Dezilen:
+unten 2, oben 64 (das neunte Dezil).
+
+| n | glatt (Form 2) | Staffel (Form 1) |
+| --- | --- | --- |
+| 2 | 0,200 | 0,15 |
+| 4 (Median) | 0,320 | 0,15 |
+| 8 | 0,440 | 0,15 |
+| 15 | 0,549 | 0,15 |
+| 30 | 0,669 | 0,40 |
+| 64 | 0,800 | 0,70 |
+| 151 | 0,800 | 0,70 |
+
+**Der Unterschied ist erheblich und liegt genau dort, wo die Masse sitzt:** bei den 70 %
+mit hoechstens 15 Aktionen gibt die Staffel 0,15, die glatte Form 0,20 bis 0,55. Form 2 ist
+also deutlich explorativer, obwohl ihre Obergrenze hoeher und ihre Untergrenze
+gleichzeitig hoeher liegt.
+
+**Beauftragt, noch nicht gebaut.** Der Bau wartet, weil `self_play.rs` gerade vom
+Weg-B-Auftrag bearbeitet wird -- zwei Agenten auf derselben Datei war heute schon einmal
+fahrlaessig (par.9b der Spezialfeld-Prereg).
