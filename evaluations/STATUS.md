@@ -24,180 +24,127 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (UEBERGABE 2026-09-06, 21:46; Anlass: Nutzer /mosaic-handover, Kontextfenster der Tagessitzung zu rund 80 % voll)
+## 1. WAS GERADE LAEUFT (ZWISCHENBERICHT 2026-09-07, 06:05; Nutzer-Auftrag "fahr einfach durch und bereite mir einen zwischenbericht vor")
 
-**Champion seit 2026-09-06 18:42: `v24-b06`** (Modell `alphazero_v24-b06_brierbest.onnx`, Spec
-`models/v24-b06_brierbest.spec.json` = K3-P C 1,0 Modus 1; Elo-Knoten `v24-b06_k3p10` 1309
-[1271, 1350]; Vorgaenger `v23-b01_k3p10` 1276; Artefakt `models/frozen_champions/v24-b06/`;
-`champion.txt` = `v24-b06_brierbest`). Namen bleiben reine `vN-bXX` (`docs/generation_naming.md`).
-**Generation v24 komplett abgenommen (sechs Arme, `PREREG_v24_window.md` par.9, Vorlage par.9c).
-Generator v25 = b05 ohne K3-P (Nutzer 11:40, v25 par.4) -- ODER b06, weil der Nutzer Self-Plays
-nur vom Champion will (17:05); das ist der erste offene Entscheid. Erzeugung startet NUR auf
-Nutzer-Anweisung.** Chronik: `night_run_20260902.md` ab Eintrag 00:46 des 2026-09-06 (alles
-von der uebergebenden Sitzung).
+**Champion unveraendert: `v24-b06`** (Elo 1309, Modell `alphazero_v24-b06_brierbest.onnx`,
+Spec `models/v24-b06_brierbest.spec.json`). **Maschine ist FREI, nichts laeuft.**
+**Der Push ist offen: 84 Commits vor origin/main, Build gruen, Anker gruen.**
+Chronik der Nacht: `night_run_20260902.md` ab dem Eintrag 2026-09-06, 22:35.
 
-**LAEUFT (eigene Prozesse, ueberleben die Sitzung):**
+### Die vier Messergebnisse der Nacht, in der Reihenfolge ihrer Tragweite
 
-| Lauf | Werkzeug (PID) | Start | Stand 21:46 | erwartetes Ende | liest | Artefakte |
-| --- | --- | --- | --- | --- | --- | --- |
-| ~~Knopf-Kette am Champion b06~~ FERTIG 00:22 | `tools/night_k3_knobs_b06.sh` | 20:43 | alle vier Arme NEGATIV: K3-P2 71:89 (par.8.11a), K3-F 1,0 74:86 und 0,5 77:83 (par.8.14), beide 69:91 (par.8.14a); Champion-Knopf bleibt K3-P allein | -- | `models/alphazero_v24-b06_brierbest.onnx`, `models/k3f_w10.spec.json`, `k3f_w05.spec.json`, `k3p2f_w10.spec.json`, `v24-b06_brierbest.spec.json` | `k3_f10_v24b06.json`, `k3_f05_v24b06.json`, `k3_p2f10_v24b06.json`; `paired_arena_env_k3<arm>_b06_vs_k3p_{first,second}_s14.json`, `columns_...`, `points_k3<arm>_b06_vs_k3p_s14.json` |
-| Halte-Prozess | `tools/claude_play_hold.sh` (PID 28984) | 21:22 | wartet auf Marke `evaluations/artifacts/claude_play/.playing`; Deckel 4 h -> **endet 01:22 und entfernt die Marke** | 01:22 | Marke | -- |
-| ALTE Knopf-Kette am v23-Champion | `tools/night_k3_knobs_champion.sh` (PID 4124) | 13:33 | wartet auf freie CPU UND Marke weg; **darf NICHT messen** (misst am abgeloesten Champion); ihr 12-h-Deckel endet 01:33 mit Exit 65 | 01:33 | -- | keine (wenn sie nicht startet) |
+**1. Die Erzeugung wirft mehr als die Haelfte des Spaltenbaus weg -- durch das Sampling der
+Zugwahl** (`PREREG_search_path_remeasurements.md`, Messung 3-V). Vier Chargen zu je 200
+Sockel-Partien, gleicher Generator, gleicher Seed, nur der Umschaltpunkt variiert:
 
-**Falle daraus:** zwischen 01:22 (Halter endet) und 01:33 (Deckel der alten Kette) koennte die
-alte Kette anspringen, falls die b06-Kette fertig ist und sonst nichts laeuft. Abhilfe: vor
-01:20 `bash tools/claude_play_hold.sh` im Hintergrund neu starten (haelt 4 h), ODER der Nutzer
-beendet PID 4124 (`Stop-Process -Id 4124 -Force`; die Sitzung selbst darf keine Prozesse
-beenden, Berechtigungsfilter 2026-09-06 00:50).
+| Umschaltpunkt | volle Spalten je Seite | Punkte | Strafleiste |
+| --- | --- | --- | --- |
+| aus (Bestand) | 0,1950 | 28,3 | 9,41 |
+| 30 | 0,3000 | 36,5 | 7,80 |
+| 12 | 0,4225 | 38,5 | 7,54 |
+| **1 (durchgehend greedy)** | **0,5325** | **41,5** | **6,93** |
 
-### ERSTE AUFGABE DER NEUEN SITZUNG
+Die Reihe ist monoton, es gibt kein Zwischenoptimum. **Und die Vielfalt bleibt:** 399 von
+400 Endbrettern distinkt (gegen 400 im Bestand), Zustandsvielfalt je Record unveraendert,
+Policy-Entropie der Ziele sogar leicht hoeher. Auch die Ergebnisstreuung bleibt (Punkte-SD
+15,2 gegen 17,9, Anteil knapper Partien identisch). **Damit ist die 0,19 der
+Sockel-Klasse, die den ganzen v25-Streit um die Traeger-Kennzahl ausgeloest hatte, als
+Temperatur-Artefakt erledigt** -- am Mix war nichts zu reparieren.
 
-**Nutzer-Freigaben und Verbote, woertlich:** 2026-09-03 *"mach im programm selbststaendig
-weiter, ausser der fenster erzeugung"*; *"kein Push"* (Nutzer pusht selbst; 42 Commits vor
-origin/main); Loeschungen nur auf pfadgenaue Freigabe; v25-Erzeugung NUR auf Anweisung;
-Namen reine `vN-bXX`; Subagenten mit Modell Opus (Partien: *"Dein Modell ist zu teuer fuer
-diese spielerein"*); Uhrzeiten ABLESEN (`date`), nie fortschreiben (fuenfmal falsch am
-2026-09-06); Messungen exklusiv (ein CPU-Auftrag neben dem GPU-Training); lange Laeufe ohne
-Pipe im Hintergrund.
+**2. Die Huellenform mit zweiter Zelle in Zeile 6 traegt, ueber zwei Seeds**
+(`PREREG_geometric_envelope.md` par.8.15b/8.15c). Arm gegen Champion-Spec am selben Netz:
 
-1. **WATCHER Knopf-Kette b06:** je Arm sofort registrieren wie par.8.11a (Instrument
-   `k3_<arm>_v24b06.json` gegen 0,4975; Arena Siege, Spalten je Seite, Kuppel-Bonus, lange
-   Reihen; Verdikt an Tor 1/2, C1 gegen par.12b Punkt 3): K3-F 1,0 in
-   `geometric_envelope` par.8.14, K3-F 0,5 ebenda, beide als par.8.14a. Stillstand
-   > 30 min ohne neue Datei in `data/selfplay_k3-*` oder `evaluations/artifacts/*k3*b06*`:
-   Chronik, Nutzer fragen. Danach Kopf der Prereg nachziehen, `python
-   tools/generate_prereg_index.py`, committen.
-2. **Halter vor 01:20 erneuern** (siehe Falle oben) oder Nutzer-Kill abwarten.
-3. **Nach der Kette, CPU frei (rund 00:30): `cargo test --release --lib`** aus `engine/`
-   mit Python-DLL im PATH (`. tools/hooks/python_dll_path.sh; mosaic_prepend_python_dll_path`
-   oder `PYDIR=$(cygpath -u "$(python -c 'import sys;print(sys.base_prefix)')"); export
-   PATH="$PYDIR:$PATH"`) -- prueft das umbenannte Fixture `models/engine_test.onnx`
-   (13 Verweise, Commits e6b04ec/4bc4313/77975d2, ungetestet). Erwartung 523 gruen.
-4. **PAUSIERT (Nutzer 23:45: erst mit v25 weiter). Neun Partien Subagent gegen Champion** (`PREREG_claude_play_interface.md` par.7/8:
-   Restprogramm 4 als Erst-, 5 als Zweitspieler; je Partie ein Agent mit Modell Opus, Auftrag
-   wie in der Chronik 18:55/19:29 beschrieben: `python -X utf8 tools/claude_play.py new --game
-   g02 --seed 20260907 --first-player 0 --claude-side 0`, ab g06 `--claude-side 1
-   --first-player 0`; Zuege GENAU aus der Liste, Tiling selbst, `note` fuer bis zu drei
-   Netz-Fehlstellen, Bericht unter 60 Zeilen). VOR der ersten Partie
-   `bash tools/claude_play_hold.sh` im Hintergrund starten (Marke haelt die alte Kette und
-   spaetere Ketten fern), NACH der letzten Partie die Marke loeschen
-   (`rm evaluations/artifacts/claude_play/.playing`). Je Partie in par.7 registrieren
-   (Endstand, Zuege, Beobachtungen als Sondenkandidaten), Werkzeugfehler nicht vom Agenten
-   reparieren lassen. Kosten rund 30 min und rund 250.000 Opus-Token je Partie.
-5. **GESTELLT 2026-09-07, 00:55 (`v25_window` par.11: Generator, Value-Klasse, Traeger-Kennzahl, K3-F-Klasse, Huellenform). Vorlage v25-Zuschnitt** (`PREREG_v25_window.md` par.4/9/9a): Generator-Frage b05 gegen
-   b06 (Nutzer-Prinzip Generator = Champion; b06 hat die Champion-Kante, b05 nicht:
-   202:218 in Spielkonfiguration), Knopf in der Erzeugung (b06 spielt MIT K3-P, b05 ohne),
-   Traeger-Kennzahl 0,356 gegen Fenster 0,624, Value-Klasse 8.000/0 offen. KEINE stille Wahl.
-6. **K5 "Reihe-6-Spezialfeld"** (`special_tile_yield` par.9): Bau nach den K3-Ergebnissen,
-   als Erweiterung der K3-P-Projektion (Huellenzelle der Zeile 6), Spec-Pflichtfeld je Seite
-   wie `envelope_flush_w` (Werkzeug `tools/spec_add_field.py`; lebende Specs erst nachziehen,
-   wenn kein Lauf mehr mit dem alten Wheel laeuft; Wheel-Build nur exklusiv; danach
-   `/mosaic-anchor-invariance`).
-7. **Aus dem Test-Audit noch offen** (STATUS Punkt 9/Audit): nichts Blockierendes; die
-   `#[ignore]`-Tests mit `test_champion_model_path()` folgen jetzt dem 744er-Champion
-   (nicht gelaufen).
+| | Seed 20261014 | Seed 20261013 | gepoolt |
+| --- | --- | --- | --- |
+| Siege | 85:75 | 92:68 | **177:143** (p 0,065) |
+| volle Spalten (beide Richtungen) | 0,787 / 0,700 gegen 0,625 / 0,550 | 0,838 / 0,863 gegen 0,613 / 0,350 | vier von vier darueber |
+| Kuppel-Bonus | 4,7 / 4,6 gegen 3,8 / 3,6 | 4,5 / 5,0 gegen 3,4 / 2,3 | **hoechster je gemessener Netz-Wert (5,0)** |
 
-**Offene Nutzer-Entscheide (Fundstellen):** Generator v25 b05 oder b06 und Knopf in der
-Erzeugung (`v25_window` par.4, `v24_window` par.9c); Knoepfe in der ERZEUGUNG als Idee, K3-F und
-Kandidaten, Bauform A/B/C (`v25_window` par.10, Nutzer 22:45); welches v24-Netz die Knopf-Messung
-nachzieht (`geometric_envelope` par.8.14); K4-Skala je Runde oder gemeinsam
-(`round_estimate_leaf_term` par.4); Value-Klasse 8.000/0 (`v25_window` par.9/9a);
-`--fast-loader` als Default (`working_rules.md`: Volllauf 440 s gegen 16 min, bitgleich);
-Loeschung `models/attic_20260906_k3p10_copies/` (Duplikate).
+Die Siege sind knapp nicht signifikant, die Spalten eindeutig (groesste Differenz 0,863
+gegen 0,350, weit ausserhalb der Block-SD-Spannweite identischer Aufbauten). Es ist der
+erste Baustein seit K3-P, der Spalten HEBT statt sie zu kosten. Vorher waren alle vier
+Knopf-Arme der Nacht negativ: K3-P2 71:89, K3-F 1,0 74:86, K3-F 0,5 77:83, beide 69:91.
 
-**Blockaden:** Anker ROT, Kettenfehler, Manifest-Diff, zweite CPU-Last neben einer Messung
--> anhalten, sichern, Nutzer fragen. Skills: `/mosaic-measurement-run`, `/mosaic-prereg`,
-`/mosaic-anchor-invariance`, `/mosaic-champion-promotion`, `/mosaic-generation-turnover`
-(vor v25-Self-Play), `/mosaic-handover`.
+**3. Der Betriebspunkt der Erzeugung ist bestaetigt, das Niveau ist gestiegen**
+(`PREREG_search_depth_column_optimum.md` par.8b). Suchtiefen-Kurve am heutigen Champion:
+@100 0,8200, @250 0,5075, @400 0,4975. Plateau weiter bei 100, Absturz so steil wie vor
+drei Generationen; alle Punkte liegen 0,16 bis 0,20 hoeher als bei `v22-b05` (konfundiert:
+anderes Netz UND Champion-Knopf). **Prozessregel-Antwort (par.8c): nicht je Generation
+nachmessen, nur bei Aera-Wechseln** -- die Form hat sich ueber drei Generationen nicht
+bewegt.
 
-### Was die Tagessitzung 2026-09-06 (00:38-21:46) ergeben hat (Kurzform; alles in Preregs und Chronik)
+**4. Die gemessene Huelle bestaetigt die hergeleitete** (`geometric_envelope` par.8.15a).
+Ueber 1.004 Endbretter: bei Kosten 56 deckt sich die haeufigkeitsoptimale Zellmenge in 20
+von 21 Zellen mit dem Dreieck. Die zweite Zelle in Zeile 6 ist **Mensch-Verhalten** (0,909
+gegen 0,362 der Netze) -- also ein ZIEL, keine Beschreibung des Ist-Zustands.
 
-Alle sechs v24-Arme abgenommen (par.9): b02 und b03 nehmen Tor 1 mit Knopf, b05 ohne Knopf,
-b06 (b02-Rezept auf 744) mit Knopf ueber zwei Seeds = Champion-Kante -> Promotion nach
-Checkliste, Elo 1309. Knopf-Wechselwirkung je Arm verschieden (par.9c). Tiling-Sonde: Mensch
-laesst Punkte liegen, kauft an G4/Gline nichts (par.8.12a); Reihen-Alter: blockierte 6er
-werden zu 22-27 % gelegt gegen 86-90 % (par.8.14, Fassung 2). K3-F gebaut, getestet,
-installiert (Spec-Pflichtfeld `envelope_flush_w`), Anker gruen; K3-P2 am Champion b06
-negativ (par.8.11a). Rauschboden par.12b komplett (Schwelle B1 +-0,13, B2 +-0,06, Arena-SD
-Marge 10,7-14,3, Spalten 0,23-0,46). Netzauslastung 2D nachgeruestet: alle Netze gruen,
-Trunk der Warmstart-Linie identisch. Test-/Hook-Audit umgesetzt (Manifest-Test, Python-Tests
-im pre-commit, Regel 8, Basislinie, v20-Tests, Regel-5-Fehlalarm). Spiel-Interface
-`tools/claude_play.py` gebaut; g01 72:42 fuer den Agenten. fast-loader 440 s je Epoche.
-Laufzeiten: `measured_runtimes.md`.
+### Was gebaut und geprueft wurde
 
-### Was seit der Uebergabe von 2026-09-03 09:00 passiert ist (Kurzform; Chronik ab 09:08)
+**`cargo test --release --lib`: 538 Tests, 0 rot.** Wheel installiert, Kontrakt unveraendert
+`20b442a8164f748d`, **Anker-Drift und Konservierung je GRUEN** (1.763 Schritte).
 
-Relabel durch, b07 trainiert und abgenommen (par.A5: keine Staerke, weniger
-Spalten, b01 bleibt Generator). K1 gebaut, gemessen, repliziert, Champion-
-Kante: ENTSCHIEDEN, kein Rezept (par.15-17). K3 Raster-Form wirkungslos
-(par.9); Nutzer: "die Huelle wird kommen, Hebel gesucht"; K3-P (projiziertes
-Brett) gebaut, traegt (8.7a-d: gepoolt 191:129, Betriebspunkt @100 0,775
-gegen 0,726 Spalten); Huellen-Bauer als Uebersteuerung unbrauchbar (8.8);
-8.6 Value im Tiling Nullbefund (8.6a); K3-R/K3-O gebaut und gemessen (8.9a,
-Konstruktionsfehler 8.9b als v24-Wiedervorlage). Material-Pilot (v24 par.7):
-Tor 0 vorab belegt. Champion-Kante K3-P 38:12 und 221:179 -> Promotion
-v23-b01_k3p10 (par.11, Elo 1292). Aufraeumen (Chronik 19:45). Alle Zahlen in
-den Preregs und der Tabelle in Abschnitt 1 der Uebergabe von 07:00 (Chronik).
-
-### Stand der v24-Vorbereitung (vollstaendig registriert)
-
-`PREREG_v24_window.md` par.6 (Rezept) und par.8 (Arme b01/b02/b03, Knoepfe
-K1/K3; K2 gegenstandslos), `generation_loop.md` (Gleichstandsregel),
-`start_position_seeding` par.7 (b03-Kuratierung), `saturating_score_utility`
-par.14 (K1 baureif), `geometric_envelope` par.8 (K3 baureif, 8.6 offen).
-Index: 18 OFFEN, 79 ENTSCHIEDEN, 8 UEBERHOLT. Chronik der letzten Naechte:
-`night_run_20260901.md`, `night_run_20260902.md`.
-
-
-### Was die Nacht 2026-09-01/02 ergeben hat (Chronik: `night_run_20260901.md`)
-
-1. **Relabel-Arm b05 auf 240 Paaren: Nullbefund.** 246:234 fuer b05, p = 0,65,
-   der dritte Seed dreht um; Spalten 0,676 gegen 0,642, KI schliesst Null ein.
-   Weder Gewinn noch Schaden. **b01 bleibt Generator fuer v24**, jetzt per
-   Nullbefund statt per nachtraeglicher Gleichstandsregel
-   (`reanalyze_label_depth` par.A3).
-2. **Kaltstart ist die Ursache, nicht das Lernraten-Rezept.** `v23-b06`
-   (Kaltstart mit exakt dem b01-Rezept) baut 0,18 volle Spalten und verliert
-   65:95 gegen b01 (p = 0,024). "Spaltenwissen sitzt in der LINIE" ist damit
-   einfaktoriell belegt (`capacity_sim_frontier` par.14b).
-3. **Stufe 4 komplett.** Teil A auf 200 distinkten Zustaenden (0,825 gegen
-   0,490 Verwerfung, 70:3); Teil B: die tiefere Suche verwirft
-   spaltenrelevante Vorschlaege im GLEICHEN Anteil wie alle anderen, nur
-   doppelt so oft insgesamt -- Spaltenverlust als Nebenwirkung, kein gezieltes
-   Verwerfen (`search_depth_column_optimum` par.7, ENTSCHIEDEN).
-4. **Spreizung des Value-Kopfs im Tiling gemessen:** b01 0,048/0,065 gegen
-   plattenblind 0,018, aber die multiplikative Form kippt in 1 von 142 bzw. 4
-   von 192 Stellungen einen Punktvorsprung. Form A tot, B oder C Pflicht
-   (`geometric_envelope` par.3f).
-5. **Phase 3 auf Block-Ebene bestaetigt** (t 3,25 und -2,87 fuer die beiden
-   signifikanten Arme; `r5_value_calibration` par.12), **Reachability
-   zifferngleich reproduziert** (par.7 dort).
-6. **Hebel 3 der Cache-Prereg abgenommen:** Zusammenfuegen 344 s statt 4,98 h,
-   Datenaufbau im Training 31 s. Zwei Bedingungen waren vorher unbekannt
-   (Monolith fuer den TRAININGSANTEIL, Block-Bau unter der Trainings-Umgebung;
-   `cache_build_time` par.12, Werkzeug `tools/window_train_split.py`).
-7. **Blockgroesse 5 ist Default in allen fuenf Arena-Werkzeugen** (Nutzer,
-   zweiter Vorfall; `working_rules.md`, `pitfalls.md`).
-
-### Prereg-Bestand
-
-Stand 2026-09-05, 18:22: **11 OFFEN** (`policy_surprise_weighting` fuer b05 und `geometric_envelope` mit Schliesskriterium par.12 wieder offen (17:43); NEU `round_estimate_leaf_term`, Such-Knopf K4, Nutzer-Auftrag 18:20). Stand 11:15 war: **8 OFFEN**: `v24_window`, `v25_window`,
-`start_position_seeding`, `special_tile_yield`, `start_dome_choice`,
-`round_transition_search_sampling`, `rust_data_layer`, `stack_top_feature`
-(Nutzer: Sichtgleichheit, kein Staerkeziel, bleibt offen). Am 2026-09-05 vier
-auf ENTSCHIEDEN und vier auf UEBERHOLT/gefaltet gesetzt (`PREREG_INDEX.md`).
-
-### Was als Naechstes ansteht
-
-| Was | Kosten | Anmerkung |
+| Baustein | Was | Prereg |
 | --- | --- | --- |
-| ~~Generatorwahl-Regel bei Gleichstand~~ | -- | ENTSCHIEDEN 2026-09-02 (Nutzer): Staerke schliesst aus, Spaltenprofil entscheidet, sonst Amtsinhaber (`docs/generation_loop.md`, "Generatorwahl unter Armen") |
-| ~~Reanalyze-Arm `v23-b07`~~ | -- | ABGENOMMEN 2026-09-03 (`reanalyze_label_depth` par.A5): 75:85 gegen b01, Spalten 0,445 gegen 0,515 -- keine Staerke, weniger Spalten; b01 bleibt Generator. Reanalyze geht NICHT ins v24-Rezept |
-| **v24-Erzeugung** | 11,9 h bei threads 11 | Rezept vollstaendig in `PREREG_v24_window.md` par.6; Generator `v23-b01_brierbest`. Startet NUR auf Nutzer-Anweisung |
-| Vor dem v24-Training: Monolith fuer den Trainingsanteil | rund 45 min | `tools/window_train_split.py` -> `build_cache_incremental.py --merge-out` unter der Trainings-Umgebung (`cache_build_time` par.12) |
-| ~~b04-Zweig~~ | -- | GEPARKT 2026-09-02 (Nutzer): das Problem sitzt im Value-Kopf, nicht in Policy, Breite oder Merkmalsform (`capacity_sim_frontier` par.15). Der Fahrplan traegt die These ab jetzt als Arbeitshypothese |
-| Merkposten: `--select-by-brier` bei Kaltstarts | -- | b02 und b06 haben `_brierbest` in Epoche 1 mit BESSEREM Brier als b01 bei schwaecherem Spiel; der b05-Val-Pool misst nicht, was in der Arena zaehlt (`capacity_sim_frontier` par.14b) |
-| Push | -- | nie ohne Anweisung; Commits der Nacht sind lokal |
+| Huellenform | `envelope_hull_form` 1/2 als Spec-Pflichtfeld, alle Suchpfade | `geometric_envelope` par.8.15 |
+| Pass-Zeile | `⏭️ <Name>: passt` plus `#a`-Zeile in beiden Pfaden | `action_id_logging` S2 (Luecke geschlossen) |
+| Chip-Verbrauch | `(3 Plättchen: rot, gelb+blau, schwarz)` in der Vollendungs-Zeile | `pitfalls.md`-Nachtrag |
+| Symbol | ueberall 🎴 statt 🎫 | Nutzer 2026-09-07, 01:30 |
+| **Weg C** | eine Abweichung je Partie, aus breit gezogenen Kandidaten netzgefiltert | `start_position_seeding` par.9c/9e |
+| **Aktionsabhaengige Temperatur** | `--action-temp`, Staffel wie im Heuristik-Pfad | `v25_window` par.14 |
+
+**Replay-Nachweis in beide Richtungen:** das Altlog `claude_play/g01/game.log` (altes
+Symbol, keine Pass-Zeile, kein Chip-Zusatz) laeuft ohne Divergenz durch, 5 Chip-Zeilen ueber
+die neuen Toleranzen; die frischen Arena-Logs der Replikation ebenso. Der Replayer NUTZT die
+Chip-Angabe jetzt, statt die Wahl zu raten -- der Vorfall vom 2026-08-29 kann fuer neue Logs
+nicht wiederkehren.
+
+### Was der Nutzer entscheiden muss
+
+| # | Frage | Stand / Empfehlung | Kosten |
+| --- | --- | --- | --- |
+| 1 | **Huellenform 2 in die Champion-Spec?** | Spalten belegt (2 Seeds), Siege p 0,065. Entweder Gating mit SPRT wie K3-P am 2026-09-04, oder direkt in die v25-Erzeugung und die Staerke dort mitmessen | Gating rund 1,2 h |
+| 2 | **Value-Klasse 8.000/0 oder 7.000/1.000** (par.11 B) | Empfehlung 8.000/0; nach Messung 3-V waeren die 1.000 gesampelten die einzige verrauschte Klasse und tragen laut Messung keine Vielfalt | 0 |
+| 3 | **G-1-Sockel neu erzeugen?** (par.13a) | Empfehlung V1: die 1.350 Traeger neu, mit dem ALTEN Generator und neuem Betriebspunkt -- hebt die Traeger-Kennzahl von 0,392 auf 0,447 | +1,3 h |
+| 4 | **Schwarm-Arm** (par.15) | Nutzer-Vorschlag: variable Temperatur 0,8-0,2 plus Weg C. Eigener Faktor, gehoert in einen eigenen Arm NACH den fuenf Sockel-Armen | Bau: eine Zeile in `action_temp_for` plus Knopfwert |
+| 5 | **Messung 3-W** (Umschaltpunkt bis in die Arena) | registriert, rund 12 h -- entfaellt, wenn die fuenf v25-Arme ohnehin gefahren werden, weil S1 gegen S3 dieselbe Frage beantwortet | -- |
+
+**Bereits entschieden in dieser Nacht:** Generator v25 = `v24-b06` mit Champion-Spec
+(par.14a); Umschaltpunkt k = 1 und Abweichungsrate 1,0 (par.14b); Armstruktur S1 bis S5
+(par.14); die neun Subagent-Partien pausiert bis v25.
+
+### Was als Naechstes zu tun ist
+
+1. **Push** (84 Commits, frei -- Build und Anker gruen).
+2. **Zweite Maschine versorgen:** gleicher Commit UND gleiches Wheel; Pruefzeile und die
+   fertigen Befehle stehen in `PREREG_v25_window.md` par.14c. Erwartet:
+   `744 20b442a8164f748d 1 0.0`.
+3. **Entscheid 1 (Huellenform)**, weil er in die Generator-Spec der Erzeugung eingeht.
+4. **K5 "Reihe-6-Spezialfeld"** (`special_tile_yield` par.9) -- nicht gebaut. Es war
+   bewusst hinter die Huellenform gestellt: mit zwei Huellenzellen in Zeile 6 hat das
+   Spezialfeld zwei Zielplaetze, und der Kuppel-Bonus der Form (bis 5,0) liefert bereits
+   einen Teil dessen, wofuer K5 gedacht war.
+5. **Der Punkt bei 150 Sims** der Suchtiefen-Kurve fehlt (par.8c), rund 25 min -- nur
+   noetig, wenn jemand den Betriebspunkt feiner ausloten will.
+
+### Vorbehalte und eigene Fehler dieser Nacht (Regel 0)
+
+- **Vier Koordinator-Fehler, alle im Chat berichtigt und in der Chronik vermerkt:** (a) "die
+  tau-Messung wurde nie gefahren" -- falsch, Messung 3 lief am 2026-08-08 (H0 auf STAERKE,
+  nicht auf Spalten); (b) "Weg B entspricht KataGos Branching" -- falsch, KataGo erzeugt
+  keine zweite Trajektorie; (c) "die Streuung kommt von Dirichlet-Rauschen" -- falsch, die
+  Suche ist Gumbel-basiert; (d) "der Schwarm ist rauschfrei und trotzdem spaltenreich, also
+  braucht es keine Streuung" -- die Kennzahl der falschen Klasse, vom Nutzer korrigiert.
+- **Ein Regelbruch:** die Kurven-Messung wurde mit umgeleiteter Ausgabe gestartet statt
+  harness-getrackt. Der Lauf selbst war sauber und exklusiv; Sichtbarkeit wurde nachgeruestet.
+- **Session-Ausfall 04:30-05:30** durch ein Rate-Limit. In der Zeit lief nichts; die alte
+  Knopf-Kette am v23-Champion ist in ihren Deckel gelaufen, OHNE zu messen.
+- **Ungemessen bleibt die Kernfrage:** ob ein aus dem besseren Material trainiertes Netz
+  staerker spielt. Alle Zahlen oben sind Material- oder Suchkennzahlen. Der Schritt zur
+  Arena kostet ein Training plus Gating.
+- **`models/attic_20260906_k3p10_copies/`** liegt weiter, Loeschung nur auf pfadgenaue
+  Freigabe. Ebenso `venv_measure_hullform/` (von mir angelegt, leer, nicht mehr gebraucht).
+- **`static/`** traegt Aenderungen des Nutzers (GUI), von mir nicht angefasst und nicht
+  committet.
 
 ## 2. WAS DIE GENERATION v23 ERGEBEN HAT
 
