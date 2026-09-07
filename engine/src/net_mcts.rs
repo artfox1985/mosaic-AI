@@ -2556,11 +2556,13 @@ pub(crate) fn tau_argmax_from_move() -> Option<usize> {
 /// Getter darunter cached prozessweit (OnceLock), zwei Werte im selben
 /// Testprozess sind ueber ihn nicht pruefbar (gleiches Muster wie
 /// `self_play::sanitize_deviate_prob`).
-pub(crate) fn sanitize_action_temp(raw: f64) -> Option<bool> {
+pub(crate) fn sanitize_action_temp(raw: f64) -> Option<u8> {
     if raw == 0.0 {
-        Some(false)
+        Some(0)
     } else if raw == 1.0 {
-        Some(true)
+        Some(1)
+    } else if raw == 2.0 {
+        Some(2)
     } else {
         None
     }
@@ -2577,24 +2579,27 @@ pub(crate) fn sanitize_action_temp(raw: f64) -> Option<bool> {
 /// faehrt. Einmalig gelesen (OnceLock, #30-Muster), einmalige Warnung bei
 /// ungueltigem Wert (`sanitize_action_temp` oben).
 ///
-/// SCHALTER statt Skalierungsfaktor: par.14 registriert GENAU EIN Regime
-/// (S2 = "variabel ueber die Zahl der gueltigen Aktionen", dieselbe Staffel
-/// wie die Heuristik). Ein freier Faktor waere ein zweiter, nicht
-/// vorregistrierter Freiheitsgrad, und gemessen werden soll die Staffel
-/// selbst, nicht ihre Skalierung.
+/// MODUS statt Skalierungsfaktor: `1` = die Staffel des Heuristik-Pfads
+/// (`self_play::action_temp_for`), `2` = die glatte Form von 0,2 bis 0,8 ueber
+/// die Aktionszahl (`self_play::action_temp_smooth`, par.14d, Nutzer-Vorgabe
+/// 2026-09-07). Beide sind VORREGISTRIERTE Regime; ein freier Faktor waere
+/// dagegen ein nicht vorregistrierter Freiheitsgrad, und gemessen werden soll
+/// die Form selbst, nicht ihre Skalierung. `0` bleibt AUS und bitidentisch.
 ///
 /// Wirkt NUR im Self-Play-Pfad (`self_play::net_drafting_policy`) und dort
 /// NUR im Sampling-Zweig: `deterministic` und der τ-Zweig
 /// (`tau_argmax_from_move`) spielen argmax und bleiben unberuehrt -- eine
 /// streng monotone Transformation aendert keinen argmax. Der Arena-/GUI-Pfad
 /// ruft `net_drafting_policy` gar nicht auf (siehe `tau_argmax_from_move`).
-pub(crate) fn action_temp_enabled() -> bool {
-    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+pub(crate) fn action_temp_mode() -> u8 {
+    static CELL: std::sync::OnceLock<u8> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         let raw = read_f64_env("MOSAIC_ACTION_TEMP", 0.0);
         sanitize_action_temp(raw).unwrap_or_else(|| {
-            eprintln!("⚠️  MOSAIC_ACTION_TEMP={raw} ist weder 0 (aus) noch 1 (an) -- bleibt AUS.");
-            false
+            eprintln!(
+                "⚠️  MOSAIC_ACTION_TEMP={raw} ist weder 0 (aus), 1 (Staffel) noch 2 (glatt) -- bleibt AUS."
+            );
+            0
         })
     })
 }
