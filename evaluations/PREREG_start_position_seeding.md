@@ -571,7 +571,13 @@ ist das Ziel wieder die gesuchte Groesse.
   spielt GENAU k Zuege mit Temperatur und danach argmax.
 - Saubere Hauptlinie: derselbe Regler auf einen frueher Wert.
 
-**BERICHTIGUNG derselben Stunde (Nutzer 02:30): die Hauptlinie wird gar nicht beruehrt.**
+**BERICHTIGUNG (Nutzer 02:35): das sind ZWEI WEGE, keine Praezisierung eines einzigen.**
+Woertlich: *"das war keine praezisierung, sondern nun haben wir zwei moegliche wege. welche
+die sinnvollere ist kann ich schwer abschaetzen."* Die Unterscheidung, und die Abwaegung
+des Koordinators dazu, stehen in par.9b unten. Der urspruengliche Absatz bleibt als
+Beschreibung von WEG B stehen:
+
+**Weg B (Nutzer 02:30): die Hauptlinie wird gar nicht beruehrt.**
 Woertlich: *"meine idee war: Stellung A -> simulation mit temperature (exploration) ->
 zurueck zu Stellung A -> simulation via argmax -> Stellung B."* Der Zweig ist also ein
 AUSFLUG: von Stellung A wird explorativ simuliert, dann kehrt die Erzeugung nach A zurueck
@@ -591,3 +597,37 @@ KataGo verfaehrt sinngemaess so (die zufaellig gewaehlten Zuege werden gespielt,
 Trainingsdaten kommen aus dem, was folgt). **Offen, vor einem Bau zu entscheiden**, zusammen
 mit k (Zahl der Temperatur-Zuege), der Verzweigungsrate und der Frage aus par.9 Punkt 3
 (value-only oder policy-tragend).
+
+### par.9b ZWEI WEGE, und welcher zuerst (Koordinator-Abwaegung 2026-09-07, 02:35, auf Nutzer-Frage "welche die sinnvollere ist kann ich schwer abschaetzen. dafuer hab ich dich")
+
+| | **Weg A: eine Linie, phasenweise verrauscht** | **Weg B: Ausflug, Hauptlinie sauber** |
+| --- | --- | --- |
+| Trajektorien je Partie | eine | zwei (Hauptpartie + Ausflug) |
+| Wo die Streuung sitzt | ausschliesslich in den ersten k Halbzuegen | an frei waehlbarer Stelle, auch spaet |
+| Zusatzkosten | **keine** (die Partie laeuft ohnehin) | eine Restpartie je Ausflug (5 % Rate ~ +2 % Wanduhr) |
+| Mechanik | `--tau-argmax-from-move k` -- **fertig, im Wheel** | `start_state` + Klon in der Erzeugungs-Closure -- **zu bauen** (par.9) |
+| Stand | **GEMESSEN 2026-09-07 (Messung 3-V):** k=11 verdoppelt die Spalten (0,4225 gegen 0,1950) bei unveraenderter Vielfalt | b03 hat die OFFLINE-Fassung gefahren (par.7): hoechster Kuppel-Bonus der Generation (4,2 gegen 3,5-3,6) |
+| Literatur | AlphaZero-Standard (erste 30 Halbzuege sampeln, dann greedy) | KataGo-Seitenpartien (Wu 2019, 5 % der Partien) |
+
+**Empfehlung: A sofort, B als naechster Bau.** Begruendung:
+
+1. **A ist gemessen, kostenlos und repariert den Betriebspunkt.** Der Regler liegt im Wheel,
+   die Messung liegt vor, und der Effekt ist gross (mehr als eine Verdopplung der Spalten
+   im Sockel). Es gibt keinen Grund, darauf zu warten.
+2. **A hat aber eine strukturelle Grenze, und sie liegt genau dort, wo der Engpass der
+   Kampagne sitzt.** Seine Streuung endet nach k Halbzuegen; alles danach ist die
+   Konvergenz des Generators auf sein eigenes Optimum. Der Strukturbefund lautet aber
+   **Engpass VOLLENDUNG SPAET** ([[project_column_completion_structural_weakness]]) -- der
+   Value-Kopf braucht Stellungen aus den spaeten Runden mit halbfertigen Spalten, und die
+   erzeugt A nur zufaellig, nicht gezielt.
+3. **B ist der einzige Weg, gezielt dorthin zu kommen** -- und die Kampagne hat dafuer
+   bereits einen positiven Datenpunkt: der Seeding-Schwarm b03 (par.7) hat genau das
+   offline gemacht (Stellungen aus R2-4 mit Spaltenfortschritt 3-5, von dort weiterspielen)
+   und den hoechsten Kuppel-Bonus aller sechs v24-Arme erzeugt.
+
+**Was die Empfehlung kippen wuerde:** wenn A in der ARENA Staerke kostet. Dann waere die
+Vielfalt aus dem Partieanfang nicht ersetzbar durch "einfach weniger sampeln", und B wuerde
+von der Kuer zur Pflicht, weil die Streuung dann anderswo herkommen muss. Die alte
+Messung 3 (2026-08-08, Umschaltpunkt 30) war auf Staerke H0 -- sie kannte den hier besseren
+Punkt 12 aber nicht. **Die Arena-Frage zu A ist damit der naechste Entscheid, nicht die
+Wahl zwischen A und B.**
