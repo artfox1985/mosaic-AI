@@ -807,3 +807,43 @@ im Fenster-Manifest ergeben. **Nicht entschieden.**
 
 **Kosten:** der Ausflug kostet rund 44 % einer Vollpartie zusaetzlich (Restlaenge aus
 par.7). Bei einem Ausflug je Partie also rund +44 % Wanduhr fuer die betroffene Haelfte.
+
+### par.9g WEG B: die Bauform, wie sie beauftragt ist (Nutzer-Praezisierung 2026-09-07, 09:20)
+
+**Variante 1 des Ausflugs ist gesetzt** (Nutzer-Rueckfrage "von welcher variante von weg b
+sprechen wir nun"): der Ausflug laeuft bis zum regulaeren PARTIEENDE, das Wertziel ist der
+echte Endstand. Die Alternative (Abbruch nach x Zuegen, Ziel aus dem Bootstrap-Wert) ist
+verworfen: sie ersetzte den gemessenen Ausgang durch die Schaetzung desselben Netzes, das
+trainiert werden soll -- zirkulaer, und in dieser Kampagne beim ausrotierten
+Zusatzlabel-Experiment schon einmal teuer gewesen.
+
+**Wo die Abzweigung sitzt, woertlich vom Nutzer:** *"ich haette die abweichung zufaellig
+positioniert, die haeufigkeit in abhaengigkeit der unsicherheit des value heads. aehnlich
+wie wir es beim profil der huelle haben. sprich in den ersten runden schlaegt die abweichung
+haeufiger zu. dann kannst den zug auch noch aussuchen ueber die haeufigkeit via der
+verfuegbaren aktionen."*
+
+Umgesetzt als GENAU EINE gewichtet gezogene Stelle je Partie. Das Gewicht eines Halbzugs ist
+das Produkt aus
+1. **Rundenprofil** -- Default `ENVELOPE_PROFILE_DEFAULT` = [1,0 / 0,92 / 0,67 / 0,33 / 0]
+   (envelope.rs:37). **Das ist kein geraten gewaehltes Profil:** es ist nach par.8.5 der
+   Huellen-Prereg aus der Verlaesslichkeit des Value-Kopfs je Runde berechnet,
+   `w_e(r) = (rho(5) - rho(r)) / (rho(5) - rho(1))` mit rho = Spearman(Value, Endmarge).
+   Genau die Groesse, die der Nutzer meint. Runde 5 hat Gewicht 0, dort rechnet ohnehin der
+   exakte Loeser.
+2. **Zahl der verfuegbaren Aktionen** an diesem Halbzug -- mehr Wahl, mehr zu explorieren.
+
+Weil die Aktionszahl erst beim Spielen feststeht, laeuft die Auswahl als **gewichtetes
+Reservoir-Sampling** in der Hauptschleife mit: der aktuelle Halbzug wird mit
+`w_i / summe(w_1..i)` zum Kandidaten, sein Zustand geklont, der bisherige verworfen. Am
+Partieende steht eine gewichtet gezogene Stelle fest, und von deren Klon laeuft der Ausflug.
+
+**Knoepfe:** `MOSAIC_EXCURSION_PROB` (Default 0 = aus, bitidentisch),
+`MOSAIC_EXCURSION_TAU_MOVES` (Default 12, Halbzuege bis der Ausflug greedy wird),
+`MOSAIC_EXCURSION_PROFILE` (5 Zahlen). Env plus CLI, kein Spec-Feld.
+
+**Waechter uebernommen von Weg C:** ein Halbzug, an dem der Bauer- oder Kuppel-Vorzug
+greift, kommt als Abzweigstelle nicht in Frage -- dort ist das Policy-Ziel ein
+Ein-Hot-Demonstrationsziel (par.9e).
+
+**Beauftragt 2026-09-07, 09:26.** Ungebaut, ungetestet.
