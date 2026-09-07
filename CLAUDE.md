@@ -26,6 +26,26 @@ Die vier Auslöser, an denen es jedes Mal schiefging:
 Zusatz: **Plan und Zustand nie in derselben Zeitform** — "würde addieren" für
 Geplantes, "addiert" nur für Gebautes-und-Aktives.
 
+Zusatz 2 (Nutzer-Anweisung 2026-09-07): **jede tragende Zahl nennt n,
+GRUNDMENGE und EINHEIT** — und alle drei werden gegen die des VERBRAUCHERS
+geprüft. Eine Prüfstelle sagt, WO nachgesehen wurde, nicht WORÜBER gezählt
+wurde; genau durch diese Lücke sind an einem Tag drei Fehler gegangen:
+
+- die Aktionszahl über Drafting UND Tiling gemessen, während der Knopf nur im
+  Drafting wirkt — Median 4 statt 10, und die Anker einer gebauten Kurve
+  standen darauf;
+- die Ausflugslänge je Spieler gezählt, während `move_number` beide Spieler
+  zählt — Faktor 2 in einer Design-Aussage;
+- eine Konstante auf einer Reihe verankert, von der ein vorregistrierter Punkt
+  noch fehlte, und das im selben Absatz sogar geschrieben.
+
+**Wer n, Grundmenge und Einheit nicht alle drei benennen kann, hat nicht
+gemessen.** Der Abgleich mit dem Verbraucher ist der eigentliche Handgriff:
+"8.025 Entscheide, Grundmenge Drafting, Einheit Aktionen je Entscheidung"
+gegen "der Knopf liest `actions.len()` im Drafting" passt; "Halbzüge je
+Spieler" gegen "`move_number` zählt beide" passt nicht, und das ist in dem
+Moment sichtbar, in dem man es hinschreibt.
+
 ## Token-Optimierung & Kommunikations-Regeln
 
 - **Kein Boilerplate** Wiederhole niemals den gesamten Dateikontent. Gib nur den geänderten Funktionsblock oder die spezifischen Zeilen aus.
@@ -379,6 +399,39 @@ STATUS.md nach — und prüft dabei, ob ein *anderer* Abschnitt dadurch falsch
 wird. Genau das ist zweimal passiert: oben stand noch „beide Wege negativ",
 während weiter unten schon der Befund stand, der das widerlegt. Für einen
 Menschen ein Schönheitsfehler, für die nächste Sitzung eine Falschaussage.
+
+## Rückwärts-Prüfung: wer ein Ergebnis registriert, sucht seine Konsumenten (Nutzer-Anweisung 2026-09-07)
+
+Die Pflege-Regel oben greift nur INNERHALB von STATUS.md. Sie muss über den
+ganzen Baum gelten, denn eine Zahl wird nicht dort falsch, wo sie steht,
+sondern dort, wo sich jemand auf sie berufen hat.
+
+**Handgriff, verbindlich:** wer ein Messergebnis registriert, greppt im
+selben Zug nach dem NAMEN der Messung (und nach ihren tragenden Zahlen) über
+`evaluations/`, `docs/` und den Code — und liest jede Fundstelle. Kostet
+einen Werkzeugaufruf.
+
+**Anlass (2026-09-07, zweimal vom Nutzer gefunden):** um 03:15 wurde die
+Ausflugslänge von Weg B (`MOSAIC_EXCURSION_TAU_MOVES`, Default 12) unter
+anderem damit begründet, 12 sei „der Umschaltpunkt, der bei uns am besten
+gemessen hat (Messung 3-V)". Um 06:00 kam der Punkt bei k = 1 dazu und lieferte
+0,5325 gegen 0,4225 — die Reihe ist monoton, es gibt kein Zwischenoptimum. Der
+neue Befund wurde sauber registriert, aber niemand las nach, wer sich auf den
+alten gestützt hatte. Die Begründung stand danach fast einen Tag falsch im Baum
+und wanderte in einen Knopf-Default.
+
+**Zweite Hälfte derselben Lehre: eine Konstante nie auf einer Reihe verankern,
+von der man WEISS, dass ein Punkt fehlt.** In demselben Absatz stand wörtlich
+„der noch fehlende Punkt bei k = 1". Die Veraltung war beim Schreiben absehbar,
+nicht erst im Nachhinein. Wer so etwas trotzdem festlegen muss, markiert den
+Wert als vorläufig und trägt die Wiedervorlage ein.
+
+**Und die Blickrichtung, die dabei fehlte:** jedes Stück gegen seine eigene
+lokale Begründung zu prüfen findet Widersprüche INNERHALB einer Stelle, aber
+keine Brüche in der Linie. Beim Ausflug steuern zwei gemessene Verteilungen,
+wo er abzweigt (Rundenprofil × Aktionszahl, `PREREG_start_position_seeding.md`
+par.9g) — während seine Länge eine feste Zahl aus einer Analogie zu einem
+anderen Spiel war. Kein einzelner Absatz war falsch; die Linie war gebrochen.
 
 ## Öffentliches Repo: keine Rechnerstruktur (Nutzer-Entscheid 2026-08-17)
 

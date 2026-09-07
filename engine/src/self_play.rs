@@ -433,14 +433,20 @@ fn action_temp_for(n: usize) -> f64 {
 
 /// Untere und obere Temperatur der GLATTEN Form sowie ihre Anker auf der
 /// Aktionszahl (`MOSAIC_ACTION_TEMP=2`, `evaluations/PREREG_v25_window.md`
-/// par.14d). Die Anker sind GEMESSEN, nicht gewaehlt: aus 6.602
-/// Drafting-Entscheiden einer frischen b06-Charge ist der Median 4 und die
-/// Dezilfolge 1/1/2/3/4/8/15/30/64. `2` ist damit das untere Ende der Masse,
-/// `64` das neunte Dezil.
+/// par.14d). Die Anker sind GEMESSEN, nicht gewaehlt: aus 8.025
+/// DRAFTING-Entscheiden (`phase == "drafting"`, sieben b06-Chargen) ist der
+/// Median 10 und die Dezilfolge 2/3/4/6/10/16/25/43/72. `2` ist das erste,
+/// `72` das neunte Dezil.
+///
+/// **BERICHTIGUNG 2026-09-07:** hier standen zuerst Median 4 und die Dezile
+/// 1/1/2/3/4/8/15/30/64. Diese Zahlen stammen aus einer Messung ueber ALLE
+/// Records, also Drafting UND Tiling -- und der Knopf wirkt ausschliesslich im
+/// Drafting (`net_drafting_policy`). Die Tiling-Entscheide mit ihren wenigen
+/// Aktionen haben den Median halbiert. Nachgemessen: mit Tiling 4, ohne 10.
 const ACTION_TEMP_SMOOTH_LO: f64 = 0.2;
 const ACTION_TEMP_SMOOTH_HI: f64 = 0.8;
 const ACTION_TEMP_SMOOTH_N_LO: f64 = 2.0;
-const ACTION_TEMP_SMOOTH_N_HI: f64 = 64.0;
+const ACTION_TEMP_SMOOTH_N_HI: f64 = 72.0;
 
 /// Glatte aktionsabhaengige Temperatur (`MOSAIC_ACTION_TEMP=2`): logarithmisch
 /// von [`ACTION_TEMP_SMOOTH_LO`] bei [`ACTION_TEMP_SMOOTH_N_LO`] Aktionen bis
@@ -1748,8 +1754,21 @@ fn sanitize_excursion_tau_moves(raw: f64) -> Option<usize> {
 }
 
 /// Wie viele Halbzuege der Ausflug AB SEINEM EIGENEN START sampelt, bevor er
-/// greedy wird (`MOSAIC_EXCURSION_TAU_MOVES`, Default `12` -- par.9b:
-/// Messung 3-V hat 12 als besten Umschaltpunkt fuer Weg A gemessen).
+/// greedy wird (`MOSAIC_EXCURSION_TAU_MOVES`, Default `12`).
+///
+/// **Der Default ist UNGEMESSEN.** Seine einzige Stuetze ist die Analogie zu
+/// KataGos Temperatur-Halbwertszeit (Brettbreite, rund 8 % der Partielaenge;
+/// 8 % von 162 Drafting-Halbzuegen sind rund 13, par.9d). Die fruehere
+/// Begruendung an dieser Stelle -- "Messung 3-V hat 12 als besten
+/// Umschaltpunkt gemessen" -- ist FALSCH und am 2026-09-07 gestrichen: mit dem
+/// vierten Punkt ist die Reihe monoton, k = 1 baut die meisten Spalten
+/// (0,5325 gegen 0,4225 bei k = 12).
+///
+/// Der Sockel-Umschaltpunkt und dieses k heissen gleich und machen
+/// Verschiedenes: dort, wie lange die GANZE Partie sampelt -- weniger ist
+/// besser; hier, wie weit sich der Ausflug von der Abzweigstelle entfernt,
+/// bevor er sauber weiterspielt -- k = 1 hiesse keine Abweichung und verfehlte
+/// den Zweck. Das Sockel-Optimum darf hier NICHT eingesetzt werden.
 /// RELATIV, nicht absolut: der Ausflug bekommt einen eigenen
 /// `NetSelfPlayAgent` mit `tau_argmax_override = Some(k)`, ausgewertet gegen
 /// SEINEN EIGENEN `move_number`-Zaehler -- der bei JEDEM
@@ -7630,19 +7649,19 @@ pub(crate) mod tests {
     #[test]
     fn action_temp_smooth_interpolates_between_registered_anchors() {
         assert!((action_temp_smooth(2) - 0.2).abs() < 1e-12, "unterer Anker");
-        assert!((action_temp_smooth(64) - 0.8).abs() < 1e-12, "oberer Anker");
+        assert!((action_temp_smooth(72) - 0.8).abs() < 1e-12, "oberer Anker");
         // Kappung: unterhalb und oberhalb der Anker bleibt es bei den Grenzen.
         assert_eq!(action_temp_smooth(1), 0.2);
         assert_eq!(action_temp_smooth(0), 0.2, "total, auch fuer das unmoegliche n = 0");
         assert_eq!(action_temp_smooth(151), 0.8);
-        // Die Tabelle aus par.14d (drei Nachkommastellen).
-        for (n, want) in [(4usize, 0.320), (8, 0.440), (15, 0.549), (30, 0.669)] {
+        // Die Tabelle aus par.14d (drei Nachkommastellen), Anker 2 und 72.
+        for (n, want) in [(4usize, 0.316), (10, 0.469), (25, 0.623), (43, 0.714)] {
             let got = action_temp_smooth(n);
             assert!((got - want).abs() < 5e-4, "T({n}) = {got}, erwartet {want}");
         }
         // Streng monoton steigend im offenen Bereich.
         let mut prev = action_temp_smooth(2);
-        for n in 3..=64 {
+        for n in 3..=72 {
             let t = action_temp_smooth(n);
             assert!(t > prev, "T({n}) = {t} muss ueber T({}) = {prev} liegen", n - 1);
             prev = t;
@@ -7657,7 +7676,7 @@ pub(crate) mod tests {
     #[test]
     fn action_temp_smooth_explores_more_than_staircase_where_mass_is() {
         let visits: Vec<f64> = vec![30.0, 10.0, 5.0];
-        let n = 4; // der gemessene Median der Aktionszahl
+        let n = 10; // der gemessene Median der Aktionszahl im Drafting
         let (w1, s1) = action_temp_weights(&visits, n, 1).expect("Staffel");
         let (w2, s2) = action_temp_weights(&visits, n, 2).expect("glatt");
         let share1 = w1[0] / s1;

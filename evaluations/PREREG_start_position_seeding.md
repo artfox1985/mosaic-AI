@@ -608,7 +608,7 @@ mit k (Zahl der Temperatur-Zuege), der Verzweigungsrate und der Frage aus par.9 
 | Wo die Streuung sitzt | ausschliesslich in den ersten k Halbzuegen | an frei waehlbarer Stelle, auch spaet |
 | Zusatzkosten | **keine** (die Partie laeuft ohnehin) | eine Restpartie je Ausflug (5 % Rate ~ +2 % Wanduhr) |
 | Mechanik | `--tau-argmax-from-move k` -- **fertig, im Wheel** | `start_state` + Klon in der Erzeugungs-Closure -- **zu bauen** (par.9) |
-| Stand | **GEMESSEN 2026-09-07 (Messung 3-V):** k=11 verdoppelt die Spalten (0,4225 gegen 0,1950) bei unveraenderter Vielfalt | b03 hat die OFFLINE-Fassung gefahren (par.7): hoechster Kuppel-Bonus der Generation (4,2 gegen 3,5-3,6) |
+| Stand | **GEMESSEN 2026-09-07 (Messung 3-V):** k=11 verdoppelt die Spalten (0,4225 gegen 0,1950) bei unveraenderter Vielfalt -- **und der vierte Punkt k=1 setzt mit 0,5325 noch eins drauf, die Reihe ist monoton** | b03 hat die OFFLINE-Fassung gefahren (par.7): hoechster Kuppel-Bonus der Generation (4,2 gegen 3,5-3,6) |
 | Literatur | AlphaZero-Standard (erste 30 Halbzuege sampeln, dann greedy) | KataGo-Seitenpartien (Wu 2019, 5 % der Partien) |
 
 **Empfehlung: A sofort, B als naechster Bau.** Begruendung:
@@ -707,9 +707,21 @@ Herleitung aus, deckt aber einen Unterschied auf.
 | Endwert | **T = 0,2 -- nie null, es wird bis zum Schluss gesampelt** | **argmax, also T = 0** |
 | Zeitskala | Halbwertszeit = Brettbreite (19 von rund 230 Zuegen, also rund 8 %) | fester Halbzug k |
 
-**Auf unsere Partielaenge umgerechnet:** 8 % von 162 Drafting-Halbzuegen sind rund 13 -- die
-Halbwertszeit liegt also nahe an dem Umschaltpunkt, der bei uns am besten gemessen hat (12,
-Messung 3-V).
+**Auf unsere Partielaenge umgerechnet:** 8 % von 162 Drafting-Halbzuegen sind rund 13.
+
+**BERICHTIGUNG 2026-09-07 (Nutzer-Frage "warum zwoelf halbzuege"):** hier stand, die
+Halbwertszeit liege "nahe an dem Umschaltpunkt, der bei uns am besten gemessen hat (12,
+Messung 3-V)". **Das ist falsch.** Zum Zeitpunkt des Schreibens (03:15) lagen von Messung
+3-V nur die Punkte *aus*, *30* und *12* vor -- im selben Absatz stand sogar "der noch
+fehlende Punkt bei k = 1". Um 06:00 kam er mit **0,5325 gegen 0,4225** dazu; die Reihe ist
+monoton, es gibt kein Zwischenoptimum, und 12 ist NICHT der beste Umschaltpunkt.
+
+**Die Konstante 12 bleibt trotzdem stehen, aber nur noch auf einem Bein:** der
+KataGo-Analogie (rund 13). Sie ist damit ein UNGEMESSENER freier Parameter und als solcher
+markiert. Das Sockel-Optimum k = 1 darf NICHT uebertragen werden -- die beiden Zahlen
+heissen gleich und machen Verschiedenes: beim Sockel, wie lange die ganze Partie sampelt
+(weniger ist besser); beim Ausflug, wie weit er sich von der Abzweigstelle entfernt, bevor
+er sauber weiterspielt (k = 1 waere keine Abweichung).
 
 **Vierter Kandidat (Weg D): glatt abklingende Temperatur statt hartem Schalter.** Sie hebt
 die Schaerfe frueh an, ohne die Streuung je ganz abzuschalten. Das ist genau die Antwort auf
