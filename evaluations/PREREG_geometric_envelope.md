@@ -2312,3 +2312,37 @@ desselben Aufbaus. Das Gating allein traegt den Staerke-Anspruch NICHT (p 0,177)
 nicht eingetragen. `paired_gating` schlaegt den Befehl vor; ob eine Spec-Variante einen
 eigenen Leiterknoten bekommt, ist ein Nutzer-Entscheid (Praezedenz: die K3-P-Kante wurde
 eingetragen).
+
+### par.8.15f AUFGENOMMEN: beide Knoepfe stehen in der Champion-Spec (Nutzer-Freigabe 2026-09-07, "rein in die spec")
+
+`models/v24-b06_brierbest.spec.json` traegt jetzt `envelope_hull_form: 2` und
+`special_row6_w: 1.0`. Vor dem Schreiben geprueft und danach gegengeprueft: die Datei ist
+**inhaltsgleich** mit dem gemessenen Arm `models/hullform2_k5w10.spec.json` -- die Spec, die
+v25 erzeugt, ist damit exakt die, die 391:329 gegen den alten Champion gespielt hat und die
+im Instrument 0,6900 volle Spalten baut (Bezug 0,4975).
+
+**Der eingefrorene Champion ist NICHT betroffen.** `models/frozen_champions/v24-b06/`
+traegt eine eigene `spec.json` PLUS den Inhalt im Manifest (geprueft 2026-09-07); die
+Aenderung an der lebenden Datei erreicht ihn nicht. Sein Spec-Inhalt kennt die beiden Felder
+gar nicht -- er wurde eingefroren, bevor es sie gab, und spielt damit auf den Defaults
+(Dreieck, kein K5). Das ist richtig so: er ist der Beleg dessen, was gemessen wurde.
+
+### Die Folge fuer die Elo-Leiter, die eine Entscheidung braucht
+
+**Ein Champion ist Modell PLUS Spec.** Der Leiterknoten `v24-b06` mit Elo 1309 ist mit der
+ALTEN Spec gemessen. Seit dieser Aenderung bezeichnet derselbe Name im lebenden Baum einen
+ANDEREN Spieler -- einen, der nach eigener Messung rund 54 Prozent gegen den alten gewinnt.
+
+Damit sind zwei Dinge offen, beide Nutzer-Entscheid:
+
+1. **Bekommt die neue Konfiguration einen eigenen Knoten?** `paired_gating` hat die Kante
+   fertig ausgerechnet (`v24-b06_hf2vschamp_arm` 214:186 gegen `..._ctl`). Praezedenz:
+   die K3-P-Kante wurde eingetragen (par.10a). Dagegen spricht, dass die Leiter dann zwei
+   Knoten fuer dasselbe Modell traegt.
+2. **Muss die Paritaets-Fixture neu?** `docs/promotion_checklist.md` 5d verlangt sie bei
+   jedem CHAMPION-Wechsel. Ein Spec-Wechsel ohne Modellwechsel ist in der Checkliste nicht
+   vorgesehen -- die Fixture prueft ausdruecklich die DEFAULT-Knopfstellung, und die hat
+   sich nicht bewegt. **Ungeprueft; vor dem naechsten Push zu klaeren.**
+
+**Was damit fuer v25 feststeht:** die Spec ist geschlossen. Nach `PREREG_v25_window.md`
+par.18 aendert sich bis v27 kein spec-pflichtiger Generator-Knopf mehr.
