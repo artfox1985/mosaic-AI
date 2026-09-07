@@ -927,3 +927,70 @@ halten den Schwarm fest. Das bleibt richtig, solange man den Sockel-Faktor isoli
 Der Schwarm-Vorschlag ist ein EIGENER Faktor und gehoert in einen eigenen Arm --
 andernfalls misst man zwei Aenderungen auf einmal. **Vorschlag: erst die fuenf
 Sockel-Arme, dann der Schwarm-Arm gegen den Sieger.** Nicht entschieden.
+
+## par.16 SCHWARM-ENTSCHEID: variable Temperatur plus Weg C, alle 8.000 (Nutzer 2026-09-07, 09:03: "#2 ist obsolet in der form. es werden dann 8000 mit temp. variabel + c")
+
+**Entschieden.** Der Schwarm NEU wird nicht mehr argmax-deterministisch erzeugt, sondern
+mit der aktionsabhaengigen Temperatur (`--action-temp 1`) und Weg C (`--deviate-prob 1.0`),
+alle 8.000 Partien. Damit ist **par.11 B (8.000/0 gegen 7.000/1.000) gegenstandslos** -- die
+Frage lautete, wie viel argmax und wie viel gesampelt; jetzt ist die ganze Klasse auf
+Abdeckung gestellt. Ebenfalls entschieden: **Messung 3-W wird gestrichen** (Nutzer 09:03,
+"#5 kannst streichen"); sie beantwortet dieselbe Frage wie S1 gegen S3 in der Armstruktur.
+
+**Begruendung steht in par.15:** der Schwarm ist policy-maskiert, sein Spaltenreichtum ist
+fuer seine Aufgabe bedeutungslos, und die Rotation liefert ihm den spaltenreichen Anteil in
+der naechsten Generation von selbst.
+
+### Zwei Folgen, die benannt gehoeren
+
+**1. Die dritte Waechter-Flaeche (par.7, "Fenster") wird bedeutungslos und muss fallen.**
+Sie mittelt volle Spalten ueber ALLE Klassen. Solange beide Klassen dasselbe Ziel hatten,
+war das eine sinnvolle Sammelgroesse. Jetzt haben sie GEGENSAETZLICHE Ziele -- der Sockel
+soll spaltenreich sein, der Schwarm breit -- und ein Mittelwert ueber beide misst nichts
+mehr. Gerechnet mit einer Annahme von 0,35 fuer den temperierten Schwarm (Bandbreite aus
+Messung 3-V: volle Temperatur 0,195, argmax 0,5325):
+
+| | Traeger-Flaeche | Fenster-Flaeche |
+| --- | --- | --- |
+| v24 gemessen | 0,356 | 0,624 |
+| v25 mit argmax-Schwarm | 0,468 | 0,640 |
+| **v25 mit temperiertem Schwarm** | **0,468** (unveraendert) | **0,532** (a) |
+
+Die Traeger-Flaeche steigt weiter deutlich ueber v24; die Fenster-Flaeche faellt -- **und
+zwar absichtlich**. Wer sie als Waechter behaelt, wuerde eine gewollte Aenderung als
+Verschlechterung melden. **Vorschlag: Flaeche 3 wird von einem TOR zu einer
+Diagnosezeile**, je Klasse getrennt ausgewiesen statt gemittelt. Die beiden Tor-Flaechen
+(Generator-Instrument, Arena) bleiben unveraendert -- sie messen das NETZ und sind von der
+Klassenaufteilung unabhaengig.
+
+**2. Der Schwarm braucht eine eigene Kennzahl.** Wenn Abdeckung sein Ziel ist, misst man
+ihn nicht an vollen Spalten, sondern an Vielfalt. Vorhanden und passend:
+`tools/probes/corpus_state_diversity_probe.py` (distinkte Belegungsmuster je Runde,
+distinkte Endbretter) und `tools/probes/paired_corpus_divergence_probe.py` (bedingte
+Vielfalt bei identischen Startbedingungen, gebaut 2026-09-07). **Vorab festgelegt: der
+temperierte Schwarm muss in den distinkten Endbrettern je Seite und in den distinkten
+Zustaenden je Record mindestens den argmax-Schwarm erreichen** -- sonst hat die Temperatur
+Zugqualitaet gekostet, ohne Abdeckung zu kaufen, und der Entscheid waere zurueckzunehmen.
+
+### Offen, weil vom Nutzer nicht entschieden
+
+**Wurzelrauschen im Schwarm.** Der Bestandsbefehl faehrt `--no-root-noise --deterministic`.
+`--deterministic` MUSS fallen (es erzwingt argmax und wuerde die Temperatur wirkungslos
+machen). Ob auch `--no-root-noise` faellt, ist eine eigene Frage: das Gumbel-Rauschen ist
+eine zusaetzliche Streuquelle und passt zum Ziel Abdeckung, kostet aber Zugqualitaet
+(gemessen: die Sockel-Konfiguration mit Rauschen erreicht bei k=1 0,5325, das Instrument
+ohne Rauschen 0,8200 -- eine Differenz von 0,29). **Empfehlung: Wurzelrauschen AN**, weil
+Abdeckung das erklaerte Ziel der Klasse ist und der Spaltenverlust dort nicht zaehlt.
+
+### Der angepasste Schwarm-Befehl (ersetzt den in par.14c)
+
+```
+python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
+  --spec models/v24-b06_brierbest.spec.json --games 8000 --sims 100 --value-only \
+  --version v24-b06-value-tempc --threads 11 --chunk 10 --per-file 10 --seed 20260908 \
+  --action-temp 1 --deviate-prob 1.0
+```
+
+Weder `--deterministic` noch `--no-root-noise` (siehe oben). Kosten rund 7,5 h statt 8,2 h.
+Der Name traegt jetzt `-value-tempc` statt `-value-argmax`, damit im Fenster-Manifest
+sichtbar bleibt, wie die Klasse erzeugt wurde.

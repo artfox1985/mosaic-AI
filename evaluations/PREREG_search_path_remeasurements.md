@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Beleg: alle 3 Messungen H0, Status quo bestaetigt (Abschnitt "MESSUNG-3-ERGEBNIS"; tau-Annealing 112:118, p 0,78, v20-Aera, Mass war STAERKE). NACHTRAG 2026-09-07: Vorstufe 3-V GEFAHREN -- das Sampling der Zugwahl kostet dem Sockel mehr als die HAELFTE seines Spaltenbaus (0,195 gegen 0,4225 bei argmax ab Halbzug 12) und liefert dafuer praktisch keine Vielfalt (399 von 400 Endbrettern distinkt in beiden Faellen). Die 0,19 der Sockel-Klasse sind ein Temperatur-Artefakt. Arena-Wirkung offen -- Messung 3-W registriert (zwei Sockel-Chargen im v24-Fenster, ein Faktor, rund 12 h, Start auf Anweisung). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Beleg: alle 3 Messungen H0, Status quo bestaetigt (Abschnitt "MESSUNG-3-ERGEBNIS"; tau-Annealing 112:118, p 0,78, v20-Aera, Mass war STAERKE). NACHTRAG 2026-09-07: Vorstufe 3-V GEFAHREN -- das Sampling der Zugwahl kostet dem Sockel mehr als die HAELFTE seines Spaltenbaus (0,195 gegen 0,4225 bei argmax ab Halbzug 12) und liefert dafuer praktisch keine Vielfalt (399 von 400 Endbrettern distinkt in beiden Faellen). Die 0,19 der Sockel-Klasse sind ein Temperatur-Artefakt. Arena-Wirkung offen -- Messung 3-W GESTRICHEN (Nutzer 2026-09-07): die v25-Arme S1 gegen S3 beantworten dieselbe Frage im echten Fenster. -->
 
 # Vorregistrierung: Suchpfad-Nachmessungen (Floor-Gewicht, m-Formel, τ-Annealing)
 
@@ -272,7 +272,15 @@ grosse Klasse, die ohne jede kuenstliche Streuung auskommt und die beste Spalten
 liefert; der Sockel war die einzige Klasse, die die Zugwahl wuerfelt, und die einzige mit
 0,19. Das stuetzt die Nutzer-These unabhaengig von Messung 3-V.
 
-## Messung 3-W: traegt der Umschaltpunkt bis ins NETZ? (registriert 2026-09-07, 03:10 VOR jedem Lauf; Nutzer: "dann takte das training dafuer ein" / "oder geht das erst mit v25?")
+## Messung 3-W: GESTRICHEN (Nutzer 2026-09-07, 09:03: "#5 kannst streichen")
+
+**Gestrichen, nicht gescheitert.** Die Frage -- traegt der Umschaltpunkt bis ins Netz? --
+wird von der v25-Armstruktur beantwortet: S1 (Bestand) gegen S3 (Umschaltpunkt 1) ist
+derselbe Vergleich, nur im echten Fenster statt in einem eigens gebauten. Der Aufbau unten
+bleibt als Beschreibung stehen, damit die Messgroessen und die vorab festgelegte Lesart
+nicht verloren gehen; gefahren wird er nicht.
+
+## Messung 3-W (Aufbau, nicht gefahren): traegt der Umschaltpunkt bis ins NETZ? (registriert 2026-09-07, 03:10 VOR jedem Lauf; Nutzer: "dann takte das training dafuer ein" / "oder geht das erst mit v25?")
 
 **Die Frage, die 3-V offen laesst.** 3-V hat gemessen, dass das Sampling der Zugwahl dem
 Sockel mehr als die Haelfte seines Spaltenbaus kostet, ohne Vielfalt zu kaufen. Das ist eine
