@@ -862,6 +862,14 @@ if __name__ == "__main__":
                              "eine zweite Zufallsquelle und macht die Kosten je Abweichung "
                              "vorhersagbar. Muss >= 2 sein. Default 6. Setzt NUR "
                              "MOSAIC_DEVIATE_CANDIDATES.")
+    parser.add_argument("--action-temp", dest="action_temp", type=int, default=0,
+                        help="Arme S2/S5 (PREREG_v25_window.md par.14): aktionsabhaengige "
+                             "Temperatur fuer die ZUGWAHL im Netz-Self-Play. 0 = aus "
+                             "(Bestand: Zugwahl proportional zu den rohen Besuchszahlen, "
+                             "bitidentisch), 1 = an (Staffel wie im Heuristik-Pfad: mehr als "
+                             "50 gueltige Aktionen -> T 0,7; mehr als 15 -> 0,4; sonst 0,15; "
+                             "Gewichte werden visits^(1/T)). Das Policy-ZIEL bleibt in beiden "
+                             "Faellen die completed-Q-Verteilung. Setzt NUR MOSAIC_ACTION_TEMP.")
     parser.add_argument("--spec", type=str, default=None,
                         help="Such-Spec-Datei models/<name>.spec.json (Schema: "
                              "implicit_minimax_alpha, long_row_init_shaping_w, "
@@ -921,4 +929,5 @@ if __name__ == "__main__":
         deviate_prob=args.deviate_prob,
         deviate_mean_move=args.deviate_mean_move,
         deviate_candidates=args.deviate_candidates,
+        action_temp=args.action_temp,
     )
