@@ -68,3 +68,27 @@ beidseitig): Siegquote 0,450, volle Spalten 1,200 und Punkte 55,0 in BEIDEN
 Faellen identisch, bei 4,8-fachem Tempo. Grund:
 `PREREG_search_rng_split.md` -- jede Partie haengt an ihrem eigenen,
 abgeleiteten Suchstrom.
+
+## Generation v24, gemessen am 2026-09-07
+
+Alle Werte aus den Artefakten der Laeufe, nicht geschaetzt. Threads wie angegeben, exklusiv.
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| Gepaarte Arena, 80 Partien @400, threads 10 | **rund 1.060 s** | je Richtung; ein Arm braucht zwei |
+| argmax-Instrument, 200 Partien @400, threads 11 | **rund 24 min** | Tor 2a |
+| Vollstaendiger Knopf-Arm (Arena beide Richtungen + zwei Instrumente) | **91 min** | K5-Kette |
+| Gepaartes Gating, 170 Paare @400, threads 10 | **70 min** | rund 125 s je Block zu 5 Paaren |
+| Gepaartes Gating, 200 Paare @400 (Deckel) | **67 min** | |
+| Anker-Kante, festes n=150, 6 Worker | **1.282 s** | rund 21 min |
+| Champion-2-Kante, SPRT-Stopp nach 75 Paaren | **1.889 s** | rund 31 min |
+| Golden Probe fuers Artefakt (10 Sonden @400, einkernig) | **16 min** | |
+| Voller Build: cargo test --lib + --no-run + Wheel + Install + Anker beide Modi | **rund 6 min** | 554 Tests |
+| Netz-Self-Play, 10 Partien @100 Sims, threads 11 | **37,6 s** | 3,77 s je Partie -- Basis der v25-Hochrechnung |
+| restic rewrite + prune + check auf 14,5 GiB | **14 s** | lokale Pack-Dateien |
+| Tagesschnappschuss + check | **9 s** | |
+| Aktionsprofil-Sonde, 3 Gruppen a 400 Dateien | **rund 4 min** | 1,5 Mio Entscheide |
+
+**Hochrechnung fuer die v25-Erzeugung** (hergeleitet aus 3,77 s je Partie, NICHT auf dieser
+Groesse gemessen): rund 4,2 h je 4.000-Partien-Block, rund 3,0 h fuer die Ausflug-Haelfte
+(2.000 Hauptpartien plus 2.000 kuerzere Ausfluege), zusammen etwa 11,4 h.
