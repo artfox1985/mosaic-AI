@@ -735,7 +735,7 @@ dienen nur der Reihenfolge und dem Nachweis, dass die Knoepfe ueberhaupt gewirkt
 ### par.14a GENERATOR ENTSCHIEDEN (Nutzer 2026-09-07, 03:35: "generator wird b06")
 
 **Generator der v25-Erzeugung ist `v24-b06_brierbest`**, der amtierende Champion
-(Elo 1309), mit seiner Champion-Spec `models/v24-b06_brierbest.spec.json` -- also MIT
+(Elo 1309), mit seiner Champion-Spec `models/v24-b07_brierbest.spec.json` -- also MIT
 K3-P (Modus 1, C 1,0) und `envelope_hull_form` 1. Damit ist par.11 A entschieden und der
 Stand von par.4 (b05 ohne K3-P, Nutzer 2026-09-06 11:40) ueberholt.
 
@@ -800,31 +800,31 @@ export MOSAIC_STACK_DRAW_RESEARCH=1
 
 ```
 # S1 -- Bestand (Kontrolle): Zugwahl proportional zu den Besuchen
-python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
-  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 \
   --version v24-b06-policy-s1 --threads 11 --chunk 10 --per-file 10 --seed 20260907
 
 # S2 -- variable Temperatur ueber die Zahl der gueltigen Aktionen
-python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
-  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 \
   --version v24-b06-policy-s2 --threads 11 --chunk 10 --per-file 10 --seed 20260907 \
   --action-temp 1
 
 # S3 -- Umschaltpunkt 1 (durchgehend greedy)
-python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
-  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 \
   --version v24-b06-policy-s3 --threads 11 --chunk 10 --per-file 10 --seed 20260907 \
   --tau-argmax-from-move 1
 
 # S4 -- Umschaltpunkt 1 plus Weg C (eine Abweichung je Partie)
-python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
-  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 \
   --version v24-b06-policy-s4 --threads 11 --chunk 10 --per-file 10 --seed 20260907 \
   --tau-argmax-from-move 1 --deviate-prob 1.0
 
 # S5 -- variable Temperatur plus Weg C
-python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
-  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 \
   --version v24-b06-policy-s5 --threads 11 --chunk 10 --per-file 10 --seed 20260907 \
   --action-temp 1 --deviate-prob 1.0
 ```
@@ -840,8 +840,8 @@ nachzuziehen.
 ### Der Schwarm (EINMAL, von allen Armen geteilt)
 
 ```
-python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
-  --spec models/v24-b06_brierbest.spec.json --games 8000 --sims 100 --value-only \
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 8000 --sims 100 --value-only \
   --version v24-b06-value-argmax --threads 11 --chunk 10 --per-file 10 --seed 20260908 \
   --no-root-noise --deterministic
 ```
@@ -985,8 +985,8 @@ Abdeckung das erklaerte Ziel der Klasse ist und der Spaltenverlust dort nicht za
 ### Der angepasste Schwarm-Befehl (ersetzt den in par.14c)
 
 ```
-python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
-  --spec models/v24-b06_brierbest.spec.json --games 8000 --sims 100 --value-only \
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 8000 --sims 100 --value-only \
   --version v24-b06-value-tempc --threads 11 --chunk 10 --per-file 10 --seed 20260908 \
   --action-temp 1 --deviate-prob 1.0
 ```
@@ -1275,3 +1275,15 @@ Pruefen braucht):
    schreiben. Dann faengt die Manifest-Pruefung genau diese Fehlerklasse.
 3. **Rauchprobe** fuer `--action-temp`, wie sie Weg C bekommen hat (dort zeigten 20 Partien
    20 `[deviate]`-Zeilen). Ein Knopf ohne Rauchprobe ist ein Knopf ohne Beleg.
+
+
+### par.14f GENERATOR IST `v24-b07`, NICHT b06 (2026-09-07, nach der Namensregel)
+
+Die Erzeugungsbefehle oben nennen ab sofort `models/alphazero_v24-b07_brierbest.onnx` und
+`models/v24-b07_brierbest.spec.json`. Die Gewichte sind bytegleich mit b06; was b07
+unterscheidet, ist die Spec mit Huellenform 2 und K5
+(`PREREG_geometric_envelope.md` par.8.15f).
+
+**Damit ist die Spec fuer v25 bis v27 geschlossen** (par.18). Der Zuschnitt aus par.1 und
+die Aenderungen aus par.14b, 16, 16a, 16b und 17 bleiben unveraendert -- nur der Generator
+traegt jetzt einen eigenen Namen statt einer veraenderten b06-Spec.

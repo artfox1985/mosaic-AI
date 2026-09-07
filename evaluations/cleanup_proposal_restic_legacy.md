@@ -121,3 +121,31 @@ der gemessenen Kompression sind das je Generation grob 0,3 GiB im Repo. Das Arch
 also langsam, und die Aufbewahrungsrichtlinie (14 taeglich, 8 woechentlich, 24 monatlich,
 10 jaehrlich) haelt die Zahl der Staende ohnehin gedeckelt, sobald sie einmal mit
 `-Prune` laeuft.
+
+---
+
+## AUSGEFUEHRT (2026-09-07, 17:07:36-17:07:50)
+
+Nutzer-Anweisung *"raeum auf"*, erteilt nach dem Trockenlauf und nach dem Einwand des
+Koordinators, dass nur rund 6,6 GiB zu holen sind. `tools/restic_legacy_cleanup.sh`.
+
+| | Staende | unkomprimiert | gespeichert |
+| --- | --- | --- | --- |
+| vorher | 38 | 104,894 GiB | **14,473 GiB** |
+| nachher | 38 | 19,054 GiB | **8,968 GiB** |
+| **freigegeben** | | 85,84 GiB | **5,505 GiB** |
+
+`rewrite --forget` hat den alten Stand entfernt und einen bereinigten geschrieben; `prune`
+hat 54 alte Indizes und 402 Pack-Dateien geloescht; **`restic check`: `no errors were
+found`**. Gesamtdauer **14 Sekunden** -- die befuerchtete OneDrive-Sync-Last ist
+ausgeblieben, weil die Pack-Dateien lokal vorlagen.
+
+**Endgueltig verloren** (dieser Stand war die einzige Kopie): die losen Korpora der Aeren
+v18, v19 und v20, `asym_corpus`, `ownership_corpus`, `corpus_probe` und
+`archive_v18_ausserhalb_v21fenster_20260809`. **Erhalten geblieben**: `mirror/models/`
+(107 Modelle), `mirror/data/holdout/`, `mirror/data/seed_corpus/` und der restliche Baum.
+
+**Der Koordinator-Einwand bleibt als Notiz stehen und war teilweise falsch:** die Ersparnis
+ist mit 5,5 von 14,5 GiB tatsaechlich rund ein Drittel des Repos, und die Sync-Kosten sind
+nicht eingetreten. Die Warnung vor dem Verlust der einzigen Kopie bleibt richtig -- sie ist
+jetzt eingetreten und war so gewollt.
