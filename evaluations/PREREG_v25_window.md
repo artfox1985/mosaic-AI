@@ -1287,3 +1287,75 @@ unterscheidet, ist die Spec mit Huellenform 2 und K5
 **Damit ist die Spec fuer v25 bis v27 geschlossen** (par.18). Der Zuschnitt aus par.1 und
 die Aenderungen aus par.14b, 16, 16a, 16b und 17 bleiben unveraendert -- nur der Generator
 traegt jetzt einen eigenen Namen statt einer veraenderten b06-Spec.
+
+## par.19 DIE ERZEUGUNGSBEFEHLE FUER v25 (Nutzer-Anforderung 2026-09-07: "gib mir die python befehle fuer die 8000 schwarm identitaeten" und "du kannst die 4000 policy entitaeten machen")
+
+Generator ist `v24-b07` (par.14f). Namen tragen den Generator
+([[feedback_selfplay_naming_convention]]); **damit aendert sich der Val-Pool-Regex aus
+par.6 von `^selfplay_v24-b06-` auf `^selfplay_v24-b07-`.**
+
+### 1. Traeger, 4.000 Partien -- policy-aktiv
+
+Umschaltpunkt 1 plus Weg C (par.14b: k = 1 und Abweichungsrate 1,0), Wurzelrauschen AN.
+Das ist das Rezept, das in Messung 3-V mit 0,5325 vollen Spalten die Spitze der Reihe war.
+
+```
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 \
+  --version v24-b07-policy --threads 11 --chunk 10 --per-file 10 --seed 20260907 \
+  --tau-argmax-from-move 1 --deviate-prob 1.0
+```
+
+### 2. Schwarm Haelfte a, 4.000 Partien -- value-only, breite Abdeckung
+
+Glatte Temperatur (`--action-temp 2`, par.14d) plus Weg C, Wurzelrauschen AN.
+
+```
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 --value-only \
+  --version v24-b07-value-tempc --threads 11 --chunk 10 --per-file 10 --seed 20260908 \
+  --action-temp 2 --deviate-prob 1.0
+```
+
+### 3. Schwarm Haelfte b, 4.000 Identitaeten -- value-only, unverzerrte Ziele
+
+**`--games 2000`, nicht 4000.** Ein Ausflug kommt ZUSAETZLICH zur Hauptpartie, mit eigener
+`game_id` (Suffix `_x1`, belegt in der Rauchprobe: 20 Partien ergaben 20 Ausfluege). 2.000
+Hauptpartien plus 2.000 Ausfluege sind die 4.000 Identitaeten dieser Haelfte. **Damit ist
+die Zaehlfrage aus par.9f entschieden: der Ausflug zaehlt als eigene Partie.**
+
+```
+python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest.onnx \
+  --spec models/v24-b07_brierbest.spec.json --games 2000 --sims 100 --value-only \
+  --version v24-b07-value-excursion --threads 11 --chunk 10 --per-file 10 --seed 20260909 \
+  --excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise
+```
+
+**`--tau-argmax-from-move 1` ist eine ABLEITUNG des Koordinators, nicht vorregistriert.**
+par.17 legt fuer diese Haelfte nur "Wurzelrauschen aus" fest. Die Begruendung dort lautet
+aber: *"die Abweichung ist gewollt, alles danach soll bestes Spiel sein."* Ohne diesen
+Schalter wuerde die HAUPTPARTIE weiter proportional zu den Besuchen sampeln, also gerade
+nicht bestes Spiel -- und das Wertziel waere wieder verzerrt. Der Ausflug selbst ist davon
+unberuehrt: er faehrt seinen eigenen Umschaltpunkt (`excursion_tau_moves`, Default 12) ueber
+`tau_argmax_override`, sampelt also 12 Halbzuege ab der Abzweigstelle und spielt danach
+greedy. **Wer das anders will, streicht den Schalter -- dann ist die Haelfte b eine zweite
+temperierte Klasse und ihr Zweck faellt.**
+
+### Zusammenstellung und Kosten
+
+| Klasse | Befehl | Partien | Identitaeten |
+| --- | --- | --- | --- |
+| Traeger | 1 | 4.000 | 4.000 |
+| Schwarm a | 2 | 4.000 | 4.000 |
+| Schwarm b | 3 | 2.000 | 4.000 (2.000 + 2.000 Ausfluege) |
+
+**Laufzeiten sind HERGELEITET, nicht auf dieser Groesse gemessen** -- aus den Rauchproben
+vom 2026-09-07 (10 Partien @100 Sims, threads 11: 37,6 s, also 3,77 s je Partie):
+rund 4,2 h je 4.000-Partien-Block, und rund 3,0 h fuer Block 3 (Ausfluege sind mit rund
+44 % Restlaenge kuerzer, par.7). **Gesamt grob 11,4 h**, in derselben Groessenordnung wie
+das v24-Rezept mit 11,9 h. Jeder Lauf schreibt seine echte Dauer ins Manifest.
+
+**Reihenfolge:** die drei sind voneinander unabhaengig -- Weg B braucht KEINE
+Startstellungen aus dem Sockel mehr (Nutzer-Vorgabe 2026-09-07: "bau weg b in die engine.
+ich will keine abhaengigkeit zum sockel"). Sie koennen in beliebiger Folge laufen, aber
+NICHT gleichzeitig auf derselben Maschine.
