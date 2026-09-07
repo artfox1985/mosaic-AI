@@ -426,3 +426,34 @@ oder 6, je nach Rotation) oder Vermeidung ist, ist ungeprueft; (2) die Server-KI
 Menschen aktiviert deutlich weniger (0,50) als dieselbe Spec in der Netz-Arena (1,21) --
 Gegnerabhaengigkeit der Plattenverfuegbarkeit, nicht weiter verfolgt.
 
+### par.9a K5 WIRD GEBAUT UND GEGEN DIE HUELLENFORM GEMESSEN (Nutzer 2026-09-07, 06:07: "dann bau und miss das gemeinsam mit der form. gehoert ja zusammen")
+
+**Was sich seit der Registrierung von par.9 geaendert hat:** die Huellenform 2
+(`geometric_envelope` par.8.15b/8.15c) ist gebaut, ueber zwei Seeds gemessen und hebt den
+Kuppel-Bonus von 3,6-3,8 auf **4,5-5,0 je Partie** -- den hoechsten je fuer ein Netz
+gemessenen Wert (Mensch 8,9, alle sechs v24-Arme 3,5-4,3). Sie liefert damit bereits einen
+Teil dessen, wofuer K5 gedacht war, aber auf anderem Weg: **die Form macht den Platz
+VERFUEGBAR** (zwei Huellenzellen in Zeile 6 statt einer), **K5 zieht die Platte GEZIELT
+dorthin** (Zuschlag in der Plattenwahl). Das sind zwei verschiedene Mechanismen auf
+dieselbe Zelle.
+
+**Bau (2026-09-07, 06:07 beauftragt):** Knopf `MOSAIC_SPECIAL_ROW6_W` / Spec-Pflichtfeld
+`special_row6_w`, Default 0 = bitidentisch; Wirkung als Erweiterung der K3-P-Projektion
+(par.9 Punkt 1), nicht als eigener Blattwert-Term; "mehr geht sich nicht aus" als
+Ein-Platten-Regel; die Huellenform kommt als Parameter herein, damit K5 bei Form 2 ihre
+ZWEI Zielplaetze kennt.
+
+**Messung, vorab festgelegt:** Arm = Form 2 PLUS K5, **Kontrolle = Form 2 ALLEIN** (nicht
+der Champion). Begruendung: der Form-Anteil ist ueber zwei Seeds bereits gemessen
+(par.8.15b/c), eine Messung gegen den Champion wuerde zwei Faktoren mischen und den
+bekannten Teil noch einmal bezahlen. So ist K5 einfaktoriell isoliert und die Frage lautet
+genau: **bringt das gezielte Ziehen ueber die Geometrie hinaus noch etwas?**
+Aufbau wie die uebrigen Arme (argmax-Instrument @400 mit 200 Partien Seed 20260931; gepaarte
+Arena 2 x 80 Seed 20261014; Spalten-, Punkte- und Reihen-Alter-Sonde), Kennzahl im
+Vordergrund ist der **Kuppel-Bonus je Partie**, dazu Siege, Punkte und volle Spalten.
+
+**Lesart, vorab:** haelt K5 den Kuppel-Bonus der Form und hebt ihn weiter, ohne Siege oder
+Spalten zu kosten, ist es ein Kandidat fuer die Champion-Spec. Bleibt der Bonus gleich, hat
+die Geometrie den Posten bereits gehoben und der gezielte Zuschlag ist entbehrlich -- dann
+faellt K5 wie die vier Knopf-Arme der Nacht. Kostet er Siege oder Spalten, faellt er
+ebenfalls.
