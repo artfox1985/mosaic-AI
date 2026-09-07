@@ -425,6 +425,27 @@ war. Als Größenordnung belastbar, als Konstante nicht.
   kann beide verwenden -- der Abfall ueber die Runde ist in beiden derselbe**
   (Zerfallsrate lambda 0,173 bis 0,176 in den Runden 1 bis 4, R2 0,87 bis 0,99;
   Runde 5 steiler mit 0,26).
+### OFFEN: Darf die Eroeffnungsplatzierung blind vom Stapel ziehen?
+
+**Nicht entschieden, eigenes Prereg, vom Nutzer am 2026-09-07 ausdruecklich vertagt.**
+
+Fuer die Runde ist die Regel klar (`engine_manual.md:82-83`): "A plate can be taken for
+free from the face-up display, **or drawn blind from the stack**" -- vier Bezugsquellen.
+Fuer die EROEFFNUNG steht die Quelle nicht da (`:64-67`): "each player places one starting
+Kuppelplatte ... This placement is free, position and rotation are unrestricted."
+
+**Die Engine folgt der Auslagen-Lesart:** die Eroeffnung bietet 3 Anzeigen x 4 Rotationen
+x 9 Slots = **108** Aktionen, alle vom Typ `dome`, ohne `dome_stack_peek` (am Korpus
+geprueft 2026-09-07). Zwei Textstellen stuetzen das: die Nachfuell-Klausel `:47` ("the only
+exception is right after the opening placements" -- es waere nichts nachzufuellen, kaeme die
+Eroeffnung vom Stapel), und "this placement is free", waehrend jede Blindziehung 1 Punkt
+kostet.
+
+**Waere der Stapel auch bei der Eroeffnung erlaubt**, muessten es 4 x 4 x 9 = 144 plus die
+Peek-Aktion sein -- dann waere es ein REGELFEHLER der Engine, kein Messproblem. Bis zur
+Klaerung ist die Eroeffnungsplatzierung aus allen Abzweig-Verteilungen ausgenommen
+(`PREREG_start_position_seeding.md` par.9h).
+
 ### Punktestand je Runde — und warum es zwei Zahlenreihen gibt
 
 **Referenz ist der ARENA-Modus, nicht das Self-Play.** Gemessen an den 22

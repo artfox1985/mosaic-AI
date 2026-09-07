@@ -757,9 +757,9 @@ messen bereits zwei Faktoren; ein vierter Arm braucht einen eigenen Entscheid.
 
 **Knoepfe** (Env plus CLI, KEIN Spec-Feld -- Erzeugungs-Parameter, nicht Spielparameter;
 Bauform wie `--tau-argmax-from-move`): `MOSAIC_DEVIATE_PROB` (Default 0,0 = aus),
-`MOSAIC_DEVIATE_MEAN_MOVE` (30,0; Mittel der Exponentialverteilung fuer die Halbzugnummer),
+`MOSAIC_DEVIATE_MEAN_MOVE` (30,0; Mittel der Exponentialverteilung fuer die Halbzugnummer -- **ENTFALLEN 2026-09-07, ersetzt durch die gemessene Verteilung, par.9h**),
 `MOSAIC_DEVIATE_CANDIDATES` (6). In `self_play.py` als `--deviate-prob`,
-`--deviate-mean-move`, `--deviate-candidates`, im Lauf-Manifest gefuehrt.
+`--deviate-mean-move` (ENTFALLEN 2026-09-07, par.9h), `--deviate-candidates`, im Lauf-Manifest gefuehrt.
 
 **Wo:** in `unified_game_loop` direkt nach `agent.decide(...)` und VOR der
 Record-Vorbereitung -- ersetzt ausschliesslich `d.chosen`. `d.policy` bleibt die
@@ -851,7 +851,7 @@ Reservoir-Sampling** in der Hauptschleife mit: der aktuelle Halbzug wird mit
 Partieende steht eine gewichtet gezogene Stelle fest, und von deren Klon laeuft der Ausflug.
 
 **Knoepfe:** `MOSAIC_EXCURSION_PROB` (Default 0 = aus, bitidentisch),
-`MOSAIC_EXCURSION_TAU_MOVES` (Default 12, Halbzuege bis der Ausflug greedy wird),
+`MOSAIC_EXCURSION_TAU_MOVES` (Default 12, Halbzuege bis der Ausflug greedy wird -- **ENTFALLEN 2026-09-07, der Ausflug sampelt gar nicht mehr, par.9i**),
 `MOSAIC_EXCURSION_PROFILE` (5 Zahlen). Env plus CLI, kein Spec-Feld.
 
 **Waechter uebernommen von Weg C:** ein Halbzug, an dem der Bauer- oder Kuppel-Vorzug
@@ -859,3 +859,89 @@ greift, kommt als Abzweigstelle nicht in Frage -- dort ist das Policy-Ziel ein
 Ein-Hot-Demonstrationsziel (par.9e).
 
 **Beauftragt 2026-09-07, 09:26.** Ungebaut, ungetestet.
+
+### par.9h EINE ZIEHUNGSREGEL FUER BEIDE WEGE (Nutzer 2026-09-07: "Nimm weg 3")
+
+**Der Anlass:** nach dem Umbau steckt die Abweichungs-Mechanik in allen drei
+Erzeugungsklassen -- aber Weg B und Weg C beantworteten die Frage "wo sitzt die Abweichung"
+verschieden. Weg B zieht per gewichtetem Reservoir (Rundenprofil x Aktionszahl, beides
+gemessen), Weg C aus einer Exponentialverteilung mit Mittelwert 30. **Fuer die 30 steht im
+Registry-Eintrag keine Herleitung**, nur was der Wert bedeutet.
+
+**Das Hindernis, das die exakte Vereinheitlichung verhindert:** das Reservoir kann ONLINE
+nicht entscheiden. Es weiss erst am Partieende, welche Stelle gewonnen hat, weil die
+Normierungssumme mitwaechst. Weg B kommt damit klar, weil er den Zustand KLONT und den
+Ausflug hinterher spielt. Weg C weicht im Hauptstrang ab und muesste es im Moment des Zuges
+wissen.
+
+Drei Auswege standen zur Wahl: (1) die Partie zweimal spielen -- exakt, aber verdoppelt die
+Kosten von Sockel und Schwarm a, rund +8 h; (2) jede Reservoir-Annahme wird zur Abweichung
+-- kostenlos, aber im Mittel rund fuenf Abweichungen je Partie statt einer, und KataGo
+faehrt genau eine; (3) die Verteilung vorab aus den GEMESSENEN Gewichten bauen.
+**Nutzer-Entscheid: (3).**
+
+### Die zehn Zahlen, mit Grundmenge und Einheit
+
+**Grundmenge:** Records mit `phase == "drafting"`, **ohne die Eroeffnungsplatzierung**
+(Nutzer 2026-09-07: "den eroeffnungszug lass aussen vor"; erkennbar daran, dass der einzige
+Aktionstyp `dome` ist). **Einheit:** `len(valid_actions)` je Entscheidung. **n = 7.905**
+Entscheide aus **70 game_ids** (`data/selfplay_smoke-*.pkl`, Generator v24-b06), davon
+**60 echte Partien und 10 Ausfluege**; die 120 ausgelassenen Eroeffnungszuege sind genau
+60 x 2 -- Ausfluege starten mitten in der Partie und haben keine.
+
+**UEBERHOLT durch par.9j:** diese 70 game_ids waren eine viel zu schmale Basis. Auf
+Nutzer-Einwand nachgemessen auf 12.000 Partien; die gueltigen Zahlen stehen dort.
+
+| Runde | Masse (Profil x Aktionsmasse, normiert) | Zerfallsrate lambda | Halbwertszeit | R2 |
+| --- | --- | --- | --- | --- |
+| 1 | 0,430 | 0,1788 | 3,9 | 0,855 |
+| 2 | 0,280 | 0,1757 | 3,9 | 0,987 |
+| 3 | 0,203 | 0,1735 | 4,0 | 0,983 |
+| 4 | 0,087 | 0,1732 | 4,0 | 0,967 |
+| 5 | **0,000** | 0,2597 | 2,7 | 0,983 |
+
+Runde 5 hat Masse 0, weil das Rundenprofil dort 0 ist -- dort rechnet der exakte Loeser.
+Die Zerfallsraten der Runden 1 bis 4 liegen praktisch aufeinander (0,173 bis 0,179); das
+niedrigere R2 in Runde 1 kommt von einem Ausreisser bei Index 6 (Median 4 zwischen 60 und
+47), vermutlich ein `choose_dome_rotation`-Schritt, der dort haeufig liegt.
+
+**Gezogen wird:** erst die Runde aus den Massen, dann der 1-basierte Index innerhalb der
+Runde geometrisch mit der Rate dieser Runde. Endet die Runde vor dem gezogenen Index, gibt
+es in dieser Partie keine Abweichung -- bei lambda 0,175 und typisch 26 Indizes rund 1 %,
+gegen rund 2 % bei der abgeloesten Exponentialverteilung.
+
+**Der Unterschied zur exakten Fassung, ausdruecklich benannt:** die Naeherung nimmt die
+TYPISCHE Aktionszahl an Index i, nicht die tatsaechliche dieser Partie. Vertretbar, weil die
+Streuung innerhalb eines Index klein ist gegen den Abfall ueber die Runde (130 auf 1).
+**Weg B behaelt das exakte Reservoir**, er kann klonen.
+
+**Damit faellt `MOSAIC_DEVIATE_MEAN_MOVE` weg**, und zusammen mit
+`MOSAIC_EXCURSION_TAU_MOVES` (par.9i) verschwinden zwei unbegruendete Konstanten aus dem
+Verfahren, ohne dass eine neue hinzukommt.
+
+### par.9i WEG B OHNE GESAMPELTE PHASE (Umbau 2026-09-07)
+
+**Der Ausflug sampelt nicht mehr.** Er erzwingt an seinem ERSTEN Halbzug genau eine
+Abweichung ueber `deviation_best_action` -- dieselbe Funktion, die Weg C benutzt -- und
+spielt danach greedy bis zum echten Partieende.
+
+**Warum:** par.17 nennt den Zweck des Ausflugs ein UNVERZERRTES Wertziel, "die Abweichung
+ist gewollt, alles danach soll bestes Spiel sein". Jeder gesampelte Halbzug nach der
+Abzweigung verzerrt genau das -- die gesampelte Phase war kein Merkmal, sondern ein Leck.
+`MOSAIC_EXCURSION_TAU_MOVES` (Default 12) faellt ersatzlos; seine Begruendung war ohnehin
+schon in par.9d als falsch berichtigt.
+
+**Die Eigenschaft, die dabei entsteht:** Hauptpartie und Ausflug sind bis zur
+Abzweigstelle identisch und unterscheiden sich danach durch genau EINEN Zug und dessen
+Folgen. Fuer den Value-Kopf ist das ein gepaartes Gegenstueck mit gemeinsamem Vorlauf,
+nicht zwei unabhaengig verrauschte Partien.
+
+**Dubletten-Waechter (Koordinator-Zusatz, nicht im Auftrag):** die erzwungene Abweichung
+kann AUSFALLEN -- der Vorzugs-Waechter greift, oder `deviation_best_action` findet bei
+weniger als zwei Aktionen keinen Kandidaten. Dann spielt der Ausflug die Abzweigstellung
+bloss greedy nach, und weil die Hauptpartie in den Weg-B-Klassen ebenfalls greedy laeuft
+(`--tau-argmax-from-move 1`), waere sein Ergebnis eine **exakte Dublette** ihrer
+Fortsetzung: dieselben Zuege, dieselben Wertziele, nur unter anderer `game_id`. Solche
+Ausfluege werden VERWORFEN, mit eigener Logzeile. Ohne den Waechter haette der Korpus
+Kopien enthalten, die dem Value-Kopf Evidenz vortaeuschen, die es nicht gibt. Die Rate ist
+ungemessen und aus der Logzeile ablesbar, sobald die erste Charge laeuft.
