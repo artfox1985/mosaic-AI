@@ -2221,3 +2221,53 @@ Staerke-Frage dort mitmessen.
 dieser Nacht -- die Arena-Logs tragen die neue Pass-Zeile, das Symbol 🎴 und die
 Chip-Angabe, und die Spalten-Sonde hat beide Artefakte ohne Divergenz replayt
 (`columns_*_s13.json`, Verdikt GRUEN).
+
+### par.8.15d VORAB: wie der Spec-Entscheid zur Huellenform gelesen wird (2026-09-07, 10:02, VOR den K5-Zahlen)
+
+**Anlass:** der Entscheid wiegt seit dem Kampagnen-Beschluss vom 2026-09-07 schwerer als ein
+gewoehnlicher Knopf-Entscheid. `PREREG_v25_window.md` par.18 friert die Spec fuer drei
+Generationen ein; was jetzt hineingeht, bleibt bis v27 drin.
+
+**Der Fallstrick, der vorher benannt gehoert.** `tools/paired_gating.py` faehrt SPRT mit
+H1 p = 0,65 (`SPRT_P1`, Zeile 161). Das ist ein Test auf DEUTLICH staerker. Die Huellenform
+liegt gepoolt bei 177:143, also 55,3 Prozent. Ein SPRT gegen 0,65 wird bei diesem wahren
+Wert innerhalb von 200 Paaren sehr wahrscheinlich KEIN Verdikt oder H0 liefern -- und wer
+das als "die Form ist widerlegt" liest, hat den Test falsch herum gelesen.
+
+**Die Praezedenz sagt genau das** (par.10a, K3-P): die Replikation der K3-P-Kante lag bei
+**221:179 = 55,3 Prozent**, exakt auf dem Niveau der Huellenform, ueber 200 Paare, **SPRT
+ohne Entscheid (LLR +1,36)**. Getragen hat den Entscheid nicht das SPRT, sondern der
+gepoolte Vorzeichentest (p 0,003 ueber 225 Paare) und das gepaarte KI, das die Null knapp
+ausschloss. K3-P ist heute Champion-Spec.
+
+**Der Unterschied, der nicht verschwiegen wird:** K3-P hatte bei der Aufnahme 450 Partien
+Beleg, die Huellenform hat 320. Ihr Vorzeichentest steht bei p 0,065 und ist damit NICHT
+auf dem Niveau, auf dem K3-P aufgenommen wurde. Genau diese Luecke schliesst das Gating.
+
+### Vorab festgelegte Lesart (Superioritaet und Unbedenklichkeit getrennt)
+
+Die Huellenform wird nicht als Staerke-Knopf begruendet, sondern als **Spalten-Knopf**: sie
+ist der erste Baustein seit K3-P, der volle Spalten HEBT statt sie zu kosten (vier von vier
+Richtungen, groesste Differenz 0,863 gegen 0,350). Der Leitstern verlangt spalten- UND
+siegverstaerkend; fuer die Aufnahme in die Spec muss sie also die Spalten heben und die
+Siege NICHT kosten.
+
+| Befund nach dem Gating | Folge |
+| --- | --- |
+| Spalten in mindestens 3 von 4 Richtungen ueber der Kontrolle **und** gepoolte Siegquote nicht signifikant unter 50 % | **Aufnahme in die Spec**, als Spalten-Knopf ohne Staerke-Anspruch |
+| zusaetzlich Vorzeichentest ueber alle Seeds p < 0,05 | Aufnahme **und** als Staerke-Gewinn ausgewiesen |
+| gepoolte Siegquote signifikant unter 50 % **oder** Spalten kippen | **abgelehnt**, Spec bleibt beim Dreieck |
+
+**Die Schwaeche dieser Regel, ausdruecklich benannt:** eine Unbedenklichkeits-Regel kann
+etwas aufnehmen, das gar nichts tut. Der Waechter dagegen ist das Spalten-Kriterium -- es
+ist eine POSITIVE Anforderung, keine blosse Abwesenheit von Schaden. Ohne den
+Spalten-Befund traegt die Regel nicht.
+
+**Aufbau:** `tools/gate_hull_form_spec.sh` (gebaut 2026-09-07), 200 Paare Deckel, @400,
+Blockgroesse 5, **Seed 20261015** -- ein DRITTER Seed, weil 20261014 und 20261013 die
+beiden Arm-Messungen tragen. Kosten nach der K3-P-Praezedenz rund 1,2 h.
+
+**Welcher Arm gefahren wird, entscheidet K5** (`PREREG_special_tile_yield.md` par.9a):
+haelt K5 den Kuppel-Bonus und hebt ihn weiter, ohne Siege oder Spalten zu kosten, ist der
+Kandidat `models/hullform2_k5w10.spec.json`; sonst `models/hullform2.spec.json`. Nur EIN
+Kandidat wird gegatet -- zwei waeren zwei Faktoren und die doppelte Rechenzeit.

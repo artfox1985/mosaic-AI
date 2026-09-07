@@ -497,3 +497,72 @@ indirekt ab (hv1 ist netzlos, laeuft also nicht durch diesen Zweig), eine geziel
 waere ein argmax-Instrument mit `w = 0` gegen den Bestandswert 0,4975.
 
 **Messung** wie in par.9a festgelegt: Arm = Form 2 plus K5 gegen Kontrolle = Form 2 allein.
+
+### par.9c K5 GEMESSEN: Spalten deutlich hoch, Siege nicht -- und die Wirkung kommt NICHT aus den Spezialfeldern (2026-09-07, 09:50-11:21)
+
+Aufbau nach par.9a, einfaktoriell: Arm `models/hullform2_k5w10.spec.json` gegen Kontrolle
+`models/hullform2.spec.json` -- vor dem Lauf geprueft, dass sich die beiden Specs in GENAU
+einem Feld unterscheiden (`special_row6_w`) und die Kontrolle sich vom Champion in genau
+einem (`envelope_hull_form`). Kette `tools/night_k5_row6_special.sh`, exklusiv.
+
+**Das argmax-Instrument (200 Partien je Seite, Seed 20260931, @400): K5 hebt die Spalten
+deutlich.**
+
+| Instrument | Form 2 | Form 2 + K5 | Diff |
+| --- | --- | --- | --- |
+| **volle Spalten** | 0,5725 | **0,6900** | **+0,1175** |
+| Punkte | 48,71 | 50,49 | +1,78 |
+| Seiten mit voller Spalte | 173 | 201 | +28 |
+| volle Zeilen | 0,165 | 0,158 | -0,008 |
+| Strafleiste | 5,80 | 5,78 | -0,02 |
+
+Zum Vergleich der Bezug derselben Skala: der Champion (Dreieck, kein K5) liegt bei
+**0,4975** (`tor2a_v24b06.json`). Die Huellenform allein bringt +0,075, K5 obendrauf
++0,1175. **Das ist der groesste Spaltenzuwachs, den ein einzelner Knopf in dieser Kampagne
+gezeigt hat.**
+
+**Der Mechanismus ist aber NICHT der gebaute.** Die Aufschluesselung je Wertungsplatte
+zeigt, dass ausgerechnet das Kriterium, auf das K5 zielt, leicht SCHLECHTER wird:
+
+| Wertungsplatte | Form 2 | + K5 | Diff |
+| --- | --- | --- | --- |
+| k1 Vertikale Reihen (7 Pkt je Spalte) | 4,53 | 5,37 | **+0,84** |
+| k5 Eckplatten (3/8 Pkt) | 5,40 | 7,06 | **+1,66** |
+| k3 Mehrfarbige Felder | 4,91 | 4,39 | -0,52 |
+| **k6 Spezialfelder (-3 je leerem Feld)** | **-9,67** | **-10,08** | **-0,42** |
+
+**Lesart:** der Zuschlag zieht die Platte nach Zeile 6 und baut damit HOEHE. Hoehe zahlt auf
+die vertikalen Reihen und auf die unteren Eckplatten (8 Punkte je Stueck) -- nicht auf die
+Spezialfelder, deren Freischaltung offenbar an etwas anderem haengt. K5 wirkt also
+geometrisch, nicht ueber den Posten, fuer den er gebaut wurde. Die Vorab-Lesart in par.9a
+("haelt K5 den Kuppel-Bonus und hebt ihn weiter") trifft den Fall nicht: sie hat einen
+Wirkungsweg unterstellt, den die Messung widerlegt.
+
+**Die gepaarte Arena gegen die Kontrolle sagt dagegen: kein Unterschied.**
+
+| Arena (2 x 80, Seed 20261014) | Arm | Kontrolle |
+| --- | --- | --- |
+| Siege Richtung first | 37 | 43 |
+| Siege Richtung second | 34 | 46 |
+| **gepoolt** | **71** | **89** (44,4 %) |
+| volle Spalten je Richtung | 0,7375 / 0,7375 | 0,675 / 0,675 |
+| belegte Spezialfelder je Partie | 1,31 / 1,21 | 1,09 / 1,10 |
+
+Auf BLOCKEBENE gerechnet (32 Bloecke zu 5 Partien, der Seed faellt je Block): Siegquote des
+Arms 0,444, 95%-KI **[0,366; 0,522]**; Punktedifferenz je Block **-1,19**, 95%-KI
+**[-3,88; +1,50]**. Beide Intervalle schliessen den Nullpunkt ein. **Es gibt also weder
+einen belegten Vorteil noch einen belegten Schaden im direkten Duell.**
+
+**Der Widerspruch ist kein Messfehler, sondern ein bekanntes Muster.** Im Instrument spielt
+der Arm gegen SICH SELBST: beide Seiten bauen hoch, und Hoehe zahlt sich in Punkten aus. Im
+direkten Duell trifft er auf einen Gegner, der anders baut, und der Vorteil verschwindet.
+Dieselbe Signatur wie beim Suchtiefen-Tausch ([[project_search_depth_column_tradeoff]]) und
+bei der Gegner-Spezifitaet des Minimax-Knopfs.
+
+**Verdikt: UNENTSCHIEDEN, Nutzer-Entscheid.** Die Vorab-Lesart in par.9a deckt den Fall
+nicht ab -- sie sah "Bonus haelt und steigt" (Aufnahme) oder "Bonus bleibt gleich"
+(Verwerfen) vor, nicht "anderer Posten steigt deutlich, Zielposten faellt leicht, Duell
+neutral". Wer den Fall unter die alte Regel presst, entscheidet per Etikett statt per
+Befund. Die Abwaegung steht in `PREREG_geometric_envelope.md` par.8.15e.
+
+**Kosten:** Arena 2 x rund 1.060 s, Instrumente 2 x rund 24 min, gesamt 91 min.
