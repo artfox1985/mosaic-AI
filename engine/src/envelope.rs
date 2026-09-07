@@ -567,6 +567,7 @@ pub fn row_can_serve_hull_in(
 /// als Bonus -- Vollenden zaehlt positiv, gleichgueltig wo der Stein am
 /// Rundenende landet (Nutzer par.8.13: "auch hier ist es legitim/besser wenn
 /// ausserhalb der einhuellenden gelegt wird"). Rueckgabe `(occ, bonus, used)`.
+/// Dreieck, K5 aus (`w_k5 = 0`).
 pub fn projected_occupancy_flush(
     board: &PlayerBoard,
     hull: Hull,
@@ -574,16 +575,22 @@ pub fn projected_occupancy_flush(
     w_slot: f64,
     w_flush: f64,
 ) -> ([[f64; 6]; 6], f64, bool) {
-    projected_occupancy_flush_in(board, hull, mode, w_slot, w_flush, HullForm::Triangle)
+    projected_occupancy_flush_in(board, hull, mode, w_slot, w_flush, 0.0, HullForm::Triangle)
 }
 
-/// Wie [`projected_occupancy_flush`], in der gewaehlten Huellenform.
+/// Wie [`projected_occupancy_flush`], in der gewaehlten Huellenform und mit
+/// der K5-Erweiterung (par.9, [`apply_row6_special_in`]): bei `w_k5 > 0`
+/// laeuft sie NACH der Freiraeum-Regel auf derselben Belegung, die beiden
+/// Knoepfe ueberschreiben einander also nicht (K3-F nimmt Masse aus der
+/// Zeile, K5 traegt die Spezialfeld-Gutschrift der Zeile 6 ein). Bei
+/// `w_k5 = 0` wird der Zweig komplett uebersprungen.
 pub fn projected_occupancy_flush_in(
     board: &PlayerBoard,
     hull: Hull,
     mode: u8,
     w_slot: f64,
     w_flush: f64,
+    w_k5: f64,
     form: HullForm,
 ) -> ([[f64; 6]; 6], f64, bool) {
     let occ = occupancy(board);
@@ -633,6 +640,9 @@ pub fn projected_occupancy_flush_in(
             }
         }
     }
+    if w_k5 > 0.0 {
+        apply_row6_special_in(board, &mut out, hull, form, w_k5);
+    }
     (out, bonus, used)
 }
 
@@ -643,21 +653,27 @@ pub fn projected_occupancy_flush_in(
 /// Such-Term auf den Bestandspfaden (Modus 1 waehlt die Huelle dort nach
 /// `deviation_frac`, nicht nach dem Maximum -- deshalb ist diese Funktion
 /// KEIN Ersatz fuer [`envelope_score_projected`] bei `w_flush = 0`).
+/// Dreieck, K5 aus (`w_k5 = 0`).
 pub fn envelope_score_flush(board: &PlayerBoard, mode: u8, w_slot: f64, w_flush: f64) -> f64 {
-    envelope_score_flush_in(board, mode, w_slot, w_flush, HullForm::Triangle)
+    envelope_score_flush_in(board, mode, w_slot, w_flush, 0.0, HullForm::Triangle)
 }
 
-/// Wie [`envelope_score_flush`], in der gewaehlten Huellenform.
+/// Wie [`envelope_score_flush`], in der gewaehlten Huellenform und mit der
+/// K5-Erweiterung (par.9). Nur aufgerufen, wenn `w_flush > 0`; K5 ALLEIN
+/// (`w_flush = 0`, `w_k5 > 0`) laeuft ueber [`envelope_score_row6_in`], das
+/// die Orientierungswahl des Bestandspfads behaelt.
 pub fn envelope_score_flush_in(
     board: &PlayerBoard,
     mode: u8,
     w_slot: f64,
     w_flush: f64,
+    w_k5: f64,
     form: HullForm,
 ) -> f64 {
     let mut best = f64::NEG_INFINITY;
     for hull in [Hull::Left, Hull::Right] {
-        let (occ, bonus, _) = projected_occupancy_flush_in(board, hull, mode, w_slot, w_flush, form);
+        let (occ, bonus, _) =
+            projected_occupancy_flush_in(board, hull, mode, w_slot, w_flush, w_k5, form);
         best = best.max(envelope_score_frac_for_in(&occ, hull, form) + bonus);
     }
     best
@@ -681,6 +697,164 @@ pub fn envelope_score_projected_slot_in(board: &PlayerBoard, w_slot: f64, form: 
         best = best.max(envelope_score_frac_in(&occ, form));
     }
     best
+}
+
+// ── par.9 K5: "eine Spezialfliese in Reihe 6" ────────────────────────────────
+// PREREG_special_tile_yield.md par.9, Nutzer 2026-09-06 17:43: "soweit
+// moeglich wuerd ich immer eine spezialfliese in Reihe 6 aktivieren. Mehr
+// geht sich nicht aus." Mechanik am Code geprueft: das Spezialfeld einer
+// Kuppelplatte schaltet frei, sobald die drei anderen Zellen der Platte
+// gefuellt sind (`dome.rs::try_unlock_special`, gerufen in
+// `round_end.rs:275` und `board.rs:167`); die Spezialfliese kommt dann
+// automatisch und zahlt Punkte gleich der Rasterzeile, also 6 in Zeile 6.
+// Neun der 18 Platten tragen ein Spezialfeld (`dome.rs::build_dome_tile_pool`,
+// Designs 0, 4, 6, 7, 8, 10, 12, 15, 17 -- nachgezaehlt 2026-09-07).
+//
+// Bauform nach par.9: ERWEITERUNG der K3-P-Projektion, kein zweiter
+// Blattwert-Term. Damit zieht der bestehende Such-Term (e) die Platte an den
+// richtigen Platz, ohne neuen Zuschlag.
+//
+// Der Zielplatz haengt an der Huellenform (par.8.15 Teil B): das Dreieck hat
+// in Rasterzeile 6 GENAU EINE Huellenzelle ((5,0) links, (5,5) rechts),
+// `Row6Pair` ZWEI ((5,0)+(5,1) links, (5,4)+(5,5) rechts). Beide Zellen einer
+// Orientierung liegen im selben Kuppelslot (Slot-Zeile 2, `cell_to_dome_space`
+// bildet (5,0) und (5,1) auf Slot (2,0) ab) -- Form 2 gibt der Regel also
+// zwei Rotationslagen DERSELBEN Platte statt einer.
+
+/// `w_k5` (K5, `PREREG_special_tile_yield.md` par.9): Env-DEFAULT der
+/// `SearchConfig` (`MOSAIC_SPECIAL_ROW6_W`, Default 0 = aus, bitidentisch).
+/// Seit dem Bau ein Spec-Pflichtfeld je Seite (`special_row6_w`), damit der
+/// Knopf in der gepaarten Arena einseitig messbar ist; dieser Getter dient
+/// `from_env` und `engine_config`.
+pub fn special_row6_weight() -> f64 {
+    crate::net_mcts::read_f64_env("MOSAIC_SPECIAL_ROW6_W", 0.0)
+}
+
+/// Zielplatz der Nutzer-Regel fuer eine Orientierung: die Spalte der
+/// Huellenzelle der Rasterzeile 6, die ein noch GESPERRTES oder offenes,
+/// jedenfalls noch unbelegtes Spezialfeld traegt.
+///
+/// `None`, wenn keine Huellenzelle der Zeile ein Spezialfeld traegt ODER auf
+/// einer von ihnen schon eine Spezialfliese LIEGT -- "mehr geht sich nicht
+/// aus": ist die eine Fliese der Zeile 6 gesetzt, gibt es fuer die Regel
+/// nichts mehr zu holen, die zweite zaehlt nichts.
+///
+/// Gibt es zwei Kandidaten, zaehlt der mit der kleineren Spalte. Im 18er-
+/// Katalog traegt jede Platte hoechstens EIN Spezialfeld und beide Zellen der
+/// Zeile gehoeren derselben Platte, der Fall ist also nur ueber ein
+/// synthetisches Gitter erreichbar; der Zweig steht fuer die Regel, nicht
+/// fuer eine Spielstellung.
+pub fn row6_special_target(board: &PlayerBoard, hull: Hull, form: HullForm) -> Option<usize> {
+    let mut target: Option<usize> = None;
+    for c in 0..6 {
+        if !hull.contains_in(form, 5, c) {
+            continue;
+        }
+        let Some(space) = board.dome_grid.get_space(5, c) else {
+            continue;
+        };
+        if space.space_type != crate::dome::SpaceType::Special {
+            continue;
+        }
+        if space.placed_special {
+            return None;
+        }
+        if target.is_none() {
+            target = Some(c);
+        }
+    }
+    target
+}
+
+/// Traegt die K5-Regel in eine FERTIGE Projektion ein, fuer eine FESTE
+/// Orientierung. Zwei Wirkungen, beide nach par.9:
+///
+/// 1. Das Spezialfeld auf der Huellenzelle der Zeile 6 zaehlt als kuenftig
+///    belegt mit Gewicht `w_k5` -- es wird gefuellt, sobald die drei
+///    Normalzellen der Platte gefuellt sind.
+/// 2. Die noch leeren Normalzellen DERSELBEN Platte, die in der Huelle
+///    liegen, bekommen ihre projizierte Masse mit `1 + w_k5` verstaerkt (auf
+///    1 gedeckelt): sie sind die Bedingung der Freischaltung, und ueber sie
+///    werden die Reihen 5/6 mit den passenden Farben bevorzugt.
+///
+/// Zellen AUSSERHALB der Huelle bleiben unberuehrt. Beim Dreieck liegt die
+/// dritte Normalzelle ((5,1) links, (5,4) rechts) ausserhalb; sie zu
+/// verstaerken wuerde den AUSSEN-Abzug vertiefen, also das Gegenteil des
+/// Gewollten bewirken. Bei `Row6Pair` liegt sie innen und wird verstaerkt --
+/// die Form, gegen die der Arm gemessen wird.
+///
+/// Rueckgabe: `true`, wenn die Regel gegriffen hat. Wird nur mit
+/// `w_k5 > 0` aufgerufen.
+pub fn apply_row6_special_in(
+    board: &PlayerBoard,
+    occ: &mut [[f64; 6]; 6],
+    hull: Hull,
+    form: HullForm,
+    w_k5: f64,
+) -> bool {
+    let Some(target_col) = row6_special_target(board, hull, form) else {
+        return false;
+    };
+    // Ein Spezialfeld nimmt keinen normalen Stein an (`DomeSpace::accepts`
+    // ist fuer `Special` immer false), und belegt ist es hier nicht -- keine
+    // Projektion hat auf diese Zelle etwas gelegt.
+    debug_assert_eq!(occ[5][target_col], 0.0);
+    occ[5][target_col] = w_k5;
+    let (slot_row, slot_col, _) = crate::board::DomeGrid::cell_to_dome_space(5, target_col);
+    for r in (2 * slot_row)..(2 * slot_row + 2) {
+        for c in (2 * slot_col)..(2 * slot_col + 2) {
+            if (r, c) == (5, target_col) || !hull.contains_in(form, r, c) {
+                continue;
+            }
+            if board
+                .dome_grid
+                .get_space(r, c)
+                .is_some_and(|space| space.is_filled())
+            {
+                continue; // schon gelegt: da ist nichts mehr zu lenken
+            }
+            occ[r][c] = (occ[r][c] * (1.0 + w_k5)).min(1.0);
+        }
+    }
+    true
+}
+
+/// `H_row6(brett)` (K5, par.9) OHNE K3-F: der Bestandspfad des Modus
+/// (1 = K3-P, 4 = K3-P2) plus [`apply_row6_special_in`].
+///
+/// Die ORIENTIERUNGSWAHL bleibt die des Bestandspfads -- Modus 1 waehlt sie
+/// nach `deviation_frac` auf der unveraenderten Projektion, Modus 4 nimmt
+/// wie bisher das Maximum ueber beide Orientierungen. Damit ist der einzige
+/// Unterschied zum Kontrollarm die K5-Gutschrift; eine Umstellung auf das
+/// Maximum (wie K3-F sie mitbringt) waere ein zweiter Effekt im selben Arm.
+/// Nur aufgerufen, wenn `w_k5 > 0`; bei `w_flush > 0` laeuft stattdessen
+/// [`envelope_score_flush_in`], das K5 auf seiner eigenen Belegung mitfuehrt.
+pub fn envelope_score_row6_in(
+    board: &PlayerBoard,
+    mode: u8,
+    w_slot: f64,
+    w_k5: f64,
+    form: HullForm,
+) -> f64 {
+    if mode == 4 {
+        let mut best = f64::NEG_INFINITY;
+        for hull in [Hull::Left, Hull::Right] {
+            let (mut occ, _) = projected_occupancy_slot_in(board, hull, w_slot, form);
+            apply_row6_special_in(board, &mut occ, hull, form, w_k5);
+            best = best.max(envelope_score_frac_in(&occ, form));
+        }
+        return best;
+    }
+    let mut occ = projected_occupancy(board);
+    let hull = if deviation_frac_in(&occ, Hull::Left, form)
+        <= deviation_frac_in(&occ, Hull::Right, form)
+    {
+        Hull::Left
+    } else {
+        Hull::Right
+    };
+    apply_row6_special_in(board, &mut occ, hull, form, w_k5);
+    envelope_score_frac_for_in(&occ, hull, form)
 }
 
 // ── par.8.9 K3-O: der Ownership-Kopf als Projektion ──────────────────────────
@@ -715,6 +889,8 @@ pub fn envelope_score_ownership_in(logits_half: &[f32], form: HullForm) -> Optio
 /// `hull_form` ist die Huellenform der Seite (par.8.15 Teil B, Spec-Feld
 /// `envelope_hull_form`); bei [`HullForm::Triangle`] laufen exakt die
 /// Bestandsrechnungen (bitidentisch).
+/// `row6_w` ist der K5-Knopf (par.9, Spec-Feld `special_row6_w`); bei 0 wird
+/// sein Zweig komplett uebersprungen.
 pub fn search_shift_state(
     state: &crate::state::GameState,
     c_hull: f64,
@@ -722,6 +898,7 @@ pub fn search_shift_state(
     ownership: &[f32],
     mode: u8,
     flush_w: f64,
+    row6_w: f64,
     hull_form: HullForm,
 ) -> f64 {
     let b0 = &state.players[0];
@@ -729,12 +906,23 @@ pub fn search_shift_state(
     let f = hull_form;
     let (h0, h1) = match mode {
         // par.8.14 K3-F: nur in den Musterreihen-Modi 1 und 4 und nur bei w_flush > 0;
-        // bei 0 laufen exakt die Bestandspfade darunter (bitidentisch).
+        // bei 0 laufen exakt die Bestandspfade darunter (bitidentisch). K5 (par.9)
+        // wirkt in denselben Modi und faehrt hier auf DERSELBEN Belegung mit --
+        // die beiden Knoepfe ueberschreiben einander nicht.
         1 | 4 if flush_w > 0.0 => {
             let ws = if mode == 4 { slot_weight() } else { 0.0 };
             (
-                envelope_score_flush_in(b0, mode, ws, flush_w, f),
-                envelope_score_flush_in(b1, mode, ws, flush_w, f),
+                envelope_score_flush_in(b0, mode, ws, flush_w, row6_w, f),
+                envelope_score_flush_in(b1, mode, ws, flush_w, row6_w, f),
+            )
+        }
+        // par.9 K5 ohne K3-F: Bestandspfad des Modus plus Spezialfeld-Gutschrift,
+        // Orientierungswahl unveraendert (siehe `envelope_score_row6_in`).
+        1 | 4 if row6_w > 0.0 => {
+            let ws = if mode == 4 { slot_weight() } else { 0.0 };
+            (
+                envelope_score_row6_in(b0, mode, ws, row6_w, f),
+                envelope_score_row6_in(b1, mode, ws, row6_w, f),
             )
         }
         1 => (envelope_score_projected_in(b0, f), envelope_score_projected_in(b1, f)),
@@ -1001,7 +1189,7 @@ mod tests {
                 envelope_score_projected_slot(board, 0.5)
             );
             assert_eq!(
-                envelope_score_flush_in(board, 1, 0.0, 1.0, HullForm::Triangle),
+                envelope_score_flush_in(board, 1, 0.0, 1.0, 0.0, HullForm::Triangle),
                 envelope_score_flush(board, 1, 0.0, 1.0)
             );
             assert_eq!(
@@ -1062,10 +1250,10 @@ mod tests {
         // (w_flush * 0,5 * 6 / 56), in Form 2 legt die Reihe ihre Masse auf (5,1)
         // INNERHALB der Huelle (0,5 * 6 / 62).
         let (_, bonus_tri, used_tri) =
-            projected_occupancy_flush_in(&board, Hull::Left, 1, 0.0, 1.0, HullForm::Triangle);
+            projected_occupancy_flush_in(&board, Hull::Left, 1, 0.0, 1.0, 0.0, HullForm::Triangle);
         assert!(used_tri && (bonus_tri - 3.0 / 56.0).abs() < 1e-12, "{bonus_tri}");
         let (occ2, bonus2, used2) =
-            projected_occupancy_flush_in(&board, Hull::Left, 1, 0.0, 1.0, HullForm::Row6Pair);
+            projected_occupancy_flush_in(&board, Hull::Left, 1, 0.0, 1.0, 0.0, HullForm::Row6Pair);
         assert!(!used2 && bonus2 == 0.0, "Row6Pair: kein Freiraeumen mehr");
         assert!((occ2[5][1] - 0.5).abs() < 1e-12, "{}", occ2[5][1]);
         assert!(
@@ -1273,5 +1461,189 @@ mod tests {
         assert!((with - (base + 0.08 * 10.0)).abs() < 1e-12, "{with}");
         assert!(EnvelopeTilingParams::OFF.is_off());
         assert!(!EnvelopeTilingParams { w_val: 0.5, ..EnvelopeTilingParams::OFF }.is_off());
+    }
+
+    // ── par.9 K5: "eine Spezialfliese in Reihe 6" ────────────────────────────
+
+    /// Macht die Rasterzelle `(r, c)` zum gesperrten Spezialfeld -- das
+    /// Testgitter aus `board_with` traegt sonst nur Wild-Spaces.
+    fn with_special_cell(board: &mut PlayerBoard, r: usize, c: usize) {
+        let space = board
+            .dome_grid
+            .get_space_mut(r, c)
+            .expect("Rasterzelle existiert");
+        space.space_type = SpaceType::Special;
+        space.required_color = None;
+        space.placed_color = None;
+        space.placed_special = false;
+        space.is_locked = true;
+    }
+
+    /// Brett fuer die K5-Tests: Spezialfeld auf `(5, special_col)`; in Zeile 4
+    /// nehmen nur `(4,0)` und `(4,1)` Rot an, und Musterreihe 5 (Index 4) ist
+    /// mit fuenf roten Steinen voll. Die Projektion legt damit genau `0,5` auf
+    /// jede der beiden Zellen, alles andere ist leer.
+    fn k5_board(special_col: usize) -> PlayerBoard {
+        let mut board = board_with(&[]);
+        with_special_cell(&mut board, 5, special_col);
+        for c in 2..6 {
+            let space = board
+                .dome_grid
+                .get_space_mut(4, c)
+                .expect("Rasterzelle existiert");
+            space.space_type = SpaceType::Normal;
+            space.required_color = Some(crate::tile::TileColor::Blau);
+        }
+        board.pattern_lines[4].color = Some(crate::tile::TileColor::Rot);
+        board.pattern_lines[4].tiles = vec![crate::tile::TileColor::Rot; 5];
+        board
+    }
+
+    /// par.9: bei `w_k5 = 0` ist der K5-Pfad der Bestandspfad -- keine
+    /// zusaetzliche Rechnung, keine Rundungsdifferenz (assert_eq auf f64),
+    /// und im K3-F-Pfad wird der Zweig gar nicht betreten.
+    #[test]
+    fn row6_special_is_bit_identical_at_weight_zero() {
+        for form in [HullForm::Triangle, HullForm::Row6Pair] {
+            for special_col in [0usize, 1usize] {
+                let board = k5_board(special_col);
+                assert_eq!(
+                    envelope_score_row6_in(&board, 1, 0.0, 0.0, form),
+                    envelope_score_projected_in(&board, form),
+                    "Modus 1 (K3-P)"
+                );
+                assert_eq!(
+                    envelope_score_row6_in(&board, 4, 0.5, 0.0, form),
+                    envelope_score_projected_slot_in(&board, 0.5, form),
+                    "Modus 4 (K3-P2)"
+                );
+                let (occ, _, _) =
+                    projected_occupancy_flush_in(&board, Hull::Left, 1, 0.0, 1.0, 0.0, form);
+                assert_eq!(occ[5][special_col], 0.0, "K5-Zweig bei w = 0 uebersprungen");
+            }
+        }
+    }
+
+    /// par.9 Punkt 1 und 2: das Spezialfeld auf der Huellenzelle der Zeile 6
+    /// zaehlt mit `w_k5` (Zellenkosten 6), und die projizierte Masse der
+    /// Normalzellen DERSELBEN Platte innerhalb der Huelle waechst um den
+    /// Faktor `1 + w_k5`. Fuer `k5_board(0)` also
+    /// `H = (6 w + 2 * 0,5 * (1 + w) * 5) / kosten` gegen `5 / kosten`.
+    /// K5 faehrt auf dem K3-F-Pfad auf derselben Belegung mit.
+    #[test]
+    fn row6_special_lifts_the_projection_by_credit_and_boost() {
+        let w = 0.5;
+        for (form, cost) in [(HullForm::Triangle, 56.0), (HullForm::Row6Pair, 62.0)] {
+            let board = k5_board(0);
+            let base = envelope_score_projected_in(&board, form);
+            assert!((base - 5.0 / cost).abs() < 1e-12, "Bestand {base}");
+            let h = envelope_score_row6_in(&board, 1, 0.0, w, form);
+            let expected = (6.0 * w + 5.0 * (1.0 + w)) / cost;
+            assert!((h - expected).abs() < 1e-12, "{h} statt {expected}");
+            let (occ, bonus, _) =
+                projected_occupancy_flush_in(&board, Hull::Left, 1, 0.0, 1.0, w, form);
+            assert_eq!(
+                bonus, 0.0,
+                "Reihe 5 kann die Huelle bedienen, kein Freiraeumen"
+            );
+            assert_eq!(occ[5][0], w, "Spezialfeld zaehlt als kuenftig belegt");
+            assert!((occ[4][0] - 0.5 * (1.0 + w)).abs() < 1e-12, "{}", occ[4][0]);
+            assert!((occ[4][1] - 0.5 * (1.0 + w)).abs() < 1e-12, "{}", occ[4][1]);
+        }
+    }
+
+    /// par.9, Nutzer "mehr geht sich nicht aus": liegt die Spezialfliese der
+    /// Zeile 6 schon, gibt die Regel nichts mehr her; und traegt die
+    /// Huellenzeile ZWEI Spezialfelder (im 18er-Katalog unmoeglich -- jede
+    /// Platte hat hoechstens eines, `dome.rs::build_dome_tile_pool`), zaehlt
+    /// nur das erste.
+    #[test]
+    fn row6_special_counts_at_most_one_plate() {
+        let w = 0.5;
+        let mut placed = k5_board(0);
+        {
+            let space = placed
+                .dome_grid
+                .get_space_mut(5, 0)
+                .expect("Rasterzelle existiert");
+            space.is_locked = false;
+            space.placed_special = true;
+        }
+        assert_eq!(
+            row6_special_target(&placed, Hull::Left, HullForm::Triangle),
+            None
+        );
+        assert_eq!(
+            envelope_score_row6_in(&placed, 1, 0.0, w, HullForm::Triangle),
+            envelope_score_projected_in(&placed, HullForm::Triangle),
+            "liegt schon: die Regel aendert nichts mehr"
+        );
+
+        let mut two = k5_board(0);
+        with_special_cell(&mut two, 5, 1);
+        assert_eq!(
+            row6_special_target(&two, Hull::Left, HullForm::Row6Pair),
+            Some(0)
+        );
+        let h = envelope_score_row6_in(&two, 1, 0.0, w, HullForm::Row6Pair);
+        let expected = (6.0 * w + 5.0 * (1.0 + w)) / 62.0;
+        assert!(
+            (h - expected).abs() < 1e-12,
+            "{h} statt {expected}: die zweite zaehlt nichts"
+        );
+    }
+
+    /// par.8.15 Teil B x par.9: die Huellenform entscheidet ueber die Zahl der
+    /// Zielplaetze in Rasterzeile 6 -- Dreieck EINEN je Orientierung ((5,0)
+    /// bzw. (5,5)), `Row6Pair` ZWEI ((5,0)+(5,1) bzw. (5,4)+(5,5)), und beide
+    /// liegen im selben Kuppelslot (zwei Rotationslagen derselben Platte).
+    /// Ein Spezialfeld auf der zweiten Zelle ist deshalb nur in Form 2 ein
+    /// Zielplatz.
+    #[test]
+    fn row6_target_places_follow_the_hull_form() {
+        for hull in [Hull::Left, Hull::Right] {
+            let triangle: Vec<usize> = (0..6)
+                .filter(|&c| hull.contains_in(HullForm::Triangle, 5, c))
+                .collect();
+            let pair: Vec<usize> = (0..6)
+                .filter(|&c| hull.contains_in(HullForm::Row6Pair, 5, c))
+                .collect();
+            let (want_triangle, want_pair) = match hull {
+                Hull::Left => (vec![0], vec![0, 1]),
+                Hull::Right => (vec![5], vec![4, 5]),
+            };
+            assert_eq!(triangle, want_triangle);
+            assert_eq!(pair, want_pair);
+            let slots: Vec<(usize, usize)> = pair
+                .iter()
+                .map(|&c| {
+                    let (sr, sc, _) = crate::board::DomeGrid::cell_to_dome_space(5, c);
+                    (sr, sc)
+                })
+                .collect();
+            assert_eq!(
+                slots[0], slots[1],
+                "beide Zielplaetze liegen im selben Slot"
+            );
+        }
+
+        let board = k5_board(1);
+        assert_eq!(
+            row6_special_target(&board, Hull::Left, HullForm::Triangle),
+            None
+        );
+        assert_eq!(
+            row6_special_target(&board, Hull::Left, HullForm::Row6Pair),
+            Some(1)
+        );
+        let w = 0.5;
+        assert_eq!(
+            envelope_score_row6_in(&board, 1, 0.0, w, HullForm::Triangle),
+            envelope_score_projected_in(&board, HullForm::Triangle),
+            "Dreieck: (5,1) ist kein Zielplatz"
+        );
+        let h = envelope_score_row6_in(&board, 1, 0.0, w, HullForm::Row6Pair);
+        let expected = (6.0 * w + 5.0 * (1.0 + w)) / 62.0;
+        assert!((h - expected).abs() < 1e-12, "{h} statt {expected}");
     }
 }

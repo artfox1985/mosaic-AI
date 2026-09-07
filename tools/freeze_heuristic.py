@@ -181,6 +181,7 @@ def main() -> int:
             "envelope_projection_mode": 0,  # Raster (Promotion 2026-09-04: Spec-Feld)
             "envelope_flush_w": 0.0,  # K3-F aus (geometric_envelope par.8.14, Spec-Feld seit 2026-09-06)
             "envelope_hull_form": 1,  # Dreieck (geometric_envelope par.8.15 Teil B, Spec-Feld seit 2026-09-06)
+            "special_row6_w": 0.0,  # K5 aus (special_tile_yield par.9, Spec-Feld seit 2026-09-07)
             "heuristik_variante": a.variante}
     (target / "spec.json").write_text(json.dumps(spec, indent=2, ensure_ascii=False) + "\n",
                                     encoding="utf-8", newline="\n")

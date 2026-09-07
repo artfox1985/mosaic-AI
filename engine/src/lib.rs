@@ -755,6 +755,9 @@ fn engine_config_json() -> String {
         "envelope_flush_w": crate::net_mcts::SearchConfig::from_env().envelope_flush_w,
         // par.8.15 Teil B: Huellenform des Such-Terms (1 Dreieck, 2 plus zweite Zelle Zeile 6).
         "envelope_hull_form": crate::net_mcts::SearchConfig::from_env().envelope_hull_form,
+        // K5 (PREREG_special_tile_yield.md par.9): Gewicht der Regel "eine
+        // Spezialfliese in Reihe 6" in der K3-P-Projektion.
+        "special_row6_w": crate::net_mcts::SearchConfig::from_env().special_row6_w,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,

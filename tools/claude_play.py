@@ -62,6 +62,7 @@ SPEC_TO_ENV = {
     "envelope_profile": "MOSAIC_ENVELOPE_PROFILE",
     "envelope_flush_w": "MOSAIC_ENVELOPE_FLUSH_W",
     "envelope_hull_form": "MOSAIC_ENVELOPE_HULL_FORM",
+    "special_row6_w": "MOSAIC_SPECIAL_ROW6_W",
 }
 
 

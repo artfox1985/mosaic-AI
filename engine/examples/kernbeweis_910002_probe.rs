@@ -90,6 +90,7 @@ fn main() {
         envelope_projection_mode: 0,
         envelope_flush_w: 0.0,
         envelope_hull_form: 1,
+        special_row6_w: 0.0,
     };
     let actions = drafting_actions(&state1);
     println!(
