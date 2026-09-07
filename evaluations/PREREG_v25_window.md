@@ -1042,3 +1042,25 @@ sie faehrt zuerst Sockel-Arme, nicht die Schwarm-Haelfte mit Ausfluegen.
 halten; (b) die Kuratierungsregel fuer die Startstellungen (b03 nahm Spieler am Zug,
 R2-4, Spaltenfortschritt 3-5, par.7 -- fuer den Value-Kopf koennte eine breitere Regel
 besser sein); (c) wie viele Halbzuege der Ausflug sampelt, bevor er greedy wird.
+
+### par.16b SPLIT ENTSCHIEDEN: 50/50 (Nutzer 2026-09-07, 09:16)
+
+Die Value-Klasse (8.000 Partien) wird geteilt:
+
+| Haelfte | Partien | Erzeugung | Was sie liefert |
+| --- | --- | --- | --- |
+| **V-a** | 4.000 | variable Temperatur (`--action-temp 1`) plus Weg C, Wurzelrauschen AN | breite Abdeckung; Value-Ziele durch die Temperatur verzerrt |
+| **V-b** | 4.000 | **greedy** (`--tau-argmax-from-move 1`) plus **Weg B** (Ausfluege, in der Engine) | abweichende Stellungen mit UNVERZERRTEN Zielen |
+
+**Warum V-b greedy und nicht temperiert** (par.9f der Seeding-Prereg): der Ausflug startet
+aus der Stellung, in der er entsteht. Waere die Hauptpartie temperiert, startete er aus
+einer verrauschten Lage, und die Trennung, wegen der der Split gebaut wird, waere dahin --
+man haette zwei Sorten Abweichung in derselben Partie.
+
+**Kosten:** V-a rund 3,7 h; V-b rund 3,7 h Hauptpartien plus rund 1,6 h Ausfluege (44 %
+Restlaenge), zusammen rund 9 h statt 7,5 h fuer eine ungeteilte temperierte Klasse. Der
+Aufschlag kauft 4.000 Ausflug-Trajektorien mit sauberen Zielen.
+
+**Offen bleibt die Zaehlung** (par.9f): ob ein Ausflug als eigene Partie im Fenster-Manifest
+zaehlt oder zu seiner Hauptpartie gehoert. Das entscheidet, ob V-b 4.000 oder 8.000 Zeilen
+beitraegt und damit, ob das Fenster seine Groesse von 29.450 Partien haelt.
