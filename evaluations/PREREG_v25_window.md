@@ -1359,3 +1359,62 @@ das v24-Rezept mit 11,9 h. Jeder Lauf schreibt seine echte Dauer ins Manifest.
 Startstellungen aus dem Sockel mehr (Nutzer-Vorgabe 2026-09-07: "bau weg b in die engine.
 ich will keine abhaengigkeit zum sockel"). Sie koennen in beliebiger Folge laufen, aber
 NICHT gleichzeitig auf derselben Maschine.
+
+### par.14g BERICHTIGUNG der Anker: die Verteilung war ueber die falsche Grundmenge gemessen (2026-09-07, 18:40, Nutzer-Frage "wie hast die halbzuege bestimmt?")
+
+**Der Fehler.** par.14d begruendet die Anker der glatten Temperatur mit "6.602
+Drafting-Entscheiden, Median 4, Dezile 1/1/2/3/4/8/15/30/64". Diese Zahlen stammen aus
+einer Messung ueber **ALLE Records**, also Drafting UND Tiling. Der Knopf wirkt
+ausschliesslich im Drafting (`net_drafting_policy`); die Tiling-Entscheide mit ihren wenigen
+Aktionen haben den Median halbiert.
+
+**Nachgemessen ueber 8.025 Drafting-Entscheide** (`phase == "drafting"`, sieben b06-Chargen):
+
+| Grundmenge | n | Median | Dezile |
+| --- | --- | --- | --- |
+| alle Records (Drafting UND Tiling) | 11.195 | 4 | 1 1 2 3 4 7 14 29 59 |
+| **nur Drafting** | **8.025** | **10** | **2 3 4 6 10 16 25 43 72** |
+
+Die obere Zeile reproduziert die Morgenzahlen fast exakt -- damit ist die Ursache belegt und
+nicht vermutet.
+
+**Folge:** der obere Anker wandert von 64 auf **72** (das neunte Dezil der richtigen
+Verteilung); der untere bleibt bei **2**, ist jetzt aber das ERSTE DEZIL statt einer
+Auslegung. Die Kurve verschiebt sich dadurch wenig, weil die Log-Form nachsichtig ist:
+
+| n | alt (Anker 2/64) | **neu (Anker 2/72)** |
+| --- | --- | --- |
+| 4 | 0,320 | 0,316 |
+| 10 (Median) | 0,479 | **0,469** |
+| 25 | 0,635 | 0,623 |
+| 43 | 0,727 | 0,714 |
+| 72 | 0,800 (gekappt) | **0,800** |
+
+**Ebenfalls falsch war der Satz "70 % der Entscheide haben hoechstens 15 Aktionen"** -- auf
+der richtigen Grundmenge sind es **59,7 %**. Und die Aussage, die Staffel wirke "in der
+grossen Mehrheit als 0,15", steht damit auf 35,1 % statt auf 70 % (Anteil mit hoechstens
+4 Aktionen).
+
+**Code nachgezogen** (`ACTION_TEMP_SMOOTH_N_HI`, Doku-Kommentar, fuenf Teststellen);
+Build steht aus, weil die Promotion laeuft.
+
+### par.14h STRUKTUR INNERHALB DER RUNDE -- die Zahl, die bisher fehlte
+
+Aus derselben Messung, Median der Aktionszahl je Zug-Index und Runde (je Spieler):
+
+| Runde | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 108 | 100 | 82 | 68 | 51 | 22 | 16 | 10 | 8 | 10 | 5 |
+| 2 | 75 | 54 | 38 | 27 | 22 | 15 | 9 | 4 | 5 | 4 | 3 |
+| 3 | 86 | 60 | 36 | 22 | 16 | 12 | 10 | 4 | 6 | 4 | 3 |
+| 4 | 88 | 54 | 30 | 17 | 11 | 7 | 6 | 5 | 5 | 4 | 3 |
+| 5 | 76 | 44 | 22 | 10 | 7 | 4 | 3 | 1 | 1 | 1 | -- |
+
+**Die Klippe liegt in JEDER Runde zwischen Zug 4 und 7**, und sie kommt in spaeteren Runden
+frueher. `docs/domain_knowledge.md` nennt fuer Runde 1 hoehere Absolutwerte (195 bis 2, aus
+`actions_per_round.md`), aber dieselbe Form; die Differenz ist nicht aufgeklaert und fuer
+die Form ohne Belang.
+
+**Das ist die Zahl, die der Ausflugslaenge fehlt** (`PREREG_start_position_seeding.md`
+par.9d): ein fester Halbzug-Deckel misst etwas, das je nach Runde und Zug voellig
+verschieden viel wert ist.

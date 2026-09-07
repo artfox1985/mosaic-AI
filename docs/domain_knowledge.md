@@ -394,8 +394,37 @@ war. Als Größenordnung belastbar, als Konstante nicht.
   |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
   | Aktionen | 195 | 152 | 134 | 117 | 83 | 44 | 42 | 7 | 7 | 5 | 2 |
 
-  Die ersten vier Zuege tragen also den Loewenanteil der Entscheidung (195 bis
-  117 Optionen), ab Zug 8 ist die Runde praktisch determiniert (<= 7 Optionen).
+  Die ersten vier Zuege tragen also den Loewenanteil der Entscheidung, ab Zug 8
+  ist die Runde praktisch determiniert.
+
+  **NACHGEMESSEN 2026-09-07 -- die ABSOLUTWERTE oben sind nicht reproduzierbar,
+  die FORM schon.** Eigene Messung (Grundmenge: Records mit `phase ==
+  "drafting"`; Einheit: `len(valid_actions)` je Entscheidung; n = 8.025
+  Entscheide aus 70 Partien, `data/selfplay_smoke-*.pkl`, Generator v24-b06),
+  Median je Runde und gemeinsamem Zug-Index innerhalb der Runde:
+
+  | Runde | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+  |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+  | 1 | 108 | 108 | 130 | 116 | 91 | 79 | 60 | 4 | 47 | 28 |
+  | 2 | 82 | 73 | 60 | 53 | 41 | 35 | 30 | 27 | 21 | 21 |
+  | 3 | 90 | 79 | 63 | 53 | 41 | 30 | 28 | 24 | 21 | 18 |
+  | 4 | 92 | 76 | 60 | 47 | 36 | 25 | 20 | 17 | 14 | 12 |
+  | 5 | 82 | 76 | 51 | 44 | 25 | 17 | 11 | 10 | 8 | 7 |
+
+  **Der Eroeffnungszug ist arithmetisch zerlegt:** 108 = 3 Anzeigen x 4
+  Rotationen x 9 Slots, alle Aktionen vom Typ `dome`, das Brett noch leer
+  (geprueft am Korpus 2026-09-07). Die Auslage traegt drei Platten
+  (`state.rs:319`, Assert `:442`, `engine_manual.md:46` "3 plates lie face up")
+  -- es fehlt keine.
+
+  **Die 195 laesst sich damit nicht bauen:** 195/3 = 65, und 65 ist kein
+  Vielfaches von 4 x 9 = 36; vier Platten gaeben 144, fuenf 180. Sie stammt
+  aus einer anderen Aktionskodierung, und `evaluations/actions_per_round.md`
+  liegt nicht mehr im Baum, ihre Methode ist also nicht nachpruefbar. **Wer
+  Absolutzahlen braucht, nimmt die Tabelle oben; wer nur die Form braucht,
+  kann beide verwenden -- der Abfall ueber die Runde ist in beiden derselbe**
+  (Zerfallsrate lambda 0,173 bis 0,176 in den Runden 1 bis 4, R2 0,87 bis 0,99;
+  Runde 5 steiler mit 0,26).
 ### Punktestand je Runde — und warum es zwei Zahlenreihen gibt
 
 **Referenz ist der ARENA-Modus, nicht das Self-Play.** Gemessen an den 22
