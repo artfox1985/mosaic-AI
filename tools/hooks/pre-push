@@ -183,6 +183,23 @@ if [ -n "$NUR_LOGTEXT" ]; then
     STATUS=$?
     WAS="cargo build --release"
 else
+    # WICHTIG: cargo prueft den ARBEITSBAUM, nicht die gepushten Commits. Ist der
+    # Arbeitsbaum schmutzig, kann ein kaputter Push gruen aussehen -- genau das ist am
+    # 2026-09-07 passiert: engine/src/net_mcts.rs war beim Commit durchgerutscht, der
+    # gepushte Stand rief action_temp_mode auf ohne es zu definieren, und cargo test lief
+    # trotzdem gruen, weil der Arbeitsbaum die Datei hatte. Deshalb hier eine WARNUNG
+    # (kein Blocker: ein schmutziger Baum ist beim Pushen normal und oft harmlos).
+    DIRTY_ENGINE=$(git status --porcelain -- engine/src/ self_play.py 2>/dev/null)
+    if [ -n "$DIRTY_ENGINE" ]; then
+        echo "" >&2
+        echo "pre-push: ACHTUNG -- Arbeitsbaum ist an engine-relevanten Dateien SCHMUTZIG." >&2
+        echo "cargo prueft den Arbeitsbaum, NICHT die gepushten Commits. Der Test unten" >&2
+        echo "sagt darum nichts darueber, ob der gepushte Stand fuer sich kompiliert:" >&2
+        printf '%s
+' "$DIRTY_ENGINE" | sed 's/^/  /' >&2
+        echo "Im Zweifel: die Aenderungen mitcommitten, dann erneut pushen." >&2
+        echo "" >&2
+    fi
     echo "pre-push: engine/src/ im Push geaendert -- cargo test --release laeuft (Budget < 90 s)." >&2
     (cd engine && cargo test --release)
     STATUS=$?

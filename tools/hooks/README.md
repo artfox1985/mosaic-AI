@@ -102,6 +102,26 @@ Commit-Nachrichten zitiert.
 **Gemessen 2026-09-06** (voller Repo-Lauf ohne `--staged`, also die teuerste
 Form): 3,6 s. Der Hook-Modus prueft weniger.
 
+## Was `pre-push` NICHT sehen kann (Vorfall 2026-09-07)
+
+**`cargo` prueft den ARBEITSBAUM, nicht die gepushten Commits.** Ist der Arbeitsbaum
+schmutzig, kann ein kaputter Push gruen aussehen. Genau das ist passiert:
+`engine/src/net_mcts.rs` war beim Commit durchgerutscht (Dateien einzeln aufgezaehlt statt
+`git add -A`), der gepushte Stand rief `action_temp_mode` auf, ohne es zu definieren -- und
+`cargo test --release` lief mit 549 gruenen Tests durch, weil der Arbeitsbaum die Datei
+trug. Auf origin lag rund eine Viertelstunde ein Stand, der nicht kompiliert.
+
+Der Haken warnt seitdem, wenn `engine/src/` oder `self_play.py` schmutzig sind. **Es ist
+bewusst nur eine Warnung**: ein schmutziger Arbeitsbaum beim Pushen ist normal und meistens
+harmlos, und ein Blocker wuerde zum `--no-verify` erziehen
+([[feedback_gate_that_is_bypassed_teaches_bypassing]]). Wer die Warnung sieht, hat zwei
+Sekunden Zeit zu pruefen, ob die schmutzige Datei zum Push gehoert haette.
+
+**Die vollstaendige Pruefung waere, den gepushten Commit in einen temporaeren Baum
+auszuchecken und DORT zu bauen.** Nicht gebaut: das kostet einen zweiten
+Kompilierdurchgang je Push, und die Warnung faengt den realen Fall (vergessene Datei)
+zuverlaessig genug.
+
 ## `pre-push` -- zwei Pruefungen
 
 ### 1. Rechnerstruktur-Waechter (laeuft IMMER)
