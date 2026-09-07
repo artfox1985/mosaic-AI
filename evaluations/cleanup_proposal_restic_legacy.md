@@ -78,3 +78,46 @@ Beide sind rein lesend. Erst ihr Ergebnis sagt, wie viel ein Prune wirklich holt
 
 **Nichts davon passiert ohne pfadgenaue Freigabe.** Ein Prune ist endgueltig, und fuer
 alles unter (a) und (b) ist dieser Stand die einzige Kopie im Haus.
+
+---
+
+## TROCKENLAUF GEMESSEN (2026-09-07, 16:37): der Gewinn ist rund 6,6 GiB, nicht 92
+
+**Nutzer-Freigabe fuer die Trockenlaeufe:** *"mach die dry runs, von mir aus koennen diese
+daten weg. die wichtigen dinge sind die modelle."* Gefahren mit
+`tools/restic_legacy_dryrun.sh`, rein lesend.
+
+| `restic stats --mode raw-data` | Staende | unkomprimiert | **tatsaechlich gespeichert** |
+| --- | --- | --- | --- |
+| alle | 38 | 104,894 GiB | **14,473 GiB** |
+| ohne `61579f2e` | 37 | 12,622 GiB | **7,847 GiB** |
+| **Differenz = was allein am Legacy-Stand haengt** | | 92,27 GiB | **6,626 GiB** |
+
+**Das ganze Repository ist 14,5 GiB gross.** Die 100,60 GiB der Inventur sind die Summe der
+DATEIGROESSEN im Stand; restin dedupliziert und komprimiert sie auf ein Vierzehntel
+(Kompressionsrate 7,25x ueber das ganze Repo, gegen 1,61x ohne diesen Stand -- die
+Pickle-Korpora sind hochgradig redundant).
+
+**Damit ist die Rechnung eine andere.** Selbst wenn man den Stand KOMPLETT verwirft, werden
+6,6 GiB frei. Der Vorschlag oben laesst Modelle, Holdout und `seed_corpus` stehen, also
+rund 11 GiB der nominalen 100 -- der reale Gewinn laege bei etwa 6 GiB.
+
+**Dem steht der Preis eines Prune gegenueber:** er schreibt Pack-Dateien um, und dieses
+Repo liegt in OneDrive. Jede umgeschriebene Pack-Datei ist ein Sync-Vorgang. Fuer 6 GiB
+ist das ein schlechtes Geschaeft.
+
+**Empfehlung: nicht aufraeumen.** Der Stand kostet 6,6 GiB und ist die einzige Kopie der
+Rohdaten von drei Aeren und vier Untersuchungslinien. Die Ersparnis rechtfertigt weder das
+Risiko noch die Sync-Last. **Das Gegenargument, das die Entscheidung beim Nutzer laesst:**
+wenn das Repo aus anderen Gruenden klein bleiben soll (Platz in OneDrive, Dauer eines
+`restic check`), sind 6,6 GiB von 14,5 fast die Haelfte.
+
+**Was der `rewrite --dry-run` bestaetigt hat:** die Ausschlussmuster greifen ("would save
+new snapshot, would modify 1 snapshots"). Die Muster stehen in
+`tools/restic_legacy_dryrun.sh` und sind bei Bedarf sofort scharf zu schalten.
+
+**Nachtrag zur Wachstumsfrage:** eine Generation erzeugt rund 2 GiB Korpora nominal. Bei
+der gemessenen Kompression sind das je Generation grob 0,3 GiB im Repo. Das Archiv waechst
+also langsam, und die Aufbewahrungsrichtlinie (14 taeglich, 8 woechentlich, 24 monatlich,
+10 jaehrlich) haelt die Zahl der Staende ohnehin gedeckelt, sobald sie einmal mit
+`-Prune` laeuft.
