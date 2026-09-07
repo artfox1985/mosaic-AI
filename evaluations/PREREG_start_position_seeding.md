@@ -740,3 +740,41 @@ warum der in Messung 3-V gemessene Effekt so gross ausfaellt.
 
 **Nicht entschieden, und bewusst NICHT in die v25-Armstruktur genommen** -- drei Arme
 messen bereits zwei Faktoren; ein vierter Arm braucht einen eigenen Entscheid.
+
+### par.9e WEG C GEBAUT (2026-09-07, 03:25; Subagent Opus, ungetestet -- kein Build neben der laufenden Messung)
+
+**Knoepfe** (Env plus CLI, KEIN Spec-Feld -- Erzeugungs-Parameter, nicht Spielparameter;
+Bauform wie `--tau-argmax-from-move`): `MOSAIC_DEVIATE_PROB` (Default 0,0 = aus),
+`MOSAIC_DEVIATE_MEAN_MOVE` (30,0; Mittel der Exponentialverteilung fuer die Halbzugnummer),
+`MOSAIC_DEVIATE_CANDIDATES` (6). In `self_play.py` als `--deviate-prob`,
+`--deviate-mean-move`, `--deviate-candidates`, im Lauf-Manifest gefuehrt.
+
+**Wo:** in `unified_game_loop` direkt nach `agent.decide(...)` und VOR der
+Record-Vorbereitung -- ersetzt ausschliesslich `d.chosen`. `d.policy` bleibt die
+Besuchsverteilung der regulaeren Suche. Kein zweiter Datenstrom, keine zweite Partie. Das
+Netz kommt ueber ein neues `GameLoopConfig`-Feld `deviate_net`, das nur
+`play_net_self_play_game` setzt -- die Arena-Pfade lesen die Knoepfe nicht einmal.
+Bewertet wird `net_leaf_eval(net, folgezustand)[player]` auf einem Zustands-Klon.
+
+**Determinismus:** zwei getrennte Stroeme aus `game_seed ^ DEVIATE_SEED_DISTINGUISHER`
+ueber `derive_search_seed` (Zaehler 0 fuer "ob/wo", `move_number` fuer die
+Kandidatenziehung). Partie- und Such-RNG bleiben unberuehrt. Bei `PROB = 0` steht der
+Frueh-Ausstieg VOR dem RNG-Aufbau: keine zusaetzliche Zufallszahl, Bestand bitidentisch.
+
+**WAECHTER, vom Koordinator nachgetragen (nicht im Auftrag):** greift der Bauer- oder
+Kuppel-Vorzug (`d.vorzug.is_some()`), wird NICHT abgewichen. Grund: `NetSelfPlayAgent::decide`
+(self_play.rs ~1810) liefert in diesem Fall ein EIN-HOT-Demonstrationsziel auf genau die
+vorgezogene Aktion -- eine Abweichung liesse das Policy-Ziel auf einen nie gespielten Zug
+zeigen. Das waere stille Trainingsdaten-Korruption, und der Vorzug ist im Netz-Self-Play
+BEIDSEITIG aktiv (`play_net_self_play_game`), also kein theoretischer Fall. Nebenwirkung:
+die tatsaechliche Abweichungsrate liegt leicht unter dem eingestellten Wert; sichtbar,
+weil dann keine `[deviate]`-Zeile im Lauf steht.
+
+**Offen, vom Bau-Bericht benannt:** (a) bei geseedeten Partien (`--seed-positions`) zaehlt
+`move_number` ab dem ersten Zug der FORTSETZUNG, nicht ab dem Anfang der Ursprungspartie --
+dokumentiert, aber nicht entschieden, ob das die gewollte Semantik ist; (b) zwei
+statistische Testschwellen sind ungeprueft, weil nichts kompiliert wurde; (c) `rustfmt`
+meldet auf `self_play.rs` nur Bestands-Hunks, keine der neuen Zeilen.
+
+**Ungetestet:** kein `cargo test`, kein Wheel, keine Partie. Folgt im naechsten
+CPU-freien Fenster zusammen mit Pass-Zeile, Chip-Angabe und Symbol.
