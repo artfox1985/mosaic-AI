@@ -683,3 +683,46 @@ Wahrscheinlichkeit p an Halbzug r: n Kandidaten aus `valid_drafting_actions` zie
 Netzbewertung (die Engine hat den Vorwaertspass ohnehin), den besten spielen statt des
 Suchergebnisses. Rund 40 Zeilen in `unified_game_loop`, zwei Flags, ein Manifest-Feld.
 Deutlich weniger als B, weil weder Zustands-Klon noch zweite Partie noetig sind.
+
+### par.9d KATAGOS TEMPERATUR-POLITIK -- und ein vierter Kandidat (2026-09-07, 03:15; Nutzer-Frage "hat katago das auch wie arm 3 gemacht oder hast dir das selbst hergeleitet?")
+
+**Ehrliche Zuordnung zuerst: hergeleitet.** Arm 3 (Umschaltpunkt PLUS Weg C) entstand aus der
+Mechanik -- C ersetzt genau einen Zug und kann deshalb nur zusaetzlich zu A wirken, nicht
+statt A. Die Nutzer-Frage hat die Gegenprobe ausgeloest; sie faellt zugunsten der
+Herleitung aus, deckt aber einen Unterschied auf.
+
+**Nachgelesen (ar5iv-Fassung von arXiv:1902.10565):**
+- **KataGo fuehrt beides gleichzeitig:** die abklingende Temperatur laeuft in ALLEN Partien,
+  das Verzweigen (Anhang D) kommt in 5 % davon zusaetzlich dazu. Arm 3 entspricht damit der
+  Praxis.
+- **Die Temperatur-Politik ist aber eine ANDERE als unsere.** Wortlaut: *"moves are selected
+  proportionally to the target-pruned MCTS playout distribution raised to the power of 1/T
+  where T is a temperature constant. T begins at 0.8 and decays smoothly to 0.2, with a
+  halflife in turns equal to the width of the board b."*
+
+| | KataGo | unser Regler `--tau-argmax-from-move` |
+| --- | --- | --- |
+| Form | glatt abklingend | harter Schalter |
+| Startwert | T = 0,8 (bereits geschaerft) | T = 1,0 (ungeschaerfte Besuchsverteilung) |
+| Endwert | **T = 0,2 -- nie null, es wird bis zum Schluss gesampelt** | **argmax, also T = 0** |
+| Zeitskala | Halbwertszeit = Brettbreite (19 von rund 230 Zuegen, also rund 8 %) | fester Halbzug k |
+
+**Auf unsere Partielaenge umgerechnet:** 8 % von 162 Drafting-Halbzuegen sind rund 13 -- die
+Halbwertszeit liegt also nahe an dem Umschaltpunkt, der bei uns am besten gemessen hat (12,
+Messung 3-V).
+
+**Vierter Kandidat (Weg D): glatt abklingende Temperatur statt hartem Schalter.** Sie hebt
+die Schaerfe frueh an, ohne die Streuung je ganz abzuschalten. Das ist genau die Antwort auf
+den Nutzer-Einwand vom 03:05 ("und der value head braucht keine streuung?"): Messung 3-V
+zeigt, dass WENIGER Sampling mehr Spalten bringt -- sie zeigt NICHT, dass GAR KEIN Sampling
+das Optimum ist. Der noch fehlende Punkt bei k = 1 wuerde das auch nicht klaeren, weil er die
+harte Form behaelt.
+
+**Bau (geschaetzt, nicht gemessen):** `drafting_policy` (self_play.rs) bekommt `play_temp`
+bereits als Parameter -- heute ein fester Wert. Ein Env-Knopf mit Start-, End- und
+Halbwertszeit-Wert, der `play_temp` je Halbzug berechnet, ist kleiner als Weg C: keine
+Kandidatenziehung, keine Netzbewertung, nur eine Formel vor einem bestehenden Aufruf.
+Default = Bestandswert, damit bitidentisch.
+
+**Nicht entschieden, und bewusst NICHT in die v25-Armstruktur genommen** -- drei Arme
+messen bereits zwei Faktoren; ein vierter Arm braucht einen eigenen Entscheid.
