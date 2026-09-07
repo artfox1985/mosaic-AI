@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Beleg: alle 3 Messungen H0, Status quo bestaetigt (Abschnitt "MESSUNG-3-ERGEBNIS"; tau-Annealing 112:118, p 0,78, v20-Aera, Mass war STAERKE). NACHTRAG 2026-09-07: Vorstufe 3-V GEFAHREN -- das Sampling der Zugwahl kostet dem Sockel mehr als die HAELFTE seines Spaltenbaus (0,195 gegen 0,4225 bei argmax ab Halbzug 12) und liefert dafuer praktisch keine Vielfalt (399 von 400 Endbrettern distinkt in beiden Faellen). Die 0,19 der Sockel-Klasse sind ein Temperatur-Artefakt. Arena-Wirkung offen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Re-Validierung von Floor-Gewicht, m-Formel und τ-Annealing in der WDL-Aera (3 Messungen) | Beleg: alle 3 Messungen H0, Status quo bestaetigt (Abschnitt "MESSUNG-3-ERGEBNIS"; tau-Annealing 112:118, p 0,78, v20-Aera, Mass war STAERKE). NACHTRAG 2026-09-07: Vorstufe 3-V GEFAHREN -- das Sampling der Zugwahl kostet dem Sockel mehr als die HAELFTE seines Spaltenbaus (0,195 gegen 0,4225 bei argmax ab Halbzug 12) und liefert dafuer praktisch keine Vielfalt (399 von 400 Endbrettern distinkt in beiden Faellen). Die 0,19 der Sockel-Klasse sind ein Temperatur-Artefakt. Arena-Wirkung offen -- Messung 3-W registriert (zwei Sockel-Chargen im v24-Fenster, ein Faktor, rund 12 h, Start auf Anweisung). -->
 
 # Vorregistrierung: Suchpfad-Nachmessungen (Floor-Gewicht, m-Formel, τ-Annealing)
 
@@ -271,3 +271,92 @@ spaltenreichste des Fensters**, bei 8.000 Partien. Es gibt im Fenster also berei
 grosse Klasse, die ohne jede kuenstliche Streuung auskommt und die beste Spaltenzahl
 liefert; der Sockel war die einzige Klasse, die die Zugwahl wuerfelt, und die einzige mit
 0,19. Das stuetzt die Nutzer-These unabhaengig von Messung 3-V.
+
+## Messung 3-W: traegt der Umschaltpunkt bis ins NETZ? (registriert 2026-09-07, 03:10 VOR jedem Lauf; Nutzer: "dann takte das training dafuer ein" / "oder geht das erst mit v25?")
+
+**Die Frage, die 3-V offen laesst.** 3-V hat gemessen, dass das Sampling der Zugwahl dem
+Sockel mehr als die Haelfte seines Spaltenbaus kostet, ohne Vielfalt zu kaufen. Das ist eine
+Aussage ueber MATERIAL. Der Nutzer hat den entscheidenden Einwand dazu formuliert (03:05):
+*"und der value head braucht keine streuung? das wundert mich."* -- und er trifft eine
+Luecke, die keine der Material-Kennzahlen schliessen kann: alle drei Chargen sind
+on-policy. Verschiedene Brettmuster heissen nicht Abdeckung des Zustandsraums. Ob ein
+Value-Kopf, der nur sauber gespieltes Material sieht, Stellungen NACH einem Fehler noch
+richtig bewertet, zeigt erst ein Training plus eine Pruefung ausserhalb der eigenen
+Verteilung.
+
+**Nachgemessen, was messbar war (2026-09-07, 03:05, dieselben drei Chargen):** die
+ERGEBNIS-Streuung bleibt ebenfalls erhalten -- Punkte-SD 15,2 / 17,9 / 17,0 (A / B / C),
+mittlere absolute Marge 14,5 / 15,9 / 14,3, Anteil knapper Partien (Marge <= 5) 0,23 /
+0,24 / 0,24, Siegerverteilung in allen drei ausgeglichen. Das in der Literatur beschriebene
+Muster "zu greedy erzeugtes Material endet in lauter knappen Partien und nimmt dem
+Value-Kopf das Signal" tritt hier NICHT auf. Die Frage nach der Abdeckung bleibt davon
+unberuehrt.
+
+### Aufbau: EIN Faktor, und das v24-Fenster als Traeger
+
+**Der Test braucht v25 NICHT** (Nutzer-Frage): das v24-Fenster liegt vollstaendig vor. Es
+wird in beiden Armen benutzt, und darin werden ausschliesslich die 4.000
+Sockel-NEU-Partien ersetzt -- zweimal, vom selben Generator, mit dem einzigen Unterschied
+`--tau-argmax-from-move`:
+
+| | Arm W0 (Kontrolle) | Arm W1 |
+| --- | --- | --- |
+| Sockel NEU (4.000, policy-aktiv, @100, Wurzelrauschen an) | `--tau-argmax-from-move 0` (Bestand) | `--tau-argmax-from-move 12` |
+| Generator | `v24-b06_brierbest` mit Champion-Spec, in BEIDEN Armen | dito |
+| Schwarm NEU, G-1, G-2 | v24-Bestand, in beiden Armen dieselben Dateien | dito |
+| Training | b01-Rezept, Warm-Start vom Generator, 12 Epochen, `--fast-loader`, `--select-by-brier` | dito |
+
+**Warum nicht das v24-Material als Kontrolle:** dessen Sockel stammt von `v23-b01`. Ein
+Vergleich dagegen haette zwei Faktoren (Generator UND Temperatur). Beide Arme erzeugen
+deshalb frisch.
+
+### Messgroessen, VOR dem Lauf festgelegt
+
+1. **Value ausserhalb der eigenen Verteilung -- die Kernfrage.** Auf `frozen_v3`
+   (`PREREG_frozen_v3_eval_set.md`: 1.800 Zustaende, Orakel-Labels): `value_r2` je Runde
+   und Brier. Bezug ist der jeweils andere Arm, nicht ein historischer Wert.
+   **Aufloesungsgrenze beachten:** `value_r2` traegt nur ueber eine Luecke von rund 0,015
+   ([[project_offline_metric_resolution_limit]]) -- darunter ist die Metrik stumm, und die
+   Arena entscheidet.
+2. **Orakel-Metriken** (`tools/oracle_metrics.py`): `prior_mass_on_oracle_top3` und
+   `kendall_tau`. Sie haben die Arena 7 von 7 mal richtig vorhergesagt
+   ([[project_oracle_metrics_validated]]) und sind damit das schaerfste Offline-Mass.
+3. **Arena W1 gegen W0**, gepaart, beide Seiten Champion-Spec, Seed 20261012, Deckel
+   200 Paare, SPRT wie Tor 1. Das ist der Entscheid.
+4. **Volle Spalten** am argmax-Instrument @400 (Tor 2a, 200 Partien, Seed 20260931) je Arm
+   -- ob sich der Materialvorteil ins Netz uebertraegt.
+5. **Zustandsabdeckung des Materials** als Kontrolle:
+   `tools/probes/paired_corpus_divergence_probe.py` ueber die beiden Sockel-Chargen
+   (gleicher Seed, gepaart) und `corpus_state_diversity_probe.py` je Charge.
+
+### Lesart, vorab
+
+- **W1 gewinnt die Arena ODER liegt in den Orakel-Metriken vorn, bei gleichen oder
+  besseren Spalten:** der Umschaltpunkt gehoert ins v25-Rezept (`PREREG_v25_window.md`
+  par.13), und die Frage nach der Streuung ist beantwortet.
+- **W1 verliert die Arena oder faellt im Value ausserhalb der Verteilung ab:** die
+  Verengung ist real; dann braucht der Sockel eine Streuquelle, die NICHT die Zugwahl
+  verdirbt -- das ist Weg C (`PREREG_start_position_seeding.md` par.9c), und er wuerde
+  damit von der Kuer zur Pflicht.
+- **Beides unentschieden:** der Umschaltpunkt ist eine Material-Kosmetik ohne Wirkung; dann
+  entscheidet die Bequemlichkeit, und das heisst Bestand lassen.
+
+### Kosten (gemessen, aus `docs/measured_runtimes.md`)
+
+| Posten | Kosten |
+| --- | --- |
+| 2 x 4.000 Sockel-Partien @100 (3,365 s je Partie, threads 11) | 7,5 h |
+| 2 Trainings (12 Epochen, `--fast-loader`, rund 4.850 s je Lauf) | 2,7 h |
+| frozen_v3-Bewertung + Orakel-Metriken je Arm | Minuten |
+| Arena 2 x 80 plus Instrument je Arm | rund 1,5 h |
+| **Summe** | **rund 12 h** |
+
+Zum Vergleich: eine volle v25-Erzeugung kostet allein 11,2 h. Der Test ist also
+groessenordnungsgleich mit dem, was er absichert.
+
+### Reihenfolge
+
+**Vor der v25-Erzeugung.** Wenn W1 traegt, startet v25 mit einer belegten statt einer
+plausiblen Einstellung; wenn nicht, waere der Umschaltpunkt im v25-Rezept ein Fehler, den
+man erst am Ende der Generation bemerkt haette. **Start nur auf Nutzer-Anweisung** (die
+Erzeugung von 8.000 Partien faellt unter den Vorbehalt "ausser der Fenster-Erzeugung").
