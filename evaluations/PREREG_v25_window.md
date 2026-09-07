@@ -777,3 +777,96 @@ Klasse des Fensters.
 **Was damit NICHT gesagt ist:** dass es fuer den VALUE-Kopf reicht. Alle diese Stellungen
 sind on-policy. Genau diese Luecke ist der Grund fuer Weg C, und ob sie sich auswirkt,
 zeigt erst S4 gegen S3 nach dem Training.
+
+## par.14c DIE BEFEHLE (Generator b06, Stand 2026-09-07 03:40; NICHT starten, bevor der Build durch ist)
+
+**Vor der ersten Charge auf JEDER Maschine** -- der Kontrakt-Stempel muss ueberall gleich
+sein, sonst sind die Korpora nicht vergleichbar und es faellt erst beim Manifest-Vergleich
+auf:
+
+```
+python -X utf8 -c "import json, mosaic_rust as mr; c=json.loads(mr.engine_config_json()); print(c['input_size'], c['contract_hash'], c['envelope_hull_form'], c['envelope_flush_w'])"
+```
+
+Erwartet: `744 20b442a8164f748d 1 0.0`. Weicht etwas ab, laeuft dort ein anderes Wheel.
+
+**Gemeinsam fuer alle Chargen** (Konvention seit v23, im v24-Rezept par.6 dokumentiert):
+
+```
+export MOSAIC_STACK_DRAW_RESEARCH=1
+```
+
+### Die fuenf Sockel-Arme (je 4.000 Partien, gleicher Seed -- die Startbedingungen sind damit je Spielindex identisch und die Arme gepaart vergleichbar)
+
+```
+# S1 -- Bestand (Kontrolle): Zugwahl proportional zu den Besuchen
+python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
+  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+  --version v24-b06-policy-s1 --threads 11 --chunk 10 --per-file 10 --seed 20260907
+
+# S2 -- variable Temperatur ueber die Zahl der gueltigen Aktionen
+python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
+  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+  --version v24-b06-policy-s2 --threads 11 --chunk 10 --per-file 10 --seed 20260907 \
+  --action-temp 1
+
+# S3 -- Umschaltpunkt 1 (durchgehend greedy)
+python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
+  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+  --version v24-b06-policy-s3 --threads 11 --chunk 10 --per-file 10 --seed 20260907 \
+  --tau-argmax-from-move 1
+
+# S4 -- Umschaltpunkt 1 plus Weg C (eine Abweichung je Partie)
+python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
+  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+  --version v24-b06-policy-s4 --threads 11 --chunk 10 --per-file 10 --seed 20260907 \
+  --tau-argmax-from-move 1 --deviate-prob 1.0
+
+# S5 -- variable Temperatur plus Weg C
+python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
+  --spec models/v24-b06_brierbest.spec.json --games 4000 --sims 100 \
+  --version v24-b06-policy-s5 --threads 11 --chunk 10 --per-file 10 --seed 20260907 \
+  --action-temp 1 --deviate-prob 1.0
+```
+
+**Namen:** `v24-b06-policy-sN` -- die Dateien heissen nach dem GENERATOR
+([[feedback_selfplay_naming_convention]]), der Arm-Zusatz haengt hinten an. Der Val-Pool-
+Regex `^selfplay_v24-b06-` (par.6) trifft alle fuenf.
+
+**Flag-Namen S2/S5 vorbehaltlich des Baus** (`--action-temp`): der Baustein entsteht
+gerade; sollte der Bau einen anderen Namen waehlen, steht er im Bericht und hier ist er
+nachzuziehen.
+
+### Der Schwarm (EINMAL, von allen Armen geteilt)
+
+```
+python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest.onnx \
+  --spec models/v24-b06_brierbest.spec.json --games 8000 --sims 100 --value-only \
+  --version v24-b06-value-argmax --threads 11 --chunk 10 --per-file 10 --seed 20260908 \
+  --no-root-noise --deterministic
+```
+
+**OFFEN, vor diesem Befehl zu entscheiden (par.11 B):** 8.000 argmax und 0 gesampelt, oder
+7.000 und 1.000. Der Befehl oben setzt 8.000/0 voraus (die Empfehlung); bei 7.000/1.000
+kaeme ein zweiter Lauf mit `--games 1000 --value-only` OHNE `--no-root-noise
+--deterministic` dazu.
+
+### Aufteilung auf zwei Maschinen (Vorschlag)
+
+| Maschine | Chargen | Dauer |
+| --- | --- | --- |
+| A (diese) | Schwarm 8.000, dann S1, S2 | 8,2 + 3,7 + 3,7 = 15,6 h |
+| B (zweite) | S3, S4, S5 | 11,2 h |
+
+Der Schwarm gehoert auf die Maschine, die zuerst frei wird -- er blockiert am laengsten und
+alle Trainings brauchen ihn. **Die zweite Maschine braucht denselben Commit UND dasselbe
+Wheel** (Stempel-Pruefung oben), sonst driften die Korpora.
+
+### Nach jeder Charge
+
+```
+python -X utf8 tools/corpus_sanity_check.py data --pattern "selfplay_v24-b06-policy-sN_*.pkl" --out evaluations/artifacts/sanity_v25_sN.json
+```
+
+Damit stehen die Material-Kennzahlen (volle Spalten, Punkte, Strafleiste) je Arm fest,
+bevor trainiert wird -- die Reihenfolge der Trainings richtet sich danach (par.14).
