@@ -1238,3 +1238,40 @@ erzeugt, und der ganze Zweck des Plans faellt.
 die LETZTE Spec-Aenderung vor dem Einfrieren, nicht eine unter vielen. Dasselbe gilt fuer
 K5, dessen Messung noch aussteht. Beide gehoeren VOR den Start von v25 entschieden --
 danach ist die Spec bis v27 zu.
+
+### par.14e BEINAHE-FEHLER: --action-temp war verdrahtet, aber nicht durchgereicht (gefunden 2026-09-07, 10:20)
+
+**Der Fehler.** `--action-temp` wurde in `self_play.py` geparst (Zeile 918), validiert
+(471), in die Statuszeile gedruckt (592-600) und ins Manifest geschrieben (555) -- aber im
+Aufruf von `_run_chunk_supervised` in `generate_data` FEHLTE das Argument. Die Kette
+`_run_chunk_supervised` -> `_worker_run_chunk` -> `os.environ["MOSAIC_ACTION_TEMP"]`
+(Zeile 220) bekam damit immer den Default 0. **Der Knopf war aus, in jedem Lauf.**
+
+**Warum das schlimmer ist als ein toter Knopf: das Manifest haette gelogen.** Sein Feld
+`action_temp` wird aus dem PARAMETER gefuellt, nicht aus der tatsaechlich gesetzten
+Umgebung. Ein Lauf mit `--action-temp 1` haette also argmax-Material erzeugt und dazu ein
+Manifest mit `"action_temp": 1` sowie eine Statuszeile "an: T(n)=0,7/0,4/0,15" abgelegt.
+Die Pruefregel "Lauf-Manifest gegen Referenz" haette den Fehler NICHT gefangen, weil das
+Manifest die Absicht spiegelt und nicht den Zustand.
+
+**Betroffen waeren die Sockel-Arme S2 und S5 und die Schwarm-Klasse** (par.16: alle 8.000
+Partien mit `--action-temp 1`). Der Fehler ist gefunden, BEVOR eine Partie damit erzeugt
+wurde -- es existiert kein kontaminiertes Artefakt.
+
+**Gefunden hat ihn der Weg-B-Auftrag** beim Lesen des Umfelds, nicht der Autor des Knopfs
+(Koordinator). Die Bauform der uebrigen Knoepfe (`deviate_*`, `tau_argmax_from_move`,
+`excursion_*`) ist korrekt; nur diese eine Zeile fehlte.
+
+**Behoben** 2026-09-07, 10:20: `action_temp=action_temp` im Aufruf ergaenzt, `py_compile`
+gruen. **Noch offen und mit dem naechsten Build zu erledigen** (weil es einen Lauf zum
+Pruefen braucht):
+
+1. **Die Duplikation abschaffen, die den Fehler ermoeglicht hat.** Die Knopfliste steht
+   heute VIERMAL (Signatur `generate_data`, Aufruf `_run_chunk_supervised`, dessen
+   Signatur, dessen Aufruf von `_worker_run_chunk`). Ein einziges Knopf-Dictionary, das
+   durchgereicht wird, macht das Vergessen strukturell unmoeglich.
+2. **Das Manifest auf den ZUSTAND umstellen**, nicht auf die Absicht: die gesetzten
+   `MOSAIC_*`-Variablen aus dem Arbeitsprozess zurueckmelden und DIESE ins Manifest
+   schreiben. Dann faengt die Manifest-Pruefung genau diese Fehlerklasse.
+3. **Rauchprobe** fuer `--action-temp`, wie sie Weg C bekommen hat (dort zeigten 20 Partien
+   20 `[deviate]`-Zeilen). Ein Knopf ohne Rauchprobe ist ein Knopf ohne Beleg.
