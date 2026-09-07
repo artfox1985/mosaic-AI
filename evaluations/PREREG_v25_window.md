@@ -465,3 +465,53 @@ bleibt es bei D auf dem Dreieck. **Kein Entscheid noetig, bis der Arm gefahren i
 Zuschnitt und Groesse des Fensters (par.1: 29.450 Partien, 2.945 Dateien), die
 hv2-Uebergangsabbildung (par.2), Val-Pool-Regex und Startgewicht (par.6), die Form des
 Waechters (par.7). Die Erzeugung startet NUR auf Nutzer-Anweisung.
+
+## par.12 WAS MESSUNG 3-V AM ZUSCHNITT AENDERT (2026-09-07, 02:45; Nutzer-Frage "hat das nun einen einfluss auf unseren fenster zuschnitt?")
+
+**Kurz: an der ZUSAMMENSETZUNG nichts, am BETRIEBSPUNKT der Erzeugung alles -- und damit
+faellt Punkt C der Vorlage (par.11) ersatzlos weg.**
+
+Gemessen (`PREREG_search_path_remeasurements.md`, Messung 3-V): die Sockel-Konfiguration
+(@100, Wurzelrauschen an, policy-aktiv) baut mit dem Bestandsverhalten 0,1950 volle Spalten
+je Seite, mit argmax ab Halbzug 12 dagegen **0,4225** -- bei praktisch unveraenderter
+Zustandsvielfalt. Betroffen ist ausschliesslich der SOCKEL: der Schwarm faehrt seit v23
+ohnehin `--deterministic --no-root-noise` (par.6 der v24-Prereg, Zeile
+`selfplay_v22-b05-value-argmax`), ist also schon argmax und mit 0,748 die spaltenreichste
+Klasse.
+
+**Traeger-Kennzahl, neu gerechnet** (Zusammensetzung unveraendert: 4.000 Sockel NEU +
+1.350 G-1-Sockel + 450 hv2-Traeger = 5.800):
+
+| | volle Spalten je Seite |
+| --- | --- |
+| v24 GEMESSEN (`v24_sanity_carriers.json`) | 0,356 |
+| v25 mit Bestands-Sockel (die Sorge aus par.11 C) | 0,232 |
+| **v25 mit argmax-Sockel (Messung 3-V, Charge B)** | **0,392** |
+
+Statt eines Absturzes auf 0,23 also ein Anstieg ueber den v24-Wert. Der Spalten-Waechter
+par.7 ist damit nicht mehr in Gefahr, und die drei Hebel aus par.11 C (mehr hv2-Traeger,
+Betriebspunkt messen, nichts tun) sind gegenstandslos -- der Betriebspunkt WAR der Hebel.
+Fenster-Kennzahl: der Sockel-Fix allein hebt sie um rund 0,032 (4.000 von 29.450 Partien),
+Bezug v24 0,624.
+
+**Was sich NICHT aendert:** Groesse und Klassenaufteilung des Fensters (par.1: 29.450
+Partien, 2.945 Dateien), die hv2-Uebergangsabbildung (par.2), Val-Pool-Regex und
+Startgewicht (par.6), die Form des Waechters (par.7). Der Zuschnitt bleibt, wie er ist.
+
+**Was sich aendert oder neu zu entscheiden ist:**
+1. **Punkt C der Vorlage entfaellt.** Ersatzlos, nicht "anders beantwortet".
+2. **Punkt B (Value-Klasse 8.000/0 gegen 7.000/1.000) wird klarer:** die 1.000 gesampelten
+   waeren nach diesem Befund die EINZIGE verrauschte Klasse des Fensters und traegen laut
+   Messung keine zusaetzliche Vielfalt. Empfehlung 8.000/0 steht damit staerker.
+3. **NEU: der Erzeugungs-Betriebspunkt gehoert in den Zuschnitt.** Bisher stand er nirgends
+   als Parameter des Fensters, sondern implizit im Rezept. Vorschlag: `--tau-argmax-from-move`
+   als Pflichtfeld des v25-Rezepts, Wert aus der Kurve (heute: 12 schlaegt 30 um 0,12
+   Spalten; ein Punkt bei 1 ist noch nicht gemessen).
+4. **NEU, offen: der hv2-Anteil koennte schneller ausrotieren.** hv2 war im Fenster der
+   Spalten-Lieferant (0,73 gegen 0,19 des Sockels). Baut der Sockel selbst 0,42, ist dieses
+   Argument schwaecher. Das beruehrt par.2 (Uebergangsabbildung) und ist NICHT entschieden --
+   es ist ein Kandidat fuer den naechsten Zuschnitt, nicht fuer diesen.
+
+**Ungeprueft, ausdruecklich:** ob ein aus diesem Material trainiertes Netz staerker spielt
+oder in der ARENA mehr Spalten baut. Die Kennzahlen oben sind Material-Kennzahlen. Der
+Schritt zur Arena kostet ein Training plus Gating und ist der naechste Entscheid.
