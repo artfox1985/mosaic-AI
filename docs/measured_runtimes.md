@@ -88,6 +88,8 @@ Alle Werte aus den Artefakten der Laeufe, nicht geschaetzt. Threads wie angegebe
 | restic rewrite + prune + check auf 14,5 GiB | **14 s** | lokale Pack-Dateien |
 | Tagesschnappschuss + check | **9 s** | |
 | Aktionsprofil-Sonde, 3 Gruppen a 400 Dateien | **rund 4 min** | 1,5 Mio Entscheide |
+| **v25-Sockel: 4.000 Partien @100 Sims, threads 11** | **14.426 s = 4h 00m** | 3,61 s je Partie, 659.083 Zuege, 400 Dateien |
+| **Cache-Bloecke je Datei, 400 Dateien, 3 Arbeiter** | **1.126 s = 18,8 min** | NEBEN der laufenden Erzeugung, ohne Durchsatzverlust |
 
 **Hochrechnung fuer die v25-Erzeugung** (hergeleitet aus 3,77 s je Partie, NICHT auf dieser
 Groesse gemessen): rund 4,2 h je 4.000-Partien-Block, rund 3,0 h fuer die Ausflug-Haelfte
