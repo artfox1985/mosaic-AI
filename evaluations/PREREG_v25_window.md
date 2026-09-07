@@ -994,3 +994,51 @@ python -u self_play.py --mode network --model models/alphazero_v24-b06_brierbest
 Weder `--deterministic` noch `--no-root-noise` (siehe oben). Kosten rund 7,5 h statt 8,2 h.
 Der Name traegt jetzt `-value-tempc` statt `-value-argmax`, damit im Fenster-Manifest
 sichtbar bleibt, wie die Klasse erzeugt wurde.
+
+### par.16a WURZELRAUSCHEN AN, und der Split-Gedanke (Nutzer 2026-09-07, 09:05)
+
+**Entschieden: Wurzelrauschen im Schwarm AN.** Weder `--deterministic` noch
+`--no-root-noise`; der Befehl in par.16 gilt damit unveraendert. Begruendung wie dort:
+Abdeckung ist das erklaerte Ziel dieser Klasse, der Spaltenverlust zaehlt in ihr nicht.
+
+**Nutzer, woertlich (09:05):** *"ich ueberleg mir gerade noch einen saubern split damit wir
+nicht nur verrauschte daten in der erstellung fuer den value haben. vielleicht bauen wir
+50% der spiele eine meiner ideen ein: den weg B sozusagen."*
+
+**Der Gedanke loest den Trade-off, den par.15 benennen musste.** Eine vollstaendig
+temperierte Value-Klasse kauft Abdeckung mit verzerrten Zielen: `z` ist verzerrt, wenn
+Explorationszuege im Pfad liegen (Willemsen/Baier/Kaisers,
+`RESEARCH_alphazero_improvements_2026-08-01.md` Fund 1). **Weg B hat diesen Defekt nicht** --
+der Ausflug weicht ab und spielt danach sauber zu Ende, das Ziel ist also der Wert der
+abgewichenen Stellung unter GUTEM Spiel. Ein Split liefert damit beides: eine Haelfte
+breite, verrauschte Abdeckung, eine Haelfte abweichende Stellungen mit unverzerrten Zielen.
+
+**Und Weg B braucht dafuer KEINEN neuen Engine-Code** (Befund am Code, 2026-09-07): die
+Offline-Fassung ist `--seed-positions` (abgenommen mit b03, par.7) plus
+`--tau-argmax-from-move`. Eine Partie startet ab einer Stellung, sampelt k Halbzuege und
+spielt danach greedy -- genau der zweiphasige Ausflug. Die Startstellungen kommen aus dem
+SOCKEL derselben Generation, der ab sofort sauber gespielt ist (k = 1), also aus Stellungen,
+die unter gutem Spiel entstanden sind.
+
+**Kosten (gerechnet, Restlaenge 44 % einer Vollpartie aus par.7):**
+
+| Variante | Erzeugung | Records im Schwarm |
+| --- | --- | --- |
+| 8.000 Vollpartien temperiert | 7,5 h | rund 1.312.000 |
+| **4.000 Voll + 4.000 Ausfluege** | **5,4 h** | rund 944.000 (72 %) |
+
+Der Split ist also **billiger**, kostet aber **28 % der Zustaende**, weil ein Ausflug nur
+rund 72 Records liefert statt 164. **Das ist die einzige echte Abwaegung dieses
+Vorschlags:** der Value-Kopf ist datenhungrig ([[project_corpus_dose_result]]: doppelte
+Menge, 6 von 6 auf beiden Orakel-Metriken, Arena-bestaetigt 479:321). Wer die Zustandszahl
+halten will, faehrt entweder mehr Ausflug-Partien (5.500 statt 4.000 gleicht es aus, +0,6 h)
+oder nimmt die 28 % in Kauf, weil die gewonnenen Stellungen wertvoller sind.
+
+**Abhaengigkeit in der Reihenfolge:** die Ausfluege brauchen Startstellungen aus dem Sockel,
+also muss der Sockel VOR dieser Schwarm-Haelfte laufen. Fuer die zweite Maschine heisst das:
+sie faehrt zuerst Sockel-Arme, nicht die Schwarm-Haelfte mit Ausfluegen.
+
+**Offen (Nutzer):** (a) das Verhaeltnis -- 50/50 oder mehr Ausfluege, um die Zustandszahl zu
+halten; (b) die Kuratierungsregel fuer die Startstellungen (b03 nahm Spieler am Zug,
+R2-4, Spaltenfortschritt 3-5, par.7 -- fuer den Value-Kopf koennte eine breitere Regel
+besser sein); (c) wie viele Halbzuege der Ausflug sampelt, bevor er greedy wird.
