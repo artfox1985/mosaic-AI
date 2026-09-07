@@ -2271,3 +2271,44 @@ beiden Arm-Messungen tragen. Kosten nach der K3-P-Praezedenz rund 1,2 h.
 haelt K5 den Kuppel-Bonus und hebt ihn weiter, ohne Siege oder Spalten zu kosten, ist der
 Kandidat `models/hullform2_k5w10.spec.json`; sonst `models/hullform2.spec.json`. Nur EIN
 Kandidat wird gegatet -- zwei waeren zwei Faktoren und die doppelte Rechenzeit.
+
+### par.8.15e VERDIKT: die Huellenform besteht, mit Staerke-Anspruch (Gating 2026-09-07, 14:37-15:44)
+
+Gefahren nach par.8.15d: `tools/gate_hull_form_spec.sh`, `hullform2.spec.json` gegen die
+Champion-Spec am SELBEN Netz, **dritter Seed 20261015**, Deckel 200 Paare, @400,
+Blockgroesse 5, threads 10, exklusiv. Einfaktorialitaet vor dem Lauf belegt
+(`envelope_hull_form`).
+
+| Messung | Arm : Champion | Quote | Vorzeichentest |
+| --- | --- | --- | --- |
+| Arm-Arena Seed 20261014 (par.8.15b) | 85 : 75 | 0,531 | p 0,477 |
+| Arm-Arena Seed 20261013 (par.8.15c) | 92 : 68 | 0,575 | p 0,069 |
+| **Gating Seed 20261015** | **214 : 186** | **0,535** | p 0,177 |
+| **gepoolt, 3 Seeds, 720 Partien** | **391 : 329** | **0,543** | **p 0,0229** |
+
+**Gepoolte Siegquote 0,543, 95%-KI [0,507; 0,579] -- das Intervall schliesst 0,5 AUS.**
+Gepaarte Differenz des Gatings +0,140, KI [-0,054; +0,334]. Der SPRT lief in den Deckel
+ohne Entscheid, genau wie in par.8.15d vorhergesagt: gegen eine Alternativhypothese von
+0,65 kann eine wahre Quote um 0,54 kein Verdikt erzeugen. Wer das SPRT allein liest, liest
+den Test falsch herum.
+
+**Damit ist die ZWEITE Zeile der Vorab-Tabelle erfuellt** (par.8.15d): Spalten in vier von
+vier gemessenen Richtungen ueber der Kontrolle, Siegquote nicht unter 50 %, UND
+Vorzeichentest ueber alle Seeds unter 0,05. **Aufnahme in die Spec, und als
+Staerke-Gewinn ausgewiesen** -- nicht nur als Spalten-Knopf.
+
+**Einordnung an der Praezedenz:** K3-P wurde bei 259:191 = 0,576 ueber 450 Partien
+(p 0,003) aufgenommen. Die Huellenform liegt bei 0,543 ueber 720 Partien (p 0,023) --
+schwaecher im Effekt, breiter im Beleg. Sie ist damit die erste Spec-Aenderung seit K3-P,
+die den Champion nachweislich schlaegt.
+
+**Vorbehalt, der genannt gehoert:** die drei Zeilen stammen aus ZWEI Werkzeugen
+(`paired_arena_env_ab` fuer die beiden Arm-Arenen, `paired_gating` fuer das Gating). Beide
+sind gepaart, @400, gleiches Netz, nur die Spec unterscheidet sich; die Poolung ist
+verteidigbar, aber sie ist eine Poolung ueber Aufbauten, nicht ueber Wiederholungen
+desselben Aufbaus. Das Gating allein traegt den Staerke-Anspruch NICHT (p 0,177).
+
+**Nicht getan, weil es die Leiter veraendert:** eine Elo-Kante fuer die Huellenform ist
+nicht eingetragen. `paired_gating` schlaegt den Befehl vor; ob eine Spec-Variante einen
+eigenen Leiterknoten bekommt, ist ein Nutzer-Entscheid (Praezedenz: die K3-P-Kante wurde
+eingetragen).
