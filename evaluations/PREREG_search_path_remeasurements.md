@@ -360,3 +360,30 @@ groessenordnungsgleich mit dem, was er absichert.
 plausiblen Einstellung; wenn nicht, waere der Umschaltpunkt im v25-Rezept ein Fehler, den
 man erst am Ende der Generation bemerkt haette. **Start nur auf Nutzer-Anweisung** (die
 Erzeugung von 8.000 Partien faellt unter den Vorbehalt "ausser der Fenster-Erzeugung").
+
+### 3-V, vierter Punkt: k = 1 ist das Optimum, die Reihe ist monoton (gefahren 2026-09-07, 03:24-03:33)
+
+| `--tau-argmax-from-move` | gesampelte Halbzuege | volle Spalten je Seite | Punkte | Strafleiste | Seiten mit voller Spalte |
+| --- | --- | --- | --- | --- | --- |
+| aus (Bestand) | alle 162 | 0,1950 (KI +-0,047) | 28,3 | 9,41 | 64 / 400 |
+| **1** | **keine** | **0,5325** (KI +-0,072) | **41,5** | **6,93** | **156 / 400** |
+| 12 | 11 | 0,4225 (KI +-0,062) | 38,5 | 7,54 | 138 / 400 |
+| 30 | 29 | 0,3000 (KI +-0,053) | 36,5 | 7,80 | 103 / 400 |
+
+**Die Reihe ist monoton: je frueher argmax, desto mehr Spalten, desto mehr Punkte, desto
+weniger Strafleiste.** Es gibt kein Zwischenoptimum. Der beste Punkt ist der Randpunkt
+k = 1, also durchgehend greedy -- die Zugwahl sampelt gar nicht mehr, die einzige Streuung
+kommt aus dem Gumbel-Wurzelrauschen der Suche (par.9d der Seeding-Prereg: `add_root_noise`
+ist im Sockel AN) und aus dem Spiel selbst.
+
+**Damit ist der Nutzer-Vorschlag "argmax + C" (2026-09-07, 03:12) belegt die richtige
+Wahl:** wenn das Sampling in JEDER Dosis schadet, holt man die Streuung besser aus einem
+Mechanismus, der die Zugqualitaet nicht verdirbt. Fuer die v25-Arme S3 und S4
+(`PREREG_v25_window.md` par.14) gilt damit **k = 1**.
+
+**Einordnung, damit die Zahl nicht ueberdehnt wird:** 0,5325 ist die
+SOCKEL-Konfiguration (@100, Wurzelrauschen an, policy-aktiv). Das argmax-Instrument
+derselben Nacht misst 0,8200 bei @100 -- dort sind zusaetzlich `--deterministic` und
+`--no-root-noise` gesetzt. Der Unterschied von rund 0,29 zeigt, was allein das
+Wurzelrauschen der Suche noch kostet; es ist die letzte verbliebene Streuquelle im
+Sockel und NICHT Gegenstand dieser Messung.
