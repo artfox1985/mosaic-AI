@@ -595,7 +595,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         action_temp_status = "irrelevant (--deterministic argmaxt bereits die ganze Partie)"
     else:
         form = ("Staffel T(n)=0,7/0,4/0,15 (par.14)" if action_temp == 1
-                else "glatt T(n)=0,2..0,8 log ueber |Aktionen|, Anker 2 und 64 (par.14d)")
+                else "glatt T(n)=0,2..0,8 log ueber |Aktionen|, Anker 2 und 72 (par.14d/14g)")
         if tau_argmax_from_move:
             action_temp_status = (f"an: {form}, ab Zug {tau_argmax_from_move} "
                                   f"wirkungslos (argmax hat Vorrang)")
@@ -920,8 +920,8 @@ if __name__ == "__main__":
                              "(Bestand: Zugwahl proportional zu den rohen Besuchszahlen, "
                              "bitidentisch), 1 = Staffel wie im Heuristik-Pfad (mehr als "
                              "50 gueltige Aktionen -> T 0,7; mehr als 15 -> 0,4; sonst 0,15), "
-                             "2 = glatte Form (par.14d): logarithmisch von T 0,2 bei 2 Aktionen "
-                             "bis 0,8 bei 64, ausserhalb gekappt. In beiden Faellen werden die "
+                             "2 = glatte Form (par.14d/14g): logarithmisch von T 0,2 bei 2 Aktionen "
+                             "bis 0,8 bei 72, ausserhalb gekappt. In beiden Faellen werden die "
                              "Gewichte visits^(1/T); das Policy-ZIEL bleibt die "
                              "completed-Q-Verteilung. Setzt NUR MOSAIC_ACTION_TEMP.")
     parser.add_argument("--excursion-prob", dest="excursion_prob", type=float, default=0.0,
