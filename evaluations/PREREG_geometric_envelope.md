@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt (8.7 gepoolt 191:129, Champion-Knopf seit 2026-09-04, par.11). Am Champion v24-b06 gemessen 2026-09-06: K3-P2 NEGATIV (8.11a, 71:89), K3-F 1,0 NEGATIV (8.14, 74:86, vollendet +0,3 lange Reihen, zahlt Punkte), K3-F 0,5 NEGATIV (8.14, 77:83, Arena-Spalten darunter), K3-P2 + K3-F 1,0 NEGATIV (8.14a, 69:91, Punkte -5,7/-1,9): alle vier Knopf-Arme am Champion negativ. par.8.15: Huellenform 2 (zweite Zelle in Zeile 6) ist der ERSTE positive Arm (8.15b): Spalten 0,787/0,700 gegen 0,625/0,550, Kuppel-Bonus 4,7/4,6 gegen 3,8/3,6, Siege 85:75 (p 0,48, nicht belegt); Replikation offen. Schliesskriterium par.12 (Value-Entlastung, Rauschboden par.12b gemessen) offen. -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf in den ersten Runden messbar und spielt das Netz dadurch stabiler? | Beleg: K3-P (Modus 1, C 1,0) traegt (8.7 gepoolt 191:129, Champion-Knopf seit 2026-09-04, par.11). Am Champion v24-b06 gemessen 2026-09-06: K3-P2 NEGATIV (8.11a, 71:89), K3-F 1,0 NEGATIV (8.14, 74:86, vollendet +0,3 lange Reihen, zahlt Punkte), K3-F 0,5 NEGATIV (8.14, 77:83, Arena-Spalten darunter), K3-P2 + K3-F 1,0 NEGATIV (8.14a, 69:91, Punkte -5,7/-1,9): alle vier Knopf-Arme am Champion negativ. par.8.15: Huellenform 2 (zweite Zelle in Zeile 6) ist der ERSTE positive Arm (8.15b): Spalten 0,787/0,700 gegen 0,625/0,550, Kuppel-Bonus 4,7/4,6 gegen 3,8/3,6, Siege 85:75 (p 0,48, nicht belegt); Replikation Seed 20261013 GEFAHREN (8.15c): 92:68, Spalten 0,838/0,863 gegen 0,613/0,350, Kuppel-Bonus bis 5,0; gepoolt 177:143 (p 0,065) -- Spalten belegt, Siege knapp nicht. Schliesskriterium par.12 (Value-Entlastung, Rauschboden par.12b gemessen) offen. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -2183,3 +2183,41 @@ gleichsinnigen Dreiklang einen Beleg zu machen. Traegt sie, ist die Form ein Kan
 die Champion-Spec (wie K3-P am 2026-09-04) und fuer die v25-Erzeugung
 (`PREREG_v25_window.md` par.11 E). Danach erst K5, weil die Form einen Teil seiner Wirkung
 schon liefert und der Baustein sonst gegen einen bewegten Bezug gemessen wuerde.
+
+### par.8.15c REPLIKATION DER HUELLENFORM, Seed 20261013 (gefahren 2026-09-07, 05:37-06:00)
+
+Gleicher Aufbau wie par.8.15b, nur der Basis-Seed wechselt (20261013 statt 20261014).
+Gefahren unter dem NEUEN Wheel (alle sechs Bausteine, Kontrakt unveraendert
+20b442a8164f748d, Anker beidseitig gruen).
+
+| Groesse | Huellenform 2 | Kontrolle (Dreieck) |
+| --- | --- | --- |
+| Arena 2 x 80, Siege | **92 : 68** (Brett 0: 42:38, Brett 1: 50:30; p 0,069) | |
+| volle Spalten je Seite | **0,838 / 0,863** | 0,613 / 0,350 |
+| Punkte | 49,0 / 49,5 | 45,6 / 43,2 |
+| Kuppel-Bonus je Partie | **4,5 / 5,0** | 3,4 / 2,3 |
+
+**Gepoolt ueber beide Seeds (320 Paare): 177 : 143, p = 0,065.** Die Siege bleiben damit
+knapp unter der Signifikanz, aber die Richtung ist ueber zwei unabhaengige Seeds und vier
+Arena-Richtungen konstant.
+
+**Die Spalten sind der harte Teil des Befunds.** Vier Richtungen, vier Mal darueber:
+0,787 / 0,700 (Seed 14) und 0,838 / 0,863 (Seed 13) gegen 0,625 / 0,550 und 0,613 / 0,350.
+Die groesste Einzeldifferenz (0,863 gegen 0,350) betraegt mehr als das Doppelte und liegt
+weit ausserhalb der Block-SD-Spannweite identischer Aufbauten (0,23 bis 0,46, par.12b
+Punkt 3). Ebenso der Kuppel-Bonus: 4,5 bis 5,0 gegen 2,3 bis 3,4 -- der Wert von 5,0 ist der
+hoechste, der in dieser Kampagne je fuer ein Netz gemessen wurde (Mensch 8,9, alle
+v24-Arme 3,5 bis 4,3).
+
+**Verdikt:** Die Huellenform 2 ist der erste Baustein seit K3-P, der Spalten HEBT statt sie
+zu kosten, und der einzige, der zugleich den Kuppel-Bonus deutlich bewegt. Champion-Strenge
+im Sinne von `generation_loop.md` (zwei unabhaengige Seeds) ist fuer die SPALTEN erfuellt,
+fuer die SIEGE nicht (p 0,065 gepoolt). **Konsequenz, Nutzer-Entscheid:** entweder als
+Champion-Spec-Kandidat behandeln wie K3-P am 2026-09-04 (dann braucht es ein Gating mit
+SPRT gegen den Champion, rund 1,2 h), oder direkt in die v25-Erzeugung nehmen und die
+Staerke-Frage dort mitmessen.
+
+**Nebenbefund:** dieser Lauf ist zugleich der Praxis-Nachweis fuer die Log-Aenderungen
+dieser Nacht -- die Arena-Logs tragen die neue Pass-Zeile, das Symbol 🎴 und die
+Chip-Angabe, und die Spalten-Sonde hat beide Artefakte ohne Divergenz replayt
+(`columns_*_s13.json`, Verdikt GRUEN).
