@@ -566,3 +566,52 @@ neutral". Wer den Fall unter die alte Regel presst, entscheidet per Etikett stat
 Befund. Die Abwaegung steht in `PREREG_geometric_envelope.md` par.8.15e.
 
 **Kosten:** Arena 2 x rund 1.060 s, Instrumente 2 x rund 24 min, gesamt 91 min.
+
+### par.9d NACHMESSUNG: das negative Vorzeichen war Rauschen, K5 ist siegneutral (2026-09-07, 13:24-14:34)
+
+Nutzer-Entscheid 2026-09-07 auf den unentschiedenen Befund in par.9c: *"K5 erst nachmessen,
+dann entscheiden."* Gefahren mit `tools/gate_hull_form_spec.sh` (um eine freie
+Kontroll-Spec erweitert), Arm `hullform2_k5w10` gegen Kontrolle `hullform2`, **dritter,
+unabhaengiger Seed 20261016**, Deckel 200 Paare, @400, Blockgroesse 5. Das Skript hat vor
+dem Lauf selbst belegt, dass sich die Specs in genau einem Feld unterscheiden
+(`special_row6_w`).
+
+| Messung | Arm : Kontrolle | Quote | Vorzeichentest |
+| --- | --- | --- | --- |
+| Arena Seed 20261014 (par.9c) | 71 : 89 | 0,444 | p 0,179 |
+| **Gating Seed 20261016** | **172 : 168** | **0,506** | **p 0,913** |
+| **gepoolt, 500 Partien** | **243 : 257** | **0,486** | **p 0,561** |
+
+Gepoolte Siegquote mit 95%-KI **[0,442; 0,530]**, gepaarte Differenz des Gatings **+0,024**
+mit KI [-0,188; +0,235]. SPRT-Entscheid nach 170 Paaren: H0 -- also **kein Beleg, dass der
+Arm besser ist**, was bei einer Alternativhypothese von 0,65 und einer wahren Quote um 0,50
+genau das erwartete Ergebnis ist und keinen Schaden belegt (Lesart vorab in
+`PREREG_geometric_envelope.md` par.8.15d).
+
+**Das negative Vorzeichen der ersten Messung hat sich NICHT repliziert.** 0,444 gegen 0,506
+auf zwei Seeds ist genau die Streuungsgroesse, die fuer diese Kampagne gemessen ist
+(5,75 Prozentpunkte bei n=400 fuer identische Konfiguration,
+[[project_training_seed_variance]]). Wer nach der ersten Messung entschieden haette -- so
+wie der Koordinator es um 11:30 im Chat getan hat --, haette Rauschen fuer einen Befund
+gehalten. **Die Nachmessung war die richtige Entscheidung.**
+
+### Damit steht der Befund vollstaendig
+
+| Frage | Antwort | Beleg |
+| --- | --- | --- |
+| Hebt K5 die Spalten? | **Ja, deutlich** | Instrument 0,5725 -> 0,6900; Arena 0,675 -> 0,7375 in beiden Richtungen |
+| Kostet K5 Siege? | **Nein** | 500 Partien, 0,486, KI [0,442; 0,530] |
+| Wirkt K5 ueber die Spezialfelder? | **Nein** | Kriterium k6 leicht schlechter (-9,67 -> -10,08); die Punkte kommen aus vertikalen Reihen (+0,84) und Eckplatten (+1,66) |
+
+**Nach der in par.8.15d vorab festgelegten Lesart ist das eine AUFNAHME** -- Spalten in
+allen gemessenen Vergleichen ueber der Kontrolle, Siegquote nicht signifikant unter 50 %,
+also ein Spalten-Knopf ohne Staerke-Anspruch. Die Regel war fuer die Huellenform
+geschrieben; sie auf K5 anzuwenden ist konsequent, weil beide dieselbe Bauart sind.
+
+**Der Vorbehalt, der mit in die Entscheidung gehoert:** der Wirkungsweg ist nicht der
+gebaute. Wir wuerden einen Effekt drei Generationen lang einfrieren, dessen Ursache wir
+nur geometrisch plausibel machen (Hoehe zahlt auf vertikale Reihen und untere Eckplatten),
+nicht gemessen haben. Dasselbe gilt allerdings auch fuer die Huellenform. **Nutzer-Entscheid.**
+
+**Laufzeit:** 170 Paare, rund 70 min, 125 s je Block, threads 10, exklusiv.
+Artefakt `evaluations/artifacts/paired_gating_k5vshf2_s16.json`.
