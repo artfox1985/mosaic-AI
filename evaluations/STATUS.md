@@ -24,127 +24,92 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (ZWISCHENBERICHT 2026-09-07, 06:05; Nutzer-Auftrag "fahr einfach durch und bereite mir einen zwischenbericht vor")
+## 1. WAS GERADE LAEUFT (Stand 2026-09-07, 17:20; Maschine FREI, origin/main aktuell)
 
-**Champion unveraendert: `v24-b06`** (Elo 1309, Modell `alphazero_v24-b06_brierbest.onnx`,
-Spec `models/v24-b06_brierbest.spec.json`). **Maschine ist FREI, nichts laeuft.**
-**Der Push ist offen: 84 Commits vor origin/main, Build gruen, Anker gruen.**
-Chronik der Nacht: `night_run_20260902.md` ab dem Eintrag 2026-09-06, 22:35.
+**Generator fuer v25: `v24-b07`** -- bytegleiche Kopie der b06-Gewichte plus die Spec mit
+Huellenform 2 und K5 (`models/alphazero_v24-b07_brierbest.onnx`,
+`models/v24-b07_brierbest.spec.json`). **Elo-Knoten bleibt `v24-b06` (1309)**; b07 hat noch
+keinen eigenen Knoten, siehe Offene Punkte.
 
-### Die vier Messergebnisse der Nacht, in der Reihenfolge ihrer Tragweite
+**Nichts laeuft. Der Baum ist gepusht** (d6ba1d6), Build gruen (549 Tests), Anker in beiden
+Modi gruen. Chronik: `night_run_20260902.md`.
 
-**1. Die Erzeugung wirft mehr als die Haelfte des Spaltenbaus weg -- durch das Sampling der
-Zugwahl** (`PREREG_search_path_remeasurements.md`, Messung 3-V). Vier Chargen zu je 200
-Sockel-Partien, gleicher Generator, gleicher Seed, nur der Umschaltpunkt variiert:
+### Was der 2026-09-07 ergeben hat
 
-| Umschaltpunkt | volle Spalten je Seite | Punkte | Strafleiste |
-| --- | --- | --- | --- |
-| aus (Bestand) | 0,1950 | 28,3 | 9,41 |
-| 30 | 0,3000 | 36,5 | 7,80 |
-| 12 | 0,4225 | 38,5 | 7,54 |
-| **1 (durchgehend greedy)** | **0,5325** | **41,5** | **6,93** |
+**1. Die Huellenform schlaegt den Champion** (`PREREG_geometric_envelope.md` par.8.15e).
+Gepoolt ueber drei Seeds **391:329 = 0,543**, Vorzeichentest **p 0,023**, KI der Siegquote
+**[0,507; 0,579]** -- schliesst 0,5 aus. Erste Spec-Aenderung seit K3-P, die den Champion
+nachweislich schlaegt. Das Gating ALLEIN traegt das nicht (214:186, p 0,177); der SPRT lief
+wie vorhergesagt in den Deckel, weil er gegen H1 = 0,65 testet.
 
-Die Reihe ist monoton, es gibt kein Zwischenoptimum. **Und die Vielfalt bleibt:** 399 von
-400 Endbrettern distinkt (gegen 400 im Bestand), Zustandsvielfalt je Record unveraendert,
-Policy-Entropie der Ziele sogar leicht hoeher. Auch die Ergebnisstreuung bleibt (Punkte-SD
-15,2 gegen 17,9, Anteil knapper Partien identisch). **Damit ist die 0,19 der
-Sockel-Klasse, die den ganzen v25-Streit um die Traeger-Kennzahl ausgeloest hatte, als
-Temperatur-Artefakt erledigt** -- am Mix war nichts zu reparieren.
+**2. K5 hebt Spalten am staerksten von allem Gemessenen, kostet aber keine Siege**
+(`PREREG_special_tile_yield.md` par.9c/9d). Instrument **0,5725 -> 0,6900** (Champion-Bezug
+0,4975). Siegquote ueber **500 Partien 0,486**, KI [0,442; 0,530]. **Der Wirkungsweg ist
+NICHT der gebaute:** das Spezialfeld-Kriterium wird leicht schlechter (-9,67 -> -10,08), die
+Punkte kommen aus vertikalen Reihen (+0,84) und Eckplatten (+1,66). K5 wirkt geometrisch.
 
-**2. Die Huellenform mit zweiter Zelle in Zeile 6 traegt, ueber zwei Seeds**
-(`PREREG_geometric_envelope.md` par.8.15b/8.15c). Arm gegen Champion-Spec am selben Netz:
-
-| | Seed 20261014 | Seed 20261013 | gepoolt |
-| --- | --- | --- | --- |
-| Siege | 85:75 | 92:68 | **177:143** (p 0,065) |
-| volle Spalten (beide Richtungen) | 0,787 / 0,700 gegen 0,625 / 0,550 | 0,838 / 0,863 gegen 0,613 / 0,350 | vier von vier darueber |
-| Kuppel-Bonus | 4,7 / 4,6 gegen 3,8 / 3,6 | 4,5 / 5,0 gegen 3,4 / 2,3 | **hoechster je gemessener Netz-Wert (5,0)** |
-
-Die Siege sind knapp nicht signifikant, die Spalten eindeutig (groesste Differenz 0,863
-gegen 0,350, weit ausserhalb der Block-SD-Spannweite identischer Aufbauten). Es ist der
-erste Baustein seit K3-P, der Spalten HEBT statt sie zu kosten. Vorher waren alle vier
-Knopf-Arme der Nacht negativ: K3-P2 71:89, K3-F 1,0 74:86, K3-F 0,5 77:83, beide 69:91.
-
-**3. Der Betriebspunkt der Erzeugung ist bestaetigt, das Niveau ist gestiegen**
-(`PREREG_search_depth_column_optimum.md` par.8b). Suchtiefen-Kurve am heutigen Champion:
-@100 0,8200, @250 0,5075, @400 0,4975. Plateau weiter bei 100, Absturz so steil wie vor
-drei Generationen; alle Punkte liegen 0,16 bis 0,20 hoeher als bei `v22-b05` (konfundiert:
-anderes Netz UND Champion-Knopf). **Prozessregel-Antwort (par.8c): nicht je Generation
-nachmessen, nur bei Aera-Wechseln** -- die Form hat sich ueber drei Generationen nicht
-bewegt.
-
-**4. Die gemessene Huelle bestaetigt die hergeleitete** (`geometric_envelope` par.8.15a).
-Ueber 1.004 Endbretter: bei Kosten 56 deckt sich die haeufigkeitsoptimale Zellmenge in 20
-von 21 Zellen mit dem Dreieck. Die zweite Zelle in Zeile 6 ist **Mensch-Verhalten** (0,909
-gegen 0,362 der Netze) -- also ein ZIEL, keine Beschreibung des Ist-Zustands.
+**3. Eine erste Messung hat sich nicht repliziert, und das ist die Lehre des Tages.** Die
+K5-Arena stand nach 160 Partien bei 0,444; der Koordinator hat daraus im Chat ein Verdikt
+gemacht. Die Nachmessung auf einem dritten Seed ergab 0,506. Die Differenz ist genau die
+gemessene Streuungsgroesse dieser Kampagne. **Nutzer-Entscheid "erst nachmessen" war
+richtig, das Koordinator-Verdikt war voreilig.**
 
 ### Was gebaut und geprueft wurde
 
-**`cargo test --release --lib`: 538 Tests, 0 rot.** Wheel installiert, Kontrakt unveraendert
-`20b442a8164f748d`, **Anker-Drift und Konservierung je GRUEN** (1.763 Schritte).
+| Baustein | Stand |
+| --- | --- |
+| **Weg B (Ausflug)** | gebaut, gewichtetes Reservoir, eigene `game_id` mit Suffix `_x1`; Rauchprobe 20 von 20 |
+| **Glatte Temperatur** | `MOSAIC_ACTION_TEMP` ist jetzt ein MODUS: 0 aus, 1 Staffel, 2 glatt (0,2 bis 0,8 log ueber die Aktionszahl, Anker 2 und 64 gemessen) |
+| Rauchprobe der drei Modi | GRUEN -- alle drei erzeugen verschiedene Zugfolgen (belegt die WIRKUNG, nicht nur eine Statuszeile) |
+| Build | 549 Tests, examples/benches kompilieren, Wheel installiert, Anker-Drift und -Konservierung gruen |
 
-| Baustein | Was | Prereg |
-| --- | --- | --- |
-| Huellenform | `envelope_hull_form` 1/2 als Spec-Pflichtfeld, alle Suchpfade | `geometric_envelope` par.8.15 |
-| Pass-Zeile | `⏭️ <Name>: passt` plus `#a`-Zeile in beiden Pfaden | `action_id_logging` S2 (Luecke geschlossen) |
-| Chip-Verbrauch | `(3 Plättchen: rot, gelb+blau, schwarz)` in der Vollendungs-Zeile | `pitfalls.md`-Nachtrag |
-| Symbol | ueberall 🎴 statt 🎫 | Nutzer 2026-09-07, 01:30 |
-| **Weg C** | eine Abweichung je Partie, aus breit gezogenen Kandidaten netzgefiltert | `start_position_seeding` par.9c/9e |
-| **Aktionsabhaengige Temperatur** | `--action-temp`, Staffel wie im Heuristik-Pfad | `v25_window` par.14 |
+**Zwei Verdrahtungsluecken am selben Knopf gefunden und geschlossen:** `--action-temp` wurde
+geprueft, gedruckt und ins Manifest geschrieben, aber nie an den Arbeitsprozess
+durchgereicht; und die Statuszeile hat ihren eigenen Text nie ausgegeben. **Der Knopf war in
+jedem Lauf aus, und das Manifest haette das Gegenteil behauptet** (par.14e). Gefunden hat es
+der Weg-B-Auftrag beim Lesen, nicht der Autor.
 
-**Replay-Nachweis in beide Richtungen:** das Altlog `claude_play/g01/game.log` (altes
-Symbol, keine Pass-Zeile, kein Chip-Zusatz) laeuft ohne Divergenz durch, 5 Chip-Zeilen ueber
-die neuen Toleranzen; die frischen Arena-Logs der Replikation ebenso. Der Replayer NUTZT die
-Chip-Angabe jetzt, statt die Wahl zu raten -- der Vorfall vom 2026-08-29 kann fuer neue Logs
-nicht wiederkehren.
+### Aufgeraeumt
 
-### Was der Nutzer entscheiden muss
+- **25 obsolete Ketten-Skripte geloescht** (Nutzer-Freigabe), zehn bleiben. Vorschlag mit
+  Begruendung je Zeile: `evaluations/cleanup_proposal_shell_scripts.md`.
+- **restic-Archiv entruempelt** (Nutzer-Anweisung "raeum auf"): **14,473 -> 8,968 GiB**,
+  `check` ohne Fehler, 14 Sekunden. Endgueltig weg sind die Korpora der Aeren v18-v20,
+  `asym_corpus`, `ownership_corpus`, `corpus_probe`. Erhalten: Modelle, Holdout,
+  `seed_corpus`. Der Legacy-Stand hat dadurch eine NEUE Snapshot-ID.
+- restic-Umgebung in `tools/restic_env.sh` zusammengefasst (der pre-push-Waechter hatte die
+  dreifache Ableitung zu Recht angemeckert).
 
-| # | Frage | Stand / Empfehlung | Kosten |
-| --- | --- | --- | --- |
-| 1 | **Huellenform 2 in die Champion-Spec?** | Spalten belegt (2 Seeds), Siege p 0,065. Entweder Gating mit SPRT wie K3-P am 2026-09-04, oder direkt in die v25-Erzeugung und die Staerke dort mitmessen | Gating rund 1,2 h |
-| 2 | **Value-Klasse 8.000/0 oder 7.000/1.000** (par.11 B) | Empfehlung 8.000/0; nach Messung 3-V waeren die 1.000 gesampelten die einzige verrauschte Klasse und tragen laut Messung keine Vielfalt | 0 |
-| 3 | **G-1-Sockel neu erzeugen?** (par.13a) | Empfehlung V1: die 1.350 Traeger neu, mit dem ALTEN Generator und neuem Betriebspunkt -- hebt die Traeger-Kennzahl von 0,392 auf 0,447 | +1,3 h |
-| 4 | **Schwarm-Arm** (par.15) | Nutzer-Vorschlag: variable Temperatur 0,8-0,2 plus Weg C. Eigener Faktor, gehoert in einen eigenen Arm NACH den fuenf Sockel-Armen | Bau: eine Zeile in `action_temp_for` plus Knopfwert |
-| 5 | **Messung 3-W** (Umschaltpunkt bis in die Arena) | registriert, rund 12 h -- entfaellt, wenn die fuenf v25-Arme ohnehin gefahren werden, weil S1 gegen S3 dieselbe Frage beantwortet | -- |
+### Der naechste Schritt: v25 erzeugen
 
-**Bereits entschieden in dieser Nacht:** Generator v25 = `v24-b06` mit Champion-Spec
-(par.14a); Umschaltpunkt k = 1 und Abweichungsrate 1,0 (par.14b); Armstruktur S1 bis S5
-(par.14); die neun Subagent-Partien pausiert bis v25.
+**Die drei Befehle stehen fertig in `PREREG_v25_window.md` par.19.** 4.000 Traeger
+(Umschaltpunkt 1 + Weg C), 4.000 Schwarm mit glatter Temperatur + Weg C, und **`--games
+2000`** fuer die 4.000 Identitaeten der Ausflug-Haelfte -- ein Ausflug kommt ZUSAETZLICH
+zur Hauptpartie. Hergeleitete Kosten grob 11,4 h; auf einer Maschine nacheinander.
 
-### Was als Naechstes zu tun ist
+**Vor dem Start:** Generationswechsel (`/mosaic-generation-turnover`). Und der
+Val-Pool-Regex aus par.6 wandert von `^selfplay_v24-b06-` auf `^selfplay_v24-b07-`.
 
-1. **Push** (84 Commits, frei -- Build und Anker gruen).
-2. **Zweite Maschine versorgen:** gleicher Commit UND gleiches Wheel; Pruefzeile und die
-   fertigen Befehle stehen in `PREREG_v25_window.md` par.14c. Erwartet:
-   `744 20b442a8164f748d 1 0.0`.
-3. **Entscheid 1 (Huellenform)**, weil er in die Generator-Spec der Erzeugung eingeht.
-4. **K5 "Reihe-6-Spezialfeld"** (`special_tile_yield` par.9) -- nicht gebaut. Es war
-   bewusst hinter die Huellenform gestellt: mit zwei Huellenzellen in Zeile 6 hat das
-   Spezialfeld zwei Zielplaetze, und der Kuppel-Bonus der Form (bis 5,0) liefert bereits
-   einen Teil dessen, wofuer K5 gedacht war.
-5. **Der Punkt bei 150 Sims** der Suchtiefen-Kurve fehlt (par.8c), rund 25 min -- nur
-   noetig, wenn jemand den Betriebspunkt feiner ausloten will.
+### Offene Punkte, die eine Entscheidung brauchen
 
-### Vorbehalte und eigene Fehler dieser Nacht (Regel 0)
+1. **Elo-Knoten fuer `v24-b07`.** Die Kante gegen b06 ist gemessen (214:186, Seed 20261015).
+   Eintragen aendert die Leiter -- Nutzer-Entscheid, Befehl in par.8.15f.
+2. **Paritaets-Fixture bei reinem Spec-Wechsel?** `docs/promotion_checklist.md` 5d kennt nur
+   den Champion-Wechsel. Die Fixture prueft die DEFAULT-Knopfstellung, und die hat sich
+   nicht bewegt. **Ungeprueft.**
+3. **`--tau-argmax-from-move 1` in der Ausflug-Haelfte** ist eine markierte Ableitung des
+   Koordinators, nicht vorregistriert (Begruendung in par.19).
+4. **Neun Subagent-Partien** bleiben pausiert bis v25.
+5. `models/attic_20260906_k3p10_copies/` und `venv_measure_hullform/` liegen weiter,
+   Loeschung nur auf pfadgenaue Freigabe.
 
-- **Vier Koordinator-Fehler, alle im Chat berichtigt und in der Chronik vermerkt:** (a) "die
-  tau-Messung wurde nie gefahren" -- falsch, Messung 3 lief am 2026-08-08 (H0 auf STAERKE,
-  nicht auf Spalten); (b) "Weg B entspricht KataGos Branching" -- falsch, KataGo erzeugt
-  keine zweite Trajektorie; (c) "die Streuung kommt von Dirichlet-Rauschen" -- falsch, die
-  Suche ist Gumbel-basiert; (d) "der Schwarm ist rauschfrei und trotzdem spaltenreich, also
-  braucht es keine Streuung" -- die Kennzahl der falschen Klasse, vom Nutzer korrigiert.
-- **Ein Regelbruch:** die Kurven-Messung wurde mit umgeleiteter Ausgabe gestartet statt
-  harness-getrackt. Der Lauf selbst war sauber und exklusiv; Sichtbarkeit wurde nachgeruestet.
-- **Session-Ausfall 04:30-05:30** durch ein Rate-Limit. In der Zeit lief nichts; die alte
-  Knopf-Kette am v23-Champion ist in ihren Deckel gelaufen, OHNE zu messen.
-- **Ungemessen bleibt die Kernfrage:** ob ein aus dem besseren Material trainiertes Netz
-  staerker spielt. Alle Zahlen oben sind Material- oder Suchkennzahlen. Der Schritt zur
-  Arena kostet ein Training plus Gating.
-- **`models/attic_20260906_k3p10_copies/`** liegt weiter, Loeschung nur auf pfadgenaue
-  Freigabe. Ebenso `venv_measure_hullform/` (von mir angelegt, leer, nicht mehr gebraucht).
-- **`static/`** traegt Aenderungen des Nutzers (GUI), von mir nicht angefasst und nicht
-  committet.
+### Kampagnen-Rahmen (Nutzer-Entscheid 2026-09-07)
+
+**v25 bis v27 wird NICHT am Netz gedreht** -- Architektur, Trainingsrezept,
+Value-Ziel-Mischung und Koepfe bleiben fest, nur das Material aendert sich. Eine flache
+Arena ist dabei ausdruecklich akzeptiert, Ruecklauf nicht. **Damit ist auch die Spec
+geschlossen:** Huellenform und K5 waren die letzten spec-pflichtigen Aenderungen
+(`PREREG_v25_window.md` par.18).
 
 ## 2. WAS DIE GENERATION v23 ERGEBEN HAT
 
