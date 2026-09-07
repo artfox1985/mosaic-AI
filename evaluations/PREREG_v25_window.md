@@ -749,3 +749,31 @@ Stand von par.4 (b05 ohne K3-P, Nutzer 2026-09-06 11:40) ueberholt.
 
 **Ebenfalls entschieden (03:35): S2 und S5 werden gebaut**, also die aktionsabhaengige
 Temperatur im Netz-Pfad (par.14). Damit sind alle fuenf Arme baubar.
+
+### par.14b DOSIS UND UMSCHALTPUNKT ENTSCHIEDEN (Nutzer 2026-09-07, 03:38)
+
+- **Umschaltpunkt k = 1** fuer S3 und S4 (belegt: Messung 3-V, vierter Punkt -- die Reihe
+  ist monoton, der Randpunkt gewinnt mit 0,5325 gegen 0,4225 bei k=12 und 0,195 im
+  Bestand). **Es wird also gar kein Halbzug mehr gesampelt.**
+- **Abweichungsrate 1,0** fuer S4 und S5 (`--deviate-prob 1.0`), also eine Abweichung in
+  JEDER Partie. Begruendung gegen KataGos 5 %: bei 4.000 Sockel-Partien waeren 5 % nur 200
+  Abweichungen, und da im Mittel die halbe Restpartie hinter dem Knick liegt, stammten
+  rund 2,5 % des Materials aus der Zeit danach -- unter jeder Aufloesung. Bei Rate 1,0 sind
+  es rund 50 %. KataGos Rate ist fuer Millionen Partien gedacht, nicht fuer viertausend.
+  **Nebenwirkung, benannt:** die tatsaechliche Rate liegt leicht darunter, weil der
+  Vorzugs-Waechter (par.9e der Seeding-Prereg) Abweichungen ueberspringt, wenn der Bauer-
+  oder Kuppel-Vorzug greift.
+
+**Was damit ueber die Streuung im Sockel gesagt ist** (Nutzer-Rueckfrage: "sprich wir
+machen nun keine gesampelten halbzuege weil uns das wurzelrauschen eh schon etwas zufall
+reinhaut?"): ja. Bei k = 1 bleiben drei Quellen -- das Gumbel-Wurzelrauschen der Suche
+(`add_root_noise` ist im Sockel AN, wirkt bei JEDER Suche, par.9d der Seeding-Prereg), der
+Spiel-Zufall (Auslagen, Platten, Wertungsplatten) und bei S4/S5 die eine Abweichung je
+Partie. Zwei Belege, dass das fuer ZUSTANDSVIELFALT reicht: 399 von 400 distinkten
+Endbrettern bei k = 12 (Messung 3-V), und die Schwarm-Klasse faehrt seit v23 voellig
+rauschfrei (`--deterministic --no-root-noise`) und ist mit 0,748 die spaltenreichste
+Klasse des Fensters.
+
+**Was damit NICHT gesagt ist:** dass es fuer den VALUE-Kopf reicht. Alle diese Stellungen
+sind on-policy. Genau diese Luecke ist der Grund fuer Weg C, und ob sie sich auswirkt,
+zeigt erst S4 gegen S3 nach dem Training.
