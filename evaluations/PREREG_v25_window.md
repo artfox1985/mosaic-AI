@@ -610,3 +610,51 @@ Restlaenge aus par.7). **Bau: par.9**, Zustands-Klon plus Zweig in derselben Clo
    Spaltenfortschritt).
 
 **Nicht entschieden:** nichts davon. Die Erzeugung startet nur auf Anweisung.
+
+### par.13a DEN G-1-SOCKEL NEU ERZEUGEN (Nutzer 2026-09-07, 02:55: "den sockel aus der vorgeneration koennen wir ebenfalls neu erstellen mit mehr spalten")
+
+**Der Gedanke.** Die gesampelten G-1-Sockel-Partien sind Temperatur-Artefakt-Material
+(0,189 volle Spalten, Messung 3-V erklaert warum). Sie werden bisher UEBERNOMMEN, weil sie
+schon da sind. Man kann sie stattdessen mit dem neuen Betriebspunkt neu erzeugen.
+
+| Variante | was neu erzeugt wird | Traeger | Fenster | Partien neu | Erzeugung |
+| --- | --- | --- | --- | --- | --- |
+| Basis (par.13) | 12.000 (Sockel + Schwarm G) | 0,392 | 0,625 | 12.000 | 11,2 h |
+| **V1** | dazu die **1.350 G-1-TRAEGER** | **0,447** | 0,636 | 13.350 | 12,5 h |
+| **V2** | dazu **alle 4.000 gesampelten G-1-Sockelpartien** (1.350 Traeger + 2.650 Rest) | **0,447** | **0,657** | 16.000 | 15,0 h |
+
+(Bezug v24 gemessen: Traeger 0,356 / Fenster 0,624 / Erzeugung 11,9 h. Der Schwarm G-1
+bleibt in allen Varianten Bestand -- er ist bereits argmax und mit 0,748 die
+spaltenreichste Klasse; neu zu erzeugen waere dort reine Kostenverschwendung.)
+
+**Mit welchem Generator?** Das ist die eigentliche Frage, und sie entscheidet, ob das noch
+eine Rotation ist:
+- **Mit dem ALTEN Generator (`v23-b01` mit K3-P), neuem Betriebspunkt:** die
+  Generationen-Mischung bleibt erhalten (zwei verschiedene Netze im Fenster), nur das
+  Temperatur-Artefakt verschwindet. **Empfohlen.**
+- **Mit dem NEUEN Generator:** dann traegt das Fenster nur noch EIN Netz plus hv2. Das ist
+  keine Rotation mehr, sondern ein Ein-Generator-Fenster -- eine andere Fenster-Philosophie,
+  nicht ein anderer Parameter. Nicht empfohlen, ohne dass jemand geprueft hat, wofuer die
+  Mischung ueberhaupt da ist.
+
+**Was fuer den Vorschlag spricht.** Der Zweck des Alt-Bestands ist laut
+[[project_replay_window_strategy]] VOLUMEN fuer den datenhungrigen Value-Kopf ("Policy im
+Warm-Start-Regime gesaettigt, Value-Kopf log-linear hungrig"), nicht Zeit-Vielfalt. Volumen
+laesst sich neu erzeugen; ob es aus 2026-09 oder 2026-08 stammt, ist dem Value-Kopf gleich.
+Und die 0,189 sind kein Merkmal jener Generation, sondern ein Messfehler in der Erzeugung,
+den wir seit heute Nacht kennen.
+
+**Was dagegen spricht.** (a) V2 kostet 3,8 h mehr Erzeugung, ein Drittel Aufschlag. (b) Der
+Vorteil ist im TRAEGER klein (V1 und V2 sind dort identisch, 0,447 -- die 2.650 sind
+Value-Material und beruehren die Policy nicht); der Unterschied zwischen V1 und V2 sind
+0,021 Fenster-Kennzahl. (c) Ungeprueft ist, ob das Fenster durch mehr Gleichartigkeit
+schmaler wird: alle vier Sockel-Klassen kaemen dann aus demselben Betriebspunkt, und die
+bedingte Vielfalt ueber die Klassen hinweg ist nie gemessen worden.
+
+**Empfehlung: V1.** Sie holt den ganzen Traeger-Gewinn (0,392 auf 0,447, das ist die Zahl,
+an der der Spalten-Waechter haengt) fuer 1,3 h Aufschlag und laesst die Value-Masse
+unberuehrt. V2 kauft 0,021 Fenster-Kennzahl fuer weitere 2,5 h -- das ist der schlechtere
+Handel, solange nicht gezeigt ist, dass die Fenster-Kennzahl selbst etwas bewirkt.
+
+**Beide Varianten aendern die Klassenaufteilung NICHT** -- nur, ob eine Klasse kopiert oder
+neu gefahren wird. Der Waechter par.7 und die Groesse 29.450 bleiben.
