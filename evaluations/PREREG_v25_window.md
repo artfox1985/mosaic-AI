@@ -870,3 +870,60 @@ python -X utf8 tools/corpus_sanity_check.py data --pattern "selfplay_v24-b06-pol
 
 Damit stehen die Material-Kennzahlen (volle Spalten, Punkte, Strafleiste) je Arm fest,
 bevor trainiert wird -- die Reihenfolge der Trainings richtet sich danach (par.14).
+
+## par.15 ARBEITSTEILUNG SOCKEL / SCHWARM (Nutzer-Einwand 2026-09-07, 03:40; Koordinator-Aussage berichtigt)
+
+**Was der Koordinator gesagt hatte** (Chat 03:38): der Schwarm laufe ganz ohne Rauschen und
+sei trotzdem mit 0,748 die spaltenreichste Klasse -- als Beleg dafuer, dass Streuung
+entbehrlich sei.
+
+**Nutzer, woertlich:** *"der schwarm ist eigentlich nur fuer den value head da und es gibt
+nur vielfalt aus dem spiel aber nicht aus der eigenen spielvarianz. da wissen wir ja
+eigentlich dass nichts gelernt wird. die spalten werden in der policy erzogen, ich wuerd
+vermutlich den schwarm mehr auf varianz trimmen und weniger auf spalten. sprich genau
+umgekehrt zum sockel. das gute am rotierenden fenster ist, dass dann in den schwarm
+maskierte sockel spiele reinkommen die wieder mehr auf spalten und weniger auf varianz
+gehen."*
+
+**Der Einwand trifft, die Koordinator-Aussage war schief.** Sie hat die Kennzahl der
+falschen Klasse als Beleg genommen: der Schwarm ist policy-maskiert (`--value-only`), sein
+Spaltenreichtum ist fuer seine Aufgabe ohne Bedeutung. Was fuer ihn zaehlt, ist die
+Abdeckung des Zustandsraums.
+
+**Die Arbeitsteilung, die daraus folgt:**
+
+| Klasse | Aufgabe | Optimieren auf | Warum |
+| --- | --- | --- | --- |
+| **Sockel** (Traeger, policy-aktiv) | Prior erziehen | **Spalten** | Der Spalteneffekt haengt am PRIOR: flache Suche baut 0,82, tiefe 0,50 (`PREREG_search_depth_column_optimum.md` par.2l/par.8b). Der Prior lernt aus den Traegern. |
+| **Schwarm** (policy-maskiert) | Value-Kopf fuettern | **Varianz / Abdeckung** | Der Value-Kopf lernt Zustand -> Ergebnis. Spaltenreiche, aber enge Zustaende helfen ihm nicht; er braucht Breite. |
+
+**Das Rotations-Argument ist der tragende Teil und war bisher nirgends notiert.** Die
+Sockel-Partien dieser Generation werden in der naechsten zu maskiertem Value-Material
+(par.1: "Sockel-Rest G-1" wandert in den Schwarm). Der Schwarm bekommt seinen
+spaltenreichen, varianzarmen Anteil also von selbst aus der Rotation -- er muss nicht dafuer
+gebaut werden. Damit ist die Aufgabenteilung nicht nur zulaessig, sondern selbstkorrigierend.
+
+**Der Preis, der gemessen und nicht angenommen gehoert.** Mehr Temperatur im Schwarm heisst
+mehr Abdeckung, aber auch verzerrte Wertziele: `z` ist verzerrt, wenn Explorationszuege im
+Pfad liegen (Willemsen/Baier/Kaisers, `RESEARCH_alphazero_improvements_2026-08-01.md`
+Fund 1). Der Value-Kopf lernt dann, Stellungen unter maessigem Spiel zu bewerten, waehrend
+er sie in der Suche unter gutem braucht. **Weg C mildert genau das** (Abweichung, danach
+sauber weiterspielen), Temperatur nicht.
+
+**Nutzer-Vorschlag fuer die Erzeugung (2026-09-07, 03:40):**
+- **Sockel: Umschaltpunkt 1 + Weg C** -- maximale Zugqualitaet, Streuung nur aus
+  Wurzelrauschen und der einen Abweichung.
+- **Schwarm: variable Temperatur (0,8 bis 0,2, auf Basis der moeglichen Aktionen je Runde)
+  + Weg C** -- maximale Abdeckung, Abweichung zusaetzlich.
+
+**Was dafuer noch fehlt:** der gebaute Knopf faehrt die HEURISTIK-Staffel (0,7 / 0,4 /
+0,15), nicht 0,8 bis 0,2. Die Nutzer-Form braucht entweder andere Konstanten oder eine
+glatte Interpolation zwischen 0,8 und 0,2 ueber die Aktionszahl. **Beides ist eine Zeile im
+bereits gebauten `action_temp_for`** (self_play.rs:424) plus ein zweiter Knopfwert; die
+Bauform steht.
+
+**Folge fuer die Armstruktur par.14:** die fuenf Arme variieren bisher NUR den Sockel und
+halten den Schwarm fest. Das bleibt richtig, solange man den Sockel-Faktor isolieren will.
+Der Schwarm-Vorschlag ist ein EIGENER Faktor und gehoert in einen eigenen Arm --
+andernfalls misst man zwei Aenderungen auf einmal. **Vorschlag: erst die fuenf
+Sockel-Arme, dann der Schwarm-Arm gegen den Sieger.** Nicht entschieden.
