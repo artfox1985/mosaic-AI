@@ -515,3 +515,98 @@ Startgewicht (par.6), die Form des Waechters (par.7). Der Zuschnitt bleibt, wie 
 **Ungeprueft, ausdruecklich:** ob ein aus diesem Material trainiertes Netz staerker spielt
 oder in der ARENA mehr Spalten baut. Die Kennzahlen oben sind Material-Kennzahlen. Der
 Schritt zur Arena kostet ein Training plus Gating und ist der naechste Entscheid.
+
+## par.13 KONKRETE ZUSAMMENSETZUNG MIT DEN DREI SELF-PLAY-WEGEN (2026-09-07, 02:50; Nutzer: "dann gib mir nun eine konkrete fenster zusammensetzung mit den verschiedenen self play wegen (A, B, C)")
+
+Die drei Wege sind in `PREREG_start_position_seeding.md` par.9b/9c definiert: **A** eine
+Linie, erste k Halbzuege gesampelt, dann argmax (Regler im Wheel, gemessen); **B** Ausflug
+von einer Stellung, Hauptlinie bleibt sauber (zu bauen, kostet eine Restpartie je Ausflug);
+**C** KataGo-Form, ein Zug an zufaelliger Stelle weicht ab, aus breit gezogenen Kandidaten
+per einer Netzbewertung gefiltert (zu bauen, kostenlos).
+
+**Grundsatz: EIN Faktor je Arm.** Die Kampagne misst Arme einfaktoriell
+(`generation_loop.md`; b03: "einziger Faktor gegen b01 der Zusatz-Schwarm"). A, B und C
+gleichzeitig einzubauen waere kein Zuschnitt, sondern ein Gemisch, dessen Wirkung nicht
+zuzuordnen ist. Der Vorschlag ist deshalb: **A in die Basis** (weil gemessen und gratis),
+**C und B als je EIN Arm daneben**.
+
+### Basis-Zuschnitt v25 (Weg A) -- die Zusammensetzung aus par.1, unveraendert
+
+| Klasse | Quelle | Partien | Erzeugungsregel | volle Spalten je Seite |
+| --- | --- | --- | --- | --- |
+| **Sockel NEU** (Traeger) | G = v24-Generator, policy-aktiv | 4.000 | `--sims 100`, Wurzelrauschen an, **NEU: `--tau-argmax-from-move 12`** | **0,4225** (g) |
+| Sockel G-1 (Traeger) | 135 der 400 `selfplay_v23-b01-policy_*` | 1.350 | Bestand, unveraendert | 0,189 (g) |
+| hv2-Traeger (Traeger) | 45 der 180 aus `carriers_v23_hv2.txt` | 450 | Bestand | 0,732 (g) |
+| Schwarm NEU | G, `--value-only --deterministic --no-root-noise` | 8.000 | unveraendert (ist bereits argmax) | 0,748 (g) |
+| Schwarm G-1 | alle 800 `selfplay_v23-b01-value-*` | 8.000 | Bestand | 0,748 (g) |
+| Sockel-Rest G-1 | die 265 uebrigen policy-Dateien | 2.650 | Bestand | 0,189 (g) |
+| Sockel-Rest G-2 | hv2 | 3.550 | Bestand | 0,732 (g) |
+| Schwarm G-2 | hv2 | 1.450 | Bestand | 0,732 (g) |
+| **Summe** | | **29.450** (2.945 Dateien) | neu zu erzeugen: **12.000** | |
+
+**Kennzahlen: Traeger 0,392 | Fenster 0,625.** Bezug v24 gemessen: 0,356 / 0,624. Beide
+Waechter-Flaechen liegen damit ueber der Vor-Generation, ohne dass an der Zusammensetzung
+etwas geaendert wurde. **Kosten unveraendert** (rund 11,9 h bei threads 11): der
+Umschaltpunkt kostet keine Rechenzeit, er aendert nur, wie die Zugwahl aus der ohnehin
+gerechneten Besuchsverteilung gezogen wird.
+
+**Der einzige Eingriff gegenueber par.1 ist eine Zeile im Erzeugungsbefehl:**
+
+```
+python -u self_play.py --mode network --model <generator>.onnx --spec <spec> \
+  --games 4000 --sims 100 --version v25-<gen>-policy --threads 11 --chunk 10 \
+  --per-file 10 --seed <seed> --tau-argmax-from-move 12
+```
+
+### Arm C -- dieselbe Zusammensetzung, andere Abweichungsregel
+
+**Zusammensetzung Zeile fuer Zeile IDENTISCH zur Basis.** Einziger Unterschied: waehrend der
+Erzeugung des **Sockels NEU** weicht in 5 % der Partien an einer exponentiell verteilten
+Stelle GENAU EIN Zug ab (3 bis 10 Kandidaten gleichverteilt gezogen, jeder eine
+Netzbewertung, der beste gespielt), danach laeuft die Partie normal weiter.
+
+- **Kosten: 0** -- eine Linie, keine Zusatzpartie; die Kandidaten-Bewertung ist ein
+  Vorwaertspass, den die Suche ohnehin macht.
+- **Bau: rund 40 Zeilen** in `unified_game_loop` plus zwei Flags (par.9c).
+- **Erwartete Kennzahlen: wie die Basis** (ein abweichender Zug in 5 % der Partien bewegt
+  den Spaltenschnitt nicht messbar) -- **das ist der Punkt**: C zielt nicht auf die
+  Kennzahl, sondern auf die ABDECKUNG (Stellungen, die eine volle Suche nie erzeugt).
+- **Messgroesse ist deshalb nicht der Spaltenschnitt, sondern die bedingte Vielfalt**
+  (`tools/probes/paired_corpus_divergence_probe.py`, gegen die Basis mit gleichem Seed) und
+  spaeter Tor 1/2 des trainierten Netzes.
+
+### Arm B -- eine eigene Ausflug-Klasse
+
+Ausfluege von Sockel-Stellungen: je Ausflug k Zuege mit Temperatur, dann argmax bis zum
+Ende; die Hauptpartie laeuft unberuehrt weiter. Vorbild ist der Seeding-Schwarm b03
+(`PREREG_start_position_seeding.md` par.7), der genau das offline gemacht hat.
+**Value-only**, wie b03 -- die Ausfluege tragen keine Policy-Ziele.
+
+Zwei Fassungen, weil das Fenster eine stationaere Groesse hat:
+
+| Fassung | Aenderung | Partien | Traeger | Fenster | neu zu erzeugen |
+| --- | --- | --- | --- | --- | --- |
+| **B1 zusaetzlich** | +2.000 Ausfluege | 31.450 | 0,392 | 0,623 (a) | 14.000 |
+| **B2 im Tausch** | +2.000 Ausfluege, dafuer 2.000 hv2 weniger (1.450 Schwarm G-2 + 550 aus dem Sockel-Rest G-2) | 29.450 | 0,392 | 0,616 (a) | 14.000 |
+
+Spaltenwert der Ausflug-Klasse mit **0,60 ANGENOMMEN** (sie starten aus Sockel-Stellungen
+und laufen argmax; gemessen ist nichts) -- beide Fenster-Werte oben sind damit Schaetzungen,
+nicht Messungen. **B2 haelt die stationaere Form** und ist deshalb vorzuziehen; B1 waere ein
+einmaliger Groessensprung, der die naechste Rotation verschiebt.
+
+**Kosten B: rund +50 min** (2.000 Ausfluege, Restlaenge rund 44 % einer Vollpartie bei
+Verzweigung in R2-4, 3,365 s je Vollpartie -- alles aus `measured_runtimes.md`, die
+Restlaenge aus par.7). **Bau: par.9**, Zustands-Klon plus Zweig in derselben Closure.
+
+### Reihenfolge und was zuerst zu entscheiden ist
+
+1. **Basis (A) ist entscheidungsreif.** Sie braucht nur den Generator-Entscheid (par.11 A)
+   und den Umschaltpunkt. Fuer den Umschaltpunkt fehlt ein Punkt bei k = 1 (rund 10 min),
+   weil 12 heute nur gegen 30 und gegen "aus" gemessen ist.
+2. **C ist der billigste naechste Bau** und laesst die Zusammensetzung unberuehrt -- er
+   kann auch NACH der v25-Erzeugung als eigener Arm kommen, ohne den Zuschnitt zu aendern.
+3. **B ist der teuerste und der einzige, der ZIELEN kann.** Er lohnt, wenn C zeigt, dass
+   zufaellige Abweichung nicht reicht, oder wenn eine Auswahlregel vorliegt (Unsicherheit,
+   Spaltenfortschritt).
+
+**Nicht entschieden:** nichts davon. Die Erzeugung startet nur auf Anweisung.
