@@ -1192,3 +1192,49 @@ gleichzeitig hoeher liegt.
 **Beauftragt, noch nicht gebaut.** Der Bau wartet, weil `self_play.rs` gerade vom
 Weg-B-Auftrag bearbeitet wird -- zwei Agenten auf derselben Datei war heute schon einmal
 fahrlaessig (par.9b der Spezialfeld-Prereg).
+
+## par.18 KAMPAGNEN-ENTSCHEID: drei Generationen ohne Netz-Aenderung (Nutzer 2026-09-07, 09:41)
+
+**Nutzer, woertlich (09:40):** *"somit wird die naechsten generationen eher nicht am netz
+gedreht sondern wir schauen dass wir mal in ein sauberes generationsfenster kommen."*
+Und auf den Einwand, die Arena koenne dabei flach bleiben (09:41): *"dann bleibt sie halt
+flach. aber zumindest haben wir dann eine gute ausgangsbasis um wieder am netz zu drehen."*
+
+**Geltungsbereich: v25, v26, v27.** Fest bleiben Architektur, Trainingsrezept,
+Value-Ziel-Mischung, Koepfe und Kopfgewichte. Veraendert wird ausschliesslich das MATERIAL,
+nach den Erzeugungsregeln aus par.16, 16a, 16b und 17. Der stationaere Zustand aus par.17
+ist erst nach v27 erreicht, weil G-1 und G-2 zwei Generationen zum Nachrotieren brauchen.
+
+**Begruendung, die traegt (gepruefte Haelfte).** Die Leiter-Attribution ist heute
+konfundiert: von Generation zu Generation aendern sich Netz UND Material gleichzeitig, und
+das Material der Vorgeneration steckt als G-1/G-2 im Fenster. Praezedenz im Baum:
+[[project_v19_cycle_result]] / [[project_v20_cycle_result]] -- "Aera >> Dosis", also der
+Materialwechsel schlug jede Dosierung. Sobald die Erzeugungsregel ueber die Generationen
+konstant ist, bleibt als einzige Aenderung das Netz, das erzeugt hat. Erst dann heisst
+"Generation N+1 schlaegt N" tatsaechlich, dass das Netz besser geworden ist.
+
+**Die zweite Begruendung ist NICHT gepruefte Herleitung und wird als solche markiert:** die
+lange Reihe negativer Trainingsknoepfe (Ownership-Gewicht, PCR, Stage-2-Kapazitaet,
+Lambda ausserhalb des v18-Fensters) koennte teilweise daran liegen, dass sie gegen einen
+Materialdeckel gemessen wurden -- gegen ein Fenster mit plattenblindem hv2-Anteil und
+temperatur-verarmten Sockeln. Ob dieselben Knoepfe auf sauberem Material positiv waeren,
+ist UNBEKANNT und aus den vorliegenden Artefakten nicht entscheidbar. Es ist kein Argument
+FUER den Plan, sondern eine Hoffnung, die er ueberpruefbar macht.
+
+**Was "flach ist akzeptabel" nicht aufhebt.** Die zwei Tor-Flaechen bleiben scharf: eine
+Generation, die in der gepaarten Arena SCHLECHTER ist als ihre Vorgaengerin, wird nicht
+Champion. Akzeptiert ist Stillstand, nicht Ruecklauf. Der Elo-Anker bleibt unveraendert,
+die Anker-Invarianz wird nach jeder Engine-Aenderung weiter gefahren.
+
+### Die Folge, die JETZT eine Entscheidung beeinflusst
+
+**Ein Fenster ist nur stationaer, wenn auch die SPEC steht.** Die Erzeugungsregel umfasst
+nicht nur Temperatur, Umschaltpunkt und Ausfluege, sondern jeden spec-pflichtigen Knopf des
+Generators -- `envelope_flush_w`, `envelope_hull_form`, `special_row6_w`. Aendert sich einer
+davon zwischen v25 und v27, ist das Material der drei Generationen wieder verschieden
+erzeugt, und der ganze Zweck des Plans faellt.
+
+**Daraus folgt fuer den offenen Entscheid 1 (Huellenform 2 in die Generator-Spec):** er ist
+die LETZTE Spec-Aenderung vor dem Einfrieren, nicht eine unter vielen. Dasselbe gilt fuer
+K5, dessen Messung noch aussteht. Beide gehoeren VOR den Start von v25 entschieden --
+danach ist die Spec bis v27 zu.
