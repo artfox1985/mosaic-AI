@@ -249,3 +249,25 @@ abschneidet als C (Zug 30), war damals nicht im Bild -- gemessen wurde nur Zug 3
    argmax die Spalten verdoppelt, ohne Vielfalt zu kosten, ist der gerichtete Ersatz der
    Streuung weniger dringend als angenommen -- aber er bleibt der Weg, um GEZIELT in
    selten besuchte Stellungen zu kommen.
+
+### 3-V, Nachtrag: was "Wurzelrauschen" hier ist, und was daraus folgt (Nutzer-Berichtigung 2026-09-07, 03:00: "nein. es gibt kein dirichlet rauschen")
+
+Der Koordinator hatte im Chat behauptet, die Streuung bei aktivem Wurzelrauschen komme von
+Dirichlet-Rauschen auf dem Prior. **Falsch, am Code geprueft:** die Netz-Suche ist
+Gumbel-basiert (`build_gumbel_tree`; der PUCT-Baum wird nicht mehr betreten, sein
+Doc-Kommentar bei net_mcts.rs:4258 spricht noch von Dirichlet und ist ueberholt). Was
+`add_root_noise` schaltet, sind **Gumbel-Samples je Wurzelkandidat**: `g + ln(prior)` mit
+`g = sample_gumbel(rng)` (net_mcts.rs:3974); ist der Schalter aus, sind alle `g = 0` und die
+Wurzelauswahl rankt deterministisch nach `ln(prior) + sigma(Q)`.
+
+**Die Schlussfolgerung der Messung bleibt** (die Partien bleiben auch nach dem Umschaltpunkt
+verschieden, 399 von 400 Endbrettern), nur die Rauschquelle heisst anders.
+
+**Der wichtigere Punkt, der dabei sichtbar wurde:** die **Schwarm-Klasse laeuft mit
+`--deterministic --no-root-noise`**, hat also GAR KEINE Rauschquelle -- weder Sampling der
+Zugwahl noch Gumbel an der Wurzel. Ihre gesamte Streuung kommt aus dem Spiel (Auslagen,
+Wertungsplatten, Startspieler). Und genau diese Klasse ist mit **0,748 vollen Spalten die
+spaltenreichste des Fensters**, bei 8.000 Partien. Es gibt im Fenster also bereits eine
+grosse Klasse, die ohne jede kuenstliche Streuung auskommt und die beste Spaltenzahl
+liefert; der Sockel war die einzige Klasse, die die Zugwahl wuerfelt, und die einzige mit
+0,19. Das stuetzt die Nutzer-These unabhaengig von Messung 3-V.
