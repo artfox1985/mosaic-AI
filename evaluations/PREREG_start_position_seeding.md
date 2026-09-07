@@ -718,11 +718,25 @@ zeigt, dass WENIGER Sampling mehr Spalten bringt -- sie zeigt NICHT, dass GAR KE
 das Optimum ist. Der noch fehlende Punkt bei k = 1 wuerde das auch nicht klaeren, weil er die
 harte Form behaelt.
 
-**Bau (geschaetzt, nicht gemessen):** `drafting_policy` (self_play.rs) bekommt `play_temp`
-bereits als Parameter -- heute ein fester Wert. Ein Env-Knopf mit Start-, End- und
-Halbwertszeit-Wert, der `play_temp` je Halbzug berechnet, ist kleiner als Weg C: keine
-Kandidatenziehung, keine Netzbewertung, nur eine Formel vor einem bestehenden Aufruf.
-Default = Bestandswert, damit bitidentisch.
+**BERICHTIGUNG 03:20 (Nutzer-Frage "ich dachte unsere temperatur haengt an den gueltigen
+zuegen?"): die Temperatur sitzt im HEURISTIK-Pfad, der Netz-Pfad hat gar keine.** Am Code
+geprueft:
+- **Heuristik-Self-Play** (`drafting_policy` ueber `HeuristicSelfPlayAgent`,
+  self_play.rs:1656): aktionsabhaengige Temperatur, `n > 50 -> 0,7`, `n > 15 -> 0,4`,
+  sonst `0,15` (Port von self_play.py:172). Der Nutzer erinnert das korrekt -- so ist das
+  hv2-Lehrermaterial entstanden.
+- **Netz-Self-Play** (`net_drafting_policy`, self_play.rs:3419 ff.), also der Pfad JEDER
+  heutigen Erzeugung: **keine Temperatur.** Die gespielte Aktion kommt aus
+  `weighted_index(&weights, total, rng)` mit `weights = rohe Besuchszahlen` -- kein Exponent,
+  fest T = 1. Es gibt genau zwei Zustaende: proportional zu den Besuchen, oder (bei
+  gesetztem `tau_argmax_from_move` und erreichtem Halbzug) `argmax_index(&weights)`.
+
+**Zwei Folgen.** (1) Die Bau-Schaetzung fuer Weg D oben war zu billig: `play_temp` ist im
+NETZ-Pfad nicht vorhanden, es waere ein neuer Parameter samt Durchreichung durch
+`net_drafting_policy` -- immer noch klein, aber nicht geschenkt. (2) Unser Sprung ist
+GROESSER als KataGos: wir gehen von voll proportional (T = 1) direkt auf greedy (T = 0),
+KataGo von 0,8 auf 0,2 und nie auf null. Das ist eine plausible Teilerklaerung dafuer,
+warum der in Messung 3-V gemessene Effekt so gross ausfaellt.
 
 **Nicht entschieden, und bewusst NICHT in die v25-Armstruktur genommen** -- drei Arme
 messen bereits zwei Faktoren; ein vierter Arm braucht einen eigenen Entscheid.
