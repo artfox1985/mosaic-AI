@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, @100 33:47 n.s., par.2j2). Faktor TIEFE, nicht Breite (par.2k). Stufe 4: die tiefere Suche verwirft den Prior-Top-1 doppelt so oft (par.6b), spaltenrelevante Vorschlaege aber im GLEICHEN Anteil wie alle anderen (par.7) -- Nebenwirkung, kein gezieltes Verwerfen. Betriebspunkt 100 Sims bleibt. WIEDERVORLAGE 2026-09-07 (Nutzer): die Kurve stammt von v22-b05, drei Generationen alt, und der Effekt haengt am Prior (par.2l) -- Neumessung am Champion v24-b06 registriert (par.8), Hinweis: Instrument @400 heute 0,4975 gegen 0,3375 damals. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, @100 33:47 n.s., par.2j2). Faktor TIEFE, nicht Breite (par.2k). Stufe 4: die tiefere Suche verwirft den Prior-Top-1 doppelt so oft (par.6b), spaltenrelevante Vorschlaege aber im GLEICHEN Anteil wie alle anderen (par.7) -- Nebenwirkung, kein gezieltes Verwerfen. Betriebspunkt 100 Sims bleibt. WIEDERVORLAGE 2026-09-07 GEFAHREN (par.8b): am Champion v24-b06 liegt das Plateau weiter bei 100 (0,8200 gegen 0,5075 @250 und 0,4975 @400), der Absturz ist so steil wie damals -- Betriebspunkt bestaetigt. Das NIVEAU ist ueber alle drei Punkte um 0,16-0,20 gestiegen (konfundiert: anderes Netz UND Champion-Knopf). Prozessregel (par.8c): Neumessung nur bei AERA-Wechseln, nicht je Generation. -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -866,3 +866,52 @@ Reihe von par.7 der v25-Prereg neben den Spalten-Waechter.
 **Entschieden wird das NACH der Messung** -- eine Regel, die eine unbewegte Groesse jedes
 Mal nachmisst, kostet nur Zeit. Zeigt sich der Punkt als stabil, bleibt es bei der
 Einmalmessung mit Wiedervorlage bei jedem Aera-Wechsel (Sicht, Encoder, Regelwerk).
+
+### par.8b ERGEBNIS: die Form haelt, das Niveau ist gestiegen (gefahren 2026-09-07, 02:26-03:21, `tools/depth_curve_recheck.sh`)
+
+Drei Punkte am Champion `v24-b06` mit Champion-Spec, je 200 Partien, Seed 20260931,
+`--deterministic --no-root-noise`, `MOSAIC_STACK_DRAW_RESEARCH=1` -- Konfiguration des
+Tor-2a-Instruments.
+
+| Sims | v24-b06 (heute, mit K3-P) | v22-b05 (par.2i, ohne Knopf) | Differenz | Punkte heute |
+| --- | --- | --- | --- | --- |
+| 100 | **0,8200** (KI +-0,083) | 0,6225 | +0,198 | 52,9 |
+| 250 | **0,5075** (KI +-0,068) | 0,3325 | +0,175 | 48,5 |
+| 400 | **0,4975** (KI +-0,066) | 0,3375 | +0,160 | 48,3 |
+
+**Befund 1: das Plateau liegt weiter bei 100, und der Absturz ist so steil wie damals.**
+Abstand 100 zu 400 heute 0,3225, damals 0,285. Die vorab festgelegte Lesart (Fall 1:
+"100 deutlich ueber 250 und 400, Abstand wie damals rund 0,3") ist erfuellt. **Der
+Betriebspunkt 100 der Erzeugung bleibt bestaetigt** -- die Annahme, auf der v23, v24 und der
+v25-Zuschnitt stehen, traegt auch beim heutigen Netz.
+
+**Befund 2: das NIVEAU ist um rund 0,16 bis 0,20 gestiegen, ueber alle drei Punkte.** Der
+Hinweis, der die Messung ausgeloest hat (@400 heute 0,4975 gegen 0,3375 damals), war kein
+Messfehler, sondern ein echter Unterschied -- und er ist an allen drei Stuetzstellen
+gleich gross. **Konfundiert, wie in par.8 angekuendigt:** der Vergleich mischt anderes Netz
+UND Champion-Knopf K3-P; welcher Anteil woher kommt, sagt diese Messung nicht.
+
+**Nebenbefund (Reproduktion):** der @400-Wert 0,4975 ist zifferngleich mit `tor2a_v24b06.json`
+aus der Abnahme vom 2026-09-06. Gleicher Seed, gleiche Konfiguration, anderer Lauf, anderes
+Wheel-Datum (die Abnahme lief vor dem Huellenform- und Pass-Zeilen-Umbau) -- eine saubere
+Determinismus-Bestaetigung nebenbei.
+
+### par.8c ANTWORT AUF DIE PROZESSREGEL-FRAGE (Nutzer 2026-09-07: "vielleicht muessen wir das bei jedem champ/generator neu messen")
+
+**Nein -- eine Wiedervorlage bei AERA-Wechseln genuegt, nicht je Generation.** Begruendung
+aus der Messung: die FORM der Kurve (Plateau bei 100, Absturz ab 250, Abstand rund 0,3) hat
+sich ueber DREI Generationen (v22-b05 -> v23-b01 -> v24-b06), einen Sichtwechsel (714 -> 744)
+und die Einfuehrung des Champion-Knopfs nicht bewegt. Was sich bewegt hat, ist das Niveau --
+und das aendert den optimalen Betriebspunkt nicht, weil alle Punkte gleichmaessig steigen.
+
+Eine Regel, die jede Generation eine Stunde fuer eine Groesse ausgibt, die sich in drei
+Generationen nicht verschoben hat, kostet nur Zeit
+([[feedback_gate_that_is_bypassed_teaches_bypassing]] sinngemaess: ein Waechter, der nie
+ausloest, erzieht zum Ignorieren). **Vorschlag fuer `docs/generation_loop.md`:** die
+Suchtiefen-Kurve wird neu gemessen, wenn sich die AERA aendert -- Encoder, Sicht
+(INPUT_SIZE), Regelwerk oder ein Knopf, der in die Erzeugung geht -- nicht bei jedem
+Generatorwechsel. Kosten dann rund eine Stunde, wie hier.
+
+**Was die Messung NICHT ausschliesst:** dass ein anderer Punkt zwischen 100 und 250 heute
+besser waere (150 ist nicht gemessen, damals 0,4425). Wer das wissen will, misst zwei
+Zwischenpunkte fuer rund 25 min.
