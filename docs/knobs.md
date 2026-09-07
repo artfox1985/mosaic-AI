@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 104 Knoepfe (64 aktiv, 32 diagnose, 7 tot, 1 geplant).
+Stand: 105 Knoepfe (64 aktiv, 33 diagnose, 7 tot, 1 geplant).
 
 **Status** sagt, ob der Knopf VERDRAHTET ist -- ausdruecklich nicht, ob sein
 Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
@@ -149,6 +149,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_OWNERSHIP_CONJ` | 0 (aus, Produktform) | aktiv | ENTSCHIEDEN | FORMumschaltung, keine Dosis: die konjunktiven Kriterien (k0/k1/k2/k3/k5/k7) kommen aus den gelernten Konjunktions-Atomen statt aus dem Produkt der Feldwahrscheinlichkeiten; additive k4/k6 bleiben auf den Feldlabels. Braucht den 140er-Kopf, sonst Rueckfall MIT Warnung (shaping.rs, ownership_conj) | PREREG_conjunction_terms.md par.4 |
 | `MOSAIC_STACK_DRAW_RESEARCH` | aus | diagnose | ENTSCHIEDEN | Stapelzug nicht sammelaufloesen: nur der Peek wird angewandt, danach neue Suche (self_play.rs:609) | PREREG_chance_nodes.md |
 | `MOSAIC_ASYM_VORZUG` | aus | diagnose | ENTSCHIEDEN | Baustein 1 (Arm S): je Self-Play-Partie bekommt GENAU EINE Seite den Bauer-Vorzug (vorzug:true), Seitenwahl deterministisch aus dem Partie-Seed 50/50; dome_preference faehrt in derselben Kette mit (self_play.rs, asym_preference_active/asym_preference_side) | PREREG_asymmetric_curriculum.md par.3 |
+| `MOSAIC_ACTION_TEMP` | 0.0 (= aus, rohe Besuchszahlen) | diagnose | OFFEN | Arme S2/S5 der v25-Sockelstruktur: aktionsabhaengige Temperatur fuer die ZUGWAHL im Netz-Self-Play, Staffel wie im Heuristik-Pfad (n>50 -> 0,7; n>15 -> 0,4; sonst 0,15). Gewichte werden visits^(1/T) statt visits; das Policy-ZIEL (completed-Q) bleibt unberuehrt. Bei 0 exakt die rohen Besuchszahlen, bitidentisch (net_mcts::action_temp_enabled, self_play::action_temp_weights) | PREREG_v25_window.md par.14 |
 | `MOSAIC_DEVIATE_PROB` | 0.0 (= aus) | diagnose | OFFEN | Weg C (KataGo, Wu 2019 Anhang D): Wahrscheinlichkeit je Self-Play-Partie, dass GENAU EIN Drafting-Zug von der Suche abweicht; KataGo faehrt 0,05. Bei 0.0 wird keine einzige Zusatz-Zufallszahl gezogen (self_play.rs, deviate_prob/deviation_move) | PREREG_start_position_seeding.md par.9c |
 | `MOSAIC_DEVIATE_MEAN_MOVE` | 30.0 | diagnose | OFFEN | Weg C: Mittelwert der Exponentialverteilung, aus der die Halbzugnummer der Abweichung gezogen wird (gezaehlt wie move_number: echte Drafting-Entscheide, 1-basiert, beide Spieler zusammen) (self_play.rs, deviate_mean_move) | PREREG_start_position_seeding.md par.9c |
 | `MOSAIC_DEVIATE_CANDIDATES` | 6 | diagnose | OFFEN | Weg C: wie viele legale Aktionen an der Abweichungsstelle gleichverteilt gezogen werden, jede mit EINER Netzbewertung ihres Folgezustands gefiltert; KataGo zieht 3 bis 10, wir nehmen einen festen Wert (self_play.rs, deviate_candidates/deviation_candidates_from) | PREREG_start_position_seeding.md par.9c |

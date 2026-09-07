@@ -164,7 +164,7 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       heartbeat_path, seed_positions=None, seed_positions_offset=0,
                       heuristik_variante="hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
                       spec=None, deviate_prob=0.0, deviate_mean_move=30.0,
-                      deviate_candidates=6):
+                      deviate_candidates=6, action_temp=0):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -196,11 +196,17 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     (self_play.rs::deviate_prob und Geschwister), deshalb hier VOR dem
     `import mosaic_rust` in DIESEM Subprozess gesetzt (frischer mp.Process je
     Chunk -> kein Stale-Value-Risiko). `0.0` (Default) ist fuer Rust identisch
-    zu "ungesetzt" (AUS, keine zusaetzliche Zufallszahl)."""
+    zu "ungesetzt" (AUS, keine zusaetzliche Zufallszahl).
+    `action_temp` (PREREG_v25_window.md par.14, Arme S2/S5): wie die beiden
+    oben KEIN pyo3-Parameter -- Rust liest MOSAIC_ACTION_TEMP selbst per
+    OnceLock (net_mcts::action_temp_enabled), deshalb hier VOR dem
+    `import mosaic_rust` in DIESEM Subprozess gesetzt. `0` (Default) ist fuer
+    Rust identisch zu "ungesetzt" (AUS, rohe Besuchszahlen, bitidentisch)."""
     os.environ["MOSAIC_TAU_ARGMAX_FROM_MOVE"] = str(tau_argmax_from_move)
     os.environ["MOSAIC_DEVIATE_PROB"] = str(deviate_prob)
     os.environ["MOSAIC_DEVIATE_MEAN_MOVE"] = str(deviate_mean_move)
     os.environ["MOSAIC_DEVIATE_CANDIDATES"] = str(deviate_candidates)
+    os.environ["MOSAIC_ACTION_TEMP"] = str(action_temp)
     try:
         import mosaic_rust as mr
         if mode == "network":
@@ -278,7 +284,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           tau_argmax_from_move=0, seed_positions=None,
                           seed_positions_offset=0, spec=None,
                           deviate_prob=0.0, deviate_mean_move=30.0,
-                          deviate_candidates=6) -> str | None:
+                          deviate_candidates=6, action_temp=0) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -295,7 +301,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               pcr_cheap_sims, tau_argmax_from_move, queue,
               str(progress_path), str(heartbeat_path),
               seed_positions, seed_positions_offset, heuristik_variante, spec,
-              deviate_prob, deviate_mean_move, deviate_candidates),
+              deviate_prob, deviate_mean_move, deviate_candidates, action_temp),
     )
     proc.start()
     t_start = time.time()
@@ -398,7 +404,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   heuristik_variante: str = "hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
                   spec: str | None = None,
                   deviate_prob: float = 0.0, deviate_mean_move: float = 30.0,
-                  deviate_candidates: int = 6):
+                  deviate_candidates: int = 6, action_temp: int = 0):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -436,6 +442,17 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     if deviate_prob and mode != "network":
         print(f"  ⚠️  --deviate-prob={deviate_prob} wirkt nur bei --mode network "
               f"(die Abweichung braucht die Netzbewertung) -- bei --mode {mode!r} ist es ein No-Op.")
+    # Aktionsabhaengige Temperatur (PREREG_v25_window.md par.14, Arme S2/S5):
+    # Schalter, kein Skalierungsfaktor -- registriert ist GENAU EIN Regime
+    # (dieselbe Staffel wie im Heuristik-Pfad). Wirkt nur im netzgefuehrten
+    # Self-Play (net_drafting_policy); --mode mcts hat die Staffel ohnehin
+    # fest an, liest MOSAIC_ACTION_TEMP aber nicht -- deshalb wie bei tau
+    # Warnung statt SystemExit.
+    if action_temp not in (0, 1):
+        raise SystemExit(f"❌ --action-temp ist 0 (aus) oder 1 (an), ist {action_temp}.")
+    if action_temp and mode != "network":
+        print(f"  ⚠️  --action-temp={action_temp} wirkt nur bei --mode network "
+              f"(net_drafting_policy) -- bei --mode {mode!r} ist es ein No-Op.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -495,6 +512,10 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # (Nutzer-Regel: cli_args des eigenen Laufs gegen die Referenz diffen).
         "deviate_prob": deviate_prob, "deviate_mean_move": deviate_mean_move,
         "deviate_candidates": deviate_candidates,
+        # par.14 (Arme S2/S5): Erzeugungs-Parameter wie das deviate-Trio --
+        # ohne dieses Feld waere ein fehlendes Flag ein stiller Default, und
+        # S1/S3/S4 waeren im Nachhinein nicht von S2/S5 zu unterscheiden.
+        "action_temp": action_temp,
     })
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -523,6 +544,18 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                           f"{deviate_candidates} Kandidaten (par.9c)")
     else:
         deviate_status = "AUS (Standard)"
+    # par.14: die Temperatur wirkt nur im Sampling-Zweig -- argmax (ob per
+    # --deterministic oder ab dem tau-Umschaltpunkt) haengt nicht von einer
+    # monotonen Transformation der Gewichte ab.
+    if not action_temp:
+        action_temp_status = "AUS (Standard, τ=1 auf rohen Besuchen)"
+    elif deterministic:
+        action_temp_status = "irrelevant (--deterministic argmaxt bereits die ganze Partie)"
+    elif tau_argmax_from_move:
+        action_temp_status = (f"an: T(n)=0,7/0,4/0,15, ab Zug {tau_argmax_from_move} "
+                              f"wirkungslos (argmax hat Vorrang)")
+    else:
+        action_temp_status = "an: T(n)=0,7/0,4/0,15 ueber |Aktionen| (par.14)"
     if mode == "network":
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"base_sims {simulations} | c_puct {c_puct} | "
