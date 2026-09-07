@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, @100 33:47 n.s., par.2j2). Faktor TIEFE, nicht Breite (par.2k). Stufe 4: die tiefere Suche verwirft den Prior-Top-1 doppelt so oft (par.6b), spaltenrelevante Vorschlaege aber im GLEICHEN Anteil wie alle anderen (par.7) -- Nebenwirkung, kein gezieltes Verwerfen. Betriebspunkt 100 Sims bleibt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, @100 33:47 n.s., par.2j2). Faktor TIEFE, nicht Breite (par.2k). Stufe 4: die tiefere Suche verwirft den Prior-Top-1 doppelt so oft (par.6b), spaltenrelevante Vorschlaege aber im GLEICHEN Anteil wie alle anderen (par.7) -- Nebenwirkung, kein gezieltes Verwerfen. Betriebspunkt 100 Sims bleibt. WIEDERVORLAGE 2026-09-07 (Nutzer): die Kurve stammt von v22-b05, drei Generationen alt, und der Effekt haengt am Prior (par.2l) -- Neumessung am Champion v24-b06 registriert (par.8), Hinweis: Instrument @400 heute 0,4975 gegen 0,3375 damals. -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -801,3 +801,68 @@ Spaltenzuegen.
 Ergebnis zusammenhaengen (Spaltenzahl am Ende), laesst sich an Traces nicht
 ablesen -- das braeuchte ausgespielte Fortsetzungen. Stufe 4 ist damit
 gemessen; die Tiefen-Delle bleibt beschrieben, nicht behoben.
+
+## par.8 NEUMESSUNG DER KURVE AM AKTUELLEN CHAMPION (registriert 2026-09-07, 02:05 VOR der Messung; Nutzer: "ja, kurve neu messen nach dem temperatur-vergleich. vielleicht muessen wir das bei jedem champ/generator neu messen")
+
+**Warum die Frage aufkam.** Der Betriebspunkt der Erzeugung (100 Sims) steht auf par.2i,
+gemessen am 2026-08-30 mit `v22-b05` -- dem Netz von VOR DREI Generationen
+(v22-b05 -> v23-b01 -> v24-b06). Seither haben sich Fenster, Sicht (714 -> 744) und
+Champion-Knopf geaendert. par.2l hat gemessen, dass der Effekt am PRIOR haengt, und der
+Prior ist dreimal neu trainiert worden. Der Nutzer hat die Luecke benannt: gilt das Plateau
+beim heutigen Netz noch?
+
+**Der Hinweis, der die Messung ausloest (kein Beleg, weil die Konfigurationen abweichen):**
+das argmax-Instrument der Knopf-Kette misst am Champion `v24-b06` bei 400 Sims **0,4975**
+volle Spalten (`tor2a_v24b06.json`); die alte Kurve nennt fuer 400 Sims **0,3375**. Wenn der
+Absturz bei hoher Tiefe beim heutigen Netz schwaecher ist, liegt der spaltenoptimale Punkt
+womoeglich woanders -- und die Erzeugung faehrt seit v23 auf einer nicht nachgezogenen
+Annahme.
+
+**Aufbau.** Drei Punkte, je 200 Partien, gleicher Seed, dieselbe Konfiguration wie das
+Tor-2a-Instrument (`tools/argmax_profile.sh`: `--deterministic --no-root-noise`,
+`MOSAIC_STACK_DRAW_RESEARCH=1`, Champion-Spec des amtierenden Champions):
+
+| Punkt | Sims | alte Kurve (v22-b05, par.2i) |
+| --- | --- | --- |
+| A | 100 | 0,6225 (Replikation 0,6550) |
+| B | 250 | 0,3325 |
+| C | 400 | 0,3375 |
+
+Alle drei werden FRISCH gefahren, obwohl fuer 400 ein Wert vorliegt: intern konsistente
+Punkte sind mehr wert als ein gesparter Lauf, und der vorhandene Wert stammt aus einem
+anderen Lauf-Kontext (Tor 2a der Abnahme).
+
+**Messgroessen (wie par.2i):** volle Spalten je Seite mit Konfidenzintervall, Punkte,
+Zeilen, Strafleiste -- alles aus `tools/corpus_sanity_check.py`. Zusaetzlich die Laufzeit je
+Punkt (CLAUDE.md-Pflicht).
+
+**Lesart, vorab festgelegt:**
+- **Plateau weiter bei 100** (100 deutlich ueber 250 und 400, Abstand wie damals rund 0,3):
+  der Betriebspunkt ist bestaetigt, die Erzeugung bleibt bei 100, und die Frage ist
+  beantwortet, bis sich der Prior wieder aendert.
+- **Kurve flacher** (Abstand deutlich kleiner als 0,3): der Tausch zwischen Spalten und
+  Suchtiefe ist beim heutigen Netz schwaecher; dann ist die Wahl des Erzeugungspunkts neu
+  zu treffen, weil hoehere Sims Staerke bringen koennten, ohne so viele Spalten zu kosten.
+- **Plateau verschoben** (250 oder 400 auf dem Niveau von 100): der Betriebspunkt 100 ist
+  ueberholt, und die v25-Erzeugung faehrt anders.
+
+**Was die Messung NICHT beantwortet:** warum sich die Kurve gegebenenfalls verschoben hat.
+Der Vergleich zur alten Kurve mischt zwei Faktoren (anderes Netz UND Champion-Knopf K3-P in
+der Spec); die Zerlegung waere ein eigener Arm. Gefragt ist hier der heutige
+Betriebspunkt, nicht seine Ursache.
+
+**Kosten (hergeleitet aus `docs/measured_runtimes.md`, nicht gemessen):** 400 Sims rund
+7 s je Partie = 23 min, 250 rund 15 min, 100 rund 7 min, zusammen knapp eine Stunde.
+
+### par.8a VORSCHLAG ZUR PROZESSREGEL (Nutzer 2026-09-07: "vielleicht muessen wir das bei jedem champ/generator neu messen")
+
+Wenn die Neumessung eine Verschiebung zeigt, ist der Erzeugungs-Betriebspunkt keine
+Konstante der Kampagne, sondern eine Eigenschaft des jeweiligen Generators -- und gehoert
+dann in die Generationsschleife (`docs/generation_loop.md`) als Pflichtschritt VOR der
+Erzeugung, in der Groessenordnung einer Stunde je Generation. Vorschlag fuer die
+Kurzfassung: drei Punkte (100/250/400) am gewaehlten Generator, Ergebnis in die
+Reihe von par.7 der v25-Prereg neben den Spalten-Waechter.
+
+**Entschieden wird das NACH der Messung** -- eine Regel, die eine unbewegte Groesse jedes
+Mal nachmisst, kostet nur Zeit. Zeigt sich der Punkt als stabil, bleibt es bei der
+Einmalmessung mit Wiedervorlage bei jedem Aera-Wechsel (Sicht, Encoder, Regelwerk).
