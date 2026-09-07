@@ -24,361 +24,71 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-09-07, 17:20; Maschine FREI, origin/main aktuell)
+## 1. WAS GERADE LAEUFT (Stand 2026-09-07, 19:40)
 
-**Generator fuer v25: `v24-b07`** -- bytegleiche Kopie der b06-Gewichte plus die Spec mit
-Huellenform 2 und K5 (`models/alphazero_v24-b07_brierbest.onnx`,
-`models/v24-b07_brierbest.spec.json`). **Elo-Knoten bleibt `v24-b06` (1309)**; b07 hat noch
-keinen eigenen Knoten, siehe Offene Punkte.
+**Generationswechsel v24 -> v25 gefahren** (`/mosaic-generation-turnover`). Maschine frei,
+Baum sauber. Der v24-Bericht steht in `archive/history.md`.
 
-**Nichts laeuft. Der Baum ist gepusht** (d6ba1d6), Build gruen (549 Tests), Anker in beiden
-Modi gruen. Chronik: `night_run_20260902.md`.
+**Champion: `v24-b07`** -- die Gewichte von b06, aber die Spec mit Huellenform 2 und K5.
+`models/alphazero_v24-b07_brierbest.onnx`, `models/v24-b07_brierbest.spec.json`.
+Eingefroren unter `models/frozen_champions/v24-b07/` mit Wheel, Golden Probe (10 Sonden),
+venv und gruenem Referee-Selbsttest (Handshake beidseitig `20b442a8164f748d`).
 
-### Was der 2026-09-07 ergeben hat
-
-**1. Die Huellenform schlaegt den Champion** (`PREREG_geometric_envelope.md` par.8.15e).
-Gepoolt ueber drei Seeds **391:329 = 0,543**, Vorzeichentest **p 0,023**, KI der Siegquote
-**[0,507; 0,579]** -- schliesst 0,5 aus. Erste Spec-Aenderung seit K3-P, die den Champion
-nachweislich schlaegt. Das Gating ALLEIN traegt das nicht (214:186, p 0,177); der SPRT lief
-wie vorhergesagt in den Deckel, weil er gegen H1 = 0,65 testet.
-
-**2. K5 hebt Spalten am staerksten von allem Gemessenen, kostet aber keine Siege**
-(`PREREG_special_tile_yield.md` par.9c/9d). Instrument **0,5725 -> 0,6900** (Champion-Bezug
-0,4975). Siegquote ueber **500 Partien 0,486**, KI [0,442; 0,530]. **Der Wirkungsweg ist
-NICHT der gebaute:** das Spezialfeld-Kriterium wird leicht schlechter (-9,67 -> -10,08), die
-Punkte kommen aus vertikalen Reihen (+0,84) und Eckplatten (+1,66). K5 wirkt geometrisch.
-
-**3. Eine erste Messung hat sich nicht repliziert, und das ist die Lehre des Tages.** Die
-K5-Arena stand nach 160 Partien bei 0,444; der Koordinator hat daraus im Chat ein Verdikt
-gemacht. Die Nachmessung auf einem dritten Seed ergab 0,506. Die Differenz ist genau die
-gemessene Streuungsgroesse dieser Kampagne. **Nutzer-Entscheid "erst nachmessen" war
-richtig, das Koordinator-Verdikt war voreilig.**
-
-### Was gebaut und geprueft wurde
-
-| Baustein | Stand |
-| --- | --- |
-| **Weg B (Ausflug)** | gebaut, gewichtetes Reservoir, eigene `game_id` mit Suffix `_x1`; Rauchprobe 20 von 20 |
-| **Glatte Temperatur** | `MOSAIC_ACTION_TEMP` ist jetzt ein MODUS: 0 aus, 1 Staffel, 2 glatt (0,2 bis 0,8 log ueber die Aktionszahl, Anker 2 und 64 gemessen) |
-| Rauchprobe der drei Modi | GRUEN -- alle drei erzeugen verschiedene Zugfolgen (belegt die WIRKUNG, nicht nur eine Statuszeile) |
-| Build | 549 Tests, examples/benches kompilieren, Wheel installiert, Anker-Drift und -Konservierung gruen |
-
-**Zwei Verdrahtungsluecken am selben Knopf gefunden und geschlossen:** `--action-temp` wurde
-geprueft, gedruckt und ins Manifest geschrieben, aber nie an den Arbeitsprozess
-durchgereicht; und die Statuszeile hat ihren eigenen Text nie ausgegeben. **Der Knopf war in
-jedem Lauf aus, und das Manifest haette das Gegenteil behauptet** (par.14e). Gefunden hat es
-der Weg-B-Auftrag beim Lesen, nicht der Autor.
-
-### Aufgeraeumt
-
-- **25 obsolete Ketten-Skripte geloescht** (Nutzer-Freigabe), zehn bleiben. Vorschlag mit
-  Begruendung je Zeile: `evaluations/cleanup_proposal_shell_scripts.md`.
-- **restic-Archiv entruempelt** (Nutzer-Anweisung "raeum auf"): **14,473 -> 8,968 GiB**,
-  `check` ohne Fehler, 14 Sekunden. Endgueltig weg sind die Korpora der Aeren v18-v20,
-  `asym_corpus`, `ownership_corpus`, `corpus_probe`. Erhalten: Modelle, Holdout,
-  `seed_corpus`. Der Legacy-Stand hat dadurch eine NEUE Snapshot-ID.
-- restic-Umgebung in `tools/restic_env.sh` zusammengefasst (der pre-push-Waechter hatte die
-  dreifache Ableitung zu Recht angemeckert).
-
-### Der naechste Schritt: v25 erzeugen
-
-**Die drei Befehle stehen fertig in `PREREG_v25_window.md` par.19.** 4.000 Traeger
-(Umschaltpunkt 1 + Weg C), 4.000 Schwarm mit glatter Temperatur + Weg C, und **`--games
-2000`** fuer die 4.000 Identitaeten der Ausflug-Haelfte -- ein Ausflug kommt ZUSAETZLICH
-zur Hauptpartie. Hergeleitete Kosten grob 11,4 h; auf einer Maschine nacheinander.
-
-**Vor dem Start:** Generationswechsel (`/mosaic-generation-turnover`). Und der
-Val-Pool-Regex aus par.6 wandert von `^selfplay_v24-b06-` auf `^selfplay_v24-b07-`.
-
-### Offene Punkte, die eine Entscheidung brauchen
-
-1. **Elo-Knoten fuer `v24-b07`.** Die Kante gegen b06 ist gemessen (214:186, Seed 20261015).
-   Eintragen aendert die Leiter -- Nutzer-Entscheid, Befehl in par.8.15f.
-2. **Paritaets-Fixture bei reinem Spec-Wechsel?** `docs/promotion_checklist.md` 5d kennt nur
-   den Champion-Wechsel. Die Fixture prueft die DEFAULT-Knopfstellung, und die hat sich
-   nicht bewegt. **Ungeprueft.**
-3. **`--tau-argmax-from-move 1` in der Ausflug-Haelfte** ist eine markierte Ableitung des
-   Koordinators, nicht vorregistriert (Begruendung in par.19).
-4. **Neun Subagent-Partien** bleiben pausiert bis v25.
-5. `models/attic_20260906_k3p10_copies/` und `venv_measure_hullform/` liegen weiter,
-   Loeschung nur auf pfadgenaue Freigabe.
-
-### Kampagnen-Rahmen (Nutzer-Entscheid 2026-09-07)
-
-**v25 bis v27 wird NICHT am Netz gedreht** -- Architektur, Trainingsrezept,
-Value-Ziel-Mischung und Koepfe bleiben fest, nur das Material aendert sich. Eine flache
-Arena ist dabei ausdruecklich akzeptiert, Ruecklauf nicht. **Damit ist auch die Spec
-geschlossen:** Huellenform und K5 waren die letzten spec-pflichtigen Aenderungen
-(`PREREG_v25_window.md` par.18).
-
-## 2. WAS DIE GENERATION v23 ERGEBEN HAT
-
-**Alle vier Tore bestanden -- das v24-Self-Play ist freigegeben**
-(`docs/generation_loop.md` Schritt 9). Herleitungen in
-`PREREG_v23_window.md` par.2b bis par.2g.
-
-| Tor | Ergebnis |
-| --- | --- |
-| 0 Korpus traegt das Signal | Symmetrie-Trennung +0,4041 (t 41,26), 5.629 von 16.000 Seiten mit voller Spalte |
-| 1 Siege gegen b05 | **119:61** aus zwei unabhaengigen Seeds (Champion-Strenge erfuellt) |
-| 2a Spalten im Self-Play | 0,5150 gegen 0,3100, gepaart **+0,2050** (t 4,47) |
-| 2b Spalten in der Arena | 0,6456 gegen 0,4304, gepaart **+0,2152** (t 2,61) |
-
-| Elo-Kante | Ergebnis |
-| --- | --- |
-| gegen **v22-b05** | 119:61 -- signifikant |
-| gegen **v21** (Champion) | 219:181, p = 0,084, KI [-0,013, +0,393] -- **nicht belegt besser**, Augenhoehe. **KEINE Promotion**, v21 bleibt Champion |
-| gegen **hv1** (Anker) | 127:23 aus 150 (84,7 Prozent), eingetragen (Abschnitt 4) |
-
-**Phase 3 gemessen, NEGATIV (par.11 der R5-Kalibrierung):** die
-Betrags-Daempfung ist unveraendert -- b01 0,0859 gegen b05 0,0886 auf
-denselben 139 Paaren. Der Korpus heilt sie nicht. b01 wurde also deutlich
-staerker und baut 66 Prozent mehr Spalten, OHNE dass der Bewerter repariert
-wurde; der Punkte-Kopf trifft dieselbe Groesse mit 0,97. **Der Eingriff ist
-damit faellig**, Erfolgstest "kippt die Sims-Kurve?".
-
-**`v23-b02` (Kaltstart):** Early Stop nach Epoche 15/40, **4,22 h** gegen
-b01s 5,97 h -- ein Kaltstart kostet mit stehendem Fenster-Cache WENIGER als
-ein Warmstart. Sein brierbestes Modell liegt allerdings bei Epoche 1
-(par.2g) -- die Checkpoint-Arena hat es trotzdem zum Kandidaten gemacht:
-**33:47 fuer `_brierbest`** (SPRT H0, Vorzeichentest p = 0,189, gepaarte
-Differenz -0,350 [-0,791, +0,091], Punkte 42,33 gegen 37,53). Nicht
-signifikant, aber die vorab registrierte Regel laesst hier den Punktschaetzer
-entscheiden (par.2h).
-
----
-
-## 3. WAS ALS NAECHSTES ZU TUN IST
-
-**Nutzer-Zuschnitt fuer diese Generation (2026-08-31):** relabelter Sockel,
-b02, b03, Phase 3 -- dann v24. **Stand 2026-09-01: alle vier erledigt**, es
-bleibt v24 (Abschnitt 1, Rezept in `PREREG_v24_window.md` par.6). Nicht in diesem Zyklus: Kuppelplatten-
-Verteilung, Arm K, b04-Breite, geometrisches Gelaender (alle registriert).
-
-### 3.1 Relabel-Arm: GEFAHREN (2026-09-01)
-
-`v23-b05` (Policy-Klasse per hv2-Lehrer relabelt, sonst wie b01): Arena auf
-240 Paare verlaengert (2026-09-02): **246:234 fuer b05, p = 0,65**, dritter
-Seed 75:85; Spalten 0,676 gegen 0,642, KI [-0,06, +0,13]. Weder Gewinn noch
-Schaden, b01 bleibt Generator (par.A3). Herleitung `PREREG_reanalyze_label_depth.md` par.A1; die dortige
-Zeile-1-Frage (Spielen gegen Labeln bei Suchtiefe) ist damit NICHT gemessen,
-gefahren wurde die Lehrer-Variante. Laufzeit 7,42 h, davon 4,98 h einkerniger
-Datenaufbau (`cache_build_time` par.11).
-
-### 3.2 Phase 3: GESCHLOSSEN ohne Bau (2026-09-01)
-
-Stufe 0 der Prereg (`PREREG_r5_value_calibration` par.12) hat die Praemisse
-GEPRUEFT, bevor etwas gebaut wurde -- und sie faellt:
-
-| Arm (je 200 Partien, argmax, Seed 20260931) | volle Spalten | gegen Kontrolle |
-| --- | --- | --- |
-| @100 Sims | **0,7200** | +0,205 (t 3,97) |
-| @400 Sims (Kontrolle) | 0,5150 | -- |
-| @400, `VALUE_CAL_B=2,0` | 0,3900 | -0,125 (t -2,7) |
-| @400, `VALUE_CAL_B=0,5` | 0,5325 | +0,018 (n.s.) |
-| @400, `POINTS_UTILITY_W=0,1` | 0,4850 | -0,030 (n.s.) |
-
-**Die Delle gibt es auch bei b01** (0,205, vorher nur an b05 gemessen), **aber
-keine Einstellung des Value-Kopfs holt sie zurueck.** Verstaerken schadet,
-Daempfen tut nichts, Punkte-Beimischung tut nichts. Die Betrags-Daempfung ist
-damit ein registrierter Befund OHNE benannten Nutzniesser -- der Eingriff
-entfaellt, der Trainingslauf ist gespart. Die Ursachenfrage erbt
-`PREREG_search_depth_column_optimum` Stufe 4: sie liegt nicht in der Skalierung
-des Blattwerts und nicht in fehlender Punkte-Information, sondern in dem, was die
-tiefere Suche mit den Kandidaten TUT.
-
-**Nebenbefund zu einem Nutzer-Einwand:** die vier fruher geschlossenen Wege am
-Verbraucher wurden alle auf plattenBLINDEM v21 gemessen. Der billigste davon
-(Punkte-Blend) ist hier auf b01 wiederholt worden und traegt auch dort nicht --
-fuer die SPALTEN. Fuer die Staerke sagt der Arm nichts, die alte Schliessung war
-eine Staerke-Messung.
-
-### 3.2b Die Tiefen-Delle: vier Wurzel-Eingriffe gemessen, alle wirkungslos
-
-| Eingriff (b01, argmax @400, je 200 Partien) | volle Spalten |
-| --- | --- |
-| Kontrolle | 0,5150 |
-| `VALUE_CAL_B = 2,0` | 0,3900 (-0,125, schaedlich) |
-| `VALUE_CAL_B = 0,5` | 0,5325 (n.s.) |
-| `POINTS_UTILITY_W = 0,1` | 0,4850 (n.s.) |
-| `MOSAIC_GUMBEL_C_SCALE = 0,36` | 0,5000 (n.s.) |
-| zum Vergleich: 100 statt 400 Sims | **0,7200** |
-
-Weder Betrag noch Balance noch Zusatzinformation am Blattwert bewegen die Delle --
-nur die Suchtiefe selbst tut es. **Was bleibt, liegt tiefer im Baum:** was die Suche
-in den Fortsetzungen findet und nach oben propagiert (`search_depth_column_optimum`
-Stufe 4). Die quantitativ saubere Erklaerung ueber das sigma/Prior-Verhaeltnis (2,81)
-ist gepruft und WIDERLEGT -- sie steht in `prior_blind_spot` par.G3 als solche
-markiert.
-
-**Neuer Knopf, bleibt:** `MOSAIC_GUMBEL_C_SCALE` (Default 1,0, paritaetsgeprueft an
-20 Partien, im Lauf-Manifest sichtbar). Er kostet nichts und macht die naechste
-Frage an die Prior/Value-Balance ohne Bau messbar.
-
-### 3.3 Dann v24 -- Zuschnitt STEHT (2026-09-01)
-
-`PREREG_v24_window.md` ist angelegt und der Generator entschieden: **b01**,
-weil kein Arm belegt besser ist. Form wie v23, neu besetzt:
-
-| Klasse | Posten | Partien |
-| --- | --- | --- |
-| Sockel (Policy) | `v23-b01` Self-Play | 4.000 |
-| Sockel (Policy) | `hv2`, policy-aktiv | 1.800 |
-| Schwarm (Value) | `v23-b01` Self-Play | 8.000 |
-| Schwarm (Value) | `hv2`, policy-maskiert | 15.650 |
-
-**Summe 29.450.** Der hv2-Anteil ist identisch mit dem von v23 (1.745 Dateien
-a 10 Partien) und wird UNVERAENDERT weiterverwendet -- **es muss kein einziges
-Lehrerspiel neu erzeugt werden**, die Traegerauswahl kommt aus
-`data/carriers_v23_hv2.txt`. Neu sind allein die 12.000 b01-Partien, mit
-`--per-file 10` (`docs/working_rules.md`). Verfahren: `docs/generation_loop.md`.
-
-**Die Daten der Vorgeneration sind archiviert** (Nutzer, 2026-09-01): in
-`data/` stehen nur noch die 1.745 hv2-Dateien des Fensters plus ihre Bloecke.
-Alles andere liegt im Archiv, samt einer README, die festhaelt, welche
-Korpora BELEGE laufender Preregs sind (frozen_v3-Quelle, die vier
-Phase-3-Arme, der Tor-2a-Referenzlauf).
-
-### 3.4 Belegungsplan (GPU und CPU parallel)
-
-Regel und Thread-Budget: `../docs/working_rules.md`, Abschnitt "Auslastung".
-Ein Training belegt gemessen rund EINEN Kern, der CPU-Auftrag daneben darf
-also rund 10 Threads nehmen. Zwei CPU-Messungen gegeneinander bleiben
-verboten, und ein unter Nebenlast gefahrener `laufzeit`-Block wird als
-solcher markiert.
-
----
-
-## 4. STAND JETZT
-
-**Champion seit 2026-09-04, 19:33: `v23-b01_k3p10`** (= `v23-b01_brierbest`
-mit K3-P: projiziertes Huellen-Potential, Modus 1, C_HULL 1,0, Spec
-`models/v23-b01_k3p10.spec.json`; Server-Default `models/champion.txt`, die
-GUI uebernimmt die Spec beim Start in die Env-Knoepfe). Elo **1292**
-[1253, 1335] auf der R5-Fix-Leiter (`elo_tracker.py report`, alle Knoten mit
-dem Anker verbunden) aus vier Kanten: Gating 38:12 und 221:179 gegen v21,
-Anker 128:22 (n=150, Cross-Aera), Champion-2 32:8 gegen v22-b05 (v20 nicht im
-Baum). Vorgaenger `v21_2d_brierbest` 1232 [1199, 1265]; `v23-b01_brierbest`
-ohne Knopf 1263 [1226, 1305]. Anzeige-Kalibrierung server.py A=-0,1080 /
-B=0,5587 (frozen_v3); sigma/Prior-Balance 2,92 (unter der 3er-Schwelle, Runde
-3 3,88); Paritaets-Fixture `a274e3ad68f4ad91` (frischer Prozess gruen).
-Promotion nach `docs/promotion_checklist.md`, Artefakt
-`models/frozen_champions/v23-b01_k3p10/`. Kanten ueber die Fix-Grenze nie
-mischen.
-
-**Bester Stand der Spalten-Linie: `v23-b01_brierbest`** (seit 2026-08-31) --
-volle Spalten 0,5150 am argmax-Instrument, 119:61 gegen den Vorgaenger b05,
-gegen den Champion 219:181 (nicht signifikant). **Anker-Kante gefochten
-(2026-08-31, 22:39): 127:23 aus 150 = 84,7 Prozent** gegen
-`Heuristik_hv1_anchor`@150, Cross-Aera, Golden-Selbsttest gruen, Ergebnisse per
-Determinismus-Probe freigegeben. **ES GIBT KEIN REMIS** (Nutzer-Hinweis, Regel an
-`game.rs:586` geprueft: bei Gleichstand gewinnt, wer den Startspielerstein zuletzt
-nahm): der Schiedsrichter meldete drei Partien faelschlich als Remis, alle drei gehen
-an b01. `frozen_referee_match.py:380` liest den Tie-Break jetzt aus dem Zustand
-(`first_player_next_round`), Gegenprobe auf denselben Seeds bestaetigt es. Die
-Rust-Arenen waren nie betroffen. Kennzahlen je Seite: volle Spalten 0,953 gegen
-0,027, Punkte 53,97 gegen 36,13, Margin +17,84, Strafpunkte -14,31 gegen -20,17.
-Elo als HERLEITUNG: rund +297 ueber dem Anker (aus 84,7 Prozent), und rund +33 ueber
-v21 aus der Champion-Kante. Beide Kanten sind seit dem 2026-08-31 in
-`elo_history.csv` und die Anker-Kante zusaetzlich in `arena_trends.csv`. Zum
-Vergleich, ueber zwei Instrumente hinweg (Paritaet 20/20 belegt): v21 kam am Anker
-auf 116 von 150 (77,3 Prozent, Remis dort nicht ausgewiesen).
-
-**EINGETRAGEN am 2026-08-31** in `elo_history.csv` und `arena_trends.csv`.
-Beim Eintragen fiel auf, dass der Tracker auf den LITERALEN Namen `Heuristik`
-verankerte, waehrend die Checkliste `Heuristik_hv1_anchor` vorschreibt -- die Kante
-landete dadurch in einer eigenen, freien Komponente (b01 1148 / Anker 852, Summe
-exakt 2000). BEHOBEN, siehe unten; Herleitung in `PREREG_agent_encapsulation.md`
-par.13.
-
-**Die Vorbedingung ist inzwischen GEMESSEN (2026-08-31, Nutzer-Vorgabe: nicht
-gegeneinander spielen lassen, sondern Zug fuer Zug vergleichen).**
-`tools/verify_frozen_heuristic.py` in beiden Modi, hv1-Rezept aus dem Manifest
-(10 Partien, 600 Sims, Seed 20260826):
-
-| Modus | Verdikt | verglichen | Wanduhr |
+| Knoten | Elo | KI | Partien |
 | --- | --- | --- | --- |
-| Live-Wheel (Drift) | **GRUEN** | 1.763 Schritte, Feld fuer Feld, keine Abweichung | 22,2 s |
-| Artefakt-Wheel (Konservierung) | **GRUEN** | dieselben 1.763 Schritte | 13,4 s |
+| **v24-b07@400** | **1327** | [1287, 1370] | 700 |
+| v24-b06_k3p10@400 | 1302 | [1266, 1341] | 1230 |
+| Heuristik_hv1_anchor@150 | 1000 | fix | 1050 |
 
-Dazu die Referee-Paritaet neu gefahren (`anchor_referee_parity_20260831.json`):
-20/20 identisch in beiden Modi, 0 Abweichungen. **Der lebende Code spielt hv1 also
-Zug fuer Zug wie das Artefakt** -- die Engine-Aenderungen seit dem Einfrieren haben
-den Anker nicht bewegt. Ab jetzt Pflicht nach jeder Engine-Aenderung, als Skill
-`mosaic-anchor-invariance` abgelegt.
+Alle Knoten haengen am Anker, keine freie Komponente.
 
-**Nutzer-Klarstellung dazu:** die In-Process-Heuristik ist eine
-ENTWICKLUNGSUMGEBUNG, kein Vergleichswert. Der Fixpunkt gehoert an das Artefakt;
-"der Anker ist gedriftet" ist keine moegliche Diagnose, ein rotes Ergebnis hiesse,
-der lebende Code hat sich bewegt.
+**Tagesschnappschuss `b6842b4e`** (2026-09-07 19:37, 8,189 GiB), `verify_backup.ps1` in
+allen gefahrenen Stufen gruen, 12 Stichproben gleich. Repo 8,989 GiB ueber 39 Staende --
+das Archiv wurde heute von 14,473 GiB entruempelt (Nutzer-Anweisung, Alt-Korpora der
+Aeren v18 bis v20 sowie asym/ownership/corpus_probe endgueltig weg).
 
-**GESETZT (Nutzer-Anweisung 2026-08-31): der Anker IST das Artefakt.**
-`ANCHOR_NAME = "Heuristik_hv1_anchor"` in `tools/elo_tracker.py`, dazu
-`ANCHOR_ALIASES = {"Heuristik": ...}` fuer die Zeilen vor der Umbenennung.
-`Heuristik_v2huelle` bleibt ein eigener Spieler. Registriert in
-`PREREG_agent_encapsulation.md` par.13, Ablauf als Skill
-`mosaic-anchor-invariance`, Checkliste nachgezogen.
+## 2. WAS ALS NAECHSTES LAEUFT: die v25-Erzeugung
 
-**Die Leiter danach** (`python tools/elo_tracker.py report`, 11 Zeilen, kein
-einziger "NICHT verbunden"-Vermerk mehr; eingetragen sind seither auch die
-beiden Tor-1-Gatings gegen b05):
+**Die drei Befehle stehen fertig in `PREREG_v25_window.md` par.19.** Generator ist b07.
 
-| Modell | Elo | 95%-KI | Partien |
-| --- | --- | --- | --- |
-| **v23-b01_brierbest@400** | **1263** | [1223, 1311] | 730 |
-| v21_2d_brierbest@400 | 1227 | [1191, 1269] | 1407 |
-| v20_2d_opp_brierbest@400 | 1194 | [1158, 1235] | 950 |
-| v19_2d_best@400 | 1142 | [1103, 1186] | 550 |
-| Heuristik_v2huelle@150 | 1137 | [1086, 1190] | 407 |
-| v22-b05@400 | 1136 | [1074, 1198] | 230 |
-| Heuristik_hv1_anchor@150 | 1000 | fix | 600 |
+| Klasse | Partien | Identitaeten | Zugwahl | Abweichung | Wurzelrauschen |
+| --- | --- | --- | --- | --- | --- |
+| Sockel (policy-aktiv) | 4.000 | 4.000 | greedy ab Zug 1 | Weg C im Hauptstrang | an |
+| Schwarm a (value-only) | 4.000 | 4.000 | glatte Temperatur, Modus 2 | Weg C im Hauptstrang | an |
+| Schwarm b (value-only) | 2.000 | 4.000 | greedy ab Zug 1 | Weg B, nur im Ausflug | aus |
 
-**Beide Kanten sind drin (Nutzer-Anweisung 2026-08-31, "ist ja ein valides
-match"): die Champion-Kante 219:181 gegen v21 ist als 9. Zeile eingetragen** --
-informativ, kein Promotionsentscheid. Sie zieht b01 von 1297 (Anker-Kante allein)
-auf 1266; mit den beiden b05-Kanten dazu steht er bei **1263** ueber 730 Partien.
-Anker- und Champion-Kante implizierten einzeln 1297 und rund 1259, der gemeinsame
-Fit legt sich dazwischen. Die KI von b01 [1223, 1311] und v21 [1191, 1269]
-ueberlappen -- dieselbe Aussage wie die
-Champion-Kante selbst: Augenhoehe, nicht belegt besser, keine Promotion.
+**`--games 2000` in der dritten Zeile ist kein Tippfehler:** ein Ausflug kommt ZUSAETZLICH
+zur Hauptpartie. Hergeleitete Kosten rund 11,4 h, nacheinander auf einer Maschine.
 
-**Was noch offen BLEIBT:** der Alias faltet die Anker-Kanten vom 2026-08-20 auf ein am 2026-08-26
-   eingefrorenes Artefakt. Fuer diese sechs Tage liegt kein Wheel im Baum, die
-   Zug-Gleichheit ist dort also NICHT geprueft. Einzige unbelegte Fuge der
-   Leiter.
+**Val-Pool-Regex wandert** von `^selfplay_v24-b06-` auf `^selfplay_v24-b07-`.
 
-Vorgaenger `v22-b05`: Elo **1136** [1074, 1198] -- und das ist eine ANDERE Zahl als
-die 1084, die hier bis zum 2026-08-31 stand. Grund ist nicht eine neue Partie,
-sondern die Datenlage: b05 hing bis dahin an einer einzigen fruehgestoppten Kante
-(16:34 gegen v21, n=50). Mit den beiden Tor-1-Gatings gegen b01 (52:28 und 67:33)
-kommen 180 Partien dazu, das Intervall schrumpft von 228 auf 124 Punkte. Der
-hv2-Lehrer liegt mit **1137** jetzt gleichauf statt 40 Punkte darueber.
+## 3. WAS DIE SPEC JETZT TRAEGT -- und bis wann sie zu ist
 
-**Wheel:** 79-Kanal-Build (`e91cd34`), Vertragshash `efd564d87bac2722`,
-Paritaets-Hash `8c6684ff...` gemessen unveraendert.
+`envelope_projection_mode 1`, `envelope_search_c 1,0`, `envelope_flush_w 0,0`,
+**`envelope_hull_form 2`**, **`special_row6_w 1,0`**, Profil 1/0,92/0,67/0,33/0.
 
-**Was ueber den Value-Kopf gemessen ist:** relativ geheilt, im Betrag
-gedaempft -- und die Daempfung ist auf v23-b01 unveraendert (0,0859 gegen
-b05s 0,0886, par.11). Geschwister-Tau auf b05 **+0,338** (gegen -0,08/-0,19
-der plattenblinden Netze), Mensch-Orakel-Differenz praktisch null. Kriterienweise aufgeloest ist die
-Daempfung BREIT, nicht spaltenspezifisch (k1 mit 0,1747 am wenigsten
-gedaempft). Daraus die Betrags-Schiene als Phase 3.
+**Nutzer-Entscheid 2026-09-07: v25 bis v27 wird NICHT am Netz gedreht** -- Architektur,
+Trainingsrezept, Value-Ziel-Mischung und Koepfe bleiben fest, nur das Material aendert
+sich. Eine flache Arena ist dabei ausdruecklich akzeptiert, Ruecklauf nicht. **Damit ist
+auch die Spec geschlossen**, denn ein Fenster ist nur stationaer, wenn die
+Erzeugungsregeln stehen (`PREREG_v25_window.md` par.18).
 
-**Was ueber den Spaltenbau gemessen ist:** der Korpus wirkt (b01 baut 3x so
-viele Spalten wie der Champion), das Ownership-TRAININGSGEWICHT nicht (w0
-gleichauf, w2,0 signifikant darunter). Der Engpass ist die VOLLENDUNG spaet,
-nicht der Plattenblick. Die Suchtiefe ist ein Regler zwischen Policy
-(traegt das Spaltenwissen) und Value-Kopf: Plateau 25-100 Sims bei ~0,6
-vollen Spalten gegen 0,34 ab 250 -- aber ein TAUSCH (@25 verliert 11:29,
-@100 verliert 33:47 n.s.). Die Erklaerung dafuer ist OFFEN; die Deutung
-"der Kopf sieht Spalten nicht" ist durch die kriterienweise Zerlegung
-widerlegt.
+## 4. OFFENE NUTZER-ENTSCHEIDE (Stand 2026-09-07, 19:40)
 
-**Erzeugungs-Knoepfe, gemessen entschieden:** implicit-Minimax alpha 0,0,
-Stack-Draw-Kontrollfluss EIN, Bootstrap-Horizont 2, Seed-Positionen AUS
-(Quelle plattenblind), Startkuppel Handheuristik, Vollendbarkeits-Filter AUS
-(ungebaut). Vollstaendig in `PREREG_v23_window.md` par.4c.
----
+1. **Loeschfreigaben**, pfadgenau: `evaluations/cleanup_proposal_turnover_v25.md`
+   (6 Einmal-Skripte), dazu die seit gestern offenen
+   `models/attic_20260906_k3p10_copies/` und `venv_measure_hullform/`.
+2. **Schritt 4 des Generationswechsels** (Korpora, Bloecke, Monolithe toter Fenster) ist
+   NICHT gefahren -- er braucht die v25-Fensterliste und je Gruppe einen
+   `restic find`-Beleg. Vorlage folgt, sobald die Erzeugung laeuft.
+3. **Eroeffnungsplatzierung und Kuppelstapel**: darf die Eroeffnung blind ziehen? Vom
+   Nutzer als eigenes Prereg vertagt; Belege beider Lesarten in
+   `docs/domain_knowledge.md`. Bis zur Klaerung ist die Eroeffnung aus allen
+   Abzweig-Verteilungen ausgenommen.
+4. **Paritaets-Fixture bei reinem Spec-Wechsel**: die Checkliste kennt nur den
+   Champion-Wechsel. Fuer b07 wurde sie neu geschrieben und ist gruen -- ob das noetig
+   war, ist ungeklaert.
+5. **Prereg-Bestand: 13 mit OFFEN im Kopf**, Ziel rund 7.
 
 ## 5. OFFENE ENTSCHEIDUNGEN (Nutzer)
 
