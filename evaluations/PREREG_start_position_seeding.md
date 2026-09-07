@@ -778,3 +778,32 @@ meldet auf `self_play.rs` nur Bestands-Hunks, keine der neuen Zeilen.
 
 **Ungetestet:** kein `cargo test`, kein Wheel, keine Partie. Folgt im naechsten
 CPU-freien Fenster zusammen mit Pass-Zeile, Chip-Angabe und Symbol.
+
+### par.9f WEG B WIRD IN DIE ENGINE GEBAUT (Nutzer 2026-09-07, 09:11: "bau weg b in die engine. ich will keine abhaengigkeit zum sockel")
+
+**Entschieden gegen die Offline-Fassung.** Der Ausflug entsteht mitten in der laufenden
+Partie, nicht aus einer Stellungsdatei. Damit faellt die Reihenfolge-Abhaengigkeit weg, die
+`--seed-positions` erzwungen haette (erst Sockel, dann Stellungen ziehen, dann Ausfluege),
+und beide Maschinen koennen jede Charge unabhaengig fahren.
+
+**Bauform wie in par.9 beschrieben, mit dem Unterschied aus par.9a/9b:** der Ausflug ist ein
+AUSFLUG, keine Abzweigung -- die Hauptpartie laeuft von derselben Stellung unbeirrt weiter.
+Zweiphasig: k Halbzuege gesampelt, danach greedy bis zum Ende, damit das Value-Ziel des
+Ausflugs der Wert der abgewichenen Stellung unter GUTEM Spiel ist (der Punkt, an dem sich
+Weg B von reiner Temperatur unterscheidet, par.9a).
+
+**Was das fuer die Startstellung heisst:** sie ist per Konstruktion so sauber wie die
+Hauptpartie, in der sie entsteht. Ein Ausflug aus einer temperierten Partie startet also
+aus einer verrauschten Lage. **Fuer den Split (v25 par.16a) folgt daraus:** die Haelfte mit
+Ausfluegen sollte GREEDY gespielt werden (`--tau-argmax-from-move 1`), die andere Haelfte
+temperiert und ohne Ausfluege. Sonst mischt man die beiden Sorten Abweichung in derselben
+Partie und verliert genau die Trennung, wegen der der Split gebaut wird.
+
+**Offene Zaehl-Frage, vor der Erzeugung zu klaeren:** eine Partie mit Ausflug liefert die
+Vollpartie PLUS den Ausflug, also rund 164 + 72 Records statt 164. Die Fenster-Groesse ist
+in PARTIEN definiert (par.1). Zaehlt ein Ausflug als eigene Partie, oder gehoert er zu
+seiner Hauptpartie? Das entscheidet, ob 4.000 Partien mit Ausflug 4.000 oder 8.000 Zeilen
+im Fenster-Manifest ergeben. **Nicht entschieden.**
+
+**Kosten:** der Ausflug kostet rund 44 % einer Vollpartie zusaetzlich (Restlaenge aus
+par.7). Bei einem Ausflug je Partie also rund +44 % Wanduhr fuer die betroffene Haelfte.
