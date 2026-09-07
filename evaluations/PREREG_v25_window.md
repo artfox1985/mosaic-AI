@@ -1064,3 +1064,60 @@ Aufschlag kauft 4.000 Ausflug-Trajektorien mit sauberen Zielen.
 **Offen bleibt die Zaehlung** (par.9f): ob ein Ausflug als eigene Partie im Fenster-Manifest
 zaehlt oder zu seiner Hauptpartie gehoert. Das entscheidet, ob V-b 4.000 oder 8.000 Zeilen
 beitraegt und damit, ob das Fenster seine Groesse von 29.450 Partien haelt.
+
+## par.17 DER STATIONAERE ZUSTAND, wenn alles durchrotiert ist (Nutzer 2026-09-07, 09:30)
+
+**Nachgerechnet: die Aufteilung geht exakt auf.** Schwarm 23.650, Traeger 5.800, Fenster
+29.450 -- Zeile fuer Zeile die Groessen aus par.1, nur mit Erzeugungsregeln statt Quellen
+beschrieben.
+
+| Klasse | Partien | Erzeugungsregel | Wurzelrauschen |
+| --- | --- | --- | --- |
+| Sockel NEU (G) -- **Traeger** | 4.000 | Umschaltpunkt 1 + Weg C | an |
+| Sockel G-1 -- **Traeger** | 1.350 | (aus der Vorgeneration, dort Umschaltpunkt 1 + Weg C) | -- |
+| G-2 -- **Traeger** | 450 | (aus G-2) | -- |
+| Schwarm G, Haelfte a | 4.000 | variable Temperatur + Weg C | **an** |
+| Schwarm G, Haelfte b | 4.000 | **Weg B** (Ausfluege) | **aus** |
+| Schwarm G-1, Haelfte a | 4.000 | variable Temperatur + Weg C | an |
+| Schwarm G-1, Haelfte b | 4.000 | **Weg B** | aus |
+| Sockel-Rest G-1 (maskiert) | 2.650 | Umschaltpunkt 1 + Weg C (als Sockel erzeugt) | an |
+| Schwarm G-2 | 1.450 | **Weg B** | aus |
+| Sockel-Rest G-2 (maskiert) | 3.550 | Umschaltpunkt 1 + Weg C (als Sockel erzeugt) | an |
+
+**Zusammensetzung der Value-Masse im Endzustand:** 40 % Ausfluege (Weg B, saubere Ziele
+aus abweichenden Stellungen), 34 % temperiert (breite Abdeckung, verzerrte Ziele), 26 %
+ehemalige Sockel-Partien (greedy, spaltenreich). Die drei Sorten decken genau die drei
+Anforderungen ab, die in par.15 auseinandergefallen waren -- Abdeckung, saubere Ziele,
+Spaltenstruktur -- und keine Klasse muss alle drei zugleich leisten.
+
+**NEU und entschieden: Weg B laeuft OHNE Wurzelrauschen.** Das ist konsequent und war so
+noch nicht festgelegt (par.16a hatte Wurzelrauschen fuer die ganze Value-Klasse
+eingeschaltet). Begruendung: der Zweck des Ausflugs ist ein UNVERZERRTES Wertziel -- die
+Abweichung ist gewollt, alles danach soll bestes Spiel sein. Gumbel-Rauschen an der Wurzel
+wuerde genau diese Fortsetzung wieder verrauschen und den Vorteil gegenueber der
+temperierten Haelfte einebnen. **Damit gilt praezisiert:** Wurzelrauschen AN in der
+temperierten Haelfte (Abdeckung ist dort das Ziel), AUS in der Ausflug-Haelfte.
+
+**Was das ueber die Rotation sagt.** Die Ex-Sockel-Anteile (2.650 + 3.550 = 6.200 Partien)
+sind der Mechanismus, den der Nutzer am 03:40 benannt hat: der Schwarm bekommt seinen
+spaltenreichen, sauber gespielten Anteil von selbst, weil die Traeger von gestern das
+maskierte Wertmaterial von morgen sind. Im Endzustand ist das ein Viertel der Value-Masse,
+ohne dass irgendwo dafuer erzeugt werden muesste.
+
+### Der Unterschied zum v25-Fenster (wichtig, damit niemand das eine fuer das andere haelt)
+
+**v25 ist NICHT dieser Zustand.** Dort sind G-1 und G-2 noch Altbestand:
+- G-1 = das heutige v24-Material, erzeugt von `v23-b01` mit voller Temperatur (Sockel) und
+  argmax (Schwarm) -- also weder Weg B noch Weg C, und der Sockel-Anteil traegt die 0,19,
+  die Messung 3-V als Temperatur-Artefakt entlarvt hat.
+- G-2 = hv2, der plattenblinde Lehrer.
+
+**Der Zustand oben stellt sich erst nach ZWEI weiteren Generationen ein** (v26 hat G-1 aus
+v25, v27 dann auch G-2). Fuer v25 gilt weiter der Zuschnitt aus par.1 mit den Aenderungen
+aus par.14b, 16, 16a und 16b. Wer die Tabelle oben als v25-Rezept liest, erzeugt Material,
+das es noch gar nicht geben kann.
+
+**Offen bleibt** die Zaehlfrage aus par.9f: ob ein Ausflug als eigene Partie zaehlt. Im
+Zustand oben ist unterstellt, dass er es TUT (die 4.000 "Weg B" sind 4.000 Ausfluege, nicht
+4.000 Hauptpartien mit je einem Ausflug). Andernfalls verdoppelt sich die Zeile und das
+Fenster waere groesser als 29.450.
