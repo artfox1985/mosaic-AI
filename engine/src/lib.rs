@@ -1060,7 +1060,7 @@ fn net_drafting_policy_states_json_batch(
             continue;
         }
         let (_chosen, policy, root_q, _child_q) = crate::self_play::net_drafting_policy(
-            &net, &state, &actions, sims, c_puct, &mut rng, false, true, 0, &search_config,
+            &net, &state, &actions, sims, c_puct, &mut rng, false, true, 0, None, &search_config,
         );
         out.push(json!({ "policy": policy, "root_q": root_q, "n_actions": actions.len() }).to_string());
     }

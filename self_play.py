@@ -164,7 +164,8 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       heartbeat_path, seed_positions=None, seed_positions_offset=0,
                       heuristik_variante="hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
                       spec=None, deviate_prob=0.0, deviate_mean_move=30.0,
-                      deviate_candidates=6, action_temp=0):
+                      deviate_candidates=6, action_temp=0,
+                      excursion_prob=0.0, excursion_tau_moves=12, excursion_profile=None):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -199,14 +200,28 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     zu "ungesetzt" (AUS, keine zusaetzliche Zufallszahl).
     `action_temp` (PREREG_v25_window.md par.14, Arme S2/S5): wie die beiden
     oben KEIN pyo3-Parameter -- Rust liest MOSAIC_ACTION_TEMP selbst per
-    OnceLock (net_mcts::action_temp_enabled), deshalb hier VOR dem
+    OnceLock (net_mcts::action_temp_mode), deshalb hier VOR dem
     `import mosaic_rust` in DIESEM Subprozess gesetzt. `0` (Default) ist fuer
-    Rust identisch zu "ungesetzt" (AUS, rohe Besuchszahlen, bitidentisch)."""
+    Rust identisch zu "ungesetzt" (AUS, rohe Besuchszahlen, bitidentisch).
+    `excursion_*` (Weg B, PREREG_start_position_seeding.md par.9f): wie
+    `deviate_*` KEIN pyo3-Parameter -- Rust liest MOSAIC_EXCURSION_PROB /
+    _TAU_MOVES / _PROFILE selbst per OnceLock (self_play.rs::excursion_prob
+    und Geschwister), deshalb hier VOR dem `import mosaic_rust` gesetzt.
+    `excursion_prob=0.0` (Default) ist fuer Rust identisch zu "ungesetzt"
+    (AUS, kein Ausflug, keine zusaetzliche Zufallszahl, kein Zustands-Klon).
+    `excursion_profile=None` (Default) laesst MOSAIC_EXCURSION_PROFILE
+    UNGESETZT -- Rust faellt dann auf sein eigenes Default-Profil zurueck
+    (ENVELOPE_PROFILE_DEFAULT), die Python-Seite muss die fuenf Zahlen also
+    nicht kennen."""
     os.environ["MOSAIC_TAU_ARGMAX_FROM_MOVE"] = str(tau_argmax_from_move)
     os.environ["MOSAIC_DEVIATE_PROB"] = str(deviate_prob)
     os.environ["MOSAIC_DEVIATE_MEAN_MOVE"] = str(deviate_mean_move)
     os.environ["MOSAIC_DEVIATE_CANDIDATES"] = str(deviate_candidates)
     os.environ["MOSAIC_ACTION_TEMP"] = str(action_temp)
+    os.environ["MOSAIC_EXCURSION_PROB"] = str(excursion_prob)
+    os.environ["MOSAIC_EXCURSION_TAU_MOVES"] = str(excursion_tau_moves)
+    if excursion_profile:
+        os.environ["MOSAIC_EXCURSION_PROFILE"] = excursion_profile
     try:
         import mosaic_rust as mr
         if mode == "network":
@@ -284,7 +299,9 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           tau_argmax_from_move=0, seed_positions=None,
                           seed_positions_offset=0, spec=None,
                           deviate_prob=0.0, deviate_mean_move=30.0,
-                          deviate_candidates=6, action_temp=0) -> str | None:
+                          deviate_candidates=6, action_temp=0,
+                          excursion_prob=0.0, excursion_tau_moves=12,
+                          excursion_profile=None) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -301,7 +318,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               pcr_cheap_sims, tau_argmax_from_move, queue,
               str(progress_path), str(heartbeat_path),
               seed_positions, seed_positions_offset, heuristik_variante, spec,
-              deviate_prob, deviate_mean_move, deviate_candidates, action_temp),
+              deviate_prob, deviate_mean_move, deviate_candidates, action_temp,
+              excursion_prob, excursion_tau_moves, excursion_profile),
     )
     proc.start()
     t_start = time.time()
@@ -404,7 +422,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   heuristik_variante: str = "hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
                   spec: str | None = None,
                   deviate_prob: float = 0.0, deviate_mean_move: float = 30.0,
-                  deviate_candidates: int = 6, action_temp: int = 0):
+                  deviate_candidates: int = 6, action_temp: int = 0,
+                  excursion_prob: float = 0.0, excursion_tau_moves: int = 12,
+                  excursion_profile: str | None = None):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -443,16 +463,35 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         print(f"  ⚠️  --deviate-prob={deviate_prob} wirkt nur bei --mode network "
               f"(die Abweichung braucht die Netzbewertung) -- bei --mode {mode!r} ist es ein No-Op.")
     # Aktionsabhaengige Temperatur (PREREG_v25_window.md par.14, Arme S2/S5):
-    # Schalter, kein Skalierungsfaktor -- registriert ist GENAU EIN Regime
-    # (dieselbe Staffel wie im Heuristik-Pfad). Wirkt nur im netzgefuehrten
+    # MODUS, kein Skalierungsfaktor -- registriert sind GENAU ZWEI Regime:
+    # 1 = die Staffel des Heuristik-Pfads (par.14), 2 = die glatte Form von
+    # 0,2 bis 0,8 ueber die Aktionszahl (par.14d). Wirkt nur im netzgefuehrten
     # Self-Play (net_drafting_policy); --mode mcts hat die Staffel ohnehin
     # fest an, liest MOSAIC_ACTION_TEMP aber nicht -- deshalb wie bei tau
     # Warnung statt SystemExit.
-    if action_temp not in (0, 1):
-        raise SystemExit(f"❌ --action-temp ist 0 (aus) oder 1 (an), ist {action_temp}.")
+    if action_temp not in (0, 1, 2):
+        raise SystemExit(
+            f"❌ --action-temp ist 0 (aus), 1 (Staffel) oder 2 (glatt), ist {action_temp}.")
     if action_temp and mode != "network":
         print(f"  ⚠️  --action-temp={action_temp} wirkt nur bei --mode network "
               f"(net_drafting_policy) -- bei --mode {mode!r} ist es ein No-Op.")
+    # Weg B (PREREG_start_position_seeding.md par.9f): Ausflug -- an EINER per
+    # gewichtetem Reservoir gezogenen Stelle wird der Zustand geklont, die
+    # Hauptpartie laeuft unbeirrt weiter, vom Klon laeuft NACH der Hauptpartie
+    # eine eigene Partie bis zum Ende. Wirkt nur im netzgefuehrten Self-Play
+    # (die Reservoir-Gewichtung und der Ausflug selbst brauchen das Netz) --
+    # wie bei deviate/tau/action_temp deshalb Warnung statt SystemExit, wenn
+    # der Modus nicht passt.
+    if not (0.0 <= excursion_prob <= 1.0):
+        raise SystemExit(f"❌ --excursion-prob muss in [0,1] liegen (0 = AUS), ist {excursion_prob}.")
+    if excursion_tau_moves < 0:
+        raise SystemExit(
+            f"❌ --excursion-tau-moves darf nicht negativ sein, ist {excursion_tau_moves}."
+        )
+    if excursion_prob and mode != "network":
+        print(f"  ⚠️  --excursion-prob={excursion_prob} wirkt nur bei --mode network "
+              f"(der Ausflug braucht die Reservoir-Gewichtung und die Netz-Suche) -- "
+              f"bei --mode {mode!r} ist es ein No-Op.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -516,6 +555,11 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # ohne dieses Feld waere ein fehlendes Flag ein stiller Default, und
         # S1/S3/S4 waeren im Nachhinein nicht von S2/S5 zu unterscheiden.
         "action_temp": action_temp,
+        # Weg B (par.9f): Erzeugungs-Parameter, kein Spielparameter -- gehoert
+        # ins Lauf-Manifest, nicht in models/<name>.spec.json, aus demselben
+        # Grund wie das deviate-Trio oben.
+        "excursion_prob": excursion_prob, "excursion_tau_moves": excursion_tau_moves,
+        "excursion_profile": excursion_profile,
     })
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -551,18 +595,31 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         action_temp_status = "AUS (Standard, τ=1 auf rohen Besuchen)"
     elif deterministic:
         action_temp_status = "irrelevant (--deterministic argmaxt bereits die ganze Partie)"
-    elif tau_argmax_from_move:
-        action_temp_status = (f"an: T(n)=0,7/0,4/0,15, ab Zug {tau_argmax_from_move} "
-                              f"wirkungslos (argmax hat Vorrang)")
     else:
-        action_temp_status = "an: T(n)=0,7/0,4/0,15 ueber |Aktionen| (par.14)"
+        form = ("Staffel T(n)=0,7/0,4/0,15 (par.14)" if action_temp == 1
+                else "glatt T(n)=0,2..0,8 log ueber |Aktionen|, Anker 2 und 64 (par.14d)")
+        if tau_argmax_from_move:
+            action_temp_status = (f"an: {form}, ab Zug {tau_argmax_from_move} "
+                                  f"wirkungslos (argmax hat Vorrang)")
+        else:
+            action_temp_status = f"an: {form}"
+    # Weg B (par.9f): eine Zeile, damit im Log ablesbar ist, ob ein Ausflug
+    # entstehen kann (nur die Wahrscheinlichkeit -- OB tatsaechlich einer
+    # entsteht, entscheidet das Bernoulli-Gate je Partie in Rust).
+    if excursion_prob:
+        excursion_status = (f"p={excursion_prob}, {excursion_tau_moves} Zuege gesampelt "
+                            f"ab Start (par.9f)")
+    else:
+        excursion_status = "AUS (Standard)"
     if mode == "network":
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"base_sims {simulations} | c_puct {c_puct} | "
               f"Root-Noise {'an' if add_root_noise else 'AUS'} | "
               f"Zugwahl {'ARGMAX (deterministisch)' if deterministic else 'Sampling (Standard)'} | "
               f"τ-Annealing {tau_status} | "
+              f"Aktions-Temperatur {action_temp_status} | "
               f"Abweichung {deviate_status} | "
+              f"Ausflug {excursion_status} | "
               f"rtv-Labels {rtv_status} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
@@ -600,7 +657,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             seed_positions=seed_positions, seed_positions_offset=pos_offset,
             spec=spec,
             deviate_prob=deviate_prob, deviate_mean_move=deviate_mean_move,
-            deviate_candidates=deviate_candidates,
+            deviate_candidates=deviate_candidates, action_temp=action_temp,
+            excursion_prob=excursion_prob, excursion_tau_moves=excursion_tau_moves,
+            excursion_profile=excursion_profile,
         )
         return raw, progress_path, heartbeat_path
 
@@ -866,10 +925,42 @@ if __name__ == "__main__":
                         help="Arme S2/S5 (PREREG_v25_window.md par.14): aktionsabhaengige "
                              "Temperatur fuer die ZUGWAHL im Netz-Self-Play. 0 = aus "
                              "(Bestand: Zugwahl proportional zu den rohen Besuchszahlen, "
-                             "bitidentisch), 1 = an (Staffel wie im Heuristik-Pfad: mehr als "
-                             "50 gueltige Aktionen -> T 0,7; mehr als 15 -> 0,4; sonst 0,15; "
-                             "Gewichte werden visits^(1/T)). Das Policy-ZIEL bleibt in beiden "
-                             "Faellen die completed-Q-Verteilung. Setzt NUR MOSAIC_ACTION_TEMP.")
+                             "bitidentisch), 1 = Staffel wie im Heuristik-Pfad (mehr als "
+                             "50 gueltige Aktionen -> T 0,7; mehr als 15 -> 0,4; sonst 0,15), "
+                             "2 = glatte Form (par.14d): logarithmisch von T 0,2 bei 2 Aktionen "
+                             "bis 0,8 bei 64, ausserhalb gekappt. In beiden Faellen werden die "
+                             "Gewichte visits^(1/T); das Policy-ZIEL bleibt die "
+                             "completed-Q-Verteilung. Setzt NUR MOSAIC_ACTION_TEMP.")
+    parser.add_argument("--excursion-prob", dest="excursion_prob", type=float, default=0.0,
+                        help="PREREG_start_position_seeding.md par.9f, Weg B (Ausflug): "
+                             "Wahrscheinlichkeit je Partie, dass ueberhaupt ein Ausflug entsteht "
+                             "-- eine ZWEITE, vollstaendige Partie ab einer per gewichtetem "
+                             "Reservoir gezogenen Abzweigstelle (Gewicht = Rundenprofil * "
+                             "Aktionszahl an diesem Halbzug). Die Hauptpartie laeuft von der "
+                             "Abzweigstelle unbeirrt weiter; der Ausflug liefert eigene Records "
+                             "mit eigener game_id (Suffix _x1) und kommt ZUSAETZLICH zur "
+                             "Hauptpartie, nicht statt ihr. Default 0.0 = AUS (bitidentisch: es "
+                             "wird keine einzige zusaetzliche Zufallszahl gezogen und kein "
+                             "Zustand geklont). Setzt NUR MOSAIC_EXCURSION_PROB fuer den "
+                             "Rust-Aufruf, siehe self_play.rs. Nur bei --mode network wirksam.")
+    parser.add_argument("--excursion-tau-moves", dest="excursion_tau_moves", type=int, default=12,
+                        help="Weg B: wie viele Halbzuege der Ausflug AB SEINEM EIGENEN START "
+                             "sampelt (Exploration), bevor er greedy (argmax) weiterspielt -- "
+                             "RELATIV zum Ausflug, nicht zur Hauptpartie (Messung 3-V: 12 ist "
+                             "der beste gemessene Umschaltpunkt fuer die analoge Weg-A-Groesse "
+                             "--tau-argmax-from-move). Grund fuer den Umschaltpunkt ueberhaupt: "
+                             "das Value-Ziel des Ausflugs soll der Wert der abgewichenen "
+                             "Stellung unter GUTEM Spiel sein, nicht unter Explorationszuegen. "
+                             "Default 12. Setzt NUR MOSAIC_EXCURSION_TAU_MOVES.")
+    parser.add_argument("--excursion-profile", dest="excursion_profile", type=str, default=None,
+                        help="Weg B: Rundenprofil der Abzweig-Gewichte, fuenf Kommazahlen "
+                             "(Runde 1..5, z.B. '1,0.92,0.67,0.33,0'). Default None laesst "
+                             "MOSAIC_EXCURSION_PROFILE UNGESETZT -- Rust faellt dann auf "
+                             "envelope::ENVELOPE_PROFILE_DEFAULT zurueck (dieselbe Kurve, aus "
+                             "der Verlaesslichkeit des Value-Kopfs je Runde hergeleitet, "
+                             "PREREG_geometric_envelope.md par.8.5). EIGENER Knopf, gewichtet "
+                             "NUR die Reservoir-Abzweigstelle, nicht Suche/Tiling wie "
+                             "MOSAIC_ENVELOPE_PROFILE.")
     parser.add_argument("--spec", type=str, default=None,
                         help="Such-Spec-Datei models/<name>.spec.json (Schema: "
                              "implicit_minimax_alpha, long_row_init_shaping_w, "
@@ -930,4 +1021,7 @@ if __name__ == "__main__":
         deviate_mean_move=args.deviate_mean_move,
         deviate_candidates=args.deviate_candidates,
         action_temp=args.action_temp,
+        excursion_prob=args.excursion_prob,
+        excursion_tau_moves=args.excursion_tau_moves,
+        excursion_profile=args.excursion_profile,
     )

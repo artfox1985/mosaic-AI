@@ -431,12 +431,53 @@ fn action_temp_for(n: usize) -> f64 {
     }
 }
 
+/// Untere und obere Temperatur der GLATTEN Form sowie ihre Anker auf der
+/// Aktionszahl (`MOSAIC_ACTION_TEMP=2`, `evaluations/PREREG_v25_window.md`
+/// par.14d). Die Anker sind GEMESSEN, nicht gewaehlt: aus 6.602
+/// Drafting-Entscheiden einer frischen b06-Charge ist der Median 4 und die
+/// Dezilfolge 1/1/2/3/4/8/15/30/64. `2` ist damit das untere Ende der Masse,
+/// `64` das neunte Dezil.
+const ACTION_TEMP_SMOOTH_LO: f64 = 0.2;
+const ACTION_TEMP_SMOOTH_HI: f64 = 0.8;
+const ACTION_TEMP_SMOOTH_N_LO: f64 = 2.0;
+const ACTION_TEMP_SMOOTH_N_HI: f64 = 64.0;
+
+/// Glatte aktionsabhaengige Temperatur (`MOSAIC_ACTION_TEMP=2`): logarithmisch
+/// von [`ACTION_TEMP_SMOOTH_LO`] bei [`ACTION_TEMP_SMOOTH_N_LO`] Aktionen bis
+/// [`ACTION_TEMP_SMOOTH_HI`] bei [`ACTION_TEMP_SMOOTH_N_HI`], ausserhalb
+/// gekappt. Nutzer-Vorgabe 2026-09-07 (par.14d).
+///
+/// LOGARITHMISCH und nicht linear, weil die gemessene Verteilung stark schief
+/// ist: 70 % der Entscheide haben hoechstens 15 Aktionen. Linear laege fast
+/// alles am unteren Ende und die Kurve waere praktisch eine Stufe.
+///
+/// Die Kopplung an die Aktionszahl hat einen inhaltlichen Grund, nicht nur
+/// einen statistischen (Nutzer 2026-09-07): eine hohe Aktionszahl entsteht
+/// nur, solange Kuppelplatten gelegt und rotiert werden koennen. Sie zeigt
+/// also an, dass die Plattenwahl noch offen ist -- und genau dort ist die
+/// Entscheidung folgenreich und Exploration wertvoll.
+///
+/// `n = 0` kann in der Zugwahl nicht vorkommen (ohne legale Aktion gibt es
+/// keine Entscheidung); `max(1)` haelt die Funktion trotzdem total, statt sich
+/// auf den Aufrufer zu verlassen. Reine Funktion, direkt unit-testbar.
+fn action_temp_smooth(n: usize) -> f64 {
+    let n = n.max(1) as f64;
+    let span = ACTION_TEMP_SMOOTH_N_HI.ln() - ACTION_TEMP_SMOOTH_N_LO.ln();
+    let t = (n.ln() - ACTION_TEMP_SMOOTH_N_LO.ln()) / span;
+    (ACTION_TEMP_SMOOTH_LO + (ACTION_TEMP_SMOOTH_HI - ACTION_TEMP_SMOOTH_LO) * t)
+        .clamp(ACTION_TEMP_SMOOTH_LO, ACTION_TEMP_SMOOTH_HI)
+}
+
 /// Zugwahl-Gewichte des NETZ-Pfads unter aktionsabhaengiger Temperatur
 /// (`evaluations/PREREG_v25_window.md` par.14, Arme S2/S5): `visits^(1/T(n))`
 /// statt der rohen Besuchszahlen, zusammen mit deren Summe -- [`weighted_index`]
 /// verlangt als `total` die Summe GENAU der Gewichte, aus denen gezogen wird.
 ///
-/// `enabled = false` (Default des Knopfs `MOSAIC_ACTION_TEMP`) gibt sofort
+/// `mode` ist der Knopfwert `MOSAIC_ACTION_TEMP`: `1` = Staffel des
+/// Heuristik-Pfads ([`action_temp_for`]), `2` = glatte Form
+/// ([`action_temp_smooth`], par.14d).
+///
+/// `mode = 0` (Default des Knopfs `MOSAIC_ACTION_TEMP`) gibt sofort
 /// `None` zurueck: der Aufrufer sampelt dann unveraendert aus den rohen
 /// Besuchszahlen, ohne eine einzige zusaetzliche Fliesskomma-Operation und
 /// ohne zusaetzliche Zufallszahl. Das ist die Bitidentitaet bei AUS.
@@ -445,16 +486,19 @@ fn action_temp_for(n: usize) -> f64 {
 /// oder nicht > 0) -- dann faellt die Zugwahl auf die rohen Besuche zurueck,
 /// gleiche Schutzrichtung wie `drafting_policy`s Visits-Fallback in
 /// `weights_for`. Ein Ueberlauf ist bei realistischen Besuchszahlen nicht zu
-/// erwarten (`1/T <= 6,67`, es braeuchte `visits > 1e46`): Vorsicht, kein
+/// erwarten (`1/T <= 6,67` bei der Staffel, `<= 5,0` bei der glatten Form; es
+/// braeuchte `visits > 1e46`): Vorsicht, kein
 /// beobachteter Fall.
 ///
 /// Reine Funktion -- der Knopfzustand kommt als Parameter, kein Env-Zugriff,
 /// kein Netz, kein Suchbaum; deshalb direkt unit-testbar.
-fn action_temp_weights(visits: &[f64], n_actions: usize, enabled: bool) -> Option<(Vec<f64>, f64)> {
-    if !enabled {
-        return None;
-    }
-    let inv = 1.0 / action_temp_for(n_actions);
+fn action_temp_weights(visits: &[f64], n_actions: usize, mode: u8) -> Option<(Vec<f64>, f64)> {
+    let temp = match mode {
+        1 => action_temp_for(n_actions),
+        2 => action_temp_smooth(n_actions),
+        _ => return None,
+    };
+    let inv = 1.0 / temp;
     let w: Vec<f64> = visits.iter().map(|v| v.powf(inv)).collect();
     let s: f64 = w.iter().sum();
     (s.is_finite() && s > 0.0).then_some((w, s))
@@ -1639,6 +1683,169 @@ fn deviation_best_action<R: Rng + ?Sized>(
     best.map(|(_, a)| a)
 }
 
+// ── Weg B: Ausflug-Reservoir der Self-Play-Erzeugung ─────────────────────────
+//
+// `PREREG_start_position_seeding.md` par.9/par.9a/par.9b/par.9f. Ein AUSFLUG
+// ist KEINE Abweichung IN der Hauptpartie (das ist Weg C oben), sondern eine
+// ZWEITE, vollstaendige Partie: an GENAU EINER Stelle wird der Zustand
+// geklont ("Stellung A"), die Hauptpartie laeuft von dort UNBEIRRT weiter,
+// und vom Klon laeuft (NACH der Hauptpartie, im selben Thread, siehe
+// `run_net_self_play`) eine eigene Partie bis zum regulaeren Ende -- die
+// ersten `MOSAIC_EXCURSION_TAU_MOVES` Halbzuege AB IHREM START gesampelt
+// (Exploration), danach greedy (par.9a: das Value-Ziel des Ausflugs soll der
+// Wert der abgewichenen Stellung unter GUTEM Spiel sein).
+//
+// Die Abzweigstelle wird waehrend der Hauptschleife per GEWICHTETEM
+// Reservoir-Sampling gezogen (Nutzer-Spezifikation 2026-09-07 09:20):
+// Gewicht = Rundenprofil (Value-Kopf-Unsicherheit, `envelope::profile_weight`)
+// * Zahl der legalen Aktionen an diesem Halbzug. Sequenzielles Verfahren
+// (Reservoir-Groesse 1): `S += w_i`, mit Wahrscheinlichkeit `w_i / S` wird
+// der aktuelle Kandidat ersetzt -- das liefert am Ende exakt eine Ziehung
+// proportional zu den Gewichten ueber die GANZE Partie, ohne die Gesamtsumme
+// vorher zu kennen (die Aktionszahl ist erst beim Spielen bekannt).
+
+/// Distinguisher fuer den Ausflug-Strom (Bernoulli-Gate UND Reservoir-Zuege).
+/// EIGENER Wert, nicht `DEVIATE_SEED_DISTINGUISHER`: Weg B und Weg C sind
+/// unabhaengige Knoepfe und koennen gleichzeitig aktiv sein, ihre
+/// Zufallsstroeme duerfen sich deshalb nicht ueberschneiden.
+const EXCURSION_SEED_DISTINGUISHER: u64 = 0xE7CB_5104_5EED_C0DE;
+
+/// Reservierter Zaehlerwert fuer die Ableitung des Ausflug-EIGENEN
+/// `game_seed` aus dem `partie_seed` der Hauptpartie (`run_net_self_play`s
+/// `play`-Abschluss) -- kollidiert nicht mit dem Bernoulli-Gate (Zaehler `0`)
+/// oder den Reservoir-Zuegen je Halbzug (Zaehler = `move_number`, bleibt
+/// weit unter diesem Wert -- realistische Partien haben < 200 Halbzuege).
+const EXCURSION_GAME_SEED_COUNTER: u64 = u64::MAX;
+
+/// Gueltigkeitspruefung von `MOSAIC_EXCURSION_PROB` -- `None` = ungueltig.
+/// Eigene reine Funktion (gleiches Muster wie `sanitize_deviate_prob`), damit
+/// die Pruefung isoliert testbar bleibt.
+fn sanitize_excursion_prob(raw: f64) -> Option<f64> {
+    (0.0..=1.0).contains(&raw).then_some(raw)
+}
+
+/// Wahrscheinlichkeit je Partie, dass ueberhaupt ein Ausflug entsteht
+/// (`MOSAIC_EXCURSION_PROB`). Default `0.0` = AUS = byte-identisches
+/// Bestandsverhalten -- bei `0.0` wird KEINE einzige Zufallszahl gezogen und
+/// KEIN Zustand geklont (siehe `excursion_gate`s Fruehausstieg). Ausserhalb
+/// `[0,1]` -> Default mit EINMALIGER Warnung (OnceLock).
+fn excursion_prob() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let raw = crate::net_mcts::read_f64_env("MOSAIC_EXCURSION_PROB", 0.0);
+        sanitize_excursion_prob(raw).unwrap_or_else(|| {
+            eprintln!(
+                "⚠️  MOSAIC_EXCURSION_PROB={raw} liegt nicht in [0,1] -- Ausflug bleibt AUS (0.0)."
+            );
+            0.0
+        })
+    })
+}
+
+/// Gueltigkeitspruefung von `MOSAIC_EXCURSION_TAU_MOVES` -- `None` = ungueltig.
+fn sanitize_excursion_tau_moves(raw: f64) -> Option<usize> {
+    (raw.is_finite() && raw >= 0.0).then(|| raw.round() as usize)
+}
+
+/// Wie viele Halbzuege der Ausflug AB SEINEM EIGENEN START sampelt, bevor er
+/// greedy wird (`MOSAIC_EXCURSION_TAU_MOVES`, Default `12` -- par.9b:
+/// Messung 3-V hat 12 als besten Umschaltpunkt fuer Weg A gemessen).
+/// RELATIV, nicht absolut: der Ausflug bekommt einen eigenen
+/// `NetSelfPlayAgent` mit `tau_argmax_override = Some(k)`, ausgewertet gegen
+/// SEINEN EIGENEN `move_number`-Zaehler -- der bei JEDEM
+/// `unified_game_loop`-Aufruf, auch mit `start_state`, bei 1 beginnt (siehe
+/// `GameLoopConfig::deviate_net`-Doku). Unabhaengig von
+/// `MOSAIC_TAU_ARGMAX_FROM_MOVE` (Weg A, wirkt auf die HAUPTPARTIE). `< 0`/
+/// nicht endlich -> Default mit EINMALIGER Warnung.
+fn excursion_tau_moves() -> usize {
+    static CELL: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let raw = crate::net_mcts::read_f64_env("MOSAIC_EXCURSION_TAU_MOVES", 12.0);
+        sanitize_excursion_tau_moves(raw).unwrap_or_else(|| {
+            eprintln!("⚠️  MOSAIC_EXCURSION_TAU_MOVES={raw} ist < 0 oder unlesbar -- verwende Default 12.");
+            12
+        })
+    })
+}
+
+/// Rundenprofil der Abzweig-Gewichte (`MOSAIC_EXCURSION_PROFILE`, Default
+/// `envelope::ENVELOPE_PROFILE_DEFAULT`) -- gleiche Fuenf-Kommazahlen-Form
+/// und Validierung wie `net_mcts::read_envelope_profile_env`, aber ein
+/// EIGENER Knopf: dieses Profil gewichtet die Reservoir-Abzweigstelle, jenes
+/// shaped Suche/Tiling -- unabhaengige Zwecke trotz gleicher Default-Kurve
+/// (par.8.5: dort ist das Profil die Verlaesslichkeit des Value-Kopfs je
+/// Runde, genau die Groesse, die hier "wo braucht das Training mehr Daten"
+/// beantworten soll).
+fn excursion_profile_env() -> [f64; 5] {
+    static CELL: std::sync::OnceLock<[f64; 5]> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let Ok(raw) = std::env::var("MOSAIC_EXCURSION_PROFILE") else {
+            return crate::envelope::ENVELOPE_PROFILE_DEFAULT;
+        };
+        let parsed: Vec<f64> = raw.split(',').filter_map(|s| s.trim().parse::<f64>().ok()).collect();
+        if parsed.len() == 5 && raw.split(',').count() == 5 && parsed.iter().all(|v| v.is_finite()) {
+            let mut out = [0.0; 5];
+            out.copy_from_slice(&parsed);
+            return out;
+        }
+        eprintln!(
+            "⚠️  MOSAIC_EXCURSION_PROFILE={raw:?} ignoriert -- erwartet genau 5 Kommazahlen \
+             (Runde 1..5); Default {:?} gilt.",
+            crate::envelope::ENVELOPE_PROFILE_DEFAULT
+        );
+        crate::envelope::ENVELOPE_PROFILE_DEFAULT
+    })
+}
+
+/// Weg B (par.9f): ob DIESE Partie per Bernoulli einen Ausflug bekommt.
+/// `prob <= 0.0` (Default): `false` OHNE jede Ziehung -- exakt derselbe
+/// Fruehausstieg wie [`deviation_move`] (Determinismus-Vorgabe: bei
+/// `MOSAIC_EXCURSION_PROB=0` bleibt der Partie-RNG UND jeder abgeleitete
+/// Strom vollstaendig unberuehrt). Eigener, aus `game_seed` abgeleiteter
+/// Strom, Zaehler `0` -- der Zaehler der Reservoir-Zuege ist `move_number`
+/// und faengt bei 1 an, die 0 ist also frei (gleiches Muster wie
+/// `deviation_move`).
+fn excursion_gate(game_seed: u64) -> bool {
+    let prob = excursion_prob();
+    if !(prob > 0.0) {
+        return false;
+    }
+    let mut rng = StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+        game_seed ^ EXCURSION_SEED_DISTINGUISHER,
+        0,
+    ));
+    rng.random::<f64>() < prob
+}
+
+/// EIN Schritt des gewichteten Reservoir-Samplings (Reservoir-Groesse 1,
+/// sequenzielles Verfahren): gegeben die bisherige Gewichtsumme
+/// `weight_sum_before` und das Gewicht `w` des aktuellen Kandidaten, zieht
+/// hoechstens EINE Zufallszahl aus `rng` und entscheidet, ob der aktuelle
+/// Kandidat den bisherigen ersetzt. Gibt `(ersetzen?, neue Gewichtsumme)`
+/// zurueck.
+///
+/// `w <= 0.0` ersetzt NIE und zieht KEINE Zufallszahl -- ein Kandidat mit
+/// Gewicht 0 (z.B. Runde 5 im Default-Profil) kann per Konstruktion nicht
+/// gewinnen, das ist strukturell und nicht nur statistisch garantiert.
+///
+/// Korrektheit des Verfahrens: verarbeitet man Elemente sequenziell und
+/// ersetzt bei jedem Element `i` den aktuellen Kandidaten mit
+/// Wahrscheinlichkeit `w_i / (w_1+...+w_i)`, ist die Endverteilung exakt
+/// proportional zu den Gewichten -- Standardbeweis per Induktion ueber `i`
+/// (Basisfall `i=1`: Wahrscheinlichkeit 1, trivial korrekt; Induktionsschritt:
+/// ein bereits korrekt verteilter Kandidat bleibt mit Wahrscheinlichkeit
+/// `1 - w_i/S_i` erhalten, skaliert seine Gewinnwahrscheinlichkeit also exakt
+/// auf `w_j/S_i` fuer `j<i`). Reine Funktion, isoliert testbar -- gleiches
+/// Prinzip wie [`deviation_move`].
+fn reservoir_step<R: Rng + ?Sized>(weight_sum_before: f64, w: f64, rng: &mut R) -> (bool, f64) {
+    if w <= 0.0 {
+        return (false, weight_sum_before);
+    }
+    let weight_sum = weight_sum_before + w;
+    let accept = rng.random::<f64>() < w / weight_sum;
+    (accept, weight_sum)
+}
+
 /// Ergebnis eines Drafting-Entscheids eines [`DraftingAgent`].
 struct DraftingDecision {
     chosen: Action,
@@ -1870,6 +2077,13 @@ struct NetSelfPlayAgent<'n> {
     /// Spezifikation) nutzt EIN Spec fuer beide Seiten (beide Seiten SIND
     /// dasselbe Netz).
     search_config: crate::net_mcts::SearchConfig,
+    /// Weg B (`PREREG_start_position_seeding.md` par.9f): Ausflug-eigener
+    /// τ-Umschaltpunkt, RELATIV zu diesem Agenten (siehe
+    /// `excursion_tau_moves`-Doku). `None` (alle Aufrufer ausser dem
+    /// Ausflug in `run_net_self_play`) -> `net_drafting_policy` faellt auf
+    /// das GLOBALE `MOSAIC_TAU_ARGMAX_FROM_MOVE` zurueck (Weg A,
+    /// byte-identisches Bestandsverhalten).
+    tau_argmax_override: Option<usize>,
 }
 
 impl DraftingAgent for NetSelfPlayAgent<'_> {
@@ -1904,7 +2118,8 @@ impl DraftingAgent for NetSelfPlayAgent<'_> {
                 crate::profiling::timed(crate::profiling::note_gumbel_move_ns, || {
                     net_drafting_policy(
                         self.net, state, actions, effective_sims, self.c_puct, search_rng,
-                        self.add_root_noise, self.deterministic, move_number, &self.search_config,
+                        self.add_root_noise, self.deterministic, move_number,
+                        self.tau_argmax_override, &self.search_config,
                     )
                 })
             })
@@ -2035,6 +2250,18 @@ struct GameLoopConfig<'a> {
     /// auch dort bei 1, die Abweichungsstelle zaehlt also ab dem ERSTEN Zug
     /// der Fortsetzung, nicht ab dem Anfang der Ursprungspartie.
     deviate_net: Option<&'a Net>,
+    /// Weg B (`PREREG_start_position_seeding.md` par.9f): Nebenausgabe des
+    /// per gewichtetem Reservoir-Sampling gezogenen Ausflug-Kandidaten
+    /// (Cell-Muster wie `vorzug_greift` oben). Die Schleife BESCHREIBT die
+    /// Zelle waehrend des Samplings (siehe `EXCURSION_SEED_DISTINGUISHER`-
+    /// Kommentar), der Aufrufer LIEST sie NACH `unified_game_loop`s
+    /// Rueckkehr aus (`.take()`). `Some(cell)` NUR im Netz-Self-Play
+    /// (`play_net_self_play_game`) -- Arena-Pfade und Heuristik-Self-Play
+    /// setzen `None` und lesen die `MOSAIC_EXCURSION_*`-Knoepfe damit gar
+    /// nicht erst. Auch im Self-Play ist der Default
+    /// (`MOSAIC_EXCURSION_PROB=0`) byte-identisch zum Bestand, siehe
+    /// [`excursion_gate`].
+    excursion_branch: Option<&'a std::cell::Cell<Option<GameState>>>,
 }
 
 /// Ausgabe der vereinheitlichten Schleife (je [`LoopMode`]-Variante).
@@ -2095,6 +2322,20 @@ fn unified_game_loop<R: Rng + ?Sized>(
     let deviate_at: Option<u64> = cfg
         .deviate_net
         .and_then(|_| deviation_move(cfg.game_seed, deviate_prob(), deviate_mean_move()));
+    // Weg B (`PREREG_start_position_seeding.md` par.9f): ob DIESE Partie
+    // ueberhaupt einen Ausflug-Kandidaten sammelt. Nur der Netz-Self-Play
+    // setzt `excursion_branch`; bei `None` wird `excursion_gate` gar nicht
+    // erst aufgerufen (kurzschliessendes `&&`), und bei Default-AUS
+    // (`MOSAIC_EXCURSION_PROB=0`) liefert `excursion_gate` `false` OHNE eine
+    // einzige Zufallszahl zu ziehen -- exakt dasselbe Muster wie `deviate_at`
+    // oben.
+    let excursion_active: bool = cfg.excursion_branch.is_some() && excursion_gate(cfg.game_seed);
+    let excursion_profile: [f64; 5] = excursion_profile_env();
+    // Laufende Gewichtsumme des gewichteten Reservoir-Samplings (Reservoir-
+    // Groesse 1): `S += w_i`, mit Wahrscheinlichkeit `w_i / S` ersetzt der
+    // aktuelle Halbzug den bisherigen Kandidaten (siehe Modulkommentar vor
+    // `EXCURSION_SEED_DISTINGUISHER`).
+    let mut reservoir_weight_sum: f64 = 0.0;
     loop {
         guard += 1;
         if let Some(hb) = cfg.move_heartbeat {
@@ -2221,6 +2462,41 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                     want.max(2).min(actions.len())
                                 );
                                 d.chosen = a;
+                            }
+                        }
+                    }
+                    // Weg B (par.9f): gewichtetes Reservoir-Sampling der EINEN
+                    // Ausflug-Abzweigstelle. Gewicht = Rundenprofil (Value-
+                    // Kopf-Unsicherheit) * Zahl der legalen Aktionen an
+                    // DIESEM Halbzug. WAECHTER exakt wie beim Weg-C-Block
+                    // oben (`d.vorzug.is_none()`): greift der Bauer-/Kuppel-
+                    // Vorzug, ist `d.policy` ein Ein-Hot-Demonstrationsziel --
+                    // eine alternative Fortsetzung ab hier waere kein
+                    // sinnvoller Ausflug. Klont "Stellung A" -- den Zustand
+                    // VOR dieser Wahl, also VOR dem Apply unten.
+                    if let Some(cell) = cfg.excursion_branch {
+                        if excursion_active && d.vorzug.is_none() {
+                            let w = crate::envelope::profile_weight(
+                                &excursion_profile,
+                                game.state.round_number,
+                            ) * actions.len() as f64;
+                            // `w <= 0.0` (z.B. Runde 5 im Default-Profil):
+                            // `reservoir_step` selbst waere hier bereits ein
+                            // No-Op (struktureller Fruehausstieg, siehe dessen
+                            // Doku), der Guard hier spart zusaetzlich den
+                            // unbenutzten `StdRng`-Aufbau.
+                            if w > 0.0 {
+                                let mut reservoir_rng =
+                                    StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+                                        cfg.game_seed ^ EXCURSION_SEED_DISTINGUISHER,
+                                        move_number,
+                                    ));
+                                let (accept, new_sum) =
+                                    reservoir_step(reservoir_weight_sum, w, &mut reservoir_rng);
+                                reservoir_weight_sum = new_sum;
+                                if accept {
+                                    cell.set(Some(game.state.clone()));
+                                }
                             }
                         }
                     }
@@ -2580,6 +2856,8 @@ pub fn play_one_game<R: Rng + ?Sized>(
         // Abweichung filtert per NETZBEWERTUNG des Folgezustands, dieser
         // Pfad hat dafuer keinen Drafting-Netzpfad.
         deviate_net: None,
+        // Weg B (par.9f): kein Ausflug-Tracking ausserhalb des Netz-Self-Play.
+        excursion_branch: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -3009,6 +3287,8 @@ fn play_net_game<R: Rng + ?Sized>(
         // Weg C (par.9c): Arena-Pfad -- die Abweichung ist eine Regel der
         // ERZEUGUNG, nie des Messens.
         deviate_net: None,
+        // Weg B (par.9f): dito -- kein Ausflug im Arena-Pfad.
+        excursion_branch: None,
     };
     let mut result = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -3164,6 +3444,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
         // Weg C (par.9c): Arena-Pfad -- die Abweichung ist eine Regel der
         // ERZEUGUNG, nie des Messens.
         deviate_net: None,
+        // Weg B (par.9f): dito -- kein Ausflug im Arena-Pfad.
+        excursion_branch: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -3498,6 +3780,13 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
     add_root_noise: bool,
     deterministic: bool,
     move_number: u64,
+    // Weg B (`PREREG_start_position_seeding.md` par.9f): `Some(k)` ersetzt
+    // das GLOBALE `net_mcts::tau_argmax_from_move()` fuer DIESEN Aufruf --
+    // der Ausflug braucht einen vom Hauptpartie-Umschaltpunkt (Weg A)
+    // UNABHAENGIGEN, relativ zu seinem eigenen `move_number` gezaehlten
+    // Schwellenwert. `None` (alle Bestandsaufrufer) = byte-identisch: exakt
+    // dieselbe globale Env-Var-Abfrage wie vor diesem Parameter.
+    tau_argmax_override: Option<usize>,
     search_config: &crate::net_mcts::SearchConfig,
 ) -> (Action, Vec<Value>, Option<f64>, Vec<f64>) {
     let sims = net_effective_sims(base_sims, actions.len());
@@ -3579,7 +3868,10 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
             })
             .map(|(i, _)| i)
             .unwrap_or(0)
-    } else if crate::net_mcts::tau_argmax_from_move().is_some_and(|n| move_number as usize >= n) {
+    } else if tau_argmax_override
+        .or_else(crate::net_mcts::tau_argmax_from_move)
+        .is_some_and(|n| move_number as usize >= n)
+    {
         // τ-Annealing (PREREG_search_path_remeasurements.md, Messung 3):
         // `MOSAIC_TAU_ARGMAX_FROM_MOVE=N` gesetzt UND dieser Halbzug (>=N) --
         // ab hier wird der argmax der Besuchsverteilung gespielt statt
@@ -3597,7 +3889,7 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
         // Default AUS, siehe `net_mcts::tau_argmax_from_move`-Doku.
         argmax_index(&weights)
     } else if let Some((tempered, tempered_total)) =
-        action_temp_weights(&weights, actions.len(), crate::net_mcts::action_temp_enabled())
+        action_temp_weights(&weights, actions.len(), crate::net_mcts::action_temp_mode())
     {
         // Aktionsabhaengige Temperatur (PREREG_v25_window.md par.14, Arme
         // S2/S5, Knopf `MOSAIC_ACTION_TEMP`): gesampelt wird aus
@@ -3841,7 +4133,14 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // PREREG_agent_encapsulation.md par.3/par.4 Punkt 4: EIN Spec fuer beide
     // Seiten (beide Seiten SIND dasselbe Netz).
     search_config: crate::net_mcts::SearchConfig,
-) -> Vec<Value> {
+    // Weg B (`PREREG_start_position_seeding.md` par.9f): `Some(k)` NUR fuer
+    // den Ausflug-eigenen Aufruf (`run_net_self_play`s `play`-Abschluss) --
+    // ersetzt dort den GLOBALEN `MOSAIC_TAU_ARGMAX_FROM_MOVE` (Weg A) durch
+    // einen Ausflug-relativen Umschaltpunkt. `None` fuer die Hauptpartie
+    // (byte-identisches Bestandsverhalten, siehe `net_drafting_policy`s
+    // gleichnamiger Parameter).
+    tau_argmax_override: Option<usize>,
+) -> (Vec<Value>, Option<GameState>) {
     // Duenner Wrapper um `unified_game_loop` (PREREG_unified_game_loop.md):
     // EIN NetSelfPlayAgent fuer beide Seiten (beide Seiten SIND das Netz),
     // Vorzug BEIDSEITIG (PREREG_ownership_corpus.md §3.1, seit 5992f38 --
@@ -3874,6 +4173,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         pcr_cheap_sims,
         vorzug: vorzug_p0,
         search_config,
+        tau_argmax_override,
     };
     let agent1 = NetSelfPlayAgent {
         net,
@@ -3885,6 +4185,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         pcr_cheap_sims,
         vorzug: vorzug_p1,
         search_config,
+        tau_argmax_override,
     };
     let player0 = PlayerLoopConfig {
         agent: &agent0,
@@ -3905,6 +4206,12 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // par.5: Greif-Zaehler nur angelegt und verdrahtet, wenn der Knopf aktiv
     // ist -- sonst exakt dieselbe Nebenwirkungsfreiheit wie vorher.
     let greif_counter = std::cell::Cell::new([0u64; 2]);
+    // Weg B (par.9f): Reservoir-Zelle IMMER angelegt und verdrahtet -- wie
+    // `deviate_net: Some(net)` unten ist dieser Aufruf der EINZIGE Pfad mit
+    // Ausflug, die eigentliche Abschaltung (Default AUS) passiert INNEN
+    // (`excursion_gate`s Fruehausstieg bei `MOSAIC_EXCURSION_PROB<=0`), nicht
+    // hier ueber einen Bool-Parameter.
+    let excursion_cell: std::cell::Cell<Option<GameState>> = std::cell::Cell::new(None);
     let cfg = GameLoopConfig {
         timeout_secs: net_game_timeout_secs(base_sims)
             + crate::round_transition_deep::EXTRA_GAME_TIMEOUT_SECS,
@@ -3919,6 +4226,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         // Weg C (par.9c): der EINZIGE Pfad mit Abweichung. Default AUS
         // (`MOSAIC_DEVIATE_PROB=0`) ist byte-identisch zum Bestand.
         deviate_net: Some(net),
+        excursion_branch: Some(&excursion_cell),
     };
     let out = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -3939,7 +4247,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
             counts[0], counts[1]
         );
     }
-    out
+    (out, excursion_cell.take())
 }
 
 /// Zusätzliche Sicherheitsmarge (über `net_game_timeout_secs +
@@ -4135,6 +4443,14 @@ pub fn run_net_self_play(
         let names = ["Netz".to_string(), "Netz".to_string()];
         let gid = format!("{prefix}_g{}", i + 1);
         let net = std::sync::Arc::clone(&net);
+        // Weg B (par.9f): EIGENER Klon, VOR der `move`-Closure unten geklont --
+        // die Closure zieht `net` (den Klon direkt darueber) vollstaendig in
+        // ihre Umgebung (Rust `move`-Semantik: ALLE referenzierten Variablen
+        // werden per Wert erfasst, unabhaengig davon, ob im Rumpf nur `&net`
+        // steht). Nach dem `run_with_watchdog`-Aufruf unten waere `net` selbst
+        // also nicht mehr verfuegbar -- `net_ex` sichert den Ausflug-eigenen
+        // Zugriff dagegen vorher ab.
+        let net_ex = std::sync::Arc::clone(&net);
         let gid_thread = gid.clone();
         let move_counter_thread = Arc::clone(&move_counter);
         let result = run_with_watchdog(watchdog_deadline, move || {
@@ -4184,19 +4500,19 @@ pub fn run_net_self_play(
                     play_net_self_play_game(
                         &net, base_sims, c_puct, ids, names, first, &gid_thread, &mut rng, add_root_noise,
                         deterministic, record_rtv, Some(&move_counter_thread), pcr_full_prob, pcr_cheap_sims,
-                        partie_seed, start_state, search_config,
+                        partie_seed, start_state, search_config, None,
                     )
                 },
             )
         });
-        let steps = match result {
-            Some(v) => v,
+        let (mut steps, excursion_branch) = match result {
+            Some((v, b)) => (v, b),
             None => {
                 eprintln!(
                     "⚠️  [Watchdog] Spiel {gid} ueberschritt die harte {watchdog_deadline:?}-Deadline -- \
                      als unvollstaendig verworfen (verwaister Thread laeuft im Hintergrund weiter)."
                 );
-                Vec::new()
+                (Vec::new(), None)
             }
         };
         // Nur GENUTZTE Spiele (nicht der leere Watchdog-Abbruch-Fall) zaehlen
@@ -4206,6 +4522,74 @@ pub fn run_net_self_play(
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
             append_game_progress(&progress_file, &steps);
+        }
+        // Weg B (`PREREG_start_position_seeding.md` par.9f): der Ausflug
+        // laeuft NACH der Hauptpartie, im GLEICHEN Thread dieser rayon-
+        // Closure -- die Parallelisierung ueber `into_par_iter` (unten)
+        // bleibt unberuehrt, der Ausflug ist Teil derselben Aufgabe `i`.
+        // `excursion_branch` ist nur bei aktivem `MOSAIC_EXCURSION_PROB` UND
+        // erfolgreichem Bernoulli-Gate `Some` (`excursion_gate`) -- Default
+        // AUS spawnt hier keinen einzigen Ausflug. Offene Frage (par.9f,
+        // NICHT entschieden): ob ein Ausflug als eigene Partie im
+        // Fenster-Manifest zaehlt -- deshalb hier bewusst NICHT in
+        // `games_counter` gezaehlt (der die Ziel-Partiezahl `n_games`
+        // trackt), nur additiv in den flachen Record-Strom gefaltet.
+        if let Some(branch_state) = excursion_branch {
+            // Eigener, aus `partie_seed` abgeleiteter Ausflug-Seed
+            // (Determinismus-Vorgabe) -- unabhaengig vom Hauptpartie-Strom,
+            // reservierter Zaehler (siehe `EXCURSION_GAME_SEED_COUNTER`-Doku).
+            let excursion_seed = crate::net_mcts::derive_search_seed(
+                partie_seed ^ EXCURSION_SEED_DISTINGUISHER,
+                EXCURSION_GAME_SEED_COUNTER,
+            );
+            let mut ex_rng = StdRng::seed_from_u64(excursion_seed);
+            let ex_ids = branch_state.scoring_tile_ids.clone();
+            let ex_first = branch_state.current_player;
+            let ex_names = ["Netz".to_string(), "Netz".to_string()];
+            let ex_gid = format!("{gid}_x1");
+            let ex_gid_thread = ex_gid.clone();
+            let move_counter_ex = Arc::clone(&move_counter);
+            let ex_result = run_with_watchdog(watchdog_deadline, move || {
+                // Thread-lokales Setup MUSS hier passieren (siehe Kommentar
+                // an der Hauptpartie oben, gleicher Grund: `run_with_watchdog`
+                // spawnt einen NEUEN Thread) -- eigener Ausflug-Seed statt
+                // `partie_seed`.
+                let streuung_max = crate::net_mcts::scoring_scatter_max();
+                crate::net_mcts::set_game_shaping_weight(if streuung_max > 0.0 {
+                    Some(crate::net_mcts::game_weight_from_seed(excursion_seed, streuung_max))
+                } else {
+                    None
+                });
+                crate::plate_builder::set_game_seed(Some(excursion_seed));
+                crate::profiling::selfplay_profile::timed(
+                    crate::profiling::selfplay_profile::SelfplayCat::TotalSelfplay,
+                    || {
+                        play_net_self_play_game(
+                            &net_ex, base_sims, c_puct, ex_ids, ex_names, ex_first, &ex_gid_thread,
+                            &mut ex_rng, add_root_noise, deterministic, record_rtv,
+                            Some(&move_counter_ex), pcr_full_prob, pcr_cheap_sims, excursion_seed,
+                            Some(branch_state), search_config, Some(excursion_tau_moves()),
+                        )
+                    },
+                )
+            });
+            match ex_result {
+                Some((ex_steps, _)) if !ex_steps.is_empty() => {
+                    eprintln!(
+                        "[excursion] game_id={ex_gid} seed={excursion_seed} records={}",
+                        ex_steps.len()
+                    );
+                    append_game_progress(&progress_file, &ex_steps);
+                    steps.extend(ex_steps);
+                }
+                Some(_) => {}
+                None => {
+                    eprintln!(
+                        "⚠️  [Watchdog] Ausflug {ex_gid} ueberschritt die harte {watchdog_deadline:?}-Deadline -- \
+                         verworfen (verwaister Thread laeuft im Hintergrund weiter)."
+                    );
+                }
+            }
         }
         steps
     };
@@ -4500,7 +4884,7 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
                             // τ-Annealing-Zweig, der Wert wird hier nie gelesen
                             // (siehe `net_drafting_policy`s `move_number`-Doku).
                             let (a, _, _, _) = net_drafting_policy(
-                                net, &g.state, &actions, base_sims, c_puct, rng, false, true, 0,
+                                net, &g.state, &actions, base_sims, c_puct, rng, false, true, 0, None,
                                 &SearchConfig::from_env(),
                             );
                             a
@@ -5753,6 +6137,7 @@ pub(crate) mod tests {
                 vorzug_greift: None,
                 start_state: Some(state),
                 deviate_net: None,
+                excursion_branch: None,
             };
             match unified_game_loop(vec![], ["A".into(), "B".into()], 0, &mut r, cfg) {
                 LoopOutput::Records(out) => serde_json::to_string(&out).unwrap(),
@@ -6137,7 +6522,7 @@ pub(crate) mod tests {
             let mut rng = StdRng::seed_from_u64(seed);
             let ids = sample_valid_scoring_ids(3, &mut rng);
             let names = ["Netz".to_string(), "Netz".to_string()];
-            let records = play_net_self_play_game(
+            let (records, _excursion) = play_net_self_play_game(
                 net,
                 NET_PARITY_SIMS,
                 crate::net_mcts::DEFAULT_C_PUCT,
@@ -6155,6 +6540,7 @@ pub(crate) mod tests {
                 seed,  // game_seed
                 None,  // start_state
                 crate::net_mcts::SearchConfig::from_env(),
+                None, // tau_argmax_override (Weg B, par.9f)
             );
             assert!(
                 !records.is_empty(),
@@ -6662,10 +7048,12 @@ pub(crate) mod tests {
             let mut rng = StdRng::seed_from_u64(seed);
             let ids = sample_valid_scoring_ids(3, &mut rng);
             let names = ["Netz".to_string(), "Netz".to_string()];
-            play_net_self_play_game(
+            let (records, _excursion) = play_net_self_play_game(
                 net, 60, crate::net_mcts::DEFAULT_C_PUCT, ids, names, 0, "gate_b_repro", &mut rng,
                 true, false, true, None, None, 0, seed, None, crate::net_mcts::SearchConfig::from_env(),
-            )
+                None,
+            );
+            records
         }
 
         // Spielgeschehen-Teilmenge: additive Trainingsziele ohne Rueckwirkung
@@ -7174,14 +7562,14 @@ pub(crate) mod tests {
     #[test]
     fn action_temp_off_keeps_raw_visit_weights() {
         let visits: Vec<f64> = vec![37.0, 12.0, 5.0, 1.0, 0.0];
-        assert!(action_temp_weights(&visits, visits.len(), false).is_none());
+        assert!(action_temp_weights(&visits, visits.len(), 0).is_none());
         // Env-Var in der Testumgebung ungesetzt -> Knopf aus (gleiche
         // Parity-Assertion wie beim τ-Zweig oben).
-        assert!(!crate::net_mcts::action_temp_enabled());
-        let enabled = crate::net_mcts::action_temp_enabled();
+        assert_eq!(crate::net_mcts::action_temp_mode(), 0);
+        let mode = crate::net_mcts::action_temp_mode();
         // Exakt der Ausdruck aus `net_drafting_policy`s `else if let`:
         // `None` -> der Bestandszweig mit `weights`/`total`.
-        let (play_weights, play_total) = match action_temp_weights(&visits, visits.len(), enabled) {
+        let (play_weights, play_total) = match action_temp_weights(&visits, visits.len(), mode) {
             Some((w, s)) => (w, s),
             None => (visits.clone(), visits.iter().sum::<f64>()),
         };
@@ -7200,14 +7588,14 @@ pub(crate) mod tests {
         let visits: Vec<f64> = vec![30.0, 10.0, 5.0];
         let raw_total: f64 = visits.iter().sum();
         let raw_share = visits[0] / raw_total;
-        let (w, s) = action_temp_weights(&visits, visits.len(), true).expect("Knopf an");
+        let (w, s) = action_temp_weights(&visits, visits.len(), 1).expect("Staffel");
         assert_eq!(w.len(), visits.len());
         let sharp_share = w[0] / s;
         assert!(sharp_share > raw_share, "Schaerfung erwartet: {sharp_share} > {raw_share}");
         let recomputed: f64 = w.iter().sum();
         assert_eq!(s, recomputed, "total muss die Summe der transformierten Gewichte sein");
         assert_eq!(argmax_index(&w), argmax_index(&visits));
-        let (w_mild, s_mild) = action_temp_weights(&visits, 60, true).expect("Knopf an");
+        let (w_mild, s_mild) = action_temp_weights(&visits, 60, 1).expect("Staffel");
         let mild_share = w_mild[0] / s_mild;
         assert!(
             mild_share > raw_share && mild_share < sharp_share,
@@ -7223,14 +7611,65 @@ pub(crate) mod tests {
     #[test]
     fn action_temp_env_parsing_falls_back_to_off() {
         use crate::net_mcts::sanitize_action_temp;
-        assert_eq!(sanitize_action_temp(0.0), Some(false));
-        assert_eq!(sanitize_action_temp(1.0), Some(true));
-        for junk in [0.5, 2.0, -1.0, f64::NAN, f64::INFINITY] {
+        assert_eq!(sanitize_action_temp(0.0), Some(0));
+        assert_eq!(sanitize_action_temp(1.0), Some(1));
+        assert_eq!(sanitize_action_temp(2.0), Some(2));
+        for junk in [0.5, 1.5, 3.0, -1.0, f64::NAN, f64::INFINITY] {
             assert_eq!(sanitize_action_temp(junk), None, "{junk} ist kein gueltiger Knopfwert");
         }
         // Nicht als Zahl lesbare Werte fangen schon in `read_f64_env` ab
         // (Warnung + Default 0.0), und 0.0 ist AUS.
-        assert!(!crate::net_mcts::action_temp_enabled());
+        assert_eq!(crate::net_mcts::action_temp_mode(), 0);
+    }
+
+    /// (5) Die GLATTE Form (`MOSAIC_ACTION_TEMP=2`, par.14d): die beiden Anker
+    /// treffen exakt, dazwischen steigt sie streng monoton, ausserhalb ist sie
+    /// gekappt. Die Zwischenwerte sind die in par.14d registrierte Tabelle --
+    /// wer die Konstanten verstellt, bricht hier auf, nicht erst in einer
+    /// Erzeugung ueber acht Stunden.
+    #[test]
+    fn action_temp_smooth_interpolates_between_registered_anchors() {
+        assert!((action_temp_smooth(2) - 0.2).abs() < 1e-12, "unterer Anker");
+        assert!((action_temp_smooth(64) - 0.8).abs() < 1e-12, "oberer Anker");
+        // Kappung: unterhalb und oberhalb der Anker bleibt es bei den Grenzen.
+        assert_eq!(action_temp_smooth(1), 0.2);
+        assert_eq!(action_temp_smooth(0), 0.2, "total, auch fuer das unmoegliche n = 0");
+        assert_eq!(action_temp_smooth(151), 0.8);
+        // Die Tabelle aus par.14d (drei Nachkommastellen).
+        for (n, want) in [(4usize, 0.320), (8, 0.440), (15, 0.549), (30, 0.669)] {
+            let got = action_temp_smooth(n);
+            assert!((got - want).abs() < 5e-4, "T({n}) = {got}, erwartet {want}");
+        }
+        // Streng monoton steigend im offenen Bereich.
+        let mut prev = action_temp_smooth(2);
+        for n in 3..=64 {
+            let t = action_temp_smooth(n);
+            assert!(t > prev, "T({n}) = {t} muss ueber T({}) = {prev} liegen", n - 1);
+            prev = t;
+        }
+    }
+
+    /// (6) Die beiden Modi sind VERSCHIEDEN, und zwar dort, wo die Masse
+    /// liegt: bei den 70 % der Entscheide mit hoechstens 15 Aktionen gibt die
+    /// Staffel 0,15, die glatte Form 0,20 bis 0,55. Der Test haelt fest, dass
+    /// Modus 2 dort WENIGER schaerft als Modus 1 -- also mehr exploriert --,
+    /// und dass beide denselben argmax lassen.
+    #[test]
+    fn action_temp_smooth_explores_more_than_staircase_where_mass_is() {
+        let visits: Vec<f64> = vec![30.0, 10.0, 5.0];
+        let n = 4; // der gemessene Median der Aktionszahl
+        let (w1, s1) = action_temp_weights(&visits, n, 1).expect("Staffel");
+        let (w2, s2) = action_temp_weights(&visits, n, 2).expect("glatt");
+        let share1 = w1[0] / s1;
+        let share2 = w2[0] / s2;
+        let raw_share = visits[0] / visits.iter().sum::<f64>();
+        assert!(
+            raw_share < share2 && share2 < share1,
+            "glatt muss zwischen roh und Staffel liegen: {raw_share} < {share2} < {share1}"
+        );
+        assert_eq!(argmax_index(&w2), argmax_index(&visits));
+        // Modus 0 bleibt AUS, auch neben den beiden anderen Modi.
+        assert!(action_temp_weights(&visits, n, 0).is_none());
     }
 
     /// Provokations-Pflichttest 1 (`evaluations/PREREG_provocation.md`,
@@ -7663,6 +8102,160 @@ pub(crate) mod tests {
             None,
             "bei nur einer legalen Aktion gibt es nichts zu ersetzen"
         );
+    }
+
+    // ── Weg B: Ausflug-Reservoir (PREREG_start_position_seeding.md par.9f) ──
+
+    /// Test (1) der Auftragsliste, DEFAULT-AUS-Haelfte: bei ungesetzten
+    /// Env-Vars ist der Ausflug aus, und dann wird KEINE einzige Zufallszahl
+    /// gezogen und KEIN Zustand geklont. Der zweite Teil ist strukturell und
+    /// nicht nur statistisch geprueft (gleiches Muster wie `deviation_is_
+    /// off_by_default_and_draws_no_random_number` oben): `excursion_gate`
+    /// steigt bei `prob <= 0.0` VOR dem `StdRng`-Aufbau aus, und
+    /// `excursion_active` in `unified_game_loop` verknuepft `cfg.excursion_
+    /// branch.is_some()` per kurzschliessendem `&&` MIT `excursion_gate` --
+    /// ist Letzteres `false`, wird der komplette Reservoir-Block (inkl.
+    /// `game.state.clone()`) im Loop-Koerper gar nicht erst betreten (siehe
+    /// dortiger `if excursion_active && ...`-Guard). Ohne Netz pruefbar,
+    /// deshalb kein `#[ignore]`.
+    #[test]
+    fn excursion_is_off_by_default_and_gate_draws_no_random_number() {
+        assert_eq!(
+            excursion_prob(),
+            0.0,
+            "MOSAIC_EXCURSION_PROB muss ungesetzt 0.0 (= AUS) sein"
+        );
+        assert_eq!(
+            excursion_tau_moves(),
+            12,
+            "MOSAIC_EXCURSION_TAU_MOVES-Default ist 12"
+        );
+        for seed in 0..5_000u64 {
+            assert!(
+                !excursion_gate(seed),
+                "Seed {seed}: bei Default-AUS darf kein Ausflug-Gate durchgehen"
+            );
+        }
+    }
+
+    /// Test (2) der Auftragsliste: das gewichtete Reservoir zieht bei
+    /// GLEICHEN Gewichten uniform. Deterministisch mit festem Seed pruefbar
+    /// (der Trial-Index IST der Seed, der Testlauf ist damit reproduzierbar)
+    /// -- die Uniformitaet selbst ist eine Verteilungsaussage und deshalb
+    /// nur ueber viele unabhaengige Ziehungen zeigbar, gleiches Prinzip wie
+    /// `deviation_move_rate_and_mean_match_the_knobs` oben.
+    #[test]
+    fn reservoir_step_is_uniform_at_equal_weights() {
+        let n_items = 5usize;
+        let n_trials = 60_000u64;
+        let mut wins = vec![0u64; n_items];
+        for trial in 0..n_trials {
+            let mut rng = StdRng::seed_from_u64(trial);
+            let mut sum = 0.0f64;
+            let mut winner = 0usize;
+            for i in 0..n_items {
+                let (accept, new_sum) = reservoir_step(sum, 1.0, &mut rng);
+                sum = new_sum;
+                if accept {
+                    winner = i;
+                }
+            }
+            wins[winner] += 1;
+        }
+        let expected = n_trials as f64 / n_items as f64;
+        for (i, &w) in wins.iter().enumerate() {
+            let rel_dev = (w as f64 - expected).abs() / expected;
+            assert!(
+                rel_dev < 0.05,
+                "Position {i}: {w} Treffer, erwartet ~{expected:.0} (Abweichung {:.1}%) -- \
+                 das Reservoir zieht bei gleichen Gewichten nicht uniform",
+                rel_dev * 100.0
+            );
+        }
+    }
+
+    /// Test (3) der Auftragsliste: das Rundenprofil wirkt -- Runde 5 hat im
+    /// Default-Profil Gewicht 0 und wird deshalb NIE gezogen. Strukturell
+    /// geprueft (nicht nur statistisch, gleiches Prinzip wie Test 1):
+    /// `reservoir_step` nimmt bei `w <= 0.0` den Fruehausstieg VOR dem
+    /// `rng.random`-Aufruf, ein Gewicht-0-Kandidat kann also gar nicht
+    /// gewinnen, unabhaengig vom RNG-Zustand -- und die Gewichtsumme bleibt
+    /// unveraendert (sonst wuerde ein spaeterer Kandidat falsch normiert).
+    #[test]
+    fn round_profile_excludes_round5_from_the_reservoir() {
+        let profile = crate::envelope::ENVELOPE_PROFILE_DEFAULT;
+        // Faktor (Aktionszahl) ist hier beliebig > 0 -- das Gewicht ist ein
+        // PRODUKT, und Rundenprofil 0 macht es unabhaengig davon 0.
+        let w_round5 = crate::envelope::profile_weight(&profile, 5) * 40.0;
+        assert_eq!(
+            w_round5, 0.0,
+            "Default-Profil muss Runde 5 Gewicht 0 geben (par.4.1)"
+        );
+        for seed in 0..2_000u64 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            // Ein vorheriger positiver Kandidat, damit die Gewichtsumme beim
+            // Runde-5-Schritt nicht selbst 0 ist (sonst waere "nie
+            // akzeptiert" trivial durch 0/0 statt durch den Guard).
+            let (_, sum_before) = reservoir_step(0.0, 3.0, &mut rng);
+            let (accept, sum_after) = reservoir_step(sum_before, w_round5, &mut rng);
+            assert!(
+                !accept,
+                "Seed {seed}: Runde-5-Gewicht 0 darf nie akzeptiert werden"
+            );
+            assert_eq!(
+                sum_after, sum_before,
+                "Seed {seed}: ein Gewicht-0-Kandidat darf die Gewichtsumme nicht veraendern"
+            );
+        }
+    }
+
+    /// Test (4) der Auftragsliste: der Umschaltpunkt des Ausflugs gilt
+    /// RELATIV zu seinem eigenen Start. `tau_argmax_override` ersetzt in
+    /// `net_drafting_policy` das GLOBALE `MOSAIC_TAU_ARGMAX_FROM_MOVE` (in
+    /// der Testumgebung ungesetzt, siehe `tau_argmax_from_move_defaults_to_
+    /// off_regardless_of_move_number` oben) -- exakt dieselbe Guard-
+    /// Bedingung wie dort im `else if`-Zweig, hier direkt geprueft (kein
+    /// Netz noetig, gleiches Prinzip wie jener Test). "Relativ zu seinem
+    /// Start" bedeutet konkret: der Ausflug bekommt einen EIGENEN
+    /// `NetSelfPlayAgent` mit `tau_argmax_override=Some(k)`, und
+    /// `move_number` beginnt bei JEDEM `unified_game_loop`-Aufruf bei 1 --
+    /// auch mit `start_state` (`GameLoopConfig::deviate_net`-Doku) --, der
+    /// Schwellenwert `k` zaehlt also ab dem ERSTEN Halbzug des Ausflugs,
+    /// nicht ab einer absoluten Stelle der Hauptpartie.
+    #[test]
+    fn tau_argmax_override_switches_relative_to_its_own_move_number() {
+        assert_eq!(
+            crate::net_mcts::tau_argmax_from_move(),
+            None,
+            "Testumgebung: MOSAIC_TAU_ARGMAX_FROM_MOVE muss ungesetzt sein"
+        );
+        let k = 12usize;
+        let override_active: Option<usize> = Some(k);
+        for move_number in [0u64, 1, 11, 12, 13, 200] {
+            let triggers = override_active
+                .or_else(crate::net_mcts::tau_argmax_from_move)
+                .is_some_and(|n| move_number as usize >= n);
+            assert_eq!(
+                triggers,
+                move_number as usize >= k,
+                "move_number={move_number}, k={k}: Umschaltpunkt muss exakt bei \
+                 move_number>=k greifen (relativ zum eigenen Start des Ausflugs)"
+            );
+        }
+        // `None` (Hauptpartie, Weg A ohne Override): faellt weiter auf das
+        // GLOBALE (hier: AUS) Verhalten zurueck -- byte-identisches
+        // Bestandsverhalten fuer alle Aufrufer ausser dem Ausflug.
+        let override_inactive: Option<usize> = None;
+        for move_number in [1u64, 12, 200] {
+            let triggers = override_inactive
+                .or_else(crate::net_mcts::tau_argmax_from_move)
+                .is_some_and(|n| move_number as usize >= n);
+            assert!(
+                !triggers,
+                "move_number={move_number}: ohne Override und ohne globalen \
+                 Schwellenwert darf nie argmax erzwungen werden"
+            );
+        }
     }
 }
 
