@@ -163,7 +163,8 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       pcr_cheap_sims, tau_argmax_from_move, queue, progress_path,
                       heartbeat_path, seed_positions=None, seed_positions_offset=0,
                       heuristik_variante="hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
-                      spec=None):
+                      spec=None, deviate_prob=0.0, deviate_mean_move=30.0,
+                      deviate_candidates=6):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -188,8 +189,18 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     `models/<name>.spec.json`, EIN Spec fuer beide Seiten (beide Seiten SIND
     dasselbe Netz). `None` (Default) reicht `None` an pyo3 durch und damit
     `SearchConfig::from_env()` -- byte-identisches Bestandsverhalten. Nur im
-    network-Modus wirksam (die anderen beiden Einstiege nehmen kein Spec)."""
+    network-Modus wirksam (die anderen beiden Einstiege nehmen kein Spec).
+    `deviate_*` (Weg C, PREREG_start_position_seeding.md par.9c): wie
+    `tau_argmax_from_move` KEIN pyo3-Parameter -- Rust liest
+    MOSAIC_DEVIATE_PROB / _MEAN_MOVE / _CANDIDATES selbst per OnceLock
+    (self_play.rs::deviate_prob und Geschwister), deshalb hier VOR dem
+    `import mosaic_rust` in DIESEM Subprozess gesetzt (frischer mp.Process je
+    Chunk -> kein Stale-Value-Risiko). `0.0` (Default) ist fuer Rust identisch
+    zu "ungesetzt" (AUS, keine zusaetzliche Zufallszahl)."""
     os.environ["MOSAIC_TAU_ARGMAX_FROM_MOVE"] = str(tau_argmax_from_move)
+    os.environ["MOSAIC_DEVIATE_PROB"] = str(deviate_prob)
+    os.environ["MOSAIC_DEVIATE_MEAN_MOVE"] = str(deviate_mean_move)
+    os.environ["MOSAIC_DEVIATE_CANDIDATES"] = str(deviate_candidates)
     try:
         import mosaic_rust as mr
         if mode == "network":
@@ -265,7 +276,9 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           progress_path, heartbeat_path, heuristik_variante="hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
                           pcr_full_prob=None, pcr_cheap_sims=150,
                           tau_argmax_from_move=0, seed_positions=None,
-                          seed_positions_offset=0, spec=None) -> str | None:
+                          seed_positions_offset=0, spec=None,
+                          deviate_prob=0.0, deviate_mean_move=30.0,
+                          deviate_candidates=6) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -281,7 +294,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               add_root_noise, deterministic, record_rtv, pcr_full_prob,
               pcr_cheap_sims, tau_argmax_from_move, queue,
               str(progress_path), str(heartbeat_path),
-              seed_positions, seed_positions_offset, heuristik_variante, spec),
+              seed_positions, seed_positions_offset, heuristik_variante, spec,
+              deviate_prob, deviate_mean_move, deviate_candidates),
     )
     proc.start()
     t_start = time.time()
@@ -382,7 +396,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   pcr_full_prob: float | None = None, pcr_cheap_sims: int = 150,
                   tau_argmax_from_move: int = 0, seed_positions: str = None,
                   heuristik_variante: str = "hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
-                  spec: str | None = None):
+                  spec: str | None = None,
+                  deviate_prob: float = 0.0, deviate_mean_move: float = 30.0,
+                  deviate_candidates: int = 6):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -402,6 +418,24 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     if tau_argmax_from_move and mode != "network":
         print(f"  ⚠️  --tau-argmax-from-move={tau_argmax_from_move} wirkt nur bei --mode network "
               f"(net_drafting_policy) -- bei --mode {mode!r} ist es ein No-Op.")
+    # Weg C (PREREG_start_position_seeding.md par.9c, KataGo/Wu 2019 Anhang D):
+    # in einem Anteil der Partien weicht GENAU EIN Drafting-Zug von der Suche
+    # ab. Wirkt nur im netzgefuehrten Self-Play -- die Abweichung filtert die
+    # gezogenen Kandidaten per NETZBEWERTUNG ihres Folgezustands, dafuer
+    # braucht es ein Netz im Drafting-Pfad. Wie bei tau deshalb Warnung statt
+    # SystemExit, wenn der Modus nicht passt.
+    if not (0.0 <= deviate_prob <= 1.0):
+        raise SystemExit(f"❌ --deviate-prob muss in [0,1] liegen (0 = AUS), ist {deviate_prob}.")
+    if deviate_mean_move <= 0:
+        raise SystemExit(f"❌ --deviate-mean-move muss > 0 sein, ist {deviate_mean_move}.")
+    if deviate_candidates < 2:
+        raise SystemExit(
+            f"❌ --deviate-candidates muss >= 2 sein (unter 2 gibt es nichts zu filtern), "
+            f"ist {deviate_candidates}."
+        )
+    if deviate_prob and mode != "network":
+        print(f"  ⚠️  --deviate-prob={deviate_prob} wirkt nur bei --mode network "
+              f"(die Abweichung braucht die Netzbewertung) -- bei --mode {mode!r} ist es ein No-Op.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -455,6 +489,12 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # die kuratierten Startstellungen.
         "spec": spec, "pcr_full_prob": pcr_full_prob,
         "pcr_cheap_sims": pcr_cheap_sims, "seed_positions": seed_positions,
+        # Weg C (par.9c): Erzeugungs-Parameter, kein Spielparameter -- gehoert
+        # deshalb ins Lauf-Manifest und NICHT in models/<name>.spec.json.
+        # Ohne diese drei Felder waere ein fehlendes Flag ein stiller Default
+        # (Nutzer-Regel: cli_args des eigenen Laufs gegen die Referenz diffen).
+        "deviate_prob": deviate_prob, "deviate_mean_move": deviate_mean_move,
+        "deviate_candidates": deviate_candidates,
     })
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -477,12 +517,19 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         tau_status = f"ab Zug {tau_argmax_from_move} ARGMAX (Messung 3)"
     else:
         tau_status = "AUS (Standard, τ=1/Sampling durchgehend)"
+    # Weg C (par.9c): eine Zeile, damit im Log ablesbar ist, ob abgewichen wird.
+    if deviate_prob:
+        deviate_status = (f"p={deviate_prob} @ Exp(mean={deviate_mean_move}), "
+                          f"{deviate_candidates} Kandidaten (par.9c)")
+    else:
+        deviate_status = "AUS (Standard)"
     if mode == "network":
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"base_sims {simulations} | c_puct {c_puct} | "
               f"Root-Noise {'an' if add_root_noise else 'AUS'} | "
               f"Zugwahl {'ARGMAX (deterministisch)' if deterministic else 'Sampling (Standard)'} | "
               f"τ-Annealing {tau_status} | "
+              f"Abweichung {deviate_status} | "
               f"rtv-Labels {rtv_status} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
@@ -519,6 +566,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             tau_argmax_from_move=tau_argmax_from_move,
             seed_positions=seed_positions, seed_positions_offset=pos_offset,
             spec=spec,
+            deviate_prob=deviate_prob, deviate_mean_move=deviate_mean_move,
+            deviate_candidates=deviate_candidates,
         )
         return raw, progress_path, heartbeat_path
 
@@ -752,6 +801,34 @@ if __name__ == "__main__":
                              "MOSAIC_TAU_ARGMAX_FROM_MOVE für den Rust-Aufruf, siehe net_mcts.rs. "
                              "Nur bei --mode network wirksam; Runde 5 bleibt davon unberührt "
                              "(Alpha-Beta-exakt, round5.rs).")
+    parser.add_argument("--deviate-prob", dest="deviate_prob", type=float, default=0.0,
+                        help="PREREG_start_position_seeding.md par.9c, Weg C (KataGo, Wu 2019, "
+                             "Anhang D): Wahrscheinlichkeit je Partie, dass GENAU EIN "
+                             "Drafting-Zug von dem abweicht, was die Suche gespielt haette. "
+                             "An der (zufaelligen) Stelle werden mehrere legale Aktionen "
+                             "gleichverteilt gezogen, jede bekommt EINE Netzbewertung ihres "
+                             "Folgezustands, die beste wird gespielt; danach laeuft die Partie "
+                             "normal weiter. Es entsteht KEINE zweite Partie und kein zweiter "
+                             "Datensatzstrom -- das Policy-Ziel des Records bleibt die "
+                             "Besuchsverteilung der regulaeren Suche. KataGo faehrt 0.05. "
+                             "Default 0.0 = AUS (Bestandsverhalten, bitidentisch: es wird keine "
+                             "einzige zusaetzliche Zufallszahl gezogen). Setzt NUR "
+                             "MOSAIC_DEVIATE_PROB fuer den Rust-Aufruf, siehe self_play.rs. "
+                             "Nur bei --mode network wirksam.")
+    parser.add_argument("--deviate-mean-move", dest="deviate_mean_move", type=float, default=30.0,
+                        help="Weg C: Mittelwert der Exponentialverteilung, aus der die "
+                             "Halbzugnummer der Abweichung gezogen wird -- gezaehlt wie "
+                             "--tau-argmax-from-move (echte Drafting-Entscheide, 1-basiert, "
+                             "beide Spieler zusammen). Default 30.0 (grob Ende Runde 1), mit "
+                             "langem Schwanz bis in die spaete Partie. Setzt NUR "
+                             "MOSAIC_DEVIATE_MEAN_MOVE.")
+    parser.add_argument("--deviate-candidates", dest="deviate_candidates", type=int, default=6,
+                        help="Weg C: wie viele legale Aktionen an der Abweichungsstelle "
+                             "gleichverteilt gezogen werden (jede kostet EINE Netzbewertung). "
+                             "KataGo zieht 3 bis 10; wir nehmen einen festen Wert, das spart "
+                             "eine zweite Zufallsquelle und macht die Kosten je Abweichung "
+                             "vorhersagbar. Muss >= 2 sein. Default 6. Setzt NUR "
+                             "MOSAIC_DEVIATE_CANDIDATES.")
     parser.add_argument("--spec", type=str, default=None,
                         help="Such-Spec-Datei models/<name>.spec.json (Schema: "
                              "implicit_minimax_alpha, long_row_init_shaping_w, "
@@ -808,4 +885,7 @@ if __name__ == "__main__":
         seed_positions=args.seed_positions,
         heuristik_variante=args.heuristik_variante,
         spec=args.spec,
+        deviate_prob=args.deviate_prob,
+        deviate_mean_move=args.deviate_mean_move,
+        deviate_candidates=args.deviate_candidates,
     )

@@ -1355,6 +1355,239 @@ fn asym_preference_side(game_seed: u64) -> usize {
     }
 }
 
+// ── Weg C: Abweichungsregel der Self-Play-Erzeugung ──────────────────────────
+//
+// `PREREG_start_position_seeding.md` par.9c (Quelle: KataGo, Wu 2019,
+// arXiv:1902.10565, Anhang D -- dort woertlich zitiert). In einem Anteil der
+// Partien weicht GENAU EIN Drafting-Zug von dem ab, was die Suche gespielt
+// haette: an einer zufaelligen, exponentiell verteilten Halbzugstelle werden
+// mehrere legale Aktionen GLEICHVERTEILT gezogen, jede bekommt EINE
+// Netzbewertung ihres Folgezustands, und die beste davon wird gespielt.
+// Danach laeuft die Partie ganz normal weiter.
+//
+// Was hier ausdruecklich NICHT passiert (Abgrenzung zu den Wegen A und B der
+// Prereg): es entsteht KEINE zweite Partie und KEIN zweiter Datensatzstrom.
+// Das Policy-Ziel des Records an dieser Stelle bleibt die Besuchsverteilung
+// der regulaeren Suche -- die laeuft ohnehin, nur die GESPIELTE Aktion wird
+// ersetzt. Zweck laut Paper: Trainingsdaten darueber, wie man auf Zuege
+// antwortet, die eine volle Suche nie spielen wuerde.
+//
+// Der Unterschied zur Temperatur (par.9c Punkt 3): breit ziehen, billig
+// filtern. Ein offensichtlich schlechter Zug faellt an der Netzbewertung
+// heraus; verrauscht wird nur die Auswahl, nicht die Qualitaet.
+
+/// Distinguisher fuer den Abweichungs-Strom. Der Seed der Abweichung darf
+/// nicht bit-fuer-bit mit `derive_search_seed(game_seed, move_number)` der
+/// SUCHE desselben Halbzugs zusammenfallen -- gleiches Muster und gleicher
+/// Grund wie der `DISTINGUISHER` in [`asym_preference_side`] oben.
+const DEVIATE_SEED_DISTINGUISHER: u64 = 0x0DE7_1A7E_5EED_C0DE;
+
+/// Gueltigkeitspruefung von `MOSAIC_DEVIATE_PROB` -- `None` = ungueltig.
+/// Als eigene reine Funktion, damit die Pruefung isoliert testbar bleibt: der
+/// Getter darunter cached prozessweit (OnceLock), zwei Werte im selben
+/// Testprozess sind ueber ihn nicht pruefbar (bekanntes Muster, siehe
+/// `net_mcts::read_f64_env`-Tests).
+fn sanitize_deviate_prob(raw: f64) -> Option<f64> {
+    (0.0..=1.0).contains(&raw).then_some(raw)
+}
+
+/// Gueltigkeitspruefung von `MOSAIC_DEVIATE_MEAN_MOVE` -- `None` = ungueltig.
+/// Ein Mittelwert <= 0 hat keine Exponentialverteilung, `NaN`/`inf` ebenso
+/// wenig eine brauchbare Halbzugnummer.
+fn sanitize_deviate_mean_move(raw: f64) -> Option<f64> {
+    (raw.is_finite() && raw > 0.0).then_some(raw)
+}
+
+/// Gueltigkeitspruefung von `MOSAIC_DEVIATE_CANDIDATES` -- `None` = ungueltig.
+/// Unter 2 Kandidaten gibt es nichts zu filtern (der einzige gezogene Zug
+/// waere automatisch der "beste"), das ist keine Abweichungsregel mehr.
+fn sanitize_deviate_candidates(raw: f64) -> Option<usize> {
+    (raw.is_finite() && raw >= 2.0).then(|| raw.round() as usize)
+}
+
+/// Wahrscheinlichkeit je Partie, dass ueberhaupt abgewichen wird
+/// (`MOSAIC_DEVIATE_PROB`). Default `0.0` = AUS = byte-identisches
+/// Bestandsverhalten, und zwar im starken Sinn: bei `0.0` wird KEINE einzige
+/// Zufallszahl zusaetzlich gezogen (siehe [`deviation_move`]s Fruehausstieg),
+/// der Zufallsstrom der Partie verschiebt sich also nicht. KataGo faehrt 0,05.
+/// Ausserhalb `[0,1]` -> Default mit EINMALIGER Warnung (OnceLock).
+fn deviate_prob() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let raw = crate::net_mcts::read_f64_env("MOSAIC_DEVIATE_PROB", 0.0);
+        sanitize_deviate_prob(raw).unwrap_or_else(|| {
+            eprintln!("⚠️  MOSAIC_DEVIATE_PROB={raw} liegt nicht in [0,1] -- Abweichung bleibt AUS (0.0).");
+            0.0
+        })
+    })
+}
+
+/// Mittelwert der Exponentialverteilung, aus der die Halbzugnummer der
+/// Abweichung gezogen wird (`MOSAIC_DEVIATE_MEAN_MOVE`, Default `30.0`).
+/// Gezaehlt wird wie `move_number` in [`unified_game_loop`]: echte
+/// Drafting-Entscheide, 1-basiert, beide Spieler zusammen. KataGo zieht
+/// `r ~ Exp(mean = 0,025*b^2)` und weicht NACH den ersten `r` Zuegen ab; 30
+/// entspricht bei uns grob dem Ende von Runde 1 (`evaluations/
+/// actions_per_round.md`: rund 11 Zuege je Runde und Spieler), mit dem langen
+/// Schwanz der Exponentialverteilung bis in die spaete Partie -- genau die
+/// Eigenschaft, wegen der par.9c Weg C vor Weg A empfiehlt.
+/// Nicht-positiv/nicht endlich -> Default mit EINMALIGER Warnung.
+fn deviate_mean_move() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let raw = crate::net_mcts::read_f64_env("MOSAIC_DEVIATE_MEAN_MOVE", 30.0);
+        sanitize_deviate_mean_move(raw).unwrap_or_else(|| {
+            eprintln!("⚠️  MOSAIC_DEVIATE_MEAN_MOVE={raw} ist nicht > 0 -- verwende Default 30.0.");
+            30.0
+        })
+    })
+}
+
+/// Zahl der gleichverteilt gezogenen Kandidaten je Abweichung
+/// (`MOSAIC_DEVIATE_CANDIDATES`, Default `6`).
+///
+/// KataGo zieht je Abweichung "between 3 and 10 moves"; wir nehmen EINEN
+/// festen Wert. Begruendung: die Paper-Spanne ist selbst eine Ziehung, also
+/// eine zweite Zufallsquelle, die den Determinismus-Nachweis verbreitert,
+/// ohne dem Zweck etwas hinzuzufuegen -- gebraucht wird "breit ziehen, billig
+/// filtern", und das leistet jede feste Breite in diesem Bereich. Ein fester
+/// Wert macht ausserdem die Kosten je Abweichung exakt vorhersagbar (genau
+/// `n` Netzbewertungen) und die Ziehung ohne Netz testbar. 6 liegt in der
+/// Mitte der Paper-Spanne; dass eine gezogene Breite messbar besser waere,
+/// wird hier nicht behauptet und ist nicht gemessen.
+/// `< 2`/nicht endlich -> Default mit EINMALIGER Warnung.
+fn deviate_candidates() -> usize {
+    static CELL: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let raw = crate::net_mcts::read_f64_env("MOSAIC_DEVIATE_CANDIDATES", 6.0);
+        sanitize_deviate_candidates(raw).unwrap_or_else(|| {
+            eprintln!(
+                "⚠️  MOSAIC_DEVIATE_CANDIDATES={raw} ist < 2 oder unlesbar -- verwende Default 6."
+            );
+            6
+        })
+    })
+}
+
+/// An welchem Halbzug DIESER Partie abgewichen wird (`None` = gar nicht).
+/// Reine Funktion von `(game_seed, prob, mean_move)` -- ohne Netz, ohne
+/// Spielzustand, ohne fremden RNG, deshalb isoliert testbar.
+///
+/// DETERMINISMUS (`PREREG_search_rng_split.md`-Muster): die beiden Ziehungen
+/// (ob / wo) kommen aus einem AUS `game_seed` ABGELEITETEN Strom --
+/// `derive_search_seed` auf den mit [`DEVIATE_SEED_DISTINGUISHER`] verxorten
+/// Seed, Zaehler `0` (der Zaehler der Suche ist `move_number` und 1-basiert,
+/// die 0 ist also frei). Der Partie-RNG bleibt damit auch bei AKTIVER
+/// Abweichung voellig unberuehrt; ein Lauf mit gleichem Seed bleibt
+/// reproduzierbar, und was sich unterscheidet, ist ausschliesslich die
+/// gespielte Aktion.
+///
+/// `prob <= 0.0` (Default): `None` OHNE jede Ziehung -- der Fruehausstieg
+/// steht VOR dem `StdRng`-Aufbau. Das ist die wichtigste Eigenschaft dieser
+/// Aenderung (Bestand bleibt bitidentisch).
+///
+/// Zaehlweise: KataGo weicht "after the first r turns" ab, der abweichende
+/// Halbzug ist also der `r+1`-te. `move_number` ist 1-basiert, das Ergebnis
+/// daher `floor(r) + 1`. Sehr grosse `r` (langer Schwanz) bedeuten schlicht,
+/// dass die Partie vorher endet -- dann weicht sie nicht ab.
+fn deviation_move(game_seed: u64, prob: f64, mean_move: f64) -> Option<u64> {
+    if !(prob > 0.0) {
+        return None;
+    }
+    let mut rng = StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+        game_seed ^ DEVIATE_SEED_DISTINGUISHER,
+        0,
+    ));
+    if rng.random::<f64>() >= prob {
+        return None;
+    }
+    // Exponentialverteilung per Inversionsmethode: r = -mean * ln(1-u) mit
+    // u ~ U[0,1). `1-u` liegt in (0,1], `ln` davon ist nie -inf.
+    let u: f64 = rng.random::<f64>();
+    let r = -mean_move * (1.0 - u).ln();
+    Some((r.floor().max(0.0) as u64).saturating_add(1))
+}
+
+/// Zieht `want` VERSCHIEDENE legale Aktionen gleichverteilt (ohne
+/// Zuruecklegen). Gibt es hoechstens `want` legale Aktionen, kommen ALLE
+/// zurueck -- in Bestandsreihenfolge und OHNE RNG-Verbrauch (es gibt dann
+/// nichts zu ziehen). Reine Funktion ohne Netz und ohne Spielzustand, damit
+/// die Ziehung isoliert testbar ist.
+///
+/// Teil-Fisher-Yates auf einem Indexvektor statt `choose_multiple`: gebraucht
+/// wird nur `random_range` (dieselbe Grundoperation wie [`weighted_index`]),
+/// und die Zahl der Ziehungen liegt mit `want` exakt fest.
+fn deviation_candidates_from<R: Rng + ?Sized>(
+    actions: &[Action],
+    want: usize,
+    rng: &mut R,
+) -> Vec<Action> {
+    if want >= actions.len() {
+        return actions.to_vec();
+    }
+    let mut idx: Vec<usize> = (0..actions.len()).collect();
+    for i in 0..want {
+        let j = i + rng.random_range(0..(idx.len() - i));
+        idx.swap(i, j);
+    }
+    idx.truncate(want);
+    idx.into_iter().map(|i| actions[i].clone()).collect()
+}
+
+/// Die Abweichung selbst: Kandidaten ziehen, je EINE Netzbewertung ihres
+/// FOLGEZUSTANDS, die beste Aktion zurueckgeben. `None`, wenn es nichts zu
+/// entscheiden gibt (`actions.len() < 2`) oder kein Kandidat anwendbar war --
+/// der Aufrufer behaelt dann die Aktion der Suche.
+///
+/// Perspektive: [`crate::net_mcts::net_leaf_eval`] liefert
+/// `[Gewinnwahrscheinlichkeit Brett 0, Brett 1]`, unabhaengig davon, wer im
+/// Folgezustand am Zug ist (belegt durch
+/// `net_mcts::tests::net_leaf_eval_is_invariant_to_which_player_is_flagged_current`).
+/// Bewertet wird deshalb der Eintrag des ABWEICHENDEN Spielers.
+///
+/// Der Folgezustand entsteht ueber [`apply_chosen_action`] auf einem Klon --
+/// genau der Apply-Pfad der Netz-Spielpfade (`apply_via_chosen_action`),
+/// damit der bewertete Zustand derselbe ist, der bei dieser Wahl auch
+/// wirklich entstuende. Ein `Err` waere ein Engine-Bug (`actions` kommt aus
+/// `drafting_actions`) und UEBERSPRINGT den Kandidaten, statt die Partie zu
+/// reissen.
+///
+/// `want` wird auf `>= 2` angehoben: `deviate_candidates` laesst kleinere
+/// Werte gar nicht erst durch, aber die Funktion soll auch bei direktem
+/// Aufruf nicht in die "ein Kandidat ist automatisch der beste"-Entartung
+/// laufen.
+fn deviation_best_action<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    actions: &[Action],
+    player: usize,
+    want: usize,
+    rng: &mut R,
+) -> Option<Action> {
+    if actions.len() < 2 {
+        return None;
+    }
+    let candidates = deviation_candidates_from(actions, want.max(2), rng);
+    let mut best: Option<(f64, Action)> = None;
+    for a in candidates {
+        let mut probe = Game {
+            state: state.clone(),
+        };
+        if apply_chosen_action(&mut probe, a.clone()).is_err() {
+            continue;
+        }
+        let v = crate::net_mcts::net_leaf_eval(net, &probe.state)[player];
+        let better = match &best {
+            None => true,
+            Some((bv, _)) => v > *bv,
+        };
+        if better {
+            best = Some((v, a));
+        }
+    }
+    best.map(|(_, a)| a)
+}
+
 /// Ergebnis eines Drafting-Entscheids eines [`DraftingAgent`].
 struct DraftingDecision {
     chosen: Action,
@@ -1735,6 +1968,18 @@ struct GameLoopConfig<'a> {
     /// ignoriert, sie stecken im Zustand. `None` (alle Bestandsaufrufer)
     /// = byte-identisches Bestandsverhalten.
     start_state: Option<GameState>,
+    /// Weg C (`PREREG_start_position_seeding.md` par.9c): Netz, mit dem die
+    /// Kandidaten der EINEN Abweichung je Partie bewertet werden. `Some(net)`
+    /// NUR im Netz-Self-Play (`play_net_self_play_game`) -- die Arena-Pfade
+    /// und der Heuristik-Self-Play setzen `None` und lesen die
+    /// `MOSAIC_DEVIATE_*`-Knoepfe damit gar nicht erst. Auch im Self-Play ist
+    /// der Default (`MOSAIC_DEVIATE_PROB=0`) byte-identisch zum Bestand,
+    /// siehe [`deviation_move`].
+    ///
+    /// Zaehlung bei geseedetem Start (`start_state`): `move_number` beginnt
+    /// auch dort bei 1, die Abweichungsstelle zaehlt also ab dem ERSTEN Zug
+    /// der Fortsetzung, nicht ab dem Anfang der Ursprungspartie.
+    deviate_net: Option<&'a Net>,
 }
 
 /// Ausgabe der vereinheitlichten Schleife (je [`LoopMode`]-Variante).
@@ -1785,6 +2030,16 @@ fn unified_game_loop<R: Rng + ?Sized>(
     let mut guard = 0u32;
     let t_start = std::time::Instant::now();
     let recording = matches!(cfg.mode, LoopMode::Records { .. });
+    // Weg C (`PREREG_start_position_seeding.md` par.9c): an welchem Halbzug
+    // DIESER Partie genau ein Drafting-Zug von der Suche abweicht. Nur der
+    // Netz-Self-Play setzt `deviate_net`; bei `None` werden die
+    // `MOSAIC_DEVIATE_*`-Getter gar nicht aufgerufen, und bei Default-AUS
+    // (`MOSAIC_DEVIATE_PROB=0`) liefert `deviation_move` `None`, OHNE eine
+    // einzige Zufallszahl zu ziehen -- weder der Partie-RNG noch ein
+    // abgeleiteter Strom wird beruehrt.
+    let deviate_at: Option<u64> = cfg
+        .deviate_net
+        .and_then(|_| deviation_move(cfg.game_seed, deviate_prob(), deviate_mean_move()));
     loop {
         guard += 1;
         if let Some(hb) = cfg.move_heartbeat {
@@ -1847,14 +2102,71 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     } else {
                         None
                     };
-                    let d = pcfg.agent.decide(&game.state, &actions, &mut search_rng, move_number);
+                    let mut d = pcfg.agent.decide(&game.state, &actions, &mut search_rng, move_number);
                     // Baustein 1 (par.5 "wie oft greift der Bauer"): additiv,
-                    // NUR wenn der Aufrufer einen Zaehler bereitstellt.
+                    // NUR wenn der Aufrufer einen Zaehler bereitstellt. Zaehlt
+                    // den ENTSCHEID des Agenten, steht deshalb VOR der
+                    // Abweichung unten (die den Vorzug nicht neu bewertet, nur
+                    // die gespielte Aktion ersetzt).
                     if let Some(cell) = cfg.vorzug_greift {
                         if d.vorzug.is_some() {
                             let mut counts = cell.get();
                             counts[player] += 1;
                             cell.set(counts);
+                        }
+                    }
+                    // Weg C (par.9c): GENAU EIN Halbzug je Partie weicht ab.
+                    // Ersetzt AUSSCHLIESSLICH die gespielte Aktion --
+                    // `d.policy` bleibt die Besuchsverteilung der regulaeren
+                    // Suche (die ohnehin gelaufen ist), es entsteht kein
+                    // zweiter Datensatzstrom und keine zweite Partie. Muss VOR
+                    // der Record-Vorbereitung stehen: `moon_order_target` und
+                    // der Spaltenbau-Trace lesen `d.chosen`, und beide sollen
+                    // die TATSAECHLICH gespielte Aktion beschreiben.
+                    // Zufallsquelle: eigener, aus `game_seed` abgeleiteter
+                    // Strom (siehe `deviation_move`) -- die Kandidatenziehung
+                    // verschiebt weder den Partie-RNG noch den Such-RNG dieses
+                    // Halbzugs, aus dem gleich `moon_order_target` zieht.
+                    // WAECHTER (Koordinator 2026-09-07, nach dem Bau-Bericht): greift der
+                    // Bauer-/Kuppel-Vorzug, ist `d.policy` ein EIN-HOT-Demonstrationsziel
+                    // auf genau die vorgezogene Aktion (`NetSelfPlayAgent::decide`, oben).
+                    // Eine Abweichung davon liesse das Ziel auf einen Zug zeigen, der nie
+                    // gespielt wurde -- stille Trainingsdaten-Korruption. In diesem Fall
+                    // wird NICHT abgewichen; die Partie hat dann keine Abweichung, was
+                    // die Rate leicht unter den eingestellten Wert druecken kann (im
+                    // Bericht je Lauf sichtbar, weil die `[deviate]`-Zeile fehlt).
+                    if deviate_at == Some(move_number) && d.vorzug.is_none() {
+                        if let Some(net) = cfg.deviate_net {
+                            let want = deviate_candidates();
+                            let mut deviate_rng =
+                                StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+                                    cfg.game_seed ^ DEVIATE_SEED_DISTINGUISHER,
+                                    move_number,
+                                ));
+                            if let Some(a) = deviation_best_action(
+                                net,
+                                &game.state,
+                                &actions,
+                                player,
+                                want,
+                                &mut deviate_rng,
+                            ) {
+                                // Zuordnung als Log-Zeile, nicht als
+                                // Record-Feld -- derselbe Praezedenzfall wie
+                                // `[seed_position]`/`[asym_vorzug]` (par.6:
+                                // das Record-Schema hat mehrere
+                                // Python-Konsumenten). Nur bei aktivem Knopf,
+                                // also hoechstens einmal je Partie.
+                                eprintln!(
+                                    "[deviate] seed={} move={} player={} legal={} kandidaten={}",
+                                    cfg.game_seed,
+                                    move_number,
+                                    player,
+                                    actions.len(),
+                                    want.max(2).min(actions.len())
+                                );
+                                d.chosen = a;
+                            }
                         }
                     }
                     // Record-Vorbereitung VOR dem Apply (moon_order_target
@@ -2209,6 +2521,10 @@ pub fn play_one_game<R: Rng + ?Sized>(
         players: [player, player],
         vorzug_greift: None,
         start_state: None,
+        // Weg C (par.9c): der Heuristik-Self-Play weicht nicht ab -- die
+        // Abweichung filtert per NETZBEWERTUNG des Folgezustands, dieser
+        // Pfad hat dafuer keinen Drafting-Netzpfad.
+        deviate_net: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -2635,6 +2951,9 @@ fn play_net_game<R: Rng + ?Sized>(
         players,
         vorzug_greift: None,
         start_state: None,
+        // Weg C (par.9c): Arena-Pfad -- die Abweichung ist eine Regel der
+        // ERZEUGUNG, nie des Messens.
+        deviate_net: None,
     };
     let mut result = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -2787,6 +3106,9 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
         ],
         vorzug_greift: None,
         start_state: None,
+        // Weg C (par.9c): Arena-Pfad -- die Abweichung ist eine Regel der
+        // ERZEUGUNG, nie des Messens.
+        deviate_net: None,
     };
     match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Summary(v) => v,
@@ -3507,6 +3829,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         players: [player0, player1],
         vorzug_greift: if asym { Some(&greif_counter) } else { None },
         start_state,
+        // Weg C (par.9c): der EINZIGE Pfad mit Abweichung. Default AUS
+        // (`MOSAIC_DEVIATE_PROB=0`) ist byte-identisch zum Bestand.
+        deviate_net: Some(net),
     };
     let out = match unified_game_loop(scoring_ids, names, first_player, rng, cfg) {
         LoopOutput::Records(r) => r,
@@ -5340,6 +5665,7 @@ pub(crate) mod tests {
                 players: [player, player],
                 vorzug_greift: None,
                 start_state: Some(state),
+                deviate_net: None,
             };
             match unified_game_loop(vec![], ["A".into(), "B".into()], 0, &mut r, cfg) {
                 LoopOutput::Records(out) => serde_json::to_string(&out).unwrap(),
@@ -6931,6 +7257,241 @@ pub(crate) mod tests {
         assert!(
             (frac0 - 0.5).abs() < 0.02,
             "Seitenverteilung ueber abgeleitete Partie-Seeds weicht zu stark von 50/50 ab: {frac0:.4}"
+        );
+    }
+
+    // ── Weg C: Abweichungsregel (PREREG_start_position_seeding.md par.9c) ──
+
+    /// Test (1) der Auftragsliste, DEFAULT-AUS-Haelfte: bei ungesetzten
+    /// Env-Vars ist die Abweichung aus, und dann wird KEINE einzige
+    /// Zufallszahl gezogen. Der zweite Teil ist hier strukturell und nicht
+    /// nur statistisch: `deviation_move` steigt bei `prob <= 0.0` VOR dem
+    /// `StdRng`-Aufbau aus (Fruehausstieg im Funktionsrumpf), es gibt also
+    /// gar keinen Strom, der sich verschieben koennte -- und der Partie-RNG
+    /// wird ohnehin nie angefasst, weil die Funktion keinen entgegennimmt.
+    /// Ohne Netz pruefbar, deshalb kein `#[ignore]`.
+    #[test]
+    fn deviation_is_off_by_default_and_draws_no_random_number() {
+        assert_eq!(
+            deviate_prob(),
+            0.0,
+            "MOSAIC_DEVIATE_PROB muss ungesetzt 0.0 (= AUS) sein"
+        );
+        assert_eq!(
+            deviate_mean_move(),
+            30.0,
+            "MOSAIC_DEVIATE_MEAN_MOVE-Default ist 30.0"
+        );
+        assert_eq!(
+            deviate_candidates(),
+            6,
+            "MOSAIC_DEVIATE_CANDIDATES-Default ist 6"
+        );
+        for seed in 0..5_000u64 {
+            assert_eq!(
+                deviation_move(seed, deviate_prob(), deviate_mean_move()),
+                None,
+                "Seed {seed}: bei Default-AUS darf keine Abweichungsstelle entstehen"
+            );
+        }
+    }
+
+    /// Die Ziehung haengt AUSSCHLIESSLICH am Partie-Seed (Determinismus-
+    /// Anforderung par.9c Punkt 4 / `PREREG_search_rng_split.md`): gleicher
+    /// Seed -> gleiche Stelle, und ueber viele Seeds ist die Stelle nicht
+    /// konstant (sonst waere der abgeleitete Strom entartet).
+    #[test]
+    fn deviation_move_is_deterministic_per_game_seed_and_spreads() {
+        let mut distinct = std::collections::BTreeSet::new();
+        for seed in 0..2_000u64 {
+            let a = deviation_move(seed, 1.0, 30.0);
+            let b = deviation_move(seed, 1.0, 30.0);
+            assert_eq!(
+                a, b,
+                "Seed {seed}: Abweichungsstelle muss deterministisch sein"
+            );
+            let m = a.expect("prob=1.0 muss immer eine Stelle liefern");
+            assert!(m >= 1, "Halbzugnummern sind 1-basiert, war {m}");
+            distinct.insert(m);
+        }
+        assert!(
+            distinct.len() > 50,
+            "Abweichungsstelle streut zu wenig ({} verschiedene Werte ueber 2000 Seeds)",
+            distinct.len()
+        );
+    }
+
+    /// Die Rate trifft `prob`, und die Stelle folgt der Exponentialverteilung
+    /// mit dem eingestellten Mittelwert. Beides zusammen belegt, dass die
+    /// beiden Ziehungen in `deviation_move` in der richtigen Reihenfolge und
+    /// mit der richtigen Bedeutung verdrahtet sind (eine vertauschte
+    /// Reihenfolge wuerde die Rate kippen).
+    #[test]
+    fn deviation_move_rate_and_mean_match_the_knobs() {
+        let n = 40_000u64;
+        let prob = 0.05;
+        let mean = 30.0;
+        let mut hits = 0u64;
+        let mut sum = 0u64;
+        for seed in 0..n {
+            if let Some(m) = deviation_move(seed, prob, mean) {
+                hits += 1;
+                sum += m;
+            }
+        }
+        let rate = hits as f64 / n as f64;
+        assert!(
+            (rate - prob).abs() < 0.006,
+            "Abweichungsrate {rate:.4} weicht zu stark von MOSAIC_DEVIATE_PROB={prob} ab"
+        );
+        // Erwartungswert von floor(Exp(mean)) + 1 ist rund `mean` + 0,5
+        // (exakt: e^-1/m/(1-e^-1/m) + 1, fuer m=30 also 30,50). Toleranz 4,0
+        // ist damit rund 5 Standardfehler des Mittelwerts (30/sqrt(2000)).
+        let avg = sum as f64 / hits as f64;
+        assert!(
+            (avg - mean).abs() < 4.0,
+            "mittlere Abweichungsstelle {avg:.2} passt nicht zu MOSAIC_DEVIATE_MEAN_MOVE={mean}"
+        );
+    }
+
+    /// Test (2) der Auftragsliste: die Env-Pruefung faellt bei Unsinn auf den
+    /// Default zurueck. Geprueft an den REINEN Sanitizern, nicht an den
+    /// OnceLock-Gettern -- diese cachen prozessweit, zwei Werte im selben
+    /// Testprozess sind ueber sie nicht pruefbar (dasselbe Muster und
+    /// derselbe Grund wie bei den `read_f64_env_*`-Tests in net_mcts.rs).
+    /// Die EINMALIGKEIT der Warnung ist eine Eigenschaft des `OnceLock`
+    /// (`get_or_init` laeuft genau einmal), nicht des Sanitizers.
+    #[test]
+    fn deviate_env_sanitizers_reject_nonsense_and_keep_valid_values() {
+        assert_eq!(sanitize_deviate_prob(0.0), Some(0.0));
+        assert_eq!(sanitize_deviate_prob(0.05), Some(0.05));
+        assert_eq!(sanitize_deviate_prob(1.0), Some(1.0));
+        assert_eq!(sanitize_deviate_prob(-0.1), None);
+        assert_eq!(sanitize_deviate_prob(1.5), None);
+        assert_eq!(sanitize_deviate_prob(f64::NAN), None);
+
+        assert_eq!(sanitize_deviate_mean_move(30.0), Some(30.0));
+        assert_eq!(sanitize_deviate_mean_move(0.0), None);
+        assert_eq!(sanitize_deviate_mean_move(-5.0), None);
+        assert_eq!(sanitize_deviate_mean_move(f64::INFINITY), None);
+
+        assert_eq!(sanitize_deviate_candidates(6.0), Some(6));
+        assert_eq!(sanitize_deviate_candidates(2.0), Some(2));
+        assert_eq!(sanitize_deviate_candidates(1.0), None);
+        assert_eq!(sanitize_deviate_candidates(0.0), None);
+        assert_eq!(sanitize_deviate_candidates(f64::NAN), None);
+    }
+
+    /// Test (3) der Auftragsliste: die Kandidatenziehung waehlt AUS den
+    /// legalen Aktionen (keine erfundenen, keine doppelten) und gibt bei
+    /// weniger legalen Aktionen als gewuenscht ALLE zurueck. Reine Funktion,
+    /// kein Netz noetig.
+    #[test]
+    fn deviation_candidates_are_drawn_from_the_legal_actions() {
+        let actions: Vec<Action> = (0..10u32).map(Action::ChooseDomeRotation).collect();
+        let mut rng = StdRng::seed_from_u64(4711);
+
+        let picked = deviation_candidates_from(&actions, 6, &mut rng);
+        assert_eq!(
+            picked.len(),
+            6,
+            "genau `want` Kandidaten bei genug legalen Aktionen"
+        );
+        for a in &picked {
+            assert!(actions.contains(a), "gezogene Aktion {a:?} ist nicht legal");
+        }
+        let unique: std::collections::BTreeSet<u32> = picked
+            .iter()
+            .map(|a| match a {
+                Action::ChooseDomeRotation(r) => *r,
+                other => panic!("unerwartete Aktion {other:?}"),
+            })
+            .collect();
+        assert_eq!(
+            unique.len(),
+            6,
+            "Kandidaten muessen paarweise verschieden sein"
+        );
+
+        // Weniger legale Aktionen als gewuenscht -> alle, ohne RNG-Verbrauch.
+        let few = &actions[..3];
+        let mut rng_a = StdRng::seed_from_u64(99);
+        let mut rng_b = StdRng::seed_from_u64(99);
+        let all = deviation_candidates_from(few, 6, &mut rng_a);
+        assert_eq!(
+            all,
+            few.to_vec(),
+            "bei want > len kommen alle Aktionen unveraendert zurueck"
+        );
+        assert_eq!(
+            deviation_candidates_from(few, 3, &mut rng_a),
+            few.to_vec(),
+            "want == len ebenso"
+        );
+        assert_eq!(
+            rng_a.random::<u64>(),
+            rng_b.random::<u64>(),
+            "der Alle-Fall darf keine Zufallszahl verbrauchen"
+        );
+
+        // Deterministisch bei gleichem Seed.
+        let mut r1 = StdRng::seed_from_u64(1234);
+        let mut r2 = StdRng::seed_from_u64(1234);
+        assert_eq!(
+            deviation_candidates_from(&actions, 4, &mut r1),
+            deviation_candidates_from(&actions, 4, &mut r2)
+        );
+    }
+
+    /// Die Abweichung selbst am ECHTEN Netz: sie spielt eine LEGALE Aktion,
+    /// ist bei gleichem Seed reproduzierbar, und bei nur einer legalen
+    /// Aktion greift sie gar nicht (`None` -> der Aufrufer behaelt die Aktion
+    /// der Suche). Nutzt dasselbe Fixture wie die uebrigen Netz-Tests dieser
+    /// Datei (`engine_test.onnx`).
+    #[test]
+    fn deviation_best_action_plays_a_legal_action_and_is_reproducible() {
+        let model_path = crate::net::test_model_path("engine_test.onnx");
+        let net = Net::load_auto(model_path.to_str().unwrap()).unwrap_or_else(|e| {
+            panic!(
+                "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf \
+                 nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+            )
+        });
+        let mut rng = StdRng::seed_from_u64(20260907);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
+        state.scoring_tile_ids = ids;
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let actions = drafting_actions(&state);
+        assert!(
+            actions.len() > 6,
+            "Test braucht mehr legale Aktionen als Kandidaten, waren {}",
+            actions.len()
+        );
+        let player = state.current_player;
+
+        let mut r1 = StdRng::seed_from_u64(777);
+        let a1 = deviation_best_action(&net, &state, &actions, player, 6, &mut r1)
+            .expect("bei mehr als einer legalen Aktion muss eine Abweichung herauskommen");
+        assert!(
+            actions.contains(&a1),
+            "die abweichende Aktion muss legal sein"
+        );
+
+        let mut r2 = StdRng::seed_from_u64(777);
+        let a2 = deviation_best_action(&net, &state, &actions, player, 6, &mut r2)
+            .expect("zweiter Aufruf mit gleichem Seed");
+        assert_eq!(
+            a1, a2,
+            "gleicher Seed -> gleiche Abweichung (Determinismus-Anforderung par.9c)"
+        );
+
+        assert_eq!(
+            deviation_best_action(&net, &state, &actions[..1], player, 6, &mut r1),
+            None,
+            "bei nur einer legalen Aktion gibt es nichts zu ersetzen"
         );
     }
 }
