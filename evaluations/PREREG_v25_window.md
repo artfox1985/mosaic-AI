@@ -658,3 +658,76 @@ Handel, solange nicht gezeigt ist, dass die Fenster-Kennzahl selbst etwas bewirk
 
 **Beide Varianten aendern die Klassenaufteilung NICHT** -- nur, ob eine Klasse kopiert oder
 neu gefahren wird. Der Waechter par.7 und die Groesse 29.450 bleiben.
+
+## par.14 SOCKEL-ARME v25: das volle Paket (Nutzer 2026-09-07, 03:30: "temp bestand, temp variabel ueber moegliche aktionen, umschaltpunkt, umschaltpunkt + c, temp variabel + c")
+
+**Der Zuschnitt (par.13) bleibt unveraendert.** Variiert wird ausschliesslich, WIE die
+4.000 Sockel-NEU-Partien erzeugt werden. Schwarm, G-1 und G-2 sind in allen Armen dieselben
+Dateien -- der Schwarm wird EINMAL erzeugt und von allen Armen geteilt.
+
+| Arm | Temperatur-Regime | Weg C | Was der Vergleich isoliert |
+| --- | --- | --- | --- |
+| **S1** | Bestand (roh proportional zu den Besuchen, T = 1) | aus | Kontrolle |
+| **S2** | variabel ueber die Zahl der gueltigen Aktionen | aus | S2 gegen S1: bringt eine milde, aktionsabhaengige Schaerfung dasselbe wie hartes Umschalten? |
+| **S3** | Umschaltpunkt (argmax ab Halbzug k) | aus | S3 gegen S1: was das Sampling kostet (Messung 3-V, jetzt bis ins Netz) |
+| **S4** | Umschaltpunkt | **an** | S4 gegen S3: was C liefert, wenn die Zugwahl greedy ist |
+| **S5** | variabel | **an** | S5 gegen S2: was C liefert, wenn die Zugwahl mild gesampelt bleibt |
+
+Das ist ein 3 x 2-Feld ohne die Zelle "Bestand plus C" -- sie faellt weg, weil der Bestand
+in Messung 3-V die schlechteste Spaltenzahl hatte und eine Abweichung je Partie daran
+nichts aendert.
+
+### Der fehlende Baustein: variable Temperatur im NETZ-Pfad (S2, S5)
+
+Der Netz-Pfad hat heute keine Temperatur (par.9d): `net_drafting_policy` zieht mit
+`weighted_index` aus den ROHEN Besuchszahlen, fest T = 1. Die aktionsabhaengige Formel
+existiert nur im HEURISTIK-Pfad (`drafting_policy`, self_play.rs:1656: `n > 50 -> 0,7`,
+`n > 15 -> 0,4`, sonst `0,15`, Port von self_play.py:172).
+
+**Zu bauen:** dieselbe Formel im Netz-Pfad, als Knopf mit Default aus (bitidentisch).
+Bauform wie `tau_argmax_from_move`: Env plus CLI-Flag, kein Spec-Feld. Der Eingriff ist
+eine Zeile in `net_drafting_policy` -- statt `weights = visits` dann
+`weights = visits^(1/T(n))`. **Geschaetzt (nicht gemessen): rund 30 Zeilen mit Getter,
+Warnung und Test.** Kleiner als Weg C.
+
+**Warum diese Form und nicht KataGos zeitabhaengige Abklingung** (par.9d, T 0,8 -> 0,2 mit
+Halbwertszeit = Brettbreite): die aktionsabhaengige Formel ist im Projekt bereits im
+Einsatz und hat das hv2-Lehrermaterial erzeugt, das im Fenster mit 0,732 vollen Spalten die
+zweitbeste Klasse ist. Sie ist damit die naheliegendere Wahl, und sie trifft denselben
+Punkt: nie ganz greedy, aber scharf, wo wenige Zuege zur Wahl stehen.
+
+### Kosten (aus `docs/measured_runtimes.md`, gerechnet)
+
+| Posten | Kosten |
+| --- | --- |
+| 5 x 4.000 Sockel-Partien (3,365 s je Partie, threads 11) | 18,7 h |
+| Schwarm 8.000, EINMAL fuer alle Arme (3,674 s) | 8,2 h |
+| **Erzeugung gesamt** | **26,9 h**, auf zwei Maschinen grob **13,4 h** |
+| 5 Trainings (GPU, seriell, rund 4.845 s je Lauf) | 6,7 h |
+| Tor 2a je Arm (200 Partien @400 argmax) | 1,9 h |
+| Tor 1 je Arm (gepaartes Gating, Deckel 200 Paare) | rund 1,2 h je Arm |
+
+**Vorschlag zur Staffelung, damit nicht alle fuenf durch die volle Abnahme muessen:** erst
+alle fuenf Sockel erzeugen und die MATERIAL-Kennzahlen vergleichen (volle Spalten,
+bedingte Vielfalt, Policy-Entropie -- kostet Minuten, `corpus_sanity_check.py` und
+`paired_corpus_divergence_probe.py`), dann alle fuenf trainieren (6,7 h GPU, laeuft neben
+der CPU), dann Tor 2a fuer alle fuenf (1,9 h) und Tor 1 nur fuer die drei besten. Das
+spart rund 2,5 h Gating, ohne einen Arm ungemessen zu lassen.
+
+**Wichtig zur Lesart der Material-Kennzahlen:** sie entscheiden NICHT, welcher Arm gewinnt
+(Messung 3-V hat gezeigt, dass Materialvorteil und Netzstaerke zwei Fragen sind). Sie
+dienen nur der Reihenfolge und dem Nachweis, dass die Knoepfe ueberhaupt gewirkt haben.
+
+### Abhaengigkeiten vor dem Start
+
+1. **Weg C muss durch den Build** (par.9e: gebaut, ungetestet) -- cargo test, Wheel,
+   Anker-Invarianz.
+2. **Der variable-Temperatur-Knopf muss gebaut werden** (S2, S5).
+3. **Der Umschaltpunkt k muss festliegen.** Gemessen sind aus, 12 und 30
+   (0,195 / 0,4225 / 0,300); der Punkt bei 1 laeuft.
+4. **Generator-Entscheid** (par.11 A: b05 oder b06) -- betrifft alle Arme gleich.
+5. **Zweite Maschine:** gleiches Wheel, gleicher Kontrakt-Stempel
+   (`engine_config_json`), sonst sind die Korpora nicht vergleichbar. Der Stempel gehoert
+   in den Lauf-Bericht jeder Charge.
+
+**Nicht entschieden, Start nur auf Anweisung.**
