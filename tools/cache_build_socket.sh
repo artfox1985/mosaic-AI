@@ -14,6 +14,14 @@
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
+# MOSAIC_IGNORE_POLICY_TARGET_VALID gehoert IN DIESES SKRIPT (2026-09-09): die
+# Variable steht als `|ignore_ptv_v1` IM Datei-Schluessel
+# (engine/py/file_cache_key.py:115-117, gelesen bei Import in neural_net.py:9).
+# Ohne sie landen die Bloecke in einem Namensraum, den das Training nie
+# adressiert -- gemessen am 2026-09-09: 2.200 solche Bloecke aus der Nacht vom
+# 07./08.09. (840 MiB) und 480 aus einem Waechter-Fehlstart. Die v25-Kette
+# exportiert sie vor ihrem Blockbau, dieses Skript tat es nicht.
+export MOSAIC_IGNORE_POLICY_TARGET_VALID=1
 LIST=${1:?Dateiliste fehlt}
 echo "== Cache-Bau Sockel $(date +%H:%M:%S), $(wc -l < "$LIST") Dateien"
 python -X utf8 -u tools/build_cache_incremental.py \
