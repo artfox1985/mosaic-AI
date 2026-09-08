@@ -24,28 +24,74 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. WAS GERADE LAEUFT (Stand 2026-09-07, 19:40)
+## 1. UEBERGABE an die naechste Sitzung (2026-09-08, 22:40)
 
-**Generationswechsel v24 -> v25 gefahren** (`/mosaic-generation-turnover`). Maschine frei,
-Baum sauber. Der v24-Bericht steht in `archive/history.md`.
+**Maschine FREI. Champion laut `models/champion.txt`: `v25-b01_brierbest`.**
+Die Promotion ist GEMESSEN und die Elo-Kanten sind EINGETRAGEN; es fehlen nur noch
+mechanische Schritte (unten). Nichts laeuft im Hintergrund ausser einem Platt-Fit, der in
+Minuten fertig ist.
 
-**Champion: `v24-b07`** -- die Gewichte von b06, aber die Spec mit Huellenform 2 und K5.
-`models/alphazero_v24-b07_brierbest.onnx`, `models/v24-b07_brierbest.spec.json`.
-Eingefroren unter `models/frozen_champions/v24-b07/` mit Wheel, Golden Probe (10 Sonden),
-venv und gruenem Referee-Selbsttest (Handshake beidseitig `20b442a8164f748d`).
+### v25-b01 schlaegt den Champion -- die Beleglage
 
-| Knoten | Elo | KI | Partien |
-| --- | --- | --- | --- |
-| **v24-b07@400** | **1327** | [1287, 1370] | 700 |
-| v24-b06_k3p10@400 | 1302 | [1266, 1341] | 1230 |
-| Heuristik_hv1_anchor@150 | 1000 | fix | 1050 |
+| Kante | Ergebnis | Bemerkung |
+| --- | --- | --- |
+| Gating gegen v24-b07, Seed 20261020 | 53:27 | SPRT nach 40 Paaren, p 0,0049 |
+| Gating, Replikation Seed 20261021 | 129:91 | SPRT nach 110 Paaren, p 0,0145 |
+| **gepoolt** | **182:118 = 0,607** | **p 0,0003**, KI [0,551; 0,662], n = 300 |
+| Anker (festes n=150) | 126:24 | identisch zu v24-b07 |
+| Champion-2 gegen v24-b06 | 48:22 | SPRT nach 35 Paaren |
 
-Alle Knoten haengen am Anker, keine freie Komponente.
+Alle vier Zeilen stehen in `evaluations/elo_history.csv`. **Beide Gating-Seeds sind
+einzeln signifikant** -- bessere Lage als bei K3-P, wo der Fruehstopp in der Replikation
+zusammenfiel.
 
-**Tagesschnappschuss `b6842b4e`** (2026-09-07 19:37, 8,189 GiB), `verify_backup.ps1` in
-allen gefahrenen Stufen gruen, 12 Stichproben gleich. Repo 8,989 GiB ueber 39 Staende --
-das Archiv wurde heute von 14,473 GiB entruempelt (Nutzer-Anweisung, Alt-Korpora der
-Aeren v18 bis v20 sowie asym/ownership/corpus_probe endgueltig weg).
+### WAS NOCH ZU TUN IST (mechanisch, keine Entscheidung noetig)
+
+1. **Anzeige-Kalibrierung nach `server.py`**: `_DISPLAY_CAL_A/_B` (Zeilen 1611/1612) auf
+   die Werte aus `evaluations/artifacts/platt_fit_v25-b01_v3.json` setzen. **NICHT die aus
+   `platt_fit_v25-b01.json`** -- das ist der frozen_v1-Satz, also die TRENDmetrik
+   (A 0,3433 / B 0,6538 / Brier 0,24634, zum Vergleich b06: 0,3281 / 0,6497). Der
+   Anzeige-Fit gehoert auf `frozen_eval_set_v3.pkl`, so wie b06 ihn hat
+   (A -0,0961 / B 0,5875).
+2. **Eingefrorenes Artefakt** `models/frozen_champions/v25-b01/` nach dem Muster von
+   `v24-b07/`: model.onnx, model.pth, spec.json (= `v24-b07_brierbest.spec.json`, die Spec
+   ist bis v27 eingefroren), das aktuelle Wheel plus `wheel.sha256`, `manifest.json`,
+   Golden Probe (`tools/build_frozen_golden_probe.py --artifact-dir ... --seed-base 916001`,
+   rund 16 min), venv aus dem Wheel, dann `tools/frozen_referee_match.py ... --n-games 2`.
+3. **STATUS-Champion-Zeile und `archive/history.md`** nachziehen (Generationsbericht v25).
+4. **Elo-Bericht lesen** und auf `NICHT mit Anker verbunden` pruefen.
+
+### BEFUNDE, die eine Entscheidung brauchen
+
+- **sigma/Prior-Balance steigt: 2,792** (b06: 2,603). Unter der Schwelle 3, die Regler-
+  Familie bleibt also zu -- **aber Runde 4 liegt einzeln bei 3,408**. Artefakt
+  `gumbel_scale_calibration_v25-b01.json`. Beim naechsten Champion wieder pruefen; bei
+  Ueberschreiten oeffnet sich `c_visit`/`c_scale` per Regel, ohne Ermessen.
+- **v25-b01 hat KEINEN eigenen restic-Stand**: der Modell-Snapshot des Trainings ist mit
+  Exitcode 0xC0000142 (DLL-Init) fehlgeschlagen. Nachholen.
+- **Loeschfreigaben stehen aus**: `evaluations/cleanup_proposal_turnover_v25.md`
+  (6 Einmal-Skripte), `models/attic_20260906_k3p10_copies/`, `venv_measure_hullform/`.
+- **Schritt 4 des Generationswechsels** (tote Korpora, Bloecke, Monolithe) wurde vor v25
+  bewusst uebersprungen und ist vor v26 faellig.
+
+### DER NAECHSTE GROSSE SCHRITT: v26
+
+**Zuschnitt steht fertig in `PREREG_v26_window.md`**, Befehle in par.7 (Generator
+`v25-b01`, drei Klassen, `--games 4000` auch fuer die Ausflug-Haelfte). **Vorher
+`/mosaic-generation-turnover`**, nicht von Hand.
+
+**Der Rahmen, der alles bindet** (`PREREG_v25_window.md` par.18): v25 bis v27 wird NICHT
+am Netz gedreht, nur das Material aendert sich; die Spec ist zu. Eine flache Arena waere
+akzeptiert, Ruecklauf nicht.
+
+### WAS IN DIESER SITZUNG GEBAUT WURDE (Kurzfassung)
+
+Huellenform 2 und K5 in die Spec (als eigene Entitaet `v24-b07`, nicht durch Mutation von
+b06); Weg B mit erzwungener Einzelabweichung statt gesampelter Phase; Weg C auf die
+gemessene Ziehungsregel; aktionsabhaengige Temperatur als Modus 0/1/2; Dubletten-Waechter
+fuer Ausfluege; zwei unbegruendete Konstanten ersatzlos entfernt (109 Knoepfe -> 107).
+Zwei neue Regeln in CLAUDE.md: Rueckwaerts-Pruefung beim Registrieren, und Regel 0
+Zusatz 2 (n, Grundmenge, Einheit gegen die des Verbrauchers).
 
 ## 2. WAS ALS NAECHSTES LAEUFT: die v25-Erzeugung
 
