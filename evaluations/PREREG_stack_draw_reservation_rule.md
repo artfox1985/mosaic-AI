@@ -112,7 +112,19 @@ zahlt man, um ueberhaupt etwas zu erfahren, hier ist das Typ-Signal gratis.
 Es gibt daher nicht einen Reservationswert, sondern zwei bedingte (Wild und
 Special); die Restunsicherheit steckt nur noch in der Farbanordnung.
 
-**Wichtige Einschraenkung zur vierten Zeile:** `dome_stack_top_type` steht in
+**UEBERHOLT seit v24-b04 (nachgetragen 2026-09-09):** der folgende Absatz galt am
+2026-08-25 und gilt seit dem 2026-09-05 nicht mehr. `dome_stack_top_type` steht seit dem
+Sicht-Arm v24-b04 IM Merkmalsvektor -- `engine/src/features.rs:418-455`, Abschnitt
+"12. Plattentyp-Sicht": `[top_is_special, top_is_wild]` plus je Auslage-Slot
+`[has_special, has_wild]`, acht Werte ans Ende (Teil des Sicht-Arms, INPUT_SIZE 714 -> 744), Altmodelle sehen sie nie, weil
+`net.rs::build_inputs` auf die Modellbreite kuerzt. Registriert in
+`PREREG_stack_top_feature.md` par.6/par.10. Der Satz "als Erwartung an das heutige Netz
+nicht anwendbar" ist damit falsch geworden; die uebrigen drei Annahmen der Tabelle sind
+davon unberuehrt. **Anlass des Nachtrags:** der Koordinator hat am 2026-09-09 diesen
+Absatz zitiert, statt `features.rs` zu lesen, und dem Nutzer gesagt, das Netz sehe den
+Stapeltyp nicht. Der Nutzer hat es richtiggestellt. Genau dafuer steht REGEL 0.
+
+**Der historische Wortlaut (Stand 2026-08-25):** `dome_stack_top_type` steht in
 der SERIALISIERUNG, nicht im Merkmalsvektor. Ein handgeschriebener Bewerter
 liest es, das NETZ sieht es nicht -- `features.rs` und `neural_net.py` lesen
 es nirgends (unabhaengig geprueft und bereits registriert in
