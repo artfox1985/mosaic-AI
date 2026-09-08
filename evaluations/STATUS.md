@@ -62,6 +62,20 @@ zusammenfiel.
 
 ### BEFUNDE, die eine Entscheidung brauchen
 
+- **METHODENFEHLER bei der Champion-2-Kante, zweimal** (Nutzer 2026-09-08): sie wurde gegen
+  die LEBENDEN Modelldateien gemessen statt gegen das eingefrorene Artefakt -- bei v25-b01
+  gegen `models/alphazero_v24-b06_brierbest.onnx` (48:22) und bei v24-b07 gegen
+  `models/alphazero_v23-b01_brierbest.onnx` (92:58). Damit lief der heutige Motor auf beiden
+  Seiten. **Genau dafuer wird der Alt-Champion mit eigenem Wheel eingefroren:** damit er
+  spielt wie zu der Zeit, aus der seine Elo-Zahl stammt. Beide Kanten sind nachzumessen,
+  ueber den Artefakt-Pfad (`tools/frozen_referee_match.py` bzw. das Artefakt-venv). Bis
+  dahin tragen sie weniger, als ihre Zahl suggeriert. **Die uebrigen Kanten sind nicht
+  betroffen** -- Gating misst zwei aktuelle Netze gegeneinander, die Anker-Kante laeuft
+  ohnehin ueber das Anker-Artefakt.
+- **Lebende Modelldateien werden regelmaessig archiviert** (Nutzer): `alphazero_v24-b06*`
+  wird nicht mehr gebraucht, das Artefakt `frozen_champions/v24-b06/` loescht der Nutzer.
+  Was bleibt, ist die Artefakt-Kopie im restic-Stand b6842b4e (alle sieben Teile geprueft).
+
 - **sigma/Prior-Balance steigt: 2,792** (b06: 2,603). Unter der Schwelle 3, die Regler-
   Familie bleibt also zu -- **aber Runde 4 liegt einzeln bei 3,408**. Artefakt
   `gumbel_scale_calibration_v25-b01.json`. Beim naechsten Champion wieder pruefen; bei
