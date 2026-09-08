@@ -94,3 +94,27 @@ Alle Werte aus den Artefakten der Laeufe, nicht geschaetzt. Threads wie angegebe
 **Hochrechnung fuer die v25-Erzeugung** (hergeleitet aus 3,77 s je Partie, NICHT auf dieser
 Groesse gemessen): rund 4,2 h je 4.000-Partien-Block, rund 3,0 h fuer die Ausflug-Haelfte
 (2.000 Hauptpartien plus 2.000 kuerzere Ausfluege), zusammen etwa 11,4 h.
+
+## Generation v25, gemessen am 2026-09-09
+
+Alle Werte aus den Artefakten der Laeufe. Die Erzeugung lief mit Generator `v24-b07`,
+threads 11; Training auf der GPU, Arenen mit threads 10 exklusiv.
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| **Erzeugung Traeger**, 4.000 Partien @100, threads 11 | **14.426,1 s = 4h 00m** | 3,607 s je Partie (`manifest_v24-b07-policy_20260907_194058.json`) |
+| **Erzeugung Schwarm temperiert**, 4.000 Partien @100 | **12.755,9 s = 3h 33m** | 3,189 s je Partie, zweite Maschine |
+| **Erzeugung Schwarm Ausflug**, 2 x 2.000 Identitaeten | **6.291,1 s + 6.665,7 s = 3h 36m** | 3,142 bzw. 3,329 s je Identitaet; zwei Laeufe, weil `--games` die Ausfluege mitzaehlt (par.19a) |
+| **Training v25-b01**, 12 Epochen, 4.704.642 Samples, cuda | **5.779,6 s = 1h 36m** | 27.399,9 s CPU auf 6 Threads, davon 69 s Datenaufbau; rund 8 min je Epoche |
+| Gepaartes Gating, SPRT-Stopp nach 40 Paaren, threads 10 | **1.096,2 s = 18 min** | Seed 20261020 |
+| Gepaartes Gating, SPRT-Stopp nach 110 Paaren, threads 10 | **3.122,2 s = 52 min** | Seed 20261021 |
+| Champion-2-Kante, SPRT-Stopp nach 35 Paaren | **736,7 s = 12 min** | |
+| Anker-Kante, festes n=150, 6 Worker | **1.138,4 s = 19 min** | v24-b07 hatte 1.282 s |
+| Modell-Snapshot ins restic-Repo (`snapshot_models.ps1`) | **5 s** | 147 Dateien / 581,6 MiB, davon 41 neu |
+| Tagesschnappschuss plus `check` | **7 s** | 7.725 Dateien / 9,279 GiB |
+
+**Was daraus fuer v26 folgt** (hergeleitet, nicht gemessen): die drei Erzeugungsbefehle aus
+`PREREG_v26_window.md` par.7 kosten zusammen rund 11,1 h, wenn `v25-b01` so schnell zieht
+wie `v24-b07`: 4,0 h fuer Nr. 1, 3,5 h fuer Nr. 2 und rund 3,5 h fuer Nr. 3 (4.000
+Identitaeten zu 3,142 s). Nr. 3 laeuft diesmal in EINEM Aufruf mit `--games 4000`; in v25
+waren es zwei Laeufe zu je 2.000, weil der erste nur 2.002 Identitaeten lieferte.

@@ -96,6 +96,10 @@ wer eine Generation abschliesst, zieht diese Tabelle nach.
 | daraus trainiert (Arme `v23-b01`/`b02`/`b03`/`b05`) | **v23-Netz**; bester Stand `v23-b01_brierbest` (Tor 1 und Tor 2 bestanden, 2026-08-31) |
 | dessen Self-Play (12.000 Partien, `selfplay_v23-b01-*`) | fuellt **das v24-Fenster** (`PREREG_v24_window.md` par.6, hv2-Anteil unveraendert) |
 | daraus trainiert: `v24-b01` (Standard), `v24-b02` (lambda 0,7), `v24-b03` (Seeding-Schwarm); dazu drei Such-Knoepfe ohne Training (Margen-Saettigung, Risiko-Utility, Gelaender) -- `PREREG_v24_window.md` par.8 | **v24-Netz** |
+| Champion der Generation: `v24-b07` (dasselbe Netz wie `v24-b06`, nur andere Spec: Huellenform 2 und K5) | **v24-Netz**, Elo 1311 |
+| dessen Self-Play (12.004 Partien, `selfplay_v24-b07-*`) | fuellt **das v25-Fenster** (`PREREG_v25_window.md` par.1) |
+| daraus trainiert: `v25-b01` (Warmstart, Spec unveraendert) | **v25-Netz**, Champion seit 2026-09-08, Elo 1376 |
+| dessen Self-Play (`selfplay_v25-b01-policy`, `-value-tempc`, `-value-excursion`) | fuellt **das v26-Fenster** (`PREREG_v26_window.md` par.1) -- noch nicht erzeugt |
 
 Zuschnitt des v23-Fensters ist seit 2026-08-25 festgelegt
 (`PREREG_v23_window.md`): 29.450 Partien, davon 12.000 aus dem v22-Self-Play
@@ -104,6 +108,17 @@ rotieren aus). Beides ist seit 2026-08-31 ERLEDIGT: Rotation seed-gezogen
 (20260920, `data/window_v23_hv2.txt`), Traeger-Manifest mit 380 Eintraegen
 (`data/policy_carrier_manifest_v23.json`, `PREREG_v23_window.md` par.2a).
 Dieser Absatz stand bis zum 2026-09-01 auf dem Stand vom 2026-08-30.
+
+## Reservierte Namen fuer v26 (Generationswechsel 2026-09-09)
+
+Die Erzeugung schreibt drei Klassen, benannt nach ihrem GENERATOR `v25-b01`
+(`feedback_selfplay_naming_convention`): `selfplay_v25-b01-policy_*`,
+`selfplay_v25-b01-value-tempc_*`, `selfplay_v25-b01-value-excursion_*`. Die Befehle stehen
+woertlich in `PREREG_v26_window.md` par.7, die Seeds sind 20260911 / 20260912 / 20260913.
+
+**Trainingsarme: `v26-b01` aufwaerts.** Weil die Spec bis v27 eingefroren ist
+(`PREREG_v25_window.md` par.18), unterscheiden sich die Arme nur im Trainingsrezept, nicht
+in Knoepfen -- ein Knopf-Suffix ist in v26 also nicht zu erwarten.
 
 ## Champion-Namen bleiben reine `vN-bXX` (Nutzer-Anweisung 2026-09-06, 20:40)
 
