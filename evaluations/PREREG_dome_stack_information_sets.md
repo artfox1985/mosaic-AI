@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das Wissen ueber den Kuppelstapel je Spieler modelliert, sodass die Suche weder Orakelwissen hat noch ihr EIGENES Wissen vergisst? | Beleg: nichts gebaut. Ursache am Code geprueft: net_mcts.rs:3952 mischt bei JEDER Suche den ganzen dome_tile_pool, waehrend die Rueckgabe-Reihenfolge in game.rs:278 gewaehlt wird -- die Suche vergisst ihr eigenes Wissen. Anlass: game_20260909_004553_seed876496 (13 Ziehungen in R1, dann 2/5/1). Regellage und die drei Wissensstufen: par.4/par.5. Zeitfenster ENTSCHIEDEN 2026-09-09: NACH v27 (par.6). Offen: Bauvariante A/B/C. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das Wissen ueber den Kuppelstapel je Spieler modelliert, sodass die Suche weder Orakelwissen hat noch ihr EIGENES Wissen vergisst? | Beleg: nichts gebaut. Ursache am Code geprueft: net_mcts.rs:3952 mischt bei JEDER Suche den ganzen dome_tile_pool, waehrend die Rueckgabe-Reihenfolge in game.rs:278 gewaehlt wird -- die Suche vergisst ihr eigenes Wissen. Anlass: game_20260909_004553_seed876496 (13 Ziehungen in R1, dann 2/5/1). Regellage und drei Wissensstufen: par.4/par.5. Start ENTSCHIEDEN: nach dem Arm v27-b01, dem letzten eingefrorenen (par.6). Offen: Bauvariante A/B/C. -->
 
 # PREREG: Informationsmengen am Kuppelstapel
 
@@ -165,10 +165,15 @@ Dieser Umbau beruehrt das in zwei Stufen unterschiedlich stark:
 | B: A plus Merkmale | Merkmalsvektor waechst -> Eingangsgroesse -> neues Netz | Voller Bruch mit par.18 |
 
 **ENTSCHIEDEN 2026-09-09 (Nutzer):** *"nach v27 ist das Einfrieren beendet. dann sind wir
-einmal voll durchrotiert."* Damit faellt der Umbau NICHT in v27, sondern in die erste
-Generation danach: v27 laeuft die Rotation zu Ende (Material, konstante Erzeugungsregel),
-und der Stapel-Umbau ist das erste Stueck, das auf der dann sauberen Ausgangsbasis
-aufsetzt -- genau die "gute Ausgangsbasis, um wieder am Netz zu drehen" aus par.18.
+einmal voll durchrotiert."* Und praezisiert: *"v27-b01 ist der letzte eingefrorene Arm.
+dann gehts weiter."*
+
+**Der Ausloeser ist damit ein ARM, keine Generation:** sobald `v27-b01` trainiert ist, ist
+die Vergleichskette `v25-b01` / `v26-b01` / `v27-b01` vollstaendig -- drei Arme, gleiches
+Rezept, nur rotierendes Material -- und das Einfrieren hat seinen Zweck erfuellt. Der
+Umbau darf ab da starten, auch noch innerhalb der Generation v27 (dann als eigener Arm,
+`v27-b02` aufwaerts, mit eigener Nummer nach [[feedback_measured_identity_gets_own_bxx]]).
+Er muss NICHT auf einen Generationswechsel warten.
 
 **Koordinator-Lesart, als solche markiert:** damit gehoert von den drei Straengen, die als
 "Programm fuer v27" gesammelt wurden, nur die G-2-Schwarm-Frage

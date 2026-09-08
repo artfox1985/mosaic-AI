@@ -1200,6 +1200,14 @@ gedreht sondern wir schauen dass wir mal in ein sauberes generationsfenster komm
 Und auf den Einwand, die Arena koenne dabei flach bleiben (09:41): *"dann bleibt sie halt
 flach. aber zumindest haben wir dann eine gute ausgangsbasis um wieder am netz zu drehen."*
 
+**PRAEZISIERT 2026-09-09 (Nutzer):** *"v27-b01 ist der letzte eingefrorene Arm. dann
+gehts weiter."* Das Einfrieren endet also nicht mit der Generation v27, sondern mit ihrem
+ERSTEN ARM. Die saubere Vergleichskette ist damit `v25-b01` / `v26-b01` / `v27-b01`: drei
+Arme, gleiches Rezept, nur das Material rotiert. Was danach kommt -- auch noch innerhalb
+von v27, etwa als `v27-b02` -- ist frei. Ausloeser fuer den naechsten Umbau
+(`PREREG_dome_stack_information_sets.md`) ist damit "v27-b01 ist trainiert", nicht "v27 ist
+abgeschlossen".
+
 **Geltungsbereich: v25, v26, v27.** Fest bleiben Architektur, Trainingsrezept,
 Value-Ziel-Mischung, Koepfe und Kopfgewichte. Veraendert wird ausschliesslich das MATERIAL,
 nach den Erzeugungsregeln aus par.16, 16a, 16b und 17. Der stationaere Zustand aus par.17
