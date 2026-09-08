@@ -121,12 +121,30 @@ einbaut, sollte im selben Zug wissen, ob die Waehrung traegt.
 
 Ein korrektes Modell braucht drei Dinge, die es heute nicht gibt:
 
-1. **Einen Wissensstand JE SPIELER ueber den Stapel** (Positionsblock -> bekannte Menge,
-   fuer den Ziehenden zusaetzlich die Reihenfolge). Heute gibt es einen einzigen wahren
-   Stapel und eine Determinisierung, die ihn ganz mischt.
-2. **Eine Determinisierung, die nur den UNBEKANNTEN Teil mischt** -- aus Sicht des Spielers
-   am Zug. Ein Block mit bekannter Menge, aber unbekannter Reihenfolge wird INNERHALB des
-   Blocks permutiert, nicht mit dem Rest vermengt.
+1. **Einen Wissensstand JE SPIELER und JE POSITION, mit DREI Stufen** (Nutzer 2026-09-09:
+   *"die Wurzeldeterminisierung muss dann unterscheiden: was ist vollkommen unbekannt, wo
+   kenn ich die Rueckseite und was kenn ich"*):
+
+   | Stufe | Was der Spieler weiss | Woher |
+   | --- | --- | --- |
+   | 0 unbekannt | nichts ueber diese Position | nie gesehen |
+   | 1 Rueckseite | der TYP (Wild oder Special) | lag oben auf (offen sichtbar) oder wurde vom Gegner gezogen |
+   | 2 Identitaet | die Platte selbst | selbst gezogen, oder als einzige Rueckgabe des Gegners erschliessbar (par.4 Beispiel A) |
+
+   Heute gibt es keinen dieser Staende: ein einziger wahrer Stapel und eine
+   Determinisierung, die ihn ganz mischt.
+2. **Eine Determinisierung unter NEBENBEDINGUNGEN statt eines Vollmischers.** Stufe-2-
+   Positionen stehen fest; Stufe-1-Positionen duerfen nur eine Platte des bekannten Typs
+   bekommen; nur Stufe 0 ist frei. Bauform: die Restplatten den typgebundenen Positionen
+   ohne Zuruecklegen zulosen, dann den Rest frei permutieren. **Ungepruefte Annahme, vor
+   dem Bau zu zeigen:** dass das gleichverteilt ueber alle vertraeglichen Welten zieht (die
+   Zahl der Vervollstaendigungen haengt nicht davon ab, WELCHE typgleiche Platte eine
+   gebundene Position bekommt -- plausibel, aber nicht bewiesen).
+
+   **Praezedenz im selben Code:** `determinize_hidden_information` macht die Unterscheidung
+   fuer die BONUSCHIPS bereits -- aufgedeckte Fabrik-Chips sind oeffentliches Wissen und
+   bleiben unangetastet, nur die verdeckten werden gemischt (`net_mcts.rs:979-1008`). Der
+   Umbau traegt dieselbe Idee an den Stapel, wo sie fehlt; er fuehrt kein neues Konzept ein.
 3. **Merkmale, die dem Netz das Bekannte zeigen.** Die OBERSTE Karte sieht es seit v24-b04
    (`features.rs:418-455`, Plattentyp-Sicht); was fehlt, ist alles dahinter -- wie tief der
    bekannte Block reicht und was in ihm liegt. Ohne diese Merkmale kann nur die SUCHE den
