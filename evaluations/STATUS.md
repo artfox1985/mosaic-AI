@@ -155,7 +155,8 @@ Partie**, nicht aus der Kampagnenplanung.
 | --- | --- | --- |
 | **Informationsmengen am Kuppelstapel** -- die Wurzeldeterminisierung unterscheidet unbekannt / Rueckseite bekannt / Platte bekannt, statt den ganzen Stapel zu mischen | `PREREG_dome_stack_information_sets.md` | OFFEN, 2026-09-09 vorregistriert; Variante A (nur Suche) oder B (plus Merkmale) noch offen |
 | **Sichtgleichheit, Reststufen** -- laufende Ziehserie, Phasenaufloesung, und ein Netz, das die in v24-b04 gelegten Werte auch NUTZT | `PREREG_stack_top_feature.md` par.7/par.10 | OFFEN, fuer v27 eingeplant (Nutzer 2026-09-08) |
-| **Schwarm G-2 ohne Split** -- welche der beiden v24-b07-Haelften den G-2-Posten traegt, wird gemessen statt geraten | `PREREG_v26_window.md` par.6 | OFFEN, Werkzeuge stehen (Korpus-Sonden, Minuten) |
+| **Schwarm G-2 ohne Split** -- welche der beiden v24-b07-Haelften den G-2-Posten traegt, wird gemessen statt geraten | `PREREG_v26_window.md` par.6 | **Messung eingereiht**: `tools/probe_g2_swarm_choice.sh` laeuft los, sobald das Training v26-b01 auf der GPU steht (dann ist EIN CPU-Auftrag daneben erlaubt) |
+| **Null-Klammer** -- bleibt die Anreizstruktur unter null erhalten | `PREREG_score_clamp_incentive.md` | OFFEN, 2026-09-09 aufgemacht; Stufe 0 ist eine Messung und darf frueher laufen |
 
 **Der Zeitpunkt ist entschieden (Nutzer 2026-09-09):** *"nach v27 ist das Einfrieren
 beendet"*, und praezisiert: *"v27-b01 ist der letzte eingefrorene Arm. dann gehts weiter."*
@@ -165,11 +166,13 @@ rotierendes Material -- und der Umbau darf starten, notfalls als `v27-b02` inner
 derselben Generation. **In v27-b01 selbst faellt von der Tabelle oben nur die
 G-2-Schwarm-Frage**, sie ist eine Material-Entscheidung.
 
-**Nicht im Programm, aber mindestens gleich gross:** die Null-Klammer-Falle (par.9
-derselben Prereg). Bei Punktestand 0 sind Ziehungen UND Strafleiste gratis; der
-Schattenzaehler `score_unclamped` faengt nur das Trainingsziel ab, nicht das Spiel
-(`board.rs:344-365`, `features.rs:689` zeigt dem Netz den GEKLAMMERTEN Wert). Braucht eine
-eigene Prereg, sobald der Nutzer sie aufmacht.
+**Vierter Strang, am 2026-09-09 aufgemacht und ebenfalls fuer v27 nach b01 eingetaktet:**
+die Null-Klammer, `PREREG_score_clamp_incentive.md`. Bei Punktestand 0 sind Strafen wie
+Kaeufe wirkungslos; der Schattenzaehler `score_unclamped` faengt nur das TRAININGSZIEL ab,
+waehrend das Netz im Spiel den geklammerten Wert sieht (`features.rs:689`). **Stufe 0 ist
+eine reine Messung** (wie oft steht ein Spieler auf 0, wie lange, wie viel Strafe schluckt
+die Klammer) und darf frueher laufen, sobald die Maschine frei ist -- mit einer VOR der
+Messung festgelegten Schwelle, unter der der Strang als UEBERHOLT geschlossen wird.
 
 ## 4. OFFENE NUTZER-ENTSCHEIDE (Stand 2026-09-07, 19:40)
 
