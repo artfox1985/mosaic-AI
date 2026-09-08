@@ -1,5 +1,10 @@
 # Loeschvorschlag zum Generationswechsel v24 -> v25 (2026-09-07)
 
+**ERLEDIGT 2026-09-08:** der Nutzer hat die Freigabe fuer A und B erteilt; alle sechs
+Skripte sind aus dem Baum entfernt (getrackt gewesen, also ueber die Historie holbar).
+`models/attic_20260906_k3p10_copies/` und `venv_measure_hullform/` lagen zu diesem
+Zeitpunkt nicht mehr im Baum. Teil C (Modelle) bleibt offen wie beschrieben.
+
 Schritt 3 und 5 des Ablaufs `/mosaic-generation-turnover`. **Nichts wird ohne pfadgenaue
 Freigabe geloescht.** Schritt 4 (Korpora, Bloecke, Monolithe) folgt getrennt, weil er den
 restic-Beleg je Gruppe braucht.

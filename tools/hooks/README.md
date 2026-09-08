@@ -190,7 +190,7 @@ eine eigene Entscheidung des Koordinators.
 (Nutzer-Freigabe, `evaluations/cleanup_proposal_shell_scripts.md`) sind
 `cpu_queue_after_b02.sh` und `k3f_build_window.sh` weg -- die Duplikation ist
 damit auf VIER Kopien geschrumpft. Neu gebaute Skripte rufen die Sammelstelle auf
-(`tools/wegb_temp2_build_window.sh` tut es), statt die Herleitung zu wiederholen.
+(`tools/promote_v25_b01.sh` tut es), statt die Herleitung zu wiederholen.
 
 ## Fehlalarm? `--no-verify`
 
