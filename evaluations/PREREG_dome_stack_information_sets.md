@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das Wissen ueber den Kuppelstapel je Spieler modelliert, sodass die Suche weder Orakelwissen hat noch ihr EIGENES Wissen vergisst? | Beleg: nichts gebaut, nichts gemessen. Anlass am Log geprueft (game_20260909_004553_seed876496: 13 Ziehungen in R1, danach 2/5/1 in R2-R4). Ursache am Code geprueft: net_mcts.rs:3952 mischt bei JEDER Suche den ganzen dome_tile_pool (determinize_hidden_information), waehrend die Rueckgabe-Reihenfolge in game.rs:278 bewusst gewaehlt wird. Regellage vom Nutzer 2026-09-09 (par.4). Offen: Zeitfenster (Kollision mit dem Einfrieren v25-v27, par.6) und Bauvariante. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das Wissen ueber den Kuppelstapel je Spieler modelliert, sodass die Suche weder Orakelwissen hat noch ihr EIGENES Wissen vergisst? | Beleg: nichts gebaut. Ursache am Code geprueft: net_mcts.rs:3952 mischt bei JEDER Suche den ganzen dome_tile_pool, waehrend die Rueckgabe-Reihenfolge in game.rs:278 gewaehlt wird -- die Suche vergisst ihr eigenes Wissen. Anlass: game_20260909_004553_seed876496 (13 Ziehungen in R1, dann 2/5/1). Regellage und die drei Wissensstufen: par.4/par.5. Zeitfenster ENTSCHIEDEN 2026-09-09: NACH v27 (par.6). Offen: Bauvariante A/B/C. -->
 
 # PREREG: Informationsmengen am Kuppelstapel
 
@@ -164,12 +164,21 @@ Dieser Umbau beruehrt das in zwei Stufen unterschiedlich stark:
 | A: nur die Determinisierung | Suchverhalten, keine neuen Merkmale, kein Netz-Umbau | Architektur unberuehrt, aber die ERZEUGUNGSREGEL aendert sich -- und deren Konstanz ist der Zweck des Einfrierens |
 | B: A plus Merkmale | Merkmalsvektor waechst -> Eingangsgroesse -> neues Netz | Voller Bruch mit par.18 |
 
-**Zu entscheiden (Nutzer):** ob v27 dafuer geoeffnet wird -- der Nutzer hat den Brocken
-ausdruecklich fuer v27 benannt -- oder ob er nach v27 faellt, wenn das stationaere Fenster
-einmal sauber durchgelaufen ist. **Diese Prereg trifft die Entscheidung nicht.** Sie haelt
-nur fest, dass der Widerspruch existiert und beim Start beantwortet sein muss; die Linie
-ungeprueft weiterzuschreiben ist genau der Fehler, gegen den die Rueckwaerts-Pruefung in
-CLAUDE.md steht.
+**ENTSCHIEDEN 2026-09-09 (Nutzer):** *"nach v27 ist das Einfrieren beendet. dann sind wir
+einmal voll durchrotiert."* Damit faellt der Umbau NICHT in v27, sondern in die erste
+Generation danach: v27 laeuft die Rotation zu Ende (Material, konstante Erzeugungsregel),
+und der Stapel-Umbau ist das erste Stueck, das auf der dann sauberen Ausgangsbasis
+aufsetzt -- genau die "gute Ausgangsbasis, um wieder am Netz zu drehen" aus par.18.
+
+**Koordinator-Lesart, als solche markiert:** damit gehoert von den drei Straengen, die als
+"Programm fuer v27" gesammelt wurden, nur die G-2-Schwarm-Frage
+(`PREREG_v26_window.md` par.6) WIRKLICH nach v27 -- sie ist eine Material-Entscheidung und
+vertraegt sich mit dem Einfrieren. Dieser Umbau und die restlichen Sicht-Stufen
+(`PREREG_stack_top_feature.md`) liegen dahinter. Wenn das nicht gemeint war, widersprechen.
+
+**Was das fuer die Reihenfolge heisst:** Stufe A und B koennen dann zusammen gebaut werden,
+weil kein Einfrieren mehr im Weg steht. Die Anker-Frage bleibt (par.8), und die Aera-Regel
+gilt unveraendert.
 
 ## par.7 BAUVARIANTEN (Vorschlag, nicht entschieden)
 

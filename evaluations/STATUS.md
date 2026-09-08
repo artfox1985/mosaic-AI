@@ -157,12 +157,11 @@ Partie**, nicht aus der Kampagnenplanung.
 | **Sichtgleichheit, Reststufen** -- laufende Ziehserie, Phasenaufloesung, und ein Netz, das die in v24-b04 gelegten Werte auch NUTZT | `PREREG_stack_top_feature.md` par.7/par.10 | OFFEN, fuer v27 eingeplant (Nutzer 2026-09-08) |
 | **Schwarm G-2 ohne Split** -- welche der beiden v24-b07-Haelften den G-2-Posten traegt, wird gemessen statt geraten | `PREREG_v26_window.md` par.6 | OFFEN, Werkzeuge stehen (Korpus-Sonden, Minuten) |
 
-**Der Widerspruch, der vor dem Start beantwortet sein muss** (`PREREG_v25_window.md`
-par.18): v25 bis v27 sollte NUR das Material aendern -- Architektur, Trainingsrezept und
-Erzeugungsregeln fest, damit die Attribution sauber wird. Stufe A des Stapel-Umbaus aendert
-die Erzeugungsregel, Stufe B die Architektur. **Beides bricht das Einfrieren**; die
-Entscheidung, ob v27 dafuer geoeffnet wird oder ob der Umbau nach v27 faellt, steht aus
-(`PREREG_dome_stack_information_sets.md` par.6).
+**Der Zeitpunkt ist entschieden (Nutzer 2026-09-09):** *"nach v27 ist das Einfrieren
+beendet. dann sind wir einmal voll durchrotiert."* v27 laeuft die Rotation zu Ende, nur
+Material; der Stapel-Umbau und die restlichen Sicht-Stufen setzen auf der dann sauberen
+Ausgangsbasis auf. **Von der Tabelle oben faellt damit nur die G-2-Schwarm-Frage wirklich
+in v27** -- sie ist eine Material-Entscheidung. Die anderen beiden liegen dahinter.
 
 **Nicht im Programm, aber mindestens gleich gross:** die Null-Klammer-Falle (par.9
 derselben Prereg). Bei Punktestand 0 sind Ziehungen UND Strafleiste gratis; der
