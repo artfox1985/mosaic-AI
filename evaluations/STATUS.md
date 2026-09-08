@@ -24,47 +24,48 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. UEBERGABE an die naechste Sitzung (2026-09-08, 23:50)
+## 1. STAND (2026-09-09, Generationswechsel v25 -> v26)
 
-**MASCHINE FREI, nichts laeuft.** Baum sauber, **6 Commits vor origin, NICHT gepusht**
-(Push nur auf Nutzer-Anweisung). Champion laut `models/champion.txt`:
-`v25-b01_brierbest`, **Elo 1376** [1333, 1425] aus 520 Partien.
+**MASCHINE FREI, nichts laeuft.** Baum sauber, **Commits vor origin nicht gepusht**
+(Push nur auf Nutzer-Anweisung; Zahl im Chat gemeldet). Champion laut
+`models/champion.txt`: `v25-b01_brierbest`, **Elo 1376** [1333, 1425] aus 520 Partien.
 
-**Die Promotion v25-b01 ist VOLLSTAENDIG durch** -- alle sechs Schritte der Checkliste plus
-das eingefrorene Artefakt. Was bleibt, steht unter "Erste Aufgabe".
+**Die Generation v25 ist abgeschlossen und berichtet.** Der vollstaendige
+Generationsbericht (Beleglage, Fenster, Trainingszahlen, die zwei Koordinator-Fehler)
+steht am Ende von `../archive/history.md`; die Uebergabe vom 2026-09-08, die hier stand,
+ist damit abgeloest. Alle vier Punkte, die sie offen liess, sind erledigt: Bericht und
+Elo-Zahl (auch im Artefakt-Manifest), restic-Stand `028989fb` (`run:v25-b01`),
+Anzeige-Kalibrierung, eingefrorenes Artefakt.
 
-### v25-b01 schlaegt den Champion -- die Beleglage
+**Nutzer-Entscheid 2026-09-08:** die zwei Champion-2-Kanten, die gegen die LEBENDEN
+Modelldateien statt gegen die eingefrorenen Artefakte gemessen wurden (`v25-b01` 48:22
+gegen `v24-b06`, `v24-b07` 92:58 gegen `v23-b01_k3p10`), werden NICHT nachgemessen --
+"extra Fleissarbeit mit geringem Nutzen". Sie bleiben mit dieser Einschraenkung in
+`elo_history.csv`; wer sich auf sie beruft, nennt sie mit. Nicht neu vorschlagen.
 
-| Kante | Ergebnis | Bemerkung |
-| --- | --- | --- |
-| Gating gegen v24-b07, Seed 20261020 | 53:27 | SPRT nach 40 Paaren, p 0,0049 |
-| Gating, Replikation Seed 20261021 | 129:91 | SPRT nach 110 Paaren, p 0,0145 |
-| **gepoolt** | **182:118 = 0,607** | **p 0,0003**, KI [0,551; 0,662], n = 300 |
-| Anker (festes n=150) | 126:24 | identisch zu v24-b07 |
-| Champion-2 gegen v24-b06 | 48:22 | SPRT nach 35 Paaren |
+### Was der Generationswechsel gebracht hat (Ablauf `/mosaic-generation-turnover`)
 
-Alle vier Zeilen stehen in `evaluations/elo_history.csv`. **Beide Gating-Seeds sind
-einzeln signifikant** -- bessere Lage als bei K3-P, wo der Fruehstopp in der Replikation
-zusammenfiel.
+- **Schritt 0-2 erledigt:** Maschine frei (Prozessliste, nicht Task-Meldungen),
+  Tages-Snapshot **6dd4d988** (7.725 Dateien / 9,279 GiB, `check` ohne Fehler),
+  Modell-Snapshot **028989fb**.
+- **Schritt 1 war schon getan:** der Generator fuer v26 ist `v25-b01`, und der liegt
+  eingefroren unter `models/frozen_champions/v25-b01/` (Wheel, Spec, Golden Probe).
+- **Schritt 3-5 liegen als Vorschlag vor:** `cleanup_proposal_turnover_v26.md`, mit
+  restic-Beleg je Gruppe. Zusammen rund 1,3 GiB Korpora, 6,4 GiB Monolithe und 325 MiB
+  Modelle. **Es wartet auf pfadgenaue Freigabe; ohne die passiert nichts.**
+- **Waisen-Bloecke: 0** (`tools/cache_inventory.py --orphans`, 13.955 Bloecke). Nach einer
+  Korpus-Loeschung noch einmal laufen lassen und die Waisen mitnehmen.
 
-### ERSTE AUFGABE DER NEUEN SITZUNG (in dieser Reihenfolge)
+### ERSTE AUFGABE DER NEUEN SITZUNG
 
-1. ~~Champion-2-Kanten ueber das ARTEFAKT nachmessen~~ **ENTFAELLT (Nutzer-Entscheid
-   2026-09-08): "nicht notwendig, das waere extra Fleissarbeit mit geringem Nutzen".**
-   Die beiden Kanten (`v25-b01` 48:22 gegen die lebende `alphazero_v24-b06_brierbest.onnx`,
-   `v24-b07` 92:58 gegen `alphazero_v23-b01_brierbest.onnx`) bleiben stehen wie gemessen --
-   mit dem Vermerk unten, dass auf beiden Seiten der heutige Motor lief. Nicht neu
-   vorschlagen.
-2. ~~Generationsbericht v25~~ **ERLEDIGT 2026-09-09**: steht am Ende von
-   `archive/history.md`. **v25-b01 hat Elo 1376** [1333, 1425] aus 520 Partien, v24-b07
-   steht jetzt bei 1311; das Artefakt-Manifest traegt die Zahl samt KI und Quelle.
-3. ~~restic-Stand fuer v25-b01 nachholen~~ **ERLEDIGT 2026-09-09**: Snapshot
-   **028989fb**, Marke `run:v25-b01` (`tools/snapshot_models.ps1 -Version v25-b01`,
-   41 neue Dateien, 147 Dateien / 581,6 MiB verarbeitet, 6,8 MiB dazugekommen, 5 s).
-4. **`/mosaic-generation-turnover`** vor der v26-Erzeugung, NICHT von Hand. Schritt 4
-   (tote Korpora, Bloecke, Monolithe) wurde vor v25 uebersprungen und ist jetzt faellig.
-5. **v26 erzeugen**: drei Befehle in `PREREG_v26_window.md` par.7, Generator `v25-b01`.
-   **NUR auf ausdrueckliche Nutzer-Freigabe starten.**
+1. **Loeschfreigaben einholen** zu `evaluations/cleanup_proposal_turnover_v26.md`
+   (Gruppen A bis E), dann loeschen und `cache_inventory.py --orphans` nachziehen.
+2. **v26-Kette schreiben** nach dem Muster `tools/night_v25_chain.sh`, mit gehaerteter
+   Wartebedingung und `--resume`-Hinweis; Chronik `night_run_<Datum>.md` anlegen.
+3. **v26 erzeugen**: drei Befehle in `PREREG_v26_window.md` par.7, Generator `v25-b01`,
+   rund 11,1 h. **NUR auf ausdrueckliche Nutzer-Freigabe starten.**
+4. Vor dem Start: `MOSAIC_DATA_EXCLUDE` pinnen (Fenster-Pinning), Val-Pool-Regex in
+   par.4 der v26-Prereg entscheiden -- das ist der einzige offene Zuschnitt-Punkt.
 
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
 
@@ -72,92 +73,37 @@ zusammenfiel.
 - **Loeschung nur auf pfadgenaue Freigabe**, auch bei "offensichtlichem" Muell.
 - **Messungen laufen exklusiv**; GPU und CPU duerfen parallel, zwei CPU-Messungen nicht.
 - **Erzeugung startet nur auf Anweisung.**
-- ~~Offene Loeschfreigaben~~ **ERLEDIGT 2026-09-08**: Freigabe erteilt, die sechs
-  Einmal-Skripte aus `cleanup_proposal_turnover_v25.md` sind geloescht;
-  `models/attic_20260906_k3p10_copies/` und `venv_measure_hullform/` lagen zum Zeitpunkt
-  der Freigabe nicht mehr im Baum (nie getrackt, kein git-Loeschcommit -- wer sie entfernt
-  hat, ist nicht belegbar).
 
-### WAS NOCH ZU TUN IST (mechanisch, keine Entscheidung noetig)
+### BEFUNDE, die weiter gelten
 
-1. ~~Anzeige-Kalibrierung~~ **ERLEDIGT 22:45**: `server.py:1611/1612` traegt jetzt
-   A **-0,0814** / B **0,6386** aus `platt_fit_v25-b01_v3.json` (Brier 0,2268 auf
-   frozen_v3, b06 hatte 0,23221). Der Fit auf `frozen_eval_set.pkl` (A 0,3433 / B 0,6538 /
-   Brier 0,24634) ist die TRENDmetrik und gehoert NICHT in die Anzeige -- er steht in
-   `platt_fit_v25-b01.json` und im Artefakt-Manifest.
-2. **Eingefrorenes Artefakt** `models/frozen_champions/v25-b01/` nach dem Muster von
-   `v24-b07/`: model.onnx, model.pth, spec.json (= `v24-b07_brierbest.spec.json`, die Spec
-   ist bis v27 eingefroren), das aktuelle Wheel plus `wheel.sha256`, `manifest.json`,
-   Golden Probe (`tools/build_frozen_golden_probe.py --artifact-dir ... --seed-base 916001`,
-   rund 16 min), venv aus dem Wheel, dann `tools/frozen_referee_match.py ... --n-games 2`.
-3. ~~STATUS-Champion-Zeile und `archive/history.md`~~ **ERLEDIGT 2026-09-09** (Bericht
-   am Ende von `archive/history.md`, Champion-Zeile oben stimmt).
-4. ~~Elo-Bericht lesen~~ **ERLEDIGT 2026-09-09**: kein Modell traegt die Marke
-   `NICHT mit Anker verbunden`; die Leiter ist durchgehend verbunden.
-
-### BEFUNDE, die eine Entscheidung brauchen
-
-- **METHODENFEHLER bei der Champion-2-Kante, zweimal** (Nutzer 2026-09-08): sie wurde gegen
-  die LEBENDEN Modelldateien gemessen statt gegen das eingefrorene Artefakt -- bei v25-b01
-  gegen `models/alphazero_v24-b06_brierbest.onnx` (48:22) und bei v24-b07 gegen
-  `models/alphazero_v23-b01_brierbest.onnx` (92:58). Damit lief der heutige Motor auf beiden
-  Seiten. **Genau dafuer wird der Alt-Champion mit eigenem Wheel eingefroren:** damit er
-  spielt wie zu der Zeit, aus der seine Elo-Zahl stammt. Beide Kanten sind nachzumessen,
-  ueber den Artefakt-Pfad (`tools/frozen_referee_match.py` bzw. das Artefakt-venv). **Nutzer-Entscheid 2026-09-08: es
-  wird NICHT nachgemessen** (Aufwand gegen Nutzen). Beide Kanten bleiben in
-  `elo_history.csv` stehen und tragen weniger, als ihre Zahl suggeriert -- wer sich auf sie
-  beruft, nennt diese Einschraenkung mit. **Die uebrigen Kanten sind nicht
-  betroffen** -- Gating misst zwei aktuelle Netze gegeneinander, die Anker-Kante laeuft
-  ohnehin ueber das Anker-Artefakt.
+- **sigma/Prior-Balance 2,792** (v24-b06: 2,603), Schwelle 3 nicht gerissen, die
+  Regler-Familie bleibt zu -- **aber Runde 4 liegt einzeln bei 3,408**
+  (`artifacts/gumbel_scale_calibration_v25-b01.json`). Beim naechsten Champion wieder
+  pruefen; bei Ueberschreiten oeffnet sich `c_visit`/`c_scale` per Regel, ohne Ermessen.
+- **Die Anker-Kante steht still:** v25-b01 126:24, exakt wie v24-b07. Als Fixpunkt bleibt
+  der Anker richtig, als Fortschrittsmass ist er gesaettigt.
 - **Lebende Modelldateien werden regelmaessig archiviert** (Nutzer): `alphazero_v24-b06*`
-  wird nicht mehr gebraucht, das Artefakt `frozen_champions/v24-b06/` loescht der Nutzer.
-  Was bleibt, ist die Artefakt-Kopie im restic-Stand b6842b4e (alle sieben Teile geprueft).
+  wird nicht mehr gebraucht; das Artefakt `frozen_champions/v24-b06/` loescht der Nutzer.
+  Was bleibt, ist die Artefakt-Kopie im restic-Stand `b6842b4e`.
 
-- **sigma/Prior-Balance steigt: 2,792** (b06: 2,603). Unter der Schwelle 3, die Regler-
-  Familie bleibt also zu -- **aber Runde 4 liegt einzeln bei 3,408**. Artefakt
-  `gumbel_scale_calibration_v25-b01.json`. Beim naechsten Champion wieder pruefen; bei
-  Ueberschreiten oeffnet sich `c_visit`/`c_scale` per Regel, ohne Ermessen.
-- ~~v25-b01 hat KEINEN eigenen restic-Stand~~ **ERLEDIGT 2026-09-09**: nachgeholt als
-  Snapshot `028989fb` (Marke `run:v25-b01`). Der Fehlschlag beim Training war Exitcode
-  0xC0000142 (DLL-Init) beim Start der PowerShell aus `train.py` heraus; direkt gestartet
-  lief dasselbe Skript ohne Beanstandung durch.
-- ~~Loeschfreigaben stehen aus~~ **ERLEDIGT 2026-09-08** (siehe oben unter FREIGABEN).
-- **Schritt 4 des Generationswechsels** (tote Korpora, Bloecke, Monolithe) wurde vor v25
-  bewusst uebersprungen und ist vor v26 faellig.
+## 2. WAS ALS NAECHSTES LAEUFT: die v26-Erzeugung
 
-### DER NAECHSTE GROSSE SCHRITT: v26
+**Die drei Befehle stehen fertig in `PREREG_v26_window.md` par.7.** Generator ist `v25-b01`.
 
-**Zuschnitt steht fertig in `PREREG_v26_window.md`**, Befehle in par.7 (Generator
-`v25-b01`, drei Klassen, `--games 4000` auch fuer die Ausflug-Haelfte). **Vorher
-`/mosaic-generation-turnover`**, nicht von Hand.
-
-**Der Rahmen, der alles bindet** (`PREREG_v25_window.md` par.18): v25 bis v27 wird NICHT
-am Netz gedreht, nur das Material aendert sich; die Spec ist zu. Eine flache Arena waere
-akzeptiert, Ruecklauf nicht.
-
-### WAS IN DIESER SITZUNG GEBAUT WURDE (Kurzfassung)
-
-Huellenform 2 und K5 in die Spec (als eigene Entitaet `v24-b07`, nicht durch Mutation von
-b06); Weg B mit erzwungener Einzelabweichung statt gesampelter Phase; Weg C auf die
-gemessene Ziehungsregel; aktionsabhaengige Temperatur als Modus 0/1/2; Dubletten-Waechter
-fuer Ausfluege; zwei unbegruendete Konstanten ersatzlos entfernt (109 Knoepfe -> 107).
-Zwei neue Regeln in CLAUDE.md: Rueckwaerts-Pruefung beim Registrieren, und Regel 0
-Zusatz 2 (n, Grundmenge, Einheit gegen die des Verbrauchers).
-
-## 2. WAS ALS NAECHSTES LAEUFT: die v25-Erzeugung
-
-**Die drei Befehle stehen fertig in `PREREG_v25_window.md` par.19.** Generator ist b07.
-
-| Klasse | Partien | Identitaeten | Zugwahl | Abweichung | Wurzelrauschen |
+| Klasse | `--games` | Identitaeten | Zugwahl | Abweichung | Wurzelrauschen |
 | --- | --- | --- | --- | --- | --- |
 | Sockel (policy-aktiv) | 4.000 | 4.000 | greedy ab Zug 1 | Weg C im Hauptstrang | an |
 | Schwarm a (value-only) | 4.000 | 4.000 | glatte Temperatur, Modus 2 | Weg C im Hauptstrang | an |
-| Schwarm b (value-only) | 2.000 | 4.000 | greedy ab Zug 1 | Weg B, nur im Ausflug | aus |
+| Schwarm b (value-only) | 4.000 | rund 4.000 | greedy ab Zug 1 | Weg B, nur im Ausflug | aus |
 
-**`--games 2000` in der dritten Zeile ist kein Tippfehler:** ein Ausflug kommt ZUSAETZLICH
-zur Hauptpartie. Hergeleitete Kosten rund 11,4 h, nacheinander auf einer Maschine.
+**`--games 4000` auch in der dritten Zeile**, anders als in v25: der Ausflug hat eine
+eigene `game_id` und zaehlt gegen `--games` (`PREREG_v25_window.md` par.19a). Der
+v25-Lauf lieferte mit `--games 2000` nur 2.002 statt 4.000 Identitaeten und musste
+aufgefuellt werden. Kosten nach den gemessenen v25-Werten rund 11,1 h
+(`docs/measured_runtimes.md`, Abschnitt v25).
 
-**Val-Pool-Regex wandert** von `^selfplay_v24-b06-` auf `^selfplay_v24-b07-`.
+**Val-Pool-Regex:** in v25 `^selfplay_v24-b07-`; fuer v26 ist er der einzige offene
+Zuschnitt-Punkt (`PREREG_v26_window.md` par.4).
 
 ## 3. WAS DIE SPEC JETZT TRAEGT -- und bis wann sie zu ist
 
