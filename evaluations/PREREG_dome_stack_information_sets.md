@@ -40,7 +40,8 @@ geklammert, Z. 103/209/304/387). Das ist ein EIGENER Strang, siehe par.9.
 | Die Reihenfolge ist im Zustand | der Vec traegt sie, das Log druckt sie sogar aus | `engine/src/game.rs:285` |
 | Die Suche wuerfelt sie weg | `build_net_tree` ruft an der WURZEL JEDER Suche `determinize_hidden_information`, dort `state.dome_tile_pool.shuffle(rng)` | `engine/src/net_mcts.rs:3952`, `:986` |
 | Der Schalter ist bewusst an | `DETERMINIZE_ROOT_HIDDEN_INFO = true`, Nutzer-Entscheid 2026-07-20, Begruendung KORREKTHEIT (kein Orakelwissen) | `engine/src/net_mcts.rs:976` |
-| Das Netz sieht den Stapel ohnehin kaum | nur `dome_wild_remaining_frac` und `dome_stack_count`; `dome_stack_top_type` steht in der Serialisierung, NICHT im Merkmalsvektor | `PREREG_stack_top_feature.md` par.3, `PREREG_stack_draw_reservation_rule.md` par.2 |
+| Was das Netz vom Stapel sieht | `dome_stack_count`, `dome_wild_remaining_frac` UND seit v24-b04 die Plattentyp-Sicht: `[top_is_special, top_is_wild]` plus je Auslage-Slot `[has_special, has_wild]`, acht Werte ans Ende, Teil des Sicht-Arms, der INPUT_SIZE von 714 auf 744 hebt | `engine/src/features.rs:418-455`, `PREREG_stack_top_feature.md` par.6/par.10 |
+| Was es NICHT sieht | alles jenseits der obersten Karte: kein Wissensstand, keine Blockgrenze, keine Menge des bekannten Blocks | dieselbe Stelle, keine weiteren Stapelfelder |
 
 **Der Kern in einem Satz:** die Determinisierung ist gebaut, um der Suche Wissen zu NEHMEN,
 das ein echter Spieler nicht hat. Sie nimmt aber auch das Wissen, das er rechtmaessig HAT,
@@ -126,8 +127,10 @@ Ein korrektes Modell braucht drei Dinge, die es heute nicht gibt:
 2. **Eine Determinisierung, die nur den UNBEKANNTEN Teil mischt** -- aus Sicht des Spielers
    am Zug. Ein Block mit bekannter Menge, aber unbekannter Reihenfolge wird INNERHALB des
    Blocks permutiert, nicht mit dem Rest vermengt.
-3. **Merkmale, die dem Netz das Bekannte zeigen.** Ohne das kann nur eine handgeschriebene
-   Politik den Vorteil nutzen (par.3, letzte Zeile).
+3. **Merkmale, die dem Netz das Bekannte zeigen.** Die OBERSTE Karte sieht es seit v24-b04
+   (`features.rs:418-455`, Plattentyp-Sicht); was fehlt, ist alles dahinter -- wie tief der
+   bekannte Block reicht und was in ihm liegt. Ohne diese Merkmale kann nur die SUCHE den
+   Vorteil nutzen, die Policy nicht.
 
 ## par.6 DER ZEITPUNKT IST EINE NUTZER-ENTSCHEIDUNG (Kollision mit par.18)
 
@@ -158,10 +161,11 @@ oder Reihenfolge). `determinize_hidden_information` mischt nur noch den Rest und
 den Block getrennt. Kein neues Merkmal, kein Netz-Umbau. Erwartete Wirkung: die Suche zieht
 nicht ein zweites Mal fuer Wissen, das sie hat.
 
-**B) A plus Merkmale.** Zusaetzlich lernt das Netz, was bekannt ist (Groesse des bekannten
-Blocks, dessen Wild-Anteil, `dome_stack_top_type`). Erst damit kann die POLICY den Vorteil
-nutzen statt nur die Suche. Additiv nach der 2D-Encoder-Regel, Alt-ONNX muessen spielbar
-bleiben.
+**B) A plus Merkmale.** Zusaetzlich lernt das Netz, was bekannt ist: Groesse des bekannten
+Blocks und dessen Zusammensetzung. **Nicht noch einmal die oberste Karte** -- die steht
+seit v24-b04 im Vektor (acht Werte, `features.rs:418`; INPUT_SIZE 744). Erst damit kann die
+POLICY den Vorteil nutzen statt nur die Suche. Additiv nach der 2D-Encoder-Regel, Alt-ONNX
+muessen spielbar bleiben (`net.rs::build_inputs` kuerzt auf die Modellbreite).
 
 **C) Volles Informationsmengen-Modell.** Beide Spieler fuehren ihre Sicht getrennt, die
 Suche determinisiert je Wurzelspieler. Groesster Schnitt, groesste Korrektheit; nur
