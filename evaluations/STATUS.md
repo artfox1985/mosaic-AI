@@ -47,12 +47,11 @@ zusammenfiel.
 
 ### WAS NOCH ZU TUN IST (mechanisch, keine Entscheidung noetig)
 
-1. **Anzeige-Kalibrierung nach `server.py`**: `_DISPLAY_CAL_A/_B` (Zeilen 1611/1612) auf
-   die Werte aus `evaluations/artifacts/platt_fit_v25-b01_v3.json` setzen. **NICHT die aus
-   `platt_fit_v25-b01.json`** -- das ist der frozen_v1-Satz, also die TRENDmetrik
-   (A 0,3433 / B 0,6538 / Brier 0,24634, zum Vergleich b06: 0,3281 / 0,6497). Der
-   Anzeige-Fit gehoert auf `frozen_eval_set_v3.pkl`, so wie b06 ihn hat
-   (A -0,0961 / B 0,5875).
+1. ~~Anzeige-Kalibrierung~~ **ERLEDIGT 22:45**: `server.py:1611/1612` traegt jetzt
+   A **-0,0814** / B **0,6386** aus `platt_fit_v25-b01_v3.json` (Brier 0,2268 auf
+   frozen_v3, b06 hatte 0,23221). Der Fit auf `frozen_eval_set.pkl` (A 0,3433 / B 0,6538 /
+   Brier 0,24634) ist die TRENDmetrik und gehoert NICHT in die Anzeige -- er steht in
+   `platt_fit_v25-b01.json` und im Artefakt-Manifest.
 2. **Eingefrorenes Artefakt** `models/frozen_champions/v25-b01/` nach dem Muster von
    `v24-b07/`: model.onnx, model.pth, spec.json (= `v24-b07_brierbest.spec.json`, die Spec
    ist bis v27 eingefroren), das aktuelle Wheel plus `wheel.sha256`, `manifest.json`,
