@@ -319,3 +319,24 @@ b03-Trainings (train.py liest `config.INPUT_SIZE` beim Start; eine Aenderung
 davor liesse b03 seinen Monolithen nicht finden) und nach dem Ende des
 b03-Trainings, wenn das laufende Training das Wheel geladen haelt.
 
+## par.11 ZWEITE ACHSE: was WEISS die Suche (Nutzer-Auftrag 2026-09-09)
+
+Diese Prereg fragt "sieht das Netz dasselbe wie ein Spieler am Tisch?" und hat so acht
+Asymmetrien gefunden, alle Netz-sieht-weniger. Die Frage hat eine zweite Achse, die bisher
+niemand gestellt hat: **was WEISS die Suche, und was vergisst sie zwischen zwei Zuegen?**
+
+Anlass ist der Fund vom 2026-09-09 (`PREREG_dome_stack_information_sets.md`): die
+Wurzel-Determinisierung mischt den ganzen Kuppelstapel und loescht damit die
+Rueckgabe-Reihenfolge, die der Spieler selbst gewaehlt hat. Ein Sicht-Audit findet das
+NICHT -- das Merkmal ist da, der Zustand ist da; vernichtet wird erst im Suchpfad.
+
+**Die zweite Achse ist damit:** fuer jede Information, die ein Spieler am Tisch ueber die
+Zeit AUFBAUT (gesehene Stapelplatten, gezaehlte Farben, gemerkte Rueckseiten), nachsehen,
+ob der Zustand sie traegt UND ob der Suchpfad sie stehen laesst. Beides muss gelten;
+Stufe 0 dieser Prereg hat nur das erste geprueft.
+
+**Eingetaktet fuer v27** zusammen mit den drei offenen Punkten aus par.10. Der Naht-Audit
+(alle Stellen, an denen Information absichtlich vernichtet wird) ist am 2026-09-09 bereits
+gefahren und steht in `PREREG_dome_stack_information_sets.md` par.10 -- er ist die
+Werkzeugseite dieser zweiten Achse.
+
