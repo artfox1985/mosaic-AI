@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das Wissen ueber den Kuppelstapel je Spieler modelliert, sodass die Suche weder Orakelwissen hat noch ihr EIGENES Wissen vergisst? | Beleg: nichts gebaut. Ursache am Code geprueft: net_mcts.rs:3952 mischt bei JEDER Suche den ganzen dome_tile_pool, waehrend die Rueckgabe-Reihenfolge in game.rs:278 gewaehlt wird -- die Suche vergisst ihr eigenes Wissen. Anlass: game_20260909_004553_seed876496 (13 Ziehungen in R1, dann 2/5/1). Regellage und drei Wissensstufen: par.4/par.5. Start ENTSCHIEDEN: nach dem Arm v27-b01, dem letzten eingefrorenen (par.6). Offen: Bauvariante A/B/C. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das Wissen ueber den Kuppelstapel je Spieler modelliert, sodass die Suche weder Orakelwissen hat noch ihr EIGENES Wissen vergisst? | Beleg: nichts gebaut. Ursache am Code geprueft: die Suche mischt den ganzen dome_tile_pool und vergisst damit die Rueckgabe-Reihenfolge, die sie selbst gewaehlt hat (net_mcts.rs:987, game.rs:278). Naht-Audit gefahren: ZWEI aktive Mischstellen, nicht eine (par.10). Drei Wissensstufen und Regellage: par.4/par.5. KORREKTHEITS-Fix, haengt nicht an einer Messung (Nutzer 2026-09-09). Start: nach dem Arm v27-b01 (par.6). Offen: Bauvariante. -->
 
 # PREREG: Informationsmengen am Kuppelstapel
 
@@ -38,7 +38,8 @@ geklammert, Z. 103/209/304/387). Das ist ein EIGENER Strang, siehe par.9.
 | --- | --- | --- |
 | Rueckgabe unter den Stapel | `push` in der vom Ziehenden GEWAEHLTEN Reihenfolge; Ziehung nimmt vorne (`remove(0)`) | `engine/src/game.rs:278`, `:183` |
 | Die Reihenfolge ist im Zustand | der Vec traegt sie, das Log druckt sie sogar aus | `engine/src/game.rs:285` |
-| Die Suche wuerfelt sie weg | `build_net_tree` ruft an der WURZEL JEDER Suche `determinize_hidden_information`, dort `state.dome_tile_pool.shuffle(rng)` | `engine/src/net_mcts.rs:3952`, `:986` |
+| Die Suche wuerfelt sie weg | `build_net_tree` ruft an der WURZEL JEDER Suche `determinize_hidden_information`, dort `state.dome_tile_pool.shuffle(rng)` | `engine/src/net_mcts.rs:3952`, `:987` |
+| ...und ein zweites Mal je simuliertem Rundenwechsel | `simulate_one_round` mischt den Stapel beim Eintritt, ungeschuetzt | `engine/src/round_transition_deep.rs:623` |
 | Der Schalter ist bewusst an | `DETERMINIZE_ROOT_HIDDEN_INFO = true`, Nutzer-Entscheid 2026-07-20, Begruendung KORREKTHEIT (kein Orakelwissen) | `engine/src/net_mcts.rs:976` |
 | Was das Netz vom Stapel sieht | `dome_stack_count`, `dome_wild_remaining_frac` UND seit v24-b04 die Plattentyp-Sicht: `[top_is_special, top_is_wild]` plus je Auslage-Slot `[has_special, has_wild]`, acht Werte ans Ende, Teil des Sicht-Arms, der INPUT_SIZE von 714 auf 744 hebt | `engine/src/features.rs:418-455`, `PREREG_stack_top_feature.md` par.6/par.10 |
 | Was es NICHT sieht | alles jenseits der obersten Karte: kein Wissensstand, keine Blockgrenze, keine Menge des bekannten Blocks | dieselbe Stelle, keine weiteren Stapelfelder |
@@ -246,3 +247,82 @@ und gehoert in eine eigene Prereg, sobald der Nutzer ihn aufmacht.
 AUS). Ob er im Zuge dieses Umbaus neu bewertet wird, entscheidet sich NACH par.7 -- eine
 Stopp-Regel auf einem Zustand, den die Suche vergisst, ist etwas anderes als eine auf einem
 Zustand, den sie behaelt.
+
+## par.10 NAHT-AUDIT 2026-09-09 (Kanal 1, durchgefuehrt)
+
+**Nutzer-Frage:** *"wie koennen wir solche Architektur-Bugs vernuenftig finden?"* Erster
+Kanal: die Stellen aufzaehlen, an denen der Code Information ABSICHTLICH vernichtet, und
+jede zwei Fragen beantworten lassen -- wessen Informationsmenge sie modelliert, und was sie
+wegnimmt, das der Spieler rechtmaessig hat. Die Liste ist endlich und greppbar
+(`.shuffle(`, `choose_multiple`, Kuerzungen). Durchgefuehrt am 2026-09-09, reines Lesen.
+
+**Ergebnis: 24 Mischstellen, davon 5 am Kuppelstapel.**
+
+| Stelle | Was | Urteil |
+| --- | --- | --- |
+| `net_mcts.rs:987` (via `:3952`) | Wurzel-Determinisierung, ganzer `dome_tile_pool` | **AKTIV, der Befund dieser Prereg** |
+| `round_transition_deep.rs:623` | `simulate_one_round` mischt den Stapel beim Eintritt | **AKTIV, gleiche Klasse, in par.3 zuerst uebersehen** |
+| `net_mcts.rs:4010`, `:4139`, `:4448` | Neumischen bei `DrawStackPeek` im Baum | **RUHEND**: `SHUFFLE_STACK_PEEK_IN_SEARCH = false` (`:904`), 2026 gemessen schlechter (17 % -> 9 % Siege), Code blieb liegen |
+| `round_transition.rs` (8 Stellen), `self_play.rs:5093`, `round_transition_resample.rs:193` | Beutel und verdeckter Chip-Vorrat | in Ordnung: Reihenfolge ist echt verdeckt, Multimenge bleibt erhalten |
+| `net_mcts.rs:1003` | verdeckte Bonuschips | in Ordnung, und **die Praezedenz**: aufgedeckte Fabrik-Chips bleiben ausdruecklich unangetastet |
+| `scoring.rs:106` | Auswahl der Wertungsplatten | Spielaufbau, keine Informationsfrage |
+| `mcts.rs:235`, `self_play.rs:803` | Zugreihenfolge, Permutationen | Gleichstandsaufloesung, keine Informationsfrage |
+
+**Zwei Funde ueber den Anlass hinaus:**
+
+1. **Der Umbau muss ZWEI aktive Stellen abdecken**, nicht eine. Die Tiefen-Simulation
+   mischt bei jedem simulierten Rundenwechsel nach. Ein Fix nur an der Wurzel liesse das
+   Wissen im Baum wieder verfallen.
+2. **Die ruhenden Stellen tragen die Begruendung, die den blinden Fleck hat.** Woertlich am
+   Code (`net_mcts.rs:4440-4443`): *"`dome_tile_pool` enthaelt an dieser Stelle ohnehin nur
+   noch die ungezogenen (= wirklich verdeckten) Platten -- volles Mischen ist daher exakt
+   richtig."* Das gilt fuer nie gesehene Platten und ist falsch fuer die, die der Spieler
+   selbst zurueckgelegt hat. Dieselbe Praemisse wie an der Wurzel, nur ausgeschrieben.
+
+**Was der Audit NICHT gefunden hat, und das ist die Grenze des Kanals:** er sieht nur, wo
+Information vernichtet wird -- nicht, wo sie nie entsteht (fehlende Merkmale) und nicht, wo
+sie falsch bewertet wird. Dafuer stehen die Kanaele 2 bis 4 (par.11).
+
+## par.11 DIE UEBRIGEN DREI KANAELE, eingetaktet (Nutzer 2026-09-09)
+
+| Kanal | Was er kann | Wann |
+| --- | --- | --- |
+| **2 Sicht-Audit, zweite Achse** | `PREREG_stack_top_feature.md` fragt "sieht das Netz dasselbe wie ein Spieler?" und hat so acht Asymmetrien gefunden. Die zweite Achse fehlt: **was WEISS die Suche, und was vergisst sie zwischen zwei Zuegen?** | mit v27, dort registriert |
+| **3 Orakel-Differential** | dieselbe Konfiguration gegen sich selbst, eine Seite OHNE Determinisierung. **Absichtliche Asymmetrie** -- entkommt der Symmetriefalle, an der Arena und Gating hier blind sind. Misst die GROESSENORDNUNG, entscheidet aber nicht ueber den Umbau (siehe unten) | Knopf baubar, sobald die Maschine frei ist |
+| **4 Anomalie-Report** | listet aus den Self-Play-Logs Aktionen, die auffaellig oft vorkommen oder Punkte kosten, ohne messbar etwas zu bringen. 13 Stapelziehungen in einer Runde waeren dort oben gestanden, lange vor der Anlasspartie | Werkzeug baubar sofort, Lauf sobald die Maschine frei ist |
+
+**Warum das Instrument ueberhaupt gebraucht wird** (und warum kein Elo-Wert es ersetzt):
+Selfplay, Arena, Gating und die Offline-Metriken vergleichen zwei Agenten IM SELBEN
+Weltmodell. Ein Fehler im geteilten Modell wirkt auf beide Seiten gleich und kuerzt sich
+weg -- die Stapelblindheit kostet in jeder Arena exakt null Elo, bei jeder Partienzahl.
+**Symmetrische Defekte sind fuer symmetrische Messung unsichtbar.** Das ist die
+Irrtumskosten-Begruendung nach CLAUDE.md, mit benanntem Nutzniesser: diesem Umbau.
+
+### Das Orakel-Differential ist ein MASSSTAB, kein Tor (Nutzer-Berichtigung 2026-09-09)
+
+**Nutzer, woertlich:** *"beim Stapel-Umbau geht es meiner Meinung nach weniger ob es lohnt:
+es ist einfach falsch implementiert und nicht vergleichbar mit der Sicht, die ein Mensch
+hat. Das gehoert korrigiert."*
+
+**Damit ist der Umbau nicht an eine Messung gebunden.** Ein frueherer Absatz an dieser
+Stelle hat das Orakel-Differential als Abbruchkriterium vorregistriert ("liegt die
+Obergrenze im Rauschen, wird der Umbau gestrichen") -- das widersprach par.8 derselben
+Prereg, die den Umbau schon als Korrektheits-Fix eingeordnet hatte, und ist gestrichen.
+
+**Die Praezedenz ist die Determinisierung selbst.** Sie wurde am 2026-07-20 mit genau
+diesem Argument BEHALTEN, obwohl ihr Arena-Delta unklar war (`net_mcts.rs:968-977`,
+woertlich: *"es geht nicht nur um gemessenen Vorteil, sondern auch um KORREKTHEIT: die
+Suche soll kein Wissen nutzen, das ein echter Spieler nicht hat"*). Heute nimmt dieselbe
+Funktion der Suche Wissen, das ein echter Spieler SEHR WOHL hat. Der Umbau kehrt den
+Entscheid von damals nicht um, er vollendet ihn: dieselbe Regel, konsequent in beide
+Richtungen angewandt.
+
+**Wozu das Differential dann noch dient:** als Groessenordnung, nicht als Tor. Es sagt,
+wieviel an dieser Information ueberhaupt haengt -- eine OBERGRENZE, denn das Orakel weiss
+mehr, als ein Spieler je wissen kann. Das ist zweierlei wert: es priorisiert gegen die
+anderen Straenge, und es gibt der Arena NACH dem Umbau einen Massstab, an dem ein flaches
+Ergebnis lesbar wird (flach bei kleiner Obergrenze heisst etwas anderes als flach bei
+grosser). Gebraucht wird dafuer ein Knopf, denn `DETERMINIZE_ROOT_HIDDEN_INFO` ist heute
+eine Konstante (`net_mcts.rs:976`); Default AUS laesst das Bestandsverhalten unberuehrt,
+danach `/mosaic-anchor-invariance`.
+
