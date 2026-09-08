@@ -58,8 +58,9 @@ zusammenfiel.
 2. ~~Generationsbericht v25~~ **ERLEDIGT 2026-09-09**: steht am Ende von
    `archive/history.md`. **v25-b01 hat Elo 1376** [1333, 1425] aus 520 Partien, v24-b07
    steht jetzt bei 1311; das Artefakt-Manifest traegt die Zahl samt KI und Quelle.
-3. **restic-Stand fuer v25-b01 nachholen** -- der Modell-Snapshot des Trainings ist mit
-   Exitcode 0xC0000142 gescheitert.
+3. ~~restic-Stand fuer v25-b01 nachholen~~ **ERLEDIGT 2026-09-09**: Snapshot
+   **028989fb**, Marke `run:v25-b01` (`tools/snapshot_models.ps1 -Version v25-b01`,
+   41 neue Dateien, 147 Dateien / 581,6 MiB verarbeitet, 6,8 MiB dazugekommen, 5 s).
 4. **`/mosaic-generation-turnover`** vor der v26-Erzeugung, NICHT von Hand. Schritt 4
    (tote Korpora, Bloecke, Monolithe) wurde vor v25 uebersprungen und ist jetzt faellig.
 5. **v26 erzeugen**: drei Befehle in `PREREG_v26_window.md` par.7, Generator `v25-b01`.
@@ -116,8 +117,10 @@ zusammenfiel.
   Familie bleibt also zu -- **aber Runde 4 liegt einzeln bei 3,408**. Artefakt
   `gumbel_scale_calibration_v25-b01.json`. Beim naechsten Champion wieder pruefen; bei
   Ueberschreiten oeffnet sich `c_visit`/`c_scale` per Regel, ohne Ermessen.
-- **v25-b01 hat KEINEN eigenen restic-Stand**: der Modell-Snapshot des Trainings ist mit
-  Exitcode 0xC0000142 (DLL-Init) fehlgeschlagen. Nachholen.
+- ~~v25-b01 hat KEINEN eigenen restic-Stand~~ **ERLEDIGT 2026-09-09**: nachgeholt als
+  Snapshot `028989fb` (Marke `run:v25-b01`). Der Fehlschlag beim Training war Exitcode
+  0xC0000142 (DLL-Init) beim Start der PowerShell aus `train.py` heraus; direkt gestartet
+  lief dasselbe Skript ohne Beanstandung durch.
 - ~~Loeschfreigaben stehen aus~~ **ERLEDIGT 2026-09-08** (siehe oben unter FREIGABEN).
 - **Schritt 4 des Generationswechsels** (tote Korpora, Bloecke, Monolithe) wurde vor v25
   bewusst uebersprungen und ist vor v26 faellig.
