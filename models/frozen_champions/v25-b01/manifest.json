@@ -32,8 +32,16 @@
   "contract_hash": "20b442a8164f748d",
   "engine_version": "0.1.0",
   "elo": {
-    "value": null,
-    "condition": "vier Kanten in elo_history.csv (Gating 53:27 und 129:91 gegen v24-b07, Anker 126:24, Champion-2 48:22 gegen v24-b06_k3p10); Zahl nach dem naechsten elo_tracker report nachtragen"
+    "value": 1376,
+    "ci95": [
+      1333,
+      1425
+    ],
+    "games": 520,
+    "record": "356-164",
+    "as_of": "2026-09-08",
+    "source": "tools/elo_tracker.py report, 44 Match-Zeilen in evaluations/elo_history.csv; mit dem Anker verbunden (keine Status-Marke in der Tabelle)",
+    "condition": "vier Kanten in elo_history.csv (Gating 53:27 und 129:91 gegen v24-b07, Anker 126:24, Champion-2 48:22 gegen v24-b06_k3p10). Die Champion-2-Kante lief gegen die LEBENDE alphazero_v24-b06_brierbest.onnx, nicht gegen das eingefrorene Artefakt; Nutzer-Entscheid 2026-09-08: wird nicht nachgemessen."
   },
   "wheels": {
     "champion_behavior_artifact": {
