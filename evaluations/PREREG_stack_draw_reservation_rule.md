@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem -- ist die gebaute Stopp-Regel die richtige? | Beleg: NEIN (par.5b): optimale Tiefe ist ueberall 1, die gebaute Regel zieht bei negativem Brettniveau 9-11 mal; Ursache ist der Einheitenbruch (par.1c). Knopf gebaut, **Default AUS** (par.5c), Abnahme n=200 ohne Staerkeunterschied in beide Richtungen (par.5d). Wiedervorlage nur unter den zwei benannten Bedingungen aus par.5e -- beide ungebaut. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem -- ist die gebaute Stopp-Regel die richtige? | Beleg: NEIN (par.5b): optimale Tiefe ist ueberall 1, die gebaute Regel zieht bei negativem Brettniveau 9-11 mal; Ursache ist der Einheitenbruch (par.1c). Knopf gebaut, **Default AUS** (par.5c), Abnahme n=200 ohne Staerkeunterschied (par.5d). BEDINGT ab 2026-09-09 (par.7): V bepreist nur den Sofortwert, nicht das erworbene Stapelwissen; neu rechnen nach PREREG_dome_stack_information_sets. Wiedervorlage nur unter den zwei benannten Bedingungen aus par.5e -- beide ungebaut. -->
 
 # PREREG: Reservationswert-Regel fuer die Blindziehung (`stack_draw_reservation_rule`)
 
@@ -129,6 +129,29 @@ Der erste Teil ist heute falsch. Das Teil-C-ERGEBNIS bleibt davon unberuehrt
 (es bedingt auf die aktive Wertungsplatte, und die steht als One-hot im
 Vektor), aber der Satz wuerde den naechsten Leser in die Irre fuehren. Ein
 datierter Korrekturhinweis ist dort eingetragen.
+
+## par.7 NACHTRAG 2026-09-09: das Modell ist gedaechtnislos, und das ist eine Praemisse
+
+**Nutzer-Einwand (2026-09-09):** *"wenn ich also 11 zieh und mein Gegner nichts an der
+Reihenfolge aendert, hab ich das ultimative Orakelwissen. Fuer ein paar Punkte. Nicht der
+schlechteste Tausch."*
+
+Er trifft die Praemisse, nicht die Rechnung. `V(Platte)` (par.3) ist der
+PLATZIERUNGSWERT in Punkten, Maximum ueber Slot und Rotation. Was eine Ziehung sonst noch
+kauft -- die Kenntnis des Stapels fuer den Rest der Partie -- kommt in `V` nicht vor. Das
+Stoppproblem ist damit ueber einen Ein-Runden-Nutzen gerechnet, und sein Ergebnis
+("optimale Tiefe ueberall 1", par.5b) gilt genau so weit.
+
+**Heute ist die Praemisse wahr, und zwar aus einem Grund, der nicht im Spiel liegt:** die
+Suche mischt bei JEDER Suche den ganzen Kuppelstapel neu
+(`engine/src/net_mcts.rs:3952` -> `determinize_hidden_information`, `dome_tile_pool
+.shuffle`). Was ein Spieler gesehen hat, ist fuer sie danach wertlos, weil sie es vergisst.
+
+**Wird das geaendert, faellt die Praemisse und diese Regel muss neu gerechnet werden** --
+dann steht neben dem Sofortwert ein Optionswert, der mit jeder gesehenen Platte waechst.
+Der Umbau ist vorregistriert: `PREREG_dome_stack_information_sets.md` (par.4b traegt genau
+diesen Einwand, par.8 die berichtigte Messgroesse). **Bis dahin bleibt par.5b gueltig; das
+Verdikt wird nicht zurueckgenommen, sondern bedingt gestellt.**
 
 ## par.3 Was `V` ist, und warum die Einheit ueber die Regel entscheidet
 

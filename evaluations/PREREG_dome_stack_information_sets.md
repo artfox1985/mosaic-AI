@@ -75,6 +75,39 @@ zerfaellt der Stapel fuer den Beobachter in drei Bereiche:
 Reihenfolge, weil er sie gewaehlt hat. Die Informationsmengen der beiden Spieler sind
 also VERSCHIEDEN -- genau das ist heute nicht modelliert.
 
+## par.4b DAS WISSEN IST EIN GUT, UND DER PREIS IST NIEDRIG (Nutzer 2026-09-09)
+
+**Nutzer, sinngemaess:** den ganzen Stapel neu zu mischen macht keinen Sinn -- die oberste
+Karte ist ohnehin teilweise bekannt (Typ), und je mehr Kuppelkarten ich inspiziert habe,
+desto bekannter ist der Stapel. *"Wenn ich also 11 zieh und mein Gegner nichts an der
+Reihenfolge aendert, hab ich das ultimative Orakelwissen. Fuer ein paar Punkte. Nicht der
+schlechteste Tausch."*
+
+Das dreht die Erwartung um, mit der diese Prereg zuerst geschrieben war. Der tiefe Zug ist
+dann nicht der Fehler, sondern moeglicherweise die richtige Eroeffnung: er kauft
+
+1. die beste Platte JETZT (das ist der einzige Posten, den die Stopp-Regel bepreist,
+   `PREREG_stack_draw_reservation_rule.md` par.3: `V(Platte)` ist der Platzierungswert in
+   Punkten, Maximum ueber Slot und Rotation), und
+2. **die Kenntnis des Stapels fuer den REST der Partie** -- ein Posten, der in `V`
+   ueberhaupt nicht vorkommt.
+
+**Damit ist par.5b jener Prereg ("die optimale Tiefe ist ueberall 1") innerhalb seines
+Modells richtig und als Handlungsanweisung unvollstaendig.** Das Modell ist gedaechtnislos:
+es preist den Sofortwert und unterstellt implizit, dass das Gesehene danach wertlos ist.
+Genau das ist heute wahr -- weil die Suche mischt (par.3). Wird der Umbau gebaut, wird die
+Praemisse falsch, und die Regel muss neu gerechnet werden. Ein datierter Hinweis steht dort.
+
+**Zwei Folgerungen, die dann zum Spiel gehoeren:**
+
+* **Das Wissen waechst monoton.** Jede Inspektion und jede auf die Kuppel gelegte Platte
+  verkleinert die Restunsicherheit; der Stapel wird ueber die Partie hinweg immer
+  bekannter, nie unbekannter -- ausser durch fremde Zuege.
+* **Wissen laesst sich zerstoeren.** Zieht der Gegner selbst und legt neu zurueck, ordnet er
+  den unteren Block um; mein Wissen ueber diese Positionen faellt von "Reihenfolge" auf
+  "Menge" (par.4, Beispiel B). Das ist eine echte Stoerhandlung und hat Verwandtschaft zum
+  Chip-Denial-Strang -- ob die Suche sie je findet, ist eine Frage NACH dem Umbau.
+
 ## par.5 WAS DARAUS FOLGT (Anforderung, noch keine Bauentscheidung)
 
 Ein korrektes Modell braucht drei Dinge, die es heute nicht gibt:
@@ -134,11 +167,17 @@ Naht `dome_tile_pool`? Vor dem Bau zaehlen, nicht schaetzen.
 **Primaer, Staerke:** gepaartes Gating gegen dasselbe Netz OHNE die Aenderung, block-size 5,
 zwei unabhaengige Seeds, SPRT; Champion-Strenge wie im Generationsablauf.
 
-**Diagnostisch, und hier liegt die eigentliche Erwartung:** Ziehungen je Partie und
-**Wiederholungsziehungen nach einem vollstaendigen Durchgang** (aus den Partie-Logs,
-`tools/analyze_game_log.py`, Kategorie STACK_PEEK). Vorregistrierte Richtung: die zweite
-Zahl muss auf nahe null fallen, sonst hat der Umbau sein Ziel verfehlt, unabhaengig von der
-Arena.
+**Diagnostisch, und hier liegt die eigentliche Erwartung -- BERICHTIGT nach par.4b:**
+gezaehlt wird nicht "Ziehungen je Partie", sondern die **Wiederholungsziehung in einen
+BEREITS BEKANNTEN Stapelteil hinein** (aus den Partie-Logs, `tools/analyze_game_log.py`,
+Kategorie STACK_PEEK, gegen den mitgefuehrten Wissensstand). Vorregistrierte Richtung: DIESE
+Zahl faellt auf nahe null. **Die Gesamtzahl der Ziehungen darf steigen** -- ein tiefer
+Erstzug kauft Wissen fuer den Rest der Partie und kann richtig sein.
+
+Die erste Fassung dieser Prereg hat hier "Ziehungen je Partie muessen sinken"
+vorregistriert. Das war der Denkfehler des Koordinators, vom Nutzer am selben Tag
+korrigiert: er haette den Umbau an genau der Groesse gemessen, die der Umbau erst
+wertvoll macht.
 
 **Waechter:** nach der Engine-Aenderung `/mosaic-anchor-invariance` (Drift-Pruefung gegen
 `models/frozen_heuristics/hv1_anchor`), und die Aera-Frage stellen, bevor Elo-Zahlen ueber
