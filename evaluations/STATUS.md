@@ -50,11 +50,17 @@ gegen `v24-b06`, `v24-b07` 92:58 gegen `v23-b01_k3p10`), werden NICHT nachgemess
   Modell-Snapshot **028989fb**.
 - **Schritt 1 war schon getan:** der Generator fuer v26 ist `v25-b01`, und der liegt
   eingefroren unter `models/frozen_champions/v25-b01/` (Wheel, Spec, Golden Probe).
-- **Schritt 3-5 liegen als Vorschlag vor:** `cleanup_proposal_turnover_v26.md`, mit
-  restic-Beleg je Gruppe. Zusammen rund 1,3 GiB Korpora, 6,4 GiB Monolithe und 325 MiB
-  Modelle. **Es wartet auf pfadgenaue Freigabe; ohne die passiert nichts.**
-- **Waisen-Bloecke: 0** (`tools/cache_inventory.py --orphans`, 13.955 Bloecke). Nach einer
-  Korpus-Loeschung noch einmal laufen lassen und die Waisen mitnehmen.
+- **Schritt 3-5 AUSGEFUEHRT** (Nutzer-Freigabe 2026-09-09 fuer alle Gruppen des
+  Vorschlags `cleanup_proposal_turnover_v26.md`): **11.154 MiB frei**, `data/` von 19,69
+  auf 9,12 GiB. Weg sind die Messkorpora der v24-Arme, der hv2-Korpus, die zwoelf
+  Monolithe, die Modell-Arme `v24-b01` bis `b05` und 7.553 Waisen-Bloecke.
+  Gegenprobe: **0 Waisen** bei 6.402 Bloecken.
+- **Folge fuers naechste Mal:** `tools/probes/bootstrap_coherence_probe.py` und
+  `action_count_profile_probe.py` finden ihre hv2-Vorgabedateien nicht mehr und brauchen
+  `--file` bzw. eine andere Gruppe. Der Korpus liegt im Snapshot `6dd4d988`.
+- **Der Monolith des v25-Fensters ist mit weg** (Schluessel 976b1ef66843 u.a.). Ein
+  erneutes Training auf `window_v25.txt` muesste ihn neu bauen; die Korpusdateien des
+  v25-Fensters sind alle noch da.
 
 ### ERSTE AUFGABE DER NEUEN SITZUNG
 

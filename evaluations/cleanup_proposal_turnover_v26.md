@@ -1,5 +1,11 @@
 # Loeschvorschlag zum Generationswechsel v25 -> v26 (2026-09-09)
 
+**ERLEDIGT 2026-09-09:** der Nutzer hat A, B, C, D und E freigegeben; alles unten ist
+geloescht. Bilanz: **11.154 MiB frei** (B 611 Dateien / 607,4 MiB, C 1.746 / 679,3 MiB,
+D 12 / 6.576,7 MiB, E 50 / 324,6 MiB, dazu 7.553 Waisen-Bloecke / 2.965,9 MiB).
+`data/` faellt von 19,69 auf 9,12 GiB. Gegenprobe `tools/cache_inventory.py --orphans`:
+**0 Waisen** bei 6.402 verbliebenen Bloecken und 3.002 Korpusdateien.
+
 Schritte 3, 4 und 5 des Ablaufs `/mosaic-generation-turnover`. **Nichts wird ohne
 pfadgenaue Freigabe geloescht.** Schritt 4 wurde vor v25 bewusst uebersprungen und ist
 jetzt faellig, deshalb ist die Liste laenger als beim letzten Mal.
