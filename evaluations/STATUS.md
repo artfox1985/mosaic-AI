@@ -24,12 +24,13 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. UEBERGABE an die naechste Sitzung (2026-09-08, 22:40)
+## 1. UEBERGABE an die naechste Sitzung (2026-09-08, 23:50)
 
-**Maschine FREI. Champion laut `models/champion.txt`: `v25-b01_brierbest`.**
-Die Promotion ist GEMESSEN und die Elo-Kanten sind EINGETRAGEN; es fehlen nur noch
-mechanische Schritte (unten). Nichts laeuft im Hintergrund ausser einem Platt-Fit, der in
-Minuten fertig ist.
+**MASCHINE FREI, nichts laeuft.** Baum sauber, **6 Commits vor origin, NICHT gepusht**
+(Push nur auf Nutzer-Anweisung). Champion laut `models/champion.txt`: `v25-b01_brierbest`.
+
+**Die Promotion v25-b01 ist VOLLSTAENDIG durch** -- alle sechs Schritte der Checkliste plus
+das eingefrorene Artefakt. Was bleibt, steht unter "Erste Aufgabe".
 
 ### v25-b01 schlaegt den Champion -- die Beleglage
 
@@ -44,6 +45,35 @@ Minuten fertig ist.
 Alle vier Zeilen stehen in `evaluations/elo_history.csv`. **Beide Gating-Seeds sind
 einzeln signifikant** -- bessere Lage als bei K3-P, wo der Fruehstopp in der Replikation
 zusammenfiel.
+
+### ERSTE AUFGABE DER NEUEN SITZUNG (in dieser Reihenfolge)
+
+1. **Champion-2-Kanten ueber das ARTEFAKT nachmessen** (der Methodenfehler unten).
+   Betrifft `v25-b01` gegen `frozen_champions/v24-b06/` und `v24-b07` gegen
+   `frozen_champions/v23-b01_k3p10/`. Weg: `tools/frozen_referee_match.py` bzw. das
+   Artefakt-venv, NICHT die lebenden `models/alphazero_*`-Dateien. Abnahme: neue Zeile in
+   `elo_history.csv` mit Vermerk, dass sie die alte ersetzt. Kosten je Kante rund 30 min.
+   **ACHTUNG:** der Nutzer loescht `frozen_champions/v24-b06/` -- vorher fragen oder aus
+   restic-Stand `b6842b4e` zurueckholen (`restic restore b6842b4e --target . --include
+   "*/frozen_champions/v24-b06/*"`, alle sieben Teile geprueft vorhanden).
+2. **Generationsbericht v25 nach `archive/history.md`** (Muster: der v24-Bericht am Ende
+   der Datei). Elo-Zahl von v25-b01 vorher aus `tools/elo_tracker.py report` holen und ins
+   Artefakt-Manifest nachtragen (Feld `elo.value` steht auf `null`).
+3. **restic-Stand fuer v25-b01 nachholen** -- der Modell-Snapshot des Trainings ist mit
+   Exitcode 0xC0000142 gescheitert.
+4. **`/mosaic-generation-turnover`** vor der v26-Erzeugung, NICHT von Hand. Schritt 4
+   (tote Korpora, Bloecke, Monolithe) wurde vor v25 uebersprungen und ist jetzt faellig.
+5. **v26 erzeugen**: drei Befehle in `PREREG_v26_window.md` par.7, Generator `v25-b01`.
+   **NUR auf ausdrueckliche Nutzer-Freigabe starten.**
+
+### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
+
+- **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden.
+- **Loeschung nur auf pfadgenaue Freigabe**, auch bei "offensichtlichem" Muell.
+- **Messungen laufen exklusiv**; GPU und CPU duerfen parallel, zwei CPU-Messungen nicht.
+- **Erzeugung startet nur auf Anweisung.**
+- Offene Loeschfreigaben: `evaluations/cleanup_proposal_turnover_v25.md` (6 Skripte),
+  `models/attic_20260906_k3p10_copies/`, `venv_measure_hullform/`.
 
 ### WAS NOCH ZU TUN IST (mechanisch, keine Entscheidung noetig)
 
