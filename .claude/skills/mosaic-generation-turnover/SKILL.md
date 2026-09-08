@@ -143,7 +143,10 @@ Laufzeiten im Artefakt, Regel 0 (geprueft oder markiert).
 - Kette fuer G+1 nach dem Muster `night_v25_chain.sh` schreiben (Manifest,
   Fenster, Monolith, Trainings-Arme), MIT gehaerteter Wartebedingung
   (leere Prozessantwort = belegt) und `--resume`-Hinweis fuer jedes
-  Training; Chronik `night_run_<Datum>.md` anlegen.
+  Training. **Keine eigene Chronikdatei anlegen** (Nutzer 2026-09-09): das
+  Inhaltliche gehoert in die Prereg, der Stand in STATUS.md, die Chronik nach
+  `archive/history.md`. Die frueheren `night_run_<Datum>.md` waren eine zweite
+  Chronik neben `history.md` und sind dorthin aufgeloest worden.
 
 ## Was dieser Ablauf NICHT ist
 
