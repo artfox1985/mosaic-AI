@@ -146,6 +146,30 @@ sich. Eine flache Arena ist dabei ausdruecklich akzeptiert, Ruecklauf nicht. **D
 auch die Spec geschlossen**, denn ein Fenster ist nur stationaer, wenn die
 Erzeugungsregeln stehen (`PREREG_v25_window.md` par.18).
 
+## 3b. DAS PROGRAMM FUER v27 (Nutzer 2026-09-09: "ausreichendes Programm")
+
+Drei Straenge liegen vor, alle vorregistriert. **Der Kern ist neu und kam aus einer
+Partie**, nicht aus der Kampagnenplanung.
+
+| Strang | Prereg | Stand |
+| --- | --- | --- |
+| **Informationsmengen am Kuppelstapel** -- die Wurzeldeterminisierung unterscheidet unbekannt / Rueckseite bekannt / Platte bekannt, statt den ganzen Stapel zu mischen | `PREREG_dome_stack_information_sets.md` | OFFEN, 2026-09-09 vorregistriert; Variante A (nur Suche) oder B (plus Merkmale) noch offen |
+| **Sichtgleichheit, Reststufen** -- laufende Ziehserie, Phasenaufloesung, und ein Netz, das die in v24-b04 gelegten Werte auch NUTZT | `PREREG_stack_top_feature.md` par.7/par.10 | OFFEN, fuer v27 eingeplant (Nutzer 2026-09-08) |
+| **Schwarm G-2 ohne Split** -- welche der beiden v24-b07-Haelften den G-2-Posten traegt, wird gemessen statt geraten | `PREREG_v26_window.md` par.6 | OFFEN, Werkzeuge stehen (Korpus-Sonden, Minuten) |
+
+**Der Widerspruch, der vor dem Start beantwortet sein muss** (`PREREG_v25_window.md`
+par.18): v25 bis v27 sollte NUR das Material aendern -- Architektur, Trainingsrezept und
+Erzeugungsregeln fest, damit die Attribution sauber wird. Stufe A des Stapel-Umbaus aendert
+die Erzeugungsregel, Stufe B die Architektur. **Beides bricht das Einfrieren**; die
+Entscheidung, ob v27 dafuer geoeffnet wird oder ob der Umbau nach v27 faellt, steht aus
+(`PREREG_dome_stack_information_sets.md` par.6).
+
+**Nicht im Programm, aber mindestens gleich gross:** die Null-Klammer-Falle (par.9
+derselben Prereg). Bei Punktestand 0 sind Ziehungen UND Strafleiste gratis; der
+Schattenzaehler `score_unclamped` faengt nur das Trainingsziel ab, nicht das Spiel
+(`board.rs:344-365`, `features.rs:689` zeigt dem Netz den GEKLAMMERTEN Wert). Braucht eine
+eigene Prereg, sobald der Nutzer sie aufmacht.
+
 ## 4. OFFENE NUTZER-ENTSCHEIDE (Stand 2026-09-07, 19:40)
 
 1. **Loeschfreigaben**, pfadgenau: `evaluations/cleanup_proposal_turnover_v25.md`
