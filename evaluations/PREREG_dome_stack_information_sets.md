@@ -98,6 +98,14 @@ es preist den Sofortwert und unterstellt implizit, dass das Gesehene danach wert
 Genau das ist heute wahr -- weil die Suche mischt (par.3). Wird der Umbau gebaut, wird die
 Praemisse falsch, und die Regel muss neu gerechnet werden. Ein datierter Hinweis steht dort.
 
+**Und die Stelle, an der dieser Strang den aus par.9 beruehrt:** das Wissen wird in
+PUNKTEN bezahlt, und Punkte sind genau dort keine Waehrung mehr, wo der Zaehler klemmt. Im
+Anlassspiel haben die Ziehungen 1 bis 4 echte Punkte gekostet, die Ziehungen 5 bis 13 gar
+nichts (Log Z. 41-49, alle auf 0). Der Tausch "ein paar Punkte gegen Orakelwissen" ist
+also in beide Richtungen unbepreist: oberhalb von null zahlt man einen Preis, den das
+Modell nicht gegen den Nutzen haelt, unterhalb zahlt man keinen. Wer den Optionswert
+einbaut, sollte im selben Zug wissen, ob die Waehrung traegt.
+
 **Zwei Folgerungen, die dann zum Spiel gehoeren:**
 
 * **Das Wissen waechst monoton.** Jede Inspektion und jede auf die Kuppel gelegte Platte
