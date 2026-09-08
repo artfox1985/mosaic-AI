@@ -149,3 +149,17 @@ Sockel-Klasse): die Traeger-Klasse ist policy-tragend, ihr Schluessel stimmt sch
 Traeger-Manifest. Fuer die value-only-Klassen entstehen die Bloecke erst mit dem
 v26-Manifest.
 
+**BERICHTIGUNG 2026-09-09 (an der Primaerquelle geprueft):** die Einschraenkung "nur
+Nr. 1" ruht auf einer ueberholten Annahme. **Der Traegerstatus ist seit 2026-08-31 NICHT
+mehr Teil des Datei-Schluessels** (`engine/py/file_cache_key.py:29-47`,
+Nutzer-Auftrag): der Block ist traegeragnostisch, die Traeger-Maske wird erst beim
+Zusammenfuegen des Fensters angewandt (`build_cache_parallel.merge(..., mask_parts=...)`).
+Die einzige praefixabhaengige Groesse im Schluessel ist `bootstrap_native`, und
+`selfplay_v25-b01-*` steht in keiner der `LEGACY_STRETCHED_PREFIXES`
+(`engine/py/neural_net.py:837-839`) -- fuer alle drei Klassen ergibt sich derselbe
+Schluessel. **Der Waechter darf also ueber alle drei Klassen laufen**, nicht nur ueber die
+Sockel-Klasse; `--file-list` ist ohnehin nicht mit `--watch` kombinierbar
+(`tools/build_cache_incremental.py:258`). Gefahren wird er als
+`build_cache_incremental.py --watch --workers 3 --encoder 2d --value-target-variant nortv`
+ohne `MOSAIC_CARRIER_MANIFEST` (Vorgabe leer, "jede Datei traegt").
+
