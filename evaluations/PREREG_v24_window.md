@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v24-Trainingsfenster zugeschnitten? | Beleg: Zuschnitt vom Nutzer (2026-09-01), Rezept par.6b' mit K3-P C 1,0 (Vorbehalt gefallen, Champion-Kante par.10a der Einhuellenden-Prereg). ERZEUGUNG LAEUFT seit 2026-09-04 21:10 (Sockel extern, 1,48 s je Partie) und 21:31 (Value hier); par.6c Punkte 1 und 2 fuer alle drei Laeufe GRUEN (par.6c'), Tor 0 nach den Value-Laeufen. Nachtkette `tools/night_v24_chain.sh` traegt Manifest, Fenster, Monolith und die Trainings-Arme b01/b02 (par.8), b03 ueber `night_v24_b03_chain.sh`. Offen: Tor 0, Tor 1/2 je Arm, Generatorwahl. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v24-Trainingsfenster zugeschnitten? | Beleg: Generation abgeschlossen 2026-09-07. Zuschnitt gefahren wie in par.6d (2.945 Dateien, 580 Traeger), Champion wurde v24-b06 (Tor 1 gepoolt 319:241, par.9) und nach dem Spec-Entscheid v24-b07 (Huellenform 2 und K5, Elo 1327). Das Fenster ist mit v25 ausrotiert; die Nachfolge-Zuschnitte stehen in PREREG_v25_window.md par.1 und PREREG_v26_window.md par.1. -->
 
 # Vorregistrierung: v24-Fenster
 
