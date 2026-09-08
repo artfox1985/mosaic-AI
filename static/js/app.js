@@ -27,37 +27,25 @@ let pendingTiling = null;      // {pi, ri, sr, sc, si}
 let _tilingTicker = null;
 let _tilingDeadline = 0;
 
-// -- LOG-ZUSAETZE DER OBERFLAECHE (Punkt 8) ---------------------------------
-// Das Passen erzeugt in der Engine BEWUSST keine Log-Zeile: der Replay
-// (tools/analyze_game_log.py::Replayer.ensure_drafting_actor) rekonstruiert es
-// aus dem Spielerwechsel und bricht ab, wenn `apply_pass` die Log-Laenge
-// veraendert (engine/src/py.rs:310-317). Damit der Mensch trotzdem sieht, dass
-// ein Zug uebersprungen wurde, fuehrt die Oberflaeche eine eigene, rein
-// anzeigende Spur: `at` ist die Log-Laenge zum Zeitpunkt des Eintrags, die
-// Zeile wird beim Zeichnen an genau dieser Stelle eingeblendet. Engine-Log und
-// Log-Datei bleiben unberuehrt.
-let uiLogExtras = [];
+// -- KEINE LOG-ZUSAETZE DER OBERFLAECHE MEHR (2026-09-09) -------------------
+// Bis hierher fuehrte die Oberflaeche eine eigene, rein anzeigende Spur fuer
+// das Passen ("⏸ ... passt (keine Aktion moeglich)"), weil `apply_pass` frueher
+// bewusst nichts ins Log schrieb. Seit Commit 1bb4ea6 (2026-09-07) schreibt die
+// ENGINE den Pass selbst (`game.rs::Action::Pass` -> "⏭️ {name}: passt", beide
+// Pfade, Mensch wie KI) -- die Spur war damit doppelt.
+//
+// Sie war ausserdem falsch verankert, und das war der gemeldete Fehler
+// (Nutzer 2026-09-09, Partie game_20260909_004553_seed876496): die Zeilen
+// wurden an der INDEXPOSITION `at` eingeblendet, die als `S.log.length`
+// genommen wurde -- aber `S.log` ist nur ein SCHIEBEFENSTER der letzten 30
+// sichtbaren Zeilen (`serialize.rs:246-250`, `.rev().take(30).rev()`). Sobald
+// das Log ueber 30 Zeilen hinaus war, zeigte `at` hinter das Fensterende:
+// die Pruefung "hat die Engine den Pass schon geschrieben?" lief ins Leere
+// (Duplikat), und der Merge haengte die Zeile ans ENDE, also weit hinter die
+// Runde, in der sie entstand. Ein Index in ein wanderndes Fenster ist keine
+// Position -- deshalb faellt die Mechanik ganz weg statt nachgebessert zu
+// werden.
 
-// Seit Commit 1bb4ea6 (2026-09-07) schreibt die Engine den Pass selbst ins
-// Log ("⏭️ {name}: passt", game.rs, beide Pfade). Das installierte Wheel kann
-// aelter sein -- die Oberflaeche schaut deshalb nach, statt es anzunehmen: ist
-// an der Stelle, an der der Pass stand, schon eine Zeile mit "passt", schreibt
-// sie keine zweite. So steht der Pass mit jedem Wheel genau EINMAL im Log.
-function _enginePassLogged(at) {
-  const l = S && S.log ? S.log : [];
-  for(let i = at; i < Math.min(l.length, at + 2); i++) {
-    if(/passt/i.test(l[i])) return true;
-  }
-  return false;
-}
-
-function addUiLog(text, at) {
-  if(!S) return;
-  // `at` ausdruecklich mitgeben, wenn die Zeile NACH dem Zug geschrieben wird,
-  // aber VOR dessen Log-Zeilen gehoert (Passen: erst nach der Antwort steht
-  // fest, dass er wirklich stattgefunden hat, s. maybeAutoPass).
-  uiLogExtras.push({at: at !== undefined ? at : (S.log || []).length, text});
-}
 // Nutzer-Feedback (2026-07-29, Folgeauftrag): Reihenfolge-Regel gilt nur fuer
 // die PLATZIERUNG voller Reihen -- eine nur-per-Chips-komplettierbare Reihe
 // darf der Mensch bewusst ueberspringen, um eine SPAETERE chip-faehige Reihe
@@ -262,7 +250,6 @@ async function startNewGame() {
   if(!d.ok){showError(d.error);return;}
   S=d.state; sel=null; domeModal=null; tilingPi=null; tilingRow=null;
   clearTilingPending();
-  uiLogExtras = [];
   _autoPassStuck = 0;
   window._gameEndLogged = false;
   _chipGhosts = {0: [], 1: []}; _prevBonusChips = {0: null, 1: null};
@@ -318,7 +305,6 @@ async function triggerAIMove() {
     // Loop: KI zieht solange sie dran ist (max 20 Züge gegen Endlosloop)
     let safety = 0;
     while (aiIsDue() && safety++ < 20) {
-      const logVorZug = (S.log || []).length;
       const d = await api('/ai/move');
       if (!d.ok) {
         // Kein Fehler anzeigen wenn KI einfach nicht dran ist
@@ -330,13 +316,6 @@ async function triggerAIMove() {
         break;
       }
       S = d.state;
-      // Punkt 8: auch das Passen der KI stand nirgends -- die Engine schreibt
-      // dafuer bewusst keine Log-Zeile (py.rs:310-317, Replay-Vertrag), die
-      // gespielte Aktion kommt aber in der Antwort mit
-      // (mcts.rs:709 -> {"type":"pass"}).
-      if (d.ai_action && d.ai_action.type === 'pass' && !_enginePassLogged(logVorZug)) {
-        addUiLog(`⏸ ${S.players[AI_PLAYER].name} passt (keine Aktion möglich)`, logVorZug);
-      }
       render();
       if (aiIsDue()) await new Promise(r => setTimeout(r, 350));
     }
@@ -657,17 +636,13 @@ function maybeAutoPass() {
   if(pendingStackPlacement) return;
   if(_autoPassStuck >= 3) return;
   _autoPassBusy = true;
-  const name = S.players[S.current_player].name;
-  const at   = (S.log || []).length;
   setTimeout(async () => {
     let durch = false;
     try { durch = await passMove(); }
     finally {
       if(durch) {
-        // Der Zug ist durch. Die Zeile gehoert an die Stelle VOR die
-        // Log-Zeilen, die die Gegenseite inzwischen erzeugt hat -- und faellt
-        // ganz weg, wenn die Engine sie selbst geschrieben hat.
-        if(!_enginePassLogged(at)) addUiLog(`⏸ ${name} passt (keine Aktion möglich)`, at);
+        // Die Zeile schreibt die Engine (game.rs::Action::Pass), nicht die
+        // Oberflaeche -- siehe Kopf dieser Datei.
         _autoPassStuck = 0;
       } else {
         _autoPassStuck++;
@@ -1830,19 +1805,10 @@ document.getElementById('auslage-area').innerHTML = `
     </div>
     </div>`;
 
-  // Punkt 8: die rein anzeigenden Zeilen der Oberflaeche (bisher nur das
-  // Passen) werden an der Stelle eingeblendet, an der sie entstanden sind --
-  // `uiLogExtras[i].at` ist die Log-Laenge von damals. Alles, was ueber die
-  // aktuelle Log-Laenge hinausweist, haengt hinten dran (kann nach einem
-  // Spielwechsel vorkommen, bevor `uiLogExtras` zurueckgesetzt ist).
-  const rawLog = S.log || [];
-  const mergedLog = [];
-  for(let i = 0; i <= rawLog.length; i++) {
-    uiLogExtras
-      .filter(x => (i < rawLog.length ? x.at === i : x.at >= i))
-      .forEach(x => mergedLog.push(x.text));
-    if(i < rawLog.length) mergedLog.push(rawLog[i]);
-  }
+  // Das Log der Anzeige ist genau das, was die Engine liefert (ein
+  // Schiebefenster der letzten 30 sichtbaren Zeilen, serialize.rs:246-250).
+  // Keine eingemischten Oberflaechen-Zeilen mehr, siehe Kopf dieser Datei.
+  const mergedLog = S.log || [];
   document.getElementById('log').innerHTML = [...mergedLog].reverse().map(e=>{
     let cls='le';
     let style='';

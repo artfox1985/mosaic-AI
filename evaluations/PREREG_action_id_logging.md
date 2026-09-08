@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann der Partie-Replay exakt statt heuristisch werden, indem jede Aktion mit ihrer ID aus dem ACTION SPACE geloggt wird -- derselben, gegen die der Policy-Kopf trainiert? | Beleg: par.7, ENTSCHIEDEN 2026-08-18 -- gebaut und gemessen. Neue Partie: 52/52 Stein-Zuege ueber die ID, 245/245 Zeilen exakt. Beide offenen Alt-Partien laufen jetzt ebenfalls durch (321/321 bzw. 327/327). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann der Partie-Replay exakt statt heuristisch werden, indem jede Aktion mit ihrer ID aus dem ACTION SPACE geloggt wird -- derselben, gegen die der Policy-Kopf trainiert? | Beleg: par.7, ENTSCHIEDEN 2026-08-18 -- gebaut und gemessen. Neue Partie: 52/52 Stein-Zuege ueber die ID, 245/245 Zeilen exakt. Beide offenen Alt-Partien laufen jetzt ebenfalls durch (321/321 bzw. 327/327). Nachlese par.9 (2026-09-09): die Oberflaechen-Spur fuers Passen war doppelt und falsch verankert (Index in ein 30-Zeilen-Schiebefenster) und ist ersatzlos entfallen. -->
 
 # PREREG: Aktions-IDs im Partie-Log, synchron zum Action Space
 
@@ -406,3 +406,41 @@ belegt), die Rolle des Server-Prozesses (geprueft, unschuldig), die Frage, ob
 die Engine gegen das Regelwerk protokolliert (tut sie nicht -- `take_from_sun`
 zitiert die Regel und haelt sie ein), und die Idee, `apply_drafting` selbst
 loggen zu lassen (abgewogen und verworfen, par.7.3).
+
+## par.9 NACHLESE 2026-09-09: der Pass stand zweimal und an der falschen Stelle
+
+**Befund des Nutzers** (Partie `static/log/game_20260909_004553_seed876496.log`): in der
+Anzeige passte die Position der Pass-Zeilen nicht zur Logdatei; die Datei war korrekt. Die
+beiden Zeilen `⏸ Spieler 1 passt (keine Aktion moeglich)` standen ganz oben, also NACH den
+Zeilen der zweiten Runde, obwohl der Pass in Runde 1 geschah -- und zusaetzlich zu den
+Engine-Zeilen `[R1] ⏭️ Spieler 1: passt` (Datei Z. 89 und 93), die an der richtigen Stelle
+standen.
+
+**Ursache, geprueft:** die Oberflaeche fuehrte seit "Punkt 8" eine eigene, rein anzeigende
+Spur (`uiLogExtras`) und verankerte sie an einer INDEXPOSITION `at = S.log.length`.
+`S.log` ist aber kein Log, sondern ein **Schiebefenster der letzten 30 sichtbaren Zeilen**
+(`engine/src/serialize.rs:246-250`, `.rev().take(30).rev()`, Maschinenzeilen vorher
+gefiltert). Sobald eine Partie ueber 30 Zeilen hinaus ist, zeigt ein einmal genommenes `at`
+hinter das Fensterende. Daraus folgen BEIDE Symptome aus einer Wurzel:
+
+1. `_enginePassLogged(at)` sah `l[30]`/`l[31]` in einem 30-elementigen Feld, also
+   `undefined`, und meldete "die Engine hat nichts geschrieben" -- obwohl sie es hatte.
+   Ergebnis: die zweite, ueberfluessige Zeile.
+2. Der Merge blendete Extras mit `at >= rawLog.length` am ENDE ein. Ergebnis: die Zeile
+   erschien in der neuesten Runde statt in ihrer eigenen.
+
+**Warum die Spur ueberhaupt bestand und warum sie jetzt weg ist:** sie kam aus der Zeit, in
+der `apply_pass` bewusst nichts ins Log schrieb (Luecke 1 aus par.2 S2). Seit Commit
+1bb4ea6 (2026-09-07, Nutzer-Auftrag "Pass als eigener Schritt") schreibt `game.rs`
+(`Action::Pass`) die Zeile fuer BEIDE Pfade, Mensch wie KI -- die Oberflaechen-Spur war
+damit doppelt. Sie ist am 2026-09-09 ersatzlos entfallen (`static/js/app.js`:
+`uiLogExtras`, `addUiLog`, `_enginePassLogged`, `logVorZug` und der Merge in `render()`).
+Nachbessern statt entfernen waere der falsche Weg gewesen: ein Index in ein wanderndes
+Fenster ist keine Position, und die Anzeige braucht die Zeile nicht selbst zu erfinden,
+wenn die Engine sie liefert.
+
+**Nebenbefund fuer den naechsten Leser:** die Kommentare an drei Stellen in `app.js` und
+einer in `maybeAutoPass` behaupteten noch, `apply_pass` schreibe bewusst nichts, und
+verwiesen dafuer auf `py.rs:310-317` -- genau die Stelle, die seit 1bb4ea6 das Gegenteil
+sagt. Der Kommentar hat den Umbau ueberlebt und die Fehlersuche in die falsche Richtung
+geschickt; er ist mit entfernt.
