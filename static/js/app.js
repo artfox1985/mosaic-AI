@@ -24,6 +24,10 @@ let humanTilingDone = false;
 // gedrueckt wird, der sie dann mitsendet (siehe finishHumanTiling).
 const TILING_CONFIRM_MS = 5000;
 let pendingTiling = null;      // {pi, ri, sr, sc, si}
+// Steht das Abschluss-Fenster offen? Gesetzt beim Zeichnen
+// (renderTilingFinishPopup), gelesen vom Reihen-Klick der letzten
+// Musterreihe -- er uebergibt nur dann an die KI (Nutzer 2026-09-09).
+let _tilingFinishOffen = false;
 let _tilingTicker = null;
 let _tilingDeadline = 0;
 
@@ -1461,6 +1465,10 @@ function renderCenter() {
     const hasPending = pending.some(x =>
       !(pendingTiling && pendingTiling.pi === x.pi && pendingTiling.ri === x.ri
         && isLastPatternRow(pendingTiling.pi, pendingTiling.ri)));
+    // SCHON HIER setzen, nicht erst in renderTilingFinishPopup: der
+    // Hinweistext unten liest die Flagge, und der wird VOR dem Fenster
+    // gebaut. Sonst haengt er einen Zeichendurchgang hinterher.
+    _tilingFinishOffen = !hasPending && !AI_THINKING && !humanTilingDone;
 
     // Nur Reihen die der Server als chippable markiert hat
     const chippableRows2 = S.chippable_tiling_rows || [];
@@ -1494,7 +1502,11 @@ function renderCenter() {
             ${head} - liegt vorgemerkt auf dem Kuppelfeld.
             <div style="font-size:10px;margin-top:3px">
               ${letzte
-                ? 'Gelegt wird sie erst beim Abschließen des Tilings.'
+                ? (_tilingFinishOffen
+                    ? (AI_ENABLED
+                        ? 'Klick auf die Musterreihe legt sie und übergibt an die KI.'
+                        : 'Klick auf die Musterreihe legt sie und beendet die Runde.')
+                    : 'Gelegt wird sie erst beim Abschließen des Tilings.')
                 : `Klick auf die Musterreihe schließt sie ab<span id="tiling-countdown"></span>.`}
               Anderes Feld = verschieben, dasselbe Feld noch einmal = zurücknehmen.
             </div>
@@ -1991,7 +2003,14 @@ function onTilingRowClick(pi, ri) {
   // wieder aushebeln (und zwar durch einen Klick, den man beim Verschieben
   // leicht daneben setzt).
   if(pendingTiling && pendingTiling.pi === pi && pendingTiling.ri === ri) {
-    if(!isLastPatternRow(pi, ri)) commitPendingTiling();
+    if(!isLastPatternRow(pi, ri)) { commitPendingTiling(); return; }
+    // Letzte Musterreihe (Nutzer 2026-09-09): der Reihen-Klick bestaetigt hier
+    // nicht nur, er UEBERGIBT auch -- derselbe Weg wie der Abschluss-Knopf,
+    // nur ohne den Griff zum Fenster. Bedingung ist, dass das Fenster ohnehin
+    // schon offen steht; sonst waere der Klick eine Uebergabe, waehrend der
+    // Mensch noch Reihen offen hat. Bis dahin bleibt die Fliese korrigierbar,
+    // wie 2026-09-07 gewuenscht: sie hat weiterhin keinen 5-Sekunden-Ablauf.
+    if(_tilingFinishOffen) finishHumanTiling();
     return;
   }
   // Chip-Reihe: sie ist nicht voll und laesst sich nicht an die Kuppel legen,
@@ -2182,6 +2201,7 @@ function renderTilingFinishPopup(hasPending) {
   // ist dann weiter 'tiling', offene Reihen hat der Mensch aber keine mehr).
   const show = !!S && S.phase === 'tiling' && !hasPending
             && !AI_THINKING && !humanTilingDone;
+  _tilingFinishOffen = show;
   ov.style.display = show ? 'block' : 'none';
   if(!show) return;
   const title = document.getElementById('tiling-finish-title');
