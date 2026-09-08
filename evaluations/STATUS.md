@@ -27,7 +27,8 @@ diesen Inhalten etwas aendert, aendert es DORT.
 ## 1. UEBERGABE an die naechste Sitzung (2026-09-08, 23:50)
 
 **MASCHINE FREI, nichts laeuft.** Baum sauber, **6 Commits vor origin, NICHT gepusht**
-(Push nur auf Nutzer-Anweisung). Champion laut `models/champion.txt`: `v25-b01_brierbest`.
+(Push nur auf Nutzer-Anweisung). Champion laut `models/champion.txt`:
+`v25-b01_brierbest`, **Elo 1376** [1333, 1425] aus 520 Partien.
 
 **Die Promotion v25-b01 ist VOLLSTAENDIG durch** -- alle sechs Schritte der Checkliste plus
 das eingefrorene Artefakt. Was bleibt, steht unter "Erste Aufgabe".
@@ -54,9 +55,9 @@ zusammenfiel.
    `v24-b07` 92:58 gegen `alphazero_v23-b01_brierbest.onnx`) bleiben stehen wie gemessen --
    mit dem Vermerk unten, dass auf beiden Seiten der heutige Motor lief. Nicht neu
    vorschlagen.
-2. **Generationsbericht v25 nach `archive/history.md`** (Muster: der v24-Bericht am Ende
-   der Datei). Elo-Zahl von v25-b01 vorher aus `tools/elo_tracker.py report` holen und ins
-   Artefakt-Manifest nachtragen (Feld `elo.value` steht auf `null`).
+2. ~~Generationsbericht v25~~ **ERLEDIGT 2026-09-09**: steht am Ende von
+   `archive/history.md`. **v25-b01 hat Elo 1376** [1333, 1425] aus 520 Partien, v24-b07
+   steht jetzt bei 1311; das Artefakt-Manifest traegt die Zahl samt KI und Quelle.
 3. **restic-Stand fuer v25-b01 nachholen** -- der Modell-Snapshot des Trainings ist mit
    Exitcode 0xC0000142 gescheitert.
 4. **`/mosaic-generation-turnover`** vor der v26-Erzeugung, NICHT von Hand. Schritt 4
@@ -88,8 +89,10 @@ zusammenfiel.
    ist bis v27 eingefroren), das aktuelle Wheel plus `wheel.sha256`, `manifest.json`,
    Golden Probe (`tools/build_frozen_golden_probe.py --artifact-dir ... --seed-base 916001`,
    rund 16 min), venv aus dem Wheel, dann `tools/frozen_referee_match.py ... --n-games 2`.
-3. **STATUS-Champion-Zeile und `archive/history.md`** nachziehen (Generationsbericht v25).
-4. **Elo-Bericht lesen** und auf `NICHT mit Anker verbunden` pruefen.
+3. ~~STATUS-Champion-Zeile und `archive/history.md`~~ **ERLEDIGT 2026-09-09** (Bericht
+   am Ende von `archive/history.md`, Champion-Zeile oben stimmt).
+4. ~~Elo-Bericht lesen~~ **ERLEDIGT 2026-09-09**: kein Modell traegt die Marke
+   `NICHT mit Anker verbunden`; die Leiter ist durchgehend verbunden.
 
 ### BEFUNDE, die eine Entscheidung brauchen
 

@@ -17230,3 +17230,54 @@ gemessen (Drafting UND Tiling statt nur Drafting), und die Ausfluglaenge um Fakt
 falsch eingeordnet (`move_number` zaehlt beide Spieler). Daraus zwei neue Regeln in
 CLAUDE.md: die Rueckwaerts-Pruefung beim Registrieren und Regel 0 Zusatz 2 (n, Grundmenge,
 Einheit -- gegen die des Verbrauchers geprueft).
+
+
+# Generationsbericht v25 (abgeschlossen 2026-09-08)
+
+**Champion am Ende der Generation: `v25-b01`, Elo 1376** [1333, 1425] aus 520 Partien
+(`tools/elo_tracker.py report`, 44 Match-Zeilen). Vorgaenger `v24-b07` steht jetzt bei
+1311 [1275, 1349] aus 1.000 Partien, der Anker fix bei 1000. Die 1327 aus dem
+v24-Bericht sind kein Widerspruch: Elo-Zahlen sind Momentaufnahmen der ganzen Leiter und
+wandern, wenn Kanten dazukommen.
+
+**Was v25 gebracht hat, in der Reihenfolge der Tragweite:**
+
+1. **Der erste Beleg, dass allein das MATERIAL den Champion schlaegt.** Die Spec ist nach
+   `PREREG_v25_window.md` par.18 bis v27 eingefroren; v25-b01 aendert nur das Netz. Gating
+   gegen `v24-b07` gepoolt **182:118 = 0,607** ueber 300 Partien, p 0,0003, KI
+   [0,551; 0,662] -- und **beide Seeds sind einzeln SPRT-signifikant** (Seed 20261020
+   53:27 nach 40 Paaren, p 0,0049; Seed 20261021 129:91 nach 110 Paaren, p 0,0145). Damit
+   bessere Beleglage als bei K3-P, wo der Fruehstopp in der Replikation zusammenfiel.
+2. **Das Fenster: 2.947 Dateien in acht Klassen, davon 580 Traegerdateien**
+   (`manifest_train_v25-b01_20260908_044738.json`, Grundmenge Fensterdateien, Einheit
+   Dateien). Traeger je Praefix: `v24-b07-policy` 400, `v23-b01-policy` 135, `hv2` 45.
+   Die drei v24-b07-Klassen bringen 400 Dateien Traeger, 400 temperiert und zweimal 201
+   Ausflug-Dateien (Stride 2, je 402 Partien).
+3. **Das Training** lief als Warmstart auf `v24-b06_brierbest` (die Gewichte von v24-b07):
+   12 Epochen, lr 5e-5 mit Cosine T_max 12, `nortv`, WDL-Kopf, 2D-Encoder, lambda 0,7.
+   **5.779,6 s Wanduhr, 27.399,9 s CPU, 6 Threads, cuda, 4.704.642 Samples.** Val-Brier
+   0,19361 in Epoche 1, **bester Wert 0,19121 in Epoche 9** -- das ist der `brierbest`,
+   der Champion wurde.
+4. **Die Anker-Kante steht still: 126:24, exakt wie v24-b07.** Die Generation gewinnt
+   gegen ihren Vorgaenger, nicht gegen den Anker. Der Anker misst inzwischen eine
+   Distanz, die fuer die Auswertung zu gross ist -- als Fixpunkt bleibt er richtig, als
+   Fortschrittsmass ist er gesaettigt.
+5. **sigma/Prior-Balance 2,792** (v24-b06: 2,603), Schwelle 3 nicht gerissen, die
+   Regler-Familie `c_visit`/`c_scale` bleibt also zu. **Runde 4 liegt einzeln bei 3,408**
+   (`evaluations/artifacts/gumbel_scale_calibration_v25-b01.json`, n_used 233): beim
+   naechsten Champion wieder pruefen.
+6. **Anzeige-Kalibrierung** auf A -0,0814 / B 0,6386 (Brier 0,2268 auf `frozen_v3`; v24-b06
+   hatte 0,23221), eingetragen in `server.py:1611/1612`. Der Fit auf `frozen_eval_set.pkl`
+   ist NUR Trendmetrik und gehoert nicht in die Anzeige.
+
+**Zwei Koordinator-Fehler dieser Generation, beide vom Nutzer gefunden:** `--games` zaehlt
+bei Weg B die Ausfluege mit (Auffuell-Lauf noetig, `PREREG_v25_window.md` par.19a), und die
+Champion-2-Kante wurde gegen die LEBENDEN Modelldateien statt gegen das eingefrorene
+Artefakt gemessen -- betrifft auch die entsprechende Kante von v24-b07. **Nutzer-Entscheid
+2026-09-08: es wird nicht nachgemessen** (Aufwand gegen Nutzen); beide Kanten bleiben mit
+dieser Einschraenkung stehen.
+
+**Was am Ende der Generation offen blieb:** v25-b01 hat keinen eigenen restic-Stand (der
+Modell-Snapshot des Trainings scheiterte mit Exitcode 0xC0000142), und Schritt 4 des
+Generationswechsels (tote Korpora, Bloecke, Monolithe) wurde bewusst uebersprungen und ist
+vor v26 faellig.
