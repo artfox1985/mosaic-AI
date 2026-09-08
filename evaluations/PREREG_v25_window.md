@@ -1319,7 +1319,7 @@ python -u self_play.py --mode network --model models/alphazero_v24-b07_brierbest
 
 ### 3. Schwarm Haelfte b, 4.000 Identitaeten -- value-only, unverzerrte Ziele
 
-**`--games 2000`, nicht 4000.** Ein Ausflug kommt ZUSAETZLICH zur Hauptpartie, mit eigener
+**`--games 4000`** -- BERICHTIGT 2026-09-08, siehe par.19a. Hier stand zuerst `--games 2000`, und das war falsch. Ein Ausflug kommt ZUSAETZLICH zur Hauptpartie, mit eigener
 `game_id` (Suffix `_x1`, belegt in der Rauchprobe: 20 Partien ergaben 20 Ausfluege). 2.000
 Hauptpartien plus 2.000 Ausfluege sind die 4.000 Identitaeten dieser Haelfte. **Damit ist
 die Zaehlfrage aus par.9f entschieden: der Ausflug zaehlt als eigene Partie.**
@@ -1418,3 +1418,76 @@ die Form ohne Belang.
 **Das ist die Zahl, die der Ausflugslaenge fehlt** (`PREREG_start_position_seeding.md`
 par.9d): ein fester Halbzug-Deckel misst etwas, das je nach Runde und Zug voellig
 verschieden viel wert ist.
+
+### par.19a BERICHTIGUNG: der Ausflug zaehlt gegen `--games` (2026-09-08, 01:30)
+
+**Der Fehler.** par.19 hat fuer die Ausflug-Haelfte `--games 2000` vorgeschrieben, mit der
+Begruendung, ein Ausflug komme ZUSAETZLICH zur Hauptpartie -- 2.000 Hauptpartien plus 2.000
+Ausfluege ergaeben die 4.000 Identitaeten. **Der erste Teil stimmt, der zweite nicht.**
+
+**Am Code:** `self_play.py:689-692` zaehlt `done` je Eintrag aus `_group_by_game`, und das
+gruppiert nach `game_id`. Der Ausflug hat eine EIGENE `game_id` (Suffix `_x1`), zaehlt also
+mit. Die Chunk-Schleife bricht bei `done >= num_games` ab (Zeile 698). Der RUST-Zaehler
+`games_counter` erhoeht dagegen nur je Hauptpartie (`self_play.rs:4753`) -- die beiden
+Zaehler messen Verschiedenes, und der Python-seitige entscheidet.
+
+**Gemessen am Korpus** (nicht am Log): der Lauf vom 2026-09-07 23:44 mit `--games 2000`
+lieferte **2.002 game_ids: 1.002 Hauptpartien und 1.000 Ausfluege**, in 201 Dateien,
+6.291 s. Also rund die HAELFTE der geplanten Klasse.
+
+**Richtig ist `--games 4000`** fuer 4.000 Identitaeten der Ausflug-Haelfte (rund 2.000
+Hauptpartien plus rund 2.000 Ausfluege). Erwartete Dauer nach dem gemessenen Durchsatz
+(3,14 s je Identitaet) rund 3,5 h.
+
+**Behebung ohne Wegwerfen:** der vorhandene Lauf bleibt, ein zweiter mit eigenem Seed
+(20260910) fuellt auf rund 4.000 auf. Das ist billiger als ein Neustart und verletzt
+nichts -- die Seeds sind verschieden, die Klasse ist dieselbe.
+
+**Warum es nicht frueher auffiel:** die Rauchprobe fuhr 20 Partien und meldete 20
+Ausfluege; bei `--games 20` und 10 Hauptpartien plus 10 Ausfluegen sieht das Verhaeltnis
+1:1 genauso aus wie erwartet. Erst die Gesamtzahl im Korpus zeigt den Unterschied.
+
+## par.20 DAS FENSTER IST GEBAUT (2026-09-08, 03:33)
+
+**Seed aller Auswahlen: 20260925** (v24 nahm 20260921). Werkzeug
+`tools/generate_carrier_manifest.py`, Kette `tools/night_v25_chain.sh`.
+
+| Posten | Dateien | Partien | Rolle |
+| --- | --- | --- | --- |
+| `selfplay_v24-b07-policy_*` | 400 | 4.000 | **Traeger** |
+| 135 aus `selfplay_v23-b01-policy_*` (`--pick`) | 135 | 1.350 | **Traeger** |
+| 45 aus `carriers_v23_hv2.txt` | 45 | 450 | **Traeger** |
+| **Traeger gesamt** | **580** | **5.800** | |
+| `selfplay_v24-b07-value-tempc_*` | 400 | 4.000 | maskiert |
+| `selfplay_v24-b07-value-excursion*_*` | 402 | 4.004 | maskiert |
+| `selfplay_v23-b01-value-*` | 800 | 8.000 | maskiert |
+| Rest `selfplay_v23-b01-policy_*` | 265 | 2.650 | maskiert |
+| 500 hv2 (135 Ex-Traeger + 365 Auswahl) | 500 | 5.000 | maskiert |
+| **Fenster gesamt** | **2.947** | **29.804** | |
+
+Die 29.804 liegen 354 Partien ueber den 29.450 aus par.1 -- der Ueberschuss steckt in der
+Ausflug-Klasse (4.004 statt 4.000) und im hv2-Anteil (545 Dateien, die Rechnung in par.2
+ging von 5.450 Partien aus). Beides ist Rundung, kein Zuschnittsfehler.
+
+### Die Falle, die vor dem Start aufgefallen ist
+
+**Die in par.3 registrierte Aufrufform waere falsch gewesen.** Dort steht
+`--from-list carriers_v23_hv2.txt --n-files 45 --pick "selfplay_v23-b01-policy_*.pkl:135"`
+-- das ergibt 180 Traeger und laesst die **400 neuen Sockel-Dateien maskiert**. Der
+Praefix-Kurzschluss deckt sie nicht ab: `V20_CARRIER_SHORTCUT_PREFIXES = ("selfplay_v19wdl",
+"selfplay_v20wdl")` (`engine/py/neural_net.py:847`), und
+`generate_carrier_manifest.py` schreibt `carrier_prefixes` bewusst nicht
+(`PREREG_v23_window.md:540-543` haelt genau das fest).
+
+Ohne `--include-glob "selfplay_v24-b07-policy_*.pkl"` waere die Klasse, um die es in dieser
+Generation geht, gar nicht als Policy-Quelle gezaehlt worden -- und der Fehler waere erst
+nach zwoelf Stunden Training an einer flachen Policy-Metrik aufgefallen, wenn ueberhaupt.
+Die par.3-Zeile war eine Demonstration des `--pick`-Mechanismus, kein vollstaendiger
+Aufruf; sie ist hier richtiggestellt.
+
+**Trainingsrezept** (aus `manifest_train_v24-b06_20260906_114705.json` uebernommen, damit
+der Netz-Teil zwischen den Generationen fest bleibt, par.18): Warmstart auf
+`v24-b06_brierbest` (das sind die Gewichte von b07), 12 Epochen, lr 5e-05, Kosinus mit
+T_max 12, Brier-Auswahl, 2D-Encoder, WDL-Kopf, `nortv` mit lambda 0,7, Ownership-Gewicht
+1,0, Endgame- und Gegnerpunkte-Kopf, Val-Anteil 5 % aus dem Pool
+**`^selfplay_v24-b07-`**.
