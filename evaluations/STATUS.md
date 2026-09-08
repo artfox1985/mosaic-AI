@@ -48,14 +48,12 @@ zusammenfiel.
 
 ### ERSTE AUFGABE DER NEUEN SITZUNG (in dieser Reihenfolge)
 
-1. **Champion-2-Kanten ueber das ARTEFAKT nachmessen** (der Methodenfehler unten).
-   Betrifft `v25-b01` gegen `frozen_champions/v24-b06/` und `v24-b07` gegen
-   `frozen_champions/v23-b01_k3p10/`. Weg: `tools/frozen_referee_match.py` bzw. das
-   Artefakt-venv, NICHT die lebenden `models/alphazero_*`-Dateien. Abnahme: neue Zeile in
-   `elo_history.csv` mit Vermerk, dass sie die alte ersetzt. Kosten je Kante rund 30 min.
-   **ACHTUNG:** der Nutzer loescht `frozen_champions/v24-b06/` -- vorher fragen oder aus
-   restic-Stand `b6842b4e` zurueckholen (`restic restore b6842b4e --target . --include
-   "*/frozen_champions/v24-b06/*"`, alle sieben Teile geprueft vorhanden).
+1. ~~Champion-2-Kanten ueber das ARTEFAKT nachmessen~~ **ENTFAELLT (Nutzer-Entscheid
+   2026-09-08): "nicht notwendig, das waere extra Fleissarbeit mit geringem Nutzen".**
+   Die beiden Kanten (`v25-b01` 48:22 gegen die lebende `alphazero_v24-b06_brierbest.onnx`,
+   `v24-b07` 92:58 gegen `alphazero_v23-b01_brierbest.onnx`) bleiben stehen wie gemessen --
+   mit dem Vermerk unten, dass auf beiden Seiten der heutige Motor lief. Nicht neu
+   vorschlagen.
 2. **Generationsbericht v25 nach `archive/history.md`** (Muster: der v24-Bericht am Ende
    der Datei). Elo-Zahl von v25-b01 vorher aus `tools/elo_tracker.py report` holen und ins
    Artefakt-Manifest nachtragen (Feld `elo.value` steht auf `null`).
@@ -72,8 +70,11 @@ zusammenfiel.
 - **Loeschung nur auf pfadgenaue Freigabe**, auch bei "offensichtlichem" Muell.
 - **Messungen laufen exklusiv**; GPU und CPU duerfen parallel, zwei CPU-Messungen nicht.
 - **Erzeugung startet nur auf Anweisung.**
-- Offene Loeschfreigaben: `evaluations/cleanup_proposal_turnover_v25.md` (6 Skripte),
-  `models/attic_20260906_k3p10_copies/`, `venv_measure_hullform/`.
+- ~~Offene Loeschfreigaben~~ **ERLEDIGT 2026-09-08**: Freigabe erteilt, die sechs
+  Einmal-Skripte aus `cleanup_proposal_turnover_v25.md` sind geloescht;
+  `models/attic_20260906_k3p10_copies/` und `venv_measure_hullform/` lagen zum Zeitpunkt
+  der Freigabe nicht mehr im Baum (nie getrackt, kein git-Loeschcommit -- wer sie entfernt
+  hat, ist nicht belegbar).
 
 ### WAS NOCH ZU TUN IST (mechanisch, keine Entscheidung noetig)
 
@@ -98,8 +99,10 @@ zusammenfiel.
   `models/alphazero_v23-b01_brierbest.onnx` (92:58). Damit lief der heutige Motor auf beiden
   Seiten. **Genau dafuer wird der Alt-Champion mit eigenem Wheel eingefroren:** damit er
   spielt wie zu der Zeit, aus der seine Elo-Zahl stammt. Beide Kanten sind nachzumessen,
-  ueber den Artefakt-Pfad (`tools/frozen_referee_match.py` bzw. das Artefakt-venv). Bis
-  dahin tragen sie weniger, als ihre Zahl suggeriert. **Die uebrigen Kanten sind nicht
+  ueber den Artefakt-Pfad (`tools/frozen_referee_match.py` bzw. das Artefakt-venv). **Nutzer-Entscheid 2026-09-08: es
+  wird NICHT nachgemessen** (Aufwand gegen Nutzen). Beide Kanten bleiben in
+  `elo_history.csv` stehen und tragen weniger, als ihre Zahl suggeriert -- wer sich auf sie
+  beruft, nennt diese Einschraenkung mit. **Die uebrigen Kanten sind nicht
   betroffen** -- Gating misst zwei aktuelle Netze gegeneinander, die Anker-Kante laeuft
   ohnehin ueber das Anker-Artefakt.
 - **Lebende Modelldateien werden regelmaessig archiviert** (Nutzer): `alphazero_v24-b06*`
@@ -112,8 +115,7 @@ zusammenfiel.
   Ueberschreiten oeffnet sich `c_visit`/`c_scale` per Regel, ohne Ermessen.
 - **v25-b01 hat KEINEN eigenen restic-Stand**: der Modell-Snapshot des Trainings ist mit
   Exitcode 0xC0000142 (DLL-Init) fehlgeschlagen. Nachholen.
-- **Loeschfreigaben stehen aus**: `evaluations/cleanup_proposal_turnover_v25.md`
-  (6 Einmal-Skripte), `models/attic_20260906_k3p10_copies/`, `venv_measure_hullform/`.
+- ~~Loeschfreigaben stehen aus~~ **ERLEDIGT 2026-09-08** (siehe oben unter FREIGABEN).
 - **Schritt 4 des Generationswechsels** (tote Korpora, Bloecke, Monolithe) wurde vor v25
   bewusst uebersprungen und ist vor v26 faellig.
 
