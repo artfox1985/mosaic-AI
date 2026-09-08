@@ -17281,3 +17281,115 @@ dieser Einschraenkung stehen.
 Modell-Snapshot des Trainings scheiterte mit Exitcode 0xC0000142), und Schritt 4 des
 Generationswechsels (tote Korpora, Bloecke, Monolithe) wurde bewusst uebersprungen und ist
 vor v26 faellig.
+
+# Chronik 2026-09-09 (Generationswechsel v25 -> v26)
+
+Umgezogen aus `evaluations/night_run_20260902.md`, die als zweite Chronik neben dieser
+Datei gewachsen war (Nutzer-Anweisung 2026-09-09).
+
+## 2026-09-09 -- Uebergabepunkte 2 und 3 abgearbeitet
+
+Punkt 2: Elo-Zahl von v25-b01 ist **1376** [1333, 1425] aus 520 Partien; im
+Artefakt-Manifest nachgetragen (`elo.value` war null), Generationsbericht v25 am Ende von
+`archive/history.md`. Der Elo-Bericht traegt bei keinem Modell die Marke "NICHT mit Anker
+verbunden". Das Trainings-Manifest `manifest_train_v25-b01_20260908_044738.json` war als
+einziges der 26 nicht eingecheckt und ist jetzt im Baum.
+
+Punkt 3: Modell-Snapshot nachgeholt, `tools/snapshot_models.ps1 -Version v25-b01` -->
+Snapshot **028989fb**, Marke `run:v25-b01`, 41 neue Dateien, 581,6 MiB verarbeitet,
+6,8 MiB dazugekommen, 5 s. Der Fehlschlag beim Training (0xC0000142) hat sich beim
+direkten Start nicht wiederholt -- er lag am Aufruf aus `train.py`, nicht am Skript.
+
+Nebenbefund: `docs/knobs.md` stand auf dem Stand vor den Prereg-Kopf-Nachtraegen (59 statt
+70 Knoepfe an beantworteten Preregs) und hat den Konventionspruefer rot gemacht; neu
+generiert.
+
+## 2026-09-09 -- Generationswechsel v25 -> v26 (Punkt 4), Schritte 0 bis 6
+
+Ablauf `/mosaic-generation-turnover`, in seiner Reihenfolge.
+
+**Schritt 0:** Prozessliste leer (nur die eigene Abfrage), Baum sauber. **Schritt 1** war
+schon getan: der Generator fuer v26 ist `v25-b01` und liegt als eingefrorenes Artefakt.
+**Schritt 2:** Tages-Snapshot **6dd4d988** (`tools/mosaic_backup.ps1`, 7.725 Dateien /
+9,279 GiB, 84 neu, 22,2 MiB dazugekommen, `check` ueber 43 Snapshots ohne Fehler, 7 s).
+
+**Schritte 3 bis 5** liegen als `evaluations/cleanup_proposal_turnover_v26.md` vor, mit
+`restic find --snapshot 6dd4d988` je Gruppe -- alle neun geprueften Muster stimmen auf die
+Datei genau mit dem Baum ueberein (u.a. hv2 1.745/1.745, tor2a 280/280). Nicht als
+Kandidat vorgeschlagen: `selfplay_v23-b01-seedvalue_*` (600 Dateien), weil
+`PREREG_start_position_seeding.md` OFFEN ist und der Korpus damit Referenz bleibt --
+genau die Pruefung, die der Ablauf an dieser Stelle verlangt.
+
+**Bloecke:** `tools/cache_inventory.py --orphans` meldet 0 Waisen bei 13.955 Bloecken
+(5.495 MB) und 5.320 Korpusdateien. **Monolithe:** 12 Dateien, 6,42 GiB; geprueft, dass
+KEIN Trainings-Manifest ein `cache_file` nennt, die Zuordnung Monolith-zu-Fenster also
+nicht aus den Manifesten lesbar ist. Alle `.h5` sind per `backup_excludes.txt` bewusst
+ungesichert (nachbaubar).
+
+**Schritt 6:** `docs/measured_runtimes.md` um den Abschnitt "Generation v25" ergaenzt
+(Erzeugung 4h00 / 3h33 / 2 x rund 1h45, Training 5.779,6 s, Gating 18 und 52 min, Anker
+19 min), `docs/generation_naming.md` um die v24-b07/v25/v26-Zeilen und die reservierten
+v26-Namen, `docs/knobs.md` neu generiert. STATUS Abschnitt 1 neu gefasst, Abschnitt 2 auf
+die v26-Erzeugung umgestellt (`--games 4000` auch fuer die Ausflug-Klasse).
+
+**Abweichung vom Ablauf, bewusst:** der alte STATUS wurde NICHT als Ganzes nach
+`archive/history.md` kopiert. Der Generationsbericht v25 steht dort bereits und traegt
+denselben Inhalt; ein zweites Kapitel waere eine plausible Zweitquelle mehr, und genau
+davor warnt die STATUS-Regel. Abschnitt 1 wurde stattdessen an Ort und Stelle ersetzt.
+
+**Schritt 7 nicht ausgefuehrt:** die v26-Kette ist nicht geschrieben und die Erzeugung
+nicht gestartet -- beides braucht die Nutzer-Freigabe.
+
+## 2026-09-09 -- Loeschungen des Generationswechsels ausgefuehrt
+
+Nutzer-Freigabe fuer alle vier Gruppen des Vorschlags. Geloescht:
+
+| Gruppe | Dateien | Groesse |
+| --- | --- | --- |
+| B Messkorpora plus ihre Manifeste | 611 | 607,4 MiB |
+| C hv2-Korpus | 1.746 | 679,3 MiB |
+| D Monolithe (`.cache_*`, `.par_full_79`, `.ref_serial_79`) | 12 | 6.576,7 MiB |
+| E Modell-Arme `alphazero_v24-b0[1-5]*` | 50 | 324,6 MiB |
+| Waisen-Bloecke danach | 7.553 | 2.965,9 MiB |
+| **zusammen** | **9.972** | **11.154 MiB** |
+
+`data/` faellt von 19,69 auf 9,12 GiB, `models/` auf 0,59 GiB. Die Waisen kamen
+ausschliesslich aus den geloeschten Praefixen (Liste nach Praefix geprueft, hv2 allein
+6.980 Bloecke); Gegenprobe `cache_inventory.py --orphans` danach: 0 Waisen bei 6.402
+Bloecken und 3.002 Korpusdateien.
+
+Dazu `tools/night_v24_chain.sh` (Gruppe A) und der Skill-Verweis darauf
+(`mosaic-generation-turnover/SKILL.md:143`), der jetzt auf `night_v25_chain.sh` zeigt.
+
+**Was das kostet, falls es gebraucht wird:** die Korpora liegen im Snapshot `6dd4d988`,
+die Modell-Arme unter ihren `run:`-Marken. Die Monolithe sind NICHT gesichert (per
+`backup_excludes.txt`) und muessten aus dem Korpus neu gebaut werden -- betrifft auch den
+Monolithen des v25-Fensters.
+
+## 2026-09-09, 00:35 -- v26-Erzeugung angelaufen (Nutzer startet Klasse 1 selbst)
+
+Nutzer-Entscheid: die drei Erzeugungsbefehle laufen NICHT als Hintergrundaufgaben des
+Koordinators ("wenn alles bei dir im hintergrund laeuft ist mir das zu unsicher").
+**Klasse 1 (Traeger, Seed 20260911) hat der Nutzer um 00:31:53 selbst gestartet**, 4.000
+Partien, threads 11. Auftrag um 00:40: die zwei Schwarm-Laeufe uebernimmt der Koordinator,
+sobald die Traeger durch sind.
+
+**Dafuer gebaut: `tools/night_v26_swarm.sh`** (laeuft seit 00:34:58, Hintergrundaufgabe).
+Die Wartebedingung ist zweiteilig und gehaertet: erst wenn (a) das Manifest des
+Traeger-Laufs seinen `laufzeit`-Block traegt -- den schreibt `self_play.py:771` erst am
+Ende -- UND (b) die Prozessabfrage eine KLARE 0 liefert, geht es weiter. Jede andere
+Antwort, auch eine leere oder unlesbare, gilt als BELEGT. Danach Klasse 2 (tempc, Seed
+20260912) und Klasse 3 (Ausflug, Seed 20260913, `--games 4000`), nacheinander, Befehle
+woertlich aus `PREREG_v26_window.md` par.7.
+
+**Cache-Waechter laeuft daneben** (`build_cache_incremental.py --watch --workers 3`,
+seit 00:22): er arbeitet zuerst 802 Bestandsdateien ohne Block ab (v24-b07-Ausflug-Klassen,
+rund 1,8 s je Datei) und nimmt danach die neuen Dateien im 60-s-Takt mit. Er endet nicht
+von selbst (`--leerlauf-abbruch 100000`).
+
+`git gc` auf Nutzer-Hinweis: 497 lose Objekte auf 0, alles in zwei Packs (116,8 MB).
+
+**Commit der Kette und dieses Eintrags steht aus** -- der pre-commit-Hook erzeugt Last, und
+CLAUDE.md nennt einen Commit waehrend eines laufenden Self-Plays ausdruecklich einen
+Grenzfall, den man im Zweifel aufhebt. Wird nach der Erzeugung nachgeholt.
+

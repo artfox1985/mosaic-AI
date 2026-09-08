@@ -24,9 +24,33 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. STAND (2026-09-09, Generationswechsel v25 -> v26)
+## 1. STAND (2026-09-09, v26-Erzeugung laeuft)
 
-**MASCHINE FREI, nichts laeuft.** Baum sauber, **Commits vor origin nicht gepusht**
+**ES LAEUFT (Stand 01:20).** Drei Hintergrundlaeufe, alle mit derselben gehaerteten
+Wartebedingung verkettet: `laufzeit`-Block im Manifest der Vorgaenger-Klasse UND eine
+KLARE 0 aus der Prozessabfrage; jede andere Antwort gilt als belegt.
+
+| Lauf | Was | Erwartet |
+| --- | --- | --- |
+| (Nutzer, 00:31:53) | Klasse 1 Traeger, Seed 20260911 | rund 04:30 |
+| `tools/night_v26_swarm.sh` | Klasse 2 (tempc, 20260912), dann Klasse 3 (Ausflug, 20260913) | rund 11:30 |
+| `tools/night_v26_chain.sh` | Traeger-Kennzahl, Manifest, Fenster, Bloecke, Monolith, **Training v26-b01** | rund 14:00 |
+| Cache-Waechter | Datei-Bloecke im Mitlauf, `--workers 3` | wird von der Kette beendet |
+
+**Nichts anderes anfassen, solange das laeuft.** Der Nutzer hat Erzeugung Klasse 2/3 und
+das Training ausdruecklich freigegeben (2026-09-09, 00:40 und 00:55); die Zuschnitt-Groessen
+stehen in `PREREG_v26_window.md` par.1, Auswahl-Seed **20260929**, Val-Pool
+**`^selfplay_v25-`**.
+
+**Zwei Befunde dieser Nacht, beide in par.7 der v26-Prereg registriert:** der Waechter darf
+ueber alle drei Klassen laufen (der Traegerstatus steht seit 2026-08-31 nicht mehr im
+Datei-Schluessel), aber er MUSS unter `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` laufen -- die
+Variable steht im Schluessel, und der erste Start ohne sie hat rund 350 Bloecke in den
+falschen Namensraum gebaut.
+
+**Der Abschnitt darunter beschreibt den Stand VOR dem Start.**
+
+**MASCHINE war frei beim Generationswechsel.** Baum sauber, **Commits vor origin nicht gepusht**
 (Push nur auf Nutzer-Anweisung; Zahl im Chat gemeldet). Champion laut
 `models/champion.txt`: `v25-b01_brierbest`, **Elo 1376** [1333, 1425] aus 520 Partien.
 

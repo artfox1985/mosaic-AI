@@ -32,6 +32,12 @@ G = v25, G-1 = v24-b07, G-2 = v23-b01.
 | Schwarm G-2 | 145 der 800 `selfplay_v23-b01-value-*` | 145 | 1.450 |
 | **Summe** | | **2.367** | **23.654** |
 
+**SEED der seedbestimmten Auswahlen: 20260929** (v25 nahm 20260925, v24 20260921;
+Koordinator-Setzung 2026-09-09, weil die Reihe fortgeschrieben werden musste und kein
+Seed registriert war). Er steuert beide Ziehungen: die 135 aus G-1 und 45 aus G-2 fuer
+den Sockel (`generate_carrier_manifest.py`) und die 145 von 800 fuer den G-2-Schwarm.
+Gefahren wird er von `tools/night_v26_chain.sh`.
+
 **Fenster gesamt 2.947 Dateien, 29.454 Partien** -- dieselben Groessen wie v25
 (2.947 / 29.804), die Zusammensetzung ist eine andere.
 
@@ -77,7 +83,9 @@ waere weg. Genau davor warnt par.18 im letzten Absatz.
 
 **Es bleibt EIN Punkt, und der ist reine Buchfuehrung:**
 
-1. **Der Val-Pool** wandert auf `^selfplay_v25-`. Kein Ermessen, aber eine stille
+1. **Der Val-Pool** wandert auf `^selfplay_v25-`. **GESETZT 2026-09-09** in
+   `tools/night_v26_chain.sh` (Schritt 6 und die Trainings-Umgebung), damit er nicht in der
+   Erinnerung haengt. Kein Ermessen, aber eine stille
    Fehlerquelle: er gehoert in den Kopf der Kette, nicht in die Erinnerung. In v25 war der
    Wechsel von `^selfplay_v24-b06-` auf `^selfplay_v24-b07-` faellig und ist nur deshalb
    nicht vergessen worden, weil er in par.19 stand.
@@ -162,4 +170,15 @@ Sockel-Klasse; `--file-list` ist ohnehin nicht mit `--watch` kombinierbar
 (`tools/build_cache_incremental.py:258`). Gefahren wird er als
 `build_cache_incremental.py --watch --workers 3 --encoder 2d --value-target-variant nortv`
 ohne `MOSAIC_CARRIER_MANIFEST` (Vorgabe leer, "jede Datei traegt").
+
+**ZWEITE BERICHTIGUNG, gleicher Tag, teurer:** der Waechter MUSS unter
+`MOSAIC_IGNORE_POLICY_TARGET_VALID=1` laufen. Diese Umgebungsvariable steht als
+`|ignore_ptv_v1` IM Datei-Schluessel (`engine/py/file_cache_key.py:115-117`, gelesen bei
+Import in `neural_net.py:9`) -- ein Block ohne sie traegt einen anderen Hash und wird vom
+Training nie adressiert. Gemessen an einer Beispieldatei: `733d301b2cf1` ohne, `e5ccaac28a97`
+mit der Variablen, beide liegen im Baum. Der erste Waechter-Start am 2026-09-09 lief 40 min
+ohne sie und hat rund 350 Bloecke in den falschen Namensraum gebaut (rund 140 MB, keine
+Waisen im Sinne von `cache_inventory.py`, weil ihre Quelldateien existieren -- sie sind
+ueber den Schluesselvergleich zu finden). Genau deshalb baut die v25-Kette ihre Bloecke
+ausdruecklich "UNTER der Trainings-Umgebung".
 
