@@ -171,6 +171,11 @@
      die Platte selbst dreht sie ebenfalls um 90°. Erst "Legen" schickt den
      Zug an den Server. -->
 <div id="place-toolbar" style="display:none">
+  <!-- Nutzer 2026-09-09: die Leiste haengt unter dem gewaehlten Kuppelfeld und
+       verdeckt dort die Felder darunter. Sie ist deshalb halbdurchsichtig
+       (voll deckend, sobald die Maus darauf liegt) UND am Griff verschiebbar
+       (initPlaceToolbarDrag). -->
+  <span id="place-toolbar-grip" title="Leiste verschieben">⠿</span>
   <button class="btn" onclick="rotatePlacement(-90)" title="90° gegen den Uhrzeigersinn">↺</button>
   <span id="place-rot-label">0°</span>
   <button class="btn" onclick="rotatePlacement(90)" title="90° im Uhrzeigersinn">↻</button>

@@ -13,10 +13,14 @@ let humanTilingDone = false;
 // -- VORGEMERKTE TILING-PLATZIERUNG (Punkt 10, Nutzer 2026-09-06) ------------
 // Der Klick auf ein Kuppelfeld schickt den Zug NICHT mehr sofort an den
 // Server: die Fliese liegt erst einmal nur vorgemerkt auf dem Feld
-// (`pendingTiling`, gezeichnet als `.ds.pending-place`). Bestaetigt wird per
-// Klick auf die Musterreihe -- oder nach TILING_CONFIRM_MS von selbst. Bis
-// dahin ist ein anderes Feld waehlbar (verschieben) bzw. dasselbe Feld noch
-// einmal (zuruecknehmen).
+// (`pendingTiling`, gezeichnet als `.ds.pending-place`).
+//
+// GESTEN GETAUSCHT (Nutzer 2026-09-09): bestaetigt wird jetzt am FELD --
+// derselbe Kuppelplatz noch einmal angeklickt legt die Fliese fest. Der Klick
+// auf die MUSTERREIHE nimmt sie zurueck. Ein anderes Feld verschiebt sie
+// weiterhin. Vorher war es umgekehrt (Reihe = bestaetigen, Feld = zuruecknehmen);
+// die Hand bleibt so dort, wo die Fliese liegt, statt zwischen Reihe und Kuppel
+// zu wechseln. TILING_CONFIRM_MS bestaetigt nach wie vor von selbst.
 //
 // Die LETZTE Musterreihe bekommt bewusst KEINEN Ablauf (Nutzer: "in reihe 6
 // ist ein reset des setzens der fliese moeglich bis das tiling fuer die KI
@@ -25,7 +29,7 @@ let humanTilingDone = false;
 const TILING_CONFIRM_MS = 5000;
 let pendingTiling = null;      // {pi, ri, sr, sc, si}
 // Steht das Abschluss-Fenster offen? Gesetzt beim Zeichnen
-// (renderTilingFinishPopup), gelesen vom Reihen-Klick der letzten
+// (renderTilingFinishPopup), gelesen vom Bestaetigungs-Klick der letzten
 // Musterreihe -- er uebergibt nur dann an die KI (Nutzer 2026-09-09).
 let _tilingFinishOffen = false;
 let _tilingTicker = null;
@@ -867,8 +871,8 @@ function spaceHTML(sp, si=-1, pi=-1, sr=-1, sc=-1, tiling=false) {
       const pendColor = normColor(S.players[pendingTiling.pi]
         .pattern_lines[pendingTiling.ri].color || '');
       return `<div class="ds filled ${pendColor} click pending-place" `
-           + `style="cursor:pointer;" title="Vorgemerkt - Klick auf die Musterreihe legt sie, `
-           + `Klick hierher nimmt sie zurueck"${tdata}></div>`;
+           + `style="cursor:pointer;" title="Vorgemerkt - Klick hierher legt sie fest, `
+           + `Klick auf die Musterreihe nimmt sie zurueck"${tdata}></div>`;
     }
     // Nutzer-Auftrag 2026-08-13: nach dem Reihen-Klick pulsieren die LEGALEN
     // Zielfelder (Halo-Sprache wie die Lehrermodus-Tipps). Regel exakt aus
@@ -1131,12 +1135,11 @@ function renderBoard(pi) {
       const isPhantom = tileIdx >= row.tiles.length - phantomCount;
       return `<div class="tile sm ${normColor(row.color)}${isPhantom ? ' phantom' : ''}"></div>`;
     }).join('');
-    // Nutzer 2026-09-07: liegt die Fliese dieser Reihe vorgemerkt auf der
-    // Kuppel, ist die Reihe selbst das naechste Klickziel -- sie bekommt
-    // deshalb dieselbe Art Markierung wie die legalen Kuppelfelder
-    // (pulsierender Hof, `.prow.confirm-ready` in style.css).
-    const confirmCls = (pendingTiling && pendingTiling.pi === pi && pendingTiling.ri === ri)
-      ? ' confirm-ready' : '';
+    // Hier sass `.prow.confirm-ready` (pulsierender Hof), solange der
+    // Reihen-Klick BESTAETIGT hat. Seit dem Gesten-Tausch (Nutzer 2026-09-09)
+    // bestaetigt das Kuppelfeld, und dort pulsiert bereits `.ds.pending-place`.
+    // Die Reihe traegt jetzt nur noch die Ruecknahme -- zwei pulsierende Ziele
+    // nebeneinander wuerden gerade das verwischen, was der Tausch klarstellt.
     const chipTargetCls = isChipRow ? ' chip-target' : '';
     // Die Chip-Reihe traegt ihr Zeichen an der Stelle, an der sonst der Pfeil
     // steht (`.rowlabel` hat feste Mindestbreite) -- damit kostet die
@@ -1151,7 +1154,7 @@ function renderBoard(pi) {
     const rowLabel = chipTargetCls
       ? `<span class="rowlabel chip-label" title="Diese Reihe lässt sich mit Bonusplättchen vervollständigen - Reihe oder Bonuschips-Kasten anklicken">🎴</span>`
       : `<span class="rowlabel" style="color:var(--text3)">→</span>`;
-    return `<div class="prow ${cls}${chipTargetCls}${confirmCls}" data-ri="${ri}" ${onclick}>
+    return `<div class="prow ${cls}${chipTargetCls}" data-ri="${ri}" ${onclick}>
       <span class="rownum">${ri+1}</span>${cells}
       ${rowLabel}
     </div>`;
@@ -1504,11 +1507,11 @@ function renderCenter() {
               ${letzte
                 ? (_tilingFinishOffen
                     ? (AI_ENABLED
-                        ? 'Klick auf die Musterreihe legt sie und übergibt an die KI.'
-                        : 'Klick auf die Musterreihe legt sie und beendet die Runde.')
+                        ? 'Noch einmal auf dasselbe Feld klicken legt sie und übergibt an die KI.'
+                        : 'Noch einmal auf dasselbe Feld klicken legt sie und beendet die Runde.')
                     : 'Gelegt wird sie erst beim Abschließen des Tilings.')
-                : `Klick auf die Musterreihe schließt sie ab<span id="tiling-countdown"></span>.`}
-              Anderes Feld = verschieben, dasselbe Feld noch einmal = zurücknehmen.
+                : `Noch einmal auf dasselbe Feld klicken legt sie fest<span id="tiling-countdown"></span>.`}
+              Anderes Feld = verschieben, Klick auf die Musterreihe = zurücknehmen.
             </div>
           </div>`
         : `<div class="info tiling">
@@ -1992,25 +1995,14 @@ function onTilingRowClick(pi, ri) {
   if (AI_THINKING) return;
   // Mensch darf nicht für KI tilen
   if (AI_ENABLED && pi === AI_PLAYER) return;
-  // Punkt 10: liegt eine Fliese dieser Reihe vorgemerkt auf einem Kuppelfeld,
-  // ist der Klick auf die Reihe der ABSCHLUSS -- das ersetzt den frueheren
-  // sofortigen Server-Aufruf beim Feld-Klick.
-  //
-  // AUSNAHME letzte Musterreihe (Nutzer 2026-09-07): dort schliesst das
-  // Abschluss-Fenster ab, nicht der Reihen-Klick. Sie hat bewusst keinen
-  // 5-Sekunden-Ablauf, damit sie bis zur Freigabe des Tilings korrigierbar
-  // bleibt -- ein zweiter Weg, sie vorher festzuschreiben, wuerde genau das
-  // wieder aushebeln (und zwar durch einen Klick, den man beim Verschieben
-  // leicht daneben setzt).
+  // Gesten-Tausch (Nutzer 2026-09-09): liegt eine Fliese DIESER Reihe
+  // vorgemerkt auf einem Kuppelfeld, nimmt der Klick auf die Reihe sie
+  // ZURUECK. Bestaetigt wird am Feld (setPendingTiling). Die Reihe bleibt
+  // danach angewaehlt, die legalen Kuppelfelder pulsieren also weiter.
   if(pendingTiling && pendingTiling.pi === pi && pendingTiling.ri === ri) {
-    if(!isLastPatternRow(pi, ri)) { commitPendingTiling(); return; }
-    // Letzte Musterreihe (Nutzer 2026-09-09): der Reihen-Klick bestaetigt hier
-    // nicht nur, er UEBERGIBT auch -- derselbe Weg wie der Abschluss-Knopf,
-    // nur ohne den Griff zum Fenster. Bedingung ist, dass das Fenster ohnehin
-    // schon offen steht; sonst waere der Klick eine Uebergabe, waehrend der
-    // Mensch noch Reihen offen hat. Bis dahin bleibt die Fliese korrigierbar,
-    // wie 2026-09-07 gewuenscht: sie hat weiterhin keinen 5-Sekunden-Ablauf.
-    if(_tilingFinishOffen) finishHumanTiling();
+    clearTilingPending();
+    tilingPi = pi; tilingRow = ri;
+    render();
     return;
   }
   // Chip-Reihe: sie ist nicht voll und laesst sich nicht an die Kuppel legen,
@@ -2034,9 +2026,11 @@ function onTilingRowClick(pi, ri) {
 
 // -- VORGEMERKTE TILING-PLATZIERUNG: Ablauf (Punkt 10) -----------------------
 // Reihenfolge am Brett: Musterreihe anklicken -> Kuppelfeld anklicken (die
-// Fliese liegt jetzt VORGEMERKT dort) -> Musterreihe anklicken (abschliessen).
-// Ohne den letzten Klick uebernimmt der 5-Sekunden-Ablauf -- ausser in der
-// letzten Musterreihe, die bis zum Abschluss-Fenster korrigierbar bleibt.
+// Fliese liegt jetzt VORGEMERKT dort) -> dasselbe Kuppelfeld noch einmal
+// (festlegen). Ohne den letzten Klick uebernimmt der 5-Sekunden-Ablauf --
+// ausser in der letzten Musterreihe, die bis zum Abschluss-Fenster
+// korrigierbar bleibt. Klick auf die Musterreihe nimmt die Fliese zurueck,
+// Klick auf ein anderes Feld verschiebt sie.
 
 function isLastPatternRow(pi, ri) {
   return ri >= (S.players[pi].pattern_lines.length - 1);
@@ -2071,11 +2065,24 @@ function startTilingTicker() {
 function setPendingTiling(pi, ri, sr, sc, si) {
   if(pendingTiling && pendingTiling.pi===pi && pendingTiling.sr===sr
      && pendingTiling.sc===sc && pendingTiling.si===si) {
-    clearTilingPending();          // dasselbe Feld noch einmal = zuruecknehmen
-  } else {
-    pendingTiling = {pi, ri, sr, sc, si};
-    startTilingTicker();
+    // Dasselbe Feld noch einmal = FESTLEGEN (Nutzer 2026-09-09).
+    //
+    // AUSNAHME letzte Musterreihe (Nutzer 2026-09-07): sie hat bewusst keinen
+    // 5-Sekunden-Ablauf und bleibt bis zur Freigabe des Tilings korrigierbar.
+    // Steht das Abschluss-Fenster ohnehin offen, ist der Bestaetigungs-Klick
+    // dort zugleich die UEBERGABE -- derselbe Weg wie der Abschluss-Knopf, nur
+    // ohne den Griff zum Fenster (so hielt es bis heute der Reihen-Klick).
+    // Steht es noch nicht offen, hat der Mensch andere Reihen offen: dann
+    // bleibt die Fliese liegen und wird beim Abschliessen mitgesendet.
+    if(isLastPatternRow(pi, ri)) {
+      if(_tilingFinishOffen) finishHumanTiling();
+      return;
+    }
+    commitPendingTiling();
+    return;
   }
+  pendingTiling = {pi, ri, sr, sc, si};
+  startTilingTicker();
   render();
 }
 
@@ -2207,12 +2214,29 @@ function renderTilingFinishPopup(hasPending) {
   const title = document.getElementById('tiling-finish-title');
   const sub   = document.getElementById('tiling-finish-sub');
   const btn   = document.getElementById('tiling-finish-btn');
-  if(title) title.textContent = AI_ENABLED ? 'Dein Tiling ist fertig' : `Runde ${S.round} beenden`;
+  // Nutzer 2026-09-09: "Dein Tiling ist fertig" war irrefuehrend, solange sich
+  // noch Reihen mit Bonusplaettchen vervollstaendigen lassen. Das Fenster geht
+  // bei `!hasPending` auf -- das heisst nur, dass keine VOLLE Reihe mehr an die
+  // Kuppel kann, nicht dass nichts mehr zu tun waere. Die Chip-Reihen stehen in
+  // `S.chippable_tiling_rows` (round_end.rs::chippable_rows), dieselbe Quelle,
+  // aus der der Info-Kasten seinen 🎴-Hinweis baut.
+  const chipRows = (S.chippable_tiling_rows || [])
+    .filter(cr => !AI_ENABLED || cr.pi !== AI_PLAYER);
+  if(title) title.textContent = chipRows.length
+    ? 'Keine Reihe kann mehr an die Kuppel'
+    : (AI_ENABLED ? 'Dein Tiling ist fertig' : `Runde ${S.round} beenden`);
+  const chipHinweis = chipRows.length
+    ? `${chipRows.length > 1 ? 'Reihen' : 'Reihe'} `
+      + chipRows.map(cr => cr.ri + 1).join(' und ')
+      + ` ${chipRows.length > 1 ? 'lassen' : 'lässt'} sich noch mit Bonusplättchen `
+      + 'vervollständigen - Abschließen verzichtet darauf. '
+    : '';
   if(sub) sub.textContent = pendingTiling
-    ? 'Die vorgemerkte Fliese wird dabei gelegt. Solange dieses Fenster offen ist, '
+    ? chipHinweis
+      + 'Die vorgemerkte Fliese wird dabei gelegt. Solange dieses Fenster offen ist, '
       + 'kannst du sie noch auf ein anderes Kuppelfeld schieben oder zurücknehmen.'
-    : (AI_ENABLED ? 'Danach ist die KI mit ihrem Tiling dran.'
-                  : 'Danach wird die Runde gewertet.');
+    : chipHinweis + (AI_ENABLED ? 'Danach ist die KI mit ihrem Tiling dran.'
+                                : 'Danach wird die Runde gewertet.');
   if(btn) btn.textContent = AI_ENABLED ? 'Abschließen → KI ist dran' : 'Runde beenden ✓';
   // Nach dem Fuellen -- die Lage haengt an der Kartenhoehe, und die steht erst
   // fest, wenn der Text drin ist.
@@ -2939,6 +2963,7 @@ async function submitDomePlacement(sr, sc) {
   pend.slot_r = sr;
   pend.slot_c = sc;
   if(pend.rotation === undefined) pend.rotation = 0;
+  _placeToolbarPos = null;      // anderes Feld = Leiste haengt sich neu an
   render();
 }
 
@@ -2950,9 +2975,16 @@ function rotatePlacement(delta) {
   render();
 }
 
+// Vom Nutzer verschobene Lage der Dreh-Leiste (Nutzer 2026-09-09). Gilt nur
+// fuer die LAUFENDE Platzierung: sobald die Platte auf ein anderes Feld geht
+// oder der Zug abgeschickt bzw. abgebrochen wird, haengt sich die Leiste
+// wieder von selbst ans Feld.
+let _placeToolbarPos = null;
+
 // Die Bedienleiste haengt am gewaehlten Kuppelfeld statt in der Bildmitte --
 // gedreht wird dort, wo die Platte liegt. Position aus dem Slot-Rechteck;
-// passt sie darunter nicht mehr, klappt sie darueber.
+// passt sie darunter nicht mehr, klappt sie darueber. Hat der Nutzer sie
+// weggeschoben, gilt seine Lage.
 function updatePlaceToolbar() {
   const bar = document.getElementById('place-toolbar');
   if(!bar) return;
@@ -2964,18 +2996,51 @@ function updatePlaceToolbar() {
   bar.style.display = 'flex';
   const lbl = document.getElementById('place-rot-label');
   if(lbl) lbl.textContent = `${pend.rotation||0}°`;
-  const r = slotEl.getBoundingClientRect();
   const bw = bar.offsetWidth, bh = bar.offsetHeight;
-  let left = r.left + r.width/2 - bw/2;
-  let top  = r.bottom + 8;
-  if(top + bh > window.innerHeight - 6) top = r.top - bh - 8;
+  let left, top;
+  if(_placeToolbarPos) {
+    ({left, top} = _placeToolbarPos);
+  } else {
+    const r = slotEl.getBoundingClientRect();
+    left = r.left + r.width/2 - bw/2;
+    top  = r.bottom + 8;
+    if(top + bh > window.innerHeight - 6) top = r.top - bh - 8;
+  }
   bar.style.left = Math.max(6, Math.min(left, window.innerWidth - bw - 6)) + 'px';
-  bar.style.top  = Math.max(6, top) + 'px';
+  bar.style.top  = Math.max(6, Math.min(top,  window.innerHeight - bh - 6)) + 'px';
+}
+
+// Verschieben am Griff (nicht an der ganzen Leiste -- die besteht fast nur aus
+// Knoepfen). Gleiche Bauform wie initTilingFinishDrag.
+function initPlaceToolbarDrag() {
+  const bar = document.getElementById('place-toolbar');
+  const grip = document.getElementById('place-toolbar-grip');
+  if(!bar || !grip) return;
+  let unten = false, startX = 0, startY = 0, startL = 0, startT = 0;
+  grip.addEventListener('mousedown', e => {
+    unten = true;
+    startX = e.clientX; startY = e.clientY;
+    const r = bar.getBoundingClientRect();
+    startL = r.left; startT = r.top;
+    bar.classList.add('dragging');
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => {
+    if(!unten) return;
+    _placeToolbarPos = {left: startL + (e.clientX - startX), top: startT + (e.clientY - startY)};
+    updatePlaceToolbar();
+  });
+  document.addEventListener('mouseup', () => {
+    if(!unten) return;
+    unten = false;
+    bar.classList.remove('dragging');
+  });
 }
 
 function closeRotateStep() {
   const bar = document.getElementById('place-toolbar');
   if(bar) bar.style.display = 'none';
+  _placeToolbarPos = null;
 }
 
 async function confirmRotation() {
@@ -3474,8 +3539,8 @@ document.addEventListener('click', e=>{
         showError(`Reihe ${tilingRow+1} gehört zur Kuppelreihe ${expectedDomeRow}, nicht ${sr}`);
         return;
       }
-      // Ein bereits vorgemerktes Feld nimmt den Klick immer an (er nimmt die
-      // Fliese zurueck) -- auch wenn es selbst kein legales Ziel mehr waere.
+      // Ein bereits vorgemerktes Feld nimmt den Klick immer an (er legt die
+      // Fliese fest) -- die Legalitaet war beim Vormerken schon geprueft.
       const isPending = pendingTiling && pendingTiling.pi===pi
         && pendingTiling.sr===sr && pendingTiling.sc===sc && pendingTiling.si===si;
       const slot = S.players[pi].dome_grid[sr][sc];
@@ -3637,6 +3702,7 @@ window.addEventListener('scroll', updatePlaceToolbar, true);
 window.addEventListener('resize', updatePlaceToolbar);
 window.addEventListener('resize', positionTilingFinishPopup);
 initTilingFinishDrag();
+initPlaceToolbarDrag();
 
 makeDraggable('dome-overlay');
 makeDraggable('moon-overlay');

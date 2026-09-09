@@ -1508,23 +1508,27 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
   border:1px solid var(--border);
   border-radius:9px;
   box-shadow:0 6px 22px rgba(0,0,0,.20);
+  /* Nutzer 2026-09-09: sie sitzt direkt unter dem gewaehlten Kuppelfeld und
+     nahm die Sicht auf die Felder darunter. Halbdurchsichtig im Ruhezustand,
+     voll deckend, sobald man sie bedient. */
+  opacity:.55;
+  transition:opacity .12s ease;
 }
+#place-toolbar:hover,
+#place-toolbar.dragging{opacity:1}
 #place-toolbar .btn{padding:3px 8px;font-size:12px;line-height:1.2}
 #place-rot-label{font-size:10px;color:var(--text2);min-width:26px;text-align:center}
+#place-toolbar-grip{
+  cursor:grab;
+  user-select:none;
+  font-size:12px;
+  color:var(--text3);
+  padding:0 2px;
+}
+#place-toolbar.dragging #place-toolbar-grip{cursor:grabbing}
 
 
-/* -- Reihe ist abschlussbereit (Nutzer 2026-09-07) --------------------------
-   Die Fliese liegt vorgemerkt auf der Kuppel, der Klick auf die Musterreihe
-   schliesst sie ab. Dieselbe Sprache wie die legalen Zielfelder auf den
-   Kuppelplatten (`.ds.legal-target`): Rahmen plus pulsierender Hof -- hier in
-   Amber, weil die Markierung zu der vorgemerkten Fliese gehoert
-   (`.ds.pending-place`), nicht zur Zielsuche. */
-.prow.confirm-ready{
-  outline:2px solid var(--gelb);
-  outline-offset:-1px;
-  animation:confirm-pulse 1.2s ease-in-out infinite;
-}
-@keyframes confirm-pulse{
-  0%,100%{box-shadow:0 0 0 2px rgba(245,158,11,.25)}
-  50%{box-shadow:0 0 0 5px rgba(245,158,11,.55)}
-}
+/* `.prow.confirm-ready` (Nutzer 2026-09-07) stand hier: pulsierender Hof an
+   der Musterreihe, solange deren Klick die vorgemerkte Fliese BESTAETIGT hat.
+   Entfallen mit dem Gesten-Tausch (Nutzer 2026-09-09) -- bestaetigt wird jetzt
+   am Kuppelfeld, und das pulsiert bereits ueber `.ds.pending-place`. */
