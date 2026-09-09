@@ -413,8 +413,23 @@ def apply_result(pid: str, opponent_label: str, opponent_rating: float,
     return entry
 
 
+# Gruende, aus denen eine Partie ungewertet bleibt. Der Wert landet als
+# `unrated_reason` im Historien-Eintrag und traegt den Text der Oberflaeche.
+#
+# Nutzer-Meldung 2026-09-09: das Endwertungsfenster sagte "ungewertet
+# (KI-Tipps genutzt)" in einer Partie ohne einen einzigen Tipp. Der Grund war
+# ein anderer -- der Elo-Betrugsschutz in server.py wertet nur gegen eine
+# DIREKTE Arena-Kante, und auf den Stufen medium/hard (60/150 Sims) gibt es
+# die nicht. `record_unrated` schrieb aber `hints_used: True` fest, egal
+# warum: die Falschaussage stand damit nicht nur im Fenster, sondern dauerhaft
+# in der Profil-Historie.
+UNRATED_HINTS = "hints"
+UNRATED_NO_DIRECT_ANCHOR = "no_direct_anchor"
+
+
 def record_unrated(pid: str, opponent_label: str, opponent_rating: float | None,
-                    opponent_is_estimate: bool, result: float, seed=None, log=None) -> dict:
+                    opponent_is_estimate: bool, result: float, seed=None, log=None,
+                    reason: str = UNRATED_HINTS) -> dict:
     """Schreibt einen Historien-Eintrag OHNE das Rating zu aendern (User-
     Entscheid 2026-08-02: Partien, in denen KI-Tipps genutzt wurden, sind
     fuer ALLE beteiligten Profile komplett ungewertet, nicht nur markiert --
@@ -425,7 +440,12 @@ def record_unrated(pid: str, opponent_label: str, opponent_rating: float | None,
     `log` zeigt hier auf die UNVERAENDERTE Datei in static/log/ (ungewertete
     Partien werden NICHT nach static/log/elo/ archiviert). Gibt den Eintrag
     zurueck (fuers API-Response, Frontend zeigt statt einer Rating-Aenderung
-    einen Hinweistext)."""
+    einen Hinweistext).
+
+    `reason` sagt WARUM (s. UNRATED_*): `hints_used` folgt daraus, statt wie
+    frueher immer True zu sein. Alt-Eintraege ohne `unrated_reason` bleiben
+    lesbar -- die Oberflaeche nennt dort keinen Grund mehr, statt den
+    falschen zu behaupten."""
     data = _load_profiles_raw()
     profile = data["profiles"].get(pid)
     if profile is None:
@@ -442,8 +462,9 @@ def record_unrated(pid: str, opponent_label: str, opponent_rating: float | None,
         "rating_after": round(rating, 1),
         "delta": 0.0,
         "k_factor": None,
-        "hints_used": True,
+        "hints_used": reason == UNRATED_HINTS,
         "rated": False,
+        "unrated_reason": reason,
         "seed": seed,
         "log": log,
     }
