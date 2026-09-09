@@ -23,30 +23,44 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v21_2d_brierbest`**, Elo **1215** (95% CI [1170, 1259]),
-anchored at Heuristic@150 (dyn. ~330 sims) = 1000 (`tools/elo_tracker.py
-report`), the first champion produced by pure corpus scaling (same recipe,
-+40% window from a stronger generator). The ladder was **re-anchored on
-2026-08-21**: a fix to the round-5 solver's move ordering changed every
-game with a round-5 share, so the old register (champion at 1358 on a
-longer ladder) moved to `archive/elo_history_pre_r5fix.csv`; Elo values
-are not comparable across that boundary. The value head predicts a win
-*probability* (WDL era, task #34); display probabilities are Platt-calibrated
-per champion.
+Champion: **`v25-b01`**, Elo **1376** (95% CI [1333, 1425]) from 520 rated
+games, anchored at a **frozen** heuristic artifact
+(`models/frozen_heuristics/hv1_anchor`, Heuristic@150 = 1000,
+`tools/elo_tracker.py report`). The anchor carries its own wheel: since
+2026-08-31 an engine change can no longer move the fixed point of the ladder,
+and every engine change is checked move by move against it
+(drift check, `/mosaic-anchor-invariance`). The ladder was re-anchored once
+before, on 2026-08-21, when a fix to the round-5 solver changed every game
+with a round-5 share; that older register lives in
+`archive/elo_history_pre_r5fix.csv` and is not comparable across the boundary.
+The value head predicts a win *probability* (WDL); display probabilities are
+Platt-calibrated per champion.
 
-Current campaign: teaching the net to see **scoring plates**. The
-ownership *consumer* strand (an ownership head steering the search) was
-measured to exhaustion and closed: every variant came out neutral or
-negative in the paired arena. What remains open and is running now: an
-**asymmetric self-play curriculum**, in which exactly one side per game
-gets a rule-guided plate builder, so the value head sees plate building
-as a win signal for the first time
-(`evaluations/PREREG_asymmetric_curriculum.md`), and oracle-derived
-**policy supervision** as the last untried strand. Full history, all
-measurements and the standing methodology rules:
+**The current campaign changes only the MATERIAL.** For three generations
+(v25, v26, v27) the architecture, the training recipe, the value-target blend,
+the heads and their weights are frozen; only the replay window rotates
+(`evaluations/PREREG_v25_window.md` par.18). The reason is attribution: until
+now, net and material changed together from generation to generation, so
+"generation N+1 beats N" never meant "the net got better". A flat arena is
+explicitly accepted for the duration; a regression is not. v26 reached its
+milestone: it is the first window built entirely from network self-play, with
+the plate-blind heuristic teacher rotated out completely.
+
+**What comes after the freeze** is an architecture correction rather than a
+tuning knob: the search reshuffles the whole dome-plate stack at the root of
+every search and therefore forgets the order it chose itself when returning
+plates under the stack. It buys the same information again and again
+(`evaluations/PREREG_dome_stack_information_sets.md`). This class of defect is
+invisible to the entire measurement apparatus, because self-play, arena and
+gating compare two agents inside the *same* world model, where a shared
+modelling error cancels out. The seam list that makes such defects findable
+lives in [`docs/architecture_reference.md`](docs/architecture_reference.md)
+("Wo der Code Information ABSICHTLICH vernichtet").
+
+Full history, all measurements and the standing methodology rules:
 [`evaluations/STATUS.md`](evaluations/STATUS.md); rendered process diagrams:
-[`docs/diagrams.txt`](docs/diagrams.txt) (`game_flow`,
-`net_search`, `value_target`, `window_generation`, `selfplay_training`; render via
+[`docs/diagrams.txt`](docs/diagrams.txt) (`game_flow`, `net_search`,
+`value_target`, `window_generation`, `selfplay_training`; render via
 `python docs/render_diagrams.py`).
 
 ## Engine Core in Brief
@@ -102,38 +116,51 @@ from the reigning champion. Every step has a written pre-registration in
 `evaluations/PREREG_*.md`: design **and** decision rule are fixed *before*
 the run, so a result cannot be reinterpreted afterwards.
 
-1. **Self-play in two classes** (generator = reigning champion). Policy
-   targets are expensive, value targets are cheap, so they are bought
-   separately:
-   
-   ```bash
-   # Base class: full search, carries the policy targets
-   python -u self_play.py --mode network --model models/alphazero_<champion>.onnx        --games 4000 --sims 600 --version <gen>wdl --threads 11
-   # Swarm class: cheap, value targets only (policy masked)
-   python -u self_play.py --mode network --model models/alphazero_<champion>.onnx        --games 8000 --sims 150 --version <gen>wdlsw --value-only --threads 11
-   ```
-   
-   The swarm costs ~2.5x less per game; the value target (bootstrap +
-   outcome) is robust to the smaller search budget, whereas the policy
-   target is not; hence the split.
+1. **Self-play in three classes** (generator = the champion of the previous
+   generation). Policy targets are expensive, value targets are cheap, so they
+   are bought separately, and the value half is split again by *how* the moves
+   are chosen:
 
-2. **Replay window with generation rotation** (~29,000 games): the new base
-   class plus a seed-determined subset of older generations as additional
-   policy carriers (`data/policy_carrier_manifest_v21.json`, whose content
-   enters the cache key), plus all older swarm material as masked
+   ```bash
+   # Base class: policy-carrying, greedy from move 1, one forced deviation
+   python -u self_play.py --mode network --model models/alphazero_<gen>_brierbest.onnx        --spec models/<champion>.spec.json --games 4000 --sims 100        --version <gen>-policy --threads 11 --chunk 10 --per-file 10 --seed <s1>        --tau-argmax-from-move 1 --deviate-prob 1.0
+   # Swarm a: value only, smooth action temperature (coverage)
+   python -u self_play.py ... --value-only --version <gen>-value-tempc --seed <s2>        --action-temp 2 --deviate-prob 1.0
+   # Swarm b: value only, one excursion per game, otherwise greedy (unbiased targets)
+   python -u self_play.py ... --value-only --version <gen>-value-excursion --seed <s3>        --excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise
+   ```
+
+   Measured on the v26 production run: 3.6 s per game for the base class,
+   about 11 h for all three classes (`docs/measured_runtimes.md`). Note that
+   `--games` counts excursion identities as well, so the excursion half needs
+   the full number, not half of it.
+
+2. **Replay window with generation rotation** (2,947 files, ~29,450 games):
+   the new base class plus a seed-determined subset of the two previous
+   generations as additional policy carriers (`data/policy_carrier_manifest_v<N>.json`,
+   whose content no longer enters the per-file cache key but is applied as a
+   mask when the window is assembled), plus all older swarm material as masked
    value-only data. Each generation ages one step; the oldest rotates out.
-   Backup/legacy-rule corpora are never mixed back in.
+   Legacy-rule corpora are never mixed back in.
 
 3. **Training** (warm start from the champion):
-   
+
    ```bash
-   MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v21.json    python -u train.py --name v21_2d --load <champion> --lr 5e-5        --lr-schedule cosine --encoder 2d --value-head wdl        --opp-points-head --endgame-head --value-target-variant nortv
+   MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v<N>.json    MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_VAL_POOL='^selfplay_<gen>-'    python -u train.py --name v<N>-b01 --load <champion>_brierbest        --file-list data/window_v<N>.txt --epochs 12 --lr 5e-05        --lr-schedule cosine --lr-t-max 12 --encoder 2d --value-head wdl        --value-target-variant nortv --value-target-lambda 0.7        --ownership-head-2d --opp-points-head --endgame-head --select-by-brier
    ```
-   
-   Early stopping requires a plateau on *both* sides (policy and value);
-   the shipped checkpoint is the best Brier, not the best combined loss.
-   `MOSAIC_DATA_EXCLUDE` pins the window while other generation runs are
-   still writing to `data/` (the cache key depends on the file list).
+
+   Early stopping requires a plateau on *both* sides (policy and value); the
+   shipped checkpoint is the best Brier, not the best combined loss. Several
+   options that look like flags are read from the environment instead
+   (`--val-pool`, `--ignore-policy-target-valid`); the manifest logs them
+   either way. `MOSAIC_DATA_EXCLUDE` pins the window while other generation
+   runs are still writing to `data/`.
+
+   The per-file cache blocks can be built *while* self-play is still running
+   (`tools/build_cache_incremental.py --watch`); the window monolith is then
+   assembled from those blocks in minutes instead of hours. The build
+   environment must match the training environment exactly, because variables
+   such as `MOSAIC_IGNORE_POLICY_TARGET_VALID` are part of the block key.
 
 4. **Offline diagnosis**, with an explicit resolution limit. On the policy
    side, `tools/offline_diagnosis.py --frozen` reports the two *arena-
@@ -142,14 +169,19 @@ the run, so a result cannot be reinterpreted afterwards.
    there is **no** validated offline predictor: gaps below ~0.015 predicted
    the arena outcome in 0 of 4 cases, so the arena decides.
 
-5. **Gating**: `tools/paired_gating.py` with paired seed blocks, swapped
-   boards, Bernoulli SPRT (`H1: p1=0.65`), cap 200 pairs. An early stop
+5. **Gating**: `tools/paired_gating.py` with paired seed blocks (block size 5,
+   the seed changes per block, so score analyses have to run at block level),
+   swapped boards, Bernoulli SPRT (`H1: p1=0.65`), cap 200 pairs. An early stop
    below ~150 pairs only counts after a fresh-seed replication (a false
    positive taught us that). Only `ACCEPT_H1` promotes.
 
 6. **Promotion & bookkeeping**: `tools/set_champion.py` (server default for
    human games), `tools/elo_tracker.py add` (Bradley-Terry over the whole
-   match graph, cadre names only, never file names).
+   match graph, cadre names only, never file names), and a **frozen artifact**
+   for the new champion under `models/frozen_champions/<name>/`: model, spec,
+   the wheel it was measured with, a golden probe and a manifest. The wheel
+   travels with the artifact so that an old champion still plays the way it did
+   when its Elo was measured. The full list is `docs/promotion_checklist.md`.
 
 7. **Mandatory diagnostics on the winner**: Platt calibration
    (`tools/platt_fit.py`), round-5 plate sensitivity
@@ -206,12 +238,17 @@ change.
 
 `STATUS.md` (a living status/roadmap document, kept in German) and
 `elo_history.csv` are the primary sources. In addition: `arena_trends.csv`
-(points/floor trend per run), `frozen_eval_set.pkl` +
-`frozen_v1_oracle_labels.json` (frozen, cross-generation eval/oracle set),
+(points/floor trend per run), `frozen_eval_set.pkl` and its successors plus the matching
+`artifacts/frozen_v<N>_oracle_labels.json` (frozen, cross-generation
+eval/oracle sets; `frozen_v3` is the current one, `frozen_v1` is kept as a
+trend metric only),
 various `offline_diagnosis_*`, `paired_gating_result_*`, and
 `paired_arena_*` JSONs (individual runs, each mapped to a STATUS.md section
 by filename). `game_analysis/` holds the reports generated by the
-game-analysis tool (`tools/analyze_game_log.py`). The process diagrams live in `docs/`
+game-analysis tool (`tools/analyze_game_log.py`), and `fixtures/` holds frozen
+human-vs-AI games with their checksums: they are exactly replayable through the
+action IDs in the log and serve as reference positions when a change is
+supposed to alter a decision. The process diagrams live in `docs/`
 (`diagrams.txt` plus `render_diagrams.py` and the `.svg` files it renders).
 
 ### `tools/`
@@ -297,8 +334,8 @@ before anything is deleted; it never deletes by itself.
 ### Neural Network (`Mosaic2DNet`, `engine/py/neural_net.py`)
 
 ```
-planes (76×6×6) → [Conv3×3(48) → BN → ReLU] ×2 → flatten ─┐
-state  (708)    → Linear(512) → BN → ReLU ────────────────┴→ concat
+planes (79×6×6) → [Conv3×3(48) → BN → ReLU] ×2 → flatten ─┐
+state  (744)    → Linear(512) → BN → ReLU ────────────────┴→ concat
     → Fusion: Linear(512) → BN → ReLU → Linear(512) → ReLU
        ┌→ Policy Head:      Linear(256) → ReLU → Linear(406)  (action logits)
        ├→ Value Head (WDL): Linear(64)  → ReLU → Linear(2)    (logits → P(win))
@@ -308,20 +345,23 @@ state  (708)    → Linear(512) → BN → ReLU ──────────�
        └→ Endgame Head:     round-5 solver root margin (aux, Tanh)
 ```
 
-The champion ONNX export (`alphazero_v21_2d_brierbest.onnx`, verified)
+The champion ONNX export (`alphazero_v25-b01_brierbest.onnx`, verified)
 carries two inputs (`planes`, `state`) and eight outputs (`policy`,
 `value`, `moon`, `points`, `ownership`, `value_wdl_logits`, `opp_points`,
 `endgame_margin`). Aux heads are training signal only; the search reads
-none of them. The legacy flat `MosaicNet` (708 → 3×512 trunk, Tanh value)
+none of them. The legacy flat `MosaicNet` (708 -> 3×512 trunk, Tanh value)
 remains loadable: the input layout is detected from the model file
 (`detect_layout`, `engine/src/net.rs`), never assumed.
 
-### State Tensor (708 Features)
+### State Tensor (744 Features)
 
-Source of truth: `engine/src/features.rs` ↔ `state_to_tensor`; global
-state, active scoring plates (Wertungsplatten), factories, both player
-boards in ego perspective, both 3×3 dome grids, moon/dome stacks, hidden
-information as masks/shares.
+Source of truth: `engine/src/features.rs` (the constant there is the single
+source, `config.py` mirrors it); global state, active scoring plates
+(Wertungsplatten), factories, both player boards in ego perspective, both 3×3
+dome grids, moon/dome stacks, hidden information as masks/shares. Features are
+only ever appended, never reordered: indices 0..713 are unchanged since
+2026-09-05, so older ONNX models stay playable (`net.rs::build_inputs`
+truncates to the model width).
 
 ### Action Space (406 Actions)
 
@@ -344,7 +384,7 @@ information as masks/shares.
 
 | Parameter                      | Value | Where                     | Description                                                 |
 | ------------------------------ | ----- | ------------------------- | ----------------------------------------------------------- |
-| `INPUT_SIZE`                   | 708   | `config.py`               | Size of the state tensor                                    |
+| `INPUT_SIZE`                   | 744   | `config.py`               | Size of the state tensor (714 + plate-type sight, floor colours, phantom shares) |
 | `NUM_ACTIONS`                  | 406   | `config.py`               | Size of the action space                                    |
 | `HIDDEN_SIZE`                  | 512   | `config.py`               | Neurons per hidden layer                                    |
 | `TD_LAMBDA`                    | 0.5   | `engine/py/neural_net.py` | TD-bootstrap blend in the value target                      |
@@ -352,7 +392,7 @@ information as masks/shares.
 | `USE_GUMBEL_SEARCH`            | true  | `engine/src/net_mcts.rs`  | Gumbel search (false = legacy PUCT)                         |
 | `GUMBEL_TOP_M`                 | 16    | `engine/src/net_mcts.rs`  | Root candidates for Sequential Halving                      |
 | `FLOOR_SHAPING_WEIGHT`         | 0.3   | `engine/src/net_mcts.rs`  | Exact floor-penalty leaf-value additive (validated)         |
-| `DETERMINIZE_ROOT_HIDDEN_INFO` | true  | `engine/src/net_mcts.rs`  | Single determinization of hidden information at the root    |
+| `DETERMINIZE_ROOT_HIDDEN_INFO` | true  | `engine/src/net_mcts.rs`  | Single determinization of hidden information at the root. **Known limitation:** it reshuffles the *whole* dome-plate stack, including the part the acting player legitimately knows (see Current Status) |
 
 Further constants along with their calibration history are documented as
 Rust/Python constants in the code; every self-play/training run also writes
