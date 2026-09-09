@@ -90,6 +90,39 @@ gefehlt: die Kanalzahl war beim Uebertrag ueberholt (siehe unten).
 - Champion: `models/champion.txt` zeigt auf `v21_2d_brierbest` (geprueft
   2026-08-28).
 
+## Wo der Code Information ABSICHTLICH vernichtet (Naht-Audit 2026-09-09)
+
+**Wozu diese Liste.** Selfplay, Arena, Gating und die Offline-Metriken vergleichen zwei
+Agenten IM SELBEN Weltmodell. Ein Fehler im geteilten Modell wirkt auf beide Seiten gleich
+und kuerzt sich weg -- er kostet null Elo, bei jeder Partienzahl. **Symmetrische Defekte
+sind fuer symmetrische Messung unsichtbar.** Die einzige Gegenwehr ist, die Stellen
+aufzuzaehlen, an denen Information absichtlich verschwindet, und jede zwei Fragen
+beantworten zu lassen: WESSEN Informationsmenge modelliert sie, und was nimmt sie weg, das
+der Spieler rechtmaessig HAT?
+
+Die Liste ist endlich und greppbar: `.shuffle(`, `choose_multiple`, Kuerzungen wie
+`net.rs::build_inputs`. Stand 2026-09-09: 24 Mischstellen.
+
+| Stelle | Was | Urteil |
+| --- | --- | --- |
+| `net_mcts.rs:987` (via `:3952`) | Wurzel-Determinisierung, mischt den ganzen `dome_tile_pool` | **VERDAECHTIG**: nimmt auch die Rueckgabe-Reihenfolge, die der Spieler selbst gewaehlt hat (`game.rs:278`). `PREREG_dome_stack_information_sets.md` |
+| `round_transition_deep.rs:623` | `simulate_one_round` mischt den Stapel beim Eintritt | **VERDAECHTIG**, gleiche Klasse, zweite aktive Stelle |
+| `net_mcts.rs:4010`, `:4139`, `:4448` | Neumischen bei `DrawStackPeek` im Baum | RUHEND (`SHUFFLE_STACK_PEEK_IN_SEARCH = false`, `:904`; gemessen schlechter, 17 % -> 9 % Siege). Die Kommentare dort tragen dieselbe Praemisse mit dem blinden Fleck |
+| `net_mcts.rs:1003` | verdeckte Bonuschips | in Ordnung -- und **das Vorbild**: aufgedeckte Fabrik-Chips bleiben ausdruecklich unangetastet |
+| `round_transition.rs` (8x), `round_transition_resample.rs:193`, `self_play.rs:5093` | Beutel und verdeckter Chip-Vorrat | in Ordnung: Reihenfolge ist echt verdeckt, die Multimenge bleibt erhalten |
+| `scoring.rs:106` | Auswahl der Wertungsplatten | Spielaufbau, keine Informationsfrage |
+| `mcts.rs:235`, `self_play.rs:803` | Zugreihenfolge, Permutationen | Gleichstandsaufloesung, keine Informationsfrage |
+
+**Was dieser Audit NICHT sieht** (und wofuer die anderen Kanaele stehen): wo Information
+nie ENTSTEHT (fehlende Merkmale -- dafuer `PREREG_stack_top_feature.md`, Sicht-Achse) und
+wo sie falsch BEWERTET wird (dafuer `PREREG_score_clamp_incentive.md`). Die zweite Achse
+des Sicht-Audits -- was WEISS die Suche und was vergisst sie zwischen zwei Zuegen -- steht
+in jener Prereg par.11.
+
+**Regel fuer neue Stellen:** wer einen `shuffle` oder eine Kuerzung auf verdeckten Bestand
+neu einbaut, traegt ihn hier ein, mit der Antwort auf die beiden Fragen oben. Ein
+`shuffle`, der nicht sagen kann, wessen Unwissen er modelliert, ist ein Bug in Wartestellung.
+
 ## Konstanten mit Fallstrick
 
 - `bonus_points` in `dome.rs` ist ein **Diskriminator** (Special = 3,
