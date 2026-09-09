@@ -55,7 +55,7 @@ Material traegt.
 ### ERSTE AUFGABE DER NEUEN SITZUNG
 
 1. **v27-Erzeugung starten** -- `bash tools/night_v27_generate.sh` (drei Klassen, Generator
-   `v26-b01`, Seeds 20260914/15/16, rund 9 h). Das Skript wartet selbst auf eine freie
+   `v26-b01`, Seeds 20260914/15/16, rund 8,4 h nach den v26-Manifesten). Das Skript wartet selbst auf eine freie
    Maschine. **Daneben gehoert der Cache-Waechter**, zwingend mit
    `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` -- der Aufruf steht im Kopf des Skripts.
 2. **Danach `bash tools/night_v27_chain.sh`** -- wartet auf den `laufzeit`-Block der
@@ -89,6 +89,43 @@ Material traegt.
   v27-Training.
 - **Die Anker-Kante ist gesaettigt** (127:23 gegen 126:24 zweimal). Als Fortschrittsmass
   taugt sie nicht mehr; als Fixpunkt bleibt sie richtig.
+
+**Prereg-Audit 2026-09-09 abends (alle 13 offenen Preregs, drei Opus-Agenten, tragende
+Stellen vom Koordinator am Code nachgeprueft).** Koepfe und Laufzeiten sind berichtigt;
+die Befunde stehen je in der Prereg. Was eine ENTSCHEIDUNG braucht, in Reihenfolge:
+
+- ~~Tor 2 fuer v26-b01 nachmessen~~ ENTSCHIEDEN 2026-09-09 (Nutzer: "nicht nachmessen").
+  Praezedenz in `docs/generation_loop.md` (Abschnitt Tor 2) festgeschrieben: Tor 2a wird
+  ex post am erzeugten Korpus gemessen, die v27-Kette liefert die Zahl fuer v26-b01 als
+  Generator (Schritt 1, Bezug 0,737). Tor 2b (Arena gegen Vorgaenger) ist seit v25 nicht
+  gemessen; die Anker-Arena zeigt 1,267 gegen 1,307 (kein Tor-Instrument, n = 150).
+- **Ausflug-Klasse: 11 % der Ausfluege weichen nicht ab** (`PREREG_start_position_seeding.md`
+  par.9k, n = 200 Paare). Fix ist ein Engine-Eingriff; Empfehlung: NACH v27-b01, weil v25-
+  und v26-Klassen denselben Defekt tragen und der letzte eingefrorene Arm stationaer bleibt.
+  Der Abzweig zur Haelfte in Runde 1 ist KEIN Widerspruch: die Begruendung "Engpass
+  Vollendung spaet" in par.9b ist die am 2026-08-23 widerlegte Lesart (Legalitaetsstufe
+  0/160, Engpass ist die Zufuehrung), par.9b gehoert berichtigt, nicht par.9g.
+- **STATUS Abschnitt 8, erster Punkt ("Der Champion vollendet keine Spalten") ist
+  ueberholt** (v26-Generationsbericht Punkt 4: 1,267 volle Spalten je Partie gegen den
+  Anker). Beim naechsten Neuschnitt streichen oder auf v26 datieren.
+- **Einfrieren ist am Trainings-Seed undicht:** `cli_args.seed` 20260925 / 20260929 /
+  20260933 bei sonst identischen Flags (Manifeste v25-b01, v26-b01, Kette v27). Fixieren
+  hebt die Konfundierung nicht auf (anderes Material, andere Batches), aber par.18 sagt
+  "ausschliesslich Material". Entscheid: so lassen und in par.18 benennen, oder v27 mit
+  20260929 fahren.
+- **Null-Klammer, Kaufseite ohne Eigentuemer** und Stufe 0 auf der falschen Grundmenge
+  (`PREREG_score_clamp_incentive.md` par.9, `PREREG_dome_stack_information_sets.md`
+  par.14). Vor Stufe 0 zu klaeren, sonst schliesst die Schwelle den Strang auf Self-Play,
+  wo der Effekt strukturell selten ist.
+- **Die Oberflaeche zeigt dem Menschen die Rueckgabe-Reihenfolge des Stapels**
+  (`game.rs:282-286`, Log im Frontend), die `dome_stack` par.4 als unbekannt modelliert.
+  Vor der naechsten Referenzpartie entscheiden: Log kuerzen oder Reihenfolge als bekannt
+  modellieren.
+- Kleinere Widersprueche, je in der Prereg registriert: `round_transition_search_sampling`
+  par.8 (Determinisierung lebt, Paritaetssonde nicht), `round_estimate_leaf_term` (eine
+  Skala gegen gemessenes Rundenprofil), `stack_top_feature` par.12 (par.7 ohne
+  Verwerf-Ausgang), `start_dome_choice` (Anker-Sperre ueberholt), `policy_surprise_weighting`
+  par.11 (Kante b05 gegen b04 nie registriert).
 
 ## 2. WAS ALS NAECHSTES LAEUFT: die v26-Erzeugung
 
@@ -129,9 +166,9 @@ das letzte unter dem Einfrieren. **Beide Zuschnitt-Entscheide sind am 2026-09-09
 Generator ist `v26-b01` (par.3, ausdruecklich unabhaengig von Tor 1 -- Generatorwahl und
 Promotion sind zwei Entscheidungen), und den G-2-Posten traegt die **temperierte** Haelfte
 (par.2; das gemessene Kriterium trennte nicht, entschieden wurde auf der Rolle von G-2).
-Offen ist damit nur noch die Erzeugung selbst, rund 9 h.
+Offen ist damit nur noch die Erzeugung selbst, rund 8,4 h (30.077 s in den drei v26-Manifesten).
 
-Drei Straenge liegen vor, alle vorregistriert. **Der Kern ist neu und kam aus einer
+Vier Straenge liegen vor, alle vorregistriert. **Der Kern ist neu und kam aus einer
 Partie**, nicht aus der Kampagnenplanung.
 
 | Strang | Prereg | Stand |
@@ -177,7 +214,7 @@ Messung festgelegten Schwelle, unter der der Strang als UEBERHOLT geschlossen wi
 4. **Paritaets-Fixture bei reinem Spec-Wechsel**: die Checkliste kennt nur den
    Champion-Wechsel. Fuer b07 wurde sie neu geschrieben und ist gruen -- ob das noetig
    war, ist ungeklaert.
-5. **Prereg-Bestand: 13 mit OFFEN im Kopf**, Ziel rund 7.
+5. **Prereg-Bestand: 11 mit OFFEN im Kopf** (2026-09-09 abends; v25 und v26 auf ENTSCHIEDEN gesetzt), Ziel rund 7.
 
 ## 5. OFFENE ENTSCHEIDUNGEN (Nutzer)
 
@@ -211,7 +248,7 @@ Stufe 4), `capacity_sim_frontier`, `reanalyze_label_depth`,
 | --- | --- |
 | ~~`v23_window`~~ | ENTSCHIEDEN: Fenster gebaut, alle Tore und alle Arme gemessen |
 | `capacity_sim_frontier` | Warm gegen Kalt einfaktoriell belegt (b06, par.14b: 0,18 Spalten, 65:95); b04 wartet auf den Zweig-Entscheid (Abschnitt 5) |
-| ~~`policy_surprise_weighting`~~ | ENTSCHIEDEN 2026-09-01: b03 traegt nicht (Orakel Gleichstand, Arena 75:85) |
+| `policy_surprise_weighting` | wieder OFFEN seit 2026-09-05; Arm v24-b05 gefahren, Belege in `PREREG_v24_window.md` par.9, Kante b05 gegen b04 nie registriert (par.11, Audit 2026-09-09) |
 | `reanalyze_label_depth` | ENTSCHIEDEN 2026-09-03 (par.A5): Lehrer-Relabel b05 Nullbefund (par.A3), Reanalyze b07 keine Staerke und weniger Spalten -- b01 bleibt Generator; Teil B ohne Verbraucher bei lambda 1,0 |
 | ~~`r5_solver_split`~~ | Teil B war Phase 3 -- GESCHLOSSEN ohne Bau (2026-09-01) |
 | ~~`v23_reachability_recheck`~~ | ENTSCHIEDEN 2026-09-01: 14,64 Prozent tot-kartiert gegen 13,89 beim Vorgaenger, Stufe 1 wird NICHT eroeffnet; Quelldateien im restic-Backup |

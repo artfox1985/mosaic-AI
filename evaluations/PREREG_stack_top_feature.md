@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 gefahren (par.10), acht Asymmetrien gefunden, alle Netz-sieht-weniger. GEBAUT im Sicht-Arm v24-b04: Stapel-Rueckseite, Plattentyp der drei Auslage-Kuppeln, Strafleisten-Farben, Phantom-Anteil je Musterreihe -- additiv, INPUT_SIZE 714 -> 744, Indizes 0..713 unveraendert (Alt-Modelle bleiben spielbar). Damit ist der ANLASS der Prereg (Stapel-Rueckseite) geschlossen. OFFEN bleiben drei Punkte, eingeplant fuer v27 (Nutzer 2026-09-08): laufende Ziehserie (par.10 Punkt 3, eigene Stufe nach par.8), Phasenaufloesung (Punkt 7, vermutlich folgenlos, UNGEPRUEFT) und Stufe 2 -- ein Netz, das die neuen Werte auch nutzt (par.7). Kriterium ist Sichtgleichheit, nicht Elo (Nutzer 2026-09-05). -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 gefahren (par.10), acht Asymmetrien, alle Netz-sieht-weniger. GEBAUT im Sicht-Arm v24-b04: Stapel-Rueckseite, Plattentyp der Auslage-Kuppeln, Strafleisten-Farben, Phantom-Anteil je Musterreihe; additiv, INPUT_SIZE 714 -> 744, Kuerzung auf Modellbreite in net.rs (build_inputs), nicht in features_for_layout (par.10 berichtigt 2026-09-09). Anlass geschlossen. OFFEN vier Punkte, nach v27-b01: laufende Ziehserie (par.10 P.3), Phasenaufloesung (P.7), Stufe 2 Netz nutzt die Werte (par.7), zweite Achse was WEISS die Suche (par.11). Kriterium Sichtgleichheit, nicht Elo. -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -295,8 +295,10 @@ b04, 8 ist geklaert); Historie (4)
 ist auf Nutzer-Entscheid kein Merkposten.
 
 Bau (par.6 Punkte 2-5): drei Encoder-Stellen append-only (JSON-Pfad,
-Direktpfad, `neural_net.py`), `features_for_layout` kuerzt den Flachteil auf
-die vom Modell deklarierte Laenge (nur kuerzen, nie auffuellen),
+Direktpfad, `neural_net.py`), `Net::build_inputs` (`engine/src/net.rs`) kuerzt den Flachteil auf
+die vom Modell deklarierte Laenge (nur kuerzen, nie auffuellen; berichtigt
+2026-09-09, Audit: hier stand `features_for_layout`, die gibt aber den vollen Vektor
+zurueck, die Kuerzung sitzt erst beim Bau des Eingabetensors),
 `config.INPUT_SIZE`, Laengen-Assertion der Paritaetstests, Fingerprint
 `lib.rs:642`; Sichtgleichheits-Test (>= 300 Zustaende gegen
 `dome_stack_top_type`, `dome_display`-Typen, `floor` und `phantom_count`) und Regressionstest
@@ -340,3 +342,19 @@ Stufe 0 dieser Prereg hat nur das erste geprueft.
 gefahren und steht in `PREREG_dome_stack_information_sets.md` par.10 -- er ist die
 Werkzeugseite dieser zweiten Achse.
 
+## par.12 AUDIT 2026-09-09: par.7 ist so nicht falsifizierbar, par.6 zaehlt falsch
+
+**par.7, zweiter Spiegelstrich:** Gleichstand in der Arena heisst "Merkmalsstand
+uebernehmen", Regression heisst "Hinweis auf einen Fehler im Bau oder Trainingslauf".
+Es gibt keinen Ausgang, unter dem der Stand NICHT uebernommen wird; die Arena ist damit
+kein Waechter. Und die Begruendung ("ein Merkmal, das der Spieler hat, kann das Netz nicht
+ehrlich schwaecher machen") schliesst per Definition aus, dass ein Warmstart mit
+veraenderter Eingabe schlechter konvergiert. Vor Stufe 2 ist ein Ausgang zu benennen, der
+den Stand verwirft (Vorschlag: Regression ueber zwei Seeds bei Blockgroesse 5, dann
+Merkmal aus und Ursache suchen, nicht "Bau pruefen und trotzdem uebernehmen").
+
+**par.6 Punkt 2:** "17 Aufrufstellen, alle in `net_mcts.rs`". Gezaehlt 2026-09-09: 26
+Aufrufe von `features_for_net(` in `engine/src/net_mcts.rs` und 7 in
+`engine/src/self_play.rs`. Der Engpass-Charakter (eine Funktion) haelt, die Zahl und
+der Ort nicht. Zeilendrift im Altbestand (par.3/4/6) ist gross, ein Dutzend Zeiger; die
+Substanz der Aussagen wurde am Code bestaetigt, die Zeilen nicht nachgezogen.

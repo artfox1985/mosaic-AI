@@ -14,14 +14,14 @@ Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
 trennen "aus, weil noch niemand ihn eingeschaltet hat" von "aus, weil die
 Messung ihn erledigt hat" -- in der Registratur allein sehen die gleich aus.
 
-**70 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
+**71 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
 
 Der Statuskopf sagt ENTSCHIEDEN, aber NICHT die Richtung -- deshalb die
 Trennung nach Default. Kein Loeschauftrag: ein negatives Ergebnis kann
 "falscher Hebel, richtiges Ziel" heissen (`PREREG_long_row_payoff` ist
 genau so ein Fall). Es ist die Liste, an der die Frage stellbar wird.
 
-**Beantwortet UND Default aus (45)** -- hier lohnt die Nachfrage,
+**Beantwortet UND Default aus (46)** -- hier lohnt die Nachfrage,
 ob der Knopf noch etwas offen haelt:
 
 - `MOSAIC_POINTS_UTILITY_W` (ENTSCHIEDEN, PREREG_task28_aggression.md)
@@ -55,6 +55,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_OWNERSHIP_CONJ` (ENTSCHIEDEN, PREREG_conjunction_terms.md par.4)
 - `MOSAIC_STACK_DRAW_RESEARCH` (ENTSCHIEDEN, PREREG_chance_nodes.md)
 - `MOSAIC_ASYM_VORZUG` (ENTSCHIEDEN, PREREG_asymmetric_curriculum.md par.3)
+- `MOSAIC_ACTION_TEMP` (ENTSCHIEDEN, PREREG_v25_window.md par.14, par.14d)
 - `MOSAIC_PROFILE_SELFPLAY` (ENTSCHIEDEN, PREREG_gpu_offloading.md)
 - `MOSAIC_SPALTENBAU` (ENTSCHIEDEN, PREREG_provocation.md par.11ff)
 - `MOSAIC_SPALTENBAU_SICHERHEITSNETZ` (ENTSCHIEDEN, PREREG_provocation.md par.15)
@@ -161,7 +162,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_OWNERSHIP_CONJ` | 0 (aus, Produktform) | aktiv | ENTSCHIEDEN | FORMumschaltung, keine Dosis: die konjunktiven Kriterien (k0/k1/k2/k3/k5/k7) kommen aus den gelernten Konjunktions-Atomen statt aus dem Produkt der Feldwahrscheinlichkeiten; additive k4/k6 bleiben auf den Feldlabels. Braucht den 140er-Kopf, sonst Rueckfall MIT Warnung (shaping.rs, ownership_conj) | PREREG_conjunction_terms.md par.4 |
 | `MOSAIC_STACK_DRAW_RESEARCH` | aus | diagnose | ENTSCHIEDEN | Stapelzug nicht sammelaufloesen: nur der Peek wird angewandt, danach neue Suche (self_play.rs:609) | PREREG_chance_nodes.md |
 | `MOSAIC_ASYM_VORZUG` | aus | diagnose | ENTSCHIEDEN | Baustein 1 (Arm S): je Self-Play-Partie bekommt GENAU EINE Seite den Bauer-Vorzug (vorzug:true), Seitenwahl deterministisch aus dem Partie-Seed 50/50; dome_preference faehrt in derselben Kette mit (self_play.rs, asym_preference_active/asym_preference_side) | PREREG_asymmetric_curriculum.md par.3 |
-| `MOSAIC_ACTION_TEMP` | 0.0 (= aus, rohe Besuchszahlen) | diagnose | OFFEN | Arme S2/S5 der v25-Sockelstruktur: aktionsabhaengige Temperatur fuer die ZUGWAHL im Netz-Self-Play. MODUS, kein Faktor: 1 = Staffel wie im Heuristik-Pfad (n>50 -> 0,7; n>15 -> 0,4; sonst 0,15), 2 = glatte Form (par.14d, Nutzer 2026-09-07): logarithmisch von T 0,2 bei 2 Aktionen bis 0,8 bei 72, ausserhalb gekappt -- die Anker sind gemessen: erstes und neuntes Dezil der DRAFTING-Verteilung (Median 10, n = 8.025 Entscheide). Die fruehere Angabe 'Median 4, Dezil 64' war ueber Drafting UND Tiling gemessen, der Knopf wirkt aber nur im Drafting (par.14g). Gewichte werden visits^(1/T) statt visits; das Policy-ZIEL (completed-Q) bleibt unberuehrt. Bei 0 exakt die rohen Besuchszahlen, bitidentisch (net_mcts::action_temp_mode, self_play::action_temp_weights) | PREREG_v25_window.md par.14, par.14d |
+| `MOSAIC_ACTION_TEMP` | 0.0 (= aus, rohe Besuchszahlen) | diagnose | ENTSCHIEDEN | Arme S2/S5 der v25-Sockelstruktur: aktionsabhaengige Temperatur fuer die ZUGWAHL im Netz-Self-Play. MODUS, kein Faktor: 1 = Staffel wie im Heuristik-Pfad (n>50 -> 0,7; n>15 -> 0,4; sonst 0,15), 2 = glatte Form (par.14d, Nutzer 2026-09-07): logarithmisch von T 0,2 bei 2 Aktionen bis 0,8 bei 72, ausserhalb gekappt -- die Anker sind gemessen: erstes und neuntes Dezil der DRAFTING-Verteilung (Median 10, n = 8.025 Entscheide). Die fruehere Angabe 'Median 4, Dezil 64' war ueber Drafting UND Tiling gemessen, der Knopf wirkt aber nur im Drafting (par.14g). Gewichte werden visits^(1/T) statt visits; das Policy-ZIEL (completed-Q) bleibt unberuehrt. Bei 0 exakt die rohen Besuchszahlen, bitidentisch (net_mcts::action_temp_mode, self_play::action_temp_weights) | PREREG_v25_window.md par.14, par.14d |
 | `MOSAIC_DEVIATE_PROB` | 0.0 (= aus) | diagnose | OFFEN | Weg C (KataGo, Wu 2019 Anhang D): Wahrscheinlichkeit je Self-Play-Partie, dass GENAU EIN Drafting-Zug von der Suche abweicht; KataGo faehrt 0,05. WO abgewichen wird, ist seit 2026-09-07 kein Knopf mehr, sondern kommt aus der GEMESSENEN Verteilung: erst die Runde aus DEVIATE_ROUND_MASS, dann der 1-basierte Index in der Runde geometrisch mit DEVIATE_DECAY (n = 501.914 Entscheide aus 4.000 Partien; MOSAIC_DEVIATE_MEAN_MOVE ist ersatzlos entfallen). Bei 0.0 wird keine einzige Zusatz-Zufallszahl gezogen (self_play.rs, deviate_prob/deviation_site) | PREREG_start_position_seeding.md par.9c, par.9h |
 | `MOSAIC_DEVIATE_CANDIDATES` | 6 | diagnose | OFFEN | Weg C: wie viele legale Aktionen an der Abweichungsstelle gleichverteilt gezogen werden, jede mit EINER Netzbewertung ihres Folgezustands gefiltert; KataGo zieht 3 bis 10, wir nehmen einen festen Wert (self_play.rs, deviate_candidates/deviation_candidates_from) | PREREG_start_position_seeding.md par.9c |
 | `MOSAIC_EXCURSION_PROB` | 0.0 (= aus) | diagnose | OFFEN | Weg B: Wahrscheinlichkeit je Self-Play-Partie, dass ein Ausflug entsteht -- eine ZWEITE, vollstaendige Partie ab einer per gewichtetem Reservoir gezogenen Abzweigstelle (Gewicht = Rundenprofil * Aktionszahl), die Hauptpartie laeuft unbeirrt weiter. Der Ausflug SAMPELT NICHT: er weicht an seinem ERSTEN Halbzug genau einmal ab (deviation_best_action, dieselbe Funktion wie Weg C) und spielt danach argmax bis zum echten Partieende -- unverzerrtes Wertziel, MOSAIC_EXCURSION_TAU_MOVES ist dafuer ersatzlos entfallen. Bei 0.0 wird keine einzige Zusatz-Zufallszahl gezogen und kein Zustand geklont (self_play.rs, excursion_prob/excursion_gate/reservoir_step/excursion_deviates_here) | PREREG_start_position_seeding.md par.9f |

@@ -58,6 +58,18 @@ echo "== 1) Traeger-Kennzahl der Klassen $(date +%H:%M:%S)"
 for k in v25-b01-policy v26-b01-policy v26-b01-value-tempc v26-b01-value-excursion; do
   python -X utf8 -u tools/corpus_sanity_check.py data --pattern "selfplay_${k}_*.pkl" --out "$ART/corpus_sanity_${k}.json"
 done
+# Tor 2a ex post (docs/generation_loop.md, Praezedenz 2026-09-09): der Generator v26-b01 darf
+# als Punktschaetzer nicht unter den Vorgaenger fallen. Nur Vorlage, kein Abbruch.
+python - <<'PYCHK'
+import json, io
+v = {}
+for k in ("v25-b01-policy", "v26-b01-policy"):
+    d = json.load(io.open(f"evaluations/artifacts/corpus_sanity_{k}.json", encoding="utf-8"))["arme"][0]
+    v[k] = (d["sp_voll"], d["sp_voll_ci"], d["seiten"])
+a, b = v["v25-b01-policy"], v["v26-b01-policy"]
+print(f"TOR 2a ex post: v26-b01 als Generator {b[0]:.3f} (+-{b[1]:.3f}, {b[2]} Seiten) "
+      f"gegen v25-b01 {a[0]:.3f} (+-{a[1]:.3f}) -> {'HAELT' if b[0] >= a[0] else 'GERISSEN (Nutzer-Vorlage)'}")
+PYCHK
 
 echo "== 2) Traeger-Manifest v27 (580 = 400 neu + 135 G-1 + 45 G-2) $(date +%H:%M:%S)"
 python -X utf8 tools/generate_carrier_manifest.py \

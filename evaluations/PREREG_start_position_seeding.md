@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Spalten-Stellungen aus FREI weiterspielt (Startpositions-Seeding, KataGo-startPoses-Muster) -- also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: Kette v1 durchgemessen: Arena kein k1-Signal, kein Siegverlust (par.4c); Mechanik-Sonde erstes POSITIVES Zustandssignal (p = 0,017, par.4d). **Wiedervorlage registriert als v24-Arm b03 (par.7, 2026-09-03):** 1.500 Stellungen aus der b01-Value-Klasse, k = 4, 6.000 Seeding-Partien als Zusatz-Schwarm, Regel und Werkzeugaenderung festgelegt; laeuft nach der v24-Erzeugung. -->
+<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Stellungen aus FREI weiterspielt (Startpositions-Seeding), also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: Kette v1: Arena kein k1-Signal, Mechanik-Sonde positives Zustandssignal p = 0,017 (par.4c/4d). b03 GEFAHREN (par.7 Nachtrag 2026-09-05): 1.500 Stellungen, 6.000 Seeding-Partien, hoechster Kuppel-Bonus der v24-Arme. Weg C (par.9e) und Weg B/Ausflug (par.9f-9i) GEBAUT und seit v25 in der Erzeugung. Ziehungs-Konstanten stehen in self_play.rs, das angekuendigte par.9j wurde nie geschrieben (par.9k). Audit 2026-09-09 (par.9k): 11 % der Ausfluege weichen nicht ab, Abzweig zur Haelfte in Runde 1. -->
 
 # PREREG-SKELETT: Startpositions-Seeding -- frei weiterspielen ab halbfertigen Spalten
 
@@ -945,3 +945,45 @@ Fortsetzung: dieselben Zuege, dieselben Wertziele, nur unter anderer `game_id`. 
 Ausfluege werden VERWORFEN, mit eigener Logzeile. Ohne den Waechter haette der Korpus
 Kopien enthalten, die dem Value-Kopf Evidenz vortaeuschen, die es nicht gibt. Die Rate ist
 ungemessen und aus der Logzeile ablesbar, sobald die erste Charge laeuft.
+
+### par.9k AUDIT 2026-09-09: Ziehungs-Konstanten, Abzweig-Verteilung, Dubletten-Waechter
+
+**Das in par.9h angekuendigte par.9j wurde nie geschrieben.** Die laufenden Konstanten
+stehen im Code: `DEVIATE_ROUND_MASS = [0,448 / 0,280 / 0,189 / 0,083 / 0]` und
+`DEVIATE_DECAY` (`engine/src/self_play.rs`, Doc-Kommentar mit Grundmenge: 501.914
+Drafting-Entscheide aus 4.000 Partien des Korpus v23-b01-policy,
+`evaluations/artifacts/action_count_profile.json`); Weg B zieht ueber
+`profile_weight(ENVELOPE_PROFILE_DEFAULT) * actions.len()` (`envelope.rs:37`,
+`self_play.rs`, Reservoir-Schritt).
+
+**Gemessen am v26-Material** (`selfplay_v25-b01-value-excursion_*.pkl`, die ersten 40
+Dateien, n = 200 Paare Hauptpartie plus Ausflug, Einheit Paare):
+
+| Groesse | Wert |
+| --- | --- |
+| Abzweig-Runde R1 / R2 / R3 / R4 / R5 | 101 / 43 / 39 / 17 / 0 |
+| Ausflug mit identischem ERSTEN Folgezustand (keine Abweichung) | 22 = 11 % |
+| Ausflug byte-identisch mit dem Rest der Hauptpartie | 0 |
+| Ausflug-Laenge, Median / Mittel (Halbzuege beider Seiten) | 142 / 129,6 |
+
+**Zwei Befunde daraus.** (1) Der Dubletten-Waechter aus par.9i prueft nur, ob
+`deviation_best_action` einen Kandidaten fand; die Kandidaten werden gleichverteilt aus
+ALLEN legalen Aktionen gezogen, der Suchzug ist nicht ausgeschlossen, und der Aufrufer
+vergleicht die Wahl nicht mit ihm. In 11 % der Faelle spielt der Ausflug deshalb den
+Suchzug nach. Byte-Kopien entstehen trotzdem nicht, weil der Ausflug mit eigenem
+Such-Seed laeuft und spaeter divergiert; aber die Zusage aus par.9i ("genau EIN Zug
+anders") gilt nur fuer 89 %. Fix: Suchzug aus der Kandidatenmenge nehmen oder die Wahl
+gegen ihn pruefen und bei Gleichheit verwerfen. Ein Engine-Eingriff, deshalb NICHT vor
+`v27-b01` (Einfrieren; die v25- und v26-Klassen tragen denselben Defekt, der letzte
+eingefrorene Arm bleibt damit stationaer). (2) Der Abzweig sitzt zur Haelfte in Runde 1
+und zu 8,5 % in Runde 4. par.9b begruendet Weg B mit "Engpass Vollendung SPAET"; diese
+Lesart stammt aus der Lueckensonde vom 2026-08-23 (`column_completion_gap_probe.json`,
+Champion v21: 15,2 % von 658 Hoehe-5-Spalten vollendet, Erreichen zu 78 % in R4/5) und
+wurde am selben Tag von der Legalitaetsstufe widerlegt (`column_completion_legality_probe
+.json`: 0 von 160 Faellen ueberhaupt legal vollendbar, Musterreihe nicht voll 87, Spezialfeld
+41, Farbe 32; `archive/history.md:12797-12816`: "Engpass UPSTREAM in der ZUFUEHRUNG,
+Draft-/Reihenwahl Runden vorher"). Die frueh sitzende Abzweigung aus par.9g passt also zur
+KORRIGIERTEN Datenlage; falsch ist die Begruendung in par.9b, nicht die Ziehungsregel.
+Nachgetragen 2026-09-09 auf Nutzer-Rueckfrage; der erste Wortlaut dieses Punktes hatte es
+umgekehrt behauptet. Dazu: die Datenlage ist vom v21-Champion, der heutige baut 1,267 volle
+Spalten je Partie gegen den Anker (`anchor_arena_v26-b01.json`, n = 150).

@@ -123,8 +123,8 @@ waren es zwei Laeufe zu je 2.000, weil der erste nur 2.002 Identitaeten lieferte
 
 | Aufbau | Dauer | Bemerkung |
 | --- | --- | --- |
-| **Erzeugung Traeger**, 4.000 Partien @100, threads 11 | **rund 3,0 h** | 2,62 s je Partie, schneller als v25 (3,607), weil der Cache-Waechter seinen Rueckstand abgearbeitet hatte |
-| **Erzeugung Schwarm temperiert**, 4.000 Partien | **rund 3,5 h** | |
+| **Erzeugung Traeger**, 4.000 Partien @100, threads 11 | **11.077,9 s = 3h 05m** | 2,769 s je Partie (`manifest_v25-b01-policy_20260909_003156.json`), schneller als v25 (3,607), weil der Cache-Waechter seinen Rueckstand abgearbeitet hatte; berichtigt 2026-09-09, vorher standen hier 'rund 3,0 h' und '2,62 s' ohne Artefakt |
+| **Erzeugung Schwarm temperiert**, 4.000 Partien | **10.161,0 s = 2h 49m** | 2,540 s je Partie (`manifest_v25-b01-value-tempc_20260909_034044.json`); berichtigt 2026-09-09, vorher stand hier der v25-Schaetzwert 'rund 3,5 h' |
 | **Erzeugung Schwarm Ausflug**, 4.000 Identitaeten | **8.837,9 s = 2h 27m** | 2,21 s je Identitaet, EIN Lauf mit `--games 4000` |
 | **Training v26-b01**, 12 Epochen, 4.512.977 Samples | **7.441,0 s = 2h 04m** | 34.539,8 s CPU auf 6 Threads, 30,1 s Datenaufbau; langsamer als v25 (5.780 s), weil die G-2-Sonden daneben liefen |
 | Gepaartes Gating, 200 Paare @400, threads 10 | **4.281 s / 4.269 s** | rund 21,4 s je Paar |
@@ -137,6 +137,7 @@ waren es zwei Laeufe zu je 2.000, weil der erste nur 2.002 Identitaeten lieferte
 | Modell-Snapshot ins restic-Repo | **4 s** | |
 | Netz-Paritaets-Fixture (cargo test, warmes target) | **rund 10 s** | plus Gegenprobe |
 
-**Fuer v27 folgt daraus** (hergeleitet): die drei Erzeugungsbefehle kosten zusammen rund
-9 h, die Kette danach rund 2,5 h bis zum fertigen Training.
+**Fuer v27 folgt daraus** (hergeleitet aus den drei v26-Manifesten, 30.076,8 s): die drei
+Erzeugungsbefehle kosten zusammen rund 8,4 h, die Kette danach rund 2,5 h bis zum fertigen
+Training.
 
