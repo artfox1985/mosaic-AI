@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest -- gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. Nutzer 2026-08-31: die Plattenverteilung ist der GENERELLE Hebel (k6 nur in einem Drittel der Partien aktiv). Code-Befund par.6a: die Handheuristik bewertet Spezialfelder mit NULL. Aendern darf man sie nicht (Elo-Anker), der Weg fuehrt ueber die Netz-Seite. Stufe 0 faellig (Generation 2). -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. Nutzer 2026-08-31: die Plattenverteilung ist der GENERELLE Hebel (k6 nur in einem Drittel der Partien aktiv). Code-Befund par.6a: die Handheuristik bewertet Spezialfelder mit NULL. Die Sperre 'Aendern darf man sie nicht (Elo-Anker)' ist seit dem eingefrorenen Anker-Artefakt (2026-08-31) ueberholt, Nachtrag am Ende. Stufe 0 war fuer Generation 2 (v24) faellig, nicht gefahren; fruehestens nach v27-b01. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -225,3 +225,17 @@ oft, ~10 Punkte je betroffenem Stapelzug), `PREREG_stack_top_feature.md`
 dem Statuskopf hierher gezogen 2026-08-28): dort geht es darum, HALBFERTIGE
 Stellungen als Startpunkt einer Partie zu setzen; hier um die Wahl der
 Startkuppel am regulaeren Partiebeginn. Aehnlicher Name, verschiedene Frage.
+
+**Nachtrag 2026-09-09 (Audit):** die Sperre in par.6a ("Aendern darf man sie nicht,
+Elo-Anker") ist ueberholt. Seit 2026-08-31 ist der Anker das eingefrorene Artefakt
+`models/frozen_heuristics/hv1_anchor` (`ANCHOR_NAME` in `tools/elo_tracker.py`); der
+lebende Heuristik-Pfad darf sich bewegen, mit der Zug-fuer-Zug-Pruefung aus CLAUDE.md
+(Anker-Invarianz). Der direkte Weg, Spezialfelder in `choose_start_placement` zu
+bewerten, ist damit wieder eine Option und nicht mehr aus Anker-Gruenden verworfen. Zwei
+weitere Punkte aus dem Audit: die Zahl "4,02 gegen 3,15 Spezialpunkte je Seite" in par.6a
+stammt aus `PREREG_special_tile_yield.md` par.7 und vergleicht hv2-Lehrer gegen v22-b06,
+nicht Mensch gegen KI (Mensch gegen Netz: 10,3 gegen 1,3 je Partie,
+`docs/domain_knowledge.md`); und Stufe 0 misst die Spannweite ueber die SLOTS, ihr
+vorregistriertes Verdikt "Spanne klein, Arm tot" schloesse aber auch die Plattenwahl mit,
+die par.5 ausdruecklich bei der Heuristik laesst. Vor Stufe 0 ist das Verdikt auf den
+Slot-Teil einzugrenzen.

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v26-Trainingsfenster zugeschnitten, jetzt wo die Rotation zum ERSTEN MAL vollstaendig aus eigenem Material besteht? | Beleg: Fenster gebaut (2.948 Dateien), Training v26-b01 durch, Traeger-Kennzahl gemessen (neuer Sockel 0,737 gegen 0,637 volle Spalten je Seite, par.3 bestaetigt). **Tor 1 BESTANDEN** (par.8a): drei Seeds, in allen dreien liegt v26-b01 vorn (210:190, 85:55, 226:174), zwei signifikant, keiner negativ; verzerrungsfrei 436:364 = 54,5 % ueber die zwei vollen Laeufe. G-2-Wahl fuer v27 gemessen, aber das Kriterium trennt nicht (par.6). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v26-Trainingsfenster zugeschnitten, jetzt wo die Rotation zum ERSTEN MAL vollstaendig aus eigenem Material besteht? | Beleg: Fenster gebaut (2.948 Dateien), v26-b01 trainiert, Tor 1 BESTANDEN ueber drei Seeds (par.8a: 210:190, 85:55, 226:174; verzerrungsfrei 436:364 = 54,5 %), Promotion 2026-09-09 (Elo 1389). Traeger-Kennzahl par.3 bestaetigt: neuer Sockel 0,737 gegen 0,637 volle Spalten je Seite (je 8.000 Seiten, par.3 Nachtrag). G-2-Wahl fuer v27 gemessen, Kriterium trennt nicht (par.6); Entscheid in PREREG_v27_window.md par.2. -->
 
 # PREREG v26: Fensterzuschnitt
 
@@ -67,6 +67,14 @@ stammen statt aus voller Temperatur:
 0,5325 fuer das Rezept gemessen, nicht fuer diesen Korpus. **Vor dem v26-Zuschnitt gehoert
 die Traeger-Kennzahl der drei v24-b07-Klassen gemessen** (`tools/probes/`-Sonden auf den
 fertigen Korpora, keine neue Erzeugung noetig).
+
+**Nachtrag 2026-09-09 (Messung nachgetragen; der Kopf trug die Zahlen, der Koerper
+nicht):** `tools/corpus_sanity_check.py` ueber die Policy-Klassen, je 4.000 Partien =
+8.000 Seiten, Einheit volle Spalten je Seite: `selfplay_v25-b01-policy_*` **0,737**
+(KI +-0,017), `selfplay_v24-b07-policy_*` **0,637** (KI +-0,017); Artefakte
+`corpus_sanity_v25-b01-policy.json` / `corpus_sanity_v24-b07-policy.json`. Die
+Vorhersage oben (Kennzahl steigt, weil die G-1-Traeger erstmals aus Umschaltpunkt 1 und
+Weg C stammen) ist damit bestaetigt.
 
 ## par.4 WAS ENTSCHIEDEN WERDEN MUSS -- fast nichts (Nutzer-Berichtigung 2026-09-08)
 

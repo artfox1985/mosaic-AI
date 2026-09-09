@@ -119,6 +119,23 @@ Fuellstand und bleibt als Berichtsgroesse brauchbar, aber nicht als Tor-Mass.
 Die Doku stand einen Tag hinter der Messung; wer das Tor-Instrument wechselt,
 zieht diese Datei im selben Zug nach.
 
+**Praezedenz seit v25, festgeschrieben 2026-09-09 (Nutzer: "nicht nachmessen"):**
+die Self-Play-Flaeche wird NICHT vor der Erzeugung mit dem argmax-Instrument @400
+gemessen, sondern EX POST am erzeugten Korpus: `tools/corpus_sanity_check.py` ueber die
+Policy-Klasse des Generators (Kette Schritt 1, Artefakt `corpus_sanity_<gen>-policy.json`,
+Feld `sp_voll`, Einheit volle Spalten je Seite, n = 8.000 Seiten aus 4.000 Partien),
+Bezug ist dieselbe Zahl der Vorgeneration am selben Instrument. Belegt: v24-b07 als
+Generator 0,637, v25-b01 als Generator 0,737 (KI je +-0,017). Der Preis: die Zahl liegt
+erst vor, wenn die Erzeugung gelaufen ist; ein gerissenes Tor 2a kostet dann eine
+Erzeugung (rund 8,4 h). Die Arena-Flaeche gegen den Vorgaenger ist seit v25 nicht mehr
+gemessen worden, die Gating-Artefakte tragen keine Spaltenzahl. Was stattdessen vorliegt,
+ist der Kennzahlen-Block der Anker-Arena (v25-b01 1,307, v26-b01 1,267 volle Spalten je
+Partie, je n = 150 gegen den Anker, nicht gegen den Vorgaenger); das ist NICHT das
+Instrument oben, und 1,267 liegt als Punktschaetzer unter 1,307. Wer Tor 2b wieder
+braucht, faehrt das Gating mit `--log-games` und `tools/probes/arena_column_probe.py`
+wie bei v23. Fuer v26-b01 als Generator liefert die v27-Kette die Tor-2a-Zahl mit
+(`corpus_sanity_v26-b01-policy.json` gegen 0,737).
+
 **Den Bezugswert holt man sich, indem man die Vor-Generation am selben
 Instrument misst**, nicht aus dem Gedaechtnis und nicht aus einem Bericht mit
 anderem Betriebspunkt. Das ist keine Formalie: dieselbe Groesse liegt je nach

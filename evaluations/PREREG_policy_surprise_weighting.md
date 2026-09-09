@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: alpha 0,5 ohne Tor: NEIN (par.9, v23-b03: Arena 75:85, Spalten 0,500 gegen 0,631). WIEDER OFFEN 2026-09-05 als v24-Arm v24-b05 (par.10, Nutzer): Ueberraschung nur bei SICHERER Suche (Top-1 des Ziels >= 0,5), Knopf --surprise-confidence-min gebaut, Default 0 = bitidentisch; Training nach b04, einziger Faktor gegen b04. -->
+<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: alpha 0,5 ohne Tor: NEIN (par.9, v23-b03: Arena 75:85, Spalten 0,500 gegen 0,631). Mit Sicherheits-Tor 0,5 als v24-b05 GEFAHREN 2026-09-05/06 (par.10, Manifest: einziger Faktor gegen b04): Tor 2a 0,4975 volle Spalten, Tor 1 ohne Knopf 66:34 und 112:78 (SPRT), mit Knopf 219:181 ohne Entscheid; Belege nur in PREREG_v24_window.md par.9 (par.11). Ein Verdikt GEGEN b04 (der einzige saubere Vergleich) ist nirgends registriert; Generator v25 wurde v24-b07. -->
 
 # Vorregistrierung: Policy-Surprise-Weighting
 
@@ -326,3 +326,19 @@ nachzutragen: wie viele Samples ueber der Schwelle lagen). Liegt er unter 10
 Prozent, kann der Arm nichts zeigen und wird als "Tor zu eng" registriert,
 nicht als Nullbefund.
 
+## par.11 NACHTRAG 2026-09-09: der Arm v24-b05 ist gefahren, sein Verdikt steht woanders
+
+`v24-b05` wurde in der Nacht 2026-09-05/06 trainiert und abgenommen
+(`models/manifest_train_v24-b05_20260905_205133.json`: `surprise_alpha 0,5`,
+`surprise_confidence_min 0,5`; der cli_args-Diff gegen
+`manifest_train_v24-b04_20260905_165948.json` zeigt genau diese zwei Felder plus den
+Namen, die Einfaktorialitaet ist also belegt). Die Ergebnisse stehen NICHT hier, sondern
+in `PREREG_v24_window.md` par.9 (Tabellenzeile `v24-b05`): Tor 2a ohne Knopf 0,4825 und
+mit Knopf 0,4975 volle Spalten je Seite (200 Partien @400 argmax), Tor 1 ohne Knopf 66:34
+(SPRT) und repliziert 112:78, mit Knopf 219:181 ohne Entscheid; Generatorwahl in par.9c.
+
+**Was fehlt und diesen Strang offen haelt:** der einzige saubere Vergleich fuer die
+Ueberraschungsgewichtung ist b05 GEGEN b04 (gleiches Rezept, ein Faktor). Diese Kante ist
+nirgends registriert, und der in par.10 verlangte Anteil gegateter Stichproben je Epoche
+wurde nie aus dem Trainingslog nachgetragen. Beides waere aus den vorhandenen Modellen
+und Logs nachholbar, ohne neues Training. Bis dahin: kein Verdikt.

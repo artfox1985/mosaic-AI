@@ -15,9 +15,9 @@
 # Die Variable steht IM Datei-Schluessel; ohne sie landen die Bloecke in einem Namensraum,
 # den das Training nie adressiert (2026-09-09: 2.680 tote Bloecke, docs/pitfalls.md).
 #
-# ERWARTETE DAUER nach den gemessenen v26-Werten (docs/measured_runtimes.md): rund 3,0 h +
-# 3,5 h + 2,5 h = 9 h. `--games 4000` gilt AUCH fuer die Ausflug-Klasse: der Ausflug hat
-# eine eigene game_id und zaehlt mit (Korrektur aus PREREG_v25_window.md par.19a).
+# ERWARTETE DAUER nach den v26-Manifesten (data/manifest_v25-b01-*.json, laufzeit-Block):
+# 11.078 s + 10.161 s + 8.838 s = 30.077 s, rund 8,4 h. `--games 4000` gilt AUCH fuer die
+# Ausflug-Klasse: der Ausflug hat eine eigene game_id und zaehlt mit (Korrektur aus PREREG_v25_window.md par.19a).
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8

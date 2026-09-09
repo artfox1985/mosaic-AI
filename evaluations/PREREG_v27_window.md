@@ -140,10 +140,14 @@ python -u self_play.py --mode network --model models/alphazero_v26-b01_brierbest
 python -u self_play.py --mode network --model models/alphazero_v26-b01_brierbest.onnx   --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 --value-only   --version v26-b01-value-excursion --threads 11 --chunk 10 --per-file 10 --seed 20260916   --excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise
 ```
 
-**Kosten, gemessen an der v26-Erzeugung** (nicht geschaetzt, `docs/measured_runtimes.md`):
-Nr. 1 rund 3,0 h bei 2,62 s je Partie, Nr. 2 rund 3,5 h, Nr. 3 rund 2,5 h (8.838 s
-gemessen) -- zusammen **rund 9 h**. Die v26-Laeufe waren schneller als die v25-Werte, weil
-der Cache-Waechter seinen Rueckstand abgearbeitet hatte und die CPU freigab.
+**Kosten, gemessen an der v26-Erzeugung** (Primaerquelle sind die `laufzeit`-Bloecke der
+drei Manifeste `data/manifest_v25-b01-*.json`, je 4.000 Partien bei threads 11): Nr. 1
+11.077,9 s = 3,08 h (2,769 s je Partie), Nr. 2 10.161,0 s = 2,82 h (2,540 s), Nr. 3
+8.837,9 s = 2,45 h (2,207 s je Identitaet) -- zusammen **30.076,8 s = 8,4 h**. Berichtigt
+2026-09-09: vorher standen hier '2,62 s', '3,5 h' und 'rund 9 h', uebernommen aus
+`docs/measured_runtimes.md`, wo der v25-Schaetzwert als Messung gefuehrt war. Die
+v26-Laeufe waren schneller als die v25-Werte, weil der Cache-Waechter seinen Rueckstand
+abgearbeitet hatte und die CPU freigab.
 
 **Cache-Waechter mitlaufen lassen** (`build_cache_incremental.py --watch --workers 3`),
 **zwingend unter `MOSAIC_IGNORE_POLICY_TARGET_VALID=1`**: die Variable steht im

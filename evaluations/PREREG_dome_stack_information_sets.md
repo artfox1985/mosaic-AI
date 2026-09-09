@@ -480,3 +480,45 @@ Staerkeaussage taugt es nicht. Als BASISLINIE fuer den Vergleich nach dem Umbau 
 genau richtig: dieselbe Stellung, dasselbe Netz, nur ein anderes Weltmodell -- faellt der
 Rang der Wiederholungsziehung dann, hat der Umbau seine Wirkung; bleibt er bei 1, nicht.
 
+## par.14 AUDIT 2026-09-09 (vor dem Bau; Befunde, die par.7 bis par.13 beruehren)
+
+Nachgeprueft am Code, je Punkt mit Pruefstelle. Nichts davon aendert den Anlass (par.3
+bleibt richtig: `net_mcts.rs:976` `DETERMINIZE_ROOT_HIDDEN_INFO = true`, `:987`
+Vollmischung), aber vier Stellen der Prereg tragen Aussagen, die so nicht halten.
+
+1. **Die Kauf-Seite der Null-Klammer hat keinen Eigentuemer.** par.9 verweist sie an
+   `PREREG_score_clamp_incentive.md`; deren par.4 verweist sie hierher (par.4b), und
+   par.4b formuliert nur eine Warnung. Dazu kommt: `apply_paid_cost`
+   (`engine/src/board.rs:361-364`) bucht bei Kaeufen auf `score` UND `score_unclamped` nur
+   den tatsaechlich bezahlten Betrag. Die Gratisziehungen des Anlassspiels (Ziehungen 6 bis
+   13 bei Stand 0) tauchen damit in KEINER Differenz der beiden Zaehler auf. Wer sie messen
+   will, braucht eine eigene Zaehlung (Ziehungen bei Stand 0 je Partie), und eine der beiden
+   Preregs muss sie tragen. Vorschlag: hier, weil der Stapel hier modelliert wird.
+2. **par.13 nennt "-12 = Maximum von vier offenen Feldern" als Befund, die Zahl ist
+   unbelegt.** `score_empty_special_fields` (`engine/src/scoring.rs:771-775`) zaehlt ueber
+   `collect_spaces` (`:804-814`) die leeren Spezialfelder ALLER gelegten Platten im
+   3x3-Raster, mit -3 je Feld. Die Obergrenze ist also 3 mal die Zahl der Spezialfelder
+   auf dem Brett, nicht 12. par.13a Punkt 1 stellt die Frage richtig; par.13 darf die
+   Zahl bis dahin nicht als Befund fuehren.
+3. **Das Informationsmengen-Modell aus par.4 wird von der Oberflaeche gebrochen:**
+   `game.rs:282-286` schreibt die Rueckgabe-Reihenfolge mit Kachel-ID in das Ereignis-Log,
+   das Frontend zeigt dieses Log an (`static/js/app.js`, Abschnitt "Log der Anzeige").
+   Der menschliche Gegner kann die Reihenfolge, die par.4 als "offiziell NICHT bekannt"
+   modelliert, mitlesen. Die vier Referenzpartien (par.12/13) sind unter diesem Leck
+   gespielt worden; ob es genutzt wurde, ist nicht feststellbar. Vor der naechsten
+   Referenzpartie: Log-Zeile auf die Anzahl kuerzen oder die Reihenfolge als BEKANNT
+   modellieren. Das ist ein Nutzer-Entscheid, weil er die Sichtgleichheits-Frage aus
+   `PREREG_stack_top_feature.md` in die Gegenrichtung betrifft (Mensch sieht mehr).
+4. **par.8 beschreibt Geplantes im Praesens:** ein "mitgefuehrter Wissensstand" in
+   `tools/analyze_game_log.py` existiert nicht (Agentenbefund, Grep ueber
+   bekannt/known/return_order: nur Prosa-Treffer; nicht unabhaengig nachgeprueft). Die Zahl
+   ist baubar, weil die Reihenfolge mit IDs im Log steht, aber sie ist zu BAUEN. Ausserdem
+   nennt par.8 fuer das gepaarte Gating weder n noch SPRT-Grenzen; "faellt auf nahe null"
+   ist keine Schwelle. Beides vor dem PRE/POST-Vergleich festlegen.
+
+Kleineres, ebenfalls aus dem Audit: par.3 zeigt auf `build_net_tree` bei 3952, die
+aktive Determinisierung des Gumbel-Pfads liegt bei `net_mcts.rs:4371` (Funktion richtig,
+Zeile nicht); par.4b sagt "Ziehungen 1 bis 4 bezahlt", im Log kostet auch Ziehung 5 einen
+Punkt (Fixture Z.41, Agentenbefund); par.12a "130 bewertete Entscheidungen" sind 130
+Zeilen, davon 99 mit `evaluated: true` (Agentenbefund am Artefakt); das Artefakt
+`replay_dome_stack_pre.json` traegt keinen `laufzeit`-Block.

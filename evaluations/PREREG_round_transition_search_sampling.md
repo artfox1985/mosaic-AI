@@ -251,3 +251,26 @@ fruehestens nach den v24-Abnahmen (Maschine belegt); Reihenfolge der
 Such-Knoepfe am v24-Siegernetz: K3-P2 (gebaut), K4 Rundenschaetzer
 (`round_estimate_leaf_term`), dann B -- ein Knopf, ein Netz, eine Messung.
 
+## par.8 AUDIT 2026-09-09: zwei Praemissen halten nicht mehr
+
+1. **par.6 ("Determinisierung ersatzlos entfallen") ist falsch.** `MOSAIC_NUM_DETERMINIZATIONS`
+   steht als aktiver Knopf in `engine/src/knob_registry.rs`, `determinize_hidden_information`
+   lebt in `engine/src/net_mcts.rs:986` und wird unter `DETERMINIZE_ROOT_HIDDEN_INFO = true`
+   (`:976`) an jeder Wurzel aufgerufen. Es ist genau die Mischstelle, die seit 2026-09-09
+   als verdaechtig gefuehrt wird (`docs/architecture_reference.md`, Naht-Audit;
+   `PREREG_dome_stack_information_sets.md`). Der Wegfall in `PREREG_chance_nodes.md` war
+   eine FOLGE von deren Teil B, und Teil B ist ungebaut.
+2. **par.4.2 verspricht als Nutzen den Erhalt einer Paritaetssonde, die es nicht mehr gibt.**
+   `tools/parity_probe.py` liegt nicht im Baum; die Aera mit Soll-Hash `8c6684ff` ist am
+   2026-08-28 geschlossen (`docs/promotion_checklist.md:84`). Nachfolger ist die
+   Champion-Fixture `engine/tests/fixtures/net_parity_champion.txt`. Die Bauvorgabe "Hash
+   gilt weiter" ist damit leer; richtig ist: Paritaets-Fixture des amtierenden Champions
+   muss gruen bleiben.
+3. **Die in par.4.2 zitierte Praezedenz ist ruhend bzw. selbst verdaechtig:** der
+   Stapel-Peek-Shuffle ist aus (`SHUFFLE_STACK_PEEK_IN_SEARCH = false`), und der Shuffle
+   in `round_transition_deep::simulate_one_round` steht in derselben Verdachtsliste.
+
+Folge: dieser Arm haengt an der Antwort aus `PREREG_dome_stack_information_sets.md`. Wer
+die Rundensimulation an Blaettern einschaltet, uebernimmt deren Mischregel; die Prereg
+ist vor einem Bau um die dort entschiedene Informationsmenge zu ergaenzen. Zeilendrift:
+par.1 Konstante `net_mcts.rs:95`, Aufrufstelle `:2329`.

@@ -117,3 +117,31 @@ Punkte, mit denen es bezahlt wird, unterhalb von null noch etwas bedeuten.
 **Stufe 0 ist davon ausgenommen und darf frueher laufen:** sie liest nur vorhandene
 Records, aendert nichts und braucht kein offenes Fenster. Bedingung ist allein eine freie
 Maschine.
+
+## par.9 AUDIT 2026-09-09 (vor Stufe 0)
+
+Drei Punkte, die Stufe 0 so, wie sie in par.5 steht, ins Leere laufen liessen:
+
+1. **Grundmenge.** par.5 misst auf Self-Play-Partien und haengt die Abbruchschwelle
+   daran. Im Self-Play spielen zwei gleich starke Kopien; die Klammer-Falle entsteht aber,
+   wenn eine Seite weit zurueckliegt. Der Anlass war 69:0 gegen einen Menschen. Die 23
+   Mensch-Logs in `static/log/` (in `PREREG_dome_stack_information_sets.md` par.13a der
+   tragende Beleg) gehoeren als ZWEITE Grundmenge in Stufe 0, mit eigener Zahl; die
+   Schwelle "UEBERHOLT" darf nur fallen, wenn BEIDE Grundmengen unter ihr liegen.
+2. **Kennzahl (3) sieht die Kauf-Seite nicht.** `score - score_unclamped` enthaelt per
+   Bau nur Strafen: `apply_paid_cost` (`engine/src/board.rs:361-364`) bucht bei Kaeufen
+   auf beiden Zaehlern nur den bezahlten Betrag. Die gratis gezogenen Platten, der
+   auffaellige Posten des Anlassspiels, stehen in keiner der drei Zahlen. Stufe 0 braucht
+   eine vierte: Ziehungen bei Punktestand 0 je Partie und Seite. Eigentuemer dieser Zahl
+   ist nach Absprache mit `dome_stack` par.14 Punkt 1 festzulegen; bis dahin faellt sie
+   zwischen die beiden Preregs.
+3. **`scores` und `scores_unclamped` sind Endstaende, keine Zwischenstaende.** Beide
+   werden am Partieende berechnet und in JEDEN Record zurueckgeschrieben
+   (`engine/src/self_play.rs:2899-2913`). Kennzahl (1) und (2) ("Halbzuege bei Stand 0")
+   sind daraus nicht berechenbar; sie brauchen den Schritt-Zustand `players[i].score`
+   aus dem serialisierten `state` je Record (vorhanden, in par.5 nicht benannt). Der
+   Startpunktestand ist 5 (`board.rs:302-303`, Agentenbefund), fuer Kennzahl (1) relevant.
+
+Nebenbefund fuer par.6a: `score_unclamped` ist eine Mischgroesse, ungeklemmte Strafen
+(`board.rs:344-346`) bei geklemmten Kaeufen (`:361-364`). Als Merkmal ist das eine
+Konvention, kein "Stand ohne Klammer"; vor dem Bau benennen.
