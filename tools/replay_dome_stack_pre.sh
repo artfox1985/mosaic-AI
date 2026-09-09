@@ -7,6 +7,12 @@
 # steht, und (c) die G-2-Sonden durch sind. Punkt (c) ist die Exklusivitaetsregel: EIN
 # CPU-Auftrag neben der GPU ist erlaubt, zwei gegeneinander nicht.
 # Gehaertet wie die anderen Ketten: alles ausser einer klaren Zahl gilt als belegt.
+# SELBSTTREFFER (2026-09-09, hier gefunden): das Suchmuster steht auch in der
+# Kommandozeile des FRAGENDEN Prozesses. `-match 'self_play'` lieferte deshalb
+# nie 0, sondern 4, und die Wartebedingung ging nie auf -- die Kette stand 35
+# Minuten still, obwohl die Erzeugung fertig war. Zwei Sperren dagegen: der
+# escapte Punkt (`self_play\.py`; die fragende Kommandozeile traegt den
+# Backslash, der Zielprozess nicht) UND der Ausschluss der PowerShell-Prozesse.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
@@ -15,12 +21,12 @@ LOG=evaluations/fixtures/game_20260909_004553_seed876496.log
 OUT=evaluations/artifacts/replay_dome_stack_pre.json
 
 zaehle() {
-  powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '$1' }).Count" 2>/dev/null | tr -d '\r' | tail -1
+  powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '$1' -and \$_.Name -notmatch 'pwsh|powershell' }).Count" 2>/dev/null | tr -d '\r' | tail -1
 }
 
 echo "== WARTEN auf das Fenster (Training laeuft, Sonden durch) $(date +%F' '%H:%M:%S)"
 while :; do
-  sp=$(zaehle 'self_play'); tr=$(zaehle 'train\.py'); pr=$(zaehle 'corpus_state_diversity_probe|paired_corpus_divergence_probe')
+  sp=$(zaehle 'self_play\.py'); tr=$(zaehle 'train\.py'); pr=$(zaehle 'corpus_state_diversity_probe|paired_corpus_divergence_probe')
   case "$sp" in ''|*[!0-9]*) sp=BELEGT;; esac
   case "$pr" in ''|*[!0-9]*) pr=BELEGT;; esac
   case "$tr" in ''|*[!0-9]*) tr=0;; esac

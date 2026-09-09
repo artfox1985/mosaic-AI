@@ -12,6 +12,12 @@
 # WARUM DER CACHE-WAECHTER HIER BEENDET WIRD: er baut dieselben Datei-Bloecke wie Schritt 5.
 # Zwei Prozesse, die denselben Block schreiben, sind ein Rennen um dieselbe .h5 -- billiger
 # ist es, den Waechter zu beenden, weil ab hier ohnehin nichts mehr dazukommt.
+# SELBSTTREFFER (2026-09-09, hier gefunden): das Suchmuster steht auch in der
+# Kommandozeile des FRAGENDEN Prozesses. `-match 'self_play'` lieferte deshalb
+# nie 0, sondern 4, und die Wartebedingung ging nie auf -- die Kette stand 35
+# Minuten still, obwohl die Erzeugung fertig war. Zwei Sperren dagegen: der
+# escapte Punkt (`self_play\.py`; die fragende Kommandozeile traegt den
+# Backslash, der Zielprozess nicht) UND der Ausschluss der PowerShell-Prozesse.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
@@ -32,7 +38,7 @@ PYEOF
 
 keine_erzeugung_laeuft() {
   local n
-  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match 'self_play' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
+  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match 'self_play\.py' -and \$_.Name -notmatch 'pwsh|powershell' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
   [ "$n" = "0" ]
 }
 
