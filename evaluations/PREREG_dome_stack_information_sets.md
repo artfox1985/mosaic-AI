@@ -314,3 +314,58 @@ grosser). Gebraucht wird dafuer ein Knopf, denn `DETERMINIZE_ROOT_HIDDEN_INFO` i
 eine Konstante (`net_mcts.rs:976`); Default AUS laesst das Bestandsverhalten unberuehrt,
 danach `/mosaic-anchor-invariance`.
 
+## par.12 DIE REFERENZ-PARTIE (Nutzer-Auftrag 2026-09-09)
+
+**Nutzer:** *"als Referenz kannst das Log anfuehren. Das kannst bei Bedarf nachspielen und
+dann laesst sich abschaetzen, wann/ob mit welchen Massnahmen sich das Netz anders
+entscheidet."*
+
+**Eingefroren, weil sie ab jetzt eine Rolle traegt**
+([[feedback_freeze_when_it_becomes_a_reference]]): `static/log/` ist gitignoriert
+(`.gitignore:50`), die Partie liegt deshalb als Kopie im Baum.
+
+| | |
+| --- | --- |
+| Datei | `evaluations/fixtures/game_20260909_004553_seed876496.log` |
+| sha256 | `98c28a92881cd341b8c5cec3c4a24ef3c6babd83602c57d33cacbbccd3b9c002` |
+| Groesse | 32.257 Bytes, 483 Zeilen |
+| Motor | das Wheel vom 2026-09-07 (Weg B/C), Netz `v25-b01_brierbest`, Champion-Spec |
+
+**Warum genau diese Partie taugt:** sie ist exakt nachspielbar, nicht heuristisch. Seit
+`PREREG_action_id_logging.md` traegt jede Aktion ihre ID im Log (`#a`-Zeilen), und
+`tools/analyze_game_log.py` loest Stein-Zuege ueber diese ID auf statt aus der Prosa; nach
+JEDER Aktion wird `log_since` gegen den Original-Abschnitt gekreuzt und bricht bei
+Divergenz ab. Die Partie enthaelt zudem alle vier Stapelzuege in einem Stueck.
+
+**Die Entscheidungsstellen** (Zeilen der eingefrorenen Kopie):
+
+| Runde | Zeilen | Was dort geschah |
+| --- | --- | --- |
+| R1 | 37-50 | 13 Ziehungen, 12 zurueck, Reihenfolge im Log -- ab hier ist der Stapel dem Ziehenden bekannt |
+| R2 | 135-137 | 2 Ziehungen, 1 zurueck |
+| R3 | 246-251 | 5 Ziehungen, 4 zurueck |
+| R4 | 369 | 1 Ziehung |
+
+**Das Protokoll, vorregistriert:**
+
+```
+python -X utf8 -u tools/analyze_game_log.py   --log evaluations/fixtures/game_20260909_004553_seed876496.log   --model models/alphazero_v25-b01_brierbest.onnx --sims 400   --oracle-json evaluations/artifacts/replay_dome_stack_<STAND>.json
+```
+
+Gefahren wird er ZWEIMAL mit demselben Netz und denselben Seeds: einmal auf dem heutigen
+Stand (`<STAND>` = `pre`), einmal nach dem Umbau (`post`). **Verglichen wird die
+Entscheidung an den vier Stellen oben**, nicht die Partie -- gleiche Stellung, gleiches
+Netz, nur ein anderes Weltmodell.
+
+**Was der Vergleich zeigen soll und was nicht.** Er beantwortet die Frage des Nutzers:
+*wann und mit welcher Massnahme entscheidet sich das Netz anders?* Er ist damit die
+DIAGNOSTIK des Umbaus und ersetzt keine Arena -- eine einzelne Partie traegt keine
+Staerkeaussage. Erwartung, vorab benannt: in R2 bis R4 faellt die Ziehtiefe, weil der
+Stapel dort bereits bekannt ist; in R1 muss sie NICHT fallen (par.4b: der tiefe Erstzug
+kauft Wissen und kann richtig sein).
+
+**Zweiter Nutzen, der nichts kostet:** derselbe Aufruf mit `--no-oracle` ist ein
+Regressionstest. Laeuft die Partie nach einer Engine-Aenderung nicht mehr byte-gleich
+durch, hat die Aenderung Regelverhalten veraendert -- gemerkt an einer echten Partie statt
+an einem Kunstzustand.
+

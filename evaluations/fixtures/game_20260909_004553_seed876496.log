@@ -1,0 +1,483 @@
+# MOSAIC GAME LOG
+# {"timestamp": "20260909_004553", "seed": 876496, "players": ["Spieler 1", "KI"], "first_player": 1, "ai_enabled": true, "ai_player": 1, "ai_model": "v25-b01_brierbest", "ai_sims": 400, "teacher_level": 0, "teacher_sims": null, "teacher_coach_sims": null}
+# ============================================================
+[R1] Spiel gestartet. KI beginnt.
+[R1] Wertungsplatten gewählt: [1, 5, 6]
+[R1] Spieler 1: Startkachel 7 → (0,0) rot=0°
+[R1] KI: Startkachel 1 → (0,0) rot=0°
+#a {"a":{"color":"blau","factory_index":2,"moon_order":["rot","schwarz","rot"],"row":0,"type":"stone"},"id":18,"p":1}
+[R1] ☀️  KI: 1× blau von F3 → Reihe 1 [1/1]
+[R1] 🌙 F3 Mond-Stapel: (rot, schwarz→rot)
+#a {"a":{"color":"gelb","factory_id":null,"moon_order":[],"row":0,"source":"LARGE_FACTORY_SUN","type":"stone"},"id":68,"p":0}
+[R1] ☀️  Spieler 1: 1× gelb von GF → Reihe 1 [1/1]
+#a {"a":{"color":"türkis","factory_index":0,"moon_order":["blau","blau","blau"],"row":1,"type":"stone"},"id":214,"p":1}
+[R1] ☀️  KI: 1× türkis von F1 → Reihe 2 [1/2]
+[R1] 🌙 F1 Mond-Stapel: (blau, blau→blau)
+#a {"a":{"id_rotation":391,"rotation":0,"slot_col":2,"slot_row":2,"tile_id":3,"type":"dome_display"},"id":336,"p":0}
+[R1] Spieler 1: Kachel 3 → Slot (2,2) rot=0° [Plättchen 1/2]
+#a {"a":{"display_index":1,"slot_col":0,"slot_row":2,"type":"choose_dome_slot"},"id":343,"p":1}
+#a {"a":{"rotation":180,"type":"choose_dome_rotation"},"id":393,"p":1}
+[R1] KI: Kachel 15 → Slot (2,0) rot=180° [Plättchen 1/2]
+#a {"a":{"id_rotation":391,"rotation":0,"slot_col":1,"slot_row":2,"tile_id":11,"type":"dome_display"},"id":335,"p":0}
+[R1] Spieler 1: Kachel 11 → Slot (2,1) rot=0° [Plättchen 2/2]
+#a {"a":{"color":"blau","factory_index":5,"moon_order":[],"row":4,"type":"stone"},"id":45,"p":1}
+[R1] ❖ KI: Startspielerstein genommen (−2 Pkt am Rundenende → aktuell 5 Pkt)
+[R1] 🌙 KI: 2 (1+1)× blau von F1, GF → Reihe 5 [2/5]
+[R1] 🌙 F1 Mond-Stapel: (blau→blau)
+[R1] 🌙 GF Moon-Pool: (schwarz, türkis, türkis)
+#a {"a":{"color":"schwarz","factory_id":null,"moon_order":[],"row":1,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":171,"p":0}
+[R1] 🌙 Spieler 1: 1 (1)× schwarz von GF → Reihe 2 [1/2]
+[R1] 🌙 GF Moon-Pool: (türkis, türkis)
+#a {"a":{"color":"blau","factory_index":5,"moon_order":[],"row":4,"type":"stone"},"id":45,"p":1}
+[R1] 🌙 KI: 1 (1)× blau von F1 → Reihe 5 [3/5]
+[R1] 🌙 F1 Mond-Stapel: (blau)
+#a {"a":{"color":"schwarz","factory_id":2,"moon_order":["gelb","rot","türkis"],"row":1,"source":"SMALL_FACTORY_SUN","type":"stone"},"id":167,"p":0}
+[R1] ☀️  Spieler 1: 1× schwarz von F2 → Reihe 2 [2/2]
+[R1] 🌙 F2 Mond-Stapel: (gelb, rot→türkis)
+[R1] 📦 KI: 1. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 4 Gesamt
+[R1] 📦 KI: 2. Kachel vom Stapel gezogen (Rückseite: Wild) −1 Pkt → 3 Gesamt
+[R1] 📦 KI: 3. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 2 Gesamt
+[R1] 📦 KI: 4. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 1 Gesamt
+[R1] 📦 KI: 5. Kachel vom Stapel gezogen (Rückseite: Wild) −1 Pkt → 0 Gesamt
+[R1] 📦 KI: 6. Kachel vom Stapel gezogen (Rückseite: Wild) −1 Pkt → 0 Gesamt
+[R1] 📦 KI: 7. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt
+[R1] 📦 KI: 8. Kachel vom Stapel gezogen (Rückseite: Wild) −1 Pkt → 0 Gesamt
+[R1] 📦 KI: 9. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt
+[R1] 📦 KI: 10. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt
+[R1] 📦 KI: 11. Kachel vom Stapel gezogen (Rückseite: Wild) −1 Pkt → 0 Gesamt
+[R1] 📦 KI: 12. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt
+[R1] 📦 KI: 13. Kachel vom Stapel gezogen (Rückseite: Wild) −1 Pkt → 0 Gesamt
+[R1] ↩️ 12 Kuppelplatte(n) zurueck unter den Stapel (Reihenfolge): #10 (Special), #13 (Wild), #0 (Special), #4 (Special), #5 (Wild), #16 (Wild), #6 (Special), #9 (Wild), #8 (Special), #17 (Special), #14 (Wild), #12 (Special)
+[R1] KI: Kachel 2 → Slot (0,1) rot=0° [Plättchen 2/2]
+#a {"a":{"color":"türkis","factory_id":null,"moon_order":[],"row":3,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":231,"p":0}
+[R1] 🌙 Spieler 1: 3 (1+2)× türkis von F2, GF → Reihe 4 [3/4]
+[R1] 🌙 F2 Mond-Stapel: (gelb→rot)
+[R1] 🌙 GF Moon-Pool: leer
+#a {"a":{"color":"blau","factory_index":5,"moon_order":[],"row":4,"type":"stone"},"id":45,"p":1}
+[R1] 🌙 KI: 1 (1)× blau von F1 → Reihe 5 [4/5]
+[R1] 🌙 F1 Mond-Stapel: leer
+[R1] 🎴 F1: Bonusplättchen aufgedeckt!
+#a {"a":{"factory_id":1,"type":"bonus_chip"},"id":401,"p":0}
+[R1] Spieler 1: Bonusplättchen von Fabrik 1 genommen [1/2 diese Runde]
+#a {"a":{"color":"rot","factory_index":5,"moon_order":[],"row":3,"type":"stone"},"id":135,"p":1}
+[R1] 🌙 KI: 2 (1+1)× rot von F2, F3 → Reihe 4 [2/4]
+[R1] 🌙 F2 Mond-Stapel: (gelb)
+[R1] 🌙 F3 Mond-Stapel: (rot→schwarz)
+#a {"a":{"color":"blau","factory_id":4,"moon_order":["gelb","schwarz","rot"],"row":5,"source":"SMALL_FACTORY_SUN","type":"stone"},"id":49,"p":0}
+[R1] ☀️  Spieler 1: 1× blau von F4 → Reihe 6 [1/6]
+[R1] 🌙 F4 Mond-Stapel: (gelb, schwarz→rot)
+#a {"a":{"color":"rot","factory_index":5,"moon_order":[],"row":3,"type":"stone"},"id":135,"p":1}
+[R1] 🌙 KI: 1 (1)× rot von F4 → Reihe 4 [3/4]
+[R1] 🌙 F4 Mond-Stapel: (gelb→schwarz)
+#a {"a":{"color":"schwarz","factory_id":null,"moon_order":[],"row":2,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":177,"p":0}
+[R1] 🌙 Spieler 1: 2 (1+1)× schwarz von F3, F4 → Reihe 3 [2/3]
+[R1] 🌙 F3 Mond-Stapel: (rot)
+[R1] 🌙 F4 Mond-Stapel: (gelb)
+#a {"a":{"color":"rot","factory_index":5,"moon_order":[],"row":3,"type":"stone"},"id":135,"p":1}
+[R1] 🌙 KI: 1 (1)× rot von F3 → Reihe 4 [4/4]
+[R1] 🌙 F3 Mond-Stapel: leer
+[R1] 🎴 F3: Bonusplättchen aufgedeckt!
+#a {"a":{"factory_id":3,"type":"bonus_chip"},"id":403,"p":0}
+[R1] Spieler 1: Bonusplättchen von Fabrik 3 genommen [2/2 diese Runde]
+#a {"a":{"color":"gelb","factory_index":5,"moon_order":[],"row":5,"type":"stone"},"id":99,"p":1}
+[R1] 🌙 KI: 2 (1+1)× gelb von F2, F4 → Reihe 6 [2/6]
+[R1] 🌙 F2 Mond-Stapel: leer
+[R1] 🎴 F2: Bonusplättchen aufgedeckt!
+[R1] 🌙 F4 Mond-Stapel: leer
+[R1] 🎴 F4: Bonusplättchen aufgedeckt!
+#a {"a":{"type":"pass"},"id":0,"p":0}
+[R1] ⏭️ Spieler 1: passt
+#a {"a":{"factory_index":3,"type":"bonus_chip"},"id":404,"p":1}
+[R1] KI: Bonusplättchen von Fabrik 4 genommen [1/2 diese Runde]
+#a {"a":{"type":"pass"},"id":0,"p":0}
+[R1] ⏭️ Spieler 1: passt
+#a {"a":{"factory_index":1,"type":"bonus_chip"},"id":402,"p":1}
+[R1] KI: Bonusplättchen von Fabrik 2 genommen [2/2 diese Runde]
+[R1] Tiling-Phase beginnt.
+[R1] Spieler 1: gelb → Slot (0,0) Space 0
+[R1] 🎯 Spieler 1: +1 Pkt (Reihe 1 → Kuppel 1/1 - alleinstehend)
+[R1] Spieler 1: schwarz → Slot (0,0) Space 2
+[R1] 🎯 Spieler 1: +2 Pkt (Reihe 2 → Kuppel 1/1 - 2 vertikal)
+[R1] KI: blau → Slot (0,0) Space 0
+[R1] 🎯 KI: +1 Pkt (Reihe 1 → Kuppel 1/1 - alleinstehend)
+[R1] KI: Strafe -2 Pkt → 0 Gesamt
+[R2] Runde 2 beginnt. KI ist Startspieler.
+#a {"a":{"color":"türkis","factory_index":0,"moon_order":["rot","gelb","blau"],"row":1,"type":"stone"},"id":214,"p":1}
+[R2] ☀️  KI: 1× türkis von F1 → Reihe 2 [2/2]
+[R2] 🌙 F1 Mond-Stapel: (rot, gelb→blau)
+#a {"a":{"id_rotation":393,"rotation":180,"slot_col":0,"slot_row":1,"tile_id":13,"type":"dome_display"},"id":340,"p":0}
+[R2] Spieler 1: Kachel 13 → Slot (1,0) rot=180° [Plättchen 1/2]
+#a {"a":{"color":"blau","factory_index":4,"moon_order":[],"row":4,"type":"stone"},"id":44,"p":1}
+[R2] ☀️  KI: 1× blau von GF → Reihe 5 [5/5]
+#a {"a":{"color":"blau","factory_id":null,"moon_order":[],"row":0,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":21,"p":0}
+[R2] 🌙 Spieler 1: 1 (1)× blau von F1 → Reihe 1 [1/1]
+[R2] 🌙 F1 Mond-Stapel: (rot→gelb)
+#a {"a":{"display_index":0,"slot_col":0,"slot_row":1,"type":"choose_dome_slot"},"id":331,"p":1}
+#a {"a":{"rotation":90,"type":"choose_dome_rotation"},"id":392,"p":1}
+[R2] KI: Kachel 10 → Slot (1,0) rot=90° [Plättchen 1/2]
+#a {"a":{"color":"schwarz","factory_id":null,"moon_order":[],"row":2,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":177,"p":0}
+[R2] ❖ Spieler 1: Startspielerstein genommen (−2 Pkt am Rundenende → aktuell 8 Pkt)
+[R2] 🌙 Spieler 1: 1 (1)× schwarz von GF → Reihe 3 [3/3]
+[R2] 🌙 GF Moon-Pool: (gelb, rot, gelb)
+#a {"a":{"color":"gelb","factory_index":5,"moon_order":[],"row":5,"type":"stone"},"id":99,"p":1}
+[R2] 🌙 KI: 3 (1+2)× gelb von F1, GF → Reihe 6 [5/6]
+[R2] 🌙 F1 Mond-Stapel: (rot)
+[R2] 🌙 GF Moon-Pool: (rot)
+#a {"a":{"color":"türkis","factory_id":2,"moon_order":["rot","gelb","rot"],"row":3,"source":"SMALL_FACTORY_SUN","type":"stone"},"id":227,"p":0}
+[R2] ☀️  Spieler 1: 1× türkis von F2 → Reihe 4 [4/4]
+[R2] 🌙 F2 Mond-Stapel: (rot, gelb→rot)
+#a {"a":{"display_index":0,"slot_col":2,"slot_row":0,"type":"choose_dome_slot"},"id":330,"p":1}
+#a {"a":{"rotation":90,"type":"choose_dome_rotation"},"id":392,"p":1}
+[R2] KI: Kachel 0 → Slot (0,2) rot=90° [Plättchen 2/2]
+#a {"a":{"type":"dome_stack_peek"},"id":405,"p":0}
+[R2] 📦 Spieler 1: 1. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 7 Gesamt
+#a {"a":{"type":"dome_stack_peek"},"id":405,"p":0}
+[R2] 📦 Spieler 1: 2. Kachel vom Stapel gezogen (Rückseite: Wild) −1 Pkt → 6 Gesamt
+#a {"a":{"chosen_id":5,"id_rotation":391,"return_order":[4],"rotation":0,"slot_col":1,"slot_row":0,"type":"dome_stack_choose"},"id":365,"p":0}
+[R2] ↩️ 1 Kuppelplatte(n) zurueck unter den Stapel (Reihenfolge): #4 (Special)
+[R2] Spieler 1: Kachel 5 → Slot (0,1) rot=0° [Plättchen 2/2]
+#a {"a":{"color":"rot","factory_index":5,"moon_order":[],"row":2,"type":"stone"},"id":129,"p":1}
+[R2] 🌙 KI: 3 (1+1+1)× rot von F1, F2, GF → Reihe 3 [3/3]
+[R2] 🌙 F1 Mond-Stapel: leer
+[R2] 🎴 F1: Bonusplättchen aufgedeckt!
+[R2] 🌙 F2 Mond-Stapel: (rot→gelb)
+[R2] 🌙 GF Moon-Pool: leer
+#a {"a":{"factory_id":1,"type":"bonus_chip"},"id":401,"p":0}
+[R2] Spieler 1: Bonusplättchen von Fabrik 1 genommen [1/2 diese Runde]
+#a {"a":{"color":"gelb","factory_index":5,"moon_order":[],"row":0,"type":"stone"},"id":69,"p":1}
+[R2] 🌙 KI: 1 (1)× gelb von F2 → Reihe 1 [1/1]
+[R2] 🌙 F2 Mond-Stapel: (rot)
+#a {"a":{"color":"blau","factory_id":4,"moon_order":["rot","schwarz","gelb"],"row":5,"source":"SMALL_FACTORY_SUN","type":"stone"},"id":49,"p":0}
+[R2] ☀️  Spieler 1: 1× blau von F4 → Reihe 6 [2/6]
+[R2] 🌙 F4 Mond-Stapel: (rot, schwarz→gelb)
+#a {"a":{"color":"gelb","factory_index":2,"moon_order":["rot","türkis","blau"],"row":5,"type":"stone"},"id":96,"p":1}
+[R2] ☀️  KI: 1× gelb von F3 → Reihe 6 [6/6]
+[R2] 🌙 F3 Mond-Stapel: (rot, türkis→blau)
+#a {"a":{"color":"blau","factory_id":null,"moon_order":[],"row":5,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":51,"p":0}
+[R2] 🌙 Spieler 1: 1 (1)× blau von F3 → Reihe 6 [3/6]
+[R2] 🌙 F3 Mond-Stapel: (rot→türkis)
+#a {"a":{"color":"rot","factory_index":5,"moon_order":[],"row":-1,"type":"stone"},"id":111,"p":1}
+[R2] 🌙 KI: 1 (1)× rot von F2 → Strafleiste
+[R2] ⚠️  KI: 1× auf Strafleiste (Slots 1–1, -1 Pkt Strafe)
+[R2] 🌙 F2 Mond-Stapel: leer
+[R2] 🎴 F2: Bonusplättchen aufgedeckt!
+#a {"a":{"factory_id":2,"type":"bonus_chip"},"id":402,"p":0}
+[R2] Spieler 1: Bonusplättchen von Fabrik 2 genommen [2/2 diese Runde]
+#a {"a":{"color":"türkis","factory_index":5,"moon_order":[],"row":-1,"type":"stone"},"id":207,"p":1}
+[R2] 🌙 KI: 1 (1)× türkis von F3 → Strafleiste
+[R2] ⚠️  KI: 1× auf Strafleiste (Slots 2–2, -2 Pkt Strafe)
+[R2] 🌙 F3 Mond-Stapel: (rot)
+#a {"a":{"color":"rot","factory_id":null,"moon_order":[],"row":1,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":123,"p":0}
+[R2] 🌙 Spieler 1: 1 (1)× rot von F3 → Reihe 2 [1/2]
+[R2] 🌙 F3 Mond-Stapel: leer
+[R2] 🎴 F3: Bonusplättchen aufgedeckt!
+#a {"a":{"color":"gelb","factory_index":5,"moon_order":[],"row":-1,"type":"stone"},"id":63,"p":1}
+[R2] 🌙 KI: 1 (1)× gelb von F4 → Strafleiste
+[R2] ⚠️  KI: 1× auf Strafleiste (Slots 3–3, -3 Pkt Strafe)
+[R2] 🌙 F4 Mond-Stapel: (rot→schwarz)
+#a {"a":{"color":"schwarz","factory_id":null,"moon_order":[],"row":-1,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":159,"p":0}
+[R2] 🌙 Spieler 1: 1 (1)× schwarz von F4 → Strafleiste
+[R2] ⚠️  Spieler 1: 1× auf Strafleiste (Slots 1–1, -1 Pkt Strafe)
+[R2] 🌙 F4 Mond-Stapel: (rot)
+#a {"a":{"factory_index":2,"type":"bonus_chip"},"id":403,"p":1}
+[R2] KI: Bonusplättchen von Fabrik 3 genommen [1/2 diese Runde]
+#a {"a":{"color":"rot","factory_id":null,"moon_order":[],"row":1,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":123,"p":0}
+[R2] 🌙 Spieler 1: 1 (1)× rot von F4 → Reihe 2 [2/2]
+[R2] 🌙 F4 Mond-Stapel: leer
+[R2] 🎴 F4: Bonusplättchen aufgedeckt!
+#a {"a":{"factory_index":3,"type":"bonus_chip"},"id":404,"p":1}
+[R2] KI: Bonusplättchen von Fabrik 4 genommen [2/2 diese Runde]
+[R2] Tiling-Phase beginnt.
+[R2] Spieler 1: blau → Slot (0,0) Space 1 [Special freigeschaltet!]
+[R2] 🎯 Spieler 1: +2 Pkt (Reihe 1 → Kuppel 1/1 - 2 horizontal)
+[R2] ⭐ Spieler 1: +2 Spezial-Punkte (Kuppel-Bonus)
+[R2] Spieler 1: rot → Slot (0,1) Space 2
+[R2] 🎯 Spieler 1: +3 Pkt (Reihe 2 → Kuppel 1/2 - 3 horizontal)
+[R2] Spieler 1: schwarz → Slot (1,0) Space 0
+[R2] 🎯 Spieler 1: +3 Pkt (Reihe 3 → Kuppel 2/1 - 3 vertikal)
+[R2] Spieler 1: türkis → Slot (1,0) Space 2
+[R2] 🎯 Spieler 1: +4 Pkt (Reihe 4 → Kuppel 2/1 - 4 vertikal)
+[R2] KI: gelb → Slot (0,2) Space 1
+[R2] 🎯 KI: +1 Pkt (Reihe 1 → Kuppel 1/3 - alleinstehend)
+[R2] KI: türkis → Slot (0,0) Space 2
+[R2] 🎯 KI: +2 Pkt (Reihe 2 → Kuppel 1/1 - 2 vertikal)
+[R2] KI: rot → Slot (1,0) Space 2
+[R2] 🎯 KI: +1 Pkt (Reihe 4 → Kuppel 2/1 - alleinstehend)
+[R2] KI: blau → Slot (2,0) Space 0
+[R2] 🎯 KI: +2 Pkt (Reihe 5 → Kuppel 3/1 - 2 vertikal)
+[R2] Spieler 1: Strafe -3 Pkt → 17 Gesamt
+[R2] KI: Strafe -6 Pkt → 0 Gesamt
+[R3] Runde 3 beginnt. Spieler 1 ist Startspieler.
+#a {"a":{"id_rotation":392,"rotation":90,"slot_col":0,"slot_row":2,"tile_id":6,"type":"dome_display"},"id":343,"p":0}
+[R3] Spieler 1: Kachel 6 → Slot (2,0) rot=90° [Plättchen 1/2]
+#a {"a":{"color":"gelb","factory_index":0,"moon_order":["rot","rot"],"row":4,"type":"stone"},"id":88,"p":1}
+[R3] ☀️  KI: 2× gelb von F1 → Reihe 5 [2/5]
+[R3] 🌙 F1 Mond-Stapel: (rot→rot)
+#a {"a":{"color":"rot","factory_id":null,"moon_order":[],"row":4,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":141,"p":0}
+[R3] 🌙 Spieler 1: 1 (1)× rot von F1 → Reihe 5 [1/5]
+[R3] 🌙 F1 Mond-Stapel: (rot)
+#a {"a":{"color":"blau","factory_index":2,"moon_order":["türkis","türkis","türkis"],"row":1,"type":"stone"},"id":24,"p":1}
+[R3] ☀️  KI: 1× blau von F3 → Reihe 2 [1/2]
+[R3] 🌙 F3 Mond-Stapel: (türkis, türkis→türkis)
+#a {"a":{"color":"blau","factory_id":null,"moon_order":[],"row":5,"source":"LARGE_FACTORY_SUN","type":"stone"},"id":50,"p":0}
+[R3] ☀️  Spieler 1: 1× blau von GF → Reihe 6 [4/6]
+#a {"a":{"color":"gelb","factory_index":3,"moon_order":["blau","schwarz","türkis"],"row":4,"type":"stone"},"id":91,"p":1}
+[R3] ☀️  KI: 1× gelb von F4 → Reihe 5 [3/5]
+[R3] 🌙 F4 Mond-Stapel: (blau, schwarz→türkis)
+#a {"a":{"color":"rot","factory_id":null,"moon_order":[],"row":4,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":141,"p":0}
+[R3] 🌙 Spieler 1: 1 (1)× rot von F1 → Reihe 5 [2/5]
+[R3] 🌙 F1 Mond-Stapel: leer
+[R3] 🎴 F1: Bonusplättchen aufgedeckt!
+#a {"a":{"display_index":0,"slot_col":1,"slot_row":1,"type":"choose_dome_slot"},"id":332,"p":1}
+#a {"a":{"rotation":180,"type":"choose_dome_rotation"},"id":393,"p":1}
+[R3] KI: Kachel 16 → Slot (1,1) rot=180° [Plättchen 1/2]
+#a {"a":{"color":"rot","factory_id":2,"moon_order":["schwarz","schwarz","türkis"],"row":4,"source":"SMALL_FACTORY_SUN","type":"stone"},"id":137,"p":0}
+[R3] ☀️  Spieler 1: 1× rot von F2 → Reihe 5 [3/5]
+[R3] 🌙 F2 Mond-Stapel: (schwarz, schwarz→türkis)
+#a {"a":{"color":"türkis","factory_index":5,"moon_order":[],"row":3,"type":"stone"},"id":231,"p":1}
+[R3] ❖ KI: Startspielerstein genommen (−2 Pkt am Rundenende → aktuell 0 Pkt)
+[R3] 🌙 KI: 4 (1+1+1+1)× türkis von F2, F3, F4, GF → Reihe 4 [4/4]
+[R3] 🌙 F2 Mond-Stapel: (schwarz→schwarz)
+[R3] 🌙 F3 Mond-Stapel: (türkis→türkis)
+[R3] 🌙 F4 Mond-Stapel: (blau→schwarz)
+[R3] 🌙 GF Moon-Pool: (schwarz, schwarz, schwarz)
+#a {"a":{"id_rotation":391,"rotation":0,"slot_col":2,"slot_row":1,"tile_id":9,"type":"dome_display"},"id":333,"p":0}
+[R3] Spieler 1: Kachel 9 → Slot (1,2) rot=0° [Plättchen 2/2]
+[R3] 📦 KI: 1. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt
+[R3] 📦 KI: 2. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt
+[R3] 📦 KI: 3. Kachel vom Stapel gezogen (Rückseite: Wild) −1 Pkt → 0 Gesamt
+[R3] 📦 KI: 4. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt
+[R3] 📦 KI: 5. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt
+[R3] ↩️ 4 Kuppelplatte(n) zurueck unter den Stapel (Reihenfolge): #8 (Special), #17 (Special), #12 (Special), #4 (Special)
+[R3] KI: Kachel 14 → Slot (1,2) rot=0° [Plättchen 2/2]
+#a {"a":{"color":"türkis","factory_id":null,"moon_order":[],"row":0,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":213,"p":0}
+[R3] 🌙 Spieler 1: 1 (1)× türkis von F3 → Reihe 1 [1/1]
+[R3] 🌙 F3 Mond-Stapel: (türkis)
+#a {"a":{"color":"türkis","factory_index":5,"moon_order":[],"row":0,"type":"stone"},"id":213,"p":1}
+[R3] 🌙 KI: 1 (1)× türkis von F3 → Reihe 1 [1/1]
+[R3] 🌙 F3 Mond-Stapel: leer
+[R3] 🎴 F3: Bonusplättchen aufgedeckt!
+#a {"a":{"factory_id":1,"type":"bonus_chip"},"id":401,"p":0}
+[R3] Spieler 1: Bonusplättchen von Fabrik 1 genommen [1/2 diese Runde]
+#a {"a":{"factory_index":2,"type":"bonus_chip"},"id":403,"p":1}
+[R3] KI: Bonusplättchen von Fabrik 3 genommen [1/2 diese Runde]
+#a {"a":{"color":"schwarz","factory_id":null,"moon_order":[],"row":3,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":183,"p":0}
+[R3] 🌙 Spieler 1: 5 (1+1+3)× schwarz von F2, F4, GF → Reihe 4 [4/4] (+1 Strafleiste)
+[R3] ⚠️  Spieler 1: 1× auf Strafleiste (Slots 1–1, -1 Pkt Strafe)
+[R3] 🌙 F2 Mond-Stapel: (schwarz)
+[R3] 🌙 F4 Mond-Stapel: (blau)
+[R3] 🌙 GF Moon-Pool: leer
+#a {"a":{"color":"blau","factory_index":5,"moon_order":[],"row":1,"type":"stone"},"id":27,"p":1}
+[R3] 🌙 KI: 1 (1)× blau von F4 → Reihe 2 [2/2]
+[R3] 🌙 F4 Mond-Stapel: leer
+[R3] 🎴 F4: Bonusplättchen aufgedeckt!
+#a {"a":{"factory_id":4,"type":"bonus_chip"},"id":404,"p":0}
+[R3] Spieler 1: Bonusplättchen von Fabrik 4 genommen [2/2 diese Runde]
+#a {"a":{"color":"schwarz","factory_index":5,"moon_order":[],"row":-1,"type":"stone"},"id":159,"p":1}
+[R3] 🌙 KI: 1 (1)× schwarz von F2 → Strafleiste
+[R3] ⚠️  KI: 1× auf Strafleiste (Slots 1–1, -1 Pkt Strafe)
+[R3] 🌙 F2 Mond-Stapel: leer
+[R3] 🎴 F2: Bonusplättchen aufgedeckt!
+#a {"a":{"type":"pass"},"id":0,"p":0}
+[R3] ⏭️ Spieler 1: passt
+#a {"a":{"factory_index":1,"type":"bonus_chip"},"id":402,"p":1}
+[R3] KI: Bonusplättchen von Fabrik 2 genommen [2/2 diese Runde]
+[R3] Tiling-Phase beginnt.
+[R3] ⚠️  KI: Musterreihe 3 (rot) nicht platzierbar → 3× Strafleiste
+[R3] Spieler 1: türkis → Slot (0,1) Space 0
+[R3] 🎯 Spieler 1: +5 Pkt (Reihe 1 → Kuppel 1/2 - 3 horizontal + 2 vertikal)
+[R3] Spieler 1: schwarz → Slot (1,2) Space 2
+[R3] 🎯 Spieler 1: +1 Pkt (Reihe 4 → Kuppel 2/3 - alleinstehend)
+[R3] 🎴 Spieler 1 komplettiert Reihe 6 mit Bonus-Chips (5 Plättchen: rot+türkis, schwarz, blau, blau+rot, gelb+schwarz)!
+[R3] Spieler 1: blau → Slot (2,0) Space 2
+[R3] 🎯 Spieler 1: +1 Pkt (Reihe 6 → Kuppel 3/1 - alleinstehend)
+[R3] KI: türkis → Slot (0,1) Space 0
+[R3] 🎯 KI: +1 Pkt (Reihe 1 → Kuppel 1/2 - alleinstehend)
+[R3] KI: blau → Slot (0,1) Space 2
+[R3] 🎯 KI: +2 Pkt (Reihe 2 → Kuppel 1/2 - 2 vertikal)
+[R3] KI: türkis → Slot (1,2) Space 2
+[R3] 🎯 KI: +1 Pkt (Reihe 4 → Kuppel 2/3 - alleinstehend)
+[R3] 🎴 KI komplettiert Reihe 5 mit Bonus-Chips (6 Plättchen: türkis, blau, gelb, schwarz+blau, blau+rot, rot)!
+[R3] KI: gelb → Slot (2,0) Space 1
+[R3] 🎯 KI: +2 Pkt (Reihe 5 → Kuppel 3/1 - 2 horizontal)
+[R3] Spieler 1: Strafe -1 Pkt → 23 Gesamt
+[R3] KI: Strafe -12 Pkt → 0 Gesamt
+[R4] Runde 4 beginnt. KI ist Startspieler.
+#a {"a":{"color":"schwarz","factory_index":4,"moon_order":[],"row":2,"type":"stone"},"id":176,"p":1}
+[R4] ☀️  KI: 2× schwarz von GF → Reihe 3 [2/3]
+#a {"a":{"color":"rot","factory_id":2,"moon_order":["blau","schwarz"],"row":4,"source":"SMALL_FACTORY_SUN","type":"stone"},"id":137,"p":0}
+[R4] ☀️  Spieler 1: 2× rot von F2 → Reihe 5 [5/5]
+[R4] 🌙 F2 Mond-Stapel: (blau→schwarz)
+#a {"a":{"color":"schwarz","factory_index":0,"moon_order":["blau","rot","türkis"],"row":2,"type":"stone"},"id":172,"p":1}
+[R4] ☀️  KI: 1× schwarz von F1 → Reihe 3 [3/3]
+[R4] 🌙 F1 Mond-Stapel: (blau, rot→türkis)
+#a {"a":{"color":"schwarz","factory_id":null,"moon_order":[],"row":5,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":195,"p":0}
+[R4] 🌙 Spieler 1: 1 (1)× schwarz von F2 → Reihe 6 [1/6]
+[R4] 🌙 F2 Mond-Stapel: (blau)
+#a {"a":{"color":"schwarz","factory_index":2,"moon_order":["gelb","rot","türkis"],"row":1,"type":"stone"},"id":168,"p":1}
+[R4] ☀️  KI: 1× schwarz von F3 → Reihe 2 [1/2]
+[R4] 🌙 F3 Mond-Stapel: (gelb, rot→türkis)
+#a {"a":{"color":"gelb","factory_id":null,"moon_order":[],"row":0,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":69,"p":0}
+[R4] ❖ Spieler 1: Startspielerstein genommen (−2 Pkt am Rundenende → aktuell 23 Pkt)
+[R4] 🌙 Spieler 1: 1 (1)× gelb von GF → Reihe 1 [1/1]
+[R4] 🌙 GF Moon-Pool: (blau, blau)
+#a {"a":{"color":"blau","factory_index":5,"moon_order":[],"row":3,"type":"stone"},"id":39,"p":1}
+[R4] 🌙 KI: 3 (1+2)× blau von F2, GF → Reihe 4 [3/4]
+[R4] 🌙 F2 Mond-Stapel: leer
+[R4] 🎴 F2: Bonusplättchen aufgedeckt!
+[R4] 🌙 GF Moon-Pool: leer
+#a {"a":{"color":"rot","factory_id":4,"moon_order":["blau","gelb","türkis"],"row":3,"source":"SMALL_FACTORY_SUN","type":"stone"},"id":133,"p":0}
+[R4] ☀️  Spieler 1: 1× rot von F4 → Reihe 4 [1/4]
+[R4] 🌙 F4 Mond-Stapel: (blau, gelb→türkis)
+#a {"a":{"factory_index":1,"type":"bonus_chip"},"id":402,"p":1}
+[R4] KI: Bonusplättchen von Fabrik 2 genommen [1/2 diese Runde]
+#a {"a":{"id_rotation":393,"rotation":180,"slot_col":2,"slot_row":0,"tile_id":8,"type":"dome_display"},"id":330,"p":0}
+[R4] Spieler 1: Kachel 8 → Slot (0,2) rot=180° [Plättchen 1/2]
+#a {"a":{"color":"türkis","factory_index":5,"moon_order":[],"row":4,"type":"stone"},"id":237,"p":1}
+[R4] 🌙 KI: 3 (1+1+1)× türkis von F1, F3, F4 → Reihe 5 [3/5]
+[R4] 🌙 F1 Mond-Stapel: (blau→rot)
+[R4] 🌙 F3 Mond-Stapel: (gelb→rot)
+[R4] 🌙 F4 Mond-Stapel: (blau→gelb)
+#a {"a":{"color":"rot","factory_id":null,"moon_order":[],"row":3,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":135,"p":0}
+[R4] 🌙 Spieler 1: 2 (1+1)× rot von F1, F3 → Reihe 4 [3/4]
+[R4] 🌙 F1 Mond-Stapel: (blau)
+[R4] 🌙 F3 Mond-Stapel: (gelb)
+#a {"a":{"color":"blau","factory_index":5,"moon_order":[],"row":0,"type":"stone"},"id":21,"p":1}
+[R4] 🌙 KI: 1 (1)× blau von F1 → Reihe 1 [1/1]
+[R4] 🌙 F1 Mond-Stapel: leer
+[R4] 🎴 F1: Bonusplättchen aufgedeckt!
+#a {"a":{"color":"gelb","factory_id":null,"moon_order":[],"row":2,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":81,"p":0}
+[R4] 🌙 Spieler 1: 2 (1+1)× gelb von F3, F4 → Reihe 3 [2/3]
+[R4] 🌙 F3 Mond-Stapel: leer
+[R4] 🎴 F3: Bonusplättchen aufgedeckt!
+[R4] 🌙 F4 Mond-Stapel: (blau)
+#a {"a":{"color":"blau","factory_index":5,"moon_order":[],"row":3,"type":"stone"},"id":39,"p":1}
+[R4] 🌙 KI: 1 (1)× blau von F4 → Reihe 4 [4/4]
+[R4] 🌙 F4 Mond-Stapel: leer
+[R4] 🎴 F4: Bonusplättchen aufgedeckt!
+#a {"a":{"factory_id":1,"type":"bonus_chip"},"id":401,"p":0}
+[R4] Spieler 1: Bonusplättchen von Fabrik 1 genommen [1/2 diese Runde]
+#a {"a":{"factory_index":3,"type":"bonus_chip"},"id":404,"p":1}
+[R4] KI: Bonusplättchen von Fabrik 4 genommen [2/2 diese Runde]
+#a {"a":{"factory_id":3,"type":"bonus_chip"},"id":403,"p":0}
+[R4] Spieler 1: Bonusplättchen von Fabrik 3 genommen [2/2 diese Runde]
+#a {"a":{"display_index":1,"slot_col":2,"slot_row":2,"type":"choose_dome_slot"},"id":345,"p":1}
+#a {"a":{"rotation":180,"type":"choose_dome_rotation"},"id":393,"p":1}
+[R4] KI: Kachel 12 → Slot (2,2) rot=180° [Plättchen 1/2]
+#a {"a":{"id_rotation":391,"rotation":0,"slot_col":1,"slot_row":1,"tile_id":17,"type":"dome_display"},"id":332,"p":0}
+[R4] Spieler 1: Kachel 17 → Slot (1,1) rot=0° [Plättchen 2/2]
+[R4] 📦 KI: 1. Kachel vom Stapel gezogen (Rückseite: Special) −1 Pkt → 0 Gesamt
+[R4] KI: Kachel 4 → Slot (2,1) rot=0° [Plättchen 2/2]
+[R4] Tiling-Phase beginnt.
+[R4] ⚠️  KI: Musterreihe 6 (gelb) nicht platzierbar → 6× Strafleiste
+[R4] Spieler 1: gelb → Slot (0,1) Space 1
+[R4] 🎯 Spieler 1: +4 Pkt (Reihe 1 → Kuppel 1/2 - 4 horizontal)
+[R4] 🎴 Spieler 1 komplettiert Reihe 3 mit Bonus-Chips (2 Plättchen: türkis+gelb, gelb)!
+[R4] Spieler 1: gelb → Slot (1,0) Space 1
+[R4] 🎯 Spieler 1: +5 Pkt (Reihe 3 → Kuppel 2/1 - 2 horizontal + 3 vertikal)
+[R4] Spieler 1: rot → Slot (2,0) Space 0
+[R4] 🎯 Spieler 1: +6 Pkt (Reihe 5 → Kuppel 3/1 - 6 vertikal)
+[R4] KI: blau → Slot (0,0) Space 1
+[R4] 🎯 KI: +3 Pkt (Reihe 1 → Kuppel 1/1 - 3 horizontal)
+[R4] KI: schwarz → Slot (1,1) Space 0
+[R4] 🎯 KI: +3 Pkt (Reihe 3 → Kuppel 2/2 - 3 vertikal)
+[R4] KI: blau → Slot (1,1) Space 2
+[R4] 🎯 KI: +4 Pkt (Reihe 4 → Kuppel 2/2 - 4 vertikal)
+[R4] Spieler 1: Strafe -2 Pkt → 36 Gesamt
+[R4] KI: Strafe -10 Pkt → 0 Gesamt
+[R5] Runde 5 beginnt. Spieler 1 ist Startspieler.
+#a {"a":{"color":"schwarz","factory_id":null,"moon_order":[],"row":5,"source":"LARGE_FACTORY_SUN","type":"stone"},"id":194,"p":0}
+[R5] ☀️  Spieler 1: 3× schwarz von GF → Reihe 6 [4/6]
+#a {"a":{"color":"schwarz","factory_index":1,"moon_order":["türkis","blau"],"row":1,"type":"stone"},"id":167,"p":1}
+[R5] ☀️  KI: 2× schwarz von F2 → Reihe 2 [2/2] (+1 Strafleiste)
+[R5] ⚠️  KI: 1× auf Strafleiste (Slots 1–1, -1 Pkt Strafe)
+[R5] 🌙 F2 Mond-Stapel: (türkis→blau)
+#a {"a":{"color":"schwarz","factory_id":4,"moon_order":["rot","rot","gelb"],"row":5,"source":"SMALL_FACTORY_SUN","type":"stone"},"id":193,"p":0}
+[R5] ☀️  Spieler 1: 1× schwarz von F4 → Reihe 6 [5/6]
+[R5] 🌙 F4 Mond-Stapel: (rot, rot→gelb)
+#a {"a":{"color":"türkis","factory_index":2,"moon_order":["blau","gelb","rot"],"row":0,"type":"stone"},"id":210,"p":1}
+[R5] ☀️  KI: 1× türkis von F3 → Reihe 1 [1/1]
+[R5] 🌙 F3 Mond-Stapel: (blau, gelb→rot)
+#a {"a":{"color":"rot","factory_id":1,"moon_order":["türkis","türkis","türkis"],"row":3,"source":"SMALL_FACTORY_SUN","type":"stone"},"id":130,"p":0}
+[R5] ☀️  Spieler 1: 1× rot von F1 → Reihe 4 [4/4]
+[R5] 🌙 F1 Mond-Stapel: (türkis, türkis→türkis)
+#a {"a":{"color":"türkis","factory_index":5,"moon_order":[],"row":2,"type":"stone"},"id":225,"p":1}
+[R5] 🌙 KI: 1 (1)× türkis von F1 → Reihe 3 [1/3]
+[R5] 🌙 F1 Mond-Stapel: (türkis→türkis)
+#a {"a":{"color":"gelb","factory_id":null,"moon_order":[],"row":2,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":81,"p":0}
+[R5] 🌙 Spieler 1: 1 (1)× gelb von F4 → Reihe 3 [1/3]
+[R5] 🌙 F4 Mond-Stapel: (rot→rot)
+#a {"a":{"color":"türkis","factory_index":5,"moon_order":[],"row":4,"type":"stone"},"id":237,"p":1}
+[R5] 🌙 KI: 1 (1)× türkis von F1 → Reihe 5 [4/5]
+[R5] 🌙 F1 Mond-Stapel: (türkis)
+#a {"a":{"color":"türkis","factory_id":null,"moon_order":[],"row":1,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":219,"p":0}
+[R5] 🌙 Spieler 1: 1 (1)× türkis von F1 → Reihe 2 [1/2]
+[R5] 🌙 F1 Mond-Stapel: leer
+[R5] 🎴 F1: Bonusplättchen aufgedeckt!
+#a {"a":{"color":"blau","factory_index":5,"moon_order":[],"row":5,"type":"stone"},"id":51,"p":1}
+[R5] ❖ KI: Startspielerstein genommen (−2 Pkt am Rundenende → aktuell 0 Pkt)
+[R5] 🌙 KI: 2 (1+1)× blau von F2, GF → Reihe 6 [2/6]
+[R5] 🌙 F2 Mond-Stapel: (türkis)
+[R5] 🌙 GF Moon-Pool: (rot)
+#a {"a":{"color":"türkis","factory_id":null,"moon_order":[],"row":1,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":219,"p":0}
+[R5] 🌙 Spieler 1: 1 (1)× türkis von F2 → Reihe 2 [2/2]
+[R5] 🌙 F2 Mond-Stapel: leer
+[R5] 🎴 F2: Bonusplättchen aufgedeckt!
+#a {"a":{"factory_index":0,"type":"bonus_chip"},"id":401,"p":1}
+[R5] KI: Bonusplättchen von Fabrik 1 genommen [1/2 diese Runde]
+#a {"a":{"factory_id":2,"type":"bonus_chip"},"id":402,"p":0}
+[R5] Spieler 1: Bonusplättchen von Fabrik 2 genommen [1/2 diese Runde]
+#a {"a":{"color":"rot","factory_index":5,"moon_order":[],"row":3,"type":"stone"},"id":135,"p":1}
+[R5] 🌙 KI: 3 (1+1+1)× rot von F3, F4, GF → Reihe 4 [3/4]
+[R5] 🌙 F3 Mond-Stapel: (blau→gelb)
+[R5] 🌙 F4 Mond-Stapel: (rot)
+[R5] 🌙 GF Moon-Pool: leer
+#a {"a":{"color":"gelb","factory_id":null,"moon_order":[],"row":2,"source":"SMALL_FACTORY_MOON","type":"stone"},"id":81,"p":0}
+[R5] 🌙 Spieler 1: 1 (1)× gelb von F3 → Reihe 3 [2/3]
+[R5] 🌙 F3 Mond-Stapel: (blau)
+#a {"a":{"color":"blau","factory_index":5,"moon_order":[],"row":5,"type":"stone"},"id":51,"p":1}
+[R5] 🌙 KI: 1 (1)× blau von F3 → Reihe 6 [3/6]
+[R5] 🌙 F3 Mond-Stapel: leer
+[R5] 🎴 F3: Bonusplättchen aufgedeckt!
+#a {"a":{"factory_id":3,"type":"bonus_chip"},"id":403,"p":0}
+[R5] Spieler 1: Bonusplättchen von Fabrik 3 genommen [2/2 diese Runde]
+#a {"a":{"color":"rot","factory_index":5,"moon_order":[],"row":3,"type":"stone"},"id":135,"p":1}
+[R5] 🌙 KI: 1 (1)× rot von F4 → Reihe 4 [4/4]
+[R5] 🌙 F4 Mond-Stapel: leer
+[R5] 🎴 F4: Bonusplättchen aufgedeckt!
+#a {"a":{"type":"pass"},"id":0,"p":0}
+[R5] ⏭️ Spieler 1: passt
+#a {"a":{"factory_index":3,"type":"bonus_chip"},"id":404,"p":1}
+[R5] KI: Bonusplättchen von Fabrik 4 genommen [2/2 diese Runde]
+[R5] Tiling-Phase beginnt.
+[R5] Spieler 1: türkis → Slot (0,2) Space 3
+[R5] 🎯 Spieler 1: +1 Pkt (Reihe 2 → Kuppel 1/3 - alleinstehend)
+[R5] Spieler 1: rot → Slot (1,0) Space 3
+[R5] 🎯 Spieler 1: +6 Pkt (Reihe 4 → Kuppel 2/1 - 2 horizontal + 4 vertikal)
+[R5] 🎴 Spieler 1 komplettiert Reihe 6 mit Bonus-Chips (2 Plättchen: blau+schwarz, schwarz+gelb)!
+[R5] Spieler 1: schwarz → Slot (2,0) Space 3 [Special freigeschaltet!]
+[R5] 🎯 Spieler 1: +2 Pkt (Reihe 6 → Kuppel 3/1 - 2 horizontal)
+[R5] ⭐ Spieler 1: +5 Spezial-Punkte (Kuppel-Bonus)
+[R5] KI: türkis → Slot (0,2) Space 0
+[R5] 🎯 KI: +2 Pkt (Reihe 1 → Kuppel 1/3 - 2 horizontal)
+[R5] KI: schwarz → Slot (0,2) Space 3 [Special freigeschaltet!]
+[R5] 🎯 KI: +2 Pkt (Reihe 2 → Kuppel 1/3 - 2 vertikal)
+[R5] ⭐ KI: +2 Spezial-Punkte (Kuppel-Bonus)
+[R5] KI: rot → Slot (1,1) Space 3
+[R5] 🎯 KI: +3 Pkt (Reihe 4 → Kuppel 2/2 - 3 horizontal)
+[R5] 🎴 KI komplettiert Reihe 5 mit Bonus-Chips (3 Plättchen: türkis, schwarz, rot+türkis)!
+[R5] KI: türkis → Slot (2,2) Space 0
+[R5] 🎯 KI: +2 Pkt (Reihe 5 → Kuppel 3/3 - 2 vertikal)
+[R5] KI: Strafe -3 Pkt → 8 Gesamt
+[R5] Das Spiel ist beendet!
+# ============================================================
+# SPIELENDE: [50, 8]
+# Seed: 876496
+[R5] 🏆 Spieler 1: Endwertung 19 Pkt → Gesamt: 69 Pkt
+[R5]    ↕️ Vertikale Reihen: 14 Pkt
+[R5]    🔲 Eckplatten: 11 Pkt
+[R5]    ⭐ Spezialfelder: -6 Pkt
+[R5] 🏆 KI: Endwertung -9 Pkt → Gesamt: 0 Pkt
+[R5]    ↕️ Vertikale Reihen: 0 Pkt
+[R5]    🔲 Eckplatten: 3 Pkt
+[R5]    ⭐ Spezialfelder: -12 Pkt
