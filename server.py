@@ -1227,6 +1227,11 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
     result_p0 = 1.0 if winner == 0 else 0.0
     result_p1 = 1.0 - result_p0
     rated = not _hints_used_this_game
+    # WARUM ungewertet -- wandert in den Historien-Eintrag und traegt den Text
+    # der Oberflaeche (Nutzer-Meldung 2026-09-09: das Endwertungsfenster
+    # behauptete "KI-Tipps genutzt" in einer Partie ohne Tipp). Der zweite
+    # Grund kommt weiter unten dazu, wenn der KI-Anker nur geschaetzt ist.
+    unrated_reason = _pp.UNRATED_HINTS
 
     # Seed + Log-Referenz (Nutzer-Erweiterung 2026-08-02): NUR gewertete
     # Partien werden nach ELO_LOG_DIR kopiert (Original bleibt zusaetzlich in
@@ -1249,6 +1254,8 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
     out = {"0": None, "1": None, "note": None}
 
     def _record(pid, opponent_label, opponent_rating, opponent_is_estimate, result):
+        # `unrated_reason` steht im umgebenden Rahmen und kann sich zwischen
+        # den beiden Aufrufen nicht mehr aendern -- gelesen, nie geschrieben.
         # Vorfall 2026-08-02: pro-Profil abgesichert, damit ein fehlendes/
         # nicht mehr auffindbares Profil (Datei zwischenzeitlich geleert/
         # ersetzt) NICHT die Wertung der ANDEREN Seite mitreisst (Mensch-vs-
@@ -1262,7 +1269,8 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
                                          seed=seed, log=_log_ref())
             return _pp.record_unrated(pid, opponent_label, opponent_rating,
                                        opponent_is_estimate, result,
-                                       seed=seed, log=_orig_log_name)
+                                       seed=seed, log=_orig_log_name,
+                                       reason=unrated_reason)
         except KeyError:
             print(f"WARNUNG: Elo-Update fuer Profil-ID '{pid}' uebersprungen -- "
                   f"Profil nicht gefunden (Datei evtl. zwischenzeitlich geleert/ersetzt).")
@@ -1295,6 +1303,7 @@ def _apply_elo_for_finished_game(state: dict) -> dict:
                            f"(nur Schätzwert) - Spiel ungewertet. Gewertete Spiele nur "
                            f"gegen verankerte Konfigurationen (z.B. @400).")
             rated = False
+            unrated_reason = _pp.UNRATED_NO_DIRECT_ANCHOR
         if ai_elo is None and rated:
             # Kein Anker bekannt: nur bei GEWERTETEN Spielen ein Problem
             # (ohne Anker keine Elo-Rechnung moeglich) -- bei ungewerteten

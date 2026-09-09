@@ -139,6 +139,20 @@ function _ratingBadgeHTML(pi) {
   if (RATING_INFO.unrated) {
     return ` <span class="rating-badge unrated" title="KI-Tipps genutzt - diese Partie zählt nicht fürs Rating">ungewertet</span>`;
   }
+  // Zweiter Weg in die Ungewertetheit, und bis 2026-09-09 einer, den man erst
+  // im Endwertungsfenster erfuhr: der Elo-Betrugsschutz wertet NUR gegen eine
+  // direkte Arena-Kante (server.py::_apply_elo_for_finished_game). Auf den
+  // Stufen medium/hard (60/150 Sims) gibt es die nicht -- der Anker ist dort
+  // ein Sims-Tier-Schaetzwert. Das steht schon beim Spielstart fest und
+  // gehoert darum an den Anfang, nicht ans Ende der Partie.
+  const ai = RATING_INFO.ai;
+  if (AI_ENABLED && ai && (ai.elo == null || ai.is_estimate)) {
+    const t = ai.elo == null
+      ? `Kein Elo-Anker fuer ${ai.node} - diese Partie zählt nicht fürs Rating.`
+      : `${ai.node} ist nur ein Schätzwert (keine direkte Arena-Kante bei dieser `
+        + `Sims-Zahl) - diese Partie zählt nicht fürs Rating. Gewertet wird z.B. auf Stufe Experte.`;
+    return ` <span class="rating-badge unrated" title="${t}">ungewertet</span>`;
+  }
   return ` <span class="rating-badge" title="Profil-Rating (Elo)">${Math.round(prof.rating)}</span>`;
 }
 
@@ -3377,19 +3391,34 @@ async function calculateEndScoring() {
   render();
 }
 
+// Der Grund, aus dem eine Partie ungewertet blieb (player_profiles.py::
+// UNRATED_*). Nutzer-Meldung 2026-09-09: hier stand fest verdrahtet
+// "KI-Tipps genutzt", auch in Partien ohne einen einzigen Tipp -- der
+// haeufigere Grund ist laengst ein anderer, naemlich ein KI-Gegner ohne
+// direkte Arena-Kante (Stufen medium/hard, 60/150 Sims).
+//
+// Alt-Eintraege tragen kein `unrated_reason`. Die bekommen KEINEN geratenen
+// Grund: sie stammen aus der Zeit, in der jeder Eintrag "Tipps" behauptete,
+// und genau diese Behauptung ist der Fehler, der hier abgestellt wird.
+const UNRATED_REASON_TEXT = {
+  hints: 'ungewertet (KI-Tipps genutzt)',
+  no_direct_anchor: 'ungewertet (KI-Stufe ohne direkte Arena-Kante)',
+};
+
 // Spielerprofile: baut die Rating-Zeile "Rating: 1000 -> 1016 (+16) vs
 // v19_2d_best@400 (1326)" aus EINEM Historien-Eintrag (s.
 // player_profiles.py::apply_result). `~` vor der Gegner-Elo markiert einen
 // Schaetzwert (opponent_is_estimate). User-Entscheid 2026-08-02: bei
-// `rated===false` (KI-Tipps genutzt, s. player_profiles.py::record_unrated)
-// wird STATT der Rating-Aenderung ein erklaerender Hinweis gezeigt --
-// rating_before===rating_after in diesem Fall ohnehin (keine echte Aenderung).
+// `rated===false` wird STATT der Rating-Aenderung ein erklaerender Hinweis
+// gezeigt -- rating_before===rating_after in diesem Fall ohnehin (keine
+// echte Aenderung).
 function _ratingUpdateLineHTML(name, entry) {
   if (!entry) return '';
   if (entry.rated === false) {
+    const grund = UNRATED_REASON_TEXT[entry.unrated_reason] || 'ungewertet';
     return `<div style="font-size:11px;margin-top:4px">
       <strong>${_escapeHtml(name)}</strong>:
-      <span style="color:#B45309">ungewertet (KI-Tipps genutzt)</span>
+      <span style="color:#B45309">${grund}</span>
       <span style="color:var(--text3)">- Rating bleibt bei ${Math.round(entry.rating_before)}</span>
     </div>`;
   }
@@ -3435,9 +3464,16 @@ async function showEndResults(results, ratingUpdates) {
     const line0 = _ratingUpdateLineHTML(p0.name, ratingUpdates['0']);
     const line1 = _ratingUpdateLineHTML(p1.name, ratingUpdates['1']);
     if (line0 || line1) {
+      // Die Anmerkung des Servers stand bis 2026-09-09 im `else`-Zweig und
+      // wurde damit genau dann verschluckt, wenn sie am meisten erklaert:
+      // bei einer ungewerteten Partie MIT Historien-Eintrag (sie nennt die
+      // Stufe und was eine gewertete Partie braucht).
+      const anmerkung = ratingUpdates.note
+        ? `<div style="font-size:10px;color:var(--text3);margin-top:4px">${_escapeHtml(ratingUpdates.note)}</div>`
+        : '';
       ratingHTML = `<div class="sep" style="margin:10px 0"></div>
         <div class="lbl" style="margin-bottom:4px">📈 Elo-Wertung</div>
-        ${line0}${line1}`;
+        ${line0}${line1}${anmerkung}`;
     } else if (ratingUpdates.note) {
       ratingHTML = `<div class="sep" style="margin:10px 0"></div>
         <div style="font-size:10px;color:var(--text3)">📈 ${_escapeHtml(ratingUpdates.note)}</div>`;
