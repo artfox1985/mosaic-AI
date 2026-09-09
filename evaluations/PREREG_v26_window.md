@@ -120,6 +120,35 @@ Generationswechsel nicht neu gefunden werden muss.
    **Koordinator-Vorurteil, ausdruecklich als solches:** die temperierte Haelfte, weil
    Abdeckung die Rolle von G-2 ist und der Vorteil der Ausfluege -- unverzerrte Wertziele
    -- dort am staerksten wiegt, wo das Material die aktuelle Wertschaetzung traegt.
+**GEMESSEN 2026-09-09, und das Kriterium TRENNT NICHT.** Beide Sonden gefahren
+(`tools/probe_g2_swarm_choice.sh`, Artefakte `evaluations/artifacts/g2_swarm_choice_*.json`):
+
+| Groesse | `value-tempc` | `value-excursion` | Grundmenge |
+| --- | --- | --- | --- |
+| distinkte Zustaende | 5.793 | 5.529 | je 200 Partien |
+| distinkte je Record | 0,176 | **0,189** | dieselbe Stichprobe |
+| distinkte Endbretter je Seite | **0,9935** | 0,9741 | 1.002 gepaarte Partien |
+| Policy-Entropie im Mittel | 0,5945 | **0,6436** | dieselbe Menge |
+| Schritte je Partie | 164,5 | **330,0** | dieselbe Menge |
+| bedingte Vielfalt je Spielindex | 4 von 4 | 4 von 4 | Maximum, beide gesaettigt |
+
+**Lesart:** die vorregistrierte Groesse -- Vielfalt -- ist bei beiden gleich; die
+bedingte Vielfalt saettigt sogar bei beiden am Maximum. Ein Unterschied von 0,02 in
+den Endbrettern je Seite traegt keine Entscheidung. **Die Wahl kann also nicht
+gemessen begruendet werden, jedenfalls nicht mit diesem Kriterium.**
+
+**Was die Messung dafuer zeigt, ungeplant:** die Ausflug-Haelfte liefert bei gleicher
+Partienzahl die **doppelte Zahl an Records** (330,0 gegen 164,5 Schritte je Partie) und
+eine hoehere Policy-Entropie. Wer nach Wertzielen je Partie zaehlt statt nach Vielfalt,
+kommt damit zum umgekehrten Ergebnis wie das Koordinator-Vorurteil unten. **Beides ist
+kein Verdikt** -- die Entscheidung braucht entweder ein anderes vorregistriertes
+Kriterium oder einen Nutzer-Entscheid.
+
+**BERICHTIGUNG zur Kostenschaetzung:** hier stand "Minuten statt Stunden". Gemessen:
+**4.234 s** fuer die Vielfalts-Sonde (10,6 s je Partie, einkernig) und **6.444 s** fuer
+die Divergenz-Sonde, zusammen knapp **3 Stunden**. Die Schaetzung war um zwei
+Groessenordnungen daneben; wer den naechsten Lauf einplant, rechnet mit Stunden.
+
 2. **Sichtgleichheit, Reststufen** (`PREREG_stack_top_feature.md`): laufende Ziehserie,
    Phasenaufloesung, und ein Netz, das die in b04 gelegten Werte auch nutzt. Der Anlass
    jener Prereg (Stapel-Rueckseite) ist mit b04 geschlossen; diese drei sind es nicht.
