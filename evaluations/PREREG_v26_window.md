@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v26-Trainingsfenster zugeschnitten, jetzt wo die Rotation zum ERSTEN MAL vollstaendig aus eigenem Material besteht? | Beleg: nichts gemessen, nichts gebaut. Zuschnitt hergeleitet aus PREREG_v25_window.md par.17 (stationaerer Zustand) mit den tatsaechlichen Dateizahlen der v24-b07-Erzeugung; hv2 faellt erstmals ganz heraus. Offen ist praktisch nur der Val-Pool-Regex; Sockelgroesse und Klassengewichte sind durch par.18 der v25-Prereg bis v27 eingefroren (Nutzer-Berichtigung 2026-09-08). Vor dem Zuschnitt faellig: Traeger-Kennzahl der drei v24-b07-Klassen messen. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v26-Trainingsfenster zugeschnitten, jetzt wo die Rotation zum ERSTEN MAL vollstaendig aus eigenem Material besteht? | Beleg: Fenster gebaut (2.948 Dateien), Training v26-b01 durch, Traeger-Kennzahl gemessen (neuer Sockel 0,737 gegen 0,637 volle Spalten je Seite, par.3 bestaetigt). **Tor 1 NICHT bestanden** (par.8): die zwei Seeds widersprechen sich, 210:190 im vollen Lauf gegen 85:55 im Fruehstopp; dritter Seed bis zum Deckel noetig. G-2-Wahl fuer v27 gemessen, aber das Kriterium trennt nicht (par.6). -->
 
 # PREREG v26: Fensterzuschnitt
 
@@ -210,4 +210,46 @@ ohne sie und hat rund 350 Bloecke in den falschen Namensraum gebaut (rund 140 MB
 Waisen im Sinne von `cache_inventory.py`, weil ihre Quelldateien existieren -- sie sind
 ueber den Schluesselvergleich zu finden). Genau deshalb baut die v25-Kette ihre Bloecke
 ausdruecklich "UNTER der Trainings-Umgebung".
+
+## par.8 TOR 1 GEFAHREN (2026-09-09): die beiden Seeds widersprechen sich
+
+`tools/night_v26_arena.sh`, beide Seiten mit der bis v27 geschlossenen Champion-Spec --
+verglichen wird ausschliesslich das Netz. Blockgroesse 5, SPRT gegen H1 p=0,65, Deckel
+200 Paare, threads 10, exklusiv.
+
+| Seed | Ergebnis | Paare | SPRT | McNemar | gepaarte Differenz | Punkte | Strafleiste |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20261030 | 210:190 (52,5 %) | 200 (Deckel) | **kein Entscheid**, LLR -1,620 | p=0,368 | +0,100 [-0,096; +0,296] | 52,6 : 50,9 | 8,7 : 9,0 |
+| 20261031 | 85:55 (60,7 %) | 70 (Fruehstopp) | **fuer v26-b01**, LLR +3,087 | p=0,0135 | +0,429 [+0,121; +0,736] | 52,3 : 48,7 | 8,3 : 8,9 |
+
+**Verdikt: Tor 1 ist NICHT bestanden.** Die Fruehstopp-Regel
+(`docs/promotion_checklist.md`) laesst einen SPRT-Entscheid unter 150 Paaren erst nach
+einer Replikation mit unabhaengigem Seed gelten -- Seed 20261031 stoppte nach 70 Paaren,
+und die Replikation ist genau der Lauf, der ihn NICHT bestaetigt.
+
+**Warum die gepoolte Zahl hier nicht taugt.** Gepoolt sind es 295:245 = 0,5463 ueber 540
+Partien, Vorzeichentest p=0,031. Das sieht wie ein Beleg aus und ist keiner: Seed 20261031
+hat frueh gestoppt, WEIL er vorne lag. Ein optionaler Stopp und ein Lauf bis zum Deckel
+duerfen nicht gepoolt werden, ohne die Schaetzung nach oben zu verzerren. Die einzige
+verzerrungsfreie Zahl der Nacht ist der volle Lauf: **210:190, 52,5 %, p=0,368.**
+
+**Die Lage ist die bekannte Seed-Streuung, nicht ein Widerspruch im Material.** Der
+Kampagnen-Befund dazu steht seit langem: 5,75 Prozentpunkte Streuung bei n=400 fuer
+IDENTISCHE Konfiguration, der Seed bewegt die Metrik 4- bis 6-mal staerker als jeder
+Knopf. Zwei Seeds koennen das nicht aufloesen.
+
+**Was NICHT widerspruechlich ist, und deshalb erwaehnenswert:** in BEIDEN Laeufen liegt
+v26-b01 bei den Punkten vorn (52,6 gegen 50,9 und 52,3 gegen 48,7) und bei der
+Strafleiste niedriger (8,7 gegen 9,0 und 8,3 gegen 8,9). Die Randgroessen zeigen in
+dieselbe Richtung wie die Siegquote, nur ruhiger -- genau wofuer die sechs
+Standard-Kennzahlen da sind.
+
+**Naechster Schritt, vorregistriert bevor die Zahl da ist:** EIN dritter Seed, bis zum
+Deckel, ohne Fruehstopp-Anrechnung. Faellt er wie 20261030 aus, ist v26-b01 nicht besser
+als v25-b01 und bleibt Generator ohne Promotion; faellt er wie 20261031 aus, tragen zwei
+von drei und die Promotion steht zur Entscheidung. Kosten nach den gemessenen Werten:
+rund 70 min.
+
+**Laufzeiten fuer die Kostentabelle:** 4.281 s fuer 200 Paare, 1.453 s fuer 70 Paare, je
+10 Threads -- rund 21,4 s je Paar.
 
