@@ -150,6 +150,13 @@ Erzeugungsregeln stehen (`PREREG_v25_window.md` par.18).
 
 ## 3b. DAS PROGRAMM FUER v27 (Nutzer 2026-09-09: "ausreichendes Programm")
 
+**Der v27-Zuschnitt steht seit 2026-09-09 in `PREREG_v27_window.md`** (Nutzer-Auftrag:
+"unabhaengig davon kannst schon den v27 zuschnitt machen"). 2.946 Dateien, Seed 20260933,
+Val-Pool `^selfplay_v26-`; es ist das erste VOLLSTAENDIG stationaere Fenster und zugleich
+das letzte unter dem Einfrieren. **Zwei Punkte darin sind Nutzer-Entscheide:** welche
+v24-b07-Haelfte den G-2-Posten traegt (par.2, gemessen aber nicht getrennt) und wer
+erzeugt (par.3, haengt an Tor 1).
+
 Drei Straenge liegen vor, alle vorregistriert. **Der Kern ist neu und kam aus einer
 Partie**, nicht aus der Kampagnenplanung.
 
@@ -157,7 +164,7 @@ Partie**, nicht aus der Kampagnenplanung.
 | --- | --- | --- |
 | **Informationsmengen am Kuppelstapel** -- die Wurzeldeterminisierung unterscheidet unbekannt / Rueckseite bekannt / Platte bekannt, statt den ganzen Stapel zu mischen | `PREREG_dome_stack_information_sets.md` | OFFEN, 2026-09-09 vorregistriert; Variante A (nur Suche) oder B (plus Merkmale) noch offen |
 | **Sichtgleichheit, Reststufen** -- laufende Ziehserie, Phasenaufloesung, und ein Netz, das die in v24-b04 gelegten Werte auch NUTZT | `PREREG_stack_top_feature.md` par.7/par.10 | OFFEN, fuer v27 eingeplant (Nutzer 2026-09-08) |
-| **Schwarm G-2 ohne Split** -- welche der beiden v24-b07-Haelften den G-2-Posten traegt, wird gemessen statt geraten | `PREREG_v26_window.md` par.6 | **Messung eingereiht**: `tools/probe_g2_swarm_choice.sh` laeuft los, sobald das Training v26-b01 auf der GPU steht (dann ist EIN CPU-Auftrag daneben erlaubt) |
+| **Schwarm G-2 ohne Split** -- welche der beiden v24-b07-Haelften den G-2-Posten traegt | `PREREG_v26_window.md` par.6, `PREREG_v27_window.md` par.2 | **GEMESSEN 2026-09-09, Kriterium trennt NICHT** (bedingte Vielfalt saettigt bei beiden). Nutzer-Entscheid noetig; drei Lesarten stehen in par.2 |
 | **Null-Klammer** -- bleibt die Anreizstruktur unter null erhalten | `PREREG_score_clamp_incentive.md` | OFFEN, 2026-09-09 aufgemacht; Stufe 0 ist eine Messung und darf frueher laufen |
 
 **Das Werkzeug dahinter steht in `../docs/architecture_reference.md`**, Abschnitt "Wo der
