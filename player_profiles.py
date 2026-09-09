@@ -139,28 +139,44 @@ def _anchor_table() -> dict:
     return _anchor_cache
 
 
-def estimate_ai_anchor(identity: str, sims: int):
-    """Liefert (elo, is_estimate, source_node) fuer einen KI-Gegner
-    `identity@sims` (identity z.B. "v19_2d_best" oder "Heuristik", NIEMALS
-    bereits mit "@sims" versehen -- sonst entsteht ein von der Arena-Kante
-    verschiedener Doppel-Suffix-Knoten, siehe Datenwarnung unten).
+# Checkpoint-Suffixe der ONNX-Dateinamen, die in der Elo-Leiter NICHT
+# auftauchen (Nutzer-Meldung 2026-09-09: das KI-Rating fehlte in der
+# Oberflaeche).
+#
+# Der Bruch: `models/champion.txt` traegt den ONNX-Basisnamen
+# ("v26-b01_brierbest" -> models/alphazero_v26-b01_brierbest.onnx), und genau
+# der geht als `identity` durch server.py::new_game hierher. Die Leiter
+# registriert seit dem v24-Generationswechsel (elo_history.csv, erste
+# v24-Bloecke am 2026-09-05) aber den BLOCKNAMEN ohne Checkpoint-Suffix
+# ("v26-b01"). Ergebnis war ein Knoten, den es nicht gibt -> elo=None -> in der
+# Oberflaeche gar kein Badge. Betroffen waren alle drei Champions seit v24-b07;
+# der letzte Name, der in beiden Welten gleich hiess, war "v23-b01_brierbest".
+#
+# Dass Block und Checkpoint dasselbe Netz meinen, steht im Artefakt und ist
+# nicht abgeleitet: models/frozen_champions/v26-b01/manifest.json nennt als
+# `model_source` "models/alphazero_v26-b01_brierbest.onnx". Der Rueckfall
+# liefert deshalb einen EXAKTEN Wert (is_estimate=False) -- welcher Knoten ihn
+# getragen hat, steht im zurueckgegebenen `source_node` und damit im Tooltip
+# der Oberflaeche, ist also am Bildschirm nachpruefbar.
+_CHECKPOINT_SUFFIXES = ("_brierbest", "_best")
 
-    1. Existiert eine DIREKTE Arena-Kante fuer exakt diese Sims-Zahl (per
-       Bradley-Terry ans Anker-Netz angebunden) -> exakter Wert, is_estimate=False.
-    2. Sonst: beste bekannte Sims-Stufe DERSELBEN Identity im Graphen finden
-       (bevorzugt 400, da das die ueberwiegende Arena-Konvention ist),
-       Sims-Tier-Diskont-Differenz anwenden -> Schaetzwert, is_estimate=True.
-    3. Keine einzige Arena-Kante fuer diese Identity vorhanden (z.B. frisch
-       trainiertes/unbekanntes Modell) -> (None, True, None), Aufrufer
-       muss das Spiel dann als ungewertet behandeln (kein Anker vorhanden).
 
-    Datenwarnung (nicht Teil dieses Features, nur zur Einordnung): die CSV
-    enthaelt einen historischen Eintrag mit player_b="Heuristik@150" UND
-    sims_b=150 (statt player_b="Heuristik"), der einen eigenen Knoten
-    "Heuristik@150@150" erzeugt, verschieden vom echten fixen Anker
-    "Heuristik@150" (node_key("Heuristik", 150)). Solange `identity` hier
-    IMMER der reine Modellname ohne "@" ist (so wie es DIFFICULTY_PRESETS/
-    _ai_model in server.py liefern), betrifft das diese Funktion nicht."""
+def _ladder_identities(identity: str):
+    """Namen, unter denen `identity` in der Elo-Leiter stehen kann -- der
+    eigene zuerst. Ein Suffix wird nur abgeschnitten, wenn danach noch etwas
+    uebrig bleibt; Alt-Knoten wie "v19_2d_best" oder "v23-b01_brierbest"
+    stehen selbst in der Leiter und treffen darum schon im ersten Anlauf."""
+    names = [identity]
+    for suffix in _CHECKPOINT_SUFFIXES:
+        if identity.endswith(suffix) and len(identity) > len(suffix):
+            names.append(identity[: -len(suffix)])
+            break
+    return names
+
+
+def _anchor_for_identity(identity: str, sims: int):
+    """Ein Nachschlag-Anlauf fuer GENAU diesen Namen -- Rueckgabe wie
+    `estimate_ai_anchor`, oder None, wenn der Graph den Namen nicht kennt."""
     fitted = _anchor_table()
     exact_key = _anchor_node_key(identity, sims)
     hit = fitted.get(exact_key)
@@ -179,7 +195,7 @@ def estimate_ai_anchor(identity: str, sims: int):
         except ValueError:
             continue
     if not candidates:
-        return None, True, None
+        return None
 
     # Bevorzugt sims=400 (haeufigste Arena-Bedingung), sonst die naechste
     # tatsaechlich vermessene Sims-Stufe.
@@ -187,6 +203,37 @@ def estimate_ai_anchor(identity: str, sims: int):
     base_sims, base_elo = candidates[0]
     est = base_elo - (_tier_discount(sims) - _tier_discount(base_sims))
     return est, True, _anchor_node_key(identity, base_sims)
+
+
+def estimate_ai_anchor(identity: str, sims: int):
+    """Liefert (elo, is_estimate, source_node) fuer einen KI-Gegner
+    `identity@sims` (identity z.B. "v19_2d_best" oder "Heuristik", NIEMALS
+    bereits mit "@sims" versehen -- sonst entsteht ein von der Arena-Kante
+    verschiedener Doppel-Suffix-Knoten, siehe Datenwarnung unten).
+
+    1. Existiert eine DIREKTE Arena-Kante fuer exakt diese Sims-Zahl (per
+       Bradley-Terry ans Anker-Netz angebunden) -> exakter Wert, is_estimate=False.
+    2. Sonst: beste bekannte Sims-Stufe DERSELBEN Identity im Graphen finden
+       (bevorzugt 400, da das die ueberwiegende Arena-Konvention ist),
+       Sims-Tier-Diskont-Differenz anwenden -> Schaetzwert, is_estimate=True.
+    3. Beides erfolglos und der Name traegt ein Checkpoint-Suffix: derselbe
+       Anlauf noch einmal mit dem Blocknamen (s. `_ladder_identities`).
+    4. Keine einzige Arena-Kante fuer diese Identity vorhanden (z.B. frisch
+       trainiertes/unbekanntes Modell) -> (None, True, None), Aufrufer
+       muss das Spiel dann als ungewertet behandeln (kein Anker vorhanden).
+
+    Datenwarnung (nicht Teil dieses Features, nur zur Einordnung): die CSV
+    enthaelt einen historischen Eintrag mit player_b="Heuristik@150" UND
+    sims_b=150 (statt player_b="Heuristik"), der einen eigenen Knoten
+    "Heuristik@150@150" erzeugt, verschieden vom echten fixen Anker
+    "Heuristik@150" (node_key("Heuristik", 150)). Solange `identity` hier
+    IMMER der reine Modellname ohne "@" ist (so wie es DIFFICULTY_PRESETS/
+    _ai_model in server.py liefern), betrifft das diese Funktion nicht."""
+    for name in _ladder_identities(identity):
+        found = _anchor_for_identity(name, sims)
+        if found is not None:
+            return found
+    return None, True, None
 
 
 # ── Persistenz (atomares Schreiben, OneDrive-Vorsicht) ──────────────────────
