@@ -115,7 +115,21 @@ let RATING_INFO = {p0: null, p1: null, ai: null, unrated: false};
 function _ratingBadgeHTML(pi) {
   if (AI_ENABLED && pi === AI_PLAYER) {
     const ai = RATING_INFO.ai;
-    if (!ai || ai.elo == null) return '';
+    // `ai == null` heisst NICHT "kein Anker", sondern "diese Seite weiss es
+    // nicht": RATING_INFO wird nur bei /new_game gefuellt, nach einem Neuladen
+    // ist es leer. Da bleibt die Anzeige leer wie bisher.
+    if (!ai) return '';
+    // `ai.elo == null` dagegen ist eine ANTWORT des Servers: er hat gesucht
+    // und in der Elo-Leiter nichts gefunden. Das war bis 2026-09-09 ebenfalls
+    // ein leerer String -- und genau darum ist monatelang niemandem
+    // aufgefallen, dass die Champion-Namen seit v24 nicht mehr auf die
+    // Leiter-Knoten passten (s. player_profiles.py::_ladder_identities). Ein
+    // stiller Ausfall meldet sich nicht; dieses Badge tut es.
+    if (ai.elo == null) {
+      const t = `Kein Elo-Anker fuer ${ai.node} - diese Partie ist ungewertet. `
+              + `Der Name muss als Knoten in evaluations/elo_history.csv stehen.`;
+      return ` <span class="rating-badge unknown" title="${t}">?</span>`;
+    }
     const val = Math.round(ai.elo);
     const title = `KI-Elo-Anker ${ai.node}${ai.is_estimate ? ' (geschätzt -- keine direkte Arena-Kante bei dieser Sims-Zahl)' : ''}`;
     return ` <span class="rating-badge" title="${title}">${ai.is_estimate ? '~' : ''}${val}</span>`;
