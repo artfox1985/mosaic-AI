@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v27-Trainingsfenster zugeschnitten -- das erste VOLLSTAENDIG stationaere, und zugleich das letzte unter dem Einfrieren? | Beleg: nichts gebaut, nichts gemessen. Zuschnitt hergeleitet aus PREREG_v25_window.md par.17 mit den tatsaechlichen Dateizahlen der v25-b01-Erzeugung; v23-b01 faellt ganz heraus, v24-b07 rutscht auf G-2 und traegt dort EINE Schwarm-Haelfte. Zwei Punkte offen und beide vom Nutzer zu entscheiden: welche Haelfte (das gemessene Kriterium trennt nicht, PREREG_v26_window par.6/par.8) und wer erzeugt (haengt an Tor 1). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v27-Trainingsfenster zugeschnitten -- das erste VOLLSTAENDIG stationaere, und zugleich das letzte unter dem Einfrieren? | Beleg: nichts gebaut. Zuschnitt hergeleitet aus PREREG_v25_window.md par.17, nachgerechnet an den Bestandszahlen: 580 Traeger + 2.366 Schwarm = 2.946 Dateien, Seed 20260933, Val-Pool ^selfplay_v26-. Erstes VOLLSTAENDIG stationaeres Fenster und letztes unter dem Einfrieren. Beide Zuschnitt-Entscheide sind vom Nutzer gefallen (2026-09-09): Generator v26-b01 (par.3, unabhaengig von Tor 1), G-2-Posten = temperierte Haelfte (par.2, Kriterium trennte nicht, entschieden auf der Rolle). Offen ist nur noch die Erzeugung selbst. -->
 
 # PREREG v27: Fensterzuschnitt
 
@@ -11,7 +11,7 @@ Schwarms mit, und keine Klasse stammt mehr aus einer aelteren Erzeugungsregel.
 Nutzer-Praezisierung vom 2026-09-09 der letzte eingefrorene Arm; danach endet die Regel
 "nur das Material aendert sich" (`PREREG_v25_window.md` par.18).
 
-## par.1 ZUSCHNITT (hergeleitet, nicht entschieden)
+## par.1 ZUSCHNITT (hergeleitet; die zwei Entscheide dazu in par.2 und par.3)
 
 G = v26-Erzeugung, G-1 = `v25-b01`, G-2 = `v24-b07`. `v23-b01` faellt aus der Rotation.
 
@@ -33,7 +33,7 @@ G = v26-Erzeugung, G-1 = `v25-b01`, G-2 = `v24-b07`. `v23-b01` faellt aus der Ro
 | Schwarm G-1, Haelfte b | alle 401 `selfplay_v25-b01-value-excursion_*` | 401 | 4.010 |
 | Sockel-Rest G-1 | die 265 uebrigen `selfplay_v25-b01-policy_*` | 265 | 2.650 |
 | Sockel-Rest G-2 | 355 der `selfplay_v24-b07-policy_*` | 355 | 3.550 |
-| Schwarm G-2 | 145 aus EINER Haelfte von `v24-b07` (par.2) | 145 | 1.450 |
+| Schwarm G-2 | 145 der 400 `selfplay_v24-b07-value-tempc_*` (par.2, entschieden) | 145 | 1.450 |
 | **Summe** | | **2.366** | **23.660** |
 
 **Fenster gesamt 2.946 Dateien, 29.460 Partien** -- dieselbe Groesse wie v25 (2.947) und
@@ -48,7 +48,7 @@ den G-2-Schwarm.
 **Val-Pool wandert auf `^selfplay_v26-`** (in v26: `^selfplay_v25-`). Wie dort gehoert er
 in den Kopf der Kette, nicht in die Erinnerung.
 
-## par.2 DER EINE ECHTE ZUSCHNITT-ENTSCHEID: welche G-2-Haelfte
+## par.2 WELCHE G-2-HAELFTE (entschieden)
 
 Ab v27 rutscht `v24-b07` auf G-2, und dort steht EIN Posten von 145 Dateien fuer beide
 Schwarm-Haelften zusammen. **Nutzer-Entscheid (v26-Prereg par.6): kein Split** -- 145
@@ -77,23 +77,41 @@ Vielfalt, waehlt den Ausflug.
    volles Trainings- und Gating-Paar, also rund 4 h, und faellt damit in dieselbe
    Groessenordnung wie der Nutzen.
 
-**Diese Prereg entscheidet es nicht.** Sie haelt fest, dass die Entscheidung ansteht,
-was gemessen ist, und dass jede Wahl begruendbar bleibt.
+**ENTSCHIEDEN 2026-09-09 (Nutzer): die TEMPERIERTE Haelfte.** *"wir nehmen die
+temperierte haelfte fuer den g-2 posten."* Der G-2-Schwarm besteht damit aus 145 Dateien
+`selfplay_v24-b07-value-tempc_*`, seed-gezogen mit 20260933; die Ausflug-Dateien der
+Generation v24-b07 rotieren ersatzlos hinaus.
 
-## par.3 DER ZWEITE OFFENE PUNKT: wer erzeugt
+**Was gegen die Wahl sprach, bleibt aktenkundig** -- nicht um sie infrage zu stellen,
+sondern damit ein spaeterer Leser die Lage kennt: die Ausflug-Haelfte haette bei gleicher
+Dateizahl doppelt so viele Records geliefert (330,0 gegen 164,5 Schritte je Partie) und
+kommt aus spaltenreicherem Material (0,768 gegen 0,367 volle Spalten je Seite). Dagegen
+steht die Rolle von G-2: Abdeckung, und die liefert die temperierte Haelfte per
+Erzeugungsregel (glatte Temperatur, Wurzelrauschen an). Das gemessene Kriterium hat
+zwischen beiden nicht getrennt, die Entscheidung faellt also auf der Rolle, nicht auf der
+Zahl -- und das ist hier der richtige Grund, weil die Zahl nichts hergibt.
 
-**Haengt an Tor 1** (`PREREG_v26_window.md` par.8, laufender dritter Seed). Generatorwahl
-und Promotion sind zwei Entscheidungen (`docs/generation_loop.md`):
+**Folge fuer die Kette:** die Auswahl zieht aus `selfplay_v24-b07-value-tempc_*.pkl`
+(400 Kandidaten, 145 gezogen), nicht mehr aus `value-*`.
 
-* **`v26-b01` gewinnt Tor 1** -- er wird Generator, moeglicherweise auch Champion, und die
-  neuen Klassen heissen `selfplay_v26-b01-*`.
-* **Tor 1 faellt negativ aus** -- dann ist zu entscheiden, ob `v25-b01` ein zweites Mal
-  erzeugt (das Fenster rotiert trotzdem weiter, nur mit demselben Erzeuger wie v26) oder
-  ob v26 als Generation ohne Nachfolger endet. Praezedenz fuer den ersten Fall gibt es
-  nicht; er waere zu begruenden.
+## par.3 WER ERZEUGT (entschieden)
 
-**Beides beruehrt den Zuschnitt oben nicht** -- die Groessen stehen, nur die Praefixe der
-NEUEN Klassen haengen am Erzeuger.
+**ENTSCHIEDEN 2026-09-09 (Nutzer): `v26-b01` erzeugt.** *"ich sag mal v26 wird
+erzeugen."* Die neuen Klassen heissen damit `selfplay_v26-b01-policy_*`,
+`-value-tempc_*`, `-value-excursion_*`.
+
+**Das ist unabhaengig von Tor 1, und zwar regelkonform:** Generatorwahl und Promotion sind
+zwei Entscheidungen (`docs/generation_loop.md`). Fuer die Generatorwahl reicht "nicht
+schlechter", und das ist belegt -- 210:190 im vollen Lauf, 85:55 im zweiten, in keinem der
+beiden liegt v26-b01 hinten. Praezedenz ist v25-b01, der als Generator gewaehlt wurde,
+bevor seine Promotion feststand.
+
+**Was offen bleibt, ist allein die PROMOTION:** faellt der dritte Seed negativ aus, erzeugt
+`v26-b01` trotzdem, aber `v25-b01` bleibt Champion -- und die Elo-Leiter bekommt keine
+neue Kante. Der Zuschnitt oben ist davon unberuehrt.
+
+**Der Zuschnitt oben ist davon unberuehrt** -- die Groessen stehen, und die Praefixe der
+neuen Klassen sind mit dem Generator jetzt festgelegt.
 
 ## par.4 WAS NICHT NEU ENTSCHIEDEN WERDEN MUSS
 
@@ -107,19 +125,19 @@ in jeder Arena, die beiden Tor-Flaechen. Alles registriert und bis `v27-b01` unv
 
 ## par.5 DIE ERZEUGUNGSBEFEHLE FUER v27 (Generator offen, siehe par.3)
 
-Seeds: 20260914 / 20260915 / 20260916 (v26 nahm 20260911-13). `<GEN>` ist der Generator
-aus par.3, die Spec bleibt `models/v24-b07_brierbest.spec.json` -- sie ist bis v27
+Seeds: 20260914 / 20260915 / 20260916 (v26 nahm 20260911-13). Generator ist `v26-b01`
+(par.3), die Spec bleibt `models/v24-b07_brierbest.spec.json` -- sie ist bis v27
 geschlossen und bekommt bewusst keine Kopie unter neuem Namen.
 
 ```
 # 1) Traeger, 4.000 Partien -- policy-aktiv
-python -u self_play.py --mode network --model models/alphazero_<GEN>_brierbest.onnx   --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100   --version <GEN>-policy --threads 11 --chunk 10 --per-file 10 --seed 20260914   --tau-argmax-from-move 1 --deviate-prob 1.0
+python -u self_play.py --mode network --model models/alphazero_v26-b01_brierbest.onnx   --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100   --version v26-b01-policy --threads 11 --chunk 10 --per-file 10 --seed 20260914   --tau-argmax-from-move 1 --deviate-prob 1.0
 
 # 2) Schwarm Haelfte a, 4.000 Partien -- value-only, breite Abdeckung
-python -u self_play.py --mode network --model models/alphazero_<GEN>_brierbest.onnx   --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 --value-only   --version <GEN>-value-tempc --threads 11 --chunk 10 --per-file 10 --seed 20260915   --action-temp 2 --deviate-prob 1.0
+python -u self_play.py --mode network --model models/alphazero_v26-b01_brierbest.onnx   --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 --value-only   --version v26-b01-value-tempc --threads 11 --chunk 10 --per-file 10 --seed 20260915   --action-temp 2 --deviate-prob 1.0
 
 # 3) Schwarm Haelfte b, 4.000 Identitaeten -- value-only, unverzerrte Ziele
-python -u self_play.py --mode network --model models/alphazero_<GEN>_brierbest.onnx   --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 --value-only   --version <GEN>-value-excursion --threads 11 --chunk 10 --per-file 10 --seed 20260916   --excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise
+python -u self_play.py --mode network --model models/alphazero_v26-b01_brierbest.onnx   --spec models/v24-b07_brierbest.spec.json --games 4000 --sims 100 --value-only   --version v26-b01-value-excursion --threads 11 --chunk 10 --per-file 10 --seed 20260916   --excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise
 ```
 
 **Kosten, gemessen an der v26-Erzeugung** (nicht geschaetzt, `docs/measured_runtimes.md`):

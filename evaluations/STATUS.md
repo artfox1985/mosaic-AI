@@ -153,9 +153,11 @@ Erzeugungsregeln stehen (`PREREG_v25_window.md` par.18).
 **Der v27-Zuschnitt steht seit 2026-09-09 in `PREREG_v27_window.md`** (Nutzer-Auftrag:
 "unabhaengig davon kannst schon den v27 zuschnitt machen"). 2.946 Dateien, Seed 20260933,
 Val-Pool `^selfplay_v26-`; es ist das erste VOLLSTAENDIG stationaere Fenster und zugleich
-das letzte unter dem Einfrieren. **Zwei Punkte darin sind Nutzer-Entscheide:** welche
-v24-b07-Haelfte den G-2-Posten traegt (par.2, gemessen aber nicht getrennt) und wer
-erzeugt (par.3, haengt an Tor 1).
+das letzte unter dem Einfrieren. **Beide Zuschnitt-Entscheide sind am 2026-09-09 gefallen:**
+Generator ist `v26-b01` (par.3, ausdruecklich unabhaengig von Tor 1 -- Generatorwahl und
+Promotion sind zwei Entscheidungen), und den G-2-Posten traegt die **temperierte** Haelfte
+(par.2; das gemessene Kriterium trennte nicht, entschieden wurde auf der Rolle von G-2).
+Offen ist damit nur noch die Erzeugung selbst, rund 9 h.
 
 Drei Straenge liegen vor, alle vorregistriert. **Der Kern ist neu und kam aus einer
 Partie**, nicht aus der Kampagnenplanung.
