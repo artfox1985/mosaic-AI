@@ -30,8 +30,12 @@ while :; do
   case "$sp" in ''|*[!0-9]*) sp=BELEGT;; esac
   case "$pr" in ''|*[!0-9]*) pr=BELEGT;; esac
   case "$tr" in ''|*[!0-9]*) tr=0;; esac
-  if [ "$sp" = "0" ] && [ "$pr" = "0" ] && [ "$tr" -ge 1 ] 2>/dev/null; then
-    echo "   Fenster offen ($(date +%H:%M:%S))"
+  # Zwei Faelle sind gut, nicht einer (berichtigt 2026-09-09): das Training auf
+  # der GPU als Deckung ODER eine ganz freie Maschine. Die erste Fassung verlangte
+  # ein LAUFENDES Training -- als es um 12:03 fertig war, wartete der Lauf auf
+  # einen Zustand, den es nicht mehr gab, obwohl die Maschine frei dalag.
+  if [ "$sp" = "0" ] && [ "$pr" = "0" ]; then
+    echo "   Fenster offen ($(date +%H:%M:%S)): train=$tr (>=1 heisst Deckung durch die GPU, 0 heisst freie Maschine)"
     break
   fi
   echo "   noch nicht ($(date +%H:%M:%S)): self_play=$sp sonden=$pr train=$tr"
