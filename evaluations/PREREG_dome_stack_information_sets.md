@@ -250,38 +250,26 @@ Zustand, den sie behaelt.
 
 ## par.10 NAHT-AUDIT 2026-09-09 (Kanal 1, durchgefuehrt)
 
-**Nutzer-Frage:** *"wie koennen wir solche Architektur-Bugs vernuenftig finden?"* Erster
-Kanal: die Stellen aufzaehlen, an denen der Code Information ABSICHTLICH vernichtet, und
-jede zwei Fragen beantworten lassen -- wessen Informationsmenge sie modelliert, und was sie
-wegnimmt, das der Spieler rechtmaessig hat. Die Liste ist endlich und greppbar
-(`.shuffle(`, `choose_multiple`, Kuerzungen). Durchgefuehrt am 2026-09-09, reines Lesen.
+**Die vollstaendige Liste steht in `docs/architecture_reference.md`**, Abschnitt "Wo der
+Code Information ABSICHTLICH vernichtet" -- sie betrifft den ganzen Baum (24 Mischstellen)
+und nicht nur diese Frage, gehoert also ins Dauerwissen und nicht in eine Prereg. Dort
+steht auch die Regel fuer neue Stellen.
 
-**Ergebnis: 24 Mischstellen, davon 5 am Kuppelstapel.**
+**Was der Audit FUER DIESE PREREG geaendert hat, zwei Funde:**
 
-| Stelle | Was | Urteil |
-| --- | --- | --- |
-| `net_mcts.rs:987` (via `:3952`) | Wurzel-Determinisierung, ganzer `dome_tile_pool` | **AKTIV, der Befund dieser Prereg** |
-| `round_transition_deep.rs:623` | `simulate_one_round` mischt den Stapel beim Eintritt | **AKTIV, gleiche Klasse, in par.3 zuerst uebersehen** |
-| `net_mcts.rs:4010`, `:4139`, `:4448` | Neumischen bei `DrawStackPeek` im Baum | **RUHEND**: `SHUFFLE_STACK_PEEK_IN_SEARCH = false` (`:904`), 2026 gemessen schlechter (17 % -> 9 % Siege), Code blieb liegen |
-| `round_transition.rs` (8 Stellen), `self_play.rs:5093`, `round_transition_resample.rs:193` | Beutel und verdeckter Chip-Vorrat | in Ordnung: Reihenfolge ist echt verdeckt, Multimenge bleibt erhalten |
-| `net_mcts.rs:1003` | verdeckte Bonuschips | in Ordnung, und **die Praezedenz**: aufgedeckte Fabrik-Chips bleiben ausdruecklich unangetastet |
-| `scoring.rs:106` | Auswahl der Wertungsplatten | Spielaufbau, keine Informationsfrage |
-| `mcts.rs:235`, `self_play.rs:803` | Zugreihenfolge, Permutationen | Gleichstandsaufloesung, keine Informationsfrage |
-
-**Zwei Funde ueber den Anlass hinaus:**
-
-1. **Der Umbau muss ZWEI aktive Stellen abdecken**, nicht eine. Die Tiefen-Simulation
-   mischt bei jedem simulierten Rundenwechsel nach. Ein Fix nur an der Wurzel liesse das
-   Wissen im Baum wieder verfallen.
-2. **Die ruhenden Stellen tragen die Begruendung, die den blinden Fleck hat.** Woertlich am
+1. **Der Umbau muss ZWEI aktive Stellen abdecken, nicht eine.** Neben der
+   Wurzel-Determinisierung mischt `round_transition_deep.rs:623` den Stapel bei jedem
+   simulierten Rundenwechsel nach. Ein Fix nur an der Wurzel liesse das Wissen im Baum
+   wieder verfallen -- par.3 hatte nur die Wurzel.
+2. **Drei ruhende Stellen tragen die Begruendung mit dem blinden Fleck.** Woertlich am
    Code (`net_mcts.rs:4440-4443`): *"`dome_tile_pool` enthaelt an dieser Stelle ohnehin nur
    noch die ungezogenen (= wirklich verdeckten) Platten -- volles Mischen ist daher exakt
-   richtig."* Das gilt fuer nie gesehene Platten und ist falsch fuer die, die der Spieler
-   selbst zurueckgelegt hat. Dieselbe Praemisse wie an der Wurzel, nur ausgeschrieben.
+   richtig."* Gilt fuer nie gesehene Platten, ist falsch fuer selbst zurueckgelegte.
+   Sie ruhen hinter `SHUFFLE_STACK_PEEK_IN_SEARCH = false`; wer den Schalter je wieder
+   anfasst, muss sie mitziehen.
 
-**Was der Audit NICHT gefunden hat, und das ist die Grenze des Kanals:** er sieht nur, wo
-Information vernichtet wird -- nicht, wo sie nie entsteht (fehlende Merkmale) und nicht, wo
-sie falsch bewertet wird. Dafuer stehen die Kanaele 2 bis 4 (par.11).
+**Und die Grenze des Kanals:** er sieht nur, wo Information vernichtet wird -- nicht, wo
+sie nie entsteht, und nicht, wo sie falsch bewertet wird. Dafuer par.11.
 
 ## par.11 DIE UEBRIGEN DREI KANAELE, eingetaktet (Nutzer 2026-09-09)
 
