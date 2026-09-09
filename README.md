@@ -253,39 +253,42 @@ supposed to alter a decision. The process diagrams live in `docs/`
 
 ### `tools/`
 
-| Script                              | Purpose                                                                                                                                                          |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `analyze_game_log.py`               | Analyzes human-vs-AI logs (`static/log/`): parser + replay cross-validation + oracle evaluation of every move, report as Markdown                                |
-| `arena.py`                          | Round-robin/anchor matches (heuristic configurations and network-vs-heuristic), Rust engine, SPRT                                                                |
-| `arena_trends.py`                   | Appends a row (avg. score, floor penalty) to `evaluations/arena_trends.csv` per arena/gating run                                                                 |
-| `build_frozen_eval_set.py`          | Builds the frozen, cross-generation eval set (`frozen_eval_set.pkl`)                                                                                             |
-| `build_frozen_oracle_labels.py`     | Labels the frozen set via deep network search (oracle reference for `oracle_metrics.py`)                                                                         |
-| `build_release.py`                  | Builds the PyInstaller Windows bundle + ZIP for end users                                                                                                        |
-| `diagnosis.py`                      | Sanity check of the training data (zero mask, policy leak, policy sharpness)                                                                                     |
-| `elo_tracker.py`                    | Bradley-Terry Elo bookkeeping over `evaluations/elo_history.csv` (pure evaluation, does not run matches)                                                         |
-| `extract_kat2_examples.py`          | Extracts example states for "floor penalty despite alternative" cases from self-play data                                                                        |
-| `git_tree.py`                       | Prints a cleaned-up project directory tree                                                                                                                       |
-| `hybrid_paired_arena.py`            | Paired arena runner for hybrid search (priors from network A, leaf values from network B)                                                                        |
-| `model_info.py`                     | Shows metadata of a saved model checkpoint                                                                                                                       |
-| `offline_diagnosis.py`              | Value validation R² overall + per round, policy top-1/top-3, `--frozen` for cross-generation comparison                                                          |
-| `oracle_metrics.py`                 | Offline metrics of candidate networks against the oracle labels + rank correlation with Elo                                                                      |
-| `paired_arena_arm_worker.py`        | Single-arm worker for paired A/Bs (thin CLI wrapper around `net_arena_match`)                                                                                    |
-| `paired_arena_env_ab.py`            | Generic paired A/B over runtime `MOSAIC_*` knobs (one worker process per arm, shared seeds, McNemar); the standard instrument, also drives the Elo-ladder edges |
-| `paired_arena_ismcts.py`            | Paired A/B: single vs. multiple determinization (ISMCTS)                                                                                                         |
-| `paired_arena_round5.py`            | Paired A/B for the round-5 budget switch (time vs. node budget)                                                                                                  |
-| `paired_arena_shrink_ab.py`         | Paired A/B for the value shrinkage constant (orchestrator)                                                                                                       |
-| `paired_arena_shrink_arm_worker.py` | Single-arm worker for the value shrinkage A/B (network vs. network)                                                                                              |
-| `paired_arena_speedbundle.py`       | Paired A/B for the search speed bundle (inference batching, Gumbel depth fixes)                                                                                  |
-| `paired_gating.py`                  | Standard gating tool: paired seeds/swapped boards, SPRT (`p1=0.65`), sign test                                                                                   |
-| `platt_fit.py`                      | Fits the per-champion Platt calibration for displayed win probabilities                                                                                          |
-| `r5_value_calibration.py`           | Round-5 plate sensitivity of the value head (mandatory post-promotion diagnostic)                                                                                |
-| `rtv_redundancy_report.py`          | Offline analysis: does `round_transition_value` still carry independent information over `bootstrap_value`?                                                      |
-| `selfplay_diversity_report.py`      | Opening/trajectory diversity in the self-play corpus (collapse check)                                                                                            |
-| `set_champion.py`                   | Sets `models/champion.txt`, the server default for human games                                                                                                  |
-| `t36_curve_eval.py`                 | Brier score on a frozen legacy measurement set (cross-generation comparison)                                                                                     |
-| `probes/` (26 scripts)              | Focused one-question measurement probes, each tied to a `PREREG_*.md`                                                                                            |
+The tool collection has grown past 200 files, and a hand-kept table in this
+README could not answer the question that matters: **is this still used, or is
+it a leftover?** So the list is generated instead and lives in
+[`docs/tools_index.md`](docs/tools_index.md)
+(`python -X utf8 tools/generate_tools_index.py`, `--check` verifies it is
+current). Each entry carries its purpose, its last commit, and who names it,
+classified by evidence rather than opinion:
 
----
+| Class | Meaning |
+| --- | --- |
+| **VERDRAHTET** (wired) | code, a test, a hook, a skill or `CLAUDE.md` *calls* it, i.e. names it outside a comment |
+| **BESCHRIEBEN** (documented) | only `docs/` or a code comment names it: a tool with instructions, nothing invokes it automatically. The normal case for probes |
+| **CHRONIK** (chronicle) | only `evaluations/` names it, so a measurement report or a pre-registration. Typical for one-shot scripts whose run is over |
+| **UNGENANNT** (unnamed) | nobody names it. A candidate for review, but not automatically dead: a tool invoked by hand appears nowhere |
+
+The current counts stand in the generated file, not here: a number in this
+README would drift the moment a tool is renamed.
+
+The classification is deliberately a usage *signal*, not a deletion proposal:
+in this project nothing is removed without a path-exact go-ahead, and the
+retired scripts of each generation are proposed in
+`evaluations/cleanup_proposal_*.md` first.
+
+The entry points below are the ones worth knowing by name.
+
+| Script | Purpose |
+| --- | --- |
+| `arena.py`, `paired_gating.py` | matches: round-robin/anchor, and the paired gating with SPRT that decides a promotion |
+| `elo_tracker.py` | Bradley-Terry bookkeeping over `evaluations/elo_history.csv` (evaluation only, runs no matches) |
+| `analyze_game_log.py` | replays a human-vs-AI log exactly through its action IDs and evaluates every move against the net |
+| `offline_diagnosis.py`, `oracle_metrics.py` | the offline predictors, with their measured resolution limit |
+| `self_play.py`, `train.py`, `export_onnx.py` (repo root) | the production path: material, training, export |
+| `build_cache_incremental.py` | per-file cache blocks, also `--watch` while self-play is still writing |
+| `generate_carrier_manifest.py`, `window_train_split.py` | window assembly: policy carriers and the train/val split |
+| `mosaic_backup.ps1`, `snapshot_models.ps1`, `verify_backup.ps1` | restic backup: daily snapshot, per-training model snapshot, five-stage verification |
+| `generate_prereg_index.py`, `generate_knob_docs.py`, `generate_tools_index.py`, `check_conventions.py` | the generated documents and the convention check that guards them |
 
 ## Playing & Debugging
 
