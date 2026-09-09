@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v26-Trainingsfenster zugeschnitten, jetzt wo die Rotation zum ERSTEN MAL vollstaendig aus eigenem Material besteht? | Beleg: Fenster gebaut (2.948 Dateien), Training v26-b01 durch, Traeger-Kennzahl gemessen (neuer Sockel 0,737 gegen 0,637 volle Spalten je Seite, par.3 bestaetigt). **Tor 1 NICHT bestanden** (par.8): die zwei Seeds widersprechen sich, 210:190 im vollen Lauf gegen 85:55 im Fruehstopp; dritter Seed bis zum Deckel noetig. G-2-Wahl fuer v27 gemessen, aber das Kriterium trennt nicht (par.6). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v26-Trainingsfenster zugeschnitten, jetzt wo die Rotation zum ERSTEN MAL vollstaendig aus eigenem Material besteht? | Beleg: Fenster gebaut (2.948 Dateien), Training v26-b01 durch, Traeger-Kennzahl gemessen (neuer Sockel 0,737 gegen 0,637 volle Spalten je Seite, par.3 bestaetigt). **Tor 1 BESTANDEN** (par.8a): drei Seeds, in allen dreien liegt v26-b01 vorn (210:190, 85:55, 226:174), zwei signifikant, keiner negativ; verzerrungsfrei 436:364 = 54,5 % ueber die zwei vollen Laeufe. G-2-Wahl fuer v27 gemessen, aber das Kriterium trennt nicht (par.6). -->
 
 # PREREG v26: Fensterzuschnitt
 
@@ -244,11 +244,41 @@ Strafleiste niedriger (8,7 gegen 9,0 und 8,3 gegen 8,9). Die Randgroessen zeigen
 dieselbe Richtung wie die Siegquote, nur ruhiger -- genau wofuer die sechs
 Standard-Kennzahlen da sind.
 
-**Naechster Schritt, vorregistriert bevor die Zahl da ist:** EIN dritter Seed, bis zum
+**Naechster Schritt, vorregistriert bevor die Zahl da war:** EIN dritter Seed, bis zum
 Deckel, ohne Fruehstopp-Anrechnung. Faellt er wie 20261030 aus, ist v26-b01 nicht besser
 als v25-b01 und bleibt Generator ohne Promotion; faellt er wie 20261031 aus, tragen zwei
-von drei und die Promotion steht zur Entscheidung. Kosten nach den gemessenen Werten:
-rund 70 min.
+von drei und die Promotion steht zur Entscheidung.
+
+### par.8a DER DRITTE SEED (2026-09-09, 16:40-17:51): er faellt wie 20261031 aus
+
+Seed 20261032, 200 Paare bis zum Deckel, Fruehstopp durch `alpha=beta=1e-12` ausgeschaltet
+(Schranken +-27,63; der Eingriff steht im Artefakt und beruehrt keine Partie).
+
+| | Ergebnis | Paare | McNemar | gepaarte Differenz | Punkte | Strafleiste |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20261030 (voll) | 210:190 (52,5 %) | 200 | p=0,368 | +0,100 [-0,096; +0,296] | 52,6 : 50,9 | 8,7 : 9,0 |
+| 20261031 (Fruehstopp) | 85:55 (60,7 %) | 70 | p=0,0135 | +0,429 [+0,121; +0,736] | 52,3 : 48,7 | 8,3 : 8,9 |
+| **20261032 (voll)** | **226:174 (56,5 %)** | **200** | **p=0,0080** | **+0,260 [+0,077; +0,443]** | 52,7 : 49,1 | 8,9 : 9,4 |
+
+**Verdikt: Tor 1 ist bestanden.** Drei Seeds, in allen dreien liegt `v26-b01` vorn; zwei
+davon signifikant, keiner negativ. Die Fruehstopp-Auflage ist erfuellt: der Entscheid aus
+20261031 (70 Paare) ist durch 20261032 mit unabhaengigem Seed und voller Laenge
+repliziert.
+
+**Die verzerrungsfreie Zusammenfassung sind die beiden VOLLEN Laeufe:** 436:364 aus 800
+Partien = 54,5 %. Der Fruehstopp-Lauf gehoert da nicht hinein (er stoppte, WEIL er vorne
+lag). Ein gepoolter p-Wert ueber Partien stuende bei 0,011 -- **er wird hier bewusst NICHT
+als Beleg gefuehrt**, weil er die Block-Korrelation ignoriert (der Seed faellt je Block,
+Partien innerhalb eines Blocks sind nicht unabhaengig). Was traegt, sind die gepaarten
+Statistiken je Lauf, und die stehen in der Tabelle.
+
+**Die Randgroessen zeigen in allen drei Laeufen dasselbe:** mehr Punkte (52,6/52,3/52,7
+gegen 50,9/48,7/49,1) und weniger Strafleiste in zwei von drei. Das ist das ruhigere
+Signal hinter der Siegquote.
+
+**Was das NICHT sagt:** dass v26-b01 der bessere Champion IST -- das entscheidet die
+Promotion mit ihren eigenen Kanten (Anker, Champion-2) nach `docs/promotion_checklist.md`.
+Tor 1 ist die Ratsche gegen den Vorgaenger, nicht die Kroenung.
 
 **Laufzeiten fuer die Kostentabelle:** 4.281 s fuer 200 Paare, 1.453 s fuer 70 Paare, je
 10 Threads -- rund 21,4 s je Paar.
