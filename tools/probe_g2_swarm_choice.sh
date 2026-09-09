@@ -13,18 +13,24 @@
 # Kette vorbei, der vor dem Training laeuft.
 #
 # Gehaertet wie die anderen Ketten: alles ausser einer klaren Zahl gilt als belegt.
+# SELBSTTREFFER (2026-09-09, hier gefunden): das Suchmuster steht auch in der
+# Kommandozeile des FRAGENDEN Prozesses. `-match 'self_play'` lieferte deshalb
+# nie 0, sondern 4, und die Wartebedingung ging nie auf -- die Kette stand 35
+# Minuten still, obwohl die Erzeugung fertig war. Zwei Sperren dagegen: der
+# escapte Punkt (`self_play\.py`; die fragende Kommandozeile traegt den
+# Backslash, der Zielprozess nicht) UND der Ausschluss der PowerShell-Prozesse.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
 ART=evaluations/artifacts
 
 zaehle() {
-  powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '$1' }).Count" 2>/dev/null | tr -d '\r' | tail -1
+  powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '$1' -and \$_.Name -notmatch 'pwsh|powershell' }).Count" 2>/dev/null | tr -d '\r' | tail -1
 }
 
 echo "== WARTEN auf das Training v26-b01 $(date +%F' '%H:%M:%S)"
 while :; do
-  sp=$(zaehle 'self_play')
+  sp=$(zaehle 'self_play\.py')
   tr=$(zaehle 'train\.py')
   case "$sp" in ''|*[!0-9]*) sp=BELEGT;; esac
   case "$tr" in ''|*[!0-9]*) tr=0;; esac
