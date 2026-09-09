@@ -36,6 +36,8 @@ KLARE 0 aus der Prozessabfrage; jede andere Antwort gilt als belegt.
 | `tools/night_v26_swarm.sh` | Klasse 2 (tempc, 20260912), dann Klasse 3 (Ausflug, 20260913) | rund 11:30 |
 | `tools/night_v26_chain.sh` | Traeger-Kennzahl, Manifest, Fenster, Bloecke, Monolith, **Training v26-b01** | rund 14:00 |
 | Cache-Waechter | Datei-Bloecke im Mitlauf, `--workers 3` | wird von der Kette beendet |
+| `tools/probe_g2_swarm_choice.sh` | G-2-Wahl: zwei Korpus-Sonden, sobald das Training auf der GPU steht | Minuten |
+| `tools/replay_dome_stack_pre.sh` | PRE-Lauf der Referenz-Partie (par.12), danach -- EIN CPU-Auftrag neben der GPU, nicht zwei | nach den Sonden |
 
 **Nichts anderes anfassen, solange das laeuft.** Der Nutzer hat Erzeugung Klasse 2/3 und
 das Training ausdruecklich freigegeben (2026-09-09, 00:40 und 00:55); die Zuschnitt-Groessen
