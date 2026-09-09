@@ -118,3 +118,25 @@ threads 11; Training auf der GPU, Arenen mit threads 10 exklusiv.
 wie `v24-b07`: 4,0 h fuer Nr. 1, 3,5 h fuer Nr. 2 und rund 3,5 h fuer Nr. 3 (4.000
 Identitaeten zu 3,142 s). Nr. 3 laeuft diesmal in EINEM Aufruf mit `--games 4000`; in v25
 waren es zwei Laeufe zu je 2.000, weil der erste nur 2.002 Identitaeten lieferte.
+
+## Generation v26, gemessen am 2026-09-09
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| **Erzeugung Traeger**, 4.000 Partien @100, threads 11 | **rund 3,0 h** | 2,62 s je Partie, schneller als v25 (3,607), weil der Cache-Waechter seinen Rueckstand abgearbeitet hatte |
+| **Erzeugung Schwarm temperiert**, 4.000 Partien | **rund 3,5 h** | |
+| **Erzeugung Schwarm Ausflug**, 4.000 Identitaeten | **8.837,9 s = 2h 27m** | 2,21 s je Identitaet, EIN Lauf mit `--games 4000` |
+| **Training v26-b01**, 12 Epochen, 4.512.977 Samples | **7.441,0 s = 2h 04m** | 34.539,8 s CPU auf 6 Threads, 30,1 s Datenaufbau; langsamer als v25 (5.780 s), weil die G-2-Sonden daneben liefen |
+| Gepaartes Gating, 200 Paare @400, threads 10 | **4.281 s / 4.269 s** | rund 21,4 s je Paar |
+| Gepaartes Gating, SPRT-Stopp nach 70 Paaren | **1.453 s** | |
+| Anker-Kante, festes n=150, 6 Worker | **1.106 s** | |
+| Champion-2-Kante gegen das ARTEFAKT, n=150, 6 Prozesse | **rund 36 min** | frozen_referee_match, inkl. Handshake und Golden-Selbsttest |
+| Golden Probe fuers Artefakt (10 Sonden @400) | **rund 17 min** | |
+| Korpus-Vielfaltssonde, 400 Partien einkernig | **4.234 s** | 10,6 s je Partie -- die Prereg hatte "Minuten" geschaetzt |
+| Korpus-Divergenzsonde, 1.002 gepaarte Partien | **6.444 s** | |
+| Modell-Snapshot ins restic-Repo | **4 s** | |
+| Netz-Paritaets-Fixture (cargo test, warmes target) | **rund 10 s** | plus Gegenprobe |
+
+**Fuer v27 folgt daraus** (hergeleitet): die drei Erzeugungsbefehle kosten zusammen rund
+9 h, die Kette danach rund 2,5 h bis zum fertigen Training.
+

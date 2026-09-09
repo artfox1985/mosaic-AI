@@ -24,113 +24,71 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. STAND (2026-09-09, v26-Erzeugung laeuft)
+## 1. UEBERGABE an die naechste Sitzung (2026-09-09, 20:30)
 
-**TOR 1 IST BESTANDEN (2026-09-09, 17:51).** `v26-b01` gegen `v25-b01` ueber drei Seeds:
-210:190, 85:55 und 226:174 -- in allen dreien vorn, zwei davon signifikant (McNemar 0,0135
-und 0,0080), keiner negativ. Verzerrungsfrei sind die beiden VOLLEN Laeufe: 436:364 aus
-800 Partien = 54,5 %. Punkte in allen dreien hoeher, Strafleiste in zweien niedriger.
-Details und die Begruendung, warum der gepoolte p-Wert nicht als Beleg gefuehrt wird
-(Block-Korrelation): `PREREG_v26_window.md` par.8a.
+**MASCHINE FREI, nichts laeuft.** Champion laut `models/champion.txt`:
+**`v26-b01_brierbest`, Elo 1389** [1349, 1432] aus 1.240 Partien. Vorgaenger `v25-b01`
+steht bei 1355, `v24-b07` bei 1296, der Anker fix bei 1000.
 
-**Damit steht die PROMOTION zur Entscheidung** -- Tor 1 ist die Ratsche gegen den
-Vorgaenger, nicht die Kroenung. Der Ablauf dafuer ist `/mosaic-champion-promotion`
-(Anker-Kante, Champion-2-Kante, Pflicht-Diagnostiken, Anzeige-Kalibrierung, eingefrorenes
-Artefakt). Der Generator fuer v27 ist unabhaengig davon schon entschieden: `v26-b01`.
+**Die Promotion v26-b01 ist VOLLSTAENDIG durch**, alle sieben Schritte der
+`docs/promotion_checklist.md` inklusive eingefrorenem Artefakt. Der Generationsbericht
+steht am Ende von `../archive/history.md`.
 
----
+### Warum diese Generation zaehlt
 
-**(Ueberholt, Stand 01:20 der Nacht:)** Drei Hintergrundlaeufe, alle mit derselben gehaerteten
-Wartebedingung verkettet: `laufzeit`-Block im Manifest der Vorgaenger-Klasse UND eine
-KLARE 0 aus der Prozessabfrage; jede andere Antwort gilt als belegt.
+Sie ist die erste, in der **nur das Material** geaendert wurde -- Architektur, Rezept und
+Spec waren eingefroren. Damit heisst "v26 schlaegt v25" zum ersten Mal wirklich, dass das
+Material traegt.
 
-| Lauf | Was | Erwartet |
+| Kante | Ergebnis | Bemerkung |
 | --- | --- | --- |
-| (Nutzer, 00:31:53) | Klasse 1 Traeger, Seed 20260911 | rund 04:30 |
-| `tools/night_v26_swarm.sh` | Klasse 2 (tempc, 20260912), dann Klasse 3 (Ausflug, 20260913) | rund 11:30 |
-| `tools/night_v26_chain.sh` | Traeger-Kennzahl, Manifest, Fenster, Bloecke, Monolith, **Training v26-b01** | rund 14:00 |
-| Cache-Waechter | Datei-Bloecke im Mitlauf, `--workers 3` | wird von der Kette beendet |
-| `tools/probe_g2_swarm_choice.sh` | G-2-Wahl: zwei Korpus-Sonden, sobald das Training auf der GPU steht | Minuten |
-| `tools/replay_dome_stack_pre.sh` | PRE-Lauf der Referenz-Partie (par.12), danach -- EIN CPU-Auftrag neben der GPU, nicht zwei | nach den Sonden |
+| Tor 1, Seed 20261030 | 210:190 | voller Lauf, p 0,368 |
+| Tor 1, Seed 20261031 | 85:55 | SPRT nach 70 Paaren, p 0,0135 |
+| Tor 1, Seed 20261032 | 226:174 | voller Lauf ohne Fruehstopp, p 0,0080 |
+| **verzerrungsfrei (die zwei vollen)** | **436:364 = 54,5 %** | der Fruehstopp-Lauf stoppte, WEIL er vorne lag |
+| Anker | 127:23 | v25-b01 und v24-b07 hatten beide 126:24 |
+| Champion-2 gegen `v24-b07` | 98:52 | erste Kante gegen das ARTEFAKT statt die lebende Datei |
 
-**Nichts anderes anfassen, solange das laeuft.** Der Nutzer hat Erzeugung Klasse 2/3 und
-das Training ausdruecklich freigegeben (2026-09-09, 00:40 und 00:55); die Zuschnitt-Groessen
-stehen in `PREREG_v26_window.md` par.1, Auswahl-Seed **20260929**, Val-Pool
-**`^selfplay_v25-`**.
-
-**Zwei Befunde dieser Nacht, beide in par.7 der v26-Prereg registriert:** der Waechter darf
-ueber alle drei Klassen laufen (der Traegerstatus steht seit 2026-08-31 nicht mehr im
-Datei-Schluessel), aber er MUSS unter `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` laufen -- die
-Variable steht im Schluessel, und der erste Start ohne sie hat rund 350 Bloecke in den
-falschen Namensraum gebaut.
-
-**Der Abschnitt darunter beschreibt den Stand VOR dem Start.**
-
-**MASCHINE war frei beim Generationswechsel.** Baum sauber, **Commits vor origin nicht gepusht**
-(Push nur auf Nutzer-Anweisung; Zahl im Chat gemeldet). Champion laut
-`models/champion.txt`: `v25-b01_brierbest`, **Elo 1376** [1333, 1425] aus 520 Partien.
-
-**Die Generation v25 ist abgeschlossen und berichtet.** Der vollstaendige
-Generationsbericht (Beleglage, Fenster, Trainingszahlen, die zwei Koordinator-Fehler)
-steht am Ende von `../archive/history.md`; die Uebergabe vom 2026-09-08, die hier stand,
-ist damit abgeloest. Alle vier Punkte, die sie offen liess, sind erledigt: Bericht und
-Elo-Zahl (auch im Artefakt-Manifest), restic-Stand `028989fb` (`run:v25-b01`),
-Anzeige-Kalibrierung, eingefrorenes Artefakt.
-
-**Nutzer-Entscheid 2026-09-08:** die zwei Champion-2-Kanten, die gegen die LEBENDEN
-Modelldateien statt gegen die eingefrorenen Artefakte gemessen wurden (`v25-b01` 48:22
-gegen `v24-b06`, `v24-b07` 92:58 gegen `v23-b01_k3p10`), werden NICHT nachgemessen --
-"extra Fleissarbeit mit geringem Nutzen". Sie bleiben mit dieser Einschraenkung in
-`elo_history.csv`; wer sich auf sie beruft, nennt sie mit. Nicht neu vorschlagen.
-
-### Was der Generationswechsel gebracht hat (Ablauf `/mosaic-generation-turnover`)
-
-- **Schritt 0-2 erledigt:** Maschine frei (Prozessliste, nicht Task-Meldungen),
-  Tages-Snapshot **6dd4d988** (7.725 Dateien / 9,279 GiB, `check` ohne Fehler),
-  Modell-Snapshot **028989fb**.
-- **Schritt 1 war schon getan:** der Generator fuer v26 ist `v25-b01`, und der liegt
-  eingefroren unter `models/frozen_champions/v25-b01/` (Wheel, Spec, Golden Probe).
-- **Schritt 3-5 AUSGEFUEHRT** (Nutzer-Freigabe 2026-09-09 fuer alle Gruppen des
-  Vorschlags `cleanup_proposal_turnover_v26.md`): **11.154 MiB frei**, `data/` von 19,69
-  auf 9,12 GiB. Weg sind die Messkorpora der v24-Arme, der hv2-Korpus, die zwoelf
-  Monolithe, die Modell-Arme `v24-b01` bis `b05` und 7.553 Waisen-Bloecke.
-  Gegenprobe: **0 Waisen** bei 6.402 Bloecken.
-- **Folge fuers naechste Mal:** `tools/probes/bootstrap_coherence_probe.py` und
-  `action_count_profile_probe.py` finden ihre hv2-Vorgabedateien nicht mehr und brauchen
-  `--file` bzw. eine andere Gruppe. Der Korpus liegt im Snapshot `6dd4d988`.
-- **Der Monolith des v25-Fensters ist mit weg** (Schluessel 976b1ef66843 u.a.). Ein
-  erneutes Training auf `window_v25.txt` muesste ihn neu bauen; die Korpusdateien des
-  v25-Fensters sind alle noch da.
+**Struktur:** der neue Sockel liegt bei 0,737 vollen Spalten je Seite (Vorgeneration
+0,637); gegen den Anker baut der Champion 1,267 je Partie gegen dessen 0,060.
 
 ### ERSTE AUFGABE DER NEUEN SITZUNG
 
-1. **Loeschfreigaben einholen** zu `evaluations/cleanup_proposal_turnover_v26.md`
-   (Gruppen A bis E), dann loeschen und `cache_inventory.py --orphans` nachziehen.
-2. **v26-Kette schreiben** nach dem Muster `tools/night_v25_chain.sh`, mit gehaerteter
-   Wartebedingung und `--resume`-Hinweis; Chronik `night_run_<Datum>.md` anlegen.
-3. **v26 erzeugen**: drei Befehle in `PREREG_v26_window.md` par.7, Generator `v25-b01`,
-   rund 11,1 h. **NUR auf ausdrueckliche Nutzer-Freigabe starten.**
-4. Vor dem Start: `MOSAIC_DATA_EXCLUDE` pinnen (Fenster-Pinning), Val-Pool-Regex in
-   par.4 der v26-Prereg entscheiden -- das ist der einzige offene Zuschnitt-Punkt.
+1. **v27-Erzeugung starten** -- `bash tools/night_v27_generate.sh` (drei Klassen, Generator
+   `v26-b01`, Seeds 20260914/15/16, rund 9 h). Das Skript wartet selbst auf eine freie
+   Maschine. **Daneben gehoert der Cache-Waechter**, zwingend mit
+   `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` -- der Aufruf steht im Kopf des Skripts.
+2. **Danach `bash tools/night_v27_chain.sh`** -- wartet auf den `laufzeit`-Block der
+   Ausflug-Klasse und faehrt dann Kennzahl, Traegermanifest (580), G-2-Auswahl aus der
+   TEMPERIERTEN Haelfte, Fenster (~2.946), Bloecke, Monolith und das Training `v27-b01`.
+3. **`/mosaic-generation-turnover` Schritte 2-5** sind fuer v27 NICHT gefahren: kein
+   Tages-Snapshot seit 2026-09-09 06:00, kein Loeschvorschlag. Faellig sind die Klassen,
+   die mit v27 aus der Rotation fallen: `selfplay_v23-b01-policy_*` (400),
+   `-value-argmax_*` (600), `-value-sampled_*` (200) und `selfplay_v24-b07-value-excursion*`
+   (402, weil der G-2-Posten die temperierte Haelfte nimmt). **NICHT** anfassen:
+   `selfplay_v23-b01-seedvalue_*` -- `PREREG_start_position_seeding.md` ist OFFEN.
+4. Die Ketten-Skripte der Generationen v25 und v26 sind Loeschkandidaten nach Schritt 3
+   des Ablaufs; `night_v26_chain.sh` bleibt als Muster, bis die v27-Kette gelaufen ist.
 
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
 
 - **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden.
-- **Loeschung nur auf pfadgenaue Freigabe**, auch bei "offensichtlichem" Muell.
+- **Loeschung nur auf pfadgenaue Freigabe.**
 - **Messungen laufen exklusiv**; GPU und CPU duerfen parallel, zwei CPU-Messungen nicht.
-- **Erzeugung startet nur auf Anweisung.**
+- **Erzeugung startet nur auf Anweisung** -- der Nutzer faehrt sie in der neuen Sitzung
+  selbst.
 
-### BEFUNDE, die weiter gelten
+### BEFUNDE, die eine Entscheidung oder Nachschau brauchen
 
-- **sigma/Prior-Balance 2,792** (v24-b06: 2,603), Schwelle 3 nicht gerissen, die
-  Regler-Familie bleibt zu -- **aber Runde 4 liegt einzeln bei 3,408**
-  (`artifacts/gumbel_scale_calibration_v25-b01.json`). Beim naechsten Champion wieder
-  pruefen; bei Ueberschreiten oeffnet sich `c_visit`/`c_scale` per Regel, ohne Ermessen.
-- **Die Anker-Kante steht still:** v25-b01 126:24, exakt wie v24-b07. Als Fixpunkt bleibt
-  der Anker richtig, als Fortschrittsmass ist er gesaettigt.
-- **Lebende Modelldateien werden regelmaessig archiviert** (Nutzer): `alphazero_v24-b06*`
-  wird nicht mehr gebraucht; das Artefakt `frozen_champions/v24-b06/` loescht der Nutzer.
-  Was bleibt, ist die Artefakt-Kopie im restic-Stand `b6842b4e`.
+- **sigma/Prior Runde 4 springt auf 8,537** (v25-b01: 3,408), waehrend die Gesamt-Kennzahl
+  auf 2,270 faellt. Die Regel haengt an der Gesamtzahl, die Familie bleibt also zu -- aber
+  bei der naechsten Promotion nachsehen. n_used 233, eine Runde ist duenn.
+- **Der Modell-Snapshot aus `train.py` scheitert reproduzierbar** (0xC0000142, dritter
+  Fall). Seit 2026-09-09 raeumt die Funktion vorher auf, wiederholt einmal und legt bei
+  Fehlschlag `models/.snapshot_pending_<name>.txt` ab. Ob das reicht, zeigt das
+  v27-Training.
+- **Die Anker-Kante ist gesaettigt** (127:23 gegen 126:24 zweimal). Als Fortschrittsmass
+  taugt sie nicht mehr; als Fixpunkt bleibt sie richtig.
 
 ## 2. WAS ALS NAECHSTES LAEUFT: die v26-Erzeugung
 
