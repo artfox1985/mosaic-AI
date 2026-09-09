@@ -2729,33 +2729,98 @@ def _snapshot_models_to_backup(version_name: str) -> None:
     Ein Fehlschlag bleibt eine WARNUNG: ein fertiges Training darf nicht an
     seiner Sicherung scheitern.
     """
+    script = Path(__file__).resolve().parent / "tools" / "snapshot_models.ps1"
+    if not script.is_file():
+        print(f"⚠️  Modell-Snapshot übersprungen: {script} fehlt.")
+        return
+    command = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+              "-File", str(script), "-Version", version_name, "-Path", str(MODELS_DIR)]
+
+    # WARUM DIE UMSTAENDE (2026-09-09): der Aufruf ist bei v25-b01 UND v26-b01 mit
+    # Exitcode 0xC0000142 (STATUS_DLL_INIT_FAILED) gescheitert -- das Kind kam nicht
+    # einmal bis zu seiner main(). Von Hand, nach dem Training, laeuft dasselbe Skript
+    # in 4 Sekunden durch. UNGEPRUEFTE Vermutung: an dieser Stelle haelt der
+    # Trainingsprozess noch das ganze Fenster im RAM (gemessen 13 GB RSS, 17,8 GB
+    # Commit), und ein Kind kann seine DLLs nicht mehr initialisieren. Drei Sperren
+    # dagegen, von der billigsten zur teuersten -- keine davon aendert eine
+    # Trainingszahl:
+    #   1. vorher aufraeumen (gc + CUDA-Cache), damit Commit frei wird -- billig und
+    #      ohne Nebenwirkung, aber die Ursache ist damit NICHT bewiesen;
+    #   2. bei Fehlschlag EINMAL wiederholen, nach fuenf Sekunden;
+    #   3. und wenn es dann immer noch klemmt, den fertigen Befehl als Merkzettel
+    #      hinterlegen -- ein verlorener Snapshot darf nicht nur in einer Logzeile
+    #      stehen, sondern muss der naechsten Sitzung entgegenfallen.
+    # Die eigentliche Probe ist das naechste Training; scheitert es wieder, ist der
+    # Merkzettel da und die Vermutung widerlegt.
     try:
+        import gc
+        gc.collect()
+        try:
+            import torch as _t
+            if _t.cuda.is_available():
+                _t.cuda.empty_cache()
+        except Exception:
+            pass
+    except Exception:
+        pass
+
+    # KEINE eigene Umgebung fuer das Kind (2026-09-09, geprueft statt vermutet).
+    # Der erste Entwurf reichte eine Weissliste durch, um einen verbogenen
+    # Umgebungsblock als Ursache auszuschliessen. Die Trockenprobe hat das
+    # widerlegt UND den Entwurf gleich mit: unter Windows sind die Schluessel in
+    # `os.environ` GROSSGESCHRIEBEN, eine Liste mit `SystemRoot` und `OneDrive`
+    # trifft sie also nicht -- die so gebaute Umgebung liess PowerShell mit
+    # 0x8009001d beim Laden einer Bibliothek scheitern. Mit der GEERBTEN Umgebung
+    # laeuft derselbe Aufruf aus derselben Shell mit Rueckgabe 0 durch. Die
+    # Umgebung ist damit als Ursache ausgeschlossen, und eine handgebaute waere
+    # eine neue Fehlerquelle gewesen.
+
+    def _attempt(attempt: int):
         import subprocess
-        script = Path(__file__).resolve().parent / "tools" / "snapshot_models.ps1"
-        if not script.is_file():
-            print(f"⚠️  Modell-Snapshot übersprungen: {script} fehlt.")
-            return
         # encoding explizit: ohne das dekodiert Python die Ausgabe als cp1252
         # und zerlegt sich an Umlauten (Projektfalle 2026-08-xx).
         # timeout, damit ein haengender Aufruf kein Training festhaelt.
-        result = subprocess.run(
-            ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-             "-File", str(script),
-             "-Version", version_name,
-             "-Path", str(MODELS_DIR)],
-            capture_output=True, text=True, encoding="utf-8", errors="replace",
-            timeout=1800,
-        )
-        if result.returncode == 0:
-            print(f"💾 Modell-Snapshot gesichert (restic, Marke run:{version_name}).")
-        else:
-            print(f"⚠️  Modell-Snapshot fehlgeschlagen (Training davon unberührt), "
-                  f"Exitcode {result.returncode}:")
-            for stream in (result.stdout, result.stderr):
-                for line in (stream or "").splitlines()[-5:]:
-                    print(f"    {line}")
+        return subprocess.run(command, capture_output=True, text=True,
+                              encoding="utf-8", errors="replace",
+                              timeout=1800)
+
+    result = None
+    for attempt in (1, 2):
+        try:
+            result = _attempt(attempt)
+        except Exception as e:
+            print(f"⚠️  Modell-Snapshot, Versuch {attempt} warf: {e}")
+            result = None
+        if result is not None and result.returncode == 0:
+            print(f"💾 Modell-Snapshot gesichert (restic, Marke run:{version_name}"
+                  + (", zweiter Versuch)." if attempt == 2 else ")."))
+            return
+        if attempt == 1:
+            import time as _time
+            _time.sleep(5)
+
+    code = result.returncode if result is not None else "Ausnahme"
+    print(f"⚠️  Modell-Snapshot fehlgeschlagen (Training davon unberührt), Exitcode {code}:")
+    if result is not None:
+        for stream in (result.stdout, result.stderr):
+            for line in (stream or "").splitlines()[-5:]:
+                print(f"    {line}")
+    # Merkzettel: der Snapshot ist NACH dem Training von Hand in 4 s nachzuholen.
+    try:
+        note_path = Path(MODELS_DIR) / f".snapshot_pending_{version_name}.txt"
+        note_lines = [
+            "Der ereignisgesteuerte Modell-Snapshot dieses Laufs ist fehlgeschlagen "
+            f"(Exitcode {code}).",
+            "Von Hand nachholen, kostet rund 4 s:",
+            "",
+            f"    powershell -NoProfile -File tools/snapshot_models.ps1 -Version {version_name}",
+            "",
+            "Danach diese Datei loeschen. Hintergrund: train.py::_snapshot_models_to_backup.",
+        ]
+        note_path.write_text(chr(10).join(note_lines) + chr(10), encoding="utf-8", newline=chr(10))
+        print(f"    Merkzettel geschrieben: {note_path}")
     except Exception as e:
-        print(f"⚠️  Modell-Snapshot fehlgeschlagen (Training davon unberührt): {e}")
+        print(f"    (Merkzettel konnte nicht geschrieben werden: {e})")
 
 
 if __name__ == "__main__":

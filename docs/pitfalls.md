@@ -265,3 +265,27 @@ rot, gelb+blau, schwarz)!`. Damit ist der oben beschriebene Schaden an der Wurze
 welche Chips real verbraucht wurden, steht jetzt im Log. Altlogs tragen weder Symbol noch
 Zusatz; `tools/analyze_game_log.py` traegt dafuer zwei datierte Toleranzen
 (`chip_symbol_toleriert`, `chip_zusatz_toleriert`) und einen Regex, der beide Symbole trifft.
+
+- **Der Modell-Snapshot aus `train.py` scheitert reproduzierbar mit 0xC0000142**
+  (2026-09-08 bei `v25-b01`, 2026-09-09 bei `v26-b01`; Schaden: zweimal stand der
+  Champion ohne eigenen restic-Stand da, gemerkt hat es beide Male nur eine
+  Warnzeile im Trainingslog). `0xC0000142` ist `STATUS_DLL_INIT_FAILED`: das Kind
+  kommt nicht bis zu seiner `main()`. Dasselbe Skript von Hand nach dem Training:
+  **4 Sekunden, Rueckgabe 0**.
+  **Was geprueft ist:** die Umgebung ist NICHT die Ursache -- ein PowerShell-Kind
+  mit der geerbten Umgebung aus derselben Shell laeuft mit Rueckgabe 0 durch
+  (2026-09-09). **Was Vermutung bleibt:** der Trainingsprozess haelt an dieser
+  Stelle noch das ganze Fenster (13 GB RSS, 17,8 GB Commit), und das Kind bekommt
+  seine DLLs nicht mehr initialisiert.
+  **Handgriff, wenn es wieder passiert:** `powershell -NoProfile -File
+  tools/snapshot_models.ps1 -Version <name>`. Seit 2026-09-09 legt `train.py` bei
+  Fehlschlag zusaetzlich `models/.snapshot_pending_<name>.txt` mit genau diesem
+  Befehl ab, raeumt vorher auf (gc + CUDA-Cache) und wiederholt einmal -- die
+  Vermutung ist damit nicht bewiesen, aber der Snapshot geht nicht mehr verloren.
+  **Vorsicht bei der eigenen Reparatur:** der erste Entwurf reichte dem Kind eine
+  handgebaute Weissliste als Umgebung durch und haette es damit erst richtig
+  kaputtgemacht -- unter Windows sind die Schluessel in `os.environ`
+  GROSSGESCHRIEBEN, `SystemRoot` und `OneDrive` fielen still heraus, PowerShell
+  scheiterte in der Trockenprobe mit 0x8009001d. Die Trockenprobe hat den Fix
+  gerettet, nicht das Nachdenken.
+
