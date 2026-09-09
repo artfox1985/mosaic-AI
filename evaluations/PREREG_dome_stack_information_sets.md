@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das Wissen ueber den Kuppelstapel je Spieler modelliert, sodass die Suche weder Orakelwissen hat noch ihr EIGENES Wissen vergisst? | Beleg: nichts gebaut. Ursache am Code geprueft: die Suche mischt den ganzen dome_tile_pool und vergisst damit die Rueckgabe-Reihenfolge, die sie selbst gewaehlt hat (net_mcts.rs:987, game.rs:278). Naht-Audit gefahren: ZWEI aktive Mischstellen, nicht eine (par.10). Drei Wissensstufen und Regellage: par.4/par.5. KORREKTHEITS-Fix, haengt nicht an einer Messung (Nutzer 2026-09-09). Start: nach dem Arm v27-b01 (par.6). Offen: Bauvariante. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das Wissen ueber den Kuppelstapel je Spieler modelliert, sodass die Suche weder Orakelwissen hat noch ihr EIGENES Wissen vergisst? | Beleg: nichts gebaut. Ursache am Code geprueft: die Suche mischt den ganzen dome_tile_pool und vergisst damit die Rueckgabe-Reihenfolge, die sie selbst gewaehlt hat (net_mcts.rs:987, game.rs:278). Naht-Audit gefahren: ZWEI aktive Mischstellen (par.10). Ueber 23 Mensch-Partien gemessen: die Ziehtiefe haengt an Wertungsplatte 6 -- Median 4 ohne, 22,5 mit (par.13a). Drei Wissensstufen und Regellage: par.4/par.5. KORREKTHEITS-Fix, haengt nicht an einer Messung (Nutzer 2026-09-09). Start: nach dem Arm v27-b01 (par.6). Offen: Bauvariante. -->
 
 # PREREG: Informationsmengen am Kuppelstapel
 
@@ -407,6 +407,39 @@ Merkmal `dome_wild_remaining_frac` (`serialize.rs:58-65`, Kommentar nennt die
 ist die Stapelblindheit teurer als bisher angenommen -- die Suche wuerfelt genau die
 Information weg, die ueber diesen Posten entscheidet, und kauft sie in jeder Runde neu.
 Der Zusammenhang ist damit ein Argument IN dieser Prereg, kein eigener Strang.
+
+### par.13a NACHGEMESSEN ueber ALLE Mensch-Partien (2026-09-09, noch in derselben Nacht)
+
+Der Nutzer wies darauf hin, dass die Logs vollstaendig unter `static/log/` liegen -- also
+nicht vier Partien, sondern **23**. Reines Textparsen, keine Erzeugung, keine Engine.
+
+**GRUNDMENGE: 23 Mensch-gegen-KI-Partien in `static/log/` (2026-08-18 bis 2026-09-09),
+EINHEIT: Ziehungen je Partie, gezaehlt als Zeilen "vom Stapel gezogen".**
+
+| | Partien | Ziehungen je Partie |
+| --- | --- | --- |
+| **ohne** Wertungsplatte 6 | 19 | 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 6, 6, 7, 8, 8 |
+| **mit** Wertungsplatte 6 | 4 | **8, 21, 24, 28** |
+
+**Die Trennung ist sauber:** keine einzige Partie ohne Platte 6 kommt ueber 8 Ziehungen;
+drei der vier Partien mit Platte 6 liegen bei 21 bis 28. Median 4 gegen 22,5.
+
+**Damit ist Pruefschritt 3 auf Mensch-Partien beantwortet: JA, die Ziehtiefe haengt an der
+Platte.** Die Hypothese des Nutzers ist auf dieser Grundmenge beschreibend bestaetigt.
+
+**Was das NICHT zeigt, und das bleibt offen:**
+
+* **Nicht die Ursache.** Dass die Platte die Tiefe TREIBT, ist plausibel (Wild rettet, ein
+  leeres Spezialfeld kostet -3), aber die vier Partien unterscheiden sich auch in den
+  anderen zwei Platten und im Netz-Stand (die Alt-Partien vom August laufen auf frueheren
+  Netzen). n = 4 auf der einen Seite.
+* **Nicht, ob die Tiefe falsch ist.** Bei aktiver Platte 6 KANN tiefes Ziehen richtig sein.
+  Falsch ist nur das Wiederholen in einen bereits bekannten Stapel hinein -- und das misst
+  erst der Vergleich aus par.12.
+* **Aber es verschiebt das Gewicht dieser Prereg:** die Pathologie sitzt nicht ueberall,
+  sondern konzentriert in rund einem Sechstel der Partien -- dort dafuer heftig. Das
+  Punkteniveau jener vier Partien liegt auffallend tief (37:36, 43:42, 40:25, 69:0 gegen
+  sonst 70-80 : 45-60), und die KI nimmt in allen vieren den Maximalabzug von -12.
 
 **Zu pruefen, wenn die Maschine frei ist** (keine Erzeugung noetig, alles liegt vor):
 
