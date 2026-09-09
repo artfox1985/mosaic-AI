@@ -324,12 +324,19 @@ entscheidet."*
 ([[feedback_freeze_when_it_becomes_a_reference]]): `static/log/` ist gitignoriert
 (`.gitignore:50`), die Partie liegt deshalb als Kopie im Baum.
 
-| | |
-| --- | --- |
-| Datei | `evaluations/fixtures/game_20260909_004553_seed876496.log` |
-| sha256 | `98c28a92881cd341b8c5cec3c4a24ef3c6babd83602c57d33cacbbccd3b9c002` |
-| Groesse | 32.257 Bytes, 483 Zeilen |
-| Motor | das Wheel vom 2026-09-07 (Weg B/C), Netz `v25-b01_brierbest`, Champion-Spec |
+**Erweitert 2026-09-09 auf VIER Partien** (Nutzer nannte drei weitere). Alle vier tragen
+`#a`-Zeilen, sind also exakt nachspielbar, und alle vier enthalten Stapelzuege.
+
+| Datei in `evaluations/fixtures/` | sha256 (Kopf) | Zeilen | Stapelziehungen | Platten |
+| --- | --- | --- | --- | --- |
+| `game_20260904_194912_seed771522.log` | `d866a71a29ccd3e7` | 434 | 8 | 0, 6, 2 |
+| `game_20260904_202338_seed180879.log` | `135b44e5bae419bc` | 458 | 28 | 6, 0, 5 |
+| `game_20260905_224028_seed300512.log` | `b3a79cde6f5d4058` | 462 | 24 | 1, 0, 6 |
+| `game_20260909_004553_seed876496.log` | `98c28a92881cd341` | 483 | 21 | 1, 5, 6 |
+
+Die vollen Pruefsummen liegen als `<name>.sha256` daneben. Motor der letzten Partie: Wheel
+vom 2026-09-07 (Weg B/C), Netz `v25-b01_brierbest`, Champion-Spec; die drei aelteren
+stammen aus der v24-Aera.
 
 **Warum genau diese Partie taugt:** sie ist exakt nachspielbar, nicht heuristisch. Seit
 `PREREG_action_id_logging.md` traegt jede Aktion ihre ID im Log (`#a`-Zeilen), und
@@ -368,4 +375,46 @@ kauft Wissen und kann richtig sein).
 Regressionstest. Laeuft die Partie nach einer Engine-Aenderung nicht mehr byte-gleich
 durch, hat die Aenderung Regelverhalten veraendert -- gemerkt an einer echten Partie statt
 an einem Kunstzustand.
+
+## par.13 EIN MUSTER UEBER ALLE VIER PARTIEN (Nutzer-Hypothese 2026-09-09)
+
+**Nutzer:** *"da hast auch viele Kuppelzuege. Haengt vielleicht mit der Wertungsplatte
+Spezialfliesen zusammen."* Nachgesehen -- und das Muster ist deutlicher als erwartet.
+
+**GRUNDMENGE: 4 Mensch-gegen-KI-Partien aus `static/log`, EINHEIT: Punkte der Endwertung.**
+n = 4, keine Korpus-Messung.
+
+| Partie | Platten | Stapelziehungen | Spezialfelder Mensch | Spezialfelder KI | Endstand |
+| --- | --- | --- | --- | --- | --- |
+| `..._771522` | 0, 6, 2 | 8 | -6 | **-12** | 37 : 36 |
+| `..._180879` | 6, 0, 5 | 28 | -6 | **-12** | 43 : 42 |
+| `..._300512` | 1, 0, 6 | 24 | -9 | **-12** | 40 : 25 |
+| `..._876496` | 1, 5, 6 | 21 | -6 | **-12** | 69 : 0 |
+
+**Platte 6 ist in ALLEN VIER aktiv** (`scoring.rs:48`: *"Spezialfelder, -3 Pkt je leeres
+Spezialfliesenfeld"*), und die KI kassiert **jedes Mal exakt -12**, also das Maximum von
+vier offenen Feldern. Der Mensch liegt bei -6 oder -9. Vier von vier, gleicher Wert,
+gleiche Richtung.
+
+**Die Hypothese, ausdruecklich als solche markiert und NICHT gemessen:** die Platte macht
+den Stapelzug zur Wild-gegen-Special-Lotterie. Die Rueckseite verraet den Typ, und ein
+SPECIAL-Feld kostet am Ende -3, wenn es leer bleibt -- die KI zieht also tief, um Wild zu
+bekommen, und endet trotzdem beim Maximalabzug. Genau fuer diese Frage existiert das
+Merkmal `dome_wild_remaining_frac` (`serialize.rs:58-65`, Kommentar nennt die
+"-3 je offenes Spezialfeld"-Platte als Anlass).
+
+**Warum das hierher gehoert und nicht in eine eigene Prereg:** wenn die Hypothese traegt,
+ist die Stapelblindheit teurer als bisher angenommen -- die Suche wuerfelt genau die
+Information weg, die ueber diesen Posten entscheidet, und kauft sie in jeder Runde neu.
+Der Zusammenhang ist damit ein Argument IN dieser Prereg, kein eigener Strang.
+
+**Zu pruefen, wenn die Maschine frei ist** (keine Erzeugung noetig, alles liegt vor):
+
+1. **Ist -12 wirklich das Maximum?** Vier leere Spezialfelder je Spieler, also Deckel bei
+   -12 -- am Code nachsehen, nicht ableiten (`score_empty_special_fields`, `scoring.rs:33`).
+2. **Gilt das ueber den Korpus?** Verteilung der Spezialfeld-Punkte je Seite in den
+   Self-Play-Records, nicht nur in vier Mensch-Partien. Werkzeug steht:
+   `tools/plate_points_from_arena.py` (Punkte je Kriterium).
+3. **Haengt die Ziehtiefe an der Platte?** Ziehungen je Partie mit aktiver Platte 6 gegen
+   ohne. Das ist die eigentliche Frage des Nutzers.
 
