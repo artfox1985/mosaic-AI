@@ -17414,3 +17414,55 @@ waehrend die v25-Kette es vor ihrem Blockbau tut. Jetzt tut es das Skript auch, 
 Begruendung im Kopf. Die Lehre ist aelter als der Fall: die Umgebung eines Bauwegs gehoert
 ins Skript, nicht ins Gedaechtnis.
 
+# Generationsbericht v26 (abgeschlossen 2026-09-09)
+
+**Champion am Ende der Generation: `v26-b01`, Elo 1389** [1349, 1432] aus 1.240 Partien.
+Vorgaenger `v25-b01` steht bei 1355 [1317, 1398], `v24-b07` bei 1296, der Anker fix bei
+1000.
+
+**Was v26 belegt, und warum es die wichtigste Generation der Kampagne ist:** sie ist die
+erste, in der **nur das MATERIAL** geaendert wurde. Architektur, Trainingsrezept,
+Value-Ziel-Mischung, Koepfe, Kopfgewichte und Spec waren nach `PREREG_v25_window.md`
+par.18 eingefroren. Bis dahin aenderten sich Netz und Material immer zugleich, "Generation
+N+1 schlaegt N" hiess also nie "das Netz ist besser geworden". Diesmal schon.
+
+1. **Tor 1 bestanden ueber drei Seeds** (`PREREG_v26_window.md` par.8/8a): 210:190 (voller
+   Lauf, p 0,368), 85:55 (SPRT nach 70 Paaren, p 0,0135), 226:174 (voller Lauf ohne
+   Fruehstopp, p 0,0080). In allen dreien liegt v26-b01 vorn, keiner ist negativ.
+   **Verzerrungsfrei sind die beiden VOLLEN Laeufe: 436:364 aus 800 Partien = 54,5 %.** Der
+   gepoolte p-Wert ueber alle Partien (0,031) steht bewusst NICHT als Beleg -- er ignoriert
+   die Block-Korrelation, und der Fruehstopp-Lauf stoppte, WEIL er vorne lag.
+2. **Das erste Fenster ganz aus Netz-Self-Play.** hv2, der plattenblinde Lehrer, ist mit
+   v26 vollstaendig herausrotiert (2.948 Dateien, drei Generationen, alle mit dem
+   Huellen-Knopf erzeugt).
+3. **Die Traeger-Kennzahl steigt wie vorhergesagt** (par.3): der neue Sockel liegt bei
+   **0,737 volle Spalten je Seite** gegen 0,637 der Vorgeneration, Konfidenzintervalle
+   ohne Ueberlappung. Grund ist der Zuschnitt: die G-1-Traeger stammen erstmals aus einer
+   Erzeugung mit Umschaltpunkt 1 und Weg C statt aus voller Temperatur.
+4. **Gegen den Anker baut der Champion 1,267 volle Spalten je Partie** (Anker: 0,060), bei
+   56,4 zu 40,6 Punkten. Der Strukturbefund der v22-Kampagne ("der Champion vollendet
+   keine Spalten") ist damit ueberholt.
+5. **Die Anker-Kante steht still: 127:23**, gegen 126:24 bei v25-b01 UND v24-b07. Als
+   Fixpunkt bleibt der Anker richtig, als Fortschrittsmass ist er gesaettigt.
+6. **sigma/Prior-Balance faellt auf 2,270** (v25-b01: 2,792), die Regler-Familie bleibt
+   zu. **Runde 4 springt allerdings von 3,408 auf 8,537** -- bei der naechsten Promotion
+   nachsehen, n_used 233.
+
+**Methodisch neu:** die Champion-2-Kante (98:52 gegen `v24-b07`) ist die erste der
+Kampagne, die **gegen das eingefrorene Artefakt mit dessen eigenem Wheel** gemessen wurde
+statt gegen die lebende Modelldatei. Bei v25-b01 und v24-b07 war das der vom Nutzer
+gefundene Methodenfehler; hier war er vermeidbar, weil das Artefakt vollstaendig vorlag.
+
+**Ein Fund aus einer gespielten Partie, der groesser ist als die Generation:** die Suche
+mischt bei JEDER Suche den ganzen Kuppelstapel und vergisst dabei die Reihenfolge, die sie
+selbst beim Zuruecklegen gewaehlt hat. Vorregistriert als
+`PREREG_dome_stack_information_sets.md` mit Referenz-Partie und PRE-Lauf; dazu die
+Null-Klammer als eigener Strang (`PREREG_score_clamp_incentive.md`). Beide beginnen nach
+`v27-b01`, dem letzten eingefrorenen Arm.
+
+**Koordinator-Fehler dieser Generation, alle berichtigt:** eine Wartebedingung, die sich
+selbst traf (`-match 'self_play'` fand den fragenden Prozess, eine Kette stand 35 Minuten
+still), ein Werkzeug-Index, der sich selbst zaehlte, deutsche Bezeichner in neuem Code (vom
+pre-commit-Haken gestoppt), und ein Snapshot-Fix, den die eigene Trockenprobe widerlegt hat,
+bevor er produktiv wurde.
+
