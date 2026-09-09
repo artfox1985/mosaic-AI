@@ -61,12 +61,12 @@ Material traegt.
 2. **Danach `bash tools/night_v27_chain.sh`** -- wartet auf den `laufzeit`-Block der
    Ausflug-Klasse und faehrt dann Kennzahl, Traegermanifest (580), G-2-Auswahl aus der
    TEMPERIERTEN Haelfte, Fenster (~2.946), Bloecke, Monolith und das Training `v27-b01`.
-3. **`/mosaic-generation-turnover` Schritte 2-5** sind fuer v27 NICHT gefahren: kein
-   Tages-Snapshot seit 2026-09-09 06:00, kein Loeschvorschlag. Faellig sind die Klassen,
-   die mit v27 aus der Rotation fallen: `selfplay_v23-b01-policy_*` (400),
-   `-value-argmax_*` (600), `-value-sampled_*` (200) und `selfplay_v24-b07-value-excursion*`
-   (402, weil der G-2-Posten die temperierte Haelfte nimmt). **NICHT** anfassen:
-   `selfplay_v23-b01-seedvalue_*` -- `PREREG_start_position_seeding.md` ist OFFEN.
+3. **`/mosaic-generation-turnover`: Schritte 2, 3 und 4 gefahren (21:38-21:45, Snapshot
+   `1dba15e8`, Chronik):** 9 Ketten-Skripte per `git rm`, 1.602 Korpusdateien und 6
+   Manifeste, danach 2.802 Waisen-Bloecke (1.211 MiB) geloescht, `--orphans` = 0, `data/`
+   8,6 GiB. **Offen:** Schritt 5 (Modelle) nicht vorgelegt.
+   `selfplay_v23-b01-seedvalue_*` (600, 25 MiB) steht noch im Baum, weil
+   `PREREG_start_position_seeding.md` OFFEN ist -- Nutzer-Rueckfrage 21:45, ob das noetig ist.
 4. Die Ketten-Skripte der Generationen v25 und v26 sind Loeschkandidaten nach Schritt 3
    des Ablaufs; `night_v26_chain.sh` bleibt als Muster, bis die v27-Kette gelaufen ist.
 

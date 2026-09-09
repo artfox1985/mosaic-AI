@@ -306,8 +306,12 @@ if ($SampleSize -gt 0) {
                            Select-Object -First 1
                     if (-not $hit) { $missing++; Add-Failure "nicht wiederhergestellt: $($f.path)"; continue }
 
-                    $srcPath = $f.path
-                    if (-not (Test-Path $srcPath)) {
+                    # restic meldet Windows-Pfade als /D/Ordner/...; Test-Path kennt
+                    # diese Form nicht, und bis 2026-09-09 lief deshalb JEDE
+                    # Stichprobe in den Zweig "Quelle fehlt" -- Stufe 3 meldete
+                    # "12 gleich", ohne einen einzigen Hash verglichen zu haben.
+                    $srcPath = $f.path -replace '^/([A-Za-z])/', '$1:/'
+                    if (-not (Test-Path -LiteralPath $srcPath)) {
                         # Datei existiert in der Quelle nicht mehr -- genau der
                         # Fall, fuer den die Sicherung da ist. Kein Fehler,
                         # aber auch kein Vergleich moeglich.

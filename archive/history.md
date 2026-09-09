@@ -17466,3 +17466,58 @@ still), ein Werkzeug-Index, der sich selbst zaehlte, deutsche Bezeichner in neue
 pre-commit-Haken gestoppt), und ein Snapshot-Fix, den die eigene Trockenprobe widerlegt hat,
 bevor er produktiv wurde.
 
+# Chronik 2026-09-09 abends (Generationswechsel v26 -> v27)
+
+## 2026-09-09, 21:38 -- Schritt 2 des Generationswechsels: Tages-Snapshot mit Beleg
+
+`tools/mosaic_backup.ps1` auf Nutzer-Freigabe gefahren: **Snapshot `1dba15e8`**, Marke
+`daily`, 6.367 Dateien / 8,848 GiB gescannt, 129 neu, 32 geaendert, 20,5 MiB ins
+Repository (12,7 MiB gespeichert), 8 s. `check` danach ueber 46 Snapshots ohne Fehler.
+`tools/verify_backup.ps1`: Stufen 1 bis 3 gruen (Abdeckung 0 neu / 0 geaendert / 6.367
+unveraendert; Stichprobe 12 gleich, 0 abweichend); Stufen 4 und 5 nicht gefahren.
+
+**Dabei gefunden und behoben: Stufe 3 hat bis heute NICHTS verglichen.** restic meldet
+Windows-Pfade als `/D/Ordner/...`, `Test-Path` kennt die Form nicht, und jede Stichprobe
+lief in den Zweig "Quelle fehlt, nur im Backup" und zaehlte als "gleich". Der erste Lauf
+heute zeigte zwoelf solcher Zeilen fuer Dateien, die im Baum liegen. Fix in
+`tools/verify_backup.ps1` (Pfad auf `D:/...` abgebildet, `Test-Path -LiteralPath`);
+der zweite Lauf vergleicht wirklich: 12 SHA-256 gleich.
+
+**`restic find --snapshot 1dba15e8` je Loeschgruppe des Schritts 4, Treffer gegen Baum:**
+
+| Gruppe | im Snapshot | im Baum |
+| --- | --- | --- |
+| `selfplay_v23-b01-policy_*.pkl` | 400 | 400 |
+| `selfplay_v23-b01-value-argmax_*.pkl` | 600 | 600 |
+| `selfplay_v23-b01-value-sampled_*.pkl` | 200 | 200 |
+| `selfplay_v24-b07-value-excursion_*.pkl` | 201 | 201 |
+| `selfplay_v24-b07-value-excursion2_*.pkl` | 201 | 201 |
+| `manifest_v23-b01-*.json` (davon 1 seedvalue, bleibt) | 5 | 5 |
+| `manifest_v24-b07-value-excursion*.json` | 2 | 2 |
+
+Nicht zur Loeschung vorgeschlagen: `selfplay_v23-b01-seedvalue_*` (600, Prereg
+`start_position_seeding` OFFEN). Loeschung selbst: NICHT ausgefuehrt, Vorlage im Chat.
+
+## 2026-09-09, 21:45 -- Schritte 3 und 4 ausgefuehrt (Nutzer-Freigabe "wie vorgeschlagen")
+
+**Schritt 3, `git rm`:** `tools/night_v25_arena.sh`, `night_v25_chain.sh`,
+`night_v25_excursion.sh`, `night_v25_socket.sh`, `night_v25_train.sh`,
+`night_v26_arena.sh`, `night_v26_arena_seed3.sh`, `night_v26_promotion.sh`,
+`night_v26_swarm.sh` (9 Skripte, Ergebnisse in `PREREG_v25_window.md` par.20,
+`PREREG_v26_window.md` par.8/8a und den Generationsberichten). `night_v26_chain.sh` bleibt
+als Muster; der Skill-Verweis (`mosaic-generation-turnover/SKILL.md`, Schritt 7) zeigt jetzt
+dorthin. `docs/tools_index.md` regeneriert.
+
+**Schritt 4, Korpora:** 1.602 `.pkl` geloescht (Soll 1.602, Beleg Snapshot `1dba15e8`,
+Tabelle oben): `selfplay_v23-b01-policy_*` 400, `-value-argmax_*` 600, `-value-sampled_*`
+200, `selfplay_v24-b07-value-excursion_*` 201, `-excursion2_*` 201, dazu 6 Manifeste.
+`.pkl` im Baum von 4.203 auf 2.601. Verbleibende Klassen: v23-b01-seedvalue 600,
+v24-b07-policy 400, v24-b07-value-tempc 400, v25-b01 400/400/401.
+
+**Waisen-Bloecke danach** (`cache_inventory.py --orphans`): 2.802 Bloecke, 1.130 MB,
+ausschliesslich aus den geloeschten Praefixen (v23-b01-policy 800, -value-argmax 1.200,
+-value-sampled 400, v24-b07-value-excursion 201, -excursion2 201; die v23-Klassen tragen
+je zwei Bloecke je Datei aus zwei Schluesselraeumen). **Auf Nutzer-Freigabe 21:50
+geloescht: 2.802 Bloecke, 1.211 MiB** (Liste aus `--print-delete-list`, jede Datei vor dem
+Loeschen auf Existenz geprueft, 0 nicht gefunden). Gegenprobe danach: 3.201 Bloecke zu
+2.601 Korpusdateien, **0 Waisen**. `data/` von 12 auf 8,6 GiB.
