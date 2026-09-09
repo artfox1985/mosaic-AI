@@ -26,7 +26,21 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. STAND (2026-09-09, v26-Erzeugung laeuft)
 
-**ES LAEUFT (Stand 01:20).** Drei Hintergrundlaeufe, alle mit derselben gehaerteten
+**TOR 1 IST BESTANDEN (2026-09-09, 17:51).** `v26-b01` gegen `v25-b01` ueber drei Seeds:
+210:190, 85:55 und 226:174 -- in allen dreien vorn, zwei davon signifikant (McNemar 0,0135
+und 0,0080), keiner negativ. Verzerrungsfrei sind die beiden VOLLEN Laeufe: 436:364 aus
+800 Partien = 54,5 %. Punkte in allen dreien hoeher, Strafleiste in zweien niedriger.
+Details und die Begruendung, warum der gepoolte p-Wert nicht als Beleg gefuehrt wird
+(Block-Korrelation): `PREREG_v26_window.md` par.8a.
+
+**Damit steht die PROMOTION zur Entscheidung** -- Tor 1 ist die Ratsche gegen den
+Vorgaenger, nicht die Kroenung. Der Ablauf dafuer ist `/mosaic-champion-promotion`
+(Anker-Kante, Champion-2-Kante, Pflicht-Diagnostiken, Anzeige-Kalibrierung, eingefrorenes
+Artefakt). Der Generator fuer v27 ist unabhaengig davon schon entschieden: `v26-b01`.
+
+---
+
+**(Ueberholt, Stand 01:20 der Nacht:)** Drei Hintergrundlaeufe, alle mit derselben gehaerteten
 Wartebedingung verkettet: `laufzeit`-Block im Manifest der Vorgaenger-Klasse UND eine
 KLARE 0 aus der Prozessabfrage; jede andere Antwort gilt als belegt.
 
