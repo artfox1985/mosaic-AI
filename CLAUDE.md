@@ -234,6 +234,29 @@ gemessen zu werden. Ein Infrastruktur-Vorschlag braucht deshalb einen
 BENANNTEN Nutznießer – eine konkrete Messung, die dadurch möglich oder
 schärfer wird –, nicht „hilft künftig allgemein".
 
+## Symmetrische Defekte sieht keine Arena (Nutzer-Anweisung 2026-09-09)
+
+Selfplay, Arena, Gating und die Offline-Metriken vergleichen zwei Agenten **im selben
+Weltmodell**. Ein Fehler im geteilten Modell wirkt auf beide Seiten gleich und kuerzt sich
+weg: er kostet null Elo, bei jeder Partienzahl. Mehr Sims, groessere Netze, mehr Korpus
+sind dagegen blind.
+
+**Anlass (2026-09-09):** die Suche mischte bei jeder Suche den ganzen Kuppelstapel und
+vergass damit die Reihenfolge, die sie beim Zuruecklegen selbst gewaehlt hatte. Gefunden
+hat es der Nutzer beim Spielen, nicht die Messkette. Nutzer dazu: *"es ist einfach falsch
+implementiert und nicht vergleichbar mit der Sicht, die ein Mensch hat. Das gehoert
+korrigiert"* -- solche Funde sind Korrektheitsfragen, keine Elo-Fragen.
+
+**Die Liste dagegen steht in `docs/architecture_reference.md`**, Abschnitt "Wo der Code
+Information ABSICHTLICH vernichtet": jede Mischstelle, jede Kuerzung auf verdeckten
+Bestand, mit Urteil. **Wer eine neue einbaut, traegt sie dort ein** und beantwortet zwei
+Fragen: wessen Informationsmenge modelliert sie, und was nimmt sie weg, das der Spieler
+rechtmaessig HAT? Ein `shuffle`, der das nicht sagen kann, ist ein Bug in Wartestellung.
+
+Die drei anderen Kanaele, mit denen solche Fehler ueberhaupt auffindbar sind (Sicht-Audit,
+Orakel-Differential, Anomalie-Report), stehen in
+`evaluations/PREREG_dome_stack_information_sets.md` par.11.
+
 ## Messungen laufen EXKLUSIV — und ein Build ist Nebenlast (2026-08-25)
 
 **Der Ablauf dazu: `/mosaic-measurement-run`** -- vor dem Start UND beim
