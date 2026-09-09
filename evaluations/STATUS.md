@@ -158,6 +158,11 @@ Partie**, nicht aus der Kampagnenplanung.
 | **Schwarm G-2 ohne Split** -- welche der beiden v24-b07-Haelften den G-2-Posten traegt, wird gemessen statt geraten | `PREREG_v26_window.md` par.6 | **Messung eingereiht**: `tools/probe_g2_swarm_choice.sh` laeuft los, sobald das Training v26-b01 auf der GPU steht (dann ist EIN CPU-Auftrag daneben erlaubt) |
 | **Null-Klammer** -- bleibt die Anreizstruktur unter null erhalten | `PREREG_score_clamp_incentive.md` | OFFEN, 2026-09-09 aufgemacht; Stufe 0 ist eine Messung und darf frueher laufen |
 
+**Das Werkzeug dahinter steht in `../docs/architecture_reference.md`**, Abschnitt "Wo der
+Code Information ABSICHTLICH vernichtet" (Naht-Audit vom 2026-09-09, 24 Mischstellen mit
+Urteil, plus die Regel fuer neue Stellen). CLAUDE.md verweist darauf; die drei uebrigen
+Suchkanaele stehen in `PREREG_dome_stack_information_sets.md` par.11.
+
 **Der Zeitpunkt ist entschieden (Nutzer 2026-09-09):** *"nach v27 ist das Einfrieren
 beendet"*, und praezisiert: *"v27-b01 ist der letzte eingefrorene Arm. dann gehts weiter."*
 **Der Ausloeser ist ein ARM, keine Generation.** Sobald `v27-b01` trainiert ist, steht die

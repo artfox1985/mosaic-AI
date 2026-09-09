@@ -17393,3 +17393,24 @@ von selbst (`--leerlauf-abbruch 100000`).
 CLAUDE.md nennt einen Commit waehrend eines laufenden Self-Plays ausdruecklich einen
 Grenzfall, den man im Zweifel aufhebt. Wird nach der Erzeugung nachgeholt.
 
+## 2026-09-09, Nacht -- Cache-Bloecke im falschen Schluesselraum aufgeraeumt
+
+`MOSAIC_IGNORE_POLICY_TARGET_VALID` steht als `|ignore_ptv_v1` IM Datei-Schluessel
+(`engine/py/file_cache_key.py:115-117`). Bloecke ohne die Variable tragen einen Hash, den
+kein Training adressiert. Zwei Laeufe hatten sie nicht gesetzt:
+
+| Herkunft | Bloecke | Groesse |
+| --- | --- | --- |
+| Waechter-Fehlstart 2026-09-09, 00:25-00:40 (Koordinator) | 480 | 188,0 MiB |
+| Lauf in der Nacht 07./08.09., 23:00-00:03 | 2.200 | 840,1 MiB |
+| **zusammen** | **2.680** | **1.028 MiB** |
+
+Beide auf Nutzer-Freigabe geloescht; `data/` faellt von 9,6 auf **8,69 GiB**, Waisenprobe
+danach 0 bei 3.189 Korpusdateien. Vor dem Loeschen geprueft: JEDE `.pkl` im Baum hat ihren
+korrekten Block, die geloeschten waren durchweg Dubletten im toten Namensraum.
+
+**Ursache abgestellt:** `tools/cache_build_socket.sh` exportierte die Variable nicht,
+waehrend die v25-Kette es vor ihrem Blockbau tut. Jetzt tut es das Skript auch, mit der
+Begruendung im Kopf. Die Lehre ist aelter als der Fall: die Umgebung eines Bauwegs gehoert
+ins Skript, nicht ins Gedaechtnis.
+
