@@ -451,3 +451,32 @@ Platte.** Die Hypothese des Nutzers ist auf dieser Grundmenge beschreibend besta
 3. **Haengt die Ziehtiefe an der Platte?** Ziehungen je Partie mit aktiver Platte 6 gegen
    ohne. Das ist die eigentliche Frage des Nutzers.
 
+## par.12a PRE-LAUF GEFAHREN (2026-09-09, 13:27-13:32)
+
+`tools/replay_dome_stack_pre.sh`, Netz `v25-b01_brierbest` bei 400 Sims, auf der
+eingefrorenen Partie (sha256 vor dem Lesen geprueft). Artefakt:
+`evaluations/artifacts/replay_dome_stack_pre.json` (130 bewertete Entscheidungen, davon
+**21 Stapelzuege**), Bericht in `evaluations/game_analysis/`. Wanduhr 266 s.
+
+**Der Befund an der R1-Serie** -- Rang des tatsaechlich gespielten Zuges in der
+Bewertung des HEUTIGEN Netzes, plus dessen Q gegen den Wurzelwert:
+
+| Ziehung | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Rang | 16 | 1 | 3 | 8 | 2 | **1** | **1** | **1** | **1** | **1** | **1** | **1** | **1** |
+| Q(gespielt) | 0,580 | 0,652 | 0,639 | 0,568 | 0,583 | 0,596 | 0,634 | 0,635 | 0,627 | 0,629 | 0,637 | 0,640 | 0,640 |
+| Wurzelwert | 0,608 | 0,627 | 0,634 | 0,581 | 0,569 | 0,560 | 0,567 | 0,565 | 0,567 | 0,565 | 0,563 | 0,565 | 0,568 |
+
+**Ab der sechsten Ziehung ist "nochmal ziehen" durchgehend die Nummer eins**, mit einem
+Q, das den Wurzelwert um rund 0,07 uebersteigt -- und zwar STABIL, ueber acht Zuege
+hinweg. Genau das ist die vorhergesagte Signatur: nach dem Mischen sieht jede Ziehung
+wieder aus wie ein frisches Los mit positivem Erwartungswert. Dass der Stapel zu diesem
+Zeitpunkt bereits vollstaendig gesehen war, kann die Suche nicht wissen (par.3), und
+kosten tut es nichts, weil der Punktestand auf 0 steht (par.9).
+
+**Lesart, eng gehalten:** das ist EINE Partie und der Rang ist die Bewertung des heutigen
+Netzes bei 400 Sims, nicht die Entscheidung, die im Spiel getroffen wurde. Als
+Staerkeaussage taugt es nicht. Als BASISLINIE fuer den Vergleich nach dem Umbau ist es
+genau richtig: dieselbe Stellung, dasselbe Netz, nur ein anderes Weltmodell -- faellt der
+Rang der Wiederholungsziehung dann, hat der Umbau seine Wirkung; bleibt er bei 1, nicht.
+
