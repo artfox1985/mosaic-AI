@@ -24,108 +24,56 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ---
 
-## 1. UEBERGABE an die naechste Sitzung (2026-09-09, 20:30)
+## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 15:30)
 
-**MASCHINE FREI, nichts laeuft.** Champion laut `models/champion.txt`:
-**`v26-b01_brierbest`, Elo 1389** [1349, 1432] aus 1.240 Partien. Vorgaenger `v25-b01`
-steht bei 1355, `v24-b07` bei 1296, der Anker fix bei 1000.
+**MASCHINE FREI, nichts laeuft.** Champion laut `models/champion.txt`: **`v27-b01_brierbest`,
+Elo 1405** [1361, 1453] aus 790 Partien. Leiter: `v26-b01` 1364, `v25-b01` 1336, `v24-b07`
+1283, Anker fix 1000. **Die Promotion v27-b01 ist VOLLSTAENDIG durch** (alle Schritte der
+`docs/promotion_checklist.md`, Artefakt `models/frozen_champions/v27-b01/`, restic
+`run:v27-b01` 2a12d266). Generationsbericht v27 am Ende von `../archive/history.md`; Belege
+`PREREG_v27_window.md` par.7 bis par.10.
 
-**Die Promotion v26-b01 ist VOLLSTAENDIG durch**, alle sieben Schritte der
-`docs/promotion_checklist.md` inklusive eingefrorenem Artefakt. Der Generationsbericht
-steht am Ende von `../archive/history.md`.
+**Das Einfrieren ist beendet.** v25-b01 / v26-b01 / v27-b01 sind die Vergleichskette mit
+gleichem Rezept und rotierendem Material; dreimal Tor 1, dreimal steigende Spalten (Tabelle im
+Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst werden.
 
-### Warum diese Generation zaehlt
+### NAECHSTE SCHRITTE, nur auf Anweisung (Nutzer 2026-09-10, 13:25: v28-Self-Play ausgesetzt)
 
-Sie ist die erste, in der **nur das Material** geaendert wurde -- Architektur, Rezept und
-Spec waren eingefroren. Damit heisst "v26 schlaegt v25" zum ersten Mal wirklich, dass das
-Material traegt.
-
-| Kante | Ergebnis | Bemerkung |
-| --- | --- | --- |
-| Tor 1, Seed 20261030 | 210:190 | voller Lauf, p 0,368 |
-| Tor 1, Seed 20261031 | 85:55 | SPRT nach 70 Paaren, p 0,0135 |
-| Tor 1, Seed 20261032 | 226:174 | voller Lauf ohne Fruehstopp, p 0,0080 |
-| **verzerrungsfrei (die zwei vollen)** | **436:364 = 54,5 %** | der Fruehstopp-Lauf stoppte, WEIL er vorne lag |
-| Anker | 127:23 | v25-b01 und v24-b07 hatten beide 126:24 |
-| Champion-2 gegen `v24-b07` | 98:52 | erste Kante gegen das ARTEFAKT statt die lebende Datei |
-
-**Struktur:** der neue Sockel liegt bei 0,737 vollen Spalten je Seite (Vorgeneration
-0,637); gegen den Anker baut der Champion 1,267 je Partie gegen dessen 0,060.
-
-### ERSTE AUFGABE DER NEUEN SITZUNG
-
-1. **v27-Erzeugung starten** -- `bash tools/night_v27_generate.sh` (drei Klassen, Generator
-   `v26-b01`, Seeds 20260914/15/16, rund 8,4 h nach den v26-Manifesten). Das Skript wartet selbst auf eine freie
-   Maschine. **Daneben gehoert der Cache-Waechter**, zwingend mit
-   `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` -- der Aufruf steht im Kopf des Skripts.
-2. **Danach `bash tools/night_v27_chain.sh`** -- wartet auf den `laufzeit`-Block der
-   Ausflug-Klasse und faehrt dann Kennzahl, Traegermanifest (580), G-2-Auswahl aus der
-   TEMPERIERTEN Haelfte, Fenster (~2.946), Bloecke, Monolith und das Training `v27-b01`.
-3. **`/mosaic-generation-turnover`: Schritte 2, 3 und 4 gefahren (21:38-21:45, Snapshot
-   `1dba15e8`, Chronik):** 9 Ketten-Skripte per `git rm`, 1.602 Korpusdateien und 6
-   Manifeste, danach 2.802 Waisen-Bloecke (1.211 MiB) geloescht, `--orphans` = 0, `data/`
-   8,6 GiB. **Offen:** Schritt 5 (Modelle) nicht vorgelegt.
-   `selfplay_v23-b01-seedvalue_*` (600, 25 MiB) steht noch im Baum, weil
-   `PREREG_start_position_seeding.md` OFFEN ist -- Nutzer-Rueckfrage 21:45, ob das noetig ist.
-4. Die Ketten-Skripte der Generationen v25 und v26 sind Loeschkandidaten nach Schritt 3
-   des Ablaufs; `night_v26_chain.sh` bleibt als Muster, bis die v27-Kette gelaufen ist.
+1. **Nach-v27-Programm** (Abschnitt 3b): Kuppelstapel-Informationsmengen (Variante A/B ist
+   Nutzer-Entscheid; Rueckgabe-Reihenfolge seit heute nur fuer den Ausfuehrenden sichtbar,
+   `dome_stack` par.14), Null-Klammer Stufe 0 (erst Audit-Punkte in `score_clamp` par.9
+   klaeren: Kaufseite, zweite Grundmenge Mensch-Logs), Sicht-Reststufen (`stack_top` par.11/12),
+   Dubletten-Fix im Ausflug (`start_position_seeding` par.9k).
+2. **Claude-Partien** (`PREREG_claude_play_interface.md` par.9): Engine, Replayer und
+   `claude_play.py` sind umgebaut und gebaut, Alt-Logs replayen; offen ist nur ein Rauchtest
+   von `claude_play.py new/move/show` mit `.engine.log`. Gegner ist `models/champion.txt`.
+   Der Partien-Agent liest NUR `show` und `game.log`.
+3. **Werkzeug:** `plate_points_from_arena.py` um `side_names` erweitern, sonst bleibt
+   Standard-Kennzahl 4 je Modell unmessbar (heute nur gemischt ueber beide Modelle).
+4. **Generationswechsel-Rest:** Schritt 5 (Modell-Liste zur Ruecksprache), `night_v26_chain.sh`
+   und die v27-Skripte werden Loeschkandidaten, sobald v28 ansteht.
+5. **Entscheid Trainings-Seed** fuer die Zeit nach dem Einfrieren (wanderte 20260925/29/33).
 
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
 
 - **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden.
 - **Loeschung nur auf pfadgenaue Freigabe.**
 - **Messungen laufen exklusiv**; GPU und CPU duerfen parallel, zwei CPU-Messungen nicht.
-- **Erzeugung startet nur auf Anweisung** -- der Nutzer faehrt sie in der neuen Sitzung
-  selbst.
+- **v28-Self-Play ausgesetzt** (2026-09-10, 13:25).
 
 ### BEFUNDE, die eine Entscheidung oder Nachschau brauchen
 
-- **sigma/Prior Runde 4 springt auf 8,537** (v25-b01: 3,408), waehrend die Gesamt-Kennzahl
-  auf 2,270 faellt. Die Regel haengt an der Gesamtzahl, die Familie bleibt also zu -- aber
-  bei der naechsten Promotion nachsehen. n_used 233, eine Runde ist duenn.
-- **Der Modell-Snapshot aus `train.py` scheitert reproduzierbar** (0xC0000142, dritter
-  Fall). Seit 2026-09-09 raeumt die Funktion vorher auf, wiederholt einmal und legt bei
-  Fehlschlag `models/.snapshot_pending_<name>.txt` ab. Ob das reicht, zeigt das
-  v27-Training.
-- **Die Anker-Kante ist gesaettigt** (127:23 gegen 126:24 zweimal). Als Fortschrittsmass
-  taugt sie nicht mehr; als Fixpunkt bleibt sie richtig.
-
-**Prereg-Audit 2026-09-09 abends (alle 13 offenen Preregs, drei Opus-Agenten, tragende
-Stellen vom Koordinator am Code nachgeprueft).** Koepfe und Laufzeiten sind berichtigt;
-die Befunde stehen je in der Prereg. Was eine ENTSCHEIDUNG braucht, in Reihenfolge:
-
-- ~~Tor 2 fuer v26-b01 nachmessen~~ ENTSCHIEDEN 2026-09-09 (Nutzer: "nicht nachmessen").
-  Praezedenz in `docs/generation_loop.md` (Abschnitt Tor 2) festgeschrieben: Tor 2a wird
-  ex post am erzeugten Korpus gemessen, die v27-Kette liefert die Zahl fuer v26-b01 als
-  Generator (Schritt 1, Bezug 0,737). Tor 2b (Arena gegen Vorgaenger) ist seit v25 nicht
-  gemessen; die Anker-Arena zeigt 1,267 gegen 1,307 (kein Tor-Instrument, n = 150).
-- **Ausflug-Klasse: 11 % der Ausfluege weichen nicht ab** (`PREREG_start_position_seeding.md`
-  par.9k, n = 200 Paare). Fix ist ein Engine-Eingriff; Empfehlung: NACH v27-b01, weil v25-
-  und v26-Klassen denselben Defekt tragen und der letzte eingefrorene Arm stationaer bleibt.
-  Der Abzweig zur Haelfte in Runde 1 ist KEIN Widerspruch: die Begruendung "Engpass
-  Vollendung spaet" in par.9b ist die am 2026-08-23 widerlegte Lesart (Legalitaetsstufe
-  0/160, Engpass ist die Zufuehrung), par.9b gehoert berichtigt, nicht par.9g.
-- **STATUS Abschnitt 8, erster Punkt ("Der Champion vollendet keine Spalten") ist
-  ueberholt** (v26-Generationsbericht Punkt 4: 1,267 volle Spalten je Partie gegen den
-  Anker). Beim naechsten Neuschnitt streichen oder auf v26 datieren.
-- **Einfrieren ist am Trainings-Seed undicht:** `cli_args.seed` 20260925 / 20260929 /
-  20260933 bei sonst identischen Flags (Manifeste v25-b01, v26-b01, Kette v27). Fixieren
-  hebt die Konfundierung nicht auf (anderes Material, andere Batches), aber par.18 sagt
-  "ausschliesslich Material". Entscheid: so lassen und in par.18 benennen, oder v27 mit
-  20260929 fahren.
-- **Null-Klammer, Kaufseite ohne Eigentuemer** und Stufe 0 auf der falschen Grundmenge
-  (`PREREG_score_clamp_incentive.md` par.9, `PREREG_dome_stack_information_sets.md`
-  par.14). Vor Stufe 0 zu klaeren, sonst schliesst die Schwelle den Strang auf Self-Play,
-  wo der Effekt strukturell selten ist.
-- **Die Oberflaeche zeigt dem Menschen die Rueckgabe-Reihenfolge des Stapels**
-  (`game.rs:282-286`, Log im Frontend), die `dome_stack` par.4 als unbekannt modelliert.
-  Vor der naechsten Referenzpartie entscheiden: Log kuerzen oder Reihenfolge als bekannt
-  modellieren.
-- Kleinere Widersprueche, je in der Prereg registriert: `round_transition_search_sampling`
-  par.8 (Determinisierung lebt, Paritaetssonde nicht), `round_estimate_leaf_term` (eine
-  Skala gegen gemessenes Rundenprofil), `stack_top_feature` par.12 (par.7 ohne
-  Verwerf-Ausgang), `start_dome_choice` (Anker-Sperre ueberholt), `policy_surprise_weighting`
-  par.11 (Kante b05 gegen b04 nie registriert).
+- **`player_profiles.json` ist im Arbeitsbaum veraendert** (plus `player_profiles.json.bak`),
+  nicht durch diese Sitzung; nicht committet. Nutzer fragen, woher.
+- **Erzeugung 23 % langsamer als v26** bei gleicher Konfiguration (10,25 h gegen 8,35 h;
+  `measured_runtimes.md` v27). Ursache nicht gemessen (Waechter-Last, OneDrive).
+- **Einfrieren am Trainings-Seed undicht** (20260925/29/33); fuer die Kette folgenlos, aber
+  par.18 sagt "ausschliesslich Material".
+- **Null-Klammer, Kaufseite ohne Eigentuemer**; Stufe 0 auf der falschen Grundmenge
+  (`score_clamp` par.9, `dome_stack` par.14).
+- Kleinere Widersprueche, je in der Prereg registriert (Audit 2026-09-09):
+  `round_transition_search_sampling` par.8, `round_estimate_leaf_term`, `stack_top_feature`
+  par.12, `start_dome_choice` Nachtrag, `policy_surprise_weighting` par.11.
 
 ## 2. WAS ALS NAECHSTES LAEUFT: die v26-Erzeugung
 

@@ -1,11 +1,23 @@
 # -*- coding: utf-8 -*-
 """Spiel-Interface Claude gegen Netz (PREREG_claude_play_interface.md, Nutzer-Auftrag 2026-09-06).
 
-Jeder Zug ist ein eigener Prozess: der Zustand wird bei jedem Aufruf aus dem Partie-Log
-(Server-Format, `static/log/game_*.log`) per `tools/analyze_game_log.Replayer` rekonstruiert,
-damit jede Partie mit den vorhandenen Sonden auswertbar bleibt (par.3.1). Claude sieht genau
-das, was `serialize.rs` liefert und das Netz kodiert (par.3.2), nicht mehr. Tiling legt Claude
+Jeder Zug ist ein eigener Prozess: der Zustand wird bei jedem Aufruf aus dem Maschinen-Log
+`.engine.log` (Server-Format wie `static/log/game_*.log`, inklusive Kopfzeilen und der
+`#a`-Maschinenzeilen) per `tools/analyze_game_log.Replayer` rekonstruiert, damit jede Partie
+mit den vorhandenen Sonden auswertbar bleibt (par.3.1). Claude sieht genau das, was
+`serialize.rs` liefert und das Netz kodiert (par.3.2), nicht mehr. Tiling legt Claude
 selbst (Nutzer 2026-09-06 12:50: "tiling spielst selber").
+
+ZWEI Logdateien je Partie, und der Unterschied ist der Informationsstand (Nutzer-Entscheid
+2026-09-10, "Die Reihenfolge der zurueckgelegten Kuppelplatten ist nur fuer den Spieler
+sichtbar, der sie auch erstellt"):
+
+  `.engine.log`  vollstaendig, fuer den Replayer -- mit Kopf und `#a`-Zeilen, und damit auch
+                 mit der `return_order` des Gegners.
+  `game.log`     die Lesefassung fuer Claude: jede Zeile, die NICHT mit "#" beginnt. Das ist
+                 dieselbe Filterung, die die Web-Anzeige macht (serialize.rs::state_to_json).
+
+Wer die Partie liest, liest `game.log`. `.engine.log` ist Maschinenstand, kein Spielerwissen.
 
 Aufrufe (Projektordner; Netz-Zuege sind CPU-Auftraege -> NICHT neben einer Arena oder Sonde):
     python -X utf8 tools/claude_play.py new --game g01 --seed 20260906 --first-player 0
@@ -71,6 +83,15 @@ def game_dir(name: str) -> Path:
     return GAMES_DIR / name
 
 
+def engine_log_path(name: str) -> Path:
+    """Der VOLLE Log-Strom der Partie (Replayer-Eingabe). Rueckfall auf
+    `game.log`, solange eine Partie von vor dem 2026-09-10 kein `.engine.log`
+    hat (g01): deren `game.log` traegt noch den kompletten Strom."""
+    d = game_dir(name)
+    eng = d / ".engine.log"
+    return eng if eng.exists() else d / "game.log"
+
+
 def load_manifest(name: str) -> dict:
     return json.loads((game_dir(name) / "manifest.json").read_text(encoding="utf-8"))
 
@@ -105,7 +126,7 @@ def rebuild_game(name: str, m: dict):
     """PyGame aus dem Log rekonstruieren (Replayer), Netz laden, (g, log_len) zurueckgeben."""
     mr = engine(m)
     import analyze_game_log as agl
-    log_path = game_dir(name) / "game.log"
+    log_path = engine_log_path(name)
     rep, _lines, li, div = agl.run(log_path, model_path=None, sims=1, c_puct=0.3, do_oracle=False, limit=None)
     if div:
         raise SystemExit(f"Replay-Divergenz in {log_path.name}: {div}")
@@ -122,11 +143,29 @@ def rebuild_game(name: str, m: dict):
 
 
 def append_log(name: str, g, since: int) -> int:
+    """Neue Log-Zeilen wegschreiben -- VOLL nach `.engine.log`, gefiltert nach `game.log`.
+
+    Die Filterung ist dieselbe wie in der Web-Anzeige (serialize.rs::state_to_json):
+    alles mit "#"-Praefix ist Maschinenstand. Konkret haelt sie die `#a`-Zeilen des
+    GEGNERS heraus, und damit dessen `return_order` -- welche Kuppelplatten er in
+    welcher Reihenfolge unter den Stapel gelegt hat, sieht nur er selbst
+    (Nutzer-Entscheid 2026-09-10, game.rs::execute_draw_from_stack).
+
+    Alt-Partien ohne `.engine.log` (g01) behalten ihren EINEN gemischten Strom in
+    `game.log` -- ein zweiter, kopfloser `.engine.log` waere ab der naechsten
+    Rekonstruktion die falsche Quelle (`load_log` braucht die "# {...}"-Kopfzeile)."""
     new = g.log_since(since)
     if new:
-        with open(game_dir(name) / "game.log", "a", encoding="utf-8", newline="\n") as fh:
+        eng = engine_log_path(name)
+        with open(eng, "a", encoding="utf-8", newline="\n") as fh:
             for e in new:
                 fh.write(f"{e}\n")
+        if eng.name != "game.log":
+            visible = [e for e in new if not e.startswith("#")]
+            if visible:
+                with open(game_dir(name) / "game.log", "a", encoding="utf-8", newline="\n") as fh:
+                    for e in visible:
+                        fh.write(f"{e}\n")
     return g.log_len()
 
 
@@ -174,7 +213,10 @@ def cell_char(sp: dict | None) -> str:
         return "."
     t = sp.get("type")
     if sp.get("filled") is not None:
-        return "#" if sp["filled"] == "special" else COLORS.get(sp["filled"], "?").upper()
+        # 2026-09-10 (PREREG_claude_play_interface.md par.9): ein GEFUELLTES
+        # Spezialfeld zeigt `@`, ein leeres `#` -- g01 konnte beide nicht
+        # unterscheiden und musste den Fuellstand aus der Punktzahl erschliessen.
+        return "@" if sp["filled"] == "special" else COLORS.get(sp["filled"], "?").upper()
     if t == "SPECIAL":
         return "#"
     if t == "WILD":
@@ -242,7 +284,7 @@ def render(st: dict, m: dict, tiles_catalog: dict) -> str:
             k = len(row.get("tiles") or [])
             rows.append(f"R{row['index']}:{COLORS.get(row.get('color'), '-') if k else '-'}{k}/{row['capacity']}{'(' + str(row['phantom_count']) + 'ph)' if row.get('phantom_count') else ''}")
         L.append("    Musterreihen " + " ".join(rows) + f" | Strafleiste {colors_str(pl.get('floor', []))} | Chips {' '.join(colors_str(c['colors']) for c in pl.get('bonus_chips', [])) or '-'}")
-        L.append("    Raster (gross = belegt, klein = Farbe der freien Zelle, * wild, # Spezial, . ohne Platte)")
+        L.append("    Raster (gross = belegt, klein = Farbe der freien Zelle, * wild, # Spezial leer, @ Spezial gefuellt, . ohne Platte)")
         L.extend(grid_lines(pl.get("dome_grid") or []))
     return "\n".join(L)
 
@@ -393,10 +435,15 @@ def cmd_new(a) -> int:
             "first_player": a.first_player, "ai_enabled": True, "ai_player": ai,
             "ai_model": opponent, "ai_sims": a.sims, "teacher_level": 0, "teacher_sims": None,
             "teacher_coach_sims": None, "claude_play": True}
-    with open(d / "game.log", "w", encoding="utf-8", newline="\n") as fh:
+    # Der Kopf (inkl. der "# {...}"-Metazeile, die `load_log` braucht) gehoert in
+    # den MASCHINEN-Strom; `game.log` ist die gefilterte Lesefassung fuer Claude
+    # und beginnt darum leer (siehe Modul-Docstring und `append_log`). Die Metadaten
+    # stehen fuer den Leser ohnehin in manifest.json.
+    with open(d / ".engine.log", "w", encoding="utf-8", newline="\n") as fh:
         fh.write("# MOSAIC GAME LOG\n")
         fh.write(f"# {json.dumps(meta, ensure_ascii=False)}\n")
         fh.write(f"# {'=' * 60}\n")
+    (d / "game.log").write_text("", encoding="utf-8", newline="\n")
     m["seed"] = g.seed()
     save_manifest(name, m)
     out: list[str] = []

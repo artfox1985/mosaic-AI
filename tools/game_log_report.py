@@ -123,6 +123,15 @@ def build_report(header: dict, log_path: Path, rep: "Replayer", divergence: str 
           f"(altes 🎫 gegen heutiges 🎴), {rep.chip_zusatz_toleriert} nur beim fehlenden "
           "Plaettchen-Zusatz. Beides sind die benannten Toleranzen fuer Logs von vor dem "
           "2026-09-07; die heutige Engine schreibt `🎴 ... (3 Plättchen: rot, ...)`.")
+    # Vierte Toleranz (2026-09-10, Nutzer-Entscheid zur Sichtbarkeit der
+    # Rueckleg-Reihenfolge). Gleiche Regel wie oben: benennen, nicht verschweigen.
+    if getattr(rep, "return_list_tolerated", 0):
+        P("")
+        P(f"⚠️ Rueckleg-Zeile: {rep.return_list_tolerated} Zeile(n) nur bei der Plattenliste "
+          "toleriert (Logs vor dem 2026-09-10 nennen `(Reihenfolge): #id (Typ), ...`, die "
+          "heutige Engine nur noch die Anzahl -- die Reihenfolge sieht nur der ziehende "
+          f"Spieler). Reihenfolge aus der `#a`-Zeile uebernommen: "
+          f"{getattr(rep, 'return_order_from_hint', 0)} Stapelzug/-zuege.")
     if getattr(rep, "chip_aus_log", 0):
         P("")
         P(f"Chip-Wahl aus dem LOG uebernommen: {rep.chip_aus_log} Vollendung(en) "

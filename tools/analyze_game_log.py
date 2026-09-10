@@ -161,8 +161,16 @@ PATTERNS: dict[str, re.Pattern] = {
     # Partie (net_arena_match(log_games=True)) kann sie erzeugen. Geht der
     # DOME_PLACE-Zeile immer unmittelbar voraus (ein log_event-Aufruf) --
     # wie MARKER per SECONDARY_LINE_CATEGORIES uebersprungen.
+    # Zwei Formen, seit dem Nutzer-Entscheid 2026-09-10 ("Die Reihenfolge der
+    # zurueckgelegten Kuppelplatten ist nur fuer den Spieler sichtbar, der sie
+    # auch erstellt"): die heutige Engine schreibt NUR die Anzahl, Logs von vor
+    # dem 2026-09-10 tragen zusaetzlich "(Reihenfolge): #id (Typ), ...".
+    # `liste` ist darum optional und bei neuen Logs None. Die Reihenfolge selbst
+    # kommt beim Replay nicht mehr aus dem Text, sondern aus `return_order` in
+    # der `#a`-Zeile (siehe resolve_dome).
     "DOME_RETURN_TO_STACK": re.compile(
-        r"^↩️\s*(?P<n>\d+) Kuppelplatte\(n\) zurueck unter den Stapel \(Reihenfolge\): (?P<liste>.+)$"
+        r"^↩️\s*(?P<n>\d+) Kuppelplatte\(n\) zurueck unter den Stapel"
+        r"(?: \(Reihenfolge\): (?P<liste>.+))?$"
     ),
     "MOON_STACK_INFO": re.compile(r"^🌙 F(?P<fid>\d+) Mond-Stapel(?: nach Entnahme)?: (?P<desc>.+)$"),
     "MOON_POOL_INFO": re.compile(r"^🌙 GF Moon-Pool: (?P<desc>.+)$"),
@@ -386,6 +394,8 @@ class Replayer:
         self.emoji_toleriert = 0  # Zeilen, die nur am ☀️/🌙-Praefix abwichen
         self.chip_zusatz_toleriert = 0  # Chip-Zeilen ohne den Plaettchen-Zusatz (Logs vor 2026-09-07)
         self.chip_symbol_toleriert = 0  # Chip-Zeilen mit dem alten Symbol 🎫 statt 🎴
+        self.return_list_tolerated = 0  # Rueckleg-Zeilen mit Plattenliste (Logs vor 2026-09-10)
+        self.return_order_from_hint = 0  # Stapelzuege, deren Rueckleg-Reihenfolge aus der `#a`-Zeile kam
         self.chip_aus_log = 0        # Vollendungen, deren Chip-Wahl AUS DEM LOG kam
         self.chip_log_mehrdeutig = 0  # davon: mehrere Kandidaten mit gleicher Farbsignatur
         self.hint_used = 0      # Zuege, die ueber die ID aufgeloest wurden
@@ -466,6 +476,27 @@ class Replayer:
                 self.chip_symbol_toleriert += symbol_toleriert
                 self.chip_zusatz_toleriert += 1
                 return True
+        # Vierte datierte Toleranz (2026-09-10, Nutzer-Entscheid: "Die Reihenfolge
+        # der zurueckgelegten Kuppelplatten ist nur fuer den Spieler sichtbar, der
+        # sie auch erstellt"). Die Engine schreibt seither nur noch die ANZAHL;
+        # jedes Log von DAVOR traegt zusaetzlich "(Reihenfolge): #id (Typ), ...".
+        # Ohne diese Toleranz waere jede aeltere Partie mit einem Stapelzug
+        # dauerhaft unreplaybar (16 Logdateien am 2026-09-10, u.a. die Fixtures
+        # der Kuppelstapel-Prereg und evaluations/artifacts/claude_play/g01).
+        #
+        # Eng gehalten: beide Seiten muessen die Rueckleg-Zeile sein, die Anzahl
+        # muss uebereinstimmen, und nur die ALTE Seite darf die Liste tragen.
+        # Was dabei aufgegeben wird: die Textprobe kann eine abweichende
+        # Rueckleg-REIHENFOLGE nicht mehr melden. Diese Pruefung wandert auf den
+        # ID-Weg -- `resolve_dome` uebernimmt `return_order` aus der `#a`-Zeile,
+        # wo sie steht; fehlt sie (Arena-/KI-Log), ist die Reihenfolge ohnehin
+        # kanonisch (game.rs::generate_draw_stack_moves).
+        m_ret_o = PATTERNS["DOME_RETURN_TO_STACK"].match(rest_o)
+        m_ret_r = PATTERNS["DOME_RETURN_TO_STACK"].match(rest_r)
+        if (m_ret_o and m_ret_r and m_ret_o.group("n") == m_ret_r.group("n")
+                and m_ret_r.group("liste") is None and m_ret_o.group("liste") is not None):
+            self.return_list_tolerated += 1
+            return True
         return False
 
     # ── zentrale Anwendung + exakte Textvalidierung ─────────────────────────
@@ -958,6 +989,20 @@ class Replayer:
         if any(mv["type"] == "dome_stack_choose" and mv["chosen_id"] == tile_id
                and mv["slot_row"] == slot_row and mv["slot_col"] == slot_col and mv["rotation"] == rotation
                for mv in vm):
+            # Rueckleg-Reihenfolge: seit dem Nutzer-Entscheid 2026-09-10 nennt die
+            # Textzeile sie nicht mehr (sie ist nur fuer den ziehenden Spieler
+            # sichtbar), also kommt sie aus der `#a`-Zeile -- dort steht sie seit
+            # PREREG_action_id_logging.md S2 im Feld `return_order`
+            # (py.rs::apply_dome_stack_choose). Fehlt der Hinweis (Arena-/KI-Log,
+            # Log vor S2), bleibt es beim Default der Engine: die kanonische
+            # Ziehreihenfolge, die die KI ohnehin spielt
+            # (game.rs::generate_draw_stack_moves).
+            h = self.hint_for(li, "dome_stack_choose")
+            ro = (h.get("a") or {}).get("return_order") if h else None
+            if isinstance(ro, list):
+                self.return_order_from_hint += 1
+                return self.apply(lines, li, "apply_dome_stack_choose", tile_id, slot_row, slot_col,
+                                  rotation, return_order=[int(x) for x in ro])
             return self.apply(lines, li, "apply_dome_stack_choose", tile_id, slot_row, slot_col, rotation)
         if any(mv["type"] == "dome_display" and mv["tile_id"] == tile_id
                and mv["slot_row"] == slot_row and mv["slot_col"] == slot_col and mv["rotation"] == rotation

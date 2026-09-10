@@ -1,0 +1,167 @@
+{
+  "champion": "v27-b01",
+  "freeze_date": "2026-09-10",
+  "name_dialect": "hv",
+  "model_file": "model.onnx",
+  "pth_file": "model.pth",
+  "spec_file": "spec.json",
+  "model_source": "models/alphazero_v27-b01_brierbest.onnx (Training v27-b01, 12 Epochen, 5.116,7 s, Warmstart v26-b01_brierbest, brierbest Epoche 3)",
+  "spec_source": "models/v24-b07_brierbest.spec.json -- UNVERAENDERT uebernommen (Einfrieren bis v27-b01, PREREG_v25_window.md par.18)",
+  "spec_content": {
+    "implicit_minimax_alpha": 0.0,
+    "long_row_init_shaping_w": 0.0,
+    "score_utility_c": 0.0,
+    "score_utility_b": 20.0,
+    "envelope_search_c": 1.0,
+    "envelope_tiling_w": 0.0,
+    "envelope_profile": [
+      1.0,
+      0.92,
+      0.67,
+      0.33,
+      0.0
+    ],
+    "envelope_tiling_value_w": 0.0,
+    "envelope_projection_mode": 1,
+    "envelope_flush_w": 0.0,
+    "envelope_hull_form": 2,
+    "special_row6_w": 1.0,
+    "heuristik_variante": "hv1"
+  },
+  "input_size": 744,
+  "contract_hash": "20b442a8164f748d",
+  "engine_version": "0.1.0",
+  "wheels": {
+    "champion_behavior_artifact": {
+      "file": "mosaic_rust_stackreturn_20260910.whl",
+      "sha256": "c0aa6fdcdcf61e0f83a315f854260c23cca5a49729f6143a14d79665091284cf",
+      "source": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl, gebaut 2026-09-10 (Rueckgabe-Logzeile ohne Kachel-IDs, Nutzer-Entscheid 2026-09-10; Anker-Drift gruen, 1.763 Schritte identisch). NICHT identisch mit dem Wheel der Artefakte v25-b01/v26-b01 (ea69b2e5...), Zugverhalten laut Anker-Drift unveraendert"
+    }
+  },
+  "worker_python": {
+    "interpreter_relative": "venv/Scripts/python.exe",
+    "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, angelegt 2026-09-10 per pip install --no-deps aus dem Wheel plus numpy/onnxruntime"
+  },
+  "prereg": "evaluations/PREREG_v27_window.md; docs/promotion_checklist.md",
+  "elo": {
+    "value": 1405,
+    "ci95": [
+      1361,
+      1453
+    ],
+    "games": 790,
+    "record": "500-290",
+    "as_of": "2026-09-10",
+    "edges": [
+      "Gating v27-b01 gegen v26-b01 Seed 20261034 59:31 (SPRT nach 45 Paaren, p 0,0125)",
+      "Gating Replikation Seed 20261035 222:178 (Deckel, p 0,033)",
+      "Anker 127:23 (n=150, Cross-Aera)",
+      "Champion-2 gegen Artefakt v25-b01 92:58 (n=150, Handshake gruen)"
+    ],
+    "ladder_after_refit": {
+      "v26-b01": 1364,
+      "v25-b01": 1336,
+      "v24-b07": 1283,
+      "anchor": 1000
+    }
+  },
+  "knobs": "Alle Knoepfe in spec.json; Spielbetrieb: server.py uebersetzt die Spec in Env-Knoepfe (MOSAIC_*), Referee: frozen_champion_worker.py dito",
+  "golden_probe": {
+    "file": "golden_probe.json",
+    "source": "tools/build_frozen_golden_probe.py --artifact-dir models/frozen_champions/v27-b01 --seed-base 916001",
+    "n_probes": 10,
+    "meta": {
+      "n_probes": 10,
+      "artifact": "models/frozen_champions/v27-b01",
+      "model": "models/frozen_champions/v27-b01/model.onnx",
+      "spec": "models/frozen_champions/v27-b01/spec.json",
+      "generator": "tools/build_frozen_golden_probe.py",
+      "protocol": "par.8d PER-ENTSCHEIDUNG (state_to_json_exact fuenftes Feld pending_dome_choice_exact, kein rot_seed mehr)"
+    },
+    "erzeugt": "2026-09-10 15:19"
+  },
+  "parity_fixture": {
+    "file": "engine/tests/fixtures/net_parity_champion.txt",
+    "neu_geschrieben": "2026-09-10",
+    "kopf": [
+      "# Netz-Paritaets-Fixture -- GENERIERT, nicht von Hand editieren.",
+      "#",
+      "# Nachfolger von tools/parity_probe.py (Nutzer-Entscheid 2026-08-28): belegt,"
+    ],
+    "hash_zeilen": [
+      "# Netz-Paritaets-Fixture -- GENERIERT, nicht von Hand editieren.",
+      "#     net_parity_hash_matches_champion_fixture -- --nocapture"
+    ]
+  },
+  "display_calibration": {
+    "A": -0.0476,
+    "B": 0.6853,
+    "brier": 0.22379,
+    "eval_set": "frozen_eval_set_v3.pkl",
+    "trend_frozen_v1": {
+      "A": 0.401,
+      "B": 0.6335,
+      "brier": 0.25135
+    },
+    "server_py": "_DISPLAY_CAL_A/_B eingetragen 2026-09-10"
+  },
+  "gumbel_balance": {
+    "ratio_sigma_over_prior_median": 2.1610979229692058,
+    "by_round": {
+      "1": 1.7558560968687984,
+      "2": 2.454465782049021,
+      "3": 1.8436964390478754,
+      "4": 2.8765466697908986
+    },
+    "n_used": 233,
+    "note": "Schwelle 3; Familie c_visit/c_scale bleibt zu. v26-b01: 2,270 (Runde 4 8,537), v27-b01 Runde 4 2,88"
+  },
+  "sigma_prior_balance": {
+    "gesamt": 2.1610979229692058,
+    "schwelle": 3,
+    "je_runde": {
+      "1": 1.7558560968687984,
+      "2": 2.454465782049021,
+      "3": 1.8436964390478754,
+      "4": 2.8765466697908986
+    }
+  },
+  "acceptance": {
+    "tor1": "Seed 20261034 59:31 SPRT (p 0,0125); Seed 20261035 222:178 bis zum Deckel (p 0,033, Differenz +0,22 [+0,03; +0,41]); kein dritter Seed (Nutzer 2026-09-10)",
+    "tor2a": "v26-b01 als Generator 0,777 gegen v25-b01 0,737 volle Spalten je Seite (Korpus, je 8.000 Seiten)",
+    "tor2b": "v27-b01 1,005 gegen v26-b01 0,855 volle Spalten je Seite (Seed 20261035, je n=394 aus den Tor-1-Logs)",
+    "anker": "127:23, Spalten 1,373 je Partie",
+    "champion2": "92:58 gegen Artefakt v25-b01"
+  },
+  "referee_selftest": {
+    "datum": "2026-09-10 15:19",
+    "handshake": {
+      "ok": true,
+      "artifact_contract_hash": "20b442a8164f748d",
+      "current_contract_hash": "20b442a8164f748d"
+    },
+    "golden": {
+      "ran": true,
+      "mismatches": []
+    },
+    "partien": {
+      "wins_a": 1,
+      "wins_b": 1,
+      "n": 2
+    }
+  },
+  "live_wheel_check": {
+    "direct_url": {
+      "archive_info": {
+        "hash": "sha256=c0aa6fdcdcf61e0f83a315f854260c23cca5a49729f6143a14d79665091284cf",
+        "hashes": {
+          "sha256": "c0aa6fdcdcf61e0f83a315f854260c23cca5a49729f6143a14d79665091284cf"
+        }
+      },
+      "url": "file:///D:/OneDrive/Documents/Projekte/mosaic-AI/engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl"
+    },
+    "wheel_sha256_now": "c0aa6fdcdcf61e0f83a315f854260c23cca5a49729f6143a14d79665091284cf",
+    "note": "sha256 des heute gebauten Wheels; im Artefakt als mosaic_rust_stackreturn_20260910.whl"
+  },
+  "champion_note": "Dritter und letzter Champion aus dem eingefrorenen Rezept (v25/v26/v27: nur das Material rotierte). Erstes vollstaendig stationaeres Fenster (PREREG_v27_window.md par.1). Mit diesem Arm endet das Einfrieren (PREREG_v25_window.md par.18)."
+}

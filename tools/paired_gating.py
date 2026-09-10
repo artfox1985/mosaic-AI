@@ -113,6 +113,18 @@ Schreibt `evaluations/paired_gating_result_<name_a>_vs_<name_b>.json`
 `elo_tracker.py add`-Kommandozeile (Zahlen aus der Fixed-n-Statistik, nicht
 aus dem SPRT-Zwischenstand).
 
+## 2026-09-09: `--log-games`
+
+Tor 2b (`docs/generation_loop.md`, Abschnitt Tor 2) will die volle Spaltenzahl
+je Seite AUS DEN PARTIEN DES TORS -- gerechnet wird sie von
+`tools/probes/arena_column_probe.py`, die dafuer je Partie die Logzeilen im
+Artefakt braucht. Die trug bis v23 `tools/paired_arena_env_ab.py` bei (dort
+gibt es `--log-games` seit 2026-08-11). Seit dem Werkzeugwechsel auf
+`paired_gating.py` als Tor-1-Instrument war Tor 2b stillschweigend unmessbar:
+das Gating-Artefakt hatte gar kein `games`-Feld, die Sonde haette nur
+"keine Partie mit Log" gemeldet. `--log-games` schliesst genau diese Luecke --
+Default AUS, und bei AUS ist das Artefakt Feld fuer Feld das bisherige.
+
 WICHTIG (Phase A, 2026-07-23): dieses Skript ist reine Code-Lieferung.
 Es wird NICHT fuer eine echte Gating-Entscheidung ausgefuehrt, solange der
 aktuelle netcq2-Self-Play-Batch das installierte Wheel nutzt -- nur ein
@@ -234,25 +246,45 @@ _sprt_bounds_selftest()
 def play_pair_block(mr, model_a: str, model_b: str, sims_a: int, sims_b: int,
                      c_puct_a: float, c_puct_b: float, n: int, seed: int,
                      threads: int, spec_a: str | None = None,
-                     spec_b: str | None = None) -> tuple[list[dict], list[dict]]:
+                     spec_b: str | None = None,
+                     log_games: bool = False) -> tuple[list[dict], list[dict]]:
     """Spielt EINEN Block von `n` gepaarten Seeds -- je Seed zwei Spiele mit
     getauschten Brettern (siehe Modul-Docstring). `g1[i]`/`g2[i]` teilen sich
     denselben abgeleiteten Pro-Spiel-Seed (identisches `seed`+`n_games`,
-    Index `i`), nur die Modell-Brett-Zuordnung ist vertauscht."""
+    Index `i`), nur die Modell-Brett-Zuordnung ist vertauscht.
+
+    `log_games` (2026-09-09): reicht den gleichnamigen Parameter von
+    `net_vs_net_arena_match` durch (lib.rs:331/344). Der ist laut dessen
+    Doku reine ZUSATZAUSGABE -- kein neuer Suchpfad, kein RNG-Verbrauch --,
+    haengt also nur `game_seed`/`first_player`/`names`/`log` an jeden Record.
+    Bei `False` wird das Argument GAR NICHT gesetzt: die Aufrufliste bleibt
+    dann die bisherige (und laeuft auch auf einem Wheel ohne den Parameter)."""
     # 2026-09-03 (Champion-Kante mit Such-Knopf, PREREG_saturating_score_utility
     # par.16): per-Seite SearchConfig-Spec, damit ein Env-Knopf NUR auf einer
     # Seite wirkt (ohne Spec lesen beide Seiten from_env -> Spiegelmatch).
     # `None` je Seite = Bestandsverhalten (byte-identisch).
-    raw1 = mr.net_vs_net_arena_match(
-        model_a, model_b, sims_a=sims_a, sims_b=sims_b, n_games=n, seed=seed,
-        num_threads=threads, c_puct_a=c_puct_a, c_puct_b=c_puct_b,
-        spec_a=spec_a, spec_b=spec_b,
-    )
-    raw2 = mr.net_vs_net_arena_match(
-        model_b, model_a, sims_a=sims_b, sims_b=sims_a, n_games=n, seed=seed,
-        num_threads=threads, c_puct_a=c_puct_b, c_puct_b=c_puct_a,
-        spec_a=spec_b, spec_b=spec_a,
-    )
+    extra = {"log_games": True} if log_games else {}
+    try:
+        raw1 = mr.net_vs_net_arena_match(
+            model_a, model_b, sims_a=sims_a, sims_b=sims_b, n_games=n, seed=seed,
+            num_threads=threads, c_puct_a=c_puct_a, c_puct_b=c_puct_b,
+            spec_a=spec_a, spec_b=spec_b, **extra,
+        )
+        raw2 = mr.net_vs_net_arena_match(
+            model_b, model_a, sims_a=sims_b, sims_b=sims_a, n_games=n, seed=seed,
+            num_threads=threads, c_puct_a=c_puct_b, c_puct_b=c_puct_a,
+            spec_a=spec_b, spec_b=spec_a, **extra,
+        )
+    except TypeError as e:
+        if not log_games:
+            raise
+        raise SystemExit(
+            "--log-games: das installierte Wheel kennt an "
+            "`net_vs_net_arena_match` keinen Parameter `log_games` "
+            f"({e}). Erwartet wird die Signatur aus engine/src/lib.rs:331. "
+            "Ohne passendes Wheel bleibt der Lauf besser ungestartet, statt "
+            "Stunden ohne die Logzeilen zu spielen."
+        ) from e
     return json.loads(raw1), json.loads(raw2)
 
 
@@ -264,7 +296,7 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
                        sprt_alpha: float = SPRT_ALPHA, sprt_beta: float = SPRT_BETA,
                        base_seed: int | None = None, threads: int = DEFAULT_THREADS,
                        promote_winner: bool = False, spec_a: str | None = None,
-                       spec_b: str | None = None) -> dict:
+                       spec_b: str | None = None, log_games: bool = False) -> dict:
     """Orchestriert das volle gepaarte Gating (siehe Modul-Docstring). Die
     STOPP-Entscheidung ist ein Wald-SPRT auf den informativen Paaren (b/c);
     bricht NACH einem VOLLSTAENDIGEN Block ab, sobald die LLR eine der beiden
@@ -282,7 +314,15 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     laut Modul-Docstring genau fuer die Frage "loest ein neuer Kandidat den
     amtierenden Champion ab?" gebaut ist -- historisch wurde in diesem
     Projekt JEDE entschiedene Gating-Runde als neue Referenz/neuer Generator
-    uebernommen (siehe evaluations/STATUS.md)."""
+    uebernommen (siehe evaluations/STATUS.md).
+
+    `log_games` (2026-09-09, siehe Modul-Docstring): legt zusaetzlich das Feld
+    `games` ins Ergebnis-JSON -- eine FLACHE Liste aller Einzelpartien in
+    Spielreihenfolge, je Partie der unveraenderte Rust-Record (inkl. `log`,
+    `game_seed`, `first_player`, `names`) plus die Zuordnungsfelder
+    `pair_index`, `orientation`, `block_seed`, `board0_name`, `side_names`.
+    Default AUS: dann fehlt das Feld ganz und das Artefakt ist Feld fuer Feld
+    das bisherige."""
     import mosaic_rust as mr
 
     # CLAUDE.md "Laufzeiten messen, nicht schaetzen": Startmarken fuer den
@@ -309,6 +349,11 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
     # mehrere Arme hinweg (identischer base_seed => Paar i ist ueber Arme
     # vergleichbar). Reine Zusatzfelder, keine Verhaltensaenderung.
     per_pair_scores: list[dict] = []
+    # 2026-09-09: Partie-Records mit Logzeilen (nur bei `log_games`), im Format
+    # von `tools/probes/arena_column_probe.py` (artifact["games"] -> je Partie
+    # `log` + Header-Felder). Bleibt leer und wird nicht ins JSON geschrieben,
+    # wenn der Schalter aus ist.
+    logged_games: list[dict] = []
     sprt_verdict = None   # None=laeuft noch, name_a=A signifikant besser, "H0"=kein Beleg fuer A
     done_pairs = 0
     block_idx = 0
@@ -325,8 +370,19 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         seed = base_seed + block_idx * 1_000_000
         t0 = time.time()
         g1, g2 = play_pair_block(mr, model_a, model_b, sims_a, sims_b, c_puct_a, c_puct_b,
-                                  n, seed, threads, spec_a=spec_a, spec_b=spec_b)
+                                  n, seed, threads, spec_a=spec_a, spec_b=spec_b,
+                                  log_games=log_games)
         dur = time.time() - t0
+
+        # 2026-09-09: fruehestmoegliche Absicherung -- lieber nach dem ERSTEN
+        # Block abbrechen als nach Stunden ein Artefakt ohne Logzeilen haben.
+        if log_games and block_idx == 0 and n > 0 and "log" not in g1[0]:
+            raise SystemExit(
+                "--log-games: `net_vs_net_arena_match` hat den Parameter "
+                "angenommen, liefert aber kein Feld `log` je Partie. Das "
+                "Wheel passt nicht zu engine/src/self_play.rs:2966 "
+                "(LoopMode::Summary { log_games }). Lauf abgebrochen."
+            )
 
         for i in range(n):
             a_won_o1 = g1[i]["winner"] == 0  # A auf Brett 0 (Orientierung 1)
@@ -347,6 +403,23 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
             for g in (g1[i], g2[i]):
                 if g["scores"][0] == 0 and g["scores"][1] == 0:
                     zerozero_count += 1
+            if log_games:
+                # Zuordnung explizit, weil die Engine BEIDE Orientierungen mit
+                # denselben generischen Spielernamen loggt ("NetzA"/"NetzB",
+                # self_play.rs:3708) -- die sind Brett-Etiketten, keine
+                # Modell-Etiketten. `names` bleibt darum unangetastet (der
+                # Replayer bildet daraus Name -> Brettindex ab,
+                # analyze_game_log.py:374); die Modellzuordnung steht daneben
+                # in `side_names`/`board0_name`.
+                for orientation, (rec, side) in enumerate(
+                        ((g1[i], [name_a, name_b]), (g2[i], [name_b, name_a])), start=1):
+                    entry = dict(rec)
+                    entry["pair_index"] = done_pairs + i
+                    entry["orientation"] = orientation
+                    entry["block_seed"] = seed
+                    entry["side_names"] = side
+                    entry["board0_name"] = side[0]
+                    logged_games.append(entry)
             a_wins_pair = int(a_won_o1) + int(a_won_o2)
             b_wins_pair = 2 - a_wins_pair
             a_wins_total += a_wins_pair
@@ -429,6 +502,12 @@ def run_paired_gating(model_a: str, model_b: str, name_a: str | None = None,
         "laufzeit": laufzeit_block(t_wall0, cpu_start=t_cpu0, threads=threads,
                                    n_games=n_games_total),
     }
+    # 2026-09-09: `games` NUR anhaengen, wenn der Schalter an war -- sonst
+    # bleibt das Artefakt schluesselgleich zum Bestand (Tor-2b-Sonde meldet
+    # bei fehlendem Feld ohnehin "kein `games`-Feld").
+    if log_games:
+        result["log_games"] = True
+        result["games"] = logged_games
 
     # Task #92: Arena-Trend-Log -- eine Zeile aus Sicht von A (Kandidat).
     append_run(
@@ -498,6 +577,14 @@ def main() -> None:
     p.add_argument("--spec-a", default=None, help="SearchConfig-Spec (JSON) fuer Modell A, alle Bretter")
     p.add_argument("--spec-b", default=None, help="SearchConfig-Spec (JSON) fuer Modell B, alle Bretter")
     p.add_argument("--threads", type=int, default=DEFAULT_THREADS)
+    # 2026-09-09 (Tor 2b, docs/generation_loop.md Abschnitt Tor 2): Partie-Logs
+    # ins Artefakt, damit `tools/probes/arena_column_probe.py` die vollen
+    # Spalten aus DENSELBEN Partien rechnet wie die Tor-1-Siegquote. Default
+    # AUS = Bestandsverhalten, Artefaktfelder unveraendert.
+    p.add_argument("--log-games", dest="log_games", action="store_true",
+                    help="Je Partie die vollen Logzeilen ins Ergebnis-JSON "
+                         "schreiben (Feld `games`, Format der Arena-Artefakte) "
+                         "-- Eingabe fuer tools/probes/arena_column_probe.py")
     p.add_argument("--out", default=None, help="Ziel-JSON-Pfad (Default: evaluations/paired_gating_result_<a>_vs_<b>.json)")
     p.add_argument("--promote-winner", dest="promote_winner", action="store_true", default=True,
                     help="Setzt models/champion.txt automatisch auf --name-a, sobald der SPRT "
@@ -521,7 +608,7 @@ def main() -> None:
         block_size=args.block_size, max_pairs=args.max_pairs, sprt_p1=args.sprt_p1,
         sprt_alpha=args.sprt_alpha, sprt_beta=args.sprt_beta,
         base_seed=args.seed, threads=args.threads, promote_winner=args.promote_winner,
-        spec_a=args.spec_a, spec_b=args.spec_b,
+        spec_a=args.spec_a, spec_b=args.spec_b, log_games=args.log_games,
     )
 
     out_path = Path(args.out) if args.out else (

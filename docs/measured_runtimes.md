@@ -141,3 +141,32 @@ waren es zwei Laeufe zu je 2.000, weil der erste nur 2.002 Identitaeten lieferte
 Erzeugungsbefehle kosten zusammen rund 8,4 h, die Kette danach rund 2,5 h bis zum fertigen
 Training.
 
+## Generation v27, gemessen am 2026-09-10 (Erzeugung)
+
+Generator `v26-b01`, je 4.000 Partien @100, threads 11, Cache-Waechter mit 3 Workern daneben
+(`laufzeit`-Bloecke in `data/manifest_v26-b01-*.json`):
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| **Erzeugung Traeger** (policy, Weg C) | **13.769,2 s = 3h 49m** | 3,442 s je Partie (v26: 2,769) |
+| **Erzeugung Schwarm temperiert** | **12.574,6 s = 3h 30m** | 3,144 s je Partie (v26: 2,540) |
+| **Erzeugung Schwarm Ausflug**, `--games 4000` | **10.567,7 s = 2h 56m** | 2,640 s je Identitaet, 4.003 Identitaeten, 401 Dateien (v26: 2,207) |
+| **zusammen** | **36.911,5 s = 10,25 h** | 23 % langsamer als v26 (30.076,8 s) bei gleicher Konfiguration; Ursache NICHT gemessen (Kandidaten: Waechter-Last beim Blockbau der neuen Dateien, OneDrive-Sync). Fuer die Planung der naechsten Erzeugung gilt die langsamere Zahl |
+
+## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| **Training v27-b01**, 12 Epochen, Fenster 2.947 Dateien | **5.116,7 s = 1h 25m** | 25.933 s CPU, Datenaufbau 35,4 s; Maschine sonst frei |
+| Kette Schritte 1-6 (4 Trägerkennzahlen, Manifeste, Fenster, Monolith) | **rund 31 min** | Bloecke lagen vom Waechter vollstaendig vor |
+| Gepaartes Gating 200 Paare @400, threads 10, MIT `--log-games` | **5.181,5 s / 5.189,7 s** | 13,0 s je Partie; ohne Logs 10,7 s (v26). Artefakt 9,8 MB |
+| Gepaartes Gating, SPRT-Stopp nach 45 Paaren, mit Logs | **1.139,5 s** | |
+| Spaltensonde auf 400 Partie-Logs | **83 s** einkernig | |
+| Anker-Kante, festes n=150, 6 Worker | **1.333,3 s** | 8,9 s je Partie |
+| Champion-2-Kante gegen das Artefakt v25-b01, n=150, 6 Prozesse | **2.578 s = 43 min** | inkl. Handshake und Golden-Selbsttest |
+| sigma/Prior-Kalibrierung, 300 Zustaende @400 | **rund 13 min** | |
+| Platt-Fit, 1.440 Zustaende | **rund 10 s** je Set | |
+| Golden Probe fuers Artefakt (10 Sonden @400) | **rund 23 min** | 14:53-15:16 |
+| Referee-Selbsttest, 2 Echtpartien | **67 s** | |
+| Paritaets-Fixture (cargo test, warmes target) | **rund 12 s** je Lauf | plus 43 s Kompilat |
+| Anker-Drift-Pruefung nach Wheel-Bau | **rund 25 s** | 1.763 Schritte |
