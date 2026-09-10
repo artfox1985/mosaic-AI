@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: g01 gespielt 2026-09-06: Claude 72:42 gegen Champion v24-b06 @400, sechs Beobachtungen als Sondenkandidaten (par.7). AUSGESETZT (Nutzer 2026-09-10) bis zum Entscheid ueber die Sichtbarkeit der Rueckgabe-Reihenfolge (par.9 Punkt 5, dome_stack par.14). Audit par.9: Spezialfeld-Anzeige behoben, Pass- und Mondzug-Blocker abgeraeumt, KI-Zeile ungeklaert; Gegner bei Wiederaufnahme = models/champion.txt. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: g01 gespielt 2026-09-06: Claude 72:42 gegen v24-b06 @400 (par.7). Werkzeug 2026-09-10 umgebaut (par.9): Spezialfeld-Anzeige, game.log ohne Maschinenzeilen (.engine.log fuer den Replayer), Spec-Rueckfall auf das Artefakt, Rueckgabe-Reihenfolge nur fuer den Ausfuehrenden; Rauchtest gruen (par.9 P.7). BEREIT fuer g02-g10 gegen models/champion.txt (v27-b01), Start auf Nutzer-Freigabe. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -288,3 +288,15 @@ Geprueft am Code, je Punkt mit Pruefstelle:
    (`claude_play.py:461`, `:470`), also den amtierenden Champion (heute `v26-b01_brierbest`);
    par.8.2 (`v23-b01_k3p10`) und der Kopf (`v25`) sind ueberholt. Der Gegner der Partie steht
    im Manifest je Partie und gehoert beim Registrieren in die Ergebniszeile.
+
+7. **Rauchtest 2026-09-10, 18:15-18:30, GRUEN** (Partie `gsmoke`, Seed 20260910, Claude
+   Spieler 0, Gegner `v27-b01_brierbest` @50, Spec ueber den neuen Rueckfall
+   `models/frozen_champions/v27-b01/spec.json`): `new` legt `game.log` (nur Anzeige, 0
+   Zeilen mit `#`) und `.engine.log` (Kopfzeilen plus voller Strom) an; `move "start 5 2 2 0"`
+   wird angenommen, das Netz zieht, `show` rekonstruiert danach aus `.engine.log` ohne
+   Divergenz. Der Rauchtest fand den Spec-Fehler des Servers (STATUS Abschnitt 1): ohne den
+   Rueckfall brach `new` mit FileNotFoundError ab, waehrend `server.py` an derselben Stelle
+   STILL auf Env-Defaults zurueckfiel. **Bereit fuer g02-g10**; Auftrag an den
+   Partien-Agenten: nur `show`, `move`, `note` und `game.log` benutzen, `.engine.log` nie
+   lesen; `--sims 400`; Gegner ohne `--opponent` (= `models/champion.txt`); je Partie den
+   Gegner und den Spec-Pfad aus dem Manifest in die Ergebniszeile.

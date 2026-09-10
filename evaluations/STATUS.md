@@ -48,10 +48,10 @@ Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst wer
    `MOSAIC_DOME_POOL_KNOWLEDGE`. **Naechste Schritte des Programms:** Diagnostik "Ziehung in
    eigenen bekannten Block" ueber Mensch-Logs und Self-Play (Werkzeug fehlt), dann Variante B
    (Merkmale), Stufe 1 der Null-Klammer an der Ziehung, Sicht-Reststufen (`stack_top`).
-2. **Claude-Partien** (`PREREG_claude_play_interface.md` par.9): Engine, Replayer und
-   `claude_play.py` sind umgebaut und gebaut, Alt-Logs replayen; offen ist nur ein Rauchtest
-   von `claude_play.py new/move/show` mit `.engine.log`. Gegner ist `models/champion.txt`.
-   Der Partien-Agent liest NUR `show` und `game.log`.
+2. **Claude-Partien BEREIT** (`PREREG_claude_play_interface.md` par.9 P.7): Rauchtest gruen
+   (18:30), Spec-Rueckfall auf das Artefakt gebaut. Nutzer 2026-09-10, 16:00: "Wenn
+   abgeschlossen koennen wir die claude plays fahren." Gegner ist `models/champion.txt`
+   (v27-b01). Der Partien-Agent liest NUR `show` und `game.log`, nie `.engine.log`.
 3. ~~Werkzeug `plate_points_from_arena.py`~~ ERLEDIGT 16:20: wertet mit `side_names` je
    Modell aus, gepaarte Differenzen je Kriterium; Befund fuer v27-b01: Zuwachs bei vertikalen
    Reihen (+1,34) und Eckplatten (+0,97), nicht bei Spezialfeldern (`PREREG_v27_window.md`
@@ -68,6 +68,18 @@ Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst wer
 - **v28-Self-Play ausgesetzt** (2026-09-10, 13:25).
 
 ### BEFUNDE, die eine Entscheidung oder Nachschau brauchen
+
+- **Der Browser-Champion spielte seit v25-b01 OHNE seine Spec** (gefunden 2026-09-10, 18:20,
+  beim Rauchtest der Claude-Partien): `server.py::_apply_champion_spec_env` las nur
+  `models/<name>.spec.json`, kehrte bei Fehlen STILL zurueck, und seit dem Einfrieren gibt es
+  die Datei nur unter `v24-b07_brierbest.spec.json`. Folge: v25-b01, v26-b01 und v27-b01 liefen
+  im Browser mit Env-Defaults (Huelle aus, hull_form 1, special_row6_w 0) statt mit der
+  Champion-Spec, sofern der Nutzer keine Env-Variablen gesetzt hatte (nicht pruefbar, die
+  Log-Koepfe tragen keine Knoepfe). Betroffen: alle Mensch-Partien in `static/log/` ab
+  2026-09-08 inklusive der Referenzpartie der Kuppelstapel-Prereg (KI v25-b01) und der KI-Seite
+  der Null-Klammer-Logs. Behoben: Rueckfall auf `frozen_champions/<name>/spec.json` in
+  `server.py` und `tools/claude_play.py`, laute Meldung statt stillem Default. **Server neu
+  starten**, dann schreibt er "Champion-Spec spec.json: ..." in die Konsole.
 
 - **`player_profiles.json` ist im Arbeitsbaum veraendert** (plus `player_profiles.json.bak`),
   nicht durch diese Sitzung; nicht committet. Nutzer fragen, woher.

@@ -671,3 +671,14 @@ Oberseite zum eigenen Block gehoert" gegen den Wissensstand aus `dome_pool_known
 des eigenen Blocks) ist der naechste Hebel, damit die POLICY das Wissen nutzt, nicht nur die
 Suche; Bau erst nach (2). (4) Kopplung zur Null-Klammer (`score_clamp` par.10): die
 Gratis-Ziehungen bei Stand 0 sind die andere Haelfte derselben Frage.
+
+### par.15d VORBEHALT zur Referenzpartie (gefunden 2026-09-10, 18:20)
+
+Die Referenzpartie (par.12, 2026-09-09 00:45, KI `v25-b01_brierbest` im Browser) wurde sehr
+wahrscheinlich OHNE die Champion-Spec gespielt: `server.py` las die Spec nur unter
+`models/<name>.spec.json`, die es seit dem Einfrieren nicht gibt, und fiel still auf die
+Env-Defaults zurueck (Huelle aus, hull_form 1, special_row6_w 0). Die Log-Koepfe tragen keine
+Knoepfe, ein Beleg in beide Richtungen fehlt. Fuer die PRE/POST-Laeufe hier ist das
+zweitrangig (beide bewerten dieselbe Partie mit demselben Netz), fuer die Lesart der
+13er-Ziehserie nicht: sie stammt von einem Champion ohne seine Suchknoepfe. Die naechsten
+Referenzpartien (Claude-Partien, Mensch-Partien) laufen mit dem Rueckfall auf das Artefakt.
