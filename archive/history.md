@@ -17753,3 +17753,11 @@ Nutzer: "bleiben wir bei 1". Regelbuch S.4 (je 1 Punkt, so oft man will) und S.9
 Partie, unter jeder Arena-Aufloesung), `engine_manual.md` mit Regelzitat, `dome_stack` par.15f
 mit der neu gefassten Diagnostik (Ziehungen in eigenen Block bei positivem Stand). Offene
 Preregs: 8.
+
+## 2026-09-10, 19:35 -- Schritt 5 des Generationswechsels ausgefuehrt, Seed-Entscheid
+
+19 Modelldateien geloescht (Nutzer-Freigabe pfadgenau nach Vorlage): v24-b06 fuenf
+(`.onnx`, `.pth`, `_best.onnx`, `_best.pth`, `_brierbest.pth`), v25-b01 fuenf, v26-b01 fuenf,
+v27-b01 vier (ohne `_brierbest.*`), rund 205 MB; jede Datei vorher per `restic find` in
+Snapshot 1dba15e8 bzw. 2a12d266 belegt (19/19 Treffer). Trainings-Seed bleibt variabel je
+Generation, gleich innerhalb einer Generation (`generation_loop.md`).

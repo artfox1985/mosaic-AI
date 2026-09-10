@@ -178,6 +178,13 @@ Generation erreichbar ist -- die zweite DAgger-Runde war bereits gesaettigt.
 Ein Tor, das Unmoegliches verlangt, wird umgangen; ein Tor gegen Rueckschritt
 haelt.
 
+**Trainings-Seed (Nutzer-Entscheid 2026-09-10):** je Generation ein NEUER Seed (v25
+20260925, v26 20260929, v27 20260933, weiter im Vierer-Schritt), aber innerhalb einer
+Generation teilen ALLE Arme denselben Seed (v24-Praxis, alle Arme 20260828). Grund: Arme
+einer Generation werden gegeneinander gemessen, dort waere ein wechselnder Seed 4- bis 6-mal
+staerker als jeder Knopf; Generationen unterscheiden sich ohnehin im Material, ein fester
+Seed ueber Generationen wuerde nur Seed-Glueck festschreiben.
+
 ## Richtung je Generation und erwartete Saettigung (Nutzer 2026-09-05)
 
 **Jede Generation soll in der Arena SPALTENVERSTAERKEND und SIEGVERSTAERKEND

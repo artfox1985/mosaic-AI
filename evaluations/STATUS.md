@@ -65,7 +65,13 @@ Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst wer
    Modell aus, gepaarte Differenzen je Kriterium; Befund fuer v27-b01: Zuwachs bei vertikalen
    Reihen (+1,34) und Eckplatten (+0,97), nicht bei Spezialfeldern (`PREREG_v27_window.md`
    par.10). Offen im Werkzeug: KI auf Paar- statt Block-Ebene.
-4. **Generationswechsel-Rest, Schritt 5 -- VORLAGE (2026-09-10, 18:45), nichts geloescht:**
+4. **Generationswechsel-Rest, Schritt 5 -- AUSGEFUEHRT 2026-09-10, 19:35 (Nutzer: "loesch die
+   19 dateien wie vorgeschlagen"):** 19 Modelldateien geloescht, je Datei per `restic find`
+   belegt (v24-b06/v25/v26 in Snapshot 1dba15e8, v27 in 2a12d266). Bleiben:
+   `v24-b06_brierbest.onnx`, `v24-b07_brierbest.onnx`, `v27-b01_brierbest.{onnx,pth}`,
+   `.ref.txt`, `_loss.png`, drei Artefakte. **Trainings-Seed: bleibt VARIABEL je Generation
+   (Nutzer 2026-09-10, 19:35)**; innerhalb einer Generation teilen alle Arme einen Seed
+   (v24-Praxis). Ursprung der Vorlage:
    alle Arme v24-b06 bis v27-b01 tragen eine `run:`-Marke im restic-Repo (geprueft). Rollen:
    `v27-b01_brierbest` Champion und Warmstart der naechsten Generation (`.pth` bleibt);
    `v25-b01`/`v26-b01`/`v27-b01` liegen als Artefakte mit `model.onnx` und `model.pth`;
@@ -78,7 +84,8 @@ Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst wer
    v24-b06 nur im restic-Snapshot `run:v24-b06`). Zusammen rund 200 MB, `.ref.txt` und
    `_loss.png` sind klein und bleiben. `night_v26_chain.sh` und die v27-Skripte werden
    Loeschkandidaten, sobald v28 ansteht.
-5. **Entscheid Trainings-Seed** fuer die Zeit nach dem Einfrieren (wanderte 20260925/29/33).
+5. ~~Entscheid Trainings-Seed~~ ENTSCHIEDEN 2026-09-10: variabel je Generation, gleich
+   innerhalb einer Generation (`docs/generation_loop.md`).
 
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
 
