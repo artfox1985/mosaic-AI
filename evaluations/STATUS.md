@@ -49,8 +49,14 @@ Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst wer
    par.15e): Ziehungen in den eigenen bekannten Block STEIGEN mit Variante A (+0,69 je
    Partie, p rund 0,05), zwei Drittel davon gratis bei Stand 0.** **Nutzer 19:15: Regel bleibt,
    Ziehen bei 0 ist gratis und legal (Regelbuch S.4/S.9); `score_clamp` ENTSCHIEDEN (par.11),
-   Diagnostik neu gefasst (`dome_stack` par.15f).** Naechster Bau: Variante B (Merkmale fuer
-   den eigenen Block, Training, A/B B gegen A), dann Sicht-Reststufen (`stack_top`).
+   Diagnostik neu gefasst (`dome_stack` par.15f).** **Variante B und die Sicht-Reststufen brauchen
+   ein neues Fenster:** die Merkmale (eigener Block, laufende Ziehserie) muessen im
+   Self-Play-Record stehen, und die Records der v25-v27-Klassen tragen weder Bloecke noch
+   exakte Reihenfolgen (Frontend-JSON). Ein Training auf dem v27-Fenster saehe die Merkmale
+   nur als Null. Also: Record-Schema VOR der v28-Erzeugung erweitern (Sicht des Ziehenden:
+   Blockgroesse eigen/fremd, Zusammensetzung des eigenen Blocks, unbekanntes Praefix), dann
+   erzeugen, dann B trainieren. Das Nach-v27-Programm ist damit an seinem heutigen Ende;
+   v28 startet nur auf Anweisung.
 2. **Claude-Partien BEREIT** (`PREREG_claude_play_interface.md` par.9 P.7): Rauchtest gruen
    (18:30), Spec-Rueckfall auf das Artefakt gebaut. Nutzer 2026-09-10, 16:00: "Wenn
    abgeschlossen koennen wir die claude plays fahren." Gegner ist `models/champion.txt`
