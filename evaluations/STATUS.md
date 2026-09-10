@@ -26,7 +26,9 @@ diesen Inhalten etwas aendert, aendert es DORT.
 
 ## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 15:30)
 
-**MASCHINE FREI, nichts laeuft.** Champion laut `models/champion.txt`: **`v27-b01_brierbest`,
+**STAFFELSTAB 2026-09-10, 19:45: die Maschine gehoert der Parallelsitzung "Claude-Partien
+g02-g05" (Arbeitsauftrag-Chip, Nutzer-Auftrag). Diese Koordinator-Sitzung startet solange
+KEINE Rechenlast** (keine Arena, keine Sonde, kein Build). Champion laut `models/champion.txt`: **`v27-b01_brierbest`,
 Elo 1405** [1361, 1453] aus 790 Partien. Leiter: `v26-b01` 1364, `v25-b01` 1336, `v24-b07`
 1283, Anker fix 1000. **Die Promotion v27-b01 ist VOLLSTAENDIG durch** (alle Schritte der
 `docs/promotion_checklist.md`, Artefakt `models/frozen_champions/v27-b01/`, restic
