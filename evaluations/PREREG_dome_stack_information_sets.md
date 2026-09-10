@@ -739,3 +739,24 @@ Platte JETZT, par.4b) oder ob ihm das Merkmal fehlt. Das ist die Frage an Varian
 Merkmale fuer den eigenen Block (Groesse, Zusammensetzung), Training, dann dieselbe Sonde
 auf einem A/B-Lauf B gegen A. Kosten wie ein Arm (Training rund 1,5 h, Gating rund 1,5 h,
 Sonde Minuten).
+
+### par.15g Eine Browser-Partie mit Spec (2026-09-10, 22:56, KI v27-b01, Nutzer-Frage "mehr gezogen als notwendig?")
+
+`static/log/game_20260910_225625_seed576088.log`, Sonde aus par.15e auf dieser einen Partie
+(`dome_stack_known_block_draws_human_20260910_2256.json`, n = 1 Partie, illustrativ):
+
+| Runde | Ziehungen der KI | Klassifikation | Kosten |
+| --- | --- | --- | --- |
+| R2 | 9 (Stand 5 -> 0) | 9 x unbekanntes Praefix | 5 Punkte, Ziehungen 6-9 gratis |
+| R3 | 5 (Stand 16 -> 11) | **5 x eigener Block** | 5 Punkte |
+| R4 | 1 | 1 x eigener Block | 1 Punkt |
+
+Nach der R2-Serie war der ganze Stapel ihr eigener Block (9 gezogen, 8 zurueckgelegt, kein
+unbekanntes Praefix mehr). In R3 zog sie fuenf Platten, deren Identitaet und Reihenfolge sie
+kannte: das ist keine Informationssuche, sondern der Weg zu einer bekannten Platte an
+Position 5 (ziehen geht nur von oben, zurueck gehen die vier anderen), bezahlt mit fuenf
+Punkten statt einer Auslage-Platte gratis. In R4 dasselbe fuer die oberste Platte fuer einen
+Punkt. Variante A wirkt also wie gebaut: die Suche kennt die Reihenfolge und plant die
+Ziehtiefe danach; keine Ziehung ueber das Ziel hinaus. Ob fuenf Punkte fuer diese Platte
+richtig waren, ist die Value-Frage (par.15f, Variante B); die Partie ging 72:81 verloren,
+Mensch zog einmal.
