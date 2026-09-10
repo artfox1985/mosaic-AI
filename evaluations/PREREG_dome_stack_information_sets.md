@@ -725,3 +725,17 @@ die steigt, also bleibt die Frage an den Value-Kopf offen. (3) Ungeprueft: ob di
 der A/B-Artefakte wirklich mit dem Knopf AN lief (kein Knopf-Feld im Artefakt; folgt aus dem
 Wheel-Stand 16:24, der den Knopf noch nicht hatte und Variante A fest AN), und 9 Partien mit
 Replay-Divergenz (Chip-Vollendung), nicht auf Verzerrung geprueft.
+
+### par.15f Regelentscheid und Neufassung der Diagnostik (Nutzer 2026-09-10, 19:15)
+
+Nutzer: Ziehen bei Stand 0 bleibt gratis und legal (Regelbuch S.4 und S.9, `score_clamp`
+par.11). Damit ist der Anstieg aus par.15e regelkonformes Verhalten: die Suche kauft Wissen,
+wenn es nichts kostet. **Die Diagnostik aus par.8 wird ersetzt** durch "Ziehungen in den
+eigenen bekannten Block bei POSITIVEM Stand je Partie" (kosten 1 Punkt und bringen keine neue
+Information ueber die Reihenfolge). Aus par.15e abgeleitet: Live 109 / 109 (s60 / s1300)
+gegen Artefakt 48 / 75, also je Partie 0,73 / 0,73 gegen 0,32 / 0,50; auch diese Zahl steigt
+mit A. Offen bleibt, ob das der Value-Kopf richtig bewertet (die Ziehung kauft die beste
+Platte JETZT, par.4b) oder ob ihm das Merkmal fehlt. Das ist die Frage an Variante B:
+Merkmale fuer den eigenen Block (Groesse, Zusammensetzung), Training, dann dieselbe Sonde
+auf einem A/B-Lauf B gegen A. Kosten wie ein Arm (Training rund 1,5 h, Gating rund 1,5 h,
+Sonde Minuten).

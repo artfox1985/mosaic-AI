@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bleibt die Anreizstruktur unter null erhalten -- die Null-Klammer macht bei Stand 0 Strafen wie Kaeufe wirkungslos? | Beleg: Stufe 0 GEMESSEN 2026-09-10 (par.10): Korpus 39 % der Partien je Seite mit Stand 0, geschluckte Strafe Median 0 (Mittel 0,5 Punkte), aber 3,1 GRATIS-Ziehungen je Partie und Seite (bedingt Median 8, Max 35); Mensch-Logs: Mensch 3 %, KI 13 %. Schwelle aus par.5 NICHT unterschritten, Strang bleibt offen; Gewicht liegt auf der Kaufseite (par.9). Stufe 1 erst nach dem POST-Lauf des Kuppelstapel-Umbaus. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Bleibt die Anreizstruktur unter null erhalten -- die Null-Klammer macht bei Stand 0 Strafen wie Kaeufe wirkungslos? | Beleg: Stufe 0 (par.10): 39 % der Korpuspartien je Seite mit Stand 0, geschluckte Strafe Median 0 / Mittel 0,5 Punkte, aber 3,1 Gratis-Ziehungen je Partie und Seite. NUTZER-ENTSCHEID 2026-09-10 (par.11): Regel bleibt, Ziehen bei 0 ist gratis und legal (Regelbuch S.4: je 1 Punkt verlieren, so oft man moechte; S.9: nie unter 0). Die Anreizstruktur ist damit regelkonform, keine Bauform; die Strafseite ist mit 0,5 Punkten je Partie zu klein fuer einen Arm. -->
 
 # PREREG: Die Null-Klammer und die Anreizstruktur
 
@@ -199,3 +199,23 @@ die Champion-Spec (`server.py` fand `models/<name>.spec.json` nicht und fiel sti
 Env-Defaults zurueck; STATUS Abschnitt 1). Die Zahlen der Grundmenge (b) fuer die KI-Seite
 mischen also Champions mit und ohne Spec; die Korpus-Zahlen (a) sind davon unberuehrt
 (Self-Play liest die Spec explizit ueber `--spec`).
+
+## par.11 ENTSCHIEDEN (Nutzer 2026-09-10, 19:15): die Regel bleibt, keine Bauform
+
+Anlass war par.15e der Kuppelstapel-Prereg: mit Variante A steigen die Ziehungen in den
+eigenen bekannten Block, zwei Drittel davon gratis bei Stand 0. Drei Lesarten lagen vor
+(Regel bleibt / Ziehen bei 0 verboten / nur die Suche zahlt). **Nutzer: "meiner meinung
+nach bleiben wir bei 1."** Regelbuch nachgelesen (`docs/DE_AzulDuel_Rulebook_compressed2.pdf`,
+S.4: "je 1 Punkt verlieren, um jeweils 1 verdeckte Kuppelplatte vom Stapel zu ziehen. Dies
+darfst du so oft wiederholen ..., wie du moechtest"; S.9: "Du kannst niemals unter 0 Punkte
+fallen"). Ein Verbot bei 0 steht nirgends; die Engine-Auslegung (`engine_manual.md`
+Abschnitt A, `board.rs::apply_paid_cost`) ist damit regelkonform, nicht nur konsistent.
+
+**Folgen.** (1) Kaufseite: kein Defekt, keine Bauform; die Suche darf bei 0 Wissen kaufen,
+und die Diagnostik der Kuppelstapel-Prereg misst kuenftig Ziehungen bei POSITIVEM Stand
+(dort par.15f). (2) Strafseite: Stufe 0 zeigt Median 0 und Mittel 0,5 geschluckte Punkte je
+Partie und Seite; die Kandidaten a/b aus par.6 haetten einen Effekt dieser Groesse zum Ziel,
+das ist unter der Aufloesung jeder Arena (5,75 Prozentpunkte bei n=400, CLAUDE.md). Kein
+Arm. (3) `scores_unclamped` bleibt als Trainingsziel, wie gebaut (par.3). Der Strang ist
+ENTSCHIEDEN; wer die Strafseite wieder aufmacht, braucht einen Befund, der groesser ist
+als 0,5 Punkte.
