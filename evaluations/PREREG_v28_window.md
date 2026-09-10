@@ -208,3 +208,32 @@ Nach Schritt 7 sind von den acht offenen Preregs `round_estimate_leaf_term`,
 `start_dome_choice`, `policy_surprise_weighting` und `rust_data_layer` (Teil A) mit Verdikt
 versehen; `round_transition_search_sampling` geht in `dome_stack` auf (UEBERHOLT), `stack_top`
 haengt am Ausgang von b02. Ziel "rund 7 OFFEN" ist damit erreichbar.
+
+## par.9 BAUSTAND VARIANTE B (2026-09-11, 00:15-00:50) und die Zurueckstellung der Python-Seite
+
+**Gebaut (Opus-Agent, gegengelesen):** elf Werte an den Indizes 744..754 (Praefix /18; eigener
+Block Laenge /18, Spezial /9, Wild /9; Typen der obersten vier Positionen des obersten eigenen
+Blocks +1/-1/0; fremde Bloecke Laenge /18, Spezial /9, Wild /9; Konstanten
+`dome::NUM_DOME_TILE_DESIGNS` 18 und neu `dome::NUM_SPECIAL_DOME_TILES` 9, gegen den Katalog
+getestet). Beide Rust-Pfade (`features.rs`, Abschnitt 15) und der Python-Zwilling
+(`neural_net.py`, Alt-Records elf Nullen); pyo3-Export `state_features_from_json` und
+`state_planes_from_json` (`lib.rs`); Schalter `MOSAIC_FEATURES_FROM_RUST` (Default aus, nicht
+im Cache-Schluessel); Paritaetswerkzeug `tools/probes/feature_parity_rust_python.py`
+(ungelaufen, braucht das Wheel). INPUT_SIZE 744 -> 755 (`features.rs`, `config.py`),
+Merkmals-Fixture neu, **Kontrakt-Hash 20b442a8164f748d -> c65768636c0560a7**: kuenftige
+Anker- und Champion-2-Kanten gegen die Artefakte v25-v27 laufen Cross-Aera (`--force-cross-era`,
+Regel vom 2026-08-29). Tests gezielt gruen (features 22, dome_pool_knowledge 11, contract 3,
+examples/benches gebaut).
+
+**Zwei Dinge, die der Bau aufgedeckt hat.** (1) Die Netz-Paritaets-Fixture war seit Commit
+`56fd9f2` (Record-Feld `dome_pool_view`) rot: der Hash liest den Record-Zustand mit, das neue
+Feld aendert ihn (b5188b25e073a1c0 statt 5e3b1362ddc65fa6); Gegenprobe des Agenten ohne das Feld
+liefert exakt den alten Hash, kein Zugwechsel. Fixture am 2026-09-11 bewusst neu erzeugt (unten).
+(2) **Die Python-Seite darf erst NACH dem Training von `v28-b01` in den Baum**: die laufende
+Kette importiert `config.py`/`neural_net.py` beim Blockbau (Schritt 5) und beim Training
+(Schritt 7); mit INPUT_SIZE 755 wuerde b01 ein 755-Modell mit den v28-Blockmerkmalen, also
+kein "Rezept unveraendert" mehr. Deshalb liegen `config.py` und `engine/py/neural_net.py` in
+`git stash` (stash@{0}, "Variante B Python-Seite"), der Baum steht auf 744; die Rust-Seite bleibt
+im Baum, wird aber erst nach der Kette zum Wheel gebaut. Reihenfolge: Kette durch -> Tor 1 b01
+-> `git stash pop` -> Wheel -> Anker-Drift -> Paritaetswerkzeug -> Bloecke unter neuem Schluessel
+-> Training b02.

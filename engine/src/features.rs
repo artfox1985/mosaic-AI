@@ -15,7 +15,9 @@ use crate::tiling_solver::solve_round_final_score;
 /// Feature-Vektor-Länge (= `config.INPUT_SIZE`). EINZIGE Quelle der Wahrheit
 /// für die ONNX-Eingabegröße — bei jeder Feature-Änderung hier UND in
 /// config.py aktualisieren (sonst `Net::load`-Shape-Mismatch beim Inferieren).
-pub const INPUT_SIZE: usize = 744; // 714 + 8 Plattentyp-Sicht + 10 Strafleisten-Farben + 12 Phantom-Anteile (Abschnitte 12-14, v24-b04, 2026-09-05)
+pub const INPUT_SIZE: usize = 755; // 744 + 11 Kuppelstapel-Wissen (Abschnitt 15, Variante B, v28-b02, 2026-09-11)
+// 714 + 8 Plattentyp-Sicht + 10 Strafleisten-Farben + 12 Phantom-Anteile = 744
+// (Abschnitte 12-14, v24-b04, 2026-09-05); + 11 Abschnitt 15 = 755.
 
 /// Per-Kriterium-Normalisierung der 8 Wertungsplatten-Punkte (= `SCORE_NORM`).
 const SCORE_NORM: [f32; 8] = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0];
@@ -79,6 +81,168 @@ fn arr_n(obj: Option<&Value>, k: &str, n: usize) -> Vec<f64> {
 
 fn num(obj: &Value, k: &str) -> f64 {
     obj.get(k).and_then(|x| x.as_f64()).unwrap_or(0.0)
+}
+
+// ── Abschnitt 15: Kuppelstapel-Wissen (Variante B) ───────────────────────────
+//
+// PREREG_dome_stack_information_sets.md par.7 (B) und par.15f,
+// PREREG_v28_window.md par.4/par.6 (Arm v28-b02). Variante A hat den
+// Wissensstand in die SUCHE gebracht (`GameState::dome_pool_known_blocks`,
+// state.rs); ohne Merkmal sieht der Value-/Policy-Kopf davon nichts. Diese
+// elf Werte sind der additive Anhang, mit dem das NETZ dasselbe sieht wie die
+// Suche -- sichtkonform aus Sicht des Spielers am Zug, exakt die Sichtregel
+// von `serialize::dome_pool_view` (eigener Block mit Reihenfolge, fremder nur
+// als Menge, Praefix nur als Laenge).
+//
+// NICHT noch einmal die oberste Stapelplatte: die steht seit v24-b04 im
+// Vektor (Abschnitt 12).
+
+/// Zahl der Positionen des obersten EIGENEN Blocks, deren Typ einzeln kodiert
+/// wird (oben zuerst). Vier, weil eine Kuppelplatte vier Felder hat und ein
+/// Ziehvorgang in dieser Groessenordnung liegt; groessere Bloecke tragen ihren
+/// Rest weiter ueber die Zaehler.
+const DOME_POOL_TOP_TYPES: usize = 4;
+
+/// Laenge des Anhangs aus Abschnitt 15 (1 Praefix + 3 eigen + 4 Typen + 3 fremd).
+pub const DOME_POOL_KNOWLEDGE_VALUES: usize = 1 + 3 + DOME_POOL_TOP_TYPES + 3;
+
+/// Rohzaehlung des Kuppelstapel-Wissens, bevor normiert wird. Beide Encoder-
+/// Pfade fuellen dieselbe Struktur (der JSON-Pfad aus dem Record-Feld
+/// `dome_pool_view`, der Direktpfad aus dem `GameState`), und
+/// [`push_dome_pool_knowledge`] ist die EINZIGE Stelle, die daraus
+/// Vektorwerte macht -- so kann die Reihenfolge der elf Werte nicht zwischen
+/// den Pfaden auseinanderlaufen.
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+struct DomePoolKnowledge {
+    unknown_prefix: usize,
+    own_len: usize,
+    own_special: usize,
+    own_wild: usize,
+    /// Typ je Position des OBERSTEN eigenen Blocks, oben zuerst:
+    /// +1 Spezial, -1 Wild, 0 = Position existiert nicht.
+    top_types: [f32; DOME_POOL_TOP_TYPES],
+    foreign_len: usize,
+    foreign_special: usize,
+    foreign_wild: usize,
+}
+
+/// Haengt die elf Werte aus Abschnitt 15 an, in dieser Reihenfolge:
+///
+/// | Index (ab 744) | Bedeutung | Normierung |
+/// | --- | --- | --- |
+/// | 0 | Laenge des unbekannten Praefix | / 18 |
+/// | 1 | Laenge aller EIGENEN Bloecke | / 18 |
+/// | 2 | Spezial-Zaehler der eigenen Bloecke | / 9 |
+/// | 3 | Wild-Zaehler der eigenen Bloecke | / 9 |
+/// | 4..8 | Typ der obersten 4 Positionen des obersten eigenen Blocks | +1/-1/0 |
+/// | 8 | Laenge aller FREMDEN Bloecke | / 18 |
+/// | 9 | Spezial-Zaehler der fremden Bloecke | / 9 |
+/// | 10 | Wild-Zaehler der fremden Bloecke | / 9 |
+///
+/// 18 = [`crate::dome::NUM_DOME_TILE_DESIGNS`] (der ganze Stapel), 9 =
+/// [`crate::dome::NUM_SPECIAL_DOME_TILES`] (Spezial- wie Wild-Platten gibt es
+/// je neun). Damit liegen alle Laengen- und Zaehlwerte in [0, 1] und die
+/// Typwerte in {-1, 0, +1}.
+fn push_dome_pool_knowledge(f: &mut Vec<f32>, k: &DomePoolKnowledge) {
+    let len_norm = crate::dome::NUM_DOME_TILE_DESIGNS as f32;
+    let count_norm = crate::dome::NUM_SPECIAL_DOME_TILES as f32;
+    f.push(k.unknown_prefix as f32 / len_norm);
+    f.push(k.own_len as f32 / len_norm);
+    f.push(k.own_special as f32 / count_norm);
+    f.push(k.own_wild as f32 / count_norm);
+    for t in k.top_types {
+        f.push(t);
+    }
+    f.push(k.foreign_len as f32 / len_norm);
+    f.push(k.foreign_special as f32 / count_norm);
+    f.push(k.foreign_wild as f32 / count_norm);
+}
+
+/// Wissensstand aus dem Record-/Frontend-Feld `dome_pool_view`
+/// (`serialize.rs`). FEHLT das Feld, sind alle elf Werte 0 -- so lesen sich
+/// Alt-Records (v25 bis v27) und alte Schnappschuesse, dieselbe Toleranz wie
+/// bei `dome_wild_remaining_frac`/`col_f_max`. Bewusst KEIN Rueckfall auf
+/// "alles unbekannt = Praefix gleich Stapellaenge": ein Alt-Record soll das
+/// Merkmal ausgeschaltet sehen, nicht eine erfundene Sicht.
+fn dome_pool_knowledge_from_json(v: &Value) -> DomePoolKnowledge {
+    let mut k = DomePoolKnowledge::default();
+    let view = match v.get("dome_pool_view") {
+        Some(x) if x.is_object() => x,
+        _ => return k,
+    };
+    k.unknown_prefix = view.get("unknown_prefix").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+    let blocks = match view.get("blocks").and_then(|x| x.as_array()) {
+        Some(b) => b,
+        None => return k,
+    };
+    let mut own_seen = false;
+    for b in blocks {
+        let len = b.get("len").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+        let special = b.get("special").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+        let wild = b.get("wild").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+        if b.get("own").and_then(|x| x.as_bool()).unwrap_or(false) {
+            k.own_len += len;
+            k.own_special += special;
+            k.own_wild += wild;
+            if !own_seen {
+                own_seen = true;
+                if let Some(types) = b.get("types").and_then(|x| x.as_array()) {
+                    for (i, slot) in k.top_types.iter_mut().enumerate() {
+                        *slot = match types.get(i).and_then(|t| t.as_str()) {
+                            Some("special") => 1.0,
+                            Some("wild") => -1.0,
+                            _ => 0.0,
+                        };
+                    }
+                }
+            }
+        } else {
+            k.foreign_len += len;
+            k.foreign_special += special;
+            k.foreign_wild += wild;
+        }
+    }
+    k
+}
+
+/// Wissensstand direkt aus dem `GameState` -- dieselbe Ableitung wie
+/// `serialize::dome_pool_view` (inklusive der dortigen Saettigung an der
+/// Poolgrenze), damit `state_to_features_direct` und der JSON-Pfad Wert fuer
+/// Wert uebereinstimmen (bewacht von `direct_matches_json_path_*`).
+fn dome_pool_knowledge_from_state(state: &GameState) -> DomePoolKnowledge {
+    let mut k = DomePoolKnowledge::default();
+    let pool_len = state.dome_tile_pool.len();
+    let viewer = state.current_player;
+    k.unknown_prefix = state.dome_pool_unknown_prefix_len();
+    let mut start = k.unknown_prefix.min(pool_len);
+    let mut own_seen = false;
+    for b in &state.dome_pool_known_blocks {
+        let end = (start + b.len).min(pool_len);
+        let slice = &state.dome_tile_pool[start..end];
+        let special = slice.iter().filter(|t| t.is_special_type()).count();
+        let wild = slice.len() - special;
+        if b.returner == viewer {
+            k.own_len += b.len;
+            k.own_special += special;
+            k.own_wild += wild;
+            if !own_seen {
+                own_seen = true;
+                for (i, slot) in k.top_types.iter_mut().enumerate() {
+                    *slot = match slice.get(i) {
+                        Some(t) if t.is_special_type() => 1.0,
+                        Some(_) => -1.0,
+                        None => 0.0,
+                    };
+                }
+            }
+        } else {
+            k.foreign_len += b.len;
+            k.foreign_special += special;
+            k.foreign_wild += wild;
+        }
+        start = end;
+    }
+    k
 }
 
 /// Vollständiger Feature-Vektor aus dem State-Dict (`state_to_json`).
@@ -503,6 +667,11 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
         }
     }
 
+    // 15. Kuppelstapel-Wissen (Variante B) -- siehe `push_dome_pool_knowledge`
+    // fuer die Belegung der elf Indizes. Quelle ist das Record-Feld
+    // `dome_pool_view`; fehlt es (Alt-Records v25 bis v27), sind alle elf 0.
+    push_dome_pool_knowledge(&mut f, &dome_pool_knowledge_from_json(v));
+
     f
 }
 
@@ -926,6 +1095,12 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
         }
     }
 
+    // 15. Kuppelstapel-Wissen (Variante B) -- siehe JSON-Pfad. Hier aus dem
+    // Zustand selbst, mit derselben Sichtregel, aus der `serialize.rs` das
+    // Feld `dome_pool_view` bildet; die `direct_matches_json_path_*`-Tests
+    // bewachen die Gleichheit.
+    push_dome_pool_knowledge(&mut f, &dome_pool_knowledge_from_state(state));
+
     f
 }
 
@@ -1313,6 +1488,13 @@ mod tests {
     use rand::seq::IndexedRandom;
     use rand::SeedableRng;
 
+    /// Vektorlaenge VOR dem Sicht-Arm v24-b04; die Abschnitte 12-14 haengen
+    /// dahinter (PREREG_stack_top_feature.md par.10).
+    const LEN_BEFORE_PLATE_TYPE_SIGHT: usize = 714;
+    /// Vektorlaenge VOR Abschnitt 15 (Kuppelstapel-Wissen, Variante B,
+    /// v28-b02); der Champion v27-b01 deklariert genau diese Breite.
+    const LEN_BEFORE_DOME_POOL_KNOWLEDGE: usize = 744;
+
     /// Spielt ab einem frischen Start bis zu `steps` zufällige, legale
     /// Drafting-Züge und sammelt den Zustand NACH jedem Zug (inkl. des
     /// Pseudo-Terminal-Zustands, sobald die Phase wechselt) -- damit die
@@ -1364,7 +1546,7 @@ mod tests {
     /// eine ausgelegte Platte hat genau EIN Nicht-Normal-Feld.
     #[test]
     fn plate_type_sight_matches_gui_json() {
-        let base = INPUT_SIZE - 30;
+        let base = LEN_BEFORE_PLATE_TYPE_SIGHT;
         let mut checked = 0usize;
         // 8 Seeds x 60 Schritte ergaben 224 Zustaende (Drafting endet frueher);
         // 12 Seeds decken die geforderten >= 300 ab.
@@ -1440,15 +1622,176 @@ mod tests {
         let s = states.last().expect("mind. ein Zustand");
         let f = state_to_features_direct(s);
         assert_eq!(f.len(), INPUT_SIZE);
-        // Der Anhang (Abschnitte 12-14) ist genau 30 Werte lang und haengt hinter
-        // den 714 Altwerten; alle Anhangswerte liegen in [0, 1].
-        let old_len = INPUT_SIZE - 30;
-        assert_eq!(old_len, 714, "Anhang ist genau 30 Werte lang");
+        // Der Anhang der Abschnitte 12-14 ist genau 30 Werte lang und haengt
+        // hinter den 714 Altwerten; alle 30 liegen in [0, 1]. Abschnitt 15
+        // haengt seinerseits dahinter und wird eigens geprueft (dort sind
+        // auch -1 zulaessig).
+        let old_len = LEN_BEFORE_PLATE_TYPE_SIGHT;
+        assert_eq!(
+            LEN_BEFORE_DOME_POOL_KNOWLEDGE - old_len,
+            30,
+            "Anhang der Abschnitte 12-14 ist genau 30 Werte lang"
+        );
         for x in &f[old_len..old_len + 8] {
             assert!(*x == 0.0 || *x == 1.0, "Plattentyp-Werte sind One-hot: {x}");
         }
-        for x in &f[old_len..] {
+        for x in &f[old_len..LEN_BEFORE_DOME_POOL_KNOWLEDGE] {
             assert!((0.0..=1.0).contains(x), "Anhangswert ausserhalb [0, 1]: {x}");
+        }
+    }
+
+    /// Abschnitt 15 gegen eine DRITTE Rechnung: nicht gegen `dome_pool_view`
+    /// (das ist der JSON-Pfad selbst) und nicht gegen
+    /// `dome_pool_knowledge_from_state` (das ist der Direktpfad selbst),
+    /// sondern gegen den Stapel und die Blockliste des Zustands, hier eigens
+    /// nachgezaehlt. Aufbau wie in `serialize.rs::dome_pool_view_tests`: zwei
+    /// Rueckgabebloecke, einmal aus Sicht jedes Spielers.
+    #[test]
+    fn dome_pool_knowledge_matches_stack_from_both_views() {
+        let base = LEN_BEFORE_DOME_POOL_KNOWLEDGE;
+        let mut rng = StdRng::seed_from_u64(4711);
+        let mut state = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        state.note_dome_pool_return(2, 0); // Block A: Spieler 0, 2 Platten
+        state.note_dome_pool_return(3, 1); // Block B: Spieler 1, 3 Platten
+        let prefix = state.dome_tile_pool.len() - 5;
+        assert_eq!(state.dome_pool_unknown_prefix_len(), prefix);
+
+        let spec = |from: usize, to: usize, st: &crate::state::GameState| -> (usize, usize) {
+            let s = st.dome_tile_pool[from..to].iter().filter(|t| t.is_special_type()).count();
+            (s, (to - from) - s)
+        };
+        let (a_special, a_wild) = spec(prefix, prefix + 2, &state);
+        let (b_special, b_wild) = spec(prefix + 2, prefix + 5, &state);
+        let type_val = |i: usize, st: &crate::state::GameState| -> f32 {
+            if st.dome_tile_pool[i].is_special_type() { 1.0 } else { -1.0 }
+        };
+
+        for viewer in [0usize, 1usize] {
+            state.current_player = viewer;
+            let f = state_to_features_direct(&state);
+            assert_eq!(f.len(), INPUT_SIZE);
+            assert_feature_parity(&state, &format!("viewer={viewer}"));
+            let n18 = crate::dome::NUM_DOME_TILE_DESIGNS as f32;
+            let n9 = crate::dome::NUM_SPECIAL_DOME_TILES as f32;
+            assert_eq!(f[base], prefix as f32 / n18, "viewer={viewer}: Praefixlaenge");
+            // Sicht 0: Block A eigen (2 Platten), Block B fremd (3).
+            // Sicht 1: genau umgekehrt.
+            let (own_len, own_s, own_w, own_from) = if viewer == 0 {
+                (2usize, a_special, a_wild, prefix)
+            } else {
+                (3usize, b_special, b_wild, prefix + 2)
+            };
+            let (fo_len, fo_s, fo_w) = if viewer == 0 {
+                (3usize, b_special, b_wild)
+            } else {
+                (2usize, a_special, a_wild)
+            };
+            assert_eq!(f[base + 1], own_len as f32 / n18, "viewer={viewer}: eigene Laenge");
+            assert_eq!(f[base + 2], own_s as f32 / n9, "viewer={viewer}: eigene Spezial");
+            assert_eq!(f[base + 3], own_w as f32 / n9, "viewer={viewer}: eigene Wild");
+            for i in 0..DOME_POOL_TOP_TYPES {
+                let want = if i < own_len { type_val(own_from + i, &state) } else { 0.0 };
+                assert_eq!(f[base + 4 + i], want, "viewer={viewer}: Typ Position {i}");
+            }
+            assert_eq!(f[base + 8], fo_len as f32 / n18, "viewer={viewer}: fremde Laenge");
+            assert_eq!(f[base + 9], fo_s as f32 / n9, "viewer={viewer}: fremde Spezial");
+            assert_eq!(f[base + 10], fo_w as f32 / n9, "viewer={viewer}: fremde Wild");
+        }
+    }
+
+    /// Bestandsfall (frisches Spiel, Alt-Records): keine Bloecke, also elf
+    /// Nullen -- und zwar auch fuer das Praefix. Damit sieht ein Alt-Record
+    /// das Merkmal AUSGESCHALTET statt einer erfundenen Sicht; der Python-
+    /// Zwilling macht dasselbe, wenn `dome_pool_view` im Record fehlt.
+    #[test]
+    fn dome_pool_knowledge_is_zero_without_blocks_in_json_path() {
+        let mut rng = StdRng::seed_from_u64(5);
+        let state = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        let mut v = state_to_json(&state, true);
+        v.as_object_mut().unwrap().remove("dome_pool_view");
+        let f = state_to_features(&v);
+        assert_eq!(f.len(), INPUT_SIZE);
+        for (i, x) in f[LEN_BEFORE_DOME_POOL_KNOWLEDGE..].iter().enumerate() {
+            assert_eq!(*x, 0.0, "Alt-Record ohne dome_pool_view: Wert {i} != 0");
+        }
+        // Mit Feld, aber ohne Bloecke: nur das Praefix traegt.
+        let v2 = state_to_json(&state, true);
+        let f2 = state_to_features(&v2);
+        assert_eq!(
+            f2[LEN_BEFORE_DOME_POOL_KNOWLEDGE],
+            state.dome_tile_pool.len() as f32 / crate::dome::NUM_DOME_TILE_DESIGNS as f32
+        );
+        for x in &f2[LEN_BEFORE_DOME_POOL_KNOWLEDGE + 1..] {
+            assert_eq!(*x, 0.0, "ohne Bloecke traegt nur das Praefix");
+        }
+    }
+
+    /// Zahlenprobe des JSON-Pfades gegen HANDGERECHNETE Werte -- dieselbe
+    /// gestellte Sicht, mit der der Python-Zwilling
+    /// (`neural_net.py::state_to_tensor_python`) am 2026-09-11 geprueft
+    /// wurde. Damit haengt die Uebereinstimmung der beiden Bauer nicht allein
+    /// am Paritaets-Werkzeug (das ein gebautes Wheel braucht): die elf Zahlen
+    /// stehen hier und dort als Literale.
+    #[test]
+    fn dome_pool_knowledge_json_path_matches_hand_computed_values() {
+        let mut rng = StdRng::seed_from_u64(3);
+        let state = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        let mut v = state_to_json(&state, true);
+        v.as_object_mut().unwrap().insert(
+            "dome_pool_view".to_string(),
+            serde_json::json!({
+                "unknown_prefix": 4,
+                "blocks": [
+                    {"own": true, "len": 2, "special": 1, "wild": 1, "types": ["special", "wild"]},
+                    {"own": false, "len": 3, "special": 1, "wild": 2, "types": null},
+                ],
+            }),
+        );
+        let f = state_to_features(&v);
+        assert_eq!(f.len(), INPUT_SIZE);
+        let got: Vec<f32> = f[LEN_BEFORE_DOME_POOL_KNOWLEDGE..].to_vec();
+        let want: Vec<f32> = vec![
+            4.0 / 18.0, // unbekanntes Praefix
+            2.0 / 18.0, // eigene Laenge
+            1.0 / 9.0,  // eigene Spezial
+            1.0 / 9.0,  // eigene Wild
+            1.0,        // Typ Position 0: special
+            -1.0,       // Typ Position 1: wild
+            0.0,        // Position 2 existiert nicht
+            0.0,        // Position 3 existiert nicht
+            3.0 / 18.0, // fremde Laenge
+            1.0 / 9.0,  // fremde Spezial
+            2.0 / 9.0,  // fremde Wild
+        ];
+        assert_eq!(got, want, "Abschnitt 15, JSON-Pfad");
+    }
+
+    /// Additivitaets-Regel (2D-Encoder-Regel, docs/architecture_reference.md):
+    /// Abschnitt 15 haengt HINTER den 744 Werten, die der Champion v27-b01
+    /// deklariert. Wertebereich: Laengen/Zaehler in [0, 1], Typen in
+    /// {-1, 0, +1}.
+    #[test]
+    fn dome_pool_knowledge_is_appended_after_744() {
+        assert_eq!(
+            INPUT_SIZE - LEN_BEFORE_DOME_POOL_KNOWLEDGE,
+            DOME_POOL_KNOWLEDGE_VALUES,
+            "Abschnitt 15 ist genau {DOME_POOL_KNOWLEDGE_VALUES} Werte lang"
+        );
+        let mut rng = StdRng::seed_from_u64(4711);
+        let mut state = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+        state.note_dome_pool_return(2, 0);
+        state.note_dome_pool_return(3, 1);
+        let f = state_to_features_direct(&state);
+        let base = LEN_BEFORE_DOME_POOL_KNOWLEDGE;
+        for (i, x) in f[base..].iter().enumerate() {
+            if (4..4 + DOME_POOL_TOP_TYPES).contains(&i) {
+                assert!(
+                    *x == -1.0 || *x == 0.0 || *x == 1.0,
+                    "Typwert {i} ausserhalb {{-1, 0, +1}}: {x}"
+                );
+            } else {
+                assert!((0.0..=1.0).contains(x), "Wert {i} ausserhalb [0, 1]: {x}");
+            }
         }
     }
 
