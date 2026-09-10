@@ -71,6 +71,67 @@ fn dome_wild_remaining_frac(state: &GameState) -> f64 {
     wild as f64 / total as f64
 }
 
+/// Sichtkonforme Sicht auf den Wissensstand ueber das UNTERE Ende des
+/// Kuppelstapels, AUS SICHT VON `state.current_player`
+/// (PREREG_dome_stack_information_sets.md par.4/par.15, Nutzer-Entscheid
+/// 2026-09-10). Gegenstueck zur Determinisierung
+/// [`crate::state::determinize_dome_pool`], nur eben als Merkmalsquelle statt
+/// als Sampler -- Variante B (Merkmale fuer den eigenen Rueckgabe-Block)
+/// braucht diese Sicht IM RECORD, sonst ist das Merkmal im Training ueberall
+/// null.
+///
+/// Sichtregel, identisch zu der der Determinisierung:
+///
+/// * das unbekannte Praefix bleibt eine blosse LAENGE (`unknown_prefix`) --
+///   dort weiss niemand etwas,
+/// * der eigene Block (`returner == current_player`) traegt seine
+///   REIHENFOLGE (`types`, oben zuerst) -- der Rueckleger hat sie gewaehlt,
+/// * ein fremder Block traegt nur seine MENGE (`special`/`wild`) und seine
+///   Laenge; `types` ist dort `null`.
+///
+/// Bloecke in Stapelreihenfolge von oben nach unten, also aeltester Block
+/// zuerst -- genau die Reihenfolge von `dome_pool_known_blocks`.
+///
+/// Anzeige-seitig ist `current_player` der Spieler am Zug, im Self-Play-Record
+/// der Spieler, dessen Entscheidung das Record beschreibt.
+fn dome_pool_view(state: &GameState) -> Value {
+    let pool_len = state.dome_tile_pool.len();
+    let viewer = state.current_player;
+    let unknown_prefix = state.dome_pool_unknown_prefix_len();
+    let mut start = unknown_prefix.min(pool_len);
+    let mut blocks: Vec<Value> = Vec::with_capacity(state.dome_pool_known_blocks.len());
+    for b in &state.dome_pool_known_blocks {
+        // Saettigung wie in `dome_pool_unknown_prefix_len`: eine verletzte
+        // Invariante darf im Release-Bau nicht paniken, der `debug_assert` in
+        // `determinize_dome_pool` macht sie im Debug-Bau hoerbar.
+        let end = (start + b.len).min(pool_len);
+        let slice = &state.dome_tile_pool[start..end];
+        let special = slice.iter().filter(|t| t.is_special_type()).count();
+        let own = b.returner == viewer;
+        blocks.push(json!({
+            "own": own,
+            "len": b.len,
+            "special": special,
+            "wild": slice.len() - special,
+            "types": if own {
+                Value::Array(
+                    slice
+                        .iter()
+                        .map(|t| json!(if t.is_special_type() { "special" } else { "wild" }))
+                        .collect(),
+                )
+            } else {
+                Value::Null
+            },
+        }));
+        start = end;
+    }
+    json!({
+        "unknown_prefix": unknown_prefix,
+        "blocks": blocks,
+    })
+}
+
 fn space_type_name(t: SpaceType) -> &'static str {
     match t {
         SpaceType::Normal => "NORMAL",
@@ -310,6 +371,12 @@ pub fn state_to_json(state: &GameState, scoring_confirmed: bool) -> Value {
         "tower_colors": color_counts(&state.tower.tiles),
         "dome_pool_mask": dome_pool_mask(state),
         "dome_wild_remaining_frac": dome_wild_remaining_frac(state),
+        // Wissensstand ueber das untere Stapelende, SICHTKONFORM aus Sicht
+        // von `current_player` -- siehe `dome_pool_view` fuer die Sichtregel.
+        // Anders als `dome_pool_known_blocks_exact` (state_to_json_exact) ist
+        // das KEINE Grundwahrheit, sondern genau das, was der Spieler am Zug
+        // legitim weiss; darum darf es hier stehen.
+        "dome_pool_view": dome_pool_view(state),
         "players": players,
         "log": log_sichtbar,
         "valid_moves": serialize_valid_moves(state),
@@ -1182,14 +1249,17 @@ pub fn state_to_json_exact(state: &GameState, scoring_confirmed: bool) -> Value 
     );
     obj.insert("pending_dome_choice_exact".to_string(), pending_dome_choice_to_json(&state.pending_dome_choice));
     // Wissensstand ueber das untere Stapelende (PREREG_dome_stack_information_
-    // sets.md par.7 Variante A, 2026-09-10). Gehoert in DIESE Funktion und
-    // nicht in `state_to_json`: der Wissensstand ist SEITENABHAENGIG (wer
-    // zurueckgelegt hat, kennt die Reihenfolge -- der Gegner nicht), und
-    // `state_to_json` ist die gemeinsame Anzeige-/Export-Sicht beider Seiten.
-    // Der exact-Pfad dagegen traegt ohnehin die vollstaendige verdeckte
-    // Ordnung (`dome_pool_order_exact`) ueber die Referee-/Worker-Grenze und
-    // ist damit die richtige Stelle. TOLERANT gelesen (fehlendes Feld ->
-    // leer = Bestandsverhalten), damit Alt-JSONs weiter laden.
+    // sets.md par.7 Variante A, 2026-09-10) als GRUNDWAHRHEIT: die Bloecke
+    // roh, ohne Blickwinkel, passend zur ebenfalls rohen
+    // `dome_pool_order_exact`. Diese Fassung gehoert in DIESE Funktion, weil
+    // sie die Referee-/Worker-Grenze bedient, an der der Zustand
+    // WIEDERHERGESTELLT und nicht BEURTEILT wird. TOLERANT gelesen (fehlendes
+    // Feld -> leer = Bestandsverhalten), damit Alt-JSONs weiter laden.
+    //
+    // Die SEITENABHAENGIGE Fassung steht seit 2026-09-10 als `dome_pool_view`
+    // in `state_to_json` (par.15, Variante B braucht sie im Record). Die
+    // beiden widersprechen sich nicht: `dome_pool_view` ist die auf
+    // `current_player` verkuerzte Sicht dieser Grundwahrheit.
     obj.insert(
         "dome_pool_known_blocks_exact".to_string(),
         json!(state
@@ -1889,8 +1959,9 @@ mod json_to_state_exact_tests {
         let rebuilt_old = json_to_state_exact(&json_old).expect("Alt-JSON muss weiter laden");
         assert!(rebuilt_old.dome_pool_known_blocks.is_empty());
 
-        // `state_to_json` (Anzeige-/Export-Sicht beider Seiten) traegt den
-        // seitenabhaengigen Wissensstand bewusst NICHT.
+        // `state_to_json` traegt die ROHE Grundwahrheit bewusst NICHT -- nur
+        // die auf `current_player` verkuerzte Sicht (`dome_pool_view`, eigener
+        // Test unten).
         let plain = state_to_json(&state, true);
         assert!(plain.get("dome_pool_known_blocks_exact").is_none());
         assert!(plain.get("dome_pool_known_blocks").is_none());
@@ -2316,12 +2387,31 @@ mod json_to_state_tests {
                 let is_player_obj = oa.contains_key("estimated_score") && oa.contains_key("bonus_chips");
                 let bonus_chips_nonempty = is_player_obj
                     && oa.get("bonus_chips").and_then(|v| v.as_array()).map(|a| !a.is_empty()).unwrap_or(false);
+                // Wurzelobjekt des EXAKTEN Schemas? Dann stellt
+                // `json_to_state_exact` den Wissensstand woertlich wieder her
+                // und `dome_pool_view` MUSS uebereinstimmen -- keine Ausnahme.
+                let is_exact_root = oa.contains_key("dome_pool_known_blocks_exact")
+                    || ob.contains_key("dome_pool_known_blocks_exact");
                 let mut keys: Vec<&String> = oa.keys().chain(ob.keys()).collect();
                 keys.sort();
                 keys.dedup();
                 for k in keys {
                     if is_player_obj && k == "estimated_score" && bonus_chips_nonempty {
                         continue; // dokumentierte Ausnahme, s.o.
+                    }
+                    if k == "dome_pool_view" && !is_exact_root {
+                        // Dokumentierte Ausnahme (Kategorie 1): `json_to_state`
+                        // baut den verdeckten Stapel aus der blossen
+                        // `dome_pool_mask` neu und wuerfelt seine Reihenfolge
+                        // neu aus -- eine Blockgrenze aus dem alten Zustand
+                        // haette danach keine Bedeutung mehr, also bleibt
+                        // `dome_pool_known_blocks` dort ABSICHTLICH leer
+                        // (Begruendung in voller Laenge bei `json_to_state`).
+                        // Die daraus abgeleitete Sicht weicht damit
+                        // zwangslaeufig ab. Der exact-Pfad prueft den
+                        // Wissensstand statt dessen direkt auf den Structs
+                        // (`diff_game_states`, Feld `dome_pool_known_blocks`).
+                        continue;
                     }
                     if k == "first_player_next_round" {
                         // Dokumentierte Ausnahme (Kategorie 2, aber nur
@@ -2553,5 +2643,129 @@ mod json_to_state_tests {
             }
         }
         panic!("keiner der Test-Seeds erreichte Runde 5 in Phase::Drafting -- Testaufbau prüfen");
+    }
+}
+
+/// Sichtkonformer Kuppelstapel-Blick im Zustands-JSON
+/// (PREREG_dome_stack_information_sets.md par.4/par.15, Nutzer-Entscheid
+/// 2026-09-10). Geprueft wird die SICHTREGEL, nicht der Stapelinhalt: eigener
+/// Block mit Reihenfolge, fremder Block nur als Menge, Praefix nur als Laenge.
+#[cfg(test)]
+mod dome_pool_view_tests {
+    use super::*;
+    use crate::state::setup_new_game;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn names() -> [String; 2] {
+        ["Alpha".into(), "Beta".into()]
+    }
+
+    /// Typ-Zeichenketten der Pool-Positionen `[from, to)`, oben zuerst --
+    /// dieselbe Ableitung wie in `dome_pool_view`, hier absichtlich zweite
+    /// Rechnung statt geteilter Helfer (sonst prueft der Test sich selbst).
+    fn types_at(state: &GameState, from: usize, to: usize) -> Vec<String> {
+        state.dome_tile_pool[from..to]
+            .iter()
+            .map(|t| if t.is_special_type() { "special".to_string() } else { "wild".to_string() })
+            .collect()
+    }
+
+    /// Zwei Rueckgabe-Bloecke wie in state.rs::dome_pool_knowledge_tests:
+    /// erst Spieler 0 (2 Platten), dann Spieler 1 (3 Platten). Die Pflege
+    /// laeuft ueber dieselbe API, die game.rs:292 nach einer echten Rueckgabe
+    /// unter den Stapel aufruft.
+    fn state_with_two_blocks() -> GameState {
+        let mut rng = StdRng::seed_from_u64(4711);
+        let mut state = setup_new_game(names(), 0, &mut rng);
+        state.note_dome_pool_return(2, 0);
+        state.note_dome_pool_return(3, 1);
+        assert!(crate::state::dome_pool_knowledge_is_consistent(&state));
+        state
+    }
+
+    #[test]
+    fn own_block_carries_order_foreign_block_only_counts() {
+        let mut state = state_with_two_blocks();
+        let prefix = state.dome_pool_unknown_prefix_len();
+        let own_types = types_at(&state, prefix, prefix + 2);
+        let foreign_types = types_at(&state, prefix + 2, prefix + 5);
+        let foreign_special = foreign_types.iter().filter(|t| *t == "special").count();
+
+        // (a) Sicht von Spieler 0: Block 0 ist der eigene.
+        state.current_player = 0;
+        let v = state_to_json(&state, true);
+        let view = v.get("dome_pool_view").expect("Feld dome_pool_view fehlt");
+        let blocks = view.get("blocks").and_then(|b| b.as_array()).expect("blocks-Array");
+        assert_eq!(blocks.len(), 2, "beide Bloecke muessen erscheinen");
+
+        assert_eq!(blocks[0]["own"], json!(true));
+        assert_eq!(blocks[0]["len"], json!(2));
+        assert_eq!(
+            blocks[0]["types"],
+            json!(own_types),
+            "der Rueckleger kennt die Reihenfolge seines Blocks (par.4)"
+        );
+
+        assert_eq!(blocks[1]["own"], json!(false));
+        assert_eq!(blocks[1]["len"], json!(3));
+        assert_eq!(
+            blocks[1]["types"],
+            Value::Null,
+            "der Gegner kennt den fremden Block nur als MENGE, nicht als Reihenfolge"
+        );
+        assert_eq!(blocks[1]["special"], json!(foreign_special));
+        assert_eq!(blocks[1]["wild"], json!(3 - foreign_special));
+
+        // (b) Sicht von Spieler 1: genau umgekehrt, gleicher Zustand.
+        state.current_player = 1;
+        let v2 = state_to_json(&state, true);
+        let blocks2 = v2["dome_pool_view"]["blocks"].as_array().expect("blocks-Array");
+        assert_eq!(blocks2[0]["own"], json!(false));
+        assert_eq!(blocks2[0]["types"], Value::Null);
+        assert_eq!(
+            blocks2[0]["special"],
+            json!(own_types.iter().filter(|t| *t == "special").count())
+        );
+        assert_eq!(blocks2[1]["own"], json!(true));
+        assert_eq!(blocks2[1]["types"], json!(foreign_types));
+    }
+
+    #[test]
+    fn unknown_prefix_matches_dome_pool_unknown_prefix_len() {
+        let mut state = state_with_two_blocks();
+        let v = state_to_json(&state, true);
+        assert_eq!(
+            v["dome_pool_view"]["unknown_prefix"],
+            json!(state.dome_pool_unknown_prefix_len())
+        );
+
+        // Auch nachdem Ziehungen das Praefix aufgefressen haben: die Sicht
+        // liest dieselbe Quelle, kein zweiter Zaehler.
+        let prefix = state.dome_pool_unknown_prefix_len();
+        for _ in 0..prefix {
+            state.note_dome_pool_draw_from_top();
+            state.dome_tile_pool.remove(0);
+        }
+        assert_eq!(state.dome_pool_unknown_prefix_len(), 0);
+        let v2 = state_to_json(&state, true);
+        assert_eq!(v2["dome_pool_view"]["unknown_prefix"], json!(0));
+        assert_eq!(
+            v2["dome_pool_view"]["blocks"].as_array().map(|b| b.len()),
+            Some(2)
+        );
+    }
+
+    #[test]
+    fn fresh_game_has_no_known_blocks() {
+        // Bestandsfall (Spielaufbau, Alt-JSONs): alles unbekannt.
+        let mut rng = StdRng::seed_from_u64(5);
+        let state = setup_new_game(names(), 0, &mut rng);
+        let v = state_to_json(&state, true);
+        assert_eq!(v["dome_pool_view"]["blocks"], json!([]));
+        assert_eq!(
+            v["dome_pool_view"]["unknown_prefix"],
+            json!(state.dome_tile_pool.len())
+        );
     }
 }

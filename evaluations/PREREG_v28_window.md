@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: nichts gebaut. Zuschnitt aus PREREG_v25_window.md par.17 auf v28 fortgeschrieben (580 Traeger + 2.366 Schwarm, Seed 20260937, Val-Pool ^selfplay_v27-), Generator v27-b01 (Champion, Tor 1 und 2 gehalten). Voraussetzung: Record-Feld dome_pool_view (par.4) im Wheel, Anker-Drift gruen. Offen: G-2-Haelfte (par.2), Freigabe der Erzeugung (Nutzer, v28 ausgesetzt seit 2026-09-10). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: nichts gebaut. Zuschnitt aus PREREG_v25_window.md par.17 auf v28 fortgeschrieben (580 Traeger + 2.366 Schwarm, Seed 20260937, Val-Pool ^selfplay_v27-), Generator v27-b01 (Champion, Tor 1 und 2 gehalten). Voraussetzung: Record-Feld dome_pool_view (par.4) im Wheel, Anker-Drift gruen. G-2-Haelfte ENTSCHIEDEN (par.2: Ausflug, Nutzer 2026-09-10). Offen: Freigabe der Erzeugung (v28 ausgesetzt seit 2026-09-10). -->
 
 # PREREG v28: Fensterzuschnitt und der erste Plan nach dem Einfrieren
 
@@ -45,7 +45,7 @@ Dateien; nicht ausgeglichen.
 `docs/generation_loop.md`: je Generation neu im Vierer-Schritt, alle Arme einer Generation
 gleich; v27 hatte 20260933). **Val-Pool `^selfplay_v27-`.**
 
-## par.2 WELCHE G-2-HAELFTE (offen, Nutzer)
+## par.2 WELCHE G-2-HAELFTE (entschieden 2026-09-10)
 
 `v25-b01` rutscht auf G-2; der Posten von 145 Dateien traegt EINE Haelfte (v26-Prereg par.6:
 kein Split). Fuer v27 fiel der Entscheid auf die temperierte Haelfte, auf der Rolle
@@ -58,6 +58,13 @@ Ausflug-Haelfte** -- G-1 liefert beide Haelften ohnehin vollstaendig, der G-2-Po
 1.450 Partien klein, und die Ausflug-Haelfte bringt bei gleicher Dateizahl die doppelte Zahl
 an Records (`PREREG_v27_window.md` par.2). Kandidatenmuster dann
 `selfplay_v25-b01-value-excursion_*.pkl` (401), sonst `-value-tempc_*` (400).
+
+**ENTSCHIEDEN 2026-09-10, 23:40 (Nutzer): die AUSFLUG-Haelfte.** *"dann machen wir das so."*
+Der G-2-Schwarm besteht aus 145 der 401 `selfplay_v25-b01-value-excursion_*`, seed-gezogen
+mit 20260937; `tools/night_v28_chain.sh` steht bereits so (`G2_SWARM_PATTERN`). Die
+temperierte v25-b01-Haelfte rotiert ersatzlos hinaus. Damit hat jede Generation ihre eigene
+G-2-Wahl (v27: temperiert auf der Rolle; v28: Ausflug auf den Zahlen), und der Vergleich
+der beiden Fenster ist ein Nebenbefund, keine Messung.
 
 ## par.3 WER ERZEUGT (hergeleitet, keine Wahl)
 
