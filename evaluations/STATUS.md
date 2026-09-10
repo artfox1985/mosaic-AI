@@ -27,13 +27,23 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**Was gerade laeuft:** die Parallelsitzung "Claude-Partien g02-g05" (Arbeitsauftrag-Chip,
+**MASCHINE BELEGT seit 2026-09-10, 23:49:56: v28-ERZEUGUNG LAEUFT** (Nutzer: "starte beides
+hier, die app bleibt offen"; `tools/night_v28_generate.sh` als Hintergrundaufgabe dieser
+Sitzung, Klasse 1 zuerst, Manifest `data/manifest_v27-b01-policy_20260910_234958.json`;
+Cache-Waechter unter `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` daneben; `night_v28_chain.sh` seit
+23:49:57 scharf, wartet auf den `laufzeit`-Block der Ausflug-Klasse und faehrt dann Kennzahl mit
+Tor-2a-Vorlage, Fenster, Bloecke, Monolith und Training `v28-b01`). Erwartet rund 10,3 h
+Erzeugung plus 2 h Kette, also bis etwa 12:00 am 2026-09-11; die Claude-Partien laufen daneben,
+die Laufzeit ist damit als Planungsgroesse gebremst zu lesen. Danach Tor 1 `v28-b01` gegen
+`v27-b01` mit `--log-games`, Bau von Variante B fuer `v28-b02`.
+
+**Ausserdem laeuft:** die Parallelsitzung "Claude-Partien g02-g05" (Arbeitsauftrag-Chip,
 seit 2026-09-10 abends). Sie spielt selbst gegen den Champion, registriert in
 `PREREG_claude_play_interface.md` par.7 und committet am Ende einmal. Sie braucht wenig
 Rechenlast (lange Denkzeiten je Zug); leichte Arbeiten daneben sind vom Nutzer freigegeben,
 Arenen und Erzeugung nicht.
 
-### v28 IST STARTKLAR (Vorlage, Start nur auf Anweisung)
+### v28: ZUSCHNITT UND KETTE (gestartet 2026-09-10, 23:49)
 
 `PREREG_v28_window.md`: Zuschnitt (580 Traeger + rund 2.367 Schwarm, Seed 20260937, Val-Pool
 `^selfplay_v27-`), Generator `v27-b01`, G-2-Schwarm aus der Ausflug-Haelfte von v25-b01
