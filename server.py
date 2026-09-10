@@ -706,6 +706,12 @@ def new_game():
             "teacher_level":      _teacher_level,
             "teacher_sims":       _teacher_sims if _teacher_level else None,
             "teacher_coach_sims": _teacher_coach_sims if _teacher_level == 3 else None,
+            # 2026-09-10: Spec-Pfad und die wirksamen Knoepfe in den Kopf -- bis heute war aus
+            # keinem Log ablesbar, ob der Champion mit seiner Spec spielte (Vorfall: zwei Tage
+            # ohne, STATUS 2026-09-10). Werte aus os.environ, so wie die Engine sie liest.
+            "champion_spec": (str(_resolve_champion_spec(_ai_model).relative_to(MODELS_DIR.parent))
+                              if (_ai_model and _resolve_champion_spec(_ai_model)) else None),
+            "knobs": {env_name: os.environ.get(env_name) for env_name in _SPEC_TO_ENV.values()},
         }
         lf.write("# MOSAIC GAME LOG\n")
         lf.write(f"# {_json.dumps(meta, ensure_ascii=False)}\n")

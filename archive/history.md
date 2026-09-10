@@ -17761,3 +17761,12 @@ Preregs: 8.
 v27-b01 vier (ohne `_brierbest.*`), rund 205 MB; jede Datei vorher per `restic find` in
 Snapshot 1dba15e8 bzw. 2a12d266 belegt (19/19 Treffer). Trainings-Seed bleibt variabel je
 Generation, gleich innerhalb einer Generation (`generation_loop.md`).
+
+## 2026-09-10, 23:05 -- Log-Kopf traegt Spec-Pfad und Knoepfe; drei Mensch-Partien gegen v27-b01 mit Spec
+
+Nutzer hat den Server nach dem Spec-Fix neu gestartet (Konsolenzeile "Champion-Spec spec.json:
+... MOSAIC_ENVELOPE_HULL_FORM=2, MOSAIC_SPECIAL_ROW6_W=1.0" reproduziert per Modul-Import).
+Drei Browser-Partien gegen v27-b01 danach (22:38, 22:48, 22:56): Mensch 71:63, 70:90, 81:72;
+KI-Stapelziehungen 3 / 1 / 15 (im dritten Spiel 5 davon auf Stand 0). Damit aus keinem Log
+mehr geraten werden muss, schreibt `server.py` seit jetzt `champion_spec` (Pfad) und `knobs`
+(die wirksamen MOSAIC_*-Werte) in die JSON-Kopfzeile jeder Partie.
