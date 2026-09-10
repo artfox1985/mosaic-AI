@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v26-Trainingsfenster zugeschnitten, jetzt wo die Rotation zum ERSTEN MAL vollstaendig aus eigenem Material besteht? | Beleg: Fenster gebaut (2.948 Dateien), v26-b01 trainiert, Tor 1 BESTANDEN ueber drei Seeds (par.8a: 210:190, 85:55, 226:174; verzerrungsfrei 436:364 = 54,5 %), Promotion 2026-09-09 (Elo 1389). Traeger-Kennzahl par.3 bestaetigt: neuer Sockel 0,737 gegen 0,637 volle Spalten je Seite (je 8.000 Seiten, par.3 Nachtrag). G-2-Wahl fuer v27 gemessen, Kriterium trennt nicht (par.6); Entscheid in PREREG_v27_window.md par.2. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v26-Trainingsfenster zugeschnitten, jetzt wo die Rotation zum ERSTEN MAL vollstaendig aus eigenem Material besteht? | Beleg: Fenster gebaut (2.948 Dateien), v26-b01 trainiert, Tor 1 BESTANDEN ueber drei Seeds (par.8a: 210:190, 85:55, 226:174; verzerrungsfrei 436:364 = 54,5 %), Promotion 2026-09-09 (Elo 1389, nach der vierten Kante am 2026-09-10: 1386 [1346, 1431] aus 1.640 Partien). Traeger-Kennzahl par.3 bestaetigt: neuer Sockel 0,737 gegen 0,637 volle Spalten je Seite (je 8.000 Seiten, par.3 Nachtrag). Tor 2b NACHGEHOLT 2026-09-10 (par.8b): v26-b01 0,993 gegen v25-b01 0,803 volle Spalten je Seite in derselben Arena (je n = 400, KI +-0,077), HAELT; Siege 210:190. G-2-Entscheid in PREREG_v27_window.md par.2. -->
 
 # PREREG v26: Fensterzuschnitt
 
@@ -291,3 +291,35 @@ Tor 1 ist die Ratsche gegen den Vorgaenger, nicht die Kroenung.
 **Laufzeiten fuer die Kostentabelle:** 4.281 s fuer 200 Paare, 1.453 s fuer 70 Paare, je
 10 Threads -- rund 21,4 s je Paar.
 
+## par.8b TOR 2b NACHGEHOLT (2026-09-10): Spalten gegen den Vorgaenger, aus den Partie-Logs
+
+**Anlass:** seit dem Wechsel auf `tools/paired_gating.py` als Tor-1-Instrument (v24) war die
+Arena-Flaeche von Tor 2 unmessbar, weil das Werkzeug keine Partie-Logs schrieb
+(`docs/generation_loop.md`, Abschnitt Tor 2, Nachtrag 2026-09-09). `--log-games` ist seit
+2026-09-10 gebaut und per Rauchtest abgenommen; dieser Lauf ist die erste Anwendung.
+
+**Lauf:** v26-b01 gegen v25-b01, beide Champion-Spec, 200 Paare @400, Blockgroesse 5,
+Seed 20261033, SPRT-Schranken 1e-12 (kein Fruehstopp), 10 Threads, 5.189,7 s
+(12,97 s je Partie; die Logs kosten gegen 10,7 s ohne). Artefakt
+`paired_gating_v26-b01_vs_v25-b01_s33_logs.json` (400 Logs, 9,8 MB); Sonde
+`arena_columns_paired_gating_v26-b01_vs_v25-b01_s33_logs.json` (400/400 replayt, 0
+divergiert, 83 s).
+
+| Seite | volle Spalten je Seite | Punkte | Margin | Strafleiste | Spalten >= 4 | Reihen voll | Spezialfelder belegt |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **v26-b01** | **0,993 +-0,077** | 52,4 | +2,3 | 9,31 | 2,16 | 0,133 | 1,24 |
+| v25-b01 | 0,803 +-0,077 | 50,1 | -2,3 | 9,43 | 2,23 | 0,190 | 1,26 |
+
+(n = 400 Seiten je Modell, KI 95 %; Siege 210:190 fuer v26-b01, McNemar p 0,382, gepaarte
+Differenz +0,10 [-0,10; +0,30].)
+
+**Tor 2b HAELT:** 0,993 gegen 0,803, Intervalle getrennt. Zusammen mit Tor 2a (par.3,
+0,777 gegen 0,737 als Generator) ist Tor 2 fuer v26-b01 auf beiden Flaechen belegt; die
+Anker-Arena (1,267 gegen 1,307) war als Ersatzflaeche irrefuehrend, sie zeigte das
+Gegenteil. Wertungsplatten-Punkte je Kriterium liefert die Sonde nicht (Standard-Kennzahl 4
+fehlt hier; `plate_points_from_arena.py` braucht dieselben Logs und kann nachgefahren werden).
+
+**Ins Elo-Register eingetragen (Nutzer 2026-09-10, 12:30: "Mehr Daten sind immer gut"):**
+vierte Kante v26-b01 gegen v25-b01. Leiter danach: v26-b01 1386 [1346, 1431] aus 1.640
+Partien (vorher 1389 aus 1.240), v25-b01 1356 [1317, 1401], v24-b07 1296, Anker 1000; keine
+"NICHT mit Anker verbunden"-Warnung im Report.

@@ -124,3 +124,42 @@ class ChipChoiceFromLogTest(unittest.TestCase):
         got = self.rep._chip_choice_from_log(body, 0, [[0, 1], [0, 2], [1, 2]])
         self.assertEqual(got, [0, 1])
         self.assertEqual(self.rep.chip_log_mehrdeutig, 1)
+
+
+class DomeReturnLineTest(unittest.TestCase):
+    """Rueckleg-Zeile nach dem Nutzer-Entscheid 2026-09-10 ("Die Reihenfolge der
+    zurueckgelegten Kuppelplatten ist nur fuer den Spieler sichtbar, der sie auch
+    erstellt"): die Engine schreibt nur noch die Anzahl, Logs von davor tragen die
+    Plattenliste. Beide Formen muessen klassifizieren, und ein Altlog muss gegen die
+    heutige Zeile replaybar bleiben."""
+
+    OLD_FORM = ("↩️ 4 Kuppelplatte(n) zurueck unter den Stapel (Reihenfolge): "
+                "#16 (Wild), #11 (Wild), #12 (Special), #7 (Special)")
+    NEW_FORM = "↩️ 4 Kuppelplatte(n) zurueck unter den Stapel"
+
+    def setUp(self):
+        self.rep = agl.Replayer.__new__(agl.Replayer)
+        self.rep.emoji_toleriert = 0
+        self.rep.chip_zusatz_toleriert = 0
+        self.rep.chip_symbol_toleriert = 0
+        self.rep.return_list_tolerated = 0
+
+    def test_both_forms_classify(self):
+        for body in (self.OLD_FORM, self.NEW_FORM):
+            cat, m = agl.classify(body)
+            self.assertEqual(cat, "DOME_RETURN_TO_STACK", body)
+            self.assertEqual(m.group("n"), "4")
+        self.assertIsNone(agl.classify(self.NEW_FORM)[1].group("liste"))
+        self.assertIsNotNone(agl.classify(self.OLD_FORM)[1].group("liste"))
+
+    def test_old_log_line_equals_new_engine_line(self):
+        self.assertTrue(self.rep._lines_equal(f"[R3] {self.OLD_FORM}", f"[R3] {self.NEW_FORM}"))
+        self.assertEqual(self.rep.return_list_tolerated, 1)
+
+    def test_different_count_is_not_tolerated(self):
+        self.assertFalse(self.rep._lines_equal(
+            f"[R3] {self.OLD_FORM}", "[R3] ↩️ 3 Kuppelplatte(n) zurueck unter den Stapel"))
+
+    def test_new_log_against_old_engine_is_not_tolerated(self):
+        # Nur die Richtung ALT -> NEU ist erlaubt; andersherum waere es Drift.
+        self.assertFalse(self.rep._lines_equal(f"[R3] {self.NEW_FORM}", f"[R3] {self.OLD_FORM}"))

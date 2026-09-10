@@ -84,7 +84,10 @@ for free from the face-up display, or drawn blind from the stack.
 *Drawing from the stack:* every single draw costs 1 point and may be repeated
 as often as you like – the plate backs reveal only the type (Wild or Special).
 When you stop drawing, the fronts are turned up, you keep and place one plate,
-and the rest go back under the stack in any order you choose. At a score of 0
+and the rest go back under the stack in any order you choose. The order in which
+the remaining plates go back is known only to the player who returned them; the
+opponent sees the fronts of the drawn plates and the placement, not the return
+order (engine decision 2026-09-10, replacing the one of 2026-08-09). At a score of 0
 further draws are effectively free, because a score can never drop below zero.
 *(The physical rules leave this case open; the engine resolves it consistently
 with the never-below-zero rule.)* Placed plates are permanent; position and

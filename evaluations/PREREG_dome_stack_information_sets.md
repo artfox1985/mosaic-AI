@@ -500,15 +500,36 @@ Vollmischung), aber vier Stellen der Prereg tragen Aussagen, die so nicht halten
    3x3-Raster, mit -3 je Feld. Die Obergrenze ist also 3 mal die Zahl der Spezialfelder
    auf dem Brett, nicht 12. par.13a Punkt 1 stellt die Frage richtig; par.13 darf die
    Zahl bis dahin nicht als Befund fuehren.
-3. **Das Informationsmengen-Modell aus par.4 wird von der Oberflaeche gebrochen:**
-   `game.rs:282-286` schreibt die Rueckgabe-Reihenfolge mit Kachel-ID in das Ereignis-Log,
-   das Frontend zeigt dieses Log an (`static/js/app.js`, Abschnitt "Log der Anzeige").
-   Der menschliche Gegner kann die Reihenfolge, die par.4 als "offiziell NICHT bekannt"
-   modelliert, mitlesen. Die vier Referenzpartien (par.12/13) sind unter diesem Leck
-   gespielt worden; ob es genutzt wurde, ist nicht feststellbar. Vor der naechsten
-   Referenzpartie: Log-Zeile auf die Anzahl kuerzen oder die Reihenfolge als BEKANNT
-   modellieren. Das ist ein Nutzer-Entscheid, weil er die Sichtgleichheits-Frage aus
-   `PREREG_stack_top_feature.md` in die Gegenrichtung betrifft (Mensch sieht mehr).
+3. **par.4 widerspricht einem registrierten Nutzer-Entscheid (berichtigt 2026-09-10;
+   die erste Fassung dieses Punktes nannte es ein "Leck", das war falsch hergeleitet).**
+   `game.rs:262-269` traegt den Entscheid vom 2026-08-09 im Kommentar: das Regelwerk
+   laesst die Sichtbarkeit offen (`docs/engine_manual.md`, Abschnitt A: "the rest go back
+   under the stack in any order you choose", ohne Aussage zur Sicht), und der Nutzer hat
+   festgelegt, dass der Gegner die Platzierung UND die Rueckgabe-Reihenfolge SIEHT. Genau
+   deshalb schreibt `game.rs:282-286` die Reihenfolge mit Kachel-ID ins Log, das Frontend
+   zeigt sie an, und `tools/analyze_game_log.py:164` (Kategorie `DOME_RETURN_TO_STACK`)
+   liest sie fuer das Replay. Par.4 modelliert die Reihenfolge dagegen als "offiziell NICHT
+   bekannt". Eines von beiden muss weichen, und das ist ein Nutzer-Entscheid:
+   (a) Entscheid vom 2026-08-09 bleibt: dann ist die Reihenfolge OEFFENTLICHE Information
+   fuer beide Seiten, par.4 und die Bauvarianten par.7 sind darauf umzustellen (die
+   Determinisierung darf die zurueckgelegten Platten dann fuer KEINEN Spieler mischen),
+   und das Log ist korrekt. (b) Entscheid wird zurueckgenommen: dann muss die Zeile aus der
+   Anzeige (und aus `game.log` der Claude-Partien) verschwinden, waehrend der Replayer sie
+   weiter braucht; Bauform: Maschinenzeile nach dem Muster der `#a`-Zeilen
+   (`serialize.rs:240-250` filtert sie aus der Anzeige) plus getrennte Ablage in
+   `tools/claude_play.py`. Die vier Referenzpartien (par.12/13) wurden unter Lesart (a)
+   gespielt.
+   **ENTSCHIEDEN 2026-09-10 (Nutzer, woertlich): "die reihenfolge der zurueckgelegten
+   kuppelplatten ist nur fuer den spieler sichtbar der sie auch erstellt."** Das ist
+   Lesart (b) mit Praezisierung: der Ausfuehrende kennt seine Reihenfolge, der Gegner nicht;
+   der Gegner sieht weiterhin die aufgedeckten Fronten der gezogenen Platten und die
+   Platzierung. Damit gilt par.4 so, wie es steht, und der Entscheid vom 2026-08-09 in
+   `game.rs:262-269` ist abgeloest. Folgen: sichtbare Logzeile nur noch mit der Anzahl,
+   Replayer-Kompatibilitaet fuer Alt-Logs, `claude_play.py` trennt Anzeige- und
+   Maschinenzeilen (Patch 2026-09-10 vorbereitet; Build, Anker-Invarianz und Rauchtest
+   erst auf freier Maschine). Fuer die Informationsmengen (par.4) heisst das ausserdem:
+   die vom GEGNER zurueckgelegten Platten sind ihm als MENGE bekannt (Fronten lagen offen),
+   ihre Reihenfolge im Stapel nicht; die selbst zurueckgelegten sind in Reihenfolge bekannt.
 4. **par.8 beschreibt Geplantes im Praesens:** ein "mitgefuehrter Wissensstand" in
    `tools/analyze_game_log.py` existiert nicht (Agentenbefund, Grep ueber
    bekannt/known/return_order: nur Prosa-Treffer; nicht unabhaengig nachgeprueft). Die Zahl
@@ -522,3 +543,8 @@ Zeile nicht); par.4b sagt "Ziehungen 1 bis 4 bezahlt", im Log kostet auch Ziehun
 Punkt (Fixture Z.41, Agentenbefund); par.12a "130 bewertete Entscheidungen" sind 130
 Zeilen, davon 99 mit `evaluated: true` (Agentenbefund am Artefakt); das Artefakt
 `replay_dome_stack_pre.json` traegt keinen `laufzeit`-Block.
+
+**Zeiger-Nachzug 2026-09-10 (nach dem Logzeilen-Patch):** `game.rs:262-269` (alter
+Entscheid) ist jetzt der Kommentarblock ab `game.rs:263`, die Logzeile steht bei
+`game.rs:285`, die Replayer-Regex bei `analyze_game_log.py:171`. Die Verweise in
+par.3 und par.14 oben sind Stand vor dem Patch und werden nicht rueckwirkend umgeschrieben.

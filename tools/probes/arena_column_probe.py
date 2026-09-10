@@ -189,7 +189,14 @@ def main() -> int:
                         errors.append(f"{type(e).__name__}: {str(e)[:140]}")
                     continue
                 ok += 1
-                names = g.get("names") or ["seite0", "seite1"]
+                # 2026-09-09: `names` ist im Engine-Record ein BRETT-Etikett
+                # ("NetzA"/"NetzB", self_play.rs:3708) und in beiden
+                # Orientierungen eines gepaarten Gatings dasselbe -- als
+                # Aggregations-Schluessel wuerde es die Modelle vermischen.
+                # `side_names` (tools/paired_gating.py --log-games) traegt die
+                # MODELLE in Brett-Reihenfolge; fehlt es (alle Alt-Artefakte),
+                # bleibt es beim bisherigen `names`.
+                names = g.get("side_names") or g.get("names") or ["seite0", "seite1"]
                 cols = [_full_columns(state, pi) for pi in (0, 1)]
                 extras = [_side_extras(state, g, pi) for pi in (0, 1)]
                 for pi in (0, 1):

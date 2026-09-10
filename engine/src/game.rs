@@ -260,29 +260,29 @@ pub fn execute_draw_from_stack(state: &mut GameState, m: &DrawFromStackMove) -> 
     // Rest in der vom Spieler gewählten Reihenfolge zurück unter den Stapel
     // (Regelwerk: "in beliebiger Reihenfolge zurücklegen", siehe DrawFromStackMove).
     //
-    // Nutzer-Praezisierung 2026-08-09 (das Regelwerk laesst die Sichtbarkeit
-    // offen, daher hier festgelegt): der Gegner sieht die Platzierung UND
-    // welche Kuppelplatten in welcher Reihenfolge in den Stapel zurueckgehen.
-    // Diese Information war bisher nirgends protokolliert -- beim Zuschauen
-    // eines KI-Zuges mit mehreren Ziehungen war also nicht nachvollziehbar,
-    // was zurueckwanderte. Genau das wird hier nachgetragen; die Reihenfolge
-    // des Logs entspricht der Rueckleg-Reihenfolge.
-    let mut returned: Vec<String> = Vec::new();
+    // Nutzer-Entscheid 2026-09-10 (loest die Praezisierung vom 2026-08-09 ab,
+    // die dem Gegner die Rueckleg-Reihenfolge zeigte): "Die Reihenfolge der
+    // zurueckgelegten Kuppelplatten ist nur fuer den Spieler sichtbar, der sie
+    // auch erstellt." Die sichtbare Zeile nennt darum nur noch die ANZAHL --
+    // keine IDs, keine Typen. Was der Gegner weiterhin sieht, bleibt
+    // unveraendert: die aufgedeckten Fronten der gezogenen Platten und die
+    // Platzierung (docs/engine_manual.md Abschnitt A).
+    //
+    // Maschinenlesbar bleibt die Reihenfolge erhalten, aber NUR in der
+    // `#a`-Zeile (py.rs::push_action_id_line, Feld `return_order`): die
+    // filtert die Anzeige heraus (serialize.rs::state_to_json), und der
+    // Replayer liest sie (analyze_game_log.py::resolve_dome). Eine eigene
+    // Maschinenzeile ist deshalb nicht noetig.
+    let mut n_returned = 0usize;
     for id in &m.return_order {
         if let Some(t) = rest.remove(id) {
-            returned.push(format!(
-                "#{} ({})",
-                t.tile_id,
-                if t.is_special_type() { "Special" } else { "Wild" }
-            ));
+            n_returned += 1;
             state.dome_tile_pool.push(t);
         }
     }
-    if !returned.is_empty() {
-        let n = returned.len();
-        let liste = returned.join(", ");
+    if n_returned > 0 {
         state.log_event(format!(
-            "↩️ {n} Kuppelplatte(n) zurueck unter den Stapel (Reihenfolge): {liste}"
+            "↩️ {n_returned} Kuppelplatte(n) zurueck unter den Stapel"
         ));
     }
     let mut chosen = chosen.ok_or("gewählte Kachel nicht gezogen")?;

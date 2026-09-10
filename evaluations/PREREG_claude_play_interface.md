@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: g01 gespielt 2026-09-06 (Subagent Opus): Claude 72:42 gegen Champion v24-b06 @400, sechs Beobachtungen als Sondenkandidaten (par.7); Werkzeug nach drei Blockern (Farbzaehler, globaler Mondzug, Pass ohne Log) stabil. Restprogramm 9 Partien PAUSIERT (Nutzer 2026-09-06 23:45: vermutlich erst mit dem v25-Champion weiter). Nutzer-Entscheide par.8: 10 Partien (5/5), Gegner Champion @400, keine Uebereinstimmungsmessung, Werkzeug bleibt in tools/. Bauform par.3, Messgroessen par.4, Ergebnisse par.7. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: g01 gespielt 2026-09-06: Claude 72:42 gegen Champion v24-b06 @400, sechs Beobachtungen als Sondenkandidaten (par.7). AUSGESETZT (Nutzer 2026-09-10) bis zum Entscheid ueber die Sichtbarkeit der Rueckgabe-Reihenfolge (par.9 Punkt 5, dome_stack par.14). Audit par.9: Spezialfeld-Anzeige behoben, Pass- und Mondzug-Blocker abgeraeumt, KI-Zeile ungeklaert; Gegner bei Wiederaufnahme = models/champion.txt. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -252,3 +252,39 @@ g06-g10 `--claude-side 1 --first-player 0`, Halter davor, Marke danach loeschen)
    CLAUDE.md-Vorgabe) ueber `tools/claude_play.py`; der Koordinator startet ihn im
    CPU-freien Fenster, prueft sein Protokoll (par.4.4) nach Regel 0 und registriert
    hier. "Claude" in dieser Prereg meint ab jetzt den Subagenten.
+
+## par.9 AUDIT 2026-09-10 (Nutzer-Auftrag "ueberpruefe par.7"), vor der Wiederaufnahme
+
+Geprueft am Code, je Punkt mit Pruefstelle:
+
+1. **Gefuelltes Spezialfeld nicht vom leeren unterscheidbar: STIMMTE, behoben.**
+   `cell_char` (`tools/claude_play.py:172-183`) gab fuer `filled == "special"` dasselbe
+   `#` zurueck wie fuer ein leeres Spezialfeld. Jetzt: leeres Spezialfeld `#`, gefuelltes
+   `@`; Legende in `render` nachgezogen. Reiner Anzeige-Fix, kein Engine-Eingriff.
+2. **`KI:`-Zeile mit unzuverlaessigen Zaehlern (g01-Notizen 19:59): NICHT geklaert.**
+   Die Zeile zeigt `action.description` aus `ai_step_net_json`; im Hauptpfad wird die
+   Beschreibung VOR dem Anwenden gebaut (`engine/src/py.rs:781` gegen `:793`), was die
+   beobachteten Nullzaehler ("0x Stein rot von F1") nicht erklaert. Reproduktion braucht
+   eine Partie, also die Maschine; bis dahin gilt die Warnung aus par.7: verlaesslich sind
+   Raster, Musterreihen-Zeile und die Klartextzeilen in `game.log`, nicht die `KI:`-Zeile.
+3. **Die zwei Werkzeug-Blocker aus g01 sind abgeraeumt:** Pass schreibt seit 2026-09-07
+   eine eigene Logzeile (`game.rs:816-824`, Kategorie PASS im Replayer); Mondzuege werden
+   mit `mond:<farben>` gelistet und angenommen (`claude_play.py:261`, `:314`).
+4. **`show` druckt keine Engine-Logzeilen**, nur Raster, Musterreihen, legale Zuege
+   (`claude_play.py:408-419`); `drive_ai` druckt je Netz-Zug nur die `KI:`-Zeile
+   (`:151`, `:165`). Die volle Engine-Logliste liegt aber in `game.log` auf der Platte
+   (`append_log`, `:124-131`), inklusive der Rueckgabe-Reihenfolge der Kuppelplatten mit
+   Kachel-ID. Ein Agent, der die Datei liest, sieht sie.
+5. **Sichtbarkeit der Rueckgabe-Reihenfolge ist ein offener Nutzer-Entscheid**, kein
+   Werkzeugfehler: `game.rs:262-269` registriert vom 2026-08-09, dass der Gegner sie SIEHT;
+   `PREREG_dome_stack_information_sets.md` par.4 modelliert sie als unbekannt (dort par.14
+   Punkt 3, Lesarten (a)/(b)). **ENTSCHIEDEN 2026-09-10 (Nutzer): nur der Ausfuehrende
+   sieht seine Reihenfolge** (Lesart b). Vor der Wiederaufnahme: Engine-Logzeile ohne IDs,
+   `claude_play.py` trennt `game.log` (Anzeige, ohne `#`-Zeilen) von `.engine.log` (voll,
+   fuer den Replayer); Patch 2026-09-10 vorbereitet, Build und Rauchtest auf freier
+   Maschine. Der Agent der Partien liest NUR `show` und `game.log`, nie `.engine.log`
+   (in den Auftrag aufnehmen).
+6. **Gegner bei Wiederaufnahme:** ohne `--opponent` liest das Werkzeug `models/champion.txt`
+   (`claude_play.py:461`, `:470`), also den amtierenden Champion (heute `v26-b01_brierbest`);
+   par.8.2 (`v23-b01_k3p10`) und der Kopf (`v25`) sind ueberholt. Der Gegner der Partie steht
+   im Manifest je Partie und gehoert beim Registrieren in die Ergebniszeile.

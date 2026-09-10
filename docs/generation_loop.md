@@ -128,13 +128,27 @@ Bezug ist dieselbe Zahl der Vorgeneration am selben Instrument. Belegt: v24-b07 
 Generator 0,637, v25-b01 als Generator 0,737 (KI je +-0,017). Der Preis: die Zahl liegt
 erst vor, wenn die Erzeugung gelaufen ist; ein gerissenes Tor 2a kostet dann eine
 Erzeugung (rund 8,4 h). Die Arena-Flaeche gegen den Vorgaenger ist seit v25 nicht mehr
-gemessen worden, die Gating-Artefakte tragen keine Spaltenzahl. Was stattdessen vorliegt,
+gemessen worden, die Gating-Artefakte tragen keine Spaltenzahl. Ursache: Tor 1 laeuft seit
+v24 ueber `tools/paired_gating.py`, und das Werkzeug hatte kein `--log-games`; die
+Spaltensonde braucht die Logzeilen im Arena-JSON, die nur `paired_arena_env_ab.py`
+schrieb. Mit dem Werkzeugwechsel fiel die zweite Flaeche still weg (gefunden 2026-09-09
+abends). Abhilfe: `--log-games` in `paired_gating.py` (Patch 2026-09-09), Tor 2b fuer
+v26-b01 gegen v25-b01 wird nachgeholt, und ab v27-b01 liefert jedes Tor 1 die Tor-2b-Zahl
+mit. Was stattdessen vorliegt,
 ist der Kennzahlen-Block der Anker-Arena (v25-b01 1,307, v26-b01 1,267 volle Spalten je
 Partie, je n = 150 gegen den Anker, nicht gegen den Vorgaenger); das ist NICHT das
 Instrument oben, und 1,267 liegt als Punktschaetzer unter 1,307. Wer Tor 2b wieder
 braucht, faehrt das Gating mit `--log-games` und `tools/probes/arena_column_probe.py`
 wie bei v23. Fuer v26-b01 als Generator liefert die v27-Kette die Tor-2a-Zahl mit
 (`corpus_sanity_v26-b01-policy.json` gegen 0,737).
+
+**Nachtrag 2026-09-10:** beides gemessen. Tor 2a ex post 0,777 gegen 0,737
+(`PREREG_v27_window.md` par.7), Tor 2b nachgeholt mit `paired_gating.py --log-games`
+(seit 2026-09-10): 0,993 gegen 0,803 volle Spalten je Seite in derselben Arena, je n = 400
+(`PREREG_v26_window.md` par.8b). Die Anker-Arena hatte als Ersatzflaeche das Gegenteil
+angezeigt (1,267 gegen 1,307): gegen den schwachen Fixpunkt sagt die Spaltenzahl nichts
+ueber die Kampagnen-Groesse. Ab v27 laeuft jedes Tor 1 mit `--log-games`, Tor 2b kommt
+damit ohne eigenen Lauf.
 
 **Den Bezugswert holt man sich, indem man die Vor-Generation am selben
 Instrument misst**, nicht aus dem Gedaechtnis und nicht aus einem Bericht mit

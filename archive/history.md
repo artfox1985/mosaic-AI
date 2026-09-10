@@ -17521,3 +17521,167 @@ je zwei Bloecke je Datei aus zwei Schluesselraeumen). **Auf Nutzer-Freigabe 21:5
 geloescht: 2.802 Bloecke, 1.211 MiB** (Liste aus `--print-delete-list`, jede Datei vor dem
 Loeschen auf Existenz geprueft, 0 nicht gefunden). Gegenprobe danach: 3.201 Bloecke zu
 2.601 Korpusdateien, **0 Waisen**. `data/` von 12 auf 8,6 GiB.
+
+## 2026-09-09, 21:50-21:53 -- v27-Erzeugung und Kette gestartet, v24-b07-Artefakt geloescht
+
+Nutzer-Freigabe 21:50 ("fang mit der v27 erzeugung an"): `tools/night_v27_generate.sh`
+laeuft seit 21:50:57 (Klasse 1, Manifest `manifest_v26-b01-policy_20260909_215059.json`),
+Cache-Waechter daneben unter `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` (Bestand 2.601 Bloecke
+vollstaendig). `tools/night_v27_chain.sh` seit 21:53:02 scharf, wartet auf den
+`laufzeit`-Block der Ausflug-Klasse. Beides Hintergrundaufgaben dieser Sitzung.
+
+Nutzer 21:55: **`models/frozen_champions/v24-b07` geloescht** (Baum geprueft: nur noch
+`v25-b01` und `v26-b01`). Die drei Elo-Kanten von v24-b07 bleiben im Register; die
+Champion-2-Kante von v26-b01 (98:52) wurde gegen dieses Artefakt gemessen und ist
+registriert. Kuenftige Champion-2-Kanten gehen gegen `v25-b01` (liegt vor). Kein
+Code- oder Doku-Verweis zeigt auf das geloeschte Verzeichnis (Grep 21:55).
+seedvalue bleibt auf Nutzer-Entscheid liegen.
+
+## 2026-09-10, 08:06 -- v27-Erzeugung fertig, Kette uebernimmt
+
+Alle drei Klassen Exit 0: `selfplay_v26-b01-policy_*` 400 Dateien (21:50:57-01:40:29),
+`-value-tempc_*` 400 (bis 05:10:07), `-value-excursion_*` 401 mit 4.003 Identitaeten (bis
+08:06:18). Laufzeiten aus den Manifesten: 13.769 + 12.575 + 10.568 = 36.912 s = 10,25 h,
+23 % ueber dem v26-Lauf (30.077 s) bei gleicher Konfiguration; s je Partie 3,44 / 3,14 /
+2,64 gegen 2,77 / 2,54 / 2,21. Ursache nicht gemessen (`docs/measured_runtimes.md`,
+Abschnitt v27). `night_v27_chain.sh` wartete seit 21:53 und greift mit dem naechsten
+5-Minuten-Takt (Wartebedingung: `laufzeit`-Block UND keine `self_play.py`-Prozesse).
+
+## 2026-09-10, 08:09-08:30 -- Kette: Tor 2a ex post haelt, Fenster gebaut
+
+Kette uebernahm 08:09:22, Waechter beendet. Traegerkennzahlen (Schritt 1, je 8.000 Seiten):
+v25-b01-policy 0,737, **v26-b01-policy 0,777** (Tor 2a HAELT, erste Anwendung der
+Praezedenz), v26-b01-value-tempc 0,463, v26-b01-value-excursion 0,858 (Details
+`PREREG_v27_window.md` par.7). Traeger-Manifest 580, G-2 145, Fenster 2.947 Dateien,
+Bloecke vollstaendig vom Waechter, Schluessel `9934367b3d82`, Monolith, dann Training.
+
+## 2026-09-10, 09:05 -- Nutzer-Entscheid: Rueckgabe-Reihenfolge nur fuer den Ausfuehrenden sichtbar
+
+Anlass: Audit-Punkt zur Logzeile mit Kachel-IDs (`game.rs:282-286`); beim Nachlesen stellte
+sich heraus, dass sie auf dem Nutzer-Entscheid vom 2026-08-09 beruhte ("Gegner sieht die
+Reihenfolge", `game.rs:262-269`), gegen den par.4 der Kuppelstapel-Prereg steht. Nutzer
+09:05, woertlich: *"die reihenfolge der zurueckgelegten kuppelplatten ist nur fuer den
+spieler sichtbar der sie auch erstellt"*. Registriert in `dome_stack` par.14 Punkt 3,
+`claude_play_interface` par.9, STATUS; Patch (Engine-Logzeile, Replayer-Regex,
+claude_play-Logtrennung, engine_manual) vorbereitet ohne Build. Claude-Partien bleiben bis
+Build und Rauchtest ausgesetzt. Nebenbei aus par.7 der Claude-Play-Prereg: Spezialfeld-
+Anzeige behoben (`@` fuer gefuellt), KI-Zeile ungeklaert, Pass- und Mondzug-Blocker
+abgeraeumt (par.9).
+
+## 2026-09-10, 10:05 -- Training v27-b01 durch, letzter eingefrorener Arm
+
+5.116,7 s, 12 Epochen, `_brierbest` Epoche 3 (val_brier 0,1873, nicht ueber Arme
+vergleichbar, anderer Val-Pool), Modell-Snapshot `run:v27-b01` erfolgreich (Snapshot-Fix
+vom 2026-09-09 haelt). `PREREG_v27_window.md` par.8. Damit steht die Vergleichskette
+v25-b01 / v26-b01 / v27-b01 (gleiches Rezept, rotierendes Material); das Einfrieren endet
+mit den Abnahmen dieses Arms. 10:10: Wheel-Bau fuer die Rueckgabe-Logzeile gestartet.
+
+## 2026-09-10, 10:10-10:26 -- Wheel, Anker-Drift, Replays, Rauchtest, Tor 2b gestartet
+
+Wheel gebaut und installiert (`maturin build --release`, `pip install --force-reinstall`),
+neue Logzeile im Binaer bestaetigt (alte Zeichenkette 0 Treffer). Anker-Drift GRUEN:
+`verify_frozen_heuristic.py` 1.763 Schritte Feld fuer Feld identisch,
+`evaluations/artifacts/anchor_drift_live_wheel_20260910.json`. Unit-Test des Replayers 19/19.
+Alt-Log-Replays ohne Divergenz: Fixture 20260909 (3 Rueckleg-Zeilen toleriert, 1 Reihenfolge
+aus `#a`), Fixture 20260904 (1 toleriert, 2 aus `#a`), g01 (2 toleriert, 0 aus `#a`).
+Rauchtest `paired_gating.py --log-games`: 2 Paare @20, 4 Partien mit `side_names` und Logs,
+`arena_column_probe.py` 4/4 replayt, 0 divergiert, je Seite n = 4; Smoke-Zeile aus
+`arena_trends.csv` wieder entfernt. 10:26: Tor 2b fuer v26-b01 gegen v25-b01 gestartet
+(`paired_gating.py`, 200 Paare @400, Blockgroesse 5, Seed 20261033, SPRT-Schranken 1e-12,
+`--log-games`, Artefakt `paired_gating_v26-b01_vs_v25-b01_s33_logs.json`).
+
+## 2026-09-10, 11:36-11:40 -- Tor 2b fuer v26-b01 nachgeholt: HAELT
+
+Arena 210:190 (p 0,382), Spaltensonde 400/400 replayt: v26-b01 0,993, v25-b01 0,803 volle
+Spalten je Seite (KI +-0,077). `PREREG_v26_window.md` par.8b, `generation_loop.md` Nachtrag.
+Nicht ins Elo-Register (Nutzer-Entscheid offen). 11:40: Tor 1 v27-b01 gegen v26-b01 mit
+Logs gestartet, Seeds 20261034 und 20261035 nacheinander.
+
+## 2026-09-10, 12:35 -- Vierte Kante v26-b01 gegen v25-b01 im Elo-Register
+
+Auf Nutzer-Anweisung ("Mehr Daten sind immer gut") eingetragen: 210:190, Seed 20261033,
+Tor-2b-Lauf. Leiter danach: **v26-b01 1386 [1346, 1431] aus 1.640 Partien** (Generationsbericht
+v26 nannte 1389 [1349, 1432] aus 1.240; die Zahl dort ist Stand ihres Datums), v25-b01 1356
+[1317, 1401], v24-b07 1296, Anker 1000, keine Anker-Warnung. STATUS und
+`PREREG_v26_window.md` nachgezogen. Tor 1 v27-b01: Seed 20261034 SPRT fuer v27-b01 nach 45
+Paaren (59:31, p 0,0125); Replikation Seed 20261035 laeuft.
+
+## 2026-09-10, 13:24-13:30 -- Tor 1 fuer v27-b01 bestanden, Promotion gestartet
+
+Seed 20261034: 59:31, SPRT nach 45 Paaren (p 0,0125). Seed 20261035: 222:178 bis zum
+Deckel, p 0,033, Differenz +0,22 [+0,03; +0,41]. Kein dritter Seed (Nutzer). Beide Kanten
+ins Elo-Register. Nutzer 13:20: "autark weiterfahren mit dem v27 Programm"; 13:25: v28-Self-
+Play wird ausgesetzt. 13:30: `tools/night_v27_promotion.sh` gestartet (nach dem v26-Muster,
+zusaetzlich Schritt 0 mit Spaltensonde und Wertungsplatten-Punkten aus den Logs).
+
+## 2026-09-10, 13:27-14:55 -- Promotionsmessungen v27-b01
+
+Tor 2b aus den Tor-1-Logs: 1,005 gegen 0,855 (n = 394, Seed 35), haelt. Anker 127:23
+(wie v26-b01), Spalten gegen Anker 1,373. Champion-2 gegen das v25-b01-Artefakt 92:58,
+Handshake und Golden-Selbsttest gruen. sigma/Prior 2,161, Runde 4 wieder 2,88 (v26: 8,54).
+Platt v3 A -0,0476 / B 0,6853 in server.py. Wertungsplatten-Punkte je Kriterium nur ueber
+beide Modelle gemischt messbar (Werkzeug ohne side_names; offen). Details
+`PREREG_v27_window.md` par.10. Danach: Anker- und Champion-2-Kante ins Register, dann
+`tools/night_v27_freeze.sh` (set_champion, Paritaets-Fixture, Artefakt).
+
+## 2026-09-10, 14:52-15:20 -- Promotion v27-b01: set_champion, Artefakt, zwei Stolperer
+
+`set_champion v27-b01_brierbest` (14:52). `tools/night_v27_freeze.sh`: Artefakt
+`models/frozen_champions/v27-b01/` mit Modell, Spec, Wheel (`mosaic_rust_stackreturn_20260910.whl`,
+sha256 c0aa6fdc...), venv (mosaic_rust, numpy, onnxruntime), Vorab-Manifest, Golden Probe
+(10 Sonden, 2 mit pending_dome_choice, 14:53-15:16). Zwei Koordinator-Fehler: (1) Schritt 5d
+(Paritaets-Fixture) scheiterte mit Exit 127, weil ein Windows-Pfad mit Doppelpunkt die
+PATH-Variable der Git-Bash zerlegte (Python-DLL nicht gefunden); (2) das LAUFENDE Skript
+wurde fuer die Wiederholung editiert, Bash las danach an falschem Offset weiter und brach vor
+dem Referee-Selbsttest mit Syntaxfehler ab. Beides von Hand nachgeholt (15:17, Selbsttest
+plus Fixture mit `cygpath`-PATH); Lehre in der Gedaechtnisnotiz zu laufenden Laeufen.
+
+# Generationsbericht v27 (abgeschlossen 2026-09-10)
+
+**Champion am Ende der Generation: `v27-b01`, Elo 1405** [1361, 1453] aus 790 Partien
+(500:290). Leiter nach dem Neu-Fit: v26-b01 1364 [1324, 1406], v25-b01 1336 [1298, 1380],
+v24-b07 1283, Anker fix 1000. Promotion vollstaendig nach `docs/promotion_checklist.md`,
+Artefakt `models/frozen_champions/v27-b01/` (eigenes Wheel vom 2026-09-10, venv, Golden Probe
+10 Sonden, Referee-Selbsttest gruen, Paritaets-Fixture 9232a97d1267875e), restic-Snapshot
+`run:v27-b01` (2a12d266).
+
+**Was v27 belegt:** der dritte und letzte Arm des Einfrierens. v25-b01, v26-b01 und v27-b01
+teilen Architektur, Rezept, Koepfe und Spec; nur das Material rotierte. Dreimal in Folge
+schlug der neue Arm den Vorgaenger in Tor 1, dreimal stieg die Spaltenzahl auf beiden Flaechen:
+
+| Generation | Tor 1 (verzerrungsfrei) | Tor 2a Korpus (volle Spalten je Seite) | Tor 2b Arena gegen Vorgaenger |
+| --- | --- | --- | --- |
+| v25-b01 gegen v24-b07 | 182:118 gepoolt (p 0,0003) | 0,637 (v24-b07 als Generator) | nicht gemessen (Werkzeugluecke) |
+| v26-b01 gegen v25-b01 | 436:364 (54,5 %) | 0,737 | 0,993 gegen 0,803 (nachgeholt 2026-09-10) |
+| v27-b01 gegen v26-b01 | 222:178 (55,5 %, p 0,033) plus 59:31 SPRT | 0,777 | 1,005 gegen 0,855 |
+
+1. **Erzeugung** (`PREREG_v27_window.md` par.7): 400/400/401 Dateien, 10,25 h (23 % ueber
+   v26 bei gleicher Konfiguration, Ursache nicht gemessen). Erstes vollstaendig stationaeres
+   Fenster: 2.947 Dateien, alle drei Generationen mit Zwei-Haelften-Schwarm.
+2. **Tor 2a ex post** (Praezedenz seit 2026-09-10 in `generation_loop.md`): 0,777 gegen 0,737,
+   Intervalle getrennt. Nebenbefund: Ausflug-Klasse 0,858, temperierte 0,463.
+3. **Training** (par.8): brierbest Epoche 3, 5.117 s; der Modell-Snapshot aus `train.py`
+   lief erstmals seit dem Fix durch.
+4. **Tor 1** (par.9): Seed 20261034 59:31 SPRT nach 45 Paaren (p 0,0125), Seed 20261035
+   222:178 bis zum Deckel (p 0,033). Kein dritter Seed (Nutzer).
+5. **Tor 2b** (par.10) erstmals aus den Tor-1-Logs: `paired_gating.py --log-games` seit
+   heute; die Luecke bestand seit v24 (Werkzeugwechsel), fuer v26-b01 nachgeholt.
+6. **Anker-Kante 127:23** wie v26-b01; als Fortschrittsmass gesaettigt, gegen den Anker baut
+   v27-b01 1,373 volle Spalten je Partie (v26-b01 1,267).
+7. **sigma/Prior 2,161**, Runde 4 wieder 2,88 (v26-b01: 8,54); Familie bleibt zu. Platt v3
+   A -0,0476 / B 0,6853.
+
+**Methodisch neu in dieser Generation:** Tor 2b aus denselben Partien wie Tor 1 (Logs im
+Gating-Artefakt), Tor-2a-Vorlage in der Kette, Rueckgabe-Reihenfolge des Kuppelstapels nur
+noch fuer den Ausfuehrenden sichtbar (Nutzer-Entscheid 2026-09-10, Engine plus Replayer plus
+claude_play), Stufe 3 der Backup-Verifikation verglich vorher nie einen Hash (behoben).
+
+**Offen und registriert:** Wertungsplatten-Punkte je Modell brauchen `side_names` in
+`plate_points_from_arena.py`; Trainings-Seed wandert je Generation (par.18-Frage);
+Dubletten-Waechter im Ausflug (`start_position_seeding` par.9k); die Nach-v27-Straenge
+(Kuppelstapel-Informationsmengen, Null-Klammer, Sicht-Reststufen) beginnen erst auf
+Anweisung, v28-Self-Play ist ausgesetzt (Nutzer 2026-09-10).
+
+**Koordinator-Fehler dieser Generation:** Audit-Punkt "Leck" statt Nutzer-Entscheid vom
+08-09 (berichtigt), Audit-Punkt zur Abzweigrunde falsch herum (berichtigt), PATH-Doppelpunkt
+im Freeze-Skript, Edit am laufenden Skript.
