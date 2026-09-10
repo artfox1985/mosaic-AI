@@ -5,8 +5,8 @@
 #
 # SEED der Auswahlen: 20260937 (v27 nahm 20260933, v26 20260929), in par.1 registriert.
 # VAL-POOL: '^selfplay_v27-' (par.1).
-# G-2-POSTEN: welche Haelfte von v25-b01, ist OFFEN (PREREG_v28_window.md par.2; Empfehlung
-# Ausflug). Variable G2_SWARM_PATTERN unten VOR dem Start setzen; der Nutzer-Entscheid gehoert
+# G-2-POSTEN: die AUSFLUG-Haelfte von v25-b01 (Nutzer-Entscheid 2026-09-10, PREREG_v28_window.md par.2;
+# vorher stand hier die Empfehlung). Variable G2_SWARM_PATTERN unten traegt sie; Aenderungen gehoeren
 # in par.2 der Prereg.
 #
 # WARTEBEDINGUNG, gehaertet: laufzeit-Block im Manifest der Ausflug-Klasse (den schreibt

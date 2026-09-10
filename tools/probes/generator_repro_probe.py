@@ -78,7 +78,13 @@ IDENTITY_FIELDS = ("game_id",)
 # Pass als Zeile (Nutzer-Auftrag); ein Vergleich, der den Text mitliest, meldet dann
 # Drift, wo Zug fuer Zug alles gleich ist. Geprueft am Paritaets-Hash des Champions
 # (self_play.rs net_parity_hash, 2026-09-07 00:45).
-STATE_IGNORED_SUBFIELDS = ("log",)
+# Seit 2026-09-10 traegt `state` zusaetzlich `dome_pool_view` (sichtkonformer Wissensstand
+# ueber den Kuppelstapel, PREREG_v28_window.md par.4): ein aus dem Zustand ABGELEITETES
+# Anzeige-/Record-Feld, das keine Zugwahl beeinflusst und das die eingefrorenen Golden-
+# Probes (Anker 2026-08-26) nicht kennen. Ohne die Ausnahme meldete die Anker-Drift-Pruefung
+# am 2026-09-10 23:35 Abweichung an Schritt 0, Feld `state`, waehrend Zuege, Policy und
+# Werte gleich waren. Alles andere im Zustand wird weiter Feld fuer Feld verglichen.
+STATE_IGNORED_SUBFIELDS = ("log", "dome_pool_view")
 
 
 def _strip_state(v):
