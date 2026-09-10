@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Stellungen aus FREI weiterspielt (Startpositions-Seeding), also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: Kette v1: Arena kein k1-Signal, Mechanik-Sonde positives Zustandssignal p = 0,017 (par.4c/4d). b03 GEFAHREN (par.7 Nachtrag 2026-09-05): 1.500 Stellungen, 6.000 Seeding-Partien, hoechster Kuppel-Bonus der v24-Arme. Weg C (par.9e) und Weg B/Ausflug (par.9f-9i) GEBAUT und seit v25 in der Erzeugung. Ziehungs-Konstanten stehen in self_play.rs, das angekuendigte par.9j wurde nie geschrieben (par.9k). Audit 2026-09-09 (par.9k): 11 % der Ausfluege weichen nicht ab, Abzweig zur Haelfte in Runde 1. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Lernt der Value-Kopf den Spaltenwert, wenn Self-Play von HALBFERTIGEN Stellungen aus FREI weiterspielt (Startpositions-Seeding), also On-Policy-Wertdaten statt erzwungener Trajektorien? | Beleg: Kette v1 (par.4c/4d: Arena kein k1-Signal, Zustandssignal p = 0,017), b03 gefahren (par.7), Weg C und Weg B/Ausflug gebaut und seit v25 in der Erzeugung (par.9e-9i); Audit par.9k (11 % der Ausfluege ohne Abweichung) und Dubletten-Fix par.9l (2026-09-10, Anker-Drift gruen). Offen nur Folgearme mit eigener Registrierung: Dosis, Abzweig-Verteilung gegen par.9b. -->
 
 # PREREG-SKELETT: Startpositions-Seeding -- frei weiterspielen ab halbfertigen Spalten
 
@@ -987,3 +987,28 @@ KORRIGIERTEN Datenlage; falsch ist die Begruendung in par.9b, nicht die Ziehungs
 Nachgetragen 2026-09-09 auf Nutzer-Rueckfrage; der erste Wortlaut dieses Punktes hatte es
 umgekehrt behauptet. Dazu: die Datenlage ist vom v21-Champion, der heutige baut 1,267 volle
 Spalten je Partie gegen den Anker (`anchor_arena_v26-b01.json`, n = 150).
+
+### par.9l DUBLETTEN-FIX GEBAUT (2026-09-10, 15:50-16:05)
+
+`deviation_best_action` (`engine/src/self_play.rs`) bekommt `exclude: Option<&Action>`; der
+Aufrufer reicht fuer BEIDE Quellen (Weg C und Ausflug) den Suchzug `d.chosen` durch, die
+Kandidaten werden aus den legalen Aktionen OHNE diesen gezogen (gleiche Ziehlogik, gleicher
+RNG-Aufruf, kuerzere Liste). Bleibt nach dem Ausschluss keine Aktion, `None`, und der
+Waechter aus par.9i verwirft den Ausflug. Die `[deviate]`-Logzeile nennt `kandidaten` auf
+der verkleinerten Menge. Bit-Identitaet zum Bestand gilt absichtlich NICHT: jede Erzeugung
+nach diesem Stand divergiert von den v25-v27-Klassen, sobald der Suchzug gezogen worden
+waere (Einfrieren ist beendet). Tests: 11 Abweichungs-Tests gruen (zwei neue: nie der
+ausgeschlossene Zug ueber 200 Seeds; leerer Pool -> None), `self_play::` 56 gruen,
+`cargo test --release --no-run` gruen (examples/benches gelinkt). Wheel gebaut und
+installiert, **Anker-Drift GRUEN** (1.763 Schritte identisch,
+`anchor_drift_live_wheel_20260910b.json`). Knopf-Texte `MOSAIC_DEVIATE_CANDIDATES` /
+`MOSAIC_EXCURSION_PROB` nachgezogen, `docs/knobs.md` regeneriert.
+
+**Ungemessen:** die neue Verwurfsrate (leerer Pool) und der Anteil abweichender Ausfluege
+nach dem Fix; beides liest sich aus der naechsten Erzeugung (`[excursion] VERWORFEN`-Zeilen,
+Messung wie par.9k). Punkt (2) aus par.9k (Abzweig frueh, Begruendung in par.9b veraltet)
+bleibt eine Nutzer-Frage fuer den naechsten Zuschnitt.
+
+**Damit sind alle in dieser Prereg registrierten Messungen und Bauten abgeschlossen**
+(Kette v1, b03, Weg C, Weg B, Dubletten-Fix). Folgearme (Dosis, Abzweig-Verteilung) brauchen
+eine eigene Registrierung; der Kopf geht auf ENTSCHIEDEN.

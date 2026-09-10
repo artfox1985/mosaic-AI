@@ -284,6 +284,7 @@ class OracleRecord:
     top_desc: str | None = None
     delta_win_pct: float | None = None
     ambiguous_match: bool = False
+    state_exact: bool = False  # 2026-09-10: Orakel auf dem exakten Zustand (Wissensbloecke) statt der Pool-Maske
 
 
 def deterministic_seed(log_name: str, turn_idx: int) -> int:
@@ -791,7 +792,15 @@ class Replayer:
             rec.reason = "--no-oracle"
             self.oracle_records.append(rec)
             return
-        state_json = self.g.state_json()
+        # 2026-09-10 (PREREG_dome_stack_information_sets.md par.12): das Orakel
+        # bekommt den EXAKTEN Zustand (verdeckte Reihenfolgen, Wissensbloecke),
+        # sobald das Wheel `state_json_exact` kennt. Vorher lief es auf dem
+        # Frontend-JSON, also auf der Pool-Maske mit Neumischung -- der POST-Lauf
+        # des Kuppelstapel-Umbaus war damit byte-gleich zum PRE-Lauf (16:30).
+        # Alt-Wheel: Rueckfall auf den bisherigen Weg, im Record vermerkt.
+        exact_fn = getattr(self.g, "state_json_exact", None)
+        state_json = exact_fn() if exact_fn is not None else self.g.state_json()
+        rec.state_exact = exact_fn is not None
         seed = deterministic_seed(self.log_name, self.turn_idx)
         try:
             out = evaluate_oracle(state_json, self.model_path, self.sims, self.c_puct, seed, kind, fields)

@@ -170,3 +170,7 @@ Generator `v26-b01`, je 4.000 Partien @100, threads 11, Cache-Waechter mit 3 Wor
 | Referee-Selbsttest, 2 Echtpartien | **67 s** | |
 | Paritaets-Fixture (cargo test, warmes target) | **rund 12 s** je Lauf | plus 43 s Kompilat |
 | Anker-Drift-Pruefung nach Wheel-Bau | **rund 25 s** | 1.763 Schritte |
+| A/B-Kante ueber den Referee, gleiches Netz, Live gegen Artefakt, n=150, 6 Prozesse | **2.515 s / 2.621 s** | rund 17 s je Partie |
+| Orakel-Replay einer Partie, 98 Entscheidungen @400 (exakter Zustand) | **rund 290 s** | je Lauf |
+| Null-Klammer-Sonde Stufe 0, 4.000 Partien plus 30 Logs, einkernig | **283 s** (360 s unter Fremdlast) | |
+| Wheel-Bau plus Install | **rund 30 s** (warmes target) | |

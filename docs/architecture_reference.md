@@ -105,9 +105,10 @@ Die Liste ist endlich und greppbar: `.shuffle(`, `choose_multiple`, Kuerzungen w
 
 | Stelle | Was | Urteil |
 | --- | --- | --- |
-| `net_mcts.rs:987` (via `:3952`) | Wurzel-Determinisierung, mischt den ganzen `dome_tile_pool` | **VERDAECHTIG**: nimmt auch die Rueckgabe-Reihenfolge, die der Spieler selbst gewaehlt hat (`game.rs:278`). `PREREG_dome_stack_information_sets.md` |
-| `round_transition_deep.rs:623` | `simulate_one_round` mischt den Stapel beim Eintritt | **VERDAECHTIG**, gleiche Klasse, zweite aktive Stelle |
-| `net_mcts.rs:4010`, `:4139`, `:4448` | Neumischen bei `DrawStackPeek` im Baum | RUHEND (`SHUFFLE_STACK_PEEK_IN_SEARCH = false`, `:904`; gemessen schlechter, 17 % -> 9 % Siege). Die Kommentare dort tragen dieselbe Praemisse mit dem blinden Fleck |
+| `net_mcts.rs:987` (via `:3952`) | Wurzel-Determinisierung, ruft seit 2026-09-10 `state::determinize_dome_pool(state, Some(current_player), rng)` statt `dome_tile_pool.shuffle` | **REPARIERT** (par.7 Variante A): modelliert die Informationsmenge des SUCHENDEN (`current_player`, unmittelbar danach als `root_player` gelesen). Weggenommen wird nur noch das unbekannte Praefix plus die Reihenfolge INNERHALB fremder Rueckgabe-Bloecke; der eigene Block bleibt stehen. `PREREG_dome_stack_information_sets.md` |
+| `round_transition_deep.rs:623` | `simulate_one_round` determinisiert den Stapel beim Eintritt, ebenfalls ueber `determinize_dome_pool`, aber mit `viewer = None` | **TEILWEISE**: Blockgrenzen und Blockmengen bleiben erhalten, die Reihenfolge in JEDEM Block faellt weg. Wessen Unwissen: keines einzelnen Spielers -- die Rollout-Kette liefert `[f64; 2]` fuer BEIDE Spieler und laeuft aus den Label-Pfaden (`self_play.rs:4238/4248/4258`, `:2827/:2835`, `lib.rs:1917`), nicht aus dem Baum eines Wurzelspielers. Konservativ: nimmt niemandem Wissen zu, gibt keinem Orakelwissen |
+| `net_mcts.rs:4010`, `:4139`, `:4448` | Neumischen bei `DrawStackPeek` im Baum, seit 2026-09-10 ueber `determinize_dome_pool(.., Some(mover), ..)` | RUHEND (`SHUFFLE_STACK_PEEK_IN_SEARCH = false`, `:904`; gemessen schlechter, 17 % -> 9 % Siege). Der blinde Fleck der Kommentare dort ist berichtigt ("volles Mischen ist exakt richtig" war falsch) |
+| `self_play.rs:5140` (`mean_rollout_diff`), `:5973` (`value_noise_floor_diagnostic`) | Diagnose-Rollouts wuerfeln das Verdeckte neu, seit 2026-09-10 ueber `determinize_dome_pool(.., None, ..)` | in Ordnung: Diagnose ohne Wurzelspieler, gleiche Klasse wie `round_transition_deep.rs:623`. Ohne bekannte Bloecke byte-identisch zum fruehreren `shuffle` |
 | `net_mcts.rs:1003` | verdeckte Bonuschips | in Ordnung -- und **das Vorbild**: aufgedeckte Fabrik-Chips bleiben ausdruecklich unangetastet |
 | `round_transition.rs` (8x), `round_transition_resample.rs:193`, `self_play.rs:5093` | Beutel und verdeckter Chip-Vorrat | in Ordnung: Reihenfolge ist echt verdeckt, die Multimenge bleibt erhalten |
 | `scoring.rs:106` | Auswahl der Wertungsplatten | Spielaufbau, keine Informationsfrage |
@@ -118,6 +119,15 @@ nie ENTSTEHT (fehlende Merkmale -- dafuer `PREREG_stack_top_feature.md`, Sicht-A
 wo sie falsch BEWERTET wird (dafuer `PREREG_score_clamp_incentive.md`). Die zweite Achse
 des Sicht-Audits -- was WEISS die Suche und was vergisst sie zwischen zwei Zuegen -- steht
 in jener Prereg par.11.
+
+**Der Wissensstand selbst** haengt seit 2026-09-10 im Zustand: `GameState::dome_pool_known_blocks`
+(`state.rs`, `KnownPoolBlock { len, returner }`) beschreibt das untere Ende des Stapels
+blockweise, aeltester Block zuerst; gepflegt an den vier Pool-Stellen in `game.rs`
+(`:183`/`:571`/`:984` Ziehen von oben, `:280`-Schleife Rueckgabe), geprueft von
+`state::dome_pool_knowledge_is_consistent`. Ueber die Referee-/Worker-Grenze geht er als
+`dome_pool_known_blocks_exact` (`serialize.rs`, `state_to_json_exact`/`json_to_state_exact`,
+tolerant gelesen); die gemeinsame Anzeige-Sicht `state_to_json` traegt ihn bewusst NICHT,
+weil er seitenabhaengig ist.
 
 **Regel fuer neue Stellen:** wer einen `shuffle` oder eine Kuerzung auf verdeckten Bestand
 neu einbaut, traegt ihn hier ein, mit der Antwort auf die beiden Fragen oben. Ein

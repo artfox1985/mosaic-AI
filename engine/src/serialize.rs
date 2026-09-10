@@ -1006,6 +1006,16 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
     // IDENTITÄTS-MENGE, Reihenfolge wird neu gewürfelt; die oberste Platte wird
     // danach per Tausch an `dome_stack_top_type` angepasst (einziger
     // Roundtrip-relevanter Rest, s.o.).
+    //
+    // Wissensstand ueber das untere Stapelende (`dome_pool_known_blocks`,
+    // PREREG_dome_stack_information_sets.md par.7 Variante A): bleibt hier
+    // LEER, und das ist konsistent statt nachlaessig -- diese Funktion baut
+    // den Pool aus einer blossen Maske neu und wuerfelt seine Reihenfolge neu
+    // aus; eine Blockgrenze aus dem alten Zustand haette danach keine
+    // Bedeutung mehr. Leer = "alles unbekannt" = exaktes Bestandsverhalten.
+    // Den echten Wissensstand traegt der exact-Pfad (`json_to_state_exact`,
+    // Feld `dome_pool_known_blocks_exact`), der die Reihenfolge woertlich
+    // wiederherstellt.
     let mask_json = get_arr(v, "dome_pool_mask")?;
     let mut dome_tile_pool: Vec<DomeTile> = crate::dome::build_dome_tile_pool()
         .into_iter()
@@ -1073,6 +1083,7 @@ pub fn json_to_state<R: Rng + ?Sized>(v: &Value, rng: &mut R) -> Result<GameStat
         large_factory,
         players,
         dome_tile_pool,
+        dome_pool_known_blocks: Vec::new(), // s.o.: Reihenfolge neu gewuerfelt -> alles unbekannt
         dome_display,
         bonus_chip_pool,
         pending_stack_draw,
@@ -1170,6 +1181,23 @@ pub fn state_to_json_exact(state: &GameState, scoring_confirmed: bool) -> Value 
         json!(state.bonus_chip_pool.iter().map(|c| c.chip_id).collect::<Vec<_>>()),
     );
     obj.insert("pending_dome_choice_exact".to_string(), pending_dome_choice_to_json(&state.pending_dome_choice));
+    // Wissensstand ueber das untere Stapelende (PREREG_dome_stack_information_
+    // sets.md par.7 Variante A, 2026-09-10). Gehoert in DIESE Funktion und
+    // nicht in `state_to_json`: der Wissensstand ist SEITENABHAENGIG (wer
+    // zurueckgelegt hat, kennt die Reihenfolge -- der Gegner nicht), und
+    // `state_to_json` ist die gemeinsame Anzeige-/Export-Sicht beider Seiten.
+    // Der exact-Pfad dagegen traegt ohnehin die vollstaendige verdeckte
+    // Ordnung (`dome_pool_order_exact`) ueber die Referee-/Worker-Grenze und
+    // ist damit die richtige Stelle. TOLERANT gelesen (fehlendes Feld ->
+    // leer = Bestandsverhalten), damit Alt-JSONs weiter laden.
+    obj.insert(
+        "dome_pool_known_blocks_exact".to_string(),
+        json!(state
+            .dome_pool_known_blocks
+            .iter()
+            .map(|b| json!({ "len": b.len, "returner": b.returner }))
+            .collect::<Vec<_>>()),
+    );
     // par.8e-Folge (Koordinator-Auftrag 2026-08-24, "Luecke im Pruefverfahren"):
     // ZWEI weitere additive Pflichtfelder, empirisch per erschoepfendem
     // Strukturvergleich (state vs rebuilt, nicht nur JSON vs JSON) gefunden --
@@ -1391,6 +1419,30 @@ pub fn json_to_state_exact(v: &Value) -> Result<GameState, String> {
             state.bag.tiles.len()
         ));
     }
+    // Wissensstand ueber das untere Stapelende (par.7 Variante A). TOLERANT:
+    // fehlt der Schluessel (exact-JSON aus einer aelteren Engine), bleibt die
+    // Liste leer -- "alles unbekannt", also exaktes Bestandsverhalten. Ein
+    // hartes Pflichtfeld wuerde jedes Bestands-JSON unlesbar machen (gleiche
+    // Abwaegung wie bei den `long_rows_*_exact`-Zaehlern unten).
+    state.dome_pool_known_blocks = match v.get("dome_pool_known_blocks_exact").and_then(|x| x.as_array()) {
+        Some(arr) => arr
+            .iter()
+            .filter_map(|b| {
+                let len = b.get("len").and_then(|x| x.as_u64())? as usize;
+                let returner = b.get("returner").and_then(|x| x.as_u64())? as usize;
+                (len > 0).then_some(crate::state::KnownPoolBlock { len, returner })
+            })
+            .collect(),
+        None => Vec::new(),
+    };
+    if !crate::state::dome_pool_knowledge_is_consistent(&state) {
+        return Err(format!(
+            "json_to_state_exact: dome_pool_known_blocks_exact inkonsistent (Bloecke {:?}, Pool {})",
+            state.dome_pool_known_blocks,
+            state.dome_tile_pool.len()
+        ));
+    }
+
     let dome_stack_count = get_u64(v, "dome_stack_count")? as usize;
     if state.dome_tile_pool.len() != dome_stack_count {
         return Err(format!(
@@ -1602,6 +1654,12 @@ mod json_to_state_exact_tests {
                 b.dome_tile_pool.iter().map(|t| t.tile_id).collect::<Vec<_>>()
             ));
         }
+        if a.dome_pool_known_blocks != b.dome_pool_known_blocks {
+            out.push(format!(
+                "dome_pool_known_blocks: {:?} != {:?}",
+                a.dome_pool_known_blocks, b.dome_pool_known_blocks
+            ));
+        }
         if a.dome_display != b.dome_display {
             out.push(format!(
                 "dome_display: {:?} != {:?}",
@@ -1806,6 +1864,36 @@ mod json_to_state_exact_tests {
         let mut rng = StdRng::seed_from_u64(31);
         let state = crate::state::setup_new_game(names(), 0, &mut rng);
         assert_roundtrip_exact(&state, "frischer Spielstart (start_placement)");
+    }
+
+    /// (c) JSON-Roundtrip MIT bekannten Rueckgabe-Bloecken
+    /// (PREREG_dome_stack_information_sets.md par.7 Variante A): das neue Feld
+    /// `dome_pool_known_blocks_exact` muss ueber die Referee-/Worker-Grenze
+    /// kommen -- `diff_game_states` vergleicht es seit demselben Patch mit.
+    #[test]
+    fn roundtrip_exact_carries_dome_pool_known_blocks() {
+        let mut rng = StdRng::seed_from_u64(77);
+        let mut state = crate::state::setup_new_game(names(), 0, &mut rng);
+        state.note_dome_pool_return(2, 0);
+        state.note_dome_pool_return(1, 1);
+        assert_roundtrip_exact(&state, "Kuppelstapel mit zwei bekannten Bloecken");
+
+        let json = state_to_json_exact(&state, true);
+        let rebuilt = json_to_state_exact(&json).expect("exact-Roundtrip");
+        assert_eq!(rebuilt.dome_pool_known_blocks, state.dome_pool_known_blocks);
+
+        // Tolerant: fehlt das Feld (exact-JSON einer aelteren Engine), bleibt
+        // die Liste leer = Bestandsverhalten, kein harter Fehler.
+        let mut json_old = json.clone();
+        json_old.as_object_mut().unwrap().remove("dome_pool_known_blocks_exact");
+        let rebuilt_old = json_to_state_exact(&json_old).expect("Alt-JSON muss weiter laden");
+        assert!(rebuilt_old.dome_pool_known_blocks.is_empty());
+
+        // `state_to_json` (Anzeige-/Export-Sicht beider Seiten) traegt den
+        // seitenabhaengigen Wissensstand bewusst NICHT.
+        let plain = state_to_json(&state, true);
+        assert!(plain.get("dome_pool_known_blocks_exact").is_none());
+        assert!(plain.get("dome_pool_known_blocks").is_none());
     }
 
     #[test]

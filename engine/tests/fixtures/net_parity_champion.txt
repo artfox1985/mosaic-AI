@@ -18,4 +18,4 @@
 champion	v27-b01_brierbest
 erzeugt	2026-09-10
 engine	0.1.0
-hash	9232a97d1267875e
+hash	5e3b1362ddc65fa6

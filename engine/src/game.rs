@@ -180,6 +180,10 @@ pub fn execute_draw_stack_peek(state: &mut GameState) -> Result<(), String> {
     // KAUF (−1 Pkt), keine Strafe -- bei 0 Punkten laut Regelbuch wirklich
     // gratis, siehe `apply_paid_cost`-Kommentar (Abgrenzung zu Fund 7).
     state.players[pi].apply_paid_cost(-1);
+    // Wissensstand nachziehen, BEVOR die Platte weg ist (par.7 Variante A):
+    // ist das unbekannte Praefix leer, frisst die Ziehung eine Position des
+    // aeltesten bekannten Blocks.
+    state.note_dome_pool_draw_from_top();
     let tile = state.dome_tile_pool.remove(0);
     let typ = if tile.is_special_type() { "Special" } else { "Wild" };
     state.pending_stack_draw.push(tile);
@@ -281,6 +285,15 @@ pub fn execute_draw_from_stack(state: &mut GameState, m: &DrawFromStackMove) -> 
         }
     }
     if n_returned > 0 {
+        // Wissensstand (PREREG_dome_stack_information_sets.md par.7 Variante A):
+        // EIN Block je Rueckgabe, ganz unten am Stapel. `pi` kennt seine
+        // Reihenfolge, der Gegner nur die Menge -- siehe
+        // state.rs::determinize_dome_pool.
+        state.note_dome_pool_return(n_returned, pi);
+        debug_assert!(
+            crate::state::dome_pool_knowledge_is_consistent(state),
+            "Rueckgabe hat den Kuppelstapel-Wissensstand zerrissen"
+        );
         state.log_event(format!(
             "↩️ {n_returned} Kuppelplatte(n) zurueck unter den Stapel"
         ));
@@ -568,6 +581,7 @@ pub fn apply_start_placement(
     let mut tile = state.dome_display.remove(idx);
     if !state.dome_tile_pool.is_empty() {
         // Nachziehen an dieselbe Display-Position, damit übrige Karten ihren Platz behalten.
+        state.note_dome_pool_draw_from_top();
         let refill = state.dome_tile_pool.remove(0);
         state.dome_display.insert(idx, refill);
     }
@@ -981,6 +995,7 @@ impl Game {
     /// Bereitet die nächste Runde vor: Display auf 3 auffüllen, dann setup_new_round.
     fn next_round<R: Rng + ?Sized>(&mut self, rng: &mut R) {
         while self.state.dome_display.len() < 3 && !self.state.dome_tile_pool.is_empty() {
+            self.state.note_dome_pool_draw_from_top();
             let t = self.state.dome_tile_pool.remove(0);
             self.state.dome_display.push(t);
         }
@@ -1523,5 +1538,154 @@ mod tests {
         }
         assert!(checked_dome > 0, "Testvoraussetzung: mind. ein ChooseDomeSlot-Kandidat gesehen");
         assert!(checked_draw_stack > 0, "Testvoraussetzung: mind. ein ChooseDrawStackSlot-Kandidat gesehen");
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Kuppelstapel-Wissensstand ueber eine ganze Partie
+// (PREREG_dome_stack_information_sets.md par.7 Variante A, 2026-09-10)
+// ═══════════════════════════════════════════════════════════════════════════
+#[cfg(test)]
+mod dome_pool_knowledge_game_tests {
+    use super::*;
+    use crate::state::dome_pool_knowledge_is_consistent;
+    use rand::rngs::StdRng;
+    use rand::RngExt as _;
+    use rand::SeedableRng;
+
+    fn names() -> [String; NUM_PLAYERS] {
+        ["P1".into(), "P2".into()]
+    }
+
+    /// (a) Ziehen und Rueckgabe halten die Invariante ueber ganze Partien:
+    /// nach JEDER Aktion (Drafting wie Tiling wie Rundenwechsel) muss der
+    /// Wissensstand konsistent sein UND die Blockstruktur muss zum Pool
+    /// passen (Summe der Blocklaengen <= Poolgroesse). Zusaetzlich wird
+    /// belegt, dass ueberhaupt Bloecke entstehen und wieder abgebaut werden --
+    /// ein Test, der nur leere Bloecke sieht, prueft nichts.
+    #[test]
+    fn dome_pool_knowledge_stays_consistent_over_full_games() {
+        let mut n_steps = 0usize;
+        let mut n_blocks_created = 0usize;
+        let mut max_known = 0usize;
+        let mut saw_block_consumed = false;
+        for seed in 1u64..=40 {
+            let mut rng = StdRng::seed_from_u64(seed.wrapping_mul(97).wrapping_add(1));
+            let first_player = (seed % 2) as usize;
+            let mut game =
+                Game::start(names(), first_player, crate::scoring::sample_valid_scoring_ids(3, &mut rng), &mut rng);
+            for pi in [1 - first_player, first_player] {
+                let (tile_id, r, c, rot) = crate::self_play::choose_start_placement(&game.state, pi).unwrap();
+                crate::game::apply_start_placement(&mut game.state, pi, tile_id, r, c, rot).unwrap();
+                assert!(dome_pool_knowledge_is_consistent(&game.state), "Startplatzierung seed={seed}");
+            }
+            let mut steps = 0u32;
+            const MAX_STEPS: u32 = 4000;
+            let mut prev_known: usize = 0;
+            while game.state.round_number <= NUM_ROUNDS && steps < MAX_STEPS {
+                steps += 1;
+                match game.state.phase {
+                    Phase::Drafting => {
+                        let actions = drafting_actions(&game.state);
+                        if actions.is_empty() {
+                            break;
+                        }
+                        let idx = rng.random_range(0..actions.len());
+                        if game.apply_drafting(&actions[idx]).is_err() {
+                            break;
+                        }
+                    }
+                    Phase::Tiling => {
+                        for pi in 0..2 {
+                            loop {
+                                let acts = game.valid_tiling_actions(pi);
+                                let Some(a) = acts.first().copied() else { break };
+                                if game.apply_single_tiling(pi, &a).is_err() {
+                                    break;
+                                }
+                            }
+                            if game.apply_tiling(&TilingMove::EndTiling { player: pi }, &mut rng).is_err() {
+                                break;
+                            }
+                        }
+                    }
+                    Phase::End => {
+                        let _ = game.apply_end_scoring();
+                        break;
+                    }
+                    _ => break,
+                }
+                n_steps += 1;
+                assert!(
+                    dome_pool_knowledge_is_consistent(&game.state),
+                    "seed={seed} Schritt {steps}: Wissensstand inkonsistent (Bloecke {:?}, Pool {})",
+                    game.state.dome_pool_known_blocks,
+                    game.state.dome_tile_pool.len()
+                );
+                let known: usize = game.state.dome_pool_known_blocks.iter().map(|b| b.len).sum();
+                if known > prev_known {
+                    n_blocks_created += 1;
+                }
+                if known < prev_known {
+                    saw_block_consumed = true;
+                }
+                max_known = max_known.max(known);
+                prev_known = known;
+            }
+            assert!(steps < MAX_STEPS, "seed={seed}: MAX_STEPS erreicht");
+        }
+        assert!(n_steps > 500, "erwartet viele gepruefte Schritte, waren {n_steps}");
+        assert!(n_blocks_created > 10, "erwartet, dass Rueckgabe-Bloecke entstehen, waren {n_blocks_created}");
+        assert!(max_known > 0, "erwartet mindestens einen bekannten Block");
+        assert!(
+            saw_block_consumed,
+            "erwartet, dass ein bekannter Block irgendwann von oben aufgebraucht wird (Rundenauffuellung/Ziehung)"
+        );
+    }
+
+    /// Die Rueckgabe selbst: EIN Block je Rueckgabe, `len` = Zahl der
+    /// zurueckgelegten Platten, `returner` = ziehender Spieler, und der Block
+    /// beschreibt tatsaechlich das untere Ende des Pools.
+    #[test]
+    fn return_creates_one_block_with_the_returned_tiles_at_the_bottom() {
+        let mut rng = StdRng::seed_from_u64(4);
+        let mut game = Game::start(names(), 0, crate::scoring::sample_valid_scoring_ids(3, &mut rng), &mut rng);
+        for pi in [1, 0] {
+            let (tile_id, r, c, rot) = crate::self_play::choose_start_placement(&game.state, pi).unwrap();
+            crate::game::apply_start_placement(&mut game.state, pi, tile_id, r, c, rot).unwrap();
+        }
+        let pi = game.state.current_player;
+        // Drei Platten ziehen -> zwei gehen zurueck.
+        for _ in 0..3 {
+            crate::game::execute_draw_stack_peek(&mut game.state).unwrap();
+        }
+        assert!(game.state.dome_pool_known_blocks.is_empty(), "vor der Rueckgabe ist nichts bekannt");
+        let drawn: Vec<usize> = game.state.pending_stack_draw.iter().map(|t| t.tile_id).collect();
+        let mut free = None;
+        'slots: for r in 0..3 {
+            for c in 0..3 {
+                if game.state.players[pi].dome_grid.dome_slots[r][c].is_none() {
+                    free = Some((r, c));
+                    break 'slots;
+                }
+            }
+        }
+        let free = free.expect("freier Kuppel-Slot");
+        let m = DrawFromStackMove {
+            chosen_id: drawn[0],
+            slot_row: free.0,
+            slot_col: free.1,
+            rotation: 0,
+            return_order: vec![drawn[2], drawn[1]], // bewusst NICHT die Ziehreihenfolge
+        };
+        crate::game::execute_draw_from_stack(&mut game.state, &m).unwrap();
+
+        assert_eq!(game.state.dome_pool_known_blocks.len(), 1);
+        assert_eq!(game.state.dome_pool_known_blocks[0].len, 2);
+        assert_eq!(game.state.dome_pool_known_blocks[0].returner, pi);
+        let n = game.state.dome_tile_pool.len();
+        let bottom: Vec<usize> = game.state.dome_tile_pool[n - 2..].iter().map(|t| t.tile_id).collect();
+        assert_eq!(bottom, vec![drawn[2], drawn[1]], "der Block liegt in der gewaehlten Reihenfolge unten");
+        assert!(dome_pool_knowledge_is_consistent(&game.state));
     }
 }

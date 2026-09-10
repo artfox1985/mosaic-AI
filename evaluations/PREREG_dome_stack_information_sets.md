@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das Wissen ueber den Kuppelstapel je Spieler modelliert, sodass die Suche weder Orakelwissen hat noch ihr EIGENES Wissen vergisst? | Beleg: nichts gebaut. Ursache am Code geprueft: die Suche mischt den ganzen dome_tile_pool und vergisst die Rueckgabe-Reihenfolge, die sie selbst gewaehlt hat (net_mcts.rs:987, game.rs:278); Naht-Audit fand ZWEI aktive Mischstellen (par.10). Ueber 23 Mensch-Partien gemessen: die Ziehtiefe haengt an Wertungsplatte 6, Median 4 ohne gegen 22,5 mit (par.13a). KORREKTHEITS-Fix, haengt nicht an einer Messung. Start nach dem Arm v27-b01. Offen: Bauvariante. -->
+<!-- STATUS: OFFEN | Frage: Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | Beleg: VARIANTE A GEBAUT 2026-09-10 (par.15; Anker-Drift gruen, Fixture 5e3b1362ddc65fa6). A/B gleiches Netz, Live gegen Artefakt: 165:135 gepoolt (55 %, p 0,09), kein Ruecklauf, Fix bleibt (par.15b). PRE/POST auf dem exakten Zustand (par.15c): nur R3 aendert sich, Q des Weiterziehens sinkt um 0,005-0,02, Raenge bleiben; die Erwartung 'Wiederholungsziehung faellt auf nahe null' tritt an der Referenzpartie NICHT ein. Offen: Diagnostik ueber breitere Grundmenge, dann Variante B (Merkmale). -->
 
 # PREREG: Informationsmengen am Kuppelstapel
 
@@ -548,3 +548,126 @@ Zeilen, davon 99 mit `evaluated: true` (Agentenbefund am Artefakt); das Artefakt
 Entscheid) ist jetzt der Kommentarblock ab `game.rs:263`, die Logzeile steht bei
 `game.rs:285`, die Replayer-Regex bei `analyze_game_log.py:171`. Die Verweise in
 par.3 und par.14 oben sind Stand vor dem Patch und werden nicht rueckwirkend umgeschrieben.
+
+## par.15 VARIANTE A GEBAUT (2026-09-10, 16:05-16:25); POST-Lauf und A/B-Kante laufen
+
+**Entscheid (Koordinator, unter dem Auftrag "Nach-v27-Programm starten"): A zuerst, B additiv
+danach, falls A traegt.** Nahtbreite vor dem Schnitt gemessen: 144 Nennungen von
+`dome_tile_pool` in 16 Dateien; Zieh-/Rueckgabestellen `game.rs` 183/280/571/984, aktive
+Mischstellen `net_mcts.rs:987` und `round_transition_deep.rs:623`, drei ruhende hinter
+`SHUFFLE_STACK_PEEK_IN_SEARCH`, Roundtrip-Neumischung `serialize.rs:1014`.
+
+**Bauform** (Opus-Agent, gegengelesen): `GameState::dome_pool_known_blocks: Vec<KnownPoolBlock
+{len, returner}>` beschreibt das SUFFIX des Stapels (aeltester Block zuerst); Pflege vor jedem
+`remove(0)` (game.rs 186/584/998) und nach jeder Rueckgabe (game.rs 292, ein Block je
+Rueckgabe). `determinize_dome_pool(state, viewer, rng)` (state.rs) mischt das unbekannte
+Praefix, laesst den eigenen Block in Reihenfolge stehen und permutiert fremde Bloecke nur in
+sich, exakt die Sicht aus par.4 mit dem Entscheid aus par.14 Punkt 3. Wurzel-Determinisierung
+(`net_mcts.rs:996`) mit viewer = Suchender; `round_transition_deep.rs:634` mit viewer = None
+(Label-/Bootstrap-Rollouts fuer beide Seiten: Blockgrenzen und -mengen bleiben, Reihenfolge in
+jedem Block faellt; dokumentiert). Chip-Determinisierung unveraendert. JSON: nur im
+exact-Pfad (`state_to_json_exact`, Referee/Golden-Probe), tolerant fuer Alt-Artefakte; das
+Frontend-JSON traegt das Feld NICHT (keine viewer-abhaengige Sicht dort; Anzeige der eigenen
+Blockgroessen waere ein eigener additiver Schnitt). Bestandsfall (keine Bloecke) byte-identisch
+zum alten `shuffle`, als Test festgeschrieben. Mischstellen-Liste in
+`docs/architecture_reference.md` nachgezogen, `MOSAIC_NUM_DETERMINIZATIONS`-Text auch.
+
+**Tests:** 9 neue (40 Partien mit Konsistenzpruefung nach jeder Aktion; 200 Seeds je
+Richtung fuer eigener Block identisch / fremder Block Permutation / Praefix Permutation /
+Multimenge gleich; exact-Roundtrip), Suite 563 gruen + 1 erwartet rot: die
+Netz-Paritaets-Fixture, weil die Suche sich absichtlich aendert (Kausalitaet per Schalter
+belegt: mit Vollmischung alter Hash 9232a97d1267875e). Fixture neu erzeugt und frisch
+geprueft: **5e3b1362ddc65fa6**. Wheel gebaut, **Anker-Drift GRUEN**
+(`anchor_drift_live_wheel_20260910c.json`, 1.763 Schritte; `mcts.rs` mischt den Pool nicht).
+
+**Laeuft seit 16:26:** POST-Lauf der Referenzpartie (par.12, gleiches Netz v25-b01 @400,
+`replay_dome_stack_post.json`) und die Staerke-Kante nach par.8 in der einzigen sauberen Form:
+Live-Engine MIT Umbau gegen das v27-b01-Artefakt OHNE Umbau (Wheel vom Vormittag), gleiches
+Netz, `frozen_referee_match`, 150 Partien, Seed-Basis 20261060
+(`dome_stack_ab_v27-b01_live_vs_artifact_s60.json`). Par.8 verlangt gepaartes Gating mit
+Bloecken zu 5 und zwei Seeds; der Referee pairt nicht. Bei einem Ergebnis nahe 50 % folgt
+ein zweiter Seed; das Verdikt "Korrektheits-Fix bleibt, Ruecklauf nicht" gilt.
+
+**Nebenbefund des Agenten:** die "24 Mischstellen" in `docs/architecture_reference.md` sind
+ein datierter Stand (2026-09-09); ein roher Grep ueber `.shuffle(|choose_multiple` liefert
+heute 39 inklusive Testcode. Die Grundmenge der 24 ist nicht reproduziert.
+
+### par.15a POST-Lauf war blind, erste A/B-Kante (2026-09-10, 16:30-17:15)
+
+**POST-Lauf (par.12) byte-gleich zum PRE-Lauf, an allen 99 bewerteten Entscheidungen,
+Rang und Q bis auf die dritte Stelle.** Das ist kein Nullbefund, sondern ein Messfehler im
+Instrument: `analyze_game_log.evaluate_oracle` reicht das Frontend-JSON (`PyGame.state_json`,
+Pool als MASKE) an `net_search_state_json`, und das rekonstruiert den Zustand ueber
+`serialize::json_to_state` mit Neumischung des Pools (`serialize.rs:1010-1014`). Die
+Wissensbloecke konnten dort per Konstruktion nie ankommen; die verdeckte Reihenfolge ebenso
+wenig. Der PRE-Lauf hatte also nie den Stapel gesehen, den die Partie hatte. Behoben
+(ungebaut, wartet auf freie Maschine): `PyGame::state_json_exact` (py.rs, exakte Reihenfolgen
+plus Bloecke), `net_search_state_json` rekonstruiert bei vorhandenen `*_exact`-Feldern exakt
+(lib.rs), `analyze_game_log.py` nutzt es, Feld `state_exact` im Orakel-Record. Danach
+PRE und POST beide auf dem exakten Zustand neu fahren (der alte PRE-Lauf bleibt als
+Artefakt liegen, wird aber nicht mehr verglichen).
+
+**A/B-Kante, Seed-Basis 20261060, 150 Partien, Referee** (Live-Engine MIT Variante A gegen
+das v27-b01-Artefakt OHNE, gleiches Netz, Handshake gruen, Golden-Selbsttest 10/10,
+Erstspieler 75/75, 2.515 s): **83:67 fuer die Live-Seite** (55,3 %), zweiseitig binomial
+p 0,22. Kein Ruecklauf, nicht signifikant; zweiter Seed (20261300) laeuft seit 17:12.
+
+### par.15b A/B-Kante komplett (2026-09-10, 16:30-17:57): kein Ruecklauf, Richtung positiv
+
+| Seed-Basis | Live MIT Variante A : Artefakt OHNE | Anteil | zweiseitig binomial p |
+| --- | --- | --- | --- |
+| 20261060 | 83:67 | 0,553 | 0,22 |
+| 20261300 | 82:68 | 0,547 | 0,29 |
+| **gepoolt** | **165:135** | **0,550** | **0,094** |
+
+Gleiches Netz `v27-b01_brierbest` @400 auf beiden Seiten, Champion-Spec, Referee mit dem
+Wheel des Artefakts vom 2026-09-10 10:10 (ohne Umbau) gegen die Live-Engine (mit Umbau),
+Handshake gruen, Golden-Selbsttest 10/10 in beiden Laeufen, Erstspieler je 75/75, je rund
+43 min auf 6 Prozessen. Einheit: Partien, ungepaart (der Referee pairt nicht; par.8 hatte
+gepaartes Gating mit Bloecken zu 5 vorgesehen, das geht mit zwei Engines in einem Prozess
+nicht). **Verdikt nach par.8: Korrektheits-Fix bleibt; kein Ruecklauf, beide Seeds vorn,
+gepoolt 55 % bei p 0,09.** Die Staerkefrage ist damit nicht entschieden, aber sie war
+nicht das Kriterium. Die eigentliche Erwartung (Wiederholungsziehung in bekannten Stapelteil
+faellt) misst der exakte POST-Lauf (par.15a); Variante B (Merkmale) bleibt vorgemerkt.
+
+### par.15c PRE/POST auf dem EXAKTEN Zustand (2026-09-10, 18:01-18:11): Wissen allein bewegt die Ziehungen kaum
+
+Instrument repariert (par.15a): `PyGame::state_json_exact`, exakte Rekonstruktion im
+Orakel-Einstieg, Knopf `MOSAIC_DOME_POOL_KNOWLEDGE` (=0 Vollmischung) fuer den PRE-Lauf auf
+demselben Wheel; Wheel gebaut, Anker-Drift GRUEN (`anchor_drift_live_wheel_20260910d.json`),
+Suite 564 gruen. Beide Laeufe: Referenzpartie, Netz `v25-b01_brierbest` @400, exakter Zustand
+in 98/98 bewerteten Entscheidungen (`replay_dome_stack_pre_exact.json`,
+`replay_dome_stack_post_exact.json`, Vergleich `dome_stack_pre_post_compare.json`, Werkzeug
+`tools/probes/dome_stack_pre_post_compare.py`).
+
+| Stelle | Rang PRE / POST | Q PRE / POST | Wurzel PRE / POST |
+| --- | --- | --- | --- |
+| R1, Ziehungen 1-13 (turn 11-23) | identisch (13, 1, 3, 1, 2, 1 x 8) | identisch | identisch |
+| R2, Spieler 1 zieht 2 (turn 46-47) | identisch (16, 3) | identisch | identisch |
+| R3, KI zieht 5 in den EIGENEN bekannten Block (turn 75-79) | 2, 1, 1, **5 -> 6**, 5 | 0,306 / 0,306; **0,329 -> 0,308**; 0,318 -> 0,314; 0,295 -> 0,290; 0,288 / 0,288 | 0,283 -> 0,278; 0,268 -> 0,263; 0,265 -> 0,259; 0,295 -> 0,290; 0,270 / 0,270 |
+| R4 (turn 110-111) | identisch | identisch | identisch |
+
+31 von 98 Entscheidungen aendern sich irgendwo in Rang oder Q (die uebrigen Aenderungen
+liegen ausserhalb der Stapelzuege, nach R3). Rang-1-Anteil der Stapelzuege 15/25 in beiden
+Laeufen, mittlerer Rang 2,80 gegen 2,84.
+
+**Lesart.** R1 und R2 sind per Konstruktion gleich: in R1 gibt es noch keinen Block, in R2
+ist der ganze Stapel EIN fremder Block (Permutation in sich = Vollmischung). Der einzige
+Ort, an dem Variante A etwas wissen kann, ist R3: die KI zieht fuenfmal in den Stapel, dessen
+Oberseite ihr eigener Rueckgabe-Block aus R1 ist. Dort sinkt der Wert des Weiterziehens um
+0,005 bis 0,02 und ein Rang rutscht um eins; die Ziehungen 2 und 3 bleiben Rang 1. **Die
+vorregistrierte Erwartung aus par.8 (Wiederholungsziehung in bekannten Stapelteil "faellt auf
+nahe null") tritt an dieser Partie NICHT ein.** Das Wissen ist jetzt in der Suche, aber die
+Suche haelt das Ziehen trotzdem fuer richtig; ob wegen des Preises (par.4b: Ziehen kauft
+die beste Platte JETZT, in R3 bezahlt die KI von 6 auf 1) oder weil der Value-Kopf den
+Vorteil einer bekannten Reihenfolge nicht sieht (er hat kein Merkmal dafuer, Variante B),
+trennt diese eine Partie nicht. n = 1 Partie, 5 Entscheidungen im Wirkbereich.
+
+**Folgen.** (1) Der Korrektheits-Fix bleibt (par.8, A/B ohne Ruecklauf, par.15b). (2) Die
+Diagnostik aus par.8 braucht eine breitere Grundmenge: dieselbe Messung ueber die 30
+Mensch-Logs und eine Stichprobe Self-Play-Partien, gezaehlt als "Ziehung, waehrend die
+Oberseite zum eigenen Block gehoert" gegen den Wissensstand aus `dome_pool_known_blocks`
+(Werkzeug fehlt noch, par.14 Punkt 4). (3) Variante B (Merkmale: Groesse und Zusammensetzung
+des eigenen Blocks) ist der naechste Hebel, damit die POLICY das Wissen nutzt, nicht nur die
+Suche; Bau erst nach (2). (4) Kopplung zur Null-Klammer (`score_clamp` par.10): die
+Gratis-Ziehungen bei Stand 0 sind die andere Haelfte derselben Frage.

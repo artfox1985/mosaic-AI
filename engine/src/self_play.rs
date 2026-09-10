@@ -1728,18 +1728,49 @@ fn deviation_candidates_from<R: Rng + ?Sized>(
 /// Werte gar nicht erst durch, aber die Funktion soll auch bei direktem
 /// Aufruf nicht in die "ein Kandidat ist automatisch der beste"-Entartung
 /// laufen.
+///
+/// `exclude` (2026-09-09, `PREREG_start_position_seeding.md` par.9k): die
+/// Aktion, VON DER abgewichen werden soll -- der Zug der Suche. Sie wird VOR
+/// der Ziehung aus der Kandidatenmenge entfernt, sonst kann die "Abweichung"
+/// genau den Suchzug reproduzieren. Gemessen am v26-Material war das in 11 %
+/// der Ausfluege der Fall (n = 200 Paare), womit die Zusage aus par.9i
+/// ("genau EIN Zug anders") nur fuer 89 % galt. Bleibt nach dem Ausschluss
+/// keine Aktion uebrig, kommt `None` zurueck -- beim Ausflug greift dann der
+/// Dubletten-Waechter in `run_net_self_play` und verwirft ihn.
+///
+/// **Bit-Identitaet zum Bestand gilt hier NICHT.** Die Ziehlogik und der
+/// RNG-Aufruf sind unveraendert, aber sie laufen auf der um eine Aktion
+/// verkuerzten Liste: sobald der Suchzug gezogen worden WAERE, faellt die
+/// Ziehung anders aus, und damit auch der Rest der Partie. Das ist
+/// beabsichtigt und in par.9k registriert; die Erzeugung nach dem Einfrieren
+/// von v27-b01 darf sich an dieser Stelle aendern. Mit `exclude = None`
+/// (nur Tests) ist das Verhalten unveraendert.
 fn deviation_best_action<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
     actions: &[Action],
     player: usize,
     want: usize,
+    exclude: Option<&Action>,
     rng: &mut R,
 ) -> Option<Action> {
     if actions.len() < 2 {
         return None;
     }
-    let candidates = deviation_candidates_from(actions, want.max(2), rng);
+    // Kandidatenmenge OHNE den Suchzug. `exclude = None` laesst `actions`
+    // unangetastet (Bestandsverhalten, kein Klon der Liste).
+    let filtered: Vec<Action>;
+    let pool: &[Action] = match exclude {
+        None => actions,
+        Some(x) => {
+            filtered = actions.iter().filter(|a| *a != x).cloned().collect();
+            &filtered
+        }
+    };
+    if pool.is_empty() {
+        return None;
+    }
+    let candidates = deviation_candidates_from(pool, want.max(2), rng);
     let mut best: Option<(f64, Action)> = None;
     for a in candidates {
         let mut probe = Game {
@@ -2384,8 +2415,9 @@ struct GameLoopConfig<'a> {
     is_excursion: bool,
     /// Weg B: meldet zurueck, ob die erzwungene Abweichung TATSAECHLICH
     /// stattgefunden hat. Sie kann ausfallen -- der Vorzugs-Waechter greift
-    /// (`d.vorzug.is_some()`), oder `deviation_best_action` findet bei weniger
-    /// als zwei Aktionen keinen Kandidaten. Dann spielt der Ausflug die
+    /// (`d.vorzug.is_some()`), oder `deviation_best_action` findet keinen
+    /// Kandidaten (weniger als zwei legale Aktionen, oder nach dem Ausschluss
+    /// des Suchzugs bleibt keine uebrig, par.9k). Dann spielt der Ausflug die
     /// Abzweigstellung nur GREEDY nach; weil die Hauptpartie in den
     /// Weg-B-Klassen ebenfalls greedy laeuft (`--tau-argmax-from-move 1`),
     /// waere sein Ergebnis eine exakte DUBLETTE ihrer Fortsetzung. Solche
@@ -2634,12 +2666,25 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                         cfg.game_seed ^ distinguisher,
                                         seed_counter,
                                     ));
+                                // par.9k (2026-09-09): der Suchzug ist aus der
+                                // Kandidatenmenge AUSGESCHLOSSEN -- fuer BEIDE
+                                // Quellen. Eine "Abweichung", die den Suchzug
+                                // reproduziert, ist in beiden Faellen keine:
+                                // beim Ausflug (Weg B) bricht sie die Zusage
+                                // "genau EIN Zug anders" (gemessen 11 % von
+                                // 200 Paaren), bei Weg C ersetzt sie `d.chosen`
+                                // durch sich selbst und die Partie ist trotz
+                                // `[deviate]`-Zeile unabgewichen.
+                                let search_action = d.chosen.clone();
+                                let pool_len =
+                                    actions.iter().filter(|a| **a != search_action).count();
                                 if let Some(a) = deviation_best_action(
                                     net,
                                     &game.state,
                                     &actions,
                                     player,
                                     want,
+                                    Some(&search_action),
                                     &mut deviate_rng,
                                 ) {
                                     if quelle == "ausflug" {
@@ -2663,7 +2708,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                         round_move_index,
                                         player,
                                         actions.len(),
-                                        want.max(2).min(actions.len())
+                                        want.max(2).min(pool_len)
                                     );
                                     d.chosen = a;
                                 }
@@ -4808,8 +4853,9 @@ pub fn run_net_self_play(
             match ex_result {
                 // Der Ausflug zaehlt NUR, wenn seine erzwungene Abweichung
                 // wirklich zustande kam. Faellt sie aus -- Vorzugs-Waechter
-                // greift, oder `deviation_best_action` findet bei weniger als
-                // zwei Aktionen keinen Kandidaten --, hat der Ausflug die
+                // greift, oder `deviation_best_action` findet keinen Kandidaten
+                // (weniger als zwei legale Aktionen, oder nach dem Ausschluss
+                // des Suchzugs bleibt keine uebrig, par.9k) --, hat der Ausflug die
                 // Abzweigstellung bloss greedy nachgespielt. Da die Hauptpartie
                 // in den Weg-B-Klassen ebenfalls greedy laeuft, waere das eine
                 // exakte DUBLETTE ihrer Fortsetzung: dieselben Zuege, dieselben
@@ -5091,7 +5137,11 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
         // Kuppel-Auslage) bleibt unveraendert -- nur das wirklich Verdeckte
         // wird neu resampelt.
         g.state.bag.tiles.shuffle(rng);
-        g.state.dome_tile_pool.shuffle(rng);
+        // par.7 Variante A (2026-09-10): bekannte Rueckgabe-Bloecke bleiben
+        // Bloecke, nur in sich permutiert -- kein Blickwinkel (Diagnose-
+        // Rollout, keine Wurzel eines Spielers). Ohne Bloecke identisch zum
+        // fruehreren `dome_tile_pool.shuffle(rng)`.
+        crate::state::determinize_dome_pool(&mut g.state, None, rng);
         // `first_action` wurde vom Aufrufer gegen den urspruenglichen
         // (sichtbaren) Zustand als legal ermittelt -- das Reshuffle oben
         // betrifft nur die verdeckte Reihenfolge (Beutel-Rest/Kuppelstapel),
@@ -5924,7 +5974,8 @@ pub fn value_noise_floor_diagnostic(
             for _ in 0..k_rollouts {
                 let mut g2 = Game { state: sample_state.clone() };
                 g2.state.bag.tiles.shuffle(&mut rng);
-                g2.state.dome_tile_pool.shuffle(&mut rng);
+                // par.7 Variante A, wie in `mean_rollout_diff`.
+                crate::state::determinize_dome_pool(&mut g2.state, None, &mut rng);
                 let mut rguard = 0u32;
                 loop {
                     rguard += 1;
@@ -6200,7 +6251,7 @@ pub(crate) mod tests {
             let mut g = Game { state: snapshot.clone() };
             // Derselbe Fix wie in mean_rollout_diff: unbekanntes neu auswuerfeln.
             g.state.bag.tiles.shuffle(&mut rng);
-            g.state.dome_tile_pool.shuffle(&mut rng);
+            crate::state::determinize_dome_pool(&mut g.state, None, &mut rng);
             let mut guard = 0u32;
             // Bis mindestens EINE Runde weiter (next_round() also mind. 1x
             // durchlaufen) -- entspricht ungefaehr horizon_rounds=2.
@@ -8439,7 +8490,7 @@ pub(crate) mod tests {
         let player = state.current_player;
 
         let mut r1 = StdRng::seed_from_u64(777);
-        let a1 = deviation_best_action(&net, &state, &actions, player, 6, &mut r1)
+        let a1 = deviation_best_action(&net, &state, &actions, player, 6, None, &mut r1)
             .expect("bei mehr als einer legalen Aktion muss eine Abweichung herauskommen");
         assert!(
             actions.contains(&a1),
@@ -8447,7 +8498,7 @@ pub(crate) mod tests {
         );
 
         let mut r2 = StdRng::seed_from_u64(777);
-        let a2 = deviation_best_action(&net, &state, &actions, player, 6, &mut r2)
+        let a2 = deviation_best_action(&net, &state, &actions, player, 6, None, &mut r2)
             .expect("zweiter Aufruf mit gleichem Seed");
         assert_eq!(
             a1, a2,
@@ -8455,9 +8506,109 @@ pub(crate) mod tests {
         );
 
         assert_eq!(
-            deviation_best_action(&net, &state, &actions[..1], player, 6, &mut r1),
+            deviation_best_action(&net, &state, &actions[..1], player, 6, None, &mut r1),
             None,
             "bei nur einer legalen Aktion gibt es nichts zu ersetzen"
+        );
+    }
+
+    /// Fixture der Ausschluss-Tests (par.9k): geladenes Netz, eine spielbare
+    /// Drafting-Stellung, ihre legalen Aktionen und der Spieler am Zug --
+    /// dieselbe Konstruktion wie im Test darueber.
+    fn deviation_exclude_fixture() -> (Net, GameState, Vec<Action>, usize) {
+        let model_path = crate::net::test_model_path("engine_test.onnx");
+        let net = Net::load_auto(model_path.to_str().unwrap()).unwrap_or_else(|e| {
+            panic!(
+                "{model_path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf                  nicht leer-gruen bestehen (Nutzer-Regel: nie leer gruen)."
+            )
+        });
+        let mut rng = StdRng::seed_from_u64(20260909);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
+        state.scoring_tile_ids = ids;
+        for p in state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let actions = drafting_actions(&state);
+        assert!(
+            actions.len() > 2,
+            "Fixture braucht mehr als zwei legale Aktionen, waren {}",
+            actions.len()
+        );
+        let player = state.current_player;
+        (net, state, actions, player)
+    }
+
+    /// par.9k: der SUCHZUG darf nie als "Abweichung" herauskommen. Bei genau
+    /// zwei legalen Aktionen und `exclude = a0` bleibt nur `a1` uebrig -- ueber
+    /// viele Seeds, denn genau hier hat der Bestand in 11 % der Ausfluege den
+    /// Suchzug reproduziert (n = 200 Paare, v26-Material).
+    #[test]
+    fn deviation_best_action_never_returns_the_excluded_search_move() {
+        let (net, state, actions, player) = deviation_exclude_fixture();
+        let pair = &actions[..2];
+        for seed in 0..200u64 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let a = deviation_best_action(&net, &state, pair, player, 6, Some(&pair[0]), &mut rng)
+                .expect("nach Ausschluss von a0 bleibt a1 -- es MUSS eine Abweichung geben");
+            assert_ne!(a, pair[0], "Seed {seed}: der Suchzug wurde reproduziert");
+            assert_eq!(a, pair[1], "Seed {seed}: es gibt nur eine andere Aktion");
+        }
+
+        // Zweite Haelfte, damit die Seed-Schleife nicht leerlaeuft: auf der
+        // VOLLEN Aktionsliste zieht die Kandidatenziehung wirklich (Pool >
+        // `want`), und auch dort darf der ausgeschlossene Zug nie gewinnen.
+        for seed in 0..200u64 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let a = deviation_best_action(
+                &net,
+                &state,
+                &actions,
+                player,
+                6,
+                Some(&actions[0]),
+                &mut rng,
+            )
+            .expect("bei vielen legalen Aktionen bleibt nach dem Ausschluss reichlich uebrig");
+            assert_ne!(
+                a, actions[0],
+                "Seed {seed}: ausgeschlossene Aktion kam trotzdem zurueck"
+            );
+            assert!(actions.contains(&a), "Seed {seed}: Aktion muss legal sein");
+        }
+    }
+
+    /// par.9k, andere Seite derselben Aenderung: bleibt nach dem Ausschluss
+    /// KEINE Aktion uebrig, gibt es keine Abweichung (`None`). Der Aufrufer
+    /// verwirft den Ausflug dann ueber den Dubletten-Waechter in
+    /// `run_net_self_play`, statt eine Kopie der Hauptpartie zu erzeugen.
+    #[test]
+    fn deviation_best_action_is_none_when_the_exclusion_empties_the_pool() {
+        let (net, state, actions, player) = deviation_exclude_fixture();
+        let mut rng = StdRng::seed_from_u64(4242);
+
+        // Eine einzige legale Aktion, und die ist der Suchzug.
+        assert_eq!(
+            deviation_best_action(&net, &state, &actions[..1], player, 6, Some(&actions[0]), &mut rng),
+            None,
+            "eine legale Aktion, ausgeschlossen -> keine Abweichung"
+        );
+
+        // Mehrere Eintraege, aber alle gleich dem Suchzug: Pool nach dem
+        // Ausschluss leer, obwohl der Laengen-Waechter (`len < 2`) nicht greift.
+        let only_search = vec![actions[0].clone(), actions[0].clone()];
+        assert_eq!(
+            deviation_best_action(
+                &net,
+                &state,
+                &only_search,
+                player,
+                6,
+                Some(&actions[0]),
+                &mut rng
+            ),
+            None,
+            "leerer Pool nach Ausschluss -> None (Dubletten-Waechter uebernimmt)"
         );
     }
 
