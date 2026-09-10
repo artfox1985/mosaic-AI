@@ -140,7 +140,7 @@ Laufzeiten im Artefakt, Regel 0 (geprueft oder markiert).
   Plattenplatz (`data/` und Sicherungswurzel) reicht fuer rund 1.200
   Dateien plus Bloecke; keine Nebenlast; die App, an der die Sitzung haengt,
   bleibt offen (Harness-Stopp 2026-09-05), lange Laeufe ueber Ketten-Skripte.
-- Kette fuer G+1 nach dem Muster `night_v26_chain.sh` schreiben (Manifest,
+- Kette fuer G+1 nach dem Muster `night_v28_chain.sh` schreiben (Manifest,
   Fenster, Monolith, Trainings-Arme), MIT gehaerteter Wartebedingung
   (leere Prozessantwort = belegt) und `--resume`-Hinweis fuer jedes
   Training. **Keine eigene Chronikdatei anlegen** (Nutzer 2026-09-09): das

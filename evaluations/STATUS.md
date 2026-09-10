@@ -1,336 +1,139 @@
 # Mosaic-AI – Status & Fahrplan
 
-**Dieses Dokument traegt NUR Aktuelles und Offenes.** Neufassung vom
-2026-08-31 (Nutzer-Auftrag); der vollstaendige Stand davor liegt in
-`../archive/history.md`, Kapitel **"Vollstaendiger STATUS-Stand vom
-2026-08-31 (vor der Neufassung)"** -- dort steht jede Herleitung, die hier
-nur noch als Verweis vorkommt, inklusive der kompletten v22-Chronologie
-(Faecher-Durchgang, Schlachtplan v22->v23, Nachtprogramme, abgeloeste
-Tor-Fassungen).
+**Dieses Dokument traegt NUR Aktuelles und Offenes.** Neufassung vom 2026-09-10, 23:55
+(Generationswechsel v27 -> v28, Schritt 6); der vollstaendige Stand davor liegt in
+`../archive/history.md`, Kapitel **"Vollstaendiger STATUS-Stand vom 2026-09-10 (vor der
+Neufassung)"**, die Generationsberichte v24 bis v27 ebenfalls dort.
 
-**Pflegeregel:** wer einen Befund erzeugt, traegt ihn im selben Zug hier nach
-und prueft, ob ein anderer Abschnitt dadurch falsch wird. Wer einen Strang
-abschliesst, schiebt die Herleitung ins Archiv und laesst hier eine Zeile mit
-Verweis stehen.
+**Pflegeregel:** wer einen Befund erzeugt, traegt ihn im selben Zug hier nach und prueft, ob
+ein anderer Abschnitt dadurch falsch wird. Wer einen Strang abschliesst, schiebt die
+Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
-**Zahlen ohne Datum stammen aus dem Stand vom 2026-08-30 und sind in dieser
-Neufassung nicht neu nachgemessen worden.**
-
-**Dauerhaftes Prozesswissen steht NICHT hier**, sondern kanonisch in
-`../docs/`: `generation_loop.md` (die Schleife und ihre Tore),
-`promotion_checklist.md`, `generation_naming.md`, `working_rules.md`,
-`pitfalls.md`, `measured_runtimes.md`, `architecture_reference.md`. Wer an
-diesen Inhalten etwas aendert, aendert es DORT.
+**Dauerhaftes Prozesswissen steht NICHT hier**, sondern in `../docs/`: `generation_loop.md`
+(Schleife, Tore, Tor-2-Praezedenz, Seed-Regel), `promotion_checklist.md`,
+`generation_naming.md`, `working_rules.md`, `pitfalls.md`, `measured_runtimes.md`,
+`architecture_reference.md`, `engine_manual.md` (mit Regelbuch-Zitaten).
 
 ---
 
-## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 15:30)
+## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 23:55)
 
-**STAFFELSTAB 2026-09-10, 19:45: die Maschine gehoert der Parallelsitzung "Claude-Partien
-g02-g05" (Arbeitsauftrag-Chip, Nutzer-Auftrag). Diese Koordinator-Sitzung startet solange
-KEINE Rechenlast** (keine Arena, keine Sonde, kein Build). Champion laut `models/champion.txt`: **`v27-b01_brierbest`,
-Elo 1405** [1361, 1453] aus 790 Partien. Leiter: `v26-b01` 1364, `v25-b01` 1336, `v24-b07`
-1283, Anker fix 1000. **Die Promotion v27-b01 ist VOLLSTAENDIG durch** (alle Schritte der
-`docs/promotion_checklist.md`, Artefakt `models/frozen_champions/v27-b01/`, restic
-`run:v27-b01` 2a12d266). Generationsbericht v27 am Ende von `../archive/history.md`; Belege
-`PREREG_v27_window.md` par.7 bis par.10.
+**Champion laut `models/champion.txt`: `v27-b01_brierbest`, Elo 1405** [1361, 1453] aus 790
+Partien; Leiter `v26-b01` 1364, `v25-b01` 1336, `v24-b07` 1283, Anker fix 1000. Promotion
+vollstaendig (Artefakt `models/frozen_champions/v27-b01/`, restic `run:v27-b01`),
+Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md` par.7-10.
 
-**Das Einfrieren ist beendet.** v25-b01 / v26-b01 / v27-b01 sind die Vergleichskette mit
-gleichem Rezept und rotierendem Material; dreimal Tor 1, dreimal steigende Spalten (Tabelle im
-Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst werden.
+**Das Einfrieren ist beendet** (v25-b01 / v26-b01 / v27-b01: gleiches Rezept, rotierendes
+Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
+bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-### NAECHSTE SCHRITTE, nur auf Anweisung (Nutzer 2026-09-10, 13:25: v28-Self-Play ausgesetzt)
+**Was gerade laeuft:** die Parallelsitzung "Claude-Partien g02-g05" (Arbeitsauftrag-Chip,
+seit 2026-09-10 abends). Sie spielt selbst gegen den Champion, registriert in
+`PREREG_claude_play_interface.md` par.7 und committet am Ende einmal. Sie braucht wenig
+Rechenlast (lange Denkzeiten je Zug); leichte Arbeiten daneben sind vom Nutzer freigegeben,
+Arenen und Erzeugung nicht.
 
-1. **Nach-v27-Programm LAEUFT seit 15:35 (Nutzer):** Dubletten-Fix GEBAUT (Seeding-Prereg
-   ENTSCHIEDEN), Null-Klammer Stufe 0 GEMESSEN (Schwelle nicht unterschritten, Kaufseite traegt,
-   `score_clamp` par.10), Kuppelstapel Variante A GEBAUT und GEMESSEN (`dome_stack`
-   par.15-15c: A/B 165:135 ohne Ruecklauf, Fix bleibt; PRE/POST exakt: Wissen allein bewegt
-   die Ziehungen kaum, Erwartung aus par.8 an der Referenzpartie nicht eingetreten). Live-Wheel
-   seit 18:00 mit Variante A, Dubletten-Fix, exaktem Orakel-Pfad und Knopf
-   `MOSAIC_DOME_POOL_KNOWLEDGE`. **Diagnostik auf 300 A/B-Partien (19:00, `dome_stack`
-   par.15e): Ziehungen in den eigenen bekannten Block STEIGEN mit Variante A (+0,69 je
-   Partie, p rund 0,05), zwei Drittel davon gratis bei Stand 0.** **Nutzer 19:15: Regel bleibt,
-   Ziehen bei 0 ist gratis und legal (Regelbuch S.4/S.9); `score_clamp` ENTSCHIEDEN (par.11),
-   Diagnostik neu gefasst (`dome_stack` par.15f).** **Variante B und die Sicht-Reststufen brauchen
-   ein neues Fenster:** die Merkmale (eigener Block, laufende Ziehserie) muessen im
-   Self-Play-Record stehen, und die Records der v25-v27-Klassen tragen weder Bloecke noch
-   exakte Reihenfolgen (Frontend-JSON). Ein Training auf dem v27-Fenster saehe die Merkmale
-   nur als Null. Also: Record-Schema VOR der v28-Erzeugung erweitern (Sicht des Ziehenden:
-   Blockgroesse eigen/fremd, Zusammensetzung des eigenen Blocks, unbekanntes Praefix), dann
-   erzeugen, dann B trainieren. Das Nach-v27-Programm ist damit an seinem heutigen Ende;
-   v28 startet nur auf Anweisung.
-2. **Claude-Partien BEREIT** (`PREREG_claude_play_interface.md` par.9 P.7): Rauchtest gruen
-   (18:30), Spec-Rueckfall auf das Artefakt gebaut. Nutzer 2026-09-10, 16:00: "Wenn
-   abgeschlossen koennen wir die claude plays fahren." Gegner ist `models/champion.txt`
-   (v27-b01). Der Partien-Agent liest NUR `show` und `game.log`, nie `.engine.log`.
-3. ~~Werkzeug `plate_points_from_arena.py`~~ ERLEDIGT 16:20: wertet mit `side_names` je
-   Modell aus, gepaarte Differenzen je Kriterium; Befund fuer v27-b01: Zuwachs bei vertikalen
-   Reihen (+1,34) und Eckplatten (+0,97), nicht bei Spezialfeldern (`PREREG_v27_window.md`
-   par.10). Offen im Werkzeug: KI auf Paar- statt Block-Ebene.
-4. **Generationswechsel-Rest, Schritt 5 -- AUSGEFUEHRT 2026-09-10, 19:35 (Nutzer: "loesch die
-   19 dateien wie vorgeschlagen"):** 19 Modelldateien geloescht, je Datei per `restic find`
-   belegt (v24-b06/v25/v26 in Snapshot 1dba15e8, v27 in 2a12d266). Bleiben:
-   `v24-b06_brierbest.onnx`, `v24-b07_brierbest.onnx`, `v27-b01_brierbest.{onnx,pth}`,
-   `.ref.txt`, `_loss.png`, drei Artefakte. **Trainings-Seed: bleibt VARIABEL je Generation
-   (Nutzer 2026-09-10, 19:35)**; innerhalb einer Generation teilen alle Arme einen Seed
-   (v24-Praxis). Ursprung der Vorlage:
-   alle Arme v24-b06 bis v27-b01 tragen eine `run:`-Marke im restic-Repo (geprueft). Rollen:
-   `v27-b01_brierbest` Champion und Warmstart der naechsten Generation (`.pth` bleibt);
-   `v25-b01`/`v26-b01`/`v27-b01` liegen als Artefakte mit `model.onnx` und `model.pth`;
-   `v24-b06_brierbest.onnx` ist die einzige Kopie des Elo-Knotens v24-b06 (Artefakt nie
-   angelegt), bleibt; `v24-b07_brierbest.onnx` ist derselbe Netzstand wie v24-b06_brierbest
-   unter anderem Namen (Spec-Wechsel), Elo-Knoten v24-b07, bleibt. Kandidaten ohne Rolle
-   (je 10,8 MB): `alphazero_v24-b06.{onnx,pth}`, `_best.{onnx,pth}`; dasselbe fuer v25-b01,
-   v26-b01, v27-b01 (Epochen-Zwischenstaende `_best` und letzte Epoche); dazu die
-   `_brierbest.pth` von v24-b06, v25-b01 und v26-b01 (v25/v26 im Artefakt vorhanden,
-   v24-b06 nur im restic-Snapshot `run:v24-b06`). Zusammen rund 200 MB, `.ref.txt` und
-   `_loss.png` sind klein und bleiben. `night_v26_chain.sh` und die v27-Skripte werden
-   Loeschkandidaten, sobald v28 ansteht.
-5. ~~Entscheid Trainings-Seed~~ ENTSCHIEDEN 2026-09-10: variabel je Generation, gleich
-   innerhalb einer Generation (`docs/generation_loop.md`).
+### v28 IST STARTKLAR (Vorlage, Start nur auf Anweisung)
+
+`PREREG_v28_window.md`: Zuschnitt (580 Traeger + rund 2.367 Schwarm, Seed 20260937, Val-Pool
+`^selfplay_v27-`), Generator `v27-b01`, G-2-Schwarm aus der Ausflug-Haelfte von v25-b01
+(Nutzer 2026-09-10), Record-Feld `dome_pool_view` im Wheel (Anker-Drift gruen, Rauchtest
+321/321 Records), Skripte `tools/night_v28_generate.sh` (Seeds 20260917/18/19, rund 10,3 h)
+und `tools/night_v28_chain.sh` (Training `v28-b01`, Rezept unveraendert). Zweiter Arm
+`v28-b02` = Variante B (Merkmale aus `dome_pool_view`) nach par.6 der Prereg; sein Bau
+(Merkmal in `neural_net.py`/`features.rs`, INPUT_SIZE 744 -> 744 + k, Cache-Schluessel neu) ist
+NICHT begonnen und gehoert vor das Training von b02, nicht vor die Erzeugung.
+
+Start: `bash tools/night_v28_generate.sh` plus Cache-Waechter unter
+`MOSAIC_IGNORE_POLICY_TARGET_VALID=1` (Aufruf im Skriptkopf), danach `bash tools/night_v28_chain.sh`.
+Vorher pruefen: Maschine frei (Claude-Partien beendet), `models/champion.txt` = v27-b01_brierbest,
+Platz (`data/` 6,96 GiB, Sicherungswurzel).
 
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
 
 - **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden.
 - **Loeschung nur auf pfadgenaue Freigabe.**
 - **Messungen laufen exklusiv**; GPU und CPU duerfen parallel, zwei CPU-Messungen nicht.
-- **v28-Self-Play ausgesetzt** (2026-09-10, 13:25).
+- **v28-Erzeugung nur auf Anweisung** (ausgesetzt seit 2026-09-10, 13:25).
+- **Trainings-Seed variabel je Generation, gleich innerhalb einer Generation** (2026-09-10).
+- **Ziehen vom Stapel bei Punktestand 0 bleibt gratis und legal** (Regelbuch S.4/S.9,
+  2026-09-10).
 
 ### BEFUNDE, die eine Entscheidung oder Nachschau brauchen
 
-- **Der Browser-Champion spielte seit v25-b01 OHNE seine Spec** (gefunden 2026-09-10, 18:20,
-  beim Rauchtest der Claude-Partien): `server.py::_apply_champion_spec_env` las nur
-  `models/<name>.spec.json`, kehrte bei Fehlen STILL zurueck, und seit dem Einfrieren gibt es
-  die Datei nur unter `v24-b07_brierbest.spec.json`. Folge: v25-b01, v26-b01 und v27-b01 liefen
-  im Browser mit Env-Defaults (Huelle aus, hull_form 1, special_row6_w 0) statt mit der
-  Champion-Spec, sofern der Nutzer keine Env-Variablen gesetzt hatte (nicht pruefbar, die
-  Log-Koepfe tragen keine Knoepfe). Betroffen: alle Mensch-Partien in `static/log/` ab
-  2026-09-08 inklusive der Referenzpartie der Kuppelstapel-Prereg (KI v25-b01) und der KI-Seite
-  der Null-Klammer-Logs. Behoben: Rueckfall auf `frozen_champions/<name>/spec.json` in
-  `server.py` und `tools/claude_play.py`, laute Meldung statt stillem Default. **Server neu
-  starten**, dann schreibt er "Champion-Spec spec.json: ..." in die Konsole.
-
 - **`player_profiles.json` ist im Arbeitsbaum veraendert** (plus `player_profiles.json.bak`),
-  nicht durch diese Sitzung; nicht committet. Nutzer fragen, woher.
-- **Erzeugung 23 % langsamer als v26** bei gleicher Konfiguration (10,25 h gegen 8,35 h;
-  `measured_runtimes.md` v27). Ursache nicht gemessen (Waechter-Last, OneDrive).
-- **Einfrieren am Trainings-Seed undicht** (20260925/29/33); fuer die Kette folgenlos, aber
-  par.18 sagt "ausschliesslich Material".
-- **Null-Klammer, Kaufseite ohne Eigentuemer**; Stufe 0 auf der falschen Grundmenge
-  (`score_clamp` par.9, `dome_stack` par.14).
-- Kleinere Widersprueche, je in der Prereg registriert (Audit 2026-09-09):
-  `round_transition_search_sampling` par.8, `round_estimate_leaf_term`, `stack_top_feature`
-  par.12, `start_dome_choice` Nachtrag, `policy_surprise_weighting` par.11.
+  aus der Nutzer- bzw. Parallelsitzung; nicht committet.
+- **Erzeugung v27 war 23 % langsamer als v26** bei gleicher Konfiguration (10,25 h gegen
+  8,35 h); Ursache nicht gemessen (Waechter-Last, OneDrive). Fuer v28 mit 10,3 h planen.
+- **Alte Mess-Manifeste in `data/`** (`manifest_otw22*`, `manifest_p3s0*`, `manifest_peek22*`,
+  `manifest_tor22*`, `manifest_v21depth*`, `manifest_frozenv3-b01*`, 30 Dateien, klein): ihre
+  Korpora sind seit 2026-09-09 geloescht; Loeschkandidaten beim naechsten Wechsel.
+- **Zwei untracked Replay-Reports** in `evaluations/game_analysis/` (Rauchtest 2026-09-10).
+- **Server-Log-Kopf traegt seit `29b8e1a` Spec-Pfad und Knoepfe**; wirkt nach dem naechsten
+  Neustart. Mensch-Partien vom 2026-09-08 bis 2026-09-10 18:20 liefen ohne Champion-Spec
+  (Vorbehalte in `score_clamp` par.10 und `dome_stack` par.15d).
 
-## 2. WAS ALS NAECHSTES LAEUFT: die v26-Erzeugung
+## 2. LAUFZEITEN (gemessen, Planungsgroessen; Artefakte und Details in `docs/measured_runtimes.md`)
 
-**Die drei Befehle stehen fertig in `PREREG_v26_window.md` par.7.** Generator ist `v25-b01`.
+| Aufbau | Dauer |
+| --- | --- |
+| Erzeugung 3 x 4.000 Partien @100, threads 11 (v27) | 36.912 s = 10,25 h |
+| Kette Schritte 1-6 (Kennzahlen, Manifeste, Fenster, Monolith) | rund 31 min |
+| Training 12 Epochen, Fenster 2.947 Dateien | 5.117 s = 1,4 h (v26 mit Nebenlast 2,1 h) |
+| Gepaartes Gating 200 Paare @400, 10 Threads, mit `--log-games` | rund 5.190 s = 86 min |
+| Anker-Kante n=150, 6 Worker | rund 22 min |
+| Champion-2-Kante gegen Artefakt, n=150 | rund 43 min |
+| A/B ueber den Referee, gleiches Netz, n=150 | rund 43 min |
+| sigma/Prior-Kalibrierung, Platt-Fits | 13 min, je 10 s |
+| Golden Probe fuers Artefakt, Referee-Selbsttest | 23 min, 67 s |
+| Spaltensonde / Block-Ziehungs-Sonde auf 400 Logs | 83 s / rund 95 s |
+| Wheel-Bau plus Install, Anker-Drift | 30 s, 25 s |
 
-| Klasse | `--games` | Identitaeten | Zugwahl | Abweichung | Wurzelrauschen |
-| --- | --- | --- | --- | --- | --- |
-| Sockel (policy-aktiv) | 4.000 | 4.000 | greedy ab Zug 1 | Weg C im Hauptstrang | an |
-| Schwarm a (value-only) | 4.000 | 4.000 | glatte Temperatur, Modus 2 | Weg C im Hauptstrang | an |
-| Schwarm b (value-only) | 4.000 | rund 4.000 | greedy ab Zug 1 | Weg B, nur im Ausflug | aus |
+## 3. SPEC UND REZEPT
 
-**`--games 4000` auch in der dritten Zeile**, anders als in v25: der Ausflug hat eine
-eigene `game_id` und zaehlt gegen `--games` (`PREREG_v25_window.md` par.19a). Der
-v25-Lauf lieferte mit `--games 2000` nur 2.002 statt 4.000 Identitaeten und musste
-aufgefuellt werden. Kosten nach den gemessenen v25-Werten rund 11,1 h
-(`docs/measured_runtimes.md`, Abschnitt v25).
-
-**Val-Pool-Regex:** in v25 `^selfplay_v24-b07-`; fuer v26 ist er der einzige offene
-Zuschnitt-Punkt (`PREREG_v26_window.md` par.4).
-
-## 3. WAS DIE SPEC JETZT TRAEGT -- und bis wann sie zu ist
-
+Spec `models/v24-b07_brierbest.spec.json` (identisch mit der Spec im Artefakt v27-b01):
 `envelope_projection_mode 1`, `envelope_search_c 1,0`, `envelope_flush_w 0,0`,
-**`envelope_hull_form 2`**, **`special_row6_w 1,0`**, Profil 1/0,92/0,67/0,33/0.
+`envelope_hull_form 2`, `special_row6_w 1,0`, Profil 1/0,92/0,67/0,33/0. Nach dem Ende des
+Einfrierens ist kein Spec- oder Rezept-Entscheid registriert; `v28-b01` faehrt beides
+unveraendert, `v28-b02` aendert nur das Merkmal. Engine seit v27: Variante A des
+Kuppelstapels, Dubletten-Fix im Ausflug, Record-Feld `dome_pool_view`, Rueckgabe-Reihenfolge
+nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 
-**Nutzer-Entscheid 2026-09-07: v25 bis v27 wird NICHT am Netz gedreht** -- Architektur,
-Trainingsrezept, Value-Ziel-Mischung und Koepfe bleiben fest, nur das Material aendert
-sich. Eine flache Arena ist dabei ausdruecklich akzeptiert, Ruecklauf nicht. **Damit ist
-auch die Spec geschlossen**, denn ein Fenster ist nur stationaer, wenn die
-Erzeugungsregeln stehen (`PREREG_v25_window.md` par.18).
+## 4. DAS PROGRAMM NACH v27 -- Stand
 
-## 3b. DAS PROGRAMM FUER v27 (Nutzer 2026-09-09: "ausreichendes Programm")
-
-**Der v27-Zuschnitt steht seit 2026-09-09 in `PREREG_v27_window.md`** (Nutzer-Auftrag:
-"unabhaengig davon kannst schon den v27 zuschnitt machen"). 2.946 Dateien, Seed 20260933,
-Val-Pool `^selfplay_v26-`; es ist das erste VOLLSTAENDIG stationaere Fenster und zugleich
-das letzte unter dem Einfrieren. **Beide Zuschnitt-Entscheide sind am 2026-09-09 gefallen:**
-Generator ist `v26-b01` (par.3, ausdruecklich unabhaengig von Tor 1 -- Generatorwahl und
-Promotion sind zwei Entscheidungen), und den G-2-Posten traegt die **temperierte** Haelfte
-(par.2; das gemessene Kriterium trennte nicht, entschieden wurde auf der Rolle von G-2).
-Offen ist damit nur noch die Erzeugung selbst, rund 8,4 h (30.077 s in den drei v26-Manifesten).
-
-Vier Straenge liegen vor, alle vorregistriert. **Der Kern ist neu und kam aus einer
-Partie**, nicht aus der Kampagnenplanung.
-
-| Strang | Prereg | Stand |
+| Strang | Prereg | Stand 2026-09-10 |
 | --- | --- | --- |
-| **Informationsmengen am Kuppelstapel** -- die Wurzeldeterminisierung unterscheidet unbekannt / Rueckseite bekannt / Platte bekannt, statt den ganzen Stapel zu mischen | `PREREG_dome_stack_information_sets.md` | OFFEN, 2026-09-09 vorregistriert; Variante A (nur Suche) oder B (plus Merkmale) noch offen |
-| **Sichtgleichheit, Reststufen** -- laufende Ziehserie, Phasenaufloesung, und ein Netz, das die in v24-b04 gelegten Werte auch NUTZT | `PREREG_stack_top_feature.md` par.7/par.10 | OFFEN, fuer v27 eingeplant (Nutzer 2026-09-08) |
-| **Schwarm G-2 ohne Split** -- welche der beiden v24-b07-Haelften den G-2-Posten traegt | `PREREG_v26_window.md` par.6, `PREREG_v27_window.md` par.2 | **GEMESSEN 2026-09-09, Kriterium trennt NICHT** (bedingte Vielfalt saettigt bei beiden). Nutzer-Entscheid noetig; drei Lesarten stehen in par.2 |
-| **Null-Klammer** -- bleibt die Anreizstruktur unter null erhalten | `PREREG_score_clamp_incentive.md` | OFFEN, 2026-09-09 aufgemacht; Stufe 0 ist eine Messung und darf frueher laufen |
+| Kuppelstapel-Informationsmengen | `dome_stack_information_sets` par.15-15g | Variante A GEBAUT und gemessen: A/B 165:135 ohne Ruecklauf, Fix bleibt; Diagnostik auf 300 Partien: Ziehungen in den eigenen Block STEIGEN (+0,69 je Partie), meist gratis bei Stand 0; par.8-Erwartung nicht eingetreten, Diagnostik neu gefasst (Ziehungen bei positivem Stand). Naechster Hebel Variante B = v28-b02 |
+| Null-Klammer | `score_clamp_incentive` | ENTSCHIEDEN: Regel bleibt (Stufe 0: 39 % der Partien auf 0, geschluckte Strafe Median 0, 3,1 Gratis-Ziehungen je Partie und Seite) |
+| Startpositions-Seeding / Ausflug | `start_position_seeding` | ENTSCHIEDEN: Dubletten-Fix gebaut (par.9l); Folgearme brauchen eigene Registrierung |
+| Sicht-Reststufen | `stack_top_feature` par.10/11/12 | offen; Merkmale erst nach v28-b02, weil sie Records brauchen |
+| Claude-Partien | `claude_play_interface` par.9 | laufen (Parallelsitzung) |
+| Werkzeuge | | `paired_gating --log-games` (Tor 2b aus Tor 1), `plate_points` je Modell, `dome_stack_known_block_draw_probe`, exakter Orakel-Pfad, Spec-Rueckfall in server.py |
 
-**Das Werkzeug dahinter steht in `../docs/architecture_reference.md`**, Abschnitt "Wo der
-Code Information ABSICHTLICH vernichtet" (Naht-Audit vom 2026-09-09, 24 Mischstellen mit
-Urteil, plus die Regel fuer neue Stellen). CLAUDE.md verweist darauf; die drei uebrigen
-Suchkanaele stehen in `PREREG_dome_stack_information_sets.md` par.11.
+## 5. PREREG-BESTAND (8 OFFEN, Ziel rund 7)
 
-**Der Zeitpunkt ist entschieden (Nutzer 2026-09-09):** *"nach v27 ist das Einfrieren
-beendet"*, und praezisiert: *"v27-b01 ist der letzte eingefrorene Arm. dann gehts weiter."*
-**Der Ausloeser ist ein ARM, keine Generation.** Sobald `v27-b01` trainiert ist, steht die
-Vergleichskette `v25-b01` / `v26-b01` / `v27-b01` -- drei Arme, gleiches Rezept, nur
-rotierendes Material -- und der Umbau darf starten, notfalls als `v27-b02` innerhalb
-derselben Generation. **In v27-b01 selbst faellt von der Tabelle oben nur die
-G-2-Schwarm-Frage**, sie ist eine Material-Entscheidung.
+`v28_window` (Vorlage), `dome_stack_information_sets` (Variante B), `stack_top_feature`,
+`claude_play_interface` (laeuft), `round_estimate_leaf_term` (Skalenwahl a/b, Nutzer),
+`round_transition_search_sampling` (haengt an dome_stack; Kandidat fuer UEBERHOLT),
+`start_dome_choice` (Stufe 0 nie gefahren; Sonde am v28-Korpus), `policy_surprise_weighting`
+(Kante v24-b05 gegen v24-b04 aus dem restic-Repo nachholbar), `rust_data_layer`
+(Registrierung ohne Auftrag; Kandidat fuer UEBERHOLT). Index: `PREREG_INDEX.md`
+(generiert).
 
-**Vierter Strang, am 2026-09-09 aufgemacht und ebenfalls fuer v27 nach b01 eingetaktet:**
-die Null-Klammer, `PREREG_score_clamp_incentive.md`. Bei Punktestand 0 sind Strafen wie
-Kaeufe wirkungslos; der Schattenzaehler `score_unclamped` faengt nur das TRAININGSZIEL ab,
-waehrend das Netz im Spiel den geklammerten Wert sieht (`features.rs:689`). **Stufe 0 ist
-eine reine Messung** (wie oft steht ein Spieler auf 0, wie lange, wie viel Strafe schluckt
-die Klammer) und darf frueher laufen, sobald die Maschine frei ist -- mit einer VOR der
-Messung festgelegten Schwelle, unter der der Strang als UEBERHOLT geschlossen wird.
+## 6. OFFENE NUTZER-ENTSCHEIDE
 
-## 4. OFFENE NUTZER-ENTSCHEIDE (Stand 2026-09-07, 19:40)
+1. **Start der v28-Erzeugung** (Abschnitt 1).
+2. **Bau von Variante B** (`v28-b02`): Merkmalsumfang (Laenge/Zaehler/Typenfolge der obersten
+   m des eigenen Blocks, fremde Bloecke, Praefix) -- Vorschlag in `PREREG_v28_window.md` par.6.
+3. **Preregs schliessen ohne Erzeugung** (Abschnitt 5): welche der vier.
+4. **Loeschfreigaben**: alte Mess-Manifeste in `data/`, die zwei Replay-Reports.
 
-1. **Loeschfreigaben**, pfadgenau: `evaluations/cleanup_proposal_turnover_v25.md`
-   (6 Einmal-Skripte), dazu die seit gestern offenen
-   `models/attic_20260906_k3p10_copies/` und `venv_measure_hullform/`.
-2. **Schritt 4 des Generationswechsels** (Korpora, Bloecke, Monolithe toter Fenster) ist
-   NICHT gefahren -- er braucht die v25-Fensterliste und je Gruppe einen
-   `restic find`-Beleg. Vorlage folgt, sobald die Erzeugung laeuft.
-3. **Eroeffnungsplatzierung und Kuppelstapel**: darf die Eroeffnung blind ziehen? Vom
-   Nutzer als eigenes Prereg vertagt; Belege beider Lesarten in
-   `docs/domain_knowledge.md`. Bis zur Klaerung ist die Eroeffnung aus allen
-   Abzweig-Verteilungen ausgenommen.
-4. **Paritaets-Fixture bei reinem Spec-Wechsel**: die Checkliste kennt nur den
-   Champion-Wechsel. Fuer b07 wurde sie neu geschrieben und ist gruen -- ob das noetig
-   war, ist ungeklaert.
-5. **Prereg-Bestand: 11 mit OFFEN im Kopf** (2026-09-09 abends; v25 und v26 auf ENTSCHIEDEN gesetzt), Ziel rund 7.
+## 7. MERKLISTE CODEPFLEGE und STRUKTURBEFUNDE
 
-## 5. OFFENE ENTSCHEIDUNGEN (Nutzer)
-
-| Punkt | Worum es geht |
-| --- | --- |
-| **b04: welcher Zweig wird breiter** | Flach-Zweig `hidden_size` 512 ist ohne Bau fahrbar; Conv-Zweig `conv_channels` 48 / `conv_layers` 2 braucht zwei Flags, ein Checkpoint-Feld und eine Ableitung beim Laden -- sonst ist der Checkpoint nicht ladbar (`PREREG_capacity_sim_frontier.md` par.10) |
-| ~~frozen_v3: woher die Zustaende~~ ERLEDIGT 2026-09-01 | Weg (b) gefahren: 400 frische Sockel-Partien (24,2 min), Satz und zwei Orakel-Label-Saetze gebaut (`PREREG_frozen_v3_eval_set.md` par.7-9). Quelldateien liegen im restic-Backup (`archive_pre_v24/`) |
-| ~~Generatorwahl bei Gleichstand der Arme~~ | ENTSCHIEDEN 2026-09-02: dreistufig, Staerke schliesst aus, Spaltenprofil entscheidet, sonst Amtsinhaber (`docs/generation_loop.md`) |
-| ~~Loeschfreigaben~~ ERLEDIGT 2026-09-01 | `data/onpolicy_v22-b05/` und `-b06/` auf Nutzer-Freigabe geloescht (je 31 Dateien, 32 + 34 MB). Vorher geprueft: KEINE Fenster- oder Traegerdatei verweist darauf. Die Preregs `heuristic_v2_long_rows` (DAgger-Runden) und `v23_window` zitieren sie im TEXT -- die Herleitungen bleiben lesbar, die Rohpartien sind weg |
-| **Messartefakte tracked?** | `evaluations/artifacts/` ist ungetrackt; Preregs zitieren die JSONs als Beleg, ein frischer Klon hat sie nicht. Zurueckdrehen: `.gitignore`-Zeile raus, `git add -f` |
-| **Push** | NIE ohne ausdrueckliche Anweisung; der Ahead-Stand wird im CHAT gemeldet, nicht hier gefuehrt |
-
----
-
-## 6. OFFENE STRAENGE -- abgeglichen mit dem Prereg-Index (2026-08-31, nachgefuehrt 2026-09-01)
-
-Der Index zaehlt (Stand 2026-09-01 abends, aus dem Generator) **20 OFFEN, 77 ENTSCHIEDEN, 8 UEBERHOLT** (`search_depth_column_optimum` ist wieder OFFEN, `frozen_v3_eval_set` und `v23_reachability_recheck` sind ENTSCHIEDEN)****.
-Koepfe, die gegen ihren eigenen Koerper standen, sind an drei Tagen berichtigt
-worden: am 2026-08-31 `cache_build_time` und `v23_reachability_recheck`, am
-2026-09-01 frueh `policy_surprise_weighting`, `cache_build_time` (Hebel 3
-hat einen Nutzniesser) und `r5_solver_split`, am 2026-09-01 abends bei der
-Pruefung aller geaenderten Preregs `prior_blind_spot` (Kopf behauptete die
-widerlegte Erklaerung), `heuristic_v2_long_rows` (Erzeugung "laeuft"),
-`v23_window` (Arm-Frage offen), `search_depth_column_optimum` (jetzt OFFEN,
-Stufe 4), `capacity_sim_frontier`, `reanalyze_label_depth`,
-`policy_surprise_weighting` (Kennzahlen).
-
-**Am laufenden Strang, mit Platz im Fahrplan:**
-
-| Prereg | Wo es haengt |
-| --- | --- |
-| ~~`v23_window`~~ | ENTSCHIEDEN: Fenster gebaut, alle Tore und alle Arme gemessen |
-| `capacity_sim_frontier` | Warm gegen Kalt einfaktoriell belegt (b06, par.14b: 0,18 Spalten, 65:95); b04 wartet auf den Zweig-Entscheid (Abschnitt 5) |
-| `policy_surprise_weighting` | wieder OFFEN seit 2026-09-05; Arm v24-b05 gefahren, Belege in `PREREG_v24_window.md` par.9, Kante b05 gegen b04 nie registriert (par.11, Audit 2026-09-09) |
-| `reanalyze_label_depth` | ENTSCHIEDEN 2026-09-03 (par.A5): Lehrer-Relabel b05 Nullbefund (par.A3), Reanalyze b07 keine Staerke und weniger Spalten -- b01 bleibt Generator; Teil B ohne Verbraucher bei lambda 1,0 |
-| ~~`r5_solver_split`~~ | Teil B war Phase 3 -- GESCHLOSSEN ohne Bau (2026-09-01) |
-| ~~`v23_reachability_recheck`~~ | ENTSCHIEDEN 2026-09-01: 14,64 Prozent tot-kartiert gegen 13,89 beim Vorgaenger, Stufe 1 wird NICHT eroeffnet; Quelldateien im restic-Backup |
-| ~~`search_depth_column_optimum`~~ | ENTSCHIEDEN 2026-09-02: Stufe 4 komplett (par.6b, par.7); Tiefen-Delle beschrieben, nicht behoben |
-| `special_tile_yield` | Kanaele 77/78 gebaut, ihre Wirkung nie isoliert |
-| `cache_build_time` | Hebel (3) hat seit 2026-09-01 einen Nutzniesser: **4,98 h** einkerniges Zusammenfuegen bei neuer Fenster-Zusammensetzung (par.11). Die vermisste serielle Vollreferenz liegt damit auch vor |
-| `frozen_v3_eval_set` | ENTSCHIEDEN und GEBAUT 2026-09-01 (Satz 1.800 Zustaende, Orakel aus b01 und v21, Zirkularitaet belegt, par.7-9). Nachgetragen: die Bruecke gilt nur fuer Runden 1-4; Quelldateien im restic-Backup; Artefakte ohne `laufzeit`-Block |
-| `geometric_envelope` | K3 GEBAUT 2026-09-03 (par.8.2/8.3, Anker und Paritaet GRUEN), Messung nach par.8.4 offen; par.8.6 (Value-Anteil im Tiling, Vorpruefung bestanden) wartet auf den Nutzer |
-
-**Registriert, nicht eingetaktet** (jeder Bau braucht vorher eine
-Registrierung): `plate_policy_supervision`, `saturating_score_utility`,
-`risk_sensitive_leaf_utility`, `uvfa_plate_regime`,
-`uncertainty_guided_selfplay`, `start_position_seeding` (Dosis-Folgearm),
-`start_dome_choice` (Stufe 0, Wiedervorlage Generation 2),
-`round_transition_search_sampling` (Kostentor zuerst),
-`stack_draw_reservation_rule` (Default AUS steht),
-`stack_top_feature`, `chance_nodes` (Teil B1/A1 geparkt),
-`floor_shaping_scale`, `rust_data_layer` (Registrierung, kein Auftrag).
-
-**OHNE PREREG, nur Merkposten -- und darum beim Index-Abgleich durchgefallen
-(berichtigt 2026-08-31):** die Neufassung hat Abschnitt 5 aus dem
-Prereg-Index gebaut, und damit faellt per Konstruktion alles heraus, was
-offen ist, aber keine Prereg hat. Wieder aufgenommen:
-
-* **Einhuellende / geometrisches Gelaender: seit 2026-08-31 REGISTRIERT**
-  als `PREREG_geometric_envelope.md` (Nutzer-Auftrag) -- damit ist der
-  Merkposten von 2026-08-24 abgeloest. Steht in Abschnitt 5 oben bei den
-  Straengen am laufenden Fahrplan.
-* **#31 / #38 / #39**: geparkt, Arbeitskreis "Spaeter", Beschreibungen im
-  Archiv.
-
-Wer Abschnitt 5 kuenftig aus dem Index erzeugt, traegt diese Liste HIER
-nach -- der Index kennt nur, was eine Datei hat.
-
-**Verschoben, nicht verworfen:** Arm K (Bootstrap-Kohaerenz,
-`PREREG_heuristic_v2_long_rows.md` par.3b.3/3b.3a) -- gebaut, Default aus,
-ausloeserbasiert. Er korrigiert einen VERSATZ, das gemessene Problem ist eine
-STEIGUNG; seine drei benannten Nutzniesser sind ungebaut; und er ist der
-einzige Arm, der alle Cache-Bloecke entwertet.
-
----
-
-## 7. MERKLISTE CODEPFLEGE (Audit 2026-08-27, bewusst verschoben)
-
-**Naechstes Build-Fenster** (brauchen cargo, Paritaets-Gate): sechs Dialekte
-fuer "ist dieser Bool-Knopf an?" (Befund 4); drei stille Env-Verschlucker
-(13-15); Value-Spread-Pfad verkleinert den Pool still (16); toter Zweitpfad
-`board.rs:184-220` mit irrefuehrenden Spaltennamen (19).
-
-**Nach dem v23-Training:** ONNX-Paritaetspruefung nie fertiggebaut (18);
-Kanalzahl als Hand-Literal im Fenster-Key (5, NICHT vor dem Training);
-viermal dasselbe 95%-KI mit Entartungen (20); sieben Eigenaufloesungen von
-`champion.txt`, sechs Tool-Stellen offen plus `dist/mosaic_release.spec:46`
-packt eine geloeschte ONNX (21); `MosaicDataset.__init__` mit 998 Zeilen
-(22); `offline_diagnosis.py` rechnet ein historisches Value-Ziel (6).
-
-Fundstellen im Audit-Bericht; Details im Archiv-Kapitel.
-
----
-
-## 8. STRUKTURBEFUNDE, die weitergelten
-
-- **Der Champion vollendet keine Spalten**, und der Grund ist Verteilung,
-  nicht Versorgung: eine volle Spalte kostet 21 Zellen, das Netz verbraucht
-  42,7 und truege gleichverteilt 2,03 Spalten statt 0,10.
-- **Die Dreiecksform ist die MACHBARKEITSHUELLE**, keine aesthetische Wahl:
-  erlaubt ist `r + c <= 5`, also dieselben 21 Zellen.
-- **Eine volle Rasterzeile ist ohne Spezialfliese unmoeglich** -- sie wird nur
-  von ihrer Musterreihe gespeist, und die schliesst hoechstens einmal je Runde
-  ab. Spalten haben das Problem nicht.
-- **Der Durchbruch kam vom DRAFTING, nicht vom Routing** (Split-Test, je 160
-  gepaarte Partien): Huelle nur im Drafting 0,756 gegen 0,044 (t 10,29),
-  Huelle nur im Routing 0,113 gegen 0,113. Die Luecke zur Summe ist eine
-  Wechselwirkung -- das Routing kann nur einsortieren, was das Drafting geholt
-  hat.
-- **Erste unkontaminierte Referenz:** Mensch-gegen-Netz in `static/log/` --
-  der Mensch schliesst 1,80 volle Spalten je Partie gegen 0,10 des Netzes,
-  bei GLEICHEN Platzierungspunkten. Der Vorsprung sitzt bei den
-  Spezialfliesen; der Mensch tauscht kurze Reihen gegen lange.
-- **Chip-Allokation, nicht Chip-Volumen:** Mensch 0,8 Reihe-6-Chip-
-  Abschluesse je Partie, v21 0,1. Kosten-gewichtete Huelle Mensch 0,86,
-  Lehrer 0,68 (berichtigt 2026-09-03: die zweite Huelle war falsch
-  gespiegelt, `heuristic_v2_long_rows` par.3b.14); Netz-Werte 0,54-0,62
-  stammen noch aus der falschen Rechnung und sind vermutlich zu niedrig.
-- **Blindzieh-Regel:** bei Wertungsplatte 6 laeuft die gebaute Stopp-Regel das
-  Punktekonto leer (58-66 Prozent der Serien enden bei 0). Spaltenbau behebt
-  das NICHT -- k1 zahlt quadratisch, das Spezialfeld-Defizit kostet linear -3
-  je Feld.
-- **Eine Herleitung aus dem Code ist eine Hypothese, kein Befund.** Am
-  2026-08-25 lagen vier davon im Vorzeichen falsch.
+Die Merkliste vom Audit 2026-08-27 (Bool-Knopf-Dialekte, stille Env-Verschlucker,
+ONNX-Paritaetspruefung, `champion.txt`-Eigenaufloesungen, 998-Zeilen-`MosaicDataset`) steht
+unveraendert im Archiv-Kapitel "Vollstaendiger STATUS-Stand vom 2026-09-10", Abschnitt 7. Von
+den Strukturbefunden dort ist der erste ("Der Champion vollendet keine Spalten") seit v26
+UEBERHOLT (1,27 volle Spalten je Partie gegen den Anker); die uebrigen (Dreieck als
+Machbarkeitshuelle, Rasterzeile nur ueber Spezialfliese, Drafting vor Routing, Mensch-Referenz,
+Blindzieh-Regel) gelten weiter, Wortlaut im Archiv.
