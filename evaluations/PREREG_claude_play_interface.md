@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen -- und stimmt die Spielstaerke des Netzes aus Spielersicht mit der Leiter ueberein? | Beleg: g01 gespielt 2026-09-06: Claude 72:42 gegen v24-b06 @400 (par.7). Werkzeug 2026-09-10 umgebaut (par.9): Spezialfeld-Anzeige, game.log ohne Maschinenzeilen (.engine.log fuer den Replayer), Spec-Rueckfall auf das Artefakt, Rueckgabe-Reihenfolge nur fuer den Ausfuehrenden; Rauchtest gruen (par.9 P.7). BEREIT fuer g02-g10 gegen models/champion.txt (v27-b01), Start auf Nutzer-Freigabe. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen? | Beleg: g02-g05 gegen v27-b01 @400 gespielt (par.7), Claude 3:1 (55:43, 66:48, 36:28, 50:55). Zwei Muster in allen vier Partien: die Ziehzahl folgt dem Punktestand (bei 0 durchsucht das Netz den Stapel, 21 Ziehungen in g04 R1; in g05 nie auf 0, darum nur 7), und es fuellt lange Musterreihen mit Farben, die seine Kuppelzeile nicht aufnehmen kann (fuenfmal, in g04 zehn Steine auf einmal). g06-g10 offen. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -232,6 +232,227 @@ vermutlich mit v25 weiter"):** die neun Partien laufen nicht gegen v24-b06; Wied
 voraussichtlich gegen den v25-Champion, Aufruf und Agenten-Auftrag wie in STATUS
 Abschnitt 1 der Uebergabe vom 2026-09-06 21:46 beschrieben (g02-g05 `--claude-side 0`,
 g06-g10 `--claude-side 1 --first-player 0`, Halter davor, Marke danach loeschen).
+
+**WIEDERAUFNAHME 2026-09-10/11 (Nutzer-Auftrag: g02-g05 gegen den amtierenden Champion).
+g02 (Seed 20260911, Claude Spieler 0 UND Erstspieler, Gegner `v27-b01_brierbest` @400, Spec
+`models/frozen_champions/v27-b01/spec.json`; Gegner und Spec-Pfad aus `manifest.json` der
+Partie): Claude 55 : 43 Netz, Claude gewinnt.** 77 Claude-Zuege, Log
+`evaluations/artifacts/claude_play/g02/game.log` (351 Zeilen), Notizen `notes.md`.
+Wertungsplatten dieser Partie: Spezialfelder (-3 je leerem Feld), Aeussere Felder (+1 je
+Randfliese), Farbenreiche Reihen (+4 je Reihe mit >= 5 Farben) -- KEINE Spalten-, Diagonal-
+oder Eckplatte.
+
+**Endwertung je Kriterium** (game.log Z. 344-351): Claude Spezialfelder -3, Aeussere Felder
++12, Farbenreiche Reihen +4 (Summe +13); Netz Spezialfelder -9, Aeussere Felder +11,
+Farbenreiche Reihen 0 (Summe +2).
+
+**Standard-Kennzahlen** (aus dem Endraster der `show`-Ausgabe, n = 1 Partie, Grundmenge
+Endstellung, Einheit Zellen bzw. Punkte):
+
+- *Reihenauslastung Kuppel*: Claude 21 Steine (z0 5/6, z1 6/6, z2 5/6, z3 4/6, z4 1/6,
+  z5 0/6); Netz 16 (z0 4, z1 4, z2 2, z3 2, z4 2, z5 2).
+- *Spaltenauslastung*: Claude 0 volle Spalten, hoechste Spalte 5 (Spalte 5), drei Spalten
+  mit >= 4; Netz 2 VOLLE Spalten (0 und 1), dort liegen 12 seiner 16 Steine.
+- *Strafleistenauslastung*: Claude 8 Fliesen (R3 vier = -10, R5 vier = -10, eine weitere
+  lief in den Turm) plus Startmarker in R3 und R4 (-4), zusammen -24; Netz 5 Fliesen
+  (R2 vier = -10, R3 eine = -1) plus Startmarker in R1, R2, R5 (-6), zusammen -17 nominal,
+  davon -12 in R2 durch die Null-Klammer wirkungslos (Z. 148).
+- *Punkte und Marge*: 55 : 43, Marge +12 fuer Claude.
+
+**Beobachtungen** (Zeilen in `game.log`):
+
+1. **Stapel-Ziehungen 28, davon 23 bei Punktestand 0** (Z. 26-38, 94-102, 172-193, 263).
+   Runde 1: das Netz zog den KOMPLETTEN Reststapel, 13 von 13 Platten, fuer EINE Platte und
+   legte 12 zurueck (Z. 39); die ersten fuenf Ziehungen verbrauchten seinen gesamten
+   Startvorrat (5 -> 0, Z. 26-30), die restlichen acht waren gratis. Runde 2: 9 Ziehungen,
+   alle bei 0. Runde 3: 5, alle bei 0. Runde 4, bei Stand 12: genau EINE. Das g01-Muster ist
+   damit bestaetigt und geschaerft: bei Stand 0 wird die verdeckte Ziehung zur vollstaendigen
+   Durchsicht des Stapels, bei positivem Stand zieht das Netz sparsam.
+2. **Die Null-Klammer deckte eine ganze Runde**: das Netz stand ab Runde 1 auf 0 und nahm in
+   Runde 2 vier Strafleisten-Fliesen plus Startmarker (-12, Z. 148) ohne jede Wirkung.
+3. **Spaltenbau ohne Spaltenplatte**: es baute Spalte 0 und Spalte 1 voll, obwohl "Vertikale
+   Reihen" nicht auslag, und liess dafuer 3 Spezialfelder leer (-9) und jede farbenreiche
+   Reihe aus. Kandidat fuer eine Sonde: Spaltenpraeferenz gegen die tatsaechlich ausliegenden
+   Wertungsplatten.
+4. **Senken-Disziplin**: das Netz hielt lange Musterreihen (R3 mit 4, R5 mit 6 Plaetzen) bis
+   zum Rundenende leer und konnte die Reststeine strafarm aufnehmen.
+5. **Gezieltes Wegnehmen**: dreimal nahm es genau den Stein, den Claude als naechstes
+   brauchte (R3 die zwei Blau der grossen Fabrik, R4 das letzte Tuerkis, R5 das letzte Rot).
+6. **Werkzeug, par.9 Punkt 2 erneut belegt**: die `KI:`-Zeile meldete "Reihe 4 [4/4]
+   (+1 Strafleiste)", waehrend der Zustand danach R3:S3/4 und eine LEERE Strafleiste zeigte.
+
+**Eigene Fehler:**
+
+a. Runde 3 und Runde 5 waren alle sechs Musterreihen belegt oder farblich festgelegt; am
+   Rundenende war jeweils nur noch der Zug auf die Strafleiste legal (zweimal -10). Das Netz
+   machte es umgekehrt (Beobachtung 4). Teuerster Fehler der Partie: 20 Punkte.
+b. In Runde 5 hatte z1 keine freie Normalzelle mehr, R1 war damit eine Zwangsraeumungs-Falle
+   und schied als Senke aus.
+c. Startmarker zweimal genommen (-4); der Tempo-Gewinn in Runde 4 wurde durch Beobachtung 5
+   wieder eingesammelt.
+
+**g03 (2026-09-11; Seed 20260912, Claude Spieler 0, NETZ Erstspieler, Gegner
+`v27-b01_brierbest` @400, Spec `models/frozen_champions/v27-b01/spec.json` aus dem Manifest):
+Claude 66 : 48 Netz, Claude gewinnt.** 77 Claude-Zuege, Log 354 Zeilen. Wertungsplatten:
+Eckplatten (3 Pkt je vollstaendige obere, 8 je untere Eckplatte), Farbenreiche Reihen,
+Spezialfelder.
+
+**Endwertung je Kriterium** (game.log Z. 344-354): Claude Eckplatten +6, Farbenreiche Reihen
++4, Spezialfelder 0 (Summe +10); Netz Eckplatten +11, Farbenreiche Reihen 0, Spezialfelder -9
+(Summe +2).
+
+**Standard-Kennzahlen** (Endraster, n = 1 Partie, Grundmenge Endstellung, Einheit Zellen bzw.
+Punkte):
+
+- *Reihenauslastung Kuppel*: Claude 21 Steine (z0 6/6, z1 6/6, z2 4, z3 3, z4 1, z5 1);
+  Netz 19 (z0 6/6, z1 5, z2 2, z3 2, z4 2, z5 2).
+- *Spaltenauslastung*: je 1 volle Spalte (Claude Spalte 5, Netz Spalte 0); Claude zusaetzlich
+  zwei Spalten mit 4, das Netz eine mit 5.
+- *Strafleistenauslastung*: Claude 6 Fliesen (R2 1, R3 1, R4 4) plus Startmarker in R2 und R5,
+  Rundenstrafen -3/-1/-10/-2 = -16, dazu 1 Punkt fuer die einzige eigene Stapelziehung;
+  Netz 6 Fliesen plus Startmarker in R1, R3, R4, Rundenstrafen -2/-3/-5/-6 = -16.
+- *Punkte und Marge*: 66 : 48, Marge +18 fuer Claude.
+
+**Beobachtungen** (Zeilen in `game.log`):
+
+1. **Die Ziehzahl haengt am Punktestand, nicht an der Stellung** (Z. 26-38, 94-102, 172, 263).
+   Netz-Ziehungen gesamt 24: Runde 1 dreizehn (die ersten fuenf verbrauchten den gesamten
+   Startvorrat 5 -> 0, die uebrigen acht gratis), Runde 2 neun (eine kostete den letzten
+   Punkt, acht gratis), Runde 3 GENAU EINE bei Stand 11 -> 10, Runde 4 GENAU EINE bei
+   28 -> 27. Zusammen mit g02 (28 Ziehungen, 23 bei Stand 0) ist das Muster dreimal belegt:
+   bei Stand 0 wird die verdeckte Ziehung zur vollstaendigen Stapel-Durchsicht, bei
+   positivem Stand zieht das Netz genau einmal.
+2. **Zwangsraeumung der langen Musterreihe, zweimal** (Z. 262, 330): "Musterreihe 6 (gelb)
+   nicht platzierbar -> 2x Strafleiste" in Runde 4 und dasselbe mit tuerkis in Runde 5. In
+   der Kuppelzeile z5 des Netzes waren nur blau- und rot-Zellen frei; es legte trotzdem
+   zweimal eine nicht platzierbare Farbe in die 6er-Reihe und zahlte je zwei Strafleisten-
+   Fliesen. Das ist derselbe Fehler, den Claude in g02 gemacht hat, hier vom Netz.
+3. **Strafleiste genommen, obwohl eine leere 6er-Reihe frei war** (Z. 301-302): "KI: 1x rot
+   von F4 -> Strafleiste (-1)", waehrend die eigene Musterreihe 6 leer war und den Stein
+   strafffrei aufgenommen haette. Spaeter fuellte es dieselbe Reihe mit tuerkis, das dann
+   zwangsgeraeumt wurde (Beobachtung 2).
+4. **Eckstrategie erkannt**: das Netz besetzte beide unteren Ecken frueh mit SPEZIAL-Platten
+   (Spezialfeld = die vierte Zelle gratis) und holte 11 Eckpunkte gegen Claudes 6. Es
+   bezahlte das mit -9 Spezialfeldern an anderer Stelle; unter dem Strich blieben ihm 2
+   Endwertungspunkte gegen 10.
+5. **Gezieltes Wegnehmen** wie in g02: in Runde 4 nahm es unmittelbar nach Claudes
+   Plattenzug die zwei letzten Tuerkis, die Claudes Reihe 3 fehlten.
+
+**Eigene Fehler:**
+
+a. Runde 4: Claude zahlte -10 Strafleiste, um EIN Blau aus einem Mondstapel freizugraben
+   (zwei Schwarz Ueberlauf, zwei Rot obendrauf). Der Zug war den Preis wert (er schloss die
+   obere Zeile, eine Ecke und ein Spezialfeld, zusammen 13 Punkte), aber der Engpass entstand
+   vorher: das freie Blau der grossen Fabrik wanderte in den Mondpool, wo das Netz es nahm.
+b. Runde 2: Startmarker genommen (-2), weil nach dem eigenen Zug auf die Sonnenseite der
+   grossen Fabrik JEDER Mondzug den Pool beruehrte. Wer die grosse Fabrik anzapft, macht
+   damit alle folgenden globalen Mondzuege markerpflichtig.
+c. Runde 2: Reihe 2 auf z2c0 statt auf die Wildzelle z2c2 gelegt (1 statt 3 Punkte), um die
+   Wildzelle aufzusparen; die Flexibilitaet wurde spaeter nicht gebraucht.
+
+**g04 (2026-09-11; Seed 20260913, Claude Spieler 0 UND Erstspieler, Gegner
+`v27-b01_brierbest` @400, Spec `models/frozen_champions/v27-b01/spec.json` aus dem Manifest):
+Claude 36 : 28 Netz, Claude gewinnt.** 76 Claude-Zuege, Log 346 Zeilen. Wertungsplatten:
+Spezialfelder, Eckplatten (3/8), Vertikale Reihen (7 Pkt je volle Spalte). Die niedrigste
+Punktzahl der Serie auf beiden Seiten: die Auslage warf ab Runde 3 nur noch Spezialplatten
+aus, und beide Seiten endeten mit je VIER leeren Spezialfeldern (-12).
+
+**Endwertung je Kriterium** (game.log Z. 339-346): Claude Spezialfelder -12, Eckplatten +3,
+Vertikale Reihen +7 (Summe -2); Netz Spezialfelder -12, Eckplatten +3, Vertikale Reihen 0
+(Summe -9).
+
+**Standard-Kennzahlen** (Endraster, n = 1 Partie, Grundmenge Endstellung):
+
+- *Reihenauslastung Kuppel*: Claude 17 Steine (z0 5, z1 5, z2 2, z3 2, z4 1, z5 2);
+  Netz 16 (z0 4, z1 5, z2 4, z3 1, z4 1, z5 1).
+- *Spaltenauslastung*: Claude 1 VOLLE Spalte (Spalte 0, von oben nach unten aufgebaut,
+  Platzierungspunkte 3+4+5+6 plus 7 fuer die Wertungsplatte); Netz 0 volle Spalten,
+  hoechste Spalte 5 von 6.
+- *Strafleistenauslastung*: Claude R3 drei Fliesen (-6), R5 vier Fliesen plus eine in den
+  Turm (-10), Startmarker in R3 und R4 (-4), zusammen -20; Netz Startmarker in R1, R2, R5
+  (-6), R4 zehn zwangsgeraeumte Fliesen (Strafleiste voll, -10), R5 eine (-1), zusammen -17.
+- *Punkte und Marge*: 36 : 28, Marge +8.
+
+**Beobachtungen** (Zeilen in `game.log`):
+
+1. **Ziehzahl am Punktestand, drittes Mal**: 32 Netz-Ziehungen, 26 davon bei Stand 0.
+   Runde 1: 21 Ziehungen (die ersten fuenf verbrauchten 5 -> 0, danach 16 gratis), Runde 2:
+   9 (alle bei 0), Runde 3: GENAU EINE bei 9 -> 8, Runde 4: GENAU EINE bei 17 -> 16. Damit
+   ist das Muster in g02, g03 und g04 identisch: Stand 0 = Stapel durchsuchen, Stand > 0 =
+   genau eine Ziehung.
+2. **Zwangsraeumung, gross** (Z. 262-263): "Musterreihe 5 (schwarz) nicht platzierbar ->
+   5x Strafleiste" UND "Musterreihe 6 (blau) nicht platzierbar -> 5x Strafleiste" in
+   derselben Runde. Das Netz hatte eine volle 5er- und eine volle 6er-Reihe gefuellt, ohne
+   dass die zugehoerige Kuppelzeile eine passende freie Zelle hatte: ZEHN Steine auf einmal
+   verloren, Strafleiste voll (-10). Zusammen mit g03 (zweimal je zwei Steine) ist das der
+   vierte Beleg: das Netz prueft beim Fuellen der langen Musterreihen nicht, ob die Zielzeile
+   die Farbe ueberhaupt aufnehmen kann.
+3. **Der Vergleich der Endwertung**: identische Spezialfeld-Strafe (-12 zu -12), identische
+   Eckpunkte (3 zu 3), Unterschied allein bei der Spalte (7 zu 0). Der Sieg kam aus dem
+   Spaltenbau, nicht aus der Endwertung im Uebrigen.
+
+**Eigene Fehler:**
+
+a. Runde 5: einen Schwarz-Stein in die leere Reihe 4 geparkt, obwohl die Kuppelzeile z3 nur
+   noch tuerkise Zellen frei hatte -> Zwangsraeumung, ein Stein auf die Leiste. Genau der
+   Fehler aus Beobachtung 2, in klein.
+b. Runde 5: am Rundenende waren alle sechs Musterreihen farblich festgelegt, sodass drei
+   erzwungene Rot-Zuege -7 kosteten (dieselbe Senken-Falle wie in g02).
+c. Ab Runde 3 gab es nur noch Spezialplatten; zwei davon landeten in der unteren Slotreihe,
+   wo R4/R5 nie drei Zellen fuellen konnten (-6 davon). Frueher haette man mit Ziehungen
+   (1 Punkt je Zug) Wildplatten sichern koennen, solange der Stapel noch welche hatte.
+
+**g05 (2026-09-11; Seed 20260914, Claude Spieler 0, NETZ Erstspieler, Gegner
+`v27-b01_brierbest` @400, Spec `models/frozen_champions/v27-b01/spec.json` aus dem Manifest):
+Claude 50 : 55 Netz, NETZ GEWINNT** -- die erste Niederlage der Serie. 77 Claude-Zuege, Log
+331 Zeilen. Wertungsplatten: Mehrfarbige Felder (2 Pkt je Wildfeld, aber nur wenn ALLE
+belegt sind), Aeussere Felder, Farbenreiche Reihen.
+
+**Endwertung je Kriterium** (game.log Z. 324-331): Claude Mehrfarbige Felder +8 (alle vier
+Wildfelder belegt), Aeussere Felder +9, Farbenreiche Reihen +4 (Summe +21); Netz Mehrfarbige
+Felder 0 (zwei Wildfelder leer), Aeussere Felder +9, Farbenreiche Reihen 0 (Summe +9).
+Claude gewann die Endwertung mit 21:9 und verlor die Partie trotzdem.
+
+**Standard-Kennzahlen** (Endraster):
+
+- *Reihenauslastung Kuppel*: Claude 18 Steine (z0 5, z1 5, z2 3, z3 3, z4 2, z5 0);
+  Netz 20 (z0 4, z1 4, z2 4, z3 2, z4 2, z5 4).
+- *Spaltenauslastung*: keine volle Spalte auf beiden Seiten; Claude hoechste Spalte 5
+  (Spalte 3), zwei Spalten mit 4.
+- *Strafleistenauslastung*: **Claude -32 in Strafen** (R1 Marker -2, R2 -12 = Leiste voll
+  plus Marker, R3 -12 dito, R4 -3, R5 -3), davon zweimal die volle Leiste; Netz -8 (Marker
+  in R4 und R5, dazu drei zwangsgeraeumte Fliesen in R5). Das ist die Partie in einer Zahl:
+  24 Strafpunkte Unterschied bei 5 Punkten Endabstand.
+- *Punkte und Marge*: 50 : 55, Marge -5.
+
+**Beobachtungen** (Zeilen in `game.log`):
+
+1. **Die Ziehzahl folgt dem Punktestand -- Gegenprobe**: in dieser Partie fiel das Netz NIE
+   auf 0 und zog folglich nur SIEBEN Mal insgesamt (Runde 1 vier Ziehungen von 5 auf 1,
+   danach je genau eine bei 4->3, 13->12, 28->27). In g02/g03/g04 dagegen 28/24/32
+   Ziehungen, jeweils mit langen Serien bei Stand 0. Damit ist die Regel in beide
+   Richtungen belegt: das Netz zieht sparsam, solange Punkte kosten, und durchsucht den
+   Stapel, sobald sie es nicht mehr tun.
+2. **Zwangsraeumung, fuenfter Beleg** (Z. 310): "Musterreihe 4 (gelb) nicht platzierbar ->
+   3x Strafleiste".
+3. **Das Netz gewinnt hier ohne Endwertung**: 9 Endwertungspunkte gegen 21, aber ein
+   Vorsprung von 17 aus dem laufenden Spiel. Sein Spiel ist auf Platzierungspunkte und
+   Strafvermeidung gebaut, nicht auf die ausliegenden Wertungsplatten -- dasselbe Bild wie
+   in g02 (Spaltenbau ohne Spaltenplatte) und g04 (-12 Spezialfelder).
+
+**Eigene Fehler (diese Partie hat Claude verloren, nicht das Netz gewonnen):**
+
+a. **Runde 2 und Runde 3 je -12**: beide Male waren am Rundenende alle sechs Musterreihen
+   farblich festgelegt, und die Reststeine (Tuerkis, Rot) hatten in keiner Kuppelzeile eine
+   freie Zelle. Dieselbe Senken-Falle wie in g02 und g04, hier zweimal in Folge und
+   spielentscheidend. Die Lehre steht damit dreimal im Protokoll: **eine lange Musterreihe
+   muss bis zum Rundenende eine Farbe aufnehmen koennen, die noch auf dem Tisch liegt.**
+b. Runde 1: den Startmarker fuer drei Blau genommen (-2), obwohl der Zug nicht nötig war;
+   in Runde 2 und 3 kam er nochmals dazu, weil nach dem Anzapfen der grossen Fabrik jeder
+   globale Mondzug den Pool beruehrte.
+c. Reihe 5 (6 Plaetze) wurde in Runde 1 mit einem einzelnen Schwarz belegt und blieb damit
+   die ganze Partie als Senke unbrauchbar; genau dieser Stein haette die spaeteren
+   Zwangszuege aufgefangen.
 
 ## par.8 Nutzer-Entscheide (2026-09-06, 12:40, woertlich: "partienanzahl 10 ist ok, gegner champ @400 ist ok, uebereinstimmungsmessung nein, werkzeug bleibt dann in tools.")
 

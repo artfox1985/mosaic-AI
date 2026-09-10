@@ -18132,3 +18132,33 @@ Generationswechsel Schritt 7. `night_v28_generate.sh` (Generator v27-b01, Seeds
 `night_v28_chain.sh` seit 23:49:57 scharf. Alles Hintergrundaufgaben dieser Sitzung; parallel
 spielt die Claude-Sitzung g02-g05 (Nutzer: braucht wenig Rechenlast). Erwartung nach v27:
 10,3 h plus 2 h Kette, unter Nebenlast langsamer.
+
+## 2026-09-11 -- Claude-Partien g02 bis g05 gegen den Champion v27-b01 (Claude 3:1)
+
+Vier Partien am Spiel-Interface `tools/claude_play.py`, Gegner `v27-b01_brierbest` @400 mit
+der Spec aus dem eingefrorenen Artefakt (Manifest je Partie). Ergebnis 3:1 fuer Claude:
+g02 55:43, g03 66:48, g04 36:28, g05 50:55. Registrierung mit Endwertung je Kriterium, den
+sechs Standard-Kennzahlen und Protokoll in `evaluations/PREREG_claude_play_interface.md`
+par.7.
+
+Zwei Muster tragen ueber alle vier Partien und sind damit Sonden-Kandidaten:
+
+- **Die Ziehzahl am Kuppelstapel folgt dem Punktestand, nicht der Stellung.** Bei Stand 0
+  durchsucht das Netz den Stapel (g02 28 Ziehungen, g03 24, g04 32 -- allein 21 in einer
+  Runde, was dem gesamten Reststapel entsprach); bei positivem Stand zieht es genau einmal
+  je Runde. In g05 fiel es nie auf 0 und zog in der ganzen Partie nur siebenmal. Das ist die
+  in `PREREG_score_clamp_incentive.md` par.11 entschiedene Regel in Reinform.
+- **Das Netz fuellt lange Musterreihen mit Farben, die seine eigene Kuppelzeile nicht
+  aufnehmen kann.** Fuenf Vorfaelle: g03 zweimal (je zwei Steine), g04 einmal mit ZEHN
+  Steinen auf einmal (Reihe 5 schwarz und Reihe 6 blau in derselben Runde, Strafleiste voll,
+  -10), g05 einmal (drei Steine). Claude ist derselbe Fehler in klein zweimal unterlaufen.
+
+Nebenbefunde: das Netz baute in g02 zwei volle Spalten, obwohl die Spaltenplatte NICHT
+auslag, und liess dafuer drei Spezialfelder leer (-9); in g05 gewann es mit 9
+Endwertungspunkten gegen 21, also allein aus dem laufenden Spiel. Sein Spiel haengt an
+Platzierungspunkten und Strafvermeidung, nicht an den ausliegenden Wertungsplatten.
+
+Claudes eigene Fehler stehen in derselben Prereg; der teuerste ist dreimal derselbe: am
+Rundenende waren alle sechs Musterreihen farblich festgelegt, sodass die Reststeine nur noch
+auf die Strafleiste konnten (g02 -10, g04 -10, g05 zweimal -10 und damit die einzige
+Niederlage).
