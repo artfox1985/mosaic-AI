@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. Nutzer 2026-08-31: die Plattenverteilung ist der GENERELLE Hebel (k6 nur in einem Drittel der Partien aktiv). Code-Befund par.6a: die Handheuristik bewertet Spezialfelder mit NULL. Die Sperre 'Aendern darf man sie nicht (Elo-Anker)' ist seit dem eingefrorenen Anker-Artefakt (2026-08-31) ueberholt, Nachtrag am Ende. Stufe 0 war fuer Generation 2 (v24) faellig, nicht gefahren; fruehestens nach v27-b01. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. Stufe 0 (Spannweite ueber die neun Slots, par.4) EINGETAKTET 2026-09-11 als Sonde am v28-Korpus, Schritt 5 des v28-Programms (PREREG_v28_window.md par.8); Verdikt nur fuer den Slot-Teil, Plattenwahl bleibt offen (Nachtrag 2026-09-09). Anker-Sperre aus par.6a ist ueberholt. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -239,3 +239,9 @@ nicht Mensch gegen KI (Mensch gegen Netz: 10,3 gegen 1,3 je Partie,
 vorregistriertes Verdikt "Spanne klein, Arm tot" schloesse aber auch die Plattenwahl mit,
 die par.5 ausdruecklich bei der Heuristik laesst. Vor Stufe 0 ist das Verdikt auf den
 Slot-Teil einzugrenzen.
+
+**Eingetaktet 2026-09-11 (Nutzer):** Stufe 0 laeuft als Sonde am v28-Korpus
+(`selfplay_v27-b01-policy_*`, 4.000 Partien), sobald die Maschine zwischen zwei Laeufen frei
+ist (`PREREG_v28_window.md` par.8, Schritt 5). Gemessen wird die Spannweite des Slot-Wertes
+ueber die neun Slots je Startplatte; das vorregistrierte Verdikt gilt nur fuer den Slot-Teil
+(Nachtrag 2026-09-09), die Plattenwahl bleibt eine eigene Frage.

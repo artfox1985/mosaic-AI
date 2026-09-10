@@ -167,3 +167,44 @@ par.8 der Kuppelstapel-Prereg endgueltig UEBERHOLT. Standard-Kennzahlen aus
    Punkten, die Saettigung (1-2 Spalten, 100 Punkte) ist nicht erreicht.
 4. **Claude-Partien g02-g10** laufen parallel als Beobachtungsquelle; ihre Befunde werden zu
    Sondenkandidaten, nicht zu Armen.
+
+## par.8 DAS v28-PROGRAMM, VERBINDLICH (Nutzer 2026-09-11, 00:10)
+
+Nutzer-Wortlaut: *"bau das alles so ein mit den bauschritt aus der prereg rust_data_layer.
+ansonsten weiter mit deinem vorschlag fuer die reihenfolge -> b01, b02 Variante B, dann die
+zwei Ablationen, parallel dazu die Sonde Startkuppel und die Ueberraschungs-Kante. dann takte
+den round_estimate_leaf_term noch an einer passenden stelle ein."*
+
+**Variante B, Merkmalsdefinition (v28-b02), elf Werte additiv ans Ende des Flachvektors,
+Sicht des Spielers am Zug, Quelle `dome_pool_view`:** unbekanntes Praefix (Laenge, 1);
+eigener Block gesamt (Laenge, Spezial-, Wild-Zaehler, 3); Typen der obersten vier Positionen
+des obersten eigenen Blocks (+1 Spezial, -1 Wild, 0 leer, 4); fremde Bloecke gesamt (Laenge,
+Spezial, Wild, 3). INPUT_SIZE 744 -> 755. Alt-Records ohne Feld liefern Nullen; Alt-ONNX
+bleiben spielbar (`net.rs::build_inputs` kuerzt). **Bauschritt aus `PREREG_rust_data_layer.md`
+par.2 (Teil A):** das Merkmal wird EINMAL in `features.rs` gebaut, per pyo3 exportiert
+(`state_features_from_json`, `state_planes_from_json`), der Python-Zwilling in `neural_net.py`
+wird nachgezogen und dient als Test-Orakel; Tor: Bit-Identitaet beider Bauer
+(`tools/probes/feature_parity_rust_python.py`, `np.array_equal`, keine Toleranz) VOR der
+Umstellung des Blockbaus auf Rust (Schalter `MOSAIC_FEATURES_FROM_RUST`, nicht im
+Cache-Schluessel). Netz-Paritaets-Fixture des Champions muss unveraendert gruen bleiben
+(744-Modell, gekuerzt). Bau: Agentenauftrag 2026-09-11, 00:15; danach Wheel, Anker-Drift,
+Paritaetswerkzeug, dann Bloecke fuer das v28-Fenster unter dem neuen Schluessel (INPUT_SIZE ist
+Teil des Cache-Materials), dann Training b02 (Warmstart `v27-b01_brierbest`, Seed 20260937,
+sonst wie b01).
+
+**Reihenfolge und Kosten (Planung nach `docs/measured_runtimes.md`):**
+
+| Schritt | Was | Kosten |
+| --- | --- | --- |
+| 1 | `v28-b01`, Rezept fest (Kette, laeuft seit 2026-09-10 23:49) | 10,3 h Erzeugung + 2 h |
+| 2 | Tor 1 b01 gegen v27-b01, zwei Seeds mit Logs (Tor 2b inklusive) | 2 x 86 min |
+| 3 | `v28-b02`, Variante B (Bloecke neu, Training, Tor 1 gegen b01 zwei Seeds; Diagnostik `dome_stack_known_block_draw_probe` auf den Logs, par.6) | 30 min + 1,4 h + 2 x 86 min |
+| 4 | Ablationen: `v28-b03` = Fenster OHNE die neue Ausflug-Klasse (rund 401 Dateien weniger), `v28-b04` = Fenster OHNE den G-2-Posten (45 + 355 + 145 = 545 Dateien weniger); Rezept wie b01, Seed 20260937, Weglassen ohne Ersatz (Fenstergroesse ist damit Teil des Effekts, registriert); je Tor 1 gegen b01, ein Seed, zweiter nur bei Fruehstopp | je 1,3 h + 86 min |
+| 5 | parallel zu 3/4, wenn die Maschine zwischen zwei Laeufen frei ist: Sonde Startkuppel Stufe 0 am v28-Korpus (`PREREG_start_dome_choice.md` par.4, Spannweite ueber die neun Slots; nur der Slot-Teil, Verdikt eingegrenzt nach dem Nachtrag dort) | Minuten |
+| 6 | Ueberraschungs-Kante: `v24-b05` gegen `v24-b04`, beide aus dem restic-Repo (`run:v24-b05`, `run:v24-b04`) in einen Sammelordner zurueckgeholt, gepaartes Gating mit `models/k3v_off.spec.json` auf beiden Seiten (die Fassung OHNE Knopf, in der b05 seinen SPRT-Befund hatte, `PREREG_v24_window.md` par.9 Zeile v24-b05), 200 Paare, Blockgroesse 5 | 86 min |
+| 7 | `round_estimate_leaf_term`: Such-Knopf am Champion-Stand nach b02 (Bau nach par.3 dort, Skala (a) je Runde 3/8/10/12 aus par.4; Koordinator-Vorschlag, Nutzer kann auf (b) 9,25 wechseln), A/B gleiches Netz Live gegen Artefakt wie bei Variante A, zwei Seed-Basen | Bau + 2 x 43 min |
+
+Nach Schritt 7 sind von den acht offenen Preregs `round_estimate_leaf_term`,
+`start_dome_choice`, `policy_surprise_weighting` und `rust_data_layer` (Teil A) mit Verdikt
+versehen; `round_transition_search_sampling` geht in `dome_stack` auf (UEBERHOLT), `stack_top`
+haengt am Ausgang von b02. Ziel "rund 7 OFFEN" ist damit erreichbar.

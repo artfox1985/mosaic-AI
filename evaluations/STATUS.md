@@ -132,11 +132,14 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
-1. **Start der v28-Erzeugung** (Abschnitt 1).
-2. **Bau von Variante B** (`v28-b02`): Merkmalsumfang (Laenge/Zaehler/Typenfolge der obersten
-   m des eigenen Blocks, fremde Bloecke, Praefix) -- Vorschlag in `PREREG_v28_window.md` par.6.
-3. **Preregs schliessen ohne Erzeugung** (Abschnitt 5): welche der vier.
+1. ~~Start der v28-Erzeugung~~ gestartet 2026-09-10, 23:49.
+2. ~~Bau von Variante B~~ ENTSCHIEDEN 2026-09-11, 00:10: elf Werte plus Rust-Merkmalsexport
+   (`PREREG_v28_window.md` par.8); Bau laeuft (Agent), danach Wheel und Paritaetstor.
+3. **v28-Programm verbindlich** (par.8 dort): b01, b02, Ablationen b03/b04, Startkuppel-Sonde,
+   Ueberraschungs-Kante, round_estimate als Such-Knopf nach b02. Offen darin: Skala des
+   Rundenschaetzers (Vorschlag (a) je Runde; (b) 9,25 auf Zuruf).
 4. **Loeschfreigaben**: alte Mess-Manifeste in `data/`, die zwei Replay-Reports.
+5. **Spec- und Rezeptfragen nach dem Einfrieren**: keine gestellt; b01 faehrt beides fest.
 
 ## 7. MERKLISTE CODEPFLEGE und STRUKTURBEFUNDE
 
