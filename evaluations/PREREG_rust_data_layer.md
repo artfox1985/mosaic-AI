@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes, spaltenorientiertes Rohformat (Teil B)? | Beleg: NICHTS GEBAUT, angelegt 2026-08-28; REGISTRIERUNG, kein Arbeitsauftrag. Teuer ist nicht die Sprachaufteilung, sondern die GRENZE: jede Eingabe-Erweiterung ist ein Dreifachbau (par.1). Teil A = Umzug von Hebel 2, Vorbedingung und Bit-Tor wandern mit (par.2); Teil B = Rohformat, rohe Zustaende statt Merkmale (par.3). Ausloesung par.4; Erfolgsmass Irrtumskosten, nicht Elo. -->
+<!-- STATUS: OFFEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes Rohformat (Teil B)? | Beleg: TEIL A EINGETAKTET 2026-09-11 als Bauschritt von Variante B (PREREG_v28_window.md par.8, Nutzer): Merkmal einmal in features.rs, pyo3-Export, Python-Zwilling als Test-Orakel, Bit-Identitaets-Tor vor der Umstellung, Schalter nicht im Cache-Schluessel. Nutzniesser benannt: jede Merkmalserweiterung ab jetzt (elf Werte fuer v28-b02). TEIL B ohne Ausloeser (Datenaufbau 35 s von 5.117 s beim v27-Training = 0,7 %, Schwelle 25 %), bleibt liegen. -->
 
 # Vorregistrierung: Datenschicht in Rust (Merkmalsbauer und Rohformat)
 
@@ -180,3 +180,18 @@ Elo-Wert auf. Die Gegenprobe, die die Infrastruktur-Regel verlangt: wenn zum
 Ausloesezeitpunkt keine Eingabe-Erweiterung ansteht und keine Messung an der
 Ladezeit haengt, ist der Bau **nicht** faellig -- dann ist er Aufraeumen, und
 Aufraeumen konkurriert mit Spielstaerke um dieselbe Zeit.
+
+## par.6 EINGETAKTET (Nutzer 2026-09-11, 00:10): Teil A als Bauschritt von Variante B
+
+Der Audit vom 2026-09-09 hatte diese Prereg als Registrierung ohne Nutzniesser gefuehrt; die
+Sperre "nach v22" war abgelaufen, die Vorbedingung aus par.2 (Merkmalsanteil nach den Hebeln
+neu messen) nie erfuellt, und Teil B ohne Ausloeser (v27-b01-Training: Datenaufbau 35,4 s von
+5.116,7 s, also 0,7 % gegen die 25 %-Schwelle aus par.4). Was sie dennoch traegt, steht in
+par.1: nicht die Ladezeit, sondern die GRENZE ist teuer, jede Eingabe-Erweiterung ist ein
+Dreifachbau. Mit Variante B (`PREREG_v28_window.md` par.8, elf neue Werte) steht genau das an.
+**Nutzer-Entscheid: Teil A wird als Bauschritt von Variante B gefahren** -- Merkmal einmal in
+Rust, pyo3-Export der beiden Bauer, Python-Zwilling nur noch Test-Orakel, hartes Tor aus
+par.2 unveraendert (Bit-Identitaet VOR der Umstellung, `np.array_equal`; Schalter
+`MOSAIC_FEATURES_FROM_RUST` NICHT im Cache-Schluessel; Kill-Kriterium bei nicht herstellbarer
+Identitaet). Verdikt hier, sobald das Tor gefahren ist. Teil B bleibt ohne Ausloeser liegen
+und wird beim naechsten Bestandsabgleich UEBERHOLT, falls die Schwelle weiter verfehlt wird.

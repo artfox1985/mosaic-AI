@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt ein additiver Rundenschaetzer-Term am Netz-Blattwert (Solver-Rundenscore plus Strafleisten-Busse, Differenz beider Seiten, tanh mit gemessener Skala, Runde 5 null) Spielstaerke und Spalten? | Beleg: Nichts gebaut. Skala GEMESSEN 2026-09-05 (par.4, round_estimate_scale_probe.json, 38.073 Draft-Zustaende R1-R4): P90 von abs(D) 3 / 8 / 10 / 12 je Runde, gepoolt 9, B_est 9,25. Das widerspricht par.3 (eine Skala, kein Rundenprofil); Wahl (a) je Runde oder (b) eine Skala und der Knopf-Default sind offen (Nutzer). Messkette par.5, Bau fruehestens nach v27-b01 (Einfrieren). -->
+<!-- STATUS: OFFEN | Frage: Traegt ein additiver Rundenschaetzer-Term am Netz-Blattwert (Solver-Rundenscore plus Strafleisten-Busse, Differenz beider Seiten, tanh mit gemessener Skala, Runde 5 null) Spielstaerke und Spalten? | Beleg: Nichts gebaut. Skala GEMESSEN 2026-09-05 (par.4: P90 3 / 8 / 10 / 12 je Runde, gepoolt 9,25). EINGETAKTET 2026-09-11 als Schritt 7 des v28-Programms (PREREG_v28_window.md par.8): Bau nach par.3, Skala (a) je Runde als Koordinator-Vorschlag (Nutzer kann auf (b) wechseln), A/B gleiches Netz Live gegen Artefakt nach dem Muster der Kuppelstapel-Kante, zwei Seed-Basen. -->
 
 # Vorregistrierung: Rundenschaetzer als additiver Term am Netz-Blattwert (Such-Knopf K4)
 
@@ -170,3 +170,16 @@ gestrichen, K3 Huelle, K3-P2 Platzhalter). Gemessen wird am v24-Siegernetz,
 nach den v24-Abnahmen; vorher laeuft nur die Skalen-Messung (par.4), sobald
 die CPU frei ist. Bei Erfolg Kandidat fuer den v25-Knopfsatz zusammen mit
 K3-P2; Kreuzprodukte nur mit Anlass (ein Knopf, ein Netz, eine Messung).
+
+## par.6 EINGETAKTET (2026-09-11): Schritt 7 des v28-Programms
+
+Nutzer 2026-09-11: *"takte den round_estimate_leaf_term noch an einer passenden stelle ein."*
+Passende Stelle: nach `v28-b02`, am dann amtierenden Champion-Stand, als Such-Knopf ohne
+Training (`PREREG_v28_window.md` par.8, Schritt 7). Messform wie bei Variante A des
+Kuppelstapels: gleiches Netz, Live-Engine MIT Term gegen das eingefrorene Artefakt OHNE,
+`frozen_referee_match`, zwei Seed-Basen a 150 Partien, plus Spaltensonde auf den Logs
+(Standard-Kennzahlen). **Skala: Koordinator-Vorschlag (a) je Runde 3 / 8 / 10 / 12** (par.4
+zeigt den Faktor 4 ueber die Runden; eine Skala 9,25 liesse den Term in Runde 1 praktisch
+aus). Der Nutzer kann vor dem Bau auf (b) wechseln; der Knopf-Default traegt dann den
+gewaehlten Wert, Vorab-Auflage aus par.3 erfuellt. Kostentor 25 % und Falsifikator aus par.5
+unveraendert.

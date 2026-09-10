@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: alpha 0,5 ohne Tor: NEIN (par.9, v23-b03: Arena 75:85, Spalten 0,500 gegen 0,631). Mit Sicherheits-Tor 0,5 als v24-b05 GEFAHREN 2026-09-05/06 (par.10, Manifest: einziger Faktor gegen b04): Tor 2a 0,4975 volle Spalten, Tor 1 ohne Knopf 66:34 und 112:78 (SPRT), mit Knopf 219:181 ohne Entscheid; Belege nur in PREREG_v24_window.md par.9 (par.11). Ein Verdikt GEGEN b04 (der einzige saubere Vergleich) ist nirgends registriert; Generator v25 wurde v24-b07. -->
+<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: alpha 0,5 ohne Tor: NEIN (par.9, v23-b03). Mit Sicherheits-Tor 0,5 als v24-b05 gefahren (par.10/11), Belege in PREREG_v24_window.md par.9; die einzige saubere Kante b05 gegen b04 fehlt. EINGETAKTET 2026-09-11 als Schritt 6 des v28-Programms (PREREG_v28_window.md par.8): beide Modelle aus dem restic-Repo, gepaartes Gating 200 Paare, dann Verdikt hier. -->
 
 # Vorregistrierung: Policy-Surprise-Weighting
 
@@ -342,3 +342,11 @@ Ueberraschungsgewichtung ist b05 GEGEN b04 (gleiches Rezept, ein Faktor). Diese 
 nirgends registriert, und der in par.10 verlangte Anteil gegateter Stichproben je Epoche
 wurde nie aus dem Trainingslog nachgetragen. Beides waere aus den vorhandenen Modellen
 und Logs nachholbar, ohne neues Training. Bis dahin: kein Verdikt.
+
+**Eingetaktet 2026-09-11 (Nutzer):** die fehlende Kante `v24-b05` gegen `v24-b04` wird als
+Schritt 6 des v28-Programms gefahren (`PREREG_v28_window.md` par.8): beide Modelle aus den
+restic-Snapshots `run:v24-b05` / `run:v24-b04` in einen Sammelordner zurueckgeholt, gepaartes
+Gating mit `models/k3v_off.spec.json` auf beiden Seiten (Fassung ohne Knopf wie bei den
+v24-Abnahmen, `PREREG_v24_window.md` par.9), 200 Paare,
+Blockgroesse 5, `--log-games`. Verdikt danach hier in par.12: traegt die Gewichtung mit
+Sicherheits-Tor (Punktschaetzer und Spalten), oder nicht.
