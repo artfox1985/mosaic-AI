@@ -47,9 +47,10 @@ Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst wer
    seit 18:00 mit Variante A, Dubletten-Fix, exaktem Orakel-Pfad und Knopf
    `MOSAIC_DOME_POOL_KNOWLEDGE`. **Diagnostik auf 300 A/B-Partien (19:00, `dome_stack`
    par.15e): Ziehungen in den eigenen bekannten Block STEIGEN mit Variante A (+0,69 je
-   Partie, p rund 0,05), zwei Drittel davon gratis bei Stand 0.** Folge: `score_clamp` Stufe 1
-   (Regel oder Nutzenterm fuer Ziehungen bei 0, par.6) rueckt VOR Variante B; das ist ein
-   Nutzer-Entscheid am Spielmodell. Danach Variante B, Sicht-Reststufen (`stack_top`).
+   Partie, p rund 0,05), zwei Drittel davon gratis bei Stand 0.** **Nutzer 19:15: Regel bleibt,
+   Ziehen bei 0 ist gratis und legal (Regelbuch S.4/S.9); `score_clamp` ENTSCHIEDEN (par.11),
+   Diagnostik neu gefasst (`dome_stack` par.15f).** Naechster Bau: Variante B (Merkmale fuer
+   den eigenen Block, Training, A/B B gegen A), dann Sicht-Reststufen (`stack_top`).
 2. **Claude-Partien BEREIT** (`PREREG_claude_play_interface.md` par.9 P.7): Rauchtest gruen
    (18:30), Spec-Rueckfall auf das Artefakt gebaut. Nutzer 2026-09-10, 16:00: "Wenn
    abgeschlossen koennen wir die claude plays fahren." Gegner ist `models/champion.txt`

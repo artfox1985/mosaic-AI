@@ -17745,3 +17745,11 @@ Live MIT Variante A 0,271 / 0,276 Anteil eigener Block, Artefakt OHNE 0,189 / 0,
 +0,689 je Partie [-0,009; +1,387], +70/-48. Zwei Drittel der Live-Ziehungen in den eigenen
 Block bei Stand 0 (gratis). Mensch 0,015, KI in den Logs 0,277. par.8-Erwartung tritt nicht
 ein; naechster Hebel Null-Klammer Stufe 1 (Nutzer-Entscheid), `dome_stack` par.15e.
+
+## 2026-09-10, 19:15 -- Regelentscheid: Ziehen bei 0 bleibt gratis; Null-Klammer ENTSCHIEDEN
+
+Nutzer: "bleiben wir bei 1". Regelbuch S.4 (je 1 Punkt, so oft man will) und S.9 (nie unter
+0) tragen die Engine-Auslegung. `score_clamp` geschlossen (par.11; Strafseite 0,5 Punkte je
+Partie, unter jeder Arena-Aufloesung), `engine_manual.md` mit Regelzitat, `dome_stack` par.15f
+mit der neu gefassten Diagnostik (Ziehungen in eigenen Block bei positivem Stand). Offene
+Preregs: 8.

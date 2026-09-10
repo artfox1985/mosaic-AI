@@ -89,8 +89,9 @@ the remaining plates go back is known only to the player who returned them; the
 opponent sees the fronts of the drawn plates and the placement, not the return
 order (engine decision 2026-09-10, replacing the one of 2026-08-09). At a score of 0
 further draws are effectively free, because a score can never drop below zero.
-*(The physical rules leave this case open; the engine resolves it consistently
-with the never-below-zero rule.)* Placed plates are permanent; position and
+*(Rulebook p.4: "lose 1 point each ... as often as you like"; p.9: "you can never
+drop below 0 points". No rule forbids drawing at 0; the engine follows both sentences
+literally. User decision 2026-09-10 (PREREG_score_clamp_incentive.md par.11): this stays.)* Placed plates are permanent; position and
 rotation are free.
 
 **B) Take tiles from a Sonnenseite.** Take every tile of one colour from the
