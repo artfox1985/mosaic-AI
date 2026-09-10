@@ -50,9 +50,11 @@ Arenen und Erzeugung nicht.
 (Nutzer 2026-09-10), Record-Feld `dome_pool_view` im Wheel (Anker-Drift gruen, Rauchtest
 321/321 Records), Skripte `tools/night_v28_generate.sh` (Seeds 20260917/18/19, rund 10,3 h)
 und `tools/night_v28_chain.sh` (Training `v28-b01`, Rezept unveraendert). Zweiter Arm
-`v28-b02` = Variante B (Merkmale aus `dome_pool_view`) nach par.6 der Prereg; sein Bau
-(Merkmal in `neural_net.py`/`features.rs`, INPUT_SIZE 744 -> 744 + k, Cache-Schluessel neu) ist
-NICHT begonnen und gehoert vor das Training von b02, nicht vor die Erzeugung.
+`v28-b02` = Variante B: GEBAUT (par.9 der Prereg, elf Werte, INPUT_SIZE 755, Rust-Export,
+Kontrakt-Hash neu c65768636c0560a7), aber **die Python-Seite liegt in `git stash` (stash@{0})**,
+damit die laufende Kette b01 mit 744 trainiert. Nach Kette und Tor 1 b01: `git stash pop`,
+Wheel, Anker-Drift, `tools/probes/feature_parity_rust_python.py`, Bloecke neu, Training b02.
+**Wer den Baum vorher anfasst: NICHT `git stash pop` vor dem b01-Training.**
 
 Start: `bash tools/night_v28_generate.sh` plus Cache-Waechter unter
 `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` (Aufruf im Skriptkopf), danach `bash tools/night_v28_chain.sh`.

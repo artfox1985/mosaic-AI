@@ -56,8 +56,11 @@ gefehlt: die Kanalzahl war beim Uebertrag ueberholt (siehe unten).
 
 ## Netz- und Trainingsseite (`config.py`, `engine/py/neural_net.py`)
 
-- **`INPUT_SIZE = 714`** (config.py:38; seit 2026-08-25 plus 6 `col_f_max`),
-  **`NUM_ACTIONS = 406`** (config.py:43).
+- **`INPUT_SIZE = 755`** (config.py:38 und engine/src/features.rs:18 -- die
+  beiden EINZIGEN Literale; alles andere liest sie oder holt sie aus den
+  Checkpoint-Metadaten). Wachstum: 708 -> 714 (+6 `col_f_max`, 2026-08-25)
+  -> 744 (+30 Sicht-Arm v24-b04, 2026-09-05) -> 755 (+11 Kuppelstapel-Wissen,
+  Abschnitt 15, Variante B, 2026-09-11). **`NUM_ACTIONS = 406`** (config.py:43).
 - **`NUM_PLANES_CHANNELS = 79`** (engine/src/features.rs:813, geprueft
   2026-08-28). Der STATUS-Stand vom 2026-08-25 nannte hier noch **77**; die
   beiden Spezialfeld-Kanaele kamen mit Schritt 1a des v22-Schlachtplans dazu

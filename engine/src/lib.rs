@@ -1562,6 +1562,67 @@ fn ownership_ek_plate_points_json(state_json: String, ownership: Vec<f64>) -> Py
 /// Statischer Wertungsplatten-Katalog für die Auswahl-UI (Port von
 /// `/api/scoring_tiles`): `{tiles:[{id,name,description,emoji,excludes}],
 /// exclusive_pairs:[[a,b],…]}`. Braucht keinen Spielzustand.
+/// Teil A der Rust-Datenschicht (`PREREG_rust_data_layer.md` par.2): der
+/// FLACHE Merkmalsvektor aus einem Zustands-JSON (`serialize::state_to_json`),
+/// genau die Funktion, die auch der Spielpfad benutzt.
+///
+/// Zweck ist, den Python-Zwilling (`neural_net.py::state_to_tensor`) vom
+/// PRODUKTIVEN Pfad abzuloesen und zum Test-Orakel zu machen. Bis das
+/// Bit-Identitaets-Tor bestanden ist, ist der Aufruf ein Opt-in
+/// (`MOSAIC_FEATURES_FROM_RUST=1`); geprueft wird er von
+/// `tools/probes/feature_parity_rust_python.py`.
+///
+/// Liefert `INPUT_SIZE` Werte. Kein Zustandsaufbau, keine Determinisierung --
+/// der JSON-Pfad liest das Dict direkt.
+#[pyfunction]
+fn state_features_from_json(state_json: String) -> PyResult<Vec<f32>> {
+    use pyo3::exceptions::PyValueError;
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let f = crate::features::state_to_features(&parsed);
+    if f.len() != crate::features::INPUT_SIZE {
+        return Err(PyValueError::new_err(format!(
+            "state_to_features lieferte {} Werte, INPUT_SIZE ist {}",
+            f.len(),
+            crate::features::INPUT_SIZE
+        )));
+    }
+    Ok(f)
+}
+
+/// Teil A der Rust-Datenschicht: der PLANES-Block aus einem Zustands-JSON,
+/// als flache Liste plus Form `(C, H, W)` -- C-Major/NCHW, also Kanal `c`,
+/// Zeile `r`, Spalte `w` bei Index `c*36 + r*6 + w` (dieselbe Linearisierung,
+/// die `net.rs` erwartet).
+///
+/// Anders als beim Flachvektor gibt es in Rust KEINEN JSON-Pfad fuer die
+/// Planes: der Zustand wird ueber `json_to_state` rekonstruiert und dann
+/// `state_to_planes_direct` gerufen. Das ist exakt die Route, die
+/// `examples/planes_parity.rs` seit Task #11 Phase 2 fuer den Vergleich gegen
+/// Python benutzt; der feste Seed 0 ist dort begruendet -- die RNG treibt in
+/// `json_to_state` nur das Neumischen verdeckter Bestaende, und die Planes
+/// lesen davon nichts (nur `dome_grid` und `scoring_tile_ids`).
+#[pyfunction]
+fn state_planes_from_json(state_json: String) -> PyResult<(Vec<f32>, (usize, usize, usize))> {
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let mut rng = StdRng::seed_from_u64(0);
+    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    let planes = crate::features::state_to_planes_direct(&state);
+    let shape = (crate::features::NUM_PLANES_CHANNELS, 6usize, 6usize);
+    if planes.len() != shape.0 * shape.1 * shape.2 {
+        return Err(PyValueError::new_err(format!(
+            "state_to_planes_direct lieferte {} Werte, erwartet {}",
+            planes.len(),
+            shape.0 * shape.1 * shape.2
+        )));
+    }
+    Ok((planes, shape))
+}
+
 #[pyfunction]
 fn scoring_tiles_json() -> String {
     use crate::scoring::{exclusion_partner, ALL_SCORING_TILES, MUTUALLY_EXCLUSIVE_PAIRS};
@@ -1951,6 +2012,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(self_play_games_with_net_labels, m)?)?;
     m.add_function(wrap_pyfunction!(arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
+    m.add_function(wrap_pyfunction!(state_features_from_json, m)?)?;
+    m.add_function(wrap_pyfunction!(state_planes_from_json, m)?)?;
     m.add_function(wrap_pyfunction!(not_deckel_diagnostics_json, m)?)?;
     m.add_function(wrap_pyfunction!(reset_not_deckel_diagnostics, m)?)?;
     m.add_function(wrap_pyfunction!(tiling_budget_stats_json, m)?)?;
@@ -2066,11 +2129,21 @@ mod contract_stamp_tests {
     /// blieb, in dem dieser Waechter rot wurde. Der eingefrorene Champion
     /// traegt den alten Hash im Manifest; sein Referee-Handshake ist ab jetzt
     /// eine Cross-Aera-Messung (Aera-Regel 2026-08-29).
+    ///
+    /// **Neu gesetzt 2026-09-11** (vorher `20b442a8164f748d`), Anlass:
+    /// `PREREG_dome_stack_information_sets.md` par.7 Variante B und
+    /// `PREREG_v28_window.md` par.6 (Arm v28-b02) -- `INPUT_SIZE` 744 -> 755
+    /// (+11 Flachwerte am ENDE: Kuppelstapel-Wissen aus `dome_pool_view`,
+    /// Abschnitt 15 in `features.rs`). `NUM_PLANES_CHANNELS` bleibt 79,
+    /// `NUM_ACTIONS` 406, Kopf-Liste unveraendert. Additiv wie die Schritte
+    /// davor: `net.rs::build_inputs` kuerzt den Flat-Block auf die
+    /// MODELL-Breite, der Champion `v27-b01_brierbest` (744) sieht die elf
+    /// neuen Werte nie und spielt bitgleich weiter.
     #[test]
     fn contract_hash_matches_pinned_literal() {
         assert_eq!(
             contract_hash(),
-            "20b442a8164f748d",
+            "c65768636c0560a7",
             "A2-Vertragshash hat sich veraendert -- Bestandschampions bekommen \
              andere Eingaben (siehe Testdoku)"
         );

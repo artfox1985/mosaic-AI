@@ -197,6 +197,13 @@ impl DomeTile {
 /// noch im verdeckten Stapel").
 pub const NUM_DOME_TILE_DESIGNS: usize = 18;
 
+/// Zahl der SPEZIAL-Platten im Katalog (die uebrigen 9 sind WILD) --
+/// Normierung der Kuppelstapel-Wissensmerkmale (features.rs Abschnitt 15,
+/// PREREG_dome_stack_information_sets.md par.7 Variante B). Gegen
+/// `build_dome_tile_pool` geprueft von `special_tile_count_matches_catalog`,
+/// damit die Konstante nicht von einer Katalog-Aenderung abdriftet.
+pub const NUM_SPECIAL_DOME_TILES: usize = 9;
+
 /// Vollständiger Pool von 18 Kuppelplättchen (engine/dome.py, dome_colors.csv).
 pub fn build_dome_tile_pool() -> Vec<DomeTile> {
     use TileColor::*;
@@ -334,5 +341,20 @@ mod tests {
         assert!(t.spaces[sp_idx].accepts_special());
         // zweiter Aufruf liefert false (schon entsperrt)
         assert!(!t.try_unlock_special());
+    }
+
+    /// `NUM_SPECIAL_DOME_TILES` ist eine NORMIERUNGSKONSTANTE der Merkmale
+    /// (features.rs Abschnitt 15) -- sie darf nicht vom Katalog abdriften.
+    #[test]
+    fn special_tile_count_matches_catalog() {
+        let pool = build_dome_tile_pool();
+        assert_eq!(pool.len(), NUM_DOME_TILE_DESIGNS);
+        let specials = pool.iter().filter(|t| t.is_special_type()).count();
+        assert_eq!(specials, NUM_SPECIAL_DOME_TILES);
+        assert_eq!(
+            pool.len() - specials,
+            NUM_SPECIAL_DOME_TILES,
+            "Katalog ist haelftig geteilt: 9 Spezial, 9 Wild"
+        );
     }
 }
