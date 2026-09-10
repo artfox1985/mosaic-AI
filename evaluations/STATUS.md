@@ -45,9 +45,11 @@ Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst wer
    par.15-15c: A/B 165:135 ohne Ruecklauf, Fix bleibt; PRE/POST exakt: Wissen allein bewegt
    die Ziehungen kaum, Erwartung aus par.8 an der Referenzpartie nicht eingetreten). Live-Wheel
    seit 18:00 mit Variante A, Dubletten-Fix, exaktem Orakel-Pfad und Knopf
-   `MOSAIC_DOME_POOL_KNOWLEDGE`. **Naechste Schritte des Programms:** Diagnostik "Ziehung in
-   eigenen bekannten Block" ueber Mensch-Logs und Self-Play (Werkzeug fehlt), dann Variante B
-   (Merkmale), Stufe 1 der Null-Klammer an der Ziehung, Sicht-Reststufen (`stack_top`).
+   `MOSAIC_DOME_POOL_KNOWLEDGE`. **Diagnostik auf 300 A/B-Partien (19:00, `dome_stack`
+   par.15e): Ziehungen in den eigenen bekannten Block STEIGEN mit Variante A (+0,69 je
+   Partie, p rund 0,05), zwei Drittel davon gratis bei Stand 0.** Folge: `score_clamp` Stufe 1
+   (Regel oder Nutzenterm fuer Ziehungen bei 0, par.6) rueckt VOR Variante B; das ist ein
+   Nutzer-Entscheid am Spielmodell. Danach Variante B, Sicht-Reststufen (`stack_top`).
 2. **Claude-Partien BEREIT** (`PREREG_claude_play_interface.md` par.9 P.7): Rauchtest gruen
    (18:30), Spec-Rueckfall auf das Artefakt gebaut. Nutzer 2026-09-10, 16:00: "Wenn
    abgeschlossen koennen wir die claude plays fahren." Gegner ist `models/champion.txt`
@@ -56,8 +58,19 @@ Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst wer
    Modell aus, gepaarte Differenzen je Kriterium; Befund fuer v27-b01: Zuwachs bei vertikalen
    Reihen (+1,34) und Eckplatten (+0,97), nicht bei Spezialfeldern (`PREREG_v27_window.md`
    par.10). Offen im Werkzeug: KI auf Paar- statt Block-Ebene.
-4. **Generationswechsel-Rest:** Schritt 5 (Modell-Liste zur Ruecksprache), `night_v26_chain.sh`
-   und die v27-Skripte werden Loeschkandidaten, sobald v28 ansteht.
+4. **Generationswechsel-Rest, Schritt 5 -- VORLAGE (2026-09-10, 18:45), nichts geloescht:**
+   alle Arme v24-b06 bis v27-b01 tragen eine `run:`-Marke im restic-Repo (geprueft). Rollen:
+   `v27-b01_brierbest` Champion und Warmstart der naechsten Generation (`.pth` bleibt);
+   `v25-b01`/`v26-b01`/`v27-b01` liegen als Artefakte mit `model.onnx` und `model.pth`;
+   `v24-b06_brierbest.onnx` ist die einzige Kopie des Elo-Knotens v24-b06 (Artefakt nie
+   angelegt), bleibt; `v24-b07_brierbest.onnx` ist derselbe Netzstand wie v24-b06_brierbest
+   unter anderem Namen (Spec-Wechsel), Elo-Knoten v24-b07, bleibt. Kandidaten ohne Rolle
+   (je 10,8 MB): `alphazero_v24-b06.{onnx,pth}`, `_best.{onnx,pth}`; dasselbe fuer v25-b01,
+   v26-b01, v27-b01 (Epochen-Zwischenstaende `_best` und letzte Epoche); dazu die
+   `_brierbest.pth` von v24-b06, v25-b01 und v26-b01 (v25/v26 im Artefakt vorhanden,
+   v24-b06 nur im restic-Snapshot `run:v24-b06`). Zusammen rund 200 MB, `.ref.txt` und
+   `_loss.png` sind klein und bleiben. `night_v26_chain.sh` und die v27-Skripte werden
+   Loeschkandidaten, sobald v28 ansteht.
 5. **Entscheid Trainings-Seed** fuer die Zeit nach dem Einfrieren (wanderte 20260925/29/33).
 
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)

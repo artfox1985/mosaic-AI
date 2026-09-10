@@ -17737,3 +17737,11 @@ Dubletten-Fix, Null-Klammer Stufe 0, Kuppelstapel Variante A mit A/B und exaktem
 Plattenpunkte je Modell, Spec-Fehler des Servers behoben. Offen fuer Anweisung: Claude-Partien
 g02-g10, Diagnostik "Ziehung in eigenen Block" ueber breitere Grundmenge, Variante B,
 Null-Klammer Stufe 1, Sicht-Reststufen, Trainings-Seed-Entscheid, Server-Neustart.
+
+## 2026-09-10, 18:45-19:05 -- Diagnostik Kuppelstapel auf 300 Partien: Ziehungen in eigenen Block steigen
+
+Sonde `dome_stack_known_block_draw_probe.py` (Opus-Agent, Zahlen am Artefakt nachgerechnet):
+Live MIT Variante A 0,271 / 0,276 Anteil eigener Block, Artefakt OHNE 0,189 / 0,209; gepaart
++0,689 je Partie [-0,009; +1,387], +70/-48. Zwei Drittel der Live-Ziehungen in den eigenen
+Block bei Stand 0 (gratis). Mensch 0,015, KI in den Logs 0,277. par.8-Erwartung tritt nicht
+ein; naechster Hebel Null-Klammer Stufe 1 (Nutzer-Entscheid), `dome_stack` par.15e.
