@@ -137,3 +137,11 @@ woertlich: *"Bleib bei reinem vN-bXX."* Ab jetzt:
   `--select-by-brier`), keine Knopf-Suffixe; das Champion-Modell `alphazero_<name>.onnx`
   ist die gewaehlte Auswahl (fuer v24-b06: `_brierbest`, Epoche 4).
 
+## v28 (reserviert 2026-09-10, Generationswechsel Schritt 6)
+
+Self-Play-Klassen nach dem Generator: `selfplay_v27-b01-policy_*`, `-value-tempc_*`,
+`-value-excursion_*` (Seeds 20260917 / 20260918 / 20260919, `PREREG_v28_window.md` par.5).
+Trainingsarme: **`v28-b01`** (Rezept unveraendert, Warmstart `v27-b01_brierbest`, Seed 20260937)
+und **`v28-b02`** (Variante B: Merkmale aus dem Record-Feld `dome_pool_view`, sonst wie b01,
+gleicher Seed). Weitere Arme ab `v28-b03` nur mit eigener Registrierung. Kein Knopf-Suffix
+im Namen (Regel oben).
