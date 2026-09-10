@@ -37,11 +37,18 @@ Erzeugung plus 2 h Kette, also bis etwa 12:00 am 2026-09-11; die Claude-Partien 
 die Laufzeit ist damit als Planungsgroesse gebremst zu lesen. Danach Tor 1 `v28-b01` gegen
 `v27-b01` mit `--log-games`, Bau von Variante B fuer `v28-b02`.
 
-**Ausserdem laeuft:** die Parallelsitzung "Claude-Partien g02-g05" (Arbeitsauftrag-Chip,
-seit 2026-09-10 abends). Sie spielt selbst gegen den Champion, registriert in
-`PREREG_claude_play_interface.md` par.7 und committet am Ende einmal. Sie braucht wenig
-Rechenlast (lange Denkzeiten je Zug); leichte Arbeiten daneben sind vom Nutzer freigegeben,
-Arenen und Erzeugung nicht.
+**Claude-Partien g02-g05: FERTIG (2026-09-11). Die Parallelsitzung gibt ihren Teil der
+Maschine frei -- von ihr laeuft nichts mehr.** Ergebnis: **Claude 3:1** gegen
+`v27-b01_brierbest` @400 (g02 55:43, g03 66:48, g04 36:28, g05 50:55, alle Seeds und
+Spec-Pfade aus den Partie-Manifesten). Registriert in `PREREG_claude_play_interface.md` par.7
+mit Endwertung je Kriterium, den sechs Standard-Kennzahlen, Beobachtungen und eigenen Fehlern.
+Zwei Muster tragen ueber alle vier Partien: die Ziehzahl am Kuppelstapel folgt dem
+PUNKTESTAND (bei Stand 0 durchsucht das Netz den Stapel -- 21 Ziehungen allein in g04 Runde 1 --,
+waehrend es in g05 nie auf 0 fiel und darum nur siebenmal zog), und das Netz fuellt lange
+Musterreihen mit Farben, die seine eigene Kuppelzeile nicht aufnehmen kann (fuenf Vorfaelle,
+in g04 zehn Steine auf einmal, volle Strafleiste). Beides sind Sonden-Kandidaten, keine
+Verdikte. Die verlorene Partie g05 ging an eigenen Strafleisten-Fehlern verloren (-32 gegen
+-8), nicht an der Endwertung (21:9 fuer Claude).
 
 ### v28: ZUSCHNITT UND KETTE (gestartet 2026-09-10, 23:49)
 
