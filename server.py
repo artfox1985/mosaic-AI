@@ -217,9 +217,36 @@ _SPEC_TO_ENV = {
 }
 
 
+def _resolve_champion_spec(name: str):
+    """Spec des Champions: `models/<name>.spec.json`, sonst das eingefrorene
+    Artefakt `models/frozen_champions/<name ohne _brierbest/_best>/spec.json`.
+
+    2026-09-10, gefunden beim Rauchtest der Claude-Partien: seit v25-b01 (2026-09-08)
+    gab es KEINE `models/<champion>.spec.json` mehr -- die Spec blieb bewusst unter
+    `v24-b07_brierbest.spec.json` (Einfrieren, PREREG_v27_window.md par.5) -- und
+    diese Funktion kehrte STILL zurueck: der Champion spielte im Browser mit den
+    Env-Defaults (Huelle aus, hull_form 1, special_row6_w 0) statt mit seiner Spec.
+    Ein Champion ist Modell PLUS Spec (docs/promotion_checklist.md); das Artefakt
+    traegt sie immer, deshalb ist es der zweite Ort. Kein dritter: fehlt beides,
+    wird das laut gemeldet, nicht still hingenommen."""
+    direct = MODELS_DIR / f"{name}.spec.json"
+    if direct.exists():
+        return direct
+    base = name
+    for suffix in ("_brierbest", "_best"):
+        if base.endswith(suffix):
+            base = base[: -len(suffix)]
+    frozen = MODELS_DIR / "frozen_champions" / base / "spec.json"
+    if frozen.exists():
+        return frozen
+    return None
+
+
 def _apply_champion_spec_env(name: str) -> None:
-    spec_path = MODELS_DIR / f"{name}.spec.json"
-    if not spec_path.exists():
+    spec_path = _resolve_champion_spec(name)
+    if spec_path is None:
+        print(f"⚠️  KEINE Spec fuer Champion {name} gefunden (weder models/{name}.spec.json noch "
+              f"frozen_champions/<name>/spec.json) -- Env-Defaults gelten, das ist NICHT der Champion.")
         return
     try:
         spec = _json.loads(spec_path.read_text(encoding="utf-8"))

@@ -16,7 +16,14 @@ gegen die Vor-Generation.
 Bei JEDEM Champion-Wechsel vollstaendig abarbeiten, nicht aus dem
 Gedaechtnis:
 
-1. `tools/set_champion.py <neu>` (Server-Default, wirkt nach Neustart).
+1. `tools/set_champion.py <neu>` (Server-Default, wirkt nach Neustart). **Und die Spec muss
+   fuer den Server auffindbar sein** (seit 2026-09-10): `server.py` liest
+   `models/<neu>.spec.json`, sonst `models/frozen_champions/<neu ohne _brierbest>/spec.json`
+   (Schritt 7), sonst meldet er laut und spielt mit Env-Defaults. Vorfall: v25-b01 bis
+   v27-b01 hatten keine Datei unter dem Champion-Namen (Einfrieren: Spec blieb unter
+   `v24-b07_brierbest.spec.json`), der Server kehrte still zurueck, der Browser-Champion
+   spielte zwei Tage ohne Huelle. Nach dem Neustart die Konsolenzeile "Champion-Spec ..."
+   lesen.
 2. Elo-Kante **Gating** (gegen Champion-1) -- inkl. Replikations-Zeile,
    falls Fruehstopp unter 150 Paaren.
 3. Elo-Kante **Anker**: `Heuristik@150(dyn)`, **festes n=150 ohne

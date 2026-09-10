@@ -17716,3 +17716,24 @@ der Pool-Maske mit Neumischung); Instrument repariert (`state_json_exact`, exakt
 Rekonstruktion, Knopf `MOSAIC_DOME_POOL_KNOWLEDGE`), PRE/POST exakt: nur R3 bewegt sich, Q
 des Weiterziehens sinkt um 0,005-0,02, Raenge bleiben. Erwartung aus par.8 nicht eingetreten
 (n = 1 Partie). Details `dome_stack` par.15-15c.
+
+## 2026-09-10, 18:20 -- Browser-Champion spielte seit v25-b01 ohne Spec (Rauchtest der Claude-Partien)
+
+`tools/claude_play.py new` brach mit FileNotFoundError auf `models/v27-b01_brierbest.spec.json`
+ab; dieselbe Aufloesung in `server.py::_apply_champion_spec_env` kehrt bei Fehlen still
+zurueck. Seit dem Einfrieren (Spec bewusst unter `v24-b07_brierbest.spec.json` belassen,
+PREREG_v27_window.md par.5) gab es fuer v25-b01, v26-b01, v27-b01 keine Datei unter dem
+Champion-Namen: der Browser-Champion lief mit Env-Defaults (Huelle aus). Behoben durch
+Rueckfall auf `frozen_champions/<name>/spec.json` in server.py und claude_play.py plus laute
+Meldung; Checkliste Schritt 1 ergaenzt; Vorbehalte in `dome_stack` par.15d (Referenzpartie)
+und `score_clamp` par.10 (KI-Seite der Logs) eingetragen. Belegt ist der Codepfad, nicht die
+Umgebung des Nutzer-Servers (Log-Koepfe tragen keine Knoepfe).
+
+## 2026-09-10, 18:30 -- Rauchtest claude_play gruen, Nach-v27-Programm abgeschlossen
+
+`gsmoke`: new/move/show mit `.engine.log`-Trennung und Spec-Rueckfall auf das Artefakt,
+keine Divergenz. Damit ist das Nach-v27-Programm, soweit heute beauftragt, durch:
+Dubletten-Fix, Null-Klammer Stufe 0, Kuppelstapel Variante A mit A/B und exaktem PRE/POST,
+Plattenpunkte je Modell, Spec-Fehler des Servers behoben. Offen fuer Anweisung: Claude-Partien
+g02-g10, Diagnostik "Ziehung in eigenen Block" ueber breitere Grundmenge, Variante B,
+Null-Klammer Stufe 1, Sicht-Reststufen, Trainings-Seed-Entscheid, Server-Neustart.

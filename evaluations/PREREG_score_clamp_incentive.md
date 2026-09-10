@@ -192,3 +192,10 @@ v25-b01 1, v26-b01 7 Partien). Kopplung zum Kuppelstapel-Strang: Gratis-Ziehunge
 Wissen ueber den Stapel; mit Variante A (`dome_stack` par.7) nutzt die Suche dieses Wissen
 erstmals, dadurch koennte die Zahl der Ziehungen bei 0 STEIGEN. Vor Stufe 1 hier deshalb erst
 den POST-Lauf des Kuppelstapel-Umbaus abwarten und (4) dort nachmessen.
+
+**Vorbehalt 2026-09-10, 18:20 (par.10, Grundmenge b):** die KI-Seite der Mensch-Logs ab
+2026-09-08 (v25-b01, v26-b01; 8 der 30 Partien) spielte im Browser sehr wahrscheinlich ohne
+die Champion-Spec (`server.py` fand `models/<name>.spec.json` nicht und fiel still auf
+Env-Defaults zurueck; STATUS Abschnitt 1). Die Zahlen der Grundmenge (b) fuer die KI-Seite
+mischen also Champions mit und ohne Spec; die Korpus-Zahlen (a) sind davon unberuehrt
+(Self-Play liest die Spec explizit ueber `--spec`).

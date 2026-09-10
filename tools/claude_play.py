@@ -418,7 +418,28 @@ def cmd_new(a) -> int:
     ai = 1 - me
     names = ["Claude", "KI"] if me == 0 else ["KI", "Claude"]
     opponent = a.opponent
-    spec = a.spec or (f"models/{opponent}.spec.json" if opponent != "heuristic" else "models/k3v_off.spec.json")
+    # 2026-09-10: Spec wie server.py aufloesen -- `models/<name>.spec.json`, sonst das
+    # eingefrorene Artefakt. Seit v25-b01 gibt es keine Spec-Datei unter dem
+    # Champion-Namen mehr (Einfrieren, PREREG_v27_window.md par.5); ohne den Rueckfall
+    # brach `new` mit FileNotFoundError ab (Rauchtest 2026-09-10, 18:20).
+    spec = a.spec
+    if spec is None:
+        if opponent == "heuristic":
+            spec = "models/k3v_off.spec.json"
+        else:
+            direct = REPO / "models" / f"{opponent}.spec.json"
+            base = opponent
+            for suffix in ("_brierbest", "_best"):
+                if base.endswith(suffix):
+                    base = base[: -len(suffix)]
+            frozen = REPO / "models" / "frozen_champions" / base / "spec.json"
+            if direct.exists():
+                spec = f"models/{opponent}.spec.json"
+            elif frozen.exists():
+                spec = f"models/frozen_champions/{base}/spec.json"
+            else:
+                raise SystemExit(f"Keine Spec fuer {opponent}: weder {direct} noch {frozen}. "
+                                 "Ein Champion ist Modell PLUS Spec; --spec angeben.")
     model_path = None if opponent == "heuristic" else str(resolve_model(opponent).relative_to(REPO))
     m = {"game": name, "seed": a.seed, "first_player": a.first_player, "me": me, "ai_player": ai,
          "names": names, "opponent": opponent, "model_path": model_path, "spec": spec,
