@@ -18124,3 +18124,11 @@ Fundstellen im Audit-Bericht; Details im Archiv-Kapitel.
   je Feld.
 - **Eine Herleitung aus dem Code ist eine Hypothese, kein Befund.** Am
   2026-08-25 lagen vier davon im Vorzeichen falsch.
+
+## 2026-09-10, 23:49 -- v28-Erzeugung gestartet (Nutzer: "starte beides hier, die app bleibt offen")
+
+Generationswechsel Schritt 7. `night_v28_generate.sh` (Generator v27-b01, Seeds
+20260917/18/19) seit 23:49:56, Cache-Waechter daneben (2.002 Bloecke lagen vollstaendig),
+`night_v28_chain.sh` seit 23:49:57 scharf. Alles Hintergrundaufgaben dieser Sitzung; parallel
+spielt die Claude-Sitzung g02-g05 (Nutzer: braucht wenig Rechenlast). Erwartung nach v27:
+10,3 h plus 2 h Kette, unter Nebenlast langsamer.
