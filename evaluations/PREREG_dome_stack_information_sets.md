@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | Beleg: VARIANTE A GEBAUT 2026-09-10 (par.15; Anker-Drift gruen, Fixture 5e3b1362ddc65fa6). A/B gleiches Netz, Live gegen Artefakt: 165:135 gepoolt (55 %, p 0,09), kein Ruecklauf, Fix bleibt (par.15b). PRE/POST auf dem exakten Zustand (par.15c): nur R3 aendert sich, Q des Weiterziehens sinkt um 0,005-0,02, Raenge bleiben; die Erwartung 'Wiederholungsziehung faellt auf nahe null' tritt an der Referenzpartie NICHT ein. Offen: Diagnostik ueber breitere Grundmenge, dann Variante B (Merkmale). -->
+<!-- STATUS: OFFEN | Frage: Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | Beleg: VARIANTE A GEBAUT 2026-09-10 (par.15; Anker-Drift gruen). A/B Live gegen Artefakt 165:135 (55 %), kein Ruecklauf, Fix bleibt (par.15b). Diagnostik auf 300 Partien (par.15e): Ziehungen in den EIGENEN bekannten Block STEIGEN mit A (+0,69 je Partie, +70/-48), zwei Drittel davon gratis bei Stand 0; die Erwartung aus par.8 tritt nicht ein. Naechster Hebel ist die Null-Klammer (score_clamp Stufe 1), Variante B danach. -->
 
 # PREREG: Informationsmengen am Kuppelstapel
 
@@ -682,3 +682,46 @@ Knoepfe, ein Beleg in beide Richtungen fehlt. Fuer die PRE/POST-Laeufe hier ist 
 zweitrangig (beide bewerten dieselbe Partie mit demselben Netz), fuer die Lesart der
 13er-Ziehserie nicht: sie stammt von einem Champion ohne seine Suchknoepfe. Die naechsten
 Referenzpartien (Claude-Partien, Mensch-Partien) laufen mit dem Rueckfall auf das Artefakt.
+
+### par.15e DIAGNOSTIK auf 300 Partien (2026-09-10, 19:00): Ziehungen in den eigenen Block STEIGEN mit Variante A
+
+Werkzeug `tools/probes/dome_stack_known_block_draw_probe.py` (Replay mit dem heutigen Wheel,
+Zustand VOR jeder Stapelziehung aus `state_json_exact`, Klassifikation der obersten
+Pool-Position: unbekanntes Praefix / eigener Block / fremder Block; Konsistenz gegen die
+`📦`-Zeilen 0 Abweichungen in 731 Partien). Artefakte
+`dome_stack_known_block_draws_{ab_s60,ab_s1300,gating_s35,human}.json`.
+
+| Grundmenge | Seite | Partien | Ziehungen | Anteil eigener Block | eigener Block je Partie | davon bei Stand 0 |
+| --- | --- | --- | --- | --- | --- | --- |
+| A/B s60 | Live MIT A | 150 | 1.192 | **0,271** | 2,15 | 214 / 323 |
+| A/B s60 | Artefakt OHNE | 150 | 1.073 | 0,189 | 1,35 | 155 / 203 |
+| A/B s1300 | Live MIT A | 149 | 1.173 | **0,276** | 2,17 | 215 / 324 |
+| A/B s1300 | Artefakt OHNE | 149 | 1.140 | 0,209 | 1,60 | 163 / 238 |
+| Tor 1 s35 (beide OHNE) | v27-b01 / v26-b01 | 394 | | 0,214 / 0,221 | 1,45 / 1,76 | |
+| Mensch-Logs | KI / Mensch | 30 | 159 / 67 | 0,277 / 0,015 | 1,47 / 0,03 | alle 59 KI-Ziehungen bei 0 / keine |
+
+**Gepaart je Partie (dieselbe Partie, beide Seiten), gepoolt ueber 299 Partien: Live minus
+Artefakt = +0,689 Ziehungen in den eigenen Block je Partie, 95 %-KI [-0,009; +1,387],
+Vorzeichentest +70 / -48 (p rund 0,05).** Einheit Ziehungen je Partie und Seite, nachgerechnet
+am Artefakt. Runde 1 ist per Konstruktion frei von eigenen Bloecken; die Masse liegt in R2 (Live
+s60: 211 von 520 Ziehungen), R3 und R4.
+
+**Antwort auf par.8: die vorregistrierte Richtung tritt NICHT ein, die Zahl steigt.** Die Suche
+kennt jetzt ihren Block und zieht eher OEFTER hinein. Der groesste Posten sind Gratis-Ziehungen
+bei Stand 0 (zwei Drittel der eigenen-Block-Ziehungen der Live-Seite), also die Kaufseite der
+Null-Klammer (`score_clamp` par.10). Lesart nach par.4b: Wissen ist ein Gut, und wenn es
+nichts kostet, kauft die Suche es. Das ist kein Fehler des Umbaus (Korrektheits-Fix bleibt,
+A/B ohne Ruecklauf), sondern zeigt, dass par.8 die falsche Groesse vorregistriert hatte: nicht
+"Ziehungen in Bekanntes fallen", sondern "Ziehungen, die nichts Neues bringen UND etwas
+kosten, fallen". Bei Stand 0 kosten sie nichts. Die Diagnostik trennt weiterhin nicht, ob die
+Ziehungen bei positivem Stand richtig sind (Value) oder ob dem Kopf das Merkmal fehlt (B).
+
+**Folgen fuer das Programm:** (1) `score_clamp` Stufe 1 rueckt VOR Variante B: solange
+Ziehungen bei 0 gratis sind, misst jede Merkmalsaenderung gegen einen Anreiz, der nicht der
+des Spiels ist (Nutzer-Frage: Regel oder Nutzenterm, `score_clamp` par.6). (2) par.8 ist um
+die Groesse "Ziehungen in eigenen Block bei positivem Stand je Partie" zu ergaenzen; heute
+Live 109 / 109 gegen Artefakt 48 / 75 (s60 / s1300, aus den Tabellen oben abgeleitet). Auch
+die steigt, also bleibt die Frage an den Value-Kopf offen. (3) Ungeprueft: ob die Live-Seite
+der A/B-Artefakte wirklich mit dem Knopf AN lief (kein Knopf-Feld im Artefakt; folgt aus dem
+Wheel-Stand 16:24, der den Knopf noch nicht hatte und Variante A fest AN), und 9 Partien mit
+Replay-Divergenz (Chip-Vollendung), nicht auf Verzerrung geprueft.
