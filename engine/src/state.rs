@@ -18,6 +18,25 @@ pub const TILES_PER_SMALL_FACTORY: usize = 4;
 pub const TILES_PER_LARGE_FACTORY: usize = 5;
 pub const DOME_TILES_EACH: usize = 9;
 
+/// Ein zusammenhaengender Block am ENDE (unten) von `dome_tile_pool`, dessen
+/// Herkunft bekannt ist: `len` Platten, die `returner` in EINEM Stapelzug
+/// unter den Stapel zurueckgelegt hat.
+///
+/// Informationslage (PREREG_dome_stack_information_sets.md par.4, Nutzer-
+/// Entscheid 2026-09-10): der Rueckleger kennt die REIHENFOLGE innerhalb
+/// seines Blocks (er hat sie gewaehlt), der Gegner nur die MENGE (die Fronten
+/// der gezogenen Platten lagen offen) und die Blockgrenze. Genau daran haengt
+/// [`determinize_dome_pool`]: eigener Block bleibt unangetastet, fremder Block
+/// wird NUR IN SICH permutiert, der unbekannte Rest (das Praefix davor) wird
+/// voll gemischt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KnownPoolBlock {
+    /// Zahl der Positionen, die dieser Block belegt (immer > 0).
+    pub len: usize,
+    /// Spieler, der diesen Block zurueckgelegt hat.
+    pub returner: usize,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
     StartPlacement,
@@ -53,6 +72,18 @@ pub struct GameState {
     pub players: Vec<PlayerBoard>,
 
     pub dome_tile_pool: Vec<DomeTile>, // verdeckter Stapel (F)
+    /// Wissensstand ueber das UNTERE Ende von `dome_tile_pool`: die Bloecke
+    /// beschreiben, lueckenlos und in dieser Reihenfolge, das SUFFIX des Pools
+    /// (aeltester Block zuerst, der zuletzt zurueckgelegte ganz unten am
+    /// Vec-Ende). Der unbekannte Bereich ist das Praefix davor, seine Laenge
+    /// ist `dome_tile_pool.len() - Summe(len)` (siehe
+    /// [`GameState::dome_pool_unknown_prefix_len`]).
+    ///
+    /// Invariante: Summe der `len` <= `dome_tile_pool.len()`, jede `len` > 0,
+    /// jeder `returner` < `players.len()` -- geprueft von
+    /// [`dome_pool_knowledge_is_consistent`]. Leer heisst "alles unbekannt"
+    /// und ist das Bestandsverhalten (Spielaufbau, Alt-JSONs).
+    pub dome_pool_known_blocks: Vec<KnownPoolBlock>,
     pub dome_display: Vec<DomeTile>,   // 3 offen ausgelegte Kuppeln (G)
     pub bonus_chip_pool: Vec<BonusChip>,
     /// Aktion A (Stapel-Variante), laufender Zieh-Vorgang von `current_player`:
@@ -94,6 +125,130 @@ impl GameState {
 
     pub fn all_factories_empty(&self) -> bool {
         self.factories.iter().all(|f| f.is_fully_empty()) && self.large_factory.is_empty()
+    }
+
+    /// Laenge des UNBEKANNTEN Praefix von `dome_tile_pool` (alles, was nicht
+    /// von `dome_pool_known_blocks` abgedeckt ist). Saettigt bei 0, falls die
+    /// Invariante verletzt waere -- der `debug_assert` in
+    /// [`determinize_dome_pool`] macht den Bruch im Debug-Bau hoerbar, im
+    /// Release-Bau bleibt das Verhalten definiert.
+    pub fn dome_pool_unknown_prefix_len(&self) -> usize {
+        let known: usize = self.dome_pool_known_blocks.iter().map(|b| b.len).sum();
+        self.dome_tile_pool.len().saturating_sub(known)
+    }
+
+    /// Pflege VOR einem `dome_tile_pool.remove(0)` (Ziehen von oben).
+    /// Ist das unbekannte Praefix leer, frisst die Ziehung die oberste
+    /// Position des AELTESTEN bekannten Blocks; ein dadurch leerer Block
+    /// faellt weg. Sonst schrumpft nur das Praefix, und nichts ist zu tun.
+    pub fn note_dome_pool_draw_from_top(&mut self) {
+        if self.dome_pool_unknown_prefix_len() > 0 {
+            return;
+        }
+        if let Some(first) = self.dome_pool_known_blocks.first_mut() {
+            first.len -= 1;
+            if first.len == 0 {
+                self.dome_pool_known_blocks.remove(0);
+            }
+        }
+    }
+
+    /// Pflege NACH einer Rueckgabe unter den Stapel: EIN Block je Rueckgabe,
+    /// `len` = Zahl der zurueckgelegten Platten, `returner` = ziehender
+    /// Spieler. Der Block landet am Vec-Ende, weil `push` die Platten ganz
+    /// unter den Stapel legt (game.rs::execute_draw_from_stack).
+    pub fn note_dome_pool_return(&mut self, len: usize, returner: usize) {
+        if len == 0 {
+            return;
+        }
+        self.dome_pool_known_blocks.push(KnownPoolBlock { len, returner });
+    }
+
+    /// Alles wieder unbekannt (Spielaufbau, Neuaufbau des Pools, volles
+    /// Mischen ausserhalb der Determinisierung).
+    pub fn forget_dome_pool_knowledge(&mut self) {
+        self.dome_pool_known_blocks.clear();
+    }
+}
+
+/// Prueffunktion zur Invariante von [`GameState::dome_pool_known_blocks`]:
+/// jede Blocklaenge > 0, jeder `returner` ein gueltiger Spielerindex, Summe
+/// der Laengen <= Poolgroesse. Gedacht fuer `debug_assert!` an den
+/// Pflegestellen und fuer Tests.
+pub fn dome_pool_knowledge_is_consistent(state: &GameState) -> bool {
+    let n_players = state.players.len();
+    let mut sum = 0usize;
+    for b in &state.dome_pool_known_blocks {
+        if b.len == 0 || b.returner >= n_players {
+            return false;
+        }
+        sum += b.len;
+    }
+    sum <= state.dome_tile_pool.len()
+}
+
+/// Determinisierung des Kuppelstapels AUS SICHT EINES SPIELERS
+/// (PREREG_dome_stack_information_sets.md par.7 Variante A). Ersetzt das
+/// fruehere `state.dome_tile_pool.shuffle(rng)` an den Suchstellen:
+///
+/// * das unbekannte Praefix wird voll gemischt (dort weiss niemand etwas),
+/// * jeder Block mit `returner == viewer` bleibt UNVERAENDERT -- der Spieler
+///   hat diese Reihenfolge selbst gewaehlt und kennt sie (par.4),
+/// * jeder fremde Block wird NUR IN SICH permutiert -- der Beobachter kennt
+///   die MENGE des Blocks (die Fronten lagen offen) und seine Lage im Stapel,
+///   nicht aber die Reihenfolge darin.
+///
+/// `viewer == None` heisst "kein Spieler blickt hier" -- dann wird auch der
+/// eigene Block in sich permutiert. Das ist die konservative Wahl fuer
+/// Stellen, an denen kein einzelner Wurzelspieler existiert (siehe
+/// round_transition_deep.rs::simulate_one_round).
+///
+/// **RNG-Vertrag:** ist `dome_pool_known_blocks` leer (Bestandsfall), ist der
+/// Aufruf byte-identisch zum alten `shuffle` -- dieselbe eine
+/// `shuffle`-Anwendung auf denselben vollen Slice, derselbe RNG-Verbrauch.
+/// Erst bekannte Bloecke veraendern Verbrauch und Ergebnis; genau das ist der
+/// beabsichtigte Korrektheits-Fix (par.8).
+/// `MOSAIC_DOME_POOL_KNOWLEDGE` -- Default AN (Variante A der Kuppelstapel-Prereg,
+/// 2026-09-10). `=0` schaltet auf die alte Vollmischung zurueck; NUR fuer den
+/// PRE/POST-Vergleich der Prereg gedacht, nicht fuer Erzeugung oder Arena.
+pub fn dome_pool_knowledge_enabled() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_DOME_POOL_KNOWLEDGE")
+            .map(|v| v.is_empty() || v != "0")
+            .unwrap_or(true)
+    })
+}
+
+pub fn determinize_dome_pool<R: Rng + ?Sized>(
+    state: &mut GameState,
+    viewer: Option<usize>,
+    rng: &mut R,
+) {
+    debug_assert!(
+        dome_pool_knowledge_is_consistent(state),
+        "determinize_dome_pool: dome_pool_known_blocks inkonsistent (Bloecke {:?}, Pool {})",
+        state.dome_pool_known_blocks,
+        state.dome_tile_pool.len()
+    );
+    if !dome_pool_knowledge_enabled() {
+        // Diagnose-Rueckfall (MOSAIC_DOME_POOL_KNOWLEDGE=0): Vollmischung wie vor
+        // Variante A, damit PRE- und POST-Lauf der Prereg (par.12/par.15a) auf
+        // DEMSELBEN Wheel und denselben exakten Zustaenden verglichen werden
+        // koennen. Die Bloecke bleiben erhalten, sie werden nur nicht beachtet.
+        state.dome_tile_pool.shuffle(rng);
+        return;
+    }
+    let prefix_len = state.dome_pool_unknown_prefix_len();
+    state.dome_tile_pool[..prefix_len].shuffle(rng);
+    let mut start = prefix_len;
+    for i in 0..state.dome_pool_known_blocks.len() {
+        let block = state.dome_pool_known_blocks[i];
+        let end = (start + block.len).min(state.dome_tile_pool.len());
+        if Some(block.returner) != viewer {
+            state.dome_tile_pool[start..end].shuffle(rng);
+        }
+        start = end;
     }
 }
 
@@ -326,6 +481,9 @@ pub fn setup_new_game<R: Rng + ?Sized>(
         large_factory,
         players,
         dome_tile_pool,
+        // Spielaufbau: der Stapel ist frisch gemischt, niemand weiss etwas
+        // ueber seine Reihenfolge.
+        dome_pool_known_blocks: Vec::new(),
         dome_display,
         bonus_chip_pool: bonus_pool,
         pending_stack_draw: Vec::new(),
@@ -559,5 +717,165 @@ mod tests {
         // wird defensiv entfernt, damit is_empty() erreichbar bleibt.
         assert!(s.large_factory.monochrome_fallback);
         assert!(s.large_factory.is_empty());
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Kuppelstapel-Wissensstand (PREREG_dome_stack_information_sets.md par.7 A)
+// ═══════════════════════════════════════════════════════════════════════════
+#[cfg(test)]
+mod dome_pool_knowledge_tests {
+    use super::*;
+    use rand::rngs::StdRng;
+    use rand::RngExt as _;
+    use rand::SeedableRng;
+
+    fn names() -> [String; NUM_PLAYERS] {
+        ["A".to_string(), "B".to_string()]
+    }
+
+    /// Zustand mit zwei bekannten Bloecken am unteren Ende: erst Spieler 0
+    /// (2 Platten), dann Spieler 1 (3 Platten) -- der juengste ganz unten.
+    fn state_with_blocks() -> GameState {
+        let mut rng = StdRng::seed_from_u64(11);
+        let mut s = setup_new_game(names(), 0, &mut rng);
+        s.note_dome_pool_return(2, 0);
+        s.note_dome_pool_return(3, 1);
+        assert!(dome_pool_knowledge_is_consistent(&s));
+        s
+    }
+
+    fn ids(state: &GameState) -> Vec<usize> {
+        state.dome_tile_pool.iter().map(|t| t.tile_id).collect()
+    }
+
+    fn sorted(v: &[usize]) -> Vec<usize> {
+        let mut v = v.to_vec();
+        v.sort_unstable();
+        v
+    }
+
+    #[test]
+    fn empty_blocks_shuffle_the_whole_pool_like_before() {
+        // RNG-Vertrag: ohne Bloecke ist `determinize_dome_pool` byte-identisch
+        // zum fruehreren `dome_tile_pool.shuffle(rng)` -- gleiche Reihenfolge
+        // UND gleicher RNG-Verbrauch (der Folge-`u64` muss uebereinstimmen).
+        let mut rng = StdRng::seed_from_u64(5);
+        let base = setup_new_game(names(), 0, &mut rng);
+
+        let mut a = base.clone();
+        let mut rng_a = StdRng::seed_from_u64(99);
+        a.dome_tile_pool.shuffle(&mut rng_a);
+        let after_a: u64 = rng_a.random();
+
+        let mut b = base.clone();
+        let mut rng_b = StdRng::seed_from_u64(99);
+        determinize_dome_pool(&mut b, Some(0), &mut rng_b);
+        let after_b: u64 = rng_b.random();
+
+        assert_eq!(ids(&a), ids(&b), "ohne Bloecke muss die Reihenfolge identisch sein");
+        assert_eq!(after_a, after_b, "ohne Bloecke muss der RNG-Verbrauch identisch sein");
+    }
+
+    #[test]
+    fn own_block_survives_every_determinization() {
+        let base = state_with_blocks();
+        let n = base.dome_tile_pool.len();
+        // Bloecke: [0]=2 (Spieler 0), [1]=3 (Spieler 1) am Ende.
+        let own_range = n - 5..n - 3; // Block von Spieler 0
+        let foreign_range = n - 3..n; // Block von Spieler 1
+        let prefix_range = 0..n - 5;
+        let own_before = ids(&base)[own_range.clone()].to_vec();
+        let foreign_before = ids(&base)[foreign_range.clone()].to_vec();
+        let prefix_before = ids(&base)[prefix_range.clone()].to_vec();
+
+        let mut foreign_changed = 0usize;
+        let mut prefix_changed = 0usize;
+        for seed in 0u64..200 {
+            let mut s = base.clone();
+            let mut rng = StdRng::seed_from_u64(seed);
+            determinize_dome_pool(&mut s, Some(0), &mut rng);
+            let after = ids(&s);
+
+            assert_eq!(
+                &after[own_range.clone()],
+                &own_before[..],
+                "seed {seed}: eigener Block muss Zug fuer Zug unveraendert bleiben"
+            );
+            assert_eq!(
+                sorted(&after[foreign_range.clone()]),
+                sorted(&foreign_before),
+                "seed {seed}: fremder Block darf nur IN SICH permutiert werden"
+            );
+            assert_eq!(
+                sorted(&after[prefix_range.clone()]),
+                sorted(&prefix_before),
+                "seed {seed}: das Praefix darf den Block-Bereich nicht beruehren"
+            );
+            assert_eq!(sorted(&after), sorted(&ids(&base)), "seed {seed}: Multimenge des Pools unveraendert");
+            assert!(dome_pool_knowledge_is_consistent(&s));
+
+            if after[foreign_range.clone()] != foreign_before[..] {
+                foreign_changed += 1;
+            }
+            if after[prefix_range.clone()] != prefix_before[..] {
+                prefix_changed += 1;
+            }
+        }
+        assert!(foreign_changed > 20, "fremder Block sollte ueber 200 Seeds oft permutiert sein, war {foreign_changed}");
+        assert!(prefix_changed > 150, "das Praefix sollte fast immer neu gemischt sein, war {prefix_changed}");
+    }
+
+    #[test]
+    fn viewer_none_permutes_every_block_in_itself() {
+        let base = state_with_blocks();
+        let n = base.dome_tile_pool.len();
+        let own_before = ids(&base)[n - 5..n - 3].to_vec();
+        let mut own_changed = 0usize;
+        for seed in 0u64..200 {
+            let mut s = base.clone();
+            let mut rng = StdRng::seed_from_u64(seed);
+            determinize_dome_pool(&mut s, None, &mut rng);
+            let after = ids(&s);
+            assert_eq!(sorted(&after[n - 5..n - 3]), sorted(&own_before), "Block bleibt Block");
+            if after[n - 5..n - 3] != own_before[..] {
+                own_changed += 1;
+            }
+        }
+        assert!(own_changed > 20, "ohne Blickwinkel muss auch der eigene Block permutiert werden, war {own_changed}");
+    }
+
+    #[test]
+    fn draw_from_top_eats_the_prefix_first_then_the_oldest_block() {
+        let mut s = state_with_blocks();
+        let prefix0 = s.dome_pool_unknown_prefix_len();
+        assert!(prefix0 > 0);
+        // Solange das Praefix traegt, bleiben die Bloecke unberuehrt.
+        for _ in 0..prefix0 {
+            s.note_dome_pool_draw_from_top();
+            s.dome_tile_pool.remove(0);
+        }
+        assert_eq!(s.dome_pool_known_blocks.len(), 2);
+        assert_eq!(s.dome_pool_unknown_prefix_len(), 0);
+        // Jetzt frisst jede Ziehung den aeltesten Block.
+        s.note_dome_pool_draw_from_top();
+        s.dome_tile_pool.remove(0);
+        assert_eq!(s.dome_pool_known_blocks[0].len, 1);
+        s.note_dome_pool_draw_from_top();
+        s.dome_tile_pool.remove(0);
+        assert_eq!(s.dome_pool_known_blocks.len(), 1, "leerer Block faellt weg");
+        assert_eq!(s.dome_pool_known_blocks[0].returner, 1);
+        assert!(dome_pool_knowledge_is_consistent(&s));
+    }
+
+    #[test]
+    fn consistency_check_rejects_broken_blocks() {
+        let mut s = state_with_blocks();
+        assert!(dome_pool_knowledge_is_consistent(&s));
+        s.dome_pool_known_blocks.push(KnownPoolBlock { len: 99, returner: 0 });
+        assert!(!dome_pool_knowledge_is_consistent(&s), "Summe > Poolgroesse muss auffallen");
+        s.dome_pool_known_blocks.pop();
+        s.dome_pool_known_blocks.push(KnownPoolBlock { len: 1, returner: 7 });
+        assert!(!dome_pool_knowledge_is_consistent(&s), "unbekannter Spielerindex muss auffallen");
     }
 }

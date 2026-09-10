@@ -259,15 +259,28 @@ Logs (Promotionsskript `tools/night_v27_promotion.sh`, Schritt 0).
 **Tor 2b HAELT** (Intervalle im vollen Lauf getrennt). Punkte 53,1 gegen 49,9, Strafleiste
 9,21 gegen 8,28 (v27-b01 zahlt mehr Strafe), Reihen voll 0,147 gegen 0,150.
 
-**Wertungsplatten-Punkte je Kriterium** (`plate_points_from_arena.py`, Mittel ueber Partien
-mit aktiver Platte, Klammer = Zahl der Partien): das Werkzeug wertet EIN Brett aus und kennt
-die Modellzuordnung `side_names` nicht; die Zahlen unten sind deshalb ueber BEIDE Modelle
-gemischt (n = 200 Partien je Artefakt) und taugen nur als Niveau, nicht als Vergleich.
-Seed 20261035: Diagonale 0,49 (81), Eckplatten 8,17 (72), Farbenreiche Reihen 0,53 (75),
-Horizontale Reihen 0,62 (73), Mehrfarbige Felder 2,26 (70), Spezialfelder -10,54 (74),
-Vertikale Reihen 5,82 (89), Aeussere Felder 10,64 (66). Zum Vergleich s33 (v26 gegen v25):
-Spezialfelder -10,57, Vertikale 5,27, Aeussere 10,71. **Offen:** das Werkzeug um
-`side_names` erweitern, sonst bleibt Standard-Kennzahl 4 je Modell unmessbar.
+**Wertungsplatten-Punkte je Kriterium, JE MODELL** (`plate_points_from_arena.py`, seit
+2026-09-10 16:20 mit `side_names`; Artefakt `plate_points_v27b01_vs_v26b01_s35.json`, n = 400
+Bretter je Modell, Einheit Punkte je Partie; Klammer = Bretter mit aktivem Kriterium; die
+erste Fassung dieses Absatzes hatte nur ein ueber beide Modelle gemischtes Niveau):
+
+| Kriterium | v27-b01 | v26-b01 | gepaarte Differenz [95 %-KI ueber 200 Paare] |
+| --- | --- | --- | --- |
+| Vertikale Reihen | 7,35 (178) | 6,02 (178) | **+1,34 [+0,27; +2,41]** |
+| Eckplatten | 8,83 (144) | 7,87 (144) | **+0,97 [+0,16; +1,77]** |
+| Spezialfelder | -10,66 (148) | -10,52 (148) | nicht signifikant |
+| Aeussere Felder | 10,72 (132) | 10,66 (132) | nicht signifikant |
+| Endwertung gesamt | +7,66 | +6,47 | +1,19 [+0,38; +1,99] |
+| Punkte | 53,17 | 49,89 | +3,29 [+1,35; +5,22] |
+| Strafleiste | 9,18 | 8,31 | +0,88 [+0,06; +1,69] (v27 zahlt mehr) |
+
+Gegenprobe: Punkte und Siege treffen den Gating-Kopf exakt (53,175 / 49,8875, 222:178); die
+Kriteriensumme entspricht in 400/400 Brettern der Endwertungszeile. Der Zuwachs sitzt bei den
+vertikalen Reihen (Spaltenbau) und den Eckplatten, nicht bei den Spezialfeldern. s33 (v26
+gegen v25): Vertikale +2,05 [+0,73; +3,37], Eckplatten +1,13 [+0,29; +1,97], Punkte +2,34.
+**Vorbehalt:** die Intervalle mitteln ueber Paare, nicht ueber 5er-Bloecke (die Regel
+`arena_block_correlation` verlangt die Block-Ebene); sie koennen zu eng sein. Die
+Punktschaetzer sind davon unberuehrt.
 
 **Anker-Kante** (`anchor_arena.py`, n = 150 fest, 6 Worker, Cross-Aera, 1.333 s):
 **127:23**, exakt wie v26-b01 (v25-b01 und v24-b07: 126:24). Gesaettigt wie erwartet.

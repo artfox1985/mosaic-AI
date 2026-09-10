@@ -975,7 +975,9 @@ pub const BATCH_ROOT_EXPANSION: bool = false;
 /// als Standardverhalten beibehalten, unabhängig vom (unklaren) Arena-Delta.
 pub const DETERMINIZE_ROOT_HIDDEN_INFO: bool = true;
 
-/// Mischt `dome_tile_pool` und alle noch unaufgedeckten Bonuschip-Werte
+/// Determinisiert den Kuppelstapel (seit 2026-09-10 nur noch den fuer den
+/// Wurzelspieler UNBEKANNTEN Teil, siehe `state::determinize_dome_pool`) und
+/// mischt alle noch unaufgedeckten Bonuschip-Werte
 /// (Fabrik-Chips mit `!bonus_chip_revealed` + `bonus_chip_pool`) einmalig
 /// neu -- siehe `DETERMINIZE_ROOT_HIDDEN_INFO`-Kommentar. Bereits
 /// AUFGEDECKTE Fabrik-Chips sind öffentliches Wissen und bleiben
@@ -984,7 +986,14 @@ pub const DETERMINIZE_ROOT_HIDDEN_INFO: bool = true;
 /// verdeckten Informationsquellen erweitert und auf Wurzel-Ebene (einmal
 /// pro Suche) statt pro Runde angewendet.
 fn determinize_hidden_information<R: Rng + ?Sized>(state: &mut GameState, rng: &mut R) {
-    state.dome_tile_pool.shuffle(rng);
+    // PREREG_dome_stack_information_sets.md par.7 Variante A (Korrektheits-Fix
+    // 2026-09-10): NICHT mehr der ganze Stapel. Der Suchende ist
+    // `state.current_player` -- beide Aufrufstellen lesen unmittelbar nach
+    // diesem Aufruf `root_player = root_state.current_player`
+    // (build_gumbel_tree_inner, build_net_tree). Sein eigener Rueckgabe-Block
+    // bleibt darum stehen; fremde Bloecke werden nur in sich permutiert.
+    let viewer = state.current_player;
+    crate::state::determinize_dome_pool(state, Some(viewer), rng);
 
     let orig_pool_len = state.bonus_chip_pool.len();
     let mut hidden_chips: Vec<crate::dome::BonusChip> = state.bonus_chip_pool.drain(..).collect();
@@ -4007,7 +4016,8 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
             crate::profiling::note_gamestate_clone();
             let mut g = Game { state: nodes[nid].state.clone() };
             if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
-                g.state.dome_tile_pool.shuffle(rng);
+                // par.7 Variante A: aus Sicht des ziehenden Spielers (`mover`).
+                crate::state::determinize_dome_pool(&mut g.state, Some(mover), rng);
             }
             if g.apply_drafting(&act).is_ok() {
                 let mut child_state = g.state;
@@ -4136,7 +4146,8 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
                     crate::profiling::note_gamestate_clone();
                     let mut g = Game { state: nodes[0].state.clone() };
                     if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
-                        g.state.dome_tile_pool.shuffle(rng);
+                        // par.7 Variante A: aus Sicht des ziehenden Spielers.
+                        crate::state::determinize_dome_pool(&mut g.state, Some(mover), rng);
                     }
                     if g.apply_drafting(&act).is_ok() {
                         let mut child_state = g.state;
@@ -4441,11 +4452,15 @@ fn build_net_tree<R: Rng + ?Sized>(
                 // Runden-Eintritt): hier einmalig VOR jedem simulierten Peek,
                 // da genau in diesem Moment eine neue verdeckte Information
                 // aufgedeckt würde. `dome_tile_pool` enthält an dieser Stelle
-                // ohnehin nur noch die ungezogenen (= wirklich verdeckten)
-                // Platten -- volles Mischen ist daher exakt richtig, keine
-                // Sonderbehandlung für bereits aufgedeckte Platten nötig.
+                // ohnehin nur noch die ungezogenen Platten -- eine
+                // Sonderbehandlung für bereits aufgedeckte ist nicht nötig.
+                // BERICHTIGT 2026-09-10 (PREREG_dome_stack_information_sets.md
+                // par.7 Variante A): "volles Mischen ist exakt richtig" war
+                // falsch -- der zurueckgelegte Block des ziehenden Spielers
+                // ist ihm bekannt, `determinize_dome_pool` laesst ihn stehen.
                 if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
-                    g.state.dome_tile_pool.shuffle(rng);
+                    // par.7 Variante A: aus Sicht des ziehenden Spielers.
+                    crate::state::determinize_dome_pool(&mut g.state, Some(mover), rng);
                 }
                 if g.apply_drafting(&act).is_ok() {
                     let mut child_state = g.state;

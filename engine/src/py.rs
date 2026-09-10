@@ -144,6 +144,17 @@ impl PyGame {
         state_to_json(&self.game.state, self.scoring_confirmed).to_string()
     }
 
+    /// EXAKTES Zustands-JSON (`serialize::state_to_json_exact`): traegt die
+    /// verdeckten Reihenfolgen und seit 2026-09-10 `dome_pool_known_blocks_exact`.
+    /// Gebaut fuer den POST-Lauf der Kuppelstapel-Prereg (par.12): das Orakel
+    /// in `tools/analyze_game_log.py` rekonstruierte den Zustand bisher aus dem
+    /// Frontend-JSON, also aus der Pool-MASKE mit Neumischung -- die
+    /// Wissensbloecke konnten dort per Konstruktion nie ankommen, PRE und POST
+    /// waren byte-gleich. Nur fuer Analysewerkzeuge, nicht fuer die Anzeige.
+    fn state_json_exact(&self) -> String {
+        crate::serialize::state_to_json_exact(&self.game.state, self.scoring_confirmed).to_string()
+    }
+
     /// NN-Feature-Vektor (Länge = `features::INPUT_SIZE`; Port von
     /// `state_to_tensor`) — für die Phase-B-Paritätsprüfung gegen Python.
     fn features(&self) -> Vec<f32> {

@@ -915,7 +915,17 @@ fn net_search_state_json(
 
     let parsed: serde_json::Value = serde_json::from_str(&state_json)
         .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
-    let state = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    // 2026-09-10 (PREREG_dome_stack_information_sets.md par.12/par.15): traegt
+    // das JSON die exakten Felder (`PyGame::state_json_exact`), wird der
+    // Zustand EXAKT rekonstruiert -- verdeckte Reihenfolgen und
+    // Wissensbloecke inklusive, die Determinisierung laeuft dann wie im Spiel.
+    // Das Frontend-JSON (Maske) geht weiter den alten Weg mit Neumischung;
+    // dessen RNG-Verbrauch bleibt unveraendert.
+    let state = if parsed.get("dome_pool_order_exact").is_some() {
+        crate::serialize::json_to_state_exact(&parsed).map_err(PyValueError::new_err)?
+    } else {
+        crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?
+    };
 
     let net = crate::net::Net::load_auto(&model_path)
         .map_err(|e| PyValueError::new_err(format!("Netz konnte nicht geladen werden: {e}")))?;

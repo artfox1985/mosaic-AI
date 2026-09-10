@@ -39,17 +39,23 @@ Generationsbericht). Ab jetzt duerfen Netz, Rezept und Spec wieder angefasst wer
 
 ### NAECHSTE SCHRITTE, nur auf Anweisung (Nutzer 2026-09-10, 13:25: v28-Self-Play ausgesetzt)
 
-1. **Nach-v27-Programm** (Abschnitt 3b): Kuppelstapel-Informationsmengen (Variante A/B ist
-   Nutzer-Entscheid; Rueckgabe-Reihenfolge seit heute nur fuer den Ausfuehrenden sichtbar,
-   `dome_stack` par.14), Null-Klammer Stufe 0 (erst Audit-Punkte in `score_clamp` par.9
-   klaeren: Kaufseite, zweite Grundmenge Mensch-Logs), Sicht-Reststufen (`stack_top` par.11/12),
-   Dubletten-Fix im Ausflug (`start_position_seeding` par.9k).
+1. **Nach-v27-Programm LAEUFT seit 15:35 (Nutzer):** Dubletten-Fix GEBAUT (Seeding-Prereg
+   ENTSCHIEDEN), Null-Klammer Stufe 0 GEMESSEN (Schwelle nicht unterschritten, Kaufseite traegt,
+   `score_clamp` par.10), Kuppelstapel Variante A GEBAUT und GEMESSEN (`dome_stack`
+   par.15-15c: A/B 165:135 ohne Ruecklauf, Fix bleibt; PRE/POST exakt: Wissen allein bewegt
+   die Ziehungen kaum, Erwartung aus par.8 an der Referenzpartie nicht eingetreten). Live-Wheel
+   seit 18:00 mit Variante A, Dubletten-Fix, exaktem Orakel-Pfad und Knopf
+   `MOSAIC_DOME_POOL_KNOWLEDGE`. **Naechste Schritte des Programms:** Diagnostik "Ziehung in
+   eigenen bekannten Block" ueber Mensch-Logs und Self-Play (Werkzeug fehlt), dann Variante B
+   (Merkmale), Stufe 1 der Null-Klammer an der Ziehung, Sicht-Reststufen (`stack_top`).
 2. **Claude-Partien** (`PREREG_claude_play_interface.md` par.9): Engine, Replayer und
    `claude_play.py` sind umgebaut und gebaut, Alt-Logs replayen; offen ist nur ein Rauchtest
    von `claude_play.py new/move/show` mit `.engine.log`. Gegner ist `models/champion.txt`.
    Der Partien-Agent liest NUR `show` und `game.log`.
-3. **Werkzeug:** `plate_points_from_arena.py` um `side_names` erweitern, sonst bleibt
-   Standard-Kennzahl 4 je Modell unmessbar (heute nur gemischt ueber beide Modelle).
+3. ~~Werkzeug `plate_points_from_arena.py`~~ ERLEDIGT 16:20: wertet mit `side_names` je
+   Modell aus, gepaarte Differenzen je Kriterium; Befund fuer v27-b01: Zuwachs bei vertikalen
+   Reihen (+1,34) und Eckplatten (+0,97), nicht bei Spezialfeldern (`PREREG_v27_window.md`
+   par.10). Offen im Werkzeug: KI auf Paar- statt Block-Ebene.
 4. **Generationswechsel-Rest:** Schritt 5 (Modell-Liste zur Ruecksprache), `night_v26_chain.sh`
    und die v27-Skripte werden Loeschkandidaten, sobald v28 ansteht.
 5. **Entscheid Trainings-Seed** fuer die Zeit nach dem Einfrieren (wanderte 20260925/29/33).

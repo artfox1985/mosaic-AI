@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bleibt die Anreizstruktur der Suche erhalten, wenn ein Spieler bei 0 Punkten steht und Strafen wie Kaeufe dort gratis sind? | Beleg: nichts gebaut. Befund am Code geprueft (par.2): das LABEL kennt den Unterschied, der EINGANG nicht -- score_unclamped geht nur ins Trainingsziel (corpus_dataset.py:1128), das Netz sieht im Spiel den geklammerten Wert (features.rs:689). Anlass: game_20260909_004553_seed876496 (KI ab R1 auf 0, vier Runden Strafen ohne Wirkung). Stufe 0 ist eine MESSUNG mit vorab gesetzter Abbruchschwelle (par.5). Getaktet fuer v27 nach dem Arm v27-b01. -->
+<!-- STATUS: OFFEN | Frage: Bleibt die Anreizstruktur unter null erhalten -- die Null-Klammer macht bei Stand 0 Strafen wie Kaeufe wirkungslos? | Beleg: Stufe 0 GEMESSEN 2026-09-10 (par.10): Korpus 39 % der Partien je Seite mit Stand 0, geschluckte Strafe Median 0 (Mittel 0,5 Punkte), aber 3,1 GRATIS-Ziehungen je Partie und Seite (bedingt Median 8, Max 35); Mensch-Logs: Mensch 3 %, KI 13 %. Schwelle aus par.5 NICHT unterschritten, Strang bleibt offen; Gewicht liegt auf der Kaufseite (par.9). Stufe 1 erst nach dem POST-Lauf des Kuppelstapel-Umbaus. -->
 
 # PREREG: Die Null-Klammer und die Anreizstruktur
 
@@ -145,3 +145,50 @@ Drei Punkte, die Stufe 0 so, wie sie in par.5 steht, ins Leere laufen liessen:
 Nebenbefund fuer par.6a: `score_unclamped` ist eine Mischgroesse, ungeklemmte Strafen
 (`board.rs:344-346`) bei geklemmten Kaeufen (`:361-364`). Als Merkmal ist das eine
 Konvention, kein "Stand ohne Klammer"; vor dem Bau benennen.
+
+## par.10 STUFE 0 GEMESSEN (2026-09-10, 16:10-16:40): Schwelle NICHT unterschritten, Gewicht liegt auf der Kaufseite
+
+Werkzeug `tools/probes/score_clamp_stage0_probe.py`, Artefakt
+`evaluations/artifacts/score_clamp_stage0.json` (laufzeit 359,9 s einkernig, durch Fremdlast
+gebremst; ein identischer Vorlauf brauchte 283 s bei gleichen Zahlen). Zwei Grundmengen nach
+par.9: (a) Korpus `selfplay_v26-b01-policy_*` (4.000 Partien, je Seite), (b) alle 30 Mensch-Logs
+in `static/log/` (par.9 nannte 23; es sind 30, alle mit KI als Spieler 1). Ziehungserkennung
+im Korpus ueber die `📦`-Logzeilen des Folge-Records (Gegenprobe Pool-Rueckgang 10/10 exakt,
+0 Log-Luecken in 4.000 Partien); in den Logs ueber den fortgeschriebenen Punktestand
+(0 Widersprueche an allen "-> Gesamt"-Zeilen).
+
+| Kennzahl (Einheit) | Korpus Sp. 0 | Korpus Sp. 1 | Mensch (n = 30) | KI in den Logs (n = 30) |
+| --- | --- | --- | --- | --- |
+| (1) Partien mit Halbzug bei Stand 0 (Anteil) | **0,393** [0,377; 0,408] | **0,390** | 0,033 (1/30) | **0,133** (4/30) [0,053; 0,297] |
+| (2) Halbzuege bei 0 je Partie, Median / p90 | 0 / 18 | 0 / 17 | 0 / (Max 10) | 0 / (Max 53) |
+| (2) bedingt auf betroffene Partien, Median | 12 (n = 1.570) | 11,5 (n = 1.558) | 10 (n = 1) | 14,5 (n = 4) |
+| (3) geschluckte Strafe, Median / Mittel (Punkte) | 0 / 0,53 | 0 / 0,52 | 0 / 0,07 | 0 / 0,27 |
+| (3) bedingt auf Partien mit > 0, Median / Max | 3 / 23 (15,2 %) | 3 / 14 (14,5 %) | 2 (3,3 %) | 8 (3,3 %) |
+| (4) GRATIS-Ziehungen je Partie, Mittel / Anteil >= 1 | **3,09 / 0,336** | **3,12 / 0,336** | 0,03 / 0,033 | 1,97 / 0,133 |
+| (4) bedingt, Median / Max | 8 / 35 | 8 / 34 | 1 | 14 / 18 |
+| Ziehungen gesamt je Partie, Median / Mittel | 3 / 6,9 | 3 / 7,0 | 2 / 2,4 | 2,5 / 5,2 |
+
+Lage im Spielverlauf (Teilstichprobe 200 Korpus-Partien): Anteil der Halbzuege bei Stand 0 je
+Runde 5,5 / 8,7 / 11,4 / 4,2 / 0,4 Prozent; kein reiner Runde-1-Effekt des Startguthabens.
+
+**Verdikt nach par.5** (UEBERHOLT nur bei (1) < 5 % UND (3)-Median < 3): **keine der beiden
+Grundmengen unterschreitet die Schwelle.** Korpus (1) = 39 %, Faktor 8 ueber der Schwelle; in
+den Logs unterschreitet die Mensch-Seite beides, die KI-Seite nicht (13 %, Wilson-Untergrenze
+5,3 %). Der Strang bleibt OFFEN.
+
+**Was die Messung verschiebt:** geschluckt wird kaum STRAFE (Median 0, Mittel 0,5 Punkte je
+Partie und Seite), verschenkt werden ZIEHUNGEN: im Korpus 3,1 Gratis-Ziehungen je Partie und
+Seite, in betroffenen Partien Median 8, Maximum 35; in den Mensch-Partien zieht die KI bedingt
+14 gratis, der Mensch 1. Kennzahl (3) haette das nie gezeigt (par.9 Punkt 2). Damit gehoert
+die Kaufseite in DIESEN Strang, und die Stufe-1-Kandidaten aus par.6 sind an der Ziehung zu
+messen, nicht an der Strafe. Nebenbefund zum Anlassspiel: die Klammer schluckte dort 8 der
+33 Strafpunkte; die Strafen in R2 (-6) und R4 (-10) waren wirksam. Die Tabelle in par.3
+("Wirkung: keine") beschreibt den angezeigten Stand, nicht die Wirkung.
+
+**Ungeprueft:** Kausalitaet (die Sonde zaehlt); Halbzug-Einheit der beiden Grundmengen ist
+nicht identisch (Korpus Kuppelzug = 2 Records; Kennzahl (1) ist davon robust, (2) nur
+eingeschraenkt vergleichbar); die KI-Seite der Logs sind vier Netze (v21 13, v23-b01 9,
+v25-b01 1, v26-b01 7 Partien). Kopplung zum Kuppelstapel-Strang: Gratis-Ziehungen kaufen
+Wissen ueber den Stapel; mit Variante A (`dome_stack` par.7) nutzt die Suche dieses Wissen
+erstmals, dadurch koennte die Zahl der Ziehungen bei 0 STEIGEN. Vor Stufe 1 hier deshalb erst
+den POST-Lauf des Kuppelstapel-Umbaus abwarten und (4) dort nachmessen.

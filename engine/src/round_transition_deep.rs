@@ -110,7 +110,6 @@
 
 use std::time::{Duration, Instant};
 
-use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::game::Game;
@@ -620,7 +619,19 @@ pub(crate) fn simulate_one_round<R: Rng + ?Sized>(
         return None;
     }
     let mut game = Game { state: round_start_state.clone() };
-    game.state.dome_tile_pool.shuffle(rng);
+    // PREREG_dome_stack_information_sets.md par.7 Variante A (2026-09-10):
+    // statt des ganzen Stapels nur noch der unbekannte Teil; bekannte
+    // Rueckgabe-Bloecke werden lediglich IN SICH permutiert.
+    //
+    // `viewer = None`, und das ist hier kein Versehen: die Aufrufer dieser
+    // Rollout-Kette (`continue_through_round{2,3,4}`, `bootstrap_value_after_
+    // rounds`) liefern einen Wert fuer BEIDE Spieler (`[f64; 2]`) und werden
+    // aus den LABEL-Pfaden gerufen (self_play.rs:4238/4248/4258, :2827/:2835,
+    // lib.rs:1917), nicht aus dem Suchbaum eines Wurzelspielers -- eine
+    // einzelne Informationsmenge gibt es an dieser Stelle also nicht. Ohne
+    // Blickwinkel wird konservativ auch der eigene Block permutiert: das
+    // nimmt niemandem Wissen ZU, gibt aber auch keinem Orakelwissen.
+    crate::state::determinize_dome_pool(&mut game.state, None, rng);
     let mut guard = 0u32;
     while game.state.phase == Phase::Drafting {
         guard += 1;

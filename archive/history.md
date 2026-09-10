@@ -17685,3 +17685,34 @@ Anweisung, v28-Self-Play ist ausgesetzt (Nutzer 2026-09-10).
 **Koordinator-Fehler dieser Generation:** Audit-Punkt "Leck" statt Nutzer-Entscheid vom
 08-09 (berichtigt), Audit-Punkt zur Abzweigrunde falsch herum (berichtigt), PATH-Doppelpunkt
 im Freeze-Skript, Edit am laufenden Skript.
+
+## 2026-09-10, 15:35-16:05 -- Nach-v27-Programm gestartet (Nutzer: "Starte das nach v27 Programm. Claude Partien noch nicht")
+
+Drei Straenge parallel: (1) Dubletten-Fix im Ausflug GEBAUT (Opus-Agent, `self_play.rs`,
+`exclude` am Suchzug fuer Weg C und Ausflug; 11 neue/alte Tests gruen), Wheel gebaut,
+**Anker-Drift GRUEN** (`anchor_drift_live_wheel_20260910b.json`); `start_position_seeding`
+auf ENTSCHIEDEN (par.9l). (2) Null-Klammer Stufe 0: Opus-Agent misst nach par.5 mit par.9
+(Korpus v26-b01-policy und 23 Mensch-Logs, Kaufseite mit). (3) Kuppelstapel Variante A:
+Nahtbreite 144 Nennungen / 16 Dateien, 4 Zieh-/Rueckgabestellen, 2 aktive Mischstellen;
+Opus-Agent baut den Block-Marker je Rueckgeber plus sichtabhaengige Determinisierung
+(Koordinator-Entscheid: A zuerst, B additiv danach). Das Artefakt v27-b01 traegt das Wheel
+von 10:10 (Logzeile); das Live-Wheel seit 16:00 zusaetzlich den Dubletten-Fix.
+
+## 2026-09-10, 16:40 -- Null-Klammer Stufe 0: Schwelle nicht unterschritten, Kaufseite traegt
+
+Korpus v26-b01-policy (4.000 Partien): 39 % der Partien je Seite mit Stand 0, geschluckte
+Strafe Median 0 / Mittel 0,5, Gratis-Ziehungen 3,1 je Partie und Seite (bedingt Median 8,
+Max 35). Mensch-Logs (30): Mensch 3 %, KI 13 %. Strang bleibt OFFEN (`score_clamp` par.10);
+Stufe 1 nach dem POST-Lauf des Kuppelstapel-Umbaus. plate_points je Modell gebaut (16:20),
+v27-b01 gewinnt bei vertikalen Reihen (+1,34) und Eckplatten (+0,97).
+
+## 2026-09-10, 16:05-18:11 -- Kuppelstapel Variante A: gebaut, A/B ohne Ruecklauf, PRE/POST exakt
+
+Variante A (Opus-Agent, gegengelesen): Block-Marker je Rueckgeber, sichtabhaengige
+Determinisierung, 9 neue Tests, Fixture neu (5e3b1362ddc65fa6), Anker-Drift gruen (dreimal
+heute: nach Dubletten-Fix, nach A, nach Orakel-Pfad). A/B gleiches Netz Live gegen Artefakt
+v27-b01: 83:67 und 82:68, gepoolt 165:135 (p 0,09). Der erste POST-Lauf war blind (Orakel auf
+der Pool-Maske mit Neumischung); Instrument repariert (`state_json_exact`, exakte
+Rekonstruktion, Knopf `MOSAIC_DOME_POOL_KNOWLEDGE`), PRE/POST exakt: nur R3 bewegt sich, Q
+des Weiterziehens sinkt um 0,005-0,02, Raenge bleiben. Erwartung aus par.8 nicht eingetreten
+(n = 1 Partie). Details `dome_stack` par.15-15c.
