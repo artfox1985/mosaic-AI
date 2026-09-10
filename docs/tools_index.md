@@ -16,18 +16,18 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | **CHRONICLE** | nur `evaluations/` nennt es, also ein Messbericht oder eine Prereg. Typisch fuer Einmal-Skripte, deren Lauf vorbei ist. |
 | **UNNAMED** | niemand nennt es ausser ihm selbst. Kandidat fuer eine Ruecksprache -- aber nicht automatisch tot: ein Werkzeug, das man von Hand aufruft, steht nirgends. |
 
-**Stand: 228 Dateien** = 111 WIRED + 57 DOCUMENTED + 48 CHRONICLE + 12 UNNAMED.
+**Stand: 233 Dateien** = 112 WIRED + 59 DOCUMENTED + 50 CHRONICLE + 12 UNNAMED.
 
-## WIRED (111)
+## WIRED (112)
 
 | Datei | Zweck | Genannt von | Letzter Commit |
 | --- | --- | --- | --- |
-| `tools/analyze_game_log.py` | tools/analyze_game_log.py -- wiederverwendbares Werkzeug zur Analyse von | Aufruf 11, Kommentar 10, Regeln 2, docs 4, evaluations 48 | 2026-09-07 |
+| `tools/analyze_game_log.py` | tools/analyze_game_log.py -- wiederverwendbares Werkzeug zur Analyse von | Aufruf 13, Kommentar 10, Regeln 2, docs 4, evaluations 48 | 2026-09-10 |
 | `tools/anchor_arena.py` | Arena gegen den EINGEFRORENEN Anker (B2 der Kapselungs-Kette). | Aufruf 2, Kommentar 1, Regeln 1, docs 4, evaluations 4 | 2026-08-31 |
-| `tools/arena.py` | Mosaic-AI — Arena (Rust-Engine) | Aufruf 19, Kommentar 9, Regeln 2, docs 7, evaluations 24 | 2026-08-05 |
+| `tools/arena.py` | Mosaic-AI — Arena (Rust-Engine) | Aufruf 19, Kommentar 9, Regeln 2, docs 7, evaluations 28 | 2026-08-05 |
 | `tools/argmax_profile.sh` | argmax-Instrument (Tor 2a, docs/generation_loop.md): 200 Partien @400, Seed 20260931, deterministisch, | Regeln 1, evaluations 4 | 2026-09-04 |
 | `tools/backup_common.ps1` | (kein Kopfkommentar) | Aufruf 3, Kommentar 1, docs 1 | 2026-08-31 |
-| `tools/build_cache_incremental.py` | Cache JE DATEI, auch WAEHREND der Erzeugung (PREREG_cache_build_time.md par.6, | Aufruf 8, Kommentar 1, docs 6, evaluations 9 | 2026-08-31 |
+| `tools/build_cache_incremental.py` | Cache JE DATEI, auch WAEHREND der Erzeugung (PREREG_cache_build_time.md par.6, | Aufruf 9, Kommentar 2, docs 6, evaluations 9 | 2026-08-31 |
 | `tools/build_cache_parallel.py` | Parallel gebauter Trainings-Cache (PREREG_cache_build_time.md Hebel 1). | Aufruf 3, Kommentar 2, docs 2 | 2026-08-31 |
 | `tools/build_frozen_eval_set.py` | tools/build_frozen_eval_set.py — Task #87: eingefrorenes, generationsuebergreifendes | Aufruf 2, docs 2, evaluations 2 | 2026-09-01 |
 | `tools/build_frozen_golden_probe.py` | Golden-Probe-Generator fuer eingefrorene Champion-Artefakte | Aufruf 2, docs 2, evaluations 2 | 2026-08-29 |
@@ -35,7 +35,7 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/cache_inventory.py` | Inventar der Datei-Cache-Bloecke: welcher Block gehoert zu welcher Datei? | Regeln 1, docs 3, evaluations 2 | 2026-08-30 |
 | `tools/check_conventions.py` | tools/check_conventions.py -- Konventions-Linter (Baustein A5). | Aufruf 6, Kommentar 2, Regeln 2, docs 4, evaluations 2 | 2026-09-06 |
 | `tools/conjunction_head_selfcheck.py` | tools/conjunction_head_selfcheck.py -- Selbsttest der Konjunktions-Erweiterung | Aufruf 1, Kommentar 1, docs 1, evaluations 1 | 2026-08-13 |
-| `tools/corpus_sanity_check.py` | Sanity-Check eines Self-Play-Korpus auf den sechs Standard-Kennzahlen | Aufruf 9, docs 3, evaluations 19 | 2026-09-05 |
+| `tools/corpus_sanity_check.py` | Sanity-Check eines Self-Play-Korpus auf den sechs Standard-Kennzahlen | Aufruf 10, docs 3, evaluations 19 | 2026-09-05 |
 | `tools/diagnosis.py` | tools/diagnosis.py — Sanity Check der Trainingsdaten | Aufruf 11, Kommentar 4, docs 3, evaluations 12 | 2026-09-07 |
 | `tools/e3b_firing_rate.py` | E3b Stufe 1 (PREREG_denial_tiebreak.md): Feuerrate des Denial-Tie-Breaks | Aufruf 1, Kommentar 1, docs 1, evaluations 2 | 2026-08-25 |
 | `tools/elo_tracker.py` | Mosaic-AI -- Elo-Tracking-Infrastruktur (Task #62) | Aufruf 4, Kommentar 1, Regeln 3, docs 6, evaluations 5 | 2026-08-31 |
@@ -43,8 +43,8 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/freeze_trunk_selfcheck.py` | tools/freeze_trunk_selfcheck.py -- Selbsttest des Trunk-Einfrier-Modus | Aufruf 1, docs 1, evaluations 1 | 2026-08-16 |
 | `tools/frozen_champion_worker.py` | Wave-3-Worker (PREREG_agent_encapsulation.md par.8): persistenter Prozess | Aufruf 5, Kommentar 1, Regeln 1, docs 1 | 2026-08-28 |
 | `tools/frozen_name_dialect.py` | Uebersetzt Heuristik-Variantennamen an der Grenze zu einem eingefrorenen | Aufruf 1, Kommentar 5, docs 2 | 2026-08-28 |
-| `tools/frozen_referee_match.py` | Wave-3-Referee (PREREG_agent_encapsulation.md par.8): Partie-Serie Seite A | Aufruf 5, Kommentar 1, Regeln 1, docs 3, evaluations 6 | 2026-08-31 |
-| `tools/generate_carrier_manifest.py` | Erzeuger fuer Policy-Traeger-Manifeste (Rekonstruktion, 2026-08-29). | Aufruf 2, Regeln 1, docs 3, evaluations 5 | 2026-09-04 |
+| `tools/frozen_referee_match.py` | Wave-3-Referee (PREREG_agent_encapsulation.md par.8): Partie-Serie Seite A | Aufruf 6, Kommentar 1, Regeln 1, docs 3, evaluations 6 | 2026-08-31 |
+| `tools/generate_carrier_manifest.py` | Erzeuger fuer Policy-Traeger-Manifeste (Rekonstruktion, 2026-08-29). | Aufruf 3, Regeln 1, docs 3, evaluations 5 | 2026-09-04 |
 | `tools/generate_knob_docs.py` | Erzeugt docs/knobs.md aus der MOSAIC_*-Knopf-Registratur. | Aufruf 2, Kommentar 1, Regeln 1, docs 3 | 2026-08-27 |
 | `tools/generate_prereg_index.py` | tools/generate_prereg_index.py -- erzeugt den Tabellenteil von | Aufruf 2, Regeln 4, docs 4, evaluations 4 | 2026-08-15 |
 | `tools/gpu_batch_throughput.py` | Teil 1 der GPU-Inferenz-Batcher-Machbarkeitsprobe | Aufruf 1, Kommentar 1, docs 1, evaluations 2 | 2026-08-25 |
@@ -55,7 +55,8 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/mosaic_backup.ps1` | (kein Kopfkommentar) | Aufruf 2, Regeln 2, docs 4, evaluations 1 | 2026-08-31 |
 | `tools/mosaic_backup_credential.ps1` | (kein Kopfkommentar) | Aufruf 1, docs 1 | 2026-08-31 |
 | `tools/night_v26_chain.sh` | v26-Kette: Traeger-Kennzahl, Traeger-Manifest, Fenster, Bloecke, Monolith, Training v26-b01. | Kommentar 1, Regeln 1, docs 1, evaluations 2 | 2026-09-09 |
-| `tools/night_v27_chain.sh` | v27-Kette: Traeger-Kennzahl, Traeger-Manifest, Fenster, Bloecke, Monolith, Training v27-b01. | Aufruf 1, docs 1, evaluations 1 | 2026-09-09 |
+| `tools/night_v27_chain.sh` | v27-Kette: Traeger-Kennzahl, Traeger-Manifest, Fenster, Bloecke, Monolith, Training v27-b01. | Aufruf 1, Kommentar 1, docs 1 | 2026-09-09 |
+| `tools/night_v28_chain.sh` | v27-Kette: Traeger-Kennzahl, Traeger-Manifest, Fenster, Bloecke, Monolith, Training v28-b01. | Aufruf 1, evaluations 1 | - |
 | `tools/offline_diagnosis.py` | tools/offline_diagnosis.py — Offline-Diagnose eines trainierten Checkpoints: | Aufruf 8, Kommentar 3, docs 3, evaluations 8 | 2026-08-28 |
 | `tools/offline_vs_arena.py` | tools/offline_vs_arena.py -- Sagen unsere Offline-Metriken die Arena voraus? | Aufruf 1, Kommentar 2, docs 2, evaluations 2 | 2026-08-25 |
 | `tools/oracle_metrics.py` | tools/oracle_metrics.py -- Task #89 Teil B, Schritte 2-3: Offline-Metriken der | Aufruf 7, Kommentar 1, docs 3, evaluations 9 | 2026-09-02 |
@@ -68,14 +69,14 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/paired_arena_shrink_ab.py` | Gepaarter A/B fuer Task #78 (v12c Value-Shrinkage-Toggle, 2026-07-23): | Aufruf 1, Kommentar 1, docs 3, evaluations 1 | 2026-09-02 |
 | `tools/paired_arena_shrink_arm_worker.py` | Ein-Arm-Worker fuer den Task-#78-Value-Shrinkage-A/B (VALUE_SHRINK_ENABLED | Aufruf 2, docs 2 | 2026-07-23 |
 | `tools/paired_arena_speedbundle.py` | Gepaarter A/B: ALT (Commit b0c6a9c, Stand VOR dem Stufe-2-Speed-Bündel) | Aufruf 3, docs 2, evaluations 1 | 2026-08-11 |
-| `tools/paired_gating.py` | Gepaartes Netz-vs-Netz-Gating als STANDARD-Werkzeug fuer Kandidaten- | Aufruf 13, Kommentar 3, docs 6, evaluations 23 | 2026-09-03 |
+| `tools/paired_gating.py` | Gepaartes Netz-vs-Netz-Gating als STANDARD-Werkzeug fuer Kandidaten- | Aufruf 14, Kommentar 3, docs 6, evaluations 22 | 2026-09-10 |
 | `tools/pattern_row_availability.py` | Wie oft KANN Musterreihe r (Kapazitaet r) ueberhaupt geschlossen werden? | Aufruf 1, docs 3, evaluations 1 | 2026-08-25 |
 | `tools/plate_head_labels.py` | Label-Extraktor fuer den Plattenkopf (`evaluations/PREREG_plate_head.md`). | Aufruf 2, docs 2, evaluations 2 | 2026-08-13 |
-| `tools/plate_points_from_arena.py` | Wertungsplatten-Punkte und Strafleiste aus gepaarten Arena-Ergebnissen ziehen. | Aufruf 3, Kommentar 1, Regeln 2, docs 3, evaluations 12 | 2026-08-25 |
+| `tools/plate_points_from_arena.py` | Wertungsplatten-Punkte und Strafleiste aus gepaarten Arena-Ergebnissen ziehen. | Aufruf 3, Kommentar 1, Regeln 2, docs 3, evaluations 16 | 2026-09-10 |
 | `tools/plate_rank_invariance.py` | Mosaic-AI -- Task #5, Teil 1a: Score-Luecke vs. Platten-Signal (Gumbel-Rang- | Aufruf 1, docs 2, evaluations 2 | 2026-08-25 |
 | `tools/platt_fit.py` | tools/platt_fit.py -- Platt-Kalibrierungs-Fit des Value-Kopfs gegen den | Aufruf 2, Kommentar 1, docs 4, evaluations 2 | 2026-08-07 |
 | `tools/probes/anchor_referee_parity_probe.py` | DAS TOR vor der Anker-Umstellung: spielt der Referee-Pfad dieselben Partien | Aufruf 1, evaluations 2 | 2026-08-28 |
-| `tools/probes/arena_column_probe.py` | Volle Spalten in der ARENA -- aus den Partie-Logs rekonstruiert. | Aufruf 3, docs 2, evaluations 11 | 2026-09-03 |
+| `tools/probes/arena_column_probe.py` | Volle Spalten in der ARENA -- aus den Partie-Logs rekonstruiert. | Aufruf 4, docs 2, evaluations 11 | 2026-09-10 |
 | `tools/probes/bootstrap_native_default_probe.py` | Fixier-Test: nativ ist der DEFAULT, entstaucht nur die Blockliste. | Aufruf 1, docs 1, evaluations 1 | 2026-08-31 |
 | `tools/probes/cache_parity_probe.py` | Bit-Identitaet zweier Trainings-Caches (PREREG_cache_build_time.md par.4). | Aufruf 4, evaluations 1 | 2026-08-28 |
 | `tools/probes/column_build_prior_mass.py` | Gate C / par.16.1 Sonde: Policy-Priormasse auf Spaltenbau-Aktionen. | Aufruf 1, evaluations 2 | 2026-08-29 |
@@ -132,9 +133,9 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/train_seed_sweep.py` | tools/train_seed_sweep.py -- Trainings-A/B mit MEHREREN Seeds je Arm | Aufruf 2, docs 2, evaluations 2 | 2026-08-25 |
 | `tools/verify_backup.ps1` | (kein Kopfkommentar) | Aufruf 1, Regeln 1, docs 3 | 2026-09-09 |
 | `tools/verify_frozen_heuristic.py` | Prueft ein eingefrorenes Heuristik-Artefakt gegen seine Golden Probe. | Aufruf 3, Kommentar 3, Regeln 1, docs 2, evaluations 2 | 2026-08-28 |
-| `tools/window_train_split.py` | tools/window_train_split.py -- den Train/Val-Split von train.py VORAB | Aufruf 2, docs 2, evaluations 4 | 2026-09-02 |
+| `tools/window_train_split.py` | tools/window_train_split.py -- den Train/Val-Split von train.py VORAB | Aufruf 3, docs 2, evaluations 4 | 2026-09-02 |
 
-## DOCUMENTED (57)
+## DOCUMENTED (59)
 
 | Datei | Zweck | Genannt von | Letzter Commit |
 | --- | --- | --- | --- |
@@ -145,22 +146,23 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/build_release.py` | Mosaic-AI — Release-Build-Skript (Task #96) | docs 4, evaluations 1 | 2026-08-15 |
 | `tools/cache_build_socket.sh` | Cache-Bloecke fuer die 400 fertigen v25-SOCKEL-Dateien, waehrend die Ausflug-Haelfte | docs 1, evaluations 1 | 2026-09-09 |
 | `tools/chance_node_pretest.py` | tools/chance_node_pretest.py -- Billiger Vortest zur Stochastic-MuZero- | docs 2 | 2026-08-25 |
+| `tools/claude_play.py` | Spiel-Interface Claude gegen Netz (PREREG_claude_play_interface.md, Nutzer-Auftrag 2026-09-06). | docs 1, evaluations 7 | 2026-09-10 |
 | `tools/color_denial_probe.py` | PREREG_opponent_disruption_v2.md, Stufe 1 -- die ECHTE, vorregistrierte | Kommentar 1, docs 1, evaluations 1 | 2026-08-16 |
 | `tools/column_build_trace.py` | Entscheidungs-Spur des Spaltenbauers evaluate (`[SB]`-Logzeilen). | Kommentar 1, docs 2, evaluations 1 | 2026-08-25 |
 | `tools/disruption_window_rate.py` | PREREG_opponent_disruption_v2.md, Stufe 0 + Stufe-1-Offline-Ersatz. | docs 1, evaluations 1 | 2026-08-25 |
 | `tools/dome_split_diagnosis.py` | tools/dome_split_diagnosis.py -- TASK B "Zerlegungs-Diagnose" (Nutzer-Auftrag | Kommentar 1, docs 2, evaluations 3 | 2026-08-25 |
 | `tools/export_frozen_drafting_states.py` | Exportiert die "sauberen" Phase::Drafting-Zustaende eines eingefrorenen | docs 1, evaluations 1 | 2026-08-12 |
 | `tools/extract_kat2_examples.py` | tools/extract_kat2_examples.py — Extrahiert konkrete Beispiel-Zustände fuer | docs 1 | 2026-07-23 |
-| `tools/game_log_report.py` | tools/game_log_report.py -- die MARKDOWN-DARSTELLUNG einer Partie-Analyse. | Kommentar 1, docs 2, evaluations 2 | 2026-09-07 |
+| `tools/game_log_report.py` | tools/game_log_report.py -- die MARKDOWN-DARSTELLUNG einer Partie-Analyse. | Kommentar 1, docs 2, evaluations 2 | 2026-09-10 |
 | `tools/generate_tools_index.py` | Erzeugt `docs/tools_index.md`: was liegt in tools/, wozu, und wird es benutzt? | docs 1 | 2026-09-09 |
 | `tools/git_tree.py` | (kein Kopfkommentar) | docs 1 | 2026-07-23 |
 | `tools/gpu_inference_path_ipc_roundtrip.py` | Schritt 1 (Weg A) aus `evaluations/PREREG_gpu_inference_path.md` Abschnitt 6. | docs 2 | 2026-08-25 |
 | `tools/hybrid_paired_arena.py` | Task #88 (Hybrid-Suche 2x2, kausaler Kopf-Test) -- gepaarter Arena-Runner | docs 3, evaluations 1 | 2026-09-02 |
 | `tools/interleave_batch_probe.py` | Teil-1-Probe zu `evaluations/PREREG_gpu_offloading.md`: ist ein | docs 1, evaluations 1 | 2026-08-25 |
 | `tools/model_info.py` | tools/model_info.py — Zeigt Metadaten eines gespeicherten Modells an. | docs 1, evaluations 1 | 2026-07-23 |
-| `tools/night_v27_freeze.sh` | Promotion v27-b01, schreibende und bauende Schritte NACH den Messungen | docs 1, evaluations 1 | - |
-| `tools/night_v27_generate.sh` | v27-ERZEUGUNG: die drei Klassen, nacheinander, Generator v26-b01. | docs 1, evaluations 2 | 2026-09-09 |
-| `tools/night_v27_promotion.sh` | Promotion v27-b01: die MESSENDEN Schritte der Checkliste, nacheinander und exklusiv. | Kommentar 1, docs 1, evaluations 2 | - |
+| `tools/night_v27_freeze.sh` | Promotion v27-b01, schreibende und bauende Schritte NACH den Messungen | docs 1 | 2026-09-10 |
+| `tools/night_v27_generate.sh` | v27-ERZEUGUNG: die drei Klassen, nacheinander, Generator v26-b01. | docs 1, evaluations 1 | 2026-09-09 |
+| `tools/night_v27_promotion.sh` | Promotion v27-b01: die MESSENDEN Schritte der Checkliste, nacheinander und exklusiv. | Kommentar 1, docs 1, evaluations 1 | 2026-09-10 |
 | `tools/pattern_row_throughput.py` | Wieviele Fliesen landen je RASTERREIHE und RUNDE tatsaechlich auf der Kuppel? | docs 3 | 2026-08-13 |
 | `tools/plate_head_smoketest.py` | Rauchtest fuer den Plattenkopf (`evaluations/PREREG_plate_head.md`). | docs 2, evaluations 1 | 2026-08-13 |
 | `tools/play_rule_cost.py` | Task #13: Was kostet die Play-Regel (visit-proportionales Sampling auf einem | docs 2 | 2026-08-25 |
@@ -175,6 +177,7 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/probes/conjunction_calibration_fit.py` | Kalibrierung des Konjunktions-Kopfes auf dem ausgesperrten Bewertungssatz. | docs 1 | 2026-08-25 |
 | `tools/probes/conjunction_reliability_by_source.py` | Kennlinie des Konjunktions-Kopfes, getrennt nach Quelle. | docs 1 | 2026-08-25 |
 | `tools/probes/corpus_column_outcome_symmetry_probe.py` | PREREG_heuristic_v2_long_rows.md par.3b.4, Stufe 0 -- Symmetrie-Pruefung. | docs 2, evaluations 3 | 2026-08-28 |
+| `tools/probes/dome_stack_known_block_draw_probe.py` | Wiederholungsziehung in einen BEREITS BEKANNTEN Stapelteil -- gezaehlt | docs 1, evaluations 2 | 2026-09-10 |
 | `tools/probes/frozen_agent_referee_probe.py` | Spielt ein gefrorenes Agenten-Artefakt VOLLSTAENDIG ueber den Referee-Pfad. | docs 1, evaluations 2 | 2026-08-28 |
 | `tools/probes/frozen_worker_protocol_probe.py` | Prueft das erweiterte Worker-Protokoll gegen einen ECHTEN Worker-Prozess. | docs 1, evaluations 1 | 2026-08-28 |
 | `tools/probes/human_oracle_gap_k1.py` | Auswertung PREREG_human_game_oracle_gap.md par.4/par.5: k1-relevant vs neutral. | docs 1, evaluations 1 | 2026-08-29 |
@@ -196,13 +199,13 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/train_pcr_dose.py` | tools/train_pcr_dose.py -- PCR-A/B-Auswertung (Task #14), siehe | docs 2, evaluations 3 | 2026-08-25 |
 | `tools/value_rank_metric.py` | tools/value_rank_metric.py -- Task #29: Value-Rangmetrik gegen das Orakel | docs 1, evaluations 1 | 2026-08-25 |
 
-## CHRONICLE (48)
+## CHRONICLE (50)
 
 | Datei | Zweck | Genannt von | Letzter Commit |
 | --- | --- | --- | --- |
-| `tools/claude_play.py` | Spiel-Interface Claude gegen Netz (PREREG_claude_play_interface.md, Nutzer-Auftrag 2026-09-06). | evaluations 6 | 2026-09-07 |
 | `tools/gate_hull_form_spec.sh` | Gating des Spec-Kandidaten (Huellenform 2, wahlweise plus K5) gegen die Champion-Spec, | evaluations 3 | 2026-09-07 |
 | `tools/k3_arm_summary.py` | Kennzahlen eines Knopf-Arms der Kette night_k3_knobs_b06.sh fuer die Registrierung | evaluations 2 | 2026-09-06 |
+| `tools/night_v28_generate.sh` | v28-ERZEUGUNG: die drei Klassen, nacheinander, Generator v27-b01. | evaluations 1 | - |
 | `tools/probe_g2_swarm_choice.sh` | Welche der beiden v24-b07-Schwarmhaelften traegt den G-2-Posten in v27? | evaluations 1 | 2026-09-09 |
 | `tools/probes/arena_block_sd_probe.py` | Arena-Streuung fuer PREREG_geometric_envelope.md par.12b Punkt 3 (C1-Aufloesung). | evaluations 2 | 2026-09-06 |
 | `tools/probes/arena_points_probe.py` | Punktbilanz je Seite aus den Partie-Logs eines Arena-Artefakts (`--log-games`), | evaluations 4 | 2026-09-05 |
@@ -213,6 +216,7 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/probes/completion_locus_row_delta.py` | PREREG_completion_bottleneck_locus.md par.5: die sekundaere Locus-Frage. | evaluations 1 | 2026-08-25 |
 | `tools/probes/conjunction_base_rates.py` | Positivraten der Konjunktions-Atome je Korpus-Quelle. | evaluations 1 | 2026-08-25 |
 | `tools/probes/cpu_stress.py` | (kein Kopfkommentar) | evaluations 1 | 2026-08-15 |
+| `tools/probes/dome_stack_pre_post_compare.py` | PRE/POST-Vergleich der Kuppelstapel-Prereg (PREREG_dome_stack_information_sets.md par.12/par.15a). | evaluations 1 | 2026-09-10 |
 | `tools/probes/effect_probe_arm.py` | Wirkungs-Probe (PREREG_ownership_corpus.md, Anti-Stillstand-Beweis fuer die | evaluations 1 | 2026-08-25 |
 | `tools/probes/effect_probe_eval.py` | Auswertung der Wirkungs-Probe (Arm A/B/C/E/F) -- fuer JEDE der 30 Partien | evaluations 1 | 2026-08-15 |
 | `tools/probes/emergency_cap_fire_rates.py` | PREREG_deterministic_labels.md §2 Stufe 1: Feuerraten-Messung der | evaluations 1 | 2026-08-15 |
@@ -238,6 +242,7 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/probes/row_initiation_opportunity_probe.py` | PREREG_long_row_payoff.md par.2a: Initiierung langer Reihen, auf | evaluations 1 | 2026-08-25 |
 | `tools/probes/row_supply_ceiling_probe.py` | Analytische Versorgungs-Schranke je Musterreihe -- Sanity-Check. | evaluations 2 | 2026-08-25 |
 | `tools/probes/saturating_score_utility_gate.py` | PREREG_saturating_score_utility.md par.3a: Tor "fast konstant" gegen | evaluations 1 | 2026-08-25 |
+| `tools/probes/score_clamp_stage0_probe.py` | Stufe 0 zu evaluations/PREREG_score_clamp_incentive.md par.5 (+ par.9). | evaluations 3 | 2026-09-10 |
 | `tools/probes/score_correlation_probe.py` | PREREG_score_correlation.md, komplett (par.2-par.7). | evaluations 1 | 2026-08-25 |
 | `tools/probes/search_depth_column_label_probe.py` | PREREG_search_depth_column_optimum.md Stufe 4 Teil B -- ist das Verworfene | evaluations 2 | 2026-09-02 |
 | `tools/probes/search_depth_rejection_probe.py` | PREREG_search_depth_column_optimum.md Stufe 4 Teil A -- Verwerfungsanteil. | evaluations 1 | 2026-09-01 |
@@ -247,7 +252,7 @@ Verwendungs-Evidenz, KEIN Loeschvorschlag.
 | `tools/probes/value_head_reliability_probe.py` | rho(r) des Value-Kopfs je Runde auf frozen_v3 plus Rauschboden (PREREG_geometric_envelope.md par.8.5, par.12a B1/B2, par.12b Punkte 1 und 2). | evaluations 2 | 2026-09-06 |
 | `tools/replay_dome_stack_pre.sh` | Der PRE-Lauf der Referenz-Partie (PREREG_dome_stack_information_sets.md par.12): | evaluations 1 | 2026-09-09 |
 | `tools/restic_legacy_inventory.sh` | Bestandsaufnahme des legacy-mirror-Stands im restic-Repo (Nutzer-Auftrag 2026-09-07: | evaluations 2 | 2026-09-07 |
-| `tools/tests/test_analyze_game_log_pass.py` | Pass als eigene Log-Zeile (Nutzer 2026-09-07; PREREG_action_id_logging.md S2, Luecke 1 | evaluations 1 | 2026-09-07 |
+| `tools/tests/test_analyze_game_log_pass.py` | Pass als eigene Log-Zeile (Nutzer 2026-09-07; PREREG_action_id_logging.md S2, Luecke 1 | evaluations 1 | 2026-09-10 |
 
 ## UNNAMED (12)
 
