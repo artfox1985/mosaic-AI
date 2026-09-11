@@ -27,12 +27,20 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE BELEGT: v28-KETTE LAEUFT, Schritt 6 Monolith seit 2026-09-11, 10:04, danach
-Training `v28-b01`** (`tools/night_v28_chain.sh` als Hintergrundaufgabe dieser Sitzung). **Erzeugung FERTIG**
+**MASCHINE BELEGT: v28-KETTE WIEDERAUFGENOMMEN ab Schritt 6 seit 2026-09-11, 10:20
+(`tools/night_v28_chain_resume.sh`, Hintergrundaufgabe dieser Sitzung): Monolith, dann
+Training `v28-b01`.** Der erste Lauf starb um 10:13 im Monolith-Merge: 24 Bloecke
+(`selfplay_v27-b01-policy_*_g410` bis `g640`, gebaut 00:14-00:28) trugen 755 Spalten unter
+744er-Schluesseln, weil die Waechter-Worker `config.py` frisch importierten, waehrend die
+Datei fuer den Variante-B-Bau auf 755 stand (der Elternprozess hatte 744 im Schluessel). Die
+Kette startete das Training trotzdem auf dem halben Monolithen (Exit 1, KeyError `values`).
+Behoben: 24 Bloecke an Ort und Stelle neu gebaut (Gesamtscan 3.203 x 744), Formen-Waechter
+im Merge (`tools/build_cache_parallel.py`), Kette bricht bei Merge-Fehler ab. Kein Modell
+entstanden, kein Artefakt betroffen. **Erzeugung FERTIG**
 23:49:56 bis 09:45:31, 3 x 4.000 Partien, 1.201 Dateien, 35.726 s = 9,92 h
 (`PREREG_v28_window.md` par.10). **Tor 2a HAELT: 0,816 gegen 0,777** volle Spalten je Seite
 (n = 8.000 Seiten). Fenster 2.947 Dateien, Schluessel `2db448af20fe`, alle Bloecke unter
-INPUT_SIZE 744. Monolith rund 30 min, Training rund 1,4 h (Ende etwa 12:00). Danach Tor 1 `v28-b01` gegen
+INPUT_SIZE 744. Monolith rund 10 min, Training rund 1,4 h (Ende etwa 12:10). Danach Tor 1 `v28-b01` gegen
 `v27-b01` mit `--log-games` (zwei Seeds), dann `git stash pop` und Variante B fuer `v28-b02`.
 
 **Claude-Partien g02-g05: FERTIG (2026-09-11). Die Parallelsitzung gibt ihren Teil der
@@ -103,9 +111,9 @@ Platz (`data/` 6,96 GiB, Sicherungswurzel).
 
 - **`player_profiles.json` ist im Arbeitsbaum veraendert** (plus `player_profiles.json.bak`),
   aus der Nutzer- bzw. Parallelsitzung; nicht committet.
-- **Erzeugung v27/v28 rund 20 % langsamer als v26** bei gleicher Konfiguration (10,25 h und
-  9,92 h gegen 8,35 h); Ursache nicht gemessen (Waechter-Last, OneDrive). Fuer v29 mit 10 h
-  planen.
+- ~~Erzeugung v27/v28 langsamer als v26~~ GEKLAERT 2026-09-11 (Nutzer): Teile der
+  v26-Erzeugung liefen ausgelagert, die v26-Zahl ist keine Referenz dieser Maschine. Fuer v29
+  mit 10 h planen.
 - **Alte Mess-Manifeste in `data/`** (`manifest_otw22*`, `manifest_p3s0*`, `manifest_peek22*`,
   `manifest_tor22*`, `manifest_v21depth*`, `manifest_frozenv3-b01*`, 30 Dateien, klein): ihre
   Korpora sind seit 2026-09-09 geloescht; Loeschkandidaten beim naechsten Wechsel.
