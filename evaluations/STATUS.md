@@ -152,15 +152,17 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 | Claude-Partien | `claude_play_interface` par.9 | laufen (Parallelsitzung) |
 | Werkzeuge | | `paired_gating --log-games` (Tor 2b aus Tor 1), `plate_points` je Modell, `dome_stack_known_block_draw_probe`, exakter Orakel-Pfad, Spec-Rueckfall in server.py |
 
-## 5. PREREG-BESTAND (8 OFFEN, Ziel rund 7)
+## 5. PREREG-BESTAND (9 OFFEN, Ziel rund 7)
 
 `v28_window` (Vorlage), `dome_stack_information_sets` (Variante B), `stack_top_feature`,
 `claude_play_interface` (laeuft), `round_estimate_leaf_term` (Skalenwahl a/b, Nutzer),
 `round_transition_search_sampling` (haengt an dome_stack; Kandidat fuer UEBERHOLT),
 `start_dome_choice` (Stufe 0 nie gefahren; Sonde am v28-Korpus), `policy_surprise_weighting`
 (Kante v24-b05 gegen v24-b04 aus dem restic-Repo nachholbar), `rust_data_layer`
-(Registrierung ohne Auftrag; Kandidat fuer UEBERHOLT). Index: `PREREG_INDEX.md`
-(generiert).
+(Registrierung ohne Auftrag; Kandidat fuer UEBERHOLT), `difficulty_levels` (angelegt
+2026-09-11 auf Nutzer-Auftrag: Stufenleiter fuer die GUI aus eingefrorenen Spielern mit
+Elo-Knoten; sechs offene Nutzer-Entscheide in par.8, Stufe 0 prueft 744/755 VOR dem Bau).
+Index: `PREREG_INDEX.md` (generiert).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
