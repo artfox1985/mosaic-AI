@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wie stark sind eigener und gegnerischer Endpunktestand tatsaechlich korreliert, und wie gross ist der Fehler, den die Unabhaengigkeitsannahme in P(Sieg) erzeugt? | Beleg: KOMPLETT GEFAHREN 2026-08-24 (score_correlation_probe.json): r +0,2973 (Gleichtakt); MAE_eng 0,0390 -> nach par.5 Kennzahl, weder widerlegt noch belegt, kein Bau-Argument. Details par.5/par.6. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie stark sind eigener und gegnerischer Endpunktestand tatsaechlich korreliert, und wie gross ist der Fehler, den die Unabhaengigkeitsannahme in P(Sieg) erzeugt? | Beleg: KOMPLETT GEFAHREN 2026-08-24 (score_correlation_probe.json): r +0,2973 (Gleichtakt); MAE_eng 0,0390 -> nach par.5 Kennzahl, kein Bau-Argument (par.5/par.6). Waechter 4 (par.6) ist FAELLIG: der Champion ist plattenbewusst (1,030 volle Spalten je Seite, n = 396, PREREG_v28_window.md par.10; zur v21-Zeit rund 0,10 je Partie), die Messung waere zu wiederholen -- nicht eingetaktet. -->
 
 # Vorregistrierung: Korrelation von eigenem und gegnerischem Endstand
 
@@ -239,3 +239,20 @@ Entscheidungsgroesse. Zu berichten ist `Var(D)` ueber abgeschlossene
 Partien, ungeclampt, **mit Angabe des Fensters** -- die Zahl ist
 politikabhaengig (Waechter 4), und wer sie weiterverwendet, muss wissen,
 aus welchem Korpus sie stammt.
+
+## Nachtrag 2026-09-11 (Audit-Querlesung): Waechter 4 ist faellig
+
+Waechter 4 (par.6) verlangt die Wiederholung der Messung bei einem
+plattenbewussten Champion, "weil sich dann die Punkteverteilung selbst
+verschiebt". Die Bedingung ist eingetreten: der amtierende Champion baut in der
+Arena 1,030 volle Spalten je Seite (n = 396 Partien, `PREREG_v28_window.md`
+par.10, TOR 2b). Zum Vergleich die Groesse aus der v21-Zeit: rund 0,10 volle
+Spalten **je Partie** (`PREREG_r5_value_calibration.md` und
+`PREREG_frozen_v3_eval_set.md`). Die beiden Zahlen tragen NICHT dieselbe Einheit
+(je Seite gegen je Partie) und sind hier nur als Groessenordnung
+gegenuebergestellt; die Richtung des Wechsels ist davon unabhaengig.
+
+Folge: die gemessenen Groessen (r +0,2973, MAE_eng 0,0390) gelten fuer eine
+Partieverteilung, die es so nicht mehr gibt. Nicht eingetaktet, kein Lauf
+beauftragt -- nur registriert, damit die Zahlen nicht als generationsunabhaengig
+weiterverwendet werden. Kopf im selben Zug nachgezogen.

@@ -132,3 +132,15 @@ elo_history_pre_r5fix.csv`) stand v21 bei 1349 auf einer LAENGEREN Leiter
 Unterschied zur neuen 1215 ist damit doppelt konfundiert (Leiterlaenge +
 Fix-Grenze) und KEINE Staerkeaussage — die Regel "Kanten ueber die
 Fix-Grenze nie mischen" gilt unveraendert.
+
+## Nachtrag 2026-09-11 (Audit-Querlesung): Fixture v2 IST gebaut
+
+Die in par.4 beauftragte "Fixture v2 mit einem Runde-5-Zustand" existiert.
+Fundstellen: `engine/tests/fixtures/anchor_behaviour_v2.txt` (4 Zeilen), Test
+`heuristic_anchor_r5_choice_matches_fixture_v2` in `engine/src/mcts.rs:1484` mit
+dem Zustandsbauer `a4_round5_state` (`mcts.rs:1436`, Runde 5, Drafting,
+`scoring_tile_ids` 1/5/6, Seed 66); der Test prueft vorab
+`crate::round5::applies(&state)`, trifft also den R5-Loeser, den die A4-v1-Fixture
+nicht erreicht. Angelegt mit Commit 538b1bc (2026-08-22). Die Auflage aus par.4
+ist damit erledigt; Kopf unveraendert, weil das Verdikt der Prereg davon nicht
+beruehrt ist.

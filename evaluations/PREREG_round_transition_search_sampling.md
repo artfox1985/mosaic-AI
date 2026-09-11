@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern -- bringt das Spielstaerke zu vertretbarem Preis (Durchsatz, Paarung)? | Beleg: nichts gebaut, nichts gemessen. 2026-09-05: Nutzer-Leitsatz 'Drafting muss das Tiling kennen'; par.4.2 ENTSCHIEDEN als Bauvorgabe (stellungsgebundener Seed, Paarung bleibt); Variante B (Tiling im Blatt, EINE Neubefuellung) REGISTRIERT als Basisarm (par.7), Kostentor 25 % zuerst (par.5). Bau nach den v24-Abnahmen, Reihenfolge K3-P2, K4, B. -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern -- zu vertretbarem Preis (Durchsatz, Paarung)? | Beleg: Nichts gebaut. Variante B (Tiling im Blatt, EINE Neubefuellung) ist registrierter Basisarm (par.7), par.4.2 ENTSCHIEDEN als Bauvorgabe. AUDIT 2026-09-09 (par.8): par.6 falsch (Determinisierung lebt), Paritaetssonde 8c6684ff weg (Nachfolger Champion-Fixture); der Arm haengt an PREREG_dome_stack_information_sets.md. K4 (round_estimate_leaf_term) ist v28-Schritt 7, keine Vorstufe mehr. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -274,3 +274,12 @@ Folge: dieser Arm haengt an der Antwort aus `PREREG_dome_stack_information_sets.
 die Rundensimulation an Blaettern einschaltet, uebernimmt deren Mischregel; die Prereg
 ist vor einem Bau um die dort entschiedene Informationsmenge zu ergaenzen. Zeilendrift:
 par.1 Konstante `net_mcts.rs:95`, Aufrufstelle `:2329`.
+
+## Nachtrag 2026-09-11 (Audit-Querlesung)
+
+Die Reihenfolge-Angabe in par.7 ("K3-P2, K4, B") ist ueberholt: K4
+(`round_estimate_leaf_term`) ist am 2026-09-11 als Schritt 7 des v28-Programms
+eingetaktet (`PREREG_v28_window.md` par.8) und damit keine Vorstufe dieses Arms
+mehr. Variante B bleibt ungebaut und haengt weiter an der Informationsmengen-
+Antwort aus `PREREG_dome_stack_information_sets.md` (par.8). Zeile-1-Kopf im
+selben Zug nachgezogen.

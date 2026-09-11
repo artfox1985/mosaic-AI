@@ -569,7 +569,14 @@ entschieden ist.
 
 ---
 
-## par.10 ERGEBNIS (leer bei Registrierung)
+## par.10 ERGEBNIS -- siehe SCHLIESSUNGS-NACHTRAG (2026-08-20)
+
+Nachtrag 2026-09-11 (Audit-Querlesung): dieser Platzhalter ist nie gefuellt
+worden, weil die Registrierung schon an der Vorpruefung endete. Das Verdikt
+traegt der **SCHLIESSUNGS-NACHTRAG (2026-08-20)** direkt darunter (negativ
+geschlossen; die par.6-Messungen liegen vor: Nenner ~50x zu gross, E
+rundenkonstant, q-Bitgleichheit R1), die Vorpruefung selbst par.6.1 bis
+par.6.3, die Nachfolger `PREREG_reachability_target.md` par.14.
 
 
 ## SCHLIESSUNGS-NACHTRAG (2026-08-20)

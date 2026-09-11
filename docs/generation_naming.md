@@ -151,6 +151,7 @@ im Namen (Regel oben).
 Self-Play-Klassen nach dem Generator, der erst mit der v28-Promotion feststeht
 (`PREREG_v29_window.md` par.3): `selfplay_v28-bXX-policy_*`, `-value-tempc_*`,
 `-value-excursion_*` (Seeds 20260920 / 20260921 / 20260922, par.5 dort). Trainingsarm:
-**`v29-b01`** (Rezept unveraendert, Warmstart `<Generator>_brierbest`, Seed 20260941).
-`v29-b02` ist nur ein Kandidat (Sicht-Reststufen) und wird erst mit dem Nutzer-Entscheid
-reserviert. Kein Knopf-Suffix im Namen (Regel oben).
+**`v29-b01`** (Rezept unveraendert, Warmstart `<Generator>_brierbest`, Seed 20260941) und
+**`v29-b02`** (Spezialfeld-Frage als Ein-Faktor-Arm, Bauform offen, Vorschlag Ablation der
+Kanaele 77/78; sonst wie b01, gleicher Seed; `PREREG_v29_window.md` par.6 mit Berichtigung 2026-09-11).
+Weitere Arme ab `v29-b03` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).

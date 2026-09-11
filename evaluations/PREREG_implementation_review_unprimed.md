@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Findet ein UNGEPRIMTER Reviewer (ohne unsere Hypothesen und Verdachtsflaechen) Korrektheitsfehler in Suche, Netz-Integration, Self-Play oder Trainingszielen? | Beleg: JA (par.7, 2026-08-20): zwei mittlere Befunde, beide am Code bestaetigt (invertierte Alpha-Beta-Zugsortierung an MIN-Knoten, moon_order_target als No-Op), zwei niedrige, eine Sauber-Liste. Konsequenzen par.3. Nachtrag 2026-08-30: Befund 2 als Knopf gebaut (train.py --moon-loss-weight, v23 faehrt 0); Befund 1 weiter Nutzer-Entscheid. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Findet ein UNGEPRIMTER Reviewer (ohne unsere Hypothesen und Verdachtsflaechen) Korrektheitsfehler in Suche, Netz-Integration, Self-Play oder Trainingszielen? | Beleg: JA (par.7, 2026-08-20): zwei mittlere Befunde, am Code bestaetigt (invertierte Alpha-Beta-Zugsortierung an MIN-Knoten, moon_order_target als No-Op), zwei niedrige, eine Sauber-Liste. Konsequenzen par.3. Befund 2 (2026-08-30): Knopf train.py --moon-loss-weight, v23 faehrt 0. Befund 1 BEHOBEN: round5.rs sortiert knotenlokal, Leiter 2026-08-21 neu verankert (PREREG_round5_minfix_elo_reset). -->
 
 # PREREG: Ungeprimter Implementierungs-Review der KI
 
@@ -199,4 +199,26 @@ Haelfte, `w=0.0` den uebersprungenen Term).
 **Was dieser Nachtrag NICHT entscheidet:** ob 0 dem v23-Netz nuetzt. Der
 Knopf ist Infrastruktur; die Wirkung ist ungemessen und braucht ein eigenes
 Gating. Befund 1 (Min-Knoten-Sortierung) bleibt unberuehrt -- er ist
-Nutzer-Entscheid und wartet weiter.
+Nutzer-Entscheid und wartet weiter. (Stand 2026-08-30; inzwischen behoben,
+siehe den Nachtrag vom 2026-09-11 unten.)
+
+
+### Nachtrag zu Befund 1 (2026-09-11, Audit-Querlesung): BEHOBEN
+
+Der par.7-Befund 1 und der Anker-Nachtrag vom 2026-08-20 sind ueberholt: die
+Min-Knoten-Sortierung ist **gefixt**, nicht mehr offen. Pruefstelle
+`engine/src/round5.rs`, Doc-Kommentar ueber `fn ordered_children`
+(Zeilen 366-386): "BUGFIX (`PREREG_round5_minfix_elo_reset.md` par.1 /
+`PREREG_implementation_review_unprimed.md` par.7 Befund 1, bestaetigt)" --
+der Sortierschluessel ist jetzt KNOTENLOKAL, immer aus Sicht von
+`state.current_player`; der wurzelfeste `perspective`-Parameter ist
+weggefallen. An Max-Knoten ist das byte-identisch zum alten Verhalten, die
+Rueckgabe-Semantik von `negamax`/`leaf_value` bleibt in `perspective`-Sicht.
+
+Der im 2026-08-20-Nachtrag empfohlene Zuschnitt (Fix hinter einem Knopf,
+Default = altes Verhalten, um den Anker byte-identisch zu halten) wurde also
+NICHT gefahren. Stattdessen ist der Fix Default geworden und die Elo-Leiter
+wurde am 2026-08-21 deswegen neu verankert (dortiger Zeile-1-Kopf: "par.4 Fix
+gebaut (Suite 464/0), par.5 Leiter neu verankert (2026-08-21)"); der Fix deckt
+auch die zweite Fundstelle `round_transition_deep.rs` ab. Ablauf und Belege
+stehen in `PREREG_round5_minfix_elo_reset.md`.

@@ -1,8 +1,13 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen? | Beleg: JA (par.10.1), v2-Zweig entfernt (par.19). Bester Stand v22-b05 (par.3b.9/3b.10), DAgger-Runde 2 H0 (par.3b.11). Tor-Revision par.3b.12: Erzeugung abgeschlossen 2026-08-31 (12.000 Partien), Waechter bestanden (Symmetrie +0,4041, 5.629 Seiten), v23 daraus trainiert; Arm K gebaut, Default aus (par.3b.3). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Kann ein ZWEITER Heuristik-Lehrer, dessen Bewertung die Musterreihen sieht, langes-Reihen-Spiel ueberhaupt erst erzeugen -- und laesst er sich neben den eingefrorenen Elo-Anker stellen? | Beleg: JA (par.10.1), v2-Zweig entfernt (par.19). Bester Stand v22-b05 (par.3b.9/3b.10), DAgger-Runde 2 H0 (par.3b.11). Tor-Revision par.3b.12: Erzeugung fertig 2026-08-31 (12.000 Partien), Waechter bestanden (Symmetrie +0,4041), v23 daraus trainiert; Arm K gebaut, Default aus (par.3b.3). Huellen-Richtwerte par.3b.14: Mensch 0,86, Lehrer 0,68 (b04/v21/b06 ungerechnet). -->
 
 # Prereg: Heuristik v2 mit musterreihen-sichtigem Fortschritt
 
-**Status: ENTWURF. Nichts gebaut. Alle par.6-Entscheide offen.**
+**Status: siehe Zeile-1-Statuskopf.** Nachtrag 2026-09-11 (Audit-Querlesung):
+die urspruengliche Entwurfs-Zeile ("ENTWURF. Nichts gebaut. Alle
+par.6-Entscheide offen.") ist ueberholt -- v2 wurde gebaut, gemessen und hat
+den Quellstand am 2026-08-27 wieder verlassen (par.19); die Stufen und ihre
+Ergebnisse stehen in par.8-par.18 und par.3b.*, die berichtigten
+Huellen-Richtwerte in par.3b.14.
 
 Diese Prereg entsteht aus der Nutzer-Frage vom 2026-08-24 ("ist es das
 richtige Netz und was muessen wir tun damit es lernbar ist und auch gelernt

@@ -86,18 +86,16 @@ IST-Bestand ableiten -- generierende Tags aendern sich waehrend der
 Kampagne (hier: Schwarm fertig, Sockel neu).**
 
 ---
-**STATUS (Stand 2026-08-08): OFFEN** -- `lam07_wdl2_s2` ist gueltig
-trainiert (Zielfeld `values_wdl` verifiziert; Offline: Brier-Paritaet,
-Platt-B 0,9966 vs Champion 0,930), aber das entscheidende Arena-Gating
-gegen `v20_2d_opp_brierbest` wurde bislang NICHT durchgefuehrt (kein
-Ergebnis in archive/history.md oder in einer JSON-Datei auffindbar).
-Der Nutzer hat die Frage zusaetzlich a priori auf "kein
-Replikationskandidat" heruntergestuft (Aera-Grenzen-Argument, der
-tanh-Aera-Befund uebertraegt sich vermutlich nicht auf den WDL-Kopf) --
-das Gating bleibt aber der offene, ausstehende Schritt. Belegstelle:
-evaluations/STATUS.md, Abschnitt "OFFENES GATING (v20-Aera, hat
-Vorrang)" ("λ-Arm `lam07_wdl2_s2`: ... Gating steht aus") und Zeile 20
-("λ ... UMGESTUFT").
+**ZWISCHENSTATUS ERLEDIGT.** Nachtrag 2026-09-11 (Audit-Querlesung): hier
+stand ein "STATUS (Stand 2026-08-08): OFFEN"-Block, der das Arena-Gating
+gegen `v20_2d_opp_brierbest` als ausstehenden Schritt fuehrte. Das Gating
+ist am Tag darauf gelaufen; der Stand dieser Registrierung steht im
+Abschnitt "ERGEBNIS (2026-08-09): H0 -- λ in der WDL-AERA GESCHLOSSEN"
+weiter unten und im Zeile-1-Statuskopf. Die damaligen Offline-Zahlen des
+Arms (Brier-Paritaet, Platt-B 0,9966 vs Champion 0,930) und die a-priori-
+Herunterstufung auf "kein Replikationskandidat" (Aera-Grenzen-Argument des
+Nutzers) sind damit hier erhalten; die Platt-B-Zahl traegt der
+Ergebnisabschnitt ebenfalls.
 
 ## Gegner-Festlegung KORRIGIERT (2026-08-09, nach Nutzer-Rueckfrage
 ## "auf welches Fenster wurde der lambda arm trainiert?")

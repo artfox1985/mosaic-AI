@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: Grossteils geliefert: R5-Zufallsknoten scharf seit 2026-08-10, Stack-Draw-Knopf seit der v23-Erzeugung im Rezept (par.15, v24 ebenso). Rest (Teil B1, A1) geparkt als Merkposten par.14. Nutzer-Entscheid 2026-09-05. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: Grossteils geliefert: R5-Zufallsknoten scharf seit 2026-08-10, Stack-Draw-Knopf seit v23 im Rezept (par.15, v24 ebenso). Teil A1 ist seit 2026-09-10 gebaut, als Variante A (dome_stack_information_sets par.15: die Determinisierung kennt die eigenen Rueckgabe-Bloecke). Geparkt bleibt nur B1 (MOSAIC_STACK_DRAW_CHANCE, null Code-Treffer, par.14). Nutzer-Entscheid 2026-09-05. -->
 
 # Vorregistrierung: Wahrscheinlichkeiten statt Welten (Zufallsknoten)
 
@@ -1029,6 +1029,17 @@ bleibt und nichts verloren geht.
   Peek-Aktion, oben beschrieben): **nie gebaut**, null Code-Treffer auf den
   Knopfnamen.
 - **Teil A1** (Bekannt-Segment-Zaehler, TEIL A oben): ebenfalls nicht gebaut.
+
+**Nachtrag 2026-09-11 (Audit-Querlesung): Teil A1 ist gebaut, der Eintrag oben
+gilt nur noch fuer B1.** Am 2026-09-10 als "Variante A" in
+`PREREG_dome_stack_information_sets.md` par.15: `GameState::dome_pool_known_blocks`
+beschreibt das bekannte Suffix des Stapels, `determinize_dome_pool` mischt nur das
+unbekannte Praefix, laesst den eigenen Block in Reihenfolge stehen und permutiert
+fremde Bloecke nur in sich; Wurzel-Determinisierung `net_mcts.rs:996` mit
+viewer = Suchender. Damit ist der Zaehler da, den der Abschnitt "TEIL B1 EINGETAKTET"
+als Voraussetzung fuer eine nicht-konservative Peek-Verteilung nennt. Teil B1
+(`MOSAIC_STACK_DRAW_CHANCE`) bleibt ungebaut, null Code-Treffer auf den Knopfnamen
+(am 2026-09-11 erneut geprueft).
 
 **Als Paket zu heben, zusammen mit `PREREG_stack_top_feature.md`.** Beide
 zielen auf dieselbe blinde Zone von zwei Seiten: das Merkmal gibt dem NETZ
