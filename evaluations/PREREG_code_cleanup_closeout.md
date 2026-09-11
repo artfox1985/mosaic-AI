@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche der beim Review 2026-09-11 gefundenen Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: nichts gebaut. Review mit sechs Bereichsberichten liegt vor (evaluations/review/), zehn tragende Funde am Code geprueft (par.2). STUFE 1 (Korrektheit und Beobachtbarkeit, sechs Punkte, par.3) vom Nutzer FREIGEGEBEN 2026-09-11; Stufe 2 (Altlast, par.4) und Stufe 3 (Doku, par.5) folgen nach der letzten Generation; drei Nutzer-Entscheide offen (par.6). -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche der beim Review 2026-09-11 gefundenen Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: nichts gebaut. Review mit sechs Bereichsberichten liegt vor (evaluations/review/), zehn tragende Funde am Code geprueft (par.2). STUFE 1 (Korrektheit und Beobachtbarkeit, acht Punkte inkl. A4 und A10, par.3) vom Nutzer FREIGEGEBEN 2026-09-11, A8 gebaut; Stufe 2 (Altlast, par.4) und Stufe 3 (Doku, par.5) folgen nach der letzten Generation; offen bleibt der Umfang von Stufe 2 (par.6). -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -77,6 +77,19 @@ Bezeichner (Kern 13, `plate_builder.rs` 25 von 28 Typnamen).
    (`read_*_env("NAME")`, `env::var("NAME")`) statt Textvorkommen und scannt `tools/` nicht
    mehr. Tor: `cargo test --lib knob_registry` gruen, `docs/knobs.md` generiert.
 
+7. **A4 Chip-Sperre in die Arbeitsfunktion** (ENTSCHIEDEN 2026-09-11, 23:30, Nutzer: "ja, nimm
+   A4 und A10 mit rein"): die Pruefung `row_idx >= tiled_max_row` aus `round_end.rs:460-468`
+   nach `apply_bonus_chips_with` (`:613`) ziehen, Aufrufer unveraendert (doppelte Pruefung
+   ist harmlos). Tor: Unit-Test gesperrte Reihe -> false; Anker-Drift (kann Zuege bewegen,
+   falls ein Aufrufer heute nicht filtert; ROT ist Nutzer-Entscheid).
+8. **A10 Kontrakt-Hash erweitern** (ENTSCHIEDEN 2026-09-11, 23:30): `contract_canonical_string`
+   (`lib.rs:639-648`) um `PLANES_H`/`PLANES_W` und den Kopf `ownership` (Reihenfolge wie
+   `net.rs` sie sucht) erweitern. Der Hash wechselt (heute c65768636c0560a7); die Manifeste
+   der eingefrorenen Artefakte behalten ihren alten Hash, Kanten dagegen laufen Cross-Aera
+   (`--force-cross-era`, Regel 2026-08-29; seit Variante B ohnehin). Tor: `cargo test`
+   (Kontrakt-Tests), neuer Hash in `PREREG_v29_window.md` par.3/par.4 nachziehen, Registrierung
+   hier in par.8 mit altem und neuem Hash.
+
 **Reihenfolge und Randbedingungen:** Code schreiben darf neben der laufenden Ablations-Kette
 (kein Build); `cargo test`, Wheel, Paritaets-Fixture und Anker-Drift erst, wenn keine Messung
 laeuft (nach der Kette, vor dem naechsten Messlauf des v28-Programms). Ein Wheel, ein
@@ -118,14 +131,10 @@ Abschlusskapitel in `docs/architecture_reference.md` "Stand beim Projektende".
 
 ## par.6 Nutzer-Entscheide
 
-1. **A10 Kontrakt-Hash** um `ownership`-Kopf und Planes-Geometrie erweitern: bewegt den Hash
-   (heute c65768636c0560a7), damit laufen kuenftige Kanten gegen die v26/v27-Artefakte
-   Cross-Aera (Regel vom 2026-08-29, ohnehin schon der Fall seit Variante B). Vorschlag: JA,
-   zusammen mit Stufe 1, weil der Hash gerade erst gewechselt hat.
-2. **A4 Chip-Sperre in die Arbeitsfunktion**: kann Zuege bewegen, falls ein Aufrufer heute
-   nicht filtert (der Bericht fand keinen); Tor waere die Anker-Drift. Vorschlag: JA, in
-   Stufe 1, weil es dieselbe Fehlerklasse wie A5 ist.
-3. **Umfang Stufe 2** (par.4): welche Kandidaten, insbesondere die Plattenbauer-Zweige.
+1. ~~A10 Kontrakt-Hash erweitern~~ ENTSCHIEDEN 2026-09-11 (Nutzer: "ja, nimm A4 und A10 mit
+   rein"): in Stufe 1, par.3 Punkt 8.
+2. ~~A4 Chip-Sperre in die Arbeitsfunktion~~ ENTSCHIEDEN 2026-09-11: in Stufe 1, par.3 Punkt 7.
+3. **Umfang Stufe 2** (par.4): welche Kandidaten, insbesondere die Plattenbauer-Zweige. Offen.
 
 ## par.7 Was diese Prereg NICHT ist
 
