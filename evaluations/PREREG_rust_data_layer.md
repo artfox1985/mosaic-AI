@@ -196,7 +196,7 @@ par.2 unveraendert (Bit-Identitaet VOR der Umstellung, `np.array_equal`; Schalte
 Identitaet). Verdikt hier, sobald das Tor gefahren ist. Teil B bleibt ohne Ausloeser liegen
 und wird beim naechsten Bestandsabgleich UEBERHOLT, falls die Schwelle weiter verfehlt wird.
 
-## par.7 TEIL A: TOR BESTANDEN (2026-09-11, 15:05)
+## par.7 TEIL A: TOR BESTANDEN (2026-09-11, 14:46)
 
 Wheel mit INPUT_SIZE 755 gebaut und installiert (Variante B, `PREREG_v28_window.md` par.9);
 `tools/probes/feature_parity_rust_python.py` (Konstruktor-Aufruf berichtigt: `PyGame` nimmt ein

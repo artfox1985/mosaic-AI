@@ -82,7 +82,7 @@ beschreibt die Presets trotzdem als Feature (Konsument, par.9).
 | hv2_generator | `models/frozen_heuristics/hv2_generator/` | netzlos (`label_net.onnx` fuer Labels) | ja | ja | `Heuristik_v2huelle@150` 1100 [1053, 1145]; **Identitaet hv2_generator = v2huelle NICHT geprueft** (Manifest: `heuristik_variante hv2`, Rolle "Erzeuger v22-Korpus") |
 | v24-b06 | `models/alphazero_v24-b06_brierbest.onnx` + `models/v24-b06_brierbest.spec.json` | lebend | lebend | Live-Wheel | `v24-b06_k3p10@400` 1269 [1240, 1303] oder `v24-b06@400` 1238; **welcher Knoten zur Spec-Datei gehoert: NICHT geprueft** |
 | v24-b07 | `models/alphazero_v24-b07_brierbest.onnx` + `models/v24-b07_brierbest.spec.json` | lebend | lebend | Live-Wheel | `v24-b07@400` 1283 [1248, 1318] |
-| v25-b01 | `models/frozen_champions/v25-b01/` | ja | ja | ja | 1336 [1298, 1380] |
+| v25-b01 | ~~`models/frozen_champions/v25-b01/`~~ Artefakt vom Nutzer geloescht 2026-09-11 (Kanten im Register, `run:v25-b01` im restic-Repo) | – | – | – | 1336 [1298, 1380] |
 | v26-b01 | `models/frozen_champions/v26-b01/` | ja | ja | ja | 1364 [1324, 1406] |
 | v27-b01 | `models/frozen_champions/v27-b01/` (Champion) | ja | ja | ja | 1405 [1361, 1453] |
 

@@ -23,7 +23,7 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v25-b01`**, Elo **1376** (95% CI [1333, 1425]) from 520 rated
+Champion: **`v27-b01`**, Elo **1405** (95% CI [1360, 1451]) from 1,480 rated
 games, anchored at a **frozen** heuristic artifact
 (`models/frozen_heuristics/hv1_anchor`, Heuristic@150 = 1000,
 `tools/elo_tracker.py report`). The anchor carries its own wheel: since
@@ -36,26 +36,40 @@ with a round-5 share; that older register lives in
 The value head predicts a win *probability* (WDL); display probabilities are
 Platt-calibrated per champion.
 
-**The current campaign changes only the MATERIAL.** For three generations
-(v25, v26, v27) the architecture, the training recipe, the value-target blend,
-the heads and their weights are frozen; only the replay window rotates
-(`evaluations/PREREG_v25_window.md` par.18). The reason is attribution: until
-now, net and material changed together from generation to generation, so
-"generation N+1 beats N" never meant "the net got better". A flat arena is
-explicitly accepted for the duration; a regression is not. v26 reached its
-milestone: it is the first window built entirely from network self-play, with
-the plate-blind heuristic teacher rotated out completely.
+**The material-only freeze is over.** For three generations (v25, v26, v27)
+the architecture, the training recipe, the value-target blend, the heads and
+their weights were frozen; only the replay window rotated
+(`evaluations/PREREG_v25_window.md` par.18). Each of the three passed its
+gates against its predecessor, so the material alone carries: v25-b01 1336,
+v26-b01 1364, v27-b01 1405 on the ladder, and the champion completes more
+columns in the paired arena with every step (Gate 2b).
 
-**What comes after the freeze** is an architecture correction rather than a
-tuning knob: the search reshuffles the whole dome-plate stack at the root of
-every search and therefore forgets the order it chose itself when returning
-plates under the stack. It buys the same information again and again
-(`evaluations/PREREG_dome_stack_information_sets.md`). This class of defect is
+**v28 is the first generation after the freeze** (`evaluations/PREREG_v28_window.md`).
+Its first arm, `v28-b01`, keeps the recipe unchanged and passed Gate 1 against
+`v27-b01` on 2026-09-11 (166:124 by SPRT, replicated 221:179; Elo 1447
+[1395, 1499], not yet promoted). The second arm, `v28-b02`, is the first
+architecture change since the freeze: eleven input features that encode what
+the acting player legitimately knows about the dome-plate stack (see below).
+Two ablations of the window composition follow.
+
+**The dome-stack defect is fixed.** Until 2026-09-10 the search reshuffled the
+whole dome-plate stack at the root of every search and therefore forgot the
+order it had chosen itself when returning plates under the stack
+(`evaluations/PREREG_dome_stack_information_sets.md`). Now the root
+determinization keeps the acting player's own returned blocks in order and
+shuffles only the unknown prefix and the opponent's blocks
+(`engine/src/state.rs::determinize_dome_pool`, variant A), and variant B feeds
+that knowledge to the net as input features 744..754. This class of defect is
 invisible to the entire measurement apparatus, because self-play, arena and
 gating compare two agents inside the *same* world model, where a shared
-modelling error cancels out. The seam list that makes such defects findable
-lives in [`docs/architecture_reference.md`](docs/architecture_reference.md)
+modelling error cancels out; it was found by a human playing the GUI. The
+seam list that makes such defects findable lives in
+[`docs/architecture_reference.md`](docs/architecture_reference.md)
 ("Wo der Code Information ABSICHTLICH vernichtet").
+
+The project is approaching its end: one or two generations after v28 are
+planned, then a measured ladder of difficulty levels for the GUI
+(`evaluations/PREREG_difficulty_levels.md`, scheduled for v29) closes it.
 
 Full history, all measurements and the standing methodology rules:
 [`evaluations/STATUS.md`](evaluations/STATUS.md); rendered process diagrams:
@@ -72,8 +86,11 @@ Full history, all measurements and the standing methodology rules:
   The legacy PUCT path is still available behind `USE_GUMBEL_SEARCH`.
 
 - **Network** (`engine/py/neural_net.py`): 2D encoder (`Mosaic2DNet`):
-  conv branch over 76 binary 6x6 planes + flat branch over 708 features,
-  fused into a 512-wide trunk. Heads: policy (406 actions), value
+  conv branch over 79 binary 6x6 planes + flat branch over 755 features
+  (744 up to `v28-b01`), fused into a 512-wide trunk. Both inputs are built
+  once, in Rust (`engine/src/features.rs`), and exported to Python via PyO3;
+  the Python twin builder remains as a test oracle and is bit-identical
+  (`tools/probes/feature_parity_rust_python.py`, gate passed 2026-09-11). Heads: policy (406 actions), value
   (WDL: two logits -> P(win)), moon order, own points, opponent points,
   ownership, and optionally `endgame_margin` (auxiliary target: the
   round-5 solver's root value, recorded free of charge from self-play
@@ -130,8 +147,8 @@ the run, so a result cannot be reinterpreted afterwards.
    python -u self_play.py ... --value-only --version <gen>-value-excursion --seed <s3>        --excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise
    ```
 
-   Measured on the v26 production run: 3.6 s per game for the base class,
-   about 11 h for all three classes (`docs/measured_runtimes.md`). Note that
+   Measured on the v28 production run: 3.2 s per game for the base class,
+   9.9 h for all three classes on one machine (`docs/measured_runtimes.md`). Note that
    `--games` counts excursion identities as well, so the excursion half needs
    the full number, not half of it.
 
@@ -160,7 +177,12 @@ the run, so a result cannot be reinterpreted afterwards.
    (`tools/build_cache_incremental.py --watch`); the window monolith is then
    assembled from those blocks in minutes instead of hours. The build
    environment must match the training environment exactly, because variables
-   such as `MOSAIC_IGNORE_POLICY_TARGET_VALID` are part of the block key.
+   such as `MOSAIC_IGNORE_POLICY_TARGET_VALID` and the feature width
+   `INPUT_SIZE` are part of the block key; and nothing a worker imports
+   (`config.py`, `neural_net.py`) may change while the watcher runs, because
+   its workers re-import on every start while the parent keeps the key it
+   computed at launch. The merge refuses blocks of differing shape before it
+   writes anything.
 
 4. **Offline diagnosis**, with an explicit resolution limit. On the policy
    side, `tools/offline_diagnosis.py --frozen` reports the two *arena-
@@ -181,7 +203,9 @@ the run, so a result cannot be reinterpreted afterwards.
    for the new champion under `models/frozen_champions/<name>/`: model, spec,
    the wheel it was measured with, a golden probe and a manifest. The wheel
    travels with the artifact so that an old champion still plays the way it did
-   when its Elo was measured. The full list is `docs/promotion_checklist.md`.
+   when its Elo was measured. The artifact set holds the reigning champion and
+   its predecessor (today `v27-b01` and `v26-b01`); older ones are retired once
+   their edges are in the register. The full list is `docs/promotion_checklist.md`.
 
 7. **Mandatory diagnostics on the winner**: Platt calibration
    (`tools/platt_fit.py`), round-5 plate sensitivity
@@ -297,17 +321,23 @@ python server.py
 # http://localhost:5000
 ```
 
-Difficulty levels: `easy` plays the heuristic; `medium`/`hard`/`expert`
-all point dynamically at the reigning champion from `models/champion.txt`
-and differ only in simulation count (60/150/400; `server.py`'s
-`DIFFICULTY_PRESETS`). The AI debugger (`/debug`) shows a value-head
+The opponent is the reigning champion from `models/champion.txt`, played
+with its own spec (search knobs) from the frozen artifact; the new-game
+dialog exposes the simulation count (default 400) and the model name. The
+server-side `DIFFICULTY_PRESETS` (`easy`/`medium`/`hard`/`expert`) are not
+reachable from the web UI; a measured ladder of four levels (frozen heuristic
+anchor, then the champion in three search styles) is pre-registered in
+`evaluations/PREREG_difficulty_levels.md` and scheduled for v29. The AI
+debugger (`/debug`) shows a value-head
 breakdown (raw value, points forecast, win %, blended utility, floor shift)
 as well as a granular Gumbel trace (top-m candidates, Sequential Halving
 phases with eliminations, finalists) per move.
 
-Games against the AI are logged under `static/log/game_*.log`.
-Analysis/oracle evaluation of these logs is in progress
-(`tools/analyze_game_log.py`, maintained separately).
+Games against the AI are logged under `static/log/game_*.log`; the final
+score is the per-player `Endwertung ... Gesamt` line (the `# SPIELENDE`
+summary is written before the end scoring is applied). `tools/analyze_game_log.py`
+replays a log exactly through its action IDs and evaluates every move against
+the net; `tools/claude_play.py` drives the same engine from the command line.
 
 ---
 
@@ -338,7 +368,7 @@ before anything is deleted; it never deletes by itself.
 
 ```
 planes (79×6×6) → [Conv3×3(48) → BN → ReLU] ×2 → flatten ─┐
-state  (744)    → Linear(512) → BN → ReLU ────────────────┴→ concat
+state  (755)    → Linear(512) → BN → ReLU ────────────────┴→ concat
     → Fusion: Linear(512) → BN → ReLU → Linear(512) → ReLU
        ┌→ Policy Head:      Linear(256) → ReLU → Linear(406)  (action logits)
        ├→ Value Head (WDL): Linear(64)  → ReLU → Linear(2)    (logits → P(win))
@@ -348,7 +378,7 @@ state  (744)    → Linear(512) → BN → ReLU ──────────�
        └→ Endgame Head:     round-5 solver root margin (aux, Tanh)
 ```
 
-The champion ONNX export (`alphazero_v25-b01_brierbest.onnx`, verified)
+The champion ONNX export (`alphazero_v27-b01_brierbest.onnx`, verified)
 carries two inputs (`planes`, `state`) and eight outputs (`policy`,
 `value`, `moon`, `points`, `ownership`, `value_wdl_logits`, `opp_points`,
 `endgame_margin`). Aux heads are training signal only; the search reads
@@ -356,15 +386,20 @@ none of them. The legacy flat `MosaicNet` (708 -> 3×512 trunk, Tanh value)
 remains loadable: the input layout is detected from the model file
 (`detect_layout`, `engine/src/net.rs`), never assumed.
 
-### State Tensor (744 Features)
+### State Tensor (755 Features)
 
 Source of truth: `engine/src/features.rs` (the constant there is the single
 source, `config.py` mirrors it); global state, active scoring plates
 (Wertungsplatten), factories, both player boards in ego perspective, both 3×3
-dome grids, moon/dome stacks, hidden information as masks/shares. Features are
-only ever appended, never reordered: indices 0..713 are unchanged since
-2026-09-05, so older ONNX models stay playable (`net.rs::build_inputs`
-truncates to the model width).
+dome grids, moon/dome stacks, hidden information as masks/shares, and since
+2026-09-11 (section 15, `v28-b02`) eleven values describing the acting
+player's knowledge of the dome-plate stack: the unknown prefix, the own
+returned block (length, special and wild counts, the types of its top four
+positions) and the opponent's returned blocks. Features are only ever
+appended, never reordered: indices 0..743 are unchanged since 2026-09-05, so
+older ONNX models stay playable (`net.rs::build_inputs` truncates to the
+model width), and a warm start pads the input layer with zero columns
+(`train.py`).
 
 ### Action Space (406 Actions)
 
@@ -387,7 +422,7 @@ truncates to the model width).
 
 | Parameter                      | Value | Where                     | Description                                                 |
 | ------------------------------ | ----- | ------------------------- | ----------------------------------------------------------- |
-| `INPUT_SIZE`                   | 744   | `config.py`               | Size of the state tensor (714 + plate-type sight, floor colours, phantom shares) |
+| `INPUT_SIZE`                   | 755   | `config.py`               | Size of the state tensor (744 + 11 dome-stack knowledge values since `v28-b02`) |
 | `NUM_ACTIONS`                  | 406   | `config.py`               | Size of the action space                                    |
 | `HIDDEN_SIZE`                  | 512   | `config.py`               | Neurons per hidden layer                                    |
 | `TD_LAMBDA`                    | 0.5   | `engine/py/neural_net.py` | TD-bootstrap blend in the value target                      |
@@ -395,7 +430,7 @@ truncates to the model width).
 | `USE_GUMBEL_SEARCH`            | true  | `engine/src/net_mcts.rs`  | Gumbel search (false = legacy PUCT)                         |
 | `GUMBEL_TOP_M`                 | 16    | `engine/src/net_mcts.rs`  | Root candidates for Sequential Halving                      |
 | `FLOOR_SHAPING_WEIGHT`         | 0.3   | `engine/src/net_mcts.rs`  | Exact floor-penalty leaf-value additive (validated)         |
-| `DETERMINIZE_ROOT_HIDDEN_INFO` | true  | `engine/src/net_mcts.rs`  | Single determinization of hidden information at the root. **Known limitation:** it reshuffles the *whole* dome-plate stack, including the part the acting player legitimately knows (see Current Status) |
+| `DETERMINIZE_ROOT_HIDDEN_INFO` | true  | `engine/src/net_mcts.rs`  | Single determinization of hidden information at the root; since 2026-09-10 it keeps the acting player's own returned dome-plate blocks in order (`state.rs::determinize_dome_pool`, `MOSAIC_DOME_POOL_KNOWLEDGE=0` restores the full shuffle for A/B checks) |
 
 Further constants along with their calibration history are documented as
 Rust/Python constants in the code; every self-play/training run also writes

@@ -238,7 +238,7 @@ im Baum, wird aber erst nach der Kette zum Wheel gebaut. Reihenfolge: Kette durc
 -> `git stash pop` -> Wheel -> Anker-Drift -> Paritaetswerkzeug -> Bloecke unter neuem Schluessel
 -> Training b02.
 
-**Nachtrag 2026-09-11, 14:50-15:05: alles davon durch.** `git stash pop` (Baum auf 755), Wheel
+**Nachtrag 2026-09-11, 14:37-14:47: alles davon durch.** `git stash pop` (Baum auf 755), Wheel
 `mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl` gebaut und installiert (Export
 `state_features_from_json` vorhanden), Anker-Drift GRUEN (1.763 Schritte), Paritaetstor
 BESTANDEN (`PREREG_rust_data_layer.md` par.7: 1.033 Zustaende, Flach und Planes bit-identisch).

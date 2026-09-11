@@ -27,10 +27,10 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE BELEGT: v28-b02-KETTE (Variante B) seit 2026-09-11, 15:10
+**MASCHINE BELEGT: v28-b02-KETTE (Variante B) seit 2026-09-11, 14:49
 (`tools/night_v28_b02.sh`, Hintergrundaufgabe dieser Sitzung): Bloecke unter dem
 755er-Schluessel (rund 30 min), Monolith, Training (1,4 h), dann Tor 1 b02 gegen b01 mit zwei
-Seeds (2 x 86 min); Ende etwa 20:30.** Vorher 14:50-15:05: Baum auf INPUT_SIZE 755 (Stash
+Seeds (2 x 86 min); Ende etwa 20:00.** Vorher 14:37-14:47: Baum auf INPUT_SIZE 755 (Stash
 eingespielt), Wheel gebaut und installiert, Anker-Drift GRUEN, Paritaetstor Rust/Python
 BESTANDEN (`PREREG_rust_data_layer.md` par.7). Der Baum ist damit auf Variante B; das
 Tor-1-Instrument kuerzt 744er-Modelle auf Modellbreite (`net.rs:421`).
@@ -121,6 +121,9 @@ Platz (`data/` 6,96 GiB, Sicherungswurzel).
 
 ### BEFUNDE, die eine Entscheidung oder Nachschau brauchen
 
+- **Artefakt `models/frozen_champions/v25-b01/` vom Nutzer geloescht (2026-09-11)**: der
+  Elo-Kader haelt nur noch v26-b01 und v27-b01 als Artefakte; die Champion-2-Kante einer
+  v28-Promotion geht gegen das v26-b01-Artefakt. Loeschung im Baum committet.
 - **`player_profiles.json` ist im Arbeitsbaum veraendert** (plus `player_profiles.json.bak`),
   aus der Nutzer- bzw. Parallelsitzung; nicht committet.
 - ~~Erzeugung v27/v28 langsamer als v26~~ GEKLAERT 2026-09-11 (Nutzer): Teile der
