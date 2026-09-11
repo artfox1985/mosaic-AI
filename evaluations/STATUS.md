@@ -32,9 +32,13 @@ b03 (ohne Ausflug-Klasse) 77:83 und 26:44 (p 0,035), b04 (ohne G-2) 55:65 und 11
 vier SPRT-H0; **keine Ablation schlaegt b02, Fensterzuschnitt bleibt.** Bester Stand v28-b02,
 Promotion steht an. **Code-Abschluss Stufe 1 GEBAUT** (`PREREG_code_cleanup_closeout.md`
 par.8): 585 Tests gruen, Wheel installiert, Kontrakt-Hash jetzt 39648b95bbba1acf, Paritaets-
-Fixture wegen A2 neu; **ANKER-DRIFT ROT durch A2 (Phantom-Abzug), NUTZER-ENTSCHEID offen**
-(a) Anker neu setzen, (b) A2 zuruecknehmen, (c) Knopf; bis dahin keine Kante mit dem lebenden
-hv1 (Referee-Kanten laufen aus dem Artefakt-Wheel). Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
+Fixture wegen A2 neu; **ANKER NEU GESETZT (Nutzer 2026-09-12, 02:10: "setz den anker neu"):** Artefakt
+`models/frozen_heuristics/hv1_anchor_v2` (Wheel mit A2), Drift und Konservierung GRUEN; Alt-Register
+nach `archive/elo_history_pre_phantomfix.csv`, frisches `elo_history.csv`, `ANCHOR_NAME =
+Heuristik_hv1_anchor_v2`, keine Aliase. **MASCHINE BELEGT: Neuverankerungs-Kette
+`tools/night_reanchor.sh`** (drei Anker-Kanten n=150 fuer v28-b02, v28-b01, v27-b01 und die
+Nachbar-Kante v28-b02 gegen v27-b01, 200 Paare), rund 2,5 h ab 02:15
+(`PREREG_code_cleanup_closeout.md` par.7a). Danach Elo-Eintraege und Promotion v28-b02. Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
 1461 gegen 1447 ueberlappend; Blockziehungen bei positivem Stand eher mehr, nicht weniger;
 `PREREG_v28_window.md` par.10, `dome_stack` par.15h). **Nutzer-Entscheid 20:30: b02 ist als
 korrektere Fassung (volleres Merkmalsbild) der beste Stand und Generator-Kandidat fuer v29;**
@@ -212,8 +216,7 @@ Index: `PREREG_INDEX.md` (generiert).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
-00. **ANKER-DRIFT ROT durch A2** (`PREREG_code_cleanup_closeout.md` par.8): (a) Anker neu setzen,
-    (b) A2 zuruecknehmen, (c) Knopf nur fuer den Netzpfad. Empfehlung (a).
+00. ~~ANKER-DRIFT ROT durch A2~~ ENTSCHIEDEN 2026-09-12: (a) Anker neu gesetzt (`hv1_anchor_v2`, Segment 2).
 0. ~~Name des Schlussmodells~~ ENTSCHIEDEN 2026-09-11: **Tessa** (Umsetzung mit Stufe 3 des
    Code-Abschlusses, `PREREG_code_cleanup_closeout.md` par.5a).
 

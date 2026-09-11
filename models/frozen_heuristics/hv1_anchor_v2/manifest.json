@@ -1,0 +1,135 @@
+{
+  "artefakt": "hv1_anchor_v2",
+  "rolle": "Elo-Anker, Segment 2 der Leiter (seit dem Phantom-Fix A2, 2026-09-12)",
+  "typ": "heuristik",
+  "freeze_date": "2026-09-12",
+  "name_dialect": "hv",
+  "spec": {
+    "implicit_minimax_alpha": 0.0,
+    "long_row_init_shaping_w": 0.0,
+    "score_utility_c": 0.0,
+    "score_utility_b": 20.0,
+    "envelope_search_c": 0.0,
+    "envelope_tiling_w": 0.0,
+    "envelope_profile": [
+      1.0,
+      0.92,
+      0.67,
+      0.33,
+      0.0
+    ],
+    "envelope_tiling_value_w": 0.0,
+    "envelope_projection_mode": 0,
+    "envelope_flush_w": 0.0,
+    "envelope_hull_form": 1,
+    "special_row6_w": 0.0,
+    "heuristik_variante": "hv1"
+  },
+  "wheel": {
+    "datei": "mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
+    "quelle": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl",
+    "rolle": "Traeger des VERHALTENS. Bei einer Heuristik gibt es kein ONNX, das es mittraegt -- ohne dieses Wheel ist der Agent weg."
+  },
+  "tiling_net": null,
+  "herkunft": {
+    "git_commit": "2a0cf4bfc4d78962db46d3eaee6e217f19ae1f84",
+    "git_dirty": true,
+    "git_dirty_hinweis": "TRUE heisst: der Baum trug beim Einfrieren unversionierte Aenderungen. Das Wheel im Artefakt ist dann NICHT aus dem Commit rekonstruierbar -- es ist die einzige Kopie des Verhaltens.",
+    "dirty_dateien": [
+      "M player_profiles.json",
+      "?? evaluations/game_analysis/game_analysis_20260904_194912_seed771522.md",
+      "?? evaluations/game_analysis/game_analysis_game.md",
+      "?? models/frozen_heuristics/hv1_anchor_v2/",
+      "?? models/manifest_train_v28-b03_20260911_201057.json",
+      "?? models/manifest_train_v28-b04_20260911_221704.json",
+      "?? player_profiles.json.bak"
+    ]
+  },
+  "contract_hash": "39648b95bbba1acf",
+  "engine_config": {
+    "active_leaf": "Net",
+    "aggr_lambda": 0.0,
+    "bootstrap_horizon_rounds": 2,
+    "contract_hash": "39648b95bbba1acf",
+    "dead_cell_w": 0.0,
+    "decouple_net_sims_from_actions": true,
+    "determinize_root_hidden_info": true,
+    "engine_version": "0.1.0",
+    "envelope_flush_w": 0.0,
+    "envelope_hull_form": 1,
+    "envelope_profile": [
+      1.0,
+      0.92,
+      0.67,
+      0.33,
+      0.0
+    ],
+    "envelope_projection_mode": 0,
+    "envelope_reach_w": 0.25,
+    "envelope_search_c": 0.0,
+    "envelope_slot_w": 0.5,
+    "envelope_tiling_value_w": 0.0,
+    "envelope_tiling_w": 0.0,
+    "floor_shaping_weight": 0.3,
+    "gumbel_c_scale": 1.0,
+    "gumbel_top_m": 16,
+    "input_size": 755,
+    "mirror_other_val": false,
+    "net_eval_failures": 0,
+    "num_actions": 406,
+    "num_planes_channels": 79,
+    "out_wild_w": 0.0,
+    "points_utility_w": 0.0,
+    "points_utility_weight": 0.0,
+    "policy_mass_cutoff": 0.95,
+    "round_transition_n_samples_search": 8,
+    "round_transition_sampling": false,
+    "score_utility_b": 20.0,
+    "score_utility_c": 0.0,
+    "shuffle_stack_peek_in_search": false,
+    "special_row6_w": 0.0,
+    "use_gumbel_search": true,
+    "value_cal_a": 0.0,
+    "value_cal_b": 1.0,
+    "value_opp_epsilon": 0.0
+  },
+  "protokoll": {
+    "kinds": [
+      "drafting",
+      "tiling",
+      "start_placement"
+    ],
+    "hinweis": "Fehlt dieses Feld, stammt das Artefakt aus der Zeit vor dem erweiterten Protokoll und kann seine Platzierung NICHT selbst entscheiden. Der Treiber verweigert dann, statt es als hv1 kacheln zu lassen."
+  },
+  "golden_probe": {
+    "art": "self-play-reproduktion, byte-verglichen",
+    "warum": "Die Welle-3-Probe der Netz-Champions prueft nur DRAFTING-Entscheidungen; der Referee loest Tiling und Startsetzung selbst auf und ist dabei auf hv1 verdrahtet (referee.rs:312 -> self_play.rs:1207). Fuer eine Heuristik waere das eine halbe Probe. Ein Self-Play-Lauf aus dem eigenen Wheel deckt Drafting, Tiling und Runde 5 ab.",
+    "rezept": {
+      "mode": "mcts",
+      "games": 10,
+      "sims": 600,
+      "version": "probe",
+      "threads": 11,
+      "chunk": 10,
+      "per_file": 10,
+      "seed": 20260826,
+      "c_puct": 1.5,
+      "add_root_noise": true,
+      "deterministic": false,
+      "record_rtv": false,
+      "tau_argmax_from_move": 0,
+      "heuristik_variante": "hv1",
+      "model": null
+    },
+    "dateien": [
+      "selfplay_probe_20260912_0129_g10.pkl"
+    ],
+    "pruefbefehl": "python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv1_anchor_v2"
+  },
+  "laufzeit": {
+    "wanduhr_s": 15.9,
+    "cpu_s": null,
+    "threads": 11,
+    "s_je_partie": null
+  }
+}

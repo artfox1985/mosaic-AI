@@ -124,7 +124,14 @@ HEADER = ["date", "player_a", "sims_a", "player_b", "sims_b", "wins_a", "wins_b"
 # Knoten; `fit_all` zentriert ankerlose Komponenten auf das geometrische
 # Mittel, und die gedruckten Zahlen trugen nur noch ihre Differenz (am
 # 2026-08-31: v23-b01 1148 / hv1_anchor 852, Summe exakt 2000).
-ANCHOR_NAME = "Heuristik_hv1_anchor"
+# NEUVERANKERUNG 2026-09-12 (PREREG_code_cleanup_closeout.md par.7a): der
+# Phantom-Fix A2 hat den lebenden hv1 vom Artefakt `hv1_anchor` entfernt
+# (Drift ROT ab Schritt 99). Nutzer-Entscheid: Anker neu setzen. Neues
+# Segment: Artefakt `models/frozen_heuristics/hv1_anchor_v2` (Wheel mit A2),
+# frisches Register; das Alt-Register liegt in
+# `archive/elo_history_pre_phantomfix.csv` und wird NIE mit diesem gemischt
+# (Regel wie bei der R5-Neuverankerung 2026-08-21).
+ANCHOR_NAME = "Heuristik_hv1_anchor_v2"
 # Korrigendum 2026-07-25: Anker lief faktisch IMMER mit HEUR_SIMS=150
 # (nominal; dynamic_sims -> real Ø~330) -- Label war faelschlich 200.
 ANCHOR_SIMS = 150
@@ -147,7 +154,10 @@ ANCHOR_ELO = 1000.0
 #
 # NICHT aliasiert wird `Heuristik_v2huelle`: das ist der hv2-Lehrer, ein
 # ANDERER Spieler (Elo 1125 aus eigener Kante).
-ANCHOR_ALIASES = {"Heuristik": ANCHOR_NAME}
+# Seit 2026-09-12 KEINE Aliase: "Heuristik" und "Heuristik_hv1_anchor" sind
+# Spieler des Alt-Registers auf der Engine vor A2; im neuen Segment gibt es
+# nur `hv1_anchor_v2`.
+ANCHOR_ALIASES = {}
 LN10_OVER_400 = math.log(10) / 400.0
 
 
