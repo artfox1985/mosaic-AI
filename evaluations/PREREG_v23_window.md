@@ -575,3 +575,8 @@ ersten Ownership-Kopfs auf den v22-EIGENPARTIEN (= v23).
   (Karten-Diagnose gegen das Vorrats-Praedikat, trainingsfrei -- braucht
   den trainierten Kopf); nur bei substanzieller Unterschaetzung folgt
   Stufe 1 (Zielwechsel am par.3b.6-Instrument der Lehrer-Prereg).
+
+**Nachtrag 2026-09-11 (Code-Review, `PREREG_code_cleanup_closeout.md` par.3 A8):** der hier
+genannte Weg `--val-frac 0` verwarf bis zum 2026-09-11 still die `--file-list` (train.py setzte
+`train_files = None`, der Datensatz globte den ganzen Ordner); seither wird das Fenster auch
+ohne Val-Split geehrt. Kein Lauf im Baum war betroffen (alle Ketten fahren 0,05).

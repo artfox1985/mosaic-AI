@@ -160,7 +160,8 @@ Lauf auf der ruhigen Maschine wiederholen und auf Partiegleichheit pruefen.
   der Cache KEINE Champion-Entscheidung.** Belegt ist Bit-Identitaet auf 120
   Dateien, nicht auf den 4,19 Mio Zustaenden.
 - **`--cache-file` nutzt, wer `--val-frac 0` faehrt** oder ein exakt passendes
-  Fenster baut: der Voll-Cache passt per Design nicht auf Laeufe mit Val-Split
+  Fenster baut (seit 2026-09-11 ehrt `--val-frac 0` die `--file-list`; vorher globte
+  der Datensatz dann still den ganzen Ordner, `PREREG_code_cleanup_closeout.md` par.3 A8): der Voll-Cache passt per Design nicht auf Laeufe mit Val-Split
   (anderer Fenster-Schluessel, der Waechter lehnt korrekt ab).
 - **B1-Vorgabe fuer jeden Nachfolge-Arm**: wer die Initiierung langer Reihen
   hebt, ohne die Vollendungsquote deutlich ueber 0,53 zu bringen, wiederholt
