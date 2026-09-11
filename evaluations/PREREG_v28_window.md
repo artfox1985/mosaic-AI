@@ -263,4 +263,17 @@ Strafleiste 6,07. Die Reihe der Generatoren am selben Instrument: v24-b07 0,637,
 45 G-2 (`data/policy_carrier_manifest_v28.json`); Schwarm G-2 145 aus
 `selfplay_v25-b01-value-excursion_*.pkl` (par.2); `data/window_v28.txt` 2.947 Dateien
 (Soll rund 2.946); Bloecke lagen alle (Waechter: 3.203 von 3.203, INPUT_SIZE 744);
-Fenster-Schluessel `2db448af20fe`. Training `v28-b01` laeuft (Ergebnis folgt hier).
+Fenster-Schluessel `2db448af20fe`.
+
+**Zwischenfall Monolith (10:13):** der Merge starb mit `Can't broadcast (1661, 755) -> (1661, 744)`.
+24 Bloecke (`selfplay_v27-b01-policy_20260911_0014_g410.pkl` bis `_0028_g640.pkl`, Blockdateien
+00:15-00:29) trugen `states` mit 755 Spalten unter 744er-Schluesseln: der Schluessel liest
+`config.INPUT_SIZE` im Elternprozess des Waechters (seit 23:49 auf 744), die Worker importieren
+`config.py` je Start frisch, und die Datei stand 00:15-00:50 fuer den Variante-B-Bau (par.9) auf
+755, bevor sie in den Stash ging. Die Kette startete Schritt 7 trotz Merge-Fehler; das Training
+starb nach 26 s (KeyError `values` im halben Monolithen). Behebung: 24 Bloecke in eine
+Nachbardatei neu gebaut, je auf 744 Spalten und gleiche Zeilenzahl geprueft, per `os.replace`
+eingesetzt (112 s); Gesamtscan danach 3.203 Bloecke x 744, keine Abweichung. Dauerhaft:
+Formen-Waechter in `build_cache_parallel.merge` (bricht VOR dem Schreiben ab), Kette stoppt bei
+Merge-Fehler (`tools/night_v28_chain_resume.sh`). Rezept unveraendert, Seed 20260937, Fenster
+und Schluessel identisch. Training `v28-b01` laeuft ab etwa 10:30 (Ergebnis folgt hier).

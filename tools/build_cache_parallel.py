@@ -113,6 +113,24 @@ def merge(parts, target, window_key=None, mask_parts=None):
         with h5py.File(t, "r") as hf:
             for k in felder:
                 formen.setdefault(k, []).append((hf[k].shape, hf[k].dtype))
+    # Formen-Waechter (2026-09-11): jedes Feld muss in allen Teilen dieselbe
+    # Zeilenform (alles ausser der ersten Achse) und denselben dtype haben.
+    # Anlass: 24 Bloecke trugen `states` mit 755 statt 744 Spalten unter einem
+    # 744er-Schluessel (der Waechter-Elternprozess hatte INPUT_SIZE beim Start
+    # gelesen, seine Worker importierten `config.py` frisch, waehrend die Datei
+    # kurzzeitig auf 755 stand). Ohne diese Pruefung starb der Merge erst beim
+    # Schreiben, mit einem halb geschriebenen Monolithen auf der Platte, und
+    # die Kette startete darauf das Training.
+    for k in felder:
+        rest0, dt0 = formen[k][0][0][1:], formen[k][0][1]
+        odd = [(t, f[0], f[1]) for t, f in zip(parts, formen[k])
+               if f[0][1:] != rest0 or f[1] != dt0]
+        if odd:
+            lines_out = "\n".join(f"  {t}: {sh} {dt}" for t, sh, dt in odd[:40])
+            raise SystemExit(
+                f"Teil-Caches haben verschiedene Formen im Feld '{k}' "
+                f"(Referenz {parts[0]}: {formen[k][0][0]} {dt0}); {len(odd)} abweichende Teile:\n"
+                f"{lines_out}\nAbbruch VOR dem Schreiben -- das waere ein stiller oder halber Monolith.")
     with h5py.File(target, "w") as out:
         for k in felder:
             n_ges = sum(f[0][0] for f in formen[k])
