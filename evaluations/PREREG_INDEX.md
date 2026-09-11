@@ -77,16 +77,17 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 116 Dateien = 13 OFFEN + 91 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 117 Dateien = 14 OFFEN + 91 ENTSCHIEDEN + 12 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (13)
+## OFFEN (14)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
 | `PREREG_claude_play_interface.md` | Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen? | g02-g05 gegen v27-b01 @400 (par.7), Claude 3:1 (55:43, 66:48, 36:28, 50:55). Zwei Muster in allen vier Partien, als Sonden vorregistriert in PREREG_corpus_behaviour_audit.md: Ziehzahl folgt dem Punktestand; lange Musterreihen werden mit Farben gefuellt, die die Kuppelzeile nicht aufnehmen kann. Werkzeug 2026-09-11 nachgebessert (par.9 P.8-10), Rauchtest offen. g06-g10 gegen v28, sobald verfuegbar (par.8.8). |
+| `PREREG_code_cleanup_closeout.md` | Wie wird der Code vor dem Projektende sauber hinterlassen -- welche der beim Review 2026-09-11 gefundenen Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | nichts gebaut. Review mit sechs Bereichsberichten liegt vor (evaluations/review/), zehn tragende Funde am Code geprueft (par.2). STUFE 1 (Korrektheit und Beobachtbarkeit, sechs Punkte, par.3) vom Nutzer FREIGEGEBEN 2026-09-11; Stufe 2 (Altlast, par.4) und Stufe 3 (Doku, par.5) folgen nach der letzten Generation; drei Nutzer-Entscheide offen (par.6). |
 | `PREREG_corpus_behaviour_audit.md` | Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Anlass g02-g05 (claude_play par.7). Quellenfrage GEKLAERT (par.3): Self-Plays schreiben keine Partielogs, aber jeder Record traegt `state.log` als Fenster; ueberlappend zusammengesetzt ergibt das den vollen Log, alle drei Arme sind aus dem vorhandenen Korpus messbar. Vorschau n=4: Ziehungen 4/24/5/36, Zwangsraeumungen 0/1/2/2. LAUF ERST MIT v29 (Nutzer 2026-09-11). Nichts gemessen. |
 | `PREREG_difficulty_levels.md` | Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | nichts gefahren. Bestand (par.2): Presets im Server sind aus der GUI nicht erreichbar, alle 33 Mensch-Partien liefen @400 (Mensch 24:7:2). Zuschnitt ENTSCHIEDEN 2026-09-11 (par.4.1): vier Stufen, Anfaenger = Anker hv2 @150, Erfahren/Experte/Meister aus dem aktuellen Champion, Meister = Champion wie in der Arena, die zwei darunter mit den Self-Play-Stilmitteln (Sims 100, Wurzelrauschen, Besuchs-Sampling, Weg C); jede Stufe bekommt eine Kante (par.5). EINGETAKTET fuer v29 (Nutzer 2026-09-11, par.8.6): kein Bau und keine Kante vor der v29-Generation. |
 | `PREREG_dome_stack_information_sets.md` | Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | VARIANTE A GEBAUT 2026-09-10 (par.15), A/B Live gegen Artefakt 165:135, Fix bleibt (par.15b); Ziehungen in den eigenen Block STEIGEN mit A (+0,69 je Partie, par.15e), regelkonform: Ziehen bei Stand 0 bleibt gratis, Null-Klammer als Regel entschieden (par.15f, PREREG_score_clamp_incentive.md). VARIANTE B GEBAUT 2026-09-11 (elf Merkmale 744..754, INPUT_SIZE 755), Arm v28-b02 gegen b01 in Messung (PREREG_v28_window.md par.9/10), Ergebnis steht aus. |

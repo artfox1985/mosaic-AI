@@ -180,7 +180,7 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 | Einhuellende, Schliesskriterium | `geometric_envelope` par.12c | EINGETAKTET 2026-09-11 als v28-Schritt 8: K3-D plus Jokerfeld-Knopf bauen, C2 an den v28-Armen, A1/A2 am Champion |
 | Werkzeuge | | `paired_gating --log-games` (Tor 2b aus Tor 1), `plate_points` je Modell, `dome_stack_known_block_draw_probe`, exakter Orakel-Pfad, Spec-Rueckfall in server.py |
 
-## 5. PREREG-BESTAND (10 OFFEN, Ziel rund 7)
+## 5. PREREG-BESTAND (14 OFFEN, Ziel rund 7)
 
 `v28_window` (Vorlage), `dome_stack_information_sets` (Variante B), `stack_top_feature`,
 `claude_play_interface` (laeuft), `round_estimate_leaf_term` (Skalenwahl a/b, Nutzer),
@@ -195,6 +195,9 @@ aus den Endwertungszeilen, NICHT aus `# SPIELENDE`; EINGETAKTET fuer v29 (Nutzer
 Bau waehrend der v29-Erzeugung, Kanten nach Tor 1 v29; offen nur das Knoten-Namensschema).
 `v29_window` (angelegt 2026-09-11 als Zyklusdurchlauf: Pflichtarm b01, Generator = Sieger der
 v28-Promotion, Begleitprogramm Leiter und Ziehsucht-Sonde; Nutzer-Entscheide par.8).
+`code_cleanup_closeout` (angelegt 2026-09-11 nach dem Code-Review, `evaluations/review/`; Stufe 1
+Korrektheit/Beobachtbarkeit vom Nutzer freigegeben, Bau neben der Kette, Tore danach; Stufen 2/3
+nach der letzten Generation; drei Nutzer-Entscheide par.6).
 Index: `PREREG_INDEX.md` (generiert).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
