@@ -153,6 +153,21 @@ Generator `v26-b01`, je 4.000 Partien @100, threads 11, Cache-Waechter mit 3 Wor
 | **Erzeugung Schwarm Ausflug**, `--games 4000` | **10.567,7 s = 2h 56m** | 2,640 s je Identitaet, 4.003 Identitaeten, 401 Dateien (v26: 2,207) |
 | **zusammen** | **36.911,5 s = 10,25 h** | 23 % langsamer als v26 (30.076,8 s) bei gleicher Konfiguration; Ursache NICHT gemessen (Kandidaten: Waechter-Last beim Blockbau der neuen Dateien, OneDrive-Sync). Fuer die Planung der naechsten Erzeugung gilt die langsamere Zahl |
 
+## Generation v28, gemessen am 2026-09-11 (Erzeugung)
+
+Generator `v27-b01`, je 4.000 Partien @100, threads 11, Cache-Waechter daneben, dazu die
+Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-Bloecke in
+`data/manifest_v27-b01-*.json`):
+
+| Aufbau | Dauer | Bemerkung |
+| --- | --- | --- |
+| **Erzeugung Traeger** (policy, Weg C) | **12.732,4 s = 3h 32m** | 3,183 s je Partie (v27: 3,442) |
+| **Erzeugung Schwarm temperiert** | **11.632,4 s = 3h 14m** | 2,908 s je Partie (v27: 3,144) |
+| **Erzeugung Schwarm Ausflug**, `--games 4000` | **11.361,3 s = 3h 09m** | 2,837 s je Identitaet, 4.005 Identitaeten, 401 Dateien (v27: 2,640) |
+| **zusammen** | **35.726,1 s = 9,92 h** | 3 % schneller als v27 (36.911,5 s), 19 % langsamer als v26 (30.076,8 s); Ursache der v27/v28-Stufe weiter nicht gemessen |
+| Tor 2a ex post (`corpus_sanity_check.py`, 4.000 Partien) | 270,7 s | 1 Thread |
+| Kette Schritte 2-6 (Manifest, G-2, Fenster, Monolith-Schluessel) | 5 s | Bloecke lagen bereits (Waechter) |
+
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 
 | Aufbau | Dauer | Bemerkung |
