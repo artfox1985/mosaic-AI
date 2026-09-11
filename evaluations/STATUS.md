@@ -27,9 +27,14 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE BELEGT: ABLATIONS-KETTE `tools/night_v28_ablations.sh` (b03 ohne Ausflug-Klasse, b04
-ohne G-2, je Training plus Tor 1 gegen b02 mit zwei Seeds), gestartet 2026-09-11 abends, Ende
-etwa 8 h spaeter.** Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
+**MASCHINE FREI seit 2026-09-12, 01:30.** Ablationen DURCH (`PREREG_v28_window.md` par.10):
+b03 (ohne Ausflug-Klasse) 77:83 und 26:44 (p 0,035), b04 (ohne G-2) 55:65 und 114:116, alle
+vier SPRT-H0; **keine Ablation schlaegt b02, Fensterzuschnitt bleibt.** Bester Stand v28-b02,
+Promotion steht an. **Code-Abschluss Stufe 1 GEBAUT** (`PREREG_code_cleanup_closeout.md`
+par.8): 585 Tests gruen, Wheel installiert, Kontrakt-Hash jetzt 39648b95bbba1acf, Paritaets-
+Fixture wegen A2 neu; **ANKER-DRIFT ROT durch A2 (Phantom-Abzug), NUTZER-ENTSCHEID offen**
+(a) Anker neu setzen, (b) A2 zuruecknehmen, (c) Knopf; bis dahin keine Kante mit dem lebenden
+hv1 (Referee-Kanten laufen aus dem Artefakt-Wheel). Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
 1461 gegen 1447 ueberlappend; Blockziehungen bei positivem Stand eher mehr, nicht weniger;
 `PREREG_v28_window.md` par.10, `dome_stack` par.15h). **Nutzer-Entscheid 20:30: b02 ist als
 korrektere Fassung (volleres Merkmalsbild) der beste Stand und Generator-Kandidat fuer v29;**
@@ -207,6 +212,8 @@ Index: `PREREG_INDEX.md` (generiert).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
+00. **ANKER-DRIFT ROT durch A2** (`PREREG_code_cleanup_closeout.md` par.8): (a) Anker neu setzen,
+    (b) A2 zuruecknehmen, (c) Knopf nur fuer den Netzpfad. Empfehlung (a).
 0. ~~Name des Schlussmodells~~ ENTSCHIEDEN 2026-09-11: **Tessa** (Umsetzung mit Stufe 3 des
    Code-Abschlusses, `PREREG_code_cleanup_closeout.md` par.5a).
 

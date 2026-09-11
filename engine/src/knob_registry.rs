@@ -109,9 +109,9 @@ pub const KNOBS: &[KnobEntry] = &[
     KnobEntry { name: "MOSAIC_DEAD_CELL_W", default: "0.0 (aus)", status: KnobStatus::Diagnose, purpose: "K3-D par.8.9b Baustein 2 / par.12c 'tote Huellenzellen' (eingetaktet 2026-09-11 als v28-Schritt 8): Gewicht dead_cell_w, mit dem eine Zelle der bestpassenden Huelle, die nicht mehr erfuellbar ist (column_build.rs:563 cell_is_completable == false: die Kuppelplatte liegt, fordert eine Farbe, und Musterreihe plus Restvorrat reichen fuer die r+1 Fliesen nicht mehr), als Abzug -dead_cell_w * (r+1) / Gesamtkosten zaehlt (56 beim Dreieck, 62 bei envelope_hull_form 2; envelope.rs dead_hull_mass_in, cell_knob_shift_in). Bestraft nur Zerstoerung und belohnt KEINE Optionalitaet -- der Konstruktionsfehler von K3-R (Bestrafung des Beginnens langer Reihen) kann so nicht wiederkommen. Additive Korrektur auf H, wirkt in ALLEN Projektions-Modi (0/1/2/3/4, K3-F und K5 eingeschlossen); dort, wo der Modus die Orientierung per Maximum waehlt, steht sie INNERHALB des Maximums. 0 = aus, bitidentisch (der Zweig in search_shift_state wird gar nicht betreten). Spec-Feld je Seite (dead_cell_w), OPTIONAL mit Default 0, damit die eingefrorenen Artefakte weiter laden; dieser Env-Wert ist der Default von SearchConfig::from_env", prereg: "PREREG_geometric_envelope.md par.12c" },
     KnobEntry { name: "MOSAIC_OUT_WILD_W", default: "0.0 (voller Abzug)", status: KnobStatus::Diagnose, purpose: "Jokerfeld-Regel par.12c (Anlass: Nutzerfrage 2026-09-11 zur Platte 'Mehrfarbige Felder', 2 Punkte je Jokerfeld nur bei Vollbelegung; eine Jokerplatte am Huellenrand hat Zellen ausserhalb, deren Belegung heute (r+1)/62 * w_e kostet): Zellen AUSSERHALB der Huelle, die JOKERFELDER (SpaceType::Wild) einer gelegten Platte sind, zaehlen im Abzug 'Steine ausserhalb' nur noch mit (1 - out_wild_w), umgesetzt als Gutschrift + out_wild_w * v * (r+1) / Gesamtkosten (envelope.rs outside_wild_mass_in; Praedikat board.rs get_space plus space_type == Wild). Normal- und Spezialfelder ausserhalb behalten den vollen Abzug. 0 = Bestand (bitidentisch), 1 = kein Abzug fuer Jokerfelder. Die erste Fassung nahm jede gelegte Platte und damit jeden Aussenstein, weil ein Stein immer auf einer Platte liegt; das war nur eine Dosis auf den Aussen-Abzug und ist verworfen", prereg: "PREREG_geometric_envelope.md par.12c" },
     // ── Runde 5 (round5.rs) ─────────────────────────────────────────────────
-    KnobEntry { name: "MOSAIC_PHASE_STAGE", default: "both", status: KnobStatus::Diagnose, purpose: "Auf welchen Entscheidungsstellen der Phasenfaktor wirkt: draft/tiling/both (plate_builder.rs::phase_wirkt_auf) -- trennt Rang-Entscheidung im Drafting von der Summen-Entscheidung im Tiling", prereg: "PREREG_heuristic_v2_long_rows.md par.14" },
-    KnobEntry { name: "MOSAIC_PHASE_AMP", default: "unset (= feste Tabelle SPALTEN_PHASE)", status: KnobStatus::Diagnose, purpose: "Gipfelhoehe des Phasenfaktors auf die Spalten-Stufen der v2-Zielkarte (plate_builder.rs::spalten_phase); 1.0 = wirkungslos, dient im Sweep als Nullpunkt", prereg: "PREREG_heuristic_v2_long_rows.md par.13" },
-    KnobEntry { name: "MOSAIC_PHASE_PEAK", default: "2.5 (nur wirksam wenn MOSAIC_PHASE_AMP gesetzt)", status: KnobStatus::Diagnose, purpose: "Gipfel-Runde des Phasenfaktors (plate_builder.rs::spalten_phase)", prereg: "PREREG_heuristic_v2_long_rows.md par.13" },
+    KnobEntry { name: "MOSAIC_PHASE_STAGE", default: "both", status: KnobStatus::Tot, purpose: "Auf welchen Entscheidungsstellen der Phasenfaktor wirkt: draft/tiling/both -- trennte Rang-Entscheidung im Drafting von der Summen-Entscheidung im Tiling. seit 2026-09-11 UEBERHOLT: keine Lesestelle im Code (Review); tools/probes/phase_sweep.py setzt sie wirkungslos", prereg: "PREREG_heuristic_v2_long_rows.md par.14" },
+    KnobEntry { name: "MOSAIC_PHASE_AMP", default: "unset (= feste Tabelle SPALTEN_PHASE)", status: KnobStatus::Tot, purpose: "Gipfelhoehe des Phasenfaktors auf die Spalten-Stufen der v2-Zielkarte; 1.0 = wirkungslos, diente im Sweep als Nullpunkt. seit 2026-09-11 UEBERHOLT: keine Lesestelle im Code (Review); tools/probes/phase_sweep.py setzt sie wirkungslos", prereg: "PREREG_heuristic_v2_long_rows.md par.13" },
+    KnobEntry { name: "MOSAIC_PHASE_PEAK", default: "2.5 (nur wirksam wenn MOSAIC_PHASE_AMP gesetzt)", status: KnobStatus::Tot, purpose: "Gipfel-Runde des Phasenfaktors. seit 2026-09-11 UEBERHOLT: keine Lesestelle im Code (Review); tools/probes/phase_sweep.py setzt sie wirkungslos", prereg: "PREREG_heuristic_v2_long_rows.md par.13" },
     KnobEntry { name: "MOSAIC_R5_CHANCE_NODES", default: "an (=0 Altverhalten)", status: KnobStatus::Aktiv, purpose: "Zufallsknoten fuer verdeckte Bonuschips im R5-Loeser, scharf seit 2026-08-10 (round5.rs:159)", prereg: "PREREG_chance_nodes.md" },
     KnobEntry { name: "MOSAIC_R5_NET_SOLVER", default: "an (=0 Gegenprobe Netz)", status: KnobStatus::Aktiv, purpose: "Netzpfad nutzt in Runde 5 den exakten Loeser statt des Netz-Blattwerts (round5.rs:183)", prereg: "PREREG_chance_nodes.md Teil E" },
     KnobEntry { name: "MOSAIC_R5_NODE_BUDGET", default: "200", status: KnobStatus::Aktiv, purpose: "Knotenbudget je R5-Entscheidung (round5.rs:199, NODE_BUDGET round5.rs:88)", prereg: "PREREG_chance_nodes.md" },
@@ -213,30 +213,80 @@ mod tests {
     use std::collections::BTreeSet;
     use std::path::{Path, PathBuf};
 
-    /// Zieht alle `MOSAIC_[A-Z0-9_]*`-Tokens aus `text`. Tokens mit
-    /// abschliessendem `_` sind Prosa-Praefixe (Zeilenumbruch in Kommentaren,
-    /// z.B. "MOSAIC_INTERLEAVE_") und werden uebersprungen; Tokens mit
-    /// `_TEST_` sind synthetische Test-Env-Vars (OnceLock-Kontaminations-
-    /// Schutzmuster, z.B. MOSAIC_TEST_ENV_VALID_28B) und ebenfalls kein
-    /// Laufzeit-Knopf.
-    fn extract_mosaic_tokens(text: &str, out: &mut BTreeSet<String>) {
-        for (pos, _) in text.match_indices("MOSAIC_") {
-            // Kein Treffer mitten in einem laengeren Bezeichner.
-            if pos > 0 {
-                let prev = text.as_bytes()[pos - 1];
-                if prev.is_ascii_alphanumeric() || prev == b'_' {
+    /// A9 (`PREREG_code_cleanup_closeout.md` par.3 Punkt 6): Marker einer
+    /// LESESTELLE in Rust. Der Waechter zaehlte bis 2026-09-11 jedes
+    /// TEXTVORKOMMEN eines `MOSAIC_*`-Namens -- ein Knopf galt damit als
+    /// "im Code", solange irgendein Kommentar oder irgendein Werkzeug ihn
+    /// noch nannte. Genau so haben `MOSAIC_PHASE_STAGE/_AMP/_PEAK` ueber
+    /// Monate als lebendig gegolten, obwohl die Engine sie nicht mehr liest
+    /// (ihre frueheren Leser `plate_builder.rs::phase_wirkt_auf`/
+    /// `spalten_phase` existieren nicht mehr; `tools/probes/phase_sweep.py`
+    /// setzte sie weiter).
+    ///
+    /// `_env(`/`_env_local(`/`_env_once(` decken die Leser-Helfer im Baum ab
+    /// (`read_f64_env`, `read_f64_env_local`, `read_bool_env_once`),
+    /// `probe_usize(` die Sonden-Leser in `scoring.rs`. `set_var(`/
+    /// `remove_var(` stehen BEWUSST nicht hier: Setzen ist keine Lesestelle.
+    const RUST_READ_MARKERS: [&str; 8] = [
+        "env::var(",
+        "env::var_os(",
+        "var_os(",
+        "getenv(",
+        "_env(",
+        "_env_local(",
+        "_env_once(",
+        "probe_usize(",
+    ];
+
+    /// Dasselbe fuer Python (`os.environ.get("NAME")`, `environ["NAME"]`,
+    /// `os.getenv("NAME")`).
+    const PY_READ_MARKERS: [&str; 3] = ["environ.get(", "environ[", "getenv("];
+
+    /// Zieht die `MOSAIC_*`-Namen aus `text`, die an einer LESESTELLE stehen:
+    /// der Name muss eine vollstaendige Zeichenkette sein (`"MOSAIC_X"`, nicht
+    /// `"MOSAIC_X ist gesetzt, aber ..."`) UND auf derselben Zeile muss VOR
+    /// ihm einer der `markers` stehen.
+    ///
+    /// VERTRAG (die Kehrseite der Zeilen-Regel): ein Leser-Aufruf schreibt den
+    /// Namen auf DIESELBE Zeile wie den Aufruf. Ein ueber mehrere Zeilen
+    /// umgebrochener Aufruf faellt aus dem Scan -- dann meldet die
+    /// Gegenrichtung (`registered_non_dead_knobs_exist_in_code`) den Eintrag
+    /// als veraltet, also die sichere Richtung: ein sichtbarer Testfehler,
+    /// kein stilles Durchgehen.
+    ///
+    /// Tokens mit abschliessendem `_` sind Prosa-Praefixe (Zeilenumbruch in
+    /// Kommentaren) und werden uebersprungen; Tokens mit `_TEST_` sind
+    /// synthetische Test-Env-Vars (OnceLock-Kontaminations-Schutzmuster,
+    /// z.B. MOSAIC_TEST_ENV_VALID_28B) und kein Laufzeit-Knopf.
+    fn extract_read_site_tokens(text: &str, markers: &[&str], out: &mut BTreeSet<String>) {
+        for line in text.lines() {
+            for (pos, _) in line.match_indices("MOSAIC_") {
+                if pos == 0 {
                     continue;
                 }
+                let quote = line.as_bytes()[pos - 1];
+                if quote != b'"' && quote != b'\'' {
+                    continue;
+                }
+                let rest = &line[pos..];
+                let end = rest
+                    .find(|c: char| !(c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'))
+                    .unwrap_or(rest.len());
+                let token = &rest[..end];
+                // Die Zeichenkette muss GENAU der Name sein (naechstes Zeichen
+                // ist das schliessende Anfuehrungszeichen) -- sonst ist es
+                // Prosa in einer Meldung.
+                if rest.as_bytes().get(end) != Some(&quote) {
+                    continue;
+                }
+                if token == "MOSAIC_" || token.ends_with('_') || token.contains("_TEST_") {
+                    continue;
+                }
+                let before = &line[..pos - 1];
+                if markers.iter().any(|m| before.contains(m)) {
+                    out.insert(token.to_string());
+                }
             }
-            let rest = &text[pos..];
-            let end = rest
-                .find(|c: char| !(c.is_ascii_uppercase() || c.is_ascii_digit() || c == '_'))
-                .unwrap_or(rest.len());
-            let token = &rest[..end];
-            if token == "MOSAIC_" || token.ends_with('_') || token.contains("_TEST_") {
-                continue;
-            }
-            out.insert(token.to_string());
         }
     }
 
@@ -246,13 +296,17 @@ mod tests {
 
     /// Sammelt die Scan-Menge: engine/src/*.rs (ohne diese Registratur-Datei
     /// selbst, sonst waere die Gegenrichtungs-Pruefung zirkulaer), *.py im
-    /// Repo-Root, tools/ rekursiv, engine/py/.
+    /// Repo-Root (server.py, self_play.py, train.py, ...), engine/py/.
+    ///
+    /// A9: `tools/` wird NICHT mehr gescannt. Dort stehen Sonden und
+    /// Ketten-Skripte, die Knoepfe SETZEN; ein Setzer in einem Werkzeug ist
+    /// kein Beleg dafuer, dass die Engine den Knopf noch liest -- genau diese
+    /// Verwechslung hielt die drei Phasen-Knoepfe am Leben.
     fn scan_files() -> Vec<PathBuf> {
         let root = repo_root();
         let mut files = Vec::new();
         collect(&root.join("engine/src"), "rs", true, &mut files);
         collect(&root, "py", false, &mut files);
-        collect(&root.join("tools"), "py", true, &mut files);
         collect(&root.join("engine/py"), "py", true, &mut files);
         files.retain(|p| p.file_name().map(|n| n != "knob_registry.rs").unwrap_or(true));
         assert!(!files.is_empty(), "Scan-Menge leer -- Repo-Layout unerwartet?");
@@ -273,17 +327,26 @@ mod tests {
         }
     }
 
+    /// Alle `MOSAIC_*`-Namen, die im gescannten Baum an einer LESESTELLE
+    /// stehen (A9, siehe [`extract_read_site_tokens`]). Beide Waechter unten
+    /// arbeiten auf DIESER Menge: "im Code" heisst seit 2026-09-11 "wird
+    /// gelesen", nicht "wird irgendwo erwaehnt".
     fn scanned_tokens() -> BTreeSet<String> {
         let mut tokens = BTreeSet::new();
         for f in scan_files() {
             let Ok(text) = std::fs::read_to_string(&f) else { continue };
-            extract_mosaic_tokens(&text, &mut tokens);
+            let markers: &[&str] = if f.extension().map(|e| e == "py").unwrap_or(false) {
+                &PY_READ_MARKERS
+            } else {
+                &RUST_READ_MARKERS
+            };
+            extract_read_site_tokens(&text, markers, &mut tokens);
         }
         tokens
     }
 
-    /// DER WAECHTER (Auftragspunkt 3): jeder im Quelltext vorkommende
-    /// `MOSAIC_*`-Name MUSS einen Registratur-Eintrag haben. Ein neuer Knopf
+    /// DER WAECHTER (Auftragspunkt 3): jeder `MOSAIC_*`-Name, den der
+    /// Quelltext LIEST, MUSS einen Registratur-Eintrag haben. Ein neuer Knopf
     /// ohne Eintrag laesst diesen Test fehlschlagen -- kein stiller
     /// Knopf-Wildwuchs mehr.
     #[test]
@@ -301,10 +364,16 @@ mod tests {
     }
 
     /// Gegenrichtung: ein Registratur-Eintrag mit Status `Aktiv`/`Diagnose`,
-    /// dessen Name nirgends mehr im gescannten Quelltext steht, ist veraltet
-    /// -- entweder der Knopf wurde entfernt (dann Status auf `Tot` setzen)
-    /// oder der Eintrag ist ein Tippfehler. `Tot`/`Geplant` sind per
-    /// Definition ohne (Pflicht-)Vorkommen im Code.
+    /// dessen Name an KEINER Lesestelle mehr steht, ist veraltet -- entweder
+    /// der Knopf wurde entfernt (dann Status auf `Tot` setzen) oder der
+    /// Eintrag ist ein Tippfehler. `Tot`/`Geplant` sind per Definition ohne
+    /// (Pflicht-)Lesestelle.
+    ///
+    /// A9 (2026-09-11): "steht im Code" wurde zu "wird gelesen" geschaerft
+    /// (siehe [`extract_read_site_tokens`]). Dabei fielen genau die drei
+    /// Phasen-Knoepfe heraus, die im selben Zug auf `Tot` gesetzt wurden;
+    /// jeder weitere Eintrag, den diese Regel kuenftig aufdeckt, ist ein
+    /// echter Fund und kein Fehlalarm.
     #[test]
     fn registered_non_dead_knobs_exist_in_code() {
         let tokens = scanned_tokens();
@@ -317,9 +386,61 @@ mod tests {
             .collect();
         assert!(
             stale.is_empty(),
-            "Registratur-Eintraege ohne Vorkommen im Code (Status auf Tot setzen oder \
+            "Registratur-Eintraege ohne LESESTELLE im Code (Status auf Tot setzen oder \
              Eintrag korrigieren): {stale:?}"
         );
+    }
+
+    /// A9: der geschaerfte Scanner trennt Lesen von Nennen. Ein Setzer, ein
+    /// Kommentar und eine Prosa-Meldung duerfen einen Knopf NICHT mehr am
+    /// Leben halten.
+    #[test]
+    fn read_site_scanner_counts_reads_not_mentions() {
+        let mut found = BTreeSet::new();
+        let rust = r#"
+            let a = read_f64_env("MOSAIC_READ_ONE", 0.0);
+            let b = read_bool_env_once(&CELL, "MOSAIC_READ_TWO", false);
+            let c = std::env::var("MOSAIC_READ_THREE");
+            let d = probe_usize("MOSAIC_READ_FOUR", 1);
+            std::env::set_var("MOSAIC_ONLY_SET", "1");
+            std::env::remove_var("MOSAIC_ONLY_REMOVED");
+            // MOSAIC_ONLY_COMMENTED ist nur ein Kommentar.
+            eprintln!("MOSAIC_ONLY_PROSA ist gesetzt, aber wirkungslos");
+            let e = read_f64_env("MOSAIC_TEST_ENV_SYNTHETIC", 0.0);
+        "#;
+        extract_read_site_tokens(rust, &RUST_READ_MARKERS, &mut found);
+        let py = r#"
+            x = os.environ.get("MOSAIC_PY_READ", "")
+            y = os.environ['MOSAIC_PY_SUBSCRIPT']
+            os.environ["MOSAIC_PY_ONLY_SET"] = "1"
+        "#;
+        extract_read_site_tokens(py, &PY_READ_MARKERS, &mut found);
+
+        for want in [
+            "MOSAIC_READ_ONE",
+            "MOSAIC_READ_TWO",
+            "MOSAIC_READ_THREE",
+            "MOSAIC_READ_FOUR",
+            "MOSAIC_PY_READ",
+            "MOSAIC_PY_SUBSCRIPT",
+        ] {
+            assert!(found.contains(want), "{want} ist eine Lesestelle und muss gezaehlt werden");
+        }
+        for unwanted in [
+            "MOSAIC_ONLY_SET",
+            "MOSAIC_ONLY_REMOVED",
+            "MOSAIC_ONLY_COMMENTED",
+            "MOSAIC_ONLY_PROSA",
+            "MOSAIC_TEST_ENV_SYNTHETIC",
+        ] {
+            assert!(!found.contains(unwanted), "{unwanted} ist KEINE Lesestelle");
+        }
+        // `os.environ["X"] = "1"` ist ein Setzer -- aber `environ[` ist auch
+        // der Marker des Lese-Subscripts. Der Fall wird bewusst mitgezaehlt
+        // (Python unterscheidet die beiden Formen nicht im Praefix); er ist im
+        // Baum nicht vorhanden und waere die harmlose Richtung (ein Knopf
+        // gilt als lebendig, statt still zu verschwinden).
+        assert!(found.contains("MOSAIC_PY_ONLY_SET"));
     }
 
     #[test]

@@ -1134,8 +1134,8 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
 // (`NUM_PLANES_VALUES`) -- ein Altmodell sieht dadurch seine Ebenen Wert fuer
 // Wert unveraendert, obwohl der Bauer breiter geworden ist.
 pub const NUM_PLANES_CHANNELS: usize = 79;
-const PLANES_H: usize = 6;
-const PLANES_W: usize = 6;
+pub(crate) const PLANES_H: usize = 6;
+pub(crate) const PLANES_W: usize = 6;
 
 /// Ebene "Erreichbarkeit je Zelle" (ziehender Spieler), 0/1.
 pub const REACHABILITY_CHANNEL: usize = 76;

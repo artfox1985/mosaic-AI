@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche der beim Review 2026-09-11 gefundenen Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: nichts gebaut. Review mit sechs Bereichsberichten liegt vor (evaluations/review/), zehn tragende Funde am Code geprueft (par.2). STUFE 1 (Korrektheit und Beobachtbarkeit, acht Punkte inkl. A4 und A10, par.3) vom Nutzer FREIGEGEBEN 2026-09-11, A8 gebaut; Stufe 2 (Altlast, par.4) und Stufe 3 (Doku, par.5) folgen nach der letzten Generation; offen bleibt der Umfang von Stufe 2 (par.6). -->
+<!-- STATUS: OFFEN | Frage: Wie wird der Code vor dem Projektende sauber hinterlassen -- welche der beim Review 2026-09-11 gefundenen Defekte, Fussangeln und Altlasten werden behoben, in welcher Reihenfolge, mit welchen Toren? | Beleg: STUFE 1 GEBAUT (par.8: acht Punkte, 585 Tests gruen, Paritaets-Fixture wegen A2 bewusst neu, Kontrakt-Hash 39648b95bbba1acf). ANKER-DRIFT ROT durch A2 (Phantom-Abzug bewegt den lebenden hv1 ab Schritt 99; Gegenprobe ohne A2 gruen): Nutzer-Entscheid (a) Anker neu setzen, (b) A2 zuruecknehmen, (c) Knopf. Stufen 2/3 nach der letzten Generation. -->
 
 # Vorregistrierung: Code-Abschluss (Aufraeumen vor dem Projektende)
 
@@ -158,4 +158,33 @@ die eingefrorenen Artefakte werden nicht angefasst.
 
 ## par.8 Ergebnisse (leer bis zum Bau)
 
-Nichts gebaut (Stand 2026-09-11, 23:10).
+**STUFE 1 GEBAUT (2026-09-11 abends bis 2026-09-12, 01:30), Tore gefahren im freien Fenster
+nach der Ablations-Kette:**
+
+| Punkt | Bau | Tor |
+| --- | --- | --- |
+| A1 | Zaehler `NET_EVAL_FAILURES` mit einmaliger Warnung an elf Stellen (`net_mcts.rs:184-229`, Aufrufstellen laut Agentenbericht), pyo3 `net_eval_failures()`/`reset_net_eval_failures()`, Feld `net_eval_failures` in `engine_config_json`; Grundmenge = fehlgeschlagener AUFRUF, nicht Batchzeile | Test `net_eval_failure_counter_counts_and_resets`; Bit-Identitaet: Paritaets-Fixture ohne A2 unveraendert (Gegenprobe) |
+| A2 | `provocation.rs` `subtract_phantom_tiles` in `remaining_colors` und `still_reachable_colors`, deutsche Lokale mitmigriert | Tests `remaining_colors_ignores_phantom_tiles`, `still_reachable_colors_ignores_opponent_phantom_tiles`; Feature-Golden-Hash unveraendert; **Netz-Paritaets-Fixture ROT -> bewusst neu erzeugt** (b5188b25e073a1c0 -> f644cafc5e6506c6; Gegenprobe: ohne A2 haelt die alte, die Aenderung ist also der Grund); **ANKER-DRIFT ROT** (siehe unten) |
+| A3 | `sanitized_score_utility_b`, `from_spec_file` harter Fehler bei b <= 0 | Tests `search_config_from_spec_file_validates_score_utility_b`, `sanitized_score_utility_b_falls_back_on_non_positive`; alle 15 Spec-Dateien tragen 20,0 |
+| A4 | Sperre in `apply_bonus_chips_with` plus Reihenindex-Pruefung | Test `locked_row_is_refused_by_apply_bonus_chips_with` (ein fehlender Slot kostet zwei Chips, Test entsprechend); Drift ohne A2 GRUEN, A4 bewegt hv1 also nicht |
+| A5 | Bereichspruefungen `validate_draw_from_stack`, `apply_start_placement`, `validate_tiling_action` (Zusatzfund `player_idx`), `py.rs::check_player_row` fuer die Chip-Routen, `server.py::_slot_out_of_range` an vier Routen | Tests `draw_from_stack_rejects_out_of_range_slot`, `start_placement_rejects_out_of_range_indices` |
+| A8 | `train.py` ehrt die Fensterliste auch ohne Val-Split; drei Doku-Nachtraege | Commit f8db185 |
+| A9 | drei Phasen-Knoepfe auf `Tot`, Waechter prueft Lesestellen (Rust- und Python-Marker, `tools/` nicht mehr gescannt), `phase_sweep.py` gesperrt; keine weiteren Eintraege betroffen (Grep-Simulation, dann `cargo test`) | Test `read_site_scanner_counts_reads_not_mentions`, `docs/knobs.md` generiert |
+| A10 | Vertragsstring mit `PLANES_H`/`PLANES_W` und Kopf `ownership`; **Hash c65768636c0560a7 -> 39648b95bbba1acf** | Test `contract_hash_matches_pinned_literal` mit datiertem Vermerk |
+
+Gesamt: `cargo test --release --lib` 585 gruen, `--no-run` fuer examples/benches gruen, Wheel
+gebaut und installiert, Konventions-Check gruen.
+
+**ANKER-DRIFT ROT durch A2 (NUTZER-ENTSCHEID, keine Reparatur):**
+`anchor_drift_live_wheel_20260912_stage1.json`: erste Abweichung Schritt 99 von 1.763, Feld
+`state`. Gegenprobe `..._ohneA2.json` (Wheel ohne den Phantom-Abzug): GRUEN. Der lebende
+hv1-Pfad liest den Restvorrat ueber `column_build`/`plate_builder`, und die Phantom-Korrektur
+aendert dort einen Zug. Das Anker-ARTEFAKT (eigenes Wheel) ist davon unberuehrt, die Leiter
+haengt am Artefakt; ROT heisst: der lebende Code hat sich vom Artefakt entfernt. Optionen:
+(a) A2 behalten und den Anker bewusst neu setzen (neues Leitersegment; Kanten ueber die Grenze
+nie mischen), (b) A2 zuruecknehmen (der Phantom-Fehler bleibt, symmetrisch fuer alle Spieler),
+(c) A2 nur im Netzpfad wirken lassen (Knopf, Default fuer die Heuristik aus) -- (c) haelt den
+Anker und den Fix, ist aber eine zweite Wahrheit fuer denselben Restvorrat. Empfehlung des
+Koordinators: (a), weil das Artefakt die Leiter traegt und der Fehler ein echter Sichtfehler
+ist. Bis zum Entscheid: Code im Baum committet, Wheel MIT A2 installiert, KEINE Elo-Kante mit
+dem lebenden hv1; die Referee-Kanten laufen ohnehin aus dem Artefakt-Wheel.

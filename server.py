@@ -341,6 +341,15 @@ def ok() -> dict:
 def err(msg: str) -> dict:
     return {"ok": False, "error": msg}
 
+def _slot_out_of_range(slot_row: int, slot_col: int) -> bool:
+    """A5 (PREREG_code_cleanup_closeout.md par.3 Punkt 4): das Kuppel-Raster
+    ist 3x3. Slot-Indizes aus dem Anfrage-Rumpf gingen bis 2026-09-11
+    ungeprueft in Rust-Indexzugriffe; die Rust-Seite liefert seitdem einen
+    Fehler statt zu panicken, aber die Pruefung gehoert AUCH hierher -- ein
+    Panic im PyO3-Aufruf beendet den Prozess und wird von `except Exception`
+    nicht gefangen, und eine klare Meldung ist billiger als ein Trace."""
+    return not (0 <= slot_row <= 2 and 0 <= slot_col <= 2)
+
 def _flush_game_log() -> None:
     _rust_flush_log()
 
@@ -945,6 +954,8 @@ def move_dome():
     d = request.get_json()
     try:
         tile_id, slot_row, slot_col = int(d['tile_id']), int(d['slot_row']), int(d['slot_col'])
+        if _slot_out_of_range(slot_row, slot_col):
+            return jsonify(err(f"Ungültiger Slot ({slot_row},{slot_col})."))
         pre_analysis = _teacher_pre_move_snapshot()
         _rust.apply_dome(tile_id, slot_row, slot_col, int(d.get('rotation', 0)))
         _flush_game_log()
@@ -998,6 +1009,8 @@ def move_dome_stack_choose():
         if return_order is not None:
             return_order = [int(x) for x in return_order]
         slot_row, slot_col = int(d['slot_row']), int(d['slot_col'])
+        if _slot_out_of_range(slot_row, slot_col):
+            return jsonify(err(f"Ungültiger Slot ({slot_row},{slot_col})."))
         pre_analysis = _teacher_pre_move_snapshot()
         _rust.apply_dome_stack_choose(int(d['chosen_id']),
                                       slot_row, slot_col,
@@ -1043,8 +1056,11 @@ def move_start_tile():
         return e
     d = request.json
     try:
+        slot_row, slot_col = int(d['slot_row']), int(d['slot_col'])
+        if _slot_out_of_range(slot_row, slot_col):
+            return jsonify(err(f"Ungültiger Slot ({slot_row},{slot_col})."))
         _rust.apply_start_tile(int(d['player']), int(d['tile_id']),
-                               int(d['slot_row']), int(d['slot_col']),
+                               slot_row, slot_col,
                                int(d.get('rotation', 0)))
         _flush_game_log()
         return jsonify(ok())
@@ -1079,8 +1095,11 @@ def tiling():
         return jsonify(err("Nicht in der Tiling-Phase"))
     d = request.get_json()
     try:
+        slot_row, slot_col = int(d['slot_row']), int(d['slot_col'])
+        if _slot_out_of_range(slot_row, slot_col):
+            return jsonify(err(f"Ungültiger Slot ({slot_row},{slot_col})."))
         _rust.apply_tiling(int(d['player']), int(d['pattern_row']),
-                           int(d['slot_row']), int(d['slot_col']),
+                           slot_row, slot_col,
                            int(d['space_index']))
         _flush_game_log()
         return jsonify(ok())
