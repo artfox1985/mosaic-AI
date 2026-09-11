@@ -169,6 +169,10 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Kette Schritte 2-6 (Manifest, G-2, Fenster, Monolith-Schluessel) | 5 s | Bloecke lagen bereits (Waechter); der erste Merge starb an 24 Bloecken mit 755 Spalten (PREREG_v28_window.md par.10), Neubau der 24 Bloecke 112 s |
 | Monolith-Merge 2.800 Bloecke, 1,10 GB | 531 s = 9 min | Wiederaufnahme 10:20:16-10:29:07, mit Formen-Waechter |
 | **Training v28-b01**, 12 Epochen, Fenster 2.947 Dateien, 4,43 M Zustaende | **5.156,6 s = 1,43 h** | Datenaufbau 33,5 s, fast-loader, cuda; v27: 5.116,7 s |
+| **Tor 1** gepaartes Gating @400, 10 Threads, `--log-games`, Seed 20261036 (SPRT-Stopp nach 145 Paaren) | **3.979,6 s = 66 min** | 290 Partien, 13,7 s je Partie |
+| **Tor 1** Replikation Seed 20261037 bis zum Deckel 200 Paare | **5.446,0 s = 91 min** | 400 Partien, 13,6 s je Partie (v27: 5.182 s) |
+| Tor 2b `arena_column_probe.py` auf 290 / 400 Partie-Logs | 83 s / 108 s | 1 Thread, Replayer |
+| Plattenpunkte je Kriterium (`plate_points_from_arena.py`, 400 Partien) | unter 10 s | – |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 
