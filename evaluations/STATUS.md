@@ -27,10 +27,11 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE BELEGT: v28-b02-KETTE (Variante B) seit 2026-09-11, 14:49
-(`tools/night_v28_b02.sh`, Hintergrundaufgabe dieser Sitzung): Bloecke unter dem
-755er-Schluessel (rund 30 min), Monolith, Training (1,4 h), dann Tor 1 b02 gegen b01 mit zwei
-Seeds (2 x 86 min); Ende etwa 20:00.** Vorher 14:37-14:47: Baum auf INPUT_SIZE 755 (Stash
+**MASCHINE BELEGT: TOR 1 v28-b02 gegen v28-b01 seit 2026-09-11, 16:52 (Kette
+`tools/night_v28_b02.sh`, Seeds 20261038/39 nacheinander, je rund 86 min, mit Logs; Ende etwa
+20:00). Training `v28-b02` DURCH 16:52: brierbest Epoche 6 (val_brier 0,1802, Kurve deckungsgleich
+mit b01), 5.262 s gebremst, `run:v28-b02` gesichert; Bloecke 755 in 26 min ueber den Rust-Bauer
+(`PREREG_v28_window.md` par.9).** Vorher 14:37-14:47: Baum auf INPUT_SIZE 755 (Stash
 eingespielt), Wheel gebaut und installiert, Anker-Drift GRUEN, Paritaetstor Rust/Python
 BESTANDEN (`PREREG_rust_data_layer.md` par.7). Der Baum ist damit auf Variante B; das
 Tor-1-Instrument kuerzt 744er-Modelle auf Modellbreite (`net.rs:421`).

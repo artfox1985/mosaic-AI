@@ -173,6 +173,9 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | **Tor 1** Replikation Seed 20261037 bis zum Deckel 200 Paare | **5.446,0 s = 91 min** | 400 Partien, 13,6 s je Partie (v27: 5.182 s) |
 | Tor 2b `arena_column_probe.py` auf 290 / 400 Partie-Logs | 83 s / 108 s | 1 Thread, Replayer |
 | Plattenpunkte je Kriterium (`plate_points_from_arena.py`, 400 Partien) | unter 10 s | – |
+| Blockbau 2.947 Dateien unter neuem Schluessel, 6 Worker, Rust-Merkmalsbauer (`MOSAIC_FEATURES_FROM_RUST=1`) | 1.582 s = 26 min | 1,86 Bloecke je s; Python-Pfad nicht unter gleichen Bedingungen gemessen |
+| Monolith-Merge 2.800 Bloecke, 1,11 GB (b02) | 551 s = 9 min | mit Formen-Waechter |
+| **Training v28-b02** (Variante B, 755), 12 Epochen | **5.262,3 s = 1,46 h** | GEBREMST (cargo test des Pre-push-Hakens um Epoche 6/7); b01 5.156,6 s |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 
