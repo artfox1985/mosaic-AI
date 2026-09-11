@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen? | Beleg: g02-g05 gegen v27-b01 @400 gespielt (par.7), Claude 3:1 (55:43, 66:48, 36:28, 50:55). Zwei Muster in allen vier Partien: die Ziehzahl folgt dem Punktestand (bei 0 durchsucht das Netz den Stapel, 21 Ziehungen in g04 R1; in g05 nie auf 0, darum nur 7), und es fuellt lange Musterreihen mit Farben, die seine Kuppelzeile nicht aufnehmen kann (fuenfmal, in g04 zehn Steine auf einmal). g06-g10 offen. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen? | Beleg: g02-g05 gegen v27-b01 @400 (par.7), Claude 3:1 (55:43, 66:48, 36:28, 50:55). Zwei Muster in allen vier Partien, als Sonden vorregistriert in PREREG_corpus_behaviour_audit.md: Ziehzahl folgt dem Punktestand; lange Musterreihen werden mit Farben gefuellt, die die Kuppelzeile nicht aufnehmen kann (fuenfmal). Werkzeug 2026-09-11 nachgebessert (par.9 P.8-10). g06-g10 offen. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -521,3 +521,52 @@ Geprueft am Code, je Punkt mit Pruefstelle:
    Partien-Agenten: nur `show`, `move`, `note` und `game.log` benutzen, `.engine.log` nie
    lesen; `--sims 400`; Gegner ohne `--opponent` (= `models/champion.txt`); je Partie den
    Gegner und den Spec-Pfad aus dem Manifest in die Ergebniszeile.
+
+8. **Die `KI:`-Zeile ist GEFIXT, die Ursache bleibt offen (2026-09-11).** Punkt 2 oben ist
+   damit fuer den Spielbetrieb erledigt. Befund aus g02-g05: das ENGINE-Log daneben ist
+   korrekt -- dieselbe Aktion steht dort als `2 (2)×`, waehrend die Tool-Zeile
+   `0× Stein tuerkis von F1 → Reihe 2 [0/2]` meldete, obwohl die Reihe danach auf 1/2 stand
+   (g02 Runde 1), und `[4/4] (+1 Strafleiste)` bei LEERER Strafleiste (g02 Runde 2). Quelle
+   ist `action.description` aus `ai_step_net_json`, gebaut in
+   `engine/src/mcts.rs::label_search_move` (:624) ueber `tiles_taken` (:599); der Zaehler
+   wird dort VOR dem Anwenden aus dem Zustand gelesen, warum er 0 bzw. zu klein herauskommt,
+   ist weiter ungeklaert. **Fix im Werkzeug:** `drive_ai` druckt jetzt die sichtbaren
+   Logzeilen, die die Engine gerade geschrieben hat (neue Funktion `ai_lines`), statt der
+   Beschreibung. Damit sieht der Spieler exakt das, was auch in `game.log` landet. Der
+   Engine-Fehler bleibt fuer die Suche selbst folgenlos (die Beschreibung ist reiner
+   Anzeigetext), sollte aber bei naechster Gelegenheit nachgesehen werden.
+
+9. **Engine-Luecke: der Validator laesst einen Zug durch, den es nicht gibt (2026-09-11).**
+   `validation.rs::validate_small_moon` (:66-85) akzeptiert `SmallFactoryMoon` MIT
+   `factory_id`, nimmt also den obersten Stein EINER Fabrik. Aktion C ist laut
+   `docs/engine_manual.md` (Phase 1 C) immer global ueber alle Mondbereiche, und
+   `generate_valid_moves` erzeugt folgerichtig nur die globale Form (:214). Der Zug ist also
+   nur ueber die direkte API erreichbar -- Suche und Self-Play sind nicht betroffen. Der
+   Kopf-Docstring dieses Werkzeugs hat ihn als `m1`-`m4` sogar angeboten; das war eine
+   Einladung zu einem illegalen Zug. **Fix im Werkzeug:** `m1`-`m4` wird jetzt mit
+   Verweis auf das Regelbuch abgewiesen, der Docstring korrigiert. Ob der Validator selbst
+   nachgezogen wird, ist ein Nutzer-Entscheid (Engine-Aenderung, Anker-Invarianz faellig).
+
+10. **Drei Bedien-Verbesserungen aus 307 gespielten Zuegen (2026-09-11).**
+    (a) `show` nennt jetzt die Pflichten der Runde: `Kuppelplatten x/2, Bonuschips y/2`.
+    `dome_tiles_placed_this_round` ist nicht serialisiert (serialize.rs:759), laesst sich
+    aber exakt ausrechnen (Startplatte plus zwei je abgeschlossener Runde); in g04 waere die
+    Plattenpflicht beinahe verfallen.
+    (b) `show` zeigt die **Reihen-Ziele**: je Musterreihe, welche Zellen ihrer Kuppelzeile
+    sie noch aufnehmen kann, mit Warnung `ZWANGSRAEUMUNG beim Tiling`, wenn keine Zelle mehr
+    passt und alle drei Slots der Zeile belegt sind. Das steht vollstaendig auf dem Brett,
+    verletzt die Sichtgleichheit also nicht; es ist die Handrechnung, die jede Runde anfiel
+    und die dreimal (g02, g04, g05) zweistellig danebenging.
+    (c) Die Zugliste fasst die Zielreihen je Quelle und Farbe zusammen (`s 1 gelb 0-5|floor`)
+    statt einer Zeile je Kombination. In Runde 1 waren das mehrere hundert Zeilen; das war
+    der groesste Einzelposten am Token-Verbrauch und der Grund, warum `show` meist nur
+    gefiltert gelesen wurde.
+    **Keine Aenderung** gab es an der Ablehnungs-Ausgabe: `cmd_move` druckt bereits
+    `ZUG ABGEWIESEN (...)` und gibt 1 zurueck. Dass drei abgewiesene Zuege in g03/g04
+    unbemerkt blieben, lag an der eigenen `grep`-Filterung der Ausgabe, nicht am Werkzeug.
+    Lehre fuer den naechsten Auftrag: die Ausgabe von `move` nicht filtern.
+
+    Geprueft: `py_compile` gruen, `compact_rows`, `duty_line`, `row_targets` und `ai_lines`
+    an der rekonstruierten Endstellung von g05 gegengerechnet, `s m2 ...` wird abgewiesen.
+    **Ein Rauchtest mit lebendem Gegner steht aus** (Maschine belegt durch die v28-Erzeugung)
+    und gehoert vor die naechste Partie.

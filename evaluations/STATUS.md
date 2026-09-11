@@ -46,8 +46,18 @@ Zwei Muster tragen ueber alle vier Partien: die Ziehzahl am Kuppelstapel folgt d
 PUNKTESTAND (bei Stand 0 durchsucht das Netz den Stapel -- 21 Ziehungen allein in g04 Runde 1 --,
 waehrend es in g05 nie auf 0 fiel und darum nur siebenmal zog), und das Netz fuellt lange
 Musterreihen mit Farben, die seine eigene Kuppelzeile nicht aufnehmen kann (fuenf Vorfaelle,
-in g04 zehn Steine auf einmal, volle Strafleiste). Beides sind Sonden-Kandidaten, keine
-Verdikte. Die verlorene Partie g05 ging an eigenen Strafleisten-Fehlern verloren (-32 gegen
+in g04 zehn Steine auf einmal, volle Strafleiste). Beides ist seit 2026-09-11 als Sonde
+vorregistriert: **`PREREG_corpus_behaviour_audit.md`**, drei Arme, alle aus vorhandenen
+Partielogs, kein Engine-Eingriff und keine neue Erzeugung (A Anomalie-Report mit
+Ziehungen je Platzierung bedingt auf den Punktestand und Zwangsraeumungen, B Siegquote
+nach "faellt in Runde 1 auf 0", C konditioniert der Prior ueberhaupt auf die ausliegenden
+Wertungsplatten). Die Prereg traegt damit Kanal 4 aus `PREREG_dome_stack_information_sets.md`
+par.11. **Vor dem Bau zu klaeren (ungeprueft): ob die v27/v28-Self-Plays mit `--log-games`
+laufen** -- ohne Partielogs braucht Arm A eine eigene kleine Erzeugung. Das Spiel-Werkzeug
+`tools/claude_play.py` ist im selben Zug nachgebessert (par.9 P.8-10: falsche `KI:`-Zeile
+durch die echten Engine-Logzeilen ersetzt, `m1`-`m4` abgewiesen, Pflichtzaehler und
+Reihen-Ziele in `show`, Zugliste zusammengefasst); ein Rauchtest mit lebendem Gegner steht
+aus, weil die Maschine belegt ist. Die verlorene Partie g05 ging an eigenen Strafleisten-Fehlern verloren (-32 gegen
 -8), nicht an der Endwertung (21:9 fuer Claude).
 
 ### v28: ZUSCHNITT UND KETTE (gestartet 2026-09-10, 23:49)
