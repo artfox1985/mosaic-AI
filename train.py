@@ -1394,7 +1394,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
                           policy_carriers=policy_carrier_report(_manifest_files, _SELFPLAY_FILENAME_RE))
 
     val_files = []
-    train_files = None  # None == MosaicDataset laedt wie bisher den ganzen Ordner
+    train_files = None  # wird unten IMMER gesetzt (A8: kein stiller Ordner-Glob mehr)
     if val_frac > 0 and len(all_files) >= 10:
         # MOSAIC_VAL_POOL (2026-08-25): Regex, der die KANDIDATEN fuer den
         # Val-Split einschraenkt -- alles, was NICHT matcht, geht garantiert in
@@ -1437,6 +1437,16 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
             n_val = max(1, round(len(shuffled) * val_frac))
             val_files = sorted(shuffled[:n_val])
             train_files = sorted(shuffled[n_val:])
+
+    if train_files is None:
+        # A8 (PREREG_code_cleanup_closeout.md par.3, Review 2026-09-11): ohne
+        # Val-Split galt bisher "MosaicDataset globt den ganzen Ordner", und damit
+        # fielen --file-list, MOSAIC_DATA_EXCLUDE und --train-file-limit STILL weg,
+        # waehrend das Manifest das gewollte Fenster schrieb. all_files traegt
+        # bereits alle Filter; es ist jetzt in jedem Fall das Trainingsfenster.
+        train_files = sorted(all_files)
+        print(f"📄 Kein Val-Split (val_frac={val_frac}, {len(all_files)} Dateien): "
+              f"{len(train_files)} Dateien als Trainingsfenster gesetzt, kein Ordner-Glob.", flush=True)
 
     # Daten-Skalierungs-Ablation (Task #69): Trainings-Dateien NACH dem
     # Val-Split auf train_file_limit kappen -- der Val-Split oben ist davon

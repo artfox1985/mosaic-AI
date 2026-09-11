@@ -555,3 +555,8 @@ benannten Monolithen trifft, steht im b06-Manifest (`datenaufbau_s`).
 ## par.13 VERDIKT (2026-09-05, Nutzer-Entscheid: "setz die mal auf entschieden")
 
 Alle vier Hebel sind beantwortet: (1) und (4) abgenommen mit Bit-Identitaet (par.7, par.9), (3) im Regelbetrieb der v24-Nachtkette (`tools/night_v24_chain.sh`: Monolith des Trainingsanteils 2.798 Dateien, Schluessel 976b1ef66843, Zusammenfuegen 450,4 s; Datenaufbau im Training v24-b01 35,2 s, `models/manifest_train_v24-b01_20260905_061205.json`), (2) ist als Teil A nach `PREREG_rust_data_layer.md` gewandert. Die Frage dieser Prereg ist damit geschlossen; was am Cache noch offen ist, gehoert zur Datenschicht-Prereg.
+
+**Nachtrag 2026-09-11 (Code-Review, `PREREG_code_cleanup_closeout.md` par.3 A8):** der hier
+genannte Weg `--val-frac 0` verwarf bis zum 2026-09-11 still die `--file-list` (train.py setzte
+`train_files = None`, der Datensatz globte den ganzen Ordner); seither wird das Fenster auch
+ohne Val-Split geehrt. Kein Lauf im Baum war betroffen (alle Ketten fahren 0,05).
