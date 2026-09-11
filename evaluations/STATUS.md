@@ -27,12 +27,12 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE BELEGT: v28-KETTE LAEUFT, Training `v28-b01` seit 2026-09-11, 10:04** (GPU;
-`tools/night_v28_chain.sh` als Hintergrundaufgabe dieser Sitzung). **Erzeugung FERTIG**
+**MASCHINE BELEGT: v28-KETTE LAEUFT, Schritt 6 Monolith seit 2026-09-11, 10:04, danach
+Training `v28-b01`** (`tools/night_v28_chain.sh` als Hintergrundaufgabe dieser Sitzung). **Erzeugung FERTIG**
 23:49:56 bis 09:45:31, 3 x 4.000 Partien, 1.201 Dateien, 35.726 s = 9,92 h
 (`PREREG_v28_window.md` par.10). **Tor 2a HAELT: 0,816 gegen 0,777** volle Spalten je Seite
 (n = 8.000 Seiten). Fenster 2.947 Dateien, Schluessel `2db448af20fe`, alle Bloecke unter
-INPUT_SIZE 744. Training erwartet rund 1,4 h (bis etwa 11:30). Danach Tor 1 `v28-b01` gegen
+INPUT_SIZE 744. Monolith rund 30 min, Training rund 1,4 h (Ende etwa 12:00). Danach Tor 1 `v28-b01` gegen
 `v27-b01` mit `--log-games` (zwei Seeds), dann `git stash pop` und Variante B fuer `v28-b02`.
 
 **Claude-Partien g02-g05: FERTIG (2026-09-11). Die Parallelsitzung gibt ihren Teil der
