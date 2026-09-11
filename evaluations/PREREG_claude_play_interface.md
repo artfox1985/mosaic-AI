@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen? | Beleg: g02-g05 gegen v27-b01 @400 (par.7), Claude 3:1 (55:43, 66:48, 36:28, 50:55). Zwei Muster in allen vier Partien, als Sonden vorregistriert in PREREG_corpus_behaviour_audit.md: Ziehzahl folgt dem Punktestand; lange Musterreihen werden mit Farben gefuellt, die die Kuppelzeile nicht aufnehmen kann (fuenfmal). Werkzeug 2026-09-11 nachgebessert (par.9 P.8-10). g06-g10 offen. -->
+<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen? | Beleg: g02-g05 gegen v27-b01 @400 (par.7), Claude 3:1 (55:43, 66:48, 36:28, 50:55). Zwei Muster in allen vier Partien, als Sonden vorregistriert in PREREG_corpus_behaviour_audit.md: Ziehzahl folgt dem Punktestand; lange Musterreihen werden mit Farben gefuellt, die die Kuppelzeile nicht aufnehmen kann. Werkzeug 2026-09-11 nachgebessert (par.9 P.8-10), Rauchtest offen. g06-g10 gegen v28, sobald verfuegbar (par.8.8). -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -473,6 +473,24 @@ c. Reihe 5 (6 Plaetze) wurde in Runde 1 mit einem einzelnen Schwarz belegt und b
    CLAUDE.md-Vorgabe) ueber `tools/claude_play.py`; der Koordinator startet ihn im
    CPU-freien Fenster, prueft sein Protokoll (par.4.4) nach Regel 0 und registriert
    hier. "Claude" in dieser Prereg meint ab jetzt den Subagenten.
+
+8. **Restprogramm g06-g10: gegen `v28`, sobald es steht (Nutzer 2026-09-11, woertlich:
+   "du wirst sobald v28 verfuegbar ist die restlichen spiele gegen v28 machen").** Damit ist
+   par.8.2 endgueltig ueberholt (dort stand noch `v23-b01_k3p10`): die zehn Partien der
+   Reihe laufen NICHT gegen einen festen Gegner, sondern je gegen den amtierenden Champion
+   ihrer Zeit -- g01 gegen v24-b06, g02-g05 gegen v27-b01, g06-g10 gegen v28. Eine
+   Siegquote ueber alle zehn ist damit KEINE Groesse: die Partien sind gegen verschiedene
+   Gegner gespielt und werden je Block ausgewiesen. Vergleichbar bleibt das Qualitative
+   (par.4.4) und, je Gegner getrennt, die sechs Standard-Kennzahlen.
+
+   Seitenwahl wie vorgesehen: `--claude-side 1 --first-player 0`, also Claude als
+   ZWEITSPIELER, damit die Reihe am Ende fuenf Partien je Seite hat (g01-g05 waren
+   `--claude-side 0`). Gegner ohne `--opponent`, das Werkzeug liest dann `models/champion.txt`
+   und loest die Spec ueber das eingefrorene Artefakt auf (par.9 P.6); vor dem Start ist zu
+   pruefen, dass im Manifest auch wirklich v28 und dessen Spec stehen.
+
+   **Vor g06: der ausstehende Rauchtest** (par.9 P.10) -- das Werkzeug ist seit den
+   Aenderungen vom 2026-09-11 nicht mehr gegen einen lebenden Gegner gelaufen.
 
 ## par.9 AUDIT 2026-09-10 (Nutzer-Auftrag "ueberpruefe par.7"), vor der Wiederaufnahme
 

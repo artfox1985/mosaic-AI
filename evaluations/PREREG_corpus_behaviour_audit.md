@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Beleg: Anlass sind g02-g05 (PREREG_claude_play_interface.md par.7): Ziehzahl folgt dem Punktestand (28/24/32 Ziehungen bei Stand 0, in g05 nur 7 ohne Stand 0), fuenf Zwangsraeumungen langer Musterreihen (einmal zehn Steine), Spaltenbau ohne Spaltenplatte. Drei Arme, alle aus vorhandenen Logs, kein Engine-Eingriff, keine neue Erzeugung. Nichts gemessen. -->
+<!-- STATUS: OFFEN | Frage: Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Beleg: Anlass g02-g05 (claude_play par.7). Quellenfrage GEKLAERT (par.3): Self-Plays schreiben keine Partielogs, aber jeder Record traegt `state.log` als Fenster; ueberlappend zusammengesetzt ergibt das den vollen Log, alle drei Arme sind aus dem vorhandenen Korpus messbar. Vorschau n=4: Ziehungen 4/24/5/36, Zwangsraeumungen 0/1/2/2. LAUF ERST MIT v29 (Nutzer 2026-09-11). Nichts gemessen. -->
 
 # Vorregistrierung: Verhaltens-Audit am Korpus (drei Arme aus den Claude-Partien)
 
@@ -88,9 +88,31 @@ Punktzeilen), A2 die Raeumungszeile, C das Endraster plus `scoring_tile_ids` aus
 Kopfzeile. Auswertung auf BLOCK-Ebene (Blockgroesse 5), wie fuer jede Score-Analyse in
 diesem Projekt vorgeschrieben.
 
-**UNGEPRUEFT und vor dem Bau zu klaeren:** ob die v27- und v28-Self-Plays mit `--log-games`
-gelaufen sind. Ohne Partielogs braucht Arm A eine eigene, kleine Log-Erzeugung; Arm C kaeme
-notfalls auch aus den Self-Play-Records, Arm A und B nicht.
+**GEPRUEFT 2026-09-11 -- die Quelle sind die RECORDS, nicht Partielogs.** Der Punkt war
+falsch gestellt und ist damit erledigt:
+
+- `--log-games` ist ein ARENA-Flag (`tools/paired_arena_arm_worker.py:101`, durchgereicht an
+  `net_arena_match`), kein Self-Play-Flag. `self_play.py` schreibt ueberhaupt keine
+  Partielogs (grep ueber die Datei, 2026-09-11), und `tools/night_v28_generate.sh` ruft es
+  ohne so ein Flag auf. Es gibt also keine Self-Play-Partielogs, in keiner Generation.
+- **Der Record traegt den Log aber selbst mit.** Jeder Datensatz hat `state.log`, ein
+  mitlaufendes FENSTER der letzten Zeilen (im letzten Record einer Partie rund 30 von rund
+  300). Da es je Zug einen Record gibt, ueberlappen die Fenster; wer sie ueber die Records
+  einer Partie ueberlappend zusammensetzt, bekommt den vollstaendigen Log zurueck.
+- **Die Zusammensetzung muss ueber die UEBERLAPPUNG laufen, nicht ueber eine Menge.**
+  Gemessen an `data/selfplay_v27-b01-policy_20260910_2350_g10.pkl`: 301 gegen 299, 348 gegen
+  340, 313 gegen 309, 339 gegen 333 Zeilen. Gleiche Zeilen kommen in einer Partie mehrfach
+  vor; ein `set` verliert sie.
+- **Alle drei Arme sind damit aus dem vorhandenen Korpus messbar**, ohne neue Erzeugung: die
+  Ziehzeile traegt den Punktestand mit (`📦 Netz: 1. Kachel vom Stapel gezogen (Rueckseite:
+  Special) −1 Pkt → 4 Gesamt`), die Raeumungszeile steht drin, und `state` enthaelt
+  `scoring_tile_ids`, `round`, `players` samt Punkten und das Raster.
+
+**Erste Zahlen aus der Stichprobe** (n = 4 Partien aus einer Datei, Grundmenge Partien,
+Einheit Vorfaelle je Partie -- eine Vorschau, kein Ergebnis): Stapelziehungen 4, 24, 5, 36;
+Zwangsraeumungen 0, 1, 2, 2. Die Spreizung bei den Ziehungen ist genau das Muster aus den
+Claude-Partien und der Grund, warum A1 auf den Punktestand bedingt werden muss statt zu
+mitteln (`PREREG_score_clamp_incentive.md` par.10 mittelt und kommt auf 3,1).
 
 ## par.4 Kosten
 
@@ -122,7 +144,8 @@ Leer. Nichts gemessen.
 
 ## par.8 Offene Nutzer-Entscheide
 
-1. **Reihenfolge gegen die v28-Kette:** sofort nach dem Lesen der Logs, oder erst nach Tor 1
-   von `v28-b01`?
+1. ~~Reihenfolge gegen die v28-Kette~~ **ENTSCHIEDEN (Nutzer 2026-09-11): der Lauf kommt
+   erst mit v29.** Bis dahin bleibt diese Prereg vorregistriert und ungemessen; gebaut wird
+   das Werkzeug, wenn v29 ansteht, gegen den dann vorliegenden Korpus.
 2. **Umfang von Arm C:** nur `v27-b01` (der heutige Champion) oder die Kette v25/v26/v27, um
    zu sehen, ob die Plattenblindheit ueber die Generationen zu- oder abnimmt?

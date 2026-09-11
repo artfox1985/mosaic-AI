@@ -52,13 +52,26 @@ Partielogs, kein Engine-Eingriff und keine neue Erzeugung (A Anomalie-Report mit
 Ziehungen je Platzierung bedingt auf den Punktestand und Zwangsraeumungen, B Siegquote
 nach "faellt in Runde 1 auf 0", C konditioniert der Prior ueberhaupt auf die ausliegenden
 Wertungsplatten). Die Prereg traegt damit Kanal 4 aus `PREREG_dome_stack_information_sets.md`
-par.11. **Vor dem Bau zu klaeren (ungeprueft): ob die v27/v28-Self-Plays mit `--log-games`
-laufen** -- ohne Partielogs braucht Arm A eine eigene kleine Erzeugung. Das Spiel-Werkzeug
+par.11. **Quellenfrage GEKLAERT 2026-09-11** (Prereg par.3): `--log-games` ist ein Arena-Flag,
+`self_play.py` schreibt gar keine Partielogs -- aber jeder Record traegt `state.log` als
+mitlaufendes Fenster, und ueberlappend ueber die Records einer Partie zusammengesetzt ergibt
+das den vollstaendigen Log (ueber die UEBERLAPPUNG, nicht ueber eine Menge: 301 gegen 299
+Zeilen). Alle drei Arme sind damit aus dem vorhandenen Korpus messbar, ohne neue Erzeugung.
+Vorschau aus vier Partien: Stapelziehungen 4/24/5/36, Zwangsraeumungen 0/1/2/2.
+**Der Lauf kommt erst mit v29 (Nutzer 2026-09-11);** bis dahin bleibt die Prereg
+vorregistriert und ungemessen. Das Spiel-Werkzeug
 `tools/claude_play.py` ist im selben Zug nachgebessert (par.9 P.8-10: falsche `KI:`-Zeile
 durch die echten Engine-Logzeilen ersetzt, `m1`-`m4` abgewiesen, Pflichtzaehler und
 Reihen-Ziele in `show`, Zugliste zusammengefasst); ein Rauchtest mit lebendem Gegner steht
 aus, weil die Maschine belegt ist. Die verlorene Partie g05 ging an eigenen Strafleisten-Fehlern verloren (-32 gegen
 -8), nicht an der Endwertung (21:9 fuer Claude).
+
+**Restprogramm der Reihe: g06-g10 gegen v28, sobald es steht (Nutzer 2026-09-11).** Claude
+spielt dort als ZWEITSPIELER (`--claude-side 1 --first-player 0`), damit die Reihe fuenf
+Partien je Seite hat. Die zehn Partien laufen damit gegen drei verschiedene Champions
+(g01 v24-b06, g02-g05 v27-b01, g06-g10 v28) -- eine Siegquote ueber alle zehn ist keine
+Groesse, ausgewiesen wird je Block (`PREREG_claude_play_interface.md` par.8.8). **Vor g06
+faellt der Rauchtest des geaenderten Werkzeugs an** (par.9 P.10).
 
 ### v28: ZUSCHNITT UND KETTE (gestartet 2026-09-10, 23:49)
 
