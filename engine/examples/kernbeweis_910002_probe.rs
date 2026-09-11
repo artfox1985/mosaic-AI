@@ -91,6 +91,10 @@ fn main() {
         envelope_flush_w: 0.0,
         envelope_hull_form: 1,
         special_row6_w: 0.0,
+        // par.12c: beide Zell-Knoepfe aus -- diese Sonde ist ein
+        // Byte-Identitaets-Nachweis (siehe Kommentar oben).
+        dead_cell_w: 0.0,
+        out_wild_w: 0.0,
     };
     let actions = drafting_actions(&state1);
     println!(

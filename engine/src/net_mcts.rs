@@ -455,6 +455,23 @@ pub struct SearchConfig {
     /// wirksam; `0.0` = aus, bitidentisch. Spec-Pflichtfeld je Seite
     /// (`special_row6_w`), Env-Default `MOSAIC_SPECIAL_ROW6_W`.
     pub special_row6_w: f64,
+    /// K3-D (`PREREG_geometric_envelope.md` par.8.9b Baustein 2 / par.12c,
+    /// gebaut 2026-09-11): `dead_cell_w`, Gewicht des Abzugs je TOTER
+    /// Huellenzelle -- eine Zelle der bestpassenden Huelle, die laut
+    /// `column_build::cell_is_completable` nicht mehr erfuellbar ist, zaehlt
+    /// `-dead_cell_w * (r + 1) / Gesamtkosten` (56 bzw. 62,
+    /// `envelope::dead_hull_mass_in`). Wirkt in ALLEN Projektions-Modi;
+    /// `0.0` = aus, bitidentisch. Spec-Feld je Seite (`dead_cell_w`,
+    /// OPTIONAL mit Default 0), Env-Default `MOSAIC_DEAD_CELL_W`.
+    pub dead_cell_w: f64,
+    /// Jokerfeld-Regel (par.12c, gebaut 2026-09-11): `out_wild_w`, Anteil
+    /// des Aussen-Abzugs, der fuer Zellen AUSSERHALB der Huelle ENTFAELLT,
+    /// die zu einer bereits gelegten Kuppelplatte gehoeren
+    /// (`envelope::outside_wild_mass_in`). `0.0` = voller Abzug wie bisher
+    /// (bitidentisch), `1.0` = kein Abzug fuer solche Zellen. Wirkt in ALLEN
+    /// Projektions-Modi. Spec-Feld je Seite (`out_wild_w`, OPTIONAL mit
+    /// Default 0), Env-Default `MOSAIC_OUT_WILD_W`.
+    pub out_wild_w: f64,
 }
 
 impl SearchConfig {
@@ -490,6 +507,8 @@ impl SearchConfig {
             envelope_flush_w: crate::envelope::flush_weight(),
             envelope_hull_form: crate::envelope::hull_form(),
             special_row6_w: crate::envelope::special_row6_weight(),
+            dead_cell_w: crate::envelope::dead_cell_weight(),
+            out_wild_w: crate::envelope::out_wild_weight(),
         }
     }
 
@@ -521,6 +540,8 @@ impl SearchConfig {
             "envelope_flush_w",
             "envelope_hull_form",
             "special_row6_w",
+            "dead_cell_w",
+            "out_wild_w",
             "heuristik_variante",
         ];
         for key in obj.keys() {
@@ -601,6 +622,36 @@ impl SearchConfig {
                 "Spec-Datei {path}: 'special_row6_w' muss >= 0 sein, ist {special_row6_w}"
             ));
         }
+        // K3-D und Jokerfeld-Regel (PREREG_geometric_envelope.md par.12c):
+        // die beiden EINZIGEN Spec-Felder mit Default -- sie sind OPTIONAL,
+        // wo alle Felder darueber PFLICHT sind. Der Grund ist nicht Bequem-
+        // lichkeit, sondern die Richtung der Vertragsbindung: die Pflicht
+        // sichert, dass eine Spec das Suchverhalten vollstaendig festlegt;
+        // ein fehlendes Pflichtfeld ist deshalb ein harter Fehler, weil man
+        // dem alten Artefakt sonst still ein neues Verhalten unterschoebe.
+        // Genau das kann hier NICHT passieren: der Default ist 0, und bei 0
+        // wird der Zweig in `envelope::search_shift_state` gar nicht
+        // betreten -- die Spec ohne diese Felder beschreibt bitgenau das
+        // Verhalten, das sie schon immer beschrieben hat. Die Alternative
+        // (Pflicht) haette die eingefrorenen Artefakte
+        // (`models/frozen_champions/*/spec.json`,
+        // `models/frozen_heuristics/*/spec.json`) und die lebenden
+        // `models/*.spec.json` auf DIESEM Wheel unlesbar gemacht, obwohl sie
+        // inhaltlich vollstaendig sind. Wird einer der beiden Knoepfe je
+        // Rezeptbestandteil, wandert er per `tools/spec_add_field.py` in die
+        // lebenden Specs und kann dann auf Pflicht hochgestuft werden.
+        let get_optional_non_negative = |name: &str, default: f64| -> Result<f64, String> {
+            let Some(v) = obj.get(name) else { return Ok(default) };
+            let v = v
+                .as_f64()
+                .ok_or_else(|| format!("Spec-Datei {path}: '{name}' ist keine Zahl"))?;
+            if !(v >= 0.0) {
+                return Err(format!("Spec-Datei {path}: '{name}' muss >= 0 sein, ist {v}"));
+            }
+            Ok(v)
+        };
+        let dead_cell_w = get_optional_non_negative("dead_cell_w", 0.0)?;
+        let out_wild_w = get_optional_non_negative("out_wild_w", 0.0)?;
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -673,6 +724,8 @@ impl SearchConfig {
             envelope_flush_w,
             envelope_hull_form,
             special_row6_w,
+            dead_cell_w,
+            out_wild_w,
         })
     }
 }
@@ -2286,7 +2339,10 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
                 // 2 = plus zweite Zelle der Zeile 6. Ein ungueltiger Wert kann hier
                 // nicht ankommen (Spec-Parser und Env-Getter pruefen), der Fallback
                 // ist das Dreieck. K5 (special_tile_yield par.9): `special_row6_w`,
-                // bei 0 wird der Zweig uebersprungen.
+                // bei 0 wird der Zweig uebersprungen. Zell-Knoepfe par.12c
+                // (`dead_cell_w` K3-D, `out_wild_w` Jokerfeld-Regel): sind
+                // BEIDE 0, wird ihr Zweig in `search_shift_state` gar nicht
+                // betreten -- bitidentisch.
                 let hull_form = crate::envelope::HullForm::from_u8(search_config.envelope_hull_form)
                     .unwrap_or(crate::envelope::HullForm::Triangle);
                 let shift = crate::envelope::search_shift_state(
@@ -2295,6 +2351,8 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
                     search_config.envelope_flush_w,
                     search_config.special_row6_w,
                     hull_form,
+                    search_config.dead_cell_w,
+                    search_config.out_wild_w,
                 );
                 today_value[0] = (today_value[0] + shift).clamp(0.0, 1.0);
                 today_value[1] = (today_value[1] - shift).clamp(0.0, 1.0);
@@ -6455,6 +6513,8 @@ mod tests {
             envelope_flush_w: 0.0,
             envelope_hull_form: 1,
             special_row6_w: 0.0,
+            dead_cell_w: 0.0,
+            out_wild_w: 0.0,
         }
     }
 
@@ -6698,6 +6758,39 @@ mod tests {
         std::fs::write(&path, spec(", \"special_row6_w\": 0.5")).unwrap();
         let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("0,5 ist gueltig");
         assert_eq!(cfg.special_row6_w, 0.5);
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// par.12c: `dead_cell_w` und `out_wild_w` sind die beiden OPTIONALEN
+    /// Spec-Felder -- fehlen sie, laedt die Spec mit Default 0 (so tragen die
+    /// eingefrorenen Artefakte und die lebenden `models/*.spec.json` sie
+    /// nicht, und der Such-Term ueberspringt ihren Zweig). Stehen sie drin,
+    /// kommen sie unveraendert an; negativ ist ein Fehler.
+    #[test]
+    fn search_config_from_spec_file_takes_cell_knobs_as_optional_fields() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_cellknobs_{}.json", std::process::id()));
+        let spec = |extra: &str| {
+            format!(
+                r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 1, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0{extra}, "heuristik_variante": "hv1"}}"#
+            )
+        };
+        // Beide Felder fehlen: laedt, beide 0 (Bestandsverhalten).
+        std::fs::write(&path, spec("")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect("Spec ohne die beiden Zell-Knoepfe muss weiter laden");
+        assert_eq!((cfg.dead_cell_w, cfg.out_wild_w), (0.0, 0.0));
+        // Beide gesetzt: kommen unveraendert an.
+        std::fs::write(&path, spec(", \"dead_cell_w\": 1.0, \"out_wild_w\": 0.5")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltige Werte");
+        assert_eq!((cfg.dead_cell_w, cfg.out_wild_w), (1.0, 0.5));
+        // Negativ ist ein Fehler, je Feld.
+        for bad in ["dead_cell_w", "out_wild_w"] {
+            std::fs::write(&path, spec(format!(", \"{bad}\": -0.25").as_str())).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("negatives Gewicht muss scheitern");
+            assert!(msg.contains(bad), "{msg}");
+        }
         std::fs::remove_file(&path).ok();
     }
 

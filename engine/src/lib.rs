@@ -758,6 +758,10 @@ fn engine_config_json() -> String {
         // K5 (PREREG_special_tile_yield.md par.9): Gewicht der Regel "eine
         // Spezialfliese in Reihe 6" in der K3-P-Projektion.
         "special_row6_w": crate::net_mcts::SearchConfig::from_env().special_row6_w,
+        // par.12c: K3-D (tote Huellenzellen) und die Jokerfeld-Regel (Zellen
+        // ausserhalb der Huelle auf bereits gelegten Kuppelplatten).
+        "dead_cell_w": crate::net_mcts::SearchConfig::from_env().dead_cell_w,
+        "out_wild_w": crate::net_mcts::SearchConfig::from_env().out_wild_w,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,

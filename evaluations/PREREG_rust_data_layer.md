@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes Rohformat (Teil B)? | Beleg: TEIL A GEBAUT UND TOR BESTANDEN 2026-09-11 (par.7): Rust-Bauer bit-identisch zum Python-Zwilling auf 733 Spiel- und 300 Korpuszustaenden (Flachvektor 755 UND Planes, np.array_equal), Anker-Drift gruen; Blockbau fuer v28-b02 laeuft ueber MOSAIC_FEATURES_FROM_RUST=1. TEIL B ohne Ausloeser (Datenaufbau 33,5 s von 5.157 s beim v28-b01-Training). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes Rohformat (Teil B)? | Beleg: TEIL A GEBAUT, TOR BESTANDEN und im Betrieb bewaehrt (par.7/par.8): Rust-Bauer bit-identisch zum Python-Zwilling (1.033 Zustaende), Blockbau des v28-Fensters in 26 min, Arm v28-b02 damit trainiert. TEIL B ohne Ausloeser (Datenaufbau 34 s von 5.262 s). -->
 
 # Vorregistrierung: Datenschicht in Rust (Merkmalsbauer und Rohformat)
 
@@ -210,3 +210,14 @@ Umstellung des Blockbaus auf den Rust-Bauer freigegeben; die v28-b02-Kette
 (`tools/night_v28_b02.sh`) setzt `MOSAIC_FEATURES_FROM_RUST=1`. Der Python-Zwilling bleibt als
 Test-Orakel im Baum. Verdikt fuer Teil A folgt mit dem b02-Training (Blockbau-Laufzeit gegen
 den Python-Pfad als Nebenbefund); Teil B bleibt ohne Ausloeser.
+
+## par.8 VERDIKT TEIL A (2026-09-11): ENTSCHIEDEN, Bauweg bewaehrt
+
+Der Rust-Merkmalsbauer hat den Blockbau des v28-Fensters unter dem 755er-Schluessel getragen
+(2.947 Bloecke in 26 min, 6 Worker, `docs/measured_runtimes.md`), das Paritaetstor war
+bit-identisch (par.7), der Arm v28-b02 wurde damit trainiert und gemessen (Nullbefund in der
+Arena, `PREREG_v28_window.md` par.10; das ist ein Befund ueber das MERKMAL, nicht ueber den
+Bauweg). Erfolgsmass laut par.5 sind Irrtumskosten, nicht Elo: jede weitere Merkmalserweiterung
+wird einmal in `features.rs` gebaut und ueber das Paritaetstor freigegeben; der Python-Zwilling
+bleibt Test-Orakel. Teil B (Rohformat aus Rust) bleibt ohne Ausloeser (Datenaufbau 34 s von
+5.262 s beim v28-b02-Training). Kopf auf ENTSCHIEDEN.

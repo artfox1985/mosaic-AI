@@ -342,14 +342,22 @@ pub fn envelope_score_frac(occ: &[[f64; 6]; 6]) -> f64 {
     envelope_score_frac_in(occ, HullForm::Triangle)
 }
 
-/// Wie [`envelope_score_frac`], in der gewaehlten Huellenform (Normierung
-/// [`hull_total_cost`]).
-pub fn envelope_score_frac_in(occ: &[[f64; 6]; 6], form: HullForm) -> f64 {
-    let hull = if deviation_frac_in(occ, Hull::Left, form) <= deviation_frac_in(occ, Hull::Right, form) {
+/// Bestpassende Orientierung fuer eine GEBROCHENE Belegung: kleinere
+/// `deviation_frac`, bei Gleichstand LINKS -- genau die Wahl, die
+/// [`envelope_score_frac_in`] intern trifft. Eigene Funktion, seit die
+/// Zell-Knoepfe par.12c wissen muessen, WELCHE Orientierung bewertet wurde.
+pub fn best_hull_frac_in(occ: &[[f64; 6]; 6], form: HullForm) -> Hull {
+    if deviation_frac_in(occ, Hull::Left, form) <= deviation_frac_in(occ, Hull::Right, form) {
         Hull::Left
     } else {
         Hull::Right
-    };
+    }
+}
+
+/// Wie [`envelope_score_frac`], in der gewaehlten Huellenform (Normierung
+/// [`hull_total_cost`]).
+pub fn envelope_score_frac_in(occ: &[[f64; 6]; 6], form: HullForm) -> f64 {
+    let hull = best_hull_frac_in(occ, form);
     let (mut inside, mut outside) = (0.0, 0.0);
     for (r, row) in occ.iter().enumerate() {
         for (c, &v) in row.iter().enumerate() {
@@ -869,6 +877,13 @@ pub fn envelope_score_ownership(logits_half: &[f32]) -> Option<f64> {
 /// Wie [`envelope_score_ownership`], in der gewaehlten Huellenform (die Form
 /// steckt in der H-Rechnung `envelope_score_frac_in`, nicht in den Logits).
 pub fn envelope_score_ownership_in(logits_half: &[f32], form: HullForm) -> Option<f64> {
+    Some(envelope_score_frac_in(&ownership_occupancy(logits_half)?, form))
+}
+
+/// Gebrochene Belegung aus 36 Feld-Logits (Sigmoid je Zelle) -- der erste
+/// Schritt von [`envelope_score_ownership_in`], eigene Funktion seit den
+/// Zell-Knoepfen par.12c (sie brauchen die Belegung, nicht nur ihren Wert).
+pub fn ownership_occupancy(logits_half: &[f32]) -> Option<[[f64; 6]; 6]> {
     if logits_half.len() < 36 {
         return None;
     }
@@ -879,32 +894,325 @@ pub fn envelope_score_ownership_in(logits_half: &[f32], form: HullForm) -> Optio
             occ[r][c] = 1.0 / (1.0 + (-z).exp());
         }
     }
-    Some(envelope_score_frac_in(&occ, form))
+    Some(occ)
 }
 
-/// Such-Term (e) im gewaehlten Projektions-Modus (`projection_mode`), aus
-/// Sicht von Spieler 0. `ownership` sind die rohen Kopf-Logits des Mover-
-/// Passes (`[0:36]` ego = `state.current_player`, `[36:72]` der andere);
-/// im Modus 3 ohne Kopf: 0 (einmalige Warnung).
-/// `hull_form` ist die Huellenform der Seite (par.8.15 Teil B, Spec-Feld
-/// `envelope_hull_form`); bei [`HullForm::Triangle`] laufen exakt die
-/// Bestandsrechnungen (bitidentisch).
-/// `row6_w` ist der K5-Knopf (par.9, Spec-Feld `special_row6_w`); bei 0 wird
-/// sein Zweig komplett uebersprungen.
-pub fn search_shift_state(
+// ── par.12c K3-D und die Jokerfeld-Regel ─────────────────────────────────────
+// Zwei ZELL-Knoepfe (`PREREG_geometric_envelope.md` par.12c, eingetaktet
+// 2026-09-11 als v28-Schritt 8). Beide sind ADDITIVE Korrekturen auf `H` EINER
+// Orientierung und wirken damit in ALLEN Projektions-Modi, die H aus einer
+// Belegung rechnen; beide haben Default 0, und bei 0 wird ihr Zweig in
+// [`search_shift_state`] gar nicht erst betreten (bitidentisch zum Bestand).
+//
+// K3-D "tote Huellenzellen" (par.8.9b Baustein 2): eine Zelle der
+// bestpassenden Huelle, die nicht mehr erfuellbar ist, zaehlt
+// `-dead_cell_w * (r + 1) / Gesamtkosten(form)` (56 bzw. 62). "Nicht mehr
+// erfuellbar" ist das Vorrats-Praedikat `column_build::cell_is_completable`:
+// die Kuppelplatte liegt, fordert eine Farbe, und Musterreihe plus
+// Restvorrat reichen fuer die `r + 1` Fliesen nicht mehr. Bestraft nur
+// ZERSTOERUNG, belohnt keine Optionalitaet -- der Konstruktionsfehler von
+// K3-R (par.8.9b: das Beginnen langer Reihen wurde bestraft) kann so nicht
+// wiederkommen, denn leere, noch vollendbare Zellen bekommen NICHTS.
+//
+// Jokerfeld-Regel (Anlass: Nutzerfrage 2026-09-11 zur Platte "Mehrfarbige
+// Felder", 2 Punkte je Jokerfeld nur bei Vollbelegung): eine Zelle AUSSERHALB
+// der Huelle, die zu einer BEREITS GELEGTEN Kuppelplatte gehoert, zaehlt im
+// Abzug "Steine ausserhalb" nur noch mit `(1 - out_wild_w)`; bei 1 ist sie
+// abzugsfrei. Umgesetzt als Gutschrift `+ out_wild_w * v * (r + 1) /
+// Gesamtkosten`, also genau der fehlende Anteil des Abzugs. "Gehoert zu einer
+// gelegten Platte" ist `DomeGrid::get_space(r, c).is_some()`: die vier
+// 2x2-Zellen eines Slots existieren genau dann, wenn dort eine Platte liegt
+// (`board.rs`, `get_space` ueber `dome_slots[sr][sc].as_ref()`).
+//
+// GRENZE, ausdruecklich und am Code geprueft: Masse AUSSERHALB der Huelle
+// liegt in jeder Projektion auf Zellen mit gelegter Platte -- ein Stein
+// braucht eine Platte (`DomeGrid::place_tile`), die Musterreihen-Projektion
+// legt nur auf annehmende Zellen (`get_space(..).accepts`), und die
+// Platzhalter-Regel K3-P2 legt ausschliesslich INNERHALB der Huelle ab.
+// `out_wild_w = 1` schaltet den Aussen-Abzug damit praktisch ganz ab; der
+// Knopf ist eine Dosis zwischen "voller Abzug" (0, Bestand) und "kein Abzug
+// fuer Zellen gelegter Platten" (1), kein Filter auf Jokerplatten.
+
+/// `dead_cell_w` (par.12c, K3-D): Env-DEFAULT der `SearchConfig`
+/// (`MOSAIC_DEAD_CELL_W`, Default 0 = aus, bitidentisch). Spec-Feld je Seite
+/// (`dead_cell_w`, OPTIONAL mit Default 0 -- die eingefrorenen Artefakte
+/// tragen es nicht); dieser Getter dient `from_env` und `engine_config`.
+pub fn dead_cell_weight() -> f64 {
+    crate::net_mcts::read_f64_env("MOSAIC_DEAD_CELL_W", 0.0)
+}
+
+/// `out_wild_w` (par.12c, Jokerfeld-Regel): Env-DEFAULT der `SearchConfig`
+/// (`MOSAIC_OUT_WILD_W`, Default 0 = aus, bitidentisch). Spec-Feld je Seite
+/// (`out_wild_w`, OPTIONAL mit Default 0); dieser Getter dient `from_env`
+/// und `engine_config`.
+pub fn out_wild_weight() -> f64 {
+    crate::net_mcts::read_f64_env("MOSAIC_OUT_WILD_W", 0.0)
+}
+
+/// Restvorrat-Platzhalter fuer [`CellKnobs::OFF`] -- wird nie gelesen, weil
+/// `dead_cell_w == 0` den K3-D-Zweig ueberspringt.
+static NO_REMAINING: [i64; 5] = [0; 5];
+
+/// Die beiden Zell-Knoepfe par.12c EINER Seite, plus der Restvorrat je Farbe
+/// (`provocation::remaining_colors`), den K3-D fuer die Vollendbarkeit
+/// braucht.
+#[derive(Debug, Clone, Copy)]
+pub struct CellKnobs<'a> {
+    /// Gewicht des Abzugs je toter Huellenzelle (0 = aus).
+    pub dead_cell_w: f64,
+    /// Anteil des Aussen-Abzugs, der fuer Zellen gelegter Platten ENTFAELLT
+    /// (0 = Bestand, 1 = kein Abzug fuer solche Zellen).
+    pub out_wild_w: f64,
+    /// Restvorrat je Farbe, Reihenfolge `provocation::color_index`.
+    pub remaining: &'a [i64; 5],
+}
+
+impl CellKnobs<'_> {
+    /// Beide Knoepfe aus: der Bestandspfad. ACHTUNG, `remaining` ist hier ein
+    /// Nullvektor -- `OFF` taugt nur fuer Modi, die den Restvorrat nicht
+    /// selbst lesen (Modus 2 tut es). Der Such-Term betritt den Zweig ohnehin
+    /// nur mit gesetzten Gewichten und echtem Restvorrat.
+    pub const OFF: CellKnobs<'static> =
+        CellKnobs { dead_cell_w: 0.0, out_wild_w: 0.0, remaining: &NO_REMAINING };
+
+    #[inline]
+    pub fn is_off(&self) -> bool {
+        self.dead_cell_w == 0.0 && self.out_wild_w == 0.0
+    }
+}
+
+/// K3-D (par.12c): kosten-gewichtete Masse der TOTEN Huellenzellen einer
+/// Orientierung, normiert mit [`hull_total_cost`]. Tot heisst
+/// `column_build::cell_is_completable == false`; belegte Zellen und Zellen
+/// ohne gelegte Platte sind per Definition dieses Praedikats NICHT tot.
+pub fn dead_hull_mass_in(
+    board: &PlayerBoard,
+    remaining: &[i64; 5],
+    hull: Hull,
+    form: HullForm,
+) -> f64 {
+    let mut mass = 0.0;
+    for r in 0..6 {
+        for c in 0..6 {
+            if hull.contains_in(form, r, c)
+                && !crate::column_build::cell_is_completable(board, r, c, remaining)
+            {
+                mass += row_cost(r);
+            }
+        }
+    }
+    mass / hull_total_cost(form)
+}
+
+/// Jokerfeld-Regel (par.12c): kosten-gewichtete Masse der Belegung
+/// AUSSERHALB der Huelle, die auf einer bereits gelegten Kuppelplatte liegt
+/// (`get_space(..).is_some()`), normiert mit [`hull_total_cost`] -- genau
+/// der Teil des Aussen-Abzugs, den `out_wild_w` zurueckgibt.
+pub fn outside_wild_mass_in(
+    occ: &[[f64; 6]; 6],
+    board: &PlayerBoard,
+    hull: Hull,
+    form: HullForm,
+) -> f64 {
+    let mut mass = 0.0;
+    for (r, row) in occ.iter().enumerate() {
+        for (c, &v) in row.iter().enumerate() {
+            // Nur JOKERFELDER (SpaceType::Wild) auf gelegten Platten: die
+            // Platte "Mehrfarbige Felder" zahlt nur bei Vollbelegung ALLER
+            // Jokerfelder, und eine Jokerplatte am Huellenrand hat Zellen
+            // ausserhalb. Ein Normal- oder Spezialfeld ausserhalb bleibt voller
+            // Abzug (Nutzer-Frage 2026-09-11; erste Fassung nahm jede gelegte
+            // Platte und damit JEDEN Aussenstein, weil ein Stein immer auf einer
+            // Platte liegt -- das waere nur eine Dosis auf den Aussen-Abzug).
+            if v > 0.0
+                && !hull.contains_in(form, r, c)
+                && board
+                    .dome_grid
+                    .get_space(r, c)
+                    .map_or(false, |sp| sp.space_type == crate::dome::SpaceType::Wild)
+            {
+                mass += v * row_cost(r);
+            }
+        }
+    }
+    mass / hull_total_cost(form)
+}
+
+/// Summe beider Korrekturen par.12c fuer EINE Orientierung und EINE fertige
+/// Belegung: `- dead_cell_w * tote Masse + out_wild_w * Aussen-Masse auf
+/// Jokerfeldern gelegter Platten`. Bei `dead_cell_w == 0` bzw. `out_wild_w == 0` wird
+/// der jeweilige Summand gar nicht gerechnet.
+pub fn cell_knob_shift_in(
+    board: &PlayerBoard,
+    occ: &[[f64; 6]; 6],
+    hull: Hull,
+    form: HullForm,
+    knobs: CellKnobs,
+) -> f64 {
+    let mut shift = 0.0;
+    if knobs.dead_cell_w != 0.0 {
+        shift -= knobs.dead_cell_w * dead_hull_mass_in(board, knobs.remaining, hull, form);
+    }
+    if knobs.out_wild_w != 0.0 {
+        shift += knobs.out_wild_w * outside_wild_mass_in(occ, board, hull, form);
+    }
+    shift
+}
+
+/// Bool-Belegung als gebrochene Belegung (1,0 / 0,0) -- der Raster-Modus 0
+/// rechnet auf `[[bool; 6]; 6]`, die Korrekturen par.12c auf `[[f64; 6]; 6]`.
+pub fn frac_occupancy(occ: &[[bool; 6]; 6]) -> [[f64; 6]; 6] {
+    let mut out = [[0.0f64; 6]; 6];
+    for r in 0..6 {
+        for c in 0..6 {
+            if occ[r][c] {
+                out[r][c] = 1.0;
+            }
+        }
+    }
+    out
+}
+
+/// `H` EINES Bretts im Such-Modus `mode` MIT den Korrekturen par.12c
+/// (Modus 3 laeuft ueber [`ownership_score_with_cells`], weil seine Belegung
+/// aus dem Kopf kommt und nicht aus dem Brett).
+///
+/// Bauregel: die Korrektur greift dort an, wo der Bestandspfad die
+/// Orientierung WAEHLT. Wo das Maximum ueber beide Orientierungen
+/// entscheidet (K3-R, K3-P2, K3-F), steht sie INNERHALB des Maximums -- eine
+/// Huelle mit toten Zellen soll auch als Alternative schlechter dastehen; wo
+/// die Orientierung nach `deviation` faellt (Modus 0 und 1), wird sie auf
+/// genau diese Orientierung gerechnet. Die Wahl selbst bleibt unveraendert:
+/// `deviation` ist ungewichtet und kennt weder tote Zellen noch Platten.
+fn envelope_score_mode_with_cells(
+    board: &PlayerBoard,
+    mode: u8,
+    flush_w: f64,
+    row6_w: f64,
+    form: HullForm,
+    knobs: CellKnobs,
+) -> f64 {
+    match mode {
+        // K3-F (par.8.14), ggf. mit K5 auf derselben Belegung.
+        1 | 4 if flush_w > 0.0 => {
+            let ws = if mode == 4 { slot_weight() } else { 0.0 };
+            let mut best = f64::NEG_INFINITY;
+            for hull in [Hull::Left, Hull::Right] {
+                let (occ, bonus, _) =
+                    projected_occupancy_flush_in(board, hull, mode, ws, flush_w, row6_w, form);
+                best = best.max(
+                    envelope_score_frac_for_in(&occ, hull, form)
+                        + bonus
+                        + cell_knob_shift_in(board, &occ, hull, form, knobs),
+                );
+            }
+            best
+        }
+        // K5 ohne K3-F (par.9): Orientierungswahl wie im Bestandspfad
+        // (`envelope_score_row6_in`).
+        1 | 4 if row6_w > 0.0 => {
+            if mode == 4 {
+                let ws = slot_weight();
+                let mut best = f64::NEG_INFINITY;
+                for hull in [Hull::Left, Hull::Right] {
+                    let (mut occ, _) = projected_occupancy_slot_in(board, hull, ws, form);
+                    apply_row6_special_in(board, &mut occ, hull, form, row6_w);
+                    let chosen = best_hull_frac_in(&occ, form);
+                    best = best.max(
+                        envelope_score_frac_in(&occ, form)
+                            + cell_knob_shift_in(board, &occ, chosen, form, knobs),
+                    );
+                }
+                return best;
+            }
+            let mut occ = projected_occupancy(board);
+            let hull = best_hull_frac_in(&occ, form);
+            apply_row6_special_in(board, &mut occ, hull, form, row6_w);
+            envelope_score_frac_for_in(&occ, hull, form)
+                + cell_knob_shift_in(board, &occ, hull, form, knobs)
+        }
+        // K3-P (par.8.7).
+        1 => {
+            let occ = projected_occupancy(board);
+            let hull = best_hull_frac_in(&occ, form);
+            envelope_score_frac_in(&occ, form) + cell_knob_shift_in(board, &occ, hull, form, knobs)
+        }
+        // K3-R (par.8.9), Aufbau Zelle fuer Zelle wie `envelope_score_reach_in`.
+        2 => {
+            let base = projected_occupancy(board);
+            let w_r = reach_weight();
+            let mut best = f64::NEG_INFINITY;
+            for hull in [Hull::Left, Hull::Right] {
+                let mut occ = base;
+                for r in 0..6 {
+                    for c in 0..6 {
+                        if hull.contains_in(form, r, c)
+                            && occ[r][c] == 0.0
+                            && crate::column_build::cell_is_completable(board, r, c, knobs.remaining)
+                        {
+                            occ[r][c] = w_r;
+                        }
+                    }
+                }
+                best = best.max(
+                    envelope_score_frac_for_in(&occ, hull, form)
+                        + cell_knob_shift_in(board, &occ, hull, form, knobs),
+                );
+            }
+            best
+        }
+        // K3-P2 (par.8.9b Baustein 1).
+        4 => {
+            let ws = slot_weight();
+            let mut best = f64::NEG_INFINITY;
+            for hull in [Hull::Left, Hull::Right] {
+                let (occ, _) = projected_occupancy_slot_in(board, hull, ws, form);
+                let chosen = best_hull_frac_in(&occ, form);
+                best = best.max(
+                    envelope_score_frac_in(&occ, form)
+                        + cell_knob_shift_in(board, &occ, chosen, form, knobs),
+                );
+            }
+            best
+        }
+        // Raster (par.8.1).
+        _ => {
+            let occ_bool = occupancy(board);
+            let hull = best_hull_in(&occ_bool, form);
+            envelope_score_of_in(&occ_bool, form)
+                + cell_knob_shift_in(board, &frac_occupancy(&occ_bool), hull, form, knobs)
+        }
+    }
+}
+
+/// `H_own` (Modus 3) MIT den Korrekturen par.12c: die Belegung kommt aus den
+/// 36 Feld-Logits der Seite, die toten Zellen und die gelegten Platten aus
+/// IHREM Brett. `None`, wenn die Haelfte fehlt (wie
+/// [`envelope_score_ownership_in`]).
+fn ownership_score_with_cells(
+    board: &PlayerBoard,
+    logits_half: &[f32],
+    form: HullForm,
+    knobs: CellKnobs,
+) -> Option<f64> {
+    let occ = ownership_occupancy(logits_half)?;
+    let hull = best_hull_frac_in(&occ, form);
+    Some(envelope_score_frac_in(&occ, form) + cell_knob_shift_in(board, &occ, hull, form, knobs))
+}
+
+/// `(H0, H1)` im Modus `mode` -- der BESTANDSPFAD, unveraendert seit par.9.
+/// `None` heisst "Modus 3 ohne Ownership-Kopf": der Aufrufer gibt 0 zurueck.
+fn mode_scores(
     state: &crate::state::GameState,
-    c_hull: f64,
-    profile: &[f64; 5],
     ownership: &[f32],
     mode: u8,
     flush_w: f64,
     row6_w: f64,
-    hull_form: HullForm,
-) -> f64 {
+    f: HullForm,
+) -> Option<(f64, f64)> {
     let b0 = &state.players[0];
     let b1 = &state.players[1];
-    let f = hull_form;
-    let (h0, h1) = match mode {
+    Some(match mode {
         // par.8.14 K3-F: nur in den Musterreihen-Modi 1 und 4 und nur bei w_flush > 0;
         // bei 0 laufen exakt die Bestandspfade darunter (bitidentisch). K5 (par.9)
         // wirkt in denselben Modi und faehrt hier auf DERSELBEN Belegung mit --
@@ -936,11 +1244,8 @@ pub fn search_shift_state(
         }
         3 => {
             if ownership.len() < 72 {
-                static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
-                WARNED.get_or_init(|| {
-                    eprintln!("⚠️  MOSAIC_ENVELOPE_PROJECTED=3, aber das Netz hat keinen Ownership-Kopf -- Term aus.");
-                });
-                return 0.0;
+                warn_missing_ownership_head();
+                return None;
             }
             let ego = envelope_score_ownership_in(&ownership[0..36], f).unwrap_or(0.0);
             let other = envelope_score_ownership_in(&ownership[36..72], f).unwrap_or(0.0);
@@ -951,7 +1256,89 @@ pub fn search_shift_state(
             (envelope_score_projected_slot_in(b0, w, f), envelope_score_projected_slot_in(b1, w, f))
         }
         _ => (envelope_score_in(b0, f), envelope_score_in(b1, f)),
+    })
+}
+
+/// Einmalige Warnung, wenn Modus 3 ohne Ownership-Kopf gefahren wird --
+/// geteilt vom Bestands- und vom par.12c-Pfad, damit sie EINMAL erscheint.
+fn warn_missing_ownership_head() {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    WARNED.get_or_init(|| {
+        eprintln!("⚠️  MOSAIC_ENVELOPE_PROJECTED=3, aber das Netz hat keinen Ownership-Kopf -- Term aus.");
+    });
+}
+
+/// `(H0, H1)` im Modus `mode` MIT den Zell-Knoepfen par.12c. Wird nur
+/// gerufen, wenn mindestens einer der beiden Knoepfe gesetzt ist.
+fn mode_scores_with_cells(
+    state: &crate::state::GameState,
+    ownership: &[f32],
+    mode: u8,
+    flush_w: f64,
+    row6_w: f64,
+    f: HullForm,
+    knobs: CellKnobs,
+) -> Option<(f64, f64)> {
+    let b0 = &state.players[0];
+    let b1 = &state.players[1];
+    if mode == 3 {
+        if ownership.len() < 72 {
+            warn_missing_ownership_head();
+            return None;
+        }
+        // Haelften wie im Bestandspfad: `[0:36]` ist der Zug-Spieler.
+        let (half0, half1) = if state.current_player == 0 {
+            (&ownership[0..36], &ownership[36..72])
+        } else {
+            (&ownership[36..72], &ownership[0..36])
+        };
+        return Some((
+            ownership_score_with_cells(b0, half0, f, knobs).unwrap_or(0.0),
+            ownership_score_with_cells(b1, half1, f, knobs).unwrap_or(0.0),
+        ));
+    }
+    Some((
+        envelope_score_mode_with_cells(b0, mode, flush_w, row6_w, f, knobs),
+        envelope_score_mode_with_cells(b1, mode, flush_w, row6_w, f, knobs),
+    ))
+}
+
+/// Such-Term (e) im gewaehlten Projektions-Modus (`projection_mode`), aus
+/// Sicht von Spieler 0. `ownership` sind die rohen Kopf-Logits des Mover-
+/// Passes (`[0:36]` ego = `state.current_player`, `[36:72]` der andere);
+/// im Modus 3 ohne Kopf: 0 (einmalige Warnung).
+/// `hull_form` ist die Huellenform der Seite (par.8.15 Teil B, Spec-Feld
+/// `envelope_hull_form`); bei [`HullForm::Triangle`] laufen exakt die
+/// Bestandsrechnungen (bitidentisch).
+/// `row6_w` ist der K5-Knopf (par.9, Spec-Feld `special_row6_w`); bei 0 wird
+/// sein Zweig komplett uebersprungen.
+/// `dead_cell_w` (K3-D) und `out_wild_w` (Jokerfeld-Regel) sind die
+/// Zell-Knoepfe par.12c; sind BEIDE 0, wird ihr Zweig gar nicht betreten und
+/// es laeuft exakt [`mode_scores`] -- bitidentisch zum Bestand.
+#[allow(clippy::too_many_arguments)]
+pub fn search_shift_state(
+    state: &crate::state::GameState,
+    c_hull: f64,
+    profile: &[f64; 5],
+    ownership: &[f32],
+    mode: u8,
+    flush_w: f64,
+    row6_w: f64,
+    hull_form: HullForm,
+    dead_cell_w: f64,
+    out_wild_w: f64,
+) -> f64 {
+    let f = hull_form;
+    let scores = if dead_cell_w == 0.0 && out_wild_w == 0.0 {
+        mode_scores(state, ownership, mode, flush_w, row6_w, f)
+    } else {
+        // Der Restvorrat wird EINMAL je Blattwert gerechnet (K3-D braucht ihn
+        // fuer jede Zelle, K3-R ohnehin).
+        let remaining = crate::provocation::remaining_colors(state);
+        let knobs = CellKnobs { dead_cell_w, out_wild_w, remaining: &remaining };
+        mode_scores_with_cells(state, ownership, mode, flush_w, row6_w, f, knobs)
     };
+    let Some((h0, h1)) = scores else { return 0.0 };
     let phi = profile_weight(profile, state.round_number) * (h0 - h1);
     c_hull * phi.tanh()
 }
@@ -1645,5 +2032,196 @@ mod tests {
         let h = envelope_score_row6_in(&board, 1, 0.0, w, HullForm::Row6Pair);
         let expected = (6.0 * w + 5.0 * (1.0 + w)) / 62.0;
         assert!((h - expected).abs() < 1e-12, "{h} statt {expected}");
+    }
+
+    // ── par.12c K3-D und Jokerfeld-Regel ────────────────────────────────────
+
+    /// Die drei Bretter des Paritaetstests gegen die Python-Sonde (A, B, C),
+    /// als Testvorrat fuer die par.12c-Tests.
+    fn parity_boards() -> [PlayerBoard; 3] {
+        let full_left: Vec<(usize, usize)> = (0..6)
+            .flat_map(|r| (0..6).map(move |c| (r, c)))
+            .filter(|&(r, c)| r + c <= 5)
+            .collect();
+        [
+            board_with(&[(0, 0), (0, 1), (1, 0), (2, 0), (1, 1), (5, 5)]),
+            board_with(&[(0, 5), (1, 5), (0, 4), (2, 5), (3, 5), (4, 5), (5, 5), (0, 0)]),
+            board_with(&full_left),
+        ]
+    }
+
+    /// par.12c, Bitidentitaet: mit beiden Zell-Knoepfen auf 0 liefert der
+    /// neue Pfad in JEDEM Modus EXAKT (`assert_eq` auf f64) die Zahl des
+    /// Bestandspfads -- geprueft an den drei Paritaets-Brettern, in beiden
+    /// Huellenformen, mit und ohne K3-F und K5. Im Betrieb wird der Zweig bei
+    /// 0 gar nicht erst betreten (`search_shift_state`); dieser Test sichert,
+    /// dass die Modus-Verteilung darin trotzdem dieselbe ist.
+    #[test]
+    fn cell_knobs_are_bit_identical_at_weight_zero() {
+        let remaining = [10i64; 5];
+        let off = CellKnobs { dead_cell_w: 0.0, out_wild_w: 0.0, remaining: &remaining };
+        let ws = slot_weight();
+        let wr = reach_weight();
+        for board in &parity_boards() {
+            for form in [HullForm::Triangle, HullForm::Row6Pair] {
+                assert_eq!(
+                    envelope_score_mode_with_cells(board, 0, 0.0, 0.0, form, off),
+                    envelope_score_in(board, form),
+                    "Modus 0 (Raster)"
+                );
+                assert_eq!(
+                    envelope_score_mode_with_cells(board, 1, 0.0, 0.0, form, off),
+                    envelope_score_projected_in(board, form),
+                    "Modus 1 (K3-P)"
+                );
+                assert_eq!(
+                    envelope_score_mode_with_cells(board, 2, 0.0, 0.0, form, off),
+                    envelope_score_reach_in(board, &remaining, wr, form),
+                    "Modus 2 (K3-R)"
+                );
+                assert_eq!(
+                    envelope_score_mode_with_cells(board, 4, 0.0, 0.0, form, off),
+                    envelope_score_projected_slot_in(board, ws, form),
+                    "Modus 4 (K3-P2)"
+                );
+                assert_eq!(
+                    envelope_score_mode_with_cells(board, 1, 1.0, 0.0, form, off),
+                    envelope_score_flush_in(board, 1, 0.0, 1.0, 0.0, form),
+                    "K3-F, Modus 1"
+                );
+                assert_eq!(
+                    envelope_score_mode_with_cells(board, 4, 1.0, 0.0, form, off),
+                    envelope_score_flush_in(board, 4, ws, 1.0, 0.0, form),
+                    "K3-F, Modus 4"
+                );
+                assert_eq!(
+                    envelope_score_mode_with_cells(board, 1, 0.0, 0.5, form, off),
+                    envelope_score_row6_in(board, 1, 0.0, 0.5, form),
+                    "K5, Modus 1"
+                );
+                assert_eq!(
+                    envelope_score_mode_with_cells(board, 4, 0.0, 0.5, form, off),
+                    envelope_score_row6_in(board, 4, ws, 0.5, form),
+                    "K5, Modus 4"
+                );
+                for hull in [Hull::Left, Hull::Right] {
+                    assert_eq!(
+                        cell_knob_shift_in(board, &projected_occupancy(board), hull, form, off),
+                        0.0
+                    );
+                }
+            }
+        }
+        assert!(CellKnobs::OFF.is_off());
+        assert!(!CellKnobs { dead_cell_w: 1.0, ..CellKnobs::OFF }.is_off());
+        assert!(!CellKnobs { out_wild_w: 1.0, ..CellKnobs::OFF }.is_off());
+    }
+
+    /// par.12c K3-D: (2,0) verlangt Rot, Musterreihe 3 ist leer und der
+    /// Restvorrat Rot ist aufgebraucht -- die Zelle ist tot
+    /// (`column_build::cell_is_completable == false`). Sie liegt NUR in der
+    /// linken Huelle, und auf dem leeren Brett ist LINKS die bestpassende
+    /// (Gleichstand). Der Abzug ist genau `dead_cell_w * (r + 1) /
+    /// Gesamtkosten`, also 3/56 bzw. 3/62.
+    #[test]
+    fn dead_hull_cells_cost_exactly_their_row_cost_share() {
+        let mut board = board_with(&[]);
+        {
+            let sp = board.dome_grid.get_space_mut(2, 0).expect("Rasterzelle existiert");
+            sp.space_type = SpaceType::Normal;
+            sp.required_color = Some(crate::tile::TileColor::Rot);
+        }
+        let empty = [0i64; 5];
+        let plenty = [10i64; 5];
+        assert!(!crate::column_build::cell_is_completable(&board, 2, 0, &empty));
+        assert!(crate::column_build::cell_is_completable(&board, 2, 0, &plenty));
+        assert_eq!(best_hull_in(&occupancy(&board), HullForm::Triangle), Hull::Left);
+        assert!(
+            (dead_hull_mass_in(&board, &empty, Hull::Left, HullForm::Triangle) - 3.0 / 56.0).abs()
+                < 1e-12
+        );
+        assert_eq!(
+            dead_hull_mass_in(&board, &empty, Hull::Right, HullForm::Triangle),
+            0.0,
+            "(2,0) liegt nicht in der rechten Huelle"
+        );
+        for (form, cost) in [(HullForm::Triangle, 56.0), (HullForm::Row6Pair, 62.0)] {
+            let dead = CellKnobs { dead_cell_w: 1.0, out_wild_w: 0.0, remaining: &empty };
+            let base = envelope_score_in(&board, form);
+            assert_eq!(base, 0.0, "leeres Brett");
+            let h = envelope_score_mode_with_cells(&board, 0, 0.0, 0.0, form, dead);
+            assert!((h - (base - 3.0 / cost)).abs() < 1e-12, "{h}");
+            let half = CellKnobs { dead_cell_w: 0.5, ..dead };
+            let h_half = envelope_score_mode_with_cells(&board, 0, 0.0, 0.0, form, half);
+            assert!((h_half - (base - 1.5 / cost)).abs() < 1e-12, "{h_half}");
+            let alive = CellKnobs { dead_cell_w: 1.0, out_wild_w: 0.0, remaining: &plenty };
+            assert_eq!(
+                envelope_score_mode_with_cells(&board, 0, 0.0, 0.0, form, alive),
+                base,
+                "noch vollendbar: kein Abzug"
+            );
+            // K3-P (Modus 1) traegt denselben Abzug -- die Regel haengt am
+            // Brett, nicht an der Projektion.
+            let p = envelope_score_mode_with_cells(&board, 1, 0.0, 0.0, form, dead);
+            assert!(
+                (p - (envelope_score_projected_in(&board, form) - 3.0 / cost)).abs() < 1e-12,
+                "{p}"
+            );
+        }
+    }
+
+    /// par.12c Jokerfeld-Regel: Brett A des Paritaetstests hat innen 9 und
+    /// aussen 6 Kostenpunkte ((5,5), Zellenkosten 6, auf einer gelegten
+    /// Platte). `out_wild_w` gibt genau diesen Abzug anteilig zurueck:
+    /// 3/56 (0, Bestand), 6/56 (0,5), 9/56 (1, abzugsfrei).
+    #[test]
+    fn outside_wild_cells_lose_their_deduction() {
+        let boards = parity_boards();
+        let board = &boards[0];
+        let remaining = [10i64; 5];
+        let occ = frac_occupancy(&occupancy(board));
+        assert_eq!(best_hull_in(&occupancy(board), HullForm::Triangle), Hull::Left);
+        assert!(
+            (outside_wild_mass_in(&occ, board, Hull::Left, HullForm::Triangle) - 6.0 / 56.0)
+                .abs()
+                < 1e-12
+        );
+        assert!((envelope_score_in(board, HullForm::Triangle) - 3.0 / 56.0).abs() < 1e-12);
+        for (w, want) in [(0.0, 3.0), (0.5, 6.0), (1.0, 9.0)] {
+            let knobs = CellKnobs { dead_cell_w: 0.0, out_wild_w: w, remaining: &remaining };
+            let h = envelope_score_mode_with_cells(board, 0, 0.0, 0.0, HullForm::Triangle, knobs);
+            assert!((h - want / 56.0).abs() < 1e-12, "out_wild_w = {w}: {h}");
+        }
+        // K3-P (Modus 1) liest dieselbe Regel: die Projektion traegt die
+        // belegten Zellen mit 1,0.
+        let full = CellKnobs { dead_cell_w: 0.0, out_wild_w: 1.0, remaining: &remaining };
+        let h = envelope_score_mode_with_cells(board, 1, 0.0, 0.0, HullForm::Triangle, full);
+        assert!((h - 9.0 / 56.0).abs() < 1e-12, "{h}");
+        // Gegenprobe zum Praedikat: liegt im Slot KEINE Platte, gibt es
+        // nichts gutzuschreiben. Im Spiel unerreichbar (ein Stein braucht
+        // eine Platte), aber es ist die Bedingung, die die Funktion prueft.
+        let mut tileless = board_with(&[]);
+        let _tile = tileless.dome_grid.dome_slots[2][2]
+            .take()
+            .expect("Testgitter hat alle neun Platten");
+        let mut synthetic = [[0.0f64; 6]; 6];
+        synthetic[5][5] = 1.0;
+        assert_eq!(
+            outside_wild_mass_in(&synthetic, &tileless, Hull::Left, HullForm::Triangle),
+            0.0
+        );
+        // Und ein NORMALFELD ausserhalb bekommt keinen Nachlass: die Regel gilt
+        // nur fuer Jokerfelder.
+        let mut normal_board = board_with(&[(5, 5)]);
+        {
+            let sp = normal_board.dome_grid.get_space_mut(5, 5).expect("Zelle");
+            sp.space_type = SpaceType::Normal;
+            sp.required_color = Some(crate::tile::TileColor::Rot);
+        }
+        let occ_n = frac_occupancy(&occupancy(&normal_board));
+        assert_eq!(
+            outside_wild_mass_in(&occ_n, &normal_board, Hull::Left, HullForm::Triangle),
+            0.0
+        );
     }
 }

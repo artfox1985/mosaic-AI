@@ -214,6 +214,11 @@ _SPEC_TO_ENV = {
     "envelope_flush_w": "MOSAIC_ENVELOPE_FLUSH_W",
     "envelope_hull_form": "MOSAIC_ENVELOPE_HULL_FORM",
     "special_row6_w": "MOSAIC_SPECIAL_ROW6_W",
+    # par.12c (2026-09-11): beide Spec-Felder sind OPTIONAL (Default 0). Die
+    # Schleife unten ueberspringt fehlende Felder, aeltere Specs bleiben also
+    # unveraendert -- und eine Spec, die sie traegt, wirkt auch in der GUI.
+    "dead_cell_w": "MOSAIC_DEAD_CELL_W",
+    "out_wild_w": "MOSAIC_OUT_WILD_W",
 }
 
 
