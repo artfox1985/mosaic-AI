@@ -2382,3 +2382,19 @@ in CPU-freien Fenstern (kein Bau, keine Messung neben einer Arena):
 4. **Verdikt** nach par.12: alle drei Bedingungen erfuellt -> ENTSCHIEDEN; sonst bleibt die
    Prereg OFFEN mit K3-P und Huellenform 2 als Rezeptbestandteil, und die gemessenen Zahlen
    stehen hier. Kosten: Bau rund 2 h plus 1 h, Messungen rund 2 h CPU (ANNAHMEN).
+
+**Baustand 2026-09-11, 20:20 (par.12c Punkt 1 GEBAUT):** `engine/src/envelope.rs` Abschnitt
+par.12c: `dead_hull_mass_in` (tote Huellenzellen ueber `column_build::cell_is_completable`,
+`column_build.rs:563`), `outside_wild_mass_in` (nur JOKERFELDER, `SpaceType::Wild`, gelegter
+Platten ausserhalb der Huelle; die erste Fassung des Agenten nahm jede gelegte Platte und damit
+jeden Aussenstein, weil ein Stein immer auf einer Platte liegt, und wurde vor dem Kompilieren
+eingeengt), `cell_knob_shift_in`, `mode_scores_with_cells` fuer alle Projektionsmodi;
+`search_shift_state` um `dead_cell_w`, `out_wild_w` erweitert; SearchConfig-Felder OPTIONAL mit
+Default 0 (die eingefrorenen Artefakt-Specs tragen sie nicht und laden weiter), Env
+`MOSAIC_DEAD_CELL_W` / `MOSAIC_OUT_WILD_W`, Registratur, `docs/knobs.md`, `server.py` und
+`tools/claude_play.py` Spec-Abbildung. Tiling-Seite bewusst nicht angefasst (`tiling_solver.rs`
+liest schon die Huellenform nicht; Praezedenz). Tests: Bit-Identitaet bei 0 an den drei
+Paritaets-Brettern in beiden Huellenformen, Abzug genau (r+1)/Gesamtkosten, Jokerfeld-Nachlass
+nur fuer Wild-Zellen; 576 Engine-Tests gruen, Wheel gebaut und installiert, Netz-Paritaets-
+Fixture unveraendert, Anker-Drift GRUEN (`anchor_drift_live_wheel_20260911_k3d.json`).
+Messungen (Punkte 2 und 3) folgen nach der Ablations-Kette.

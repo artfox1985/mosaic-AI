@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: Erzeugung GEFAHREN (par.10, 9,9 h). TOR 2a HAELT 0,816 gegen 0,777. v28-b01 trainiert (brierbest Epoche 3). TOR 1 BESTANDEN: v28-b01 gegen v27-b01 166:124 (SPRT nach 145 Paaren, p 0,015) und 221:179 (Deckel, p 0,053, KI der Paardifferenz [+0,01; +0,41]); Elo 1447 [1395; 1499]. TOR 2b HAELT: 1,030 gegen 0,884 volle Spalten je Seite (n = 396). Offen: b02 (Variante B, par.9), Ablationen, Sonde, Kante, round_estimate (par.8). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: Erzeugung GEFAHREN (par.10, 9,9 h), TOR 2a HAELT 0,816 gegen 0,777. b01: TOR 1 BESTANDEN gegen v27-b01 (166:124 SPRT, 221:179), Elo 1447, TOR 2b HAELT (1,030 gegen 0,884). b02 (Variante B, elf Stapelmerkmale): NULLBEFUND gegen b01 (207:193, 209:191, beide Deckel), Blockziehungen unveraendert; b01 bleibt bester Stand. Offen: Ablationen b03/b04 (Kette laeuft), Sonde, Kante, round_estimate, Einhuellende Schritt 8 (par.8). -->
 
 # PREREG v28: Fensterzuschnitt und der erste Plan nach dem Einfrieren
 
@@ -261,8 +261,50 @@ lief um Epoche 6/7 daneben), restic-Marke `run:v28-b02`. `_brierbest` ist **Epoc
 (val_brier 0,1802), `_best` Epoche 1, Plateau ab Epoche 10; ONNX `alphazero_v28-b02_brierbest.onnx`
 mit `flat_input=755`. Die Epochenkurve liegt auf der von b01 (Brier 0,1809/0,1804/0,1802 gegen
 0,1810/0,1805/0,1802 in den Epochen 1-3): die elf Merkmale bewegen die Offline-Metrik nicht
-messbar, die Arena entscheidet. Tor 1 b02 gegen b01 laeuft seit 16:52 (Seed 20261038, danach
-20261039).
+messbar, die Arena entscheidet. Tor 1 b02 gegen b01 lief 16:52-19:44 (Seeds 20261038/39); Ergebnis in par.10.
+
+**TOR 1 v28-b02 gegen v28-b01: NULLBEFUND (16:52-19:44, beide Seiten Champion-Spec, @400,
+Blockgroesse 5, 10 Threads, `--log-games`):**
+
+| Seed | Ergebnis | Paare | McNemar p | gepaarte Differenz [95 %-KI] | Punkte | Strafleiste | Dauer |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20261038 | 207:193, Deckel ohne SPRT-Entscheid (LLR -1,936) | 200 | 0,5203 | +0,07 [-0,11; +0,25] | 52,3 gegen 52,0 | 8,66 gegen 8,47 | 5.563 s |
+| 20261039 | 209:191, Deckel ohne SPRT-Entscheid (LLR -1,788) | 200 | 0,4168 | +0,09 [-0,10; +0,28] | 51,9 gegen 51,7 | 8,94 gegen 8,69 | 4.773 s |
+
+Gepoolt 416:384 = 52,0 Prozent, kein Seed mit Entscheid, beide Intervalle der Paardifferenz
+schliessen die Null ein. Elo-Register: v28-b02 1461 [1403; 1521] gegen v28-b01 1447 [1395; 1500],
+ueberlappend. **Die elf Kuppelstapel-Merkmale bewegen die Staerke nicht messbar.** Nach der
+Regel aus par.6 bleibt v28-b01 der beste Stand; Generator-Kandidat fuer v29 ist v28-b01
+(`PREREG_v29_window.md` par.3, Fall "b02 faellt"), vorbehaltlich der Ablationen.
+
+**Diagnostik (par.6, vorregistriert), `dome_stack_known_block_draw_probe.py` auf beiden Logs
+(397 Partien je Seite und Seed, Einheit Ziehungen in den EIGENEN bekannten Block bei positivem
+Stand = `n_eigener_block` minus `n_eigener_block_bei_stand_0`):**
+
+| Seed | v28-b01 | v28-b02 |
+| --- | --- | --- |
+| 20261038 | 211 (0,53 je Partie) | 227 (0,57) |
+| 20261039 | 217 (0,55) | 250 (0,63) |
+
+b02 zieht bei positivem Stand eher HAEUFIGER in den eigenen Block, nicht seltener, bei gleicher
+Staerke. Nach der vorab registrierten Lesart traegt das Merkmal damit nicht: der Value-Kopf
+bewertet die bekannten Ziehungen mit dem Merkmal nicht erkennbar anders. Ziehungen gesamt je
+Partie 7,6 gegen 7,6 (s38) und 7,7 gegen 7,5 (s39), Ziehungen bei Stand 0 unveraendert
+(1.380/1.411 und 1.321/1.274). Artefakte `dome_stack_known_block_draws_b02_vs_b01_s38/s39.json`.
+
+**Tor 2b und Plattenpunkte (Standard-Kennzahlen):** volle Spalten je Seite 0,970 gegen 0,990
+(s38) und 1,025 gegen 0,932 (s39), beide innerhalb der Intervalle; Punkte +0,33 [-1,60; +2,26]
+und +0,20 [-1,79; +2,19]; kein Kriterium gepaart signifikant (Eckplatten +0,69 [-0,06; +1,45],
+Spezialfelder -0,58 [-1,45; +0,28] in s38). Artefakte `arena_columns_v28-b02_vs_v28-b01_s38/s39.json`,
+`plate_points_v28b02_vs_v28b01.json`.
+
+**Was das fuer die Preregs heisst:** `dome_stack_information_sets` par.15f Variante B: gebaut,
+gemessen, KEIN Staerkeeffekt, Ziehsucht (par.8 dort) nicht behoben; `stack_top_feature`: Merkmale
+der Sicht-Achse kommen in der Arena nicht an, die Sicht-Reststufen werden nicht gebaut;
+`rust_data_layer` Teil A: Bauweg bewaehrt (Blockbau 2.947 Bloecke in 26 min ueber den Rust-Bauer,
+Paritaet bitidentisch), Verdikt ENTSCHIEDEN als Infrastruktur, unabhaengig vom Nullbefund des
+Arms. Die Kanaele bleiben aus Kompatibilitaet im Vektor (Modellbreite 755 fuer alle v28-Arme).
+
 
 ## par.10 ERGEBNISSE DER GENERATION (fortlaufend)
 

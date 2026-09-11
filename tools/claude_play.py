@@ -83,6 +83,9 @@ SPEC_TO_ENV = {
     "envelope_flush_w": "MOSAIC_ENVELOPE_FLUSH_W",
     "envelope_hull_form": "MOSAIC_ENVELOPE_HULL_FORM",
     "special_row6_w": "MOSAIC_SPECIAL_ROW6_W",
+    # par.12c (2026-09-11), OPTIONALE Spec-Felder mit Default 0.
+    "dead_cell_w": "MOSAIC_DEAD_CELL_W",
+    "out_wild_w": "MOSAIC_OUT_WILD_W",
 }
 
 

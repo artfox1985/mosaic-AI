@@ -358,3 +358,13 @@ Aufrufe von `features_for_net(` in `engine/src/net_mcts.rs` und 7 in
 `engine/src/self_play.rs`. Der Engpass-Charakter (eine Funktion) haelt, die Zahl und
 der Ort nicht. Zeilendrift im Altbestand (par.3/4/6) ist gross, ein Dutzend Zeiger; die
 Substanz der Aussagen wurde am Code bestaetigt, die Zeilen nicht nachgezogen.
+
+## Nachtrag 2026-09-11, 20:15: Sicht-Merkmale kommen in der Arena nicht an
+
+Der erste Arm mit reinen Sicht-Merkmalen nach v24-b04, `v28-b02` (elf Kuppelstapel-Werte,
+`PREREG_dome_stack_information_sets.md` par.15h), ist gegen `v28-b01` ein Nullbefund (207:193,
+209:191, beide Deckel). Damit ist die Frage aus `PREREG_v28_window.md` par.7 Punkt 1 beantwortet:
+Merkmale der Sicht-Achse allein bewegen die Staerke nicht messbar. Die Sicht-Reststufen
+(par.10 P.3 laufende Ziehserie, P.7 Phasenaufloesung) werden NICHT gebaut (Nutzer-Zuschnitt v29,
+`PREREG_v29_window.md` par.6). Das Kriterium dieser Prereg (Sichtgleichheit) bleibt davon
+unberuehrt; offen bleiben par.11 (was WEISS die Suche) und par.12 (Verwerfungs-Ausgang).

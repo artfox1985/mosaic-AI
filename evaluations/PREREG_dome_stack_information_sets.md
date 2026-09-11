@@ -777,3 +777,18 @@ Zwei Punkte aus par.15f sind seither weitergezogen, standen aber nur in anderen 
    Registriert in `PREREG_v28_window.md` par.9; Training `v28-b02` durch (ebd. par.9, Nachtrag
    14:37-16:52; Offline-Metrik unbewegt, Brier-Kurve auf der von b01), Tor 1 b02 gegen b01 seit
    16:52 in Messung. Die Sonde aus par.15e auf einem A/B-Lauf B gegen A (par.15f) steht noch aus.
+
+## par.15h VARIANTE B GEMESSEN (2026-09-11, 16:52-19:44): NULLBEFUND
+
+Arm `v28-b02` (elf Merkmale 744..754 aus `dome_pool_view`, Rezept sonst wie `v28-b01`, Warmstart
+mit null-initialisierten Spalten, Training in `PREREG_v28_window.md` par.9) gegen `v28-b01` im
+gepaarten Gating: 207:193 und 209:191, beide Seeds am Deckel ohne SPRT-Entscheid, McNemar p 0,52
+und 0,42, Elo 1461 [1403; 1521] gegen 1447 [1395; 1500]. Die vorregistrierte Diagnostik (par.15f:
+Ziehungen in den eigenen bekannten Block bei positivem Stand) zeigt b02 mit 0,57 und 0,63 je
+Partie gegen 0,53 und 0,55 bei b01, also eher mehr, bei gleicher Staerke. Lesart nach par.15f:
+das Merkmal traegt nicht messbar; ob der Value-Kopf die bekannten Ziehungen richtig bewertet,
+bleibt offen, und par.8 (Ziehsucht) ist durch Variante B NICHT behoben. Variante A bleibt der
+Korrektheitsfix; die Kanaele bleiben aus Kompatibilitaet im Vektor. Naechste Adresse fuer die
+Ziehsucht: die Stopp-Regel und die Peek-Bewertung (`PREREG_stack_draw_reservation_rule.md`
+par.7, `PREREG_chance_nodes.md` Teil B1, v29-Begleitprogramm) und die Ziehsucht-Sonde
+(`PREREG_claude_play_interface.md` par.9). Zahlen: `PREREG_v28_window.md` par.10.

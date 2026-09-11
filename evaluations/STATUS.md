@@ -27,11 +27,14 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE BELEGT: TOR 1 v28-b02 gegen v28-b01 seit 2026-09-11, 16:52 (Kette
-`tools/night_v28_b02.sh`, Seeds 20261038/39 nacheinander, je rund 86 min, mit Logs; Ende etwa
-20:00). Training `v28-b02` DURCH 16:52: brierbest Epoche 6 (val_brier 0,1802, Kurve deckungsgleich
-mit b01), 5.262 s gebremst, `run:v28-b02` gesichert; Bloecke 755 in 26 min ueber den Rust-Bauer
-(`PREREG_v28_window.md` par.9).** Vorher 14:37-14:47: Baum auf INPUT_SIZE 755 (Stash
+**MASCHINE BELEGT: ABLATIONS-KETTE `tools/night_v28_ablations.sh` (b03 ohne Ausflug-Klasse, b04
+ohne G-2, je Training plus Tor 1 gegen b02 mit zwei Seeds), gestartet 2026-09-11 abends, Ende
+etwa 8 h spaeter.** Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
+1461 gegen 1447 ueberlappend; Blockziehungen bei positivem Stand eher mehr, nicht weniger;
+`PREREG_v28_window.md` par.10, `dome_stack` par.15h). b01 bleibt bester Stand und
+Generator-Kandidat fuer v29. **K3-D plus Jokerfeld-Knopf GEBAUT** (`dead_cell_w`,
+`out_wild_w`, Default 0 bitidentisch; 576 Tests gruen, Wheel installiert, Anker-Drift gruen,
+`geometric_envelope` par.12c), Messungen C2 und A1/A2 folgen nach den Ablationen. Vorher 14:37-14:47: Baum auf INPUT_SIZE 755 (Stash
 eingespielt), Wheel gebaut und installiert, Anker-Drift GRUEN, Paritaetstor Rust/Python
 BESTANDEN (`PREREG_rust_data_layer.md` par.7). Der Baum ist damit auf Variante B; das
 Tor-1-Instrument kuerzt 744er-Modelle auf Modellbreite (`net.rs:421`).
@@ -168,7 +171,7 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 
 | Strang | Prereg | Stand 2026-09-10 |
 | --- | --- | --- |
-| Kuppelstapel-Informationsmengen | `dome_stack_information_sets` par.15-15g | Variante A GEBAUT und gemessen: A/B 165:135 ohne Ruecklauf, Fix bleibt; Diagnostik auf 300 Partien: Ziehungen in den eigenen Block STEIGEN (+0,69 je Partie), meist gratis bei Stand 0; par.8-Erwartung nicht eingetreten, Diagnostik neu gefasst (Ziehungen bei positivem Stand). Naechster Hebel Variante B = v28-b02 |
+| Kuppelstapel-Informationsmengen | `dome_stack_information_sets` par.15-15h (Variante B: Nullbefund) | Variante A GEBAUT und gemessen: A/B 165:135 ohne Ruecklauf, Fix bleibt; Diagnostik auf 300 Partien: Ziehungen in den eigenen Block STEIGEN (+0,69 je Partie), meist gratis bei Stand 0; par.8-Erwartung nicht eingetreten, Diagnostik neu gefasst (Ziehungen bei positivem Stand). Naechster Hebel Variante B = v28-b02 |
 | Null-Klammer | `score_clamp_incentive` | ENTSCHIEDEN: Regel bleibt (Stufe 0: 39 % der Partien auf 0, geschluckte Strafe Median 0, 3,1 Gratis-Ziehungen je Partie und Seite) |
 | Startpositions-Seeding / Ausflug | `start_position_seeding` | ENTSCHIEDEN: Dubletten-Fix gebaut (par.9l); Folgearme brauchen eigene Registrierung |
 | Sicht-Reststufen | `stack_top_feature` par.10/11/12 | offen; Merkmale erst nach v28-b02, weil sie Records brauchen |
