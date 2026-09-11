@@ -276,4 +276,19 @@ Nachbardatei neu gebaut, je auf 744 Spalten und gleiche Zeilenzahl geprueft, per
 eingesetzt (112 s); Gesamtscan danach 3.203 Bloecke x 744, keine Abweichung. Dauerhaft:
 Formen-Waechter in `build_cache_parallel.merge` (bricht VOR dem Schreiben ab), Kette stoppt bei
 Merge-Fehler (`tools/night_v28_chain_resume.sh`). Rezept unveraendert, Seed 20260937, Fenster
-und Schluessel identisch. Training `v28-b01` laeuft ab etwa 10:30 (Ergebnis folgt hier).
+und Schluessel identisch. Monolith 1.102.756.306 Byte, Merge 10:20-10:29 mit Formen-Waechter.
+
+**Training v28-b01 DURCH (10:29:07-11:55:09, Exit 0):** Rezept fest (Warmstart
+`v27-b01_brierbest`, 12 Epochen, lr 5e-05 cosine, lambda 0,7, Seed 20260937), Manifest
+`models/manifest_train_v28-b01_20260911_102910.json`: Laufzeit 5.156,6 s (Datenaufbau 33,5 s,
+4.431.025 Zustaende, 17.308 Batches je Epoche), restic-Marke `run:v28-b01`. `_brierbest` ist
+**Epoche 3** (val_brier 0,1802, Val-Pool `^selfplay_v27-`), `_best` nach val_combined Epoche 1,
+Plateau ab Epoche 10, Policy-Val 0,39 am Ende. ONNX `models/alphazero_v28-b01_brierbest.onnx`
+(flat_input 744). Wie bei v27 (Epoche 3) liegt der Bestpunkt frueh; die Brier-Werte sind
+ueber die Arme nicht vergleichbar (anderer Val-Pool), die Entscheidung faellt in Tor 1.
+
+**Tor 1 (gestartet 2026-09-11, 12:05; `tools/night_v28_tor1.sh`):** v28-b01 gegen v27-b01 aus
+dem eingefrorenen Artefakt, beide Seiten Champion-Spec `frozen_champions/v27-b01/spec.json`,
+@400, Blockgroesse 5, 10 Threads, `--log-games`, Deckel 200 Paare, Seeds 20261036 und
+20261037 nacheinander. Regel wie v27 (par.9 dort): kein dritter Seed, wenn beide Seeds fuer
+b01 liegen und kein Nullentscheid faellt. Ergebnis folgt hier.

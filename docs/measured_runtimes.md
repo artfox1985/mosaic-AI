@@ -167,6 +167,8 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | **zusammen** | **35.726,1 s = 9,92 h** | 3 % schneller als v27 (36.911,5 s). Die v26-Zahl (30.076,8 s) ist KEINE Referenz derselben Maschine: Teile der v26-Erzeugung liefen ausgelagert (Nutzer 2026-09-11); die "Verlangsamung" seit v27 ist damit kein Befund. Planungsgroesse fuer diese Maschine: rund 10 h |
 | Tor 2a ex post (`corpus_sanity_check.py`, 4.000 Partien) | 270,7 s | 1 Thread |
 | Kette Schritte 2-6 (Manifest, G-2, Fenster, Monolith-Schluessel) | 5 s | Bloecke lagen bereits (Waechter); der erste Merge starb an 24 Bloecken mit 755 Spalten (PREREG_v28_window.md par.10), Neubau der 24 Bloecke 112 s |
+| Monolith-Merge 2.800 Bloecke, 1,10 GB | 531 s = 9 min | Wiederaufnahme 10:20:16-10:29:07, mit Formen-Waechter |
+| **Training v28-b01**, 12 Epochen, Fenster 2.947 Dateien, 4,43 M Zustaende | **5.156,6 s = 1,43 h** | Datenaufbau 33,5 s, fast-loader, cuda; v27: 5.116,7 s |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 
