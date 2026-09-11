@@ -202,6 +202,9 @@ Index: `PREREG_INDEX.md` (generiert).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
+0. ~~Name des Schlussmodells~~ ENTSCHIEDEN 2026-09-11: **Tessa** (Umsetzung mit Stufe 3 des
+   Code-Abschlusses, `PREREG_code_cleanup_closeout.md` par.5a).
+
 1. ~~Start der v28-Erzeugung~~ gestartet 2026-09-10, 23:49.
 2. ~~Bau von Variante B~~ ENTSCHIEDEN 2026-09-11, 00:10: elf Werte plus Rust-Merkmalsexport
    (`PREREG_v28_window.md` par.8); Bau laeuft (Agent), danach Wheel und Paritaetstor.

@@ -129,6 +129,20 @@ widersprechenden Kommentare (A13: `ROUND5_ENDSCORING_ENABLED`, `NET_TILING_TIEBR
 `provocation.rs:459-464`, Jokerfeld-Kommentare in `envelope.rs`); `docs/knobs.md` generieren;
 Abschlusskapitel in `docs/architecture_reference.md` "Stand beim Projektende".
 
+## par.5a NAME DES SCHLUSSMODELLS: "Tessa" (Nutzer-Entscheid 2026-09-11, 23:45)
+
+Der Champion am Projektende heisst nach aussen **Tessa** (Tessera: der einzelne Mosaikstein;
+Nutzer: "tessa passt, so machen wir das"). Umsetzung mit Stufe 3, NACH der letzten Promotion:
+
+1. Manifestfeld `display_name: "Tessa"` im eingefrorenen Artefakt des Schlusschampions
+   (`models/frozen_champions/<name>/manifest.json`); der Generationsname (z.B. `v29-b01`) bleibt
+   der technische Name in Register, Preregs und Dateinamen, damit Elo-Kanten eindeutig bleiben.
+2. GUI: Anzeige "Tessa" statt "KI" als Spielername im Spielfeld und im Log-Kopf
+   (`server.py` Spielernamen, `static/js/app.js`); die Log-Auswertung (`analyze_game_log.py`)
+   muss den Namen als KI-Seite erkennen (heute haengt sie an "KI", Pruefstelle beim Bau).
+3. README "Current Status": Name und Generationsname nebeneinander; Schwierigkeitsleiter
+   (`PREREG_difficulty_levels.md`): Stufe "Meister" = Tessa.
+
 ## par.6 Nutzer-Entscheide
 
 1. ~~A10 Kontrakt-Hash erweitern~~ ENTSCHIEDEN 2026-09-11 (Nutzer: "ja, nimm A4 und A10 mit
