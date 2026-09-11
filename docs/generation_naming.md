@@ -145,3 +145,12 @@ Trainingsarme: **`v28-b01`** (Rezept unveraendert, Warmstart `v27-b01_brierbest`
 und **`v28-b02`** (Variante B: Merkmale aus dem Record-Feld `dome_pool_view`, sonst wie b01,
 gleicher Seed). Weitere Arme ab `v28-b03` nur mit eigener Registrierung. Kein Knopf-Suffix
 im Namen (Regel oben).
+
+## v29 (reserviert 2026-09-11, vor dem Generationswechsel)
+
+Self-Play-Klassen nach dem Generator, der erst mit der v28-Promotion feststeht
+(`PREREG_v29_window.md` par.3): `selfplay_v28-bXX-policy_*`, `-value-tempc_*`,
+`-value-excursion_*` (Seeds 20260920 / 20260921 / 20260922, par.5 dort). Trainingsarm:
+**`v29-b01`** (Rezept unveraendert, Warmstart `<Generator>_brierbest`, Seed 20260941).
+`v29-b02` ist nur ein Kandidat (Sicht-Reststufen) und wird erst mit dem Nutzer-Entscheid
+reserviert. Kein Knopf-Suffix im Namen (Regel oben).
