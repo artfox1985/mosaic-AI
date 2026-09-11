@@ -163,7 +163,8 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 2026-09-11; Zuschnitt vom Nutzer entschieden: Anfaenger = Anker hv2 @150, Erfahren/Experte
 = Champion mit Self-Play-Stilmitteln, Meister = Champion wie in der Arena; drei Kanten je
 100 Paare als Messung, Bau = Stilmittel in die Spec fuer GUI UND Arena; Mensch-Bilanz 24:7:2
-aus den Endwertungszeilen, NICHT aus `# SPIELENDE`; offen: Zeitpunkt, Knoten-Namen).
+aus den Endwertungszeilen, NICHT aus `# SPIELENDE`; EINGETAKTET fuer v29 (Nutzer 2026-09-11):
+Bau waehrend der v29-Erzeugung, Kanten nach Tor 1 v29; offen nur das Knoten-Namensschema).
 Index: `PREREG_INDEX.md` (generiert).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE

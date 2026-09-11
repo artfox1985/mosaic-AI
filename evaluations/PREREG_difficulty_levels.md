@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets im Server sind aus der GUI nicht erreichbar, alle 33 Mensch-Partien liefen @400 (Mensch 24:7:2). Zuschnitt ENTSCHIEDEN 2026-09-11 (par.4.1): vier Stufen, Anfaenger = Anker hv2 @150, Erfahren/Experte/Meister aus dem aktuellen Champion, Meister = Champion wie in der Arena, die zwei darunter mit den Self-Play-Stilmitteln (Sims 100, Wurzelrauschen, Besuchs-Sampling, Weg C); jede Stufe bekommt eine Kante (par.5). -->
+<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets im Server sind aus der GUI nicht erreichbar, alle 33 Mensch-Partien liefen @400 (Mensch 24:7:2). Zuschnitt ENTSCHIEDEN 2026-09-11 (par.4.1): vier Stufen, Anfaenger = Anker hv2 @150, Erfahren/Experte/Meister aus dem aktuellen Champion, Meister = Champion wie in der Arena, die zwei darunter mit den Self-Play-Stilmitteln (Sims 100, Wurzelrauschen, Besuchs-Sampling, Weg C); jede Stufe bekommt eine Kante (par.5). EINGETAKTET fuer v29 (Nutzer 2026-09-11, par.8.6): kein Bau und keine Kante vor der v29-Generation. -->
 
 # Vorregistrierung: Schwierigkeitsstufen beim Spiel gegen das Netz
 
@@ -391,9 +391,15 @@ Rechenlast ausser Wheel-Build. Mensch-Validierung: 12 Partien des Nutzers
 3. ~~Artefakt v24-b07 neu anlegen~~ entfaellt mit 1.
 4. ~~Eingabelaenge 744/755~~ entfaellt mit 1 (par.4.4).
 5. ~~Antwortzeit-Schwelle fuer eine Stufe ueber dem Meister~~ entfaellt mit 1.
-6. Zeitpunkt: Stufen 0 bis 3 und der Bau parallel zum v28-Programm (die
-   einzige laengere Rechenlast ist Stufe 2, unter 1 h; NICHT neben einer
-   laufenden Arena), Stufe 5 nach dem letzten Champion. Offen.
+6. ~~Zeitpunkt~~ ENTSCHIEDEN 2026-09-11 (Nutzer: "nein. kannst fuer v29
+   eintakten"): NICHT parallel zum v28-Programm. Eintaktung: Stufe 0 (Inventur)
+   und der Bau (par.4.2/4.3, Wheel mit Paritaets-Fixture und Anker-Drift)
+   waehrend der v29-Erzeugung, weil sie keine Messmaschine brauchen ausser dem
+   Wheel-Build; Stufen 1 bis 3 (Antwortzeit, drei Kanten, gespielt = gemessen)
+   im CPU-freien Fenster NACH Tor 1 der v29-Generation, mit dem dann
+   amtierenden Champion als Meister; Stufe 4 (Mensch) danach; Stufe 5 mit dem
+   letzten Champion. Ist v29 die letzte Generation, fallen Stufe 2 und 5
+   zusammen.
 7. ~~Heuristik-Stufe: lebender Pfad oder Anker-Artefakt?~~ ENTSCHIEDEN
    2026-09-11 (Nutzer: "aendere das auf die eingefrorenen anker"): das
    Anker-Artefakt `hv2_generator`.
