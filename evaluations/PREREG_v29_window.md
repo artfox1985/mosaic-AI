@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, Generator = Sieger der v28-Promotion, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: nichts gefahren. Zuschnitt rotiert aus v28 (580 Traeger + rund 2.367 Schwarm, Seed 20260941, par.1). v29-b02: Spezialfeld-Frage als Ein-Faktor-Arm, Bauform OFFEN (par.6 Berichtigung: die Kanaele 77/78 sind seit e91cd34 gebaut, Vorschlag Ablation); Begleitprogramm par.7 (Leiter, Ziehsucht, Stapel-Stopp-Regel, Peek-Bewertung, Startkuppel, Sims-Kurve). Offen: G-2-Haelfte (par.2), letzte Generation?, Freigabe. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, Generator = Sieger der v28-Promotion, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: nichts gefahren. Zuschnitt rotiert aus v28 (580 Traeger + rund 2.367 Schwarm, Seed 20260941, par.1). v29-b02 ENTSCHIEDEN: Ablation der Spezialfeld-Kanaele 77/78 (par.6; die Kanaele sind seit e91cd34 gebaut, ihre Wirkung nie isoliert); Begleitprogramm par.7 (Leiter, Ziehsucht, Stapel-Stopp-Regel, Peek-Bewertung, Startkuppel, Sims-Kurve). Offen: G-2-Haelfte (par.2), letzte Generation?, Freigabe. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -158,7 +158,7 @@ Gating 66-91 min je Seed mit Logs, Tor 2b und Plattenpunkte unter 5 min.
 | Arm | Was | Faktor gegen | Seed |
 | --- | --- | --- | --- |
 | **v29-b01** (Pflicht) | Rezept UNVERAENDERT (Warmstart `<GEN>_brierbest`, 12 Epochen, lr 5e-05 cosine, lambda 0,7, Koepfe wie gehabt, INPUT_SIZE 755) | Champion (= Generator): nur das Material, 5. Punkt der Materialkette; bei Generator b02 zusaetzlich das Stapelwissen auf 82 statt 40 Prozent des Fensters (par.1, nicht trennbar) | 20260941 |
-| **v29-b02** (Nutzer-Entscheid 2026-09-11 par.8.2, Zuschnitt BERICHTIGT 18:50, siehe unten) | Spezialfeld-Frage als EIN-Faktor-Arm; Bauform offen: Vorschlag ABLATION (Kanaele 77/78 auf Null, sonst wie b01) | b01: EIN Faktor, die Spezialfeld-Eingabe | 20260941 |
+| **v29-b02** (ENTSCHIEDEN 2026-09-11, 19:00, par.8.2) | ABLATION der Spezialfeld-Eingabe: Rezept b01, Planes-Kanaele 77 (Spezialfeld-Ertrag) und 78 (Abstand zur Ausloesung) auf Null; Schalter im Merkmalsbauer (`features.rs`, beide Pfade, plus Python-Zwilling), Teil des Cache-Schluessels; Bloecke neu, gleiches Fenster, gleicher Seed | b01: EIN Faktor, die Spezialfeld-Eingabe | 20260941 |
 
 **BERICHTIGUNG 2026-09-11, 18:50 (Regel 0):** die Aussage, par.4a sei "registriert und nie
 gebaut", war FALSCH. Die zwei Planes (Spezialfeld-Ertrag je Slot und Abstand zur Ausloesung)
@@ -172,9 +172,17 @@ die eigene Memory-Notiz ("Kanaele 77/78 gebaut, Wirkung nie isoliert") uebersehe
 Folge fuer den Arm: ein Neubau derselben Eingabe ist gegenstandslos. Was die Frage "traegt die
 Spezialfeld-Eingabe?" beantwortet, ist die Ablation: v29-b02 = Rezept b01 mit den Kanaelen
 77/78 auf Null (Schalter im Merkmalsbauer, Teil des Cache-Schluessels; Bloecke neu, rund 26 min),
-Tor 1 b02 gegen b01. Verliert b02, traegt die Eingabe; gleichauf, dann nicht, und der naechste
-Hebel ist par.4c oder die Drafting-Seite. Alternative: keinen zweiten Arm fahren (v29 rein).
-**Nutzer-Entscheid offen (par.8.2, wieder geoeffnet).**
+Tor 1 b02 gegen b01. **ENTSCHIEDEN 2026-09-11, 19:00 (Nutzer: "dann fahren wir die ablation als
+v29-b02").** Leserichtung, VORAB: die Kante laeuft b02 (ohne Kanaele) gegen b01 (mit); verliert b02
+signifikant, traegt die Eingabe (Verdikt fuer `special_tile_yield` par.4a: wirksam), und der
+naechste Hebel fuer den Spezialfeld-Posten ist die Drafting-Seite oder par.4c; gleichauf oder
+b02 vorn, dann traegt sie nicht, und die Kanaele bleiben nur aus Kompatibilitaet (Modellbreite)
+im Vektor. Zusatzkennzahl je Modell aus den Logs: Plattenpunkte "Spezialfelder" und ausgeloeste
+untere Spezialfelder je Seite (`plate_points_from_arena.py`, `special_tile_yield_measurement.py`).
+Bau: Schalter `MOSAIC_SPECIAL_PLANES_OFF` (Name vorlaeufig, Registratur-Eintrag Pflicht) im
+Rust-Bauer und im Python-Zwilling, Paritaetstor mit Schalter an, Anker-Drift (der Anker ist
+netzlos, die Drift muss gruen bleiben), Netz-Paritaets-Fixture des Champions unveraendert (Schalter
+aus = bitidentisch). Generator fuer v30 (falls es v30 gibt) bleibt der Sieger der Kanten.
 
 **Warum die Spezialfelder (Nutzer 2026-09-11: "Kandidat 1 als einzigen Netz-Arm"; Zahlen bleiben gueltig):**
 die Spezialfelder sind der groesste negative Posten der Plattenwertung (Tor 1 v28: -9,73 gegen
@@ -254,10 +262,9 @@ Champion aus seinem Artefakt, beide Seiten Champion-Spec. Promotion nach
 ## par.8 OFFENE NUTZER-ENTSCHEIDE
 
 1. G-2-Haelfte (par.2; Vorschlag Ausflug).
-2. Kandidat v29-b02: ENTSCHIEDEN 2026-09-11 (Nutzer: "dann takte das so ein") auf der
-   Praemisse "Spezialfeld-Kanaele ungebaut"; die Praemisse war falsch (par.6 Berichtigung),
-   deshalb WIEDER OFFEN mit zwei Wegen: (a) Ablation ohne Kanaele 77/78 (Vorschlag), (b) kein
-   zweiter Arm. Unberuehrt vom Irrtum und weiter entschieden: Stapel-Stopp-Regel, Peek-Bewertung,
+2. ~~Kandidat v29-b02~~ ENTSCHIEDEN 2026-09-11, 19:00 (Nutzer: "dann fahren wir die ablation
+   als v29-b02"), nach der Berichtigung in par.6: v29-b02 = Ablation der Spezialfeld-Kanaele
+   77/78. Weiter entschieden: Stapel-Stopp-Regel, Peek-Bewertung,
    Startkuppel und Sims-Kurve als Sonden und Knoepfe im Begleitprogramm (par.7 Punkt 4);
    Rundenschaetzer und R5-Netzloeser nach Maschinenlage. Die Sicht-Reststufen sind nicht
    bestellt.
