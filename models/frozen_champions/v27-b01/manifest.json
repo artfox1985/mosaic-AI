@@ -158,7 +158,7 @@
           "sha256": "c0aa6fdcdcf61e0f83a315f854260c23cca5a49729f6143a14d79665091284cf"
         }
       },
-      "url": "file:///D:/OneDrive/Documents/Projekte/mosaic-AI/engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl"
+      "url": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl (relativ zur Repo-Wurzel; pip direct_url ohne Rechnerpfad, CLAUDE.md 2026-08-17)"
     },
     "wheel_sha256_now": "c0aa6fdcdcf61e0f83a315f854260c23cca5a49729f6143a14d79665091284cf",
     "note": "sha256 des heute gebauten Wheels; im Artefakt als mosaic_rust_stackreturn_20260910.whl"
