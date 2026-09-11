@@ -176,6 +176,9 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Blockbau 2.947 Dateien unter neuem Schluessel, 6 Worker, Rust-Merkmalsbauer (`MOSAIC_FEATURES_FROM_RUST=1`) | 1.582 s = 26 min | 1,86 Bloecke je s; Python-Pfad nicht unter gleichen Bedingungen gemessen |
 | Monolith-Merge 2.800 Bloecke, 1,11 GB (b02) | 551 s = 9 min | mit Formen-Waechter |
 | **Training v28-b02** (Variante B, 755), 12 Epochen | **5.262,3 s = 1,46 h** | GEBREMST (cargo test des Pre-push-Hakens um Epoche 6/7); b01 5.156,6 s |
+| Tor 1 b02 gegen b01, Seeds 20261038 / 20261039, je 200 Paare mit Logs | 5.562,5 s / 4.773,3 s | 13,9 bzw. 11,9 s je Partie, 10 Threads; der zweite Lauf ohne Nebenlast |
+| Block-Ziehungs-Diagnostik (`dome_stack_known_block_draw_probe.py`, 400 Partien) | 105 s / 129 s | 1 Thread, Replayer |
+| K3-D-Bau: `cargo test --release --lib` (576 Tests) / Wheel / Anker-Drift | 80 s Tests, 26 s Wheel-Bau, rund 25 s Drift | Vollast nur beim Bauen |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 

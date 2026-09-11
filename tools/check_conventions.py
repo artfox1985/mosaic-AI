@@ -906,6 +906,9 @@ KNOWN_FIELDS_RE = re.compile(
 )
 
 
+OPTIONAL_FIELD_RE = re.compile(r'get_optional_non_negative\(\s*"([^"]+)"')
+
+
 def _spec_known_fields() -> set[str] | None:
     """Feldnamen aus `SearchConfig::from_spec_file`, oder None wenn nicht parsebar."""
     if not NET_MCTS_PATH.is_file():
@@ -916,8 +919,19 @@ def _spec_known_fields() -> set[str] | None:
     return set(re.findall(r'"([^"]+)"', m.group("body"))) or None
 
 
+def _spec_optional_fields() -> set[str]:
+    """Felder, die `from_spec_file` mit Default liest (`get_optional_non_negative`):
+    ein FEHLEN ist dort kein Abweisungsgrund, nur ein UNBEKANNTES Feld bleibt einer.
+    Seit 2026-09-11 (`dead_cell_w`, `out_wild_w`, PREREG_geometric_envelope.md par.12c):
+    die eingefrorenen Artefakt-Specs tragen sie nicht und muessen weiter laden."""
+    if not NET_MCTS_PATH.is_file():
+        return set()
+    return set(OPTIONAL_FIELD_RE.findall(NET_MCTS_PATH.read_text(encoding="utf-8", errors="replace")))
+
+
 def warn_live_specs_match_known_fields(staged_only: bool, staged_files: set[str]) -> None:
     known = _spec_known_fields()
+    optional = _spec_optional_fields()
     if known is None:
         print(
             "[WARNUNG, Regel 8 -- Spec-Pflichtfelder] KNOWN_FIELDS in "
@@ -944,7 +958,7 @@ def warn_live_specs_match_known_fields(staged_only: bool, staged_files: set[str]
                 file=sys.stderr,
             )
             continue
-        missing = sorted(known - set(spec))
+        missing = sorted(known - set(spec) - optional)
         unknown = sorted(set(spec) - known)
         if not missing and not unknown:
             continue
