@@ -18162,3 +18162,39 @@ Claudes eigene Fehler stehen in derselben Prereg; der teuerste ist dreimal derse
 Rundenende waren alle sechs Musterreihen farblich festgelegt, sodass die Reststeine nur noch
 auf die Strafleiste konnten (g02 -10, g04 -10, g05 zweimal -10 und damit die einzige
 Niederlage).
+
+## 2026-09-11 -- Claude-Partien g06 und g07 gegen v28-b02 (1:1)
+
+Zwei Partien gegen `v28-b02_brierbest` @400, Claude als Zweitspieler, Spec
+`models/frozen_champions/v27-b01/spec.json` (dieselbe, mit der Tor 1 die v28-Netze faehrt):
+**g06 70:64 gewonnen, g07 45:58 verloren.** Alles Weitere in
+`evaluations/PREREG_claude_play_interface.md` par.7.
+
+Der Befund der beiden Partien ist nicht das Ergebnis, sondern **wie das Netz punktet**. In
+g06 holte es aus drei Wertungsplatten NULL Endwertungspunkte -- zwei seiner drei Wildfelder
+blieben leer, keine Reihe erreichte fuenf Farben, keine Diagonale wurde geschlossen -- und
+kam trotzdem auf 64. In g07 lag die Platte "Spezialfelder" aus, die jedes leere Spezialfeld
+mit -3 bestraft; das Netz beendete die Partie mit drei leeren (-9), verlor die Endwertung
+2:8 und gewann die Partie um 13. Die Punkte kommen aus langen Linien beim Platzieren: +29 in
+einem einzigen Tiling. Dazu ein Nebenbefund aus g06: **zwei volle Spalten, obwohl keine
+Spaltenplatte auslag** -- der Spaltenbau laeuft unabhaengig von der Auslage, was den
+Strukturbefund "Champion vollendet keine Spalten" in ein anderes Licht rueckt.
+
+**Die Null-Klammer ist fuer das Netz ein Werkzeug.** In g07 fiel es in Runde 1 von 5 auf 0,
+indem es in EINEM Zug dreizehn Kuppelplatten zog -- fuenf davon bezahlt, die restlichen acht
+gratis, weil der Punktestand nicht unter 0 faellt. Bei Stand 0 zog es danach 8, 7 und 4
+Platten je Zug; sobald es wieder bei 12 Punkten stand, genau eine. In g06 fiel keine Seite
+je auf 0, und es gab keinen einzigen Mehrfachzug. Damit ist Arm A1 der am selben Tag
+angelegten `PREREG_corpus_behaviour_audit.md` an lebenden Partien bestaetigt (dort par.7),
+bevor der Korpuslauf ueberhaupt gefahren ist; der Lauf selbst kommt mit v29.
+
+Claudes eigene Schwaeche bleibt die Strafleiste: -40 ueber beide Partien gegen -19 des
+Netzes, in g07 allein -25 gegen -11 bei 13 Punkten Endabstand. Die Ursache ist dieselbe wie
+in g02/g04/g05 -- sind am Rundenende alle Musterreihen farblich festgelegt, fegt Aktion C die
+Restfarben als Block herein -- und kam in g07 ein Rotationsfehler beim Plattenlegen dazu.
+
+Das Werkzeug `tools/claude_play.py` hat in g06 seinen ausstehenden Rauchtest gegen einen
+lebenden Gegner bestanden. Ein `PermissionError` auf `manifest.json` (OneDrive-Sperre)
+verschluckte dabei einen schon berechneten Netzzug, weil `drive_ai` das Manifest VOR dem Log
+schreibt; seitdem wiederholt `save_manifest` den Schreibversuch, und ein neues Unterkommando
+`step` laesst im Notfall nur die KI ziehen.

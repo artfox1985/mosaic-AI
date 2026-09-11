@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen? | Beleg: g02-g05 gegen v27-b01 @400 (par.7), Claude 3:1 (55:43, 66:48, 36:28, 50:55). Zwei Muster in allen vier Partien, als Sonden vorregistriert in PREREG_corpus_behaviour_audit.md: Ziehzahl folgt dem Punktestand; lange Musterreihen werden mit Farben gefuellt, die die Kuppelzeile nicht aufnehmen kann. Werkzeug 2026-09-11 nachgebessert (par.9 P.8-10), Rauchtest offen. g06-g10 gegen v28, sobald verfuegbar (par.8.8). -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1 (70:64, 45:58). Das Netz punktet aus Platzierungen, nicht aus den Wertungsplatten (Endwertung 0:10 bzw. 2:8), und nutzt die Null-Klammer als Werkzeug: bei Stand 0 zog es 13/8/7/4 Platten je Zug, bei Stand >0 genau eine -- Arm A der PREREG_corpus_behaviour_audit an lebenden Partien bestaetigt. Eigene Schwaeche bleibt die Strafleiste (-40 zu -19). Werkzeug: par.9 P.11-13. g08-g10 offen. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -453,6 +453,120 @@ b. Runde 1: den Startmarker fuer drei Blau genommen (-2), obwohl der Zug nicht n
 c. Reihe 5 (6 Plaetze) wurde in Runde 1 mit einem einzelnen Schwarz belegt und blieb damit
    die ganze Partie als Senke unbrauchbar; genau dieser Stein haette die spaeteren
    Zwangszuege aufgefangen.
+**g06 (2026-09-11; Seed 20260915, Claude Spieler 1, NETZ Erstspieler, Gegner
+`v28-b02_brierbest` @400, Spec `models/frozen_champions/v27-b01/spec.json` aus dem Manifest):
+Claude 70 : 64 Netz, CLAUDE GEWINNT** -- erste Partie gegen die v28-Generation. 79
+Claude-Zuege. Wertungsplatten: Mehrfarbige Felder (2 Pkt je Wildfeld, nur wenn ALLE belegt),
+Diagonale Reihen (10 Pkt je vollstaendige Diagonale), Farbenreiche Reihen.
+
+**Endwertung je Kriterium** (Manifest `result.end_scoring`): Claude Mehrfarbige Felder +6
+(alle drei Wildfelder belegt), Diagonale 0, Farbenreiche Reihen +4 (Summe +10); Netz in
+ALLEN DREI Kriterien 0 (Summe 0). Das Netz holte seine 64 Punkte vollstaendig aus dem
+laufenden Spiel.
+
+**Standard-Kennzahlen** (Endraster):
+
+- *Reihenauslastung Kuppel*: Claude 21 Steine (z0 5, z1 6, z2 5, z3 4, z4 1, z5 0);
+  Netz 18 (z0 4, z1 4, z2 3, z3 3, z4 2, z5 2).
+- *Spaltenauslastung*: **das Netz hatte ZWEI volle Spalten** (Spalte 0 und 1, je 6 von 6),
+  obwohl keine Spaltenplatte im Spiel war; Claude keine volle Spalte, hoechste Spalte 5
+  (Spalte 3), vier Spalten mit >= 4.
+- *Strafleistenauslastung*: Claude -15 (R1 Marker -2, R2 -6 aus drei Zwangssteinen, R3 -1,
+  R4 -3 = Marker plus ein Stein, R5 -3 aus zwei Steinen); Netz -8 (Marker in R2 und R3,
+  je -2; R4 -1; R5 -3). Differenz 7 Strafpunkte bei 6 Punkten Endabstand.
+- *Punkte und Marge*: 70 : 64, Marge +6.
+
+**Stapelziehungen**: Netz VIER, alle einzeln und alle bei Punktestand > 0 (5->4, 7->6,
+12->11, 28->27); Claude keine. Das Netz fiel in dieser Partie nie auf 0.
+
+**Beobachtungen**:
+
+1. **Plattenblind, aber stark**: 0 von 10 moeglichen Endwertungspunkten ueber drei
+   Kriterien, und trotzdem 64 Punkte. Zwei seiner drei Wildfelder blieben leer, keine
+   Reihe erreichte fuenf Farben, keine Diagonale wurde geschlossen. Vierter Beleg derselben
+   Linie (g02, g04, g05, g06).
+2. **Spaltenbau laeuft unabhaengig von der Wertungsplatte**: zwei volle Spalten ohne
+   Spaltenkriterium. Das passt zum Strukturbefund "Champion vollendet keine Spalten" nur
+   dem Anschein nach: er vollendet sie hier sehr wohl -- nur zahlt es in dieser Auslage
+   nichts. Kandidat fuer eine eigene Sonde (Spaltenquote bedingt auf die ausliegende Platte).
+3. **Die Chip-Aufdeckung entscheidet, wer den Restmuell frisst.** Bonuschips liegen unter
+   den letzten Steinen einer Fabrik. Wer den letzten Stein raeumt, deckt den Chip fuer den
+   Gegner auf. In R2 und R5 hat mich genau das getroffen: die KI nahm den einzigen
+   aufgedeckten Chip, danach war der Steinblock meine einzige legale Aktion.
+4. Das Netz nahm den Startmarker zweimal freiwillig (R2, R3), um zwei Tuerkis bzw. vier
+   Gelb in einem Zug zu holen -- es bewertet den Zugriff hoeher als die -2.
+
+**Eigene Fehler:**
+
+a. **R2 -6**: mit dem Schwarz-Zug Fabrik 3 geleert, damit den Chip fuer die KI aufgedeckt,
+   und danach blieb als einzige legale Aktion der Dreierblock Rot -> volle Strafleiste.
+   Lehre: bei der Restzugrechnung zaehlen die AUFGEDECKTEN Chips, nicht die vorhandenen.
+b. **R5, 4 Punkte verschenkt**: R2 mit Gelb gefuellt, um das Wildfeld (2,5) zu belegen --
+   Gelb lag aber schon auf (2,2), war also keine fuenfte Farbe. Blau waere richtig gewesen.
+
+**g07 (2026-09-11; Seed 20260916, Claude Spieler 1, NETZ Erstspieler, Gegner
+`v28-b02_brierbest` @400, Spec wie oben): Claude 45 : 58 Netz, NETZ GEWINNT.** 77
+Claude-Zuege. Wertungsplatten: Aeussere Felder, **Spezialfelder (-3 je LEEREM
+Spezialfeld)**, Farbenreiche Reihen.
+
+**Endwertung je Kriterium** (Manifest): Claude Aeussere Felder +10, Spezialfelder -6 (zwei
+leer), Farbenreiche Reihen +4 (Summe +8); Netz Aeussere Felder +11, Spezialfelder -9 (drei
+leer), Farbenreiche 0 (Summe +2). Claude gewann die Endwertung 8:2 und verlor die Partie um
+13 -- dasselbe Muster wie g05.
+
+**Standard-Kennzahlen** (Endraster):
+
+- *Reihenauslastung Kuppel*: Claude 18 Steine (z0 5, z1 6, z2 3, z3 3, z4 1, z5 0);
+  Netz 20 (z0 5, z1 5, z2 3, z3 3, z4 2, z5 2).
+- *Spaltenauslastung*: Netz eine volle Spalte (Spalte 1), daneben eine mit 5; Claude keine
+  volle, hoechste 5 (Spalte 1), zwei Spalten mit >= 4.
+- *Strafleistenauslastung*: **Claude -25** (R2 -12 = volle Leiste plus Marker, R4 -10 =
+  volle Leiste, R5 -3), Netz -11 (R1 -3, R2 -3, R3 -2, R4 -2, R5 -1). 14 Strafpunkte
+  Unterschied bei 13 Punkten Endabstand -- die Partie in einer Zahl.
+- *Punkte und Marge*: 45 : 58, Marge -13.
+
+**Stapelziehungen -- der schaerfste Beleg der Serie**: Netz 33 Ziehungen, Claude 3.
+Aufgeschluesselt nach Punktestand beim Zug:
+
+| Zug | Stand vorher | Ziehungen in DIESEM Zug |
+| --- | --- | --- |
+| Netz R1 | 5 | **13** (fuenf bezahlt, ab Stand 0 acht gratis) |
+| Netz R2 | 0 | **8** |
+| Netz R2 | 0 | **7** |
+| Netz R3 | 0 | **4** |
+| Netz R4 | 12 | **1** |
+| Claude R2 | 7 | 2 |
+| Claude R3 | 0 | 1 |
+
+Bei Stand > 0 zieht das Netz genau einmal, bei Stand 0 vier- bis dreizehnmal. Zusammen mit
+g06 (nie auf 0, vier Einzelziehungen) und g05 (dieselbe Gegenprobe) ist damit **Arm A der
+`PREREG_corpus_behaviour_audit.md` an lebenden Partien bestaetigt**, bevor der Korpuslauf
+ueberhaupt gefahren ist.
+
+**Beobachtungen**:
+
+1. Das Netz meidet Spezialplatten NICHT, obwohl sie in dieser Auslage -3 je leerem Feld
+   kosten: es endete mit drei leeren Spezialfeldern (-9). Die ausliegende Platte aendert
+   sein Plattenwahlverhalten nicht -- dritter unabhaengiger Beleg der Plattenblindheit
+   (nach g04 und g06).
+2. Es gewinnt trotzdem, weil es beim Platzieren dominiert: +29 in einem einzigen Tiling
+   (R4) und +19 in einem zweiten (R5), gebaut aus langen waagerechten und senkrechten
+   Linien.
+3. Der Null-Klammer-Zug ist bei ihm kein Unfall, sondern ein Werkzeug: es faellt in R1
+   bewusst von 5 auf 0 und durchsucht danach den halben Stapel gratis.
+
+**Eigene Fehler:**
+
+a. **R4, rund -5**: Platte #10 auf Slot (2,1) mit Rotation 0 gelegt; dadurch landete ihre
+   Schwarz-Zelle in z5 statt in z4, und meine zwei geparkten Schwarz in R4 hatten keine
+   Zielzelle mehr -> Zwangsraeumung. Mit Rotation 180 waere (4,3) schwarz gewesen. Die
+   Warnzeile des Werkzeugs ("ZWANGSRAEUMUNG beim Tiling") erscheint erst NACH dem Legen.
+b. **R2 -12**: dieselbe Senken-Falle wie in g02/g04/g05. Alle sechs Reihen farblich
+   festgelegt, danach fegte Aktion C fuenf Gelb und zwei Schwarz als Block herein.
+c. `chips 2` verbrauchte ausgerechnet den blau-tragenden Chip fuer eine Zelle, die drei
+   beliebige gebraucht haette; damit fehlte R3 die zweite passende Farbe (-1). Die Auswahl
+   trifft die Engine, nicht der Spieler (par.9 P.13).
+
 
 ## par.8 Nutzer-Entscheide (2026-09-06, 12:40, woertlich: "partienanzahl 10 ist ok, gegner champ @400 ist ok, uebereinstimmungsmessung nein, werkzeug bleibt dann in tools.")
 
@@ -588,3 +702,38 @@ Geprueft am Code, je Punkt mit Pruefstelle:
     an der rekonstruierten Endstellung von g05 gegengerechnet, `s m2 ...` wird abgewiesen.
     **Ein Rauchtest mit lebendem Gegner steht aus** (Maschine belegt durch die v28-Erzeugung)
     und gehoert vor die naechste Partie.
+
+11. **Rauchtest nachgeholt, GRUEN (2026-09-11, g06 Zug 1-3).** Der in Punkt 10 offene Test
+    mit lebendem Gegner lief zu Beginn von g06 gegen `v28-b02_brierbest`: die Pflichtzeile
+    ("Kuppelplatten 0/2, Bonuschips 0/2"), der Reihen-Ziele-Block und die gruppierte
+    Zugliste (`s 1 gelb 0-5|floor mond:blau`) erschienen wie gebaut, die KI-Zeilen kamen aus
+    dem Engine-Log statt aus `action.description`. Zwei Partien (156 Claude-Zuege) ohne
+    Fehlanzeige.
+
+12. **Werkzeugfehler in g06: `PermissionError` auf `manifest.json` -- und der Gegenzug ging
+    verloren (2026-09-11, Runde 2).** OneDrive hatte die Datei waehrend der Synchronisierung
+    fuer Sekundenbruchteile gesperrt. Die Stelle ist gefaehrlicher als sie aussieht:
+    `drive_ai` ruft `save_manifest` NACH `ai_step_net_json`, aber VOR `append_log` -- der
+    schon berechnete Netzzug war damit nur im Speicher und verschwand mit dem Prozess. Die
+    Partie selbst blieb konsistent (der Zustand wird bei jedem Aufruf aus `.engine.log`
+    rekonstruiert), aber sie stand mit der KI am Zug, und `move` haette nicht durchgekonnt.
+    Zwei Gegenmassnahmen gebaut:
+    (a) `save_manifest` wiederholt bis zu sechsmal mit 0,5 s Abstand, bevor es aufgibt;
+    (b) neues Unterkommando **`step`**, das NUR die KI ziehen laesst, ohne eigenen Zug --
+    der Notausgang genau fuer diesen Zustand. In g06 hat er die Partie ohne Verlust
+    fortgesetzt.
+    Offen (kein Fix, bewusst): die Reihenfolge in `drive_ai` liesse sich umdrehen
+    (`append_log` vor `save_manifest`), dann waere der Zug auch ohne Wiederholversuche
+    sicher. Das beruehrt die Log-Semantik und gehoert in einen eigenen Zug.
+
+13. **Zwei Bedien-Luecken aus g06/g07, beide haben Punkte gekostet.**
+    (a) **Die Zwangsraeumungs-Warnung kommt zu spaet.** `show` warnt erst, wenn die Platte
+    schon liegt. In g07 R4 hat genau das -5 gekostet: Platte #10 mit Rotation 0 statt 180
+    gelegt, Schwarz landete in z5 statt z4, die zwei geparkten Schwarz in R4 verloren ihre
+    Zielzelle. Was fehlt, ist eine **Vorschau je Platzierungskandidat**: welche der eigenen
+    belegten Musterreihen nach `d <platte> <slot> <rot>` keine Zielzelle mehr haette. Das
+    steht vollstaendig auf dem Brett und verletzt die Sichtgleichheit nicht.
+    (b) **`chips <reihe>` hat keine Chipwahl.** Die Engine sucht die Plaettchen selbst aus.
+    In g07 R5 verbrauchte sie den einzigen blau-tragenden Chip fuer eine Zelle, die drei
+    beliebige gebraucht haette; die danach geplante Vollendung von R3 fiel aus (-1). Ein
+    optionales Argument (`chips <reihe> [ids]`) wuerde reichen.

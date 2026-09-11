@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Beleg: Anlass g02-g05 (claude_play par.7). Quellenfrage GEKLAERT (par.3): Self-Plays schreiben keine Partielogs, aber jeder Record traegt `state.log` als Fenster; ueberlappend zusammengesetzt ergibt das den vollen Log, alle drei Arme sind aus dem vorhandenen Korpus messbar. Vorschau n=4: Ziehungen 4/24/5/36, Zwangsraeumungen 0/1/2/2. LAUF ERST MIT v29 (Nutzer 2026-09-11). Nichts gemessen. -->
+<!-- STATUS: OFFEN | Frage: Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Beleg: Quellenfrage GEKLAERT (par.3), alle drei Arme aus den vorhandenen Records messbar. Korpuslauf ERST MIT v29 (Nutzer 2026-09-11). Arm A1 ist an lebenden Partien schon belegt (par.7, g06/g07 gegen v28-b02): bei Punktestand 0 zog das Netz 13/8/7/4 Platten je Zug, bei Stand >0 genau eine, und in g06 fiel niemand auf 0 -- kein einziger Mehrfachzug. Am Korpus nichts gemessen. -->
 
 # Vorregistrierung: Verhaltens-Audit am Korpus (drei Arme aus den Claude-Partien)
 
@@ -140,7 +140,38 @@ eigener Arm mit eigener Vorregistrierung -- erst die Rate, dann die Frage.
 
 ## par.7 Ergebnisse
 
-Leer. Nichts gemessen.
+**Am Korpus: nichts gemessen** (der Lauf kommt mit v29, par.8 P.1).
+
+**Aus LEBENDEN Partien liegt Arm A1 aber bereits belegt vor (2026-09-11, g06/g07 gegen
+`v28-b02_brierbest`, `PREREG_claude_play_interface.md` par.7).** Das ist keine
+Korpusmessung und ersetzt sie nicht -- es ist die Vorhersage des Arms an zwei Partien, und
+sie trifft in beide Richtungen:
+
+| Partie | Zug | Punktestand VOR dem Zug | Ziehungen in diesem Zug |
+| --- | --- | --- | --- |
+| g06 | Netz R1/R2/R3/R4 | 5 / 7 / 12 / 28 | 1 / 1 / 1 / 1 |
+| g07 | Netz R1 | 5 | **13** (fuenf bezahlt, dann Stand 0) |
+| g07 | Netz R2 | 0 | **8** |
+| g07 | Netz R2 | 0 | **7** |
+| g07 | Netz R3 | 0 | **4** |
+| g07 | Netz R4 | 12 | 1 |
+| g07 | Claude R2 | 7 | 2 |
+| g07 | Claude R3 | 0 | 1 |
+
+n = 12 Zuege mit Ziehung, Grundmenge die beiden Partien g06/g07, Einheit Ziehungen je
+Plattenzug. Bei Stand > 0: 1,17 im Mittel (7 Ziehungen in 6 Zuegen, Maximum 2). Bei Stand 0:
+6,6 (33 in 5 Zuegen, Maximum 13). In g06 fiel keine Seite je auf 0 -- und es gab keinen
+einzigen Mehrfachzug. Die Gegenprobe steht damit dreimal (g05, g06 und der v28-Zug in g07
+R4, nach Rueckkehr auf 12 Punkte).
+
+**Was das fuer den Korpuslauf aendert: nichts am Aufbau, aber es schaerft die Erwartung.**
+A1 misst dieselbe Groesse ueber Zehntausende Partien und liefert die Verteilung, nicht nur
+das Vorzeichen; die Vorschau (par.3, Ziehungen 4/24/5/36 je Partie) passt zu dem hier
+sichtbaren Mechanismus. Die Konfundierung bleibt dieselbe und wird dort behandelt: wer bei 0
+steht, steht meist schlecht -- die Frage ist nicht, OB schlechte Lagen mehr ziehen, sondern
+ob die Ziehzahl an der 0-Grenze SPRINGT. In g07 springt sie im selben Zug, in dem der Stand
+die 0 erreicht (Ziehung 5 bezahlt, Ziehung 6 gratis, weitere acht folgen).
+
 
 ## par.8 Offene Nutzer-Entscheide
 
