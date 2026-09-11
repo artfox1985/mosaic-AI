@@ -27,11 +27,17 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE BELEGT: TOR 1 v28-b01 gegen v27-b01 seit 2026-09-11, 12:05
-(`tools/night_v28_tor1.sh`, zwei Seeds 20261036/37 nacheinander, je rund 86 min, mit Logs;
-Hintergrundaufgabe dieser Sitzung). Training `v28-b01` DURCH 11:55: brierbest Epoche 3
-(val_brier 0,1802), 5.157 s, `run:v28-b01` gesichert (`PREREG_v28_window.md` par.10).**
-Davor die Kette: Der erste Lauf starb um 10:13 im Monolith-Merge: 24 Bloecke
+**MASCHINE FREI seit 2026-09-11, 14:36 (Tor 2b und Plattenauswertung danach, unter 5 min).
+Naechster Schritt: Variante B fuer `v28-b02` (`git stash pop`, Wheel, Anker-Drift,
+Paritaetswerkzeug, Bloecke unter neuem Schluessel, Training).**
+
+**v28-b01: TOR 1 BESTANDEN, TOR 2b HAELT (2026-09-11, `PREREG_v28_window.md` par.10):**
+166:124 (Seed 20261036, SPRT nach 145 Paaren, p 0,015) und 221:179 (Seed 20261037, Deckel,
+p 0,053, KI der Paardifferenz [+0,01; +0,41]); Elo **1447 [1395; 1499]**; volle Spalten je
+Seite 1,030 gegen 0,884; Punkte +3,0 je Partie, vertikale Reihen +1,43, Spezialfelder +0,88.
+Training `v28-b01` DURCH 11:55: brierbest Epoche 3 (val_brier 0,1802), 5.157 s,
+`run:v28-b01` gesichert. Generator-Kandidat fuer v29: v28-b01, sofern kein v28-Arm ihn
+schlaegt. Davor die Kette: Der erste Lauf starb um 10:13 im Monolith-Merge: 24 Bloecke
 (`selfplay_v27-b01-policy_*_g410` bis `g640`, gebaut 00:14-00:28) trugen 755 Spalten unter
 744er-Schluesseln, weil die Waechter-Worker `config.py` frisch importierten, waehrend die
 Datei fuer den Variante-B-Bau auf 755 stand (der Elternprozess hatte 744 im Schluessel). Die
@@ -131,7 +137,7 @@ Platz (`data/` 6,96 GiB, Sicherungswurzel).
 | Erzeugung 3 x 4.000 Partien @100, threads 11 (v27 / v28) | 36.912 s = 10,25 h / 35.726 s = 9,92 h |
 | Kette Schritte 1-6 (Kennzahlen, Manifeste, Fenster, Monolith) | rund 31 min |
 | Training 12 Epochen, Fenster 2.947 Dateien | 5.117 s = 1,4 h (v26 mit Nebenlast 2,1 h) |
-| Gepaartes Gating 200 Paare @400, 10 Threads, mit `--log-games` | rund 5.190 s = 86 min |
+| Gepaartes Gating 200 Paare @400, 10 Threads, mit `--log-games` | 5.182-5.446 s = 86-91 min (13,6 s je Partie) |
 | Anker-Kante n=150, 6 Worker | rund 22 min |
 | Champion-2-Kante gegen Artefakt, n=150 | rund 43 min |
 | A/B ueber den Referee, gleiches Netz, n=150 | rund 43 min |

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: Erzeugung GEFAHREN 2026-09-10/11 (par.10: 3 x 4.000 Partien @100, 35.726 s = 9,9 h, Generator v27-b01). TOR 2a HAELT: 0,816 gegen 0,777 volle Spalten je Seite (n = 8.000 Seiten, +-0,017). Fenster 2.947 Dateien (580 Traeger + 145 G-2 Ausflug), Schluessel 2db448af20fe; Training v28-b01 laeuft in der Kette. Offen: Tor 1 b01, dann b02 (Variante B, par.9), Ablationen, Sonde, Kante, round_estimate (par.8). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: Erzeugung GEFAHREN (par.10, 9,9 h). TOR 2a HAELT 0,816 gegen 0,777. v28-b01 trainiert (brierbest Epoche 3). TOR 1 BESTANDEN: v28-b01 gegen v27-b01 166:124 (SPRT nach 145 Paaren, p 0,015) und 221:179 (Deckel, p 0,053, KI der Paardifferenz [+0,01; +0,41]); Elo 1447 [1395; 1499]. TOR 2b HAELT: 1,030 gegen 0,884 volle Spalten je Seite (n = 396). Offen: b02 (Variante B, par.9), Ablationen, Sonde, Kante, round_estimate (par.8). -->
 
 # PREREG v28: Fensterzuschnitt und der erste Plan nach dem Einfrieren
 
@@ -287,8 +287,57 @@ Plateau ab Epoche 10, Policy-Val 0,39 am Ende. ONNX `models/alphazero_v28-b01_br
 (flat_input 744). Wie bei v27 (Epoche 3) liegt der Bestpunkt frueh; die Brier-Werte sind
 ueber die Arme nicht vergleichbar (anderer Val-Pool), die Entscheidung faellt in Tor 1.
 
-**Tor 1 (gestartet 2026-09-11, 12:05; `tools/night_v28_tor1.sh`):** v28-b01 gegen v27-b01 aus
+**Tor 1 (gestartet 2026-09-11, 11:57; `tools/night_v28_tor1.sh`):** v28-b01 gegen v27-b01 aus
 dem eingefrorenen Artefakt, beide Seiten Champion-Spec `frozen_champions/v27-b01/spec.json`,
 @400, Blockgroesse 5, 10 Threads, `--log-games`, Deckel 200 Paare, Seeds 20261036 und
 20261037 nacheinander. Regel wie v27 (par.9 dort): kein dritter Seed, wenn beide Seeds fuer
-b01 liegen und kein Nullentscheid faellt. Ergebnis folgt hier.
+b01 liegen und kein Nullentscheid faellt.
+
+**TOR 1 BESTANDEN (11:57-14:34):**
+
+| Seed | Ergebnis | Paare | McNemar p | gepaarte Differenz [95 %-KI] | Punkte | Strafleiste | Dauer |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20261036 | **166:124**, SPRT-Entscheid fuer v28-b01 (LLR +3,246) | 145 | 0,0154 | +0,29 [+0,07; +0,51] | 54,0 gegen 50,9 | 8,55 gegen 8,57 | 3.980 s |
+| 20261037 (Replikation) | **221:179**, Deckel ohne SPRT-Entscheid (LLR +1,454) | 200 | 0,0527 | +0,21 [+0,01; +0,41] | 54,5 gegen 51,5 | 8,34 gegen 8,57 | 5.446 s |
+
+Artefakte `paired_gating_v28-b01_vs_v27-b01_s36.json` / `_s37.json` (290 bzw. 400 Partie-Logs),
+10 Threads, 13,7 s je Partie. Beide Seeds liegen fuer v28-b01; im Deckel-Lauf liegt McNemar
+knapp ueber 0,05, das Konfidenzintervall der Paardifferenz schliesst die Null aus. Nach der
+v27-Regel (beide Seeds positiv, kein Nullentscheid) kein dritter Seed; wer die Kante haerter
+will, faehrt einen dritten Seed (86 min). Beide Kanten im Elo-Register (2026-09-11):
+**v28-b01@400 = 1447 [1395; 1499]** (690 Partien), v27-b01 1405, mit dem Anker verbunden.
+
+**TOR 2b HAELT** (aus denselben Logs, `arena_column_probe.py`, Einheit volle Spalten je Seite,
+Tor-2-Regel: nicht unter dem Vorgaenger im selben Instrument):
+
+| Lauf | v28-b01 | v27-b01 | replayt / divergiert |
+| --- | --- | --- | --- |
+| Seed 20261036 (290 Partien) | 1,004 +-0,087 | 0,913 +-0,088 | 287 / 3 |
+| **Seed 20261037 (400 Partien)** | **1,030 +-0,071** | **0,884 +-0,079** | 396 / 4 (Chip-Vollendung, bekannte Replayer-Grenze) |
+
+Im vollen Lauf beruehren sich die Intervalle (0,959 gegen 0,962); die Richtung stimmt in
+beiden Seeds, und die gepaarte Plattenauswertung unten traegt sie signifikant. Nebenzahlen
+voller Lauf: Spalten >= 4 je Partie 2,29 gegen 2,26, lange Reihen 3,02 gegen 2,97, Reihen-H
+0,589 gegen 0,572. Artefakte `arena_columns_v28-b01_vs_v27-b01_s36/s37.json`.
+
+**Wertungsplatten-Punkte je Kriterium, je Modell** (`plate_points_from_arena.py --block 5`,
+Artefakt `plate_points_v28b01_vs_v27b01_s37.json`, n = 400 Bretter je Modell, Einheit Punkte je
+Partie, Klammer = Bretter mit aktivem Kriterium, KI ueber 200 Paare):
+
+| Kriterium | v28-b01 | v27-b01 | gepaarte Differenz [95 %-KI] |
+| --- | --- | --- | --- |
+| Vertikale Reihen | 7,83 (152) | 6,40 (152) | **+1,43 [+0,24; +2,62]** |
+| Spezialfelder | -9,73 (160) | -10,61 (160) | **+0,88 [+0,23; +1,53]** |
+| Aeussere Felder | 10,82 (162) | 10,55 (162) | +0,27 [+0,01; +0,54] |
+| Eckplatten | 8,71 (144) | 8,08 (144) | nicht signifikant (+0,63) |
+| Mehrfarbige Felder | 2,69 (144) | 3,15 (144) | nicht signifikant (-0,46) |
+| Endwertung gesamt | +8,07 | +6,91 | +1,16 [+0,32; +1,99] |
+| Punkte | 54,54 | 51,54 | +3,01 [+1,10; +4,91] |
+| Marge | +3,00 | -3,00 | +6,01 [+2,20; +9,82] |
+| Strafleiste | 8,34 | 8,57 | -0,23 [-1,05; +0,59] |
+
+Waechter: Kriteriensumme = Endwertung 400/400, Log-Endstand = scores 400/400. Lesart: der
+vierte Materialschritt in Folge traegt Siege (Tor 1), Spalten (Tor 2b) und Punkte, und wieder
+sitzt der Zuwachs in den vertikalen Reihen; neu ist ein signifikanter Posten bei den
+Spezialfeldern (weniger Abzug). **Generator fuer v29 nach der Generatorwahl-Regel: v28-b01**,
+sofern kein v28-Arm ihn schlaegt (b02 bis b04, par.8).
