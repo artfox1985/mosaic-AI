@@ -27,9 +27,13 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE FREI seit 2026-09-11, 14:36 (Tor 2b und Plattenauswertung danach, unter 5 min).
-Naechster Schritt: Variante B fuer `v28-b02` (`git stash pop`, Wheel, Anker-Drift,
-Paritaetswerkzeug, Bloecke unter neuem Schluessel, Training).**
+**MASCHINE BELEGT: v28-b02-KETTE (Variante B) seit 2026-09-11, 15:10
+(`tools/night_v28_b02.sh`, Hintergrundaufgabe dieser Sitzung): Bloecke unter dem
+755er-Schluessel (rund 30 min), Monolith, Training (1,4 h), dann Tor 1 b02 gegen b01 mit zwei
+Seeds (2 x 86 min); Ende etwa 20:30.** Vorher 14:50-15:05: Baum auf INPUT_SIZE 755 (Stash
+eingespielt), Wheel gebaut und installiert, Anker-Drift GRUEN, Paritaetstor Rust/Python
+BESTANDEN (`PREREG_rust_data_layer.md` par.7). Der Baum ist damit auf Variante B; das
+Tor-1-Instrument kuerzt 744er-Modelle auf Modellbreite (`net.rs:421`).
 
 **v28-b01: TOR 1 BESTANDEN, TOR 2b HAELT (2026-09-11, `PREREG_v28_window.md` par.10):**
 166:124 (Seed 20261036, SPRT nach 145 Paaren, p 0,015) und 221:179 (Seed 20261037, Deckel,

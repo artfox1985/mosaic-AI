@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes Rohformat (Teil B)? | Beleg: TEIL A EINGETAKTET 2026-09-11 als Bauschritt von Variante B (PREREG_v28_window.md par.8, Nutzer): Merkmal einmal in features.rs, pyo3-Export, Python-Zwilling als Test-Orakel, Bit-Identitaets-Tor vor der Umstellung, Schalter nicht im Cache-Schluessel. Nutzniesser benannt: jede Merkmalserweiterung ab jetzt (elf Werte fuer v28-b02). TEIL B ohne Ausloeser (Datenaufbau 35 s von 5.117 s beim v27-Training = 0,7 %, Schwelle 25 %), bleibt liegen. -->
+<!-- STATUS: OFFEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes Rohformat (Teil B)? | Beleg: TEIL A GEBAUT UND TOR BESTANDEN 2026-09-11 (par.7): Rust-Bauer bit-identisch zum Python-Zwilling auf 733 Spiel- und 300 Korpuszustaenden (Flachvektor 755 UND Planes, np.array_equal), Anker-Drift gruen; Blockbau fuer v28-b02 laeuft ueber MOSAIC_FEATURES_FROM_RUST=1. TEIL B ohne Ausloeser (Datenaufbau 33,5 s von 5.157 s beim v28-b01-Training). -->
 
 # Vorregistrierung: Datenschicht in Rust (Merkmalsbauer und Rohformat)
 
@@ -195,3 +195,18 @@ par.2 unveraendert (Bit-Identitaet VOR der Umstellung, `np.array_equal`; Schalte
 `MOSAIC_FEATURES_FROM_RUST` NICHT im Cache-Schluessel; Kill-Kriterium bei nicht herstellbarer
 Identitaet). Verdikt hier, sobald das Tor gefahren ist. Teil B bleibt ohne Ausloeser liegen
 und wird beim naechsten Bestandsabgleich UEBERHOLT, falls die Schwelle weiter verfehlt wird.
+
+## par.7 TEIL A: TOR BESTANDEN (2026-09-11, 15:05)
+
+Wheel mit INPUT_SIZE 755 gebaut und installiert (Variante B, `PREREG_v28_window.md` par.9);
+`tools/probes/feature_parity_rust_python.py` (Konstruktor-Aufruf berichtigt: `PyGame` nimmt ein
+Tupel) auf zwei Grundmengen: 733 Zustaende aus 4 Heuristik-Partien @30 (alle mit
+`dome_pool_view`, Seeds ab 20260911) und 300 Zustaende aus 3 Sockel-Dateien
+`selfplay_v26-b01-policy_*.pkl` (ohne das Feld, Null-Pfad). Ergebnis: Flachvektor 755 gleich
+1.033/1.033, Planes gleich 1.033/1.033, `np.array_equal` ohne Toleranz; 16,0 s, 1 Thread.
+Artefakt `evaluations/artifacts/feature_parity_rust_python.json`. Anker-Drift auf demselben
+Wheel GRUEN (1.763 Schritte, `anchor_drift_live_wheel_20260911_varB.json`). Damit ist die
+Umstellung des Blockbaus auf den Rust-Bauer freigegeben; die v28-b02-Kette
+(`tools/night_v28_b02.sh`) setzt `MOSAIC_FEATURES_FROM_RUST=1`. Der Python-Zwilling bleibt als
+Test-Orakel im Baum. Verdikt fuer Teil A folgt mit dem b02-Training (Blockbau-Laufzeit gegen
+den Python-Pfad als Nebenbefund); Teil B bleibt ohne Ausloeser.
