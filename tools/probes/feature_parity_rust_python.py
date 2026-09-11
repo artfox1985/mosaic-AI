@@ -108,7 +108,7 @@ def states_from_pygame(n_games: int, sims: int, seed_base: int, progress_every: 
 
     out: list[dict] = []
     for gi in range(n_games):
-        game = mosaic_rust.PyGame(["A", "B"], 0, seed_base + gi, None)
+        game = mosaic_rust.PyGame(("A", "B"), 0, seed_base + gi, None)
         for _ in range(4000):
             st = json.loads(game.state_json())
             phase = st.get("phase")

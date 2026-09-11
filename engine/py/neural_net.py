@@ -36,6 +36,29 @@ FILLED_ID_MAP = {None: 0, "blau": 1, "gelb": 2, "rot": 3, "schwarz": 4, "türkis
 # Normalisierung der aktuellen Punkte je der 8 Wertungsplatten (grobe Skalen).
 SCORE_NORM = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0]
 
+# Normierung des Kuppelstapel-Wissens (Abschnitt 15). Spiegel von
+# `dome.rs::NUM_DOME_TILE_DESIGNS` (18 Platten insgesamt) und
+# `dome.rs::NUM_SPECIAL_DOME_TILES` (9 Spezial, 9 Wild); dort steht ein Test,
+# der die Zahlen gegen den Katalog haelt.
+DOME_TILE_COUNT = 18.0
+DOME_SPECIAL_TILE_COUNT = 9.0
+# Zahl der einzeln kodierten Positionen des obersten eigenen Blocks
+# (= `features.rs::DOME_POOL_TOP_TYPES`).
+DOME_POOL_TOP_TYPES = 4
+
+# Teil A der Rust-Datenschicht (PREREG_rust_data_layer.md par.2): mit "1"
+# beziehen `state_to_tensor` und `state_to_planes` ihre Werte aus dem
+# Rust-Bauer statt aus dem Python-Zwilling. DEFAULT AUS, bis das
+# Bit-Identitaets-Tor (tools/probes/feature_parity_rust_python.py) bestanden
+# ist. Einmal beim Import gelesen, damit derselbe Prozess nicht auf halber
+# Strecke den Bauer wechselt.
+#
+# Der Schalter gehoert AUSDRUECKLICH NICHT in den Cache-Schluessel
+# (engine/py/file_cache_key.py): sind beide Fassungen bit-identisch, MUSS
+# derselbe Schluessel herauskommen, sonst waeren alle bestehenden Caches
+# wertlos (par.2, "Hartes Tor", Punkt 3).
+_FEATURES_FROM_RUST = os.environ.get("MOSAIC_FEATURES_FROM_RUST") == "1"
+
 
 def _padn(lst, n):
     """Liste auf genau n Einträge bringen (0-gepolstert) — robust gegen alte Daten."""
@@ -43,6 +66,46 @@ def _padn(lst, n):
     return (lst + [0] * n)[:n]
 
 def state_to_tensor(data):
+    """Flacher Merkmalsvektor aus dem Serializer-Dict.
+
+    Weiche zwischen dem Python-Zwilling und dem Rust-Bauer
+    (`MOSAIC_FEATURES_FROM_RUST=1`, PREREG_rust_data_layer.md par.2 Teil A).
+    Beide Fassungen bleiben aufrufbar, damit das Paritaets-Werkzeug sie
+    GEGENEINANDER rechnen kann, ohne den Schalter zu setzen.
+    """
+    if _FEATURES_FROM_RUST:
+        return state_to_tensor_rust(data)
+    return state_to_tensor_python(data)
+
+
+def state_to_tensor_rust(data):
+    """Flacher Merkmalsvektor aus dem Rust-Bauer (`features::state_to_features`).
+
+    EINE Wahrheit: derselbe Code, den die Engine im Spielpfad benutzt. Der
+    Umweg ueber JSON ist der Preis dafuer; die Werte sind f32 auf beiden
+    Seiten, die Umwandlung f32 -> Python-float -> f32 ist verlustfrei.
+    """
+    import mosaic_rust
+    return torch.tensor(
+        mosaic_rust.state_features_from_json(json.dumps(data)),
+        dtype=torch.float32,
+    )
+
+
+def state_to_planes_rust(data):
+    """Planes [C,6,6] aus dem Rust-Bauer (`features::state_to_planes_direct`).
+
+    Anders als beim Flachvektor gibt es in Rust keinen JSON-Pfad fuer die
+    Planes: der Export rekonstruiert den Zustand ueber `json_to_state` und
+    ruft dann den Direktpfad -- genau die Route, die `examples/planes_parity.rs`
+    seit Task #11 Phase 2 fuer den Vergleich gegen Python benutzt.
+    """
+    import mosaic_rust
+    flat, shape = mosaic_rust.state_planes_from_json(json.dumps(data))
+    return torch.tensor(flat, dtype=torch.float32).reshape(*shape)
+
+
+def state_to_tensor_python(data):
     """Macht aus deinem Serializer-Dict ein flaches Zahlen-Array für PyTorch."""
     features = []
     
@@ -342,6 +405,56 @@ def state_to_tensor(data):
             else:
                 features.append(0.0)
 
+    # 15. Kuppelstapel-Wissen (Variante B, PREREG_dome_stack_information_sets.md
+    # par.7/par.15f, PREREG_v28_window.md par.6), spiegelbildlich zu features.rs
+    # Abschnitt 15: elf Werte ANS ENDE, Indizes 0..743 unveraendert. Quelle ist
+    # das Record-Feld `dome_pool_view` (serialize.rs, Sicht des Spielers am Zug).
+    # FEHLT das Feld -- Alt-Records v25 bis v27 --, sind alle elf 0: der
+    # Alt-Record sieht das Merkmal ausgeschaltet, nicht eine erfundene Sicht.
+    #   744    Laenge des unbekannten Praefix          / 18
+    #   745    Laenge aller EIGENEN Bloecke            / 18
+    #   746    Spezial-Zaehler der eigenen Bloecke     / 9
+    #   747    Wild-Zaehler der eigenen Bloecke        / 9
+    #   748-751 Typ der obersten 4 Positionen des OBERSTEN eigenen Blocks
+    #           (+1 Spezial, -1 Wild, 0 = keine Position)
+    #   752    Laenge aller FREMDEN Bloecke            / 18
+    #   753    Spezial-Zaehler der fremden Bloecke     / 9
+    #   754    Wild-Zaehler der fremden Bloecke        / 9
+    # 18 = NUM_DOME_TILE_DESIGNS, 9 = NUM_SPECIAL_DOME_TILES (dome.rs).
+    _view = data.get("dome_pool_view")
+    if not isinstance(_view, dict):
+        _view = {}
+    features.append(float(_view.get("unknown_prefix", 0) or 0) / DOME_TILE_COUNT)
+    _own_len = _own_special = _own_wild = 0.0
+    _foreign_len = _foreign_special = _foreign_wild = 0.0
+    _top_types = [0.0] * DOME_POOL_TOP_TYPES
+    _own_seen = False
+    for _b in _view.get("blocks", []) or []:
+        _len = float(_b.get("len", 0) or 0)
+        _special = float(_b.get("special", 0) or 0)
+        _wild = float(_b.get("wild", 0) or 0)
+        if _b.get("own"):
+            _own_len += _len
+            _own_special += _special
+            _own_wild += _wild
+            if not _own_seen:
+                _own_seen = True
+                _types = _b.get("types") or []
+                for _i in range(DOME_POOL_TOP_TYPES):
+                    _t = _types[_i] if _i < len(_types) else None
+                    _top_types[_i] = 1.0 if _t == "special" else (-1.0 if _t == "wild" else 0.0)
+        else:
+            _foreign_len += _len
+            _foreign_special += _special
+            _foreign_wild += _wild
+    features.append(_own_len / DOME_TILE_COUNT)
+    features.append(_own_special / DOME_SPECIAL_TILE_COUNT)
+    features.append(_own_wild / DOME_SPECIAL_TILE_COUNT)
+    features.extend(_top_types)
+    features.append(_foreign_len / DOME_TILE_COUNT)
+    features.append(_foreign_special / DOME_SPECIAL_TILE_COUNT)
+    features.append(_foreign_wild / DOME_SPECIAL_TILE_COUNT)
+
     return torch.tensor(features, dtype=torch.float32)
 
 
@@ -454,6 +567,17 @@ def _board_channels(dome_grid) -> torch.Tensor:
 
 
 def state_to_planes(data) -> torch.Tensor:
+    """Planes [C,6,6] aus dem Serializer-Dict.
+
+    Weiche zwischen dem Python-Zwilling und dem Rust-Bauer
+    (`MOSAIC_FEATURES_FROM_RUST=1`, PREREG_rust_data_layer.md par.2 Teil A),
+    Gegenstueck zu `state_to_tensor`."""
+    if _FEATURES_FROM_RUST:
+        return state_to_planes_rust(data)
+    return state_to_planes_python(data)
+
+
+def state_to_planes_python(data) -> torch.Tensor:
     """2D-Gegenstück zu `state_to_tensor` (Task #11 Phase 1) -- Format
     [C,6,6], C=NUM_PLANES_CHANNELS=79. ADDITIV: `state_to_tensor` bleibt
     unverändert, dies ist ein PARALLELER Zweig für den geplanten
