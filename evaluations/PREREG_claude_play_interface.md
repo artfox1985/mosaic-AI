@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1 (70:64, 45:58). Das Netz punktet aus Platzierungen, nicht aus den Wertungsplatten (Endwertung 0:10 bzw. 2:8), und nutzt die Null-Klammer als Werkzeug: bei Stand 0 zog es 13/8/7/4 Platten je Zug, bei Stand >0 genau eine -- Arm A der PREREG_corpus_behaviour_audit an lebenden Partien bestaetigt. Eigene Schwaeche bleibt die Strafleiste (-40 zu -19). Werkzeug: par.9 P.11-13. g08-g10 offen. -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1 (70:64, 45:58). Das Netz punktet aus Platzierungen, nicht aus den Wertungsplatten (Endwertung 0:10 bzw. 2:8), und nutzt die Null-Klammer als Werkzeug: bei Stand 0 zog es 13/8/7/4 Platten je Zug, bei Stand >0 genau eine -- Arm A der PREREG_corpus_behaviour_audit an lebenden Partien bestaetigt. Eigene Schwaeche bleibt die Strafleiste (-40 zu -19). Werkzeug nachgebessert, par.9 P.11-14. g08-g10 offen. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -737,3 +737,50 @@ Geprueft am Code, je Punkt mit Pruefstelle:
     In g07 R5 verbrauchte sie den einzigen blau-tragenden Chip fuer eine Zelle, die drei
     beliebige gebraucht haette; die danach geplante Vollendung von R3 fiel aus (-1). Ein
     optionales Argument (`chips <reihe> [ids]`) wuerde reichen.
+
+14. **Vier Nachbesserungen aus g06/g07 GEBAUT (2026-09-12), drei davon gegen Fehler, die in
+    diesen Partien Punkte gekostet haben.** Alle vier sind reine Brett-Arithmetik und
+    verletzen die Sichtgleichheit nicht (dieselbe Begruendung wie bei den Reihen-Zielen,
+    P.10b): sie rechnen nur nach, was auf dem Tisch liegt.
+
+    (a) **Platzierungs-Vorschau `placement_warnings`** -- die in P.13a benannte Luecke. Vor
+    dem Legen wird fuer JEDE legale Kombination aus Platte, Slot und Drehung geprueft, ob
+    danach eine eigene belegte Musterreihe ohne Zielzelle dastuende; ausgegeben werden nur
+    die gefaehrlichen, mit zusammengefassten Drehungen:
+    `d 7 0 2 rot 90|180  -> R0 B1/1 ohne Zielzelle`. Eine Platte nimmt nie eine Zelle weg --
+    gefaehrlich ist nur die LETZTE Platte einer Kuppelzeile, und genau die hat in g07 Runde 4
+    rund -5 gekostet.
+
+    (b) **Spezialfeld-Zeilen `special_lines`** -- je leerem Spezialfeld, was seiner Platte
+    noch fehlt und was es zahlt: `(4,3) +5, es fehlt: (4,2) G, (5,2) S, (5,3) R`. Das war die
+    teuerste Handrechnung der beiden Partien (in g06 drei geplante Freischaltungen mit +4,
+    +2 und +6; in g07 zwei leere Felder mit -6).
+
+    (c) **Wertungsplatten-Stand `criteria_lines`** -- je AUSLIEGENDER Platte eine Zeile mit
+    dem Stand beider Seiten. Anlass ist ein 4-Punkte-Fehler in g06: R2 wurde mit Gelb
+    vollendet, um ein Wildfeld zu belegen, obwohl Gelb in derselben Kuppelzeile schon lag,
+    also keine fuenfte Farbe war. Die Zuordnung laeuft ueber den NAMEN der Platte, nicht ueber
+    ihre Id -- ein Id-Wechsel in der Engine soll hier nicht still falsch rechnen.
+
+    (d) **Mond-Reihenfolge optional, aber nur wenn eindeutig** (`resolve_moon_order`). Dabei
+    ist ein Nebenbefund aufgefallen, der die erste Fassung falsch gemacht haette: **der
+    Zuggenerator fuehrt je (Quelle, Farbe, Reihe) nur EINE, kanonische Reihenfolge** --
+    abweichende sind trotzdem legal, weil `apply_stone` nur die MENGE der Reststeine prueft.
+    Wer die Zahl der Zugeintraege als Mass fuer Wahlfreiheit nimmt, setzt also still den
+    Generator-Vorschlag ein; entschieden wird jetzt an der LAENGE der Restliste. Bei echter
+    Wahl weist das Werkzeug ab und nennt die Reste samt Vorschlag.
+
+    **Geprueft:** `criteria_lines` und `special_lines` an den rekonstruierten Endstellungen
+    von g06 und g07 gegen `result.end_scoring` aus den Manifesten -- die Engine ist hier eine
+    unabhaengige Referenz, und alle acht Zahlen stimmen (g06 Wildfelder 6 gegen 0,
+    Farbenreiche 4 gegen 0; g07 Aeussere 10 gegen 11, Spezialfelder -6 gegen -9,
+    Farbenreiche 4 gegen 0). Dazu **14 neue Unit-Tests** in
+    `tools/tests/test_claude_play_board_hints.py`, darunter die g07-Stellung mit Rotation 0
+    (Zwangsraeumung) gegen Rotation 180 (kein Verlust) und die Rotationstabelle gegen
+    `engine/src/dome.rs:89-97`. Suite 58 Tests gruen. Live-Rauchtest in der Wegwerf-Partie
+    `gsmoke2` (nicht Teil der Reihe): Warnung, Kriterien-Zeilen und die Mond-Abweisung
+    erschienen wie gebaut; ein dabei gefundener Anzeigefehler (jede Drehung stand vierfach,
+    weil `valid_moves` denselben Slot mehrfach fuehrt) ist behoben.
+
+    **Nicht gebaut:** die Chipwahl aus P.13b. `apply_tiling_chips(spieler, reihe)` nimmt
+    keine Plaettchenliste; das waere eine Engine-Aenderung und bleibt als solche offen.

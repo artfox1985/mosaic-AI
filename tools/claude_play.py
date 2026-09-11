@@ -24,6 +24,7 @@ Aufrufe (Projektordner; Netz-Zuege sind CPU-Auftraege -> NICHT neben einer Arena
     python -X utf8 tools/claude_play.py show --game g01
     python -X utf8 tools/claude_play.py move --game g01 "s 2 rot 3"
     python -X utf8 tools/claude_play.py note --game g01 "R2: Netz laesst Reihe 6 liegen (Zeile 41)"
+    python -X utf8 tools/claude_play.py step --game g01     # NUR die KI ziehen lassen (Notausgang)
 
 Zugnotation (par.3.3), Farben blau gelb rot schwarz tuerkis (auch B G R S T):
     s <quelle> <farbe> <reihe|floor> [mond:<farbe,...>]   Stein; Quelle = 1-4 (Sonnenseite der Fabrik),
@@ -39,6 +40,11 @@ Zugnotation (par.3.3), Farben blau gelb rot schwarz tuerkis (auch B G R S T):
                                                           validation.rs::validate_small_moon wuerde sie
                                                           aber durchlassen -- Engine-Luecke, registriert in
                                                           PREREG_claude_play_interface.md par.9)
+                                                          `mond:` darf nur wegbleiben, wenn die Reste
+                                                          nichts zu entscheiden lassen (hoechstens einer
+                                                          oder lauter gleichfarbige); sonst weist das
+                                                          Werkzeug ab und nennt die Reste. Unten zuerst,
+                                                          erreichbar ist spaeter nur der oberste Stein.
     d <platte> <slot_r> <slot_c> [rot]                    Kuppelplatte aus der Auslage (rot 0/90/180/270)
     peek                                                  verdeckt vom Stapel ziehen (Aktion A, Schritt 1)
     choose <platte> <slot_r> <slot_c> [rot] [zurueck:<id,...>]  gezogene Platte legen
@@ -378,6 +384,235 @@ def duty_line(st: dict, pl: dict) -> str:
     return (f"    Pflicht diese Runde: Kuppelplatten {min(placed_now, owed)}/{owed}, "
             f"Bonuschips {pl.get('chips_taken', 0)}/2")
 
+# Rotationstabelle wie in der Engine (engine/src/dome.rs:89-97): die gedrehte Platte ist
+# `rotated[i] = spaces[perm[i]]` (dome.rs:162-165). Wird fuer die Platzierungs-Vorschau
+# gebraucht, die eine Platte legt, OHNE den Zustand anzufassen.
+ROTATION_INDICES = {0: (0, 1, 2, 3), 90: (2, 0, 3, 1), 180: (3, 2, 1, 0), 270: (1, 3, 0, 2)}
+
+
+def special_lines(pl: dict) -> list[str]:
+    """Je LEEREM Spezialfeld: was seiner Platte noch fehlt und was es zahlt.
+
+    Ein Spezialfeld schaltet frei, sobald die drei anderen Zellen SEINER Platte belegt sind,
+    und zahlt dann Punkte in Hoehe seiner Rasterzeile (1..6, engine_manual Abschnitt 5).
+    Liegt die Wertungsplatte "Spezialfelder" aus, kostet jedes leere zusaetzlich -3. Beides
+    war in g06/g07 die teuerste Handrechnung der Partie: in g06 haben drei so geplante
+    Freischaltungen +4, +2 und +6 gebracht, in g07 blieben zwei Felder leer (-6).
+    """
+    grid = pl.get("dome_grid") or []
+    out: list[str] = []
+    for sr in range(3):
+        for sc in range(3):
+            slot = grid[sr][sc] if sr < len(grid) and sc < len(grid[sr]) else None
+            if not slot:
+                continue
+            spaces = slot.get("spaces") or []
+            for i, sp in enumerate(spaces):
+                if not sp or sp.get("type") != "SPECIAL":
+                    continue
+                r, c = 2 * sr + i // 2, 2 * sc + i % 2
+                if sp.get("filled") is not None:
+                    out.append(f"({r},{c}) BELEGT (+{r + 1})")
+                    continue
+                missing = []
+                for j, other in enumerate(spaces):
+                    if j == i or not other or other.get("filled") is not None:
+                        continue
+                    orr, occ = 2 * sr + j // 2, 2 * sc + j % 2
+                    col = "jede" if other.get("type") == "WILD" else COLORS.get(other.get("color"), "?")
+                    missing.append(f"({orr},{occ}) {col}")
+                out.append(f"({r},{c}) +{r + 1}, es fehlt: " + (", ".join(missing) if missing else "nichts"))
+    return out
+
+
+def _filled_colors_in_row(grid, r: int) -> set:
+    """Farben der belegten Zellen einer Rasterzeile. Spezialfliesen zaehlen als KEINE Farbe
+    (engine_manual, Wertungsplatte 8)."""
+    cols = set()
+    for c in range(6):
+        sp, has = slot_space(grid, r, c)
+        if has and sp and sp.get("filled") is not None and sp["filled"] != "special":
+            cols.add(sp["filled"])
+    return cols
+
+
+def _reachable_colors_in_row(grid, r: int) -> set:
+    """Farben, die eine Rasterzeile ueber ihre noch FREIEN Zellen aufnehmen koennte."""
+    cols = set()
+    for c in range(6):
+        sp, has = slot_space(grid, r, c)
+        if not has or sp is None or sp.get("filled") is not None or sp.get("type") == "SPECIAL":
+            continue
+        if sp.get("type") == "WILD":
+            return set(NORMAL_ORDER)
+        cols.add(sp.get("color"))
+    return cols
+
+
+def _criterion_state(pl: dict, key: str) -> str:
+    """Stand EINER Wertungsplatte auf EINEM Brett, als kurzer Text."""
+    grid = pl.get("dome_grid") or []
+
+    def filled(r, c):
+        sp, has = slot_space(grid, r, c)
+        return has and sp is not None and sp.get("filled") is not None
+
+    if key == "horizontal":
+        done = [r for r in range(6) if all(filled(r, c) for c in range(6))]
+        return f"{len(done)} voll" + (f" (z{', z'.join(map(str, done))})" if done else "")
+    if key == "vertikal":
+        done = [c for c in range(6) if all(filled(r, c) for r in range(6))]
+        best = max((sum(filled(r, c) for r in range(6)) for c in range(6)), default=0)
+        return f"{len(done)} voll, hoechste Spalte {best}"
+    if key == "diagonal":
+        main_diag = sum(filled(i, i) for i in range(6))
+        anti_diag = sum(filled(i, 5 - i) for i in range(6))
+        return f"Haupt {main_diag}/6, Gegen {anti_diag}/6"
+    if key == "wild":
+        total = empty = 0
+        for r in range(6):
+            for c in range(6):
+                sp, has = slot_space(grid, r, c)
+                if has and sp and sp.get("type") == "WILD":
+                    total += 1
+                    empty += sp.get("filled") is None
+        if not total:
+            return "kein Wildfeld"
+        return f"{total - empty}/{total} belegt -> {2 * total if not empty else 0} Pkt"
+    if key == "aussen":
+        n = sum(filled(r, c) for r in range(6) for c in range(6) if r in (0, 5) or c in (0, 5))
+        return f"{n} Fliesen am Rand"
+    if key == "ecken":
+        pts, done = 0, []
+        for sr, sc in ((0, 0), (0, 2), (2, 0), (2, 2)):
+            if all(filled(2 * sr + i // 2, 2 * sc + i % 2) for i in range(4)):
+                done.append(f"({sr},{sc})")
+                pts += 3 if sr == 0 else 8
+        return f"{len(done)} fertig = {pts} Pkt" + (" " + ",".join(done) if done else "")
+    if key == "spezial":
+        empty = 0
+        for r in range(6):
+            for c in range(6):
+                sp, has = slot_space(grid, r, c)
+                if has and sp and sp.get("type") == "SPECIAL" and sp.get("filled") is None:
+                    empty += 1
+        return f"{empty} leer = {-3 * empty} Pkt"
+    if key == "farben":
+        done_rows, open_rows = [], []
+        for r in range(6):
+            have = _filled_colors_in_row(grid, r)
+            if len(have) >= 5:
+                done_rows.append(f"z{r}")
+                continue
+            missing = _reachable_colors_in_row(grid, r) - have
+            if len(have) + len(missing) >= 5 and have:
+                open_rows.append(f"z{r} {len(have)} (+{'/'.join(sorted(COLORS.get(x, '?') for x in missing))})")
+        return (f"{len(done_rows)} fertig" + (" " + ",".join(done_rows) if done_rows else "")
+                + ("; moeglich: " + ", ".join(open_rows[:3]) if open_rows else ""))
+    return "?"
+
+
+# Zuordnung ueber den NAMEN der Wertungsplatte, nicht ueber ihre Id: der Katalog liefert die
+# Namen mit, und ein Id-Wechsel in der Engine wuerde hier sonst still falsch rechnen.
+CRITERION_KEYS = (
+    ("Horizontale", "horizontal"), ("Vertikale", "vertikal"), ("Diagonale", "diagonal"),
+    ("Mehrfarbige", "wild"), ("ere Felder", "aussen"), ("Eckplatten", "ecken"),
+    ("Spezialfelder", "spezial"), ("Farbenreiche", "farben"),
+)
+
+
+def criteria_lines(st: dict, m: dict, tiles_catalog: dict) -> list[str]:
+    """Stand der AUSLIEGENDEN Wertungsplatten fuer beide Seiten, eine Zeile je Kriterium.
+
+    Reine Brett-Arithmetik (dieselbe Begruendung wie bei den Reihen-Zielen). Anlass ist ein
+    4-Punkte-Fehler in g06: R2 wurde mit Gelb vollendet, um ein Wildfeld zu belegen, obwohl
+    Gelb in derselben Kuppelzeile schon lag -- also keine fuenfte Farbe war.
+    """
+    players = st.get("players") or []
+    me = m["me"]
+    out: list[str] = []
+    for tid in st.get("scoring_tile_ids") or []:
+        name = tiles_catalog.get(tid, {}).get("name", "")
+        key = next((k for needle, k in CRITERION_KEYS if needle in name), None)
+        if key is None:
+            continue
+        mine = _criterion_state(players[me], key) if me < len(players) else "?"
+        theirs = _criterion_state(players[1 - me], key) if len(players) > 1 else "?"
+        out.append(f"{name}: Claude {mine} | KI {theirs}")
+    return out
+
+
+def forced_clears_after(pl: dict, slot_r: int, slot_c: int, spaces_rot: list) -> list[str]:
+    """Welche eigenen Musterreihen nach DIESER Platzierung zwangsgeraeumt wuerden.
+
+    Eine Platte nimmt nie eine Zelle weg -- gefaehrlich ist nur die LETZTE Platte einer
+    Kuppelzeile: erst wenn alle drei Slots belegt sind und keine freie Zelle die Farbe der
+    Musterreihe aufnimmt, wird geraeumt (game.rs:869/966). Genau das ist in g07 Runde 4
+    passiert: Platte #10 mit Rotation 0 statt 180 gelegt, die Schwarz-Zelle landete in z5
+    statt z4, und die zwei geparkten Schwarz in R4 verloren ihre letzte Zielzelle.
+    """
+    grid = pl.get("dome_grid") or []
+    hits: list[str] = []
+    for row in pl.get("pattern_lines", []):
+        i, color = row["index"], row.get("color")
+        k = len(row.get("tiles") or [])
+        if not k or not color:
+            continue
+        cells_with_plate = fits = 0
+        for c in range(6):
+            if i // 2 == slot_r and c // 2 == slot_c:
+                idx = (i % 2) * 2 + (c % 2)
+                sp, has = (spaces_rot[idx] if idx < len(spaces_rot) else None), True
+            else:
+                sp, has = slot_space(grid, i, c)
+            if not has:
+                continue
+            cells_with_plate += 1
+            if sp is None or sp.get("filled") is not None or sp.get("type") == "SPECIAL":
+                continue
+            if sp.get("type") == "WILD" or sp.get("color") == color:
+                fits += 1
+        if cells_with_plate == 6 and fits == 0:
+            hits.append(f"R{i} {COLORS.get(color, '?')}{k}/{row['capacity']}")
+    return hits
+
+
+def placement_warnings(st: dict, m: dict) -> list[str]:
+    """Vorschau VOR dem Legen: welche Platte auf welchem Slot in welcher Drehung eine
+    eigene Musterreihe heimatlos macht. Zeigt nur die gefaehrlichen Kombinationen."""
+    players = st.get("players") or []
+    if m["me"] >= len(players):
+        return []
+    pl = players[m["me"]]
+    catalog = {t["id"]: t for t in (st.get("dome_display") or []) + (st.get("pending_stack_draw") or []) if t}
+    # Menge, nicht Liste: `valid_moves` fuehrt denselben (Platte, Slot) mehrfach auf, sonst
+    # stuende jede Drehung vierfach in der Warnung.
+    cands: dict[tuple, set[int]] = {}
+    for v in st.get("valid_moves") or []:
+        if v["type"] == "dome_display":
+            tid, verb = v.get("tile_id"), "d"
+        elif v["type"] == "dome_stack_choose":
+            tid, verb = v.get("chosen_id"), "choose"
+        else:
+            continue
+        tile = catalog.get(tid)
+        if not tile:
+            continue
+        spaces = tile.get("spaces") or []
+        for deg, perm in ROTATION_INDICES.items():
+            rot = [spaces[p] if p < len(spaces) else None for p in perm]
+            hits = forced_clears_after(pl, v["slot_row"], v["slot_col"], rot)
+            if hits:
+                cands.setdefault((verb, tid, v["slot_row"], v["slot_col"], tuple(hits)), set()).add(deg)
+    if not cands:
+        return []
+    out = ["ACHTUNG Plattenwahl -- so gelegt folgt beim Tiling eine ZWANGSRAEUMUNG:"]
+    for (verb, tid, sr, sc, hits), degs in sorted(cands.items()):
+        out.append(f"  {verb} {tid} {sr} {sc} rot {'|'.join(str(d) for d in sorted(degs))}"
+                   f"  -> {', '.join(hits)} ohne Zielzelle")
+    return out
+
+
 
 def render(st: dict, m: dict, tiles_catalog: dict) -> str:
     me, ai = m["me"], m["ai_player"]
@@ -407,6 +642,15 @@ def render(st: dict, m: dict, tiles_catalog: dict) -> str:
             L.append(duty_line(st, pl))
             L.append("    Reihen-Ziele (was jede Musterreihe in ihrer Kuppelzeile noch aufnehmen kann):")
             L.extend("      " + s for s in row_targets(pl))
+            sp_lines = special_lines(pl)
+            if sp_lines:
+                L.append("    Spezialfelder (frei, sobald die 3 anderen Zellen IHRER Platte belegt sind):")
+                L.extend("      " + s for s in sp_lines)
+    if st.get("phase") != "end":
+        crit = criteria_lines(st, m, tiles_catalog)
+        if crit:
+            L.append("Wertungsplatten-Stand (reine Brett-Arithmetik):")
+            L.extend("  " + s for s in crit)
     return "\n".join(L)
 
 
@@ -440,10 +684,7 @@ def legal_moves_text(st: dict, m: dict) -> str:
     # gelesen wurde (was seinerseits Ablehnungen verschluckt hat).
     groups: dict[tuple, list[int]] = {}
     for v in stones:
-        fid = v.get("factory_id")
-        # Aktion C (globaler Mondzug): SMALL_FACTORY_MOON ohne Fabrik-Id (moves.rs:39) -> Kurzform "m".
-        src = {"SMALL_FACTORY_SUN": f"{fid}", "SMALL_FACTORY_MOON": ("m" if fid is None else f"m{fid}"),
-               "LARGE_FACTORY_SUN": "gf", "LARGE_FACTORY_MOON": "gm"}.get(v["source"], v["source"])
+        src = move_source_key(v)
         key = (src, v["color"], tuple(v.get("moon_order") or []))
         groups.setdefault(key, []).append(v["row"])
     for (src, color, moon), rows in groups.items():
@@ -469,6 +710,7 @@ def legal_moves_text(st: dict, m: dict) -> str:
             L.append("  pass")
         if v["type"] == "start_tile_pending":
             L.append(f"  start <platte> <slot_r> <slot_c> [rot]   (Spieler {v['player']} legt die Startplatte; Platten der Auslage)")
+    L.extend(placement_warnings(st, m))
     return "\n".join(L)
 
 
@@ -489,6 +731,47 @@ def parse_color(tok: str) -> str:
         raise SystemExit(f"unbekannte Farbe '{tok}'")
     return c
 
+def move_source_key(v: dict) -> str:
+    """Kurzform der Quelle EINES Zuges -- dieselbe Abbildung fuer Anzeige und Eingabe.
+
+    Aktion C (globaler Mondzug) kommt ohne Fabrik-Id (moves.rs:39) und heisst darum "m".
+    """
+    fid = v.get("factory_id")
+    return {"SMALL_FACTORY_SUN": f"{fid}", "SMALL_FACTORY_MOON": ("m" if fid is None else f"m{fid}"),
+            "LARGE_FACTORY_SUN": "gf", "LARGE_FACTORY_MOON": "gm"}.get(v["source"], v["source"])
+
+
+def resolve_moon_order(g, src: str, color: str, row_i: int) -> list:
+    """Mond-Reihenfolge nachschlagen, wenn sie beim Zug weggelassen wurde.
+
+    Weglassen ist nur erlaubt, wenn es NICHTS zu entscheiden gibt: hoechstens ein Reststein
+    oder lauter gleichfarbige. Sobald echte Wahl besteht, bleibt die Angabe Pflicht. Die
+    Reihenfolge legt fest, was der Gegner oben auf dem Mondstapel vorfindet, und genau das
+    war in g06 mehrfach der Hebel (Blau ganz unten vergraben, damit das Netz seine Reihe
+    nicht schliessen kann); ein stiller Default waere hier ein stiller Punktverlust.
+
+    **Wichtig zur Quelle (geprueft 2026-09-12):** `valid_moves` traegt je (Quelle, Farbe,
+    Reihe) nur EINE, kanonische Reihenfolge -- der Zuggenerator zaehlt die Permutationen
+    nicht auf. Abweichende Reihenfolgen sind trotzdem legal, weil `apply_stone` nur die
+    MENGE der Reststeine prueft. Die Zahl der Eintraege sagt hier also nichts ueber die
+    Wahlfreiheit; entscheidend ist die Laenge der Liste.
+    """
+    st = json.loads(g.state_json())
+    orders = {tuple(v.get("moon_order") or []) for v in st.get("valid_moves", [])
+              if v.get("type") == "stone" and v.get("color") == color and v.get("row") == row_i
+              and move_source_key(v) == src}
+    if not orders:
+        return []
+    canonical = sorted(orders)[0]
+    if len(set(canonical)) <= 1:
+        return list(canonical)
+    raise SystemExit(
+        f"'{src} {color} {row_i}' braucht eine Mond-Reihenfolge (unten zuerst): die Reste "
+        f"{', '.join(canonical)} lassen sich verschieden stapeln, und nur der oberste Stein "
+        f"ist spaeter mit Aktion C erreichbar. Vorschlag des Zuggenerators: mond:"
+        + ",".join(canonical))
+
+
 
 def apply_move(g, m: dict, text: str) -> str:
     me = m["me"]
@@ -504,6 +787,8 @@ def apply_move(g, m: dict, text: str) -> str:
                 moon = [parse_color(x) for x in extra[5:].split(",") if x]
         row_i = -1 if row.lower() == "floor" else int(row)
         s_ = src.lower()
+        if not moon:
+            moon = resolve_moon_order(g, s_, color, row_i)
         if s_ == "gf":
             g.apply_stone("LARGE_FACTORY_SUN", color, row_i, None, moon or None)
         elif s_ == "gm":
