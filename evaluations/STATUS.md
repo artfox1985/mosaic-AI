@@ -60,41 +60,46 @@ entstanden, kein Artefakt betroffen. **Erzeugung FERTIG**
 INPUT_SIZE 744. Monolith 9 min, Training 1,43 h, beides gemessen. Danach Tor 1 `v28-b01` gegen
 `v27-b01` mit `--log-games` (zwei Seeds), dann `git stash pop` und Variante B fuer `v28-b02`.
 
-**Claude-Partien g02-g05: FERTIG (2026-09-11). Die Parallelsitzung gibt ihren Teil der
-Maschine frei -- von ihr laeuft nichts mehr.** Ergebnis: **Claude 3:1** gegen
-`v27-b01_brierbest` @400 (g02 55:43, g03 66:48, g04 36:28, g05 50:55, alle Seeds und
-Spec-Pfade aus den Partie-Manifesten). Registriert in `PREREG_claude_play_interface.md` par.7
-mit Endwertung je Kriterium, den sechs Standard-Kennzahlen, Beobachtungen und eigenen Fehlern.
-Zwei Muster tragen ueber alle vier Partien: die Ziehzahl am Kuppelstapel folgt dem
-PUNKTESTAND (bei Stand 0 durchsucht das Netz den Stapel -- 21 Ziehungen allein in g04 Runde 1 --,
-waehrend es in g05 nie auf 0 fiel und darum nur siebenmal zog), und das Netz fuellt lange
-Musterreihen mit Farben, die seine eigene Kuppelzeile nicht aufnehmen kann (fuenf Vorfaelle,
-in g04 zehn Steine auf einmal, volle Strafleiste). Beides ist seit 2026-09-11 als Sonde
-vorregistriert: **`PREREG_corpus_behaviour_audit.md`**, drei Arme, alle aus vorhandenen
-Partielogs, kein Engine-Eingriff und keine neue Erzeugung (A Anomalie-Report mit
-Ziehungen je Platzierung bedingt auf den Punktestand und Zwangsraeumungen, B Siegquote
-nach "faellt in Runde 1 auf 0", C konditioniert der Prior ueberhaupt auf die ausliegenden
-Wertungsplatten). Die Prereg traegt damit Kanal 4 aus `PREREG_dome_stack_information_sets.md`
-par.11. **Quellenfrage GEKLAERT 2026-09-11** (Prereg par.3): `--log-games` ist ein Arena-Flag,
-`self_play.py` schreibt gar keine Partielogs -- aber jeder Record traegt `state.log` als
-mitlaufendes Fenster, und ueberlappend ueber die Records einer Partie zusammengesetzt ergibt
-das den vollstaendigen Log (ueber die UEBERLAPPUNG, nicht ueber eine Menge: 301 gegen 299
-Zeilen). Alle drei Arme sind damit aus dem vorhandenen Korpus messbar, ohne neue Erzeugung.
-Vorschau aus vier Partien: Stapelziehungen 4/24/5/36, Zwangsraeumungen 0/1/2/2.
-**Der Lauf kommt erst mit v29 (Nutzer 2026-09-11);** bis dahin bleibt die Prereg
-vorregistriert und ungemessen. Das Spiel-Werkzeug
-`tools/claude_play.py` ist im selben Zug nachgebessert (par.9 P.8-10: falsche `KI:`-Zeile
-durch die echten Engine-Logzeilen ersetzt, `m1`-`m4` abgewiesen, Pflichtzaehler und
-Reihen-Ziele in `show`, Zugliste zusammengefasst); ein Rauchtest mit lebendem Gegner steht
-aus, weil die Maschine belegt ist. Die verlorene Partie g05 ging an eigenen Strafleisten-Fehlern verloren (-32 gegen
--8), nicht an der Endwertung (21:9 fuer Claude).
+**Claude-Partien: g02-g05 gegen `v27-b01` FERTIG (Claude 3:1), g06/g07 gegen
+`v28-b02_brierbest` @400 FERTIG (2026-09-11): 1:1, g06 70:64 gewonnen, g07 45:58 verloren.**
+Alle Seeds und Spec-Pfade aus den Partie-Manifesten; registriert in
+`PREREG_claude_play_interface.md` par.7 mit Endwertung je Kriterium, den sechs
+Standard-Kennzahlen, Beobachtungen und eigenen Fehlern. Zwei Linien tragen jetzt ueber sechs
+Partien:
 
-**Restprogramm der Reihe: g06-g10 gegen v28, sobald es steht (Nutzer 2026-09-11).** Claude
-spielt dort als ZWEITSPIELER (`--claude-side 1 --first-player 0`), damit die Reihe fuenf
-Partien je Seite hat. Die zehn Partien laufen damit gegen drei verschiedene Champions
-(g01 v24-b06, g02-g05 v27-b01, g06-g10 v28) -- eine Siegquote ueber alle zehn ist keine
-Groesse, ausgewiesen wird je Block (`PREREG_claude_play_interface.md` par.8.8). **Vor g06
-faellt der Rauchtest des geaenderten Werkzeugs an** (par.9 P.10).
+1. **Das Netz spielt plattenblind und gewinnt trotzdem ueber Platzierungen.** In g06 holte es
+   0 von 10 moeglichen Endwertungspunkten (zwei Wildfelder leer, keine farbenreiche Reihe,
+   keine Diagonale) und kam dennoch auf 64; in g07 verlor es die Endwertung 2:8 (drei leere
+   Spezialfelder, -9) und gewann die Partie um 13. Nebenbefund aus g06: **zwei volle Spalten,
+   obwohl keine Spaltenplatte auslag** -- der Spaltenbau laeuft unabhaengig von der Auslage.
+2. **Die Null-Klammer ist fuer das Netz ein Werkzeug, kein Unfall.** In g07 fiel es in Runde 1
+   bewusst von 5 auf 0 (13 Ziehungen in EINEM Zug, fuenf bezahlt) und durchsuchte danach bei
+   Stand 0 den Stapel mit 8, 7 und 4 Ziehungen je Zug; zurueck bei 12 Punkten zog es genau
+   einmal. In g06 fiel keine Seite je auf 0 -- und es gab keinen einzigen Mehrfachzug.
+   Damit ist **Arm A1 der `PREREG_corpus_behaviour_audit.md` an lebenden Partien bestaetigt**
+   (dort par.7 mit der Tabelle), bevor der Korpuslauf gefahren ist. **Der Lauf selbst kommt
+   erst mit v29 (Nutzer 2026-09-11);** die Quellenfrage ist geklaert (Prereg par.3: keine
+   Partielogs noetig, `state.log` je Record ueberlappend zusammensetzen).
+
+**Eigene Schwaeche bleibt die Strafleiste:** ueber g06/g07 -40 gegen -19 des Netzes; in g07
+allein -25 gegen -11 bei 13 Punkten Endabstand. Ursache in beiden Partien dieselbe wie in
+g02/g04/g05: sind am Rundenende alle Musterreihen farblich festgelegt, fegt Aktion C die
+Restfarben als Block herein. Dazu in g07 ein Rotationsfehler beim Plattenlegen (Schwarz-Zelle
+in z5 statt z4, R4 zwangsgeraeumt, rund -5).
+
+**Werkzeug `tools/claude_play.py`:** der ausstehende **Rauchtest mit lebendem Gegner ist
+GRUEN** (g06, par.9 P.11). Neu dazugekommen (par.9 P.12/13): `save_manifest` wiederholt gegen
+OneDrive-Sperren (ein `PermissionError` hatte in g06 einen schon berechneten Netzzug
+verschluckt, weil `drive_ai` das Manifest VOR `append_log` schreibt), neues Unterkommando
+**`step`** laesst nur die KI ziehen (Notausgang genau dafuer), und zwei offene Bedien-Luecken
+sind benannt: die Zwangsraeumungs-Warnung kommt erst NACH dem Plattenlegen, und
+`chips <reihe>` hat keine Chipwahl.
+
+**Restprogramm der Reihe: g08-g10.** Claude spielt weiter als ZWEITSPIELER
+(`--claude-side 1 --first-player 0`), damit die Reihe fuenf Partien je Seite hat. Die zehn
+Partien laufen gegen drei verschiedene Champions (g01 v24-b06, g02-g05 v27-b01, g06-g10 v28)
+-- eine Siegquote ueber alle zehn ist keine Groesse, ausgewiesen wird je Block
+(`PREREG_claude_play_interface.md` par.8.8).
 
 ### v28: ZUSCHNITT UND KETTE (gestartet 2026-09-10, 23:49)
 
@@ -176,7 +181,7 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 | Null-Klammer | `score_clamp_incentive` | ENTSCHIEDEN: Regel bleibt (Stufe 0: 39 % der Partien auf 0, geschluckte Strafe Median 0, 3,1 Gratis-Ziehungen je Partie und Seite) |
 | Startpositions-Seeding / Ausflug | `start_position_seeding` | ENTSCHIEDEN: Dubletten-Fix gebaut (par.9l); Folgearme brauchen eigene Registrierung |
 | Sicht-Reststufen | `stack_top_feature` par.10/11/12 | offen; Merkmale erst nach v28-b02, weil sie Records brauchen |
-| Claude-Partien | `claude_play_interface` par.9 | laufen (Parallelsitzung) |
+| Claude-Partien | `claude_play_interface` par.7/par.9 | g02-g07 gespielt (3:1 gegen v27-b01, 1:1 gegen v28-b02); Werkzeug-Rauchtest gruen; g08-g10 offen |
 | Einhuellende, Schliesskriterium | `geometric_envelope` par.12c | EINGETAKTET 2026-09-11 als v28-Schritt 8: K3-D plus Jokerfeld-Knopf bauen, C2 an den v28-Armen, A1/A2 am Champion |
 | Werkzeuge | | `paired_gating --log-games` (Tor 2b aus Tor 1), `plate_points` je Modell, `dome_stack_known_block_draw_probe`, exakter Orakel-Pfad, Spec-Rueckfall in server.py |
 

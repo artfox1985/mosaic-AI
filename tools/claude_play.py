@@ -58,6 +58,7 @@ import datetime as dt
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
@@ -108,7 +109,22 @@ def load_manifest(name: str) -> dict:
 
 
 def save_manifest(name: str, m: dict) -> None:
-    (game_dir(name) / "manifest.json").write_text(json.dumps(m, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
+    """Manifest schreiben, mit Wiederholversuchen gegen kurzzeitige Sperren.
+
+    OneDrive sperrt eine Datei waehrend der Synchronisierung fuer Sekundenbruchteile.
+    In g06 (2026-09-11) ist `drive_ai` genau daran gestorben, NACHDEM die KI ihren Zug
+    schon berechnet hatte; der Zug ging verloren, weil `append_log` erst danach kommt
+    (PREREG_claude_play_interface.md par.9)."""
+    path = game_dir(name) / "manifest.json"
+    payload = json.dumps(m, indent=2, ensure_ascii=False) + "\n"
+    for attempt in range(6):
+        try:
+            path.write_text(payload, encoding="utf-8", newline="\n")
+            return
+        except PermissionError:
+            if attempt == 5:
+                raise
+            time.sleep(0.5)
 
 
 def apply_spec_env(spec_path: Path) -> None:
@@ -648,6 +664,24 @@ def cmd_move(a) -> int:
     return show(a.game, m, mr, g)
 
 
+def cmd_step(a) -> int:
+    """Nur die KI ziehen lassen, ohne eigenen Zug.
+
+    Notausgang fuer den Fall, dass `drive_ai` mitten im Gegenzug abgebrochen ist
+    (g06 2026-09-11: PermissionError auf manifest.json). Der KI-Zug ist dann NICHT
+    persistiert -- `append_log` kommt erst nach dem Manifest --, die Partie steht also
+    sauber, aber mit der KI am Zug, und `move` kaeme nicht durch.
+    """
+    m = load_manifest(a.game)
+    mr, g = rebuild_game(a.game, m)
+    out: list[str] = []
+    drive_ai(a.game, m, g, g.log_len(), out)
+    if out:
+        print(chr(10).join(out))
+        print()
+    return show(a.game, m, mr, g)
+
+
 def cmd_note(a) -> int:
     d = game_dir(a.game)
     with open(d / "notes.md", "a", encoding="utf-8", newline="\n") as fh:
@@ -668,6 +702,7 @@ def main() -> int:
     s = sub.add_parser("show"); s.add_argument("--game", required=True)
     mv = sub.add_parser("move"); mv.add_argument("--game", required=True); mv.add_argument("move")
     nt = sub.add_parser("note"); nt.add_argument("--game", required=True); nt.add_argument("text")
+    sp = sub.add_parser("step"); sp.add_argument("--game", required=True)
     a = ap.parse_args()
     if a.cmd == "new":
         if a.opponent is None:
@@ -677,6 +712,8 @@ def main() -> int:
         return cmd_show(a)
     if a.cmd == "move":
         return cmd_move(a)
+    if a.cmd == "step":
+        return cmd_step(a)
     if a.cmd == "note":
         return cmd_note(a)
     return 2
