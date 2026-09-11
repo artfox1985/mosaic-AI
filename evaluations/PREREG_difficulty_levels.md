@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets im Server sind aus der GUI nicht erreichbar, alle 33 Mensch-Partien liefen @400; Vorschlag (par.4): Stufen als Leiter EINGEFRORENER Spieler mit Elo-Knoten (hv1 1000 bis Champion 1405), Sims nur als Feinregler; Stufe 0 (Inventur, Eingabelaenge 744/755) VOR jedem Bau. -->
+<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets im Server sind aus der GUI nicht erreichbar, alle 33 Mensch-Partien liefen @400 (Mensch 24:7:2); Vorschlag (par.4): Stufen als Leiter EINGEFRORENER Spieler mit Elo-Knoten (hv1 1000 bis Champion 1405), Heuristik-Stufen = Anker-Artefakte (Nutzer-Entscheid par.8.7), Sims nur als Feinregler; Stufe 0 (Inventur, Eingabelaenge 744/755) VOR jedem Bau. -->
 
 # Vorregistrierung: Schwierigkeitsstufen beim Spiel gegen das Netz
 
@@ -13,10 +13,11 @@ sind deutsch (Anzeige, kein Bezeichner).
 
 Das Projekt endet nach ein bis zwei Generationen nach v28. Was bleibt, ist die
 GUI mit dem Netz als Gegner. Heute hat sie GENAU EINE Staerke (par.2): den
-amtierenden Champion bei 400 Simulationen, und in 33 Mensch-Partien (par.2.4)
-hat der Mensch 13 gewonnen und 18 verloren. Fuer einen Spieler, der das Spiel
-lernt, ist das eine Wand; fuer einen, der es kann, ist es genau eine Stufe. Ein
-Endprodukt braucht eine Leiter.
+amtierenden Champion bei 400 Simulationen. In 33 Mensch-Partien (par.2.4) hat
+der Mensch 24 gewonnen, 7 verloren und 2 punktgleich beendet; gegen die zwei
+juengsten Champions steht es 5:5. Fuer die Stammspieler ist das eine Stufe, die
+sie schlagen koennen, fuer einen Anfaenger eine Wand, und nach oben gibt es
+nichts. Ein Endprodukt braucht eine Leiter in beide Richtungen.
 
 Die Frage ist NICHT "wie macht man das Netz schwaecher" (das geht trivial:
 weniger Sims, Zufallszuege). Die Frage ist: **welche Stufen sind GEMESSEN
@@ -60,7 +61,9 @@ beschreibt die Presets trotzdem als Feature (Konsument, par.9).
   also die LEBENDE In-Process-Heuristik. Das ist die Entwicklungsumgebung, nicht
   der eingefrorene Anker `hv1_anchor` (Skill `mosaic-anchor-invariance`); ihr
   Elo steht in keinem Register. Welche Variante (hv1/hv2) sie heute spielt, ist
-  NICHT geprueft (Stufe 0).
+  NICHT geprueft (Stufe 0). **Nutzer-Entscheid 2026-09-11 (par.8.7): die
+  Heuristik-Stufen spielen die EINGEFRORENEN Anker (`hv1_anchor`,
+  `hv2_generator`), nicht den lebenden Pfad.**
 - Suche in der GUI: `net_search_with_tree(..., add_root_noise=false, ...)`
   (`py.rs:571` fuer den Debug-Pfad; fuer den Zugpfad `ai_drafting_net_step`
   ANNAHME gleicher Aufruf, Stufe 0 prueft es). Kein Wurzelrauschen, keine
@@ -92,26 +95,37 @@ fuer diese vier).
 
 `static/log/game_*.log`, Kopfzeile 2 je Datei (alle 33 gelesen): `ai_player 1`
 in allen 33, `first_player 0` in 28 und `1` in 5; `ai_sims 400` in allen 33.
-Endstand aus der Zeile `# SPIELENDE: [p0, p1]` (Regex `SPIELENDE_RE`,
-`tools/analyze_game_log.py:252`); p0 = "Spieler 1" = Mensch (ANNAHME aus der
-`players`-Liste des Kopfes, an einer Datei gelesen). Wer gespielt hat, steht
-nicht im Kopf (Profil-Feld nicht ausgewertet).
+Vier Menschen-Namen im Kopf: "Spieler 1" (23 Partien), "Spielerin" (8),
+"Erwin" (1), "Spieler" (1); wer dahintersteht, steht nicht im Log.
+
+**Endstand = die Zeilen `🏆 <Name>: Endwertung ... Gesamt: X Pkt`** (Regex
+`FINAL_SCORE`, `tools/analyze_game_log.py:152`), je Partie eine je Seite. NICHT
+die Zeile `# SPIELENDE: [..]`: die schreibt `server.py:1432-1436` aus
+`_rust.scores()` beim Aufruf von `/api/end_game_log`, und in allen 33 Logs
+weicht sie von den 🏆-Summen ab (Beispiel 2026-09-04 19:49: SPIELENDE [33, 48],
+🏆 37:36). Warum sie die Endwertung nicht traegt, ist NICHT geprueft (ANNAHME:
+der Aufruf kommt vor dem Einrechnen der Endwertung in `scores`). Die erste
+Fassung dieser Prereg (Commit ea32dd3) hatte aus SPIELENDE gezaehlt und 13:18
+gemeldet; der Nutzer hat es angezweifelt, die 🏆-Zeilen widerlegen es.
 
 | Gegner | n | Mensch gewinnt | verliert | Punktgleich |
 | --- | --- | --- | --- | --- |
-| v21_2d_brierbest @400 | 13 | 7 | 6 | 0 |
-| v23-b01_k3p10 @400 | 9 | 1 | 7 | 1 |
-| v25-b01_brierbest @400 | 1 | 1 (50:8, Abbruch nicht ausgeschlossen) | 0 | 0 |
-| v26-b01_brierbest @400 | 7 | 2 | 4 | 1 |
+| v21_2d_brierbest @400 | 13 | 12 | 0 | 1 (80:80) |
+| v23-b01_k3p10 @400 | 9 | 6 | 2 | 1 (51:51) |
+| v25-b01_brierbest @400 | 1 | 1 (69:0, KI-Endwertung 0, Abbruch nicht ausgeschlossen) | 0 | 0 |
+| v26-b01_brierbest @400 | 7 | 3 | 4 | 0 |
 | v27-b01_brierbest @400 | 3 | 2 | 1 | 0 |
-| **gesamt** | **33** | **13** | **18** | **2** |
+| **gesamt** | **33** | **24** | **7** | **2** |
 
+Nur "Spieler 1"/"Spieler" gegen v26/v27 (9 Partien): 5 Siege, 4 Niederlagen.
 Punktgleichstaende loest die Startspielerstein-Regel im Spiel auf; hier steht
-der rohe Endstand. Einheit: Partien; Grundmenge: alle Logs in `static/log/`.
-Lesart, MARKIERT als Deutung: der Stammspieler liegt ungefaehr auf dem Niveau
-von v21 bis v23 (Elo-Knoten 1190 bis 1242); gegen v26/v27 verliert er oefter,
-aber n = 10 traegt keine Zahl. Fuer den Zuschnitt heisst das: die Leiter braucht
-Stufen UNTER dem heutigen Champion mehr als darueber.
+die rohe Endwertung. Einheit: Partien; Grundmenge: alle Logs in `static/log/`.
+Lesart, MARKIERT als Deutung: v21 (Elo 1190) schlagen die Menschen durchweg,
+v23 (1242) meist, v26/v27 (1364/1405) etwa zur Haelfte. Der Stammspieler liegt
+damit ungefaehr auf Champion-Niveau; n = 10 gegen v26/v27 traegt keine feinere
+Zahl. Fuer den Zuschnitt heisst das: die Leiter braucht Stufen UNTER dem
+Champion fuer Neue und mindestens eine Stufe DARUEBER fuer die Stammspieler,
+und die obere Stufe ist nicht optional (H3).
 
 ### par.2.5 Die vorhandene Leiter: das Elo-Register
 
@@ -145,14 +159,17 @@ Elo-Systems, keine Messung): 100 Punkte = 0,64, 200 = 0,76, 300 = 0,85,
   definiert. Grund: par.2.5 (Stilwechsel bei flacher Suche) und die fehlende
   Kante. Wird eine Stufe doch ueber Sims gebildet (par.4.2, Einsteigerstufe),
   bekommt sie ihre eigene Kante (par.5 Stufe 2).
-- **H3 (die obere Grenze ist die Antwortzeit).** Ob es eine Stufe UEBER dem
-  Champion @400 gibt (Champion @1200), entscheidet die gemessene Sekundenzahl je
-  Zug (par.5 Stufe 1), nicht ein Elo-Wunsch; ohne Kante bleibt so eine Stufe
-  als "ungemessen staerker" markiert.
-- **H4 (ein Einsteiger braucht etwas unter 1000).** Der Anker hv1 @150 schlaegt
-  v21 in keiner Kante, verliert aber 34:116 gegen v21 (Register). Ob er fuer
-  einen Anfaenger schon zu stark ist, sagt keine Zahl im Baum; par.5 Stufe 2
-  misst hv1 @40 gegen hv1 @150 als Kandidat fuer eine Stufe unter dem Anker.
+- **H3 (die obere Stufe ist noetig, ihre Grenze ist die Antwortzeit).** Die
+  Stammspieler stehen 5:5 gegen v26/v27 (par.2.4); eine Stufe UEBER dem Champion
+  @400 (Champion @1200) gehoert in die Leiter. Ob @1200 spielbar ist,
+  entscheidet die gemessene Sekundenzahl je Zug (par.5 Stufe 1); ob es staerker
+  ist, braucht eine Kante (par.5 Stufe 2b), sonst bleibt die Stufe als
+  "ungemessen staerker" markiert.
+- **H4 (ein Einsteiger braucht etwas unter 1000).** Der Anker hv1 @150
+  verliert 34:116 gegen v21 (Register), und v21 verlieren die Menschen hier
+  nie (12:0:1). Ob hv1 @150 fuer einen Anfaenger schon zu stark ist, sagt keine
+  Zahl im Baum; par.5 Stufe 2 misst hv1 @40 gegen hv1 @150 als Kandidat fuer
+  eine Stufe unter dem Anker.
 - **H5 (Kein Wuerfel).** Zufallszuege, Temperatur-Sampling und
   Punkte-Handicaps werden NICHT gebaut (par.6). Eine Stufe, die absichtlich
   Fehler macht, lehrt den Menschen falsche Muster; das Ziel ist ein schwaecherer
@@ -170,7 +187,7 @@ Elo-Systems, keine Messung): 100 Punkte = 0,64, 200 = 0,76, 300 = 0,85,
 | 4 | Erfahren | v24-b07 @400 mit `v24-b07_brierbest.spec.json` | lebende Datei, einzufrieren (par.4.4) | 1283 |
 | 5 | Stark | v25-b01 @400 mit seiner Spec | `frozen_champions/v25-b01` | 1336 |
 | 6 | Champion | amtierender Champion @400 mit seiner Spec (heute v27-b01; am Projektende der letzte) | `frozen_champions/<champion>` | 1405 heute |
-| 7 | Meister (optional) | Champion @1200 | wie 6 | ungemessen; nur wenn Stufe 1 der Messung die Antwortzeit unter der Schwelle (par.4.5) belegt |
+| 7 | Meister | Champion @1200 (Sims-Zahl nach Stufe 1 der Messung: die hoechste unter der Antwortzeit-Schwelle par.4.5) | wie 6 | ungemessen; Kante par.5 Stufe 2b |
 
 Abstaende: 100, 180, 50, 70 Elo zwischen den Stufen 2 bis 6; die Luecke
 zwischen 3 und 4 ist die groesste (hv2 1100 gegen v24-b07 1283). Ob eine
@@ -178,12 +195,14 @@ Zwischenstufe (v24-b06 1238 oder ein aus dem restic-Repo geholtes v21/v23)
 noetig ist: Nutzer-Entscheid par.8.2. Sechs Stufen sind der Vorschlag; mehr
 als sieben Stufen unterscheidet kein Mensch (ANNAHME, keine Messung).
 
-Die Heuristik-Stufen laufen NICHT ueber die lebende In-Process-Heuristik
-(par.2.2), sondern muessen den eingefrorenen Anker spielen. Wie: entweder die
-Server-Heuristik wird als hv1/hv2 mit der Spec des Artefakts konfiguriert und
-per Drift-Pruefung (Skill `mosaic-anchor-invariance`, 22 s) als zuggleich
-belegt, oder der Zug laeuft ueber den Artefakt-Worker
-(`tools/frozen_champion_worker.py`). Entscheid nach Stufe 0 (par.5).
+**Die Heuristik-Stufen spielen die eingefrorenen Anker** (`hv1_anchor`,
+`hv2_generator`), NICHT die lebende In-Process-Heuristik (par.2.2);
+Nutzer-Entscheid 2026-09-11 (par.8.7). Wie: entweder die Server-Heuristik wird
+als hv1/hv2 mit der Spec des Artefakts konfiguriert und per Drift-Pruefung
+(Skill `mosaic-anchor-invariance`, 22 s) als zuggleich mit dem Artefakt belegt,
+oder der Zug laeuft ueber den Artefakt-Worker (`tools/frozen_champion_worker.py`)
+aus dem Wheel des Artefakts. Der Weg ist eine Bau-Frage nach Stufe 0 (par.5);
+der Spieler ist entschieden.
 
 ### par.4.2 Server
 
@@ -276,6 +295,15 @@ entsteht nur, wenn hv1 @40 hoechstens 80 von 200 Partien gewinnt
 `Heuristik_hv1_anchor@40`. Sechs Standard-Kennzahlen (CLAUDE.md) aus den Logs.
 Kosten: rund 200 Partien Heuristik gegen Heuristik, unter 5 min (ANNAHME).
 
+**Stufe 2b: Kante fuer die Meister-Stufe.** Gepaarte Arena Champion @S gegen
+Champion @400 (S = hoechste Sim-Zahl unter der Antwortzeit-Schwelle aus
+Stufe 1, Kandidat 1200), 100 Paare, `--block-size 5`, Seed 20260953,
+`--log-games`. Entscheidungsregel, VORAB: die Stufe traegt den Namen "Meister"
+nur, wenn Champion @S mindestens 120 von 200 gewinnt (Vorzeichentest p < 0,05);
+sonst wird sie als "Champion, langsamer" gestrichen. Eintrag ins Elo-Register
+als Knoten `<champion>@S`. Kosten: 200 Partien @1200 gegen @400, rund
+4-mal die Kosten einer @400-Kante (ANNAHME).
+
 **Stufe 3: Gespielt = gemessen.** Je Stufe eine Partie ueber den GUI-Pfad und
 dieselbe Partie ueber den Arena-Pfad (gleicher Seed, gleiche Spec, gleiche
 Sims): Zugfolge byte-gleich (Muster: Netz-Paritaets-Fixture, Promotions-
@@ -319,11 +347,11 @@ dieser Prereg. Danach aendert sich die Leiter nicht mehr.
 
 ## par.7 Kosten
 
-Rechenlast: Stufe 1 unter 10 min, Stufe 2 unter 5 min, Stufe 3 je Stufe zwei
+Rechenlast: Stufe 1 unter 10 min, Stufe 2 unter 5 min, Stufe 2b rund 1-2 h, Stufe 3 je Stufe zwei
 Partien (unter 5 min gesamt), alles ANNAHMEN bis zum Artefakt. Bau: Server
 (Stufentabelle, Spec je Stufe, Log-Kopf) und Frontend (Auswahl, Hinweis,
 Expertenpfad) rund 3-4 h ohne Rechenlast; Einfrieren v24-b07 rund 30 min
-(Muster vorhanden). Mensch-Validierung: 18 Partien des Nutzers (6 Stufen mal
+(Muster vorhanden). Mensch-Validierung: 21 Partien des Nutzers (7 Stufen mal
 3), die einzige Groesse, die Kalenderzeit kostet.
 
 ## par.8 Offene Nutzer-Entscheide
@@ -339,8 +367,12 @@ Expertenpfad) rund 3-4 h ohne Rechenlast; Einfrieren v24-b07 rund 30 min
    je Stufe, falls Stufe 0 rot ist.
 5. Antwortzeit-Schwelle fuer "Meister" (Vorschlag 5 s je Zug, Median).
 6. Zeitpunkt: Bau vor oder nach der letzten Generation? Vorschlag: Stufen 0
-   bis 3 und der Bau JETZT parallel zum v28-Programm (keine Konkurrenz um die
-   CPU ausser Stufe 1-3, je unter 10 min), Stufe 5 nach dem letzten Champion.
+   bis 3 und der Bau JETZT parallel zum v28-Programm (Konkurrenz um die CPU
+   nur in Stufe 1-3; Stufe 2b ist die einzige laengere Messung), Stufe 5 nach
+   dem letzten Champion.
+7. ~~Heuristik-Stufen: lebender Pfad oder Anker-Artefakt?~~ ENTSCHIEDEN
+   2026-09-11 (Nutzer: "aendere das auf die eingefrorenen anker"): die
+   Anker-Artefakte `hv1_anchor` und `hv2_generator`.
 
 ## par.9 Konsumenten (Rueckwaerts-Pruefung beim Registrieren)
 

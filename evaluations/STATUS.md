@@ -161,7 +161,9 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 (Kante v24-b05 gegen v24-b04 aus dem restic-Repo nachholbar), `rust_data_layer`
 (Registrierung ohne Auftrag; Kandidat fuer UEBERHOLT), `difficulty_levels` (angelegt
 2026-09-11 auf Nutzer-Auftrag: Stufenleiter fuer die GUI aus eingefrorenen Spielern mit
-Elo-Knoten; sechs offene Nutzer-Entscheide in par.8, Stufe 0 prueft 744/755 VOR dem Bau).
+Elo-Knoten, Heuristik-Stufen = Anker-Artefakte (Nutzer 2026-09-11); Mensch-Bilanz 24:7:2 aus
+den Endwertungszeilen, NICHT aus `# SPIELENDE`; sechs offene Nutzer-Entscheide in par.8,
+Stufe 0 prueft 744/755 VOR dem Bau).
 Index: `PREREG_INDEX.md` (generiert).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
