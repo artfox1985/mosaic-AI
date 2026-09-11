@@ -72,15 +72,16 @@ Offen bis zum Nutzer-Entscheid; die Kette bekommt `G2_SWARM_PATTERN` erst danach
 ## par.3 WER ERZEUGT (Regel fest, Name offen bis zur v28-Promotion)
 
 Nach `docs/generation_loop.md` erzeugt der beste Stand der Vorgeneration mit Tor 1 und Tor 2
-auf beiden Flaechen. Stand 2026-09-11, 17:30: `v28-b01` hat Tor 1 gegen `v27-b01` (166:124,
-221:179; Elo 1447) und Tor 2b (1,030 gegen 0,884), `v28-b02` steht in Tor 1 gegen `v28-b01`
-(nach 50 Paaren 58:42, kein Entscheid). **Generator ist der Sieger der v28-Promotion**
+auf beiden Flaechen. Stand 2026-09-11, 20:30: `v28-b01` hat Tor 1 gegen `v27-b01` (166:124,
+221:179; Elo 1447) und Tor 2b (1,030 gegen 0,884); `v28-b02` ist gegen `v28-b01` ein
+Nullbefund (207:193, 209:191) und per Nutzer-Entscheid als korrektere Fassung der beste Stand. **Generator ist der Sieger der v28-Promotion**
 (`docs/promotion_checklist.md`, Champion-2-Kante gegen das Artefakt `v26-b01`):
 
 | Fall | Generator | Klassen | Merkmalsbreite des Generators |
 | --- | --- | --- | --- |
 | b02 besteht Tor 1 gegen b01 | `v28-b02` | `selfplay_v28-b02-policy_*`, `-value-tempc_*`, `-value-excursion_*` | 755 (sieht den Stapel) |
-| b02 faellt (H0 oder negativ) | `v28-b01` | `selfplay_v28-b01-*` | 744, unter dem 755er-Wheel gekuerzt (`net.rs:421`) |
+| b02 gleichauf mit b01 (EINGETRETEN 2026-09-11: 207:193, 209:191, beide Deckel) | `v28-b02` (Nutzer-Entscheid 2026-09-11: bei Gleichstand ist die Fassung mit dem volleren Informationsstand die richtige, `PREREG_v28_window.md` par.10) | `selfplay_v28-b02-*` | 755 |
+| b02 negativ gegen b01 | `v28-b01` | `selfplay_v28-b01-*` | 744, unter dem 755er-Wheel gekuerzt (`net.rs:421`) |
 | eine Ablation b03/b04 schlaegt den Sieger | der Ablationsarm | entsprechend | wie sein Rezept |
 
 Spec: die Champion-Spec aus dem Artefakt des Generators (`models/frozen_champions/<name>/spec.json`;

@@ -31,8 +31,9 @@ bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 ohne G-2, je Training plus Tor 1 gegen b02 mit zwei Seeds), gestartet 2026-09-11 abends, Ende
 etwa 8 h spaeter.** Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
 1461 gegen 1447 ueberlappend; Blockziehungen bei positivem Stand eher mehr, nicht weniger;
-`PREREG_v28_window.md` par.10, `dome_stack` par.15h). b01 bleibt bester Stand und
-Generator-Kandidat fuer v29. **K3-D plus Jokerfeld-Knopf GEBAUT** (`dead_cell_w`,
+`PREREG_v28_window.md` par.10, `dome_stack` par.15h). **Nutzer-Entscheid 20:30: b02 ist als
+korrektere Fassung (volleres Merkmalsbild) der beste Stand und Generator-Kandidat fuer v29;**
+Promotion dann fuer v28-b02, sofern keine Ablation ihn schlaegt. **K3-D plus Jokerfeld-Knopf GEBAUT** (`dead_cell_w`,
 `out_wild_w`, Default 0 bitidentisch; 576 Tests gruen, Wheel installiert, Anker-Drift gruen,
 `geometric_envelope` par.12c), Messungen C2 und A1/A2 folgen nach den Ablationen. Vorher 14:37-14:47: Baum auf INPUT_SIZE 755 (Stash
 eingespielt), Wheel gebaut und installiert, Anker-Drift GRUEN, Paritaetstor Rust/Python
