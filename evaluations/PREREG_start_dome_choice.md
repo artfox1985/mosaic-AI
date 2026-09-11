@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. Stufe 0 (Spannweite ueber die neun Slots, par.4) EINGETAKTET 2026-09-11 als Sonde am v28-Korpus, Schritt 5 des v28-Programms (PREREG_v28_window.md par.8); Verdikt nur fuer den Slot-Teil, Plattenwahl bleibt offen (Nachtrag 2026-09-09). Anker-Sperre aus par.6a ist ueberholt. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. Stufe 0 (Spannweite ueber die neun Slots, par.4) EINGETAKTET 2026-09-11 als Sonde am v28-Korpus, Schritt 5 des v28-Programms (PREREG_v28_window.md par.8); Verdikt nur fuer den Slot-Teil; Plattenwahl (Nachtrag 2026-09-09) EINGETAKTET als zweiter Teil im v29-Begleitprogramm. Anker-Sperre aus par.6a ist ueberholt. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -245,3 +245,9 @@ Slot-Teil einzugrenzen.
 ist (`PREREG_v28_window.md` par.8, Schritt 5). Gemessen wird die Spannweite des Slot-Wertes
 ueber die neun Slots je Startplatte; das vorregistrierte Verdikt gilt nur fuer den Slot-Teil
 (Nachtrag 2026-09-09), die Plattenwahl bleibt eine eigene Frage.
+
+## Nachtrag 2026-09-11 (Eintaktung)
+
+Stufe 0 bleibt v28-Schritt 5; die Plattenwahl (Nachtrag 2026-09-09) folgt als zweiter Teil im
+v29-Begleitprogramm (Nutzer 2026-09-11, `PREREG_v29_window.md` par.7 Punkt 4). Anlass par.6a: `choose_start_placement` bewertet
+`SpaceType::Special` mit 0,0 (`engine/src/self_play.rs:922`, geprueft 2026-09-11).

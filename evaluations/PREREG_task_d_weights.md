@@ -215,8 +215,8 @@ Kontrolle/den Champion `v21_2d_brierbest`, 400 Sims beidseitig.
 
 | Groesse | Wert | Quelle der Zahl |
 |---|---|---|
-| Ergebnis | **68:82** (45,3 %) | Zeile-1-Kopf dieser Datei |
-| SPRT | **H0 angenommen** nach 75 Paaren | Zeile-1-Kopf dieser Datei |
+| Ergebnis | **68:82** (45,3 %) | Zeile-1-Kopf dieser Datei; gleichlautend `archive/history.md:10590` |
+| SPRT | **H0 angenommen** nach 75 Paaren | Zeile-1-Kopf dieser Datei; gleichlautend `archive/history.md:10590` |
 | n / Sims | 150 Partien, 400 Sims | `evaluations/arena_trends.csv`, Zeile 74 (2026-08-10T01:35:34) |
 | Winrate | 0,4533 | dieselbe CSV-Zeile |
 | Eigene Punkte : Gegner | 44,067 : 45,227 | dieselbe CSV-Zeile |

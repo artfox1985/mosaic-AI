@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem -- ist die gebaute Stopp-Regel die richtige? | Beleg: NEIN (par.5b): optimale Tiefe ist ueberall 1, die gebaute Regel zieht bei negativem Brettniveau 9-11 mal; Ursache ist der Einheitenbruch (par.1c). Knopf gebaut, **Default AUS** (par.5c), Abnahme n=200 ohne Staerkeunterschied (par.5d). BEDINGT ab 2026-09-09 (par.7): V bepreist nur den Sofortwert, nicht das erworbene Stapelwissen; neu rechnen nach PREREG_dome_stack_information_sets. Wiedervorlage nur unter den zwei benannten Bedingungen aus par.5e -- beide ungebaut. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Die Blindziehung ist ein exakt loesbares Stoppproblem -- ist die gebaute Stopp-Regel die richtige? | Beleg: NEIN (par.5b): optimale Tiefe ist ueberall 1, die gebaute Regel zieht bei negativem Brettniveau 9-11 mal; Ursache ist der Einheitenbruch (par.1c). Knopf gebaut, **Default AUS** (par.5c), Abnahme n=200 ohne Staerkeunterschied (par.5d). BEDINGT ab 2026-09-09 (par.7): V bepreist nur den Sofortwert, nicht das erworbene Stapelwissen; neu rechnen nach PREREG_dome_stack_information_sets. Neurechnung nach par.7 EINGETAKTET fuer das v29-Begleitprogramm (Sonde am v29-Korpus, dann Knopf-A/B), Bedingungen par.5e dabei zu bauen. -->
 
 # PREREG: Reservationswert-Regel fuer die Blindziehung (`stack_draw_reservation_rule`)
 
@@ -853,3 +853,10 @@ informativen Paaren (`tools/paired_gating.py`).
    faechert die Permutationen nicht auf (`engine/src/game.rs:391`).
 4. **Der Gegner zieht auch.** Ein Zug an dieser Stelle kostet Tempo im
    Drafting; die Regel bilanziert nur Punkte gegen Punkte.
+
+## Nachtrag 2026-09-11 (Eintaktung)
+
+Die in par.7 geforderte Neurechnung der Stopp-Regel unter behaltenem Stapelwissen (Variante A ist
+gebaut) ist als Sonde und Knopf-A/B im v29-Begleitprogramm eingetaktet (Nutzer 2026-09-11, `PREREG_v29_window.md` par.7 Punkt 4),
+zusammen mit der Peek-Bewertung (`PREREG_chance_nodes.md` Teil B1) und der Ziehsucht-Sonde
+(`PREREG_claude_play_interface.md` par.9), weil alle drei denselben Befund bearbeiten.

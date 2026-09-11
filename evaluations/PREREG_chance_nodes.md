@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: Grossteils geliefert: R5-Zufallsknoten scharf seit 2026-08-10, Stack-Draw-Knopf seit v23 im Rezept (par.15, v24 ebenso). Teil A1 ist seit 2026-09-10 gebaut, als Variante A (dome_stack_information_sets par.15: die Determinisierung kennt die eigenen Rueckgabe-Bloecke). Geparkt bleibt nur B1 (MOSAIC_STACK_DRAW_CHANCE, null Code-Treffer, par.14). Nutzer-Entscheid 2026-09-05. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Sollten wir an den Zufallspunkten mit Wahrscheinlichkeiten statt mit Stichwelten rechnen -- und darf der oeffentlich bekannte Stapel-Unterbau weiter mitgemischt werden? | Beleg: Grossteils geliefert: R5-Zufallsknoten scharf seit 2026-08-10, Stack-Draw-Knopf seit v23 im Rezept (par.15, v24 ebenso). Teil A1 ist seit 2026-09-10 gebaut, als Variante A (dome_stack_information_sets par.15: die Determinisierung kennt die eigenen Rueckgabe-Bloecke). B1 (MOSAIC_STACK_DRAW_CHANCE, null Code-Treffer, par.14) EINGETAKTET fuer das v29-Begleitprogramm als Such-Knopf mit A/B. Nutzer-Entscheid 2026-09-05/2026-09-11. -->
 
 # Vorregistrierung: Wahrscheinlichkeiten statt Welten (Zufallsknoten)
 
@@ -1138,3 +1138,9 @@ Partien, plus die zugehoerigen `data/manifest_sdrb05*.json`.
 ## VERDIKT (2026-09-05, Nutzer-Entscheid: "setz die mal auf entschieden")
 
 Die Frage ist beantwortet, soweit sie einen Verbraucher hat: R5-Zufallsknoten und Stack-Draw-Knopf sind gebaut, gemessen und im Erzeugungsrezept (v23, v24: `MOSAIC_STACK_DRAW_RESEARCH=1`, Stack-Draw-Kontrolle 2,9-3,1 % der Records). Die geparkten Teile B1 und A1 (par.14) bleiben als Merkposten in dieser Datei; wer sie aufnimmt, registriert sie neu.
+
+## Nachtrag 2026-09-11 (Eintaktung)
+
+Teil B1, die Ein-Schritt-Erwartung an der Peek-Aktion (`MOSAIC_STACK_DRAW_CHANCE`), wird im
+v29-Begleitprogramm gebaut und per Referee-A/B gemessen (Nutzer 2026-09-11, `PREREG_v29_window.md` par.7 Punkt 4), zusammen mit der Neurechnung der
+Stopp-Regel (`PREREG_stack_draw_reservation_rule.md` par.7).
