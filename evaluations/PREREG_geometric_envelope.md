@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: Die Knopf-Seite traegt (Huellenform 2 gepoolt ueber drei Seeds 391:329 = 0,543, p 0,023, seit 2026-09-07 als v24-b07 in der Spec, par.8.15e/8.15f; K3-P Champion-Knopf par.11; vier weitere Arme negativ, par.8.11a/8.14). Das Schliesskriterium par.12 (Nutzer 2026-09-05) ist aber in allen drei Bedingungen offen: K3-D nicht gebaut (par.12 Bed.1), A1/A2 nie gemessen und B1/B2 nicht ueber den Rauschboden bewegt (par.12b), C2 verletzt (par.12a). -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: Die Knopf-Seite traegt (Huellenform 2 gepoolt ueber drei Seeds 391:329 = 0,543, p 0,023, seit 2026-09-07 als v24-b07 in der Spec, par.8.15e/8.15f; K3-P Champion-Knopf par.11; vier weitere Arme negativ, par.8.11a/8.14). Das Schliesskriterium par.12 (Nutzer 2026-09-05) ist aber in allen drei Bedingungen offen: K3-D nicht gebaut, A1/A2 nie gemessen, B1/B2 nicht ueber den Rauschboden bewegt (par.12b), C2 verletzt. EINGETAKTET 2026-09-11 als v28-Schritt 8 (par.12c): K3-D plus Jokerfeld-Knopf bauen, C2 an den v28-Armen, A1/A2 am Champion. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -2354,3 +2354,31 @@ gemessen wurde.
    sich nicht bewegt. **Ungeprueft; vor dem naechsten Push zu klaeren.**
 3. **v25 erzeugt mit b07**, nicht mit b06. Die Befehle in `PREREG_v25_window.md` sind
    nachgezogen.
+
+### par.12c EINGETAKTET (Nutzer 2026-09-11, 19:20: "takte das fuer v28 noch ein")
+
+Als Schritt 8 des v28-Programms (`PREREG_v28_window.md` par.8), in dieser Reihenfolge und nur
+in CPU-freien Fenstern (kein Bau, keine Messung neben einer Arena):
+
+1. **Bau K3-D** (par.8.9b Baustein 2): tote Huellenzellen (`cell_is_completable == false`)
+   zaehlen `-w_dead * (r+1) / Gesamtkosten` (56 bzw. 62 je Huellenform); Spec-Feld `dead_cell_w`,
+   Default 0 = bitidentisch. **Dazu die Jokerfeld-Regel als EIGENER Knopf** (Anlass: Nutzerfrage
+   2026-09-11 zur Platte "Mehrfarbige Felder", 2 Punkte je Jokerfeld nur bei Vollbelegung; eine
+   Jokerplatte am Huellenrand hat Zellen ausserhalb, deren Belegung heute (r+1)/62 * w_e kostet):
+   Zellen ausserhalb der Huelle, die zu einer BEREITS GELEGTEN Kuppelplatte gehoeren, zaehlen
+   mit Faktor `w_out_placed` (Default 0 = Bestand; 1 = keine Abweichung). Beides in
+   `envelope.rs` fuer alle Projektionsmodi, Registratur-Eintrag, Netz-Paritaets-Fixture des
+   Champions unveraendert (Default), Anker-Drift gruen (der Anker ist netzlos).
+2. **C2 Vorzeichen-Konsistenz an den v28-Armen** (par.12a): volle Spalten am argmax-Instrument
+   (`self_play.py --deterministic --no-root-noise` @400, `corpus_sanity_check.py`), Knopf an
+   minus aus, fuer b01 und b02 (b03/b04 nach ihrem Training). Kriterium unveraendert: gleiches
+   Vorzeichen fuer alle Arme; Schwelle aus par.12b.
+3. **A1/A2 am Champion** (par.12a Kanal A): Such-Variante der Orakel-Bruecke bauen
+   (`tools/oracle_metrics.py`: Besuchsverteilung der Suche @400 statt Prior, ein Schalter; UNGEPRUEFT,
+   ob es ein Schalter bleibt), dann auf `frozen_v3` Knopf an gegen aus am amtierenden Champion:
+   A1 Orakel-Top-3-Treffer je Runde, A2 Spearman Wurzelwert gegen Orakelwert je Runde; Schwellen
+   par.12b. K3-D und der Jokerfeld-Knopf werden in derselben Messung als dritte und vierte
+   Einstellung mitgefahren (aus / K3-P Bestand / plus K3-D / plus Jokerfeld).
+4. **Verdikt** nach par.12: alle drei Bedingungen erfuellt -> ENTSCHIEDEN; sonst bleibt die
+   Prereg OFFEN mit K3-P und Huellenform 2 als Rezeptbestandteil, und die gemessenen Zahlen
+   stehen hier. Kosten: Bau rund 2 h plus 1 h, Messungen rund 2 h CPU (ANNAHMEN).

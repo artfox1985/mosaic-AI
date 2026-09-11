@@ -173,6 +173,7 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 | Startpositions-Seeding / Ausflug | `start_position_seeding` | ENTSCHIEDEN: Dubletten-Fix gebaut (par.9l); Folgearme brauchen eigene Registrierung |
 | Sicht-Reststufen | `stack_top_feature` par.10/11/12 | offen; Merkmale erst nach v28-b02, weil sie Records brauchen |
 | Claude-Partien | `claude_play_interface` par.9 | laufen (Parallelsitzung) |
+| Einhuellende, Schliesskriterium | `geometric_envelope` par.12c | EINGETAKTET 2026-09-11 als v28-Schritt 8: K3-D plus Jokerfeld-Knopf bauen, C2 an den v28-Armen, A1/A2 am Champion |
 | Werkzeuge | | `paired_gating --log-games` (Tor 2b aus Tor 1), `plate_points` je Modell, `dome_stack_known_block_draw_probe`, exakter Orakel-Pfad, Spec-Rueckfall in server.py |
 
 ## 5. PREREG-BESTAND (10 OFFEN, Ziel rund 7)
