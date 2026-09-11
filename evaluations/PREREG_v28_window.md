@@ -247,6 +247,21 @@ b01 laeuft damit auf demselben Wheel. Kette `tools/night_v28_b02.sh`: Bloecke un
 755er-Schluessel (Rust-Bauer), Split, Monolith, Training v28-b02, Tor 1 b02 gegen b01 (Seeds
 20261038/39).
 
+**b02-Kette gefahren (14:48-16:52):** 2.947 Bloecke unter dem 755er-Schluessel ueber den
+Rust-Bauer in 26 min (14:48:48-15:15:10; kein sauberer Vergleich zum Python-Pfad, weil die
+744er-Bloecke ueber Nacht vom Waechter neben der Erzeugung gebaut wurden); Split identisch
+(2.800 Train, 147 Val); Monolith `data/.cache_9aae67c464f6.h5` (1,105 GB) in 551 s mit
+Formen-Waechter. **Training v28-b02 DURCH (15:24:29-16:52:17, Exit 0):** Rezept wie b01,
+Warmstart `v27-b01_brierbest` mit Eingangsbreite 744 -> 755 (elf Spalten null-initialisiert,
+`train.py:1678`), Seed 20260937, Manifest `models/manifest_train_v28-b02_20260911_152432.json`:
+Laufzeit 5.262,3 s (Datenaufbau 34,0 s; GEBREMST: ein `cargo test --release` des Pre-push-Hakens
+lief um Epoche 6/7 daneben), restic-Marke `run:v28-b02`. `_brierbest` ist **Epoche 6**
+(val_brier 0,1802), `_best` Epoche 1, Plateau ab Epoche 10; ONNX `alphazero_v28-b02_brierbest.onnx`
+mit `flat_input=755`. Die Epochenkurve liegt auf der von b01 (Brier 0,1809/0,1804/0,1802 gegen
+0,1810/0,1805/0,1802 in den Epochen 1-3): die elf Merkmale bewegen die Offline-Metrik nicht
+messbar, die Arena entscheidet. Tor 1 b02 gegen b01 laeuft seit 16:52 (Seed 20261038, danach
+20261039).
+
 ## par.10 ERGEBNISSE DER GENERATION (fortlaufend)
 
 **Erzeugung (2026-09-10, 23:49:56 bis 2026-09-11, 09:45:31; Laufzeit-Bloecke in
