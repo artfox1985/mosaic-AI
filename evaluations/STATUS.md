@@ -27,9 +27,11 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE BELEGT: v28-KETTE WIEDERAUFGENOMMEN ab Schritt 6 seit 2026-09-11, 10:20
-(`tools/night_v28_chain_resume.sh`, Hintergrundaufgabe dieser Sitzung): Monolith, dann
-Training `v28-b01`.** Der erste Lauf starb um 10:13 im Monolith-Merge: 24 Bloecke
+**MASCHINE BELEGT: TOR 1 v28-b01 gegen v27-b01 seit 2026-09-11, 12:05
+(`tools/night_v28_tor1.sh`, zwei Seeds 20261036/37 nacheinander, je rund 86 min, mit Logs;
+Hintergrundaufgabe dieser Sitzung). Training `v28-b01` DURCH 11:55: brierbest Epoche 3
+(val_brier 0,1802), 5.157 s, `run:v28-b01` gesichert (`PREREG_v28_window.md` par.10).**
+Davor die Kette: Der erste Lauf starb um 10:13 im Monolith-Merge: 24 Bloecke
 (`selfplay_v27-b01-policy_*_g410` bis `g640`, gebaut 00:14-00:28) trugen 755 Spalten unter
 744er-Schluesseln, weil die Waechter-Worker `config.py` frisch importierten, waehrend die
 Datei fuer den Variante-B-Bau auf 755 stand (der Elternprozess hatte 744 im Schluessel). Die
@@ -40,7 +42,7 @@ entstanden, kein Artefakt betroffen. **Erzeugung FERTIG**
 23:49:56 bis 09:45:31, 3 x 4.000 Partien, 1.201 Dateien, 35.726 s = 9,92 h
 (`PREREG_v28_window.md` par.10). **Tor 2a HAELT: 0,816 gegen 0,777** volle Spalten je Seite
 (n = 8.000 Seiten). Fenster 2.947 Dateien, Schluessel `2db448af20fe`, alle Bloecke unter
-INPUT_SIZE 744. Monolith rund 10 min, Training rund 1,4 h (Ende etwa 12:10). Danach Tor 1 `v28-b01` gegen
+INPUT_SIZE 744. Monolith 9 min, Training 1,43 h, beides gemessen. Danach Tor 1 `v28-b01` gegen
 `v27-b01` mit `--log-games` (zwei Seeds), dann `git stash pop` und Variante B fuer `v28-b02`.
 
 **Claude-Partien g02-g05: FERTIG (2026-09-11). Die Parallelsitzung gibt ihren Teil der
