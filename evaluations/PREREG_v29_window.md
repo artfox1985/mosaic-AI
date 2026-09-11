@@ -250,6 +250,9 @@ Champion aus seinem Artefakt, beide Seiten Champion-Spec. Promotion nach
      faellig, weil INPUT_SIZE 744 -> 755 ein Aera-Wechsel ist): drei Punkte 100/250/400 wie in
      par.8b, dazu 150/200; rund eine Stunde; Betriebspunkt der Erzeugung bleibt 100, solange das
      Plateau steht.
+   - **Rueckgabe-Reihenfolge der Kuppelplatten** (`PREREG_dome_return_order.md`, Nutzer
+     2026-09-12: legaler Zug, den das Netz nicht nutzt): Such-Knopf `return_order_mode` (netzbewertet),
+     A/B ueber den Referee nach der Promotion; wird er Default, gilt er fuer die v29-Erzeugung.
    - **Nach Maschinenlage**: `round_estimate_leaf_term` (Skala (a) 3/8/10/12, Bau nach par.3
      dort; sitzt schon als v28-Schritt 7) und die Netz-Loeser-Arme aus `PREREG_r5_solver_split.md`
      par.4 (Knotenbudget netzseitig, Policy-Sortierung, Korrekturterm; 200 Knoten treffen das
