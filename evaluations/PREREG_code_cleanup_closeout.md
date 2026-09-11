@@ -156,6 +156,43 @@ Keine Staerkemessung, kein neuer Arm. Kein Refactoring "weil es schoener ist": j
 braucht einen der Gruende Defekt, Fussangel, toter Code oder Widerspruch. Die Elo-Leiter und
 die eingefrorenen Artefakte werden nicht angefasst.
 
+## par.7a NEUVERANKERUNG DER ELO-LEITER (Nutzer 2026-09-12: "setz den anker neu")
+
+Anlass: die Anker-Drift ist durch A2 ROT (par.8). Entscheid (a): A2 bleibt, der Anker wird
+bewusst neu gesetzt. Verfahren nach dem Praezedenzfall `PREREG_round5_minfix_elo_reset.md`
+par.2/par.3/par.5 (Neuverankerung 2026-08-21): ein NEUES Leitersegment, Kanten ueber die
+Grenze werden nie gemischt.
+
+1. **Neues Anker-Artefakt `models/frozen_heuristics/hv1_anchor_v2`**: hv1 mit dem Wheel, das
+   A2 traegt (Stand `2a0cf4b` plus Wheel-Bau vom 2026-09-12), Golden-Probe wie beim ersten
+   Artefakt (10 Partien, 600 Sims, Seed 20260826, 11 Threads; `tools/freeze_heuristic.py`).
+   `hv1_anchor` bleibt als historisches Artefakt liegen (Bezug des Alt-Registers). Drift-Pruefung
+   gegen das neue Artefakt muss GRUEN sein (gleiches Wheel; Konstruktionsbeleg).
+2. **Register**: `evaluations/elo_history.csv` wird nach `archive/elo_history_pre_phantomfix.csv`
+   verschoben (git mv, Teil des Nutzer-Entscheids "setz den anker neu"), eine frische
+   `elo_history.csv` beginnt mit den Neuverankerungs-Kanten. `tools/elo_tracker.py`:
+   `ANCHOR_NAME = "Heuristik_hv1_anchor_v2"`, keine Aliase (der alte Anker ist ein anderer
+   Spieler auf einer anderen Engine).
+3. **Neuverankerungs-Kanten, alle auf der A2-Engine** (Kandidaten als ONNX plus Champion-Spec
+   auf dem lebenden Wheel; `models/alphazero_v27-b01_brierbest.onnx` ist sha256-identisch mit
+   dem Artefakt-Modell, geprueft 6f19f28dc6ee17eb):
+
+   | Kante | n | Werkzeug |
+   | --- | --- | --- |
+   | v28-b02@400 gegen hv1_anchor_v2@150 | 150 fest, kein Fruehstopp, Seed-Basis 900001 | `frozen_referee_match.py` (Anker aus dem Artefakt, 6 Worker) |
+   | v28-b01@400 gegen hv1_anchor_v2@150 | 150, dito | dito |
+   | v27-b01@400 gegen hv1_anchor_v2@150 | 150, dito | dito |
+   | v28-b02@400 gegen v27-b01@400 | 200 Paare mit Logs, Seed 20261044, Blockgroesse 5 | `paired_gating.py` |
+
+   Kosten: 3 x rund 22 min + 86 min (ANNAHME aus `docs/measured_runtimes.md`). Erwartung: die
+   Reihung v27-b01 < v28-b01 <= v28-b02 haelt im Fit; die absoluten Zahlen sind nicht mit dem
+   Alt-Register vergleichbar (kuerzere Leiter, andere Engine), Regel wie 2026-08-21.
+4. **Konsumenten** (Rueckwaerts-Pruefung): `docs/promotion_checklist.md` (Anker-Name),
+   `.claude/skills/mosaic-anchor-invariance/SKILL.md` (Artefaktpfad), `README.md` "Current
+   Status" (Anker und Leiter), `PREREG_difficulty_levels.md` par.4.1 (Anfaenger-Stufe hv2 bleibt
+   hv2_generator; der Elo-Knoten 1100 stammt aus dem Alt-Register und ist im neuen Segment
+   ungemessen), `docs/generation_loop.md`. Alle mit dem Ergebnis nachziehen.
+
 ## par.8 Ergebnisse (leer bis zum Bau)
 
 **STUFE 1 GEBAUT (2026-09-11 abends bis 2026-09-12, 01:30), Tore gefahren im freien Fenster

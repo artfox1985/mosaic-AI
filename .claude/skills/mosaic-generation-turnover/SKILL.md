@@ -46,7 +46,7 @@ Laufzeiten im Artefakt, Regel 0 (geprueft oder markiert).
   fertig aus" (`feedback_freeze_when_it_becomes_a_reference`).
 - Wurde die Engine seit dem letzten Anker-Check geaendert oder das Wheel
   gewechselt: `/mosaic-anchor-invariance` (Drift-Pruefung gegen
-  `models/frozen_heuristics/hv1_anchor`). ROT ist Nutzer-Entscheid, kein
+  `models/frozen_heuristics/hv1_anchor_v2`, seit 2026-09-12). ROT ist Nutzer-Entscheid, kein
   Reparaturauftrag.
 - Champion-Wechsel steht an? Dann `/mosaic-champion-promotion` VOR diesem
   Ablauf, nicht nebenher.

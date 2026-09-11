@@ -14,7 +14,7 @@ Stellen, an denen es in der Vergangenheit schiefging.
 
 1. `tools/set_champion.py <neu>`
 2. Elo-Kante **Gating** gegen Champion-1
-3. Elo-Kante **Anker** (`Heuristik_hv1_anchor`), festes n=150 ohne Fruehstopp
+3. Elo-Kante **Anker** (`Heuristik_hv1_anchor_v2`, Artefakt `models/frozen_heuristics/hv1_anchor_v2` seit 2026-09-12), festes n=150 ohne Fruehstopp
 4. Elo-Kante **Champion-2** (Vorvorgaenger, @400)
 5. Pflicht-Diagnostiken am Sieger, inklusive 5b Anzeige-Kalibrierung,
    5c sigma/Prior-Balance und 5d Netz-Paritaets-Fixture

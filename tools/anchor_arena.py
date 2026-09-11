@@ -33,7 +33,7 @@ _ROOT = pathlib.Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 sys.path.insert(0, str(_ROOT / "tools" / "probes"))
 
-ANCHOR = _ROOT / "models" / "frozen_heuristics" / "hv1_anchor"
+ANCHOR = _ROOT / "models" / "frozen_heuristics" / "hv1_anchor_v2"  # seit 2026-09-12 (Neuverankerung, PREREG_code_cleanup_closeout.md par.7a)
 
 
 def _metrics(games: list[dict], name_net: str, name_anchor: str) -> dict:

@@ -28,11 +28,11 @@ Gedaechtnis:
    falls Fruehstopp unter 150 Paaren.
 3. Elo-Kante **Anker**: `Heuristik@150(dyn)`, **festes n=150 ohne
    Fruehstopp** (Praezedenz v18/v19/v20-Verankerung). Seit der Kapselung:
-   Anker-Identitaet in der Zeile als `Heuristik_hv1_anchor` fuehren (seit der
+   Anker-Identitaet in der Zeile als `Heuristik_hv1_anchor_v2` fuehren (seit der Neuverankerung 2026-09-12; davor `Heuristik_hv1_anchor`, seit der
    Umbenennung am 2026-08-28; aeltere CSV-Zeilen tragen `Heuristik_v2huelle`
    bzw. `Heuristik` und werden NICHT umgeschrieben -- seit dem 2026-08-31 faltet
    `ANCHOR_ALIASES` in `tools/elo_tracker.py` sie auf denselben Knoten, und der
-   Anker IST dieser Knoten: `ANCHOR_NAME = "Heuristik_hv1_anchor"`); die
+   Anker IST dieser Knoten: `ANCHOR_NAME = "Heuristik_hv1_anchor_v2"`); die
    Knoepfe liegen in dessen `spec.json` (elo_tracker `--knobs`).
 
    **Aera-Regel (Nutzer-Entscheid 2026-08-29): Cross-Aera ist der
