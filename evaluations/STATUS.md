@@ -27,15 +27,13 @@ Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md`
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
 bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
 
-**MASCHINE BELEGT seit 2026-09-10, 23:49:56: v28-ERZEUGUNG LAEUFT** (Nutzer: "starte beides
-hier, die app bleibt offen"; `tools/night_v28_generate.sh` als Hintergrundaufgabe dieser
-Sitzung, Klasse 1 zuerst, Manifest `data/manifest_v27-b01-policy_20260910_234958.json`;
-Cache-Waechter unter `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` daneben; `night_v28_chain.sh` seit
-23:49:57 scharf, wartet auf den `laufzeit`-Block der Ausflug-Klasse und faehrt dann Kennzahl mit
-Tor-2a-Vorlage, Fenster, Bloecke, Monolith und Training `v28-b01`). Erwartet rund 10,3 h
-Erzeugung plus 2 h Kette, also bis etwa 12:00 am 2026-09-11; die Claude-Partien laufen daneben,
-die Laufzeit ist damit als Planungsgroesse gebremst zu lesen. Danach Tor 1 `v28-b01` gegen
-`v27-b01` mit `--log-games`, Bau von Variante B fuer `v28-b02`.
+**MASCHINE BELEGT: v28-KETTE LAEUFT, Training `v28-b01` seit 2026-09-11, 10:04** (GPU;
+`tools/night_v28_chain.sh` als Hintergrundaufgabe dieser Sitzung). **Erzeugung FERTIG**
+23:49:56 bis 09:45:31, 3 x 4.000 Partien, 1.201 Dateien, 35.726 s = 9,92 h
+(`PREREG_v28_window.md` par.10). **Tor 2a HAELT: 0,816 gegen 0,777** volle Spalten je Seite
+(n = 8.000 Seiten). Fenster 2.947 Dateien, Schluessel `2db448af20fe`, alle Bloecke unter
+INPUT_SIZE 744. Training erwartet rund 1,4 h (bis etwa 11:30). Danach Tor 1 `v28-b01` gegen
+`v27-b01` mit `--log-games` (zwei Seeds), dann `git stash pop` und Variante B fuer `v28-b02`.
 
 **Claude-Partien g02-g05: FERTIG (2026-09-11). Die Parallelsitzung gibt ihren Teil der
 Maschine frei -- von ihr laeuft nichts mehr.** Ergebnis: **Claude 3:1** gegen
@@ -96,7 +94,7 @@ Platz (`data/` 6,96 GiB, Sicherungswurzel).
 - **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden.
 - **Loeschung nur auf pfadgenaue Freigabe.**
 - **Messungen laufen exklusiv**; GPU und CPU duerfen parallel, zwei CPU-Messungen nicht.
-- **v28-Erzeugung nur auf Anweisung** (ausgesetzt seit 2026-09-10, 13:25).
+- **v28-Erzeugung gestartet 2026-09-10, 23:49 und fertig 2026-09-11, 09:45**; v29 nur auf Anweisung.
 - **Trainings-Seed variabel je Generation, gleich innerhalb einer Generation** (2026-09-10).
 - **Ziehen vom Stapel bei Punktestand 0 bleibt gratis und legal** (Regelbuch S.4/S.9,
   2026-09-10).
@@ -105,8 +103,9 @@ Platz (`data/` 6,96 GiB, Sicherungswurzel).
 
 - **`player_profiles.json` ist im Arbeitsbaum veraendert** (plus `player_profiles.json.bak`),
   aus der Nutzer- bzw. Parallelsitzung; nicht committet.
-- **Erzeugung v27 war 23 % langsamer als v26** bei gleicher Konfiguration (10,25 h gegen
-  8,35 h); Ursache nicht gemessen (Waechter-Last, OneDrive). Fuer v28 mit 10,3 h planen.
+- **Erzeugung v27/v28 rund 20 % langsamer als v26** bei gleicher Konfiguration (10,25 h und
+  9,92 h gegen 8,35 h); Ursache nicht gemessen (Waechter-Last, OneDrive). Fuer v29 mit 10 h
+  planen.
 - **Alte Mess-Manifeste in `data/`** (`manifest_otw22*`, `manifest_p3s0*`, `manifest_peek22*`,
   `manifest_tor22*`, `manifest_v21depth*`, `manifest_frozenv3-b01*`, 30 Dateien, klein): ihre
   Korpora sind seit 2026-09-09 geloescht; Loeschkandidaten beim naechsten Wechsel.
@@ -119,7 +118,7 @@ Platz (`data/` 6,96 GiB, Sicherungswurzel).
 
 | Aufbau | Dauer |
 | --- | --- |
-| Erzeugung 3 x 4.000 Partien @100, threads 11 (v27) | 36.912 s = 10,25 h |
+| Erzeugung 3 x 4.000 Partien @100, threads 11 (v27 / v28) | 36.912 s = 10,25 h / 35.726 s = 9,92 h |
 | Kette Schritte 1-6 (Kennzahlen, Manifeste, Fenster, Monolith) | rund 31 min |
 | Training 12 Epochen, Fenster 2.947 Dateien | 5.117 s = 1,4 h (v26 mit Nebenlast 2,1 h) |
 | Gepaartes Gating 200 Paare @400, 10 Threads, mit `--log-games` | rund 5.190 s = 86 min |

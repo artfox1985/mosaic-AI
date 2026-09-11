@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: nichts gebaut. Zuschnitt aus PREREG_v25_window.md par.17 auf v28 fortgeschrieben (580 Traeger + 2.366 Schwarm, Seed 20260937, Val-Pool ^selfplay_v27-), Generator v27-b01 (Champion, Tor 1 und 2 gehalten). Voraussetzung: Record-Feld dome_pool_view (par.4) im Wheel, Anker-Drift gruen. G-2-Haelfte ENTSCHIEDEN (par.2: Ausflug, Nutzer 2026-09-10). Offen: Freigabe der Erzeugung (v28 ausgesetzt seit 2026-09-10). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: Erzeugung GEFAHREN 2026-09-10/11 (par.10: 3 x 4.000 Partien @100, 35.726 s = 9,9 h, Generator v27-b01). TOR 2a HAELT: 0,816 gegen 0,777 volle Spalten je Seite (n = 8.000 Seiten, +-0,017). Fenster 2.947 Dateien (580 Traeger + 145 G-2 Ausflug), Schluessel 2db448af20fe; Training v28-b01 laeuft in der Kette. Offen: Tor 1 b01, dann b02 (Variante B, par.9), Ablationen, Sonde, Kante, round_estimate (par.8). -->
 
 # PREREG v28: Fensterzuschnitt und der erste Plan nach dem Einfrieren
 
@@ -237,3 +237,30 @@ kein "Rezept unveraendert" mehr. Deshalb liegen `config.py` und `engine/py/neura
 im Baum, wird aber erst nach der Kette zum Wheel gebaut. Reihenfolge: Kette durch -> Tor 1 b01
 -> `git stash pop` -> Wheel -> Anker-Drift -> Paritaetswerkzeug -> Bloecke unter neuem Schluessel
 -> Training b02.
+
+## par.10 ERGEBNISSE DER GENERATION (fortlaufend)
+
+**Erzeugung (2026-09-10, 23:49:56 bis 2026-09-11, 09:45:31; Laufzeit-Bloecke in
+`data/manifest_v27-b01-*.json`, threads 11, Cache-Waechter daneben, Claude-Partien der
+Parallelsitzung daneben):**
+
+| Klasse | Partien | Dateien | Wanduhr | s je Partie |
+| --- | --- | --- | --- | --- |
+| Traeger `v27-b01-policy` (Weg C, argmax ab Halbzug 1) | 4.000 | 400 | 12.732,4 s = 3h 32m | 3,183 |
+| Schwarm `v27-b01-value-tempc` (Temperatur 2, Weg C) | 4.000 | 400 | 11.632,4 s = 3h 14m | 2,908 |
+| Schwarm `v27-b01-value-excursion` (Ausflug, 4.005 Identitaeten) | 4.005 | 401 | 11.361,3 s = 3h 09m | 2,837 |
+| zusammen | 12.005 | 1.201 | **35.726,1 s = 9,92 h** | (v27: 36.911,5 s; 3 % schneller, Ursache nicht gemessen) |
+
+**Tor 2a ex post (Kette Schritt 1, `evaluations/artifacts/corpus_sanity_v27-b01-policy.json`,
+Instrument `tools/corpus_sanity_check.py`, Grundmenge Policy-Klasse, n = 8.000 Seiten aus
+4.000 Partien, Einheit volle Spalten je Seite): v27-b01 als Generator 0,816 (+-0,017) gegen
+v26-b01 als Generator 0,777 (+-0,017, `corpus_sanity_v26-b01-policy.json`). HAELT.**
+Nebenzahlen derselben Datei: volle Zeilen 0,112 (v26: 0,122), Punkte 46,34 je Seite,
+Strafleiste 6,07. Die Reihe der Generatoren am selben Instrument: v24-b07 0,637, v25-b01
+0,737, v26-b01 0,777, v27-b01 0,816.
+
+**Kette (Schritte 2-6, 10:04:18 bis 10:04:23):** Traeger-Manifest 580 = 400 neu + 135 G-1 +
+45 G-2 (`data/policy_carrier_manifest_v28.json`); Schwarm G-2 145 aus
+`selfplay_v25-b01-value-excursion_*.pkl` (par.2); `data/window_v28.txt` 2.947 Dateien
+(Soll rund 2.946); Bloecke lagen alle (Waechter: 3.203 von 3.203, INPUT_SIZE 744);
+Fenster-Schluessel `2db448af20fe`. Training `v28-b01` laeuft (Ergebnis folgt hier).
