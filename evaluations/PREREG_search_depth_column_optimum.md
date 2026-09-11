@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k); das Verwerfen des Prior-Top-1 ist Nebenwirkung (par.6b/par.7). Betriebspunkt 100 Sims bleibt, am Champion v24-b06 bestaetigt (par.8b: 0,8200 gegen 0,5075 @250). Prozessregel par.8c: Neumessung nur bei AERA-Wechseln. NEUMESSUNG FAELLIG seit 2026-09-11 (INPUT_SIZE 744 -> 755), nicht eingetaktet (par.8d). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k); das Verwerfen des Prior-Top-1 ist Nebenwirkung (par.6b/par.7). Betriebspunkt 100 Sims bleibt, am Champion v24-b06 bestaetigt (par.8b: 0,8200 gegen 0,5075 @250). Prozessregel par.8c: Neumessung nur bei AERA-Wechseln. NEUMESSUNG FAELLIG seit 2026-09-11 (INPUT_SIZE 744 -> 755), EINGETAKTET fuer das v29-Begleitprogramm (par.8d: 100/150/200/250/400). -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -933,3 +933,9 @@ Beim Nachziehen des Zeile-1-Kopfes am selben Tag ist er von 931 auf 596 Zeichen
 gekuerzt worden (Richtwert unter 600). Die dabei aus dem Kopf entfallenen Zahlen
 stehen unveraendert im Koerper: @100 verliert 33:47 n.s. (par.2j2), @400 0,4975
 (par.8b), Niveau-Anstieg 0,16 bis 0,20 (par.8b Befund 2).
+
+## Nachtrag 2026-09-11 (Eintaktung)
+
+Die in par.8d faellige Neumessung der Sims-Kurve am Generator ist im v29-Begleitprogramm
+eingetaktet (Nutzer 2026-09-11, `PREREG_v29_window.md` par.7 Punkt 4): Punkte 100/250/400 wie in par.8b plus 150/200, rund eine Stunde ohne
+Training; der Betriebspunkt 100 bleibt, solange das Plateau steht.
