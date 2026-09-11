@@ -273,9 +273,18 @@ Blockgroesse 5, 10 Threads, `--log-games`):**
 
 Gepoolt 416:384 = 52,0 Prozent, kein Seed mit Entscheid, beide Intervalle der Paardifferenz
 schliessen die Null ein. Elo-Register: v28-b02 1461 [1403; 1521] gegen v28-b01 1447 [1395; 1500],
-ueberlappend. **Die elf Kuppelstapel-Merkmale bewegen die Staerke nicht messbar.** Nach der
-Regel aus par.6 bleibt v28-b01 der beste Stand; Generator-Kandidat fuer v29 ist v28-b01
-(`PREREG_v29_window.md` par.3, Fall "b02 faellt"), vorbehaltlich der Ablationen.
+ueberlappend. **Die elf Kuppelstapel-Merkmale bewegen die Staerke nicht messbar.**
+
+**Nutzer-Entscheid 2026-09-11, 20:30 (woertlich: "Das b01 und b02 keinen messbaren Unterschied
+haben stoert mich nicht. Korrekter ist es mit der hoeheren feature Zahl."):** bei Gleichstand
+gilt die Fassung mit dem volleren Informationsstand als die richtige (Regel "Korrektheit vor
+gemessenem Nutzen", CLAUDE.md Abschnitt "Symmetrische Defekte sieht keine Arena"). Damit ist
+**v28-b02 der beste Stand** und der Generator-Kandidat fuer v29 (`PREREG_v29_window.md` par.3),
+vorbehaltlich der Ablationen, die ohnehin gegen b02 messen. Die Promotion (Anker-Kante,
+Champion-2 gegen das Artefakt v26-b01, Einfrieren) laeuft dann fuer v28-b02; das 755er-Netz
+sieht den Stapelstand, den es seit Variante A auch in der Suche kennt. Die par.6-Regel
+"gleichauf, dann traegt das Merkmal nicht" bleibt als MESSAUSSAGE stehen; der Entscheid ueber
+den besten Stand ist eine Korrektheitsfrage.
 
 **Diagnostik (par.6, vorregistriert), `dome_stack_known_block_draw_probe.py` auf beiden Logs
 (397 Partien je Seite und Seed, Einheit Ziehungen in den EIGENEN bekannten Block bei positivem
