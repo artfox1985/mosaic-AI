@@ -34,6 +34,16 @@ koennen auseinanderlaufen, ohne dass es jemand sieht. Und der
 Cache-Waechter faellt nicht auf: er rechnet den Fenster-Schluessel aus
 derselben `files=None`-Glob-Liste und bestaetigt sich selbst.
 
+**Wie weit es getragen hat (Rueckwaerts-Pruefung ueber den Baum, 2026-09-11):**
+gebissen hat es bislang nicht -- alle lebenden Rezepte fahren `--val-frac 0.05`
+(`tools/night_v28_b02.sh:29`, `tools/night_v28_ablations.sh:32/47`,
+`PREREG_v24_window.md:296`) und schneiden ihr Fenster vorher mit
+`tools/window_train_split.py`. Die Empfehlung steht aber an drei Stellen als
+Rat: `docs/working_rules.md:162`, `PREREG_v23_window.md:532`,
+`PREREG_cache_build_time.md:533` ("`--cache-file` nutzt, wer `--val-frac 0`
+faehrt"). Wer dem folgt UND `--file-list` setzt, trainiert auf dem ganzen
+Ordner. Die drei Stellen gehoeren mit dem Fix nachgezogen.
+
 Billigster Fix: `train_files = all_files` statt `None` in `train.py:1397`.
 
 ### 1.2 Warmstart-Verbreiterung nur fuer den Flach-Zweig, ohne Lage-Beweis
@@ -310,7 +320,7 @@ einer FREMDEN Datei -- stimmt heute, veraltet beim ersten Loader-Umbau).
 
 | # | Punkt | Stelle | Aufwand | Risiko |
 |---|---|---|---|---|
-| 1 | `train_files = all_files` statt `None`, damit `--file-list`/`--extra-data-dir`/`--train-file-limit` auch bei `--val-frac 0` greifen | train.py:1397 | 0,5 h + 1 Probelauf | mittel: aendert den Cache-Schluessel fuer `val_frac=0`-Laeufe (Voll-Neubau), deshalb NUR zwischen zwei Generationen |
+| 1 | `train_files = all_files` statt `None`, damit `--file-list`/`--extra-data-dir`/`--train-file-limit` auch bei `--val-frac 0` greifen; im selben Zug die drei Rat-Stellen nachziehen (docs/working_rules.md:162, PREREG_v23_window.md:532, PREREG_cache_build_time.md:533) | train.py:1397 | 0,5 h + 1 Probelauf | mittel: aendert den Cache-Schluessel fuer `val_frac=0`-Laeufe (Voll-Neubau), deshalb NUR zwischen zwei Generationen |
 | 2 | Datei-Block-Schluessel im Worker bilden (oder `INPUT_SIZE` mitgeben und dort pruefen) | build_cache_incremental.py:200, :127 | 1 h | gering, reine Absicherung |
 | 3 | Planes-Kanal-Erweiterung beim Warmstart wie den Flach-Zweig behandeln, sonst laut scheitern statt zufaellig starten | train.py:1630, :1675-1686 | 1,5 h | gering |
 | 4 | `_ai_lock` tatsaechlich um Zustandsaenderungen legen (oder loeschen und den Einzelsitzungs-Charakter dokumentieren) | server.py:111, :1571 | 2 h | mittel: beruehrt jeden Move-Endpunkt |
