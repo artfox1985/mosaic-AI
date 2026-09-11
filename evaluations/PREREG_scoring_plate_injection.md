@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Nutzt es, die WERTUNGSPLATTEN (alle acht Kriterien, gegatet auf die aktiven) in die Blattbewertung zu injizieren -- und in welcher Dosis? | Beleg: NEGATIV: der Haupt-Sweep lief am 2026-08-11 (w 0,03/0,1/0,3/1,0), Vertikale nur 0,70 auf 1,05 Plattenpunkte; die Artefakt-Frage (rundenblinder Nenner) lebt registriert in PREREG_shaping_scale_per_round.md weiter. Stale-Korrektur des Kopfes 2026-08-20. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Nutzt es, die WERTUNGSPLATTEN (alle acht Kriterien, gegatet auf die aktiven) in die Blattbewertung zu injizieren -- und in welcher Dosis? | Beleg: NEGATIV: der Haupt-Sweep lief am 2026-08-11 (w 0,03/0,1/0,3/1,0), Vertikale nur 0,70 auf 1,05 Plattenpunkte; die Artefakt-Frage (rundenblinder Nenner) lebt registriert in PREREG_shaping_scale_per_round.md weiter. Nutzer-Auftrag N7 (25-Zellen-Raster w[1] x alpha[1], Ziel >= 14 Plattenpunkte) nach 2 von 25 Zellen ABGEBROCHEN: beide vertikal 0,70 (Nullpunkt), Endstaende 48,90 / 46,45 gegen 53,30. -->
 
 # Vorregistrierung: Injektion der WERTUNGSPLATTEN (alle acht Kriterien)
 
@@ -576,3 +576,12 @@ Punkte, ohne eine einzige Spalte zu bewegen.
 ## SCHLIESSUNGS-NACHTRAG (2026-08-20)
 
 Status auf **ENTSCHIEDEN** gesetzt (Nutzer-Durchsicht der offenen Registrierungen). Begruendung: NEGATIV: der Haupt-Sweep lief am 2026-08-11 (w 0,03/0,1/0,3/1,0), Vertikale nur 0,70 auf 1,05 Plattenpunkte; die Artefakt-Frage (rundenblinder Nenner) lebt registriert in PREREG_shaping_scale_per_round.md weiter. Stale-Korrektur des Kopfes 2026-08-20.
+
+## Nachtrag 2026-09-11 (Audit-Querlesung): N7 im Kopf ergaenzt
+
+Der Zeile-1-Kopf nannte bis heute nur den Haupt-Sweep vom 2026-08-11, nicht den
+Nutzer-Auftrag N7 (25-Zellen-Raster ueber `w[1]` x `alpha[1]`, Ziel >= 14
+Plattenpunkte). N7 ist nach 2 von 25 Zellen abgebrochen; beide gemessenen Zellen
+(w=1/alpha=2 und w=3/alpha=2) liegen mit vertikal 0,70 exakt auf dem Nullpunkt,
+bei Endstaenden 48,90 und 46,45 gegen 53,30 (Abschnitt N7). Das steht jetzt im
+Kopf; das Verdikt NEGATIV bleibt unveraendert.

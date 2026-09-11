@@ -82,15 +82,17 @@ Kosten: ~1,5x Wandzeit pro Arm (~30 min statt ~21 min), ~90 min gesamt.
    positiv beantwortet ist.
 
 ---
-**STATUS (Stand 2026-08-08): OFFEN** -- der Knopf
-(`MOSAIC_NUM_DETERMINIZATIONS`) ist vorbereitet, die Messung selbst
-steht laut STATUS.md ausdruecklich in der "NACH-v21-QUEUE" (Nutzer-Go
-2026-08-08) und ist noch nicht gelaufen. Die einzige verwandte Messung
-in archive/history.md ("Task #65", 2026-07-22) ist eine AELTERE, ANDERE
-Messung aus dem Vor-WDL-/Vor-Gumbel-Regime, die damals verworfen wurde
--- keine Antwort auf die hier reaktivierte 600-Sims-Messung. Belegstelle:
-evaluations/STATUS.md, Abschnitt "NACH-v21-QUEUE (Nutzer-Go 2026-08-08)",
-Punkt 2 ("ISMCTS-k"); kein Ergebnis in archive/history.md.
+**ZWISCHENSTATUS ERLEDIGT.** Nachtrag 2026-09-11 (Audit-Querlesung): hier
+stand ein "STATUS (Stand 2026-08-08): OFFEN"-Block, der die Messung als
+noch nicht gelaufen fuehrte (Knopf `MOSAIC_NUM_DETERMINIZATIONS`
+vorbereitet, Messung in der NACH-v21-QUEUE). Sie ist am 2026-08-09/10
+gelaufen; der Stand steht in den drei Ergebnisabschnitten unten
+("ERGEBNIS (2026-08-09)", "ERGEBNIS der Trenn-Messung (2026-08-09)",
+"ERGEBNIS k=4 (2026-08-10)") und im Zeile-1-Statuskopf. Aus dem alten
+Block erhalten bleibt die Abgrenzung: die einzige verwandte Messung in
+archive/history.md ("Task #65", 2026-07-22) stammt aus dem Vor-WDL-/
+Vor-Gumbel-Regime und wurde damals verworfen -- sie ist KEINE Antwort auf
+die hier gefahrene 600-Sims-Messung.
 
 ---
 ## ERGEBNIS (2026-08-09): H0 nach Regel 2 -- k=1 BLEIBT, Punkt GESCHLOSSEN
@@ -600,3 +602,23 @@ verschieden -- er mittelt Ausgaenge, die danach oeffentlich sind, statt
 Plaene aus nicht unterscheidbaren Welten. Genau dieser Unterschied ist der
 Grund, warum der Knoten an die Aufdeck-Stelle gehoert und nicht an die
 Wurzel.
+
+### Nachtrag 2026-09-11 (Audit-Querlesung): eine tragende Praemisse gilt nicht mehr
+
+Das Verdikt bleibt stehen (Status unveraendert ENTSCHIEDEN, Zahlen
+unveraendert), aber eine der Begruendungen ist ueberholt. Die Zeile
+"Kuppelstapel: bewiesen irrelevant -- der Value-Kopf sieht
+`pending_stack_draw` architektonisch nie" und der gleichlautende
+Tabelleneintrag stuetzten sich darauf, dass das Netz vom Stapel nichts
+sieht. Seit **Variante B** (elf Stapel-Merkmale an den Eingangs-Indizes
+744..754, INPUT_SIZE 744 -> 755) ist das nicht mehr gegeben:
+`PREREG_dome_stack_information_sets.md` par.15f und
+`PREREG_v28_window.md` par.9. Die Einordnung des Nachtrags "der Zieh-Zug
+ist in 45% der Entscheidungen verfuegbar" (der alte Befund traegt nur fuer
+die IN-TREE-Neumischung, nicht fuer die Wurzel-Determinisierung) wird
+dadurch eher gestuetzt als entkraeftet.
+
+**Konsequenz, ausdruecklich:** eine Neumessung der k-Frage auf einem Netz
+mit Stapel-Merkmalen ist NICHT eingetaktet. Wer sie eintaktet, tut es als
+NEUE Frage -- die hier gemessenen Zahlen stammen von Netzen ohne diese
+Merkmale und bleiben fuer jene Aera gueltig.

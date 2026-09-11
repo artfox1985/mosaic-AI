@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, mit dem besten v28-Arm als Generator und einem Pflichtarm mit unveraendertem Rezept? | Beleg: nichts gebaut, nichts gefahren. Zuschnitt aus PREREG_v28_window.md par.1 rotiert (580 Traeger + rund 2.367 Schwarm, Seed 20260941, Val-Pool ^selfplay_v28-), Generator = Sieger der v28-Promotion (b01 oder b02, par.3). G-2-Haelfte: Vorschlag Ausflug (par.2, Nutzer-Entscheid). Begleitprogramm par.7: Schwierigkeitsleiter, Ziehsucht-Sonde. Erzeugung nur auf Anweisung. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, Generator = Sieger der v28-Promotion, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: nichts gefahren. Zuschnitt rotiert aus v28 (580 Traeger + rund 2.367 Schwarm, Seed 20260941, par.1). v29-b02: Spezialfeld-Frage als Ein-Faktor-Arm, Bauform OFFEN (par.6 Berichtigung: die Kanaele 77/78 sind seit e91cd34 gebaut, Vorschlag Ablation); Begleitprogramm par.7 (Leiter, Ziehsucht, Stapel-Stopp-Regel, Peek-Bewertung, Startkuppel, Sims-Kurve). Offen: G-2-Haelfte (par.2), letzte Generation?, Freigabe. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -158,12 +158,45 @@ Gating 66-91 min je Seed mit Logs, Tor 2b und Plattenpunkte unter 5 min.
 | Arm | Was | Faktor gegen | Seed |
 | --- | --- | --- | --- |
 | **v29-b01** (Pflicht) | Rezept UNVERAENDERT (Warmstart `<GEN>_brierbest`, 12 Epochen, lr 5e-05 cosine, lambda 0,7, Koepfe wie gehabt, INPUT_SIZE 755) | Champion (= Generator): nur das Material, 5. Punkt der Materialkette; bei Generator b02 zusaetzlich das Stapelwissen auf 82 statt 40 Prozent des Fensters (par.1, nicht trennbar) | 20260941 |
-| v29-b02 (Kandidat, KEIN Arm ohne Nutzer-Entscheid) | Sicht-Reststufen aus `PREREG_stack_top_feature.md` par.10 P.3/P.7 (laufende Ziehserie, Phasenaufloesung) als additive Merkmale, sonst wie b01 | b01: EIN Faktor | 20260941 |
+| **v29-b02** (Nutzer-Entscheid 2026-09-11 par.8.2, Zuschnitt BERICHTIGT 18:50, siehe unten) | Spezialfeld-Frage als EIN-Faktor-Arm; Bauform offen: Vorschlag ABLATION (Kanaele 77/78 auf Null, sonst wie b01) | b01: EIN Faktor, die Spezialfeld-Eingabe | 20260941 |
 
-Der Kandidat b02 steht nur, wenn `v28-b02` Tor 1 gegen `v28-b01` besteht (sonst ist offen,
-ob Merkmale der Sicht-Achse ueberhaupt ankommen, `PREREG_v28_window.md` par.7 Punkt 1) UND
-der Nutzer ihn bestellt. Weitere Arme (Ablationen, Knoepfe) nur mit eigener Registrierung
-in dieser Datei; Namensregel `docs/generation_naming.md`.
+**BERICHTIGUNG 2026-09-11, 18:50 (Regel 0):** die Aussage, par.4a sei "registriert und nie
+gebaut", war FALSCH. Die zwei Planes (Spezialfeld-Ertrag je Slot und Abstand zur Ausloesung)
+sind seit Commit `e91cd34` (2026-08-28) gebaut: `features.rs:1149` `SPECIAL_YIELD_CHANNEL = 77`,
+`:1160` `SPECIAL_UNLOCK_DISTANCE_CHANNEL = 78`, NUM_PLANES_CHANNELS 79; jedes Modell seit v22-b01
+traegt sie (`PREREG_special_tile_yield.md`, Nachtrag 2026-08-29 im Kopfbereich). Was fehlt, ist
+die ISOLIERTE Wirkungsmessung (kein 77-gegen-79-A/B, der Beitrag ist in der b-Serien-Baseline
+konfundiert) und der par.4c-Kopf (ungebaut; Hilfskoepfe stehen 0 von 4). Der Koordinator hat
+die eigene Memory-Notiz ("Kanaele 77/78 gebaut, Wirkung nie isoliert") uebersehen.
+
+Folge fuer den Arm: ein Neubau derselben Eingabe ist gegenstandslos. Was die Frage "traegt die
+Spezialfeld-Eingabe?" beantwortet, ist die Ablation: v29-b02 = Rezept b01 mit den Kanaelen
+77/78 auf Null (Schalter im Merkmalsbauer, Teil des Cache-Schluessels; Bloecke neu, rund 26 min),
+Tor 1 b02 gegen b01. Verliert b02, traegt die Eingabe; gleichauf, dann nicht, und der naechste
+Hebel ist par.4c oder die Drafting-Seite. Alternative: keinen zweiten Arm fahren (v29 rein).
+**Nutzer-Entscheid offen (par.8.2, wieder geoeffnet).**
+
+**Warum die Spezialfelder (Nutzer 2026-09-11: "Kandidat 1 als einzigen Netz-Arm"; Zahlen bleiben gueltig):**
+die Spezialfelder sind der groesste negative Posten der Plattenwertung (Tor 1 v28: -9,73 gegen
+-10,61 Punkte je Partie bei 160 von 400 Brettern, `PREREG_v28_window.md` par.10), der Lehrer
+liess 81 Prozent der unteren Spezialfelder liegen (`special_tile_yield` par.7), und der Knopf K5
+(`MOSAIC_SPECIAL_ROW6_W`, in der Champion-Spec) hob zwar die Spalten, nicht aber das
+Spezialfeld-Kriterium (par.9 dort). Der Tiling-Loeser holt den Bonus bereits exakt ab; die Luecke
+sitzt im Drafting Runden vorher (par.4a). Die Eingabe dafuer existiert (Berichtigung oben); ob
+sie wirkt, ist die offene Frage. Das Sicht-Reststufen-Paket (`stack_top_feature` par.10
+P.3/P.7) ist NICHT bestellt.
+
+**Diagnostik am Arm, vorregistriert:** auf den Tor-1-Logs b02 gegen b01 die Plattenpunkte je
+Kriterium (`plate_points_from_arena.py --block 5`): Erwartung ist ein Zuwachs GENAU im Posten
+Spezialfelder (gepaart, 200 Paare); ein Zuwachs anderswo bei unbewegtem Spezialfeld-Posten
+hiesse, die Eingabe wirkt ueber einen anderen Weg (Praezedenz K5). Zusaetzlich der
+Spezialfeld-Bonus je Partie aus den Logs (Sonde `tools/probes/special_tile_yield_measurement.py`,
+Grundmenge Arena-Partien, Einheit ausgeloeste untere Spezialfelder je Seite).
+
+Weitere Arme (Ablationen, Knoepfe) nur mit eigener Registrierung in dieser Datei; Namensregel
+`docs/generation_naming.md`. Reihenfolge: b01 in der Kette, b02 danach auf demselben Fenster
+(Bloecke neu unter dem Planes-Schluessel), Tor 1 b02 gegen b01, der bessere gegen den Champion,
+falls das nicht dieselbe Kante ist.
 
 **Tore** (`docs/generation_loop.md`): Tor 0 Traegerkennzahl (Kette Schritt 1; Tor 2a ex post
 gegen den Wert des v28-Generators, par.4 Punkt 5), Tor 1 gepaartes Gating mit `--log-games`,
@@ -190,7 +223,29 @@ Champion aus seinem Artefakt, beide Seiten Champion-Spec. Promotion nach
    v29-Korpus, gleiches Instrument), Ueberraschungs-Kante v24-b05 gegen v24-b04,
    `round_estimate_leaf_term` als Such-Knopf am Champion-Stand. Jeder davon ist ein
    Engine-Knopf oder eine Sonde ohne Training; sie laufen NIE neben einer Arena.
-4. **Prereg-Bestand**: Ziel bleibt rund 7 OFFEN. Mit v28 schliessen `rust_data_layer` (Teil A
+4. **Aus der Audit-Querlesung 2026-09-11 (Nutzer: "2 bis 4 als Sonden und Knoepfe im
+   Begleitprogramm, 5 und 6 nach Maschinenlage"), alle ohne Training, keine neben einer Arena:**
+   - **Stapelziehen bei positivem Stand**, zwei Teile: (a) Neurechnung der Stopp-Regel der
+     Blindziehung (`PREREG_stack_draw_reservation_rule.md` par.7: das Modell nahm ein
+     gedaechtnisloses Ziehen an; seit Variante A behaelt die Suche das Wissen; par.5b: die Regel
+     zieht bei negativem Brettniveau 9 bis 11 Mal, optimal ist Tiefe 1), Ergebnis als Sonde am
+     v29-Korpus plus Knopf-A/B, wenn die Neurechnung eine andere Regel ergibt; (b) Bau der
+     Ein-Schritt-Bewertung der Zieh-Aktion (`PREREG_chance_nodes.md` par.14 Teil B1, Knopf
+     `MOSAIC_STACK_DRAW_CHANCE`, nie gebaut) als Such-Knopf mit A/B ueber den Referee. Beides
+     laeuft zusammen mit der Ziehsucht-Sonde (Punkt 2), weil alle drei denselben Befund
+     bearbeiten.
+   - **Startkuppel**: Stufe 0 nach `PREREG_start_dome_choice.md` par.4 (Slot-Spannweite), dazu
+     die Plattenwahl (Nachtrag 2026-09-09 dort) als zweiter Teil; Anlass par.6a:
+     `choose_start_placement` bewertet `SpaceType::Special` mit 0,0 (`self_play.rs:922`).
+   - **Sims-Kurve des Generators neu messen** (`PREREG_search_depth_column_optimum.md` par.8c:
+     faellig, weil INPUT_SIZE 744 -> 755 ein Aera-Wechsel ist): drei Punkte 100/250/400 wie in
+     par.8b, dazu 150/200; rund eine Stunde; Betriebspunkt der Erzeugung bleibt 100, solange das
+     Plateau steht.
+   - **Nach Maschinenlage**: `round_estimate_leaf_term` (Skala (a) 3/8/10/12, Bau nach par.3
+     dort; sitzt schon als v28-Schritt 7) und die Netz-Loeser-Arme aus `PREREG_r5_solver_split.md`
+     par.4 (Knotenbudget netzseitig, Policy-Sortierung, Korrekturterm; 200 Knoten treffen das
+     Orakel zu 81,4 Prozent, 4.000 zu 84,8; der Anker ist eingefroren und davon unberuehrt).
+5. **Prereg-Bestand**: Ziel bleibt rund 7 OFFEN. Mit v28 schliessen `rust_data_layer` (Teil A
    Verdikt mit b02), `stack_top` (haengt an b02), `round_transition_search_sampling`
    (UEBERHOLT durch `dome_stack`), `start_dome_choice`, `policy_surprise_weighting`,
    `round_estimate_leaf_term`; offen bleiben `v29_window`, `difficulty_levels`,
@@ -199,8 +254,13 @@ Champion aus seinem Artefakt, beide Seiten Champion-Spec. Promotion nach
 ## par.8 OFFENE NUTZER-ENTSCHEIDE
 
 1. G-2-Haelfte (par.2; Vorschlag Ausflug).
-2. Kandidat v29-b02 (Sicht-Reststufen) bestellen oder v29 als reinen Zyklusdurchlauf fahren
-   (Vorschlag: rein, solange die Leiter und die Sonden die CPU-freien Fenster fuellen).
+2. Kandidat v29-b02: ENTSCHIEDEN 2026-09-11 (Nutzer: "dann takte das so ein") auf der
+   Praemisse "Spezialfeld-Kanaele ungebaut"; die Praemisse war falsch (par.6 Berichtigung),
+   deshalb WIEDER OFFEN mit zwei Wegen: (a) Ablation ohne Kanaele 77/78 (Vorschlag), (b) kein
+   zweiter Arm. Unberuehrt vom Irrtum und weiter entschieden: Stapel-Stopp-Regel, Peek-Bewertung,
+   Startkuppel und Sims-Kurve als Sonden und Knoepfe im Begleitprogramm (par.7 Punkt 4);
+   Rundenschaetzer und R5-Netzloeser nach Maschinenlage. Die Sicht-Reststufen sind nicht
+   bestellt.
 3. Ist v29 die letzte Generation? Dann gilt: Leiter-Endfassung mit dem v29-Champion
    (`PREREG_difficulty_levels.md` Stufe 5), Generationswechsel ohne v30-Vorlage, und
    STATUS-Neufassung als Abschlussbericht. Sonst v30 nach demselben Muster.

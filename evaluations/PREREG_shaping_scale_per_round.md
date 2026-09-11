@@ -258,6 +258,13 @@ in STATUS.md schliesst die Zähl-Kriterien aus; gefragt sind die konjunktiven.
 
 ## par.10 ERGEBNIS (leer bei Registrierung)
 
+**Nachtrag 2026-09-11 (Audit-Querlesung):** dieser Platzhalter ist leer
+geblieben, das Ergebnis steht in **par.13** (2026-08-20, NICHT-ERFOLG: Siege
+284:295 bei McNemar p=0,34; k1-Delta -0,23 bei Block-t -1,27; k2-Delta +0,13 bei
+Block-t +1,58 -- alle Zahlen aus par.13 dieser Datei). Hier nur der Verweis,
+damit der leere Absatz nicht als "nie gemessen" gelesen wird; die Zahlen stehen
+weiterhin nur an ihrer Fundstelle par.13.
+
 
 ## par.11 EINTAKTUNG (2026-08-20)
 

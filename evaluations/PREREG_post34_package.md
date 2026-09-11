@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Tragen Aux-Koepfe (Arm 1 `t12_dist`, Arm 2 `t9_own`) am neuen #34-WDL-Ziel zur Staerke bei? | Beleg: Beide Arme geschlossen (t9_own Paritaet, t12_dist Seed-Rauschen in Replikation); `archive/history.md` Z. ~10005-10039 -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Tragen Aux-Koepfe (Arm 1 `t12_dist`, Arm 2 `t9_own`) am neuen #34-WDL-Ziel zur Staerke bei? | Beleg: Beide Arme geschlossen (t9_own Paritaet, t12_dist Seed-Rauschen in Replikation); `archive/history.md` Z. ~10005-10039. #29 (Rangmetrik) bleibt formal VERTAGT, die Vorbedingung ist aber erfuellt: arena-differenzierte Paare existieren seit v25 (Leiter 1336 / 1364 / 1405 / 1447, je signifikante Kante). Validierung nicht eingetaktet. -->
 
 # Vorregistrierung: Nach-#34-Paket in EINEM Zug (#9, #12, #29)
 
@@ -79,3 +79,14 @@ Frozen-Set-Neubau. Paket-Fazit: kein Aux-Kopf-Hebel am neuen #34-Ziel;
 einziger belegter Hebel bleibt die Spielzahl (#36). Belegstelle:
 archive/history.md, Abschnitt "Nach-#34-Paket ERGEBNISSE (2026-08-06,
 PREREG_post34_package.md)", Zeile ~10005-10039.
+
+## Nachtrag 2026-09-11 (Audit-Querlesung): Vorbedingung von #29 ist erfuellt
+
+#29 (Rangmetrik) ist "formal vertagt, bis arena-differenzierte Paare existieren".
+Diese Paare gibt es inzwischen: seit v25 traegt jede Generation eine
+arena-signifikante Kante zur vorigen (Elo-Leiter v25-b01 1336, v26-b01 1364,
+v27-b01 1405, v28-b01 1447; `evaluations/STATUS.md` Abschnitt 1 und
+`PREREG_v28_window.md` par.10). Die Validierung der Rangmetrik ist damit moeglich,
+aber NICHT eingetaktet und nicht beauftragt. Die Verdikte zu Arm 1 und Arm 2
+bleiben unveraendert; der Kopf sagt nun "beide Arme geschlossen, #29 vertagt"
+statt nur "beide Arme geschlossen".

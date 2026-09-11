@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | Beleg: VARIANTE A GEBAUT 2026-09-10 (par.15; Anker-Drift gruen). A/B Live gegen Artefakt 165:135 (55 %), kein Ruecklauf, Fix bleibt (par.15b). Diagnostik auf 300 Partien (par.15e): Ziehungen in den EIGENEN bekannten Block STEIGEN mit A (+0,69 je Partie, +70/-48), zwei Drittel davon gratis bei Stand 0; die Erwartung aus par.8 tritt nicht ein. Naechster Hebel ist die Null-Klammer (score_clamp Stufe 1), Variante B danach. -->
+<!-- STATUS: OFFEN | Frage: Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | Beleg: VARIANTE A GEBAUT 2026-09-10 (par.15), A/B Live gegen Artefakt 165:135, Fix bleibt (par.15b); Ziehungen in den eigenen Block STEIGEN mit A (+0,69 je Partie, par.15e), regelkonform: Ziehen bei Stand 0 bleibt gratis, Null-Klammer als Regel entschieden (par.15f, PREREG_score_clamp_incentive.md). VARIANTE B GEBAUT 2026-09-11 (elf Merkmale 744..754, INPUT_SIZE 755), Arm v28-b02 gegen b01 in Messung (PREREG_v28_window.md par.9/10), Ergebnis steht aus. -->
 
 # PREREG: Informationsmengen am Kuppelstapel
 
@@ -760,3 +760,20 @@ Punkt. Variante A wirkt also wie gebaut: die Suche kennt die Reihenfolge und pla
 Ziehtiefe danach; keine Ziehung ueber das Ziel hinaus. Ob fuenf Punkte fuer diese Platte
 richtig waren, ist die Value-Frage (par.15f, Variante B); die Partie ging 72:81 verloren,
 Mensch zog einmal.
+
+### Nachtrag 2026-09-11 (Audit-Querlesung): Null-Klammer entschieden, Variante B gebaut und in Messung
+
+Zwei Punkte aus par.15f sind seither weitergezogen, standen aber nur in anderen Preregs:
+
+1. **Null-Klammer.** Der Vorrang "`score_clamp` Stufe 1 VOR Variante B" (par.15e Folge 1) ist
+   erledigt, aber nicht als Bau: `PREREG_score_clamp_incentive.md` steht auf ENTSCHIEDEN --
+   Nutzer-Entscheid 2026-09-10, Ziehen bei Stand 0 bleibt gratis und legal (Regelbuch S.4/S.9),
+   die Strafseite ist mit 0,5 Punkten je Partie zu klein fuer einen Arm. Der Anreiz, gegen den
+   Variante B gemessen wird, ist damit der des Spiels.
+2. **Variante B gebaut (2026-09-11, 00:15-00:50).** Elf Werte an den Indizes 744..754 (Praefix,
+   eigener Block nach Laenge/Spezial/Wild, Typen der obersten vier Positionen, fremde Bloecke),
+   beide Rust-Pfade plus Python-Zwilling, INPUT_SIZE 744 -> 755, Kontrakt-Hash
+   20b442a8164f748d -> c65768636c0560a7 (kuenftige Anker-Kanten gegen v25-v27 laufen Cross-Aera).
+   Registriert in `PREREG_v28_window.md` par.9; Training `v28-b02` durch (ebd. par.9, Nachtrag
+   14:37-16:52; Offline-Metrik unbewegt, Brier-Kurve auf der von b01), Tor 1 b02 gegen b01 seit
+   16:52 in Messung. Die Sonde aus par.15e auf einem A/B-Lauf B gegen A (par.15f) steht noch aus.

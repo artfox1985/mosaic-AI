@@ -154,11 +154,19 @@ und das direkte Duell 43:57 verlor.
 
 ---
 
-## par.7 ERGEBNIS (leer bei Registrierung)
+## par.7 ERGEBNIS -- siehe par.6a
 
-## par.8 VERDIKT NACH DER VORAB-REGEL (leer bei Registrierung)
+Nachtrag 2026-09-11 (Audit-Querlesung): dieser Platzhalter ist gefuellt,
+aber unter abweichender Nummer. Das Ergebnis steht in **par.6a ERGEBNIS
+(2026-08-17)** unten.
 
-## par.6 ERGEBNIS (2026-08-17)
+## par.8 VERDIKT NACH DER VORAB-REGEL -- siehe par.6b
+
+Nachtrag 2026-09-11 (Audit-Querlesung): das Verdikt nach der par.5-Vorab-
+Regel steht in **par.6b** unten; der Kopf-Stand danach im
+SCHLIESSUNGS-NACHTRAG (2026-08-20) am Dateiende.
+
+## par.6a ERGEBNIS (2026-08-17)
 
 Beide Arme durch, Early Stopping jeweils nach Epoche 15. Bester Checkpoint
 `b18` Epoche 4, `b19` Epoche 3. Kopfguete mit `tools/probes/ownership_gate_a.py`
@@ -189,7 +197,7 @@ Einfaktor-Vergleich — aber es bleibt EINE Realisierung. Getragen wird er
 weniger von der Groesse der Einzeldifferenzen als davon, dass **acht von neun
 Metriken in dieselbe Richtung zeigen** und die neunte ein Gleichstand ist.
 
-## par.7 VERDIKT NACH DER VORAB-REGEL
+## par.6b VERDIKT NACH DER VORAB-REGEL
 
 Die Regel aus par.5 woertlich: *"2,0 wird uebernommen, wenn es die Kopfguete
 auf der MEHRHEIT von {Feld-AUC, E_k k1, E_k k2, E_k k5} gegenueber 1,0 hebt

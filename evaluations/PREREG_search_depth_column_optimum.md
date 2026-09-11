@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, @100 33:47 n.s., par.2j2). Faktor TIEFE, nicht Breite (par.2k). Stufe 4: die tiefere Suche verwirft den Prior-Top-1 doppelt so oft (par.6b), spaltenrelevante Vorschlaege aber im GLEICHEN Anteil wie alle anderen (par.7) -- Nebenwirkung, kein gezieltes Verwerfen. Betriebspunkt 100 Sims bleibt. WIEDERVORLAGE 2026-09-07 GEFAHREN (par.8b): am Champion v24-b06 liegt das Plateau weiter bei 100 (0,8200 gegen 0,5075 @250 und 0,4975 @400), der Absturz ist so steil wie damals -- Betriebspunkt bestaetigt. Das NIVEAU ist ueber alle drei Punkte um 0,16-0,20 gestiegen (konfundiert: anderes Netz UND Champion-Knopf). Prozessregel (par.8c): Neumessung nur bei AERA-Wechseln, nicht je Generation. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k); das Verwerfen des Prior-Top-1 ist Nebenwirkung (par.6b/par.7). Betriebspunkt 100 Sims bleibt, am Champion v24-b06 bestaetigt (par.8b: 0,8200 gegen 0,5075 @250). Prozessregel par.8c: Neumessung nur bei AERA-Wechseln. NEUMESSUNG FAELLIG seit 2026-09-11 (INPUT_SIZE 744 -> 755), nicht eingetaktet (par.8d). -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -915,3 +915,21 @@ Generatorwechsel. Kosten dann rund eine Stunde, wie hier.
 **Was die Messung NICHT ausschliesst:** dass ein anderer Punkt zwischen 100 und 250 heute
 besser waere (150 ist nicht gemessen, damals 0,4425). Wer das wissen will, misst zwei
 Zwischenpunkte fuer rund 25 min.
+
+### par.8d NEUMESSUNG FAELLIG (Nachtrag 2026-09-11, Audit-Querlesung)
+
+par.8c nennt als Ausloeser einer Neumessung ausdruecklich einen AERA-Wechsel --
+"Encoder, Sicht (INPUT_SIZE), Regelwerk oder ein Knopf, der in die Erzeugung
+geht". Genau das ist am 2026-09-11 eingetreten: `INPUT_SIZE` steht seit Variante B
+(v28-b02) auf 755 statt 744 (`engine/src/features.rs:18`; Herleitung
+`PREREG_v28_window.md` par.9). Die Suchtiefen-Kurve ist damit **faellig**; Kosten
+laut par.8b rund eine Stunde.
+
+Nicht eingetaktet, kein Lauf beauftragt. Die Verdikte oben (Betriebspunkt 100,
+Form der Kurve, Tausch gegen Spielstaerke) bleiben unveraendert stehen, bis die
+Neumessung gefahren ist.
+
+Beim Nachziehen des Zeile-1-Kopfes am selben Tag ist er von 931 auf 596 Zeichen
+gekuerzt worden (Richtwert unter 600). Die dabei aus dem Kopf entfallenen Zahlen
+stehen unveraendert im Koerper: @100 verliert 33:47 n.s. (par.2j2), @400 0,4975
+(par.8b), Niveau-Anstieg 0,16 bis 0,20 (par.8b Befund 2).

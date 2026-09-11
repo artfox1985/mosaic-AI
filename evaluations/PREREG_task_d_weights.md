@@ -204,13 +204,43 @@ laesst nur 4 Bloecke a 25 -- zu wenig fuer eine belastbare Block-SE. Das
 wird so festgehalten statt eine Scheinzahl zu rechnen; die
 Stopp-Entscheidung ist ohnehin der vorregistrierte SPRT.
 
-### Zwischenstand des Sweeps (2 von 3 Armen)
+## ERGEBNIS Arm `t_d_pw025` (points_weight 0,25) -- 2026-08-10: H0 (SPRT-Entscheid)
+
+**Nachtrag 2026-09-11 (Audit-Querlesung):** der Dateikoerper endete bisher mit
+dem Zwischenstand "2 von 3 Armen", obwohl der dritte Arm am 2026-08-10 gefahren
+und im Zeile-1-Kopf laengst verbucht war. Hier nachgezogen, KEINE neue Messung.
+
+Gleicher Aufbau wie die beiden anderen Arme: gepaartes Gating gegen die
+Kontrolle/den Champion `v21_2d_brierbest`, 400 Sims beidseitig.
+
+| Groesse | Wert | Quelle der Zahl |
+|---|---|---|
+| Ergebnis | **68:82** (45,3 %) | Zeile-1-Kopf dieser Datei |
+| SPRT | **H0 angenommen** nach 75 Paaren | Zeile-1-Kopf dieser Datei |
+| n / Sims | 150 Partien, 400 Sims | `evaluations/arena_trends.csv`, Zeile 74 (2026-08-10T01:35:34) |
+| Winrate | 0,4533 | dieselbe CSV-Zeile |
+| Eigene Punkte : Gegner | 44,067 : 45,227 | dieselbe CSV-Zeile |
+| Strafleiste : Gegner | 14,547 : 14,26 | dieselbe CSV-Zeile |
+
+**Artefakt nicht gefunden (Audit 2026-09-11).** Die im Zeile-1-Kopf genannte
+Belegstelle `evaluations/artifacts/paired_gating_t_d_pw025_vs_v21.json` liegt
+nicht im Baum: `find -iname "*pw025*"` ueber das Repo liefert null Treffer, in
+`evaluations/artifacts/` liegen nur die Pendants der Arme `vw04` und `vw08`.
+Die Zahlen oben stammen deshalb aus dem Kopf und aus der Arena-Trendtabelle;
+exakter Paar-Vorzeichentest, LLR und Block-Ebene sind fuer diesen Arm mangels
+Artefakt nicht nachtraeglich belegbar.
+
+**Damit greift Regel 5** (alle drei Arme H0): `VALUE_WEIGHT = 0,2` und der
+Punkte-Default bleiben, der Punkt gilt fuer die WDL-/2D-Aera als geschlossen --
+so bereits im Zeile-1-Kopf verbucht.
+
+### Zwischenstand des Sweeps (2 von 3 Armen) -- Nachtrag 2026-09-11: Zeile `pw025` nachgezogen, damit vollstaendig
 
 | Arm | value/points | Quote gegen Champion | Verdikt |
 |---|---|---|---|
 | `t_d_vw04` | vw 0,4 | 52,0% (208:192) | H0, Deckel |
 | `t_d_vw08` | vw 0,8 | 46,0% (92:108) | H0, SPRT |
-| `t_d_pw025` | pw 0,25 | trainiert noch | offen |
+| `t_d_pw025` | pw 0,25 | 45,3% (68:82) | H0, SPRT nach 75 Paaren |
 
 Bild bisher **monoton und in sich konsistent**: 0,2 (Kontrolle) ist nicht
 schlechter als 0,4, und 0,8 liegt darunter. Das stuetzt die Lesart von

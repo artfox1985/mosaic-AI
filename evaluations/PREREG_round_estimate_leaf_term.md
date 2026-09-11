@@ -171,7 +171,9 @@ nach den v24-Abnahmen; vorher laeuft nur die Skalen-Messung (par.4), sobald
 die CPU frei ist. Bei Erfolg Kandidat fuer den v25-Knopfsatz zusammen mit
 K3-P2; Kreuzprodukte nur mit Anlass (ein Knopf, ein Netz, eine Messung).
 
-## par.6 EINGETAKTET (2026-09-11): Schritt 7 des v28-Programms
+## par.6a EINGETAKTET (2026-09-11): Schritt 7 des v28-Programms
+
+*(Dieser Abschnitt trug bis zur Audit-Querlesung am 2026-09-11 ebenfalls die Nummer par.6 -- doppelt vergeben neben "par.6 Was dieser Term NICHT ist". Umbenannt in par.6a; externe Verweise auf par.6 dieser Datei gab es keine.)*
 
 Nutzer 2026-09-11: *"takte den round_estimate_leaf_term noch an einer passenden stelle ein."*
 Passende Stelle: nach `v28-b02`, am dann amtierenden Champion-Stand, als Such-Knopf ohne
