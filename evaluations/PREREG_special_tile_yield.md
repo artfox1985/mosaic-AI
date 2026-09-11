@@ -615,3 +615,13 @@ nicht gemessen haben. Dasselbe gilt allerdings auch fuer die Huellenform. **Nutz
 
 **Laufzeit:** 170 Paare, rund 70 min, 125 s je Block, threads 10, exklusiv.
 Artefakt `evaluations/artifacts/paired_gating_k5vshf2_s16.json`.
+
+## Nachtrag 2026-09-11, 19:00: isolierte Wirkungsmessung der Kanaele 77/78 EINGETAKTET als v29-b02
+
+Nutzer-Entscheid ("dann fahren wir die ablation als v29-b02"): Rezept v29-b01 mit den
+Planes-Kanaelen 77 (Spezialfeld-Ertrag) und 78 (Abstand zur Ausloesung) auf Null, Tor 1 gegen
+v29-b01, Leserichtung und Zusatzkennzahlen in `PREREG_v29_window.md` par.6. Damit bekommt der
+seit 2026-08-29 offene Punkt (2) des Kopfbereichs (kein 77-gegen-79-A/B) seine Messung; par.4c
+bleibt ungebaut und haengt am Ausgang. Anlass der Wiedervorlage: Audit-Querlesung 2026-09-11
+und der Spezialfeld-Posten in Tor 1 v28 (-9,73 gegen -10,61 Punkte je Partie, 160 von 400
+Brettern, `PREREG_v28_window.md` par.10).
