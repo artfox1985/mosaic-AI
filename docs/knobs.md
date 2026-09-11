@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 108 Knoepfe (65 aktiv, 35 diagnose, 7 tot, 1 geplant).
+Stand: 109 Knoepfe (65 aktiv, 36 diagnose, 7 tot, 1 geplant).
 
 **Status** sagt, ob der Knopf VERDRAHTET ist -- ausdruecklich nicht, ob sein
 Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
@@ -180,6 +180,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_SPALTENBAU_JACKPOT` | aus (Opt-in =1) | diagnose | ENTSCHIEDEN | Baustein 3a dominante Jackpot-Gewichtung, seit par.15 default AUS (column_build.rs:151) | PREREG_provocation.md par.15 |
 | `MOSAIC_SPALTENBAU_SPECIAL` | aus (Opt-in =1) | diagnose | ENTSCHIEDEN | par.16 Special-Zellen-Erweiterung des Spaltenbauers (column_build.rs:204) | PREREG_provocation.md par.16 |
 | `MOSAIC_DOME_POOL_KNOWLEDGE` | an (=0 schaltet auf Vollmischung zurueck) | diagnose | OFFEN | Variante A der Kuppelstapel-Informationsmengen: die Wurzel-Determinisierung mischt nur das unbekannte Praefix und fremde Rueckgabe-Bloecke in sich, der eigene Block bleibt in Reihenfolge (state.rs::determinize_dome_pool). =0 nur fuer den PRE/POST-Vergleich der Prereg auf demselben Wheel; Erzeugung und Arena fahren AN | PREREG_dome_stack_information_sets.md par.15/par.15a |
+| `MOSAIC_FEATURES_FROM_RUST` | aus (Opt-in =1) | diagnose | OFFEN | Python-seitiger Schalter (neural_net.py::state_to_tensor/state_to_planes): Merkmalsvektor und Planes ueber den pyo3-Export state_features_from_json/state_planes_from_json aus features.rs bauen statt ueber den Python-Zwilling; NICHT im Cache-Schluessel (per_file_cache_key), weil beide Bauer bit-identisch sein muessen (tools/probes/feature_parity_rust_python.py, Tor bestanden 2026-09-11). Der Rust-Code liest den Knopf nicht, er ist hier nur registriert, weil lib.rs ihn in der Export-Dokumentation nennt | PREREG_rust_data_layer.md par.2/par.7 |
 | `MOSAIC_STACK_DRAW_RESERVATION` | aus (Opt-in =1) | diagnose | ENTSCHIEDEN | reparierte Blindzieh-Stopp-Regel: erwartete VERBESSERUNG in einer Einheit statt Niveau gegen Typmittelwert (self_play.rs::resolve_and_apply_stack_draw) | PREREG_stack_draw_reservation_rule.md par.5b |
 | `MOSAIC_UPDATE_FEATURE_FIXTURE` | aus (Opt-in =1) | diagnose | - | schreibt die Feature-Golden-Fixture neu statt zu pruefen; NUR fuer gewollte Feature-Aenderungen (features.rs::maybe_update_fixture) | - |
 | `MOSAIC_UPDATE_NET_PARITY_FIXTURE` | aus (Opt-in =1) | diagnose | - | schreibt die Netz-Paritaets-Fixture (engine/tests/fixtures/net_parity_champion.txt) neu statt zu pruefen; Pflicht-Schritt bei jedem Champion-Wechsel, siehe docs/promotion_checklist.md 5d (self_play.rs::maybe_update_net_parity_fixture) | - |
