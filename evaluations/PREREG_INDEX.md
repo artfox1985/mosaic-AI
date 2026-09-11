@@ -77,12 +77,12 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 115 Dateien = 11 OFFEN + 92 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 116 Dateien = 12 OFFEN + 92 ENTSCHIEDEN + 12 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (11)
+## OFFEN (12)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
@@ -97,6 +97,7 @@ Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 | `PREREG_stack_top_feature.md` | Sieht das Netz dasselbe wie ein Spieler am Tisch? | Stufe 0 gefahren (par.10), acht Asymmetrien, alle Netz-sieht-weniger. GEBAUT im Sicht-Arm v24-b04: Stapel-Rueckseite, Plattentyp der Auslage-Kuppeln, Strafleisten-Farben, Phantom-Anteil je Musterreihe; additiv, INPUT_SIZE 714 -> 744, Kuerzung auf Modellbreite in net.rs (build_inputs), nicht in features_for_layout (par.10 berichtigt 2026-09-09). Anlass geschlossen. OFFEN vier Punkte, nach v27-b01: laufende Ziehserie (par.10 P.3), Phasenaufloesung (P.7), Stufe 2 Netz nutzt die Werte (par.7), zweite Achse was WEISS die Suche (par.11). Kriterium Sichtgleichheit, nicht Elo. |
 | `PREREG_start_dome_choice.md` | Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | NICHTS GEBAUT. Stufe 0 (Spannweite ueber die neun Slots, par.4) EINGETAKTET 2026-09-11 als Sonde am v28-Korpus, Schritt 5 des v28-Programms (PREREG_v28_window.md par.8); Verdikt nur fuer den Slot-Teil, Plattenwahl bleibt offen (Nachtrag 2026-09-09). Anker-Sperre aus par.6a ist ueberholt. |
 | `PREREG_v28_window.md` | Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Erzeugung GEFAHREN (par.10, 9,9 h). TOR 2a HAELT 0,816 gegen 0,777. v28-b01 trainiert (brierbest Epoche 3). TOR 1 BESTANDEN: v28-b01 gegen v27-b01 166:124 (SPRT nach 145 Paaren, p 0,015) und 221:179 (Deckel, p 0,053, KI der Paardifferenz [+0,01; +0,41]); Elo 1447 [1395; 1499]. TOR 2b HAELT: 1,030 gegen 0,884 volle Spalten je Seite (n = 396). Offen: b02 (Variante B, par.9), Ablationen, Sonde, Kante, round_estimate (par.8). |
+| `PREREG_v29_window.md` | Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, mit dem besten v28-Arm als Generator und einem Pflichtarm mit unveraendertem Rezept? | nichts gebaut, nichts gefahren. Zuschnitt aus PREREG_v28_window.md par.1 rotiert (580 Traeger + rund 2.367 Schwarm, Seed 20260941, Val-Pool ^selfplay_v28-), Generator = Sieger der v28-Promotion (b01 oder b02, par.3). G-2-Haelfte: Vorschlag Ausflug (par.2, Nutzer-Entscheid). Begleitprogramm par.7: Schwierigkeitsleiter, Ziehsucht-Sonde. Erzeugung nur auf Anweisung. |
 
 ## ENTSCHIEDEN (92)
 
