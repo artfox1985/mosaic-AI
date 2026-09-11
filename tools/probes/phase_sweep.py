@@ -1,5 +1,21 @@
 #!/usr/bin/env python
-"""PREREG_heuristic_v2_long_rows.md par.13: Latin-Hypercube ueber STAERKE und
+"""WIRKUNGSLOS seit 2026-09-11 (Knoepfe ohne Lesestelle,
+PREREG_code_cleanup_closeout.md par.3 A9).
+
+Diese Sonde setzt `MOSAIC_PHASE_AMP`, `MOSAIC_PHASE_PEAK` und
+`MOSAIC_PHASE_STAGE`. Die Engine LIEST keinen der drei mehr: ihre frueheren
+Leser `plate_builder.rs::phase_wirkt_auf` und `spalten_phase` existieren nicht
+mehr (Grep ueber `engine/src`, Review 2026-09-11). Ein Lauf wuerde also
+16 x 3 x 160 Partien fahren und dreimal DENSELBEN Arm gegen sich selbst
+messen -- der Sweep produziert Rauschen, das wie ein Positionseffekt aussieht.
+
+Die Registratur fuehrt die drei Knoepfe seit demselben Tag als `Tot`
+(`engine/src/knob_registry.rs`). Die Datei bleibt als Beleg des Entwurfs
+stehen (Loeschung nur mit Freigabe); der Lauf ist gesperrt, siehe `main`.
+
+Historischer Kopf des Entwurfs:
+
+PREREG_heuristic_v2_long_rows.md par.13: Latin-Hypercube ueber STAERKE und
 POSITION des Phasenfaktors.
 
 par.11 hat EINE Form getestet (Gipfel 1,4 auf den Runden 2-3) und H0 geliefert.
@@ -99,8 +115,20 @@ def fahre_punkt(i: int, amp: float, peak: float, stufe: str) -> dict:
     }
 
 
+BLOCKED_NOTICE = (
+    "WIRKUNGSLOS seit 2026-09-11 (Knoepfe ohne Lesestelle, "
+    "PREREG_code_cleanup_closeout.md par.3 A9): MOSAIC_PHASE_AMP / _PEAK / "
+    "_STAGE werden von der Engine nicht mehr gelesen (Registratur-Status Tot, "
+    "engine/src/knob_registry.rs). Dieser Sweep wuerde 48 x 160 Partien lang "
+    "denselben Arm gegen sich selbst messen. Wer ihn trotzdem braucht, baut "
+    "zuerst eine Lesestelle -- und entfernt dann diese Sperre."
+)
+
+
 def main() -> None:
     sys.stdout.reconfigure(encoding="utf-8")
+    # A9: Abbruch VOR jedem Lauf, nicht erst nach den ersten Partien.
+    sys.exit(BLOCKED_NOTICE)
     entwurf = latin_hypercube(N_PUNKTE, LHS_SEED)
     t0, c0 = time.monotonic(), time.process_time()
     gesamt = N_PUNKTE * len(STUFEN)

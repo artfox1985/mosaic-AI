@@ -140,6 +140,13 @@ pub fn validate_tiling_action(
     if action.pattern_row >= 6 || action.slot_row >= 3 || action.slot_col >= 3 {
         return Some("Tiling-Aktion außerhalb des Rasters.".into());
     }
+    // A5 (PREREG_code_cleanup_closeout.md par.3 Punkt 4, gleiche Fundfamilie):
+    // die Raster-Indizes waren bereits geprueft, `player_idx` nicht -- er
+    // kommt ueber py.rs (`apply_tiling`) aus dem HTTP-Rumpf (server.py
+    // /api/tiling) und war damit ein Panic-Pfad.
+    if player_idx >= state.players.len() {
+        return Some(format!("Ungültiger Spielerindex {player_idx}."));
+    }
     let player = &state.players[player_idx];
     let row = &player.pattern_lines[action.pattern_row];
 
@@ -611,6 +618,15 @@ pub fn chips_label(player: &PlayerBoard, indices: &[usize]) -> String {
 /// Komplettiert Reihe `row_idx` mit GENAU den angegebenen Chips (Indizes in
 /// `player.bonus_chips`). Gibt false, wenn die Auswahl ungültig ist.
 pub fn apply_bonus_chips_with(player: &mut PlayerBoard, row_idx: usize, chip_indices: &[usize]) -> bool {
+    // A4 (PREREG_code_cleanup_closeout.md par.3, Review 2026-09-11): die
+    // Top-down-Sperre (Manual: gesperrte Reihen koennen nicht mehr per Chip
+    // befuellt werden) sass bis hierher nur in `apply_bonus_chips_to_row` und
+    // bei den Aufrufern (self_play, tiling_solver, py.rs); die Arbeitsfunktion
+    // selbst liess eine gesperrte Reihe durch. Jetzt prueft sie es selbst;
+    // fuer Aufrufer, die vorher filtern, ist das eine doppelte, harmlose Pruefung.
+    if row_idx >= player.pattern_lines.len() || (row_idx as i32) < player.tiled_max_row {
+        return false;
+    }
     let color = match player.pattern_lines[row_idx].color {
         Some(c) if !player.pattern_lines[row_idx].tiles.is_empty() => c,
         _ => return false,
@@ -699,6 +715,28 @@ mod tests {
             p.start_tile_pending = false;
         }
         s
+    }
+
+    #[test]
+    fn locked_row_is_refused_by_apply_bonus_chips_with() {
+        // A4: eine Reihe unterhalb von tiled_max_row (Top-down-Sperre) darf auch
+        // ueber die Arbeitsfunktion nicht per Chip befuellt werden -- bisher
+        // filterten nur die Aufrufer.
+        use crate::dome::BonusChip;
+        let mut p = PlayerBoard::new(0, "P");
+        p.pattern_lines[1].add_tiles(&[Rot]); // cap 2, eine fehlt
+        // Ein fehlender Slot kostet ZWEI farbgleiche Chips (Regel in
+        // `chips_complete`, siehe den Test `chips_complete_row_...` unten).
+        p.bonus_chips.push(BonusChip { chip_id: 7, colors: vec![Rot] });
+        p.bonus_chips.push(BonusChip { chip_id: 8, colors: vec![Rot] });
+        p.tiled_max_row = 2; // Reihen 0 und 1 gesperrt
+        assert!(!apply_bonus_chips_with(&mut p, 1, &[0, 1]));
+        assert_eq!(p.bonus_chips.len(), 2, "Chips duerfen nicht verbraucht sein");
+        assert_eq!(p.pattern_lines[1].tiles.len(), 1);
+        p.tiled_max_row = -1; // Sperre auf, derselbe Aufruf fuellt die Reihe
+        assert!(apply_bonus_chips_with(&mut p, 1, &[0, 1]));
+        assert!(p.bonus_chips.is_empty());
+        assert!(!apply_bonus_chips_with(&mut p, 9, &[]), "Reihenindex ausserhalb -> false statt Panic");
     }
 
     #[test]

@@ -418,3 +418,24 @@ vierte Materialschritt in Folge traegt Siege (Tor 1), Spalten (Tor 2b) und Punkt
 sitzt der Zuwachs in den vertikalen Reihen; neu ist ein signifikanter Posten bei den
 Spezialfeldern (weniger Abzug). **Generator fuer v29 nach der Generatorwahl-Regel: v28-b01**,
 sofern kein v28-Arm ihn schlaegt (b02 bis b04, par.8).
+
+**ABLATIONEN b03/b04 GEFAHREN (Kette `tools/night_v28_ablations.sh`, 2026-09-11 20:03 bis
+2026-09-12 00:47; Rezept b02 (755, Rust-Bauer), Seed 20260937, Tor 1 gegen v28-b02, beide
+Seiten Champion-Spec, @400, Blockgroesse 5, 10 Threads, `--log-games`; Nebenlast: zwei
+Claude-Partien der Parallelsitzung, Laufzeiten gebremst zu lesen):**
+
+| Arm | Fenster | Training | Seed | Ergebnis | Paare | McNemar p | Paardifferenz [95 %-KI] |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| v28-b03 (ohne neue Ausflug-Klasse) | 2.547 Dateien, 3.875.543 Zustaende | 4.322 s, brierbest Epoche 3 (0,1884, eigener Val-Pool) | 20261040 | 77:83, SPRT-H0 (LLR -3,05) | 80 | 0,766 | -0,08 [-0,41; +0,26] |
+| | | | 20261041 | **26:44, SPRT-H0 (LLR -3,49)** | 35 | **0,035** | **-0,51 [-0,92; -0,11]** |
+| v28-b04 (ohne G-2-Posten v25-b01) | 2.403 Dateien, 3.604.023 Zustaende | 4.511 s, brierbest Epoche 5 (0,1778, eigener Val-Pool) | 20261042 | 55:65, SPRT-H0 (LLR -3,01) | 60 | 0,473 | -0,17 [-0,53; +0,20] |
+| | | | 20261043 | 114:116, SPRT-H0 (LLR -3,00) | 115 | 1,0 | -0,02 [-0,28; +0,24] |
+
+Lesart: **keine Ablation schlaegt b02.** Ohne die neue Ausflug-Klasse ist der Arm im zweiten
+Seed signifikant schlechter (Punkte 50,2 gegen 56,6 in diesem Lauf); die Ausflug-Klasse traegt.
+Ohne den G-2-Posten ist der Arm nicht besser und in einem Seed nominell schlechter (Punkte 48,6
+gegen 52,7); der Posten bleibt. Der Fensterzuschnitt aus par.1 bleibt fuer v29 unveraendert
+(`PREREG_v29_window.md` par.1). Alle vier Kanten im Elo-Register. Artefakte
+`paired_gating_v28-b03_vs_v28-b02_s40/s41.json`, `paired_gating_v28-b04_vs_v28-b02_s42/s43.json`.
+**Bester Stand der Generation: v28-b02** (Nutzer-Entscheid oben); Promotion nach
+`docs/promotion_checklist.md` steht an (Anker-Kante, Champion-2 gegen v26-Artefakt, Einfrieren).

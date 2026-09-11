@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 111 Knoepfe (65 aktiv, 38 diagnose, 7 tot, 1 geplant).
+Stand: 111 Knoepfe (65 aktiv, 35 diagnose, 10 tot, 1 geplant).
 
 **Status** sagt, ob der Knopf VERDRAHTET ist -- ausdruecklich nicht, ob sein
 Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
@@ -14,14 +14,14 @@ Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
 trennen "aus, weil noch niemand ihn eingeschaltet hat" von "aus, weil die
 Messung ihn erledigt hat" -- in der Registratur allein sehen die gleich aus.
 
-**66 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
+**63 verdrahtete Knoepfe haengen an einer BEANTWORTETEN Prereg** (entschieden oder ueberholt).
 
 Der Statuskopf sagt ENTSCHIEDEN, aber NICHT die Richtung -- deshalb die
 Trennung nach Default. Kein Loeschauftrag: ein negatives Ergebnis kann
 "falscher Hebel, richtiges Ziel" heissen (`PREREG_long_row_payoff` ist
 genau so ein Fall). Es ist die Liste, an der die Frage stellbar wird.
 
-**Beantwortet UND Default aus (43)** -- hier lohnt die Nachfrage,
+**Beantwortet UND Default aus (42)** -- hier lohnt die Nachfrage,
 ob der Knopf noch etwas offen haelt:
 
 - `MOSAIC_POINTS_UTILITY_W` (ENTSCHIEDEN, PREREG_task28_aggression.md)
@@ -41,7 +41,6 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_COLOR_DENIAL_PROBE_Z` (UEBERHOLT, PREREG_opponent_disruption_v2.md par.5.2)
 - `MOSAIC_IMPLICIT_MINIMAX_A` (ENTSCHIEDEN, PREREG_implicit_minimax_backup.md par.1; PREREG_agent_encapsulation.md par.4)
 - `MOSAIC_SCORE_UTILITY_C` (ENTSCHIEDEN, PREREG_saturating_score_utility.md par.14; PREREG_v24_window.md par.8)
-- `MOSAIC_PHASE_AMP` (ENTSCHIEDEN, PREREG_heuristic_v2_long_rows.md par.13)
 - `MOSAIC_ORT_CUDA_ENABLED` (ENTSCHIEDEN, PREREG_gpu_inference_path.md par.11)
 - `MOSAIC_INTERLEAVE_ENABLED` (ENTSCHIEDEN, PREREG_async_search.md)
 - `MOSAIC_TILING_SELECT` (ENTSCHIEDEN, PREREG_t37_tiling_criterion.md)
@@ -68,7 +67,7 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_CACHE_NOPACK` (ENTSCHIEDEN, PREREG_v21_window.md)
 - `MOSAIC_VAL_POOL` (ENTSCHIEDEN, PREREG_v22_window.md par.6)
 
-**Beantwortet, Default AN (23)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
+**Beantwortet, Default AN (21)** -- in Benutzung, hier ist "entschieden" das Ergebnis, nicht das Ende:
 
 - `MOSAIC_GUMBEL_C_SCALE` = 1.0 (ENTSCHIEDEN, PREREG_prior_blind_spot.md par.G3)
 - `MOSAIC_FLOOR_SHAPING_W` = 0.3 (ENTSCHIEDEN, PREREG_search_path_remeasurements.md M1)
@@ -80,8 +79,6 @@ ob der Knopf noch etwas offen haelt:
 - `MOSAIC_DENIAL_MIN_VISIT_FRAC` = 0.5 (ENTSCHIEDEN, PREREG_denial_tiebreak.md)
 - `MOSAIC_COLOR_DENIAL_PROBE_MIN_VISIT_FRAC` = 0.5 (UEBERHOLT, PREREG_opponent_disruption_v2.md par.5.2)
 - `MOSAIC_SCORE_UTILITY_B` = 20 (ENTSCHIEDEN, PREREG_saturating_score_utility.md par.14.1/14.5)
-- `MOSAIC_PHASE_STAGE` = both (ENTSCHIEDEN, PREREG_heuristic_v2_long_rows.md par.14)
-- `MOSAIC_PHASE_PEAK` = 2.5 (nur wirksam wenn MOSAIC_PHASE_AMP gesetzt) (ENTSCHIEDEN, PREREG_heuristic_v2_long_rows.md par.13)
 - `MOSAIC_R5_CHANCE_NODES` = an (=0 Altverhalten) (ENTSCHIEDEN, PREREG_chance_nodes.md)
 - `MOSAIC_R5_NET_SOLVER` = an (=0 Gegenprobe Netz) (ENTSCHIEDEN, PREREG_chance_nodes.md Teil E)
 - `MOSAIC_R5_NODE_BUDGET` = 200 (ENTSCHIEDEN, PREREG_chance_nodes.md)
@@ -139,9 +136,9 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_SPECIAL_ROW6_W` | 0.0 (aus) | aktiv | OFFEN | K5 par.9 'eine Spezialfliese in Reihe 6' (Nutzer 2026-09-06 17:43: 'soweit moeglich wuerd ich immer eine spezialfliese in Reihe 6 aktivieren. Mehr geht sich nicht aus.'): Gewicht w_k5, mit dem ein noch unbelegtes Spezialfeld auf einer Huellenzelle der Rasterzeile 6 in der K3-P-Projektion als kuenftig belegt zaehlt (Zellenkosten 6), waehrend die projizierte Masse der Normalzellen DERSELBEN Kuppelplatte innerhalb der Huelle mit 1 + w_k5 verstaerkt wird -- sie sind die Freischaltbedingung (dome.rs try_unlock_special, round_end.rs:275), also der Weg zu den Reihen 5/6 mit den passenden Farben (envelope.rs apply_row6_special_in, envelope_score_row6_in). Hoechstens EINE Platte zaehlt; liegt die Spezialfliese der Zeile 6 schon, gibt die Regel nichts mehr. Zielplaetze je Orientierung: bei envelope_hull_form 1 (Dreieck) EINER ((5,0) bzw. (5,5)), bei 2 (Row6Pair) ZWEI ((5,0)+(5,1) bzw. (5,4)+(5,5), zwei Rotationslagen derselben Platte). Nur in den Modi 1 (K3-P) und 4 (K3-P2) wirksam, koexistiert mit MOSAIC_ENVELOPE_FLUSH_W auf derselben Belegung; 0 = aus, bitidentisch. Spec-Pflichtfeld je Seite (special_row6_w), dieser Env-Wert ist der Default von SearchConfig::from_env | PREREG_special_tile_yield.md par.9 |
 | `MOSAIC_DEAD_CELL_W` | 0.0 (aus) | diagnose | OFFEN | K3-D par.8.9b Baustein 2 / par.12c 'tote Huellenzellen' (eingetaktet 2026-09-11 als v28-Schritt 8): Gewicht dead_cell_w, mit dem eine Zelle der bestpassenden Huelle, die nicht mehr erfuellbar ist (column_build.rs:563 cell_is_completable == false: die Kuppelplatte liegt, fordert eine Farbe, und Musterreihe plus Restvorrat reichen fuer die r+1 Fliesen nicht mehr), als Abzug -dead_cell_w * (r+1) / Gesamtkosten zaehlt (56 beim Dreieck, 62 bei envelope_hull_form 2; envelope.rs dead_hull_mass_in, cell_knob_shift_in). Bestraft nur Zerstoerung und belohnt KEINE Optionalitaet -- der Konstruktionsfehler von K3-R (Bestrafung des Beginnens langer Reihen) kann so nicht wiederkommen. Additive Korrektur auf H, wirkt in ALLEN Projektions-Modi (0/1/2/3/4, K3-F und K5 eingeschlossen); dort, wo der Modus die Orientierung per Maximum waehlt, steht sie INNERHALB des Maximums. 0 = aus, bitidentisch (der Zweig in search_shift_state wird gar nicht betreten). Spec-Feld je Seite (dead_cell_w), OPTIONAL mit Default 0, damit die eingefrorenen Artefakte weiter laden; dieser Env-Wert ist der Default von SearchConfig::from_env | PREREG_geometric_envelope.md par.12c |
 | `MOSAIC_OUT_WILD_W` | 0.0 (voller Abzug) | diagnose | OFFEN | Jokerfeld-Regel par.12c (Anlass: Nutzerfrage 2026-09-11 zur Platte 'Mehrfarbige Felder', 2 Punkte je Jokerfeld nur bei Vollbelegung; eine Jokerplatte am Huellenrand hat Zellen ausserhalb, deren Belegung heute (r+1)/62 * w_e kostet): Zellen AUSSERHALB der Huelle, die JOKERFELDER (SpaceType::Wild) einer gelegten Platte sind, zaehlen im Abzug 'Steine ausserhalb' nur noch mit (1 - out_wild_w), umgesetzt als Gutschrift + out_wild_w * v * (r+1) / Gesamtkosten (envelope.rs outside_wild_mass_in; Praedikat board.rs get_space plus space_type == Wild). Normal- und Spezialfelder ausserhalb behalten den vollen Abzug. 0 = Bestand (bitidentisch), 1 = kein Abzug fuer Jokerfelder. Die erste Fassung nahm jede gelegte Platte und damit jeden Aussenstein, weil ein Stein immer auf einer Platte liegt; das war nur eine Dosis auf den Aussen-Abzug und ist verworfen | PREREG_geometric_envelope.md par.12c |
-| `MOSAIC_PHASE_STAGE` | both | diagnose | ENTSCHIEDEN | Auf welchen Entscheidungsstellen der Phasenfaktor wirkt: draft/tiling/both (plate_builder.rs::phase_wirkt_auf) -- trennt Rang-Entscheidung im Drafting von der Summen-Entscheidung im Tiling | PREREG_heuristic_v2_long_rows.md par.14 |
-| `MOSAIC_PHASE_AMP` | unset (= feste Tabelle SPALTEN_PHASE) | diagnose | ENTSCHIEDEN | Gipfelhoehe des Phasenfaktors auf die Spalten-Stufen der v2-Zielkarte (plate_builder.rs::spalten_phase); 1.0 = wirkungslos, dient im Sweep als Nullpunkt | PREREG_heuristic_v2_long_rows.md par.13 |
-| `MOSAIC_PHASE_PEAK` | 2.5 (nur wirksam wenn MOSAIC_PHASE_AMP gesetzt) | diagnose | ENTSCHIEDEN | Gipfel-Runde des Phasenfaktors (plate_builder.rs::spalten_phase) | PREREG_heuristic_v2_long_rows.md par.13 |
+| `MOSAIC_PHASE_STAGE` | both | tot | ENTSCHIEDEN | Auf welchen Entscheidungsstellen der Phasenfaktor wirkt: draft/tiling/both -- trennte Rang-Entscheidung im Drafting von der Summen-Entscheidung im Tiling. seit 2026-09-11 UEBERHOLT: keine Lesestelle im Code (Review); tools/probes/phase_sweep.py setzt sie wirkungslos | PREREG_heuristic_v2_long_rows.md par.14 |
+| `MOSAIC_PHASE_AMP` | unset (= feste Tabelle SPALTEN_PHASE) | tot | ENTSCHIEDEN | Gipfelhoehe des Phasenfaktors auf die Spalten-Stufen der v2-Zielkarte; 1.0 = wirkungslos, diente im Sweep als Nullpunkt. seit 2026-09-11 UEBERHOLT: keine Lesestelle im Code (Review); tools/probes/phase_sweep.py setzt sie wirkungslos | PREREG_heuristic_v2_long_rows.md par.13 |
+| `MOSAIC_PHASE_PEAK` | 2.5 (nur wirksam wenn MOSAIC_PHASE_AMP gesetzt) | tot | ENTSCHIEDEN | Gipfel-Runde des Phasenfaktors. seit 2026-09-11 UEBERHOLT: keine Lesestelle im Code (Review); tools/probes/phase_sweep.py setzt sie wirkungslos | PREREG_heuristic_v2_long_rows.md par.13 |
 | `MOSAIC_R5_CHANCE_NODES` | an (=0 Altverhalten) | aktiv | ENTSCHIEDEN | Zufallsknoten fuer verdeckte Bonuschips im R5-Loeser, scharf seit 2026-08-10 (round5.rs:159) | PREREG_chance_nodes.md |
 | `MOSAIC_R5_NET_SOLVER` | an (=0 Gegenprobe Netz) | aktiv | ENTSCHIEDEN | Netzpfad nutzt in Runde 5 den exakten Loeser statt des Netz-Blattwerts (round5.rs:183) | PREREG_chance_nodes.md Teil E |
 | `MOSAIC_R5_NODE_BUDGET` | 200 | aktiv | ENTSCHIEDEN | Knotenbudget je R5-Entscheidung (round5.rs:199, NODE_BUDGET round5.rs:88) | PREREG_chance_nodes.md |

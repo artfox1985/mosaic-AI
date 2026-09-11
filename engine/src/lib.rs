@@ -637,11 +637,21 @@ fn onnx_eval(
 /// Liste mitgeändert werden, sonst zeigt der Hash einen Vertrag an, den
 /// `net.rs` tatsächlich nicht mehr einhält.
 fn contract_canonical_string() -> String {
-    let heads = ["policy", "value", "moon", "points", "opp_points"];
+    // A10 (PREREG_code_cleanup_closeout.md par.3 Punkt 8, Review 2026-09-11):
+    // seit 2026-09-11 auch die Planes-Geometrie (`net.rs` schneidet die
+    // Planes/Flat-Grenze an NUM_PLANES_CHANNELS * PLANES_H * PLANES_W) und der
+    // Kopf `ownership`, den `net.rs::detect_own_head` genauso NAMENTLICH sucht
+    // wie `opp_points`. Vorher waere eine Umbenennung des Ownership-Kopfs bei
+    // unveraendertem Hash still zu einer leeren Ownership-Spalte geworden.
+    // Der Hash wechselt damit einmalig (alt c65768636c0560a7); Kanten gegen
+    // aeltere Artefakte laufen Cross-Aera (Regel 2026-08-29).
+    let heads = ["policy", "value", "moon", "points", "opp_points", "ownership"];
     format!(
-        "INPUT_SIZE={};NUM_PLANES_CHANNELS={};NUM_ACTIONS={};HEADS={}",
+        "INPUT_SIZE={};NUM_PLANES_CHANNELS={};PLANES_H={};PLANES_W={};NUM_ACTIONS={};HEADS={}",
         crate::features::INPUT_SIZE,
         crate::features::NUM_PLANES_CHANNELS,
+        crate::features::PLANES_H,
+        crate::features::PLANES_W,
         crate::net_mcts::NUM_ACTIONS,
         heads.join(",")
     )
@@ -769,6 +779,15 @@ fn engine_config_json() -> String {
         "policy_mass_cutoff": POLICY_MASS_CUTOFF,
         "round_transition_n_samples_search": crate::round_transition::N_SAMPLES_SEARCH,
         "bootstrap_horizon_rounds": crate::round_transition_deep::BOOTSTRAP_HORIZON_ROUNDS,
+        // A1 (PREREG_code_cleanup_closeout.md par.3 Punkt 1): Stand des
+        // prozessweiten Zaehlers fehlgeschlagener Netz-Auswertungen ZUM
+        // ZEITPUNKT DES AUFRUFS. Anders als alle Felder darueber ist das kein
+        // Konfigurationswert, sondern eine Laufzeit-Beobachtung -- ein
+        // Manifest, das VOR dem Lauf geschrieben wird, sieht hier 0; der
+        // aussagekraeftige Zeitpunkt ist NACH dem Lauf (Arena-/Self-Play-
+        // Artefakt, Feld `net_eval_failures`). > 0 heisst: die Suche hat an so
+        // vielen Aufrufen mit einem leeren Netz-Ergebnis gearbeitet.
+        "net_eval_failures": crate::net_mcts::net_eval_failures(),
     })
     .to_string()
 }
@@ -843,6 +862,24 @@ fn score_utility_stats() -> (u64, u64, u64) {
 #[pyfunction]
 fn reset_score_utility_stats() {
     crate::net_mcts::reset_score_utility_stats()
+}
+
+/// A1 (`PREREG_code_cleanup_closeout.md` par.3 Punkt 1): Zahl der
+/// fehlgeschlagenen Netz-Auswertungen dieses Prozesses. GRUNDMENGE ist der
+/// AUFRUF (ein gescheitertes `eval_batch_ex` ueber n Zeilen zaehlt 1), EINHEIT
+/// sind Aufrufe. Jeder gezaehlte Fall bedeutet ein LEERES Netz-Ergebnis
+/// (Blattwert 0,5, Priors gleichverteilt) -- Arena und Self-Play fuehren den
+/// Wert als `net_eval_failures` im Artefakt und melden ihn laut, wenn er > 0
+/// ist. Prozessweit, Muster `score_utility_stats`.
+#[pyfunction]
+fn net_eval_failures() -> u64 {
+    crate::net_mcts::net_eval_failures()
+}
+
+/// Setzt den A1-Zaehler zurueck (vor einem zu messenden Lauf).
+#[pyfunction]
+fn reset_net_eval_failures() {
+    crate::net_mcts::reset_net_eval_failures()
 }
 
 /// Setzt den Denial-Tie-Break-Debug-Zaehler zurueck -- vor einem zu
@@ -2041,6 +2078,8 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(reset_denial_tiebreak_stats, m)?)?;
     m.add_function(wrap_pyfunction!(score_utility_stats, m)?)?;
     m.add_function(wrap_pyfunction!(reset_score_utility_stats, m)?)?;
+    m.add_function(wrap_pyfunction!(net_eval_failures, m)?)?;
+    m.add_function(wrap_pyfunction!(reset_net_eval_failures, m)?)?;
     m.add_function(wrap_pyfunction!(color_denial_probe_stats, m)?)?;
     m.add_function(wrap_pyfunction!(reset_color_denial_probe_stats, m)?)?;
     m.add_function(wrap_pyfunction!(net_search_state_json, m)?)?;
@@ -2134,6 +2173,14 @@ mod contract_stamp_tests {
     /// traegt den alten Hash im Manifest; sein Referee-Handshake ist ab jetzt
     /// eine Cross-Aera-Messung (Aera-Regel 2026-08-29).
     ///
+    /// **Neu gesetzt 2026-09-12** (vorher `c65768636c0560a7`), Anlass:
+    /// `evaluations/PREREG_code_cleanup_closeout.md` par.3 Punkt 8 (A10) --
+    /// der Vertragsstring nennt jetzt auch `PLANES_H`/`PLANES_W` (6/6) und den
+    /// Kopf `ownership`, den `net.rs::detect_own_head` namentlich sucht. Kein
+    /// Wert im Eingabe- oder Ausgabevertrag hat sich geaendert; der Hash
+    /// wechselt, weil er MEHR abdeckt. Bestandschampions spielen bitgleich
+    /// weiter (Netz-Paritaets-Fixture im selben Lauf gegengeprueft, s. dort).
+    ///
     /// **Neu gesetzt 2026-09-11** (vorher `20b442a8164f748d`), Anlass:
     /// `PREREG_dome_stack_information_sets.md` par.7 Variante B und
     /// `PREREG_v28_window.md` par.6 (Arm v28-b02) -- `INPUT_SIZE` 744 -> 755
@@ -2147,7 +2194,7 @@ mod contract_stamp_tests {
     fn contract_hash_matches_pinned_literal() {
         assert_eq!(
             contract_hash(),
-            "c65768636c0560a7",
+            "39648b95bbba1acf",
             "A2-Vertragshash hat sich veraendert -- Bestandschampions bekommen \
              andere Eingaben (siehe Testdoku)"
         );

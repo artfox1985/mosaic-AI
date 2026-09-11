@@ -16,6 +16,6 @@
 # ["round_transition_value", "bootstrap_value"] (siehe NET_PARITY_EXCLUDED_FIELDS in self_play.rs).
 # Hash-Verfahren: FNV-1a-64 ueber die Record-JSONs.
 champion	v27-b01_brierbest
-erzeugt	2026-09-10
+erzeugt	2026-09-11
 engine	0.1.0
-hash	b5188b25e073a1c0
+hash	f644cafc5e6506c6

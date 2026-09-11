@@ -181,6 +181,54 @@ fn aggr_lambda_cell() -> &'static std::sync::atomic::AtomicU64 {
 /// PUCT-Blattauswertungen einer einzigen Suche).
 static WARNED_NO_OPP_HEAD: std::sync::OnceLock<()> = std::sync::OnceLock::new();
 
+// ── A1: Zaehler fuer Netz-Auswertungsfehler ─────────────────────────────────
+//
+// `PREREG_code_cleanup_closeout.md` par.3 Punkt 1 (Review 2026-09-11, Fund A1):
+// JEDER `net.eval*`-Aufruf dieser Datei faengt seinen Fehler mit einem LEEREN
+// Ergebnis ab. Aus einem leeren `value` macht `value_to_win_prob` 0,5 und aus
+// leeren Logits eine Gleichverteilung -- ein aussetzendes ONNX-Backend
+// degradierte die Suche also zu Zufall, ohne jede Spur im Artefakt. Das
+// FALLBACK bleibt unveraendert (kein Abbruch, die Suche hat ein definiertes
+// Verhalten); neu ist nur, dass es gezaehlt und beim ersten Mal gemeldet wird.
+
+/// Prozessweiter Zaehler fehlgeschlagener Netz-Auswertungen. GRUNDMENGE: ein
+/// fehlgeschlagener AUFRUF (nicht die Zeilen eines Batches) -- ein
+/// `eval_batch_ex` ueber n Zeilen, das als Ganzes scheitert, zaehlt 1.
+/// Leser: [`net_eval_failures`], Export `mosaic_rust.net_eval_failures()` und
+/// Feld `net_eval_failures` in `engine_config_json` (lib.rs).
+static NET_EVAL_FAILURES: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Markiert, ob die A1-Warnung bereits geloggt wurde (Muster
+/// [`WARNED_NO_OPP_HEAD`]: EINMAL je Prozess, kein Log-Spam ueber tausende
+/// Blattauswertungen).
+static WARNED_NET_EVAL_FAILURE: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+
+/// Zaehlt eine fehlgeschlagene Netz-Auswertung und warnt beim ERSTEN Fall
+/// einmalig auf stderr. An jeder `unwrap_or_else`-Stelle eines
+/// `net.eval*`-Aufrufs zu rufen -- und NUR dort (die Env-Var-Fallbacks der
+/// Tests sind keine Netz-Auswertung).
+pub(crate) fn note_net_eval_failure() {
+    NET_EVAL_FAILURES.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    WARNED_NET_EVAL_FAILURE.get_or_init(|| {
+        eprintln!(
+            "⚠️  Netz-Auswertung fehlgeschlagen -- die Suche arbeitet mit einem LEEREN \
+             Ergebnis weiter (Blattwert 0,5, Priors gleichverteilt). Zaehler: \
+             net_eval_failures (engine_config_json / mosaic_rust.net_eval_failures())."
+        );
+    });
+}
+
+/// Snapshot des A1-Zaehlers (Muster [`score_utility_stats`]).
+pub fn net_eval_failures() -> u64 {
+    NET_EVAL_FAILURES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Setzt den A1-Zaehler zurueck -- vor einem zu messenden Lauf aufrufen
+/// (Muster [`reset_score_utility_stats`]).
+pub fn reset_net_eval_failures() {
+    NET_EVAL_FAILURES.store(0, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// Liest eine `MOSAIC_*`-Env-Var einmalig als `f64` -- fehlend/leer -> Default
 /// (kein Fehler), nicht parsbar -> Default + EINMALIGE Warnung auf stderr
 /// (kein Panic; Laufzeit-Konfiguration darf einen Prozess nie abstuerzen
@@ -224,6 +272,30 @@ pub(crate) fn read_f64_env(name: &str, default: f64) -> f64 {
         },
         Err(_) => default,
     }
+}
+
+/// A3 (`PREREG_code_cleanup_closeout.md` par.3 Punkt 3, Review-Fund A3):
+/// `score_utility_b` ist der Nenner in `atan((x - x0) / b)` -- bei `b == 0`
+/// wird der Term zur Vorzeichenfunktion und bei `x == x0` zu `NaN`, bei
+/// `b < 0` kehrt er das Vorzeichen der Marge um. Der Spec-Weg lehnt solche
+/// Werte HART ab (`from_spec_file`, eine Spec legt das Suchverhalten
+/// vollstaendig fest); der Env-Weg darf einen Prozess nicht stuerzen und
+/// faellt darum auf [`SCORE_UTILITY_B_DEFAULT`] zurueck -- mit EINMALIGER
+/// Warnung, gleiche Disziplin wie [`read_f64_env`]/[`read_envelope_profile_env`].
+/// Gueltige Werte (alles > 0 und endlich, Default 20) kommen unveraendert
+/// zurueck: bitidentisch zum Bestand.
+pub(crate) fn sanitized_score_utility_b(raw: f64) -> f64 {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    if raw > 0.0 && raw.is_finite() {
+        return raw;
+    }
+    WARNED.get_or_init(|| {
+        eprintln!(
+            "⚠️  MOSAIC_SCORE_UTILITY_B={raw} ist nicht > 0 (endlich) -- verwende Default \
+             {SCORE_UTILITY_B_DEFAULT} (b = 0 macht den Utility-Term zur Vorzeichenfunktion)."
+        );
+    });
+    SCORE_UTILITY_B_DEFAULT
 }
 
 thread_local! {
@@ -497,7 +569,12 @@ impl SearchConfig {
             implicit_minimax_alpha: read_f64_env("MOSAIC_IMPLICIT_MINIMAX_A", 0.0),
             long_row_init_shaping_w: read_f64_env("MOSAIC_LONG_ROW_INIT_W", 0.0),
             score_utility_c: read_f64_env("MOSAIC_SCORE_UTILITY_C", 0.0),
-            score_utility_b: read_f64_env("MOSAIC_SCORE_UTILITY_B", SCORE_UTILITY_B_DEFAULT),
+            // A3: nicht-positive/nicht-endliche Werte -> Default plus einmalige
+            // Warnung (siehe `sanitized_score_utility_b`).
+            score_utility_b: sanitized_score_utility_b(read_f64_env(
+                "MOSAIC_SCORE_UTILITY_B",
+                SCORE_UTILITY_B_DEFAULT,
+            )),
             score_utility_root_margin: None,
             envelope_search_c: read_f64_env("MOSAIC_ENVELOPE_SEARCH_C", 0.0),
             envelope_tiling_w: read_f64_env("MOSAIC_ENVELOPE_TILING_W", 0.0),
@@ -575,6 +652,16 @@ impl SearchConfig {
         // beiden Felder seit dem K1-Bau.
         let score_utility_c = get_required("score_utility_c")?;
         let score_utility_b = get_required("score_utility_b")?;
+        // A3 (PREREG_code_cleanup_closeout.md par.3 Punkt 3): Bereichspruefung
+        // wie bei `envelope_flush_w`/`special_row6_w` darunter. `b` ist der
+        // Nenner in `atan((x - x0) / b)`: 0 macht den Term zur
+        // Vorzeichenfunktion (NaN bei x == x0), negativ dreht sein Vorzeichen.
+        // `!(x > 0.0)` faengt auch NaN.
+        if !(score_utility_b > 0.0) {
+            return Err(format!(
+                "Spec-Datei {path}: 'score_utility_b' muss > 0 sein, ist {score_utility_b}"
+            ));
+        }
         // K3 (PREREG_geometric_envelope.md par.8): dieselbe Pflicht-Regel;
         // das Profil als Feld mit GENAU fuenf Zahlen (Runde 1..5).
         let envelope_search_c = get_required("envelope_search_c")?;
@@ -1922,6 +2009,7 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
         let (_logits, value, _moon, points, opp_points, ownership) =
             crate::profiling::timed_net_eval(1, || {
                 net.eval_ex(&feats).unwrap_or_else(|_| {
+                    note_net_eval_failure(); // A1
                     (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
                 })
             });
@@ -1945,6 +2033,7 @@ pub(crate) fn net_leaf_eval(net: &Net, state: &GameState) -> [f64; 2] {
             Some(pair) => pair,
             None => crate::profiling::timed_net_eval(2, || {
                 net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
+                    note_net_eval_failure(); // A1
                     (
                         (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
                         (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
@@ -2015,6 +2104,7 @@ pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Actio
         Some(row) => row,
         None => crate::profiling::timed_net_eval(1, || {
             net.eval(&feats).unwrap_or_else(|_| {
+                note_net_eval_failure(); // A1
                 (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
             })
         }),
@@ -2106,6 +2196,7 @@ fn make_node<R: Rng + ?Sized>(
                 Some(pair) => pair,
                 None => crate::profiling::timed_net_eval(2, || {
                     net.eval_pair_ex(&feats, &other_feats).unwrap_or_else(|_| {
+                        note_net_eval_failure(); // A1
                         (
                             (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
                             (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
@@ -2119,6 +2210,7 @@ fn make_node<R: Rng + ?Sized>(
             let (logits, value, moon, points, opp_points, ownership) =
                 crate::profiling::timed_net_eval(1, || {
                     net.eval_ex(&feats).unwrap_or_else(|_| {
+                        note_net_eval_failure(); // A1
                         (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
                     })
                 });
@@ -2137,9 +2229,10 @@ fn make_node<R: Rng + ?Sized>(
             crate::features::features_for_net(net_policy, &state)
         });
         let (logits, _p_value, moon, _p_points) = crate::profiling::timed_net_eval(1, || {
-            net_policy
-                .eval(&feats_policy)
-                .unwrap_or_else(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new()))
+            net_policy.eval(&feats_policy).unwrap_or_else(|_| {
+                note_net_eval_failure(); // A1
+                (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
+            })
         });
         if need_other_pass {
             crate::profiling::note_gamestate_clone();
@@ -2152,6 +2245,7 @@ fn make_node<R: Rng + ?Sized>(
                 (_o_logits, o_value, _o_moon, o_points, o_opp_points, _o_ownership),
             ) = crate::profiling::timed_net_eval(2, || {
                 net_value.eval_pair_ex(&feats_value, &other_feats_value).unwrap_or_else(|_| {
+                    note_net_eval_failure(); // A1
                     (
                         (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
                         (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()),
@@ -2163,6 +2257,7 @@ fn make_node<R: Rng + ?Sized>(
             let feats_value = crate::features::features_for_net(net_value, &state);
             let (_v_logits, value, _v_moon, points, opp_points, ownership) = crate::profiling::timed_net_eval(1, || {
                 net_value.eval_ex(&feats_value).unwrap_or_else(|_| {
+                    note_net_eval_failure(); // A1
                     (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
                 })
             });
@@ -3629,6 +3724,7 @@ fn compute_root_value_debug(net_policy: &Net, net_value: Option<&Net>, state: &G
     // Task #28: `eval_ex` statt `eval` -- liest zusaetzlich den optionalen
     // `opp_points`-Kopf (leerer Vec bei jedem Netz ohne den Kopf).
     let (_logits, value, _moon, points, opp_points, _ownership) = net.eval_ex(&feats).unwrap_or_else(|_| {
+        note_net_eval_failure(); // A1
         (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
     });
     let raw_value = value.first().copied().unwrap_or(0.0);
@@ -3929,6 +4025,9 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
     // Kopf), sonst BYTE-IDENTISCH.
     let outputs = crate::profiling::timed_net_eval(n, || net_policy.eval_batch_ex(&feats_refs)).unwrap_or_else(
         |_| {
+            // A1: EIN fehlgeschlagener Aufruf zaehlt 1, nicht n (Grundmenge
+            // ist der Aufruf, siehe `NET_EVAL_FAILURES`).
+            note_net_eval_failure();
             (0..n)
                 .map(|_| (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new()))
                 .collect()
@@ -3947,6 +4046,7 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
         let other_feats_refs: Vec<&[f32]> = other_feats.iter().map(|v| v.as_slice()).collect();
         let other_out = crate::profiling::timed_net_eval(n, || net_policy.eval_batch_ex(&other_feats_refs))
             .unwrap_or_else(|_| {
+                note_net_eval_failure(); // A1 (ein Aufruf = 1, siehe oben)
                 (0..n).map(|_| (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())).collect()
             });
         other_out
@@ -6734,6 +6834,70 @@ mod tests {
             assert_eq!(cfg.envelope_hull_form, good);
         }
         std::fs::remove_file(&path).ok();
+    }
+
+    /// A3 (`PREREG_code_cleanup_closeout.md` par.3 Punkt 3): `score_utility_b`
+    /// ist Pflichtfeld UND muss `> 0` sein -- `b = 0` macht den Utility-Term
+    /// zur Vorzeichenfunktion (NaN bei `x == x0`), `b < 0` dreht sein
+    /// Vorzeichen. Aufbau wie
+    /// `search_config_from_spec_file_validates_envelope_hull_form`.
+    #[test]
+    fn search_config_from_spec_file_validates_score_utility_b() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_scoreb_{}.json", std::process::id()));
+        let spec = |b: &str| {
+            format!(
+                r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": {b}, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 1, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0, "heuristik_variante": "hv1"}}"#
+            )
+        };
+        for bad in ["0.0", "-1.0"] {
+            std::fs::write(&path, spec(bad)).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("score_utility_b <= 0 muss scheitern");
+            assert!(msg.contains("score_utility_b"), "{msg}");
+        }
+        // Der Default-Wert der lebenden Specs kommt unveraendert an.
+        std::fs::write(&path, spec("20.0")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("20 ist gueltig");
+        assert_eq!(cfg.score_utility_b, SCORE_UTILITY_B_DEFAULT);
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// A3, Env-Haelfte: der Env-Weg darf keinen Prozess stuerzen und faellt
+    /// auf den Default zurueck. Geprueft wird die REINE Funktion (kein
+    /// `std::env::set_var`, das gegen parallel laufende Tests racet).
+    #[test]
+    fn sanitized_score_utility_b_falls_back_on_non_positive() {
+        assert_eq!(sanitized_score_utility_b(20.0), 20.0);
+        assert_eq!(sanitized_score_utility_b(0.5), 0.5);
+        for bad in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert_eq!(
+                sanitized_score_utility_b(bad),
+                SCORE_UTILITY_B_DEFAULT,
+                "{bad} muss auf den Default zurueckfallen"
+            );
+        }
+    }
+
+    /// A1 (`PREREG_code_cleanup_closeout.md` par.3 Punkt 1): der Zaehler der
+    /// Netz-Auswertungsfehler laesst sich zuruecksetzen und zaehlt jeden
+    /// gemeldeten Fehlschlag. Ein Netz-Mock existiert in diesem Testmodul
+    /// nicht (die Netz-Tests laden echte ONNX-Artefakte, siehe
+    /// `MOSAIC_FROZEN_STATES_JSON`-Tests), darum wird die Meldefunktion
+    /// direkt gerufen -- genau das tun die elf `unwrap_or_else`-Stellen.
+    /// Geprueft wird die DIFFERENZ, nicht der Absolutwert: der Zaehler ist
+    /// prozessweit und `cargo test` laeuft mehrfaedig.
+    #[test]
+    fn net_eval_failure_counter_counts_and_resets() {
+        reset_net_eval_failures();
+        let before = net_eval_failures();
+        note_net_eval_failure();
+        note_net_eval_failure();
+        let after = net_eval_failures();
+        assert!(
+            after >= before + 2,
+            "zwei gemeldete Fehlschlaege muessen den Zaehler um mindestens 2 heben ({before} -> {after})"
+        );
     }
 
     /// K5 par.9: `special_row6_w` ist Pflichtfeld, muss `>= 0` sein und

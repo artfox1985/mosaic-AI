@@ -586,50 +586,82 @@ pub(crate) fn preference_move_for_column(state: &GameState, spalte: usize) -> Op
 /// sichtbar NEGATIVE Zahl auffallen statt in einem Unsigned-Underflow zu
 /// verschwinden (defensiv, kein Panic) -- Aufrufer clampen selbst auf 0.
 pub(crate) fn remaining_colors(state: &GameState) -> [i64; 5] {
-    let mut verbaut = [0i64; 5];
-    let mut zaehle = |c: TileColor| {
+    let mut consumed = [0i64; 5];
+    let mut count_one = |c: TileColor| {
         if let Some(i) = color_index(c) {
-            verbaut[i] += 1;
+            consumed[i] += 1;
         }
     };
     for f in &state.factories {
         for &c in &f.sun_tiles {
-            zaehle(c);
+            count_one(c);
         }
         for stack in &f.moon_stacks {
             for &c in stack {
-                zaehle(c);
+                count_one(c);
             }
         }
     }
     for &c in &state.large_factory.sun_tiles {
-        zaehle(c);
+        count_one(c);
     }
     for &c in &state.large_factory.moon_pool {
-        zaehle(c);
+        count_one(c);
     }
     for p in &state.players {
         for line in &p.pattern_lines {
             for &c in &line.tiles {
-                zaehle(c);
+                count_one(c);
             }
         }
         for &c in &p.broken_tiles {
-            zaehle(c);
+            count_one(c);
         }
         for row in &p.dome_grid.dome_slots {
             for slot in row {
                 if let Some(tile) = slot {
                     for space in &tile.spaces {
                         if let Some(c) = space.placed_color {
-                            zaehle(c);
+                            count_one(c);
                         }
                     }
                 }
             }
         }
     }
-    std::array::from_fn(|i| crate::tile::TILES_PER_COLOR as i64 - verbaut[i])
+    subtract_phantom_tiles(state, None, &mut consumed);
+    std::array::from_fn(|i| crate::tile::TILES_PER_COLOR as i64 - consumed[i])
+}
+
+/// A2 (`PREREG_code_cleanup_closeout.md` par.3 Punkt 2, Review-Fund A2):
+/// zieht die PHANTOM-Fliesen wieder aus einer Verbrauchs-/Verlustzaehlung ab.
+///
+/// `round_end.rs:651-654` (`apply_bonus_chips_with`) schiebt beim Einsatz von
+/// Bonuschips `missing` Fliesen als ECHTE Eintraege in
+/// `pattern_lines[row].tiles` und merkt sich die Zahl in `phantom_count`.
+/// Diese Fliesen sind nie aus Beutel/Turm gezogen worden; wer sie mitzaehlt,
+/// haelt den Restvorrat der Farbe zu NIEDRIG -- und zwar genau solange, bis
+/// die Reihe getilt wird (`PatternLine::clear` setzt `phantom_count` auf 0).
+/// `self_play.rs:6110-6116` (`count_color`) rechnet seit jeher so; die beiden
+/// Zaehlungen hier taten es nicht.
+///
+/// Gerechnet wird `phantom_count.min(raw)` je Reihe, nur fuer die GEBUNDENE
+/// Farbe der Reihe (`pl.color`) -- dieselbe Formel wie in `count_color`.
+/// `only_player = Some(i)` beschraenkt auf einen Spieler (fuer
+/// [`still_reachable_colors`], das nur die Gegnerreihen als verloren zaehlt),
+/// `None` nimmt beide.
+fn subtract_phantom_tiles(state: &GameState, only_player: Option<usize>, counts: &mut [i64; 5]) {
+    for (pi, p) in state.players.iter().enumerate() {
+        if only_player.is_some_and(|want| want != pi) {
+            continue;
+        }
+        for line in &p.pattern_lines {
+            let Some(bound) = line.color else { continue };
+            let Some(i) = color_index(bound) else { continue };
+            let raw = line.tiles.iter().filter(|&&c| c == bound).count();
+            counts[i] -= line.phantom_count.min(raw) as i64;
+        }
+    }
 }
 
 /// Runde 4, Baustein 1 (Nutzer-Auftrag `PREREG_provocation.md` §14): fuer
@@ -651,38 +683,42 @@ pub(crate) fn remaining_colors(state: &GameState) -> [i64; 5] {
 /// vollendbar`s "transiente Falschbindung"-Kommentar), es zusaetzlich
 /// abzuziehen waere erneut zu pessimistisch. Fabrik-/Mond-/Beutel-/Turm-
 /// Kacheln bleiben unangetastet -- sie sind (irgendwann) erreichbar.
-pub(crate) fn still_reachable_colors(state: &GameState, aktueller_spieler: usize) -> [i64; 5] {
-    let mut verloren = [0i64; 5];
-    let mut zaehle = |c: TileColor| {
+pub(crate) fn still_reachable_colors(state: &GameState, current_player: usize) -> [i64; 5] {
+    let mut lost = [0i64; 5];
+    let mut count_one = |c: TileColor| {
         if let Some(i) = color_index(c) {
-            verloren[i] += 1;
+            lost[i] += 1;
         }
     };
     for p in &state.players {
         for &c in &p.broken_tiles {
-            zaehle(c);
+            count_one(c);
         }
         for row in &p.dome_grid.dome_slots {
             for slot in row {
                 if let Some(tile) = slot {
                     for space in &tile.spaces {
                         if let Some(c) = space.placed_color {
-                            zaehle(c);
+                            count_one(c);
                         }
                     }
                 }
             }
         }
     }
-    let gegner = 1 - aktueller_spieler;
-    if let Some(p) = state.players.get(gegner) {
+    let opponent = 1 - current_player;
+    if let Some(p) = state.players.get(opponent) {
         for line in &p.pattern_lines {
             for &c in &line.tiles {
-                zaehle(c);
+                count_one(c);
             }
         }
     }
-    std::array::from_fn(|i| crate::tile::TILES_PER_COLOR as i64 - verloren[i])
+    // A2: die Phantom-Fliesen der GEGNER-Reihen sind nie gezogen worden und
+    // damit auch nicht "beim Gegner weg" -- siehe `subtract_phantom_tiles`.
+    // Die eigenen Reihen zaehlen hier ohnehin nicht als verloren.
+    subtract_phantom_tiles(state, Some(opponent), &mut lost);
+    std::array::from_fn(|i| crate::tile::TILES_PER_COLOR as i64 - lost[i])
 }
 
 /// Index 0..=4 von `color` in `TileColor::NORMAL` -- `None` fuer `Wild`
@@ -1360,5 +1396,96 @@ mod vorzugszug_tests {
         let (wirkung, boden) = disruption_score(&game.state, &m, &bedarf);
         assert_eq!(wirkung, 1, "3 genommene Fliesen, aber nur 1 gebraucht -> Wirkung 1");
         assert_eq!(boden, 0, "Reihe 6 fasst alle drei");
+    }
+
+    /// A2 (`PREREG_code_cleanup_closeout.md` par.3 Punkt 2): Phantom-Fliesen
+    /// stehen als echte Eintraege in `pattern_lines[].tiles`
+    /// (`round_end.rs:651-654`), sind aber nie gezogen worden. Der Restvorrat
+    /// muss sie ueberspringen; ohne Markierung zaehlt dieselbe Fliese wieder.
+    #[test]
+    fn remaining_colors_ignores_phantom_tiles() {
+        let mut game = drafting_game(109);
+        let pi = game.state.current_player;
+        let ci = color_index(Rot).expect("Rot ist eine Normalfarbe");
+        let base = remaining_colors(&game.state);
+        // Zwei ECHTE Rot in Musterreihe 3 (Index 2, Kapazitaet 3).
+        {
+            let line = &mut game.state.players[pi].pattern_lines[2];
+            line.color = Some(Rot);
+            line.tiles = vec![Rot, Rot];
+        }
+        let with_real = remaining_colors(&game.state);
+        assert_eq!(
+            with_real[ci],
+            base[ci] - 2,
+            "ohne Phantome bitidentisch zum Bestand: zwei echte Fliesen senken den Restvorrat um 2"
+        );
+        // Dritte Fliese als PHANTOM gebucht (Bonuschip-Weg).
+        {
+            let line = &mut game.state.players[pi].pattern_lines[2];
+            line.tiles.push(Rot);
+            line.phantom_count += 1;
+        }
+        let with_phantom = remaining_colors(&game.state);
+        assert_eq!(
+            with_phantom[ci], with_real[ci],
+            "eine Phantom-Fliese darf den Restvorrat nicht senken"
+        );
+        // Gegenprobe: OHNE Abzug (Phantom-Markierung weg) waere derselbe
+        // Zustand um 1 niedriger -- das ist exakt der behobene Fehler.
+        game.state.players[pi].pattern_lines[2].phantom_count = 0;
+        let without_deduction = remaining_colors(&game.state);
+        assert_eq!(
+            without_deduction[ci],
+            with_phantom[ci] - 1,
+            "der Abzug macht genau eine Fliese Unterschied"
+        );
+    }
+
+    /// A2, zweite Zaehlstelle: `still_reachable_colors` zaehlt die
+    /// GEGNER-Musterreihen als verloren -- Phantome des Gegners sind aber nie
+    /// gezogen worden und duerfen die Erreichbarkeit nicht senken. Eigene
+    /// Reihen zaehlen hier ohnehin nicht (siehe Funktions-Doku).
+    #[test]
+    fn still_reachable_colors_ignores_opponent_phantom_tiles() {
+        let mut game = drafting_game(111);
+        let me = game.state.current_player;
+        let opponent = 1 - me;
+        let ci = color_index(Blau).expect("Blau ist eine Normalfarbe");
+        let base = still_reachable_colors(&game.state, me);
+        {
+            let line = &mut game.state.players[opponent].pattern_lines[3];
+            line.color = Some(Blau);
+            line.tiles = vec![Blau, Blau];
+        }
+        let with_real = still_reachable_colors(&game.state, me);
+        assert_eq!(
+            with_real[ci],
+            base[ci] - 2,
+            "ohne Phantome bitidentisch: zwei echte Gegner-Fliesen sind zwei verlorene"
+        );
+        {
+            let line = &mut game.state.players[opponent].pattern_lines[3];
+            line.tiles.push(Blau);
+            line.phantom_count += 1;
+        }
+        assert_eq!(
+            still_reachable_colors(&game.state, me)[ci],
+            with_real[ci],
+            "eine Phantom-Fliese des Gegners darf die Erreichbarkeit nicht senken"
+        );
+        // Eigene Phantome aendern hier nichts (eigene Reihen sind nicht verloren).
+        let mut own = game.state.clone();
+        {
+            let line = &mut own.players[me].pattern_lines[3];
+            line.color = Some(Blau);
+            line.tiles = vec![Blau, Blau, Blau];
+            line.phantom_count = 1;
+        }
+        assert_eq!(
+            still_reachable_colors(&own, me)[ci],
+            with_real[ci],
+            "eigene Reihen zaehlen in dieser Groesse gar nicht"
+        );
     }
 }

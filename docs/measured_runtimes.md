@@ -179,6 +179,9 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Tor 1 b02 gegen b01, Seeds 20261038 / 20261039, je 200 Paare mit Logs | 5.562,5 s / 4.773,3 s | 13,9 bzw. 11,9 s je Partie, 10 Threads; der zweite Lauf ohne Nebenlast |
 | Block-Ziehungs-Diagnostik (`dome_stack_known_block_draw_probe.py`, 400 Partien) | 105 s / 129 s | 1 Thread, Replayer |
 | K3-D-Bau: `cargo test --release --lib` (576 Tests) / Wheel / Anker-Drift | 80 s Tests, 26 s Wheel-Bau, rund 25 s Drift | Vollast nur beim Bauen |
+| Ablation b03: Monolith 2.546 Bloecke / Training 3,88 M Zustaende / Tor 1 (80 + 35 Paare) | 7 min / 4.322 s / 1.994 s + 868 s | Nebenlast: Claude-Partien der Parallelsitzung |
+| Ablation b04: Monolith 2.403 Bloecke / Training 3,60 M Zustaende / Tor 1 (60 + 115 Paare) | 6 min / 4.511 s / 1.581 s + 2.922 s | dito |
+| Code-Abschluss Stufe 1: Tests (585) / Paritaets-Fixture / Wheel / Drift | 80 s / 14 s / 26 s / 17 s | – |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 

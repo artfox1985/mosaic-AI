@@ -229,6 +229,15 @@ pub fn validate_draw_from_stack(state: &GameState, m: &DrawFromStackMove) -> Opt
         }
         return Some("Das 3×3-Raster ist bereits voll.".into());
     }
+    // A5 (PREREG_code_cleanup_closeout.md par.3 Punkt 4, Review-Fund A5):
+    // Bereichspruefung VOR dem Indexzugriff. `validate_dome_move` (die andere
+    // Kuppel-Erwerbsvariante) hat sie seit jeher (game.rs:51); hier fehlte
+    // sie, und `slot_row`/`slot_col` kommen ueber py.rs direkt aus dem
+    // HTTP-Rumpf (server.py). Ein Index >= 3 war damit ein Rust-PANIC, den
+    // server.pys `except Exception` nicht faengt. Gleiche Meldung wie dort.
+    if m.slot_row > 2 || m.slot_col > 2 {
+        return Some(format!("Ungültiger Slot ({},{}).", m.slot_row, m.slot_col));
+    }
     if player.dome_grid.dome_slots[m.slot_row][m.slot_col].is_some() {
         return Some(format!("Slot ({},{}) ist bereits belegt.", m.slot_row, m.slot_col));
     }
@@ -562,6 +571,17 @@ pub fn apply_start_placement(
     col: usize,
     rot: u32,
 ) -> Result<(), String> {
+    // A5 (PREREG_code_cleanup_closeout.md par.3 Punkt 4): Bereichspruefung VOR
+    // jedem Indexzugriff -- `player_idx`/`row`/`col` kommen ueber py.rs
+    // (`apply_start_tile`) direkt aus dem HTTP-Rumpf (server.py). Bisher war
+    // ein Wert ausserhalb des Bereichs ein Rust-PANIC statt eines Err, und
+    // ein Panic im PyO3-Aufruf faengt server.pys `except Exception` nicht.
+    if player_idx >= state.players.len() {
+        return Err(format!("Ungültiger Spielerindex {player_idx}."));
+    }
+    if row > 2 || col > 2 {
+        return Err(format!("Ungültiger Slot ({row},{col})."));
+    }
     let first_player = state.current_player;
     let non_starter = 1 - first_player;
     if player_idx == first_player && state.players[non_starter].start_tile_pending {
@@ -1349,6 +1369,71 @@ mod tests {
             return_order: vec![pool[1].tile_id],
         };
         assert!(validate_draw_from_stack(&game.state, &mv).is_some());
+    }
+
+    /// A5 (`PREREG_code_cleanup_closeout.md` par.3 Punkt 4): ein Slot-Index
+    /// ausserhalb 0..=2 muss ein FEHLER sein, kein Panic. Die Werte kommen
+    /// ueber py.rs aus dem HTTP-Rumpf (`server.py` /api/move/dome_stack_choose);
+    /// ein Panic im PyO3-Aufruf faengt dort kein `except Exception`.
+    #[test]
+    fn draw_from_stack_rejects_out_of_range_slot() {
+        use crate::dome::build_dome_tile_pool;
+
+        let mut rng = StdRng::seed_from_u64(7);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let pool = build_dome_tile_pool();
+        game.state.pending_stack_draw = vec![pool[0].clone(), pool[1].clone()];
+        game.state.dome_tile_pool.clear();
+
+        for (sr, sc) in [(3usize, 0usize), (0, 3), (99, 99)] {
+            let mv = DrawFromStackMove {
+                chosen_id: pool[0].tile_id,
+                slot_row: sr,
+                slot_col: sc,
+                rotation: 0,
+                return_order: vec![pool[1].tile_id],
+            };
+            let msg = validate_draw_from_stack(&game.state, &mv)
+                .unwrap_or_else(|| panic!("Slot ({sr},{sc}) muss abgelehnt werden"));
+            assert!(msg.contains("Ungültiger Slot"), "{msg}");
+        }
+        // Gegenprobe: ein gueltiger Slot bleibt unveraendert erlaubt.
+        let (sr, sc) = game.state.players[game.state.current_player]
+            .dome_grid
+            .empty_slots()[0];
+        let ok = DrawFromStackMove {
+            chosen_id: pool[0].tile_id,
+            slot_row: sr,
+            slot_col: sc,
+            rotation: 0,
+            return_order: vec![pool[1].tile_id],
+        };
+        assert!(validate_draw_from_stack(&game.state, &ok).is_none());
+    }
+
+    /// A5, zweite Stelle: `apply_start_placement` indexiert `players`,
+    /// `dome_slots[row][col]` direkt mit den Werten aus `/api/move/start_tile`.
+    /// Index 3 (und ein Spielerindex 2) muessen `Err` liefern, nicht panicken.
+    #[test]
+    fn start_placement_rejects_out_of_range_indices() {
+        let mut rng = StdRng::seed_from_u64(51);
+        let mut game = Game::start(names(), 0, vec![0, 1, 2], &mut rng);
+        let tid = game.state.dome_display[0].tile_id;
+        // Nicht-Startspieler (1) waere hier der legale Zug -- die
+        // Bereichspruefung greift VORHER.
+        for (pi, r, c) in [(1usize, 3usize, 0usize), (1, 0, 3), (2, 0, 0), (99, 99, 99)] {
+            let err = apply_start_placement(&mut game.state, pi, tid, r, c, 0)
+                .expect_err("Index ausserhalb des Bereichs muss Err liefern");
+            assert!(
+                err.contains("Ungültiger Slot") || err.contains("Ungültiger Spielerindex"),
+                "{err}"
+            );
+        }
+        // Gegenprobe: der legale Zug bleibt unveraendert moeglich.
+        apply_start_placement(&mut game.state, 1, tid, 0, 0, 0).expect("gueltige Startplatzierung");
     }
 
     #[test]

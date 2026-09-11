@@ -86,8 +86,8 @@ Nullbefund (207:193, 209:191) und per Nutzer-Entscheid als korrektere Fassung de
 
 Spec: die Champion-Spec aus dem Artefakt des Generators (`models/frozen_champions/<name>/spec.json`;
 seit v25 inhaltlich die v24-b07-Spec, `PREREG_v28_window.md` par.3). Wheel: das Variante-B-Wheel
-(INPUT_SIZE 755, Kontrakt-Hash c65768636c0560a7, `mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl`
-vom 2026-09-11, 14:46), Anker-Drift gruen (`anchor_drift_live_wheel_20260911_varB.json`).
+(INPUT_SIZE 755, Kontrakt-Hash seit 2026-09-12 39648b95bbba1acf nach A10 des Code-Abschlusses, vorher
+c65768636c0560a7; Wheel `mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl`), Anker-Drift gruen (`anchor_drift_live_wheel_20260911_varB.json`).
 **Die Engine ist dieselbe wie bei der v28-Erzeugung** bis auf den Merkmalsbauer (Rust statt
 Python, bit-identisch, `PREREG_rust_data_layer.md` par.7); Records tragen `dome_pool_view`
 seit dem v27-Wheel. Aendert sich vor dem Start noch etwas an der Engine (par.7 Punkt 3):
@@ -99,7 +99,7 @@ Anker-Drift wiederholen, hier eintragen.
    parallele Messung; die Claude-Partien der Parallelsitzung sind zulaessige Nebenlast
    (Nutzer 2026-09-10), die Laufzeit wird dann als gebremst markiert.
 2. **Wheel installiert und im Manifest**: `python -c "import mosaic_rust as m; m.state_features_from_json"`
-   vorhanden, Kontrakt-Hash im Manifest der ersten Klasse = c65768636c0560a7.
+   vorhanden, Kontrakt-Hash im Manifest der ersten Klasse = 39648b95bbba1acf (seit A10, 2026-09-12).
 3. **Spec-Datei liegt** (Artefakt-Spec des Generators), Golden-Probe des Generator-Artefakts
    gruen (Promotion Schritt 5d), Anker-Drift auf dem Start-Wheel gruen.
 4. **Manifest-Diff gegen die Referenz**: das Manifest der ersten Klasse gegen

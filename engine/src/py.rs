@@ -348,8 +348,22 @@ impl PyGame {
         map_err(self.game.apply_single_tiling(player, &action))
     }
 
+    /// A5 (PREREG_code_cleanup_closeout.md par.3): Spieler- und Reihenindex aus
+    /// dem HTTP-Pfad VOR jedem Indexzugriff pruefen -- ein Panic im pyo3-Aufruf
+    /// faengt `except Exception` in server.py nicht.
+    fn check_player_row(&self, player: usize, pattern_row: usize) -> PyResult<()> {
+        if player >= self.game.state.players.len() {
+            return Err(PyValueError::new_err(format!("Ungueltiger Spielerindex {player}.")));
+        }
+        if pattern_row >= self.game.state.players[player].pattern_lines.len() {
+            return Err(PyValueError::new_err(format!("Ungueltige Musterreihe {pattern_row}.")));
+        }
+        Ok(())
+    }
+
     /// Reihe in der Tiling-Phase mit Bonusplättchen komplettieren.
     fn apply_tiling_chips(&mut self, player: usize, pattern_row: usize) -> PyResult<()> {
+        self.check_player_row(player, pattern_row)?;
         // Beschriftung VOR dem Anwenden (Nutzer 2026-09-07): greedy waehlt hier,
         // dieselbe Funktion auf demselben Zustand nennt die Auswahl.
         let label = crate::round_end::greedy_chip_alloc(&self.game.state.players[player], pattern_row)
@@ -395,6 +409,7 @@ impl PyGame {
         pattern_row: usize,
         chips: Vec<usize>,
     ) -> PyResult<()> {
+        self.check_player_row(player, pattern_row)?;
         if (pattern_row as i32) < self.game.state.players[player].tiled_max_row {
             return Err(PyValueError::new_err(format!(
                 "Reihe {} ist top-down gesperrt.",
@@ -424,6 +439,9 @@ impl PyGame {
     /// Kandidatenliste nie etwas anbietet, das `apply_tiling_chips_with`
     /// anschliessend ablehnt.
     fn chip_allocations_json(&self, player: usize, pattern_row: usize) -> String {
+        if self.check_player_row(player, pattern_row).is_err() {
+            return "[]".to_string();
+        }
         let p = &self.game.state.players[player];
         if (pattern_row as i32) < p.tiled_max_row {
             return "[]".to_string();
