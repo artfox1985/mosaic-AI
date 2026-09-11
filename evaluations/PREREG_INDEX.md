@@ -77,16 +77,17 @@ Eskalations-Preregs laengst belegt waren.
 
 <!-- BEGIN GENERATED PREREG TABLES (tools/generate_prereg_index.py; nicht von Hand editieren) -->
 
-**Stand (automatisch generiert): 113 Dateien = 9 OFFEN + 92 ENTSCHIEDEN + 12 UEBERHOLT.**
+**Stand (automatisch generiert): 114 Dateien = 10 OFFEN + 92 ENTSCHIEDEN + 12 UEBERHOLT.**
 Sortierung: OFFEN zuerst, dann ENTSCHIEDEN, dann UEBERHOLT; innerhalb
 der Abschnitte alphabetisch nach Dateiname. Quelle je Zeile: der
 Status-Kopf (HTML-Kommentar) in der ersten Zeile der Datei.
 
-## OFFEN (9)
+## OFFEN (10)
 
 | Datei | Frage (1 Zeile) | Belegstelle |
 |---|---|---|
-| `PREREG_claude_play_interface.md` | Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen? | g02-g05 gegen v27-b01 @400 gespielt (par.7), Claude 3:1 (55:43, 66:48, 36:28, 50:55). Zwei Muster in allen vier Partien: die Ziehzahl folgt dem Punktestand (bei 0 durchsucht das Netz den Stapel, 21 Ziehungen in g04 R1; in g05 nie auf 0, darum nur 7), und es fuellt lange Musterreihen mit Farben, die seine Kuppelzeile nicht aufnehmen kann (fuenfmal, in g04 zehn Steine auf einmal). g06-g10 offen. |
+| `PREREG_claude_play_interface.md` | Was lernt ein Beobachter, der selbst gegen das Champion-Netz spielt, ueber dessen Schwaechen, das die Arenen nicht zeigen? | g02-g05 gegen v27-b01 @400 (par.7), Claude 3:1 (55:43, 66:48, 36:28, 50:55). Zwei Muster in allen vier Partien, als Sonden vorregistriert in PREREG_corpus_behaviour_audit.md: Ziehzahl folgt dem Punktestand; lange Musterreihen werden mit Farben gefuellt, die die Kuppelzeile nicht aufnehmen kann (fuenfmal). Werkzeug 2026-09-11 nachgebessert (par.9 P.8-10). g06-g10 offen. |
+| `PREREG_corpus_behaviour_audit.md` | Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Anlass sind g02-g05 (PREREG_claude_play_interface.md par.7): Ziehzahl folgt dem Punktestand (28/24/32 Ziehungen bei Stand 0, in g05 nur 7 ohne Stand 0), fuenf Zwangsraeumungen langer Musterreihen (einmal zehn Steine), Spaltenbau ohne Spaltenplatte. Drei Arme, alle aus vorhandenen Logs, kein Engine-Eingriff, keine neue Erzeugung. Nichts gemessen. |
 | `PREREG_dome_stack_information_sets.md` | Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | VARIANTE A GEBAUT 2026-09-10 (par.15; Anker-Drift gruen). A/B Live gegen Artefakt 165:135 (55 %), kein Ruecklauf, Fix bleibt (par.15b). Diagnostik auf 300 Partien (par.15e): Ziehungen in den EIGENEN bekannten Block STEIGEN mit A (+0,69 je Partie, +70/-48), zwei Drittel davon gratis bei Stand 0; die Erwartung aus par.8 tritt nicht ein. Naechster Hebel ist die Null-Klammer (score_clamp Stufe 1), Variante B danach. |
 | `PREREG_policy_surprise_weighting.md` | Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | alpha 0,5 ohne Tor: NEIN (par.9, v23-b03). Mit Sicherheits-Tor 0,5 als v24-b05 gefahren (par.10/11), Belege in PREREG_v24_window.md par.9; die einzige saubere Kante b05 gegen b04 fehlt. EINGETAKTET 2026-09-11 als Schritt 6 des v28-Programms (PREREG_v28_window.md par.8): beide Modelle aus dem restic-Repo, gepaartes Gating 200 Paare, dann Verdikt hier. |
 | `PREREG_round_estimate_leaf_term.md` | Traegt ein additiver Rundenschaetzer-Term am Netz-Blattwert (Solver-Rundenscore plus Strafleisten-Busse, Differenz beider Seiten, tanh mit gemessener Skala, Runde 5 null) Spielstaerke und Spalten? | Nichts gebaut. Skala GEMESSEN 2026-09-05 (par.4: P90 3 / 8 / 10 / 12 je Runde, gepoolt 9,25). EINGETAKTET 2026-09-11 als Schritt 7 des v28-Programms (PREREG_v28_window.md par.8): Bau nach par.3, Skala (a) je Runde als Koordinator-Vorschlag (Nutzer kann auf (b) wechseln), A/B gleiches Netz Live gegen Artefakt nach dem Muster der Kuppelstapel-Kante, zwei Seed-Basen. |

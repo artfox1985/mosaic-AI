@@ -27,10 +27,18 @@ Aufrufe (Projektordner; Netz-Zuege sind CPU-Auftraege -> NICHT neben einer Arena
 
 Zugnotation (par.3.3), Farben blau gelb rot schwarz tuerkis (auch B G R S T):
     s <quelle> <farbe> <reihe|floor> [mond:<farbe,...>]   Stein; Quelle = 1-4 (Sonnenseite der Fabrik),
-                                                          m1-m4 (Mondstapel der Fabrik), m (globaler
-                                                          Mondzug, Aktion C), gf / gm (grosse
+                                                          m (Mondzug, Aktion C), gf / gm (grosse
                                                           Fabrik Sonne / Mond); <reihe> 0-5 oder "floor";
-                                                          die Anzeige nennt zu jedem legalen Zug die Kurzform
+                                                          die Anzeige nennt zu jedem legalen Zug die Kurzform.
+                                                          Aktion C ist IMMER global: sie nimmt den obersten
+                                                          Stein der Farbe von JEDEM Mondstapel plus alle
+                                                          dieser Farbe aus dem Pool der grossen Fabrik
+                                                          (docs/engine_manual.md, Phase 1 C). Eine Auswahl
+                                                          EINER Fabrik gibt es nicht; `m1`-`m4` wird darum
+                                                          abgewiesen (der Zuggenerator erzeugt sie nicht,
+                                                          validation.rs::validate_small_moon wuerde sie
+                                                          aber durchlassen -- Engine-Luecke, registriert in
+                                                          PREREG_claude_play_interface.md par.9)
     d <platte> <slot_r> <slot_c> [rot]                    Kuppelplatte aus der Auslage (rot 0/90/180/270)
     peek                                                  verdeckt vom Stapel ziehen (Aktion A, Schritt 1)
     choose <platte> <slot_r> <slot_c> [rot] [zurueck:<id,...>]  gezogene Platte legen
@@ -170,8 +178,24 @@ def append_log(name: str, g, since: int) -> int:
 
 
 # ---------------------------------------------------------------- Netz-Zuege bis Claude dran ist
+def ai_lines(g, seen: int) -> tuple[list[str], int]:
+    """Sichtbare Logzeilen, die die Engine seit `seen` geschrieben hat, plus neue Marke.
+
+    2026-09-11: ERSETZT die frueher gedruckte `action.description`. Deren Zaehler sind
+    nachweislich falsch (`0x Stein tuerkis von F1 -> Reihe 2 [0/2]`, waehrend die Reihe
+    danach auf 1/2 stand; `[4/4] (+1 Strafleiste)` bei leerer Leiste), das Engine-Log
+    danebent traegt dieselbe Aktion korrekt als `2 (2)x`. Quelle der Beschreibung ist
+    `mcts.rs::label_search_move` ueber `tiles_taken`; die Ursache dort ist offen
+    (PREREG_claude_play_interface.md par.9 Punkt 2). Der Spielbetrieb braucht sie nicht:
+    die Engine schreibt fuer jede Aktion ohnehin ihre Klartextzeile, und genau die steht
+    auch in `game.log`. `#`-Zeilen bleiben draussen (Maschinenstand, s. `append_log`)."""
+    new = [l for l in g.log_since(seen) if not l.startswith("#")]
+    return new, g.log_len()
+
+
 def drive_ai(name: str, m: dict, g, since: int, out: list[str]) -> int:
     ai = m["ai_player"]
+    seen = since
     for _ in range(400):
         st = json.loads(g.state_json())
         phase = st.get("phase")
@@ -186,8 +210,9 @@ def drive_ai(name: str, m: dict, g, since: int, out: list[str]) -> int:
         pend = [v for v in st.get("valid_moves", []) if v.get("type") == "start_tile_pending"]
         if pend:
             if pend[0]["player"] == ai:
-                res = json.loads(g.ai_start_tile_json(ai))
-                out.append(f"KI: {res.get('description')}")
+                json.loads(g.ai_start_tile_json(ai))
+                lines, seen = ai_lines(g, seen)
+                out.extend(lines)
                 continue
             return append_log(name, g, since)
         if phase in ("drafting", "tiling") and g.current_player() == ai:
@@ -198,10 +223,10 @@ def drive_ai(name: str, m: dict, g, since: int, out: list[str]) -> int:
             if not res.get("applied"):
                 out.append(f"KI konnte nicht ziehen: {res.get('reason')}")
                 return append_log(name, g, since)
-            a = res.get("action") or {}
             m["trailing_pass"] = None; m["engine_logs_pass"] = True
             save_manifest(name, m)
-            out.append(f"KI: {a.get('description') or json.dumps(a, ensure_ascii=False)[:160]}")
+            lines, seen = ai_lines(g, seen)
+            out.extend(lines)
             continue
         return append_log(name, g, since)
     raise SystemExit("drive_ai: Schleifendeckel erreicht")
@@ -262,6 +287,79 @@ def colors_str(lst) -> str:
     return "".join(COLORS.get(c, "?") for c in lst) or "-"
 
 
+# ---------------------------------------------------------------- Reihen-Ziele (Handrechnung)
+DOME_TILES_PER_ROUND = 2
+
+
+def slot_space(grid, r: int, c: int):
+    """(Space, hat_platte) fuer Rasterzelle (r, c) -- dieselbe Indexrechnung wie `grid_lines`."""
+    slot = grid[r // 2][c // 2] if grid and r // 2 < len(grid) and c // 2 < len(grid[r // 2]) else None
+    if not slot:
+        return None, False
+    spaces = slot.get("spaces") or []
+    idx = (r % 2) * 2 + (c % 2)
+    return (spaces[idx] if idx < len(spaces) else None), True
+
+
+def row_targets(pl: dict) -> list[str]:
+    """Je Musterreihe: welche Zellen der zugehoerigen Kuppelzeile sie noch aufnehmen kann.
+
+    Steht vollstaendig auf dem Brett, ist also keine Zusatzinformation gegenueber der Sicht
+    des Netzes -- nur die Handrechnung, die beim Spielen jede Runde anfiel. Sie zeigt genau
+    die Falle, die in g02, g04 und g05 je zweistellig gekostet hat: eine Reihe, deren
+    Kuppelzeile ihre Farbe nicht mehr aufnehmen kann UND deren drei Slots alle belegt sind,
+    wird beim Tiling zwangsgeraeumt (game.rs:869/966). Dieselbe Falle hat das Netz in
+    g03/g04/g05 fuenfmal selbst getroffen.
+    """
+    grid = pl.get("dome_grid") or []
+    out: list[str] = []
+    for row in pl.get("pattern_lines", []):
+        i, cap = row["index"], row["capacity"]
+        color, k = row.get("color"), len(row.get("tiles") or [])
+        free: list[tuple[int, str]] = []
+        cells_without_plate = 0
+        for c in range(6):
+            sp, has_plate = slot_space(grid, i, c)
+            if not has_plate:
+                cells_without_plate += 1
+                continue
+            if sp is None or sp.get("filled") is not None or sp.get("type") == "SPECIAL":
+                continue
+            free.append((c, "*" if sp.get("type") == "WILD" else sp.get("color")))
+        open_slots = cells_without_plate // 2
+        if k and color:
+            fit = [f"c{c}" for c, col in free if col in ("*", color)]
+            head = f"R{i} {COLORS.get(color, '?')}{k}/{cap} -> z{i}: "
+            if fit:
+                out.append(head + ", ".join(fit))
+            elif open_slots:
+                out.append(head + f"keine Zelle, aber {open_slots} Slot(s) frei (bleibt liegen)")
+            else:
+                out.append(head + "KEINE Zelle und Slots voll -> ZWANGSRAEUMUNG beim Tiling")
+        else:
+            cols = sorted({"jede" if col == "*" else COLORS.get(col, "?") for _, col in free})
+            tail = ", ".join(cols) if cols else "nichts"
+            out.append(f"R{i} leer ({cap}) -> z{i} frei fuer: {tail}"
+                       + (f" (+{open_slots} Slot(s) offen)" if open_slots else ""))
+    return out
+
+
+def duty_line(st: dict, pl: dict) -> str:
+    """Pflichten der laufenden Runde: Kuppelplatten (2 in Runde 1-4) und Bonuschips (2).
+
+    `dome_tiles_placed_this_round` ist nicht serialisiert (serialize.rs:759), laesst sich
+    aber exakt ausrechnen: Startplatte plus zwei je abgeschlossener Runde.
+    """
+    rnd = st.get("round") or 1
+    grid = pl.get("dome_grid") or []
+    placed_total = sum(1 for row in grid for slot in row if slot)
+    owed = DOME_TILES_PER_ROUND if rnd <= 4 else 0
+    base = 1 + DOME_TILES_PER_ROUND * (rnd - 1) if pl.get("start_placed") else 0
+    placed_now = max(0, placed_total - base)
+    return (f"    Pflicht diese Runde: Kuppelplatten {min(placed_now, owed)}/{owed}, "
+            f"Bonuschips {pl.get('chips_taken', 0)}/2")
+
+
 def render(st: dict, m: dict, tiles_catalog: dict) -> str:
     me, ai = m["me"], m["ai_player"]
     L = []
@@ -286,7 +384,28 @@ def render(st: dict, m: dict, tiles_catalog: dict) -> str:
         L.append("    Musterreihen " + " ".join(rows) + f" | Strafleiste {colors_str(pl.get('floor', []))} | Chips {' '.join(colors_str(c['colors']) for c in pl.get('bonus_chips', [])) or '-'}")
         L.append("    Raster (gross = belegt, klein = Farbe der freien Zelle, * wild, # Spezial leer, @ Spezial gefuellt, . ohne Platte)")
         L.extend(grid_lines(pl.get("dome_grid") or []))
+        if pi == me and st.get("phase") != "end":
+            L.append(duty_line(st, pl))
+            L.append("    Reihen-Ziele (was jede Musterreihe in ihrer Kuppelzeile noch aufnehmen kann):")
+            L.extend("      " + s for s in row_targets(pl))
     return "\n".join(L)
+
+
+def compact_rows(rows: list[int]) -> str:
+    """"0-5|floor" statt sechs Einzelzeilen; -1 ist die Strafleiste."""
+    floor = -1 in rows
+    nums = sorted({r for r in rows if r >= 0})
+    parts: list[str] = []
+    i = 0
+    while i < len(nums):
+        j = i
+        while j + 1 < len(nums) and nums[j + 1] == nums[j] + 1:
+            j += 1
+        parts.append(str(nums[i]) if i == j else f"{nums[i]}-{nums[j]}")
+        i = j + 1
+    if floor:
+        parts.append("floor")
+    return "|".join(parts) if parts else "-"
 
 
 def legal_moves_text(st: dict, m: dict) -> str:
@@ -295,12 +414,21 @@ def legal_moves_text(st: dict, m: dict) -> str:
         return ""
     L = ["Legale Zuege:"]
     stones = [v for v in vm if v["type"] == "stone"]
+    # 2026-09-11: Zielreihen je (Quelle, Farbe) ZUSAMMENFASSEN statt eine Zeile je
+    # Kombination. In Runde 1 waren das mehrere hundert Zeilen, praktisch alle
+    # gleichlautend bis auf die Reihennummer -- der groesste Einzelposten am
+    # Token-Verbrauch einer Partie und der Grund, warum `show` oft nur gefiltert
+    # gelesen wurde (was seinerseits Ablehnungen verschluckt hat).
+    groups: dict[tuple, list[int]] = {}
     for v in stones:
         fid = v.get("factory_id")
         # Aktion C (globaler Mondzug): SMALL_FACTORY_MOON ohne Fabrik-Id (moves.rs:39) -> Kurzform "m".
         src = {"SMALL_FACTORY_SUN": f"{fid}", "SMALL_FACTORY_MOON": ("m" if fid is None else f"m{fid}"),
                "LARGE_FACTORY_SUN": "gf", "LARGE_FACTORY_MOON": "gm"}.get(v["source"], v["source"])
-        L.append(f"  s {src} {v['color']} {v['row'] if v['row'] >= 0 else 'floor'}" + (f" mond:{','.join(v['moon_order'])}" if v.get("moon_order") else ""))
+        key = (src, v["color"], tuple(v.get("moon_order") or []))
+        groups.setdefault(key, []).append(v["row"])
+    for (src, color, moon), rows in groups.items():
+        L.append(f"  s {src} {color} {compact_rows(rows)}" + (f" mond:{','.join(moon)}" if moon else ""))
     domes = {}
     for v in vm:
         if v["type"] == "dome_display":
@@ -362,7 +490,12 @@ def apply_move(g, m: dict, text: str) -> str:
         elif s_ == "gm":
             g.apply_stone("LARGE_FACTORY_MOON", color, row_i, None, moon or None)
         elif s_.startswith("m"):
-            g.apply_stone("SMALL_FACTORY_MOON", color, row_i, (int(s_[1:]) if len(s_) > 1 else None), moon or None)
+            if len(s_) > 1:
+                raise SystemExit(
+                    f"'{src}' ist kein legaler Zug: Aktion C nimmt IMMER alle obersten Steine der Farbe "
+                    "ueber alle Mondbereiche zugleich (docs/engine_manual.md, Phase 1 C). Kurzform: 's m "
+                    f"{color} <reihe>'.")
+            g.apply_stone("SMALL_FACTORY_MOON", color, row_i, None, moon or None)
         else:
             g.apply_stone("SMALL_FACTORY_SUN", color, row_i, int(s_), moon or None)
         return f"Claude: Stein {color} aus {src} nach {'Strafleiste' if row_i < 0 else 'R' + str(row_i)}"
