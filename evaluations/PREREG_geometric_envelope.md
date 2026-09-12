@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: Die Knopf-Seite traegt (Huellenform 2 gepoolt ueber drei Seeds 391:329 = 0,543, p 0,023, seit 2026-09-07 als v24-b07 in der Spec, par.8.15e/8.15f; K3-P Champion-Knopf par.11; vier weitere Arme negativ, par.8.11a/8.14). Das Schliesskriterium par.12 (Nutzer 2026-09-05) ist aber in allen drei Bedingungen offen: K3-D nicht gebaut, A1/A2 nie gemessen, B1/B2 nicht ueber den Rauschboden bewegt (par.12b), C2 verletzt. EINGETAKTET 2026-09-11 als v28-Schritt 8 (par.12c): K3-D plus Jokerfeld-Knopf bauen, C2 an den v28-Armen, A1/A2 am Champion. -->
+<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: Die Knopf-Seite traegt (Huellenform 2 gepoolt 391:329, p 0,023, seit v24-b07 in der Spec, par.8.15e/f; K3-P par.11). Schliesskriterium par.12 nach v28-Schritt 8 (par.12c, 2026-09-12): K3-D und Jokerfeld GEBAUT (Default 0); C2 ERFUELLT (Knopf an minus aus +0,14 b01 / +0,23 b02 volle Spalten); A1/A2 NICHT erfuellt, mit Knopf in jeder Runde unter ohne (A2 R1 0,68 gegen 0,79), gegen ein huellenblindes Orakel; B1/B2 ungemessen. Bleibt OFFEN mit K3-P und Huellenform 2 als Rezept; Nutzer-Entscheid, ob par.12 mit diesem Orakel schliessbar ist. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -2418,4 +2418,43 @@ Der Stand vom 2026-09-05 (b01 +0,045, v24-b01 -0,075, v24-b02 +0,095: verletzt) 
 v24-Aera; an den v28-Netzen ist die Knopf-Wechselwirkung nicht nur vorzeichenstabil, sondern
 groesser als damals. Hinweis zur Lesart: das Instrument ist deterministisch und laeuft ohne
 Wurzelrauschen, die KI ist die Spielstreuung ueber 200 Partien, nicht die Seed-Streuung (C3,
-drei Seeds je Arm, bleibt ungemessen). A1/A2 (Punkt 3) laufen.
+drei Seeds je Arm, bleibt ungemessen).
+
+**A1/A2 GEMESSEN (par.12c Punkt 3; 2026-09-12, 09:49-10:13, `tools/night_envelope_bridge.sh`,
+exklusiv, je Einstellung 343-371 s):** Such-Variante der Orakel-Bruecke (`tools/oracle_metrics.py
+--search-sims 400`, Besuchsverteilung @400 ohne Wurzelrauschen, Seed je Zustand aus dem Orakel-
+Label) am Champion v28-b02 auf `frozen_v3`; Grundmenge je Runde die Orakel-gelabelten Drafting-
+Zustaende (R1 236, R2 237, R3 215, R4 227; Runde 5 exakter Loeser beidseits, Selbsttest 1,0),
+Einheit A1 = Anteil der Zustaende, deren Suchzug in den Orakel-Top-3 liegt; A2 = Spearman
+Wurzelwert gegen Orakelwert @5000 (beide Sicht des Spielers am Zug). Artefakte
+`search_bridge_frozen_v3_v28-b02_<aus|bestand|k3d|jokerfeld>.json`, 0 Fehler:
+
+| Einstellung | A1 R1 | A1 R2 | A1 R3 | A1 R4 | A2 R1 | A2 R2 | A2 R3 | A2 R4 | A1 / A2 R1-4 gepoolt |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| aus (k3v_off) | 0,674 | 0,641 | 0,674 | 0,683 | 0,791 | 0,896 | 0,891 | 0,915 | 0,668 / 0,873 |
+| Bestand (K3-P, Huellenform 2, K5) | 0,644 | 0,620 | 0,660 | 0,656 | 0,676 | 0,807 | 0,823 | 0,902 | 0,645 / 0,815 |
+| plus K3-D (dead_cell_w 1) | 0,648 | 0,658 | 0,642 | 0,643 | 0,681 | 0,746 | 0,786 | 0,893 | 0,648 / 0,788 |
+| plus Jokerfeld (out_wild_w 1) | 0,644 | 0,624 | 0,665 | 0,670 | 0,678 | 0,806 | 0,833 | 0,903 | 0,650 / 0,820 |
+
+**Lesart:** das Kriterium aus par.12a ("Runde 1 UND 2 mit Knopf HOEHER als der Rauschboden") ist
+in keiner Runde und keiner Einstellung erfuellt; mit Knopf liegt die Suche in JEDER Runde unter
+der Einstellung ohne Knopf, bei A2 in Runde 1 um 0,115 (0,791 gegen 0,676), bei A1 um 0,03
+(rund 7 von 236 Zustaenden). Der Zustands-Bootstrap aus par.12b Punkt 1 wurde deshalb NICHT
+gerechnet: er koennte "nicht hoeher" nur in "signifikant niedriger" verwandeln, das Verdikt
+aendert er nicht (die Artefakte tragen keine Zustandszeilen; ein Nachlauf mit Zustandsdump
+kostet 4 x 6 min, falls die Schaerfe gebraucht wird). K3-D und Jokerfeld bewegen A1 nicht und
+A2 nur nach unten (K3-D R2 0,746).
+
+**Warum das nicht "der Knopf schadet" heisst, und warum das Kriterium hier an seine Grenze
+kommt:** das Orakel ist die v21-Suche @5000 OHNE Huelle (`PREREG_frozen_v3_eval_set.md` par.9),
+also plattenblind in genau dem Sinn, den der Knopf korrigieren soll. Ein Knopf, der die Wurzel
+absichtlich um c*tanh(w_e*(H0-H1)) verschiebt, MUSS die Rangkorrelation zu einem Orakel senken,
+das diese Verschiebung nicht kennt (A2); und ein Knopf, der Zuege Richtung Spalten dreht, MUSS
+seltener in den Top-3 eines Orakels liegen, das Spalten nicht hoeher bewertet (A1). Kanal A
+misst damit Uebereinstimmung mit plattenblindem Spiel ([[feedback_dont_calibrate_to_plate_blind_play]]),
+nicht "entscheidet besser". Die Groessen, die den Knopf tragen, sind die Arena-Groessen: Tor 1
+und Tor 2b der v25-v28-Champions (alle mit K3-P), C2 an beiden v28-Armen (+0,14 / +0,23 volle
+Spalten), Plattenpunkte. **Stand par.12 nach Punkt 4: Bedingung C2 erfuellt, Kanal A NICHT
+erfuellt, Kanal B ungemessen; die Prereg bleibt OFFEN mit K3-P und Huellenform 2 als
+Rezeptbestandteil.** Ob das Schliesskriterium mit einem huellenblinden Orakel ueberhaupt
+erreichbar ist oder par.12 auf die Arena-Groessen umgestellt wird, ist ein Nutzer-Entscheid.
