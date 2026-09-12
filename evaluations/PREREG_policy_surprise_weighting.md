@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: alpha 0,5 ohne Tor: NEIN (par.9, v23-b03). Mit Sicherheits-Tor 0,5 als v24-b05 gefahren (par.10/11), Belege in PREREG_v24_window.md par.9; die einzige saubere Kante b05 gegen b04 fehlt. EINGETAKTET 2026-09-11 als Schritt 6 des v28-Programms (PREREG_v28_window.md par.8): beide Modelle aus dem restic-Repo, gepaartes Gating 200 Paare, dann Verdikt hier. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Bringt es etwas, Trainings-Stichproben nach der Ueberraschung des Policy-Ziels zu gewichten (KL Ziel gegen Netz)? | Beleg: NEIN, zweimal. alpha 0,5 ohne Tor: v23-b03 negativ (par.9). Mit Sicherheits-Tor 0,5 (v24-b05) gegen das einfaktorielle Gegenstueck v24-b04: 97:103, SPRT H0 nach 100 Paaren, McNemar p 0,78, gepaarte Differenz -0,06 [-0,35; +0,23], Punkte 42,9 gegen 44,2 (par.12, 2026-09-12). Die Gewichtung bleibt aus (Default 0). -->
 
 # Vorregistrierung: Policy-Surprise-Weighting
 
@@ -350,3 +350,30 @@ Gating mit `models/k3v_off.spec.json` auf beiden Seiten (Fassung ohne Knopf wie 
 v24-Abnahmen, `PREREG_v24_window.md` par.9), 200 Paare,
 Blockgroesse 5, `--log-games`. Verdikt danach hier in par.12: traegt die Gewichtung mit
 Sicherheits-Tor (Punktschaetzer und Spalten), oder nicht.
+
+## par.12 VERDIKT 2026-09-12: die Kante b05 gegen b04 ist gefahren, sie traegt nichts
+
+Gefahren als Schritt 6 des v28-Programms (`tools/night_surprise_edge.sh`, 06:45-07:31, 2.731 s,
+10 Threads, Blockgroesse 5, `--log-games`, exklusiv; Artefakt
+`paired_gating_v24-b05_vs_v24-b04_s45.json`, Seed 20261045). Beide Modelle aus den restic-
+Snapshots `run:v24-b05` (73b5c104) und `run:v24-b04` (c6877ec9) nach `models/restored_v24/`
+(sha256 469a1bfd... / 4109630f...), beide Seiten `models/k3v_off.spec.json`, @400.
+
+**v24-b05 (surprise_alpha 0,5, Tor 0,5) gegen v24-b04 (ohne): 97:103, SPRT-Entscheid H0 nach
+100 Paaren (LLR -3,43), McNemar p=0,784, gepaarte Differenz -0,06 [-0,347; +0,227]** (47 Splits,
+25 A-Sweeps, 28 B-Sweeps); Punkte 42,9 gegen 44,2 (n=200 je Seite, Einheit Punkte je Partie).
+Lesart nach par.10: die Gewichtung mit Sicherheits-Tor liefert keinen messbaren Vorteil, der
+Punktschaetzer liegt sogar leicht unter dem Gegenstueck; zusammen mit dem negativen
+Befund ohne Tor (par.9, v23-b03) ist der Hebel zweimal ohne Wirkung. **ENTSCHIEDEN: die
+Ueberraschungsgewichtung bleibt aus** (`--surprise-alpha` Default 0, Knopf bleibt als Bestand
+im Trainer, kein Arm mehr).
+
+Randbedingungen, damit die Zahl nicht missdeutet wird: (1) beide 744er-Modelle liefen auf dem
+755er-Wheel (Kuerzung auf Modellbreite, `net.rs`), beide Seiten gleich, ein symmetrischer
+Umstand; (2) die Spec ohne Huelle (k3v_off) erklaert das niedrige Punkteniveau (42-44 gegen
+50-54 der Champion-Kanten), auch symmetrisch; (3) die Kante liegt in KEINEM Leitersegment
+(beide Knoten haben im Segment 2 keine Anker-Verbindung) und wird deshalb NICHT ins Elo-
+Register eingetragen, sie ist ein Faktor-Vergleich, keine Leiterposition. Die
+Standard-Kennzahlen aus den Logs (Spalten, Reihen, Strafleiste, Plattenpunkte) folgen als
+Nachtrag, sobald die Maschine frei ist (Replay-Sonde nicht neben dem laufenden C2-Instrument).
+

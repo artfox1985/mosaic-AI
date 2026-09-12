@@ -229,8 +229,9 @@ Champion aus seinem Artefakt, beide Seiten Champion-Spec. Promotion nach
    v29 gelegt): ein CPU-Lauf ohne neue Erzeugung, Reihenfolge nach der Leiter-Kante oder
    davor, je nachdem, was die Maschine frei hat.
 3. **Reste aus v28**, falls dort nicht mehr gefahren: Startkuppel-Sonde Stufe 0 (am v28- ODER
-   v29-Korpus, gleiches Instrument), Ueberraschungs-Kante v24-b05 gegen v24-b04,
-   `round_estimate_leaf_term` als Such-Knopf am Champion-Stand. Jeder davon ist ein
+   v29-Korpus, gleiches Instrument), ~~Ueberraschungs-Kante v24-b05 gegen v24-b04~~ (in v28
+   gefahren 2026-09-12: 97:103, SPRT H0, `policy_surprise_weighting` par.12 ENTSCHIEDEN),
+   `round_estimate_leaf_term` als Such-Knopf am Champion-Stand (Knopf seit 2026-09-12 im Wheel). Jeder davon ist ein
    Engine-Knopf oder eine Sonde ohne Training; sie laufen NIE neben einer Arena.
 4. **Aus der Audit-Querlesung 2026-09-11 (Nutzer: "2 bis 4 als Sonden und Knoepfe im
    Begleitprogramm, 5 und 6 nach Maschinenlage"), alle ohne Training, keine neben einer Arena:**

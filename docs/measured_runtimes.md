@@ -191,6 +191,7 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | sigma/Prior-Balance (300 Zustaende @400) / Platt v3 / Platt v1 | 787 s / 12 s / 9 s | |
 | Paritaets-Fixture schreiben + Gegenprobe (je cargo test, warm) | 2 x ~14 s + Bau ~32 s | ein Schreiblauf scheiterte an einer OneDrive-Dateisperre (os error 32), Wiederholung gruen |
 | Einfrieren v28-b02: venv 24 s / Golden Probe (10 Sonden @400, einkernig) **1.450 s** / Referee-Selbsttest 2 Partien 78 s | | `tools/night_v28_freeze.sh` |
+| Ueberraschungs-Kante v24-b05 gegen v24-b04 (paired_gating, SPRT H0 nach 100 Paaren, 10 Threads, Logs) | **2.731 s** | 13,7 s je Partie |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 
