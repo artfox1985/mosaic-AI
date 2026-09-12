@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Ueber WELCHEN Pfad erreicht die Rust-Engine die GPU -- Cross-Language-Queue zu Python/torch oder ein CUDA-faehiger Rust-Pfad? | Beleg: ENTSCHIEDEN 2026-08-14 (Datei §23 Regel-3-Endverdikt): keine Zelle erreicht 2,0x gegen den frisch gemessenen staerksten Sync-Arm (528,5 Partien/h bei 11 Faeden); beste Konfiguration = Doppel-Prozess-Aggregat 663,0/h = 1,255x. Weg B (GPU-Inferenzpfad) wird NICHT Standard fuer v22+ -- geschlossen, bis ein groesseres Netz die Kennlinie verschiebt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Ueber WELCHEN Pfad erreicht die Rust-Engine die GPU -- Cross-Language-Queue zu Python/torch oder ein CUDA-faehiger Rust-Pfad? | Beleg: ENTSCHIEDEN 2026-08-14 (Datei §23 Regel-3-Endverdikt): keine Zelle erreicht 2,0x gegen den frisch gemessenen staerksten Sync-Arm (528,5 Partien/h bei 11 Faeden); beste Konfiguration = Doppel-Prozess-Aggregat 663,0/h = 1,255x. Weg B (GPU-Inferenzpfad) wird NICHT Standard fuer v22+. ENDGUELTIG GESCHLOSSEN (Nutzer 2026-09-12: "damit haben wir uns lang genug beschaeftigt"), keine Wiedervorlage, auch nicht bei groesserem Netz. -->
 
 # Vorregistrierung: der Inferenz-PFAD zur GPU
 
@@ -2035,3 +2035,8 @@ mehr ist strukturell sinnlos; der staerkste Sync-Arm ist entsprechend
 12 logischen Prozessoren -- der Aggregat-Gewinn muss also aus der GPU-
 Entlastung kommen, nicht aus mehr CPU (vorab notiert, damit ein Nullergebnis
 richtig gelesen wird).
+
+## Nachtrag 2026-09-12: endgueltig geschlossen
+
+Nutzer-Entscheid 2026-09-12 ("lass das mal weg, damit haben wir uns lang genug beschaeftigt"): der Vorbehalt "bis ein groesseres Netz die Kennlinie verschiebt" entfaellt; Suchgeschwindigkeit ueber GPU-Pfad oder asynchrone Suche ist kein Hebel des Projekts mehr, in keinem Programm nach v29. Der Code-Verbleib bleibt wie in den Abschlussabschnitten beschrieben.
+
