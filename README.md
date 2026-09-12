@@ -23,7 +23,7 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1344** (95% CI [1298, 1399])
+Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1344** (95% CI [1301, 1395])
 from 1,380 rated games on the **second ladder segment**, anchored at the frozen
 heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 =
 1000, `tools/elo_tracker.py report`). The ladder was re-anchored on 2026-09-12:
@@ -35,8 +35,10 @@ boundary; the same happened once before on 2026-08-21 with the round-5 solver
 fix (`archive/elo_history_pre_r5fix.csv`). Because every net since v23 beats the
 heuristic anchor at 84-90 % (saturated edges), the second segment carries
 intermediate rungs from frozen artifacts restored out of the backup
-(`v21_2d_brierbest` 1157, `v24-b07` 1184, `v26-b01` 1251, `v27-b01` 1301) and the
-second heuristic `hv2_generator` (987). The anchor carries its own wheel:
+(`v22-b05` 1158, `v21_2d_brierbest` 1178, `v24-b07` 1191, `v26-b01` 1244,
+`v27-b01` 1301, `v28-b01` 1313) and the two hull-teacher heuristics `hv2` (978,
+frozen before the phantom fix) and `hv3` (992, the same recipe rebuilt on the
+fixed engine; the fix does not change its strength). The anchor carries its own wheel:
 an engine change can no longer move the fixed point of the ladder, and every
 engine change is checked move by move against it (drift check,
 `/mosaic-anchor-invariance`). `v28-b02` beat `v27-b01` 133:97 (SPRT), 212:188 (to the

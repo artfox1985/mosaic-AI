@@ -446,3 +446,9 @@ Frueh-Stopp, p 0,81; `PREREG_code_cleanup_closeout.md` par.7a). Elo-Knoten `Heur
 liegt die Anfaenger-Stufe rund 360 Elo unter dem Champion (Endstand 17:10: v28-b02 1344 [1298, 1399], hv2 987 [941, 1033]); die Stufen
 2 und 3 (Champion mit Self-Play-Stilmitteln) muessen diesen Abstand fuellen (Stufe 2 der Prereg).
 
+**Nachtrag 2026-09-12, 21:50 (hv3 verfuegbar):** fuer die Anfaenger-Stufe steht jetzt auch
+`models/frozen_heuristics/hv3_generator` (Huellen-Lehrer MIT Phantom-Fix, Motor der heutigen
+Aera) bereit; gegen hv4-Anker 73:77 und gegen hv2 78:72, Elo 992 [948, 1035], also gleich stark
+wie hv2 (978). Empfehlung: Anfaenger = hv3, weil es auf dem Motor der Champions spielt (kein
+Cross-Aera-Wheel im Spielbetrieb); Nutzer-Entscheid bei Stufe 2.
+
