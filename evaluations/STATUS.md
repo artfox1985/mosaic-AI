@@ -279,8 +279,9 @@ Index: `PREREG_INDEX.md` (generiert).
    kodiert die Setzung deshalb als choose_dome_slot (IDs 328-354, Rotationen gebuendelt) und
    bekommt im Trainings-Cache Gewicht 1 (bisher 0 fuer alle Start-Records). Streu-Knopf
    MOSAIC_START_SLOT_RANDOM_P ebenfalls geschrieben (Self-Play-Erzeugung, p=0 bitidentisch).
-   **NICHT PUSHEN, bis `tools/night_start_by_search_ab.sh` den Bau-Durchgang gruen hat** (der
-   pre-push-Hook baut den Arbeitsbaum und liefe neben der Leiter).
+   **GEBAUT 13:33, Tore gruen** (613 Tests, Fixture und Kontrakt unveraendert, Anker-Drift und
+   Konservierung gruen, Wheel installiert). Push erst, wenn die Leiter durch ist (der pre-push-
+   Hook baut und testet neben den Referee-Partien).
 
 00. ~~ANKER-DRIFT ROT durch A2~~ ENTSCHIEDEN 2026-09-12: (a) Anker neu gesetzt (`hv1_anchor_v2`, Segment 2).
 0. ~~Name des Schlussmodells~~ ENTSCHIEDEN 2026-09-11: **Tessa** (Umsetzung mit Stufe 3 des
