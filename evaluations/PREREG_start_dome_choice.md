@@ -447,3 +447,42 @@ in `tools/night_startslot_build.sh` in der Luecke zwischen den Ketten.**
   das v28-Netz (Sonde auf Stufe-0-Partien, gleiche Seeds), und ob der Gegner-Abweichung eine
   andere Antwort folgt (Policy-Entropie am Zug nach der Gegner-Startsetzung).
 
+## par.9c NUTZER-ENTSCHEID 2026-09-12, 13:00: im Spiel entscheidet die Suche, nicht die Handregel
+
+Nutzer: *"im arena spiel wuerd ich die entscheidung der einhuellenden bzw. der suche ueberlassen.
+aehnlich wie die kuppelplatten bereits heute selektiert und gelegt werden."*
+
+**Stand heute (geprueft):** der Start-Record kodiert die Setzung als gewoehnliche Kuppel-Aktion
+(`start_placement_step`, `self_play.rs:1330-1340`: `type: dome, is_start: true`, alle Display x
+freie Slots x 4 Rotationen, bis zu 108 Eintraege) im 406er-Aktionsraum (`net_mcts.rs:54`); der
+Policy-Kopf kennt die Startsetzung also und lernt sie heute als One-Hot der Handregel. Die
+Suche selbst sieht die Phase nie: `net_mcts.rs` enthaelt keine Behandlung von `StartPlacement`,
+in allen Spielpfaden (Self-Play `self_play.rs:2912`, Arena, Referee `referee.rs:508`,
+`round_transition.rs:656`, `py.rs:644`) wird die Setzung VOR der ersten Suche per
+`choose_start_placement` aufgeloest.
+
+**Ziel:** die Startsetzung wird ein Suchentscheid wie jede Kuppelplatzierung: Wurzel = Zustand in
+der StartPlacement-Phase des Spielers, Kinder = die legalen Start-Aktionen, Prior aus dem
+Policy-Kopf (heute Handregel-Klon, mit par.9b-Streuung teilweise ungueltig markiert), Blatt =
+Netzwert plus Einhuellenden-Verschiebung (K3-P, Huellenform 2) wie ueberall sonst; damit sieht die
+Wahl die Wertungsplatten und die Huelle, nicht nur Farbzaehler und Eckbonus.
+
+**Bauumfang (ANNAHME, ungeprueft):** (1) `net_mcts`: Expansion und Anwendung von Start-Aktionen
+in der StartPlacement-Phase, Uebergang in die Drafting-Phase im Baum; (2) Spielpfade: statt
+`choose_start_placement` die Suche rufen, wenn ein Netz spielt (Heuristik-Spieler behalten die
+Handregel, sonst bewegt sich der Anker); (3) Self-Play: dieselbe Wahl in der Erzeugung
+(Traegerprinzip: was die Arena spielt, erzeugt das Self-Play), Streuung par.9b obendrauf;
+(4) Referee-Protokoll: der Worker entscheidet die Startsetzung schon extern
+(`ask_start_placement`), muss dann die Suche statt der Handregel rufen; Golden-Proben der
+NETZ-Artefakte enthalten 2 von 10 Sonden mit `pending_dome_choice` und sind neu zu erzeugen,
+falls sich die Startsetzung der Artefakte aendert (sie aendert sich NICHT: die Artefakte
+tragen ihre eigenen Wheels). Kosten grob ein Tag Bau plus A/B (200 Paare, Champion mit
+Such-Start gegen Champion mit Handregel; Erwartung nach Stufe 0 klein, da (0,0) schon der beste
+Slot ist; Platte/Rotation sind der Rest, par.9a Punkt 1). Knopf-Form: `MOSAIC_START_BY_SEARCH`
+(Default 0 = Handregel, bitidentisch), Spec-Feld fuer die Artefakt-Identitaet.
+
+**Reihenfolge, Vorschlag:** par.9b (Streuung, in Bau) fuer die v29-Erzeugung; par.9c als
+Such-Knopf VOR der v29-Erzeugung nur, wenn der Nutzer ihn im Generator haben will, sonst als
+v29-Begleitprogramm mit A/B am Champion und Uebernahme bei v30. Offen: Nutzer-Entscheid zum
+Zeitpunkt.
+
