@@ -475,3 +475,19 @@ blau/gelb, der Rest aus dem gemischten Turm plus Rundenende-Abraum; die Summe al
 nicht. Grenzen der Sonde: in dieser Partie keine Phantom-Fliesen (Chip-Vollendung) und keine
 gelegte Spezialfliese; beide Faelle sind im Code behandelt (Phantome abgezogen, SPECIAL-Felder
 ausgenommen), aber an diesem Log nicht geprueft.
+
+**Abgleich "sieht/weiss das Netz es?" (Nutzer 01:35: "dann gleich es auch ab ob das netz es
+weiss/sieht"), am Zustand von Zug 47 (Runde 3, Beutel [1, 1, 0, 0, 0], Turm [7, 5, 4, 2, 0],
+`bag_count` 2) ueber die Python-Bindung `state_features_from_json` / `state_planes_from_json`
+(755er Flachvektor plus 2D-Planes):**
+- V1, gleiche Summe je Farbe, andere Aufteilung (Beutel [0, 2, 0, 0, 0], Turm [8, 4, 4, 2, 0]):
+  Flachvektor an allen 755 Indizes identisch, Planes identisch. **Das Netz SIEHT die Aufteilung
+  nicht.**
+- V2, Beutel und Turm komplett vertauscht: nur Index 2 (`bag_count`/65, `features.rs` Z.257)
+  weicht ab (0,0308 gegen 0,2769); je Farbe nichts. Das Netz sieht also den Beutel-GESAMTbestand
+  und je Farbe die Summe, sonst nichts.
+- Suche: `engine/src/net_mcts.rs` enthaelt keinen Treffer fuer `bag` oder `tower` (0 Treffer);
+  die Suche spielt den Rundenuebergang nicht (Blatt vor dem Tiling), sie zieht nie aus dem Beutel.
+  **Das Netz WEISS die Aufteilung auch ueber die Suche nicht.** Sie wirkt heute nirgends; sie
+  koennte nur als Eingang des Value-Kopfs wirken (P.9, Sicht-Arm v29-b03), und erst mit einer
+  Suche, die den Rundenuebergang sieht (`PREREG_round_transition_search_sampling.md`), auch dort.

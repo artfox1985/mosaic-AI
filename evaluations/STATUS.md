@@ -43,7 +43,9 @@ durch (Schritt 1 unten).
 1. ~~Crosscheck Fliesenbuchhaltung~~ ERLEDIGT 01:30: 106 von 106 Entscheidungspunkten des Logs
    `game_20260911_092554_seed946607` stimmen in Beutel UND Turm je Farbe mit der Engine ueberein
    (`tools/probes/tile_ledger_crosscheck.py`, `PREREG_stack_top_feature.md` par.14); P.9 ist damit
-   eine echte Sicht-Asymmetrie (Beispiel R3: Beutel 2 Fliesen, Turm 18, Encoder sieht nur die Summe).
+   eine echte Sicht-Asymmetrie (Beispiel R3: Beutel 2 Fliesen, Turm 18). Abgleich am Encoder: gleiche Summe, andere
+   Aufteilung ergibt an allen 755 Indizes und in den Planes denselben Eingang; die Suche liest
+   Beutel und Turm nirgends (net_mcts.rs 0 Treffer). Das Netz sieht und weiss die Aufteilung nicht.
 2. **Sims-Kette starten** (par.8e), danach Auswertung nach der Lesart dort und der VORSCHLAG fuer
    die Sims von Sockel und Schwarm getrennt, mit Kosten je Variante fuer v29 UND v30 (Nutzer:
    "zum schluss sind es nur noch zwei generationen"; Entscheidungsregel "eklatant" in par.8e).
