@@ -650,3 +650,12 @@ volle Spalten je Seite fehlen deshalb fuer dieses A/B und sind aus den Logs per
 `reconstruct_game` (Muster Stufe-0-Sonde) nachzuziehen; der Replayer braucht die Startsetzung aus
 der START_TILE-Zeile (Aufgabe, nicht gebaut).
 
+**Offene Zahl (Nutzer 18:25, "mach das"):** welcher Term treibt die (2,0)-Praeferenz, der auf
+(2,0)-Brettern untrainierte Value-Kopf oder die Huellen-Verschiebung (Dreieck geometrisch unten)?
+Diagnose `tools/night_start_search_hull_off.sh` nach `tail9`: zwei Instrument-Laeufe (100 Partien
+@400 deterministisch, Seed 20260931) mit Such-Start, einmal Champion-Spec, einmal `k3v_off` plus
+`start_by_search`; Zielgroesse Slotverteilung der Startsetzungen je Lauf (aus den Records,
+`start_by_search`-Feld). Lesart vorab: kehrt die Suche ohne Huelle zu (0,0) zurueck, treibt die
+Huelle; bleibt (2,0), treibt der Value-Kopf (und dann ist die v29-Streuung die Korrektur, weil er
+dort extrapoliert).
+
