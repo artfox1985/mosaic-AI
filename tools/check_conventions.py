@@ -908,6 +908,14 @@ KNOWN_FIELDS_RE = re.compile(
 
 OPTIONAL_FIELD_RE = re.compile(r'get_optional_non_negative\(\s*"([^"]+)"')
 
+# Zweite Bauform desselben "optional mit Default": ein FELD (Liste) laesst sich
+# nicht durch `get_optional_non_negative` lesen, es kommt als
+# `match obj.get("<name>") { None => <DEFAULT>, ... }`. Erstes Beispiel:
+# `round_est_b_profile` (K4, PREREG_round_estimate_leaf_term.md par.4). Ohne
+# diese zweite Erkennung meldete Regel 8 jede lebende Spec als unvollstaendig,
+# obwohl das Feld gar nicht gefordert ist -- eine Warnung, die man wegsieht.
+OPTIONAL_ARRAY_FIELD_RE = re.compile(r'obj\.get\(\s*"([^"]+)"\s*\)\s*\{\s*None\s*=>')
+
 
 def _spec_known_fields() -> set[str] | None:
     """Feldnamen aus `SearchConfig::from_spec_file`, oder None wenn nicht parsebar."""
@@ -923,10 +931,14 @@ def _spec_optional_fields() -> set[str]:
     """Felder, die `from_spec_file` mit Default liest (`get_optional_non_negative`):
     ein FEHLEN ist dort kein Abweisungsgrund, nur ein UNBEKANNTES Feld bleibt einer.
     Seit 2026-09-11 (`dead_cell_w`, `out_wild_w`, PREREG_geometric_envelope.md par.12c):
-    die eingefrorenen Artefakt-Specs tragen sie nicht und muessen weiter laden."""
+    die eingefrorenen Artefakt-Specs tragen sie nicht und muessen weiter laden.
+    ZWEI Bauformen, beide zaehlen: der Zahl-Leser `get_optional_non_negative` und
+    der Feld-Leser `match obj.get("<name>") { None => <DEFAULT>, ... }`
+    (`round_est_b_profile`, K4, seit 2026-09-12)."""
     if not NET_MCTS_PATH.is_file():
         return set()
-    return set(OPTIONAL_FIELD_RE.findall(NET_MCTS_PATH.read_text(encoding="utf-8", errors="replace")))
+    text = NET_MCTS_PATH.read_text(encoding="utf-8", errors="replace")
+    return set(OPTIONAL_FIELD_RE.findall(text)) | set(OPTIONAL_ARRAY_FIELD_RE.findall(text))
 
 
 def warn_live_specs_match_known_fields(staged_only: bool, staged_files: set[str]) -> None:

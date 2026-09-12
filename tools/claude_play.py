@@ -93,6 +93,13 @@ SPEC_TO_ENV = {
     # par.12c (2026-09-11), OPTIONALE Spec-Felder mit Default 0.
     "dead_cell_w": "MOSAIC_DEAD_CELL_W",
     "out_wild_w": "MOSAIC_OUT_WILD_W",
+    # K4 (2026-09-12), ebenfalls OPTIONALE Spec-Felder; das Profil ist eine
+    # Liste und wird wie envelope_profile kommasepariert uebergeben.
+    "round_est_c": "MOSAIC_ROUND_EST_C",
+    "round_est_b_profile": "MOSAIC_ROUND_EST_B_PROFILE",
+    # PREREG_dome_return_order.md par.4 (2026-09-12), OPTIONALES Spec-Feld
+    # mit Default 0 (Ziehreihenfolge).
+    "return_order_mode": "MOSAIC_RETURN_ORDER_MODE",
 }
 
 

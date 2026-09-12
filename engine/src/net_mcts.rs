@@ -261,6 +261,64 @@ pub(crate) fn read_envelope_profile_env() -> [f64; 5] {
     crate::envelope::ENVELOPE_PROFILE_DEFAULT
 }
 
+/// K4-Skala `MOSAIC_ROUND_EST_B_PROFILE` als VIER Kommazahlen (Runde 1..4,
+/// z.B. `3,8,10,12`) -- gleiches Muster wie [`read_envelope_profile_env`]:
+/// fehlend -> [`ROUND_EST_B_PROFILE_DEFAULT`]; nicht parsbar, nicht genau
+/// vier Werte oder ein Wert nicht > 0 -> Default plus einmalige
+/// stderr-Warnung, kein Panic. Die Positivpruefung steht hier, weil jeder
+/// Wert ein NENNER ist (`tanh(dE / B)`): 0 macht den Term zur
+/// Vorzeichenfunktion, negativ dreht sein Vorzeichen um (dieselbe Ueberlegung
+/// wie bei [`sanitized_score_utility_b`]).
+pub(crate) fn read_round_est_b_profile_env() -> [f64; 4] {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_ROUND_EST_B_PROFILE") else {
+        return ROUND_EST_B_PROFILE_DEFAULT;
+    };
+    let parsed: Vec<f64> = raw.split(',').filter_map(|s| s.trim().parse::<f64>().ok()).collect();
+    if parsed.len() == 4 && raw.split(',').count() == 4 && parsed.iter().all(|v| v.is_finite() && *v > 0.0) {
+        let mut out = [0.0; 4];
+        out.copy_from_slice(&parsed);
+        return out;
+    }
+    WARNED.get_or_init(|| {
+        eprintln!(
+            "⚠️  MOSAIC_ROUND_EST_B_PROFILE={raw:?} ignoriert -- erwartet genau 4 Kommazahlen > 0 \
+             (Runde 1..4); Default {ROUND_EST_B_PROFILE_DEFAULT:?} gilt."
+        );
+    });
+    ROUND_EST_B_PROFILE_DEFAULT
+}
+
+/// Groesster gueltiger Wert von [`SearchConfig::return_order_mode`]
+/// (`PREREG_dome_return_order.md` par.4): 0 Bestand, 1 netzbewertet,
+/// 2 Heuristik.
+pub const RETURN_ORDER_MODE_MAX: u8 = 2;
+
+/// `MOSAIC_RETURN_ORDER_MODE` als ganze Zahl 0..=[`RETURN_ORDER_MODE_MAX`].
+/// Fehlend oder ungueltig -> 0 (Bestand) plus einmalige stderr-Warnung, kein
+/// Panic (gleiche Disziplin wie [`read_f64_env`]). KEIN `OnceLock`: der Wert
+/// ist ein Spec-Feld JE SEITE, und `SearchConfig::from_env` cacht bewusst
+/// nichts (siehe dortige Doku) -- ein prozessweiter Cache waere genau der
+/// Defekt aus `PREREG_agent_encapsulation.md` par.1.
+pub(crate) fn read_return_order_mode_env() -> u8 {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_RETURN_ORDER_MODE") else {
+        return 0;
+    };
+    match raw.trim().parse::<u8>() {
+        Ok(v) if v <= RETURN_ORDER_MODE_MAX => v,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "⚠️  MOSAIC_RETURN_ORDER_MODE={raw:?} ungueltig (0 Bestand, 1 netzbewertet, \
+                     2 Heuristik) -- Modus 0 gilt."
+                );
+            });
+            0
+        }
+    }
+}
+
 pub(crate) fn read_f64_env(name: &str, default: f64) -> f64 {
     match std::env::var(name) {
         Ok(s) => match s.trim().parse::<f64>() {
@@ -544,6 +602,31 @@ pub struct SearchConfig {
     /// Projektions-Modi. Spec-Feld je Seite (`out_wild_w`, OPTIONAL mit
     /// Default 0), Env-Default `MOSAIC_OUT_WILD_W`.
     pub out_wild_w: f64,
+    /// K4 (`PREREG_round_estimate_leaf_term.md` par.3/par.6a, gebaut
+    /// 2026-09-12): `C_est`, Gewicht des Rundenschaetzer-Terms am
+    /// Netz-Blattwert (`shift = C_est * tanh((E(0) - E(1)) / B_est(Runde))`,
+    /// Nullsumme, geklammert, Runde 5 null). `E` ist
+    /// [`round_estimate_points`]. Default `0.0` = aus, bitidentisch (der
+    /// Block wird komplett uebersprungen). Spec-Feld je Seite (`round_est_c`,
+    /// OPTIONAL mit Default 0), Env-Default `MOSAIC_ROUND_EST_C`.
+    pub round_est_c: f64,
+    /// K4-Skala `B_est(Runde 1..4)` in Punkten (par.4 Variante (a)). Default
+    /// [`ROUND_EST_B_PROFILE_DEFAULT`]. Nur wirksam bei `round_est_c != 0`;
+    /// Spec-Feld je Seite (`round_est_b_profile`, OPTIONAL, vier Zahlen > 0),
+    /// Env-Default `MOSAIC_ROUND_EST_B_PROFILE`.
+    pub round_est_b_profile: [f64; 4],
+    /// Rueckgabe-Reihenfolge der nicht gewaehlten Kuppelplatten
+    /// (`PREREG_dome_return_order.md` par.4, gebaut 2026-09-12): `0` =
+    /// Bestand (Ziehreihenfolge, bitidentisch, Default), `1` = netzbewertet
+    /// (je Permutation ein Folgezustand, Value-Kopf aus Sicht des
+    /// Ruecklegers), `2` = Heuristik "beste Platte nach oben" (ohne Netz).
+    /// Wirkt am ENDE der Ziehserie (`self_play.rs::
+    /// resolve_and_apply_stack_draw_with`) und im GUI-Default
+    /// (`py.rs::apply_dome_stack_choose`), NICHT im Suchbaum
+    /// (`game.rs::generate_draw_stack_moves` bleibt bei einem Kandidaten je
+    /// (Platte, Slot)). Spec-Feld je Seite (`return_order_mode`, OPTIONAL mit
+    /// Default 0), Env-Default `MOSAIC_RETURN_ORDER_MODE`.
+    pub return_order_mode: u8,
 }
 
 impl SearchConfig {
@@ -586,6 +669,9 @@ impl SearchConfig {
             special_row6_w: crate::envelope::special_row6_weight(),
             dead_cell_w: crate::envelope::dead_cell_weight(),
             out_wild_w: crate::envelope::out_wild_weight(),
+            round_est_c: read_f64_env("MOSAIC_ROUND_EST_C", 0.0),
+            round_est_b_profile: read_round_est_b_profile_env(),
+            return_order_mode: read_return_order_mode_env(),
         }
     }
 
@@ -619,6 +705,9 @@ impl SearchConfig {
             "special_row6_w",
             "dead_cell_w",
             "out_wild_w",
+            "round_est_c",
+            "round_est_b_profile",
+            "return_order_mode",
             "heuristik_variante",
         ];
         for key in obj.keys() {
@@ -739,6 +828,75 @@ impl SearchConfig {
         };
         let dead_cell_w = get_optional_non_negative("dead_cell_w", 0.0)?;
         let out_wild_w = get_optional_non_negative("out_wild_w", 0.0)?;
+        // K4 (PREREG_round_estimate_leaf_term.md par.3/par.6a): dieselbe
+        // OPTIONAL-Begruendung wie bei den beiden Zell-Knoepfen darueber, Wort
+        // fuer Wort uebertragbar -- die eingefrorenen Artefakt-Specs
+        // (`models/frozen_champions/*/spec.json`,
+        // `models/frozen_heuristics/*/spec.json`) und die lebenden
+        // `models/*.spec.json` tragen die Felder nicht, und bei
+        // `round_est_c == 0` wird der Blatt-Zweig gar nicht betreten: die Spec
+        // ohne sie beschreibt bitgenau das Verhalten, das sie schon immer
+        // beschrieben hat. Wird der Knopf Rezeptbestandteil, wandert er per
+        // `tools/spec_add_field.py` in die lebenden Specs und kann dann auf
+        // Pflicht hochgestuft werden.
+        let round_est_c = get_optional_non_negative("round_est_c", 0.0)?;
+        let round_est_b_profile = match obj.get("round_est_b_profile") {
+            None => ROUND_EST_B_PROFILE_DEFAULT,
+            Some(v) => {
+                let arr = v.as_array().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'round_est_b_profile' ist kein Feld")
+                })?;
+                if arr.len() != 4 {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'round_est_b_profile' braucht genau 4 Zahlen \
+                         (Runde 1..4), hat {}",
+                        arr.len()
+                    ));
+                }
+                let mut out = ROUND_EST_B_PROFILE_DEFAULT;
+                for (i, item) in arr.iter().enumerate() {
+                    let x = item.as_f64().ok_or_else(|| {
+                        format!("Spec-Datei {path}: 'round_est_b_profile'[{i}] ist keine Zahl")
+                    })?;
+                    // Nenner: dieselbe Bereichspruefung wie bei
+                    // `score_utility_b`; `!(x > 0.0)` faengt auch NaN.
+                    if !(x > 0.0) {
+                        return Err(format!(
+                            "Spec-Datei {path}: 'round_est_b_profile'[{i}] muss > 0 sein, ist {x}"
+                        ));
+                    }
+                    out[i] = x;
+                }
+                out
+            }
+        };
+        // `PREREG_dome_return_order.md` par.4: dieselbe OPTIONAL-Begruendung
+        // wie bei den Feldern darueber. Die eingefrorenen Artefakt-Specs
+        // (`models/frozen_champions/*/spec.json`,
+        // `models/frozen_heuristics/*/spec.json`) und die lebenden
+        // `models/*.spec.json` tragen das Feld nicht, und bei
+        // `return_order_mode == 0` ist die Rueckgabe die Ziehreihenfolge --
+        // genau das Verhalten, das diese Specs schon immer beschrieben haben
+        // (kein zusaetzlicher Netzaufruf, keine zusaetzliche Zufallszahl).
+        // Wird der Knopf Rezeptbestandteil, wandert er per
+        // `tools/spec_add_field.py` in die lebenden Specs und kann dann auf
+        // Pflicht hochgestuft werden.
+        let return_order_mode = match obj.get("return_order_mode") {
+            None => 0u8,
+            Some(v) => {
+                let x = v.as_f64().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'return_order_mode' ist keine Zahl")
+                })?;
+                let max = f64::from(RETURN_ORDER_MODE_MAX);
+                if x.fract() != 0.0 || !(0.0..=max).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'return_order_mode' muss eine ganze Zahl 0..{max} sein \
+                         (0 Ziehreihenfolge, 1 netzbewertet, 2 Heuristik), ist {x}"
+                    ));
+                }
+                x as u8
+            }
+        };
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -813,6 +971,9 @@ impl SearchConfig {
             special_row6_w,
             dead_cell_w,
             out_wild_w,
+            round_est_c,
+            round_est_b_profile,
+            return_order_mode,
         })
     }
 }
@@ -1410,6 +1571,101 @@ pub(crate) fn floor_penalties(state: &GameState) -> (f64, f64) {
     let theirs = (state.players[1].broken_penalty()
         + crate::round_end::projected_unplaceable_penalty(&state.players[1])) as f64;
     (mine, theirs)
+}
+
+// ── K4: Rundenschaetzer am Blattwert (PREREG_round_estimate_leaf_term.md) ────
+
+/// Skala `B_est(Runde 1..4)` in PUNKTEN, par.4 Variante (a) und par.6a:
+/// `3 / 8 / 10 / 12`. Das sind die P90-Betraege von `E(0) - E(1)` je Runde
+/// aus der Messung vom 2026-09-05 (`round_estimate_scale_probe.json`, 38.073
+/// Draft-Zustaende R1-R4), die par.4 als Variante (a) und par.6a als
+/// Koordinator-Vorschlag NAMENTLICH so nennt. Die Regel `B = P90 / 0,973`
+/// derselben Tabelle ergaebe 3,1 / 8,2 / 10,3 / 12,3 -- die Variante (a)
+/// nimmt bewusst die runden P90-Werte, der Unterschied liegt unter der
+/// Aufloesung der Messung. Runde 5 steht NICHT im Profil: dort ist der Term
+/// per Auflage 0 (par.3, wie beim K3-Profil), nicht "klein".
+pub const ROUND_EST_B_PROFILE_DEFAULT: [f64; 4] = [3.0, 8.0, 10.0, 12.0];
+
+/// K4 (par.3): Rundenschaetzer EINES Spielers in PUNKTEN --
+/// `solve_round_final_score(state, pi) - score(pi) +
+/// projected_unplaceable_penalty(pi)`.
+///
+/// VORZEICHEN wie in `mcts.rs::player_total` (mcts.rs:80-84, geprueft
+/// 2026-09-12): `projected_unplaceable_penalty` liefert selbst einen
+/// NEGATIVEN Wert (round_end.rs:121-129, Summe der `BROKEN_PENALTIES`), wird
+/// also ADDIERT, nicht abgezogen. `scoring_progress` geht bewusst NICHT ein
+/// (par.3: Wertungsplatten-Fortschritt ist Geometrie, nicht Rundenpunkte, und
+/// ist ueber K3 / die Plattenkoepfe anders adressiert).
+///
+/// KOSTEN -- par.3 nennt es UNGEPRUEFT, hier am Code geprueft (2026-09-12):
+/// der Aufruf ist KEIN zweiter Solverlauf. `solve_round_final_score` geht
+/// ueber `cached_plain` (tiling_solver.rs:404-427) in eine THREAD-LOKALE
+/// Memoisierung, die seit 2026-08-05 per Default AN ist
+/// (`MOSAIC_TILING_CACHE`, tiling_solver.rs:379-387; Schluessel ist das
+/// Spielerbrett, `tiling_key`). Der Feature-Bau desselben Blattzustands hat
+/// diesen Schluessel unmittelbar davor auf DEMSELBEN Faden gefuellt, und zwar
+/// fuer BEIDE Spieler (features.rs:859, Schleife ueber `[curr, enemy]`; im
+/// 2D-Layout ueber `state_to_features_2d_direct`, das denselben Flachteil
+/// baut). Es bleiben Schluesselbau plus HashMap-Treffer. Den FEATURE-Wert
+/// wiederzuverwenden waere der teurere und schlechtere Weg: er steht als
+/// `f32`, durch 100 geteilt, an einem layout-abhaengigen Index eines Puffers,
+/// den `node_from_net_outputs` gar nicht uebergeben bekommt (und im
+/// gebuendelten Wurzel-Pfad erst recht nicht), und er enthaelt die Busse
+/// nicht. Bei `MOSAIC_TILING_CACHE=0` waeren es zwei echte Solverlaeufe je
+/// Blatt -- nur dann greift das Kostentor par.5 Punkt 3.
+pub(crate) fn round_estimate_points(state: &GameState, pi: usize) -> f64 {
+    let p = &state.players[pi];
+    f64::from(
+        crate::tiling_solver::solve_round_final_score(state, pi) - p.score
+            + crate::round_end::projected_unplaceable_penalty(p),
+    )
+}
+
+/// K4, REINE Formel (par.3): `shift = c * tanh((e0 - e1) / B_est(runde))` aus
+/// Sicht von Spieler 0, `0` bei `c == 0` und ab Runde 5. Der Aufrufer addiert
+/// `shift` auf Spieler 0 und subtrahiert ihn von Spieler 1 (Nullsumme) und
+/// klammert beide auf [0, 1] -- gleiche Bauform wie Floor-, Langreihen- und
+/// K3-Term. Ohne Zustand und ohne Netz testbar.
+pub(crate) fn round_estimate_shift_from(
+    e0: f64,
+    e1: f64,
+    round: u32,
+    c: f64,
+    b_profile: &[f64; 4],
+) -> f64 {
+    if c == 0.0 || round >= 5 {
+        return 0.0;
+    }
+    // Runde 0 wie Runde 1 (Muster `envelope::profile_weight`).
+    let b = b_profile[(round.max(1) as usize - 1).min(3)];
+    if !(b > 0.0) {
+        // Kann ueber Spec und Env-Getter nicht ankommen (beide pruefen > 0);
+        // defensiv, damit ein kuenftiger dritter Weg keinen NaN-Blattwert
+        // erzeugt.
+        return 0.0;
+    }
+    c * ((e0 - e1) / b).tanh()
+}
+
+/// K4 am Zustand: [`round_estimate_points`] fuer beide Spieler, dann
+/// [`round_estimate_shift_from`]. Der Fruehausstieg steht VOR den beiden
+/// Schaetzern, damit bei `c == 0` und in Runde 5 gar kein Solveraufruf
+/// entsteht.
+pub(crate) fn round_estimate_shift_state(
+    state: &GameState,
+    c: f64,
+    b_profile: &[f64; 4],
+) -> f64 {
+    if c == 0.0 || state.round_number >= 5 {
+        return 0.0;
+    }
+    round_estimate_shift_from(
+        round_estimate_points(state, 0),
+        round_estimate_points(state, 1),
+        state.round_number,
+        c,
+        b_profile,
+    )
 }
 
 // ── Perspektiven-/OOD-Audit (externer Hinweis, 2026-07-20) ──────────────────
@@ -2448,6 +2704,27 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
                     hull_form,
                     search_config.dead_cell_w,
                     search_config.out_wild_w,
+                );
+                today_value[0] = (today_value[0] + shift).clamp(0.0, 1.0);
+                today_value[1] = (today_value[1] - shift).clamp(0.0, 1.0);
+            }
+
+            // K4 (PREREG_round_estimate_leaf_term.md par.3, Skala par.4
+            // Variante (a), eingetaktet par.6a): Rundenschaetzer-Differenz
+            // `C_est * tanh((E(0) - E(1)) / B_est(Runde))`, reine
+            // Zustandsfunktion, Nullsumme, geklammert -- DIESELBE Stelle im
+            // Blatt-Pfad wie von par.3 verlangt, direkt hinter dem K3-Term.
+            // Bei `C_est == 0` (Default) wird der Block KOMPLETT
+            // uebersprungen: kein Solveraufruf, keine Rundung, bitidentisch
+            // (gleiche Zusage wie bei `envelope_search_c == 0`). In Runde 5
+            // ist der Term 0 (par.3: dort rechnet der exakte Loeser samt
+            // Endwertung, dieselbe Auflage wie beim K3-Profil).
+            let round_est_c = search_config.round_est_c;
+            if round_est_c != 0.0 {
+                let shift = round_estimate_shift_state(
+                    &state,
+                    round_est_c,
+                    &search_config.round_est_b_profile,
                 );
                 today_value[0] = (today_value[0] + shift).clamp(0.0, 1.0);
                 today_value[1] = (today_value[1] - shift).clamp(0.0, 1.0);
@@ -6615,6 +6892,9 @@ mod tests {
             special_row6_w: 0.0,
             dead_cell_w: 0.0,
             out_wild_w: 0.0,
+            round_est_c: 0.0,
+            round_est_b_profile: ROUND_EST_B_PROFILE_DEFAULT,
+            return_order_mode: 0,
         }
     }
 
@@ -6956,6 +7236,165 @@ mod tests {
             assert!(msg.contains(bad), "{msg}");
         }
         std::fs::remove_file(&path).ok();
+    }
+
+    /// K4 (`PREREG_round_estimate_leaf_term.md` par.3/par.6a): `round_est_c`
+    /// und `round_est_b_profile` sind OPTIONALE Spec-Felder -- fehlen sie,
+    /// laedt die Spec mit C = 0 und dem gemessenen Default-Profil (so tragen
+    /// die eingefrorenen Artefakte und die lebenden `models/*.spec.json` sie
+    /// nicht, und der Blatt-Term ueberspringt seinen Zweig). Stehen sie drin,
+    /// kommen sie unveraendert an; negatives C und ein Nenner <= 0 sind
+    /// Fehler, eine falsche Profillaenge auch.
+    #[test]
+    fn search_config_from_spec_file_takes_round_estimate_knobs_as_optional_fields() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_roundest_{}.json", std::process::id()));
+        let spec = |extra: &str| {
+            format!(
+                r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 1, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0{extra}, "heuristik_variante": "hv1"}}"#
+            )
+        };
+        // Beide Felder fehlen: laedt, C = 0 und gemessenes Default-Profil.
+        std::fs::write(&path, spec("")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect("Spec ohne die K4-Felder muss weiter laden");
+        assert_eq!(cfg.round_est_c, 0.0);
+        assert_eq!(cfg.round_est_b_profile, ROUND_EST_B_PROFILE_DEFAULT);
+        // Beide gesetzt: kommen unveraendert an.
+        std::fs::write(
+            &path,
+            spec(", \"round_est_c\": 0.5, \"round_est_b_profile\": [4.0, 9.0, 11.0, 13.0]"),
+        )
+        .unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltige Werte");
+        assert_eq!(cfg.round_est_c, 0.5);
+        assert_eq!(cfg.round_est_b_profile, [4.0, 9.0, 11.0, 13.0]);
+        // Negatives C ist ein Fehler.
+        std::fs::write(&path, spec(", \"round_est_c\": -0.25")).unwrap();
+        let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect_err("negatives C muss scheitern");
+        assert!(msg.contains("round_est_c"), "{msg}");
+        // Nenner 0 und negativer Nenner sind Fehler (tanh-Nenner).
+        for bad in ["[3.0, 8.0, 0.0, 12.0]", "[3.0, -8.0, 10.0, 12.0]"] {
+            std::fs::write(&path, spec(&format!(", \"round_est_b_profile\": {bad}"))).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("Nenner <= 0 muss scheitern");
+            assert!(msg.contains("round_est_b_profile"), "{msg}");
+        }
+        // Falsche Laenge ist ein Fehler (genau vier Zahlen, Runde 1..4).
+        std::fs::write(&path, spec(", \"round_est_b_profile\": [3.0, 8.0, 10.0]")).unwrap();
+        let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect_err("drei Zahlen muessen scheitern");
+        assert!(msg.contains("genau 4 Zahlen"), "{msg}");
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// `PREREG_dome_return_order.md` par.4: `return_order_mode` ist ein
+    /// OPTIONALES Spec-Feld -- fehlt es, laedt die Spec mit Modus 0
+    /// (Ziehreihenfolge, bitidentisch zum Bestand). Steht es drin, kommt es
+    /// unveraendert an; alles ausserhalb 0..2 und jede gebrochene Zahl ist
+    /// ein Fehler.
+    #[test]
+    fn search_config_from_spec_file_takes_return_order_mode_as_optional_field() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_returnorder_{}.json", std::process::id()));
+        let spec = |extra: &str| {
+            format!(
+                r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 1, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0{extra}, "heuristik_variante": "hv1"}}"#
+            )
+        };
+        std::fs::write(&path, spec("")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect("Spec ohne return_order_mode muss weiter laden");
+        assert_eq!(cfg.return_order_mode, 0);
+        for want in [0u8, 1, 2] {
+            std::fs::write(&path, spec(&format!(", \"return_order_mode\": {want}"))).unwrap();
+            let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltiger Modus");
+            assert_eq!(cfg.return_order_mode, want);
+        }
+        for bad in ["3", "-1", "1.5"] {
+            std::fs::write(&path, spec(&format!(", \"return_order_mode\": {bad}"))).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("ungueltiger Modus muss scheitern");
+            assert!(msg.contains("return_order_mode"), "{msg}");
+        }
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// K4 par.3, reine Formel (Muster
+    /// `envelope::search_shift_is_zero_when_off_or_in_round_five_and_bounded_by_c`):
+    /// `C = 0` ergibt exakt 0, Runde 5 ergibt exakt 0, gleiche Schaetzer
+    /// ergeben exakt 0, der Betrag bleibt unter `C`, und der Seitentausch
+    /// dreht genau das Vorzeichen (Nullsumme per Konstruktion).
+    #[test]
+    fn round_estimate_shift_is_zero_when_off_or_in_round_five_and_bounded_by_c() {
+        let p = ROUND_EST_B_PROFILE_DEFAULT;
+        assert_eq!(round_estimate_shift_from(9.0, -3.0, 2, 0.0, &p), 0.0, "C = 0");
+        assert_eq!(round_estimate_shift_from(9.0, -3.0, 5, 1.0, &p), 0.0, "Runde 5");
+        assert_eq!(round_estimate_shift_from(9.0, -3.0, 6, 1.0, &p), 0.0, "jenseits Runde 5");
+        assert_eq!(round_estimate_shift_from(4.0, 4.0, 3, 1.0, &p), 0.0, "E-Differenz 0");
+        let s = round_estimate_shift_from(9.0, -3.0, 3, 0.2, &p);
+        assert!(s > 0.0 && s < 0.2, "{s}");
+        let mirrored = round_estimate_shift_from(-3.0, 9.0, 3, 0.2, &p);
+        assert!((s + mirrored).abs() < 1e-12, "Antisymmetrie beim Seitentausch");
+        // Die Skala ist RUNDENABHAENGIG (par.4: P90 waechst um Faktor 4 ueber
+        // R1-R4) -- dieselbe Punktedifferenz wirkt frueh staerker als spaet.
+        let r1 = round_estimate_shift_from(3.0, 0.0, 1, 1.0, &p);
+        let r4 = round_estimate_shift_from(3.0, 0.0, 4, 1.0, &p);
+        assert!(r1 > r4, "r1={r1} r4={r4}");
+        assert_eq!(
+            round_estimate_shift_from(3.0, 0.0, 0, 1.0, &p),
+            r1,
+            "Runde 0 wird wie Runde 1 gelesen"
+        );
+        // Exakte Formel je Runde, gegen die vier Werte aus par.4 Variante (a).
+        for (round, b) in [(1u32, 3.0), (2, 8.0), (3, 10.0), (4, 12.0)] {
+            let want = 0.5 * (6.0f64 / b).tanh();
+            let got = round_estimate_shift_from(6.0, 0.0, round, 0.5, &p);
+            assert!((got - want).abs() < 1e-12, "Runde {round}: {got} statt {want}");
+        }
+    }
+
+    /// K4 am ZUSTAND: der Schaetzer je Seite ist genau der Rundenanteil aus
+    /// `mcts.rs::player_total` OHNE `scoring_progress` (par.3), mit dem
+    /// Vorzeichen, das `projected_unplaceable_penalty` selbst traegt; bei
+    /// `C = 0` liefert der Zustands-Einstieg exakt 0 (kein Rechenpfad).
+    #[test]
+    fn round_estimate_points_matches_player_total_parts_and_is_off_at_c_zero() {
+        let mut rng = StdRng::seed_from_u64(20260912);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 15, &mut rng) else { continue };
+            assert_eq!(
+                round_estimate_shift_state(&state, 0.0, &ROUND_EST_B_PROFILE_DEFAULT),
+                0.0,
+                "Spiel {gi}: C = 0 muss exakt 0 ergeben"
+            );
+            for pi in 0..2usize {
+                let p = &state.players[pi];
+                let want = f64::from(
+                    crate::tiling_solver::solve_round_final_score(&state, pi) - p.score
+                        + crate::round_end::projected_unplaceable_penalty(p),
+                );
+                assert!(
+                    (round_estimate_points(&state, pi) - want).abs() < 1e-12,
+                    "Spiel {gi}, Seite {pi}: Schaetzer weicht von der par.3-Formel ab"
+                );
+            }
+            // Der Zustands-Einstieg verrechnet genau diese beiden Werte, in
+            // dieser Reihenfolge, mit der Runde aus dem Zustand.
+            let want = round_estimate_shift_from(
+                round_estimate_points(&state, 0),
+                round_estimate_points(&state, 1),
+                state.round_number,
+                0.3,
+                &ROUND_EST_B_PROFILE_DEFAULT,
+            );
+            let got = round_estimate_shift_state(&state, 0.3, &ROUND_EST_B_PROFILE_DEFAULT);
+            assert!((got - want).abs() < 1e-12, "Spiel {gi}: {got} statt {want}");
+            checked += 1;
+        }
+        assert!(checked > 0, "kein Drafting-Zustand erzeugt -- Test darf nicht leer gruen sein");
     }
 
     /// K3: das Profil muss genau fuenf Zahlen haben.

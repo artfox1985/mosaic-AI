@@ -95,6 +95,13 @@ fn main() {
         // Byte-Identitaets-Nachweis (siehe Kommentar oben).
         dead_cell_w: 0.0,
         out_wild_w: 0.0,
+        // K4 (PREREG_round_estimate_leaf_term.md par.3): Rundenschaetzer-Term
+        // aus, aus demselben Grund wie die Zell-Knoepfe darueber.
+        round_est_c: 0.0,
+        round_est_b_profile: mosaic_rust::net_mcts::ROUND_EST_B_PROFILE_DEFAULT,
+        // PREREG_dome_return_order.md par.4: Rueckgabe in Ziehreihenfolge
+        // (Modus 0), aus demselben Grund wie die Knoepfe darueber.
+        return_order_mode: 0,
     };
     let actions = drafting_actions(&state1);
     println!(

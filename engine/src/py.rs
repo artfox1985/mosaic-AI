@@ -274,9 +274,17 @@ impl PyGame {
     /// `return_order`: Reihenfolge, in der die NICHT gewählten gezogenen
     /// Platten zurück unter den Stapel gelegt werden (Regelwerk: "in
     /// beliebiger Reihenfolge") -- tile_ids, erstes Element zuerst
-    /// zurückgelegt. `None`/weggelassen füllt die Ziehreihenfolge (kanonisch,
-    /// wie bei der KI) -- bei ≤1 übriger Platte ohnehin die einzig mögliche
-    /// Reihenfolge, das Frontend fragt den Menschen nur bei 2+ übrigen.
+    /// zurückgelegt. `None`/weggelassen wählt die Reihenfolge wie die KI, nach
+    /// `MOSAIC_RETURN_ORDER_MODE` (`PREREG_dome_return_order.md` par.4):
+    /// Modus 0 (Default) ist die Ziehreihenfolge und damit bit-identisch zum
+    /// Bestand, Modus 1 netzbewertet (nur mit geladenem Netz, sonst Rückfall
+    /// auf die Ziehreihenfolge), Modus 2 die Handregel. Bei ≤1 übriger Platte
+    /// ohnehin die einzig mögliche Reihenfolge, das Frontend fragt den
+    /// Menschen nur bei 2+ übrigen.
+    ///
+    /// Die GUI-Sitzung liest den Knopf aus der UMGEBUNG (kein Spec-Pfad hier),
+    /// wie jeder andere Env-Knopf des Spielbetriebs -- gleiche Begründung wie
+    /// bei `ai_tiling_step` (K3 (d), siehe dortigen Kommentar).
     #[pyo3(signature = (chosen_id, slot_row, slot_col, rotation=0, return_order=None))]
     fn apply_dome_stack_choose(
         &mut self,
@@ -286,15 +294,21 @@ impl PyGame {
         rotation: u32,
         return_order: Option<Vec<usize>>,
     ) -> PyResult<()> {
-        let return_order = return_order.unwrap_or_else(|| {
-            self.game
-                .state
-                .pending_stack_draw
-                .iter()
-                .filter(|t| t.tile_id != chosen_id)
-                .map(|t| t.tile_id)
-                .collect()
-        });
+        let return_order = match return_order {
+            Some(o) => o,
+            None => {
+                let mode = crate::net_mcts::SearchConfig::from_env().return_order_mode;
+                crate::self_play::choose_return_order(
+                    &self.game.state,
+                    chosen_id,
+                    slot_row,
+                    slot_col,
+                    rotation,
+                    mode,
+                    self.net.as_ref(),
+                )
+            }
+        };
         // Bleibt nach aussen atomar -- siehe `apply_dome`-Kommentar.
         let m = DrawFromStackMove { chosen_id, slot_row, slot_col, rotation: 0, return_order };
         let ui = json!({
@@ -921,7 +935,17 @@ impl PyGame {
             self.push_action_id_line(id, ui);
         }
         let mark = self.game.state.log.len();
-        let resolved = match crate::self_play::apply_chosen_action(&mut self.game, a) {
+        // `PREREG_dome_return_order.md` par.4: bei einem Stapelzug waehlt die
+        // Aufloesung die Rueckgabe-Reihenfolge nach `MOSAIC_RETURN_ORDER_MODE`
+        // -- Modus 0 (Default) ist byte-identisch zum Bestand. Knopf aus der
+        // Umgebung, kein Spec-Pfad (wie `ai_tiling_step`, K3 (d)).
+        let return_order_mode = crate::net_mcts::SearchConfig::from_env().return_order_mode;
+        let resolved = match crate::self_play::apply_chosen_action_with(
+            &mut self.game,
+            a,
+            self.net.as_ref(),
+            return_order_mode,
+        ) {
             Ok(resolved) => resolved,
             Err(e) => {
                 // Angekuendigte, aber nie angewandte Aktion wieder entfernen --

@@ -418,3 +418,22 @@ ANNAHME; Stufe 1 hier liefert die Messung).
 ## par.10 Ergebnisse (leer bis zur ersten Messung)
 
 Nichts gefahren, nichts gebaut (Stand 2026-09-11).
+
+## Nachtrag 2026-09-12 (Neuverankerung der Leiter, Segment 2)
+
+Alle Elo-Zahlen in par.2.3, par.2.5 und par.4 stammen aus dem ALT-REGISTER (Segment 1,
+Anker `Heuristik_hv1_anchor`), das am 2026-09-12 nach `archive/elo_history_pre_phantomfix.csv`
+verschoben wurde (`PREREG_code_cleanup_closeout.md` par.7a: Phantom-Fix A2 bewegte den
+Anker, Nutzer-Entscheid "setz den anker neu"). Seither gilt Segment 2 mit dem Anker
+`models/frozen_heuristics/hv1_anchor_v2` (`Heuristik_hv1_anchor_v2@150` = 1000 fix); Kanten
+ueber die Grenze werden nie gemischt. Folgen fuer diese Prereg:
+
+- Die Zeile `hv1_anchor` in par.2.3 bezeichnet den Segment-1-Anker; der Spieler der Stufen
+  bleibt unveraendert `hv2_generator`. **Sein Elo-Knoten 1100 [1053, 1145] ist im Segment 2
+  UNGEMESSEN**; die Stufe-0b-Messung (Identitaet und Kante) laeuft im neuen Segment.
+- Stufe 4 (Meister) zeigt auf `models/champion.txt`; die Zahl 1405 ist Segment 1. Der
+  Segment-2-Stand des Champions kommt mit der Promotion von v28-b02 (Anker-Kante 126:24,
+  Nachbar-Kante gegen v27-b01 laeuft), Stand par.7a der Cleanup-Prereg.
+- Zahlen ab hier nur aus `evaluations/elo_history.csv` (Segment 2) lesen; par.2.5 ist
+  historisch und wird nicht umgeschrieben.
+

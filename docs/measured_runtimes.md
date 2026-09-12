@@ -182,6 +182,9 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Ablation b03: Monolith 2.546 Bloecke / Training 3,88 M Zustaende / Tor 1 (80 + 35 Paare) | 7 min / 4.322 s / 1.994 s + 868 s | Nebenlast: Claude-Partien der Parallelsitzung |
 | Ablation b04: Monolith 2.403 Bloecke / Training 3,60 M Zustaende / Tor 1 (60 + 115 Paare) | 6 min / 4.511 s / 1.581 s + 2.922 s | dito |
 | Code-Abschluss Stufe 1: Tests (585) / Paritaets-Fixture / Wheel / Drift | 80 s / 14 s / 26 s / 17 s | – |
+| Anker-Kante Segment 2 (hv1_anchor_v2, `frozen_referee_match.py`, n=150, 6 Worker), 3 Kanten | **1.441 / 1.491 / 1.489 s** | 9,6-9,9 s je Partie; Artefakte `anchor_v2_arena_<name>.json` |
+| Nachbar-Kante Segment 2 v28-b02 gegen v27-b01 (paired_gating, 10 Threads, Logs), SPRT nach 115 Paaren | **3.243 s** | 14,1 s je Partie |
+| Knopf-Bau 2026-09-12: Lib-Tests (601) / no-run / Wheel+pip / Drift / Konservierung / Sonden-Rauchtest | 84 s / 33 s / 34 s / 19 s / 12 s / 18,7 s | `tools/night_v28_knob_build.sh` |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 

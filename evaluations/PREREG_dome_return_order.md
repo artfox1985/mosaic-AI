@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge, in der nicht gewaehlte Kuppelplatten unter den Stapel zurueckgehen, ist ein legaler Zug, der steuert, wann welche Platte wiederkommt -- das Netz legt heute immer in Ziehreihenfolge zurueck. Wird die Wahl gebaut, in welcher Form, und traegt sie? | Beleg: nichts gebaut. Bestand par.2 (self_play.rs:675-684, game.rs:413-423: kanonische Ziehreihenfolge, keine Policy-Dimension). Vorschlag par.4: netzbewertete Rueckgabe als Such-Knopf (Default 0 bitidentisch), A/B ueber den Referee (par.5). Nutzer 2026-09-12: Vollstaendigkeitsfrage, nicht Geschmacksfrage. -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge, in der nicht gewaehlte Kuppelplatten unter den Stapel zurueckgehen, ist ein legaler Zug, der steuert, wann welche Platte wiederkommt -- das Netz legt heute immer in Ziehreihenfolge zurueck. Wird die Wahl gebaut, in welcher Form, und traegt sie? | Beleg: GEBAUT und im Wheel seit 2026-09-12 (par.8a; Modus 0 = Default bitidentisch: 601 Tests, Paritaets-Fixture unveraendert, Anker-Drift gruen), A/B Modus 1 gegen 0 UNGEMESSEN. Bestand par.2 (self_play.rs:675-684, game.rs:413-423: kanonische Ziehreihenfolge, keine Policy-Dimension). Vorschlag par.4: netzbewertete Rueckgabe als Such-Knopf (Default 0 bitidentisch), A/B ueber den Referee (par.5). Nutzer 2026-09-12: Vollstaendigkeitsfrage, nicht Geschmacksfrage. -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -104,7 +104,7 @@ Peek-Bewertung). Wird Modus 1 Default (Nutzer-Entscheid), gilt er fuer die v29-E
 
 Nichts gebaut (Stand 2026-09-12, 02:00).
 
-## par.8a BAUSTAND 2026-09-12 (Code geschrieben, noch nicht kompiliert)
+## par.8a BAUSTAND 2026-09-12 (gebaut, im Wheel seit 03:47)
 
 Knopf `return_order_mode` (Spec optional, Env `MOSAIC_RETURN_ORDER_MODE`, 0/1/2) nach par.4 gebaut:
 `self_play.rs` (`order_permutations`, `return_order_candidates`, `choose_return_order`,
@@ -128,3 +128,5 @@ legt per `push` in Reihenfolge zurueck, der Block liegt unten und `[0]` kommt zu
    (`MIRROR_OTHER_VAL = false`, `net_mcts.rs:1117`). Kosten je Kandidat: ein `eval_pair`-Batch,
    nicht ein Pass.
 Kompilierung, Fixture, Drift und die Messung par.5 folgen nach der Promotion von v28-b02.
+
+**Kompiliert und im Wheel (Nachtrag 03:50):** Bau-Tor 2026-09-12, 03:44-03:48 (`tools/night_v28_knob_build.sh`, Artefakte `anchor_drift_live_wheel_20260912_knobs.json` / `anchor_conservation_artifact_wheel_20260912_knobs.json`): `cargo test --release --lib` 601 gruen (84 s; darunter Kontrakt-Hash-Literal 39648b95bbba1acf und die Netz-Paritaets-Fixture des Champions UNVERAENDERT), Beispiele/Benches kompilieren, Wheel gebaut und installiert (Kontrakt 39648b95bbba1acf, INPUT_SIZE 755), Anker-Drift gegen hv1_anchor_v2 GRUEN und Konservierung GRUEN, Konventions-Check gruen. Zwei Nachbesserungen beim Bau: `#![recursion_limit = "256"]` in lib.rs (das `json!`-Literal von `engine_config_json` riss das Makro-Limit) und die Lesestelle der Startslot-Knoepfe als zwei Literal-Aufrufe (Registratur-Scanner). Alle neuen Knoepfe stehen damit auf Default im Wheel, das die Promotion v28-b02 einfriert.

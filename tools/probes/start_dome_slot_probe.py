@@ -93,6 +93,23 @@ from column_build_structural_probe import (  # noqa: E402
     reconstruct_game,
     struktur_kennzahlen,
 )
+from analyze_game_log import PATTERNS, ROUND_PREFIX  # noqa: E402
+
+
+def realised_start_slot(log: list[str], name: str) -> int | None:
+    """Slot-Index (row*3+col) der Startkuppel von Spieler `name` aus der
+    START_TILE-Logzeile; None, wenn keine gefunden. Dient als KONTROLLE, dass
+    der erzwungene Slot wirklich gelegt wurde (sonst waere die Messung eine
+    Messung des Bestands unter falschem Etikett)."""
+    for raw_line in log or []:
+        if raw_line.startswith("#"):
+            continue
+        m = ROUND_PREFIX.match(raw_line)
+        text = m.group(2) if m else raw_line
+        mm = PATTERNS["START_TILE"].match(text)
+        if mm and mm.group("name") == name:
+            return int(mm.group("row")) * 3 + int(mm.group("col"))
+    return None
 
 OUT_DEFAULT = ROOT / "evaluations" / "artifacts" / "start_dome_slot_probe.json"
 
@@ -166,6 +183,7 @@ def game_metrics(game: dict) -> dict | None:
     out["_reihenfuellstand"] = rfill
     out["_plattenpunkte"] = final_scoring_criteria_per_player(log).get(NAME_SELF, {})
     out["_game_seed"] = game.get("game_seed")
+    out["_start_slot"] = realised_start_slot(log, NAME_SELF)
     return out
 
 
@@ -279,12 +297,18 @@ def main() -> int:
             rsum = [0.0] * 6
             csum = [0.0] * 6
             n_ok = 0
+            slot_hits = 0
+            slot_misses: Counter = Counter()
             for g in games:
                 m = game_metrics(g)
                 if m is None:
                     fehlende_logs += 1
                     continue
                 n_ok += 1
+                if m["_start_slot"] == slot:
+                    slot_hits += 1
+                else:
+                    slot_misses[str(m["_start_slot"])] += 1
                 for key in METRICS:
                     values[key].append(m[key])
                 for k, v in m["_plattenpunkte"].items():
@@ -307,7 +331,20 @@ def main() -> int:
                 "plattenpunkte_je_kriterium": {
                     k: round(v / teiler, 3) for k, v in sorted(krit.items())
                 },
+                # Kontrolle: wurde der erzwungene Slot wirklich gelegt?
+                # Abweichungen = Partien, in denen die Startkuppel von Spieler 0
+                # laut START_TILE-Logzeile woanders liegt (Slot belegt -> Rueckfall
+                # auf den Bestand, self_play.rs::choose_start_placement_with_slot).
+                "slot_kontrolle": {
+                    "erzwungen": slot,
+                    "treffer": slot_hits,
+                    "abweichungen": n_ok - slot_hits,
+                    "abweichungen_nach_slot": dict(slot_misses),
+                },
             }
+            if n_ok - slot_hits:
+                print(f"  [slot {slot}] WARNUNG: {n_ok - slot_hits} von {n_ok} Partien liegen "
+                      f"NICHT im erzwungenen Slot ({dict(slot_misses)})", flush=True)
             margin_mean = je_slot[str(slot)]["kennzahlen"]["margin"]["mittel"]
             points_mean = je_slot[str(slot)]["kennzahlen"]["punkte"]["mittel"]
             print(f"  [slot {slot}] n={n_ok}  points_mean={points_mean}  margin={margin_mean}  "
