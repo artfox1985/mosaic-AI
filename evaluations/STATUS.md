@@ -272,6 +272,10 @@ Index: `PREREG_INDEX.md` (generiert).
    par.9c): ENTSCHIEDEN 13:15 (Nutzer: "bau den such-start dann vor v29"): Bau rund ein Tag
    (net_mcts, Spielpfade, Self-Play, Referee-Worker), Knopf MOSAIC_START_BY_SEARCH Default 0,
    A/B am Champion hinter der Leiter; v29-Erzeugung danach mit Such-Start UND Streuung.
+   **A/B GEMESSEN 18:03** (par.9e): Suche legt zu 93 % auf (2,0), Siege 91:99 (SPRT H0 nach 95
+   Paaren), Punkte gleich, Eckplatten +1,85 / Aussenfelder +0,83 gegen vertikale Reihen -0,82:
+   gleichwertig, andere Praeferenz als die Heuristik. Werkzeug-Aufgabe: Replayer der
+   Spaltensonde kann Such-Start-Partien nicht nachspielen (Startsetzung aus dem Log lesen).
    **GESCHRIEBEN 13:20 (Agent), UNKOMPILIERT** (`PREREG_start_dome_choice.md` par.9d): Suche
    `net_mcts.rs::search_start_placement` (Gumbel-Wurzel ueber die Startkandidaten, ein
    Vorwaertspass fuer Priors plus sims Simulationen), umgeschaltet in allen Netz-Spielpfaden
