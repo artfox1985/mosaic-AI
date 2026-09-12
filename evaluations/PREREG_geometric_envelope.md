@@ -2495,3 +2495,17 @@ Rezeptbestandteil und bleibt es; keine weiteren Arme aus dieser Prereg.** Die Fr
 ("entlastet den Value-Kopf") ist auf den Arena-Groessen mit JA beantwortet; als Zustandsgroesse
 bleibt sie unbeantwortet, und das steht hier.
 
+**Nachtrag 2026-09-12, 11:45 (Nutzer: "takte 1 und 2 nach der hv2-Gegenprobe ein. dann haben
+wir es wirklich sauber durch"):** K3-D und die Jokerfeld-Regel bekommen doch eine Messung am
+Spieler, damit "Knopf ohne Arm" nicht der Endzustand bleibt. `tools/night_k3d_joker_instrument.sh`
+(Stufe H von `tools/night_v28_tail.sh`, exklusiv nach der hv2-Gegenprobe): v28-b02 am
+argmax-Instrument wie C2 (200 Partien @400, Seed 20260931, deterministisch, ohne Wurzelrauschen),
+je Knopf ein Lauf mit `out_wild_on.spec.json` bzw. `k3d_on.spec.json` gegen den vorhandenen
+Bezug `c2_v28b02_on.json` (Champion-Spec, gleicher Seed). Zielgroessen, vorab: Jokerfeld ->
+Punkte des Kriteriums "Mehrfarbige Felder" (k3, `scoring.rs` id 3; im Bezug 4,90 Punkte bei 79
+aktiven Partien) mit vollen Spalten als Waechter; K3-D -> volle Spalten (Bezug 0,895 +-0,075)
+und Teilspalten >= 3 (Bezug 3,3). Lesart: bewegt ein Knopf seine Zielgroesse ueber die Lauf-KI
+ohne die Spalten zu kosten, bekommt er eine gepaarte Arena als eigene Spec-Nummer (200 Paare);
+sonst bleibt er Knopf ohne Rezeptwirkung, und par.13 gilt unveraendert. Kosten je Lauf rund
+35 min (C2-Laufzeit).
+
