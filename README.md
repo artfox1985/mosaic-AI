@@ -23,8 +23,8 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1296** (95% CI [1242, 1354])
-from 930 rated games on the **second ladder segment**, anchored at the frozen
+Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1299** (95% CI [1244, 1359])
+from 1,330 rated games on the **second ladder segment**, anchored at the frozen
 heuristic artifact `models/frozen_heuristics/hv1_anchor_v2` (Heuristic@150 =
 1000, `tools/elo_tracker.py report`). The ladder was re-anchored on 2026-09-12:
 a correctness fix in the hull evaluation (phantom tiles, cleanup finding A2)
@@ -35,9 +35,10 @@ boundary; the same happened once before on 2026-08-21 with the round-5 solver
 fix (`archive/elo_history_pre_r5fix.csv`). The anchor carries its own wheel:
 an engine change can no longer move the fixed point of the ladder, and every
 engine change is checked move by move against it (drift check,
-`/mosaic-anchor-invariance`). On the new segment `v27-b01` sits at 1264 and
-`v26-b01` at 1171; `v28-b02` beat `v27-b01` 133:97 (SPRT) and 212:188 (to the
-cap, not significant), a third seed without early stopping is pending. The
+`/mosaic-anchor-invariance`). On the new segment `v27-b01` sits at 1262 and
+`v26-b01` at 1173; `v28-b02` beat `v27-b01` 133:97 (SPRT), 212:188 (to the
+cap, not significant) and 226:174 (third seed to the cap without early
+stopping, p 0.017), so the edge holds. The
 value head predicts a win *probability* (WDL); display probabilities are
 Platt-calibrated per champion.
 

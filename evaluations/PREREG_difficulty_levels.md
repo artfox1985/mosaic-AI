@@ -431,9 +431,10 @@ ueber die Grenze werden nie gemischt. Folgen fuer diese Prereg:
 - Die Zeile `hv1_anchor` in par.2.3 bezeichnet den Segment-1-Anker; der Spieler der Stufen
   bleibt unveraendert `hv2_generator`. **Sein Elo-Knoten 1100 [1053, 1145] ist im Segment 2
   UNGEMESSEN**; die Stufe-0b-Messung (Identitaet und Kante) laeuft im neuen Segment.
-- Stufe 4 (Meister) zeigt auf `models/champion.txt`; die Zahl 1405 ist Segment 1. Der
-  Segment-2-Stand des Champions kommt mit der Promotion von v28-b02 (Anker-Kante 126:24,
-  Nachbar-Kante gegen v27-b01 laeuft), Stand par.7a der Cleanup-Prereg.
+- Stufe 4 (Meister) zeigt auf `models/champion.txt`; die Zahl 1405 ist Segment 1. Seit der
+  Promotion 2026-09-12 ist der Champion v28-b02 mit Segment-2-Elo 1299 [1244, 1359] aus 1.330
+  Partien (Anker 126:24, drei Nachbar-Seeds gegen v27-b01, Champion-2 101:49; par.7a der
+  Cleanup-Prereg). Stufe 1 (hv2@150) bleibt im Segment 2 ungemessen, bis Stufe 0b laeuft.
 - Zahlen ab hier nur aus `evaluations/elo_history.csv` (Segment 2) lesen; par.2.5 ist
   historisch und wird nicht umgeschrieben.
 
