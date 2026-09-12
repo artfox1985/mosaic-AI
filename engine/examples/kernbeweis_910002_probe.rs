@@ -102,6 +102,7 @@ fn main() {
         // PREREG_dome_return_order.md par.4: Rueckgabe in Ziehreihenfolge
         // (Modus 0), aus demselben Grund wie die Knoepfe darueber.
         return_order_mode: 0,
+        start_by_search: 0,
     };
     let actions = drafting_actions(&state1);
     println!(

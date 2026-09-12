@@ -5857,7 +5857,7 @@ fn mean_rollout_diff<R: Rng + ?Sized>(
             match g.state.phase {
                 Phase::StartPlacement | Phase::Drafting => {
                     if g.state.players.iter().any(|p| p.start_tile_pending) {
-                        if start_placement_step(&mut g, rng).is_none() {
+                        if start_placement_step(&mut g, rng, None).is_none() {
                             break;
                         }
                     } else if g.state.phase == Phase::Drafting {
@@ -6678,7 +6678,7 @@ pub fn value_noise_floor_diagnostic(
                     match g2.state.phase {
                         Phase::StartPlacement | Phase::Drafting => {
                             if g2.state.players.iter().any(|p| p.start_tile_pending) {
-                                if start_placement_step(&mut g2, &mut rng).is_none() {
+                                if start_placement_step(&mut g2, &mut rng, None).is_none() {
                                     break;
                                 }
                             } else if g2.state.phase == Phase::Drafting {
@@ -6854,7 +6854,7 @@ pub(crate) mod tests {
                 match game.state.phase {
                     Phase::StartPlacement | Phase::Drafting => {
                         if game.state.players.iter().any(|p| p.start_tile_pending) {
-                            if start_placement_step(&mut game, &mut rng).is_none() {
+                            if start_placement_step(&mut game, &mut rng, None).is_none() {
                                 break;
                             }
                         } else if game.state.phase == Phase::Drafting {
@@ -6932,7 +6932,7 @@ pub(crate) mod tests {
         // Bis zum Start von Runde 1 (Startkacheln legen), damit wir eine
         // echte fruehe Runde-1-Drafting-Entscheidung als Ausgangspunkt haben.
         while base.state.players.iter().any(|p| p.start_tile_pending) {
-            if start_placement_step(&mut base, &mut base_rng).is_none() {
+            if start_placement_step(&mut base, &mut base_rng, None).is_none() {
                 break;
             }
         }
@@ -6957,7 +6957,7 @@ pub(crate) mod tests {
                 match g.state.phase {
                     Phase::StartPlacement | Phase::Drafting => {
                         if g.state.players.iter().any(|p| p.start_tile_pending) {
-                            if start_placement_step(&mut g, &mut rng).is_none() {
+                            if start_placement_step(&mut g, &mut rng, None).is_none() {
                                 break;
                             }
                         } else if g.state.phase == Phase::Drafting {
@@ -8699,7 +8699,7 @@ pub(crate) mod tests {
                 match game.state.phase {
                     Phase::StartPlacement | Phase::Drafting => {
                         if game.state.players.iter().any(|p| p.start_tile_pending) {
-                            if start_placement_step(&mut game, &mut rng).is_none() {
+                            if start_placement_step(&mut game, &mut rng, None).is_none() {
                                 break;
                             }
                         } else if game.state.phase == Phase::Drafting {
@@ -8763,7 +8763,7 @@ pub(crate) mod tests {
                 match game.state.phase {
                     Phase::StartPlacement | Phase::Drafting => {
                         if game.state.players.iter().any(|p| p.start_tile_pending) {
-                            if start_placement_step(&mut game, &mut rng).is_none() {
+                            if start_placement_step(&mut game, &mut rng, None).is_none() {
                                 break;
                             }
                         } else if game.state.phase == Phase::Drafting {
