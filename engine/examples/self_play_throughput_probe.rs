@@ -200,7 +200,7 @@ fn play_one(
     let gid = format!("{prefix}_g{}", i + 1);
     play_one_game(
         base_sims, c, ids, names, first, &gid, &mut rng, Some(net), record_rtv, None,
-        partie_seed,
+        mosaic_rust::mcts::HeuristicVariant::Hv1, partie_seed,
     )
 }
 

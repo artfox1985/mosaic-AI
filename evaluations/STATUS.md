@@ -251,9 +251,13 @@ Index: `PREREG_INDEX.md` (generiert).
    v30-Champion). v29 traegt das Begleitprogramm, v30 nur Rezept-Knoepfe; danach Leiter-Endfassung,
    Code-Abschluss Stufen 2/3, Abschlussbericht (`PREREG_v29_window.md` par.8 Punkt 3).
 
-00d. **hv3 (hv2 + Phantom-Fix) als Leiter-Knoten** (Nutzer 17:30): Port des hv2-Codes aus
-   65b48af^ auf den heutigen Motor laeuft (Agent, nur Code); danach Kompilat, Einfrieren
-   (`freeze_heuristic.py`), Kanten gegen Anker/hv2/v21. Dazu v22-b05 (live, k3v_off) als Sprosse
+00d. **hv3 (hv2 + Phantom-Fix) als Leiter-Knoten** (Nutzer 17:30): Port GESCHRIEBEN 18:00 (Agent;
+   `heuristic_v3.rs`, `plate_builder_v3.rs`, Variante durch Suche/Self-Play/Referee, hv1 per
+   Delegation bitidentisch; A2 wirkt in hv3 an zwei Routing-Stellen ueber `remaining_colors`),
+   UNKOMPILIERT. Dazu der Aktions-ID-Waechter (Nutzer: Punkt 1): `action_to_id` kennt jeden Typ,
+   unbekannter Typ ist ein harter Fehler, `dome` bildet auf die Slot-IDs ab, Python-Spiegel plus
+   Test. Beides faehrt seine Tore in `tools/night_hv3_freeze_edges.sh` (tail9, nach tail8):
+   Kompilat, Fixture, Anker-Drift, Einfrieren `hv3_generator`, Kanten gegen hv4-Anker und hv2. Dazu v22-b05 (live, k3v_off) als Sprosse
    in der Luecke 1000-1157 (`tools/night_ladder_v22_edges.sh`, nach dem Such-Start-A/B).
 
 00a. **Startkuppel-Streuung in der v29-Erzeugung** (Nutzer 12:45: das Netz soll abweichende

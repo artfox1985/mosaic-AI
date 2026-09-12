@@ -661,11 +661,57 @@ def state_to_planes_python(data) -> torch.Tensor:
 
 MAX_PENDING_STACK_TILES = 4  # muss zu features.rs::MAX_PENDING_STACK_TILES passen
 
+# Sentinel-ID fuer einen Aktionstyp ohne eigenen Zweig -- muss zu
+# `features.rs::UNKNOWN_ACTION_ID` passen. Bewusst NICHT 405
+# (`dome_stack_peek`): siehe Kommentar dort. Wird von `action_to_id` NICHT
+# zurueckgegeben (der unbekannte Typ ist hier ein harter Fehler), sondern nur
+# von Werkzeugen gebraucht, die den Wert kennen muessen.
+UNKNOWN_ACTION_ID = 2
+
+# Alle Aktionstypen, die die Engine im agent_env-Schema erzeugt -- Spiegel von
+# `features.rs::KNOWN_ACTION_TYPES`, gleiche Reihenfolge. Der Test
+# `tools/tests/test_action_id_mirror.py` haelt beide Tabellen gegeneinander.
+KNOWN_ACTION_TYPES = (
+    "pass",
+    "end_tiling",
+    "stone",
+    "tiling",
+    "dome",
+    "choose_dome_slot",
+    "choose_draw_stack_slot",
+    "choose_dome_rotation",
+    "use_chips",
+    "bonus_chip",
+    "dome_stack_peek",
+)
+
+
+class UnknownActionTypeError(ValueError):
+    """Ein Aktionstyp ohne Zweig in `action_to_id` -- siehe dortige Doku."""
+
+
 def action_to_id(action: dict) -> int:
     """Python-Mirror von `features.rs::action_to_id` -- MUSS bei jeder Änderung
     dort synchron gehalten werden (kein automatischer Abgleich, siehe Vorfall
     2026-07-19: `dome`/`dome_stack` kollabierten Slot+Rotation NICHT mehr in
-    die ID, der Python-Mirror war noch auf dem alten 108/36-ID-Schema)."""
+    die ID, der Python-Mirror war noch auf dem alten 108/36-ID-Schema).
+
+    WAECHTER (2026-09-12): ein unbekannter Typ ist ein harter Fehler
+    (`UnknownActionTypeError`), KEIN stiller Rückfall auf 405 mehr. Der alte
+    Rückfall legte jeden unbekannten Typ auf die ID von `dome_stack_peek` --
+    eine echte Aktion, deren Policy-Ziel dadurch fremde Masse bekam. Genau das
+    ist mit `"dome"` (Startsetzung) wochenlang passiert und von keiner Arena
+    zu sehen gewesen: der Defekt ist symmetrisch (beide Seiten lesen dieselbe
+    Tabelle) und Start-Records tragen im Training Policy-Gewicht 0.
+
+    WARUM HIER HART (anders als im Rust-Release-Pfad, der einmalig warnt): der
+    einzige Aufrufer ist `corpus_dataset.py` (Zeilen 1125/1314/1326/1332),
+    also der Datensatz-BAU vor dem Training -- ein Abbruch dort kostet
+    Sekunden und keine laufende Partie, während ein stiller Fehler ein
+    komplettes Trainingsziel verdirbt. Trifft es einen Alt-Korpus mit einem
+    Typ aus einem früheren Aktionsschema, ist das die richtige Meldung: dessen
+    Policy-Ziele wären sonst still falsch.
+    """
     t = action.get("type", "")
     if t == "pass":       return 0
     if t == "end_tiling": return 1
@@ -685,10 +731,21 @@ def action_to_id(action: dict) -> int:
         sc = action.get("slot_col", 0)
         return 274 + (pr * 9) + (sr * 3) + sc      # 274–327
 
-    if t == "choose_dome_slot":
+    if t in ("dome", "choose_dome_slot"):
         # Baustein B: Kachel (Auslage-Index 0-2) + Slot ZUSAMMEN, Rotation ist
         # eine separate Stufe-2-Aktion (choose_dome_rotation) -- ersetzt das
         # frühere kollabierte "dome"-Schema (dome_slot_head/dome_rotation_head).
+        #
+        # "dome" = Startsetzung der Kuppelplatte (self_play.rs:1480/1533,
+        # Record-Feld `is_start: true`): dieselbe Entscheidung, nur eine
+        # historisch andere Record-Form -- deshalb dieselbe ID-Bildung. Die
+        # vier Rotationen derselben (Platte, Slot) fallen dabei zusammen und
+        # ihre Masse addiert sich (`t_policy[id] += prob`, corpus_dataset.py);
+        # das ist gewollt, siehe docs/architecture_reference.md, Abschnitt "Wo
+        # der Code Information ABSICHTLICH vernichtet". Das Training führt
+        # diese Records mit Policy-Gewicht 0, solange sie kein `start_by_search`
+        # tragen (corpus_dataset.py) -- genau dieses Gewicht 0 hat den früheren
+        # Rückfall auf 405 wochenlang unsichtbar gemacht.
         d_idx = action.get("display_index", 0)
         sr = action.get("slot_row", 0)
         sc = action.get("slot_col", 0)
@@ -717,7 +774,15 @@ def action_to_id(action: dict) -> int:
     if t == "dome_stack_peek":
         return 405
 
-    return 405  # Fallback
+    # Kein stiller Rückfall mehr (früher `return 405`, also die ID von
+    # `dome_stack_peek`): jeder von der Engine erzeugte Typ hat oben einen
+    # Zweig, alles andere ist ein Defekt.
+    raise UnknownActionTypeError(
+        f"action_to_id: Aktionstyp {t!r} hat keinen Zweig. Bekannt sind "
+        f"{list(KNOWN_ACTION_TYPES)}. Ein stiller Rückfall auf eine fremde ID "
+        "(früher 405 = dome_stack_peek) verdirbt Policy-Ziel und Maske, ohne "
+        "dass eine Arena es sehen könnte -- siehe features.rs::action_to_id."
+    )
 
 # --- 2. DATENSATZ & NETZWERK ---
 

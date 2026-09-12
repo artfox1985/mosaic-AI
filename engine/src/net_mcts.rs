@@ -674,6 +674,19 @@ pub struct SearchConfig {
     /// Spec-Feld je Seite (`start_by_search`, OPTIONAL mit Default 0),
     /// Env-Default `MOSAIC_START_BY_SEARCH`.
     pub start_by_search: u8,
+    /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
+    /// Spec-Pflichtfeld `heuristik_variante`.
+    ///
+    /// Gelesen wird sie ausschliesslich auf den HEURISTIK-Pfaden des Referees
+    /// (`referee.rs::choose_heuristic_drafting_action_json`/
+    /// `choose_tiling_step_json`/`choose_start_placement_json`) -- die
+    /// Netz-Suche hat keine Heuristik-Bewertung. Das ist der ganze Punkt der
+    /// Kapselung: am 2026-08-26 hat ein vom Aufrufer vergessenes
+    /// `--heuristik-variante` einen falschen Befund erzeugt; ein Artefakt, das
+    /// sich selbst beschreibt, kann so nicht mehr falsch gespielt werden.
+    ///
+    /// Default (`from_env`, `search_config_off`) ist `Hv1` -- der Elo-Anker.
+    pub heuristic_variant: crate::mcts::HeuristicVariant,
 }
 
 impl SearchConfig {
@@ -720,6 +733,10 @@ impl SearchConfig {
             round_est_b_profile: read_round_est_b_profile_env(),
             return_order_mode: read_return_order_mode_env(),
             start_by_search: read_start_by_search_env(),
+            // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
+            // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
+            // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
+            heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
         }
     }
 
@@ -990,22 +1007,23 @@ impl SearchConfig {
             }
             out
         };
-        // Das Feld bleibt PFLICHT, obwohl es seit 2026-08-26 nur noch einen
-        // gueltigen Wert hat: die Specs der eingefrorenen Artefakte tragen es,
-        // und ein weggelassenes Pflichtfeld waere ein stiller Vertragsbruch.
+        // Das Feld ist PFLICHT: die Specs der eingefrorenen Artefakte tragen
+        // es, und ein weggelassenes Pflichtfeld waere ein stiller
+        // Vertragsbruch.
         //
-        // Der zweite Zweig ist aus dem Quellstand entfernt (B4a). Eine
-        // hv2-Spec wird deshalb ABGEWIESEN und nicht still als hv1 gefahren --
-        // sonst laege genau der Fehler vor, gegen den die Kapselung gebaut
-        // ist: ein Agent, der etwas anderes spielt, als seine Spec sagt. Das
-        // Artefakt bleibt auf seinem MITGELIEFERTEN Wheel lauffaehig.
+        // Gueltig sind `hv1` (Elo-Anker) und -- seit dem hv3-Port 2026-09-12
+        // -- `hv3`: das hv2-Rezept auf dem HEUTIGEN Motor, samt Phantom-Abzug
+        // A2. `hv2` selbst bleibt ABGEWIESEN und wird NICHT still als hv1
+        // gefahren: sonst laege genau der Fehler vor, gegen den die Kapselung
+        // gebaut ist -- ein Agent, der etwas anderes spielt, als seine Spec
+        // sagt. Das hv2-Artefakt bleibt auf seinem MITGELIEFERTEN Wheel
+        // lauffaehig und ist damit weiter die einzige hv2-Quelle.
         //
-        // UMBENENNUNG 2026-08-28: gueltig ist NUR noch `hv1`. Die Alt-Namen
-        // (`v1`, `v2huelle`) sind hier bewusst KEIN Sonderfall -- die Specs
-        // der Artefakte tragen den neuen Namen, und wo ein altes Wheel den
-        // Alt-Namen braucht, uebersetzt der Treiber an der Prozessgrenze
-        // (tools/frozen_name_dialect.py). Eine zweite Akzeptanz hier waere
-        // eine zweite Wahrheit.
+        // UMBENENNUNG 2026-08-28: die Alt-Namen (`v1`, `v2huelle`) sind hier
+        // bewusst KEIN Sonderfall -- die Specs der Artefakte tragen den neuen
+        // Namen, und wo ein altes Wheel den Alt-Namen braucht, uebersetzt der
+        // Treiber an der Prozessgrenze (tools/frozen_name_dialect.py). Eine
+        // zweite Akzeptanz hier waere eine zweite Wahrheit.
         let variant_name = obj
             .get("heuristik_variante")
             .ok_or_else(|| format!("Spec-Datei {path}: Feld 'heuristik_variante' fehlt"))?
@@ -1013,21 +1031,24 @@ impl SearchConfig {
             .ok_or_else(|| {
                 format!("Spec-Datei {path}: 'heuristik_variante' ist keine Zeichenkette")
             })?;
-        if variant_name != "hv1" {
+        let Some(heuristic_variant) = crate::mcts::HeuristicVariant::from_name(variant_name) else {
             let hint = match variant_name {
                 "v1" => " Das ist der Name VOR der Umbenennung am 2026-08-28; er heisst \
                          jetzt 'hv1'.",
                 "v2huelle" => " Das ist der Name VOR der Umbenennung am 2026-08-28; er \
                                heisst jetzt 'hv2'.",
+                "hv2" => " hv2 wurde am 2026-08-26 aus dem Quellstand entfernt \
+                          (PREREG_heuristic_v2_long_rows.md par.19). Das Artefakt \
+                          models/frozen_heuristics/hv2_generator laeuft weiter auf seinem \
+                          mitgelieferten Wheel; auf dem HEUTIGEN Motor heisst dasselbe \
+                          Rezept 'hv3' (mit Phantom-Abzug A2, also NICHT zugbgleich).",
                 _ => "",
             };
             return Err(format!(
                 "Spec-Datei {path}: heuristik_variante '{variant_name}' ist in diesem Build \
-                 nicht mehr spielbar -- nur 'hv1'.{hint} Der zweite Zweig wurde am 2026-08-26 \
-                 entfernt (PREREG_heuristic_v2_long_rows.md par.19). Das Artefakt laeuft \
-                 weiter auf seinem mitgelieferten Wheel."
+                 nicht spielbar -- erlaubt: 'hv1', 'hv3'.{hint}"
             ));
-        }
+        };
         Ok(Self {
             implicit_minimax_alpha,
             long_row_init_shaping_w,
@@ -1048,6 +1069,7 @@ impl SearchConfig {
             round_est_b_profile,
             return_order_mode,
             start_by_search,
+            heuristic_variant,
         })
     }
 }
@@ -5951,14 +5973,14 @@ impl StartPlacementSearch {
 /// Familie wie `choose_dome_slot` (`features.rs::action_to_id`: 328..354 =
 /// 3 Auslageplaetze x 9 Slots).
 ///
-/// WARUM NICHT der Record-Schluessel `"type": "dome"` (geprueft 2026-09-12 an
-/// `features.rs::action_to_id` UND am Python-Spiegel
-/// `engine/py/neural_net.py::action_to_id`): `"dome"` trifft dort KEINEN
-/// Zweig und faellt auf den Fallback `405` -- alle bis zu 108 Startkandidaten
-/// haetten dieselbe ID. Der Policy-Kopf koennte sie damit weder als Prior
-/// trennen noch als Ziel lernen (und `405` ist ausserdem die ID von
-/// `dome_stack_peek`, das Ziel liefe also auf eine ganz andere Aktion).
-/// Deshalb die zweistufige Kuppel-Kodierung, die der Kopf ohnehin kennt.
+/// WARUM NICHT der Record-Schluessel `"type": "dome"`: bis zum 2026-09-12 traf
+/// `"dome"` in `features.rs::action_to_id` (und im Python-Spiegel
+/// `engine/py/neural_net.py::action_to_id`) KEINEN Zweig und fiel auf den
+/// Fallback `405` -- alle bis zu 108 Startkandidaten haetten dieselbe ID
+/// bekommen, und `405` ist ausserdem die ID von `dome_stack_peek`. Seit dem
+/// Waechter vom 2026-09-12 hat `"dome"` einen expliziten Zweig mit GENAU
+/// dieser ID-Bildung; die zweistufige Kuppel-Kodierung bleibt trotzdem die
+/// Form des Such-Records, weil der Policy-Kopf sie ohnehin kennt.
 ///
 /// Der Paritaetstest gegen `action_to_id` steht im Testmodul
 /// (`start_action_ids_match_action_to_id`).
@@ -7457,6 +7479,7 @@ mod tests {
             round_est_b_profile: ROUND_EST_B_PROFILE_DEFAULT,
             return_order_mode: 0,
             start_by_search: 0,
+            heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
         }
     }
 
@@ -7571,9 +7594,27 @@ mod tests {
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "eine hv2-Spec darf in diesem Build NICHT still als hv1 laufen");
         let msg = result.unwrap_err();
-        assert!(msg.contains("nicht mehr spielbar"), "Fehlermeldung muss den Grund nennen: {msg}");
+        assert!(msg.contains("nicht spielbar"), "Fehlermeldung muss den Grund nennen: {msg}");
         assert!(msg.contains("mitgelieferten Wheel"), "Fehlermeldung muss den Ausweg nennen: {msg}");
+        assert!(msg.contains("hv3"), "Fehlermeldung muss auf den heutigen Nachbau zeigen: {msg}");
         std::fs::remove_file(&path).ok();
+    }
+
+    /// Gegenprobe zur Abweisung oben: `hv3` -- das hv2-Rezept auf dem
+    /// HEUTIGEN Motor (`heuristic_v3.rs`/`plate_builder_v3.rs`, mit
+    /// Phantom-Abzug A2) -- wird angenommen UND landet als solche in der
+    /// Config. Ein stilles Durchwinken als `hv1` waere hier derselbe Fehler
+    /// wie 2026-08-26, nur mit umgekehrtem Vorzeichen.
+    #[test]
+    fn search_config_from_spec_file_accepts_hv3() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_hv3_{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0, "heuristik_variante": "hv3"}"#).unwrap();
+        let result = SearchConfig::from_spec_file(path.to_str().unwrap());
+        std::fs::remove_file(&path).ok();
+        let cfg = result.expect("hv3 muss angenommen werden");
+        assert_eq!(cfg.heuristic_variant, crate::mcts::HeuristicVariant::Hv3);
+        assert!(cfg.heuristic_variant.is_hv3());
     }
 
     /// UMBENENNUNG 2026-08-28: die ALTEN Namen (`v1`, `v2huelle`) sind hier
@@ -7615,6 +7656,7 @@ mod tests {
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         std::fs::remove_file(&path).ok();
         let cfg = result.expect("hv1 muss angenommen werden");
+        assert_eq!(cfg.heuristic_variant, crate::mcts::HeuristicVariant::Hv1);
         assert_eq!(cfg.implicit_minimax_alpha, 0.25);
         assert_eq!(cfg.long_row_init_shaping_w, 0.3);
         assert_eq!(cfg.score_utility_c, 0.0);
@@ -7929,10 +7971,13 @@ mod tests {
     /// 406er-Vektors. Gleiches Absicherungsmuster wie
     /// `action_to_id_direct_matches_json_path_across_random_games`.
     ///
-    /// Die zweite Haelfte des Tests ist der BEFUND, der die
-    /// `choose_dome_slot`-Form ueberhaupt noetig macht: der Record-Schluessel
-    /// `"type": "dome"` faellt in `action_to_id` auf den Fallback 405 -- und
-    /// zwar fuer JEDEN Slot und JEDE Rotation gleich.
+    /// Die zweite Haelfte des Tests war der BEFUND, der die
+    /// `choose_dome_slot`-Form noetig machte: der Record-Schluessel
+    /// `"type": "dome"` fiel in `action_to_id` auf den Fallback 405, fuer
+    /// JEDEN Slot und JEDE Rotation gleich. Seit dem Waechter vom 2026-09-12
+    /// (features.rs: expliziter Zweig je Aktionstyp, harter Fehler statt
+    /// Rueckfall) bildet `"dome"` auf dieselben IDs ab wie
+    /// `choose_dome_slot`; der Test haelt jetzt diese Gleichheit fest.
     #[test]
     fn start_action_ids_match_action_to_id() {
         for d in 0..3usize {
@@ -7952,22 +7997,31 @@ mod tests {
             assert_eq!(via_json, start_rotation_action_id(*rot), "rot={rot}");
             assert_eq!(via_json, 391 + i);
         }
-        // Der Grund fuer die ganze Uebung: `"dome"` trennt NICHT.
-        let mut collapsed = std::collections::BTreeSet::new();
+        // Historie (2026-09-12): `"dome"` hatte in `action_to_id` KEINEN Zweig
+        // und fiel auf den Rueckfall 405 -- alle 27 Slot-Varianten auf EINER
+        // ID, und zwar auf der von `dome_stack_peek`. Seit dem Waechter in
+        // features.rs hat `"dome"` einen expliziten Zweig mit DERSELBEN
+        // ID-Bildung wie `choose_dome_slot`; der Test haelt jetzt genau diese
+        // Gleichheit fest (die `choose_dome_slot`-Form des Such-Records bleibt
+        // richtig, sie ist nur nicht mehr die einzige, die trennt).
+        let mut separated = std::collections::BTreeSet::new();
         for d in 0..3usize {
             for r in 0..3usize {
                 for c in 0..3usize {
-                    collapsed.insert(action_to_id(&json!({
+                    let id = action_to_id(&json!({
                         "type": "dome", "is_start": true,
                         "display_index": d, "slot_row": r, "slot_col": c, "rotation": 90,
-                    })));
+                    }));
+                    assert_eq!(id, start_slot_action_id(d, r, c), "dome d={d} r={r} c={c}");
+                    separated.insert(id);
                 }
             }
         }
         assert_eq!(
-            collapsed.into_iter().collect::<Vec<_>>(),
-            vec![405],
-            "der Record-Schluessel 'dome' faellt auf den Fallback 405 -- genau deshalb kodiert              der Such-Record die Startaktionen als 'choose_dome_slot'"
+            separated.len(),
+            27,
+            "der Record-Schluessel 'dome' muss jeden (Platte, Slot) trennen -- 405 fuer alle war \
+             der Defekt vom 2026-09-12"
         );
     }
 

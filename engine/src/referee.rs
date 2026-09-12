@@ -159,7 +159,15 @@ pub(crate) fn choose_start_placement_json(
             }
         }
     }
-    match crate::self_play::choose_start_placement(&state, pi) {
+    // Die Variante kommt aus der SPEC dieser Seite, nicht aus einem Parameter
+    // des Aufrufers. `game_seed` ist dabei Pflicht und kein Zufall: fuer `hv3`
+    // waehlt `choose_start_placement_with_variant` unter mehreren Kandidaten
+    // SEED-BASIERT die Ecke. Ohne den Seed des Referees waere die Setzung eine
+    // andere als die, die derselbe Agent in-process getroffen haette. `Hv1`
+    // delegiert unveraendert auf `choose_start_placement`.
+    match crate::self_play::choose_start_placement_with_variant(
+        &state, pi, search_config.heuristic_variant, game_seed,
+    ) {
         Some((tid, r, c, rot)) => Ok(json!({"tile_id": tid, "row": r, "col": c, "rot": rot})),
         None => Err(PyValueError::new_err(
             "choose_start_placement_json: keine legale Startsetzung fuer diesen Zustand",
@@ -181,8 +189,15 @@ pub(crate) fn choose_tiling_step_json(
         ));
     }
     let pi = state.current_player;
-    let _ = search_config;
-    let step = crate::self_play::resolve_tiling_step(&state, pi, net);
+    // Die Variante kommt aus der SPEC dieser Seite: der hv3-Durchbruch sitzt
+    // im Platzierungs-Routing, und `resolve_tiling_step` allein ist auf `hv1`
+    // verdrahtet. `net`: die hv3-Vorzugskarte greift nur, wenn sie einen
+    // Schritt liefert; sonst faellt es auf den Bestandspfad durch, und DORT
+    // entscheidet das Netz Gleichstaende (self_play.rs).
+    let step = crate::self_play::resolve_tiling_step_with_variant(
+        &state, pi, net, &crate::envelope::EnvelopeTilingParams::OFF,
+        search_config.heuristic_variant,
+    );
     Ok(crate::serialize::tiling_step_to_dict(&step))
 }
 
@@ -203,8 +218,12 @@ pub(crate) fn choose_heuristic_drafting_action_json(
     }
     let actions = drafting_actions(&state);
     let mut rng = StdRng::seed_from_u64(seed);
-    let _ = search_config;
-    let chosen = crate::self_play::heuristic_arena_choose_action(&state, &actions, &mut rng, sims, c);
+    // Variante aus der SPEC des Artefakts, NICHT aus einem Parameter des
+    // Aufrufers -- das ist der ganze Punkt: am 2026-08-26 hat ein vom Aufrufer
+    // vergessenes `--heuristik-variante` einen falschen Befund erzeugt.
+    let chosen = crate::self_play::heuristic_arena_choose_action(
+        &state, &actions, &mut rng, sims, c, search_config.heuristic_variant,
+    );
     Ok(action_to_dict(&chosen))
 }
 

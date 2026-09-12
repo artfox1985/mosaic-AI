@@ -83,6 +83,82 @@ pub(crate) fn player_total(state: &GameState, pi: usize) -> f64 {
         + crate::round_end::projected_unplaceable_penalty(&state.players[pi]) as f64
 }
 
+/// Welche Heuristik bewertet und routet? **hv1 ist der Elo-Anker und wird
+/// nicht angefasst** -- jede Bestands-Aufrufstelle laeuft weiter ueber
+/// [`player_total`] und damit ueber `Hv1`; die Anker-Invarianz-Pruefung muss
+/// unveraendert durchgehen.
+///
+/// `Hv3` ist das hv2-Rezept (frueher `v2huelle`) auf dem HEUTIGEN Motor:
+/// dieselben zwei Zusatzsummanden (`heuristic_v3`) und dasselbe Routing
+/// (`plate_builder_v3`), aber mit allen Engine-Korrekturen seit dem
+/// 2026-08-26 -- namentlich dem Phantom-Abzug A2. `hv2` selbst ist NICHT
+/// wieder aufgenommen: das eingefrorene Artefakt
+/// `models/frozen_heuristics/hv2_generator` bleibt die einzige hv2-Quelle und
+/// laeuft auf seinem mitgelieferten Wheel.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum HeuristicVariant {
+    /// Bestand, byte-identisch. Elo-Anker der gesamten Leiter.
+    #[default]
+    Hv1,
+    /// hv1 PLUS `heuristic_v3`-Terme PLUS `plate_builder_v3`-Routing.
+    Hv3,
+}
+
+impl HeuristicVariant {
+    /// Der kanonische Name -- die Umkehrung von [`HeuristicVariant::from_name`].
+    /// Damit koennen Spec-Dateien und Artefakt-Manifeste ihre Variante
+    /// SCHREIBEN, ohne die Zuordnung ein zweites Mal von Hand zu pflegen.
+    pub fn name(self) -> &'static str {
+        match self {
+            HeuristicVariant::Hv1 => "hv1",
+            HeuristicVariant::Hv3 => "hv3",
+        }
+    }
+
+    /// Loest einen Variantennamen auf. `None` bei unbekanntem Namen -- der
+    /// Aufrufer soll das MELDEN statt still auf hv1 zurueckzufallen (der
+    /// Fehler vom 2026-08-26: Flag vergessen, Default hv1, Korpus bitgleich,
+    /// falscher Befund committet).
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "hv1" => Some(HeuristicVariant::Hv1),
+            "hv3" => Some(HeuristicVariant::Hv3),
+            _ => None,
+        }
+    }
+
+    /// Laeuft diese Variante ueber den hv3-Pfad (Zusatzterme UND Routing)?
+    pub fn is_hv3(self) -> bool {
+        matches!(self, HeuristicVariant::Hv3)
+    }
+}
+
+/// Wie [`player_total`], aber mit ausdruecklicher Variante.
+///
+/// `Hv3` addiert genau zwei Summanden. Alles andere bleibt gleich, damit ein
+/// Vergleich hv1 gegen hv3 GENAU diese Terme misst und nicht ein Buendel von
+/// Unterschieden. Der `Hv1`-Arm ist Ausdruck fuer Ausdruck der Rumpf von
+/// [`player_total`] -- der Anker bewegt sich nicht.
+pub(crate) fn player_total_with_variant(
+    state: &GameState,
+    pi: usize,
+    variant: HeuristicVariant,
+) -> f64 {
+    let base = player_total(state, pi);
+    match variant {
+        HeuristicVariant::Hv1 => base,
+        HeuristicVariant::Hv3 => {
+            base + crate::heuristic_v3::row_completion_progress(
+                &state.players[pi],
+                &state.scoring_tile_ids,
+            ) + crate::heuristic_v3::plate_independent_l_value(
+                &state.players[pi],
+                &state.scoring_tile_ids,
+            )
+        }
+    }
+}
+
 /// Skala für die Score→Wert-Normalisierung — identisch zum Netz-Value-Target
 /// (`config.py` `VALUE_SCALE=50`), damit Heuristik- und Netzbewertung auf
 /// derselben Punkte-Kalibrierung beruhen: gutes Signal bei ~50 Punkten,
@@ -120,17 +196,18 @@ pub(crate) fn normalize_score(score: f64) -> f64 {
 /// Sampling würde die Kosten mit *(Besuche × N)* multiplizieren, nicht nur
 /// N, ein leicht zu übersehender Performance-Fallstrick.
 pub fn evaluate(state: &GameState, n_actions: usize) -> [f64; 2] {
-    evaluate_inner(state, n_actions)
+    evaluate_inner(state, n_actions, HeuristicVariant::Hv1)
 }
 
 /// Wie [`evaluate`], mit ausdruecklicher Variante.
 fn evaluate_inner(
     state: &GameState,
     _n_actions: usize,
+    variant: HeuristicVariant,
 ) -> [f64; 2] {
     [
-        normalize_score(player_total(state, 0)),
-        normalize_score(player_total(state, 1)),
+        normalize_score(player_total_with_variant(state, 0, variant)),
+        normalize_score(player_total_with_variant(state, 1, variant)),
     ]
 }
 
@@ -139,11 +216,12 @@ fn evaluate_inner(
 fn evaluate_explain(
     state: &GameState,
     _n_actions: usize,
+    variant: HeuristicVariant,
 ) -> ([f64; 2], String) {
     let n0 = state.players[0].name.as_str();
     let n1 = state.players[1].name.as_str();
-    let t0 = player_total(state, 0);
-    let t1 = player_total(state, 1);
+    let t0 = player_total_with_variant(state, 0, variant);
+    let t1 = player_total_with_variant(state, 1, variant);
     let v = [normalize_score(t0), normalize_score(t1)];
     if state.phase != Phase::Drafting {
         let why = format!(
@@ -197,6 +275,7 @@ fn apply_search_move(state: &GameState, mv: &SearchMove) -> Option<GameState> {
 fn rank_actions_root(
     state: &GameState,
     moves: Vec<SearchMove>,
+    variant: HeuristicVariant,
 ) -> Vec<SearchMove> {
     let acting = state.current_player;
     let other = 1 - acting;
@@ -205,8 +284,8 @@ fn rank_actions_root(
         .map(|m| {
             let score = match apply_search_move(state, &m) {
                 Some(child) => {
-                    player_total(&child, acting)
-                        - player_total(&child, other)
+                    player_total_with_variant(&child, acting, variant)
+                        - player_total_with_variant(&child, other, variant)
                 }
                 None => f64::NEG_INFINITY,
             };
@@ -248,6 +327,7 @@ fn make_node<R: Rng + ?Sized>(
     terminal: bool,
     depth: u32,
     rng: &mut R,
+    variant: HeuristicVariant,
 ) -> Node {
     let (untried, remaining, n_actions) = if terminal {
         (Vec::new(), Vec::new(), 0)
@@ -260,7 +340,7 @@ fn make_node<R: Rng + ?Sized>(
         // der sollte dann auch plausibel sein, nicht zufällig. Ab Tiefe 2
         // (Enkel) wieder das billige Typ-Ranking wie bisher.
         let mut ordered = if depth <= 1 {
-            rank_actions_root(&state, moves)
+            rank_actions_root(&state, moves, variant)
         } else {
             rank_actions_cheap(moves, rng)
         };
@@ -332,6 +412,7 @@ fn expand_and_backprop<R: Rng + ?Sized>(
     names: &[&str; 2],
     rng: &mut R,
     log: &mut Option<&mut Vec<String>>,
+    variant: HeuristicVariant,
 ) {
     if nodes[nid].untried.is_empty() && !nodes[nid].remaining.is_empty() {
         let allowed = MAX_ACTIONS + (WIDEN_FACTOR * (nodes[nid].visits as f64).sqrt()) as usize;
@@ -349,7 +430,7 @@ fn expand_and_backprop<R: Rng + ?Sized>(
     let Some(child_state) = apply_search_move(&nodes[nid].state, &mv) else { return };
     let terminal = child_state.phase != Phase::Drafting;
     let child_depth = nodes[nid].depth + 1;
-    let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng);
+    let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng, variant);
     let cid = nodes.len();
     nodes.push(child);
     nodes[nid].children.push(cid);
@@ -363,7 +444,7 @@ fn expand_and_backprop<R: Rng + ?Sized>(
     }
 
     let value = if log.is_some() {
-        let (v, why) = evaluate_explain(&nodes[cid].state, nodes[cid].n_actions);
+        let (v, why) = evaluate_explain(&nodes[cid].state, nodes[cid].n_actions, variant);
         if let Some(l) = log.as_deref_mut() {
             l.push(format!(
                 "  EVAL   #{cid} {why} → win[{}]={:.3} win[{}]={:.3}",
@@ -372,7 +453,7 @@ fn expand_and_backprop<R: Rng + ?Sized>(
         }
         v
     } else {
-        evaluate_inner(&nodes[cid].state, nodes[cid].n_actions)
+        evaluate_inner(&nodes[cid].state, nodes[cid].n_actions, variant)
     };
 
     let mut bp = String::from("  BACKPROP");
@@ -402,6 +483,7 @@ fn build_tree<R: Rng + ?Sized>(
     c: f64,
     rng: &mut R,
     mut log: Option<&mut Vec<String>>,
+    variant: HeuristicVariant,
 ) -> Option<Vec<Node>> {
     if state.phase != Phase::Drafting {
         return None;
@@ -412,7 +494,7 @@ fn build_tree<R: Rng + ?Sized>(
     root_state.log.clear();
     let root_player = root_state.current_player;
     let mut nodes: Vec<Node> =
-        vec![make_node(root_state, None, None, root_player, false, 0, rng)];
+        vec![make_node(root_state, None, None, root_player, false, 0, rng, variant)];
 
     macro_rules! logln {
         ($($arg:tt)*) => { if let Some(l) = log.as_deref_mut() { l.push(format!($($arg)*)); } };
@@ -477,7 +559,7 @@ fn build_tree<R: Rng + ?Sized>(
                 // Terminal sobald die Drafting-Phase verlassen ist (→ DFS-Eval).
                 let terminal = child_state.phase != Phase::Drafting;
                 let child_depth = nodes[nid].depth + 1;
-                let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng);
+                let child = make_node(child_state, Some(nid), Some(mv.clone()), mover, terminal, child_depth, rng, variant);
                 let cid = nodes.len();
                 nodes.push(child);
                 nodes[nid].children.push(cid);
@@ -493,11 +575,11 @@ fn build_tree<R: Rng + ?Sized>(
 
         // 3. Blattbewertung (Per-Spieler-Win-Prob).
         let value = if log.is_some() {
-            let (v, why) = evaluate_explain(&nodes[nid].state, nodes[nid].n_actions);
+            let (v, why) = evaluate_explain(&nodes[nid].state, nodes[nid].n_actions, variant);
             logln!("  EVAL   #{nid} {why} → win[{}]={:.3} win[{}]={:.3}", names[0], v[0], names[1], v[1]);
             v
         } else {
-            evaluate_inner(&nodes[nid].state, nodes[nid].n_actions)
+            evaluate_inner(&nodes[nid].state, nodes[nid].n_actions, variant)
         };
 
         // 4. Backprop (player_who_acted, ohne Vorzeichenwechsel).
@@ -521,7 +603,7 @@ fn build_tree<R: Rng + ?Sized>(
     // dauerhaft ohne eigene Antwort (siehe search_common::nachlauf_targets).
     for target in crate::search_common::nachlauf_targets(&nodes) {
         logln!("  NACHLAUF → #{target}: offenes Ende nachträglich geschlossen");
-        expand_and_backprop(&mut nodes, target, &names, rng, &mut log);
+        expand_and_backprop(&mut nodes, target, &names, rng, &mut log, variant);
     }
 
     Some(nodes)
@@ -535,7 +617,7 @@ pub fn search_log_text<R: Rng + ?Sized>(
     rng: &mut R,
 ) -> String {
     let mut lines: Vec<String> = Vec::new();
-    let nodes = build_tree(state, simulations, c, rng, Some(&mut lines));
+    let nodes = build_tree(state, simulations, c, rng, Some(&mut lines), HeuristicVariant::Hv1);
 
     let mut out = String::new();
     let n_actions = drafting_actions(state).len();
@@ -761,6 +843,21 @@ pub fn root_child_stats<R: Rng + ?Sized>(
     c: f64,
     rng: &mut R,
 ) -> Vec<(Action, u32, f64)> {
+    root_child_stats_with_variant(state, simulations, c, rng, HeuristicVariant::Hv1)
+}
+
+/// Wie [`root_child_stats`], mit ausdruecklicher Heuristik-Variante.
+///
+/// Die Bestandssignatur oben bleibt unveraendert und laeuft weiter ueber `hv1`
+/// -- das haelt alle Aufrufer (inklusive `engine/examples/` und
+/// `engine/benches/`, dem bekannten Push-Blocker) unberuehrt.
+pub fn root_child_stats_with_variant<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+    variant: HeuristicVariant,
+) -> Vec<(Action, u32, f64)> {
     // Runde 5: informationsfreies Endspiel, siehe round5.rs -- exakte
     // Alpha-Beta-Wahl statt PUCT-Baum. Einzelner Eintrag mit Gewicht 1.0
     // (statt leer) macht `drafting_policy`s Zufalls-Fallback (bei leerer
@@ -771,7 +868,7 @@ pub fn root_child_stats<R: Rng + ?Sized>(
             .map(|a| (a, 1, 1.0))
             .collect();
     }
-    let nodes = match build_tree(state, simulations, c, rng, None) {
+    let nodes = match build_tree(state, simulations, c, rng, None, variant) {
         Some(n) => n,
         None => return Vec::new(),
     };
@@ -796,7 +893,7 @@ pub fn search_action<R: Rng + ?Sized>(
     c: f64,
     rng: &mut R,
 ) -> Option<SearchMove> {
-    search_action_inner(state, simulations, c, rng)
+    search_action_inner(state, simulations, c, rng, HeuristicVariant::Hv1)
 }
 
 /// Wie [`search_action`], mit ausdruecklicher Heuristik-Variante.
@@ -810,6 +907,7 @@ fn search_action_inner<R: Rng + ?Sized>(
     simulations: u32,
     c: f64,
     rng: &mut R,
+    variant: HeuristicVariant,
 ) -> Option<SearchMove> {
     if crate::round5::applies(state) {
         // Der exakte R5-Anker ist von der Variante UNBERUEHRT: er rechnet den
@@ -817,7 +915,7 @@ fn search_action_inner<R: Rng + ?Sized>(
         // zu verbessern und wuerde nur den Anker verfaelschen.
         return crate::round5::choose_action(state).map(SearchMove::Draft);
     }
-    let nodes = build_tree(state, simulations, c, rng, None)?;
+    let nodes = build_tree(state, simulations, c, rng, None, variant)?;
     let best = best_root_child(&nodes)?;
     nodes[best].action.clone()
 }
@@ -837,7 +935,7 @@ pub fn search_with_tree<R: Rng + ?Sized>(
         let (a, analysis) = crate::round5::choose_action_with_analysis(state);
         return (a.map(SearchMove::Draft), analysis);
     }
-    let nodes = match build_tree(state, simulations, c, rng, log) {
+    let nodes = match build_tree(state, simulations, c, rng, log, HeuristicVariant::Hv1) {
         Some(n) => n,
         None => return (None, Value::Null),
     };
@@ -941,17 +1039,18 @@ pub fn search_drafting_action<R: Rng + ?Sized>(
     c: f64,
     rng: &mut R,
 ) -> Option<Action> {
-    search_drafting_action_inner(state, simulations, c, rng)
+    search_drafting_action_with_variant(state, simulations, c, rng, HeuristicVariant::Hv1)
 }
 
 /// Wie [`search_drafting_action`], mit ausdruecklicher Heuristik-Variante.
-fn search_drafting_action_inner<R: Rng + ?Sized>(
+pub fn search_drafting_action_with_variant<R: Rng + ?Sized>(
     state: &GameState,
     simulations: u32,
     c: f64,
     rng: &mut R,
+    variant: HeuristicVariant,
 ) -> Option<Action> {
-    match search_action_inner(state, simulations, c, rng)? {
+    match search_action_inner(state, simulations, c, rng, variant)? {
         SearchMove::Draft(a) => Some(a),
     }
 }
@@ -1107,6 +1206,83 @@ mod tests {
         assert!(drafting_actions(&s).contains(&action), "MCTS-Aktion muss legal sein");
     }
 
+    /// **Anker-Invarianz des hv3-Ports** (CLAUDE.md, "Nach jeder
+    /// Engine-Aenderung: Anker-Invarianz pruefen"): der `Hv1`-Arm ist BITGLEICH
+    /// zur Anker-Formel. Nicht "ungefaehr" und nicht "statistisch" --
+    /// `assert_eq!` auf `f64`, weil es derselbe Ausdruck sein MUSS.
+    ///
+    /// Ohne diesen Test waere eine versehentlich mitgezaehlte hv3-Summe nur in
+    /// einer Elo-Messung sichtbar, und dort nicht von Rauschen zu unterscheiden.
+    #[test]
+    fn hv1_arm_is_bit_identical_to_the_anchor_total() {
+        for seed in [7u64, 21, 33, 109] {
+            let s = drafting_state(seed);
+            for pi in 0..2usize {
+                assert_eq!(
+                    player_total_with_variant(&s, pi, HeuristicVariant::Hv1),
+                    player_total(&s, pi),
+                    "hv1 muss Ausdruck fuer Ausdruck der Anker-Formel sein (seed {seed}, pi {pi})"
+                );
+            }
+            assert_eq!(
+                evaluate(&s, 0),
+                evaluate_inner(&s, 0, HeuristicVariant::Hv1),
+                "der Bestands-Einstieg `evaluate` muss der hv1-Arm sein (seed {seed})"
+            );
+        }
+    }
+
+    /// Gegenprobe: hv3 ist auf mindestens einem plausiblen Zustand ein ANDERER
+    /// Wert. Ohne diese Haelfte belegt der Test oben nur, dass beide Arme
+    /// dasselbe tun -- also dass hv3 gar nicht wirkt.
+    ///
+    /// Geprueft wird auf einem Zustand mit einer angefangenen, erreichbaren
+    /// MUSTERREIHE 6 (Index 5) -- bewusst die unterste: nur dort ist
+    /// `ROW_CREDIT` von null verschieden (`[0, 0, 0, 1, 3, 5]`), der Term also
+    /// unabhaengig davon positiv, welche drei Wertungsplatten dieser Seed
+    /// gezogen hat. Musterreihe 6 speist Rasterreihe 5, also Slotreihe 2,
+    /// Space 2/3; Pool-Platte 0 ist `[Gelb, Schwarz, Tuerkis, Special]`, ihr
+    /// Space 2 nimmt also Tuerkis.
+    #[test]
+    fn hv3_differs_from_hv1_on_a_started_row() {
+        let mut s = drafting_state(7);
+        let tile = crate::dome::build_dome_tile_pool()[0].clone();
+        s.players[0].dome_grid.place_dome_tile(tile, 2, 0).expect("Slot (2,0) frei");
+        s.players[0].pattern_lines[5].add_tiles(&[crate::tile::TileColor::Tuerkis]);
+        let hv1 = player_total_with_variant(&s, 0, HeuristicVariant::Hv1);
+        let hv3 = player_total_with_variant(&s, 0, HeuristicVariant::Hv3);
+        assert_ne!(hv1, hv3, "hv3 muss sich von hv1 unterscheiden, sonst wirkt der Port nicht");
+        assert!(hv3 > hv1, "die beiden hv3-Summanden sind nicht-negativ: {hv3} gegen {hv1}");
+    }
+
+    /// Die Namenszuordnung ist eine Abbildung mit Umkehrung -- zwei Tabellen,
+    /// die dasselbe abbilden, laufen sonst auseinander. `hv2` ist KEIN
+    /// gueltiger Name: das Artefakt ist die einzige hv2-Quelle.
+    #[test]
+    fn variant_names_round_trip_and_reject_hv2() {
+        for v in [HeuristicVariant::Hv1, HeuristicVariant::Hv3] {
+            assert_eq!(HeuristicVariant::from_name(v.name()), Some(v));
+        }
+        for bad in ["hv2", "v1", "v2huelle", "", "HV1"] {
+            assert_eq!(HeuristicVariant::from_name(bad), None, "{bad} darf nicht aufloesen");
+        }
+        assert!(!HeuristicVariant::Hv1.is_hv3());
+        assert!(HeuristicVariant::Hv3.is_hv3());
+    }
+
+    /// hv3 liefert LEGALE Zuege -- das Routing ist eine Praeferenz, kein
+    /// Filter auf der Zugmenge (die Beschneidungs-Bauform ist in
+    /// `PREREG_provocation.md` par.7/par.9 als spielzerstoerend gemessen).
+    #[test]
+    fn hv3_search_returns_a_legal_drafting_action() {
+        let s = drafting_state(7);
+        let mut rng = StdRng::seed_from_u64(1);
+        let action =
+            search_drafting_action_with_variant(&s, 200, DEFAULT_C, &mut rng, HeuristicVariant::Hv3)
+                .expect("Aktion");
+        assert!(drafting_actions(&s).contains(&action), "hv3-Aktion muss legal sein");
+    }
+
     #[test]
     fn none_outside_drafting() {
         let mut s = drafting_state(7);
@@ -1121,7 +1297,7 @@ mod tests {
         let s = drafting_state(7);
         assert!(valid_search_moves(&s).len() > MAX_ACTIONS);
         let mut rng = StdRng::seed_from_u64(2);
-        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None).unwrap();
+        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None, HeuristicVariant::Hv1).unwrap();
         // allowed = 10 + 2.5*sqrt(300) ≈ 53 → Wurzel muss > MAX_ACTIONS Kinder haben.
         assert!(
             nodes[0].children.len() > MAX_ACTIONS,
@@ -1142,7 +1318,7 @@ mod tests {
         // wurde -- daher gilt die Garantie jetzt für ALLE Wurzelkinder.
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(21);
-        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None).unwrap();
+        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, None, HeuristicVariant::Hv1).unwrap();
         assert!(nodes[0].children.len() > 1, "Test braucht mehrere Wurzelkinder");
         for &cid in &nodes[0].children {
             if !nodes[cid].terminal {
@@ -1167,7 +1343,7 @@ mod tests {
         // "alle außer dem letzten".
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(33);
-        let nodes = build_tree(&s, 600, DEFAULT_C, &mut rng, None).unwrap();
+        let nodes = build_tree(&s, 600, DEFAULT_C, &mut rng, None, HeuristicVariant::Hv1).unwrap();
         let mut checked_any = false;
         for &root_child in &nodes[0].children {
             let grandkids = &nodes[root_child].children;
@@ -1199,7 +1375,7 @@ mod tests {
         let s = drafting_state(7);
         let mut rng = StdRng::seed_from_u64(21);
         let mut lines = Vec::new();
-        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, Some(&mut lines)).unwrap();
+        let nodes = build_tree(&s, 300, DEFAULT_C, &mut rng, Some(&mut lines), HeuristicVariant::Hv1).unwrap();
         let mut checked_any = false;
         for line in &lines {
             if !line.contains("NACHLAUF") {

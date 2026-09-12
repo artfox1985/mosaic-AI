@@ -338,7 +338,12 @@ fn target_cells_generic(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, 
 /// Orientierung ableiten muss -- ueber denselben Kostenvergleich und
 /// dieselbe Seed-Streuung wie jeder andere Bauer, statt einer zweiten,
 /// separat zu pflegenden Regel.
-fn target_index_generic(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<usize> {
+///
+/// `pub(crate)`, weil das hv3-Routing (`plate_builder_v3::hull_orientation_by_cost`)
+/// genau diesen Kostenvergleich braucht. Der Aufruf von
+/// `provocation::remaining_colors` unten ist zugleich die Stelle, an der der
+/// Phantom-Abzug A2 in hv3 wirkt (dort dokumentiert).
+pub(crate) fn target_index_generic(state: &GameState, pi: usize, kandidaten: &[Vec<(usize, usize)>]) -> Option<usize> {
     if kandidaten.is_empty() {
         return None;
     }
@@ -679,7 +684,9 @@ fn cells_row(r: usize) -> Vec<(usize, usize)> {
     (0..6).map(|c| (r, c)).collect()
 }
 
-fn cells_column(c: usize) -> Vec<(usize, usize)> {
+/// `pub(crate)`: die Orientierungswahl von hv3 vergleicht damit die beiden
+/// Randspalten (`plate_builder_v3::hull_orientation_by_cost`).
+pub(crate) fn cells_column(c: usize) -> Vec<(usize, usize)> {
     (0..6).map(|r| (r, c)).collect()
 }
 

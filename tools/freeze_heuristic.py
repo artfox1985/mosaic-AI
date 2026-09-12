@@ -17,7 +17,8 @@ Und die Golden Probe ist eine andere. Die Welle-3-Probe der Netz-Champions
 gewaehlte Aktion -- mehr kann sie nicht, weil der Referee Tiling und
 Startsetzung selbst aufloest (`referee.rs:312` ruft `resolve_tiling_step`,
 und das ist auf `hv1` hart verdrahtet). Fuer eine Heuristik waere das eine
-HALBE Probe: `hv2` wirkt gerade im Platzierungs-Routing.
+HALBE Probe: `hv3` (wie sein Vorgaenger `hv2`) wirkt gerade im
+Platzierungs-Routing.
 
 Die Probe hier ist deshalb ein SELF-PLAY-Lauf aus dem eigenen Wheel, byte-
 verglichen (Nutzer-Vorschlag 2026-08-26: "laesst sich einfach pruefen ueber
@@ -47,8 +48,16 @@ er es nicht war.
 
 Aufruf:
     python -X utf8 -u tools/freeze_heuristic.py --name hv1_anchor --variante hv1
-    python -X utf8 -u tools/freeze_heuristic.py --name hv2_generator \\
-        --variante hv2 --tiling-net models/alphazero_v21_2d_brierbest.onnx
+    python -X utf8 -u tools/freeze_heuristic.py --name hv3_generator \\
+        --variante hv3 --tiling-net models/alphazero_v21_2d_brierbest.onnx
+
+SPIELBARE VARIANTEN dieses Quellstands: `hv1` und (seit 2026-09-12) `hv3` --
+das hv2-Rezept auf dem HEUTIGEN Motor (engine/src/heuristic_v3.rs +
+engine/src/plate_builder_v3.rs), also MIT dem Phantom-Abzug A2. `hv2` selbst
+weist die Engine ab; das Artefakt models/frozen_heuristics/hv2_generator
+bleibt die einzige hv2-Quelle und laeuft auf seinem mitgelieferten Wheel.
+KEINE Variantenliste in diesem Werkzeug: ein unbekannter Name laesst den
+Golden-Probe-Lauf unten hart scheitern, das Artefakt entsteht gar nicht erst.
 
 NAMENSSCHEMA seit 2026-08-28: die Heuristik-Varianten heissen `hv1`/`hv2`
 (vorher `v1`/`v2huelle`). Ein hier NEU eingefrorenes Artefakt traegt deshalb
@@ -122,7 +131,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--name", required=True, help="Artefaktname, z.B. hv1_anchor")
     ap.add_argument("--variante", required=True,
-                    help="Heuristik-Variante, z.B. hv1 / hv2 (Namensschema seit 2026-08-28)")
+                    help="Heuristik-Variante: hv1 oder hv3 (Namensschema seit 2026-08-28; "
+                         "hv2 ist nur noch als eingefrorenes Artefakt spielbar)")
     ap.add_argument("--wheel", default=None,
                     help="Pfad zum Wheel (Default: der frischeste Build in engine/target/wheels)")
     ap.add_argument("--tiling-net", default=None,
@@ -166,8 +176,8 @@ def main() -> int:
         src = pathlib.Path(a.tiling_net)
         shutil.copy2(src, target / "label_net.onnx")
         tiling_net = {"datei": "label_net.onnx", "quelle": _repo_relative(src),
-                      "rolle": ("Stichentscheid im Tiling-Durchfall (self_play.rs:1234: die "
-                                "hv2-Vorzugskarte greift nur, wenn sie einen Zug liefert -- sonst "
+                      "rolle": ("Stichentscheid im Tiling-Durchfall (resolve_tiling_step_with_variant: die "
+                                "hv3-Vorzugskarte greift nur, wenn sie einen Schritt liefert -- sonst "
                                 "faellt es auf das Netz durch) und Erzeuger der "
                                 "bootstrap_value-Label")}
         print(f"Label-Netz kopiert: {src.name} -> label_net.onnx", flush=True)

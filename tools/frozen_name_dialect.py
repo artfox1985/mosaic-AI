@@ -34,6 +34,15 @@ from __future__ import annotations
 # Kanonischer Name -> Dialekt der Wheels vor dem 2026-08-28.
 LEGACY_BY_CANONICAL = {"hv1": "v1", "hv2": "v2huelle"}
 
+# ALLE kanonischen Namen, auch die ohne Alt-Entsprechung. `hv3` (2026-09-12)
+# ist das hv2-Rezept auf dem heutigen Motor; ein Wheel von VOR der Umbenennung
+# kann es per Konstruktion nicht kennen, deshalb steht es nicht in der
+# Uebersetzungstabelle darueber -- aber es ist ein gueltiger Name, und die
+# Pruefung unten darf es nicht als "unbekannt" abweisen. Genau das waere sonst
+# beim Selbsttest eines hv3-Artefakts passiert (verify_frozen_heuristic.py
+# ruft `to_artifact_dialect` auch fuer Artefakte im neuen Dialekt).
+CANONICAL_NAMES = frozenset({"hv1", "hv2", "hv3"})
+
 # Nur zur Diagnose (Fehlermeldungen, Werkzeuge, die ein Alt-Artefakt lesen).
 CANONICAL_BY_LEGACY = {legacy: new for new, legacy in LEGACY_BY_CANONICAL.items()}
 
@@ -53,20 +62,25 @@ def speaks_current_dialect(manifest: dict) -> bool:
 def to_artifact_dialect(name: str, manifest: dict) -> str:
     """Kanonischen Variantennamen in den Dialekt des Artefakts uebersetzen.
 
-    `name` MUSS kanonisch sein (`hv1`/`hv2`). Ein Alt-Name hier waere ein
+    `name` MUSS kanonisch sein (`hv1`/`hv2`/`hv3`). Ein Alt-Name hier waere ein
     Aufrufer, der die Umbenennung nicht mitbekommen hat -- harter Fehler,
     kein Durchreichen.
     """
-    if name not in LEGACY_BY_CANONICAL:
+    if name not in CANONICAL_NAMES:
         hint = ""
         if name in CANONICAL_BY_LEGACY:
             hint = (f" Das ist der ALTE Name; kanonisch heisst er jetzt "
                     f"'{CANONICAL_BY_LEGACY[name]}' (Umbenennung 2026-08-28).")
         raise ValueError(
             f"Unbekannte Heuristik-Variante {name!r}. Gueltig sind "
-            f"{sorted(LEGACY_BY_CANONICAL)}.{hint}")
+            f"{sorted(CANONICAL_NAMES)}.{hint}")
     if speaks_current_dialect(manifest):
         return name
+    if name not in LEGACY_BY_CANONICAL:
+        raise ValueError(
+            f"Variante {name!r} hat keine Entsprechung im Dialekt vor dem 2026-08-28 -- "
+            "ein Wheel aus jener Zeit kann sie nicht spielen. Das Artefakt-Manifest sagt "
+            "aber, sein Wheel spreche den Alt-Dialekt. Eines von beidem ist falsch.")
     return LEGACY_BY_CANONICAL[name]
 
 
