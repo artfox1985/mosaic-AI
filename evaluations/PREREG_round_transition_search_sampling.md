@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern -- zu vertretbarem Preis (Durchsatz, Paarung)? | Beleg: Nichts gebaut. Variante B (Tiling im Blatt, EINE Neubefuellung) ist registrierter Basisarm (par.7), par.4.2 ENTSCHIEDEN als Bauvorgabe. AUDIT 2026-09-09 (par.8): par.6 falsch (Determinisierung lebt), Paritaetssonde 8c6684ff weg (Nachfolger Champion-Fixture); der Arm haengt an PREREG_dome_stack_information_sets.md. K4 (round_estimate_leaf_term) ist v28-Schritt 7, keine Vorstufe mehr. -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis (Durchsatz, Paarung)? | Beleg: Nichts gebaut. EINGETAKTET FUER v29 (Nutzer 2026-09-12, par.9): Variante B (Tiling im Blatt, EINE Neubefuellung) als Such-Knopf mit Default aus, Mischregel = determinize_dome_pool aus v28 (par.8 damit beantwortet), Kostentor und A/B 200 Paare am Champion. par.4.2 ENTSCHIEDEN als Bauvorgabe. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -283,3 +283,29 @@ eingetaktet (`PREREG_v28_window.md` par.8) und damit keine Vorstufe dieses Arms
 mehr. Variante B bleibt ungebaut und haengt weiter an der Informationsmengen-
 Antwort aus `PREREG_dome_stack_information_sets.md` (par.8). Zeile-1-Kopf im
 selben Zug nachgezogen.
+
+## par.9 EINGETAKTET FUER v29 (Nutzer 2026-09-12, 17:55: "gerne eintakten fuer v29")
+
+Anlass: Projekt-Rueckschau des Koordinators, der Nutzer hat den Punkt bestaetigt. Der Arm ist
+der eine Suchumbau, der die Bewertung dort korrigiert, wo Wertungsplatten entstehen: das Blatt
+der Suche ist heute der Netzwert VOR dem Tiling, die Tiling-Aufloesung folgt erst nach der
+Runde (par.7, Leitsatz des Nutzers).
+
+**Gebaut wird Variante B (par.7, Basisarm) als Such-Knopf:** Tiling beider Seiten im Rundenende-
+Blatt mit dem exakten Loeser (`resolve_to_pre_chance`), dann EINE gezogene Neubefuellung und EIN
+Netzaufruf; Knopf `MOSAIC_ROUND_TRANSITION_LEAF` (Default 0 = Bestand bitidentisch, kein RNG-Zug),
+Spec-Feld optional. **Die Antwort auf par.8 liegt inzwischen vor:** die Informationsmenge an der
+Wurzel ist seit v28 durch `determinize_dome_pool` (Variante A der Kuppelstapel-Prereg,
+`PREREG_dome_stack_information_sets.md`) festgelegt; das Rundenende-Blatt uebernimmt GENAU diese
+Mischregel (bekannte eigene Rueckgabebloecke bleiben in Reihenfolge, nur unbekannter Praefix und
+Gegnerbloecke werden gemischt), keine eigene. Der Eintrag in `docs/architecture_reference.md`
+("Wo der Code Information ABSICHTLICH vernichtet") ist Teil des Baus.
+
+**Messkette wie par.5, konkret:** Schritt 1 Kostentor am Champion (argmax-Instrument 200 Partien,
+Wanduhr je Partie mit gegen ohne Knopf; Anteil der Rundenende-Blaetter je Suche); Schritt 2 A/B
+gepaart am Champion v29-b01 (200 Paare, Blockgroesse 5, Logs, Standard-Kennzahlen), Kanal Punkte
+und Wertungsplatten-Punkte je Kriterium neben den Siegen, weil der Knopf genau dort wirken soll.
+Kein Training, kein Arm; Aufnahme ins Rezept nur bei positivem Schritt 2 und vertretbarem Kostentor
+(Nutzer-Entscheid). Reihenfolge im v29-Begleitprogramm: nach Ziehsucht-Sonde und Mondstapel-
+Stufe 1, weil die beiden billiger sind. Kosten grob: ein Tag Bau, 3 h Messung (ANNAHME).
+

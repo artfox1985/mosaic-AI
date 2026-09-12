@@ -240,6 +240,15 @@ Spalten der Erzeugung gegen v28) ex post.
    STATUS Abschnitt 1: drei Arme aus dem vorhandenen Korpus messbar, Lauf vom Nutzer auf
    v29 gelegt): ein CPU-Lauf ohne neue Erzeugung, Reihenfolge nach der Leiter-Kante oder
    davor, je nachdem, was die Maschine frei hat.
+2b. **Zugklassen-Differential der Claude-Partien** (`PREREG_claude_play_interface.md` par.10,
+   Nutzer 2026-09-12): an jedem Claude-Entscheid Champion-Zug und Wurzelwert, Abweichungen je
+   Klasse mit Ausgang; unter 30 min, direkt nach der Ziehsucht-Sonde (gleiches Replay).
+2c. **Drafting sieht das Tiling** (`PREREG_round_transition_search_sampling.md` par.9, Nutzer
+   2026-09-12): Variante B als Such-Knopf mit Default aus, Mischregel = determinize_dome_pool;
+   Kostentor am Instrument, dann A/B 200 Paare am Champion v29-b01. Rund ein Tag Bau, 3 h Messung;
+   Aufnahme ins Rezept nur bei positivem A/B (Nutzer-Entscheid).
+2d. **Mondstapel-Reihenfolge Stufe 1** (`PREREG_moon_stack_order.md` par.4): Knopf
+   `MOSAIC_MOON_ORDER_VARIANTS` (Default = Bestand), A/B Fan-out an gegen aus, 200 Paare.
 3. **Reste aus v28**, falls dort nicht mehr gefahren: Startkuppel-Sonde Stufe 0 (am v28- ODER
    v29-Korpus, gleiches Instrument), ~~Ueberraschungs-Kante v24-b05 gegen v24-b04~~ (in v28
    gefahren 2026-09-12: 97:103, SPRT H0, `policy_surprise_weighting` par.12 ENTSCHIEDEN),
