@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1 (70:64, 45:58). Das Netz punktet aus Platzierungen, nicht aus den Wertungsplatten (Endwertung 0:10 bzw. 2:8), und nutzt die Null-Klammer als Werkzeug: bei Stand 0 zog es 13/8/7/4 Platten je Zug, bei Stand >0 genau eine -- Arm A der PREREG_corpus_behaviour_audit an lebenden Partien bestaetigt. Eigene Schwaeche bleibt die Strafleiste (-40 zu -19). Werkzeug nachgebessert, par.9 P.11-14. g08-g10 offen. -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1 (70:64, 45:58). Das Netz punktet aus Platzierungen, nicht aus den Wertungsplatten (Endwertung 0:10 bzw. 2:8), und nutzt die Null-Klammer als Werkzeug: bei Stand 0 zog es 13/8/7/4 Platten je Zug, bei Stand >0 genau eine -- Arm A der PREREG_corpus_behaviour_audit an lebenden Partien bestaetigt. Eigene Schwaeche bleibt die Strafleiste (-40 zu -19). Werkzeug nachgebessert, par.9 P.11-14. g08-g10 offen. NEU par.10 (Nutzer 2026-09-12): Zugklassen-Differential Claude gegen Champion an jedem Entscheid, v29-Begleitprogramm. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -784,3 +784,46 @@ Geprueft am Code, je Punkt mit Pruefstelle:
 
     **Nicht gebaut:** die Chipwahl aus P.13b. `apply_tiling_chips(spieler, reihe)` nimmt
     keine Plaettchenliste; das waere eine Engine-Aenderung und bleibt als solche offen.
+
+## par.10 ZUGKLASSEN-DIFFERENTIAL AUS DEN CLAUDE-PARTIEN (Nutzer 2026-09-12, 17:58: "dann schreib das so ins prereg")
+
+**Befund, der den Absatz traegt:** die Claude-Partien sind die einzige Stelle im Projekt, an der ein
+staerkerer Gegner tatsaechlich vorliegt (g02-g05 gegen v27-b01 3:1 fuer Claude, g06/g07 gegen
+v28-b02 1:1; `archive/history.md` 2026-09-11). Alle anderen Messungen vergleichen Netze
+untereinander oder gegen Heuristiken, die jedes Netz seit v21 zu 82-90 % schlaegt.
+
+**Frage:** an welchen Entscheiden weicht Claude vom Netz ab, und gewinnt danach? Nicht "wie viel
+zieht Claude" (das ist die Ziehsucht-Sonde par.9, Stufe 1), sondern WELCHE ZUGKLASSE dem Netz fehlt;
+das sagt, welcher Knopf oder welcher Zieltyp ueberhaupt zu bauen waere, bevor man einen baut.
+
+**Instrument (netzfrei fuer Claude, Netz nur als Vergleich, kein Training):**
+1. Jede Claude-Partie (`evaluations/artifacts/claude_play/g*/game.log`, Server-Format) wird per
+   `analyze_game_log.run` Zug fuer Zug in Zustaende zerlegt (dasselbe Replay wie die Spaltensonde).
+2. An jedem Claude-Entscheid (Drafting, Kuppelplatzierung, Startsetzung, Tiling-Schritte, Chips)
+   rechnet der Champion mit seinem Arena-Instrument (@400, argmax, ohne Wurzelrauschen, Champion-Spec)
+   seinen Zug und den Wurzelwert VOR und NACH Claudes Zug (Sicht Claude).
+3. Abweichung = Claudes Zug ungleich Netzzug. Je Abweichung: Aktionsklasse (Quelle x Farbe x Reihe
+   bzw. Kuppel-Slot/Rotation, Start, Chips), Runde, Wurzelwert-Differenz (Netzurteil ueber Claudes
+   Zug gegen den eigenen) und der Partieausgang aus Claudes Sicht.
+4. Aggregation: Abweichungsrate je Klasse und Runde; mittlere Wurzelwert-Differenz je Klasse (wo das
+   Netz Claudes Zug fuer schlechter haelt, aber Claude gewinnt, sitzt die Luecke); Rangliste
+   Haeufigkeit x Ausgang. Grundmenge: alle Claude-Entscheide der vorhandenen Partien (g01-g07,
+   rund 80-90 je Partie), Einheit Entscheide; n ist klein (rund 600), die Sonde ist ein
+   Richtungsgeber, kein Verdikt.
+5. Ausgabe: JSON mit n/Grundmenge/Einheit, `laufzeit`-Block, Tabelle der zehn haeufigsten
+   Abweichungsklassen mit Wurzelwert-Differenz und Ausgang; dazu die Gegenprobe mit einer
+   NETZ-gegen-NETZ-Partie gleicher Laenge (Abweichungsrate des Netzes gegen sich selbst unter
+   Wurzelrauschen als Rauschboden der Klassen).
+
+**Vorab festgelegte Lesarten:** (a) haeufen sich die Abweichungen mit positivem Ausgang in EINER
+Klasse (z. B. Kuppelplatzierung Richtung Spalten, oder Verzicht auf Ziehen), ist das der naechste
+Knopf oder das naechste Trainingsziel (Prereg dafuer, kein Bau aus dieser Sonde heraus); (b) sind
+sie ueber alle Klassen verteilt, fehlt dem Netz keine Zugklasse, sondern Tiefe (dann ist der Hebel
+Suchgeschwindigkeit, `PREREG_gpu_inference_path.md`/`PREREG_async_search.md`); (c) haelt das Netz
+Claudes Zuege fast ueberall fuer schlechter und Claude gewinnt trotzdem, ist der Value-Kopf die
+Luecke (Orakel-Differential wie `PREREG_human_game_oracle_gap.md`).
+
+**Eingetaktet als v29-Begleitprogramm** (nach der Ziehsucht-Sonde, gleiche Logs, gleiches Replay;
+Kosten: rund 600 Entscheide x eine Suche @400 = unter 30 min, exklusiv). Mehr Claude-Partien
+erhoehen n; die Sitzung dafuer entscheidet der Nutzer.
+
