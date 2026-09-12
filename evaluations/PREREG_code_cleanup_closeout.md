@@ -263,6 +263,25 @@ Heuristik-Seiten @150 mit c_puct 0,3, Netze @400 mit 1,5; Artefakt gegen Artefak
 Kante weniger Praezision, dafuer haengt jeder Knoten an mehreren Nachbarn; Kanten mit Frueh-Stopp
 werden im Register als solche gekennzeichnet (SPRT-artige Verzerrung der Siegquote nach oben).
 
+**ZWISCHENSTUFEN GEFAHREN (2026-09-12, 13:36-14:55, `tools/night_ladder_rungs2.sh` Teil B, nach
+dem Worker-Patch 13:37; die drei Anker-Kanten und hv2 gegen Anker davor gescheitert, Nachlauf
+`tools/night_ladder_missing_edges.sh`; v21-Sprossen im Nachlauf `night_ladder_v21_edges.sh`):**
+
+| Kante | Ergebnis | Bloecke | Binomial p | Wanduhr |
+| --- | --- | --- | --- | --- |
+| v26-b01 (Art.) gegen v24-b07 (Art.) | 36:14 | 1 (Frueh-Stopp) | 0,0026 | 941 s |
+| v27-b01 gegen v24-b07 (Art.) | 63:37 | 2 | 0,012 | 963 + 933 s |
+| v28-b02 gegen v24-b07 (Art.) | 44:6 | 1 | < 0,0001 | 917 s |
+| v24-b07 (Art.) gegen hv2@150 | 45:5 | 1 | < 0,0001 | 464 s |
+| v26-b01 (Art.) gegen hv2@150 | 41:9 | 1 | < 0,0001 | 436 s |
+
+Alle im Register (`elo_history.csv`, Kommentar nennt den Frueh-Stopp). Lesart: v24-b07 ist die
+brauchbare Sprosse fuer v26/v27 (72 % / 63 %), fuer v28-b02 schon gesaettigt (88 %); hv2@150 ist
+fuer alle Netze ab v24 gesaettigt (82-90 %) und taugt nur als Sprosse fuer v21. Zwischenstand des
+Fits OHNE Anker (bis die Anker-Kanten aus dem Nachlauf da sind): v28-b02 > v27-b01 (+44) >
+v26-b01 (+72) > v24-b07 (+82) > hv2 (+278). Die Segment-1-Zahl von hv2 (1100 gegen Anker 1000)
+war damit vermutlich zu hoch; die Kante hv2 gegen Anker im Nachlauf entscheidet das.
+
 **Champion-2-Kante (Promotion Schritt 4, 05:22-06:04, 2.516 s):** v28-b02 gegen das
 EINGEFRORENE Artefakt v26-b01 mit dessen eigenem Wheel (`frozen_referee_match.py`, 150 Partien,
 6 Prozesse, Seed-Basis 20261052) **101:49**, Punkte 52,9 gegen 50,5. Cross-Aera nach der
