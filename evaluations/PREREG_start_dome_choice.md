@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): die Handregel legt immer (0,0), und das ist der beste Slot (Reihe 2 kostet 11-13 Punkte); der Slot-Hebel ist damit geschlossen. Nutzer-Entscheide 2026-09-12: Self-Play STREUT den Slot (par.9b, p 0,15) und im Spiel entscheidet die SUCHE die Setzung (par.9c). BEIDES GEBAUT 2026-09-12 (par.9d), NICHTS kompiliert und nichts gemessen; A/B des Such-Starts hinter der Leiter. hv2-Gegenprobe (Weg 3) laeuft. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): die Handregel legt immer (0,0), und das ist bei hv1@25, hv1@400 und hv2@150 der beste Slot (Reihe 2 kostet 11-13 Punkte; Waechter Weg 3 erfuellt, Spearman 0,85 und 0,52, kippt nicht). Nutzer-Entscheide: Self-Play STREUT den Slot (par.9b, p 0,15) und im Spiel entscheidet die SUCHE (par.9c/9d); beide GEBAUT und im Wheel (13:33), A/B des Such-Starts laeuft. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -392,6 +392,32 @@ gegen Slot 0, Intervall schliesst 0 ein). Die Spanne ist gross, aber sie misst d
 Abweichens vom Bestand, nicht einen offenen Gewinn. **Der Hebel "Slotwahl befreien" ist damit
 GESCHLOSSEN: par.2a und par.5 haben fuer den Slot keinen Gegenstand mehr.** Was offen bleibt,
 steht in par.9a.
+
+**hv2-GEGENPROBE (Weg 3, 2026-09-12, 14:55-15:01, `tools/night_start_dome_hv2.sh`; Rauchtest
+18 Partien mit Slot-Kontrolle 18/18, dann voller Lauf):** hv2_generator@150 (Artefakt, eigenes
+Wheel, Worker) mit erzwungenem Startslot ueber den Referee (Setzung auf dem lebenden Wheel nach
+hv1-Handregel im erzwungenen Slot, benannter Konfund par.8) gegen lebende hv1@150 (Bestand), 20
+Partien je Slot, Seed-Basis 20260913, gepaart ueber den Seed, 6 Referee-Prozesse, 180 Partien in
+219 s. Slot-Kontrolle 20/20 in jedem Slot. Sicht hv2, Einheit je Partie:
+
+| Slot | Punkte | Margin | KI95 | gepaart gegen Slot 0 |
+| --- | --- | --- | --- | --- |
+| 0 (0,0) | 48,2 | +8,9 | [+0,3; +17,5] | Bezug |
+| 1 (0,1) | 44,0 | -0,5 | [-12,5; +11,5] | -9,4 |
+| 2 (0,2) | 43,6 | -0,7 | [-11,3; +10,0] | -9,6 |
+| 3 (1,0) | 42,6 | +3,2 | [-6,1; +12,4] | -5,8 |
+| 4 (1,1) | 32,4 | -9,2 | [-18,7; +0,3] | -18,1 |
+| 5 (1,2) | 37,0 | -4,3 | [-11,3; +2,8] | -13,2 |
+| 6 (2,0) | 41,8 | -3,1 | [-12,7; +6,5] | -12,0 |
+| 7 (2,1) | 34,1 | -7,3 | [-15,1; +0,5] | -16,2 |
+| 8 (2,2) | 38,2 | -3,0 | [-12,2; +6,2] | -11,9 |
+
+**Waechter erfuellt:** Spearman der Slot-Margins hv2@150 gegen hv1@400 = **0,52**, `kippt = False`;
+bester Slot bei beiden Spielern (0,0), alle acht anderen Slots gepaart negativ (-5,8 bis -18,1).
+"Guter Start" ist damit eine Eigenschaft der Position, bei zwei verschieden faehigen Spielern
+(hv1@25/hv1@400/hv2@150) dieselbe. Mit n=20 je Slot sind die Einzelintervalle breit; die
+Aussage traegt die Richtung, nicht die Feinordnung innerhalb der Reihen. Artefakt
+`start_dome_slot_referee_probe.json`, Einzellaeufe `start_dome_slot_referee_runs/`.
 
 ## par.9a Was nach Stufe 0 noch offen ist
 
