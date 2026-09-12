@@ -51,8 +51,8 @@ Diff +0,313 [+0,068; +0,558]); Segment-2-Leiter jetzt v28-b02 1305, v28-b01 1346
 OneDrive-Sperrfehler im Fixture-Schreiblauf; Stufen A-D sind DURCH: Ueberraschungs-Kante 97:103
 SPRT H0 (ENTSCHIEDEN NEIN), C2 erfuellt (+0,140 b01, +0,228 b02 volle Spalten, `geometric_envelope`
 par.12c); E A1/A2 DURCH (Kanal A NICHT erfuellt: mit Knopf in jeder Runde unter ohne, gegen ein
-huellenblindes Orakel; `geometric_envelope` bleibt OFFEN mit K3-P als Rezept, Nutzer-Entscheid zum
-Schliesskriterium); es laeuft F dritter Seed (seit 10:13, ~1,5 h) + Startkuppel Stufe 0; danach
+huellenblindes Orakel; **`geometric_envelope` ENTSCHIEDEN 10:40 (Nutzer: Schliesskriterium auf die
+Arena-Groessen umgestellt, K3-P/Huellenform 2/K5 bleiben Rezept, par.13)); es laeuft F dritter Seed (seit 10:13, ~1,5 h) + Startkuppel Stufe 0; danach
 `tools/night_start_dome_hv2.sh` (hv2-Gegenprobe, Weg 3)). Nutzer-Entscheid 09:35: Waechter der Startkuppel-Sonde nach Weg 3 (Sims-Stufen plus
 hv2-Artefakt per Referee als Gegenprobe; Referee-Schalter im Bau durch Agenten). Davor `tools/night_v28_after_reanchor.sh` ab 03:44 (A Knopf-Bau mit Toren,
 B Promotions-Messungen v28-b02: Replikation der Nachbar-Kante Seed 20261046 DURCH, **212:188
@@ -214,7 +214,7 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 | Startpositions-Seeding / Ausflug | `start_position_seeding` | ENTSCHIEDEN: Dubletten-Fix gebaut (par.9l); Folgearme brauchen eigene Registrierung |
 | Sicht-Reststufen | `stack_top_feature` par.10/11/12 | offen; Merkmale erst nach v28-b02, weil sie Records brauchen |
 | Claude-Partien | `claude_play_interface` par.7/par.9 | g02-g07 gespielt (3:1 gegen v27-b01, 1:1 gegen v28-b02); Werkzeug-Rauchtest gruen; g08-g10 offen |
-| Einhuellende, Schliesskriterium | `geometric_envelope` par.12c | EINGETAKTET 2026-09-11 als v28-Schritt 8: K3-D plus Jokerfeld-Knopf bauen, C2 an den v28-Armen, A1/A2 am Champion |
+| Einhuellende, Schliesskriterium | `geometric_envelope` par.13 | ENTSCHIEDEN 2026-09-12: Kriterium auf Arena-Groessen umgestellt (Nutzer); C2 erfuellt, A1/A2 gegen huellenblindes Orakel negativ und gestrichen; K3-P/Huellenform 2/K5 bleiben Rezept |
 | Werkzeuge | | `paired_gating --log-games` (Tor 2b aus Tor 1), `plate_points` je Modell, `dome_stack_known_block_draw_probe`, exakter Orakel-Pfad, Spec-Rueckfall in server.py |
 
 ## 5. PREREG-BESTAND (15 OFFEN, Ziel rund 7)

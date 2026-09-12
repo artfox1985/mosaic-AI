@@ -468,6 +468,7 @@ Nebenbefund fuer Tor 2a: ohne Huellen-Knopf faellt b02 (0,668) unter b01 (0,723)
 b02 vorn (0,895 gegen 0,863); die Reihung der Arme haengt an der Spec, mit der gemessen wird.
 Schritt 8c (A1/A2 am Champion, `geometric_envelope` par.12c): Kanal A NICHT erfuellt, die Suche
 stimmt mit Huellen-Knopf in jeder Runde weniger mit dem huellenblinden Orakel ueberein (A2 R1
-0,68 gegen 0,79); K3-D und Jokerfeld bewegen A1 nicht. Die Prereg bleibt OFFEN mit K3-P als
-Rezept; Nutzer-Entscheid zum Schliesskriterium.
+0,68 gegen 0,79); K3-D und Jokerfeld bewegen A1 nicht. Nutzer-Entscheid 10:40: Schliesskriterium
+auf die Arena-Groessen umgestellt, `geometric_envelope` ENTSCHIEDEN (par.13), K3-P/Huellenform
+2/K5 bleiben Rezept. Schritt 8 damit komplett.
 

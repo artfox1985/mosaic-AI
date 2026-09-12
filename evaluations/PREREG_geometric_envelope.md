@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: Die Knopf-Seite traegt (Huellenform 2 gepoolt 391:329, p 0,023, seit v24-b07 in der Spec, par.8.15e/f; K3-P par.11). Schliesskriterium par.12 nach v28-Schritt 8 (par.12c, 2026-09-12): K3-D und Jokerfeld GEBAUT (Default 0); C2 ERFUELLT (Knopf an minus aus +0,14 b01 / +0,23 b02 volle Spalten); A1/A2 NICHT erfuellt, mit Knopf in jeder Runde unter ohne (A2 R1 0,68 gegen 0,79), gegen ein huellenblindes Orakel; B1/B2 ungemessen. Bleibt OFFEN mit K3-P und Huellenform 2 als Rezept; Nutzer-Entscheid, ob par.12 mit diesem Orakel schliessbar ist. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen, par.13 (Nutzer 2026-09-12: Schliesskriterium auf Arena umgestellt). K3-P c 1,0, Huellenform 2, K5 sind Rezeptbestandteil seit v24-b07 (Huellenform 2 gepoolt 391:329, p 0,023, par.8.15e/f); vier Champions in Folge mit Knopf bestehen Tor 1 und Tor 2b; C2 an beiden v28-Armen erfuellt (+0,14 / +0,23 volle Spalten, par.12c). Kanal A (A1/A2) misst gegen ein huellenblindes Orakel und gilt nicht mehr; K3-D und Jokerfeld gebaut, Default 0, ohne Arm. -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -2458,3 +2458,40 @@ Spalten), Plattenpunkte. **Stand par.12 nach Punkt 4: Bedingung C2 erfuellt, Kan
 erfuellt, Kanal B ungemessen; die Prereg bleibt OFFEN mit K3-P und Huellenform 2 als
 Rezeptbestandteil.** Ob das Schliesskriterium mit einem huellenblinden Orakel ueberhaupt
 erreichbar ist oder par.12 auf die Arena-Groessen umgestellt wird, ist ein Nutzer-Entscheid.
+
+## par.13 VERDIKT (Nutzer-Entscheid 2026-09-12, 10:40: "mach das so")
+
+**Umstellung des Schliesskriteriums auf die Arena-Groessen.** Bedingung 2 aus par.12 ("entlastet
+den Value-Kopf messbar in den ersten Runden", Kanal A/B) ist mit dem vorhandenen Orakel nicht
+entscheidbar: das v21-Orakel @5000 kennt die Huelle nicht, und ein Knopf, der die Wurzel
+absichtlich verschiebt, MUSS die Uebereinstimmung damit senken (par.12c, A1/A2 gemessen am
+2026-09-12: mit Knopf in jeder Runde unter ohne). Kanal B (rho des Value-Kopfs der
+Folgegeneration) hat den Rauschboden nie ueberschritten (par.12b). Der Nutzer stellt das
+Kriterium deshalb auf die Groessen um, die den Spieler tatsaechlich messen: Tor 1, Tor 2b,
+Plattenpunkte und die Vorzeichen-Konsistenz C2.
+
+**Was auf diesen Groessen belegt ist (alles im Baum registriert):**
+
+- Huellenform 2 als Champion-Knopf: gepoolt ueber drei Seeds 391:329 = 0,543, p 0,023
+  (par.8.15e/f), seit 2026-09-07 als v24-b07 in der Spec; K3-P c 1,0 als Champion-Knopf par.11;
+  K5 (special_row6_w 1,0) in derselben Spec.
+- Vier Champions in Folge mit dieser Spec (v25-b01, v26-b01, v27-b01, v28-b02) bestehen Tor 1
+  gegen ihren Vorgaenger und bauen mehr volle Spalten (Tor 2b: 1,005 gegen 0,855 bei v27,
+  1,02 gegen 0,90 bei v28 im Segment 2; `PREREG_v27_window.md`, `PREREG_v28_window.md` par.10).
+- C2 an beiden v28-Armen erfuellt: Knopf an minus aus +0,140 (b01) und +0,228 (b02) volle
+  Spalten je Seite am argmax-Instrument, Punkte +2,6 / +2,4, gleiches Vorzeichen, ueber der
+  Lauf-KI (par.12c).
+- Sauber implementiert (Bedingung 1): K3-P2 (par.8.11), K3-D und Jokerfeld-Regel (par.12c
+  Punkt 1) sind gebaut, Default 0 bitidentisch; K3-R ist aus dem aktiven Modus entfernt.
+
+**Was NICHT belegt ist und mit diesem Verdikt bewusst offen bleibt:** Kanal A/B als
+Zustandsgroessen (nur mit einem Orakel MIT Huelle messbar, nicht gebaut); C1 (Block-Streuung
+mit gegen ohne Knopf) und C3 (Seed-Spannweite des argmax-Instruments) ungemessen; K3-D und
+Jokerfeld haben keinen Arena-Arm (A1/A2 zeigen sie bei Bestand, par.12c) und bleiben Knoepfe
+ohne Rezeptwirkung.
+
+**ENTSCHIEDEN: die geometrische Einhuellende (K3-P c 1,0, Huellenform 2, K5) ist
+Rezeptbestandteil und bleibt es; keine weiteren Arme aus dieser Prereg.** Die Frage im Kopf
+("entlastet den Value-Kopf") ist auf den Arena-Groessen mit JA beantwortet; als Zustandsgroesse
+bleibt sie unbeantwortet, und das steht hier.
+
