@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEBAUT 2026-09-12, NICHT gemessen (par.8): Diagnoseknopf MOSAIC_START_SLOT_P0/P1 und Sonde tools/probes/start_dome_slot_probe.py (netzfrei, gepaart, arena_match mit Logs); Im Wheel seit 2026-09-12 03:47 (601 Tests inkl. fuenf Startslot-Tests, Anker-Drift gruen), Rauchtest 36 Partien ohne Fehler; volle Messung OFFEN. Waechter weicht von par.4 ab (Sims-Stufen 25/400 statt hv1/hv2, hv2 nicht spielbar), Nutzer-Entscheid offen. Plattenwahl (par.6a) EINGETAKTET im v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEBAUT und im Wheel seit 2026-09-12 (Diagnoseknopf MOSAIC_START_SLOT_P0/P1, gepaarte Heuristik-Sonde, par.8), volle Messung LAEUFT (Sims-Stufen 25/400). Waechter nach Nutzer-Entscheid Weg 3: dazu hv2-Artefakt per Referee als Gegenprobe (Schalter im Bau). Plattenwahl (par.6a) EINGETAKTET im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -285,14 +285,24 @@ Standard-Kennzahlen sind damit abgedeckt. Defaults: `--n-seeds 60`, `--pairings 
 Seed-Basis 20260912. JSON mit n/Grundmenge/Einheit, `laufzeit`-Block, `cli_args`.
 
 **ABWEICHUNG von par.4 (Nutzer-Entscheid offen):** der Zirkularitaets-Waechter verlangt zwei
-verschieden faehige Spieler `v1`/`v2huelle`. hv2 ist im heutigen Quellstand nicht spielbar
-(`SearchConfig::from_spec_file` weist alles ausser hv1 ab, `net_mcts.rs:942-957`; Zweig am
-2026-08-26 entfernt); das eingefrorene hv2-Artefakt traegt ein aelteres Wheel ohne diesen Knopf.
-Ersatz in der Sonde: zwei Faehigkeitsstufen derselben Variante ueber die Suchtiefe (25 gegen 400
+verschieden faehige Spieler `v1`/`v2huelle`. PRAEZISIERT 2026-09-12 (Nutzer-Rueckfrage): hv2 IST
+spielbar, als eingefrorenes Artefakt `models/frozen_heuristics/hv2_generator/` im Referee-Pfad
+(eigenes Wheel, Protokoll drafting/tiling/start_placement). Nicht spielbar ist hv2 nur auf dem
+LEBENDEN Wheel (`SearchConfig::from_spec_file` weist alles ausser hv1 ab, Zweig am 2026-08-26
+entfernt). Das Hindernis fuer die Sonde ist enger: im Referee-Pfad berechnet die Startsetzung
+der Artefakt-Seite deren WORKER mit dem Artefakt-Wheel (`tools/frozen_referee_match.py:344-349`,
+`frozen_champion_worker.py:192-194`), und dieses Wheel kennt `MOSAIC_START_SLOT_P0` nicht; der
+Slot laesst sich hv2 also nicht ueber den Knopf aufzwingen. Ausweg (nicht gebaut): der Referee
+erzwingt die Startsetzung der Seite A selbst auf dem lebenden Wheel (`--force-start-slot-a`,
+Platte/Rotation dann nach hv1-Handregel, ein benannter Konfund) und hv2 spielt den Rest; Kosten
+Referee-Partien 9-17 s je Partie. Ersatz in der gebauten Sonde: zwei Faehigkeitsstufen derselben Variante ueber die Suchtiefe (25 gegen 400
 Sims, der gemessene Prior/Value-Regler), Spearman-Rangkorrelation der Slot-Margins zwischen den
-Stufen, Flag `kippt` bei rho < 0. Im Artefakt als `waechter.abweichung_von_prereg` vermerkt. Ob
-dieser Ersatz den Waechter erfuellt, entscheidet der Nutzer; bis dahin gilt ein Verdikt nur
-unter Vorbehalt.
+Stufen, Flag `kippt` bei rho < 0. Im Artefakt als `waechter.abweichung_von_prereg` vermerkt. **Nutzer-Entscheid 2026-09-12 ("Nimm Weg 3"):** die Sims-Stufen bleiben die Hauptmessung, dazu
+kommt die hv2-Gegenprobe ueber den Referee mit kleinerem n (20 Partien je Slot): Schalter
+`--force-start-slot-artifact` in `tools/frozen_referee_match.py` (Startsetzung der Artefakt-Seite
+auf dem lebenden Wheel mit gesetztem Knopf, nur fuer diese eine Anfrage) und Treiber
+`tools/probes/start_dome_slot_referee_probe.py` (Spearman der Slot-Margins hv2 gegen hv1@400).
+Bau laeuft (Agent, nur Code); Lauf nach der Fortsetzungskette, exklusiv.
 
 **Ungeprueft / offen:** nichts kompiliert (Wheel-Durchgang fuer alle neuen Knoepfe folgt nach der
 Neuverankerungs-Kette, PREREG_v28_window.md par.8); die Log-Muster der Heuristik-Arena fuer

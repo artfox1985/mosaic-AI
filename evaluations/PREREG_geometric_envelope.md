@@ -2398,3 +2398,24 @@ Paritaets-Brettern in beiden Huellenformen, Abzug genau (r+1)/Gesamtkosten, Joke
 nur fuer Wild-Zellen; 576 Engine-Tests gruen, Wheel gebaut und installiert, Netz-Paritaets-
 Fixture unveraendert, Anker-Drift GRUEN (`anchor_drift_live_wheel_20260911_k3d.json`).
 Messungen (Punkte 2 und 3) folgen nach der Ablations-Kette.
+
+**C2 GEMESSEN (par.12c Punkt 2; 2026-09-12, 07:31-09:49, `tools/night_v28_measure.sh`, exklusiv,
+je Lauf rund 2.050 s):** argmax-Instrument @400, 200 Partien, Seed 20260931, deterministisch,
+ohne Wurzelrauschen, `MOSAIC_STACK_DRAW_RESEARCH=1`; Knopf AN = Champion-Spec
+(`frozen_champions/v27-b01/spec.json`: K3-P c 1,0, Huellenform 2, K5 1,0; dead_cell_w und
+out_wild_w fehlen = 0), AUS = `models/k3v_off.spec.json`. Grundmenge je Lauf 400 Seiten aus
+200 Partien, Einheit volle Spalten je Seite (`corpus_sanity_check.py`, Artefakte
+`c2_v28b01_on.json` usw.):
+
+| Arm | Knopf an | Knopf aus | Differenz | Punkte an / aus |
+| --- | --- | --- | --- | --- |
+| v28-b01 | 0,8625 (KI +-0,070) | 0,7225 (+-0,074) | **+0,140** | 54,95 / 52,38 |
+| v28-b02 | 0,8950 (+-0,075) | 0,6675 (+-0,074) | **+0,228** | 54,60 / 52,18 |
+
+**C2 ERFUELLT fuer die v28-Generation:** beide Arme dasselbe Vorzeichen, beide Differenzen
+ueber der Lauf-KI, Punkte in derselben Richtung (+2,6 / +2,4), Strafleiste unbewegt (5,0-5,1).
+Der Stand vom 2026-09-05 (b01 +0,045, v24-b01 -0,075, v24-b02 +0,095: verletzt) gilt fuer die
+v24-Aera; an den v28-Netzen ist die Knopf-Wechselwirkung nicht nur vorzeichenstabil, sondern
+groesser als damals. Hinweis zur Lesart: das Instrument ist deterministisch und laeuft ohne
+Wurzelrauschen, die KI ist die Spielstreuung ueber 200 Partien, nicht die Seed-Streuung (C3,
+drei Seeds je Arm, bleibt ungemessen). A1/A2 (Punkt 3) laufen.
