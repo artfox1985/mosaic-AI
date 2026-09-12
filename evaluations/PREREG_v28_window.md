@@ -460,3 +460,10 @@ Stichentscheid (`tools/night_v28_third_seed.sh`). Artefakte
 `paired_gating_v28-b02_vs_v27-b01_s44_segment2.json` / `..._s46_segment2.json`,
 `arena_columns_...` je Seed.
 
+**SCHRITT 6 UND 8b DES PROGRAMMS (2026-09-12):** Ueberraschungs-Kante v24-b05 gegen v24-b04
+97:103, SPRT H0 nach 100 Paaren (`policy_surprise_weighting` par.12, ENTSCHIEDEN NEIN). C2 der
+Einhuellenden an beiden Armen erfuellt: Knopf an minus aus +0,140 (b01) und +0,228 (b02) volle
+Spalten je Seite am argmax-Instrument, Punkte +2,6 / +2,4 (`geometric_envelope` par.12c).
+Nebenbefund fuer Tor 2a: ohne Huellen-Knopf faellt b02 (0,668) unter b01 (0,723), mit Knopf liegt
+b02 vorn (0,895 gegen 0,863); die Reihung der Arme haengt an der Spec, mit der gemessen wird.
+
