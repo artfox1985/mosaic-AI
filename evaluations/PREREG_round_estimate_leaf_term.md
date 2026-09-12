@@ -185,3 +185,22 @@ zeigt den Faktor 4 ueber die Runden; eine Skala 9,25 liesse den Term in Runde 1 
 aus). Der Nutzer kann vor dem Bau auf (b) wechseln; der Knopf-Default traegt dann den
 gewaehlten Wert, Vorab-Auflage aus par.3 erfuellt. Kostentor 25 % und Falsifikator aus par.5
 unveraendert.
+
+## par.7 BAUSTAND 2026-09-12 (Code geschrieben, noch nicht kompiliert)
+
+Gebaut nach par.3 mit Skala (a) aus par.4/par.6a: `net_mcts.rs` K4-Block (`round_estimate_points`,
+`round_estimate_shift_from`, `round_estimate_shift_state`, Blatt-Pfad hinter dem K3-Term),
+Spec-Felder `round_est_c` (Default 0,0) und `round_est_b_profile` (vier Zahlen, Default 3 / 8 /
+10 / 12 = P90 von |E(0) - E(1)| je Runde 1..4 aus `round_estimate_scale_probe.json`, n = 10.698 /
+9.441 / 9.184 / 8.750 Draft-Zustaende, Einheit Punkte), Env `MOSAIC_ROUND_EST_C` /
+`MOSAIC_ROUND_EST_B_PROFILE`, Registratur, `engine_config`, Spec-Abbildung in server.py und
+claude_play.py, drei Tests. **Abweichung von par.3, hiermit registriert:** statt EINER Skala
+`round_est_b` als Pflichtfeld ein RUNDENPROFIL `round_est_b_profile`, und beide Felder OPTIONAL
+(Grund: die eingefrorenen Artefakt-Specs und `models/*.spec.json` tragen sie nicht und muessen
+weiter laden; Muster `dead_cell_w`). Solver-Wiederverwendung (par.3 "UNGEPRUEFT"): der Blatt-Pfad
+ruft `solve_round_final_score` je Spieler selbst, trifft aber die thread-lokale Memoisierung, die
+der Merkmalsbau desselben Zustands unmittelbar davor fuellt (`tiling_solver.rs:404-427`,
+`features.rs:859`); bei `MOSAIC_TILING_CACHE=0` waeren es zwei echte Solverlaeufe je Blatt. Der
+Merkmalswert selbst ist als Quelle unbrauchbar (f32/100, ohne Strafleisten-Busse). Vorzeichen der
+Busse wie `mcts.rs::player_total`. Kompilierung, Paritaets-Fixture, Anker-Drift und die Messkette
+par.5 folgen im v28-Programm Schritt 7; A/B ueber den Referee am Champion, C_est aus par.5.
