@@ -749,3 +749,19 @@ am Quelltext begruendet (der Zweig wird nicht betreten), nicht gemessen; die Son
 gelaufen. Rauchtest vorgesehen:
 `python -X utf8 -u tools/probes/start_dome_tile_probe.py --limit 4 --pairings 25 --threads 4`;
 voller Lauf: `python -X utf8 -u tools/probes/start_dome_tile_probe.py` (exklusiv).
+
+**KORREKTUR 22:05 (Replayer-Befund, Agent, vom Koordinator uebernommen; Regel
+`PREREG_search_rng_split.md`):** der Replayer liest die Startsetzung schon aus der START_TILE-Zeile
+(`analyze_game_log.py:1196-1199` -> `py.rs:344 apply_start_tile`); die 190 nicht nachspielbaren
+Partien kommen nicht von der Handregel, sondern von einem RNG-Leck: die Startsetzungs-SUCHE zog
+aus dem geteilten Partie-RNG (Determinisierung plus jede Simulation), den der Replay aus dem Seed
+nachbaut; ab der ersten Turm-Nachfuellung (`supply.rs:43/50`, `state.rs:354`) divergieren Log und
+Replay. Dieselbe Verschiebung entpaart gepaarte Arenen ab dieser Stelle: **das A/B par.9e ist ab
+der ersten Nachfuellung nur nominell gepaart** (jede Partie fuer sich bleibt fair, beide Spieler
+sehen dieselben Fabriken; Siege 91:99 und Punkte gelten als ungepaarter Vergleich, die gepaarten
+Intervalle sind zu eng gerechnet). Fix: eigener seed-abgeleiteter Strom fuer die Start-Suche
+(`derive_search_seed(game_seed, START_SEARCH_STREAM + start_step)`), Arena-Zweig gefixt, Self-Play-
+und Diagnose-Zweig in Arbeit (Agent), dann Bau-Tore und WIEDERHOLUNG des A/B mit echter Paarung
+(`tools/night_tile_probe_replay.sh` erweitert). Die 93-%-Praeferenz fuer (2,0) ist von dem Leck
+nicht betroffen (sie ist die Wahl der Suche, nicht der Partie).
+
