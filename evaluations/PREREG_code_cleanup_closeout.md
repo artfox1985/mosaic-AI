@@ -131,6 +131,8 @@ Abschlusskapitel in `docs/architecture_reference.md` "Stand beim Projektende".
 
 ## par.5a NAME DES SCHLUSSMODELLS: "Tessa" (Nutzer-Entscheid 2026-09-11, 23:45)
 
+Nutzer 2026-09-12, 18:05: v30 wird released und ist der Projektabschluss; Tessa ist damit der v30-Champion, Stufe 2 und 3 folgen der v30-Promotion.
+
 Der Champion am Projektende heisst nach aussen **Tessa** (Tessera: der einzelne Mosaikstein;
 Nutzer: "tessa passt, so machen wir das"). Umsetzung mit Stufe 3, NACH der letzten Promotion:
 

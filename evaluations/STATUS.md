@@ -247,6 +247,10 @@ Index: `PREREG_INDEX.md` (generiert).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
+000. **ENTSCHIEDEN 2026-09-12, 18:05: v30 wird released und ist der Projektabschluss** (Tessa =
+   v30-Champion). v29 traegt das Begleitprogramm, v30 nur Rezept-Knoepfe; danach Leiter-Endfassung,
+   Code-Abschluss Stufen 2/3, Abschlussbericht (`PREREG_v29_window.md` par.8 Punkt 3).
+
 00d. **hv3 (hv2 + Phantom-Fix) als Leiter-Knoten** (Nutzer 17:30): Port des hv2-Codes aus
    65b48af^ auf den heutigen Motor laeuft (Agent, nur Code); danach Kompilat, Einfrieren
    (`freeze_heuristic.py`), Kanten gegen Anker/hv2/v21. Dazu v22-b05 (live, k3v_off) als Sprosse
