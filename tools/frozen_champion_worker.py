@@ -196,10 +196,17 @@ def main() -> int:
                 # Budget, mit dem es draftet. Traegt sie das Feld nicht
                 # (jede eingefrorene Spec von heute), liest die Engine den
                 # Wert nie und legt wie bisher per Handregel.
-                out = {"ok": True, "placement": json.loads(
-                    engine.start_placement(state_json, int(req["pi"]),
-                                           int(req["game_seed"]),
-                                           int(req.get("sims", args.sims))))}
+                # ABWAERTSKOMPATIBEL (Vorfall 2026-09-12, 13:35): jedes eingefrorene
+                # Wheel vor dem Such-Start kennt nur die Drei-Argument-Form; der
+                # Vier-Argument-Aufruf brach dort mit TypeError und riss alle
+                # Anker-Kanten. Erst die alte Form, nur bei TypeError die neue.
+                pi_ = int(req["pi"]); seed_ = int(req["game_seed"])
+                try:
+                    raw = engine.start_placement(state_json, pi_, seed_)
+                except TypeError:
+                    raw = engine.start_placement(state_json, pi_, seed_,
+                                                 int(req.get("sims", args.sims)))
+                out = {"ok": True, "placement": json.loads(raw)}
             else:
                 raise ValueError(
                     f"unbekannte Anfrageart '{kind}' (drafting/tiling/start_placement). "
