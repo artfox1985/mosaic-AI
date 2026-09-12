@@ -342,7 +342,36 @@ Motor mit Phantom-Fix (Nutzer: "mach mir eine hv3 (hv2 + phantom fix)"), Port au
 Backup (Segment 1: 1242, zwischen v21 und v24-b07, dort ist die Leiter dicht) und wird nicht
 gezogen, solange die Luecke unten offen ist.
 
-**ZWISCHENSTUFEN GEFAHREN (2026-09-12, 13:36-14:55, `tools/night_ladder_rungs2.sh` Teil B, nach
+**hv3 GEBAUT, EINGEFROREN UND GEMESSEN (21:41-21:49, `tools/night_hv3_freeze_edges.sh`):** Port
+des hv2-Rezepts auf den heutigen Motor (heuristic_v3.rs, plate_builder_v3.rs; der Phantom-Fix A2
+wirkt ueber `remaining_colors` an zwei Routing-Stellen), Bau-Tore gruen (629 Lib-Tests,
+Beispiele, Wheel, Fixture und Kontrakt unveraendert, Anker-Drift und Konservierung gruen,
+Python-Spiegeltest der Aktions-IDs 8/8), Artefakt `models/frozen_heuristics/hv3_generator`
+(Golden Probe 10 Partien, venv, Konservierung gruen). Kanten, beide @150 c_puct 0,3, drei
+Bloecke bis zum Deckel: **hv3 gegen hv4-Anker 73:77** (p 0,81), **hv3 gegen hv2 78:72** (p 0,68).
+Der Phantom-Fix aendert die Staerke des Huellen-Lehrers nicht messbar; hv3 992 [948, 1035].
+
+**v22-b05 UND v28-b01 (18:04-20:20, `tools/night_v28_tail8.sh`):** v22-b05 live (k3v_off) gegen v21
+64:86 (Deckel, p 0,086), gegen Anker 38:12 (Frueh-Stopp, 76 %), gegen hv2 41:9; v28-b01 gegen
+v26-b01 92:58 (Deckel, p 0,007), gegen v21 69:31 (Frueh-Stopp nach 100). v22-b05 1158 liegt
+knapp unter v21, die Luecke 1000-1158 bleibt ohne Netz-Sprosse.
+
+**LEITER SEGMENT 2, ENDSTAND 21:50 (24 Kanten, alle am Anker):**
+
+| Knoten | Elo | KI95 | Partien |
+| --- | --- | --- | --- |
+| v28-b02@400 (Champion) | **1344** | [1301, 1395] | 1.380 |
+| v28-b01@400 | 1313 | [1264, 1366] | 400 |
+| v27-b01@400 | 1301 | [1256, 1351] | 1.280 |
+| v26-b01@400 | 1244 | [1194, 1296] | 400 |
+| v24-b07@400 | 1191 | [1146, 1244] | 400 |
+| v21_2d_brierbest@400 | 1178 | [1135, 1224] | 500 |
+| v22-b05_live@400 | 1158 | [1105, 1215] | 250 |
+| Heuristik_hv4_anchor@150 | 1000 | fix | 850 |
+| Heuristik_hv3_generator@150 | 992 | [948, 1035] | 300 |
+| Heuristik_hv2_generator@150 | 978 | [937, 1018] | 500 |
+
+ `tools/night_ladder_rungs2.sh` Teil B, nach
 dem Worker-Patch 13:37; die drei Anker-Kanten und hv2 gegen Anker davor gescheitert, Nachlauf
 `tools/night_ladder_missing_edges.sh`; v21-Sprossen im Nachlauf `night_ladder_v21_edges.sh`):**
 

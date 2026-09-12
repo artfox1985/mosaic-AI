@@ -47,12 +47,12 @@
   "elo": {
     "value": 1344,
     "ci95": [
-      1298,
-      1399
+      1301,
+      1395
     ],
     "games": 1380,
     "record": "842-538",
-    "as_of": "2026-09-12 17:10",
+    "as_of": "2026-09-12 21:50",
     "segment": "2 (Anker hv4_anchor @150 c_puct 0,3, seit dem Phantom-Fix A2 am 2026-09-12; Alt-Register archive/elo_history_pre_phantomfix.csv)",
     "edges": [
       "Anker 126:24 (n=150 fest, Anker @150/0,3; die Morgenfassung @400/1,5 ist archiviert)",
@@ -63,13 +63,15 @@
       "Sprosse gegen Artefakt v24-b07 44:6 (Frueh-Stopp nach 50)"
     ],
     "ladder_after_refit": {
+      "v28-b01": 1313,
       "v27-b01": 1301,
-      "v28-b01": 1288,
-      "v26-b01": 1251,
-      "v24-b07": 1184,
-      "v21_2d_brierbest": 1157,
-      "anchor": 1000,
-      "hv2_generator": 987
+      "v26-b01": 1244,
+      "v24-b07": 1191,
+      "v21_2d_brierbest": 1178,
+      "v22-b05_live": 1158,
+      "anchor_hv4": 1000,
+      "hv3_generator": 992,
+      "hv2_generator": 978
     }
   },
   "golden_probe": {

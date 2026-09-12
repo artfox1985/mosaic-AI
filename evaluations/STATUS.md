@@ -19,9 +19,9 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 ## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 23:55)
 
 **Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12, 06:17-06:45),
-Elo 1344** [1298, 1399] aus 1.380 Partien im LEITERSEGMENT 2 (Endstand 17:10, 16 Kanten, alle am
-Anker `hv4_anchor` fix 1000): v27-b01 1301, v28-b01 1288 (nur Anker-Kante), v26-b01 1251,
-v24-b07 1184, v21 1157, hv2 987. Die Anker-Kanten der Nacht liefen mit falschen Parametern
+Elo 1344** [1301, 1395] aus 1.380 Partien im LEITERSEGMENT 2 (Endstand 21:50, 24 Kanten, alle am
+Anker `hv4_anchor` fix 1000): v28-b01 1313, v27-b01 1301, v26-b01 1244, v24-b07 1191, v21 1178,
+v22-b05 1158, hv3 992, hv2 978. Die Anker-Kanten der Nacht liefen mit falschen Parametern
 (archiviert) und wurden korrekt wiederholt; die Leiter traegt jetzt auf Zwischenstufen aus dem
 restic-Repo (v21, v24-b07; `PREREG_code_cleanup_closeout.md` par.7a). Promotion vollstaendig nach
 Checkliste (Anker 126:24, Nachbar 133:97 SPRT + Replikation 212:188 ohne Entscheid, Champion-2
@@ -251,7 +251,10 @@ Index: `PREREG_INDEX.md` (generiert).
    v30-Champion). v29 traegt das Begleitprogramm, v30 nur Rezept-Knoepfe; danach Leiter-Endfassung,
    Code-Abschluss Stufen 2/3, Abschlussbericht (`PREREG_v29_window.md` par.8 Punkt 3).
 
-00d. **hv3 (hv2 + Phantom-Fix) als Leiter-Knoten** (Nutzer 17:30): Port GESCHRIEBEN 18:00 (Agent;
+00d. ~~hv3 (hv2 + Phantom-Fix) als Leiter-Knoten~~ ERLEDIGT 21:50: gebaut, Tore gruen,
+   eingefroren (`models/frozen_heuristics/hv3_generator`), Kanten 73:77 gegen hv4 und 78:72 gegen
+   hv2 (beide Deckel): der Fix aendert die Staerke nicht messbar, hv3 992. Aktions-ID-Waechter
+   ebenfalls im Wheel (Spiegeltest 8/8). Urspruenglicher Eintrag: Port GESCHRIEBEN 18:00 (Agent;
    `heuristic_v3.rs`, `plate_builder_v3.rs`, Variante durch Suche/Self-Play/Referee, hv1 per
    Delegation bitidentisch; A2 wirkt in hv3 an zwei Routing-Stellen ueber `remaining_colors`),
    UNKOMPILIERT. Dazu der Aktions-ID-Waechter (Nutzer: Punkt 1): `action_to_id` kennt jeden Typ,
