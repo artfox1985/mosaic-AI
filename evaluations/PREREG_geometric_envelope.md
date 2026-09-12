@@ -2510,3 +2510,20 @@ ohne die Spalten zu kosten, bekommt er eine gepaarte Arena als eigene Spec-Numme
 sonst bleibt er Knopf ohne Rezeptwirkung, und par.13 gilt unveraendert. Kosten je Lauf rund
 35 min (C2-Laufzeit).
 
+**ERGEBNIS des Nachtrags (2026-09-12, 12:09-13:26, `tools/night_k3d_joker_instrument.sh`; der
+Jokerfeld-Lauf lief neben dem cargo-Build des Nutzer-Pushes, deterministisches Instrument, Laufzeit
+gebremst zu lesen: 41 min statt ~35; K3-D 36 min):** Bezug `c2_v28b02_on` (Champion-Spec, gleicher
+Seed 20260931, 200 Partien, 400 Seiten).
+
+| Einstellung | volle Spalten | Teilspalten >= 3 | Punkte | Strafleiste | Mehrfarbige Felder (k3, 79 aktive Partien) |
+| --- | --- | --- | --- | --- | --- |
+| Champion-Spec (Bezug) | 0,895 (+-0,075) | 3,23 | 54,60 (+-1,65) | 5,14 | 3,92 (+-0,68) |
+| plus Jokerfeld (out_wild_w 1) | 0,873 (+-0,074) | 3,25 | 54,41 | 4,91 | 4,35 (+-0,70) |
+| plus K3-D (dead_cell_w 1) | 0,888 (+-0,077) | 3,26 | 54,86 | 4,92 | 3,94 |
+
+Jokerfeld: Zielgroesse +0,43 Punkte bei den Mehrfarbigen Feldern, Intervalle je +-0,7, Spalten
+-0,02; K3-D: Spalten -0,01, Teilspalten +0,04, Punkte +0,3. **Kein Knopf bewegt seine Zielgroesse
+ueber die Lauf-KI; beide bleiben Knoepfe ohne Rezeptwirkung, keine Arena, par.13 unveraendert.**
+Artefakte `c2_v28b02_jokerfeld.json`, `c2_v28b02_k3d.json`. Damit ist der Nachtrag erledigt
+und die Prereg bleibt ENTSCHIEDEN.
+
