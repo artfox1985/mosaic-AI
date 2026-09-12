@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): die Handregel legt IMMER Slot (0,0) (Code), und genau dieser Slot ist der beste oder gleichbeste (Margin +1,5 [-4,1; +7,0] gegen Bestand, alle anderen Slots schlechter, Reihe 2 um 11-13 Punkte). Hebel SLOTWAHL geschlossen; offen bleibt nur Platte/Rotation (par.9a). hv2-Gegenprobe (Weg 3) laeuft als zweiter Waechter. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): die Handregel legt immer (0,0), und das ist der beste Slot (Reihe 2 kostet 11-13 Punkte). Nutzer-Entscheide 2026-09-12: Self-Play STREUT den Slot (par.9b, p 0,15 je Spieler, Bau laeuft) und im Spiel entscheidet die SUCHE die Setzung (par.9c, Bau vor v29, A/B hinter der Leiter). hv2-Gegenprobe (Weg 3) laeuft. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -487,6 +487,7 @@ Erwartung: *"kann gut sein dass die suche/netz dann selbststaendig entscheidet, 
 0,0 die stabilste ist. aber zumindest hat es staerkeren hebel einzugreifen."* Das ist auch die
 Messfrage des A/B: nicht "mehr Elo", sondern (a) wie oft weicht die Suche von (0,0) ab und in
 welchen Auslagen, (b) kostet die Abweichung Punkte oder bringt sie welche (gepaart, gleiche
-Seeds), (c) Siege als Waechter. Zeitpunkt vom Koordinator vorgeschlagen (vor v29), Nutzer hat
-nicht widersprochen; der Generationswechsel verschiebt sich um rund einen Tag.
+Seeds), (c) Siege als Waechter. Zeitpunkt ENTSCHIEDEN (Nutzer 13:15: "bau den such-start dann vor v29"); der
+Generationswechsel verschiebt sich um rund einen Tag. Nutzer 13:10 zur Erwartung: die Suche darf
+auch (0,2) waehlen, das Spaltenspiegelbild von (0,0); Stufe 0 zeigt Reihe 0 als gleichauf.
 
