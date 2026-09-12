@@ -481,8 +481,12 @@ Such-Start gegen Champion mit Handregel; Erwartung nach Stufe 0 klein, da (0,0) 
 Slot ist; Platte/Rotation sind der Rest, par.9a Punkt 1). Knopf-Form: `MOSAIC_START_BY_SEARCH`
 (Default 0 = Handregel, bitidentisch), Spec-Feld fuer die Artefakt-Identitaet.
 
-**Reihenfolge, Vorschlag:** par.9b (Streuung, in Bau) fuer die v29-Erzeugung; par.9c als
-Such-Knopf VOR der v29-Erzeugung nur, wenn der Nutzer ihn im Generator haben will, sonst als
-v29-Begleitprogramm mit A/B am Champion und Uebernahme bei v30. Offen: Nutzer-Entscheid zum
-Zeitpunkt.
+**Reihenfolge:** par.9b (Streuung, in Bau) und par.9c BEIDE vor der v29-Erzeugung, damit der
+Generator sie traegt; A/B des Such-Starts am Champion hinter der Leiter-Kette. Nutzer 13:05 zur
+Erwartung: *"kann gut sein dass die suche/netz dann selbststaendig entscheidet, dass die position
+0,0 die stabilste ist. aber zumindest hat es staerkeren hebel einzugreifen."* Das ist auch die
+Messfrage des A/B: nicht "mehr Elo", sondern (a) wie oft weicht die Suche von (0,0) ab und in
+welchen Auslagen, (b) kostet die Abweichung Punkte oder bringt sie welche (gepaart, gleiche
+Seeds), (c) Siege als Waechter. Zeitpunkt vom Koordinator vorgeschlagen (vor v29), Nutzer hat
+nicht widersprochen; der Generationswechsel verschiebt sich um rund einen Tag.
 
