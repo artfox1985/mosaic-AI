@@ -197,6 +197,9 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Dritter Seed Nachbar-Kante, 200 Paare bis zum Deckel, Fruehstopp aus, 10 Threads, Logs | **5.405 s** | 13,5 s je Partie |
 | Startkuppel Stufe 0 (arena_match Heuristik, 9 Slots x 60 Partien x 2 Sims-Stufen, threads 0) | **430 s** fuer 1.080 Partien | 0,40 s je Partie |
 | argmax-Instrument je Knopf (Jokerfeld / K3-D, 200 Partien @400) | 41 min (gebremst, neben Push-Build) / 36 min | |
+| Such-Start A/B (paired_gating, SPRT H0 nach 95 Paaren, 10 Threads, Logs) | **2.977 s** | 15,7 s je Partie (Such-Start kostet je Partie eine Suche mehr) |
+| Sprossen-Kanten (frozen_referee_match, 50 Partien, 6 Prozesse) | Netz gegen Netz-Artefakt 917-963 s; Heuristik gegen Heuristik 53 s; Netz gegen Heuristik 365-464 s | je Block |
+| hv2-Gegenprobe Startkuppel (9 Slots x 20 Referee-Partien, 6 Prozesse) | **219 s** | 1,2 s je Partie |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 

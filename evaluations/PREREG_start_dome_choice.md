@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): die Handregel legt immer (0,0), und das ist bei hv1@25, hv1@400 und hv2@150 der beste Slot (Reihe 2 kostet 11-13 Punkte; Waechter Weg 3 erfuellt, Spearman 0,85 und 0,52, kippt nicht). Nutzer-Entscheide: Self-Play STREUT den Slot (par.9b, p 0,15) und im Spiel entscheidet die SUCHE (par.9c/9d); beide GEBAUT und im Wheel (13:33), A/B des Such-Starts laeuft. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 (par.9): Handregel legt immer (0,0), fuer Heuristiken der beste Slot. Such-Start GEBAUT und A/B GEMESSEN (par.9e): die Suche legt zu 93 % auf (2,0), Siege 91:99 und Punkte gleich, Eckplatten +1,85 und Aussenfelder +0,83 gegen vertikale Reihen -0,82. Gleichwertig, andere Praeferenz als die Heuristik. Streuung (par.9b, p 0,15) und Such-Start gehen ins v29-Rezept. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -608,3 +608,45 @@ NETZ-Artefakte (`pending_dome_choice`) sind unberuehrt, solange die Artefakte au
 eigenen Wheels spielen und ihre Specs das Feld nicht tragen -- das ist heute der Fall, aber
 ungeprueft am Artefakt-Bestand; das A/B (200 Paare, Champion mit Such-Start gegen Champion mit
 Handregel) samt der drei Messfragen aus par.9c.
+
+## par.9e A/B DES SUCH-STARTS (2026-09-12, 17:13-18:03, `tools/night_start_by_search_ab.sh`)
+
+Bau-Tore vorab gruen (Lib-Tests 613, Wheel, Fixture und Kontrakt unveraendert, Anker-Drift und
+Konservierung gegen hv4_anchor gruen). A/B gepaart: v28-b02 mit `start_by_search 1`
+(`models/start_by_search_on.spec.json`) gegen v28-b02 mit Champion-Spec, Seed 20261048,
+Blockgroesse 5, `--log-games`, 10 Threads, exklusiv; **SPRT H0 nach 95 Paaren** (LLR -3,50;
+2.977 s, 15,7 s je Partie). Artefakt `paired_gating_v28-b02_startsearch_vs_v28-b02_s48.json`.
+
+**Messfrage (a), Abweichungsrate:** aus den START_TILE-Logzeilen, Seitenzuordnung ueber
+`side_names` je Partie (die Lognamen NetzA/NetzB sind Brettnamen): die Handregel-Seite legt
+190 von 190 auf (0,0); **die Such-Seite legt 177 von 190 (93 %) auf (2,0)**, 12 auf (0,0), 1 auf
+(1,0). Die Suche weicht also nicht gelegentlich ab, sie hat eine ANDERE feste Praeferenz: die
+untere linke Ecke, zeilengespiegelt zur Handregel.
+
+**Messfrage (b), Kosten der Abweichung:** Punkte gepaart -0,05 [-3,04; +2,94], Marge -0,11
+[-6,09; +5,88]; Abweichungspartien der Such-Seite im Mittel Marge -0,1 (n=178) gegen +0,7 bei
+den zwoelf (0,0)-Partien (n zu klein). Plattenpunkte gepaart (Such-Start minus Handregel):
+**Eckplatten +1,85 [+0,58; +3,11]**, **Aeussere Felder +0,83 [+0,37; +1,30]**, Vertikale Reihen
+-0,82 [-2,24; +0,60], Spezialfelder -0,25, Strafleiste -0,45 [-1,71; +0,81]; Summe der
+Endwertung +8,71 gegen +8,03 je Partie. Die Suche kauft mit (2,0) Eck- und Aussenfeld-Punkte
+und gibt sie bei den vertikalen Reihen wieder ab.
+
+**Messfrage (c), Siege:** 91:99, McNemar p 0,67, gepaarte Differenz -0,08 [-0,37; +0,20].
+**Gleichwertig** (Nutzer 18:00: "schaut gleichwertig aus. das ist gut").
+
+**Lesart, und was sie an Stufe 0 korrigiert:** fuer die Heuristiken (hv1@25, hv1@400, hv2@150)
+kostet Reihe 2 elf bis dreizehn Punkte (par.9); fuer das Netz mit Huelle kostet (2,0) nichts.
+"Guter Start ist eine Eigenschaft der Position" gilt also innerhalb der Heuristik-Familie und
+NICHT fuer den Spieler, um den es geht: das Netz spielt von (2,0) aus einen anderen Plan
+(Ecken und Aussenfelder statt vertikaler Reihen) mit gleichem Ergebnis. Genau das ist der
+Grund, den Startzug der Suche zu ueberlassen (par.9c): nicht Elo, sondern dass die Wahl zum Plan
+des Spielers passt. Fuer die v29-Erzeugung mit Such-Start heisst das: der Korpus wird zu rund
+93 % (2,0)-Starts tragen, die Streuung (par.9b, p 0,15) liefert die uebrigen Slots; der
+Policy-Kopf lernt damit erstmals einen Start-Prior, der nicht die Handregel ist.
+
+**Werkzeug-Befund:** `tools/probes/arena_column_probe.py` konnte 190 von 190 Partien NICHT
+nachspielen (Replayer loest die Startsetzung mit der Handregel auf und divergiert dann);
+volle Spalten je Seite fehlen deshalb fuer dieses A/B und sind aus den Logs per
+`reconstruct_game` (Muster Stufe-0-Sonde) nachzuziehen; der Replayer braucht die Startsetzung aus
+der START_TILE-Zeile (Aufgabe, nicht gebaut).
+

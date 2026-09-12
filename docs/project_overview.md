@@ -46,7 +46,11 @@ gegenseitig hochschaukeln:
 2. **Eine Suche als "Nachdenken".** Vor jedem Zug spielt das
    Programm im Kopf einige hundert Varianten durch. Das Bauchgefühl
    sagt ihr, welche Varianten sich überhaupt lohnen; das Nachdenken
-   korrigiert das Bauchgefühl, wo es daneben liegt.
+   korrigiert das Bauchgefühl, wo es daneben liegt. Und genau diese
+   Korrektur ist das Lernsignal: Das Netz wird darauf trainiert, beim
+   nächsten Mal von vornherein das zu bevorzugen, was die Suche nach
+   dem Nachdenken gewählt hat. Wo Suche und Bauchgefühl auseinander
+   liegen, lernt das Netz am meisten.
 
 Der Lernkreislauf, den wir "Generationszyklus" nennen:
 
