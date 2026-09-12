@@ -302,7 +302,22 @@ kommt die hv2-Gegenprobe ueber den Referee mit kleinerem n (20 Partien je Slot):
 `--force-start-slot-artifact` in `tools/frozen_referee_match.py` (Startsetzung der Artefakt-Seite
 auf dem lebenden Wheel mit gesetztem Knopf, nur fuer diese eine Anfrage) und Treiber
 `tools/probes/start_dome_slot_referee_probe.py` (Spearman der Slot-Margins hv2 gegen hv1@400).
-Bau laeuft (Agent, nur Code); Lauf nach der Fortsetzungskette, exklusiv.
+GEBAUT 2026-09-12, 10:10 (Agent, vom Koordinator gegengelesen; nichts gelaufen):
+`tools/frozen_referee_match.py` mit `--force-start-slot-artifact N` (Startsetzung der Artefakt-
+Seite ueber `mosaic_rust.start_placement_choice_state_json` auf dem lebenden Wheel, Knopf nur um
+diesen Aufruf gesetzt und danach entfernt; Partie-Record traegt `start_slot_artifact` aus der
+START_TILE-Zeile und `start_slot_forced`) und `--heuristic-a` (Seite A netzlos hv1 ueber
+`heuristic_arena_choice_state_json`; `--model-a` ohne Modell spielt KEINE Heuristik,
+`referee.rs:689-710` laedt ein Netz). Treiber `tools/probes/start_dome_slot_referee_probe.py`:
+hv2_generator@150 gegen lebende hv1@150, 20 Partien je Slot, Seed-Basis 20260913, 6 Worker,
+`--force-cross-era` (Kontrakt a3f61f246d9bbf5c gegen 39648b95bbba1acf), c_puct 0,3 wie in der
+Heuristik-Arena; Waechter = Spearman der Slot-Margins gegen die Paarung hv1@400 der
+Hauptmessung. **Benannter Konfund:** `choose_start_placement_json` ignoriert Spec und Seed
+(`referee.rs:121`) und nutzt die hv1-Handregel; gemessen wird "hv2 spielt eine Partie, die in
+Slot N beginnt", nicht "hv2 waehlt Slot N". Ungeprueft bis zum Rauchtest: Prozess-Isolation von
+`os.environ` je Worker (aus `mp.Pool`/`_play_block` hergeleitet), Sichtbarkeit der Python-
+Umgebungsvariable fuer das Rust-`env::var` (in der Hauptsonde gleich gebaut, Slot-Kontrolle
+dort noch nicht gelaufen). Lauf nach der Fortsetzungskette, exklusiv.
 
 **Ungeprueft / offen:** nichts kompiliert (Wheel-Durchgang fuer alle neuen Knoepfe folgt nach der
 Neuverankerungs-Kette, PREREG_v28_window.md par.8); die Log-Muster der Heuristik-Arena fuer
