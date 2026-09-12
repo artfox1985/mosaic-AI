@@ -7594,7 +7594,7 @@ mod tests {
         let result = SearchConfig::from_spec_file(path.to_str().unwrap());
         assert!(result.is_err(), "eine hv2-Spec darf in diesem Build NICHT still als hv1 laufen");
         let msg = result.unwrap_err();
-        assert!(msg.contains("nicht spielbar"), "Fehlermeldung muss den Grund nennen: {msg}");
+        assert!(msg.contains("nicht mehr spielbar"), "Fehlermeldung muss den Grund nennen: {msg}");
         assert!(msg.contains("mitgelieferten Wheel"), "Fehlermeldung muss den Ausweg nennen: {msg}");
         assert!(msg.contains("hv3"), "Fehlermeldung muss auf den heutigen Nachbau zeigen: {msg}");
         std::fs::remove_file(&path).ok();
