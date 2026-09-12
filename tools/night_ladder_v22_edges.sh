@@ -10,7 +10,7 @@ set -u
 cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
 ART=evaluations/artifacts
-ANCHOR=models/frozen_heuristics/hv1_anchor_v2
+ANCHOR=models/frozen_heuristics/hv4_anchor
 HV2=models/frozen_heuristics/hv2_generator
 V21=models/frozen_champions/v21_2d_brierbest
 M22=models/restored_v22/alphazero_v22-b05.onnx

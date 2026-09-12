@@ -20,7 +20,7 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 **Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12, 06:17-06:45),
 Elo 1344** [1298, 1399] aus 1.380 Partien im LEITERSEGMENT 2 (Endstand 17:10, 16 Kanten, alle am
-Anker `hv1_anchor_v2` fix 1000): v27-b01 1301, v28-b01 1288 (nur Anker-Kante), v26-b01 1251,
+Anker `hv4_anchor` fix 1000): v27-b01 1301, v28-b01 1288 (nur Anker-Kante), v26-b01 1251,
 v24-b07 1184, v21 1157, hv2 987. Die Anker-Kanten der Nacht liefen mit falschen Parametern
 (archiviert) und wurden korrekt wiederholt; die Leiter traegt jetzt auf Zwischenstufen aus dem
 restic-Repo (v21, v24-b07; `PREREG_code_cleanup_closeout.md` par.7a). Promotion vollstaendig nach
@@ -42,9 +42,9 @@ vier SPRT-H0; **keine Ablation schlaegt b02, Fensterzuschnitt bleibt.** Bester S
 Promotion steht an. **Code-Abschluss Stufe 1 GEBAUT** (`PREREG_code_cleanup_closeout.md`
 par.8): 585 Tests gruen, Wheel installiert, Kontrakt-Hash jetzt 39648b95bbba1acf, Paritaets-
 Fixture wegen A2 neu; **ANKER NEU GESETZT (Nutzer 2026-09-12, 02:10: "setz den anker neu"):** Artefakt
-`models/frozen_heuristics/hv1_anchor_v2` (Wheel mit A2), Drift und Konservierung GRUEN; Alt-Register
+`models/frozen_heuristics/hv4_anchor` (Wheel mit A2), Drift und Konservierung GRUEN; Alt-Register
 nach `archive/elo_history_pre_phantomfix.csv`, frisches `elo_history.csv`, `ANCHOR_NAME =
-Heuristik_hv1_anchor_v2`, keine Aliase. **MASCHINE BELEGT: Neuverankerungs-Kette
+Heuristik_hv4_anchor`, keine Aliase. **MASCHINE BELEGT: Neuverankerungs-Kette
 `tools/night_reanchor.sh`**: die drei Anker-Kanten SIND DURCH und registriert (v28-b02 126:24,
 v28-b01 132:18, v27-b01 124:26; Segment-2-Elo 1288 / 1346 / 1271, Intervalle ueberlappend;
 `PREREG_code_cleanup_closeout.md` par.7a), die Nachbar-Kante v28-b02 gegen v27-b01
@@ -276,7 +276,7 @@ Index: `PREREG_INDEX.md` (generiert).
    Konservierung gruen, Wheel installiert). Push erst, wenn die Leiter durch ist (der pre-push-
    Hook baut und testet neben den Referee-Partien).
 
-00. ~~ANKER-DRIFT ROT durch A2~~ ENTSCHIEDEN 2026-09-12: (a) Anker neu gesetzt (`hv1_anchor_v2`, Segment 2).
+00. ~~ANKER-DRIFT ROT durch A2~~ ENTSCHIEDEN 2026-09-12: (a) Anker neu gesetzt (`hv4_anchor`, Segment 2).
 0. ~~Name des Schlussmodells~~ ENTSCHIEDEN 2026-09-11: **Tessa** (Umsetzung mit Stufe 3 des
    Code-Abschlusses, `PREREG_code_cleanup_closeout.md` par.5a).
 

@@ -25,7 +25,7 @@ dome-building board game with hidden information.
 
 Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1344** (95% CI [1298, 1399])
 from 1,380 rated games on the **second ladder segment**, anchored at the frozen
-heuristic artifact `models/frozen_heuristics/hv1_anchor_v2` (Heuristic@150 =
+heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 =
 1000, `tools/elo_tracker.py report`). The ladder was re-anchored on 2026-09-12:
 a correctness fix in the hull evaluation (phantom tiles, cleanup finding A2)
 moved the old anchor's moves, so the first segment (anchor `hv1_anchor`,

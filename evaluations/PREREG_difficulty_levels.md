@@ -425,7 +425,7 @@ Alle Elo-Zahlen in par.2.3, par.2.5 und par.4 stammen aus dem ALT-REGISTER (Segm
 Anker `Heuristik_hv1_anchor`), das am 2026-09-12 nach `archive/elo_history_pre_phantomfix.csv`
 verschoben wurde (`PREREG_code_cleanup_closeout.md` par.7a: Phantom-Fix A2 bewegte den
 Anker, Nutzer-Entscheid "setz den anker neu"). Seither gilt Segment 2 mit dem Anker
-`models/frozen_heuristics/hv1_anchor_v2` (`Heuristik_hv1_anchor_v2@150` = 1000 fix); Kanten
+`models/frozen_heuristics/hv4_anchor` (`Heuristik_hv4_anchor@150` = 1000 fix); Kanten
 ueber die Grenze werden nie gemischt. Folgen fuer diese Prereg:
 
 - Die Zeile `hv1_anchor` in par.2.3 bezeichnet den Segment-1-Anker; der Spieler der Stufen
@@ -439,7 +439,7 @@ ueber die Grenze werden nie gemischt. Folgen fuer diese Prereg:
   historisch und wird nicht umgeschrieben.
 
 **Nachtrag 2026-09-12, 16:20 (Segment 2, Stufe 1 gemessen):** die Anfaenger-Stufe hv2_generator@150
-(c_puct 0,3) gegen den Anker hv1_anchor_v2@150: **77:73 aus 150 Partien** (drei Bloecke a 50 ohne
+(c_puct 0,3) gegen den Anker hv4_anchor@150: **77:73 aus 150 Partien** (drei Bloecke a 50 ohne
 Frueh-Stopp, p 0,81; `PREREG_code_cleanup_closeout.md` par.7a). Elo-Knoten `Heuristik_hv2_generator@150`
 972 [921, 1022], also gleich stark wie der Anker. Die Zahl 1100 aus par.2.5 galt fuer
 `Heuristik_v2huelle` im Segment 1 und ist fuer die Leiter der Stufen NICHT mehr zu verwenden. Damit

@@ -35,7 +35,7 @@
     "champion_behavior_artifact": {
       "file": "mosaic_rust_knobs_20260912.whl",
       "sha256": "ea980d9f3c0c95569620c3ea6f8a4626066cd7f0437f03bcafe3b9b783c107c7",
-      "source": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl, gebaut 2026-09-12 (Knopf-Durchgang: round_estimate, Rueckgabe-Reihenfolge, Startslot, alle auf Default; Anker-Drift gegen hv1_anchor_v2 gruen, tools/night_v28_knob_build.sh)"
+      "source": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl, gebaut 2026-09-12 (Knopf-Durchgang: round_estimate, Rueckgabe-Reihenfolge, Startslot, alle auf Default; Anker-Drift gegen hv4_anchor gruen, tools/night_v28_knob_build.sh)"
     }
   },
   "worker_python": {
@@ -53,7 +53,7 @@
     "games": 1380,
     "record": "842-538",
     "as_of": "2026-09-12 17:10",
-    "segment": "2 (Anker hv1_anchor_v2 @150 c_puct 0,3, seit dem Phantom-Fix A2 am 2026-09-12; Alt-Register archive/elo_history_pre_phantomfix.csv)",
+    "segment": "2 (Anker hv4_anchor @150 c_puct 0,3, seit dem Phantom-Fix A2 am 2026-09-12; Alt-Register archive/elo_history_pre_phantomfix.csv)",
     "edges": [
       "Anker 126:24 (n=150 fest, Anker @150/0,3; die Morgenfassung @400/1,5 ist archiviert)",
       "Nachbar/Gating gegen v27-b01 Seed 20261044 133:97 (SPRT nach 115 Paaren, p 0,0198)",
@@ -138,7 +138,7 @@
     "tor1": "gegen v28-b01 (Segment 1): 207:193 (Seed 20261038) und 209:191 (Seed 20261039), beide Deckel, Nullbefund; Nutzer-Entscheid 2026-09-11: b02 als korrektere Fassung (755 Merkmale) bester Stand",
     "tor2a": "Variante B als Generator: siehe PREREG_v28_window.md par.10",
     "tor2b": "Segment 2 gegen v27-b01: 1,022 gegen 0,895 (Seed 20261044, n=229) und 1,015 gegen 0,901 (Seed 20261046, n=392) volle Spalten je Seite",
-    "anker": "126:24 (Segment 2, hv1_anchor_v2)",
+    "anker": "126:24 (Segment 2, hv4_anchor)",
     "champion2": "101:49 gegen Artefakt v26-b01 (Cross-Aera)",
     "ablations": "b03 (ohne Ausflug-Klasse) 77:83 und 26:44, b04 (ohne G-2) 55:65 und 114:116: keine schlaegt b02"
   },
@@ -172,5 +172,5 @@
     "wheel_sha256_now": "ea980d9f3c0c95569620c3ea6f8a4626066cd7f0437f03bcafe3b9b783c107c7",
     "note": "sha256 des am 2026-09-12 03:47 gebauten Wheels (Knopf-Durchgang); im Artefakt als mosaic_rust_knobs_20260912.whl; live installiert identisch (geprueft 06:25)"
   },
-  "champion_note": "Erster Champion nach dem Einfrieren (v25-v27) und erste Architekturaenderung: Variante B des Kuppelstapel-Fixes (11 Merkmale 744..754, INPUT_SIZE 755, Rust-Merkmalsbauer). Gegen v28-b01 gemessen gleichauf, gewaehlt als korrektere Fassung (Nutzer 2026-09-11). Generator der Generation v29. Erstes Artefakt im Leitersegment 2 (Anker hv1_anchor_v2)."
+  "champion_note": "Erster Champion nach dem Einfrieren (v25-v27) und erste Architekturaenderung: Variante B des Kuppelstapel-Fixes (11 Merkmale 744..754, INPUT_SIZE 755, Rust-Merkmalsbauer). Gegen v28-b01 gemessen gleichauf, gewaehlt als korrektere Fassung (Nutzer 2026-09-11). Generator der Generation v29. Erstes Artefakt im Leitersegment 2 (Anker hv4_anchor)."
 }
