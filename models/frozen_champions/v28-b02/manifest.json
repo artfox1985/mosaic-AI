@@ -45,29 +45,32 @@
   "training_manifest": "models/manifest_train_v28-b02_20260911_152432.json",
   "prereg": "evaluations/PREREG_v28_window.md; docs/promotion_checklist.md",
   "elo": {
-    "value": 1299,
+    "value": 1344,
     "ci95": [
-      1244,
-      1359
+      1298,
+      1399
     ],
-    "games": 1330,
-    "record": "798-532",
-    "as_of": "2026-09-12 11:45",
-    "segment": "2 (Anker hv1_anchor_v2, seit dem Phantom-Fix A2 am 2026-09-12; Alt-Register archive/elo_history_pre_phantomfix.csv)",
+    "games": 1380,
+    "record": "842-538",
+    "as_of": "2026-09-12 17:10",
+    "segment": "2 (Anker hv1_anchor_v2 @150 c_puct 0,3, seit dem Phantom-Fix A2 am 2026-09-12; Alt-Register archive/elo_history_pre_phantomfix.csv)",
     "edges": [
-      "Anker 126:24 (n=150, Handshake gruen)",
-      "Nachbar/Gating v28-b02 gegen v27-b01 Seed 20261044 133:97 (SPRT nach 115 Paaren, p 0,0198)",
-      "Replikation Seed 20261046 212:188 (Deckel, p 0,281, nicht signifikant)",
-      "Dritter Seed 20261047 226:174 (Deckel, Fruehstopp aus, p 0,0167): die Kante traegt",
-      "Champion-2 gegen Artefakt v26-b01 101:49 (n=150, Cross-Aera)"
+      "Anker 126:24 (n=150 fest, Anker @150/0,3; die Morgenfassung @400/1,5 ist archiviert)",
+      "Nachbar/Gating gegen v27-b01 Seed 20261044 133:97 (SPRT nach 115 Paaren, p 0,0198)",
+      "Replikation Seed 20261046 212:188 (Deckel, p 0,281)",
+      "Dritter Seed 20261047 226:174 (Deckel, Fruehstopp aus, p 0,0167)",
+      "Champion-2 gegen Artefakt v26-b01 101:49 (n=150, Cross-Aera)",
+      "Sprosse gegen Artefakt v24-b07 44:6 (Frueh-Stopp nach 50)"
     ],
     "ladder_after_refit": {
-      "v28-b01": 1346,
-      "v27-b01": 1262,
-      "v26-b01": 1173,
-      "anchor": 1000
-    },
-    "vorlaeufig": "2026-09-12 12:10: die drei Anker-Kanten des Segments 2 liefen mit Anker @400/c_puct 1,5 statt @150/0,3 und wurden aus dem Register genommen; Wiederholung mit korrekten Parametern plus Zwischenstufen laeuft (tools/night_ladder_rungs.sh). Die Zahlen hier stammen aus dem Fit MIT den falschen Kanten und werden nachgezogen."
+      "v27-b01": 1301,
+      "v28-b01": 1288,
+      "v26-b01": 1251,
+      "v24-b07": 1184,
+      "v21_2d_brierbest": 1157,
+      "anchor": 1000,
+      "hv2_generator": 987
+    }
   },
   "golden_probe": {
     "file": "golden_probe.json",

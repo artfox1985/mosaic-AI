@@ -291,6 +291,31 @@ haelt fuer das Artefakt hv2_generator nicht; ob beides derselbe Spieler ist, ble
 (hv2@150) ist so stark wie der Anker, nicht 100 Elo darueber. Register nach dieser Kante: v28-b02
 1329 [1281, 1389], v28-b01 1288, v27-b01 1285, v26-b01 1232, v24-b07 1155, Anker 1000, hv2 972.
 
+**v21-SPROSSEN (16:18-17:09, `tools/night_ladder_v21_edges.sh`):** v21 gegen hv2 34:16 (Frueh-Stopp
+nach 50, p 0,015); v24-b07 gegen v21 **85:65 am Deckel** (drei Bloecke 30:20, 27:23, 28:22, p 0,12,
+die Sprosse mit der besten Aufloesung); v21 gegen Anker 42:8 (Frueh-Stopp, p < 0,0001: auch v21 ist
+gegen den Anker schon gesaettigt).
+
+**LEITER SEGMENT 2, ENDSTAND 17:10 (16 Kanten, alle am Anker, `tools/elo_tracker.py report`):**
+
+| Knoten | Elo | KI95 | Partien |
+| --- | --- | --- | --- |
+| v28-b02@400 (Champion) | **1344** | [1298, 1399] | 1.380 |
+| v27-b01@400 | 1301 | [1256, 1352] | 1.280 |
+| v28-b01@400 | 1288 | [1220, 1369] | 150 (nur Anker-Kante) |
+| v26-b01@400 | 1251 | [1188, 1316] | 250 |
+| v24-b07@400 | 1184 | [1134, 1236] | 400 |
+| v21_2d_brierbest@400 | 1157 | [1100, 1215] | 250 |
+| Heuristik_hv1_anchor_v2@150 | 1000 | fix | 650 |
+| Heuristik_hv2_generator@150 | 987 | [941, 1033] | 300 |
+
+Lesart: die Leiter traegt jetzt auf Kanten im 57-77-%-Bereich (v24-b07 gegen v21, v26 gegen
+v24, v27 gegen v24) statt nur auf gesaettigten Anker-Kanten; die Netze ab v21 gewinnen gegen beide
+Heuristiken 82-90 %. Der Abstand v28-b02 zu v27-b01 (+43) ist der der drei Nachbar-Seeds; v28-b01
+haengt nur an der Anker-Kante und ist damit die unschaerfste Zahl. Frueh-Stopp-Kanten sind im
+Register als solche markiert. Alle Segment-2-Zahlen in STATUS, README und dem Artefakt-Manifest
+sind auf diesen Stand gezogen; die Vorlaeufigkeits-Markierung entfaellt.
+
 **ZWISCHENSTUFEN GEFAHREN (2026-09-12, 13:36-14:55, `tools/night_ladder_rungs2.sh` Teil B, nach
 dem Worker-Patch 13:37; die drei Anker-Kanten und hv2 gegen Anker davor gescheitert, Nachlauf
 `tools/night_ladder_missing_edges.sh`; v21-Sprossen im Nachlauf `night_ladder_v21_edges.sh`):**

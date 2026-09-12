@@ -23,10 +23,8 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v28-b02`** (promoted 2026-09-12), Elo **about 1300** on the **second
-ladder segment** (provisional: the segment's anchor edges are being re-measured
-with the ladder's anchor parameters and intermediate rungs are being added,
-because the direct anchor edges are saturated at 84-88 % wins), anchored at the frozen
+Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1344** (95% CI [1298, 1399])
+from 1,380 rated games on the **second ladder segment**, anchored at the frozen
 heuristic artifact `models/frozen_heuristics/hv1_anchor_v2` (Heuristic@150 =
 1000, `tools/elo_tracker.py report`). The ladder was re-anchored on 2026-09-12:
 a correctness fix in the hull evaluation (phantom tiles, cleanup finding A2)
@@ -34,11 +32,14 @@ moved the old anchor's moves, so the first segment (anchor `hv1_anchor`,
 `v27-b01` at 1405, `v26-b01` 1364, `v25-b01` 1336) now lives in
 `archive/elo_history_pre_phantomfix.csv` and is not comparable across the
 boundary; the same happened once before on 2026-08-21 with the round-5 solver
-fix (`archive/elo_history_pre_r5fix.csv`). The anchor carries its own wheel:
+fix (`archive/elo_history_pre_r5fix.csv`). Because every net since v23 beats the
+heuristic anchor at 84-90 % (saturated edges), the second segment carries
+intermediate rungs from frozen artifacts restored out of the backup
+(`v21_2d_brierbest` 1157, `v24-b07` 1184, `v26-b01` 1251, `v27-b01` 1301) and the
+second heuristic `hv2_generator` (987). The anchor carries its own wheel:
 an engine change can no longer move the fixed point of the ladder, and every
 engine change is checked move by move against it (drift check,
-`/mosaic-anchor-invariance`). On the new segment `v27-b01` sits at 1262 and
-`v26-b01` at 1173; `v28-b02` beat `v27-b01` 133:97 (SPRT), 212:188 (to the
+`/mosaic-anchor-invariance`). `v28-b02` beat `v27-b01` 133:97 (SPRT), 212:188 (to the
 cap, not significant) and 226:174 (third seed to the cap without early
 stopping, p 0.017), so the edge holds. The
 value head predicts a win *probability* (WDL); display probabilities are
