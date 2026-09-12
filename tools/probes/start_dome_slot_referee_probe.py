@@ -194,6 +194,16 @@ def main_reference(path: Path, pairing: str) -> dict:
     return {"verfuegbar": True, "paarung": pairing, "quelle": path.name, "margins": margins}
 
 
+def _repo_relative(path: Path) -> str:
+    """Pfad relativ zur Repo-Wurzel als POSIX-String; ein Pfad ausserhalb (oder ein
+    relativer, der sich nicht aufloesen laesst) bleibt so, wie er ist. `relative_to`
+    verlangt zwei Pfade derselben Art, sonst ValueError (Rauchtest 2026-09-12)."""
+    try:
+        return path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return path.as_posix()
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(description=__doc__,
@@ -314,7 +324,7 @@ def main() -> int:
                 "abweichungen_nach_slot": dict(slot_misses),
             },
             "referee_lauf": {
-                "datei": (runs_dir / f"slot_{slot}.json").relative_to(ROOT).as_posix(),
+                "datei": _repo_relative(runs_dir / f"slot_{slot}.json"),
                 "elapsed_s": result.get("elapsed_s"),
                 "wins_a": result.get("wins_a"),
                 "wins_b": result.get("wins_b"),
