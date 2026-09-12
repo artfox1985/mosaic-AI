@@ -4,7 +4,7 @@ Dieses Dokument erklärt das Projekt für Menschen ohne KI- oder
 Statistik-Hintergrund. Es beantwortet drei Fragen: Was machen wir?
 Wie machen wir es? Und warum ausgerechnet so?
 
-Stand: 2026-08-21. Der tagesaktuelle Detailstand steht immer in
+Stand: 2026-09-12. Der tagesaktuelle Detailstand steht immer in
 `evaluations/STATUS.md` (Fachdokument, deutsch); die technische
 Kurzfassung in der `README.md` (englisch).
 
@@ -63,10 +63,13 @@ Der Lernkreislauf, den wir "Generationszyklus" nennen:
   neuer Champion. Ein Unentschieden reicht nicht.
 - Die Stärke aller Versionen halten wir auf einer **Elo-Leiter**
   fest (dasselbe Zahlensystem wie im Schach). Als Fixpunkt dient ein
-  regelbasierter Vergleichsspieler, den wir auf Elo 1000 setzen. Der
-  aktuelle Champion (Generation 21) steht auf dieser Leiter bei
-  etwa **1215** – grob gesagt: er gewinnt gegen den Fixpunkt rund
-  drei von vier Partien.
+  regelbasierter Vergleichsspieler, den wir auf Elo 1000 setzen und
+  eingefroren haben (mit eigenem Programmstand, damit ihn keine
+  spätere Änderung verschiebt). Der aktuelle Champion (Generation 28)
+  steht bei **1344**. Weil jedes Netz seit Generation 21 gegen den
+  Fixpunkt rund neun von zehn Partien gewinnt, trägt die Leiter
+  dazwischen auf eingefrorenen Zwischenstufen (ältere Champions),
+  gegen die die Duelle noch etwas aussagen.
 
 Eine Besonderheit unseres Spiels: In der letzten Runde ist fast
 alles bekannt und berechenbar. Dort rechnet das Programm nicht mehr
@@ -74,46 +77,52 @@ mit Bauchgefühl, sondern mit einem exakten Endspiel-Rechner
 (inklusive der Wahrscheinlichkeiten für die wenigen noch verdeckten
 Plättchen). Auch dessen Wissen fließt zurück ins Training.
 
-## 3. Woran arbeiten wir gerade? (Die Wertungsplatten-Baustelle)
+## 3. Woran arbeiten wir gerade? (Die Wertungsplatten-Baustelle, Stand nach Generation 28)
 
-Der Champion spielt das Grundspiel inzwischen stark – aber er lässt
+Der Champion spielt das Grundspiel stark – aber lange ließ er
 messbar Punkte liegen, die über die Wertungsplatten zu holen wären.
 Ein menschlicher Spieler, der gezielt "auf die Platten spielt", holt
-dort zweistellige Punktbeträge, die dem Programm entgehen.
+dort zweistellige Punktbeträge.
 
 Warum ist ausgerechnet das schwer? Weil eine Wertungsplatte eine
 **langfristige Absicht** verlangt: Wer eine 7-Punkte-Spalte bauen
 will, muss sich über mehrere Runden hinweg auf bestimmte Farben und
-Felder festlegen. In den Selbstspiel-Daten kommt so ein konsequenter
-Spaltenbau aber fast nie vor – und was in den Trainingsdaten nicht
-vorkommt, kann das Netz nicht lernen. Ein Henne-Ei-Problem: Das Netz
-baut keine Spalten, also sieht es nie, dass Spalten Siege bringen,
-also baut es keine Spalten.
+Felder festlegen. In den Selbstspiel-Daten kam so ein konsequenter
+Spaltenbau anfangs fast nie vor – und was in den Trainingsdaten nicht
+vorkommt, kann das Netz nicht lernen.
 
-Wir haben dafür in den letzten Wochen systematisch Lösungswege
-durchprobiert und die meisten **sauber gemessen und verworfen** (das
-ist kein Scheitern, sondern der Sinn der Messung – siehe Abschnitt 4).
-Der aktuell laufende Versuch ist ein **asymmetrisches Curriculum**,
-und die Idee ist anschaulich:
+Was seit August dazu belegt ist:
 
-- Wir erzeugen einen Lehr-Datensatz von 16.000 Partien, in dem **je
-  Partie genau eine Seite** einen regelbasierten "Bauhelfer"
-  bekommt, der sie zum Spaltenbau drängt. Die andere Seite spielt
-  normal.
-- Dadurch entsteht zum ersten Mal ein Datensatz, in dem "Brett mit
-  Spaltenfortschritt" und "Partie gewonnen/verloren" nicht mehr
-  symmetrisch verrauscht sind – das Netz bekommt erstmals die Chance,
-  den **Wert** des Plattenbaus zu sehen, nicht nur seine Existenz.
-- Die Abnahme des Datensatzes hat die Voraussetzung bestätigt: Die
-  gedrängte Seite schließt in 34,6 % der Partien mindestens eine
-  Spalte ab, die freie Seite nur in 3,3 % – ein deutlicher
-  Unterschied, aus dem sich lernen lässt.
-- Jetzt trainieren zwei ansonsten identische Netze: eines mit dem
-  Lehr-Datensatz, eines mit einem gleich großen normalen Datensatz
-  (die "Kontrollgruppe", wie in einer Studie). Danach wird gemessen,
-  ob das Lehr-Netz von sich aus mehr Spalten baut – und ob es dabei
-  nicht schwächer wird. Beides ist vorher schriftlich als Messlatte
-  festgelegt.
+- Ein regelbasierter "Bauhelfer", der eine Seite zum Spaltenbau
+  drängt, hat als Lehr-Datensatz den Knoten gelöst: Der Champion baut
+  seither in jeder Generation mehr volle Spalten (heute rund eine je
+  Partie, vorher praktisch null) und gewinnt trotzdem die Duelle
+  gegen seinen Vorgänger. Das war das eigentliche Ziel dieser
+  Baustelle.
+- Ein "geometrisches Geländer" in der Suche (die Einhüllende: eine
+  Dreiecksform, in der Spalten überhaupt fertig werden können) bleibt
+  Teil des Rezepts, weil vier Champions in Folge damit ihre Duelle
+  bestanden haben. Der Versuch, seinen Nutzen auch am Bauchgefühl des
+  Netzes nachzuweisen, ist an einem ungeeigneten Maßstab gescheitert
+  und wurde bewusst geschlossen.
+- Drei Generationen lang wurde **nur das Material** getauscht (die
+  Aufzeichnungen, aus denen trainiert wird), sonst nichts – und jede
+  davon war stärker als die vorige. Das sagt, dass der Kreislauf
+  selbst trägt.
+- Zwei Fehler, die keine Messung zeigen konnte, weil sie beide
+  Seiten eines Duells gleich betrafen, wurden durch Spielen und Lesen
+  gefunden: die Suche vergaß eine Reihenfolge, die sie selbst gewählt
+  hatte, und die Startsetzung der Kuppel landete im Netz auf einer
+  falschen Kennung. Beide sind behoben, und aus beiden sind Wächter
+  im Code geworden.
+
+Was jetzt läuft: Generation 29 und 30. In 29 wird gemessen, ob die
+Suche am Rundenende schon das Legen der Fliesen sehen soll, ob die
+Startsetzung der Kuppel ein Suchentscheid wird, und woran genau die
+Züge eines stärkeren Gegners (Partien gegen ein großes Sprachmodell)
+vom Netz abweichen. Was davon trägt, kommt in Generation 30. Mit
+ihr endet das Projekt: Das Schlussmodell heißt Tessa, und die
+Web-Oberfläche bekommt eine gemessene Leiter von Schwierigkeitsstufen.
 
 ## 4. Warum so umständlich? (Unsere Arbeitsregeln, und woher sie kommen)
 
@@ -161,9 +170,10 @@ Entscheidungen wird.
 - **Netz und Training: Python/PyTorch** – der Standardwerkzeugkasten
   für neuronale Netze.
 - **Eine Web-Oberfläche zum Selberspielen** (`python server.py`,
-  dann im Browser `http://localhost:5000`): Mensch gegen Programm in
-  mehreren Schwierigkeitsstufen, inklusive eines Debug-Fensters, das
-  zeigt, was das Programm bei seinem Zug "dachte".
+  dann im Browser `http://localhost:5000`): Mensch gegen Programm,
+  inklusive eines Debug-Fensters, das zeigt, was das Programm bei
+  seinem Zug "dachte". Die Schwierigkeitsstufen werden zum Abschluss
+  neu vermessen (vom eingefrorenen Regelspieler bis zum Champion).
 - **Ordnung im Projektordner:** Der Wurzelordner führt aus,
   `engine/` rechnet, `tools/` misst, `evaluations/` protokolliert,
   `docs/` erklärt (dieses Dokument, das Regelheft, die
@@ -176,7 +186,8 @@ dann die `README.md`, dann `evaluations/STATUS.md`.
 ## 6. Ehrlichkeitsklausel
 
 Dieses Dokument ist eine Vereinfachung. Wo es mit den Fachdokumenten
-kollidiert, gelten die Fachdokumente. Die Zahlen hier (Elo 1215,
-16.000 Lehr-Partien, 34,6 % gegen 3,3 %) stammen aus den am
-2026-08-21 protokollierten Messungen; sie veralten mit dem Projekt,
-die Aussagen zur Methode nicht.
+kollidiert, gelten die Fachdokumente. Die Zahlen hier (Elo 1344 für
+Generation 28, rund eine volle Spalte je Partie, neun von zehn
+Partien gegen den Fixpunkt) stammen aus den am 2026-09-12
+protokollierten Messungen; sie veralten mit dem Projekt, die
+Aussagen zur Methode nicht.
