@@ -451,3 +451,27 @@ Erzeugung vor dem Training. Kosten (ANNAHME): Bau und Tore rund 2 h, Bloecke run
 (Praezedenz b02), Training wie b01.
 
 Nicht eingetaktet: par.11 (zweite Achse, was WEISS die Suche) bleibt als eigener Punkt offen.
+
+## par.14 CROSSCHECK FLIESENBUCHHALTUNG am Server-Log (Nutzer 2026-09-13, 01:05: "ich denk das laesst sich mitrechnen")
+
+`tools/probes/tile_ledger_crosscheck.py` auf dem Engine-Replay von
+`static/log/game_20260911_092554_seed946607.log` (Mensch gegen v27-b01@400; Dump per
+`tools/analyze_game_log.py --dump-states`, 106 Entscheidungspunkte, Runden 1-5). Die Sonde benutzt
+NUR oeffentliche Information (Fabriken, Musterreihen ohne Phantome, Strafleiste, belegte
+Kuppelfelder; Turm als Ereignis-Ledger am Rundenwechsel; Nachfuellregel aus `state.rs`) und vergleicht
+Beutel und Turm je Farbe gegen `bag_colors`/`tower_colors` der Engine.
+
+**Ergebnis: 106 von 106 Entscheidungspunkten stimmen in Beutel UND Turm je Farbe ueberein**
+(Artefakt `evaluations/artifacts/tile_ledger_crosscheck_game_20260911_092554_seed946607.json`,
+n = 106, Grundmenge Entscheidungspunkte des Dumps, Einheit Fliesen je Farbe; 0,05 s). Zwei
+Nachfuellungen aus dem Turm: vor Runde 4 (Beutel 2, Turm 34 nach dem Rundenende 3) und vor
+Runde 5 (Beutel 15, Turm 15). Die Aufteilung ist also fuer einen zaehlenden Spieler
+vollstaendig reproduzierbar, P.9 ist eine echte Sicht-Asymmetrie.
+
+**Was der Encoder heute wegaddiert, am Beispiel Runde 3 (Zuege 47-68):** Beutel [1, 1, 0, 0, 0]
+(blau, gelb, rot, schwarz, tuerkis), Turm [7, 5, 4, 2, 0]; das Netz sieht `bag_count` 2 und die
+Summe [8, 6, 4, 2, 0]. Fuer die Fuellung von Runde 4 kommen die ersten 2 Fliesen sicher aus
+blau/gelb, der Rest aus dem gemischten Turm plus Rundenende-Abraum; die Summe allein sagt das
+nicht. Grenzen der Sonde: in dieser Partie keine Phantom-Fliesen (Chip-Vollendung) und keine
+gelegte Spezialfliese; beide Faelle sind im Code behandelt (Phantome abgezogen, SPECIAL-Felder
+ausgenommen), aber an diesem Log nicht geprueft.
