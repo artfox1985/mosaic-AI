@@ -1344,16 +1344,40 @@ fn tiling_choice_state_json(
 /// `current_player()`: in dieser Phase kann der Nicht-Starter zuerst dran sein.
 /// `game_seed` aus `RefereeGame::game_seed()` -- `hv2` waehlt unter
 /// mehreren Kandidaten seed-basiert.
+/// `model_path`/`sims` (`PREREG_start_dome_choice.md` par.9c): nur noetig,
+/// wenn die Spec `start_by_search == 1` traegt -- dann sucht diese Seite ihre
+/// Startsetzung mit dem angegebenen Netz. Beide weggelassen (jeder
+/// Bestandsaufrufer, u.a. `tools/frozen_referee_match.py`) = Handregel wie
+/// bisher, kein Netzladen.
 #[pyfunction]
-#[pyo3(signature = (state_json, pi, game_seed, spec=None))]
+#[pyo3(signature = (state_json, pi, game_seed, spec=None, model_path=None, sims=None))]
 fn start_placement_choice_state_json(
     state_json: String,
     pi: usize,
     game_seed: u64,
     spec: Option<String>,
+    model_path: Option<String>,
+    sims: Option<u32>,
 ) -> PyResult<String> {
     let search_config = resolve_search_config(spec)?;
-    let p = crate::referee::choose_start_placement_json(&search_config, &state_json, pi, game_seed)?;
+    // Netz NUR laden, wenn der Knopf es ueberhaupt braucht -- ein ~9 MB ONNX
+    // je Startsetzung waere sonst reine Ladezeit (dieselbe Falle wie in
+    // `FrozenWorkerEngine::tiling`).
+    let net = match (search_config.start_by_search, &model_path) {
+        (1, Some(p)) => Some(
+            crate::net::Net::load_auto(p)
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(e.to_string()))?,
+        ),
+        _ => None,
+    };
+    let p = crate::referee::choose_start_placement_json(
+        &search_config,
+        &state_json,
+        pi,
+        game_seed,
+        net.as_ref(),
+        sims.unwrap_or(crate::referee::START_SEARCH_DEFAULT_SIMS),
+    )?;
     Ok(p.to_string())
 }
 

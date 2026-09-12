@@ -109,16 +109,56 @@ use crate::tile::TileColor;
 /// `choose_start_placement_variante` unter mehreren Kandidaten SEED-BASIERT
 /// aus. Ohne den Seed des Referees waere die Setzung eine andere als die, die
 /// derselbe Agent in-process getroffen haette.
+/// `net`/`sims` (`PREREG_start_dome_choice.md` par.9c): traegt die Spec
+/// dieser Seite `start_by_search == 1` UND liegt ein Netz vor, sucht die
+/// Setzung ([`crate::net_mcts::search_start_placement`]) statt sie per
+/// Handregel zu legen. Bei `start_by_search == 0` (Default, und jede
+/// eingefrorene Spec) wird `net`/`sims` gar nicht angefasst -- bitidentischer
+/// Bestand. Ein HEURISTIK-Artefakt hat zwar ein `net` (Tiling-Durchfall,
+/// siehe `FrozenWorkerEngine::net`), traegt aber nie `start_by_search`, und
+/// genau deshalb haengt die Umschaltung am Spec-Feld und nicht daran, ob ein
+/// Netz da ist.
+/// Sim-Budget der Startsetzungs-Suche im Referee-/Worker-Protokoll, wenn der
+/// Aufrufer keines mitschickt (`PREREG_start_dome_choice.md` par.9c). 400 ist
+/// das Budget, mit dem Arena und Gating draften; ein EIGENER Default statt
+/// `0`, weil eine Suche mit Budget 0 still auf den Prior zusammenfiele und
+/// dann nur so AUSSAEHE, als haette sie gesucht.
+pub(crate) const START_SEARCH_DEFAULT_SIMS: u32 = 400;
+
 pub(crate) fn choose_start_placement_json(
     search_config: &SearchConfig,
     state_json: &str,
     pi: usize,
     game_seed: u64,
+    net: Option<&Net>,
+    sims: u32,
 ) -> PyResult<Value> {
     let parsed: Value = serde_json::from_str(state_json)
         .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
     let state = crate::serialize::json_to_state_exact(&parsed).map_err(PyValueError::new_err)?;
-    let _ = (search_config, game_seed);
+    // `pi < 2` VOR dem Indexzugriff (A5-Muster aus `apply_start_placement`):
+    // `pi` kommt ueber das Worker-Protokoll aus Python, und `1 - pi` waere
+    // fuer `pi >= 2` ein usize-Unterlauf. Ausserhalb des Bereichs faellt es
+    // auf den Bestandspfad, der den Fehler ohnehin sauber meldet.
+    if search_config.start_by_search == 1 && pi < 2 {
+        if let Some(net) = net {
+            // Seed-Konvention des Arena-/Referee-Pfads (`derive_search_seed`
+            // ueber den ALLE-Schritte-Zaehler): Startsetzungen sind die
+            // ersten beiden Schritte einer Partie, der Nicht-Starter legt
+            // zuerst. Steht die Setzung des Gegners noch aus, ist dies
+            // Schritt 0, sonst Schritt 1 -- damit trifft der Worker-Pfad
+            // denselben Seed wie `RefereeGame::pending_search_seed()`
+            // in-process.
+            let steps: u64 = if state.players[1 - pi].start_tile_pending { 0 } else { 1 };
+            let mut rng = StdRng::seed_from_u64(derive_search_seed(game_seed, steps));
+            if let Some(s) = crate::net_mcts::search_start_placement(
+                net, &state, pi, sims, false, &mut rng, search_config,
+            ) {
+                let (tid, r, c, rot) = s.chosen_placement();
+                return Ok(json!({"tile_id": tid, "row": r, "col": c, "rot": rot}));
+            }
+        }
+    }
     match crate::self_play::choose_start_placement(&state, pi) {
         Some((tid, r, c, rot)) => Ok(json!({"tile_id": tid, "row": r, "col": c, "rot": rot})),
         None => Err(PyValueError::new_err(
@@ -267,9 +307,26 @@ impl FrozenWorkerEngine {
         Ok(step.to_string())
     }
 
-    /// Startsetzung -- braucht kein Netz, aber die Spec (und bei v2 den Seed).
-    fn start_placement(&self, state_json: String, pi: usize, game_seed: u64) -> PyResult<String> {
-        let p = choose_start_placement_json(&self.search_config, &state_json, pi, game_seed)?;
+    /// Startsetzung -- braucht die Spec (und bei v2 den Seed).
+    ///
+    /// `sims` (`PREREG_start_dome_choice.md` par.9c): Sim-Budget, falls die
+    /// Spec dieses Artefakts `start_by_search == 1` traegt. Weggelassen ->
+    /// [`START_SEARCH_DEFAULT_SIMS`]. Bei `start_by_search == 0` (jede
+    /// eingefrorene Spec von heute) wird der Wert nie gelesen und die
+    /// Handregel legt wie bisher -- die Signatur-Erweiterung ist damit fuer
+    /// jeden Bestandsaufrufer wirkungslos.
+    #[pyo3(signature = (state_json, pi, game_seed, sims=None))]
+    fn start_placement(
+        &self, state_json: String, pi: usize, game_seed: u64, sims: Option<u32>,
+    ) -> PyResult<String> {
+        let p = choose_start_placement_json(
+            &self.search_config,
+            &state_json,
+            pi,
+            game_seed,
+            self.net.as_ref(),
+            sims.unwrap_or(START_SEARCH_DEFAULT_SIMS),
+        )?;
         Ok(p.to_string())
     }
 }
@@ -482,10 +539,19 @@ impl RefereeGame {
     /// naechstes aufrufen), oder `"stuck"` (Deadlock -- laut Bestandscode nie
     /// erwartet, siehe `unified_game_loop`s `None => break`-Zweige; wird hier
     /// NICHT verschluckt, sondern woertlich gemeldet).
-    #[pyo3(signature = (model_path_p0=None, model_path_p1=None, external_players=None))]
+    ///
+    /// `spec_p0`/`spec_p1`/`start_sims` (`PREREG_start_dome_choice.md`
+    /// par.9c): NUR fuer die Startsetzung der NICHT-externen Seiten. Traegt
+    /// die Spec dieser Seite `start_by_search == 1` UND ist fuer sie ein
+    /// Modell angegeben, sucht sie ihre Startsetzung, statt sie per Handregel
+    /// zu legen. Alle drei weggelassen (jeder Bestandsaufrufer) = kein
+    /// Spec-Aufloesen, kein Netzladen, Handregel wie bisher -- bitidentisch.
+    #[pyo3(signature = (model_path_p0=None, model_path_p1=None, external_players=None,
+                        spec_p0=None, spec_p1=None, start_sims=None))]
     fn advance_to_decision(
         &mut self, model_path_p0: Option<String>, model_path_p1: Option<String>,
         external_players: Option<Vec<usize>>,
+        spec_p0: Option<String>, spec_p1: Option<String>, start_sims: Option<u32>,
     ) -> PyResult<String> {
         let externe = external_players.unwrap_or_default();
         loop {
@@ -505,7 +571,33 @@ impl RefereeGame {
                             self.pending_start_player = Some(pi);
                             return Ok("start_placement".to_string());
                         }
-                        match choose_start_placement(&self.game.state, pi) {
+                        // par.9c: die IN-PROCESS-Seite sucht ihre Startsetzung,
+                        // wenn ihre Spec `start_by_search == 1` traegt UND fuer
+                        // sie ein Modell angegeben ist. Ohne Spec-Argumente
+                        // (jeder Bestandsaufrufer) wird `resolve_search_config`
+                        // gar nicht erst gerufen -- die Handregel unten ist der
+                        // einzige gelaufene Code.
+                        let spec_here = if pi == 0 { &spec_p0 } else { &spec_p1 };
+                        let model_here = if pi == 0 { &model_path_p0 } else { &model_path_p1 };
+                        let mut searched: Option<(usize, usize, usize, u32)> = None;
+                        if let (Some(spec), Some(path)) = (spec_here, model_here) {
+                            let cfg = crate::resolve_search_config(Some(spec.clone()))?;
+                            if cfg.start_by_search == 1 {
+                                let seed = derive_search_seed(self.game_seed, self.steps as u64);
+                                let mut rng = StdRng::seed_from_u64(seed);
+                                let sims = start_sims.unwrap_or(START_SEARCH_DEFAULT_SIMS);
+                                let net = load_cached(&mut self.nets, path)?;
+                                searched = crate::net_mcts::search_start_placement(
+                                    net, &self.game.state, pi, sims, false, &mut rng, &cfg,
+                                )
+                                .map(|s| s.chosen_placement());
+                            }
+                        }
+                        let placement = match searched {
+                            Some(p) => Some(p),
+                            None => choose_start_placement(&self.game.state, pi),
+                        };
+                        match placement {
                             Some((tid, r, c2, rot)) => {
                                 let _ = apply_start_placement(&mut self.game.state, pi, tid, r, c2, rot);
                             }

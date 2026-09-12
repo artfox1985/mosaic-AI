@@ -403,6 +403,19 @@ def play_one_game(
     board_b = 1 - board_a
     model_p0 = model_a if board_a == 0 else artifact_model
     model_p1 = model_a if board_a == 1 else artifact_model
+    # PREREG_start_dome_choice.md par.9c: die Spec der IN-PROCESS-Seite (A)
+    # an `advance_to_decision` reichen, damit sie ihre Startsetzung SUCHEN
+    # kann, falls die Spec `start_by_search == 1` traegt. Nur fuer eine Seite
+    # mit Netz: eine netzlose hv1-Seite (`heuristic_a`) und eine Seite, die
+    # ihre Zuege ohnehin extern trifft (`worker_a`), behalten die Handregel --
+    # und der Anker behaelt sie damit IMMER. Die Artefakt-Seite entscheidet
+    # ihre Startsetzung ohnehin selbst (`ask_start_placement`), auf ihrem
+    # eigenen Wheel. Traegt `spec_a` das Feld nicht (jede Spec von heute),
+    # aendert sich nichts: die Engine loest die Spec dann nur auf und legt wie
+    # bisher per Handregel.
+    _inprocess_net_a = worker_a is None and not heuristic_a and model_a
+    start_spec_p0 = spec_a if (_inprocess_net_a and board_a == 0) else None
+    start_spec_p1 = spec_a if (_inprocess_net_a and board_a == 1) else None
 
     def worker_for(pi: int) -> WorkerProc:
         """Der Worker der Seite `pi`.
@@ -438,7 +451,8 @@ def play_one_game(
         # Fuer solche Artefakte bleibt es beim Bestandsverhalten: der Referee
         # loest Platzierung und Startsetzung selbst auf. Das ist fuer ein Netz
         # auch inhaltlich richtig, seine Identitaet ist das ONNX.
-        status = rg.advance_to_decision(model_p0, model_p1, external_sides)
+        status = rg.advance_to_decision(
+            model_p0, model_p1, external_sides, start_spec_p0, start_spec_p1, sims_a)
         if status == "game_over":
             rg.finalize_scoring()
             break

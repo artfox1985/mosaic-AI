@@ -440,6 +440,27 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
         # Cache entwertet.
         + "+bsnative_default_v1:" + ",".join(sorted(LEGACY_STRETCHED_PREFIXES))
     )
+    # PREREG_start_dome_choice.md par.9c (2026-09-12): die Aenderung der
+    # `pol_w`-Regel (Start-Records mit `start_by_search: true` bekommen
+    # Gewicht 1) bekommt BEWUSST KEINE eigene Key-Komponente -- und das ist
+    # begruendet, nicht vergessen:
+    #
+    #  * `str(files)` steht bereits im Schluesselmaterial. Das Feld
+    #    `start_by_search` schreibt AUSSCHLIESSLICH der neue Erzeugungspfad
+    #    (self_play.rs::start_placement_step bei Knopf 1), es kann also nur in
+    #    Dateien stehen, die es vor dem 2026-09-12 noch nicht gab. Jedes
+    #    Fenster mit solchen Dateien hat damit zwangslaeufig einen
+    #    Schluessel, den es noch nie gab -- ein Alt-Cache ist nicht
+    #    erreichbar.
+    #  * Fuer jedes Fenster OHNE solche Dateien ist die neue Regel
+    #    wirkungslos (`step.get(...)` -> None), der Cache also korrekt
+    #    wiederverwendbar. Eine unbedingte Komponente wuerde JEDEN
+    #    vorhandenen Cache entwerten, ohne dass sich sein Inhalt aendert.
+    #
+    # WAS DAS NICHT DECKT (Wiedervorlage): wird die Regel spaeter GEAENDERT
+    # (anderes Gewicht, andere Bedingung), trifft derselbe Dateisatz danach
+    # denselben Schluessel -- dann ist eine Komponente
+    # ("+startsearch_polw_v2") PFLICHT, genau wie bei "+bsnative_default_v1".
     if policy_carrier_set is not None:
         cache_key_material += "+carriers:" + ",".join(sorted(policy_carrier_set))
     if carrier_prefixes is not None:
@@ -1328,7 +1349,33 @@ class MosaicDataset(Dataset):
                         # und die Drafting-Priors verkommen zu Rauschen.
                         phase = step["state"].get("phase")
                         is_start = any(pe["action"].get("is_start") for pe in step["policy"])
-                        pol_w = 1.0 if (phase == "drafting" and not is_start) else 0.0
+                        # PREREG_start_dome_choice.md par.9c (2026-09-12): ein
+                        # Start-Record, dessen Setzung die SUCHE getroffen hat,
+                        # traegt ein echtes Besuchsziel -- kein One-Hot auf eine
+                        # Handregel und keine Zufallswahl. Genau diese Records
+                        # (`start_by_search: true`) bekommen Policy-Gewicht 1;
+                        # ALLE uebrigen Start-Records bleiben bei 0, inklusive
+                        # der gestreuten (par.9b, `policy_target_valid=false`)
+                        # -- die Bedingung fragt beide Felder ab, nicht nur das
+                        # neue. Das Feld existiert in keinem Korpus vor dem
+                        # 2026-09-12; dort ist die Zeile wirkungslos und der
+                        # Datensatz byte-identisch (`.get` liefert None).
+                        #
+                        # `phase`: der Start-Record wird VOR dem Anwenden
+                        # geschnitten, seine Phase ist damit "drafting" ODER
+                        # "start_placement", je nach Serialisierung -- deshalb
+                        # steht die Ausnahme NEBEN der Phasenbedingung und nicht
+                        # in ihr (geprueft an self_play.rs::start_placement_step:
+                        # `state_to_json` laeuft vor `apply_start_placement`).
+                        start_by_search = (
+                            bool(step.get("start_by_search"))
+                            and step.get("policy_target_valid") is not False
+                        )
+                        pol_w = (
+                            1.0
+                            if (phase == "drafting" and not is_start) or start_by_search
+                            else 0.0
+                        )
                         # Schema 17 / v20-Zwei-Klassen-Fenster: liegt ein
                         # Policy-Traeger-Manifest vor, tragen ALT-Dateien nur
                         # dann Policy-Ziele, wenn sie darin gelistet sind --

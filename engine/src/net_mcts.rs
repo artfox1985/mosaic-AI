@@ -300,6 +300,40 @@ pub const RETURN_ORDER_MODE_MAX: u8 = 2;
 /// ist ein Spec-Feld JE SEITE, und `SearchConfig::from_env` cacht bewusst
 /// nichts (siehe dortige Doku) -- ein prozessweiter Cache waere genau der
 /// Defekt aus `PREREG_agent_encapsulation.md` par.1.
+/// `MOSAIC_START_BY_SEARCH` als 0/1 (`PREREG_start_dome_choice.md` par.9c).
+///
+/// `0` (Default, auch bei fehlender oder ungueltiger Variable) ist der
+/// BESTAND und zwar im starken Sinn: kein Suchaufruf, kein Netz-Forward,
+/// keine Zufallszahl -- die Startsetzung faellt wie bisher per Handregel
+/// `self_play::choose_start_placement`. `1` laesst die NETZ-Seiten ihre
+/// Startsetzung suchen ([`search_start_placement`]); Heuristik-Seiten (hv1,
+/// hv2, der Elo-Anker) behalten die Handregel IMMER, sonst bewegte sich der
+/// Anker.
+///
+/// KEIN `OnceLock` -- gleiche Begruendung wie bei
+/// [`read_return_order_mode_env`]: der Wert ist ein Spec-Feld JE SEITE.
+pub(crate) fn read_start_by_search_env() -> u8 {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_START_BY_SEARCH") else {
+        return 0;
+    };
+    if raw.trim().is_empty() {
+        return 0;
+    }
+    match raw.trim().parse::<u8>() {
+        Ok(v) if v <= 1 => v,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "⚠️  MOSAIC_START_BY_SEARCH={raw:?} ungueltig (0 Handregel, 1 Suche) -- \
+                     Handregel (0) gilt."
+                );
+            });
+            0
+        }
+    }
+}
+
 pub(crate) fn read_return_order_mode_env() -> u8 {
     static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     let Ok(raw) = std::env::var("MOSAIC_RETURN_ORDER_MODE") else {
@@ -627,6 +661,19 @@ pub struct SearchConfig {
     /// (Platte, Slot)). Spec-Feld je Seite (`return_order_mode`, OPTIONAL mit
     /// Default 0), Env-Default `MOSAIC_RETURN_ORDER_MODE`.
     pub return_order_mode: u8,
+    /// Startsetzung der Kuppelplatte per SUCHE statt per Handregel
+    /// (`PREREG_start_dome_choice.md` par.9c, gebaut 2026-09-12): `0` =
+    /// Bestand (`self_play::choose_start_placement`, bitidentisch, Default),
+    /// `1` = [`search_start_placement`] -- Wurzel ist die Startsetzung des
+    /// Spielers, Kinder sind die legalen Start-Aktionen, Blatt ist der
+    /// gewoehnliche Netzwert samt Einhuellenden-Verschiebung.
+    ///
+    /// Gilt NUR, wo ein NETZ die Zuege macht. Heuristik-Seiten (hv1/hv2, der
+    /// eingefrorene Elo-Anker) behalten die Handregel auch bei `1` -- ein
+    /// Anker, der sich bewegt, ist keiner (CLAUDE.md, Anker-Invarianz).
+    /// Spec-Feld je Seite (`start_by_search`, OPTIONAL mit Default 0),
+    /// Env-Default `MOSAIC_START_BY_SEARCH`.
+    pub start_by_search: u8,
 }
 
 impl SearchConfig {
@@ -672,6 +719,7 @@ impl SearchConfig {
             round_est_c: read_f64_env("MOSAIC_ROUND_EST_C", 0.0),
             round_est_b_profile: read_round_est_b_profile_env(),
             return_order_mode: read_return_order_mode_env(),
+            start_by_search: read_start_by_search_env(),
         }
     }
 
@@ -708,6 +756,7 @@ impl SearchConfig {
             "round_est_c",
             "round_est_b_profile",
             "return_order_mode",
+            "start_by_search",
             "heuristik_variante",
         ];
         for key in obj.keys() {
@@ -897,6 +946,30 @@ impl SearchConfig {
                 x as u8
             }
         };
+        // `PREREG_start_dome_choice.md` par.9c: dieselbe OPTIONAL-Begruendung
+        // wie bei `return_order_mode` darueber, Wort fuer Wort uebertragbar.
+        // Die eingefrorenen Artefakt-Specs (`models/frozen_champions/*/
+        // spec.json`, `models/frozen_heuristics/*/spec.json`) und die lebenden
+        // `models/*.spec.json` tragen das Feld nicht, und bei
+        // `start_by_search == 0` wird die Startsetzung wie seit jeher von
+        // `self_play::choose_start_placement` gelegt -- kein Netzaufruf, keine
+        // zusaetzliche Zufallszahl, genau das Verhalten, das diese Specs schon
+        // immer beschrieben haben. MUSS deshalb auch nach par.9c weiter laden.
+        let start_by_search = match obj.get("start_by_search") {
+            None => 0u8,
+            Some(v) => {
+                let x = v.as_f64().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'start_by_search' ist keine Zahl")
+                })?;
+                if x.fract() != 0.0 || !(0.0..=1.0).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'start_by_search' muss 0 oder 1 sein \
+                         (0 Handregel, 1 Suche), ist {x}"
+                    ));
+                }
+                x as u8
+            }
+        };
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -974,6 +1047,7 @@ impl SearchConfig {
             round_est_c,
             round_est_b_profile,
             return_order_mode,
+            start_by_search,
         })
     }
 }
@@ -1294,6 +1368,23 @@ fn determinize_hidden_information<R: Rng + ?Sized>(state: &mut GameState, rng: &
     // (build_gumbel_tree_inner, build_net_tree). Sein eigener Rueckgabe-Block
     // bleibt darum stehen; fremde Bloecke werden nur in sich permutiert.
     let viewer = state.current_player;
+    determinize_hidden_information_for(state, viewer, rng)
+}
+
+/// Rumpf von [`determinize_hidden_information`] mit EXPLIZITEM Betrachter.
+///
+/// Gebaut 2026-09-12 (`PREREG_start_dome_choice.md` par.9c): bei der
+/// Startsetzung ist der Suchende NICHT zwingend `state.current_player` --
+/// der Nicht-Starter legt zuerst (`game.rs::apply_start_placement`), waehrend
+/// `current_player` schon der Startspieler ist. Wer hier `current_player`
+/// nimmt, determinisiert aus der Sicht der FALSCHEN Seite. Die
+/// Bestandsaufrufer gehen ueber den Wrapper darueber und sind damit
+/// byte-identisch.
+fn determinize_hidden_information_for<R: Rng + ?Sized>(
+    state: &mut GameState,
+    viewer: usize,
+    rng: &mut R,
+) {
     crate::state::determinize_dome_pool(state, Some(viewer), rng);
 
     let orig_pool_len = state.bonus_chip_pool.len();
@@ -4352,6 +4443,82 @@ fn batched_expand_root_candidates<R: Rng + ?Sized>(
     }
 }
 
+/// Eine einzelne Tiefe-≥1-Deszension + Backprop, beginnend bei einem
+/// bereits existierenden Knoten (typischerweise ein Wurzelkind). Paket 2
+/// (2026-07-22): KEIN Progressive-Widening-Cap/Forced-Expansion mehr (PUCT-
+/// Erbe, entfernt) -- `gumbel_select_child` wählt bei jedem Schritt über
+/// `children ∪ untried`; fällt die Wahl auf einen unbesuchten Kandidaten,
+/// wird GENAU DIESER on demand expandiert (statt immer `untried[0]`), sonst
+/// wird zum gewählten bestehenden Kind weiter deszendiert. Der PUCT-Legacy-
+/// Pfad (`build_net_tree`s eigene Sim-Schleife, `USE_GUMBEL_SEARCH=false`)
+/// behält seinen eigenen Widening-Cap unverändert -- diese Funktion wird
+/// von dort nie aufgerufen. Kein granularer Sim-Trace (siehe
+/// `build_net_tree`-Dispatch-Kommentar).
+///
+/// Stand 2026-09-12 (`PREREG_start_dome_choice.md` par.9c) aus
+/// `build_gumbel_tree_inner` HERAUSGEZOGEN -- reiner Ortswechsel, kein
+/// Verhaltensunterschied (eine verschachtelte `fn` faengt in Rust ohnehin
+/// nichts aus der Umgebung ein, alle Abhaengigkeiten standen schon in der
+/// Signatur). Zweiter Aufrufer ist seither [`build_start_placement_tree`]:
+/// unterhalb einer Startsetzung laeuft die Suche als GEWOEHNLICHE
+/// Drafting-Suche weiter, und zwar durch DIESE Funktion -- keine zweite
+/// Kopie der Deszensions-Logik.
+fn descend_and_backprop<R: Rng + ?Sized>(
+    net_policy: &Net,
+    net_value: Option<&Net>,
+    nodes: &mut Vec<Node>,
+    start_nid: usize,
+    rng: &mut R,
+    search_config: &SearchConfig,
+) {
+    let mut nid = start_nid;
+    let mut expansion_failed = false;
+    loop {
+        if nodes[nid].terminal {
+            break;
+        }
+        if nodes[nid].children.is_empty() && nodes[nid].untried.is_empty() {
+            break; // defensiv: sollte an einem Nicht-Terminal-Knoten nie vorkommen
+        }
+        let n_children = nodes[nid].children.len();
+        let idx = gumbel_select_child(nodes, nid, search_config);
+        if idx < n_children {
+            nid = nodes[nid].children[idx];
+            continue;
+        }
+        // Auswahl faellt auf einen unbesuchten Kandidaten -- GENAU DIESEN
+        // on demand expandieren (kein Zwang mehr auf `untried[0]`).
+        let untried_idx = idx - n_children;
+        let (act, prior) = nodes[nid].untried.remove(untried_idx);
+        let mover = nodes[nid].state.current_player;
+        crate::profiling::note_gamestate_clone();
+        let mut g = Game { state: nodes[nid].state.clone() };
+        if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
+            // par.7 Variante A: aus Sicht des ziehenden Spielers (`mover`).
+            crate::state::determinize_dome_pool(&mut g.state, Some(mover), rng);
+        }
+        if g.apply_drafting(&act).is_ok() {
+            let mut child_state = g.state;
+            child_state.log.clear();
+            let child = make_node(
+                net_policy, net_value, child_state, Some(nid), Some(&nodes[nid].state), Some(act), prior, mover, rng,
+                search_config,
+            );
+            let cid = nodes.len();
+            nodes.push(child);
+            nodes[nid].children.push(cid);
+            nid = cid;
+        } else {
+            expansion_failed = true;
+        }
+        break;
+    }
+    if expansion_failed {
+        return;
+    }
+    backprop_path(nodes, nid);
+}
+
 fn build_gumbel_tree<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
@@ -4407,73 +4574,6 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
     if let Some(t) = trace.as_deref_mut() {
         t.determinize_active = DETERMINIZE_ROOT_HIDDEN_INFO;
         t.root_value = Some(compute_root_value_debug(net_policy, net_value, &nodes[0].state));
-    }
-
-    // Eine einzelne Tiefe-≥1-Deszension + Backprop, beginnend bei einem
-    // bereits existierenden Knoten (typischerweise ein Wurzelkind). Paket 2
-    // (2026-07-22): KEIN Progressive-Widening-Cap/Forced-Expansion mehr (PUCT-
-    // Erbe, entfernt) -- `gumbel_select_child` wählt bei jedem Schritt über
-    // `children ∪ untried`; fällt die Wahl auf einen unbesuchten Kandidaten,
-    // wird GENAU DIESER on demand expandiert (statt immer `untried[0]`), sonst
-    // wird zum gewählten bestehenden Kind weiter deszendiert. Der PUCT-Legacy-
-    // Pfad (`build_net_tree`s eigene Sim-Schleife, `USE_GUMBEL_SEARCH=false`)
-    // behält seinen eigenen Widening-Cap unverändert -- diese Funktion wird
-    // von dort nie aufgerufen. Kein granularer Sim-Trace (siehe
-    // `build_net_tree`-Dispatch-Kommentar).
-    fn descend_and_backprop<R: Rng + ?Sized>(
-        net_policy: &Net,
-        net_value: Option<&Net>,
-        nodes: &mut Vec<Node>,
-        start_nid: usize,
-        rng: &mut R,
-        search_config: &SearchConfig,
-    ) {
-        let mut nid = start_nid;
-        let mut expansion_failed = false;
-        loop {
-            if nodes[nid].terminal {
-                break;
-            }
-            if nodes[nid].children.is_empty() && nodes[nid].untried.is_empty() {
-                break; // defensiv: sollte an einem Nicht-Terminal-Knoten nie vorkommen
-            }
-            let n_children = nodes[nid].children.len();
-            let idx = gumbel_select_child(nodes, nid, search_config);
-            if idx < n_children {
-                nid = nodes[nid].children[idx];
-                continue;
-            }
-            // Auswahl faellt auf einen unbesuchten Kandidaten -- GENAU DIESEN
-            // on demand expandieren (kein Zwang mehr auf `untried[0]`).
-            let untried_idx = idx - n_children;
-            let (act, prior) = nodes[nid].untried.remove(untried_idx);
-            let mover = nodes[nid].state.current_player;
-            crate::profiling::note_gamestate_clone();
-            let mut g = Game { state: nodes[nid].state.clone() };
-            if SHUFFLE_STACK_PEEK_IN_SEARCH && act == Action::DrawStackPeek {
-                // par.7 Variante A: aus Sicht des ziehenden Spielers (`mover`).
-                crate::state::determinize_dome_pool(&mut g.state, Some(mover), rng);
-            }
-            if g.apply_drafting(&act).is_ok() {
-                let mut child_state = g.state;
-                child_state.log.clear();
-                let child = make_node(
-                    net_policy, net_value, child_state, Some(nid), Some(&nodes[nid].state), Some(act), prior, mover, rng,
-                    search_config,
-                );
-                let cid = nodes.len();
-                nodes.push(child);
-                nodes[nid].children.push(cid);
-                nid = cid;
-            } else {
-                expansion_failed = true;
-            }
-            break;
-        }
-        if expansion_failed {
-            return;
-        }
-        backprop_path(nodes, nid);
     }
 
     let n_root = nodes[0].untried.len();
@@ -5772,6 +5872,467 @@ fn dirichlet<R: Rng + ?Sized>(n: usize, alpha: f64, rng: &mut R) -> Vec<f64> {
     g.iter().map(|&x| x / s).collect()
 }
 
+// ── Startsetzung der Kuppelplatte als SUCHENTSCHEID ──────────────────────────
+//
+// `PREREG_start_dome_choice.md` par.9c (Nutzer-Entscheid 2026-09-12): *"im
+// arena spiel wuerd ich die entscheidung der einhuellenden bzw. der suche
+// ueberlassen. aehnlich wie die kuppelplatten bereits heute selektiert und
+// gelegt werden."*
+//
+// Bis dahin legte AUSNAHMSLOS jeder Spielpfad die Startkuppel per Handregel
+// `self_play::choose_start_placement` (Farbzaehler der Sonnenfelder plus
+// Eckbonus; Spezialfelder mit 0,0 bewertet, self_play.rs:1199) -- und das
+// Policy-Ziel des Self-Play-Records war ein One-Hot auf genau diesen Griff.
+// Mit `MOSAIC_START_BY_SEARCH=1` (bzw. Spec-Feld `start_by_search`) wird die
+// Setzung zu dem, was jede andere Kuppelplatzierung schon ist: Wurzel =
+// Zustand vor der Setzung, Kinder = die legalen Start-Aktionen, Prior aus dem
+// Policy-Kopf, Blatt = Netzwert samt Einhuellenden-Verschiebung (K3/K4/
+// Floor/Plate-Shaping -- alles, was `make_node` ohnehin rechnet).
+//
+// DREI Eigenschaften, die beim Aendern zu halten sind:
+//
+//  1. **Knopf 0 ist bitidentisch.** Kein Aufruf dieser Funktion, kein
+//     Netz-Forward, keine Zufallszahl. Die Umschaltung liegt bei den
+//     Aufrufern (`self_play.rs`, `referee.rs`, `py.rs`), nicht hier.
+//  2. **Heuristik-Seiten sind ausgenommen**, auch bei Knopf 1: der Elo-Anker
+//     ist eine Heuristik, und ein Anker, der sich bewegt, ist keiner
+//     (CLAUDE.md, Anker-Invarianz).
+//  3. **`NUM_ACTIONS` bleibt 406.** Die Startaktionen bekommen KEINE neuen
+//     IDs; sie leihen sich die beiden Familien, die der Policy-Kopf fuer die
+//     zweistufige Kuppelwahl im Drafting schon hat (Slot 328..354, Rotation
+//     391..394). Damit bleibt auch der Vertragshash unveraendert.
+
+/// Ein Kandidat der Startsetzungs-Suche (eine legale Startsetzung samt
+/// Suchstatistik). `visits`/`q` sind nach der Suche gefuellt, `q` aus Sicht
+/// des setzenden Spielers `pi`.
+#[derive(Clone, Copy, Debug)]
+pub struct StartPlacementCandidate {
+    pub tile_id: usize,
+    pub display_index: usize,
+    pub slot_row: usize,
+    pub slot_col: usize,
+    pub rotation: u32,
+    /// Prior aus dem Policy-Kopf (siehe [`start_placement_priors`]), ueber
+    /// alle Kandidaten auf 1 normiert.
+    pub prior: f32,
+    /// Besuche dieses Wurzelkindes; `0` = nie expandiert (ausserhalb der
+    /// Gumbel-Top-m-Auslese).
+    pub visits: u32,
+    /// Mittlerer Suchwert aus Sicht von `pi`; `0.0`, wenn nie besucht.
+    pub q: f64,
+}
+
+/// Ergebnis von [`search_start_placement`]: alle legalen Kandidaten (in der
+/// Reihenfolge von `self_play::start_placement_kandidaten`) plus der Index des
+/// gewaehlten. Die Besuchsverteilung ueber `candidates` ist das Policy-Ziel
+/// des Self-Play-Records (par.9c).
+#[derive(Clone, Debug)]
+pub struct StartPlacementSearch {
+    pub candidates: Vec<StartPlacementCandidate>,
+    pub chosen: usize,
+}
+
+impl StartPlacementSearch {
+    /// Die gewaehlte Setzung als `(tile_id, slot_row, slot_col, rotation)` --
+    /// dieselbe Tupelform, die `self_play::choose_start_placement` liefert,
+    /// damit die Aufrufstellen austauschbar bleiben.
+    pub fn chosen_placement(&self) -> (usize, usize, usize, u32) {
+        let k = self.candidates[self.chosen];
+        (k.tile_id, k.slot_row, k.slot_col, k.rotation)
+    }
+
+    /// Summe der Besuche ueber alle Kandidaten (Nenner des Policy-Ziels).
+    pub fn total_visits(&self) -> u32 {
+        self.candidates.iter().map(|k| k.visits).sum()
+    }
+}
+
+/// Aktions-ID der SLOT-Haelfte einer Startsetzung im 406er-Raum -- dieselbe
+/// Familie wie `choose_dome_slot` (`features.rs::action_to_id`: 328..354 =
+/// 3 Auslageplaetze x 9 Slots).
+///
+/// WARUM NICHT der Record-Schluessel `"type": "dome"` (geprueft 2026-09-12 an
+/// `features.rs::action_to_id` UND am Python-Spiegel
+/// `engine/py/neural_net.py::action_to_id`): `"dome"` trifft dort KEINEN
+/// Zweig und faellt auf den Fallback `405` -- alle bis zu 108 Startkandidaten
+/// haetten dieselbe ID. Der Policy-Kopf koennte sie damit weder als Prior
+/// trennen noch als Ziel lernen (und `405` ist ausserdem die ID von
+/// `dome_stack_peek`, das Ziel liefe also auf eine ganz andere Aktion).
+/// Deshalb die zweistufige Kuppel-Kodierung, die der Kopf ohnehin kennt.
+///
+/// Der Paritaetstest gegen `action_to_id` steht im Testmodul
+/// (`start_action_ids_match_action_to_id`).
+fn start_slot_action_id(display_index: usize, slot_row: usize, slot_col: usize) -> usize {
+    328 + display_index * 9 + slot_row * 3 + slot_col
+}
+
+/// Aktions-ID der ROTATIONS-Haelfte einer Startsetzung (391..394, Familie
+/// `choose_dome_rotation`) -- siehe [`start_slot_action_id`].
+fn start_rotation_action_id(rotation: u32) -> usize {
+    391 + ((rotation / 90).min(3)) as usize
+}
+
+/// Priors der Startkandidaten aus EINEM Forward-Pass auf dem Wurzelzustand.
+///
+/// Faktorisiert wie im Drafting: maskierte Softmax getrennt ueber die beiden
+/// ID-Familien (Slot, Rotation), Prior = Produkt, danach auf 1 normiert.
+/// Dieselbe Bauform wie `build_untried_actions` (maskierte Softmax NUR ueber
+/// die EINDEUTIGEN legalen IDs, exakt wie das Training mit maskiertem
+/// log_softmax). Faellt der Netz-Aufruf durch, wird gleichverteilt -- die
+/// Suche laeuft dann ohne Prior-Information weiter, statt auszusteigen.
+///
+/// PERSPEKTIVE, benannt statt stillschweigend: die Merkmale kommen aus dem
+/// UNVERAENDERTEN Zustand, also ego zu `state.current_player` -- und das ist
+/// bei der ersten Setzung der STARTSPIELER, waehrend der NICHT-Starter legt
+/// (`game.rs::apply_start_placement` erzwingt die Reihenfolge). Kein
+/// Versehen, sondern Deckungsgleichheit mit dem Trainingsziel:
+/// `self_play.rs::start_placement_step` schneidet seinen Record aus demselben
+/// Zustand und stempelt ihn mit `player = current_player`. Prior und Ziel
+/// liegen damit im SELBEN Bezugsrahmen; wer hier auf `pi` umstellt, muss den
+/// Record im selben Zug mitdrehen. Der BLATTWERT ist davon unberuehrt --
+/// `leaf_value` ist je Spieler indiziert, die Suche liest `leaf_value[pi]`.
+fn start_placement_priors(
+    net: &Net,
+    state: &GameState,
+    candidates: &[StartPlacementCandidate],
+) -> Vec<f32> {
+    let n = candidates.len();
+    let uniform = vec![1.0f32 / (n.max(1) as f32); n];
+    if n == 0 {
+        return uniform;
+    }
+    let feats = crate::features::features_for_net(net, state);
+    let logits = match net.eval_ex(&feats) {
+        Ok((logits, _value, _moon, _points, _opp, _own)) => logits,
+        Err(_) => {
+            note_net_eval_failure(); // A1
+            return uniform;
+        }
+    };
+
+    let mut slot_ids: Vec<usize> = candidates
+        .iter()
+        .map(|k| start_slot_action_id(k.display_index, k.slot_row, k.slot_col))
+        .collect();
+    slot_ids.sort_unstable();
+    slot_ids.dedup();
+    let slot_logits: Vec<f32> =
+        slot_ids.iter().map(|&id| logits.get(id).copied().unwrap_or(f32::NEG_INFINITY)).collect();
+    let p_slot: HashMap<usize, f32> = slot_ids.into_iter().zip(softmax(&slot_logits)).collect();
+
+    let mut rot_ids: Vec<usize> =
+        candidates.iter().map(|k| start_rotation_action_id(k.rotation)).collect();
+    rot_ids.sort_unstable();
+    rot_ids.dedup();
+    let rot_logits: Vec<f32> =
+        rot_ids.iter().map(|&id| logits.get(id).copied().unwrap_or(f32::NEG_INFINITY)).collect();
+    let p_rot: HashMap<usize, f32> = rot_ids.into_iter().zip(softmax(&rot_logits)).collect();
+
+    let mut out: Vec<f32> = candidates
+        .iter()
+        .map(|k| {
+            let s = *p_slot
+                .get(&start_slot_action_id(k.display_index, k.slot_row, k.slot_col))
+                .unwrap_or(&0.0);
+            let r = *p_rot.get(&start_rotation_action_id(k.rotation)).unwrap_or(&0.0);
+            s * r
+        })
+        .collect();
+    let sum: f32 = out.iter().sum();
+    if sum > 0.0 && sum.is_finite() {
+        for v in out.iter_mut() {
+            *v /= sum;
+        }
+        out
+    } else {
+        uniform
+    }
+}
+
+/// Sucht die Startsetzung des Spielers `pi` (`PREREG_start_dome_choice.md`
+/// par.9c). `None`, wenn `pi` gar keine Startsetzung aussteht oder es keinen
+/// legalen Kandidaten gibt -- dann bleibt der Aufrufer beim Bestandspfad.
+///
+/// ABLAUF, Stueck fuer Stueck dieselbe Maschinerie wie an jeder anderen
+/// Wurzel (`build_gumbel_tree_inner`), nur mit Startsetzungen statt
+/// Drafting-Aktionen als Wurzelkindern:
+///
+///  1. Verdeckte Information wird EINMAL determinisiert, aus der Sicht von
+///     `pi` (nicht `current_player`, siehe
+///     [`determinize_hidden_information_for`]). Das ist keine Kosmetik:
+///     `apply_start_placement` zieht die Luecke im Display vom Kuppelstapel
+///     nach -- ohne Determinisierung saehe die Suche die echte, verdeckte
+///     Nachziehplatte.
+///  2. Kandidaten = `self_play::start_placement_kandidaten` (bis zu
+///     3 Platten x 9 Slots x 4 Rotationen = 108), Prior aus EINEM
+///     Forward-Pass ([`start_placement_priors`]).
+///  3. Gumbel-Top-m + Sequential Halving wie im Drafting: nur
+///     `gumbel_top_m_for_budget(sims)` (4..16) Kandidaten werden ueberhaupt
+///     expandiert. KOSTEN damit: 1 Forward-Pass fuer die Priors plus `sims`
+///     Simulationen -- also rund EIN Drafting-Zug je Partie und Seite, nicht
+///     108 Netzaufrufe.
+///  4. Ein Wurzelkind entsteht, indem die Setzung angewandt wird; steht dann
+///     noch die Setzung des GEGNERS aus (`pi` ist der Nicht-Starter), loest
+///     sie im Baum die HANDREGEL auf -- **benannte Modellannahme**: gemessen
+///     wird "wie gut ist meine Setzung, wenn der Gegner wie die Handregel
+///     legt", nicht "gegen die beste Gegensetzung". Danach ist der Zustand in
+///     der Drafting-Phase und die Suche laeuft als GEWOEHNLICHE
+///     Drafting-Suche weiter ([`descend_and_backprop`]).
+///  5. Finale Wahl = meistbesuchtes Wurzelkind, Gleichstand per
+///     `ln(prior) + sigma(Q)` -- dieselbe Regel wie
+///     [`gumbel_final_root_action`].
+///
+/// K1 (`score_utility_root_margin`) bleibt in dieser Suche AUS: die Wurzel
+/// ist kein `make_node`-Knoten und hat deshalb keinen eigenen
+/// Punkte-Forecast, um den re-zentriert werden koennte. Vor dem ersten Zug
+/// gibt es auch keine Marge, die man re-zentrieren wollte. Bewusst so, nicht
+/// vergessen.
+///
+/// `add_root_noise` zieht die Gumbel-Werte (Self-Play-Exploration); die
+/// Arena-Pfade rufen mit `false` und sind damit deterministisch bei festem
+/// Seed.
+pub fn search_start_placement<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    pi: usize,
+    base_sims: u32,
+    add_root_noise: bool,
+    rng: &mut R,
+    search_config: &SearchConfig,
+) -> Option<StartPlacementSearch> {
+    if !state.players.get(pi).map(|p| p.start_tile_pending).unwrap_or(false) {
+        return None;
+    }
+    let raw = crate::self_play::start_placement_kandidaten(state, pi);
+    if raw.is_empty() {
+        return None;
+    }
+
+    let mut root_state = state.clone();
+    root_state.log.clear();
+    if DETERMINIZE_ROOT_HIDDEN_INFO {
+        determinize_hidden_information_for(&mut root_state, pi, rng);
+    }
+
+    let mut candidates: Vec<StartPlacementCandidate> = raw
+        .iter()
+        .map(|&(_score, tile_id, r, c, rot)| {
+            let d = root_state
+                .dome_display
+                .iter()
+                .position(|t| t.tile_id == tile_id)
+                .unwrap_or(0);
+            StartPlacementCandidate {
+                tile_id,
+                display_index: d,
+                slot_row: r,
+                slot_col: c,
+                rotation: rot,
+                prior: 0.0,
+                visits: 0,
+                q: 0.0,
+            }
+        })
+        .collect();
+    let priors = start_placement_priors(net, &root_state, &candidates);
+    for (k, p) in candidates.iter_mut().zip(priors.into_iter()) {
+        k.prior = p;
+    }
+
+    let sims = net_effective_sims(base_sims, candidates.len());
+
+    // Wurzelknoten VON HAND, nicht per `make_node`: der Wurzelzustand ist
+    // keine Drafting-Stellung (`start_tile_pending`), `build_untried_actions`
+    // haette dort nichts zu tun, und `make_node` wuerde ihn wegen
+    // `phase != Drafting`-Logik ohnehin anders behandeln. `terminal: false`
+    // und `untried: []` sind der Punkt: die Deszension geht IMMER ueber
+    // `children`, nie ueber eine Expansion an der Wurzel.
+    let mut nodes: Vec<Node> = vec![Node {
+        parent: None,
+        children: Vec::new(),
+        untried: Vec::new(),
+        action: None,
+        player_who_acted: pi,
+        visits: 0,
+        value: 0.0,
+        prior: 0.0,
+        state: root_state.clone(),
+        terminal: false,
+        leaf_value: [0.5, 0.5],
+        n_actions: candidates.len(),
+        points_forecast: None,
+        opp_points_forecast: None,
+        raw_value: None,
+        im_value: [0.5, 0.5],
+    }];
+    let mut candidate_node: Vec<Option<usize>> = vec![None; candidates.len()];
+
+    // Expandiert (falls noetig) und simuliert EINEN weiteren Besuch fuer
+    // Kandidat `ci`. Muster `build_gumbel_tree_inner::visit_candidate!` --
+    // Unterschied nur in der Anwendung (`apply_start_placement` statt
+    // `apply_drafting`) und in der Aufloesung der zweiten Startsetzung.
+    macro_rules! visit_start_candidate {
+        ($ci:expr) => {{
+            let ci = $ci;
+            match candidate_node[ci] {
+                Some(cid) => descend_and_backprop(net, None, &mut nodes, cid, rng, search_config),
+                None => {
+                    let k = candidates[ci];
+                    crate::profiling::note_gamestate_clone();
+                    let mut child_state = root_state.clone();
+                    let applied = crate::game::apply_start_placement(
+                        &mut child_state, pi, k.tile_id, k.slot_row, k.slot_col, k.rotation,
+                    )
+                    .is_ok();
+                    if applied {
+                        // par.9c Punkt 4: die zweite ausstehende Setzung
+                        // (Gegner) loest die HANDREGEL auf -- benannte
+                        // Modellannahme, siehe Funktionskommentar.
+                        let opp = 1 - pi;
+                        if child_state.players[opp].start_tile_pending {
+                            if let Some((t, r, c, rot)) =
+                                crate::self_play::choose_start_placement(&child_state, opp)
+                            {
+                                let _ = crate::game::apply_start_placement(
+                                    &mut child_state, opp, t, r, c, rot,
+                                );
+                            }
+                        }
+                        child_state.log.clear();
+                        let child = make_node(
+                            net, None, child_state, Some(0), None, None, k.prior, pi, rng,
+                            search_config,
+                        );
+                        let cid = nodes.len();
+                        nodes.push(child);
+                        nodes[0].children.push(cid);
+                        candidate_node[ci] = Some(cid);
+                        backprop_path(&mut nodes, cid);
+                    }
+                    // Fehlgeschlagene Anwendung: `candidate_node[ci]` bleibt
+                    // `None`, der Kandidat faellt bei der naechsten Rangfolge
+                    // mit Q=0 heraus (gleiche Behandlung wie im Drafting).
+                }
+            }
+        }};
+    }
+
+    // Gumbel-Top-m an der Wurzel (§1 wie im Drafting): Score = g(a) +
+    // ln(prior(a)). `g(a) = 0` ohne Wurzel-Noise (Arena/Referee/GUI) --
+    // dann ist die Auslese rein der Prior.
+    let m_prime = gumbel_top_m_for_budget(sims).min(candidates.len());
+    let mut scored: Vec<(f64, f64, usize)> = candidates
+        .iter()
+        .enumerate()
+        .map(|(i, k)| {
+            let g = if add_root_noise { sample_gumbel(rng) } else { 0.0 };
+            (g + (k.prior as f64).max(1e-9).ln(), g, i)
+        })
+        .collect();
+    scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
+    let g_of: HashMap<usize, f64> =
+        scored.iter().take(m_prime).map(|&(_, g, i)| (i, g)).collect();
+    let mut current: Vec<usize> = scored.iter().take(m_prime).map(|&(_, _, i)| i).collect();
+    if current.is_empty() {
+        return None;
+    }
+
+    if current.len() <= 1 {
+        let only = current[0];
+        for _ in 0..sims {
+            visit_start_candidate!(only);
+        }
+    } else {
+        let num_phases = (current.len() as f64).log2().ceil().max(1.0) as u32;
+        let mut remaining_phases = num_phases;
+        let mut budget_used: u32 = 0;
+        while current.len() > 1 && budget_used < sims {
+            let remaining_slots = (remaining_phases as usize) * current.len();
+            let extra = (((sims - budget_used) as usize / remaining_slots.max(1)).max(1)) as u32;
+            for &ci in &current.clone() {
+                for _ in 0..extra {
+                    if budget_used >= sims {
+                        break;
+                    }
+                    visit_start_candidate!(ci);
+                    budget_used += 1;
+                }
+            }
+            let max_n = current
+                .iter()
+                .filter_map(|&ci| candidate_node[ci].map(|cid| nodes[cid].visits))
+                .max()
+                .unwrap_or(0);
+            current.sort_by(|&a, &b| {
+                let score = |ci: usize| -> f64 {
+                    let g = *g_of.get(&ci).unwrap_or(&0.0);
+                    let prior = (candidates[ci].prior as f64).max(1e-9);
+                    let q = match candidate_node[ci] {
+                        Some(cid) if nodes[cid].visits > 0 => {
+                            nodes[cid].value / nodes[cid].visits as f64
+                        }
+                        _ => 0.0,
+                    };
+                    g + prior.ln() + gumbel_sigma(q, max_n)
+                };
+                score(b).partial_cmp(&score(a)).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            let keep = (current.len() / 2).max(2);
+            current.truncate(keep);
+            remaining_phases = remaining_phases.saturating_sub(1).max(1);
+        }
+        // Restbudget (Rundungsreste) auf die Verbliebenen verteilen.
+        while budget_used < sims {
+            for &ci in &current.clone() {
+                if budget_used >= sims {
+                    break;
+                }
+                visit_start_candidate!(ci);
+                budget_used += 1;
+            }
+        }
+    }
+
+    for ci in 0..candidates.len() {
+        if let Some(cid) = candidate_node[ci] {
+            candidates[ci].visits = nodes[cid].visits;
+            candidates[ci].q = if nodes[cid].visits > 0 {
+                nodes[cid].value / nodes[cid].visits as f64
+            } else {
+                0.0
+            };
+        }
+    }
+
+    let max_n = candidates.iter().map(|k| k.visits).max().unwrap_or(0);
+    let chosen = if max_n == 0 {
+        // Budget 0 oder jede Expansion durchgefallen: hoechster Prior. Kein
+        // stiller Ersatz durch die Handregel -- der Aufrufer bekommt eine
+        // legale Setzung aus DIESER Kandidatenmenge.
+        (0..candidates.len())
+            .max_by(|&a, &b| {
+                candidates[a]
+                    .prior
+                    .partial_cmp(&candidates[b].prior)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap_or(0)
+    } else {
+        (0..candidates.len())
+            .filter(|&i| candidates[i].visits == max_n)
+            .max_by(|&a, &b| {
+                let sc = |i: usize| -> f64 {
+                    (candidates[i].prior as f64).max(1e-9).ln()
+                        + gumbel_sigma(candidates[i].q, max_n)
+                };
+                sc(a).partial_cmp(&sc(b)).unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap_or(0)
+    };
+
+    Some(StartPlacementSearch { candidates, chosen })
+}
+
 #[cfg(test)]
 mod tests {
     // Die Shaping-Terme liegen seit 2026-08-27 in `shaping.rs` (Schritt A);
@@ -6895,6 +7456,7 @@ mod tests {
             round_est_c: 0.0,
             round_est_b_profile: ROUND_EST_B_PROFILE_DEFAULT,
             return_order_mode: 0,
+            start_by_search: 0,
         }
     }
 
@@ -7319,6 +7881,94 @@ mod tests {
             assert!(msg.contains("return_order_mode"), "{msg}");
         }
         std::fs::remove_file(&path).ok();
+    }
+
+    /// `PREREG_start_dome_choice.md` par.9c: `start_by_search` ist ein
+    /// OPTIONALES Spec-Feld. Die Zusage, die dieser Test haelt: die
+    /// EINGEFRORENEN Artefakt-Specs tragen es nicht und muessen weiter
+    /// laden -- sonst waere jede Elo-Kante gegen ein Artefakt tot. Erlaubt
+    /// sind nur 0 und 1.
+    #[test]
+    fn search_config_from_spec_file_takes_start_by_search_as_optional_field() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_startsearch_{}.json", std::process::id()));
+        let spec = |extra: &str| {
+            format!(
+                r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 1, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0{extra}, "heuristik_variante": "hv1"}}"#
+            )
+        };
+        std::fs::write(&path, spec("")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect("Spec ohne start_by_search muss weiter laden");
+        assert_eq!(cfg.start_by_search, 0, "fehlendes Feld = Handregel");
+        for want in [0u8, 1] {
+            std::fs::write(&path, spec(&format!(", \"start_by_search\": {want}"))).unwrap();
+            let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltiger Wert");
+            assert_eq!(cfg.start_by_search, want);
+        }
+        for bad in ["2", "-1", "0.5"] {
+            std::fs::write(&path, spec(&format!(", \"start_by_search\": {bad}"))).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("ungueltiger Wert muss scheitern");
+            assert!(msg.contains("start_by_search"), "{msg}");
+        }
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// Default-AUS: ungesetzt liefert der Knopf 0 (Handregel). Zusammen mit
+    /// `StartSearchParams::for_net` (self_play.rs) steht damit fest, dass
+    /// ohne gesetzten Knopf KEIN Suchpfad erreichbar ist.
+    #[test]
+    fn start_by_search_is_off_by_default() {
+        assert_eq!(read_start_by_search_env(), 0);
+    }
+
+    /// Die beiden ID-Helfer der Startsetzung muessen EXAKT das liefern, was
+    /// `features::action_to_id` fuer dieselbe Aktion liefert -- sonst
+    /// zoegen Prior und Trainingsziel an verschiedenen Stellen des
+    /// 406er-Vektors. Gleiches Absicherungsmuster wie
+    /// `action_to_id_direct_matches_json_path_across_random_games`.
+    ///
+    /// Die zweite Haelfte des Tests ist der BEFUND, der die
+    /// `choose_dome_slot`-Form ueberhaupt noetig macht: der Record-Schluessel
+    /// `"type": "dome"` faellt in `action_to_id` auf den Fallback 405 -- und
+    /// zwar fuer JEDEN Slot und JEDE Rotation gleich.
+    #[test]
+    fn start_action_ids_match_action_to_id() {
+        for d in 0..3usize {
+            for r in 0..3usize {
+                for c in 0..3usize {
+                    let via_json = action_to_id(&json!({
+                        "type": "choose_dome_slot",
+                        "display_index": d, "slot_row": r, "slot_col": c,
+                    }));
+                    assert_eq!(via_json, start_slot_action_id(d, r, c), "d={d} r={r} c={c}");
+                    assert!((328..=354).contains(&via_json));
+                }
+            }
+        }
+        for (i, rot) in [0u32, 90, 180, 270].iter().enumerate() {
+            let via_json = action_to_id(&json!({"type": "choose_dome_rotation", "rotation": rot}));
+            assert_eq!(via_json, start_rotation_action_id(*rot), "rot={rot}");
+            assert_eq!(via_json, 391 + i);
+        }
+        // Der Grund fuer die ganze Uebung: `"dome"` trennt NICHT.
+        let mut collapsed = std::collections::BTreeSet::new();
+        for d in 0..3usize {
+            for r in 0..3usize {
+                for c in 0..3usize {
+                    collapsed.insert(action_to_id(&json!({
+                        "type": "dome", "is_start": true,
+                        "display_index": d, "slot_row": r, "slot_col": c, "rotation": 90,
+                    })));
+                }
+            }
+        }
+        assert_eq!(
+            collapsed.into_iter().collect::<Vec<_>>(),
+            vec![405],
+            "der Record-Schluessel 'dome' faellt auf den Fallback 405 -- genau deshalb kodiert              der Such-Record die Startaktionen als 'choose_dome_slot'"
+        );
     }
 
     /// K4 par.3, reine Formel (Muster

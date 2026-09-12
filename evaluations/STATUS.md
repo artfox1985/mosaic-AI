@@ -270,6 +270,16 @@ Index: `PREREG_INDEX.md` (generiert).
    par.9c): ENTSCHIEDEN 13:15 (Nutzer: "bau den such-start dann vor v29"): Bau rund ein Tag
    (net_mcts, Spielpfade, Self-Play, Referee-Worker), Knopf MOSAIC_START_BY_SEARCH Default 0,
    A/B am Champion hinter der Leiter; v29-Erzeugung danach mit Such-Start UND Streuung.
+   **GESCHRIEBEN 13:20 (Agent), UNKOMPILIERT** (`PREREG_start_dome_choice.md` par.9d): Suche
+   `net_mcts.rs::search_start_placement` (Gumbel-Wurzel ueber die Startkandidaten, ein
+   Vorwaertspass fuer Priors plus sims Simulationen), umgeschaltet in allen Netz-Spielpfaden
+   inkl. Referee-Worker; Heuristik-Seiten unveraendert. BEFUND: `action_to_id` kennt den Typ
+   "dome" nicht, alle Startkandidaten fielen bisher auf ID 405 (dome_stack_peek); der Such-Record
+   kodiert die Setzung deshalb als choose_dome_slot (IDs 328-354, Rotationen gebuendelt) und
+   bekommt im Trainings-Cache Gewicht 1 (bisher 0 fuer alle Start-Records). Streu-Knopf
+   MOSAIC_START_SLOT_RANDOM_P ebenfalls geschrieben (Self-Play-Erzeugung, p=0 bitidentisch).
+   **NICHT PUSHEN, bis `tools/night_start_by_search_ab.sh` den Bau-Durchgang gruen hat** (der
+   pre-push-Hook baut den Arbeitsbaum und liefe neben der Leiter).
 
 00. ~~ANKER-DRIFT ROT durch A2~~ ENTSCHIEDEN 2026-09-12: (a) Anker neu gesetzt (`hv1_anchor_v2`, Segment 2).
 0. ~~Name des Schlussmodells~~ ENTSCHIEDEN 2026-09-11: **Tessa** (Umsetzung mit Stufe 3 des
