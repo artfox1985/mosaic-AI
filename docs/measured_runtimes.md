@@ -200,6 +200,9 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Such-Start A/B (paired_gating, SPRT H0 nach 95 Paaren, 10 Threads, Logs) | **2.977 s** | 15,7 s je Partie (Such-Start kostet je Partie eine Suche mehr) |
 | Such-Start A/B Wiederholung (SPRT H0 nach 85 Paaren) / Spaltensonde Replay 170 Partien / Plattenpunkte | **2.545 s** / 48 s / < 5 s | 15,0 s je Partie |
 | Sprosse Netz@100 gegen Heuristik-Artefakt (Referee, 50 Partien, 6 Prozesse) / Netz@100 gegen Netz@400 live (paired_gating, 30 Paare, 10 Threads, Logs) | 155-167 s / 497 s | 3,2 s / 8,3 s je Partie |
+| Champion v28-b02@100 gegen @400 (paired_gating, 15 Paare, Logs) / Spaltensonde Replay 30 Partien | 256 s / 6 s | 8,5 s je Partie |
+| Netz@25 gegen Heuristik-Artefakt @150 (Referee, 50 Partien) / Netz@25 gegen Netz@100 live (paired_gating, 50 Paare) | 73-92 s / 294 s | 1,6 s / 2,9 s je Partie |
+| Heuristik-Artefakt @600 gegen @150 (Referee, 150 Partien, 6 Prozesse) / Netz@25 gegen Heuristik @600 (150 Partien) | 111 s / 254 s | 0,7 s / 1,7 s je Partie |
 | Sprossen-Kanten (frozen_referee_match, 50 Partien, 6 Prozesse) | Netz gegen Netz-Artefakt 917-963 s; Heuristik gegen Heuristik 53 s; Netz gegen Heuristik 365-464 s | je Block |
 | hv2-Gegenprobe Startkuppel (9 Slots x 20 Referee-Partien, 6 Prozesse) | **219 s** | 1,2 s je Partie |
 | hv3: Bau-Tore (629 Tests 85 s, Wheel, Drift, Konservierung) / Einfrieren mit Golden Probe / venv+Konservierung / 2 Heuristik-Kanten a 150 | 4 min / 30 s / 30 s / je ~2 min | `tools/night_hv3_freeze_edges.sh` |

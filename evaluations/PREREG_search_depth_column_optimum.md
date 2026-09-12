@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k); das Verwerfen des Prior-Top-1 ist Nebenwirkung (par.6b/par.7). Betriebspunkt 100 Sims bleibt, am Champion v24-b06 bestaetigt (par.8b: 0,8200 gegen 0,5075 @250). Prozessregel par.8c: Neumessung nur bei AERA-Wechseln. NEUMESSUNG FAELLIG seit 2026-09-11 (INPUT_SIZE 744 -> 755), EINGETAKTET fuer das v29-Begleitprogramm (par.8d: 100/150/200/250/400). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k); das Verwerfen des Prior-Top-1 ist Nebenwirkung (par.6b/par.7). Betriebspunkt 100 Sims bestaetigt an v24-b06 (par.8b); Prozessregel par.8c. Neumessung par.8d in v29; erster Punkt (Nachtrag 2026-09-12): v28-b02@100 verliert 7:23 gegen @400 und baut WENIGER Spalten (0,87 gegen 1,30), Plateau gilt fuer den Champion nicht mehr, Betriebspunkt 100 offen. -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -939,3 +939,36 @@ stehen unveraendert im Koerper: @100 verliert 33:47 n.s. (par.2j2), @400 0,4975
 Die in par.8d faellige Neumessung der Sims-Kurve am Generator ist im v29-Begleitprogramm
 eingetaktet (Nutzer 2026-09-11, `PREREG_v29_window.md` par.7 Punkt 4): Punkte 100/250/400 wie in par.8b plus 150/200, rund eine Stunde ohne
 Training; der Betriebspunkt 100 bleibt, solange das Plateau steht.
+
+## Nachtrag 2026-09-12/13 (erster Punkt der Neumessung, am Champion v28-b02)
+
+Nutzer 2026-09-12, 23:35 ("weil es mich mal interessiert, mach mal v28-b02@100 vs. v28-b02@400
+mit fruehstop"), mit dem Hinweis auf par.2j/2j2 ("wir haben das mit den 100 sims schon mal
+gesehen"). Gepaartes Gating, dasselbe Modell und dieselbe Champion-Spec beidseitig, Seed 20261051,
+Bloecke zu 5 Paaren, Logs, 10 Threads, SPRT: **v28-b02@100 verliert 7:23 nach 15 Paaren** (H0,
+LLR -2,95, McNemar p 0,021, gepaarte Differenz -1,07 [-1,71; -0,42]), Punkte 50,9 gegen 60,1
+(gepaart -9,2 [-14,5; -3,9]); 256 s. Artefakt `paired_gating_v28-b02_s100_vs_s400_seed51.json`,
+Register-Zeile mit Bloecken und Frueh-Stopp-Markierung.
+
+**Volle Spalten je Brett (Replay, 25 von 30 Partien; fuenf an der Chip-Vollendungs-Grenze des
+Replayers):** @100 0,87 +- 0,26, @400 1,30 +- 0,28. Plattenpunkte gepaart @100 minus @400: gesamt
+-1,7 [-4,6; +1,2], Platzierungspunkte -4,5 [-8,7; -0,3], Aeussere Felder -1,3 [-2,0; -0,6],
+Horizontale Reihen -1,1 [-2,0; -0,2]; Eckplatten +0,9 [-0,4; +2,2].
+
+**Lesart:** der Befund von par.2i/2j (flache Suche baut MEHR Spalten, Plateau 25-100) gilt fuer
+den heutigen Champion NICHT mehr: v28-b02 baut mit 400 Sims mehr volle Spalten als mit 100 und
+holt dazu neun Punkte mehr. n ist klein (15 Paare, Frueh-Stopp), aber jede Kennzahl zeigt in
+dieselbe Richtung. Plausible Ursache (ANNAHME, nicht gemessen): seit v22 tragen Huelle,
+Plattenblick-Kanaele und drei Material-Generationen den Spaltenbau in Prior UND Value-Kopf, so
+dass die tiefere Suche ihn nicht mehr wegbewertet, sondern vollendet. Der Betriebspunkt 100 fuer
+die Erzeugung bleibt bis zur vollen Neumessung (par.8d, v29-Begleitprogramm), die damit ihren
+ersten Punkt hat; die Erzeugung mit 100 Sims ist damit als Frage markiert, nicht entschieden.
+
+**Gegenprobe am alten Generator v22-b05 (Leiter-Sprossen derselben Nacht, k3v_off-Spec):**
+@25 gegen @100 43:57 nach 50 Paaren (SPRT H0, McNemar p 0,19), Punkte -5,1 [-9,2; -0,9],
+Strafleiste +2,0, Platzierungspunkte -4,4 [-7,1; -1,8]; volle Spalten 0,53 gegen 0,56 (Replay
+100/100), Plattenpunkte +1,35 [-0,10; +2,80] fuer @25. Also das Plateau von par.2i: 25 und 100
+bauen gleich viele Spalten, 25 verliert die Punkte an Strafleiste und Platzierung. @100 gegen @400
+21:39 nach 30 Paaren (SPRT H0). Artefakte `paired_gating_v22-b05_s25_vs_s100_seed52.json`,
+`paired_gating_v22-b05_s100_vs_s400_seed50.json`.
+
