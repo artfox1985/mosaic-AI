@@ -239,6 +239,30 @@ Nachbar-Kante: zwei von drei Seeds signifikant, der dritte als verzerrungsfreier
 Verzerrungsfrei gepoolt (nur die beiden Deckel-Laeufe 46 und 47): 438:362 aus 800 = 0,548.
 Replay-Sonden (Spalten, Plattenpunkte) auf s47 folgen im Schwanz der Kette.
 
+**KORREKTUR 2026-09-12, 12:05 (Anker-Kanten falsch etikettiert):** die drei Anker-Kanten oben
+liefen ueber `tools/night_reanchor.sh` OHNE `--sims-worker 150 --c-puct-worker 0.3`; der Anker
+spielte @400 mit c_puct 1,5 (Artefakte `anchor_v2_arena_*.json`: `sims_worker 400`,
+`c_puct_worker 1.5`), nicht die Leiterdefinition @150/0,3 (`tools/anchor_arena.py:118-119`, so
+lief die Segment-1-Kante von v27-b01). Die Zeilen liegen in
+`archive/elo_history_segment2_anchor_mislabelled.csv`; alle daraus abgeleiteten Segment-2-Zahlen
+(1299/1262/1173/1346) sind bis zur Wiederholung VORLAEUFIG. Wiederholung mit korrekten
+Parametern, festes n=150, in `tools/night_ladder_rungs2.sh` Teil A.
+
+**ZWISCHENSTUFEN (Nutzer 2026-09-12: "die neuverankerung steht auf recht wackligen beinen ...
+weil der abstand von hv1 bereits gesaettigt ist"):** die Anker-Kanten liegen bei 84-88 % Siegquote
+(gegen den STAERKEREN Anker @400; Segment 1 zeigt Saettigung ab v23 mit 84-85 %, geprueft am
+Alt-Register). Deshalb Sprossen in rund 100-Elo-Schritten aus eingefrorenen Artefakten:
+hv2_generator (Segment 1: 1100), v21_2d_brierbest (1190, aus restic-Snapshot 55623af8, Worker-
+Wheel wave3g aus f003e008), v24-b07 (1283, aus bfbe80b1), v26-b01 (1364). Neun Kanten
+(`night_ladder_rungs2.sh` Teil B), jede in Bloecken zu 50 Partien mit eigener Seed-Basis und
+Frueh-Stopp bei zweiseitigem Binomialtest p < 0,05 der gepoolten Bloecke, spaetestens 150
+(Nutzer: "muss nicht fest 150 sein, kann auch vorher abbrechen, wir machen ja kein champion
+gate"; und: "lass die sprossen, die werden wir brauchen wenn wir vorzeitig abbrechen lassen").
+Heuristik-Seiten @150 mit c_puct 0,3, Netze @400 mit 1,5; Artefakt gegen Artefakt per
+`--artifact-dir-a`, Cross-Aera per `--force-cross-era`. Lesart: mit Frueh-Stopp traegt jede
+Kante weniger Praezision, dafuer haengt jeder Knoten an mehreren Nachbarn; Kanten mit Frueh-Stopp
+werden im Register als solche gekennzeichnet (SPRT-artige Verzerrung der Siegquote nach oben).
+
 **Champion-2-Kante (Promotion Schritt 4, 05:22-06:04, 2.516 s):** v28-b02 gegen das
 EINGEFRORENE Artefakt v26-b01 mit dessen eigenem Wheel (`frozen_referee_match.py`, 150 Partien,
 6 Prozesse, Seed-Basis 20261052) **101:49**, Punkte 52,9 gegen 50,5. Cross-Aera nach der
