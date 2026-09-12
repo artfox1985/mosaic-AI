@@ -1,0 +1,92 @@
+{
+  "champion": "v21_2d_brierbest",
+  "freeze_date": "2026-08-23",
+  "model_file": "model.onnx",
+  "model_source": "models/alphazero_v21_2d_brierbest.onnx",
+  "spec_file": "spec.json",
+  "spec_source": "models/champion_frozen.spec.json",
+  "spec_content": { "implicit_minimax_alpha": 0.0 },
+
+  "elo": {
+    "value": 1215,
+    "ci95": [1170, 1259],
+    "condition": "v21_2d_brierbest@400 gegen Heuristik@150(dyn)",
+    "source": "evaluations/PREREG_round5_minfix_elo_reset.md par.5, Zeile 118 (geprueft in dieser Sitzung)"
+  },
+
+  "engine_config_json_of_artifact_wheel": {
+    "active_leaf": "Net",
+    "aggr_lambda": 0.0,
+    "bootstrap_horizon_rounds": 2,
+    "contract_hash": "a169ebf0a4451e08",
+    "decouple_net_sims_from_actions": true,
+    "determinize_root_hidden_info": true,
+    "engine_version": "0.1.0",
+    "floor_shaping_weight": 0.3,
+    "gumbel_top_m": 16,
+    "input_size": 708,
+    "mirror_other_val": false,
+    "num_actions": 406,
+    "num_planes_channels": 76,
+    "points_utility_w": 0.0,
+    "points_utility_weight": 0.0,
+    "policy_mass_cutoff": 0.95,
+    "round_transition_n_samples_search": 8,
+    "round_transition_sampling": false,
+    "shuffle_stack_peek_in_search": false,
+    "use_gumbel_search": true,
+    "value_cal_a": 0.0,
+    "value_cal_b": 1.0,
+    "value_opp_epsilon": 0.0,
+    "_geprueft": "gemessen ueber python -c 'import mosaic_rust as mr; print(mr.engine_config_json())' NACH Installation des wave3e-Wheels im Haupt-Interpreter, 2026-08-23/24 -- contract_hash unveraendert gegenueber allen Vorgaengerwellen"
+  },
+  "contract_hash": "a169ebf0a4451e08",
+  "engine_version": "0.1.0",
+  "state_schema_version": "nicht versioniert (kein `state_schema_version`/`schema_version`-Symbol im Rust-Quellstand gefunden, grep-geprueft 2026-08-23; der Referee-Handshake stuetzt sich deshalb NUR auf `contract_hash` + den Golden-Selbsttest, nicht auf eine dritte Schema-Kennung)",
+
+  "wheels": {
+    "champion_behavior_artifact": {
+      "file": "mosaic_rust_searchconfig_wave1_20260823.whl",
+      "source": "models/frozen_wheels/mosaic_rust_searchconfig_wave1_20260823.whl",
+      "role": "Dokumentiert/verankert das VERHALTEN, auf dem die Elo-Messung 1215 [1170,1259] beruht (par.8: 'ueber die Paritaets-Kette 8c6684ff byte-identisch zur R5-Fix-Aera, auf der v21s Elo gemessen ist'). Wird NICHT in die Artefakt-venv installiert -- reine Provenienz-Kopie im Artefakt-Verzeichnis, nicht funktional genutzt."
+    },
+    "worker_wheel": {
+      "file": "mosaic_rust_wave3g_20260824.whl (in models/frozen_wheels/, NICHT im Artefakt-Verzeichnis kopiert -- per pip in venv/ installiert)",
+      "source": "models/frozen_wheels/mosaic_rust_wave3g_20260824.whl",
+      "role": "TATSAECHLICH in venv/ installiert. GEGENUEBER wave3e/wave3f NEU (Koordinator-Auftrag 2026-08-24, 'Luecke im Pruefverfahren' -- der bestehende Roundtrip-Test verglich fuer fast alle Felder nur eine erneute JSON-Serialisierung von `rebuilt` gegen `state_to_json_exact(state)`, NIE `state` direkt gegen `rebuilt`; Felder, die `state_to_json` gar nicht ausgibt, oder die dort nur GROB/gerundet ausgegeben werden, waren fuer diesen Vergleich strukturell blind, s.o. `evaluations/PREREG_agent_encapsulation.md`): `serialize.rs` bekam einen ERSCHOEPFENDEN direkten Struct-Vergleich (`json_to_state_exact_tests::diff_game_states`/`diff_player_board`, geht JEDES `GameState`/`PlayerBoard`-Feld einzeln durch) UND einen neuen Test `roundtrip_exact_many_real_games` (80 echte, bis Runde 5 durchgespielte Partien, nicht nur Random-Walks). Damit wurden SIEBEN echte, bisher unentdeckte Roundtrip-Verluste im exact-Pfad gefunden und je additiv behoben (sieben neue Pflichtfelder in `state_to_json_exact`/`json_to_state_exact`): `first_player_next_round_exact` (die Basisrekonstruktion leitete das Feld nur NAEHERUNGSWEISE aus den Marker-Flags ab, mit Ruecksturz auf `current_player`, sobald niemand die Marke aktuell haelt -- weicht schon ab Schritt 2 eines Random Walks ab), `log_exact` (`state_to_json`s `log`-Feld ist UI-gefenstert auf die letzten 30 Nicht-Maschinenzeilen), `score_unclamped_exact`/`total_floor_penalties_exact`/`floor_penalties_per_round_exact` je Spieler (drei Felder, die `state_to_json` ueberhaupt nicht ausgibt), `tiled_max_row_exact` je Spieler (die Doku-Annahme 'fuer Phase::Drafting per Konstruktion -1' war falsch fuer einen aus einer bereits abgeschlossenen Tiling-Phase STEHENGEBLIEBENEN Wert), und `dome_tiles_placed_this_round_exact` je Spieler -- DIES war der schwerwiegendste Fund: in Runde 5 ist `can_place_dome_tile()` IMMER `false` (reiner Runden-Gate, unabhaengig vom echten Platzierungsstand), die alte 'can_place_dome-Bool -> 0 oder DOME_TILES_PER_ROUND'-Naeherung lieferte dort IMMER 2, obwohl der wahre Wert nach dem Rundenwechsel-Reset 0 ist; der `seed_state_fixup`-Behelf (par.8d) reparierte nur die GEGENRICHTUNG (zu klein) und griff hier nicht. `seed_state_fixup` wird im exact-Pfad seither NICHT mehr aufgerufen (ueberfluessig, bleibt aber fuer den SEEDING-Pfad in self_play.rs bestehen). `state_to_json`/`json_to_state` bleiben BYTE-UNVERAENDERT (Basislinien-Schutz, nur der `*_exact`-Pfad ist betroffen). Abnahme: cargo test --lib --release 503/0/26 (502/0/26 + 1 neuer Test), cargo build --release --examples --benches gruen (0 Fehler/Warnungen), Paritaets-Hash 8c6684ffba06cf3e16e898b83325f3154c04efac555c8e862c079b71155bd423 unveraendert (tools/parity_probe.py), contract_hash a169ebf0a4451e08 unveraendert (mr.engine_config_json()).",
+      "caveat": null
+    }
+  },
+
+  "worker_python": {
+    "interpreter_relative": "venv/Scripts/python.exe",
+    "interpreter_note": "Relativ zu diesem Verzeichnis (models/frozen_champions/v21_2d_brierbest/). Windows-venv, Python 3.14 (dieselbe Minor-Version wie der Koordinator-Interpreter, ueber den das Wheel gebaut wurde -- PyO3-Wheels sind an die CPython-ABI-Minor-Version gebunden)."
+  },
+
+  "state_step_api": {
+    "status": "additiv gebaut (par.8, Welle 3) -- vorher fehlte eine State-json->Zug->State-json-Schritt-API vollstaendig, siehe Scout-Befund im Abnahmebericht. Seit Fork A (par.8b) traegt `state_json` vier PFLICHT-Felder mit der exakten Reihenfolge der verdeckten Sammlungen; seit par.8d ein FUENFTES PFLICHT-Feld `pending_dome_choice_exact` (Rundtrip des angefangenen Kuppel-/Stapel-Zugs). Seit par.8d ist das Protokoll ECHT PER-ENTSCHEIDUNG: kein atomarer Kuppel-Sonderfall, kein `rot_seed` mehr -- jede Anfrage beantwortet GENAU EINE Drafting-Entscheidung.",
+    "worker_side": "lib.rs::net_arena_choice_state_json(state_json, model_path, sims, c_puct, seed, spec=None) -> {action, value}. NUR Drafting-Entscheidungen (harter Fehler sonst). `state_json` MUSS aus `RefereeGame::state_json()`/`serialize::state_to_json_exact` stammen (haelt die fuenf `*_exact`-Felder) -- ein `state_json` aus der alten, einfachen `state_to_json` wird hart abgelehnt.",
+    "referee_side": "referee.rs::RefereeGame (pyclass): haelt die Live-Partie, loest Startplatzierung/Tiling selbst auf (advance_to_decision), wendet In-Process-Entscheide an (drafting_decide_and_apply_inprocess) oder validiert+wendet GENAU EINE externe Worker-Aktion je Aufruf an (drafting_apply_external, harter Abbruch bei Illegalitaet). `state_json()` liefert `state_to_json_exact` inkl. `pending_dome_choice_exact`."
+  },
+
+  "golden_probe": {
+    "file": "golden_probe.json",
+    "source": "10 LIVE RefereeGame-Zustaende (state_to_json_exact, generiert ueber tools/build_frozen_golden_probe.py, 2 je Runde 1-5, seeds 916001+ je Partie) -- NEU ERZEUGT 2026-08-24 (nach dem Roundtrip-Fix, wave3g): das exact-Schema hat sieben zusaetzliche Pflichtfelder (s.o. wheels.worker_wheel.role), die Vorgaenger-Sonden (wave3e/wave3f) wuerden hart abgelehnt. Bevorzugt gezielt Zustaende mit `pending_dome_choice` gesetzt (2 von 10, beide Runde 2, Aktion `dome_rotation`).",
+    "n_probes": 10,
+    "rounds_covered": [1, 2, 3, 4, 5],
+    "pending_dome_choice_probes": 2,
+    "sims": 400,
+    "c_puct": 1.5,
+    "note": "Deterministische Antworten von net_arena_choice_state_json (wave3g-Wheel, gefrorenes Modell+Spec, feste Seeds 916101-916110) je Sondenstellung -- der Referee spielt sie beim Laden nach (exakter Vergleich). Selbsttest gegen einen frisch gestarteten Worker-Prozess: 10/10 gruen (tools/frozen_referee_match.py, 2026-08-24, evaluations/frozen_referee_realrun_wave3g_20260824.json)."
+  },
+
+  "kernbeweis": {
+    "status": "GRUEN (2026-08-24, nach dem Roundtrip-Fix, wave3g) -- 6. Diagnoserunde, siebte behobene Ursache (dome_tiles_placed_this_round in Runde 5, s.o.)",
+    "methode": "8 Partien seeds 910001-910008, 400/400 Sims, num_threads=1. REFERENZ = RefereeGame rein in-process (BEIDE Seiten per drafting_decide_and_apply_inprocess, identisches Modell+Spec, kein Worker) gegen REFEREE = dieselbe RefereeGame-Konstruktion, aber Seite B (board_a alterniert i%2, first_player=board_a) ueber den Worker-Subprozess (state_to_json_exact -> json_to_state_exact -> Suche -> Aktion zurueck) -- Vergleich per vollem Partie-Log (`RefereeGame::full_log()`, ungefenstert), nicht nur Endstand.",
+    "artefakte": [
+      "evaluations/frozen_kernbeweis_result_postfix_20260824.json (Referenz- und Referee-Scores/Steps/Hashes je Seed, Erstabweichungszeile je Partie)",
+      "evaluations/frozen_referee_realrun_wave3g_20260824.json (separater 6-Partien-Echtlauf via frozen_referee_match.py, seeds 920001-920006, inkl. Golden-Selbsttest 10/10)"
+    ],
+    "befund": "8/8 Partien byte-identisch (voller Log inkl. aller Zwischenschritte, Endstand, Rundenzahl -- keine einzige Abweichung mehr). Die Wurzel-Ursache war NICHT Numerik/Batching (par.8e-Hypothese blieb widerlegt) und NICHT die vorher vermuteten Protokoll-/RNG-/Reihenfolge-Themen (par.8a-8d, bereits behoben) -- die verbliebene Divergenz kam aus dem Roundtrip SELBST: der bestehende Test verglich nur JSON gegen JSON (strukturell blind fuer nicht ausgegebene/gerundete Felder), ein direkter Struct-Vergleich state-vs-rebuilt auf echten Partien deckte sieben reale Feldverluste auf (s.o. wheels.worker_wheel.role); nach deren Behebung ist der exact-Pfad auf allen 8 Kernbeweis-Seeds und 250 zusaetzlich abgesuchten Testseeds (roundtrip_exact_many_real_games, temporaer auf 250 erweitert getestet) verlustfrei."
+  }
+}

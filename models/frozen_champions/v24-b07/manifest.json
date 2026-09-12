@@ -1,0 +1,105 @@
+{
+  "champion": "v24-b07",
+  "freeze_date": "2026-09-07",
+  "name_dialect": "hv",
+  "model_file": "model.onnx",
+  "model_source": "models/alphazero_v24-b07_brierbest.onnx -- BYTEGLEICHE Kopie von alphazero_v24-b06_brierbest.onnx. b07 ist KEIN Trainingsblock: die Gewichte sind die von b06, unterschieden ist nur die Spec (Huellenform 2, K5). Nutzer-Namensregel 2026-09-07: eine gemessene Konfiguration bekommt eine eigene Nummer.",
+  "pth_file": "model.pth",
+  "pth_source": "models/alphazero_v24-b06_brierbest.pth -- dieselben Gewichte, siehe model_source.",
+  "spec_file": "spec.json",
+  "spec_source": "models/v24-b07_brierbest.spec.json = b06-Spec plus envelope_hull_form 2 und special_row6_w 1.0; inhaltsgleich mit dem gemessenen Arm hullform2_k5w10.spec.json",
+  "spec_content": {
+    "implicit_minimax_alpha": 0.0,
+    "long_row_init_shaping_w": 0.0,
+    "score_utility_c": 0.0,
+    "score_utility_b": 20.0,
+    "envelope_search_c": 1.0,
+    "envelope_tiling_w": 0.0,
+    "envelope_profile": [
+      1.0,
+      0.92,
+      0.67,
+      0.33,
+      0.0
+    ],
+    "envelope_tiling_value_w": 0.0,
+    "envelope_projection_mode": 1,
+    "envelope_flush_w": 0.0,
+    "envelope_hull_form": 2,
+    "special_row6_w": 1.0,
+    "heuristik_variante": "hv1"
+  },
+  "input_size": 744,
+  "contract_hash": "20b442a8164f748d",
+  "engine_version": "0.1.0",
+  "elo": {
+    "value": 1327,
+    "ci95": [
+      1287,
+      1370
+    ],
+    "condition": "v24-b07@400 auf der R5-Fix-Leiter, drei Kanten aus der Promotion 2026-09-07: Gating 214:186 gegen v24-b06_k3p10 (Seed 20261015), Anker 126:24 gegen Heuristik_hv1_anchor@150 (festes n=150, Seed-Basis 900001, Cross-Aera), Champion-2 92:58 gegen v23-b01_k3p10 (SPRT nach 75 Paaren, p 0,0115). 700 Partien, 432-268. Vorgaenger v24-b06_k3p10 steht bei 1302."
+  },
+  "wheels": {
+    "champion_behavior_artifact": {
+      "file": "mosaic_rust_wegb_temp2_20260907.whl",
+      "source": "engine/target/wheels\\mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl, gebaut 2026-09-07 (Weg B und Temperatur-Form 2)",
+      "sha256": "82e73375717832d6a62877cea2f28946cb0e37e0104acceeda579f4c01a467e8",
+      "hinweis": "Das Wheel im Artefakt ist das vom 2026-09-07 11:27 -- unter DIESEM Wheel sind die drei Elo-Kanten zwischen 17:33 und 18:42 gemessen worden. Der spaetere Umbau von Weg B und Weg C (19:26) beruehrt den Champion nicht, weil MOSAIC_DEVIATE_PROB und MOSAIC_EXCURSION_PROB per Default aus sind; die Anker-Pruefung nach dem Umbau war in beiden Modi gruen. Ein Artefakt traegt das Verhalten, das seine Zahlen erzeugt hat."
+    }
+  },
+  "knobs": "Alle Knoepfe in spec.json; Spielbetrieb: server.py uebersetzt die Spec in Env-Knoepfe (MOSAIC_ENVELOPE_PROJECTED=1, MOSAIC_ENVELOPE_SEARCH_C=1.0, Profil 1,0.92,0.67,0.33,0, MOSAIC_ENVELOPE_FLUSH_W=0)",
+  "golden_probe": {
+    "file": "golden_probe.json",
+    "source": "tools/build_frozen_golden_probe.py --artifact-dir models/frozen_champions/v24-b07 --seed-base 916001",
+    "n_probes": 10,
+    "erzeugt": "2026-09-07 18:42"
+  },
+  "parity_fixture": "engine/tests/fixtures/net_parity_champion.txt, neu geschrieben 2026-09-07 18:26 (MOSAIC_UPDATE_NET_PARITY_FIXTURE=1), Gegenprobe im frischen Prozess gruen",
+  "display_calibration": {
+    "A": -0.0961,
+    "B": 0.5875,
+    "brier": 0.23221,
+    "eval_set": "frozen_eval_set_v3.pkl",
+    "trend_frozen_v1": {
+      "A": 0.3281,
+      "B": 0.6497,
+      "brier": 0.24657
+    },
+    "in_server_py": true,
+    "note": "UNVERAENDERT von b06 uebernommen: tools/platt_fit.py rechnet auf der .pth, und die Gewichte sind bytegleich. Ein neuer Fit koennte sich nur durch Rauschen unterscheiden."
+  },
+  "gumbel_balance": {
+    "ratio_sigma_over_prior_median": 2.603,
+    "by_round": [
+      1.84,
+      3.56,
+      2.88,
+      2.34
+    ],
+    "source": "evaluations/artifacts/gumbel_scale_calibration_v24-b06_k3p10.json",
+    "regel": "unter 3: c_visit/c_scale-Familie bleibt geschlossen (v23-b01_k3p10: 2,92)",
+    "note": "UNVERAENDERT von b06 uebernommen: tools/gumbel_scale_calibration.py kennt kein --spec (Zeilen 85-88), ist also spec-unabhaengig -- bei gleichen Gewichten derselbe Wert."
+  },
+  "worker_python": {
+    "interpreter_relative": "venv/Scripts/python.exe",
+    "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, angelegt 2026-09-06 18:17 per pip install --no-deps aus dem kanonisch benannten Wheel plus onnx/numpy; engine_config_json in der venv: contract 20b442a8164f748d"
+  },
+  "acceptance": {
+    "note": "Belege liegen an der Spec, nicht am Netz",
+    "instrument_volle_spalten": 0.69,
+    "instrument_bezug_b06": 0.4975,
+    "gating_gegen_b06": "214:186 (Seed 20261015)",
+    "huellenform_gepoolt_3_seeds": "391:329 = 0,543, p 0,023, KI [0,507; 0,579]",
+    "k5_siegneutral": "243:257 ueber 500 Partien, KI [0,442; 0,530]"
+  },
+  "prereg": "evaluations/PREREG_geometric_envelope.md par.8.15e/8.15f; PREREG_special_tile_yield.md par.9c/9d; docs/promotion_checklist.md",
+  "champion_note": "Nutzer 2026-09-07: 'wenn ich ein modell hab und dann die knoepfe solang tune bis ein champ rauskommt ist das in ordnung.' b07 teilt die Gewichte mit b06 und ist trotzdem ein eigener Leiterknoten -- Champion ist Modell PLUS Spec.",
+  "referee_selftest": {
+    "datum": "2026-09-07",
+    "handshake": "ok (20b442a8164f748d beidseitig)",
+    "golden_selftest": "gruen, 10 Sonden, 0 Abweichungen",
+    "echtpartien": 2,
+    "artefakt": "evaluations/frozen_referee_match_v24-b07.json"
+  }
+}
