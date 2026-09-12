@@ -117,6 +117,8 @@ Die Liste ist endlich und greppbar: `.shuffle(`, `choose_multiple`, Kuerzungen w
 | `round_transition.rs` (8x), `round_transition_resample.rs:193`, `self_play.rs:5093` | Beutel und verdeckter Chip-Vorrat | in Ordnung: Reihenfolge ist echt verdeckt, die Multimenge bleibt erhalten |
 | `scoring.rs:106` | Auswahl der Wertungsplatten | Spielaufbau, keine Informationsfrage |
 | `mcts.rs:235`, `self_play.rs:803` | Zugreihenfolge, Permutationen | Gleichstandsaufloesung, keine Informationsfrage |
+| `features.rs::action_to_id` (Zweig `"dome" \| "choose_dome_slot"`) | ID-BUENDELUNG statt Mischen: die vier Rotationen derselben (Platte, Slot) fallen auf EINE ID; ihre Besuchsmasse addiert sich (`t_policy[id] += prob`, `corpus_dataset.py:1314`) | **absichtlich**, weil die Rotation seit Baustein B eine eigene Stufe-2-Entscheidung mit eigener ID-Familie ist (`choose_dome_rotation`, 391-394): der Kopf lernt sie getrennt, nicht als Kreuzprodukt. Weggenommen wird nichts, das ein Spieler HAT -- es ist eine Aufteilung des Aktionsraums, keine Modellierung von Unwissen. Kehrseite: an der Startsetzung (`is_start`) gibt es die Stufe 2 nicht, dort verliert das Ziel die Rotation wirklich |
+| `self_play.rs:226-235` (`action_to_env_dict`, Zweig `Stone`) | `moon_order` fliesst NICHT in die ID ein: Mondvarianten desselben Sonnenzugs teilen sich eine ID | **absichtlich**: die Suche kombiniert die Priors dieser Varianten separat (`net_mcts.rs:1840`), der Policy-Kopf traegt die Farbreihenfolge als EIGENEN Kopf (`moon`). Eine ID je Permutation wuerde `NUM_ACTIONS` sprengen, ohne dass der Kopf die Trennung lernen koennte |
 
 **Was dieser Audit NICHT sieht** (und wofuer die anderen Kanaele stehen): wo Information
 nie ENTSTEHT (fehlende Merkmale -- dafuer `PREREG_stack_top_feature.md`, Sicht-Achse) und
@@ -133,9 +135,31 @@ blockweise, aeltester Block zuerst; gepflegt an den vier Pool-Stellen in `game.r
 tolerant gelesen); die gemeinsame Anzeige-Sicht `state_to_json` traegt ihn bewusst NICHT,
 weil er seitenabhaengig ist.
 
-**Regel fuer neue Stellen:** wer einen `shuffle` oder eine Kuerzung auf verdeckten Bestand
-neu einbaut, traegt ihn hier ein, mit der Antwort auf die beiden Fragen oben. Ein
-`shuffle`, der nicht sagen kann, wessen Unwissen er modelliert, ist ein Bug in Wartestellung.
+**Zweite Klasse derselben Sorte: die ID-BUENDELUNG** (zwei Zeilen oben, seit 2026-09-12).
+Sie mischt nichts, sie legt verschiedene Aktionen auf denselben Platz im 406er-Policy-Raum
+-- mit demselben Messverhalten: beide Seiten lesen dieselbe Tabelle, jeder Fehler darin
+kuerzt sich in Arena und Gating weg.
+
+**Anlass (2026-09-12), und warum der Waechter dort jetzt steht:** `action_to_id` hatte
+keinen Zweig fuer den Aktionstyp `"dome"` (Startsetzung der Kuppelplatte, Record
+`type: dome, is_start: true`). Der Rueckfall `_ => 405` legte JEDEN unbekannten Typ auf die
+ID des verdeckten Ziehens (`dome_stack_peek`) -- alle bis zu 108 Startkandidaten auf einer
+einzigen, und zwar auf der einer fremden, echten Aktion. Unbemerkt seit Wochen, weil
+`corpus_dataset.py` Start-Records ohne `start_by_search` mit Policy-Gewicht 0 fuehrt: das
+Ziel war falsch, aber gewichtslos. Gefunden hat es kein Messlauf, sondern das Lesen des
+Codes. Seitdem: jeder von der Engine erzeugte Typ hat einen EXPLIZITEN Zweig
+(`features.rs::KNOWN_ACTION_TYPES`), der Rueckfall ist ein harter Fehler (Test-Build
+`panic!`, Release `debug_assert!` plus einmalige Warnung und der Sentinel
+`UNKNOWN_ACTION_ID = 2` aus der ungenutzten ID-Luecke, damit eine laufende Partie nicht
+stirbt und die Kollision auf keine echte Aktion faellt), und zwei Tests halten die Menge
+der Erzeuger gegen die Menge der Zweige: `features.rs::action_to_id_branches_cover_exactly_the_engine_action_types`
+(Rust) und `tools/tests/test_action_id_mirror.py` (Python-Spiegel gegen Rust-Quelltext).
+
+**Regel fuer neue Stellen:** wer einen `shuffle`, eine Kuerzung auf verdeckten Bestand oder
+eine neue ID-Buendelung einbaut, traegt sie hier ein, mit der Antwort auf die beiden Fragen
+oben. Ein `shuffle`, der nicht sagen kann, wessen Unwissen er modelliert, ist ein Bug in
+Wartestellung -- und eine Buendelung, die nicht sagen kann, welche Entscheidungen sie
+absichtlich zusammenlegt, genauso.
 
 ## Konstanten mit Fallstrick
 

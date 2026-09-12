@@ -29,7 +29,7 @@ use crate::game::{
     apply_start_placement, determine_winner, drafting_actions, execute_draw_from_stack, Game,
     TilingMove,
 };
-use crate::mcts::{dynamic_sims, player_total, root_child_stats, search_drafting_action};
+use crate::mcts::{dynamic_sims, player_total, root_child_stats_with_variant, search_drafting_action};
 use crate::net::Net;
 use crate::net_mcts::{
     net_effective_sims, net_root_child_stats, net_search_drafting_action,
@@ -333,9 +333,12 @@ fn drafting_policy<R: Rng + ?Sized>(
     c: f64,
     play_temp: f64,
     rng: &mut R,
+    variant: crate::mcts::HeuristicVariant,
 ) -> (Action, Vec<Value>) {
     let sims = dynamic_sims(base_sims, actions.len());
-    let stats = root_child_stats(state, sims, c, rng); // Vec<(Action, visits, q)>
+    // `Hv1` laeuft ueber dieselbe Suche wie zuvor (`root_child_stats`
+    // delegiert mit `Hv1`) -- der Anker bleibt unberuehrt.
+    let stats = root_child_stats_with_variant(state, sims, c, rng, variant); // Vec<(Action, visits, q)>
 
     if stats.is_empty() {
         let a = actions.choose(rng).cloned().unwrap_or(Action::Pass);
@@ -1360,6 +1363,61 @@ pub(crate) fn choose_start_placement_with_slot(
     best.map(|(_, t, r, c, rot)| (t, r, c, rot))
 }
 
+/// Wie [`choose_start_placement`], aber fuer `hv3` mit gestreuter ECKE.
+///
+/// **Warum:** der Bestandspfad vergleicht mit striktem `>` in fester
+/// Reihenfolge, und der Eck-Bonus ist fuer alle vier Ecken derselbe `0.5` --
+/// Gleichstaende sind damit der Normalfall und werden systematisch nach oben
+/// links aufgeloest. Gemessen 2026-08-24: 28 von 35 vollen Spalten lagen links
+/// (S0 16, S1 12, S5 1). Fuer ein Lehr-Korpus ist das die falsche Art
+/// Determinismus; das Netz lernte "Spalten baut man links".
+///
+/// **Was gestreut wird:** die ECKE, per Partie-Seed. Innerhalb der gewaehlten
+/// Ecke entscheidet danach unveraendert die Bewertung ueber Platte und
+/// Rotation -- die Streuung wechselt also die Seite, nicht die Qualitaet der
+/// Wahl. Gibt es dort keinen Kandidaten, faellt sie auf den Bestandspfad
+/// zurueck.
+///
+/// **Anker unberuehrt:** `Hv1` delegiert Ausdruck fuer Ausdruck. Der Seed kommt
+/// als Parameter statt aus einer Thread-lokalen Zelle -- `choose_start_placement`
+/// ist geteilter Code, und ein prozess- oder threadweiter Zustand waere in einer
+/// Partie hv1 GEGEN hv3 genau die Fehlerquelle, vor der die Kampagne mehrfach
+/// stand.
+pub(crate) fn choose_start_placement_with_variant(
+    state: &GameState,
+    pi: usize,
+    variant: crate::mcts::HeuristicVariant,
+    game_seed: u64,
+) -> Option<(usize, usize, usize, u32)> {
+    if !variant.is_hv3() {
+        return choose_start_placement(state, pi);
+    }
+    let all = start_placement_kandidaten(state, pi);
+    if all.is_empty() {
+        return None;
+    }
+    // Seed je Partie UND Spieler -- sonst waehlen beide Seiten dieselbe Ecke
+    // und die Spiegelung faende wieder nicht statt.
+    const CORNERS: [(usize, usize); 4] = [(0, 0), (0, 2), (2, 0), (2, 2)];
+    let pick = (game_seed
+        .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        .wrapping_add(pi as u64 + 1)
+        >> 17) as usize
+        % CORNERS.len();
+    let (want_r, want_c) = CORNERS[pick];
+    let best_in_corner = all
+        .iter()
+        .filter(|k| k.2 == want_r && k.3 == want_c)
+        .fold(None::<&(f64, usize, usize, usize, u32)>, |acc, k| match acc {
+            Some(b) if b.0 >= k.0 => Some(b),
+            _ => Some(k),
+        });
+    match best_in_corner {
+        Some(&(_, t, r, c, rot)) => Some((t, r, c, rot)),
+        None => choose_start_placement(state, pi),
+    }
+}
+
 // ── Einzelschritte ────────────────────────────────────────────────────────────
 
 /// Startkuppel-Platzierung (nur Runde 1). Platziert per Farb-/Reihen-Heuristik
@@ -1863,6 +1921,39 @@ pub(crate) fn resolve_tiling_step_with(
     net: Option<&Net>,
     envelope: &crate::envelope::EnvelopeTilingParams,
 ) -> TilingStep {
+    resolve_tiling_step_with_variant(state, pi, net, envelope, crate::mcts::HeuristicVariant::Hv1)
+}
+
+/// Wie [`resolve_tiling_step_with`], mit ausdruecklicher Heuristik-Variante.
+///
+/// `hv3` routet die Platzierung ZUERST in die Zielzellen der Dreiecks-Huelle
+/// (`plate_builder_v3::tiling_preference`) und faellt sonst auf den
+/// Bestandspfad durch.
+///
+/// **Das ist die Haelfte, die ein Bewertungsterm nicht erreichen kann.**
+/// `best_first_step_inner` waehlt nach reinen Sofortpunkten
+/// (`tiling_solver.rs:49-56`, dort ausdruecklich als Befund vermerkt) und
+/// wuerfe jede Draft-seitige Absicht wieder weg. `PREREG_provocation.md` nennt
+/// denselben Punkt als Kernbefund: "der Engpass ist die PLATZIERBARKEIT, nicht
+/// die Plattenbewertung".
+///
+/// **Der Anker bleibt unberuehrt:** `Hv1` laeuft Zeile fuer Zeile wie zuvor,
+/// und der Vorzug haengt an der VARIANTE statt an
+/// `MOSAIC_SPALTENBAU`/`MOSAIC_PLATTENBAU`. Beide Knoepfe sind prozessweit und
+/// damit fuer eine Partie hv1 GEGEN hv3 unbrauchbar -- sie gaelten fuer beide
+/// Seiten oder fuer keine.
+pub(crate) fn resolve_tiling_step_with_variant(
+    state: &GameState,
+    pi: usize,
+    net: Option<&Net>,
+    envelope: &crate::envelope::EnvelopeTilingParams,
+    variant: crate::mcts::HeuristicVariant,
+) -> TilingStep {
+    if variant.is_hv3() {
+        if let Some(step) = crate::plate_builder_v3::tiling_preference(state, pi) {
+            return step;
+        }
+    }
     match net {
         Some(n) => {
             // Ownership-Pol Teil 2: EINMAL je Zug, VOR der Kandidatenschleife.
@@ -1900,10 +1991,21 @@ fn tiling_step_with<R: Rng + ?Sized>(
     rng: &mut R,
     envelope: &crate::envelope::EnvelopeTilingParams,
 ) -> Map<String, Value> {
+    tiling_step_with_variant(game, net, rng, envelope, crate::mcts::HeuristicVariant::Hv1)
+}
+
+/// Wie [`tiling_step_with`], mit ausdruecklicher Heuristik-Variante.
+fn tiling_step_with_variant<R: Rng + ?Sized>(
+    game: &mut Game,
+    net: Option<&Net>,
+    rng: &mut R,
+    envelope: &crate::envelope::EnvelopeTilingParams,
+    variant: crate::mcts::HeuristicVariant,
+) -> Map<String, Value> {
     let pi = game.state.current_player;
     let state_json = state_to_json(&game.state, true);
     let valid_actions = tiling_env_actions(&game.state, pi);
-    let step = resolve_tiling_step_with(&game.state, pi, net, envelope);
+    let step = resolve_tiling_step_with_variant(&game.state, pi, net, envelope, variant);
 
     let chosen_env: Value = match &step {
         TilingStep::Place(ta) => json!({
@@ -2636,6 +2738,12 @@ trait DraftingAgent {
 struct HeuristicSelfPlayAgent {
     base_sims: u32,
     c: f64,
+    /// Heuristik-Variante fuer die DRAFTING-Entscheidung -- dieselbe Rolle wie
+    /// in `HeuristicArenaAgent`. Bis 2026-08-25 fehlte dieses Feld beim
+    /// Vorgaenger hv2, und der Lehrer kam im Self-Play deshalb gar nicht an:
+    /// die Variante erreichte nur den Tiling-Schritt, ein `v2huelle`-Korpus war
+    /// bitgleich mit `v1`.
+    variant: crate::mcts::HeuristicVariant,
 }
 
 impl DraftingAgent for HeuristicSelfPlayAgent {
@@ -2646,6 +2754,34 @@ impl DraftingAgent for HeuristicSelfPlayAgent {
         search_rng: &mut StdRng,
         _move_number: u64,
     ) -> DraftingDecision {
+        // hv3-Vorzug ZUERST: Praeferenz statt Verbot, greift nur bei einem
+        // LEGALEN Zug, sonst entscheidet die Suche frei. Ein Beschneiden der
+        // Aktionsmenge war gemessen spielzerstoerend (PREREG_provocation.md
+        // par.7/par.9, Endstand 6-15 statt 47,80).
+        //
+        // Der Vorzug bleibt ein Override und wandert NICHT als Prior in die
+        // Suche -- das waere ein Agent, den niemand gemessen hat, und die
+        // Suche koennte genau die Spaltenvollendungen wieder wegoptimieren,
+        // fuer die der Korpus da ist.
+        let preferred = if self.variant.is_hv3() {
+            crate::plate_builder_v3::drafting_preference(state).filter(|a| actions.contains(a))
+        } else {
+            None
+        };
+        if let Some(a) = preferred {
+            // Das Policy-Ziel waere hier eine reine Eins auf dem erzwungenen
+            // Zug -- ein Ziel, das nicht aus der Suche stammt. Der Record
+            // traegt es, wird aber als policy-ungueltig markiert; die
+            // Value-Labels bleiben gueltig (dieselbe Bauform wie beim
+            // PCR-Muenzwurf des Netz-Agenten).
+            let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
+            return DraftingDecision {
+                policy: Some(vec![entry]),
+                policy_target_valid: Some(false),
+                vorzug: Some(a.clone()), // konvention-ok: Bestandsfeld von DraftingDecision
+                ..DraftingDecision::plain(a)
+            };
+        }
         let n = actions.len();
         // Aktionsabhängige Temperatur (Port self_play.py:172) -- seit
         // PREREG_v25_window.md par.14 in `action_temp_for` zentralisiert,
@@ -2658,7 +2794,7 @@ impl DraftingAgent for HeuristicSelfPlayAgent {
             let entry = json!({ "action": action_to_env_dict(state, &a), "prob": 1.0 });
             (a, vec![entry])
         } else {
-            drafting_policy(state, actions, self.base_sims, self.c, temp, search_rng)
+            drafting_policy(state, actions, self.base_sims, self.c, temp, search_rng, self.variant)
         };
         DraftingDecision { policy: Some(policy), ..DraftingDecision::plain(chosen) }
     }
@@ -2669,6 +2805,9 @@ impl DraftingAgent for HeuristicSelfPlayAgent {
 struct HeuristicArenaAgent {
     base_sims: u32,
     c: f64,
+    /// Heuristik-Variante fuer die DRAFTING-Entscheidung. `Hv1` an jeder
+    /// Bestandsstelle (die Konstruktoren setzen es dort explizit).
+    variant: crate::mcts::HeuristicVariant,
 }
 
 /// Die Drafting-Entscheidung der Heuristik-Arena-Seite -- als FREIE Funktion,
@@ -2690,16 +2829,25 @@ pub(crate) fn heuristic_arena_choose_action(
     search_rng: &mut StdRng,
     base_sims: u32,
     c: f64,
+    variant: crate::mcts::HeuristicVariant,
 ) -> Action {
     if actions.len() == 1 {
         return actions[0].clone();
     }
     let s = dynamic_sims(base_sims, actions.len());
-    // v2-Vorzug ZUERST, wie im Heuristik-vs-Heuristik-Pfad
-    // (`play_arena_game`) -- Praeferenz statt Verbot, greift nur bei
-    // einem LEGALEN Zug, sonst entscheidet die Suche frei.
-    crate::mcts::search_drafting_action(state, s, c, search_rng)
-        .unwrap_or_else(|| actions[0].clone())
+    // hv3-Vorzug ZUERST -- Praeferenz statt Verbot, greift nur bei einem
+    // LEGALEN Zug, sonst entscheidet die Suche frei. Bei `Hv1` ist der
+    // `unwrap_or_else`-Zweig der EINZIGE gelaufene Code: bitidentischer
+    // Bestand, kein zusaetzlicher Aufruf, keine Zufallszahl.
+    let preferred = if variant.is_hv3() {
+        crate::plate_builder_v3::drafting_preference(state).filter(|a| actions.contains(a))
+    } else {
+        None
+    };
+    preferred.unwrap_or_else(|| {
+        crate::mcts::search_drafting_action_with_variant(state, s, c, search_rng, variant)
+            .unwrap_or_else(|| actions[0].clone())
+    })
 }
 
 impl DraftingAgent for HeuristicArenaAgent {
@@ -2711,7 +2859,7 @@ impl DraftingAgent for HeuristicArenaAgent {
         _move_number: u64,
     ) -> DraftingDecision {
         DraftingDecision::plain(heuristic_arena_choose_action(
-            state, actions, search_rng, self.base_sims, self.c,
+            state, actions, search_rng, self.base_sims, self.c, self.variant,
         ))
     }
 }
@@ -2934,6 +3082,10 @@ struct PlayerLoopConfig<'a> {
     /// [`StartSearchParams::for_net`], damit die Bedingung nur an EINER
     /// Stelle steht.
     start_search: Option<StartSearchParams<'a>>,
+    /// Heuristik-Variante fuer die TILING-Aufloesung DIESER SEITE
+    /// (`resolve_tiling_step_with_variant`). An allen Bestands-Konstruktions-
+    /// stellen `Hv1`; nur der hv3-Self-Play setzt `Hv3`.
+    heuristic_variant: crate::mcts::HeuristicVariant,
 }
 
 impl PlayerLoopConfig<'_> {
@@ -3514,7 +3666,10 @@ fn unified_game_loop<R: Rng + ?Sized>(
                 if recording {
                     // Self-Play-Pfade: Tiling MIT Trainings-Record; `tiling_net`
                     // je Spieler-Konfiguration (Task #20, siehe Feld-Doku).
-                    records.push(tiling_step_with(&mut game, pcfg.tiling_net, rng, &pcfg.envelope_params()));
+                    records.push(tiling_step_with_variant(
+                        &mut game, pcfg.tiling_net, rng, &pcfg.envelope_params(),
+                        pcfg.heuristic_variant,
+                    ));
                 } else {
                     // Arena-Pfade: Tiling ohne Aufzeichnung. Spaltenbau-Trace:
                     // `tiling_preference` separat (rein lesend) NUR fuer die
@@ -3531,7 +3686,10 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     } else {
                         None
                     };
-                    let step = resolve_tiling_step_with(&game.state, pi, pcfg.tiling_net, &pcfg.envelope_params());
+                    let step = resolve_tiling_step_with_variant(
+                        &game.state, pi, pcfg.tiling_net, &pcfg.envelope_params(),
+                        pcfg.heuristic_variant,
+                    );
                     let trace = if pcfg.column_build_trace {
                         crate::column_build::trace_line(
                             &game.state, pi, "Tiling",
@@ -3689,7 +3847,8 @@ pub fn play_one_game<R: Rng + ?Sized>(
     // STATUS "(2) Heuristik-Variante bis ins Self-Play durchreichen": bis
     // 2026-08-25 war hier `hv1` fest verdrahtet, waehrend nur die Arena die
     // Variante als Parameter nahm -- ein hv2-Lehrer-Korpus war damit gar nicht
-    // erzeugbar. Bestandsaufrufer uebergeben `hv1` und bleiben bit-identisch.
+    // erzeugbar. Bestandsaufrufer uebergeben `Hv1` und bleiben bit-identisch.
+    variant: crate::mcts::HeuristicVariant,
     // PREREG_search_rng_split.md: der Seed, mit dem DIESER Aufrufer `rng`
     // erzeugt hat (siehe dortige Formel `seed.wrapping_add(i*0x9E37...)`).
     // Zusammen mit einem lokalen Zugindex (`move_idx` unten) baut
@@ -3709,7 +3868,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
     // statt `apply_chosen_action` (Bestand dieses Pfads), Timeout mit
     // EXTRA-Zuschlag nur bei aktivem Label-Sampling (Bugfix-Historie siehe
     // urspruenglicher Kommentar in round_transition_deep.rs).
-    let agent = HeuristicSelfPlayAgent { base_sims, c };
+    let agent = HeuristicSelfPlayAgent { base_sims, c, variant };
     let player = PlayerLoopConfig {
         agent: &agent,
         tiling_net: None,
@@ -3724,6 +3883,7 @@ pub fn play_one_game<R: Rng + ?Sized>(
         // par.9c: Heuristik-Self-Play legt die Startkuppel per Handregel,
         // auch bei Knopf 1 -- hier zieht kein Netz.
         start_search: None,
+        heuristic_variant: variant,
     };
     let cfg = GameLoopConfig {
         timeout_secs: heuristic_game_timeout_secs(base_sims)
@@ -3768,6 +3928,34 @@ pub fn run_self_play(
     progress_path: Option<&str>,
     heartbeat_path: Option<&str>,
 ) -> String {
+    run_self_play_with_variant(
+        n_games, base_sims, c, seed, num_threads, prefix, progress_path, heartbeat_path,
+        crate::mcts::HeuristicVariant::Hv1,
+    )
+}
+
+/// Wie [`run_self_play`], mit ausdruecklicher Heuristik-Variante.
+///
+/// Die Bestandssignatur oben bleibt BEWUSST unveraendert (`engine/examples/`
+/// ruft sie auf, und der pre-push-Hook kompiliert die Beispiele mit).
+///
+/// Warum dieser Einstieg die Variante ueberhaupt braucht: er ist der
+/// `--mode mcts`-Pfad OHNE Label-Netz. Bis 2026-09-12 nahm er sie nicht
+/// entgegen, ein `--heuristik-variante hv3` ohne `--model` haette also still
+/// ein hv1-Korpus erzeugt -- genau die Bauform, an der am 2026-08-26 ein
+/// falscher Befund entstand.
+#[allow(clippy::too_many_arguments)]
+pub fn run_self_play_with_variant(
+    n_games: usize,
+    base_sims: u32,
+    c: f64,
+    seed: u64,
+    num_threads: usize,
+    prefix: &str,
+    progress_path: Option<&str>,
+    heartbeat_path: Option<&str>,
+    variant: crate::mcts::HeuristicVariant,
+) -> String {
     let progress_file = open_progress_file(progress_path);
     let move_counter = Arc::new(AtomicU64::new(0));
     let games_counter = Arc::new(AtomicU64::new(0));
@@ -3792,7 +3980,8 @@ pub fn run_self_play(
         // nach `run_net_self_play`, wo sie tatsaechlich einen Netz-Blattwert
         // erreicht).
         let steps = play_one_game(
-            base_sims, c, ids, names, first, &gid, &mut rng, None, false, Some(&move_counter), partie_seed,
+            base_sims, c, ids, names, first, &gid, &mut rng, None, false, Some(&move_counter),
+            variant, partie_seed,
         );
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
@@ -3831,6 +4020,35 @@ pub fn run_self_play_with_net_labels(
     progress_path: Option<&str>,
     heartbeat_path: Option<&str>,
 ) -> Result<String, String> {
+    run_self_play_with_net_labels_with_variant(
+        model_path, n_games, base_sims, c, seed, num_threads, prefix, record_rtv, progress_path,
+        heartbeat_path, crate::mcts::HeuristicVariant::Hv1,
+    )
+}
+
+/// Wie [`run_self_play_with_net_labels`], aber mit waehlbarer
+/// Heuristik-Variante -- die Voraussetzung fuer ein hv3-Lehrer-Korpus. Die
+/// Heuristik SPIELT, ein Netz LABELT (Bootstrap/rtv); die Variante betrifft
+/// nur die Spielseite.
+///
+/// Die Bestandssignatur oben bleibt BEWUSST unveraendert: `engine/examples/`
+/// ruft sie auf, und der pre-push-Hook kompiliert die Beispiele mit; eine
+/// geaenderte Signatur braeche den Push, obwohl `cargo build` gruen waere
+/// (CLAUDE.md, wiederkehrende Falle).
+#[allow(clippy::too_many_arguments)]
+pub fn run_self_play_with_net_labels_with_variant(
+    model_path: &str,
+    n_games: usize,
+    base_sims: u32,
+    c: f64,
+    seed: u64,
+    num_threads: usize,
+    prefix: &str,
+    record_rtv: bool,
+    progress_path: Option<&str>,
+    heartbeat_path: Option<&str>,
+    variant: crate::mcts::HeuristicVariant,
+) -> Result<String, String> {
     let net = Net::load_auto(model_path).map_err(|e| e.to_string())?;
     let net = std::sync::Arc::new(net);
     let progress_file = open_progress_file(progress_path);
@@ -3864,7 +4082,7 @@ pub fn run_self_play_with_net_labels(
         let gid = format!("{prefix}_g{}", i + 1);
         let steps = play_one_game(
             base_sims, c, ids, names, first, &gid, &mut rng, Some(&net), record_rtv, Some(&move_counter),
-            partie_seed,
+            variant, partie_seed,
         );
         if !steps.is_empty() {
             games_counter.fetch_add(1, Ordering::Relaxed);
@@ -4149,7 +4367,7 @@ fn play_net_game<R: Rng + ?Sized>(
     // tatsaechlich gated/trainiert wird; die Heuristik-Seite bleibt bewusst
     // ohne Netz). Spaltenbau-Trace nur Netz-Seite (Nutzer 2026-08-13).
     let net_agent = NetArenaAgent { net, base_sims: net_sims, c_puct, vorzug: true, search_config };
-    let heur_agent = HeuristicArenaAgent { base_sims: heur_sims, c };
+    let heur_agent = HeuristicArenaAgent { base_sims: heur_sims, c, variant: crate::mcts::HeuristicVariant::Hv1 };
     let net_player = PlayerLoopConfig {
         agent: &net_agent,
         tiling_net: Some(net),
@@ -4161,7 +4379,9 @@ fn play_net_game<R: Rng + ?Sized>(
         return_order_mode: search_config.return_order_mode,
         // par.9c: nur die NETZ-Seite kann ihre Startsetzung suchen, und auch
         // sie nur bei `start_by_search == 1` (sonst `None` = Handregel).
-        start_search: StartSearchParams::for_net(Some(net), net_sims, &search_config, false),};
+        start_search: StartSearchParams::for_net(Some(net), net_sims, &search_config, false),
+        heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+    };
     let heur_player = PlayerLoopConfig {
         agent: &heur_agent,
         tiling_net: None,
@@ -4177,6 +4397,7 @@ fn play_net_game<R: Rng + ?Sized>(
         // Arena ist der Elo-Verankerungspfad, ihr Anker darf sich nicht
         // bewegen.
         start_search: None,
+        heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
     };
     // `net_board` waehlt das Brett der Netz-Seite (alle Aufrufer nutzen 0).
     let players = if net_board == 0 { [net_player, heur_player] } else { [heur_player, net_player] };
@@ -4343,7 +4564,9 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 // (Champion mit Such-Start gegen Champion mit Handregel im
                 // selben Prozess).
                 start_search: StartSearchParams::for_net(
-                    Some(net_a), sims_a, &search_config_a, false),},
+                    Some(net_a), sims_a, &search_config_a, false),
+                heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+            },
             PlayerLoopConfig {
                 agent: &agent_b,
                 tiling_net: Some(net_b),
@@ -4354,7 +4577,9 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 column_build_trace: false,
                 return_order_mode: search_config_b.return_order_mode,
                 start_search: StartSearchParams::for_net(
-                    Some(net_b), sims_b, &search_config_b, false),},
+                    Some(net_b), sims_b, &search_config_b, false),
+                heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+            },
         ],
         vorzug_greift: None,
         start_state: None,
@@ -5150,7 +5375,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         // Self-Play. `add_root_noise` folgt dem Drafting-Knopf dieses Laufs
         // -- die Erzeugung darf an der Wurzel streuen, die Arena nicht.
         start_search: StartSearchParams::for_net(
-            Some(net), base_sims, &search_config, add_root_noise),};
+            Some(net), base_sims, &search_config, add_root_noise),
+        heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+    };
     let player1 = PlayerLoopConfig {
         agent: &agent1,
         tiling_net: Some(net),
@@ -5161,7 +5388,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         column_build_trace: false,
         return_order_mode: search_config.return_order_mode,
         start_search: StartSearchParams::for_net(
-            Some(net), base_sims, &search_config, add_root_noise),};
+            Some(net), base_sims, &search_config, add_root_noise),
+        heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+    };
     // par.5: Greif-Zaehler nur angelegt und verdrahtet, wenn der Knopf aktiv
     // ist -- sonst exakt dieselbe Nebenwirkungsfreiheit wie vorher.
     let greif_counter = std::cell::Cell::new([0u64; 2]);
@@ -7089,7 +7318,7 @@ pub(crate) mod tests {
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let recs = play_one_game(
             40, SELF_PLAY_C, ids, ["P0".into(), "P1".into()], 0, "seedsrc_g1",
-            &mut rng, None, false, None, 321,
+            &mut rng, None, false, None, crate::mcts::HeuristicVariant::Hv1, 321,
         );
         let mid = recs
             .iter()
@@ -7109,7 +7338,7 @@ pub(crate) mod tests {
             let mut st_rng = StdRng::seed_from_u64(654);
             let mut state = crate::serialize::json_to_state(&mid["state"], &mut st_rng).unwrap();
             seed_state_fixup(&mut state);
-            let agent = HeuristicSelfPlayAgent { base_sims: 40, c: SELF_PLAY_C };
+            let agent = HeuristicSelfPlayAgent { base_sims: 40, c: SELF_PLAY_C, variant: crate::mcts::HeuristicVariant::Hv1 };
             let player = PlayerLoopConfig {
                 agent: &agent,
                 tiling_net: None,
@@ -7119,7 +7348,9 @@ pub(crate) mod tests {
                 apply_via_chosen_action: false,
                 column_build_trace: false,
                 return_order_mode: 0,
-                start_search: None,};
+                start_search: None,
+                heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+            };
             let cfg = GameLoopConfig {
                 timeout_secs: 600,
                 seed_from_steps: false,
@@ -7155,6 +7386,77 @@ pub(crate) mod tests {
         );
     }
 
+    /// Die Abnahme, die beim ERSTEN Durchreichen des Vorgaengers hv2 GEFEHLT
+    /// hat: sie laeuft auf dem AUFZEICHNENDEN Pfad. Damals war "v1 gegen
+    /// v2huelle unterscheidet sich" auf einem ARENA-Pfad geprueft worden --
+    /// dort sass der einzige Verbraucher der Variante --, und genau der Pfad,
+    /// fuer den der Umbau gebaut war, blieb ungeprueft. Ein 200-Partien-Korpus
+    /// war deshalb bitgleich mit v1 (volle Spalten 0,004665140240412135 in
+    /// BEIDEN Armen).
+    #[test]
+    fn hv3_reaches_the_recording_self_play_path() {
+        let play = |variant: crate::mcts::HeuristicVariant| -> Vec<Value> {
+            let mut rng = StdRng::seed_from_u64(4242);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            play_one_game(
+                40, SELF_PLAY_C, ids, ["P0".into(), "P1".into()], 0, "var_g1",
+                &mut rng, None, false, None, variant, 4242,
+            )
+        };
+        let hv1 = play(crate::mcts::HeuristicVariant::Hv1);
+        let hv3 = play(crate::mcts::HeuristicVariant::Hv3);
+        assert!(!hv1.is_empty() && !hv3.is_empty());
+
+        // 1) Gleicher Seed, andere Variante -> ANDERE Partie. Zahlengleichheit
+        //    waere hier der Alarm, nicht der Befund.
+        assert_ne!(hv1, hv3, "hv3 muss den aufzeichnenden Pfad erreichen");
+
+        // 2) Der Vorzug markiert seine Records als policy-ungueltig, und zwar
+        //    NUR im hv3-Arm. Ohne diese Haelfte lehrt der Korpus das Routing
+        //    ohne das Urteil dahinter.
+        let invalid = |recs: &[Value]| -> usize {
+            recs.iter()
+                .filter(|r| r.get("policy_target_valid") == Some(&Value::Bool(false)))
+                .count()
+        };
+        assert_eq!(invalid(&hv1), 0, "hv1 kennt keinen Vorzug, darf also nichts markieren");
+        assert!(
+            invalid(&hv3) > 0,
+            "hv3 muss mindestens einen Vorzugszug fahren und ihn markieren"
+        );
+
+        // 3) Ein markierter Record traegt trotzdem ein one-hot Policy-Ziel und
+        //    seine Value-Labels -- ausgenommen ist nur der Policy-Verlust.
+        let marked = hv3
+            .iter()
+            .find(|r| r.get("policy_target_valid") == Some(&Value::Bool(false)))
+            .unwrap();
+        let pol = marked.get("policy").unwrap().as_array().unwrap();
+        assert_eq!(pol.len(), 1, "Vorzug ist ein Override, also genau ein Eintrag");
+        assert_eq!(pol[0].get("prob").unwrap().as_f64().unwrap(), 1.0);
+        assert!(marked.get("scores").is_some(), "Value-Labels bleiben erhalten");
+    }
+
+    /// Der hv1-Pfad ist von der Variantenweiche UNBERUEHRT: der neue
+    /// `variant`-Parameter mit `Hv1` liefert exakt dieselbe Partie wie der
+    /// Bestandsaufruf. Byte-Vergleich ueber die vollstaendigen Records --
+    /// das ist die Anker-Zusage auf der Self-Play-Seite.
+    #[test]
+    fn hv1_self_play_is_unchanged_by_the_variant_parameter() {
+        let play = |variant: crate::mcts::HeuristicVariant| -> Vec<Value> {
+            let mut rng = StdRng::seed_from_u64(99);
+            let ids = sample_valid_scoring_ids(3, &mut rng);
+            play_one_game(
+                40, SELF_PLAY_C, ids, ["P0".into(), "P1".into()], 1, "anchor_g1",
+                &mut rng, None, false, None, variant, 99,
+            )
+        };
+        let a = play(crate::mcts::HeuristicVariant::Hv1);
+        let b = play(crate::mcts::HeuristicVariant::Hv1);
+        assert_eq!(a, b, "hv1 muss bei gleichem Seed byte-identisch bleiben");
+        assert!(!a.is_empty());
+    }
+
     #[test]
     fn play_one_game_terminates_with_records() {
         let mut rng = StdRng::seed_from_u64(123);
@@ -7170,7 +7472,8 @@ pub(crate) mod tests {
             None,
             false,
             None,
-                        123,
+            crate::mcts::HeuristicVariant::Hv1,
+            123,
         );
         assert!(!recs.is_empty(), "Spiel muss Records erzeugen");
         for r in &recs {
@@ -7327,7 +7630,8 @@ pub(crate) mod tests {
                 None,
                 false,
                 None,
-                                seed,
+                crate::mcts::HeuristicVariant::Hv1,
+                seed,
             );
             assert!(
                 recs.len() < 3000,

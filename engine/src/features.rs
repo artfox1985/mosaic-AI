@@ -1438,6 +1438,89 @@ fn features_for_layout(layout: crate::net::InputLayout, state: &GameState) -> Ve
 /// wachsen. Ungeprüfter erster Wert -- gegen echte Spielverläufe absichern.
 pub(crate) const MAX_PENDING_STACK_TILES: i64 = 4;
 
+/// Sentinel-ID fuer einen Aktionstyp OHNE eigenen Zweig in [`action_to_id`]
+/// (nur im Release-Pfad erreichbar, siehe [`unknown_action_type_id`]).
+///
+/// Bewusst NICHT 405: genau das war der Vorfall vom 2026-09-12. Der frueher
+/// dort stehende Rueckfall `_ => 405` legte jeden unbekannten Typ auf die ID
+/// von `dome_stack_peek` -- eine ECHTE Aktion, deren Policy-Ziel dadurch
+/// stillschweigend fremde Masse bekam. 2 liegt in der ohnehin unbenutzten
+/// Luecke 2..9 zwischen `end_tiling` (1) und dem `stone`-Bereich (ab 10):
+/// keine Kollision mit einer echten Aktion, `NUM_ACTIONS` (406, Vertragshash)
+/// bleibt unberuehrt, weil die Luecke schon vorher innerhalb des Bereichs lag.
+pub const UNKNOWN_ACTION_ID: usize = 2;
+
+/// Alle Aktionstypen, die die Engine im agent_env-Schema erzeugt -- also genau
+/// die Menge, die [`action_to_id`] als Zweig kennen MUSS. Belegt und gegen die
+/// Erzeugerstellen gehalten vom Test
+/// `action_to_id_branches_cover_exactly_the_engine_action_types` (unten, mit
+/// den Fundstellen als Kommentar).
+///
+/// NICHT enthalten ist das UI-/Log-Schema aus `serialize.rs::action_to_json`
+/// (`dome_display`, `dome_stack`, `dome_rotation`): das geht an die
+/// Oberflaeche, nie in `action_to_id` (geprueft 2026-09-12 an allen Aufrufern
+/// -- self_play.rs:5906/5982, net_mcts.rs:6600, corpus_dataset.py:1125/1314/
+/// 1326/1332; alle reichen `action_to_env_dict`- bzw. Record-Dicts herein).
+pub const KNOWN_ACTION_TYPES: [&str; 11] = [
+    "pass",
+    "end_tiling",
+    "stone",
+    "tiling",
+    "dome",
+    "choose_dome_slot",
+    "choose_draw_stack_slot",
+    "choose_dome_rotation",
+    "use_chips",
+    "bonus_chip",
+    "dome_stack_peek",
+];
+
+/// Waechter gegen stille Aktions-ID-Kollisionen: ein Aktionstyp ohne Zweig in
+/// [`action_to_id`] ist ein Defekt, kein Laufzeitfall.
+///
+/// WARUM zweigeteilt: der Defekt ist SYMMETRISCH (beide Seiten einer Arena
+/// benutzen dieselbe Tabelle), also von keiner Messung sichtbar -- er muss
+/// deshalb dort auffallen, wo er entsteht. Im Test-Build ist das ein harter
+/// `panic!` mit dem Typnamen: ein neuer Aktionstyp ohne Zweig bricht die
+/// Testsuite, statt monatelang unbemerkt zu laufen (Vorfall 2026-09-12:
+/// `"dome"` fiel seit Wochen auf 405, unbemerkt nur deshalb, weil
+/// `corpus_dataset.py` Start-Records mit Policy-Gewicht 0 fuehrt). Im
+/// Release-Build waere ein Panic die falsche Antwort: `action_to_id` laeuft
+/// im heissen Suchpfad und in der GUI-Partie: eine laufende Partie stirbt
+/// nicht wegen eines Prior-Zuordnungsfehlers. Dort also `debug_assert!`
+/// (schlaegt zu, sobald jemand mit `debug-assertions` baut) plus EINE
+/// Warnung ueber einen `AtomicBool` -- einmalig, weil die Stelle pro Zug und
+/// Aktion laeuft und eine Warnung je Aufruf das Log unlesbar machen wuerde.
+#[cfg(test)]
+fn unknown_action_type_id(t: &str) -> usize {
+    panic!(
+        "action_to_id: Aktionstyp {:?} hat keinen Zweig -- jeder von der Engine erzeugte Typ \
+         braucht einen expliziten Zweig (siehe KNOWN_ACTION_TYPES). Ein stiller Rueckfall auf \
+         eine fremde ID ist genau der Defekt vom 2026-09-12.",
+        t
+    );
+}
+
+#[cfg(not(test))]
+fn unknown_action_type_id(t: &str) -> usize {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    static WARNED: AtomicBool = AtomicBool::new(false);
+    debug_assert!(
+        false,
+        "action_to_id: Aktionstyp {:?} hat keinen Zweig (siehe KNOWN_ACTION_TYPES)",
+        t
+    );
+    if !WARNED.swap(true, Ordering::Relaxed) {
+        eprintln!(
+            "WARNUNG action_to_id: Aktionstyp {:?} hat keinen Zweig -- ID {} (Sentinel) statt \
+             einer echten Aktions-ID. Prior/Maske/Policy-Ziel dieser Aktion sind damit wertlos; \
+             diese Warnung erscheint nur EINMAL je Prozess.",
+            t, UNKNOWN_ACTION_ID
+        );
+    }
+    UNKNOWN_ACTION_ID
+}
+
 /// Port von `action_to_id` (für Masken/Prior-Zuordnung). Erwartet ein
 /// env-Action-Dict (agent_env-Schema).
 ///
@@ -1449,6 +1532,10 @@ pub(crate) const MAX_PENDING_STACK_TILES: i64 = 4;
 /// Pfaden), keine Prior-Faktorisierung mehr nötig (ersetzt die frühere
 /// `dome_slot_head`/`dome_rotation_head`-Multiplikation, siehe
 /// net_mcts.rs::build_untried_actions).
+///
+/// JEDER von der Engine erzeugte Aktionstyp hat einen EXPLIZITEN Zweig
+/// ([`KNOWN_ACTION_TYPES`]); der frühere stille Rückfall `_ => 405` ist seit
+/// dem 2026-09-12 ein harter Fehler ([`unknown_action_type_id`]).
 pub fn action_to_id(a: &Value) -> usize {
     let t = a.get("type").and_then(|x| x.as_str()).unwrap_or("");
     let geti = |k: &str| a.get(k).and_then(|x| x.as_i64()).unwrap_or(0);
@@ -1462,7 +1549,23 @@ pub fn action_to_id(a: &Value) -> usize {
             (10 + c_id * 48 + r_id * 6 + f_idx).min(273) as usize
         }
         "tiling" => (274 + geti("pattern_row") * 9 + geti("slot_row") * 3 + geti("slot_col")) as usize,
-        "choose_dome_slot" => {
+        // Startsetzung der Kuppelplatte (self_play.rs:1480/1533, Record-Feld
+        // `is_start: true`) -- DIESELBE ID-Bildung wie `choose_dome_slot`, weil
+        // es dieselbe Entscheidung ist (welche Auslage-Platte in welchen Slot);
+        // nur die Record-Form heisst historisch anders. Die vier Rotationen
+        // derselben (Platte, Slot) fallen dabei zusammen, ihre Masse addiert
+        // sich (`t_policy[id] += prob` in corpus_dataset.py) -- gewollt, siehe
+        // docs/architecture_reference.md, Abschnitt "Wo der Code Information
+        // ABSICHTLICH vernichtet".
+        //
+        // WAS DAS TRAINING HEUTE DAMIT MACHT: `corpus_dataset.py` gibt
+        // Start-Records Policy-Gewicht 0, solange sie kein `start_by_search`
+        // tragen (Handregel-One-Hot, nichts zu lernen) -- die IDs hier sind
+        // also vorerst nur fuer Maske/Prior und fuer den Suchpfad relevant,
+        // der seine Kandidaten ohnehin schon als `choose_dome_slot` schreibt.
+        // Genau dieses Gewicht 0 hat den Rueckfall auf 405 wochenlang
+        // unsichtbar gemacht (Vorfall 2026-09-12).
+        "dome" | "choose_dome_slot" => {
             (328 + geti("display_index") * 9 + geti("slot_row") * 3 + geti("slot_col")) as usize
         }
         "choose_draw_stack_slot" => {
@@ -1474,7 +1577,10 @@ pub fn action_to_id(a: &Value) -> usize {
         "bonus_chip" => (401 + geti("factory_index")) as usize,
         // Aktion A, Schritt 1 (verdeckt ziehen) -- parameterlos, eigene feste ID.
         "dome_stack_peek" => 405,
-        _ => 405,
+        // Kein stiller Rueckfall mehr (frueher `_ => 405`, also auf die ID von
+        // `dome_stack_peek`): unbekannter Typ = Defekt, siehe
+        // `unknown_action_type_id`.
+        other => unknown_action_type_id(other),
     }
 }
 
@@ -1872,6 +1978,11 @@ mod tests {
         // Baustein B: 3 Auslage-Platten x 3x3 Kuppelraster, Kachel+Slot ZUSAMMEN
         // (Rotation ist eine separate Stufe-2-Suchknotenentscheidung, siehe
         // game.rs::generate_dome_moves / Action::ChooseDomeRotation).
+        //
+        // ACHTUNG beim Erweitern: der Typ `"dome"` (Startsetzung) teilt sich
+        // diesen Bereich ABSICHTLICH (gleiche Entscheidung, andere Record-Form,
+        // siehe action_to_id) und darf hier NICHT als eigene Familie
+        // aufgenommen werden -- er wuerde per Konstruktion "ueberlappen".
         let mut dome_slot_ids = Vec::new();
         for d in 0..3 {
             for sr in 0..3 {
@@ -1938,6 +2049,180 @@ mod tests {
             crate::net_mcts::NUM_ACTIONS,
             global_max + 1
         );
+    }
+
+    /// Waechter gegen stille Aktions-ID-Kollisionen (Vorfall 2026-09-12:
+    /// `"dome"` hatte keinen Zweig und fiel auf 405, die ID von
+    /// `dome_stack_peek`): die Menge der Aktionstypen, die die Engine
+    /// ERZEUGT, muss exakt die Menge der Zweige von `action_to_id` sein --
+    /// kein erzeugter Typ ohne Zweig (stille Kollision) und kein Zweig ohne
+    /// Erzeuger (toter Zweig, der beim naechsten Umbau falsch mitgezogen
+    /// wird).
+    ///
+    /// ERZEUGERSTELLEN (gegriffen 2026-09-12 nach `"type"` in serialize.rs,
+    /// self_play.rs, execution.rs, referee.rs, game.rs):
+    ///
+    /// - `self_play.rs:224-276` (`action_to_env_dict`): die sieben
+    ///   `Action`-Varianten -- hier ueber echte Beispielaktionen abgedeckt,
+    ///   die Vollstaendigkeit haengt an `variant_label` unten (Match ohne
+    ///   `_`-Arm: eine neue Variante bricht die KOMPILIERUNG dieses Tests).
+    /// - `self_play.rs:1674` / `1699` / `1705` (`tiling_env_actions`) und
+    ///   `self_play.rs:2012` / `2020` / `2022` (gewaehlter Tiling-Schritt):
+    ///   `tiling`, `use_chips`, `end_tiling` -- private Funktionen, deshalb
+    ///   als Literale gefuehrt.
+    /// - `self_play.rs:1480` / `1533` (`start_placement_step_with_random_p`):
+    ///   `dome` mit `is_start: true`; der Suchpfad daneben
+    ///   (`self_play.rs:1560`) schreibt `choose_dome_slot`.
+    /// - NICHT hier: `serialize.rs:491-521` / `556-643` und `py.rs:227-340`
+    ///   erzeugen das UI-/Log-Schema (`dome_display`, `dome_stack`,
+    ///   `dome_rotation`, `dome_stack_choose`, `start_tile_pending`, `place`/
+    ///   `chips`/`end`). Das geht an die Oberflaeche bzw. in den Log, nie in
+    ///   `action_to_id` (alle Aufrufer reichen `action_to_env_dict`- oder
+    ///   Record-Dicts herein). `py.rs:675` (`ai_start_tile_json`) schreibt
+    ///   zwar `"type": "dome"`, aber als GUI-Antwort, nicht als Record.
+    #[test]
+    fn action_to_id_branches_cover_exactly_the_engine_action_types() {
+        use crate::moves::{
+            Action, DrawFromStackMove, Move, PlaceAction, PlaceDomeTileMove, TakeAction,
+            TakeBonusChipMove, TakeSource,
+        };
+        use serde_json::json;
+        use std::collections::BTreeSet;
+
+        /// Kein `_`-Arm: eine neue `Action`-Variante bricht hier die
+        /// Kompilierung, statt still ohne Beispielaktion zu bleiben.
+        fn variant_label(a: &Action) -> &'static str {
+            match a {
+                Action::Stone(_) => "Stone",
+                Action::ChooseDomeSlot(_) => "ChooseDomeSlot",
+                Action::DrawStackPeek => "DrawStackPeek",
+                Action::ChooseDrawStackSlot(_) => "ChooseDrawStackSlot",
+                Action::ChooseDomeRotation(_) => "ChooseDomeRotation",
+                Action::BonusChip(_) => "BonusChip",
+                Action::Pass => "Pass",
+            }
+        }
+
+        let mut rng = StdRng::seed_from_u64(12);
+        let state = setup_new_game(["P1".into(), "P2".into()], 0, &mut rng);
+
+        let samples = vec![
+            Action::Stone(Move {
+                take: TakeAction {
+                    source: TakeSource::SmallFactorySun,
+                    color: TileColor::Blau,
+                    factory_id: None,
+                    moon_order: Vec::new(),
+                },
+                place: PlaceAction { row_index: 0 },
+            }),
+            Action::ChooseDomeSlot(PlaceDomeTileMove {
+                dome_tile_id: 0,
+                slot_row: 1,
+                slot_col: 2,
+                rotation: 0,
+            }),
+            Action::DrawStackPeek,
+            Action::ChooseDrawStackSlot(DrawFromStackMove {
+                chosen_id: 0,
+                slot_row: 2,
+                slot_col: 1,
+                rotation: 0,
+                return_order: Vec::new(),
+            }),
+            Action::ChooseDomeRotation(180),
+            Action::BonusChip(TakeBonusChipMove { factory_id: 1 }),
+            Action::Pass,
+        ];
+
+        let labels: BTreeSet<&'static str> = samples.iter().map(variant_label).collect();
+        assert_eq!(
+            labels.len(),
+            7,
+            "jede Action-Variante braucht genau eine Beispielaktion (gefunden: {labels:?})"
+        );
+
+        let mut produced: BTreeSet<String> = BTreeSet::new();
+        for a in &samples {
+            let env = crate::self_play::action_to_env_dict(&state, a);
+            let t = env
+                .get("type")
+                .and_then(|x| x.as_str())
+                .expect("action_to_env_dict schreibt immer ein type-Feld")
+                .to_string();
+            produced.insert(t);
+        }
+        // Tiling-Records und Startsetzung (Fundstellen siehe Doc-Kommentar).
+        for t in ["tiling", "use_chips", "end_tiling", "dome"] {
+            produced.insert(t.to_string());
+        }
+
+        let known: BTreeSet<String> =
+            KNOWN_ACTION_TYPES.iter().map(|s| (*s).to_string()).collect();
+        assert_eq!(
+            produced, known,
+            "Erzeuger und action_to_id-Zweige sind auseinandergelaufen (links erzeugt, rechts \
+             bekannt): ein erzeugter Typ ohne Zweig kollidiert still auf einer fremden ID, ein \
+             Zweig ohne Erzeuger ist tot"
+        );
+
+        // Zweite Haelfte: jeder bekannte Typ liefert auch wirklich eine ID im
+        // Kopfbereich und NICHT den Unbekannt-Sentinel (fiele ein Zweig einem
+        // Tippfehler zum Opfer, stuende er zwar in der Liste, liefe aber in
+        // den Rueckfall -- der im Test-Build panict, siehe unten).
+        let sample_dict = |t: &str| -> Value {
+            json!({
+                "type": t,
+                "color": "blau",
+                "row": 0,
+                "factory_index": 0,
+                "pattern_row": 0,
+                "display_index": 0,
+                "pending_index": 0,
+                "slot_row": 0,
+                "slot_col": 0,
+                "rotation": 0,
+                "is_start": true,
+            })
+        };
+        for t in KNOWN_ACTION_TYPES {
+            let id = action_to_id(&sample_dict(t));
+            assert!(
+                id < crate::net_mcts::NUM_ACTIONS,
+                "{t}: ID {id} liegt ausserhalb des Policy-Kopfs"
+            );
+            assert_ne!(id, UNKNOWN_ACTION_ID, "{t}: faellt auf den Unbekannt-Sentinel");
+        }
+
+        // `dome` und `choose_dome_slot` sind dieselbe Entscheidung und MUESSEN
+        // deshalb dieselbe ID liefern (der Vorfall vom 2026-09-12 war genau
+        // die fehlende Gleichheit).
+        for d in 0..3i64 {
+            for r in 0..3i64 {
+                for c in 0..3i64 {
+                    let a = json!({
+                        "type": "dome", "is_start": true,
+                        "display_index": d, "slot_row": r, "slot_col": c, "rotation": 90,
+                    });
+                    let b = json!({
+                        "type": "choose_dome_slot",
+                        "display_index": d, "slot_row": r, "slot_col": c,
+                    });
+                    assert_eq!(action_to_id(&a), action_to_id(&b), "d={d} r={r} c={c}");
+                }
+            }
+        }
+    }
+
+    /// Der Rueckfall ist im Test-Build ein harter Fehler -- das ist der
+    /// eigentliche Waechter. (Im Release warnt er einmalig und liefert
+    /// `UNKNOWN_ACTION_ID`, damit eine laufende Partie nicht stirbt; dieser
+    /// Zweig ist per `#[cfg]` hier nicht erreichbar.)
+    #[test]
+    #[should_panic(expected = "hat keinen Zweig")]
+    fn action_to_id_panics_on_unknown_action_type_in_test_build() {
+        use serde_json::json;
+        let _ = action_to_id(&json!({ "type": "voellig_unbekannter_typ" }));
     }
 
     // ── Task #11 Phase 2, M3.5: `features_for_layout`-Dispatch (ONNX-frei) ──

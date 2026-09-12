@@ -20,6 +20,9 @@ pub mod execution;
 pub mod factory;
 pub mod features;
 pub mod game;
+/// hv3-Bewertung: das hv2-Rezept auf dem heutigen Motor (Port aus dem mit
+/// Commit 65b48af entfernten `heuristic_v2.rs`).
+pub mod heuristic_v3;
 pub mod knob_registry;
 pub mod mcts;
 pub mod moves;
@@ -33,6 +36,9 @@ pub mod net_mcts;
 #[cfg(feature = "ort_cuda_probe")]
 pub mod net_ort;
 pub mod plate_builder;
+/// hv3-Routing: die Dreiecks-Huelle als Zielzellenkarte (Port der hv2-Teile,
+/// die mit Commit 65b48af aus `plate_builder.rs` entfernt wurden).
+pub mod plate_builder_v3;
 pub mod profiling;
 pub mod provocation;
 pub mod py;
@@ -75,8 +81,14 @@ fn ping(x: i64) -> i64 {
 /// `self_play::run_self_play`-Dokumentation -- Einzelspiel-Flush (JSONL, eine
 /// Zeile je fertigem Spiel) + periodischer Zug-/Spiel-Herzschlag für den
 /// Chunk-Supervisor in `self_play.py`.
+/// `heuristik_variante` (2026-09-12, hv3-Port): NICHT kosmetisch. Dieser
+/// Einstieg ist der `--mode mcts`-Pfad OHNE Label-Netz, und bis hierher nahm
+/// er die Variante gar nicht entgegen -- ein `--heuristik-variante hv3` ohne
+/// `--model` haette still ein hv1-Korpus erzeugt. Genau diese Bauform hat am
+/// 2026-08-26 einen falschen Befund produziert (Flag vergessen, Default hv1,
+/// Korpus bitgleich). Unbekannte Werte werden ABGEWIESEN.
 #[pyfunction]
-#[pyo3(signature = (n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust".to_string(), progress_path=None, heartbeat_path=None))]
+#[pyo3(signature = (n_games, base_sims=300, c=0.3, seed=None, num_threads=0, prefix="vrust".to_string(), progress_path=None, heartbeat_path=None, heuristik_variante="hv1".to_string()))]
 #[allow(clippy::too_many_arguments)]
 fn self_play_games(
     py: Python<'_>,
@@ -88,14 +100,45 @@ fn self_play_games(
     prefix: String,
     progress_path: Option<String>,
     heartbeat_path: Option<String>,
-) -> String {
+    heuristik_variante: String, // konvention-ok: Schluesselwort-Name der pyo3-Signatur (Protokoll, siehe self_play.py)
+) -> PyResult<String> {
     let seed = seed.unwrap_or_else(rand::random);
-    py.detach(move || {
-        crate::self_play::run_self_play(
+    let variant = resolve_heuristic_variant(&heuristik_variante)?;
+    Ok(py.detach(move || {
+        crate::self_play::run_self_play_with_variant(
             n_games, base_sims, c, seed, num_threads, &prefix,
-            progress_path.as_deref(), heartbeat_path.as_deref(),
+            progress_path.as_deref(), heartbeat_path.as_deref(), variant,
         )
-    })
+    }))
+}
+
+/// EINE Aufloesung des Spec-/CLI-Variantennamens fuer beide Self-Play-
+/// Einstiege. Zwei Kopien derselben Namensliste waeren zwei Wahrheiten.
+///
+/// Gueltig: `hv1` (Elo-Anker) und `hv3` (das hv2-Rezept auf dem HEUTIGEN
+/// Motor, `heuristic_v3.rs` + `plate_builder_v3.rs`, also MIT dem
+/// Phantom-Abzug A2). `hv2` selbst bleibt abgewiesen -- das Artefakt
+/// models/frozen_heuristics/hv2_generator ist die einzige hv2-Quelle und
+/// laeuft auf seinem mitgelieferten Wheel.
+fn resolve_heuristic_variant(name: &str) -> PyResult<crate::mcts::HeuristicVariant> {
+    let lower = name.to_ascii_lowercase();
+    if let Some(v) = crate::mcts::HeuristicVariant::from_name(&lower) {
+        return Ok(v);
+    }
+    // UMBENENNUNG 2026-08-28: die Alt-Namen sind hier KEIN Sonderfall,
+    // sondern ein harter Fehler MIT Hinweis -- die einzige Stelle, die noch
+    // beide Dialekte kennt, ist der Treiber an der Grenze zu einem alten
+    // Artefakt-Wheel (tools/frozen_name_dialect.py).
+    let hint = match lower.as_str() {
+        "v1" => " Das ist der Name VOR der Umbenennung am 2026-08-28; er heisst jetzt 'hv1'.",
+        "v2huelle" | "hv2" => {
+            " hv2 wurde am 2026-08-26 aus dem Quellstand entfernt              (PREREG_heuristic_v2_long_rows.md par.19); die damit erzeugten Korpora liegen              unveraendert in data/, und das Erzeuger-Artefakt laeuft auf seinem              mitgelieferten Wheel weiter. Auf dem HEUTIGEN Motor heisst dasselbe Rezept              'hv3' -- mit Phantom-Abzug A2, also NICHT zugbgleich."
+        }
+        _ => "",
+    };
+    Err(pyo3::exceptions::PyValueError::new_err(format!(
+        "heuristik_variante {name:?} ist in diesem Build nicht spielbar -- erlaubt: hv1, hv3.{hint}"
+    )))
 }
 
 /// Wie `self_play_games`, aber zusätzlich mit `round_transition_value`-
@@ -140,27 +183,16 @@ fn self_play_games_with_net_labels(
     // Hinweis -- die einzige Stelle, die noch beide Dialekte kennt, ist der
     // Treiber an der Grenze zu einem alten Artefakt-Wheel
     // (tools/frozen_name_dialect.py).
-    if !heuristik_variante.eq_ignore_ascii_case("hv1") {
-        let hint = if heuristik_variante.eq_ignore_ascii_case("v1") {
-            " Das ist der Name VOR der Umbenennung am 2026-08-28; er heisst jetzt 'hv1'."
-        } else if heuristik_variante.eq_ignore_ascii_case("v2huelle") {
-            " Das ist der Name VOR der Umbenennung am 2026-08-28; er heisst jetzt 'hv2' \
-             und ist in diesem Build ohnehin nicht spielbar."
-        } else {
-            ""
-        };
-        return Err(pyo3::exceptions::PyValueError::new_err(format!(
-            "heuristik_variante {heuristik_variante:?} ist in diesem Build nicht mehr spielbar \
-             -- erlaubt: hv1.{hint} Der zweite Zweig wurde am 2026-08-26 entfernt \
-             (PREREG_heuristic_v2_long_rows.md par.19); die damit erzeugten Korpora liegen \
-             unveraendert in data/, und das Erzeuger-Artefakt laeuft auf seinem \
-             mitgelieferten Wheel weiter."
-        )));
-    }
+    //
+    // Seit 2026-09-12 ist `hv3` der zweite gueltige Wert: das hv2-Rezept auf
+    // dem HEUTIGEN Motor (`heuristic_v3.rs` + `plate_builder_v3.rs`), also mit
+    // dem Phantom-Abzug A2. Die Namensliste steht an EINER Stelle
+    // ([`resolve_heuristic_variant`]) -- zwei Kopien waeren zwei Wahrheiten.
+    let variant = resolve_heuristic_variant(&heuristik_variante)?;
     py.detach(move || {
-        crate::self_play::run_self_play_with_net_labels(
+        crate::self_play::run_self_play_with_net_labels_with_variant(
             &model_path, n_games, base_sims, c, seed, num_threads, &prefix, record_rtv,
-            progress_path.as_deref(), heartbeat_path.as_deref(),
+            progress_path.as_deref(), heartbeat_path.as_deref(), variant,
         )
     })
     .map_err(pyo3::exceptions::PyValueError::new_err)

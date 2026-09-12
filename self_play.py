@@ -258,10 +258,21 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                 heuristik_variante=heuristik_variante,
             )
         else:
+            # Die Variante gehoert AUCH auf diesen Pfad (2026-09-12, hv3-Port):
+            # ohne sie haette `--heuristik-variante hv3` ohne `--model` still
+            # ein hv1-Korpus erzeugt -- genau die Bauform, an der am 2026-08-26
+            # ein falscher Befund entstand. Ein Wheel, das den Parameter noch
+            # nicht kennt (jedes eingefrorene Artefakt vor diesem Tag), wirft
+            # hier TypeError; deshalb nur mitgeben, wenn nicht der Default
+            # gefahren wird -- der Golden-Probe-Lauf eines alten Artefakts
+            # bleibt damit Zeichen fuer Zeichen derselbe Aufruf.
+            extra = ({} if heuristik_variante == "hv1"
+                     else {"heuristik_variante": heuristik_variante})  # konvention-ok: Feldname der pyo3-Signatur
             raw = mr.self_play_games(
                 n_games=n, base_sims=simulations, seed=seed,
                 num_threads=threads, prefix=prefix,
                 progress_path=progress_path, heartbeat_path=heartbeat_path,
+                **extra,
             )
         queue.put(("ok", raw))
     except Exception as e:  # pragma: no cover
