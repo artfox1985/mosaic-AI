@@ -194,6 +194,7 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Ueberraschungs-Kante v24-b05 gegen v24-b04 (paired_gating, SPRT H0 nach 100 Paaren, 10 Threads, Logs) | **2.731 s** | 13,7 s je Partie |
 | C2 argmax-Instrument (self_play.py 200 Partien @400 deterministisch, 11 Threads) plus corpus_sanity_check | **~2.050 s + 12 s je Lauf** (4 Laeufe 07:31-09:49) | 10,3 s je Partie |
 | Orakel-Bruecke Such-Variante (oracle_metrics --search-sims 400, frozen_v3, 1.144 Zustaende, einkernig) | **343-371 s je Einstellung** | 0,33 s je Zustand |
+| Dritter Seed Nachbar-Kante, 200 Paare bis zum Deckel, Fruehstopp aus, 10 Threads, Logs | **5.405 s** | 13,5 s je Partie |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 

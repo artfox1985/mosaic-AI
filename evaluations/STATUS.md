@@ -24,8 +24,8 @@ Leiter `v28-b01` 1346 (eine Kante), `v27-b01` 1264, `v26-b01` 1171). Promotion v
 Checkliste (Anker 126:24, Nachbar 133:97 SPRT + Replikation 212:188 ohne Entscheid, Champion-2
 101:49 gegen Artefakt v26-b01, sigma/Prior 2,222, Platt in server.py, Fixture e1f94c44f0c7959b,
 Artefakt `models/frozen_champions/v28-b02/` mit Wheel vom Knopf-Durchgang, Golden Probe 10
-Sonden, Selbsttest gruen); **dritter Seed ohne Fruehstopp als Stichentscheid laeuft in der
-Fortsetzungskette**. Belege `PREREG_code_cleanup_closeout.md` par.7a, `PREREG_v28_window.md`
+Sonden, Selbsttest gruen); **dritter Seed ohne Fruehstopp 226:174 (p 0,017), die Nachbar-Kante
+traegt (2 von 3 Seeds signifikant)**. Belege `PREREG_code_cleanup_closeout.md` par.7a, `PREREG_v28_window.md`
 par.10. Alt-Register (Segment 1: v27-b01 1405 usw.) in `../archive/elo_history_pre_phantomfix.csv`.
 Generator v29 = v28-b02 (Nutzer 2026-09-11).
 
@@ -52,7 +52,7 @@ OneDrive-Sperrfehler im Fixture-Schreiblauf; Stufen A-D sind DURCH: Ueberraschun
 SPRT H0 (ENTSCHIEDEN NEIN), C2 erfuellt (+0,140 b01, +0,228 b02 volle Spalten, `geometric_envelope`
 par.12c); E A1/A2 DURCH (Kanal A NICHT erfuellt: mit Knopf in jeder Runde unter ohne, gegen ein
 huellenblindes Orakel; **`geometric_envelope` ENTSCHIEDEN 10:40 (Nutzer: Schliesskriterium auf die
-Arena-Groessen umgestellt, K3-P/Huellenform 2/K5 bleiben Rezept, par.13)); es laeuft F dritter Seed (seit 10:13, ~1,5 h) + Startkuppel Stufe 0; danach
+Arena-Groessen umgestellt, K3-P/Huellenform 2/K5 bleiben Rezept, par.13)); F dritter Seed DURCH (226:174, p 0,017), es laeuft die Startkuppel-Hauptmessung (seit 11:43); danach
 `tools/night_v28_tail.sh` (G hv2-Gegenprobe Weg 3, H K3-D und Jokerfeld am argmax-Instrument,
 Nutzer 11:45; `geometric_envelope` par.13 Nachtrag)). Nutzer-Entscheid 09:35: Waechter der Startkuppel-Sonde nach Weg 3 (Sims-Stufen plus
 hv2-Artefakt per Referee als Gegenprobe; Referee-Schalter im Bau durch Agenten). Davor `tools/night_v28_after_reanchor.sh` ab 03:44 (A Knopf-Bau mit Toren,
