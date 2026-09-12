@@ -282,6 +282,15 @@ Register nach den Anker-Kanten und fuenf Sprossen: v28-b02 1294 [1244, 1354], v2
 [1220, 1369], v27-b01 1251 [1204, 1311], v26-b01 1178 [1100, 1257], v24-b07 1096 [1019, 1174],
 hv2 818 (nur zwei Frueh-Stopp-Kanten, direkte Anker-Kante laeuft).
 
+**hv2 GEGEN ANKER (16:15-16:18, `night_ladder_missing_edges.sh` Teil B):** hv2_generator@150 gegen
+hv1_anchor_v2@150, beide c_puct 0,3, drei Bloecke bis zum Deckel ohne Frueh-Stopp (27:23, 29:21,
+21:29) = **77:73 aus 150, p 0,81**: hv2 und hv1 sind im Segment 2 gleich stark (hv2 972
+[921, 1022]). Die Segment-1-Zahl 1100 fuer `Heuristik_v2huelle` (2026-08-25, ueber v21 gemessen)
+haelt fuer das Artefakt hv2_generator nicht; ob beides derselbe Spieler ist, bleibt ungeprueft
+(`PREREG_difficulty_levels.md` Stufe 0b). Folge: die Anfaenger-Stufe der Schwierigkeitsleiter
+(hv2@150) ist so stark wie der Anker, nicht 100 Elo darueber. Register nach dieser Kante: v28-b02
+1329 [1281, 1389], v28-b01 1288, v27-b01 1285, v26-b01 1232, v24-b07 1155, Anker 1000, hv2 972.
+
 **ZWISCHENSTUFEN GEFAHREN (2026-09-12, 13:36-14:55, `tools/night_ladder_rungs2.sh` Teil B, nach
 dem Worker-Patch 13:37; die drei Anker-Kanten und hv2 gegen Anker davor gescheitert, Nachlauf
 `tools/night_ladder_missing_edges.sh`; v21-Sprossen im Nachlauf `night_ladder_v21_edges.sh`):**
