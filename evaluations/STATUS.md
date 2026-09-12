@@ -50,14 +50,12 @@ v28-b01 132:18, v27-b01 124:26; Segment-2-Elo 1288 / 1346 / 1271, Intervalle ueb
 `PREREG_code_cleanup_closeout.md` par.7a), die Nachbar-Kante v28-b02 gegen v27-b01
 (Seed 20261044) endete 03:40 per SPRT nach 115 Paaren: **133:97 fuer v28-b02** (p 0,0198,
 Diff +0,313 [+0,068; +0,558]); Segment-2-Leiter jetzt v28-b02 1305, v28-b01 1346, v27-b01 1256.
-**MASCHINE BELEGT: `tools/night_v28_resume_freeze.sh` seit 06:19** (Fortsetzung nach einem
-OneDrive-Sperrfehler im Fixture-Schreiblauf; Stufen A-D sind DURCH: Ueberraschungs-Kante 97:103
-SPRT H0 (ENTSCHIEDEN NEIN), C2 erfuellt (+0,140 b01, +0,228 b02 volle Spalten, `geometric_envelope`
-par.12c); E A1/A2 DURCH (Kanal A NICHT erfuellt: mit Knopf in jeder Runde unter ohne, gegen ein
-huellenblindes Orakel; **`geometric_envelope` ENTSCHIEDEN 10:40 (Nutzer: Schliesskriterium auf die
-Arena-Groessen umgestellt, K3-P/Huellenform 2/K5 bleiben Rezept, par.13)); F dritter Seed DURCH (226:174, p 0,017), es laeuft die Startkuppel-Hauptmessung (seit 11:43); danach
-`tools/night_v28_tail.sh` (G hv2-Gegenprobe Weg 3, H K3-D und Jokerfeld am argmax-Instrument,
-Nutzer 11:45; `geometric_envelope` par.13 Nachtrag)). Nutzer-Entscheid 09:35: Waechter der Startkuppel-Sonde nach Weg 3 (Sims-Stufen plus
+**MASCHINE FREI seit 2026-09-12, 21:50.** Alle Ketten des Tages sind durch und registriert
+(Promotion v28-b02, Ueberraschungs-Kante, C2/A1-A2, Startkuppel Stufe 0 samt hv2-Gegenprobe und
+Such-Start-A/B mit Huellen-Diagnose, Leiter Segment 2 mit 24 Kanten inkl. hv3). Es laufen nur
+Code-Auftraege ohne Rechenlast (Replayer-Fix fuer Such-Start-Partien; Platte/Rotation-Sonde der
+Startkuppel); deren Tore fahren beim naechsten Wheel-Bau. Push ist frei.
+Nutzer-Entscheid 09:35: Waechter der Startkuppel-Sonde nach Weg 3 (Sims-Stufen plus
 hv2-Artefakt per Referee als Gegenprobe; Referee-Schalter im Bau durch Agenten). Davor `tools/night_v28_after_reanchor.sh` ab 03:44 (A Knopf-Bau mit Toren,
 B Promotions-Messungen v28-b02: Replikation der Nachbar-Kante Seed 20261046 DURCH, **212:188
 am Deckel ohne SPRT-Entscheid** (p 0,28, Diff +0,12 [-0,08; +0,32]; Register v28-b02 1296,
