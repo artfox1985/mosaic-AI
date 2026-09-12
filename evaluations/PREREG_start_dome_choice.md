@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: NICHTS GEBAUT. Stufe 0 (Spannweite ueber die neun Slots, par.4) EINGETAKTET 2026-09-11 als Sonde am v28-Korpus, Schritt 5 des v28-Programms (PREREG_v28_window.md par.8); Verdikt nur fuer den Slot-Teil; Plattenwahl (Nachtrag 2026-09-09) EINGETAKTET als zweiter Teil im v29-Begleitprogramm. Anker-Sperre aus par.6a ist ueberholt. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEBAUT 2026-09-12, NICHT gemessen (par.8): Diagnoseknopf MOSAIC_START_SLOT_P0/P1 und Sonde tools/probes/start_dome_slot_probe.py (netzfrei, gepaart, arena_match mit Logs); Wheel-Durchgang steht aus. Waechter weicht von par.4 ab (Sims-Stufen 25/400 statt hv1/hv2, hv2 nicht spielbar), Nutzer-Entscheid offen. Plattenwahl (par.6a) EINGETAKTET im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -251,3 +251,51 @@ ueber die neun Slots je Startplatte; das vorregistrierte Verdikt gilt nur fuer d
 Stufe 0 bleibt v28-Schritt 5; die Plattenwahl (Nachtrag 2026-09-09) folgt als zweiter Teil im
 v29-Begleitprogramm (Nutzer 2026-09-11, `PREREG_v29_window.md` par.7 Punkt 4). Anlass par.6a: `choose_start_placement` bewertet
 `SpaceType::Special` mit 0,0 (`engine/src/self_play.rs:922`, geprueft 2026-09-11).
+
+## par.8 Baustand 2026-09-12 (Stufe 0 gebaut, nichts gemessen)
+
+Gebaut von einem Agenten, vom Koordinator gelesen (Regel 0: Codepruefung durch Lesen, kein
+Kompilat, kein Lauf). Alles unten ist Baustand, nicht Messung.
+
+**Knopf.** `MOSAIC_START_SLOT_P0` / `MOSAIC_START_SLOT_P1` (Diagnose, kein Spec-Feld,
+`engine/src/knob_registry.rs:155-156`): erzwingt den SLOT der Startkuppel des jeweiligen Spielers,
+Index 0..8 = `row*3+col` (Zaehlweise `board.rs::empty_slots`, r aussen, c innen). Platte und
+Rotation waehlt weiter die Handregel, eingeschraenkt auf die Kandidaten dieses Slots
+(`self_play.rs::choose_start_placement_with_slot`, Zeilen 1268-1296). Ungesetzt oder leer =
+Bestand, bitidentisch (dieselbe Schleife, strikt groesser, feste Reihenfolge); ungueltiger Wert =
+einmalige Warnung und Bestand; belegter Slot = Rueckfall auf Bestand. Die Variable wird JE
+STARTSETZUNG gelesen (kein `OnceLock`), damit die Sonde die neun Slots in einem Prozess faehrt.
+
+**Wirkungsbereich (geprueft per Grep 2026-09-12):** `choose_start_placement` wird aus Self-Play,
+Arena, Referee (`referee.rs:122/508`), Round-Transition (`round_transition.rs:656`), `py.rs:644`
+und den Serialize-/Game-Tests aufgerufen. Der Knopf greift also in JEDEM Pfad, sobald die
+Variable gesetzt ist; deshalb setzt ihn ausschliesslich die Sonde selbst, in-Prozess, zwischen
+zwei Arena-Aufrufen, und entfernt `..._P1` aktiv. In Gating, Anker-Kanten und Erzeugung ist er
+nie gesetzt.
+
+**Sonde** `tools/probes/start_dome_slot_probe.py` (448 Zeilen): Einstieg `mosaic_rust.arena_match`
+(Heuristik-MCTS beide Seiten, netzfrei, keine Records), dafuer neuer Parameter `log_games`
+(Default `false`, `lib.rs:174`, `self_play.rs::run_arena_match`), weil volle Spalten und Reihen
+nur aus dem Log rekonstruierbar sind. Partie `i` bekommt `seed_base + i*0x9E3779B97F4A7C15`
+unabhaengig vom Slot, Startspieler alterniert mit `i % 2`: dieselbe Partie in allen neun Armen,
+gepaart gegen Slot 0 mit 95-%-KI. Erhoben je Slot (Sicht Spieler 0, Einheit je Partie, Grundmenge
+Partien des Slots): Punkte, Margin, Gegnerpunkte, Strafpunkte, volle Spalten und Reihen,
+Spalten-/Reihenprofil, Teilspalten >= 3/4, Plattenpunkte je Kriterium; die sechs
+Standard-Kennzahlen sind damit abgedeckt. Defaults: `--n-seeds 60`, `--pairings 25,400`,
+Seed-Basis 20260912. JSON mit n/Grundmenge/Einheit, `laufzeit`-Block, `cli_args`.
+
+**ABWEICHUNG von par.4 (Nutzer-Entscheid offen):** der Zirkularitaets-Waechter verlangt zwei
+verschieden faehige Spieler `v1`/`v2huelle`. hv2 ist im heutigen Quellstand nicht spielbar
+(`SearchConfig::from_spec_file` weist alles ausser hv1 ab, `net_mcts.rs:942-957`; Zweig am
+2026-08-26 entfernt); das eingefrorene hv2-Artefakt traegt ein aelteres Wheel ohne diesen Knopf.
+Ersatz in der Sonde: zwei Faehigkeitsstufen derselben Variante ueber die Suchtiefe (25 gegen 400
+Sims, der gemessene Prior/Value-Regler), Spearman-Rangkorrelation der Slot-Margins zwischen den
+Stufen, Flag `kippt` bei rho < 0. Im Artefakt als `waechter.abweichung_von_prereg` vermerkt. Ob
+dieser Ersatz den Waechter erfuellt, entscheidet der Nutzer; bis dahin gilt ein Verdikt nur
+unter Vorbehalt.
+
+**Ungeprueft / offen:** nichts kompiliert (Wheel-Durchgang fuer alle neuen Knoepfe folgt nach der
+Neuverankerungs-Kette, PREREG_v28_window.md par.8); die Log-Muster der Heuristik-Arena fuer
+`reconstruct_game` sind hergeleitet (gleicher Erzeuger `state.log` wie in den Netz-Arenen), nicht
+in dieser Sitzung gemessen; fuenf neue Tests im Modul `start_slot_tests` (`self_play.rs:9763ff`)
+sind geschrieben, nicht gelaufen. Rauchtest vorgesehen: `--limit 4 --pairings 25 --threads 4`.
