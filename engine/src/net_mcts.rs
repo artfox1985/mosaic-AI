@@ -1041,12 +1041,12 @@ impl SearchConfig {
                           (PREREG_heuristic_v2_long_rows.md par.19). Das Artefakt \
                           models/frozen_heuristics/hv2_generator laeuft weiter auf seinem \
                           mitgelieferten Wheel; auf dem HEUTIGEN Motor heisst dasselbe \
-                          Rezept 'hv3' (mit Phantom-Abzug A2, also NICHT zugbgleich).",
+                          Rezept 'hv3' (mit Phantom-Abzug A2, also NICHT zuggleich).",
                 _ => "",
             };
             return Err(format!(
                 "Spec-Datei {path}: heuristik_variante '{variant_name}' ist in diesem Build \
-                 nicht spielbar -- erlaubt: 'hv1', 'hv3'.{hint}"
+                 nicht mehr spielbar -- erlaubt: 'hv1', 'hv3'.{hint}"
             ));
         };
         Ok(Self {
