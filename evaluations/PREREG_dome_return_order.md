@@ -35,9 +35,10 @@ unbekannte Praefix aufgebraucht ist; der Gegner sieht nur die Menge.
   (`features.rs:1444-1470`).
 - **Records:** die `#a`-Zeile traegt `return_order` (`game.rs:285-290`), Replayer und Logs sind
   darauf eingerichtet; ein Netz, das waehlt, braucht kein neues Record-Feld.
-- **Derselbe Bauplan bei den Mondsteinen:** `moon_order` (Reihenfolge der auf die Mondseite
-  gelegten Steine nach einem Sonnenzug) ist ebenfalls kanonisch und keine Wahl des Netzes
-  (`self_play.rs:234`, `game.rs:413` Kommentar). Gleiche Klasse, hier nur als Merkposten (par.7).
+- **Derselbe Bauplan bei den Mondsteinen, KORRIGIERT 2026-09-12:** `moon_order` ist im
+  Aktionsraum und im Heuristik-Pfad kanonisch (`self_play.rs:234`, `validation.rs:175-193`), in
+  der NETZSUCHE aber seit 2026-07-01 ein Suchentscheid (`net_mcts.rs:1724-1920`: alle Permutationen
+  als Kinder, Prior aus dem Moon-Order-Kopf). Eigene Prereg `PREREG_moon_stack_order.md`.
 
 ## par.3 Hypothesen (VOR jeder Messung)
 
@@ -96,8 +97,8 @@ Peek-Bewertung). Wird Modus 1 Default (Nutzer-Entscheid), gilt er fuer die v29-E
 ## par.7 Was NICHT gebaut wird
 
 - Keine Aktionsraum-Erweiterung, kein neues Trainingsziel (H3).
-- `moon_order` (Mondsteine) bleibt kanonisch; derselbe Bauplan waere moeglich (Merkposten,
-  eigener Entscheid).
+- `moon_order` (Mondsteine): in der Netzsuche schon gebaut (siehe par.2, korrigiert); Messung
+  und Zielfrage in `PREREG_moon_stack_order.md`.
 - Kein Eingriff in die Heuristik-Anker (hv1/hv2 bleiben bei Modus 0).
 
 ## par.8 Ergebnisse (leer bis zum Bau)

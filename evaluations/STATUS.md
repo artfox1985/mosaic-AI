@@ -261,6 +261,9 @@ Index: `PREREG_INDEX.md` (generiert).
    `MOSAIC_START_SLOT_RANDOM_P` = 0,15 je Spieler als Koordinator-Wahl im Nutzer-Rahmen;
    `PREREG_start_dome_choice.md` par.9b, `PREREG_v29_window.md` par.6b. Bau laeuft (Agent),
    Tore in der Luecke zwischen den Ketten (`tools/night_startslot_build.sh`).
+00c. **Mondstapel-Reihenfolge** (Nutzer 13:20: "mit v29 oder v30"): im Netzpfad seit 2026-07-01
+   Suchentscheid (nie gemessen); `PREREG_moon_stack_order.md` angelegt: Stufe 1 A/B Fan-out an
+   gegen aus als v29-Begleitprogramm (Knopf Default = Bestand), Stufe 2 Zielfrage bei v30.
 00b. **Startsetzung als Suchentscheid im Spiel** (Nutzer 13:00, `PREREG_start_dome_choice.md`
    par.9c): ENTSCHIEDEN 13:15 (Nutzer: "bau den such-start dann vor v29"): Bau rund ein Tag
    (net_mcts, Spielpfade, Self-Play, Referee-Worker), Knopf MOSAIC_START_BY_SEARCH Default 0,
