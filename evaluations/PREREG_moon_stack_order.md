@@ -32,8 +32,11 @@ selbst gewaehlter Reihenfolge auf die Mondseite (`docs/engine_manual.md`; `facto
   Nutzer 2026-09-12, Korrektur der ersten Fassung "Stichproben"), also ein RUNDEN-Label (was am
   Rundenende am meisten bringt), kein Such- oder Ausgangslabel.
 - **Haeufigkeit (Nutzer):** der Entscheid faellt hoechstens EINMAL je kleiner Fabrik und Runde
-  (der erste Sonnenzug aus der Fabrik legt den Stapel), also hoechstens 4 je Runde und 20 je
-  Partie, real weniger (Rest >= 2 noetig). Der Posten ist damit von vornherein klein. Im Korpus `selfplay_v27-b01-policy_..._g10.pkl`
+  (der erste Sonnenzug aus der Fabrik legt den Stapel), also 4 je Runde und rund 20 je Partie;
+  Nutzer: "ziemlich genau 20, die wahrscheinlichkeit dass 4 gleiche farben auf einer fabrik
+  liegen ist gering". Korpus-Beleg: 199 Ziele in einer Datei mit 10 Partien = 19,9 je Partie.
+  Ein Entscheid je Fabrik und Runde, mit hoechstens 6 Alternativen; der Posten ist damit klar
+  umrissen und eher klein. Im Korpus `selfplay_v27-b01-policy_..._g10.pkl`
   tragen 199 von 1.675 Records ein Ziel (Sonnenzuege aus kleinen Fabriken mit Rest >= 2).
 - **Korrektur einer Notiz:** `PREREG_dome_return_order.md` par.2 nennt `moon_order` "kanonisch
   und keine Wahl des Netzes". Das gilt fuer `self_play.rs:234` (Aktionsraum/Record) und fuer den
