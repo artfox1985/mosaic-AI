@@ -217,8 +217,9 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 `v28_window` (Vorlage), `dome_stack_information_sets` (Variante B), `stack_top_feature`,
 `claude_play_interface` (laeuft), `round_estimate_leaf_term` (Skalenwahl a/b, Nutzer),
 `round_transition_search_sampling` (haengt an dome_stack; Kandidat fuer UEBERHOLT),
-`start_dome_choice` (Stufe 0 nie gefahren; Sonde am v28-Korpus), `policy_surprise_weighting`
-(Kante v24-b05 gegen v24-b04 aus dem restic-Repo nachholbar), `rust_data_layer`
+`start_dome_choice` (Stufe 0 GEBAUT 2026-09-12, volle Messung laeuft in der Fortsetzungskette),
+~~`policy_surprise_weighting`~~ ENTSCHIEDEN 2026-09-12 (Kante v24-b05 gegen v24-b04 97:103,
+SPRT H0: NEIN), `rust_data_layer`
 (Registrierung ohne Auftrag; Kandidat fuer UEBERHOLT), `difficulty_levels` (angelegt
 2026-09-11; Zuschnitt vom Nutzer entschieden: Anfaenger = Anker hv2 @150, Erfahren/Experte
 = Champion mit Self-Play-Stilmitteln, Meister = Champion wie in der Arena; drei Kanten je
