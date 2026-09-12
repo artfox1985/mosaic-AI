@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 (par.9): Handregel legt immer (0,0), fuer Heuristiken der beste Slot. Such-Start GEBAUT und A/B ZWEIMAL GEMESSEN (par.9e, zweiter Seed echt gepaart nach RNG-Leck-Fix): Suche legt zu 93 % auf (2,0), Siege 91:99 und 81:89, Punkte und volle Spalten gleich (0,95 gegen 0,98), Eckplatten +1,85 und Kuppel-Boni +2,25 gegen Platzierungspunkte: gleichwertig, andere Praeferenz. Streuung (par.9b, p 0,15) und Such-Start gehen ins v29-Rezept. Platte/Rotation GEMESSEN (par.9f): Handregel gegen Zufall +1,8 Punkte @25 / +1,6 @400, KI schliesst 0 ein, kein Hebel, par.9a Punkt 1 geschlossen. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: ABGESCHLOSSEN 2026-09-13 (par.10). Handregel legt immer (0,0), fuer Heuristiken der beste Slot (par.9). Such-Start gebaut, zweimal gemessen (par.9e): 91:99 und 81:89, Punkte und Spalten gleich, andere Praeferenz; Platte/Rotation kein Hebel (par.9f). Streuung 0,15 und Such-Start ins v29-Rezept (v29_window par.6b); Plattenwahl (par.6a) im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -828,3 +828,12 @@ andere Plan-Signatur (Ecken, Aussenfelder und Kuppel-Boni statt Platzierungspunk
 bleiben gleich (0,95 gegen 0,98, Intervalle ueberlappen), der Such-Start kostet also auch beim
 Spaltenbau nichts. Entscheid par.9c (Such-Start ins v29-Rezept) bleibt.
 
+## par.10 ABSCHLUSS (2026-09-13, 01:15; Nutzer: "schliess auch die 3 preregs von vorhin")
+
+Die Frage "lohnt es, den Startzug zu befreien?" ist beantwortet: die Suche legt anders (93 Prozent
+auf (2,0) statt (0,0)), spielt aber gleich stark und baut gleich viele Spalten (par.9e, zwei Seeds,
+der zweite echt gepaart); Platte und Rotation sind kein Hebel (par.9f). Was daraus ins Rezept geht,
+ist entschieden und in `PREREG_v29_window.md` par.6b registriert (Slot-Streuung 0,15 je Spieler,
+Such-Start in der Erzeugung). Der einzige Rest, die Plattenwahl (par.6a: `choose_start_placement`
+bewertet Spezialfelder mit 0,0), laeuft im v29-Begleitprogramm (`PREREG_v29_window.md` par.7
+Punkt 4) und wird dort registriert, nicht hier.

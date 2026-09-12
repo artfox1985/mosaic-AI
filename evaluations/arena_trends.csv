@@ -136,3 +136,5 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-09-12T23:23:16,paired_gating,v22-b05_live_s100,v22-b05_live,100,60,0.35,39.9,46.383,13.017,10.25,0.0
 2026-09-12T23:41:04,paired_gating,v28-b02_s100,v28-b02,100,30,0.2333,50.867,60.1,8.567,7.567,0.0
 2026-09-12T23:49:05,paired_gating,v22-b05_live_s25,v22-b05_live_s100,25,100,0.43,40.94,45.99,12.03,10.04,0.0
+2026-09-13T00:41:27,paired_gating,v22-b05_live_s25,v22-b05_live_s100,25,150,0.4067,42.76,48.513,11.827,9.587,0.0
+2026-09-13T00:59:10,paired_gating,v22-b05_live_s100,v22-b05_live,100,150,0.4067,36.6,42.253,12.38,12.273,0.0

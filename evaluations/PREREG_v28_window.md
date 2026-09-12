@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: Erzeugung GEFAHREN (par.10, 9,9 h), TOR 2a HAELT 0,816 gegen 0,777. b01: TOR 1 BESTANDEN gegen v27-b01 (166:124 SPRT, 221:179), Elo 1447, TOR 2b HAELT (1,030 gegen 0,884). b02 (Variante B, elf Stapelmerkmale): NULLBEFUND gegen b01 (207:193, 209:191, beide Deckel), Blockziehungen unveraendert; Nutzer-Entscheid: b02 ist als korrektere Fassung der beste Stand (par.10). Offen: Ablationen b03/b04 (Kette laeuft), Sonde, Kante, round_estimate, Einhuellende Schritt 8 (par.8). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie wird das v28-Trainingsfenster zugeschnitten -- die erste Generation NACH dem Einfrieren, mit Record-Feld fuer den Kuppelstapel-Wissensstand und zwei Armen (b01 Rezept fest, b02 Variante B)? | Beleg: ABGESCHLOSSEN 2026-09-13 (par.11). Erzeugung gefahren (par.10, 9,9 h), Tor 2a haelt; b01 Tor 1 bestanden gegen v27-b01; b02 (Variante B) Nullbefund gegen b01, als korrektere Fassung der beste Stand (Nutzer); b03/b04 gefahren; PROMOTION v28-b02 vollstaendig 2026-09-12, Elo 1353 [1306, 1402] (Segment 2, 2026-09-13). Reste in ihren eigenen Preregs. -->
 
 # PREREG v28: Fensterzuschnitt und der erste Plan nach dem Einfrieren
 
@@ -473,3 +473,12 @@ stimmt mit Huellen-Knopf in jeder Runde weniger mit dem huellenblinden Orakel ue
 auf die Arena-Groessen umgestellt, `geometric_envelope` ENTSCHIEDEN (par.13), K3-P/Huellenform
 2/K5 bleiben Rezept. Schritt 8 damit komplett.
 
+## par.11 ABSCHLUSS (2026-09-13, 01:15; Nutzer: "schliess auch die 3 preregs von vorhin")
+
+Alle Messungen der Generation sind registriert (par.10), die Promotion von v28-b02 ist vollstaendig
+(2026-09-12, `PREREG_code_cleanup_closeout.md` par.7a; Elo am 2026-09-13 1353 [1306, 1402] aus
+1.410 Partien im Segment 2). Der Kopf dieser Datei nannte noch "Offen: Ablationen b03/b04 (Kette
+laeuft), Sonde, Kante, round_estimate, Einhuellende Schritt 8"; alles davon ist gefahren oder in
+seiner eigenen Prereg weitergefuehrt (`round_estimate_leaf_term` als Knopf im Wheel, A/B im
+v29-Begleitprogramm; Einhuellende Schritt 8 komplett, `geometric_envelope` ENTSCHIEDEN). Die
+Fenster-Frage ist damit beantwortet; die naechste Generation steht in `PREREG_v29_window.md`.

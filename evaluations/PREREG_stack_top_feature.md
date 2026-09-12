@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 gefahren (par.10), acht Asymmetrien, alle Netz-sieht-weniger. GEBAUT im Sicht-Arm v24-b04: Stapel-Rueckseite, Plattentyp der Auslage-Kuppeln, Strafleisten-Farben, Phantom-Anteil je Musterreihe; additiv, INPUT_SIZE 714 -> 744, Kuerzung auf Modellbreite in net.rs (build_inputs), nicht in features_for_layout (par.10 berichtigt 2026-09-09). Anlass geschlossen. OFFEN fuenf Punkte: Sicht-Reststufen Ziehserie (par.10 P.3) und Phasenaufloesung (P.7) haengen am Ausgang von v28-b02 (`PREREG_v28_window.md` par.7; Tor 1 b02 gegen b01 laeuft, dort par.10), Stufe 2 Netz nutzt die Werte (par.7), zweite Achse was WEISS die Suche (par.11), sowie par.12: der Verwerfungs-Ausgang fuer par.7 ist VOR Stufe 2 zu registrieren. Kriterium Sichtgleichheit, nicht Elo. -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 (par.10): acht Asymmetrien, alle Netz-sieht-weniger; vier GEBAUT in v24-b04 (714 -> 744), elf Stapelwerte in v28-b02 (755); Nullbefund b02 gegen b01, Kriterium bleibt Sichtgleichheit (par.1). EINGETAKTET v29 (par.13, Nutzer 2026-09-13): P.3 Ziehserie und P.7 Phasenaufloesung als Sicht-Arm v29-b03; P.9 Turm je Farbe (verdeckt, aber mitzaehlbar) als Vorschlag; Record-Felder liegen vor, nur Encoder-Anbau. Offen bleibt par.11 (was WEISS die Suche). -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -368,3 +368,86 @@ Merkmale der Sicht-Achse allein bewegen die Staerke nicht messbar. Die Sicht-Res
 (par.10 P.3 laufende Ziehserie, P.7 Phasenaufloesung) werden NICHT gebaut (Nutzer-Zuschnitt v29,
 `PREREG_v29_window.md` par.6). Das Kriterium dieser Prereg (Sichtgleichheit) bleibt davon
 unberuehrt; offen bleiben par.11 (was WEISS die Suche) und par.12 (Verwerfungs-Ausgang).
+
+## Nachtrag 2026-09-13, 01:00: Beutel/Turm-Aufteilung ist eine neunte Asymmetrie (Nutzerfrage)
+
+Nutzer: "sprich es wird nicht getrennt zwischen beutel und turm?" Geprueft am Code: der Encoder
+kodiert `bag_count`/65 und je Farbe die SUMME Beutel plus Turm (/13; `engine/src/features.rs`
+Z.256-269 JSON-Pfad, Z.767-772 Direktpfad). Der Turm-Gesamtbestand ist daraus rechenbar, die
+Aufteilung JE FARBE nicht. Der Zustand traegt sie getrennt (`serialize.rs` Z.369-371:
+`bag_colors`, `tower_colors`); der Encoder-Kommentar begruendet nur die Rueckrechenbarkeit der
+Summe. Die GUI zeigt dem Menschen nur Beutel gesamt und Turm gesamt (`static/js/app.js`
+Z.1808-1812), keine Farben.
+
+Warum es zaehlt: die Fabriken werden aus dem Beutel gefuellt, der Turm wird erst bei leerem Beutel
+gemischt und nachgefuellt (`docs/engine_manual.md` Z.29-31, `state.rs` Z.265/314). Die
+Farbverteilung der naechsten Auslage haengt an der Beutelzusammensetzung, nicht an der Summe;
+relevant vor allem in den Runden 3 bis 5 bei kleinem Beutel. Die Suche braucht die Aufteilung heute
+nicht (sie spielt den Rundenuebergang nicht), die Information ginge allein in den Value-Kopf.
+
+OFFENER REGELPUNKT (Nutzer): liegt der Turm im Original offen? Das Handbuch sagt es nicht. Liegt er
+offen, ist die Aufteilung fuer einen zaehlenden Spieler vollstaendig rekonstruierbar und die Luecke
+eine echte Sicht-Asymmetrie (P.9), Bau wie P.5: fuenf additive Werte (Turm je Farbe /13) in einem
+Sicht-Arm (v29 oder v30, neue INPUT_SIZE). Liegt er verdeckt, ist der Stand sichtgleich und der
+Punkt geschlossen. Kein Bau ohne Entscheid.
+
+Zugleich berichtigt (Koordinator, Chat 00:55): die Kurzfassung "Anlass geschlossen, fuenf
+Restpunkte haengen an den Sicht-Reststufen" war zu locker. Offen sind P.3 (Ziehserie, nicht
+gebaut), P.7 (Phasenaufloesung, ungeprueft), par.11 (was WEISS die Suche; ein Fall repariert, Achse
+nicht abgearbeitet), par.12 (Verwerfungs-Ausgang), und jetzt P.9. Der Nachtrag 2026-09-11
+begruendet das Nichtbauen von P.3/P.7 mit dem Nullbefund b02 gegen b01; par.1 dieser Datei sagt
+ausdruecklich, dass ein flaches Arena-Ergebnis kein Grund ist, die Sichtgleichheit herzunehmen.
+Die Prereg bleibt OFFEN, bis P.3/P.7/P.9 gebaut oder vom Nutzer ausdruecklich als "bewusst nicht
+sichtgleich" entschieden sind.
+
+## par.13 EINGETAKTET FUER v29: P.3, P.7 (Nutzer 2026-09-13, 01:00: "takte p3 und p7 fuer v29 ein") und P.9 als Vorschlag
+
+**Regelpunkt zu P.9 GEKLAERT (Nutzer, woertlich): "der turm liegt nicht offen, es laesst sich nur
+mitzaehlen am rundenende was in den turm kommt."** Damit ist die Aufteilung fuer einen zaehlenden
+Spieler rekonstruierbar (alles, was in den Turm geht, ist im Moment des Abraeumens sichtbar:
+Strafleiste und Ueberschuss der Musterreihen), also Information, die der Spieler ueber die Zeit
+AUFBAUT, genau die Klasse von par.11. Der Zustand traegt sie (`tower_colors`), der Encoder
+addiert sie weg: P.9 ist eine echte Sicht-Asymmetrie. Aufnahme in den Sicht-Arm ist VORSCHLAG
+(fuenf Werte, Record-Feld vorhanden), Freigabe des Nutzers steht aus.
+
+**Record-Lage (geprueft 2026-09-13, alle drei Felder liegen seit jeher im Record, KEIN neues
+Record-Feld noetig, anders als bei `dome_pool_view` fuer v28-b02):**
+- P.3: `pending_stack_draw` (`serialize.rs` Z.368, Liste der gezogenen, noch nicht gewaehlten
+  Platten als `DomeTile`; Rueckweg Z.1069).
+- P.7: `phase` (`serialize.rs` Z.340); der Encoder faltet heute start_placement, drafting und (im
+  Direktpfad) scoring auf 0 (`features.rs` Z.62-68 und Z.716-721).
+- P.9: `bag_colors`, `tower_colors` (`serialize.rs` Z.370-371).
+
+**Zuschnitt (VORSCHLAG fuer die Bau-Registrierung, additiv nach der 2D-Encoder-Regel, Abschnitt 16
+am Ende des Flachvektors, Indizes 0..754 unveraendert):**
+- P.3 Ziehserie: Anzahl gezogen /18, davon Wild /18, davon Spezial /18 (das ist, was die
+  Rueckseiten waehrend der Serie zeigen), plus 18 Bits "Design liegt gezogen vor mir" in
+  tile_id-Reihenfolge. SICHTPUNKT, vor dem Bau zu entscheiden: die 18 Bits sind erst beim
+  Stopp (Vorderseiten aufgedeckt) sichtkonform; ob der Entscheid "weiterziehen oder aufhoeren"
+  (`DrawStackPeek` gegen `ChooseDrawStackSlot`, `moves.rs` Z.112-120) im Engine-Ablauf die
+  Vorderseiten schon kennt, ist am Code zu pruefen; sieht er sie, ist das eine Netz-sieht-MEHR-
+  Stelle und gehoert in par.10 nachgetragen. Bis dahin: 3 Werte sicher, 18 Bits bedingt.
+- P.7 Phasenaufloesung: One-Hot ueber die sechs Phasen (`state.rs` Z.41-48), 6 Werte; ersetzt
+  nicht den alten Wert an Index 0.., sondern kommt dazu (Altmodelle bleiben spielbar).
+- P.9 Beutel/Turm: Turm je Farbe /13, 5 Werte (Beutel je Farbe folgt aus der Summe).
+Summe 14 sichere plus 18 bedingte Werte: INPUT_SIZE 755 -> 769 oder 787.
+
+**Arm:** `v29-b03` (Sicht-Arm, Rezept b01 plus Abschnitt 16, Warmstart mit null-initialisierten
+neuen Spalten wie v24-b04, Bloecke neu unter dem neuen Schluessel), Faktor gegen b01 = allein die
+Sichtwerte; Registrierung in `PREREG_v29_window.md` par.6c, Name in `docs/generation_naming.md`.
+Kriterium bleibt par.1 (Sichtgleichheit); die Arena ist Waechter mit dem Verwerfungs-Ausgang aus
+par.12 (Regression ueber zwei Seeds bei Blockgroesse 5 -> Merkmal aus, Ursache suchen), damit ist
+par.12 mit diesem Arm erledigt.
+
+**Zeitpunkt des Baus:** der Encoder-Anbau ist ein Wheel-Wechsel (Rust beide Pfade, Python-Zwilling
+`engine/py/neural_net.py` Abschnitt 16, `config.INPUT_SIZE`, Paritaetstests, Sichtgleichheits-Test
+>= 300 Zustaende gegen die drei Record-Felder, Regressionstest 755er-Layout byte-gleich,
+Paritaets-Fixture des Champions unveraendert, Anker-Drift gruen). Er gehoert in ein Fenster OHNE
+laufende Erzeugung, Waechter oder Kette (`PREREG_v29_window.md` par.4 Punkt 6; Praezedenz v24-b04:
+Wheel-Install nie, waehrend ein Lauf das Wheel geladen haelt). Vorschlag: im Generationswechsel
+nach der Sims-Neumessung und VOR dem Start der v29-Erzeugung; der Generator v28-b02 deklariert
+755 und sieht die neuen Werte nie (`build_inputs` kuerzt). Alternative: nach dem Ende der
+Erzeugung vor dem Training. Kosten (ANNAHME): Bau und Tore rund 2 h, Bloecke rund 26 min
+(Praezedenz b02), Training wie b01.
+
+Nicht eingetaktet: par.11 (zweite Achse, was WEISS die Suche) bleibt als eigener Punkt offen.

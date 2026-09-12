@@ -70,7 +70,7 @@ Der Lernkreislauf, den wir "Generationszyklus" nennen:
   regelbasierter Vergleichsspieler, den wir auf Elo 1000 setzen und
   eingefroren haben (mit eigenem Programmstand, damit ihn keine
   spätere Änderung verschiebt). Der aktuelle Champion (Generation 28)
-  steht bei **1349**. Weil jedes Netz seit Generation 21 gegen den
+  steht bei **1353**. Weil jedes Netz seit Generation 21 gegen den
   Fixpunkt rund neun von zehn Partien gewinnt, trägt die Leiter
   dazwischen auf eingefrorenen Zwischenstufen (ältere Champions),
   gegen die die Duelle noch etwas aussagen.
@@ -190,8 +190,8 @@ dann die `README.md`, dann `evaluations/STATUS.md`.
 ## 6. Ehrlichkeitsklausel
 
 Dieses Dokument ist eine Vereinfachung. Wo es mit den Fachdokumenten
-kollidiert, gelten die Fachdokumente. Die Zahlen hier (Elo 1349 für
+kollidiert, gelten die Fachdokumente. Die Zahlen hier (Elo 1353 für
 Generation 28, rund eine volle Spalte je Partie, neun von zehn
-Partien gegen den Fixpunkt) stammen aus den am 2026-09-12
+Partien gegen den Fixpunkt) stammen aus den am 2026-09-12/13
 protokollierten Messungen; sie veralten mit dem Projekt, die
 Aussagen zur Methode nicht.

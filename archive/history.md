@@ -18432,3 +18432,21 @@ die Treppe Anker -> hv4@600 -> v22@25 -> v22@100 -> v22@400 steht, Festigung lae
 Champions, Loeschung nach dem Start des v29-Self-Plays. Uebergabe an eine neue Sitzung per
 Arbeitsauftrag-Chip (Kontextfenster).
 
+
+### 2026-09-13, 00:11-01:10 -- Treppe gefestigt (36 Kanten), Sims-Neumessung vorregistriert, Sicht-Arm v29-b03 eingetaktet
+
+Neue Sitzung per Arbeitsauftrag-Chip. `night_ladder_gap_fill.sh` lief bis 00:59 durch: v22@100
+gegen hv4@600 108:42, v22@400 gegen hv4@600 110:40 (je 3 x 50, Binomial < 1e-7), v22@25 gegen @100
+61:89 und @100 gegen @400 61:89 (je 75 Paare ohne Frueh-Stopp, McNemar 0,013 / 0,034). Champion
+1353 [1306, 1402] aus 1.410 Partien; hv4@600 (1046) ist die Sprosse zwischen Anker und Netzblock,
+jeder Treppenknoten hat mindestens zwei Kanten am Deckel (`PREREG_code_cleanup_closeout.md` par.7a).
+Nutzer-Entscheide: Sims-Neumessung in ZWEI Formen (gepaart gegen @400 fuer die Staerke, argmax fuer
+den Korpus) bei 100/200/400/600, "eklatant besser" rechtfertigt hoehere Erzeugungszeit, danach
+Vorschlag fuer die Sims von Sockel und Schwarm getrennt (par.8e, Kette `night_sims_curve_v28b02.sh`).
+Nutzerfragen zur Sicht: die Arena ist bei gleichem Seed ebenso reproduzierbar wie das argmax-
+Instrument (Unterschied ist die Frage, nicht der Determinismus); das Netz sieht NICHT so viel wie
+der Mensch: P.3 Ziehserie und P.7 Phasenaufloesung ungebaut, dazu neu P.9 (Beutel/Turm je Farbe
+nur als Summe kodiert; Turm verdeckt, aber am Rundenende mitzaehlbar). P.3/P.7 als Sicht-Arm
+v29-b03 eingetaktet, P.9 als Vorschlag (`PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md`
+par.6c). Prereg-Bestand: 14 OFFEN laut Index; vier davon (v28_window, dome_stack, start_dome_choice)
+koennen schliessen, stack_top_feature nicht. Auf Nutzer-Anweisung um 01:15 die drei geschlossen (ENTSCHIEDEN): Index 11 OFFEN.

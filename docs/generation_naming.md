@@ -154,4 +154,7 @@ Self-Play-Klassen nach dem Generator, der erst mit der v28-Promotion feststeht
 **`v29-b01`** (Rezept unveraendert, Warmstart `<Generator>_brierbest`, Seed 20260941) und
 **`v29-b02`** (Ablation der Spezialfeld-Kanaele 77/78, sonst wie b01, gleicher Seed;
 Nutzer-Entscheid 2026-09-11, `PREREG_v29_window.md` par.6).
-Weitere Arme ab `v29-b03` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
+**`v29-b03`** (Sicht-Arm: Encoder-Abschnitt 16 mit P.3 Ziehserie, P.7 Phasenaufloesung, P.9
+Turm je Farbe als Vorschlag, sonst wie b01; Nutzer-Eintaktung 2026-09-13,
+`PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c).
+Weitere Arme ab `v29-b04` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).

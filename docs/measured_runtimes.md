@@ -204,6 +204,10 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Netz@25 gegen Heuristik-Artefakt @150 (Referee, 50 Partien) / Netz@25 gegen Netz@100 live (paired_gating, 50 Paare) | 73-92 s / 294 s | 1,6 s / 2,9 s je Partie |
 | Heuristik-Artefakt @600 gegen @150 (Referee, 150 Partien, 6 Prozesse) / Netz@25 gegen Heuristik @600 (150 Partien) | 111 s / 254 s | 0,7 s / 1,7 s je Partie |
 | Sprossen-Kanten (frozen_referee_match, 50 Partien, 6 Prozesse) | Netz gegen Netz-Artefakt 917-963 s; Heuristik gegen Heuristik 53 s; Netz gegen Heuristik 365-464 s | je Block |
+| Treppe 2026-09-13: Netz@100 gegen Heuristik-Artefakt @600 (Referee, 3 x 50 Partien, 6 Prozesse) | 166 / 164 / 151 s | 3,2 s je Partie; `rung_v22b05s100_vs_hv4s600_b*.json` |
+| Treppe 2026-09-13: Netz@400 gegen Heuristik-Artefakt @600 (Referee, 3 x 50 Partien, 6 Prozesse) | 389 / 421 / 413 s | 8,2 s je Partie; `rung_v22b05s400_vs_hv4s600_b*.json` |
+| Treppe 2026-09-13: Netz@25 gegen Netz@100 live (paired_gating, 75 Paare bis zum Deckel, 10 Threads, Logs) | **423 s** | 2,8 s je Partie; `paired_gating_v22-b05_s25_vs_s100_seed53_full.json` |
+| Treppe 2026-09-13: Netz@100 gegen Netz@400 live (paired_gating, 75 Paare bis zum Deckel, 10 Threads, Logs) | **1.062 s** | 7,1 s je Partie; `paired_gating_v22-b05_s100_vs_s400_seed54_full.json` |
 | hv2-Gegenprobe Startkuppel (9 Slots x 20 Referee-Partien, 6 Prozesse) | **219 s** | 1,2 s je Partie |
 | hv3: Bau-Tore (629 Tests 85 s, Wheel, Drift, Konservierung) / Einfrieren mit Golden Probe / venv+Konservierung / 2 Heuristik-Kanten a 150 | 4 min / 30 s / 30 s / je ~2 min | `tools/night_hv3_freeze_edges.sh` |
 | Such-Start Huellen-Diagnose (2 x 100 Partien @400 argmax) | 37 min / 30 min | |

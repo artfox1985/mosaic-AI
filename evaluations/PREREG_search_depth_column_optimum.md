@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k); das Verwerfen des Prior-Top-1 ist Nebenwirkung (par.6b/par.7). Betriebspunkt 100 Sims bestaetigt an v24-b06 (par.8b); Prozessregel par.8c. Neumessung par.8d in v29; erster Punkt (Nachtrag 2026-09-12): v28-b02@100 verliert 7:23 gegen @400 und baut WENIGER Spalten (0,87 gegen 1,30), Plateau gilt fuer den Champion nicht mehr, Betriebspunkt 100 offen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k). Betriebspunkt 100 bestaetigt an v24-b06 (par.8b), am Champion v28-b02 GEKIPPT (@100 verliert 7:23 gegen @400, Spalten 0,87 gegen 1,30). Neumessung par.8e VORREGISTRIERT (Nutzer 2026-09-13: 100/200/400/600, gepaart UND argmax), Lauf Nacht 2026-09-13; Betriebspunkt der v29-Erzeugung bis dahin offen. -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -972,3 +972,90 @@ bauen gleich viele Spalten, 25 verliert die Punkte an Strafleiste und Platzierun
 21:39 nach 30 Paaren (SPRT H0). Artefakte `paired_gating_v22-b05_s25_vs_s100_seed52.json`,
 `paired_gating_v22-b05_s100_vs_s400_seed50.json`.
 
+
+## par.8e NEUMESSUNG IN ZWEI FORMEN, VIER PUNKTE (registriert 2026-09-13, 00:35, VOR dem Lauf; Nutzer: "dann also beide. wir bleiben am anfang grob. miss nur bei 100 sims, 200, 400 und 600")
+
+**Anlass.** Der erste Punkt (Nachtrag 2026-09-12/13) hat das Plateau von par.2i fuer den
+heutigen Champion gekippt: v28-b02@100 verliert 7:23 gegen @400 und baut WENIGER Spalten. Damit
+ist der Betriebspunkt der v29-Erzeugung offen (Nutzer-Entscheid 2026-09-13, 00:12: Neumessung
+VOR dem v29-Self-Play; faellt die Kurve fuer hoehere Sims aus, wird auch der Sockel des
+v29-Fensters mit den hoeheren Sims neu erzeugt, `PREREG_v29_window.md` par.1/par.6). Die
+Nutzerfrage "bei der Arena hast bei gleichem Seed doch auch die selben Ergebnisse?" ist mit ja
+beantwortet (`tools/paired_gating.py` Z.21-27, `docs/pitfalls.md` Z.30-35: ohne Nebenlast
+byte-identisch): Determinismus unterscheidet die beiden Messformen NICHT. Was sie unterscheidet,
+ist die Frage, die sie beantworten, deshalb beide.
+
+**Punkte (Nutzer): 100, 200, 400, 600 Sims.** Grob am Anfang; 150 und 250 aus dem Nachtrag
+2026-09-11 entfallen. 600 ist neu: die Frage lautet jetzt, ob die Kurve ueber 400 hinaus weiter
+steigt.
+
+**Teil A, Staerke (gepaart, `tools/paired_gating.py`):** Generator v28-b02 (live-ONNX
+`models/alphazero_v28-b02_brierbest.onnx`, sha256 1cc296ee..., identisch mit dem eingefrorenen
+Artefakt) gegen sich selbst, Champion-Spec `frozen_champions/v28-b02/spec.json` beidseitig,
+c_puct 1,5: @100, @200 und @600 jeweils gegen @400. 75 Paare = 150 Partien je Punkt, Bloecke zu 5
+Paaren, Frueh-Stopp AUS (alpha = beta = 1e-12), Logs, 10 Threads, Seeds 20261055 / 20261056 /
+20261057. Der Punkt @400 gegen @400 wird nicht gefahren (per Konstruktion 50 Prozent); die
+@400-Seite liegt in jedem Lauf als B-Seite vor. Je Punkt danach `tools/probes/arena_column_probe.py`
+(volle Spalten je Seite, Replay aus den Logs) und `tools/plate_points_from_arena.py` (Punkte je
+Kriterium, Strafleiste, gepaart). Der Punkt @100 ist damit die Replikation des 15-Paare-Punkts vom
+2026-09-12 (Seed 20261051) mit neuem Seed und vollem Umfang.
+
+**Teil B, Korpus (argmax-Instrument wie par.8b):** `self_play.py --mode network --deterministic
+--no-root-noise`, `MOSAIC_STACK_DRAW_RESEARCH=1`, Seed 20260931, 200 Partien, 11 Threads, dieselbe
+Champion-Spec, bei 100 / 200 / 400 / 600 Sims; Auswertung `tools/corpus_sanity_check.py`
+(volle Spalten je Seite mit Konfidenzintervall, Punkte, Zeilen, Strafleiste), Artefakte
+`depth_curve_<S>_v28b02.json`. Die Self-Play-Dateien `data/selfplay_depth<S>-v28b02_*.pkl`
+sind Messmaterial, kein Trainingsmaterial: VOR dem v29-Fensterbau auf die Ausschlussliste
+(`MOSAIC_DATA_EXCLUDE`) oder loeschen (Nutzer-Freigabe).
+
+**Kette:** `tools/night_sims_curve_v28b02.sh` (Teil A zuerst, dann Teil B), Hintergrundaufgabe
+ohne Pipe, exklusiv nach dem Ende von `night_ladder_gap_fill.sh` und der Registrierung der vier
+Leiter-Kanten.
+
+**Kosten (ANNAHME, aus gemessenen Nachbarn hergeleitet, nicht gemessen):** Teil A je Punkt 150
+Partien; @100 gegen @400 lief am 2026-09-12 mit 8,5 s je Partie (256 s fuer 30), also rund 21 min;
+@200 und @600 langsamer, zusammen fuer Teil A rund 80 bis 90 min plus Sonden. Teil B: @400 mit 200
+Partien argmax exklusiv 1.396 s (`docs/measured_runtimes.md` Z.59, v23-b06); @600 rund das
+1,5-fache, @100 und @200 entsprechend weniger; Teil B rund 75 min. Gesamt rund 2,5 bis 3 h. Die
+gemessenen Dauern kommen aus den Artefakten (`laufzeit`-Bloecke bzw. Manifeste) in par.8e und
+`docs/measured_runtimes.md`.
+
+**Lesart, vorab festgelegt (Teil A entscheidet die Staerkefrage, Teil B die Korpusfrage; beide
+Formen sollen in dieselbe Richtung zeigen, sonst ist der Widerspruch der Befund):**
+- **Monoton steigend bis 600** (Siegquote und Spalten wachsen mit den Sims, @600 schlaegt @400):
+  der Betriebspunkt 100 ist ueberholt; die v29-Erzeugung faehrt hoeher, und der Sockel wird nach
+  Nutzer-Entscheid mit den hoeheren Sims neu erzeugt (Kosten vorher in `PREREG_v29_window.md`).
+- **Saettigung bei 400** (@600 gegen @400 im Nullbefund, @100 und @200 unterlegen): 400 ist der
+  Betriebspunkt; der Sockel-Entscheid steht genauso an, nur ohne die 600er-Kosten.
+- **Plateau haelt doch** (@100 baut in Teil B mindestens so viele Spalten wie @400 und verliert in
+  Teil A nicht signifikant): der 15-Paare-Punkt vom 2026-09-12 war Streuung, Betriebspunkt 100
+  bleibt.
+- **Formen widersprechen sich** (z. B. Teil B mehr Spalten bei 100, Teil A Staerke bei 400): dann
+  gilt fuer die Erzeugung Teil B (was in den Korpus geht) und fuer die Bewertung Teil A, und der
+  Tausch von par.2j2 lebt weiter; die Entscheidung ist dann eine Abwaegung des Nutzers.
+
+**Standard-Kennzahlen (CLAUDE.md):** Reihen, Spalten, Strafleiste, Plattenpunkte je Kriterium,
+eigene Punkte und Margin kommen fuer Teil A aus Spaltensonde, Plattenpunkte-Werkzeug und dem
+Artefakt (`avg_score_a/b`, `avg_floor_a/b`, `per_pair_scores`), fuer Teil B aus dem
+Sanity-Check. Auswertung auf Block-Ebene (Blockgroesse 5).
+
+**Pflichtteil der Auswertung (Nutzer 2026-09-13, 00:40: "wenn die messung durch ist, mach mir
+einen vorschlag fuer die sim anzahl von sockel und schwarm"):** aus beiden Formen ein VORSCHLAG
+fuer die Sims des v29-Sockels (Traeger-Korpus) und des Schwarms, getrennt, mit Kosten je Variante
+aus den gemessenen s-je-Partie der Punkte (Sockel-Umfang und Schwarm-Umfang aus
+`PREREG_v29_window.md` par.1), zur Entscheidung des Nutzers. Kein Start der Erzeugung ohne
+Freigabe.
+
+**Entscheidungsregel des Nutzers (2026-09-13, 00:45, woertlich): "einerseits hoff ich ja dass wir
+bei 100 sims bleiben koennen. aber wenn es mit hoeherer sim anzahl wirklich eklatant besser ist,
+nehm ich die hoehere erzeugungszeit in kauf." Und 00:50: "zum schluss sind es nur noch zwei
+generationen. da koennen wir schon etwas zeit in die erzeugung stecken wenn es hilft" (Rahmen fuer
+den Kostenteil des Sockel/Schwarm-Vorschlags: v29 und v30, `project_v30_release_close`).** Vorschlag des Koordinators, was "eklatant" vorab
+heisst (VORSCHLAG, Nutzer entscheidet am Ergebnis): beide Formen zeigen in dieselbe Richtung, UND
+in Teil A gewinnt der hoehere Punkt gegen @400 bzw. @400 gegen @100 mit mindestens 60 Prozent bei
+McNemar p < 0,05 auf 75 Paaren, UND in Teil B liegt der Spaltenabstand je Seite ueber 0,3 (der
+Abstand, den par.2i/par.8b als "deutlich" benutzt haben). Ein Punkt, der nur eine der drei
+Bedingungen erfuellt, ist "besser", nicht "eklatant": dann bleibt 100 der Betriebspunkt und der
+Befund geht als Kostenargument in den Sockel/Schwarm-Vorschlag.
+
+**Ergebnis: leer bis zum Lauf.**
