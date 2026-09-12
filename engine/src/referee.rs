@@ -24,7 +24,7 @@ use serde_json::{json, Value};
 use crate::game::{apply_start_placement, drafting_actions, Game, TilingMove};
 use crate::moves::Action;
 use crate::net::Net;
-use crate::net_mcts::{derive_search_seed, SearchConfig};
+use crate::net_mcts::{derive_search_seed, SearchConfig, START_SEARCH_STREAM};
 use crate::round_end::apply_bonus_chips_with;
 use crate::scoring::sample_valid_scoring_ids;
 use crate::self_play::{apply_chosen_action, choose_start_placement, net_arena_choose_action, resolve_tiling_step};
@@ -142,15 +142,23 @@ pub(crate) fn choose_start_placement_json(
     // auf den Bestandspfad, der den Fehler ohnehin sauber meldet.
     if search_config.start_by_search == 1 && pi < 2 {
         if let Some(net) = net {
-            // Seed-Konvention des Arena-/Referee-Pfads (`derive_search_seed`
-            // ueber den ALLE-Schritte-Zaehler): Startsetzungen sind die
+            // Seed-Konvention der Startsetzungs-Suche: Startsetzungen sind die
             // ersten beiden Schritte einer Partie, der Nicht-Starter legt
             // zuerst. Steht die Setzung des Gegners noch aus, ist dies
             // Schritt 0, sonst Schritt 1 -- damit trifft der Worker-Pfad
-            // denselben Seed wie `RefereeGame::pending_search_seed()`
-            // in-process.
-            let steps: u64 = if state.players[1 - pi].start_tile_pending { 0 } else { 1 };
-            let mut rng = StdRng::seed_from_u64(derive_search_seed(game_seed, steps));
+            // denselben Seed wie der In-Process-Pfad
+            // (`self_play::search_start_placement_isolated`).
+            //
+            // Der Schritt liegt auf dem EIGENEN Stromindex
+            // `START_SEARCH_STREAM` und nicht auf 0/1 selbst: dort zaehlt im
+            // Arena-Pfad mit `seed_from_steps == false` die Drafting-Suche
+            // (`move_number` ab 1), und die zweite Startsetzung bekaeme
+            // denselben Seed wie der erste Drafting-Entscheid. Begruendung
+            // und Kollisionsnachweis stehen bei der Konstante
+            // (`shaping.rs::START_SEARCH_STREAM`).
+            let start_step: u64 = if state.players[1 - pi].start_tile_pending { 0 } else { 1 };
+            let mut rng =
+                StdRng::seed_from_u64(derive_search_seed(game_seed, START_SEARCH_STREAM + start_step));
             if let Some(s) = crate::net_mcts::search_start_placement(
                 net, &state, pi, sims, false, &mut rng, search_config,
             ) {
@@ -602,7 +610,20 @@ impl RefereeGame {
                         if let (Some(spec), Some(path)) = (spec_here, model_here) {
                             let cfg = crate::resolve_search_config(Some(spec.clone()))?;
                             if cfg.start_by_search == 1 {
-                                let seed = derive_search_seed(self.game_seed, self.steps as u64);
+                                // Derselbe Strom wie im Worker-Pfad
+                                // (`choose_start_placement_json`) und
+                                // in-process
+                                // (`self_play::search_start_placement_isolated`):
+                                // `START_SEARCH_STREAM` plus Schritt 0/1 aus
+                                // dem Zustand statt `self.steps` direkt. Beide
+                                // Zahlen sind hier gleich (die Startsetzungen
+                                // SIND Schritt 0 und 1), aber die Herleitung
+                                // aus dem Zustand ist die, die alle drei Pfade
+                                // teilen -- eine Konvention, nicht drei.
+                                let start_step: u64 =
+                                    if self.game.state.players[1 - pi].start_tile_pending { 0 } else { 1 };
+                                let seed = derive_search_seed(
+                                    self.game_seed, START_SEARCH_STREAM + start_step);
                                 let mut rng = StdRng::seed_from_u64(seed);
                                 let sims = start_sims.unwrap_or(START_SEARCH_DEFAULT_SIMS);
                                 let net = load_cached(&mut self.nets, path)?;
