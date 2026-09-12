@@ -263,6 +263,25 @@ Heuristik-Seiten @150 mit c_puct 0,3, Netze @400 mit 1,5; Artefakt gegen Artefak
 Kante weniger Praezision, dafuer haengt jeder Knoten an mehreren Nachbarn; Kanten mit Frueh-Stopp
 werden im Register als solche gekennzeichnet (SPRT-artige Verzerrung der Siegquote nach oben).
 
+**ANKER-KANTEN KORREKT WIEDERHOLT (2026-09-12, 15:02-16:15, `tools/night_ladder_missing_edges.sh`
+Teil A; Anker @150, c_puct 0,3, festes n=150, Seed-Basis 900001, 6 Worker, Handshake gruen ohne
+Cross-Aera, Golden-Selbsttests gruen):**
+
+| Kante | korrekt (@150/0,3) | Morgenfassung (@400/1,5, archiviert) | Wanduhr |
+| --- | --- | --- | --- |
+| v28-b02@400 gegen hv1_anchor_v2@150 | **126:24** | 126:24 | 1.472 s |
+| v28-b01@400 gegen hv1_anchor_v2@150 | **126:24** | 132:18 | 1.460 s |
+| v27-b01@400 gegen hv1_anchor_v2@150 | **122:28** | 124:26 | 1.444 s |
+
+Kontrolle, dass die Parameter ankamen (Regel 0, weil v28-b02 dieselbe Summe wie morgens hat):
+keine der 150 Partien ist identisch (Punkte und Schrittzahl je Seed verglichen), die Worker-
+Wartezeit sinkt von 417 s auf 301 s (150 statt 400 Sims). Der schwaechere Anker @150 gewinnt
+NICHT mehr Partien als der staerkere @400 (24/24/28 gegen 24/18/26): die Kanten sind in der
+Saettigung, die Zahlen dort sind Rauschen um 84 %, genau der Grund fuer die Zwischenstufen.
+Register nach den Anker-Kanten und fuenf Sprossen: v28-b02 1294 [1244, 1354], v28-b01 1288
+[1220, 1369], v27-b01 1251 [1204, 1311], v26-b01 1178 [1100, 1257], v24-b07 1096 [1019, 1174],
+hv2 818 (nur zwei Frueh-Stopp-Kanten, direkte Anker-Kante laeuft).
+
 **ZWISCHENSTUFEN GEFAHREN (2026-09-12, 13:36-14:55, `tools/night_ladder_rungs2.sh` Teil B, nach
 dem Worker-Patch 13:37; die drei Anker-Kanten und hv2 gegen Anker davor gescheitert, Nachlauf
 `tools/night_ladder_missing_edges.sh`; v21-Sprossen im Nachlauf `night_ladder_v21_edges.sh`):**
