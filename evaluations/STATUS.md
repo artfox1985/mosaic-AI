@@ -247,6 +247,11 @@ Index: `PREREG_INDEX.md` (generiert).
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
+00d. **hv3 (hv2 + Phantom-Fix) als Leiter-Knoten** (Nutzer 17:30): Port des hv2-Codes aus
+   65b48af^ auf den heutigen Motor laeuft (Agent, nur Code); danach Kompilat, Einfrieren
+   (`freeze_heuristic.py`), Kanten gegen Anker/hv2/v21. Dazu v22-b05 (live, k3v_off) als Sprosse
+   in der Luecke 1000-1157 (`tools/night_ladder_v22_edges.sh`, nach dem Such-Start-A/B).
+
 00a. **Startkuppel-Streuung in der v29-Erzeugung** (Nutzer 12:45: das Netz soll abweichende
    Startsetzungen kennen; 12:50: "nicht in jedem spiel, aber oft genug"): Dosis
    `MOSAIC_START_SLOT_RANDOM_P` = 0,15 je Spieler als Koordinator-Wahl im Nutzer-Rahmen;

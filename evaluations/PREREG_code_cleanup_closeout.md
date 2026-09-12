@@ -321,6 +321,18 @@ haengt nur an der Anker-Kante und ist damit die unschaerfste Zahl. Frueh-Stopp-K
 Register als solche markiert. Alle Segment-2-Zahlen in STATUS, README und dem Artefakt-Manifest
 sind auf diesen Stand gezogen; die Vorlaeufigkeits-Markierung entfaellt.
 
+**AUFLOESUNG DER LEITER, Nutzer-Entscheide 17:20-17:30:** (1) alle Kanten zum Anker sind
+gesaettigt (81-90 %), die Luecke 1000-1157 (Heuristiken bis v21) hat keine Sprosse; (2) hv2 ist
+ein Knoten der Aera vor A2 und nicht nachbaubar. Daraus: **hv3** = hv2-Verhalten auf dem heutigen
+Motor mit Phantom-Fix (Nutzer: "mach mir eine hv3 (hv2 + phantom fix)"), Port aus Commit 65b48af^
+(Agent, nur Code; Kompilat und Einfrieren nach dem Such-Start-A/B), dann als Knoten
+`Heuristik_hv3_generator@150` gegen Anker, hv2 und v21; und **v22-b05** als Sprosse in der Luecke
+(Segment 1: 1084, verlor 16:34 gegen v21), aus dem Backup nur als ONNX (Snapshot f567ad7d,
+`models/restored_v22/`), spielt LIVE mit `k3v_off.spec.json` als Knoten `v22-b05_live`
+(`tools/night_ladder_v22_edges.sh`: gegen v21, Anker, hv2). v23-b01_k3p10 liegt als Artefakt im
+Backup (Segment 1: 1242, zwischen v21 und v24-b07, dort ist die Leiter dicht) und wird nicht
+gezogen, solange die Luecke unten offen ist.
+
 **ZWISCHENSTUFEN GEFAHREN (2026-09-12, 13:36-14:55, `tools/night_ladder_rungs2.sh` Teil B, nach
 dem Worker-Patch 13:37; die drei Anker-Kanten und hv2 gegen Anker davor gescheitert, Nachlauf
 `tools/night_ladder_missing_edges.sh`; v21-Sprossen im Nachlauf `night_ladder_v21_edges.sh`):**
