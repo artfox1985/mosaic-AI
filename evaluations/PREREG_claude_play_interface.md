@@ -818,8 +818,9 @@ das sagt, welcher Knopf oder welcher Zieltyp ueberhaupt zu bauen waere, bevor ma
 **Vorab festgelegte Lesarten:** (a) haeufen sich die Abweichungen mit positivem Ausgang in EINER
 Klasse (z. B. Kuppelplatzierung Richtung Spalten, oder Verzicht auf Ziehen), ist das der naechste
 Knopf oder das naechste Trainingsziel (Prereg dafuer, kein Bau aus dieser Sonde heraus); (b) sind
-sie ueber alle Klassen verteilt, fehlt dem Netz keine Zugklasse, sondern Tiefe (dann ist der Hebel
-Suchgeschwindigkeit, `PREREG_gpu_inference_path.md`/`PREREG_async_search.md`); (c) haelt das Netz
+sie ueber alle Klassen verteilt, fehlt dem Netz keine Zugklasse, sondern Tiefe (Suchgeschwindigkeit
+ist per Nutzer-Entscheid 2026-09-12 kein Hebel mehr, GPU-Pfad und asynchrone Suche sind endgueltig
+geschlossen; dann bleibt nur mehr Sims je Zug fuer Tessa gegen Menschen, ohne Motorumbau); (c) haelt das Netz
 Claudes Zuege fast ueberall fuer schlechter und Claude gewinnt trotzdem, ist der Value-Kopf die
 Luecke (Orakel-Differential wie `PREREG_human_game_oracle_gap.md`).
 

@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inference_path.md`) strukturell scheitert? | Beleg: JA fuer den Batch (99,7 % Fuellung), NEIN fuer den Zweck: Gate C (>= 2,0x) mit maximal 1,255x VERFEHLT, Strang geschlossen bis zum groesseren Netz. Korrektheit durchweg gruen (Gate A Abschnitt 8, Gate B Abschnitt 12). Stufe 3 lief als Vehikel in PREREG_gpu_inference_path.md §20-§23; Abschluss und Code-Verbleib in Abschnitt 13. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Erreicht eine Suchen-ueber-Faeden-Entkopplung (Drafting-Suche als fortsetzbarer Zustandsautomat, `net_batcher.rs` als Sammel-Faden) den Batch, an dem Weg V (`PREREG_gpu_inference_path.md`) strukturell scheitert? | Beleg: JA fuer den Batch (99,7 % Fuellung), NEIN fuer den Zweck: Gate C (>= 2,0x) mit maximal 1,255x VERFEHLT, Strang ENDGUELTIG geschlossen (Nutzer 2026-09-12: keine Wiedervorlage, auch nicht bei groesserem Netz). Korrektheit durchweg gruen (Gate A Abschnitt 8, Gate B Abschnitt 12). Stufe 3 lief als Vehikel in PREREG_gpu_inference_path.md §20-§23; Abschluss und Code-Verbleib in Abschnitt 13. -->
 
 # Vorregistrierung: Async-Suche (Drafting-Suche als Zustandsautomat)
 
@@ -970,3 +970,8 @@ nachgetragen am 2026-08-21 (Datum aus dem Zeile-1-Statuskopf uebernommen,
   Wertungsplatten traegt", Zwei-Pole-Architektur) gehoert zur inzwischen
   ENDGUELTIG durchgemessenen Ownership-Verbraucher-Kampagne (STATUS.md
   2026-08-20).
+
+## Nachtrag 2026-09-12: endgueltig geschlossen
+
+Nutzer-Entscheid 2026-09-12 ("lass das mal weg, damit haben wir uns lang genug beschaeftigt"): der Vorbehalt "bis ein groesseres Netz die Kennlinie verschiebt" entfaellt; Suchgeschwindigkeit ueber GPU-Pfad oder asynchrone Suche ist kein Hebel des Projekts mehr, in keinem Programm nach v29. Der Code-Verbleib bleibt wie in den Abschlussabschnitten beschrieben.
+
