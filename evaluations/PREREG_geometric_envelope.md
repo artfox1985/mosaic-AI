@@ -2502,8 +2502,9 @@ Spieler, damit "Knopf ohne Arm" nicht der Endzustand bleibt. `tools/night_k3d_jo
 argmax-Instrument wie C2 (200 Partien @400, Seed 20260931, deterministisch, ohne Wurzelrauschen),
 je Knopf ein Lauf mit `out_wild_on.spec.json` bzw. `k3d_on.spec.json` gegen den vorhandenen
 Bezug `c2_v28b02_on.json` (Champion-Spec, gleicher Seed). Zielgroessen, vorab: Jokerfeld ->
-Punkte des Kriteriums "Mehrfarbige Felder" (k3, `scoring.rs` id 3; im Bezug 4,90 Punkte bei 79
-aktiven Partien) mit vollen Spalten als Waechter; K3-D -> volle Spalten (Bezug 0,895 +-0,075)
+Punkte des Kriteriums "Mehrfarbige Felder" (k3, `scoring.rs` id 3; im Bezug `c2_v28b02_on` 3,92
+Punkte +-0,68 bei 79 aktiven Partien; die erste Fassung dieses Absatzes nannte 4,90, das war der
+b01-Lauf, korrigiert 12:55) mit vollen Spalten als Waechter; K3-D -> volle Spalten (Bezug 0,895 +-0,075)
 und Teilspalten >= 3 (Bezug 3,3). Lesart: bewegt ein Knopf seine Zielgroesse ueber die Lauf-KI
 ohne die Spalten zu kosten, bekommt er eine gepaarte Arena als eigene Spec-Nummer (200 Paare);
 sonst bleibt er Knopf ohne Rezeptwirkung, und par.13 gilt unveraendert. Kosten je Lauf rund
