@@ -274,7 +274,9 @@ Index: `PREREG_INDEX.md` (generiert).
    A/B am Champion hinter der Leiter; v29-Erzeugung danach mit Such-Start UND Streuung.
    **A/B GEMESSEN 18:03** (par.9e): Suche legt zu 93 % auf (2,0), Siege 91:99 (SPRT H0 nach 95
    Paaren), Punkte gleich, Eckplatten +1,85 / Aussenfelder +0,83 gegen vertikale Reihen -0,82:
-   gleichwertig, andere Praeferenz als die Heuristik. Werkzeug-Aufgabe: Replayer der
+   gleichwertig, andere Praeferenz als die Heuristik. Diagnose 21:40: die (2,0)-Praeferenz bleibt
+   ohne Huelle (84,5 % gegen 87,5 %), sie kommt aus dem Netz (Value-Kopf/Prior extrapolieren),
+   die v29-Streuung ist die Korrektur. Werkzeug-Aufgabe: Replayer der
    Spaltensonde kann Such-Start-Partien nicht nachspielen (Startsetzung aus dem Log lesen).
    **GESCHRIEBEN 13:20 (Agent), UNKOMPILIERT** (`PREREG_start_dome_choice.md` par.9d): Suche
    `net_mcts.rs::search_start_placement` (Gumbel-Wurzel ueber die Startkandidaten, ein

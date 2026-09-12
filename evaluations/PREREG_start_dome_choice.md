@@ -659,3 +659,21 @@ Diagnose `tools/night_start_search_hull_off.sh` nach `tail9`: zwei Instrument-La
 Huelle; bleibt (2,0), treibt der Value-Kopf (und dann ist die v29-Streuung die Korrektur, weil er
 dort extrapoliert).
 
+**Diagnose GEMESSEN (21:10-21:40, `tools/night_start_search_hull_off.sh`; je 100 Partien @400
+deterministisch, Seed 20260931, 400 Startsetzungen je Lauf, alle `start_by_search`, Policy-Ziel
+gueltig; Artefakte `c2_v28b02_startsearch_hull.json`, `c2_v28b02_startsearch_nohull.json`,
+`start_search_hull_off_slots.json`):**
+
+| Einstellung | (2,0) | (0,0) | (1,0) | volle Spalten je Seite | Punkte |
+| --- | --- | --- | --- | --- | --- |
+| Such-Start mit Huelle (Champion-Spec) | 350 (87,5 %) | 42 | 8 | 0,905 | 52,8 |
+| Such-Start ohne Huelle (k3v_off) | 338 (84,5 %) | 48 | 14 | 0,735 | 51,2 |
+
+**Lesart nach der vorab festgelegten Regel: die Praeferenz fuer (2,0) bleibt ohne Huelle, also
+treibt sie NICHT die Huellen-Verschiebung, sondern das Netz selbst** (Value-Kopf auf Brettern,
+die es nie gesehen hat, plus der auf den Start uebertragene Kuppelplatzierungs-Prior; welcher
+der beiden Anteile ueberwiegt, trennt dieses Instrument nicht). Die v29-Streuung (par.9b) und die
+Such-Start-Records mit gueltigem Policy-Ziel sind genau die Korrektur: ab v29 sieht der Value-Kopf
+alle Slots, und der Prior lernt den Start. Nebenbefund: die Huelle bringt auch am Such-Start
++0,17 volle Spalten und +1,6 Punkte (Instrument, gleicher Seed), konsistent mit C2.
+
