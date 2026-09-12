@@ -1328,8 +1328,121 @@ fn sample_random_start_slot<R: Rng + ?Sized>(
     Some(empties[rng.random_range(0..empties.len())])
 }
 
+/// Reine Auswertung des Knopfwerts von `MOSAIC_START_TILE_RANDOM_P0/P1`:
+/// `Some(true)` = streuen, `Some(false)` = Bestand, `None` = ungueltig.
+///
+/// Getrennt vom Env-Leser darunter aus demselben Grund wie
+/// [`parse_start_slot`]: so laesst sich die Auswertung testen, ohne
+/// `std::env::set_var` gegen die parallel laufenden Tests der Datei zu setzen.
+fn parse_start_tile_random(raw: &str) -> Option<bool> {
+    match raw.trim().parse::<u8>() {
+        Ok(0) => Some(false),
+        Ok(1) => Some(true),
+        _ => None,
+    }
+}
+
+/// Warn-Merker je Spieler: ein ungueltiger Knopfwert soll EINMAL melden.
+static START_TILE_RANDOM_WARNED: [std::sync::atomic::AtomicBool; 2] = [
+    std::sync::atomic::AtomicBool::new(false),
+    std::sync::atomic::AtomicBool::new(false),
+];
+
+/// Diagnose-Knopf `MOSAIC_START_TILE_RANDOM_P0` / `..._P1`
+/// (`PREREG_start_dome_choice.md` par.9a Punkt 1): waehlt PLATTE und ROTATION
+/// der Startkuppel gleichverteilt aus den Kandidaten des Slots, statt sie nach
+/// Farbzaehlern zu bewerten. Der SLOT bleibt der, den die Handregel gewaehlt
+/// haette (also (0,0), oder der erzwungene Slot aus `MOSAIC_START_SLOT_P0/P1`).
+///
+/// UNGESETZT = Bestand, bitidentisch: der Zweig wird gar nicht betreten, es
+/// wird keine Zufallszahl gezogen. Ungueltige Werte -> einmalige Warnung und
+/// Bestand. Gelesen wird JE STARTSETZUNG (kein `OnceLock`), damit ein Treiber
+/// beide Arme in EINEM Prozess nacheinander fahren kann.
+fn random_start_tile_enabled(pi: usize) -> bool {
+    if pi > 1 {
+        return false;
+    }
+    // Zwei Literal-Aufrufe statt eines Namens in einer Variablen -- siehe
+    // `forced_start_slot`: der Lesestellen-Scanner der Registratur erkennt nur
+    // `env::var("MOSAIC_...")` mit dem Namen auf derselben Zeile.
+    let (name, raw) = if pi == 0 {
+        ("MOSAIC_START_TILE_RANDOM_P0", std::env::var("MOSAIC_START_TILE_RANDOM_P0"))
+    } else {
+        ("MOSAIC_START_TILE_RANDOM_P1", std::env::var("MOSAIC_START_TILE_RANDOM_P1"))
+    };
+    let Ok(raw) = raw else {
+        return false;
+    };
+    if raw.trim().is_empty() {
+        return false;
+    }
+    match parse_start_tile_random(&raw) {
+        Some(v) => v,
+        None => {
+            if !START_TILE_RANDOM_WARNED[pi].swap(true, std::sync::atomic::Ordering::Relaxed) {
+                eprintln!(
+                    "[start_tile] {name}={raw:?} ist kein 0/1 -- Knopf ignoriert, \
+                     Bestandswahl bleibt."
+                );
+            }
+            false
+        }
+    }
+}
+
+/// Kern der Platten-/Rotations-Streuung als REINE Funktion: Kandidatenmenge,
+/// Slot und RNG kommen von aussen, damit der Test ohne `std::env::set_var`
+/// laeuft.
+///
+/// Gezogen wird GLEICHVERTEILT aus genau den Kandidaten dieses Slots (bis zu
+/// 3 Platten x 4 Rotationen = 12). Die Bewertung `k.0` wird bewusst ignoriert
+/// -- sie ist der Gegenstand der Messung, nicht ihr Werkzeug. Leere Auswahl ->
+/// `None` und KEIN rng-Griff.
+fn sample_random_start_tile<R: Rng + ?Sized>(
+    candidates: &[(f64, usize, usize, usize, u32)],
+    slot: (usize, usize),
+    rng: &mut R,
+) -> Option<(usize, usize, usize, u32)> {
+    let in_slot: Vec<&(f64, usize, usize, usize, u32)> = candidates
+        .iter()
+        .filter(|k| k.2 == slot.0 && k.3 == slot.1)
+        .collect();
+    if in_slot.is_empty() {
+        return None;
+    }
+    let pick = in_slot[rng.random_range(0..in_slot.len())];
+    Some((pick.1, pick.2, pick.3, pick.4))
+}
+
 pub(crate) fn choose_start_placement(state: &GameState, pi: usize) -> Option<(usize, usize, usize, u32)> {
-    choose_start_placement_with_slot(state, pi, forced_start_slot(pi))
+    choose_start_placement_rng(state, pi, None::<&mut StdRng>)
+}
+
+/// Wie [`choose_start_placement`], aber mit optionalem Partie-RNG.
+///
+/// `rng = None` ist der Bestand und der Default aller Aufrufer, die den
+/// Diagnoseknopf nicht sehen sollen (Referee, Rundenuebergang, `py.rs`). Nur
+/// wo ein RNG durchgereicht wird UND `MOSAIC_START_TILE_RANDOM_P0/P1` gesetzt
+/// ist, wird Platte und Rotation gestreut -- der Slot bleibt der der
+/// Handregel, denn `base` ist deren Wahl (samt ihres Rueckfalls bei belegtem
+/// erzwungenem Slot).
+pub(crate) fn choose_start_placement_rng<R: Rng + ?Sized>(
+    state: &GameState,
+    pi: usize,
+    rng: Option<&mut R>,
+) -> Option<(usize, usize, usize, u32)> {
+    let forced = forced_start_slot(pi);
+    let base = choose_start_placement_with_slot(state, pi, forced)?;
+    match rng {
+        // Der Knopf wird NUR gelesen, wenn ueberhaupt ein RNG da ist; bei
+        // ungesetztem Knopf faellt kein Zug und die Rueckgabe ist `base`,
+        // also Ausdruck fuer Ausdruck der Bestand.
+        Some(r) if random_start_tile_enabled(pi) => {
+            let candidates = start_placement_kandidaten(state, pi);
+            Some(sample_random_start_tile(&candidates, (base.1, base.2), r).unwrap_or(base))
+        }
+        _ => Some(base),
+    }
 }
 
 /// Kern der Startkuppel-Wahl. `forced_slot = None` ist der Bestand.
@@ -1517,10 +1630,25 @@ fn start_placement_step_with_random_p<R: Rng + ?Sized>(
     // zurueck (`choose_start_placement_with_slot`). Mit
     // `forced_slot.or(randomized_slot) == forced_start_slot(pi)` ist der
     // Aufruf byte-gleich zum frueheren `choose_start_placement`.
-    let (tile_id, r, c, rot) = match &search {
+    let base = match &search {
         Some(s) => s.chosen_placement(),
         None => choose_start_placement_with_slot(&game.state, pi, forced_slot.or(randomized_slot))?,
     };
+    // par.9a Punkt 1: der Diagnoseknopf MOSAIC_START_TILE_RANDOM_P0/P1 streut
+    // PLATTE und ROTATION innerhalb des Slots, den die Handregel (bzw. der
+    // Slotknopf oder die Streuung) festgelegt hat. In eine GESUCHTE Setzung
+    // greift er nicht -- dort gibt es keine Handregel, deren Wert zu messen
+    // waere. Ungesetzt wird der Zweig nicht betreten: kein Zug aus `rng`,
+    // `base` bleibt Ausdruck fuer Ausdruck der Bestand.
+    let randomized_tile = match &search {
+        None if random_start_tile_enabled(pi) => sample_random_start_tile(
+            &start_placement_kandidaten(&game.state, pi),
+            (base.1, base.2),
+            rng,
+        ),
+        _ => None,
+    };
+    let (tile_id, r, c, rot) = randomized_tile.unwrap_or(base);
     let d_idx = game
         .state
         .dome_display
@@ -1603,6 +1731,15 @@ fn start_placement_step_with_random_p<R: Rng + ?Sized>(
     if randomized_slot.is_some() {
         m.insert("policy_target_valid".into(), json!(false));
         m.insert("start_slot_randomized".into(), json!(true));
+    }
+    // Dieselbe Begruendung fuer die gestreute PLATTE/ROTATION (par.9a Punkt 1):
+    // ein Policy-Ziel auf einer Zufallswahl ist schlechter als der heutige
+    // Handregel-Klon. Eigener Schluessel neben `start_slot_randomized`, damit
+    // eine Sonde die beiden Streuquellen nicht verwechselt. Bei ungesetztem
+    // Knopf wird kein Feld geschrieben -- der Record bleibt byte-gleich.
+    if randomized_tile.is_some() {
+        m.insert("policy_target_valid".into(), json!(false));
+        m.insert("start_tile_randomized".into(), json!(true));
     }
     // par.9c: der Record-Vertrag der GESUCHTEN Setzung. Beide Felder stehen
     // NUR bei Knopf 1 und gesuchter Setzung -- bei Knopf 0 ist der Record
@@ -3322,12 +3459,42 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         // Bestandspfad darunter, kein stiller Abbruch. Bei
                         // Knopf 0 ist `start_search` `None` und der
                         // `or_else`-Zweig ist der EINZIGE gelaufene Code:
-                        // bitidentischer Bestand.
+                        // bitidentischer Bestand (kein eigener Strom gezogen,
+                        // `rng` unberuehrt -- der Elo-Anker bewegt sich nicht).
+                        //
+                        // EIGENER Suchstrom statt `rng` (PREREG_search_rng_split.md,
+                        // Vertrag im Doc-Kommentar dieser Funktion: `rng` traegt
+                        // NUR Spielzustands-Ereignisse). Die Suche zieht reichlich
+                        // (net_mcts.rs: `determinize_hidden_information_for` plus
+                        // jede Simulation); aus `rng` gezogen verschob sie jede
+                        // spaetere bedingte Ziehung der Partie -- Beutel-Nachfuellen
+                        // aus dem Turm (supply.rs `refill_from_tower`) und den
+                        // monochromen Redraw der grossen Fabrik. Die Partie war
+                        // damit aus ihrem EIGENEN Log nicht mehr nachspielbar:
+                        // `arena_columns_paired_gating_v28-b02_startsearch_vs_v28-b02_s48.json`
+                        // meldet 190 von 190 Partien divergent, die erste ab Runde 4
+                        // (genau dort recycelt der Turm zum ersten Mal).
+                        // Schritt-Konvention wie im Referee (referee.rs:152 und
+                        // :605): die beiden Startsetzungen sind Schritt 0 und 1,
+                        // der Nicht-Starter legt zuerst. Sie liegen aber auf
+                        // einem EIGENEN Stromindex, nicht auf 0/1 selbst: bei
+                        // `seed_from_steps == false` zaehlt die Drafting-Suche
+                        // mit `move_number` ab 1, und dann bekaemen die zweite
+                        // Startsetzung und der erste Drafting-Entscheid
+                        // denselben Seed. Gleiches Muster wie
+                        // `START_TILE_STREAM` im Heuristik-Loop, anderer Block.
+                        const START_SEARCH_STREAM: u64 = 1 << 41;
                         let placement = start_search
                             .and_then(|p| {
+                                let start_step: u64 =
+                                    if game.state.players[1 - pi].start_tile_pending { 0 } else { 1 };
+                                let mut start_rng = StdRng::seed_from_u64(
+                                    crate::net_mcts::derive_search_seed(
+                                        cfg.game_seed, START_SEARCH_STREAM + start_step),
+                                );
                                 crate::net_mcts::search_start_placement(
-                                    p.net, &game.state, pi, p.base_sims, p.add_root_noise, rng,
-                                    &p.search_config,
+                                    p.net, &game.state, pi, p.base_sims, p.add_root_noise,
+                                    &mut start_rng, &p.search_config,
                                 )
                                 .map(|s| s.chosen_placement())
                             })
@@ -4157,7 +4324,26 @@ fn play_arena_game<R: Rng + ?Sized>(
                     } else {
                         break;
                     };
-                    match choose_start_placement(&game.state, pi) {
+                    // Startsetzung mit eigenem, aus `game_seed` abgeleitetem
+                    // Strom (Muster `PREREG_search_rng_split.md`, zwei Zeilen
+                    // weiter unten fuer die Drafting-Suche schon so gebaut):
+                    // der Diagnoseknopf MOSAIC_START_TILE_RANDOM_P0/P1 zieht
+                    // daraus, statt den Partie-`rng` zu verschieben. Damit
+                    // bleibt die Partie reproduzierbar UND der Zufallsstrom
+                    // der Nachziehplatten unberuehrt -- sonst waere die
+                    // gepaarte Sonde (Handregel gegen Zufall, gleicher Seed)
+                    // an der Wurzel nicht mehr gepaart. Der Stromindex liegt
+                    // mit 1<<40 ausserhalb des Bereichs, den `steps` je
+                    // erreicht (Haenger-Schutz bricht bei 100.000 ab).
+                    // Bei ungesetztem Knopf wird aus `start_rng` NICHTS
+                    // gezogen und der Partie-`rng` nicht angefasst: der Pfad
+                    // ist bitidentisch zum Bestand.
+                    const START_TILE_STREAM: u64 = 1 << 40;
+                    let mut start_rng = StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+                        game_seed,
+                        START_TILE_STREAM + pi as u64,
+                    ));
+                    match choose_start_placement_rng(&game.state, pi, Some(&mut start_rng)) {
                         Some((tid, r, c2, rot)) => {
                             let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
                         }
@@ -10680,6 +10866,55 @@ mod start_slot_tests {
         );
     }
 
+    /// Der Suchstrom der Startsetzung wird ABGELEITET (`derive_search_seed`),
+    /// nicht aus dem Partie-`rng` gezogen -- sonst verschoebe die Suche jede
+    /// spaetere bedingte Ziehung der Partie (Turm-Recycling, monochromer
+    /// Redraw) und die Partie waere aus ihrem eigenen Log nicht mehr
+    /// nachspielbar. Dieser Test haelt die ZAEHLER-Konvention fest, auf der
+    /// die Ableitung im Arena-Zweig von `unified_game_loop` steht: die erste
+    /// Startsetzung ist Schritt 0 (der Gegner steht noch aus), die zweite
+    /// Schritt 1 -- dieselbe Unterscheidung wie im Referee (referee.rs:152),
+    /// dort allerdings direkt auf dem Schritt-Zaehler. Hier liegen beide auf
+    /// einem eigenen Stromindex, damit sie mit keinem Drafting-Zaehler
+    /// zusammenfallen koennen.
+    #[test]
+    fn start_placement_search_seed_steps_are_zero_then_one() {
+        let mut rng = StdRng::seed_from_u64(4711);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let names = ["A".to_string(), "B".to_string()];
+        let first = 0usize;
+        let mut game = Game::start(names, first, ids, &mut rng);
+        // Der NICHT-Starter legt zuerst (game.rs::apply_start_placement).
+        let pi = 1 - first;
+        assert_eq!(
+            if game.state.players[1 - pi].start_tile_pending { 0 } else { 1 },
+            0,
+            "erste Setzung: der Gegner steht noch aus -> Schritt 0"
+        );
+        let (tid, r, c, rot) =
+            choose_start_placement(&game.state, pi).expect("legale Startsetzung erwartet");
+        apply_start_placement(&mut game.state, pi, tid, r, c, rot).expect("Setzung muss greifen");
+        let pi2 = first;
+        assert_eq!(
+            if game.state.players[1 - pi2].start_tile_pending { 0 } else { 1 },
+            1,
+            "zweite Setzung: der Gegner hat gelegt -> Schritt 1"
+        );
+        // Eigener Stromindex (`START_SEARCH_STREAM`, 1<<41): beide
+        // Startsetzungen unterscheiden sich voneinander UND von den
+        // Drafting-Zaehlern (`steps`/`move_number`, die bei 0/1/2 beginnen).
+        let stream = 1u64 << 41;
+        let game_seed = 20261048u64;
+        let s0 = crate::net_mcts::derive_search_seed(game_seed, stream);
+        let s1 = crate::net_mcts::derive_search_seed(game_seed, stream + 1);
+        assert_ne!(s0, s1, "beide Startsetzungen brauchen verschiedene Suchstroeme");
+        for ctr in 0..3u64 {
+            let d = crate::net_mcts::derive_search_seed(game_seed, ctr);
+            assert_ne!(d, s0, "Startsetzung 0 kollidiert mit Drafting-Zaehler {ctr}");
+            assert_ne!(d, s1, "Startsetzung 1 kollidiert mit Drafting-Zaehler {ctr}");
+        }
+    }
+
     /// Die Suche liefert eine Setzung AUS DER KANDIDATENMENGE -- kein
     /// erfundener Slot, keine belegte Zelle, keine Platte ausserhalb der
     /// Auslage. Das ist die Legalitaets-Zusage, auf die sich
@@ -10775,5 +11010,142 @@ mod start_slot_tests {
             valids.iter().all(|a| a["type"] == json!("choose_dome_slot")),
             "die Maske muss dieselbe Aktionsform tragen wie das Ziel"
         );
+    }
+
+    // ── Streuung von Platte und Rotation (par.9a Punkt 1) ────────────────────
+
+    /// Spielerwahl exakt wie in `start_placement_step`: der Nicht-Startspieler
+    /// legt zuerst (die Engine erzwingt das).
+    fn pending_player(state: &GameState) -> usize {
+        let first = state.current_player;
+        let non_starter = 1 - first;
+        if state.players[non_starter].start_tile_pending { non_starter } else { first }
+    }
+
+    /// Der Knopf nimmt nur `0` und `1`; alles andere ist ungueltig (Warnung im
+    /// Env-Leser, Bestand bleibt).
+    #[test]
+    fn parse_start_tile_random_accepts_only_zero_and_one() {
+        assert_eq!(parse_start_tile_random("0"), Some(false));
+        assert_eq!(parse_start_tile_random("1"), Some(true));
+        assert_eq!(parse_start_tile_random(" 1 "), Some(true));
+        for raw in ["", "   ", "2", "-1", "ja", "0.0", "true"] {
+            assert_eq!(parse_start_tile_random(raw), None, "{raw:?} darf nicht durchgehen");
+        }
+    }
+
+    /// Default-AUS: ungesetzt ist der Knopf fuer BEIDE Spieler aus, und ein
+    /// Spielerindex ausserhalb 0..1 schaltet ihn ebenfalls nicht ein.
+    #[test]
+    fn start_tile_random_is_off_by_default() {
+        assert!(!random_start_tile_enabled(0), "MOSAIC_START_TILE_RANDOM_P0 muss ungesetzt AUS sein");
+        assert!(!random_start_tile_enabled(1), "MOSAIC_START_TILE_RANDOM_P1 muss ungesetzt AUS sein");
+        assert!(!random_start_tile_enabled(2), "es gibt nur zwei Spieler");
+    }
+
+    /// Die Bitidentitaets-Bedingung, strukturell geprueft: bei ungesetztem
+    /// Knopf liefert der RNG-Pfad dieselbe Setzung wie der Bestand UND nimmt
+    /// keinen Zug aus dem gereichten Strom.
+    #[test]
+    fn unset_knob_keeps_the_legacy_choice_and_draws_nothing() {
+        for seed in [3u64, 11, 29] {
+            let state = fresh_state(seed);
+            let pi = pending_player(&state);
+            let legacy = choose_start_placement(&state, pi).expect("Bestandswahl");
+            let mut touched = StdRng::seed_from_u64(4711);
+            let mut untouched = StdRng::seed_from_u64(4711);
+            assert_eq!(
+                choose_start_placement_rng(&state, pi, Some(&mut touched)),
+                Some(legacy),
+                "ungesetzter Knopf muss die Bestandswahl liefern (Seed {seed})"
+            );
+            for i in 0..16 {
+                assert_eq!(
+                    touched.random::<u64>(),
+                    untouched.random::<u64>(),
+                    "Zufallsstrom bei ungesetztem Knopf verschoben (Seed {seed}, Zug {i})"
+                );
+            }
+        }
+    }
+
+    /// Gesetzter Knopf (hier ueber den reinen Kern gefahren, ohne
+    /// `std::env::set_var`): die Ziehung bleibt IM SLOT und liefert immer
+    /// einen echten Kandidaten -- nie eine erfundene Platte oder Rotation.
+    #[test]
+    fn a_random_start_tile_stays_inside_the_given_slot() {
+        let state = fresh_state(31);
+        let pi = pending_player(&state);
+        let candidates = start_placement_kandidaten(&state, pi);
+        assert!(!candidates.is_empty(), "Testvoraussetzung: Kandidaten vorhanden");
+        let slot = (0usize, 0usize);
+        let mut rng = StdRng::seed_from_u64(2026);
+        for _ in 0..200 {
+            let (tid, r, c, rot) = sample_random_start_tile(&candidates, slot, &mut rng)
+                .expect("im freien Slot (0,0) gibt es Kandidaten");
+            assert_eq!((r, c), slot, "die Ziehung hat den Slot verlassen");
+            assert!(
+                candidates.iter().any(|k| (k.1, k.2, k.3, k.4) == (tid, r, c, rot)),
+                "({tid},{r},{c},{rot}) ist kein Kandidat"
+            );
+        }
+    }
+
+    /// Nicht entartet: ueber viele Ziehungen kommt JEDER Kandidat des Slots
+    /// vor (bis zu 3 Platten x 4 Rotationen), grob gleich haeufig. Ohne diesen
+    /// Test koennte eine Ziehung, die immer denselben Kandidaten liefert, still
+    /// als "Zufallsarm" durchgehen -- und die Sonde maesse den Bestand unter
+    /// falschem Etikett.
+    #[test]
+    fn the_random_start_tile_covers_every_candidate_of_the_slot() {
+        let state = fresh_state(31);
+        let pi = pending_player(&state);
+        let candidates = start_placement_kandidaten(&state, pi);
+        let slot = (0usize, 0usize);
+        let im_slot: Vec<(usize, usize, usize, u32)> = candidates
+            .iter()
+            .filter(|k| (k.2, k.3) == slot)
+            .map(|k| (k.1, k.2, k.3, k.4))
+            .collect();
+        assert!(im_slot.len() > 1, "Testvoraussetzung: mehr als ein Kandidat im Slot");
+        let mut counts: std::collections::HashMap<(usize, usize, usize, u32), u32> =
+            std::collections::HashMap::new();
+        let mut rng = StdRng::seed_from_u64(5);
+        let n = 200 * im_slot.len() as u32;
+        for _ in 0..n {
+            let pick = sample_random_start_tile(&candidates, slot, &mut rng).expect("Kandidat da");
+            *counts.entry(pick).or_insert(0) += 1;
+        }
+        assert_eq!(
+            counts.len(),
+            im_slot.len(),
+            "nicht jeder Kandidat des Slots wurde gezogen -- die Ziehung ist entartet"
+        );
+        // Grobe Schranke um die Erwartung 200 je Kandidat: der Test belegt die
+        // Gleichverteilung, er schaetzt sie nicht.
+        for (k, &c) in &counts {
+            assert!((120..280).contains(&c), "{k:?} kam {c} von {n} Mal -- nicht gleichverteilt");
+        }
+    }
+
+    /// Kein Kandidat im Slot (belegtes Raster oder leere Menge) -> `None` und
+    /// KEIN rng-Griff; die Aufrufer fallen dann auf die Bestandswahl zurueck.
+    #[test]
+    fn an_empty_candidate_selection_draws_nothing() {
+        let state = fresh_state(31);
+        let pi = pending_player(&state);
+        let candidates = start_placement_kandidaten(&state, pi);
+        let mut touched = StdRng::seed_from_u64(77);
+        let mut untouched = StdRng::seed_from_u64(77);
+        assert_eq!(sample_random_start_tile(&[], (0, 0), &mut touched), None);
+        // (9,9) ist kein Slot des 3x3-Rasters -- die Auswahl bleibt leer.
+        assert_eq!(sample_random_start_tile(&candidates, (9, 9), &mut touched), None);
+        for i in 0..8 {
+            assert_eq!(
+                touched.random::<u64>(),
+                untouched.random::<u64>(),
+                "leere Auswahl darf keinen Zufall ziehen (Zug {i})"
+            );
+        }
     }
 }

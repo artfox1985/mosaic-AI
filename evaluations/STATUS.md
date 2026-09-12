@@ -269,6 +269,21 @@ Index: `PREREG_INDEX.md` (generiert).
 00c. **Mondstapel-Reihenfolge** (Nutzer 13:20: "mit v29 oder v30"): im Netzpfad seit 2026-07-01
    Suchentscheid (nie gemessen); `PREREG_moon_stack_order.md` angelegt: Stufe 1 A/B Fan-out an
    gegen aus als v29-Begleitprogramm (Knopf Default = Bestand), Stufe 2 Zielfrage bei v30.
+00e. **Startkuppel Platte/Rotation: Handregel gegen Zufall** (Nutzer 2026-09-12 "mach 1 und 2",
+   Punkt 2; `PREREG_start_dome_choice.md` par.9a Punkt 1, Baustand par.9f): Stufe 0 hat den SLOT
+   geschlossen (Handregel legt immer (0,0), fuer Heuristiken der beste). Offen waren die bis zu
+   zwoelf Kandidaten IM Slot (3 Platten x 4 Rotationen). **GESCHRIEBEN (Agent), UNKOMPILIERT,
+   UNGEMESSEN:** Diagnoseknopf `MOSAIC_START_TILE_RANDOM_P0/P1` (0/1, ungesetzt = Bestand
+   bitidentisch, kein RNG-Zug) waehlt Platte und Rotation gleichverteilt aus den Kandidaten des
+   Slots, den die Handregel gewaehlt haette; Wirkstellen nur dort, wo ein RNG durchgereicht wird
+   (Heuristik-Arena `arena_match` und aufzeichnendes Self-Play), Referee/Rundenuebergang/py.rs
+   unberuehrt. In der Arena zieht er aus einem aus `game_seed` abgeleiteten Strom, nicht aus dem
+   Partie-RNG -- sonst waere der gepaarte Vergleich an der Wurzel entpaart. Sonde
+   `tools/probes/start_dome_tile_probe.py` (netzfrei, hv1 beide Seiten, zwei Arme ueber demselben
+   Seed, 200 Partien je Arm, Paarungen 25 und 400, Kontrollen: Slot bleibt (0,0), Platten- und
+   Rotationsverteilung im Zufallsarm nicht entartet). Vorab-Lesart: KI der gepaarten Differenz
+   schliesst 0 ein = auch Platte/Rotation kein Hebel; gross = die Handregel ist die Messlatte des
+   Such-Starts. Tore offen: Kompilat, Tests, Wheel, Anker-Invarianz; Lauf exklusiv nach der Kette.
 00b. **Startsetzung als Suchentscheid im Spiel** (Nutzer 13:00, `PREREG_start_dome_choice.md`
    par.9c): ENTSCHIEDEN 13:15 (Nutzer: "bau den such-start dann vor v29"): Bau rund ein Tag
    (net_mcts, Spielpfade, Self-Play, Referee-Worker), Knopf MOSAIC_START_BY_SEARCH Default 0,

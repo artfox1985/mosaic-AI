@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 (par.9): Handregel legt immer (0,0), fuer Heuristiken der beste Slot. Such-Start GEBAUT und A/B GEMESSEN (par.9e): die Suche legt zu 93 % auf (2,0), Siege 91:99 und Punkte gleich, Eckplatten +1,85 und Aussenfelder +0,83 gegen vertikale Reihen -0,82. Gleichwertig, andere Praeferenz als die Heuristik. Streuung (par.9b, p 0,15) und Such-Start gehen ins v29-Rezept. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 (par.9): Handregel legt immer (0,0), fuer Heuristiken der beste Slot. Such-Start GEBAUT und A/B GEMESSEN (par.9e): Suche legt zu 93 % auf (2,0), Siege 91:99, Punkte gleich -- gleichwertig, andere Praeferenz. Streuung (par.9b, p 0,15) und Such-Start gehen ins v29-Rezept. Platte/Rotation (par.9a.1): Knopf und Sonde GEBAUT (par.9f), unkompiliert, ungemessen. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -677,3 +677,75 @@ Such-Start-Records mit gueltigem Policy-Ziel sind genau die Korrektur: ab v29 si
 alle Slots, und der Prior lernt den Start. Nebenbefund: die Huelle bringt auch am Such-Start
 +0,17 volle Spalten und +1,6 Punkte (Instrument, gleicher Seed), konsistent mit C2.
 
+## par.9f BAUSTAND Platte/Rotation (2026-09-12, Agent; NICHTS kompiliert, nichts gemessen)
+
+Auftrag: par.9a Punkt 1, die erste Haelfte (Handregel gegen Zufall, netzfrei; die
+Ownership-Ablesung par.2a braucht ein Netz und ist nicht Teil dieses Baus). Alles hier ist
+Baustand aus Quelltext, kein Kompilat und kein Lauf -- `cargo` und `maturin` waren gesperrt.
+
+**Knopf.** `MOSAIC_START_TILE_RANDOM_P0` / `..._P1` (Diagnose, kein Spec-Feld, Registratur
+`knob_registry.rs`, `docs/knobs.md` neu erzeugt): waehlt fuer den jeweiligen Spieler PLATTE und
+ROTATION der Startkuppel GLEICHVERTEILT aus den Kandidaten des Slots, den die Handregel gewaehlt
+haette -- also (0,0), oder der erzwungene Slot aus `MOSAIC_START_SLOT_P0/P1`. Werte 0 und 1;
+ungesetzt, leer oder ungueltig = Bestand, bitidentisch und ohne jeden RNG-Zug (einmalige Warnung
+bei ungueltigem Wert). Je Startsetzung gelesen (kein `OnceLock`), damit der Treiber beide Arme in
+EINEM Prozess faehrt. Bausteine in `engine/src/self_play.rs`: `parse_start_tile_random` (rein),
+`random_start_tile_enabled` (Env-Huelle), `sample_random_start_tile` (reiner Kern, RNG von
+aussen) und die neue Huelle `choose_start_placement_rng(state, pi, rng)`.
+
+**Signatur.** `choose_start_placement(state, pi)` bleibt unveraendert und delegiert mit
+`rng = None` -- kein Bestands-Aufrufer war anzufassen, also auch keiner in `engine/examples/`
+oder `engine/benches/` (beide rufen die `pub(crate)`-Funktion ohnehin nicht).
+`choose_start_placement_with_slot` ist unberuehrt.
+
+**Wirkungsbereich (geprueft per Grep 2026-09-12).** Den Knopf sieht nur, wo ein RNG
+durchgereicht wird: die Heuristik-Arena `play_arena_game` (das ist `mosaic_rust.arena_match`,
+der Einstieg der Sonde) und das aufzeichnende Self-Play `start_placement_step`. Referee
+(`referee.rs:122/508`), Rundenuebergang (`round_transition.rs`), `py.rs`, die Diagnose-Schleife
+`play_stage3_vs_stage1_game` und jede GESUCHTE Startsetzung (par.9c) rufen weiter ohne RNG und
+bleiben Bestand. In Gating, Anker-Kanten und Erzeugung ist der Knopf nie gesetzt.
+
+**Zufallsquelle, und warum sie in der Arena NICHT der Partie-RNG ist:** `play_arena_game` zieht
+aus einem eigenen, aus `game_seed` abgeleiteten Strom
+(`derive_search_seed(game_seed, (1 << 40) + pi)`, Muster `PREREG_search_rng_split.md`, zwei
+Zeilen weiter unten fuer die Drafting-Suche schon so gebaut). Aus dem Partie-RNG zu ziehen waere
+reproduzierbar, wuerde aber ALLE spaeteren Nachziehplatten verschieben -- der gepaarte Vergleich
+Handregel gegen Zufall waere dann an der Wurzel entpaart, und die Partien, in denen die Ziehung
+zufaellig die Wahl der Handregel trifft, waeren nicht mehr identisch. Im Self-Play zieht die
+Streuung dagegen aus dem Partie-RNG, genau wie die Slot-Streuung par.9b.
+
+**Record-Vertrag (Self-Play, nur bei gesetztem Knopf):** `policy_target_valid: false` und
+`start_tile_randomized: true` -- eigener Schluessel neben `start_slot_randomized`, damit eine
+Sonde die beiden Streuquellen nicht verwechselt. Bei ungesetztem Knopf wird kein Feld
+geschrieben, der Record ist byte-gleich zum Bestand.
+
+**Sonde** `tools/probes/start_dome_tile_probe.py`: Einstieg
+`mosaic_rust.arena_match(log_games=True)`, hv1 auf beiden Seiten, netzfrei; zwei Arme (Handregel,
+Zufall) ueber demselben Seed, Spieler 1 immer Bestand; Defaults `--n-seeds 200`,
+`--pairings 25,400`, Seed-Basis 20260912, `--slot` optional. Je Arm die Kennzahlen der
+Stufe-0-Sonde (dieselben Helfer `game_metrics`, `mean_ci`, `METRICS`, `realised_start_slot`, also
+dieselben Groessen), dazu Reihen- und Spaltenprofil und Plattenpunkte je Kriterium; gepaarte
+Differenz Handregel minus Zufall mit 95-%-KI, je Kennzahl UND je Wertungskriterium. Zwei
+Kontrollen aus dem Log: der gelegte Slot muss in beiden Armen (0,0) bleiben, und die Verteilung
+von Platte und Rotation (neuer Helfer `realised_start_tile` aus der START_TILE-Zeile) darf im
+Zufallsarm nicht entarten -- sonst haette er den Bestand unter falschem Etikett gespielt. JSON
+mit n/Grundmenge/Einheit, `laufzeit`-Block und `cli_args`.
+
+**Vorab-Lesart (im Docstring der Sonde und im Artefakt):** gepaarte Differenz Handregel minus
+Zufall in Marge und Punkten. Schliesst das 95-%-Intervall 0 ein, ist auch Platte/Rotation kein
+Hebel und par.9a Punkt 1 ist geschlossen; ist die Differenz gross, traegt die Handregel und ist
+die Messlatte, die der Such-Start (par.9c) an dieser Stelle mindestens erreichen muss.
+
+**Tests geschrieben, nicht gelaufen** (Rust, Modul `start_slot_tests` in `self_play.rs`): der
+Knopf nimmt nur 0 und 1; ungesetzt ist er fuer beide Spieler aus; bei ungesetztem Knopf liefert
+der RNG-Pfad die Bestandswahl UND verschiebt den gereichten Strom nicht (16 Zuege verglichen);
+die Ziehung bleibt im Slot und liefert immer einen echten Kandidaten; ueber 200 Ziehungen je
+Kandidat kommt JEDER Kandidat des Slots vor (nicht entartet, grobe Gleichverteilungs-Schranke);
+leere Auswahl zieht nichts. Python: `py_compile` gruen, Konventions-Check gruen.
+
+**Offen / ungeprueft:** nichts kompiliert (`cargo test --release --lib`, Beispiele/Benches,
+Wheel-Bau) und damit auch die Anker-Invarianz nicht; die Bitidentitaet bei ungesetztem Knopf ist
+am Quelltext begruendet (der Zweig wird nicht betreten), nicht gemessen; die Sonde ist nicht
+gelaufen. Rauchtest vorgesehen:
+`python -X utf8 -u tools/probes/start_dome_tile_probe.py --limit 4 --pairings 25 --threads 4`;
+voller Lauf: `python -X utf8 -u tools/probes/start_dome_tile_probe.py` (exklusiv).
