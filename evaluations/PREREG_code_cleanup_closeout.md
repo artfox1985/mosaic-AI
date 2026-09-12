@@ -356,7 +356,7 @@ Der Phantom-Fix aendert die Staerke des Huellen-Lehrers nicht messbar; hv3 992 [
 v26-b01 92:58 (Deckel, p 0,007), gegen v21 69:31 (Frueh-Stopp nach 100). v22-b05 1158 liegt
 knapp unter v21, die Luecke 1000-1158 bleibt ohne Netz-Sprosse.
 
-**LEITER SEGMENT 2, ENDSTAND 21:50 (24 Kanten, alle am Anker):**
+**LEITER SEGMENT 2, ENDSTAND 21:50 (23 Kanten, alle am Anker; Korrektur 22:56: das Register zaehlt 23 Zeilen, nicht 24):**
 
 | Knoten | Elo | KI95 | Partien |
 | --- | --- | --- | --- |
@@ -370,6 +370,60 @@ knapp unter v21, die Luecke 1000-1158 bleibt ohne Netz-Sprosse.
 | Heuristik_hv4_anchor@150 | 1000 | fix | 850 |
 | Heuristik_hv3_generator@150 | 992 | [948, 1035] | 300 |
 | Heuristik_hv2_generator@150 | 978 | [937, 1018] | 500 |
+
+**PRUEFUNG DES TRACKERS UND WERKZEUG (Nutzer 2026-09-12, gegen 22:45-22:56: "Pruefung wie der Tracker
+rechnet" / "mach das Werkzeug"):** `tools/elo_tracker.py` fittet Bradley-Terry per MM (Zermelo/
+Hunter, Anker-gamma fix, Zeilen desselben Paars summiert), das Intervall ist ein nichtparametrischer
+Bootstrap (1.000 Wiederholungen), der bis dahin JEDE Zeile als Binomial(n, p) zog, also alle
+Partien als unabhaengig. Befund: (1) gepaarte Bloecke (5 Paare je Seed) sind korreliert, das
+Intervall war dort zu schmal; (2) elf der 23 Kanten sind frueh gestoppt (SPRT oder Binomial-
+Block-Abbruch), ihre Siegquote ist nach oben verzerrt und der Fit weiss es nicht; (3) das Modell
+setzt Transitivitaet voraus, der Widerspruch v21/hv2/hv4 (68 % / 84 % / 51 %) geht nicht ins
+Intervall. Gebaut: zwei ADDITIVE Register-Spalten `units` ("k:w1,w2,..." Siege je Seed-Block, aus
+dem paired_gating-Artefakt ableitbar: `elo_tracker.py units --paired-artifact`, `add
+--units-from-paired-artifact`) und `early_stop` (`add --early-stop`); der Bootstrap zieht bei
+gesetzten `units` Bloecke statt Partien, der Report traegt eine Spalte "Frueh" (gestoppte/alle
+Kanten je Knoten), markiert Zeilen mit [FRUEH-STOPP] und nennt die Zaehlung. Kopf-Migration
+automatisch beim naechsten `add` (DictReader verwirft Felder jenseits des Kopfes still:
+Testfund). Tests `tools/tests/test_elo_tracker_units.py` 8/8; Rueckfuellung: die drei
+paired_gating-Zeilen v28-b02 gegen v27-b01 mit Bloecken, elf Zeilen als frueh gestoppt.
+**Wirkung auf die Zahlen: praktisch keine** (v28-b02 [1301, 1393] statt [1301, 1395], v28-b01
+[1266, 1375] statt [1264, 1366]): die Block-Korrelation der drei gepaarten Kanten ist gering, und
+der Anker-Schritt, nicht die Paarung, traegt die Breite. Der Frueh-Stopp bleibt eine Markierung,
+keine Korrektur.
+
+**SPROSSE v22-b05@100 (Nutzer 2026-09-12, gegen 22:50 und 22:53; 23:09-23:23,
+`tools/night_ladder_v22_sims100.sh`):** Ziel war ein Knoten ZWISCHEN Anker (1000) und v22-b05@400
+(1158), weil alle Netz-Kanten gegen die Heuristiken gesaettigt sind. Drei Kanten, alle frueh
+gestoppt: **v22@100 gegen hv4-Anker 39:11** (Block 1, p 0,0001, 167 s), **gegen hv3 43:7** (Block 1,
+p < 0,0001, 155 s), **gegen v22@400 21:39** (paired_gating Seed 20261050, SPRT H0 nach 30 Paaren,
+McNemar p 0,049, gepaarte Differenz -0,60 [-1,10; -0,10], 497 s; Register-Zeile mit Bloecken).
+**Befund: die Sprosse liegt NICHT in der Luecke.** Mit 100 statt 400 Sims verliert v22-b05 gegen
+sich selbst 35 %, schlaegt die Heuristiken aber weiter zu 78-86 %: der Vorsprung der Netze ueber
+die Heuristiken ist kein Suchtiefen-Vorsprung, sondern sitzt im Netz (Prior und Value-Kopf), und er
+schrumpft mit weniger Sims kaum. Der Fit legt v22@100 auf 1175 und zieht damit den ganzen unteren
+Netz-Block um 10-30 Punkte nach oben (v22@400 1191 statt 1158, v21 1194 statt 1178); der Champion
+steigt auf 1349 [1302, 1402]. Das ist genau die Weichheit, die oben beschrieben ist: die absolute
+Hoehe des Netz-Blocks ueber der 1000 haengt am gesaettigten Anker-Schritt, und jede neue Kante
+dorthin verschiebt sie. Wer die Luecke wirklich fuellen will, braucht einen Knoten, der gegen die
+Heuristiken bei 55-70 % liegt: ein Netz mit 25 Sims oder eine Heuristik mit 600 Sims (nicht
+gefahren; Vorschlag fuers v29-Begleitprogramm, kein Auftrag).
+
+**LEITER SEGMENT 2, ENDSTAND 23:25 (26 Kanten, alle am Anker; Block-Bootstrap):**
+
+| Knoten | Elo | KI95 | Partien |
+| --- | --- | --- | --- |
+| v28-b02@400 (Champion) | **1349** | [1302, 1402] | 1.380 |
+| v28-b01@400 | 1321 | [1272, 1375] | 400 |
+| v27-b01@400 | 1306 | [1261, 1358] | 1.280 |
+| v26-b01@400 | 1250 | [1198, 1305] | 400 |
+| v24-b07@400 | 1200 | [1150, 1249] | 400 |
+| v21_2d_brierbest@400 | 1194 | [1150, 1239] | 500 |
+| v22-b05_live@400 | 1191 | [1145, 1241] | 310 |
+| v22-b05_live@100 | 1175 | [1127, 1231] | 160 |
+| Heuristik_hv4_anchor@150 | 1000 | fix | 900 |
+| Heuristik_hv3_generator@150 | 980 | [940, 1021] | 350 |
+| Heuristik_hv2_generator@150 | 980 | [939, 1018] | 500 |
 
  `tools/night_ladder_rungs2.sh` Teil B, nach
 dem Worker-Patch 13:37; die drei Anker-Kanten und hv2 gegen Anker davor gescheitert, Nachlauf

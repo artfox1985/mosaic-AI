@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 (par.9): Handregel legt immer (0,0), fuer Heuristiken der beste Slot. Such-Start GEBAUT und A/B GEMESSEN (par.9e): Suche legt zu 93 % auf (2,0), Siege 91:99, Punkte gleich -- gleichwertig, andere Praeferenz. Streuung (par.9b, p 0,15) und Such-Start gehen ins v29-Rezept. Platte/Rotation (par.9a.1): Knopf und Sonde GEBAUT (par.9f), unkompiliert, ungemessen. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 (par.9): Handregel legt immer (0,0), fuer Heuristiken der beste Slot. Such-Start GEBAUT und A/B ZWEIMAL GEMESSEN (par.9e, zweiter Seed echt gepaart nach RNG-Leck-Fix): Suche legt zu 93 % auf (2,0), Siege 91:99 und 81:89, Punkte und volle Spalten gleich (0,95 gegen 0,98), Eckplatten +1,85 und Kuppel-Boni +2,25 gegen Platzierungspunkte: gleichwertig, andere Praeferenz. Streuung (par.9b, p 0,15) und Such-Start gehen ins v29-Rezept. Platte/Rotation GEMESSEN (par.9f): Handregel gegen Zufall +1,8 Punkte @25 / +1,6 @400, KI schliesst 0 ein, kein Hebel, par.9a Punkt 1 geschlossen. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -764,4 +764,67 @@ Intervalle sind zu eng gerechnet). Fix: eigener seed-abgeleiteter Strom fuer die
 und Diagnose-Zweig in Arbeit (Agent), dann Bau-Tore und WIEDERHOLUNG des A/B mit echter Paarung
 (`tools/night_tile_probe_replay.sh` erweitert). Die 93-%-Praeferenz fuer (2,0) ist von dem Leck
 nicht betroffen (sie ist die Wahl der Suche, nicht der Partie).
+
+## par.9f ERGEBNIS Platte/Rotation (2026-09-12, 22:18-22:24, `tools/night_tile_probe_replay.sh`)
+
+Bau-Tore vorab gruen (637 Lib-Tests, Beispiele/Benches, Wheel, Anker-Drift und Konservierung
+gegen hv4_anchor, Python-Spiegeltest der Aktions-IDs 8/8); Rauchtest 4 Partien gruen; voller
+Lauf exklusiv: 200 Seeds x 2 Arme x 2 Paarungen = **800 Partien in 322 s** (0,40 s je Partie,
+alle Kerne), Artefakt `evaluations/artifacts/start_dome_tile_probe.json`. Grundmenge: Partien
+eines Arms je Paarung, Sicht Spieler 0, Einheit je Partie; n = 200 Paare je Paarung.
+
+**Beide Kontrollen bestanden:** der gelegte Slot ist in allen 800 Partien (0,0) (Treffer 200/200
+je Arm und Paarung, keine Abweichung); die Handregel legt 18 verschiedene Platten, alle mit
+Rotation 0 (200 von 200); der Zufallsarm legt 68 verschiedene Platte-Rotations-Kandidaten mit
+Rotationen 0/90/180/270 = 44/55/47/54. Der Zufallsarm hat also wirklich anders gelegt, und die
+Handregel waehlt nie eine gedrehte Platte.
+
+**Gepaarte Differenz Handregel minus Zufall (Spieler 0, 95-%-KI):**
+
+| Paarung | Punkte | Marge | volle Spalten | Strafpunkte |
+| --- | --- | --- | --- | --- |
+| hv1@25 | +1,84 [-0,71; +4,39] | +2,73 [-0,51; +5,97] | +0,03 [-0,03; +0,08] | -1,37 [-2,71; -0,02] |
+| hv1@400 | +1,60 [-1,16; +4,37] | +0,89 [-2,89; +4,67] | +0,04 [-0,03; +0,10] | -0,39 [-1,74; +0,96] |
+
+Plattenpunkte je Kriterium: einzig **Mehrfarbige Felder** traegt in beiden Paarungen fuer die
+Handregel (+0,72 [+0,20; +1,24] @25, +0,56 [+0,04; +1,08] @400); Eckplatten @400 -0,29
+[-0,47; -0,11] gegen die Handregel, volle Reihen @400 -0,16 [-0,30; -0,02]; alle uebrigen
+Kriterien und alle Reihen-/Spalten-Profile schliessen 0 ein.
+
+**Verdikt nach der Vorab-Lesart: das Intervall schliesst 0 ein, Platte/Rotation ist fuer die
+Heuristik kein Hebel; par.9a Punkt 1 ist GESCHLOSSEN.** Die Handregel ist etwa 1,5 bis 2 Punkte
+je Partie wert (Punktmittel beider Paarungen, nicht signifikant), und der Betrag sitzt in den
+mehrfarbigen Feldern: die Handregel legt die Platte so, dass mehr Farben nebeneinander liegen,
+und kauft das bei @400 mit weniger Eckplatten-Punkten. Fuer den Such-Start (par.9c) heisst das:
+die Messlatte an dieser Stelle ist niedrig; das A/B par.9e (Siege gleich, Punkte gleich) hat sie
+erreicht. Fuer v29 bleibt die Streuung auf den SLOT beschraenkt (par.9b); eine Streuung ueber
+Platte/Rotation wird nicht eingebaut, weil der Zufallsarm hier zeigt, dass der Ertrag klein ist,
+und die Such-Seite die Rotation ohnehin frei waehlt (Kandidatenmenge <= 108 in par.9c).
+
+## par.9e WIEDERHOLUNG MIT ECHTER PAARUNG (2026-09-12, 22:26-23:09, `tools/night_tile_probe_replay.sh`)
+
+Nach dem RNG-Leck-Fix (Start-Suche zieht in allen Pfaden aus einem eigenen seed-abgeleiteten
+Strom, `START_SEARCH_STREAM` in shaping.rs; Bau-Tore gruen, Anker-Drift und Konservierung gruen)
+derselbe Aufbau wie oben mit Seed 20261049: v28-b02 `start_by_search 1` gegen v28-b02 Champion-
+Spec, Blockgroesse 5, `--log-games`, 10 Threads, exklusiv. **SPRT H0 nach 85 Paaren** (LLR -3,03),
+**Siege 81:89**, McNemar p 0,63, gepaarte Differenz -0,09 [-0,38; +0,19]; 2.545 s, 15,0 s je
+Partie. Artefakt `paired_gating_v28-b02_startsearch_vs_v28-b02_s49.json`.
+
+**Replay traegt jetzt:** `arena_column_probe` spielt 169 von 170 Partien nach (vorher 0 von 190);
+die eine Divergenz ist die bekannte Chip-Vollendungs-Grenze des Replayers ("Reihe 6 nicht mit
+Chips" nach 60 Versuchen), nicht die Startsetzung. Das Leck ist damit als Ursache bestaetigt und
+geschlossen; das A/B oben (Seed 20261048) bleibt als ungepaarter Vergleich stehen.
+
+**Praeferenz unveraendert:** Such-Seite 158 von 170 (93 %) auf (2,0), 12 auf (0,0); Handregel-Seite
+170 von 170 auf (0,0). **Volle Spalten je Brett** (Replay, n=169): Such-Start 0,95 +- 0,12,
+Handregel 0,98 +- 0,11; Huellenanteil H 0,55 gegen 0,60. **Gepaart, Such-Start minus Handregel
+(85 Paare):** Punkte +1,09 [-1,75; +3,94], Marge +2,19 [-3,50; +7,88], Plattenpunkte gesamt +0,92
+[-0,26; +2,10]; je Kriterium Eckplatten +1,85 [+0,37; +3,33], Aeussere Felder +0,57 [+0,11; +1,03],
+Vertikale Reihen +0,50 [-0,63; +1,63], Mehrfarbige Felder -0,47 [-2,12; +1,18]; Kuppel-Boni
+(`spezial_bonus`) +2,25 [+1,52; +2,99], Platzierungspunkte -1,87 [-3,95; +0,23].
+
+**Lesart:** beide Seeds sagen dasselbe, jetzt sauber gepaart: gleichwertig in Siegen und Punkten,
+andere Plan-Signatur (Ecken, Aussenfelder und Kuppel-Boni statt Platzierungspunkte). Die Spalten
+bleiben gleich (0,95 gegen 0,98, Intervalle ueberlappen), der Such-Start kostet also auch beim
+Spaltenbau nichts. Entscheid par.9c (Such-Start ins v29-Rezept) bleibt.
 
