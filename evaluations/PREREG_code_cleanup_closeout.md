@@ -215,7 +215,47 @@ n=150 gegen hv1_anchor). Die Nachbar-Kante v28-b02 gegen v27-b01 (Seed 20261044,
 `paired_gating_v28-b02_vs_v27-b01_s44_segment2.json`). Register nach vier Kanten: v28-b02 1305
 [1248, 1371], v28-b01 1346 [1271, 1458], v27-b01 1256 [1202, 1317]. Fruehstopp unter 150
 Paaren: die Replikation (Seed 20261046, bis zum Deckel) laeuft als Schritt 2r der
-Promotionskette `tools/night_v28_promotion.sh`; Nachtrag folgt.
+Promotionskette `tools/night_v28_promotion.sh`.
+
+**Replikation (Seed 20261046, 03:48-05:19, 5.449 s, 10 Threads, Logs): 212:188 am Deckel, KEIN
+SPRT-Entscheid** (LLR -1,19), McNemar p=0,281, gepaarte Differenz +0,12 [-0,08; +0,32], Punkte
+51,4 gegen 50,8 (96 Splits, 58 A-Sweeps, 46 B-Sweeps; Artefakt
+`paired_gating_v28-b02_vs_v27-b01_s46_segment2.json`). Die Replikation traegt die Signifikanz
+des ersten Seeds NICHT; die Richtung ist dieselbe (fuenfte positive Arena von v28-b01/b02 gegen
+v27-b01 ueber beide Segmente, aber nur zwei davon signifikant). Ein Pool aus SPRT-Stopp und
+Deckel-Lauf waere verzerrt (Regel seit v26); nach der v26-Praezedenz folgt ein dritter Seed als
+unverzerrter Stichentscheid (200 Paare, Fruehstopp per alpha=beta=1e-12 aus), eingetaktet NACH
+der Master-Kette. Register nach fuenf Kanten: v28-b02 1296 [1244, 1358], v27-b01 1264
+[1210, 1323], v28-b01 1346 [1271, 1441] (eine Kante). Die Promotion von v28-b02 laeuft
+unabhaengig davon weiter: der Nutzer-Entscheid zum besten Stand (Korrektheit des volleren
+Merkmalsbilds) haengt nicht an dieser Kante, und der Vorgaenger v27-b01 hat im Segment 2 keine
+Kante, die ihn ueber v28-b02 stellt.
+
+**Champion-2-Kante (Promotion Schritt 4, 05:22-06:04, 2.516 s):** v28-b02 gegen das
+EINGEFRORENE Artefakt v26-b01 mit dessen eigenem Wheel (`frozen_referee_match.py`, 150 Partien,
+6 Prozesse, Seed-Basis 20261052) **101:49**, Punkte 52,9 gegen 50,5. Cross-Aera nach der
+Aera-Regel (Handshake ROT 20b442a8164f748d gegen 39648b95bbba1acf, `--force-cross-era`;
+Golden-Selbsttest des Artefakts 10/10 gruen: es spielt noch wie am Einfriertag). Artefakt
+`champion2_v28-b02_vs_v26-b01.json`. Damit haengt v28-b02 im Segment 2 an drei Nachbarn
+(Anker, v27-b01, v26-b01); v26-b01 selbst hat im Segment 2 nur diese eine Kante.
+
+**Pflicht-Diagnostiken (Schritte 5b/5c, 06:04-06:17):** sigma/Prior-Balance
+(`gumbel_scale_calibration.py`, 300 Zustaende, n_used 233) gesamt **2,222** (v27-b01 2,161,
+v26-b01 2,270), je Runde 1,30 / 2,48 / 3,04 / 3,76; die c_visit/c_scale-Familie bleibt zu
+(Regel: Gesamt-Kennzahl ueber 3). Nebenbefund: Runde 4 liegt mit 3,76 ueber der Schwelle
+(v27-b01 2,88), Runde 3 knapp (3,04); kein Ausreisser wie bei v26-b01 (8,54). Anzeige-
+Kalibrierung (`platt_fit.py`, je 1.440 Zustaende): frozen_v3 (Anzeige) **A -0,0539, B 0,6684,
+Brier 0,22537** (v27-b01: -0,0476 / 0,6853 / 0,22379), frozen_v1 (Trend) A +0,3840, B 0,6074,
+Brier 0,25217 (v27-b01: +0,4010 / 0,6335 / 0,25135). In `server.py` eingetragen (06:20).
+Artefakte `gumbel_scale_calibration_v28-b02.json`, `platt_fit_v28-b02_v3.json`,
+`platt_fit_v28-b02.json`. Schritt 1 `set_champion v28-b02_brierbest` 06:17; Schritte 5d und 7
+(Fixture, Artefakt `frozen_champions/v28-b02`, Golden Probe, Selbsttest) liefen in
+`tools/night_v28_freeze.sh` (06:19-06:45, zweiter Anlauf nach einer Dateisperre im ersten
+Schreiblauf): Fixture **e1f94c44f0c7959b** (Schreiblauf + frische Gegenprobe gruen), Artefakt
+mit Wheel `mosaic_rust_knobs_20260912.whl` (sha256 ea980d9f..., identisch mit dem live
+installierten), Golden Probe 10 Sonden (3 mit pending_dome_choice, 1.450 s), Referee-Selbsttest
+Handshake gruen (39648b95bbba1acf beidseits), Golden 10/10, 2 Echtpartien. **Promotion v28-b02
+VOLLSTAENDIG (06:45); Manifest vervollstaendigt.** Offen bleibt der dritte Seed der Nachbar-Kante.
 
 Nebenbefund zur Erwartung aus Punkt 3: im Alt-Register lag v28-b02 gegen v28-b01 im
 Nullbefund (207:193, 209:191, `PREREG_v28_window.md` par.10); im Segment 2 tragen die beiden

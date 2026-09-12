@@ -439,3 +439,24 @@ gegen 52,7); der Posten bleibt. Der Fensterzuschnitt aus par.1 bleibt fuer v29 u
 `paired_gating_v28-b03_vs_v28-b02_s40/s41.json`, `paired_gating_v28-b04_vs_v28-b02_s42/s43.json`.
 **Bester Stand der Generation: v28-b02** (Nutzer-Entscheid oben); Promotion nach
 `docs/promotion_checklist.md` steht an (Anker-Kante, Champion-2 gegen v26-Artefakt, Einfrieren).
+
+**v28-b02 GEGEN v27-b01 IM SEGMENT 2 (Neuverankerung nach A2, `PREREG_code_cleanup_closeout.md`
+par.7a; beide Seiten Champion-Spec, Modelle vom Baum, Wheel mit A2 vom 2026-09-12 00:57 bzw.
+03:47, @400, Blockgroesse 5, 10 Threads, `--log-games`, exklusiv):**
+
+| Kante | Ergebnis | McNemar | gepaarte Diff | Punkte | volle Spalten je Seite |
+| --- | --- | --- | --- | --- | --- |
+| Seed 20261044 | **133:97, SPRT nach 115 Paaren** | p 0,0198 | +0,313 [+0,068; +0,558] | 53,7 gegen 50,2 | 1,022 gegen 0,895 (n=229, 1 Divergenz) |
+| Seed 20261046 (Replikation, Deckel) | 212:188, kein Entscheid | p 0,281 | +0,12 [-0,08; +0,32] | 51,4 gegen 50,8 | 1,015 gegen 0,901 (n=392, 8 Divergenzen) |
+
+Plattenpunkte gepaart (v28-b02 minus v27-b01): Seed 44 Punkte +3,45 [+0,93; +5,97], Marge
++6,90 [+1,85; +11,94], Vertikale Reihen +1,32 [-0,02; +2,66]; Seed 46 Punkte +0,54 [-1,25; +2,32],
+Platten +1,08 [+0,36; +1,80], Vertikale Reihen **+1,14 [+0,17; +2,11]**. Waechter je Lauf:
+Kriteriensumme = Endwertung und Log-Endstand = scores 230/230 bzw. 400/400. Tor 2b im
+Segment 2: die Spaltenzahl liegt in beiden Seeds um 0,12 ueber dem Vorgaenger (Intervalle
++-0,08 bis +-0,10 je Seite, also knapp getrennt), der Zuwachs sitzt wieder in den vertikalen
+Reihen. Die Siegkante traegt nur der erste Seed; ein dritter Seed ohne Fruehstopp folgt als
+Stichentscheid (`tools/night_v28_third_seed.sh`). Artefakte
+`paired_gating_v28-b02_vs_v27-b01_s44_segment2.json` / `..._s46_segment2.json`,
+`arena_columns_...` je Seed.
+
