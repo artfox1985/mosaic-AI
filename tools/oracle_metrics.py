@@ -31,6 +31,24 @@ Vier Metriken je Netz, GESAMT + je Runde:
 Reine Auswertung/Lesezugriffe -- evaluations/frozen_v1_oracle_labels.json
 sowie frozen_eval_set.pkl werden nur GELESEN.
 
+ADDITIV ERWEITERT 2026-09-12 (PREREG_geometric_envelope.md par.12a Kanal A,
+eingetaktet als par.12c Punkt 3): SUCH-Variante der Bruecke ueber den Schalter
+`--search-sims N`. Bei N = 0 (Default) aendert sich nichts -- bei N > 0 wird je
+Zustand zusaetzlich die Netzsuche gefahren und daraus A1 (Suchzug in den
+Orakel-Top-3) und A2 (Spearman Wurzelwert gegen Orakelwert) je Runde gebildet.
+Ein Lauf = EINE Spec (`--spec`); Knopf an gegen aus sind zwei Aufrufe, siehe
+den Kommentarblock ueber `_apply_spec_env` (OnceLock-Getter der Huelle).
+
+Aufruf (EXKLUSIV, keine Arena daneben; `--models` ohne Werte laesst die
+Prior-Seite weg, dann laeuft NUR die Such-Bruecke):
+
+    python -u tools/oracle_metrics.py --models \\
+        --oracle-json evaluations/artifacts/frozen_v3_oracle_labels.json \\
+        --frozen-set evaluations/frozen_eval_set_v3.pkl \\
+        --search-sims 400 --search-model models/frozen_champions/v26-b01/model.onnx \\
+        --spec models/frozen_champions/v26-b01/spec.json \\
+        --out evaluations/artifacts/search_bridge_frozen_v3_v26-b01_k3p_an.json
+
 ADDITIV ERWEITERT 2026-08-09 (Task E, evaluations/PREREG_prior_blind_spot.md):
 zusaetzliche Recall-Breiten (8/16/32/64, rauschfrei), eine rausch-treue
 Gumbel-Top-m-Aufnahmerate (Monte Carlo auf logit+Gumbel(0,1), das ECHTE
@@ -41,8 +59,10 @@ bestehenden Aufrufe/Ausgaben oben bleiben davon unberuehrt.
 """
 import argparse
 import json
+import os
 import pickle
 import sys
+import time
 from pathlib import Path
 
 import numpy as np
@@ -498,6 +518,344 @@ def aggregate_task_e(per_state: list[dict], recall_widths=DEFAULT_RECALL_WIDTHS,
     }
 
 
+# ---------------------------------------------------------------------------
+# SUCH-VARIANTE DER ORAKEL-BRUECKE (PREREG_geometric_envelope.md par.12a
+# Kanal A, eingetaktet als par.12c Punkt 3) -- rein additiv: alles ab hier
+# laeuft NUR bei `--search-sims N > 0`. Bei N = 0 wird keine dieser Funktionen
+# aufgerufen, die Prior-Metriken oben bleiben bitgleich.
+#
+#   A1 = Anteil der Zustaende je Runde, deren SUCHZUG (argmax der Besuche) in
+#        den Orakel-Top-3 liegt.
+#   A2 = Spearman(Wurzelwert der Suche, Orakelwert @5000) je Runde.
+#
+# PERSPEKTIVE UND SKALA DES WURZELWERTS -- am Code geprueft, nicht abgeleitet:
+#
+#   * Runde 1-4: das Label-Feld `root_value` (erstes Label von
+#     `frozen_v3_oracle_labels.json`: 0,5454) setzt der PyO3-Einstieg selbst,
+#     als `tree.win_pct / 100` (engine/src/lib.rs:987-992). `tree.win_pct` ist
+#     `root_q * 100` mit `root_q = nodes[0].value / nodes[0].visits`
+#     (net_mcts.rs:5215, :5249-5251). Der Backprop addiert auf jeden Knoten
+#     `value[nodes[i].player_who_acted]` (net_mcts.rs:2996), und die Wurzel
+#     traegt `player_who_acted = root_state.current_player`
+#     (net_mcts.rs:4542-4544, `build_net_tree`). ALSO: Gewinn-
+#     wahrscheinlichkeit in [0,1] aus Sicht des Spielers AM ZUG.
+#     Die Such-Seite liest GENAU DIESES Feld aus GENAU DIESEM Einstieg
+#     (`net_search_states_json_batch`, lib.rs:1009-1060; die root_value-Zeilen
+#     dort sind zeichengleich mit denen des Einzel-Einstiegs). Perspektive und
+#     Skala stimmen damit per Konstruktion ueberein -- KEINE Umrechnung noetig,
+#     und das ist der Grund, warum hier derselbe Einstieg gewaehlt ist und
+#     nicht der Arena-Einstieg (`net_arena_choice_state_json`, der ausserdem
+#     nur die Aktion liefert und `*_exact`-Felder im Zustands-JSON verlangt,
+#     die `frozen_eval_set_v3.pkl` nicht traegt -- geprueft: `grep -c
+#     dome_pool_order_exact` auf der pkl ergibt 0).
+#
+#   * Runde 5: dort antwortet der exakte Loeser (net_mcts.rs:5073-5075); sein
+#     Analyse-Dict hat kein `tree`, `root_value` ist deshalb `null` (in den
+#     Labels nachgesehen, record_index 1440: `"root_value": null`). Als
+#     Wurzelwert dient auf BEIDEN Seiten derselbe Ersatz wie im Bestands-Zweig
+#     oben: `mcts_q` des Zuges mit dem groessten `ab_value`. Dort ist
+#     `mcts_q = ((ab_value / VALUE_SCALE).tanh() + 1) / 2` (round5.rs:672-674),
+#     also wieder [0,1], und `perspective = state.current_player`
+#     (round5.rs:621), also wieder der Spieler am Zug. Auch hier keine
+#     Umrechnung.
+#
+#   * FOLGE, hergeleitet (NICHT gemessen): in Runde 5 vergleicht A2 den exakten
+#     Loeser mit sich selbst. `round5.rs` liest weder `SearchConfig` noch
+#     `envelope` (grep ueber die Datei: kein Treffer), die Huellen-Knoepfe
+#     koennen dort also gar nicht wirken. Runde 5 wird deshalb getrennt
+#     ausgewiesen und ist als Selbsttest zu lesen, nicht als Messgroesse.
+# ---------------------------------------------------------------------------
+DEFAULT_SEARCH_C_PUCT = 1.5
+SEARCH_PROGRESS_EVERY = 50
+
+
+def _rel_to_root(path: Path) -> str:
+    """Pfad relativ zur Repo-Wurzel, Vorwaertsschraegstriche. Artefakte dieses
+    Werkzeugs liegen im oeffentlichen Repo -- absolute Pfade und Nutzernamen
+    haben darin nichts verloren (CLAUDE.md "Oeffentliches Repo")."""
+    try:
+        return str(path.resolve().relative_to(ROOT)).replace("\\", "/")
+    except ValueError:
+        return path.name
+
+
+def _apply_spec_env(spec_path: Path) -> dict:
+    """Spec-Felder als Env-Knoepfe setzen, VOR dem ersten Import von
+    `mosaic_rust`.
+
+    Warum vorher: mehrere Huellen-Getter cachen ihren Env-Wert in einem
+    OnceLock und lesen ihn nur EINMAL je Prozess (`hull_form`
+    envelope.rs:128-130, `projection_mode` envelope.rs:269-271). Daraus folgt
+    die Bauform dieses Werkzeugs: ein Lauf = eine Spec. Knopf an und Knopf aus
+    sind ZWEI Aufrufe mit verschiedenen `--spec`-Dateien, kein Vergleichsmodus
+    in einem Prozess.
+
+    Die Abbildung Spec-Feld -> Env-Name wird hier NICHT neu geschrieben,
+    sondern aus `tools/claude_play.py` bezogen (dort `SPEC_TO_ENV`, selbst ein
+    Spiegel von `server.py::_SPEC_TO_ENV`) -- eine dritte Kopie waere eine
+    Driftquelle. `heuristik_variante` steht bewusst nicht in der Abbildung
+    (netzlose Seite) und wird als ignoriertes Feld protokolliert."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    from claude_play import SPEC_TO_ENV, apply_spec_env  # noqa: E402 -- erst hier, kein Modul-Import
+
+    apply_spec_env(spec_path)
+    spec = json.loads(spec_path.read_text(encoding="utf-8"))
+    return {
+        "spec_file": _rel_to_root(spec_path),
+        "gesetzte_env": {env: os.environ[env] for field, env in SPEC_TO_ENV.items() if field in spec},
+        "ignorierte_spec_felder": sorted(k for k in spec if k not in SPEC_TO_ENV),
+    }
+
+
+def resolve_search_model(name: str) -> Path:
+    """ONNX des zu durchsuchenden Netzes. Gleiche Regel wie
+    `build_frozen_oracle_labels.py --model` (Pfad oder `.onnx` direkt, sonst
+    `models/alphazero_<name>.onnx`), zusaetzlich das Champion-Artefakt
+    `models/frozen_champions/<name>/model.onnx` -- dort liegen die
+    eingefrorenen Champions (Modell PLUS Spec), nicht in `models/`."""
+    if name.endswith(".onnx") or "/" in name or "\\" in name:
+        cand = Path(name) if Path(name).is_absolute() else ROOT / name
+        if cand.exists():
+            return cand
+        raise SystemExit(f"Modell nicht gefunden: {cand}")
+    for cand in (ROOT / "models" / f"alphazero_{name}.onnx",
+                 ROOT / "models" / "frozen_champions" / name / "model.onnx"):
+        if cand.exists():
+            return cand
+    raise SystemExit(
+        f"Modell '{name}' nicht gefunden (models/alphazero_{name}.onnx, "
+        f"models/frozen_champions/{name}/model.onnx)")
+
+
+def _visit_stats(visits: list[int] | None) -> dict:
+    """Kennzahlen der Besuchsverteilung EINES Zustands. `None` in allen
+    Feldern fuer Runde 5 (der exakte Loeser hat keinen Besuchsbaum, seine
+    `mcts_visits` sind `null`, round5.rs:681)."""
+    if not visits:
+        return {"n_considered": None, "top1_visit_share": None, "visit_entropy_nats": None}
+    total = float(sum(visits))
+    if total <= 0:
+        return {"n_considered": len(visits), "top1_visit_share": None, "visit_entropy_nats": None}
+    p = np.asarray(visits, dtype=float) / total
+    nz = p[p > 0]
+    return {
+        "n_considered": len(visits),
+        "top1_visit_share": float(p.max()),
+        "visit_entropy_nats": float(-(nz * np.log(nz)).sum()),
+    }
+
+
+def _oracle_side(lbl: dict, rec: dict) -> dict | None:
+    """Orakel-Seite EINES Labels fuer die Such-Bruecke: Top-3-Aktionsmenge
+    (kanonische Aktions-IDs) und Wurzelwert.
+
+    Die Regeln sind ZEICHENGLEICH zu `compute_for_model()` oben (Rang nach
+    `mcts_visits` in Runde 1-4, nach `ab_value` in Runde 5; Zuordnung ueber das
+    `action`-Dict bzw. ueber `action_id` als Index in `valid_actions` des
+    Records, samt derselben Ausschlussgruende). Bewusst eine EIGENE Funktion
+    statt eines Umbaus des Bestands-Zweigs: der bleibt dadurch bitgleich.
+    `None` heisst "nach denselben Regeln nicht auswertbar"."""
+    moves = lbl.get("moves") or []
+    if not moves:
+        return None
+    if int(lbl["round"]) >= 5:
+        if (any(m.get("ab_value") is None for m in moves)
+                or len(rec["valid_actions"]) != lbl.get("num_actions")
+                or lbl.get("root_candidates_mismatch")):
+            return None
+        ranked = sorted(moves, key=lambda m: m["ab_value"], reverse=True)
+        top3 = [action_to_id(rec["valid_actions"][m["action_id"]]) for m in ranked[:3]]
+        return {"top3_ids": top3, "root_value": float(ranked[0]["mcts_q"])}
+    if lbl.get("root_value") is None or moves[0].get("action") is None:
+        return None
+    ranked = sorted(moves, key=lambda m: m["mcts_visits"], reverse=True)
+    top3 = [action_to_id(m["action"]) for m in ranked[:3]]
+    return {"top3_ids": top3, "root_value": float(lbl["root_value"])}
+
+
+def _search_side(res: dict, rec: dict, round_no: int) -> dict | None:
+    """Such-Seite EINES Zustands aus dem Analyse-JSON von
+    `net_search_states_json_batch`: Suchzug, Wurzelwert, Besuchsverteilung.
+
+    Der Suchzug ist der ARGMAX DER BESUCHE (par.12a A1), nicht der von der
+    Suche selbst gewaehlte Zug -- die Gumbel-Auswahl entscheidet nach
+    completed-Q, nicht nach Besuchen. Beides wird mitgefuehrt
+    (`best_index`/`chosen_index`), damit der Unterschied sichtbar bleibt statt
+    stillschweigend eingeebnet zu werden."""
+    moves = res.get("moves") or []
+    if not moves:
+        return None
+    if round_no >= 5:
+        if (any(m.get("ab_value") is None for m in moves)
+                or len(rec["valid_actions"]) != res.get("num_actions")):
+            return None
+        best = max(moves, key=lambda m: m["ab_value"])
+        return {
+            "move_id": action_to_id(rec["valid_actions"][best["action_id"]]),
+            "root_value": float(best["mcts_q"]),
+            "best_index": moves.index(best),
+            "chosen_index": res.get("ai_action"),
+            **_visit_stats(None),
+        }
+    # Nur Kandidaten mit beiden Feldern; ein einzelner Kandidat ohne
+    # `action`-Dict soll den ganzen Zustand nicht aus der Grundmenge werfen
+    # (die Orakel-Seite prueft aus demselben Grund nur `moves[0]`).
+    usable = [m for m in moves if m.get("mcts_visits") is not None and m.get("action") is not None]
+    if not usable:
+        return None
+    best = max(usable, key=lambda m: m["mcts_visits"])
+    root_value = res.get("root_value")
+    return {
+        "move_id": action_to_id(best["action"]),
+        "root_value": float(root_value) if root_value is not None else None,
+        "best_index": moves.index(best),
+        "chosen_index": res.get("ai_action"),
+        **_visit_stats([int(m["mcts_visits"]) for m in usable]),
+    }
+
+
+def search_row(lbl: dict, rec: dict, res: dict) -> dict:
+    """Eine Zeile der Such-Bruecke. `status` traegt den Ausschlussgrund, damit
+    die GRUNDMENGE je Runde nachvollziehbar bleibt (n plus Ausschlussgruende
+    statt stiller Luecken)."""
+    round_no = int(lbl["round"])
+    row = {
+        "record_index": lbl["record_index"],
+        "round": round_no,
+        "oracle_kind": "exact_r5" if round_no >= 5 else "net_search",
+        "status": "ok",
+    }
+    oracle = _oracle_side(lbl, rec)
+    if oracle is None:
+        row["status"] = "orakel_nicht_auswertbar"
+        return row
+    search = _search_side(res, rec, round_no)
+    if search is None:
+        row["status"] = "suche_nicht_auswertbar"
+        return row
+    row.update({
+        "search_move_id": search["move_id"],
+        "search_root_value": search["root_value"],
+        "oracle_root_value": oracle["root_value"],
+        "a1_hit_top3": search["move_id"] in oracle["top3_ids"],
+        "search_move_is_oracle_top1": search["move_id"] == oracle["top3_ids"][0],
+        "search_move_equals_chosen": (search["chosen_index"] is not None
+                                      and search["best_index"] == search["chosen_index"]),
+        "n_considered": search["n_considered"],
+        "top1_visit_share": search["top1_visit_share"],
+        "visit_entropy_nats": search["visit_entropy_nats"],
+    })
+    return row
+
+
+def aggregate_search(rows: list[dict], rounds=range(1, 6)) -> dict:
+    """A1/A2 je Runde plus die Randgroessen der Besuchsverteilung.
+
+    GRUNDMENGE je Block: die Orakel-gelabelten Drafting-Zustaende von
+    `frozen_v3` dieser Runde, bei denen BEIDE Seiten auswertbar sind.
+    EINHEIT: A1 ist ein Anteil in [0,1] ueber Zustaende, A2 ein Spearman-rho
+    ueber dieselben Zustaende (Paare aus Wurzelwert und Orakelwert)."""
+    def block(rs: list[dict], grundmenge: str) -> dict:
+        ok = [r for r in rs if r["status"] == "ok"]
+        reasons: dict[str, int] = {}
+        for r in rs:
+            if r["status"] != "ok":
+                reasons[r["status"]] = reasons.get(r["status"], 0) + 1
+        if not ok:
+            return {"n": 0, "n_ausgeschlossen": len(rs), "ausschlussgruende": reasons,
+                    "grundmenge": grundmenge}
+        pairs = [(r["search_root_value"], r["oracle_root_value"]) for r in ok
+                 if r["search_root_value"] is not None and r["oracle_root_value"] is not None]
+        a2 = _spearman_r([p[0] for p in pairs], [p[1] for p in pairs]) if len(pairs) >= 3 else None
+        shares = [r["top1_visit_share"] for r in ok if r["top1_visit_share"] is not None]
+        ents = [r["visit_entropy_nats"] for r in ok if r["visit_entropy_nats"] is not None]
+        cons = [r["n_considered"] for r in ok if r["n_considered"] is not None]
+        return {
+            "n": len(ok),
+            "n_ausgeschlossen": len(rs) - len(ok),
+            "ausschlussgruende": reasons,
+            "grundmenge": grundmenge,
+            "einheit": {
+                "a1_search_move_in_oracle_top3": "Anteil der Zustaende [0,1]",
+                "a2_spearman_root_vs_oracle": "Spearman-rho ueber Zustaende (Wurzelwert gegen Orakelwert, beide [0,1], Sicht des Spielers am Zug)",
+            },
+            "a1_search_move_in_oracle_top3": float(np.mean([r["a1_hit_top3"] for r in ok])),
+            "a1_search_move_is_oracle_top1": float(np.mean([r["search_move_is_oracle_top1"] for r in ok])),
+            "a2_spearman_root_vs_oracle": a2,
+            "n_a2": len(pairs),
+            "search_move_equals_chosen_rate": float(np.mean([r["search_move_equals_chosen"] for r in ok])),
+            "mean_top1_visit_share": float(np.mean(shares)) if shares else None,
+            "mean_visit_entropy_nats": float(np.mean(ents)) if ents else None,
+            "mean_n_considered": float(np.mean(cons)) if cons else None,
+        }
+
+    by_round = {
+        str(rd): block([r for r in rows if r["round"] == rd],
+                       f"frozen_v3, Orakel-gelabelte Drafting-Zustaende der Runde {rd}")
+        for rd in rounds
+    }
+    return {
+        "by_round": by_round,
+        "r1_4_pooled": block([r for r in rows if r["round"] < 5],
+                             "frozen_v3, Orakel-gelabelte Drafting-Zustaende der Runden 1-4"),
+        "r5_exact": block([r for r in rows if r["round"] >= 5],
+                          "frozen_v3, Orakel-gelabelte Drafting-Zustaende der Runde 5 (exakter Loeser auf BEIDEN Seiten)"),
+    }
+
+
+def run_search_bridge(oracle_labels: list[dict], states_by_idx: dict[int, dict], model_path: Path,
+                      sims: int, c_puct: float, chunk: int, limit: int = 0) -> tuple[list[dict], dict]:
+    """Netzsuche ueber alle gelabelten Zustaende, chunkweise.
+
+    Einstieg: `mosaic_rust.net_search_states_json_batch` (engine/src/lib.rs:1009)
+    -- laedt das ONNX EINMAL je Aufruf und faehrt je Zustand dieselbe Maschinerie
+    wie der Einzel-Einstieg `net_search_state_json`, mit dem die Orakel-Labels
+    gebaut wurden (`tools/build_frozen_oracle_labels.py:183`): `add_root_noise =
+    false`, eigener `StdRng` je Zustand aus `seeds[i]`, kein Trace. Der Chunk ist
+    zugleich der Fortschrittstakt: kleiner Chunk = mehr Netz-Ladevorgaenge, aber
+    sichtbarer Fortschritt (Default 50).
+
+    Der Seed je Zustand kommt aus dem LABEL (`lbl["seed"]`), nicht aus einer
+    neuen Ableitung: damit rekonstruiert die Suche denselben Zustand wie das
+    Orakel (die Rekonstruktion mischt verdeckten Bestand,
+    `serialize::json_to_state`), und beide Seiten sehen dieselbe Welt."""
+    import mosaic_rust  # noqa: E402 -- ERST hier, nach _apply_spec_env (OnceLock-Getter)
+
+    labels = [lbl for lbl in oracle_labels if lbl.get("moves")]
+    if limit > 0:
+        labels = labels[:limit]
+    rows: list[dict] = []
+    n_errors = 0
+    t0 = time.time()
+    print(f"  Suche @{sims} Sims ueber {len(labels)} Zustaende, Modell {model_path.name} ...", flush=True)
+    for start in range(0, len(labels), chunk):
+        part = labels[start:start + chunk]
+        states_json = [json.dumps(states_by_idx[lbl["record_index"]]["state"]) for lbl in part]
+        seeds = [int(lbl["seed"]) for lbl in part]
+        try:
+            raw_out = mosaic_rust.net_search_states_json_batch(
+                states_json, str(model_path), sims, c_puct, seeds)
+        except Exception as exc:  # defensiv: ein kaputter Chunk soll den Lauf nicht fressen
+            n_errors += len(part)
+            print(f"  [FEHLER] Chunk ab {start}: {exc}", flush=True)
+            continue
+        for lbl, raw in zip(part, raw_out):
+            rec = states_by_idx[lbl["record_index"]]
+            rows.append(search_row(lbl, rec, json.loads(raw)))
+        done = start + len(part)
+        elapsed = time.time() - t0
+        rate = done / elapsed if elapsed > 0 else 0.0
+        print(f"  [Suche {done}/{len(labels)}] {elapsed:.0f}s, {rate:.2f} Zustaende/s, "
+              f"Fehler {n_errors}", flush=True)
+    manifest = {
+        "n_states_searched": len(rows),
+        "n_states_requested": len(labels),
+        "n_errors": n_errors,
+        "wanduhr_suche_s": round(time.time() - t0, 1),
+    }
+    return rows, manifest
+
+
 def spearman_with_elo(model_names: list[str], metric_values: dict[str, float | None]) -> dict:
     """Spearman-Rangkorrelation einer Metrik (ein Skalar je Netz) mit der
     bekannten Elo-Reihenfolge -- NUR ueber Netze mit einem Elo-Eintrag (v16
@@ -571,7 +929,49 @@ def main() -> None:
     ap.add_argument("--recall-widths", nargs="*", type=int, default=list(DEFAULT_RECALL_WIDTHS))
     ap.add_argument("--gumbel-seed", type=int, default=DEFAULT_GUMBEL_SEED)
     ap.add_argument("--gumbel-draws", type=int, default=DEFAULT_GUMBEL_DRAWS)
+    # par.12a Kanal A / par.12c Punkt 3 -- Such-Variante. Default 0 = AUS:
+    # ohne diesen Schalter wird die Engine nicht einmal importiert.
+    ap.add_argument("--search-sims", type=int, default=0,
+                    help="A1/A2 (PREREG_geometric_envelope.md par.12a Kanal A): Netzsuche mit "
+                         "N Sims je Zustand, ohne Wurzelrauschen. 0 (Default) = aus, Bestand "
+                         "unveraendert. Champion-Messung: 400.")
+    ap.add_argument("--search-model", default=None,
+                    help="Netz der Suche: Pfad zu einer .onnx, oder ein Name "
+                         "(models/alphazero_<name>.onnx bzw. "
+                         "models/frozen_champions/<name>/model.onnx). Pflicht bei --search-sims > 0.")
+    ap.add_argument("--spec", default=None,
+                    help="Spec-Datei der Such-Seite (models/*.spec.json). Wird VOR dem Engine-Import "
+                         "in Env-Knoepfe uebersetzt. EIN Lauf = EINE Spec: Knopf an gegen aus sind "
+                         "zwei Aufrufe mit verschiedenen Spec-Dateien.")
+    ap.add_argument("--search-c-puct", type=float, default=DEFAULT_SEARCH_C_PUCT)
+    ap.add_argument("--search-chunk", type=int, default=SEARCH_PROGRESS_EVERY,
+                    help="Zustaende je Stapelaufruf = Fortschrittstakt (Default 50).")
+    ap.add_argument("--search-limit", type=int, default=0,
+                    help="Nur die ersten N gelabelten Zustaende durchsuchen (0 = alle). "
+                         "Fuer einen billigen Vorlauf, NICHT fuer die registrierte Messung.")
+    ap.add_argument("--search-per-state", action="store_true",
+                    help="Zeilen je Zustand mit ins Artefakt schreiben (gross).")
     args = ap.parse_args()
+
+    t_start = time.time()
+    spec_info = None
+    search_model_path = None
+    if args.search_sims > 0:
+        if not args.search_model:
+            ap.error("--search-sims > 0 verlangt --search-model")
+        search_model_path = resolve_search_model(args.search_model)
+        if args.spec:
+            spec_arg = Path(args.spec)
+            spec_file = spec_arg if spec_arg.is_absolute() else ROOT / args.spec
+            if not spec_file.exists():
+                ap.error(f"Spec-Datei nicht gefunden: {spec_file}")
+            spec_info = _apply_spec_env(spec_file)
+            print(f"Spec angewendet: {_rel_to_root(spec_file)}", flush=True)
+            for env_name, value in spec_info["gesetzte_env"].items():
+                print(f"  {env_name}={value}")
+        else:
+            print("WARNUNG: --search-sims ohne --spec -- die Suche laeuft mit den Knoepfen der "
+                  "UMGEBUNG. Fuer eine Knopf-Messung ist das ein stiller Default.", flush=True)
 
     oracle_json = (ROOT / args.oracle_json) if args.oracle_json else ORACLE_JSON
     frozen_pkl = (ROOT / args.frozen_set) if args.frozen_set else FROZEN_PKL
@@ -651,6 +1051,64 @@ def main() -> None:
         "per_model_aggregate": per_model_aggregate,
         "elo_correlations": elo_correlations,
         "gating_retrospective": retro,
+    }
+
+    # par.12a Kanal A: Such-Bruecke (nur bei --search-sims > 0).
+    search_rows: list[dict] = []
+    search_manifest: dict = {}
+    if args.search_sims > 0:
+        search_rows, search_manifest = run_search_bridge(
+            labels, states_by_idx, search_model_path, args.search_sims,
+            args.search_c_puct, max(1, args.search_chunk), args.search_limit,
+        )
+        search_agg = aggregate_search(search_rows)
+        block = {
+            "prereg": "PREREG_geometric_envelope.md par.12a Kanal A (A1/A2), eingetaktet par.12c Punkt 3",
+            "entry_point": "mosaic_rust.net_search_states_json_batch (engine/src/lib.rs:1009)",
+            "model": _rel_to_root(search_model_path),
+            "sims": args.search_sims,
+            "c_puct": args.search_c_puct,
+            "add_root_noise": False,
+            "seed_scheme": "Seed je Zustand aus dem Orakel-Label (`seed`) -- identische "
+                           "Zustands-Rekonstruktion wie beim Orakelbau",
+            "spec": spec_info,
+            "wurzelwert_perspektive": "Gewinnwahrscheinlichkeit [0,1] aus Sicht des Spielers am Zug, "
+                                      "auf beiden Seiten aus demselben Feld desselben Einstiegs "
+                                      "(R1-4 `root_value` = tree.win_pct/100; R5 `mcts_q` des "
+                                      "ab_value-besten Zugs) -- keine Umrechnung",
+            "r5_hinweis": "In Runde 5 rechnet auf BEIDEN Seiten der exakte Loeser (round5.rs); die "
+                          "Huellen-Knoepfe wirken dort nicht. Selbsttest, keine Messgroesse.",
+            **search_manifest,
+            **search_agg,
+        }
+        if args.search_per_state:
+            block["per_state"] = search_rows
+        out["search_bridge"] = block
+
+        print("\nSuch-Bruecke (A1/A2) je Runde:")
+        for rd, b in search_agg["by_round"].items():
+            if b.get("n"):
+                print(f"  Runde {rd}: n={b['n']} A1={b['a1_search_move_in_oracle_top3']:.3f} "
+                      f"A2={b['a2_spearman_root_vs_oracle']} (n_a2={b['n_a2']}) "
+                      f"top1_visit_share={b['mean_top1_visit_share']}")
+            else:
+                print(f"  Runde {rd}: n=0 ({b.get('ausschlussgruende')})")
+
+    # Pflichtfeld (CLAUDE.md "Laufzeiten messen, nicht schaetzen"). `s_je_partie`
+    # ist hier strukturell None -- dieses Werkzeug faehrt keine Partien, die
+    # Bezugsgroesse ist der Zustand.
+    n_searched = search_manifest.get("n_states_searched", 0)
+    wall = time.time() - t_start
+    out["laufzeit"] = {
+        "wanduhr_s": round(wall, 1),
+        "cpu_s": round(time.process_time(), 1),
+        # Ein Prozess, Zustaende sequenziell (lib.rs:1035 Schleife; in
+        # net_mcts.rs kein rayon/par_iter -- grep ohne Treffer). Wie viele
+        # Threads die ONNX-Laufzeit (tract) intern nimmt, ist hier NICHT
+        # gemessen.
+        "threads": 1,
+        "s_je_partie": None,
+        "s_je_zustand": round(wall / n_searched, 3) if n_searched else None,
     }
     if args.extra_metrics:
         def _rel(p: Path) -> str:
