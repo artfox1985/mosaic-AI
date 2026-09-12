@@ -525,7 +525,13 @@ def report(n_boot=1000):
             print(f"{node:<20} {'--':>7} {'--':>18} {0:>7} {'--':>9}  keine Spiele")
             continue
         lo, hi = ci.get(node, (None, None))
-        ci_str = f"[{lo:.0f}, {hi:.0f}]" if lo is not None else "n/a"
+        # Ein Knoten mit wenigen Bloecken kann in Bootstrap-Ziehungen ohne einen einzigen
+        # Sieg landen (gamma auf dem Boden, Elo -> -2600): dann ist das Intervall keine
+        # Aussage, sondern ein Artefakt der Stichprobe. Ausweisen statt drucken.
+        if lo is not None and hi - lo > 600:
+            ci_str = "degeneriert"
+        else:
+            ci_str = f"[{lo:.0f}, {hi:.0f}]" if lo is not None else "n/a"
         status = "Anker (fix)" if node == ANCHOR_KEY else ("" if connected else "NICHT mit Anker verbunden!")
         early = f"{edges_early[node]}/{edges_total[node]}"
         print(f"{node:<20} {elo:>7.0f} {ci_str:>18} {total_games:>7} "

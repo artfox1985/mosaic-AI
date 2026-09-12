@@ -16,170 +16,117 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ---
 
-## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 23:55)
+## 1. UEBERGABE an die naechste Sitzung (2026-09-13, 00:15; Anlass: Kontextfenster der alten Sitzung voll, eine Kette laeuft)
 
-**Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12, 06:17-06:45),
-Elo 1349** [1302, 1402] aus 1.380 Partien im LEITERSEGMENT 2 (Endstand 23:25, 26 Kanten, alle am
-Anker `hv4_anchor` fix 1000, Block-Bootstrap): v28-b01 1321, v27-b01 1306, v26-b01 1250, v24-b07 1200,
-v21 1194, v22-b05@400 1191, v22-b05@100 1175, hv3 980, hv2 980. Die Anker-Kanten der Nacht liefen mit falschen Parametern
-(archiviert) und wurden korrekt wiederholt; die Leiter traegt jetzt auf Zwischenstufen aus dem
-restic-Repo (v21, v24-b07; `PREREG_code_cleanup_closeout.md` par.7a). Promotion vollstaendig nach
-Checkliste (Anker 126:24, Nachbar 133:97 SPRT + Replikation 212:188 ohne Entscheid, Champion-2
-101:49 gegen Artefakt v26-b01, sigma/Prior 2,222, Platt in server.py, Fixture e1f94c44f0c7959b,
-Artefakt `models/frozen_champions/v28-b02/` mit Wheel vom Knopf-Durchgang, Golden Probe 10
-Sonden, Selbsttest gruen); **dritter Seed ohne Fruehstopp 226:174 (p 0,017), die Nachbar-Kante
-traegt (2 von 3 Seeds signifikant)**. Belege `PREREG_code_cleanup_closeout.md` par.7a, `PREREG_v28_window.md`
-par.10. Alt-Register (Segment 1: v27-b01 1405 usw.) in `../archive/elo_history_pre_phantomfix.csv`.
-Generator v29 = v28-b02 (Nutzer 2026-09-11).
+**Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12), Elo 1348
+[1304, 1400]** aus 1.410 Partien im LEITERSEGMENT 2 (Stand 00:02, 32 Kanten, alle am Anker
+`hv4_anchor` fix 1000, Block-Bootstrap; `python tools/elo_tracker.py report`): v28-b01 1320,
+v27-b01 1305, v26-b01 1249, v24-b07 1199, v21 1192, v22-b05@400 1188, v22-b05@100 1167,
+v28-b02@100 1142 (Intervall degeneriert, 30 Partien), v22-b05@25 1109, hv4_anchor@600 1069,
+hv2 978, hv3 976. Generator v29 = v28-b02 (Nutzer 2026-09-11). Belege
+`PREREG_code_cleanup_closeout.md` par.7a (Leiter, Tracker-Pruefung, Sprossen),
+`PREREG_search_depth_column_optimum.md` Nachtrag 2026-09-12/13 (Sims-Kanten),
+`PREREG_start_dome_choice.md` par.9e/9f (Such-Start, Platte/Rotation). Alle v28-Messungen sind
+registriert; der Generationswechsel v28 -> v29 (`/mosaic-generation-turnover`) ist NICHT begonnen.
 
-**Das Einfrieren ist beendet** (v25-b01 / v26-b01 / v27-b01: gleiches Rezept, rotierendes
-Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
-bis Schritt 6 durch**; Schritt 7 (Start) wartet auf dich.
+### LAEUFT (Maschine BELEGT)
 
-**MASCHINE FREI seit 2026-09-12, 01:30.** Ablationen DURCH (`PREREG_v28_window.md` par.10):
-b03 (ohne Ausflug-Klasse) 77:83 und 26:44 (p 0,035), b04 (ohne G-2) 55:65 und 114:116, alle
-vier SPRT-H0; **keine Ablation schlaegt b02, Fensterzuschnitt bleibt.** Bester Stand v28-b02,
-Promotion steht an. **Code-Abschluss Stufe 1 GEBAUT** (`PREREG_code_cleanup_closeout.md`
-par.8): 585 Tests gruen, Wheel installiert, Kontrakt-Hash jetzt 39648b95bbba1acf, Paritaets-
-Fixture wegen A2 neu; **ANKER NEU GESETZT (Nutzer 2026-09-12, 02:10: "setz den anker neu"):** Artefakt
-`models/frozen_heuristics/hv4_anchor` (Wheel mit A2), Drift und Konservierung GRUEN; Alt-Register
-nach `archive/elo_history_pre_phantomfix.csv`, frisches `elo_history.csv`, `ANCHOR_NAME =
-Heuristik_hv4_anchor`, keine Aliase. **MASCHINE BELEGT: Neuverankerungs-Kette
-`tools/night_reanchor.sh`**: die drei Anker-Kanten SIND DURCH und registriert (v28-b02 126:24,
-v28-b01 132:18, v27-b01 124:26; Segment-2-Elo 1288 / 1346 / 1271, Intervalle ueberlappend;
-`PREREG_code_cleanup_closeout.md` par.7a), die Nachbar-Kante v28-b02 gegen v27-b01
-(Seed 20261044) endete 03:40 per SPRT nach 115 Paaren: **133:97 fuer v28-b02** (p 0,0198,
-Diff +0,313 [+0,068; +0,558]); Segment-2-Leiter jetzt v28-b02 1305, v28-b01 1346, v27-b01 1256.
-**MASCHINE FREI seit 2026-09-12, 23:23; Rechner danach auf Nutzer-Anweisung heruntergefahren.**
-Alle Ketten des Tages sind durch und registriert (Promotion v28-b02, Ueberraschungs-Kante,
-C2/A1-A2, Startkuppel Stufe 0 samt hv2-Gegenprobe, Such-Start-A/B zweimal inkl. echter Paarung
-nach dem RNG-Leck-Fix, Platte/Rotation-Sonde, Leiter Segment 2 mit 26 Kanten inkl. hv3 und
-v22@100, Elo-Tracker mit Block-Bootstrap). Nichts laeuft. Push ist frei (Ahead-Stand: Abschnitt 6).
-Nutzer-Entscheid 09:35: Waechter der Startkuppel-Sonde nach Weg 3 (Sims-Stufen plus
-hv2-Artefakt per Referee als Gegenprobe; Referee-Schalter im Bau durch Agenten). Davor `tools/night_v28_after_reanchor.sh` ab 03:44 (A Knopf-Bau mit Toren,
-B Promotions-Messungen v28-b02: Replikation der Nachbar-Kante Seed 20261046 DURCH, **212:188
-am Deckel ohne SPRT-Entscheid** (p 0,28, Diff +0,12 [-0,08; +0,32]; Register v28-b02 1296,
-v27-b01 1264), dritter Seed als unverzerrter Stichentscheid nach v26-Praezedenz vorgesehen
-(`tools/night_v28_third_seed.sh`, nach der Master-Kette); dann Champion-2 gegen
-v26-b01-Artefakt, sigma/Prior, Platt; C Einfrieren `frozen_champions/v28-b02`; D Messblock
-Ueberraschungs-Kante und C2; E Einhuellende A1/A2). Startkuppel Stufe 0 GEBAUT, ungemessen (`PREREG_start_dome_choice.md`
-par.8; Waechter-Abweichung = Nutzer-Entscheid). Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
-1461 gegen 1447 ueberlappend; Blockziehungen bei positivem Stand eher mehr, nicht weniger;
-`PREREG_v28_window.md` par.10, `dome_stack` par.15h). **Nutzer-Entscheid 20:30: b02 ist als
-korrektere Fassung (volleres Merkmalsbild) der beste Stand und Generator-Kandidat fuer v29;**
-Promotion dann fuer v28-b02, sofern keine Ablation ihn schlaegt. **K3-D plus Jokerfeld-Knopf GEBAUT** (`dead_cell_w`,
-`out_wild_w`, Default 0 bitidentisch; 576 Tests gruen, Wheel installiert, Anker-Drift gruen,
-`geometric_envelope` par.12c), Messungen C2 und A1/A2 folgen nach den Ablationen. Vorher 14:37-14:47: Baum auf INPUT_SIZE 755 (Stash
-eingespielt), Wheel gebaut und installiert, Anker-Drift GRUEN, Paritaetstor Rust/Python
-BESTANDEN (`PREREG_rust_data_layer.md` par.7). Der Baum ist damit auf Variante B; das
-Tor-1-Instrument kuerzt 744er-Modelle auf Modellbreite (`net.rs:421`).
+- **`tools/night_ladder_gap_fill.sh`**, gestartet 2026-09-13 00:03 als Hintergrund-Bash der alten
+  Sitzung (laeuft als Betriebssystem-Prozess weiter; NICHT neu starten). Vier Kanten bis zum
+  Deckel OHNE Frueh-Stopp, Reihenfolge: (1) v22-b05@100 gegen hv4_anchor@600, Referee, 3 Bloecke
+  a 50, Artefakte `evaluations/artifacts/rung_v22b05s100_vs_hv4s600_b1..b3.json`; (2) v22-b05@400
+  gegen hv4@600, `rung_v22b05s400_vs_hv4s600_b1..b3.json`; (3) paired_gating v22@25 gegen v22@100,
+  75 Paare, Seed 20261053, `paired_gating_v22-b05_s25_vs_s100_seed53_full.json`; (4) paired_gating
+  v22@100 gegen v22@400, Seed 20261054, `paired_gating_v22-b05_s100_vs_s400_seed54_full.json`.
+  Stand 00:07: Kante 1 Block 1 laeuft, 0 der 8 Artefakte geschrieben. Erwartetes Ende: 00:30 bis
+  00:45 (Referee 150 Partien Netz gegen Heuristik@600 je 4-6 min, gepaart 150 Partien 5-8 min;
+  Annahme aus den Laufzeiten des Abends). Die Kette LIEST `models/frozen_heuristics/hv4_anchor`,
+  `models/restored_v22/alphazero_v22-b05.onnx`, `models/k3v_off.spec.json`: nichts davon anfassen.
+  Fertig-Marke: Zeile `== TREPPE FERTIG` in der Ausgabe; ohne Zugriff auf die Ausgabe gilt: alle
+  acht Artefakte vorhanden UND kein Prozess `frozen_referee_match|paired_gating` mehr in der
+  Prozessliste.
 
-**v28-b01: TOR 1 BESTANDEN, TOR 2b HAELT (2026-09-11, `PREREG_v28_window.md` par.10):**
-166:124 (Seed 20261036, SPRT nach 145 Paaren, p 0,015) und 221:179 (Seed 20261037, Deckel,
-p 0,053, KI der Paardifferenz [+0,01; +0,41]); Elo **1447 [1395; 1499]**; volle Spalten je
-Seite 1,030 gegen 0,884; Punkte +3,0 je Partie, vertikale Reihen +1,43, Spezialfelder +0,88.
-Training `v28-b01` DURCH 11:55: brierbest Epoche 3 (val_brier 0,1802), 5.157 s,
-`run:v28-b01` gesichert. Generator-Kandidat fuer v29: v28-b01, sofern kein v28-Arm ihn
-schlaegt. Davor die Kette: Der erste Lauf starb um 10:13 im Monolith-Merge: 24 Bloecke
-(`selfplay_v27-b01-policy_*_g410` bis `g640`, gebaut 00:14-00:28) trugen 755 Spalten unter
-744er-Schluesseln, weil die Waechter-Worker `config.py` frisch importierten, waehrend die
-Datei fuer den Variante-B-Bau auf 755 stand (der Elternprozess hatte 744 im Schluessel). Die
-Kette startete das Training trotzdem auf dem halben Monolithen (Exit 1, KeyError `values`).
-Behoben: 24 Bloecke an Ort und Stelle neu gebaut (Gesamtscan 3.203 x 744), Formen-Waechter
-im Merge (`tools/build_cache_parallel.py`), Kette bricht bei Merge-Fehler ab. Kein Modell
-entstanden, kein Artefakt betroffen. **Erzeugung FERTIG**
-23:49:56 bis 09:45:31, 3 x 4.000 Partien, 1.201 Dateien, 35.726 s = 9,92 h
-(`PREREG_v28_window.md` par.10). **Tor 2a HAELT: 0,816 gegen 0,777** volle Spalten je Seite
-(n = 8.000 Seiten). Fenster 2.947 Dateien, Schluessel `2db448af20fe`, alle Bloecke unter
-INPUT_SIZE 744. Monolith 9 min, Training 1,43 h, beides gemessen. Danach Tor 1 `v28-b01` gegen
-`v27-b01` mit `--log-games` (zwei Seeds), dann `git stash pop` und Variante B fuer `v28-b02`.
+### ERSTE AUFGABE DER NEUEN SITZUNG (in dieser Reihenfolge)
 
-**Claude-Partien: g02-g05 gegen `v27-b01` FERTIG (Claude 3:1), g06/g07 gegen
-`v28-b02_brierbest` @400 FERTIG (2026-09-11): 1:1, g06 70:64 gewonnen, g07 45:58 verloren.**
-Alle Seeds und Spec-Pfade aus den Partie-Manifesten; registriert in
-`PREREG_claude_play_interface.md` par.7 mit Endwertung je Kriterium, den sechs
-Standard-Kennzahlen, Beobachtungen und eigenen Fehlern. Zwei Linien tragen jetzt ueber sechs
-Partien:
-
-1. **Das Netz spielt plattenblind und gewinnt trotzdem ueber Platzierungen.** In g06 holte es
-   0 von 10 moeglichen Endwertungspunkten (zwei Wildfelder leer, keine farbenreiche Reihe,
-   keine Diagonale) und kam dennoch auf 64; in g07 verlor es die Endwertung 2:8 (drei leere
-   Spezialfelder, -9) und gewann die Partie um 13. Nebenbefund aus g06: **zwei volle Spalten,
-   obwohl keine Spaltenplatte auslag** -- der Spaltenbau laeuft unabhaengig von der Auslage.
-2. **Die Null-Klammer ist fuer das Netz ein Werkzeug, kein Unfall.** In g07 fiel es in Runde 1
-   bewusst von 5 auf 0 (13 Ziehungen in EINEM Zug, fuenf bezahlt) und durchsuchte danach bei
-   Stand 0 den Stapel mit 8, 7 und 4 Ziehungen je Zug; zurueck bei 12 Punkten zog es genau
-   einmal. In g06 fiel keine Seite je auf 0 -- und es gab keinen einzigen Mehrfachzug.
-   Damit ist **Arm A1 der `PREREG_corpus_behaviour_audit.md` an lebenden Partien bestaetigt**
-   (dort par.7 mit der Tabelle), bevor der Korpuslauf gefahren ist. **Der Lauf selbst kommt
-   erst mit v29 (Nutzer 2026-09-11);** die Quellenfrage ist geklaert (Prereg par.3: keine
-   Partielogs noetig, `state.log` je Record ueberlappend zusammensetzen).
-
-**Eigene Schwaeche bleibt die Strafleiste:** ueber g06/g07 -40 gegen -19 des Netzes; in g07
-allein -25 gegen -11 bei 13 Punkten Endabstand. Ursache in beiden Partien dieselbe wie in
-g02/g04/g05: sind am Rundenende alle Musterreihen farblich festgelegt, fegt Aktion C die
-Restfarben als Block herein. Dazu in g07 ein Rotationsfehler beim Plattenlegen (Schwarz-Zelle
-in z5 statt z4, R4 zwangsgeraeumt, rund -5).
-
-**Werkzeug `tools/claude_play.py`:** der ausstehende **Rauchtest mit lebendem Gegner ist
-GRUEN** (g06, par.9 P.11). Neu dazugekommen (par.9 P.12/13): `save_manifest` wiederholt gegen
-OneDrive-Sperren (ein `PermissionError` hatte in g06 einen schon berechneten Netzzug
-verschluckt, weil `drive_ai` das Manifest VOR `append_log` schreibt), neues Unterkommando
-**`step`** laesst nur die KI ziehen (Notausgang genau dafuer), und zwei offene Bedien-Luecken
-sind benannt: die Zwangsraeumungs-Warnung kommt erst NACH dem Plattenlegen, und
-`chips <reihe>` hat keine Chipwahl.
-
-**Restprogramm der Reihe: g08-g10.** Claude spielt weiter als ZWEITSPIELER
-(`--claude-side 1 --first-player 0`), damit die Reihe fuenf Partien je Seite hat. Die zehn
-Partien laufen gegen drei verschiedene Champions (g01 v24-b06, g02-g05 v27-b01, g06-g10 v28)
--- eine Siegquote ueber alle zehn ist keine Groesse, ausgewiesen wird je Block
-(`PREREG_claude_play_interface.md` par.8.8).
-
-### v28: ZUSCHNITT UND KETTE (gestartet 2026-09-10, 23:49)
-
-`PREREG_v28_window.md`: Zuschnitt (580 Traeger + rund 2.367 Schwarm, Seed 20260937, Val-Pool
-`^selfplay_v27-`), Generator `v27-b01`, G-2-Schwarm aus der Ausflug-Haelfte von v25-b01
-(Nutzer 2026-09-10), Record-Feld `dome_pool_view` im Wheel (Anker-Drift gruen, Rauchtest
-321/321 Records), Skripte `tools/night_v28_generate.sh` (Seeds 20260917/18/19, rund 10,3 h)
-und `tools/night_v28_chain.sh` (Training `v28-b01`, Rezept unveraendert). Zweiter Arm
-`v28-b02` = Variante B: GEBAUT (par.9 der Prereg, elf Werte, INPUT_SIZE 755, Rust-Export,
-Kontrakt-Hash neu c65768636c0560a7), aber **die Python-Seite liegt in `git stash` (stash@{0})**,
-damit die laufende Kette b01 mit 744 trainiert. Nach Kette und Tor 1 b01: `git stash pop`,
-Wheel, Anker-Drift, `tools/probes/feature_parity_rust_python.py`, Bloecke neu, Training b02.
-**Wer den Baum vorher anfasst: NICHT `git stash pop` vor dem b01-Training.**
-
-Start: `bash tools/night_v28_generate.sh` plus Cache-Waechter unter
-`MOSAIC_IGNORE_POLICY_TARGET_VALID=1` (Aufruf im Skriptkopf), danach `bash tools/night_v28_chain.sh`.
-Vorher pruefen: Maschine frei (Claude-Partien beendet), `models/champion.txt` = v27-b01_brierbest,
-Platz (`data/` 6,96 GiB, Sicherungswurzel).
+1. **WATCHER auf das Ketten-Ende** (Bedingung: acht Artefakte vorhanden UND kein
+   `frozen_referee_match`/`paired_gating`-Prozess; Stillstand melden, wenn 20 Minuten lang kein
+   neues Artefakt entsteht). Bis dahin nur Dateiarbeit, keine Rechenlast (CLAUDE.md "Messungen
+   laufen EXKLUSIV").
+2. **Vier Kanten ins Register** (`tools/elo_tracker.py add`, Muster der Zeilen vom 2026-09-12 im
+   Register; Referee-Kanten: wins aus den drei Bloecken summieren, KEIN `--early-stop`, Knobs
+   `spec:k3v_off.spec.json`, sims_a 100 bzw. 400, player_b `Heuristik_hv4_anchor` sims_b 600;
+   gepaarte Kanten: `--units-from-paired-artifact <JSON>`, KEIN `--early-stop`, player_a
+   `v22-b05_live` sims 25 bzw. 100, player_b `v22-b05_live` sims 100 bzw. 400; Laufzeit aus
+   `elapsed_s` bzw. `laufzeit.wanduhr_s` in den Kommentar). Dann `report` lesen: kein Knoten
+   "NICHT mit Anker verbunden".
+3. **Registrieren**: `PREREG_code_cleanup_closeout.md` par.7a bekommt einen Nachtrag "TREPPE
+   GEFESTIGT" mit den vier Ergebnissen und die ENDTABELLE aus dem Report (die Tabelle "ENDSTAND
+   23:25" ist ueberholt); STATUS-Champion-Zeile oben, `README.md` (Champion-Zeile und
+   Leiterliste, Zeilen 26 und 38), `docs/project_overview.md` (zwei Stellen "1349"),
+   `models/frozen_champions/v28-b02/manifest.json` Block `elo` (value, ci95, as_of,
+   ladder_after_refit), `docs/measured_runtimes.md` (vier Zeilen), Chronik `archive/history.md`
+   (Kapitel 2026-09-13 fortschreiben). `python tools/generate_prereg_index.py`, dann Commit
+   (ohne `player_profiles.json`, `player_profiles.json.bak`, `models/manifest_train_v28-b03/b04*`,
+   `evaluations/game_analysis/*`). Kein Push. Ahead-Stand im Chat melden.
+4. **Nutzer im Chat informieren**: Endtabelle, ob die Treppe traegt (jeder Knoten Anker ->
+   hv4@600 -> v22@25 -> v22@100 -> v22@400 mit mindestens zwei Kanten am Deckel), Ahead-Stand.
+   STATUS oben auf "MASCHINE FREI" setzen.
+5. **Danach NUR auf Anweisung: Generationswechsel v28 -> v29** nach `/mosaic-generation-turnover`.
+   Vorab bekannt: Loeschliste des Nutzers (siehe Freigaben), restic-daily-Snapshot vor dem Loeschen,
+   obsolete `night_*`-Ketten des 2026-09-12 (Liste vorlegen), Fenster-Prereg v29 mit Rezept
+   (`PREREG_v29_window.md` par.6b: Slot-Streuung `MOSAIC_START_SLOT_RANDOM_P` 0,15 und
+   `start_by_search 1` im Spec; Sims der Erzeugung NACH der Neumessung, siehe offene Entscheide),
+   Erzeugung nur auf ausdrueckliche Freigabe. **Vor der Erzeugung: Sims-Neumessung par.8d
+   (Nutzer-Entscheid 00:12), Ergebnis in die Sims-Prereg und in das v29-Rezept.**
 
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
 
-- **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden.
-- **Loeschung nur auf pfadgenaue Freigabe.**
-- **Messungen laufen exklusiv**; GPU und CPU duerfen parallel, zwei CPU-Messungen nicht.
-- **v28-Erzeugung gestartet 2026-09-10, 23:49 und fertig 2026-09-11, 09:45**; v29 nur auf Anweisung.
-- **Trainings-Seed variabel je Generation, gleich innerhalb einer Generation** (2026-09-10).
-- **Ziehen vom Stapel bei Punktestand 0 bleibt gratis und legal** (Regelbuch S.4/S.9,
-  2026-09-10).
+- **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden (Nutzer pusht selbst; Stand 00:15:
+  Ahead 0 vor dem Uebergabe-Commit).
+- **Loeschung nur auf pfadgenaue Freigabe.** Freigegebene Loeschliste (Nutzer 2026-09-12, 23:58:
+  "ich heb mir nur die letzten zwei champs auf. und hv1 ist obsolet. somit brauchen wir nur v28 und
+  v27"), aber **"wir loeschen es erst wenn das self play fuer v29 gestartet ist. dann ist es im
+  restic daily"** (00:05): `models/frozen_champions/v21_2d_brierbest/`, `v24-b07/`, `v26-b01/`,
+  `models/frozen_heuristics/hv1_anchor/`, `models/restored_v24/`. Der Nutzer loescht selbst; die
+  Sitzung traegt danach Snapshot-ID und Loeschung in Chronik und STATUS ein und zieht die
+  Text-Verweise auf `hv1_anchor` nach (CLAUDE.md Abschnitt Anker-Invarianz, `docs/working_rules.md`
+  Z.50, `docs/generation_naming.md` Z.68, `docs/architecture_reference.md` Z.39, Docstrings
+  `tools/verify_frozen_heuristic.py` Z.31/33 und `tools/anchor_arena.py` Z.8, Skill
+  mosaic-anchor-invariance). Regel dazu im Turnover-Skill Schritt 5 aktualisiert.
+- **Messungen laufen exklusiv**; GPU und CPU duerfen parallel, zwei CPU-Messungen nicht; Builds
+  zaehlen als Last.
+- **v29-Erzeugung nur auf Anweisung.** Generator v28-b02.
+- **Nie committen:** `player_profiles.json`, `player_profiles.json.bak`.
+- **Regel 0**, Prereg-Kopf im selben Zug wie das Ergebnis, Laufzeiten ins Artefakt, kein U+2014
+  in Dateien, Bezeichner englisch.
 
-### BEFUNDE, die eine Entscheidung oder Nachschau brauchen
+### OFFENE NUTZER-ENTSCHEIDE
 
-- **Artefakt `models/frozen_champions/v25-b01/` vom Nutzer geloescht (2026-09-11)**: der
-  Elo-Kader haelt nur noch v26-b01 und v27-b01 als Artefakte; die Champion-2-Kante einer
-  v28-Promotion geht gegen das v26-b01-Artefakt. Loeschung im Baum committet.
-- **`player_profiles.json` ist im Arbeitsbaum veraendert** (plus `player_profiles.json.bak`),
-  aus der Nutzer- bzw. Parallelsitzung; nicht committet.
-- ~~Erzeugung v27/v28 langsamer als v26~~ GEKLAERT 2026-09-11 (Nutzer): Teile der
-  v26-Erzeugung liefen ausgelagert, die v26-Zahl ist keine Referenz dieser Maschine. Fuer v29
-  mit 10 h planen.
-- **Alte Mess-Manifeste in `data/`** (`manifest_otw22*`, `manifest_p3s0*`, `manifest_peek22*`,
-  `manifest_tor22*`, `manifest_v21depth*`, `manifest_frozenv3-b01*`, 30 Dateien, klein): ihre
-  Korpora sind seit 2026-09-09 geloescht; Loeschkandidaten beim naechsten Wechsel.
-- **Zwei untracked Replay-Reports** in `evaluations/game_analysis/` (Rauchtest 2026-09-10).
-- **Server-Log-Kopf traegt seit `29b8e1a` Spec-Pfad und Knoepfe**; wirkt nach dem naechsten
-  Neustart. Mensch-Partien vom 2026-09-08 bis 2026-09-10 18:20 liefen ohne Champion-Spec
-  (Vorbehalte in `score_clamp` par.10 und `dome_stack` par.15d).
+- **Sims der v29-Erzeugung: ENTSCHIEDEN (Nutzer 2026-09-13, 00:12): die Neumessung
+  (`PREREG_search_depth_column_optimum.md` par.8d: 100/150/200/250/400 am Generator v28-b02,
+  rund eine Stunde) wird VOR dem v29-Self-Play gefahren.** Anlass: v28-b02@100 verliert gegen
+  @400 7:23 und baut WENIGER Spalten (0,87 gegen 1,30; Nachtrag 2026-09-12/13), das Plateau der
+  flachen Suche gilt fuer den heutigen Champion nicht mehr. Nutzer dazu: "dann muessten wir
+  wieder den sockel aufstocken von den sims her": faellt die Kurve fuer hoehere Sims aus, wird
+  auch der Sockel des v29-Fensters (Traeger-Korpus, `PREREG_v29_window.md` par.1/par.6) mit den
+  hoeheren Sims neu erzeugt, nicht nur der Schwarm; Kosten und Zuschnitt dann in der
+  Fenster-Prereg vorregistrieren. Bau der Neumessung: Kette nach dem Muster von par.8b (gepaarte
+  Laeufe Generator@S gegen Generator@400 je S, mit Logs, Spaltensonde und Plattenpunkte je Punkt,
+  Frueh-Stopp aus), Register-Zeilen mit Bloecken.
+- **Zweite Aufhaengung der Sims-Kante am Champion:** v28-b02@100 hat nur 30 Partien (Intervall
+  degeneriert); mehr Partien nur, wenn der Knoten gebraucht wird.
+- Generationswechsel-Start (Schritt 5 oben), Loeschzeitpunkt (nach Self-Play-Start).
+
+### BEFUNDE, die eine Nachschau brauchen
+
+- **Nicht-Transitivitaet am Leiterboden:** v22@25 gegen hv4@150 76 %, gegen hv4@600 50 %, hv4@600
+  gegen hv4@150 55 %. Bradley-Terry mittelt das; die Intervalle der Netze haengen weiter am
+  gesaettigten Anker-Schritt (par.7a).
+- **Replayer-Grenze Chip-Vollendung:** 5 von 30 Partien der Champion-Sims-Kante nicht nachspielbar
+  ("Reihe N nicht mit Chips komplettierbar" nach 60 Versuchen); bekannte Grenze, keine neue.
+- `player_profiles.json` im Arbeitsbaum veraendert (Nutzer-/Server-Seite), nicht committet.
+- Untracked: `models/manifest_train_v28-b03_*.json`, `v28-b04_*.json` (Loeschkandidaten beim
+  Wechsel), zwei Replay-Reports in `evaluations/game_analysis/`.
 
 ## 2. LAUFZEITEN (gemessen, Planungsgroessen; Artefakte und Details in `docs/measured_runtimes.md`)
 
@@ -297,7 +244,16 @@ Index: `PREREG_INDEX.md` (generiert).
    GEFAHREN 23:09-23:23: v22@100 gegen hv4 39:11, gegen hv3 43:7 (je Block 1, Frueh-Stopp),
    gegen v22@400 21:39 (SPRT H0 nach 30 Paaren). Die Sprosse liegt NICHT in der Luecke (1175):
    weniger Sims kosten gegen sich selbst 35 %, gegen die Heuristiken fast nichts; der Fit hebt den
-   unteren Netz-Block um 10-30 Punkte, Champion 1349 [1302, 1402]. Details par.7a.
+   unteren Netz-Block um 10-30 Punkte. Details par.7a.
+00h. **Sims-Kanten und Heuristik@600** (Nutzer 23:35-00:10): v28-b02@100 gegen @400 7:23 nach 15
+   Paaren, Punkte -9,2, volle Spalten 0,87 gegen 1,30: das Spalten-Plateau der flachen Suche gilt
+   fuer den Champion nicht mehr (`PREREG_search_depth_column_optimum.md` Nachtrag; Betriebspunkt
+   100 der Erzeugung damit offen, Neumessung par.8d in v29). v22@25: gegen hv4 38:12, hv3 35:15,
+   @100 43:57. hv4@600: gegen Anker 82:68 (Deckel), gegen v22@25 76:74 (Deckel): die Heuristik mit
+   600 Sims liegt in der Luecke (1069). Treppe Anker -> hv4@600 -> v22@25 -> v22@100 -> v22@400
+   steht; Festigung (zwei Kanten je Knoten am Deckel) laeuft als `tools/night_ladder_gap_fill.sh`.
+   Nutzer-Entscheid Aufraeumen: Artefakte nur fuer v28-b02 und v27-b01, v21/v24/v26/hv1_anchor/
+   restored_v24 werden geloescht, aber erst nach dem Start des v29-Self-Plays (restic-daily).
 00b. **Startsetzung als Suchentscheid im Spiel** (Nutzer 13:00, `PREREG_start_dome_choice.md`
    par.9c): ENTSCHIEDEN 13:15 (Nutzer: "bau den such-start dann vor v29"): Bau rund ein Tag
    (net_mcts, Spielpfade, Self-Play, Referee-Worker), Knopf MOSAIC_START_BY_SEARCH Default 0,

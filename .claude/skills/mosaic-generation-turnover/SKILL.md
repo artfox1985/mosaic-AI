@@ -101,8 +101,17 @@ Laufzeiten im Artefakt, Regel 0 (geprueft oder markiert).
   Anker, Generator, Arm, Zwischenstand), Elo-Knoten, Prereg-Verweis,
   Groesse. Kandidaten fuer die Loeschung sind Arme ohne Rolle (`_best`,
   `_brierbest`, `.pth`, `.onnx`, `.ref.txt`, `_loss.png`) und liegen
-  gebliebene `*_resume.pth`/`*.stop`. Nie: Champion, Anker-Artefakte,
-  eingefrorene Artefakte, Generator, Elo-Knoten mit Kanten.
+  gebliebene `*_resume.pth`/`*.stop`. Nie: amtierender Champion, sein
+  Vorgaenger (Champion-2-Kante), der aktive Elo-Anker, Generator.
+- **Eingefrorene Artefakte (Nutzer-Entscheid 2026-09-12): nur die letzten ZWEI
+  Champions bleiben** (`models/frozen_champions/<amtierend>` und `<Vorgaenger>`),
+  dazu der aktive Anker und die Huellen-Lehrer hv2/hv3, solange sie eine Rolle
+  haben (Anfaenger-Stufe, Sprossen). Aeltere Champion-Artefakte und obsolete
+  Anker sind Loeschkandidaten, auch wenn sie Elo-Knoten mit Kanten sind: das
+  Register traegt die Zahlen, die Artefakte liegen in restic und werden fuer
+  eine spaetere Neuverankerung von dort zurueckgeholt (Praezedenz v24-b07 aus
+  bfbe80b1). Den frueheren "Nie loeschen"-Hinweis fuer solche Knoten nicht
+  wiederholen; restic-Beleg und pfadgenaue Freigabe bleiben Pflicht.
 - Vorher `restic snapshots --tag run:<name>` je Modell (train.py sichert
   jeden Lauf als Snapshot) -- ohne Marke kein Loeschvorschlag.
 
