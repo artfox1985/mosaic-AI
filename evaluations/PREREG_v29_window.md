@@ -215,6 +215,18 @@ Nullentscheid), Tor 2b aus denselben Logs (`arena_column_probe.py`), Plattenpunk
 Champion aus seinem Artefakt, beide Seiten Champion-Spec. Promotion nach
 `docs/promotion_checklist.md`; Champion-2-Kante dann gegen das Artefakt `v27-b01`.
 
+## par.6b STARTKUPPEL-STREUUNG IN DER ERZEUGUNG (Nutzer 2026-09-12, Dosis offen)
+
+Nach Stufe 0 der Startkuppel-Frage (`PREREG_start_dome_choice.md` par.9/9a: die Handregel legt
+immer (0,0), und das ist der beste Slot) will der Nutzer, dass das Netz abweichende Setzungen
+KENNT (par.9b dort). Vorschlag fuer das v29-Rezept: Erzeugungsknopf `MOSAIC_START_SLOT_RANDOM_P`
+(je Spieler, aus dem Partie-RNG), Start-Record der gestreuten Setzung mit
+`policy_target_valid = false`, Value-Labels gueltig; Arena und Gating unveraendert. Dosis
+Vorschlag 0,15 je Spieler, Nutzer-Entscheid. Bau vor dem Generationswechsel (Default 0
+bitidentisch, Tore Tests/Fixture/Drift). Der Knopf ist KEIN Arm: v29-b01 bleibt das v28-Rezept
+plus diese Streuung; ob die Streuung selbst etwas kostet, prueft Tor 2a (Punkteniveau und
+Spalten der Erzeugung gegen v28) ex post.
+
 ## par.7 BEGLEITPROGRAMM IN DEN CPU-FREIEN FENSTERN VON v29 (eingetaktet, keine Arme)
 
 1. **Schwierigkeitsleiter** (`PREREG_difficulty_levels.md` par.8.6, Nutzer 2026-09-11):

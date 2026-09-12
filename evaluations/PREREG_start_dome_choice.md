@@ -408,3 +408,37 @@ Randbedingungen: netzfrei (das Netz benutzt dieselbe Handregel `choose_start_pla
 Befund gilt fuer seine Startsetzung ebenso, aber die Kosten eines Slots koennen unter Netz-Suche
 anders liegen, ungemessen); Sicht Spieler 0 auf Brett 0, Spieler 1 immer Bestand; Zeilen-/
 Spaltenindex des 3x3-Rasters wie `board.rs::empty_slots` (r aussen, c innen).
+
+## par.9b NUTZER-ZIEL 2026-09-12: Sichtbarkeit statt Optimierung (Streuung im Self-Play)
+
+Nutzer, 12:45: *"slot 0,0 ist ein konservativ richtiger slot wenn man sich die wertungsplatten
+ansieht. es waer nur wichtig dass das netz sieht das auch anders gelegt werden kann und welche
+auswirkungen es hat. nicht dass sich das netz dann wundert dass ein spieler mal die startplatte
+irgendwo hinlegt."* Das ist par.5 mit anderem Zweck: nicht lernen, welcher Slot besser ist
+(Stufe 0: keiner), sondern den Zustandsraum abdecken, den ein Gegner (Mensch, andere Regel)
+erzeugen kann, damit Value- und Policy-Kopf dort nicht ins Leere greifen.
+
+**Vorschlag (nicht gebaut, Nutzer-Entscheid zur Dosis offen):**
+
+- Engine-Knopf `MOSAIC_START_SLOT_RANDOM_P` (Default 0 = Bestand bitidentisch): je Partie und je
+  Spieler unabhaengig wird mit Wahrscheinlichkeit p der Startslot gleichverteilt aus den neun
+  Slots gezogen (aus dem Partie-RNG, reproduzierbar), Platte und Rotation weiter per Handregel
+  im gezogenen Slot (`choose_start_placement_with_slot`, existiert). Beide Spieler, weil das
+  Netz beide Seiten sehen soll: die eigene Abweichung (Folgen im Value) und die des Gegners
+  (Antwort in der Policy).
+- **Der Start-Record einer gestreuten Setzung bekommt `policy_target_valid = false`** (Feld
+  existiert, `self_play.rs:2376`): sonst lernt der Policy-Kopf, die Zufallswahl zu imitieren.
+  Value-Labels bleiben gueltig, genau das ist der Zweck.
+- Dosis: Vorschlag **p = 0,15 je Spieler** (rund 28 % der Partien mit mindestens einer
+  Abweichung, 2 % mit beiden); Begruendung: Reihe 2 kostet 11-13 Punkte, eine hoehere Dosis
+  verschiebt das Punkteniveau des Korpus spuerbar (ungeprueft; Kontrolle per Tor 2a und
+  Punkteniveau der Erzeugung gegen v28). Nutzer kann anders entscheiden.
+- Arena und Gating: UNVERAENDERT (Bestand beidseits). par.6 verlangte gleiche Verteilung in der
+  Arena nur fuer den Fall, dass die Slotwahl gelernt werden soll; hier soll sie es nicht.
+- Erzeugung v29 (`PREREG_v29_window.md` par.6): Knopf im Rezept, Spec-Feld nicht noetig (reiner
+  Erzeugungsknopf), Manifest-Diff gegen v28 zeigt ihn. Bau vor dem Generationswechsel, Tore:
+  Tests, Fixture unveraendert (Default 0), Anker-Drift gruen; Kosten rund 1 h Bau.
+- Messbar danach: Value-Fehler des v29-Netzes auf Zustaenden mit abweichendem Startslot gegen
+  das v28-Netz (Sonde auf Stufe-0-Partien, gleiche Seeds), und ob der Gegner-Abweichung eine
+  andere Antwort folgt (Policy-Entropie am Zug nach der Gegner-Startsetzung).
+
