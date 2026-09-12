@@ -262,9 +262,9 @@ Index: `PREREG_INDEX.md` (generiert).
    `PREREG_start_dome_choice.md` par.9b, `PREREG_v29_window.md` par.6b. Bau laeuft (Agent),
    Tore in der Luecke zwischen den Ketten (`tools/night_startslot_build.sh`).
 00b. **Startsetzung als Suchentscheid im Spiel** (Nutzer 13:00, `PREREG_start_dome_choice.md`
-   par.9c): Bau rund ein Tag (net_mcts, Spielpfade, Self-Play, Referee-Worker) plus A/B;
-   offen ist der ZEITPUNKT: vor der v29-Erzeugung (dann im Generator) oder als
-   v29-Begleitprogramm mit Uebernahme bei v30.
+   par.9c): ENTSCHIEDEN 13:15 (Nutzer: "bau den such-start dann vor v29"): Bau rund ein Tag
+   (net_mcts, Spielpfade, Self-Play, Referee-Worker), Knopf MOSAIC_START_BY_SEARCH Default 0,
+   A/B am Champion hinter der Leiter; v29-Erzeugung danach mit Such-Start UND Streuung.
 
 00. ~~ANKER-DRIFT ROT durch A2~~ ENTSCHIEDEN 2026-09-12: (a) Anker neu gesetzt (`hv1_anchor_v2`, Segment 2).
 0. ~~Name des Schlussmodells~~ ENTSCHIEDEN 2026-09-11: **Tessa** (Umsetzung mit Stufe 3 des
