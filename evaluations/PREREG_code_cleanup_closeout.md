@@ -287,7 +287,12 @@ hv1_anchor_v2@150, beide c_puct 0,3, drei Bloecke bis zum Deckel ohne Frueh-Stop
 21:29) = **77:73 aus 150, p 0,81**: hv2 und hv1 sind im Segment 2 gleich stark (hv2 972
 [921, 1022]). Die Segment-1-Zahl 1100 fuer `Heuristik_v2huelle` (2026-08-25, ueber v21 gemessen)
 haelt fuer das Artefakt hv2_generator nicht; ob beides derselbe Spieler ist, bleibt ungeprueft
-(`PREREG_difficulty_levels.md` Stufe 0b). Folge: die Anfaenger-Stufe der Schwierigkeitsleiter
+(`PREREG_difficulty_levels.md` Stufe 0b). **Cross-Aera (Nutzer-Rueckfrage 17:20):** das hv2-Artefakt
+ist vom 2026-08-26 (Wheel aus 40600ba, Kontrakt a3f61f24) und traegt den Phantom-Fix A2 vom
+2026-09-12 NICHT, der Anker hv1_anchor_v2 schon; ein hv2-Wheel mit A2 ist nicht baubar, der
+hv2-Zweig ist seit 2026-08-26 aus dem Quellstand entfernt. hv2 ist damit dauerhaft ein Knoten der
+Aera vor A2 (wie die Netz-Artefakte v21-v27 mit ihren eigenen Wheels), und die Aussage lautet
+genau: hv2 ohne A2 gegen hv1 mit A2 = 77:73. Folge: die Anfaenger-Stufe der Schwierigkeitsleiter
 (hv2@150) ist so stark wie der Anker, nicht 100 Elo darueber. Register nach dieser Kante: v28-b02
 1329 [1281, 1389], v28-b01 1288, v27-b01 1285, v26-b01 1232, v24-b07 1155, Anker 1000, hv2 972.
 
