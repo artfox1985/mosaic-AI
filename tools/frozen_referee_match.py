@@ -20,18 +20,117 @@ wie `net_vs_net_arena_match`):
         --model-a models/frozen_champions/v21_2d_brierbest/model.onnx \\
         --spec-a models/frozen_champions/v21_2d_brierbest/spec.json \\
         --sims-a 400 --sims-worker 400 --n-games 8 --seeds 900001,900002,...
+
+ZWEI ZUSAETZE FUER DIE STARTKUPPEL-GEGENPROBE (`PREREG_start_dome_choice.md`
+par.4/par.8, Nutzer-Entscheid 2026-09-12 "Weg 3")
+-------------------------------------------------------------------------
+`--heuristic-a`: Seite A spielt NETZLOS die lebende `hv1`-Heuristik. Der
+bestehende In-Process-Pfad `RefereeGame::drafting_decide_and_apply_inprocess`
+verlangt einen Modellpfad als `String` (referee.rs:689-691) und taugt dafuer
+nicht; genommen wird stattdessen `mosaic_rust.heuristic_arena_choice_state_json`
+(lib.rs:1300-1313) -- dieselbe Auswahl, die auch `HeuristicArenaAgent::decide`
+benutzt (referee.rs:149-169) -- und der Zug geht ueber
+`drafting_apply_external` zurueck, also durch dieselbe harte Legalitaets-
+pruefung wie ein Worker-Zug. Tiling und Startsetzung der Seite A loest der
+Referee weiter selbst auf (`resolve_tiling_step` / `choose_start_placement`,
+referee.rs:508/531) -- beides ist auf `hv1` verdrahtet und damit genau das,
+was diese Seite sein soll.
+
+`--force-start-slot-artifact N`: erzwingt den Startkuppel-SLOT der
+Artefakt-Seite (N = row*3+col, 0..8). Der Worker des Artefakts kann das NICHT
+(sein Wheel kennt `MOSAIC_START_SLOT_P0/P1` nicht), deshalb rechnet fuer
+diese EINE Anfrage das LEBENDE Wheel:
+`mosaic_rust.start_placement_choice_state_json` mit gesetztem Knopf, danach
+wird die Variable sofort wieder entfernt -- sie darf beim Aufloesen der
+Seite A in `advance_to_decision` nicht stehen, sonst bekaeme hv1 denselben
+Zwang (referee.rs:508 ruft `choose_start_placement`, und das liest den Knopf
+je Aufruf, self_play.rs:1242-1272).
+
+BENANNTER KONFUND, nicht verschweigen: `choose_start_placement_json` des
+LEBENDEN Wheels ignoriert `search_config` und `game_seed`
+(`let _ = (search_config, game_seed);`, referee.rs:121) und ruft die
+hv1-Handregel. Unter `--force-start-slot-artifact` setzt die Artefakt-Seite
+ihre Startkuppel also nach hv1-Handregel im erzwungenen Slot, nicht nach
+ihrer eigenen Variante. Gemessen wird damit "hv2 spielt eine Partie, die in
+Slot N beginnt", nicht "hv2 waehlt Slot N".
 """
 from __future__ import annotations
 
 import argparse
 import json
 import multiprocessing as mp
+import os
 import subprocess
 import sys
 import time
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+
+# Lazy und gecacht: `analyze_game_log` ist der Ort, an dem die Log-Regexe 1:1
+# aus den `log_event`-Formatstrings der Engine stehen. Hier wird EINE davon
+# gebraucht (START_TILE), und nur wenn die Slot-Kontrolle laeuft -- nachbauen
+# waere eine zweite Wahrheit ueber dasselbe Format.
+_LOG_PATTERNS: tuple | None = None
+
+
+def _start_tile_pattern() -> tuple:
+    global _LOG_PATTERNS
+    if _LOG_PATTERNS is None:
+        tools_dir = str(REPO / "tools")
+        if tools_dir not in sys.path:
+            sys.path.insert(0, tools_dir)
+        from analyze_game_log import PATTERNS, ROUND_PREFIX
+
+        _LOG_PATTERNS = (PATTERNS["START_TILE"], ROUND_PREFIX)
+    return _LOG_PATTERNS
+
+
+def realised_start_slot(log: list[str], name: str) -> int | None:
+    """Slot-Index (row*3+col) der Startkuppel von Spieler `name` aus der
+    START_TILE-Logzeile; None, wenn keine gefunden.
+
+    KONTROLLE fuer `--force-start-slot-artifact`: ein belegter Slot faellt in
+    der Engine auf die Bestandswahl zurueck (self_play.rs:1300-1302), die
+    Erzwingung ist also eine Bitte und kein Zwang. Ohne diese Zahl waere eine
+    Messung des Bestands unter dem Etikett "Slot N" moeglich.
+    """
+    start_tile, round_prefix = _start_tile_pattern()
+    for raw_line in log or []:
+        if raw_line.startswith("#"):
+            continue
+        m = round_prefix.match(raw_line)
+        text = m.group(2) if m else raw_line
+        mm = start_tile.match(text)
+        if mm and mm.group("name") == name:
+            return int(mm.group("row")) * 3 + int(mm.group("col"))
+    return None
+
+
+def forced_start_placement_live(mr, rg, pi: int, slot: int) -> dict:
+    """Startsetzung der Artefakt-Seite auf dem LEBENDEN Wheel, mit erzwungenem
+    Slot -- der einzige Weg, den Knopf auf eine Seite anzuwenden, deren
+    eigenes Wheel ihn nicht kennt.
+
+    Der Knopf wird NUR fuer diesen einen Aufruf gesetzt und danach entfernt:
+    `advance_to_decision` loest die Startsetzung der nicht-externen Seite
+    selbst ueber `choose_start_placement` auf (referee.rs:508), und die liest
+    dieselbe Variable. Stuende sie noch, bekaeme die Gegenseite denselben
+    Zwang und die Messung waere keine Ein-Seiten-Messung mehr.
+
+    Die Prozessumgebung ist je PROZESS eigen: mit `--workers > 1` laeuft jeder
+    Seed-Block in einem eigenen Kindprozess (`_play_block` ueber `mp.Pool`),
+    und innerhalb eines Blocks laufen die Partien nacheinander. Es gibt also
+    keine zweite Partie, die waehrend dieser paar Mikrosekunden dieselbe
+    Variable liest.
+    """
+    knob = f"MOSAIC_START_SLOT_P{pi}"
+    os.environ[knob] = str(slot)
+    try:
+        raw = mr.start_placement_choice_state_json(rg.state_json(), pi, rg.game_seed(), None)
+    finally:
+        os.environ.pop(knob, None)
+    return json.loads(raw)
 
 
 def load_manifest(artifact_dir: Path) -> dict:
@@ -247,6 +346,8 @@ def _play_block(job: dict) -> list[dict]:
                 job["sims_a"], job["c_puct_a"], job["artefakt_modell"],
                 tuple(job["names"]), first_player, seed, board_a,
                 external_sides=external_list,
+                heuristic_a=job["heuristic_a"],
+                force_start_slot_artifact=job["force_start_slot_artifact"],
             )
             # Der Index reist MIT: die Bloecke kommen in beliebiger
             # Reihenfolge zurueck, die Ergebnisliste muss aber der Seed-Folge
@@ -284,6 +385,10 @@ def play_one_game(
     # Bestandsverhalten (der Referee loest beides auf), und das bleibt der
     # Default fuer Netz-Artefakte aus Welle 3.
     external_sides=None,
+    # Seite A draftet netzlos als lebende hv1-Heuristik (siehe Modul-Doc).
+    heuristic_a: bool = False,
+    # Erzwungener Startkuppel-Slot der Artefakt-Seite, 0..8; None = Bestand.
+    force_start_slot_artifact: int | None = None,
 ) -> dict:
     external_sides = external_sides or []
     # Die Namen MIT dem Brett tauschen. `wins_a` rechnet korrekt ueber
@@ -345,9 +450,17 @@ def play_one_game(
             # `pending_start_placement_player()`, NICHT `current_player()`:
             # in dieser Phase kann der Nicht-Starter zuerst dran sein.
             pi_start = rg.pending_start_placement_player()
-            rg.start_placement_apply_external(json.dumps(
-                worker_for(pi_start).ask_start_placement(
-                    rg.state_json(), pi_start, rg.game_seed())))
+            # Nur die ARTEFAKT-Seite bekommt den Zwang. Bei einem einzigen
+            # Artefakt ist das die Seite, die nicht `board_a` ist; mit einem
+            # zweiten Artefakt waere die Zuordnung nicht mehr eindeutig, und
+            # `main()` verweigert die Kombination deshalb vorher.
+            if force_start_slot_artifact is not None and pi_start != board_a:
+                placement = forced_start_placement_live(
+                    mr, rg, pi_start, force_start_slot_artifact)
+            else:
+                placement = worker_for(pi_start).ask_start_placement(
+                    rg.state_json(), pi_start, rg.game_seed())
+            rg.start_placement_apply_external(json.dumps(placement))
             continue
         if status == "stuck":
             raise RuntimeError(
@@ -355,7 +468,17 @@ def play_one_game(
                 f"phase={rg.phase()} -- Diagnose noetig, kein stiller Fallback."
             )
         cur = rg.current_player()
-        if cur == board_a and worker_a is None:
+        if cur == board_a and worker_a is None and heuristic_a:
+            # Netzlose lebende hv1: `drafting_decide_and_apply_inprocess`
+            # verlangt einen Modellpfad (referee.rs:689-691), taugt hier also
+            # nicht. Gleiche Auswahl wie `HeuristicArenaAgent::decide`
+            # (referee.rs:149-169), gleicher Seed-Pfad wie der Worker
+            # (`pending_search_seed`), gleiche Legalitaetspruefung beim
+            # Zurueckreichen (`drafting_apply_external`).
+            resp = json.loads(mr.heuristic_arena_choice_state_json(
+                rg.state_json(), sims_a, c_puct_a, rg.pending_search_seed(), spec_a))
+            rg.drafting_apply_external(json.dumps(resp["action"]))
+        elif cur == board_a and worker_a is None:
             rg.drafting_decide_and_apply_inprocess(model_a, spec_a, sims_a, c_puct_a)
         elif cur == board_a:
             action, _v = worker_a.ask(rg.state_json(), rg.pending_search_seed())
@@ -393,7 +516,8 @@ def play_one_game(
         winner = 1
     else:
         winner = int(json.loads(rg.state_json())["first_player_next_round"])
-    return {
+    log = rg.full_log()
+    record = {
         "scores": list(scores),
         "winner": winner,
         "steps": rg.steps(),
@@ -402,8 +526,16 @@ def play_one_game(
         "board_a": board_a,
         "worker_calls": worker_calls_this_game,
         "worker_wait_s": worker_wait_s,
-        "log": rg.full_log(),
+        "log": log,
     }
+    if force_start_slot_artifact is not None:
+        # Die Namen reisen MIT dem Brett (`names_in_game` oben), der Name der
+        # Artefakt-Seite ist deshalb immer `names[1]`, unabhaengig von
+        # `board_a`. Beleg der Erzwingung, nicht Dekoration.
+        record["start_slot_artifact"] = realised_start_slot(log, names[1])
+        record["start_slot_forced"] = force_start_slot_artifact
+        record["board_artifact"] = 1 - board_a
+    return record
 
 
 def main() -> int:
@@ -416,6 +548,15 @@ def main() -> int:
                     help="Seite A ist ebenfalls ein gefrorenes Artefakt (eigener Worker, "
                          "eigenes Wheel). Damit spielen zwei Artefakte GEGENEINANDER -- der "
                          "Fall, fuer den die Prozess-Isolation gebaut wurde.")
+    ap.add_argument("--heuristic-a", action="store_true",
+                    help="Seite A spielt netzlos die LEBENDE hv1-Heuristik (kein ONNX, kein "
+                         "Artefakt). Drafting ueber heuristic_arena_choice_state_json, Tiling "
+                         "und Startsetzung loest der Referee auf -- beides hv1-verdrahtet.")
+    ap.add_argument("--force-start-slot-artifact", type=int, default=None,
+                    help="Erzwingt den Startkuppel-Slot der ARTEFAKT-Seite (0..8 = row*3+col). "
+                         "Gerechnet wird die Setzung dann auf dem LEBENDEN Wheel (der Worker "
+                         "kennt den Knopf nicht) -- Platte und Rotation kommen damit aus der "
+                         "hv1-Handregel, ein benannter Konfund (siehe Modul-Doc).")
     ap.add_argument("--spec-a", default=None, help="Such-Spec fuer Seite A (None = SearchConfig::from_env())")
     ap.add_argument("--sims-a", type=int, default=400)
     ap.add_argument("--c-puct-a", type=float, default=1.5)
@@ -431,6 +572,17 @@ def main() -> int:
                          "startet ein eigener Worker (bzw. ein Paar). 1 = seriell wie bisher.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
+
+    if args.force_start_slot_artifact is not None:
+        if not 0 <= args.force_start_slot_artifact <= 8:
+            raise SystemExit(
+                f"--force-start-slot-artifact={args.force_start_slot_artifact} liegt nicht in "
+                "0..8 (Slot-Index row*3+col des 3x3-Kuppelrasters).")
+        if args.artifact_dir_a:
+            raise SystemExit(
+                "--force-start-slot-artifact zusammen mit --artifact-dir-a ist nicht definiert: "
+                "bei ZWEI Artefakten ist 'die Artefakt-Seite' nicht eindeutig. Kein stiller "
+                "Ersatz -- die Messung muesste sagen, WESSEN Slot erzwungen wird.")
 
     artifact_dir = Path(args.artifact_dir).resolve()
     manifest = load_manifest(artifact_dir)
@@ -464,10 +616,15 @@ def main() -> int:
     handshake = static_handshake(manifest, args.force_cross_era)
     print(f"[referee] Handshake: {handshake}", file=sys.stderr)
 
-    if not args.artifact_dir_a and not args.model_a:
+    if not args.artifact_dir_a and not args.model_a and not args.heuristic_a:
         raise SystemExit(
-            "Seite A ist unbesetzt: entweder --model-a (aktuelle Engine, in-process) "
-            "oder --artifact-dir-a (zweites gefrorenes Artefakt).")
+            "Seite A ist unbesetzt: entweder --model-a (aktuelle Engine, in-process), "
+            "--heuristic-a (lebende hv1, netzlos) oder --artifact-dir-a (zweites "
+            "gefrorenes Artefakt).")
+    if args.heuristic_a and (args.model_a or args.artifact_dir_a):
+        raise SystemExit(
+            "--heuristic-a ist mit --model-a/--artifact-dir-a unvereinbar: Seite A ist "
+            "entweder netzlose Heuristik ODER ein Netz/Artefakt.")
 
     worker = WorkerProc(worker_python, worker_script, artifact_dir, args.sims_worker, args.c_puct_worker)
     time.sleep(0.2)  # Worker-Startzeit (Modell laden) -- erste Anfrage wartet ohnehin, reine Kulanz
@@ -528,6 +685,9 @@ def main() -> int:
     else:
         seeds = [args.seed_base + i for i in range(args.n_games)]
 
+    # "EngineA" bleibt der Name der Seite A auch bei --heuristic-a: ein
+    # Verbraucher liest ihn woertlich (tools/anchor_arena.py:151). Ein
+    # schoenerer Name waere ein stiller Bruch dort.
     names = (manifest_a.get("artefakt", "ArtefaktA") if manifest_a else "EngineA",
              manifest.get("artefakt") or manifest.get("champion") or "ArtefaktB")
     # Nur Artefakte, deren Worker das erweiterte Protokoll kennt, entscheiden
@@ -550,6 +710,12 @@ def main() -> int:
             "ANDEREN Spieler zu messen als den eingefrorenen.\n"
             "Abhilfe: das Artefakt mit dem heutigen Wheel neu einfrieren.")
     external_sides_active = is_heuristic
+    if args.force_start_slot_artifact is not None and not external_sides_active:
+        worker.close()
+        raise SystemExit(
+            "--force-start-slot-artifact greift nur, wenn die Artefakt-Seite ihre Startsetzung "
+            "SELBST entscheidet (Heuristik-Artefakt mit erweitertem Protokoll). Bei einem "
+            "Netz-Artefakt loest der Referee sie auf, und der Schalter waere still wirkungslos.")
     # Auch die A-Seite entscheidet selbst, wenn sie ein protokollfaehiges
     # Heuristik-Artefakt ist. Sonst kachelte SIE ueber den auf `hv1`
     # verdrahteten Referee-Pfad -- derselbe Fehler, nur auf der anderen Seite.
@@ -592,6 +758,8 @@ def main() -> int:
         "sims_a": args.sims_a, "c_puct_a": args.c_puct_a,
         "artefakt_modell": artifact_model_path, "names": list(names),
         "externe_b": external_sides_active, "externe_a": external_sides_a_active,
+        "heuristic_a": args.heuristic_a,
+        "force_start_slot_artifact": args.force_start_slot_artifact,
     }
 
     t_start = time.perf_counter()
@@ -611,6 +779,8 @@ def main() -> int:
                 mr, worker, worker_a, args.model_a, args.spec_a, args.sims_a,
                 args.c_puct_a, artifact_model_path, names, first_player, seed, board_a,
                 external_sides=external_list,
+                heuristic_a=args.heuristic_a,
+                force_start_slot_artifact=args.force_start_slot_artifact,
             )
             g["_index"] = i
             games.append(g)
@@ -655,9 +825,17 @@ def main() -> int:
         "artefakt": manifest.get("artefakt"),
         "typ": manifest.get("typ", "netz"),
         "seite_a": ({"artefakt": manifest_a.get("artefakt"), "typ": manifest_a.get("typ")}
-                    if manifest_a else {"modell": args.model_a, "typ": "aktuelle Engine"}),
+                    if manifest_a
+                    else {"modell": args.model_a,
+                          "typ": "lebende hv1-Heuristik (netzlos)" if args.heuristic_a
+                                 else "aktuelle Engine"}),
+        "namen": {"seite_a": names[0], "artefakt": names[1]},
         "handshake": handshake,
         "force_cross_era": args.force_cross_era,
+        "heuristic_a": args.heuristic_a,
+        # N oder null. Steht im Ergebnis, damit ein Leser die Erzwingung nicht
+        # aus den Partie-Records erraten muss (Lauf-Manifest gegen Referenz).
+        "force_start_slot_artifact": args.force_start_slot_artifact,
         "golden_selftest": {"ran": not args.skip_golden, "mismatches": golden_mismatches},
         "model_a": args.model_a,
         "spec_a": args.spec_a,
