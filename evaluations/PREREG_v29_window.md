@@ -294,9 +294,14 @@ Spalten der Erzeugung gegen v28) ex post.
    Startkuppel und Sims-Kurve als Sonden und Knoepfe im Begleitprogramm (par.7 Punkt 4);
    Rundenschaetzer und R5-Netzloeser nach Maschinenlage. Die Sicht-Reststufen sind nicht
    bestellt.
-3. Ist v29 die letzte Generation? Dann gilt: Leiter-Endfassung mit dem v29-Champion
-   (`PREREG_difficulty_levels.md` Stufe 5), Generationswechsel ohne v30-Vorlage, und
-   STATUS-Neufassung als Abschlussbericht. Sonst v30 nach demselben Muster.
+3. ~~Ist v29 die letzte Generation?~~ ENTSCHIEDEN (Nutzer 2026-09-12, 18:05): **v30 folgt, wird
+   released und ist der Projektabschluss.** Folgen: v29 ist die Generation, in der das
+   Begleitprogramm (par.7: Tiling im Blatt, Mondstapel Stufe 1, Claude-Differential, Sonden) seine
+   Verdikte liefert; was traegt, geht ins v30-Rezept; v30 selbst bekommt nur noch Rezept-Knoepfe,
+   keine neuen Bauvorhaben. Nach der v30-Promotion: Leiter-Endfassung mit dem v30-Champion
+   (`PREREG_difficulty_levels.md` Stufe 5), Schlussmodell "Tessa" = v30-Champion
+   (`PREREG_code_cleanup_closeout.md` par.5a), Code-Abschluss Stufen 2 und 3, STATUS-Neufassung
+   als Abschlussbericht, letzter restic-Snapshot mit Beleg.
 4. Freigabe der Erzeugung (Regel seit 2026-09-03: die Fenstererzeugung startet nur auf
    Anweisung).
 
