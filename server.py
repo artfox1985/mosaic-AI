@@ -1690,8 +1690,12 @@ def ai_start_tile():
 # A=-0.0476, B=0.6853, Brier 0.22379 (evaluations/artifacts/platt_fit_v27-b01_v3.json);
 # Trendmetrik frozen_v1: A=+0.4010, B=0.6335, Brier 0.25135. Vorgaenger v26-b01:
 # A=-0.0732, B=0.6736 (Brier 0.22486 auf frozen_v3).
-_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.0476"))
-_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.6853"))
+# Promotion 2026-09-12, Champion v28-b02: Anzeige-Fit auf frozen_v3
+# A=-0.0539, B=0.6684, Brier 0.22537 (evaluations/artifacts/platt_fit_v28-b02_v3.json);
+# Trendmetrik frozen_v1: A=+0.3840, B=0.6074, Brier 0.25217. Vorgaenger v27-b01:
+# A=-0.0476, B=0.6853 (Brier 0.22379 auf frozen_v3).
+_DISPLAY_CAL_A = float(os.environ.get("MOSAIC_DISPLAY_CAL_A", "-0.0539"))
+_DISPLAY_CAL_B = float(os.environ.get("MOSAIC_DISPLAY_CAL_B", "0.6684"))
 _DISPLAY_CAL_ON = os.environ.get("MOSAIC_DISPLAY_CAL", "1") != "0"
 
 

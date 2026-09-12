@@ -18,10 +18,16 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 23:55)
 
-**Champion laut `models/champion.txt`: `v27-b01_brierbest`, Elo 1405** [1361, 1453] aus 790
-Partien; Leiter `v26-b01` 1364, `v25-b01` 1336, `v24-b07` 1283, Anker fix 1000. Promotion
-vollstaendig (Artefakt `models/frozen_champions/v27-b01/`, restic `run:v27-b01`),
-Generationsbericht v27 in `../archive/history.md`, Belege `PREREG_v27_window.md` par.7-10.
+**Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12, 06:17-06:45),
+Elo 1296** [1242, 1354] aus 930 Partien im LEITERSEGMENT 2 (Anker `hv1_anchor_v2` fix 1000;
+Leiter `v28-b01` 1346 (eine Kante), `v27-b01` 1264, `v26-b01` 1171). Promotion vollstaendig nach
+Checkliste (Anker 126:24, Nachbar 133:97 SPRT + Replikation 212:188 ohne Entscheid, Champion-2
+101:49 gegen Artefakt v26-b01, sigma/Prior 2,222, Platt in server.py, Fixture e1f94c44f0c7959b,
+Artefakt `models/frozen_champions/v28-b02/` mit Wheel vom Knopf-Durchgang, Golden Probe 10
+Sonden, Selbsttest gruen); **dritter Seed ohne Fruehstopp als Stichentscheid laeuft in der
+Fortsetzungskette**. Belege `PREREG_code_cleanup_closeout.md` par.7a, `PREREG_v28_window.md`
+par.10. Alt-Register (Segment 1: v27-b01 1405 usw.) in `../archive/elo_history_pre_phantomfix.csv`.
+Generator v29 = v28-b02 (Nutzer 2026-09-11).
 
 **Das Einfrieren ist beendet** (v25-b01 / v26-b01 / v27-b01: gleiches Rezept, rotierendes
 Material; dreimal Tor 1, dreimal steigende Spalten). **Der Generationswechsel v27 -> v28 ist
@@ -41,9 +47,14 @@ v28-b01 132:18, v27-b01 124:26; Segment-2-Elo 1288 / 1346 / 1271, Intervalle ueb
 `PREREG_code_cleanup_closeout.md` par.7a), die Nachbar-Kante v28-b02 gegen v27-b01
 (Seed 20261044) endete 03:40 per SPRT nach 115 Paaren: **133:97 fuer v28-b02** (p 0,0198,
 Diff +0,313 [+0,068; +0,558]); Segment-2-Leiter jetzt v28-b02 1305, v28-b01 1346, v27-b01 1256.
-**MASCHINE BELEGT seit 03:44: `tools/night_v28_after_reanchor.sh`** (A Knopf-Bau mit Toren,
-B Promotions-Messungen v28-b02 inkl. Replikation der Nachbar-Kante Seed 20261046, Champion-2
-gegen v26-b01-Artefakt, sigma/Prior, Platt; C Einfrieren `frozen_champions/v28-b02`; D Messblock
+**MASCHINE BELEGT: `tools/night_v28_resume_freeze.sh` seit 06:19** (Fortsetzung nach einem
+OneDrive-Sperrfehler im Fixture-Schreiblauf; Stufen A-C sind DURCH, es laufen D Messblock, dann
+E A1/A2, dann F dritter Seed + Startkuppel Stufe 0). Davor `tools/night_v28_after_reanchor.sh` ab 03:44 (A Knopf-Bau mit Toren,
+B Promotions-Messungen v28-b02: Replikation der Nachbar-Kante Seed 20261046 DURCH, **212:188
+am Deckel ohne SPRT-Entscheid** (p 0,28, Diff +0,12 [-0,08; +0,32]; Register v28-b02 1296,
+v27-b01 1264), dritter Seed als unverzerrter Stichentscheid nach v26-Praezedenz vorgesehen
+(`tools/night_v28_third_seed.sh`, nach der Master-Kette); dann Champion-2 gegen
+v26-b01-Artefakt, sigma/Prior, Platt; C Einfrieren `frozen_champions/v28-b02`; D Messblock
 Ueberraschungs-Kante und C2; E Einhuellende A1/A2). Startkuppel Stufe 0 GEBAUT, ungemessen (`PREREG_start_dome_choice.md`
 par.8; Waechter-Abweichung = Nutzer-Entscheid). Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
 1461 gegen 1447 ueberlappend; Blockziehungen bei positivem Stand eher mehr, nicht weniger;

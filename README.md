@@ -23,17 +23,22 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v27-b01`**, Elo **1405** (95% CI [1360, 1451]) from 1,480 rated
-games, anchored at a **frozen** heuristic artifact
-(`models/frozen_heuristics/hv1_anchor`, Heuristic@150 = 1000,
-`tools/elo_tracker.py report`). The anchor carries its own wheel: since
-2026-08-31 an engine change can no longer move the fixed point of the ladder,
-and every engine change is checked move by move against it
-(drift check, `/mosaic-anchor-invariance`). The ladder was re-anchored once
-before, on 2026-08-21, when a fix to the round-5 solver changed every game
-with a round-5 share; that older register lives in
-`archive/elo_history_pre_r5fix.csv` and is not comparable across the boundary.
-The value head predicts a win *probability* (WDL); display probabilities are
+Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1296** (95% CI [1242, 1354])
+from 930 rated games on the **second ladder segment**, anchored at the frozen
+heuristic artifact `models/frozen_heuristics/hv1_anchor_v2` (Heuristic@150 =
+1000, `tools/elo_tracker.py report`). The ladder was re-anchored on 2026-09-12:
+a correctness fix in the hull evaluation (phantom tiles, cleanup finding A2)
+moved the old anchor's moves, so the first segment (anchor `hv1_anchor`,
+`v27-b01` at 1405, `v26-b01` 1364, `v25-b01` 1336) now lives in
+`archive/elo_history_pre_phantomfix.csv` and is not comparable across the
+boundary; the same happened once before on 2026-08-21 with the round-5 solver
+fix (`archive/elo_history_pre_r5fix.csv`). The anchor carries its own wheel:
+an engine change can no longer move the fixed point of the ladder, and every
+engine change is checked move by move against it (drift check,
+`/mosaic-anchor-invariance`). On the new segment `v27-b01` sits at 1264 and
+`v26-b01` at 1171; `v28-b02` beat `v27-b01` 133:97 (SPRT) and 212:188 (to the
+cap, not significant), a third seed without early stopping is pending. The
+value head predicts a win *probability* (WDL); display probabilities are
 Platt-calibrated per champion.
 
 **The material-only freeze is over.** For three generations (v25, v26, v27)
@@ -41,16 +46,19 @@ the architecture, the training recipe, the value-target blend, the heads and
 their weights were frozen; only the replay window rotated
 (`evaluations/PREREG_v25_window.md` par.18). Each of the three passed its
 gates against its predecessor, so the material alone carries: v25-b01 1336,
-v26-b01 1364, v27-b01 1405 on the ladder, and the champion completes more
+v26-b01 1364, v27-b01 1405 on the first ladder segment, and the champion completes more
 columns in the paired arena with every step (Gate 2b).
 
 **v28 is the first generation after the freeze** (`evaluations/PREREG_v28_window.md`).
 Its first arm, `v28-b01`, keeps the recipe unchanged and passed Gate 1 against
-`v27-b01` on 2026-09-11 (166:124 by SPRT, replicated 221:179; Elo 1447
-[1395, 1499], not yet promoted). The second arm, `v28-b02`, is the first
-architecture change since the freeze: eleven input features that encode what
-the acting player legitimately knows about the dome-plate stack (see below).
-Two ablations of the window composition follow.
+`v27-b01` on 2026-09-11 (166:124 by SPRT, replicated 221:179, first segment).
+The second arm, `v28-b02`, is the first architecture change since the freeze:
+eleven input features that encode what the acting player legitimately knows
+about the dome-plate stack (see below). Against `v28-b01` it measured level
+(207:193 and 209:191); it was chosen as champion and as the v29 generator
+because it is the more correct model (fuller feature picture), not because of
+a measured gain. Two ablations of the window composition (without the
+excursion class, without generation G-2) did not beat it.
 
 **The dome-stack defect is fixed.** Until 2026-09-10 the search reshuffled the
 whole dome-plate stack at the root of every search and therefore forgot the

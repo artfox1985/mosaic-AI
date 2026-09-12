@@ -1,0 +1,171 @@
+{
+  "champion": "v28-b02",
+  "freeze_date": "2026-09-12",
+  "name_dialect": "hv",
+  "model_file": "model.onnx",
+  "pth_file": "model.pth",
+  "spec_file": "spec.json",
+  "model_source": "models/alphazero_v28-b02_brierbest.onnx (Training v28-b02, Variante B mit 755 Merkmalen, 12 Epochen, 5262.3 s, Warmstart v27-b01_brierbest; Trainings-Manifest models/manifest_train_v28-b02_20260911_152432.json)",
+  "spec_source": "models/frozen_champions/v27-b01/spec.json -- UNVERAENDERT uebernommen (Champion-Spec seit v24-b07; alle Tore der v28-Generation liefen damit)",
+  "spec_content": {
+    "implicit_minimax_alpha": 0.0,
+    "long_row_init_shaping_w": 0.0,
+    "score_utility_c": 0.0,
+    "score_utility_b": 20.0,
+    "envelope_search_c": 1.0,
+    "envelope_tiling_w": 0.0,
+    "envelope_profile": [
+      1.0,
+      0.92,
+      0.67,
+      0.33,
+      0.0
+    ],
+    "envelope_tiling_value_w": 0.0,
+    "envelope_projection_mode": 1,
+    "envelope_flush_w": 0.0,
+    "envelope_hull_form": 2,
+    "special_row6_w": 1.0,
+    "heuristik_variante": "hv1"
+  },
+  "input_size": 755,
+  "contract_hash": "39648b95bbba1acf",
+  "engine_version": "0.1.0",
+  "wheels": {
+    "champion_behavior_artifact": {
+      "file": "mosaic_rust_knobs_20260912.whl",
+      "sha256": "ea980d9f3c0c95569620c3ea6f8a4626066cd7f0437f03bcafe3b9b783c107c7",
+      "source": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl, gebaut 2026-09-12 (Knopf-Durchgang: round_estimate, Rueckgabe-Reihenfolge, Startslot, alle auf Default; Anker-Drift gegen hv1_anchor_v2 gruen, tools/night_v28_knob_build.sh)"
+    }
+  },
+  "worker_python": {
+    "interpreter_relative": "venv/Scripts/python.exe",
+    "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, angelegt 2026-09-12 per pip install --no-deps aus dem Wheel plus numpy/onnxruntime"
+  },
+  "training_manifest": "models/manifest_train_v28-b02_20260911_152432.json",
+  "prereg": "evaluations/PREREG_v28_window.md; docs/promotion_checklist.md",
+  "elo": {
+    "value": 1296,
+    "ci95": [
+      1242,
+      1354
+    ],
+    "games": 930,
+    "record": "572-358",
+    "as_of": "2026-09-12",
+    "segment": "2 (Anker hv1_anchor_v2, seit dem Phantom-Fix A2 am 2026-09-12; Alt-Register archive/elo_history_pre_phantomfix.csv)",
+    "edges": [
+      "Anker 126:24 (n=150, Handshake gruen)",
+      "Nachbar/Gating v28-b02 gegen v27-b01 Seed 20261044 133:97 (SPRT nach 115 Paaren, p 0,0198)",
+      "Replikation Seed 20261046 212:188 (Deckel, p 0,281, nicht signifikant); dritter Seed ohne Fruehstopp ausstehend",
+      "Champion-2 gegen Artefakt v26-b01 101:49 (n=150, Cross-Aera)"
+    ],
+    "ladder_after_refit": {
+      "v28-b01": 1346,
+      "v27-b01": 1264,
+      "v26-b01": 1171,
+      "anchor": 1000
+    }
+  },
+  "golden_probe": {
+    "file": "golden_probe.json",
+    "source": "tools/build_frozen_golden_probe.py --artifact-dir models/frozen_champions/v28-b02 --seed-base 916001",
+    "n_probes": 10,
+    "meta": {
+      "n_probes": 10,
+      "artifact": "models/frozen_champions/v28-b02",
+      "model": "models/frozen_champions/v28-b02/model.onnx",
+      "spec": "models/frozen_champions/v28-b02/spec.json",
+      "generator": "tools/build_frozen_golden_probe.py",
+      "protocol": "par.8d PER-ENTSCHEIDUNG (state_to_json_exact fuenftes Feld pending_dome_choice_exact, kein rot_seed mehr)"
+    },
+    "erzeugt": "2026-09-12 06:45"
+  },
+  "parity_fixture": {
+    "file": "engine/tests/fixtures/net_parity_champion.txt",
+    "neu_geschrieben": "2026-09-12",
+    "hash": "e1f94c44f0c7959b",
+    "kopf": [
+      "# Netz-Paritaets-Fixture -- GENERIERT, nicht von Hand editieren.",
+      "#",
+      "# Nachfolger von tools/parity_probe.py (Nutzer-Entscheid 2026-08-28): belegt,"
+    ],
+    "hash_zeilen": [
+      "#     net_parity_hash_matches_champion_fixture -- --nocapture",
+      "# record_rtv=false, Startspieler alternierend. Nicht gehashte Label-Felder:",
+      "# Hash-Verfahren: FNV-1a-64 ueber die Record-JSONs."
+    ]
+  },
+  "display_calibration": {
+    "A": -0.0539,
+    "B": 0.6684,
+    "brier": 0.22537,
+    "eval_set": "frozen_eval_set_v3.pkl",
+    "trend_frozen_v1": {
+      "A": 0.384,
+      "B": 0.6074,
+      "brier": 0.25217
+    },
+    "server_py": "_DISPLAY_CAL_A/_B eingetragen 2026-09-12"
+  },
+  "gumbel_balance": {
+    "ratio_sigma_over_prior_median": 2.222417186441989,
+    "by_round": {
+      "1": 1.297889234561288,
+      "2": 2.4755891953492575,
+      "3": 3.039300675315022,
+      "4": 3.762438886732492
+    },
+    "n_used": 233,
+    "note": "Schwelle 3; Familie c_visit/c_scale bleibt zu. v27-b01: 2,161; Runden 3/4 einzeln 3,04/3,76 (Nebenbefund)"
+  },
+  "sigma_prior_balance": {
+    "gesamt": 2.222417186441989,
+    "schwelle": 3,
+    "je_runde": {
+      "1": 1.297889234561288,
+      "2": 2.4755891953492575,
+      "3": 3.039300675315022,
+      "4": 3.762438886732492
+    }
+  },
+  "acceptance": {
+    "tor1": "gegen v28-b01 (Segment 1): 207:193 (Seed 20261038) und 209:191 (Seed 20261039), beide Deckel, Nullbefund; Nutzer-Entscheid 2026-09-11: b02 als korrektere Fassung (755 Merkmale) bester Stand",
+    "tor2a": "Variante B als Generator: siehe PREREG_v28_window.md par.10",
+    "tor2b": "Segment 2 gegen v27-b01: 1,022 gegen 0,895 (Seed 20261044, n=229) und 1,015 gegen 0,901 (Seed 20261046, n=392) volle Spalten je Seite",
+    "anker": "126:24 (Segment 2, hv1_anchor_v2)",
+    "champion2": "101:49 gegen Artefakt v26-b01 (Cross-Aera)",
+    "ablations": "b03 (ohne Ausflug-Klasse) 77:83 und 26:44, b04 (ohne G-2) 55:65 und 114:116: keine schlaegt b02"
+  },
+  "referee_selftest": {
+    "datum": "2026-09-12 06:45",
+    "handshake": {
+      "ok": true,
+      "artifact_contract_hash": "39648b95bbba1acf",
+      "current_contract_hash": "39648b95bbba1acf"
+    },
+    "golden": {
+      "ran": true,
+      "mismatches": []
+    },
+    "partien": {
+      "wins_a": 0,
+      "wins_b": 2,
+      "n": 2
+    }
+  },
+  "live_wheel_check": {
+    "direct_url": {
+      "archive_info": {
+        "hash": "sha256=ea980d9f3c0c95569620c3ea6f8a4626066cd7f0437f03bcafe3b9b783c107c7",
+        "hashes": {
+          "sha256": "ea980d9f3c0c95569620c3ea6f8a4626066cd7f0437f03bcafe3b9b783c107c7"
+        }
+      },
+      "url": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl (relativ zur Repo-Wurzel; pip direct_url ohne Rechnerpfad)"
+    },
+    "wheel_sha256_now": "ea980d9f3c0c95569620c3ea6f8a4626066cd7f0437f03bcafe3b9b783c107c7",
+    "note": "sha256 des am 2026-09-12 03:47 gebauten Wheels (Knopf-Durchgang); im Artefakt als mosaic_rust_knobs_20260912.whl; live installiert identisch (geprueft 06:25)"
+  },
+  "champion_note": "Erster Champion nach dem Einfrieren (v25-v27) und erste Architekturaenderung: Variante B des Kuppelstapel-Fixes (11 Merkmale 744..754, INPUT_SIZE 755, Rust-Merkmalsbauer). Gegen v28-b01 gemessen gleichauf, gewaehlt als korrektere Fassung (Nutzer 2026-09-11). Generator der Generation v29. Erstes Artefakt im Leitersegment 2 (Anker hv1_anchor_v2)."
+}

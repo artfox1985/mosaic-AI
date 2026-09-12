@@ -18198,3 +18198,42 @@ lebenden Gegner bestanden. Ein `PermissionError` auf `manifest.json` (OneDrive-S
 verschluckte dabei einen schon berechneten Netzzug, weil `drive_ai` das Manifest VOR dem Log
 schreibt; seitdem wiederholt `save_manifest` den Schreibversuch, und ein neues Unterkommando
 `step` laesst im Notfall nur die KI ziehen.
+
+## 2026-09-12, 01:31-06:45 -- Neuverankerung (Segment 2) und Promotion v28-b02
+
+Nach dem Nutzer-Entscheid "setz den anker neu" (02:10, Anlass: Anker-Drift ROT durch den
+Phantom-Fix A2) lief `tools/night_reanchor.sh` exklusiv: drei Anker-Kanten gegen
+`hv1_anchor_v2` (v28-b02 126:24, v28-b01 132:18, v27-b01 124:26; je n=150, Handshake gruen ohne
+Cross-Aera, 1.441-1.491 s) und die Nachbar-Kante v28-b02 gegen v27-b01 (Seed 20261044, SPRT
+nach 115 Paaren 133:97, p 0,0198). Register neu: `evaluations/elo_history.csv` beginnt mit
+diesen Kanten, das Alt-Register liegt in `archive/elo_history_pre_phantomfix.csv`.
+
+03:41-03:48 Knopf-Bau (`tools/night_v28_knob_build.sh`): Rundenschaetzer K4, Rueckgabe-
+Reihenfolge und Startslot-Diagnose in EINEM Wheel, alle auf Default; 601 Lib-Tests, Fixture
+unveraendert, Kontrakt 39648b95bbba1acf, Anker-Drift und Konservierung gruen. Zwei Anlaeufe
+scheiterten vorher: das json!-Literal von engine_config_json riss das Makro-Rekursionslimit
+(recursion_limit 256 als Crate-Attribut), und der Registratur-Scanner sah die Startslot-
+Lesestelle nicht (Name in einer Variablen; jetzt zwei Literal-Aufrufe).
+
+03:48-06:17 Promotions-Messungen (`tools/night_v28_promotion.sh`): Replikation der Nachbar-Kante
+Seed 20261046 bis zum Deckel 212:188 OHNE Entscheid (p 0,281); Spaltensonde und Plattenpunkte
+auf beiden Kanten (1,02 gegen 0,90 volle Spalten je Seite, Zuwachs in den vertikalen Reihen);
+Champion-2-Kante gegen das Artefakt v26-b01 101:49 (Cross-Aera, force-cross-era, Golden-
+Selbsttest 10/10); sigma/Prior 2,222 (Runden 3/4 einzeln 3,04/3,76); Platt frozen_v3
+A -0,0539 / B 0,6684 / Brier 0,22537 (in server.py), frozen_v1 +0,3840 / 0,6074 / 0,25217.
+
+06:17-06:45 Einfrieren (`tools/night_v28_freeze.sh`, zweiter Anlauf: der erste Schreiblauf der
+Paritaets-Fixture scheiterte an einer gesperrten Objektdatei in engine/target, os error 32,
+vermutlich OneDrive; der Pruefaufruf lief daraufhin gegen die alte Fixture rot und die Master-
+Kette stoppte sauber vor dem Artefakt): set_champion v28-b02_brierbest, Fixture
+e1f94c44f0c7959b (Schreiblauf und frische Gegenprobe gruen), Artefakt
+`models/frozen_champions/v28-b02/` (Modell, Spec von v27-b01 unveraendert, Wheel
+`mosaic_rust_knobs_20260912.whl` sha256 ea980d9f..., identisch mit dem live installierten, venv,
+Golden Probe 10 Sonden in 1.450 s, Referee-Selbsttest Handshake gruen, Golden 10/10, 2 Partien).
+Manifest vervollstaendigt (Elo 1296 [1242, 1354] aus 930 Partien, Segment 2). README auf den
+neuen Champion und das Segment 2 umgeschrieben.
+
+Offen aus diesem Block: dritter Seed der Nachbar-Kante ohne Fruehstopp (v26-Praezedenz),
+Messblock D (Ueberraschungs-Kante, C2), Einhuellende A1/A2, Startkuppel Stufe 0 (volle Messung),
+alles in `tools/night_v28_resume_freeze.sh` ab 06:19.
+

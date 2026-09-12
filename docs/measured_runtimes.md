@@ -185,6 +185,12 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Anker-Kante Segment 2 (hv1_anchor_v2, `frozen_referee_match.py`, n=150, 6 Worker), 3 Kanten | **1.441 / 1.491 / 1.489 s** | 9,6-9,9 s je Partie; Artefakte `anchor_v2_arena_<name>.json` |
 | Nachbar-Kante Segment 2 v28-b02 gegen v27-b01 (paired_gating, 10 Threads, Logs), SPRT nach 115 Paaren | **3.243 s** | 14,1 s je Partie |
 | Knopf-Bau 2026-09-12: Lib-Tests (601) / no-run / Wheel+pip / Drift / Konservierung / Sonden-Rauchtest | 84 s / 33 s / 34 s / 19 s / 12 s / 18,7 s | `tools/night_v28_knob_build.sh` |
+| Replikation Nachbar-Kante Seed 20261046, 200 Paare bis zum Deckel, 10 Threads, Logs | **5.449 s** | 13,6 s je Partie |
+| Spaltensonde / Plattenpunkte je Kante (230 bzw. 400 Partien, Replay) | 49 s + 1 s / 108 s + 1 s | einkernig |
+| Champion-2-Kante gegen Artefakt v26-b01 (Cross-Aera, 150 Partien, 6 Prozesse) | **2.516 s** | 16,8 s je Partie |
+| sigma/Prior-Balance (300 Zustaende @400) / Platt v3 / Platt v1 | 787 s / 12 s / 9 s | |
+| Paritaets-Fixture schreiben + Gegenprobe (je cargo test, warm) | 2 x ~14 s + Bau ~32 s | ein Schreiblauf scheiterte an einer OneDrive-Dateisperre (os error 32), Wiederholung gruen |
+| Einfrieren v28-b02: venv 24 s / Golden Probe (10 Sonden @400, einkernig) **1.450 s** / Referee-Selbsttest 2 Partien 78 s | | `tools/night_v28_freeze.sh` |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 
