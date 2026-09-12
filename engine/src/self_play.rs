@@ -1268,6 +1268,63 @@ fn forced_start_slot(pi: usize) -> Option<(usize, usize)> {
     }
 }
 
+/// Gueltigkeitspruefung von `MOSAIC_START_SLOT_RANDOM_P` -- `None` = ungueltig.
+/// Eigene reine Funktion (gleiches Muster wie `sanitize_deviate_prob` und
+/// `sanitize_excursion_prob`), damit die Pruefung isoliert testbar bleibt: der
+/// Getter darunter cached prozessweit (OnceLock).
+fn sanitize_start_slot_random_p(raw: f64) -> Option<f64> {
+    (0.0..=1.0).contains(&raw).then_some(raw)
+}
+
+/// Erzeugungsknopf `MOSAIC_START_SLOT_RANDOM_P`
+/// (`PREREG_start_dome_choice.md` par.9b, `PREREG_v29_window.md` par.6b):
+/// Wahrscheinlichkeit JE PARTIE UND JE SPIELER, dass der Slot der Startkuppel
+/// gleichverteilt aus den freien Slots gezogen wird statt von der Handregel zu
+/// kommen. Zweck ist NICHT, einen besseren Slot zu lernen (Stufe 0 par.9: der
+/// Bestandsslot ist der beste), sondern den Zustandsraum abzudecken, den ein
+/// Gegner mit anderer Regel erzeugt.
+///
+/// Default `0.0` = AUS = byte-identisches Bestandsverhalten, und zwar im
+/// starken Sinn: bei `0.0` wird KEINE einzige Zufallszahl gezogen (siehe
+/// [`sample_random_start_slot`]s Fruehausstieg), der Zufallsstrom der Partie
+/// verschiebt sich also nicht. Ausserhalb `[0,1]` -> Default mit EINMALIGER
+/// Warnung (OnceLock).
+fn start_slot_random_p() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let raw = crate::net_mcts::read_f64_env("MOSAIC_START_SLOT_RANDOM_P", 0.0);
+        sanitize_start_slot_random_p(raw).unwrap_or_else(|| {
+            eprintln!(
+                "⚠️  MOSAIC_START_SLOT_RANDOM_P={raw} liegt nicht in [0,1] -- Startslot-Streuung \
+                 bleibt AUS (0.0)."
+            );
+            0.0
+        })
+    })
+}
+
+/// Kern der Startslot-Streuung als REINE Funktion: `p` und der RNG kommen von
+/// aussen, damit der Test beide Enden ohne `std::env::set_var` fahren kann.
+///
+/// Vertrag (die Bitidentitaets-Bedingung des Knopfs): bei `p <= 0.0` oder
+/// leerer Slotmenge wird VOR jeder Ziehung ausgestiegen -- kein `rng`-Griff,
+/// der Strom der Partie bleibt Zug fuer Zug der alte. Erst bei `p > 0` faellt
+/// die Muenze (ein `f64`-Zug), und nur wenn sie faellt, kommt der
+/// gleichverteilte Index dazu (ein zweiter Zug).
+fn sample_random_start_slot<R: Rng + ?Sized>(
+    p: f64,
+    empties: &[(usize, usize)],
+    rng: &mut R,
+) -> Option<(usize, usize)> {
+    if !(p > 0.0) || empties.is_empty() {
+        return None;
+    }
+    if rng.random::<f64>() >= p {
+        return None;
+    }
+    Some(empties[rng.random_range(0..empties.len())])
+}
+
 pub(crate) fn choose_start_placement(state: &GameState, pi: usize) -> Option<(usize, usize, usize, u32)> {
     choose_start_placement_with_slot(state, pi, forced_start_slot(pi))
 }
@@ -1309,7 +1366,34 @@ pub(crate) fn choose_start_placement_with_slot(
 /// und nimmt einen one-hot-`dome`-Record auf. Nicht-Startspieler legt zuerst
 /// (Engine erzwingt das). `player` = `current_player` (= Startspieler), exakt
 /// wie der Python-Loop (current_player wechselt erst nach Start-Placement).
-fn start_placement_step<R: Rng + ?Sized>(game: &mut Game, _rng: &mut R) -> Option<Map<String, Value>> {
+///
+/// EINZIGE Wirkstelle des Erzeugungsknopfs `MOSAIC_START_SLOT_RANDOM_P`
+/// (par.9b): dieser Schritt laeuft NUR im aufzeichnenden Zweig der
+/// vereinheitlichten Schleife (`unified_game_loop`, `recording`), also im
+/// Self-Play. Die Arena-Pfade legen die Startkuppel ohne Record ueber
+/// `choose_start_placement` bzw. (seit par.9c) ueber die Suche.
+///
+/// `start_search` (par.9c): `Some(..)` = diese Seite laesst ihre Startsetzung
+/// SUCHEN statt sie per Handregel zu legen. `None` (Default, Knopf 0, und
+/// jede Heuristik-Seite) = bitidentischer Bestand -- kein Netzaufruf, keine
+/// Zufallszahl, derselbe Record wie zuvor.
+fn start_placement_step<R: Rng + ?Sized>(
+    game: &mut Game,
+    rng: &mut R,
+    start_search: Option<StartSearchParams<'_>>,
+) -> Option<Map<String, Value>> {
+    start_placement_step_with_random_p(game, rng, start_slot_random_p(), start_search)
+}
+
+/// Rumpf von [`start_placement_step`] mit von aussen gereichter Streu-Dosis --
+/// nur damit der Test beide Enden (`0.0` und `1.0`) ohne
+/// `std::env::set_var` fahren kann; der Getter liest prozessweit per OnceLock.
+fn start_placement_step_with_random_p<R: Rng + ?Sized>(
+    game: &mut Game,
+    rng: &mut R,
+    random_p: f64,
+    start_search: Option<StartSearchParams<'_>>,
+) -> Option<Map<String, Value>> {
     let recorded_player = game.state.current_player;
     let first = game.state.current_player;
     let non_starter = 1 - first;
@@ -1346,8 +1430,39 @@ fn start_placement_step<R: Rng + ?Sized>(game: &mut Game, _rng: &mut R) -> Optio
         }
     }
 
+    // Slotwahl (par.9b): der Diagnoseknopf MOSAIC_START_SLOT_P0/P1 hat
+    // VORRANG -- ist er gesetzt, faellt keine Muenze und es wird keine
+    // Zufallszahl gezogen (die Stufe-0-Sonde bleibt exakt reproduzierbar).
+    // Sonst entscheidet die Streuung; bei p = 0 steigt sie VOR dem ersten
+    // rng-Griff aus, der Zufallsstrom der Partie ist dann Zug fuer Zug der
+    // alte (Bitidentitaet des Bestands).
+    let forced_slot = forced_start_slot(pi);
+    let randomized_slot = match forced_slot {
+        Some(_) => None,
+        None => sample_random_start_slot(random_p, &empties, rng),
+    };
+    // par.9c: die SUCHE entscheidet nur, wenn weder der Diagnoseknopf noch
+    // die Streuung schon einen Slot festgelegt haben -- beide sind
+    // Erzeugungs-/Messvorgaben und haben Vorrang (Auftrag 2026-09-12).
+    // `search` ist `None` bei Knopf 0 UND auf jeder Heuristik-Seite: dann
+    // laeuft der Block unten byte-gleich zum Bestand.
+    let search = match (forced_slot, randomized_slot, start_search) {
+        (None, None, Some(p)) => crate::net_mcts::search_start_placement(
+            p.net, &game.state, pi, p.base_sims, p.add_root_noise, rng, &p.search_config,
+        ),
+        _ => None,
+    };
+
     // Heuristik-Wahl (Farb-Häufigkeit + Eckbonus) — gemeinsamer Helfer.
-    let (tile_id, r, c, rot) = choose_start_placement(&game.state, pi)?;
+    // Platte und Rotation kommen weiter aus der Handregel, nur eingeschraenkt
+    // auf den gezogenen Slot; belegter Slot faellt dort auf den Bestand
+    // zurueck (`choose_start_placement_with_slot`). Mit
+    // `forced_slot.or(randomized_slot) == forced_start_slot(pi)` ist der
+    // Aufruf byte-gleich zum frueheren `choose_start_placement`.
+    let (tile_id, r, c, rot) = match &search {
+        Some(s) => s.chosen_placement(),
+        None => choose_start_placement_with_slot(&game.state, pi, forced_slot.or(randomized_slot))?,
+    };
     let d_idx = game
         .state
         .dome_display
@@ -1364,16 +1479,124 @@ fn start_placement_step<R: Rng + ?Sized>(game: &mut Game, _rng: &mut R) -> Optio
         "rotation": rot,
         "is_start": true,
     });
+    // par.9c: bei gesuchter Setzung ERSETZEN Besuchsverteilung und
+    // Kandidatenmenge das One-Hot bzw. die `"type":"dome"`-Maske.
+    //
+    // WARUM eine ANDERE Aktionsform (`choose_dome_slot` statt `dome`), obwohl
+    // der Record sonst gleich bleibt: `features.rs::action_to_id` (und der
+    // Python-Spiegel `neural_net.py::action_to_id`) kennt `"dome"` NICHT und
+    // faellt auf `405` -- alle bis zu 108 Startaktionen landeten auf EINER ID,
+    // und zwar ausgerechnet auf der von `dome_stack_peek`. Als Policy-ZIEL mit
+    // Gewicht 1 (siehe corpus_dataset.py) waere das aktiv schaedlich. Mit der
+    // zweistufigen Kuppel-Kodierung, die der Kopf fuer Kuppelzuege im Drafting
+    // ohnehin lernt, trennen die Slots (328..354); die vier Rotationen
+    // derselben (Platte, Slot) fallen zusammen und ihre Besuchsmasse addiert
+    // sich (`t_policy[id] += prob`) -- gewollt, das ist genau die Aufteilung
+    // des Aktionsraums. Der Bestandspfad (Handregel/Streuung) behaelt
+    // `"type":"dome"` unveraendert.
+    let (policy_json, valid_json) = match &search {
+        None => (json!([{ "action": chosen_env, "prob": 1.0 }]), Value::Array(valid_actions)),
+        Some(s) => {
+            let start_action = |k: &crate::net_mcts::StartPlacementCandidate| -> Value {
+                json!({
+                    "type": "choose_dome_slot",
+                    "display_index": k.display_index,
+                    "slot_row": k.slot_row,
+                    "slot_col": k.slot_col,
+                    "rotation": k.rotation,
+                    "tile_id": k.tile_id,
+                    "is_start": true,
+                })
+            };
+            let total = s.total_visits();
+            let policy: Vec<Value> = if total > 0 {
+                s.candidates
+                    .iter()
+                    .filter(|k| k.visits > 0)
+                    .map(|k| json!({ "action": start_action(k), "prob": k.visits as f64 / total as f64 }))
+                    .collect()
+            } else {
+                // Kein Besuch zustande gekommen (Budget 0): One-Hot auf die
+                // gewaehlte Setzung, dieselbe Konvention wie der
+                // Ein-Aktion-Kurzschluss im Drafting.
+                vec![json!({ "action": start_action(&s.candidates[s.chosen]), "prob": 1.0 })]
+            };
+            let valids: Vec<Value> = s.candidates.iter().map(start_action).collect();
+            (Value::Array(policy), Value::Array(valids))
+        }
+    };
 
     apply_start_placement(&mut game.state, pi, tile_id, r, c, rot).ok()?;
 
     let mut m = Map::new();
     m.insert("state".into(), state_json);
-    m.insert("policy".into(), json!([{ "action": chosen_env, "prob": 1.0 }]));
-    m.insert("valid_actions".into(), Value::Array(valid_actions));
+    m.insert("policy".into(), policy_json);
+    m.insert("valid_actions".into(), valid_json);
     m.insert("moon_order_target".into(), Value::Null);
     m.insert("player".into(), json!(recorded_player));
+    // par.9b: eine GESTREUTE Setzung ist kein Policy-Ziel -- sonst lernt der
+    // Kopf, die Zufallswahl zu imitieren. Die Value-Labels bleiben gueltig,
+    // genau sie sind der Zweck der Streuung. Beide Felder sind ADDITIV: bei
+    // p = 0 wird keines geschrieben, der Record ist byte-gleich zum Bestand.
+    // `start_slot_randomized` steht zusaetzlich zum bereits von den
+    // Drafting-Records bekannten `policy_target_valid`, damit eine Sonde die
+    // gestreuten Setzungen zaehlen kann, ohne sie mit den anderen Quellen von
+    // `policy_target_valid = false` (PCR, v2-Vorzug) zu verwechseln.
+    if randomized_slot.is_some() {
+        m.insert("policy_target_valid".into(), json!(false));
+        m.insert("start_slot_randomized".into(), json!(true));
+    }
+    // par.9c: der Record-Vertrag der GESUCHTEN Setzung. Beide Felder stehen
+    // NUR bei Knopf 1 und gesuchter Setzung -- bei Knopf 0 ist der Record
+    // byte-gleich zum Bestand. `start_by_search` ist der Schluessel, an dem
+    // `corpus_dataset.py` das Policy-Gewicht 1 vergibt (alle uebrigen
+    // Start-Records behalten Gewicht 0).
+    if search.is_some() {
+        m.insert("start_by_search".into(), json!(true));
+        m.insert("policy_target_valid".into(), json!(true));
+    }
     Some(m)
+}
+
+/// par.9c: alles, was die Startsetzungs-Suche EINER Seite braucht.
+///
+/// `None` an der Aufrufstelle heisst "diese Seite legt per Handregel" -- der
+/// Bestand. Gesetzt wird es ausschliesslich fuer NETZ-Seiten mit
+/// `search_config.start_by_search == 1`; Heuristik-Seiten (hv1/hv2, der
+/// Elo-Anker) bekommen es NIE, sonst bewegte sich der Anker.
+#[derive(Clone, Copy)]
+pub(crate) struct StartSearchParams<'a> {
+    pub net: &'a Net,
+    /// Sim-Budget der Suche (wie beim Drafting die Basis; die Skalierung
+    /// macht `net_effective_sims` in der Suche selbst).
+    pub base_sims: u32,
+    pub search_config: SearchConfig,
+    /// Gumbel-Wurzel-Noise: `true` nur in der ERZEUGUNG (Self-Play), damit
+    /// die Arena-Pfade bei festem Seed deterministisch bleiben.
+    pub add_root_noise: bool,
+}
+
+impl<'a> StartSearchParams<'a> {
+    /// Baut die Parameter, WENN diese Seite ein Netz ist UND ihr Spec-/
+    /// Env-Knopf auf 1 steht. Genau EINE Stelle, an der die Bedingung
+    /// geschrieben steht -- die sechs Aufrufer lesen sie hier ab, statt sie
+    /// jeweils neu zu formulieren.
+    pub fn for_net(
+        net: Option<&'a Net>,
+        base_sims: u32,
+        search_config: &SearchConfig,
+        add_root_noise: bool,
+    ) -> Option<Self> {
+        if search_config.start_by_search != 1 {
+            return None;
+        }
+        net.map(|net| StartSearchParams {
+            net,
+            base_sims,
+            search_config: *search_config,
+            add_root_noise,
+        })
+    }
 }
 
 /// Legale Tiling-Aktionen im agent_env-Schema (für `valid_actions` = Trainings-
@@ -2704,6 +2927,13 @@ struct PlayerLoopConfig<'a> {
     /// hier auf. Modus 1 braucht zusaetzlich `tiling_net`, das Netz dieser
     /// Seite.
     return_order_mode: u8,
+    /// `PREREG_start_dome_choice.md` par.9c: Startsetzung DIESER SEITE per
+    /// Suche statt per Handregel. `None` = Bestand (Handregel) -- so bei
+    /// jeder Heuristik-Seite UND bei jeder Netz-Seite mit
+    /// `start_by_search == 0` (Default). Gebaut ueber
+    /// [`StartSearchParams::for_net`], damit die Bedingung nur an EINER
+    /// Stelle steht.
+    start_search: Option<StartSearchParams<'a>>,
 }
 
 impl PlayerLoopConfig<'_> {
@@ -2907,9 +3137,25 @@ fn unified_game_loop<R: Rng + ?Sized>(
         match game.state.phase {
             Phase::StartPlacement | Phase::Drafting => {
                 if game.state.players.iter().any(|p| p.start_tile_pending) {
+                    // par.9c: WELCHE Seite setzt, entscheidet die
+                    // Nicht-Starter-zuerst-Regel -- dieselbe Herleitung wie im
+                    // Arena-Zweig unten und in `start_placement_step`. Hier
+                    // vorgezogen, weil die Startsetzungs-Suche eine Eigenschaft
+                    // GENAU DIESER Seite ist (`cfg.players[pi]`), nicht der
+                    // Partie.
+                    let first_now = game.state.current_player;
+                    let non_starter_now = 1 - first_now;
+                    let pending_pi = if game.state.players[non_starter_now].start_tile_pending {
+                        non_starter_now
+                    } else if game.state.players[first_now].start_tile_pending {
+                        first_now
+                    } else {
+                        break;
+                    };
+                    let start_search = cfg.players[pending_pi].start_search;
                     if recording {
                         // Self-Play-Pfade: Startplatzierung MIT Trainings-Record.
-                        match start_placement_step(&mut game, rng) {
+                        match start_placement_step(&mut game, rng, start_search) {
                             Some(rec) => records.push(rec),
                             None => break,
                         }
@@ -2917,16 +3163,24 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         // Arena-Pfade: Startplatzierung ohne Aufzeichnung
                         // (inkl. der historisch abweichenden Abbruch-Kanten:
                         // `let _ = apply_start_placement` statt `.ok()?`).
-                        let first = game.state.current_player;
-                        let non_starter = 1 - first;
-                        let pi = if game.state.players[non_starter].start_tile_pending {
-                            non_starter
-                        } else if game.state.players[first].start_tile_pending {
-                            first
-                        } else {
-                            break;
-                        };
-                        match choose_start_placement(&game.state, pi) {
+                        let pi = pending_pi;
+                        // par.9c: bei Knopf 1 und Netz-Seite entscheidet die
+                        // Suche; `search_start_placement` liefert `None`, wenn
+                        // es keinen legalen Kandidaten gibt -- dann greift der
+                        // Bestandspfad darunter, kein stiller Abbruch. Bei
+                        // Knopf 0 ist `start_search` `None` und der
+                        // `or_else`-Zweig ist der EINZIGE gelaufene Code:
+                        // bitidentischer Bestand.
+                        let placement = start_search
+                            .and_then(|p| {
+                                crate::net_mcts::search_start_placement(
+                                    p.net, &game.state, pi, p.base_sims, p.add_root_noise, rng,
+                                    &p.search_config,
+                                )
+                                .map(|s| s.chosen_placement())
+                            })
+                            .or_else(|| choose_start_placement(&game.state, pi));
+                        match placement {
                             Some((tid, r, c2, rot)) => {
                                 let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
                             }
@@ -3467,6 +3721,9 @@ pub fn play_one_game<R: Rng + ?Sized>(
         // par.4: Heuristik-Self-Play -- der Stapelzug wird hier gar nicht
         // aufgeloest (`apply_via_chosen_action: false`), der Knopf bleibt aus.
         return_order_mode: 0,
+        // par.9c: Heuristik-Self-Play legt die Startkuppel per Handregel,
+        // auch bei Knopf 1 -- hier zieht kein Netz.
+        start_search: None,
     };
     let cfg = GameLoopConfig {
         timeout_secs: heuristic_game_timeout_secs(base_sims)
@@ -3901,7 +4158,10 @@ fn play_net_game<R: Rng + ?Sized>(
         envelope_tiling_value_w: search_config.envelope_tiling_value_w,
         apply_via_chosen_action: true,
         column_build_trace: true,
-        return_order_mode: search_config.return_order_mode,};
+        return_order_mode: search_config.return_order_mode,
+        // par.9c: nur die NETZ-Seite kann ihre Startsetzung suchen, und auch
+        // sie nur bei `start_by_search == 1` (sonst `None` = Handregel).
+        start_search: StartSearchParams::for_net(Some(net), net_sims, &search_config, false),};
     let heur_player = PlayerLoopConfig {
         agent: &heur_agent,
         tiling_net: None,
@@ -3913,6 +4173,10 @@ fn play_net_game<R: Rng + ?Sized>(
         // par.4: die Heuristik-Seite dieser Arena bleibt bei Modus 0 (hv1
         // liest den Knopf nicht).
         return_order_mode: 0,
+        // par.9c: die Heuristik-Seite behaelt die Handregel IMMER -- diese
+        // Arena ist der Elo-Verankerungspfad, ihr Anker darf sich nicht
+        // bewegen.
+        start_search: None,
     };
     // `net_board` waehlt das Brett der Netz-Seite (alle Aufrufer nutzen 0).
     let players = if net_board == 0 { [net_player, heur_player] } else { [heur_player, net_player] };
@@ -4074,7 +4338,12 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 envelope_tiling_value_w: search_config_a.envelope_tiling_value_w,
                 apply_via_chosen_action: true,
                 column_build_trace: false,
-                return_order_mode: search_config_a.return_order_mode,},
+                return_order_mode: search_config_a.return_order_mode,
+                // par.9c: je Seite aus IHRER Spec -- genau der Messnutzen
+                // (Champion mit Such-Start gegen Champion mit Handregel im
+                // selben Prozess).
+                start_search: StartSearchParams::for_net(
+                    Some(net_a), sims_a, &search_config_a, false),},
             PlayerLoopConfig {
                 agent: &agent_b,
                 tiling_net: Some(net_b),
@@ -4083,7 +4352,9 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 envelope_tiling_value_w: search_config_b.envelope_tiling_value_w,
                 apply_via_chosen_action: true,
                 column_build_trace: false,
-                return_order_mode: search_config_b.return_order_mode,},
+                return_order_mode: search_config_b.return_order_mode,
+                start_search: StartSearchParams::for_net(
+                    Some(net_b), sims_b, &search_config_b, false),},
         ],
         vorzug_greift: None,
         start_state: None,
@@ -4220,7 +4491,29 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                     } else {
                         break;
                     };
-                    match choose_start_placement(&game.state, pi) {
+                    // `PREREG_start_dome_choice.md` par.9c: dieser Pfad zieht
+                    // beide Netze aus der UMGEBUNG (Task #88, Diagnose, kein
+                    // Arena-/Self-Play-Pfad, ausserhalb des Wave-1-Scopes von
+                    // PREREG_agent_encapsulation.md) -- deshalb hier EIN
+                    // gemeinsamer `from_env()`-Knopf statt zweier Specs.
+                    // `SearchConfig::from_env()` liest `MOSAIC_START_BY_SEARCH`
+                    // frisch; bei 0 (Default) laeuft die Handregel wie bisher,
+                    // bitidentisch.
+                    let hybrid_cfg = crate::net_mcts::SearchConfig::from_env();
+                    let start_net = if pi == hybrid_board { hybrid_policy } else { plain_net };
+                    let start_sims = if pi == hybrid_board { sims_hybrid } else { sims_plain };
+                    let placement = StartSearchParams::for_net(
+                        Some(start_net), start_sims, &hybrid_cfg, false,
+                    )
+                    .and_then(|p| {
+                        crate::net_mcts::search_start_placement(
+                            p.net, &game.state, pi, p.base_sims, p.add_root_noise, rng,
+                            &p.search_config,
+                        )
+                        .map(|s| s.chosen_placement())
+                    })
+                    .or_else(|| choose_start_placement(&game.state, pi));
+                    match placement {
                         Some((tid, r, c2, rot)) => {
                             let _ = apply_start_placement(&mut game.state, pi, tid, r, c2, rot);
                         }
@@ -4852,7 +5145,12 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         envelope_tiling_value_w: search_config.envelope_tiling_value_w,
         apply_via_chosen_action: true,
         column_build_trace: false,
-        return_order_mode: search_config.return_order_mode,};
+        return_order_mode: search_config.return_order_mode,
+        // par.9c, Traegerprinzip: was die Arena spielt, erzeugt das
+        // Self-Play. `add_root_noise` folgt dem Drafting-Knopf dieses Laufs
+        // -- die Erzeugung darf an der Wurzel streuen, die Arena nicht.
+        start_search: StartSearchParams::for_net(
+            Some(net), base_sims, &search_config, add_root_noise),};
     let player1 = PlayerLoopConfig {
         agent: &agent1,
         tiling_net: Some(net),
@@ -4861,7 +5159,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         envelope_tiling_value_w: search_config.envelope_tiling_value_w,
         apply_via_chosen_action: true,
         column_build_trace: false,
-        return_order_mode: search_config.return_order_mode,};
+        return_order_mode: search_config.return_order_mode,
+        start_search: StartSearchParams::for_net(
+            Some(net), base_sims, &search_config, add_root_noise),};
     // par.5: Greif-Zaehler nur angelegt und verdrahtet, wenn der Knopf aktiv
     // ist -- sonst exakt dieselbe Nebenwirkungsfreiheit wie vorher.
     let greif_counter = std::cell::Cell::new([0u64; 2]);
@@ -6818,7 +7118,8 @@ pub(crate) mod tests {
         envelope_tiling_value_w: 0.0,
                 apply_via_chosen_action: false,
                 column_build_trace: false,
-                return_order_mode: 0,};
+                return_order_mode: 0,
+                start_search: None,};
             let cfg = GameLoopConfig {
                 timeout_secs: 600,
                 seed_from_steps: false,
@@ -9882,6 +10183,293 @@ mod start_slot_tests {
             choose_start_placement_with_slot(&state, pi, Some((0, 0))),
             choose_start_placement_with_slot(&state, pi, None),
             "besetzter Slot -> Bestandswahl"
+        );
+    }
+
+    // ── Streuung der Startslots (PREREG_start_dome_choice.md par.9b) ─────────
+
+    /// Die Grenzen des Knopfs: nur `[0,1]` ist gueltig, alles andere faellt
+    /// auf den Default zurueck (Warnung im Getter).
+    #[test]
+    fn start_slot_random_p_accepts_only_probabilities() {
+        for ok in [0.0, 0.15, 0.5, 1.0] {
+            assert_eq!(sanitize_start_slot_random_p(ok), Some(ok), "{ok} ist gueltig");
+        }
+        for bad in [-0.1, 1.000_001, f64::NAN, f64::INFINITY] {
+            assert_eq!(sanitize_start_slot_random_p(bad), None, "{bad} darf nicht durchgehen");
+        }
+    }
+
+    /// Default-AUS: ungesetzt ist der Knopf `0.0`.
+    #[test]
+    fn start_slot_random_p_is_off_by_default() {
+        assert_eq!(
+            start_slot_random_p(),
+            0.0,
+            "MOSAIC_START_SLOT_RANDOM_P muss ungesetzt 0.0 (= AUS) sein"
+        );
+    }
+
+    /// Die Bitidentitaets-Bedingung, strukturell geprueft: bei `p = 0` nimmt
+    /// die Streuung KEINEN Zug aus dem Partie-RNG -- zwei gleich geseedete
+    /// Stroeme liefern danach dieselbe Zahlenfolge.
+    #[test]
+    fn p_zero_consumes_no_random_number() {
+        let empties: Vec<(usize, usize)> = (0..9).map(|i| (i / 3, i % 3)).collect();
+        let mut touched = StdRng::seed_from_u64(4711);
+        let mut untouched = StdRng::seed_from_u64(4711);
+        assert_eq!(sample_random_start_slot(0.0, &empties, &mut touched), None);
+        // Auch ein negativer (ungueltiger, hier direkt gereichter) Wert darf
+        // nichts ziehen -- der Fruehausstieg prueft `p > 0`, nicht `p != 0`.
+        assert_eq!(sample_random_start_slot(-1.0, &empties, &mut touched), None);
+        // Und eine leere Slotmenge ebenso wenig.
+        assert_eq!(sample_random_start_slot(1.0, &[], &mut touched), None);
+        for i in 0..16 {
+            assert_eq!(
+                touched.random::<u64>(),
+                untouched.random::<u64>(),
+                "Zufallsstrom bei p = 0 verschoben (Zug {i})"
+            );
+        }
+    }
+
+    /// `p = 1` liefert IMMER einen freien Slot, und ueber viele Ziehungen
+    /// kommt jeder der neun Slots vor (gleichverteilt gezogen).
+    #[test]
+    fn p_one_always_draws_a_free_slot_and_covers_the_grid() {
+        let empties: Vec<(usize, usize)> = (0..9).map(|i| (i / 3, i % 3)).collect();
+        let mut rng = StdRng::seed_from_u64(2026);
+        let mut counts = [0u32; 9];
+        let n = 9_000;
+        for _ in 0..n {
+            let slot = sample_random_start_slot(1.0, &empties, &mut rng)
+                .expect("p = 1 zieht immer einen Slot");
+            assert!(empties.contains(&slot), "{slot:?} ist kein freier Slot");
+            counts[slot.0 * 3 + slot.1] += 1;
+        }
+        for (idx, &c) in counts.iter().enumerate() {
+            // Grobe Schranke (Erwartung 1000 je Slot): der Test soll die
+            // Gleichverteilung belegen, nicht sie scharf schaetzen.
+            assert!(
+                (800..1200).contains(&c),
+                "Slot {idx} kam {c} von {n} Mal -- das ist nicht gleichverteilt"
+            );
+        }
+    }
+
+    /// Eine Teilmenge freier Slots wird auch nur aus dieser Teilmenge
+    /// gezogen -- die Streuung erfindet keinen belegten Slot.
+    #[test]
+    fn the_draw_stays_inside_the_given_free_slots() {
+        let empties = [(0usize, 1usize), (2, 2)];
+        let mut rng = StdRng::seed_from_u64(7);
+        for _ in 0..200 {
+            if let Some(slot) = sample_random_start_slot(0.5, &empties, &mut rng) {
+                assert!(empties.contains(&slot), "{slot:?} liegt ausserhalb der freien Slots");
+            }
+        }
+    }
+
+    /// Frischer `Game` fuer den Record-Test -- dieselbe Bauform wie
+    /// [`fresh_state`], nur als Traeger.
+    fn fresh_game(seed: u64) -> crate::game::Game {
+        crate::game::Game { state: fresh_state(seed) }
+    }
+
+    /// Der Record-Vertrag (par.9b): bei `p = 0` traegt der Start-Record
+    /// WEDER `start_slot_randomized` NOCH `policy_target_valid` -- byte-gleich
+    /// zum Bestand. Bei `p = 1` traegt er beide, und die Setzung liegt im
+    /// gezogenen Slot statt im Bestandsslot der Handregel.
+    #[test]
+    fn a_randomized_start_placement_marks_its_record() {
+        // Bestandsslot derselben Ausgangsstellung, ohne Streuung ermittelt.
+        let reference = fresh_game(31);
+        // Spielerwahl exakt wie im Schritt selbst: der Nicht-Startspieler legt
+        // zuerst (Engine erzwingt das).
+        let first = reference.state.current_player;
+        let non_starter = 1 - first;
+        let pi = if reference.state.players[non_starter].start_tile_pending { non_starter } else { first };
+        let (_, br, bc, _) = choose_start_placement(&reference.state, pi).expect("Bestandswahl");
+
+        let mut rng = StdRng::seed_from_u64(123);
+        let mut legacy_game = fresh_game(31);
+        // `None` = keine Startsetzungs-Suche (par.9c, Knopf 0) -- der
+        // Bestandspfad dieses Tests bleibt damit unveraendert.
+        let rec = start_placement_step_with_random_p(&mut legacy_game, &mut rng, 0.0, None)
+            .expect("Startsetzung muss gelingen");
+        assert!(!rec.contains_key("start_slot_randomized"), "p = 0 darf nicht markieren");
+        assert!(!rec.contains_key("policy_target_valid"), "p = 0 darf das Policy-Ziel nicht entwerten");
+        assert_eq!(
+            (
+                rec["policy"][0]["action"]["slot_row"].as_u64().unwrap() as usize,
+                rec["policy"][0]["action"]["slot_col"].as_u64().unwrap() as usize,
+            ),
+            (br, bc),
+            "p = 0 muss die Bestandswahl der Handregel liefern"
+        );
+
+        // Mehrere Seeds, damit mindestens einer einen ANDEREN Slot zieht --
+        // die Ziehung darf denselben Slot treffen, das ist kein Fehler.
+        let mut saw_other_slot = false;
+        for seed in 0..12u64 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let mut game = fresh_game(31);
+            let rec = start_placement_step_with_random_p(&mut game, &mut rng, 1.0, None)
+                .expect("Startsetzung muss gelingen");
+            assert_eq!(
+                rec.get("start_slot_randomized"),
+                Some(&json!(true)),
+                "p = 1 muss die gestreute Setzung markieren"
+            );
+            assert_eq!(
+                rec.get("policy_target_valid"),
+                Some(&json!(false)),
+                "eine gestreute Setzung ist kein Policy-Ziel"
+            );
+            let action = rec["policy"][0]["action"].clone();
+            let slot = (
+                action["slot_row"].as_u64().unwrap() as usize,
+                action["slot_col"].as_u64().unwrap() as usize,
+            );
+            assert!(
+                !game.state.players[pi].dome_grid.empty_slots().contains(&slot),
+                "der aufgezeichnete Slot muss nach der Setzung belegt sein"
+            );
+            if slot != (br, bc) {
+                saw_other_slot = true;
+            }
+        }
+        assert!(
+            saw_other_slot,
+            "ueber zwoelf Seeds muss die Streuung mindestens einmal einen anderen Slot als den \
+             Bestandsslot ({br},{bc}) treffen"
+        );
+    }
+
+    // ── Startsetzung als Suchentscheid (PREREG_start_dome_choice.md par.9c) ──
+
+    /// Knopf 0 = KEINE Aenderung am Aufrufpfad: `StartSearchParams::for_net`
+    /// liefert `None`, egal ob ein Netz da ist. Damit steht strukturell fest,
+    /// dass bei Default-Knopfstellung KEIN Suchaufruf entstehen KANN -- die
+    /// Bedingung steht nur an dieser einen Stelle (siehe Doku der Funktion).
+    #[test]
+    fn start_by_search_off_yields_no_search_params() {
+        let mut cfg = crate::net_mcts::SearchConfig::from_env();
+        cfg.start_by_search = 0;
+        let path = crate::net::test_model_path("engine_test.onnx");
+        let path = path.to_str().unwrap().to_string();
+        let net = Net::load_auto(&path).unwrap_or_else(|e| {
+            panic!("{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht                     leer-gruen bestehen (Nutzer-Regel: nie leer gruen).")
+        });
+        assert!(
+            StartSearchParams::for_net(Some(&net), 64, &cfg, false).is_none(),
+            "Knopf 0 darf auch MIT Netz keine Such-Parameter ergeben"
+        );
+        cfg.start_by_search = 1;
+        assert!(
+            StartSearchParams::for_net(None, 64, &cfg, false).is_none(),
+            "ohne Netz (Heuristik-Seite) darf auch Knopf 1 keine Such-Parameter ergeben --              sonst bewegte sich der Elo-Anker"
+        );
+        assert!(
+            StartSearchParams::for_net(Some(&net), 64, &cfg, false).is_some(),
+            "Knopf 1 MIT Netz muss suchen"
+        );
+    }
+
+    /// Die Suche liefert eine Setzung AUS DER KANDIDATENMENGE -- kein
+    /// erfundener Slot, keine belegte Zelle, keine Platte ausserhalb der
+    /// Auslage. Das ist die Legalitaets-Zusage, auf die sich
+    /// `RefereeGame::start_placement_apply_external` verlaesst (es prueft
+    /// gegen genau diese Menge).
+    #[test]
+    fn searched_start_placement_is_a_legal_candidate() {
+        let path = crate::net::test_model_path("engine_test.onnx");
+        let path = path.to_str().unwrap().to_string();
+        let net = Net::load_auto(&path).unwrap_or_else(|e| {
+            panic!("{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht                     leer-gruen bestehen (Nutzer-Regel: nie leer gruen).")
+        });
+        let cfg = crate::net_mcts::SearchConfig::from_env();
+        for seed in [7u64, 8, 9] {
+            let state = fresh_state(seed);
+            let first = state.current_player;
+            let non_starter = 1 - first;
+            let pi = if state.players[non_starter].start_tile_pending { non_starter } else { first };
+            let legal = start_placement_kandidaten(&state, pi);
+            assert!(!legal.is_empty(), "Testvoraussetzung: legale Startsetzungen vorhanden");
+            let mut rng = StdRng::seed_from_u64(seed);
+            // Kleines Budget: der Test prueft Legalitaet und Vertrag, nicht
+            // Spielstaerke -- 24 Sims halten ihn unter einer Sekunde.
+            let s = crate::net_mcts::search_start_placement(&net, &state, pi, 24, false, &mut rng, &cfg)
+                .expect("Suche muss eine Setzung liefern");
+            let (tid, r, c, rot) = s.chosen_placement();
+            assert!(
+                legal.iter().any(|(_, t, rr, cc, ro)| (*t, *rr, *cc, *ro) == (tid, r, c, rot)),
+                "gesuchte Setzung ({tid},{r},{c},{rot}) steht nicht in den {} Kandidaten",
+                legal.len()
+            );
+            assert_eq!(s.candidates.len(), legal.len(), "Kandidatenmenge muss vollstaendig sein");
+            assert!(s.total_visits() > 0, "bei Budget > 0 muss mindestens ein Kandidat besucht sein");
+            // Gumbel-Auslese: nur die Top-m werden ueberhaupt expandiert.
+            let besucht = s.candidates.iter().filter(|k| k.visits > 0).count();
+            assert!(
+                besucht <= crate::net_mcts::gumbel_top_m_for_budget(24),
+                "mehr Kandidaten besucht als die Gumbel-Wurzelbreite erlaubt"
+            );
+        }
+    }
+
+    /// Der RECORD-Vertrag (par.9c): `start_by_search` und
+    /// `policy_target_valid` stehen NUR bei gesuchter Setzung im Record, und
+    /// das Policy-Ziel ist dann eine Verteilung ueber mehrere Kandidaten
+    /// statt eines One-Hot. Bei Knopf 0 (`None`) ist der Record byte-gleich
+    /// zum Bestand -- genau dieselbe Zusage wie in
+    /// `a_randomized_start_placement_marks_its_record`.
+    #[test]
+    fn searched_start_record_carries_the_contract_fields() {
+        let path = crate::net::test_model_path("engine_test.onnx");
+        let path = path.to_str().unwrap().to_string();
+        let net = Net::load_auto(&path).unwrap_or_else(|e| {
+            panic!("{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht                     leer-gruen bestehen (Nutzer-Regel: nie leer gruen).")
+        });
+        let mut cfg = crate::net_mcts::SearchConfig::from_env();
+        cfg.start_by_search = 1;
+        let params = StartSearchParams::for_net(Some(&net), 32, &cfg, false)
+            .expect("Knopf 1 mit Netz muss Such-Parameter ergeben");
+
+        // Bestand (Knopf 0): keines der beiden Felder.
+        let mut rng = StdRng::seed_from_u64(99);
+        let mut legacy = fresh_game(41);
+        let legacy_rec = start_placement_step_with_random_p(&mut legacy, &mut rng, 0.0, None)
+            .expect("Startsetzung muss gelingen");
+        assert!(!legacy_rec.contains_key("start_by_search"));
+        assert!(!legacy_rec.contains_key("policy_target_valid"));
+        assert_eq!(legacy_rec["policy"][0]["action"]["type"], json!("dome"));
+
+        // Knopf 1: beide Felder, andere Aktionsform, Verteilung statt One-Hot.
+        let mut rng = StdRng::seed_from_u64(99);
+        let mut game = fresh_game(41);
+        let rec = start_placement_step_with_random_p(&mut game, &mut rng, 0.0, Some(params))
+            .expect("Startsetzung muss gelingen");
+        assert_eq!(rec.get("start_by_search"), Some(&json!(true)));
+        assert_eq!(rec.get("policy_target_valid"), Some(&json!(true)));
+        let policy = rec["policy"].as_array().expect("policy ist ein Feld");
+        assert!(!policy.is_empty(), "Policy-Ziel darf nicht leer sein");
+        let sum: f64 = policy.iter().map(|e| e["prob"].as_f64().unwrap_or(0.0)).sum();
+        assert!((sum - 1.0).abs() < 1e-9, "Besuchsverteilung muss auf 1 normiert sein, ist {sum}");
+        // Die Aktions-IDs muessen TRENNEN -- das ist der ganze Grund fuer die
+        // `choose_dome_slot`-Form (der Record-Schluessel `dome` faellt in
+        // `action_to_id` auf 405, siehe net_mcts.rs::start_slot_action_id).
+        for entry in policy {
+            let a = &entry["action"];
+            assert_eq!(a["type"], json!("choose_dome_slot"));
+            assert_eq!(a["is_start"], json!(true));
+            let id = action_to_id(a);
+            assert!((328..=354).contains(&id), "Start-Aktion muss in der Slot-Familie liegen, ist {id}");
+        }
+        let valids = rec["valid_actions"].as_array().expect("valid_actions ist ein Feld");
+        assert!(
+            valids.iter().all(|a| a["type"] == json!("choose_dome_slot")),
+            "die Maske muss dieselbe Aktionsform tragen wie das Ziel"
         );
     }
 }

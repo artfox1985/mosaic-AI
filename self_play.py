@@ -165,7 +165,8 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       heuristik_variante="hv1",  # konvention-ok: Feldname der pyo3-Signatur des eingefrorenen Wheels
                       spec=None, deviate_prob=0.0,
                       deviate_candidates=6, action_temp=0,
-                      excursion_prob=0.0, excursion_profile=None):
+                      excursion_prob=0.0, excursion_profile=None,
+                      start_slot_random_p=0.0):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -218,12 +219,21 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     `excursion_profile=None` (Default) laesst MOSAIC_EXCURSION_PROFILE
     UNGESETZT -- Rust faellt dann auf sein eigenes Default-Profil zurueck
     (ENVELOPE_PROFILE_DEFAULT), die Python-Seite muss die fuenf Zahlen also
-    nicht kennen."""
+    nicht kennen.
+    `start_slot_random_p` (PREREG_start_dome_choice.md par.9b,
+    PREREG_v29_window.md par.6b): wie die Knoepfe oben KEIN pyo3-Parameter --
+    Rust liest MOSAIC_START_SLOT_RANDOM_P selbst per OnceLock
+    (self_play.rs::start_slot_random_p), deshalb hier VOR dem
+    `import mosaic_rust` in DIESEM Subprozess gesetzt. `0.0` (Default) ist
+    fuer Rust identisch zu "ungesetzt" (AUS, keine zusaetzliche Zufallszahl,
+    kein zusaetzliches Record-Feld). Wirkt in BEIDEN Modi -- die Streuung
+    braucht kein Netz, sie ersetzt nur den Slot der Handregel."""
     os.environ["MOSAIC_TAU_ARGMAX_FROM_MOVE"] = str(tau_argmax_from_move)
     os.environ["MOSAIC_DEVIATE_PROB"] = str(deviate_prob)
     os.environ["MOSAIC_DEVIATE_CANDIDATES"] = str(deviate_candidates)
     os.environ["MOSAIC_ACTION_TEMP"] = str(action_temp)
     os.environ["MOSAIC_EXCURSION_PROB"] = str(excursion_prob)
+    os.environ["MOSAIC_START_SLOT_RANDOM_P"] = str(start_slot_random_p)
     if excursion_profile:
         os.environ["MOSAIC_EXCURSION_PROFILE"] = excursion_profile
     try:
@@ -305,7 +315,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           deviate_prob=0.0,
                           deviate_candidates=6, action_temp=0,
                           excursion_prob=0.0,
-                          excursion_profile=None) -> str | None:
+                          excursion_profile=None,
+                          start_slot_random_p=0.0) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -323,7 +334,7 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               str(progress_path), str(heartbeat_path),
               seed_positions, seed_positions_offset, heuristik_variante, spec,
               deviate_prob, deviate_candidates, action_temp,
-              excursion_prob, excursion_profile),
+              excursion_prob, excursion_profile, start_slot_random_p),
     )
     proc.start()
     t_start = time.time()
@@ -428,7 +439,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   deviate_prob: float = 0.0,
                   deviate_candidates: int = 6, action_temp: int = 0,
                   excursion_prob: float = 0.0,
-                  excursion_profile: str | None = None):
+                  excursion_profile: str | None = None,
+                  start_slot_random_p: float = 0.0):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -490,6 +502,17 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         print(f"  ⚠️  --excursion-prob={excursion_prob} wirkt nur bei --mode network "
               f"(der Ausflug braucht die Reservoir-Gewichtung und die Netz-Suche) -- "
               f"bei --mode {mode!r} ist es ein No-Op.")
+    # Startkuppel-Streuung (PREREG_start_dome_choice.md par.9b,
+    # PREREG_v29_window.md par.6b): je Partie und je Spieler unabhaengig wird
+    # der Slot der Startkuppel gleichverteilt gezogen statt von der Handregel
+    # gelegt; Platte und Rotation bleiben Handregel. Zweck ist die Abdeckung
+    # des Zustandsraums, den ein Gegner mit anderer Regel erzeugt -- NICHT,
+    # einen besseren Slot zu lernen (Stufe 0: der Bestandsslot ist der beste).
+    # Anders als deviate/excursion braucht das KEIN Netz, wirkt also in beiden
+    # Modi -- deshalb hier keine Modus-Warnung.
+    if not (0.0 <= start_slot_random_p <= 1.0):
+        raise SystemExit(
+            f"❌ --start-slot-random-p muss in [0,1] liegen (0 = AUS), ist {start_slot_random_p}.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -558,6 +581,11 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # Grund wie das deviate-Paar oben.
         "excursion_prob": excursion_prob,
         "excursion_profile": excursion_profile,
+        # par.9b: Erzeugungs-Parameter wie die Paare oben -- gehoert ins
+        # Lauf-Manifest, nicht in models/<name>.spec.json. Ohne dieses Feld
+        # waere ein fehlendes Flag ein stiller Default, und ein v29-Korpus
+        # waere im Nachhinein nicht von einem v28-Korpus zu unterscheiden.
+        "start_slot_random_p": start_slot_random_p,
     })
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -609,6 +637,14 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                             f"Halbzug, danach argmax (par.9f)")
     else:
         excursion_status = "AUS (Standard)"
+    # par.9b: eine Zeile, damit im Log ablesbar ist, ob gestreut wird (OB eine
+    # einzelne Setzung gestreut wird, entscheidet das Bernoulli-Gate je Partie
+    # und je Spieler in Rust).
+    if start_slot_random_p:
+        start_slot_status = (f"p={start_slot_random_p} je Spieler, Slot gleichverteilt, "
+                             f"Record ohne Policy-Ziel (par.9b)")
+    else:
+        start_slot_status = "AUS (Standard)"
     if mode == "network":
         print(f"🚀 Starte Netz-Self-Play (Rust): {num_games} Spiele | Modell {model} | "
               f"base_sims {simulations} | c_puct {c_puct} | "
@@ -618,6 +654,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
               f"Aktions-Temperatur {action_temp_status} | "
               f"Abweichung {deviate_status} | "
               f"Ausflug {excursion_status} | "
+              f"Startslot-Streuung {start_slot_status} | "
               f"rtv-Labels {rtv_status} | "
               f"Threads {threads or 'alle Kerne'} | Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
@@ -632,11 +669,13 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         print(f"🚀 Starte MCTS Self-Play (Rust) mit Netz-Rundenübergangs-Labels {rtv_status}: "
               f"{num_games} Spiele | "
               f"Modell {model} | Sims {simulations} | Threads {threads or 'alle Kerne'} | "
+              f"Startslot-Streuung {start_slot_status} | "
               f"Chunk {chunk} | {per_file} Spiele/Datei | "
               f"Chunk-Hänger-Timeout {timeout_secs}s")
     else:
         print(f"🚀 Starte MCTS Self-Play (Rust): {num_games} Spiele "
               f"(Sims: {simulations} | Threads: {threads or 'alle Kerne'} | "
+              f"Startslot-Streuung {start_slot_status} | "
               f"Chunk: {chunk} | {per_file} Spiele/Datei | Chunk-Hänger-Timeout {timeout_secs}s)")
 
     def make_chunk(n, chunk_idx, pos_offset=0):
@@ -658,6 +697,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             deviate_candidates=deviate_candidates, action_temp=action_temp,
             excursion_prob=excursion_prob,
             excursion_profile=excursion_profile,
+            start_slot_random_p=start_slot_random_p,
         )
         return raw, progress_path, heartbeat_path
 
@@ -945,6 +985,22 @@ if __name__ == "__main__":
                              "PREREG_geometric_envelope.md par.8.5). EIGENER Knopf, gewichtet "
                              "NUR die Reservoir-Abzweigstelle, nicht Suche/Tiling wie "
                              "MOSAIC_ENVELOPE_PROFILE.")
+    parser.add_argument("--start-slot-random-p", dest="start_slot_random_p", type=float, default=0.0,
+                        help="PREREG_start_dome_choice.md par.9b / PREREG_v29_window.md par.6b "
+                             "(Startkuppel-Streuung): Wahrscheinlichkeit JE PARTIE UND JE SPIELER "
+                             "unabhaengig, dass der Slot der Startkuppel gleichverteilt aus den "
+                             "freien Slots des 3x3-Rasters gezogen wird statt von der Handregel "
+                             "gelegt; Platte und Rotation waehlt die Handregel weiter, nur in "
+                             "diesem Slot. Zweck ist die ABDECKUNG des Zustandsraums, den ein "
+                             "Gegner mit anderer Regel erzeugt -- nicht, einen besseren Slot zu "
+                             "lernen (Stufe 0 hat gemessen: der Bestandsslot (0,0) ist der "
+                             "beste). Der Start-Record einer gestreuten Setzung traegt "
+                             "policy_target_valid=false und start_slot_randomized=true; die "
+                             "Value-Labels bleiben gueltig, genau das ist der Zweck. Default 0.0 "
+                             "= AUS (bitidentisch: keine zusaetzliche Zufallszahl, kein "
+                             "zusaetzliches Record-Feld). Setzt NUR MOSAIC_START_SLOT_RANDOM_P "
+                             "fuer den Rust-Aufruf, siehe self_play.rs. Wirkt in beiden Modi; "
+                             "MOSAIC_START_SLOT_P0/P1 hat Vorrang, wenn gesetzt.")
     parser.add_argument("--spec", type=str, default=None,
                         help="Such-Spec-Datei models/<name>.spec.json (Schema: "
                              "implicit_minimax_alpha, long_row_init_shaping_w, "
@@ -1006,4 +1062,5 @@ if __name__ == "__main__":
         action_temp=args.action_temp,
         excursion_prob=args.excursion_prob,
         excursion_profile=args.excursion_profile,
+        start_slot_random_p=args.start_slot_random_p,
     )

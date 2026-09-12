@@ -640,9 +640,36 @@ impl PyGame {
     /// Platziert die Startkachel der KI per einfacher Farb-Häufigkeits-Heuristik
     /// (gemeinsamer Helfer mit Self-Play/Arena, siehe `self_play::choose_start_placement`).
     /// Gibt das gewählte Move-Dict zurück.
-    fn ai_start_tile_json(&mut self, player: usize) -> PyResult<String> {
-        let (tile_id, r, c, rot) = crate::self_play::choose_start_placement(&self.game.state, player)
-            .ok_or_else(|| PyValueError::new_err("Keine Startkachel platzierbar."))?;
+    ///
+    /// `PREREG_start_dome_choice.md` par.9c: laeuft die Partie im NETZ-Modus
+    /// (`load_net` gerufen) UND steht `MOSAIC_START_BY_SEARCH` (bzw. das
+    /// Spec-Feld, das `server.py` in den Knopf uebersetzt) auf 1, SUCHT die
+    /// KI ihre Startsetzung. Heuristik-Modus und Knopf 0 legen wie bisher per
+    /// Handregel -- dort wird `SearchConfig::from_env` zwar gelesen, aber
+    /// kein Netz angefasst und keine Zufallszahl gezogen.
+    #[pyo3(signature = (player, simulations=300))]
+    fn ai_start_tile_json(&mut self, player: usize, simulations: u32) -> PyResult<String> {
+        let cfg = net_mcts::SearchConfig::from_env();
+        let searched = match (cfg.start_by_search, self.net.as_ref()) {
+            (1, Some(net)) => {
+                // Eigener, aus (seed, move_seq) abgeleiteter Such-RNG --
+                // dieselbe Trennung wie bei `ai_drafting_net_step`, damit
+                // `self.rng` sich nur durch echte Zustandsereignisse bewegt.
+                self.move_seq += 1;
+                let mut rng =
+                    StdRng::seed_from_u64(net_mcts::derive_search_seed(self.seed, self.move_seq));
+                net_mcts::search_start_placement(
+                    net, &self.game.state, player, simulations, false, &mut rng, &cfg,
+                )
+                .map(|s| s.chosen_placement())
+            }
+            _ => None,
+        };
+        let (tile_id, r, c, rot) = match searched {
+            Some(p) => p,
+            None => crate::self_play::choose_start_placement(&self.game.state, player)
+                .ok_or_else(|| PyValueError::new_err("Keine Startkachel platzierbar."))?,
+        };
         map_err(apply_start_placement(&mut self.game.state, player, tile_id, r, c, rot))?;
         Ok(json!({
             "type": "dome",
@@ -1143,8 +1170,11 @@ mod tests {
 
         // Startkacheln: Nicht-Starter zuerst (Regel, siehe game.rs).
         for p in [1usize, 0] {
-            plain.ai_start_tile_json(p).unwrap();
-            probed.ai_start_tile_json(p).unwrap();
+            // `simulations` ist seit par.9c ein Pflichtparameter der
+            // Rust-Signatur (fuer Python per `#[pyo3(signature=..)]` optional);
+            // ohne Netz und mit Knopf 0 wird er hier nie gelesen.
+            plain.ai_start_tile_json(p, 300).unwrap();
+            probed.ai_start_tile_json(p, 300).unwrap();
         }
         assert_eq!(plain.state_json(), probed.state_json());
 

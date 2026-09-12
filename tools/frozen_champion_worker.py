@@ -190,8 +190,16 @@ def main() -> int:
             elif kind == "tiling":
                 out = {"ok": True, "step": json.loads(engine.tiling(state_json))}
             elif kind == "start_placement":
+                # `sims` (PREREG_start_dome_choice.md par.9c): nur wirksam,
+                # wenn die Spec dieses Artefakts `start_by_search == 1`
+                # traegt -- dann sucht es seine Startsetzung mit demselben
+                # Budget, mit dem es draftet. Traegt sie das Feld nicht
+                # (jede eingefrorene Spec von heute), liest die Engine den
+                # Wert nie und legt wie bisher per Handregel.
                 out = {"ok": True, "placement": json.loads(
-                    engine.start_placement(state_json, int(req["pi"]), int(req["game_seed"])))}
+                    engine.start_placement(state_json, int(req["pi"]),
+                                           int(req["game_seed"]),
+                                           int(req.get("sims", args.sims))))}
             else:
                 raise ValueError(
                     f"unbekannte Anfrageart '{kind}' (drafting/tiling/start_placement). "

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): die Handregel legt immer (0,0), und das ist der beste Slot (Reihe 2 kostet 11-13 Punkte). Nutzer-Entscheide 2026-09-12: Self-Play STREUT den Slot (par.9b, p 0,15 je Spieler, Bau laeuft) und im Spiel entscheidet die SUCHE die Setzung (par.9c, Bau vor v29, A/B hinter der Leiter). hv2-Gegenprobe (Weg 3) laeuft. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): die Handregel legt immer (0,0), und das ist der beste Slot (Reihe 2 kostet 11-13 Punkte); der Slot-Hebel ist damit geschlossen. Nutzer-Entscheide 2026-09-12: Self-Play STREUT den Slot (par.9b, p 0,15) und im Spiel entscheidet die SUCHE die Setzung (par.9c). BEIDES GEBAUT 2026-09-12 (par.9d), NICHTS kompiliert und nichts gemessen; A/B des Such-Starts hinter der Leiter. hv2-Gegenprobe (Weg 3) laeuft. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -454,9 +454,15 @@ aehnlich wie die kuppelplatten bereits heute selektiert und gelegt werden."*
 
 **Stand heute (geprueft):** der Start-Record kodiert die Setzung als gewoehnliche Kuppel-Aktion
 (`start_placement_step`, `self_play.rs:1330-1340`: `type: dome, is_start: true`, alle Display x
-freie Slots x 4 Rotationen, bis zu 108 Eintraege) im 406er-Aktionsraum (`net_mcts.rs:54`); der
-Policy-Kopf kennt die Startsetzung also und lernt sie heute als One-Hot der Handregel. Die
-Suche selbst sieht die Phase nie: `net_mcts.rs` enthaelt keine Behandlung von `StartPlacement`,
+freie Slots x 4 Rotationen, bis zu 108 Eintraege). **BERICHTIGT 2026-09-12 (par.9d):** der
+Zusatz "im 406er-Aktionsraum, der Policy-Kopf kennt die Startsetzung also" war FALSCH. Der
+Schluessel `"type": "dome"` trifft in `features.rs::action_to_id` keinen Zweig und faellt auf
+den Fallback `405` -- alle bis zu 108 Kandidaten liegen auf EINER ID (der von
+`dome_stack_peek`). Der Kopf kann die Startsetzung heute weder als Prior trennen noch als Ziel
+lernen; dass es nicht auffiel, liegt daran, dass `corpus_dataset.py` Start-Records ohnehin
+Policy-Gewicht 0 gibt. Die
+Suche selbst sah die Phase nie (Stand VOR par.9d, 2026-09-12): `net_mcts.rs` enthielt keine
+Behandlung von `StartPlacement`,
 in allen Spielpfaden (Self-Play `self_play.rs:2912`, Arena, Referee `referee.rs:508`,
 `round_transition.rs:656`, `py.rs:644`) wird die Setzung VOR der ersten Suche per
 `choose_start_placement` aufgeloest.
@@ -491,3 +497,88 @@ Seeds), (c) Siege als Waechter. Zeitpunkt ENTSCHIEDEN (Nutzer 13:15: "bau den su
 Generationswechsel verschiebt sich um rund einen Tag. Nutzer 13:10 zur Erwartung: die Suche darf
 auch (0,2) waehlen, das Spaltenspiegelbild von (0,0); Stufe 0 zeigt Reihe 0 als gleichauf.
 
+## par.9d BAUSTAND des Such-Starts 2026-09-12 (Agent; NICHTS kompiliert, nichts gemessen)
+
+Alles hier ist Baustand aus Quelltext-Lektuere, kein Kompilat und kein Lauf -- die Messkette
+lief waehrend des Baus, `cargo`/`maturin` waren gesperrt. Der Wheel-Durchgang (Tests, Anker-
+Invarianz, Netz-Paritaets-Fixture) steht aus.
+
+**Knopf.** `MOSAIC_START_BY_SEARCH` (0 Handregel = Bestand, 1 Suche), Getter
+`net_mcts.rs::read_start_by_search_env` (kein OnceLock, Spec-Feld je Seite). Dazu das
+OPTIONALE Spec-Feld `start_by_search` in `SearchConfig` -- Muster `return_order_mode`:
+eingefrorene Specs ohne das Feld laden weiter und beschreiben bitgenau das Verhalten, das sie
+schon immer beschrieben haben. Registratur `knob_registry.rs`, `docs/knobs.md` neu erzeugt.
+`SPEC_TO_ENV` in `server.py` und `tools/claude_play.py` nachgezogen.
+
+**Suche** `net_mcts.rs::search_start_placement(net, state, pi, base_sims, add_root_noise, rng,
+cfg) -> Option<StartPlacementSearch>`: Wurzel von Hand (der Wurzelzustand ist keine
+Drafting-Stellung), Kinder = alle Kandidaten aus `start_placement_kandidaten` (bis zu 108),
+Prior aus EINEM Vorwaertspass, Auslese per Gumbel-Top-m und Sequential Halving wie an jeder
+anderen Wurzel, Blatt = `make_node` (Netzwert plus Einhuellenden-Verschiebung, K3/K4/Floor).
+Unterhalb der Setzung laeuft die gewoehnliche Drafting-Suche weiter; dafuer ist
+`descend_and_backprop` aus `build_gumbel_tree_inner` auf Modulebene gehoben worden (reiner
+Ortswechsel). Rueckgabe traegt die Besuchsverteilung ueber ALLE Kandidaten plus den
+gewaehlten Index.
+
+**Kosten (hergeleitet, nicht gemessen):** ein Vorwaertspass fuer die Priors plus `sims`
+Simulationen, also rund EIN Drafting-Zug je Partie und Seite. Expandiert werden nur
+`gumbel_top_m_for_budget(sims)` = 4..16 der 108 Kandidaten, nicht alle.
+
+**Umgeschaltet (nur wo ein NETZ zieht):** `unified_game_loop` (Netz-Self-Play, Netz-gegen-
+Heuristik-Arena, Netz-gegen-Netz-Arena -- je Seite ueber `PlayerLoopConfig::start_search`),
+`play_net_vs_net_hybrid_game`, `referee.rs::advance_to_decision` (in-process, neue optionale
+Parameter `spec_p0`/`spec_p1`/`start_sims`), `referee.rs::choose_start_placement_json` (Worker
+und `lib.rs::start_placement_choice_state_json`, neue optionale Parameter), `py.rs::
+ai_start_tile_json` (GUI). NICHT umgeschaltet und benannt: Heuristik-Seiten (hv1/hv2, der
+Anker -- `StartSearchParams::for_net` gibt ohne Netz IMMER `None`), der Heuristik-Self-Play,
+`round_transition.rs` (Rundenuebergangs-Simulation) und die netzfreien Diagnose-Schleifen.
+
+**Record-Vertrag (par.9c, nur bei Knopf 1):** `start_by_search: true`,
+`policy_target_valid: true`, Policy-Ziel = Besuchsverteilung statt One-Hot. Vorrang bleibt bei
+`MOSAIC_START_SLOT_P0/P1` und `MOSAIC_START_SLOT_RANDOM_P`: zieht die Streuung, bleibt es bei
+Handregel-im-Slot und `policy_target_valid: false`.
+
+**BEFUND, der die Aktionsform des Records geaendert hat (geprueft an `features.rs::
+action_to_id` und dem Python-Spiegel `neural_net.py::action_to_id`):** der bisherige
+Record-Schluessel `"type": "dome"` trifft dort KEINEN Zweig und faellt auf den Fallback `405`
+-- und zwar fuer jeden der bis zu 108 Kandidaten gleich, ausgerechnet auf die ID von
+`dome_stack_peek`. Als Policy-ZIEL mit Gewicht 1 waere das aktiv schaedlich. Der
+Such-Record kodiert die Startaktionen deshalb als `choose_dome_slot` (IDs 328..354) mit
+`is_start: true`; die vier Rotationen einer (Platte, Slot) fallen auf eine ID und ihre
+Besuchsmasse addiert sich. Der Bestandspfad (Handregel, Streuung) behaelt `"type": "dome"`
+unveraendert, `NUM_ACTIONS` bleibt 406 und der Vertragshash unberuehrt.
+
+**Trainingsseite.** `engine/py/corpus_dataset.py`: ein Start-Record mit `start_by_search: true`
+UND `policy_target_valid != false` bekommt `pol_w = 1`; alle uebrigen Start-Records bleiben bei
+0. Cache-Schluessel BEWUSST ohne eigene Komponente, mit Begruendung im Code: `str(files)` steht
+schon im Schluesselmaterial, und das Feld kann nur in Dateien stehen, die es vor dem
+2026-09-12 nicht gab -- ein Alt-Cache ist nicht erreichbar, waehrend eine unbedingte
+Komponente JEDEN vorhandenen Cache entwertet haette. Wiedervorlage im Code vermerkt: wird die
+REGEL spaeter geaendert, ist eine Komponente Pflicht.
+
+**Informationsmenge.** Die Suche determinisiert die Wurzel aus Sicht von `pi` -- nicht
+`current_player`, denn der Nicht-Starter legt zuerst. Dafuer der Wrapper
+`determinize_hidden_information_for`; ohne ihn saehe die Suche die echte verdeckte
+Nachziehplatte, die `apply_start_placement` sofort ins Display zieht. Eingetragen in
+`docs/architecture_reference.md`, Abschnitt "Wo der Code Information ABSICHTLICH vernichtet".
+
+**Benannte Modellannahme:** steht bei der Suche des Nicht-Starters noch die Setzung des
+Gegners aus, loest sie IM BAUM die Handregel auf. Gemessen wird also "wie gut ist meine
+Setzung, wenn der Gegner wie die Handregel legt", nicht "gegen die beste Gegensetzung".
+Zweite benannte Eigenschaft: Prior und Trainingsziel liegen beide im Ego-Rahmen von
+`current_player` (also des Startspielers), auch wenn der Nicht-Starter legt -- das ist der
+Bestands-Rahmen des Records, nicht eine neue Entscheidung.
+
+**Tests geschrieben, nicht gelaufen:** Rust -- Knopf 0 ergibt auch mit Netz keine
+Such-Parameter (und Knopf 1 ohne Netz ebenso wenig), die Suche liefert eine Setzung AUS der
+Kandidatenmenge und besucht hoechstens die Gumbel-Wurzelbreite, der Record traegt die beiden
+Vertragsfelder nur bei Knopf 1, die Spec ohne `start_by_search` laedt weiter, der Knopf ist
+ungesetzt 0, und die ID-Helfer sind gegen `action_to_id` gespiegelt (inklusive des
+405-Kollaps-Befunds). Python: `py_compile` gruen, Konventions-Check gruen.
+
+**Offen:** nichts kompiliert (`cargo test --release --lib`, Beispiele/Benches, Wheel-Bau);
+Anker-Invarianz (Drift und Konservierung) nach dem Wheel-Bau; Golden-Proben der
+NETZ-Artefakte (`pending_dome_choice`) sind unberuehrt, solange die Artefakte auf ihren
+eigenen Wheels spielen und ihre Specs das Feld nicht tragen -- das ist heute der Fall, aber
+ungeprueft am Artefakt-Bestand; das A/B (200 Paare, Champion mit Such-Start gegen Champion mit
+Handregel) samt der drei Messfragen aus par.9c.

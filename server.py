@@ -227,6 +227,10 @@ _SPEC_TO_ENV = {
     # PREREG_dome_return_order.md par.4 (2026-09-12): ebenfalls OPTIONALES
     # Spec-Feld, Default 0 (Ziehreihenfolge).
     "return_order_mode": "MOSAIC_RETURN_ORDER_MODE",
+    # PREREG_start_dome_choice.md par.9c (2026-09-12): OPTIONALES Spec-Feld,
+    # Default 0 (Handregel). Bei 1 sucht die Netz-KI ihre Startkuppel
+    # (py.rs::ai_start_tile_json liest den Knopf).
+    "start_by_search": "MOSAIC_START_BY_SEARCH",
 }
 
 
