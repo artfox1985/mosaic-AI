@@ -195,6 +195,8 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | C2 argmax-Instrument (self_play.py 200 Partien @400 deterministisch, 11 Threads) plus corpus_sanity_check | **~2.050 s + 12 s je Lauf** (4 Laeufe 07:31-09:49) | 10,3 s je Partie |
 | Orakel-Bruecke Such-Variante (oracle_metrics --search-sims 400, frozen_v3, 1.144 Zustaende, einkernig) | **343-371 s je Einstellung** | 0,33 s je Zustand |
 | Dritter Seed Nachbar-Kante, 200 Paare bis zum Deckel, Fruehstopp aus, 10 Threads, Logs | **5.405 s** | 13,5 s je Partie |
+| Startkuppel Stufe 0 (arena_match Heuristik, 9 Slots x 60 Partien x 2 Sims-Stufen, threads 0) | **430 s** fuer 1.080 Partien | 0,40 s je Partie |
+| argmax-Instrument je Knopf (Jokerfeld / K3-D, 200 Partien @400) | 41 min (gebremst, neben Push-Build) / 36 min | |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 
