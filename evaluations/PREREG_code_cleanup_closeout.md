@@ -193,6 +193,34 @@ Grenze werden nie gemischt.
    hv2_generator; der Elo-Knoten 1100 stammt aus dem Alt-Register und ist im neuen Segment
    ungemessen), `docs/generation_loop.md`. Alle mit dem Ergebnis nachziehen.
 
+**Ergebnisse par.7a (2026-09-12, 01:31-02:46, `tools/night_reanchor.sh`, exklusiv):** die drei
+Anker-Kanten sind gefahren und registriert (`evaluations/elo_history.csv`, Zeilen 2-4), alle mit
+Handshake gruen OHNE Cross-Aera (39648b95bbba1acf beidseits) und Golden-Selbsttest ohne Abweichung,
+n=150 fest, Seed-Basis 900001, 6 Worker:
+
+| Kante | Ergebnis | Wanduhr | Elo im Segment 2 (nach 3 Kanten) |
+| --- | --- | --- | --- |
+| v28-b02@400 gegen hv1_anchor_v2@150 | 126:24 | 1.441 s | 1288 [1220, 1382] |
+| v28-b01@400 gegen hv1_anchor_v2@150 | 132:18 | 1.491 s | 1346 [1271, 1458] |
+| v27-b01@400 gegen hv1_anchor_v2@150 | 124:26 | 1.489 s | 1271 [1207, 1357] |
+
+Report ohne "NICHT mit Anker verbunden" (geprueft `tools/elo_tracker.py report`). Die Reihung
+aus Punkt 3 (v27-b01 < v28-b01 <= v28-b02) haelt nur zur Haelfte: v28-b01 liegt in diesem
+Fit ueber v28-b02, mit ueberlappenden Intervallen; auf drei Anker-Kanten allein traegt die
+Leiter noch keine Reihung unter den Netzen (Bezug Alt-Register: 127:23 fuer v27-b01, dort
+n=150 gegen hv1_anchor). Die Nachbar-Kante v28-b02 gegen v27-b01 (Seed 20261044, 02:46-03:40, 3.243 s,
+10 Threads, Blockgroesse 5, Logs): **SPRT-Entscheid fuer v28-b02 nach 115 Paaren, 133:97**
+(LLR +3,025), McNemar p=0,0198, gepaarte Differenz +0,313 [+0,068; +0,558], Punkte 53,7 gegen
+50,2 (61 Splits, 36 A-Sweeps, 18 B-Sweeps; Artefakt
+`paired_gating_v28-b02_vs_v27-b01_s44_segment2.json`). Register nach vier Kanten: v28-b02 1305
+[1248, 1371], v28-b01 1346 [1271, 1458], v27-b01 1256 [1202, 1317]. Fruehstopp unter 150
+Paaren: die Replikation (Seed 20261046, bis zum Deckel) laeuft als Schritt 2r der
+Promotionskette `tools/night_v28_promotion.sh`; Nachtrag folgt.
+
+Nebenbefund zur Erwartung aus Punkt 3: im Alt-Register lag v28-b02 gegen v28-b01 im
+Nullbefund (207:193, 209:191, `PREREG_v28_window.md` par.10); im Segment 2 tragen die beiden
+b01-Zahlen nur EINE Kante (Anker), das Intervall 1271-1458 ist entsprechend breit.
+
 ## par.8 Ergebnisse (leer bis zum Bau)
 
 **STUFE 1 GEBAUT (2026-09-11 abends bis 2026-09-12, 01:30), Tore gefahren im freien Fenster

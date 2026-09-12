@@ -697,14 +697,23 @@ impl RefereeGame {
         let search_config = crate::resolve_search_config(spec)?;
         let actions = drafting_actions(&self.game.state);
         let mut search_rng = StdRng::seed_from_u64(derive_search_seed(self.game_seed, self.steps as u64));
-        let chosen = {
-            let net = load_cached(&mut self.nets, &model_path)?;
-            net_arena_choose_action(net, &self.game.state, &actions, &mut search_rng, sims, c_puct, true, &search_config)
-        };
-        let dict = action_to_dict(&chosen);
         let pi_akt = self.game.state.current_player;
-        if self.apply_via_chosen_action[pi_akt] {
-            apply_chosen_action(&mut self.game, chosen).map_err(PyValueError::new_err)?;
+        let via_chosen_action = self.apply_via_chosen_action[pi_akt];
+        // `PREREG_dome_return_order.md` par.4: das Netz bleibt bis NACH dem
+        // Anwenden geborgt -- Modus 1 bewertet die Rueckgabe-Reihenfolge mit
+        // DEMSELBEN Netz, das den Zug gewaehlt hat. `self.nets` und
+        // `self.game` sind verschiedene Felder, die Ausleihen ueberschneiden
+        // sich also nicht. Bei Modus 0 (Default) wird `net` in der
+        // Aufloesung gar nicht gelesen -- byte-identisch zum Bestand.
+        let net = load_cached(&mut self.nets, &model_path)?;
+        let chosen =
+            net_arena_choose_action(net, &self.game.state, &actions, &mut search_rng, sims, c_puct, true, &search_config);
+        let dict = action_to_dict(&chosen);
+        if via_chosen_action {
+            crate::self_play::apply_chosen_action_with(
+                &mut self.game, chosen, Some(net), search_config.return_order_mode,
+            )
+            .map_err(PyValueError::new_err)?;
         } else {
             self.game.apply_drafting(&chosen).map_err(PyValueError::new_err)?;
         }

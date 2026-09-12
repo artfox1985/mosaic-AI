@@ -3,6 +3,12 @@
 //! Stand: Toolchain-Gerüst. Vorerst nur Smoke-Test-Funktionen; Engine/MCTS/Self-Play
 //! folgen schrittweise (siehe Plan: Phase 2–4).
 
+// `engine_config_json` ist ein einziges `json!`-Literal mit rund 80 Feldern; seit den
+// Knoepfen vom 2026-09-12 (round_estimate, Rueckgabe-Reihenfolge) reisst es das Default-
+// Rekursionslimit (128) der Makro-Expansion. Das Attribut ist die vom Compiler empfohlene
+// Loesung und aendert nichts am erzeugten Code.
+#![recursion_limit = "256"]
+
 use pyo3::prelude::*;
 use serde_json::json;
 
@@ -166,8 +172,12 @@ fn self_play_games_with_net_labels(
 /// `sims_a`, Brett 1 `sims_b`; Startspieler alternierend. Gibt ein geordnetes
 /// JSON-Array `[{scores, winner, steps, total_floor, floor_per_round}, …]`
 /// zurück (Elo/Statistik rechnet Python). `num_threads=0` = alle Kerne.
+/// `log_games` (Default `false`, 2026-09-12, `PREREG_start_dome_choice.md`
+/// par.4): haengt je Partie `log`/`names`/`game_seed` an -- dieselbe
+/// Zusatzausgabe wie bei `net_arena_match`, noetig fuer volle Spalten und
+/// volle Reihen. Bei `false` byte-identisch zum Bestand.
 #[pyfunction]
-#[pyo3(signature = (sims_a, sims_b, n_games, seed=None, num_threads=0, c=0.3))]
+#[pyo3(signature = (sims_a, sims_b, n_games, seed=None, num_threads=0, c=0.3, log_games=false))]
 fn arena_match(
     py: Python<'_>,
     sims_a: u32,
@@ -176,9 +186,12 @@ fn arena_match(
     seed: Option<u64>,
     num_threads: usize,
     c: f64,
+    log_games: bool,
 ) -> String {
     let seed = seed.unwrap_or_else(rand::random);
-    py.detach(move || crate::self_play::run_arena_match(sims_a, sims_b, n_games, seed, num_threads, c))
+    py.detach(move || {
+        crate::self_play::run_arena_match(sims_a, sims_b, n_games, seed, num_threads, c, log_games)
+    })
 }
 
 /// Geschwister-Ranking-Diagnose (siehe `self_play::sibling_ranking_diagnostic`
@@ -772,6 +785,15 @@ fn engine_config_json() -> String {
         // ausserhalb der Huelle auf bereits gelegten Kuppelplatten).
         "dead_cell_w": crate::net_mcts::SearchConfig::from_env().dead_cell_w,
         "out_wild_w": crate::net_mcts::SearchConfig::from_env().out_wild_w,
+        // K4 (PREREG_round_estimate_leaf_term.md par.3/par.4): Gewicht und
+        // Runden-Skala des Rundenschaetzer-Terms am Netz-Blattwert.
+        "round_est_c": crate::net_mcts::SearchConfig::from_env().round_est_c,
+        "round_est_b_profile": crate::net_mcts::SearchConfig::from_env().round_est_b_profile.to_vec(),
+        // PREREG_dome_return_order.md par.4: Rueckgabe-Reihenfolge der nicht
+        // gewaehlten Kuppelplatten (0 Ziehreihenfolge, 1 netzbewertet,
+        // 2 Handregel) -- gehoert ins Lauf-Manifest, sonst ist ein
+        // fehlendes Flag ein stiller Default.
+        "return_order_mode": crate::net_mcts::SearchConfig::from_env().return_order_mode,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Traegt ein additiver Rundenschaetzer-Term am Netz-Blattwert (Solver-Rundenscore plus Strafleisten-Busse, Differenz beider Seiten, tanh mit gemessener Skala, Runde 5 null) Spielstaerke und Spalten? | Beleg: Nichts gebaut. Skala GEMESSEN 2026-09-05 (par.4: P90 3 / 8 / 10 / 12 je Runde, gepoolt 9,25). EINGETAKTET 2026-09-11 als Schritt 7 des v28-Programms (PREREG_v28_window.md par.8): Bau nach par.3, Skala (a) je Runde als Koordinator-Vorschlag (Nutzer kann auf (b) wechseln), A/B gleiches Netz Live gegen Artefakt nach dem Muster der Kuppelstapel-Kante, zwei Seed-Basen. -->
+<!-- STATUS: OFFEN | Frage: Traegt ein additiver Rundenschaetzer-Term am Netz-Blattwert (Solver-Rundenscore plus Strafleisten-Busse, Differenz beider Seiten, tanh mit gemessener Skala, Runde 5 null) Spielstaerke und Spalten? | Beleg: GEBAUT und im Wheel seit 2026-09-12 (par.7 Baustand; Default 0 bitidentisch: 601 Tests, Paritaets-Fixture unveraendert, Anker-Drift gruen), A/B UNGEMESSEN. Skala GEMESSEN 2026-09-05 (par.4: P90 3 / 8 / 10 / 12 je Runde, gepoolt 9,25). EINGETAKTET 2026-09-11 als Schritt 7 des v28-Programms (PREREG_v28_window.md par.8): Bau nach par.3, Skala (a) je Runde als Koordinator-Vorschlag (Nutzer kann auf (b) wechseln), A/B gleiches Netz Live gegen Artefakt nach dem Muster der Kuppelstapel-Kante, zwei Seed-Basen. -->
 
 # Vorregistrierung: Rundenschaetzer als additiver Term am Netz-Blattwert (Such-Knopf K4)
 
@@ -186,7 +186,7 @@ aus). Der Nutzer kann vor dem Bau auf (b) wechseln; der Knopf-Default traegt dan
 gewaehlten Wert, Vorab-Auflage aus par.3 erfuellt. Kostentor 25 % und Falsifikator aus par.5
 unveraendert.
 
-## par.7 BAUSTAND 2026-09-12 (Code geschrieben, noch nicht kompiliert)
+## par.7 BAUSTAND 2026-09-12 (gebaut, im Wheel seit 03:47)
 
 Gebaut nach par.3 mit Skala (a) aus par.4/par.6a: `net_mcts.rs` K4-Block (`round_estimate_points`,
 `round_estimate_shift_from`, `round_estimate_shift_state`, Blatt-Pfad hinter dem K3-Term),
@@ -204,3 +204,5 @@ der Merkmalsbau desselben Zustands unmittelbar davor fuellt (`tiling_solver.rs:4
 Merkmalswert selbst ist als Quelle unbrauchbar (f32/100, ohne Strafleisten-Busse). Vorzeichen der
 Busse wie `mcts.rs::player_total`. Kompilierung, Paritaets-Fixture, Anker-Drift und die Messkette
 par.5 folgen im v28-Programm Schritt 7; A/B ueber den Referee am Champion, C_est aus par.5.
+
+**Kompiliert und im Wheel (Nachtrag 03:50):** Bau-Tor 2026-09-12, 03:44-03:48 (`tools/night_v28_knob_build.sh`, Artefakte `anchor_drift_live_wheel_20260912_knobs.json` / `anchor_conservation_artifact_wheel_20260912_knobs.json`): `cargo test --release --lib` 601 gruen (84 s; darunter Kontrakt-Hash-Literal 39648b95bbba1acf und die Netz-Paritaets-Fixture des Champions UNVERAENDERT), Beispiele/Benches kompilieren, Wheel gebaut und installiert (Kontrakt 39648b95bbba1acf, INPUT_SIZE 755), Anker-Drift gegen hv1_anchor_v2 GRUEN und Konservierung GRUEN, Konventions-Check gruen. Zwei Nachbesserungen beim Bau: `#![recursion_limit = "256"]` in lib.rs (das `json!`-Literal von `engine_config_json` riss das Makro-Limit) und die Lesestelle der Startslot-Knoepfe als zwei Literal-Aufrufe (Registratur-Scanner). Alle neuen Knoepfe stehen damit auf Default im Wheel, das die Promotion v28-b02 einfriert.

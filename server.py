@@ -219,6 +219,14 @@ _SPEC_TO_ENV = {
     # unveraendert -- und eine Spec, die sie traegt, wirkt auch in der GUI.
     "dead_cell_w": "MOSAIC_DEAD_CELL_W",
     "out_wild_w": "MOSAIC_OUT_WILD_W",
+    # K4 (2026-09-12, PREREG_round_estimate_leaf_term.md par.3/par.4): ebenfalls
+    # OPTIONALE Spec-Felder; das Profil ist eine Liste und wird wie
+    # envelope_profile kommasepariert uebergeben.
+    "round_est_c": "MOSAIC_ROUND_EST_C",
+    "round_est_b_profile": "MOSAIC_ROUND_EST_B_PROFILE",
+    # PREREG_dome_return_order.md par.4 (2026-09-12): ebenfalls OPTIONALES
+    # Spec-Feld, Default 0 (Ziehreihenfolge).
+    "return_order_mode": "MOSAIC_RETURN_ORDER_MODE",
 }
 
 

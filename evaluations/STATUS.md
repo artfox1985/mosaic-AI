@@ -36,9 +36,16 @@ Fixture wegen A2 neu; **ANKER NEU GESETZT (Nutzer 2026-09-12, 02:10: "setz den a
 `models/frozen_heuristics/hv1_anchor_v2` (Wheel mit A2), Drift und Konservierung GRUEN; Alt-Register
 nach `archive/elo_history_pre_phantomfix.csv`, frisches `elo_history.csv`, `ANCHOR_NAME =
 Heuristik_hv1_anchor_v2`, keine Aliase. **MASCHINE BELEGT: Neuverankerungs-Kette
-`tools/night_reanchor.sh`** (drei Anker-Kanten n=150 fuer v28-b02, v28-b01, v27-b01 und die
-Nachbar-Kante v28-b02 gegen v27-b01, 200 Paare), rund 2,5 h ab 02:15
-(`PREREG_code_cleanup_closeout.md` par.7a). Danach Elo-Eintraege und Promotion v28-b02. Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
+`tools/night_reanchor.sh`**: die drei Anker-Kanten SIND DURCH und registriert (v28-b02 126:24,
+v28-b01 132:18, v27-b01 124:26; Segment-2-Elo 1288 / 1346 / 1271, Intervalle ueberlappend;
+`PREREG_code_cleanup_closeout.md` par.7a), die Nachbar-Kante v28-b02 gegen v27-b01
+(Seed 20261044) endete 03:40 per SPRT nach 115 Paaren: **133:97 fuer v28-b02** (p 0,0198,
+Diff +0,313 [+0,068; +0,558]); Segment-2-Leiter jetzt v28-b02 1305, v28-b01 1346, v27-b01 1256.
+**MASCHINE BELEGT seit 03:44: `tools/night_v28_after_reanchor.sh`** (A Knopf-Bau mit Toren,
+B Promotions-Messungen v28-b02 inkl. Replikation der Nachbar-Kante Seed 20261046, Champion-2
+gegen v26-b01-Artefakt, sigma/Prior, Platt; C Einfrieren `frozen_champions/v28-b02`; D Messblock
+Ueberraschungs-Kante und C2; E Einhuellende A1/A2). Startkuppel Stufe 0 GEBAUT, ungemessen (`PREREG_start_dome_choice.md`
+par.8; Waechter-Abweichung = Nutzer-Entscheid). Davor: **v28-b02 NULLBEFUND** gegen b01 (207:193, 209:191, beide Deckel; Elo
 1461 gegen 1447 ueberlappend; Blockziehungen bei positivem Stand eher mehr, nicht weniger;
 `PREREG_v28_window.md` par.10, `dome_stack` par.15h). **Nutzer-Entscheid 20:30: b02 ist als
 korrektere Fassung (volleres Merkmalsbild) der beste Stand und Generator-Kandidat fuer v29;**

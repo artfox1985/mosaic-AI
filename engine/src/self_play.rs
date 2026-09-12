@@ -593,12 +593,249 @@ fn avg_remaining_type_value(state: &GameState) -> f64 {
     sum / state.dome_tile_pool.len() as f64
 }
 
+// ── Rueckgabe-Reihenfolge der Kuppelplatten ──────────────────────────────────
+//
+// `PREREG_dome_return_order.md` par.1/par.4. Wer beim verdeckten Ziehen
+// mehrere Kuppelplatten zieht, behaelt eine und legt die uebrigen in
+// BELIEBIGER Reihenfolge unter den Stapel zurueck -- ein legaler Freiheitsgrad,
+// den der Bestand nicht nutzt (kanonisch die Ziehreihenfolge).
+//
+// WELCHE POSITION VON `return_order` LIEGT OBEN? Die ERSTE. Belegt am Code,
+// nicht hergeleitet:
+//   * gezogen wird vom KOPF des Vec: `state.dome_tile_pool.remove(0)`
+//     (game.rs:187, `execute_draw_stack_peek`) -- Index 0 ist also "oben";
+//   * zurueckgelegt wird ans ENDE: `state.dome_tile_pool.push(t)` in der
+//     Schleife `for id in &m.return_order` (game.rs:290-295,
+//     `execute_draw_from_stack`) -- der Block landet ganz UNTEN, und INNERHALB
+//     des Blocks bekommt `return_order[0]` den kleinsten Index;
+//   * derselbe Block wird von `state.rs::note_dome_pool_return` als EIN
+//     `KnownPoolBlock` am Vec-Ende vermerkt, und
+//     `state.rs::determinize_dome_pool` laesst ihn fuer seinen Rueckleger
+//     UNVERAENDERT -- die gewaehlte Reihenfolge ueberlebt also in dessen
+//     eigener Suche (Variante A).
+// Folge: `return_order[0]` kommt von den zurueckgelegten Platten als ERSTE
+// wieder ans Tageslicht. "Beste Platte nach oben" heisst darum: beste Platte
+// an Position 0, NICHT zuletzt zurueckgelegt.
+
+/// Hoechstzahl an Restplatten, ueber die Modus 1 wirklich permutiert -- 3,
+/// also hoechstens `3! = 6` Kandidaten (die Kostenzusage aus par.4). Eine
+/// Ziehserie kann laenger werden (`MAX_STACK_PEEKS = 20`), und `n!` waere
+/// dort keine Wahl mehr, sondern ein Haenger. Permutiert wird der KOPF der
+/// Ziehreihenfolge, weil genau er zuerst wieder oben liegt; der Schwanz
+/// bleibt in Ziehreihenfolge.
+const RETURN_ORDER_MAX_PERMUTED: usize = 3;
+
+/// Alle Permutationen von `items`, lexikographisch nach INDEX -- die erste
+/// ist damit immer die Eingabereihenfolge (= Ziehreihenfolge), worauf sich
+/// die Gleichstandsregel von [`best_scored_index`] stuetzt. Leere oder
+/// einelementige Eingabe ergibt genau EINE Reihenfolge.
+fn order_permutations(items: &[usize]) -> Vec<Vec<usize>> {
+    if items.len() <= 1 {
+        return vec![items.to_vec()];
+    }
+    let mut out = Vec::new();
+    for i in 0..items.len() {
+        let mut rest: Vec<usize> = Vec::with_capacity(items.len() - 1);
+        rest.extend_from_slice(&items[..i]);
+        rest.extend_from_slice(&items[i + 1..]);
+        for mut tail in order_permutations(&rest) {
+            let mut one = Vec::with_capacity(items.len());
+            one.push(items[i]);
+            one.append(&mut tail);
+            out.push(one);
+        }
+    }
+    out
+}
+
+/// Kandidaten-Reihenfolgen fuer Modus 1: die Permutationen des Kopfes
+/// (hoechstens [`RETURN_ORDER_MAX_PERMUTED`] Platten), jeweils mit
+/// unveraendertem Schwanz. Erster Kandidat = Ziehreihenfolge.
+fn return_order_candidates(drawn_rest: &[usize]) -> Vec<Vec<usize>> {
+    let head_len = drawn_rest.len().min(RETURN_ORDER_MAX_PERMUTED);
+    let (head, tail) = drawn_rest.split_at(head_len);
+    order_permutations(head)
+        .into_iter()
+        .map(|mut p| {
+            p.extend_from_slice(tail);
+            p
+        })
+        .collect()
+}
+
+/// Gewinner aus Kandidatenwerten: groesster Wert, bei GLEICHSTAND der erste.
+/// Weil Kandidat 0 die Ziehreihenfolge ist, faellt ein Gleichstand damit auf
+/// den Bestand zurueck (par.4). Leere Eingabe -> 0 (der Aufrufer hat dann
+/// ohnehin nur die Ziehreihenfolge). Ein `NaN` ueberholt nie einen echten
+/// Wert (`>` ist gegen `NaN` immer falsch); steht es an Position 0, bleibt es
+/// stehen -- und das ist wieder die Ziehreihenfolge, also derselbe sichere
+/// Rueckfall wie beim Gleichstand.
+fn best_scored_index(values: &[f64]) -> usize {
+    let mut best = 0usize;
+    for (i, v) in values.iter().enumerate().skip(1) {
+        if *v > values[best] {
+            best = i;
+        }
+    }
+    best
+}
+
+/// Handregel-Wert EINER zurueckzulegenden Platte fuer ihren Rueckleger
+/// (Modus 2, par.4: "Farbtreffer fuer offene Musterreihen, Spezialfelder").
+/// Bewusst einfach und NICHT gefittet -- je Feld der Platte:
+///
+/// * `Special` zaehlt 2 (das Spezialfeld zahlt beim Freischalten Bonuspunkte
+///   aus, `dome.rs::try_unlock_special`),
+/// * `Wild` zaehlt 1 (nimmt jede Farbe an, also Flexibilitaet -- dieselbe
+///   Gewichtung wie in [`best_eval_for_tile`], wo Wild-Felder einzeln zaehlen),
+/// * `Normal` zaehlt 1, wenn der Rueckleger eine Musterreihe hat, die auf
+///   genau diese Farbe gebunden ist (`line.color == Some(c)`) -- gleich, ob
+///   sie noch fuellt oder schon voll ist: in beiden Faellen sucht diese Farbe
+///   eine Zielzelle.
+///
+/// Kein Netz, kein RNG, kein Klon des Zustands -- damit auch fuer die
+/// Heuristik-Seiten brauchbar (par.4; der Anker bleibt trotzdem bei Modus 0).
+fn return_order_tile_score(state: &GameState, pi: usize, tile: &crate::dome::DomeTile) -> i64 {
+    let lines = &state.players[pi].pattern_lines;
+    let mut score = 0i64;
+    for space in &tile.spaces {
+        match space.space_type {
+            SpaceType::Special => score += 2,
+            SpaceType::Wild => score += 1,
+            SpaceType::Normal => {
+                if let Some(c) = space.required_color {
+                    if lines.iter().any(|l| l.color == Some(c)) {
+                        score += 1;
+                    }
+                }
+            }
+        }
+    }
+    score
+}
+
+/// Die Rueckgabe-Reihenfolge fuer den laufenden Stapelzug
+/// (`PREREG_dome_return_order.md` par.4).
+///
+/// `state` ist der Zustand VOR dem Zug (`pending_stack_draw` gefuellt),
+/// `chosen_id` die behaltene Platte. Zurueck kommt immer eine gueltige
+/// Permutation der uebrigen gezogenen Platten (`game.rs:244-256` prueft das
+/// als Multiset).
+///
+/// * Modus 0: Ziehreihenfolge. Bitidentisch zum Bestand -- kein Klon, kein
+///   Netzaufruf, keine Zufallszahl.
+/// * Modus 1: je Kandidat (hoechstens sechs, siehe
+///   [`return_order_candidates`]) der Folgezustand auf einem KLON ueber
+///   dieselben zwei `apply_drafting`-Stufen wie der echte Zug, damit
+///   `execute_draw_from_stack` den Block per `note_dome_pool_return` in
+///   GENAU dieser Reihenfolge eintraegt; bewertet mit
+///   [`crate::net_mcts::net_leaf_eval`], Eintrag des RUECKLEGERS. Ohne Netz
+///   (`net == None`) faellt der Modus auf die Ziehreihenfolge zurueck.
+/// * Modus 2: absteigend nach [`return_order_tile_score`], STABIL -- bei
+///   gleichem Wert bleibt die Ziehreihenfolge stehen. Beste Platte an
+///   Position 0 (siehe Modul-Kommentar oben: Position 0 kommt zuerst wieder).
+///
+/// **Perspektive in Modus 1** (am Code geprueft, nicht geraten):
+/// `net_leaf_eval` liefert `[Gewinnwahrscheinlichkeit Brett 0, Brett 1]`
+/// (net_mcts.rs: `raw = if state.current_player == 0 { [mover_val, other_val] }
+/// else { [other_val, mover_val] }`), unabhaengig davon, wer im Folgezustand
+/// am Zug ist -- genau das Muster von [`deviation_best_action`]. Deshalb
+/// `[returner]` und nicht `net_tiling_tiebreak_value`: dessen
+/// `debug_assert_eq!(final_state.current_player, pi)` waere hier VERLETZT, weil
+/// der Stapelzug den Spieler wechselt (`switch_player` im letzten
+/// `DrawStack`-Aufruf) -- nach der Rueckgabe ist der GEGNER am Zug.
+pub(crate) fn choose_return_order(
+    state: &GameState,
+    chosen_id: usize,
+    slot_row: usize,
+    slot_col: usize,
+    rotation: u32,
+    mode: u8,
+    net: Option<&Net>,
+) -> Vec<usize> {
+    let drawn_rest: Vec<usize> = state
+        .pending_stack_draw
+        .iter()
+        .filter(|t| t.tile_id != chosen_id)
+        .map(|t| t.tile_id)
+        .collect();
+    // Nichts zu waehlen: keine oder genau eine Restplatte.
+    if mode == 0 || drawn_rest.len() < 2 {
+        return drawn_rest;
+    }
+    let returner = state.current_player;
+    match mode {
+        1 => {
+            let Some(net) = net else { return drawn_rest };
+            let candidates = return_order_candidates(&drawn_rest);
+            let mut values: Vec<f64> = Vec::with_capacity(candidates.len());
+            for cand in &candidates {
+                let mut probe = Game { state: state.clone() };
+                let mv = DrawFromStackMove {
+                    chosen_id,
+                    slot_row,
+                    slot_col,
+                    // Platzhalter wie im echten Zug: Stufe 1 traegt die
+                    // Rotation nicht, Stufe 2 setzt sie.
+                    rotation: 0,
+                    return_order: cand.clone(),
+                };
+                let ok = probe.apply_drafting(&Action::ChooseDrawStackSlot(mv)).is_ok()
+                    && probe.apply_drafting(&Action::ChooseDomeRotation(rotation)).is_ok();
+                // Ein `Err` waere ein Engine-Bug (die Reihenfolge ist per
+                // Konstruktion eine gueltige Permutation) und schliesst den
+                // Kandidaten aus, statt die Partie zu reissen -- dieselbe
+                // Disziplin wie in `deviation_best_action`.
+                values.push(if ok {
+                    crate::net_mcts::net_leaf_eval(net, &probe.state)[returner]
+                } else {
+                    f64::NEG_INFINITY
+                });
+            }
+            candidates[best_scored_index(&values)].clone()
+        }
+        _ => {
+            // Modus 2. `sort_by_key` ist STABIL (Rust-Vertrag), der
+            // Schluessel ist negiert -- absteigend nach Wert, bei Gleichstand
+            // bleibt die Ziehreihenfolge stehen.
+            let mut ranked = drawn_rest;
+            let score_of = |id: usize| -> i64 {
+                state
+                    .pending_stack_draw
+                    .iter()
+                    .find(|t| t.tile_id == id)
+                    .map_or(0, |t| return_order_tile_score(state, returner, t))
+            };
+            ranked.sort_by_key(|&id| -score_of(id));
+            ranked
+        }
+    }
+}
+
 /// Führt einen kompletten Stapel-Zug (Aktion A) aus: mind. 1 Pflichtzug,
 /// danach per Ein-Schritt-Erwartungswert-Vergleich weiterziehen oder
 /// aufhören, abschließend die beste gezogene Platte in den besten Slot legen.
 /// Mehrere echte `apply_drafting`-Aufrufe -- der Zug ist erst danach beendet
 /// (switch_player passiert im letzten `DrawStack`-Aufruf).
+///
+/// Bestandsaufrufer: Rueckgabe in Ziehreihenfolge, kein Netz
+/// (`return_order_mode = 0`) -- bitidentisch. Wer den Knopf aus
+/// `PREREG_dome_return_order.md` par.4 verdrahten will, nimmt
+/// [`resolve_and_apply_stack_draw_with`].
 fn resolve_and_apply_stack_draw(game: &mut Game) -> Result<Action, String> {
+    resolve_and_apply_stack_draw_with(game, None, 0)
+}
+
+/// Wie [`resolve_and_apply_stack_draw`], zusaetzlich mit dem Netz DIESER
+/// SEITE und ihrem `return_order_mode` (`PREREG_dome_return_order.md` par.4).
+/// `net` wird ausschliesslich in Modus 1 gelesen; bei Modus 0 ist der Ablauf
+/// byte-identisch zum Bestand (kein Klon, kein Vorwaertspass, keine
+/// Zufallszahl).
+fn resolve_and_apply_stack_draw_with(
+    game: &mut Game,
+    net: Option<&Net>,
+    return_order_mode: u8,
+) -> Result<Action, String> {
     game.apply_drafting(&Action::DrawStackPeek)?;
     // Terminierung: `can_draw_stack_peek` wird false, sobald
     // `state.dome_tile_pool` leer ist (`validate_draw_stack_peek`,
@@ -672,16 +909,33 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Result<Action, String> {
         .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal))
         .map(|(_, id, sr, sc, rot)| (id, sr, sc, rot))
         .expect("pending_stack_draw darf hier nicht leer sein (mind. 1 Pflichtzug oben)");
-    // Reihenfolge der Restplatten ist fuer die KI keine gelernte Policy-
-    // Dimension (wie moon_order/num_drawn) -- kanonisch die Ziehreihenfolge,
-    // wie beim Suchbaum-Pfad (game.rs::generate_draw_stack_moves).
-    let return_order: Vec<usize> = game
-        .state
-        .pending_stack_draw
-        .iter()
-        .filter(|t| t.tile_id != chosen_id)
-        .map(|t| t.tile_id)
-        .collect();
+    // Reihenfolge der Restplatten: bei `return_order_mode == 0` kanonisch die
+    // Ziehreihenfolge wie beim Suchbaum-Pfad
+    // (game.rs::generate_draw_stack_moves) -- keine gelernte Policy-Dimension
+    // (wie moon_order/num_drawn). Modus 1/2 waehlen sie stattdessen am ENDE
+    // der Ziehserie (PREREG_dome_return_order.md par.4); der Suchbaum bleibt
+    // unveraendert.
+    let return_order =
+        choose_return_order(&game.state, chosen_id, sr, sc, rotation, return_order_mode, net);
+    // Diagnostik fuer par.5 (Grundmenge: Rueckgaben mit >= 2 Restplatten,
+    // Einheit: Rueckgaben), nur bei tatsaechlicher ABWEICHUNG. Der ganze
+    // Block bleibt bei Modus 0 unbetreten -- dort ist `return_order` per
+    // Konstruktion die Ziehreihenfolge, und der Vergleich wuerde nur eine
+    // zweite Liste bauen, die der Bestand nie gebaut hat.
+    if return_order_mode != 0 {
+        let drawn_order: Vec<usize> = game
+            .state
+            .pending_stack_draw
+            .iter()
+            .filter(|t| t.tile_id != chosen_id)
+            .map(|t| t.tile_id)
+            .collect();
+        if return_order != drawn_order {
+            game.state.log_event(format!(
+                "[return_order] mode={return_order_mode} drawn={drawn_order:?} chosen={return_order:?}"
+            ));
+        }
+    }
     // Baustein B: zwei echte `apply_drafting`-Aufrufe (Stufe 1 Slot, Stufe 2
     // Rotation) statt eines einzelnen `DrawStack` -- die zurückgegebene
     // Aktion ist die Stufe-1-Wahl (traegt chosen_id/slot_row/slot_col, wie
@@ -757,8 +1011,31 @@ fn stack_draw_research() -> bool {
 }
 
 pub(crate) fn apply_chosen_action(game: &mut Game, a: Action) -> Result<Action, String> {
+    apply_chosen_action_with(game, a, None, 0)
+}
+
+/// Wie [`apply_chosen_action`], zusaetzlich mit dem Netz DIESER SEITE und
+/// ihrem `return_order_mode` (`PREREG_dome_return_order.md` par.4). Beides
+/// wird ausschliesslich in der Stapelzug-Aufloesung gelesen; `(None, 0)` ist
+/// byte-identisch zum Bestand, und genau das setzt
+/// [`apply_chosen_action`] fuer jeden Aufrufer, der den Knopf nicht traegt.
+///
+/// VERDRAHTET ist der Knopf an drei Stellen -- `unified_game_loop`
+/// (`PlayerLoopConfig::return_order_mode`, also Netz-Self-Play und beide
+/// Netz-Arenen), `referee.rs::drafting_decide_and_apply_inprocess` und
+/// `py.rs::ai_drafting_net_step`. NICHT verdrahtet ist der Worker-Pfad des
+/// Referees (`drafting_apply_external`): dort liegt kein Netz im Prozess, die
+/// Aktion kommt fertig von aussen.
+pub(crate) fn apply_chosen_action_with(
+    game: &mut Game,
+    a: Action,
+    net: Option<&Net>,
+    return_order_mode: u8,
+) -> Result<Action, String> {
     match a {
-        Action::DrawStackPeek if !stack_draw_research() => resolve_and_apply_stack_draw(game),
+        Action::DrawStackPeek if !stack_draw_research() => {
+            resolve_and_apply_stack_draw_with(game, net, return_order_mode)
+        }
         other => {
             game.apply_drafting(&other)?;
             Ok(other)
@@ -929,15 +1206,99 @@ pub(crate) fn start_placement_kandidaten(
     out
 }
 
+/// Slot-Index `row * 3 + col` des 3x3-Kuppelrasters (`board.rs::empty_slots`
+/// laeuft `r` in 0..3 aussen, `c` in 0..3 innen) -> `(row, col)`.
+///
+/// REINE Funktion, absichtlich getrennt vom Env-Leser darunter: so laesst sich
+/// die Umrechnung testen, ohne `std::env::set_var` gegen die parallel
+/// laufenden Tests der Datei zu setzen.
+fn parse_start_slot(raw: &str) -> Option<(usize, usize)> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    match trimmed.parse::<usize>() {
+        Ok(v) if v < 9 => Some((v / 3, v % 3)),
+        _ => None,
+    }
+}
+
+/// Warn-Merker je Spieler: ein ungueltiger Knopfwert soll EINMAL melden, nicht
+/// in jeder Partie eines Arena-Laufs.
+static START_SLOT_WARNED: [std::sync::atomic::AtomicBool; 2] = [
+    std::sync::atomic::AtomicBool::new(false),
+    std::sync::atomic::AtomicBool::new(false),
+];
+
+/// Diagnose-Knopf `MOSAIC_START_SLOT_P0` / `..._P1`
+/// (`PREREG_start_dome_choice.md` par.4, Stufe 0): erzwingt den SLOT der
+/// Startkuppel fuer den jeweiligen Spieler. Platte und Rotation waehlt weiter
+/// die Handregel, nur unter dieser Einschraenkung.
+///
+/// UNGESETZT = Bestand, bitidentisch. Ungueltige Werte -> einmalige Warnung
+/// und Bestand. Duenne Huelle um [`parse_start_slot`]; gelesen wird JE
+/// PARTIE (kein `OnceLock`), damit ein Treiber die neun Slots in EINEM Prozess
+/// nacheinander fahren kann.
+fn forced_start_slot(pi: usize) -> Option<(usize, usize)> {
+    if pi > 1 {
+        return None;
+    }
+    // Zwei Literal-Aufrufe statt eines Namens in einer Variablen: der
+    // Lesestellen-Scanner der Registratur (knob_registry.rs) erkennt nur
+    // `env::var("MOSAIC_...")` mit dem Namen auf derselben Zeile.
+    let (name, raw) = if pi == 0 {
+        ("MOSAIC_START_SLOT_P0", std::env::var("MOSAIC_START_SLOT_P0").ok()?)
+    } else {
+        ("MOSAIC_START_SLOT_P1", std::env::var("MOSAIC_START_SLOT_P1").ok()?)
+    };
+    if raw.trim().is_empty() {
+        return None;
+    }
+    match parse_start_slot(&raw) {
+        Some(rc) => Some(rc),
+        None => {
+            if !START_SLOT_WARNED[pi].swap(true, std::sync::atomic::Ordering::Relaxed) {
+                eprintln!(
+                    "[start_slot] {name}={raw:?} ist kein Slot-Index 0..8 -- Knopf ignoriert, \
+                     Bestandswahl bleibt."
+                );
+            }
+            None
+        }
+    }
+}
+
 pub(crate) fn choose_start_placement(state: &GameState, pi: usize) -> Option<(usize, usize, usize, u32)> {
+    choose_start_placement_with_slot(state, pi, forced_start_slot(pi))
+}
+
+/// Kern der Startkuppel-Wahl. `forced_slot = None` ist der Bestand.
+///
+/// Mit erzwungenem Slot bleibt die BEWERTUNG dieselbe -- gewaehlt wird das
+/// beste `(Platte, Rotation)` unter den Kandidaten dieses Slots. Ist der Slot
+/// nicht frei (dann liefert `start_placement_kandidaten` fuer ihn nichts),
+/// faellt die Wahl auf den Bestand zurueck, statt die Partie abzubrechen.
+pub(crate) fn choose_start_placement_with_slot(
+    state: &GameState,
+    pi: usize,
+    forced_slot: Option<(usize, usize)>,
+) -> Option<(usize, usize, usize, u32)> {
     // Strikt groesser und feste Reihenfolge -- bei Gleichstand gewinnt der
     // ZUERST gepruefte Kandidat. Byte-identisch zum Bestand, das ist der
     // Elo-Anker.
     let mut best: Option<(f64, usize, usize, usize, u32)> = None;
     for k in start_placement_kandidaten(state, pi) {
+        if let Some((fr, fc)) = forced_slot {
+            if k.2 != fr || k.3 != fc {
+                continue;
+            }
+        }
         if best.map_or(true, |(b, ..)| k.0 > b) {
             best = Some(k);
         }
+    }
+    if best.is_none() && forced_slot.is_some() {
+        return choose_start_placement_with_slot(state, pi, None);
     }
     best.map(|(_, t, r, c, rot)| (t, r, c, rot))
 }
@@ -2334,6 +2695,15 @@ struct PlayerLoopConfig<'a> {
     /// bisher NUR die Netz-Seite von `play_net_game`; `trace_line` selbst
     /// ist No-Op ohne `MOSAIC_SPALTENBAU_TRACE`/`MOSAIC_SPALTENBAU`.
     column_build_trace: bool,
+    /// `PREREG_dome_return_order.md` par.4: Rueckgabe-Reihenfolge der nicht
+    /// gewaehlten Kuppelplatten DIESER SEITE (0 Ziehreihenfolge, 1
+    /// netzbewertet, 2 Heuristik). Aus ihrer `SearchConfig`; die
+    /// Heuristik-Seiten stehen auf 0 (der Anker liest den Knopf nicht, par.4).
+    /// Nur wirksam, wo `apply_via_chosen_action` gilt -- die Heuristik-Seiten
+    /// gehen ueber `game.apply_drafting` und loesen den Stapelzug gar nicht
+    /// hier auf. Modus 1 braucht zusaetzlich `tiling_net`, das Netz dieser
+    /// Seite.
+    return_order_mode: u8,
 }
 
 impl PlayerLoopConfig<'_> {
@@ -2700,7 +3070,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                     // Knopf, also hoechstens einmal je Partie.
                                     eprintln!(
                                         "[deviate] quelle={} seed={} move={} runde={} index={} \
-                                         player={} legal={} kandidaten={}",
+                                         player={} legal={} candidates={}",
                                         quelle,
                                         cfg.game_seed,
                                         move_number,
@@ -2779,9 +3149,13 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     let round_before = game.state.round_number;
                     if pcfg.apply_via_chosen_action {
                         // Sequenzielle Stapel-Zieh-Aufloesung (Netz-Spielpfade,
-                        // siehe apply_chosen_action).
-                        apply_chosen_action(&mut game, d.chosen)
-                            .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
+                        // siehe apply_chosen_action). `PREREG_dome_return_order.md`
+                        // par.4: Netz und Modus DIESER Seite -- bei Modus 0
+                        // (Default) ist der Aufruf byte-identisch zum Bestand.
+                        apply_chosen_action_with(
+                            &mut game, d.chosen, pcfg.tiling_net, pcfg.return_order_mode,
+                        )
+                        .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
                     } else {
                         // Heuristik-Seiten: dieselbe Fehler-Maskierungs-Familie
                         // wie 80f3698 -- `chosen` stammt aus `drafting_actions`,
@@ -3090,6 +3464,9 @@ pub fn play_one_game<R: Rng + ?Sized>(
         envelope_tiling_value_w: 0.0,
         apply_via_chosen_action: false,
         column_build_trace: false,
+        // par.4: Heuristik-Self-Play -- der Stapelzug wird hier gar nicht
+        // aufgeloest (`apply_via_chosen_action: false`), der Knopf bleibt aus.
+        return_order_mode: 0,
     };
     let cfg = GameLoopConfig {
         timeout_secs: heuristic_game_timeout_secs(base_sims)
@@ -3447,6 +3824,13 @@ pub(crate) fn thread_plan(num_threads: usize) -> ThreadPlan {
 /// Brett 0 = Agent A (`sims_a`), Brett 1 = Agent B (`sims_b`). Spiel `i` hat den
 /// Startspieler alternierend (`i % 2`), um den Startspieler-Vorteil auszugleichen.
 /// Gibt ein geordnetes JSON-Array der Spielergebnisse zurück (Elo rechnet Python).
+///
+/// `log_games` (Default `false`, 2026-09-12): reicht den gleichnamigen
+/// Parameter von [`play_arena_game`] durch -- `log`/`names`/`game_seed` je
+/// Partie. Volle Spalten und volle Reihen sind NUR aus dem Log
+/// rekonstruierbar (`tools/probes/column_build_structural_probe.py`), und die
+/// Startslot-Sonde (`PREREG_start_dome_choice.md` par.4) braucht beide. Reine
+/// Zusatzausgabe: bei `false` ist das Ergebnis byte-identisch zum Bestand.
 pub fn run_arena_match(
     sims_a: u32,
     sims_b: u32,
@@ -3454,6 +3838,7 @@ pub fn run_arena_match(
     seed: u64,
     num_threads: usize,
     c: f64,
+    log_games: bool,
 ) -> String {
     let play = |i: usize| -> Value {
         let game_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
@@ -3462,7 +3847,7 @@ pub fn run_arena_match(
         let first = i % 2;
         let names = ["A".to_string(), "B".to_string()];
         play_arena_game(
-            [sims_a, sims_b], c, ids, names, first, &mut rng, game_seed, false,
+            [sims_a, sims_b], c, ids, names, first, &mut rng, game_seed, log_games,
         )
     };
 
@@ -3515,7 +3900,8 @@ fn play_net_game<R: Rng + ?Sized>(
         envelope_profile: search_config.envelope_profile,
         envelope_tiling_value_w: search_config.envelope_tiling_value_w,
         apply_via_chosen_action: true,
-        column_build_trace: true,};
+        column_build_trace: true,
+        return_order_mode: search_config.return_order_mode,};
     let heur_player = PlayerLoopConfig {
         agent: &heur_agent,
         tiling_net: None,
@@ -3524,6 +3910,9 @@ fn play_net_game<R: Rng + ?Sized>(
         envelope_tiling_value_w: 0.0,
         apply_via_chosen_action: false,
         column_build_trace: false,
+        // par.4: die Heuristik-Seite dieser Arena bleibt bei Modus 0 (hv1
+        // liest den Knopf nicht).
+        return_order_mode: 0,
     };
     // `net_board` waehlt das Brett der Netz-Seite (alle Aufrufer nutzen 0).
     let players = if net_board == 0 { [net_player, heur_player] } else { [heur_player, net_player] };
@@ -3684,7 +4073,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 envelope_profile: search_config_a.envelope_profile,
                 envelope_tiling_value_w: search_config_a.envelope_tiling_value_w,
                 apply_via_chosen_action: true,
-                column_build_trace: false,},
+                column_build_trace: false,
+                return_order_mode: search_config_a.return_order_mode,},
             PlayerLoopConfig {
                 agent: &agent_b,
                 tiling_net: Some(net_b),
@@ -3692,7 +4082,8 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 envelope_profile: search_config_b.envelope_profile,
                 envelope_tiling_value_w: search_config_b.envelope_tiling_value_w,
                 apply_via_chosen_action: true,
-                column_build_trace: false,},
+                column_build_trace: false,
+                return_order_mode: search_config_b.return_order_mode,},
         ],
         vorzug_greift: None,
         start_state: None,
@@ -4460,7 +4851,8 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         envelope_profile: search_config.envelope_profile,
         envelope_tiling_value_w: search_config.envelope_tiling_value_w,
         apply_via_chosen_action: true,
-        column_build_trace: false,};
+        column_build_trace: false,
+        return_order_mode: search_config.return_order_mode,};
     let player1 = PlayerLoopConfig {
         agent: &agent1,
         tiling_net: Some(net),
@@ -4468,7 +4860,8 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         envelope_profile: search_config.envelope_profile,
         envelope_tiling_value_w: search_config.envelope_tiling_value_w,
         apply_via_chosen_action: true,
-        column_build_trace: false,};
+        column_build_trace: false,
+        return_order_mode: search_config.return_order_mode,};
     // par.5: Greif-Zaehler nur angelegt und verdrahtet, wenn der Knopf aktiv
     // ist -- sonst exakt dieselbe Nebenwirkungsfreiheit wie vorher.
     let greif_counter = std::cell::Cell::new([0u64; 2]);
@@ -6424,7 +6817,8 @@ pub(crate) mod tests {
                 envelope_profile: crate::envelope::ENVELOPE_PROFILE_DEFAULT,
         envelope_tiling_value_w: 0.0,
                 apply_via_chosen_action: false,
-                column_build_trace: false,};
+                column_build_trace: false,
+                return_order_mode: 0,};
             let cfg = GameLoopConfig {
                 timeout_secs: 600,
                 seed_from_steps: false,
@@ -6571,7 +6965,7 @@ pub(crate) mod tests {
 
     #[test]
     fn arena_match_produces_results() {
-        let out = run_arena_match(40, 60, 4, 99, 2, SELF_PLAY_C);
+        let out = run_arena_match(40, 60, 4, 99, 2, SELF_PLAY_C, false);
         let games: Value = serde_json::from_str(&out).unwrap();
         let arr = games.as_array().unwrap();
         assert_eq!(arr.len(), 4);
@@ -9192,5 +9586,302 @@ mod stack_draw_reservation_check {
             let dt = t0.elapsed();
             println!("{n_platten:<10}{leer:>12}{tiefe:>10}{:>13.1?}", dt);
         }
+    }
+}
+
+// ── Rueckgabe-Reihenfolge (PREREG_dome_return_order.md par.4) ────────────────
+#[cfg(test)]
+mod return_order_tests {
+    use super::*;
+    use crate::dome::{DomeSpace, DomeTile};
+    use crate::tile::TileColor;
+
+    /// Platte mit drei Normalfeldern einer Farbe und einem vierten Feld
+    /// (`special = true` -> Spezialfeld, sonst Jokerfeld) -- genau der Aufbau
+    /// der echten Platten (`dome.rs::build_dome_tile_pool`: 3 Normal + 1
+    /// Sonderfeld).
+    fn tile(id: usize, color: TileColor, special: bool) -> DomeTile {
+        let sonder = if special { DomeSpace::special() } else { DomeSpace::wild() };
+        DomeTile::new(
+            id,
+            vec![
+                DomeSpace::normal(color),
+                DomeSpace::normal(color),
+                DomeSpace::normal(color),
+                sonder,
+            ],
+            if special { 3 } else { 0 },
+        )
+    }
+
+    /// Zustand mit gefuelltem `pending_stack_draw` und EINER gebundenen
+    /// Musterreihe des Spielers am Zug.
+    fn state_with_draw(drawn: Vec<DomeTile>, bound_color: TileColor) -> GameState {
+        let mut rng = StdRng::seed_from_u64(11);
+        let mut game = Game::start(["A".into(), "B".into()], 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let pi = game.state.current_player;
+        // Reihe 2 (Index 1) auf `bound_color` binden, noch nicht voll.
+        game.state.players[pi].pattern_lines[1].add_tiles(&[bound_color]);
+        game.state.pending_stack_draw = drawn;
+        game.state
+    }
+
+    /// (c) Der Permutations-Helfer: drei Platten -> genau sechs VERSCHIEDENE
+    /// Reihenfolgen, eine Platte -> genau eine. Die erste ist immer die
+    /// Eingabe- (= Zieh-)Reihenfolge, worauf die Gleichstandsregel baut.
+    #[test]
+    fn order_permutations_counts_and_starts_with_the_draw_order() {
+        let three = order_permutations(&[7, 8, 9]);
+        assert_eq!(three.len(), 6, "3! = 6 Reihenfolgen");
+        assert_eq!(three[0], vec![7, 8, 9], "erste Reihenfolge = Ziehreihenfolge");
+        let mut seen: Vec<Vec<usize>> = three.clone();
+        seen.sort();
+        seen.dedup();
+        assert_eq!(seen.len(), 6, "alle sechs muessen verschieden sein");
+        assert_eq!(order_permutations(&[7]), vec![vec![7]], "1! = 1");
+        assert_eq!(order_permutations(&[]), vec![Vec::<usize>::new()], "0! = 1");
+        // Der Deckel: mehr als RETURN_ORDER_MAX_PERMUTED Restplatten
+        // permutieren nur den Kopf, der Schwanz bleibt in Ziehreihenfolge.
+        let capped = return_order_candidates(&[1, 2, 3, 4, 5]);
+        assert_eq!(capped.len(), 6, "hoechstens 3! Kandidaten");
+        assert!(capped.iter().all(|c| c[3..] == [4, 5]), "Schwanz bleibt stehen");
+        assert_eq!(capped[0], vec![1, 2, 3, 4, 5], "Kandidat 0 = Ziehreihenfolge");
+    }
+
+    /// Gleichstands-Helfer (der einzige Teil von Modus 1, der ohne Netz
+    /// pruefbar ist): groesster Wert gewinnt, bei Gleichstand der ERSTE
+    /// Kandidat -- und Kandidat 0 ist die Ziehreihenfolge.
+    #[test]
+    fn best_scored_index_prefers_the_first_candidate_on_a_tie() {
+        assert_eq!(best_scored_index(&[0.5, 0.5, 0.5]), 0, "Gleichstand -> Ziehreihenfolge");
+        assert_eq!(best_scored_index(&[0.5, 0.9, 0.7]), 1);
+        assert_eq!(best_scored_index(&[0.9, 0.9, 0.2]), 0, "erster der beiden Besten");
+        assert_eq!(best_scored_index(&[]), 0);
+        assert_eq!(best_scored_index(&[0.1, f64::NAN]), 0, "NaN ueberholt nie");
+        assert_eq!(
+            best_scored_index(&[f64::NAN, 0.1]),
+            0,
+            "NaN an Position 0 -> Ziehreihenfolge bleibt (sicherer Rueckfall)"
+        );
+        // Ein ausgefallener Kandidat traegt NEG_INFINITY und kann nie gewinnen.
+        assert_eq!(best_scored_index(&[f64::NEG_INFINITY, 0.4]), 1);
+    }
+
+    /// (a) Modus 0 gibt exakt die Ziehreihenfolge zurueck -- fuer jede
+    /// Kombination aus Restplatten. Das ist die Bitidentitaets-Zusage aus
+    /// par.4: kein Klon, kein Netzaufruf, keine Zufallszahl.
+    #[test]
+    fn mode_zero_returns_the_draw_order() {
+        let drawn = vec![
+            tile(101, TileColor::Blau, false),
+            tile(102, TileColor::Rot, true),
+            tile(103, TileColor::Gelb, false),
+        ];
+        let state = state_with_draw(drawn, TileColor::Gelb);
+        let (sr, sc) = state.players[state.current_player].dome_grid.empty_slots()[0];
+        for chosen in [101usize, 102, 103] {
+            let want: Vec<usize> = state
+                .pending_stack_draw
+                .iter()
+                .filter(|t| t.tile_id != chosen)
+                .map(|t| t.tile_id)
+                .collect();
+            assert_eq!(
+                choose_return_order(&state, chosen, sr, sc, 0, 0, None),
+                want,
+                "Modus 0 muss die Ziehreihenfolge liefern (chosen={chosen})"
+            );
+        }
+    }
+
+    /// (b) Modus 2 an einem konstruierten Zustand mit ZWEI Restplatten, von
+    /// denen eine offensichtlich passt: der Rueckleger sammelt Gelb, also
+    /// bedienen die drei Gelb-Felder der einen Platte seine offene
+    /// Musterreihe, die Blau-Felder der anderen nicht. Die passende muss
+    /// OBEN liegen, und oben ist Position 0 (game.rs:187 zieht per
+    /// `remove(0)`, game.rs:290 legt per `push` ans Ende -- innerhalb des
+    /// Blocks kommt `return_order[0]` also zuerst wieder).
+    #[test]
+    fn mode_two_puts_the_matching_tile_on_top() {
+        // Ziehreihenfolge bewusst UNGUENSTIG: die passende Platte kommt als
+        // letzte, Modus 2 muss sie nach vorne ziehen.
+        let drawn = vec![
+            tile(201, TileColor::Rot, false),  // behalten
+            tile(202, TileColor::Blau, false), // passt nicht (keine Blau-Reihe)
+            tile(203, TileColor::Gelb, false), // passt (Reihe auf Gelb gebunden)
+        ];
+        let state = state_with_draw(drawn, TileColor::Gelb);
+        let (sr, sc) = state.players[state.current_player].dome_grid.empty_slots()[0];
+        assert_eq!(
+            choose_return_order(&state, 201, sr, sc, 0, 2, None),
+            vec![203, 202],
+            "die passende Platte gehoert an Position 0 (= kommt zuerst wieder)"
+        );
+        // Gegenprobe: ist die Reihe auf BLAU gebunden, dreht sich die
+        // Rangfolge -- und die Ziehreihenfolge bleibt stehen.
+        let drawn = vec![
+            tile(201, TileColor::Rot, false),
+            tile(202, TileColor::Blau, false),
+            tile(203, TileColor::Gelb, false),
+        ];
+        let state = state_with_draw(drawn, TileColor::Blau);
+        assert_eq!(
+            choose_return_order(&state, 201, sr, sc, 0, 2, None),
+            vec![202, 203],
+            "jetzt passt die erste Platte -- Ziehreihenfolge bleibt"
+        );
+    }
+
+    /// Die Handregel selbst: Spezialfeld zaehlt 2, Jokerfeld 1, ein
+    /// Normalfeld nur bei gebundener Musterreihe derselben Farbe.
+    #[test]
+    fn tile_score_counts_special_wild_and_matching_rows() {
+        let state = state_with_draw(Vec::new(), TileColor::Gelb);
+        let pi = state.current_player;
+        // 3x Gelb (Treffer) + Spezialfeld = 3 + 2.
+        assert_eq!(return_order_tile_score(&state, pi, &tile(1, TileColor::Gelb, true)), 5);
+        // 3x Gelb (Treffer) + Jokerfeld = 3 + 1.
+        assert_eq!(return_order_tile_score(&state, pi, &tile(2, TileColor::Gelb, false)), 4);
+        // 3x Blau (kein Treffer) + Jokerfeld = 0 + 1.
+        assert_eq!(return_order_tile_score(&state, pi, &tile(3, TileColor::Blau, false)), 1);
+    }
+
+    /// Ohne Netz faellt Modus 1 auf die Ziehreihenfolge zurueck (statt eine
+    /// Partie zu reissen) -- das ist der Pfad der netzlosen Aufrufer.
+    #[test]
+    fn mode_one_without_a_net_falls_back_to_the_draw_order() {
+        let drawn = vec![
+            tile(301, TileColor::Rot, false),
+            tile(302, TileColor::Blau, false),
+            tile(303, TileColor::Gelb, false),
+        ];
+        let state = state_with_draw(drawn, TileColor::Gelb);
+        let (sr, sc) = state.players[state.current_player].dome_grid.empty_slots()[0];
+        assert_eq!(choose_return_order(&state, 301, sr, sc, 0, 1, None), vec![302, 303]);
+    }
+}
+
+// ── Erzwungener Startslot (PREREG_start_dome_choice.md par.4) ────────────────
+#[cfg(test)]
+mod start_slot_tests {
+    use super::*;
+
+    /// Frischer Partiezustand mit gefuelltem Kuppel-Display und leerem
+    /// 3x3-Raster -- dieselbe Bauform wie die uebrigen Tests der Datei.
+    fn fresh_state(seed: u64) -> GameState {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let ids = sample_valid_scoring_ids(3, &mut rng);
+        let mut state = crate::state::setup_new_game(["A".into(), "B".into()], 0, &mut rng);
+        state.scoring_tile_ids = ids;
+        state
+    }
+
+    #[test]
+    fn parse_start_slot_maps_index_to_row_and_column() {
+        assert_eq!(parse_start_slot("0"), Some((0, 0)));
+        assert_eq!(parse_start_slot("4"), Some((1, 1)));
+        assert_eq!(parse_start_slot("8"), Some((2, 2)));
+        assert_eq!(parse_start_slot(" 5 "), Some((1, 2)));
+    }
+
+    #[test]
+    fn parse_start_slot_rejects_out_of_range_and_garbage() {
+        for raw in ["9", "-1", "", "   ", "abc", "1.5", "07x"] {
+            assert_eq!(parse_start_slot(raw), None, "{raw:?} darf kein Slot sein");
+        }
+    }
+
+    /// Der Knopf haelt den SLOT fest -- fuer jeden der neun Slots liegt die
+    /// Startplatte danach genau dort.
+    #[test]
+    fn a_forced_slot_places_the_start_tile_in_that_slot() {
+        for seed in [1u64, 7, 42] {
+            let state = fresh_state(seed);
+            for pi in 0..2 {
+                for idx in 0..9usize {
+                    let forced = (idx / 3, idx % 3);
+                    let (_tile, r, c, _rot) = choose_start_placement_with_slot(&state, pi, Some(forced))
+                        .expect("auf dem leeren Raster gibt es fuer jeden Slot Kandidaten");
+                    assert_eq!((r, c), forced, "Seed {seed}, Spieler {pi}, Slot {idx}");
+                }
+            }
+        }
+    }
+
+    /// Ohne Knopf bleibt die Wahl die Bestandswahl: `None` ist derselbe
+    /// Durchlauf wie vor dem Umbau (bestes Kandidatentupel, Gleichstand an den
+    /// zuerst geprueften Kandidaten).
+    #[test]
+    fn without_the_knob_the_choice_is_the_legacy_choice() {
+        for seed in [1u64, 7, 42, 2026] {
+            let state = fresh_state(seed);
+            for pi in 0..2 {
+                let mut best: Option<(f64, usize, usize, usize, u32)> = None;
+                for k in start_placement_kandidaten(&state, pi) {
+                    if best.map_or(true, |(b, ..)| k.0 > b) {
+                        best = Some(k);
+                    }
+                }
+                let legacy = best.map(|(_, t, r, c, rot)| (t, r, c, rot));
+                assert_eq!(choose_start_placement_with_slot(&state, pi, None), legacy);
+                // Und der Bestand ist unter den neun erzwungenen Waehlen
+                // enthalten -- der Knopf schraenkt ein, er erfindet nichts.
+                let (_, lr, lc, _) = legacy.expect("Bestandswahl existiert");
+                assert_eq!(
+                    choose_start_placement_with_slot(&state, pi, Some((lr, lc))),
+                    legacy,
+                    "der erzwungene Bestands-Slot muss dieselbe Platzierung liefern"
+                );
+            }
+        }
+    }
+
+    /// Der erzwungene Slot darf die BEWERTUNG nicht aendern: die gewaehlte
+    /// Platzierung ist die bestbewertete unter den Kandidaten dieses Slots,
+    /// und ihr Wert liegt nie ueber dem der freien Wahl.
+    #[test]
+    fn a_forced_slot_keeps_the_hand_rule_scoring() {
+        let state = fresh_state(99);
+        let pi = 0usize;
+        let candidates = start_placement_kandidaten(&state, pi);
+        let free_best = candidates.iter().fold(f64::NEG_INFINITY, |m, k| m.max(k.0));
+        for idx in 0..9usize {
+            let forced = (idx / 3, idx % 3);
+            let (tile_id, r, c, rot) =
+                choose_start_placement_with_slot(&state, pi, Some(forced)).expect("Kandidaten da");
+            let in_slot: Vec<_> = candidates.iter().filter(|k| (k.2, k.3) == forced).collect();
+            let best_value = in_slot.iter().fold(f64::NEG_INFINITY, |m, k| m.max(k.0));
+            let chosen = in_slot
+                .iter()
+                .find(|k| (k.1, k.2, k.3, k.4) == (tile_id, r, c, rot))
+                .expect("gewaehlte Platzierung muss ein Kandidat dieses Slots sein");
+            assert_eq!(chosen.0, best_value, "Slot {idx}: nicht der beste Kandidat des Slots");
+            assert!(best_value <= free_best, "Slot {idx}: Einschraenkung darf nicht besser werden");
+        }
+    }
+
+    /// Ist der erzwungene Slot besetzt, faellt die Wahl auf den Bestand
+    /// zurueck statt die Partie mit `None` abzubrechen.
+    #[test]
+    fn an_occupied_forced_slot_falls_back_to_the_legacy_choice() {
+        let mut state = fresh_state(5);
+        let pi = 0usize;
+        // Slot (0,0) belegen -- irgendeine Platte aus dem Display. Die Engine
+        // laesst den Nicht-Startspieler zuerst legen (game.rs:587), deshalb
+        // hier zuvor dessen Aussteh-Flag raeumen.
+        state.players[1 - pi].start_tile_pending = false;
+        let (tile_id, _r, _c, rot) =
+            choose_start_placement_with_slot(&state, pi, Some((0, 0))).expect("Kandidat da");
+        crate::game::apply_start_placement(&mut state, pi, tile_id, 0, 0, rot)
+            .expect("Startsetzung muss legal sein");
+        assert!(!state.players[pi].dome_grid.empty_slots().contains(&(0, 0)));
+        assert_eq!(
+            choose_start_placement_with_slot(&state, pi, Some((0, 0))),
+            choose_start_placement_with_slot(&state, pi, None),
+            "besetzter Slot -> Bestandswahl"
+        );
     }
 }
