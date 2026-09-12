@@ -18449,4 +18449,4 @@ der Mensch: P.3 Ziehserie und P.7 Phasenaufloesung ungebaut, dazu neu P.9 (Beute
 nur als Summe kodiert; Turm verdeckt, aber am Rundenende mitzaehlbar). P.3/P.7 als Sicht-Arm
 v29-b03 eingetaktet, P.9 als Vorschlag (`PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md`
 par.6c). Prereg-Bestand: 14 OFFEN laut Index; vier davon (v28_window, dome_stack, start_dome_choice)
-koennen schliessen, stack_top_feature nicht. Auf Nutzer-Anweisung um 01:15 die drei geschlossen (ENTSCHIEDEN): Index 11 OFFEN.
+koennen schliessen, stack_top_feature nicht. Auf Nutzer-Anweisung um 01:15 die drei geschlossen (ENTSCHIEDEN): Index 11 OFFEN. Crosscheck Fliesenbuchhaltung (Nutzer 01:05): 106/106 Entscheidungspunkte des Server-Logs seed946607 in Beutel und Turm je Farbe aus oeffentlicher Information reproduziert (`tile_ledger_crosscheck.py`, stack_top par.14); P.9 bestaetigt.

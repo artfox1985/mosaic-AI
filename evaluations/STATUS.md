@@ -35,16 +35,15 @@ NICHT begonnen.
 Kein Lauf aktiv. **Bereit, Start auf Anweisung:** `tools/night_sims_curve_v28b02.sh` (Sims-Kurve am
 Generator v28-b02, `PREREG_search_depth_column_optimum.md` par.8e: Teil A gepaart @100/@200/@600
 gegen @400 je 75 Paare ohne Frueh-Stopp mit Spaltensonde und Plattenpunkten, Teil B argmax
-@100/@200/@400/@600 je 200 Partien; rund 2,5-3 h, ANNAHME). Vorher laeuft der Crosscheck am
-Spiellog (unten), weil eine deterministische Sonde nicht neben einer Messung laufen darf.
+@100/@200/@400/@600 je 200 Partien; rund 2,5-3 h, ANNAHME). Der Crosscheck am Spiellog ist
+durch (Schritt 1 unten).
 
 ### NAECHSTE SCHRITTE (Reihenfolge)
 
-1. **Crosscheck Fliesenbuchhaltung** (Nutzer 2026-09-13, 01:05): am Server-Log
-   `static/log/game_20260911_092554_seed946607.log` pruefen, ob sich je Zug die Fliesen je Farbe
-   auf Brett, im Beutel und im Turm aus dem oeffentlichen Spielverlauf mitrechnen lassen (Ledger
-   gegen Engine-Replay, `tools/analyze_game_log.py --dump-states`). Ergebnis in
-   `PREREG_stack_top_feature.md` (P.9) nachtragen.
+1. ~~Crosscheck Fliesenbuchhaltung~~ ERLEDIGT 01:30: 106 von 106 Entscheidungspunkten des Logs
+   `game_20260911_092554_seed946607` stimmen in Beutel UND Turm je Farbe mit der Engine ueberein
+   (`tools/probes/tile_ledger_crosscheck.py`, `PREREG_stack_top_feature.md` par.14); P.9 ist damit
+   eine echte Sicht-Asymmetrie (Beispiel R3: Beutel 2 Fliesen, Turm 18, Encoder sieht nur die Summe).
 2. **Sims-Kette starten** (par.8e), danach Auswertung nach der Lesart dort und der VORSCHLAG fuer
    die Sims von Sockel und Schwarm getrennt, mit Kosten je Variante fuer v29 UND v30 (Nutzer:
    "zum schluss sind es nur noch zwei generationen"; Entscheidungsregel "eklatant" in par.8e).
