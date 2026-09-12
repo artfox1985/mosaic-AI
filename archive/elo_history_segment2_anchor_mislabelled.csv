@@ -1,0 +1,8 @@
+# FALSCH ETIKETTIERT (2026-09-12, 12:05): diese drei Anker-Kanten liefen ueber tools/night_reanchor.sh OHNE
+# --sims-worker 150 --c-puct-worker 0.3; der Anker spielte @400 mit c_puct 1,5 (Artefakte anchor_v2_arena_*.json:
+# sims_worker 400, c_puct_worker 1.5), nicht die Leiterdefinition Heuristik@150/0,3 (tools/anchor_arena.py:118-119).
+# Aus evaluations/elo_history.csv entfernt; Wiederholung mit korrekten Parametern in tools/night_ladder_rungs.sh.
+date,player_a,sims_a,player_b,sims_b,wins_a,wins_b,n,comment,contract,knobs
+2026-09-12,v28-b02,400,Heuristik_hv1_anchor_v2,150,126,24,150,"Neuverankerung Segment 2 (PREREG_code_cleanup_closeout.md par.7a): Anker-Kante gegen das neue Artefakt hv1_anchor_v2 (Wheel mit Phantom-Fix A2), festes n=150 ohne Fruehstopp, Seed-Basis 900001, 6 Worker, Handshake gruen ohne Cross-Aera (39648b95bbba1acf beidseits), Golden-Selbsttest gruen; 1.441 s. Bezug Alt-Register: v27-b01 hatte 127:23 gegen hv1_anchor",39648b95bbba1acf,spec:frozen_champions/v27-b01/spec.json
+2026-09-12,v28-b01,400,Heuristik_hv1_anchor_v2,150,132,18,150,"Neuverankerung Segment 2: Anker-Kante v28-b01 gegen hv1_anchor_v2, festes n=150 ohne Fruehstopp, Seed-Basis 900001, 6 Worker, Handshake gruen ohne Cross-Aera, Golden-Selbsttest gruen; 1.491 s",39648b95bbba1acf,spec:frozen_champions/v27-b01/spec.json
+2026-09-12,v27-b01,400,Heuristik_hv1_anchor_v2,150,124,26,150,"Neuverankerung Segment 2: Anker-Kante v27-b01 gegen hv1_anchor_v2, festes n=150 ohne Fruehstopp, Seed-Basis 900001, 6 Worker, Handshake gruen ohne Cross-Aera (39648b95bbba1acf beidseits), Golden-Selbsttest gruen; 1.489 s. Bezug Alt-Register: 127:23 gegen hv1_anchor",39648b95bbba1acf,spec:frozen_champions/v27-b01/spec.json
