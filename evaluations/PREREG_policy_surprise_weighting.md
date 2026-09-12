@@ -377,3 +377,13 @@ Register eingetragen, sie ist ein Faktor-Vergleich, keine Leiterposition. Die
 Standard-Kennzahlen aus den Logs (Spalten, Reihen, Strafleiste, Plattenpunkte) folgen als
 Nachtrag, sobald die Maschine frei ist (Replay-Sonde nicht neben dem laufenden C2-Instrument).
 
+**Nachtrag Standard-Kennzahlen (Replay-Sonde 2026-09-12, 12:06, exklusiv; Artefakt
+`arena_columns_paired_gating_v24-b05_vs_v24-b04_s45.json`, 198 von 200 Partien replayt, 2
+Divergenzen):** volle Spalten je Seite v24-b05 0,520 (+-0,103) gegen v24-b04 0,561 (+-0,107);
+Teilspalten >= 4 2,07 gegen 2,20; volle Reihen 0,18 gegen 0,15; Spezialfelder belegt 1,01 gegen
+1,13; Strafleiste 11,3 gegen 11,4 Punkte. Gepaart (v24-b05 minus v24-b04, 100 Paare): Sieg
+-0,03 [-0,17; +0,11], Punkte -1,35 [-4,23; +1,53], Marge -2,70 [-8,46; +3,06], Platten -0,24
+[-1,33; +0,86], Strafleiste -0,11. Kein Posten bewegt sich ueber sein Intervall; die Spalten
+zeigen in dieselbe Richtung wie die Siege (leicht gegen die Gewichtung). Verdikt par.12
+unveraendert.
+
