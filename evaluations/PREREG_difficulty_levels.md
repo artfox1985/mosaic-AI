@@ -438,3 +438,11 @@ ueber die Grenze werden nie gemischt. Folgen fuer diese Prereg:
 - Zahlen ab hier nur aus `evaluations/elo_history.csv` (Segment 2) lesen; par.2.5 ist
   historisch und wird nicht umgeschrieben.
 
+**Nachtrag 2026-09-12, 16:20 (Segment 2, Stufe 1 gemessen):** die Anfaenger-Stufe hv2_generator@150
+(c_puct 0,3) gegen den Anker hv1_anchor_v2@150: **77:73 aus 150 Partien** (drei Bloecke a 50 ohne
+Frueh-Stopp, p 0,81; `PREREG_code_cleanup_closeout.md` par.7a). Elo-Knoten `Heuristik_hv2_generator@150`
+972 [921, 1022], also gleich stark wie der Anker. Die Zahl 1100 aus par.2.5 galt fuer
+`Heuristik_v2huelle` im Segment 1 und ist fuer die Leiter der Stufen NICHT mehr zu verwenden. Damit
+liegt die Anfaenger-Stufe rund 350 Elo unter dem Champion (v28-b02 1329 [1281, 1389]); die Stufen
+2 und 3 (Champion mit Self-Play-Stilmitteln) muessen diesen Abstand fuellen (Stufe 2 der Prereg).
+
