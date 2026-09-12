@@ -19,23 +19,11 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 ## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 23:55)
 
 **Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12, 06:17-06:45),
-Elo im LEITERSEGMENT 2 VORLAEUFIG** (Anker `hv1_anchor_v2` fix 1000): die drei Anker-Kanten der
-Nacht liefen mit falschen Anker-Parametern (@400, c_puct 1,5 statt @150/0,3; Zeilen in
-`../archive/elo_history_segment2_anchor_mislabelled.csv`) und werden seit 11:51 korrekt
-wiederholt, danach Zwischenstufen in ~100-Elo-Schritten (Nutzer: Anker-Kanten gesaettigt; Segment 1
-zeigt Saettigung ab v23 mit 84-85 %): hv2, v21_2d_brierbest und v24-b07 als Artefakte aus dem
-restic-Repo zurueckgeholt (Snapshots 55623af8 / bfbe80b1, in `models/frozen_champions/`), Kette
-`tools/night_v28_tail3.sh` (12:03): Leiter-Teil am v21-Selbsttest abgebrochen (Wheel wave3g fehlte,
-aus restic geholt, Worker-Skript des Einfriertags ins Artefakt, Referee liest `worker_script` aus
-dem Manifest), hv2-Gegenprobe an einem Pfadfehler (behoben); der Schwanz laeuft weiter
-(Replay-Sonden DURCH, K3-D/Jokerfeld-Instrument DURCH 13:26: beide ohne Wirkung, `geometric_envelope`
-par.13 Nachtrag). **Seit 13:27 `tools/night_v28_tail5.sh`**: Bau beider neuen Knoepfe mit Toren
-(Tests, Fixture, Wheel, Anker-Drift), dann Leiter (Anker-Kanten korrekt, neun Sprossen mit
-Frueh-Stopp), dann hv2-Gegenprobe; danach `tools/night_start_by_search_ab.sh` (A/B Such-Start,
-200 Paare). Der
-erste Start (`night_v28_tail2.sh`, 11:51) wurde 12:05 gestoppt, weil v24-b07 noch live statt als
-Artefakt eingetragen war; verwaiste Referee-Prozesse beendet der Nutzer. Letzter Stand mit den falschen Kanten: v28-b02 1299 [1244, 1359]
-aus 1.330 Partien, v27-b01 1262, v26-b01 1173, v28-b01 1346. Promotion vollstaendig nach
+Elo 1344** [1298, 1399] aus 1.380 Partien im LEITERSEGMENT 2 (Endstand 17:10, 16 Kanten, alle am
+Anker `hv1_anchor_v2` fix 1000): v27-b01 1301, v28-b01 1288 (nur Anker-Kante), v26-b01 1251,
+v24-b07 1184, v21 1157, hv2 987. Die Anker-Kanten der Nacht liefen mit falschen Parametern
+(archiviert) und wurden korrekt wiederholt; die Leiter traegt jetzt auf Zwischenstufen aus dem
+restic-Repo (v21, v24-b07; `PREREG_code_cleanup_closeout.md` par.7a). Promotion vollstaendig nach
 Checkliste (Anker 126:24, Nachbar 133:97 SPRT + Replikation 212:188 ohne Entscheid, Champion-2
 101:49 gegen Artefakt v26-b01, sigma/Prior 2,222, Platt in server.py, Fixture e1f94c44f0c7959b,
 Artefakt `models/frozen_champions/v28-b02/` mit Wheel vom Knopf-Durchgang, Golden Probe 10
