@@ -466,4 +466,8 @@ Einhuellenden an beiden Armen erfuellt: Knopf an minus aus +0,140 (b01) und +0,2
 Spalten je Seite am argmax-Instrument, Punkte +2,6 / +2,4 (`geometric_envelope` par.12c).
 Nebenbefund fuer Tor 2a: ohne Huellen-Knopf faellt b02 (0,668) unter b01 (0,723), mit Knopf liegt
 b02 vorn (0,895 gegen 0,863); die Reihung der Arme haengt an der Spec, mit der gemessen wird.
+Schritt 8c (A1/A2 am Champion, `geometric_envelope` par.12c): Kanal A NICHT erfuellt, die Suche
+stimmt mit Huellen-Knopf in jeder Runde weniger mit dem huellenblinden Orakel ueberein (A2 R1
+0,68 gegen 0,79); K3-D und Jokerfeld bewegen A1 nicht. Die Prereg bleibt OFFEN mit K3-P als
+Rezept; Nutzer-Entscheid zum Schliesskriterium.
 

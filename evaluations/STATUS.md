@@ -50,8 +50,10 @@ Diff +0,313 [+0,068; +0,558]); Segment-2-Leiter jetzt v28-b02 1305, v28-b01 1346
 **MASCHINE BELEGT: `tools/night_v28_resume_freeze.sh` seit 06:19** (Fortsetzung nach einem
 OneDrive-Sperrfehler im Fixture-Schreiblauf; Stufen A-D sind DURCH: Ueberraschungs-Kante 97:103
 SPRT H0 (ENTSCHIEDEN NEIN), C2 erfuellt (+0,140 b01, +0,228 b02 volle Spalten, `geometric_envelope`
-par.12c); es laeuft E A1/A2 (seit 09:49, vier Orakel-Laeufe), dann F dritter Seed + Startkuppel
-Stufe 0). Nutzer-Entscheid 09:35: Waechter der Startkuppel-Sonde nach Weg 3 (Sims-Stufen plus
+par.12c); E A1/A2 DURCH (Kanal A NICHT erfuellt: mit Knopf in jeder Runde unter ohne, gegen ein
+huellenblindes Orakel; `geometric_envelope` bleibt OFFEN mit K3-P als Rezept, Nutzer-Entscheid zum
+Schliesskriterium); es laeuft F dritter Seed (seit 10:13, ~1,5 h) + Startkuppel Stufe 0; danach
+`tools/night_start_dome_hv2.sh` (hv2-Gegenprobe, Weg 3)). Nutzer-Entscheid 09:35: Waechter der Startkuppel-Sonde nach Weg 3 (Sims-Stufen plus
 hv2-Artefakt per Referee als Gegenprobe; Referee-Schalter im Bau durch Agenten). Davor `tools/night_v28_after_reanchor.sh` ab 03:44 (A Knopf-Bau mit Toren,
 B Promotions-Messungen v28-b02: Replikation der Nachbar-Kante Seed 20261046 DURCH, **212:188
 am Deckel ohne SPRT-Entscheid** (p 0,28, Diff +0,12 [-0,08; +0,32]; Register v28-b02 1296,
