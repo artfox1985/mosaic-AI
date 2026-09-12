@@ -39,13 +39,20 @@ build_venv() {  # <artefakt-dir> <wheel-datei>
 }
 
 echo "== TEIL 0: Artefakte aus dem Backup betriebsbereit machen $(date +%F' '%H:%M:%S)"
+# v21: eine venv aus der Provenienz-Kopie searchconfig_wave1 kennt FrozenWorkerEngine nicht;
+# Neubau aus dem zurueckgeholten wave3g-Wheel (Manifest worker_wheel_restored).
+if [ -d "$V21/venv" ] && ! "$V21/venv/Scripts/python.exe" -c "import mosaic_rust as m; m.FrozenWorkerEngine" 2>/dev/null; then
+  echo "   v21-venv ohne FrozenWorkerEngine -> Neubau aus wave3g"; rm -rf "$V21/venv"
+fi
 build_venv "$V24" mosaic_rust_wegb_temp2_20260907.whl || { echo "STOPP: venv v24-b07"; exit 11; }
-build_venv "$V21" mosaic_rust_searchconfig_wave1_20260823.whl || { echo "STOPP: venv v21"; exit 12; }
+build_venv "$V21" mosaic_rust_wave3g_20260824.whl || { echo "STOPP: venv v21"; exit 12; }
+OK_V24=1; OK_V21=1
 for A in "$V24" "$V21"; do
   echo "== Referee-Selbsttest $A (2 Partien, Cross-Aera) $(date +%H:%M:%S)"
   python -X utf8 -u tools/frozen_referee_match.py --artifact-dir "$A" --model-a "$A/model.onnx" --spec-a "$A/spec.json" \
     --sims-a 400 --c-puct-a 1.5 $NETW --n-games 2 --force-cross-era --out "$ART/referee_selftest_$(basename "$A")_restored.json"
-  RC=$?; echo "   Exit $RC ($(date +%H:%M:%S))"; [ $RC -eq 0 ] || { echo "STOPP: Selbsttest $A rot"; exit 13; }
+  RC=$?; echo "   Exit $RC ($(date +%H:%M:%S))"
+  if [ $RC -ne 0 ]; then echo "   Selbsttest $A ROT -- Kanten dieses Artefakts werden UEBERSPRUNGEN"; if [ "$A" = "$V24" ]; then OK_V24=0; else OK_V21=0; fi; fi
 done
 
 echo "== TEIL A: Anker-Kanten korrekt (n=150 fest, Anker @150 c_puct 0,3) $(date +%F' '%H:%M:%S)"
@@ -85,12 +92,12 @@ PY
 
 echo "== TEIL B: Zwischenstufen $(date +%F' '%H:%M:%S)"
 edge hv2_vs_anchor   910001 --artifact-dir "$ANCHOR" $HEUR --artifact-dir-a "$HV2" --sims-a 150 --c-puct-a 0.3
-edge v21_vs_hv2      911001 --artifact-dir "$HV2" $HEUR --artifact-dir-a "$V21" --sims-a 400 --c-puct-a 1.5
-edge v24_vs_v21      912001 --artifact-dir "$V21" $NETW --artifact-dir-a "$V24" --sims-a 400 --c-puct-a 1.5
-edge v26_vs_v24      913001 --artifact-dir "$V24" $NETW --artifact-dir-a "$V26" --sims-a 400 --c-puct-a 1.5
-edge v27_vs_v24      914001 --artifact-dir "$V24" $NETW --model-a models/alphazero_v27-b01_brierbest.onnx --spec-a "$SPEC" --sims-a 400 --c-puct-a 1.5
-edge v28b02_vs_v24   915001 --artifact-dir "$V24" $NETW --model-a models/alphazero_v28-b02_brierbest.onnx --spec-a "$SPEC" --sims-a 400 --c-puct-a 1.5
-edge v21_vs_anchor   916001 --artifact-dir "$ANCHOR" $HEUR --artifact-dir-a "$V21" --sims-a 400 --c-puct-a 1.5
-edge v24_vs_hv2      917001 --artifact-dir "$HV2" $HEUR --artifact-dir-a "$V24" --sims-a 400 --c-puct-a 1.5
+[ $OK_V21 -eq 1 ] && edge v21_vs_hv2      911001 --artifact-dir "$HV2" $HEUR --artifact-dir-a "$V21" --sims-a 400 --c-puct-a 1.5
+[ $OK_V24 -eq 1 ] && [ $OK_V21 -eq 1 ] && edge v24_vs_v21      912001 --artifact-dir "$V21" $NETW --artifact-dir-a "$V24" --sims-a 400 --c-puct-a 1.5
+[ $OK_V24 -eq 1 ] && edge v26_vs_v24      913001 --artifact-dir "$V24" $NETW --artifact-dir-a "$V26" --sims-a 400 --c-puct-a 1.5
+[ $OK_V24 -eq 1 ] && edge v27_vs_v24      914001 --artifact-dir "$V24" $NETW --model-a models/alphazero_v27-b01_brierbest.onnx --spec-a "$SPEC" --sims-a 400 --c-puct-a 1.5
+[ $OK_V24 -eq 1 ] && edge v28b02_vs_v24   915001 --artifact-dir "$V24" $NETW --model-a models/alphazero_v28-b02_brierbest.onnx --spec-a "$SPEC" --sims-a 400 --c-puct-a 1.5
+[ $OK_V21 -eq 1 ] && edge v21_vs_anchor   916001 --artifact-dir "$ANCHOR" $HEUR --artifact-dir-a "$V21" --sims-a 400 --c-puct-a 1.5
+[ $OK_V24 -eq 1 ] && edge v24_vs_hv2      917001 --artifact-dir "$HV2" $HEUR --artifact-dir-a "$V24" --sims-a 400 --c-puct-a 1.5
 edge v26_vs_hv2      918001 --artifact-dir "$HV2" $HEUR --artifact-dir-a "$V26" --sims-a 400 --c-puct-a 1.5
 echo "== LEITER FERTIG $(date +%F' '%H:%M:%S)"

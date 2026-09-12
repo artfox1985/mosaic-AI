@@ -448,13 +448,13 @@ par.7a; beide Seiten Champion-Spec, Modelle vom Baum, Wheel mit A2 vom 2026-09-1
 | --- | --- | --- | --- | --- | --- |
 | Seed 20261044 | **133:97, SPRT nach 115 Paaren** | p 0,0198 | +0,313 [+0,068; +0,558] | 53,7 gegen 50,2 | 1,022 gegen 0,895 (n=229, 1 Divergenz) |
 | Seed 20261046 (Replikation, Deckel) | 212:188, kein Entscheid | p 0,281 | +0,12 [-0,08; +0,32] | 51,4 gegen 50,8 | 1,015 gegen 0,901 (n=392, 8 Divergenzen) |
-| Seed 20261047 (dritter Seed, Fruehstopp aus, Deckel) | **226:174** | p 0,0167 | +0,26 [+0,06; +0,46] | 52,7 gegen 50,3 | Sonde folgt |
+| Seed 20261047 (dritter Seed, Fruehstopp aus, Deckel) | **226:174** | p 0,0167 | +0,26 [+0,06; +0,46] | 52,7 gegen 50,3 | 0,992 gegen 0,839 (n=398, 2 Divergenzen) |
 
 Plattenpunkte gepaart (v28-b02 minus v27-b01): Seed 44 Punkte +3,45 [+0,93; +5,97], Marge
 +6,90 [+1,85; +11,94], Vertikale Reihen +1,32 [-0,02; +2,66]; Seed 46 Punkte +0,54 [-1,25; +2,32],
-Platten +1,08 [+0,36; +1,80], Vertikale Reihen **+1,14 [+0,17; +2,11]**. Waechter je Lauf:
+Platten +1,08 [+0,36; +1,80], Vertikale Reihen **+1,14 [+0,17; +2,11]**. Seed 47 Punkte +2,44 [+0,51; +4,36], Marge +4,88 [+1,03; +8,73], Platten +1,13 [+0,34; +1,91], Vertikale Reihen +1,09 [-0,00; +2,18]. Waechter je Lauf:
 Kriteriensumme = Endwertung und Log-Endstand = scores 230/230 bzw. 400/400. Tor 2b im
-Segment 2: die Spaltenzahl liegt in beiden Seeds um 0,12 ueber dem Vorgaenger (Intervalle
+Segment 2: die Spaltenzahl liegt in allen drei Seeds um 0,12-0,15 ueber dem Vorgaenger (Intervalle
 +-0,08 bis +-0,10 je Seite, also knapp getrennt), der Zuwachs sitzt wieder in den vertikalen
 Reihen. Die Siegkante tragen Seed 44 (SPRT) und Seed 47 (Deckel, unverzerrt); Seed 46 ist der
 Nullbefund dazwischen. Verzerrungsfrei gepoolt (46+47): 438:362 aus 800. Artefakte
