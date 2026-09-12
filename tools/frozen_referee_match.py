@@ -323,7 +323,7 @@ def _play_block(job: dict) -> list[dict]:
                         job["c_puct_worker"])
     worker_a = None
     if job["artifact_dir_a"]:
-        worker_a = WorkerProc(Path(job["worker_python_a"]), Path(job["worker_script"]),
+        worker_a = WorkerProc(Path(job["worker_python_a"]), Path(job["worker_script_a"]),
                               Path(job["artifact_dir_a"]), job["sims_a"],
                               job["c_puct_a"])
     time.sleep(0.2)
@@ -538,6 +538,24 @@ def play_one_game(
     return record
 
 
+def worker_script_for(manifest: dict, artifact_dir: Path) -> Path:
+    """Worker-Skript eines Artefakts: per Default das heutige
+    `tools/frozen_champion_worker.py`; traegt das Manifest `worker_script.file`,
+    dann DIESE Datei aus dem Artefakt-Verzeichnis. Anlass 2026-09-12: das
+    v21-Artefakt (Wheel wave3g vom 2026-08-24) kennt `FrozenWorkerEngine` nur
+    mit zwei Argumenten und kein `kind`-Protokoll; der heutige Worker startet
+    darauf nicht (Broken Pipe beim ersten Request). Das Skript des
+    Einfriertags liegt deshalb im Artefakt und wird hier bevorzugt."""
+    entry = manifest.get("worker_script")
+    if isinstance(entry, dict) and entry.get("file"):
+        cand = artifact_dir / entry["file"]
+        if not cand.exists():
+            raise SystemExit(f"Manifest nennt worker_script {entry['file']!r}, aber {cand} fehlt.")
+        print(f"[referee] Worker-Skript aus dem Artefakt: {cand.name}", file=sys.stderr)
+        return cand
+    return REPO / "tools" / "frozen_champion_worker.py"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--artifact-dir", required=True)
@@ -608,7 +626,7 @@ def main() -> int:
                 "Ohne sie liefe das Artefakt auf dem heutigen Wheel -- das waere ein "
                 "Drift-Test, kein Match gegen den eingefrorenen Agenten.")
         worker_python = found
-    worker_script = REPO / "tools" / "frozen_champion_worker.py"
+    worker_script = worker_script_for(manifest, artifact_dir)
 
     sys.path.insert(0, str(REPO))
     import mosaic_rust as mr
@@ -658,7 +676,8 @@ def main() -> int:
             except SystemExit:
                 worker.close()
                 raise
-        worker_a = WorkerProc(py_a, worker_script, artifact_dir_a, args.sims_a, args.c_puct_a)
+        worker_script_a = worker_script_for(manifest_a, artifact_dir_a)
+        worker_a = WorkerProc(py_a, worker_script_a, artifact_dir_a, args.sims_a, args.c_puct_a)
         time.sleep(0.2)
 
     golden_mismatches = []
@@ -754,6 +773,7 @@ def main() -> int:
         "c_puct_worker": args.c_puct_worker,
         "artifact_dir_a": str(artifact_dir_a) if artifact_dir_a else None,
         "worker_python_a": str(py_a) if artifact_dir_a else None,
+        "worker_script_a": str(worker_script_a) if artifact_dir_a else None,
         "model_a": args.model_a, "spec_a": args.spec_a,
         "sims_a": args.sims_a, "c_puct_a": args.c_puct_a,
         "artefakt_modell": artifact_model_path, "names": list(names),
