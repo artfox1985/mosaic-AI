@@ -1617,10 +1617,14 @@ fn start_placement_step_with_random_p<R: Rng + ?Sized>(
     // Erzeugungs-/Messvorgaben und haben Vorrang (Auftrag 2026-09-12).
     // `search` ist `None` bei Knopf 0 UND auf jeder Heuristik-Seite: dann
     // laeuft der Block unten byte-gleich zum Bestand.
+    //
+    // Die Suche zieht aus ihrem EIGENEN Strom
+    // (`search_start_placement_isolated`), nicht aus `rng`: der Partie-RNG
+    // traegt nur Spielzustands-Ereignisse (PREREG_search_rng_split.md). Bei
+    // Knopf 0 wird gar kein Strom erzeugt -- `rng` steht danach exakt dort,
+    // wo er ohne die Suche stuende.
     let search = match (forced_slot, randomized_slot, start_search) {
-        (None, None, Some(p)) => crate::net_mcts::search_start_placement(
-            p.net, &game.state, pi, p.base_sims, p.add_root_noise, rng, &p.search_config,
-        ),
+        (None, None, Some(p)) => search_start_placement_isolated(&p, &game.state, pi),
         _ => None,
     };
 
@@ -1769,6 +1773,16 @@ pub(crate) struct StartSearchParams<'a> {
     /// Gumbel-Wurzel-Noise: `true` nur in der ERZEUGUNG (Self-Play), damit
     /// die Arena-Pfade bei festem Seed deterministisch bleiben.
     pub add_root_noise: bool,
+    /// Partie-Seed, aus dem [`search_start_placement_isolated`] den EIGENEN
+    /// Suchstrom ableitet (`derive_search_seed`, PREREG_search_rng_split.md).
+    ///
+    /// Er steht hier und nicht als Parameter von `start_placement_step`, weil
+    /// sonst acht Aufrufstellen, die gar nicht suchen (`None`), einen Seed
+    /// mitschleppen muessten, den sie nie benutzen. Der Wert MUSS der
+    /// `game_seed` derselben Partie sein -- alle Aufrufer bauen ihn aus
+    /// `GameLoopConfig::game_seed` bzw. dem `game_seed`-Parameter ihrer
+    /// Partie-Funktion.
+    pub game_seed: u64,
 }
 
 impl<'a> StartSearchParams<'a> {
@@ -1781,6 +1795,7 @@ impl<'a> StartSearchParams<'a> {
         base_sims: u32,
         search_config: &SearchConfig,
         add_root_noise: bool,
+        game_seed: u64,
     ) -> Option<Self> {
         if search_config.start_by_search != 1 {
             return None;
@@ -1790,8 +1805,50 @@ impl<'a> StartSearchParams<'a> {
             base_sims,
             search_config: *search_config,
             add_root_noise,
+            game_seed,
         })
     }
+}
+
+/// Startsetzungs-Suche auf einem EIGENEN, aus dem Partie-Seed abgeleiteten
+/// Zufallsstrom -- der Partie-`rng` wird nicht angefasst.
+///
+/// WARUM (PREREG_search_rng_split.md, Vertrag im Doc-Kommentar von
+/// [`unified_game_loop`]: `rng` traegt NUR Spielzustands-Ereignisse): die Suche
+/// zieht reichlich (`net_mcts::determinize_hidden_information_for` plus jede
+/// Simulation). Aus `rng` gezogen verschob sie jede spaetere bedingte Ziehung
+/// der Partie -- Beutel-Nachfuellen aus dem Turm (`supply.rs::refill_from_tower`)
+/// und den monochromen Redraw der grossen Fabrik. Die Partie war damit aus
+/// ihrem EIGENEN Log nicht mehr nachspielbar
+/// (`arena_columns_paired_gating_v28-b02_startsearch_vs_v28-b02_s48.json`:
+/// 190 von 190 Partien divergent, die erste ab Runde 4 -- genau dort recycelt
+/// der Turm zum ersten Mal), und eine gepaarte Arena war ab derselben Stelle
+/// entpaart.
+///
+/// EINE Funktion fuer alle Pfade (Self-Play mit Record, Arena, Diagnose), damit
+/// die Stromwahl nicht an drei Stellen getrennt geschrieben steht.
+/// `start_step` folgt der Referee-Konvention (referee.rs): die beiden
+/// Startsetzungen sind Schritt 0 und 1, der Nicht-Starter legt zuerst -- steht
+/// die Setzung des Gegners noch aus, ist dies Schritt 0, sonst Schritt 1.
+pub(crate) fn search_start_placement_isolated(
+    params: &StartSearchParams<'_>,
+    state: &GameState,
+    pi: usize,
+) -> Option<crate::net_mcts::StartPlacementSearch> {
+    let start_step: u64 = if state.players[1 - pi].start_tile_pending { 0 } else { 1 };
+    let mut start_rng = StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
+        params.game_seed,
+        crate::net_mcts::START_SEARCH_STREAM + start_step,
+    ));
+    crate::net_mcts::search_start_placement(
+        params.net,
+        state,
+        pi,
+        params.base_sims,
+        params.add_root_noise,
+        &mut start_rng,
+        &params.search_config,
+    )
 }
 
 /// Legale Tiling-Aktionen im agent_env-Schema (für `valid_actions` = Trainings-
@@ -3462,41 +3519,13 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         // bitidentischer Bestand (kein eigener Strom gezogen,
                         // `rng` unberuehrt -- der Elo-Anker bewegt sich nicht).
                         //
-                        // EIGENER Suchstrom statt `rng` (PREREG_search_rng_split.md,
-                        // Vertrag im Doc-Kommentar dieser Funktion: `rng` traegt
-                        // NUR Spielzustands-Ereignisse). Die Suche zieht reichlich
-                        // (net_mcts.rs: `determinize_hidden_information_for` plus
-                        // jede Simulation); aus `rng` gezogen verschob sie jede
-                        // spaetere bedingte Ziehung der Partie -- Beutel-Nachfuellen
-                        // aus dem Turm (supply.rs `refill_from_tower`) und den
-                        // monochromen Redraw der grossen Fabrik. Die Partie war
-                        // damit aus ihrem EIGENEN Log nicht mehr nachspielbar:
-                        // `arena_columns_paired_gating_v28-b02_startsearch_vs_v28-b02_s48.json`
-                        // meldet 190 von 190 Partien divergent, die erste ab Runde 4
-                        // (genau dort recycelt der Turm zum ersten Mal).
-                        // Schritt-Konvention wie im Referee (referee.rs:152 und
-                        // :605): die beiden Startsetzungen sind Schritt 0 und 1,
-                        // der Nicht-Starter legt zuerst. Sie liegen aber auf
-                        // einem EIGENEN Stromindex, nicht auf 0/1 selbst: bei
-                        // `seed_from_steps == false` zaehlt die Drafting-Suche
-                        // mit `move_number` ab 1, und dann bekaemen die zweite
-                        // Startsetzung und der erste Drafting-Entscheid
-                        // denselben Seed. Gleiches Muster wie
-                        // `START_TILE_STREAM` im Heuristik-Loop, anderer Block.
-                        const START_SEARCH_STREAM: u64 = 1 << 41;
+                        // EIGENER Suchstrom statt `rng`: Begruendung und
+                        // Schritt-Konvention stehen bei
+                        // `search_start_placement_isolated`.
                         let placement = start_search
                             .and_then(|p| {
-                                let start_step: u64 =
-                                    if game.state.players[1 - pi].start_tile_pending { 0 } else { 1 };
-                                let mut start_rng = StdRng::seed_from_u64(
-                                    crate::net_mcts::derive_search_seed(
-                                        cfg.game_seed, START_SEARCH_STREAM + start_step),
-                                );
-                                crate::net_mcts::search_start_placement(
-                                    p.net, &game.state, pi, p.base_sims, p.add_root_noise,
-                                    &mut start_rng, &p.search_config,
-                                )
-                                .map(|s| s.chosen_placement())
+                                search_start_placement_isolated(&p, &game.state, pi)
+                                    .map(|s| s.chosen_placement())
                             })
                             .or_else(|| choose_start_placement(&game.state, pi));
                         match placement {
@@ -4332,16 +4361,15 @@ fn play_arena_game<R: Rng + ?Sized>(
                     // bleibt die Partie reproduzierbar UND der Zufallsstrom
                     // der Nachziehplatten unberuehrt -- sonst waere die
                     // gepaarte Sonde (Handregel gegen Zufall, gleicher Seed)
-                    // an der Wurzel nicht mehr gepaart. Der Stromindex liegt
-                    // mit 1<<40 ausserhalb des Bereichs, den `steps` je
-                    // erreicht (Haenger-Schutz bricht bei 100.000 ab).
+                    // an der Wurzel nicht mehr gepaart. Warum der Stromindex
+                    // kollisionsfrei ist, steht bei der Konstante selbst
+                    // (`shaping.rs::START_TILE_STREAM`).
                     // Bei ungesetztem Knopf wird aus `start_rng` NICHTS
                     // gezogen und der Partie-`rng` nicht angefasst: der Pfad
                     // ist bitidentisch zum Bestand.
-                    const START_TILE_STREAM: u64 = 1 << 40;
                     let mut start_rng = StdRng::seed_from_u64(crate::net_mcts::derive_search_seed(
                         game_seed,
-                        START_TILE_STREAM + pi as u64,
+                        crate::net_mcts::START_TILE_STREAM + pi as u64,
                     ));
                     match choose_start_placement_rng(&game.state, pi, Some(&mut start_rng)) {
                         Some((tid, r, c2, rot)) => {
@@ -4565,7 +4593,8 @@ fn play_net_game<R: Rng + ?Sized>(
         return_order_mode: search_config.return_order_mode,
         // par.9c: nur die NETZ-Seite kann ihre Startsetzung suchen, und auch
         // sie nur bei `start_by_search == 1` (sonst `None` = Handregel).
-        start_search: StartSearchParams::for_net(Some(net), net_sims, &search_config, false),
+        start_search: StartSearchParams::for_net(
+            Some(net), net_sims, &search_config, false, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
     };
     let heur_player = PlayerLoopConfig {
@@ -4750,7 +4779,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 // (Champion mit Such-Start gegen Champion mit Handregel im
                 // selben Prozess).
                 start_search: StartSearchParams::for_net(
-                    Some(net_a), sims_a, &search_config_a, false),
+                    Some(net_a), sims_a, &search_config_a, false, game_seed),
                 heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             },
             PlayerLoopConfig {
@@ -4763,7 +4792,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 column_build_trace: false,
                 return_order_mode: search_config_b.return_order_mode,
                 start_search: StartSearchParams::for_net(
-                    Some(net_b), sims_b, &search_config_b, false),
+                    Some(net_b), sims_b, &search_config_b, false, game_seed),
                 heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             },
         ],
@@ -4879,6 +4908,11 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
     names: [String; 2],
     first_player: usize,
     rng: &mut R,
+    // Seed DIESER Partie -- nur fuer die Ableitung des Startsetzungs-
+    // Suchstroms (`search_start_placement_isolated`). Der Aufrufer seedet
+    // `rng` aus demselben Wert; er wird hier zusaetzlich gereicht, weil ein
+    // `Rng`-Trait-Objekt seinen Seed nicht hergibt.
+    game_seed: u64,
 ) -> Value {
     let mut game = Game::start(names, first_player, scoring_ids, rng);
     let mut steps = 0u32;
@@ -4913,15 +4947,18 @@ fn play_net_vs_net_hybrid_game<R: Rng + ?Sized>(
                     let hybrid_cfg = crate::net_mcts::SearchConfig::from_env();
                     let start_net = if pi == hybrid_board { hybrid_policy } else { plain_net };
                     let start_sims = if pi == hybrid_board { sims_hybrid } else { sims_plain };
+                    // Eigener Suchstrom wie in Arena und Self-Play
+                    // (`search_start_placement_isolated`): auch dieses
+                    // Diagnose-Werkzeug vergleicht zwei Arme bei GLEICHEM Seed
+                    // (`hybrid_board`-Tausch je Seed-Paar), und aus `rng`
+                    // gezogen waere die Versorgung der beiden Arme ab der
+                    // ersten Turm-Nachfuellung verschieden.
                     let placement = StartSearchParams::for_net(
-                        Some(start_net), start_sims, &hybrid_cfg, false,
+                        Some(start_net), start_sims, &hybrid_cfg, false, game_seed,
                     )
                     .and_then(|p| {
-                        crate::net_mcts::search_start_placement(
-                            p.net, &game.state, pi, p.base_sims, p.add_root_noise, rng,
-                            &p.search_config,
-                        )
-                        .map(|s| s.chosen_placement())
+                        search_start_placement_isolated(&p, &game.state, pi)
+                            .map(|s| s.chosen_placement())
                     })
                     .or_else(|| choose_start_placement(&game.state, pi));
                     match placement {
@@ -5066,14 +5103,16 @@ pub fn run_net_vs_net_arena_hybrid(
     let hybrid_board = hybrid_board.min(1); // defensiv: nur 0/1 sinnvoll
 
     let play = |i: usize| -> Value {
-        let mut rng =
-            StdRng::seed_from_u64(seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)));
+        // Ausdrucksgleich zum Bestand, nur benannt: derselbe Wert seedet
+        // `rng` und dient als `game_seed` der Startsetzungs-Suche.
+        let game_seed = seed.wrapping_add((i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15));
+        let mut rng = StdRng::seed_from_u64(game_seed);
         let ids = sample_valid_scoring_ids(3, &mut rng);
         let first = i % 2;
         let names = ["NetzA".to_string(), "NetzB".to_string()];
         play_net_vs_net_hybrid_game(
             &hybrid_policy, &hybrid_value, &plain_net, hybrid_board, sims_hybrid, sims_plain,
-            c_puct_hybrid, c_puct_plain, ids, names, first, &mut rng,
+            c_puct_hybrid, c_puct_plain, ids, names, first, &mut rng, game_seed,
         )
     };
 
@@ -5561,7 +5600,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         // Self-Play. `add_root_noise` folgt dem Drafting-Knopf dieses Laufs
         // -- die Erzeugung darf an der Wurzel streuen, die Arena nicht.
         start_search: StartSearchParams::for_net(
-            Some(net), base_sims, &search_config, add_root_noise),
+            Some(net), base_sims, &search_config, add_root_noise, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
     };
     let player1 = PlayerLoopConfig {
@@ -5574,7 +5613,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         column_build_trace: false,
         return_order_mode: search_config.return_order_mode,
         start_search: StartSearchParams::for_net(
-            Some(net), base_sims, &search_config, add_root_noise),
+            Some(net), base_sims, &search_config, add_root_noise, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
     };
     // par.5: Greif-Zaehler nur angelegt und verdrahtet, wenn der Knopf aktiv
@@ -10852,16 +10891,16 @@ mod start_slot_tests {
             panic!("{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht                     leer-gruen bestehen (Nutzer-Regel: nie leer gruen).")
         });
         assert!(
-            StartSearchParams::for_net(Some(&net), 64, &cfg, false).is_none(),
+            StartSearchParams::for_net(Some(&net), 64, &cfg, false, 1).is_none(),
             "Knopf 0 darf auch MIT Netz keine Such-Parameter ergeben"
         );
         cfg.start_by_search = 1;
         assert!(
-            StartSearchParams::for_net(None, 64, &cfg, false).is_none(),
+            StartSearchParams::for_net(None, 64, &cfg, false, 1).is_none(),
             "ohne Netz (Heuristik-Seite) darf auch Knopf 1 keine Such-Parameter ergeben --              sonst bewegte sich der Elo-Anker"
         );
         assert!(
-            StartSearchParams::for_net(Some(&net), 64, &cfg, false).is_some(),
+            StartSearchParams::for_net(Some(&net), 64, &cfg, false, 1).is_some(),
             "Knopf 1 MIT Netz muss suchen"
         );
     }
@@ -10903,7 +10942,13 @@ mod start_slot_tests {
         // Eigener Stromindex (`START_SEARCH_STREAM`, 1<<41): beide
         // Startsetzungen unterscheiden sich voneinander UND von den
         // Drafting-Zaehlern (`steps`/`move_number`, die bei 0/1/2 beginnen).
-        let stream = 1u64 << 41;
+        // Die Konstante wird GELESEN, nicht abgeschrieben -- sonst pruefte der
+        // Test eine Zahl, die der Code gar nicht mehr benutzt.
+        let stream = crate::net_mcts::START_SEARCH_STREAM;
+        assert!(
+            stream > crate::net_mcts::START_TILE_STREAM + 1,
+            "der Suchstrom muss oberhalb des groessten Streu-Index liegen"
+        );
         let game_seed = 20261048u64;
         let s0 = crate::net_mcts::derive_search_seed(game_seed, stream);
         let s1 = crate::net_mcts::derive_search_seed(game_seed, stream + 1);
@@ -10972,7 +11017,7 @@ mod start_slot_tests {
         });
         let mut cfg = crate::net_mcts::SearchConfig::from_env();
         cfg.start_by_search = 1;
-        let params = StartSearchParams::for_net(Some(&net), 32, &cfg, false)
+        let params = StartSearchParams::for_net(Some(&net), 32, &cfg, false, 41)
             .expect("Knopf 1 mit Netz muss Such-Parameter ergeben");
 
         // Bestand (Knopf 0): keines der beiden Felder.
@@ -11009,6 +11054,58 @@ mod start_slot_tests {
         assert!(
             valids.iter().all(|a| a["type"] == json!("choose_dome_slot")),
             "die Maske muss dieselbe Aktionsform tragen wie das Ziel"
+        );
+    }
+
+    /// Kern des Auftrags 2026-09-12: die Startsetzungs-SUCHE fasst den
+    /// Partie-RNG NICHT an. Gemessen am direktesten Ende -- nach der Setzung
+    /// muessen die naechsten Ziehungen aus `rng` bei Knopf 1 dieselben sein
+    /// wie bei Knopf 0.
+    ///
+    /// Warum das die tragende Eigenschaft ist: aus `rng` gezogen verschoebe
+    /// die Suche jede spaetere BEDINGTE Ziehung der Partie (Beutel-Nachfuellen
+    /// aus dem Turm, monochromer Redraw der grossen Fabrik). Die Partie waere
+    /// dann aus ihrem eigenen Log nicht mehr nachspielbar, und eine gepaarte
+    /// Arena waere ab der ersten Turm-Nachfuellung entpaart -- genau der
+    /// Befund, mit dem der Aufzeichnungs-Zweig hier umgebaut wurde.
+    ///
+    /// Mehrere Ziehungen statt einer: ein verschobener Strom kann in EINEM
+    /// Wert zufaellig uebereinstimmen, in acht nicht.
+    #[test]
+    fn the_start_search_leaves_the_game_rng_untouched() {
+        let path = crate::net::test_model_path("engine_test.onnx");
+        let path = path.to_str().unwrap().to_string();
+        let net = Net::load_auto(&path).unwrap_or_else(|e| {
+            panic!("{path:?} nicht ladbar ({e}) -- Test-Voraussetzung fehlt, der Test darf nicht                     leer-gruen bestehen (Nutzer-Regel: nie leer gruen).")
+        });
+        let mut cfg = crate::net_mcts::SearchConfig::from_env();
+        cfg.start_by_search = 1;
+        let params = StartSearchParams::for_net(Some(&net), 32, &cfg, false, 41)
+            .expect("Knopf 1 mit Netz muss Such-Parameter ergeben");
+
+        // Knopf 0: der Bestandspfad, der den Partie-RNG nie angefasst hat.
+        let mut rng_off = StdRng::seed_from_u64(99);
+        let mut game_off = fresh_game(41);
+        start_placement_step_with_random_p(&mut game_off, &mut rng_off, 0.0, None)
+            .expect("Startsetzung muss gelingen");
+
+        // Knopf 1: dieselbe Ausgangsstellung, derselbe RNG-Seed, aber gesucht.
+        let mut rng_on = StdRng::seed_from_u64(99);
+        let mut game_on = fresh_game(41);
+        let rec = start_placement_step_with_random_p(&mut game_on, &mut rng_on, 0.0, Some(params))
+            .expect("Startsetzung muss gelingen");
+        assert_eq!(
+            rec.get("start_by_search"),
+            Some(&json!(true)),
+            "Testvoraussetzung: es muss wirklich gesucht worden sein, sonst ist der Test leer gruen"
+        );
+
+        let after_off: Vec<u64> = (0..8).map(|_| rng_off.next_u64()).collect();
+        let after_on: Vec<u64> = (0..8).map(|_| rng_on.next_u64()).collect();
+        assert_eq!(
+            after_off, after_on,
+            "die Startsetzungs-Suche hat aus dem Partie-RNG gezogen -- ab der ersten \
+             Turm-Nachfuellung spielt diese Partie anderes Material als der Arm ohne Suche"
         );
     }
 

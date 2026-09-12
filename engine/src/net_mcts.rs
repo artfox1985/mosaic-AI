@@ -31,7 +31,7 @@ use crate::shaping::{apply_ownership_shaping, apply_plate_shaping, apply_scoring
 pub(crate) use crate::shaping::{sigmoid, with_game_scatter_suspended};
 pub use crate::shaping::{derive_search_seed, game_weight_from_seed, scoring_round_gain,
                          scoring_scatter_max, scoring_shaping_alphas,
-                         set_game_shaping_weight};
+                         set_game_shaping_weight, START_SEARCH_STREAM, START_TILE_STREAM};
 
 
 use rand::seq::SliceRandom;

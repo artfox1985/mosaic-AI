@@ -377,6 +377,47 @@ pub fn derive_search_seed(game_seed: u64, move_index: u64) -> u64 {
     z
 }
 
+// ── Stromindizes der Startsetzung (PREREG_search_rng_split.md) ───────────────
+//
+// Beide sind `move_index`-Argumente fuer `derive_search_seed` und liegen
+// ABSICHTLICH weit oberhalb jedes Zaehlers, den eine Partie erreichen kann.
+// Die Zaehler, die sonst in `derive_search_seed` gehen, sind der
+// Alle-Schritte-Zaehler `steps` (`unified_game_loop`, `seed_from_steps == true`;
+// der Haenger-Schutz bricht bei 100_000 ab) und der Halbzug-Zaehler
+// `move_number` (1-basiert, dieselbe Groessenordnung). Beide bleiben um mehr
+// als neun Zehnerpotenzen unter 2^40 -- eine Kollision ist damit nicht
+// unwahrscheinlich, sondern unmoeglich.
+//
+// EINE Stelle fuer beide Konstanten, weil sie von drei Modulen gelesen werden
+// (self_play.rs Arena-, Self-Play- und Heuristik-Schleife, referee.rs
+// in-process UND Worker-Protokoll). Zwei Kopien waeren zwei Gelegenheiten,
+// den in-process- und den Worker-Pfad auf verschiedene Stroeme zu setzen --
+// und genau deren Byte-Gleichheit ist der Kernbeweis von
+// PREREG_agent_encapsulation.md par.8b.
+
+/// Stromindex der Startsetzungs-STREUUNG von Platte und Rotation
+/// (`MOSAIC_START_TILE_RANDOM_P0/P1`, PREREG_start_dome_choice.md par.9a):
+/// ein Summand je Spieler, `START_TILE_STREAM + pi`.
+///
+/// NICHT betroffen ist die Streuung des SLOTS (`MOSAIC_START_SLOT_RANDOM_P`):
+/// die zieht per Entwurf aus dem Partie-RNG (par.9b), damit sie je Partie
+/// reproduzierbar bleibt.
+pub const START_TILE_STREAM: u64 = 1 << 40;
+
+/// Stromindex der Startsetzungs-SUCHE (`MOSAIC_START_BY_SEARCH`,
+/// PREREG_start_dome_choice.md par.9c): ein Summand je Setzung,
+/// `START_SEARCH_STREAM + start_step`. `start_step` ist 0 fuer die erste und
+/// 1 fuer die zweite Setzung (der Nicht-Starter legt zuerst) -- dieselbe
+/// Schritt-Konvention wie im Referee.
+///
+/// WARUM ein eigener Strom und nicht `steps` 0/1 direkt: bei
+/// `seed_from_steps == false` zaehlt die Drafting-Suche mit `move_number` ab 1,
+/// und dann bekaemen die zweite Startsetzung und der erste Drafting-Entscheid
+/// denselben Seed. Zu [`START_TILE_STREAM`] ist der Abstand konstruktiv:
+/// dessen groesster Index ist 2^40 + 1, und dieser Strom addiert hoechstens 1
+/// auf 2^41.
+pub const START_SEARCH_STREAM: u64 = 1 << 41;
+
 /// `MOSAIC_WERTUNG_SHAPING_W` als **acht Werte, einer JE KRITERIUM** -- gleiches
 /// Format und gleiche Haerte wie `scoring_shaping_alphas` (1 Wert gilt fuer alle;
 /// falsche Laenge wird VERWORFEN, nicht teilgelesen).
