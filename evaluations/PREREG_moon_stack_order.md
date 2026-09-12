@@ -28,8 +28,12 @@ selbst gewaehlter Reihenfolge auf die Mondseite (`docs/engine_manual.md`; `facto
 - **Kopf und Ziel:** `engine/py/neural_net.py:1458` (5 Logits, hoch = Farbe tief im Stapel),
   trainiert mit `moon_loss_weight 1.0` (Manifest v28-b02). Ziel `moon_order_target`
   (`self_play.rs:1052ff`): beste Reihenfolge der Reststeine nach `solve_round_final_score`
-  ueber hoechstens 6 Stichproben-Permutationen, also ein RUNDEN-Label (was am Rundenende am
-  meisten bringt), kein Such- oder Ausgangslabel. Im Korpus `selfplay_v27-b01-policy_..._g10.pkl`
+  ueber alle Permutationen (bei hoechstens 3 Steinen sind das hoechstens 6, also ERSCHOEPFEND;
+  Nutzer 2026-09-12, Korrektur der ersten Fassung "Stichproben"), also ein RUNDEN-Label (was am
+  Rundenende am meisten bringt), kein Such- oder Ausgangslabel.
+- **Haeufigkeit (Nutzer):** der Entscheid faellt hoechstens EINMAL je kleiner Fabrik und Runde
+  (der erste Sonnenzug aus der Fabrik legt den Stapel), also hoechstens 4 je Runde und 20 je
+  Partie, real weniger (Rest >= 2 noetig). Der Posten ist damit von vornherein klein. Im Korpus `selfplay_v27-b01-policy_..._g10.pkl`
   tragen 199 von 1.675 Records ein Ziel (Sonnenzuege aus kleinen Fabriken mit Rest >= 2).
 - **Korrektur einer Notiz:** `PREREG_dome_return_order.md` par.2 nennt `moon_order` "kanonisch
   und keine Wahl des Netzes". Das gilt fuer `self_play.rs:234` (Aktionsraum/Record) und fuer den
@@ -41,7 +45,10 @@ selbst gewaehlter Reihenfolge auf die Mondseite (`docs/engine_manual.md`; `facto
   kanonischer Reihenfolge (Fan-out AUS) gewinnt gepaart. Gegenhypothese: die Reihenfolge ist im
   Duell fast immer irrelevant (Mondsteine werden ohnehin komplett gezogen), der Fan-out kostet nur
   Suchbudget (bis zu 6 Kinder statt 1 je Sonnenzug).
-- **H2:** das Rundenloeser-Ziel ist zu kurzsichtig; ein Ziel aus der SUCHE (die vom Baum gewaehlte
+- **Erwartung:** klein, wegen der Haeufigkeit (par.2); ein Nullbefund bei 200 Paaren ist der
+  wahrscheinliche Ausgang und dann ein vollwertiges Ergebnis (Fan-out bleibt aus Gruenden der
+  Vollstaendigkeit).
+- **H2:** das Rundenloeser-Ziel ist kurzsichtig (Rundenende statt Partieausgang); ein Ziel aus der SUCHE (die vom Baum gewaehlte
   Reihenfolge, wie beim Rueckgabe-Knopf Modus 1 gedacht) oder aus dem Ausgang traegt mehr.
   Nur pruefbar nach H1 und nur mit Training (ein Arm).
 
