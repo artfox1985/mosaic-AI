@@ -198,10 +198,13 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Startkuppel Stufe 0 (arena_match Heuristik, 9 Slots x 60 Partien x 2 Sims-Stufen, threads 0) | **430 s** fuer 1.080 Partien | 0,40 s je Partie |
 | argmax-Instrument je Knopf (Jokerfeld / K3-D, 200 Partien @400) | 41 min (gebremst, neben Push-Build) / 36 min | |
 | Such-Start A/B (paired_gating, SPRT H0 nach 95 Paaren, 10 Threads, Logs) | **2.977 s** | 15,7 s je Partie (Such-Start kostet je Partie eine Suche mehr) |
+| Such-Start A/B Wiederholung (SPRT H0 nach 85 Paaren) / Spaltensonde Replay 170 Partien / Plattenpunkte | **2.545 s** / 48 s / < 5 s | 15,0 s je Partie |
+| Sprosse Netz@100 gegen Heuristik-Artefakt (Referee, 50 Partien, 6 Prozesse) / Netz@100 gegen Netz@400 live (paired_gating, 30 Paare, 10 Threads, Logs) | 155-167 s / 497 s | 3,2 s / 8,3 s je Partie |
 | Sprossen-Kanten (frozen_referee_match, 50 Partien, 6 Prozesse) | Netz gegen Netz-Artefakt 917-963 s; Heuristik gegen Heuristik 53 s; Netz gegen Heuristik 365-464 s | je Block |
 | hv2-Gegenprobe Startkuppel (9 Slots x 20 Referee-Partien, 6 Prozesse) | **219 s** | 1,2 s je Partie |
 | hv3: Bau-Tore (629 Tests 85 s, Wheel, Drift, Konservierung) / Einfrieren mit Golden Probe / venv+Konservierung / 2 Heuristik-Kanten a 150 | 4 min / 30 s / 30 s / je ~2 min | `tools/night_hv3_freeze_edges.sh` |
 | Such-Start Huellen-Diagnose (2 x 100 Partien @400 argmax) | 37 min / 30 min | |
+| Platte/Rotation-Sonde Startkuppel (netzfrei, hv1, 200 Seeds x 2 Arme x Paarungen @25 und @400 = 800 Partien, alle Kerne) | **322 s** | 0,40 s je Partie |
 
 ## Generation v27, gemessen am 2026-09-10 (Abnahmen und Promotion)
 

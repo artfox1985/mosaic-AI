@@ -617,6 +617,11 @@ def main() -> None:
     )
     out_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(f"Ergebnis gespeichert: {out_path}")
+    # 2026-09-12: der Tracker zieht sein Intervall blockweise, wenn die Zeile ihre
+    # Seed-Bloecke kennt; die Ableitung liest dieses Artefakt. Ein SPRT-Entscheid vor
+    # dem Deckel ist ein Frueh-Stopp und gehoert als solcher ins Register.
+    early = " --early-stop" if result.get("sprt_verdict") != "UNDECIDED_CAP_REACHED" else ""
+    print(f"  Register-Zusatz fuer elo_tracker add: --units-from-paired-artifact \"{out_path}\"{early}")
 
 
 if __name__ == "__main__":

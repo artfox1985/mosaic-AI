@@ -18237,3 +18237,22 @@ Offen aus diesem Block: dritter Seed der Nachbar-Kante ohne Fruehstopp (v26-Prae
 Messblock D (Ueberraschungs-Kante, C2), Einhuellende A1/A2, Startkuppel Stufe 0 (volle Messung),
 alles in `tools/night_v28_resume_freeze.sh` ab 06:19.
 
+### 2026-09-12, 22:18-22:56 -- Platte/Rotation-Sonde, Tracker-Pruefung, Werkzeug
+
+Platte/Rotation der Startkuppel gemessen (800 Partien, 322 s): Handregel gegen Zufall +1,8 Punkte
+@25 und +1,6 @400, Intervalle schliessen 0 ein, kein Hebel (`PREREG_start_dome_choice.md` par.9f).
+Nutzerfrage nach den 100 Elo zwischen hv1 und hv2 der alten Leiter: sie kamen aus EINER Kante
+ueber v21 (255:152 gegen v2huelle, 74,5 % gegen hv1 auf denselben Seeds), Segment 2 misst die
+Heuristiken direkt gleich stark. Pruefung des Trackers (BT-MM-Fit, Binomial-Bootstrap): Block-
+Korrelation und Frueh-Stopp waren nicht abgebildet; Werkzeug gebaut (Spalten `units`/`early_stop`,
+Block-Bootstrap, Report-Spalte Frueh), Zahlen praktisch unveraendert. Kette fuer die Sprosse
+v22-b05@100 (gegen hv4, hv3, v22@400) geschrieben, Start nach der A/B-Wiederholung des Such-Starts.
+
+### 2026-09-12, 23:09-23:25 -- A/B Such-Start echt gepaart, Sprosse v22@100, Herunterfahren
+
+A/B des Such-Starts mit eigenem RNG-Strom wiederholt (Seed 20261049): 81:89, SPRT H0 nach 85
+Paaren, 93 % (2,0), volle Spalten 0,95 gegen 0,98, Replay 169/170 (`PREREG_start_dome_choice.md`
+par.9e). Sprosse v22-b05@100: gegen hv4 39:11, gegen hv3 43:7, gegen v22@400 21:39; liegt bei 1175,
+nicht in der Luecke; Champion 1349 [1302, 1402] (`PREREG_code_cleanup_closeout.md` par.7a).
+Rechner auf Nutzer-Anweisung nach dem Commit heruntergefahren.
+

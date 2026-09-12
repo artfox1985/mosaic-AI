@@ -19,9 +19,9 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 ## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 23:55)
 
 **Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12, 06:17-06:45),
-Elo 1344** [1301, 1395] aus 1.380 Partien im LEITERSEGMENT 2 (Endstand 21:50, 24 Kanten, alle am
-Anker `hv4_anchor` fix 1000): v28-b01 1313, v27-b01 1301, v26-b01 1244, v24-b07 1191, v21 1178,
-v22-b05 1158, hv3 992, hv2 978. Die Anker-Kanten der Nacht liefen mit falschen Parametern
+Elo 1349** [1302, 1402] aus 1.380 Partien im LEITERSEGMENT 2 (Endstand 23:25, 26 Kanten, alle am
+Anker `hv4_anchor` fix 1000, Block-Bootstrap): v28-b01 1321, v27-b01 1306, v26-b01 1250, v24-b07 1200,
+v21 1194, v22-b05@400 1191, v22-b05@100 1175, hv3 980, hv2 980. Die Anker-Kanten der Nacht liefen mit falschen Parametern
 (archiviert) und wurden korrekt wiederholt; die Leiter traegt jetzt auf Zwischenstufen aus dem
 restic-Repo (v21, v24-b07; `PREREG_code_cleanup_closeout.md` par.7a). Promotion vollstaendig nach
 Checkliste (Anker 126:24, Nachbar 133:97 SPRT + Replikation 212:188 ohne Entscheid, Champion-2
@@ -50,11 +50,11 @@ v28-b01 132:18, v27-b01 124:26; Segment-2-Elo 1288 / 1346 / 1271, Intervalle ueb
 `PREREG_code_cleanup_closeout.md` par.7a), die Nachbar-Kante v28-b02 gegen v27-b01
 (Seed 20261044) endete 03:40 per SPRT nach 115 Paaren: **133:97 fuer v28-b02** (p 0,0198,
 Diff +0,313 [+0,068; +0,558]); Segment-2-Leiter jetzt v28-b02 1305, v28-b01 1346, v27-b01 1256.
-**MASCHINE FREI seit 2026-09-12, 21:50.** Alle Ketten des Tages sind durch und registriert
-(Promotion v28-b02, Ueberraschungs-Kante, C2/A1-A2, Startkuppel Stufe 0 samt hv2-Gegenprobe und
-Such-Start-A/B mit Huellen-Diagnose, Leiter Segment 2 mit 24 Kanten inkl. hv3). Es laufen nur
-Code-Auftraege ohne Rechenlast (Replayer-Fix fuer Such-Start-Partien; Platte/Rotation-Sonde der
-Startkuppel); deren Tore fahren beim naechsten Wheel-Bau. Push ist frei.
+**MASCHINE FREI seit 2026-09-12, 23:23; Rechner danach auf Nutzer-Anweisung heruntergefahren.**
+Alle Ketten des Tages sind durch und registriert (Promotion v28-b02, Ueberraschungs-Kante,
+C2/A1-A2, Startkuppel Stufe 0 samt hv2-Gegenprobe, Such-Start-A/B zweimal inkl. echter Paarung
+nach dem RNG-Leck-Fix, Platte/Rotation-Sonde, Leiter Segment 2 mit 26 Kanten inkl. hv3 und
+v22@100, Elo-Tracker mit Block-Bootstrap). Nichts laeuft. Push ist frei (Ahead-Stand: Abschnitt 6).
 Nutzer-Entscheid 09:35: Waechter der Startkuppel-Sonde nach Weg 3 (Sims-Stufen plus
 hv2-Artefakt per Referee als Gegenprobe; Referee-Schalter im Bau durch Agenten). Davor `tools/night_v28_after_reanchor.sh` ab 03:44 (A Knopf-Bau mit Toren,
 B Promotions-Messungen v28-b02: Replikation der Nachbar-Kante Seed 20261046 DURCH, **212:188
@@ -283,7 +283,21 @@ Index: `PREREG_INDEX.md` (generiert).
    Seed, 200 Partien je Arm, Paarungen 25 und 400, Kontrollen: Slot bleibt (0,0), Platten- und
    Rotationsverteilung im Zufallsarm nicht entartet). Vorab-Lesart: KI der gepaarten Differenz
    schliesst 0 ein = auch Platte/Rotation kein Hebel; gross = die Handregel ist die Messlatte des
-   Such-Starts. Tore offen: Kompilat, Tests, Wheel, Anker-Invarianz; Lauf exklusiv nach der Kette.
+   Such-Starts. **GEMESSEN 22:24** (par.9f, 800 Partien in 322 s): Handregel minus Zufall
+   +1,84 [-0,71; +4,39] Punkte @25 und +1,60 [-1,16; +4,37] @400, Marge und Spalten ebenso mit 0
+   im Intervall; einzig "Mehrfarbige Felder" traegt (+0,72 / +0,56). Kontrollen bestanden (Slot
+   200/200 (0,0) in beiden Armen; Zufallsarm 68 Kandidaten, Rotationen 44/55/47/54; Handregel
+   immer Rotation 0). Verdikt: KEIN HEBEL, par.9a Punkt 1 geschlossen; Streuung fuer v29 bleibt
+   auf den Slot beschraenkt.
+00f. **Elo-Tracker: Block-Bootstrap und Frueh-Stopp-Markierung** (Nutzer gegen 22:50 "mach das
+   Werkzeug"): ERLEDIGT 22:56 (`PREREG_code_cleanup_closeout.md` par.7a Nachtrag). Register-
+   Spalten `units`/`early_stop` additiv, drei gepaarte Zeilen rueckgefuellt, elf Zeilen als frueh
+   gestoppt markiert, Tests 8/8. Zahlen praktisch unveraendert (Champion [1301, 1393]).
+00g. **Sprosse v22-b05@100** (Nutzer gegen 22:50 und 22:53): Kette `tools/night_ladder_v22_sims100.sh`
+   GEFAHREN 23:09-23:23: v22@100 gegen hv4 39:11, gegen hv3 43:7 (je Block 1, Frueh-Stopp),
+   gegen v22@400 21:39 (SPRT H0 nach 30 Paaren). Die Sprosse liegt NICHT in der Luecke (1175):
+   weniger Sims kosten gegen sich selbst 35 %, gegen die Heuristiken fast nichts; der Fit hebt den
+   unteren Netz-Block um 10-30 Punkte, Champion 1349 [1302, 1402]. Details par.7a.
 00b. **Startsetzung als Suchentscheid im Spiel** (Nutzer 13:00, `PREREG_start_dome_choice.md`
    par.9c): ENTSCHIEDEN 13:15 (Nutzer: "bau den such-start dann vor v29"): Bau rund ein Tag
    (net_mcts, Spielpfade, Self-Play, Referee-Worker), Knopf MOSAIC_START_BY_SEARCH Default 0,
@@ -292,8 +306,10 @@ Index: `PREREG_INDEX.md` (generiert).
    Paaren), Punkte gleich, Eckplatten +1,85 / Aussenfelder +0,83 gegen vertikale Reihen -0,82:
    gleichwertig, andere Praeferenz als die Heuristik. Diagnose 21:40: die (2,0)-Praeferenz bleibt
    ohne Huelle (84,5 % gegen 87,5 %), sie kommt aus dem Netz (Value-Kopf/Prior extrapolieren),
-   die v29-Streuung ist die Korrektur. Werkzeug-Aufgabe: Replayer der
-   Spaltensonde kann Such-Start-Partien nicht nachspielen (Startsetzung aus dem Log lesen).
+   die v29-Streuung ist die Korrektur. Replayer-Befund war ein RNG-Leck der Start-Suche
+   (gefixt, eigener Strom); **WIEDERHOLUNG echt gepaart 23:09** (Seed 20261049, par.9e): 81:89,
+   SPRT H0 nach 85 Paaren, 93 % (2,0), volle Spalten 0,95 gegen 0,98, Replay 169/170.
+   Entscheid bleibt: Such-Start ins v29-Rezept.
    **GESCHRIEBEN 13:20 (Agent), UNKOMPILIERT** (`PREREG_start_dome_choice.md` par.9d): Suche
    `net_mcts.rs::search_start_placement` (Gumbel-Wurzel ueber die Startkandidaten, ein
    Vorwaertspass fuer Priors plus sims Simulationen), umgeschaltet in allen Netz-Spielpfaden

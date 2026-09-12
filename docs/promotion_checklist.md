@@ -25,7 +25,10 @@ Gedaechtnis:
    spielte zwei Tage ohne Huelle. Nach dem Neustart die Konsolenzeile "Champion-Spec ..."
    lesen.
 2. Elo-Kante **Gating** (gegen Champion-1) -- inkl. Replikations-Zeile,
-   falls Fruehstopp unter 150 Paaren.
+   falls Fruehstopp unter 150 Paaren. Seit 2026-09-12 traegt die Zeile ihre
+   Seed-Bloecke und den Frueh-Stopp: `elo_tracker.py add ...
+   --units-from-paired-artifact <Artefakt-JSON> [--early-stop]` (paired_gating
+   druckt den Zusatz am Ende); der Tracker zieht sein Intervall dann blockweise.
 3. Elo-Kante **Anker**: `Heuristik@150(dyn)`, **festes n=150 ohne
    Fruehstopp** (Praezedenz v18/v19/v20-Verankerung). Seit der Kapselung:
    Anker-Identitaet in der Zeile als `Heuristik_hv4_anchor` fuehren (seit der Neuverankerung 2026-09-12; davor `Heuristik_hv1_anchor`, seit der
