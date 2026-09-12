@@ -275,7 +275,8 @@ def units_from_paired_artifact(path):
     2 Partien je Paar, Siege = Summe `a_wins_pair`. Prueft gegen a_wins_total und
     n_games_total des Artefakts."""
     import json as _json
-    d = _json.loads(open(path, encoding="utf-8").read())
+    with open(path, encoding="utf-8") as f:
+        d = _json.load(f)
     order, groups = [], {}
     for p in d["per_pair_scores"]:
         key = p["block_seed"]
