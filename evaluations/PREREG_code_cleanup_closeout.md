@@ -231,6 +231,14 @@ unabhaengig davon weiter: der Nutzer-Entscheid zum besten Stand (Korrektheit des
 Merkmalsbilds) haengt nicht an dieser Kante, und der Vorgaenger v27-b01 hat im Segment 2 keine
 Kante, die ihn ueber v28-b02 stellt.
 
+**Dritter Seed (unverzerrter Stichentscheid, `tools/night_v28_third_seed.sh`, 10:13-11:43,
+5.405 s): 226:174 am Deckel, McNemar p=0,0167, gepaarte Differenz +0,26 [+0,06; +0,46], Punkte
+52,7 gegen 50,3** (90 Splits, 68 A-Sweeps, 42 B-Sweeps; Fruehstopp per Schranken 1e-12 aus,
+LLR +2,86; Artefakt `paired_gating_v28-b02_vs_v27-b01_s47_segment2.json`). Damit traegt die
+Nachbar-Kante: zwei von drei Seeds signifikant, der dritte als verzerrungsfreier Deckel-Lauf.
+Verzerrungsfrei gepoolt (nur die beiden Deckel-Laeufe 46 und 47): 438:362 aus 800 = 0,548.
+Replay-Sonden (Spalten, Plattenpunkte) auf s47 folgen im Schwanz der Kette.
+
 **Champion-2-Kante (Promotion Schritt 4, 05:22-06:04, 2.516 s):** v28-b02 gegen das
 EINGEFRORENE Artefakt v26-b01 mit dessen eigenem Wheel (`frozen_referee_match.py`, 150 Partien,
 6 Prozesse, Seed-Basis 20261052) **101:49**, Punkte 52,9 gegen 50,5. Cross-Aera nach der

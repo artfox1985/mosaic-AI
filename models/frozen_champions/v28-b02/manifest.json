@@ -45,25 +45,26 @@
   "training_manifest": "models/manifest_train_v28-b02_20260911_152432.json",
   "prereg": "evaluations/PREREG_v28_window.md; docs/promotion_checklist.md",
   "elo": {
-    "value": 1296,
+    "value": 1299,
     "ci95": [
-      1242,
-      1354
+      1244,
+      1359
     ],
-    "games": 930,
-    "record": "572-358",
-    "as_of": "2026-09-12",
+    "games": 1330,
+    "record": "798-532",
+    "as_of": "2026-09-12 11:45",
     "segment": "2 (Anker hv1_anchor_v2, seit dem Phantom-Fix A2 am 2026-09-12; Alt-Register archive/elo_history_pre_phantomfix.csv)",
     "edges": [
       "Anker 126:24 (n=150, Handshake gruen)",
       "Nachbar/Gating v28-b02 gegen v27-b01 Seed 20261044 133:97 (SPRT nach 115 Paaren, p 0,0198)",
-      "Replikation Seed 20261046 212:188 (Deckel, p 0,281, nicht signifikant); dritter Seed ohne Fruehstopp ausstehend",
+      "Replikation Seed 20261046 212:188 (Deckel, p 0,281, nicht signifikant)",
+      "Dritter Seed 20261047 226:174 (Deckel, Fruehstopp aus, p 0,0167): die Kante traegt",
       "Champion-2 gegen Artefakt v26-b01 101:49 (n=150, Cross-Aera)"
     ],
     "ladder_after_refit": {
       "v28-b01": 1346,
-      "v27-b01": 1264,
-      "v26-b01": 1171,
+      "v27-b01": 1262,
+      "v26-b01": 1173,
       "anchor": 1000
     }
   },
