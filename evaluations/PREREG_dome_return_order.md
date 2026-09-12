@@ -103,3 +103,28 @@ Peek-Bewertung). Wird Modus 1 Default (Nutzer-Entscheid), gilt er fuer die v29-E
 ## par.8 Ergebnisse (leer bis zum Bau)
 
 Nichts gebaut (Stand 2026-09-12, 02:00).
+
+## par.8a BAUSTAND 2026-09-12 (Code geschrieben, noch nicht kompiliert)
+
+Knopf `return_order_mode` (Spec optional, Env `MOSAIC_RETURN_ORDER_MODE`, 0/1/2) nach par.4 gebaut:
+`self_play.rs` (`order_permutations`, `return_order_candidates`, `choose_return_order`,
+`resolve_and_apply_stack_draw_with`, Diagnostik-Zeile `[return_order] mode=.. drawn=[..]
+chosen=[..]`), `py.rs` GUI-Default und `ai_drafting_net_step`, `referee.rs` In-Process-Seite,
+Registratur, `engine_config`, Spec-Abbildungen, sechs Tests. Zwei Bau-Entscheide ueber par.4
+hinaus: (1) permutiert werden hoechstens die ersten drei Restplatten (`RETURN_ORDER_MAX_PERMUTED`),
+der Schwanz bleibt in Ziehreihenfolge (`MAX_STACK_PEEKS` erlaubt laengere Serien; wie oft, ist
+nicht gemessen); (2) Handregel Modus 2 mit gesetzten Gewichten Spezial 2, Joker 1, Farbtreffer
+1. **Oben liegt `return_order[0]`** (geprueft: `game.rs:187` zieht per `remove(0)`, `game.rs:290-295`
+legt per `push` in Reihenfolge zurueck, der Block liegt unten und `[0]` kommt zuerst wieder).
+
+**Zwei Befunde, die par.5 vorab einordnen (am Code geprueft, nicht gemessen):**
+1. Der Value-Kopf sieht die Reihenfolge nur als TYP-Folge: `features.rs:212` kodiert fuer die
+   obersten vier Positionen des eigenen Blocks +1 Spezial / -1 Joker / 0. Permutationen
+   gleichtypiger Platten sind fuer das Netz identisch, Modus 1 waehlt dann per Gleichstand die
+   Ziehreihenfolge. Die Abweichungsrate ist damit strukturell gedeckelt; ein Kopf, der
+   Plattentypen im Block unterscheidet, waere die naechste Stufe (nicht registriert).
+2. Modus 1 braucht die Sicht des Ruecklegers im FOLGEZUSTAND, in dem der Gegner am Zug ist;
+   `net_leaf_eval` liefert beide Bretter nur ueber den gespiegelten zweiten Vorwaertspass
+   (`MIRROR_OTHER_VAL = false`, `net_mcts.rs:1117`). Kosten je Kandidat: ein `eval_pair`-Batch,
+   nicht ein Pass.
+Kompilierung, Fixture, Drift und die Messung par.5 folgen nach der Promotion von v28-b02.
