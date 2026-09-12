@@ -29,7 +29,9 @@ restic-Repo zurueckgeholt (Snapshots 55623af8 / bfbe80b1, in `models/frozen_cham
 aus restic geholt, Worker-Skript des Einfriertags ins Artefakt, Referee liest `worker_script` aus
 dem Manifest), hv2-Gegenprobe an einem Pfadfehler (behoben); der Schwanz laeuft weiter
 (Replay-Sonden DURCH, K3-D/Jokerfeld-Instrument seit 12:09). Danach `tools/night_v28_tail4.sh`
-(Leiter erneut, dann hv2-Gegenprobe). Der
+(Leiter erneut auf dem installierten Wheel, dann hv2-Gegenprobe), danach
+`tools/night_start_by_search_ab.sh` (gemeinsamer Bau der Knoepfe Streuung + Such-Start mit Toren,
+dann A/B Such-Start am Champion, 200 Paare). Such-Start wird gebaut (Agent, seit 12:40). Der
 erste Start (`night_v28_tail2.sh`, 11:51) wurde 12:05 gestoppt, weil v24-b07 noch live statt als
 Artefakt eingetragen war; verwaiste Referee-Prozesse beendet der Nutzer. Letzter Stand mit den falschen Kanten: v28-b02 1299 [1244, 1359]
 aus 1.330 Partien, v27-b01 1262, v26-b01 1173, v28-b01 1346. Promotion vollstaendig nach
