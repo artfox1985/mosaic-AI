@@ -257,9 +257,10 @@ Index: `PREREG_INDEX.md` (generiert).
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
 00a. **Startkuppel-Streuung in der v29-Erzeugung** (Nutzer 12:45: das Netz soll abweichende
-   Startsetzungen kennen): Dosis `MOSAIC_START_SLOT_RANDOM_P` je Spieler, Vorschlag 0,15;
-   `PREREG_start_dome_choice.md` par.9b, `PREREG_v29_window.md` par.6b. Bau vor dem
-   Generationswechsel.
+   Startsetzungen kennen; 12:50: "nicht in jedem spiel, aber oft genug"): Dosis
+   `MOSAIC_START_SLOT_RANDOM_P` = 0,15 je Spieler als Koordinator-Wahl im Nutzer-Rahmen;
+   `PREREG_start_dome_choice.md` par.9b, `PREREG_v29_window.md` par.6b. Bau laeuft (Agent),
+   Tore in der Luecke zwischen den Ketten (`tools/night_startslot_build.sh`).
 
 00. ~~ANKER-DRIFT ROT durch A2~~ ENTSCHIEDEN 2026-09-12: (a) Anker neu gesetzt (`hv1_anchor_v2`, Segment 2).
 0. ~~Name des Schlussmodells~~ ENTSCHIEDEN 2026-09-11: **Tessa** (Umsetzung mit Stufe 3 des

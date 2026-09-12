@@ -418,7 +418,12 @@ irgendwo hinlegt."* Das ist par.5 mit anderem Zweck: nicht lernen, welcher Slot 
 (Stufe 0: keiner), sondern den Zustandsraum abdecken, den ein Gegner (Mensch, andere Regel)
 erzeugen kann, damit Value- und Policy-Kopf dort nicht ins Leere greifen.
 
-**Vorschlag (nicht gebaut, Nutzer-Entscheid zur Dosis offen):**
+**Nutzer 12:50: "fuers self play sollten wir die position sicherlich variieren. nicht unbedingt in
+jedem spiel. aber zumindest so oft dass das netz einen unterschied sieht." Dosis innerhalb dieses
+Rahmens als Koordinator-Wahl: p = 0,15 je Spieler. Bau beauftragt 12:55 (Agent, nur Code), Tore
+in `tools/night_startslot_build.sh` in der Luecke zwischen den Ketten.**
+
+**Entwurf (Stand 12:45):**
 
 - Engine-Knopf `MOSAIC_START_SLOT_RANDOM_P` (Default 0 = Bestand bitidentisch): je Partie und je
   Spieler unabhaengig wird mit Wahrscheinlichkeit p der Startslot gleichverteilt aus den neun
