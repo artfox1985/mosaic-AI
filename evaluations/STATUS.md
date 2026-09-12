@@ -25,7 +25,11 @@ Nacht liefen mit falschen Anker-Parametern (@400, c_puct 1,5 statt @150/0,3; Zei
 wiederholt, danach Zwischenstufen in ~100-Elo-Schritten (Nutzer: Anker-Kanten gesaettigt; Segment 1
 zeigt Saettigung ab v23 mit 84-85 %): hv2, v21_2d_brierbest und v24-b07 als Artefakte aus dem
 restic-Repo zurueckgeholt (Snapshots 55623af8 / bfbe80b1, in `models/frozen_champions/`), Kette
-`tools/night_v28_tail3.sh` (Leiter zweite Fassung `night_ladder_rungs2.sh`, dann Schwanz). Der
+`tools/night_v28_tail3.sh` (12:03): Leiter-Teil am v21-Selbsttest abgebrochen (Wheel wave3g fehlte,
+aus restic geholt, Worker-Skript des Einfriertags ins Artefakt, Referee liest `worker_script` aus
+dem Manifest), hv2-Gegenprobe an einem Pfadfehler (behoben); der Schwanz laeuft weiter
+(Replay-Sonden DURCH, K3-D/Jokerfeld-Instrument seit 12:09). Danach `tools/night_v28_tail4.sh`
+(Leiter erneut, dann hv2-Gegenprobe). Der
 erste Start (`night_v28_tail2.sh`, 11:51) wurde 12:05 gestoppt, weil v24-b07 noch live statt als
 Artefakt eingetragen war; verwaiste Referee-Prozesse beendet der Nutzer. Letzter Stand mit den falschen Kanten: v28-b02 1299 [1244, 1359]
 aus 1.330 Partien, v27-b01 1262, v26-b01 1173, v28-b01 1346. Promotion vollstaendig nach
