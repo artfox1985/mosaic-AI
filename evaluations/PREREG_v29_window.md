@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, Generator = Sieger der v28-Promotion, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: nichts gefahren. Zuschnitt rotiert aus v28 (580 Traeger + rund 2.367 Schwarm, Seed 20260941, par.1). v29-b02 ENTSCHIEDEN: Ablation der Spezialfeld-Kanaele 77/78 (par.6; die Kanaele sind seit e91cd34 gebaut, ihre Wirkung nie isoliert); Begleitprogramm par.7 (Leiter, Ziehsucht, Stapel-Stopp-Regel, Peek-Bewertung, Startkuppel, Sims-Kurve). Offen: G-2-Haelfte (par.2), letzte Generation?, Freigabe. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, Generator = Sieger der v28-Promotion, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: nichts gefahren. Zuschnitt aus v28 rotiert (par.1, Seed 20260941). v29-b02 ENTSCHIEDEN: Ablation der Spezialfeld-Kanaele 77/78 (par.6; die Kanaele sind seit e91cd34 gebaut, ihre Wirkung nie isoliert); v29-b03 Sicht-Arm EINGETAKTET 2026-09-13 (par.6c: P.3/P.7, P.9 Vorschlag). Begleitprogramm par.7; Sims-Kurve vorab (search_depth par.8e). Offen: G-2-Haelfte (par.2), P.9, Freigabe. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -160,6 +160,7 @@ Gating 66-91 min je Seed mit Logs, Tor 2b und Plattenpunkte unter 5 min.
 | --- | --- | --- | --- |
 | **v29-b01** (Pflicht) | Rezept UNVERAENDERT (Warmstart `<GEN>_brierbest`, 12 Epochen, lr 5e-05 cosine, lambda 0,7, Koepfe wie gehabt, INPUT_SIZE 755) | Champion (= Generator): nur das Material, 5. Punkt der Materialkette; bei Generator b02 zusaetzlich das Stapelwissen auf 82 statt 40 Prozent des Fensters (par.1, nicht trennbar) | 20260941 |
 | **v29-b02** (ENTSCHIEDEN 2026-09-11, 19:00, par.8.2) | ABLATION der Spezialfeld-Eingabe: Rezept b01, Planes-Kanaele 77 (Spezialfeld-Ertrag) und 78 (Abstand zur Ausloesung) auf Null; Schalter im Merkmalsbauer (`features.rs`, beide Pfade, plus Python-Zwilling), Teil des Cache-Schluessels; Bloecke neu, gleiches Fenster, gleicher Seed | b01: EIN Faktor, die Spezialfeld-Eingabe | 20260941 |
+| **v29-b03** (Sicht-Arm, EINGETAKTET 2026-09-13, Nutzer: "takte p3 und p7 fuer v29 ein"; par.6c) | Rezept b01 plus Encoder-Abschnitt 16 (`PREREG_stack_top_feature.md` par.13): P.3 laufende Ziehserie, P.7 Phasenaufloesung, P.9 Turm je Farbe als Vorschlag; INPUT_SIZE 755 -> 769 (oder 787); Warmstart mit null-initialisierten neuen Spalten (v24-b04-Muster); Bloecke neu, gleiches Fenster, gleicher Seed | b01: EIN Faktor, die Sichtwerte | 20260941 |
 
 **BERICHTIGUNG 2026-09-11, 18:50 (Regel 0):** die Aussage, par.4a sei "registriert und nie
 gebaut", war FALSCH. Die zwei Planes (Spezialfeld-Ertrag je Slot und Abstand zur Ausloesung)
@@ -227,6 +228,29 @@ bitidentisch, Tore Tests/Fixture/Drift). Der Knopf ist KEIN Arm: v29-b01 bleibt 
 plus diese Streuung; ob die Streuung selbst etwas kostet, prueft Tor 2a (Punkteniveau und
 Spalten der Erzeugung gegen v28) ex post.
 
+## par.6c SICHT-ARM v29-b03 (Nutzer 2026-09-13, 01:00: "takte p3 und p7 fuer v29 ein")
+
+Dritter Arm, Registrierung und Zuschnitt in `PREREG_stack_top_feature.md` par.13. Kurz: die
+drei Record-Felder (`pending_stack_draw`, `phase`, `bag_colors`/`tower_colors`) liegen seit jeher
+im Record, es braucht KEIN neues Record-Feld vor der Erzeugung (anders als `dome_pool_view` fuer
+v28-b02), nur den additiven Encoder-Anbau (Rust beide Pfade, Python-Zwilling, `config.INPUT_SIZE`,
+Sichtgleichheits-Test, Regressionstest 755er-Layout, Paritaets-Fixture des Champions unveraendert,
+Anker-Drift gruen). P.9 (Turm je Farbe) ist im Arm VORGESCHLAGEN, Freigabe offen (par.8 Punkt 5).
+
+**Bau-Zeitpunkt:** Wheel-Wechsel, deshalb in einem Fenster ohne Erzeugung, Waechter oder Kette
+(par.4 Punkt 6). Vorschlag: im Generationswechsel NACH der Sims-Neumessung
+(`PREREG_search_depth_column_optimum.md` par.8e) und VOR dem Start der v29-Erzeugung; der
+Generator deklariert 755 und sieht die neuen Werte nie. Danach die Pflichtpruefung par.4 Punkt 2/3
+mit dem NEUEN Kontrakt-Hash (der Vertragsstring traegt die Vektorlaenge; A10 des Code-Abschlusses),
+Manifest-Referenz entsprechend. Alternative: nach dem Ende der Erzeugung vor dem Training.
+
+**Reihenfolge der Arme:** b01 in der Kette, b02 (Ablation) und b03 (Sicht) danach auf demselben
+Fenster mit je eigenen Bloecken; Tor 1 je Arm gegen b01 (zwei Seeds, Blockgroesse 5, Logs), der
+beste gegen den Champion. Lesart b03 nach `stack_top_feature` par.7 mit dem Verwerfungs-Ausgang
+aus par.12: Gleichstand -> Sichtstand uebernehmen (Kriterium Sichtgleichheit), Regression ueber
+zwei Seeds -> Merkmal aus, Ursache suchen. Kosten (ANNAHME): Bau und Tore rund 2 h, Bloecke rund
+26 min, Training wie b01, Tor 1 zwei Seeds rund 3 h.
+
 ## par.7 BEGLEITPROGRAMM IN DEN CPU-FREIEN FENSTERN VON v29 (eingetaktet, keine Arme)
 
 1. **Schwierigkeitsleiter** (`PREREG_difficulty_levels.md` par.8.6, Nutzer 2026-09-11):
@@ -269,9 +293,14 @@ Spalten der Erzeugung gegen v28) ex post.
      die Plattenwahl (Nachtrag 2026-09-09 dort) als zweiter Teil; Anlass par.6a:
      `choose_start_placement` bewertet `SpaceType::Special` mit 0,0 (`self_play.rs:922`).
    - **Sims-Kurve des Generators neu messen** (`PREREG_search_depth_column_optimum.md` par.8c:
-     faellig, weil INPUT_SIZE 744 -> 755 ein Aera-Wechsel ist): drei Punkte 100/250/400 wie in
-     par.8b, dazu 150/200; rund eine Stunde; Betriebspunkt der Erzeugung bleibt 100, solange das
-     Plateau steht.
+     faellig, weil INPUT_SIZE 744 -> 755 ein Aera-Wechsel ist). NEU GEFASST 2026-09-13 (par.8e
+     dort, Nutzer): vier Punkte 100/200/400/600 in ZWEI Formen (gepaart gegen @400 fuer die
+     Staerke, argmax-Instrument fuer den Korpus), VOR dem v29-Self-Play, weil der erste Punkt
+     am Champion das Plateau gekippt hat (@100 verliert 7:23, weniger Spalten). Faellt die Kurve
+     fuer hoehere Sims aus, wird auch der SOCKEL (par.1/par.6) mit den hoeheren Sims neu erzeugt
+     (Nutzer 2026-09-13, 00:12); Kosten und Zuschnitt dann hier vorregistrieren. Die
+     argmax-Dateien `data/selfplay_depth<S>-v28b02_*.pkl` sind Messmaterial und gehoeren vor dem
+     Fensterbau auf die Ausschlussliste (Punkt 7, Fenster-Pinning).
    - **Rueckgabe-Reihenfolge der Kuppelplatten** (`PREREG_dome_return_order.md`, Nutzer
      2026-09-12: legaler Zug, den das Netz nicht nutzt): Such-Knopf `return_order_mode` (netzbewertet),
      A/B ueber den Referee nach der Promotion; wird er Default, gilt er fuer die v29-Erzeugung.
@@ -294,6 +323,9 @@ Spalten der Erzeugung gegen v28) ex post.
    Startkuppel und Sims-Kurve als Sonden und Knoepfe im Begleitprogramm (par.7 Punkt 4);
    Rundenschaetzer und R5-Netzloeser nach Maschinenlage. Die Sicht-Reststufen sind nicht
    bestellt.
+5. **P.9 (Turm je Farbe) im Sicht-Arm v29-b03 mitbauen?** Nutzer 2026-09-13: Turm verdeckt, aber
+   am Rundenende mitzaehlbar, also echte Asymmetrie; fuenf Werte, Record-Feld vorhanden. Freigabe
+   offen; ohne Freigabe baut b03 nur P.3 und P.7.
 3. ~~Ist v29 die letzte Generation?~~ ENTSCHIEDEN (Nutzer 2026-09-12, 18:05): **v30 folgt, wird
    released und ist der Projektabschluss.** Folgen: v29 ist die Generation, in der das
    Begleitprogramm (par.7: Tiling im Blatt, Mondstapel Stufe 1, Claude-Differential, Sonden) seine

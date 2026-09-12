@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | Beleg: VARIANTE A GEBAUT 2026-09-10 (par.15), A/B Live gegen Artefakt 165:135, Fix bleibt (par.15b); Ziehungen in den eigenen Block STEIGEN mit A (+0,69 je Partie, par.15e), regelkonform: Ziehen bei Stand 0 bleibt gratis, Null-Klammer als Regel entschieden (par.15f, PREREG_score_clamp_incentive.md). VARIANTE B GEBAUT 2026-09-11 (elf Merkmale 744..754, INPUT_SIZE 755), Arm v28-b02 gegen b01 in Messung (PREREG_v28_window.md par.9/10), Ergebnis steht aus. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wie modelliert die Suche den Kuppelstapel als Informationsmenge statt ihn bei jeder Suche ganz zu mischen? | Beleg: ABGESCHLOSSEN 2026-09-13 (par.16). Variante A GEBAUT (par.15): kein Mischen des Stapels je Suche, A/B 165:135, Fix bleibt; Ziehungen in den eigenen Block +0,69 je Partie, regelkonform (par.15e/f). Variante B (elf Merkmale, INPUT_SIZE 755) Nullbefund b02 gegen b01 (par.15h), bleibt als korrektere Fassung im Generator. Ziehsucht nicht behoben, Adresse v29-Begleitprogramm. -->
 
 # PREREG: Informationsmengen am Kuppelstapel
 
@@ -792,3 +792,14 @@ Korrektheitsfix; die Kanaele bleiben aus Kompatibilitaet im Vektor. Naechste Adr
 Ziehsucht: die Stopp-Regel und die Peek-Bewertung (`PREREG_stack_draw_reservation_rule.md`
 par.7, `PREREG_chance_nodes.md` Teil B1, v29-Begleitprogramm) und die Ziehsucht-Sonde
 (`PREREG_claude_play_interface.md` par.9). Zahlen: `PREREG_v28_window.md` par.10.
+
+## par.16 ABSCHLUSS (2026-09-13, 01:15; Nutzer: "schliess auch die 3 preregs von vorhin")
+
+Die Frage dieser Datei (wie modelliert die Suche den Kuppelstapel als Informationsmenge) ist mit
+Variante A beantwortet und gebaut; Variante B (das Wissen als Netz-Eingang) ist gemessen und ein
+Nullbefund, bleibt aber als korrektere Fassung im Generator v28-b02 (Nutzer-Entscheid, par.15h).
+Der Kopf sagte noch "Ergebnis steht aus", der Koerper trug das Ergebnis seit 2026-09-11. Was aus
+dieser Datei weiterlebt, steht anderswo: die Ziehsucht (Stopp-Regel, Peek-Bewertung,
+Ziehsucht-Sonde) im v29-Begleitprogramm (`PREREG_v29_window.md` par.7 Punkt 4), die zweite
+Sicht-Achse "was WEISS die Suche" in `PREREG_stack_top_feature.md` par.11, der Naht-Audit als
+Liste in `docs/architecture_reference.md`.

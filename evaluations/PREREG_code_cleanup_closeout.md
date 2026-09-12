@@ -409,7 +409,7 @@ dorthin verschiebt sie. Wer die Luecke wirklich fuellen will, braucht einen Knot
 Heuristiken bei 55-70 % liegt: ein Netz mit 25 Sims oder eine Heuristik mit 600 Sims (nicht
 gefahren; Vorschlag fuers v29-Begleitprogramm, kein Auftrag).
 
-**LEITER SEGMENT 2, ENDSTAND 23:25 (26 Kanten, alle am Anker; Block-Bootstrap):**
+**LEITER SEGMENT 2, ENDSTAND 23:25 (26 Kanten, alle am Anker; Block-Bootstrap) -- UEBERHOLT durch den Nachtrag "TREPPE GEFESTIGT" unten (2026-09-13, 01:00, 36 Kanten):**
 
 | Knoten | Elo | KI95 | Partien |
 | --- | --- | --- | --- |
@@ -506,3 +506,50 @@ Anker und den Fix, ist aber eine zweite Wahrheit fuer denselben Restvorrat. Empf
 Koordinators: (a), weil das Artefakt die Leiter traegt und der Fehler ein echter Sichtfehler
 ist. Bis zum Entscheid: Code im Baum committet, Wheel MIT A2 installiert, KEINE Elo-Kante mit
 dem lebenden hv1; die Referee-Kanten laufen ohnehin aus dem Artefakt-Wheel.
+
+
+**TREPPE GEFESTIGT (2026-09-13, 00:03-00:59, `tools/night_ladder_gap_fill.sh`, exklusiv; vier Kanten
+bis zum Deckel OHNE Frueh-Stopp, alle im Register):**
+
+| Kante | Ergebnis | Bloecke | p | Wanduhr |
+| --- | --- | --- | --- | --- |
+| v22-b05@100 gegen hv4_anchor@600 (Referee, 3 x 50) | 108:42 (72 %) | 31:19, 39:11, 38:12 | Binomial 7e-8 | 166+164+151 = 481 s |
+| v22-b05@400 gegen hv4_anchor@600 (Referee, 3 x 50) | 110:40 (73 %) | 34:16, 38:12, 38:12 | Binomial 1e-8 | 389+421+413 = 1.223 s |
+| v22-b05@25 gegen @100 (paired_gating Seed 20261053, 75 Paare) | 61:89 (41 %) | 15 x 5 Paare | McNemar 0,013; Diff -0,37 [-0,64; -0,11] | 423 s |
+| v22-b05@100 gegen @400 (paired_gating Seed 20261054, 75 Paare) | 61:89 (41 %) | 15 x 5 Paare | McNemar 0,034; Diff -0,37 [-0,69; -0,06] | 1.062 s |
+
+Nebenbefunde: Punkte 42,8 gegen 48,5 und Strafleiste 11,8 gegen 9,6 (@25 gegen @100: die flache
+Suche verliert an der Strafleiste); Punkte 36,6 gegen 42,3 bei gleicher Strafleiste 12,4 gegen 12,3
+(@100 gegen @400). hv4@600 ist mit 72-73 Prozent gegen v22@100 und @400 die Sprosse, die zwischen
+Anker und Netzblock fehlte (gegen hv4@150 lagen die Netze bei 76-90 Prozent).
+
+**Die Treppe traegt:** Anker (fix) -> hv4@600 (4 Kanten, alle am Deckel) -> v22@25 (5 Kanten, 2 am
+Deckel: hv4@600, @100 Seed 53) -> v22@100 (7 Kanten, 3 am Deckel: hv4@600, @25, @400) -> v22@400
+(6 Kanten, 3 am Deckel: v21, hv4@600, @100). Jeder Treppenknoten hat mindestens zwei Kanten ohne
+Frueh-Stopp; kein Knoten haengt nur an frueh gestoppten Kanten. Nicht-Transitivitaet bleibt am
+Boden sichtbar (v22@25 gegen hv4@600 50 Prozent, gegen hv4@150 76 Prozent), Bradley-Terry mittelt.
+
+**LEITER SEGMENT 2, ENDSTAND 2026-09-13 01:00 (36 Kanten, alle am Anker; Block-Bootstrap,
+`python tools/elo_tracker.py report`):**
+
+| Knoten | Elo | KI95 | Partien | Frueh-Stopp-Kanten |
+| --- | --- | --- | --- | --- |
+| v28-b02@400 (Champion) | **1353** | [1306, 1402] | 1.410 | 3/7 |
+| v28-b01@400 | 1326 | [1277, 1381] | 400 | 1/3 |
+| v27-b01@400 | 1310 | [1264, 1359] | 1.280 | 2/5 |
+| v26-b01@400 | 1255 | [1203, 1308] | 400 | 2/4 |
+| v22-b05_live@400 | 1213 | [1178, 1254] | 610 | 3/6 |
+| v24-b07@400 | 1207 | [1163, 1256] | 400 | 4/5 |
+| v21_2d_brierbest@400 | 1204 | [1164, 1249] | 500 | 3/5 |
+| v22-b05_live@100 | 1173 | [1136, 1212] | 710 | 4/7 |
+| v28-b02@100 | 1146 | degeneriert | 30 | 1/1 |
+| v22-b05_live@25 | 1103 | [1062, 1144] | 500 | 3/5 |
+| Heuristik_hv4_anchor@600 | 1046 | [1009, 1083] | 600 | 0/4 |
+| Heuristik_hv4_anchor@150 | 1000 | fix | 1.100 | 4/10 |
+| Heuristik_hv2_generator@150 | 983 | [944, 1018] | 500 | 4/6 |
+| Heuristik_hv3_generator@150 | 978 | [938, 1016] | 400 | 2/4 |
+
+Bewegung gegen 00:02 (32 Kanten): Champion 1348 -> 1353, Intervalle der Netzknoten um 3-8 Punkte
+schmaler (v22@400 [1145, 1241] -> [1178, 1254]); die vier Kanten haben die Leiter unten gestrafft,
+nicht verschoben. Artefakte `rung_v22b05s{100,400}_vs_hv4s600_b1..b3.json`,
+`paired_gating_v22-b05_s25_vs_s100_seed53_full.json`, `..._s100_vs_s400_seed54_full.json`.

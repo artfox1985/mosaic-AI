@@ -16,73 +16,49 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ---
 
-## 1. UEBERGABE an die naechste Sitzung (2026-09-13, 00:15; Anlass: Kontextfenster der alten Sitzung voll, eine Kette laeuft)
+## 1. STAND (2026-09-13, 01:10; Sitzung uebernommen 00:11, Treppe gefestigt, Sims-Neumessung vorregistriert)
 
-**Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12), Elo 1348
-[1304, 1400]** aus 1.410 Partien im LEITERSEGMENT 2 (Stand 00:02, 32 Kanten, alle am Anker
-`hv4_anchor` fix 1000, Block-Bootstrap; `python tools/elo_tracker.py report`): v28-b01 1320,
-v27-b01 1305, v26-b01 1249, v24-b07 1199, v21 1192, v22-b05@400 1188, v22-b05@100 1167,
-v28-b02@100 1142 (Intervall degeneriert, 30 Partien), v22-b05@25 1109, hv4_anchor@600 1069,
-hv2 978, hv3 976. Generator v29 = v28-b02 (Nutzer 2026-09-11). Belege
-`PREREG_code_cleanup_closeout.md` par.7a (Leiter, Tracker-Pruefung, Sprossen),
-`PREREG_search_depth_column_optimum.md` Nachtrag 2026-09-12/13 (Sims-Kanten),
-`PREREG_start_dome_choice.md` par.9e/9f (Such-Start, Platte/Rotation). Alle v28-Messungen sind
-registriert; der Generationswechsel v28 -> v29 (`/mosaic-generation-turnover`) ist NICHT begonnen.
+**Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12), Elo 1353
+[1306, 1402]** aus 1.410 Partien im LEITERSEGMENT 2 (Stand 01:00, 36 Kanten, alle am Anker
+`hv4_anchor` fix 1000, Block-Bootstrap; `python tools/elo_tracker.py report`): v28-b01 1326,
+v27-b01 1310, v26-b01 1255, v22-b05@400 1213, v24-b07 1207, v21 1204, v22-b05@100 1173,
+v28-b02@100 1146 (Intervall degeneriert, 30 Partien), v22-b05@25 1103, hv4_anchor@600 1046,
+hv2 983, hv3 978. **Die Treppe Anker -> hv4@600 -> v22@25 -> v22@100 -> v22@400 traegt** (jeder
+Knoten mindestens zwei Kanten am Deckel ohne Frueh-Stopp; `PREREG_code_cleanup_closeout.md` par.7a
+Nachtrag "TREPPE GEFESTIGT", Endtabelle dort). Generator v29 = v28-b02 (Nutzer 2026-09-11). Alle
+v28-Messungen registriert; der Generationswechsel v28 -> v29 (`/mosaic-generation-turnover`) ist
+NICHT begonnen.
 
-### LAEUFT (Maschine BELEGT)
+### MASCHINE FREI (seit 00:59)
 
-- **`tools/night_ladder_gap_fill.sh`**, gestartet 2026-09-13 00:03 als Hintergrund-Bash der alten
-  Sitzung (laeuft als Betriebssystem-Prozess weiter; NICHT neu starten). Vier Kanten bis zum
-  Deckel OHNE Frueh-Stopp, Reihenfolge: (1) v22-b05@100 gegen hv4_anchor@600, Referee, 3 Bloecke
-  a 50, Artefakte `evaluations/artifacts/rung_v22b05s100_vs_hv4s600_b1..b3.json`; (2) v22-b05@400
-  gegen hv4@600, `rung_v22b05s400_vs_hv4s600_b1..b3.json`; (3) paired_gating v22@25 gegen v22@100,
-  75 Paare, Seed 20261053, `paired_gating_v22-b05_s25_vs_s100_seed53_full.json`; (4) paired_gating
-  v22@100 gegen v22@400, Seed 20261054, `paired_gating_v22-b05_s100_vs_s400_seed54_full.json`.
-  Stand 00:07: Kante 1 Block 1 laeuft, 0 der 8 Artefakte geschrieben. Erwartetes Ende: 00:30 bis
-  00:45 (Referee 150 Partien Netz gegen Heuristik@600 je 4-6 min, gepaart 150 Partien 5-8 min;
-  Annahme aus den Laufzeiten des Abends). Die Kette LIEST `models/frozen_heuristics/hv4_anchor`,
-  `models/restored_v22/alphazero_v22-b05.onnx`, `models/k3v_off.spec.json`: nichts davon anfassen.
-  Fertig-Marke: Zeile `== TREPPE FERTIG` in der Ausgabe; ohne Zugriff auf die Ausgabe gilt: alle
-  acht Artefakte vorhanden UND kein Prozess `frozen_referee_match|paired_gating` mehr in der
-  Prozessliste.
+`tools/night_ladder_gap_fill.sh` ist durch (00:03-00:59, acht Artefakte, vier Kanten im Register).
+Kein Lauf aktiv. **Bereit, Start auf Anweisung:** `tools/night_sims_curve_v28b02.sh` (Sims-Kurve am
+Generator v28-b02, `PREREG_search_depth_column_optimum.md` par.8e: Teil A gepaart @100/@200/@600
+gegen @400 je 75 Paare ohne Frueh-Stopp mit Spaltensonde und Plattenpunkten, Teil B argmax
+@100/@200/@400/@600 je 200 Partien; rund 2,5-3 h, ANNAHME). Vorher laeuft der Crosscheck am
+Spiellog (unten), weil eine deterministische Sonde nicht neben einer Messung laufen darf.
 
-### ERSTE AUFGABE DER NEUEN SITZUNG (in dieser Reihenfolge)
+### NAECHSTE SCHRITTE (Reihenfolge)
 
-1. **WATCHER auf das Ketten-Ende** (Bedingung: acht Artefakte vorhanden UND kein
-   `frozen_referee_match`/`paired_gating`-Prozess; Stillstand melden, wenn 20 Minuten lang kein
-   neues Artefakt entsteht). Bis dahin nur Dateiarbeit, keine Rechenlast (CLAUDE.md "Messungen
-   laufen EXKLUSIV").
-2. **Vier Kanten ins Register** (`tools/elo_tracker.py add`, Muster der Zeilen vom 2026-09-12 im
-   Register; Referee-Kanten: wins aus den drei Bloecken summieren, KEIN `--early-stop`, Knobs
-   `spec:k3v_off.spec.json`, sims_a 100 bzw. 400, player_b `Heuristik_hv4_anchor` sims_b 600;
-   gepaarte Kanten: `--units-from-paired-artifact <JSON>`, KEIN `--early-stop`, player_a
-   `v22-b05_live` sims 25 bzw. 100, player_b `v22-b05_live` sims 100 bzw. 400; Laufzeit aus
-   `elapsed_s` bzw. `laufzeit.wanduhr_s` in den Kommentar). Dann `report` lesen: kein Knoten
-   "NICHT mit Anker verbunden".
-3. **Registrieren**: `PREREG_code_cleanup_closeout.md` par.7a bekommt einen Nachtrag "TREPPE
-   GEFESTIGT" mit den vier Ergebnissen und die ENDTABELLE aus dem Report (die Tabelle "ENDSTAND
-   23:25" ist ueberholt); STATUS-Champion-Zeile oben, `README.md` (Champion-Zeile und
-   Leiterliste, Zeilen 26 und 38), `docs/project_overview.md` (zwei Stellen "1349"),
-   `models/frozen_champions/v28-b02/manifest.json` Block `elo` (value, ci95, as_of,
-   ladder_after_refit), `docs/measured_runtimes.md` (vier Zeilen), Chronik `archive/history.md`
-   (Kapitel 2026-09-13 fortschreiben). `python tools/generate_prereg_index.py`, dann Commit
-   (ohne `player_profiles.json`, `player_profiles.json.bak`, `models/manifest_train_v28-b03/b04*`,
-   `evaluations/game_analysis/*`). Kein Push. Ahead-Stand im Chat melden.
-4. **Nutzer im Chat informieren**: Endtabelle, ob die Treppe traegt (jeder Knoten Anker ->
-   hv4@600 -> v22@25 -> v22@100 -> v22@400 mit mindestens zwei Kanten am Deckel), Ahead-Stand.
-   STATUS oben auf "MASCHINE FREI" setzen.
-5. **Danach NUR auf Anweisung: Generationswechsel v28 -> v29** nach `/mosaic-generation-turnover`.
-   Vorab bekannt: Loeschliste des Nutzers (siehe Freigaben), restic-daily-Snapshot vor dem Loeschen,
-   obsolete `night_*`-Ketten des 2026-09-12 (Liste vorlegen), Fenster-Prereg v29 mit Rezept
-   (`PREREG_v29_window.md` par.6b: Slot-Streuung `MOSAIC_START_SLOT_RANDOM_P` 0,15 und
-   `start_by_search 1` im Spec; Sims der Erzeugung NACH der Neumessung, siehe offene Entscheide),
-   Erzeugung nur auf ausdrueckliche Freigabe. **Vor der Erzeugung: Sims-Neumessung par.8d
-   (Nutzer-Entscheid 00:12), Ergebnis in die Sims-Prereg und in das v29-Rezept.**
+1. **Crosscheck Fliesenbuchhaltung** (Nutzer 2026-09-13, 01:05): am Server-Log
+   `static/log/game_20260911_092554_seed946607.log` pruefen, ob sich je Zug die Fliesen je Farbe
+   auf Brett, im Beutel und im Turm aus dem oeffentlichen Spielverlauf mitrechnen lassen (Ledger
+   gegen Engine-Replay, `tools/analyze_game_log.py --dump-states`). Ergebnis in
+   `PREREG_stack_top_feature.md` (P.9) nachtragen.
+2. **Sims-Kette starten** (par.8e), danach Auswertung nach der Lesart dort und der VORSCHLAG fuer
+   die Sims von Sockel und Schwarm getrennt, mit Kosten je Variante fuer v29 UND v30 (Nutzer:
+   "zum schluss sind es nur noch zwei generationen"; Entscheidungsregel "eklatant" in par.8e).
+3. **Generationswechsel v28 -> v29** nach `/mosaic-generation-turnover`, NUR auf Anweisung; darin
+   der Bau des Sicht-Arms v29-b03 (P.3 Ziehserie, P.7 Phasenaufloesung, P.9 als Vorschlag;
+   `PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c) VOR dem Start der
+   Erzeugung (Wheel-Wechsel); Loeschliste des Nutzers erst nach dem Start des v29-Self-Plays.
+4. ~~Vier Preregs koennen schliessen~~ ERLEDIGT 2026-09-13, 01:15 (Nutzer: "schliess auch die 3
+   preregs"): `v28_window`, `dome_stack_information_sets`, `start_dome_choice` auf ENTSCHIEDEN;
+   `stack_top_feature` bleibt OFFEN (Sichtgleichheit nicht erreicht, par.13). Index: 11 OFFEN.
 
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
 
-- **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden (Nutzer pusht selbst; Stand 00:15:
-  Ahead 0 vor dem Uebergabe-Commit).
+- **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden (Nutzer pusht selbst).
 - **Loeschung nur auf pfadgenaue Freigabe.** Freigegebene Loeschliste (Nutzer 2026-09-12, 23:58:
   "ich heb mir nur die letzten zwei champs auf. und hv1 ist obsolet. somit brauchen wir nur v28 und
   v27"), aber **"wir loeschen es erst wenn das self play fuer v29 gestartet ist. dann ist es im
@@ -102,17 +78,13 @@ registriert; der Generationswechsel v28 -> v29 (`/mosaic-generation-turnover`) i
 
 ### OFFENE NUTZER-ENTSCHEIDE
 
-- **Sims der v29-Erzeugung: ENTSCHIEDEN (Nutzer 2026-09-13, 00:12): die Neumessung
-  (`PREREG_search_depth_column_optimum.md` par.8d: 100/150/200/250/400 am Generator v28-b02,
-  rund eine Stunde) wird VOR dem v29-Self-Play gefahren.** Anlass: v28-b02@100 verliert gegen
-  @400 7:23 und baut WENIGER Spalten (0,87 gegen 1,30; Nachtrag 2026-09-12/13), das Plateau der
-  flachen Suche gilt fuer den heutigen Champion nicht mehr. Nutzer dazu: "dann muessten wir
-  wieder den sockel aufstocken von den sims her": faellt die Kurve fuer hoehere Sims aus, wird
-  auch der Sockel des v29-Fensters (Traeger-Korpus, `PREREG_v29_window.md` par.1/par.6) mit den
-  hoeheren Sims neu erzeugt, nicht nur der Schwarm; Kosten und Zuschnitt dann in der
-  Fenster-Prereg vorregistrieren. Bau der Neumessung: Kette nach dem Muster von par.8b (gepaarte
-  Laeufe Generator@S gegen Generator@400 je S, mit Logs, Spaltensonde und Plattenpunkte je Punkt,
-  Frueh-Stopp aus), Register-Zeilen mit Bloecken.
+- **Sims der v29-Erzeugung: Neumessung VORREGISTRIERT und gebaut** (Nutzer 2026-09-13: "dann also
+  beide ... miss nur bei 100 sims, 200, 400 und 600"; `PREREG_search_depth_column_optimum.md`
+  par.8e, Kette `tools/night_sims_curve_v28b02.sh`). Entscheidungsregel des Nutzers dort woertlich
+  ("eklatant besser" -> hoehere Erzeugungszeit in Kauf); faellt die Kurve fuer hoehere Sims aus,
+  wird auch der Sockel des v29-Fensters mit den hoeheren Sims erzeugt (Kosten vorher in
+  `PREREG_v29_window.md`). Pflicht-Auswertung: Vorschlag Sims Sockel/Schwarm getrennt.
+- **P.9 (Turm je Farbe) im Sicht-Arm v29-b03 mitbauen?** (`PREREG_v29_window.md` par.8 Punkt 5)
 - **Zweite Aufhaengung der Sims-Kante am Champion:** v28-b02@100 hat nur 30 Partien (Intervall
   degeneriert); mehr Partien nur, wenn der Knoten gebraucht wird.
 - Generationswechsel-Start (Schritt 5 oben), Loeschzeitpunkt (nach Self-Play-Start).
@@ -166,7 +138,7 @@ nur fuer den Ausfuehrenden sichtbar; Anker-Drift nach jedem Schritt gruen.
 | Einhuellende, Schliesskriterium | `geometric_envelope` par.13 | ENTSCHIEDEN 2026-09-12: Kriterium auf Arena-Groessen umgestellt (Nutzer); C2 erfuellt, A1/A2 gegen huellenblindes Orakel negativ und gestrichen; K3-P/Huellenform 2/K5 bleiben Rezept |
 | Werkzeuge | | `paired_gating --log-games` (Tor 2b aus Tor 1), `plate_points` je Modell, `dome_stack_known_block_draw_probe`, exakter Orakel-Pfad, Spec-Rueckfall in server.py |
 
-## 5. PREREG-BESTAND (15 OFFEN, Ziel rund 7)
+## 5. PREREG-BESTAND (11 OFFEN laut Index 2026-09-13, Ziel rund 7)
 
 `v28_window` (Vorlage), `dome_stack_information_sets` (Variante B), `stack_top_feature`,
 `claude_play_interface` (laeuft), `round_estimate_leaf_term` (Skalenwahl a/b, Nutzer),

@@ -23,8 +23,8 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1349** (95% CI [1302, 1402])
-from 1,380 rated games on the **second ladder segment**, anchored at the frozen
+Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1353** (95% CI [1306, 1402])
+from 1,410 rated games on the **second ladder segment**, anchored at the frozen
 heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 =
 1000, `tools/elo_tracker.py report`). The ladder was re-anchored on 2026-09-12:
 a correctness fix in the hull evaluation (phantom tiles, cleanup finding A2)
@@ -35,9 +35,11 @@ boundary; the same happened once before on 2026-08-21 with the round-5 solver
 fix (`archive/elo_history_pre_r5fix.csv`). Because every net since v23 beats the
 heuristic anchor at 84-90 % (saturated edges), the second segment carries
 intermediate rungs from frozen artifacts restored out of the backup
-(`v22-b05`@100 1175, `v22-b05` 1191, `v21_2d_brierbest` 1194, `v24-b07` 1200,
-`v26-b01` 1250, `v27-b01` 1306, `v28-b01` 1321) and the two hull-teacher
-heuristics `hv2` (980, frozen before the phantom fix) and `hv3` (980, the same
+(`v22-b05`@25 1103, `v22-b05`@100 1173, `v21_2d_brierbest` 1204, `v24-b07` 1207,
+`v22-b05` 1213, `v26-b01` 1255, `v27-b01` 1310, `v28-b01` 1326), the anchor
+heuristic at 600 simulations (`hv4_anchor`@600 1046, the rung between the anchor
+and the net block) and the two hull-teacher
+heuristics `hv2` (983, frozen before the phantom fix) and `hv3` (978, the same
 recipe rebuilt on the fixed engine; the fix does not change its strength). The anchor carries its own wheel:
 an engine change can no longer move the fixed point of the ladder, and every
 engine change is checked move by move against it (drift check,
