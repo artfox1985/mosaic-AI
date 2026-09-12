@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): SPANNE GROSS, Lesart (a). hv1@400, 60 Partien je Slot gepaart: Margin +1,5 (Slot 0) bis -12,4 (Slot 7), Spannweite 13,9 Punkte, Reihe 2 kostet 11-13 Punkte gegen Slot 0 (KI schliesst 0 aus); Rangfolge ueber die Sims-Stufen stabil (Spearman 0,85, kippt nicht). hv2-Gegenprobe (Weg 3) laeuft. Naechste Stufe par.2a/par.5 nach Nutzer-Entscheid; Plattenwahl (par.6a) im v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): die Handregel legt IMMER Slot (0,0) (Code), und genau dieser Slot ist der beste oder gleichbeste (Margin +1,5 [-4,1; +7,0] gegen Bestand, alle anderen Slots schlechter, Reihe 2 um 11-13 Punkte). Hebel SLOTWAHL geschlossen; offen bleibt nur Platte/Rotation (par.9a). hv2-Gegenprobe (Weg 3) laeuft als zweiter Waechter. Plattenwahl (par.6a) im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -378,14 +378,31 @@ Spannweite Punkte 8.4, Margin 8.3; Rangfolge [1, 0, 2, 4, 5, 8, 6, 3, 7].
 Reihe 2 in beiden Stufen am Ende. Die Rangfolge ist eine Eigenschaft der Position, nicht der
 Faehigkeit; die hv2-Gegenprobe ueber den Referee (Weg 3) folgt als zweiter Waechter.
 
-**Lesart nach par.4: SPANNE GROSS, Lesart (a).** Die Startkuppel ist kein Zufallszug: die obere
-Reihe des 3x3-Rasters ist 11-13 Punkte Margin besser als die untere (Intervalle der Reihe-2-Slots
-schliessen 0 aus, Slot 0 gegen Slot 6/7/8 gepaart), und der Effekt WAECHST mit der Suchtiefe
-(Spannweite 8,3 @25 gegen 13,9 @400). Damit lohnen par.2a (maskierter Ownership-Kopf) und par.5
-(Exploration und Konsumform) grundsaetzlich; was die Handregel heute waehlt (Slotverteilung des
-unerzwungenen Spielers 1), ist in diesem Artefakt NICHT erhoben und die naechste billige Frage:
-liegt die Handregel schon in Reihe 0, ist der Hebel klein; liegt sie verteilt, sind bis zu 10
-Punkte Margin je Partie offen. Nichts davon ist gebaut; Nutzer-Entscheid.
+**Lesart nach par.4, KORRIGIERT 12:40 (Nutzer: "die handregel heute legt immer auf slot 0,0"):**
+geprueft am Code `engine/src/self_play.rs:1180-1200` (`start_placement_kandidaten`): die Bewertung
+eines Kandidaten haengt nur an Platte und Rotation (Farbzaehler der Sonnenfelder plus Eckbonus 0,5
+fuer ALLE vier Ecken), die Kandidaten laufen in fester Reihenfolge (Platte, Slot, Rotation), und
+`choose_start_placement_with_slot` nimmt strikt "groesser". Slot (0,0) ist die erste Ecke und
+gewinnt damit jeden Gleichstand: **die Handregel legt die Startkuppel IMMER auf (0,0)**, gewaehlt
+werden nur Platte und Rotation. Folge fuer die Zahlen oben: "Slot 0 erzwungen" IST der Bestand
+(Kontrolle: Margin +1,5 [-4,1; +7,0] gegen den unerzwungenen Gegner, mit 0 vertraeglich, wie es
+fuer zwei identische Spieler sein muss), und jeder andere Slot ist schlechter oder gleich (Slot 1
+-1,6, Reihe 1 -4,5 bis -5,3, Reihe 2 -12,9 bis -13,9 gepaart; @25 Sims Slot 1 nominell vorn, +3,0
+gegen Slot 0, Intervall schliesst 0 ein). Die Spanne ist gross, aber sie misst die KOSTEN des
+Abweichens vom Bestand, nicht einen offenen Gewinn. **Der Hebel "Slotwahl befreien" ist damit
+GESCHLOSSEN: par.2a und par.5 haben fuer den Slot keinen Gegenstand mehr.** Was offen bleibt,
+steht in par.9a.
+
+## par.9a Was nach Stufe 0 noch offen ist
+
+1. **Platte und Rotation** (die 12 Kandidaten je Partie im Slot (0,0)): die Handregel waehlt nach
+   Farbzaehlern der Sonnenfelder; ob das gut ist, ist ungemessen. Billige Sonde (Muster Stufe 0,
+   netzfrei, gepaart): Handregel gegen "zufaellige Platte/Rotation in (0,0)" und gegen "beste
+   Platte/Rotation nach Ownership-Ablesung par.2a" (letzteres braucht ein Netz). Erste Zahl:
+   Margin der Handregel gegen Zufall; ist sie klein, ist auch dieser Teil des Zugs kein Hebel.
+2. **hv2-Gegenprobe** (Weg 3, laeuft): kippt die Slot-Rangfolge bei hv2, waere der Bestandsslot
+   fuer einen anderen Spieler nicht der beste; nur dann lebt die Slotfrage wieder.
+3. **Plattenwahl par.6a** (Spezialfelder als 0,0 bewertet): eigener Posten, v29-Begleitprogramm.
 
 Randbedingungen: netzfrei (das Netz benutzt dieselbe Handregel `choose_start_placement`, der
 Befund gilt fuer seine Startsetzung ebenso, aber die Kosten eines Slots koennen unter Netz-Suche
