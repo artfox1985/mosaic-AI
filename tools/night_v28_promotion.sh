@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Promotion v28-b02 (Nutzer-Entscheid 2026-09-11: b02 = bester Stand; Generator v29), die
-# MESSENDEN Schritte nach docs/promotion_checklist.md, Segment 2 der Leiter (hv1_anchor_v2).
+# MESSENDEN Schritte nach docs/promotion_checklist.md, Segment 2 der Leiter (hv4_anchor).
 # Schon gelaufen (tools/night_reanchor.sh): Schritt 3 Anker-Kante (126:24) und Schritt 2 als
 # Nachbar-Kante v28-b02 gegen v27-b01 (Seed 20261044, 200 Paare, Logs). Hier:
 #   2r Replikation der Nachbar-Kante (SPRT-Fruehstopp nach 115 Paaren, 133:97), Seed 20261046

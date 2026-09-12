@@ -18203,7 +18203,7 @@ schreibt; seitdem wiederholt `save_manifest` den Schreibversuch, und ein neues U
 
 Nach dem Nutzer-Entscheid "setz den anker neu" (02:10, Anlass: Anker-Drift ROT durch den
 Phantom-Fix A2) lief `tools/night_reanchor.sh` exklusiv: drei Anker-Kanten gegen
-`hv1_anchor_v2` (v28-b02 126:24, v28-b01 132:18, v27-b01 124:26; je n=150, Handshake gruen ohne
+`hv4_anchor` (v28-b02 126:24, v28-b01 132:18, v27-b01 124:26; je n=150, Handshake gruen ohne
 Cross-Aera, 1.441-1.491 s) und die Nachbar-Kante v28-b02 gegen v27-b01 (Seed 20261044, SPRT
 nach 115 Paaren 133:97, p 0,0198). Register neu: `evaluations/elo_history.csv` beginnt mit
 diesen Kanten, das Alt-Register liegt in `archive/elo_history_pre_phantomfix.csv`.

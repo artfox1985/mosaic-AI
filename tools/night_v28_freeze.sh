@@ -66,7 +66,7 @@ man = {
     "input_size": cur.get("input_size"), "contract_hash": cur["contract_hash"],
     "engine_version": cur.get("engine_version", "0.1.0"),
     "wheels": {"champion_behavior_artifact": {"file": wheel, "sha256": sha,
-        "source": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl, gebaut 2026-09-12 (Knopf-Durchgang: round_estimate, Rueckgabe-Reihenfolge, Startslot, alle auf Default; Anker-Drift gegen hv1_anchor_v2 gruen, tools/night_v28_knob_build.sh)"}},
+        "source": "engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl, gebaut 2026-09-12 (Knopf-Durchgang: round_estimate, Rueckgabe-Reihenfolge, Startslot, alle auf Default; Anker-Drift gegen hv4_anchor gruen, tools/night_v28_knob_build.sh)"}},
     "worker_python": {"interpreter_relative": "venv/Scripts/python.exe",
         "interpreter_note": "Relativ zu diesem Verzeichnis. Windows-venv, Python 3.14, angelegt 2026-09-12 per pip install --no-deps aus dem Wheel plus numpy/onnxruntime"},
     "training_manifest": "models/manifest_train_v28-b02_20260911_152432.json",

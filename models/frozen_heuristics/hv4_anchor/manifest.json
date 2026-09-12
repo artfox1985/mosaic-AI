@@ -1,5 +1,5 @@
 {
-  "artefakt": "hv1_anchor_v2",
+  "artefakt": "hv4_anchor",
   "rolle": "Elo-Anker, Segment 2 der Leiter (seit dem Phantom-Fix A2, 2026-09-12)",
   "typ": "heuristik",
   "freeze_date": "2026-09-12",
@@ -39,7 +39,7 @@
       "M player_profiles.json",
       "?? evaluations/game_analysis/game_analysis_20260904_194912_seed771522.md",
       "?? evaluations/game_analysis/game_analysis_game.md",
-      "?? models/frozen_heuristics/hv1_anchor_v2/",
+      "?? models/frozen_heuristics/hv4_anchor/",
       "?? models/manifest_train_v28-b03_20260911_201057.json",
       "?? models/manifest_train_v28-b04_20260911_221704.json",
       "?? player_profiles.json.bak"
@@ -124,12 +124,13 @@
     "dateien": [
       "selfplay_probe_20260912_0129_g10.pkl"
     ],
-    "pruefbefehl": "python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv1_anchor_v2"
+    "pruefbefehl": "python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor"
   },
   "laufzeit": {
     "wanduhr_s": 15.9,
     "cpu_s": null,
     "threads": 11,
     "s_je_partie": null
-  }
+  },
+  "umbenennung": "2026-09-12 17:40 (Nutzer): vormals hv1_anchor_v2. hv4 = der hv1-Code des heutigen Motors MIT Phantom-Fix A2 (Commit 2a0cf4b); das Spec-Schluesselwort heuristik_variante bleibt 'hv1', weil jede Champion-Spec es traegt. Elo-Knoten Heuristik_hv4_anchor@150 = 1000 (Segment 2)."
 }

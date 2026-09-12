@@ -7,13 +7,13 @@ set -u
 cd "$(dirname "$0")/.."
 export PYTHONIOENCODING=utf-8
 ART=evaluations/artifacts
-ANCHOR=models/frozen_heuristics/hv1_anchor_v2
+ANCHOR=models/frozen_heuristics/hv4_anchor
 HV2=models/frozen_heuristics/hv2_generator
 SPEC=models/frozen_champions/v27-b01/spec.json
 HEUR="--sims-worker 150 --c-puct-worker 0.3"
 echo "== TEIL A: Anker-Kanten korrekt (n=150 fest, Anker @150 c_puct 0,3) $(date +%F' '%H:%M:%S)"
 for CAND in v28-b02 v28-b01 v27-b01; do
-  echo "== ANKER-KANTE $CAND@400 gegen hv1_anchor_v2@150 $(date +%H:%M:%S)"
+  echo "== ANKER-KANTE $CAND@400 gegen hv4_anchor@150 $(date +%H:%M:%S)"
   python -X utf8 -u tools/frozen_referee_match.py --artifact-dir "$ANCHOR" \
     --model-a "models/alphazero_${CAND}_brierbest.onnx" --spec-a "$SPEC" --sims-a 400 --c-puct-a 1.5 $HEUR \
     --n-games 150 --seed-base 900001 --workers 6 --out "$ART/anchor_v2_arena_${CAND}_c03.json"

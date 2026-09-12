@@ -29,11 +29,11 @@ Artefakt-Wheel -- dann siehst eh gleich, ob andere Zuege rauskommen."*
 sie vermengt, ist wertlos.**
 
 ```bash
-python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv1_anchor_v2
+python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor
 ```
 
 ```bash
-python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv1_anchor_v2 --venv
+python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --venv
 ```
 
 Das Rezept liegt im Manifest des Artefakts (hv1, 10 Partien, 600 Sims, Seed
@@ -149,7 +149,7 @@ seit dem Einfrieren (2026-08-26) haben den Anker NICHT bewegt. Artefakte:
 
 Der Phantom-Fix A2 (`PREREG_code_cleanup_closeout.md` par.3/par.8) hat den lebenden hv1 vom
 Artefakt `hv1_anchor` entfernt (Drift ROT ab Schritt 99, Gegenprobe ohne A2 gruen). Nutzer-
-Entscheid: Anker neu gesetzt. Seitdem ist `models/frozen_heuristics/hv1_anchor_v2` der
+Entscheid: Anker neu gesetzt. Seitdem ist `models/frozen_heuristics/hv4_anchor` der
 Fixpunkt (Segment 2, eigenes Register; Alt-Register `archive/elo_history_pre_phantomfix.csv`).
 `hv1_anchor` bleibt als historisches Artefakt liegen. Beide Modi gegen v2 am 2026-09-12 GRUEN
 (`anchor_v2_drift_live_wheel_20260912.json`, `anchor_v2_conservation_20260912.json`).

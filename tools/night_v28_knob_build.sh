@@ -3,7 +3,7 @@
 # (round_estimate K4, Rueckgabe-Reihenfolge, Startslot P0/P1) in EINEM Wheel. Tore, alle mit
 # Default 0/ungesetzt: cargo-Lib-Tests (darunter Kontrakt-Hash-Literal und die Netz-Paritaets-
 # Fixture des amtierenden Champions, erwartet UNVERAENDERT), Beispiele/Benches (--no-run), dann
-# Anker-Drift UND Konservierung gegen hv1_anchor_v2 (CLAUDE.md "Nach jeder Engine-Aenderung").
+# Anker-Drift UND Konservierung gegen hv4_anchor (CLAUDE.md "Nach jeder Engine-Aenderung").
 # Rauchtest der Startslot-Sonde am Ende. Volllast: NUR bei freier Maschine starten.
 # Aufruf: bash tools/night_v28_knob_build.sh   (Hintergrundaufgabe, keine Pipe)
 set -uo pipefail
@@ -31,11 +31,11 @@ RC=$?; echo "   pip Exit $RC ($(date +%H:%M:%S))"; [ $RC -eq 0 ] || exit 24
 sha256sum "$WHEEL"
 python -X utf8 -c "import mosaic_rust as mr, json; c=json.loads(mr.engine_config_json()); print('contract_hash', c['contract_hash'], 'input_size', c.get('input_size'))"
 
-echo "== 4) Anker-Drift (Live-Wheel gegen hv1_anchor_v2) $(date +%H:%M:%S)"
-python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv1_anchor_v2 \
+echo "== 4) Anker-Drift (Live-Wheel gegen hv4_anchor) $(date +%H:%M:%S)"
+python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor \
   --out "$ART/anchor_drift_live_wheel_20260912_knobs.json"
 RC=$?; echo "   Drift Exit $RC ($(date +%H:%M:%S))"; [ $RC -eq 0 ] || { echo "STOPP: Anker-Drift ROT -- Nutzer-Entscheid, keine Reparatur"; exit 25; }
-python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv1_anchor_v2 --venv \
+python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --venv \
   --out "$ART/anchor_conservation_artifact_wheel_20260912_knobs.json"
 echo "   Konservierung Exit $? ($(date +%H:%M:%S))"
 

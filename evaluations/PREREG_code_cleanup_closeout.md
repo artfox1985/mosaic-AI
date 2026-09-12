@@ -163,7 +163,7 @@ bewusst neu gesetzt. Verfahren nach dem Praezedenzfall `PREREG_round5_minfix_elo
 par.2/par.3/par.5 (Neuverankerung 2026-08-21): ein NEUES Leitersegment, Kanten ueber die
 Grenze werden nie gemischt.
 
-1. **Neues Anker-Artefakt `models/frozen_heuristics/hv1_anchor_v2`**: hv1 mit dem Wheel, das
+1. **Neues Anker-Artefakt `models/frozen_heuristics/hv4_anchor`**: hv1 mit dem Wheel, das
    A2 traegt (Stand `2a0cf4b` plus Wheel-Bau vom 2026-09-12), Golden-Probe wie beim ersten
    Artefakt (10 Partien, 600 Sims, Seed 20260826, 11 Threads; `tools/freeze_heuristic.py`).
    `hv1_anchor` bleibt als historisches Artefakt liegen (Bezug des Alt-Registers). Drift-Pruefung
@@ -171,7 +171,7 @@ Grenze werden nie gemischt.
 2. **Register**: `evaluations/elo_history.csv` wird nach `archive/elo_history_pre_phantomfix.csv`
    verschoben (git mv, Teil des Nutzer-Entscheids "setz den anker neu"), eine frische
    `elo_history.csv` beginnt mit den Neuverankerungs-Kanten. `tools/elo_tracker.py`:
-   `ANCHOR_NAME = "Heuristik_hv1_anchor_v2"`, keine Aliase (der alte Anker ist ein anderer
+   `ANCHOR_NAME = "Heuristik_hv4_anchor"`, keine Aliase (der alte Anker ist ein anderer
    Spieler auf einer anderen Engine).
 3. **Neuverankerungs-Kanten, alle auf der A2-Engine** (Kandidaten als ONNX plus Champion-Spec
    auf dem lebenden Wheel; `models/alphazero_v27-b01_brierbest.onnx` ist sha256-identisch mit
@@ -179,9 +179,9 @@ Grenze werden nie gemischt.
 
    | Kante | n | Werkzeug |
    | --- | --- | --- |
-   | v28-b02@400 gegen hv1_anchor_v2@150 | 150 fest, kein Fruehstopp, Seed-Basis 900001 | `frozen_referee_match.py` (Anker aus dem Artefakt, 6 Worker) |
-   | v28-b01@400 gegen hv1_anchor_v2@150 | 150, dito | dito |
-   | v27-b01@400 gegen hv1_anchor_v2@150 | 150, dito | dito |
+   | v28-b02@400 gegen hv4_anchor@150 | 150 fest, kein Fruehstopp, Seed-Basis 900001 | `frozen_referee_match.py` (Anker aus dem Artefakt, 6 Worker) |
+   | v28-b01@400 gegen hv4_anchor@150 | 150, dito | dito |
+   | v27-b01@400 gegen hv4_anchor@150 | 150, dito | dito |
    | v28-b02@400 gegen v27-b01@400 | 200 Paare mit Logs, Seed 20261044, Blockgroesse 5 | `paired_gating.py` |
 
    Kosten: 3 x rund 22 min + 86 min (ANNAHME aus `docs/measured_runtimes.md`). Erwartung: die
@@ -200,9 +200,9 @@ n=150 fest, Seed-Basis 900001, 6 Worker:
 
 | Kante | Ergebnis | Wanduhr | Elo im Segment 2 (nach 3 Kanten) |
 | --- | --- | --- | --- |
-| v28-b02@400 gegen hv1_anchor_v2@150 | 126:24 | 1.441 s | 1288 [1220, 1382] |
-| v28-b01@400 gegen hv1_anchor_v2@150 | 132:18 | 1.491 s | 1346 [1271, 1458] |
-| v27-b01@400 gegen hv1_anchor_v2@150 | 124:26 | 1.489 s | 1271 [1207, 1357] |
+| v28-b02@400 gegen hv4_anchor@150 | 126:24 | 1.441 s | 1288 [1220, 1382] |
+| v28-b01@400 gegen hv4_anchor@150 | 132:18 | 1.491 s | 1346 [1271, 1458] |
+| v27-b01@400 gegen hv4_anchor@150 | 124:26 | 1.489 s | 1271 [1207, 1357] |
 
 Report ohne "NICHT mit Anker verbunden" (geprueft `tools/elo_tracker.py report`). Die Reihung
 aus Punkt 3 (v27-b01 < v28-b01 <= v28-b02) haelt nur zur Haelfte: v28-b01 liegt in diesem
@@ -269,9 +269,9 @@ Cross-Aera, Golden-Selbsttests gruen):**
 
 | Kante | korrekt (@150/0,3) | Morgenfassung (@400/1,5, archiviert) | Wanduhr |
 | --- | --- | --- | --- |
-| v28-b02@400 gegen hv1_anchor_v2@150 | **126:24** | 126:24 | 1.472 s |
-| v28-b01@400 gegen hv1_anchor_v2@150 | **126:24** | 132:18 | 1.460 s |
-| v27-b01@400 gegen hv1_anchor_v2@150 | **122:28** | 124:26 | 1.444 s |
+| v28-b02@400 gegen hv4_anchor@150 | **126:24** | 126:24 | 1.472 s |
+| v28-b01@400 gegen hv4_anchor@150 | **126:24** | 132:18 | 1.460 s |
+| v27-b01@400 gegen hv4_anchor@150 | **122:28** | 124:26 | 1.444 s |
 
 Kontrolle, dass die Parameter ankamen (Regel 0, weil v28-b02 dieselbe Summe wie morgens hat):
 keine der 150 Partien ist identisch (Punkte und Schrittzahl je Seed verglichen), die Worker-
@@ -283,13 +283,13 @@ Register nach den Anker-Kanten und fuenf Sprossen: v28-b02 1294 [1244, 1354], v2
 hv2 818 (nur zwei Frueh-Stopp-Kanten, direkte Anker-Kante laeuft).
 
 **hv2 GEGEN ANKER (16:15-16:18, `night_ladder_missing_edges.sh` Teil B):** hv2_generator@150 gegen
-hv1_anchor_v2@150, beide c_puct 0,3, drei Bloecke bis zum Deckel ohne Frueh-Stopp (27:23, 29:21,
+hv4_anchor@150, beide c_puct 0,3, drei Bloecke bis zum Deckel ohne Frueh-Stopp (27:23, 29:21,
 21:29) = **77:73 aus 150, p 0,81**: hv2 und hv1 sind im Segment 2 gleich stark (hv2 972
 [921, 1022]). Die Segment-1-Zahl 1100 fuer `Heuristik_v2huelle` (2026-08-25, ueber v21 gemessen)
 haelt fuer das Artefakt hv2_generator nicht; ob beides derselbe Spieler ist, bleibt ungeprueft
 (`PREREG_difficulty_levels.md` Stufe 0b). **Cross-Aera (Nutzer-Rueckfrage 17:20):** das hv2-Artefakt
 ist vom 2026-08-26 (Wheel aus 40600ba, Kontrakt a3f61f24) und traegt den Phantom-Fix A2 vom
-2026-09-12 NICHT, der Anker hv1_anchor_v2 schon; ein hv2-Wheel mit A2 ist nicht baubar, der
+2026-09-12 NICHT, der Anker hv4_anchor schon; ein hv2-Wheel mit A2 ist nicht baubar, der
 hv2-Zweig ist seit 2026-08-26 aus dem Quellstand entfernt. hv2 ist damit dauerhaft ein Knoten der
 Aera vor A2 (wie die Netz-Artefakte v21-v27 mit ihren eigenen Wheels), und die Aussage lautet
 genau: hv2 ohne A2 gegen hv1 mit A2 = 77:73. Folge: die Anfaenger-Stufe der Schwierigkeitsleiter
@@ -311,7 +311,7 @@ gegen den Anker schon gesaettigt).
 | v26-b01@400 | 1251 | [1188, 1316] | 250 |
 | v24-b07@400 | 1184 | [1134, 1236] | 400 |
 | v21_2d_brierbest@400 | 1157 | [1100, 1215] | 250 |
-| Heuristik_hv1_anchor_v2@150 | 1000 | fix | 650 |
+| Heuristik_hv4_anchor@150 | 1000 | fix | 650 |
 | Heuristik_hv2_generator@150 | 987 | [941, 1033] | 300 |
 
 Lesart: die Leiter traegt jetzt auf Kanten im 57-77-%-Bereich (v24-b07 gegen v21, v26 gegen
@@ -320,6 +320,13 @@ Heuristiken 82-90 %. Der Abstand v28-b02 zu v27-b01 (+43) ist der der drei Nachb
 haengt nur an der Anker-Kante und ist damit die unschaerfste Zahl. Frueh-Stopp-Kanten sind im
 Register als solche markiert. Alle Segment-2-Zahlen in STATUS, README und dem Artefakt-Manifest
 sind auf diesen Stand gezogen; die Vorlaeufigkeits-Markierung entfaellt.
+
+**UMBENENNUNG 17:40 (Nutzer: "das benennst mir um auf hv4"):** das Anker-Artefakt hv1_anchor_v2
+heisst jetzt `models/frozen_heuristics/hv4_anchor`, der Elo-Knoten `Heuristik_hv4_anchor@150`
+(Register-Zeilen und Archiv umgeschrieben, ANCHOR_NAME in `tools/elo_tracker.py`). Lesart der
+Nummern: hv1 = Heuristik ohne Fix (Segment-1-Anker `hv1_anchor`), hv2 = Huellen-Lehrer ohne Fix,
+hv3 = Huellen-Lehrer mit Phantom-Fix (im Bau), hv4 = hv1-Code mit Phantom-Fix (der heutige Motor).
+Das Spec-Schluesselwort `heuristik_variante: hv1` bleibt, jede Champion-Spec traegt es.
 
 **AUFLOESUNG DER LEITER, Nutzer-Entscheide 17:20-17:30:** (1) alle Kanten zum Anker sind
 gesaettigt (81-90 %), die Luecke 1000-1157 (Heuristiken bis v21) hat keine Sprosse; (2) hv2 ist
