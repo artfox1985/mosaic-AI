@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEBAUT und im Wheel seit 2026-09-12 (Diagnoseknopf MOSAIC_START_SLOT_P0/P1, gepaarte Heuristik-Sonde, par.8), volle Messung LAEUFT (Sims-Stufen 25/400). Waechter nach Nutzer-Entscheid Weg 3: dazu hv2-Artefakt per Referee als Gegenprobe (Schalter im Bau). Plattenwahl (par.6a) EINGETAKTET im v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Die Startkuppel ist ein 108-Wege-Entscheid und legt die Brettgeometrie fest; gelegt wird sie von einer Handheuristik, das Trainingsziel ist ein One-Hot darauf. Lohnt es, den Zug zu befreien? | Beleg: Stufe 0 GEMESSEN 2026-09-12 (par.9): SPANNE GROSS, Lesart (a). hv1@400, 60 Partien je Slot gepaart: Margin +1,5 (Slot 0) bis -12,4 (Slot 7), Spannweite 13,9 Punkte, Reihe 2 kostet 11-13 Punkte gegen Slot 0 (KI schliesst 0 aus); Rangfolge ueber die Sims-Stufen stabil (Spearman 0,85, kippt nicht). hv2-Gegenprobe (Weg 3) laeuft. Naechste Stufe par.2a/par.5 nach Nutzer-Entscheid; Plattenwahl (par.6a) im v29-Begleitprogramm. -->
 
 # Vorregistrierung: Wahl der Startkuppel
 
@@ -326,3 +326,68 @@ in dieser Sitzung gemessen; fuenf neue Tests im Modul `start_slot_tests` (`self_
 sind geschrieben, nicht gelaufen. Rauchtest vorgesehen: `--limit 4 --pairings 25 --threads 4`.
 
 **Kompiliert und im Wheel (Nachtrag 03:50):** Bau-Tor 2026-09-12, 03:44-03:48 (`tools/night_v28_knob_build.sh`, Artefakte `anchor_drift_live_wheel_20260912_knobs.json` / `anchor_conservation_artifact_wheel_20260912_knobs.json`): `cargo test --release --lib` 601 gruen (84 s; darunter Kontrakt-Hash-Literal 39648b95bbba1acf und die Netz-Paritaets-Fixture des Champions UNVERAENDERT), Beispiele/Benches kompilieren, Wheel gebaut und installiert (Kontrakt 39648b95bbba1acf, INPUT_SIZE 755), Anker-Drift gegen hv1_anchor_v2 GRUEN und Konservierung GRUEN, Konventions-Check gruen. Zwei Nachbesserungen beim Bau: `#![recursion_limit = "256"]` in lib.rs (das `json!`-Literal von `engine_config_json` riss das Makro-Limit) und die Lesestelle der Startslot-Knoepfe als zwei Literal-Aufrufe (Registratur-Scanner). Alle neuen Knoepfe stehen damit auf Default im Wheel, das die Promotion v28-b02 einfriert. Rauchtest der Sonde (`--limit 4 --pairings 25 --threads 4`, Artefakt `start_dome_slot_probe_smoke.json`): 36 Partien in 18,7 s (0,52 s je Partie @25 Sims, 4 Threads), 0 Partien ohne rekonstruierbares Log, Punkte und Margin variieren je Slot bei gleichen Seeds (n=4, keine Aussage). Der Waechter braucht zwei Paarungen und war im Rauchtest nicht erhoben. Nachgeruestet 03:55, NOCH NICHT gelaufen: `slot_kontrolle` je Slot (gelegter Slot aus der START_TILE-Logzeile gegen den erzwungenen; Abweichungen = Rueckfall auf den Bestand bei belegtem Slot). Volle Messung (60 Partien je Slot, Paarungen 25 und 400 Sims) nach der Master-Kette, exklusiv.
+
+## par.9 ERGEBNIS STUFE 0 (2026-09-12, 11:43-11:51, `tools/night_v28_third_seed.sh` Teil 2)
+
+`tools/probes/start_dome_slot_probe.py`, Defaults: netzfrei, Heuristik-MCTS hv1 auf beiden
+Seiten, `mosaic_rust.arena_match(log_games=True)`, Seed-Basis 20260912, 60 Partien je Slot und
+Paarung, Partie i in allen neun Slots derselbe Seed (gepaart), Startspieler alterniert; Spieler 0
+mit erzwungenem Slot (`MOSAIC_START_SLOT_P0`), Spieler 1 Bestand. Grundmenge je Zeile: 60 Partien
+des Slots, Sicht Spieler 0, Einheit je Partie. 1.080 Partien in 429,7 s (threads 0 = alle
+Kerne, 0,40 s je Partie). Slot-Kontrolle: in JEDEM Slot 60/60 Partien im erzwungenen Slot, der
+Knopf greift (Umgebungsvariable aus Python fuer das Rust-`env::var` sichtbar, damit belegt).
+Artefakt `start_dome_slot_probe.json`.
+
+**Paarung hv1@400 gegen hv1@400 (Hauptmessung):**
+
+| Slot (r,c) | Punkte | Margin | KI95 Margin | volle Spalten | Strafpunkte | Slot-Kontrolle |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 (0,0) | 48.5 | +1.5 | [-4.1; +7.0] | 0.133 | 10.35 | 60/60 |
+| 1 (0,1) | 47.7 | -0.1 | [-6.1; +5.8] | 0.133 | 12.67 | 60/60 |
+| 2 (0,2) | 43.2 | -3.4 | [-7.9; +1.2] | 0.150 | 12.92 | 60/60 |
+| 3 (1,0) | 41.7 | -3.8 | [-8.9; +1.3] | 0.183 | 10.47 | 60/60 |
+| 4 (1,1) | 43.8 | -3.0 | [-7.7; +1.6] | 0.117 | 9.98 | 60/60 |
+| 5 (1,2) | 41.2 | -7.0 | [-11.6; -2.4] | 0.150 | 10.85 | 60/60 |
+| 6 (2,0) | 33.6 | -11.4 | [-15.9; -6.9] | 0.133 | 13.42 | 60/60 |
+| 7 (2,1) | 33.8 | -12.4 | [-16.9; -7.8] | 0.083 | 14.12 | 60/60 |
+| 8 (2,2) | 34.0 | -11.4 | [-16.6; -6.2] | 0.083 | 14.05 | 60/60 |
+
+Spannweite: Punkte 14.9 (bester Slot 0, schlechtester 6),
+Margin 13.9; Rangfolge nach Margin [0, 1, 4, 2, 3, 5, 6, 8, 7].
+Gepaart gegen Slot 0: Slots 6/7/8 (Reihe 2) -12,9 / -13,9 / -12,9 Punkte Margin, Slot 5 -8,5,
+Slots 2/3/4 (Reihe 1) -4,5 bis -5,3, Slot 1 -1,6.
+
+**Paarung hv1@25 gegen hv1@25 (Faehigkeitsstufe des Waechters):**
+
+| Slot (r,c) | Punkte | Margin | KI95 Margin | volle Spalten | Strafpunkte | Slot-Kontrolle |
+| --- | --- | --- | --- | --- | --- | --- |
+| 0 (0,0) | 41.8 | +1.9 | [-2.1; +5.8] | 0.067 | 14.23 | 60/60 |
+| 1 (0,1) | 43.2 | +4.9 | [+0.1; +9.7] | 0.050 | 12.20 | 60/60 |
+| 2 (0,2) | 40.7 | -0.8 | [-5.6; +3.9] | 0.050 | 12.38 | 60/60 |
+| 3 (1,0) | 39.0 | -3.3 | [-8.9; +2.2] | 0.050 | 13.05 | 60/60 |
+| 4 (1,1) | 39.5 | -1.0 | [-5.5; +3.6] | 0.083 | 14.40 | 60/60 |
+| 5 (1,2) | 36.3 | -2.5 | [-7.8; +2.8] | 0.100 | 15.22 | 60/60 |
+| 6 (2,0) | 34.8 | -3.1 | [-7.5; +1.3] | 0.183 | 16.75 | 60/60 |
+| 7 (2,1) | 35.8 | -3.5 | [-8.4; +1.4] | 0.150 | 16.23 | 60/60 |
+| 8 (2,2) | 36.8 | -2.5 | [-7.0; +2.0] | 0.100 | 16.12 | 60/60 |
+
+Spannweite Punkte 8.4, Margin 8.3; Rangfolge [1, 0, 2, 4, 5, 8, 6, 3, 7].
+
+**Waechter (Sims-Stufen, Ersatz nach par.8):** Spearman der Slot-Margins 25 gegen 400 Sims =
+**0,85**, `kippt = False`; bester Slot 1 (@25) bzw. 0 (@400), beide Reihe 0, die drei Slots der
+Reihe 2 in beiden Stufen am Ende. Die Rangfolge ist eine Eigenschaft der Position, nicht der
+Faehigkeit; die hv2-Gegenprobe ueber den Referee (Weg 3) folgt als zweiter Waechter.
+
+**Lesart nach par.4: SPANNE GROSS, Lesart (a).** Die Startkuppel ist kein Zufallszug: die obere
+Reihe des 3x3-Rasters ist 11-13 Punkte Margin besser als die untere (Intervalle der Reihe-2-Slots
+schliessen 0 aus, Slot 0 gegen Slot 6/7/8 gepaart), und der Effekt WAECHST mit der Suchtiefe
+(Spannweite 8,3 @25 gegen 13,9 @400). Damit lohnen par.2a (maskierter Ownership-Kopf) und par.5
+(Exploration und Konsumform) grundsaetzlich; was die Handregel heute waehlt (Slotverteilung des
+unerzwungenen Spielers 1), ist in diesem Artefakt NICHT erhoben und die naechste billige Frage:
+liegt die Handregel schon in Reihe 0, ist der Hebel klein; liegt sie verteilt, sind bis zu 10
+Punkte Margin je Partie offen. Nichts davon ist gebaut; Nutzer-Entscheid.
+
+Randbedingungen: netzfrei (das Netz benutzt dieselbe Handregel `choose_start_placement`, der
+Befund gilt fuer seine Startsetzung ebenso, aber die Kosten eines Slots koennen unter Netz-Suche
+anders liegen, ungemessen); Sicht Spieler 0 auf Brett 0, Spieler 1 immer Bestand; Zeilen-/
+Spaltenindex des 3x3-Rasters wie `board.rs::empty_slots` (r aussen, c innen).
