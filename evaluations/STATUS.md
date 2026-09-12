@@ -19,8 +19,12 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 ## 1. UEBERGABE an die naechste Sitzung (2026-09-10, 23:55)
 
 **Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12, 06:17-06:45),
-Elo 1296** [1242, 1354] aus 930 Partien im LEITERSEGMENT 2 (Anker `hv1_anchor_v2` fix 1000;
-Leiter `v28-b01` 1346 (eine Kante), `v27-b01` 1264, `v26-b01` 1171). Promotion vollstaendig nach
+Elo im LEITERSEGMENT 2 VORLAEUFIG** (Anker `hv1_anchor_v2` fix 1000): die drei Anker-Kanten der
+Nacht liefen mit falschen Anker-Parametern (@400, c_puct 1,5 statt @150/0,3; Zeilen in
+`../archive/elo_history_segment2_anchor_mislabelled.csv`) und werden seit 11:51 korrekt
+wiederholt (`tools/night_ladder_rungs.sh`, danach Zwischenstufen hv2/v24-b07/v26-b01, Nutzer:
+Anker-Kanten gesaettigt). Letzter Stand mit den falschen Kanten: v28-b02 1299 [1244, 1359]
+aus 1.330 Partien, v27-b01 1262, v26-b01 1173, v28-b01 1346. Promotion vollstaendig nach
 Checkliste (Anker 126:24, Nachbar 133:97 SPRT + Replikation 212:188 ohne Entscheid, Champion-2
 101:49 gegen Artefakt v26-b01, sigma/Prior 2,222, Platt in server.py, Fixture e1f94c44f0c7959b,
 Artefakt `models/frozen_champions/v28-b02/` mit Wheel vom Knopf-Durchgang, Golden Probe 10

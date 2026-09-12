@@ -66,7 +66,8 @@
       "v27-b01": 1262,
       "v26-b01": 1173,
       "anchor": 1000
-    }
+    },
+    "vorlaeufig": "2026-09-12 12:10: die drei Anker-Kanten des Segments 2 liefen mit Anker @400/c_puct 1,5 statt @150/0,3 und wurden aus dem Register genommen; Wiederholung mit korrekten Parametern plus Zwischenstufen laeuft (tools/night_ladder_rungs.sh). Die Zahlen hier stammen aus dem Fit MIT den falschen Kanten und werden nachgezogen."
   },
   "golden_probe": {
     "file": "golden_probe.json",
