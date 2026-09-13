@@ -349,9 +349,11 @@ wurde. Die Regel stand vorher nur im Gedächtnis und hat dort nicht gegriffen.
 
 ## Nach jeder Engine-Aenderung: Anker-Invarianz pruefen (Nutzer-Anweisung 2026-08-31)
 
-Die Elo-Leiter haengt an EINEM Fixpunkt, und der ist seit dem 2026-08-31 das
-eingefrorene Artefakt `models/frozen_heuristics/hv1_anchor` (`ANCHOR_NAME` in
-`tools/elo_tracker.py`). Der lebende Heuristik-Pfad ist eine
+Die Elo-Leiter haengt an EINEM Fixpunkt, und der ist seit der Neuverankerung am
+2026-09-12 das eingefrorene Artefakt `models/frozen_heuristics/hv4_anchor`
+(Leitersegment 2, `ANCHOR_NAME` in `tools/elo_tracker.py`). Davor war es
+`hv1_anchor` (seit 2026-08-31); dieses Artefakt ist am 2026-09-13 geloescht
+worden und liegt nur noch im restic-Repo. Der lebende Heuristik-Pfad ist eine
 ENTWICKLUNGSUMGEBUNG, kein Vergleichswert: er wird weiterentwickelt und darf
 sich bewegen. Ein Fixpunkt, der sich bewegen darf, ist keiner.
 

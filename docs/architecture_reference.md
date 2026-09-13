@@ -36,7 +36,9 @@ gefehlt: die Kanalzahl war beim Uebertrag ueberholt (siehe unten).
   **kein geloestes Endspiel** (~3 Halbzuege, Orakel-Uebereinstimmung 81,4
   Prozent). Der frueher hier genannte zweite, eingefrorene Loeser
   `round5_anchor.rs` ist mit B4b **entfernt** (2026-08-27); der Anker-Schutz
-  liegt seither im Artefakt `models/frozen_heuristics/hv1_anchor`, und eine
+  liegt seither in einem eingefrorenen Heuristik-Artefakt, aktuell
+  `models/frozen_heuristics/hv4_anchor` (Neuverankerung 2026-09-12; das
+  vorherige `hv1_anchor` ist seit 2026-09-13 geloescht), und eine
   Anker-Messung laeuft ueber `tools/anchor_arena.py`.
 - **Der Stapelzug wird gesammelt aufgeloest**
   (`self_play.rs::resolve_and_apply_stack_draw`, Default-Pfad): die Suche

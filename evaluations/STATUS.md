@@ -137,10 +137,18 @@ beiden Regelbefunde aus par.16/16a), `claude_play_interface`, `round_estimate_le
 5. **`-Deep`-Lauf der Backup-Verifikation**: `verify_backup.ps1` empfiehlt ihn vor der ersten
    Loeschung; am 2026-09-13 auf Nutzer-Entscheid nicht gefahren.
 
-6. **Textverweise auf `hv1_anchor` nachziehen** (das Artefakt ist geloescht): CLAUDE.md
-   Abschnitt Anker-Invarianz, `docs/working_rules.md` Z.50, `docs/generation_naming.md` Z.68,
-   `docs/architecture_reference.md` Z.39, Docstrings `tools/verify_frozen_heuristic.py` Z.31/33
-   und `tools/anchor_arena.py` Z.8, Skill `mosaic-anchor-invariance`.
+6. ~~Textverweise auf `hv1_anchor` nachziehen~~ **ERLEDIGT 2026-09-13, 13:35** fuer die
+   Stellen, die aktiv fehlleiteten: CLAUDE.md (Anker-Invarianz nennt jetzt `hv4_anchor` als
+   Fixpunkt seit der Neuverankerung), `docs/working_rules.md`, `docs/architecture_reference.md`,
+   `docs/generation_naming.md`. **Offen und ein echter Befund:** drei Sonden greifen direkt auf
+   das geloeschte Artefakt zu und laufen nicht mehr --
+   `tools/probes/anchor_referee_parity_probe.py`, `frozen_agent_referee_probe.py`,
+   `frozen_worker_protocol_probe.py`. Sie tragen jetzt einen Hinweis statt eines kryptischen
+   Abbruchs. Eine Umstellung auf `hv4_anchor` braucht NEUE Erwartungswerte (die hartkodierten
+   gelten fuer hv1, z. B. `scores [27, 15], steps 159`), also einen Lauf -- Nutzer-Entscheid, ob
+   das lohnt oder ob die drei als historisch entfallen. Verweise, die bewusst die VERGANGENHEIT
+   beschreiben (`docs/promotion_checklist.md` Z.34, die Historien-Kommentare in
+   `tools/elo_tracker.py`, das Beispiel in `tools/freeze_heuristic.py`), bleiben unveraendert.
 
 7. **Skala des Rundenschaetzers** (`round_estimate_leaf_term`): Vorschlag (a) je Runde,
    (b) 9,25 auf Zuruf. Aus dem v28-Programm uebernommen, unveraendert offen.
