@@ -18502,3 +18502,60 @@ Nachgezogen im selben Zug: par.8e-Ergebnis samt Zeile-1-Kopf und Index, sieben L
 `docs/measured_runtimes.md`, Sockel-Vorschlag und korrigierter Tor-0/Tor-2a-Hinweis in
 `PREREG_v29_window.md` P2 (die Uebergabe hatte die Richtung falsch herum erwartet),
 `docs/generation_loop.md` (Kurvenform am Champion, Betriebsart zaehlt mit), STATUS Abschnitt 1.
+
+### 2026-09-13, 12:00-12:55 -- Generationswechsel v28 auf v29: Erzeugung laeuft, Aufraeumen durch
+
+**Die v29-Erzeugung laeuft seit 12:08** auf dieser Maschine, gestartet vom Nutzer in einem eigenen
+Fenster (nicht ueber die Sitzung, damit sie nicht am Harness haengt -- Lehre vom Harness-Stopp am
+2026-09-05). Drei Klassen nacheinander, Generator `v28-b02`, alle bei **100 Sims**:
+Sockel policy-aktiv (Seed 20260920), Schwarm temperiert (20260921), Schwarm mit Ausflug (20260922).
+Erwartet rund 10,8 h. Der Sockel war zwischenzeitlich auf 400 Sims entschieden und ist auf
+Nutzer-Wunsch wieder bei 100 gelandet, womit das Fenster nur EINEN Betriebspunkt mischt und die
+Bezugswerte von Tor 0 / Tor 2a direkt vergleichbar bleiben.
+
+**`MOSAIC_STACK_DRAW_RESEARCH=1` ist erstmals belegbar gesetzt.** Das Manifest des laufenden
+Sockels (`data/manifest_v28-b02-policy_20260913_120816.json`) zeigt `stack_draw_research: True`.
+Bis heute frueh stand der Knopf in keinem Erzeugungsskript und in keinem Manifest.
+
+**Ein zweiter Manifest-Befund, vom Agenten gefunden und nachgeprueft:** `engine_config` meldet fuer
+vier Rezept-Felder den Env-Default statt des wirksamen Spec-Werts (`envelope_search_c` 0,0 statt
+1,0; `envelope_projection_mode` 0 statt 1; `envelope_hull_form` 1 statt 2; `special_row6_w` 0,0
+statt 1,0), weil `lib.rs` Z.801/807/812/815 `SearchConfig::from_env()` lesen, die Werte aber per
+`--spec`-Datei reisen. Die Nutzer-Hypothese ("die spec wurde immer nur kopiert") traegt und
+entschaerft es: die Spec-Datei hat genau EINEN Commit (d0cbfa3) und ist unveraendert, jedes
+Manifest nennt ihren Pfad -- **kein Belegverlust**. Die zuerst notierte Behauptung, ein Lauf ohne
+Spec sei nicht unterscheidbar, war zu scharf und ist korrigiert: `cli_args.spec` waere dann leer.
+Offen als Aufraeumarbeit: Spec-Inhalt plus sha256 zusaetzlich ins Manifest.
+
+**Aufgeraeumt (Schritte 3 bis 5 des Generationswechsels), alles mit restic-Beleg aus Snapshot
+`a36bc301` (daily, 12:03, 5.788 Dateien, 8,98 GiB, Verifikation gruen):**
+
+| Gruppe | Umfang | Beleg |
+| --- | --- | --- |
+| 54 obsolete Ketten-Skripte in `tools/` | 61 auf 7 Skripte | 60 im Snapshot, Rest in git |
+| `frozen_champions/` v21_2d_brierbest, v24-b07, v26-b01 | 489 MB | je 7-8 Substanzdateien im Snapshot |
+| `frozen_heuristics/hv1_anchor` | 94 MB | 6 Dateien |
+| `models/restored_v24` | 23 MB | 2 Dateien |
+| flache Arme v28-b03, v28-b04, v24-b06, v25-b01 | 160 MB, 30 Dateien | 10/10/5/5, alle mit `run:`-Marke |
+| `selfplay_v25-b01-*` (aus der Fensterrotation) | 801 Dateien, 0,76 GB | 801 im Snapshot |
+| `selfplay_depth*-v28b02_*` (Messmaterial der Sims-Kurve) | 80 Dateien, 0,08 GB | 80 im Snapshot |
+
+`models/` faellt von 1,6 GB auf 818 MB, `data/` von 10,6 auf 9,2 GB.
+
+**Eine Falle, die beim Beleg auffiel:** die Trefferzahl im Snapshot ist je Artefakt einstellig,
+im Baum stehen aber Tausende Dateien. Grund ist die `venv/` in jedem Artefakt, die das Backup
+ausschliesst -- sie ist aus dem mitgesicherten Wheel reproduzierbar
+(`verify_frozen_heuristic.py --build-venv`). Gesichert sind genau die Substanzdateien: Modell,
+Spec, Wheel, Manifest, Golden-Probe, wheel.sha256. Wer kuenftig Trefferzahlen gegen Dateizahlen
+haelt, muss das wissen, sonst sieht ein vollstaendiges Backup nach Luecke aus.
+
+**BEHALTEN, bewusst:** die Manifeste der geloeschten Korpora (`manifest_v25-b01-*`) -- sie sind
+der Laufzeit-Beleg fuer `docs/measured_runtimes.md` und kosten nichts. Ebenso `restored_v22`
+(traegt den aktiven Leiterknoten v22-b05) und die Huellen-Lehrer hv2/hv3 (Sprossen und
+Anfaenger-Stufe der Schwierigkeitsleiter).
+
+**NOCH OFFEN:** Cache-Bloecke und Monolithe (4,2 GB in 8 Monolithen, 2,5 GB in rund 5.800
+Bloecken). Der Ablauf verlangt das Waisen-Inventar NACH der Korpus-Loeschung, und die Fensterliste
+der naechsten Generation steht erst, wenn die Erzeugung durch ist. Ebenfalls offen: der
+`-Deep`-Lauf der Backup-Verifikation, den `verify_backup.ps1` vor der ersten Loeschung empfiehlt
+und der hier auf Nutzer-Entscheid nicht gefahren wurde.

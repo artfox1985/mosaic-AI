@@ -110,7 +110,18 @@ Uebergabe-Commit: 10 Commits, kein Push (Nutzer pusht selbst).
   Paritaets-Fixture, Manifest-Diff gegen die Referenz (par.4). Loeschliste erst nach dem Start.
 
 - **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden (Nutzer pusht selbst).
-- **Loeschung nur auf pfadgenaue Freigabe.** Freigegebene Loeschliste (Nutzer 2026-09-12, 23:58:
+- **ERLEDIGT 2026-09-13, 12:55: die Loeschliste ist abgearbeitet** (Freigaben des Nutzers 11:58
+  bis 12:50, restic-Beleg je Gruppe aus Snapshot `a36bc301`). Entfernt: `frozen_champions/`
+  v21_2d_brierbest, v24-b07, v26-b01; `frozen_heuristics/hv1_anchor`; `models/restored_v24`;
+  die flachen Arme v28-b03, v28-b04, v24-b06, v25-b01 (30 Dateien); 801 `selfplay_v25-b01-*`
+  und die 80 Messdateien `selfplay_depth*-v28b02_*`. `models/` 1,6 GB -> 818 MB, `data/`
+  10,6 -> 9,2 GB. Es bleiben die letzten ZWEI Champion-Artefakte (v28-b02, v27-b01), der Anker
+  hv4, die Lehrer hv2/hv3 und `restored_v22`. **Noch offen:** Cache-Bloecke und Monolithe
+  (4,2 GB in 8 Monolithen, 2,5 GB in rund 5.800 Bloecken) -- das Waisen-Inventar gehoert nach
+  der Erzeugung, weil die Fensterliste der naechsten Generation erst dann steht. Ebenfalls
+  offen: der `-Deep`-Lauf der Backup-Verifikation.
+  Die Text-Verweise auf `hv1_anchor` sind noch NICHT nachgezogen (Fundstellen unten).
+- **Loeschung nur auf pfadgenaue Freigabe.** Erledigte Liste (Nutzer 2026-09-12, 23:58:
   "ich heb mir nur die letzten zwei champs auf. und hv1 ist obsolet. somit brauchen wir nur v28 und
   v27"), aber **"wir loeschen es erst wenn das self play fuer v29 gestartet ist. dann ist es im
   restic daily"** (00:05): `models/frozen_champions/v21_2d_brierbest/`, `v24-b07/`, `v26-b01/`,
