@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 (par.10): acht Asymmetrien, vier GEBAUT (v24-b04, 714 -> 744), elf Stapelwerte (v28-b02, 755); Kriterium Sichtgleichheit (par.1). EINGETAKTET v29-b03 (par.13/15): P.3 Ziehserie, P.7 Phasenaufloesung, P.9 Turm je Farbe (par.14: 106/106 mitrechenbar), P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, P.14 Tiling-Sperre (Record-Feld vor der Erzeugung), P.15 Startspieler (755 -> 794/812). Inventur par.15: P.10 Suchfix im Code (02:35, unkompiliert bis Messende); par.11 offen. -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 (par.10): acht Asymmetrien, vier GEBAUT (v24-b04, 714 -> 744), elf Stapelwerte (v28-b02, 755). EINGETAKTET v29-b03 (par.13/15/16): P.3, P.7, P.9, P.11-P.15 = 39 Werte, INPUT_SIZE 794 ENTSCHIEDEN (par.16: Vorderseiten erst nach dem Aufhoeren bekannt, Design-Bits bleiben draussen). NEU par.16: die AKTIONSLISTE verraet die Designs schon beim Weiterziehen (game.rs:402) -- Netz-sieht-MEHR, ungemessen. P.10-Suchfix im Code, unkompiliert; par.11 offen. -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -761,3 +761,45 @@ Erzeugung vor dem Training"; der Generator deklariert 755 und sieht die neuen We
 **Anschliessend** Bloecke, Training b03, Tor 1 gegen b01, Netz-Gesundheit (par.6d), Registrierung.
 Dieser Punkt ist Arm 3 des v29-Programms (`PREREG_v29_window.md` par.6/par.6c); das
 Begleitprogramm par.7 dort laeuft unabhaengig davon.
+
+## par.16 P.3 GEKLAERT: die Vorderseiten sind erst nach dem Aufhoeren bekannt -- INPUT_SIZE 794, und eine NEUE Netz-sieht-MEHR-Stelle (2026-09-13, 10:45)
+
+**Regelauskunft des Nutzers (autoritativ, auf die Frage aus par.13/Fahrplan Nr. 4): "die
+vorderseiten sind nur bekannt nach dem aufhoeren. beim weiterziehen sind nur die rueckseiten
+bekannt."** Der Code sagt dasselbe: `engine/src/game.rs` Z.134-137 und `engine/src/moves.rs`
+Z.112-117 halten beide fest, dass die Rueckseite NUR den Typ zeigt (Wild/Special), nicht die
+Farbanordnung.
+
+**Folge 1 (Encoder-Zuschnitt, ENTSCHIEDEN): INPUT_SIZE 794, nicht 812.** Die 18 Design-Bits
+"Design liegt gezogen vor mir" bleiben DRAUSSEN. Begruendung: derselbe Encoder kodiert den
+Zustand in beiden Situationen. Nimmt man die Bits auf, sieht das Netz die Designs auch beim
+Entscheid "weiterziehen oder aufhoeren", wo ein Mensch sie nicht hat -- man wuerde also eine
+Sichtluecke schliessen und dabei eine neue Ueberlegenheit aufreissen. Abschnitt 16 bleibt damit
+bei 39 sicheren Werten: P.3 (3), P.7 (6), P.9 (5), P.11 (2), P.12 (18), P.13 (2), P.14 (2),
+P.15 (1). Der Zustand selbst leckt heute nichts: `pending_stack_draw` kommt in
+`engine/src/features.rs` nur in einem Kommentar vor (Z.1435), nicht in der Kodierung.
+
+**Folge 2 (NEUER BEFUND, gehoert zu den Netz-sieht-MEHR-Stellen von par.10): die AKTIONSLISTE
+verraet die Designs, bevor der Spieler sie kennen darf.** Bei nicht-leerem `pending_stack_draw`
+sind laut `game.rs` Z.140-141 keine anderen Drafting-Aktionen legal; die Liste besteht also aus
+`DrawStackPeek` plus den Kandidaten aus `generate_draw_stack_moves`
+(`engine/src/game.rs` Z.402-425). Diese Kandidaten sind je gezogener Platte mal freiem Slot
+erzeugt und **auf mindestens eine legale Rotation gefiltert**
+(`draw_stack_slot_rotation_candidates`) -- und diese Legalitaet haengt an der Farbanordnung,
+also an der Vorderseite. Wer die Aktionsliste sieht, liest daraus ab, welche Designs gezogen
+wurden. Der Mensch am Tisch entscheidet dagegen erst "ich hoere auf", deckt DANN auf und waehlt
+DANN Platte und Slot; die Engine legt beide Schritte in eine Aktion und macht die
+designabhaengige Legalitaet schon vorher sichtbar.
+
+**Einordnung.** Das ist keine Encoder-Frage, sondern eine der Aktionsmodellierung, und damit ein
+Kandidat fuer die Liste in `docs/architecture_reference.md` ("Wo der Code Information absichtlich
+vernichtet" -- hier der umgekehrte Fall: wo er Information PREISGIBT). Nach der Regel aus
+CLAUDE.md ("Symmetrische Defekte sieht keine Arena") ist das eine Korrektheitsfrage, keine
+Elo-Frage: der Vorteil wirkt auf beide Seiten gleich und kuerzt sich in jeder Arena weg.
+
+**NICHT gemessen und NICHT gebaut.** Offen ist, wie stark das wirkt (wie oft steht ueberhaupt
+ein Weiterzieh-Entscheid an, und wie oft unterscheiden sich die Kandidatenmengen zwischen den
+Designs) und was eine Reparatur kosten wuerde (Aufspaltung in "aufhoeren" und danach
+"Platte/Slot waehlen" waere ein Eingriff in die Aktionsmenge und damit in `NUM_ACTIONS` --
+Praezedenz `feedback_num_actions_change_breaks_old_checkpoints`). **Zuschnitt und Prioritaet
+entscheidet der Nutzer**; hier steht nur der Befund.
