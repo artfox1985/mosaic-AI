@@ -129,6 +129,37 @@ Uebergabe-Commit: 10 Commits, kein Push (Nutzer pusht selbst).
 
 ### OFFENE NUTZER-ENTSCHEIDE
 
+- **NEU 2026-09-13, 11:20, STOPP-PUNKT: Anker-Drift nach Wheel 1 ist ROT -- aber als
+  SERIALISIERUNGS-ARTEFAKT bewiesen, nicht als Drift.** Der Anker spielt Zug fuer Zug dieselben
+  Partien. Belege, alle drei geprueft:
+  (a) **Konservierung GRUEN**: das Artefakt-Wheel in der eigenen venv reproduziert die
+  Referenzprobe Feld fuer Feld (1/1 Dateien, 1.763 Schritte,
+  `anchor_conservation_20260913_wheel1.json`) -- die Referenz ist intakt, das Artefakt unversehrt.
+  (b) **Drift ROT** (`anchor_drift_live_wheel_20260913_wheel1.json`), erste Abweichung Schritt 0,
+  Feld `state`.
+  (c) **Gegenprobe** (`anchor_drift_counterproof_20260913_wheel1.json`): Golden-Probe-Rezept mit
+  dem Live-Wheel nachgespielt, Record fuer Record verglichen. Roh weichen 1.763 von 1.763 ab;
+  nach Abzug des `game_id`-Zeitstempels UND des neuen Feldes `tiled_max_row` sind es **0 von
+  1.763**. `completed`-Felder und `scores` sind identisch.
+  **Ursache:** das Pruefwerkzeug vergleicht Feld fuer Feld und kennt additive Felder nicht; seine
+  Referenzprobe stammt vom 2026-09-12, also von vor dem Record-Feld P.14.
+  **Entscheid des Nutzers (CLAUDE.md: ROT ist nie eine Agenten-Reparatur):**
+  A) Golden Probe des Ankers unter dem neuen Format neu aufnehmen, mit der Gegenprobe als
+  Bruecke -- Pruefung bleibt scharf, aber ein eingefrorenes Artefakt wird angefasst.
+  B) Werkzeug alle Feldunterschiede tolerieren lassen -- riskant, versteckt kuenftig echte
+  Aenderungen.
+  C) Record-Feld zuruecknehmen -- dann fehlt P.14 im v29-Korpus und der Sicht-Arm kann das
+  Merkmal nicht lernen.
+  D) (Vorschlag des Koordinators) Werkzeug NUR aufwaerts-tolerant machen: Felder, die im neuen
+  Record NEU sind und in der Referenz fehlen, werden ignoriert und im Artefakt protokolliert;
+  ein VERSCHWUNDENES oder geaendertes Feld bleibt ROT. Das bildet die additive Konvention ab
+  (`project_2d_encoder_must_be_additive`), ohne echte Drifts zu verstecken.
+  **Bis zum Entscheid steht Wheel 1 auf halbem Weg:** Wheel ist gebaut UND installiert
+  (Vertragshash 39648b95bbba1acf unveraendert, input_size 755, neue Manifest-Felder
+  `stack_draw_research`/`stack_draw_reservation` vorhanden), Lib-Tests 637/638 und
+  `--no-run --all-targets` (16 Targets) gruen; offen sind Konventions-Lauf und die bewusste
+  Neuerzeugung der Netz-Paritaets-Fixture.
+
 - **NEU 2026-09-13, 10:35: `MOSAIC_STACK_DRAW_RESEARCH` fuer die v29-Erzeugung -- Vorgabe und
   Praxis widersprechen sich.** `PREREG_chance_nodes.md` Z.1126 schreibt vor, der Knopf "gehoert
   in die Umgebung BEIDER Laeufe (Sockel und Schwarm)", und ihr Verdikt fuehrt ihn als Teil des
@@ -156,7 +187,7 @@ Uebergabe-Commit: 10 Commits, kein Push (Nutzer pusht selbst).
   Details in
   `PREREG_search_depth_column_optimum.md` par.8e, Abschnitt Einschraenkungen.
 
-- **SIMS DES SOCKELS: Messung DURCH, Vorschlag liegt vor, Entscheid offen.** Ergebnis in
+- **SIMS DES SOCKELS: ENTSCHIEDEN 2026-09-13, 11:50 -- 400 Sims** (Nutzer: "Die 100 sims fuer den sockel sind nicht entschieden. Ich nehm 400 und push die policy ein wenig."). Der Koordinator-Vorschlag lautete 100; der Nutzer folgt dem Gegenargument aus den Einschraenkungen (Zielqualitaet statt Zustandsverteilung). **Schwarm bleibt 100.** Kosten Sockel 8,29 h statt 4,40 h, auf der schnelleren Maschine. Erwartete Folge: Tor 0 und Tor 2a des Sockels fallen unter den Bezugswert 0,816 des v28-Generators, das ist der Suchtiefen-Effekt und allein kein Torriss. Offen bleibt nur noch der Startzeitpunkt. Herleitung: Ergebnis in
   `PREREG_search_depth_column_optimum.md` par.8e (vierter Fall: Staerke saettigt bei 400, Korpus
   faellt monoton zugunsten von 100; "eklatant"-Regel 1 von 3, Betriebspunkt 100 bleibt).
   **Vorschlag: Sockel mit 100 Sims, wie der Schwarm** (`PREREG_v29_window.md` P2, dort auch der

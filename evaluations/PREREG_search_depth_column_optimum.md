@@ -1149,7 +1149,24 @@ Betriebspunkts von 100 auf 400):
 Eine von drei Bedingungen. Nach der Regel ("ein Punkt, der nur eine der drei Bedingungen
 erfuellt, ist besser, nicht eklatant") bleibt **100 der Betriebspunkt der Erzeugung**.
 
-**SOCKEL-VORSCHLAG (Pflichtteil, Nutzer 00:40): 100 Sims, wie der Schwarm.**
+**SOCKEL: ENTSCHIEDEN AUF 400 SIMS (Nutzer 2026-09-13, 11:50, woertlich: "Die 100 sims fuer den
+sockel sind nicht entschieden. Ich nehm 400 und push die policy ein wenig.").** Der Nutzer folgt
+damit NICHT dem Vorschlag unten, sondern dem staerksten Gegenargument, das in den
+Einschraenkungen steht: Teil B misst ZUSTAENDE (wie spaltenreich der Korpus ist), nicht die
+QUALITAET der Policy-Ziele. Die Besuchsverteilung einer 400er-Suche ist weniger verrauscht als
+die einer 100er, und der Sockel ist der policy-tragende Teil des Fensters. Beides ist nicht
+gegeneinander gemessen; die Entscheidung wiegt einen gemessenen Nachteil (0,2025 volle Spalten
+je Seite weniger) gegen einen ungemessenen Vorteil (schaerfere Policy-Ziele) ab. Kosten: 8,29 h
+statt 4,40 h fuer 4.000 Partien, auf der schnelleren Maschine des Nutzers.
+
+**Folge, die beim Lesen der Tore zu nennen ist:** Tor 0 und Tor 2a des v29-Sockels werden gegen
+den Bezugswert des v28-Generators (0,816 volle Spalten je Seite) gemessen, der bei 100 Sims
+entstand. Nach der hier gemessenen Richtung ist bei 400 Sims ein NIEDRIGERER Wert zu erwarten,
+und das ist dann KEIN Qualitaetsmangel des Korpus, sondern der bekannte Effekt der Suchtiefe.
+Der Schwarm bleibt bei 100 Sims (Nutzer 02:10), das Fenster mischt also zwei Betriebspunkte.
+
+**Der urspruengliche Vorschlag des Koordinators (ueberholt, zur Nachvollziehbarkeit):**
+100 Sims, wie der Schwarm.
 
 | Variante | s je Partie (gemessen) | 4.000 Partien | Mehrkosten gegen @100 | Volle Spalten je Seite |
 | --- | --- | --- | --- | --- |
@@ -1187,14 +1204,30 @@ nur im Gegner.** Am Code geprueft:
    (`engine/src/self_play.rs` Z.972-995). Die Suche bewertet dort also eine Fortsetzung, die so
    nicht ausgefuehrt wird. Weil Stapelzuege genau die Kuppelplatten und Slots betreffen, aus
    denen Spalten entstehen, ist dieser Unterschied fuer die gemessene Groesse NICHT neutral.
-3. **Zugwahl und Rauschen sind dagegen GLEICH** (entgegen der naheliegenden Vermutung, der
-   Unterschied liege dort): die Arena uebergibt `add_root_noise = false` hart
-   (`self_play.rs` Z.3123 ruft `net_search_drafting_action(..., false, ...)`), Teil B setzt
-   `--no-root-noise`; beide waehlen deterministisch (Arena `select_final_root_child`,
-   Teil B argmax ueber `--deterministic`); beide rufen `net_effective_sims`, und da
-   `USE_GUMBEL_SEARCH` und `DECOUPLE_NET_SIMS_FROM_ACTIONS` beide `true` sind
-   (`net_mcts.rs` Z.3202/3221), gilt beidseitig `base_sims` OHNE Skalierung nach Aktionszahl;
-   der Bauer-Vorzug ist beidseitig an.
+3. **Die finale AUSWAHLREGEL ist NICHT dieselbe** (KORREKTUR 2026-09-13, 12:05, auf Nachfrage des
+   Nutzers: die erste Fassung dieses Punkts behauptete "Zugwahl und Rauschen sind GLEICH" -- das
+   war fuer die Zugwahl falsch und nur fuer das Rauschen richtig). Beide Pfade nehmen zuerst das
+   meistbesuchte Wurzelkind; sie unterscheiden sich, wenn mehrere Kinder DIESELBE Besuchszahl
+   haben:
+   - **Arena:** `select_final_root_child` -> `gumbel_final_root_action`
+     (`net_mcts.rs` Z.3566-3584) filtert auf `visits == max_n` und waehlt darunter das Maximum
+     von `ln(prior) + sigma(q)` mit `sigma(q) = (c_visit + max_N) * c_scale * q`.
+   - **Teil B / Self-Play `--deterministic`:** `max_by(visits).then(q)`
+     (`self_play.rs` Z.5249-5261), also Tie-Break ueber das ROHE q, ohne den Prior-Term.
+   Der Unterschied ist SIMS-ABHAENGIG: `sigma` skaliert mit `max_N`, bei vielen Sims dominiert
+   also der q-Term und beide Regeln fallen praktisch zusammen, bei wenigen Sims kann `ln(prior)`
+   den Ausschlag geben. Genau im unteren Bereich der hier gemessenen Kurve ist der Instrument-
+   gegen-Arena-Vergleich damit am wenigsten sauber. Wie oft Besuchs-Gleichstaende an der Wurzel
+   auftreten, ist NICHT gemessen; bei Gumbel mit Shortlist sind sie konstruktionsbedingt haeufig.
+   Der Denial-Tie-Break der Arena (`apply_denial_tiebreak`) liegt zwar im Pfad, ist aber per
+   Default aus (`MOSAIC_DENIAL_TIEBREAK_EPS = 0.0`, `net_mcts.rs` Z.3169) und damit kein
+   Unterschied.
+
+4. **Gleich sind dagegen:** Wurzelrauschen (die Arena uebergibt `add_root_noise = false` hart,
+   `self_play.rs` Z.3123; Teil B setzt `--no-root-noise`), die Sims-Skalierung (beide rufen
+   `net_effective_sims`, und da `USE_GUMBEL_SEARCH` und `DECOUPLE_NET_SIMS_FROM_ACTIONS` beide
+   `true` sind, gilt beidseitig `base_sims` ohne Skalierung nach Aktionszahl) und der
+   Bauer-Vorzug.
 
 **Folge fuer das Verdikt:** die "eklatant"-Regel bleibt unerfuellt und der Betriebspunkt 100
 bleibt, denn dafuer genuegt, dass die Formen nicht in dieselbe Richtung zeigen. Die ERKLAERUNG

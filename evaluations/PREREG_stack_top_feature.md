@@ -803,3 +803,52 @@ Designs) und was eine Reparatur kosten wuerde (Aufspaltung in "aufhoeren" und da
 "Platte/Slot waehlen" waere ein Eingriff in die Aktionsmenge und damit in `NUM_ACTIONS` --
 Praezedenz `feedback_num_actions_change_breaks_old_checkpoints`). **Zuschnitt und Prioritaet
 entscheidet der Nutzer**; hier steht nur der Befund.
+
+## par.17 WHEEL 1 GEBAUT UND ABGENOMMEN (2026-09-13, 11:12-11:35)
+
+Drei Aenderungen in einem Wheel: der **P.10-Suchfix** (`state.rs::restore_top_plate_type`, aus der
+Nacht), das **Record-Feld `tiled_max_row`** (P.14, `serialize.rs`) und die beiden
+**Stapelzug-Knoepfe im Lauf-Manifest** (`lib.rs::engine_config_json`, Nutzer-Anweisung, Herleitung
+in `PREREG_chance_nodes.md`).
+
+**Tore, alle gruen:**
+
+| Tor | Ergebnis |
+| --- | --- |
+| `cargo test --release --lib` | 638 Tests, 0 rot (nach der Fixture-Neuerzeugung) |
+| `cargo test --release --no-run --all-targets` | 16 Targets, keine Fehler |
+| Wheel-Bau plus Installation | Vertragshash `39648b95bbba1acf` UNVERAENDERT, `input_size` 755 |
+| Neue Manifest-Felder | `stack_draw_research` und `stack_draw_reservation` werden ausgegeben |
+| Anker-DRIFT | **GRUEN** (nach dem Umbau, siehe unten) |
+| Anker-KONSERVIERUNG | **GRUEN**, 1/1 Dateien feldgleich, 1.763 Schritte |
+| `tools/check_conventions.py` | alle Regeln gruen |
+| Python-Testsuite | 86 Tests, 0 rot |
+
+**Das Record-Feld hat den Roundtrip-Guard gerissen, und der hat einen Code-Kommentar widerlegt.**
+`serialize.rs` behauptete, der harte Default `tiled_max_row: -1` in `player_from_json` sei "fuer
+JEDEN `Phase::Drafting`-Zustand exakt richtig". Der Guard zeigte in Runde 2, Phase drafting,
+Werte von 1 und 2: der Wert wird nicht beim EINTRITT in Drafting zurueckgesetzt, sondern erst
+beim naechsten Uebergang nach Tiling. Konsequenz: `player_from_json` LIEST das Feld jetzt
+(Default -1 nur fuer Alt-Records ohne das Feld). Die dort beschriebene "geprüfte, dokumentierte
+Ausnahme" ueber `estimated_score` entfaellt damit ebenfalls.
+
+**Die Anker-Drift war zuerst ROT -- als Serialisierungs-Artefakt, nicht als Drift.** Belegt in
+`evaluations/artifacts/anchor_drift_counterproof_20260913_wheel1.json`: dasselbe
+Golden-Probe-Rezept mit dem Live-Wheel nachgespielt, roh weichen 1.763 von 1.763 Records ab, nach
+Abzug des `game_id`-Zeitstempels UND von `tiled_max_row` sind es **0 von 1.763**;
+`completed`-Felder und `scores` identisch; die Konservierung gegen dieselbe Probe war GRUEN.
+Der Anker bewegt sich also nicht -- das Pruefwerkzeug kannte nur additive Felder nicht.
+**Nutzer-Entscheid: Variante D** (statt die Probe neu aufzunehmen oder das Werkzeug stumpf zu
+machen): der Vergleich ist jetzt NUR AUFWAERTS tolerant. Ein Feld, das der neue Lauf zusaetzlich
+schreibt, wird ignoriert und im Artefakt NAMENTLICH protokolliert; ein fehlendes Feld, ein
+geaenderter Wert, eine abweichende Listenlaenge oder Schrittzahl bleiben ROT. Acht Faelle sichern
+das in `tools/tests/test_upward_tolerant_divergence.py`, darunter ausdruecklich der Fall
+"geaenderter Wert NEBEN einem additiven Feld" -- der Zuwachs darf nichts verdecken.
+
+**Netz-Paritaets-Fixture BEWUSST neu erzeugt:** `e1f94c44f0c7959b` (2026-09-12) ->
+`4750ffc6ec094a83` (2026-09-13). Begruendung: der P.10-Fix aendert die Wurzel-Determinisierung im
+NETZ-Pfad und damit die gespielten Partien -- das ist der Zweck des Fixes. Beim Anker trat das
+nicht auf, weil der Heuristik-Pfad `determinize_dome_pool` nicht ruft; genau diese Asymmetrie war
+in der Uebergabe vorhergesagt. Dazu kommt das additive Record-Feld, das in den Hash eingeht.
+**Gegenprobe:** derselbe Test OHNE `MOSAIC_UPDATE_NET_PARITY_FIXTURE` in einem frischen Prozess
+liefert denselben Hash `4750ffc6ec094a83` (10,8 s) -- die neue Fixture ist reproduzierbar.
