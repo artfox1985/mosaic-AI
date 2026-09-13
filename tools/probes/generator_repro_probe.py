@@ -93,29 +93,87 @@ def _strip_state(v):
     return v
 
 
-def _first_divergence(a, b, ignore=IDENTITY_FIELDS):
+def _values_equal(va, vb):
+    """Blattvergleich, numpy-tolerant (Bestandsverhalten von `_first_divergence`)."""
+    import numpy as np
+
+    try:
+        return bool(np.array_equal(np.asarray(va), np.asarray(vb)))
+    except Exception:
+        return va == vb
+
+
+def _compare_upward_tolerant(va, vb, path, added):
+    """Vergleicht REFERENZ `va` gegen NEU `vb`, aufwaerts-tolerant.
+
+    Nutzer-Entscheid 2026-09-13 ("Vorschlag d umsetzen"), Anlass: der P.14-Record
+    `tiled_max_row` liess die Anker-Drift ROT melden, obwohl die Zugfolge Zug fuer
+    Zug identisch war (Beleg `anchor_drift_counterproof_20260913_wheel1.json`:
+    0 von 1.763 Records abweichend, sobald das neue Feld und der `game_id`-
+    Zeitstempel abgezogen sind; Konservierung gegen dieselbe Probe GRUEN).
+
+    Die Regel bildet die additive Konvention des Projekts ab
+    (`project_2d_encoder_must_be_additive`), OHNE die Pruefung stumpf zu machen:
+
+    - Ein Feld, das im NEUEN Record steht und der Referenz fehlt, ist ein
+      ADDITIVER Zuwachs: es wird ignoriert und sein Pfad in `added` protokolliert.
+    - Ein Feld, das die Referenz hat und dem neuen Record FEHLT, bleibt ROT --
+      ein Rueckschritt ist kein Zuwachs.
+    - Listen unterschiedlicher Laenge bleiben ROT.
+    - Alles Uebrige wird weiter Wert fuer Wert verglichen.
+
+    Rueckgabe: `None` bei Gleichheit, sonst der Pfad der ersten Abweichung.
+    """
+    if isinstance(va, dict) and isinstance(vb, dict):
+        for k in sorted(va):
+            if k not in vb:
+                return f"{path}/{k} FEHLT im neuen Record"
+            deeper = _compare_upward_tolerant(va[k], vb[k], f"{path}/{k}", added)
+            if deeper is not None:
+                return deeper
+        for k in sorted(vb):
+            if k not in va:
+                added.append(f"{path}/{k}")
+        return None
+    if isinstance(va, list) and isinstance(vb, list):
+        if len(va) != len(vb):
+            return f"{path} LAENGE {len(va)} != {len(vb)}"
+        for i, (xa, xb) in enumerate(zip(va, vb)):
+            deeper = _compare_upward_tolerant(xa, xb, f"{path}[{i}]", added)
+            if deeper is not None:
+                return deeper
+        return None
+    return None if _values_equal(va, vb) else path
+
+
+def _first_divergence(a, b, ignore=IDENTITY_FIELDS, added=None):
     """Erste Abweichung als (schritt_index, feld, wert_a, wert_b) oder None.
 
     Meldet NAMENTLICH, welches Feld zuerst auseinanderlaeuft. Ein blosses
     "ungleich" waere hier wertlos: ob die Policy-Verteilung driftet oder eine
     Zugwahl kippt, sind voellig verschiedene Befunde.
-    """
-    import numpy as np
 
+    `a` ist die REFERENZ, `b` der neue Lauf -- die Richtung zaehlt, seit der
+    Vergleich aufwaerts-tolerant ist (siehe `_compare_upward_tolerant`). Wer
+    die Pfade der additiv hinzugekommenen Felder braucht, reicht eine Liste
+    als `added` herein.
+    """
+    if added is None:
+        added = []
     for i, (ra, rb) in enumerate(zip(a, b)):
         fields = sorted((set(ra) | set(rb)) - set(ignore))
         for f in fields:
-            if f not in ra or f not in rb:
-                return i, f, "FEHLT" if f not in ra else "da", "FEHLT" if f not in rb else "da"
+            if f not in rb:
+                return i, f, "da", "FEHLT"
+            if f not in ra:
+                added.append(f"/{f}")
+                continue
             va, vb = ra[f], rb[f]
             if f == "state":
                 va, vb = _strip_state(va), _strip_state(vb)
-            try:
-                same = bool(np.array_equal(np.asarray(va), np.asarray(vb)))
-            except Exception:
-                same = va == vb
-            if not same:
-                return i, f, repr(va)[:120], repr(vb)[:120]
+            path = _compare_upward_tolerant(va, vb, f"/{f}", added)
+            if path is not None:
+                return i, path, repr(va)[:120], repr(vb)[:120]
     if len(a) != len(b):
         return min(len(a), len(b)), "<schrittzahl>", len(a), len(b)
     return None

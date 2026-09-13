@@ -158,14 +158,26 @@ def main() -> int:
         findings, all_same = [], True
         for rf, nf in zip(ref, new):
             ra, rb = load_records(rf), load_records(nf)
-            div = _first_divergence(ra, rb)
+            # Nutzer-Entscheid 2026-09-13 ("Vorschlag d umsetzen"): der Vergleich ist
+            # aufwaerts-tolerant. Felder, die der NEUE Lauf zusaetzlich schreibt und
+            # die der eingefrorenen Probe fehlen, sind ein additiver Zuwachs und
+            # kippen die Pruefung nicht mehr -- sie werden hier aber NAMENTLICH
+            # protokolliert, damit der Zuwachs nie still bleibt. Ein fehlendes oder
+            # inhaltlich geaendertes Feld bleibt ROT.
+            added = []
+            div = _first_divergence(ra, rb, added=added)
             same = div is None and len(ra) == len(rb)
             all_same &= same
+            added_fields = sorted(set(added))
             findings.append({"probe": rf.name, "schritte": len(ra), "identisch": same,
                             "erste_abweichung": None if div is None else
-                            {"schritt": div[0], "feld": div[1]}})
+                            {"schritt": div[0], "feld": div[1]},
+                            "additive_felder_im_neuen_lauf": added_fields})
             print(f"  {'IDENTISCH ' if same else 'ABWEICHUNG'} {rf.name}  {len(ra)} Schritte",
                   flush=True)
+            if added_fields:
+                print(f"    additiv hinzugekommen (ignoriert, nicht ROT): {', '.join(added_fields)}",
+                      flush=True)
 
     out = {
         "artefakt": str(artifact).replace("\\", "/"),
