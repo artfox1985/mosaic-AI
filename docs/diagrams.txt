@@ -1,7 +1,8 @@
-# Stand 2026-08-21 (WDL-Aera, Champion v21_2d_brierbest, Elo 1215 auf der
-# NEU VERANKERTEN Leiter -- round5-Fix c83fb35, Alt-Register mit Elo 1358
-# in archive/elo_history_pre_r5fix.csv, ueber die Fix-Grenze nicht
-# vergleichbar; PREREG_round5_minfix_elo_reset.md par.5).
+# Stand 2026-09-13 (WDL-Aera, Champion v28-b02_brierbest, promoviert
+# 2026-09-12, Elo 1353 [1306, 1402] im LEITERSEGMENT 2 -- Anker ist das
+# eingefrorene Heuristik-Artefakt models/frozen_heuristics/hv4_anchor @150
+# = 1000; ueber Segmentgrenzen (R5-Fix 2026-08-21, Phantom-Fix 2026-09-12)
+# wird nie verglichen. Generation v29 in Vorbereitung, Generator v28-b02.
 # Rendern: python docs/render_diagrams.py [name]  (SVG; PNG nur auf
 # Nutzer-Anstoss via --format png, siehe CLAUDE.md Diagramm-Format-Regel)
 # Farbcode: blau = Netz/Modell, gruen = exakt/verifiziert, orange = Suche/
@@ -11,22 +12,26 @@
 digraph Spielablauf {
     rankdir=TB;
     fontname="Helvetica";
-    label="Spielablauf (Azul-Duel-Variante, 2 Spieler, 5 Runden)";
+    label="Spielablauf (Azul-Duell-Variante, 2 Spieler, 5 Runden)";
     labelloc=t; fontsize=13;
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    R1 [label="Runde 1-4: Drafting\nGumbel-Suche mit Netz-Priors\n(600 Sims Self-Play / 400 Arena)", fillcolor="#cfe2ff"];
-    T  [label="Tiling (Rundenende)\nDFS-Solver ueber Punkte-Kandidaten,\nAuswahl = Punkte x P(Sieg)\n(#37 arena-bestaetigt 2026-08-08)", fillcolor="#d9f2d9"];
-    U  [label="Rundenuebergang\nFabrik-Neubefuellung (Zufallsknoten)\n-> TD-Bootstrap-Label", fillcolor="#ffe5b4"];
-    R5 [label="Runde 5\nExpectiminimax (kein Netz):\nAlpha-Beta + Zufallsknoten fuer\n4 frische verdeckte Bonuschips;\nEXAKT ist die Blattwertung,\nnicht die Suche (Budget 200)", fillcolor="#d9f2d9"];
-    T5 [label="Tiling Runde 5\nexakte Endwertung mitmaximiert", fillcolor="#d9f2d9"];
-    E  [label="Endwertung\n3 aktive Wertungsplatten\n(Linien / Ecken / Spezialfelder ...)", fillcolor="#f0f0f0"];
+    S0 [label="Startsetzung VOR Runde 1\njeder Spieler legt EINE Kuppelplatte,\nder Nicht-Startspieler zuerst;\nPosition und Rotation frei\n(bis zu 108 Kandidaten = freie Slots x 4 Rotationen)\nheute Handregel; Such-Start gebaut, Default aus", fillcolor="#f0f0f0"];
+    R1 [label="Runden 1-4: Drafting\nvier Zugarten: Kuppelplatte legen (2 je Spieler und Runde) |\nSonnenseite | Mondbereich | Bonuschip (2 je Spieler, Pflicht)\nGumbel-Suche mit Netz-Priors\n(Erzeugung 100 Sims, Arena/GUI 400;\nSims-Neumessung fuer v29 offen)", fillcolor="#cfe2ff"];
+    KP [label="Kuppelplatten-Zug (Regelwerk)\nfrei aus der Auslage ODER blind vom Stapel: jeder Zug\nkostet 1 Punkt, beliebig oft; die Rueckseite zeigt nur\nden Typ (Wild/Spezial). Beim Stopp werden die Vorderseiten\naufgedeckt, eine Platte bleibt und wird gelegt, der Rest geht\nin SELBST gewaehlter Reihenfolge unter den Stapel --\ndie Reihenfolge kennt nur der Zurueckgebende", shape=note, fillcolor="#f0f0f0", fontsize=9];
+    T  [label="Tiling (Rundenende)\nDFS-Loeser ueber Punkte-Kandidaten,\nAuswahl = Punkte x P(Sieg) (Modus 0)\nSpezialfelder loesen automatisch aus\n(Punkte = Rasterzeile, 1 bis 6)", fillcolor="#d9f2d9"];
+    U  [label="Rundenuebergang\nFabrik-Neubefuellung (Zufallsknoten)\n-> TD-Bootstrap-Label (Horizont 2 Runden)", fillcolor="#ffe5b4"];
+    R5 [label="Runde 5\nExpectiminimax (kein Netz):\nAlpha-Beta + Zufallsknoten fuer\n4 frische verdeckte Bonuschips;\nEXAKT ist die Blattwertung,\nnicht die Suche (Knotenbudget 200)", fillcolor="#d9f2d9"];
+    T5 [label="Tiling Runde 5\nexakte Endwertung mitmaximiert\n(keine Kuppelplatte, kein Stapelzug mehr)", fillcolor="#d9f2d9"];
+    E  [label="Endwertung\ngenau 3 der 8 Wertungsplatten aktiv\n(4 sich ausschliessende Paare)\nStrafleiste -1/-2/-3/-4, Startspielerstein -2,\nkein Gesamtstand unter 0", fillcolor="#f0f0f0"];
 
+    S0 -> R1;
     R1 -> T -> U;
     U -> R1 [label="Runden 2-4", style=dashed, constraint=false];
     U -> R5 [label="nach Runde 4"];
     R5 -> T5 -> E;
+    KP -> R1 [style=dashed, label="Zugart A"];
 }
 
 # ==net_search==
@@ -38,20 +43,24 @@ digraph NetzSuche {
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    N1 [label="Forward-Pass (ONNX)\nPlanes[76,6,6] + Flach[708]\n-> Policy[406], Value (WDL: 2 Logits -> P(Sieg)),\nMoon, Punkte, [Gegner-Punkte], [Endgame]", fillcolor="#cfe2ff"];
+    N1 [label="Forward-Pass (ONNX)\nPlanes[79,6,6] + Flach[755]\n-> Policy[406], Value (WDL: 2 Logits -> P(Sieg)),\nMoon, Punkte, Gegner-Punkte, Ownership, Endgame", fillcolor="#cfe2ff"];
     N2 [label="Priors\nmaskierte Softmax ueber legale Aktionen", fillcolor="#cfe2ff"];
-    N3 [label="Wurzel-Determinisierung\nverdeckte Information EINMAL mischen\n(Korrektheit vor Messwert)", fillcolor="#d9f2d9"];
-    N4 [label="Gumbel-Top-m\nm = clamp(round(Sims/16), 4, 16)\n400 Sims -> 16 | 150 Sims -> 9\n(Formel arena-bestaetigt, Messung 2)", fillcolor="#ffe5b4"];
-    N5 [label="Sequential Halving\nlog2(m) Phasen", fillcolor="#ffe5b4"];
+    N3 [label="Wurzel-Determinisierung\nstate::determinize_dome_pool(state, Suchender):\nnur das UNBEKANNTE Stapel-Praefix und die Reihenfolge\nINNERHALB fremder Rueckgabe-Bloecke werden gemischt --\nder eigene Block bleibt stehen (Variante A)\noffener Befund P.10: der oeffentliche Typ der obersten\nPlatte wird mitgewuerfelt; Fix gebaut, Wheel folgt", fillcolor="#d9f2d9"];
+    N4 [label="Gumbel-Top-m\nm = clamp(round(Sims/16), 4, 16)\n400 Sims -> 16 | 100 Sims -> 6", fillcolor="#ffe5b4"];
+    N5 [label="Sequential Halving\nceil(log2(m)) Phasen", fillcolor="#ffe5b4"];
     N6 [label="Tiefe >= 1\nAuswahl ueber completed-Q", fillcolor="#ffe5b4"];
-    N7 [label="Blattbewertung\nP(Sieg) des Value-Kopfs\n+ Floor-Shaping (w=0,3, WDL-re-validiert)\n+ R6-Peek / R5-Kurzschluss (exakt)", fillcolor="#ffe5b4"];
+    N7 [label="Blattbewertung (Zustands-Additive, alle Nullsumme)\nP(Sieg) des Value-Kopfs\n+ Floor-Shaping (w = 0,3, Gegner-Bias 1,0)\n+ Huellen-Term K3 (c = 1,0, Projektion Musterreihen,\nHuellenform Zeile-6-Paar, K5-Gewicht 1,0)\nRunde 5 erreicht den Baum nie: exakter Loeser schliesst kurz", fillcolor="#ffe5b4"];
     N8 [label="Backpropagation (completed-Q)", fillcolor="#ffe5b4"];
-    N9 [label="Zugwahl\nArena/GUI: argmax\nSelf-Play: besuchsbasiert, tau=1 durchgehend\n(Annealing gemessen -> kein Vorteil, Messung 3)", fillcolor="#cfe2ff"];
-    OFF [label="INERTE Laufzeit-Knoepfe (alle gemessen, alle H0):\nAggressions-Blend w/lambda = 0 | Denial-Tie-Break eps = 0\nFloor-Opp-Bias = 1 | Gumbel-m-Override = aus\nTiling-Kriterium = Bestand | tau-Annealing = aus", shape=note, fillcolor="#f0f0f0", fontsize=9];
+    N9 [label="Zugwahl\nArena/GUI: argmax @400\nSelf-Play (alle 100 Sims): Sockel argmax ab Halbzug 1\nmit EINEM Abweich-Zug je Partie | Schwarm tempc:\nvisits^(1/T), T logarithmisch 0,2 bis 0,8 | Schwarm\nexcursion: argmax ohne Wurzelrauschen plus Zweitpartie", fillcolor="#cfe2ff"];
+    SPEC [label="Champion-Spec v28-b02 (spec.json, je Seite)\nenvelope_search_c 1,0 | envelope_projection_mode 1\nenvelope_hull_form 2 (Zeile-6-Paar) | special_row6_w 1,0\nscore_utility_b 20 | envelope_profile 1,00/0,92/0,67/0,33/0", shape=note, fillcolor="#e2d9f3", fontsize=9];
+    BLIND [label="Was die Suche NICHT sieht\nDer Rundenuebergang wird im Baum nicht gesampelt\n(ROUND_TRANSITION_SAMPLING = false): das Blatt endet\nVOR dem Tiling -- das Drafting kennt seine eigene\nRundenabrechnung nicht", shape=note, fillcolor="#fdf0d5", fontsize=9];
+    OFF [label="Knoepfe mit Default AUS (byte-identischer Bestand)\nAggressions-Blend w = 0 | Denial-Tie-Break eps = 0\nimplicit_minimax_alpha = 0 | score_utility_c = 0\nLangreihen-Term = 0 | Tiling-Huelle = 0 | Gumbel-m-Override = aus\nK4 Rundenschaetzer round_est_c = 0\nreturn_order_mode = 0 | start_by_search = 0", shape=note, fillcolor="#f0f0f0", fontsize=9];
 
     N1 -> N2 -> N3 -> N4 -> N5 -> N6 -> N7 -> N8;
     N8 -> N6 [label="bis Budget erschoepft", style=dashed, constraint=false];
     N8 -> N9 [label="Budget erschoepft"];
+    SPEC -> N7 [style=dashed, label="setzt die Gewichte"];
+    N7 -> BLIND [style=invis];
     N9 -> OFF [style=invis];
 }
 
@@ -59,44 +68,42 @@ digraph NetzSuche {
 digraph ValueZiel {
     rankdir=TB;
     fontname="Helvetica";
-    label="Value-Ziel-Konstruktion (Task #34, Cache-Schema 17-20;\n20 aendert nur das Punkte-Kopf-Ziel: rein own, Epsilon-Term entfallen)";
+    label="Value-Ziel-Konstruktion (Cache-Schema 20, Variante nortv)";
     labelloc=t; fontsize=13;
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    B  [label="Bootstrap je Zustand\nNetz-P(Sieg) am naechsten Rundenuebergang,\nueber 8 Fabrik-Neubefuellungen gemittelt", fillcolor="#ffe5b4"];
-    D  [label="Platt-Entstauchung\nNUR fuer Alt-Aera-Dateien (tanh-Generator):\nsigmoid(A + B*logit(p)), A=0,0051 B=1,9269", fillcolor="#d9f2d9"];
-    NAT[label="WDL-Generatoren (v19wdl, v20wdl*)\nBootstrap ist NATIV P(Sieg)\n-> keine Entstauchung", fillcolor="#d9f2d9"];
+    B  [label="Bootstrap je Zustand\nNetz-P(Sieg) nach BOOTSTRAP_HORIZON_ROUNDS = 2,\nEIN Sample je Rundenuebergang\n(engine-seitig, steckt NICHT im Cache-Schluessel:\nnur neues Self-Play aendert ihn)", fillcolor="#ffe5b4"];
     O  [label="Spielausgang z in {0,1}\n(nur abgeschlossene Partien;\nAbbruch -> Maske 0)", fillcolor="#f0f0f0"];
-    M  [label="TD-Blend\nvalues_wdl = 0,5*Bootstrap + 0,5*z", fillcolor="#ffe5b4"];
-    H  [label="Value-Kopf: 2 Logits -> Softmax\nKreuzentropie auf values_wdl\n(Platt-B 0,93 = fast kalibriert;\nvorher tanh-Marge, B=1,93 gestaucht)", fillcolor="#cfe2ff"];
-    BR [label="wdl_outcome (roher Ausgang)\n-> Brier-Score, arm-uebergreifend\nvergleichbar = Checkpoint-Kriterium", fillcolor="#e2d9f3"];
-    AUX[label="Aux-Koepfe (Trainingssignal, Suche liest sie nicht)\nPunkte | Gegner-Punkte | Moon-Reihenfolge |\nOwnership | endgame_margin (exakter R5-Wurzelwert)", fillcolor="#cfe2ff"];
+    M  [label="TD-Blend (TD_LAMBDA = 0,5)\nvalues_wdl = 0,5*Bootstrap + 0,5*z", fillcolor="#ffe5b4"];
+    L  [label="soft-Z-Mischung (Willemsen et al. 2021)\nZiel = 0,7*Ziel + 0,3*root_q,\nnur wo root_q_mask = 1\n(--value-target-lambda 0.7 im v28-/v29-Rezept)", fillcolor="#ffe5b4"];
+    H  [label="Value-Kopf: 2 Logits -> Softmax\nKreuzentropie auf values_wdl", fillcolor="#cfe2ff"];
+    BR [label="wdl_outcome (roher Ausgang)\n-> Brier-Score, arm-uebergreifend\nvergleichbar = Checkpoint-Kriterium (brierbest)", fillcolor="#e2d9f3"];
+    AUX[label="Aux-Koepfe (Trainingssignal, Suche liest sie nicht)\nPunkte | Gegner-Punkte | Moon-Reihenfolge |\nOwnership (72 Ziele = 36 Felder je Spieler, Gewicht 1,0) |\nendgame_margin (exakter R5-Wurzelwert)", fillcolor="#cfe2ff"];
+    DES[label="Platt-Entstauchung: nur noch fuer die tanh-Aera-Praefixe\n(v10b, v12, v16, v17, v18), Liste ABGESCHLOSSEN.\nSeit v19wdl ist der Bootstrap nativ P(Sieg); Alt-Korpora\nkehren per Fensterregel nie zurueck -- im heutigen Fenster inert.", shape=note, fillcolor="#f0f0f0", fontsize=9];
 
-    B -> D [label="Alt-Dateien"];
-    B -> NAT [label="WDL-Dateien"];
-    D -> M; NAT -> M; O -> M;
-    M -> H -> BR;
+    B -> M; O -> M;
+    M -> L -> H -> BR;
     H -> AUX [style=invis];
+    B -> DES [style=invis];
 }
 
 # ==window_generation==
 digraph FensterGeneration {
     rankdir=LR;
     fontname="Helvetica";
-    label="Replay-Fenster je Generation: Zwei-Klassen-Design mit stationaerer Rotation (29.450 Partien)
+    label="Replay-Fenster je Generation: Zwei-Klassen-Design mit stationaerer Rotation (Zuschnitt v29, rund 29.460 Partien)
 G = amtierender Champion als Generator, G-1/G-2 = Vorgaenger-Generationen";
     labelloc=t; fontsize=13;
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=10, margin="0.16,0.10"];
     edge [fontname="Helvetica", fontsize=9];
 
     subgraph cluster_p {
-        label="POLICY-KLASSE (5.800 Partien, teuer: 600 Sims)
-volle Suche -> completed-Q-Policy-Ziele";
+        label="SOCKEL / POLICY-KLASSE (580 Dateien, 5.800 Partien)
+policy-aktiv, 100 Sims -> completed-Q-Policy-Ziele";
         style=filled; fillcolor="#eef4ff"; fontsize=10;
         P1 [label="4.000 NEU
-Sockel von G
-(Champion-Generator)", fillcolor="#cfe2ff"];
+400 Dateien, Sockel von G", fillcolor="#cfe2ff"];
         P2 [label="1.350 aus G-1
 135 Sockel-Dateien
 (Manifest, seed-bestimmt)", fillcolor="#cfe2ff"];
@@ -105,78 +112,89 @@ Sockel von G
 (Manifest)", fillcolor="#cfe2ff"];
     }
     subgraph cluster_v {
-        label="VALUE-KLASSE (23.650 Partien, billig: 150 Sims, --value-only)
-Policy maskiert (pol_w=0), nur Value-/Bootstrap-Ziele";
+        label="SCHWARM / VALUE-KLASSE (rund 2.367 Dateien, rund 23.660 Partien)
+--value-only, 100 Sims, Policy maskiert -- nur Value-/Bootstrap-Ziele";
         style=filled; fillcolor="#fff6e6"; fontsize=10;
-        V1 [label="8.000 NEU
-Schwarm von G", fillcolor="#ffe5b4"];
-        V2 [label="8.000
-Schwarm G-1 (komplett)", fillcolor="#ffe5b4"];
+        V1 [label="4.000 NEU: tempc
+temperierte Zugwahl", fillcolor="#ffe5b4"];
+        V1b[label="4.000 NEU: excursion
+Ausflug = zweite Partie
+ab gewichteter Abzweigstelle", fillcolor="#ffe5b4"];
+        V2 [label="4.000 + 4.010
+Schwarm G-1 komplett
+(tempc 400 / excursion 401 Dateien)", fillcolor="#ffe5b4"];
         V3 [label="2.650
 Sockel-Rest G-1
-(Nicht-Traeger)", fillcolor="#ffe5b4"];
+(265 Dateien, Nicht-Traeger)", fillcolor="#ffe5b4"];
         V4 [label="3.550
 Sockel-Rest G-2
-(vollstaendig)", fillcolor="#ffe5b4"];
+(355 Dateien)", fillcolor="#ffe5b4"];
         V5 [label="1.450
 Schwarm G-2
-(Auffuellung auf 23.650)", fillcolor="#ffe5b4"];
+(145 Dateien, Haelfte offen)", fillcolor="#ffe5b4"];
     }
-    MAN [label="policy_carrier_manifest_<Ziel>.json
-Traeger-Dateiliste + carrier_prefixes
--> steckt im Cache-Key
-(kein Praefix-Kurzschluss: sonst tragen ALLE
-Dateien des Generators Policy)", shape=note, fillcolor="#d9f2d9", fontsize=9];
-    OUT [label="Cache (bitgepackt)
-~4,8 Mio. Zustaende, ~13 GB
-planes/masks 1 Bit/Feld
-Schluessel = Dateiliste + Schema + Manifest-Inhalt", fillcolor="#e2d9f3"];
-    ROT [label="Stationaere Rotation (ab v22 selbstaehnlich):
-G-3 und aelter rotieren VOLLSTAENDIG aus |
+    MAN [label="policy_carrier_manifest_<Ziel>.json (MOSAIC_CARRIER_MANIFEST)
+Traeger-Dateiliste (+ optional carrier_prefixes)
+-> steckt ueber ihren INHALT im Cache-Schluessel
+OHNE gesetztes Manifest traegt JEDE Datei Policy", shape=note, fillcolor="#d9f2d9", fontsize=9];
+    OUT [label="Cache: ein Block je Datei + Monolith
+v28-Fenster gemessen: 2.947 Bloecke in 26 min (Rust-Bauer),
+4,43 Mio Samples, Monolith 1,105 GB, Split 2.800 / 147
+Schluessel = Dateiliste + INPUT_SIZE + NUM_ACTIONS + Schema 20
++ Sharpen + TD_LAMBDA + Ziel-Variante + Traegerliste", fillcolor="#e2d9f3"];
+    ROT [label="Stationaere Rotation (seit v22 selbstaehnlich):
+G-3 und aelter rotieren VOLLSTAENDIG aus (fuer v29: v25-b01) |
 Sockel-Traegerrollen wandern eine Stufe weiter |
-Backup-/Alt-Regel-Korpora kehren NIE zurueck |
-Fenstergroesse bleibt fix bei 29.450 (Nutzer-Entscheid)", shape=note, fillcolor="#f0f0f0", fontsize=9];
-    PIN [label="Fenster-Pinning beim Training ZWEI Variablen:
+Alt-Regel-Korpora kehren NIE zurueck |
+Fenstergroesse bleibt fix (v27/v28/v29: 2.947 Dateien)", shape=note, fillcolor="#f0f0f0", fontsize=9];
+    PIN [label="Vor dem Bau pinnen und pruefen:
 MOSAIC_DATA_EXCLUDE (Regex, frisch aus dem Ist-Bestand)
-UND MOSAIC_CARRIER_MANIFEST
-Verifikation: Zeile \"Lade HDF5-Cache\" (nicht \"Lade Daten aus\")", shape=note, fillcolor="#f0f0f0", fontsize=9];
-    UEB [label="Uebergangs-Ausnahme v21: die aelteste Stufe (v18) war noch
-KEIN Zwei-Klassen-Korpus und lieferte ihre 5.000 daher als
-EINEN Block statt als 3.550 + 1.450. Ab v22 gilt die Form links.", shape=note, fillcolor="#fdf0d5", fontsize=9];
+MOSAIC_CARRIER_MANIFEST | MOSAIC_FEATURES_FROM_RUST=1 (Rust-Bauer)
+Seed je Generation (v29: 20260941), Val-Pool ^selfplay_v28-
+Waehrend Waechter oder Kette KEIN Eingriff in config.py,
+neural_net.py, corpus_dataset.py, file_cache_key.py", shape=note, fillcolor="#f0f0f0", fontsize=9];
+    PLAN[label="GEPLANT, nicht gebaut: Sicht-Arm v29-b03 haengt Abschnitt 16
+an den Flachvektor (Ziehserie, Phasenaufloesung, Turm je Farbe,
+Chip-Anzahl, Startspieler). INPUT_SIZE waechst ueber 755 hinaus
+-- damit neuer Cache-Schluessel und neue Bloecke.", shape=note, fillcolor="#fdf0d5", fontsize=9];
 
     P1 -> OUT; P2 -> OUT; P3 -> OUT;
-    V1 -> OUT; V2 -> OUT; V3 -> OUT; V4 -> OUT; V5 -> OUT;
+    V1 -> OUT; V1b -> OUT; V2 -> OUT; V3 -> OUT; V4 -> OUT; V5 -> OUT;
     MAN -> P2 [style=dashed, label="waehlt Traeger"];
     PIN -> OUT [style=dashed, label="pinnt die Dateiliste"];
     ROT -> V5 [style=invis];
-    UEB -> V4 [style=invis];
+    PLAN -> OUT [style=invis];
 }
 
 # ==selfplay_training==
 digraph SelfplayTraining {
     rankdir=TB;
     fontname="Helvetica";
-    label="Verbesserungs-Zyklus mit Entscheidungs-Gates";
+    label="Verbesserungs-Zyklus mit Entscheidungs-Toren (docs/generation_loop.md)";
     labelloc=t; fontsize=13;
     node [shape=box, style="rounded,filled", fontname="Helvetica", fontsize=11, margin="0.18,0.12"];
     edge [fontname="Helvetica", fontsize=9];
 
-    S1 [label="Self-Play\nChampion gegen sich selbst,\nzwei Klassen (Sockel 600 / Schwarm 150 Sims)", fillcolor="#cfe2ff"];
+    S1 [label="Self-Play (Generator = eingefrorenes Champion-Artefakt)\ndrei Klassen, alle 100 Sims: Sockel policy-aktiv |\nSchwarm tempc | Schwarm excursion\n12.000 Partien, gemessen 9,9 h", fillcolor="#cfe2ff"];
+    G0 [label="TOR 0: traegt der Korpus das Signal?\nSymmetrie-Sonde auf der Value-Klasse (trennt die\nKampagnen-Groesse den Ausgang?) + Mindest-Ereigniszahl\nReisst es, wird nicht trainiert", fillcolor="#d9f2d9"];
     S2 [label="Replay-Fenster\nzwei Klassen + Generations-Rotation\n(siehe Diagramm window_generation)", fillcolor="#ffe5b4"];
-    S3 [label="Cache\nPolicy = completed-Q (nur Traeger)\nValue = WDL-TD-Blend (siehe value_target)\nSchema im Cache-Key (Reproduzierbarkeit)", fillcolor="#ffe5b4"];
-    S4 [label="Training\nwarm vom Champion, lr 5e-5 cosine,\nEarly Stop bei Policy- UND Value-Plateau\nCheckpoint = bester Brier (arena-re-validiert)", fillcolor="#cfe2ff"];
-    S5 [label="Offline-Diagnose\nOrakel-Metriken auf eingefrorenem Set\n(Prior-Masse Top-3, Kendall-Tau):\nEINZIGE arena-validierten Praediktoren (7/7)", fillcolor="#d9f2d9"];
-    S6 [label="Arena-Gating\ngepaarte Seeds, SPRT (H0 50% / H1 65%),\nbis 200 Paare, Kandidat vs Champion", fillcolor="#ffe5b4"];
-    S7 [label="Neuer Champion\n+ Elo-Kader (Anker: Heuristik@150)\n+ Server-Default fuer Mensch-Partien", fillcolor="#e2d9f3"];
+    S3 [label="Cache\nPolicy = completed-Q (nur Traeger)\nValue = WDL-TD-Blend (siehe value_target)\nSchema im Cache-Schluessel (Reproduzierbarkeit)", fillcolor="#ffe5b4"];
+    S4 [label="Training (rund 1,4-1,5 h je Arm)\nwarm vom Generator, 12 Epochen, lr 5e-5 cosine (T_max 12),\n2D-Encoder, WDL-Kopf, nortv, soft-Z lambda 0,7,\nOwnership 1,0 + Endgame + Gegner-Punkte\nCheckpoint = bester Brier (brierbest)", fillcolor="#cfe2ff"];
+    S5 [label="Offline-Diagnose\nOrakel-Metriken auf eingefrorenem Set\n(Prior-Masse Top-3, Kendall-Tau):\nEINZIGE arena-validierte Praediktoren (7/7)", fillcolor="#d9f2d9"];
+    S6 [label="TOR 1: Kandidat gegen den besten Stand von N-1\ngepaarte Arena @400, SPRT (H0 0,50 / H1 0,65,\nalpha = beta = 0,05), Blockgroesse 5, Deckel 200 Paare\nIn Champion-Strenge: Fruehstopp unter 150 Paaren ist\nINFORMATIV, kein Tor-Ergebnis (Replikation mit neuem Seed)", fillcolor="#ffe5b4"];
+    S6b[label="TOR 2: die Kampagnen-Groesse darf nicht fallen\nSpaltenbau auf ZWEI Flaechen: Self-Play (argmax-Instrument,\nwas in den naechsten Korpus geht) und Arena (aus der\nBrettgeometrie der Partie-Logs, Bau gegen Widerstand)", fillcolor="#ffe5b4"];
+    S7 [label="Promotion (nur wenn die Champion-Kante faellt)\nset_champion + auffindbare Spec | drei Elo-Kanten\n(Gating, Anker @150 fix n, Champion-2 @400) |\nPlatt-Anzeige in server.py | sigma/Prior-Waechter |\nNetz-Paritaets-Fixture | eingefrorenes Artefakt\nmodels/frozen_champions/<Name> mit eigenem Wheel\nund Golden Probe", fillcolor="#e2d9f3"];
     S8 [label="Pflicht-Diagnostik am Sieger\nPlatt-Kalibrierung | R5-Plattensteigung |\nBrier auf eingefrorenem Alt-Messset |\nStruktur-Watchlist gegen Mensch-Partien", fillcolor="#d9f2d9"];
 
-    REG [label="MESS-DISZIPLIN (aus Fehlschlaegen gelernt)\n1. Vorregistrierung: Design + Entscheidungsregel VOR dem Lauf\n2. Value-Offline-Gaps < 0,015 sagen NICHTS (0/4) -> Arena entscheidet\n3. SPRT-Fruehstopp < 150 Paare nur mit Frisch-Seed-Replikation\n4. Score-Analysen auf Block-Ebene (Paar-SEs unterschaetzen)\n5. Aera-Grenzen: Alt-Befunde sind keine Argumente nach Ziel-Wechsel\n6. Fenster pinnen, wenn parallel generiert wird (Cache-Key haengt an der Dateiliste)", shape=note, fillcolor="#f0f0f0", fontsize=9];
+    REG [label="MESS-DISZIPLIN (aus Fehlschlaegen gelernt)\n1. Vorregistrierung: Design + Entscheidungsregel VOR dem Lauf\n2. Value-Offline-Gaps < 0,015 sagen NICHTS (0/4) -> Arena entscheidet\n3. Blockgroesse 5 in JEDER Arena (der Seed faellt je Block)\n4. Score-Analysen auf Block-Ebene (Paar-SEs unterschaetzen)\n5. Aera-Grenzen: Alt-Befunde sind keine Argumente nach Ziel-Wechsel\n6. Fenster pinnen, wenn parallel generiert wird (Schluessel haengt an der Dateiliste)\n7. Messungen laufen exklusiv; ein Build ist Nebenlast (GPU + EIN CPU-Auftrag erlaubt)\n8. Laufzeit-Block gehoert ins Artefakt des Laufs, nicht nur nach STATUS.md\n9. Nach jeder Engine-Aenderung: Anker-Invarianz Zug fuer Zug pruefen", shape=note, fillcolor="#f0f0f0", fontsize=9];
 
-    S1 -> S2 -> S3 -> S4 -> S5;
+    S1 -> G0 -> S2 -> S3 -> S4 -> S5;
     S5 -> S6 [label="Metriken nicht schlechter"];
     S5 -> S4 [label="beide Metriken schlechter\n-> Arena gespart", style=dashed, constraint=false];
-    S6 -> S7 [label="H1 (signifikant besser)"];
+    S6 -> S6b [label="signifikant besser"];
     S6 -> S4 [label="H0 -> Rezept-Baustein\nfuer die naechste Generation\n(kein Nachschub-Ventil)", style=dashed, constraint=false];
+    S6b -> S7 [label="Champion-Kante faellt"];
+    S6b -> S1 [label="Tor 1 UND Tor 2 halten:\nSelf-Play fuer N+1 frei,\nauch ohne Promotion", style=dashed, constraint=false];
     S7 -> S8;
     S8 -> S1 [label="naechster Zyklus", style=dashed, constraint=false];
     S8 -> REG [style=invis];
