@@ -516,9 +516,13 @@ keine Auswahl im Frontend, bevor jede Stufe "gespielt = gemessen" gruen ist.
 - **Elo-Stand, der gilt:** NUR Segment 2 (`evaluations/elo_history.csv`, Anker
   `Heuristik_hv4_anchor@150` = 1000 fix). Die Zahlen in par.2.3/par.2.5/par.4 stammen aus dem
   ALT-Register (Segment 1) und sind fuer die Leiter NICHT zu verwenden (Nachtrag 2026-09-12).
-  Gemessen im Segment 2: hv2_generator@150 = 983, hv3_generator@150 = 978, Champion v28-b02@400
-  = 1353 (Stand 2026-09-13, 01:00, `PREREG_code_cleanup_closeout.md` par.7a Endtabelle), also
-  rund 370 Elo Abstand, den die Stufen 2 und 3 fuellen muessen.
+  Gemessen im Segment 2 (Stand 2026-09-13, 10:30, nach den vier Kanten der Sims-Kurve, 40
+  Match-Zeilen): hv2_generator@150 = 983, hv3_generator@150 = **972**, Champion v28-b02@400 =
+  **1394**, also rund **420 Elo Abstand** zum Anfaenger-Kandidaten hv3, den die Stufen 2 und 3
+  fuellen muessen. (Vorher stand hier 370 auf dem Stand von 01:00 mit Champion 1353 und hv3 978;
+  der Champion ist durch die drei neuen Sim-Knoten unter seinem 400er-Knoten gestiegen, nicht
+  durch eine neue Staerkemessung.) Zwischenstufen des Champions selbst stehen jetzt ebenfalls im
+  Register und liegen genau in der Luecke: v28-b02@100 = 1298, @200 = 1289.
 
 ### 3. Schritte
 
