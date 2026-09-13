@@ -134,13 +134,20 @@ oberster festgelegt (par.4.1), eine Stufe darueber gibt es nicht.
 darueber v2huelle 1100, v19 1123, v20 1170, v21 1190, v23-b01_brierbest 1210,
 v23-b01_k3p10 1242, v24-b06 1238, v24-b07 1283, v25-b01 1336, v26-b01 1364,
 v27-b01 1405 (Konfidenzintervalle in par.2.3). ALLE Netz-Knoten sind @400
-gemessen (`sims_a,sims_b`: 43 Zeilen 400/400, 11 Zeilen 400/150). **Fuer keinen
-Champion gibt es eine Elo-Kante bei anderer Sim-Zahl.** Was zu Sims gemessen
-ist, steht in `PREREG_search_depth_column_optimum.md`: dasselbe Netz (v22-b05)
-@25 gegen @400 verliert 11:29 (SPRT H0, p = 0,0117), @100 gegen @400 33:47
-(n.s.), und die flache Suche baut MEHR Spalten (Plateau 25-100 Sims). Eine
-Sims-Leiter ist also nicht nur ungemessen, sie aendert auch den STIL des
-Gegners, nicht nur seine Staerke.
+gemessen (`sims_a,sims_b`: 43 Zeilen 400/400, 11 Zeilen 400/150). **UEBERHOLT
+seit 2026-09-13:** der Satz "fuer keinen Champion gibt es eine Elo-Kante bei
+anderer Sim-Zahl" galt bis zur Sims-Kurve; seither traegt das Register die
+Knoten `v28-b02@100` (1298), `@200` (1289) und `@600` (1389) gegen `@400`
+(1394), je n=150 ohne Frueh-Stopp, plus die zweite Aufhaengung von @100 gegen
+`v22-b05_live@25` (172:28, n=200). Eine Sims-Leiter ist damit fuer den
+AMTIERENDEN Champion gemessen. Was zu Sims gemessen ist, steht in
+`PREREG_search_depth_column_optimum.md`: dasselbe Netz (v22-b05) @25 gegen
+@400 verliert 11:29 (SPRT H0, p = 0,0117), @100 gegen @400 33:47 (n.s.); am
+Champion v28-b02 verliert @100 gegen @400 45:105 und @200 53:97, waehrend
+@600 Gleichstand haelt. Die flache Suche baut im SELBSTSPIEL MEHR Spalten
+(par.8e: 1,0975 bei 100 gegen 0,8950 bei 400 je Seite), in der ARENA gegen
+eine tiefere Suche dagegen weniger. Eine Sims-Leiter aendert also weiter den
+STIL des Gegners, nicht nur seine Staerke -- das bleibt der tragende Punkt.
 
 Umrechnung Elo-Differenz in Erwartungswert (logistische Formel des
 Elo-Systems, keine Messung): 100 Punkte = 0,64, 200 = 0,76, 300 = 0,85,
