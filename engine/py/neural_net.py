@@ -460,7 +460,7 @@ def state_to_tensor_python(data):
 
 # --- 2D-Encoder-Skelett (Task #11, Phase 1) --------------------------------
 # `state_to_planes` ist der 2D-Zweig NEBEN `state_to_tensor` (das oben
-# UNVERAENDERT bleibt) -- additiv, siehe docs/design_2d_encoder.md für die
+# UNVERAENDERT bleibt) -- additiv, siehe archive/design_2d_encoder.md für die
 # vollständige Begründung der Kanal-Aufteilung und des Geometrie-Gatings.
 # Kein Training/HDF5-Cache-Bau in Phase 1 (Stopp-Linie) -- reines
 # Format-Skelett, per Selbsttest (siehe tools/) gegen echte Zustände geprüft.
@@ -481,7 +481,7 @@ def _build_geometry_masks() -> dict:
     """Konstante 6x6-Positions-Masken der Wertungsgeometrie (Zeilen/Spalten/
     Diagonalen/Rand/Ecken) -- unabhängig vom Spielzustand, einmal berechnet.
     Quelle der Geometrie: engine/src/scoring.rs (build_grid/score_*), siehe
-    docs/design_2d_encoder.md Abschnitt 2+4."""
+    archive/design_2d_encoder.md Abschnitt 2+4."""
     row = torch.zeros(6, 6, 6)
     col = torch.zeros(6, 6, 6)
     for i in range(6):
@@ -504,7 +504,7 @@ def _build_geometry_masks() -> dict:
 
 _GEOM = _build_geometry_masks()
 
-# Kanalzahl-Buchhaltung (siehe docs/design_2d_encoder.md Abschnitt 3/4):
+# Kanalzahl-Buchhaltung (siehe archive/design_2d_encoder.md Abschnitt 3/4):
 #   Belegung je Spieler: 16 (1 slot_exists + 5 placed_color + 1 placed_special
 #                            + 5 required_color + 3 type + 1 locked)
 #   -> 32 für beide Spieler (ego zuerst, dann Gegner -- state_to_tensor-Konvention)
@@ -535,7 +535,7 @@ NUM_BINARY_PLANES_CHANNELS = 2 * 16 + 19 + 25 + 1  # = 77
 
 def _board_channels(dome_grid) -> torch.Tensor:
     """16 Kanäle für EIN Spielerbrett (6x6) -- siehe Tabelle in
-    docs/design_2d_encoder.md Abschnitt 3. `dome_grid`: 3x3-Liste von Slots
+    archive/design_2d_encoder.md Abschnitt 3. `dome_grid`: 3x3-Liste von Slots
     (oder None), jeder Slot ein Dict mit `spaces` (Liste von 4 Space-Dicts,
     Reihenfolge TL,TR,BL,BR -- identisch zu scoring.rs::build_grid)."""
     ch = torch.zeros(16, 6, 6)
@@ -581,7 +581,7 @@ def state_to_planes_python(data) -> torch.Tensor:
     """2D-Gegenstück zu `state_to_tensor` (Task #11 Phase 1) -- Format
     [C,6,6], C=NUM_PLANES_CHANNELS=79. ADDITIV: `state_to_tensor` bleibt
     unverändert, dies ist ein PARALLELER Zweig für den geplanten
-    Conv-Encoder (siehe docs/design_2d_encoder.md). Ego-Perspektive wie
+    Conv-Encoder (siehe archive/design_2d_encoder.md). Ego-Perspektive wie
     überall sonst: erst der Spieler am Zug, dann der Gegner."""
     curr_pi = data.get("current_player", 0)
     enemy_pi = 1 - curr_pi
@@ -1800,7 +1800,7 @@ class Mosaic2DNet(nn.Module):
     späte Fusion, dann EXAKT dieselben Köpfe/Ausgabereihenfolge wie
     `MosaicNet` (policy, value, moon, points, ownership -- ownership zuletzt,
     optional `points_dist`-Logits danach bei `points_dist_bins>0`). Siehe
-    docs/design_2d_encoder.md Abschnitt 5 für die Architektur-Begründung.
+    archive/design_2d_encoder.md Abschnitt 5 für die Architektur-Begründung.
 
     ADDITIV: ersetzt `MosaicNet` nicht, ist ein separates, paralleles Modul.
     Kein Training in Phase 1 (Stopp-Linie) -- nur Architektur-Skelett für den

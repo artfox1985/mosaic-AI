@@ -111,7 +111,7 @@ type RawModel = InferenceModel;
 /// `[batch, C, H, W]` = der Ein-Input-2D-Pfad (Phase 1, nie trainiert).
 /// ZWEI Inputs (Rang 4 `[batch,C,H,W]` gefolgt von Rang 2 `[batch,F]`) =
 /// `PlanesPlusFlat`, der tatsächlich trainierte Phase-2-2D-Pfad
-/// (`Mosaic2DNet`, siehe docs/design_2d_encoder.md Abschnitt 8 Phase-2-
+/// (`Mosaic2DNet`, siehe archive/design_2d_encoder.md Abschnitt 8 Phase-2-
 /// Entscheidung: Voll-Broadcast auf ein Rang-4-Tensor verworfen, eval_pair
 /// brach dabei auf das 6,5-fache ein -- zwei getrennte Inputs bleiben
 /// günstig). Jede andere Kombination ist ein Fehler -- bewusst kein

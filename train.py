@@ -3094,7 +3094,7 @@ if __name__ == "__main__":
                         help="Task #11 Phase 2. 'flat' (Standard, Bestandsverhalten byte-identisch): "
                              "MosaicNet auf state_to_tensor (708 Features). '2d': Mosaic2DNet -- "
                              "Conv-Zweig auf state_to_planes ([76,6,6]) + Flach-Zweig auf demselben "
-                             "708er-Vektor, spaete Fusion (siehe docs/design_2d_encoder.md). "
+                             "708er-Vektor, spaete Fusion (siehe archive/design_2d_encoder.md). "
                              "Aendert den HDF5-Cache-Key (Suffix '+enc2d_v1', der Flach-Cache derselben "
                              "Dateiliste bleibt unberuehrt). --load erwartet dann einen 2D-Checkpoint "
                              "(harter Fehler bei Encoder-Mismatch statt stillem Teil-Load).")

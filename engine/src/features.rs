@@ -1113,7 +1113,7 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
 // Form, in der PyTorch beim ONNX-Export linearisiert, und die
 // `net.rs::InputLayout::Planes`/`PlanesPlusFlat` erwarten.
 //
-// Kanal-Aufteilung (docs/design_2d_encoder.md Abschnitt 3/4, 1:1 aus
+// Kanal-Aufteilung (archive/design_2d_encoder.md Abschnitt 3/4, 1:1 aus
 // `neural_net.py::state_to_planes`/`_board_channels`/`_build_geometry_masks`
 // übernommen):
 //   0..16  : Belegung Ego-Brett   (state_to_planes::_board_channels(me))
