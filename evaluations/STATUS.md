@@ -49,7 +49,20 @@ kein Build, kein cargo, keine Sonde.
    (Seed 20260941), Bloecke, Monolith, Training v29-b01 mit Warmstart auf `v28-b02_brierbest`.
    Sie enthaelt Tor 0 und Tor 2a bereits als Schritt 1, Punkt 1 oben ist damit abgedeckt.
    **Starten wie die Erzeugung: in einem eigenen Fenster, nicht ueber die Sitzung.**
-6. Danach nach Fahrplan `evaluations/v29_program_agent_plan.md` (41 Punkte).
+5. **Portable Build** (aus der Uebergabe vom 02:50, beim Neufassen zunaechst verloren
+   gegangen): `python tools/build_release.py` nach
+   `evaluations/review/portable_build_audit_2026-09-13.md` Abschnitt C. Die Spec ist auf
+   v28-b02 umgestellt (Commit 3c81d0b). **Nur bei freier CPU** -- also NICHT neben der
+   Erzeugung und nicht neben der Kette. Zip-Name und Weitergabe entscheidet der Nutzer.
+6. **Zwei Bauten, die VOR ihrem jeweiligen Trainingsarm stehen** (Fahrplan Nr. 5 und Nr. 15),
+   beide brauchen eine freie Maschine und ihre Tore:
+   - **Wheel 2 fuer den Sicht-Arm v29-b03**: Encoder-Abschnitt 16 mit P.3, P.7, P.9 und
+     P.11 bis P.15, Rust beide Pfade plus Python-Zwilling, `config.INPUT_SIZE` auf **794**
+     (entschieden 2026-09-13, `PREREG_stack_top_feature.md` par.16), Sichtgleichheits- und
+     Regressionstest, Fixture, Anker-Drift. Rund 2 h (ANNAHME).
+   - **Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` fuer v29-b02** plus Tore
+     (`PREREG_special_tile_yield.md`, Fahrplan Nr. 15).
+7. Danach nach Fahrplan `evaluations/v29_program_agent_plan.md` (41 Punkte).
 
 **FENSTER-PINNING nicht vergessen:** Streudateien, die waehrend der Erzeugung entstehen,
 gehoeren beim Fensterbau in `MOSAIC_DATA_EXCLUDE`.
