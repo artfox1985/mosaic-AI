@@ -204,10 +204,18 @@ pub fn dome_pool_knowledge_is_consistent(state: &GameState) -> bool {
 /// round_transition_deep.rs::simulate_one_round).
 ///
 /// **RNG-Vertrag:** ist `dome_pool_known_blocks` leer (Bestandsfall), ist der
-/// Aufruf byte-identisch zum alten `shuffle` -- dieselbe eine
-/// `shuffle`-Anwendung auf denselben vollen Slice, derselbe RNG-Verbrauch.
-/// Erst bekannte Bloecke veraendern Verbrauch und Ergebnis; genau das ist der
-/// beabsichtigte Korrektheits-Fix (par.8).
+/// RNG-Verbrauch identisch zum alten `shuffle` -- dieselbe eine
+/// `shuffle`-Anwendung auf denselben vollen Slice. Erst bekannte Bloecke
+/// veraendern Verbrauch und Ergebnis; genau das ist der beabsichtigte
+/// Korrektheits-Fix (par.8).
+///
+/// **Oberste Platte (P.10, 2026-09-13):** der Typ an Position 0 ist oeffentlich
+/// (`dome_stack_top_type`) und wird nach dem Mischen ohne RNG-Verbrauch
+/// wiederhergestellt ([`restore_top_plate_type`]); die Reihenfolge ist damit
+/// nicht mehr byte-identisch zum alten `shuffle`, wenn das Mischen eine Platte
+/// anderen Typs nach oben gebracht hatte. Der Diagnose-Rueckfall
+/// `MOSAIC_DOME_POOL_KNOWLEDGE=0` (Vollmischung) bleibt davon ABSICHTLICH
+/// unberuehrt, er reproduziert den PRE-Stand der Prereg.
 /// `MOSAIC_DOME_POOL_KNOWLEDGE` -- Default AN (Variante A der Kuppelstapel-Prereg,
 /// 2026-09-10). `=0` schaltet auf die alte Vollmischung zurueck; NUR fuer den
 /// PRE/POST-Vergleich der Prereg gedacht, nicht fuer Erzeugung oder Arena.
@@ -239,16 +247,55 @@ pub fn determinize_dome_pool<R: Rng + ?Sized>(
         state.dome_tile_pool.shuffle(rng);
         return;
     }
+    // P.10 (Sichtinventur 2026-09-13, PREREG_stack_top_feature.md par.15): die
+    // Rueckseite der OBERSTEN Platte (Position 0, `dome_stack_top_type`) ist
+    // fuer beide Spieler jederzeit sichtbar. Ihr Typ wird vor dem Mischen
+    // festgehalten und danach wiederhergestellt -- sonst wuerfelt jede
+    // Determinisierung ein oeffentliches Merkmal neu.
+    let top_special_before = state.dome_tile_pool.first().map(|t| t.is_special_type());
     let prefix_len = state.dome_pool_unknown_prefix_len();
     state.dome_tile_pool[..prefix_len].shuffle(rng);
     let mut start = prefix_len;
+    let mut first_block_end = prefix_len;
     for i in 0..state.dome_pool_known_blocks.len() {
         let block = state.dome_pool_known_blocks[i];
         let end = (start + block.len).min(state.dome_tile_pool.len());
+        if i == 0 {
+            first_block_end = end;
+        }
         if Some(block.returner) != viewer {
             state.dome_tile_pool[start..end].shuffle(rng);
         }
         start = end;
+    }
+    restore_top_plate_type(state, top_special_before, prefix_len, first_block_end);
+}
+
+/// Stellt nach einer Determinisierung den TYP der obersten Platte wieder her
+/// (P.10). Der Tauschpartner kommt nur aus dem Segment, das Position 0
+/// enthaelt (unbekanntes Praefix, sonst der erste bekannte Block): so bleiben
+/// Blockgrenzen und Blockmengen unangetastet, und weil dieses Segment nur in
+/// sich permutiert wurde, gibt es dort immer eine typgleiche Platte. Kein
+/// RNG-Verbrauch; der RNG-Vertrag von [`determinize_dome_pool`] bleibt.
+fn restore_top_plate_type(
+    state: &mut GameState,
+    top_special_before: Option<bool>,
+    prefix_len: usize,
+    first_block_end: usize,
+) {
+    let Some(want_special) = top_special_before else {
+        return;
+    };
+    if state.dome_tile_pool.first().map(|t| t.is_special_type()) == Some(want_special) {
+        return;
+    }
+    let segment_end = if prefix_len > 0 { prefix_len } else { first_block_end };
+    let segment_end = segment_end.min(state.dome_tile_pool.len());
+    if let Some(idx) = state.dome_tile_pool[..segment_end]
+        .iter()
+        .position(|t| t.is_special_type() == want_special)
+    {
+        state.dome_tile_pool.swap(0, idx);
     }
 }
 
@@ -775,6 +822,38 @@ mod dome_pool_knowledge_tests {
 
         assert_eq!(ids(&a), ids(&b), "ohne Bloecke muss die Reihenfolge identisch sein");
         assert_eq!(after_a, after_b, "ohne Bloecke muss der RNG-Verbrauch identisch sein");
+    }
+
+    #[test]
+    fn determinization_keeps_the_public_type_of_the_top_plate() {
+        // P.10: die Rueckseite der obersten Platte ist oeffentlich. Ueber viele
+        // Seeds darf sich ihr Typ nie aendern, und das Praefix bleibt als
+        // Multimenge erhalten (nur ein Tausch innerhalb des Praefix).
+        let base = state_with_blocks();
+        let n = base.dome_tile_pool.len();
+        let prefix_range = 0..n - 5;
+        let top_before = base.dome_tile_pool[0].is_special_type();
+        let prefix_before = sorted(&ids(&base)[prefix_range.clone()]);
+        let mixed_prefix = base.dome_tile_pool[prefix_range.clone()]
+            .iter()
+            .any(|t| t.is_special_type() != top_before);
+        assert!(mixed_prefix, "Testaufbau: das Praefix muss beide Typen enthalten");
+        for seed in 0u64..200 {
+            let mut s = base.clone();
+            let mut rng = StdRng::seed_from_u64(seed);
+            determinize_dome_pool(&mut s, Some(0), &mut rng);
+            assert_eq!(
+                s.dome_tile_pool[0].is_special_type(),
+                top_before,
+                "seed {seed}: Typ der obersten Platte muss erhalten bleiben"
+            );
+            assert_eq!(
+                sorted(&ids(&s)[prefix_range.clone()]),
+                prefix_before,
+                "seed {seed}: das Praefix bleibt als Multimenge erhalten"
+            );
+            assert!(dome_pool_knowledge_is_consistent(&s));
+        }
     }
 
     #[test]
