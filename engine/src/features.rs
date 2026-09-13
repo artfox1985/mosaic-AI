@@ -2165,7 +2165,7 @@ mod tests {
             f2[LEN_BEFORE_DOME_POOL_KNOWLEDGE],
             state.dome_tile_pool.len() as f32 / crate::dome::NUM_DOME_TILE_DESIGNS as f32
         );
-        for x in &f2[LEN_BEFORE_DOME_POOL_KNOWLEDGE + 1..] {
+        for x in &f2[LEN_BEFORE_DOME_POOL_KNOWLEDGE + 1..LEN_BEFORE_SIGHT_APPENDIX] {
             assert_eq!(*x, 0.0, "ohne Bloecke traegt nur das Praefix");
         }
     }
