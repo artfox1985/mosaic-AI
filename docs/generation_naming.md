@@ -148,15 +148,18 @@ und **`v28-b02`** (Variante B: Merkmale aus dem Record-Feld `dome_pool_view`, so
 gleicher Seed). Weitere Arme ab `v28-b03` nur mit eigener Registrierung. Kein Knopf-Suffix
 im Namen (Regel oben).
 
-## v29 (reserviert 2026-09-11, vor dem Generationswechsel)
+## v29 (reserviert 2026-09-11, Generator eingesetzt 2026-09-13)
 
-Self-Play-Klassen nach dem Generator, der erst mit der v28-Promotion feststeht
-(`PREREG_v29_window.md` par.3): `selfplay_v28-bXX-policy_*`, `-value-tempc_*`,
-`-value-excursion_*` (Seeds 20260920 / 20260921 / 20260922, par.5 dort). Trainingsarm:
-**`v29-b01`** (Rezept unveraendert, Warmstart `<Generator>_brierbest`, Seed 20260941) und
+**Generator ist `v28-b02`** (Promotion 2026-09-12); die Klassen heissen damit
+`selfplay_v28-b02-policy_*`, `-value-tempc_*`, `-value-excursion_*` (Seeds
+20260920 / 20260921 / 20260922, `PREREG_v29_window.md` par.5). Erzeugt seit 2026-09-13 12:08,
+alle drei bei 100 Sims. Trainingsarm:
+**`v29-b01`** (Rezept unveraendert, Warmstart `v28-b02_brierbest`, Seed 20260941) und
 **`v29-b02`** (Ablation der Spezialfeld-Kanaele 77/78, sonst wie b01, gleicher Seed;
 Nutzer-Entscheid 2026-09-11, `PREREG_v29_window.md` par.6).
 **`v29-b03`** (Sicht-Arm: Encoder-Abschnitt 16 mit P.3 Ziehserie, P.7 Phasenaufloesung, P.9
 Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, P.14 Tiling-Sperre, P.15 Startspieler, sonst wie b01; Nutzer-Eintaktung 2026-09-13,
-`PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c).
+`PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c). **INPUT_SIZE 794**
+(entschieden 2026-09-13, `PREREG_stack_top_feature.md` par.16: die 18 Design-Bits bleiben
+draussen, weil die Vorderseiten der gezogenen Platten erst nach dem Aufhoeren bekannt sind).
 Weitere Arme ab `v29-b04` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
