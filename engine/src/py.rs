@@ -181,6 +181,17 @@ impl PyGame {
             "envelope_hull_form": c.envelope_hull_form,
             "special_row6_w": c.special_row6_w,
             "start_by_search": c.start_by_search,
+            // Stilmittel der Stufen (Schritt 1b). Sie stehen hier, BEVOR sie
+            // verdrahtet sind (Schritt 1c), weil genau das der Zweck dieser
+            // Ausgabe ist: der Log-Kopf soll sagen, was die Suche benutzt.
+            // `sims` und `root_noise` sind `null`, solange der Aufrufer sie
+            // setzt und nicht die Spec.
+            "sims": c.sims,
+            "root_noise": c.root_noise,
+            "action_temp": c.action_temp,
+            "tau_argmax_from_move": c.tau_argmax_from_move,
+            "deviate_prob": c.deviate_prob,
+            "deviate_candidates": c.deviate_candidates,
         })
         .to_string()
     }
