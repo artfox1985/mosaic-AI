@@ -907,14 +907,26 @@ Woertlich: **"Hv1 als default macht keinen Sinn. Der ist archiviert. Nimm hv3 al
 **Umgesetzt wird das als Default der STUFE, nicht als neuer Engine-weiter Default.** Der
 Unterschied ist nicht kosmetisch, deshalb hier ausgeschrieben (geprueft 2026-09-13):
 
-| Traeger | `heuristik_variante` in seiner Spec |
-| --- | --- |
-| `models/frozen_heuristics/hv4_anchor/spec.json` (aktiver Elo-Anker) | **hv1** |
-| `models/frozen_champions/v28-b02/spec.json` (Champion) | **hv1** |
-| `models/frozen_heuristics/hv3_generator/spec.json` | hv3 |
+**Erst die Begriffe, weil ich sie in einer ersten Fassung vermengt habe (Nutzer-Korrektur
+2026-09-13: "Nein tragen sie nicht. Das ist hv4"):** ARTEFAKTNAME und VARIANTENFELD sind zwei
+Ebenen. Spielbar sind in diesem Build genau zwei Varianten, `hv1` und `hv3`
+(`engine/src/lib.rs:140`); **`hv4` ist kein Variantenname, sondern die vierte Generation des
+ANKER-ARTEFAKTS.** Es heisst so, weil es der Anker seit dem Phantom-Fix A2 ist
+(Manifest-Rolle: "Elo-Anker, Segment 2 der Leiter (seit dem Phantom-Fix A2, 2026-09-12)"), und
+nicht, weil es eine vierte Heuristik spielte.
 
-Der Anker und der Champion tragen hv1 in ihrer EIGENEN Spec und sind von einem geaenderten
-Env-Default nicht betroffen -- eine Spec gewinnt immer. Betroffen waeren nur Pfade OHNE Spec.
+| Traeger | Was es IST | `heuristik_variante` im Spec-Feld |
+| --- | --- | --- |
+| `frozen_heuristics/hv4_anchor` | Anker-Artefakt, 4. Generation, Motor MIT A2 | `hv1` |
+| `frozen_heuristics/hv3_generator` | Artefakt der hv3-Heuristik | `hv3` |
+| `frozen_champions/v28-b02` | Champion-Netz | `hv1` (fuer die Heuristik-Anteile der Suche) |
+
+Der Unterschied zwischen `hv1_anchor` (geloescht 2026-09-13) und `hv4_anchor` war nie die
+Variante, sondern der MOTOR: derselbe `hv1`, einmal ohne und einmal mit A2. Genau deshalb war
+das alte Anker-Artefakt obsolet.
+
+Beide tragen ihr Variantenfeld in der EIGENEN Spec und sind von einem geaenderten Env-Default
+nicht betroffen -- eine Spec gewinnt immer. Betroffen waeren nur Pfade OHNE Spec.
 Den Env-Default in `SearchConfig::from_env` (`net_mcts.rs` Z.739) anzufassen, waere trotzdem eine
 ENGINE-Aenderung mit Anker-Drift-Pflicht und Wirkung auf jeden spec-losen Aufrufer, also auch auf
 Sonden und Tests. Das ist hier nicht gemeint und wird nicht getan.
