@@ -708,15 +708,34 @@ Der Spec-Rueckfall im Server ist kein Schmuck: `net_search_with_tree` liest ausd
 AUSSERHALB des Wave-1-Scopes"). Ohne ihn spielte die GUI mit den Env-Defaults, also OHNE
 Huelle -- genau der Vorfall, den `server.py` Z.242-245 beschreibt.
 
-**Unterschiedlich ist die SUCHTIEFE, und das ist fuer diese Prereg der Punkt.** Die Arena misst
-bei 400 Sims; der Server startet mit `_ai_sims = 300` (`server.py` Z.107) und setzt je nach
-Preset auf 100 (Z.698, Z.830) oder 300 (Z.1529). Nach der heute abgeschlossenen Sims-Kurve
-(`PREREG_search_depth_column_optimum.md` par.8e) ist das kein Nebendetail: derselbe Champion
-verliert bei 100 gegen sich selbst bei 400 mit **45:105** (n = 150 gepaarte Partien,
-McNemar p = 6e-7). **Das Netz in der GUI ist also je nach Preset messbar schwaecher als das
-Netz, dessen Elo im Register steht.** Fuer die Stufenleiter ist das die gute Nachricht: der
-Regler existiert schon und ist jetzt beziffert (Elo-Knoten `v28-b02@100` 1298, `@200` 1289,
-`@400` 1394 -- rund 96 Punkte zwischen 100 und 400).
+**Die SUCHTIEFE haengt an der Stufe -- und die oberste Stufe entspricht der Arena.**
+`DIFFICULTY_PRESETS` (`server.py` Z.292-301):
+
+| Stufe | Modell | Sims |
+| --- | --- | --- |
+| `easy` | Heuristik | 60 |
+| `medium` | Champion | 60 |
+| `hard` | Champion | 150 |
+| `expert` | Champion | **400** |
+| `_default` | Champion | **400** |
+
+**KORREKTUR 2026-09-13 (Nutzer: "Im ui wird die Staerke auf 400 Sims gesetzt. Ich denk die 100
+sind legacy"):** die erste Fassung dieses Absatzes las die Ausdruecke
+`int(preset.get('sims') or 100)` (`server.py` Z.698, Z.830) und `or 300` (Z.1529) als gesetzte
+Werte. Das ist falsch -- es sind FALLBACKS fuer ein Preset ohne `sims`, und **kein einziges
+Preset ist ohne**. Sie greifen nie und sind toter Code; dasselbe gilt fuer den Modul-Default
+`_ai_sims = 300` (Z.107), den `_resolve_difficulty` vor dem ersten Zug ueberschreibt.
+**Wer auf Experte oder ohne Stufenangabe spielt, spielt gegen dieselbe Suchtiefe, bei der die
+Arena misst.** Die schwaecheren Stufen sind Absicht und genau der Gegenstand dieser Prereg.
+
+**Was daraus fuer die Stufenleiter folgt.** Der Regler ist gebaut und benutzt, aber die heutigen
+Stufenwerte sind NICHT die vermessenen: die Sims-Kurve
+(`PREREG_search_depth_column_optimum.md` par.8e) hat 100, 200, 400 und 600 gemessen, das
+Register traegt `v28-b02@100` 1298, `@200` 1289 und `@400` 1394. Fuer **60** (medium) und
+**150** (hard) gibt es keinen gemessenen Knoten. Der Abstand 100 zu 400 betraegt rund 96
+Elopunkte (45:105 gepaart, n = 150, McNemar p = 6e-7) -- die Spanne der Leiter ist damit
+gross genug, aber ihre Zwischenstufen sind ungemessen. Das ist eine Aufgabe von par.5 Stufe 1,
+kein Fehler im Bestand.
 
 **Ein LATENTER Unterschied, heute ohne Wirkung, aber eine Sollbruchstelle:** die Arena ruft vor
 der Suche `builder_drafting_preference` auf und wuerde deren Ergebnis der Suche VORZIEHEN

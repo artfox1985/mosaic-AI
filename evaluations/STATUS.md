@@ -211,14 +211,18 @@ Verdikten von `moon_stack_order`, `dome_return_order`, `round_estimate_leaf_term
   hv4@600 gegen hv4@150 55 %. Bradley-Terry mittelt das.
 - **Replayer-Grenze Chip-Vollendung:** einzelne Partien nicht nachspielbar ("Reihe N nicht mit
   Chips komplettierbar" nach 60 Versuchen); bekannte Grenze.
-- **GUI und Arena: gleicher Suchweg, andere Suchtiefe** (geprueft 2026-09-13,
+- **GUI und Arena: gleicher Suchweg, Suchtiefe nach Stufe** (geprueft 2026-09-13,
   `PREREG_difficulty_levels.md` par.11). Beide enden in `select_final_root_child`, beide ohne
-  Wurzelrauschen, und `server.py` schreibt die Champion-Spec beim Start in die Umgebung, weil
-  der GUI-Pfad sie von dort liest. ABER: die Arena misst bei 400 Sims, der Server faehrt 300
-  oder je nach Preset 100 -- nach der Sims-Kurve sind das 45:105 im direkten Duell. Das Netz
-  in der GUI ist also schwaecher als das im Register. Fuer die Stufenleiter ist der Regler
-  damit beziffert. **Latente Sollbruchstelle:** die Arena zieht `builder_drafting_preference`
-  der Suche vor, der Serverpfad kennt den Vorzug nicht; folgenlos nur, solange
+  Wurzelrauschen, beide mit Runde-5-Kurzschluss, und `server.py` schreibt die Champion-Spec
+  beim Start in die Umgebung, weil der GUI-Pfad sie von dort liest. Die Stufen stehen auf
+  60 / 60 / 150 / **400** (easy/medium/hard/expert), Default 400: **auf Experte spielt die GUI
+  mit derselben Tiefe, bei der die Arena misst.** Die `or 100`/`or 300`-Ausdruecke im Server
+  sind Fallbacks fuer Presets ohne `sims` und damit toter Code -- eine erste Fassung dieses
+  Befundes hatte sie faelschlich fuer gesetzte Werte gehalten (Nutzer-Korrektur).
+  **Offen fuer die Stufenleiter:** fuer 60 und 150 gibt es keinen gemessenen Elo-Knoten; das
+  Register traegt nur @100, @200 und @400.
+  **Latente Sollbruchstelle:** die Arena zieht `builder_drafting_preference` der Suche vor, der
+  Serverpfad kennt den Vorzug nicht; folgenlos nur, solange
   `MOSAIC_SPALTENBAU`/`MOSAIC_PLATTENBAU` unbesetzt bleiben.
 - **Gating-Artefakte tragen keine Engine-Konfiguration** (`paired_gating.py`): ein Env-Knopf,
   der in einer Arena an war, ist dort nachtraeglich nicht belegbar.
