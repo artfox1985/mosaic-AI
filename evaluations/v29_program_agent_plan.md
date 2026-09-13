@@ -9,7 +9,8 @@ die am 2026-09-13 offen sind; die verbindlichen Angaben stehen je Punkt im Absch
 `evaluations/STATUS.md` Abschnitt 1.
 
 **Stand beim Anlegen:** Champion `v28-b02_brierbest` (Elo 1353 [1306, 1402], Segment 2, Anker
-`hv4_anchor`); `tools/night_sims_curve_v28b02.sh` laeuft seit 01:13, danach startet
+`hv4_anchor`; **Stand 2026-09-14: 1394 [1350, 1445]** nach den Kanten der Sims-Kurve --
+`tools/elo_tracker.py report`); `tools/night_sims_curve_v28b02.sh` laeuft seit 01:13, danach startet
 `tools/night_v28b02s100_vs_v22s25.sh` von selbst; der P.10-Fix steht unkompiliert in
 `engine/src/state.rs`; die Schwarm-Erzeugung v29 mit 100 Sims ist freigegeben, der Sockel
 zurueckgestellt.
@@ -22,15 +23,15 @@ messen, nicht schaetzen").
 
 | Nr. | Prereg | Punkt | Voraussetzung | Dauer | Stopp-Punkt |
 | --- | --- | --- | --- | --- | --- |
-| 1 | `search_depth_column_optimum` par.8e | Auswertung Sims-Kurve (Teil A 3 Punkte, Teil B 4 Punkte), Verdikt nach der "eklatant"-Regel | Kette durch, sieben Artefakte vollstaendig | Minuten (ANNAHME) | **ja** -- Sockel-Sims |
-| 2 | `search_depth_column_optimum` par.8e / `code_cleanup_closeout` par.7a | Register-Zeile der wartenden Kante v28-b02@100 gegen v22-b05@25 (zweite Aufhaengung des Knotens) | Kante durch (Artefakt `..._seed58_full.json`) | Minuten (ANNAHME) | nein |
-| 3 | `stack_top_feature` par.15 | **Wheel 1**: P.10-Suchfix kompilieren plus Record-Feld `tiled_max_row` in `state_to_json`; Tore Lib-Tests, no-run, Wheel, Fixture, Anker-Drift, Konventionen | Maschine frei, Nr. 1 und 2 durch | Tore rund 6 min (gemessen); Bau Minuten, Code liegt | **ja** -- bei ROT in der Drift; Fixture-Neuerzeugung melden |
-| 4 | `stack_top_feature` par.13 | Sichtpunkt P.3 klaeren: kennt der Entscheid `DrawStackPeek` gegen `ChooseDrawStackSlot` die Vorderseiten? Entscheidet INPUT_SIZE 794 gegen 812 | nur Codelesen | Minuten (ANNAHME) | **ja** -- Nutzer waehlt die Zahl |
+| 1 | `search_depth_column_optimum` par.8e | Auswertung Sims-Kurve, Verdikt nach der "eklatant"-Regel. **AUSWERTUNG DURCH**: 1 von 3 eklatant, Betriebspunkt 100 bleibt. OFFEN bleibt der Sockel-Entscheid (Vorschlag 100 Sims, 4,40 h gegen 8,29 h) | Kette durch, sieben Artefakte vollstaendig | Minuten (ANNAHME) | **ja** -- Sockel-Sims |
+| 2 | `search_depth_column_optimum` par.8e / `code_cleanup_closeout` par.7a | Register-Zeile der Kante v28-b02@100 gegen v22-b05@25. **DURCH**: `v28-b02@100` steht mit 1298 [1251, 1350] auf 380 Partien und 1 von 3 Kanten im Register | Kante durch (Artefakt `..._seed58_full.json`) | Minuten (ANNAHME) | nein |
+| 3 | `stack_top_feature` par.15 | **DURCH**, am laufenden v29-Korpus nachgezaehlt: alle sieben Sichtfelder liegen in den Records, `tiled_max_row` je Spieler. **Wheel 1**: P.10-Suchfix kompilieren plus Record-Feld `tiled_max_row` in `state_to_json`; Tore Lib-Tests, no-run, Wheel, Fixture, Anker-Drift, Konventionen | Maschine frei, Nr. 1 und 2 durch | Tore rund 6 min (gemessen); Bau Minuten, Code liegt | **ja** -- bei ROT in der Drift; Fixture-Neuerzeugung melden |
+| 4 | `stack_top_feature` par.13 | Sichtpunkt P.3 klaeren. **DURCH** (par.16, Regelauskunft des Nutzers plus Codebeleg): die Vorderseiten sind erst nach dem Aufhoeren bekannt, INPUT_SIZE **794**. Nebenbefund: die Aktionsliste verraet die Designs schon beim Weiterziehen -- Netz-sieht-MEHR, ungemessen | nur Codelesen | Minuten (ANNAHME) | **ja** -- Nutzer waehlt die Zahl |
 | 5 | `stack_top_feature` par.13/15/17, `v29_window` par.6c | **Wheel 2**: Encoder-Abschnitt 16 (P.3/P.7/P.9/P.11-P.15), Rust beide Pfade plus Python-Zwilling, `config.INPUT_SIZE`, Sichtgleichheits- und Regressionstest, Fixture, Drift. **CODE UND TORE DURCH 2026-09-13** (641 Tests gruen, drei Fixtures neu); offen nur noch Wheel-Bau/Installation plus `config.INPUT_SIZE` auf 794 im selben Zug, dann Anker-Drift | Nr. 3 und 4, Fenster ohne Erzeugung/Waechter/Kette | Bau und Tore rund 2 h (ANNAHME) | **ja** -- bei ROT in der Drift |
 | 6 | `v29_window` par.4, Skill `/mosaic-generation-turnover` | Generationswechsel: Maschine frei, Einfrieren, daily-Snapshot mit restic-Beleg, Namen reservieren, STATUS-Neufassung | Nr. 3 und 5 | Snapshot 7-9 s (gemessen), Rest rund 1 h (ANNAHME) | **ja** -- Loeschungen nur pfadgenau und erst nach dem Self-Play-Start |
 | 7 | `v29_window` par.5/par.8 Punkt 8 | **Schwarm-Erzeugung v29**: `value-tempc` und `value-excursion`, je 4.000 Partien @100, threads 11, Seeds 20260921/20260922, `MOSAIC_START_SLOT_RANDOM_P=0.15` | Nr. 6, Freigabe liegt vor (Nutzer 02:10) | 11.632 s + 11.361 s = **6,4 h** (gemessen an v28) | nein |
 | 8 | `v29_window` par.4 Punkt 5 | Tor 0 / Tor 2a ex post je Klasse (`corpus_sanity_check.py`) | Nr. 7 | 271 s je Klasse (gemessen) | nein |
-| 9 | `v29_window` par.2 | G-2-Haelfte festlegen (`G2_SWARM_PATTERN`), Vorschlag Ausflug-Haelfte | vor dem Fensterbau | Minuten | **ja** -- Nutzer-Entscheid |
+| 9 | `v29_window` par.2 | G-2-Haelfte festlegen (`G2_SWARM_PATTERN`), Vorschlag Ausflug-Haelfte. **DURCH**: `selfplay_v26-b01-value-excursion_*.pkl` steht in `tools/night_v29_chain.sh` | vor dem Fensterbau | Minuten | **ja** -- Nutzer-Entscheid |
 | 10 | `v29_window` par.5 Nr. 1, `search_depth` par.8e | **Sockel-Erzeugung** 4.000 Partien policy-aktiv, Sims nach Nr. 1 | Nr. 1 beantwortet, Freigabe, Maschine geklaert | @100 4,0 h (gemessen); hoehere Sims ANNAHME | **ja** -- Sims, Maschine, Freigabe |
 | 11 | `v29_window` par.4/par.6 | Kette: Manifeste, G-2-Kennzahlen, Fenster (Seed 20260941), Bloecke, Monolith mit Formen-Waechter | Nr. 7-10 | Kette rund 31 min, Merge 531-551 s (gemessen) | nein |
 | 12 | `v29_window` par.6 | Training **v29-b01** (Pflichtarm, Rezept unveraendert) | Nr. 11 | 5.157 s = **1,43 h** (gemessen) | nein |
