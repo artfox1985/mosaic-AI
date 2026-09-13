@@ -142,6 +142,12 @@ braucht, faehrt das Gating mit `--log-games` und `tools/probes/arena_column_prob
 wie bei v23. Fuer v26-b01 als Generator liefert die v27-Kette die Tor-2a-Zahl mit
 (`corpus_sanity_v26-b01-policy.json` gegen 0,737).
 
+**Nachtrag 2026-09-14: die Tor-2a-Reihe ist ueber fuenf Generationen monoton** -- v24-b07 0,637,
+v25-b01 0,737, v26-b01 0,777, v27-b01 0,816, v28-b02 0,843 (je +-0,017, n = 8.000 Seiten). Der
+Zuwachs wird dabei kleiner: +0,100 / +0,040 / +0,039 / +0,027. Wer die Zahl liest, halte zwei
+Dinge auseinander: sie misst die Self-Play-FLAECHE des Generators, nicht seine Spielstaerke, und
+vier Differenzen sind keine Kurve.
+
 **Nachtrag 2026-09-10:** beides gemessen. Tor 2a ex post 0,777 gegen 0,737
 (`PREREG_v27_window.md` par.7), Tor 2b nachgeholt mit `paired_gating.py --log-games`
 (seit 2026-09-10): 0,993 gegen 0,803 volle Spalten je Seite in derselben Arena, je n = 400

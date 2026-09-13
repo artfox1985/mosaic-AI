@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, Generator = Sieger der v28-Promotion, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: nichts gefahren. Zuschnitt aus v28 rotiert (par.1, Seed 20260941). v29-b02 ENTSCHIEDEN: Ablation der Spezialfeld-Kanaele 77/78 (par.6; die Kanaele sind seit e91cd34 gebaut, ihre Wirkung nie isoliert); v29-b03 Sicht-Arm EINGETAKTET 2026-09-13 (par.6c: P.3/P.7/P.9/P.11-P.15, 755 -> 794; Code gebaut, Wheel offen). P.12 erst ab v30 (stack_top par.17): der v29-Korpus traegt das Feld nicht, b03 misst 21 der 39 Werte. Begleitprogramm par.7; Sims-Kurve vorab (search_depth par.8e). Offen: G-2-Haelfte (par.2), Freigabe. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: ERZEUGUNG DURCH (par.9, 2026-09-14): 1.201 Dateien in rund 12,8 h, **Tor 2a HAELT** 0,843 gegen 0,816 volle Spalten je Seite (n=8.000); die Reihe ist ueber fuenf Generationen monoton, der Zuwachs wird kleiner. Fenster gebaut (2.947 Dateien, Schluessel 35c6bd2b9bd2), Training b01 laeuft. Arme: b02 Spezialfeld-Ablation, b03 Sicht-Arm (755 -> 794, Code durch, Wheel offen; P.12 erst ab v30). Offen: Sockel-Sims. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -419,9 +419,54 @@ Minuten je Modell, nie neben einer Arena.
 4. Freigabe der Erzeugung (Regel seit 2026-09-03: die Fenstererzeugung startet nur auf
    Anweisung).
 
-## par.9 ERGEBNISSE (leer bis zum Start)
+## par.9 ERGEBNISSE
 
-Nichts gefahren (Stand 2026-09-11, 17:35).
+### Erzeugung und Tor 2a (2026-09-14, Kette Schritt 1)
+
+**Erzeugung durch, vollstaendig** (2026-09-13 12:08 bis 2026-09-14 00:57, rund 12,8 h): 400
+Dateien `v28-b02-policy`, 400 `v28-b02-value-tempc`, 401 `v28-b02-value-excursion`. Die Dauer
+liegt ueber der Hochrechnung von 10,8 h; als Ursache kommt die Nebenlast in Frage, die in
+Abschnitt 1 von `STATUS.md` offengelegt ist (nicht geprueft).
+
+**Tor 2a ex post: HAELT.** `v28-b02` als Generator **0,843** (+-0,017) gegen `v27-b01` **0,816**
+(+-0,017). n = 8.000 Seiten aus 4.000 Partien der Policy-Klasse, Grundmenge Seiten, Einheit
+**volle Spalten je Seite** (`corpus_sanity_check.py`, Feld `sp_voll`; Instrument und Bezugsregel
+in `docs/generation_loop.md`).
+
+**Die Reihe ist ueber fuenf Generationen monoton:**
+
+| Generator | volle Spalten je Seite |
+| --- | --- |
+| v24-b07 | 0,637 |
+| v25-b01 | 0,737 |
+| v26-b01 | 0,777 |
+| v27-b01 | 0,816 |
+| **v28-b02** | **0,843** |
+
+Der Zuwachs wird kleiner (+0,100 / +0,040 / +0,039 / +0,027). Das passt zur erwarteten Saettigung
+aus dem Leitstern, ist aber KEIN Beleg dafuer: die Zahl misst die Self-Play-Flaeche des
+Generators, nicht die Spielstaerke, und vier Differenzen sind keine Kurve.
+
+**Standard-Kennzahlen der Policy-Klasse** (CLAUDE.md; alle aus demselben Artefakt, n = 8000 Seiten
+aus 4000 Partien):
+
+| Groesse | Wert |
+| --- | --- |
+| volle Spalten je Seite | 0.843 (+-0.017) |
+| Teilspalten >= 3 | 3.131 |
+| Teilspalten >= 4 | 2.167 |
+| hoechste Spalte | 5.537 |
+| eigene Punkte | 48.66 |
+| Strafleiste | 5.58 |
+| Margin zum Gegner | 0.0 |
+
+Der Margin ist per Konstruktion 0: im Self-Play spielt dasselbe Netz beide Seiten, die Klasse ist
+also ihr eigener Gegner. Die Reihenauslastung traegt dieses Artefakt nicht; sie steht in den
+Arena-Logs von Tor 1 und wird dort berichtet.
+
+**Fenster gebaut:** Traeger-Manifest 580 (400 neu + 135 G-1 + 45 G-2), G-2-Haelfte 145 aus
+`selfplay_v26-b01-value-excursion_*.pkl` (Soll 145, par.2), Fensterliste `data/window_v29.txt`
+mit 2.947 Dateien, Cache-Schluessel `35c6bd2b9bd2`.
 
 ## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
 
