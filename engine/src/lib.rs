@@ -828,6 +828,25 @@ fn engine_config_json() -> String {
         "return_order_mode": crate::net_mcts::SearchConfig::from_env().return_order_mode,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
+        // Nutzer-Anweisung 2026-09-13 ("dann muss der knopf rein ins manifest"):
+        // die beiden Stapelzug-Knoepfe standen bis heute in KEINEM Lauf-Manifest,
+        // obwohl `PREREG_chance_nodes.md` Z.1126 `MOSAIC_STACK_DRAW_RESEARCH=1`
+        // fuer Sockel UND Schwarm vorschreibt. Dadurch war an den v27- und
+        // v28-Korpora nicht mehr feststellbar, ob sie mit oder ohne ihn
+        // entstanden sind (`data/manifest_v27-b01-policy_20260910_234958.json`
+        // fuehrt ihn nicht). Genau der Fall, den der Kommentar bei
+        // `return_order_mode` oben beschreibt: ein fehlendes Flag ist ein
+        // stiller Default. Ironischerweise berief sich die Aufnahme der
+        // Huellen-Knoepfe schon auf die "Lehre vom Stack-Draw-Knopf", waehrend
+        // der Knopf selbst weiter fehlte.
+        //
+        // ACHTUNG OnceLock: beide Getter cachen beim ERSTEN Aufruf. Wer
+        // `engine_config_json()` aufruft, BEVOR er die Umgebungsvariable setzt,
+        // friert damit auch den Wert ein, den die Suche danach benutzt -- das
+        // Manifest zeigt dann zwar die Wahrheit dieses Prozesses, aber nicht die
+        // Absicht des Aufrufers. Reihenfolge also: Variable setzen, dann lesen.
+        "stack_draw_research": crate::self_play::stack_draw_research(),
+        "stack_draw_reservation": crate::self_play::stack_draw_reservation(),
         "determinize_root_hidden_info": DETERMINIZE_ROOT_HIDDEN_INFO,
         "round_transition_sampling": ROUND_TRANSITION_SAMPLING,
         "policy_mass_cutoff": POLICY_MASS_CUTOFF,
