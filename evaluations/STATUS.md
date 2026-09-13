@@ -99,10 +99,10 @@ Vier Fahrplanpunkte sind bearbeitet worden, alle ohne Messung:
 | 15 | Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` | **Bau geprueft und vollstaendig** (beide Encoder, Cache-Schluessel, Registratur, `engine_config`, `knobs.md`). OFFEN: die Tore -- sie teilen sich den Wheel-Bau mit Nr. 5, weil der Schalter per Default AUS ist |
 | 20 | Netz-Gesundheit | **Sonde `tools/probes/dead_unit_probe.py` gebaut**, Selbsttest ueber drei Generationen gruen. Der volle Lauf gehoert zur b03-Abnahme |
 | 23 | Korpus-Verhaltens-Audit | **Werkzeug gebaut, Selbsttest gruen** (18 Handzahlen ueber sechs Claude-Partien exakt). Der Korpuslauf kommt mit v29 |
-| 22 | Schwierigkeitsleiter | Bauplan in drei Punkten berichtigt, **Schritt 1b gebaut aber UNKOMPILIERT**: sechs optionale Stilfelder in der Suchkonfiguration. Der erste Bau gehoert an dieselbe freie Maschine wie das Wheel fuer Abschnitt 16 |
+| 22 | Schwierigkeitsleiter | Bauplan in drei Punkten berichtigt, **Schritt 1b gebaut UND ABGENOMMEN** (2026-09-14 01:35, neben dem b01-Training): sechs optionale Stilfelder, 641 Tests gruen, Paritaets-Fixture unveraendert -- das vorregistrierte Tor. Nichts installiert. Auch `models/levels/beginner.spec.json` liegt (hv3 @150) |
 
-**UNGETESTETER RUST-CODE LIEGT IM BAUM** (Encoder-Abschnitt 16 ist getestet, Schritt 1b der
-Leiter NICHT). Das gefaehrdet die laufende Nacht nicht: weder `tools/night_v29_chain.sh` noch
+**KEIN UNGETESTETER RUST-CODE MEHR IM BAUM** (2026-09-14 01:35: auch Schritt 1b ist kompiliert
+und abgenommen, 641 Tests gruen). Das gefaehrdet die laufende Nacht nicht: weder `tools/night_v29_chain.sh` noch
 `tools/night_v29_tor1_b01.sh` bauen ein Wheel (geprueft: kein maturin, kein pip install, kein
 cargo darin) -- beide fahren auf dem INSTALLIERTEN Wheel, und `config.INPUT_SIZE` steht bewusst
 noch auf 755. Der erste Bau gehoert an eine freie Maschine und bringt beides zugleich: Wheel fuer

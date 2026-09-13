@@ -263,7 +263,8 @@ taugen sie deshalb nur als Obergrenze.
 
 | Lauf | Dauer | Bemerkung |
 | --- | --- | --- |
-| `cargo test --release --lib` (641 Tests, Abschnitt 16 gebaut) | **149,6 s** bis **194,2 s** | dreimal gefahren; die Streuung ist die Nebenlast |
+| `cargo test --release --lib` (641 Tests, Abschnitt 16 gebaut) | **149,6 s** bis **194,2 s** | dreimal gefahren NEBEN DER ERZEUGUNG; die Streuung ist die Nebenlast |
+| dieselbe Suite neben einem GPU-Training statt neben der Erzeugung | **100,3 s** | der Vergleich zeigt, was die Erzeugung gekostet hat: rund die Haelfte |
 | Kompilieren allein (warmes target, nach Encoder-Aenderung) | **76 s** bis **83 s** | – |
 | Feature-Golden-Fixture neu schreiben (`MOSAIC_UPDATE_FEATURE_FIXTURE=1`) | **0,05 s** Test plus 83 s Bau | 130 Zeilen |
 | Netz-Paritaets-Fixture neu schreiben (3 Partien, 8 Sims) | **29,8 s** Test, 33,2 s gesamt | Champion v28-b02 |
