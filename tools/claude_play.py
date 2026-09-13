@@ -623,6 +623,92 @@ def placement_warnings(st: dict, m: dict) -> list[str]:
     return out
 
 
+def design_str(spaces) -> str:
+    """Die Platte als DESIGN, unabhaengig davon, wer welche Zelle gefuellt hat.
+
+    `tile_str` zeigt den Fuellstand (grosse Buchstaben, `@`); fuer die Frage "welches Design
+    liegt noch im Stapel" ist aber die Farbanordnung gemeint. Darum hier eine eigene Fassung,
+    die `filled` ignoriert.
+    """
+    out = []
+    for sp in (spaces or [])[:4]:
+        if not sp:
+            out.append(".")
+        elif sp.get("type") == "SPECIAL":
+            out.append("#")
+        elif sp.get("type") == "WILD":
+            out.append("*")
+        else:
+            out.append(COLORS.get(sp.get("color"), "?").lower())
+    while len(out) < 4:
+        out.append(".")
+    return f"[{out[0]}{out[1]}/{out[2]}{out[3]}]"
+
+
+def known_designs(st: dict) -> dict:
+    """Farbanordnung je Platten-Id, soweit sie AKTUELL auf dem Tisch zu sehen ist.
+
+    Quellen sind ausschliesslich offene: die Auslage, die gerade gezogenen Platten und jede
+    schon gelegte Platte auf einem der beiden Bretter. Eine Platte, die nie offen lag, bleibt
+    ohne Design -- dann steht nur ihre Nummer da.
+    """
+    out: dict = {}
+    for t in (st.get("dome_display") or []) + (st.get("pending_stack_draw") or []):
+        if t and t.get("id") is not None:
+            out[t["id"]] = t.get("spaces")
+    for pl in st.get("players") or []:
+        for row in pl.get("dome_grid") or []:
+            for slot in row or []:
+                if slot and slot.get("id") is not None:
+                    out.setdefault(slot["id"], slot.get("spaces"))
+    return out
+
+
+def stack_lines(st: dict, m: dict) -> list[str]:
+    """Was der Zustand ueber den verdeckten Kuppelstapel hergibt -- dieselben Groessen, die der
+    Encoder bekommt (`features.rs:274-286` Maske und Wild-Anteil, `features.rs:744-754` das
+    Rueckgabe-Wissen aus `dome_pool_view`).
+
+    Bis 2026-09-13 zeigte `show` vom Stapel nur Hoehe und obersten Typ; die Maske und das
+    Rueckgabe-Wissen kamen im Fenster gar nicht vor, obwohl das Netz sie seit v28-b02 bekommt
+    (Sicht-Audit par.10b). Nutzer-Entscheid 2026-09-13: "die kannst bei dir einbauen."
+
+    WAECHTER: `dome_pool_view` wird fuer `state.current_player` gerechnet (serialize.rs:99), das
+    `own`-Flag und die Reihenfolge `types` gehoeren also dem Spieler AM ZUG. Ist die KI am Zug,
+    bleibt der Block weg -- sonst laese ich ihre Blockreihenfolge mit.
+    """
+    n = st.get("dome_stack_count") or 0
+    L: list[str] = []
+    mask = st.get("dome_pool_mask") or []
+    ids = [i for i, bit in enumerate(mask) if bit]
+    frac = st.get("dome_wild_remaining_frac")
+    head = f"Kuppelstapel {n} verdeckt"
+    if n and isinstance(frac, (int, float)):
+        wild = round(frac * n)
+        head += f": {wild} wild / {n - wild} spezial"
+    if ids:
+        designs = known_designs(st)
+        head += " | Designs: " + " ".join(
+            f"#{i}{design_str(designs[i]) if designs.get(i) else ''}" for i in ids)
+    L.append(head)
+
+    view = st.get("dome_pool_view") or {}
+    if view and st.get("current_player") == m["me"] and st.get("phase") != "end":
+        parts = []
+        prefix = view.get("unknown_prefix") or 0
+        if prefix:
+            parts.append(f"{prefix} unbekannt")
+        for b in view.get("blocks") or []:
+            if b.get("own") and b.get("types"):
+                parts.append("EIGEN " + str(b.get("len")) + ": "
+                             + " ".join("S" if t == "special" else "W" for t in b["types"]))
+            else:
+                parts.append(f"fremd {b.get('len')}: {b.get('wild')}W {b.get('special')}S")
+        if parts:
+            L.append("  Stapelwissen (von oben nach unten): " + " | ".join(parts))
+    return L
+
+
 
 def render(st: dict, m: dict, tiles_catalog: dict) -> str:
     me, ai = m["me"], m["ai_player"]
@@ -631,6 +717,7 @@ def render(st: dict, m: dict, tiles_catalog: dict) -> str:
     ids = st.get("scoring_tile_ids") or []
     L.append("Wertungsplatten: " + "; ".join(f"{i} {tiles_catalog.get(i, {}).get('name', '?')} ({tiles_catalog.get(i, {}).get('description', '')})" for i in ids))
     L.append(f"Beutel {counts_str(st.get('bag_colors'))} | Turm {counts_str(st.get('tower_colors'))} | Stapel {st.get('dome_stack_count')} (oben: {st.get('dome_stack_top_type')})")
+    L.extend(stack_lines(st, m))
     L.append("Auslage Kuppelplatten: " + "  ".join(tile_str(t) for t in st.get("dome_display", [])) + (f"  | gezogen: {'  '.join(tile_str(t) for t in st.get('pending_stack_draw', []))}" if st.get("pending_stack_draw") else ""))
     for f in st.get("factories", []):
         chip = f.get("bonus_chip")
