@@ -852,3 +852,46 @@ nicht auf, weil der Heuristik-Pfad `determinize_dome_pool` nicht ruft; genau die
 in der Uebergabe vorhergesagt. Dazu kommt das additive Record-Feld, das in den Hash eingeht.
 **Gegenprobe:** derselbe Test OHNE `MOSAIC_UPDATE_NET_PARITY_FIXTURE` in einem frischen Prozess
 liefert denselben Hash `4750ffc6ec094a83` (10,8 s) -- die neue Fixture ist reproduzierbar.
+
+### par.16a NACHTRAG (Nutzer 2026-09-13, aus einer Parallelsitzung): der ZWEITE, direktere Kanal -- die Anzeige
+
+par.16 oben beschreibt, wie die AKTIONSLISTE die Designs verraet. Der Nutzer hat einen zweiten
+Kanal gefunden, und der ist direkter: **der Zustand selbst serialisiert die Vorderseiten der
+gezogenen Platten sofort.** Alles am Code geprueft:
+
+| Stelle | Was dort passiert |
+| --- | --- |
+| `engine/src/serialize.rs` Z.375-379 | `pending_stack_draw` wird mit `serialize_dome_tile(Some(t))` ausgegeben, also mit voller Vorderseite. Der Kommentar gibt es selbst zu: "Rueckseite zeigt beim Ziehen nur den Typ, hier vereinfacht schon mit voller Vorderseite serialisiert". |
+| `tools/claude_play.py` Z.721 | druckt sie dem Spieler: `... | gezogen: <tile_str je Platte>`. |
+| `tools/claude_play.py` Z.597 und Z.656 | die Platzierungs-Vorschau baut ihren Katalog aus `dome_display` PLUS `pending_stack_draw` -- sie RECHNET also auf Information, die der Spieler noch nicht haben darf. |
+| `engine/src/features.rs` | kodiert `pending_stack_draw` NICHT (nur ein Kommentar Z.1435). Der Netz-EINGANG ist also sauber. |
+
+**Damit ist die Lage differenziert:**
+
+- Das **Netz** bekommt die Vorderseiten nicht in den Eingang, sieht sie aber indirekt ueber die
+  gefilterte Aktionsliste (par.16).
+- Der **Mensch am Bildschirm** (und Claude als Spieler ueber `claude_play.py`) sieht sie DIREKT,
+  im Klartext, vor dem Entscheid "weiterziehen oder aufhoeren".
+
+**Der Nutzer ordnet es richtig ein: das ist kein Sichtproblem, sondern ein REGELPROBLEM.** Die
+Sichtinventur fragt "sieht das Netz so viel wie ein Mensch". Hier sieht der Mensch MEHR, als die
+Regel erlaubt -- die Vorderseiten sind nach seiner eigenen Regelauskunft erst nach dem Aufhoeren
+bekannt (par.16, bestaetigt durch `game.rs` Z.134-137 und `moves.rs` Z.112-117).
+
+**Live eingetreten, mit Beleg des Nutzers:** in Partie g07, Runde 2, stand nach dem ersten Peek
+`gezogen: #17[#g/br]` auf dem Schirm, und der Entscheid zum Weiterziehen fiel danach. Der Nutzer
+dazu: "Benutzt habe ich nur den Typ, gesehen habe ich mehr." Das ist der ehrliche Fall; die
+Vorschau rechnet aber ohnehin mit.
+
+**Offene Folgen, NICHT entschieden (Nutzer-Entscheid noetig):**
+
+1. **Reparatur der Serialisierung:** `pending_stack_draw` muesste bis zum Stopp nur den TYP
+   tragen (wie die Rueckseite), analog zur Sichtregel von `dome_pool_view`. Das beruehrt
+   Frontend, `claude_play.py` und das Record-Format -- und damit die Paritaets-Fixture.
+2. **Die Platzierungs-Vorschau** in `claude_play.py` muesste den gezogenen Teil ausklammern,
+   solange der Zug laeuft.
+3. **Gueltigkeit der bisherigen Claude-Partien:** g02 bis g07 sind unter dieser Anzeige gespielt.
+   Ob das die dortigen Befunde beruehrt, gehoert in `PREREG_claude_play_interface.md`.
+4. Verhaeltnis zu par.16: beide Kanaele fuehren zu derselben Regelverletzung, haben aber
+   verschiedene Reparaturen. Die Aktionslisten-Luecke (par.16) betrifft die SUCHE, diese hier die
+   ANZEIGE. Eine Reparatur der Anzeige schliesst par.16 NICHT mit.
