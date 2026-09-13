@@ -230,6 +230,17 @@ fn serialize_player(state: &GameState, pi: usize) -> Value {
         "id": p.player_id,
         "name": p.name,
         "score": p.score,
+        // P.14 (`PREREG_stack_top_feature.md` par.15): hoechste in DIESER
+        // Tiling-Phase bereits abgeraeumte Musterreihe, -1 vor der ersten.
+        // Additiv aufgenommen, weil der Record es sonst nicht traegt und der
+        // Sicht-Arm v29-b03 das Merkmal dann nicht lernen kann (Praezedenz
+        // `dome_pool_view` fuer v28-b02: ein Merkmal, das erst NACH der
+        // Erzeugung eingebaut wird, fehlt dem ganzen Korpus). Der Direktpfad
+        // liest den Wert aus dem Zustand, der Replay-Pfad aus diesem Feld.
+        // KEINE Sichtverletzung: der Wert ist am Tisch sichtbar -- abgeraeumte
+        // Reihen sind abgeraeumt -- und wird in `Phase::Drafting` ohnehin auf
+        // -1 zurueckgesetzt (`game.rs` Z.877).
+        "tiled_max_row": p.tiled_max_row,
         "pattern_lines": p.pattern_lines.iter().enumerate().map(|(i, row)| json!({
             "index": i,
             "capacity": row.capacity(),
@@ -766,20 +777,19 @@ pub fn serialize_stack_peek(state: &GameState, n: usize) -> Value {
 //      zu großzügig sein -- geprüft (game.rs::validate_dome_move/
 //      generate_dome_moves lesen `dome_tiles_placed_this_round` ausschließlich
 //      über diesen einen Schwellenwert-Vergleich).
-//    - `tiled_max_row`: nur in `Phase::Tiling` gelesen
-//      (`features.rs::chippable_pairs_direct`, phasen-gegated) -- Default -1
-//      ist für JEDEN `Phase::Drafting`-Zustand exakt richtig. EINE geprüfte,
-//      dokumentierte Ausnahme: `tiling_solver.rs::chippable_rows` (Basis von
-//      `estimated_score`/den entsprechenden Netz-Features) ist NICHT
-//      phasen-gegated und läuft nach einer abgeschlossenen Tiling-Phase mit
-//      einem stehengebliebenen (erst beim NÄCHSTEN Drafting→Tiling-Übergang
-//      zurückgesetzten) Wert weiter -- ein bereits im Original-Engine
-//      bestehendes Verhalten, kein durch die Rekonstruktion neu eingeführter
-//      Fehler. Wirkt sich nur aus, wenn der aktuelle Spieler gerade einen
-//      NICHT verbrauchten Bonuschip hält UND eine unvollständige Reihe
-//      unterhalb dieses (eigentlich schon irrelevanten) Schwellenwerts hat --
-//      schmale, seltene Randbedingung, betrifft nur ein Hilfs-Feature
-//      (`estimated_score`), nicht die Aktionslegalität.
+//    - `tiled_max_row`: SEIT 2026-09-13 KEINE Luecke mehr -- das Feld steht im
+//      Record (`serialize_player`) und wird in `player_from_json` gelesen,
+//      Default -1 nur noch fuer Alt-Records ohne das Feld.
+//      Der fruehere Text hier behauptete, der harte Default -1 sei "fuer JEDEN
+//      `Phase::Drafting`-Zustand exakt richtig". Das ist WIDERLEGT: der
+//      Roundtrip-Guard zeigte am 2026-09-13 in Runde 2, Phase drafting, Werte
+//      von 1 und 2. Der Wert wird nicht beim EINTRITT in Drafting
+//      zurueckgesetzt, sondern erst beim naechsten Uebergang nach Tiling
+//      (`game.rs` Z.877). Die frueher hier beschriebene "geprüfte, dokumentierte
+//      Ausnahme" (`tiling_solver.rs::chippable_rows` laeuft nicht
+//      phasen-gegated und trug einen stehengebliebenen Wert weiter, sichtbar
+//      ueber `estimated_score`) entfaellt damit ebenfalls: der rekonstruierte
+//      Zustand traegt jetzt denselben Wert wie das Original.
 //    - `total_floor_penalties`/`floor_penalties_per_round`/`score_unclamped`:
 //      geprüft (grep über `features.rs`) -- werden NIRGENDS für Features,
 //      Legalität oder Suche gelesen, nur für Self-Play-Diagnose-Exporte
@@ -986,6 +996,24 @@ fn player_from_json(v: &Value) -> Result<PlayerBoard, String> {
     // s.o. Kategorie 3: 0/DOME_TILES_PER_ROUND reproduziert die aktuelle
     // Wurzel-Legalität exakt (einzige Fallunterscheidung ist der Schwellenwert).
     let dome_tiles_placed_this_round = if can_place_dome { 0 } else { DOME_TILES_PER_ROUND };
+    // P.14 (`PREREG_stack_top_feature.md` par.15): seit 2026-09-13 schreibt
+    // `serialize_player` das Feld, also wird es hier auch GELESEN. Fehlt es
+    // (aeltere Records, Frontend-JSON), bleibt der bisherige Default -1 --
+    // abwaertskompatibel.
+    //
+    // Das behebt zugleich die dokumentierte Ausnahme der Kategorie 3 weiter
+    // unten: der frueher hart gesetzte Wert -1 war NICHT, wie dort behauptet,
+    // "fuer JEDEN Phase::Drafting-Zustand exakt richtig". Der
+    // Roundtrip-Guard (`assert_roundtrip_stable`) hat das am 2026-09-13
+    // gezeigt: in Runde 2, Phase drafting, trug ein Spieler `tiled_max_row`
+    // = 1 bzw. 2. Der Wert wird also NICHT beim Phasenwechsel auf -1
+    // zurueckgesetzt, sondern erst beim naechsten Drafting-zu-Tiling-Uebergang
+    // (`game.rs` Z.877 laeuft dort, nicht beim Eintritt in Drafting).
+    let tiled_max_row = v
+        .get("tiled_max_row")
+        .and_then(|x| x.as_i64())
+        .map(|x| x as i32)
+        .unwrap_or(-1);
 
     Ok(PlayerBoard {
         player_id,
@@ -997,7 +1025,7 @@ fn player_from_json(v: &Value) -> Result<PlayerBoard, String> {
         broken_tiles,
         bonus_chips,
         dome_tiles_placed_this_round,
-        tiled_max_row: -1, // s.o. Kategorie 3: exakt für Phase::Drafting (dokumentierte Ausnahme: estimated_score)
+        tiled_max_row, // seit 2026-09-13 aus dem Record gelesen, Default -1 (s.o.)
         player_tokens_used,
         holds_first_player_marker,
         start_dome_tile: None, // nur Phase::StartPlacement; dort nie erreicht (apply_drafting verlangt start_tile_pending=false)
