@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets im Server sind aus der GUI nicht erreichbar, alle 33 Mensch-Partien liefen @400 (Mensch 24:7:2). Zuschnitt ENTSCHIEDEN 2026-09-11 (par.4.1): vier Stufen, Anfaenger = hv3_generator @150 (Nachtrag 2026-09-13), Erfahren/Experte/Meister aus dem aktuellen Champion, Meister = Champion wie in der Arena, die zwei darunter mit den Self-Play-Stilmitteln (Sims 100, Wurzelrauschen, Besuchs-Sampling, Weg C); jede Stufe bekommt eine Kante (par.5). EINGETAKTET fuer v29 (Nutzer ... -->
+<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. Zuschnitt ENTSCHIEDEN (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem Champion; Kanten erst gegen den v30-Champion. Umbau Weg A (par.12c): Schritte 1 und 2 gebaut, Bauplan am 2026-09-13 in drei Punkten berichtigt und Schritt 1b ausgearbeitet -- die Variante hat bewusst KEINEN Env-Knopf, Stilfelder und sims muessen vor den Stufen-Specs in KNOWN_FIELDS, und action_temp ist ein Modus 0..2. -->
 
 # Vorregistrierung: Schwierigkeitsstufen beim Spiel gegen das Netz
 
@@ -1004,3 +1004,45 @@ Stufenwechsel) -> 4 (Stufen-Specs) -> 5 (Tore). Schritt 1b ist neu und gehoert z
 Rust; er braucht eine freie Maschine, weil ohne Bau kein Tor faellt. Vorhanden und
 wiederverwendbar: `models/hv3.spec.json` traegt bereits `heuristik_variante: "hv3"` und alle
 Champion-Felder -- sie ist die Vorlage fuer `beginner.spec.json`, sobald `sims` ein Feld ist.
+
+#### Schritt 1b im Einzelnen (vorbereitet 2026-09-13 Nacht, Quellen nachgelesen)
+
+Alle sechs Felder sind **OPTIONAL mit Default = Bestandsverhalten** -- dasselbe Muster und
+dieselbe Begruendung wie bei `dead_cell_w`/`out_wild_w`/`round_est_c`
+(`net_mcts.rs` Z.895-908): die eingefrorenen Artefakt-Specs und die lebenden
+`models/*.spec.json` tragen sie nicht, und mit dem Default beschreibt eine Spec ohne sie
+bitgenau das Verhalten, das sie schon immer beschrieben hat. Erst wenn ein Feld
+Rezeptbestandteil wird, wandert es per `tools/spec_add_field.py` in die lebenden Specs und kann
+auf Pflicht hochgestuft werden.
+
+| Spec-Feld | Typ | Default | Heutige Quelle | Bemerkung |
+| --- | --- | --- | --- | --- |
+| `sims` | ganze Zahl > 0, optional | keiner (Aufrufer entscheidet) | Parameter des Suchaufrufs | als `Option<u32>` fuehren, nicht als 0-Sentinel: 0 Sims ist kein sinnvoller Wert und ein Sentinel verdeckt den Unterschied "nicht gesetzt" gegen "gesetzt" |
+| `root_noise` | bool, optional | keiner (Aufrufer entscheidet) | Parameter `add_root_noise`, GUI ruft `false` (`py.rs` Z.856) | ebenfalls `Option<bool>` |
+| `action_temp` | ganze Zahl 0..2 | 0 (aus, rohe Besuchszahlen) | `MOSAIC_ACTION_TEMP` | **MODUS, kein Faktor** (siehe Befund unten) |
+| `tau_argmax_from_move` | ganze Zahl >= 0 | 0 (aus) | `MOSAIC_TAU_ARGMAX_FROM_MOVE` (`net_mcts.rs` Z.3101) | ab Halbzug N argmax statt Besuchs-Sampling |
+| `deviate_prob` | Zahl 0..1 | 0.0 (aus) | `MOSAIC_DEVIATE_PROB` | bei 0.0 wird keine einzige Zusatz-Zufallszahl gezogen |
+| `deviate_candidates` | ganze Zahl >= 1 | **6**, nicht 0 | `MOSAIC_DEVIATE_CANDIDATES` | wirkt nur bei `deviate_prob > 0` |
+
+**BEFUND, der par.4.2 berichtigt: `action_temp` ist ein MODUS-Schalter, keine Temperatur.**
+par.4.2 fuehrt es als "`action_temp` (f64, 0 = argmax)". Die Knopf-Registratur
+(`knob_registry.rs` Z.140) sagt etwas anderes: *"MODUS, kein Faktor: 1 = Staffel wie im
+Heuristik-Pfad (n>50 -> 0,7; n>15 -> 0,4; sonst 0,15), 2 = glatte Form ... Bei 0 exakt die rohen
+Besuchszahlen, bitidentisch"*. Das Feld ist also eine ganze Zahl 0..2, und "0" heisst nicht
+"argmax", sondern "rohe Besuchszahlen" -- argmax ist `tau_argmax_from_move`. Wer die Stufen
+zuschneidet, muss das auseinanderhalten: die beiden Regler sitzen an verschiedenen Stellen.
+
+**Drei Stellen je Feld** (Muster an `start_by_search` ablesbar, es ist das juengste der
+optionalen Felder): die Felddeklaration samt Doc-Kommentar im Struct `SearchConfig`
+(`net_mcts.rs` ab Z.543), der Default in `from_env` (ab Z.700) und das Einlesen in
+`from_spec_file` samt Eintrag in `KNOWN_FIELDS` (Z.760-785, Parser ab Z.800). `sims` und
+`root_noise` haben keinen Env-Knopf -- sie bleiben in `from_env` schlicht `None`, so wie
+`heuristic_variant` dort hart auf `Hv1` steht.
+
+**Die VERDRAHTUNG ist ein eigener Schritt (1c) und der groessere.** Felder allein aendern nichts:
+`root_noise` und `sims` sind heute Parameter des Suchaufrufs, Temperatur und Weg C leben in der
+Self-Play-Schleife (`self_play.rs` Z.2649-2700). Erst wenn die Aufrufer die Werte AUS DER CONFIG
+nehmen, liest die GUI denselben Spieler wie `paired_gating.py`. Schritt 1b ist bewusst davon
+getrennt, weil er fuer sich bestandserhaltend ist und ein eigenes Tor bekommt: **die
+Netz-Paritaets-Fixture darf sich nach 1b NICHT aendern** (ungenutzte Felder), waehrend sie nach
+1c bewusst neu gesetzt werden koennte.
