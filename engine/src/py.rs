@@ -74,6 +74,24 @@ pub struct PyGame {
     /// Zustands-Ereignisse (`PyGame::new`, `end_tiling`/`ai_tiling_step`s
     /// `EndTiling`), unabhaengig von `simulations`.
     move_seq: u64,
+    /// Aktive Suchkonfiguration dieser Partie (`PREREG_difficulty_levels.md`
+    /// par.12c, Weg A -- Nutzer-Entscheid 2026-09-13 "Plane den groesseren
+    /// Umbau ein").
+    ///
+    /// WARUM ALS FELD und nicht per Env: eine Schwierigkeitsstufe ist nach
+    /// par.4.2 eine SPEC-DATEI, die GUI und Arena gleich lesen. Der Weg ueber
+    /// die Umgebung scheidet fuer die Heuristik-Variante ausdruecklich aus
+    /// (`net_mcts.rs` `from_env`: "KEIN Env-Knopf: die Variante kommt aus der
+    /// Spec oder gar nicht"). Die uebrigen Knoepfe kommen heute ueber die
+    /// Umgebung, weil `server.py::_apply_champion_spec_env` sie dorthin
+    /// schreibt; dieses Feld loest das ab, ohne es zu brechen.
+    ///
+    /// BESTANDSVERHALTEN: initialisiert mit `SearchConfig::from_env()`, also
+    /// exakt dem, was die GUI-Suchpfade bisher selbst gelesen haben. Solange
+    /// niemand `load_search_spec` ruft, ist jeder Zug bit-identisch zu vorher
+    /// -- das ist die Bedingung, unter der die Netz-Paritaets-Fixture sich
+    /// NICHT aendern darf.
+    search_config: net_mcts::SearchConfig,
 }
 
 #[pymethods]
@@ -94,6 +112,8 @@ impl PyGame {
         PyGame {
             game, rng, seed, first_player, scoring_confirmed: false,
             net: None, net_path: None, move_seq: 0,
+            // s. Feld-Kommentar: from_env ist genau das Bestandsverhalten.
+            search_config: net_mcts::SearchConfig::from_env(),
         }
     }
 
@@ -113,6 +133,56 @@ impl PyGame {
         self.net = Some(net);
         self.net_path = Some(model_path);
         Ok(())
+    }
+
+    /// Laedt die Suchkonfiguration dieser Partie aus einer Spec-Datei
+    /// (`PREREG_difficulty_levels.md` par.12c Schritt 1, Weg A).
+    ///
+    /// Der Server ruft das beim Stufenwechsel mit `models/levels/<stufe>.spec.json`.
+    /// Danach lesen die GUI-Zugpfade die Knoepfe AUS DIESEM FELD statt aus der
+    /// Umgebung -- damit traegt eine Stufe alles, was sie ausmacht, in EINER
+    /// Datei, die auch die Arena lesen kann (`paired_gating.py --spec-a/--spec-b`).
+    ///
+    /// Der entscheidende Gewinn gegenueber dem Env-Weg ist die
+    /// HEURISTIK-VARIANTE: sie hat bewusst keinen Env-Knopf (`net_mcts.rs`
+    /// `from_env`: "die Variante kommt aus der Spec oder gar nicht"), und ohne
+    /// diesen Einstieg konnte die GUI ueberhaupt keine andere als `hv1` spielen
+    /// -- die Anfaengerstufe (hv3 @150) war damit nicht baubar.
+    ///
+    /// Ohne Aufruf bleibt das Feld auf `from_env()`, also Bestandsverhalten.
+    fn load_search_spec(&mut self, spec_path: String) -> PyResult<()> {
+        let cfg = net_mcts::SearchConfig::from_spec_file(&spec_path)
+            .map_err(|e| PyValueError::new_err(format!("Spec konnte nicht geladen werden: {e}")))?;
+        self.search_config = cfg;
+        Ok(())
+    }
+
+    /// Setzt die Suchkonfiguration auf die Umgebungswerte zurueck (Stufe
+    /// "Frei" bzw. Partiestart ohne Stufe). Gegenstueck zu
+    /// [`PyGame::load_search_spec`]; ohne diesen Weg bliebe eine einmal
+    /// geladene Stufen-Spec fuer die Lebensdauer der Partie kleben.
+    fn reset_search_spec(&mut self) {
+        self.search_config = net_mcts::SearchConfig::from_env();
+    }
+
+    /// Was die Suche gerade benutzt -- fuer den Log-Kopf der Partie und fuer
+    /// `/api/ai/config`. Ohne diese Ausgabe waere eine Mensch-Partie keiner
+    /// Stufe zuzuordnen (`PREREG_difficulty_levels.md` par.4.2, und par.2.4:
+    /// die 33 Alt-Partien waren nur auswertbar, weil ALLE bei 400 liefen).
+    fn search_config_json(&self) -> String {
+        let c = &self.search_config;
+        json!({
+            "heuristik_variante": match c.heuristic_variant {
+                crate::mcts::HeuristicVariant::Hv1 => "hv1",
+                crate::mcts::HeuristicVariant::Hv3 => "hv3",
+            },
+            "envelope_search_c": c.envelope_search_c,
+            "envelope_projection_mode": c.envelope_projection_mode,
+            "envelope_hull_form": c.envelope_hull_form,
+            "special_row6_w": c.special_row6_w,
+            "start_by_search": c.start_by_search,
+        })
+        .to_string()
     }
 
     /// Roher Netz-Forward-Pass für einen beliebigen Feature-Vektor (Länge
@@ -807,7 +877,14 @@ impl PyGame {
             // echte Zustands-Ereignisse belegt, unabhaengig von `simulations`.
             self.move_seq += 1;
             let mut search_rng = StdRng::seed_from_u64(net_mcts::derive_search_seed(self.seed, self.move_seq));
-            let (chosen, a) = search_with_tree(
+            // PREREG_difficulty_levels.md par.12c Schritt 2: die Variante kommt
+            // aus der Suchkonfiguration DIESER Partie, nicht mehr hart als Hv1.
+            // Ohne geladene Stufen-Spec steht dort `from_env()`, und das ist
+            // Hv1 -- Bestandsverhalten also bit-identisch (`net_mcts.rs`
+            // `from_env` setzt die Variante bewusst fest, s. dortiger
+            // Kommentar). Erst `load_search_spec` bewegt das, und genau so
+            // wird die Anfaengerstufe (hv3 @150) baubar.
+            let (chosen, a) = crate::mcts::search_with_tree_variant(
                 &self.game.state,
                 sims,
                 AI_C,
@@ -815,6 +892,7 @@ impl PyGame {
                 AI_TREE_DEPTH,
                 AI_TREE_TOPK,
                 logger,
+                self.search_config.heuristic_variant,
             );
             match chosen {
                 Some(m) => {
