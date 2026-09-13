@@ -34,6 +34,19 @@ Erwartet rund 10,8 h (Hochrechnung aus gemessenen Werten; v28 lief 9,92 h). Dane
 Cache-Waechter unter der Trainings-Umgebung. **Nichts anderes darf Rechenlast erzeugen** --
 kein Build, kein cargo, keine Sonde.
 
+> **OFFENGELEGT (2026-09-13/14, Nacht): diese Zusage ist gebrochen worden.** Waehrend der
+> Erzeugung lief Nebenlast, und zwar in beide Richtungen: der Nutzer hat drei Push-Versuche
+> gefahren, deren pre-push-Hook jeweils `cargo test --release` ausloest (je rund 3 min Volllast),
+> und die Sitzung hat danach auf seine Frage "warum muss ich das machen?" vier weitere
+> cargo-Laeufe, zwei Sonden-Selbsttests und einen Korpuslauf ueber 228 Dateien gestartet. Dazu je
+> Commit der pre-commit-Hook mit 91 Tests.
+>
+> **Einordnung, nicht Entwarnung:** der Self-Play laeuft mit fester Simulationszahl, nicht gegen
+> eine Uhr -- die Partien sollten dadurch langsamer, aber nicht anders werden. Die Regel in
+> CLAUDE.md begruendet sich an einem Fall, in dem CPU-Nebenlast Partien verstuemmelt hat; ob das
+> hier greift, ist NICHT geprueft. Wer den v29-Korpus auswertet, muss das wissen. Der Nutzer
+> entscheidet, ob ihm das reicht oder ob die betroffenen Klassen neu erzeugt werden.
+
 **Danach, in dieser Reihenfolge:**
 
 1. **Tor 0 / Tor 2a je Klasse** (`corpus_sanity_check.py`, 271 s je Klasse gemessen).
@@ -75,6 +88,21 @@ kein Build, kein cargo, keine Sonde.
    - **Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` fuer v29-b02** plus Tore
      (`PREREG_special_tile_yield.md`, Fahrplan Nr. 15).
 7. Danach nach Fahrplan `evaluations/v29_program_agent_plan.md` (41 Punkte).
+
+### Stand der Nacht 2026-09-13/14 (Sitzung, waehrend der Erzeugung)
+
+Vier Fahrplanpunkte sind bearbeitet worden, alle ohne Messung:
+
+| Nr. | Punkt | Stand |
+| --- | --- | --- |
+| 5 | Encoder-Abschnitt 16 (Sicht-Arm v29-b03) | **Code und Tore durch**: 39 Werte, INPUT_SIZE 794, drei neue Tests, Suite 641 gruen, drei Fixtures neu gesetzt. OFFEN: Wheel-Bau plus `config.INPUT_SIZE` auf 794 im selben Zug, dann Anker-Drift |
+| 15 | Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` | **Bau geprueft und vollstaendig** (beide Encoder, Cache-Schluessel, Registratur, `engine_config`, `knobs.md`). OFFEN: die Tore -- sie teilen sich den Wheel-Bau mit Nr. 5, weil der Schalter per Default AUS ist |
+| 20 | Netz-Gesundheit | **Sonde `tools/probes/dead_unit_probe.py` gebaut**, Selbsttest ueber drei Generationen gruen. Der volle Lauf gehoert zur b03-Abnahme |
+| 23 | Korpus-Verhaltens-Audit | **Werkzeug gebaut, Selbsttest gruen** (18 Handzahlen ueber sechs Claude-Partien exakt). Der Korpuslauf kommt mit v29 |
+
+**Zwei Entscheide des Nutzers sind eingearbeitet:** P.12 wirkt erst ab v30 (der v29-Korpus traegt
+das neue Record-Feld nicht, `PREREG_stack_top_feature.md` par.17), und die P.11-Normierung ist von
+der unbelegten 4 auf die Regel-Obergrenze 10 korrigiert (`board.rs` Z.240).
 
 **FENSTER-PINNING nicht vergessen:** Streudateien, die waehrend der Erzeugung entstehen,
 gehoeren beim Fensterbau in `MOSAIC_DATA_EXCLUDE`.
