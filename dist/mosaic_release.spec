@@ -35,7 +35,7 @@ def collect_static_datas():
 datas = collect_static_datas()
 
 # Nur das aktive Referenz-Netz (Task #96): kein .pth, keine anderen Versionsstände.
-# Champion-Stand 2026-08-15: v21_2d_brierbest (Elo 1358). champion.txt MUSS
+# Champion-Stand 2026-08-15 war v21_2d_brierbest (Elo 1358). champion.txt MUSS
 # mit ins Bundle -- server.py::_load_champion_model liest sie und fiele ohne
 # sie auf den Namen "v16_best" zurueck, dessen ONNX hier gar nicht mitgeliefert
 # wird. (KORREKTUR 2026-08-15: eine fruehere Fassung dieses Kommentars nannte
@@ -43,7 +43,14 @@ datas = collect_static_datas()
 # 406 und INPUT_SIZE 708 sind zwischen dem v16-Tag und heute identisch
 # (git show v0.1-alpha16:config.py); v16 ist nur ein flaches, viel schwaecheres
 # Netz, kein unladbares.)
-datas.append((os.path.join(PROJECT_ROOT, 'models', 'alphazero_v21_2d_brierbest.onnx'), 'models'))
+# Champion-Stand 2026-09-13: v28-b02_brierbest (Elo 1353, Leitersegment 2). Ein Champion
+# ist seit 0e87ddd Modell PLUS Spec: server.py::_resolve_champion_spec sucht
+# models/<name>.spec.json und dann models/frozen_champions/<name ohne Suffix>/spec.json;
+# ohne die Spec gelten Env-Defaults und die Champion-Knoepfe (Huelle, K5) fehlen
+# (Audit evaluations/review/portable_build_audit_2026-09-13.md, Luecken 1 und 2).
+datas.append((os.path.join(PROJECT_ROOT, 'models', 'alphazero_v28-b02_brierbest.onnx'), 'models'))
+datas.append((os.path.join(PROJECT_ROOT, 'models', 'frozen_champions', 'v28-b02', 'spec.json'),
+              os.path.join('models', 'frozen_champions', 'v28-b02')))
 datas.append((os.path.join(PROJECT_ROOT, 'models', 'champion.txt'), 'models'))
 # Elo-Historie mitliefern: ohne sie hat estimate_ai_anchor keine Arena-Kanten
 # und JEDES KI-Spiel waere ungewertet (Rauchtest-Befund 2026-08-15).

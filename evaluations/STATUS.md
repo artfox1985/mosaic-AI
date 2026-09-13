@@ -95,6 +95,17 @@ Gleichstand). Teil B (argmax @100/@200/@400/@600, je 200 Partien) laeuft seit 02
    `state_to_json`. Das installierte Wheel ist bis dahin unveraendert, die laufenden Messungen
    sind davon nicht beruehrt.
 
+7. **Portable Build (Nutzer 02:30: "ueberpruefen wie funktional unser portable build ist"):** Audit
+   `evaluations/review/portable_build_audit_2026-09-13.md` (Agent, drei schwerste Luecken vom
+   Koordinator am Code GEPRUEFT): (1) `dist/mosaic_release.spec` Z.46 packt noch die v21-ONNX,
+   `models/champion.txt` nennt v28-b02 -> der Server faellt auf die Heuristik zurueck
+   (`server.py` Z.160-164, Z.700-714); (2) die Champion-Spec `frozen_champions/v28-b02/spec.json`
+   fehlt im Bundle (`server.py` Z.250-259 loest sie dort auf) -> Env-Defaults statt Champion-Knoepfe;
+   (3) Partien gegen "Heuristik" sind im Segment-2-Register ungewertet (kein Knoten `Heuristik`,
+   `ANCHOR_ALIASES` leer, `tools/elo_tracker.py` Z.173) -- Nutzer-Entscheid, ob "Heuristik" auf den
+   Anker-Namen abgebildet wird. Fix fuer (1)/(2): zwei `datas`-Zeilen im Spec; Bau und Rauchtest
+   (Plan im Audit Abschnitt C) erst bei freier Maschine, PyInstaller ist Volllast.
+
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
 
 - **NEU 2026-09-13, 02:10 (Nutzer): "du kannst nach abschluss selbstaendig den skill starten fuer die
