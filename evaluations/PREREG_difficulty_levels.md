@@ -962,7 +962,13 @@ eine Spec-Datei, die GUI und Arena gleich lesen") und respektiert den Einwand in
 3. **`server.py`:** `heuristik_variante` in die Spec-Abbildung (Z.205-232) UND der Aufruf der
    neuen Lademethode beim Stufenwechsel; die Stufen-Spec erweitert die Champion-Spec, Felder die
    sie nicht traegt werden zurueckgesetzt (Muster `_apply_champion_spec_env`).
-4. **Stufen-Specs** unter `models/levels/`: `beginner.spec.json` (hv3, 150 Sims) ist nach diesem
+4. **Stufen-Specs** unter `models/levels/`: `beginner.spec.json` **GESCHRIEBEN 2026-09-13 Nacht**
+   -- die vierzehn Felder der eingefrorenen Artefakt-Spec
+   (`models/frozen_heuristics/hv3_generator/spec.json`, byte-gleich zu `models/hv3.spec.json`,
+   geprueft) plus `sims: 150`. Sie laedt ERST mit dem Wheel von Schritt 1b: vorher kennt
+   `KNOWN_FIELDS` das Feld `sims` nicht und weist die Datei hart ab. Der Elo-Knoten dieser Stufe
+   steht bereits (`Heuristik_hv3_generator@150` 972 [935, 1011], Segment 2, par.4.1).
+   Alte Fassung dieses Punktes: `beginner.spec.json` (hv3, 150 Sims) ist nach diesem
    Entscheid schreibbar; `advanced`/`expert`/`master` brauchen noch die Sim-Zahlen und die drei
    Stilmittel-Felder (par.12 Punkt e, par.12a).
 5. **Tore, alle Pflicht:** Lib-Tests, `--no-run --all-targets`, Wheel, **Netz-Paritaets-Fixture**

@@ -42,6 +42,11 @@
 # sind die Dateien darunter automatisch sichtbar.
 !/models/frozen_champions/
 !/models/frozen_heuristics/
+# Stufen-Specs der Schwierigkeitsleiter (PREREG_difficulty_levels.md par.4.2).
+# Dieselbe Verzeichnisform und derselbe Grund wie darueber: es sind kleine
+# JSON-Dateien, die das Suchverhalten einer Stufe VOLLSTAENDIG beschreiben, und
+# ohne sie ist eine Mensch-Partie keiner Stufe zuzuordnen.
+!/models/levels/
 
 # Ausgenommen bleibt, was ABLEITBAR ist: 'venv/' (Abschnitt 3 weiter unten)
 # greift auch hier und haelt die 33 MB je Artefakt draussen -- sie entstehen
