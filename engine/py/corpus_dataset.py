@@ -675,7 +675,7 @@ class MosaicDataset(Dataset):
         bleibt gleich). "2d" ergaenzt ein zusaetzliches `planes`-HDF5-Dataset
         ([N,NUM_PLANES_CHANNELS,6,6], `neural_net.py::state_to_planes`) NEBEN
         den bestehenden Datasets -- der Cache-Key bekommt dafuer den Suffix
-        "+enc2d_v2" (siehe docs/design_2d_encoder.md Abschnitt 7), ein
+        "+enc2d_v2" (siehe archive/design_2d_encoder.md Abschnitt 7), ein
         Flach-Cache derselben Dateiliste bleibt davon unberuehrt (eigener
         Dateiname). Speicherformat uint8 statt float32: die ersten
         `NUM_BINARY_PLANES_CHANNELS` Kanaele sind binaer (One-Hot-Belegung +

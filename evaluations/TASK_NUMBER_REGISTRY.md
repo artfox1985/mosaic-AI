@@ -93,7 +93,7 @@ Teilen als A/B benannt.
 | 8 | Marginal-Delta-Plate-Shaping (Korrektur-Ansatz zu #93) | entschieden -- verworfen | `archive/history.md:5330` |
 | 9 | Ownership-Head (Hilfsziel: 72 Binaerlabels je Kuppelfeld) | entschieden -- zweimal geschlossen (2026-07-28, erneut nach dem Nach-#34-Paket, jeweils Paritaet/kein Effekt) | `archive/history.md:5411`, `archive/history.md:10018` |
 | 10 | Gumbel-Kalibrierung `GUMBEL_TOP_M` 16 vs. 8 | entschieden -- Nullergebnis | `archive/history.md:5671` |
-| 11 | 2D-Conv-Encoder (Phase 1+2, Engine-Verdrahtung) | entschieden -- from-scratch-Arena ein Wash (416:384, p=0,30), aber als Champion-Encoder uebernommen (spaeter durch Korpus-Dosis-Befund gestuetzt) | `archive/history.md:6659`, `docs/design_2d_encoder.md:1` |
+| 11 | 2D-Conv-Encoder (Phase 1+2, Engine-Verdrahtung) | entschieden -- from-scratch-Arena ein Wash (416:384, p=0,30), aber als Champion-Encoder uebernommen (spaeter durch Korpus-Dosis-Befund gestuetzt) | `archive/history.md:6659`, `archive/design_2d_encoder.md:1` |
 | 12 | Distributionaler Punkte-Kopf (C51-artiger Verteilungskopf statt Skalarregression) | entschieden -- nicht uebernommen, im Nach-#34-Paket erneut geschlossen | `archive/history.md:6212`, `archive/history.md:10018` |
 | 13 | Play-Regel (visit-proportionales Sampling der Zugwahl) -- Rauschquelle? | entschieden -- Hypothese widerlegt | `archive/history.md:5568` |
 | 14 | Playout-Cap-Randomization (PCR) | entschieden -- als eigenstaendiges Experiment NICHT produktiv eingesetzt; spaeter "aufgegangen in Design C", aus dem Index entfernt | `archive/history.md:7008`, `archive/history.md:10102` |

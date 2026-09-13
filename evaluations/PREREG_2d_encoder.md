@@ -3,7 +3,7 @@
 # Vorregistrierung: 2D-Encoder from-scratch vs. Flach-Netz from-scratch (Task #11, Phase 2)
 
 **Angelegt 2026-07-30, VOR dem ersten der 12 Trainingsläufe.** Zweck: den
-fairen Architektur-Vergleich (docs/design_2d_encoder.md Abschnitt 8) mit einer
+fairen Architektur-Vergleich (archive/design_2d_encoder.md Abschnitt 8) mit einer
 im Voraus festgelegten Auswertungsregel fahren, statt hinterher eine Metrik zu
 wählen, die zum gewünschten Ergebnis passt. Die Regeln unten dürfen nach
 Sichtung der Ergebnisse NICHT mehr geändert werden (Präzedenzfall
@@ -16,7 +16,7 @@ Entscheidung geführt).
 ## Frage
 
 Trägt die 2D-Struktur (Conv-Zweig auf `state_to_planes`, siehe
-`docs/design_2d_encoder.md`) MEHR zur Netzstärke bei als das bestehende
+`archive/design_2d_encoder.md`) MEHR zur Netzstärke bei als das bestehende
 flache 708-Feature-MLP — **from scratch, identisches Rezept, identischer
 Korpus**? Motivation (design_2d_encoder.md Abschnitt 1): der dokumentierte
 blinde Fleck bei den 8 Wertungsplatten (Reihen-/Spalten-/Diagonalen-/Rand-/
