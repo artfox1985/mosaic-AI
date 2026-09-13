@@ -29,14 +29,21 @@ Nachtrag "TREPPE GEFESTIGT", Endtabelle dort). Generator v29 = v28-b02 (Nutzer 2
 v28-Messungen registriert; der Generationswechsel v28 -> v29 (`/mosaic-generation-turnover`) ist
 NICHT begonnen.
 
-### MASCHINE FREI (seit 00:59)
+### LAEUFT (Maschine BELEGT seit 01:13)
 
 `tools/night_ladder_gap_fill.sh` ist durch (00:03-00:59, acht Artefakte, vier Kanten im Register).
-Kein Lauf aktiv. **Bereit, Start auf Anweisung:** `tools/night_sims_curve_v28b02.sh` (Sims-Kurve am
+**LAEUFT seit 01:13 (Maschine BELEGT):** `tools/night_sims_curve_v28b02.sh` (Sims-Kurve am
 Generator v28-b02, `PREREG_search_depth_column_optimum.md` par.8e: Teil A gepaart @100/@200/@600
 gegen @400 je 75 Paare ohne Frueh-Stopp mit Spaltensonde und Plattenpunkten, Teil B argmax
 @100/@200/@400/@600 je 200 Partien; rund 2,5-3 h, ANNAHME). Der Crosscheck am Spiellog ist
 durch (Schritt 1 unten).
+
+**In der Warteschlange (startet von selbst nach der Sims-Kette):** `tools/night_v28b02s100_vs_v22s25.sh`,
+Nutzer 01:50 ("lasst bitte noch 200x spielen gegen v22-b05@25"): zweite Aufhaengung des Knotens
+v28-b02@100 (bisher 30 Partien, Intervall degeneriert), gepaart gegen v22-b05@25 (k3v_off), 100 Paare
+ohne Frueh-Stopp, Seed 20261058, Logs, Spaltensonde und Plattenpunkte; Artefakt
+`paired_gating_v28-b02_s100_vs_v22-b05_s25_seed58_full.json`. Danach Register-Zeile (player_a v28-b02
+sims 100, player_b v22-b05_live sims 25, `--units-from-paired-artifact`, kein `--early-stop`).
 
 ### NAECHSTE SCHRITTE (Reihenfolge)
 
@@ -50,14 +57,48 @@ durch (Schritt 1 unten).
    die Sims von Sockel und Schwarm getrennt, mit Kosten je Variante fuer v29 UND v30 (Nutzer:
    "zum schluss sind es nur noch zwei generationen"; Entscheidungsregel "eklatant" in par.8e).
 3. **Generationswechsel v28 -> v29** nach `/mosaic-generation-turnover`, NUR auf Anweisung; darin
-   der Bau des Sicht-Arms v29-b03 (P.3 Ziehserie, P.7 Phasenaufloesung, P.9 als Vorschlag;
+   der Bau des Sicht-Arms v29-b03 (P.3 Ziehserie, P.7 Phasenaufloesung, P.9 Turm je Farbe, P.11 bis P.15 (Chip-Anzahl, Designs fremder Bloecke, Blocktiefe, Tiling-Sperre, Startspieler), INPUT_SIZE 755 -> 794/812, registriert 02:35; Record-Feld tiled_max_row VOR der Erzeugung;
    `PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c) VOR dem Start der
-   Erzeugung (Wheel-Wechsel); Loeschliste des Nutzers erst nach dem Start des v29-Self-Plays.
+   Erzeugung (Wheel-Wechsel); Netz-Gesundheit unter wachsendem Eingang als Pflichtteil der
+   b03-Abnahme (`PREREG_v29_window.md` par.6d, Nutzer 01:55: "nicht dass uns der nun abstirbt");
+   Loeschliste des Nutzers erst nach dem Start des v29-Self-Plays.
 4. ~~Vier Preregs koennen schliessen~~ ERLEDIGT 2026-09-13, 01:15 (Nutzer: "schliess auch die 3
    preregs"): `v28_window`, `dome_stack_information_sets`, `start_dome_choice` auf ENTSCHIEDEN;
    `stack_top_feature` bleibt OFFEN (Sichtgleichheit nicht erreicht, par.13). Index: 11 OFFEN.
 
+5. **Sichtinventur (Agent, 01:50-02:05) registriert** in `PREREG_stack_top_feature.md` par.15,
+   Bericht `evaluations/review/sight_asymmetry_audit_2026-09-13.md`. Vom Koordinator am Code
+   GEPRUEFT: **P.10** die Wurzel-Determinisierung mischt den unbekannten Stapel-Praefix inklusive
+   Index 0 und wuerfelt damit den oeffentlich sichtbaren Typ der obersten Platte neu (Suchfix,
+   typerhaltende Permutation; Nutzer-Entscheid jetzt oder im Generationswechsel); **P.11** die
+   Anzahl gehaltener Bonuschips fehlt im Eingang (nur Farbzaehler; 2 Werte); **P.12** Designs
+   fremder Rueckgabe-Bloecke (18 Bits); **P.15** Startspieler der naechsten Runde in der
+   Tiling-Phase (1 Wert). P.13/P.14 sind ungepruefte Agenten-Behauptungen. REGISTRIERT 02:20 (Nutzer):
+   P.11 und P.15 in Abschnitt 16; P.12 und der Zeitpunkt des Suchfixes P.10 offen
+   (`PREREG_v29_window.md` par.8 Punkte 6/7); P.10 in der Naht-Liste von `docs/architecture_reference.md`.
+
+6. **P.10-Fix im Code (02:35, Nutzer: "p10 fix kommt jetzt"), UNKOMPILIERT:** `engine/src/state.rs`
+   `determinize_dome_pool` + `restore_top_plate_type` + Test
+   `determinization_keeps_the_public_type_of_the_top_plate`. Sobald die Messungen durch sind
+   (Sims-Kette, dann die wartende Kante): `cargo test --release --lib` (Python-DLL im PATH),
+   `--no-run` fuer examples/benches, Wheel bauen und installieren, Netz-Paritaets-Fixture des
+   Champions pruefen (aendert sich vermutlich: dann bewusst neu erzeugen und begruenden),
+   Anker-Drift und Konservierung (`/mosaic-anchor-invariance`; Anker netzlos, muss gruen bleiben),
+   Konventions-Check. Im selben Wheel das Record-Feld `tiled_max_row` (P.14) additiv in
+   `state_to_json`. Das installierte Wheel ist bis dahin unveraendert, die laufenden Messungen
+   sind davon nicht beruehrt.
+
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
+
+- **NEU 2026-09-13, 02:10 (Nutzer): "du kannst nach abschluss selbstaendig den skill starten fuer die
+  schwarm erzeugung mit 100 sims. sockel lassen wir noch aussen vor und vermutlich mach ich diesen
+  auf der schnelleren maschine."** Freigabe: nach dem Ende der Sims-Kette und der wartenden Kante
+  (Maschine frei) `/mosaic-generation-turnover` selbststaendig durchlaufen und die
+  SCHWARM-Erzeugung v29 (Value-Klasse: tempc plus excursion, je 4.000 Partien, 100 Sims, Rezept
+  `PREREG_v29_window.md` par.5/par.6b) starten. Der SOCKEL (4.000 Partien policy-aktiv) wird NICHT
+  hier erzeugt; Sims und Maschine dafuer entscheidet der Nutzer nach der Auswertung par.8e.
+  Vor dem Start: P.10-Fix und Record-Feld `tiled_max_row` im Wheel (Schritt 6), Anker-Drift,
+  Paritaets-Fixture, Manifest-Diff gegen die Referenz (par.4). Loeschliste erst nach dem Start.
 
 - **Kein Push ohne Anweisung.** Ahead-Stand im Chat melden (Nutzer pusht selbst).
 - **Loeschung nur auf pfadgenaue Freigabe.** Freigegebene Loeschliste (Nutzer 2026-09-12, 23:58:
@@ -85,7 +126,6 @@ durch (Schritt 1 unten).
   ("eklatant besser" -> hoehere Erzeugungszeit in Kauf); faellt die Kurve fuer hoehere Sims aus,
   wird auch der Sockel des v29-Fensters mit den hoeheren Sims erzeugt (Kosten vorher in
   `PREREG_v29_window.md`). Pflicht-Auswertung: Vorschlag Sims Sockel/Schwarm getrennt.
-- **P.9 (Turm je Farbe) im Sicht-Arm v29-b03 mitbauen?** (`PREREG_v29_window.md` par.8 Punkt 5)
 - **Zweite Aufhaengung der Sims-Kante am Champion:** v28-b02@100 hat nur 30 Partien (Intervall
   degeneriert); mehr Partien nur, wenn der Knoten gebraucht wird.
 - Generationswechsel-Start (Schritt 5 oben), Loeschzeitpunkt (nach Self-Play-Start).

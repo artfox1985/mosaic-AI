@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 (par.10): acht Asymmetrien, alle Netz-sieht-weniger; vier GEBAUT in v24-b04 (714 -> 744), elf Stapelwerte in v28-b02 (755); Nullbefund b02 gegen b01, Kriterium bleibt Sichtgleichheit (par.1). EINGETAKTET v29 (par.13, Nutzer 2026-09-13): P.3 Ziehserie und P.7 Phasenaufloesung als Sicht-Arm v29-b03; P.9 Turm je Farbe (verdeckt, aber mitzaehlbar) als Vorschlag; Record-Felder liegen vor, nur Encoder-Anbau. Offen bleibt par.11 (was WEISS die Suche). -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 (par.10): acht Asymmetrien, vier GEBAUT (v24-b04, 714 -> 744), elf Stapelwerte (v28-b02, 755); Kriterium Sichtgleichheit (par.1). EINGETAKTET v29-b03 (par.13/15): P.3 Ziehserie, P.7 Phasenaufloesung, P.9 Turm je Farbe (par.14: 106/106 mitrechenbar), P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, P.14 Tiling-Sperre (Record-Feld vor der Erzeugung), P.15 Startspieler (755 -> 794/812). Inventur par.15: P.10 Suchfix im Code (02:35, unkompiliert bis Messende); par.11 offen. -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -430,7 +430,8 @@ am Ende des Flachvektors, Indizes 0..754 unveraendert):**
 - P.7 Phasenaufloesung: One-Hot ueber die sechs Phasen (`state.rs` Z.41-48), 6 Werte; ersetzt
   nicht den alten Wert an Index 0.., sondern kommt dazu (Altmodelle bleiben spielbar).
 - P.9 Beutel/Turm: Turm je Farbe /13, 5 Werte (Beutel je Farbe folgt aus der Summe).
-Summe 14 sichere plus 18 bedingte Werte: INPUT_SIZE 755 -> 769 oder 787.
+Summe 14 sichere plus 18 bedingte Werte: INPUT_SIZE 755 -> 769 oder 787 (STAND 01:00; ueberholt durch
+par.15 Nachtrag 02:35: mit P.11 bis P.15 sind es 39 sichere Werte, 755 -> 794 oder 812).
 
 **Arm:** `v29-b03` (Sicht-Arm, Rezept b01 plus Abschnitt 16, Warmstart mit null-initialisierten
 neuen Spalten wie v24-b04, Bloecke neu unter dem neuen Schluessel), Faktor gegen b01 = allein die
@@ -491,3 +492,77 @@ weiss/sieht"), am Zustand von Zug 47 (Runde 3, Beutel [1, 1, 0, 0, 0], Turm [7, 
   **Das Netz WEISS die Aufteilung auch ueber die Suche nicht.** Sie wirkt heute nirgends; sie
   koennte nur als Eingang des Value-Kopfs wirken (P.9, Sicht-Arm v29-b03), und erst mit einer
   Suche, die den Rundenuebergang sieht (`PREREG_round_transition_search_sampling.md`), auch dort.
+
+**P.9 EINGETAKTET (Nutzer 2026-09-13, 01:45: "also wieder eine sichtluecke. takte es ein"):** der
+Vorschlag aus par.13 wird Bestandteil des Sicht-Arms v29-b03, fuenf additive Werte (Turm je Farbe
+/13, Reihenfolge wie `bag_colors`; der Beutel je Farbe folgt aus der Summe an Abschnitt 1).
+Nutzer-Lesart, festgehalten: das Netz kann die Beutel/Turm-Mechanik ohne diese Werte nicht lernen,
+es weiss nur "irgendwo ausserhalb des Bretts" je Farbe plus die Beutel-Gesamtzahl. Abschnitt 16
+umfasst damit P.3 (3 sichere plus 18 bedingte Werte), P.7 (6) und P.9 (5): INPUT_SIZE 755 -> 769
+oder 787 (STAND 01:45, ueberholt: 794/812 seit par.15 Nachtrag 02:35). Nachtrag im Kopf und in `PREREG_v29_window.md` par.6c/par.8.
+
+## par.15 SICHTINVENTUR IN BEIDE RICHTUNGEN (Agent Opus, 2026-09-13, 01:50-02:05; Bericht `evaluations/review/sight_asymmetry_audit_2026-09-13.md`)
+
+Nutzer-Auftrag 01:45: "lass einen agenten sicht ungleichheiten suchen; vergleich mal was dem server
+game / menschen noch zur verfuegung steht und dem netz nicht bzw. umgekehrt". Vier Wege: Feld-Diff
+`state_to_json` gegen Encoder-Lesestellen, GUI-Diff, Zeitachse (par.11), verdecktes Wissen der Suche.
+Agenten-Befunde sind Behauptungen; die mit "GEPRUEFT" markierten hat der Koordinator am Code
+nachgelesen.
+
+| Nr. | Richtung | Befund | Pruefstelle | Stand |
+| --- | --- | --- | --- | --- |
+| **P.10** | Suche VERGISST oeffentliche Information | `determinize_dome_pool` mischt den unbekannten Praefix des Stapels `[..prefix_len]` INKLUSIVE Index 0; gezogen wird per `remove(0)`, Index 0 ist also die oberste Platte, deren Rueckseite laut Zustand fuer beide jederzeit sichtbar ist (`dome_stack_top_type`, Merkmal P.2 aus v24-b04). Die Wurzel wird VOR `make_node` determinisiert (`DETERMINIZE_ROOT_HIDDEN_INFO = true`), das Netz bekommt im Suchpfad einen neu gewuerfelten Typ der obersten Platte. Fehlerklasse par.11: Sicht-Audit findet es nicht, weil Zustand und Merkmal da sind. | `state.rs` Z.242-243; `game.rs` Z.187; `serialize.rs` Z.357-363; `net_mcts.rs` Z.1373, Z.1410, Z.4938-4943; `features.rs` Z.597-599 | **GEPRUEFT.** Korrektheitsfrage (CLAUDE.md "Symmetrische Defekte sieht keine Arena"): Fix = typerhaltende Permutation, Position 0 behaelt ihren Typ (Tausch mit einer typgleichen Platte im Praefix). Eintrag in `docs/architecture_reference.md` Liste. Nutzer-Entscheid: jetzt fixen (klein, Wheel-Wechsel, Paritaets-Fixture des Champions aendert sich vermutlich) oder im Generationswechsel. |
+| **P.11** | Mensch > Netz | Die ANZAHL gehaltener Bonuschips fehlt: der Encoder zaehlt nur Farben ueber alle Chips (`chip_cnt`), ein Zweifarb-Chip {Blau, Rot} und zwei Einfarb-Chips {Blau}+{Rot} ergeben denselben Vektor. Die Vollendungsregel haengt an der Anzahl (2 farbgleiche ODER 3 beliebige je fehlender Fliese). `unused_chip_count` liegt im Zustand, 0 Treffer im Encoder; GUI zeigt jeden Chip einzeln. Jede Runde (2 Chips je Spieler). | `features.rs` Z.381-396; `docs/engine_manual.md` Z.158-159; `serialize.rs` Z.255; 0 Treffer `unused_chip_count` in `features.rs` | **GEPRUEFT.** Vorschlag: 2 additive Werte (Anzahl Chips je Spieler /4) in Abschnitt 16 des Sicht-Arms v29-b03. |
+| **P.12** | Mensch > Netz | Design-Identitaet der Platten in FREMDEN Rueckgabe-Bloecken: `dome_pool_view` gibt fuer fremde Bloecke nur `len`/`special`/`wild`, `types` null. Der Gegner sieht laut Regel die Vorderseiten der gezogenen Platten, kennt also die Multimenge der Designs im Block, nur nicht die Reihenfolge. Suche behaelt die Multimenge (Blockmischung), der Encoder wirft sie weg. | `serialize.rs` Z.100-128; `docs/engine_manual.md` Z.86-90; `features.rs` Z.129-159 | **GEPRUEFT.** Vorschlag: 18 Bits "Design liegt in einem Block, dessen Inhalt ich kenne"; Gewicht geringer als P.11 (nur nach Stapelzuegen). |
+| P.13 | Mensch > Netz | Blockstruktur des Stapels auf Summen zusammengezogen (Agent). | Bericht Abschnitt 1 | Agenten-Behauptung, NICHT nachgelesen; Teil derselben Kodierung wie P.12. |
+| P.14 | Mensch > Netz | `tiled_max_row` weder serialisiert noch kodiert (Agent). | Bericht Abschnitt 1 | NICHT nachgelesen; Gewicht unklar. |
+| **P.15** | Mensch > Netz (nur Tiling-Phase) | `holds_first_player_marker` wird in der Rundenwertung geloescht; der Encoder liest nur diesen Marker (`marker`), nicht `first_player_next_round`. In der Tiling-Phase weiss das Netz also nicht, wer die naechste Runde beginnt; relevant fuer Tiling-Entscheide und den Gleichstands-Tiebreak. | `round_end.rs` Z.438-441; `features.rs` Z.361/861; `serialize.rs` Z.348; 0 Treffer `first_player_next_round` in `features.rs` | **GEPRUEFT.** Vorschlag: 1 Wert (Startspieler naechste Runde = ich) in Abschnitt 16. |
+
+Nebenbefund des Agenten (nicht nachgelesen): Kommentar `serialize.rs` Z.281-285 behauptet, der JSON-Pfad
+lese `cell_reachable_mask`; `features.rs` habe dafuer 0 Treffer, der Rust-2D-Zweig rechne es neu.
+Bekannte Punkte laut Agent: P.1/P.5/P.6 geschlossen, P.8 bestaetigt kein Randfall, P.2 im Encoder
+geschlossen, aber in der Suche durch P.10 wieder aufgerissen, P.3/P.7/P.9 offen wie registriert.
+
+**Folgen:** Abschnitt 16 des Sicht-Arms v29-b03 waechst um P.11 (2) und P.15 (1), P.12 (18) nach
+Nutzer-Entscheid; P.10 ist KEIN Merkmal, sondern ein Suchfix (Nutzer-Entscheid zum Zeitpunkt).
+
+**REGISTRIERT (Nutzer 2026-09-13, 02:20: "registrier das so"):** Abschnitt 16 des Sicht-Arms v29-b03
+umfasst P.3 (Ziehserie, 3 sichere plus 18 bedingte Werte), P.7 (Phasenaufloesung, 6), P.9 (Turm je
+Farbe, 5), **P.11 (Anzahl gehaltener Bonuschips je Spieler /4, 2)** und **P.15 (Startspieler der
+naechsten Runde = Spieler am Zug, 1)**: 17 sichere Werte, INPUT_SIZE 755 -> 772, mit den 18
+Design-Bits von P.3 790 (STAND 02:20, ueberholt: 39 Werte, 794/812 seit dem Nachtrag 02:35). **P.12 (18 Bits, Designs in bekannten fremden Bloecken) bleibt
+Nutzer-Entscheid**, nicht Teil des Arms, bis er faellt. **P.10 ist KEIN Merkmal, sondern ein
+Suchfix** (typerhaltende Permutation in `determinize_dome_pool`, Position 0 behaelt ihren Typ);
+Zeitpunkt offen (jetzt oder im Generationswechsel), Eintrag in `docs/architecture_reference.md`
+Naht-Liste als offener Befund. P.13/P.14 bleiben ungepruefte Behauptungen ohne Auftrag.
+
+**NACHTRAG 02:35 (Nutzer: "pruef sie und wirf sie bei bedarf mit rein. p12 kommt mit rein"; "p10 fix kommt jetzt"):**
+- **P.12 ENTSCHIEDEN:** 18 Bits "Design liegt in einem Block, dessen Inhalt ich kenne" kommen in
+  Abschnitt 16.
+- **P.13 GEPRUEFT** (`features.rs` Z.116-127, Z.212-245, `DOME_POOL_TOP_TYPES = 4` Z.104): eigene und
+  fremde Bloecke werden je zu Laenge/Spezial/Wild addiert, Positionstypen gibt es nur fuer den
+  ERSTEN eigenen Block (`own_seen`) und nur fuer 4 Positionen; Tiefe und Verschachtelung der Bloecke
+  fallen weg. Am Tisch weiss der Spieler, wo sein Block liegt. Greift erst ab dem zweiten eigenen
+  Block oder bei Bloecken laenger als 4, also selten. AUFGENOMMEN in kompakter Form: Tiefe des
+  ersten eigenen Blocks /18 und Anzahl eigener Bloecke /6 (2 Werte); die 24-Werte-Blockliste des
+  Agenten nicht.
+- **P.14 GEPRUEFT** (`board.rs` Z.260 `tiled_max_row`; `serialize.rs` Z.678 nur intern, Z.1328 nur
+  im exact-Pfad; `features.rs` Z.737 nur intern; Regel `docs/engine_manual.md` Z.131-134: nach einer
+  tieferen Reihe sind alle Reihen darueber fuer den Rest der Phase gesperrt): der Sperrstand steht
+  weder im Record noch im Eingang; in der Tiling-Phase wird das Netz als Tiebreak befragt
+  (`self_play.rs` Z.1856 ff., Aktionstypen tiling/end_tiling) und kann eine vollendete, aber
+  gesperrte Reihe nicht von einer noch platzierbaren unterscheiden. AUFGENOMMEN: 1 Wert je
+  Spieler, (tiled_max_row + 1)/6. **Voraussetzung:** `tiled_max_row` muss als additives Feld in
+  `state_to_json` (Record) VOR der v29-Erzeugung ausgegeben werden, sonst traegt der v29-Korpus es
+  nicht (Praezedenz `dome_pool_view` fuer v28-b02); der Direktpfad liest es aus dem Zustand.
+- **Abschnitt 16 gesamt:** P.3 (3 + 18 bedingt), P.7 (6), P.9 (5), P.11 (2), P.12 (18), P.13 (2),
+  P.14 (2), P.15 (1) = 39 sichere Werte, INPUT_SIZE 755 -> 794 (812 mit den Design-Bits von P.3).
+- **P.10 FIX GEBAUT (Code, 02:35; Nutzer: "p10 fix kommt jetzt"):** `state.rs`
+  `determinize_dome_pool` haelt den Typ der obersten Platte vor dem Mischen fest und stellt ihn
+  danach ohne RNG-Verbrauch wieder her (`restore_top_plate_type`, Tauschpartner nur aus dem Segment,
+  das Position 0 enthaelt); Test `determinization_keeps_the_public_type_of_the_top_plate` (200 Seeds,
+  Praefix als Multimenge erhalten). Der Diagnose-Rueckfall `MOSAIC_DOME_POOL_KNOWLEDGE=0` bleibt
+  unveraendert. Der JSON-Rekonstruktionspfad (`serialize.rs` Z.1091-1101) hatte den Typ schon
+  erhalten; die Suche nicht. NOCH NICHT KOMPILIERT: Build, Tests, Wheel, Paritaets-Fixture des
+  Champions (aendert sich vermutlich, dann bewusst neu), Anker-Drift (Anker ist netzlos, muss gruen
+  bleiben) erst nach dem Ende der laufenden Messungen (Sims-Kette, dann die wartende Kante).

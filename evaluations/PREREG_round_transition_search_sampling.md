@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis (Durchsatz, Paarung)? | Beleg: Nichts gebaut. EINGETAKTET FUER v29 (Nutzer 2026-09-12, par.9): Variante B (Tiling im Blatt, EINE Neubefuellung) als Such-Knopf mit Default aus, Mischregel = determinize_dome_pool aus v28 (par.8 damit beantwortet), Kostentor und A/B 200 Paare am Champion. par.4.2 ENTSCHIEDEN als Bauvorgabe. -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis (Durchsatz, Paarung)? | Beleg: Nichts gebaut. EINGETAKTET FUER v29 (Nutzer 2026-09-12, par.9): Variante B (Tiling im Blatt, EINE Neubefuellung) als Such-Knopf mit Default aus, Mischregel = determinize_dome_pool (par.8), Kostentor und A/B 200 Paare am Champion. Bauvorgaben par.4.2 und par.10 (2026-09-13: Fuellung im Blatt aus dem echten Beutel mit Turm daneben, nie aus der Summe; Sichttor). -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -309,3 +309,37 @@ Kein Training, kein Arm; Aufnahme ins Rezept nur bei positivem Schritt 2 und ver
 (Nutzer-Entscheid). Reihenfolge im v29-Begleitprogramm: nach Ziehsucht-Sonde und Mondstapel-
 Stufe 1, weil die beiden billiger sind. Kosten grob: ein Tag Bau, 3 h Messung (ANNAHME).
 
+
+## par.10 BAUVORGABE BEUTEL/TURM (Nutzer 2026-09-13, 02:05: "aber ja trag es mal nach. wir werden dann sehen ob es traegt")
+
+**Anlass:** der Crosscheck `PREREG_stack_top_feature.md` par.14 zeigt, dass ein zaehlender Spieler
+die Aufteilung der Fliesen je Farbe zwischen Beutel und Turm an jedem Entscheidungspunkt exakt
+kennt (106 von 106 am Server-Log seed946607, zwei Nachfuellungen aus dem Turm vor Runde 4 und 5);
+der Encoder kodiert nur die Summe (P.9, Sicht-Arm v29-b03). Die heutige Suche zieht nie aus dem
+Beutel, weil ihr Blatt vor dem Tiling liegt; erst Variante B startet im Blatt die neue Runde und
+muss die Fabrik-Fuellung BEMUSTERN.
+
+**Vorgabe fuer die Stichprobe der Neubefuellung in Variante B:** sie zieht aus dem Beutel-Vec des
+Suchzustands mit dem echten Turm daneben, nur die Reihenfolge im Beutel gewuerfelt, Turm-Nachfuellung
+ueber den Spielpfad (`draw_with_refill`); NICHT aus der Summe Beutel plus Turm und NICHT aus einem
+zusammengeworfenen Pool. Im Beispiel Runde 3 (Beutel 2 Steine blau/gelb, Turm 18) sind die ersten
+zwei der 21 Fliesen damit sicher blau und gelb, der Rest kommt aus dem gemischten Turm plus
+Rundenende-Abraum; ein zusammengeworfener Pool wuerde diese Sicherheit wegwuerfeln, die der Spieler
+hat. Das ist sichtkonform: mehr als die Zusammensetzung weiss auch der Mensch nicht, die Reihenfolge
+ist echter Zufall.
+
+**Bestand, der das schon richtig macht (geprueft 2026-09-13):** `engine/src/round_transition.rs`
+Z.200-214 (`advance_one_chance`) und Z.354-372 (Kern von `sample_round_transition_value`): Klon des
+echten Zustands mit Beutel und Turm getrennt, `bag.tiles.shuffle`, Bonusplaettchen-Pool gemischt,
+dann `EndTiling`; der Bootstrap-Rollout der Erzeugung (`round_transition_deep.rs` Z.815-860) nutzt
+genau das. Variante B nimmt diesen Kern wieder; wer einen anderen baut, traegt ihn in
+`docs/architecture_reference.md` ("Wo der Code Information ABSICHTLICH vernichtet") ein und
+beantwortet dort die zwei Fragen (wessen Informationsmenge, was nimmt sie dem Spieler weg).
+Kommentar Z.356-360 ("erreicht so gut wie nie den Turm-Refill-Pfad") ist fuer Runde 4/5 ueberholt
+(Nachfuellungen sind dort die Regel, nicht die Ausnahme), der Code ist davon unberuehrt; Kommentar
+beim Bau nachziehen.
+
+**Tor dazu (vorab):** Sichttest am Instrument, 300 Blatt-Zustaende aus Runde 3 und 4 mit
+`bag_count` < 21: die gezogene Fuellung enthaelt in JEDER Stichprobe alle Beutel-Steine (die
+sicheren) und sonst nur Steine aus Turm plus Abraum; ein einziger Verstoss ist ROT. Ob die Vorgabe
+Spielstaerke TRAEGT, entscheidet der A/B aus par.9 (200 Paare am Champion), nicht dieses Tor.
