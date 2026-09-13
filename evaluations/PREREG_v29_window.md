@@ -494,8 +494,17 @@ Jeder Programmpunkt hat eigene Schritte. Reihenfolge wie nummeriert.
    (Seed 20260920, `--tau-argmax-from-move 1 --deviate-prob 1.0`); bei geaenderten Sims ist die
    Zeile hier mit der neuen Zahl zu registrieren, bevor sie laeuft.
 
-**VORSCHLAG AUS par.8e (vorgelegt 2026-09-13, 04:15; der Entscheid steht beim Nutzer aus, es
-wurde nichts gestartet): Sockel mit 100 Sims, wie der Schwarm.** Die Sims-Kurve am Champion ist
+**ENTSCHIEDEN (Nutzer 2026-09-13, 11:50): der Sockel faehrt 400 SIMS**, woertlich "Die 100 sims
+fuer den sockel sind nicht entschieden. Ich nehm 400 und push die policy ein wenig." Der Befehl
+in par.5 Nr. 1 ist damit mit `--sims 400` zu fahren (Seed 20260920 unveraendert), auf der
+schnelleren Maschine des Nutzers; Kosten 8,29 h statt 4,40 h fuer 4.000 Partien. **Der Schwarm
+bleibt bei 100 Sims** (Freigabe 02:10), das v29-Fenster mischt also bewusst zwei Betriebspunkte:
+der policy-tragende Teil tiefer gesucht, der value-tragende Schwarm flacher und billiger.
+Begruendung des Nutzers ist die Zielqualitaet, nicht die Zustandsverteilung -- das in par.8e
+notierte Gegenargument gegen den Koordinator-Vorschlag.
+
+**Ueberholter Vorschlag des Koordinators (04:15, zur Nachvollziehbarkeit): Sockel mit 100 Sims,
+wie der Schwarm.** Die Sims-Kurve am Champion ist
 durchgemessen (`PREREG_search_depth_column_optimum.md` par.8e). Fuer den KORPUS faellt sie
 monoton: volle Spalten je Seite 1,0975 / 0,9575 / 0,8950 / 0,8200 bei 100 / 200 / 400 / 600 Sims
 (n = 200 argmax-Self-Play-Partien je Punkt, Grundmenge 400 Seiten, @100 gegen @400 z = +3,74).
@@ -504,13 +513,14 @@ vorab festgelegten Lesart Teil B zustaendig, fuer die BEWERTUNG Teil A. Kosten f
 Partien aus den gemessenen Sekunden je Partie: @100 4,40 h, @200 5,82 h, @400 8,29 h,
 @600 11,74 h. Der teurere Betriebspunkt liefert also den spaltenaermeren Korpus.
 
-**Folge fuer Tor 0 und Tor 2a, falls der Nutzer doch hoehere Sims waehlt (ABLEITUNG, nicht
-gemessen):** ein Sockel bei 400 wuerde die Bezugswerte NACH UNTEN ziehen, nicht nach oben. Der
+**Folge fuer Tor 0 und Tor 2a, jetzt der EINGETRETENE Fall (ABLEITUNG, nicht gemessen):** der
+Sockel bei 400 zieht die Bezugswerte NACH UNTEN, nicht nach oben. Der
 Bezugswert von par.6 ist 0,816 volle Spalten je Seite aus `corpus_sanity_v27-b01-policy.json`
 (v28-Generator). Die Sims-Kurve misst dieselbe Groesse, aber in einer anderen BETRIEBSART
 (argmax ohne Wurzelrauschen statt policy-aktiv mit Rauschen und Temperatur): die Betraege sind
-deshalb nicht direkt vergleichbar, uebertragbar ist allein die RICHTUNG. Bei 100 Sims bleibt die
-Betriebsart des Bezugswerts erhalten, und Tor 0 / Tor 2a laufen wie in v28.
+deshalb nicht direkt vergleichbar, uebertragbar ist allein die RICHTUNG. **Ein niedrigerer Wert als 0,816 ist beim
+Sockel also erwartbar und allein KEIN Torriss** -- wer das Tor liest, nennt die Sim-Zahl dazu.
+Der Schwarm bei 100 Sims behaelt dagegen die Betriebsart des Bezugswerts.
 
 **P3 -- Kette und Arm b01 (Pflichtarm)**
 
