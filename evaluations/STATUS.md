@@ -60,9 +60,12 @@ kein Build, kein cargo, keine Sonde.
    beide brauchen eine freie Maschine und ihre Tore:
    - **Wheel 2 fuer den Sicht-Arm v29-b03**: Encoder-Abschnitt 16 mit P.3, P.7, P.9 und
      P.11 bis P.15. **Der CODE ist gebaut** (2026-09-13, `PREREG_stack_top_feature.md`
-     par.17): Rust beide Pfade, Python-Zwilling, drei Tests, plus das additive Record-Feld
-     `dome_pool_view.blocks[].designs` in `serialize.rs`. OFFEN sind Bau, Tests, Wheel,
-     Fixture und Anker-Drift -- sie brauchen ein Fenster ohne Erzeugung. Rund 2 h (ANNAHME).
+     par.17/17a): Rust beide Pfade, Python-Zwilling, drei Tests, plus das additive Record-Feld
+     `dome_pool_view.blocks[].designs` in `serialize.rs`. **Bau, Tests und Fixtures sind
+     ABGENOMMEN** (2026-09-13: 641 Tests gruen, keine Warnungen; Vertragshash jetzt
+     `39994362fba145a6`, Netz-Paritaet `3c02ed8c7c55c603`, Feature-Golden-Fixture neu
+     basisgelegt). OFFEN sind nur noch **Wheel-Bau plus Installation und die Anker-Drift** --
+     sie brauchen ein Fenster ohne Erzeugung.
      **`config.INPUT_SIZE` steht bewusst noch auf 755** und wird im SELBEN Zug wie die
      Wheel-Installation auf 794 gesetzt: `file_cache_key.py` liest den Wert zur Laufzeit,
      eine vorzeitige 794 haette die wartende Kette 755er-Bloecke unter dem 794er-Schluessel

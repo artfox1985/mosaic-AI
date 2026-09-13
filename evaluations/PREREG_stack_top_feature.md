@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 (par.10): acht Asymmetrien, vier GEBAUT (v24-b04, 714 -> 744), elf Stapelwerte (v28-b02, 755). Abschnitt 16 fuer v29-b03 GEBAUT im Code (par.17): 39 Werte, INPUT_SIZE 794, drei Tests; Bau/Wheel/Tore brauchen ein Fenster ohne Erzeugung. ENTSCHIEDEN par.17: P.12 wirkt erst ab v30 (der v29-Korpus traegt das neue Feld `designs` nicht), b03 misst 21 der 39 Werte. OFFEN: P.11 normiert /4, gemessen bis 8. par.10 P.12 korrigiert: fremde Vorderseiten sieht niemand (par.16). P.10-Suchfix unkompiliert. -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 (par.10): acht Asymmetrien, vier GEBAUT (v24-b04, 714 -> 744), elf Stapelwerte (v28-b02, 755). Abschnitt 16 GEBAUT und ABGENOMMEN (par.17/17a): 39 Werte, INPUT_SIZE 794, drei neue Tests, Suite 641 gruen ohne Warnungen, drei Fixtures neu gesetzt; OFFEN sind Wheel und Anker-Drift. ENTSCHIEDEN: P.12 wirkt erst ab v30 (v29-Korpus traegt das Feld nicht), b03 misst 21 der 39 Werte; P.11 normiert /10 statt /4 (board.rs:240). par.10 P.12 korrigiert: fremde Vorderseiten sieht niemand (par.16). -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -1020,17 +1020,40 @@ hasht, war beim Schreiben der Forderung nicht mitgedacht. **Konsequenz fuer kuen
 Record-Felder: sie brechen die Paritaets-Fixture IMMER**, und das Tor muss dann am Beleg
 entschieden werden, nicht am Hash.
 
-**Beide Fixtures sind neu zu erzeugen** (Stopp-Punkt Fahrplan Nr. 5, hiermit gemeldet):
+**DRITTER Beleg, empirisch und ungeplant:** die Netz-Paritaets-Fixture ist am 2026-09-13 neu
+erzeugt worden, NACH der P.11-Korrektur (/4 auf /10). Der Hash ist `3c02ed8c7c55c603` -- exakt
+derselbe, den der Testlauf VOR der Korrektur als `got` gemeldet hatte. Eine Aenderung an einer
+Encoder-Normierung bewegt den Paritaets-Hash also nachweislich nicht, weil er die Records
+hasht und die Normierung nur im Encoder steht. Die Fixture sagt es inzwischen selbst:
+"Hash-Verfahren: FNV-1a-64 ueber die Record-JSONs"
+(`engine/tests/fixtures/net_parity_champion.txt`).
+
+Damit war auch die Warnung, die Reihenfolge der beiden Neuerzeugungen sei kritisch, nur fuer
+die FEATURE-Fixture richtig (die hasht die Vektoren) und fuer die Paritaets-Fixture falsch.
+
+**Beide Fixtures sind neu erzeugt** (Stopp-Punkt Fahrplan Nr. 5, gemeldet und ausgefuehrt
+2026-09-13):
 
 ```
 $env:MOSAIC_UPDATE_FEATURE_FIXTURE=1; cargo test --release feature_golden_hash_matches_fixture -- --nocapture
 $env:MOSAIC_UPDATE_NET_PARITY_FIXTURE=1; cargo test --release net_parity_hash_matches_champion_fixture -- --nocapture
 ```
 
-Danach beide OHNE die Variable in einem frischen Prozess wiederholen (Abnahmeregel der
-Fixture-Tests). **Reihenfolge beachten:** erst nach der P.11-Korrektur (/4 auf /10, siehe oben),
-sonst werden die Fixtures zweimal gesetzt -- die Zahlen aus dem Lauf von 2026-09-13 sind fuer
-Punkt 2 und 3 bereits ueberholt.
+Danach beide OHNE die Variable in einem frischen Prozess wiederholt (Abnahmeregel der
+Fixture-Tests). Neue Werte: Vertragshash `39994362fba145a6`, Netz-Paritaet
+`3c02ed8c7c55c603`, Feature-Golden-Fixture neu basisgelegt (130 Zeilen, Kopf mit Begruendung
+ergaenzt).
+
+**Die Scharfschaltung haengt an EINER Stelle: `config.INPUT_SIZE`.** Solange dort 755 steht,
+liefern BEIDE Python-Wege den alten Vektor -- der Zwilling
+(`neural_net.py::state_to_tensor_python`) bricht vor Abschnitt 16 ab, und der Rust-Weg
+(`state_to_tensor_rust`) KUERZT auf die deklarierte Breite, genau wie `net.rs::build_inputs` es
+im Spielpfad tut. Der zweite Riegel ist am 2026-09-13 nachgetragen worden, nachdem beim Pruefen
+auffiel, dass `tools/night_v29_chain.sh` den Schalter `MOSAIC_FEATURES_FROM_RUST` NICHT setzt,
+die Prereg par.6 Punkt 7 ihn fuer den Blockbau aber vorsieht: ein Wheel mit Abschnitt 16 neben
+einer Konfiguration auf 755 haette sonst 794er-Vektoren unter dem 755er-Schluessel abgelegt --
+die Umkehrung des Unfalls vom 2026-09-11 und genauso still. **Der Wheel-Bau setzt `INPUT_SIZE`
+auf 794, im selben Zug wie die Installation; ein Merkposten steht an der Zeile in `config.py`.**
 
 **Drei Compiler-Warnungen im selben Zug beseitigt** (Nutzer: "vielleicht kannst die warnings auch
 gleich tackeln"): ein ueberfluessiges `mut` (`net_mcts.rs` Z.5492) und zwei

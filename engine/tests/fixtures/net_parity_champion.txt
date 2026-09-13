@@ -18,4 +18,4 @@
 champion	v28-b02_brierbest
 erzeugt	2026-09-13
 engine	0.1.0
-hash	4750ffc6ec094a83
+hash	3c02ed8c7c55c603

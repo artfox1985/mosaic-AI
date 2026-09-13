@@ -124,10 +124,22 @@ def state_to_tensor_rust(data):
     Seiten, die Umwandlung f32 -> Python-float -> f32 ist verlustfrei.
     """
     import mosaic_rust
-    return torch.tensor(
-        mosaic_rust.state_features_from_json(json.dumps(data)),
-        dtype=torch.float32,
-    )
+    _v = mosaic_rust.state_features_from_json(json.dumps(data))
+    # SCHARFSCHALTUNG, dieselbe Schaltstelle wie im Python-Zwilling: liefert
+    # das Wheel mehr Werte als `config.INPUT_SIZE` deklariert, wird auf die
+    # deklarierte Breite GEKUERZT -- nie aufgefuellt. Das ist genau, was
+    # `net.rs::build_inputs` im Spielpfad tut (Flat-Zweig Z.425,
+    # PlanesPlusFlat ueber `split_planes_flat_batch_src` Z.982).
+    #
+    # Warum das hier stehen MUSS: `file_cache_key.py` bildet den
+    # Block-Schluessel zur LAUFZEIT aus `INPUT_SIZE`. Ein Wheel, das schon
+    # Abschnitt 16 kann, waehrend die Konfiguration noch 755 sagt, wuerde
+    # sonst 794er-Vektoren unter dem 755er-Schluessel ablegen -- die
+    # Umkehrung des Unfalls vom 2026-09-11 (24 Bloecke 755 unter
+    # 744-Schluessel) und genauso still.
+    if len(_v) > INPUT_SIZE:
+        _v = _v[:INPUT_SIZE]
+    return torch.tensor(_v, dtype=torch.float32)
 
 
 def state_to_planes_rust(data):
