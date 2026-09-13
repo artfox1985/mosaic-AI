@@ -799,3 +799,41 @@ Promotion wertlos. Die Stufe-4-Mensch-Validierung verschiebt sich entsprechend.
   `hv3_generator`, die Tabelle in par.2.5 noch `hv2_generator`. Punkt (b) oben spricht fuer
   hv3, weil dessen Artefakt sauber eingefroren ist, waehrend hv2 mit `git_dirty: true`
   eingefroren wurde.
+
+### par.12a ZUSCHNITT-PRAEZISIERUNG (Nutzer 2026-09-13): die unteren Stufen ueber hv3 mit verschiedenen Sims
+
+Woertlich: **"Hv3 mit unterschiedlichen sims wird fuer die unteren Stufen relevant."** Damit
+traegt die Sim-Zahl der HEURISTIK die unteren Stufen, statt dass sie alle aus dem Champion mit
+Stilmitteln kommen (par.2.5 Tabelle Zeilen 2 und 3). Der Bau aus par.12 aendert sich dadurch in
+der Prioritaet: Punkt 1 der Umbau-Liste (Variantenparameter fuer den Heuristik-Pfad) wird zur
+Voraussetzung nicht nur der untersten, sondern mehrerer Stufen; die Stilmittel (Punkt 2) werden
+fuer sie nicht gebraucht.
+
+**Was zur Sim-Wirkung bei Heuristiken GEMESSEN ist** (Segment 2, `evaluations/elo_history.csv`,
+Stand 2026-09-13) -- die Zahlen sind fuer die Stufenabstaende die Planungsgrundlage:
+
+| Knoten | Elo | 95%-CI | Partien |
+| --- | --- | --- | --- |
+| `Heuristik_hv4_anchor@600` | 1030 | [992, 1068] | 600 |
+| `Heuristik_hv4_anchor@150` | 1000 | fix (Anker) | 1.100 |
+| `Heuristik_hv2_generator@150` | 983 | [949, 1019] | 500 |
+| `Heuristik_hv3_generator@150` | 972 | [935, 1011] | 400 |
+
+**Die tragende Einzelkante:** `hv4_anchor@600` gegen `hv4_anchor@150`, **82:68** (n = 150
+Partien, Grundmenge Referee-Partien desselben Artefakts gegen sich selbst bei verschiedener
+Sim-Zahl, drei Bloecke a 50 bis zum Deckel ohne Frueh-Stopp, Binomial p = 0,29). Das sind
+55 Prozent und rund **30 Elopunkte fuer den Faktor vier** in den Simulationen.
+
+**Zum Vergleich derselbe Sprung beim NETZ:** `v28-b02@100` gegen `@400` verliert 45:105, also
+30 Prozent, und das Register trennt die beiden Knoten um rund 96 Punkte
+(`PREREG_search_depth_column_optimum.md` par.8e). **Die Sim-Zahl ist bei der Heuristik ein
+erheblich schwaecherer Regler als beim Netz** -- gemessen ist das bisher nur an hv4, nicht an
+hv3.
+
+**Folge fuer die Stufenplanung, als Frage an den Nutzer, nicht als Entscheid:** wenn zwei untere
+Stufen aus hv3 bei verschiedenen Sims gebaut werden, ist nach diesen Zahlen mit einem Abstand in
+der Groessenordnung von 30 Elopunkten zu rechnen, solange die Sim-Zahlen im Bereich 150 bis 600
+liegen. Ob das als spuerbarer Stufenunterschied reicht, ist eine Design-Frage; ein groesserer
+Abstand waere ueber deutlich kleinere Sim-Zahlen zu holen (unter 150 ist bei der Heuristik
+nichts gemessen). **Nicht gemessen und vor dem Bau zu klaeren:** die Sim-Wirkung an hv3 selbst,
+und wo die Heuristik nach unten abflacht.
