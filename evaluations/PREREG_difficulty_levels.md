@@ -856,13 +856,21 @@ Sim-Zahl, drei Bloecke a 50 bis zum Deckel ohne Frueh-Stopp, Binomial p = 0,29).
 erheblich schwaecherer Regler als beim Netz** -- gemessen ist das bisher nur an hv4, nicht an
 hv3.
 
-**Folge fuer die Stufenplanung, als Frage an den Nutzer, nicht als Entscheid:** wenn zwei untere
-Stufen aus hv3 bei verschiedenen Sims gebaut werden, ist nach diesen Zahlen mit einem Abstand in
-der Groessenordnung von 30 Elopunkten zu rechnen, solange die Sim-Zahlen im Bereich 150 bis 600
-liegen. Ob das als spuerbarer Stufenunterschied reicht, ist eine Design-Frage; ein groesserer
-Abstand waere ueber deutlich kleinere Sim-Zahlen zu holen (unter 150 ist bei der Heuristik
-nichts gemessen). **Nicht gemessen und vor dem Bau zu klaeren:** die Sim-Wirkung an hv3 selbst,
-und wo die Heuristik nach unten abflacht.
+**KORREKTUR 2026-09-13 (Nutzer: "Es gibt keine oberen hv3 Stufen. Wir machen das ueber das
+Netz."):** die erste Fassung dieses Absatzes las "untere Stufen" als mehrere hv3-Stufen und
+rechnete mit Abstaenden zwischen ihnen. Das ist falsch. **Die Heuristik traegt AUSSCHLIESSLICH
+die unterste Stufe** (Anfaenger, hv3 @150, par.12c); alles darueber kommt aus dem Netz, wie es
+die Stufentabelle in par.4.1 von Anfang an registriert hat. Die hv3-Sim-Zahl ist damit kein
+Regler ZWISCHEN Stufen, sondern nur die Einstellung der einen Heuristik-Stufe.
+
+Die Zahlen oben bleiben trotzdem nuetzlich: sie sagen, dass ein Verstellen der hv3-Sims die
+Anfaengerstufe kaum bewegen wuerde (rund 30 Elopunkte fuer den Faktor vier), eine Feinjustierung
+dort also wenig bringt. Wer die unterste Stufe leichter machen will, muesste deutlich unter 150
+gehen -- und dort ist bei der Heuristik nichts gemessen.
+
+**Die Abstaende zwischen den Stufen 2 bis 4 macht folglich das NETZ**, ueber Sims und die drei
+Stilmittel (par.4.1). Deren Wirkung ist ungemessen; die Sim-Wirkung beim Netz dagegen ist es
+(rund 96 Elopunkte zwischen 100 und 400) und ist die belastbare Groesse fuer den Zuschnitt.
 
 ### par.12b BAU BEGONNEN (2026-09-13, Nutzer: "baue alles was moeglich ist dafuer")
 

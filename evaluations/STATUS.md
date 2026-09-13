@@ -49,11 +49,13 @@ kein Build, kein cargo, keine Sonde.
    (Seed 20260941), Bloecke, Monolith, Training v29-b01 mit Warmstart auf `v28-b02_brierbest`.
    Sie enthaelt Tor 0 und Tor 2a bereits als Schritt 1, Punkt 1 oben ist damit abgedeckt.
    **Starten wie die Erzeugung: in einem eigenen Fenster, nicht ueber die Sitzung.**
-5. **Portable Build** (aus der Uebergabe vom 02:50, beim Neufassen zunaechst verloren
-   gegangen): `python tools/build_release.py` nach
-   `evaluations/review/portable_build_audit_2026-09-13.md` Abschnitt C. Die Spec ist auf
-   v28-b02 umgestellt (Commit 3c81d0b). **Nur bei freier CPU** -- also NICHT neben der
-   Erzeugung und nicht neben der Kette. Zip-Name und Weitergabe entscheidet der Nutzer.
+5. **Portable Build -- als TEST, nicht als Auslieferung** (Nutzer 2026-09-13, 22:00: "Der
+   portable build ist fuer mich erst relevant mit v30. Wir koennen ihn von mir aus mit v29
+   testen"). Er belegt also nur, dass der Bauweg traegt; das Ergebnis wird nicht weitergegeben.
+   `python tools/build_release.py` nach
+   `evaluations/review/portable_build_audit_2026-09-13.md` Abschnitt C, Spec ist auf v28-b02
+   umgestellt (Commit 3c81d0b). **Nur bei freier CPU** -- nicht neben Erzeugung oder Kette.
+   Das RELEASE selbst gehoert zu v30 (Schlussmodell Tessa).
 6. **Zwei Bauten, die VOR ihrem jeweiligen Trainingsarm stehen** (Fahrplan Nr. 5 und Nr. 15),
    beide brauchen eine freie Maschine und ihre Tore:
    - **Wheel 2 fuer den Sicht-Arm v29-b03**: Encoder-Abschnitt 16 mit P.3, P.7, P.9 und
