@@ -101,6 +101,14 @@ Vier Fahrplanpunkte sind bearbeitet worden, alle ohne Messung:
 | 23 | Korpus-Verhaltens-Audit | **Werkzeug gebaut, Selbsttest gruen** (18 Handzahlen ueber sechs Claude-Partien exakt). Der Korpuslauf kommt mit v29 |
 | 22 | Schwierigkeitsleiter | Bauplan in drei Punkten berichtigt, **Schritt 1b gebaut aber UNKOMPILIERT**: sechs optionale Stilfelder in der Suchkonfiguration. Der erste Bau gehoert an dieselbe freie Maschine wie das Wheel fuer Abschnitt 16 |
 
+**UNGETESTETER RUST-CODE LIEGT IM BAUM** (Encoder-Abschnitt 16 ist getestet, Schritt 1b der
+Leiter NICHT). Das gefaehrdet die laufende Nacht nicht: weder `tools/night_v29_chain.sh` noch
+`tools/night_v29_tor1_b01.sh` bauen ein Wheel (geprueft: kein maturin, kein pip install, kein
+cargo darin) -- beide fahren auf dem INSTALLIERTEN Wheel, und `config.INPUT_SIZE` steht bewusst
+noch auf 755. Der erste Bau gehoert an eine freie Maschine und bringt beides zugleich: Wheel fuer
+Abschnitt 16 (Nr. 5) plus die Tore von Nr. 15, und danach den ersten Kompilierlauf fuer
+Schritt 1b.
+
 **Zwei Entscheide des Nutzers sind eingearbeitet:** P.12 wirkt erst ab v30 (der v29-Korpus traegt
 das neue Record-Feld nicht, `PREREG_stack_top_feature.md` par.17), und die P.11-Normierung ist von
 der unbelegten 4 auf die Regel-Obergrenze 10 korrigiert (`board.rs` Z.240).
