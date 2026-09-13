@@ -234,3 +234,22 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Orakel-Replay einer Partie, 98 Entscheidungen @400 (exakter Zustand) | **rund 290 s** | je Lauf |
 | Null-Klammer-Sonde Stufe 0, 4.000 Partien plus 30 Logs, einkernig | **283 s** (360 s unter Fremdlast) | |
 | Wheel-Bau plus Install | **rund 30 s** (warmes target) | |
+
+## Sims-Kurve am Champion v28-b02, gemessen am 2026-09-13 (`PREREG_search_depth_column_optimum.md` par.8e)
+
+| Aufbau | Dauer | Anmerkung |
+| --- | --- | --- |
+| Teil A, gepaarte Arena v28-b02@100 gegen @400, 75 Paare, threads 10, mit `--log-games` | **1.121,1 s** | 7,474 s je Partie, 150 Partien, Seed 20261055 |
+| Teil A, dasselbe mit @200 gegen @400 | **1.385,9 s** | 9,239 s je Partie, Seed 20261056 |
+| Teil A, dasselbe mit @600 gegen @400 | **2.363,8 s** | 15,758 s je Partie, Seed 20261057 |
+| Teil B, argmax-Self-Play @100, 200 Partien, threads 11 | **791,2 s** | **3,956 s je Partie**, 35.348 Zuege |
+| Teil B, argmax-Self-Play @200 | **1.047,3 s** | **5,237 s je Partie**, 35.296 Zuege |
+| Teil B, argmax-Self-Play @400 | **1.492,9 s** | **7,464 s je Partie**, 35.537 Zuege |
+| Teil B, argmax-Self-Play @600 | **2.112,5 s** | **10,563 s je Partie**, 35.403 Zuege |
+
+Die Teil-B-Zeilen sind die Kostenbasis fuer den Zuschnitt eines Sockels von 4.000 Partien:
+@100 4,40 h, @200 5,82 h, @400 8,29 h, @600 11,74 h (Multiplikation der gemessenen Sekunden je
+Partie, auf dieser Groesse selbst nicht gemessen). **Falle:** der `laufzeit`-Block IM Artefakt
+`depth_curve_<S>_v28b02.json` misst den Auswertungslauf von `corpus_sanity_check.py` (10-11 s,
+threads 1, `s_je_partie` null), NICHT die Erzeugung; die Erzeugungsdauer steht in
+`data/manifest_depth<S>-v28b02_*.json`.
