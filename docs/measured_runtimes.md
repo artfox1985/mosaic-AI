@@ -253,3 +253,26 @@ Partie, auf dieser Groesse selbst nicht gemessen). **Falle:** der `laufzeit`-Blo
 `depth_curve_<S>_v28b02.json` misst den Auswertungslauf von `corpus_sanity_check.py` (10-11 s,
 threads 1, `s_je_partie` null), NICHT die Erzeugung; die Erzeugungsdauer steht in
 `data/manifest_depth<S>-v28b02_*.json`.
+
+
+## Encoder-Abschnitt 16 und die Nacht-Werkzeuge, gemessen am 2026-09-13/14
+
+**ACHTUNG, alle Zahlen dieses Abschnitts sind GEBREMST:** sie wurden waehrend der laufenden
+v29-Erzeugung genommen (Offenlegung in `evaluations/STATUS.md` Abschnitt 1). Als Planungsgroesse
+taugen sie deshalb nur als Obergrenze.
+
+| Lauf | Dauer | Bemerkung |
+| --- | --- | --- |
+| `cargo test --release --lib` (641 Tests, Abschnitt 16 gebaut) | **149,6 s** bis **194,2 s** | dreimal gefahren; die Streuung ist die Nebenlast |
+| Kompilieren allein (warmes target, nach Encoder-Aenderung) | **76 s** bis **83 s** | – |
+| Feature-Golden-Fixture neu schreiben (`MOSAIC_UPDATE_FEATURE_FIXTURE=1`) | **0,05 s** Test plus 83 s Bau | 130 Zeilen |
+| Netz-Paritaets-Fixture neu schreiben (3 Partien, 8 Sims) | **29,8 s** Test, 33,2 s gesamt | Champion v28-b02 |
+| `cargo test --release --no-run` (alle Ziele) | rund **80 s** | Beispiele und Benchmarks |
+| `dead_unit_probe.py`, 3 Modelle x 24 Zustaende | **1,5 s** | voller Satz (1.800) ungemessen |
+| `corpus_behaviour_audit.py`, 10 Partien aus einer Datei | **0,5 s** bis **1,1 s** | rund 0,05 s je Partie |
+| `corpus_behaviour_audit.py`, 2.500 Partien aus 228 Dateien | rund **2 min** | single-threaded, nur Lesen |
+
+**Zwei Stolperfallen, beide mit Wiederholung geloest** (Muster `pitfalls.md`): zweimal brach
+`cargo test` mit `LNK1104: cannot open file ... .exe` ab, weil der Testlaeufer des VORIGEN Laufs
+die Datei noch hielt. Kein Testfehler, kein Schaden -- aber wer die Laeufe hintereinander
+startet, muss das Ende des vorigen abwarten, nicht nur seinen Exit-Code.
