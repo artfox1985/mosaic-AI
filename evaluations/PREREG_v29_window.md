@@ -284,9 +284,28 @@ der Abnahme von v29-b03 (und als Bezug an b01 mitgemessen):
    (dann traegt der Arm per Konstruktion nichts); ein Vielfaches der Altnormen heisst, sie
    dominieren. Beides ist ein Befund, kein Tor. Einzeiler am Checkpoint, kein Werkzeug noetig.
 2. **Tote Einheiten:** Anteil der ReLU-Einheiten der ersten Flachschicht (und des Rumpfs), die auf
-   dem Frozen-Set nie feuern, b03 gegen b01 gegen den Champion. Werkzeug gibt es nicht
-   (geprueft 2026-09-13: kein Treffer fuer dead/activation in `tools/`), Bau rund eine Stunde als
-   `tools/probes/dead_unit_probe.py`; Schwelle vorab: mehr als das Doppelte des b01-Anteils ist ROT.
+   dem Frozen-Set nie feuern, b03 gegen b01 gegen den Champion; Schwelle vorab: mehr als das
+   Doppelte des b01-Anteils ist ROT.
+
+   **GEBAUT 2026-09-13 als `tools/probes/dead_unit_probe.py`** (Fahrplan Nr. 20). Die Aussage
+   "Werkzeug gibt es nicht" war nur halb richtig: die MESSUNG stand bereits als
+   `analyze_capacity` in beiden Modellklassen (`neural_net.py` Z.1866 flach, Z.2142 2D) und
+   wird von `tools/probes/net_capacity_probe.py` aufgerufen -- was fehlte, war der FESTE
+   Auswertungssatz. Jenes Werkzeug zieht eine Zufallsstichprobe aus einer Fensterliste; fuer
+   eine Reihe ueber 744 / 755 / 794 braucht es denselben Satz je Modell, sonst vermischt sich
+   der Eingangs-Effekt mit der Stichprobe. Die neue Sonde stellt `analyze_capacity` auf
+   frozen_v3 (1.800 Zustaende) und haelt sie gegen eine benannte Referenz (`--reference`,
+   Pflichtarm der Generation); sie baut die Messung NICHT nach.
+
+   Ins Verdikt gehen nur die Schichten, die den Flachvektor sehen (2D: `flat`, `fusion1`,
+   `fusion2`; flach: `layer1` bis `layer3`), gewichtet nach Einheitenzahl. Die Conv-Schichten
+   werden mitgemessen und getrennt ausgewiesen -- sie sehen den gewachsenen Eingang nicht.
+
+   Selbsttest am 2026-09-13 ueber drei Generationen (n = 24 Zustaende, Grundmenge ein
+   Ausschnitt von frozen_v3, Einheit Anteil toter ReLU-Einheiten -- eine FUNKTIONSPROBE, kein
+   Ergebnis): v28-b02 6,51 %, v28-b01 6,71 %, v27-b01 6,71 % bei Eingaengen 755 / 744 / 744.
+   Der volle Lauf ueber 1.800 Zustaende gehoert zur b03-Abnahme und darf nicht neben einer
+   Arena oder Erzeugung laufen.
 3. **Koepfe einzeln:** `tools/offline_diagnosis.py` (Value-R2 gesamt und je Runde, Policy Top-1/3)
    und `tools/oracle_metrics.py` (prior_mass_on_oracle_top3, kendall_tau; sagen die Arena 7/7
    voraus) b03 gegen b01 auf demselben Val-Split. Aufloesungsgrenze value_r2 rund 0,015; eine
