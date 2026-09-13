@@ -36,6 +36,12 @@ Anker-Umstellung verschiebt den Anker". Dann ist es ein Nutzer-Entscheid
 Aufruf:
     python -X utf8 -u tools/probes/anchor_referee_parity_probe.py --games 6
 """
+# HINWEIS 2026-09-13: das hier benutzte Artefakt `models/frozen_heuristics/hv1_anchor`
+# ist beim Generationswechsel v28 -> v29 GELOESCHT worden (Nutzer-Freigabe: nur die letzten
+# zwei Champions plus aktiver Anker bleiben; es liegt im restic-Repo, Snapshot a36bc301).
+# Diese Sonde laeuft deshalb nicht mehr, ohne das Artefakt zurueckzuholen. Eine Umstellung
+# auf `hv4_anchor` braucht NEUE Erwartungswerte -- die hier hartkodierten gelten fuer hv1.
+
 import argparse
 import json
 import pathlib

@@ -65,7 +65,9 @@ Die Heuristik-Varianten hiessen bis zum 2026-08-28 `v1` und `v2huelle`. Das
 kollidierte mit der Netz-Zaehlung (`v21`, `v22`) und passte nicht zum
 Korpus-Tag `selfplay_hv2_*`. Seither gilt durchgaengig **`h` = Heuristik**:
 `v1` -> **`hv1`**, `v2huelle` -> **`hv2`**; die Artefaktverzeichnisse heissen
-`models/frozen_heuristics/hv1_anchor` und `.../hv2_generator`.
+`models/frozen_heuristics/hv2_generator`, `.../hv3_generator` und
+`.../hv4_anchor` (der aktive Anker seit 2026-09-12). Das urspruengliche
+`hv1_anchor` ist am 2026-09-13 geloescht worden und liegt nur noch in restic.
 
 **Der Live-Code kennt nur die neuen Namen** -- `hv1` ist der einzige spielbare
 Wert, ein Alt-Name ist ein harter Fehler mit Hinweis (`lib.rs`,
