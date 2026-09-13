@@ -687,3 +687,52 @@ Champion als Meister). **Danach:** Stufe 4 (Nutzerzeit), dann Stufe 5 mit dem le
 -- ist v29 doch die letzte Generation, fallen Stufe 2 und Stufe 5 zusammen (par.8 Punkt 6); nach
 dem heutigen Stand folgt v30 (`PREREG_v29_window.md` par.8 Punkt 3), also laeuft Stufe 5 dort.
 Dieser Punkt ist Nr. 1 des Begleitprogramms in `PREREG_v29_window.md` par.7.
+
+## par.11 GEPRUEFT 2026-09-13: spielt das Netz in der GUI dasselbe Spiel wie in der Arena?
+
+Nutzerfrage waehrend der v29-Erzeugung. Die Antwort ist fuer diese Prereg zentral, weil die
+Stufen ueber die Sim-Zahl gebaut werden sollen. Alles am Code geprueft, kein Lauf.
+
+**Gleich sind Suchweg und Konfiguration:**
+
+| Punkt | Arena | GUI / Server |
+| --- | --- | --- |
+| Einstieg | `net_arena_choose_action` -> `net_search_drafting_action` | `py.rs::ai_drafting_net_step` -> `net_mcts::net_search_with_tree` |
+| Finale Zugwahl | `select_final_root_child` | `select_final_root_child` (`net_mcts.rs` Z.5515) |
+| Wurzelrauschen | `false` (hart) | `false` (hart, `py.rs` Z.915) |
+| Runde-5-Loeser | Kurzschluss vorhanden | Kurzschluss vorhanden (`net_search_with_tree` Z.5472) |
+| Spec | per `--spec`-Datei je Seite | **per UMGEBUNG** -- `server.py` schreibt die Champion-Spec beim Start dorthin (`_apply_champion_spec_env`, Z.289; Abbildung Z.205-232 deckt Huelle, Projektionsmodus, Huellenform, `special_row6_w`, `start_by_search` ab) |
+
+Der Spec-Rueckfall im Server ist kein Schmuck: `net_search_with_tree` liest ausdruecklich
+`SearchConfig::from_env()` (Kommentar `net_mcts.rs` Z.5475-5481, "Mensch-vs-Netz-Einstieg ...
+AUSSERHALB des Wave-1-Scopes"). Ohne ihn spielte die GUI mit den Env-Defaults, also OHNE
+Huelle -- genau der Vorfall, den `server.py` Z.242-245 beschreibt.
+
+**Unterschiedlich ist die SUCHTIEFE, und das ist fuer diese Prereg der Punkt.** Die Arena misst
+bei 400 Sims; der Server startet mit `_ai_sims = 300` (`server.py` Z.107) und setzt je nach
+Preset auf 100 (Z.698, Z.830) oder 300 (Z.1529). Nach der heute abgeschlossenen Sims-Kurve
+(`PREREG_search_depth_column_optimum.md` par.8e) ist das kein Nebendetail: derselbe Champion
+verliert bei 100 gegen sich selbst bei 400 mit **45:105** (n = 150 gepaarte Partien,
+McNemar p = 6e-7). **Das Netz in der GUI ist also je nach Preset messbar schwaecher als das
+Netz, dessen Elo im Register steht.** Fuer die Stufenleiter ist das die gute Nachricht: der
+Regler existiert schon und ist jetzt beziffert (Elo-Knoten `v28-b02@100` 1298, `@200` 1289,
+`@400` 1394 -- rund 96 Punkte zwischen 100 und 400).
+
+**Ein LATENTER Unterschied, heute ohne Wirkung, aber eine Sollbruchstelle:** die Arena ruft vor
+der Suche `builder_drafting_preference` auf und wuerde deren Ergebnis der Suche VORZIEHEN
+(`self_play.rs` Z.3123-3127); der Serverpfad kennt den Vorzug gar nicht (0 Treffer in `py.rs`
+und in `net_search_with_tree`). Folgenlos ist das nur, weil die Kette bei unbesetzten Knoepfen
+durchgaengig `None` liefert (`self_play.rs` Z.2253-2261: `MOSAIC_SPALTENBAU`/`MOSAIC_PLATTENBAU`
+unset). **Wer einen der beiden Knoepfe je ins Rezept nimmt, laesst Arena und GUI auseinander
+laufen** -- und nach dem Muster des Stapelzug-Knopfs (`PREREG_chance_nodes.md`, Nachtrag
+2026-09-13) merkt das niemand, weil kein Artefakt es mitschreibt.
+
+Bemerkenswert: genau diese Fehlerklasse ist schon einmal aufgetreten. Der Kommentar an der
+vereinheitlichten Spielschleife (`self_play.rs` Z.2240-2251) nennt als Anlass, dass der
+Bauer-Vorzug "in zwei Kopien verdrahtet (einmal einseitig, einmal beidseitig) und im
+Produktionspfad zunaechst gar nicht" war. Der Serverpfad ist die Stelle, die bei jener
+Zusammenlegung aussen vor blieb.
+
+**Nicht geprueft:** ob der Tiling-Pfad (`ai_tiling_step`) in beiden gleich ist, und ob die
+Startsetzung ueber `ai_start_tile_json` dieselbe Suche fuehrt wie `StartSearchParams::for_net`
+in der Arena.
