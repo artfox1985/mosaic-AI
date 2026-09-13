@@ -1149,8 +1149,17 @@ Betriebspunkts von 100 auf 400):
 Eine von drei Bedingungen. Nach der Regel ("ein Punkt, der nur eine der drei Bedingungen
 erfuellt, ist besser, nicht eklatant") bleibt **100 der Betriebspunkt der Erzeugung**.
 
-**SOCKEL: ENTSCHIEDEN AUF 400 SIMS (Nutzer 2026-09-13, 11:50, woertlich: "Die 100 sims fuer den
-sockel sind nicht entschieden. Ich nehm 400 und push die policy ein wenig.").** Der Nutzer folgt
+**SOCKEL: ENTSCHIEDEN AUF 100 SIMS, auf DIESER Maschine (Nutzer 2026-09-13, 11:58, woertlich:
+"lass den sockel ebenfalls bei dir laufen mit 100 sims").** Damit folgt der Sockel doch dem
+Vorschlag unten, und die ganze v29-Erzeugung laeuft an einem Ort: drei Laeufe zu je 4.000
+Partien bei 100 Sims, zusammen rund 10,8 h (4,40 h Sockel plus 6,4 h Schwarm, beides aus
+gemessenen Werten hochgerechnet) -- in der Groessenordnung der v28-Erzeugung mit 9,92 h.
+
+**Zwischenzeitlich (11:50) hatte der Nutzer 400 Sims gewaehlt** ("Die 100 sims fuer den sockel
+sind nicht entschieden. Ich nehm 400 und push die policy ein wenig.") und damit das
+Gegenargument aus den Einschraenkungen aufgegriffen: Teil B misst ZUSTAENDE, nicht die
+QUALITAET der Policy-Ziele. Diese Abwaegung bleibt gueltig und ungemessen; entschieden ist sie
+jetzt zugunsten der gemessenen Groesse und des einheitlichen Betriebspunkts. Der Nutzer folgt
 damit NICHT dem Vorschlag unten, sondern dem staerksten Gegenargument, das in den
 Einschraenkungen steht: Teil B misst ZUSTAENDE (wie spaltenreich der Korpus ist), nicht die
 QUALITAET der Policy-Ziele. Die Besuchsverteilung einer 400er-Suche ist weniger verrauscht als
@@ -1159,11 +1168,10 @@ gegeneinander gemessen; die Entscheidung wiegt einen gemessenen Nachteil (0,2025
 je Seite weniger) gegen einen ungemessenen Vorteil (schaerfere Policy-Ziele) ab. Kosten: 8,29 h
 statt 4,40 h fuer 4.000 Partien, auf der schnelleren Maschine des Nutzers.
 
-**Folge, die beim Lesen der Tore zu nennen ist:** Tor 0 und Tor 2a des v29-Sockels werden gegen
-den Bezugswert des v28-Generators (0,816 volle Spalten je Seite) gemessen, der bei 100 Sims
-entstand. Nach der hier gemessenen Richtung ist bei 400 Sims ein NIEDRIGERER Wert zu erwarten,
-und das ist dann KEIN Qualitaetsmangel des Korpus, sondern der bekannte Effekt der Suchtiefe.
-Der Schwarm bleibt bei 100 Sims (Nutzer 02:10), das Fenster mischt also zwei Betriebspunkte.
+**Folge fuer die Tore:** weil Sockel UND Schwarm bei 100 Sims bleiben, behaelt die v29-Erzeugung
+die Betriebsart des Bezugswerts (0,816 volle Spalten je Seite aus dem v28-Generator, ebenfalls
+@100). Tor 0 und Tor 2a sind damit direkt vergleichbar, und das Fenster mischt KEINE zwei
+Betriebspunkte. Der bei 400 Sims erwartete niedrigere Bezugswert entfaellt als Sorge.
 
 **Der urspruengliche Vorschlag des Koordinators (ueberholt, zur Nachvollziehbarkeit):**
 100 Sims, wie der Schwarm.
