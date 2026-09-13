@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets im Server sind aus der GUI nicht erreichbar, alle 33 Mensch-Partien liefen @400 (Mensch 24:7:2). Zuschnitt ENTSCHIEDEN 2026-09-11 (par.4.1): vier Stufen, Anfaenger = Anker hv2 @150, Erfahren/Experte/Meister aus dem aktuellen Champion, Meister = Champion wie in der Arena, die zwei darunter mit den Self-Play-Stilmitteln (Sims 100, Wurzelrauschen, Besuchs-Sampling, Weg C); jede Stufe bekommt eine Kante (par.5). EINGETAKTET fuer v29 (Nutzer 2026-09-11, par.8.6): kein Bau und keine Kante vor der v29-Generation. -->
+<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets im Server sind aus der GUI nicht erreichbar, alle 33 Mensch-Partien liefen @400 (Mensch 24:7:2). Zuschnitt ENTSCHIEDEN 2026-09-11 (par.4.1): vier Stufen, Anfaenger = hv3_generator @150 (Nachtrag 2026-09-13), Erfahren/Experte/Meister aus dem aktuellen Champion, Meister = Champion wie in der Arena, die zwei darunter mit den Self-Play-Stilmitteln (Sims 100, Wurzelrauschen, Besuchs-Sampling, Weg C); jede Stufe bekommt eine Kante (par.5). EINGETAKTET fuer v29 (Nutzer ... -->
 
 # Vorregistrierung: Schwierigkeitsstufen beim Spiel gegen das Netz
 
@@ -452,6 +452,27 @@ Aera) bereit; gegen hv4-Anker 73:77 und gegen hv2 78:72, Elo 992 [948, 1035], al
 wie hv2 (978). Empfehlung: Anfaenger = hv3, weil es auf dem Motor der Champions spielt (kein
 Cross-Aera-Wheel im Spielbetrieb); Nutzer-Entscheid bei Stufe 2.
 
+
+**Nachtrag 2026-09-13, 02:50 (Identitaet des GUI-Gegners "Heuristik"; Nutzer: "das kannst dir selbst
+beantworten mit den schwierigkeitsgraden"):** der Portable-Build-Audit
+(`evaluations/review/portable_build_audit_2026-09-13.md`, Luecke 3) fand, dass Partien gegen die
+Server-Heuristik im Segment-2-Register ungewertet sind (`server.py` Z.768 uebergibt "Heuristik",
+kein solcher Knoten, `ANCHOR_ALIASES` leer). Geprueft: das Preset "easy" spielt heute die LEBENDE
+hv1-Heuristik mit 60 Sims (`server.py` Z.296) und der Netz-Konstante c_puct 1,5 (Z.109); kein
+Register-Knoten hat diese Einstellung (Anker: hv4_anchor @150, c_puct 0,3). Ein Alias
+"Heuristik" -> hv4_anchor waere deshalb eine ungeprueft gleichgesetzte Identitaet, und er unterbleibt.
+
+**Antwort ueber die Stufen (Koordinator-Entscheid nach der Empfehlung im Nachtrag 21:50, Nutzer kann
+ihn kippen):** die Anfaenger-Stufe IST der Gegner "Heuristik" der GUI. Sie spielt das eingefrorene
+Artefakt `hv3_generator` (Huellen-Lehrer auf dem Motor der Champions, Spec `models/hv3.spec.json`
+bzw. die Artefakt-Spec) mit 150 Sims und c_puct 0,3, und der Server uebergibt als Identitaet den
+Knotennamen `Heuristik_hv3_generator` mit sims 150: Knoten vorhanden (978 [938, 1016] am
+2026-09-13), keine Aliase noetig. Das Preset "easy" (hv1 @60) faellt weg (par.4.4). Bis der
+Stufen-Bau (AGENTEN-AUFTRAG unten, Plan Nr. 22) durch ist, bleibt der heutige Heuristik-Gegner
+ungewertet, und das ist richtig so. Die Anker-Drift ist davon unberuehrt: der Heuristik-Suchpfad
+ruft `determinize_dome_pool` nicht (Aufrufer nur `net_mcts.rs`, `round_transition_deep.rs`,
+`self_play.rs`-Diagnosen; Grep 2026-09-13), der P.10-Fix bewegt den Anker also nicht (Erwartung,
+Drift-Pruefung folgt beim Wheel-Bau).
 
 ## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
 

@@ -16,95 +16,74 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ---
 
-## 1. STAND (2026-09-13, 01:10; Sitzung uebernommen 00:11, Treppe gefestigt, Sims-Neumessung vorregistriert)
+## 1. UEBERGABE an die naechste Sitzung (2026-09-13, 02:50; Anlass: Kontextfenster der alten Sitzung voll, Sims-Kette Teil B laeuft)
 
 **Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12), Elo 1353
-[1306, 1402]** aus 1.410 Partien im LEITERSEGMENT 2 (Stand 01:00, 36 Kanten, alle am Anker
-`hv4_anchor` fix 1000, Block-Bootstrap; `python tools/elo_tracker.py report`): v28-b01 1326,
-v27-b01 1310, v26-b01 1255, v22-b05@400 1213, v24-b07 1207, v21 1204, v22-b05@100 1173,
-v28-b02@100 1146 (Intervall degeneriert, 30 Partien), v22-b05@25 1103, hv4_anchor@600 1046,
-hv2 983, hv3 978. **Die Treppe Anker -> hv4@600 -> v22@25 -> v22@100 -> v22@400 traegt** (jeder
-Knoten mindestens zwei Kanten am Deckel ohne Frueh-Stopp; `PREREG_code_cleanup_closeout.md` par.7a
-Nachtrag "TREPPE GEFESTIGT", Endtabelle dort). Generator v29 = v28-b02 (Nutzer 2026-09-11). Alle
-v28-Messungen registriert; der Generationswechsel v28 -> v29 (`/mosaic-generation-turnover`) ist
-NICHT begonnen.
+[1306, 1402]** aus 1.410 Partien im LEITERSEGMENT 2 (36 Kanten, Anker `hv4_anchor` fix 1000,
+Block-Bootstrap; Treppe Anker -> hv4@600 -> v22@25 -> v22@100 -> v22@400 traegt,
+`PREREG_code_cleanup_closeout.md` par.7a Nachtrag "TREPPE GEFESTIGT"). Generator v29 = v28-b02.
+**Fahrplan fuer alles Weitere: `evaluations/v29_program_agent_plan.md`** (41 Punkte, Betriebsregeln,
+"Was ein Agent NICHT darf"); je Prereg der Abschnitt AGENTEN-AUFTRAG. Ahead-Stand vor dem
+Uebergabe-Commit: 10 Commits, kein Push (Nutzer pusht selbst).
 
-### LAEUFT (Maschine BELEGT seit 01:13)
+### LAEUFT (Maschine BELEGT)
 
-`tools/night_ladder_gap_fill.sh` ist durch (00:03-00:59, acht Artefakte, vier Kanten im Register).
-**LAEUFT seit 01:13 (Maschine BELEGT):** `tools/night_sims_curve_v28b02.sh` (Sims-Kurve am
-Generator v28-b02, `PREREG_search_depth_column_optimum.md` par.8e: Teil A gepaart @100/@200/@600
-gegen @400 je 75 Paare ohne Frueh-Stopp mit Spaltensonde und Plattenpunkten, Teil B argmax
-@100/@200/@400/@600 je 200 Partien; rund 2,5-3 h, ANNAHME). Der Crosscheck am Spiellog ist
-durch (Schritt 1 unten).
+- **`tools/night_sims_curve_v28b02.sh`** (Betriebssystem-Prozess der alten Sitzung, seit 01:13; NICHT
+  neu starten). Teil A ist durch (drei Artefakte, registriert in `PREREG_search_depth_column_optimum.md`
+  par.8e: @100 45:105, @200 53:97, @600 74:76 gegen @400 -> Saettigung bei 400). **Teil B laeuft**:
+  argmax-Instrument @100/@200/@400/@600, je 200 Partien (`self_play.py --deterministic
+  --no-root-noise`, Seed 20260931, 11 Threads), Stand 02:44: Punkt @100 bei 120/200 Partien (0,25
+  Partien/s). Artefakte `evaluations/artifacts/depth_curve_{100,200,400,600}_v28b02.json`
+  (`corpus_sanity_check.py`), Self-Play-Dateien `data/selfplay_depth<S>-v28b02_*.pkl` (Messmaterial,
+  vor dem v29-Fensterbau in `MOSAIC_DATA_EXCLUDE`). Erwartetes Ende: 03:45 bis 04:15 (ANNAHME:
+  @400 rund 1.400 s, @600 rund 2.100 s). Liest `models/alphazero_v28-b02_brierbest.onnx` und
+  `models/frozen_champions/v28-b02/spec.json`: nichts davon anfassen.
+- **`tools/night_v28b02s100_vs_v22s25.sh`** (wartet, pollt alle 120 s; startet von selbst, sobald
+  `depth_curve_600_v28b02.json` liegt und kein self_play/paired_gating-Prozess mehr laeuft):
+  v28-b02@100 gegen v22-b05@25, paired_gating 100 Paare ohne Frueh-Stopp, Seed 20261058, Logs,
+  Spaltensonde, Plattenpunkte; Artefakt `paired_gating_v28-b02_s100_vs_v22-b05_s25_seed58_full.json`;
+  Dauer ANNAHME 25-35 min. Fertig-Marke: Zeile `== KANTE FERTIG`.
 
-**In der Warteschlange (startet von selbst nach der Sims-Kette):** `tools/night_v28b02s100_vs_v22s25.sh`,
-Nutzer 01:50 ("lasst bitte noch 200x spielen gegen v22-b05@25"): zweite Aufhaengung des Knotens
-v28-b02@100 (bisher 30 Partien, Intervall degeneriert), gepaart gegen v22-b05@25 (k3v_off), 100 Paare
-ohne Frueh-Stopp, Seed 20261058, Logs, Spaltensonde und Plattenpunkte; Artefakt
-`paired_gating_v28-b02_s100_vs_v22-b05_s25_seed58_full.json`. Danach Register-Zeile (player_a v28-b02
-sims 100, player_b v22-b05_live sims 25, `--units-from-paired-artifact`, kein `--early-stop`).
+### ERSTE AUFGABE DER NEUEN SITZUNG (in dieser Reihenfolge; Details je Punkt im Fahrplan)
 
-**Sims-Kette, Teil A FERTIG (02:36; Register-Zeilen und par.8e folgen nach dem Ende von Teil B):**
-v28-b02@100 gegen @400 **45:105** (McNemar 6e-7, Diff -0,80 [-1,07; -0,53], Punkte 49,0 gegen 57,5;
-1.121 s), @200 gegen @400 **53:97** (p 0,0005, Diff -0,59 [-0,88; -0,29], Punkte 50,3 gegen 57,3;
-1.386 s), @600 gegen @400 **74:76** (p 1,0, Diff -0,03 [-0,34; +0,28], Punkte 53,9 gegen 52,6;
-2.364 s = 15,8 s je Partie). Lesart par.8e: SAETTIGUNG BEI 400 (100 und 200 klar unterlegen, 600
-Gleichstand). Teil B (argmax @100/@200/@400/@600, je 200 Partien) laeuft seit 02:36.
-
-### NAECHSTE SCHRITTE (Reihenfolge)
-
-1. ~~Crosscheck Fliesenbuchhaltung~~ ERLEDIGT 01:30: 106 von 106 Entscheidungspunkten des Logs
-   `game_20260911_092554_seed946607` stimmen in Beutel UND Turm je Farbe mit der Engine ueberein
-   (`tools/probes/tile_ledger_crosscheck.py`, `PREREG_stack_top_feature.md` par.14); P.9 ist damit
-   eine echte Sicht-Asymmetrie (Beispiel R3: Beutel 2 Fliesen, Turm 18). Abgleich am Encoder: gleiche Summe, andere
-   Aufteilung ergibt an allen 755 Indizes und in den Planes denselben Eingang; die Suche liest
-   Beutel und Turm nirgends (net_mcts.rs 0 Treffer). Das Netz sieht und weiss die Aufteilung nicht.
-2. **Sims-Kette starten** (par.8e), danach Auswertung nach der Lesart dort und der VORSCHLAG fuer
-   die Sims von Sockel und Schwarm getrennt, mit Kosten je Variante fuer v29 UND v30 (Nutzer:
-   "zum schluss sind es nur noch zwei generationen"; Entscheidungsregel "eklatant" in par.8e).
-3. **Generationswechsel v28 -> v29** nach `/mosaic-generation-turnover`, NUR auf Anweisung; darin
-   der Bau des Sicht-Arms v29-b03 (P.3 Ziehserie, P.7 Phasenaufloesung, P.9 Turm je Farbe, P.11 bis P.15 (Chip-Anzahl, Designs fremder Bloecke, Blocktiefe, Tiling-Sperre, Startspieler), INPUT_SIZE 755 -> 794/812, registriert 02:35; Record-Feld tiled_max_row VOR der Erzeugung;
-   `PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c) VOR dem Start der
-   Erzeugung (Wheel-Wechsel); Netz-Gesundheit unter wachsendem Eingang als Pflichtteil der
-   b03-Abnahme (`PREREG_v29_window.md` par.6d, Nutzer 01:55: "nicht dass uns der nun abstirbt");
-   Loeschliste des Nutzers erst nach dem Start des v29-Self-Plays.
-4. ~~Vier Preregs koennen schliessen~~ ERLEDIGT 2026-09-13, 01:15 (Nutzer: "schliess auch die 3
-   preregs"): `v28_window`, `dome_stack_information_sets`, `start_dome_choice` auf ENTSCHIEDEN;
-   `stack_top_feature` bleibt OFFEN (Sichtgleichheit nicht erreicht, par.13). Index: 11 OFFEN.
-
-5. **Sichtinventur (Agent, 01:50-02:05) registriert** in `PREREG_stack_top_feature.md` par.15,
-   Bericht `evaluations/review/sight_asymmetry_audit_2026-09-13.md`. Vom Koordinator am Code
-   GEPRUEFT: **P.10** die Wurzel-Determinisierung mischt den unbekannten Stapel-Praefix inklusive
-   Index 0 und wuerfelt damit den oeffentlich sichtbaren Typ der obersten Platte neu (Suchfix,
-   typerhaltende Permutation; Nutzer-Entscheid jetzt oder im Generationswechsel); **P.11** die
-   Anzahl gehaltener Bonuschips fehlt im Eingang (nur Farbzaehler; 2 Werte); **P.12** Designs
-   fremder Rueckgabe-Bloecke (18 Bits); **P.15** Startspieler der naechsten Runde in der
-   Tiling-Phase (1 Wert). P.13/P.14 sind ungepruefte Agenten-Behauptungen. REGISTRIERT 02:20 (Nutzer):
-   P.11 und P.15 in Abschnitt 16; P.12 und der Zeitpunkt des Suchfixes P.10 offen
-   (`PREREG_v29_window.md` par.8 Punkte 6/7); P.10 in der Naht-Liste von `docs/architecture_reference.md`.
-
-6. **P.10-Fix im Code (02:35, Nutzer: "p10 fix kommt jetzt"), UNKOMPILIERT:** `engine/src/state.rs`
-   `determinize_dome_pool` + `restore_top_plate_type` + Test
-   `determinization_keeps_the_public_type_of_the_top_plate`. Sobald die Messungen durch sind
-   (Sims-Kette, dann die wartende Kante): `cargo test --release --lib` (Python-DLL im PATH),
-   `--no-run` fuer examples/benches, Wheel bauen und installieren, Netz-Paritaets-Fixture des
-   Champions pruefen (aendert sich vermutlich: dann bewusst neu erzeugen und begruenden),
-   Anker-Drift und Konservierung (`/mosaic-anchor-invariance`; Anker netzlos, muss gruen bleiben),
-   Konventions-Check. Im selben Wheel das Record-Feld `tiled_max_row` (P.14) additiv in
-   `state_to_json`. Das installierte Wheel ist bis dahin unveraendert, die laufenden Messungen
-   sind davon nicht beruehrt.
-
-7. **Portable Build (Nutzer 02:30: "ueberpruefen wie funktional unser portable build ist"):** Audit
-   `evaluations/review/portable_build_audit_2026-09-13.md` (Agent, drei schwerste Luecken vom
-   Koordinator am Code GEPRUEFT): (1) `dist/mosaic_release.spec` Z.46 packt noch die v21-ONNX,
-   `models/champion.txt` nennt v28-b02 -> der Server faellt auf die Heuristik zurueck
-   (`server.py` Z.160-164, Z.700-714); (2) die Champion-Spec `frozen_champions/v28-b02/spec.json`
-   fehlt im Bundle (`server.py` Z.250-259 loest sie dort auf) -> Env-Defaults statt Champion-Knoepfe;
-   (3) Partien gegen "Heuristik" sind im Segment-2-Register ungewertet (kein Knoten `Heuristik`,
-   `ANCHOR_ALIASES` leer, `tools/elo_tracker.py` Z.173) -- Nutzer-Entscheid, ob "Heuristik" auf den
-   Anker-Namen abgebildet wird. Fix fuer (1)/(2): zwei `datas`-Zeilen im Spec; Bau und Rauchtest
-   (Plan im Audit Abschnitt C) erst bei freier Maschine, PyInstaller ist Volllast.
+1. **WATCHER** auf beide Laeufe (Bedingung: vier `depth_curve_*_v28b02.json` UND das seed58-Artefakt
+   vorhanden UND keine Prozesse `self_play.py|paired_gating.py|night_sims_curve|night_v28b02s100`
+   in der Prozessliste; Stillstand melden, wenn 45 min kein neues Artefakt). Bis dahin nur
+   Dateiarbeit. (Der Prozess-Grep darf sich nicht selbst treffen: Muster wie `[n]ight_...`.)
+2. **Register (`tools/elo_tracker.py add`, Muster: Zeilen vom 2026-09-13 in `evaluations/elo_history.csv`):**
+   drei Sims-Kanten v28-b02 sims 100/200/600 (player_a) gegen v28-b02 sims 400 (player_b),
+   `--units-from-paired-artifact <seed55/56/57-JSON>`, KEIN `--early-stop`, Knobs
+   `spec:frozen_champions/v28-b02/spec.json`, Laufzeit in den Kommentar (1.121 / 1.386 / 2.364 s);
+   dann die Kante v28-b02 sims 100 gegen v22-b05_live sims 25 (`--units-from-paired-artifact`
+   seed58-JSON, Knobs beide Specs im Kommentar nennen). @200 und @600 bleiben an EINER Kante
+   (Nutzer 02:25). `report` lesen, Champion-Zeile oben und README/Overview/Manifest nur, wenn
+   sich der Champion-Wert aendert.
+3. **par.8e abschliessen:** Teil B (volle Spalten je Seite mit KI, Punkte, Zeilen, Strafleiste je
+   Punkt aus den Sanity-Artefakten; Spaltensonde/Plattenpunkte der Teil-A-Laeufe aus den
+   Artefakten daneben), Verdikt nach der Lesart (Saettigung bei 400 in Teil A; Teil B entscheidet
+   die Korpusfrage), **Sockel-Vorschlag 400 gegen 600 mit gemessenen s je Partie** (Schwarm ist
+   entschieden: 100), Kopf und Index, STATUS, Chronik, `docs/measured_runtimes.md` (sieben Zeilen).
+   Tor-0/Tor-2a-Hinweis in `PREREG_v29_window.md`: ein Sockel bei 400 reisst die Bezugswerte des
+   v28-Generators nach oben, das ist erwartet.
+4. **Wheel 1 (Maschine frei!):** P.10-Fix ist in `engine/src/state.rs` (`restore_top_plate_type`,
+   Test `determinization_keeps_the_public_type_of_the_top_plate`); dazu Record-Feld `tiled_max_row`
+   additiv in `serialize.rs::state_to_json` (P.14, `PREREG_stack_top_feature.md` par.15). Tore:
+   `cargo test --release --lib` (Python-DLL im PATH, CLAUDE.md), `--no-run`, Wheel per
+   `python -m maturin` + pip, Netz-Paritaets-Fixture des Champions (aendert sich vermutlich durch
+   P.10: bewusst neu mit Begruendung), Anker-Drift und Konservierung (`/mosaic-anchor-invariance`;
+   der Heuristik-Pfad ruft `determinize_dome_pool` nicht, Erwartung GRUEN; ROT = Nutzer-Entscheid),
+   `tools/check_conventions.py`. Commit.
+5. **`/mosaic-generation-turnover`** (Skill laden) und danach die **SCHWARM-Erzeugung v29 mit 100
+   Sims** starten (Freigabe unten; `PREREG_v29_window.md` par.5 value-tempc und value-excursion, je
+   4.000 Partien, Seeds 20260921/20260922, `--start-slot-random-p 0.15`, Spec mit `start_by_search 1`
+   nach par.6b; Manifest-Diff gegen `data/manifest_v27-b01-policy_20260910_234958.json`, par.4).
+   Der Sockel wird NICHT erzeugt (Nutzer: schnellere Maschine). Nach dem Start: Nutzer informieren,
+   Loeschliste (unten) loescht der Nutzer selbst; Snapshot-ID und Loeschung dann eintragen.
+6. **Portable Build** (nur bei freier CPU, z. B. neben der GPU-losen Erzeugung NICHT: die Erzeugung
+   ist CPU): `python tools/build_release.py` nach dem Plan in
+   `evaluations/review/portable_build_audit_2026-09-13.md` Abschnitt C; Spec ist auf v28-b02
+   umgestellt (Commit 3c81d0b). Zip-Name und Weitergabe = Nutzer.
+7. Danach nach Fahrplan (Wheel 2 Sicht-Arm, Fenster, b01/b02/b03, Tore, Netz-Gesundheit, ...).
 
 ### FREIGABEN UND VERBOTE (woertlich vom Nutzer)
 
