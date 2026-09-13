@@ -973,3 +973,34 @@ eine Spec-Datei, die GUI und Arena gleich lesen") und respektiert den Einwand in
 
 **Aufwand (ANNAHME):** Schritte 1-3 rund 3-4 h Rust plus Server, Schritt 5 rund 6 min gemessen.
 Alles davon braucht eine freie Maschine; waehrend der v29-Erzeugung wird nur geschrieben.
+
+#### Zwei Korrekturen am Bauplan (am Code nachgelesen, 2026-09-13 Nacht)
+
+**(a) Schritt 3, erster Halbsatz entfaellt: `heuristik_variante` kann NICHT in die
+Spec-Abbildung von `server.py`.** Jene Abbildung (`_SPEC_TO_ENV`, Z.204-232) setzt je Spec-Feld
+eine UMGEBUNGSVARIABLE -- und fuer die Variante gibt es bewusst keine. `net_mcts.rs` Z.735-739
+sagt es woertlich: *"KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht. Ein
+prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3 unbrauchbar -- er gaelte fuer beide
+Seiten oder fuer keine."* Die Begruendung ist staerker als der Bauplan-Satz, und sie ist genau
+der Grund fuer Weg A. Es bleibt der ZWEITE Halbsatz: der Server ruft beim Stufenwechsel
+`PyGame::load_search_spec`, und die Variante reist im `SearchConfig`-Feld `heuristic_variant`
+(`net_mcts.rs` Z.689) bis in den Zugpfad. Schritte 1 und 2 dafuer liegen gebaut im Baum
+(`py.rs` Z.94/153/164).
+
+**(b) Schritt 4 haengt HAERTER an Schritt 1, als dort steht: `beginner.spec.json` ist heute NICHT
+schreibbar.** `SearchConfig::from_spec_file` prueft die Feldnamen gegen eine feste Liste und
+lehnt jedes unbekannte Feld HART ab (`net_mcts.rs` Z.779-784). In dieser Liste stehen weder
+`sims` noch die vier Stilfelder aus par.4.2 (`root_noise`, `action_temp`,
+`tau_argmax_from_move`, `deviate_prob`/`deviate_candidates`). Eine Stufen-Spec mit
+"hv3 @150" wuerde also beim Laden scheitern -- die 150 sind kein Spec-Feld. **Die Felder muessen
+zuerst in `SearchConfig` und in `KNOWN_FIELDS`**, erst danach lassen sich die vier Dateien unter
+`models/levels/` ueberhaupt anlegen. Die harte Ablehnung ist dabei kein Hindernis, sondern die
+Zusage, die sie geben soll (derselbe Absatz: ein stiller Default wuerde "die 'beweisbar
+identisch'-Zusage aushebeln").
+
+**Folge fuer die Reihenfolge:** 1 (gebaut) -> 2 (gebaut) -> **1b: Stilfelder plus `sims` in
+`SearchConfig`, `from_spec_file` und `KNOWN_FIELDS`** -> 3 (Server: `load_search_spec` beim
+Stufenwechsel) -> 4 (Stufen-Specs) -> 5 (Tore). Schritt 1b ist neu und gehoert zu den 3-4 h
+Rust; er braucht eine freie Maschine, weil ohne Bau kein Tor faellt. Vorhanden und
+wiederverwendbar: `models/hv3.spec.json` traegt bereits `heuristik_variante: "hv3"` und alle
+Champion-Felder -- sie ist die Vorlage fuer `beginner.spec.json`, sobald `sims` ein Feld ist.
