@@ -1058,4 +1058,15 @@ Abstand, den par.2i/par.8b als "deutlich" benutzt haben). Ein Punkt, der nur ein
 Bedingungen erfuellt, ist "besser", nicht "eklatant": dann bleibt 100 der Betriebspunkt und der
 Befund geht als Kostenargument in den Sockel/Schwarm-Vorschlag.
 
+**Rahmen fuer den Vorschlag (Nutzer 2026-09-13, 01:55, woertlich): "den schwarm mach ich nicht mit 400
+sims plus."** Der Schwarm (Value-Klasse, rund 8.000 Partien, temperiert plus Ausfluege) bleibt
+unterhalb von 400 Sims; die Frage der hoeheren Sims betrifft den SOCKEL (Traeger, 4.000 Partien
+policy-aktiv). Der Vorschlag rechnet also: Sockel bei 400 oder 600 (je nach Kurve), Schwarm bei
+100 oder 200 (je nach Kurve und Kosten), getrennt mit Sekunden je Partie aus den argmax-Punkten.
+
+**Schwarm ENTSCHIEDEN (Nutzer 2026-09-13, 02:10): 100 Sims**, Erzeugung nach der Messung
+selbststaendig ueber den Generationswechsel-Skill; der Vorschlag betrifft damit nur noch den SOCKEL
+(400 oder 600, Kosten je Partie aus Teil B), Sockel-Erzeugung vermutlich auf der schnelleren
+Maschine des Nutzers.
+
 **Ergebnis: leer bis zum Lauf.**

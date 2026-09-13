@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, Generator = Sieger der v28-Promotion, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: nichts gefahren. Zuschnitt aus v28 rotiert (par.1, Seed 20260941). v29-b02 ENTSCHIEDEN: Ablation der Spezialfeld-Kanaele 77/78 (par.6; die Kanaele sind seit e91cd34 gebaut, ihre Wirkung nie isoliert); v29-b03 Sicht-Arm EINGETAKTET 2026-09-13 (par.6c: P.3/P.7, P.9 Vorschlag). Begleitprogramm par.7; Sims-Kurve vorab (search_depth par.8e). Offen: G-2-Haelfte (par.2), P.9, Freigabe. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- der zweite Zyklus nach dem Einfrieren, Generator = Sieger der v28-Promotion, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: nichts gefahren. Zuschnitt aus v28 rotiert (par.1, Seed 20260941). v29-b02 ENTSCHIEDEN: Ablation der Spezialfeld-Kanaele 77/78 (par.6; die Kanaele sind seit e91cd34 gebaut, ihre Wirkung nie isoliert); v29-b03 Sicht-Arm EINGETAKTET 2026-09-13 (par.6c: P.3/P.7/P.9/P.11-P.15, 755 -> 794). Begleitprogramm par.7; Sims-Kurve vorab (search_depth par.8e). Offen: G-2-Haelfte (par.2), Freigabe. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -115,6 +115,8 @@ Anker-Drift wiederholen, hier eintragen.
    `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` und `MOSAIC_FEATURES_FROM_RUST=1` (derselbe Bauer wie
    beim v28-b02-Training), Plattenplatz fuer rund 1.200 Dateien plus 1.200 Bloecke plus
    Monolith (rund 1,1 GB).
+7b. **Record-Feld `tiled_max_row`** (P.14, `stack_top_feature` par.15) additiv in `state_to_json`
+   VOR dem Start der Erzeugung, mit dem P.10-Fix im selben Wheel; sonst fehlt es im v29-Korpus.
 8. **Namen reserviert** in `docs/generation_naming.md` (v29-b01; weitere nur mit eigener
    Registrierung), Ketten-Skripte `tools/night_v29_generate.sh` und `tools/night_v29_chain.sh`
    nach dem v28-Muster INKLUSIVE der Abbruch-Waechter aus `night_v28_chain_resume.sh` und
@@ -160,7 +162,7 @@ Gating 66-91 min je Seed mit Logs, Tor 2b und Plattenpunkte unter 5 min.
 | --- | --- | --- | --- |
 | **v29-b01** (Pflicht) | Rezept UNVERAENDERT (Warmstart `<GEN>_brierbest`, 12 Epochen, lr 5e-05 cosine, lambda 0,7, Koepfe wie gehabt, INPUT_SIZE 755) | Champion (= Generator): nur das Material, 5. Punkt der Materialkette; bei Generator b02 zusaetzlich das Stapelwissen auf 82 statt 40 Prozent des Fensters (par.1, nicht trennbar) | 20260941 |
 | **v29-b02** (ENTSCHIEDEN 2026-09-11, 19:00, par.8.2) | ABLATION der Spezialfeld-Eingabe: Rezept b01, Planes-Kanaele 77 (Spezialfeld-Ertrag) und 78 (Abstand zur Ausloesung) auf Null; Schalter im Merkmalsbauer (`features.rs`, beide Pfade, plus Python-Zwilling), Teil des Cache-Schluessels; Bloecke neu, gleiches Fenster, gleicher Seed | b01: EIN Faktor, die Spezialfeld-Eingabe | 20260941 |
-| **v29-b03** (Sicht-Arm, EINGETAKTET 2026-09-13, Nutzer: "takte p3 und p7 fuer v29 ein"; par.6c) | Rezept b01 plus Encoder-Abschnitt 16 (`PREREG_stack_top_feature.md` par.13): P.3 laufende Ziehserie, P.7 Phasenaufloesung, P.9 Turm je Farbe als Vorschlag; INPUT_SIZE 755 -> 769 (oder 787); Warmstart mit null-initialisierten neuen Spalten (v24-b04-Muster); Bloecke neu, gleiches Fenster, gleicher Seed | b01: EIN Faktor, die Sichtwerte | 20260941 |
+| **v29-b03** (Sicht-Arm, EINGETAKTET 2026-09-13, Nutzer: "takte p3 und p7 fuer v29 ein"; par.6c) | Rezept b01 plus Encoder-Abschnitt 16 (`PREREG_stack_top_feature.md` par.13): P.3 laufende Ziehserie, P.7 Phasenaufloesung, P.9 Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, P.14 Tiling-Sperre, P.15 Startspieler (ENTSCHIEDEN 2026-09-13, 02:35, stack_top par.15); INPUT_SIZE 755 -> 794 (812 mit den Design-Bits von P.3); Warmstart mit null-initialisierten neuen Spalten (v24-b04-Muster); Bloecke neu, gleiches Fenster, gleicher Seed | b01: EIN Faktor, die Sichtwerte | 20260941 |
 
 **BERICHTIGUNG 2026-09-11, 18:50 (Regel 0):** die Aussage, par.4a sei "registriert und nie
 gebaut", war FALSCH. Die zwei Planes (Spezialfeld-Ertrag je Slot und Abstand zur Ausloesung)
@@ -235,7 +237,7 @@ drei Record-Felder (`pending_stack_draw`, `phase`, `bag_colors`/`tower_colors`) 
 im Record, es braucht KEIN neues Record-Feld vor der Erzeugung (anders als `dome_pool_view` fuer
 v28-b02), nur den additiven Encoder-Anbau (Rust beide Pfade, Python-Zwilling, `config.INPUT_SIZE`,
 Sichtgleichheits-Test, Regressionstest 755er-Layout, Paritaets-Fixture des Champions unveraendert,
-Anker-Drift gruen). P.9 (Turm je Farbe) ist im Arm VORGESCHLAGEN, Freigabe offen (par.8 Punkt 5).
+Anker-Drift gruen). P.9 (Turm je Farbe) ist im Arm ENTSCHIEDEN (Nutzer 2026-09-13, 01:45, nach Crosscheck `stack_top_feature` par.14). Nach der Sichtinventur (`stack_top_feature` par.15, Nutzer 02:20) kommen P.11 (Anzahl gehaltener Bonuschips, 2 Werte) und P.15 (Startspieler der naechsten Runde, 1 Wert) dazu; seit 02:35 (par.8 Punkt 6) auch P.12 (18 Bits), P.13 (2) und P.14 (2): 39 sichere Werte, INPUT_SIZE 794 (812 mit den Design-Bits von P.3). Fruehere Zwischenstaende 769/787 und 772/790 sind ueberholt. P.10 (Suche wuerfelt den Typ der obersten Stapelplatte neu) ist ein Suchfix, kein Merkmal; Zeitpunkt Nutzer-Entscheid (par.8 Punkt 7).
 
 **Bau-Zeitpunkt:** Wheel-Wechsel, deshalb in einem Fenster ohne Erzeugung, Waechter oder Kette
 (par.4 Punkt 6). Vorschlag: im Generationswechsel NACH der Sims-Neumessung
@@ -250,6 +252,40 @@ beste gegen den Champion. Lesart b03 nach `stack_top_feature` par.7 mit dem Verw
 aus par.12: Gleichstand -> Sichtstand uebernehmen (Kriterium Sichtgleichheit), Regression ueber
 zwei Seeds -> Merkmal aus, Ursache suchen. Kosten (ANNAHME): Bau und Tore rund 2 h, Bloecke rund
 26 min, Training wie b01, Tor 1 zwei Seeds rund 3 h.
+
+## par.6d NETZ-GESUNDHEIT unter wachsendem Eingang (Nutzer 2026-09-13, 01:55: "schreib fuer v29 hinzu dass wir uns die netz gesundheit anschauen sollten. nicht dass uns der nun abstirbt mit der anzahl an features")
+
+Der Flachvektor ist von 714 (bis v23) ueber 744 (v24-b04) und 755 (v28-b02) auf 794 oder 812
+(v29-b03, `stack_top_feature` par.15) gewachsen, jedes Mal per Warmstart mit null-initialisierten neuen Spalten in
+`flat_branch.0.weight` (`train.py` Z.1685-1692). Praezedenz fuer einen sterbenden Kopf gibt es
+(v14: Kaltstart-Destillation verlor den Value-Kopf; v8d). Deshalb, VORREGISTRIERT als Pflichtteil
+der Abnahme von v29-b03 (und als Bezug an b01 mitgemessen):
+
+1. **Neue Spalten leben?** Nach dem Training die Spaltennormen von `flat_branch.0.weight` fuer die
+   neuen Indizes (755..) gegen die Altspalten: nahe 0 heisst, das Netz benutzt die Sichtwerte nicht
+   (dann traegt der Arm per Konstruktion nichts); ein Vielfaches der Altnormen heisst, sie
+   dominieren. Beides ist ein Befund, kein Tor. Einzeiler am Checkpoint, kein Werkzeug noetig.
+2. **Tote Einheiten:** Anteil der ReLU-Einheiten der ersten Flachschicht (und des Rumpfs), die auf
+   dem Frozen-Set nie feuern, b03 gegen b01 gegen den Champion. Werkzeug gibt es nicht
+   (geprueft 2026-09-13: kein Treffer fuer dead/activation in `tools/`), Bau rund eine Stunde als
+   `tools/probes/dead_unit_probe.py`; Schwelle vorab: mehr als das Doppelte des b01-Anteils ist ROT.
+3. **Koepfe einzeln:** `tools/offline_diagnosis.py` (Value-R2 gesamt und je Runde, Policy Top-1/3)
+   und `tools/oracle_metrics.py` (prior_mass_on_oracle_top3, kendall_tau; sagen die Arena 7/7
+   voraus) b03 gegen b01 auf demselben Val-Split. Aufloesungsgrenze value_r2 rund 0,015; eine
+   Verschlechterung des Value-Kopfs jenseits davon ist der Verwerfungs-Ausgang aus
+   `stack_top_feature` par.12, unabhaengig vom Tor-1-Ergebnis.
+4. **Value-Kopf-Verlaesslichkeit:** `tools/probes/value_head_reliability_probe.py` (rho je Runde)
+   und `tools/platt_fit.py` (A/B, Brier auf frozen_v3) b03 gegen b01; Brier darf nicht ueber den
+   b01-Wert steigen (Praezedenz v14: der Kopf starb, die Arena sah es spaet).
+5. **Trend ueber die Generationen:** dieselben Zahlen fuer v24-b04, v28-b02 und v29-b03 in EINER
+   Tabelle (Eingang 744 / 755 / 787), damit ein schleichender Abbau sichtbar wird und nicht nur ein
+   Sprung. Ergebnis in par.9 dieser Datei und in `stack_top_feature` par.13.
+
+Lesart vorab: haelt b03 in 3 und 4 das b01-Niveau und leben die neuen Spalten (1), ist der Eingang
+tragfaehig und die naechste Sichtstufe darf anbauen. Faellt 3 oder 4, ist die Sichtgleichheit nicht
+der Fehler, sondern Warmstart oder Kapazitaet (Bezug `project_value_head_capacity`); dann Kaltstart
+oder breiterer Rumpf als eigener Arm, nicht Merkmal raus. Rechenlast: alle fuenf Punkte ohne Suche,
+Minuten je Modell, nie neben einer Arena.
 
 ## par.7 BEGLEITPROGRAMM IN DEN CPU-FREIEN FENSTERN VON v29 (eingetaktet, keine Arme)
 
@@ -323,9 +359,18 @@ zwei Seeds -> Merkmal aus, Ursache suchen. Kosten (ANNAHME): Bau und Tore rund 2
    Startkuppel und Sims-Kurve als Sonden und Knoepfe im Begleitprogramm (par.7 Punkt 4);
    Rundenschaetzer und R5-Netzloeser nach Maschinenlage. Die Sicht-Reststufen sind nicht
    bestellt.
-5. **P.9 (Turm je Farbe) im Sicht-Arm v29-b03 mitbauen?** Nutzer 2026-09-13: Turm verdeckt, aber
-   am Rundenende mitzaehlbar, also echte Asymmetrie; fuenf Werte, Record-Feld vorhanden. Freigabe
-   offen; ohne Freigabe baut b03 nur P.3 und P.7.
+5. ~~P.9 (Turm je Farbe) im Sicht-Arm v29-b03 mitbauen?~~ ENTSCHIEDEN 2026-09-13, 01:45 (Nutzer:
+   "also wieder eine sichtluecke. takte es ein"), Beleg `stack_top_feature` par.14 (Crosscheck
+   106/106, Encoder sieht nur die Summe). b03 baut P.3, P.7 und P.9.
+6. ~~P.12 in Abschnitt 16 aufnehmen?~~ ENTSCHIEDEN 02:35 (Nutzer: "p12 kommt mit rein"); dazu P.13
+   (2 Werte) und P.14 (2 Werte, Record-Feld `tiled_max_row` VOR der Erzeugung) nach Pruefung.
+7. ~~Zeitpunkt des Suchfixes P.10~~ ENTSCHIEDEN 02:35 (Nutzer: "p10 fix kommt jetzt"): Code steht in
+   `state.rs`, Build/Tests/Wheel/Fixture/Anker-Drift nach dem Ende der laufenden Messungen.
+8. **Schwarm-Erzeugung FREIGEGEBEN (Nutzer 2026-09-13, 02:10):** nach Abschluss der Sims-Messung
+   selbststaendig ueber `/mosaic-generation-turnover`, Schwarm (tempc + excursion) mit 100 Sims.
+   **Sockel zurueckgestellt**: Sims nach par.8e der Sims-Prereg, vermutlich auf der schnelleren
+   Maschine (Nutzer); Zuschnitt par.1 bleibt, nur die Reihenfolge aendert sich (Schwarm zuerst).
+   Folge fuer par.5: nur die zwei value-only-Befehle laufen jetzt; der Policy-Befehl wartet.
 3. ~~Ist v29 die letzte Generation?~~ ENTSCHIEDEN (Nutzer 2026-09-12, 18:05): **v30 folgt, wird
    released und ist der Projektabschluss.** Folgen: v29 ist die Generation, in der das
    Begleitprogramm (par.7: Tiling im Blatt, Mondstapel Stufe 1, Claude-Differential, Sonden) seine
