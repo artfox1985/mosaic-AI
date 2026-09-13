@@ -18456,3 +18456,49 @@ koennen schliessen, stack_top_feature nicht. Auf Nutzer-Anweisung um 01:15 die d
 Stand: Sims-Kette Teil B laeuft (argmax @100 bei 120/200), wartende Kante v28-b02@100 gegen
 v22-b05@25 pollt; sechs Teil-Commits der Nacht plus Uebergabe-Commit, Ahead 11, kein Push.
 Uebergabe in STATUS Abschnitt 1, Fahrplan evaluations/v29_program_agent_plan.md, Chip gesetzt.
+
+### 2026-09-13, 02:50-10:15 -- Sims-Kurve entschieden: der teurere Betriebspunkt liefert den schlechteren Korpus
+
+Neue Sitzung uebernommen, Watcher auf die laufende Kette. Teil B der Sims-Kurve
+(`PREREG_search_depth_column_optimum.md` par.8e) lief bis 04:08 durch: argmax-Selbstspiel des
+Champions `v28-b02` gegen sich selbst, je 200 Partien bei 100 / 200 / 400 / 600 Sims. **Die
+Kurve faellt MONOTON**: 1,0975 / 0,9575 / 0,8950 / 0,8200 volle Spalten je Seite (n = 200
+Partien, Grundmenge argmax-Self-Play-Partien, Einheit volle Spalten je Seite ueber 400 Seiten;
+@100 gegen @400 z = +3,74). Die Punkte fallen mit (57,83 auf 53,07), die Strafleiste steigt
+(4,74 auf 5,27). Die TEILSPALTEN bleiben unveraendert (>= 3: 3,195 / 3,292 / 3,225 / 3,232):
+es faellt allein die VOLLENDUNG, nicht der Aufbau.
+
+**Verdikt: vierter Fall der Vorregistrierung, die beiden Formen widersprechen sich.** Teil A
+(Staerke) saettigt bei 400, Teil B (Korpus) zeigt auf 100. Die "eklatant"-Regel des Nutzers ist
+mit 1 von 3 Bedingungen nicht erfuellt, damit bleibt **Betriebspunkt 100**. Sockel-Vorschlag:
+100 Sims wie der Schwarm; Kosten fuer 4.000 Partien aus gemessenen Sekunden je Partie 4,40 h
+gegen 8,29 h bei 400. Die Erwartung vom 02:33 ("ordentlicher staerke boost fuer den sockel")
+traegt nicht: sie stand auf Teil A, und Teil A ist fuer die Erzeugung nicht zustaendig.
+
+**Nebenbefund, der den scheinbaren Widerspruch aufloest (ABLEITUNG):** der Spaltenbau haengt am
+GEGNER. In der Arena gegen @400 baut @100 nur 0,9267 volle Spalten, waehrend die @400-Seite
+1,0133 baut; gegen sich selbst baut @100 dagegen 1,0975 und @400 nur 0,8950.
+
+**Zwei Werkzeugfallen gefunden.** Erstens misst der `laufzeit`-Block IM Artefakt
+`depth_curve_<S>_v28b02.json` den Auswertungslauf (10-11 s einkernig), nicht die Erzeugung; die
+Kostenbasis steht in `data/manifest_depth<S>-v28b02_*.json`. Zweitens ruft
+`tools/night_sims_curve_v28b02.sh` Z.33 `plate_points_from_arena.py` ohne `--out` auf, weshalb
+die Plattenpunkte je Kriterium fuer die drei Teil-A-Laeufe als Artefakt fehlen (nachzufahren,
+je unter 5 s).
+
+**Die wartende Kante ist nie angelaufen.** `tools/night_v28b02s100_vs_v22s25.sh` Z.13 filtert die
+Prozessliste mit `self_play.py|paired_gating.py` UNMASKIERT und trifft damit die CommandLine
+seines eigenen pwsh-Aufrufs; der Zaehler wird nie 0. Gemessen um 04:18: dasselbe Muster mit
+maskierter erster Stelle ergibt 0 Kettenprozesse, das Original 4. Genau die Falle, die CLAUDE.md
+benennt. **Dazwischen hing die Sitzung**: zwischen 04:53 (Stillstandsmeldung des Watchers) und
+10:11 lief kein Werkzeugaufruf, der Befund von 04:18 blieb also mehr als fuenf Stunden liegen,
+ohne dass die Kante startete (Nutzer 10:12: "da gab es einen haenger"). Die Kante wurde um 10:11 ueber `tools/run_v28b02s100_vs_v22s25.sh` direkt gestartet
+(gleicher Befehl und Seed 20261058, ohne Warteschleife, `--out` bei den Plattenpunkten ergaenzt);
+das haengende Wartescript laeuft weiter, ein Doppelstart ist ausgeschlossen, weil sein Zaehler
+konstruktionsbedingt nie 0 wird. Sein Poll kostet alle 120 s einen Kern von 12, die Messung
+faehrt 10 Threads.
+
+Nachgezogen im selben Zug: par.8e-Ergebnis samt Zeile-1-Kopf und Index, sieben Laufzeit-Zeilen in
+`docs/measured_runtimes.md`, Sockel-Vorschlag und korrigierter Tor-0/Tor-2a-Hinweis in
+`PREREG_v29_window.md` P2 (die Uebergabe hatte die Richtung falsch herum erwartet),
+`docs/generation_loop.md` (Kurvenform am Champion, Betriebsart zaehlt mit), STATUS Abschnitt 1.
