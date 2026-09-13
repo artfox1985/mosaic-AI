@@ -828,6 +828,12 @@ fn engine_config_json() -> String {
         "return_order_mode": crate::net_mcts::SearchConfig::from_env().return_order_mode,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
+        // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,
+        // Arm v29-b02). Gehoert ins Lauf-Manifest, weil er den EINGANG des Netzes
+        // aendert -- ein Trainingslauf, der ihn stillschweigend an oder aus hatte,
+        // waere sonst nachtraeglich nicht unterscheidbar. Er steht zusaetzlich im
+        // Cache-Schluessel, das ist die andere Haelfte desselben Schutzes.
+        "special_planes_off": crate::features::special_planes_off(),
         // Nutzer-Anweisung 2026-09-13 ("dann muss der knopf rein ins manifest"):
         // die beiden Stapelzug-Knoepfe standen bis heute in KEINEM Lauf-Manifest,
         // obwohl `PREREG_chance_nodes.md` Z.1126 `MOSAIC_STACK_DRAW_RESEARCH=1`
