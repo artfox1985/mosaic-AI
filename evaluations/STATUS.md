@@ -44,9 +44,11 @@ kein Build, kein cargo, keine Sonde.
    `--print-delete-list`): 4,2 GB in 8 Monolithen, 2,5 GB in rund 5.800 Bloecken. Die Waisen der
    heute geloeschten Korpora (v25-b01, Sims-Messdateien) sind darin. Braucht die Fensterliste
    der neuen Generation, deshalb erst jetzt.
-4. **G-2-Haelfte festlegen** (`G2_SWARM_PATTERN`, `PREREG_v29_window.md` par.2) -- Nutzer-Entscheid.
-5. **Kette v29** schreiben (Muster `tools/night_v28_chain.sh`) und fahren: Manifeste,
-   G-2-Kennzahlen, Fenster (Seed 20260941), Bloecke, Monolith, Training b01.
+4. **Kette v29 fahren**: `tools/night_v29_chain.sh` ist GESCHRIEBEN (2026-09-13, Syntax
+   geprueft) und wartet selbst auf das Ende der Erzeugung -- Manifeste, G-2-Kennzahlen, Fenster
+   (Seed 20260941), Bloecke, Monolith, Training v29-b01 mit Warmstart auf `v28-b02_brierbest`.
+   Sie enthaelt Tor 0 und Tor 2a bereits als Schritt 1, Punkt 1 oben ist damit abgedeckt.
+   **Starten wie die Erzeugung: in einem eigenen Fenster, nicht ueber die Sitzung.**
 6. Danach nach Fahrplan `evaluations/v29_program_agent_plan.md` (41 Punkte).
 
 **FENSTER-PINNING nicht vergessen:** Streudateien, die waehrend der Erzeugung entstehen,
@@ -109,9 +111,11 @@ beiden Regelbefunde aus par.16/16a), `claude_play_interface`, `round_estimate_le
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
-1. **G-2-Haelfte des v29-Fensters** (`G2_SWARM_PATTERN`, `PREREG_v29_window.md` par.2).
-   Vorschlag: die Ausflug-Haelfte `selfplay_v26-b01-value-excursion_*`. Faellig VOR dem
-   Fensterbau.
+1. ~~G-2-Haelfte des v29-Fensters~~ **ENTSCHIEDEN 2026-09-13, 13:20** (Nutzer: "Nimm fuer die
+   g-2 das selbe was wir auch bei v28 hatten"): die AUSFLUG-Haelfte
+   `selfplay_v26-b01-value-excursion_*`, 145 Dateien seed-gezogen mit 20260941. In
+   `PREREG_v29_window.md` par.2 registriert und in `tools/night_v29_chain.sh` gesetzt; die 401
+   Quelldateien liegen vollstaendig im Baum.
 
 2. **Manifest meldet Spec-Felder falsch** (geprueft 2026-09-13): `engine_config` zeigt fuer
    `envelope_search_c`, `envelope_projection_mode`, `envelope_hull_form` und `special_row6_w`
