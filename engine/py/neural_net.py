@@ -24,7 +24,7 @@ from file_cache_key import per_file_cache_key  # noqa: F401
 from reach_target import (REACH_ATOMS, REACH_K1_MIN_ROUND, REACH_BUF_CAP,
                           reach_columns, reach_target_k1_active,
                           reach_buffer_mode, reach_buffer_columns)
-from config import (NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS,
+from config import (INPUT_SIZE, NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS,
                     CONJUNCTION_TARGETS, CONJUNCTIONS_PER_PLAYER,
                     POINTS_DIST_BINS)
 
@@ -58,6 +58,28 @@ SCORE_NORM = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0]
 # der die Zahlen gegen den Katalog haelt.
 DOME_TILE_COUNT = 18.0
 DOME_SPECIAL_TILE_COUNT = 9.0
+
+# Normierung des Sicht-Anbaus (Abschnitt 16, Sicht-Arm v29-b03). Spiegel von
+# `features.rs::SIGHT_*`; die Zahlen stehen in
+# `PREREG_stack_top_feature.md` par.15 Nachtrag 02:35.
+# Die sechs Phasen des Spiels (`state.rs::Phase`), in genau dieser Reihenfolge.
+PHASE_ORDER = ("start_placement", "drafting", "tiling", "scoring", "end", "final")
+# Vektorlaenge MIT Abschnitt 16 (= `features.rs::INPUT_SIZE`, sobald das Wheel
+# von Abschnitt 16 installiert ist). Spiegel von `features.rs::SIGHT_VALUES`:
+# 755 + 39.
+LEN_WITH_SIGHT_APPENDIX = 794
+# Hoechststand einer Farbe im Turm (`tower.rs`); die Prereg normiert /13.
+TOWER_COLOR_NORM = 13.0
+# Obergrenze fuer den BESTAND gehaltener Bonuschips: `BONUS_CHIPS_PER_ROUND`
+# (2, board.rs:240) mal fuenf Runden. Eingesetzte Chips werden entfernt
+# (round_end.rs:649), das Feld zaehlt also den Bestand, nicht alle je
+# erhaltenen. Die Prereg par.15 hatte /4 angesetzt; unbelegt und am
+# 2026-09-13 korrigiert. Spiegel von `features.rs::SIGHT_BONUS_CHIP_NORM`.
+BONUS_CHIP_NORM = 10.0
+# Zahl der Musterreihen (`tiled_max_row` laeuft -1..5, normiert (x+1)/6).
+PATTERN_LINE_COUNT = 6.0
+# Obergrenze fuer die Zahl eigener Bloecke im Kuppelstapel (Prereg: /6).
+OWN_BLOCK_COUNT_NORM = 6.0
 # Zahl der einzeln kodierten Positionen des obersten eigenen Blocks
 # (= `features.rs::DOME_POOL_TOP_TYPES`).
 DOME_POOL_TOP_TYPES = 4
@@ -470,6 +492,114 @@ def state_to_tensor_python(data):
     features.append(_foreign_len / DOME_TILE_COUNT)
     features.append(_foreign_special / DOME_SPECIAL_TILE_COUNT)
     features.append(_foreign_wild / DOME_SPECIAL_TILE_COUNT)
+
+    # SCHARFSCHALTUNG: Abschnitt 16 haengt an `config.INPUT_SIZE` -- derselben
+    # Stelle, aus der `file_cache_key.py` den Blockschluessel bildet. Steht dort
+    # noch 755 (installiertes Wheel ohne Abschnitt 16), liefert der Zwilling den
+    # alten Vektor und kann keine 755er-Bloecke unter einem 794er-Schluessel
+    # erzeugen (Unfall vom 2026-09-11). Der Wheel-Bau setzt beides in EINEM Zug.
+    if INPUT_SIZE < LEN_WITH_SIGHT_APPENDIX:
+        return torch.tensor(features, dtype=torch.float32)
+
+    # 16. Sicht-Anbau (Sicht-Arm v29-b03, PREREG_stack_top_feature.md par.13/15,
+    # PREREG_v29_window.md par.6c), spiegelbildlich zu features.rs Abschnitt 16:
+    # 39 Werte ANS ENDE, Indizes 0..754 unveraendert. Alle Quellen sind
+    # Record-Felder; fehlt eines -- Alt-Records --, bleibt der zugehoerige Wert
+    # 0, dieselbe Toleranz wie in Abschnitt 15 (Merkmal aus, keine erfundene
+    # Sicht). Kriterium des Arms ist SICHTGLEICHHEIT, nicht Elo (par.1).
+    #   755-757 P.3 Ziehserie: Zahl gezogener Platten /18, davon Wild /18,
+    #           davon Spezial /18. Die 18 Design-Bits der Ziehserie bleiben
+    #           DRAUSSEN (par.16: die Vorderseiten sind erst nach dem Aufhoeren
+    #           bekannt), deshalb INPUT_SIZE 794 und nicht 812.
+    #   758-763 P.7 Phase als One-Hot ueber die sechs Phasen (PHASE_ORDER)
+    #   764-768 P.9 Turm je Farbe /13
+    #   769-770 P.11 gehaltene Bonuschips /10, Spieler am Zug zuerst
+    #   771-788 P.12 18 Bits: Design liegt in einem EIGENEN Block (Quelle
+    #           `dome_pool_view.blocks[].designs`, sortierte Multimenge, steht
+    #           nur am eigenen Block). Regel: gezogen wird mit der Rueckseite
+    #           nach oben, erst wer aufhoert, dreht seine Platten um -- fremde
+    #           Designs hat der Betrachter nie gesehen.
+    #   789-790 P.13 Tiefe des ersten eigenen Blocks /18, Zahl eigener Bloecke /6
+    #   791-792 P.14 (tiled_max_row + 1)/6, Spieler am Zug zuerst
+    #   793     P.15 Startspieler der naechsten Runde ist der Spieler am Zug
+
+    # P.3 -- Ziehserie. `pending_stack_draw` traegt die bereits gezogenen
+    # Platten als Objekte; `bonus > 0` ist der Spezial-Typ (dome.rs:
+    # `is_special_type`).
+    _draw = data.get("pending_stack_draw") or []
+    if not isinstance(_draw, list):
+        _draw = []
+    _drawn_special = sum(1 for _t in _draw if float((_t or {}).get("bonus", 0) or 0) > 0)
+    features.append(len(_draw) / DOME_TILE_COUNT)
+    features.append((len(_draw) - _drawn_special) / DOME_TILE_COUNT)
+    features.append(_drawn_special / DOME_TILE_COUNT)
+
+    # P.7 -- Phase als One-Hot. Ein unbekannter String laesst alle sechs auf 0.
+    _phase = data.get("phase")
+    for _name in PHASE_ORDER:
+        features.append(1.0 if _phase == _name else 0.0)
+
+    # P.9 -- Turm je Farbe.
+    _tower = data.get("tower_colors") or []
+    if not isinstance(_tower, list):
+        _tower = []
+    for _i in range(5):
+        _v = _tower[_i] if _i < len(_tower) else 0
+        features.append(float(_v or 0) / TOWER_COLOR_NORM)
+
+    # Spieler am Zug zuerst, dann der Gegner -- dieselbe Reihenfolge wie in
+    # allen spielerbezogenen Abschnitten davor (features.rs: `order`).
+    _players = data.get("players") or []
+    _curr = int(data.get("current_player", 0) or 0)
+    _order = [_curr, 1 - _curr] if len(_players) == 2 else list(range(len(_players)))
+
+    # P.11 -- gehaltene Bonuschips je Spieler.
+    for _pi in _order:
+        _p = _players[_pi] if _pi < len(_players) else {}
+        features.append(float((_p or {}).get("unused_chip_count", 0) or 0) / BONUS_CHIP_NORM)
+
+    # P.12 -- Design liegt in einem EIGENEN Block. Quelle ist das additive
+    # Feld `designs` (serialize.rs), das nur am eigenen Block steht: die
+    # Vorderseite sieht allein, wer aufgehoert hat zu ziehen. Alt-Records ohne
+    # das Feld lassen alle 18 Bits auf 0.
+    _known = [0.0] * int(DOME_TILE_COUNT)
+    for _b in _view.get("blocks", []) or []:
+        if not _b.get("own"):
+            continue
+        for _d in (_b.get("designs") or []):
+            _di = int(_d)
+            if 0 <= _di < len(_known):
+                _known[_di] = 1.0
+    features.extend(_known)
+
+    # P.13 -- Blockstruktur: Tiefe des ersten eigenen Blocks (Zahl der Platten
+    # VOR ihm in den bekannten Bloecken) und Zahl eigener Bloecke.
+    _depth_first_own = 0.0
+    _own_blocks = 0
+    _seen_own = False
+    _running = 0.0
+    for _b in _view.get("blocks", []) or []:
+        if _b.get("own"):
+            _own_blocks += 1
+            if not _seen_own:
+                _seen_own = True
+                _depth_first_own = _running
+        _running += float(_b.get("len", 0) or 0)
+    features.append(_depth_first_own / DOME_TILE_COUNT)
+    features.append(_own_blocks / OWN_BLOCK_COUNT_NORM)
+
+    # P.14 -- Sperrstand der Musterreihen. `tiled_max_row` laeuft -1 (nichts
+    # belegt) bis 5; nach einer tieferen Reihe sind alle darueber fuer den Rest
+    # der Phase gesperrt (docs/engine_manual.md Z.131-134).
+    for _pi in _order:
+        _p = _players[_pi] if _pi < len(_players) else {}
+        _tmr = (_p or {}).get("tiled_max_row")
+        _tmr = -1 if _tmr is None else int(_tmr)
+        features.append((_tmr + 1) / PATTERN_LINE_COUNT)
+
+    # P.15 -- ist der Spieler am Zug auch Startspieler der naechsten Runde?
+    _fpn = data.get("first_player_next_round")
+    features.append(1.0 if (_fpn is not None and int(_fpn) == _curr) else 0.0)
 
     return torch.tensor(features, dtype=torch.float32)
 

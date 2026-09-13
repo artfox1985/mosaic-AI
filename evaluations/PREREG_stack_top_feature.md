@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 (par.10): acht Asymmetrien, vier GEBAUT (v24-b04, 714 -> 744), elf Stapelwerte (v28-b02, 755). EINGETAKTET v29-b03 (par.13/15/16): P.3, P.7, P.9, P.11-P.15 = 39 Werte, INPUT_SIZE 794 ENTSCHIEDEN (par.16: Vorderseiten erst nach dem Aufhoeren bekannt, Design-Bits bleiben draussen). NEU par.16: die AKTIONSLISTE verraet die Designs schon beim Weiterziehen (game.rs:402) -- Netz-sieht-MEHR, ungemessen. P.10-Suchfix im Code, unkompiliert; par.11 offen. -->
+<!-- STATUS: OFFEN | Frage: Sieht das Netz dasselbe wie ein Spieler am Tisch? | Beleg: Stufe 0 (par.10): acht Asymmetrien, vier GEBAUT (v24-b04, 714 -> 744), elf Stapelwerte (v28-b02, 755). Abschnitt 16 fuer v29-b03 GEBAUT im Code (par.17): 39 Werte, INPUT_SIZE 794, drei Tests; Bau/Wheel/Tore brauchen ein Fenster ohne Erzeugung. ENTSCHIEDEN par.17: P.12 wirkt erst ab v30 (der v29-Korpus traegt das neue Feld `designs` nicht), b03 misst 21 der 39 Werte. OFFEN: P.11 normiert /4, gemessen bis 8. par.10 P.12 korrigiert: fremde Vorderseiten sieht niemand (par.16). P.10-Suchfix unkompiliert. -->
 
 # PREREG: Sichtgleichheit Netz/Spieler am Kuppelstapel (`stack_top_feature`)
 
@@ -513,7 +513,7 @@ nachgelesen.
 | --- | --- | --- | --- | --- |
 | **P.10** | Suche VERGISST oeffentliche Information | `determinize_dome_pool` mischt den unbekannten Praefix des Stapels `[..prefix_len]` INKLUSIVE Index 0; gezogen wird per `remove(0)`, Index 0 ist also die oberste Platte, deren Rueckseite laut Zustand fuer beide jederzeit sichtbar ist (`dome_stack_top_type`, Merkmal P.2 aus v24-b04). Die Wurzel wird VOR `make_node` determinisiert (`DETERMINIZE_ROOT_HIDDEN_INFO = true`), das Netz bekommt im Suchpfad einen neu gewuerfelten Typ der obersten Platte. Fehlerklasse par.11: Sicht-Audit findet es nicht, weil Zustand und Merkmal da sind. | `state.rs` Z.242-243; `game.rs` Z.187; `serialize.rs` Z.357-363; `net_mcts.rs` Z.1373, Z.1410, Z.4938-4943; `features.rs` Z.597-599 | **GEPRUEFT.** Korrektheitsfrage (CLAUDE.md "Symmetrische Defekte sieht keine Arena"): Fix = typerhaltende Permutation, Position 0 behaelt ihren Typ (Tausch mit einer typgleichen Platte im Praefix). Eintrag in `docs/architecture_reference.md` Liste. Nutzer-Entscheid: jetzt fixen (klein, Wheel-Wechsel, Paritaets-Fixture des Champions aendert sich vermutlich) oder im Generationswechsel. |
 | **P.11** | Mensch > Netz | Die ANZAHL gehaltener Bonuschips fehlt: der Encoder zaehlt nur Farben ueber alle Chips (`chip_cnt`), ein Zweifarb-Chip {Blau, Rot} und zwei Einfarb-Chips {Blau}+{Rot} ergeben denselben Vektor. Die Vollendungsregel haengt an der Anzahl (2 farbgleiche ODER 3 beliebige je fehlender Fliese). `unused_chip_count` liegt im Zustand, 0 Treffer im Encoder; GUI zeigt jeden Chip einzeln. Jede Runde (2 Chips je Spieler). | `features.rs` Z.381-396; `docs/engine_manual.md` Z.158-159; `serialize.rs` Z.255; 0 Treffer `unused_chip_count` in `features.rs` | **GEPRUEFT.** Vorschlag: 2 additive Werte (Anzahl Chips je Spieler /4) in Abschnitt 16 des Sicht-Arms v29-b03. |
-| **P.12** | Mensch > Netz | Design-Identitaet der Platten in FREMDEN Rueckgabe-Bloecken: `dome_pool_view` gibt fuer fremde Bloecke nur `len`/`special`/`wild`, `types` null. Der Gegner sieht laut Regel die Vorderseiten der gezogenen Platten, kennt also die Multimenge der Designs im Block, nur nicht die Reihenfolge. Suche behaelt die Multimenge (Blockmischung), der Encoder wirft sie weg. | `serialize.rs` Z.100-128; `docs/engine_manual.md` Z.86-90; `features.rs` Z.129-159 | **GEPRUEFT.** Vorschlag: 18 Bits "Design liegt in einem Block, dessen Inhalt ich kenne"; Gewicht geringer als P.11 (nur nach Stapelzuegen). |
+| **P.12** | Mensch > Netz | Design-Identitaet der Platten in bekannten Rueckgabe-Bloecken: `dome_pool_view` gab bis 2026-09-13 gar keine Design-Nummern aus, auch nicht fuer eigene Bloecke (`types` traegt nur special/wild). **KORRIGIERT 2026-09-13 (Nutzer, deckt sich mit par.16):** gezogen wird mit der RUECKSEITE nach oben, die beide Spieler sehen; erst wer AUFHOERT zu ziehen, dreht seine Platten um und sieht die Vorderseite. Der Gegner sieht sie NIE. Die fruehere Begruendung an dieser Stelle ("der Gegner sieht laut Regel die Vorderseiten ... kennt also die Multimenge") war falsch; sie haette ein Netz-sieht-MEHR erzeugt. P.12 umfasst deshalb genau die EIGENEN Bloecke: was der Spieler am Zug selbst aufgedeckt hat, bevor er zurueckgelegt hat. | `serialize.rs` Z.100-128; `docs/engine_manual.md` Z.86-90; `features.rs` Z.129-159 | **GEPRUEFT, GEBAUT 2026-09-13.** 18 Bits "Design liegt in einem EIGENEN Block"; Gewicht geringer als P.11 (nur nach Stapelzuegen). Traeger ist das additive Record-Feld `dome_pool_view.blocks[].designs` (sortierte Multimenge der `tile_id`, NUR am eigenen Block, `serialize.rs`); der Encoder liest es im JSON-Pfad, der Direktpfad nimmt dieselbe Regel am Zustand. Die Sortierung ist Absicht: die Reihenfolge im zurueckgelegten Block haelt auch der Spieler nicht mehr auseinander. |
 | P.13 | Mensch > Netz | Blockstruktur des Stapels auf Summen zusammengezogen (Agent). | Bericht Abschnitt 1 | Agenten-Behauptung, NICHT nachgelesen; Teil derselben Kodierung wie P.12. |
 | P.14 | Mensch > Netz | `tiled_max_row` weder serialisiert noch kodiert (Agent). | Bericht Abschnitt 1 | NICHT nachgelesen; Gewicht unklar. |
 | **P.15** | Mensch > Netz (nur Tiling-Phase) | `holds_first_player_marker` wird in der Rundenwertung geloescht; der Encoder liest nur diesen Marker (`marker`), nicht `first_player_next_round`. In der Tiling-Phase weiss das Netz also nicht, wer die naechste Runde beginnt; relevant fuer Tiling-Entscheide und den Gleichstands-Tiebreak. | `round_end.rs` Z.438-441; `features.rs` Z.361/861; `serialize.rs` Z.348; 0 Treffer `first_player_next_round` in `features.rs` | **GEPRUEFT.** Vorschlag: 1 Wert (Startspieler naechste Runde = ich) in Abschnitt 16. |
@@ -895,3 +895,148 @@ Vorschau rechnet aber ohnehin mit.
 4. Verhaeltnis zu par.16: beide Kanaele fuehren zu derselben Regelverletzung, haben aber
    verschiedene Reparaturen. Die Aktionslisten-Luecke (par.16) betrifft die SUCHE, diese hier die
    ANZEIGE. Eine Reparatur der Anzeige schliesst par.16 NICHT mit.
+
+
+## par.17 Abschnitt 16 GEBAUT (Code, 2026-09-13) -- Bau vollstaendig, Tore offen
+
+**Auftrag:** Nutzer 2026-09-13, 23:05: *"das ist keine option. bereite alles vor dass es
+durchlaufen kann"* (auf die Frage, ob der Encoder-Abschnitt fuer v29-b03 wegfallen kann).
+Fahrplanpunkt Nr. 5. Gebaut ist der CODE; Bau, Tore und Wheel brauchen ein Fenster ohne
+laufende Erzeugung (par.6 Punkt 2, CLAUDE.md Exklusivitaet) und stehen noch aus.
+
+**Zuschnitt wie registriert:** 39 Werte, INPUT_SIZE 755 -> 794. P.3 (3), P.7 (6), P.9 (5),
+P.11 (2), P.12 (18), P.13 (2), P.14 (2), P.15 (1). Die 18 Design-Bits der eigenen Ziehserie
+bleiben draussen (par.16).
+
+**Beruehrte Stellen:**
+
+| Stelle | Aenderung |
+| --- | --- |
+| `engine/src/serialize.rs` | `dome_pool_view` bekommt je Block das additive Feld `designs` (sortierte `tile_id`-Multimenge), NUR am eigenen Block |
+| `engine/src/features.rs` | Abschnitt 16: `SightValues` plus `push_sight_values` als einzige Vektor-Stelle, `sight_values_from_json` und `sight_values_from_state`; `INPUT_SIZE` 794 |
+| `engine/py/neural_net.py` | Python-Zwilling Abschnitt 16, 39 Werte in derselben Reihenfolge |
+| `config.py` | `INPUT_SIZE` 794 |
+| `engine/src/lib.rs` | keine Aenderung noetig: `contract_canonical_string` liest `INPUT_SIZE`, der Vertragshash wechselt von selbst |
+
+**Drei neue Tests** in `features.rs`: `sight_appendix_is_appended_after_755` (Laenge und
+Wertebereich), `sight_appendix_matches_record_fields` (Sichtgleichheit gegen die Record-Felder
+ueber >= 300 Zustaende, par.6 Punkt 6a; prueft auch, dass `designs` GENAU am eigenen Block
+steht) und `old_755_layout_keeps_the_old_vector` (Regressionstest, par.6 Punkt 6b). Der
+bestehende Test `dome_pool_knowledge_is_appended_after_744` war auf `INPUT_SIZE` als Obergrenze
+gebaut und ist auf den 15er-Bereich begrenzt worden.
+
+**P.11-Normierung KORRIGIERT: /4 war unbelegt, richtig ist /10.** Die Zahl 4 stand seit par.15
+ohne Herleitung im Zuschnitt. Aufgefallen ist sie beim Bau, weil `unused_chip_count` gemessen
+bis 8 reicht (n = 3.032 Spielerstaende, Grundmenge ein Stueck des v29-Korpus, Einheit Chips je
+Spieler) und der Wert damit bis 2,0 gelaufen waere -- die [0, 1]-Konvention von Abschnitt 15
+gebrochen. **Regelauskunft des Nutzers (autoritativ, 2026-09-13): "ich kann maximal 10 chips in
+5 runden bekommen."** Der Code sagt dasselbe: `BONUS_CHIPS_PER_ROUND = 2` (`board.rs` Z.240),
+mal fuenf Runden. Das Feld zaehlt den BESTAND, nicht alle je erhaltenen Chips: eingesetzte
+werden entfernt (`round_end.rs` Z.649). Gebaut ist jetzt /10, in beiden Encodern aus der
+Konstante abgeleitet statt als Literal; der Wertebereichs-Test braucht keine Ausnahme mehr.
+
+**BEFUND, zeitkritisch (Traegerschaft des v29-Korpus):** `designs` ist ein neues Record-Feld.
+Die v29-Erzeugung laeuft seit dem 2026-09-13 mit dem INSTALLIERTEN Wheel und traegt es daher
+NICHT -- dieselbe Lage, die par.15 fuer `tiled_max_row` vorhergesehen und rechtzeitig geloest
+hat. Ein Wheel-Wechsel waehrend der Erzeugung ist ausgeschlossen (Exklusivitaet, und das Wheel
+ist geladen). Geprueft am Korpus: die anderen sechs Quellen von Abschnitt 16
+(`pending_stack_draw`, `phase`, `tower_colors`, `unused_chip_count`, `tiled_max_row`,
+`first_player_next_round`) liegen vollstaendig vor, `dome_pool_view` ebenfalls (1.413 von 4.722
+Records tragen mindestens einen bekannten Block). Ohne `designs` stehen im Sicht-Arm v29-b03
+also 18 der 39 Werte konstant auf 0.
+
+**ENTSCHIEDEN (Nutzer 2026-09-13, 23:5x: "dann also erst fuer v30. so be it"): Weg 1 --
+P.12 WIRKT ERST AB v30.** Der Encoder bleibt bei INPUT_SIZE 794; in v29-b03 sind die 18
+P.12-Spalten konstant 0, weil der v29-Korpus das Feld `designs` nicht traegt. Sie werden
+lebendig, sobald ein Korpus mit dem Wheel von Abschnitt 16 erzeugt wird, also mit v30.
+
+**Warum Weg 1 und nicht der Zuschnitt auf 776:** so gibt es EINEN Architekturwechsel statt
+zwei. Ein 776er-b03 muesste zu v30 noch einmal auf 794 wachsen, mit einem zweiten
+Warmstart-Umbau und einem zweiten Satz Bloecke. Konstante Nullspalten kosten dagegen
+nichts: ihr Gradient ist null, die Gewichte bleiben auf ihrer Null-Initialisierung stehen
+(dasselbe Muster wie beim Warmstart neuer Spalten, v24-b04).
+
+**Folge fuer die Lesart von v29-b03:** der Arm misst P.3, P.7, P.9, P.11, P.13, P.14 und
+P.15 (21 wirksame Werte), NICHT P.12. Ein Nullbefund des Arms ist damit kein Befund ueber
+P.12. Das Verwerfungs-Kriterium aus par.12 (Regression ueber zwei Seeds) bleibt unveraendert,
+bezieht sich aber nur auf die 21 wirksamen Werte.
+
+**WIEDERVORLAGE v30:** vor der v30-Erzeugung pruefen, dass das installierte Wheel
+`designs` schreibt (ein Record aus dem neuen Korpus aufmachen, Feld muss am eigenen Block
+stehen). Erst dann traegt P.12. Der Weg-3-Gedanke (Records nachtraeglich neu serialisieren)
+ist damit erledigt und wird nicht gebaut.
+
+
+### par.17a Erster Testlauf: 636 gruen, fuenf rot -- und der Beleg fuer die Paritaets-Fixture
+
+Testlauf des Nutzers am 2026-09-13 (`cargo test --release --lib`, 179,6 s): **636 gruen, 5 rot,
+19 ignoriert.** Der Code kompiliert; die fuenf zerfallen in zwei Klassen.
+
+**Klasse A -- zwei Bestandstests, die den Anbau nicht kannten (gefixt):**
+
+| Test | Ursache | Fix |
+| --- | --- | --- |
+| `dome_pool_knowledge_is_zero_without_blocks_in_json_path` | prueft `f[744..]` auf lauter Nullen; Wert 15 war 1,0 -- das Phasen-Bit von P.7 | auf `f[744..755]` begrenzt |
+| `dome_pool_knowledge_json_path_matches_hand_computed_values` | vergleicht `f[744..]` (jetzt 50 Werte) gegen 11 erwartete | auf `f[744..755]` begrenzt |
+
+**Klasse B -- drei Hashes, die sich aendern MUESSEN:**
+
+1. **`contract_hash_matches_pinned_literal`** (`lib.rs`): `INPUT_SIZE` steckt im Vertragsstring,
+   der Hash wechselt von `39648b95bbba1acf` auf `39994362fba145a6`. Neu gesetzt, Begruendung in
+   der Testdoku. Er ist gegenueber der P.11-Korrektur stabil, weil der Vertragsstring nur
+   Laengen und Kopf-Namen traegt, keine Normierungen.
+2. **`feature_golden_hash_matches_fixture`**: der Vektor ist 39 Werte laenger. Fixture neu
+   erzeugen.
+3. **`net_parity_hash_matches_champion_fixture`**: die Fixture, die par.6 Punkt 6c ausdruecklich
+   als UNVERAENDERT verlangt. Sie bricht trotzdem -- und der Grund ist NICHT, dass der Champion
+   andere Eingaben bekommt.
+
+**Beleg zu Punkt 3 (am Code nachgelesen, keine Messung noetig):**
+
+- `net_parity_hash` hasht die **RECORDS**, nicht die Netz-Eingaben (`self_play.rs` Z.8075-8079:
+  je Record das JSON-Objekt, abzueglich `NET_PARITY_EXCLUDED_FIELDS`). Abschnitt 16 bringt mit
+  `dome_pool_view.blocks[].designs` ein neues Record-Feld mit, also aendert sich der Hash
+  zwangslaeufig.
+- Die Netz-Eingaben bleiben dagegen bitgleich, an BEIDEN Zweigen von `net.rs::build_inputs`
+  nachgelesen: im Flat-Fall kuerzt Z.425 auf `n.min(s.len())`; im PlanesPlusFlat-Fall -- dem des
+  2D-Champions v28-b02 -- liest `split_planes_flat_batch_src` (Z.982) den Flat-Block ab der
+  QUELL-Grenze und begrenzt ihn auf `flat_len`, also auf die vom MODELL deklarierten 755. Die 39
+  neuen Werte haengen dahinter und werden nie gelesen.
+
+**Einordnung:** Serialisierungs-Artefakt, keine Verhaltensaenderung -- dieselbe Lage wie bei der
+Anker-Drift am 2026-09-12, die als Serialisierungs-Artefakt bewiesen wurde (0 von 1.763 Records
+abweichend nach Abzug der additiven Felder).
+
+**Und es ist nicht das erste Mal: der Praezedenzfall steht im Kopf der Feature-Fixture**
+(`engine/tests/fixtures/feature_contract_v1.txt`, Eintrag vom 2026-09-11). Dort ist woertlich
+festgehalten, dass die Champion-Paritaets-Fixture schon damals rot war, und zwar wegen des
+Record-Felds `dome_pool_view` aus Commit 56fd9f2 (Hash `b5188b25e073a1c0` statt
+`5e3b1362ddc65fa6`) -- waehrend die ELF neuen Encoder-Werte von Abschnitt 15 sie NICHT weiter
+bewegt haben, weil Altmodelle auf ihre Breite gekuerzt werden. Genau dieselbe Trennung wie
+heute: das Record-Feld bewegt den Hash, die Encoder-Werte nicht. Der Befund ist damit zweimal
+unabhaengig belegt. Die Forderung aus par.6 Punkt 6c ("Fixture
+UNVERAENDERT") war auf die EINGABEN gemuenzt und ist erfuellt; dass die Fixture die Records
+hasht, war beim Schreiben der Forderung nicht mitgedacht. **Konsequenz fuer kuenftige additive
+Record-Felder: sie brechen die Paritaets-Fixture IMMER**, und das Tor muss dann am Beleg
+entschieden werden, nicht am Hash.
+
+**Beide Fixtures sind neu zu erzeugen** (Stopp-Punkt Fahrplan Nr. 5, hiermit gemeldet):
+
+```
+$env:MOSAIC_UPDATE_FEATURE_FIXTURE=1; cargo test --release feature_golden_hash_matches_fixture -- --nocapture
+$env:MOSAIC_UPDATE_NET_PARITY_FIXTURE=1; cargo test --release net_parity_hash_matches_champion_fixture -- --nocapture
+```
+
+Danach beide OHNE die Variable in einem frischen Prozess wiederholen (Abnahmeregel der
+Fixture-Tests). **Reihenfolge beachten:** erst nach der P.11-Korrektur (/4 auf /10, siehe oben),
+sonst werden die Fixtures zweimal gesetzt -- die Zahlen aus dem Lauf von 2026-09-13 sind fuer
+Punkt 2 und 3 bereits ueberholt.
+
+**Drei Compiler-Warnungen im selben Zug beseitigt** (Nutzer: "vielleicht kannst die warnings auch
+gleich tackeln"): ein ueberfluessiges `mut` (`net_mcts.rs` Z.5492) und zwei
+`dead_code`-Meldungen. Die beiden Funktionen sind NICHT geloescht worden, sondern mit
+`#[allow(dead_code)]` und Begruendung stehen geblieben: `split_planes_flat_batch` (`net.rs`
+Z.947) ist die Referenz-Fassung, gegen die die Tests `..._src` halten -- sie haelt den Befund vom
+2026-08-25 fest; `resolve_and_apply_stack_draw` (`self_play.rs` Z.828) wird von der
+Knopf-Registratur und drei Modulkommentaren namentlich gefuehrt. Loeschen waere ein eigener
+Entscheid.

@@ -35,7 +35,18 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- NETZWERK PARAMETER ---
-INPUT_SIZE = 755        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers; +8 Plattentyp-Sicht, +10 Strafleisten-Farben, +12 Phantom-Anteile -- PREREG_stack_top_feature.md par.10, 2026-09-05)
+# ACHTUNG, SCHARFSCHALTUNG STEHT AUS (2026-09-13): Abschnitt 16 (Sicht-Anbau,
+# v29-b03) ist in `engine/src/features.rs` und `engine/py/neural_net.py`
+# vollstaendig GEBAUT und deklariert 794. Hier steht bewusst noch 755, weil
+# das INSTALLIERTE Wheel 755 liefert und `file_cache_key.py` diesen Wert zur
+# LAUFZEIT liest: eine 794 hier wuerde die wartende v29-Kette 755er-Bloecke
+# unter dem 794er-Schluessel ablegen -- genau der Unfall vom 2026-09-11
+# (24 Bloecke 755 unter 744-Schluessel).
+#
+# PFLICHTSCHRITT beim Wheel-Bau von Abschnitt 16 (PREREG_stack_top_feature.md
+# par.17): diese Zeile im SELBEN Zug auf 794 setzen, in dem das neue Wheel
+# installiert wird -- vorher nicht, nachher nicht.
+INPUT_SIZE = 755        # state_to_tensor (564 Basis + 74 Endwertungs-/Geometrie + 46 Linien-Features; 60 je Spieler; +5 Beutel/Turm-Farbanteil; +18 Kuppelstapel-Maske; +1 wild_remaining_frac; +6 col_f_max des ziehenden Spielers; +8 Plattentyp-Sicht, +10 Strafleisten-Farben, +12 Phantom-Anteile -- PREREG_stack_top_feature.md par.10, 2026-09-05; +39 Sicht-Anbau Abschnitt 16 -- P.3/P.7/P.9/P.11-P.15, PREREG_stack_top_feature.md par.15/par.16, 2026-09-13)
                         # +11 Kuppelstapel-Wissen aus `dome_pool_view` (Praefixlaenge; eigene Bloecke Laenge/Spezial/Wild;
                         #  Typenfolge der obersten 4 Positionen des obersten eigenen Blocks; fremde Bloecke Laenge/Spezial/Wild)
                         #  -- Variante B, PREREG_dome_stack_information_sets.md par.7/par.15f, PREREG_v28_window.md par.6, 2026-09-11: 744 -> 755

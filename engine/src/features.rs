@@ -15,9 +15,10 @@ use crate::tiling_solver::solve_round_final_score;
 /// Feature-Vektor-Länge (= `config.INPUT_SIZE`). EINZIGE Quelle der Wahrheit
 /// für die ONNX-Eingabegröße — bei jeder Feature-Änderung hier UND in
 /// config.py aktualisieren (sonst `Net::load`-Shape-Mismatch beim Inferieren).
-pub const INPUT_SIZE: usize = 755; // 744 + 11 Kuppelstapel-Wissen (Abschnitt 15, Variante B, v28-b02, 2026-09-11)
+pub const INPUT_SIZE: usize = 794; // 755 + 39 Sicht-Anbau (Abschnitt 16, Sicht-Arm v29-b03, 2026-09-13)
 // 714 + 8 Plattentyp-Sicht + 10 Strafleisten-Farben + 12 Phantom-Anteile = 744
-// (Abschnitte 12-14, v24-b04, 2026-09-05); + 11 Abschnitt 15 = 755.
+// (Abschnitte 12-14, v24-b04, 2026-09-05); + 11 Abschnitt 15 = 755;
+// + 39 Abschnitt 16 (Sicht-Anbau v29-b03) = 794.
 
 /// Per-Kriterium-Normalisierung der 8 Wertungsplatten-Punkte (= `SCORE_NORM`).
 const SCORE_NORM: [f32; 8] = [18.0, 42.0, 20.0, 12.0, 20.0, 22.0, 12.0, 24.0];
@@ -243,6 +244,293 @@ fn dome_pool_knowledge_from_state(state: &GameState) -> DomePoolKnowledge {
         start = end;
     }
     k
+}
+
+// == Abschnitt 16: Sicht-Anbau (Sicht-Arm v29-b03) ===========================
+//
+// PREREG_stack_top_feature.md par.13/par.15 (Nachtrag 02:35) und
+// PREREG_v29_window.md par.6c. Abschnitt 15 hat den Wissensstand am
+// Kuppelstapel nachgetragen; diese 39 Werte schliessen die restlichen
+// Sichtpunkte der Inventur (par.10). Kriterium des Arms ist
+// SICHTGLEICHHEIT, nicht Elo (par.1) -- ein flaches Arena-Ergebnis ist
+// ausdruecklich kein Grund, sie zurueckzunehmen.
+//
+// DRAUSSEN bleiben die 18 Design-Bits der eigenen Ziehserie (P.3): die
+// Vorderseiten sind erst bekannt, wenn der Spieler AUFHOERT zu ziehen
+// (par.16); sie waehrend der Serie zu zeigen waere Netz-sieht-MEHR. Deshalb
+// INPUT_SIZE 794 und nicht 812.
+
+/// Hoechstzahl einer Farbe im Turm (`tile.rs::TILES_PER_COLOR`).
+const SIGHT_TOWER_COLOR_NORM: f32 = 13.0;
+/// Obergrenze fuer den Bestand gehaltener Bonuschips eines Spielers:
+/// [`crate::board::BONUS_CHIPS_PER_ROUND`] (2) mal fuenf Runden.
+///
+/// Das Record-Feld `unused_chip_count` zaehlt den BESTAND, nicht alle je
+/// erhaltenen Chips: eingesetzte werden entfernt (`round_end.rs` Z.649).
+/// Die Prereg par.15 hatte /4 angesetzt; die Zahl war unbelegt und ist am
+/// 2026-09-13 korrigiert worden (Nutzer: "ich kann maximal 10 chips in 5
+/// runden bekommen", bestaetigt an `board.rs` Z.240). Mit /4 waeren Werte
+/// bis 2,5 moeglich gewesen und die [0, 1]-Konvention von Abschnitt 15
+/// gebrochen; gemessen lag der hoechste Bestand bei 8 (n = 3.032
+/// Spielerstaende, Grundmenge ein Stueck des v29-Korpus).
+const SIGHT_BONUS_CHIP_NORM: f32 = (crate::board::BONUS_CHIPS_PER_ROUND * 5) as f32;
+/// Zahl der Musterreihen; `tiled_max_row` laeuft -1..5, normiert (x + 1)/6.
+const SIGHT_PATTERN_LINE_COUNT: f32 = 6.0;
+/// Obergrenze fuer die Zahl eigener Bloecke im Kuppelstapel (Prereg: /6).
+const SIGHT_OWN_BLOCK_COUNT_NORM: f32 = 6.0;
+/// Die sechs Phasen in der Reihenfolge von `state.rs::Phase`.
+const SIGHT_PHASE_ORDER: [&str; 6] = [
+    "start_placement",
+    "drafting",
+    "tiling",
+    "scoring",
+    "end",
+    "final",
+];
+
+/// Laenge des Anhangs aus Abschnitt 16: P.3 (3) + P.7 (6) + P.9 (5) +
+/// P.11 (2) + P.12 (18) + P.13 (2) + P.14 (2) + P.15 (1).
+pub const SIGHT_VALUES: usize =
+    3 + SIGHT_PHASE_ORDER.len() + 5 + 2 + crate::dome::NUM_DOME_TILE_DESIGNS + 2 + 2 + 1;
+
+/// Rohstand der Sichtpunkte, bevor normiert wird. Wie bei Abschnitt 15
+/// fuellen BEIDE Encoder-Pfade dieselbe Struktur, und
+/// [`push_sight_values`] ist die einzige Stelle, die daraus Vektorwerte
+/// macht -- so kann die Reihenfolge der 39 Werte nicht auseinanderlaufen.
+/// Alles, was je Spieler gefuehrt wird, steht in ZUGREIHENFOLGE: Index 0 ist
+/// der Spieler am Zug.
+#[derive(Debug, Clone, PartialEq)]
+struct SightValues {
+    /// P.3: Zahl der in dieser Serie bereits gezogenen Platten, davon Wild,
+    /// davon Spezial.
+    drawn_len: usize,
+    drawn_wild: usize,
+    drawn_special: usize,
+    /// P.7: Index in [`SIGHT_PHASE_ORDER`]; `None` = unbekannte Phase, dann
+    /// bleiben alle sechs Bits 0.
+    phase_index: Option<usize>,
+    /// P.9: Zaehler je Normalfarbe im Turm.
+    tower_colors: [usize; 5],
+    /// P.11: gehaltene Bonuschips, Spieler am Zug zuerst.
+    bonus_chips: [usize; 2],
+    /// P.12: je Design (`tile_id` 0..17) wahr, wenn es in einem EIGENEN
+    /// Block liegt. Nur die hat der Spieler am Zug beim Aufhoeren
+    /// umgedreht; fremde Bloecke zeigen ihm nur die Rueckseite.
+    known_designs: [bool; crate::dome::NUM_DOME_TILE_DESIGNS],
+    /// P.13: Zahl der Platten VOR dem ersten eigenen Block (unbekannter
+    /// Praefix mitgezaehlt) und Zahl eigener Bloecke.
+    first_own_block_depth: usize,
+    own_block_count: usize,
+    /// P.14: `tiled_max_row` je Spieler, Spieler am Zug zuerst (-1..5).
+    tiled_max_row: [i32; 2],
+    /// P.15: ist der Spieler am Zug Startspieler der naechsten Runde?
+    current_is_first_next: bool,
+}
+
+impl Default for SightValues {
+    fn default() -> Self {
+        SightValues {
+            drawn_len: 0,
+            drawn_wild: 0,
+            drawn_special: 0,
+            phase_index: None,
+            tower_colors: [0; 5],
+            bonus_chips: [0; 2],
+            known_designs: [false; crate::dome::NUM_DOME_TILE_DESIGNS],
+            first_own_block_depth: 0,
+            own_block_count: 0,
+            tiled_max_row: [-1; 2],
+            current_is_first_next: false,
+        }
+    }
+}
+
+/// Haengt die 39 Werte aus Abschnitt 16 an, in dieser Reihenfolge:
+///
+/// | Index (ab 755) | Bedeutung | Normierung |
+/// | --- | --- | --- |
+/// | 0-2 | P.3 Ziehserie: Zahl gezogen, davon Wild, davon Spezial | / 18 |
+/// | 3-8 | P.7 Phase als One-Hot ueber die sechs Phasen | 0/1 |
+/// | 9-13 | P.9 Turm je Normalfarbe | / 13 |
+/// | 14-15 | P.11 gehaltene Bonuschips, Spieler am Zug zuerst | / 10 |
+/// | 16-33 | P.12 Design liegt in einem bekannten Block | 0/1 |
+/// | 34 | P.13 Tiefe des ersten eigenen Blocks | / 18 |
+/// | 35 | P.13 Zahl eigener Bloecke | / 6 |
+/// | 36-37 | P.14 (tiled_max_row + 1), Spieler am Zug zuerst | / 6 |
+/// | 38 | P.15 Spieler am Zug ist Startspieler der naechsten Runde | 0/1 |
+fn push_sight_values(f: &mut Vec<f32>, s: &SightValues) {
+    let len_norm = crate::dome::NUM_DOME_TILE_DESIGNS as f32;
+    f.push(s.drawn_len as f32 / len_norm);
+    f.push(s.drawn_wild as f32 / len_norm);
+    f.push(s.drawn_special as f32 / len_norm);
+    for i in 0..SIGHT_PHASE_ORDER.len() {
+        f.push(if s.phase_index == Some(i) { 1.0 } else { 0.0 });
+    }
+    for c in s.tower_colors {
+        f.push(c as f32 / SIGHT_TOWER_COLOR_NORM);
+    }
+    for c in s.bonus_chips {
+        f.push(c as f32 / SIGHT_BONUS_CHIP_NORM);
+    }
+    for d in s.known_designs {
+        f.push(if d { 1.0 } else { 0.0 });
+    }
+    f.push(s.first_own_block_depth as f32 / len_norm);
+    f.push(s.own_block_count as f32 / SIGHT_OWN_BLOCK_COUNT_NORM);
+    for r in s.tiled_max_row {
+        f.push((r + 1) as f32 / SIGHT_PATTERN_LINE_COUNT);
+    }
+    f.push(if s.current_is_first_next { 1.0 } else { 0.0 });
+}
+
+/// Sichtstand aus dem Record (`state_to_json`). FEHLT ein Feld -- Alt-Records
+/// vor v29 --, bleibt der zugehoerige Wert auf seinem Default, also
+/// "Merkmal aus"; dieselbe Toleranz wie in Abschnitt 15, und bewusst kein
+/// Rueckfall auf eine erfundene Sicht.
+fn sight_values_from_json(v: &Value) -> SightValues {
+    let mut s = SightValues::default();
+
+    // P.3 -- Ziehserie. `bonus > 0` ist der Spezial-Typ (`dome.rs`:
+    // `is_special_type`), Wild ist der Rest.
+    if let Some(draw) = v.get("pending_stack_draw").and_then(|x| x.as_array()) {
+        s.drawn_len = draw.len();
+        s.drawn_special = draw
+            .iter()
+            .filter(|t| t.get("bonus").and_then(|b| b.as_i64()).unwrap_or(0) > 0)
+            .count();
+        s.drawn_wild = s.drawn_len - s.drawn_special;
+    }
+
+    // P.7 -- Phase.
+    if let Some(name) = v.get("phase").and_then(|x| x.as_str()) {
+        s.phase_index = SIGHT_PHASE_ORDER.iter().position(|p| *p == name);
+    }
+
+    // P.9 -- Turm je Farbe.
+    if let Some(tc) = v.get("tower_colors").and_then(|x| x.as_array()) {
+        for (i, slot) in s.tower_colors.iter_mut().enumerate() {
+            *slot = tc.get(i).and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+        }
+    }
+
+    // P.11 und P.14 -- je Spieler, Spieler am Zug zuerst.
+    let curr_pi = (v.get("current_player").and_then(|x| x.as_i64()).unwrap_or(0) as usize).min(1);
+    if let Some(players) = v.get("players").and_then(|x| x.as_array()) {
+        for (slot, pi) in [curr_pi, 1 - curr_pi].into_iter().enumerate() {
+            let p = match players.get(pi) {
+                Some(x) => x,
+                None => continue,
+            };
+            s.bonus_chips[slot] =
+                p.get("unused_chip_count").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+            s.tiled_max_row[slot] =
+                p.get("tiled_max_row").and_then(|x| x.as_i64()).unwrap_or(-1) as i32;
+        }
+    }
+
+    // P.12 und P.13 -- aus `dome_pool_view`. `designs` ist die SORTIERTE
+    // Multimenge der `tile_id` und steht NUR am eigenen Block (serialize.rs):
+    // die Vorderseite sieht allein, wer aufgehoert hat zu ziehen. Alt-Records
+    // ohne das Feld lassen alle 18 Bits auf 0.
+    if let Some(view) = v.get("dome_pool_view").filter(|x| x.is_object()) {
+        let mut depth = view
+            .get("unknown_prefix")
+            .and_then(|x| x.as_u64())
+            .unwrap_or(0) as usize;
+        let mut own_seen = false;
+        if let Some(blocks) = view.get("blocks").and_then(|x| x.as_array()) {
+            for b in blocks {
+                if b.get("own").and_then(|x| x.as_bool()).unwrap_or(false) {
+                    if let Some(designs) = b.get("designs").and_then(|x| x.as_array()) {
+                        for d in designs {
+                            if let Some(i) = d.as_u64() {
+                                if let Some(slot) = s.known_designs.get_mut(i as usize) {
+                                    *slot = true;
+                                }
+                            }
+                        }
+                    }
+                    s.own_block_count += 1;
+                    if !own_seen {
+                        own_seen = true;
+                        s.first_own_block_depth = depth;
+                    }
+                }
+                depth += b.get("len").and_then(|x| x.as_u64()).unwrap_or(0) as usize;
+            }
+        }
+    }
+
+    // P.15 -- Startspieler der naechsten Runde.
+    if let Some(fp) = v.get("first_player_next_round").and_then(|x| x.as_i64()) {
+        s.current_is_first_next = fp as usize == curr_pi;
+    }
+
+    s
+}
+
+/// Sichtstand direkt aus dem `GameState` -- dieselbe Ableitung wie
+/// `sight_values_from_json`, damit `state_to_features_direct` und der
+/// JSON-Pfad Wert fuer Wert uebereinstimmen (bewacht von
+/// `direct_matches_json_path_*`).
+fn sight_values_from_state(state: &GameState) -> SightValues {
+    let mut s = SightValues::default();
+
+    s.drawn_len = state.pending_stack_draw.len();
+    s.drawn_special = state
+        .pending_stack_draw
+        .iter()
+        .filter(|t| t.is_special_type())
+        .count();
+    s.drawn_wild = s.drawn_len - s.drawn_special;
+
+    let phase_name = state.phase.as_str();
+    s.phase_index = SIGHT_PHASE_ORDER.iter().position(|p| *p == phase_name);
+
+    // Spiegel von `serialize::color_counts` ueber `TileColor::NORMAL`.
+    for t in &state.tower.tiles {
+        if let Some(i) = crate::tile::TileColor::NORMAL.iter().position(|c| c == t) {
+            s.tower_colors[i] += 1;
+        }
+    }
+
+    let curr_pi = state.current_player.min(1);
+    for (slot, pi) in [curr_pi, 1 - curr_pi].into_iter().enumerate() {
+        if let Some(p) = state.players.get(pi) {
+            s.bonus_chips[slot] = p.bonus_chips.len();
+            s.tiled_max_row[slot] = p.tiled_max_row;
+        }
+    }
+
+    // P.12/P.13 mit derselben Saettigung an der Poolgrenze wie
+    // `dome_pool_knowledge_from_state` und `serialize::dome_pool_view`.
+    let pool_len = state.dome_tile_pool.len();
+    let unknown_prefix = state.dome_pool_unknown_prefix_len();
+    let mut start = unknown_prefix.min(pool_len);
+    let mut depth = unknown_prefix;
+    let mut own_seen = false;
+    for b in &state.dome_pool_known_blocks {
+        let end = (start + b.len).min(pool_len);
+        if b.returner == state.current_player {
+            // Nur der EIGENE Block ist aufgedeckt worden.
+            for t in &state.dome_tile_pool[start..end] {
+                if let Some(slot) = s.known_designs.get_mut(t.tile_id) {
+                    *slot = true;
+                }
+            }
+            s.own_block_count += 1;
+            if !own_seen {
+                own_seen = true;
+                s.first_own_block_depth = depth;
+            }
+        }
+        depth += b.len;
+        start = end;
+    }
+
+    s.current_is_first_next = state.first_player_next_round == state.current_player;
+
+    s
 }
 
 /// Vollständiger Feature-Vektor aus dem State-Dict (`state_to_json`).
@@ -672,6 +960,13 @@ pub fn state_to_features(v: &Value) -> Vec<f32> {
     // `dome_pool_view`; fehlt es (Alt-Records v25 bis v27), sind alle elf 0.
     push_dome_pool_knowledge(&mut f, &dome_pool_knowledge_from_json(v));
 
+    // 16. Sicht-Anbau (Sicht-Arm v29-b03) -- siehe `push_sight_values` fuer
+    // die Belegung der 39 Indizes. Quellen sind die Record-Felder
+    // `pending_stack_draw`, `phase`, `tower_colors`, `unused_chip_count`,
+    // `dome_pool_view`, `tiled_max_row` und `first_player_next_round`;
+    // fehlt eines (Alt-Records vor v29), bleibt der zugehoerige Wert 0.
+    push_sight_values(&mut f, &sight_values_from_json(v));
+
     f
 }
 
@@ -1100,6 +1395,11 @@ pub fn state_to_features_direct(state: &GameState) -> Vec<f32> {
     // Feld `dome_pool_view` bildet; die `direct_matches_json_path_*`-Tests
     // bewachen die Gleichheit.
     push_dome_pool_knowledge(&mut f, &dome_pool_knowledge_from_state(state));
+
+    // 16. Sicht-Anbau -- siehe JSON-Pfad. Hier aus dem Zustand selbst, mit
+    // denselben Sichtregeln; die `direct_matches_json_path_*`-Tests bewachen
+    // die Gleichheit.
+    push_sight_values(&mut f, &sight_values_from_state(state));
 
     f
 }
@@ -1628,6 +1928,11 @@ mod tests {
     /// Vektorlaenge VOR Abschnitt 15 (Kuppelstapel-Wissen, Variante B,
     /// v28-b02); der Champion v27-b01 deklariert genau diese Breite.
     const LEN_BEFORE_DOME_POOL_KNOWLEDGE: usize = 744;
+    /// Vektorlaenge VOR Abschnitt 16 (Sicht-Anbau, v29-b03); der
+    /// Champion v28-b02 deklariert genau diese Breite und darf die 39
+    /// neuen Werte nie sehen (`Net::build_inputs` kuerzt auf die vom
+    /// MODELL deklarierte Laenge).
+    const LEN_BEFORE_SIGHT_APPENDIX: usize = 755;
 
     /// Spielt ab einem frischen Start bis zu `steps` zufällige, legale
     /// Drafting-Züge und sammelt den Zustand NACH jedem Zug (inkl. des
@@ -1845,7 +2150,12 @@ mod tests {
         v.as_object_mut().unwrap().remove("dome_pool_view");
         let f = state_to_features(&v);
         assert_eq!(f.len(), INPUT_SIZE);
-        for (i, x) in f[LEN_BEFORE_DOME_POOL_KNOWLEDGE..].iter().enumerate() {
+        // Nur der 15er-Bereich: Abschnitt 16 dahinter liest andere Felder,
+        // die im selben Record sehr wohl gesetzt sind (Phase, Turm, Spieler).
+        for (i, x) in f[LEN_BEFORE_DOME_POOL_KNOWLEDGE..LEN_BEFORE_SIGHT_APPENDIX]
+            .iter()
+            .enumerate()
+        {
             assert_eq!(*x, 0.0, "Alt-Record ohne dome_pool_view: Wert {i} != 0");
         }
         // Mit Feld, aber ohne Bloecke: nur das Praefix traegt.
@@ -1883,7 +2193,9 @@ mod tests {
         );
         let f = state_to_features(&v);
         assert_eq!(f.len(), INPUT_SIZE);
-        let got: Vec<f32> = f[LEN_BEFORE_DOME_POOL_KNOWLEDGE..].to_vec();
+        // Nur die elf Werte von Abschnitt 15; Abschnitt 16 haengt dahinter.
+        let got: Vec<f32> =
+            f[LEN_BEFORE_DOME_POOL_KNOWLEDGE..LEN_BEFORE_SIGHT_APPENDIX].to_vec();
         let want: Vec<f32> = vec![
             4.0 / 18.0, // unbekanntes Praefix
             2.0 / 18.0, // eigene Laenge
@@ -1907,7 +2219,7 @@ mod tests {
     #[test]
     fn dome_pool_knowledge_is_appended_after_744() {
         assert_eq!(
-            INPUT_SIZE - LEN_BEFORE_DOME_POOL_KNOWLEDGE,
+            LEN_BEFORE_SIGHT_APPENDIX - LEN_BEFORE_DOME_POOL_KNOWLEDGE,
             DOME_POOL_KNOWLEDGE_VALUES,
             "Abschnitt 15 ist genau {DOME_POOL_KNOWLEDGE_VALUES} Werte lang"
         );
@@ -1917,7 +2229,9 @@ mod tests {
         state.note_dome_pool_return(3, 1);
         let f = state_to_features_direct(&state);
         let base = LEN_BEFORE_DOME_POOL_KNOWLEDGE;
-        for (i, x) in f[base..].iter().enumerate() {
+        // Nur der 15er-Bereich; Abschnitt 16 dahinter hat eigene Grenzen
+        // (`sight_appendix_is_appended_after_755`).
+        for (i, x) in f[base..LEN_BEFORE_SIGHT_APPENDIX].iter().enumerate() {
             if (4..4 + DOME_POOL_TOP_TYPES).contains(&i) {
                 assert!(
                     *x == -1.0 || *x == 0.0 || *x == 1.0,
@@ -1925,6 +2239,194 @@ mod tests {
                 );
             } else {
                 assert!((0.0..=1.0).contains(x), "Wert {i} ausserhalb [0, 1]: {x}");
+            }
+        }
+    }
+
+    /// Additivitaets-Regel (2D-Encoder-Regel, docs/architecture_reference.md):
+    /// Abschnitt 16 haengt HINTER den 755 Werten, die der Champion v28-b02
+    /// deklariert, und ist genau [`SIGHT_VALUES`] lang.
+    ///
+    /// Wertebereich: alles in [0, 1], ohne Ausnahme. Die Bonuschip-Werte
+    /// (P.11) normieren seit der Korrektur vom 2026-09-13 auf die
+    /// Regel-Obergrenze 10 (`board.rs::BONUS_CHIPS_PER_ROUND` mal fuenf
+    /// Runden), nicht mehr auf die unbelegte 4 der Prereg.
+    #[test]
+    fn sight_appendix_is_appended_after_755() {
+        assert_eq!(
+            INPUT_SIZE - LEN_BEFORE_SIGHT_APPENDIX,
+            SIGHT_VALUES,
+            "Abschnitt 16 ist genau {SIGHT_VALUES} Werte lang"
+        );
+        assert_eq!(SIGHT_VALUES, 39, "Zuschnitt laut Prereg par.15: 39 Werte");
+        for seed in 0..4u64 {
+            for (i, s) in random_drafting_states(seed, 40).into_iter().enumerate() {
+                let f = state_to_features_direct(&s);
+                assert_eq!(f.len(), INPUT_SIZE, "seed={seed} step={i}: Laenge");
+                for (j, x) in f[LEN_BEFORE_SIGHT_APPENDIX..].iter().enumerate() {
+                    assert!(
+                        (0.0..=1.0).contains(x),
+                        "seed={seed} step={i}: Abschnitt-16-Wert {j} ausserhalb [0, 1]: {x}"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Sichtgleichheits-Test (PREREG_stack_top_feature.md par.6 Punkt 6a):
+    /// JEDER der 39 neuen Werte stimmt mit dem zugehoerigen Record-Feld
+    /// ueberein, ueber mindestens 300 Zustaende. Geprueft wird gegen
+    /// `state_to_json` -- also gegen das, was der Spieler am Tisch und der
+    /// Trainingskorpus sehen, nicht gegen eine zweite Rechnung im Encoder.
+    #[test]
+    fn sight_appendix_matches_record_fields() {
+        let base = LEN_BEFORE_SIGHT_APPENDIX;
+        let mut checked = 0usize;
+        // 12 Seeds x 60 Schritte wie bei `plate_type_sight_matches_gui_json`;
+        // Drafting endet frueher, 12 Seeds decken die geforderten >= 300 ab.
+        for seed in 0..12u64 {
+            for (i, s) in random_drafting_states(seed, 60).into_iter().enumerate() {
+                let ctx = format!("seed={seed} step={i}");
+                let v = state_to_json(&s, true);
+                let f = state_to_features_direct(&s);
+                let curr = v
+                    .get("current_player")
+                    .and_then(|x| x.as_i64())
+                    .expect("current_player") as usize;
+
+                // P.3 -- Ziehserie.
+                let draw = v
+                    .get("pending_stack_draw")
+                    .and_then(|x| x.as_array())
+                    .map(|a| a.as_slice())
+                    .unwrap_or(&[]);
+                let special = draw
+                    .iter()
+                    .filter(|t| t.get("bonus").and_then(|b| b.as_i64()).unwrap_or(0) > 0)
+                    .count();
+                assert_eq!(f[base], draw.len() as f32 / 18.0, "{ctx}: P.3 Laenge");
+                assert_eq!(
+                    f[base + 1],
+                    (draw.len() - special) as f32 / 18.0,
+                    "{ctx}: P.3 Wild"
+                );
+                assert_eq!(f[base + 2], special as f32 / 18.0, "{ctx}: P.3 Spezial");
+
+                // P.7 -- genau ein Phasen-Bit, und zwar das der Record-Phase.
+                let phase = v.get("phase").and_then(|x| x.as_str()).expect("phase");
+                let hot: Vec<usize> = (0..6).filter(|k| f[base + 3 + k] == 1.0).collect();
+                assert_eq!(hot.len(), 1, "{ctx}: P.7 nicht genau ein Bit: {hot:?}");
+                assert_eq!(
+                    SIGHT_PHASE_ORDER[hot[0]], phase,
+                    "{ctx}: P.7 zeigt die falsche Phase"
+                );
+
+                // P.9 -- Turm je Farbe.
+                let tower = v
+                    .get("tower_colors")
+                    .and_then(|x| x.as_array())
+                    .expect("tower_colors");
+                for k in 0..5 {
+                    let want = tower[k].as_u64().expect("Turmzaehler") as f32 / 13.0;
+                    assert_eq!(f[base + 9 + k], want, "{ctx}: P.9 Farbe {k}");
+                }
+
+                // P.11 und P.14 -- Spieler am Zug zuerst.
+                let players = v.get("players").and_then(|x| x.as_array()).expect("players");
+                for (slot, pi) in [curr, 1 - curr].into_iter().enumerate() {
+                    let p = &players[pi];
+                    let chips =
+                        p.get("unused_chip_count").and_then(|x| x.as_u64()).expect("chips") as f32;
+                    assert_eq!(f[base + 14 + slot], chips / 10.0, "{ctx}: P.11 Spieler {pi}");
+                    let tmr = p
+                        .get("tiled_max_row")
+                        .and_then(|x| x.as_i64())
+                        .expect("tiled_max_row") as f32;
+                    assert_eq!(
+                        f[base + 36 + slot],
+                        (tmr + 1.0) / 6.0,
+                        "{ctx}: P.14 Spieler {pi}"
+                    );
+                }
+
+                // P.12 und P.13 -- aus `dome_pool_view`.
+                let view = v.get("dome_pool_view").expect("dome_pool_view");
+                let blocks = view
+                    .get("blocks")
+                    .and_then(|x| x.as_array())
+                    .expect("blocks");
+                let mut want_designs = [0.0f32; 18];
+                let mut depth = view
+                    .get("unknown_prefix")
+                    .and_then(|x| x.as_u64())
+                    .expect("unknown_prefix") as f32;
+                let mut want_first_depth = 0.0f32;
+                let mut want_own = 0.0f32;
+                let mut own_seen = false;
+                for b in blocks {
+                    let own = b.get("own").and_then(|x| x.as_bool()).expect("own");
+                    // Sichtregel: die Vorderseite kennt nur, wer aufgehoert hat
+                    // zu ziehen -- ein FREMDER Block darf keine Designs tragen.
+                    let designs = b.get("designs").expect("designs");
+                    assert_eq!(
+                        designs.is_null(),
+                        !own,
+                        "{ctx}: designs steht genau am eigenen Block"
+                    );
+                    if own {
+                        for d in designs.as_array().expect("Design-Liste") {
+                            want_designs[d.as_u64().expect("Design-Nummer") as usize] = 1.0;
+                        }
+                        want_own += 1.0;
+                        if !own_seen {
+                            own_seen = true;
+                            want_first_depth = depth;
+                        }
+                    }
+                    depth += b.get("len").and_then(|x| x.as_u64()).expect("len") as f32;
+                }
+                for k in 0..18 {
+                    assert_eq!(f[base + 16 + k], want_designs[k], "{ctx}: P.12 Design {k}");
+                }
+                assert_eq!(f[base + 34], want_first_depth / 18.0, "{ctx}: P.13 Tiefe");
+                assert_eq!(f[base + 35], want_own / 6.0, "{ctx}: P.13 Blockzahl");
+
+                // P.15 -- Startspieler der naechsten Runde.
+                let fp = v
+                    .get("first_player_next_round")
+                    .and_then(|x| x.as_i64())
+                    .expect("first_player_next_round") as usize;
+                assert_eq!(
+                    f[base + 38],
+                    if fp == curr { 1.0 } else { 0.0 },
+                    "{ctx}: P.15"
+                );
+
+                checked += 1;
+            }
+        }
+        assert!(checked >= 300, "nur {checked} Zustaende geprueft, >= 300 gefordert");
+    }
+
+    /// Regressionstest (PREREG_stack_top_feature.md par.6 Punkt 6b): ein
+    /// Modell, das die alte Breite 755 deklariert, bekommt exakt den alten
+    /// Vektor -- die 39 neuen Werte haengen HINTER Index 754, also ist der
+    /// Praefix `f[..755]` von Abschnitt 16 unberuehrt. Geprueft wird das an
+    /// der Stelle, an der es der Inferenzpfad tut: `Net::build_inputs`
+    /// KUERZT auf die vom Modell deklarierte Laenge (par.10), fuellt nie auf.
+    #[test]
+    fn old_755_layout_keeps_the_old_vector() {
+        for seed in 0..6u64 {
+            for (i, s) in random_drafting_states(seed, 40).into_iter().enumerate() {
+                let ctx = format!("seed={seed} step={i}");
+                let f = state_to_features_direct(&s);
+                let via_json = state_to_features(&state_to_json(&s, true));
+                assert_eq!(f.len(), INPUT_SIZE, "{ctx}: Laenge");
+                // Der 755er-Praefix beider Pfade ist Wert fuer Wert gleich;
+                // eine Abweichung waere ein Eingriff in den Altbestand.
+                for k in 0..LEN_BEFORE_SIGHT_APPENDIX {
+                    assert_eq!(f[k], via_json[k], "{ctx}: Altwert #{k} weicht ab");
+                }
             }
         }
     }

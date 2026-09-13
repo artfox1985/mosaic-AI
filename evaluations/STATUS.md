@@ -59,9 +59,16 @@ kein Build, kein cargo, keine Sonde.
 6. **Zwei Bauten, die VOR ihrem jeweiligen Trainingsarm stehen** (Fahrplan Nr. 5 und Nr. 15),
    beide brauchen eine freie Maschine und ihre Tore:
    - **Wheel 2 fuer den Sicht-Arm v29-b03**: Encoder-Abschnitt 16 mit P.3, P.7, P.9 und
-     P.11 bis P.15, Rust beide Pfade plus Python-Zwilling, `config.INPUT_SIZE` auf **794**
-     (entschieden 2026-09-13, `PREREG_stack_top_feature.md` par.16), Sichtgleichheits- und
-     Regressionstest, Fixture, Anker-Drift. Rund 2 h (ANNAHME).
+     P.11 bis P.15. **Der CODE ist gebaut** (2026-09-13, `PREREG_stack_top_feature.md`
+     par.17): Rust beide Pfade, Python-Zwilling, drei Tests, plus das additive Record-Feld
+     `dome_pool_view.blocks[].designs` in `serialize.rs`. OFFEN sind Bau, Tests, Wheel,
+     Fixture und Anker-Drift -- sie brauchen ein Fenster ohne Erzeugung. Rund 2 h (ANNAHME).
+     **`config.INPUT_SIZE` steht bewusst noch auf 755** und wird im SELBEN Zug wie die
+     Wheel-Installation auf 794 gesetzt: `file_cache_key.py` liest den Wert zur Laufzeit,
+     eine vorzeitige 794 haette die wartende Kette 755er-Bloecke unter dem 794er-Schluessel
+     ablegen lassen (Unfall vom 2026-09-11). Merkposten steht an der Zeile in `config.py`.
+     **P.12 wirkt erst ab v30** (Nutzer-Entscheid 2026-09-13, par.17): der laufende
+     v29-Korpus traegt `designs` nicht, die 18 Spalten sind in b03 konstant 0.
    - **Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` fuer v29-b02** plus Tore
      (`PREREG_special_tile_yield.md`, Fahrplan Nr. 15).
 7. Danach nach Fahrplan `evaluations/v29_program_agent_plan.md` (41 Punkte).
