@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. Zuschnitt ENTSCHIEDEN (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem Champion; Kanten erst gegen den v30-Champion. Umbau Weg A (par.12c): Schritte 1 und 2 gebaut, Bauplan am 2026-09-13 in drei Punkten berichtigt und Schritt 1b ausgearbeitet -- die Variante hat bewusst KEINEN Env-Knopf, Stilfelder und sims muessen vor den Stufen-Specs in KNOWN_FIELDS, und action_temp ist ein Modus 0..2. -->
+<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. Zuschnitt ENTSCHIEDEN (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem Champion; Kanten erst gegen den v30-Champion. Umbau Weg A (par.12c): Schritte 1 und 2 gebaut, Bauplan am 2026-09-13 in drei Punkten berichtigt und Schritt 1b GEBAUT (unkompiliert, sechs optionale Stilfelder) -- die Variante hat bewusst KEINEN Env-Knopf, Stilfelder und sims muessen vor den Stufen-Specs in KNOWN_FIELDS, und action_temp ist ein Modus 0..2. -->
 
 # Vorregistrierung: Schwierigkeitsstufen beim Spiel gegen das Netz
 
@@ -1031,6 +1031,16 @@ Heuristik-Pfad (n>50 -> 0,7; n>15 -> 0,4; sonst 0,15), 2 = glatte Form ... Bei 0
 Besuchszahlen, bitidentisch"*. Das Feld ist also eine ganze Zahl 0..2, und "0" heisst nicht
 "argmax", sondern "rohe Besuchszahlen" -- argmax ist `tau_argmax_from_move`. Wer die Stufen
 zuschneidet, muss das auseinanderhalten: die beiden Regler sitzen an verschiedenen Stellen.
+
+**GEBAUT 2026-09-13 Nacht, UNKOMPILIERT.** Alle sechs Felder liegen in
+`engine/src/net_mcts.rs` (Struct, `from_env`, `KNOWN_FIELDS`, Parser, Konstruktion, dazu der
+Test-Helfer `search_config_off`), `self_play::deviate_prob`/`deviate_candidates` sind dafuer auf
+`pub(crate)` gehoben, und `py.rs::search_config_json` gibt sie aus. **Kein Build, kein Test** --
+die v29-Erzeugung lief; der erste Bau gehoert an eine freie Maschine, zusammen mit dem Wheel fuer
+Encoder-Abschnitt 16. Praezedenz fuer diesen Zustand ist der P.10-Suchfix
+(`PREREG_stack_top_feature.md` par.15). Mitgebaut: `tools/check_conventions.py` Regel 8 erkennt
+jetzt die dritte Bauform optionaler Felder (der gemeinsame Helfer `spec_u32`) -- ohne sie meldete
+sie alle zwanzig lebenden Specs als unvollstaendig.
 
 **Drei Stellen je Feld** (Muster an `start_by_search` ablesbar, es ist das juengste der
 optionalen Felder): die Felddeklaration samt Doc-Kommentar im Struct `SearchConfig`
