@@ -59,7 +59,7 @@ liefern Nullen. Das ist der eigentliche Grund, warum ein reiner Materialschritt 
 sein kann als in v28, und er ist NICHT von einem Rezeptwechsel zu trennen; registriert als
 Erwartung, nicht als Arm.
 
-## par.2 WELCHE G-2-HAELFTE (Vorschlag, Nutzer-Entscheid)
+## par.2 WELCHE G-2-HAELFTE -- ENTSCHIEDEN 2026-09-13 (Nutzer)
 
 `v26-b01` rutscht auf G-2; der Posten von 145 Dateien traegt EINE Haelfte (v26-Prereg par.6:
 kein Split). v27 nahm die temperierte Haelfte (Rolle "Abdeckung"), v28 die Ausflug-Haelfte
@@ -67,7 +67,14 @@ kein Split). v27 nahm die temperierte Haelfte (Rolle "Abdeckung"), v28 die Ausfl
 die Ausflug-Haelfte** (`selfplay_v26-b01-value-excursion_*`, 401 Dateien, 145 seed-gezogen
 mit 20260941), aus denselben Gruenden wie in v28 und damit die beiden Fenster nach dem
 Einfrieren dieselbe Regel tragen. Die temperierte v26-Haelfte rotiert dann ersatzlos hinaus.
-Offen bis zum Nutzer-Entscheid; die Kette bekommt `G2_SWARM_PATTERN` erst danach.
+**ENTSCHIEDEN 2026-09-13, 13:20 (Nutzer): "Nimm fuer die g-2 das selbe was wir auch bei v28
+hatten. Da brauchen wir nichts aendern."** Also die AUSFLUG-Haelfte, wie vorgeschlagen:
+`G2_SWARM_PATTERN="selfplay_v26-b01-value-excursion_*.pkl"`, 145 Dateien seed-gezogen mit
+20260941. Geprueft: v28 fuhr `selfplay_v25-b01-value-excursion_*.pkl`
+(`tools/night_v28_chain.sh` Z.21), die Regel ist also woertlich dieselbe, nur eine Generation
+weiter. Die 401 Quelldateien liegen vollstaendig im Baum (beim Aufraeumen am 2026-09-13
+bewusst NICHT angetastet, anders als die v25-Klassen). Die temperierte v26-Haelfte rotiert
+ersatzlos hinaus.
 
 ## par.3 WER ERZEUGT (Regel fest, Name offen bis zur v28-Promotion)
 
