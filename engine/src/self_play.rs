@@ -825,6 +825,14 @@ pub(crate) fn choose_return_order(
 /// (`return_order_mode = 0`) -- bitidentisch. Wer den Knopf aus
 /// `PREREG_dome_return_order.md` par.4 verdrahten will, nimmt
 /// [`resolve_and_apply_stack_draw_with`].
+// Ohne Aufrufer, seit der Knopf `MOSAIC_RETURN_ORDER_MODE` alle Pfade auf
+// `resolve_and_apply_stack_draw_with` gelegt hat. Sie bleibt als benannter
+// Einstieg stehen, weil die Registratur und drei Modulkommentare sie
+// namentlich fuehren (`knob_registry.rs` Z.156, `referee.rs` Z.430,
+// `py.rs` Z.1039, `net_mcts.rs` Z.658) -- ein Loeschen liesse diese
+// Verweise ins Leere zeigen und ist ein eigener Entscheid, keine
+// Aufraeumarbeit im Vorbeigehen.
+#[allow(dead_code)]
 fn resolve_and_apply_stack_draw(game: &mut Game) -> Result<Action, String> {
     resolve_and_apply_stack_draw_with(game, None, 0)
 }

@@ -1,9 +1,29 @@
 # Feature-Golden-Hash-Fixture v1 (A3, docs/DESIGN_conventions_as_checks.md)
-# INPUT_SIZE=755
+# INPUT_SIZE=794
 # NUM_PLANES_CHANNELS=79
 # rustc: rustc 1.96.0 (ac68faa20 2026-05-25)
 # Datum: 2026-08-09, NEU BASISGELEGT 2026-08-25, ERNEUT 2026-08-27, ERNEUT 2026-09-05,
-# ERNEUT 2026-09-11
+# ERNEUT 2026-09-11, ERNEUT 2026-09-13
+# Grund 2026-09-13: GEWOLLTE Feature-Aenderung, kein Toolchain-Wechsel (rustc-Zeile
+# unveraendert). evaluations/PREREG_stack_top_feature.md par.17 und
+# PREREG_v29_window.md par.6c (Sicht-Arm v29-b03):
+#   +39 Flachwerte am ENDE (INPUT_SIZE 755 -> 794, Abschnitt 16 in features.rs):
+#   P.3 Ziehserie (3: Zahl gezogen, davon Wild, davon Spezial), P.7 Phase als
+#   One-Hot ueber die sechs Phasen (6), P.9 Turm je Normalfarbe (5), P.11
+#   gehaltene Bonuschips je Spieler (2, Spieler am Zug zuerst), P.12 Design
+#   liegt in einem EIGENEN Kuppelstapel-Block (18), P.13 Tiefe des ersten
+#   eigenen Blocks und Zahl eigener Bloecke (2), P.14 Sperrstand der
+#   Musterreihen je Spieler (2), P.15 Startspieler der naechsten Runde (1).
+#   Die 18 Design-Bits der eigenen ZIEHSERIE bleiben draussen: die Vorderseiten
+#   sind erst nach dem Aufhoeren bekannt (par.16), deshalb 794 und nicht 812.
+#   Planes unveraendert (79).
+#   Neu im Record ist ausserdem dome_pool_view.blocks[].designs (serialize.rs),
+#   die sortierten tile_id des EIGENEN Blocks. Damit wird die
+#   Champion-Paritaets-Fixture rot -- aus demselben Grund wie am 2026-09-11
+#   (siehe unten): sie hasht die RECORDS, nicht die Netz-Eingaben. Die
+#   Eingaben des Champions v28-b02 (755) sind unveraendert, nachgelesen an
+#   beiden Zweigen von net.rs::build_inputs (Z.425 flach, Z.982 ueber
+#   split_planes_flat_batch_src fuer PlanesPlusFlat).
 # Grund 2026-09-11: GEWOLLTE Feature-Aenderung, kein Toolchain-Wechsel (rustc-Zeile
 # unveraendert). evaluations/PREREG_dome_stack_information_sets.md par.7 Variante B
 # und PREREG_v28_window.md par.6 (Arm v28-b02):
@@ -56,133 +76,133 @@
 # Format je Zeile: <label>	<fnv1a64_hex(quantisierte state_to_features_direct ++ state_to_planes_direct)>
 # Korpus: random_drafting_states(seed, 25) fuer seed in 0..5, je Seed zusaetzlich der
 # letzte Schritt mit Phase manuell auf Tiling umgeschaltet (Tiling-Feature-Zweig).
-seed0_step0	4d6a8c674cd10e74
-seed0_step1	78d491f86c5eed17
-seed0_step2	775e7f4933b3148e
-seed0_step3	775e7f4933b3148e
-seed0_step4	d5d048fab3f09743
-seed0_step5	cac7b2538efb3512
-seed0_step6	344bb09fde3f797e
-seed0_step7	f4113f315f7ad8d6
-seed0_step8	f4113f315f7ad8d6
-seed0_step9	af872094a0a53d0e
-seed0_step10	8783c5263b75684e
-seed0_step11	44f1942d38db6ca1
-seed0_step12	8c1335ea086ab451
-seed0_step13	0b1c10e745b438e5
-seed0_step14	cfa6f0a49468ab8f
-seed0_step15	adc37d8aeec25917
-seed0_step16	adc37d8aeec25917
-seed0_step17	6ebf126e129289d5
-seed0_step18	c4fcc3feb92acbdd
-seed0_step19	8b9ec90ce4d6553b
-seed0_step20	1dc4214e6991573a
-seed0_step21	117c3750dc11aa24
-seed0_step22	cfffa798cf48429f
-seed0_step23	6dc812d2be82b048
-seed0_step24	33f9321d65c595d2
-seed0_tiling	c77f6de77c126436
-seed1_step0	fa6f7ea7152e1a80
-seed1_step1	d8538274c8c43ea3
-seed1_step2	423d1e111adabd30
-seed1_step3	423d1e111adabd30
-seed1_step4	6babbebfc32ea90b
-seed1_step5	6babbebfc32ea90b
-seed1_step6	363fef82be673838
-seed1_step7	41e37565f0227d2c
-seed1_step8	8cf0a6c1f9b57a63
-seed1_step9	bb0803b379e2b686
-seed1_step10	73485b276a9750a8
-seed1_step11	63d769dd0c35b860
-seed1_step12	63d769dd0c35b860
-seed1_step13	fd3c890e290057ff
-seed1_step14	0f4ba3442b89aaaa
-seed1_step15	b36489cd694533c6
-seed1_step16	802f639c5f52f730
-seed1_step17	bf8513441e9b4e2a
-seed1_step18	0caa22f3fa8b165b
-seed1_step19	08f21e221eb541ef
-seed1_step20	5864f2c460c7c372
-seed1_step21	3fe8e1ba40993be7
-seed1_step22	d94b4dbdae30decf
-seed1_step23	59393a55e3f1fb52
-seed1_step24	3e083547e5c75570
-seed1_tiling	2bd82df6182bfd9c
-seed2_step0	a60fe9ffe0d9891a
-seed2_step1	ee0766d2df2bb383
-seed2_step2	666c4c54ba83a1d7
-seed2_step3	103fb4a24eb11094
-seed2_step4	4e66fd7a1902b893
-seed2_step5	3a898bfd97762247
-seed2_step6	3a898bfd97762247
-seed2_step7	7b5d1be495d1804c
-seed2_step8	7b5d1be495d1804c
-seed2_step9	2c28cfaea86be948
-seed2_step10	b6c883bad7c0f3ef
-seed2_step11	b9ade2728c8ebb4a
-seed2_step12	b9ade2728c8ebb4a
-seed2_step13	199825c4ee45f2c1
-seed2_step14	8b8d225ce18a1035
-seed2_step15	8f78028c691500cb
-seed2_step16	15d58b6aaf81adbf
-seed2_step17	f994fa6cbc8b1f17
-seed2_step18	6c274cfede72f61c
-seed2_step19	6c274cfede72f61c
-seed2_step20	649ae0362ee89996
-seed2_step21	19b66dc29b3b9b16
-seed2_step22	9d3d2a0a3fb024ce
-seed2_step23	e32c522ca170ea2e
-seed2_step24	c82eee6c6773dcd4
-seed2_tiling	a2e3d1451a61cff0
-seed3_step0	3079697a92a4091d
-seed3_step1	34d72c519a78fd33
-seed3_step2	23260611a12f7a2c
-seed3_step3	1b3941a533d0442b
-seed3_step4	1b3941a533d0442b
-seed3_step5	64a40f5138cd0e9c
-seed3_step6	5a6bae0c7234224c
-seed3_step7	5a6bae0c7234224c
-seed3_step8	43e633c4a5d3e950
-seed3_step9	df34c9da2510c5c8
-seed3_step10	287d55688b48fdb3
-seed3_step11	8f50e10a837f085b
-seed3_step12	2aa0e571365faea5
-seed3_step13	2aa0e571365faea5
-seed3_step14	4cb464dd0a402218
-seed3_step15	9b3f0299d19b22eb
-seed3_step16	de75c75c6378d40b
-seed3_step17	d74284c98c5ea340
-seed3_step18	7f4b0f720f0c5d25
-seed3_step19	7f4b0f720f0c5d25
-seed3_step20	c7b70190cf429c7c
-seed3_step21	82644acd1759e362
-seed3_step22	95019e9dae66aafc
-seed3_step23	c733d8fb2663c5e4
-seed3_step24	f88110c829733587
-seed3_tiling	7cfaeb4d54e477d3
-seed4_step0	a891552c42d5cc12
-seed4_step1	a891552c42d5cc12
-seed4_step2	fb3ebb811ff6ee1f
-seed4_step3	41474fc94b72b935
-seed4_step4	41474fc94b72b935
-seed4_step5	0fa4ec86236ddf20
-seed4_step6	62ef4a46ff281b23
-seed4_step7	b74b57ec73c157e0
-seed4_step8	a832a810118e7447
-seed4_step9	f3fd8f292c5992bb
-seed4_step10	f3fd8f292c5992bb
-seed4_step11	6105f3b289243662
-seed4_step12	348fb6cb97f6afda
-seed4_step13	f02e1872bd5ee9fa
-seed4_step14	34ffe33b0818928e
-seed4_step15	f233b44e3b4a2ac4
-seed4_step16	06d0a7518a9b5117
-seed4_step17	96edfbfddd25f6a0
-seed4_step18	270d9a10909fd5c6
-seed4_step19	c858318046736cdf
-seed4_step20	fa6bbd74233d4edc
-seed4_step21	4d9cc37acfba0d95
-seed4_step22	b119f8db4730edf9
-seed4_step23	65533f4a0bf3f6be
-seed4_step24	65533f4a0bf3f6be
-seed4_tiling	4845d7f718ec5862
+seed0_step0	4cfafb6867c5f368
+seed0_step1	92609c901790e04a
+seed0_step2	3adb8ad3946a285b
+seed0_step3	3adb8ad3946a285b
+seed0_step4	8a4005f1ef4f15a7
+seed0_step5	fa25873ae28b39f7
+seed0_step6	18a6cad6c7b204ea
+seed0_step7	68e1638db372996a
+seed0_step8	68e1638db372996a
+seed0_step9	7fd4469ece59ac4b
+seed0_step10	4108089be0b30a4a
+seed0_step11	b5672f6dbbe08114
+seed0_step12	3c1ad08c4e61f7b4
+seed0_step13	8711f951f27a87e1
+seed0_step14	4b0d31b4fcb75d22
+seed0_step15	9d2cb60479441e23
+seed0_step16	9d2cb60479441e23
+seed0_step17	975ccfddd3e876f0
+seed0_step18	50608d6b6408e1f1
+seed0_step19	bd8e054109b97776
+seed0_step20	54ad4529be148e8e
+seed0_step21	192e6eab0d3c0ad0
+seed0_step22	1bd2e52b41ad4836
+seed0_step23	38de8397deb79aed
+seed0_step24	598f3f79caa2740f
+seed0_tiling	9d18a9966037903b
+seed1_step0	44997b7c080ebf65
+seed1_step1	1a8114fd5ac17ec7
+seed1_step2	87dee1c1d04f3f75
+seed1_step3	87dee1c1d04f3f75
+seed1_step4	19535de0cd4af6ef
+seed1_step5	19535de0cd4af6ef
+seed1_step6	5b984bdb81a2ab5d
+seed1_step7	fd6da5e06681f460
+seed1_step8	acd0c9db17b2642e
+seed1_step9	b34b0aa60658ce02
+seed1_step10	7eb6a24acc74786d
+seed1_step11	31dfb82cfd1f394c
+seed1_step12	31dfb82cfd1f394c
+seed1_step13	2d6f97dcccf9e892
+seed1_step14	707311fb73873a7e
+seed1_step15	5a6702a49446f273
+seed1_step16	e04dbac2da4558b4
+seed1_step17	a73e04bd6887e202
+seed1_step18	46ce57912841156f
+seed1_step19	05a59bb0e1053ee2
+seed1_step20	e3f55b73effa5b7d
+seed1_step21	1b9b42f68f2c2837
+seed1_step22	0bad545a2052552b
+seed1_step23	9695dfd3e8e5701e
+seed1_step24	5e3bb339b076a6b8
+seed1_tiling	c3aca40a92820354
+seed2_step0	bf3c66695a15a29f
+seed2_step1	bdd08f048fcab827
+seed2_step2	a9285cb501620e6a
+seed2_step3	96a4ab03d2098408
+seed2_step4	622c8c8e6d42fa6e
+seed2_step5	32ab9e13b0c8d663
+seed2_step6	32ab9e13b0c8d663
+seed2_step7	6a0f31ddd5577099
+seed2_step8	6a0f31ddd5577099
+seed2_step9	79f3df159a4fac04
+seed2_step10	48a19bb6771b2712
+seed2_step11	56964f1ecd3c775e
+seed2_step12	56964f1ecd3c775e
+seed2_step13	e92f6be84650fd6c
+seed2_step14	1cc8b62c0e760d11
+seed2_step15	33cfe318a16df776
+seed2_step16	b65b15ff824de50b
+seed2_step17	0bbe3bc54d02394a
+seed2_step18	d365aa53207dd991
+seed2_step19	d365aa53207dd991
+seed2_step20	426d696e829a5092
+seed2_step21	ffae809a65b41d1b
+seed2_step22	4d5b6ae2ea6b5dfa
+seed2_step23	5776e600d93ae1e3
+seed2_step24	5051bb5e2499f3b1
+seed2_tiling	ecb8de12e14e7aa5
+seed3_step0	8b203c3d4b3dbdf8
+seed3_step1	f41e9de1a40cacf7
+seed3_step2	1e914ab6c23de3b9
+seed3_step3	a4e2e1972675dcdf
+seed3_step4	a4e2e1972675dcdf
+seed3_step5	d1cf2a9e23cf9bc9
+seed3_step6	c28875fdd7d69e20
+seed3_step7	c28875fdd7d69e20
+seed3_step8	99eff0f61c5bfaed
+seed3_step9	1fe01dc9ac58fc3c
+seed3_step10	04a8b26f9351504e
+seed3_step11	d338a06c1aceaccf
+seed3_step12	91914b08ac49d468
+seed3_step13	91914b08ac49d468
+seed3_step14	eff841dc94baa464
+seed3_step15	3c975106f6247e06
+seed3_step16	e0adb88f50b1b49f
+seed3_step17	2f719918c3a4d61c
+seed3_step18	2cd17ca7fa01887b
+seed3_step19	2cd17ca7fa01887b
+seed3_step20	3886ac5adbe2accb
+seed3_step21	b4981a870f0119f4
+seed3_step22	fce592046519644b
+seed3_step23	99bb43d89e30fc67
+seed3_step24	75cbeaa6fb96500e
+seed3_tiling	de79cc741cd524a2
+seed4_step0	98146e0429708d47
+seed4_step1	98146e0429708d47
+seed4_step2	81b5c0dab20dca2b
+seed4_step3	7a449c0d91b62ff0
+seed4_step4	7a449c0d91b62ff0
+seed4_step5	181e7fab54612bfc
+seed4_step6	f50a345cb20e59c6
+seed4_step7	e187d40734c48abc
+seed4_step8	235f09bdca4f1ba2
+seed4_step9	3343f0c4372b0faf
+seed4_step10	3343f0c4372b0faf
+seed4_step11	e516647af82954ff
+seed4_step12	382b8b51e153d71e
+seed4_step13	d4169398f0f78ffe
+seed4_step14	40d2e18ca1fade0f
+seed4_step15	093b23cb02d88b9c
+seed4_step16	e9112afcd8f4fa34
+seed4_step17	107d20d423c4beb7
+seed4_step18	6e1d16caed39b280
+seed4_step19	4243a756102af1e7
+seed4_step20	e1892ef035052608
+seed4_step21	93a97ac0f8df4fe7
+seed4_step22	5169f538319d8351
+seed4_step23	7fb571cafca26aac
+seed4_step24	7fb571cafca26aac
+seed4_tiling	0fcd74c16320b648

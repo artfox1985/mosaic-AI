@@ -2284,20 +2284,33 @@ mod contract_stamp_tests {
     /// wechselt, weil er MEHR abdeckt. Bestandschampions spielen bitgleich
     /// weiter (Netz-Paritaets-Fixture im selben Lauf gegengeprueft, s. dort).
     ///
-    /// **Neu gesetzt 2026-09-11** (vorher `20b442a8164f748d`), Anlass:
-    /// `PREREG_dome_stack_information_sets.md` par.7 Variante B und
-    /// `PREREG_v28_window.md` par.6 (Arm v28-b02) -- `INPUT_SIZE` 744 -> 755
-    /// (+11 Flachwerte am ENDE: Kuppelstapel-Wissen aus `dome_pool_view`,
-    /// Abschnitt 15 in `features.rs`). `NUM_PLANES_CHANNELS` bleibt 79,
-    /// `NUM_ACTIONS` 406, Kopf-Liste unveraendert. Additiv wie die Schritte
-    /// davor: `net.rs::build_inputs` kuerzt den Flat-Block auf die
-    /// MODELL-Breite, der Champion `v27-b01_brierbest` (744) sieht die elf
-    /// neuen Werte nie und spielt bitgleich weiter.
+    /// **Neu gesetzt 2026-09-13** (vorher `39648b95bbba1acf`, davor
+    /// `20b442a8164f748d`), Anlass: `PREREG_stack_top_feature.md` par.17 und
+    /// `PREREG_v29_window.md` par.6c (Sicht-Arm v29-b03) -- `INPUT_SIZE`
+    /// 755 -> 794 (+39 Flachwerte am ENDE: Abschnitt 16 in `features.rs`,
+    /// die Sichtpunkte P.3, P.7, P.9 und P.11 bis P.15).
+    /// `NUM_PLANES_CHANNELS` bleibt 79, `NUM_ACTIONS` 406, Kopf-Liste
+    /// unveraendert.
+    ///
+    /// Additiv wie die Schritte davor, und diesmal an beiden Zweigen
+    /// nachgelesen: `net.rs::build_inputs` kuerzt den Flat-Block auf die
+    /// MODELL-Breite -- im Flat-Fall an Z.425, im PlanesPlusFlat-Fall (der
+    /// des 2D-Champions) ueber `split_planes_flat_batch_src` an Z.982, wo
+    /// der Flat-Block ab der QUELL-Grenze gelesen und auf `flat_len`
+    /// begrenzt wird. Der Champion `v28-b02_brierbest` (755) sieht die 39
+    /// neuen Werte also nie und spielt bitgleich weiter.
+    ///
+    /// **Die Netz-Paritaets-Fixture wechselt trotzdem** (`self_play.rs`
+    /// par.17-Notiz): sie hasht die RECORDS, nicht die Netz-Eingaben, und
+    /// Abschnitt 16 bringt mit `dome_pool_view.blocks[].designs` ein neues
+    /// Record-Feld mit. Das ist ein Serialisierungs-Artefakt, keine
+    /// Verhaltensaenderung -- dieselbe Lage wie bei der Anker-Drift am
+    /// 2026-09-12.
     #[test]
     fn contract_hash_matches_pinned_literal() {
         assert_eq!(
             contract_hash(),
-            "39648b95bbba1acf",
+            "39994362fba145a6",
             "A2-Vertragshash hat sich veraendert -- Bestandschampions bekommen \
              andere Eingaben (siehe Testdoku)"
         );

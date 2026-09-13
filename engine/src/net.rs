@@ -944,6 +944,13 @@ pub(crate) fn split_batch_n_or_empty_rows(flat: Vec<f32>, n: usize) -> Vec<Vec<f
 /// -- von `Net::build_inputs` für den eigentlichen Tensor-Bau genutzt.
 // `pub(crate)`: Weg B (`net_ort.rs::build_ort_inputs`) braucht denselben
 // Puffer-Split fuer `InputLayout::PlanesPlusFlat` wie `build_inputs` hier.
+// Nur noch von den Tests aufgerufen (Z. 1174/1182), und das mit Absicht:
+// diese Fassung ist die REFERENZ, gegen die `split_planes_flat_batch_src`
+// geprueft wird -- sie haelt den Befund vom 2026-08-25 fest (die
+// Modell-Laenge als Offset in den Puffer des BAUERS verschiebt den
+// Flat-Block, sobald der Bauer breiter wird). Wer sie loescht, loescht
+// die Gegenprobe.
+#[allow(dead_code)]
 pub(crate) fn split_planes_flat_batch(samples: &[&[f32]], planes_len: usize, flat_len: usize) -> (Vec<f32>, Vec<f32>) {
     // Bedeutung UNVERAENDERT: Quell- und Zielbreite des Planes-Blocks sind
     // gleich. Die Kompatibilitaets-Variante ist `..._src` und wird nur dort

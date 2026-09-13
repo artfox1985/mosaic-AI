@@ -108,6 +108,13 @@ fn dome_pool_view(state: &GameState) -> Value {
         let slice = &state.dome_tile_pool[start..end];
         let special = slice.iter().filter(|t| t.is_special_type()).count();
         let own = b.returner == viewer;
+        let designs = if own {
+            let mut design_ids: Vec<usize> = slice.iter().map(|t| t.tile_id).collect();
+            design_ids.sort_unstable();
+            Value::Array(design_ids.into_iter().map(|i| json!(i)).collect())
+        } else {
+            Value::Null
+        };
         blocks.push(json!({
             "own": own,
             "len": b.len,
@@ -123,6 +130,20 @@ fn dome_pool_view(state: &GameState) -> Value {
             } else {
                 Value::Null
             },
+            // Design-Nummern (`DomeTile::tile_id`, 0..17) der Platten dieses
+            // Blocks, SORTIERT -- aber NUR fuer den eigenen Block, genau wie
+            // `types`. Regel (Nutzer 2026-09-13, docs/engine_manual.md):
+            // gezogen wird mit der RUECKSEITE nach oben, die beide Spieler
+            // sehen (Typ special/wild, steckt in den Zaehlern); erst wer
+            // AUFHOERT zu ziehen, dreht seine Platten um und sieht die
+            // Vorderseite. Das Design eines FREMDEN Blocks hat der Betrachter
+            // also nie gesehen -- es hier auszugeben waere Netz-sieht-MEHR.
+            // Sortiert, weil der Spieler die Reihenfolge im zurueckgelegten
+            // Block nicht mehr auseinanderhaelt; `types` traegt sie daneben
+            // fuer die oeffentliche Rueckseiten-Folge.
+            // Additiv: Alt-Records ohne dieses Feld lesen sich im Encoder als
+            // "Merkmal aus" (dieselbe Toleranz wie bei `dome_pool_view` selbst).
+            "designs": designs,
         }));
         start = end;
     }

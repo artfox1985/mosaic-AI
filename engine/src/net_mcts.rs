@@ -5489,7 +5489,7 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     c_puct: f64,
     add_root_noise: bool,
     rng: &mut R,
-    mut log: Option<&mut Vec<String>>,
+    log: Option<&mut Vec<String>>,
     collect_trace: bool,
 ) -> (Option<Action>, Value) {
     // s. Doku der `_with_config`-Schwester oben: hier bleibt der Bestandsweg
