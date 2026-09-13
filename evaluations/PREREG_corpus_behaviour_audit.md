@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Beleg: Quellenfrage GEKLAERT (par.3), alle drei Arme aus den vorhandenen Records messbar. Korpuslauf ERST MIT v29 (Nutzer 2026-09-11). Arm A1 ist an lebenden Partien schon belegt (par.7, g06/g07 gegen v28-b02): bei Punktestand 0 zog das Netz 13/8/7/4 Platten je Zug, bei Stand >0 genau eine, und in g06 fiel niemand auf 0 -- kein einziger Mehrfachzug. Am Korpus nichts gemessen. -->
+<!-- STATUS: OFFEN | Frage: Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Beleg: Quellenfrage GEKLAERT (par.3), alle Arme aus den Records messbar. **Werkzeug GEBAUT, Selbsttest GRUEN** (par.9): alle achtzehn Handzahlen ueber sechs Claude-Partien exakt getroffen. Zwei Baubefunde: der Punktestand ist bei 0 geclampt (66 von 324 Ziehzeilen), und im Self-Play heissen beide Seiten "Netz" -- Zaehlen ueber Namen gab in Arm B exakt 0,5, die Seite kommt jetzt aus dem Record. Korpuslauf ERST MIT v29 (Nutzer 2026-09-11). -->
 
 # Vorregistrierung: Verhaltens-Audit am Korpus (drei Arme aus den Claude-Partien)
 
@@ -314,3 +314,65 @@ die Ein-Schritt-Bewertung der Zieh-Aktion (`PREREG_chance_nodes.md` par.14 Teil 
 DENSELBEN Befund und laufen zusammen mit diesem Audit. **Danach:** das Zugklassen-Differential
 (`PREREG_claude_play_interface.md` par.10) auf demselben Replay. Was traegt, geht ins v30-Rezept
 (`PREREG_v29_window.md` par.8 Punkt 3).
+
+
+## par.9 WERKZEUG GEBAUT und SELBSTTEST GRUEN (2026-09-13)
+
+`tools/probes/corpus_behaviour_audit.py` liegt im Baum (Fahrplan Nr. 23, par.6 Punkte 1 und 2).
+Der Korpuslauf (Punkt 3) steht weiter aus und kommt mit v29.
+
+### Selbsttest gegen die Handzaehlung (par.6 Punkt 2)
+
+Ueber alle sechs Claude-Partien, gegen `PREREG_claude_play_interface.md` par.7 und eine
+unabhaengige Zaehlung der Logzeilen:
+
+| Partie | Ziehungen | davon mit Endstand 0 | Zwangsraeumungen |
+| --- | --- | --- | --- |
+| g02 | 28 | 23 | 0 |
+| g03 | 25 | 18 | 2 |
+| g04 | 32 | 26 | 3 |
+| g05 | 7 | 0 | 1 |
+| g06 | 4 | 0 | 0 |
+| g07 | 36 | 29 | 2 |
+
+**Alle achtzehn Zahlen stimmen exakt.** Arm C ist im Log-Modus nicht pruefbar (er braucht das
+Endraster, das nur im Record steht); dort liefert die Sonde ausdruecklich `null` statt still zu
+schweigen.
+
+**Dabei geklaert, warum par.7 fuer g02 "23 bei Stand 0" nennt und die Sonde 22 gratis zaehlt:**
+die Grenzziehung bringt den Stand von 1 auf 0. Sie ENDET bei 0, kostet aber einen Punkt. Beide
+Groessen werden jetzt getrennt ausgewiesen (`ziehungen_mit_endstand_null` und
+`gratis_ziehungen`); die Handzaehlung meint die erste.
+
+### Zwei Befunde aus dem Bau, beide am Korpus nachgezaehlt
+
+**1. Der Punktestand ist bei 0 GECLAMPT.** Die Engine schreibt auch dann weiter "-1 Pkt", der
+Stand bleibt 0 -- 66 von 324 Ziehzeilen in sechs Korpusdateien (n = 324 Ziehzeilen, Grundmenge
+sechs Dateien, Einheit Zeilen). Wer den Stand vor einer Ziehung aus der Zeile selbst
+zurueckrechnet (`total - delta`), haelt jede Gratis-Ziehung faelschlich fuer bezahlt und sieht
+ausserdem nie eine Serie, die bei 0 STARTET -- sie sieht dort 1. Der Stand wird deshalb je Seite
+laufend gefuehrt, mit Startstand 5.
+
+**2. Im Self-Play heissen BEIDE Seiten "Netz".** Der Log unterscheidet sie nicht. Ein erster Wurf,
+der ueber die NAMEN zaehlte, lieferte in Arm B in beiden Gruppen exakt 0,5 Siegquote -- bei 208
+gegen 4792 Beobachtungen praktisch unmoeglich, und per Konstruktion: erben beide Seiten denselben
+Sturz-Status, besteht jede Gruppe zur Haelfte aus Gewinnern. **Die exakte 0,5 war das Warnsignal,
+nicht das Ergebnis.**
+
+Der Record trennt die Seiten: er traegt `player`, und `state.players[player].score` stimmt mit dem
+Endstand der neuen Ziehzeile ueberein (an einer Partie Zeile fuer Zeile nachgesehen). Die
+Logfenster werden deshalb MIT ihrem Ursprungs-Record zusammengesetzt
+(`join_overlapping_with_source`), die Seite kommt von dort. Im Log-Modus bleibt der Name der
+Schluessel, dort sind die Namen verschieden.
+
+**Folge fuer par.2 Arm A1:** die registrierte Zweiteilung (Stand 0 gegen Stand > 0 VOR der Serie)
+hat im Korpus eine duenne Haelfte -- Serien starten selten bei 0, der Sturz passiert INNERHALB der
+Serie. Genau das ist das Muster aus g07 ("fuenf bezahlt, dann Stand 0, dann weiter"). Die
+Zweiteilung bleibt unveraendert stehen, ihre Duenne ist ein Befund; daneben weist die Sonde
+bezahlte und gratis Ziehungen je Serie aus, plus die Ziehzahl nach Stand vorher.
+
+### Was NICHT registriert wird
+
+Die Zahlen aus den Probelaeufen ueber v28-Korpusdateien sind **Funktionsproben, kein Ergebnis**.
+Der registrierte Lauf geht ueber den v29-Korpus (par.6 Punkt 3, Nutzer 2026-09-11), und die
+Ergebnisse gehoeren dann in par.7.
