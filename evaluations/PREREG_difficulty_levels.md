@@ -62,8 +62,10 @@ beschreibt die Presets trotzdem als Feature (Konsument, par.9).
   der eingefrorene Anker `hv1_anchor` (Skill `mosaic-anchor-invariance`); ihr
   Elo steht in keinem Register. Welche Variante (hv1/hv2) sie heute spielt, ist
   NICHT geprueft (Stufe 0). **Nutzer-Entscheid 2026-09-11 (par.8.7): die
-  Heuristik-Stufe spielt das EINGEFRORENE Anker-Artefakt `hv2_generator`,
-  nicht den lebenden Pfad.**
+  Heuristik-Stufe spielt ein EINGEFRORENES Artefakt, nicht den lebenden Pfad.**
+  Genannt war zunaechst `hv2_generator`; seit dem Entscheid 2026-09-13 ist es
+  `hv3_generator` (par.4.1a: hv2 fehlt der Phantom-Fix A2 und ist nicht
+  nachbaubar).
 - Suche in der GUI: `net_search_with_tree(..., add_root_noise=false, ...)`
   (`py.rs:571` fuer den Debug-Pfad; fuer den Zugpfad `ai_drafting_net_step`
   ANNAHME gleicher Aufruf, Stufe 0 prueft es). Kein Wurzelrauschen, keine
@@ -206,10 +208,31 @@ Genau die liefert par.5 Stufe 2.
 
 | Stufe | Anzeige | Spieler | Suche | Elo-Knoten |
 | --- | --- | --- | --- | --- |
-| 1 | Anfaenger | Anker-Artefakt `hv2_generator` mit seiner Spec | hv2 @150 | `Heuristik_v2huelle@150` 1100 [1053, 1145] (Identitaet hv2_generator = v2huelle: Stufe 0b) |
+| 1 | Anfaenger | Artefakt **`hv3_generator`** mit seiner Spec (hv2 GESTRICHEN, s. par.4.1a) | hv3, Sim-Zahl offen (par.12a) | `Heuristik_hv3_generator@150` 972 [935, 1011], Segment 2 |
 | 2 | Erfahren | aktueller Champion mit seiner Spec | @100, Wurzelrauschen AN, Besuchs-Sampling `action-temp 2` ueber die ganze Partie, Weg C (genau eine Abweichung je Partie, Stelle aus DEVIATE_ROUND_MASS/DECAY wie im Self-Play, 6 Kandidaten) | zu messen (Stufe 2) |
 | 3 | Experte | aktueller Champion mit seiner Spec | @100, Wurzelrauschen AN, argmax ab Halbzug 1 (Traeger-Stil ohne Weg C) | zu messen (Stufe 2) |
 | 4 | Meister | aktueller Champion mit seiner Spec | @400, argmax, ohne Wurzelrauschen (wie Arena und Elo-Register) | 1405 [1361, 1453] heute; am Projektende der letzte Champion |
+
+### par.4.1a hv2 IST KEINE OPTION MEHR (Nutzer-Entscheid 2026-09-13)
+
+Woertlich: **"Hv2 ist keine Option mehr. Da fehlt der fix. Deshalb hv3."** Gemeint ist der
+Phantom-Fix A2: das Artefakt `hv2_generator` wurde am 2026-08-26 eingefroren, also VOR dem Fix,
+und sein Quellzweig ist seither entfernt -- es ist nicht nachbaubar und liegt in einer anderen
+Aera als der heutige Motor. `hv3_generator` ist genau dafuer gebaut worden: dasselbe hv2-Rezept
+auf dem heutigen Motor MIT A2, eingefroren 2026-09-12.
+
+Der Wechsel kostet nichts an Staerke und raeumt zwei Probleme ab:
+
+- **Die Aera stimmt wieder.** Eine Kante gegen hv2 waere cross-aera; der Anker traegt A2, hv2
+  nicht. hv3 gegen hv4 lief 73:77, gegen hv2 78:72 (je Deckel): der Fix bewegt die Staerke nicht
+  messbar, die Knoten liegen bei 972 (hv3) und 983 (hv2), beide mit ueberlappenden Intervallen.
+- **Die Identitaetsfrage entfaellt.** Stufe 0b musste klaeren, ob `hv2_generator` derselbe
+  Spieler ist wie der Alt-Knoten `Heuristik_v2huelle`. Das war nicht beweisbar, weil hv2 mit
+  `git_dirty: true` eingefroren wurde (par.12 Punkt b). hv3 hat einen sauberen Einfrierstand.
+
+**Folge:** Stufe 0b aus par.5 entfaellt. Der Elo-Knoten der Anfaengerstufe ist
+`Heuristik_hv3_generator@150` = 972 [935, 1011] (Segment 2, 400 Partien), nicht der Alt-Wert
+1100 aus Segment 1.
 
 **Nachziehen bei jedem Champion-Wechsel:** die Stufen 2 bis 4 zeigen auf
 `models/champion.txt`; die Kanten aus Stufe 2 gelten fuer den Champion, an dem
@@ -259,11 +282,14 @@ Kerbe. Bleibt eine Stufe auch danach ununterscheidbar, wird sie gestrichen
   traegt `difficulty` und den Pfad der Stufen-Spec; ohne beides ist eine
   Mensch-Partie keiner Stufe zuzuordnen (par.2.4 liess sich nur auswerten,
   weil alle 33 bei 400 liefen).
-- Anfaenger: die Server-Heuristik spielt hv2 mit der Spec des Artefakts und
+- Anfaenger: die Server-Heuristik spielt **hv3** mit der Spec des Artefakts und
   wird per Drift-Pruefung (Skill `mosaic-anchor-invariance`, 22 s je Lauf) als
-  zuggleich mit `hv2_generator` belegt; sonst laeuft der Zug ueber den
-  Artefakt-Worker (`tools/frozen_champion_worker.py`). Bau-Frage nach Stufe 0;
-  der Spieler ist entschieden (par.8.7).
+  zuggleich mit `hv3_generator` belegt; sonst laeuft der Zug ueber den
+  Artefakt-Worker (`tools/frozen_champion_worker.py`). Der Spieler ist
+  entschieden (par.8.7, auf hv3 gestellt 2026-09-13 in par.4.1a).
+  **Stufe 0 hat dazu den Blocker gefunden** (par.12 Punkt c): der
+  GUI-Heuristik-Pfad ist auf `HeuristicVariant::Hv1` hart verdrahtet und nimmt
+  die Variante nicht entgegen. Der Durchstich ist Punkt 1 der Umbau-Liste.
 
 ### par.4.3 Frontend
 
@@ -837,3 +863,38 @@ liegen. Ob das als spuerbarer Stufenunterschied reicht, ist eine Design-Frage; e
 Abstand waere ueber deutlich kleinere Sim-Zahlen zu holen (unter 150 ist bei der Heuristik
 nichts gemessen). **Nicht gemessen und vor dem Bau zu klaeren:** die Sim-Wirkung an hv3 selbst,
 und wo die Heuristik nach unten abflacht.
+
+### par.12b BAU BEGONNEN (2026-09-13, Nutzer: "baue alles was moeglich ist dafuer")
+
+Die Maschine traegt die v29-Erzeugung, also wird geschrieben und NICHT kompiliert. Stand:
+
+**GEBAUT (unkompiliert, Tore stehen aus):** `mcts::search_with_tree_variant`
+(`engine/src/mcts.rs:957`) -- dieselbe Suche wie `search_with_tree`, aber mit waehlbarer
+`HeuristicVariant`. Der Bestands-Einstieg bleibt und delegiert mit `Hv1`, ist also
+bit-identisch; es gibt noch KEINEN Aufrufer mit einer anderen Variante. Damit ist der Blocker
+aus par.12 Punkt c auf der Suchseite ausgeraeumt.
+
+**NICHT GEBAUT, weil ein Entscheid fehlt: WIE kommt die Variante in den GUI-Pfad?**
+`SearchConfig::from_env` setzt sie hart auf `Hv1` und begruendet das ausdruecklich
+(`net_mcts.rs` Z.736-739): *"KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht. Ein
+prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3 unbrauchbar -- er gaelte fuer beide
+Seiten oder fuer keine."* Das ist eine bewusste Design-Entscheidung, und der geplante Weg aus
+par.4.2 (Server schreibt die Stufen-Spec in die Umgebung, Muster `_apply_champion_spec_env`)
+laeuft genau dagegen.
+
+Zwei Wege, Nutzer-Entscheid:
+
+- **(A) Spec-Datei bis in den Zugpfad.** `PyGame` bekommt ein Feld fuer die aktive
+  `SearchConfig` plus eine Lademethode; `ai_drafting_step` und `ai_drafting_net_step` nutzen sie
+  statt `from_env`. Folgt dem registrierten Design ("eine Stufe ist eine Spec-Datei, die GUI und
+  Arena gleich lesen", par.4.2) und traegt auch die Stilmittel der oberen Stufen. Groesserer
+  Umbau in `py.rs`, beruehrt jeden GUI-Suchpfad.
+- **(B) Env-Knopf nur fuer den Server-Prozess.** Billiger, aber gegen den Kommentar. Der dortige
+  Einwand ("gaelte fuer beide Seiten") trifft den Server allerdings NICHT: in der GUI spielt
+  genau EINE KI-Seite gegen einen Menschen. Wer das nimmt, sollte den Kommentar im selben Zug
+  praezisieren, statt ihn stehen zu lassen.
+
+**Danach erst baubar:** `heuristik_variante` in der Spec-Abbildung von `server.py` (Z.205-232,
+heute nicht enthalten), die Stufen-Specs unter `models/levels/`, und die drei fehlenden
+Stilmittel fuer die oberen Stufen (par.12 Punkt e). Die Sim-Zahlen der hv3-Stufen sind
+ebenfalls offen (par.12a).
