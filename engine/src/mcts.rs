@@ -922,6 +922,10 @@ fn search_action_inner<R: Rng + ?Sized>(
 
 /// Wie [`search_action`], liefert zusätzlich ein debug.html-kompatibles
 /// Analyse-Dict (Per-Zug-Statistik `moves[]` + serialisierter `tree`).
+///
+/// BESTANDS-EINSTIEG, unveraendert auf `HeuristicVariant::Hv1` -- ein duenner
+/// Wrapper um [`search_with_tree_variant`]. Jeder heutige Aufrufer bekommt
+/// damit bit-identisch dasselbe wie vorher.
 pub fn search_with_tree<R: Rng + ?Sized>(
     state: &GameState,
     simulations: u32,
@@ -931,11 +935,40 @@ pub fn search_with_tree<R: Rng + ?Sized>(
     top_k: usize,
     log: Option<&mut Vec<String>>,
 ) -> (Option<SearchMove>, Value) {
+    search_with_tree_variant(state, simulations, c, rng, max_depth, top_k, log, HeuristicVariant::Hv1)
+}
+
+/// Wie [`search_with_tree`], aber mit WAEHLBARER Heuristik-Variante.
+///
+/// Angelegt 2026-09-13 fuer die Schwierigkeitsleiter
+/// (`PREREG_difficulty_levels.md` par.12 Punkt c, par.4.1a): die unteren Stufen
+/// sollen `hv3` spielen, und der GUI-Pfad kam bis hierher gar nicht an die
+/// Variante heran -- `search_with_tree` hatte `Hv1` einbetoniert und nahm sie
+/// nicht entgegen. Das ist dieselbe Bauform, die am 2026-08-26 schon einmal
+/// einen falschen Befund erzeugt hat (`lib.rs` Doku zu `heuristik_variante`:
+/// Flag vergessen, Default hv1, Korpus bitgleich).
+///
+/// ADDITIV: der Bestands-Einstieg oben bleibt und delegiert mit `Hv1`.
+/// NOCH KEIN AUFRUFER mit einer anderen Variante -- wer die GUI umstellt,
+/// braucht zuerst den Entscheid aus par.4.1a, WIE die Variante in den
+/// Server-Pfad kommt (Spec-Datei je Stufe, nicht prozessweiter Env-Knopf:
+/// `net_mcts.rs` `from_env` lehnt einen solchen Schalter ausdruecklich ab).
+#[allow(clippy::too_many_arguments)]
+pub fn search_with_tree_variant<R: Rng + ?Sized>(
+    state: &GameState,
+    simulations: u32,
+    c: f64,
+    rng: &mut R,
+    max_depth: u32,
+    top_k: usize,
+    log: Option<&mut Vec<String>>,
+    variant: HeuristicVariant,
+) -> (Option<SearchMove>, Value) {
     if crate::round5::applies(state) {
         let (a, analysis) = crate::round5::choose_action_with_analysis(state);
         return (a.map(SearchMove::Draft), analysis);
     }
-    let nodes = match build_tree(state, simulations, c, rng, log, HeuristicVariant::Hv1) {
+    let nodes = match build_tree(state, simulations, c, rng, log, variant) {
         Some(n) => n,
         None => return (None, Value::Null),
     };
