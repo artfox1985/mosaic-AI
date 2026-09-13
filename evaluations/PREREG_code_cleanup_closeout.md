@@ -553,3 +553,152 @@ Bewegung gegen 00:02 (32 Kanten): Champion 1348 -> 1353, Intervalle der Netzknot
 schmaler (v22@400 [1145, 1241] -> [1178, 1254]); die vier Kanten haben die Leiter unten gestrafft,
 nicht verschoben. Artefakte `rung_v22b05s{100,400}_vs_hv4s600_b1..b3.json`,
 `paired_gating_v22-b05_s25_vs_s100_seed53_full.json`, `..._s100_vs_s400_seed54_full.json`.
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, wie der Code vor dem Projektende sauber hinterlassen wird. Die Verdikt-Regel
+ist NICHT Elo, sondern die aus **par.1** und **par.7**: jeder Schnitt braucht einen von vier
+Gruenden -- Defekt, Fussangel, toter Code oder Widerspruch -- und jedes gebaute Stueck ist an
+seinem Tor gemessen (par.3 je Punkt). Erfolgsmass sind Irrtumskosten und Nachvollziehbarkeit
+(CLAUDE.md "Infrastruktur bewerten"). **Stufe 1 ist gebaut und registriert** (par.8: acht
+Punkte, 585 Lib-Tests gruen, Kontrakt-Hash `c65768636c0560a7` -> `39648b95bbba1acf`,
+Paritaets-Fixture wegen A2 bewusst neu); der Anker-Drift-ROT ist mit Entscheid (a) erledigt
+(par.7a, Segment 2 mit `hv4_anchor`). **Offen sind Stufe 2 (Altlast) und Stufe 3 (Doku), beide
+NACH der letzten Generation**, sowie der Umfang von Stufe 2 (par.6 Punkt 3, Nutzer-Entscheid).
+
+### 2. Voraussetzungen
+
+- **Maschine frei laut Prozessliste** fuer jedes `cargo`, jedes Wheel und jeden Werkzeug-Test;
+  Code SCHREIBEN darf neben einem Lauf, BAUEN nicht (par.3, Randbedingungen; CLAUDE.md
+  "ein Build ist Nebenlast").
+- **Zeitpunkt:** Stufen 2 und 3 laufen erst nach der LETZTEN Generation, also nach der
+  v30-Promotion (par.5a, Nutzer-Entscheid 2026-09-12: v30 wird released und ist der
+  Projektabschluss). Vorher wird an ihnen nichts gebaut.
+- **Quellen, die vorliegen muessen:** die sechs Bereichsberichte und die Zusammenfassung unter
+  `evaluations/review/code_review_2026-09-11_*.md` (dort stehen die Funde mit Datei:Zeile),
+  dazu par.2 dieser Datei (Tabelle A1-A13 und die Altlast-Liste).
+- **Anker und Fixture:** Anker `models/frozen_heuristics/hv4_anchor`, Champion-Fixture
+  `engine/tests/fixtures/net_parity_champion.txt` (Stand nach der v28-b02-Promotion
+  `e1f94c44f0c7959b`); beide sind nach JEDEM Rust-Schnitt zu pruefen.
+- **Keine andere Prereg muss vorher durch sein**; sachlich haengt Stufe 3 an
+  `PREREG_difficulty_levels.md` (die toten `DIFFICULTY_PRESETS` gehen dort auf) und an der
+  Namensumsetzung "Tessa" (par.5a).
+
+### 3. Schritte
+
+**P1 -- Umfang von Stufe 2 festlegen (Nutzer-Entscheid par.6 Punkt 3)**
+
+1. **Schritt "Zuschnitt registrieren und Nutzer fragen".** par.4 nennt Kandidaten, nicht einen
+   beschlossenen Umfang: tote Funktionen und Diagnose-Einstiege, Inversions-Pfad Runde 5 samt
+   PyO3-Huelle, `envelope::tiling_cost_delta`, die `X`/`X_in`-Wrapper in `envelope.rs`,
+   `--encoder flat` als Default in `train.py` und drei Cache-Werkzeugen, acht `server.py`-
+   Endpunkte ohne Frontend-Aufrufer, Auslagerung des Testmoduls von `net_mcts.rs` per `#[path]`,
+   Abspaltung von `self_play_diagnostics.rs`, deutsche Bezeichner (Kern 13,
+   `plate_builder.rs` 25 Typ-/Konstantennamen; `TileColor`-Varianten NICHT), entschiedene
+   Knoepfe und die rund 4.800 Zeilen Plattenbauer-Code. Der Agent legt je Kandidat Nutzen,
+   Nahtbreite und Risiko vor (Feedback `measure_seam_width_not_lines`: vor jedem Schnitt die
+   Namen ueber der Naht ZAEHLEN) und wartet auf die Freigabe je Pfad. **Nicht raten.**
+
+**P2 -- A6, A7, A11 abarbeiten (Stufe 2, par.2 und par.4)**
+
+2. **A11 zuerst MESSEN, dann entscheiden** (par.2: "2, erst messen"): Mutex je Knoten bei
+   ausgeschaltetem Sammel-Faden und GameState-Klon je Knoten (`net_mcts.rs:1874-1890`, `:2044`).
+   Messform: Wanduhr je Partie mit gegen ohne Aenderung am argmax-Instrument, 200 Partien @400,
+   `--deterministic --no-root-noise`, threads 11, exklusiv (gemessen rund 2.050 s je Lauf,
+   `docs/measured_runtimes.md`). Ohne Messung kein Umbau.
+3. **A6** (`Game::is_over()` ab Rundenbeginn 5 wahr, `game.rs:700`) und **A7** (Eroeffnungs-
+   Records: Policy-Ziel auf toter ID 405 bei Gewicht 0, `features.rs:1477`,
+   `corpus_dataset.py:1331`) nach der Freigabe aus P1; A7 beruehrt den Trainings-Cache und
+   braucht deshalb einen Cache-Schluessel-Blick, bevor etwas gebaut wird.
+
+**P3 -- Tore je Schnitt (bindend, par.4 Schlusszeile)**
+
+4. Nach JEDEM Rust-Schnitt, exklusiv und in dieser Reihenfolge:
+
+   ```
+   $env:PATH = "$(python -c 'import sys,os;print(os.path.dirname(sys.executable))');" + $env:PATH
+   cd engine; cargo test --release --lib        # gemessen 80-85 s
+   cargo test --release --no-run                # examples/benches, gemessen 33 s
+   python -m maturin build --release            # gemessen 26-34 s
+   python -m pip install --force-reinstall --no-deps engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --out evaluations/artifacts/anchor_drift_live_wheel_<datum>_stufe2.json
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --venv --out evaluations/artifacts/anchor_conservation_artifact_wheel_<datum>_stufe2.json
+   python -X utf8 tools/check_conventions.py
+   ```
+
+   Netz-Paritaets-Fixture des Champions muss UNVERAENDERT bleiben (ein Aufraeum-Schnitt darf das
+   Spiel nicht bewegen); tut sie es doch, ist das ein Befund und ein Stopp-Punkt.
+   Nach Python-Schnitten: die Werkzeug-Tests (`python -X utf8 -m pytest tools/tests -q`) und ein
+   Rauchtest der Ketten-Skripte mit `--limit`.
+   **Bei Abbruch:** `os error 32` unter OneDrive ist eine Dateisperre, Wiederholung ist regulaer
+   gruen; `STATUS_DLL_NOT_FOUND` heisst, die Python-DLL fehlt im PATH (erste Zeile).
+
+**P4 -- Stufe 3, Doku (par.5, rund 3 h, keine Rechenlast)**
+
+5. Zeilenverweise in `engine/src/knob_registry.rs` und `docs/architecture_reference.md`
+   nachziehen; die vier widersprechenden Kommentare aus A13 beheben
+   (`ROUND5_ENDSCORING_ENABLED`, `NET_TILING_TIEBREAK_ENABLED`, `provocation.rs:459-464`,
+   Jokerfeld-Kommentare in `envelope.rs`); `python -X utf8 tools/generate_knob_docs.py`;
+   Abschlusskapitel "Stand beim Projektende" in `docs/architecture_reference.md`.
+6. **Name "Tessa" (par.5a), NACH der letzten Promotion:** Manifestfeld `display_name: "Tessa"` im
+   Artefakt des Schlusschampions (`models/frozen_champions/<name>/manifest.json`); GUI-Anzeige
+   in `server.py` und `static/js/app.js`; `tools/analyze_game_log.py` muss den Namen als KI-Seite
+   erkennen (haengt heute an "KI" -- Pruefstelle beim Bau); README "Current Status" mit Name und
+   Generationsname nebeneinander; Schwierigkeitsleiter Stufe "Meister" = Tessa.
+
+**P5 -- Leiter-Pflege (par.7a, laufend)**
+
+7. Der Anker ist `hv4_anchor`, Segment 2; Kanten ueber die Segmentgrenze werden NIE gemischt.
+   Wird die Loeschliste aus STATUS Abschnitt 1 abgearbeitet (`hv1_anchor` ist obsolet), sind die
+   Textverweise nachzuziehen: CLAUDE.md Abschnitt Anker-Invarianz, `docs/working_rules.md` Z.50,
+   `docs/generation_naming.md` Z.68, `docs/architecture_reference.md` Z.39, Docstrings
+   `tools/verify_frozen_heuristic.py` Z.31/33 und `tools/anchor_arena.py` Z.8, Skill
+   `mosaic-anchor-invariance`. **Die Loeschung macht der Nutzer**; die Sitzung traegt danach
+   Snapshot-ID und Loeschung in Chronik und STATUS ein.
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: Testlaeufe "n = Tests, Grundmenge cargo-Lib-Suite,
+  Einheit gruene Tests"; A11-Messung "n = 200 Partien, Grundmenge argmax-Self-Play-Partien,
+  Einheit Sekunden je Partie"; Nahtbreite "n = Namen ueber der Naht, Grundmenge oeffentliche
+  Symbole des Moduls, Einheit Namen".
+- Eine Arena laeuft in dieser Prereg nur, falls ein Schnitt das Spiel doch bewegt; dann gelten
+  die sechs Standard-Kennzahlen (CLAUDE.md) aus den Logs.
+- **Registrierung in par.8**, je Punkt eine Zeile Bau plus Tor; **Zeile-1-Kopf im selben Zug**
+  nachziehen (Status bleibt OFFEN, bis Stufen 2 und 3 durch sind), danach sofort
+  `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1** und `archive/history.md` fortschreiben.
+- **Rueckwaerts-Pruefung**:
+  `grep -rn "code_cleanup_closeout\|39648b95bbba1acf\|hv4_anchor\|net_parity_champion" evaluations/ docs/ tools/ engine/`
+  -- jede Fundstelle lesen.
+- **Laufzeiten** ins Artefakt je Lauf; Planungsgroessen nach `docs/measured_runtimes.md`
+  (bereits vorhanden: "Code-Abschluss Stufe 1: Tests (585) / Paritaets-Fixture / Wheel / Drift
+  = 80 s / 14 s / 26 s / 17 s").
+- **Elo-Register**: nur bei Kanten am Champion. Ein Aufraeum-Schnitt erzeugt keine Kante; wenn
+  doch eine noetig wird (weil das Spiel sich bewegt hat), ist das der Stopp-Punkt unten, nicht
+  eine stille Register-Zeile.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **Umfang von Stufe 2** (par.6 Punkt 3) -- insbesondere die Plattenbauer-Zweige. **Nutzer fragen.**
+- **Jede Loeschung** von Code, Modellen, Artefakten oder Skripten: pfadgenaue Freigabe, und die
+  Loeschungen der Loeschliste erst nach dem Start des v29-Self-Plays (restic-daily).
+- **Paritaets-Fixture aendert sich durch einen Aufraeum-Schnitt**: anhalten und melden; ein
+  Aufraeumen, das das Spiel bewegt, ist kein Aufraeumen.
+- **Anker-Drift ROT: anhalten.** Nutzer-Entscheid (Anker neu setzen oder Aenderung
+  zuruecknehmen); Praezedenz ist par.7a.
+- **Kein Push** ohne Anweisung; Ahead-Stand melden (der pre-push-Hook baut und testet, zaehlt
+  also als Last).
+- **Champion-Wechsel und Anker-Neusetzung** sind nie Teil dieser Prereg.
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** die letzte Generation (v30) muss durch sein, samt Promotion; bis dahin ruht dieser
+Strang bis auf P1 (Umfangs-Entscheid), der jederzeit vorgelegt werden kann.
+**Nachher:** Leiter-Endfassung mit dem v30-Champion (`PREREG_difficulty_levels.md` Stufe 5),
+Schlussmodell "Tessa" (par.5a), STATUS-Neufassung als Abschlussbericht, letzter
+restic-Snapshot mit Beleg (`PREREG_v29_window.md` par.8 Punkt 3).
+Zum Begleitprogramm von `PREREG_v29_window.md` par.7 gehoert dieser Strang NICHT -- er ist der
+Abschluss danach.

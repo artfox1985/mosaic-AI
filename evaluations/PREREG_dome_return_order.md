@@ -131,3 +131,138 @@ legt per `push` in Reihenfolge zurueck, der Block liegt unten und `[0]` kommt zu
 Kompilierung, Fixture, Drift und die Messung par.5 folgen nach der Promotion von v28-b02.
 
 **Kompiliert und im Wheel (Nachtrag 03:50):** Bau-Tor 2026-09-12, 03:44-03:48 (`tools/night_v28_knob_build.sh`, Artefakte `anchor_drift_live_wheel_20260912_knobs.json` / `anchor_conservation_artifact_wheel_20260912_knobs.json`): `cargo test --release --lib` 601 gruen (84 s; darunter Kontrakt-Hash-Literal 39648b95bbba1acf und die Netz-Paritaets-Fixture des Champions UNVERAENDERT), Beispiele/Benches kompilieren, Wheel gebaut und installiert (Kontrakt 39648b95bbba1acf, INPUT_SIZE 755), Anker-Drift gegen hv4_anchor GRUEN und Konservierung GRUEN, Konventions-Check gruen. Zwei Nachbesserungen beim Bau: `#![recursion_limit = "256"]` in lib.rs (das `json!`-Literal von `engine_config_json` riss das Makro-Limit) und die Lesestelle der Startslot-Knoepfe als zwei Literal-Aufrufe (Registratur-Scanner). Alle neuen Knoepfe stehen damit auf Default im Wheel, das die Promotion v28-b02 einfriert.
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, ob die netzbewertete Wahl der Rueckgabe-Reihenfolge (Modus 1) etwas traegt.
+Die Verdikt-Regel steht in **par.5 Punkt 1**: A/B ueber den Referee, gleiches Netz, Modus 1 gegen
+Modus 0, 150 Partien, ZWEI Seed-Basen, Blockgroesse 5; "traegt" bei Vorzeichentest p < 0,05,
+sonst "kein messbarer Effekt". **Und der Knopf bleibt in beiden Faellen** -- der Massstab ist
+Vollstaendigkeit, nicht Elo (par.0/par.1, Nutzer 2026-09-12: "das ist ein gueltiger [Zug] und
+dadurch laesst sich beeinflussen wann welche kuppelplatte kommt"; CLAUDE.md "Symmetrische
+Defekte sieht keine Arena", Praezedenz "Korrektheit vor gemessenem Nutzen"). Die Erwartung ist
+vorab klein (H2 in par.3: die Wahl wirkt nur bei Ziehserien mit mehr als einer Platte, bei
+spaeter erreichtem eigenem Block und bei wertverschiedenen Platten), und par.8a nennt den
+strukturellen Deckel: der Value-Kopf sieht die Reihenfolge nur als TYP-Folge
+(`features.rs:212` kodiert fuer die obersten vier Positionen des eigenen Blocks +1 Spezial /
+-1 Joker / 0), Permutationen gleichtypiger Platten sind fuer das Netz identisch, und Modus 1
+faellt dann per Gleichstand auf die Ziehreihenfolge zurueck.
+
+### 2. Voraussetzungen
+
+- **Der Knopf ist GEBAUT und im Wheel seit 2026-09-12, 03:47** (par.8a Nachtrag):
+  `return_order_mode` (Spec optional, Env `MOSAIC_RETURN_ORDER_MODE`, Werte 0/1/2), Bau-Tor
+  `tools/night_v28_knob_build.sh` gruen -- 601 Lib-Tests, Kontrakt-Hash-Literal
+  `39648b95bbba1acf` und Netz-Paritaets-Fixture des Champions UNVERAENDERT, Anker-Drift und
+  Konservierung gruen, Konventions-Check gruen. **Es ist also nichts mehr zu bauen; offen ist
+  allein die Messung.**
+- **Maschine frei laut Prozessliste** (Prozesszaehler `0`); exklusiv, keine zweite CPU-Messung.
+- **Spieler:** `v28-b02` mit Champion-Spec (par.5 Punkt 1), Modell
+  `models/alphazero_v28-b02_brierbest.onnx`, Artefakt `models/frozen_champions/v28-b02/`.
+  Wird bis zur Messung ein neuer Champion promoviert, gilt der amtierende Champion; das ist dann
+  hier zu registrieren (par.6: Eintaktung NACH Neuverankerung und Promotion, damit kein
+  Engine-Knopf zwischen den Promotionskanten liegt).
+- **Eintaktung:** v29-Begleitprogramm (`PREREG_v29_window.md` par.7 Punkt 4, vierter
+  Spiegelstrich, gleiche Gruppe wie Stopp-Regel und Peek-Bewertung).
+- **Kein Eingriff in die Heuristik-Anker** (par.7): hv1/hv2 bleiben bei Modus 0.
+
+### 3. Schritte
+
+**P1 -- A/B Modus 1 gegen Modus 0 (par.5 Punkt 1)**
+
+1. Zwei Spec-Dateien anlegen, die sich NUR im Feld `return_order_mode` unterscheiden (0 gegen 1),
+   beide sonst identisch mit der Champion-Spec `models/frozen_champions/v28-b02/spec.json`.
+   Ablage unter `models/` mit sprechendem englischem Namen (z.B.
+   `models/return_order_mode1.spec.json`); der Dateiname geht ins Artefakt.
+2. A/B ueber den Referee, gleiches Netz beidseits, 150 Partien je Seed-Basis, exklusiv, als
+   Hintergrundaufgabe ohne Pipe:
+
+   ```
+   python -X utf8 -u tools/frozen_referee_match.py \
+     --artifact-dir models/frozen_champions/v28-b02 \
+     --model-a models/alphazero_v28-b02_brierbest.onnx \
+     --spec-a models/return_order_mode1.spec.json \
+     --sims-a 400 --c-puct-a 1.5 --sims-worker 400 --c-puct-worker 1.5 \
+     --n-games 150 --seed-base <SEEDBASIS> --workers 6 \
+     --out evaluations/artifacts/return_order_ab_mode1_vs_mode0_<SEEDBASIS>.json
+   ```
+
+   Zweite Seed-Basis analog. **Dauer (gemessen):** "A/B-Kante ueber den Referee, gleiches Netz,
+   Live gegen Artefakt, n=150, 6 Prozesse" 2.515 s / 2.621 s, rund 17 s je Partie
+   (`docs/measured_runtimes.md`, Abschnitt Generation v27) -- par.6 dieser Datei schaetzt 45 min
+   fuer 2 x 150, die gemessene Nachbarzahl liegt hoeher (rund 43 min JE Lauf). Fuer die Planung
+   gilt die gemessene Zahl.
+   **Bei Abbruch:** Lauf mit derselben Seed-Basis wiederholen; ein Teil-Lauf wird nicht mit einem
+   vollen gepoolt (Verzerrungs-Regel seit v26).
+   **Handshake:** laeuft das Artefakt auf einem anderen Kontrakt-Hash, ist `--force-cross-era`
+   noetig (Aera-Regel `docs/promotion_checklist.md`); der Golden-Selbsttest bleibt an
+   (`--skip-golden` ist nur Debug).
+
+**P2 -- Diagnostik aus den Logs (par.5 Punkt 2)**
+
+3. Grundmenge Rueckgaben mit mindestens 2 Restplatten, Einheit Rueckgaben. Drei Groessen:
+   (a) Anteil der Rueckgaben, deren Reihenfolge von der Ziehreihenfolge abweicht;
+   (b) Anteil, bei dem der Rueckleger die oben gelegte Platte spaeter selbst zieht;
+   (c) Ziehungen in den eigenen Block bei positivem Stand, mit
+   `python -X utf8 -u tools/probes/dome_stack_known_block_draw_probe.py` (gemessen 105-129 s auf
+   400 Partien, 1 Thread). Quelle fuer (a) und (b): die Diagnostik-Zeile des Knopfs
+   `[return_order] mode=.. drawn=[..] chosen=[..]` (par.8a) und die `#a`-Zeile mit `return_order`
+   (`game.rs:285-290`). **Erwartung nach H2:** Abweichungsrate hoch, Wiederkehr-Rate niedrig;
+   nach par.8a Befund 1 ist die Abweichungsrate strukturell gedeckelt.
+4. Sechs Standard-Kennzahlen (CLAUDE.md) aus denselben Logs (par.5 Punkt 3), je Seite und als
+   Differenz: `tools/probes/arena_column_probe.py` und `tools/plate_points_from_arena.py`.
+
+**P3 -- Modus 2 (Handregel) -- nicht beauftragt**
+
+5. Modus 2 ist gebaut (Handregel "beste Platte nach oben", Gewichte Spezial 2, Joker 1,
+   Farbtreffer 1), aber par.5 registriert nur den A/B von Modus 1 gegen 0. **Schritt "Zuschnitt
+   registrieren und Nutzer fragen":** ob Modus 2 einen eigenen Arm bekommt (er waere auch fuer
+   die Heuristik-Spieler nutzbar, NICHT fuer den Anker), ist nicht entschieden -- vorlegen, nicht
+   raten.
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: A/B "n = 150 Partien je Seed-Basis, Grundmenge
+  Referee-Partien gleiches Netz mit gegen ohne Knopf, Einheit Siege"; Diagnostik "n = Rueckgaben
+  mit >= 2 Restplatten, Grundmenge Rueckgaben, Einheit Anteil"; Ziehungen "n = Partien,
+  Grundmenge Partien je Seite, Einheit Ziehungen in den eigenen Block je Partie". Auswertung auf
+  Block-Ebene (Blockgroesse 5).
+- **Die sechs Standard-Kennzahlen** je Seite und als Differenz (CLAUDE.md).
+- **Registrierung in par.8** dieser Datei (Ergebnisse), **Zeile-1-Kopf im selben Zug** nachziehen
+  (auf ENTSCHIEDEN, sobald der A/B ein Verdikt traegt -- unabhaengig vom Vorzeichen, weil der
+  Knopf ohnehin bleibt), danach sofort `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1 und Abschnitt 5** sowie `archive/history.md` fortschreiben.
+- **Rueckwaerts-Pruefung**:
+  `grep -rn "return_order\|dome_return_order\|RETURN_ORDER_MODE" evaluations/ docs/ tools/ engine/`
+  -- betroffen sind mindestens `PREREG_dome_stack_information_sets.md` (Variante A, die
+  Reihenfolge ist nur dem Rueckleger bekannt), `PREREG_moon_stack_order.md` par.2 (dort steht die
+  Korrektur der ungenauen Notiz aus par.2 hier), `docs/knobs.md`,
+  `docs/architecture_reference.md`.
+- **Laufzeit-Zeile** in `docs/measured_runtimes.md` (A/B Referee, n=150, 6 Prozesse, s je Partie).
+- **Elo-Register: NICHTS.** Ein A/B desselben Netzes mit gegen ohne Knopf ist keine Kante am
+  Champion; erst wenn Modus 1 Default WIRD (Nutzer-Entscheid), aendert sich die gemessene
+  Identitaet des Champions -- und dann gilt Feedback `measured_identity_gets_own_bxx`, also ein
+  neuer Knotenname, keine stille Umwidmung.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **Ob Modus 1 Default wird** (par.6: "Wird Modus 1 Default (Nutzer-Entscheid), gilt er fuer die
+  v29-Erzeugung") -- Aufnahme ins Rezept entscheidet der Nutzer, auch bei positivem A/B.
+- **Ob Modus 2 einen eigenen Arm bekommt** (Schritt 5). **Nutzer fragen.**
+- **Ein Kopf, der Plattentypen im Block unterscheidet** (par.8a Befund 1, "die naechste Stufe,
+  nicht registriert"): kein Bau ohne eigene Registrierung.
+- **Anker-Drift ROT: anhalten** (der Anker liest den Knopf nicht, ROT waere also ein Hinweis auf
+  etwas anderes).
+- **Kein Push, keine Loeschung** ohne pfadgenaue Freigabe.
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** Promotion und Neuverankerung sind durch (par.6 -- der Knopf durfte nicht zwischen den
+Promotionskanten liegen, das ist eingehalten); der Bau ist erledigt. Innerhalb des
+Begleitprogramms (`PREREG_v29_window.md` par.7 Punkt 4) liegt dieser Punkt in derselben Gruppe
+wie die Stapel-Stopp-Regel und die Peek-Bewertung; alle drei sind billiger als der Tiling-Umbau
+(`PREREG_round_transition_search_sampling.md` par.9) und laufen davor. **Danach:** wird Modus 1
+Default, gilt er fuer die v29-Erzeugung -- dann muss die Entscheidung VOR dem Start des Sockels
+fallen, sonst faehrt der Korpus zwei Verhalten.

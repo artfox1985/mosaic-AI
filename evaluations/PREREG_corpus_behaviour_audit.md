@@ -180,3 +180,137 @@ die 0 erreicht (Ziehung 5 bezahlt, Ziehung 6 gratis, weitere acht folgen).
    das Werkzeug, wenn v29 ansteht, gegen den dann vorliegenden Korpus.
 2. **Umfang von Arm C:** nur `v27-b01` (der heutige Champion) oder die Kette v25/v26/v27, um
    zu sehen, ob die Plattenblindheit ueber die Generationen zu- oder abnimmt?
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, ob die drei Verhaltensmuster aus den Claude-Partien sich auch im Korpus
+zeigen und in welcher Groessenordnung. Die Verdikt-Regeln stehen je Arm in **par.2**:
+**Arm A** (Anomalie-Report) hat keinen Falsifikator, er liefert Verteilungen -- A1 Ziehungen je
+Plattenplatzierung, BEDINGT auf den Punktestand vor der ersten Ziehung (Vorab-Erwartung: bei
+Stand > 0 nahe 1, bei Stand 0 zweistellig), A2 Zwangsraeumungen je Partie und Steine je Vorfall
+nach Musterreihe und Runde (Vorab-Erwartung: Haeufung in den Reihen 4 und 5, Runden 4-5).
+**Arm B**: liegt die Differenz der Siegquoten "faellt in RUNDE 1 auf 0" gegen "faellt nicht" im
+Rauschen (gepaarte Auswertung auf Blockebene, Blockgroesse 5), ist das Muster aus den vier
+Partien erledigt und wird nicht weiterverfolgt. **Arm C**: unterscheiden sich die Raten der
+Zielstrukturen mit und ohne die zugehoerige Wertungsplatte nicht ueber das Rauschen hinaus,
+konditioniert der Prior nicht auf die Platten -- ein Befund mit Folgen fuer den Leitstern-Hebel
+Plattenblick, aber KEIN Beleg, dass ein plattenbedingter Kopf hilft. **par.5 bindet die
+Lesart:** Arm A und B sagen, WIE OFT etwas passiert, nicht ob es falsch ist; kein Elo-Knoten,
+keine Champion-Entscheidung, kein Trainingsziel.
+
+### 2. Voraussetzungen
+
+- **Der Lauf kommt ERST MIT v29** (par.8 Punkt 1, Nutzer-Entscheid 2026-09-11): gebaut wird das
+  Werkzeug, wenn v29 ansteht, gemessen wird gegen den dann vorliegenden Korpus.
+- **Maschine:** reines Parsen, kein Rechenlauf (par.4). Der Lauf darf neben der laufenden
+  Erzeugung stattfinden, solange das Lesen der Dateien sie nicht stoert; im Zweifel danach.
+  **Nie neben einer Arena** (CLAUDE.md).
+- **Quelle sind die RECORDS, nicht Partielogs** (par.3, GEPRUEFT 2026-09-11): `self_play.py`
+  schreibt keine Partielogs; `--log-games` ist ein Arena-Flag
+  (`tools/paired_arena_arm_worker.py:101`). Jeder Record traegt `state.log` als mitlaufendes
+  Fenster der letzten rund 30 Zeilen; die Fenster ueberlappen. **Die Zusammensetzung muss ueber
+  die UEBERLAPPUNG laufen, nicht ueber eine Menge** -- gemessen an
+  `data/selfplay_v27-b01-policy_20260910_2350_g10.pkl`: 301 gegen 299, 348 gegen 340, 313 gegen
+  309, 339 gegen 333 Zeilen; gleiche Zeilen kommen mehrfach vor, ein `set` verliert sie.
+- **Dateien, die existieren muessen:** der v29-Korpus (`data/selfplay_v28-b02-*.pkl`, nach der
+  Erzeugung) und die Claude-Logs `evaluations/artifacts/claude_play/g0*/game.log` fuer den
+  Selbsttest. **Das Werkzeug `tools/probes/corpus_behaviour_audit.py` existiert NICHT**
+  (geprueft 2026-09-13, Verzeichnis-Listing `tools/probes/`).
+- **Vorher durch sein muss:** die v29-Erzeugung (mindestens der Schwarm), damit ein Korpus
+  vorliegt.
+
+### 3. Schritte
+
+**P1 -- Werkzeug bauen (par.3, rund zwei bis drei Stunden, ANNAHME)**
+
+1. `tools/probes/corpus_behaviour_audit.py` anlegen: liest Record-Dateien, setzt `state.log` je
+   Partie ueberlappend zusammen, schreibt EIN JSON je Lauf mit `laufzeit`-Block (CLAUDE.md).
+   Bezeichner englisch (CLAUDE.md); Dateiname englisch. Was je Arm gebraucht wird:
+   A1 und B die Zieh- und Punktzeilen (die Ziehzeile traegt den Punktestand mit:
+   `Netz: 1. Kachel vom Stapel gezogen (Rueckseite: Special) -1 Pkt -> 4 Gesamt`),
+   A2 die Raeumungszeile (`engine/src/game.rs:869` und `:966` schreiben sie schon;
+   `tools/analyze_game_log.py` kennt den Ausdruck NICHT, grep leer 2026-09-11),
+   C das Endraster plus `scoring_tile_ids`, `round` und `players` aus `state`.
+   Fortschrittszaehler mit `flush=True` (CLAUDE.md), Auswertung auf **Block-Ebene**
+   (Blockgroesse 5).
+2. **Selbsttest (par.6 Punkt 2, bindend):** das Werkzeug gegen die Claude-Logs laufen lassen; es
+   muss dort A1, A2 und C exakt die Zahlen liefern, die in
+   `PREREG_claude_play_interface.md` par.7 von Hand stehen -- unter anderem die A1-Tabelle aus
+   g06/g07 (bei Stand > 0: 1,17 im Mittel, 7 Ziehungen in 6 Zuegen; bei Stand 0: 6,6, also 33 in
+   5 Zuegen, Maximum 13). Weicht eine Zahl ab, wird nicht der Korpuslauf gestartet, sondern der
+   Fehler gesucht.
+   Befehl (Muster):
+   `python -X utf8 -u tools/probes/corpus_behaviour_audit.py --logs evaluations/artifacts/claude_play --out evaluations/artifacts/corpus_behaviour_selftest.json`
+
+**P2 -- Korpuslauf (par.6 Punkt 3)**
+
+3. Lauf ueber den v29-Korpus, als Hintergrundaufgabe OHNE Pipe und OHNE Umleitung:
+   `python -X utf8 -u tools/probes/corpus_behaviour_audit.py --data-dir data --pattern "selfplay_v28-b02-*.pkl" --block-size 5 --out evaluations/artifacts/corpus_behaviour_audit_v29.json`
+   **Dauer:** unter 0,5 s je Partie (ANNAHME aus der Erfahrung mit `analyze_game_log.py`,
+   par.4); bei 12.000 Partien also rund 1,5 h (ANNAHME, in `docs/measured_runtimes.md` steht
+   fuer diese Sonde nichts). **Bei Abbruch:** der Lauf ist rein lesend und idempotent, er wird
+   einfach wiederholt; bei OneDrive-Dateisperren (`os error 32`-Klasse) einen Wiederholversuch
+   je Datei einbauen.
+
+**P3 -- Arm C, Umfang (Nutzer-Entscheid par.8 Punkt 2)**
+
+4. **Schritt "Zuschnitt registrieren und Nutzer fragen":** offen ist, ob Arm C nur auf dem
+   damaligen Champion gefahren wird oder auf der Kette (v25/v26/v27, inzwischen auch v28), um zu
+   sehen, ob die Plattenblindheit ueber die Generationen zu- oder abnimmt. Der Agent legt beide
+   Varianten mit Kosten vor und waehlt nicht selbst.
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit** -- je Arm genau wie in par.2 festgelegt:
+  A1 "n = alle Plattenplatzierungen mit mindestens einer Ziehung, Grundmenge Plattenplatzierungen
+  je Seite und Runde, Einheit Ziehungen je Platzierung", getrennt fuer Stand 0 und Stand > 0
+  VOR der ersten Ziehung;
+  A2 "n = alle Partien des Korpus, Grundmenge Partien je Seite, Einheit Vorfaelle je Partie und
+  Steine je Vorfall", aufgeschluesselt nach Musterreihe 0-5 und Runde;
+  B "n = alle Korpuspartien, Grundmenge Seiten (zwei je Partie), Einheit Siege je Seite";
+  C "n = alle Korpuspartien, Grundmenge Partien je Plattenkombination, Einheit Strukturen je
+  Partie".
+  **Der Rueckwaerts-Konfounder in Arm B ist benannt und behandelt** (par.2): nur Runde 1 gilt als
+  Beleg, spaetere Runden werden getrennt ausgewiesen, aber nicht als Beleg verwendet.
+- **Die sechs Standard-Kennzahlen** (CLAUDE.md): diese Sonde faehrt KEINE Arena; Reihen-,
+  Spalten- und Strafleistenauslastung, Plattenpunkte, eigene Punkte und Margin kommen aus dem
+  Korpus selbst (`tools/corpus_sanity_check.py` auf denselben Dateien) und werden im Bericht
+  neben den drei Armen ausgewiesen. Was im konkreten Kontext fehlt, wird begruendet -- stilles
+  Weglassen ist ein Regelbruch.
+- **Registrierung in par.7**, Verdikt je Arm (par.6 Punkt 4); **Zeile-1-Kopf im selben Zug**
+  nachziehen (auf ENTSCHIEDEN, sobald alle drei Arme ein Verdikt tragen), danach sofort
+  `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1** und `archive/history.md` fortschreiben.
+- **Rueckwaerts-Pruefung**:
+  `grep -rn "corpus_behaviour_audit\|Ziehsucht\|Null-Klammer\|score_clamp_incentive" evaluations/ docs/ tools/`
+  -- betroffen sind mindestens `PREREG_claude_play_interface.md` par.7/par.9,
+  `PREREG_dome_stack_information_sets.md` par.11 (Kanal 4), `PREREG_score_clamp_incentive.md`
+  par.10/par.11 (dort wird ueber alle Partien gemittelt: 3,1 Gratis-Ziehungen je Partie und
+  Seite bei 39 Prozent Partien mit Stand 0 -- diese Zahl ist NICHT bedingt auf den Zustand und
+  darf mit A1 nicht verrechnet werden), `PREREG_long_row_payoff.md` (Arm B).
+- **Laufzeit-Zeile** in `docs/measured_runtimes.md` (Sondenlauf ueber n Partien, 1 Thread).
+- **Elo-Register: nichts.** par.5 schliesst einen Elo-Knoten ausdruecklich aus.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **Umfang von Arm C** (par.8 Punkt 2): eine Generation oder die Kette. **Nutzer fragen.**
+- **Jeder Folgeschritt aus den Zahlen** -- ein Suchfilter, ein Trainingsterm, ein Knopf -- ist
+  ein eigener Arm mit eigener Vorregistrierung (par.5). Der Agent schlaegt vor, baut nicht.
+- **Keine Loeschung** von Korpusdateien, auch nicht von Messmaterial, ohne pfadgenaue Freigabe.
+- **Kein Push** ohne Anweisung.
+- Sollte der Selbsttest (Schritt 2) abweichen, ist das ein Stopp: entweder das Werkzeug oder die
+  von Hand gerechneten Zahlen in `PREREG_claude_play_interface.md` par.7 sind falsch, und das
+  gehoert vor dem Korpuslauf geklaert.
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** die v29-Erzeugung (Korpus muss existieren) und die Claude-Partien g02-g07 als
+Selbsttest-Grundlage (liegen vor). **Reihenfolge im Begleitprogramm**
+(`PREREG_v29_window.md` par.7 Punkt 2 und Punkt 4, erster Spiegelstrich): die Ziehsucht-Sonde,
+die Neurechnung der Blindzieh-Stopp-Regel (`PREREG_stack_draw_reservation_rule.md` par.7) und
+die Ein-Schritt-Bewertung der Zieh-Aktion (`PREREG_chance_nodes.md` par.14 Teil B1) bearbeiten
+DENSELBEN Befund und laufen zusammen mit diesem Audit. **Danach:** das Zugklassen-Differential
+(`PREREG_claude_play_interface.md` par.10) auf demselben Replay. Was traegt, geht ins v30-Rezept
+(`PREREG_v29_window.md` par.8 Punkt 3).

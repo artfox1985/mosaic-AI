@@ -343,3 +343,198 @@ beim Bau nachziehen.
 `bag_count` < 21: die gezogene Fuellung enthaelt in JEDER Stichprobe alle Beutel-Steine (die
 sicheren) und sonst nur Steine aus Turm plus Abraum; ein einziger Verstoss ist ROT. Ob die Vorgabe
 Spielstaerke TRAEGT, entscheidet der A/B aus par.9 (200 Paare am Champion), nicht dieses Tor.
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, ob die Suche am Rundenende das Tiling sehen soll (exakter Loeser im Blatt)
+und die Fabrik-Neubefuellung als Zufallsknoten bemustert werden soll, zu vertretbarem Preis.
+**Gebaut wird Variante B** (par.7, Basisarm; par.9, Nutzer 2026-09-12 "gerne eintakten fuer
+v29"): Tiling beider Seiten im Rundenende-Blatt mit `resolve_to_pre_chance`, dann EINE gezogene
+Neubefuellung und EIN Netzaufruf. Die Verdikt-Regel steht in **par.5**: Entscheidungsmass ist
+Siegquote und Punktemarge auf **BLOCK-Ebene**, ausdruecklich NICHT val-R2, nicht Brier, keine
+Offline-Metrik (an genau dieser Verwechslung ist v11 vorbeigelaufen). **Falsifikator:** keine
+signifikante Staerkeverbesserung auf Block-Ebene -> der Arm ist negativ, und die Linie
+"Rundenuebergangs-Rauschen" gilt zusammen mit dem v11-Befund als auf BEIDEN Wegen geprueft und
+GESCHLOSSEN -- das ist laut par.3 der eigentliche Wert dieses Laufs. Vorgeschaltet und ebenso
+bindend: **Kostentor 25 Prozent** Aufschlag auf die Wanduhr je Partie (par.4.1; die Schwelle ist
+uebernommen, nicht neu gesetzt -- `PREREG_bootstrap_horizon.md` Stufe 1 ist mit 60,7 Prozent an
+ihr gescheitert), und das **Sichttor** aus par.10 (ein einziger Verstoss ist ROT).
+
+### 2. Voraussetzungen
+
+- **Nichts gebaut** (Kopfzeile, par.9). Zu bauen ist der Such-Knopf `MOSAIC_ROUND_TRANSITION_LEAF`
+  mit Default 0 = Bestand bitidentisch, kein RNG-Zug; Spec-Feld optional.
+- **Maschine frei laut Prozessliste** fuer Bau (Volllast) und Messung; exklusiv, nie neben einer
+  Arena.
+- **Zwei Praemissen sind mit par.8 bereits berichtigt und gelten nicht mehr:** par.6
+  ("Determinisierung ersatzlos entfallen") ist falsch -- `MOSAIC_NUM_DETERMINIZATIONS` und
+  `determinize_hidden_information` leben (`net_mcts.rs:986`, `DETERMINIZE_ROOT_HIDDEN_INFO` bei
+  `:976`); und die in par.4.2 versprochene Paritaetssonde `tools/parity_probe.py` mit Soll-Hash
+  `8c6684ff` liegt nicht mehr im Baum -- **Nachfolger ist die Champion-Fixture
+  `engine/tests/fixtures/net_parity_champion.txt`, und sie muss gruen bleiben.**
+- **Die Informationsmengen-Antwort liegt vor** (par.9): das Rundenende-Blatt uebernimmt GENAU die
+  Mischregel `determinize_dome_pool` (Variante A aus `PREREG_dome_stack_information_sets.md`;
+  bekannte eigene Rueckgabebloecke bleiben in Reihenfolge, nur unbekannter Praefix und
+  Gegnerbloecke werden gemischt), keine eigene.
+- **Bauvorgabe par.4.2 (ENTSCHIEDEN 2026-09-05):** die Stichprobe zieht ihren Seed NICHT aus dem
+  laufenden Suchstrom, sondern **stellungsgebunden** -- Seed = Hash des Blatt-Zustands (Bretter,
+  Musterreihen, Strafleisten, Chips, Beutel-/Turm-Zaehler, Runde, Spieler am Zug) verknuepft mit
+  dem abgeleiteten Such-Seed der Partie. Kandidat fuer den Hash ist `lib.rs::fnv1a_64` (die
+  Engine hat kein Zobrist und kein `state_hash`, gegrept 2026-09-05). Damit bleiben
+  Wiederholbarkeit, Zustands-Determinismus UND die Kraft der Paarung erhalten.
+- **Bauvorgabe par.10 (2026-09-13):** die Fuellung im Blatt kommt aus dem **echten Beutel mit dem
+  Turm daneben** (nur die Reihenfolge im Beutel gewuerfelt, Turm-Nachfuellung ueber den
+  Spielpfad `draw_with_refill`), NIE aus der Summe Beutel plus Turm und nie aus einem
+  zusammengeworfenen Pool. Der Bestand macht das bereits richtig:
+  `engine/src/round_transition.rs` Z.200-214 (`advance_one_chance`) und Z.354-372 (Kern von
+  `sample_round_transition_value`); der Bootstrap-Rollout der Erzeugung
+  (`round_transition_deep.rs` Z.815-860) nutzt genau das. **Variante B nimmt diesen Kern
+  wieder.**
+- **Vorher durch sein muss:** ein Champion-Stand v29-b01 (par.9: A/B gepaart am Champion
+  v29-b01), also Tor 1 der v29-Generation.
+
+### 3. Schritte
+
+**P1 -- Bau des Such-Knopfs (par.9, Bauvorgaben par.4.2 und par.10)**
+
+1. Knopf `MOSAIC_ROUND_TRANSITION_LEAF`, Default 0 (Bestand bitidentisch, kein RNG-Zug),
+   Spec-Feld optional. Wirkort ist die eine Stelle, an der der heutige Schalter haengt: das
+   pseudo-terminale Blatt in `engine/src/net_mcts.rs` (par.1 nennt Konstante und Aufrufstelle,
+   mit Zeilendrift nach par.8: Konstante um `net_mcts.rs:95`, Aufrufstelle um `:2329`).
+   Ablauf im Blatt: (a) `resolve_to_pre_chance` spielt das Tiling BEIDER Seiten mit dem exakten
+   Loeser durch; (b) EINE gezogene Neubefuellung nach par.10, Seed stellungsgebunden nach
+   par.4.2; (c) EIN Netzaufruf. Registratur-Eintrag, `engine_config`, `docs/knobs.md`,
+   Tests (Default bitidentisch; gleicher Blatt-Zustand -> gleiche Fuellung, pfadunabhaengig).
+   Bezeichner englisch. **Eintrag in `docs/architecture_reference.md` ("Wo der Code Information
+   ABSICHTLICH vernichtet") ist Teil des Baus** (par.9), mit beiden Antworten: wessen
+   Informationsmenge modelliert die Mischung, und was nimmt sie dem Spieler weg.
+   Nebenbei nachziehen: der Kommentar `round_transition.rs` Z.356-360 ("erreicht so gut wie nie
+   den Turm-Refill-Pfad") ist fuer Runde 4/5 ueberholt (par.10).
+   **Kosten: rund ein Tag Bau** (ANNAHME, par.9).
+2. **Tore, Reihenfolge Bau -> Tore -> Messung** (Muster `tools/night_v28_knob_build.sh`,
+   gemessene Dauern 84 s / 33 s / 34 s / 19 s / 12 s):
+
+   ```
+   $env:PATH = "$(python -c 'import sys,os;print(os.path.dirname(sys.executable))');" + $env:PATH
+   cd engine; cargo test --release --lib
+   cargo test --release --no-run
+   python -m maturin build --release
+   python -m pip install --force-reinstall --no-deps engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --out evaluations/artifacts/anchor_drift_live_wheel_<datum>_rtleaf.json
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --venv --out evaluations/artifacts/anchor_conservation_artifact_wheel_<datum>_rtleaf.json
+   python -X utf8 tools/generate_knob_docs.py
+   python -X utf8 tools/check_conventions.py
+   ```
+
+   **Netz-Paritaets-Fixture des Champions muss bei Default UNVERAENDERT bleiben** (par.8 Punkt 2:
+   das ist der Nachfolger des in par.4.2 versprochenen Hashes); Anker-Drift gruen.
+
+**P2 -- Sichttor (par.10, vorab, ein Verstoss ist ROT)**
+
+3. Am Instrument 300 Blatt-Zustaende aus Runde 3 und 4 mit `bag_count` < 21 ziehen und pruefen:
+   die gezogene Fuellung enthaelt in JEDER Stichprobe alle Beutel-Steine (die sicheren) und sonst
+   nur Steine aus Turm plus Abraum. **Ein einziger Verstoss ist ROT.** Grundmenge
+   Blatt-Zustaende, Einheit Verstoesse. Das Tor sagt nichts ueber Staerke -- das entscheidet der
+   A/B aus par.9.
+
+**P3 -- Schritt 1 der Messkette: Kostentor (par.5 Schritt 1, par.4.1)**
+
+4. Gleiche Konfiguration, Knopf aus gegen an, Wanduhr je Partie; Schwelle **25 Prozent**.
+   Messform nach par.9: argmax-Instrument, 200 Partien, am Champion, exklusiv:
+
+   ```
+   python -X utf8 -u self_play.py --mode network --model models/alphazero_<champion>.onnx \
+     --spec models/rt_leaf_on.spec.json --games 200 --sims 400 --version rtleaf-on \
+     --threads 11 --chunk 10 --per-file 10 --seed 20260931 --no-root-noise --deterministic
+   ```
+
+   Zweiter Lauf mit `rt_leaf_off.spec.json`. **Dauer (gemessen):** rund 24 min je Lauf
+   (argmax-Instrument 200 Partien @400, threads 11, `docs/measured_runtimes.md`), also rund
+   50 min fuer beide.
+   **Zusaetzlich mitschreiben** (par.5 Schritt 1): wie oft ein pseudo-terminales Blatt ueberhaupt
+   erreicht wird -- ist der Anteil klein, ist auch der Effekt klein, und das waere schon hier
+   sichtbar. Grundmenge Blaetter je Suche, Einheit Anteil.
+   **Reisst das Tor: Arm nicht weiterverfolgen**, unabhaengig von jeder Staerkevermutung.
+   **Die Messdateien `selfplay_rtleaf-*` sind Messmaterial** und gehoeren auf die
+   Ausschlussliste, nicht in den Korpus.
+
+**P4 -- Schritt 2 der Messkette: Staerke (par.5 Schritt 2, par.9)**
+
+5. A/B gepaart am Champion **v29-b01**, DASSELBE Netz gegen sich selbst, einmal mit und einmal
+   ohne Knopf, beide Sitze, gleiche Seeds, **200 Paare**, Blockgroesse 5, Logs:
+
+   ```
+   python -X utf8 -u tools/paired_gating.py \
+     --model-a models/alphazero_v29-b01_brierbest.onnx --spec-a models/rt_leaf_on.spec.json \
+     --model-b models/alphazero_v29-b01_brierbest.onnx --spec-b models/rt_leaf_off.spec.json \
+     --name-a v29-b01_rtleaf_on --name-b v29-b01_rtleaf_off --sims-a 400 --sims-b 400 --c-puct 1.5 \
+     --block-size 5 --max-pairs 200 --sprt-alpha 1e-12 --sprt-beta 1e-12 \
+     --seed <SEED> --threads 10 --log-games --no-promote-winner \
+     --out evaluations/artifacts/rt_leaf_ab_on_vs_off_s<SEED>.json
+   ```
+
+   **Dauer (gemessen):** 200 Paare @400 mit Logs 5.182-5.446 s = 86-91 min
+   (`docs/measured_runtimes.md`); par.9 schaetzt fuer die ganze Messung 3 h (ANNAHME).
+   **Kanal Punkte und Wertungsplatten-Punkte je Kriterium stehen neben den Siegen** (par.9),
+   weil der Knopf genau dort wirken soll.
+   **Bei Abbruch:** mit demselben Seed wiederholen, Teil-Laeufe nicht mit vollen poolen.
+6. Standard-Kennzahlen je Seite und als Differenz (par.5 "Mitzuschreiben"):
+   `tools/probes/arena_column_probe.py`, `tools/plate_points_from_arena.py --block 5`,
+   dazu Reihen-, Strafleisten- und Punkteniveau aus dem Artefakt.
+
+**P5 -- Robuster Aggregator und Variante A: NICHT jetzt**
+
+7. par.4.3 registriert Median / gestutztes / winsorisiertes Mittel als ZWEITEN Faktor neben
+   "Schalter an/aus"; er wird erst danach zum Thema und nur, wenn der Schalter ueberhaupt etwas
+   bewegt. Variante A (N Stichproben statt einer) folgt laut par.7 nur, wenn B traegt. **Kein
+   Bau ohne eigene Registrierung.**
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: Sichttor "n = 300 Blatt-Zustaende aus Runde 3 und 4 mit
+  bag_count < 21, Grundmenge Blatt-Zustaende, Einheit Verstoesse" (Soll: 0); Kostentor "n = 200
+  Partien je Arm, Grundmenge argmax-Self-Play-Partien, Einheit Sekunden je Partie" plus "Anteil
+  pseudo-terminaler Blaetter je Suche"; A/B "n = 400 Partien (200 Paare), Grundmenge gepaarte
+  Arena-Partien desselben Netzes mit gegen ohne Knopf, Einheit Siege". Block-Ebene
+  (Blockgroesse 5).
+- **Die sechs Standard-Kennzahlen** (par.5, CLAUDE.md) je Seite und als Differenz.
+- **Registrierung in einem Ergebnis-Absatz dieser Datei**, **Zeile-1-Kopf im selben Zug**
+  nachziehen (bei negativem A/B auf ENTSCHIEDEN mit dem Schluss aus par.3: die Linie ist auf
+  beiden Wegen geprueft und geschlossen), danach sofort
+  `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1 und Abschnitt 5** sowie `archive/history.md` fortschreiben. Hinweis:
+  STATUS Abschnitt 5 fuehrt diese Prereg bislang als "haengt an dome_stack; Kandidat fuer
+  UEBERHOLT" -- das ist mit par.9 ueberholt und beim Registrieren zu berichtigen.
+- **Rueckwaerts-Pruefung**:
+  `grep -rn "ROUND_TRANSITION\|round_transition\|resolve_to_pre_chance\|Tiling im Blatt" evaluations/ docs/ tools/ engine/`
+  -- betroffen sind mindestens `PREREG_v29_window.md` par.7 Punkt 2c,
+  `PREREG_round_estimate_leaf_term.md` par.2/par.5 (Falsifikator verweist hierher),
+  `PREREG_stack_top_feature.md` par.14 (P.9 wirkt erst mit einer Suche, die den Rundenuebergang
+  sieht), `docs/architecture_reference.md`, `project_drafting_must_know_tiling`.
+- **Laufzeit-Zeilen** in `docs/measured_runtimes.md` (Bau-Tore, Kostentor-Laeufe, A/B).
+- **Elo-Register: NICHTS** fuer den A/B. Wird der Knopf Default, ist der Champion eine neue
+  gemessene Identitaet (Feedback `measured_identity_gets_own_bxx`).
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **Aufnahme ins Rezept nur bei positivem Schritt 2 UND vertretbarem Kostentor -- und das ist
+  ausdruecklich Nutzer-Entscheid** (par.9 Schlusssatz).
+- **Sichttor ROT: anhalten** und melden; ein Verstoss heisst, die Fuellung nimmt dem Spieler eine
+  Sicherheit weg, die er hat.
+- **Kostentor gerissen: anhalten**, nicht "trotzdem messen".
+- **Anker-Drift ROT oder Paritaets-Fixture veraendert: anhalten**, Nutzer-Entscheid.
+- **Variante A und der robuste Aggregator** (par.4.3, par.7): kein Bau ohne eigene Registrierung.
+- **Kein Push, keine Loeschung** ohne pfadgenaue Freigabe.
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** Tor 1 der v29-Generation (der A/B laeuft am Champion v29-b01), und ein freies
+CPU-Fenster fuer den Wheel-Bau -- nicht waehrend Erzeugung, Waechter oder Kette
+(`PREREG_v29_window.md` par.4 Punkt 6). **Reihenfolge im Begleitprogramm** (par.9 Schlusssatz):
+NACH der Ziehsucht-Sonde und der Mondstapel-Stufe 1, weil die beiden billiger sind; der Punkt
+steht in `PREREG_v29_window.md` par.7 als Punkt 2c. **Danach:** was traegt, geht ins v30-Rezept
+(`PREREG_v29_window.md` par.8 Punkt 3); faellt der Arm negativ aus, ist die Linie geschlossen und
+der naechste Weg zur Tiling-Sicht ist Variante C (Encoder-Seite, par.7) -- die waere ein eigener
+Arm mit Training, nicht Teil dieser Prereg.

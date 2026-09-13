@@ -452,3 +452,206 @@ Aera) bereit; gegen hv4-Anker 73:77 und gegen hv2 78:72, Elo 992 [948, 1035], al
 wie hv2 (978). Empfehlung: Anfaenger = hv3, weil es auf dem Motor der Champions spielt (kein
 Cross-Aera-Wheel im Spielbetrieb); Nutzer-Entscheid bei Stufe 2.
 
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, welche Schwierigkeitsstufen die GUI anbietet und woran jede Stufe gemessen
+ist. Der Zuschnitt ist ENTSCHIEDEN (**par.4.1**, Nutzer 2026-09-11): vier Stufen -- Anfaenger =
+eingefrorenes Heuristik-Artefakt @150, Erfahren/Experte/Meister aus dem AKTUELLEN Champion,
+Meister wie in der Arena (@400, argmax, ohne Wurzelrauschen), die zwei darunter mit den
+Self-Play-Stilmitteln. Die Verdikt-Regel je Kante steht in **par.5 Stufe 2**: der staerkere Arm
+muss mindestens 120 von 200 Partien gewinnen (Vorzeichentest auf Paardifferenzen, p < 0,05);
+sonst greift die **Notch-Regel par.4.1** -- Experte auf @60 (naechste Kerbe @40), Erfahren auf
+@60 (naechste Kerbe @40, dann `action-temp 3`); jede Kerbe ist eine neue Kante, es gibt keine
+dritte Kerbe, und bleibt eine Stufe ununterscheidbar, wird sie GESTRICHEN (drei Stufen statt
+vier), nicht "irgendwie" schwaecher gemacht. Verliert Erfahren gegen Anfaenger, ist die Leiter
+unten gebrochen und der Zuschnitt geht an den Nutzer zurueck. **Stufe 3 ist ein hartes Tor:**
+keine Auswahl im Frontend, bevor jede Stufe "gespielt = gemessen" gruen ist.
+
+### 2. Voraussetzungen
+
+- **EINGETAKTET fuer v29** (par.8 Punkt 6, Nutzer 2026-09-11): Stufe 0 (Inventur) und der Bau
+  WAEHREND der v29-Erzeugung, weil sie keine Messmaschine brauchen ausser dem Wheel-Build;
+  Stufen 1 bis 3 im CPU-freien Fenster NACH Tor 1 der v29-Generation, mit dem dann amtierenden
+  Champion als Meister; Stufe 4 (Mensch) danach; Stufe 5 mit dem letzten Champion.
+- **Der Wheel-Bau fuer die Leiter ist eine Engine-Aenderung** (`PREREG_v29_window.md` par.7
+  Punkt 1): Anker-Drift und Paritaets-Fixture vor jedem weiteren Messlauf, und NICHT waehrend
+  Waechter oder Kette (`PREREG_v29_window.md` par.4 Punkt 6).
+- **Maschine frei** fuer Stufen 1-3 (Prozessliste `0`); exklusiv.
+- **Dateien und Artefakte:** `models/frozen_heuristics/hv2_generator` und
+  `models/frozen_heuristics/hv3_generator` (beide vorhanden), `models/champion.txt`,
+  Champion-Artefakt `models/frozen_champions/<champion>/spec.json`; neu anzulegen je Stufe
+  `models/levels/<stufe>.spec.json` (englische Dateinamen: `beginner`, `advanced`, `expert`,
+  `master`).
+- **Elo-Stand, der gilt:** NUR Segment 2 (`evaluations/elo_history.csv`, Anker
+  `Heuristik_hv4_anchor@150` = 1000 fix). Die Zahlen in par.2.3/par.2.5/par.4 stammen aus dem
+  ALT-Register (Segment 1) und sind fuer die Leiter NICHT zu verwenden (Nachtrag 2026-09-12).
+  Gemessen im Segment 2: hv2_generator@150 = 983, hv3_generator@150 = 978, Champion v28-b02@400
+  = 1353 (Stand 2026-09-13, 01:00, `PREREG_code_cleanup_closeout.md` par.7a Endtabelle), also
+  rund 370 Elo Abstand, den die Stufen 2 und 3 fuellen muessen.
+
+### 3. Schritte
+
+**P1 -- Stufe 0: Inventur (keine Rechenlast, par.5)**
+
+1. Fuenf Punkte abarbeiten und als Tabelle in par.10 registrieren, jede Zeile mit Pruefstelle
+   (`datei:zeile`): (a) Artefakt des Anfaenger-Spielers vollstaendig (Spec, Manifest,
+   Golden-Probe, Wheel)? (b) Identitaet `hv2_generator` = Elo-Knoten `Heuristik_v2huelle`
+   (Manifest gegen den Kommentar der Kante vom 2026-08-25 im Alt-Register) -- Stufe 0b;
+   (c) welche Heuristik-Variante spielt `ai_step_json` (`engine/src/py.rs:524`) heute, mit
+   welchen Knoepfen? (d) liest der DRAFTING-Pfad der GUI die Knoepfe zur Suchzeit (fuer den
+   Tiling-Schritt ist `SearchConfig::from_env` in `py.rs:969` belegt, fuer Drafting ANNAHME)?
+   (e) wo genau sitzen Wurzelrauschen, `action_temp`, `tau_argmax_from_move` und Weg C im Code
+   (`net_search_with_tree(..., add_root_noise, ...)`, GUI `py.rs:856` mit `false`;
+   `self_play.rs:2649-2700`), und welche davon erreicht ein Einzelzug-Aufruf heute NICHT --
+   das ist die Umbau-Liste fuer par.4.2. **Keine Zahl ohne Pruefstelle.**
+
+**P2 -- Bau (par.4.2 / par.4.3, rund 3-4 h Rust plus 2-3 h Server/Frontend, ANNAHME)**
+
+2. **Stilmittel werden Spec-Felder** (`SearchConfig::from_spec_file`, `engine/src/net_mcts.rs:379`):
+   `root_noise` (bool), `action_temp` (f64, 0 = argmax), `tau_argmax_from_move`, `deviate_prob`,
+   `deviate_candidates`, dazu `sims`. Alle OPTIONAL, damit die eingefrorenen Specs weiter laden
+   (Muster `dead_cell_w`, `round_est_c`); fehlen sie, ist das Verhalten byte-gleich zum Bestand.
+   Ziel: `tools/paired_gating.py --spec-a/--spec-b` und die GUI lesen DENSELBEN Spieler.
+3. **Tore des Rust-Baus, Reihenfolge Bau -> Tore -> Messung:**
+
+   ```
+   $env:PATH = "$(python -c 'import sys,os;print(os.path.dirname(sys.executable))');" + $env:PATH
+   cd engine; cargo test --release --lib            # gemessen 80-85 s
+   cargo test --release --no-run                    # examples/benches, gemessen 33 s
+   python -m maturin build --release                # gemessen 26-34 s
+   python -m pip install --force-reinstall --no-deps engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --out evaluations/artifacts/anchor_drift_live_wheel_<datum>_levels.json
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --venv --out evaluations/artifacts/anchor_conservation_artifact_wheel_<datum>_levels.json
+   python -X utf8 tools/generate_knob_docs.py
+   python -X utf8 tools/check_conventions.py
+   ```
+
+   **Netz-Paritaets-Fixture des Champions muss UNVERAENDERT bleiben** (Felder fehlen = Bestand).
+   Anker-Drift muss gruen bleiben (die Heuristik liest die Stilfelder nicht).
+4. **Stufen-Specs** anlegen: je Datei erweitert die Champion-Spec um die Stilfelder aus par.4.1
+   (Erfahren: @100, `root_noise` an, `action_temp 2` ueber die ganze Partie, Weg C mit 6
+   Kandidaten; Experte: @100, `root_noise` an, argmax ab Halbzug 1, kein Weg C; Meister: @400,
+   argmax, kein Wurzelrauschen; Anfaenger: Artefakt-Spec des Heuristik-Artefakts, @150,
+   c_puct 0,3).
+5. **Server und Frontend** (par.4.2/4.3): `/api/game/new` und `/api/ai/config` nehmen
+   `difficulty` als Stufennamen, `model`/`sims` bleiben als Expertenpfad "Frei"; der Server laedt
+   die Stufen-Spec beim Stufenwechsel (Mechanismus wie `_apply_champion_spec_env`,
+   `server.py:245-272`, MIT Rueckstellung der Felder, die die neue Spec nicht traegt);
+   **der Log-Kopf traegt `difficulty` und den Pfad der Stufen-Spec** (ohne beides ist eine
+   Mensch-Partie keiner Stufe zuzuordnen); das Zahlenfeld `ng-sims` weicht einer Auswahl mit den
+   vier Namen und je Stufe dem Hinweis "Antwortzeit ca. X s je Zug" (X aus Stufe 1, nicht
+   geschaetzt); die Stufe ist im Spielfenster sichtbar. Lehrer-Modus, Tipp und Coach bleiben
+   unberuehrt.
+
+**P3 -- Stufe 1: Antwortzeit je Stufe, gemessen (par.5)**
+
+6. Je Stufe 2 Partien Stufe gegen sich selbst ueber den GUI-Pfad, Seeds 20260950 und 20260951,
+   ein Prozess, 11 Threads wie im Spielbetrieb; je Zug die Wanduhr aufzeichnen. Kennzahl: Median
+   und 90. Perzentil der Sekunden je Zug, Grundmenge Drafting-Zuege beider Seiten, Einheit s je
+   Zug. Artefakt `evaluations/artifacts/difficulty_latency_<datum>.json` mit `laufzeit`-Block.
+   Exklusiv. Kosten: 8 Partien, unter 5 min (ANNAHME aus 6,98 s je Self-Play-Partie @400,
+   `docs/measured_runtimes.md`; dort ueber parallele Partien gemittelt, hier eine Partie am
+   Stueck -- darum wird gemessen).
+
+**P4 -- Stufe 2: die drei Kanten (par.5)**
+
+7. Je Kante 100 Paare = 200 Partien, Blockgroesse 5, Logs, Spec je Seite aus `models/levels/`:
+
+   ```
+   python -X utf8 -u tools/paired_gating.py \
+     --model-a models/alphazero_<champion>.onnx --spec-a models/levels/master.spec.json \
+     --model-b models/alphazero_<champion>.onnx --spec-b models/levels/expert.spec.json \
+     --name-a master --name-b expert --sims-a 400 --sims-b 100 --c-puct 1.5 \
+     --block-size 5 --max-pairs 100 --sprt-alpha 1e-12 --sprt-beta 1e-12 \
+     --seed 20260952 --threads 10 --log-games --no-promote-winner \
+     --out evaluations/artifacts/difficulty_edge_master_vs_expert.json
+   ```
+
+   Zweite Kante Experte gegen Erfahren, Seed 20260953, analog (Sims beidseits 100, Unterschied
+   nur in den Stilfeldern). Dritte Kante Erfahren gegen Anfaenger ueber den Artefakt-Referee
+   `python -X utf8 -u tools/frozen_referee_match.py ...`, festes n = 200, Seed 20260954,
+   `--force-cross-era` falls der Handshake ROT ist (das Heuristik-Artefakt traegt ein aelteres
+   Wheel; Aera-Regel `docs/promotion_checklist.md`).
+   **Kosten:** 600 Partien, davon 400 mit Sims 100 bis 400, unter 1 h (ANNAHME; gemessene
+   Nachbarn: 200 Paare @400 mit Logs 5.182-5.446 s, 75 Paare @100 gegen @400 1.062 s,
+   `docs/measured_runtimes.md`).
+   **Bei Abbruch:** je Kante einzeln wiederholen, Seed beibehalten; Frueh-Stopp bleibt AUS
+   (`--sprt-alpha 1e-12 --sprt-beta 1e-12`), weil hier eine Leiterposition gemessen wird und
+   kein Champion-Tor.
+8. Je Kante danach `tools/probes/arena_column_probe.py --artifact <ART>` und
+   `tools/plate_points_from_arena.py <ART> --block 5` (H2 behauptet genau diese Richtung:
+   die Stilstufen bauen weniger Spalten und weniger Punkte als der Meister).
+
+**P5 -- Stufe 3: gespielt = gemessen (hartes Tor, par.5)**
+
+9. Je Stufe eine Partie ueber den GUI-Pfad und dieselbe Partie ueber den Arena-Pfad (gleicher
+   Seed, gleiche Stufen-Spec): Zugfolge byte-gleich (Muster Netz-Paritaets-Fixture,
+   Promotions-Checkliste 5d). ROT heisst: die Stufe spielt in der GUI einen anderen Spieler als
+   den, dessen Kante sie traegt. Kein Bau der Auswahl, bevor jede Stufe gruen ist.
+
+**P6 -- Stufe 4 und 5**
+
+10. **Stufe 4** ist Nutzerzeit: je Stufe mindestens 3 Partien mit `difficulty` im Log-Kopf;
+    Kennzahlen je Stufe Siege, Punkte, Margin plus die sechs Standard-Kennzahlen aus
+    `tools/analyze_game_log.py`. **Endstand aus den Endwertungszeilen, NICHT aus
+    `# SPIELENDE`** (par.2.4: die Zeile weicht in allen 33 Logs ab). Erfolgskriterium vorab:
+    keine Umkehr der Reihenfolge ueber zwei benachbarte Stufen; eine Umkehr bei n = 3 ist kein
+    Befund, sondern eine Wiedervorlage fuer 6 weitere Partien auf den zwei Stufen. Die
+    Ziehsucht am Stapel bei Stand 0 zaehlt nicht als Aussetzer (bekanntes Muster ALLER
+    Netz-Stufen).
+11. **Stufe 5** (Einfrieren am Projektende): Meister = letzter Champion, drei Kanten final,
+    Tabelle par.4.1 mit Elo-Knoten je Stufe, `README.md` und `docs/` nachgezogen, Kopf dieser
+    Prereg auf ENTSCHIEDEN.
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: Kanten "n = 200 Partien (100 Paare), Grundmenge
+  gepaarte Partien der beiden Stufen, Einheit Siege"; Latenz "n = Drafting-Zuege beider Seiten
+  aus 2 Partien je Stufe, Grundmenge Drafting-Zuege, Einheit s je Zug"; Mensch-Validierung
+  "n = Partien je Stufe, Grundmenge Mensch-Partien, Einheit Siege/Punkte/Margin".
+- **Die sechs Standard-Kennzahlen** je Stufe aus den Kanten-Logs, zusaetzlich volle Spalten
+  (`arena_column_probe.py`) und Punkte je Wertungsplatte (`plate_points_from_arena.py`), weil H2
+  genau diese Richtung behauptet.
+- **Registrierung in par.10**; **Zeile-1-Kopf im selben Zug** nachziehen, danach sofort
+  `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1 und Abschnitt 5**, `archive/history.md` fortschreiben.
+- **Rueckwaerts-Pruefung -- par.9 nennt die Konsumenten bereits**: `README.md:300-303` (Presets),
+  `server.py` Kopfkommentar Z.19-20, `docs/knobs.md` (falls ein Knopf dazukommt),
+  `evaluations/STATUS.md` Abschnitt 5, `PREREG_claude_play_interface.md` par.5 (Antwortzeit @400
+  steht dort als ANNAHME; Stufe 1 liefert die Messung). Dazu
+  `grep -rn "difficulty_levels\|DIFFICULTY_PRESETS\|models/levels" evaluations/ docs/ tools/ static/ server.py`.
+- **Laufzeit-Zeilen** in `docs/measured_runtimes.md` (Latenz je Stufe, drei Kanten, Bau-Tore).
+- **Elo-Register**: jede der drei Kanten geht als Knoten hinein
+  (`python tools/elo_tracker.py add --player-a <stufe-a> --sims-a .. --player-b <stufe-b> --sims-b .. --wins-a .. --wins-b .. --n 200 --units-from-paired-artifact <ART>`),
+  damit die Stufen eine Leiterposition mit Konfidenzintervall tragen. **Das Namensschema der
+  Knoten ist offen** (par.8 Punkt 8) -- siehe Stopp-Punkte.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **Namensschema der Elo-Knoten fuer die Stilstufen** (par.8 Punkt 8; Vorschlag in par.5 Stufe 2:
+  `<champion>@100rn`, `<champion>@100rn-t2-wegc`). **Nutzer fragen**, bevor die erste
+  Register-Zeile geschrieben wird -- ein Knotenname ist eine gemessene Identitaet
+  (Feedback `measured_identity_gets_own_bxx`).
+- **Anfaenger-Stufe: hv2 oder hv3?** par.4.1 nennt `hv2_generator` (Nutzer-Entscheid
+  2026-09-11), der Nachtrag 2026-09-12, 21:50 empfiehlt `hv3_generator`, weil es auf dem Motor
+  der heutigen Champions spielt (kein Cross-Aera-Wheel im Spielbetrieb); beide sind im Segment 2
+  gleich stark (983 gegen 978). **Nutzer fragen.**
+- **Ob die Kanten je Champion-Wechsel oder nur am Ende gefahren werden** (par.8 Punkt 8,
+  Vorschlag: nur am Ende, Praezedenz `PREREG_search_depth_column_optimum.md` par.8c).
+- **Streichen einer Stufe** nach zwei Kerben (Notch-Regel) und **Rueckgabe des Zuschnitts**,
+  falls Erfahren gegen Anfaenger verliert.
+- **Anker-Drift ROT oder Paritaets-Fixture veraendert: anhalten**, Nutzer-Entscheid.
+- **Kein Push, keine Loeschung** ohne Freigabe; die toten `DIFFICULTY_PRESETS` werden erst im
+  Code-Abschluss Stufe 2 entfernt (`PREREG_code_cleanup_closeout.md` par.4).
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** Start der v29-Erzeugung (Stufe 0 und der Bau laufen daneben, aber NICHT waehrend
+Waechter oder Kette) und Tor 1 der v29-Generation (die Kanten brauchen den dann amtierenden
+Champion als Meister). **Danach:** Stufe 4 (Nutzerzeit), dann Stufe 5 mit dem letzten Champion
+-- ist v29 doch die letzte Generation, fallen Stufe 2 und Stufe 5 zusammen (par.8 Punkt 6); nach
+dem heutigen Stand folgt v30 (`PREREG_v29_window.md` par.8 Punkt 3), also laeuft Stufe 5 dort.
+Dieser Punkt ist Nr. 1 des Begleitprogramms in `PREREG_v29_window.md` par.7.

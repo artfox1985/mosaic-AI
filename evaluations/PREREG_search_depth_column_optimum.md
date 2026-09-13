@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k). Betriebspunkt 100 bestaetigt an v24-b06 (par.8b), am Champion v28-b02 GEKIPPT (@100 verliert 7:23 gegen @400, Spalten 0,87 gegen 1,30). Neumessung par.8e VORREGISTRIERT (Nutzer 2026-09-13: 100/200/400/600, gepaart UND argmax), Lauf Nacht 2026-09-13; Betriebspunkt der v29-Erzeugung bis dahin offen. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k). Betriebspunkt 100 galt bis v24-b06 (par.8b), am Champion v28-b02 GEKIPPT. Neumessung par.8e: Teil A GEMESSEN 2026-09-13 (gegen @400: @100 45:105, @200 53:97, @600 74:76 -> SAETTIGUNG BEI 400), Teil B argmax laeuft; Schwarm 100 Sims (Nutzer), Sockel-Vorschlag folgt. -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -1069,4 +1069,158 @@ selbststaendig ueber den Generationswechsel-Skill; der Vorschlag betrifft damit 
 (400 oder 600, Kosten je Partie aus Teil B), Sockel-Erzeugung vermutlich auf der schnelleren
 Maschine des Nutzers.
 
-**Ergebnis: leer bis zum Lauf.**
+**ERGEBNIS TEIL A (2026-09-13, 01:13-02:36, `tools/night_sims_curve_v28b02.sh`, exklusiv; je 75
+Paare = 150 Partien bis zum Deckel ohne Frueh-Stopp, Blockgroesse 5, Logs, 10 Threads):**
+
+| Punkt gegen @400 | Siege | Anteil | McNemar p | gepaarte Differenz | Punkte | Strafleiste | Wanduhr |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| @100 (Seed 20261055) | 45:105 | 30 % | 6e-7 | -0,80 [-1,07; -0,53] | 49,0 gegen 57,5 | 9,0 gegen 7,9 | 1.121 s (7,5 s je Partie) |
+| @200 (Seed 20261056) | 53:97 | 35 % | 0,0005 | -0,59 [-0,88; -0,29] | 50,3 gegen 57,3 | 8,2 gegen 7,9 | 1.386 s (9,2 s) |
+| @600 (Seed 20261057) | 74:76 | 49 % | 1,0 | -0,03 [-0,34; +0,28] | 53,9 gegen 52,6 | 7,9 gegen 8,4 | 2.364 s (15,8 s) |
+
+n = 150 Partien je Punkt, Grundmenge gepaarte Partien Generator@S gegen Generator@400, Einheit Siege
+bzw. Punkte je Partie. Artefakte `paired_gating_v28-b02_s{100,200,600}_vs_s400_seed{55,56,57}_full.json`
+(Spaltensonde und Plattenpunkte je Punkt liegen daneben, Auswertung in Teil B zusammen).
+
+**Lesart Teil A: SAETTIGUNG BEI 400.** @100 und @200 sind klar unterlegen (der 7:23-Punkt vom Abend
+ist auf 75 Paaren repliziert), @600 ist Gleichstand. Die "eklatant"-Schwelle (60 Prozent bei
+p < 0,05) erreicht nur der Schritt von 100/200 auf 400, nicht der von 400 auf 600. Nutzer 02:33:
+"gleichstand es wird"; "somit bekommt der sockel einen ordentlichen staerke boost". Teil B (argmax
+@100/@200/@400/@600) laeuft seit 02:36; Sekunden je Partie daraus sind die Kostenbasis. Die drei
+Punkte gehen als Kanten gegen @400 ins Register (@200 und @600 an EINER Kante, Nutzer 02:25).
+
+**Ergebnis Teil B und Sockel-Vorschlag: leer bis zum Ende von Teil B.**
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, bei welcher Simulationszahl der Generator `v28-b02` am staerksten spielt
+(Teil A) und den spaltenreichsten Korpus erzeugt (Teil B), und daraus abgeleitet, mit welchen
+Sims der SOCKEL des v29-Fensters erzeugt wird. Die Lesart ist vorab festgelegt in **par.8e**
+(vier Faelle: monoton steigend bis 600 / Saettigung bei 400 / Plateau haelt bei 100 / Formen
+widersprechen sich) und wird durch die Entscheidungsregel des Nutzers im selben Absatz
+geschaerft: "eklatant" heisst, BEIDE Formen zeigen in dieselbe Richtung UND Teil A gewinnt mit
+mindestens 60 Prozent bei McNemar p < 0,05 auf 75 Paaren UND der Spaltenabstand je Seite in
+Teil B liegt ueber 0,3. Erfuellt ein Punkt nur eine oder zwei der drei Bedingungen, ist er
+"besser", nicht "eklatant": dann bleibt 100 der Betriebspunkt, und der Befund geht als
+Kostenargument in den Sockel-Vorschlag. **Der Schwarm ist entschieden (100 Sims, par.8e
+Schlussabsatz, Nutzer 02:10); offen ist allein der Sockel (400 oder 600).**
+
+### 2. Voraussetzungen
+
+- **Maschine frei laut Prozessliste** (nicht laut Task-Meldungen). Pruefbefehl (PowerShell):
+  `@(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'self_play|train.py|paired_gating|anchor_arena|frozen_referee' -and $_.Name -notmatch 'pwsh|powershell' }).Count`
+  Ergebnis muss `0` sein. CLAUDE.md "Messungen laufen EXKLUSIV": GPU und CPU duerfen parallel,
+  zwei CPU-Messungen nie; ein Build zaehlt als Last.
+- **Wheel unveraendert** waehrend der Auswertung: das installierte Wheel traegt Kontrakt-Hash
+  `39648b95bbba1acf`, INPUT_SIZE 755. Der P.10-Fix (`engine/src/state.rs`) ist geschrieben, aber
+  NICHT kompiliert; er darf erst NACH dieser Messung und nach der wartenden Kante gebaut werden
+  (STATUS Abschnitt 1, Schritt 6), sonst stehen die Punkte der Kurve nicht auf einer Engine.
+- **Artefakte, die vorliegen muessen** (alle unter `evaluations/artifacts/`): Teil A
+  `paired_gating_v28-b02_s100_vs_s400_seed55_full.json`, `..._s200_..._seed56_full.json`,
+  `..._s600_..._seed57_full.json`; Teil B `depth_curve_100_v28b02.json`,
+  `depth_curve_200_v28b02.json`, `depth_curve_400_v28b02.json`, `depth_curve_600_v28b02.json`.
+  Fehlt eines, ist die Kette nicht durch: nicht auswerten, sondern melden.
+- **Keine Prereg muss vorher durch sein.** Nachgelagert haengen `PREREG_v29_window.md` par.1/par.6
+  (Sockel-Zuschnitt) und der Generationswechsel an diesem Ergebnis.
+
+### 3. Schritte
+
+1. **Vollstaendigkeit pruefen** (Sekunden, kein Lauf):
+   `python -X utf8 -u tools/probes/../../tools/elo_tracker.py report` ist NICHT gemeint; gemeint ist
+   ein Lesen der sieben Artefakte samt `laufzeit`-Block. Jeder Lauf muss einen `laufzeit`-Block
+   tragen (CLAUDE.md-Pflicht). Fehlt er, aus dem Manifest bzw. den mtime-Grenzen nachtragen und
+   als REKONSTRUIERT markieren.
+   Bei Abbruch: fehlende Punkte einzeln nachfahren mit den Funktionen aus
+   `tools/night_sims_curve_v28b02.sh` (`paired_point`, `argmax_point`), gleiche Seeds
+   (20261055 / 20261056 / 20261057 fuer Teil A, 20260931 fuer Teil B), Frueh-Stopp AUS
+   (`--sprt-alpha 1e-12 --sprt-beta 1e-12`), `--block-size 5`, `--log-games`, als
+   Hintergrundaufgabe ohne Pipe und ohne Umleitung.
+2. **Teil A auswerten, Block-Ebene** (Blockgroesse 5, Feedback `arena_block_correlation`): je
+   Punkt Siege A:B, McNemar p, gepaarte Differenz mit Konfidenzintervall, `avg_score_a/b`,
+   `avg_floor_a/b`, `per_pair_scores`. Aus dem Artefakt selbst, nicht aus der Konsolenausgabe.
+3. **Spaltensonde und Plattenpunkte je Punkt** (falls die Kette sie nicht schon geschrieben hat;
+   gemessen 49 s bzw. unter 5 s je Kante, `docs/measured_runtimes.md` Z.189):
+
+   ```
+   python -X utf8 -u tools/probes/arena_column_probe.py --artifact evaluations/artifacts/<ARTEFAKT>.json
+   python -X utf8 -u tools/plate_points_from_arena.py evaluations/artifacts/<ARTEFAKT>.json
+   ```
+4. **Teil B auswerten**: aus `depth_curve_<S>_v28b02.json` volle Spalten je Seite mit
+   Konfidenzintervall, Punkte, Zeilen, Strafleiste; dazu `s_je_partie` aus dem `laufzeit`-Block je
+   Punkt -- das ist die Kostenbasis des Sockel-Vorschlags.
+5. **Verdikt nach par.8e** bilden und die "eklatant"-Regel Bedingung fuer Bedingung
+   ausschreiben (n, Grundmenge, Einheit je Zahl).
+6. **Sockel-Vorschlag rechnen** (Pflichtteil, Nutzer 00:40): Sockel = 4.000 Partien policy-aktiv
+   (`PREREG_v29_window.md` par.1), Schwarm = 2 x 4.000 bei 100 Sims (entschieden). Kosten je
+   Variante aus den gemessenen `s_je_partie` der argmax-Punkte @400 und @600, hochgerechnet auf
+   4.000 Partien, in Stunden; Vergleichsgroesse ist die gemessene v28-Erzeugung 35.726,1 s =
+   9,92 h (`docs/measured_runtimes.md`, Abschnitt "Generation v28"). Rahmen des Nutzers: "zum
+   schluss sind es nur noch zwei generationen" und "den schwarm mach ich nicht mit 400 sims plus".
+7. **Ausschlussliste**: die Messdateien `data/selfplay_depth<S>-v28b02_*.pkl` sind Messmaterial,
+   kein Trainingsmaterial. VOR dem v29-Fensterbau in `MOSAIC_DATA_EXCLUDE` aufnehmen
+   (Feedback `window_pinning_during_generation`). **Loeschen nur auf pfadgenaue Nutzer-Freigabe.**
+
+Dauer: Schritte 1-6 sind Lesen und Rechnen, wenige Minuten, kein Rechenlauf (ANNAHME).
+Nachfahren eines fehlenden Teil-A-Punkts @100: rund 21 min (gemessen 8,5 s je Partie,
+`docs/measured_runtimes.md` Z.203), hoehere Sims entsprechend mehr (ANNAHME). Ein fehlender
+Teil-B-Punkt @400: 1.396 s gemessen (ebd. Z.59).
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: Teil A je Punkt "n = 150 Partien (75 Paare), Grundmenge
+  gepaarte Arena-Partien, Einheit Siege"; Spalten "n = replaybare Partien, Grundmenge
+  Arena-Partien, Einheit volle Spalten je Seite"; Teil B "n = 200 Partien, Grundmenge
+  argmax-Self-Play-Partien, Einheit volle Spalten je Seite". Replay-Ausfaelle (Chip-Vollendungs-
+  Grenze des Replayers, STATUS Abschnitt 1) mitzaehlen und nennen.
+- **Die sechs Standard-Kennzahlen** (CLAUDE.md) je Seite und als Differenz: Reihenauslastung,
+  Spaltenauslastung, Strafleistenauslastung, Punkte je Wertungsplatte, eigene Punkte, Margin --
+  Teil A aus Spaltensonde, `plate_points_from_arena.py` und dem Artefakt (`avg_score_a/b`,
+  `avg_floor_a/b`), Teil B aus `tools/corpus_sanity_check.py`.
+- **Registrierung in par.8e** unter "Ergebnis", im selben Zug den **Zeile-1-Kopf** nachziehen
+  (Status bleibt ENTSCHIEDEN, Beleg auf den neuen Befund ziehen, unter rund 600 Zeichen,
+  Ueberholtes ERSETZEN statt anhaengen), danach sofort
+  `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1** fortschreiben (Schritt 2 abhaken, Sockel-Vorschlag als offenen
+  Nutzer-Entscheid eintragen), Chronik in `archive/history.md`.
+- **Rueckwaerts-Pruefung** (CLAUDE.md):
+  `grep -rn "Betriebspunkt 100\|par\.8e\|depth_curve\|search_depth_column" evaluations/ docs/ tools/ engine/`
+  -- jede Fundstelle lesen; betroffen sind mindestens `PREREG_v29_window.md` par.1/par.6/par.7,
+  `PREREG_difficulty_levels.md` par.3.1/par.2.5 und `docs/generation_loop.md`.
+- **Laufzeit-Zeilen** in `docs/measured_runtimes.md` ergaenzen (je Punkt Teil A und Teil B, mit
+  Threads: 10 fuer `paired_gating`, 11 fuer `self_play`).
+- **Elo-Register**: die drei Teil-A-Punkte sind Kanten des Champions gegen sich selbst bei
+  anderer Sim-Zahl und gehoeren als Knoten ins Register:
+
+  ```
+  python tools/elo_tracker.py add --player-a v28-b02 --sims-a <S> --player-b v28-b02 --sims-b 400 \
+    --wins-a <A> --wins-b <B> --n 150 \
+    --units-from-paired-artifact evaluations/artifacts/<ARTEFAKT>.json \
+    --comment "par.8e Sims-Kurve, Frueh-Stopp aus"
+  ```
+
+  kein `--early-stop` (der Frueh-Stopp war aus). Danach `python tools/elo_tracker.py report`.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **Die Sims des Sockels entscheidet der Nutzer**, nicht der Agent: der Agent legt den
+  gerechneten Vorschlag mit Kosten vor. Auch "eklatant erfuellt" ist kein Selbstlaeufer.
+- **Kein Start der Sockel-Erzeugung ohne Freigabe** (par.8e Schlussabsatz; die Freigabe vom
+  02:10 gilt ausdruecklich NUR fuer den Schwarm).
+- **Keine Loeschung** der `selfplay_depth*`-Dateien ohne pfadgenaue Freigabe: Ausschlussliste ja,
+  `rm` nein.
+- **Kein Push** (STATUS Abschnitt 1, Verbote); den Ahead-Stand nur melden.
+- Widersprechen sich die beiden Formen (vierter Fall in par.8e), ist das ausdruecklich eine
+  Abwaegung des Nutzers, kein Agenten-Entscheid.
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** nichts; die Kette laeuft seit 01:13, die wartende Kante
+`tools/night_v28b02s100_vs_v22s25.sh` startet danach von selbst und muss vor jedem Build durch
+sein. **Danach, in dieser Reihenfolge:** (a) Register-Zeile der wartenden Kante
+v28-b02@100 gegen v22-b05@25; (b) Build des P.10-Fixes plus Record-Feld `tiled_max_row`
+(STATUS Schritt 6, `PREREG_stack_top_feature.md` par.15); (c) `/mosaic-generation-turnover`;
+(d) Schwarm-Erzeugung v29 mit 100 Sims (`PREREG_v29_window.md` par.8 Punkt 8). Dieser Punkt ist
+zugleich der dritte Spiegelstrich von `PREREG_v29_window.md` par.7 Punkt 4 und Voraussetzung
+fuer den Sockel-Teil von par.1/par.6 dort.

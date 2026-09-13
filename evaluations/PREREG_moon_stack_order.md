@@ -80,3 +80,144 @@ Ein Arm mit Suchziel statt Rundenloeser-Ziel (Record traegt die vom Baum gewaehl
 ## par.7 Ergebnisse (leer bis zur Messung)
 
 Nichts gemessen (Stand 2026-09-12, 13:20).
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, ob der Moon-Order-Fan-out der Netzsuche (seit 2026-07-01 immer aktiv, ohne
+Knopf) ueberhaupt traegt. Die Verdikt-Regel steht in **par.4** (Stufe 1): A/B am amtierenden
+Champion, beide Seiten gleiche Spec bis auf `moon_order_variants`, 200 Paare, Blockgroesse 5,
+`--log-games`; **Lesart: Sieg und Punkte gepaart ueber der Aufloesung -> H1 bestaetigt; sonst
+bleibt der Fan-out (Vollstaendigkeit, Nutzer-Praezedenz Rueckgabe-Reihenfolge), aber die
+Zielfrage par.5 wird nicht weiterverfolgt.** Die Vorab-Erwartung steht in par.3: klein, weil der
+Entscheid nur rund 20 Mal je Partie faellt (gemessen: 199 Ziele in einer Datei mit 10 Partien =
+19,9 je Partie, Korpus `selfplay_v27-b01-policy_..._g10.pkl`, 199 von 1.675 Records); ein
+Nullbefund bei 200 Paaren ist der wahrscheinliche Ausgang und dann ein vollwertiges Ergebnis.
+
+### 2. Voraussetzungen
+
+- **Der Knopf ist NICHT gebaut.** par.2 (Code geprueft 2026-09-12): `net_mcts.rs:1724-1920`
+  legt bei einem SmallFactorySun-Knoten mit mindestens 2 Reststeinen ALLE eindeutigen
+  Permutationen als Kinder an (`unique_moon_orders`), Prior = P(Basis) x P(Reihenfolge |
+  Plackett-Luce ueber die 5 Farb-Scores des `moon_order_head`); **kein Knopf, immer aktiv.**
+  Zu bauen ist `MOSAIC_MOON_ORDER_VARIANTS` / Spec-Feld `moon_order_variants` nach par.4.
+- **Maschine frei laut Prozessliste** fuer Bau (Volllast) und Messung; exklusiv.
+- **Eintaktung:** v29/v30-Begleitprogramm (par.4 und `PREREG_v29_window.md` par.7 Punkt 2d);
+  Stufe 2 nur bei H1 positiv und dann in v30.
+- **Spieler:** amtierender Champion mit seiner Spec (heute `v28-b02`,
+  `models/frozen_champions/v28-b02/spec.json`).
+
+### 3. Schritte
+
+**P1 -- Bau des Knopfs (par.4)**
+
+1. `MOSAIC_MOON_ORDER_VARIANTS`, **Default 1 = BESTAND, bitidentisch**; `0` = nur die kanonische
+   Restreihenfolge wie im Heuristik-Pfad (`validation.rs:175-193`). Spec-Feld
+   `moon_order_variants` **optional** (fehlt = 1), damit alle eingefrorenen Specs weiter laden
+   (Muster `round_est_c`, `dead_cell_w`). Wirkort ist die Expansion in
+   `engine/src/net_mcts.rs:1724-1920`; der Aktionsraum bleibt bei 406 Aktionen (par.6), der
+   Heuristik-Pfad bleibt unberuehrt (kein Fan-out fuer den Anker). Registratur-Eintrag in
+   `engine/src/knob_registry.rs`, `engine_config`, Spec-Abbildung in `server.py` und
+   `tools/claude_play.py`, mindestens ein Test (bei `variants=0` entsteht genau ein Kind je
+   Sonnenzug; bei `variants=1` bitidentisch zum Bestand). Bezeichner englisch (CLAUDE.md).
+2. **Tore, Reihenfolge Bau -> Tore -> Messung** (Muster `tools/night_v28_knob_build.sh`,
+   gemessene Dauern 84 s / 33 s / 34 s / 19 s / 12 s):
+
+   ```
+   $env:PATH = "$(python -c 'import sys,os;print(os.path.dirname(sys.executable))');" + $env:PATH
+   cd engine; cargo test --release --lib
+   cargo test --release --no-run
+   python -m maturin build --release
+   python -m pip install --force-reinstall --no-deps engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --out evaluations/artifacts/anchor_drift_live_wheel_<datum>_moon.json
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --venv --out evaluations/artifacts/anchor_conservation_artifact_wheel_<datum>_moon.json
+   python -X utf8 tools/generate_knob_docs.py
+   python -X utf8 tools/check_conventions.py
+   ```
+
+   **Netz-Paritaets-Fixture des Champions muss bei Default UNVERAENDERT bleiben**; Anker-Drift
+   gruen (die Heuristik hat keinen Fan-out). Kosten: rund eine Stunde Bau plus 6 min Tore
+   (ANNAHME; die Tore selbst sind gemessen).
+   **Bei Abbruch:** `os error 32` = OneDrive-Dateisperre, wiederholen; `STATUS_DLL_NOT_FOUND` =
+   Python-DLL fehlt im PATH.
+
+**P2 -- Stufe 1: A/B Fan-out an gegen aus (par.4)**
+
+3. Zwei Spec-Dateien, die sich NUR in `moon_order_variants` unterscheiden (1 gegen 0), sonst
+   identisch mit der Champion-Spec. Dann:
+
+   ```
+   python -X utf8 -u tools/paired_gating.py \
+     --model-a models/alphazero_v28-b02_brierbest.onnx --spec-a models/moon_variants_on.spec.json \
+     --model-b models/alphazero_v28-b02_brierbest.onnx --spec-b models/moon_variants_off.spec.json \
+     --name-a v28-b02_moon_on --name-b v28-b02_moon_off --sims-a 400 --sims-b 400 --c-puct 1.5 \
+     --block-size 5 --max-pairs 200 --sprt-alpha 1e-12 --sprt-beta 1e-12 \
+     --seed <SEED> --threads 10 --log-games --no-promote-winner \
+     --out evaluations/artifacts/moon_order_ab_on_vs_off_s<SEED>.json
+   ```
+
+   Frueh-Stopp AUS, weil ein Nullbefund hier ein vollwertiges Ergebnis ist und ein frueh
+   gestoppter Lauf die Quote verzerrt. **Dauer (gemessen):** 200 Paare @400 mit Logs
+   5.182-5.446 s = 86-91 min (`docs/measured_runtimes.md`).
+   **Bei Abbruch:** mit demselben Seed wiederholen; Teil-Laeufe nicht mit vollen poolen.
+4. **Zusatzkennzahlen je Seite, aus den Logs** (par.4, `#a`-Zeile traegt `moon_order`): Anteil
+   der Sonnenzuege mit Rest >= 2 und, davon, der Anteil, in dem die gewaehlte Reihenfolge NICHT
+   die kanonische ist. Erwartungsgroesse aus par.2: rund 20 Entscheide je Partie.
+5. Sechs Standard-Kennzahlen (CLAUDE.md) aus denselben Logs:
+   `python -X utf8 -u tools/probes/arena_column_probe.py --artifact <ART>` und
+   `python -X utf8 -u tools/plate_points_from_arena.py <ART> --block 5`.
+
+**P3 -- Stufe 2 (nur bei H1 positiv, v30)**
+
+6. Ein Trainingsarm mit SUCHZIEL statt Rundenloeser-Ziel: der Record traegt die vom Baum
+   gewaehlte Reihenfolge (`policy_target_valid`-Muster), Tor 1 gegen den Vorgaenger;
+   Orakel-Metriken sind hier ohne Aussage (die Bruecke kennt die Reihenfolge nicht). Kosten:
+   ein Trainingsarm rund 1,5 h plus Gating (par.5). **Nur nach H1 und nur mit Nutzer-Freigabe.**
+   Vorher ist `moon_order_target` (`self_play.rs:1052ff`, beste Reihenfolge nach
+   `solve_round_final_score` ueber alle Permutationen, bei hoechstens 3 Steinen also
+   erschoepfend) NICHT zu aendern (par.6).
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: A/B "n = 400 Partien (200 Paare), Grundmenge gepaarte
+  Arena-Partien desselben Netzes mit gegen ohne Fan-out, Einheit Siege"; Haeufigkeit "n =
+  Sonnenzuege mit Rest >= 2, Grundmenge Sonnenzuege aus kleinen Fabriken, Einheit Entscheide je
+  Partie"; Abweichungsrate "Grundmenge Entscheide mit Rest >= 2, Einheit Anteil nicht-kanonisch".
+  Auswertung auf Block-Ebene (Blockgroesse 5).
+- **Die sechs Standard-Kennzahlen** je Seite und als Differenz (CLAUDE.md).
+- **Registrierung in par.7** dieser Datei, **Zeile-1-Kopf im selben Zug** nachziehen, danach
+  sofort `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1 und Abschnitt 6 (Punkt 00c)** sowie `archive/history.md` fortschreiben.
+- **Rueckwaerts-Pruefung**:
+  `grep -rn "moon_order\|MOON_ORDER\|moon_loss_weight" evaluations/ docs/ tools/ engine/`
+  -- betroffen sind mindestens `PREREG_dome_return_order.md` par.2/par.7 (dort steht die bereits
+  eingetragene Korrektur), `PREREG_stack_top_feature.md` par.10 P.8,
+  `PREREG_implementation_review_unprimed.md` (Befund `moon_order_target` als No-Op, behoben,
+  Knopf `train.py --moon-loss-weight`), `docs/knobs.md`.
+- **Laufzeit-Zeilen** in `docs/measured_runtimes.md` (Bau-Tore, A/B-Lauf mit Threads 10).
+- **Elo-Register: NICHTS** fuer den A/B (gleiches Netz mit gegen ohne Knopf ist keine Kante am
+  Champion). Wird `variants=0` Default, ist das eine neue gemessene Identitaet
+  (Feedback `measured_identity_gets_own_bxx`) und braucht einen eigenen Knotennamen.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **Aufnahme ins Rezept** (Fan-out aus- oder anlassen) entscheidet der Nutzer; par.4 legt fest,
+  dass der Fan-out bei Nullbefund BLEIBT.
+- **Stufe 2 (Zielwechsel des Kopfs)** ist ein Trainingsarm und braucht eine ausdrueckliche
+  Freigabe; sie kommt fruehestens mit v30 (`PREREG_v29_window.md` par.8 Punkt 3: v30 bekommt nur
+  noch Rezept-Knoepfe, keine neuen Bauvorhaben -- ein Zielwechsel ist ein Bauvorhaben und
+  braucht deshalb eine eigene Entscheidung). **Nutzer fragen.**
+- **Anker-Drift ROT oder Paritaets-Fixture veraendert: anhalten**, Nutzer-Entscheid.
+- **Keine Erweiterung des Aktionsraums** (par.6: 406 bleibt), kein Fan-out im Heuristik-Pfad.
+- **Kein Push, keine Loeschung** ohne Freigabe.
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** ein freies CPU-Fenster in v29; der Bau ist ein Wheel-Wechsel und darf NICHT waehrend
+Erzeugung, Waechter oder Kette laufen (`PREREG_v29_window.md` par.4 Punkt 6). Innerhalb des
+Begleitprogramms steht dieser Punkt als par.7 Punkt 2d nach der Ziehsucht-Sonde und vor dem
+Tiling-Umbau (`PREREG_round_transition_search_sampling.md` par.9 nennt die Reihenfolge
+ausdruecklich: "nach Ziehsucht-Sonde und Mondstapel-Stufe 1, weil die beiden billiger sind").
+**Danach:** bei H1 positiv Stufe 2 in v30; sonst ist der Strang mit dem Nullbefund abgeschlossen
+und die Prereg kann auf ENTSCHIEDEN.
