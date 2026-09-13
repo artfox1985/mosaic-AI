@@ -99,6 +99,7 @@ Vier Fahrplanpunkte sind bearbeitet worden, alle ohne Messung:
 | 15 | Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` | **Bau geprueft und vollstaendig** (beide Encoder, Cache-Schluessel, Registratur, `engine_config`, `knobs.md`). OFFEN: die Tore -- sie teilen sich den Wheel-Bau mit Nr. 5, weil der Schalter per Default AUS ist |
 | 20 | Netz-Gesundheit | **Sonde `tools/probes/dead_unit_probe.py` gebaut**, Selbsttest ueber drei Generationen gruen. Der volle Lauf gehoert zur b03-Abnahme |
 | 23 | Korpus-Verhaltens-Audit | **Werkzeug gebaut, Selbsttest gruen** (18 Handzahlen ueber sechs Claude-Partien exakt). Der Korpuslauf kommt mit v29 |
+| 22 | Schwierigkeitsleiter | Bauplan in drei Punkten berichtigt, **Schritt 1b gebaut aber UNKOMPILIERT**: sechs optionale Stilfelder in der Suchkonfiguration. Der erste Bau gehoert an dieselbe freie Maschine wie das Wheel fuer Abschnitt 16 |
 
 **Zwei Entscheide des Nutzers sind eingearbeitet:** P.12 wirkt erst ab v30 (der v29-Korpus traegt
 das neue Record-Feld nicht, `PREREG_stack_top_feature.md` par.17), und die P.11-Normierung ist von
