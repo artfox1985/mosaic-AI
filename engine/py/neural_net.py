@@ -28,6 +28,22 @@ from config import (NUM_ACTIONS, HIDDEN_SIZE, OWNERSHIP_TARGETS,
                     CONJUNCTION_TARGETS, CONJUNCTIONS_PER_PLAYER,
                     POINTS_DIST_BINS)
 
+
+def _special_planes_off() -> bool:
+    """Ablations-Schalter der Spezialfeld-Kanaele 77/78 (v29-b02).
+
+    Spiegelbild von `engine/src/features.rs::special_planes_off`. Wird bei
+    JEDEM Aufruf gelesen (nicht gecacht): der Cache-Bau startet Arbeiter als
+    frische Prozesse, und ein gecachter Wert aus dem Elternprozess koennte je
+    nach Startreihenfolge falsch sein. Der Schalter steht ausserdem IM
+    Cache-Schluessel (`file_cache_key.py`), damit Bloecke mit und ohne
+    Kanaele sich nicht gegenseitig ueberschreiben -- ohne das haette b02
+    stillschweigend denselben Eingang wie b01.
+    """
+    import os
+    v = os.environ.get("MOSAIC_SPECIAL_PLANES_OFF", "")
+    return bool(v) and v != "0"
+
 COLOR_MAP = {"blau": 0, "gelb": 1, "rot": 2, "schwarz": 3, "türkis": 4, None: -1, "special": 5}
 PHASE_MAP = {"drafting": 0, "tiling": 1, "end": 2, "final": 3}
 
@@ -635,8 +651,18 @@ def state_to_planes_python(data) -> torch.Tensor:
     # serialisierten Feld gelesen -- so wirken die Kanaele rueckwirkend auf
     # dem gesamten Bestandskorpus. KEINE Normalisierung: die Skalierung
     # lernt das Netz.
+    # Ablations-Schalter MOSAIC_SPECIAL_PLANES_OFF (PREREG_special_tile_yield.md
+    # par.6 P1, Arm v29-b02): laesst beide Kanaele auf Null. Default AUS =
+    # bit-identisches Bestandsverhalten. Spiegelbild zu
+    # `features.rs::special_planes_off` -- die beiden Pfade MUESSEN denselben
+    # Schalter lesen, sonst weichen Rust- und Python-Encoder voneinander ab und
+    # der Paritaetstest faellt (genau dafuer gibt es ihn).
     _special = torch.zeros(2, 6, 6)
-    for _sr in range(3):
+    if _special_planes_off():
+        _sr_range = range(0)   # Schleife faellt aus, Kanaele bleiben Null
+    else:
+        _sr_range = range(3)
+    for _sr in _sr_range:
         _row = me_grid[_sr] if _sr < len(me_grid) else []
         for _sc in range(3):
             _slot = _row[_sc] if _sc < len(_row) else None

@@ -1260,7 +1260,35 @@ fn space_is_filled_like_json(sp: &DomeSpace) -> bool {
 /// `col_f_max`/`cell_reachable_mask`): dadurch wirken die zwei Ebenen
 /// rueckwirkend auf dem gesamten Bestandskorpus, dessen Schnappschuesse ein
 /// neues serialisiertes Feld nicht enthalten wuerden.
+/// Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` (PREREG_special_tile_yield.md
+/// par.6 P1, Nutzer-Eintaktung fuer den v29-Arm b02).
+///
+/// `=1` laesst die Kanaele 77 und 78 auf Null, in BEIDEN Rust-Pfaden und im
+/// Python-Zwilling. Default AUS = bit-identisches Bestandsverhalten.
+///
+/// WARUM ein Schalter und kein zweiter Merkmalsbauer: die Kanaele sind seit
+/// v28-b02 im Eingang, ihr Beitrag aber nie isoliert gemessen. Die Ablation
+/// beantwortet genau das -- derselbe Korpus, dasselbe Fenster, derselbe Seed,
+/// nur diese zwei Kanaele aus.
+///
+/// **Teil des Cache-Schluessels** (`engine/py/file_cache_key.py`): sonst
+/// lieferte ein Block aus einem frueheren Lauf stillschweigend die
+/// eingeschalteten Kanaele, und der Arm haette denselben Eingang wie b01 --
+/// genau die Fehlerklasse, die am 2026-09-09 2.680 tote Bloecke erzeugt hat.
+pub(crate) fn special_planes_off() -> bool {
+    static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        std::env::var("MOSAIC_SPECIAL_PLANES_OFF")
+            .map(|v| !v.is_empty() && v != "0")
+            .unwrap_or(false)
+    })
+}
+
 fn write_special_tile_channels_direct(out: &mut [f32], grid: &crate::board::DomeGrid) {
+    // Ablation: Kanaele bleiben auf Null (s. `special_planes_off`).
+    if special_planes_off() {
+        return;
+    }
     for sr in 0..3 {
         for sc in 0..3 {
             let Some(tile) = &grid.dome_slots[sr][sc] else { continue };

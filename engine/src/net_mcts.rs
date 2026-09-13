@@ -5456,6 +5456,32 @@ fn average_completed_q_raw(forest: &[Vec<Node>]) -> Vec<(Action, f64)> {
 /// Produktions-Aufrufstellen (`ai_step_net_json`/`ai_drafting_net_step`)
 /// übergeben `false` -- nur `ai_debug_net_json` (reiner Analyse-Endpunkt,
 /// kein Zug wird angewendet) übergibt `true`.
+/// Wie [`net_search_with_tree`], aber mit UEBERGEBENER Suchkonfiguration statt
+/// `SearchConfig::from_env()`.
+///
+/// Angelegt 2026-09-13 fuer die Schwierigkeitsleiter
+/// (`PREREG_difficulty_levels.md` par.12c Schritt 2, Weg A): eine Stufe ist
+/// eine Spec-DATEI, und der GUI-Zugpfad muss sie lesen koennen, ohne dass
+/// jemand prozessweite Umgebungsvariablen setzt. `py.rs` haelt die aktive
+/// Konfiguration als Feld der Partie und reicht sie hier herein.
+///
+/// ADDITIV: [`net_search_with_tree`] bleibt und delegiert mit `from_env()`,
+/// ist also bit-identisch zu vorher.
+#[allow(clippy::too_many_arguments)]
+pub fn net_search_with_tree_with_config<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    rng: &mut R,
+    log: Option<&mut Vec<String>>,
+    collect_trace: bool,
+    search_config: SearchConfig,
+) -> (Option<Action>, Value) {
+    net_search_with_tree_inner(net, state, sims, c_puct, add_root_noise, rng, log, collect_trace, search_config)
+}
+
 pub fn net_search_with_tree<R: Rng + ?Sized>(
     net: &Net,
     state: &GameState,
@@ -5466,19 +5492,43 @@ pub fn net_search_with_tree<R: Rng + ?Sized>(
     mut log: Option<&mut Vec<String>>,
     collect_trace: bool,
 ) -> (Option<Action>, Value) {
+    // s. Doku der `_with_config`-Schwester oben: hier bleibt der Bestandsweg
+    // ueber die Umgebung, damit jeder heutige Aufrufer bit-identisch bleibt.
+    let cfg = SearchConfig::from_env();
+    net_search_with_tree_inner(net, state, sims, c_puct, add_root_noise, rng, log, collect_trace, cfg)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn net_search_with_tree_inner<R: Rng + ?Sized>(
+    net: &Net,
+    state: &GameState,
+    sims: u32,
+    c_puct: f64,
+    add_root_noise: bool,
+    rng: &mut R,
+    mut log: Option<&mut Vec<String>>,
+    collect_trace: bool,
+    search_config: SearchConfig,
+) -> (Option<Action>, Value) {
     if state.phase != Phase::Drafting {
         return (None, Value::Null);
     }
     if crate::round5::applies(state) && crate::round5::net_solver_enabled() {
         return crate::round5::choose_action_with_analysis(state);
     }
-    // Debug-UI-/Mensch-vs-Netz-Einstieg (py.rs, kein Arena-/Self-Play-Pfad):
-    // AUSSERHALB des Wave-1-Scopes von PREREG_agent_encapsulation.md (keine
-    // Pro-Seite-Spec dafuer vorgesehen) -- liest die Suchkonfiguration daher
-    // wie bisher aus der Umgebung, jetzt aber ueber `SearchConfig::from_env()`
-    // statt dem entfernten OnceLock-Getter (gleiches Ergebnis, kein
-    // Verhaltensunterschied).
-    let search_config = SearchConfig::from_env();
+    // Debug-UI-/Mensch-vs-Netz-Einstieg (py.rs, kein Arena-/Self-Play-Pfad).
+    //
+    // Die Suchkonfiguration kommt seit 2026-09-13 als PARAMETER herein statt
+    // hier aus der Umgebung gelesen zu werden (PREREG_difficulty_levels.md
+    // par.12c Schritt 2). Der Bestands-Einstieg `net_search_with_tree` reicht
+    // weiter `SearchConfig::from_env()` durch -- fuer ihn aendert sich nichts.
+    // Neu ist nur, dass `py.rs` die Konfiguration der PARTIE hereingeben kann,
+    // damit eine Schwierigkeitsstufe als Spec-Datei reisen kann (par.4.2) und
+    // nicht als prozessweiter Env-Schalter, den `from_env` fuer die
+    // Heuristik-Variante ausdruecklich ablehnt. Der frueher hier vermerkte
+    // Vorbehalt ("AUSSERHALB des Wave-1-Scopes von
+    // PREREG_agent_encapsulation.md, keine Pro-Seite-Spec vorgesehen") ist
+    // damit eingeloest: dieser Pfad hat jetzt seine Pro-Partie-Spec.
     let k = num_determinizations();
     if k <= 1 {
         let mut trace = if collect_trace { Some(GumbelTrace::default()) } else { None };

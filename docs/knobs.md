@@ -6,7 +6,7 @@ GENERIERT -- nicht von Hand editieren. Quelle: `engine/src/knob_registry.rs`
 Der Waechter-Test `knob_registry::tests::all_mosaic_env_vars_in_code_are_registered`
 stellt sicher, dass jeder im Code vorkommende `MOSAIC_*`-Knopf hier steht.
 
-Stand: 120 Knoepfe (65 aktiv, 44 diagnose, 10 tot, 1 geplant).
+Stand: 121 Knoepfe (66 aktiv, 44 diagnose, 10 tot, 1 geplant).
 
 **Status** sagt, ob der Knopf VERDRAHTET ist -- ausdruecklich nicht, ob sein
 Default an ist (`knob_registry.rs`: "Default kann an ODER aus sein").
@@ -175,6 +175,7 @@ ob der Knopf noch etwas offen haelt:
 | `MOSAIC_TILING_PUNKTE_W` | 0.0 (aus) | aktiv | - | Punkte-Kopf-Blend im Netz-Tiling-Stichentscheid; gemessen wirkungslos (self_play.rs:985; archive/history.md:10715) | - |
 | `MOSAIC_OWNERSHIP_TILING_W` | 0.0 (aus) | aktiv | ENTSCHIEDEN/UEBERHOLT | Ownership-Pol der Tiling-Zugwahl R1-4: marginale Feldwerte aus der Wurzelkarte, additiv zum Plattenterm (tiling_solver.rs, ownership_tiling_weight) | PREREG_heuristic_v2_long_rows.md par.3b.6 (vorher PREREG_ownership_consumer.md par.3) |
 | `MOSAIC_OWNERSHIP_CONJ` | 0 (aus, Produktform) | aktiv | ENTSCHIEDEN | FORMumschaltung, keine Dosis: die konjunktiven Kriterien (k0/k1/k2/k3/k5/k7) kommen aus den gelernten Konjunktions-Atomen statt aus dem Produkt der Feldwahrscheinlichkeiten; additive k4/k6 bleiben auf den Feldlabels. Braucht den 140er-Kopf, sonst Rueckfall MIT Warnung (shaping.rs, ownership_conj) | PREREG_conjunction_terms.md par.4 |
+| `MOSAIC_SPECIAL_PLANES_OFF` | aus | aktiv | OFFEN | Ablation: Planes-Kanaele 77/78 (Spezialfeld-Ertrag und Abstand) auf Null, in beiden Rust-Pfaden und im Python-Zwilling; TEIL DES CACHE-SCHLUESSELS (features.rs::special_planes_off) | PREREG_special_tile_yield.md |
 | `MOSAIC_STACK_DRAW_RESEARCH` | aus | diagnose | ENTSCHIEDEN | Stapelzug nicht sammelaufloesen: nur der Peek wird angewandt, danach neue Suche (self_play.rs:609) | PREREG_chance_nodes.md |
 | `MOSAIC_ASYM_VORZUG` | aus | diagnose | ENTSCHIEDEN | Baustein 1 (Arm S): je Self-Play-Partie bekommt GENAU EINE Seite den Bauer-Vorzug (vorzug:true), Seitenwahl deterministisch aus dem Partie-Seed 50/50; dome_preference faehrt in derselben Kette mit (self_play.rs, asym_preference_active/asym_preference_side) | PREREG_asymmetric_curriculum.md par.3 |
 | `MOSAIC_ACTION_TEMP` | 0.0 (= aus, rohe Besuchszahlen) | diagnose | ENTSCHIEDEN | Arme S2/S5 der v25-Sockelstruktur: aktionsabhaengige Temperatur fuer die ZUGWAHL im Netz-Self-Play. MODUS, kein Faktor: 1 = Staffel wie im Heuristik-Pfad (n>50 -> 0,7; n>15 -> 0,4; sonst 0,15), 2 = glatte Form (par.14d, Nutzer 2026-09-07): logarithmisch von T 0,2 bei 2 Aktionen bis 0,8 bei 72, ausserhalb gekappt -- die Anker sind gemessen: erstes und neuntes Dezil der DRAFTING-Verteilung (Median 10, n = 8.025 Entscheide). Die fruehere Angabe 'Median 4, Dezil 64' war ueber Drafting UND Tiling gemessen, der Knopf wirkt aber nur im Drafting (par.14g). Gewichte werden visits^(1/T) statt visits; das Policy-ZIEL (completed-Q) bleibt unberuehrt. Bei 0 exakt die rohen Besuchszahlen, bitidentisch (net_mcts::action_temp_mode, self_play::action_temp_weights) | PREREG_v25_window.md par.14, par.14d |

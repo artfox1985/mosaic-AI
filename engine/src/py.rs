@@ -990,7 +990,15 @@ impl PyGame {
         self.move_seq += 1;
         let mut search_rng = StdRng::seed_from_u64(net_mcts::derive_search_seed(self.seed, self.move_seq));
         let (chosen, analysis) =
-            net_search_with_tree(net, &self.game.state, sims, c_puct, false, &mut search_rng, logger, true);
+            // PREREG_difficulty_levels.md par.12c Schritt 2: Konfiguration der
+            // PARTIE statt `from_env` im Rumpf. Ohne geladene Stufen-Spec steht
+            // dort genau `from_env()`, der Zug ist also bit-identisch zu vorher
+            // -- Bedingung dafuer, dass die Netz-Paritaets-Fixture sich nicht
+            // bewegt.
+            net_mcts::net_search_with_tree_with_config(
+                net, &self.game.state, sims, c_puct, false, &mut search_rng, logger, true,
+                self.search_config,
+            );
         let a = match chosen {
             Some(a) => a,
             None => {

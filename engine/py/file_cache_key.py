@@ -15,6 +15,19 @@ sehen wie die Bauschleife. Nebenbei vermeidet es den Ringschluss --
 """
 
 
+def _special_planes_off_key() -> bool:
+    """Liest `MOSAIC_SPECIAL_PLANES_OFF` fuer den Cache-Schluessel.
+
+    Eigene kleine Funktion statt Import aus `neural_net`, weil dieses Modul
+    bewusst importarm bleibt (siehe Kopf: `INPUT_SIZE` wird erst IN der
+    Funktion importiert, damit der Schluessel nicht an der Import-Reihenfolge
+    haengt). Dieselbe Semantik wie dort und wie in Rust: gesetzt und nicht "0".
+    """
+    import os
+    v = os.environ.get("MOSAIC_SPECIAL_PLANES_OFF", "")
+    return bool(v) and v != "0"
+
+
 def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str,
                        conjunction_head: bool, bootstrap_native: bool) -> str:
     """Schluessel EINER Korpusdatei (PREREG_cache_build_time.md par.6, Hebel 4).
@@ -92,6 +105,16 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
         + "|" + str(INPUT_SIZE) + "|" + str(NUM_ACTIONS) + "|" + str(VALUE_SCHEMA_VERSION)
         + "|" + str(POLICY_TARGET_SHARPEN_EXPONENT) + "|" + str(TD_LAMBDA)
         + "|" + str(value_target_variant) + "|" + str(encoder)
+        # Ablations-Schalter der Spezialfeld-Kanaele (PREREG_special_tile_yield.md
+        # par.6 P1, Arm v29-b02). MUSS im Schluessel stehen: b02 trainiert auf
+        # DEMSELBEN Fenster und DEMSELBEN Seed wie b01, nur mit zwei Kanaelen
+        # weniger. Ohne den Schluesselanteil lieferten die Bloecke aus dem
+        # b01-Lauf stillschweigend die eingeschalteten Kanaele, und die Ablation
+        # haette exakt denselben Eingang gemessen wie der Arm, gegen den sie
+        # antritt. Dieselbe Fehlerklasse hat am 2026-09-09 2.680 tote Bloecke
+        # erzeugt (docs/pitfalls.md). Nur angehaengt, wenn gesetzt -- so bleibt
+        # der Hash aller vorhandenen Bloecke unveraendert.
+        + ("|specialoff" if _special_planes_off_key() else "")
         # Literal statt Parameter (2026-08-31, Begruendung im Kopf): haelt den
         # Hash aller vorhandenen Bloecke stabil, waehrend der Traegerstatus aus
         # dem Block-Inhalt herauswandert.
