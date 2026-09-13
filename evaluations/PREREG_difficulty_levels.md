@@ -256,7 +256,7 @@ Kerbe. Bleibt eine Stufe auch danach ununterscheidbar, wird sie gestrichen
 ### par.4.2 Eine Stufe ist eine Spec-Datei, die GUI und Arena gleich lesen
 
 - Die Stilmittel werden Felder der Spec (`SearchConfig::from_spec_file`,
-  `net_mcts.rs:379`): `root_noise` (bool), `action_temp` (f64, 0 = argmax),
+  `net_mcts.rs:379`): `root_noise` (bool), `action_temp` (ganze Zahl 0..2, MODUS -- berichtigt 2026-09-13, par.12c: 0 heisst rohe Besuchszahlen, nicht argmax),
   `tau_argmax_from_move`, `deviate_prob`, `deviate_candidates`, dazu `sims`.
   Heute sind Wurzelrauschen und argmax PARAMETER des Suchaufrufs
   (`net_search_with_tree(..., add_root_noise, ...)`, GUI: `py.rs:856` mit
@@ -569,7 +569,7 @@ keine Auswahl im Frontend, bevor jede Stufe "gespielt = gemessen" gruen ist.
 **P2 -- Bau (par.4.2 / par.4.3, rund 3-4 h Rust plus 2-3 h Server/Frontend, ANNAHME)**
 
 2. **Stilmittel werden Spec-Felder** (`SearchConfig::from_spec_file`, `engine/src/net_mcts.rs:379`):
-   `root_noise` (bool), `action_temp` (f64, 0 = argmax), `tau_argmax_from_move`, `deviate_prob`,
+   `root_noise` (bool), `action_temp` (ganze Zahl 0..2, MODUS -- berichtigt 2026-09-13, par.12c: 0 heisst rohe Besuchszahlen, nicht argmax), `tau_argmax_from_move`, `deviate_prob`,
    `deviate_candidates`, dazu `sims`. Alle OPTIONAL, damit die eingefrorenen Specs weiter laden
    (Muster `dead_cell_w`, `round_est_c`); fehlen sie, ist das Verhalten byte-gleich zum Bestand.
    Ziel: `tools/paired_gating.py --spec-a/--spec-b` und die GUI lesen DENSELBEN Spieler.
