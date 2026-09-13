@@ -18,8 +18,8 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ## 1. UEBERGABE an die naechste Sitzung (2026-09-13, 02:50; Anlass: Kontextfenster der alten Sitzung voll, Sims-Kette Teil B laeuft)
 
-**Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12), Elo 1353
-[1306, 1402]** aus 1.410 Partien im LEITERSEGMENT 2 (36 Kanten, Anker `hv4_anchor` fix 1000,
+**Champion laut `models/champion.txt`: `v28-b02_brierbest` (Promotion 2026-09-12), Elo 1394
+[1350, 1445]** aus 1.860 Partien im LEITERSEGMENT 2 (40 Kanten, Anker `hv4_anchor` fix 1000,
 Block-Bootstrap; Treppe Anker -> hv4@600 -> v22@25 -> v22@100 -> v22@400 traegt,
 `PREREG_code_cleanup_closeout.md` par.7a Nachtrag "TREPPE GEFESTIGT"). Generator v29 = v28-b02.
 **Fahrplan fuer alles Weitere: `evaluations/v29_program_agent_plan.md`** (41 Punkte, Betriebsregeln,
@@ -28,43 +28,55 @@ Uebergabe-Commit: 10 Commits, kein Push (Nutzer pusht selbst).
 
 ### LAEUFT (Maschine BELEGT)
 
-- **`tools/night_sims_curve_v28b02.sh`** (Betriebssystem-Prozess der alten Sitzung, seit 01:13; NICHT
-  neu starten). Teil A ist durch (drei Artefakte, registriert in `PREREG_search_depth_column_optimum.md`
-  par.8e: @100 45:105, @200 53:97, @600 74:76 gegen @400 -> Saettigung bei 400). **Teil B laeuft**:
-  argmax-Instrument @100/@200/@400/@600, je 200 Partien (`self_play.py --deterministic
-  --no-root-noise`, Seed 20260931, 11 Threads), Stand 02:44: Punkt @100 bei 120/200 Partien (0,25
-  Partien/s). Artefakte `evaluations/artifacts/depth_curve_{100,200,400,600}_v28b02.json`
-  (`corpus_sanity_check.py`), Self-Play-Dateien `data/selfplay_depth<S>-v28b02_*.pkl` (Messmaterial,
-  vor dem v29-Fensterbau in `MOSAIC_DATA_EXCLUDE`). Erwartetes Ende: 03:45 bis 04:15 (ANNAHME:
-  @400 rund 1.400 s, @600 rund 2.100 s). Liest `models/alphazero_v28-b02_brierbest.onnx` und
-  `models/frozen_champions/v28-b02/spec.json`: nichts davon anfassen.
-- **`tools/night_v28b02s100_vs_v22s25.sh`** (wartet, pollt alle 120 s; startet von selbst, sobald
-  `depth_curve_600_v28b02.json` liegt und kein self_play/paired_gating-Prozess mehr laeuft):
-  v28-b02@100 gegen v22-b05@25, paired_gating 100 Paare ohne Frueh-Stopp, Seed 20261058, Logs,
-  Spaltensonde, Plattenpunkte; Artefakt `paired_gating_v28-b02_s100_vs_v22-b05_s25_seed58_full.json`;
-  Dauer ANNAHME 25-35 min. Fertig-Marke: Zeile `== KANTE FERTIG`.
+- **`tools/night_sims_curve_v28b02.sh` DURCH** (01:13 bis 04:08, exklusiv). Teil A und Teil B sind
+  gemessen und in `PREREG_search_depth_column_optimum.md` par.8e registriert; Verdikt **VIERTER
+  FALL, die Formen widersprechen sich**: Teil A (Staerke) saettigt bei 400 (@100 45:105, @200
+  53:97, @600 74:76 gegen @400), Teil B (Korpus, argmax, je 200 Partien) faellt MONOTON (volle
+  Spalten je Seite 1,0975 / 0,9575 / 0,8950 / 0,8200 bei 100 / 200 / 400 / 600 Sims; @100 gegen
+  @400 z = +3,74), und es faellt allein die Vollendung, nicht die Teilspalten. Die
+  "eklatant"-Regel des Nutzers ist mit 1 von 3 Bedingungen NICHT erfuellt: **Betriebspunkt 100
+  bleibt**. Sieben Artefakte, sieben Laufzeit-Zeilen in `docs/measured_runtimes.md`.
+  Die Self-Play-Dateien `data/selfplay_depth<S>-v28b02_*.pkl` sind MESSMATERIAL: vor dem
+  v29-Fensterbau in `MOSAIC_DATA_EXCLUDE` (Loeschung nur auf pfadgenaue Freigabe).
+- **Kante v28-b02@100 gegen v22-b05@25 DURCH** (10:11-10:21, `tools/run_v28b02s100_vs_v22s25.sh`,
+  601,3 s, 3,007 s je Partie, 10 Threads): **172:28** (86 Prozent), n = 200 Partien aus 100
+  Paaren ohne Frueh-Stopp, McNemar p = 5e-19, gepaarte Differenz +1,44 [+1,24; +1,64], Punkte
+  58,9 gegen 41,2, Strafleiste 9,1 gegen 9,0. Im Register eingetragen.
+- **`tools/night_v28b02s100_vs_v22s25.sh` ist DEFEKT und haengt weiter** (Prozess der alten
+  Sitzung). Sein Prozessfilter (Z.13) enthaelt `self_play.py|paired_gating.py` unmaskiert und
+  trifft die CommandLine des eigenen pwsh-Aufrufs; der Zaehler wird nie 0, die Kante waere nie
+  gestartet. Gemessen 04:18: maskiertes Muster 0 Kettenprozesse, Originalmuster 4. Ein
+  Doppelstart ist ausgeschlossen (derselbe Grund), sein Poll kostet alle 120 s einen Kern von 12.
+  **Zu tun:** Prozess beenden (der Versuch der Sitzung wurde vom Berechtigungssystem abgelehnt)
+  und den Filter im Skript maskieren oder das Skript loeschen -- pfadgenaue Freigabe noetig.
 
 ### ERSTE AUFGABE DER NEUEN SITZUNG (in dieser Reihenfolge; Details je Punkt im Fahrplan)
 
-1. **WATCHER** auf beide Laeufe (Bedingung: vier `depth_curve_*_v28b02.json` UND das seed58-Artefakt
-   vorhanden UND keine Prozesse `self_play.py|paired_gating.py|night_sims_curve|night_v28b02s100`
-   in der Prozessliste; Stillstand melden, wenn 45 min kein neues Artefakt). Bis dahin nur
-   Dateiarbeit. (Der Prozess-Grep darf sich nicht selbst treffen: Muster wie `[n]ight_...`.)
-2. **Register (`tools/elo_tracker.py add`, Muster: Zeilen vom 2026-09-13 in `evaluations/elo_history.csv`):**
-   drei Sims-Kanten v28-b02 sims 100/200/600 (player_a) gegen v28-b02 sims 400 (player_b),
-   `--units-from-paired-artifact <seed55/56/57-JSON>`, KEIN `--early-stop`, Knobs
-   `spec:frozen_champions/v28-b02/spec.json`, Laufzeit in den Kommentar (1.121 / 1.386 / 2.364 s);
-   dann die Kante v28-b02 sims 100 gegen v22-b05_live sims 25 (`--units-from-paired-artifact`
-   seed58-JSON, Knobs beide Specs im Kommentar nennen). @200 und @600 bleiben an EINER Kante
-   (Nutzer 02:25). `report` lesen, Champion-Zeile oben und README/Overview/Manifest nur, wenn
-   sich der Champion-Wert aendert.
-3. **par.8e abschliessen:** Teil B (volle Spalten je Seite mit KI, Punkte, Zeilen, Strafleiste je
-   Punkt aus den Sanity-Artefakten; Spaltensonde/Plattenpunkte der Teil-A-Laeufe aus den
-   Artefakten daneben), Verdikt nach der Lesart (Saettigung bei 400 in Teil A; Teil B entscheidet
-   die Korpusfrage), **Sockel-Vorschlag 400 gegen 600 mit gemessenen s je Partie** (Schwarm ist
-   entschieden: 100), Kopf und Index, STATUS, Chronik, `docs/measured_runtimes.md` (sieben Zeilen).
-   Tor-0/Tor-2a-Hinweis in `PREREG_v29_window.md`: ein Sockel bei 400 reisst die Bezugswerte des
-   v28-Generators nach oben, das ist erwartet.
+1. ~~**WATCHER** auf beide Laeufe~~ **ERLEDIGT 2026-09-13:** die Sims-Kette ist um 04:08 durch
+   (vier `depth_curve_*_v28b02.json`). Die wartende Kante ist **NICHT** von selbst angelaufen
+   (defektes Wartescript, siehe oben); sie laeuft seit 10:11 direkt. Dazwischen hing die Sitzung
+   von 04:53 bis 10:11 (Nutzer: "da gab es einen haenger"), der Befund von 04:18 blieb also
+   liegen. (Der Prozess-Grep darf sich nicht selbst treffen: Muster wie `[n]ight_...` -- genau
+   daran ist das Wartescript gescheitert.)
+2. ~~**Register**~~ **ERLEDIGT 2026-09-13, 10:30:** vier Kanten eingetragen (40 Match-Zeilen).
+   Neue Knoten: `v28-b02@100` 1298 [1251, 1350], `@200` 1289 [1209, 1367], `@600` 1389
+   [1306, 1474]. **Der Champion-Wert ist dadurch von 1353 auf 1394 [1350, 1445] gestiegen**
+   (1.860 Partien), weil die drei neuen Knoten unter `@400` haengen; nachgezogen in README
+   Z.26, `docs/project_overview.md` (zwei Stellen), `models/frozen_champions/v28-b02/manifest.json`
+   Block `elo` samt `ladder_after_refit`, und in der Champion-Zeile oben. Ebenso nachgezogen:
+   `PREREG_difficulty_levels.md` (der Satz "fuer keinen Champion gibt es eine Elo-Kante bei
+   anderer Sim-Zahl" ist seit diesen Kanten ueberholt).
+3. ~~**par.8e abschliessen**~~ **ERLEDIGT 2026-09-13, 04:15:** Verdikt vierter Fall, Betriebspunkt
+   100 bleibt, Sockel-Vorschlag 100 Sims (oben unter den offenen Entscheiden). Nachgezogen sind
+   Kopf und Index, `docs/measured_runtimes.md` (sieben Zeilen), `PREREG_v29_window.md` P2 und
+   `docs/generation_loop.md`. **Korrektur zur Uebergabe:** der dort aufgetragene Hinweis, ein
+   Sockel bei 400 reisse die Tor-0/Tor-2a-Bezugswerte NACH OBEN, ist durch die Messung widerlegt
+   (er stand auf Teil A allein); eingetragen ist die gemessene Richtung, also nach unten. **Offen
+   aus diesem Punkt:** Plattenpunkte je Kriterium fuer die drei Teil-A-Laeufe nachfahren (das
+   Kettenskript rief `plate_points_from_arena.py` ohne `--out` auf, `night_sims_curve_v28b02.sh`
+   Z.33; je unter 5 s auf vorhandenen Logs) und die Rueckwaerts-Stelle
+   `PREREG_difficulty_levels.md` Z.137 ("Fuer keinen Champion gibt es eine Elo-Kante bei anderer
+   Sim-Zahl") im selben Zug wie die Register-Zeilen nachziehen.
 4. **Wheel 1 (Maschine frei!):** P.10-Fix ist in `engine/src/state.rs` (`restore_top_plate_type`,
    Test `determinization_keeps_the_public_type_of_the_top_plate`); dazu Record-Feld `tiled_max_row`
    additiv in `serialize.rs::state_to_json` (P.14, `PREREG_stack_top_feature.md` par.15). Tore:
@@ -117,12 +129,43 @@ Uebergabe-Commit: 10 Commits, kein Push (Nutzer pusht selbst).
 
 ### OFFENE NUTZER-ENTSCHEIDE
 
-- **Sims der v29-Erzeugung: Neumessung VORREGISTRIERT und gebaut** (Nutzer 2026-09-13: "dann also
-  beide ... miss nur bei 100 sims, 200, 400 und 600"; `PREREG_search_depth_column_optimum.md`
-  par.8e, Kette `tools/night_sims_curve_v28b02.sh`). Entscheidungsregel des Nutzers dort woertlich
-  ("eklatant besser" -> hoehere Erzeugungszeit in Kauf); faellt die Kurve fuer hoehere Sims aus,
-  wird auch der Sockel des v29-Fensters mit den hoeheren Sims erzeugt (Kosten vorher in
-  `PREREG_v29_window.md`). Pflicht-Auswertung: Vorschlag Sims Sockel/Schwarm getrennt.
+- **NEU 2026-09-13, 10:35: `MOSAIC_STACK_DRAW_RESEARCH` fuer die v29-Erzeugung -- Vorgabe und
+  Praxis widersprechen sich.** `PREREG_chance_nodes.md` Z.1126 schreibt vor, der Knopf "gehoert
+  in die Umgebung BEIDER Laeufe (Sockel und Schwarm)", und ihr Verdikt fuehrt ihn als Teil des
+  Erzeugungsrezepts seit v23. Geprueft ist aber: `tools/night_v28_generate.sh` setzt ihn NICHT
+  (exportiert nur `PYTHONIOENCODING`), der Befehl in `PREREG_v29_window.md` par.5 nennt ihn
+  nicht, und das Lauf-Manifest der v28-Erzeugung fuehrt ihn in `engine_config` gar nicht -- er
+  ist dort weder als gesetzt noch als ungesetzt belegbar. **VERSCHAERFT 10:55 nach Grep ueber
+  Arbeitsbaum UND Git-Historie (Nutzer-Auftrag): der Knopf stand NIE in einem Erzeugungsskript,
+  in keiner Generation** -- `night_v25_socket/excursion`, `night_v26_swarm/chain`,
+  `night_v27_generate/chain`, `night_v28_generate/chain` haben je 0 Treffer (letzter Stand je
+  Datei aus `git show`). Der Entscheid-Commit `3c5c44b` ("der Knopf gehoert in die Erzeugung",
+  2026-08-30) fasste nur Doku und eine Sonde an. Gesetzt wird er ausschliesslich von
+  MESS-Instrumenten (`argmax_profile.sh`, `night_v28_measure.sh`, `night_k3d_joker_instrument.sh`,
+  `night_start_search_hull_off.sh`, `night_sims_curve_v28b02.sh`): **gemessen MIT, erzeugt OHNE**.
+  In den Fenster-Preregs verliert er sich nach v25 (v24 und v25 haben die `export`-Zeile, v26 bis
+  v29 nennen ihn nicht). Nicht ausschliessbar ist ein Setzen von Hand in der Shell; belegbar ist
+  es nicht. Vollstaendig registriert in `PREREG_chance_nodes.md`, Nachtrag 2026-09-13.
+  Inhaltlich ist `=1` die korrekte
+  Fassung (ohne ihn bewertet die Suche eine Fortsetzung, die nicht ausgefuehrt wird,
+  `engine/src/self_play.rs` Z.972-995). **Entscheid des Nutzers, weil Rezeptfrage:** setzen
+  wir ihn fuer Sockel und Schwarm? Setzen wir ihn, weicht v29 vom belegbaren v28-Stand ab;
+  setzen wir ihn nicht, weicht die Praxis weiter von der eigenen Vorgabe ab. Unabhaengig davon
+  ist das Manifest GEBAUT: `engine_config_json()` gibt ab Wheel 1 `stack_draw_research` und
+  `stack_draw_reservation` aus (`engine/src/lib.rs`; Getter in `self_play.rs` auf `pub(crate)`).
+  Details in
+  `PREREG_search_depth_column_optimum.md` par.8e, Abschnitt Einschraenkungen.
+
+- **SIMS DES SOCKELS: Messung DURCH, Vorschlag liegt vor, Entscheid offen.** Ergebnis in
+  `PREREG_search_depth_column_optimum.md` par.8e (vierter Fall: Staerke saettigt bei 400, Korpus
+  faellt monoton zugunsten von 100; "eklatant"-Regel 1 von 3, Betriebspunkt 100 bleibt).
+  **Vorschlag: Sockel mit 100 Sims, wie der Schwarm** (`PREREG_v29_window.md` P2, dort auch der
+  Tor-0/Tor-2a-Hinweis). Kosten fuer 4.000 Partien aus gemessenen Sekunden je Partie: @100
+  **4,40 h**, @200 5,82 h, @400 8,29 h, @600 11,74 h; der teurere Punkt liefert den
+  spaltenaermeren Korpus (@400 kostet 3,89 h mehr und bringt 0,2025 volle Spalten je Seite
+  weniger). Offen bleiben damit nur noch **Maschine und Startzeitpunkt** des Sockels (Nutzer:
+  "vermutlich auf der schnelleren Maschine"). Der Schwarm ist unabhaengig davon auf 100
+  entschieden und freigegeben.
 - **Sims-Knoten v28-b02@200 und @600 im Register (Nutzer 2026-09-13, 02:25: "lass sie noch an einer
   kante. das ziehen wir dann in v29 oder v30 nach"):** die drei gepaarten Punkte der Sims-Kette werden
   als Kanten gegen @400 eingetragen; @200 und @600 haengen damit an EINER Kante (weiche Intervalle),
