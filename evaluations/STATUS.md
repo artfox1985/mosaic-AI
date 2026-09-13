@@ -129,6 +129,52 @@ Uebergabe-Commit: 10 Commits, kein Push (Nutzer pusht selbst).
 
 ### OFFENE NUTZER-ENTSCHEIDE
 
+- **NEU 2026-09-13, 12:30, GEPRUEFT und schwerer als der Stack-Draw-Fall: das Lauf-Manifest
+  meldet fuer VIER Rezept-Felder den Env-Default statt des wirksamen Spec-Werts.** Gefunden von
+  einem Opus-Agenten, die tragende Zahl selbst nachgeprueft am Manifest des GERADE LAUFENDEN
+  Sockels (`data/manifest_v28-b02-policy_20260913_120816.json`) gegen
+  `models/start_by_search_on.spec.json`:
+
+  | Feld | Spec (wirksam) | Manifest | 
+  | --- | --- | --- |
+  | `envelope_search_c` | 1,0 | **0,0** |
+  | `envelope_projection_mode` | 1 | **0** |
+  | `envelope_hull_form` | 2 | **1** |
+  | `special_row6_w` | 1,0 | **0,0** |
+
+  Ursache: `engine/src/lib.rs` Z.801/807/812/815 lesen `SearchConfig::from_env()`, die Werte
+  reisen aber per `--spec`-DATEI. Der Kommentar dort verspricht ausdruecklich "pro Seite
+  ueberschreibbar per Spec-Datei (dann steht der Spec-Wert dort)" -- genau das tut der Code
+  NICHT. Felder, deren Env-Default zufaellig dem Spec-Wert gleicht (`score_utility_b` 20,0,
+  `envelope_flush_w` 0,0, `envelope_tiling_w` 0,0), stimmen und verdecken den Fehler.
+
+  **ENTSCHAERFT 12:40 durch die Nutzer-Hypothese "die spec wurde immer nur kopiert im korpus
+  run von v25-v27" -- sie traegt, und der Schaden ist kleiner als zuerst notiert.** Geprueft:
+  (a) alle vier Erzeugungs-Manifeste (v25-b01, v26-b01, v27-b01, v28-b02) zeigen dieselben
+  falschen Werte 0,0 / 0 / 1 / 0,0; (b) `models/v24-b07_brierbest.spec.json` hat GENAU EINEN
+  Commit (d0cbfa3, 2026-09-07) und ist seither unveraendert, ihr Inhalt ist 1,0 / 1 / 2 / 1,0;
+  (c) jedes Manifest traegt den Spec-PFAD in `cli_args.spec`.
+  **Folge: kein Belegverlust.** Die Laeufe v25 bis v28 sind ueber Pfad plus versionierte,
+  unveraenderte Datei vollstaendig rekonstruierbar. Und die zuerst notierte Behauptung, ein Lauf
+  OHNE Spec sei nicht von einem MIT Spec zu unterscheiden, ist ZU SCHARF: `cli_args.spec` waere
+  dann `None`, der Unterschied also sichtbar -- nur eben in `cli_args` und nicht dort, wo die
+  Pflichtpruefung hinsieht.
+
+  **Was bleibt:** `engine_config` behauptet fuer vier Rezept-Felder etwas Falsches, und der
+  Beleg haengt daran, dass die Spec-Datei nie geaendert wird. Das ist Glueck, nicht Design --
+  eine spaetere Aenderung an einer Spec wuerde alle Laeufe entwerten, die sie per Pfad zitieren.
+  **Kein Spielfehler:** die Suche liest die Spec korrekt, die Erzeugung laeuft richtig.
+
+  **Entscheid des Nutzers, Reparatur-Optionen:** (A) `engine_config_json` die aktive Spec
+  uebergeben und deren Werte zeigen; (B) den Spec-INHALT plus sha256 zusaetzlich ins Manifest
+  schreiben (billig, additiv, macht den Lauf unabhaengig von spaeteren Spec-Aenderungen
+  belegbar); (C) die vier Felder aus `engine_config` entfernen, weil sie irrefuehren;
+  (D) nur den Kommentar korrigieren. **Vorschlag des Koordinators: B**, weil es den Beleg
+  vollstaendig macht, ohne den Prozess-Kontext von `engine_config_json` zu aendern.
+  Der vollstaendige Agentenbericht (weitere Nebenbefunde: Gating-Artefakte tragen GAR KEINE
+  Engine-Konfiguration; `MOSAIC_ENVELOPE_REACH_W`/`_SLOT_W` haben keine Spec-Entsprechung und
+  waeren bei Projektions-Modus 2 oder 4 exakt der Stack-Draw-Fall) steht in der Chronik.
+
 - **NEU 2026-09-13, 11:20, STOPP-PUNKT: Anker-Drift nach Wheel 1 ist ROT -- aber als
   SERIALISIERUNGS-ARTEFAKT bewiesen, nicht als Drift.** Der Anker spielt Zug fuer Zug dieselben
   Partien. Belege, alle drei geprueft:
