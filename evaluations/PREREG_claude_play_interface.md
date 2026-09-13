@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1. Das Netz punktet aus Platzierungen statt aus den Wertungsplatten (0:10, 2:8) und nutzt die Null-Klammer als Werkzeug (Arm A live belegt). SICHTGLEICHHEIT GILT IN KEINE RICHTUNG (par.10): vier Stellen sehe ich mehr (Beutel/Turm getrennt, Chipanzahl, Vorderseiten gezogener Platten, Historie), zwei sah das Netz mehr (Stapelmaske, Rueckgabebloecke), seit 2026-09-13 im Fenster. Werkzeug par.9 P.11-14. -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): 3:1 gegen v27-b01, 1:1 gegen v28-b02. Das Netz punktet aus Platzierungen statt aus den Wertungsplatten (0:10, 2:8) und nutzt die Null-Klammer als Werkzeug (Arm A live belegt). SICHTGLEICHHEIT GILT IN KEINE RICHTUNG (par.10): vier Stellen sehe ich mehr (Beutel/Turm, Chipanzahl, Vorderseiten gezogener Platten, Historie), Angleich ENTSCHIEDEN mit v29; die Gegenrichtung (Stapelmaske, Rueckgabebloecke) ist eingebaut. Werkzeug par.9 P.11-14. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -1114,7 +1114,11 @@ Die sechs Partien bleiben als **Beobachtung** gueltig -- die tragenden Befunde (
 Null-Klammer als Werkzeug, Strafleisten-Bilanz) haengen an keiner der sechs Stellen. Als
 **Staerkevergleich** sind sie es nicht: der Vorteil aus par.10a.2/3 wirkt in jeder Runde, und
 par.10b.2 wirkt gegen mich. Eine Siegquote aus dieser Reihe ist damit auch aus diesem Grund keine
-Groesse (par.8.8 nennt schon den Champion-Wechsel). Offen und Nutzer-Entscheid: ob das Fenster
-angeglichen wird (Punkt 4 der Liste ist am billigsten -- gezogene Platten bis zum Aufhoeren nur mit
-Typ zeigen; Punkte 2 und 3 waeren ein bewusstes Verschlechtern der eigenen Anzeige, Punkt 1 und 5
-gehen nur am Netz).
+Groesse (par.8.8 nennt schon den Champion-Wechsel). **ENTSCHIEDEN (Nutzer 2026-09-13, woertlich: "nein brauchst nichts machen. wird mit v29
+geloest"): am Fenster wird nichts geaendert.** Die vier Stellen aus par.10a bleiben also bis
+zur v29-Generation bestehen -- P.9 (Turm je Farbe) und P.11 (Chipanzahl) schliesst der Sicht-Arm
+v29-b03 auf der NETZ-Seite (`PREREG_stack_top_feature.md` par.15/par.16), die Vorderseiten der
+gezogenen Platten haengen an derselben Aktionsmodellierung wie der dortige Befund par.16 Folge 2,
+und die Historie ist ohnehin eine Netzfrage. **Fuer g08-g10 heisst das:** werden sie vor v29
+gespielt, tragen sie dieselbe Ungleichheit wie g02-g07, und dieselbe Einschraenkung gilt --
+Beobachtung ja, Staerkevergleich nein. Kein Handlungsbedarf, kein offener Punkt.
