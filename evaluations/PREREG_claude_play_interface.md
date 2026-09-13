@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1. Das Netz punktet aus Platzierungen, nicht aus den Wertungsplatten (Endwertung 0:10 und 2:8), und nutzt die Null-Klammer als Werkzeug (Arm A live belegt). SICHTGLEICHHEIT GILT IN KEINE RICHTUNG (par.10): vier Stellen sehe ich mehr (Beutel/Turm getrennt, Chipanzahl, Vorderseiten gezogener Platten, Historie), zwei sieht das Netz mehr (Stapelmaske, Rueckgabebloecke). Werkzeug par.9 P.11-14. -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1. Das Netz punktet aus Platzierungen statt aus den Wertungsplatten (0:10, 2:8) und nutzt die Null-Klammer als Werkzeug (Arm A live belegt). SICHTGLEICHHEIT GILT IN KEINE RICHTUNG (par.10): vier Stellen sehe ich mehr (Beutel/Turm getrennt, Chipanzahl, Vorderseiten gezogener Platten, Historie), zwei sah das Netz mehr (Stapelmaske, Rueckgabebloecke), seit 2026-09-13 im Fenster. Werkzeug par.9 P.11-14. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -1079,6 +1079,24 @@ das Netz, zwei sieht das Netz mehr als ich. Alle Pruefstellen in dieser Sitzung 
    vor** -- das sichtkonforme Stapelwissen erreicht mein Fenster ueberhaupt nicht. Genau dieses
    Merkmal ist gegen den v27-Champion frisch eingebaut worden; in g06/g07 spielte also ein Netz
    mit einer Stapelkenntnis, die mein Fenster nicht anzeigt.
+
+**GESCHLOSSEN 2026-09-13 (Nutzer: "die kannst bei dir einbauen").** `show` traegt jetzt beide
+Groessen (`stack_lines`, `tools/claude_play.py`):
+
+    Kuppelstapel 13 verdeckt: 9 wild / 4 spezial | Designs: #0 #1 #2 #3 #5 #6 #9 #10 #11 #13 ...
+      Stapelwissen (von oben nach unten): 4 unbekannt | EIGEN 2: S W | fremd 1: 1W 0S
+
+Die Design-Nummern kommen aus der Maske, die Aufteilung wild/spezial aus dem Anteil mal Hoehe;
+die Farbanordnung steht nur bei Platten dabei, die AKTUELL offen liegen (Auslage, gezogene,
+gelegte -- `known_designs`), nie bei einer, die nie zu sehen war. **Waechter:** `dome_pool_view`
+wird fuer `state.current_player` gerechnet (`serialize.rs:99`), das `own`-Flag und die
+Reihenfolge `types` gehoeren also dem Spieler AM ZUG; ist die KI dran oder ist die Partie zu
+Ende, bleibt die zweite Zeile weg -- sonst laese ich die Blockreihenfolge des Gegners mit, was
+die Asymmetrie nur umgedreht haette. Fuenf Tests dazu in
+`tools/tests/test_claude_play_board_hints.py` (Maske, Wild-Aufteilung, Design nur wenn offen,
+Waechter am Zug, Waechter am Partieende); Probe an `gsmoke2` gegengerechnet: 13 verdeckte
+Designs, die fuenf fehlenden Ids liegen offen und sind alle Spezialplatten, also 9 wild / 4
+spezial -- konsistent mit `dome_stack_count` und dem Anteil.
 
 ### par.10c Was NICHT als Asymmetrie zaehlt
 

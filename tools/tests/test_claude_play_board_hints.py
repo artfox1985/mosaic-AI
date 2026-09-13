@@ -124,6 +124,60 @@ class SpecialAndCriteria(unittest.TestCase):
         self.assertEqual(cp._criterion_state(pl, "aussen"), "0 Fliesen am Rand")
 
 
+def stack_state(current_player, phase="drafting"):
+    """Zustand mit Kuppelstapel-Wissen: 4 verdeckte Platten, ein eigener und ein fremder Block."""
+    return {
+        "phase": phase,
+        "current_player": current_player,
+        "dome_stack_count": 4,
+        "dome_wild_remaining_frac": 0.75,
+        "dome_pool_mask": [1 if i in (2, 5) else 0 for i in range(18)],
+        "dome_display": [{"id": 5, "spaces": [space("gelb"), space("rot"),
+                                              space(None, "WILD"), space("blau")]}],
+        "players": [],
+        "dome_pool_view": {
+            "unknown_prefix": 1,
+            "blocks": [
+                {"own": True, "len": 2, "special": 1, "wild": 1, "types": ["special", "wild"]},
+                {"own": False, "len": 1, "special": 0, "wild": 1, "types": None},
+            ],
+        },
+    }
+
+
+class StackKnowledge(unittest.TestCase):
+    """Die Stapel-Anzeige traegt die Groessen, die der Encoder seit v28-b02 bekommt
+    (`features.rs:274-286` Maske und Wild-Anteil, `features.rs:744-754` Rueckgabe-Wissen);
+    bis 2026-09-13 fehlten sie im Fenster (Sicht-Audit par.10b)."""
+
+    def test_mask_and_wild_split(self):
+        line = cp.stack_lines(stack_state(0), {"me": 0})[0]
+        self.assertIn("3 wild / 1 spezial", line)   # 0,75 von 4
+        self.assertIn("#2", line)
+        self.assertIn("#5", line)
+
+    def test_design_shown_only_when_the_plate_lies_open(self):
+        line = cp.stack_lines(stack_state(0), {"me": 0})[0]
+        # #5 liegt in der Auslage, sein Design ist oeffentlich; #2 lag nie offen.
+        self.assertIn("#5[gr/*b]", line)
+        self.assertNotIn("#2[", line)
+
+    def test_pool_view_is_shown_when_claude_is_to_move(self):
+        lines = cp.stack_lines(stack_state(0), {"me": 0})
+        self.assertEqual(len(lines), 2, lines)
+        self.assertIn("1 unbekannt", lines[1])
+        self.assertIn("EIGEN 2: S W", lines[1])
+        self.assertIn("fremd 1: 1W 0S", lines[1])
+
+    def test_pool_view_is_hidden_while_the_net_is_to_move(self):
+        """WAECHTER: `dome_pool_view` gilt fuer den Spieler AM ZUG (serialize.rs:99) -- ist die
+        KI dran, waere das `own`-Flag ihres, und die Reihenfolge ihrer Rueckgabe."""
+        self.assertEqual(len(cp.stack_lines(stack_state(1), {"me": 0})), 1)
+
+    def test_pool_view_is_hidden_after_the_game(self):
+        self.assertEqual(len(cp.stack_lines(stack_state(0, phase="end"), {"me": 0})), 1)
+
+
 class FakeGame:
     """Nur so viel Engine, wie `resolve_moon_order` liest."""
 
