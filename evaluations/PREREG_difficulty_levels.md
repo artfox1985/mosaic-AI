@@ -208,7 +208,7 @@ Genau die liefert par.5 Stufe 2.
 
 | Stufe | Anzeige | Spieler | Suche | Elo-Knoten |
 | --- | --- | --- | --- | --- |
-| 1 | Anfaenger | Artefakt **`hv3_generator`** mit seiner Spec (hv2 GESTRICHEN, s. par.4.1a) | hv3, Sim-Zahl offen (par.12a) | `Heuristik_hv3_generator@150` 972 [935, 1011], Segment 2 |
+| 1 | Anfaenger | Artefakt **`hv3_generator`** mit seiner Spec (hv2 GESTRICHEN, s. par.4.1a) | **hv3 @150** (Nutzer 2026-09-13, par.12c) | `Heuristik_hv3_generator@150` 972 [935, 1011], Segment 2 |
 | 2 | Erfahren | aktueller Champion mit seiner Spec | @100, Wurzelrauschen AN, Besuchs-Sampling `action-temp 2` ueber die ganze Partie, Weg C (genau eine Abweichung je Partie, Stelle aus DEVIATE_ROUND_MASS/DECAY wie im Self-Play, 6 Kandidaten) | zu messen (Stufe 2) |
 | 3 | Experte | aktueller Champion mit seiner Spec | @100, Wurzelrauschen AN, argmax ab Halbzug 1 (Traeger-Stil ohne Weg C) | zu messen (Stufe 2) |
 | 4 | Meister | aktueller Champion mit seiner Spec | @400, argmax, ohne Wurzelrauschen (wie Arena und Elo-Register) | 1405 [1361, 1453] heute; am Projektende der letzte Champion |
@@ -898,3 +898,58 @@ Zwei Wege, Nutzer-Entscheid:
 heute nicht enthalten), die Stufen-Specs unter `models/levels/`, und die drei fehlenden
 Stilmittel fuer die oberen Stufen (par.12 Punkt e). Die Sim-Zahlen der hv3-Stufen sind
 ebenfalls offen (par.12a).
+
+### par.12c ENTSCHEIDE 2026-09-13 (Nutzer): hv3 @150 als Default der Heuristik-Stufe, Weg A fuer den Umbau
+
+Woertlich: **"Hv1 als default macht keinen Sinn. Der ist archiviert. Nimm hv3 als default mit
+150 Sims. Plane den groesseren Umbau ein."**
+
+**Umgesetzt wird das als Default der STUFE, nicht als neuer Engine-weiter Default.** Der
+Unterschied ist nicht kosmetisch, deshalb hier ausgeschrieben (geprueft 2026-09-13):
+
+| Traeger | `heuristik_variante` in seiner Spec |
+| --- | --- |
+| `models/frozen_heuristics/hv4_anchor/spec.json` (aktiver Elo-Anker) | **hv1** |
+| `models/frozen_champions/v28-b02/spec.json` (Champion) | **hv1** |
+| `models/frozen_heuristics/hv3_generator/spec.json` | hv3 |
+
+Der Anker und der Champion tragen hv1 in ihrer EIGENEN Spec und sind von einem geaenderten
+Env-Default nicht betroffen -- eine Spec gewinnt immer. Betroffen waeren nur Pfade OHNE Spec.
+Den Env-Default in `SearchConfig::from_env` (`net_mcts.rs` Z.739) anzufassen, waere trotzdem eine
+ENGINE-Aenderung mit Anker-Drift-Pflicht und Wirkung auf jeden spec-losen Aufrufer, also auch auf
+Sonden und Tests. Das ist hier nicht gemeint und wird nicht getan.
+
+**Gemeint und registriert:** die Heuristik-Stufe der GUI spielt **hv3 mit 150 Sims**, und das ist
+zugleich der Rueckfall, wenn keine Stufen-Spec geladen ist. Damit steht die Anfaengerstufe
+vollstaendig: Artefakt `hv3_generator`, Variante hv3, 150 Sims, Elo-Knoten
+`Heuristik_hv3_generator@150` = 972 [935, 1011].
+**Falls doch der Engine-weite Default gemeint war**, ist das ein eigener Entscheid mit
+Anker-Drift und Paritaets-Fixture als Toren -- nicht nebenbei.
+
+**Weg A ist gewaehlt** ("Plane den groesseren Umbau ein"): die Spec-Datei reist bis in den
+Zugpfad, statt ueber einen prozessweiten Env-Knopf zu gehen. Das folgt par.4.2 ("eine Stufe ist
+eine Spec-Datei, die GUI und Arena gleich lesen") und respektiert den Einwand in
+`net_mcts.rs` Z.736-739.
+
+### Bauplan Weg A (Reihenfolge bindend, Tore am Ende)
+
+1. **`PyGame` bekommt die aktive Suchkonfiguration als Feld** plus eine pyo3-Lademethode
+   (`load_search_spec(path)`), die `SearchConfig::from_spec_file` nutzt. Ohne Aufruf bleibt
+   `from_env()` der Inhalt -- Bestandsverhalten bit-identisch.
+2. **Die GUI-Zugpfade lesen das Feld statt `from_env`:** `ai_drafting_net_step`
+   (`py.rs` Z.913-915) und `ai_drafting_step` (Z.810). Letzterer ruft dann
+   `mcts::search_with_tree_variant` (bereits gebaut, par.12b) mit der Variante aus der Config.
+3. **`server.py`:** `heuristik_variante` in die Spec-Abbildung (Z.205-232) UND der Aufruf der
+   neuen Lademethode beim Stufenwechsel; die Stufen-Spec erweitert die Champion-Spec, Felder die
+   sie nicht traegt werden zurueckgesetzt (Muster `_apply_champion_spec_env`).
+4. **Stufen-Specs** unter `models/levels/`: `beginner.spec.json` (hv3, 150 Sims) ist nach diesem
+   Entscheid schreibbar; `advanced`/`expert`/`master` brauchen noch die Sim-Zahlen und die drei
+   Stilmittel-Felder (par.12 Punkt e, par.12a).
+5. **Tore, alle Pflicht:** Lib-Tests, `--no-run --all-targets`, Wheel, **Netz-Paritaets-Fixture**
+   (darf sich NICHT aendern -- der Umbau ist per Konstruktion bestandsgleich, eine Abweichung
+   waere ein Fehler), **Anker-Drift UND Konservierung**, `check_conventions.py`.
+6. **Danach erst** die Kanten -- und die laufen nach Nutzer-Entscheid 2026-09-13 gegen den
+   v30-Champion, nicht gegen v29.
+
+**Aufwand (ANNAHME):** Schritte 1-3 rund 3-4 h Rust plus Server, Schritt 5 rund 6 min gemessen.
+Alles davon braucht eine freie Maschine; waehrend der v29-Erzeugung wird nur geschrieben.
