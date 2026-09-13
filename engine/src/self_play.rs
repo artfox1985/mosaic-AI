@@ -2393,7 +2393,7 @@ fn sanitize_deviate_candidates(raw: f64) -> Option<usize> {
 /// Zufallszahl zusaetzlich gezogen (siehe [`deviation_site`]s Fruehausstieg),
 /// der Zufallsstrom der Partie verschiebt sich also nicht. KataGo faehrt 0,05.
 /// Ausserhalb `[0,1]` -> Default mit EINMALIGER Warnung (OnceLock).
-fn deviate_prob() -> f64 {
+pub(crate) fn deviate_prob() -> f64 {
     static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         let raw = crate::net_mcts::read_f64_env("MOSAIC_DEVIATE_PROB", 0.0);
@@ -2417,7 +2417,7 @@ fn deviate_prob() -> f64 {
 /// Mitte der Paper-Spanne; dass eine gezogene Breite messbar besser waere,
 /// wird hier nicht behauptet und ist nicht gemessen.
 /// `< 2`/nicht endlich -> Default mit EINMALIGER Warnung.
-fn deviate_candidates() -> usize {
+pub(crate) fn deviate_candidates() -> usize {
     static CELL: std::sync::OnceLock<usize> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         let raw = crate::net_mcts::read_f64_env("MOSAIC_DEVIATE_CANDIDATES", 6.0);

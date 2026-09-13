@@ -687,6 +687,51 @@ pub struct SearchConfig {
     ///
     /// Default (`from_env`, `search_config_off`) ist `Hv1` -- der Elo-Anker.
     pub heuristic_variant: crate::mcts::HeuristicVariant,
+
+    // -- Stilmittel der Schwierigkeitsstufen (Schritt 1b) -----------------
+    //
+    // PREREG_difficulty_levels.md par.4.2 und par.12c Bauplan Weg A: eine
+    // Stufe ist eine Spec-Datei, die GUI und Arena GLEICH lesen. Dafuer
+    // muessen die Stilmittel Felder der Spec werden statt Parameter des
+    // Suchaufrufs und Env-Knoepfe der Self-Play-Schleife.
+    //
+    // ALLE sechs sind OPTIONAL mit bestandserhaltendem Default -- dieselbe
+    // Begruendung wie bei `dead_cell_w`/`round_est_c` weiter oben: die
+    // eingefrorenen Artefakt-Specs und die lebenden `models/*.spec.json`
+    // tragen sie nicht, und mit dem Default beschreibt eine Spec ohne sie
+    // bitgenau das Verhalten, das sie schon immer beschrieben hat.
+    //
+    // NOCH NICHT VERDRAHTET (Schritt 1c): die Felder werden gelesen, aber von
+    // den Suchaufrufen noch nicht benutzt -- `root_noise` und `sims` sind dort
+    // weiter Parameter, Temperatur und Weg C leben weiter in der
+    // Self-Play-Schleife. Schritt 1b ist bewusst davon getrennt, weil er fuer
+    // sich bestandserhaltend ist: die Netz-Paritaets-Fixture darf sich danach
+    // NICHT aendern.
+    /// Simulationszahl DIESER Stufe. `None` = nicht gesetzt, der Aufrufer
+    /// entscheidet wie bisher. Bewusst `Option` statt einer 0 als Sentinel:
+    /// null Simulationen ist kein sinnvoller Wert, und ein Sentinel verdeckte
+    /// den Unterschied zwischen "nicht gesetzt" und "gesetzt".
+    pub sims: Option<u32>,
+    /// Wurzelrauschen DIESER Stufe. `None` = nicht gesetzt, der Aufrufer
+    /// entscheidet (die GUI ruft heute `false`).
+    pub root_noise: Option<bool>,
+    /// Temperatur-MODUS der Zugwahl, kein Faktor: 0 = rohe Besuchszahlen
+    /// (bitidentisch), 1 = Staffel wie im Heuristik-Pfad, 2 = glatte Form.
+    /// Env-Default ueber [`action_temp_mode`]. Achtung: "argmax" ist NICHT
+    /// der Wert 0 dieses Feldes, sondern das Feld darunter -- die beiden
+    /// Regler sitzen an verschiedenen Stellen (par.12c).
+    pub action_temp: u8,
+    /// Ab diesem Halbzug argmax statt Besuchs-Sampling; 0 = aus.
+    /// Env-Default ueber [`tau_argmax_from_move`].
+    pub tau_argmax_from_move: u32,
+    /// Weg C: Wahrscheinlichkeit je Partie, dass GENAU EIN Drafting-Zug von
+    /// der Suche abweicht; 0.0 = aus, dann wird keine einzige Zusatz-
+    /// Zufallszahl gezogen. Env-Default ueber `self_play::deviate_prob`.
+    pub deviate_prob: f64,
+    /// Weg C: wie viele legale Aktionen an der Abweichungsstelle gezogen
+    /// werden. Default 6, nicht 0 -- wirkt nur bei `deviate_prob > 0`.
+    /// Env-Default ueber `self_play::deviate_candidates`.
+    pub deviate_candidates: u32,
 }
 
 impl SearchConfig {
@@ -737,6 +782,18 @@ impl SearchConfig {
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+            // Stilmittel (Schritt 1b): `sims` und `root_noise` haben keinen
+            // Env-Knopf -- sie sind heute Parameter des Suchaufrufs und bleiben
+            // hier `None`, so wie `heuristic_variant` hart auf `Hv1` steht. Die
+            // vier anderen erben ihren heutigen Env-Default ueber die
+            // bestehenden Getter, damit `from_env` weiter genau das
+            // beschreibt, was der Prozess ohne Spec tut.
+            sims: None,
+            root_noise: None,
+            action_temp: action_temp_mode(),
+            tau_argmax_from_move: tau_argmax_from_move().unwrap_or(0) as u32,
+            deviate_prob: crate::self_play::deviate_prob(),
+            deviate_candidates: crate::self_play::deviate_candidates() as u32,
         }
     }
 
@@ -775,6 +832,13 @@ impl SearchConfig {
             "return_order_mode",
             "start_by_search",
             "heuristik_variante",
+            // Stilmittel der Stufen (Schritt 1b, par.4.2).
+            "sims",
+            "root_noise",
+            "action_temp",
+            "tau_argmax_from_move",
+            "deviate_prob",
+            "deviate_candidates",
         ];
         for key in obj.keys() {
             if !KNOWN_FIELDS.contains(&key.as_str()) {
@@ -1049,6 +1113,58 @@ impl SearchConfig {
                  nicht mehr spielbar -- erlaubt: 'hv1', 'hv3'.{hint}"
             ));
         };
+        // Stilmittel der Stufen (Schritt 1b). Alle sechs OPTIONAL; fehlt
+        // eines, gilt der Wert aus `from_env` -- also das Bestandsverhalten.
+        let spec_u32 = |name: &str, lo: f64, hi: f64| -> Result<Option<u32>, String> {
+            match obj.get(name) {
+                None => Ok(None),
+                Some(v) => {
+                    let x = v
+                        .as_f64()
+                        .ok_or_else(|| format!("Spec-Datei {path}: '{name}' ist keine Zahl"))?;
+                    if x.fract() != 0.0 || !(lo..=hi).contains(&x) {
+                        return Err(format!(
+                            "Spec-Datei {path}: '{name}' muss eine ganze Zahl                              zwischen {lo} und {hi} sein, ist {x}"
+                        ));
+                    }
+                    Ok(Some(x as u32))
+                }
+            }
+        };
+        let sims = spec_u32("sims", 1.0, 1_000_000.0)?;
+        let root_noise = match obj.get("root_noise") {
+            None => None,
+            Some(v) => Some(
+                v.as_bool()
+                    .ok_or_else(|| format!("Spec-Datei {path}: 'root_noise' ist kein Bool"))?,
+            ),
+        };
+        // Das Feld ist u8, der Helfer liefert u32 -- der Cast steht hier und
+        // nicht im Helfer, damit der Helfer fuer alle Zahlenfelder gilt.
+        let action_temp = spec_u32("action_temp", 0.0, 2.0)?
+            .map(|v| v as u8)
+            .unwrap_or_else(action_temp_mode);
+        let tau_argmax_from_move = spec_u32("tau_argmax_from_move", 0.0, 1_000_000.0)?
+            .unwrap_or_else(|| tau_argmax_from_move().unwrap_or(0) as u32);
+        let deviate_prob = match obj.get("deviate_prob") {
+            None => crate::self_play::deviate_prob(),
+            Some(v) => {
+                let x = v
+                    .as_f64()
+                    .ok_or_else(|| format!("Spec-Datei {path}: 'deviate_prob' ist keine Zahl"))?;
+                if !(0.0..=1.0).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'deviate_prob' muss in [0, 1] liegen, ist {x}"
+                    ));
+                }
+                x
+            }
+        };
+        // Untergrenze 2 wie `self_play::sanitize_deviate_candidates`: unter zwei
+        // Kandidaten gibt es nichts zu filtern, das waere keine Abweichungsregel.
+        let deviate_candidates = spec_u32("deviate_candidates", 2.0, 1_000_000.0)?
+            .unwrap_or_else(|| crate::self_play::deviate_candidates() as u32);
+
         Ok(Self {
             implicit_minimax_alpha,
             long_row_init_shaping_w,
@@ -1070,6 +1186,12 @@ impl SearchConfig {
             return_order_mode,
             start_by_search,
             heuristic_variant,
+            sims,
+            root_noise,
+            action_temp,
+            tau_argmax_from_move,
+            deviate_prob,
+            deviate_candidates,
         })
     }
 }
@@ -7530,6 +7652,15 @@ mod tests {
             return_order_mode: 0,
             start_by_search: 0,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+            // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
+            // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in
+            // der nichts an ist, und darf nicht von der Umgebung abhaengen.
+            sims: None,
+            root_noise: None,
+            action_temp: 0,
+            tau_argmax_from_move: 0,
+            deviate_prob: 0.0,
+            deviate_candidates: 6,
         }
     }
 
