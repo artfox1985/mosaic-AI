@@ -760,3 +760,42 @@ Zusammenlegung aussen vor blieb.
 **Nicht geprueft:** ob der Tiling-Pfad (`ai_tiling_step`) in beiden gleich ist, und ob die
 Startsetzung ueber `ai_start_tile_json` dieselbe Suche fuehrt wie `StartSearchParams::for_net`
 in der Arena.
+
+## par.12 STUFE 0: INVENTUR (2026-09-13, Nutzer-Freigabe "Fang an mit nummer 22"; keine Rechenlast)
+
+**Nutzer-Entscheid im selben Zug, der den Zuschnitt von par.5 aendert: "Durchmessen wuerd ich es
+erst mit v30, da das unser Release Modell wird."** Der BAU (par.4.2/4.3) laeuft also jetzt, die
+KANTEN (par.5 Stufen 1-3) erst gegen den v30-Champion. Das ist konsistent: die Stufen 2 bis 4
+haengen am amtierenden Champion, und den loest v30 ab -- Kanten gegen v29 waeren mit der
+Promotion wertlos. Die Stufe-4-Mensch-Validierung verschiebt sich entsprechend.
+
+### Die fuenf Punkte, jeder mit Pruefstelle
+
+| # | Frage | Befund | Pruefstelle |
+| --- | --- | --- | --- |
+| a | Artefakt des Anfaenger-Spielers vollstaendig? | **JA** fuer `hv3_generator`: `spec.json`, `manifest.json`, `golden_probe/`, Wheel `mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl`, dazu `venv/`. Manifest traegt `rolle`, `spec`, `wheel`, `contract_hash`, `engine_config`, `golden_probe`, `protokoll`, `freeze_date`. | `models/frozen_heuristics/hv3_generator/` |
+| b | Identitaet `hv2_generator` = Elo-Knoten `Heuristik_v2huelle`? | **PLAUSIBEL, nicht bewiesen.** Das Manifest nennt als Rolle "Erzeuger des v22-Korpus (24.000 Partien, 2026-08-25/26)", Spec `heuristik_variante: hv2`, Einfrierdatum 2026-08-26. Die Alt-Register-Kante vom 2026-08-25 (`v21_2d_brierbest@400` gegen `Heuristik_v2huelle@150`, 255:152) stammt aus derselben Kampagne. **Aber:** `git_dirty: true` beim Einfrieren -- der Baum trug unversionierte Aenderungen, ein Bit-Beweis ist damit nicht zu fuehren. | `models/frozen_heuristics/hv2_generator/manifest.json`, `archive/elo_history_pre_phantomfix.csv:7` |
+| c | Welche Heuristik-Variante spielt die GUI heute? | **hv1, HART VERDRAHTET.** Der GUI-Heuristik-Pfad `ai_drafting_step` ruft `search_with_tree`, und die ruft `build_tree(..., HeuristicVariant::Hv1)`. Die Funktion nimmt die Variante NICHT als Parameter; `py.rs` enthaelt keinen Treffer auf `resolve_heuristic_variant` oder `set_heuristic_variant`. Auch `server.py` kann sie nicht setzen: die Spec-Abbildung dort fuehrt `heuristik_variante` nicht (0 Treffer). | `engine/src/py.rs:763` und `:810`, `engine/src/mcts.rs:938`, `server.py` Z.205-232 |
+| d | Liest der DRAFTING-Pfad der GUI die Knoepfe zur Suchzeit? | **NETZ-Pfad JA** (`net_search_with_tree` liest `SearchConfig::from_env()`, und `server.py` schreibt die Champion-Spec beim Start in die Umgebung). **HEURISTIK-Pfad NEIN**: `search_with_tree` nimmt gar keine `SearchConfig` entgegen (nur `state`, `sims`, `c`, `rng`, Tiefe, TopK, Log). Die Spec-Knoepfe wirken also nur, wenn ein Netz spielt. | `engine/src/net_mcts.rs:5481`, `server.py:289`, `engine/src/mcts.rs:925-938` |
+| e | Wo sitzen Wurzelrauschen, `action_temp`, `tau_argmax_from_move` und Weg C -- und was erreicht ein Einzelzug-Aufruf NICHT? | **Wurzelrauschen:** erreichbar, aber hart auf `false` (`py.rs:915`). **Die drei anderen erreichen den GUI-Einzelzug GAR NICHT:** sie sitzen in der Self-Play-Zugwahl (`self_play.rs:5249` ff.: `deterministic`-Zweig, `tau_argmax_override`, Sampling ueber `weights`), waehrend der GUI-Pfad ueber `select_final_root_child` immer argmax spielt. Weg C (`deviate_prob`) ist eine Partie-Eigenschaft der Self-Play-Schleife und hat im Einzelzug-Einstieg keinen Ort. | `engine/src/py.rs:915`, `engine/src/self_play.rs:5249-5270`, `engine/src/net_mcts.rs:5515` |
+
+### Was daraus die Umbau-Liste fuer par.4.2 wird
+
+1. **Der Heuristik-Pfad braucht einen Variantenparameter.** Heute ist hv1 einbetoniert; der
+   Zuschnitt will `hv3_generator @150` als Anfaenger. Ohne diesen Umbau ist die unterste Stufe
+   nicht baubar. Die Fehlerklasse ist bekannt und dokumentiert: derselbe Einstieg nahm die
+   Variante schon einmal nicht entgegen, und "ein `--heuristik-variante hv3` ohne `--model`
+   haette still ein hv1-Korpus erzeugt" (`engine/src/lib.rs:84-89`).
+2. **Drei der vier Stilmittel muessen in den Einzelzug-Einstieg gereicht werden**
+   (Besuchs-Sampling, argmax-ab-Halbzug, Weg C). Wurzelrauschen ist schon da, steht aber fest
+   auf aus.
+3. **Die Spec-Abbildung in `server.py` braucht `heuristik_variante`**, sonst kann die
+   Stufentabelle die Anfaengerstufe nicht ueber die Spec setzen.
+
+### Offen, Nutzer-Entscheid (unveraendert aus par.4.1)
+
+- **Namensschema der Elo-Knoten** je Stufe.
+- **Anfaenger hv2 gegen hv3**: der Kopf dieser Prereg nennt seit dem Nachtrag 2026-09-13
+  `hv3_generator`, die Tabelle in par.2.5 noch `hv2_generator`. Punkt (b) oben spricht fuer
+  hv3, weil dessen Artefakt sauber eingefroren ist, waehrend hv2 mit `git_dirty: true`
+  eingefroren wurde.
