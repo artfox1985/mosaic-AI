@@ -114,13 +114,29 @@ oeffentlichen Typ der obersten Stapelplatte fest), Record-Feld `tiled_max_row` (
 gelesen), Stapelzug-Knoepfe im Lauf-Manifest. Vertragshash `39648b95bbba1acf` unveraendert,
 `input_size` 755. Netz-Paritaets-Fixture bewusst neu: `4750ffc6ec094a83`.
 
-## 5. PREREG-BESTAND (Ziel rund 7 OFFEN)
+## 5. PREREG-BESTAND (11 OFFEN laut Index 2026-09-13, Ziel rund 7)
 
-`python tools/generate_prereg_index.py` haelt `evaluations/PREREG_INDEX.md` aktuell. OFFEN sind
-im Kern: `v29_window` (laufender Zyklus), `stack_top_feature` (Sicht-Arm v29-b03, dazu die
-beiden Regelbefunde aus par.16/16a), `claude_play_interface`, `round_estimate_leaf_term`,
-`round_transition_search_sampling`, `difficulty_levels`, `moon_stack_order`,
-`dome_return_order`, `corpus_behaviour_audit`, `code_cleanup_closeout`.
+`python tools/generate_prereg_index.py` haelt `evaluations/PREREG_INDEX.md` aktuell; Stand
+119 Dateien = 11 OFFEN + 96 ENTSCHIEDEN + 12 UEBERHOLT. Die elf offenen sind alle aktiv
+eingetaktet, keine ist liegengeblieben:
+
+| Prereg | Was noch aussteht |
+| --- | --- |
+| `v29_window` | der laufende Zyklus selbst |
+| `stack_top_feature` | Sicht-Arm v29-b03 (Wheel 2, INPUT_SIZE 794), dazu die zwei Regelbefunde par.16/16a |
+| `special_tile_yield` | Ablations-Schalter und Arm v29-b02 |
+| `difficulty_levels` | Bau waehrend der Erzeugung, Kanten nach Tor 1 |
+| `claude_play_interface` | Partien g08-g10, Zugklassen-Differential |
+| `corpus_behaviour_audit` | Werkzeug ungebaut, Korpuslauf danach |
+| `moon_stack_order` | Knopf bauen, A/B am Champion |
+| `dome_return_order` | A/B Modus 1 gegen 0 ueber den Referee |
+| `round_estimate_leaf_term` | Kostentor K4, dann argmax und A/B; Skalenwahl offen |
+| `round_transition_search_sampling` | Variante B bauen (rund ein Tag), Sichttor, Kostentor, A/B |
+| `code_cleanup_closeout` | Stufen 2 und 3, nach der v30-Promotion |
+
+Die Zahl liegt ueber dem Ziel, weil das v29-Begleitprogramm bewusst breit ist; nach den
+Verdikten von `moon_stack_order`, `dome_return_order`, `round_estimate_leaf_term` und
+`round_transition_search_sampling` sollten es rund sieben sein.
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
