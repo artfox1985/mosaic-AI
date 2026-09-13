@@ -1015,21 +1015,24 @@ das Netz, zwei sieht das Netz mehr als ich. Alle Pruefstellen in dieser Sitzung 
 
 ### par.10a Ich sehe MEHR als das Netz
 
-1. **Mondstapel der kleinen Fabriken.** Der Encoder gibt je Fabrik 15 Werte = die obersten DREI
-   Steine, und das **nur vom ERSTEN Stapel** (`stacks.first()`, `break` bei `pos >= 3`;
-   `features.rs:498-517` JSON-Pfad, `features.rs:971-988` Direktpfad, beide bytegleich). Es gibt
-   weder ein Laengen- noch ein Mengenmerkmal fuer den Rest. `moon_stacks` ist ein `Vec<Vec<..>>`
-   (`factory.rs:11`), eine Fabrik kann also mehrere Stapel tragen (`place_on_moon` pusht je
-   Sonnenzug einen weiteren, `factory.rs:62-66`), und jeder von ihnen ist mit Aktion C nehmbar
-   (`factory.rs:73-83`, Regel `docs/engine_manual.md` Phase 1 C). Mein `show` zeigt jeden Stapel
-   vollstaendig und in Reihenfolge (`claude_play.py:636-638`, unten zuerst, `factory.rs:60-61`).
-   **Gemessen, wie stark das gegriffen hat:** 291 protokollierte Stapelzustaende in g02-g07
-   (Grundmenge: alle Zeilen `Mond-Stapel: (...)` in den sechs `game.log`), davon **0 mit vier oder
-   mehr Steinen**. Die Tiefengrenze hat in diesen Partien also nie zugeschlagen. Ob eine Fabrik je
-   ZWEI Stapel trug (Rest aus der Vorrunde plus neuer Zug), laesst sich aus `game.log` allein
-   nicht auszaehlen -- **ungemessen**. Und: genau diese Reihenfolge habe ich taktisch benutzt
-   (Blau in g06 zweimal bewusst unten vergraben, par.7), also an einer Stelle, an der das Netz
-   hoechstens die obersten drei sieht.
+1. ~~**Mondstapel der kleinen Fabriken.**~~ **WIDERLEGT durch Nutzer-Regelauskunft
+   (2026-09-13, woertlich: "kleine fabriken haben immer nur einen stapel. die grosse fabrik hat
+   einen pool", "und mehr als 3 fliesen pro stapel gibt es nicht"), am Code bestaetigt.** Die
+   Rundenvorbereitung leert `sun_tiles` UND `moon_stacks` bei jedem Rundenanfang
+   (`state.rs:467-468`), und `place_on_moon` hat genau einen Produktionsaufrufer: den Sonnenzug
+   (`execution.rs:154`), der die Sonnenseite dabei leert. Je Fabrik und Runde entsteht damit
+   HOECHSTENS EIN Stapel, und er ist hoechstens 3 Fliesen hoch (`TILES_PER_SMALL_FACTORY = 4`,
+   `state.rs:17`, minus mindestens eine genommene). Die Encoder-Sicht -- erster Stapel, oberste
+   drei Positionen in Reihenfolge (`features.rs:498-517`) -- deckt den vollen Stapel also in jedem
+   erreichbaren Zustand ab. **Hier herrscht Sichtgleichheit.**
+   **Warum der Fehler passierte, als Lehre:** geprueft war der MECHANISMUS (`Vec<Vec<..>>`,
+   `push`, `break` bei `pos >= 3`), nicht die ERREICHBARKEIT. Genau die Luecke, die Regel 0
+   Zusatz 2 meint: die Pruefstelle sagt, WO nachgesehen wurde, nicht WORUEBER. Die eigene Messung
+   (0 von 291 protokollierten Stapelzustaenden mit vier oder mehr Fliesen, Grundmenge alle Zeilen
+   `Mond-Stapel: (...)` in g02-g07) war in Wahrheit die Bestaetigung der Regel und haette der
+   Anlass sein muessen, die Behauptung fallen zu lassen, statt sie als "hat nie gegriffen" zu
+   fuehren.
+
 2. **Beutel und Turm getrennt.** Der Encoder addiert beide zu EINEM Farbzaehler
    (`(bag_colors[i] + tower_colors[i]) / 13`, `features.rs:265-269`); eine getrennte
    Turmverteilung gibt es nicht. Mein `show` druckt beide Zeilen einzeln
