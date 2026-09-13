@@ -23,7 +23,7 @@ dome-building board game with hidden information.
 
 ## Current Status
 
-Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1353** (95% CI [1306, 1402])
+Champion: **`v28-b02`** (promoted 2026-09-12), Elo **1394** (95% CI [1350, 1445])
 from 1,410 rated games on the **second ladder segment**, anchored at the frozen
 heuristic artifact `models/frozen_heuristics/hv4_anchor` (Heuristic@150 =
 1000, `tools/elo_tracker.py report`). The ladder was re-anchored on 2026-09-12:
