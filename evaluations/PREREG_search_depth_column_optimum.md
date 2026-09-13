@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA (par.2i: Plateau 25-100 ~0,6 gegen 0,34 ab 250), aber ein TAUSCH (@25 verliert 11:29 signifikant, par.2j2); Faktor TIEFE, nicht Breite (par.2k). Betriebspunkt 100 galt bis v24-b06 (par.8b), am Champion v28-b02 GEKIPPT. Neumessung par.8e: Teil A GEMESSEN 2026-09-13 (gegen @400: @100 45:105, @200 53:97, @600 74:76 -> SAETTIGUNG BEI 400), Teil B argmax laeuft; Schwarm 100 Sims (Nutzer), Sockel-Vorschlag folgt. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Gibt es fuer den Spaltenbau ein Optimum mittlerer Suchtiefe -- und kostet es Spielstaerke? | Beleg: JA und JA, ein TAUSCH (par.2i/par.2j2), am Champion v28-b02 repliziert. Neumessung par.8e 2026-09-13 = VIERTER FALL: Teil A (Staerke) saettigt bei 400 (@100 45:105, @200 53:97, @600 74:76), Teil B (Korpus) faellt MONOTON (volle Spalten je Seite 1,098/0,958/0,895/0,820; @100-@400 z=+3,74), und nur die Vollendung faellt, nicht die Teilspalten. "Eklatant" 1 von 3 -> Betriebspunkt 100 BLEIBT; Sockel-Vorschlag 100 Sims (4,40 h gegen 8,29 h bei 400), Entscheid Nutzer. -->
 
 # Vorregistrierung: Suchtiefe und Spaltenbau -- gibt es ein Optimum?
 
@@ -1089,7 +1089,149 @@ p < 0,05) erreicht nur der Schritt von 100/200 auf 400, nicht der von 400 auf 60
 @100/@200/@400/@600) laeuft seit 02:36; Sekunden je Partie daraus sind die Kostenbasis. Die drei
 Punkte gehen als Kanten gegen @400 ins Register (@200 und @600 an EINER Kante, Nutzer 02:25).
 
-**Ergebnis Teil B und Sockel-Vorschlag: leer bis zum Ende von Teil B.**
+**ERGEBNIS TEIL B (2026-09-13, 02:36-04:08, `tools/night_sims_curve_v28b02.sh`, exklusiv; je 200
+Partien argmax-Selbstspiel `self_play.py --mode network --deterministic --no-root-noise`,
+`MOSAIC_STACK_DRAW_RESEARCH=1`, Seed 20260931, 11 Threads, Champion-Spec beidseitig; Auswertung
+`tools/corpus_sanity_check.py`):**
+
+| Punkt | Volle Spalten je Seite | Spalten >= 3 | Spalten >= 4 | Punkte | Strafleiste | Volle Zeilen | s je Partie |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| @100 | 1,0975 +- 0,0752 | 3,195 | 2,245 | 57,83 | 4,74 | 0,100 | 3,956 |
+| @200 | 0,9575 +- 0,0738 | 3,292 | 2,292 | 56,98 | 4,65 | 0,142 | 5,237 |
+| @400 | 0,8950 +- 0,0747 | 3,225 | 2,283 | 54,60 | 5,14 | 0,110 | 7,464 |
+| @600 | 0,8200 +- 0,0749 | 3,232 | 2,237 | 53,07 | 5,27 | 0,128 | 10,563 |
+
+n = 200 Partien (400 Seiten) je Punkt, Grundmenge argmax-Self-Play-Partien des Generators gegen
+sich selbst, Einheit volle Spalten je Seite. Das Intervall ist die halbe 95-Prozent-Breite
+(`tools/corpus_sanity_check.py` Z.34: `1,96 * sd / len(v) ** 0.5`, gemittelt ueber Seiten, nicht
+ueber Partien: Seiten derselben Partie sind korreliert, der Effekt trifft alle vier Punkte
+gleich). Differenzen gegen @400: @100 **+0,2025** (SE_diff 0,0541, z = +3,74), @200 +0,0625
+(z = +1,17), @600 -0,0750 (z = -1,39).
+
+**Die Kurve faellt MONOTON.** Mehr Sims heisst im Selbstspiel weniger vollendete Spalten und
+weniger Punkte. Die TEILSPALTEN bleiben dabei praktisch unveraendert (>= 3: 3,195 / 3,292 /
+3,225 / 3,232; >= 4: 2,245 / 2,292 / 2,283 / 2,237): es faellt allein die VOLLENDUNG, nicht der
+Aufbau. Das ist derselbe Engpass, den der Strukturbefund zum Champion beschreibt (Spalten werden
+begonnen, aber spaet nicht geschlossen). Die Strafleiste steigt mit den Sims (4,74 auf 5,27
+Steine je Partie und Seite), die volle Zeilenzahl bleibt ohne Trend (0,100 bis 0,142).
+
+**Gegner-Abhaengigkeit des Spaltenbaus (Querlesen Teil A gegen Teil B, ABLEITUNG).** In der
+ARENA baut die tiefere Suche MEHR Spalten, im Selbstspiel die flachere: gegen @400 kommt @100
+auf 0,9267 volle Spalten je Seite, waehrend die @400-Seite im selben Lauf 1,0133 baut
+(`arena_columns_paired_gating_v28-b02_s100_vs_s400_seed55_full.json`, n = 150 replayte Partien);
+gegen sich selbst baut @100 dagegen 1,0975 und @400 nur 0,8950. Der Spaltenbau haengt also am
+GEGNER, nicht allein an der eigenen Suchtiefe. Das ist eine Ableitung aus dem Vergleich beider
+Messformen, kein eigener Messpunkt.
+
+**Laufzeit-Hinweis (Praezisierung des AGENTEN-AUFTRAGs Schritt 4):** der `laufzeit`-Block IM
+Kurven-Artefakt misst den AUSWERTUNGSLAUF (10,2-11,1 s, threads 1, `s_je_partie` null), nicht die
+Erzeugung. Die Kostenbasis steht in den Manifesten `data/manifest_depth<S>-v28b02_*.json`
+(`laufzeit.s_je_partie`, threads 11, 200 Partien); von dort stammen die Sekunden je Partie in der
+Tabelle oben.
+
+**VERDIKT: VIERTER FALL, die Formen widersprechen sich.** Teil A (Staerke) sagt 400, Teil B
+(Korpus) sagt 100, und beide sagen es deutlich. Die vorab festgelegte Lesart fuer diesen Fall
+gilt unveraendert: fuer die ERZEUGUNG gilt Teil B (was in den Korpus geht), fuer die BEWERTUNG
+Teil A, und der Tausch aus par.2j2 lebt weiter. Er ist damit am Champion v28-b02 **repliziert,
+nicht aufgeloest**; neu gegenueber par.2i ist, dass die Kurve ueber den ganzen Bereich 100-600
+monoton faellt statt ein Plateau bis 100 zu zeigen, und dass die Vollendung der alleinige Traeger
+des Effekts ist.
+
+**Die "eklatant"-Regel des Nutzers, Bedingung fuer Bedingung** (geprueft fuer den Wechsel des
+Betriebspunkts von 100 auf 400):
+
+1. Beide Formen zeigen in dieselbe Richtung: **NEIN** (Teil A fuer 400, Teil B fuer 100).
+2. Teil A gewinnt mit mindestens 60 Prozent bei McNemar p < 0,05: **JA** (@400 gegen @100
+   105:45 = 70 Prozent, p = 6e-7; n = 150 Partien, Grundmenge gepaarte Arena-Partien).
+3. Teil-B-Spaltenabstand ueber 0,3 zugunsten des hoeheren Punkts: **NEIN** (der Abstand betraegt
+   0,2025 volle Spalten je Seite und zeigt in die GEGENRICHTUNG).
+
+Eine von drei Bedingungen. Nach der Regel ("ein Punkt, der nur eine der drei Bedingungen
+erfuellt, ist besser, nicht eklatant") bleibt **100 der Betriebspunkt der Erzeugung**.
+
+**SOCKEL-VORSCHLAG (Pflichtteil, Nutzer 00:40): 100 Sims, wie der Schwarm.**
+
+| Variante | s je Partie (gemessen) | 4.000 Partien | Mehrkosten gegen @100 | Volle Spalten je Seite |
+| --- | --- | --- | --- | --- |
+| @100 | 3,956 | 15.824 s = 4,40 h | -- | 1,0975 |
+| @200 | 5,237 | 20.948 s = 5,82 h | +1,42 h | 0,9575 |
+| @400 | 7,464 | 29.856 s = 8,29 h | +3,89 h | 0,8950 |
+| @600 | 10,563 | 42.252 s = 11,74 h | +7,34 h | 0,8200 |
+
+Die Multiplikation auf den Sockel-Umfang von 4.000 Partien (`PREREG_v29_window.md` par.1) ist
+HERLEITUNG; die Faktoren `s_je_partie` sind gemessen (Manifeste, threads 11). Vergleichsgroessen:
+der v25-Sockel mit 4.000 Partien @100 lief 14.426 s = 4,00 h (`docs/measured_runtimes.md` Z.91),
+die volle v28-Erzeugung 35.726 s = 9,92 h.
+
+**Begruendung.** Der teurere Betriebspunkt liefert den SCHLECHTEREN Korpus: @400 kostet 3,89 h
+mehr und bringt 0,2025 volle Spalten je Seite sowie 3,2 Punkte WENIGER. Es gibt damit keine
+Variante, in der hoehere Sims fuer den Sockel etwas kaufen, was der Korpus braucht. Der
+Nutzer-Rahmen vom 00:45 ("wenn es mit hoeherer sim anzahl wirklich eklatant besser ist, nehm ich
+die hoehere erzeugungszeit in kauf") greift nicht, weil die Bedingung nicht erfuellt ist; die
+Hoffnung aus demselben Satz ("einerseits hoff ich ja dass wir bei 100 sims bleiben koennen")
+wird erfuellt. Die Erwartung vom 02:33 ("somit bekommt der sockel einen ordentlichen staerke
+boost") traegt dagegen NICHT: sie stand auf Teil A allein, und Teil A ist fuer die Erzeugung
+nicht zustaendig.
+
+**NACHTRAG 2026-09-13 auf Nutzerfrage ("self play ist argmax ohne wurzelrauschen, sollte doch
+gleich sein wie das arenaspiel?"): die beiden Formen unterscheiden sich in DREI Stuecken, nicht
+nur im Gegner.** Am Code geprueft:
+
+1. **Gegner (der tragende Unterschied).** Teil A ist @S gegen @400, Teil B ist @S gegen @S.
+2. **Stapelzug-Aufloesung (ein echter SUCH-Unterschied, in par.8e vorab so festgelegt, aber bis
+   zu diesem Nachtrag nicht als Einschraenkung benannt).** Teil B laeuft mit
+   `MOSAIC_STACK_DRAW_RESEARCH=1`: dann wird nur der eine `DrawStackPeek` angewandt und danach
+   NEU gesucht. Ohne den Knopf (Arena, Teil A, und auch die Erzeugung) loest
+   `resolve_and_apply_stack_draw` den Zug sammelnd auf und zieht in eigener Schleife bis zu
+   20-mal weiter, je -1 Punkt, und waehlt Platte, Slot und Rotation selbst
+   (`engine/src/self_play.rs` Z.972-995). Die Suche bewertet dort also eine Fortsetzung, die so
+   nicht ausgefuehrt wird. Weil Stapelzuege genau die Kuppelplatten und Slots betreffen, aus
+   denen Spalten entstehen, ist dieser Unterschied fuer die gemessene Groesse NICHT neutral.
+3. **Zugwahl und Rauschen sind dagegen GLEICH** (entgegen der naheliegenden Vermutung, der
+   Unterschied liege dort): die Arena uebergibt `add_root_noise = false` hart
+   (`self_play.rs` Z.3123 ruft `net_search_drafting_action(..., false, ...)`), Teil B setzt
+   `--no-root-noise`; beide waehlen deterministisch (Arena `select_final_root_child`,
+   Teil B argmax ueber `--deterministic`); beide rufen `net_effective_sims`, und da
+   `USE_GUMBEL_SEARCH` und `DECOUPLE_NET_SIMS_FROM_ACTIONS` beide `true` sind
+   (`net_mcts.rs` Z.3202/3221), gilt beidseitig `base_sims` OHNE Skalierung nach Aktionszahl;
+   der Bauer-Vorzug ist beidseitig an.
+
+**Folge fuer das Verdikt:** die "eklatant"-Regel bleibt unerfuellt und der Betriebspunkt 100
+bleibt, denn dafuer genuegt, dass die Formen nicht in dieselbe Richtung zeigen. Die ERKLAERUNG
+"es liegt am Gegner" ist aber unvollstaendig: Punkt 2 ist ein zweiter, ungetrennter Kanal. Wer
+die beiden Formen sauber trennen will, braucht einen Teil-B-Punkt OHNE den Knopf oder einen
+Teil-A-Punkt MIT ihm (je 200 Partien, Kosten wie oben). Das ist nicht gemessen.
+
+**Was dieser Vorschlag NICHT gemessen hat (Einschraenkungen, als ANNAHME markiert):**
+
+- Teil B laeuft argmax und ohne Wurzelrauschen, der Sockel policy-aktiv mit Rauschen und
+  Temperatur. Dass die monotone Richtung ueber alle vier Punkte (z = +3,74 am Extrempunkt)
+  auch dort traegt, ist plausibel, aber nicht gemessen.
+- **`MOSAIC_STACK_DRAW_RESEARCH`: OFFENER WIDERSPRUCH zwischen Vorgabe und Praxis, dem Nutzer
+  vorzulegen (geprueft 2026-09-13 auf Nutzerfrage "true ist die richtige variante oder?").**
+  `PREREG_chance_nodes.md` Z.1126 schreibt vor: "gehoert in die Umgebung BEIDER Laeufe (Sockel
+  und Schwarm)", und ihr Verdikt fuehrt den Knopf als Teil des Erzeugungsrezepts seit v23
+  ("v23, v24: `MOSAIC_STACK_DRAW_RESEARCH=1`"). GEPRUEFT wurde dagegen:
+  (a) `tools/night_v28_generate.sh` exportiert nur `PYTHONIOENCODING`, den Knopf NICHT;
+  (b) der Erzeugungsbefehl in `PREREG_v29_window.md` par.5 nennt ihn ebenfalls nicht;
+  (c) das Lauf-Manifest der v28-Erzeugung (`data/manifest_v27-b01-policy_20260910_234958.json`)
+  fuehrt ihn in `engine_config` GAR NICHT (nur das verwandte `shuffle_stack_peek_in_search:
+  false`), er ist dort also weder als gesetzt noch als ungesetzt belegbar.
+  Damit ist NICHT nachweisbar, ob die v27- und v28-Korpora mit oder ohne ihn entstanden sind;
+  nachweisbar ist nur, dass kein Skript im Baum ihn setzt. Der Knopf steht im
+  `knob_registry` als `Diagnose`, nicht als Rezeptknopf. **Folgen:** (1) fuer den v29-Sockel
+  ist zu entscheiden, ob er gesetzt wird -- das ist eine Rezept-Entscheidung des Nutzers, kein
+  Agenten-Entscheid; (2) das Manifest sollte ihn mitschreiben, sonst wiederholt sich die
+  Unbelegbarkeit (Feedback `lauf_manifest_gegen_referenz`: fehlendes Flag = stiller Default);
+  (3) Teil B dieser Messung lief MIT dem Knopf, die Arena (Teil A) ohne -- dieser Unterschied
+  bleibt bestehen, unabhaengig davon, wie (1) ausgeht.
+- Die POLICY-Ziele eines 100-Sims-Korpus sind verrauschter als die eines 400-Sims-Korpus
+  (Besuchszahlen aus weniger Simulationen). Teil B misst ZUSTAENDE, nicht Zielqualitaet; dieser
+  Tausch ist hier nicht gemessen und bleibt das staerkste Gegenargument gegen den Vorschlag.
+- "Punkte im Selbstspiel" ist KEIN Staerkemass: zwei gleich starke Seiten nehmen sich gegenseitig
+  mehr weg, je besser sie spielen. Die Punktezeile der Tabelle beschreibt den KORPUS; die
+  Spielstaerke steht ausschliesslich in Teil A.
+- Der Sockel-Entscheid liegt beim Nutzer, nicht beim Koordinator (par.8e Stopp-Punkte).
 
 ## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
 

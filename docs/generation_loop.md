@@ -154,7 +154,16 @@ damit ohne eigenen Lauf.
 Instrument misst**, nicht aus dem Gedaechtnis und nicht aus einem Bericht mit
 anderem Betriebspunkt. Das ist keine Formalie: dieselbe Groesse liegt je nach
 Sims-Zahl um mehr als das Doppelte auseinander (25-100 Sims ~0,6 gegen 0,34
-ab 250).
+ab 250, gemessen an v22-b05 und v24-b06).
+
+**Am Champion v28-b02 ist die Kurve am 2026-09-13 ueber 100-600 Sims
+durchgemessen und faellt MONOTON**: 1,0975 / 0,9575 / 0,8950 / 0,8200 volle
+Spalten je Seite bei 100 / 200 / 400 / 600 Sims (je 200 argmax-Self-Play-Partien,
+`PREREG_search_depth_column_optimum.md` par.8e). Ein Plateau gibt es dort nicht
+mehr, und es faellt allein die VOLLENDUNG: die Teilspalten (>= 3 und >= 4)
+bleiben ueber den ganzen Bereich unveraendert. Auch die BETRIEBSART zaehlt, nicht
+nur die Sims-Zahl: argmax ohne Wurzelrauschen und policy-aktiv mit Temperatur
+sind nicht gegeneinander ablesbar.
 
 **"Mindestens genauso viel" ist der Punktschaetzer** (Nutzer-Anweisung
 2026-08-31: "mindestens genauso viel Affinitaet zum Spaltenbau wie der
