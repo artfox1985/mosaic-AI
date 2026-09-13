@@ -1144,3 +1144,104 @@ Die Frage ist beantwortet, soweit sie einen Verbraucher hat: R5-Zufallsknoten un
 Teil B1, die Ein-Schritt-Erwartung an der Peek-Aktion (`MOSAIC_STACK_DRAW_CHANCE`), wird im
 v29-Begleitprogramm gebaut und per Referee-A/B gemessen (Nutzer 2026-09-11, `PREREG_v29_window.md` par.7 Punkt 4), zusammen mit der Neurechnung der
 Stopp-Regel (`PREREG_stack_draw_reservation_rule.md` par.7).
+
+## Nachtrag 2026-09-13: der Knopf stand nie in einem Erzeugungsskript (Nutzer-Auftrag "kannst im repo durchgreppen" / "kannst auch die git history durchforsten")
+
+**Befund, belegt ueber den Arbeitsbaum UND die Git-Historie: `MOSAIC_STACK_DRAW_RESEARCH=1`
+wurde in KEINEM Erzeugungslauf per Skript gesetzt -- in keiner Generation.** Der Entscheid vom
+2026-08-30 (Commit `3c5c44b`, Titel woertlich "Stapelzug-Kontrollfluss gemessen: der Knopf
+gehoert in die Erzeugung") hat nur Dokumentation und die Auswertungssonde
+`tools/probes/stack_draw_research_arena_eval.py` angefasst, kein Erzeugungsskript.
+
+**Geprueft (git log/show ueber alle Refs, letzter Stand je Datei):**
+
+| Skript | setzt den Knopf? |
+| --- | --- |
+| `tools/night_v25_socket.sh`, `night_v25_excursion.sh` | nein (0 Treffer) |
+| `tools/night_v26_swarm.sh`, `night_v26_chain.sh` | nein |
+| `tools/night_v27_generate.sh`, `night_v27_chain.sh` | nein |
+| `tools/night_v28_generate.sh`, `night_v28_chain.sh` | nein |
+
+**Wer ihn setzt, sind ausschliesslich MESS-Instrumente:** `tools/argmax_profile.sh` Z.9,
+`tools/night_k3d_joker_instrument.sh` Z.15, `tools/night_v28_measure.sh` Z.16,
+`tools/night_start_search_hull_off.sh` Z.13 und `tools/night_sims_curve_v28b02.sh` Z.39
+(Teil B der Sims-Kurve). Die Lage ist also genau umgekehrt zur Absicht: **gemessen wurde mit dem
+Knopf, erzeugt ohne ihn.**
+
+**In den Fenster-Preregs verliert er sich nach v25:** `PREREG_v24_window.md` Z.152/161 fuehrt ihn
+als Pflicht "in der Umgebung ALLER DREI Laeufe" samt `export`-Zeile, `PREREG_v25_window.md`
+Z.796 hat die `export`-Zeile noch; `v26_window`, `v27_window`, `v28_window` und `v29_window`
+nennen ihn NICHT mehr (je 0 Treffer).
+
+**Nicht ausschliessbar, aber nicht belegbar:** dass der `export` beim Start von Hand in die Shell
+eingegeben wurde (die Preregs fuehren ihn als kopierbare Befehlszeile). Belegbar ist nur, dass
+kein Skript ihn setzt und dass **das Lauf-Manifest ihn bis heute nicht mitschreibt**
+(`data/manifest_v27-b01-policy_20260910_234958.json`, `engine_config` fuehrt nur das verwandte
+`shuffle_stack_peek_in_search`). Genau deshalb ist der Zustand nie aufgefallen: Feedback
+`lauf_manifest_gegen_referenz` -- ein fehlendes Flag ist ein stiller Default.
+
+**GEBAUT im selben Zug (Nutzer-Anweisung 2026-09-13: "dann muss der knopf rein ins manifest"):**
+`engine_config_json()` gibt ab Wheel 1 `stack_draw_research` und `stack_draw_reservation` aus
+(`engine/src/lib.rs`, die beiden Getter in `self_play.rs` dafuer auf `pub(crate)` gehoben).
+Damit ist die Frage ab der v29-Erzeugung je Lauf belegbar. Die OnceLock-Falle steht als
+Kommentar an der Stelle: wer `engine_config_json()` vor dem Setzen der Variablen aufruft, friert
+den Wert ein.
+
+**OFFEN, Nutzer-Entscheid (Rezeptfrage, kein Agenten-Entscheid):** faehrt die v29-Erzeugung mit
+oder ohne den Knopf? Beide Wege haben einen Preis. MIT ihm folgt v29 der eigenen Vorgabe und dem
+Korrektheitsargument (`self_play.rs` Z.972-995: ohne ihn bewertet die Suche eine Fortsetzung, die
+nicht ausgefuehrt wird), weicht aber vom Stand ab, auf dem v26 bis v28 sehr wahrscheinlich
+entstanden sind. OHNE ihn bleibt die Kette vergleichbar, und die Vorgabe bleibt weiter unerfuellt.
+
+### HARTER BELEG AM KORPUS (2026-09-13, 11:10): die v28-Erzeugung lief OHNE den Knopf
+
+Die Skript-Archaeologie oben zeigt nur, dass kein Skript den Knopf setzt. Der Knopf hinterlaesst
+aber eine **Spur im Korpus**: ohne ihn existiert die Aktionsart `choose_draw_stack_slot` im
+Netz-Self-Play gar nicht (par.15: "0 Datensaetze"). Gezaehlt wurde deshalb direkt in den
+`.pkl`-Dateien, Aktionsarten aus `valid_actions` je Record:
+
+| Korpus | Dateien | Partien | Records | Records MIT `choose_draw_stack_slot` |
+| --- | --- | --- | --- | --- |
+| `selfplay_v27-b01-policy_*` (die v28-Erzeugung) | 8 | 80 | 13.145 | **0 (0,00 %)** |
+| `selfplay_depth100-v28b02_*` (Teil B der Sims-Kurve, Knopf nachweislich AN) | 8 | 80 | 14.103 | **572 (4,06 %)** |
+
+n = je 8 Dateien (die ersten nach Namenssortierung), Grundmenge Self-Play-Records, Einheit
+Records, in deren `valid_actions` mindestens eine Aktion vom Typ `choose_draw_stack_slot` steht.
+Die Kontrollgruppe ist der einzige Korpus im Baum, bei dem der Knopf per Skript belegt gesetzt
+ist (`tools/night_sims_curve_v28b02.sh` Z.39).
+
+**Damit ist die Frage entschieden, nicht mehr nur wahrscheinlich: der Trainingskorpus des
+amtierenden Champions enthaelt KEINEN einzigen Datensatz fuer die Entscheidung "welche gezogene
+Platte, welcher Slot".** Der Policy-Kopf hat sie nie gesehen. Das deckt sich mit par.15, wo
+derselbe Nullbefund fuer den Bestandskorpus stand ("dasselbe 0 von 16.322").
+
+**Der Benefit des Knopfes ist damit beziffert und liegt NICHT in der Staerke:** er liegt darin,
+dass eine ganze Aktionsklasse ueberhaupt ins Trainingsmaterial kommt (4,06 % der Records, in
+par.15 gemessen als 136 Ziele mit Median 6 Kandidaten, 77,9 Prozent mit mehr als einem Kandidaten
+und mittlerer Top-1-Masse 0,928 -- echte Entscheidungen, keine Platzhalter). Die Staerkemessung
+war die BEDINGUNG ("kein signifikanter Staerkeverlust"), nicht der Zweck: 68:77 gegen die
+Heuristik bei p = 0,136, Punkte +2,60 (Block-t 2,04), Margin +5,43 (Block-t 2,32), n = 100
+gepaarte Partien -- nicht signifikant, aber in Richtung des Knopfes, und ausdruecklich NICHT
+Netz gegen Netz belegt.
+
+### ENTSCHEID DES NUTZERS (2026-09-13, 11:15): Knopf EIN fuer die v29-Erzeugung
+
+Woertlich: **"ja dann schalten wir ihn ein."** Damit faehrt die v29-Erzeugung
+`MOSAIC_STACK_DRAW_RESEARCH=1` in der Umgebung BEIDER Laeufe (Sockel und Schwarm), wie es der
+Betriebshinweis oben seit v23 vorsieht und wie es seit v26 faktisch nicht mehr geschah.
+
+**Tragende Begruendung ist der Korpus, nicht die Staerke:** ohne den Knopf hat der Korpus null
+Datensaetze fuer `choose_draw_stack_slot` (13.145 Records der v28-Erzeugung, 0,00 Prozent), mit
+ihm 4,06 Prozent (Kontrollmessung oben). Die Staerkebedingung ("kein signifikanter Verlust") war
+2026-08-30 erfuellt und bleibt es.
+
+**Bekannte Folge, bewusst in Kauf genommen:** v29 weicht damit im Erzeugungsrezept von v26 bis
+v28 ab. Der Unterschied besteht ohnehin schon, nur in die andere Richtung als beabsichtigt.
+Tor 0 und Tor 2a vergleichen die v29-Erzeugung also gegen einen Bezugswert aus einer anderen
+Stapelzug-Betriebsart; das ist beim Lesen der Tore zu nennen. Ob der Knopf die Traegerkennzahlen
+hebt oder senkt, ist NICHT gemessen (die Messung von 2026-08-30 lief gegen die Heuristik, nicht
+als Korpusvergleich).
+
+**Umgesetzt im selben Zug:** die Erzeugungsbefehle in `PREREG_v29_window.md` par.5 tragen den
+`export`, und `engine_config_json()` schreibt den Knopf ab Wheel 1 ins Lauf-Manifest -- damit ist
+die Frage kuenftig je Lauf belegbar statt rekonstruierbar.

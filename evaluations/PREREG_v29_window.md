@@ -127,7 +127,18 @@ Anker-Drift wiederholen, hier eintragen.
 Seeds 20260920 / 20260921 / 20260922 (v28 nahm 17-19). `<GEN>` = Name des Generators
 (par.3), `<SPEC>` = `models/frozen_champions/<GEN>/spec.json`, Modell aus dem Artefakt.
 
+**PFLICHT in der Umgebung BEIDER Laeufe (Nutzer-Entscheid 2026-09-13, 11:15: "ja dann schalten
+wir ihn ein"):** `export MOSAIC_STACK_DRAW_RESEARCH=1`. Ohne ihn traegt der Korpus NULL
+Datensaetze fuer `choose_draw_stack_slot` -- an der v28-Erzeugung nachgezaehlt: 0 von 13.145
+Records gegen 4,06 Prozent im Kontrollkorpus mit Knopf (`PREREG_chance_nodes.md`, Nachtrag
+2026-09-13). Der Knopf hat KEINE Spec-Entsprechung und wird je Prozess einmal per OnceLock
+gelesen; `self_play.py` startet jeden Chunk als frischen Prozess, der die Elternumgebung erbt,
+ein Setzen vor dem Aufruf genuegt also. Ab Wheel 1 steht er im Lauf-Manifest
+(`engine_config_json`), damit die Frage nicht wieder rekonstruiert werden muss.
+
 ```
+export MOSAIC_STACK_DRAW_RESEARCH=1
+
 # 1) Traeger, 4.000 Partien -- policy-aktiv
 python -u self_play.py --mode network --model models/frozen_champions/<GEN>/model.onnx \
   --spec <SPEC> --games 4000 --sims 100 --version <GEN>-policy \
@@ -482,6 +493,24 @@ Jeder Programmpunkt hat eigene Schritte. Reihenfolge wie nummeriert.
    den gewaehlten Zuschnitt HIER in par.9 und startet nichts. Der Befehl liegt in par.5 Nr. 1
    (Seed 20260920, `--tau-argmax-from-move 1 --deviate-prob 1.0`); bei geaenderten Sims ist die
    Zeile hier mit der neuen Zahl zu registrieren, bevor sie laeuft.
+
+**VORSCHLAG AUS par.8e (vorgelegt 2026-09-13, 04:15; der Entscheid steht beim Nutzer aus, es
+wurde nichts gestartet): Sockel mit 100 Sims, wie der Schwarm.** Die Sims-Kurve am Champion ist
+durchgemessen (`PREREG_search_depth_column_optimum.md` par.8e). Fuer den KORPUS faellt sie
+monoton: volle Spalten je Seite 1,0975 / 0,9575 / 0,8950 / 0,8200 bei 100 / 200 / 400 / 600 Sims
+(n = 200 argmax-Self-Play-Partien je Punkt, Grundmenge 400 Seiten, @100 gegen @400 z = +3,74).
+Der Staerke-Teil derselben Messung zeigt Saettigung bei 400, aber fuer die ERZEUGUNG ist nach der
+vorab festgelegten Lesart Teil B zustaendig, fuer die BEWERTUNG Teil A. Kosten fuer 4.000
+Partien aus den gemessenen Sekunden je Partie: @100 4,40 h, @200 5,82 h, @400 8,29 h,
+@600 11,74 h. Der teurere Betriebspunkt liefert also den spaltenaermeren Korpus.
+
+**Folge fuer Tor 0 und Tor 2a, falls der Nutzer doch hoehere Sims waehlt (ABLEITUNG, nicht
+gemessen):** ein Sockel bei 400 wuerde die Bezugswerte NACH UNTEN ziehen, nicht nach oben. Der
+Bezugswert von par.6 ist 0,816 volle Spalten je Seite aus `corpus_sanity_v27-b01-policy.json`
+(v28-Generator). Die Sims-Kurve misst dieselbe Groesse, aber in einer anderen BETRIEBSART
+(argmax ohne Wurzelrauschen statt policy-aktiv mit Rauschen und Temperatur): die Betraege sind
+deshalb nicht direkt vergleichbar, uebertragbar ist allein die RICHTUNG. Bei 100 Sims bleibt die
+Betriebsart des Bezugswerts erhalten, und Tor 0 / Tor 2a laufen wie in v28.
 
 **P3 -- Kette und Arm b01 (Pflichtarm)**
 

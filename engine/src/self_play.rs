@@ -995,7 +995,7 @@ fn resolve_and_apply_stack_draw_with(
 /// par.5b). Default AUS = bit-identisches Bestandsverhalten; `=1` schaltet die
 /// einheitentreue Fassung scharf. Als Knopf und nicht als Ersatz, damit die
 /// Arena beide Arme fahren kann -- der Bestand ist der Elo-Bezug.
-fn stack_draw_reservation() -> bool {
+pub(crate) fn stack_draw_reservation() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         std::env::var("MOSAIC_STACK_DRAW_RESERVATION")
@@ -1004,7 +1004,7 @@ fn stack_draw_reservation() -> bool {
     })
 }
 
-fn stack_draw_research() -> bool {
+pub(crate) fn stack_draw_research() -> bool {
     static CELL: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
     *CELL.get_or_init(|| {
         std::env::var("MOSAIC_STACK_DRAW_RESEARCH")
