@@ -211,16 +211,16 @@ Verdikten von `moon_stack_order`, `dome_return_order`, `round_estimate_leaf_term
   hv4@600 gegen hv4@150 55 %. Bradley-Terry mittelt das.
 - **Replayer-Grenze Chip-Vollendung:** einzelne Partien nicht nachspielbar ("Reihe N nicht mit
   Chips komplettierbar" nach 60 Versuchen); bekannte Grenze.
-- **GUI und Arena: gleicher Suchweg, Suchtiefe nach Stufe** (geprueft 2026-09-13,
+- **GUI und Arena: dasselbe Spiel, dieselbe Tiefe** (geprueft 2026-09-13,
   `PREREG_difficulty_levels.md` par.11). Beide enden in `select_final_root_child`, beide ohne
   Wurzelrauschen, beide mit Runde-5-Kurzschluss, und `server.py` schreibt die Champion-Spec
-  beim Start in die Umgebung, weil der GUI-Pfad sie von dort liest. Die Stufen stehen auf
-  60 / 60 / 150 / **400** (easy/medium/hard/expert), Default 400: **auf Experte spielt die GUI
-  mit derselben Tiefe, bei der die Arena misst.** Die `or 100`/`or 300`-Ausdruecke im Server
-  sind Fallbacks fuer Presets ohne `sims` und damit toter Code -- eine erste Fassung dieses
-  Befundes hatte sie faelschlich fuer gesetzte Werte gehalten (Nutzer-Korrektur).
-  **Offen fuer die Stufenleiter:** fuer 60 und 150 gibt es keinen gemessenen Elo-Knoten; das
-  Register traegt nur @100, @200 und @400.
+  beim Start in die Umgebung, weil der GUI-Pfad sie von dort liest. **Die GUI spielt heute
+  immer bei 400 Sims**, weil die Presets aus ihr nicht erreichbar sind (par.2 dort: alle 33
+  Mensch-Partien liefen @400) -- also genau die Einstellung, bei der die Arena misst.
+  Zwei Irrtuemer von mir stehen dort korrigiert: die `or 100`/`or 300`-Ausdruecke sind tote
+  Fallbacks, und die Presets im Code (60/60/150/400) sind NICHT der registrierte Zuschnitt der
+  Stufenleiter (Anfaenger hv3@150, darueber Champion mit Stilmitteln, Meister wie die Arena).
+  Beide Male kam die Korrektur vom Nutzer.
   **Latente Sollbruchstelle:** die Arena zieht `builder_drafting_preference` der Suche vor, der
   Serverpfad kennt den Vorzug nicht; folgenlos nur, solange
   `MOSAIC_SPALTENBAU`/`MOSAIC_PLATTENBAU` unbesetzt bleiben.

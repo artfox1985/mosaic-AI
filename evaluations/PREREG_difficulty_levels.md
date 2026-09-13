@@ -708,34 +708,39 @@ Der Spec-Rueckfall im Server ist kein Schmuck: `net_search_with_tree` liest ausd
 AUSSERHALB des Wave-1-Scopes"). Ohne ihn spielte die GUI mit den Env-Defaults, also OHNE
 Huelle -- genau der Vorfall, den `server.py` Z.242-245 beschreibt.
 
-**Die SUCHTIEFE haengt an der Stufe -- und die oberste Stufe entspricht der Arena.**
-`DIFFICULTY_PRESETS` (`server.py` Z.292-301):
+**Die SUCHTIEFE: die GUI spielt heute IMMER bei 400 -- also genau der Arena-Tiefe.**
 
-| Stufe | Modell | Sims |
-| --- | --- | --- |
-| `easy` | Heuristik | 60 |
-| `medium` | Champion | 60 |
-| `hard` | Champion | 150 |
-| `expert` | Champion | **400** |
-| `_default` | Champion | **400** |
+**KORREKTUR 2026-09-13, in zwei Schritten und beide Male vom Nutzer angestossen.** Die erste
+Fassung dieses Absatzes las `int(preset.get('sims') or 100)` (`server.py` Z.698, Z.830) und
+`or 300` (Z.1529) als gesetzte Werte und schloss daraus, das Netz in der GUI sei schwaecher als
+das im Register. Beides ist falsch:
 
-**KORREKTUR 2026-09-13 (Nutzer: "Im ui wird die Staerke auf 400 Sims gesetzt. Ich denk die 100
-sind legacy"):** die erste Fassung dieses Absatzes las die Ausdruecke
-`int(preset.get('sims') or 100)` (`server.py` Z.698, Z.830) und `or 300` (Z.1529) als gesetzte
-Werte. Das ist falsch -- es sind FALLBACKS fuer ein Preset ohne `sims`, und **kein einziges
-Preset ist ohne**. Sie greifen nie und sind toter Code; dasselbe gilt fuer den Modul-Default
-`_ai_sims = 300` (Z.107), den `_resolve_difficulty` vor dem ersten Zug ueberschreibt.
-**Wer auf Experte oder ohne Stufenangabe spielt, spielt gegen dieselbe Suchtiefe, bei der die
-Arena misst.** Die schwaecheren Stufen sind Absicht und genau der Gegenstand dieser Prereg.
+1. Es sind FALLBACKS fuer ein Preset ohne `sims`, und kein Preset ist ohne. Sie greifen nie
+   (Nutzer: "Ich denk die 100 sind legacy" -- zutreffend).
+2. **Wichtiger: die Presets sind aus der GUI gar nicht erreichbar.** Das steht seit dem Anlegen
+   im Kopf dieser Prereg und in par.2: "Presets im Server sind aus der GUI nicht erreichbar,
+   alle 33 Mensch-Partien liefen @400". Gespielt wird also `_default` mit 400 Sims, argmax,
+   ohne Wurzelrauschen -- **dieselbe Einstellung, bei der die Arena misst und der Elo-Knoten
+   `v28-b02@400` gebildet ist.** Wer heute in der GUI gegen den Champion spielt, spielt gegen
+   den vermessenen Spieler, nicht gegen eine abgeschwaechte Fassung.
 
-**Was daraus fuer die Stufenleiter folgt.** Der Regler ist gebaut und benutzt, aber die heutigen
-Stufenwerte sind NICHT die vermessenen: die Sims-Kurve
-(`PREREG_search_depth_column_optimum.md` par.8e) hat 100, 200, 400 und 600 gemessen, das
-Register traegt `v28-b02@100` 1298, `@200` 1289 und `@400` 1394. Fuer **60** (medium) und
-**150** (hard) gibt es keinen gemessenen Knoten. Der Abstand 100 zu 400 betraegt rund 96
-Elopunkte (45:105 gepaart, n = 150, McNemar p = 6e-7) -- die Spanne der Leiter ist damit
-gross genug, aber ihre Zwischenstufen sind ungemessen. Das ist eine Aufgabe von par.5 Stufe 1,
-kein Fehler im Bestand.
+**Der Bestand im Code ist NICHT der registrierte Zuschnitt.** `DIFFICULTY_PRESETS`
+(`server.py` Z.292-301) traegt `easy` Heuristik@60, `medium` Champion@60, `hard` Champion@150,
+`expert` und `_default` Champion@400. Der Zuschnitt dieser Prereg (par.4.1, ENTSCHIEDEN
+2026-09-11, Nachtrag 2026-09-13) sieht dagegen vor: Anfaenger = `hv3_generator` @150, darueber
+Erfahren und Experte aus dem Champion MIT Self-Play-Stilmitteln (Sims 100, Wurzelrauschen,
+Besuchs-Sampling, Weg C), Meister = Champion wie in der Arena. Die beiden Zuschnitte
+unterscheiden sich in jeder Stufe ausser der obersten; die alten Presets sind Bestand aus der
+Zeit vor dieser Prereg und werden mit dem Bau (par.4.2/4.3) ersetzt. **Diese Prereg beschreibt
+also nicht den heutigen Zustand, sondern loest ihn ab.**
+
+**Was das fuer die Messung heisst.** Nur die oberste Stufe hat heute einen gemessenen
+Elo-Knoten (`v28-b02@400` 1394). Fuer die geplanten Zwischenstufen bei 100 Sims traegt das
+Register `@100` mit 1298 und `@200` mit 1289 -- aber ohne die Stilmittel, die der Zuschnitt
+zusaetzlich vorsieht (Wurzelrauschen, Sampling, Weg C). Deren Wirkung ist ungemessen, und genau
+dafuer sind die drei Kanten aus par.5 da. Der Abstand 100 zu 400 ist mit rund 96 Elopunkten
+beziffert (45:105 gepaart, n = 150, McNemar p = 6e-7, `PREREG_search_depth_column_optimum.md`
+par.8e) -- die Spanne allein aus Sims ist also da, die Frage ist, was die Stilmittel ergaenzen.
 
 **Ein LATENTER Unterschied, heute ohne Wirkung, aber eine Sollbruchstelle:** die Arena ruft vor
 der Suche `builder_drafting_preference` auf und wuerde deren Ergebnis der Suche VORZIEHEN
