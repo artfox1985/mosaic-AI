@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1 (70:64, 45:58). Das Netz punktet aus Platzierungen, nicht aus den Wertungsplatten (Endwertung 0:10 bzw. 2:8), und nutzt die Null-Klammer als Werkzeug: bei Stand 0 zog es 13/8/7/4 Platten je Zug, bei Stand >0 genau eine -- Arm A der PREREG_corpus_behaviour_audit an lebenden Partien bestaetigt. Eigene Schwaeche bleibt die Strafleiste (-40 zu -19). Werkzeug nachgebessert, par.9 P.11-14. g08-g10 offen. NEU par.10 (Nutzer 2026-09-12): Zugklassen-Differential Claude gegen Champion an jedem Entscheid, v29-Begleitprogramm. -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): g02-g05 gegen v27-b01 3:1, g06/g07 gegen v28-b02 1:1. Das Netz punktet aus Platzierungen, nicht aus den Wertungsplatten (Endwertung 0:10 und 2:8), und nutzt die Null-Klammer als Werkzeug (Arm A live belegt). SICHTGLEICHHEIT GILT IN KEINE RICHTUNG (par.10): vier Stellen sehe ich mehr (Beutel/Turm getrennt, Chipanzahl, Vorderseiten gezogener Platten, Historie), zwei sieht das Netz mehr (Stapelmaske, Rueckgabebloecke). Werkzeug par.9 P.11-14. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -1001,3 +1001,99 @@ Tiling-Umbau (Punkt 2c) und in derselben Gruppe wie der Korpus-Verhaltens-Audit
 (`PREREG_corpus_behaviour_audit.md`), weil alle denselben Befund bearbeiten.
 **Danach:** was das Differential in EINER Klasse zeigt, wird zu einer eigenen Prereg und
 gegebenenfalls zu einem v30-Rezept-Knopf (`PREREG_v29_window.md` par.8 Punkt 3).
+
+## par.10 SICHTGLEICHHEIT DES SPIELFENSTERS, BEIDE RICHTUNGEN (Audit 2026-09-13, Nutzer-Auftrag "pruefe ob sichtgleichheit herrscht in beide richtungen")
+
+**Abgrenzung zuerst.** `PREREG_stack_top_feature.md` fuehrt die Inventur NETZ gegen MENSCH AM TISCH
+(par.15/par.16, P.1-P.15). Dieser Absatz fragt etwas anderes, das dort nicht steht: gilt
+Sichtgleichheit zwischen **dem Spielfenster `tools/claude_play.py`** und **dem Netz**, gegen das
+in g02-g07 gespielt wurde? Das ist die Frage, an der der Wert dieser sechs Partien haengt. Wo sich
+die Befunde mit P.9/P.11/P.14 decken, steht der Verweis dabei.
+
+**Verdikt: Sichtgleichheit gilt in KEINE der beiden Richtungen.** Vier Stellen sehe ich mehr als
+das Netz, zwei sieht das Netz mehr als ich. Alle Pruefstellen in dieser Sitzung selbst nachgelesen.
+
+### par.10a Ich sehe MEHR als das Netz
+
+1. **Mondstapel der kleinen Fabriken.** Der Encoder gibt je Fabrik 15 Werte = die obersten DREI
+   Steine, und das **nur vom ERSTEN Stapel** (`stacks.first()`, `break` bei `pos >= 3`;
+   `features.rs:498-517` JSON-Pfad, `features.rs:971-988` Direktpfad, beide bytegleich). Es gibt
+   weder ein Laengen- noch ein Mengenmerkmal fuer den Rest. `moon_stacks` ist ein `Vec<Vec<..>>`
+   (`factory.rs:11`), eine Fabrik kann also mehrere Stapel tragen (`place_on_moon` pusht je
+   Sonnenzug einen weiteren, `factory.rs:62-66`), und jeder von ihnen ist mit Aktion C nehmbar
+   (`factory.rs:73-83`, Regel `docs/engine_manual.md` Phase 1 C). Mein `show` zeigt jeden Stapel
+   vollstaendig und in Reihenfolge (`claude_play.py:636-638`, unten zuerst, `factory.rs:60-61`).
+   **Gemessen, wie stark das gegriffen hat:** 291 protokollierte Stapelzustaende in g02-g07
+   (Grundmenge: alle Zeilen `Mond-Stapel: (...)` in den sechs `game.log`), davon **0 mit vier oder
+   mehr Steinen**. Die Tiefengrenze hat in diesen Partien also nie zugeschlagen. Ob eine Fabrik je
+   ZWEI Stapel trug (Rest aus der Vorrunde plus neuer Zug), laesst sich aus `game.log` allein
+   nicht auszaehlen -- **ungemessen**. Und: genau diese Reihenfolge habe ich taktisch benutzt
+   (Blau in g06 zweimal bewusst unten vergraben, par.7), also an einer Stelle, an der das Netz
+   hoechstens die obersten drei sieht.
+2. **Beutel und Turm getrennt.** Der Encoder addiert beide zu EINEM Farbzaehler
+   (`(bag_colors[i] + tower_colors[i]) / 13`, `features.rs:265-269`); eine getrennte
+   Turmverteilung gibt es nicht. Mein `show` druckt beide Zeilen einzeln
+   (`claude_play.py:633`). Der Unterschied ist nicht kosmetisch: Steine im Beutel kommen in der
+   naechsten Fuellung, Turmsteine erst, wenn der Beutel leer ist. Ich habe die Beutelzahlen in
+   beiden v28-Partien zur Farbknappheit herangezogen. **Deckt sich mit P.9** der Sicht-Prereg
+   (dort als "Turm je Farbe, 5" fuer v29-b03 eingetaktet, also noch nicht gebaut).
+3. **Anzahl gehaltener Bonuschips.** Der Encoder zaehlt nur Farben ueber alle Chips
+   (`features.rs:381-396`); mein `show` listet jeden Chip einzeln (`claude_play.py:648`), ich sehe
+   also die Anzahl. Die Vollendungsregel haengt genau daran (2 farbgleiche ODER 3 beliebige je
+   fehlender Fliese). In g06 habe ich damit R3 gerechnet und vollendet (+6 mit dem Spezialfeld),
+   in g07 R2 und R3 geplant. **Identisch mit P.11.**
+4. **Vorderseiten der gezogenen Stapelplatten -- und das ist die einzige Stelle, an der mein
+   Fenster gegen die REGEL verstoesst, nicht nur gegen die Sichtgleichheit.** Nutzer-Regelauskunft
+   (dort par.16): "die vorderseiten sind nur bekannt nach dem aufhoeren. beim weiterziehen sind
+   nur die rueckseiten bekannt." `serialize.rs` serialisiert `pending_stack_draw` trotzdem mit
+   voller Vorderseite (eigener Kommentar dort: "hier vereinfacht schon mit voller Vorderseite
+   serialisiert"), und mein `show` druckt sie (`claude_play.py:634`, Feld `gezogen:`). Das Netz
+   bekommt sie NICHT: `pending_stack_draw` kommt in `features.rs` nur in einem Kommentar vor
+   (Z.1435), in keiner Kodierung. In g07 Runde 2 ist das live passiert: nach dem ersten `peek`
+   stand `gezogen: #17[#g/br]+3` auf dem Schirm, und ich habe DANACH entschieden weiterzuziehen.
+   Benutzt habe ich nur den Typ (Spezial), was regelkonform ist -- gesehen habe ich mehr.
+   Nebenbefund in eigener Sache: die am 2026-09-12 gebaute Platzierungs-Vorschau (par.9 P.14a)
+   liest denselben Datensatz (`claude_play.py:597`), rechnet also auf einer Information weiter,
+   die zu diesem Zeitpunkt nicht offen sein duerfte.
+5. **Historie.** Der Encoder hat KEINE (0 Treffer fuer `move_number|history|prev_state` in
+   `features.rs`, selbst nachgezaehlt); er sieht eine Momentaufnahme. Ich lese `game.log`, also
+   den ganzen Partieverlauf. Das ist kein Fehler des Fensters -- ein Mensch am Tisch erinnert sich
+   auch --, aber es ist eine echte Asymmetrie zum Gegner dieser Partien und die einzige, die sich
+   nicht am Fenster beheben laesst, sondern nur am Netz.
+
+### par.10b Das NETZ sieht mehr als ich
+
+1. **Kuppelstapel-Maske und Wild-Anteil.** Der Encoder bekommt 18 Bits "dieses Design liegt noch
+   verdeckt im Stapel" (`features.rs:274-277`) plus den Wild-Anteil des Rests als Skalar
+   (`features.rs:282-286`). Mein `show` zeigt vom Stapel nur Hoehe und den Typ der obersten Platte
+   ("Stapel 12 (oben: wild)", `claude_play.py:633`). Beides ist aus oeffentlicher Information
+   ableitbar (18 bekannte Designs minus alle offen gewordenen Fronten), aber ableitbar ist nicht
+   gesehen: das Netz bekommt es fertig, ich haette es in jeder Runde von Hand fuehren muessen und
+   habe es in sechs Partien kein einziges Mal getan.
+2. **Das Rueckgabe-Wissen (elf Werte, seit v28-b02).** `dome_pool_view` traegt unbekanntes
+   Praefix, eigene Bloecke mit Reihenfolge und fremde Bloecke als Menge (`serialize.rs:96-133`,
+   Encoder `features.rs:744-754`). **`dome_pool_view` kommt in `tools/claude_play.py` null Mal
+   vor** -- das sichtkonforme Stapelwissen erreicht mein Fenster ueberhaupt nicht. Genau dieses
+   Merkmal ist gegen den v27-Champion frisch eingebaut worden; in g06/g07 spielte also ein Netz
+   mit einer Stapelkenntnis, die mein Fenster nicht anzeigt.
+
+### par.10c Was NICHT als Asymmetrie zaehlt
+
+Der Encoder bekommt eine Reihe fertiger AGGREGATE (`score_geo`, `line_geo`, `col_f_max`,
+`estimated_score`, `cell_reachable_mask`), die mein Fenster nicht druckt. Das ist keine
+Information, sondern Rechenhilfe: alles davon steht auf dem Brett. Dieselbe Begruendung traegt
+umgekehrt meine eigenen Hilfen (Reihen-Ziele, Spezialfelder, Wertungsplatten-Stand, par.9 P.10/P.14)
+-- und `estimated_score` zeigt mein Fenster ohnehin als "Rundenschaetzer". Ebenfalls nicht gezaehlt:
+die Aktionsliste. Beide Seiten bekommen von der Engine nur legale Aktionen; dass der Encoder die
+Top-down-Sperre nicht kennt (P.14), betrifft seine Bewertung, nicht seine Zugauswahl.
+
+### par.10d Folge fuer par.7
+
+Die sechs Partien bleiben als **Beobachtung** gueltig -- die tragenden Befunde (Plattenblindheit,
+Null-Klammer als Werkzeug, Strafleisten-Bilanz) haengen an keiner der sechs Stellen. Als
+**Staerkevergleich** sind sie es nicht: der Vorteil aus par.10a.2/3 wirkt in jeder Runde, und
+par.10b.2 wirkt gegen mich. Eine Siegquote aus dieser Reihe ist damit auch aus diesem Grund keine
+Groesse (par.8.8 nennt schon den Champion-Wechsel). Offen und Nutzer-Entscheid: ob das Fenster
+angeglichen wird (Punkt 4 der Liste ist am billigsten -- gezogene Platten bis zum Aufhoeren nur mit
+Typ zeigen; Punkte 2 und 3 waeren ein bewusstes Verschlechtern der eigenen Anzeige, Punkt 1 und 5
+gehen nur am Netz).
