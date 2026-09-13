@@ -828,3 +828,176 @@ Luecke (Orakel-Differential wie `PREREG_human_game_oracle_gap.md`).
 Kosten: rund 600 Entscheide x eine Suche @400 = unter 30 min, exklusiv). Mehr Claude-Partien
 erhoehen n; die Sitzung dafuer entscheidet der Nutzer.
 
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, was eigenes Spiel gegen das Champion-Netz zeigt, das die Arenen nicht zeigen.
+Die Messgroessen sind in **par.4** VOR dem Spielen festgelegt: (1) Ergebnis, Punkte, Marge --
+mit der ausdruecklichen Vorab-Hypothese, dass die Frage NICHT ist, ob Claude gewinnt; (2) die
+sechs Standard-Kennzahlen je Seite; (3) Uebereinstimmung mit dem Netz ist **ENTFALLEN**
+(par.8 Punkt 4, Nutzer: "uebereinstimmungsmessung nein"); (4) **Pflicht: das qualitative
+Protokoll** je Partie -- hoechstens drei Stellen mit Logzeile, an denen das Netz aus
+Spielersicht falsch spielte, je Stelle die Regel oder das Muster, und ob eine registrierte Sonde
+oder ein Knopf das Muster trifft. **Das ist der eigentliche Ertrag: Kandidaten fuer Sonden,
+keine Verdikte.** Aus den Zahlen folgt ausdruecklich KEIN Elo-Knoten (Claudes Zuege sind nicht
+reproduzierbar im Sinn der Leiter), keine Champion- oder Generatorentscheidung und KEIN
+Trainingsmaterial (die Logs gehen NICHT ins Fenster). Fuer den zweiten Programmpunkt, das
+Zugklassen-Differential, stehen die Lesarten in **par.10**: (a) haeufen sich Abweichungen mit
+positivem Ausgang in EINER Klasse, ist das der naechste Knopf oder das naechste Trainingsziel
+(mit eigener Prereg, kein Bau aus der Sonde heraus); (b) sind sie ueber alle Klassen verteilt,
+fehlt dem Netz keine Zugklasse, sondern Tiefe; (c) haelt das Netz Claudes Zuege fast ueberall
+fuer schlechter und Claude gewinnt trotzdem, ist der Value-Kopf die Luecke.
+
+### 2. Voraussetzungen
+
+- **Wer spielt: ein SUBAGENT** (par.8 Punkt 7, Nutzer 16:46: "Dein Modell ist zu teuer fuer
+  diese spielerein"), Modell Opus, mittlerer Aufwand (CLAUDE.md). Der Koordinator startet ihn im
+  CPU-freien Fenster, prueft sein Protokoll nach Regel 0 und registriert in par.7.
+- **Werkzeug:** `tools/claude_play.py` liegt im Baum und bleibt dort (par.8 Punkt 6). Der letzte
+  Rauchtest mit lebendem Gegner ist gruen (par.9 Punkt 11, g06 Zug 1-3), die vier Nachbesserungen
+  aus g06/g07 sind gebaut und geprueft (par.9 Punkt 14: Platzierungs-Vorschau, Spezialfeld-Zeilen,
+  Wertungsplatten-Stand, Mond-Reihenfolge nur wenn eindeutig; 14 neue Unit-Tests, Suite 58 gruen).
+- **Auftrag an den Partien-Agenten, woertlich zu uebernehmen** (par.9 Punkt 7 und Punkt 10):
+  nur `show`, `move`, `note`, `step` und `game.log` benutzen, **`.engine.log` NIE lesen** (dort
+  steht die Rueckgabe-Reihenfolge mit Kachel-IDs, die laut Nutzer-Entscheid 2026-09-10 nur der
+  Ausfuehrende sieht); `--sims 400`; Gegner OHNE `--opponent`, das Werkzeug liest dann
+  `models/champion.txt`; je Partie Gegner und Spec-Pfad aus dem Manifest in die Ergebniszeile;
+  **die Ausgabe von `move` NICHT filtern** (drei abgewiesene Zuege blieben in g03/g04 durch
+  eigene grep-Filterung unbemerkt).
+- **Seitenwahl** (par.8 Punkt 8): `--claude-side 1 --first-player 0`, also Claude als
+  ZWEITSPIELER, damit die Reihe am Ende fuenf Partien je Seite hat.
+- **Gegner je Block, keine Gesamt-Siegquote** (par.8 Punkt 8): g01 gegen v24-b06, g02-g05 gegen
+  v27-b01, g06-g10 gegen den v28-Champion. Eine Siegquote ueber alle zehn ist KEINE Groesse.
+- **Auslastung:** Spielen ist ein CPU-Auftrag (@400 je Zug) und darf NICHT neben einer laufenden
+  CPU-Messung laufen, aber neben einem GPU-Training (par.2, `docs/working_rules.md`).
+- **Fuer die beiden Sonden (P2/P3):** die Logs `evaluations/artifacts/claude_play/g*/game.log`
+  im Server-Format, der Replayer `tools/analyze_game_log.py` (`Replayer`/`run`) und das
+  Arena-Instrument des Champions.
+
+### 3. Schritte
+
+**P1 -- g08 bis g10 spielen (par.6 Punkt 4, par.8 Punkt 1: zehn Partien)**
+
+1. Je Partie: `python -X utf8 tools/claude_play.py new --seed <SEED> --claude-side 1 --first-player 0 --sims 400`,
+   dann abwechselnd `show` und `move <Zug>` (Notation par.3.3), `step` als Notausgang, wenn die
+   KI am Zug haengen bleibt (par.9 Punkt 12b), `note` fuer das Protokoll. Partie-Verzeichnis
+   `evaluations/artifacts/claude_play/<id>/` mit Manifest (Seed, Erstspieler, Modell, Sims, Spec,
+   Kontrakt-Hash, Wheel).
+   **Dauer:** rund 35-45 Claude-Zuege je Partie, 30-60 min je Partie (ANNAHME, par.5); die
+   Rechenzeit je Netz-Zug liegt unter 1 s (ANNAHME aus 6,98 s je Self-Play-Partie @400 bei
+   11 Threads, `docs/measured_runtimes.md`) -- die Kosten sind Sitzungszeit, nicht CPU.
+   **Bei Abbruch:** der Zustand wird bei jedem Aufruf aus `.engine.log` rekonstruiert, die Partie
+   ist also fortsetzbar; bleibt die KI am Zug (PermissionError auf `manifest.json` durch
+   OneDrive, par.9 Punkt 12), `step` benutzen.
+2. Je Partie das **qualitative Protokoll** (par.4.4) in `notes.md` und die Ergebniszeile in
+   par.7 registrieren, mit Gegner und Spec-Pfad aus dem Manifest. Der Koordinator prueft die
+   Behauptungen des Agenten am Log nach (Regel 0: Agenten-Befunde sind Behauptungen).
+
+**P2 -- Ziehsucht-Sonde (par.9 / `PREREG_v29_window.md` par.7 Punkt 2)**
+
+3. Ein CPU-Lauf ohne neue Erzeugung, auf dem vorhandenen Korpus; die Spezifikation ist Arm A der
+   `PREREG_corpus_behaviour_audit.md` (dort par.2: A1 Ziehungen je Plattenplatzierung, BEDINGT
+   auf den Punktestand; A2 Zwangsraeumungen). Der Selbsttest des Werkzeugs laeuft gegen die
+   Claude-Logs und muss dort **exakt die Zahlen aus par.7 dieser Datei** liefern -- unter anderem
+   die A1-Tabelle aus g06/g07: bei Stand > 0 im Mittel 1,17 (7 Ziehungen in 6 Zuegen, Maximum 2),
+   bei Stand 0 im Mittel 6,6 (33 in 5 Zuegen, Maximum 13); n = 12 Zuege mit Ziehung, Grundmenge
+   die beiden Partien, Einheit Ziehungen je Plattenzug.
+   Reihenfolge im Begleitprogramm: vor oder nach der Leiter-Kante, je nachdem, was die Maschine
+   frei hat.
+
+**P3 -- Zugklassen-Differential (par.10, `PREREG_v29_window.md` par.7 Punkt 2b)**
+
+4. Instrument bauen (netzfrei fuer Claude, das Netz nur als Vergleich, kein Training), fuenf
+   Punkte genau wie in par.10 registriert:
+   (1) jede Claude-Partie `evaluations/artifacts/claude_play/g*/game.log` per
+   `analyze_game_log.run` Zug fuer Zug in Zustaende zerlegen (dasselbe Replay wie die
+   Spaltensonde);
+   (2) an jedem Claude-Entscheid (Drafting, Kuppelplatzierung, Startsetzung, Tiling-Schritte,
+   Chips) rechnet der Champion mit seinem Arena-Instrument (@400, argmax, ohne Wurzelrauschen,
+   Champion-Spec) seinen Zug und den Wurzelwert VOR und NACH Claudes Zug (Sicht Claude);
+   (3) Abweichung = Claudes Zug ungleich Netzzug; je Abweichung Aktionsklasse, Runde,
+   Wurzelwert-Differenz und Partieausgang aus Claudes Sicht;
+   (4) Aggregation: Abweichungsrate je Klasse und Runde, mittlere Wurzelwert-Differenz je Klasse,
+   Rangliste Haeufigkeit x Ausgang;
+   (5) Ausgabe als JSON mit n / Grundmenge / Einheit und `laufzeit`-Block, Tabelle der zehn
+   haeufigsten Abweichungsklassen, **dazu die Gegenprobe mit einer NETZ-gegen-NETZ-Partie
+   gleicher Laenge** (Abweichungsrate des Netzes gegen sich selbst unter Wurzelrauschen als
+   Rauschboden der Klassen).
+   **Dauer:** rund 600 Entscheide mal eine Suche @400 = unter 30 min, exklusiv (ANNAHME, par.10).
+   Grundmenge: alle Claude-Entscheide der vorhandenen Partien (g01-g07, rund 80-90 je Partie),
+   Einheit Entscheide; **n ist klein (rund 600), die Sonde ist ein Richtungsgeber, kein Verdikt.**
+   Direkt nach der Ziehsucht-Sonde, gleiches Replay.
+
+**P4 -- Offene Werkzeug- und Engine-Punkte aus par.9**
+
+5. **Nicht gebaut, mit Begruendung:** die Chipwahl (par.9 Punkt 13b / Punkt 14 Schlusssatz) --
+   `apply_tiling_chips(spieler, reihe)` nimmt keine Plaettchenliste; ein optionales Argument
+   `chips <reihe> [ids]` waere eine ENGINE-Aenderung und bleibt als solche offen. In g07 R5 hat
+   das einen Punkt gekostet.
+6. **Engine-Luecke par.9 Punkt 9:** `validation.rs::validate_small_moon` (:66-85) akzeptiert
+   `SmallFactoryMoon` MIT `factory_id`, obwohl Aktion C laut `docs/engine_manual.md` Phase 1 C
+   immer global ueber alle Mondbereiche ist und `generate_valid_moves` nur die globale Form
+   erzeugt (:214). Der Zug ist nur ueber die direkte API erreichbar, Suche und Self-Play sind
+   nicht betroffen; das Werkzeug weist `m1`-`m4` inzwischen ab. **Ob der Validator nachgezogen
+   wird, ist Nutzer-Entscheid** (Engine-Aenderung, Anker-Invarianz faellig).
+7. **Offener Anzeigefehler par.9 Punkt 8:** die Ursache der falschen Zaehler in
+   `action.description` (gebaut in `engine/src/mcts.rs::label_search_move` :624 ueber
+   `tiles_taken` :599) ist weiter ungeklaert; das Werkzeug umgeht ihn, indem `drive_ai` die
+   sichtbaren Engine-Logzeilen druckt (`ai_lines`). Fuer die Suche folgenlos (reiner
+   Anzeigetext), aber bei naechster Gelegenheit nachzusehen.
+8. **Reihenfolge in `drive_ai`** (par.9 Punkt 12, bewusst offen): `append_log` vor
+   `save_manifest` waere sicherer; das beruehrt die Log-Semantik und gehoert in einen eigenen Zug.
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: Partien "n = Partien je Gegner-Block, Grundmenge
+  Claude-Partien gegen den jeweils amtierenden Champion, Einheit Siege / Punkte / Marge" --
+  **je Block getrennt ausgewiesen, nie ueber alle zehn gepoolt** (par.8 Punkt 8);
+  Zugklassen-Differential "n = rund 600 Entscheide, Grundmenge alle Claude-Entscheide der
+  Partien g01-g07, Einheit Entscheide"; Ziehsucht "n = Zuege mit Ziehung, Grundmenge
+  Plattenzuege, Einheit Ziehungen je Zug", bedingt auf den Punktestand.
+- **Die sechs Standard-Kennzahlen** je Seite (par.4.2) aus `tools/analyze_game_log.py` und
+  `tools/probes/tiling_geometry_probe.py`, verglichen mit den Mensch-Logs und den Netz-Arenen.
+  **Endstand aus den Endwertungszeilen, NICHT aus `# SPIELENDE`**
+  (`PREREG_difficulty_levels.md` par.2.4: die Zeile weicht in allen 33 Server-Logs ab).
+- **Registrierung in par.7** (Ergebnisse je Partie plus Protokoll) und, fuer das Differential, in
+  einem eigenen Ergebnis-Absatz zu par.10; **Zeile-1-Kopf im selben Zug** nachziehen, danach
+  sofort `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1 und Abschnitt 4** sowie `archive/history.md` fortschreiben.
+- **Rueckwaerts-Pruefung**:
+  `grep -rn "claude_play\|Ziehsucht\|g06\|g07\|Zugklassen" evaluations/ docs/ tools/`
+  -- betroffen sind mindestens `PREREG_corpus_behaviour_audit.md` par.7 (Arm A1 stuetzt sich auf
+  die Zahlen aus par.7 hier), `PREREG_v29_window.md` par.7 Punkt 2/2b,
+  `PREREG_difficulty_levels.md` par.5 Stufe 4 (die Ziehsucht zaehlt dort nicht als Aussetzer),
+  `PREREG_score_clamp_incentive.md` par.10/par.11.
+- **Laufzeit-Zeilen** in `docs/measured_runtimes.md` (Sondenlauf Zugklassen-Differential mit n
+  Entscheiden; Antwortzeit je Zug liefert erst `PREREG_difficulty_levels.md` Stufe 1 -- bis dahin
+  bleibt par.5 hier eine ANNAHME und ist so zu markieren).
+- **Elo-Register: NICHTS.** par.4 schliesst einen Elo-Knoten ausdruecklich aus.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **Ob es mehr als zehn Partien gibt** (par.10 Schlusssatz: "Mehr Claude-Partien erhoehen n; die
+  Sitzung dafuer entscheidet der Nutzer"). **Nutzer fragen.**
+- **Chipwahl in der Engine** (`apply_tiling_chips` mit Plaettchenliste) und **Validator-Fix fuer
+  `validate_small_moon`**: beides Engine-Aenderungen mit faelliger Anker-Invarianz --
+  Nutzer-Entscheid, kein Agenten-Bau.
+- **Jeder Knopf und jedes Trainingsziel, das aus dem Zugklassen-Differential folgt**, braucht eine
+  eigene Prereg (par.10 Lesart (a): "kein Bau aus dieser Sonde heraus").
+- **Die Logs gehen nicht ins Trainingsfenster** (par.4); ein Arm "Claude-Logs als Traeger" waere
+  eine eigene Prereg.
+- **Kein Push, keine Loeschung** ohne pfadgenaue Freigabe; das Werkzeug bleibt in `tools/`
+  (par.8 Punkt 6).
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** ein CPU-freies Fenster (Spielen neben einem GPU-Training ist erlaubt, neben einer
+Arena nicht). Die Nachbesserungen und der Rauchtest sind erledigt (par.9 Punkte 11 und 14).
+**Reihenfolge im Begleitprogramm** (`PREREG_v29_window.md` par.7): Punkt 2 Ziehsucht-Sonde, dann
+Punkt 2b Zugklassen-Differential auf demselben Replay (unter 30 min), beide vor dem teuren
+Tiling-Umbau (Punkt 2c) und in derselben Gruppe wie der Korpus-Verhaltens-Audit
+(`PREREG_corpus_behaviour_audit.md`), weil alle denselben Befund bearbeiten.
+**Danach:** was das Differential in EINER Klasse zeigt, wird zu einer eigenen Prereg und
+gegebenenfalls zu einem v30-Rezept-Knopf (`PREREG_v29_window.md` par.8 Punkt 3).

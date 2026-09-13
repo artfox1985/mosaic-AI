@@ -385,3 +385,238 @@ Minuten je Modell, nie neben einer Arena.
 ## par.9 ERGEBNISSE (leer bis zum Start)
 
 Nichts gefahren (Stand 2026-09-11, 17:35).
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, ob ein weiterer Materialschritt (v29-b01, Rezept unveraendert) den Champion
+`v28-b02` schlaegt, und welcher der drei Arme der beste Stand wird. Die Verdikt-Regel steht in
+**par.6** (Tore) und `docs/generation_loop.md`: Tor 0 Traegerkennzahl aus der Kette Schritt 1
+plus Tor 2a ex post gegen den Wert des v28-Generators (`corpus_sanity_v27-b01-policy.json`
+0,816, par.4 Punkt 5); **Tor 1** gepaartes Gating mit `--log-games`, Blockgroesse 5, ZWEI Seeds
+(Regel aus v27: kein dritter Seed, wenn beide positiv sind und kein Nullentscheid vorliegt);
+**Tor 2b** aus denselben Logs (`arena_column_probe.py`), Plattenpunkte je Modell
+(`plate_points_from_arena.py --block 5`), dazu die sechs Standard-Kennzahlen. Fuer **b02**
+(Ablation der Spezialfeld-Kanaele) ist die Leserichtung in par.6 vorab festgelegt: verliert b02
+signifikant gegen b01, TRAEGT die Eingabe; gleichauf oder b02 vorn, dann traegt sie nicht. Fuer
+**b03** (Sicht-Arm) gilt par.6c mit dem Verwerfungs-Ausgang aus `PREREG_stack_top_feature.md`
+par.12: Gleichstand -> Sichtstand uebernehmen (das Kriterium ist Sichtgleichheit, nicht Elo);
+Regression ueber ZWEI Seeds bei Blockgroesse 5 -> Merkmal aus und Ursache suchen. Die
+Netz-Gesundheit (par.6d) ist Pflichtteil der b03-Abnahme, mit eigener Lesart dort.
+
+### 2. Voraussetzungen
+
+- **Maschine frei laut Prozessliste** (PowerShell-Zaehler wie in `tools/night_v28_generate.sh`,
+  Funktion `busy`); Ergebnis `0`. CLAUDE.md "Messungen laufen EXKLUSIV": ein Training auf der GPU
+  und EIN CPU-Auftrag daneben sind erlaubt, zwei CPU-Messungen nie; jeder Build zaehlt als Last.
+- **Pflichtpruefungen par.4 Punkte 1-8 abgearbeitet**, insbesondere: Wheel installiert und
+  `python -X utf8 -c "import mosaic_rust as m; m.state_features_from_json"` vorhanden,
+  Kontrakt-Hash im Manifest der ersten Klasse; Spec-Datei des Generators liegt
+  (`models/frozen_champions/v28-b02/spec.json`); Golden-Probe des Generator-Artefakts gruen;
+  Anker-Drift auf dem Start-Wheel gruen; **Manifest-Diff gegen die Referenz**
+  `data/manifest_v27-b01-policy_20260910_234958.json` (jede Abweichung ausser Modell, Version,
+  Seed und Datum ist ein Stopp, Feedback `lauf_manifest_gegen_referenz`).
+- **Vorher durch sein muessen:** die Sims-Neumessung
+  (`PREREG_search_depth_column_optimum.md` par.8e, Auswertung und Sockel-Vorschlag), die wartende
+  Leiter-Kante v28-b02@100 gegen v22-b05@25, der Build des P.10-Fixes samt Record-Feld
+  `tiled_max_row` (par.4 Punkt 7b) und `/mosaic-generation-turnover`.
+- **Generator:** `v28-b02` (par.3, Nutzer-Entscheid 2026-09-11), Modell
+  `models/alphazero_v28-b02_brierbest.onnx` (sha256-identisch mit dem Artefakt),
+  Spec `models/frozen_champions/v28-b02/spec.json`.
+- **Fenster-Pinning:** `MOSAIC_DATA_EXCLUDE` fuer Streudateien, darunter zwingend die
+  Messdateien `data/selfplay_depth<S>-v28b02_*.pkl` (par.7 Punkt 4); Cache-Waechter unter
+  `MOSAIC_IGNORE_POLICY_TARGET_VALID=1` und `MOSAIC_FEATURES_FROM_RUST=1`. Feedback
+  `watcher_workers_reimport_config`: waehrend Waechter oder Kette laufen, wird
+  `config.py`, `engine/py/neural_net.py`, `corpus_dataset.py` und `file_cache_key.py` NICHT
+  angefasst (Vorfall 2026-09-11, 24 Bloecke unter falschem Schluessel).
+
+### 3. Schritte
+
+Jeder Programmpunkt hat eigene Schritte. Reihenfolge wie nummeriert.
+
+**P1 -- Schwarm-Erzeugung v29 (FREIGEGEBEN, par.8 Punkt 8; Sockel spaeter)**
+
+1. `/mosaic-generation-turnover` vollstaendig durchlaufen (Maschine frei, Einfrieren,
+   daily-Snapshot mit restic-Beleg, Namen reservieren in `docs/generation_naming.md`,
+   STATUS-Neufassung). **Loeschliste des Nutzers erst NACH dem Start des Self-Plays** (STATUS
+   Abschnitt 1, Verbote), und nur mit pfadgenauer Freigabe.
+2. Ketten-Skript `tools/night_v29_generate.sh` nach dem Muster von `tools/night_v28_generate.sh`
+   anlegen (mit Warte-Schleife `busy`, Datei-Zaehler je Klasse, Abbruch-Waechter aus
+   `night_v28_chain_resume.sh` und `night_v28_b02.sh`), aber NUR mit den beiden
+   value-only-Befehlen (par.8 Punkt 8: der Policy-Befehl wartet):
+
+   ```
+   python -u self_play.py --mode network --model models/alphazero_v28-b02_brierbest.onnx \
+     --spec models/frozen_champions/v28-b02/spec.json \
+     --games 4000 --sims 100 --value-only --version v28-b02-value-tempc \
+     --threads 11 --chunk 10 --per-file 10 --seed 20260921 \
+     --action-temp 2 --deviate-prob 1.0
+
+   python -u self_play.py --mode network --model models/alphazero_v28-b02_brierbest.onnx \
+     --spec models/frozen_champions/v28-b02/spec.json \
+     --games 4000 --sims 100 --value-only --version v28-b02-value-excursion \
+     --threads 11 --chunk 10 --per-file 10 --seed 20260922 \
+     --excursion-prob 1.0 --tau-argmax-from-move 1 --no-root-noise
+   ```
+
+   Dazu der Startkuppel-Streuknopf `MOSAIC_START_SLOT_RANDOM_P=0.15` je Spieler (par.6b,
+   Koordinator-Wahl im Nutzer-Rahmen). Start als Hintergrundaufgabe, OHNE Pipe und OHNE
+   Umleitung (CLAUDE.md "Lange Laeufe NIE in eine Pipe"); `python -u` ist im Befehl.
+   **Dauer (gemessen an v28, `docs/measured_runtimes.md` Abschnitt Generation v28):** tempc
+   11.632,4 s = 3h 14m, excursion 11.361,3 s = 3h 09m, zusammen rund 6,4 h.
+   **Bei Abbruch:** nur den fehlenden Tail nachziehen (`--games <Rest>`, `--seed base + fertige
+   Chunks`, Projekt-Erinnerung `selfplay_tail_resume_by_chunk_seed`), NICHT den ganzen Block neu;
+   Ausnahme, wenn der Suchalgorithmus zwischendrin gewechselt hat.
+3. Daneben (erlaubt, weil er zur Erzeugung gehoert) der Cache-Waechter:
+   `MOSAIC_IGNORE_POLICY_TARGET_VALID=1 MOSAIC_FEATURES_FROM_RUST=1 python -X utf8 -u tools/build_cache_incremental.py --data-dir data --encoder 2d --value-target-variant nortv --workers 3 --watch --wartezeit 60 --leerlauf-abbruch 100000`
+4. **Tor 0 / Tor 2a ex post** nach jeder Klasse:
+   `python -X utf8 tools/corpus_sanity_check.py data --pattern "selfplay_v28-b02-value-tempc_*.pkl" --out evaluations/artifacts/corpus_sanity_v28-b02-value-tempc.json`
+   (gemessen 270,7 s fuer 4.000 Partien, 1 Thread, `docs/measured_runtimes.md`).
+
+**P2 -- Sockel (ZURUECKGESTELLT, Nutzer-Entscheid offen)**
+
+5. **Schritt "Zuschnitt registrieren und Nutzer fragen":** die Sims des Sockels und die Maschine
+   sind NICHT entschieden (par.8 Punkt 8: "vermutlich auf der schnelleren Maschine"). Der Agent
+   legt den Kosten-Vorschlag aus `PREREG_search_depth_column_optimum.md` par.8e vor, registriert
+   den gewaehlten Zuschnitt HIER in par.9 und startet nichts. Der Befehl liegt in par.5 Nr. 1
+   (Seed 20260920, `--tau-argmax-from-move 1 --deviate-prob 1.0`); bei geaenderten Sims ist die
+   Zeile hier mit der neuen Zahl zu registrieren, bevor sie laeuft.
+
+**P3 -- Kette und Arm b01 (Pflichtarm)**
+
+6. `tools/night_v29_chain.sh` nach dem v28-Muster: Manifest je Klasse, G-2-Kennzahlen, Fenster
+   (Seed **20260941**, Val-Pool `^selfplay_v29-`), Bloecke, Monolith mit Formen-Waechter,
+   Training. **G-2-Haelfte:** `G2_SWARM_PATTERN` erst nach dem Nutzer-Entscheid setzen (par.2,
+   Vorschlag Ausflug-Haelfte `selfplay_v26-b01-value-excursion_*`) -- siehe Stopp-Punkte.
+   Dauer gemessen: Kette Schritte 2-6 rund 5 min bei vorliegenden Bloecken, Monolith-Merge
+   531-551 s, Training 12 Epochen 5.156,6 s = 1,43 h (`docs/measured_runtimes.md`).
+7. **Tor 1 b01 gegen den Champion** (= Generator v28-b02, beide Seiten Champion-Spec), zwei
+   Seeds, Blockgroesse 5, Logs:
+
+   ```
+   python -X utf8 -u tools/paired_gating.py \
+     --model-a models/alphazero_v29-b01_brierbest.onnx --spec-a models/frozen_champions/v28-b02/spec.json \
+     --model-b models/alphazero_v28-b02_brierbest.onnx --spec-b models/frozen_champions/v28-b02/spec.json \
+     --name-a v29-b01 --name-b v28-b02 --sims-a 400 --sims-b 400 --c-puct 1.5 \
+     --block-size 5 --max-pairs 200 --seed <SEED> --threads 10 --log-games \
+     --no-promote-winner --out evaluations/artifacts/paired_gating_v29-b01_vs_v28-b02_s<SEED>.json
+   ```
+
+   Dauer gemessen: 200 Paare @400 mit Logs 5.182-5.446 s = 86-91 min je Seed
+   (`docs/measured_runtimes.md`).
+8. **Tor 2b und Plattenpunkte** auf denselben Logs:
+   `python -X utf8 -u tools/probes/arena_column_probe.py --artifact <ARTEFAKT>` (83-108 s) und
+   `python -X utf8 -u tools/plate_points_from_arena.py <ARTEFAKT> --block 5` (unter 10 s).
+
+**P4 -- Arm b02 (Ablation der Spezialfeld-Kanaele 77/78, ENTSCHIEDEN par.6)**
+
+9. **Bau:** Schalter `MOSAIC_SPECIAL_PLANES_OFF` (Name vorlaeufig, Registratur-Eintrag Pflicht)
+   im Rust-Merkmalsbauer und im Python-Zwilling. Betroffene Stellen laut par.6:
+   `engine/src/features.rs:1149` `SPECIAL_YIELD_CHANNEL = 77`, `:1160`
+   `SPECIAL_UNLOCK_DISTANCE_CHANNEL = 78` (beide Pfade), Zwilling
+   `engine/py/neural_net.py`; der Schalter ist Teil des Cache-Schluessels.
+   **Reihenfolge Bau -> Tore -> Messung.** Tore, in dieser Folge (Muster
+   `tools/night_v28_knob_build.sh`, gemessen 84 s / 33 s / 34 s / 19 s / 12 s):
+   Python-DLL in den PATH (`$env:PATH = "$(python -c 'import sys,os;print(os.path.dirname(sys.executable))');" + $env:PATH`),
+   `cargo test --release --lib`, `cargo test --release --no-run` (examples/benches),
+   `python -m maturin build --release` plus `pip install --force-reinstall --no-deps`,
+   **Paritaetstor mit Schalter AN**, Netz-Paritaets-Fixture des Champions UNVERAENDERT bei
+   Schalter aus, `/mosaic-anchor-invariance` (Drift und Konservierung; der Anker ist netzlos und
+   muss gruen bleiben), `python -X utf8 tools/generate_knob_docs.py` und
+   `python -X utf8 tools/check_conventions.py`.
+10. Bloecke fuer das ganze Fenster neu unter dem Planes-Schluessel (gemessen 1.582 s = 26 min bei
+    6 Workern, Rust-Merkmalsbauer), Monolith neu (9 min), Training wie b01.
+11. **Tor 1 b02 gegen b01**, zwei Seeds, Befehl wie Schritt 7 mit `--model-a` b02 und
+    `--model-b` b01. Diagnostik vorregistriert (par.6): Plattenpunkte je Kriterium mit
+    Erwartung "Zuwachs GENAU im Posten Spezialfelder", plus
+    `python -X utf8 -u tools/probes/special_tile_yield_measurement.py` (Grundmenge Arena-Partien,
+    Einheit ausgeloeste untere Spezialfelder je Seite).
+
+**P5 -- Arm b03 (Sicht-Arm, Abschnitt 16)**
+
+12. Bau und Tore stehen in `PREREG_stack_top_feature.md` par.15 / Abschnitt 16 und in deren
+    AGENTEN-AUFTRAG; hier nur die Einordnung: der Encoder-Anbau ist ein **Wheel-Wechsel** und
+    gehoert in ein Fenster OHNE Erzeugung, Waechter oder Kette (par.4 Punkt 6). Vorschlag par.6c:
+    im Generationswechsel NACH der Sims-Neumessung und VOR dem Start der Erzeugung; Alternative
+    nach dem Ende der Erzeugung vor dem Training. Danach Pflichtpruefung par.4 Punkte 2/3 mit dem
+    NEUEN Kontrakt-Hash und einer neuen Manifest-Referenz.
+13. Bloecke neu, Training wie b01, **Tor 1 b03 gegen b01** mit zwei Seeds (Befehl wie Schritt 7).
+14. **Netz-Gesundheit (par.6d, PFLICHTTEIL der b03-Abnahme, auch an b01 als Bezug):**
+    (1) Spaltennormen von `flat_branch.0.weight` fuer die neuen Indizes (755..) gegen die
+    Altspalten -- Einzeiler am Checkpoint, kein Werkzeug noetig;
+    (2) tote ReLU-Einheiten der ersten Flachschicht und des Rumpfs auf dem Frozen-Set, b03 gegen
+    b01 gegen Champion; Werkzeug existiert NICHT (geprueft 2026-09-13: kein Treffer fuer
+    dead/activation in `tools/`), Bau rund eine Stunde als `tools/probes/dead_unit_probe.py`;
+    Schwelle vorab: mehr als das Doppelte des b01-Anteils ist ROT;
+    (3) `python -X utf8 -u tools/offline_diagnosis.py` und `python -X utf8 -u tools/oracle_metrics.py`
+    b03 gegen b01 auf demselben Val-Split (Aufloesungsgrenze value_r2 rund 0,015);
+    (4) `python -X utf8 -u tools/probes/value_head_reliability_probe.py` und
+    `python -X utf8 tools/platt_fit.py` (Brier auf frozen_v3) -- Brier darf nicht ueber den
+    b01-Wert steigen;
+    (5) Trendtabelle ueber v24-b04 (744), v28-b02 (755) und v29-b03 (794/812).
+    Alle fuenf ohne Suche, Minuten je Modell, **nie neben einer Arena**.
+
+**P6 -- Begleitprogramm (par.7)**
+
+15. Die eingetakteten Punkte laufen in den CPU-freien Fenstern und haben je eine eigene Prereg
+    mit eigenem AGENTEN-AUFTRAG: Schwierigkeitsleiter (`PREREG_difficulty_levels.md`),
+    Ziehsucht-Sonde und Zugklassen-Differential (`PREREG_claude_play_interface.md` par.9/par.10),
+    Korpus-Verhaltens-Audit (`PREREG_corpus_behaviour_audit.md`), Tiling im Blatt
+    (`PREREG_round_transition_search_sampling.md` par.9), Mondstapel Stufe 1
+    (`PREREG_moon_stack_order.md` par.4), Rueckgabe-Reihenfolge (`PREREG_dome_return_order.md`
+    par.5), Rundenschaetzer (`PREREG_round_estimate_leaf_term.md` par.5), Stapelziehen bei
+    positivem Stand (`PREREG_stack_draw_reservation_rule.md` par.7 und `PREREG_chance_nodes.md`
+    par.14 Teil B1). Reihenfolge nach Maschinenlage, aber: **keine zwei CPU-Laeufe gleichzeitig**.
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: Tor 1 "n = 400 Partien (200 Paare) je Seed, Grundmenge
+  gepaarte Arena-Partien, Einheit Siege"; Tor 2b "n = replaybare Partien, Grundmenge
+  Arena-Partien, Einheit volle Spalten je Seite"; Tor 2a "n = 8.000 Seiten, Grundmenge
+  Self-Play-Seiten, Einheit volle Spalten je Seite". Auswertung auf **Block-Ebene**
+  (Blockgroesse 5).
+- **Die sechs Standard-Kennzahlen** je Arm und als Differenz (CLAUDE.md), zusaetzlich fuer b02
+  die Spezialfeld-Kennzahlen aus Schritt 11 und fuer b03 die fuenf Gesundheitspunkte.
+- **Ergebnisse in par.9 dieser Datei** eintragen, den **Zeile-1-Kopf im selben Zug** nachziehen
+  (Ueberholtes ersetzen, unter rund 600 Zeichen), danach sofort
+  `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1** und `archive/history.md` fortschreiben; pruefen, ob ein ANDERER
+  STATUS-Abschnitt dadurch falsch wird (CLAUDE.md Pflegeregel).
+- **Rueckwaerts-Pruefung**: `grep -rn "v29-b01\|v29-b02\|v29-b03\|v29_window" evaluations/ docs/ tools/`
+  -- jede Fundstelle lesen.
+- **Laufzeiten** je Lauf ins Artefakt (`laufzeit`-Block mit `wanduhr_s`, `cpu_s`, `threads`,
+  `s_je_partie`), Planungsgroessen nach `docs/measured_runtimes.md` unter einem neuen Abschnitt
+  "Generation v29".
+- **Elo-Register**: nur Kanten AM CHAMPION eintragen (Gating-Kante, Anker-Kante, Champion-2-Kante
+  nach `docs/promotion_checklist.md`), je mit `--units-from-paired-artifact` und `--early-stop`,
+  falls frueh gestoppt wurde. Arm-gegen-Arm-Kanten ohne Champion-Bezug gehoeren nicht hinein.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **G-2-Haelfte (par.2, par.8 Punkt 1) ist NICHT entschieden.** Vorschlag ist die Ausflug-Haelfte;
+  der Agent setzt `G2_SWARM_PATTERN` erst nach ausdruecklicher Antwort. **Nutzer fragen.**
+- **Sockel: Sims und Maschine** (par.8 Punkt 8) -- Vorschlag vorlegen, nicht starten.
+- **Start der Erzeugung** ist grundsaetzlich freigabepflichtig (par.8 Punkt 4); die Freigabe vom
+  2026-09-13, 02:10 deckt AUSSCHLIESSLICH den Schwarm mit 100 Sims.
+- **Champion-Wechsel** nur ueber `/mosaic-champion-promotion` und `docs/promotion_checklist.md`;
+  kein `set_champion` aus eigenem Antrieb.
+- **Anker-Drift ROT: anhalten.** ROT heisst Nutzer-Entscheid (Anker bewusst neu setzen oder
+  Aenderung zuruecknehmen), nie Reparatur (CLAUDE.md).
+- **Aufnahme eines Knopfs ins Rezept** (Rueckgabe-Reihenfolge, Rundenschaetzer, Tiling im Blatt,
+  Mondstapel) ist Nutzer-Entscheid, auch bei positivem A/B.
+- **Loeschungen** (Loeschliste aus STATUS Abschnitt 1, alte Manifeste, Messdateien) nur auf
+  pfadgenaue Freigabe und erst nach dem Start des v29-Self-Plays.
+- **Kein Push**; Ahead-Stand melden.
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** Sims-Auswertung (`PREREG_search_depth_column_optimum.md` par.8e), wartende
+Leiter-Kante, Build P.10-Fix und `tiled_max_row`, `/mosaic-generation-turnover`.
+**Reihenfolge der Arme** (par.6c): b01 in der Kette, b02 und b03 danach auf demselben Fenster mit
+je eigenen Bloecken, Tor 1 je Arm gegen b01, der beste gegen den Champion.
+**Danach:** Promotion nach `docs/promotion_checklist.md` (Champion-2-Kante gegen das Artefakt
+`v27-b01`), dann die Kanten der Schwierigkeitsleiter (par.7 Punkt 1: NACH Tor 1 v29), dann v30
+mit ausschliesslich Rezept-Knoepfen und der Projektabschluss (par.8 Punkt 3).
+**Das Begleitprogramm par.7 laeuft parallel in den CPU-freien Fenstern**, nie neben einer Arena;
+seine Verdikte gehen ins v30-Rezept.

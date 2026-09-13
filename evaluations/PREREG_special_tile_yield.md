@@ -625,3 +625,164 @@ seit 2026-08-29 offene Punkt (2) des Kopfbereichs (kein 77-gegen-79-A/B) seine M
 bleibt ungebaut und haengt am Ausgang. Anlass der Wiedervorlage: Audit-Querlesung 2026-09-11
 und der Spezialfeld-Posten in Tor 1 v28 (-9,73 gegen -10,61 Punkte je Partie, 160 von 400
 Brettern, `PREREG_v28_window.md` par.10).
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, ob sich der groesste unabgeholte Posten auf dem Brett -- die Spezialfliesen
+-- heben laesst und an welchem Hebel. **Zwei Teilfragen sind erledigt:** der Posten LEBT (par.7:
+auch der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen), und K5
+(`MOSAIC_SPECIAL_ROW6_W`) ist gebaut, gemessen und seit 2026-09-07 Rezeptbestandteil -- er hebt
+die vollen Spalten am staerksten von allem Gemessenen (0,5725 -> 0,6900) und ist siegneutral
+(243:257), **aber nicht ueber die Spezialfelder** (k6 leicht schlechter, die Punkte kommen aus
+vertikalen Reihen und Eckplatten; par.9c/9d, Zusammenfassung "Damit steht der Befund
+vollstaendig"). **Offen ist der netzseitige Hebel**, und die einzige eingetaktete Messung dazu
+ist die **Ablation der Planes-Kanaele 77/78 als v29-b02** (Nachtrag 2026-09-11;
+`PREREG_v29_window.md` par.6). Deren Leserichtung ist dort VORAB festgelegt: die Kante laeuft
+b02 (ohne Kanaele) gegen b01 (mit); **verliert b02 signifikant, TRAEGT die Eingabe** (Verdikt
+fuer par.4a: wirksam), und der naechste Hebel ist die Drafting-Seite oder par.4c; **gleichauf
+oder b02 vorn, dann traegt sie nicht**, und die Kanaele bleiben nur aus Kompatibilitaet
+(Modellbreite) im Vektor. Uebergeordnet gilt **par.6**: Primaermass sind eigene Punkte und
+Margin auf Block-Ebene, NICHT die Spezialfeld-Quote -- die ist eine Zwischengroesse, und
+Zwischengroessen sind in diesem Projekt schon dreimal gestiegen, ohne dass Staerke folgte.
+
+### 2. Voraussetzungen
+
+- **Die Kanaele existieren seit Commit `e91cd34` (2026-08-28)**: `features.rs:1149`
+  `SPECIAL_YIELD_CHANNEL = 77`, `:1160` `SPECIAL_UNLOCK_DISTANCE_CHANNEL = 78`,
+  `NUM_PLANES_CHANNELS 79`; jedes Modell seit v22-b01 traegt sie
+  (Berichtigung in `PREREG_v29_window.md` par.6). **Ein Neubau derselben Eingabe ist
+  gegenstandslos.**
+- **Zu bauen ist nur der Ablations-Schalter** `MOSAIC_SPECIAL_PLANES_OFF` (Name vorlaeufig,
+  Registratur-Eintrag Pflicht) im Rust-Merkmalsbauer und im Python-Zwilling, als Teil des
+  Cache-Schluessels.
+- **Maschine frei laut Prozessliste** fuer Bau, Blockbau, Training und Tor 1; exklusiv.
+- **Vorher durch sein muss:** v29-b01 (das Fenster und der Pflichtarm), weil b02 auf DEMSELBEN
+  Fenster mit demselben Seed (20260941) trainiert wird.
+- **Die drei Waechter aus par.5 gelten weiter:** (2) **Grundraten-Waechter** -- Kriterium 6 kann
+  per Konstruktion nie positiv werden, eine Kennzahl wie "Anteil Partien mit k6-Ertrag > 0" ist
+  eine Tautologie; tragend sind die ZAHL gefuellter Spezialfelder und ihre PUNKTSUMME, dazu k6
+  als getrennter Posten. (3) **Formziel-Waechter** -- vier Arme haben dieselbe Signatur gezeigt
+  (Formziel optimiert, Punkte verloren, Teilspalten hoch, volle Spalten runter); jeder
+  Spezialfeld-Arm misst deshalb PFLICHTMAESSIG Punkteniveau und Strafleiste mit.
+
+### 3. Schritte
+
+**P1 -- Bau des Ablations-Schalters (Nachtrag 2026-09-11, Details `PREREG_v29_window.md` par.6)**
+
+1. Schalter `MOSAIC_SPECIAL_PLANES_OFF`: setzt die Planes-Kanaele 77 und 78 auf Null, in BEIDEN
+   Rust-Pfaden (`engine/src/features.rs`, 2D-Zweig) und im Python-Zwilling
+   (`engine/py/neural_net.py`); **Teil des Cache-Schluessels**, damit die Bloecke sich selbst
+   auslosen. Registratur-Eintrag, `engine_config`, `docs/knobs.md`. Bezeichner englisch.
+2. **Tore, Reihenfolge Bau -> Tore -> Messung** (Muster `tools/night_v28_knob_build.sh`,
+   gemessene Dauern 84 s / 33 s / 34 s / 19 s / 12 s):
+
+   ```
+   $env:PATH = "$(python -c 'import sys,os;print(os.path.dirname(sys.executable))');" + $env:PATH
+   cd engine; cargo test --release --lib
+   cargo test --release --no-run
+   python -m maturin build --release
+   python -m pip install --force-reinstall --no-deps engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --out evaluations/artifacts/anchor_drift_live_wheel_<datum>_specialoff.json
+   python -X utf8 -u tools/probes/feature_parity_rust_python.py
+   python -X utf8 tools/generate_knob_docs.py
+   python -X utf8 tools/check_conventions.py
+   ```
+
+   **Paritaetstor MIT Schalter AN** (Rust gegen Python-Zwilling), **Netz-Paritaets-Fixture des
+   Champions unveraendert bei Schalter AUS** (bitidentisch), **Anker-Drift gruen** (der Anker ist
+   netzlos).
+
+**P2 -- Bloecke, Training, Tor 1 (v29-b02)**
+
+3. Bloecke fuer das ganze Fenster neu unter dem Planes-Schluessel: gemessen rund 26 min bei
+   6 Workern mit `MOSAIC_FEATURES_FROM_RUST=1` (`docs/measured_runtimes.md`, Abschnitt
+   Generation v28); Monolith neu (gemessen 531-551 s). Fenster, Seed (20260941) und Rezept
+   identisch zu b01 -- **EIN Faktor: die Spezialfeld-Eingabe.**
+4. Training wie b01 (gemessen 12 Epochen rund 1,43-1,46 h).
+5. **Tor 1 b02 gegen b01**, zwei Seeds, Blockgroesse 5, `--log-games` -- Befehl in
+   `PREREG_v29_window.md` AGENTEN-AUFTRAG Schritt 7 (200 Paare, gemessen 86-91 min je Seed).
+   **Bei Abbruch:** je Seed wiederholen; Teil-Laeufe nicht mit vollen poolen.
+
+**P3 -- Diagnostik am Arm (vorregistriert in `PREREG_v29_window.md` par.6)**
+
+6. Auf den Tor-1-Logs b02 gegen b01:
+   `python -X utf8 -u tools/plate_points_from_arena.py <ART> --block 5`
+   -- **Erwartung ist ein Zuwachs GENAU im Posten Spezialfelder** (gepaart, 200 Paare); ein
+   Zuwachs anderswo bei unbewegtem Spezialfeld-Posten hiesse, die Eingabe wirkt ueber einen
+   anderen Weg (Praezedenz K5, par.9c).
+7. `python -X utf8 -u tools/probes/special_tile_yield_measurement.py` auf denselben Logs:
+   Grundmenge Arena-Partien, Einheit ausgeloeste untere Spezialfelder je Seite. Die
+   Vergleichsgroesse aus par.7 (Leer-Raten je Slot-Reihe am hv2-Lehrer und an v22-b06) steht
+   dort.
+8. `python -X utf8 -u tools/probes/arena_column_probe.py --artifact <ART>` -- der
+   Formziel-Waechter verlangt volle Spalten UND Punkteniveau UND Strafleiste.
+
+**P4 -- par.4c (Slot-Ausloesungs-Kopf): NICHT gebaut, kein Auftrag**
+
+9. par.4c beschreibt einen 3x3-Kopf "wird dieses Spezialfeld bis Partieende ausgeloest?" mit dem
+   benannten Einwand, dass das Ziel POLITIKABHAENGIG ist (Praezedenz: der Konjunktions-Kopf ist
+   an genau dieser Bauform gescheitert). par.4a und par.4c sind **keine Alternativen und duerfen
+   nicht in einem Arm laufen**; Reihenfolge-Vorschlag ist erst die Eingabe, der Kopf danach und
+   nur, wenn die Ablation das Ziel traegt. Hilfskoepfe stehen bei 0 von 4.
+   **Schritt "Zuschnitt registrieren und Nutzer fragen":** der Kopf ist auf Nutzer-Priorisierung
+   gestellt (par.7 Schlusssatz, Kopfzeile) und hat keinen Auftrag. Nicht bauen, vorlegen.
+   Zusatz-Hinweis fuer die Vorlage: `PREREG_v29_window.md` par.8 Punkt 3 haelt fest, dass v30 nur
+   noch Rezept-Knoepfe bekommt und keine neuen Bauvorhaben -- ein neuer Kopf braucht also eine
+   ausdrueckliche Ausnahme.
+
+**P5 -- Drafting-Seite (par.4a), falls die Ablation positiv ist**
+
+10. par.4a verortet die Luecke im DRAFTING (welche Steine mehrere Runden vorher genommen werden,
+    damit die drei Nachbarfelder eines unteren Slots zusammenkommen); der Tiling-Loeser holt den
+    Bonus bereits exakt ab (`check_special_trigger` ist in `tiling_solver.rs` gespiegelt,
+    `placed_special`/`is_locked` sind Teil des Tiling-Keys). Traegt die Eingabe, ist der naechste
+    Hebel die Drafting-Seite -- **ohne registrierten Zuschnitt.** Auch hier: **Zuschnitt
+    registrieren und Nutzer fragen**, nicht raten.
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: Tor 1 "n = 400 Partien (200 Paare) je Seed, Grundmenge
+  gepaarte Arena-Partien, Einheit Siege"; Spezialfeld-Ertrag "Grundmenge Arena-Partien, Einheit
+  ausgeloeste untere Spezialfelder je Seite"; Plattenpunkte "gepaart, 200 Paare, Einheit Punkte
+  je Kriterium und Partie"; Spalten "n = replaybare Partien, Einheit volle Spalten je Seite".
+  Block-Ebene (Blockgroesse 5).
+- **Die sechs Standard-Kennzahlen** je Seite und als Differenz (par.6 "Begleitend zu berichten",
+  CLAUDE.md) -- und der Formziel-Waechter aus par.5(3) heisst, dass Punkteniveau und Strafleiste
+  nicht weggelassen werden duerfen.
+- **Registrierung** in einem Ergebnis-Absatz dieser Datei (Verdikt zu par.4a: wirksam oder
+  nicht), **Zeile-1-Kopf im selben Zug** nachziehen, danach sofort
+  `python tools/generate_prereg_index.py`. Das Ergebnis ist zugleich in
+  `PREREG_v29_window.md` par.9 zu registrieren (der Arm heisst dort v29-b02).
+- **STATUS.md Abschnitt 1** und `archive/history.md` fortschreiben.
+- **Rueckwaerts-Pruefung**:
+  `grep -rn "special_tile_yield\|SPECIAL_YIELD_CHANNEL\|SPECIAL_UNLOCK\|special_row6_w\|Spezialfeld" evaluations/ docs/ tools/ engine/`
+  -- betroffen sind mindestens `PREREG_v29_window.md` par.6, `PREREG_geometric_envelope.md`
+  (K5 ist Rezeptbestandteil), `PREREG_plate_head.md`, `docs/knobs.md`.
+- **Laufzeit-Zeilen** in `docs/measured_runtimes.md` (Bau-Tore, Blockbau unter neuem Schluessel,
+  Training, Tor 1 je Seed).
+- **Elo-Register**: nur, wenn b02 Champion-Kandidat wird -- dann die Kanten nach
+  `docs/promotion_checklist.md`. Eine Arm-gegen-Arm-Kante ohne Champion-Bezug gehoert nicht
+  hinein.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **par.4c (Slot-Ausloesungs-Kopf)**: kein Bau ohne Priorisierung durch den Nutzer.
+  **Nutzer fragen.**
+- **Drafting-Hebel (par.4a)**: kein Zuschnitt registriert. **Nutzer fragen.**
+- **Aenderungen am Rezept** (K5-Gewicht, Kanaele dauerhaft aus) entscheidet der Nutzer; die
+  Kanaele bleiben bei Nullbefund aus Kompatibilitaetsgruenden im Vektor (par.6 dort), sie werden
+  nicht entfernt.
+- **Anker-Drift ROT oder Paritaets-Fixture veraendert: anhalten.**
+- **Kein Push, keine Loeschung** ohne pfadgenaue Freigabe.
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** v29-b01 muss trainiert und durch Tor 1 sein (gleiches Fenster, gleicher Seed).
+**Reihenfolge der Arme** (`PREREG_v29_window.md` par.6c): b01 in der Kette, b02 (Ablation) und
+b03 (Sicht) danach auf demselben Fenster mit je eigenen Bloecken; Tor 1 je Arm gegen b01, der
+beste gegen den Champion. **Danach:** traegt die Eingabe, ist der naechste Hebel Drafting oder
+par.4c -- beides ohne Auftrag; traegt sie nicht, ist der netzseitige Eingabe-Zweig dieser Prereg
+abgeschlossen und nur noch par.4c offen. Der Posten selbst bleibt der groesste negative in der
+Plattenwertung (Tor 1 v28: -9,73 gegen -10,61 Punkte je Partie bei 160 von 400 Brettern).

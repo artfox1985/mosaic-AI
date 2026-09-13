@@ -206,3 +206,152 @@ Busse wie `mcts.rs::player_total`. Kompilierung, Paritaets-Fixture, Anker-Drift 
 par.5 folgen im v28-Programm Schritt 7; A/B ueber den Referee am Champion, C_est aus par.5.
 
 **Kompiliert und im Wheel (Nachtrag 03:50):** Bau-Tor 2026-09-12, 03:44-03:48 (`tools/night_v28_knob_build.sh`, Artefakte `anchor_drift_live_wheel_20260912_knobs.json` / `anchor_conservation_artifact_wheel_20260912_knobs.json`): `cargo test --release --lib` 601 gruen (84 s; darunter Kontrakt-Hash-Literal 39648b95bbba1acf und die Netz-Paritaets-Fixture des Champions UNVERAENDERT), Beispiele/Benches kompilieren, Wheel gebaut und installiert (Kontrakt 39648b95bbba1acf, INPUT_SIZE 755), Anker-Drift gegen hv4_anchor GRUEN und Konservierung GRUEN, Konventions-Check gruen. Zwei Nachbesserungen beim Bau: `#![recursion_limit = "256"]` in lib.rs (das `json!`-Literal von `engine_config_json` riss das Makro-Limit) und die Lesestelle der Startslot-Knoepfe als zwei Literal-Aufrufe (Registratur-Scanner). Alle neuen Knoepfe stehen damit auf Default im Wheel, das die Promotion v28-b02 einfriert.
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, ob der additive Rundenschaetzer-Term am Netz-Blattwert (K4) Spielstaerke und
+Spalten traegt. Die Verdikt-Regel steht in **par.5 Punkt 6**: in den Spielbetrieb nur, wenn die
+Arena HAELT **und** die Spalten nicht fallen (Tor-2-Logik "Nicht-Fallen"); Vorlage an den
+Nutzer, **keine stille Aufnahme ins Rezept**. Entscheidungsmass ist Siegquote und Punktemarge
+auf **Block-Ebene** (par.5 Punkt 5), ausdruecklich nicht val-R2, nicht Brier, keine
+Offline-Metrik. **Falsifikator (par.5):** keine signifikante Staerke auf Block-Ebene bei BEIDEN
+Dosen -> der Term traegt nicht; dann gilt, dass das Netz das Merkmal aus `features.rs:690`
+bereits ausreichend nutzt, und die Sicht auf das Tiling muss ueber die Geometrie kommen
+(`PREREG_round_transition_search_sampling.md` par.7 Variante B/C), nicht ueber Punkte.
+Zusaetzlich bindend: **Kostentor 25 Prozent** Aufschlag auf die Wanduhr je Partie (par.5 Punkt 3,
+uebernommen aus `round_transition_search_sampling` par.4.1 und `bootstrap_horizon`).
+
+### 2. Voraussetzungen
+
+- **Der Knopf ist GEBAUT und im Wheel seit 2026-09-12, 03:47** (par.7 Baustand und Nachtrag):
+  `net_mcts.rs` K4-Block (`round_estimate_points`, `round_estimate_shift_from`,
+  `round_estimate_shift_state`, Blatt-Pfad hinter dem K3-Term), Spec-Felder `round_est_c`
+  (Default 0,0 = aus, bitidentisch) und `round_est_b_profile` (vier Zahlen, Default **3 / 8 /
+  10 / 12** = P90 von |E(0) - E(1)| je Runde 1..4, n = 10.698 / 9.441 / 9.184 / 8.750
+  Draft-Zustaende, Einheit Punkte, aus `round_estimate_scale_probe.json`), Env
+  `MOSAIC_ROUND_EST_C` und `MOSAIC_ROUND_EST_B_PROFILE`, Registratur, `engine_config`,
+  Spec-Abbildung in `server.py` und `tools/claude_play.py`, drei Tests. Bau-Tor
+  `tools/night_v28_knob_build.sh` gruen: 601 Lib-Tests, Kontrakt-Hash `39648b95bbba1acf` und
+  Netz-Paritaets-Fixture des Champions unveraendert, Anker-Drift und Konservierung gruen.
+  **Es ist also nichts mehr zu bauen; offen sind Kostentor, Instrument und A/B.**
+- **Skala ist gemessen, nicht gesetzt** (par.4, 2026-09-05): Variante (a) je Runde ist gebaut
+  (par.6a, Koordinator-Vorschlag). Der Nutzer kann auf (b) eine Skala 9,25 wechseln -- solange er
+  das nicht tut, gilt (a).
+- **Maschine frei laut Prozessliste**; exklusiv.
+- **Spieler:** amtierender Champion-Stand mit seiner Spec (par.6a: "nach `v28-b02`, am dann
+  amtierenden Champion-Stand, als Such-Knopf ohne Training").
+- **Eintaktung:** Schritt 7 des v28-Programms, uebernommen ins v29-Begleitprogramm
+  (`PREREG_v29_window.md` par.7 Punkt 3 und Punkt 4, letzter Spiegelstrich "nach Maschinenlage").
+
+### 3. Schritte
+
+**P1 -- Kostentor (par.5 Punkt 3)**
+
+1. Wanduhr je Partie mit gegen ohne Knopf bei sonst identischer Konfiguration; Schwelle **25
+   Prozent**. Messform: argmax-Instrument, 200 Partien @400, `--deterministic --no-root-noise`,
+   threads 11, exklusiv, zweimal (C_est 0,0 gegen C_est 1,0):
+
+   ```
+   python -X utf8 -u self_play.py --mode network --model models/alphazero_<champion>.onnx \
+     --spec models/round_est_c10.spec.json --games 200 --sims 400 --version rest-c10 \
+     --threads 11 --chunk 10 --per-file 10 --seed 20260931 --no-root-noise --deterministic
+   ```
+
+   **Dauer (gemessen):** argmax-Instrument 200 Partien @400, threads 11, rund 24 min je Lauf
+   (`docs/measured_runtimes.md`, Abschnitt Generation v24; als "C2 argmax-Instrument" auch mit
+   rund 2.050 s je Lauf gefuehrt). Zwei Laeufe, also rund 50 min.
+   **Hintergrund zur Erwartung (par.7 Baustand):** der Blatt-Pfad ruft
+   `solve_round_final_score` je Spieler selbst, trifft aber die thread-lokale Memoisierung, die
+   der Merkmalsbau desselben Zustands unmittelbar davor fuellt (`tiling_solver.rs:404-427`,
+   `features.rs:859`); bei `MOSAIC_TILING_CACHE=0` waeren es zwei echte Solverlaeufe je Blatt.
+   Das Kostentor misst den realen Fall.
+   **Reisst das Tor: Arm nicht weiterverfolgen**, unabhaengig von jeder Staerkevermutung.
+
+**P2 -- argmax-Instrument, zwei Dosen und die Knopf-Wechselwirkung (par.5 Punkt 4)**
+
+2. @400, 200 Partien, Seed 20260931, am amtierenden Champion, C_est in zwei Dosen
+   (**0,5 und 1,0**, Betrag wie K3, weil die tanh-Skala dieselbe Bauform hat), jeweils auf dem
+   Champion-Knopfsatz (K3-P C 1,0) obendrauf **UND** einmal ohne K3 -- das trennt Term-Wirkung
+   von Knopf-Wechselwirkung (Lehre v24 par.9b). Auswertung mit
+   `python -X utf8 tools/corpus_sanity_check.py data --pattern "selfplay_rest-*_*.pkl" --out evaluations/artifacts/round_est_instrument_<dosis>.json`.
+   **Die erzeugten Self-Play-Dateien sind Messmaterial** und gehoeren vor einem Fensterbau auf
+   die Ausschlussliste (`MOSAIC_DATA_EXCLUDE`), nicht in den Korpus.
+
+**P3 -- A/B (par.5 Punkt 5 und par.6a)**
+
+3. **Messform nach par.6a** (Muster der Kuppelstapel-Kante): gleiches Netz, Live-Engine MIT Term
+   gegen das eingefrorene Artefakt OHNE, `frozen_referee_match`, **zwei Seed-Basen a 150
+   Partien**, plus Spaltensonde auf den Logs:
+
+   ```
+   python -X utf8 -u tools/frozen_referee_match.py \
+     --artifact-dir models/frozen_champions/<champion> \
+     --model-a models/alphazero_<champion>.onnx --spec-a models/round_est_c10.spec.json \
+     --sims-a 400 --c-puct-a 1.5 --sims-worker 400 --c-puct-worker 1.5 \
+     --n-games 150 --seed-base <SEEDBASIS> --workers 6 \
+     --out evaluations/artifacts/round_est_ab_c10_<SEEDBASIS>.json
+   ```
+
+   **Dauer (gemessen):** A/B-Kante ueber den Referee, gleiches Netz, n=150, 6 Prozesse,
+   2.515-2.621 s = rund 43 min je Lauf (`docs/measured_runtimes.md`).
+   par.5 Punkt 5 nennt alternativ die gepaarte Arena (2 x 80 in beiden Richtungen, Blockgroesse
+   5, Seed 20261014, `--log-games`); par.6a hat die Referee-Form nachregistriert -- **wer die
+   Arena-Form nimmt, registriert das hier im selben Zug.**
+   **Bei Abbruch:** Seed-Basis beibehalten und wiederholen; Teil-Laeufe nicht mit vollen poolen.
+4. Sechs Standard-Kennzahlen je Seite und als Differenz (par.5 Punkt 5 nennt sie ausdruecklich):
+   `python -X utf8 -u tools/probes/arena_column_probe.py --artifact <ART>`,
+   `python -X utf8 -u tools/probes/arena_points_probe.py <ART>` (Kuppel-Bonus und Strafe je
+   Partie) und `python -X utf8 -u tools/plate_points_from_arena.py <ART> --block 5`.
+   Zusaetzlich getrennt mitloggen: **Rundenscore-Anteil und Strafleisten-Busse** (par.3 verlangt
+   das ausdruecklich, obwohl beide als EIN Schaetzer verrechnet werden).
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: Kostentor "n = 200 Partien je Arm, Grundmenge
+  argmax-Self-Play-Partien, Einheit Sekunden je Partie"; A/B "n = 150 Partien je Seed-Basis,
+  Grundmenge Referee-Partien gleiches Netz mit gegen ohne Term, Einheit Siege"; Spalten "n =
+  replaybare Partien, Grundmenge Arena-Partien, Einheit volle Spalten je Seite". Block-Ebene
+  (Blockgroesse 5).
+- **Registrierung in einem Ergebnis-Absatz dieser Datei** (par.5 Punkt 6 verlangt ein Verdikt),
+  **Zeile-1-Kopf im selben Zug** nachziehen, danach sofort
+  `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1 und Abschnitt 5** sowie `archive/history.md` fortschreiben.
+- **Rueckwaerts-Pruefung**:
+  `grep -rn "round_est\|ROUND_EST\|round_estimate" evaluations/ docs/ tools/ engine/ server.py`
+  -- betroffen sind mindestens `PREREG_v29_window.md` par.7 Punkt 3 und 4,
+  `PREREG_round_transition_search_sampling.md` par.7/Nachtrag 2026-09-11 (dort steht die
+  Reihenfolge-Berichtigung), `PREREG_v28_window.md` par.8 Schritt 7, `docs/knobs.md`.
+  **Besonders zu pruefen:** wer sich auf die Skala 3/8/10/12 beruft -- die Zahlen stammen aus
+  b01-gegen-v24-b01-Partien mit K3-P C 1,0 beidseitig (par.4 Schlusssatz: "am v24-Siegernetz vor
+  dem Bau erneut messen, Minuten"); ist das nie geschehen, gehoert der Vorbehalt in die
+  Ergebniszeile.
+- **Laufzeit-Zeilen** in `docs/measured_runtimes.md` (Kostentor-Laeufe, A/B je Seed-Basis).
+- **Elo-Register: NICHTS.** Gleiches Netz mit gegen ohne Knopf ist keine Kante am Champion; wird
+  der Term Rezeptbestandteil, ist der Champion eine neue gemessene Identitaet
+  (Feedback `measured_identity_gets_own_bxx`).
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **Skala (a) je Runde 3/8/10/12 gegen (b) eine Skala 9,25** (par.4/par.6a): der Nutzer kann vor
+  der Messung auf (b) wechseln. Gebaut ist (a).
+- **Aufnahme ins Rezept** ist ausdruecklich Nutzer-Sache (par.5 Punkt 6: "Vorlage an den Nutzer,
+  keine stille Aufnahme ins Rezept").
+- **Ein Runden-Profil fuer C_est** (nicht fuer B_est) waere eine neue Variante und wird erst dann
+  ueberhaupt zum Thema, wenn der Basisarm frueh und spaet auseinanderlaeuft (par.3). Kein Bau
+  ohne Registrierung.
+- **Reisst das Kostentor: anhalten** und melden, nicht "trotzdem messen".
+- **Kein Push, keine Loeschung** ohne pfadgenaue Freigabe (auch nicht der Messdateien
+  `selfplay_rest-*`; Ausschlussliste ja, `rm` nein).
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** der Bau ist erledigt (par.7 Nachtrag); die Messung braucht ein freies CPU-Fenster am
+amtierenden Champion. Innerhalb des Begleitprogramms steht sie unter "nach Maschinenlage"
+(`PREREG_v29_window.md` par.7 Punkt 4, letzter Spiegelstrich) und ist damit nachrangig gegenueber
+Ziehsucht-Sonde, Mondstapel Stufe 1 und Rueckgabe-Reihenfolge.
+**Danach:** faellt der Term negativ aus, ist das laut par.5 der Verweis auf die Geometrie-Seite
+-- also auf `PREREG_round_transition_search_sampling.md` par.7 Variante B (dort par.9
+eingetaktet) und Variante C (Encoder-Seite). Faellt er positiv aus, ist er ein Kandidat fuer das
+v30-Rezept (`PREREG_v29_window.md` par.8 Punkt 3: v30 bekommt nur noch Rezept-Knoepfe).

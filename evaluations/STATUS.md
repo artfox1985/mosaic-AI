@@ -45,6 +45,13 @@ ohne Frueh-Stopp, Seed 20261058, Logs, Spaltensonde und Plattenpunkte; Artefakt
 `paired_gating_v28-b02_s100_vs_v22-b05_s25_seed58_full.json`. Danach Register-Zeile (player_a v28-b02
 sims 100, player_b v22-b05_live sims 25, `--units-from-paired-artifact`, kein `--early-stop`).
 
+**Sims-Kette, Teil A FERTIG (02:36; Register-Zeilen und par.8e folgen nach dem Ende von Teil B):**
+v28-b02@100 gegen @400 **45:105** (McNemar 6e-7, Diff -0,80 [-1,07; -0,53], Punkte 49,0 gegen 57,5;
+1.121 s), @200 gegen @400 **53:97** (p 0,0005, Diff -0,59 [-0,88; -0,29], Punkte 50,3 gegen 57,3;
+1.386 s), @600 gegen @400 **74:76** (p 1,0, Diff -0,03 [-0,34; +0,28], Punkte 53,9 gegen 52,6;
+2.364 s = 15,8 s je Partie). Lesart par.8e: SAETTIGUNG BEI 400 (100 und 200 klar unterlegen, 600
+Gleichstand). Teil B (argmax @100/@200/@400/@600, je 200 Partien) laeuft seit 02:36.
+
 ### NAECHSTE SCHRITTE (Reihenfolge)
 
 1. ~~Crosscheck Fliesenbuchhaltung~~ ERLEDIGT 01:30: 106 von 106 Entscheidungspunkten des Logs
@@ -126,6 +133,10 @@ sims 100, player_b v22-b05_live sims 25, `--units-from-paired-artifact`, kein `-
   ("eklatant besser" -> hoehere Erzeugungszeit in Kauf); faellt die Kurve fuer hoehere Sims aus,
   wird auch der Sockel des v29-Fensters mit den hoeheren Sims erzeugt (Kosten vorher in
   `PREREG_v29_window.md`). Pflicht-Auswertung: Vorschlag Sims Sockel/Schwarm getrennt.
+- **Sims-Knoten v28-b02@200 und @600 im Register (Nutzer 2026-09-13, 02:25: "lass sie noch an einer
+  kante. das ziehen wir dann in v29 oder v30 nach"):** die drei gepaarten Punkte der Sims-Kette werden
+  als Kanten gegen @400 eingetragen; @200 und @600 haengen damit an EINER Kante (weiche Intervalle),
+  eine zweite Aufhaengung (z. B. hv4@600 ueber den Referee, 150 Partien) erst in v29/v30.
 - **Zweite Aufhaengung der Sims-Kante am Champion:** v28-b02@100 hat nur 30 Partien (Intervall
   degeneriert); mehr Partien nur, wenn der Knoten gebraucht wird.
 - Generationswechsel-Start (Schritt 5 oben), Loeschzeitpunkt (nach Self-Play-Start).

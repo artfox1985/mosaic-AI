@@ -566,3 +566,198 @@ Naht-Liste als offener Befund. P.13/P.14 bleiben ungepruefte Behauptungen ohne A
   erhalten; die Suche nicht. NOCH NICHT KOMPILIERT: Build, Tests, Wheel, Paritaets-Fixture des
   Champions (aendert sich vermutlich, dann bewusst neu), Anker-Drift (Anker ist netzlos, muss gruen
   bleiben) erst nach dem Ende der laufenden Messungen (Sims-Kette, dann die wartende Kante).
+
+## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
+
+### 1. Ziel und Verdikt-Regel
+
+Zu beantworten ist, ob das Netz denselben Informationsstand hat wie ein Spieler am Tisch. Das
+Kriterium ist **Sichtgleichheit, nicht Elo** (par.1, Nutzer-Vorgabe 2026-08-20; bekraeftigt
+2026-09-05: "da geht es nicht um staerke sondern um sichtgleichheit"). Ein flaches
+Arena-Ergebnis ist ausdruecklich kein Grund, die Sichtgleichheit zurueckzunehmen. Der einzige
+Ausgang, der den Merkmalsstand VERWIRFT, steht in **par.12** und ist mit dem Arm v29-b03
+bindend: eine Regression ueber ZWEI Seeds bei Blockgroesse 5 -> Merkmal aus und Ursache suchen;
+Gleichstand -> Merkmalsstand uebernehmen. Die Pruefbarkeit des Baus selbst steht in par.6 Punkt
+5 und par.10: Sichtgleichheits-Test gegen die Record-Felder ueber mindestens 300 Zustaende,
+Regressionstest "755er-Layout bekommt exakt den alten Vektor", Netz-Paritaets-Fixture des
+Champions unveraendert (er deklariert 755 und darf die neuen Werte nie sehen), Anker-Drift
+gruen. **Zahlengleichheit bei gleichen Seeds ist hier PFLICHT, nicht Alarm.**
+
+### 2. Voraussetzungen
+
+- **Maschine frei laut Prozessliste** (PowerShell-Zaehler wie `busy` in
+  `tools/night_v28_generate.sh`); ein Wheel-Bau ist Volllast und faellt unter die
+  Exklusivitaetsregel (CLAUDE.md). Der Anbau gehoert in ein Fenster OHNE laufende Erzeugung,
+  Waechter oder Kette (`PREREG_v29_window.md` par.4 Punkt 6; Praezedenz v24-b04: Wheel-Install
+  nie, waehrend ein Lauf das Wheel geladen haelt).
+- **Ausgangsstand:** installiertes Wheel mit Kontrakt-Hash `39648b95bbba1acf`, INPUT_SIZE 755;
+  Champion und Generator `v28-b02` (`models/frozen_champions/v28-b02/`), Anker
+  `models/frozen_heuristics/hv4_anchor`.
+- **Im Baum liegt bereits, unkompiliert** (par.15 Nachtrag 02:35, STATUS Abschnitt 1 Schritt 6):
+  der P.10-Suchfix in `engine/src/state.rs` (`determinize_dome_pool` plus
+  `restore_top_plate_type` plus Test
+  `determinization_keeps_the_public_type_of_the_top_plate`). Er gehoert in DASSELBE Wheel wie
+  das Record-Feld `tiled_max_row`.
+- **Vorher durch sein muessen:** die Sims-Kette
+  (`PREREG_search_depth_column_optimum.md` par.8e) und die wartende Leiter-Kante
+  v28-b02@100 gegen v22-b05@25 -- beide laufen auf dem heutigen Wheel, ein Wheel-Wechsel
+  dazwischen stellt sie auf eine andere Engine.
+- **Record-Lage geprueft (par.13, 2026-09-13):** `pending_stack_draw` (`serialize.rs` Z.368),
+  `phase` (Z.340), `bag_colors`/`tower_colors` (Z.370-371), `unused_chip_count` (Z.255),
+  `dome_pool_view` (Z.100-128), `first_player_next_round` (Z.348) liegen im Record. NUR
+  `tiled_max_row` fehlt und muss VOR der Erzeugung additiv in `state_to_json` (par.15 Nachtrag,
+  P.14; `board.rs` Z.260, heute nur intern in `serialize.rs` Z.678 und im exact-Pfad Z.1328).
+
+### 3. Schritte
+
+**P1 -- Wheel 1: P.10-Suchfix und Record-Feld `tiled_max_row` (STATUS Schritt 6)**
+
+1. **Bau (Code liegt bereits fuer P.10):** `engine/src/state.rs` `determinize_dome_pool` und
+   `restore_top_plate_type` durchsehen (typerhaltende Permutation, Position 0 behaelt ihren Typ,
+   Tauschpartner nur aus dem Segment, das Position 0 enthaelt, kein zusaetzlicher RNG-Verbrauch);
+   der Diagnose-Rueckfall `MOSAIC_DOME_POOL_KNOWLEDGE=0` bleibt unveraendert. Zusaetzlich
+   `tiled_max_row` je Spieler additiv in `state_to_json` ausgeben (`engine/src/serialize.rs`,
+   Quelle `engine/src/board.rs` Z.260).
+2. **Tore, in dieser Reihenfolge** (Muster und gemessene Dauern aus
+   `tools/night_v28_knob_build.sh` bzw. `docs/measured_runtimes.md`):
+
+   ```
+   $env:PATH = "$(python -c 'import sys,os;print(os.path.dirname(sys.executable))');" + $env:PATH
+   cd engine; cargo test --release --lib            # gemessen 80-85 s
+   cargo test --release --no-run                    # examples/benches, gemessen 33 s
+   python -m maturin build --release                # gemessen 26-34 s
+   python -m pip install --force-reinstall --no-deps engine/target/wheels/mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --out evaluations/artifacts/anchor_drift_live_wheel_<datum>_p10.json
+   python -X utf8 -u tools/verify_frozen_heuristic.py --artifact-dir models/frozen_heuristics/hv4_anchor --venv --out evaluations/artifacts/anchor_conservation_artifact_wheel_<datum>_p10.json
+   python -X utf8 tools/generate_knob_docs.py
+   python -X utf8 tools/check_conventions.py
+   ```
+
+   **Netz-Paritaets-Fixture des Champions:** sie aendert sich durch P.10 VERMUTLICH (par.15,
+   STATUS Schritt 6). Aendert sie sich, wird sie BEWUSST neu erzeugt und die Aenderung hier
+   begruendet -- mit Gegenprobe ohne den Fix, nach dem Muster von
+   `PREREG_code_cleanup_closeout.md` par.8 (A2). Aendert sie sich nicht, ist das ebenfalls ein
+   Befund und wird notiert.
+   **Anker-Drift muss GRUEN bleiben** (der Anker ist netzlos und liest `determinize_dome_pool`
+   nicht). ROT ist Nutzer-Entscheid, keine Reparatur (CLAUDE.md; Stopp-Punkte unten).
+   Dauer zusammen: rund 6 min (gemessen "Voller Build" 554 Tests,
+   `docs/measured_runtimes.md`, Abschnitt Generation v24).
+   **Bei Abbruch:** `cargo os error 32` unter OneDrive ist bekannt (gesperrte `.o`-Datei),
+   Wiederholung ist regulaer gruen; `STATUS_DLL_NOT_FOUND` heisst, die Python-DLL fehlt im PATH
+   (erste Zeile oben).
+3. **Naht-Liste nachziehen:** P.10 steht als offener Befund in `docs/architecture_reference.md`
+   ("Wo der Code Information ABSICHTLICH vernichtet") und wird dort mit dem Fix auf erledigt
+   gesetzt, mit beiden Antworten (wessen Informationsmenge, was nimmt sie dem Spieler weg).
+
+**P2 -- Sichtpunkt P.3 klaeren, VOR dem Encoder-Bau**
+
+4. **Der Zuschnitt haengt an einer ungeklaerten Codefrage** (par.13, Spiegelstrich P.3): die 18
+   Bits "Design liegt gezogen vor mir" sind erst beim Stopp (Vorderseiten aufgedeckt)
+   sichtkonform. Am Code zu pruefen ist, ob der Entscheid "weiterziehen oder aufhoeren"
+   (`DrawStackPeek` gegen `ChooseDrawStackSlot`, `engine/src/moves.rs` Z.112-120) die
+   Vorderseiten schon kennt. Sieht er sie, ist das eine **Netz-sieht-MEHR-Stelle** und gehoert
+   in par.10 nachgetragen. Ergebnis entscheidet zwischen INPUT_SIZE **794** (39 sichere Werte)
+   und **812** (mit den 18 Design-Bits).
+   **Schritt "Zuschnitt registrieren und Nutzer fragen":** der Agent prueft die Codestelle,
+   registriert den Befund in par.15, und legt die Zahl (794 oder 812) dem Nutzer vor, statt sie
+   zu waehlen. Ohne Antwort wird die konservative Fassung 794 gebaut.
+
+**P3 -- Wheel 2: Encoder-Abschnitt 16 (Sicht-Arm v29-b03)**
+
+5. **Bau, additiv am ENDE des Flachvektors, Indizes 0..754 unveraendert** (par.13/par.15,
+   Zusammensetzung: P.3 Ziehserie 3 sichere Werte -- Anzahl gezogen /18, davon Wild /18, davon
+   Spezial /18 -- plus 18 bedingte Design-Bits; P.7 Phasen-One-Hot ueber die sechs Phasen
+   (`state.rs` Z.41-48), 6; P.9 Turm je Farbe /13, 5; P.11 Anzahl gehaltener Bonuschips je
+   Spieler /4, 2; P.12 18 Bits "Design liegt in einem Block, dessen Inhalt ich kenne"; P.13
+   Tiefe des ersten eigenen Blocks /18 und Anzahl eigener Bloecke /6, 2; P.14 (tiled_max_row +
+   1)/6 je Spieler, 2; P.15 Startspieler naechste Runde = Spieler am Zug, 1).
+   Betroffene Stellen, **drei Encoder-Orte append-only** (par.6 Punkt 3, par.10):
+   `engine/src/features.rs` JSON-Pfad (Flachteil um Z.85-419) und Direktpfad (um Z.504-782),
+   `engine/py/neural_net.py` (Python-Zwilling, Abschnitt 16); dazu `config.INPUT_SIZE`, die
+   Laengen-Assertion der Paritaetstests in `features.rs` und der Vertragsstring
+   `contract_canonical_string` in `engine/src/lib.rs` (er traegt die Vektorlaenge; nach A10 des
+   Code-Abschlusses, `PREREG_code_cleanup_closeout.md` par.3 Punkt 8). **Nur kuerzen, nie
+   auffuellen**: `Net::build_inputs` (`engine/src/net.rs`) kuerzt den Flachteil auf die vom
+   MODELL deklarierte Laenge (berichtigt 2026-09-09, par.10; nicht `features_for_layout`).
+6. **Tore des Encoder-Baus, Reihenfolge Bau -> Tore -> Messung:**
+   (a) **Sichtgleichheits-Test** ueber mindestens 300 Zustaende: jeder neue Wert stimmt mit dem
+   zugehoerigen Record-Feld ueberein (`pending_stack_draw`, `phase`, `tower_colors`,
+   `unused_chip_count`, `dome_pool_view`, `tiled_max_row`, `first_player_next_round`),
+   inklusive Randfaellen (leerer Stapel, keine Ziehserie, Tiling-Phase);
+   (b) **Regressionstest**: ein 755er-Layout bekommt exakt den alten Vektor, 0 Abweichungen;
+   (c) **Netz-Paritaets-Fixture des Champions UNVERAENDERT** (er deklariert 755);
+   (d) `cargo test --release --lib`, `cargo test --release --no-run`, Wheel per
+   `python -m maturin build --release` und `pip install`;
+   (e) **Anker-Drift und Konservierung gruen** (`/mosaic-anchor-invariance`);
+   (f) `python -X utf8 tools/check_conventions.py`; Bezeichner englisch (CLAUDE.md).
+   Kosten (ANNAHME, par.13): Bau und Tore rund 2 h.
+7. **Cache-Bloecke neu** unter dem neuen Schluessel (INPUT_SIZE steckt im Block-Schluessel),
+   gemessen rund 26 min fuer 2.947 Dateien bei 6 Workern mit
+   `MOSAIC_FEATURES_FROM_RUST=1` (`docs/measured_runtimes.md`, Abschnitt Generation v28);
+   Monolith neu (gemessen 531-551 s).
+8. **Training v29-b03**: Rezept b01, Warmstart mit **null-initialisierten** neuen Spalten in
+   `flat_branch.0.weight` (Muster v24-b04, `train.py` Z.1685-1692), Fenster und Seed wie b01
+   (20260941). Dauer gemessen: 12 Epochen rund 1,43-1,46 h.
+9. **Tor 1 b03 gegen b01**, zwei Seeds, Blockgroesse 5, `--log-games` -- Befehl in
+   `PREREG_v29_window.md` AGENTEN-AUFTRAG Schritt 7. Danach Spaltensonde und Plattenpunkte.
+10. **Netz-Gesundheit als Pflichtteil** (`PREREG_v29_window.md` par.6d, fuenf Punkte); Punkt 2
+    braucht ein neues Werkzeug `tools/probes/dead_unit_probe.py` (existiert nicht, geprueft
+    2026-09-13), Bau rund eine Stunde, Schwelle vorab: mehr als das Doppelte des b01-Anteils
+    ist ROT.
+
+**P4 -- par.11, zweite Achse (NICHT eingetaktet)**
+
+11. "Was WEISS die Suche, und was vergisst sie zwischen zwei Zuegen?" ist weiter offen (par.13
+    Schlusssatz). Ein Fall ist mit P.10 repariert, die Achse nicht abgearbeitet. Die drei
+    Kanaele, mit denen solche Fehler auffindbar sind, stehen in
+    `PREREG_dome_stack_information_sets.md` par.11 (Sicht-Audit, Orakel-Differential,
+    Anomalie-Report). **Schritt "Zuschnitt registrieren und Nutzer fragen":** kein Auftrag, kein
+    Zuschnitt, keine Kosten registriert -- nicht raten, sondern vorlegen.
+
+### 4. Auswertung und Registrierung
+
+- **Zahlen mit n, Grundmenge, Einheit**: Sichtgleichheits-Test "n >= 300 Zustaende, Grundmenge
+  zufaellige Spielzustaende, Einheit Abweichungen je Merkmal" (Soll: 0); Regressionstest
+  "n >= 300 Zustaende, Einheit abweichende Vektorindizes" (Soll: 0); Tor 1 "n = 400 Partien
+  (200 Paare) je Seed, Grundmenge gepaarte Arena-Partien, Einheit Siege".
+- **Die sechs Standard-Kennzahlen** (CLAUDE.md) aus den Tor-1-Logs je Seite und als Differenz.
+- **Registrierung** in par.15 / einem neuen Ergebnis-Absatz dieser Datei, **Zeile-1-Kopf im
+  selben Zug** nachziehen (Status bleibt OFFEN, solange Sichtgleichheit nicht erreicht ist; er
+  darf erst auf ENTSCHIEDEN, wenn P.3/P.7/P.9/P.11-P.15 gebaut sind ODER der Nutzer sie
+  ausdruecklich als "bewusst nicht sichtgleich" entscheidet, Nachtrag 2026-09-13, 01:00).
+  Danach sofort `python tools/generate_prereg_index.py`.
+- **STATUS.md Abschnitt 1** (Schritt 6 abhaken, neuen Kontrakt-Hash und die neue INPUT_SIZE
+  eintragen) und `archive/history.md` fortschreiben.
+- **Rueckwaerts-Pruefung** (CLAUDE.md):
+  `grep -rn "INPUT_SIZE\|755\|39648b95bbba1acf\|stack_top_feature\|tiled_max_row" evaluations/ docs/ tools/ engine/ *.py`
+  -- jede Fundstelle lesen. Sicher betroffen: `PREREG_v29_window.md` par.3/par.4/par.6c/par.6d,
+  `docs/architecture_reference.md`, `docs/generation_loop.md`, `config.py`.
+- **Laufzeiten** ins Artefakt je Lauf und als Planungsgroesse nach `docs/measured_runtimes.md`
+  (Bau-Tore, Blockbau, Training, Tor 1).
+- **Elo-Register**: nur, wenn b03 Champion-Kandidat wird -- dann die Kanten nach
+  `docs/promotion_checklist.md`. Der Sicht-Arm selbst erzeugt keine Register-Zeile.
+
+### 5. Stopp-Punkte fuer den Nutzer
+
+- **INPUT_SIZE 794 oder 812** (Sichtpunkt P.3, Schritt 4): Befund vorlegen, nicht selbst waehlen.
+- **Paritaets-Fixture aendert sich durch P.10**: "bewusst neu erzeugen" ist eine registrierte
+  Handlung mit Begruendung und Gegenprobe -- der Agent macht sie, meldet sie aber ausdruecklich;
+  eine stille Neuerzeugung ist ein Regelbruch.
+- **Anker-Drift ROT: anhalten.** Nutzer-Entscheid (Anker neu setzen oder Aenderung
+  zuruecknehmen), Praezedenz `PREREG_code_cleanup_closeout.md` par.7a.
+- **par.11 (zweite Achse)**: kein Bau ohne Auftrag.
+- **Aufnahme des Merkmalsstands ins Rezept von v30** entscheidet der Nutzer.
+- **Kein Push, keine Loeschung** ohne pfadgenaue Freigabe.
+
+### 6. Abhaengigkeiten und Reihenfolge
+
+**Vorher:** Sims-Kette und wartende Leiter-Kante (beide auf dem heutigen Wheel), dann Wheel 1
+(P.10 plus `tiled_max_row`) -- das Record-Feld MUSS vor dem Start der v29-Erzeugung im Wheel
+sein, sonst traegt der v29-Korpus P.14 nicht (`PREREG_v29_window.md` par.4 Punkt 7b; Praezedenz
+`dome_pool_view` fuer v28-b02). **Danach:** `/mosaic-generation-turnover`, Schwarm-Erzeugung,
+dann Wheel 2 (Encoder-Abschnitt 16) im Fenster ohne Erzeugung/Waechter/Kette -- Vorschlag par.6c
+ist "im Generationswechsel vor dem Start der Erzeugung", Alternative "nach dem Ende der
+Erzeugung vor dem Training"; der Generator deklariert 755 und sieht die neuen Werte nie.
+**Anschliessend** Bloecke, Training b03, Tor 1 gegen b01, Netz-Gesundheit (par.6d), Registrierung.
+Dieser Punkt ist Arm 3 des v29-Programms (`PREREG_v29_window.md` par.6/par.6c); das
+Begleitprogramm par.7 dort laeuft unabhaengig davon.
