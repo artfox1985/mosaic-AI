@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT (0,843 gegen 0,816), Tor 1 fuer b01 BEIDE SEEDS H0 (kein Champion-Wechsel; b01 war kein reiner Materialschritt, drei Erzeugungs-Aenderungen, nur 40,8 Prozent des Fensters tragen sie). b02 traegt 794 (Nutzer 2026-09-14: die 794 kommen sowieso), sein Bezugspunkt ist damit b03 statt b01 -- einfaktoriell im Ablations-Schalter. OFFEN: der Fenster-Cache-Schluessel kennt den Schalter nicht, b03 hat b02s Monolithen ueberschrieben (Ergebnisse unbeschaedigt, die naechste Wiederholung waere still falsch). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT, Tor 1 b01 gegen den Champion BEIDE SEEDS H0. **Tor 1 b03 gegen b01: Merkmalsstand UEBERNOMMEN** (par.12-Regel; Seed 1 klar fuer b03 mit 69:41, Seed 2 Gleichstand) -- aber KEIN Champion-Entscheid, b03 gegen den Champion ist ungemessen. b02 laeuft gegen b03. OFFEN: der Fenster-Cache-Schluessel kennt den Ablations-Schalter nicht. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -615,6 +615,36 @@ genauere Blick.
 200 Paaren abgebrochen, genau wozu er da ist. 13,8 s je Partie, 10 Threads.
 
 **Der zweite Seed (20261062) laeuft.** Ein DRITTER Seed ist kein Automatismus (Regel v27, par.6).
+
+### Tor 1 v29-b03 gegen b01: **Merkmalsstand WIRD UEBERNOMMEN** (2026-09-14)
+
+| Seed | Verdikt | Paare | b03 : b01 | LLR | gepaarte Diff | McNemar p | Punkte b03 / b01 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20261063 | **v29-b03** | 55 | **69 : 41** | +3,013 | +0,509 [+0,154, +0,865] | **0,0125** | 52,97 / 48,19 |
+| 20261064 | H0 | 125 | 123 : 127 | -3,543 | -0,032 [-0,280, +0,216] | 0,899 | 53,74 / 54,14 |
+
+**Die Seeds widersprechen sich.** Seed 1 erreicht die obere Wald-Schranke und gibt b03 einen
+klaren Sieg, Seed 2 laeuft in die untere und sieht nichts. Das ist die bekannte Seed-Streuung
+(`project_training_seed_variance`: der Seed bewegt die Metrik 4- bis 6-mal staerker als ein Knopf)
+und genau der Grund fuer zwei Seeds.
+
+**Das Verdikt folgt trotzdem eindeutig aus der vorregistrierten Regel**
+(`PREREG_stack_top_feature.md` par.12): verworfen wird der Merkmalsstand nur bei einer
+**Regression ueber ZWEI Seeds** bei Blockgroesse 5. Eine Regression liegt in keinem der beiden
+Seeds vor -- einer ist positiv, einer ist Gleichstand. **Also wird der Merkmalsstand
+uebernommen.** Das Kriterium des Arms ist ausdruecklich SICHTGLEICHHEIT, nicht Elo (par.1,
+mehrfach bekraeftigt); ein flaches Arena-Ergebnis ist kein Grund, sie zurueckzunehmen.
+
+**Was das NICHT ist: ein Champion-Entscheid.** b03 ist gegen b01 gemessen, nicht gegen den
+Champion, und b01 hat gegen `v28-b02` zweimal H0 gezeigt. Ob b03 den Champion schlaegt, ist
+**ungemessen** -- dafuer braeuchte es einen eigenen Lauf. Solange der nicht vorliegt, bleibt
+`v28-b02_brierbest` Champion.
+
+**Bemerkenswert bleibt der Widerspruch zur Offline-Metrik:** b03 hatte mit 0,18114 den
+SCHLECHTESTEN Brier-Wert der drei Arme und erreicht in der Arena trotzdem einen Seed-Sieg und
+zweimal mehr Punkte je Partie. Das stuetzt die bekannte Aufloesungsgrenze
+(`project_offline_metric_resolution_limit`) und ist ein Argument gegen Offline-Vorentscheide bei
+Abstaenden dieser Groesse.
 
 ### Trainings b02 und b03 durch -- der Sicht-Arm ist OFFLINE schlechter (2026-09-14)
 
