@@ -337,3 +337,71 @@ Konventions-Check gruen, **Anker-Drift GRUEN und Konservierung GRUEN** gegen `hv
 **Offen: das A/B** (Fahrplan Nr. 28) -- Fan-out an gegen aus am Champion, 200 Paare,
 Blockgroesse 5, `--log-games`, plus Abweichungsrate je Seite nach par.4.
 
+## par.9 STUFE 3: eigene Nachsuche fuer die Reihenfolge (Nutzer-Auftrag 2026-09-14, VOR dem Bau)
+
+Nutzer woertlich: *"dann modellier es korrekt: sobald von der sonnenseite gezogen wird brauchen
+wir eine zusaetzliche suche fuer die mond reihenfolge. damit wir in den naechsten halbzug
+hineinschauen koennen. sonst verschwendest simulationen fuer wenig wissen."*
+
+### Warum der Bestand die falsche Form ist
+
+`moon_order` ist heute Teil der Zugaktion (`TakeAction::moon_order`, `execution.rs:154`), und
+der Fan-out macht daraus bis zu sechs VERSCHIEDENE ZUEGE an derselben Stelle. Die konkurrieren
+im selben Kandidatenfeld wie inhaltlich andere Zuege; an der Wurzel rangt Gumbel daraus nur
+`gumbel_top_m_for_budget(sims)` = 16 bei @400 (`net_mcts.rs:4852`), und der Prior wird auf die
+Varianten VERTEILT (`base_p * p/pl_sum`, :2255), die Verteilung also flacher -- der
+Masse-Cutoff `POLICY_MASS_CUTOFF = 0.95` (:2280-2289) behaelt danach mehr Kandidaten mit je
+weniger Gewicht.
+
+**Sachlich ist der Stapelaufbau aber ein FOLGESCHRITT, kein Alternativzug** (Nutzer-Einwand
+2026-09-14: "wenn ich mich entscheide von der sonnenseite zu ziehen, ist der aufbau des
+mondstapels ein davon unabhaengiger schritt"). Die Kopplung ist eine Folge der Modellierung.
+Dazu passt das gemessene Bild aus par.7: der Fan-out wirkt oft (99 von 200 Paaren entschieden)
+und traegt trotzdem nichts, bei 1,83 Punkten je Partie WENIGER.
+
+### Bauform Stufe 3 (registriert VOR dem Bau)
+
+**Dritter Wert des vorhandenen Knopfs**, `MOSAIC_MOON_ORDER_VARIANTS=2`: kein Fan-out im
+Suchbaum (die Zugauswahl sieht genau EINEN Kandidaten je Zugidee, wie bei Wert 0), und NACH der
+Zugwahl entscheidet eine eigene, kleine Suche ueber die Reihenfolge.
+
+* **Wann:** nur bei einem `SmallFactorySun`-Zug mit mindestens zwei Reststeinen -- dieselbe
+  Bedingung wie der Fan-out heute (`net_mcts.rs:2241-2255`).
+* **Worueber:** die eindeutigen Permutationen aus `unique_moon_orders` (:2080), unveraendert.
+* **Wie tief:** je Variante eine Suche ueber den FOLGEZUSTAND, in dem der GEGNER am Zug ist --
+  genau der Halbzug, in dem sich die Reihenfolge auswirkt, weil pro Stapel nur der oberste Stein
+  ziehbar ist (`docs/engine_manual.md` Z.101-106, `factory.rs:76/96-97`). Eine reine
+  Blattbewertung reicht dafuer NICHT: sie sieht nicht, was der Gegner mit dem obersten Stein
+  macht. Das unterscheidet Stufe 3 von `dome_return_order` Modus 1, der genau daran scheitert
+  (dort par.10).
+* **Budget:** eigener Knopf `MOSAIC_MOON_ORDER_SEARCH_SIMS`. Das Budget kommt NICHT aus dem
+  Wurzelbudget -- das ist der Kern des Auftrags. **Nutzer-Praezisierung 2026-09-14:** *"dann
+  kannst eine normale suche machen mit 400 sims im ersten schritt. dann eine nachgelagerte fuer
+  die sonnenfelder."* Die erste Suche behaelt also ihr volles, unveraendertes Budget; die
+  Nachsuche kommt OBENDRAUF, sie wird nicht davon abgezweigt.
+* **Die Mehrkosten sind bekannt und akzeptiert.** Nutzer dazu: *"das dauert dann evtl. etwas
+  laenger ist. aber sauberer meiner meinung nach."* Das Argument ist die KORREKTHEIT der
+  Modellierung, nicht Elo (CLAUDE.md "Correctness over measured benefit", Praezedenz
+  `feedback_correctness_over_measured_benefit`). **Folge fuer das Kostentor unten:** es ist eine
+  MESSUNG, kein Veto -- ein gerissenes Tor beendet den Arm hier NICHT automatisch, sondern ist
+  ein Nutzer-Entscheid. Entsprechend wird die Nachsuche nicht auf Sparsamkeit optimiert, wenn das
+  ihren Zweck verfehlen wuerde (in den naechsten Halbzug hineinsehen).
+* **Prior:** der vorhandene `moon`-Kopf ordnet die Varianten vor (Plackett-Luce wie heute), damit
+  bei knappem Budget die aussichtsreichsten zuerst drankommen. **Kein neuer Kopf**
+  (`feedback_no_new_heads`), kein neues Trainingsziel, keine Aktionsraum-Erweiterung (par.6).
+* **Default bleibt 1** (Bestand, bitidentisch), bis ein A/B etwas anderes sagt.
+
+### Was das misst, das die bisherigen Stufen nicht messen konnten
+
+Stufe 1 hat Fan-out gegen kanonisch gemessen und dabei ZWEI Dinge vermischt: den Wert der
+Reihenfolge und die Kosten der Kandidatenkonkurrenz. Stufe 3 trennt sie: die Zugauswahl ist
+identisch zu Wert 0, der einzige Unterschied ist die Nachsuche. **Ein A/B 2 gegen 0 misst damit
+den Wert der Reihenfolge allein**, ohne Verdraengung im Wurzelfenster.
+
+### Tore
+
+Default 1 bitidentisch (Tests, Netz-Paritaets-Fixture, Anker-Drift), Kostentor vor dem A/B
+(die Nachsuche kostet Varianten x Sims je Sonnenzug mit Rest >= 2; wie oft das vorkommt, sagt
+die noch offene par.4-Diagnostik aus den Logs von Nr. 28), dann A/B 2 gegen 0 am Champion,
+200 Paare, Blockgroesse 5, ohne Frueh-Stopp.
+
