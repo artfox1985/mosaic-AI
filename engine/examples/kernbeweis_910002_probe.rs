@@ -105,6 +105,15 @@ fn main() {
         start_by_search: 0,
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
+        // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md
+        // par.12c Schritt 1b) -- alle AUS, aus demselben Grund wie die Knoepfe
+        // darueber: diese Sonde ist ein Byte-Identitaets-Nachweis.
+        sims: None,
+        root_noise: None,
+        action_temp: 0,
+        tau_argmax_from_move: 0,
+        deviate_prob: 0.0,
+        deviate_candidates: 6,
     };
     let actions = drafting_actions(&state1);
     println!(

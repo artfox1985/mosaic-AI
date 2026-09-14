@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch (1.201 Dateien, 12,8 h), Tor 2a HAELT (0,843 gegen 0,816, Reihe ueber fuenf Generationen monoton), Fenster 2.947 Dateien, Training b01 1,55 h. **Tor 1 BEIDE SEEDS H0** (87:93 und 69:81, je SPRT-Abbruch): der Pflichtarm traegt nicht, kein Champion-Wechsel -- ein weiterer reiner Materialschritt bewegt den Champion nicht mehr. Offen: b02, b03, Sockel-Sims. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch (1.201 Dateien, 12,8 h), Tor 2a HAELT (0,843 gegen 0,816, Reihe ueber fuenf Generationen monoton), Fenster 2.947 Dateien, Training b01 1,55 h. **Tor 1 BEIDE SEEDS H0** (87:93 und 69:81, je SPRT-Abbruch): der Pflichtarm traegt nicht, kein Champion-Wechsel. ACHTUNG: b01 war KEIN reiner Materialschritt -- der v29-Korpus bringt drei Aenderungen mit (Startkuppel-Variation 0,15, Startkuppel per Suche, Stapelzug-Knopf, Eingang 744 -> 755), der Nullbefund kann auch Umstellungskosten sein. Offen: b02, b03, Sockel-Sims. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -497,10 +497,47 @@ Vertikalen Reihen (+1,207 gegen +0,913, beide Intervalle enthalten die Null). **
 wiederholen sich, die Signifikanz nicht** -- und bei acht geprueften Kriterien war genau das die
 angekuendigte Erwartung. Als Befund geht das nicht durch; als Richtung bleibt es notiert.
 
-**Was das fuer die Kampagne heisst:** ein weiterer reiner Materialschritt auf demselben Rezept
-bewegt den Champion nicht mehr. Das ist die Frage, die par.6 an b01 gestellt hat, und die Antwort
-ist negativ. Die beiden anderen Arme sind davon unberuehrt -- b02 (Spezialfeld-Ablation) und b03
-(Sicht-Arm) aendern den EINGANG, nicht die Materialmenge.
+**Was das fuer die Kampagne heisst -- und was NICHT.** Die erste Fassung dieses Absatzes hat
+b01 einen "reinen Materialschritt auf demselben Rezept" genannt und daraus geschlossen, mehr
+Material bewege den Champion nicht mehr. **Das ist falsch, und der Nutzer hat es am 2026-09-14
+korrigiert: "das war kein reiner materialschnitt. wir haben den input erweitert" und "die
+startkuppel variation hinzugefuegt".**
+
+Am Manifest-Diff nachgepruefen (v29-Erzeugung gegen die des Champions, also
+`manifest_v28-b02-value-excursion_20260913` gegen `manifest_v27-b01-value-excursion_20260911`;
+Dateien heissen nach dem GENERATOR). **DREI Unterschiede, alle in der ERZEUGUNG:**
+
+| Feld | Korpus des Champions | Korpus von b01 |
+| --- | --- | --- |
+| `start_slot_random_p` | nicht gesetzt | **0,15** |
+| `spec` | `v24-b07_brierbest.spec.json` | **`start_by_search_on.spec.json`** |
+| `stack_draw_research` | aus | **an** |
+
+**Nicht in dieser Liste: `input_size` 744 -> 755.** Der Diff zeigt sie, sie ist aber KEINE
+Neuerung der v29-Erzeugung, sondern die Breite des GENERATORS: Abschnitt 15 (Kuppelstapel-Wissen)
+kam mit v28-b02, also erzeugt dieser Champion mit 755, waehrend sein Vorgaenger v27-b01 mit 744
+erzeugte. Ein Generator, der breiter sieht als der davor, ist der Normalfall jedes Zyklus und
+kein Arm-Unterschied. (Nutzer-Rueckfrage 2026-09-14; die erste Fassung dieser Tabelle hatte die
+Zeile faelschlich als vierten Unterschied gefuehrt.)
+
+Das TRAININGS-Rezept ist dagegen unveraendert (`cli_args`-Diff: nur Fensterliste, Warmstart-Name,
+Lauf-Name, Seed und Val-Pool-Regex). "Rezept unveraendert" in par.6 meint genau das -- es meint
+NICHT, dass der Korpus derselbe waere.
+
+**Die Lesart des H0 aendert sich damit grundlegend.** b01 hat nicht mehr vom Gleichen bekommen,
+sondern Material aus einer anderen Verteilung: variierte Startkuppeln statt fester, die
+Startkuppel per Suche statt per Handregel, dazu den Stapelzug-Knopf. **Hypothese des Nutzers
+(2026-09-14, ausdruecklich als solche notiert): "kann gut sein dass sich das netz erst daran
+gewoehnen muss."** Ein Nullbefund nach EINEM Zyklus auf einer neuen Verteilung ist damit etwas
+anderes als eine Saettigung -- er koennte auch der Preis der Umstellung sein.
+
+**Was daraus NICHT folgt:** dass die Umstellung sich lohnt. Der Arm ist einfaktoriell geplant
+gewesen und ist es nicht; welcher der drei Unterschiede den H0 traegt, ist mit diesen Daten nicht
+trennbar. Wer das wissen will, braucht einen Arm, der genau einen davon zuruecknimmt.
+
+Die beiden anderen Arme sind davon unberuehrt: b02 (Spezialfeld-Ablation) und b03 (Sicht-Arm)
+laufen auf DEMSELBEN Fenster wie b01 und aendern nur den Eingang -- gegen b01 gemessen sind sie
+sauber einfaktoriell.
 
 ### Tor 1 v29-b01 gegen v28-b02, Seed 20261061 (erster von zwei): **H0**
 
