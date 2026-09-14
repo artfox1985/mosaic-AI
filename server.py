@@ -235,6 +235,10 @@ _SPEC_TO_ENV = {
     # Default 1 (Fan-out an = Bestand). Umgekehrte Polung zu den Nachbarn --
     # 0 schaltet den Fan-out AUS und laesst nur die kanonische Reihenfolge.
     "moon_order_variants": "MOSAIC_MOON_ORDER_VARIANTS",
+    # PREREG_moon_stack_order.md par.9 (2026-09-14): OPTIONALES Spec-Feld,
+    # Default 256. Budget der Mondstapel-Nachsuche JE VARIANTE; wirkt nur bei
+    # moon_order_variants == 2.
+    "moon_order_search_sims": "MOSAIC_MOON_ORDER_SEARCH_SIMS",
 }
 
 

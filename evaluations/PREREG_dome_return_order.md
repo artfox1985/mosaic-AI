@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: GEBAUT und im Wheel (par.8a). A/B 2026-09-14 (par.9): kein messbarer Effekt -- **aber NICHT verneint (par.10): Henne-Ei**, der Knopf war bei der Erzeugung aus, das Netz hat die Reihenfolge nie gelernt. **WEG DAHIN registriert (par.11, Nutzer): Zufalls-Streuung in der Erzeugung liefert die Varianz, P.12 die Aufloesung** -- beides faellt mit der naechsten Erzeugung zusammen. **Streu-Knopf GEBAUT (par.11a), noch nicht kompiliert.** Der Rueckgabe-Knopf bleibt. -->
+<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: Knopf GEBAUT und im Wheel (par.8a). A/B (par.9): kein messbarer Effekt, **aber NICHT verneint (par.10)** -- Henne-Ei, und gemessen nur 0,19 Abweichungen je Partie. **Weg dahin: Zufalls-Streuung in der Erzeugung** (par.11), gebaut und abgenommen (par.11a); **Semantik-Umbau beschlossen (par.11b): je Partie statt je Rueckgabe, ab 3 Restplatten, Dosis 0,15** -- Bau-Tor danach zu wiederholen. -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -485,4 +485,71 @@ ZUSAETZLICH ins `cli_args`-Dict** -- sonst zeigt `engine_config` 0.0, waehrend d
 streuen. Das ist die Fehlerklasse "fehlendes Flag = stiller Default"
 (`feedback_run_manifest_gegen_referenz`). Flagname, Dosis und Zeitpunkt sind offen; die Dosis ist
 nach par.11 ein Nutzer-Entscheid (Startkuppel: 0,15).
+
+## par.11b DOSIS UND SEMANTIK (Nutzer-Entscheid 2026-09-14) -- Umbau noetig
+
+Gebaut war zunaechst: Muenze JE RUECKGABE mit mindestens ZWEI Restplatten
+(`self_play.rs:941-946`). Beides wird geaendert.
+
+**1. Schwelle ab DREI Restplatten** (Nutzer: *"bei 2 macht die reihenfolge wenig sinn. ab 3 kann
+ich die reihenfolge beeinflussen"*).
+
+**2. Semantik: "in 15 Prozent der PARTIEN mindestens einmal"**, nicht je Rueckgabe. Das ist
+dieselbe Lesart wie bei der Startkuppel-Streuung (`MOSAIC_START_SLOT_RANDOM_P`, dort je Partie
+und je Spieler).
+
+**Warum die Unterscheidung hier stark ins Gewicht faellt**, und das ist ein Nutzer-Befund:
+*"sobald die spezialfliesen wertungsplatte aktiv ist, zieht das netz in der arena von selber
+schon viele kuppelkarten um zu schauen wo welche kuppelplatten sind."* Eine Partie hat also nicht
+ein oder zwei Gelegenheiten, sondern viele -- eine Muenze je Rueckgabe haette entsprechend
+haeufiger gestreut als beabsichtigt.
+
+**Gemessen dazu, aus den Logs von Nr. 29** (`return_order_ab_mode1_vs_mode0_s20261071.json`,
+150 Partien, Seite mit Modus 1): **29 Abweichungen von der Ziehreihenfolge, also 0,19 je
+Partie**; die Diagnostikzeile entsteht nur bei tatsaechlicher Abweichung. Laenge der gezogenen
+Serie an diesen Stellen: 4 (3x), 6 (2x), 7 (4x), 8 (10x), 12 (10x) -- **alle mindestens vier,
+zwei Drittel bei acht oder zwoelf**. Das stuetzt sowohl die Schwelle 3 als auch den
+Nutzer-Hinweis auf lange Ziehserien.
+
+**Nebenbefund, der par.9/par.10 nachtraeglich erklaert:** bei 0,19 Abweichungen je Partie konnte
+Modus 1 in Nr. 29 gar nichts bewegen -- unabhaengig davon, wie gut er entscheidet. Der
+Nullbefund dort ist damit nicht nur "Henne-Ei", sondern zusaetzlich eine Frage der Haeufigkeit.
+
+### Bauform des Umbaus (VOR dem Bau registriert)
+
+* `order.len() < 2` wird zu `< 3`.
+* Die Muenze faellt EINMAL JE PARTIE. Faellt sie, wird GENAU EINE Gelegenheit gestreut.
+* **Welche Gelegenheit: per GLEICHGEWICHTETEM Reservoir**, nicht die erste -- sonst laegen die
+  gestreuten Stellen systematisch in fruehen Runden. Praezedenz im selben Modul: der Ausflug
+  zieht seine Abzweigstelle per Reservoir (`MOSAIC_EXCURSION_PROB`, `reservoir_step`).
+* **KEINE Gewichtung nach Serienlaenge** (Nutzer-Entscheid 2026-09-14). Der Koordinator hatte
+  eingewandt, kurze Serien koennten die langen verdraengen, weil sie haeufiger sind, und eine
+  Laengengewichtung vorgeschlagen. Nutzer dazu: *"das liegt am netz es zu lernen was sinnvoller
+  ist. wir zeigen es ihm nur."* Die gestreuten Stellen sollen also der NATUERLICHEN Verteilung
+  der Gelegenheiten folgen; eine kuenstlich ausbalancierte Streuung wuerde dem Netz eine
+  Haeufigkeitsstruktur zeigen, die im Spiel nicht vorkommt. Das ist dieselbe Linie wie
+  `feedback_dont_calibrate_to_plate_blind_play`: der Eichgrund ist die tatsaechliche Verteilung,
+  nicht eine zurechtgelegte.
+* **RUNDE 5 IST AUSGESCHLOSSEN** (Nutzer 2026-09-14: *"in runde 5 macht es keinen sinn, da gibt
+  es keine mehr"*). Die Rueckgabe-Reihenfolge steuert, WANN eine Platte wiederkommt; nach Runde 5
+  (`NUM_ROUNDS = 5`, `state.rs:15`) folgt die Endwertung, die Reihenfolge kann sich also nicht
+  mehr auswirken. Eine Streuung dort waere reiner Schaden ohne Lerngewinn.
+* **KEINE Bevorzugung frueher Runden: Runden 1 bis 4 gleichgewichtet** (Nutzer-Entscheid
+  2026-09-14: *"nein, nicht zuviel einschraenken. soll das netz selber lernen und abschaetzen"*).
+  Der Nutzer hatte zuvor angemerkt, frueh schmerze eine schlechte gestreute Reihenfolge weniger,
+  weil die Punkte nicht unter 0 fallen (Score-Clamp, `PREREG_score_clamp_incentive.md`) -- diese
+  Schadensbegrenzung wird bewusst NICHT eingebaut. **Der Unterschied zur Runde-5-Regel ist
+  wesentlich:** Runde 5 faellt aus MECHANIK weg (die Reihenfolge kann sich dort nicht mehr
+  auswirken), eine Bevorzugung frueher Runden waere dagegen eine Gewichtung der Verteilung -- und
+  die bleibt aus demselben Grund aus wie die Laengengewichtung: das Netz soll die Kosten selbst
+  abschaetzen lernen, wir zeigen ihm nur die Faelle.
+* Zufall weiterhin aus dem abgeleiteten Strom (`derive_search_seed` plus
+  `RETURN_ORDER_SEED_DISTINGUISHER`), nicht aus dem Partie-RNG.
+* Default 0 bleibt bitidentisch; der Knopfname bleibt, nur seine Bedeutung wird praeziser
+  dokumentiert (Registratur, `docs/knobs.md`, argparse-Hilfe in `self_play.py`).
+
+**Dosis: 0,15** (Nutzer-Entscheid, dieselbe Zahl wie die Startkuppel-Streuung).
+
+**Der Knopf ist damit NOCH NICHT einsatzbereit** -- die Abnahme vom 2026-09-14 (par.11a) gilt fuer
+die alte Semantik. Nach dem Umbau ist das Bau-Tor zu wiederholen.
 
