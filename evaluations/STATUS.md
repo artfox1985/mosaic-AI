@@ -18,9 +18,20 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ## 1. WAS GERADE LAEUFT
 
-**Die v29-Erzeugung, seit 2026-09-13 12:08.** Gestartet vom Nutzer in einem eigenen Fenster,
-NICHT ueber die Sitzung (Lehre vom Harness-Stopp 2026-09-05). Skript
-`tools/night_v29_generate.sh`, Generator `v28-b02`, drei Klassen nacheinander, alle bei
+**Stand 2026-09-15, 00:30: zwei Messketten laufen hintereinander, sonst nichts.**
+
+| Kette | Inhalt | Stand |
+| --- | --- | --- |
+| `tools/night_v29_20260914.sh` | 1. A/B Mondstapel-Nachsuche (Stufe 3) - 2./3. Kostentor K4 mit/ohne - 4./5. Arena K4 zwei Dosen - 6. Nachzug b02 gegen b03 ohne Frueh-Stopp | Schritt 1 bei 95:95 nach 190 von 200 Paaren (Nutzer-Meldung), laeuft weiter |
+| `tools/night_v29_envelope_value_ab.sh` | wartet auf die erste; dann Anker-Kante v29-b03 gegen hv4_anchor, dann Value-Anteil im Tiling in zwei Dosen (par.8.6b) | wartend, Prozessabfrage alle 5 min |
+
+**Nichts anderes darf Rechenlast erzeugen** -- kein Build, kein cargo, keine Sonde. Das gilt
+besonders fuer den Wheel-Bau: beide Ketten fahren auf dem Kontrakt `39994362fba145a6`, ein
+Neubau mitten darin liesse die Arme auf zwei verschiedenen Wheels laufen.
+
+**Die v29-Erzeugung ist seit dem 2026-09-14 durch** (1.201 Dateien, 12,8 h); die Einzelheiten
+und die Nebenlast-Offenlegung stehen unten. Der Vollstaendigkeit halber der Aufbau, unter dem
+der Korpus entstanden ist -- Generator `v28-b02`, drei Klassen nacheinander, alle bei
 **100 Sims**, `MOSAIC_STACK_DRAW_RESEARCH=1`, Spec `models/start_by_search_on.spec.json`,
 `--start-slot-random-p 0.15`:
 
@@ -185,8 +196,19 @@ Vier Fahrplanpunkte sind bearbeitet worden, alle ohne Messung:
 | 23 | Korpus-Verhaltens-Audit | **Werkzeug gebaut, Selbsttest gruen** (18 Handzahlen ueber sechs Claude-Partien exakt). Der Korpuslauf kommt mit v29 |
 | 22 | Schwierigkeitsleiter | Bauplan in drei Punkten berichtigt, **Schritt 1b gebaut UND ABGENOMMEN** (2026-09-14 01:35, neben dem b01-Training): sechs optionale Stilfelder, 641 Tests gruen, Paritaets-Fixture unveraendert -- das vorregistrierte Tor. Nichts installiert. Auch `models/levels/beginner.spec.json` liegt (hv3 @150) |
 
-**KEIN UNGETESTETER RUST-CODE MEHR IM BAUM** (2026-09-14 01:35: auch Schritt 1b ist kompiliert
-und abgenommen, 641 Tests gruen). Das gefaehrdet die laufende Nacht nicht: weder `tools/night_v29_chain.sh` noch
+**UEBERHOLT -- es liegt wieder ungetesteter Rust-Code im Baum** (Stand 2026-09-15 00:30), und
+zwar zweimal, beide Male bewusst und beide Male, weil ein Build Volllast gegen die laufende
+Messkette waere:
+
+* der umgebaute **Streu-Knopf der Rueckgabe** (Schwelle 3, Rundenfenster 1-4, Commit `df4b424`),
+* die **Diagnose-Zeile der Mondstapel-Nachsuche** (`[moon_order] applied=N changed=M`,
+  `PREREG_moon_stack_order.md` par.9g, Commit `50772fb`).
+
+Beides faellt an, sobald die Ketten durch sind: `cargo test --release`, Wheel-Bau, Anker-Drift.
+Kein laufender Lauf faehrt diesen Stand -- die Ketten nutzen das INSTALLIERTE Wheel.
+
+Der Satz, der hier stand (2026-09-14 01:35: auch Schritt 1b ist kompiliert und abgenommen,
+641 Tests gruen). Das gefaehrdet die laufende Nacht nicht: weder `tools/night_v29_chain.sh` noch
 `tools/night_v29_tor1_b01.sh` bauen ein Wheel (geprueft: kein maturin, kein pip install, kein
 cargo darin) -- beide fahren auf dem INSTALLIERTEN Wheel, und `config.INPUT_SIZE` steht bewusst
 noch auf 755. Der erste Bau gehoert an eine freie Maschine und bringt beides zugleich: Wheel fuer
