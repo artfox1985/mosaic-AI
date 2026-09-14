@@ -5563,7 +5563,25 @@ pub(crate) fn net_drafting_policy<R: Rng + ?Sized>(
     } else {
         weighted_index(&weights, total, rng)
     };
-    (stats[idx].0.clone(), policy, root_q, child_q)
+    // `PREREG_moon_stack_order.md` par.9 (Stufe 3): die Mondstapel-Reihenfolge
+    // ist bei `moon_order_variants == 2` kein Alternativzug mehr, sondern ein
+    // FOLGESCHRITT der Zugwahl -- sie wird hier, nach dem Sampling,
+    // nachgesucht. Bei 0 und 1 ist der Aufruf ein Early-Out (kein Netzaufruf,
+    // keine Zufallszahl, `rng` unberuehrt), der Zufallsstrom dieser Schleife
+    // verschiebt sich also nicht. Das TRAININGSZIEL bleibt unberuehrt:
+    // `policy` kommt aus `completed_q_policy`, und die Aktions-ID kodiert die
+    // Reihenfolge ohnehin nicht (par.6, Aktionsraum bleibt 406).
+    let chosen = crate::net_mcts::moon_order_post_search(
+        net,
+        None,
+        state,
+        Some(stats[idx].0.clone()),
+        c_puct,
+        rng,
+        search_config,
+    )
+    .unwrap_or_else(|| stats[idx].0.clone());
+    (chosen, policy, root_q, child_q)
 }
 
 /// Task #35 (Ranking-Loss-Vorlauf): entscheidet, ob das additive

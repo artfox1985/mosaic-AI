@@ -107,6 +107,9 @@ SPEC_TO_ENV = {
     # Default 1 (Fan-out an = Bestand); 0 laesst nur die kanonische
     # Reihenfolge der Mondsteine zu.
     "moon_order_variants": "MOSAIC_MOON_ORDER_VARIANTS",
+    # PREREG_moon_stack_order.md par.9 (2026-09-14), OPTIONALES Spec-Feld mit
+    # Default 256; Budget der Nachsuche JE VARIANTE, wirkt nur bei Wert 2.
+    "moon_order_search_sims": "MOSAIC_MOON_ORDER_SEARCH_SIMS",
 }
 
 

@@ -42,7 +42,7 @@ use serde_json::{json, Value};
 use crate::features::action_to_id;
 use crate::game::{drafting_actions, Game};
 use crate::mcts::{label_search_move, SearchMove};
-use crate::moves::{Action, TakeSource};
+use crate::moves::{Action, Move, TakeSource};
 use crate::net::{softmax, Net};
 use crate::self_play::action_to_env_dict;
 use crate::state::{GameState, Phase};
@@ -340,7 +340,24 @@ pub(crate) fn read_start_by_search_env() -> u8 {
 /// wie sie der Heuristik-Pfad nimmt (`validation.rs::generate_valid_moves`).
 pub const MOON_ORDER_VARIANTS_DEFAULT: u8 = 1;
 
-/// `MOSAIC_MOON_ORDER_VARIANTS` als 0/1 (`PREREG_moon_stack_order.md` par.4).
+/// Dritter Wert von [`SearchConfig::moon_order_variants`]
+/// (`PREREG_moon_stack_order.md` par.9, Stufe 3): KEIN Fan-out im Suchbaum
+/// (die Zugauswahl sieht genau EINEN Kandidaten je Zugidee, exakt wie bei
+/// `0`), und NACH der Zugwahl entscheidet [`moon_order_post_search`] ueber
+/// die Reihenfolge -- ueber den FOLGEZUSTAND, in dem der GEGNER am Zug ist.
+///
+/// Warum getrennt von `1`: `moon_order` ist heute Teil der Zugaktion, der
+/// Fan-out macht daraus bis zu sechs VERSCHIEDENE Zuege im selben
+/// Kandidatenfeld (an der Wurzel rangt Gumbel bei @400 nur
+/// `gumbel_top_m_for_budget(400)` = 16 davon). Sachlich ist der Stapelaufbau
+/// aber ein FOLGESCHRITT der Zugwahl, kein Alternativzug (par.9).
+pub const MOON_ORDER_VARIANTS_POST_SEARCH: u8 = 2;
+
+/// Groesster gueltiger Wert von [`SearchConfig::moon_order_variants`].
+pub const MOON_ORDER_VARIANTS_MAX: u8 = MOON_ORDER_VARIANTS_POST_SEARCH;
+
+/// `MOSAIC_MOON_ORDER_VARIANTS` als 0/1/2 (`PREREG_moon_stack_order.md`
+/// par.4 fuer 0/1, par.9 fuer 2).
 ///
 /// `1` (Default, auch bei fehlender oder ungueltiger Variable) ist der
 /// BESTAND und zwar im starken Sinn: `build_untried_actions` faechert einen
@@ -349,6 +366,8 @@ pub const MOON_ORDER_VARIANTS_DEFAULT: u8 = 1;
 /// P(Reihenfolge | Plackett-Luce). `0` legt je (Farbe, Reihe) genau EINEN
 /// Kandidaten an, mit der kanonischen Restreihenfolge aus
 /// `game::drafting_actions` -- derselben, die der Heuristik-Pfad spielt.
+/// `2` faechert wie `0` NICHT auf und schiebt die Reihenfolge in die
+/// Nachsuche ([`MOON_ORDER_VARIANTS_POST_SEARCH`]).
 ///
 /// KEIN `OnceLock` -- gleiche Begruendung wie bei
 /// [`read_return_order_mode_env`]: der Wert ist ein Spec-Feld JE SEITE.
@@ -361,15 +380,66 @@ pub(crate) fn read_moon_order_variants_env() -> u8 {
         return MOON_ORDER_VARIANTS_DEFAULT;
     }
     match raw.trim().parse::<u8>() {
-        Ok(v) if v <= 1 => v,
+        Ok(v) if v <= MOON_ORDER_VARIANTS_MAX => v,
         _ => {
             WARNED.get_or_init(|| {
                 eprintln!(
-                    "⚠️  MOSAIC_MOON_ORDER_VARIANTS={raw:?} ungueltig (0 kanonisch, 1 Fan-out) -- \
-                     Fan-out (1) gilt."
+                    "⚠️  MOSAIC_MOON_ORDER_VARIANTS={raw:?} ungueltig (0 kanonisch, 1 Fan-out, \
+                     2 Nachsuche) -- Fan-out (1) gilt."
                 );
             });
             MOON_ORDER_VARIANTS_DEFAULT
+        }
+    }
+}
+
+/// Default von [`SearchConfig::moon_order_search_sims`], dem Budget der
+/// Mondstapel-Nachsuche JE VARIANTE (`PREREG_moon_stack_order.md` par.9).
+///
+/// **Warum 256 und nicht weniger:** die Nachsuche soll den naechsten Halbzug
+/// des GEGNERS bewerten, nicht nur das Blatt (par.9: "eine reine
+/// Blattbewertung reicht dafuer NICHT"). Die Wurzelbreite eines Gumbel-Baums
+/// ist `gumbel_top_m_for_budget(sims) = clamp(round(sims/16), 4,
+/// GUMBEL_TOP_M)`; bei 256 ergibt das `round(16)` = 16 = [`GUMBEL_TOP_M`],
+/// also GENAU die Breite, die auch die erste Suche im Betrieb bekommt
+/// (`round(400/16)=25`, geklemmt auf 16). 256 ist der KLEINSTE Wert mit
+/// dieser Eigenschaft. Darunter wird die Antwort des Gegners auf einem
+/// engeren Kandidatenfeld bewertet als die Stellung, aus der sie kommt --
+/// und genau die Antwort, um die es geht (der frisch oben liegende Stein
+/// wird genommen oder eben nicht), ist eine unter vielen legalen.
+///
+/// Das Budget kommt OBENDRAUF, nicht aus dem Wurzelbudget (par.9,
+/// Nutzer-Praezisierung: "eine normale suche machen mit 400 sims im ersten
+/// schritt. dann eine nachgelagerte fuer die sonnenfelder"). Mehrkosten je
+/// betroffenem Sonnenzug: `Varianten x sims`, Varianten aus
+/// [`unique_moon_orders`] (hoechstens 3! = 6).
+///
+/// `0` schaltet die Nachsuche ab -- dann verhaelt sich `2` wie `0`
+/// (kanonische Reihenfolge, kein Fan-out).
+pub const MOON_ORDER_SEARCH_SIMS_DEFAULT: u32 = 256;
+
+/// `MOSAIC_MOON_ORDER_SEARCH_SIMS` (`PREREG_moon_stack_order.md` par.9).
+/// Nicht parsbar oder leer -> Default plus einmalige Warnung; kein Panik-Pfad
+/// (gleiche Disziplin wie [`read_moon_order_variants_env`]). KEIN `OnceLock`,
+/// aus demselben Grund: der Wert ist ein Spec-Feld JE SEITE.
+pub(crate) fn read_moon_order_search_sims_env() -> u32 {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_MOON_ORDER_SEARCH_SIMS") else {
+        return MOON_ORDER_SEARCH_SIMS_DEFAULT;
+    };
+    if raw.trim().is_empty() {
+        return MOON_ORDER_SEARCH_SIMS_DEFAULT;
+    }
+    match raw.trim().parse::<u32>() {
+        Ok(v) => v,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "⚠️  MOSAIC_MOON_ORDER_SEARCH_SIMS={raw:?} ungueltig (ganze Zahl >= 0) -- \
+                     {MOON_ORDER_SEARCH_SIMS_DEFAULT} gilt."
+                );
+            });
+            MOON_ORDER_SEARCH_SIMS_DEFAULT
         }
     }
 }
@@ -734,10 +804,27 @@ pub struct SearchConfig {
     /// erzeugen Labels, keine Zuege (par.4 nennt als Wirkort die
     /// Expansion).
     ///
+    /// `2` (`PREREG_moon_stack_order.md` par.9, Stufe 3, gebaut 2026-09-14)
+    /// faechert NICHT auf -- die Kandidatenliste ist Zug fuer Zug die von
+    /// `0` -- und laesst NACH der Zugwahl [`moon_order_post_search`] ueber
+    /// die Reihenfolge entscheiden, mit
+    /// [`SearchConfig::moon_order_search_sims`] Sims JE VARIANTE ueber den
+    /// Folgezustand, in dem der GEGNER am Zug ist.
+    ///
     /// Spec-Feld je Seite (`moon_order_variants`, OPTIONAL mit Default 1,
     /// damit alle eingefrorenen Specs weiter laden), Env-Default
     /// `MOSAIC_MOON_ORDER_VARIANTS`.
     pub moon_order_variants: u8,
+    /// Sim-Budget der Mondstapel-Nachsuche JE VARIANTE
+    /// (`PREREG_moon_stack_order.md` par.9). Wirkt AUSSCHLIESSLICH bei
+    /// `moon_order_variants == `[`MOON_ORDER_VARIANTS_POST_SEARCH`]; bei `0`
+    /// und `1` wird der Wert nie gelesen, der Zweig nie betreten. Begruendung
+    /// des Defaults: [`MOON_ORDER_SEARCH_SIMS_DEFAULT`].
+    ///
+    /// Spec-Feld je Seite (`moon_order_search_sims`, OPTIONAL mit Default
+    /// [`MOON_ORDER_SEARCH_SIMS_DEFAULT`]), Env-Default
+    /// `MOSAIC_MOON_ORDER_SEARCH_SIMS`.
+    pub moon_order_search_sims: u32,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -843,6 +930,7 @@ impl SearchConfig {
             return_order_mode: read_return_order_mode_env(),
             start_by_search: read_start_by_search_env(),
             moon_order_variants: read_moon_order_variants_env(),
+            moon_order_search_sims: read_moon_order_search_sims_env(),
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -897,6 +985,7 @@ impl SearchConfig {
             "return_order_mode",
             "start_by_search",
             "moon_order_variants",
+            "moon_order_search_sims",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -1130,13 +1219,34 @@ impl SearchConfig {
                 let x = v.as_f64().ok_or_else(|| {
                     format!("Spec-Datei {path}: 'moon_order_variants' ist keine Zahl")
                 })?;
-                if x.fract() != 0.0 || !(0.0..=1.0).contains(&x) {
+                if x.fract() != 0.0 || !(0.0..=(MOON_ORDER_VARIANTS_MAX as f64)).contains(&x) {
                     return Err(format!(
-                        "Spec-Datei {path}: 'moon_order_variants' muss 0 oder 1 sein \
-                         (0 kanonisch, 1 Fan-out), ist {x}"
+                        "Spec-Datei {path}: 'moon_order_variants' muss 0, 1 oder 2 sein \
+                         (0 kanonisch, 1 Fan-out, 2 Nachsuche), ist {x}"
                     ));
                 }
                 x as u8
+            }
+        };
+        // `PREREG_moon_stack_order.md` par.9: das Budget der Nachsuche JE
+        // VARIANTE. OPTIONAL mit Default [`MOON_ORDER_SEARCH_SIMS_DEFAULT`] --
+        // eine Spec ohne das Feld beschreibt weiter GENAU dasselbe Verhalten
+        // wie vorher, weil der Wert nur bei `moon_order_variants == 2`
+        // ueberhaupt gelesen wird und dieser Wert bis heute in keiner Spec
+        // steht.
+        let moon_order_search_sims = match obj.get("moon_order_search_sims") {
+            None => MOON_ORDER_SEARCH_SIMS_DEFAULT,
+            Some(v) => {
+                let x = v.as_f64().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'moon_order_search_sims' ist keine Zahl")
+                })?;
+                if x.fract() != 0.0 || !(0.0..=100_000.0).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'moon_order_search_sims' muss eine ganze Zahl \
+                         zwischen 0 und 100000 sein (0 = Nachsuche aus), ist {x}"
+                    ));
+                }
+                x as u32
             }
         };
         let envelope_profile = {
@@ -1274,6 +1384,7 @@ impl SearchConfig {
             return_order_mode,
             start_by_search,
             moon_order_variants,
+            moon_order_search_sims,
             heuristic_variant,
             sims,
             root_noise,
@@ -2191,7 +2302,10 @@ impl crate::search_common::SearchNode for Node {
 /// (Fan-out, siehe unten), `0` = nur die kanonische Restreihenfolge, also
 /// genau ein Kandidat je (Farbe, Reihe) wie im Heuristik-Pfad. Bei `1` ist
 /// der Ablauf bitidentisch zum Zustand vor dem Knopf -- der Zweig unten wird
-/// unveraendert betreten.
+/// unveraendert betreten. `2` (par.9, Stufe 3) verhaelt sich HIER exakt wie
+/// `0`: die Reihenfolge ist kein Alternativzug mehr, sondern ein
+/// Folgeschritt, und wird nach der Zugwahl von [`moon_order_post_search`]
+/// bestimmt.
 fn build_untried_actions(
     state: &GameState,
     logits: &[f32],
@@ -2235,11 +2349,17 @@ fn build_untried_actions(
     // `game::drafting_actions` schon mitbringt (`validation.rs::
     // generate_valid_moves` filtert `sun_tiles` in Fabrik-Reihenfolge). Genau
     // die eine Reihenfolge, die auch der Heuristik-Pfad spielt.
+    //
+    // par.9 (Stufe 3): `2` faellt in DENSELBEN 1:1-Pfad. Die Bedingung ist
+    // deshalb bewusst `== MOON_ORDER_VARIANTS_DEFAULT` und nicht mehr
+    // `!= 0` -- nur der Bestandswert `1` faechert auf. Damit ist die
+    // Kandidatenzahl bei `2` Zug fuer Zug die von `0`, und der A/B "2 gegen
+    // 0" misst die Reihenfolge ALLEIN, ohne Verdraengung im Wurzelfenster.
     let mut acts: Vec<(Action, f32)> = Vec::with_capacity(base_actions.len());
     for (act, id) in base_actions.into_iter().zip(ids.into_iter()) {
         let base_p = *p_base.get(&id).unwrap_or(&0.0);
         if let Action::Stone(m) = &act {
-            if moon_order_variants != 0
+            if moon_order_variants == MOON_ORDER_VARIANTS_DEFAULT
                 && m.take.source == TakeSource::SmallFactorySun
                 && m.take.moon_order.len() >= 2
             {
@@ -5349,6 +5469,228 @@ fn build_net_tree<R: Rng + ?Sized>(
     nodes
 }
 
+// ── Mondstapel-Nachsuche (PREREG_moon_stack_order.md par.9, Stufe 3) ──────
+
+/// Unterscheidungswert des Zufallsstroms der Mondstapel-Nachsuche
+/// (`PREREG_search_rng_split.md`-Muster, gleiche Bauform wie
+/// `self_play::EXCURSION_SEED_DISTINGUISHER` und
+/// `self_play::RETURN_ORDER_SEED_DISTINGUISHER`).
+///
+/// EIGENER Wert, weder der eine noch der andere: alle drei ziehen mit
+/// demselben Zaehler-Argument aus `derive_search_seed`, ein geteilter
+/// Unterscheidungswert wuerde also identische Stroeme ergeben.
+///
+/// Er steht hier und nicht in `self_play.rs`, weil die Nachsuche ein
+/// SUCH-Schritt ist (sie laeuft in jeder Netz-Arena, im Referee und in der
+/// GUI, nicht nur im aufzeichnenden Self-Play).
+pub(crate) const MOON_ORDER_SEARCH_SEED_DISTINGUISHER: u64 = 0x3D00_57AC_5EED_C0DE;
+
+/// Die 5 rohen Moon-Order-Scores des Netzes fuer `state` -- derselbe
+/// Extraktionsweg wie in [`drafting_action_priors`] und
+/// [`node_from_net_outputs`] (Kopf `moon`, Reihenfolge `TileColor::NORMAL`).
+/// Ein Forward-Pass; fehlt der Kopf, bleiben alle Scores `0.0` und
+/// Plackett-Luce liefert eine Gleichverteilung ueber die Varianten.
+fn net_moon_scores(net: &Net, state: &GameState) -> [f32; 5] {
+    let feats = crate::profiling::timed(crate::profiling::note_features_ns, || {
+        crate::features::features_for_net(net, state)
+    });
+    let (_logits, _value, moon, _points) = match try_batched_single_eval(net, &feats) {
+        Some(row) => row,
+        None => crate::profiling::timed_net_eval(1, || {
+            net.eval(&feats).unwrap_or_else(|_| {
+                note_net_eval_failure();
+                (vec![0.0; NUM_ACTIONS], Vec::new(), Vec::new(), Vec::new())
+            })
+        }),
+    };
+    let mut moon_scores = [0f32; 5];
+    for (i, s) in moon.iter().take(5).enumerate() {
+        moon_scores[i] = *s;
+    }
+    moon_scores
+}
+
+/// Reiner Kern der Nachsuche -- KEIN `Net`-Zugriff, keine Zufallszahl, direkt
+/// testbar (gleiches Trennungsmuster wie `calibrate_win_prob_with` /
+/// `apply_denial_tiebreak_with`).
+///
+/// Ablauf (`PREREG_moon_stack_order.md` par.9):
+///   1. Kandidaten sind die EINDEUTIGEN Permutationen der Reststeine
+///      ([`unique_moon_orders`], unveraendert -- hoechstens 3! = 6).
+///   2. Der vorhandene `moon`-Kopf ordnet sie vor (Plackett-Luce wie im
+///      Fan-out). Die Reihenfolge ist damit ABSTEIGEND nach Prior; sie
+///      entscheidet, in welcher Reihenfolge bewertet wird, und sie
+///      entscheidet bei Wertgleichheit (striktes `<` unten behaelt den
+///      hoeheren Prior).
+///   3. `evaluate(folgezustand, rang)` liefert den Wert des Folgezustands
+///      AUS SICHT DES SPIELERS, DER DORT AM ZUG IST -- das ist der GEGNER.
+///      Gewaehlt wird deshalb das MINIMUM. `None` heisst "nicht bewertbar"
+///      (der Kandidat faellt aus, ohne die anderen zu beeinflussen).
+///
+/// Rueckgabe `None`: es gibt nichts zu entscheiden (weniger als zwei
+/// eindeutige Reihenfolgen) oder kein Kandidat war bewertbar -- der Aufrufer
+/// behaelt dann die kanonische Reihenfolge, die schon in `m` steht.
+fn choose_moon_order_with<F>(
+    state: &GameState,
+    m: &Move,
+    moon_scores: &[f32; 5],
+    mut evaluate: F,
+) -> Option<Vec<TileColor>>
+where
+    F: FnMut(&GameState, usize) -> Option<f64>,
+{
+    if m.take.source != TakeSource::SmallFactorySun || m.take.moon_order.len() < 2 {
+        return None;
+    }
+    let variants = unique_moon_orders(&m.take.moon_order);
+    if variants.len() < 2 {
+        // Alle Reststeine derselben Farbe: eine einzige Reihenfolge, kein
+        // Entscheid (par.3: der Ausnahmefall).
+        return None;
+    }
+    // Vorordnung durch den Kopf. `sort_by` ist STABIL, und
+    // `unique_moon_orders` liefert bereits eine feste Reihenfolge -- bei
+    // gleichem Prior bleibt die Ordnung damit deterministisch.
+    let mut ranked: Vec<(Vec<TileColor>, f64)> = variants
+        .into_iter()
+        .map(|seq| {
+            let p = plackett_luce_prob(moon_scores, &seq);
+            (seq, p)
+        })
+        .collect();
+    ranked.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut best: Option<(usize, f64)> = None;
+    for (rank, (seq, _prior)) in ranked.iter().enumerate() {
+        let mut candidate = m.clone();
+        candidate.take.moon_order = seq.clone();
+        crate::profiling::note_gamestate_clone();
+        let mut g = Game { state: state.clone() };
+        if g.apply_drafting(&Action::Stone(candidate)).is_err() {
+            continue;
+        }
+        // Der Zug ist ausgefuehrt und `switch_player()` gelaufen
+        // (`game.rs::apply_drafting`, Zweig `Action::Stone`) -- im
+        // Folgezustand ist der GEGNER am Zug, genau der Halbzug, in dem sich
+        // die Reihenfolge auswirkt (nur der OBERSTE Stein eines Mondstapels
+        // ist ziehbar, `factory.rs:76`/`:96-97` `stack.last()`).
+        let mut next = g.state;
+        next.log.clear();
+        if next.phase != Phase::Drafting {
+            // Defensiv: nach einem Sonnenzug mit Rest >= 2 liegt der Rest auf
+            // dem Mond, die Fabrik ist also nicht leer und die Runde nicht zu
+            // Ende. Sollte es doch je so kommen, faellt der Kandidat aus,
+            // statt eine Nicht-Drafting-Stellung in die Suche zu geben.
+            continue;
+        }
+        let Some(opp_value) = evaluate(&next, rank) else { continue };
+        if best.is_none_or(|(_, b)| opp_value < b) {
+            best = Some((rank, opp_value));
+        }
+    }
+    best.map(|(rank, _)| ranked[rank].0.clone())
+}
+
+/// Das TOR der Nachsuche als eigene, reine Funktion -- ohne `Net`, ohne
+/// `rng`, direkt testbar (`PREREG_moon_stack_order.md` par.9, harte Auflage
+/// "Bitidentitaet bei 0 und 1").
+///
+/// `true` genau dann, wenn ALLE vier Bedingungen gelten:
+///   1. `moon_order_variants == `[`MOON_ORDER_VARIANTS_POST_SEARCH`],
+///   2. `moon_order_search_sims > 0`,
+///   3. die gewaehlte Aktion ist ein `SmallFactorySun`-Zug mit mindestens
+///      zwei Reststeinen (dieselbe Bedingung wie der Fan-out in
+///      [`build_untried_actions`]),
+///   4. es gibt mindestens ZWEI eindeutige Reihenfolgen (bei drei gleichen
+///      Resten gibt es nichts zu entscheiden, par.3).
+///
+/// Ist das Tor zu, ruehrt [`moon_order_post_search`] weder das Netz noch den
+/// Zufallsstrom an.
+pub(crate) fn moon_order_post_search_applies(
+    search_config: &SearchConfig,
+    action: Option<&Action>,
+) -> bool {
+    if search_config.moon_order_variants != MOON_ORDER_VARIANTS_POST_SEARCH
+        || search_config.moon_order_search_sims == 0
+    {
+        return false;
+    }
+    let Some(Action::Stone(m)) = action else { return false };
+    m.take.source == TakeSource::SmallFactorySun
+        && m.take.moon_order.len() >= 2
+        && unique_moon_orders(&m.take.moon_order).len() >= 2
+}
+
+/// Nachsuche ueber die Mondstapel-Reihenfolge, NACH der Zugwahl
+/// (`PREREG_moon_stack_order.md` par.9, Stufe 3).
+///
+/// **Sie laeuft ausschliesslich bei `search_config.moon_order_variants ==`
+/// [`MOON_ORDER_VARIANTS_POST_SEARCH`].** Bei `0` und `1` ist die erste Zeile
+/// ein Early-Out: kein Netzaufruf, keine Zustandskopie, KEINE Zufallszahl aus
+/// `rng` -- der Ablauf bleibt bitidentisch zum Bestand. Das gilt auch fuer
+/// jeden Zug, der gar kein Sonnenzug aus einer kleinen Fabrik mit mindestens
+/// zwei Reststeinen ist (zweiter Early-Out, vor der Seed-Ziehung).
+///
+/// Bewertet wird JE VARIANTE ein FOLGEZUSTAND, in dem der GEGNER am Zug ist,
+/// mit [`build_net_tree`] -- der vorhandene Suchtreiber, kein zweiter.
+/// Kennzahl ist [`v_mix`] an dessen Wurzel: der Wert aus Sicht des Spielers,
+/// der dort am Zug ist (`node_own_value`-Doku), gemischt mit den Q-Werten der
+/// bereits besuchten Kinder. Genau dieses Mischen ist der Zweck -- eine reine
+/// Blattbewertung saehe nicht, was der Gegner mit dem obersten Stein macht
+/// (par.9: "Eine reine Blattbewertung reicht dafuer NICHT").
+///
+/// **Determinismus:** aus `rng` wird GENAU EINE Zahl gezogen, und zwar nur,
+/// wenn die Nachsuche wirklich laeuft. Aus ihr leitet
+/// `derive_search_seed(base ^ `[`MOON_ORDER_SEARCH_SEED_DISTINGUISHER`]`,
+/// rang)` je Variante einen eigenen Strom ab (Muster
+/// `PREREG_search_rng_split.md`). Damit haengt der Zufall der Nachsuche nicht
+/// davon ab, wie viele Zahlen sie selbst verbraucht, und der Hauptstrom
+/// verschiebt sich um genau einen Zug. Kein globaler RNG.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn moon_order_post_search<R: Rng + ?Sized>(
+    net_policy: &Net,
+    net_value: Option<&Net>,
+    state: &GameState,
+    action: Option<Action>,
+    c_puct: f64,
+    rng: &mut R,
+    search_config: &SearchConfig,
+) -> Option<Action> {
+    if !moon_order_post_search_applies(search_config, action.as_ref()) {
+        return action;
+    }
+    let sims = search_config.moon_order_search_sims;
+    let m = match action.as_ref() {
+        Some(Action::Stone(m)) => m.clone(),
+        // Vom Tor bereits ausgeschlossen -- der Zweig ist unerreichbar und
+        // steht nur, weil das Muster hier gebunden werden muss.
+        _ => return action,
+    };
+    // Ab hier laeuft die Nachsuche wirklich -- erst JETZT kostet sie einen
+    // Netzaufruf und genau eine Zahl aus dem Suchstrom.
+    let moon_scores = net_moon_scores(net_policy, state);
+    let base: u64 = rng.random();
+    let chosen = choose_moon_order_with(state, &m, &moon_scores, |next, rank| {
+        use rand::SeedableRng as _;
+        let mut sub = rand::rngs::StdRng::seed_from_u64(derive_search_seed(
+            base ^ MOON_ORDER_SEARCH_SEED_DISTINGUISHER,
+            rank as u64,
+        ));
+        let nodes = build_net_tree(
+            net_policy, net_value, next, sims, c_puct, false, &mut sub, None, None, search_config,
+        );
+        Some(v_mix(&nodes, 0))
+    });
+    match chosen {
+        Some(seq) => {
+            let mut mm = m;
+            mm.take.moon_order = seq;
+            Some(Action::Stone(mm))
+        }
+        None => action,
+    }
+}
+
 /// Beste Drafting-Aktion per Netz-PUCT (meistbesuchtes Wurzelkind). None außerhalb
 /// der Drafting-Phase. `add_root_noise` nur im Self-Play aktivieren.
 /// `search_config` (PREREG_agent_encapsulation.md par.3/par.4): pro-Seite-
@@ -5381,7 +5723,11 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     if k <= 1 {
         let nodes = build_net_tree(net, None, state, sims, c_puct, add_root_noise, rng, None, None, search_config);
         let best = select_final_root_child(&nodes)?;
-        return nodes[best].action.clone();
+        // `PREREG_moon_stack_order.md` par.9: Early-Out bei jedem anderen
+        // Wert als 2 -- unveraendert bitidentisch.
+        return moon_order_post_search(
+            net, None, state, nodes[best].action.clone(), c_puct, rng, search_config,
+        );
     }
     // ISMCTS-Mehrfach-Determinisierung (Task #65): finale Zugwahl = argmax
     // der über die Welten GEMITTELTEN completed-Q-Politik (siehe
@@ -5389,10 +5735,11 @@ pub fn net_search_drafting_action<R: Rng + ?Sized>(
     // `select_final_root_child` auf einem Einzelbaum -- letzteres hätte
     // keinen sinnvollen "einen" Baum mehr, über den es entscheiden könnte.
     let forest = build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng, search_config);
-    average_completed_q_policy(&forest)
+    let chosen = average_completed_q_policy(&forest)
         .into_iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(a, _)| a)
+        .map(|(a, _)| a);
+    moon_order_post_search(net, None, state, chosen, c_puct, rng, search_config)
 }
 
 /// Task #88 (Hybrid-Suche, kausaler Kopf-Test): wie [`net_search_drafting_action`],
@@ -5427,7 +5774,19 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
             net_policy, Some(net_value), state, sims, c_puct, add_root_noise, rng, None, None, search_config,
         );
         let best = select_final_root_child(&nodes)?;
-        return nodes[best].action.clone();
+        // par.9: die Nachsuche nutzt dieselbe Kopf-/Blatt-Trennung wie die
+        // Hauptsuche -- Moon-Prior aus `net_policy`, Blattwert aus
+        // `net_value`. Bei gleichen Netzen ist das derselbe Codepfad wie
+        // oben (Paritaets-Zusage dieser Funktion).
+        return moon_order_post_search(
+            net_policy,
+            Some(net_value),
+            state,
+            nodes[best].action.clone(),
+            c_puct,
+            rng,
+            search_config,
+        );
     }
     let forest = build_determinized_forest(
         net_policy,
@@ -5440,10 +5799,11 @@ pub fn net_search_drafting_action_hybrid<R: Rng + ?Sized>(
         rng,
         search_config,
     );
-    average_completed_q_policy(&forest)
+    let chosen = average_completed_q_policy(&forest)
         .into_iter()
         .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-        .map(|(a, _)| a)
+        .map(|(a, _)| a);
+    moon_order_post_search(net_policy, Some(net_value), state, chosen, c_puct, rng, search_config)
 }
 
 /// Wurzelkind-Statistik `(Action, Besuche, Q)` — für Self-Play-Policy-Targets.
@@ -5777,7 +6137,17 @@ fn net_search_with_tree_inner<R: Rng + ?Sized>(
         let nodes = build_net_tree(
             net, None, state, sims, c_puct, add_root_noise, rng, log, trace.as_mut(), &search_config,
         );
-        return net_search_with_tree_from_nodes(state, sims, &nodes, trace.as_ref());
+        let (action, analysis) = net_search_with_tree_from_nodes(state, sims, &nodes, trace.as_ref());
+        // `PREREG_moon_stack_order.md` par.9: Early-Out bei jedem anderen
+        // Wert als 2, also bitidentisch fuer GUI und Debug-Endpunkt im
+        // Bestand. BEWUSSTE Einschraenkung bei 2: `analysis` beschreibt das
+        // KANDIDATENFELD der ersten Suche, und dort steht die Reihenfolge
+        // nicht mehr zur Wahl (kein Fan-out). Die Debug-Ansicht zeigt fuer
+        // den gewaehlten Zug deshalb die kanonische Reihenfolge, waehrend
+        // die zurueckgegebene AKTION die nachgesuchte traegt.
+        let action =
+            moon_order_post_search(net, None, state, action, c_puct, rng, &search_config);
+        return (action, analysis);
     }
     // ISMCTS-Mehrfach-Determinisierung: kein granularer Sim-für-Sim-Trace je
     // Welt (würde N verschachtelte "=== Sim x/y ==="-Folgen ergeben, kaum
@@ -5791,7 +6161,9 @@ fn net_search_with_tree_inner<R: Rng + ?Sized>(
     }
     let forest =
         build_determinized_forest(net, None, state, sims, c_puct, add_root_noise, k, rng, &search_config);
-    net_search_with_tree_from_forest(state, sims, &forest)
+    let (action, analysis) = net_search_with_tree_from_forest(state, sims, &forest);
+    let action = moon_order_post_search(net, None, state, action, c_puct, rng, &search_config);
+    (action, analysis)
 }
 
 /// `net_search_with_tree`s Debug-Analyse-Dict aus einem EINZELNEN Baum
@@ -7776,6 +8148,10 @@ mod tests {
             // Fan-out seit 2026-07-01 ohne Knopf). `0` waere hier eine
             // Verhaltensaenderung, kein Nullpunkt.
             moon_order_variants: MOON_ORDER_VARIANTS_DEFAULT,
+            // Wird bei `moon_order_variants != 2` nie gelesen; der Default
+            // steht hier trotzdem, damit der Helfer die Umgebung nicht
+            // braucht.
+            moon_order_search_sims: MOON_ORDER_SEARCH_SIMS_DEFAULT,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in
@@ -8223,13 +8599,14 @@ mod tests {
             "fehlendes Feld muss den BESTAND (Fan-out an) ergeben, nicht 0"
         );
         assert_eq!(MOON_ORDER_VARIANTS_DEFAULT, 1);
-        for want in [0u8, 1] {
+        // par.9: `2` (Nachsuche statt Fan-out) ist seit 2026-09-14 gueltig.
+        for want in [0u8, 1, 2] {
             std::fs::write(&path, spec(&format!(", \"moon_order_variants\": {want}"))).unwrap();
             let cfg =
                 SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltiger Wert");
             assert_eq!(cfg.moon_order_variants, want);
         }
-        for bad in ["2", "-1", "0.5"] {
+        for bad in ["3", "-1", "0.5"] {
             std::fs::write(&path, spec(&format!(", \"moon_order_variants\": {bad}"))).unwrap();
             let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
                 .expect_err("ungueltiger Wert muss scheitern");
@@ -8249,11 +8626,12 @@ mod tests {
         let prev = std::env::var(name).ok();
         std::env::remove_var(name);
         assert_eq!(read_moon_order_variants_env(), MOON_ORDER_VARIANTS_DEFAULT);
-        for want in [0u8, 1] {
+        // par.9: `2` (Nachsuche statt Fan-out) ist seit 2026-09-14 gueltig.
+        for want in [0u8, 1, 2] {
             std::env::set_var(name, want.to_string());
             assert_eq!(read_moon_order_variants_env(), want);
         }
-        for bad in ["2", "255", "-1", "1.5", "nein", "", "   "] {
+        for bad in ["3", "255", "-1", "1.5", "nein", "", "   "] {
             std::env::set_var(name, bad);
             assert_eq!(
                 read_moon_order_variants_env(),
@@ -8348,6 +8726,277 @@ mod tests {
             (sum_on - sum_off).abs() < 1e-4,
             "Prior-Gesamtmasse muss gleich bleiben: an {sum_on}, aus {sum_off}"
         );
+    }
+
+    // ── Stufe 3: Nachsuche statt Fan-out (PREREG_moon_stack_order.md par.9) ──
+
+    /// Ein `SmallFactorySun`-Zug aus der Kandidatenliste von `state`, bei dem
+    /// es ueberhaupt etwas zu entscheiden gibt (mindestens ZWEI eindeutige
+    /// Reihenfolgen der Reststeine). `None`, wenn der Aufbau keinen hergibt.
+    fn some_multi_order_sun_move(state: &GameState) -> Option<Move> {
+        crate::game::drafting_actions(state).into_iter().find_map(|a| match a {
+            Action::Stone(m)
+                if m.take.source == TakeSource::SmallFactorySun
+                    && unique_moon_orders(&m.take.moon_order).len() >= 2 =>
+            {
+                Some(m)
+            }
+            _ => None,
+        })
+    }
+
+    /// Ein Startaufbau, der GARANTIERT einen mehrdeutigen Sonnenzug enthaelt
+    /// -- sonst waeren die Stufe-3-Tests still leer (die Fabrikbefuellung ist
+    /// zufaellig; bei einem einzigen festen Seed haengt es am Wuerfel, ob es
+    /// ueberhaupt etwas zu entscheiden gibt).
+    fn state_with_multi_order_sun_move(first_seed: u64) -> (GameState, Move) {
+        for offset in 0..64u64 {
+            let mut rng = StdRng::seed_from_u64(first_seed + offset);
+            let mut state = setup_new_game(names(), 0, &mut rng);
+            // `setup_new_game` laesst beide Startkuppeln offen
+            // (`state.rs:519`), und `game.rs::apply_drafting` prallt daran
+            // hart ab. Die Handregel aufloesen, sonst ist jeder
+            // Kandidaten-Folgezustand ein `Err` -- gleicher Handgriff wie in
+            // [`search_start_placement`] fuer die zweite Setzung.
+            // ZWEI Durchlaeufe, und das ist kein Schoenheitsfehler: die
+            // Startsetzung hat eine Reihenfolgeregel -- der Nicht-Startspieler
+            // legt zuerst (`game.rs:586-589`, sonst `Err`). Ein einzelner
+            // Durchlauf von Spieler 0 aufwaerts scheitert deshalb still, sobald
+            // Spieler 0 der Startspieler ist; `start_tile_pending` bleibt
+            // stehen, der Seed wird verworfen, und nach 64 Versuchen sieht es
+            // aus wie ein Befund ueber das Spiel statt wie ein Bug im Helfer.
+            for _ in 0..2 {
+                for pi in 0..state.players.len() {
+                    if state.players[pi].start_tile_pending {
+                        if let Some((t, r, c, rot)) =
+                            crate::self_play::choose_start_placement(&state, pi)
+                        {
+                            let _ = crate::game::apply_start_placement(&mut state, pi, t, r, c, rot);
+                        }
+                    }
+                }
+            }
+            if state.players.iter().any(|p| p.start_tile_pending) {
+                continue;
+            }
+            if let Some(m) = some_multi_order_sun_move(&state) {
+                return (state, m);
+            }
+        }
+        panic!("64 Startaufbauten ohne mehrdeutigen Sonnenzug -- das waere ein Befund, kein Zufall");
+    }
+
+    /// par.9, Kern der Bauform: bei `moon_order_variants == 2` faechert die
+    /// ZUGAUSWAHL nicht auf -- die Kandidatenliste ist Aktion fuer Aktion und
+    /// Prior fuer Prior GENAU die von `0`. Nur so misst der spaetere A/B
+    /// "2 gegen 0" die Reihenfolge allein, ohne Verdraengung im
+    /// Wurzelfenster.
+    #[test]
+    fn build_untried_actions_moon_order_post_search_does_not_fan_out() {
+        let (state, _m) = state_with_multi_order_sun_move(11);
+        let logits: Vec<f32> = (0..NUM_ACTIONS).map(|i| (i % 17) as f32 * 0.05).collect();
+        let moon_scores = [0.9f32, -0.4, 1.7, 0.2, -1.1];
+
+        let (acts_zero, n_zero) = build_untried_actions(&state, &logits, &moon_scores, true, 0);
+        let (acts_two, n_two) = build_untried_actions(
+            &state,
+            &logits,
+            &moon_scores,
+            true,
+            MOON_ORDER_VARIANTS_POST_SEARCH,
+        );
+        assert_eq!(n_two, n_zero);
+        assert_eq!(
+            acts_two.len(),
+            acts_zero.len(),
+            "Wert 2 darf genau so wenig auffaechern wie Wert 0"
+        );
+        for ((a, pa), (b, pb)) in acts_two.iter().zip(acts_zero.iter()) {
+            assert_eq!(a, b);
+            assert_eq!(pa.to_bits(), pb.to_bits(), "Priors muessen bitgleich sein");
+        }
+
+        // Gegenprobe, damit der Test nicht gruen ist, weil es nichts
+        // aufzufaechern gibt: der Bestand (1) liefert auf DEMSELBEN Zustand
+        // mehr Kandidaten.
+        let (acts_one, _) =
+            build_untried_actions(&state, &logits, &moon_scores, true, MOON_ORDER_VARIANTS_DEFAULT);
+        assert!(
+            acts_one.len() > acts_zero.len(),
+            "Bestand (1) muss auffaechern: {} gegen {}",
+            acts_one.len(),
+            acts_zero.len()
+        );
+    }
+
+    /// par.9, Auflage "Bitidentitaet bei 0 und 1": das Tor der Nachsuche ist
+    /// AUSSCHLIESSLICH bei Wert 2 offen. Es ist eine eigene reine Funktion,
+    /// damit genau diese Zusage ohne Netz pruefbar ist -- ist es zu, zieht
+    /// [`moon_order_post_search`] weder eine Zufallszahl noch ruft es das
+    /// Netz.
+    #[test]
+    fn moon_order_post_search_gate_opens_only_for_value_two() {
+        let (_state, m) = state_with_multi_order_sun_move(23);
+        let act = Action::Stone(m.clone());
+
+        for v in [0u8, MOON_ORDER_VARIANTS_DEFAULT] {
+            let cfg = SearchConfig { moon_order_variants: v, ..search_config_off() };
+            assert!(
+                !moon_order_post_search_applies(&cfg, Some(&act)),
+                "Wert {v} darf die Nachsuche nicht betreten"
+            );
+        }
+        let cfg2 = SearchConfig {
+            moon_order_variants: MOON_ORDER_VARIANTS_POST_SEARCH,
+            ..search_config_off()
+        };
+        assert!(moon_order_post_search_applies(&cfg2, Some(&act)));
+
+        // Budget 0 schaltet sie ab, auch bei Wert 2.
+        let cfg2_off = SearchConfig { moon_order_search_sims: 0, ..cfg2 };
+        assert!(!moon_order_post_search_applies(&cfg2_off, Some(&act)));
+
+        // Keine Aktion und ein Zug ohne Reihenfolge-Entscheid bleiben aussen
+        // vor -- dieselbe Bedingung wie der Fan-out.
+        assert!(!moon_order_post_search_applies(&cfg2, None));
+        let mut single = m;
+        single.take.moon_order.truncate(1);
+        assert!(!moon_order_post_search_applies(&cfg2, Some(&Action::Stone(single))));
+    }
+
+    /// par.9, Kern der Nachsuche: sie waehlt TATSAECHLICH eine Reihenfolge,
+    /// und zwar die mit dem KLEINSTEN Wert des Folgezustands (der Wert gilt
+    /// aus Sicht des Gegners, der dort am Zug ist). Der Bewerter ist hier
+    /// eingesetzt statt gelernt -- er bevorzugt die Reihenfolge, deren
+    /// OBERSTER Stein (letztes Element, `factory.rs::place_on_moon`
+    /// "letzter = oben") eine bestimmte Farbe hat.
+    #[test]
+    fn choose_moon_order_with_picks_the_order_the_evaluator_prefers() {
+        let (state, m) = state_with_multi_order_sun_move(5);
+        let variants = unique_moon_orders(&m.take.moon_order);
+        assert!(variants.len() >= 2);
+        // Gleichverteilter Prior: die Wahl haengt dann NUR am Bewerter.
+        let flat = [0f32; 5];
+
+        // Jede der vorhandenen Ziel-Oberflaechen muss erreichbar sein.
+        let mut tops: Vec<TileColor> = Vec::new();
+        for seq in &variants {
+            let top = *seq.last().expect("Variante ist nie leer");
+            if !tops.contains(&top) {
+                tops.push(top);
+            }
+        }
+        assert!(tops.len() >= 2, "die Varianten muessen verschiedene Oberste haben");
+
+        for want_top in tops {
+            let chosen = choose_moon_order_with(&state, &m, &flat, |next, _rank| {
+                // Der Folgezustand traegt den frisch gelegten Stapel in der
+                // Fabrik des Zugs -- liegt `want_top` oben, ist der Wert
+                // niedrig (= gut fuer uns, schlecht fuer den Gegner).
+                let fid = m.take.factory_id.expect("kleiner Sonnenzug hat eine factory_id");
+                let f = next
+                    .factories
+                    .iter()
+                    .find(|f| f.factory_id == fid)
+                    .expect("Fabrik muss im Folgezustand existieren");
+                let top = f.moon_stacks.last().and_then(|s| s.last()).copied();
+                Some(if top == Some(want_top) { 0.1 } else { 0.9 })
+            })
+            .expect("bei zwei eindeutigen Reihenfolgen muss eine gewaehlt werden");
+            assert_eq!(
+                chosen.last().copied(),
+                Some(want_top),
+                "die Nachsuche muss die vom Bewerter bevorzugte Reihenfolge nehmen"
+            );
+            // Multimengen-Treue: es wird nur UMGEORDNET, nichts ersetzt.
+            let mut a: Vec<&str> = chosen.iter().map(|c| c.value()).collect();
+            let mut b: Vec<&str> = m.take.moon_order.iter().map(|c| c.value()).collect();
+            a.sort_unstable();
+            b.sort_unstable();
+            assert_eq!(a, b);
+        }
+
+        // Bei Wertgleichheit entscheidet der Prior: gewaehlt wird die
+        // Variante, die die Vorordnung nach vorn stellt (stabile Sortierung,
+        // striktes `<` beim Vergleich).
+        let want_on_tie = {
+            // Dieselbe stabile Absteigend-Sortierung wie in
+            // `choose_moon_order_with`; bei Gleichstand bleibt die
+            // Ausgangsreihenfolge von `unique_moon_orders` erhalten.
+            let mut v = variants.clone();
+            v.sort_by(|a, b| {
+                plackett_luce_prob(&flat, b)
+                    .partial_cmp(&plackett_luce_prob(&flat, a))
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            v[0].clone()
+        };
+        let tie = choose_moon_order_with(&state, &m, &flat, |_next, _rank| Some(0.5))
+            .expect("auch bei Gleichstand muss eine Reihenfolge herauskommen");
+        assert_eq!(tie, want_on_tie);
+
+        // Nicht bewertbar (alle `None`) -> keine Wahl, der Aufrufer behaelt
+        // die kanonische Reihenfolge.
+        assert!(choose_moon_order_with(&state, &m, &flat, |_next, _rank| None).is_none());
+    }
+
+    /// par.9: das Budget-Feld `moon_order_search_sims` ist OPTIONAL. Eine
+    /// eingefrorene Spec ohne das Feld muss weiter laden und denselben
+    /// Default tragen; `0` (Nachsuche aus) ist gueltig, Bruchzahlen und
+    /// negative Werte sind es nicht.
+    #[test]
+    fn search_config_from_spec_file_takes_moon_order_search_sims_as_optional_field() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_moonsims_{}.json", std::process::id()));
+        let spec = |extra: &str| {
+            format!(
+                r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 1, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0{extra}, "heuristik_variante": "hv1"}}"#
+            )
+        };
+        std::fs::write(&path, spec("")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect("Spec ohne moon_order_search_sims muss weiter laden");
+        assert_eq!(cfg.moon_order_search_sims, MOON_ORDER_SEARCH_SIMS_DEFAULT);
+        assert_eq!(MOON_ORDER_SEARCH_SIMS_DEFAULT, 256);
+        for want in [0u32, 1, 64, 256, 1000] {
+            std::fs::write(&path, spec(&format!(", \"moon_order_search_sims\": {want}"))).unwrap();
+            let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltiges Budget");
+            assert_eq!(cfg.moon_order_search_sims, want);
+        }
+        for bad in ["-1", "0.5", "1000000"] {
+            std::fs::write(&path, spec(&format!(", \"moon_order_search_sims\": {bad}"))).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("ungueltiges Budget muss scheitern");
+            assert!(msg.contains("moon_order_search_sims"), "{msg}");
+        }
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// par.9, Env-Haelfte des Budgets: ungesetzt, leer und ungueltig ergeben
+    /// alle den Default, gueltige Zahlen kommen an. Kein Panik-Pfad.
+    #[test]
+    fn read_moon_order_search_sims_env_defaults_and_rejects_invalid() {
+        let _guard = SEARCH_CONFIG_ENV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let name = "MOSAIC_MOON_ORDER_SEARCH_SIMS";
+        let prev = std::env::var(name).ok();
+        std::env::remove_var(name);
+        assert_eq!(read_moon_order_search_sims_env(), MOON_ORDER_SEARCH_SIMS_DEFAULT);
+        for want in [0u32, 32, 256, 4096] {
+            std::env::set_var(name, want.to_string());
+            assert_eq!(read_moon_order_search_sims_env(), want);
+        }
+        for bad in ["-1", "1.5", "nein", "", "   "] {
+            std::env::set_var(name, bad);
+            assert_eq!(
+                read_moon_order_search_sims_env(),
+                MOON_ORDER_SEARCH_SIMS_DEFAULT,
+                "{bad:?} muss auf den Default zurueckfallen, ohne zu paniken"
+            );
+        }
+        match prev {
+            Some(v) => std::env::set_var(name, v),
+            None => std::env::remove_var(name),
+        }
     }
 
     /// `PREREG_dome_return_order.md` par.4: `return_order_mode` ist ein

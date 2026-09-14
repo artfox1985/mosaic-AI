@@ -841,6 +841,12 @@ fn engine_config_json() -> String {
         // darueber -- ein fehlendes Flag ist ein stiller Default, und hier ist
         // der stille Default AN.
         "moon_order_variants": crate::net_mcts::SearchConfig::from_env().moon_order_variants,
+        // PREREG_moon_stack_order.md par.9: Budget der Mondstapel-Nachsuche JE
+        // VARIANTE. Wirkt nur bei `moon_order_variants == 2`, gehoert aber aus
+        // demselben Grund ins Manifest wie der Knopf darueber -- ein Lauf mit
+        // Wert 2 waere sonst nachtraeglich nicht von einem anderen Budget zu
+        // unterscheiden.
+        "moon_order_search_sims": crate::net_mcts::SearchConfig::from_env().moon_order_search_sims,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,

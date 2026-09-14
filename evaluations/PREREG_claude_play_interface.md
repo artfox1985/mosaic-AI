@@ -1060,9 +1060,23 @@ das Netz, zwei sieht das Netz mehr als ich. Alle Pruefstellen in dieser Sitzung 
    die zu diesem Zeitpunkt nicht offen sein duerfte.
 5. **Historie.** Der Encoder hat KEINE (0 Treffer fuer `move_number|history|prev_state` in
    `features.rs`, selbst nachgezaehlt); er sieht eine Momentaufnahme. Ich lese `game.log`, also
-   den ganzen Partieverlauf. Das ist kein Fehler des Fensters -- ein Mensch am Tisch erinnert sich
-   auch --, aber es ist eine echte Asymmetrie zum Gegner dieser Partien und die einzige, die sich
-   nicht am Fenster beheben laesst, sondern nur am Netz.
+   den ganzen Partieverlauf.
+
+   **ENTSCHAERFT 2026-09-14 (Nutzer: "der verlauf ergibt sich aus dem brettzustand sag ich
+   mal").** Hier stand, das sei "die einzige [Asymmetrie], die sich nicht am Fenster beheben
+   laesst, sondern nur am Netz". Das ist zu stark: das Brett IST weitgehend die Summe der Zuege
+   -- gelegte Steine, Wand, Strafleiste, Punktestand, Kuppelplatten. Wer den Zustand liest, kennt
+   den Verlauf in allem, was die Bewertung braucht.
+
+   **Die eine Stelle, an der der Zustand den Verlauf NICHT trug, ist inzwischen gebaut:** was ein
+   Spieler selbst gezogen und zurueckgelegt hat, stand bis 2026-09-13 in keinem Feld -- ein
+   Mensch erinnert sich daran, das Netz konnte es nicht wissen. Das ist P.12
+   (`PREREG_stack_top_feature.md`, 18 Design-Bits des EIGENEN Blocks). Die "Erinnerung" ist also
+   genau dort nachgeruestet, wo sie nicht aus dem Brett folgte.
+
+   **Was bleibt:** die Zugreihenfolge INNERHALB einer Runde. Sie ist aus dem Zustand nicht
+   rekonstruierbar, duerfte aber kaum tragen -- das Ergebnis ist dasselbe Brett. **Ungeprueft**,
+   kein offener Punkt im Programm.
 
 ### par.11b Das NETZ sieht mehr als ich
 

@@ -398,10 +398,96 @@ Reihenfolge und die Kosten der Kandidatenkonkurrenz. Stufe 3 trennt sie: die Zug
 identisch zu Wert 0, der einzige Unterschied ist die Nachsuche. **Ein A/B 2 gegen 0 misst damit
 den Wert der Reihenfolge allein**, ohne Verdraengung im Wurzelfenster.
 
+### Reihenfolge: erst messen, dann optimieren (Nutzer 2026-09-14)
+
+Nutzer: *"ich denk mal das ist keine optimierte variante. und es wurde auch noch nicht gemessen
+was es bringt."* Das ist die Leitlinie fuer Stufe 3 und trennt zwei Kostenfragen, die der
+Koordinator zunaechst vermengt hatte:
+
+* **Fuer das A/B sind die Kosten nachrangig.** 200 Paare dauern mit voller Nachsuche statt rund
+  90 vielleicht 180 Minuten -- einmalig. Gemessen wird damit, was die saubere Modellierung
+  HERGIBT, nicht was eine sparsame Variante davon uebriglaesst. Das Budget bleibt deshalb bei
+  256 je Variante (Begruendung: `gumbel_top_m_for_budget(256) = 16`, dieselbe Wurzelbreite wie
+  die erste Suche im Betrieb bei @400).
+* **Optimiert wird erst, wenn der Nutzen belegt ist.** Dann geht es um die ERZEUGUNG, wo eine
+  Verdopplung der Laufzeit die relevante Zahl waere. Moegliche Hebel, bewusst NICHT jetzt gebaut:
+  Varianten nach Prior abschneiden statt alle zu bewerten, Budget je Variante senken, die
+  Nachsuche auf Stellen mit unsicherem Prior beschraenken.
+
+**Das Kostentor bleibt damit eine Messung** (par.9 oben) und ist kein Grund, den Bau vorher
+schlank zu machen.
+
 ### Tore
 
 Default 1 bitidentisch (Tests, Netz-Paritaets-Fixture, Anker-Drift), Kostentor vor dem A/B
 (die Nachsuche kostet Varianten x Sims je Sonnenzug mit Rest >= 2; wie oft das vorkommt, sagt
 die noch offene par.4-Diagnostik aus den Logs von Nr. 28), dann A/B 2 gegen 0 am Champion,
 200 Paare, Blockgroesse 5, ohne Frueh-Stopp.
+
+## par.9a BAUSTAND Stufe 3 (2026-09-14, gebaut, kompiliert, im Wheel)
+
+`MOSAIC_MOON_ORDER_VARIANTS=2` plus Budget-Knopf `MOSAIC_MOON_ORDER_SEARCH_SIMS` (Default **256**).
+
+**Wirkung.** Bei Wert 2 faechert die Zugauswahl NICHT auf: die Fan-out-Bedingung heisst jetzt
+`== MOON_ORDER_VARIANTS_DEFAULT` statt `!= 0` (`net_mcts.rs:2362`), Wert 2 faellt damit in
+denselben 1:1-Pfad wie Wert 0. Nach der Zugwahl laeuft `moon_order_post_search`
+(`net_mcts.rs:5650`) mit dem reinen Kern `choose_moon_order_with` (:5533) und dem Tor
+`moon_order_post_search_applies` (:5609). Vier Einhaengungen, alle NACH der Zugwahl und nie im
+Baum: `net_search_drafting_action` (Einzelbaum und ISMCTS-Wald), `..._hybrid`,
+`net_search_with_tree_inner` (GUI/Debug) und `self_play.rs::net_drafting_policy`.
+
+**Das Tor ist eine eigene reine Funktion**, damit die Bitidentitaets-Zusage ohne Netz pruefbar
+ist: `true` nur bei Wert 2 UND Budget > 0 UND `SmallFactorySun` mit Rest >= 2 UND mindestens
+zwei eindeutigen Reihenfolgen. Sonst kommt die Aktion unveraendert zurueck -- kein Netzaufruf,
+keine Zustandskopie, **keine Zufallszahl** (die Ziehung steht hinter dem Tor).
+
+**Bewertung.** Wiederverwendet wird `build_net_tree` (`net_mcts.rs:5279`), kein zweiter
+Suchtreiber. Folgezustand je Variante: Kopie plus `apply_drafting`, danach ist laut
+`game.rs:786-788` der GEGNER am Zug -- genau der Halbzug, um den es geht. Kennzahl ist
+`v_mix` an der Wurzel (:3632), gewaehlt wird das Minimum. Dieses Mischen ist der Unterschied zur
+reinen Blattbewertung, an der `dome_return_order` Modus 1 scheitert.
+
+**Sim-Default 256, am Zweck begruendet:** `gumbel_top_m_for_budget(256)` = 16, also genau die
+Wurzelbreite, die die erste Suche im Betrieb bei @400 bekommt (dort `clamp(round(400/16), 4, 16)`
+= 16). 256 ist der kleinste Wert mit dieser Eigenschaft; 128 gaebe m=8, 64 gaebe m=4 -- die
+Antwort des Gegners waere dann auf einem engeren Kandidatenfeld bewertet als die Stellung, aus
+der sie kommt.
+
+**Determinismus:** genau EINE Zahl aus dem Suchstrom, daraus je Variante
+`derive_search_seed(base ^ MOON_ORDER_SEARCH_SEED_DISTINGUISHER, rang)` (:5486). Der Hauptstrom
+verschiebt sich um genau einen Zug, unabhaengig vom Verbrauch der Nachsuche.
+
+**BAU-TOR GRUEN:** `cargo test --release --lib` **659 gruen** (0 rot; darunter fuenf neue Tests
+und die **unveraenderte Netz-Paritaets-Fixture** -- sie faehrt mit `SearchConfig::from_env()`,
+Default 1, das Tor bleibt zu), `--no-run` deckt examples und benches ab (keine E0063),
+Wheel gebaut und installiert, **Kontrakt-Hash UNVERAENDERT 39994362fba145a6** (am laufenden Wheel
+gegengeprueft, das `moon_order_search_sims: 256` fuehrt), `docs/knobs.md` neu (124 Knoepfe),
+Konventions-Check gruen, **Anker-Drift und Konservierung GRUEN**.
+
+**EIN BUG IM TESTHELFER, gefunden und behoben:** `state_with_multi_order_sun_move` setzte die
+Startkuppeln stur von Spieler 0 aufwaerts und verschluckte den Fehler mit `let _ =`. Die
+Startsetzung hat aber eine Reihenfolgeregel -- der Nicht-Startspieler legt zuerst
+(`game.rs:586-589`). War Spieler 0 der Startspieler, blieb `start_tile_pending` stehen, der Seed
+wurde verworfen, und nach 64 Versuchen meldete der Helfer "64 Startaufbauten ohne mehrdeutigen
+Sonnenzug -- das waere ein Befund, kein Zufall". **Es war kein Befund ueber das Spiel, sondern
+ein Bug im Helfer**; behoben mit zwei Durchlaeufen. Drei Tests waren dadurch rot.
+
+### Offene Entscheide aus dem Bau (Nutzer)
+
+1. **Aufzeichnendes Self-Play ist mitverdrahtet** (`net_drafting_policy`): ein Modus-2-Korpus
+   traegt damit die nachgesuchte Reihenfolge, sonst haette er dieselbe Luecke wie die
+   TD-Bootstrap-Rollouts. Aendert die gespielte Trajektorie eines solchen Korpus; ruecknehmbar an
+   einer Aufrufstelle.
+2. **Keine verschachtelte Nachsuche:** im Unterbaum spielt der Gegner seine eigenen Sonnenzuege
+   kanonisch (sonst unbegrenzte Rekursion). Die Nachsuche bewertet den Gegnerzug also unter der
+   Annahme, dass der Gegner selbst nicht nachsucht.
+3. **TD-Bootstrap-Rollouts** bleiben wie in par.8 hart auf Fan-out -- bei Modus 2 ist der Knopf
+   dort weiterhin unvollstaendig.
+4. **Zwei Umgehungen in `net_arena_choose_action`** (genau eine legale Aktion, Bauer-Vorzug)
+   ueberspringen die Suche und damit auch die Nachsuche.
+5. **par.2s Haeufigkeitszahl passt nicht auf den Verbraucher:** dort stehen "19,9 Sonnenzuege mit
+   Rest >= 2 je Partie", im Code entsteht das Ziel aber schon bei Rest >= 1
+   (`self_play.rs:1296`). Die Zahl ist damit eine LOSE OBERE Schranke fuer das Tor der Nachsuche
+   (Rest >= 2 UND >= 2 eindeutige Reihenfolgen) und darf so nicht ins Kostentor. Die scharfe Zahl
+   liefert die offene par.4-Diagnostik aus den Logs von Nr. 28.
 

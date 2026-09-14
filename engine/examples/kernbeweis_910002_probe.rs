@@ -108,6 +108,9 @@ fn main() {
         // eingeschaltete Zustand, und diese Sonde ist ein
         // Byte-Identitaets-Nachweis.
         moon_order_variants: mosaic_rust::net_mcts::MOON_ORDER_VARIANTS_DEFAULT,
+        // par.9: wird bei `moon_order_variants != 2` nie gelesen -- der
+        // Default steht hier nur, damit das Struct-Literal vollstaendig ist.
+        moon_order_search_sims: mosaic_rust::net_mcts::MOON_ORDER_SEARCH_SIMS_DEFAULT,
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
         // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md
