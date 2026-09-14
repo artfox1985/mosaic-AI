@@ -389,13 +389,26 @@ def blocks(items: list, size: int = BLOCK_SIZE) -> list[list]:
 
 
 def summarize(values: list[float]) -> dict:
+    """Lage UND Streuung. Das 95-Prozent-Intervall ist Pflicht, nicht Zierde:
+    eine Differenz ohne Intervall ist nach Projektregel kein Befund, sondern
+    eine Zahl (CLAUDE.md, `feedback_statistical_rigor`). Normalapproximation
+    1,96 * SE; bei n < 2 gibt es keine Streuung und das Feld bleibt leer.
+    """
     if not values:
-        return {"n": 0, "mittel": None, "median": None, "max": None}
+        return {"n": 0, "mittel": None, "median": None, "max": None, "se": None, "ci95": None}
+    mittel = statistics.fmean(values)
+    if len(values) > 1:
+        se = statistics.stdev(values) / (len(values) ** 0.5)
+        ci = [round(mittel - 1.96 * se, 4), round(mittel + 1.96 * se, 4)]
+    else:
+        se, ci = None, None
     return {
         "n": len(values),
-        "mittel": round(statistics.fmean(values), 4),
+        "mittel": round(mittel, 4),
         "median": round(statistics.median(values), 4),
         "max": round(max(values), 4),
+        "se": round(se, 5) if se is not None else None,
+        "ci95": ci,
     }
 
 
