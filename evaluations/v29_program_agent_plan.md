@@ -73,20 +73,22 @@ EINGANG und sind damit eine andere Frage.
 
 | Punkte | Was | Dauer | Herkunft |
 | --- | --- | --- | --- |
-| 22 | Schwierigkeitsleiter: Verdrahtung 1c, Server, Stufen-Specs, Tore | 6 bis 8 h | ANNAHME (Bauplan par.12c: 3-4 h Rust plus 2-3 h Server) |
+| ~~22~~ | ~~Schwierigkeitsleiter~~ **auf v30 vertagt** (par.13) | **entfaellt fuer v29** | Nutzer-Entscheid 2026-09-14 |
 | 24-26 | Korpuslauf, Zugklassen-Differential, Partien g08-g10 | rund 4 h | ANNAHME |
 | 27, 28 | Mondstapel-Knopf plus A/B | rund 2,5 h | Bau ANNAHME, A/B gemessen (86-91 min) |
 | 29 | Rueckgabe-Modus A/B | rund 1,5 h | gemessen (2.515-2.621 s je Lauf) |
 | 30-32 | Rundenschaetzer: Kostentor, Instrument, A/B | rund 4 h | gemessen |
 | 33-36 | Tiling im Blatt: Bau, Sichttor, Kostentor, A/B | rund 11 h | **Bau ist eine ANNAHME von einem Tag** und der groesste Einzelposten |
-| 37 | Antwortzeit und drei Stufen-Kanten | rund 1 h | ANNAHME |
+| ~~37~~ | ~~Antwortzeit und drei Stufen-Kanten~~ **auf v30 vertagt** | **entfaellt fuer v29** | Nutzer-Entscheid 2026-09-14 |
 
-**Summe B: rund 30 Stunden.**
+**Summe B: rund 23 Stunden** (die Schwierigkeitsleiter ist am 2026-09-14 auf v30 vertagt worden,
+das nimmt 6 bis 8 h aus Punkt 22 und rund 1 h aus Punkt 37 heraus).
 
 ### Was die Kalenderzeit bestimmt, nicht die Rechenzeit
 
-**Rund 40 Stunden reine Rechen- und Bauzeit** fuer v29 insgesamt. Bei exklusiver CPU und einem
-produktiven Fenster von 8 bis 10 Stunden am Tag sind das **vier bis fuenf Tage** -- aber nur,
+**Rund 32 Stunden reine Rechen- und Bauzeit** fuer v29 insgesamt (vor der Vertagung der Leiter
+waren es 40). Bei exklusiver CPU und einem produktiven Fenster von 8 bis 10 Stunden am Tag sind
+das **drei bis vier Tage** -- aber nur,
 wenn nichts wartet. Drei Dinge koennen das strecken:
 
 1. **Neun Stopp-Punkte brauchen einen Nutzer-Entscheid** (Spalte "Stopp-Punkt"), darunter jede
@@ -127,7 +129,7 @@ messen, nicht schaetzen").
 | 19 | `v29_window` par.6c | Tor 1 b03 gegen b01, zwei Seeds; Lesart Sichtgleichheit mit Verwerfungs-Ausgang | Nr. 18 | 86-91 min je Seed (gemessen) | nein |
 | 20 | `v29_window` par.6d | **Netz-Gesundheit** (5 Punkte). **Bau der Sonde `tools/probes/dead_unit_probe.py` DURCH 2026-09-13** (Selbsttest ueber drei Generationen gruen); die vier anderen Punkte nutzen bestehende Werkzeuge | Nr. 12/16/18 | Bau rund 1 h, Laeufe Minuten je Modell (ANNAHME) | nein |
 | 21 | `docs/promotion_checklist.md`, Skill `/mosaic-champion-promotion` | Promotion des Siegers: `set_champion`, drei Elo-Kanten, Pflicht-Diagnostiken, Fixture, Einfrieren, Golden Probe | Nr. 13/17/19 | Anker-Kante 1.441-1.491 s, Champion-2 2.516 s, Golden Probe 1.450 s (gemessen) | **ja** -- Champion-Wechsel |
-| 22 | `difficulty_levels` par.5 Stufe 0, par.4.2/4.3, Bauplan Weg A | Schwierigkeitsleiter: Inventur und Bau (Spec-Felder, Server-Stufentabelle, Frontend), Wheel mit Fixture und Drift. **Schritte 1, 2 und 1b gebaut und abgenommen**, `beginner.spec.json` liegt; Bauplan am 2026-09-13 in drei Punkten korrigiert (kein Env-Knopf fuer die Variante; Stilfelder und `sims` muessen VOR den Stufen-Specs in `KNOWN_FIELDS`) | waehrend der v29-Erzeugung, aber nicht neben Waechter oder Kette | Rust 3-4 h, Server/Frontend 2-3 h (ANNAHME) | **ja** -- Namensschema der Elo-Knoten, Anfaenger hv2 gegen hv3 |
+| ~~22~~ | **AUF v30 VERTAGT** (par.13, Nutzer 2026-09-14) -- `difficulty_levels` par.5 Stufe 0, par.4.2/4.3, Bauplan Weg A | Schwierigkeitsleiter: Inventur und Bau (Spec-Felder, Server-Stufentabelle, Frontend), Wheel mit Fixture und Drift. **Schritte 1, 2 und 1b gebaut und abgenommen**, `beginner.spec.json` liegt; Bauplan am 2026-09-13 in drei Punkten korrigiert (kein Env-Knopf fuer die Variante; Stilfelder und `sims` muessen VOR den Stufen-Specs in `KNOWN_FIELDS`) | waehrend der v29-Erzeugung, aber nicht neben Waechter oder Kette | Rust 3-4 h, Server/Frontend 2-3 h (ANNAHME) | **ja** -- Namensschema der Elo-Knoten, Anfaenger hv2 gegen hv3 |
 | 23 | `corpus_behaviour_audit` par.3/par.6/par.9, `claude_play_interface` par.9 | Werkzeug `tools/probes/corpus_behaviour_audit.py` bauen und an den Claude-Logs selbsttesten. **DURCH 2026-09-13**: alle vier Arme gebaut, Selbsttest ueber sechs Partien exakt (par.9) | v29-Korpus liegt | Bau 2-3 h (ANNAHME) | **ja** -- Umfang Arm C |
 | 24 | `corpus_behaviour_audit` par.6 Punkt 3 | Korpuslauf ueber den v29-Korpus (Ziehsucht A1, Zwangsraeumungen A2, Null-Sturz B, Plattenkonditionierung C) | Nr. 23, Selbsttest gruen | unter 0,5 s je Partie, rund 1,5 h fuer 12.000 (ANNAHME) | nein |
 | 25 | `claude_play_interface` par.10 | Zugklassen-Differential Claude gegen Champion an jedem Entscheid, mit Netz-gegen-Netz-Rauschboden | Nr. 24 (gleiches Replay), Maschine frei | unter 30 min (ANNAHME) | nein |
@@ -142,7 +144,7 @@ messen, nicht schaetzen").
 | 34 | `round_transition_search_sampling` par.10 | Sichttor: 300 Blatt-Zustaende Runde 3/4 mit `bag_count` < 21, ein Verstoss ist ROT | Nr. 33 | Minuten (ANNAHME) | **ja** -- ROT beendet den Bau |
 | 35 | `round_transition_search_sampling` par.5 Schritt 1 | Kostentor 25 Prozent plus Anteil pseudo-terminaler Blaetter je Suche | Nr. 34 | rund 24 min je Lauf, zwei Laeufe (gemessen) | **ja** -- gerissenes Tor beendet den Arm |
 | 36 | `round_transition_search_sampling` par.5 Schritt 2, par.9 | A/B gepaart am Champion v29-b01, 200 Paare, Blockgroesse 5, Logs | Nr. 35 | 86-91 min (gemessen) | **ja** -- Rezept-Aufnahme |
-| 37 | `difficulty_levels` par.5 Stufen 1-3 | Antwortzeit je Stufe, drei Kanten (je 100 Paare), "gespielt = gemessen" | Nr. 21 und 22 | Latenz unter 5 min, Kanten unter 1 h (ANNAHME) | **ja** -- Notch-Regel, Streichen einer Stufe |
+| ~~37~~ | **AUF v30 VERTAGT** (par.13) -- `difficulty_levels` par.5 Stufen 1-3 | Antwortzeit je Stufe, drei Kanten (je 100 Paare), "gespielt = gemessen" | Nr. 21 und 22 | Latenz unter 5 min, Kanten unter 1 h (ANNAHME) | **ja** -- Notch-Regel, Streichen einer Stufe |
 | 38 | `difficulty_levels` par.5 Stufe 4 | Mensch-Validierung, je Stufe mindestens 3 Partien | Nr. 37 gruen | Kalenderzeit des Nutzers | **ja** -- spielt der Nutzer |
 | 39 | `v29_window` par.8 Punkt 3 | v30: nur Rezept-Knoepfe aus den v29-Verdikten, Zyklus wie v29 | Verdikte aus Nr. 28/29/32/36 | wie v29 (gemessen) | **ja** -- Rezept-Entscheide |
 | 40 | `code_cleanup_closeout` par.4/par.5/par.5a | Code-Abschluss Stufen 2 und 3, Name "Tessa" im Schluss-Artefakt und in der GUI | nach der v30-Promotion | Stufe 2 offen, Stufe 3 rund 3 h (ANNAHME) | **ja** -- Umfang Stufe 2 |

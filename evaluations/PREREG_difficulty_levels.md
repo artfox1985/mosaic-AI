@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: nichts gefahren. Bestand (par.2): Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. Zuschnitt ENTSCHIEDEN (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem Champion; Kanten erst gegen den v30-Champion. Umbau Weg A (par.12c): Schritte 1 und 2 gebaut, Bauplan am 2026-09-13 in drei Punkten berichtigt und Schritt 1b GEBAUT UND ABGENOMMEN (sechs optionale Stilfelder, 641 Tests gruen, Paritaets-Fixture unveraendert) -- die Variante hat bewusst KEINEN Env-Knopf, Stilfelder und sims muessen vor den Stufen-Specs in KNOWN_FIELDS, und action_temp ist ein Modus 0..2. -->
+<!-- STATUS: OFFEN | Frage: Welche Schwierigkeitsstufen bietet die GUI beim Spiel gegen das Netz an, und woran ist jede Stufe gemessen? | Beleg: **GANZE LEITER auf v30 VERTAGT** (par.13, Nutzer 2026-09-14: sonst wird auf ein Modell geeicht, das zum Schluss nicht spielt). Zuschnitt ENTSCHIEDEN und gueltig (par.4.1/4.1a): vier Stufen, Anfaenger hv3 @150, die drei oberen aus dem dann amtierenden Champion. Gebaut und bestandserhaltend liegen geblieben: Schritte 1, 2 und 1b des Umbaus Weg A plus models/levels/beginner.spec.json. Bestand par.2: Presets sind aus der GUI unerreichbar, alle 33 Mensch-Partien liefen @400. -->
 
 # Vorregistrierung: Schwierigkeitsstufen beim Spiel gegen das Netz
 
@@ -1067,3 +1067,39 @@ nehmen, liest die GUI denselben Spieler wie `paired_gating.py`. Schritt 1b ist b
 getrennt, weil er fuer sich bestandserhaltend ist und ein eigenes Tor bekommt: **die
 Netz-Paritaets-Fixture darf sich nach 1b NICHT aendern** (ungenutzte Felder), waehrend sie nach
 1c bewusst neu gesetzt werden koennte.
+
+
+## par.13 GANZE LEITER auf v30 vertagt (Nutzer-Entscheid 2026-09-14)
+
+**Woertlich:** *"ich wuerd die schwierigkeitsleiter nicht jetzt machen sondern erst mit dem
+finalen champ. sonst kalibrieren wir es auf ein modell ein das zum schluss nicht spielt."*
+
+**Das geht weiter als der Stand davor.** par.4.1 hatte nur die KANTEN auf den v30-Champion
+vertagt (Entscheid 2026-09-13); Bau und Zuschnitt der Stufen standen weiter im v29-Programm
+(Fahrplan Nr. 22). Der Einwand trifft aber den Zuschnitt selbst: die drei oberen Stufen sind als
+"Champion mit weniger Sims und mehr Stilmitteln" definiert (par.4.1). Welche Sim-Zahl welche
+Spielstaerke ergibt, haengt am Netz -- an einem anderen Netz liegen die Stufen anders.
+
+**Fehlerklasse:** eine Skala auf einem Traeger eichen, der zur Messzeit nicht mehr existiert.
+Das ist dieselbe Klasse wie
+[[feedback-dont-calibrate-to-plate-blind-play]] und wie die Wiedervorlage-Regel aus CLAUDE.md
+("eine Konstante nie auf einer Reihe verankern, von der man WEISS, dass ein Punkt fehlt"). Hier
+ist der fehlende Punkt der Champion selbst.
+
+**Was das heisst:**
+
+- **Vertagt auf v30:** Schritt 1c (Verdrahtung), Schritt 3 (Server), Schritt 4 (die drei oberen
+  Stufen-Specs), Schritt 5 (Tore), das Frontend aus par.4.3 und die Kanten aus par.5. Im Fahrplan
+  sind das die Punkte 22 und 37.
+- **Bleibt liegen und ist NICHT verloren:** Schritt 1 und 2 (das `SearchConfig`-Feld und die
+  beiden GUI-Zugpfade) sowie Schritt 1b (die sechs optionalen Stilfelder) sind gebaut, getestet
+  und bestandserhaltend -- die Netz-Paritaets-Fixture ist danach unveraendert geblieben. Sie
+  kosten nichts, solange niemand eine Stufen-Spec laedt. Auch `models/levels/beginner.spec.json`
+  bleibt: die Anfaenger-Stufe ist hv3 @150 und haengt NICHT am Champion, ihr Elo-Knoten steht
+  bereits (972 [935, 1011]).
+- **Gewinn fuer v29:** rund 6 bis 8 Stunden aus dem Begleitprogramm (Fahrplan-Schaetzung vom
+  2026-09-14), plus die Stufen-Kanten aus Punkt 37.
+
+**Der Zuschnitt selbst bleibt gueltig** (par.4.1/4.1a: vier Stufen, Anfaenger hv3 @150, die drei
+oberen aus dem amtierenden Champion). Nur wird "der amtierende Champion" jetzt als der v30-Champion
+gelesen, nicht als v28-b02 oder ein v29-Arm.
