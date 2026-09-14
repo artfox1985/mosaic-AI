@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad seit 2026-07-01 ein Suchentscheid (Varianten mit Prior aus dem Moon-Order-Kopf). Traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: nichts gemessen. Bestand par.2 (Code geprueft 2026-09-12). EINGETAKTET als v29/v30-Begleitprogramm (Nutzer 2026-09-12): A/B Fan-out an gegen aus am Champion (par.4), danach Zielfrage (par.5). -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad seit 2026-07-01 ein Suchentscheid (Varianten mit Prior aus dem Moon-Order-Kopf). Traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: nichts gemessen. Bestand par.2 (Code geprueft 2026-09-12). EINGETAKTET als v29/v30-Begleitprogramm (Nutzer 2026-09-12): A/B Fan-out an gegen aus am Champion (par.4), danach Zielfrage (par.5). **KNOPF GEBAUT und im Wheel 2026-09-14 (par.8)**: `moon_order_variants` 0/1, Default 1 = Bestand; Bau-Tor gruen (646 Tests, Kontrakt-Hash unveraendert, Anker-Drift und Konservierung gruen). OFFEN: das A/B (Fahrplan Nr. 28). -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -221,3 +221,46 @@ Tiling-Umbau (`PREREG_round_transition_search_sampling.md` par.9 nennt die Reihe
 ausdruecklich: "nach Ziehsucht-Sonde und Mondstapel-Stufe 1, weil die beiden billiger sind").
 **Danach:** bei H1 positiv Stufe 2 in v30; sonst ist der Strang mit dem Nullbefund abgeschlossen
 und die Prereg kann auf ENTSCHIEDEN.
+
+## par.8 BAUSTAND 2026-09-14 (gebaut, kompiliert, im Wheel)
+
+Knopf `moon_order_variants` (Spec optional mit Default **1**, Env `MOSAIC_MOON_ORDER_VARIANTS`,
+Werte 0/1) nach par.4 gebaut. **Wirkort** `net_mcts.rs::build_untried_actions` (neuer Parameter),
+verdrahtet ueber `SearchConfig` in `node_from_net_outputs` -- damit in beiden Netz-Arenen,
+Netz-Self-Play, Referee (in-process und Worker ueber `resolve_search_config`) und GUI. Beruehrt:
+`net_mcts.rs` (Env-Leser, Spec-Feld, `KNOWN_FIELDS`, Fan-out-Zweig, Testhelfer, vier Tests),
+`lib.rs` (`engine_config`), `knob_registry.rs`, `engine/examples/kernbeweis_910002_probe.rs`
+(Struct-Literal), `server.py` und `tools/claude_play.py` (Spec-Abbildung). Aktionsraum bleibt
+406, Heuristik-Pfad unberuehrt.
+
+**Die Zeilennummern in par.2 waren veraltet.** Der Fan-out sitzt in `net_mcts.rs:2241-2255`
+(Bedingung `source == SmallFactorySun && moon_order.len() >= 2`, dann `unique_moon_orders` x
+`plackett_luce_prob`), nicht bei 1724-1920. Die kanonische Reihenfolge kommt aus
+`game::drafting_actions` -> `validation.rs:170-193`; bei `variants=0` wird der Zweig nicht
+betreten und die Aktion faellt in den 1:1-Pfad.
+
+**ZWEI BAU-ENTSCHEIDE UEBER par.4 HINAUS, beide bewusst:**
+
+1. **Der Knopf wirkt NICHT in den TD-Bootstrap-Rollouts.** `drafting_action_priors`
+   (`net_mcts.rs:2713`) bleibt hart auf Fan-out, weil die Rollouts
+   (`round_transition_deep::continue_through_round{2,3,4}`) keine `SearchConfig` mitfuehren
+   (geprueft: kein `SearchConfig` in `round_transition_deep.rs`). Fuer das A/B am Champion ist
+   das folgenlos -- dort entstehen keine Labels. **Wuerde je ein KORPUS mit Modus 0 erzeugt,
+   waere der Knopf dort unvollstaendig**; das ist vor einer solchen Erzeugung zu klaeren.
+2. **Umgekehrte Polung:** anders als bei allen Nachbar-Knoepfen ist der Bestand der
+   EINgeschaltete Zustand. Im Testhelfer `search_config_off()` steht deshalb `1`, nicht `0` --
+   das bricht die dortige Lesart "alles aus" und ist im Code kommentiert.
+
+**Bau-Tor 2026-09-14 GRUEN** (zusammen mit der Phasen-Korrektur unten): `cargo test --release
+--lib` **646 gruen** (0 rot, darunter die vier neuen Knopf-Tests und die Netz-Paritaets-Fixture
+UNVERAENDERT), `cargo test --release --no-run` deckt examples/benches ab (keine E0063),
+Wheel gebaut und installiert, **Kontrakt-Hash UNVERAENDERT 39994362fba145a6** (er bildet nur
+INPUT_SIZE, Planes-Geometrie, NUM_ACTIONS und die Kopf-Liste ab, `lib.rs:684-700` --
+`engine_config_json` geht nicht ein), `docs/knobs.md` neu generiert (122 Knoepfe),
+Konventions-Check gruen, **Anker-Drift GRUEN und Konservierung GRUEN** gegen `hv4_anchor`
+(Artefakte `anchor_drift_live_wheel_20260914_moon_phase.json` und
+`anchor_conservation_artifact_wheel_20260914_moon_phase.json`).
+
+**Offen: das A/B** (Fahrplan Nr. 28) -- Fan-out an gegen aus am Champion, 200 Paare,
+Blockgroesse 5, `--log-games`, plus Abweichungsrate je Seite nach par.4.
+

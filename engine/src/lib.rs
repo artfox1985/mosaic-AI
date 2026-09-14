@@ -826,6 +826,12 @@ fn engine_config_json() -> String {
         // 2 Handregel) -- gehoert ins Lauf-Manifest, sonst ist ein
         // fehlendes Flag ein stiller Default.
         "return_order_mode": crate::net_mcts::SearchConfig::from_env().return_order_mode,
+        // PREREG_moon_stack_order.md par.4: Fan-out ueber die Reihenfolge der
+        // Mondsteine nach einem Sonnenzug (1 = Bestand, 0 = nur die kanonische
+        // Reihenfolge). Aus demselben Grund im Manifest wie `return_order_mode`
+        // darueber -- ein fehlendes Flag ist ein stiller Default, und hier ist
+        // der stille Default AN.
+        "moon_order_variants": crate::net_mcts::SearchConfig::from_env().moon_order_variants,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,

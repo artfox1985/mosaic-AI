@@ -334,6 +334,46 @@ pub(crate) fn read_start_by_search_env() -> u8 {
     }
 }
 
+/// Default von [`SearchConfig::moon_order_variants`]
+/// (`PREREG_moon_stack_order.md` par.4): `1` = BESTAND, der Fan-out ueber die
+/// Reihenfolge-Varianten bleibt an. `0` = nur die kanonische Restreihenfolge,
+/// wie sie der Heuristik-Pfad nimmt (`validation.rs::generate_valid_moves`).
+pub const MOON_ORDER_VARIANTS_DEFAULT: u8 = 1;
+
+/// `MOSAIC_MOON_ORDER_VARIANTS` als 0/1 (`PREREG_moon_stack_order.md` par.4).
+///
+/// `1` (Default, auch bei fehlender oder ungueltiger Variable) ist der
+/// BESTAND und zwar im starken Sinn: `build_untried_actions` faechert einen
+/// SmallFactorySun-Zug mit mindestens 2 Reststeinen weiter ueber ALLE
+/// eindeutigen Permutationen auf (`unique_moon_orders`), Prior = P(Basis) x
+/// P(Reihenfolge | Plackett-Luce). `0` legt je (Farbe, Reihe) genau EINEN
+/// Kandidaten an, mit der kanonischen Restreihenfolge aus
+/// `game::drafting_actions` -- derselben, die der Heuristik-Pfad spielt.
+///
+/// KEIN `OnceLock` -- gleiche Begruendung wie bei
+/// [`read_return_order_mode_env`]: der Wert ist ein Spec-Feld JE SEITE.
+pub(crate) fn read_moon_order_variants_env() -> u8 {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_MOON_ORDER_VARIANTS") else {
+        return MOON_ORDER_VARIANTS_DEFAULT;
+    };
+    if raw.trim().is_empty() {
+        return MOON_ORDER_VARIANTS_DEFAULT;
+    }
+    match raw.trim().parse::<u8>() {
+        Ok(v) if v <= 1 => v,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "⚠️  MOSAIC_MOON_ORDER_VARIANTS={raw:?} ungueltig (0 kanonisch, 1 Fan-out) -- \
+                     Fan-out (1) gilt."
+                );
+            });
+            MOON_ORDER_VARIANTS_DEFAULT
+        }
+    }
+}
+
 pub(crate) fn read_return_order_mode_env() -> u8 {
     static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     let Ok(raw) = std::env::var("MOSAIC_RETURN_ORDER_MODE") else {
@@ -674,6 +714,30 @@ pub struct SearchConfig {
     /// Spec-Feld je Seite (`start_by_search`, OPTIONAL mit Default 0),
     /// Env-Default `MOSAIC_START_BY_SEARCH`.
     pub start_by_search: u8,
+    /// Fan-out ueber die Reihenfolge der Mondsteine nach einem Sonnenzug
+    /// (`PREREG_moon_stack_order.md` par.4, gebaut 2026-09-14): `1` =
+    /// Bestand (Default, bitidentisch) -- `build_untried_actions` legt bei
+    /// einem SmallFactorySun-Zug mit mindestens 2 Reststeinen ALLE
+    /// eindeutigen Permutationen als Kandidaten an
+    /// ([`unique_moon_orders`]), Prior = P(Basis) x P(Reihenfolge |
+    /// Plackett-Luce ueber die 5 Farb-Scores des Moon-Order-Kopfs). `0` =
+    /// nur die kanonische Restreihenfolge, also genau ein Kandidat je
+    /// (Farbe, Reihe), wie im Heuristik-Pfad
+    /// (`validation.rs::generate_valid_moves`).
+    ///
+    /// Wirkt NUR in der Baum-Expansion der Netzsuche
+    /// ([`node_from_net_outputs`]). Der Aktionsraum bleibt bei
+    /// [`NUM_ACTIONS`] (par.6: die Aktions-ID kodiert die Reihenfolge
+    /// ohnehin nicht), der Heuristik-Pfad bleibt unberuehrt (kein Fan-out
+    /// fuer den Elo-Anker), und die TD-Bootstrap-Rollouts
+    /// ([`drafting_action_priors`]) bleiben ebenfalls beim Bestand -- sie
+    /// erzeugen Labels, keine Zuege (par.4 nennt als Wirkort die
+    /// Expansion).
+    ///
+    /// Spec-Feld je Seite (`moon_order_variants`, OPTIONAL mit Default 1,
+    /// damit alle eingefrorenen Specs weiter laden), Env-Default
+    /// `MOSAIC_MOON_ORDER_VARIANTS`.
+    pub moon_order_variants: u8,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -778,6 +842,7 @@ impl SearchConfig {
             round_est_b_profile: read_round_est_b_profile_env(),
             return_order_mode: read_return_order_mode_env(),
             start_by_search: read_start_by_search_env(),
+            moon_order_variants: read_moon_order_variants_env(),
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -831,6 +896,7 @@ impl SearchConfig {
             "round_est_b_profile",
             "return_order_mode",
             "start_by_search",
+            "moon_order_variants",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -1051,6 +1117,28 @@ impl SearchConfig {
                 x as u8
             }
         };
+        // `PREREG_moon_stack_order.md` par.4: OPTIONAL, aber mit Default 1
+        // statt 0 -- anders als bei den Knoepfen darueber ist hier der
+        // BESTAND der eingeschaltete Zustand (der Fan-out laeuft seit
+        // 2026-07-01 ohne Knopf). Ein fehlendes Feld muss deshalb `1`
+        // ergeben, sonst wuerde jede eingefrorene Spec still auf ein anderes
+        // Suchverhalten umschalten und jede Elo-Kante gegen ein Artefakt
+        // waere tot.
+        let moon_order_variants = match obj.get("moon_order_variants") {
+            None => MOON_ORDER_VARIANTS_DEFAULT,
+            Some(v) => {
+                let x = v.as_f64().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'moon_order_variants' ist keine Zahl")
+                })?;
+                if x.fract() != 0.0 || !(0.0..=1.0).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'moon_order_variants' muss 0 oder 1 sein \
+                         (0 kanonisch, 1 Fan-out), ist {x}"
+                    ));
+                }
+                x as u8
+            }
+        };
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -1185,6 +1273,7 @@ impl SearchConfig {
             round_est_b_profile,
             return_order_mode,
             start_by_search,
+            moon_order_variants,
             heuristic_variant,
             sims,
             root_noise,
@@ -2097,11 +2186,18 @@ impl crate::search_common::SearchNode for Node {
 /// Funktion (kein `Net`-Aufruf) — direkt mit synthetischen Logits testbar.
 /// Gibt `(sortierte Kandidaten, Basis-Aktionszahl VOR Moon-Order-Expansion)`
 /// zurück; letzteres bleibt für den DFS-Solver-Blattwert unverändert.
+///
+/// `moon_order_variants` (`PREREG_moon_stack_order.md` par.4): `1` = Bestand
+/// (Fan-out, siehe unten), `0` = nur die kanonische Restreihenfolge, also
+/// genau ein Kandidat je (Farbe, Reihe) wie im Heuristik-Pfad. Bei `1` ist
+/// der Ablauf bitidentisch zum Zustand vor dem Knopf -- der Zweig unten wird
+/// unveraendert betreten.
 fn build_untried_actions(
     state: &GameState,
     logits: &[f32],
     moon_scores: &[f32; 5],
     skip_cutoff: bool,
+    moon_order_variants: u8,
 ) -> (Vec<(Action, f32)>, usize) {
     let base_actions = drafting_actions(state);
     let n = base_actions.len();
@@ -2132,11 +2228,21 @@ fn build_untried_actions(
     // Kandidaten: SmallFactorySun mit ≥2 Restfliesen → alle eindeutigen Moon-
     // Order-Permutationen, Prior = P(Basis) × P(Order | Plackett-Luce). Alle
     // anderen Aktionen unverändert 1:1.
+    //
+    // `PREREG_moon_stack_order.md` par.4: bei `moon_order_variants == 0` wird
+    // der Zweig gar nicht betreten -- jede Aktion faellt in den 1:1-Pfad
+    // darunter und behaelt die KANONISCHE Restreihenfolge, die
+    // `game::drafting_actions` schon mitbringt (`validation.rs::
+    // generate_valid_moves` filtert `sun_tiles` in Fabrik-Reihenfolge). Genau
+    // die eine Reihenfolge, die auch der Heuristik-Pfad spielt.
     let mut acts: Vec<(Action, f32)> = Vec::with_capacity(base_actions.len());
     for (act, id) in base_actions.into_iter().zip(ids.into_iter()) {
         let base_p = *p_base.get(&id).unwrap_or(&0.0);
         if let Action::Stone(m) = &act {
-            if m.take.source == TakeSource::SmallFactorySun && m.take.moon_order.len() >= 2 {
+            if moon_order_variants != 0
+                && m.take.source == TakeSource::SmallFactorySun
+                && m.take.moon_order.len() >= 2
+            {
                 let variants = unique_moon_orders(&m.take.moon_order);
                 let pl: Vec<f64> =
                     variants.iter().map(|seq| plackett_luce_prob(moon_scores, seq)).collect();
@@ -2604,7 +2710,13 @@ pub(crate) fn drafting_action_priors(net: &Net, state: &GameState) -> Vec<(Actio
     for (i, s) in moon.iter().take(5).enumerate() {
         moon_scores[i] = *s;
     }
-    build_untried_actions(state, &logits, &moon_scores, false).0
+    // `PREREG_moon_stack_order.md` par.4: BEWUSST der Default (Fan-out an),
+    // kein Spec-Feld. Dieser Wrapper bedient die TD-Bootstrap-Rollouts
+    // (`round_transition_deep::continue_through_round{2,3,4}`), die LABELS
+    // erzeugen und keine Zuege; sie fuehren keine `SearchConfig` mit. par.4
+    // nennt als Wirkort des Knopfs die Expansion des Suchbaums, und die
+    // sitzt in `node_from_net_outputs`.
+    build_untried_actions(state, &logits, &moon_scores, false, MOON_ORDER_VARIANTS_DEFAULT).0
 }
 
 /// Erzeugt einen Knoten: Netz-Forward → Child-Priors (untried) + Blattwert
@@ -2821,7 +2933,15 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
     let (untried, n_actions) = if terminal {
         (Vec::new(), 0)
     } else {
-        build_untried_actions(&state, &logits, &moon_scores, skip_cutoff)
+        build_untried_actions(
+            &state,
+            &logits,
+            &moon_scores,
+            skip_cutoff,
+            // `PREREG_moon_stack_order.md` par.4: der Wirkort des Knopfs.
+            // Default 1 = Fan-out wie bisher, bitidentisch.
+            search_config.moon_order_variants,
+        )
     };
 
     // Blattwert: unabhängige Pro-Spieler-Werte. Das Netz liefert einen
@@ -6775,7 +6895,7 @@ mod tests {
         logits[spike_id] = 10.0;
         let moon_scores = [0.0f32; 5];
 
-        let (acts, n_base) = build_untried_actions(&state, &logits, &moon_scores, false);
+        let (acts, n_base) = build_untried_actions(&state, &logits, &moon_scores, false, MOON_ORDER_VARIANTS_DEFAULT);
         assert!(!acts.is_empty());
         assert!(
             acts.len() < n_base,
@@ -6795,7 +6915,7 @@ mod tests {
         let logits = vec![0.1f32; NUM_ACTIONS];
         let moon_scores = [1.0f32, 0.5, -0.5, 2.0, 0.0];
 
-        let (acts, n_base) = build_untried_actions(&state, &logits, &moon_scores, false);
+        let (acts, n_base) = build_untried_actions(&state, &logits, &moon_scores, false, MOON_ORDER_VARIANTS_DEFAULT);
         assert!(!acts.is_empty());
 
         // Kandidaten sind auf den POLICY_MASS_CUTOFF-Präfix gekappt (Long Tail
@@ -6875,7 +6995,7 @@ mod tests {
         logits[target_id] = 5.0;
         let moon_scores = [0f32; 5];
 
-        let (acts, _n) = build_untried_actions(&state, &logits, &moon_scores, false);
+        let (acts, _n) = build_untried_actions(&state, &logits, &moon_scores, false, MOON_ORDER_VARIANTS_DEFAULT);
 
         let target_p = acts
             .iter()
@@ -6911,7 +7031,7 @@ mod tests {
 
         let logits = vec![0.1f32; NUM_ACTIONS];
         let moon_scores = [0f32; 5];
-        let (acts, _n) = build_untried_actions(&state, &logits, &moon_scores, false);
+        let (acts, _n) = build_untried_actions(&state, &logits, &moon_scores, false, MOON_ORDER_VARIANTS_DEFAULT);
 
         let draw_stack_sum: f64 = acts
             .iter()
@@ -7651,6 +7771,11 @@ mod tests {
             round_est_b_profile: ROUND_EST_B_PROFILE_DEFAULT,
             return_order_mode: 0,
             start_by_search: 0,
+            // AUSNAHME von "nichts ist an": der BESTAND dieses Knopfs IST
+            // der eingeschaltete Zustand (PREREG_moon_stack_order.md par.4,
+            // Fan-out seit 2026-07-01 ohne Knopf). `0` waere hier eine
+            // Verhaltensaenderung, kein Nullpunkt.
+            moon_order_variants: MOON_ORDER_VARIANTS_DEFAULT,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in
@@ -8072,6 +8197,157 @@ mod tests {
             .expect_err("drei Zahlen muessen scheitern");
         assert!(msg.contains("genau 4 Zahlen"), "{msg}");
         std::fs::remove_file(&path).ok();
+    }
+
+    /// `PREREG_moon_stack_order.md` par.4: `moon_order_variants` ist ein
+    /// OPTIONALES Spec-Feld -- mit dem Unterschied zu allen Nachbarn, dass
+    /// der Default `1` ist und nicht `0`. Die Zusage, die dieser Test haelt:
+    /// die EINGEFRORENEN Artefakt-Specs tragen das Feld nicht und muessen
+    /// weiter laden UND weiter den Fan-out fahren -- ein fehlendes Feld, das
+    /// auf `0` fiele, wuerde jede Elo-Kante gegen ein Artefakt still auf ein
+    /// anderes Suchverhalten umstellen. Erlaubt sind nur 0 und 1.
+    #[test]
+    fn search_config_from_spec_file_takes_moon_order_variants_as_optional_field() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_moonorder_{}.json", std::process::id()));
+        let spec = |extra: &str| {
+            format!(
+                r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 1, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0{extra}, "heuristik_variante": "hv1"}}"#
+            )
+        };
+        std::fs::write(&path, spec("")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect("Spec ohne moon_order_variants muss weiter laden");
+        assert_eq!(
+            cfg.moon_order_variants, MOON_ORDER_VARIANTS_DEFAULT,
+            "fehlendes Feld muss den BESTAND (Fan-out an) ergeben, nicht 0"
+        );
+        assert_eq!(MOON_ORDER_VARIANTS_DEFAULT, 1);
+        for want in [0u8, 1] {
+            std::fs::write(&path, spec(&format!(", \"moon_order_variants\": {want}"))).unwrap();
+            let cfg =
+                SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltiger Wert");
+            assert_eq!(cfg.moon_order_variants, want);
+        }
+        for bad in ["2", "-1", "0.5"] {
+            std::fs::write(&path, spec(&format!(", \"moon_order_variants\": {bad}"))).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("ungueltiger Wert muss scheitern");
+            assert!(msg.contains("moon_order_variants"), "{msg}");
+        }
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// `PREREG_moon_stack_order.md` par.4, Env-Haelfte: ungesetzt und
+    /// ungueltig ergeben beide den BESTAND (`1`), gesetzte `0`/`1` kommen an.
+    /// Kein Panik-Pfad -- gleiche Disziplin wie [`read_f64_env`]. Der Lock
+    /// haelt den Zugriff auf die echte Variable gegen parallele Tests.
+    #[test]
+    fn read_moon_order_variants_env_defaults_to_fan_out_and_rejects_invalid() {
+        let _guard = SEARCH_CONFIG_ENV_TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let name = "MOSAIC_MOON_ORDER_VARIANTS";
+        let prev = std::env::var(name).ok();
+        std::env::remove_var(name);
+        assert_eq!(read_moon_order_variants_env(), MOON_ORDER_VARIANTS_DEFAULT);
+        for want in [0u8, 1] {
+            std::env::set_var(name, want.to_string());
+            assert_eq!(read_moon_order_variants_env(), want);
+        }
+        for bad in ["2", "255", "-1", "1.5", "nein", "", "   "] {
+            std::env::set_var(name, bad);
+            assert_eq!(
+                read_moon_order_variants_env(),
+                MOON_ORDER_VARIANTS_DEFAULT,
+                "{bad:?} muss auf den Bestand zurueckfallen, ohne zu paniken"
+            );
+        }
+        match prev {
+            Some(v) => std::env::set_var(name, v),
+            None => std::env::remove_var(name),
+        }
+    }
+
+    /// `PREREG_moon_stack_order.md` par.4: bei `moon_order_variants == 0`
+    /// entsteht je Basis-Aktion GENAU EIN Kandidat, und die Kandidatenliste
+    /// ist Aktion fuer Aktion die von `game::drafting_actions` -- also die
+    /// kanonische Restreihenfolge, die auch der Heuristik-Pfad spielt
+    /// (`validation.rs::generate_valid_moves`). `skip_cutoff = true`, damit
+    /// der POLICY_MASS_CUTOFF die Liste nicht zusaetzlich kappt und der Test
+    /// wirklich ueber die Fan-out-Frage entscheidet.
+    #[test]
+    fn build_untried_actions_moon_order_variants_off_yields_canonical_order_only() {
+        let mut rng = StdRng::seed_from_u64(42);
+        let state = setup_new_game(names(), 0, &mut rng);
+        let logits = vec![0.1f32; NUM_ACTIONS];
+        let moon_scores = [1.0f32, 0.5, -0.5, 2.0, 0.0];
+
+        let (acts_off, n_base) = build_untried_actions(&state, &logits, &moon_scores, true, 0);
+        assert_eq!(
+            acts_off.len(),
+            n_base,
+            "bei variants=0 darf kein einziger Zug aufgefaechert werden"
+        );
+        let canonical = crate::game::drafting_actions(&state);
+        assert_eq!(canonical.len(), n_base);
+        for a in &canonical {
+            assert!(
+                acts_off.iter().any(|(x, _)| x == a),
+                "kanonische Aktion fehlt in der Kandidatenliste: {a:?}"
+            );
+        }
+
+        // Gegenprobe auf demselben Zustand: der BESTAND faechert auf. Ohne
+        // diesen Teil koennte der Test auch gruen sein, weil es gar nichts
+        // aufzufaechern gibt.
+        let (acts_on, n_base_on) =
+            build_untried_actions(&state, &logits, &moon_scores, true, MOON_ORDER_VARIANTS_DEFAULT);
+        assert_eq!(n_base_on, n_base);
+        // Gleiche Vorbedingung wie in
+        // `build_untried_actions_priors_reach_cutoff_and_expand_moon_orders`:
+        // es muss ueberhaupt etwas zum Auffaechern geben.
+        let has_multi_order = state.factories.iter().any(|f| {
+            f.sun_colors().iter().any(|&c| f.sun_tiles.iter().filter(|&&t| t != c).count() >= 2)
+        });
+        if has_multi_order {
+            assert!(
+                acts_on.len() > acts_off.len(),
+                "Bestand (variants=1) muss mehr Kandidaten liefern als variants=0: {} vs {}",
+                acts_on.len(),
+                acts_off.len()
+            );
+        }
+    }
+
+    /// `PREREG_moon_stack_order.md` par.4, Default-Zusage: der ungesetzte
+    /// Knopf und der ausdrueckliche Wert `1` liefern DIESELBE Kandidatenliste
+    /// samt Priors -- und diese Liste behaelt die volle Basis-Masse (die
+    /// Aufteilung ueber die Permutationen erzeugt und verliert nichts).
+    #[test]
+    fn build_untried_actions_moon_order_variants_default_is_the_fan_out_bestand() {
+        let mut rng = StdRng::seed_from_u64(7);
+        let state = setup_new_game(names(), 0, &mut rng);
+        let logits: Vec<f32> = (0..NUM_ACTIONS).map(|i| (i % 13) as f32 * 0.07).collect();
+        let moon_scores = [0.3f32, -1.2, 0.8, 0.0, 1.9];
+
+        let (acts_default, n_default) =
+            build_untried_actions(&state, &logits, &moon_scores, true, MOON_ORDER_VARIANTS_DEFAULT);
+        let (acts_one, n_one) = build_untried_actions(&state, &logits, &moon_scores, true, 1);
+        assert_eq!(n_default, n_one);
+        assert_eq!(acts_default.len(), acts_one.len());
+        for ((a, pa), (b, pb)) in acts_default.iter().zip(acts_one.iter()) {
+            assert_eq!(a, b);
+            assert_eq!(pa.to_bits(), pb.to_bits(), "Priors muessen bitgleich sein");
+        }
+
+        // Masse-Erhaltung gegen den ausgeschalteten Fan-out: dieselbe
+        // Gesamtmasse, nur anders verteilt.
+        let (acts_off, _) = build_untried_actions(&state, &logits, &moon_scores, true, 0);
+        let sum_on: f64 = acts_default.iter().map(|(_, p)| *p as f64).sum();
+        let sum_off: f64 = acts_off.iter().map(|(_, p)| *p as f64).sum();
+        assert!(
+            (sum_on - sum_off).abs() < 1e-4,
+            "Prior-Gesamtmasse muss gleich bleiben: an {sum_on}, aus {sum_off}"
+        );
     }
 
     /// `PREREG_dome_return_order.md` par.4: `return_order_mode` ist ein
@@ -10973,8 +11249,8 @@ mod tests {
                 for (j, s) in moon_o.iter().take(5).enumerate() {
                     moon_arr_o[j] = *s;
                 }
-                let (acts_t, _) = build_untried_actions(state, policy_t, &moon_arr_t, true);
-                let (acts_o, _) = build_untried_actions(state, policy_o, &moon_arr_o, true);
+                let (acts_t, _) = build_untried_actions(state, policy_t, &moon_arr_t, true, MOON_ORDER_VARIANTS_DEFAULT);
+                let (acts_o, _) = build_untried_actions(state, policy_o, &moon_arr_o, true, MOON_ORDER_VARIANTS_DEFAULT);
                 assert_eq!(
                     acts_t.len(),
                     acts_o.len(),
@@ -11136,8 +11412,8 @@ mod tests {
                 for (j, s) in moon_o.iter().take(5).enumerate() {
                     moon_arr_o[j] = *s;
                 }
-                let (acts_t, _) = build_untried_actions(state, policy_t, &moon_arr_t, true);
-                let (acts_o, _) = build_untried_actions(state, policy_o, &moon_arr_o, true);
+                let (acts_t, _) = build_untried_actions(state, policy_t, &moon_arr_t, true, MOON_ORDER_VARIANTS_DEFAULT);
+                let (acts_o, _) = build_untried_actions(state, policy_o, &moon_arr_o, true, MOON_ORDER_VARIANTS_DEFAULT);
                 assert_eq!(acts_t.len(), acts_o.len(), "record #{record_index}: unterschiedliche Kandidatenzahl nach Moon-Expansion?!");
                 let n_root = acts_t.len();
                 let m_prime = m_for_400_sims.min(n_root);
@@ -11422,7 +11698,7 @@ mod tests {
                 for (k, s) in moon.iter().take(5).enumerate() {
                     moon_arr[k] = *s;
                 }
-                let (acts, _) = build_untried_actions(state, policy, &moon_arr, true);
+                let (acts, _) = build_untried_actions(state, policy, &moon_arr, true, MOON_ORDER_VARIANTS_DEFAULT);
                 let n_root = acts.len();
                 let m_prime = m_for_400_sims.min(n_root);
                 if m_prime < n_root {
@@ -11591,9 +11867,9 @@ mod tests {
                 moon_arr_inter[j] = *s;
             }
 
-            let (acts_tract, _) = build_untried_actions(state, &tract_policy[i], &moon_arr_tract, true);
-            let (acts_ort, _) = build_untried_actions(state, o_policy, &moon_arr_ort, true);
-            let (acts_inter, _) = build_untried_actions(state, &inter_policy, &moon_arr_inter, true);
+            let (acts_tract, _) = build_untried_actions(state, &tract_policy[i], &moon_arr_tract, true, MOON_ORDER_VARIANTS_DEFAULT);
+            let (acts_ort, _) = build_untried_actions(state, o_policy, &moon_arr_ort, true, MOON_ORDER_VARIANTS_DEFAULT);
+            let (acts_inter, _) = build_untried_actions(state, &inter_policy, &moon_arr_inter, true, MOON_ORDER_VARIANTS_DEFAULT);
             let n_root = acts_tract.len();
             assert_eq!(acts_ort.len(), n_root, "record #{record_index}: ORT-Kandidatenzahl weicht ab?!");
             assert_eq!(acts_inter.len(), n_root, "record #{record_index}: verschraenkte Kandidatenzahl weicht ab?!");
@@ -11846,8 +12122,8 @@ mod tests {
             for (j, s) in inter_moon.iter().take(5).enumerate() {
                 moon_arr_inter[j] = *s;
             }
-            let (acts_sync, _) = build_untried_actions(state, &sync_policy[i], &moon_arr_sync, true);
-            let (acts_inter, _) = build_untried_actions(state, &inter_policy, &moon_arr_inter, true);
+            let (acts_sync, _) = build_untried_actions(state, &sync_policy[i], &moon_arr_sync, true, MOON_ORDER_VARIANTS_DEFAULT);
+            let (acts_inter, _) = build_untried_actions(state, &inter_policy, &moon_arr_inter, true, MOON_ORDER_VARIANTS_DEFAULT);
             assert_eq!(acts_sync.len(), acts_inter.len(), "record #{}: unterschiedliche Kandidatenzahl?!", record_indices[i]);
             let n_root = acts_sync.len();
             let m_prime = m_for_400_sims.min(n_root);

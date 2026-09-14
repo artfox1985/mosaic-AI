@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7): auch der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen. K5 in der Champion-Spec, hebt die vollen Spalten am staerksten von allem Gemessenen, aber nicht ueber die Spezialfelder. **par.4a GESCHLOSSEN 2026-09-14 (par.10): die Kanaele 77/78 TRAGEN** -- die Ablation v29-b02 verliert gegen v29-b03 in beiden Seeds (Seed 2 signifikant) und belegt in beiden weniger Spezialfelder. OFFEN bleibt par.4c (Slot-Ausloesungs-Kopf, ungebaut). -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7): der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen. **par.4a GESCHLOSSEN (par.10): die Kanaele 77/78 TRAGEN** (Ablation v29-b02 verliert gegen b03). **par.4c VERWORFEN (par.12, Nutzer 2026-09-14): kein neuer Kopf, Hilfskoepfe stehen 0 von 4.** OFFEN ist nur noch der Drafting-Hebel, terminiert an Variante B (par.11). par.2 korrigiert: die Abrechnung kostet KEINEN Stein, der Marker zaehlt fuer die Spaltenvollendung. -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
@@ -40,8 +40,23 @@ deshalb ist die Sache heute unbeantwortet statt erledigt.
 * **Freischaltung ist konjunktiv**: der Special-Space entriegelt erst, wenn
   die anderen DREI Felder des Slots gefuellt sind
   (`try_unlock_special`, dome.rs:139-141).
-* **Abrechnung kostet zusaetzlich einen weissen Stein**
-  (`check_special_trigger`, round_end.rs:324).
+* **Die Abrechnung kostet NICHTS** (KORRIGIERT 2026-09-14, Nutzer: *"nein sie kostet keinen
+  stein. das ist eigentlich nur ein dummy stein damit fliesen die nachher kommen diesen dummy
+  stein als nachbar verwenden koennen"*). Hier stand bis dahin "Abrechnung kostet zusaetzlich
+  einen weissen Stein" -- das war falsch und stand ausserdem im Widerspruch zu par.4 unten, der
+  das Spezialfeld seit dem 2026-08-25 eine GRATISZELLE nennt.
+  Am Code nachgesehen (`check_special_trigger`, round_end.rs:361-372): die Funktion setzt
+  `slot.spaces[sp_idx].placed_special = true` und vergibt den Bonus -- **kein Zugriff auf
+  Beutel, Turm oder Spielervorrat**. Der Code-Kommentar daneben sagt es selbst: *"Kein
+  Vorrats-Check noetig: exakt 9 Kuppelplatten tragen einen Special-Slot und es gibt exakt 9
+  Special-Fliesen, der Vorrat kann nie leerlaufen."*
+* **Der gesetzte Stein ist ein BELEGUNGS-MARKER und zaehlt danach als Nachbar.**
+  `DomeSpace::is_filled` (dome.rs:54-58) gibt fuer ein Spezialfeld genau `placed_special`
+  zurueck, behandelt es also wie ein farbig belegtes Feld. **Folge, die diese Prereg bisher
+  nicht gefuehrt hat:** `board.rs:209` und `:213` pruefen ueber `is_filled()`, ob eine ZEILE
+  bzw. eine SPALTE vollstaendig ist. Ein abgerechnetes Spezialfeld zaehlt damit fuer die
+  Spaltenvollendung mit -- also fuer die Groesse, die der Leitstern der Kampagne ist. Der Posten
+  ist damit nicht nur ertragreicher als hier stand, sondern haengt direkt am Spaltenziel.
 * **Kriterium 6 ist etwas ANDERES** und wird oft damit verwechselt: -3 je
   LEEREM Spezialfeld auf GELEGTEN Platten, rein negativ-additiv und gated
   (scoring.rs:921-923). Es ist ein Abzug, den man verkleinert, kein Ertrag,
@@ -820,4 +835,53 @@ nicht gezeigt -- dafuer fehlt ein b02 auf 755, und der wird nach dem Nutzer-Ents
 
 Tor 2b in beiden Laeufen GRUEN; im zweiten Seed 2 von 58 Partien nicht nachspielbar, beide Male
 am bekannten Chip-Limit des Replays ("Chip-Vollendung nicht nachspielbar"), nicht an den Zuegen.
+
+## par.11 ABHAENGIGKEIT: der Drafting-Hebel haengt am Tiling im Blatt (Nutzer 2026-09-14)
+
+Nutzer woertlich: *"ich denk es gehoert drafting und tiling zusammen fuer tile yield. das eine
+geht nicht ohne das andere"*. Das ist an par.2 belegbar und aendert die Reihenfolge der
+verbliebenen Hebel.
+
+**Der Ertrag einer Spezialfliese ist eine KETTE ueber beide Phasen:**
+
+1. **Drafting** -- die Steine holen, die in den Slot passen.
+2. **Tiling** -- die anderen DREI Felder des Slots fuellen; erst dann entriegelt der
+   Special-Space (`try_unlock_special`, dome.rs:139-141, konjunktiv).
+3. **Abrechnung** -- kostet zusaetzlich einen weissen Stein (`check_special_trigger`,
+   round_end.rs:324).
+
+Kein Glied traegt allein, und der Wert steigt mit der Slot-Reihe, waehrend die Erreichbarkeit
+mit ihr faellt (par.2).
+
+**Folge fuer den offenen par.4a-Drafting-Hebel:** die Suche sieht im Drafting das Tiling heute
+NICHT -- das Blatt endet davor (`project_drafting_must_know_tiling`,
+`PREREG_round_transition_search_sampling.md` par.7). Ein Drafting-Knopf fuer den
+Spezialfeld-Ertrag saesse damit auf einer Bewertung, die den entscheidenden Zwischenschritt gar
+nicht durchrechnet: beim Ziehen ist nicht bewertbar, ob eine Platte am Ende einen Slot
+freischaltet.
+
+**Reihenfolge daraus:** erst `round_transition_search_sampling` Variante B (Tiling im Blatt,
+Fahrplan Nr. 33-36), dann der Drafting-Hebel. Vorher gebaut waere er nicht messbar, sondern nur
+gesetzt. Das ist KEIN Verdikt gegen den Hebel, sondern eine Voraussetzung fuer sein A/B.
+
+**Unberuehrt davon bleibt par.4c** (Slot-Ausloesungs-Kopf): der ist ein TRAININGSZIEL, keine
+Suchbewertung, und haengt nicht am Blatt. Gegen ihn spricht weiterhin die Bilanz der
+Hilfskoepfe (0 von 4, par.9).
+
+## par.12 par.4c VERWORFEN: kein neuer Kopf (Nutzer-Entscheid 2026-09-14)
+
+Nutzer woertlich: *"nein wir bauen keinen neuen kopf. haben schon genug koepfe"*.
+
+**Der Slot-Ausloesungs-Kopf aus par.4c wird nicht gebaut.** Das ist kein Vertagen auf v30,
+sondern ein Abschluss: der Hebel ist geprueft, beschrieben und verworfen.
+
+**Die Begruendung steht schon in dieser Datei** (par.9): die Hilfskoepfe stehen 0 von 4. Dazu
+die Einzelbefunde aus der Kampagne -- der Ownership-Kopf endete bei Gewicht 0 bei richtigem Ziel,
+der Konjunktions-Kopf sagt Eintreten statt Erreichbarkeit voraus, und die beiden
+Kapazitaetsversuche am Value-Kopf (Verbreiterung, Trunk-Widmung) sind beide raus. Ein fuenfter
+Kopf haette dieselbe Beweislast gehabt, ohne dass sich an der Beweislage etwas geaendert hat.
+
+**Was die Prereg damit noch offen haelt, ist genau EIN Punkt:** der Drafting-Hebel aus par.4a,
+und der ist nach par.11 an Variante B (Tiling im Blatt, Fahrplan Nr. 33-36) terminiert. Sobald
+die gefahren ist, kann diese Prereg entschieden werden.
 

@@ -103,6 +103,11 @@ fn main() {
         // (Modus 0), aus demselben Grund wie die Knoepfe darueber.
         return_order_mode: 0,
         start_by_search: 0,
+        // PREREG_moon_stack_order.md par.4: hier steht BEWUSST der Default 1
+        // (Fan-out an) und nicht 0 -- der Bestand dieses Knopfs ist der
+        // eingeschaltete Zustand, und diese Sonde ist ein
+        // Byte-Identitaets-Nachweis.
+        moon_order_variants: mosaic_rust::net_mcts::MOON_ORDER_VARIANTS_DEFAULT,
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
         // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md

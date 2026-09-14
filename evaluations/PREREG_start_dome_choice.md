@@ -837,3 +837,69 @@ ist entschieden und in `PREREG_v29_window.md` par.6b registriert (Slot-Streuung 
 Such-Start in der Erzeugung). Der einzige Rest, die Plattenwahl (par.6a: `choose_start_placement`
 bewertet Spezialfelder mit 0,0), laeuft im v29-Begleitprogramm (`PREREG_v29_window.md` par.7
 Punkt 4) und wird dort registriert, nicht hier.
+
+## par.11 WIEDERVORLAGE 2026-09-14: der Such-Start braucht vor dem Einschalten neuen Korpus
+
+Gefunden beim Auswerten der Netz-Gesundheit von v29-b03 (`PREREG_v29_window.md` par.6d,
+Nachtrag zu den Phasen-Bits), also NICHT aus dieser Prereg heraus.
+
+Seit v29 traegt der Encoder den Sichtpunkt P.7: die Spielphase als One-Hot ueber sechs Phasen
+(`features.rs:282-289`, `SIGHT_PHASE_ORDER`). Gemessen an den Spaltennormen von
+`flat_branch.0.weight` im Modell `v29-b03_brierbest` sind davon nur `drafting` und `tiling`
+belegt; **die Spalte fuer `start_placement` (Index 758) ist exakt 0.**
+
+**Der Grund ist NICHT, dass der Knopf aus war** (so stand es hier bis zur Nutzer-Nachfrage am
+selben Tag, und es war falsch): die v29-Erzeugung lief MIT `start_by_search=1`
+(`tools/night_v29_generate.sh:39`, Spec `models/start_by_search_on.spec.json`) und zusaetzlich
+mit der Startkuppel-Streuung `MOSAIC_START_SLOT_RANDOM_P=0.15` (par.6b).
+
+**Nachgezaehlt am Korpus** (eine Datei `selfplay_v28-b02-policy_*`, 1.753 Records): 1.284 tragen
+`phase: drafting`, 469 `phase: tiling`, **kein einziger `start_placement`** -- obwohl 16 Records
+das Feld `start_by_search: true` fuehren und 4 das Feld `start_slot_randomized`. Die
+Startsetzungs-Records sind also DA, aber ihr serialisierter Zustand weist sie nicht als
+Startsetzung aus. Die Phase existiert im Zustandsmodell (`state.rs:53`,
+`Phase::StartPlacement => "start_placement"`), sie kommt nur in keinem Record vor.
+
+**Folge:** P.7 kann nie anzeigen, dass ein Entscheid eine Startsetzung ist. Die WIRKUNG der
+gestreuten Startkuppel sieht das Netz weiterhin (Brett, Geometrie, Folgezuege) -- der Zweck der
+Streuung nach par.6b ist damit nicht verfehlt. **UNGEPRUEFT** bleibt, ob die Phase absichtlich
+schon auf `drafting` steht, weil der Entscheid formal dort faellt, oder ob der Record zu spaet
+serialisiert wird. Das zu klaeren ist die Voraussetzung dafuer, P.7 fuer die Startsetzung
+ueberhaupt nutzbar zu machen.
+
+**Nicht betroffen:** die drei uebrigen leeren Phasen-Bits (`scoring`, `end`, `final`). Dort
+faellt kein Entscheid, das Netz wird nie gefragt; sie sind reservierter Eingaberaum ohne Zuender.
+
+### par.11a GEBAUT 2026-09-14: der Encoder leitet die Startsetzung jetzt ab
+
+Nutzer-Auftrag *"kannst die phase korrigieren fuer die startsetzung"*. **NICHT gebaut wurde die
+naheliegende Fassung** -- die Phase in der Spiellogik auf `Phase::StartPlacement` umzuschalten.
+Grund, vollstaendig gezaehlt: **71 Gleichheitsvergleiche auf `Phase::Drafting`** ueber elf Module
+(`self_play.rs` 17, `net_mcts.rs` 12, `round5.rs` 9, `round_transition.rs` 7,
+`round_transition_deep.rs` 6, `game.rs` 5, `referee.rs` 5, `mcts.rs` 4, `serialize.rs` 4, ...).
+Die 15 `match`-Arme sind mit Drafting gepaart und harmlos, diese 71 nicht -- `mcts.rs:431` liest
+`phase != Drafting` sogar als TERMINAL, und `mcts.rs` ist der Heuristik-Pfad, also der Elo-Anker.
+
+**Gebaut ist stattdessen die Ableitung im ENCODER:** `features.rs` setzt den Sichtpunkt P.7 auf
+`start_placement`, sobald bei irgendeinem Spieler die Startsetzung aussteht -- im JSON-Pfad ueber
+`players[i].start_placed` (`serialize.rs:283`), im Zustandspfad ueber `start_tile_pending`. Dazu
+der Python-Zwilling in `neural_net.py`. Fehlt das Feld (Alt-Snappschuesse), bleibt alles wie
+bisher; fuer Bestandskorpora ist die Aenderung damit bitidentisch.
+
+**Test** `phase_shows_start_placement_while_a_start_tile_is_pending` prueft beide Encoder-Pfade
+gegeneinander (Paritaet) und die Gegenprobe nach erledigter Setzung.
+
+**Die Netz-Paritaets-Fixture ist NICHT gebrochen** -- entgegen der Erwartung im Bauplan. Der
+Grund ist derselbe, der den Befund ueberhaupt sichtbar gemacht hat: der Testhelfer
+`random_drafting_states` raeumt `start_tile_pending` selbst ab (`features.rs:1999-2001`), um in
+die Drafting-Phase zu kommen. Die Korrektur wirkt also ausschliesslich dort, wo eine Startsetzung
+aussteht.
+
+**Bau-Tor 2026-09-14 GRUEN** (gemeinsam mit dem Mondstapel-Knopf): 646 Lib-Tests, examples und
+benches kompilieren, Wheel gebaut und installiert, Kontrakt-Hash unveraendert, Anker-Drift und
+Konservierung gruen.
+
+**Wirksam wird die Korrektur erst mit dem NAECHSTEN Korpus** (`feedback_record_field_must_precede_generation`):
+die v29-Records tragen die Phase weiterhin als `drafting`, weil sie vor dem Bau erzeugt wurden.
+Ab der naechsten Erzeugung sieht das Netz die Startsetzung als solche.
+

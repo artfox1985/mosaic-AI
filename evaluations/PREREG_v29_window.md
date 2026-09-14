@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT. Tor 1: b01 gegen den Champion BEIDE SEEDS H0; **b03 gegen b01 Merkmalsstand UEBERNOMMEN**; **b02 gegen b03 die Spezialfeld-Kanaele TRAGEN**. Champion bleibt v28-b02. Monolith-Kollision behoben; derselbe Defekt traf den Val-Cache: b03 hatte auf ablatierten Daten validiert. NACHBEWERTET: **b03 ist offline NICHT schlechter** (0,17967 gegen 0,17934, Abstand 0,00034 statt 0,0018). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- **v29-b03 SCHLAEGT DEN CHAMPION** (drei Seeds: 124:86 und 64:36 signifikant, 87:93 Gleichstand, keiner dagegen; 275:215 in 490 Partien, Punkte +3,4/+5,4). Promotion ist offener Nutzer-Entscheid, Elo-Kante noch nicht eingetragen. b01 gegen den Champion war zweimal H0; b02 gegen b03 zeigt: die Spezialfeld-Kanaele TRAGEN. Monolith-Kollision behoben, b03s Offline-Rueckstand war ein kaputter Val-Cache. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -654,7 +654,35 @@ die vorhergesagten:**
 **Beide Nullgruppen waren vorher registriert**, nicht nachtraeglich erklaert: P.12 als tote
 Spalte (par.9, Nutzer-Entscheid "erst ab v30"), und dass im Korpus nur zwei der sechs Phasen
 vorkommen, steht seit dem Bau in der Messung von `phase` -- die vier unbesetzten Phasen koennen
-kein Gewicht bekommen. **Das Netz hat also genau die Spalten aufgegriffen, die ueberhaupt Signal
+kein Gewicht bekommen.
+
+**NACHTRAG 2026-09-14 (Nutzer-Nachfrage "was heisst die bleiben und kommen nicht vor"): die vier
+toten Phasen-Bits sind NICHT derselbe Fall.** Sauber getrennt:
+
+| Phase | Index | Status |
+| --- | --- | --- |
+| `drafting`, `tiling` | 759, 760 | belegt, Norm je 0,152 |
+| `scoring`, `end`, `final` | 761-763 | **strukturell leer**: Wertungs- und Endzustaende, dort faellt kein Entscheid, das Netz wird nie gefragt |
+| **`start_placement`** | **758** | **nicht strukturell leer, sondern ABGESCHALTET** |
+
+**Der Grund ist NICHT, dass der Knopf aus war** (so stand es hier bis zur Nutzer-Nachfrage am
+selben Tag, und es war falsch): die v29-Erzeugung lief MIT `start_by_search=1`
+(`tools/night_v29_generate.sh:39`, Spec `models/start_by_search_on.spec.json`) und zusaetzlich
+mit der Startkuppel-Streuung `MOSAIC_START_SLOT_RANDOM_P=0.15` (par.6b).
+
+**Nachgezaehlt am Korpus** (eine Datei `selfplay_v28-b02-policy_*`, 1.753 Records): 1.284 tragen
+`phase: drafting`, 469 `phase: tiling`, **kein einziger `start_placement`** -- obwohl 16 Records
+das Feld `start_by_search: true` fuehren und 4 das Feld `start_slot_randomized`. Die
+Startsetzungs-Records sind also DA, aber ihr serialisierter Zustand weist sie nicht als
+Startsetzung aus. Die Phase existiert im Zustandsmodell (`state.rs:53`,
+`Phase::StartPlacement => "start_placement"`), sie kommt nur in keinem Record vor.
+
+**Folge:** P.7 kann nie anzeigen, dass ein Entscheid eine Startsetzung ist. Die WIRKUNG der
+gestreuten Startkuppel sieht das Netz weiterhin (Brett, Geometrie, Folgezuege) -- der Zweck der
+Streuung nach par.6b ist damit nicht verfehlt. **UNGEPRUEFT** bleibt, ob die Phase absichtlich
+schon auf `drafting` steht, weil der Entscheid formal dort faellt, oder ob der Record zu spaet
+serialisiert wird. Das zu klaeren ist die Voraussetzung dafuer, P.7 fuer die Startsetzung
+ueberhaupt nutzbar zu machen. **Das Netz hat also genau die Spalten aufgegriffen, die ueberhaupt Signal
 tragen.**
 
 **Die lebenden Spalten sind schwach** (0,15 bis 1,02 gegen 3,01 im Mittel der Altspalten). Das ist
@@ -668,6 +696,72 @@ Erklaert wurde also ein Artefakt. Dazu kommt, dass b03 auf dem ablatierten Val-C
 validiert hat, seine Brier-Reihe also ohnehin nicht neben der von b01 und b02 steht. **Nicht
 geprueft** bleibt, ob mehr Epochen oder ein hoeherer Lernschritt fuer die neuen Spalten etwas
 aendern; das waere ein eigener Arm.
+
+### Tor 1 v29-b03 gegen den CHAMPION v28-b02: ein Seed klar, einer neutral (2026-09-14)
+
+Der Lauf, der v29 bis dahin gefehlt hat (Nutzer 2026-09-14: "ich hab noch keinen champion
+kandidaten aus v29 gesehen"): alle bisherigen v29-Kanten waren arminterne Vergleiche. b01 gegen
+den Champion war zweimal H0, b03 hatte b01 und b02 geschlagen -- gegen den Champion selbst war er
+ungemessen. `tools/night_v29_tor1_b03_vs_champion.sh`, Flags bitgleich zur b01-Kante
+(Blockgroesse 5, max-pairs 200, sims 400, c_puct 1,5, Champion-Spec beidseits).
+
+| Seed | Ergebnis | SPRT | McNemar p | gepaarte Diff | Punkte b03 / Champion |
+| --- | --- | --- | --- | --- | --- |
+| 20261067 | **124 : 86** (210 Partien, 105 Paare) | **v29-b03 signifikant besser** (LLR +3,193) | **0,0163** | **+0,362 [+0,087, +0,636]** | 53,38 / 50,03 |
+| 20261068 | 87 : 93 (180 Partien, 90 Paare) | H0 (LLR -3,239) | 0,7754 | -0,067 [-0,373, +0,240] | 53,61 / 53,63 |
+| 20261069 | **64 : 36** (100 Partien, 50 Paare) | **v29-b03 signifikant besser** (LLR +3,013) | **0,0125** | **+0,560 [+0,171, +0,949]** | 57,48 / 52,10 |
+
+**VERDIKT nach drei Seeds: v29-b03 ist ein Champion-Kandidat.** Zwei Seeds signifikant fuer b03,
+einer Gleichstand, **kein einziger Seed mit Gegenrichtung**. Ueber alle drei: 275 : 215 in 490
+Partien (56,1 Prozent). In beiden Siegseeds liegt auch das Punkteniveau klar hoeher (+3,35 und
++5,38 je Partie); im neutralen Seed sind die Punkte gleich. **Kein Seed zeigt b03 schlechter, in
+keiner der beiden Groessen.**
+
+Der dritte Seed lief auf demselben Wheel wie die ersten beiden (Kontrakt 39994362fba145a6, vor
+dem Start geprueft und im Skriptkopf festgehalten); zwischen den Laeufen wurde nichts kompiliert
+und nichts installiert.
+
+**H0 in Seed 2 heisst NICHT "b03 verliert":** 87:93 bei p = 0,7754 ist Gleichstand. Die
+vorregistrierte Alternative ist H1 p = 0,65; die untere Wald-Schranke reisst schon bei echter
+Paritaet. Gepoolt sind es 211:179 ueber 390 Partien (54,1 Prozent) -- **ein gepooltes Verdikt
+wird hier NICHT gebildet**, zwei SPRT-Laeufe zusammenzuwerfen haette vorher registriert werden
+muessen.
+
+**Dasselbe Muster wie b03 gegen b01** (dort Seed 1 klar 69:41, Seed 2 Gleichstand 123:127): ein
+Seed traegt, einer ist neutral. Das ist die bekannte Seed-Dominanz.
+
+**Der schaerfste Einzelbefund steht in den Punkten, nicht in der Siegquote:** in Seed 1 holt b03
+3,35 Punkte je Partie mehr, in Seed 2 sind beide exakt gleich (53,61 gegen 53,63). Der Seed
+bewegt also das Niveau des GEGNERS um 3,6 Punkte -- der Champion spielt in Seed 2 deutlich
+besser als in Seed 1. Bei einem Knopf-Effekt dieser Groessenordnung waere das der Grund, warum
+zwei Seeds Pflicht sind (`project_training_seed_variance`).
+
+Laufzeiten: 2.862,8 s und 2.355,3 s Wanduhr, 10 Threads, 13,6 und 13,1 s je Partie.
+
+**Elo-Kanten eingetragen 2026-09-14** (Nutzer-Freigabe "elo kante kannst eintragen"): drei
+Zeilen, je Seed eine, alle mit `--units-from-paired-artifact` (Bloecke zu 10 Partien, damit der
+Bootstrap Einheiten statt Einzelpartien zieht) und `--early-stop`. Stand danach:
+**v29-b03@400 = 1437 [1381, 1494]** gegen **v28-b02@400 = 1394 [1352, 1443]**, also +43 Elo bei
+ueberlappenden Intervallen.
+
+**Zur Frueh-Stopp-Markierung, Nutzer-Entscheid 2026-09-14 ("lass sie so mal drinnen. 3 seeds
+sollten genug sein fuer ein vernuenftiges CI"):** die Kanten bleiben, obwohl die
+Promotionskette von v28-b02 im Register eine unverzerrte Replikation nachgeschoben hatte
+(`alpha=beta=1e-12`, "verzerrungsfrei gepoolt"). Der Nutzer verweist darauf, dass die
+Zwischensprossen der Leiter ebenfalls mit Frueh-Stopp gefahren sind. **Dazu ein Befund, der den
+Entscheid stuetzt:** die drei Kanten sind NICHT gleichsinnig verzerrt -- Seed 20261068 brach an
+der UNTEREN Wald-Schranke ab, dort wirkt der Frueh-Stopp nach unten, waehrend 20261067 und
+20261069 an der oberen abbrachen. Ueber 490 Partien bleibt ein CI von 113 Elo Breite.
+
+**Kein Champion-Wechsel aus diesem Stand**: `--no-promote-winner` war in allen drei Laeufen
+gesetzt, und die Promotion ist ein eigener Ablauf mit Checkliste
+(`docs/promotion_checklist.md`, `/mosaic-champion-promotion`) plus Nutzer-Entscheid. Auch die
+Elo-Kante ist bewusst NICHT eingetragen -- sie gehoert in diesen Ablauf, und ob drei Seeds als
+eine Kante oder als drei gefuehrt werden, ist eine Registerfrage, die nicht nebenbei entschieden
+wird.
+
+Laufzeiten: 2.862,8 s / 2.355,3 s / 1.259,0 s Wanduhr, je 10 Threads, 13,6 / 13,1 / 12,6 s je
+Partie. Zusammen rund 1,8 h fuer die ganze Kante.
 
 ### Tor 1 v29-b02 gegen b03: **die Spezialfeld-Kanaele TRAGEN** (2026-09-14)
 

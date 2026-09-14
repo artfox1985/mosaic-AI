@@ -547,7 +547,18 @@ def state_to_tensor_python(data):
     features.append(_drawn_special / DOME_TILE_COUNT)
 
     # P.7 -- Phase als One-Hot. Ein unbekannter String laesst alle sechs auf 0.
+    #
+    # KORREKTUR 2026-09-14, Zwilling zu features.rs: waehrend der Startsetzung steht
+    # `phase` auf "drafting" (Phase::StartPlacement wird in der Engine nie
+    # zugewiesen). Der Sichtpunkt wird deshalb aus `players[i].start_placed`
+    # abgeleitet -- solange das bei irgendeinem Spieler False ist, steht eine
+    # Startsetzung aus. Fehlt das Feld (Alt-Snappschuesse), bleibt alles wie bisher.
     _phase = data.get("phase")
+    _players = data.get("players") or []
+    if isinstance(_players, list) and any(
+        isinstance(_p, dict) and _p.get("start_placed") is False for _p in _players
+    ):
+        _phase = "start_placement"
     for _name in PHASE_ORDER:
         features.append(1.0 if _phase == _name else 0.0)
 
