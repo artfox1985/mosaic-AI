@@ -556,3 +556,57 @@ messbar (dort als par.11 registriert). Variante B bekommt damit einen zweiten be
 Nutzniesser -- was nach CLAUDE.md ("Infrastruktur bewerten: Irrtumskosten, nicht Elo") die
 Anforderung an einen Infrastruktur-Vorschlag ist: eine konkrete Messung, die dadurch erst
 moeglich wird.
+
+## par.13 DRITTER NUTZNIESSER: die rundenuebergreifende Tiling-Bewertung (Nutzer 2026-09-14)
+
+Beim Durchsehen der Chip-Allokation kam die Frage auf, ob der Tiling-Solver ueber Runden hinweg
+zu kurz greift -- ein vielseitiger Bonuschip jetzt verbrannt, spaeter knapp. Der Koordinator
+hatte das als Architektur-Grenze beschrieben. **Nutzer-Korrektur:** *"nein er optimiert nicht nur
+runden score hoff ich mal. dafuer haben wir den einfluss von value head und einhuellender
+eingebaut"* -- und dann: *"doch, es wird ab punkt 33 nochmal angegriffen schaetz ich."*
+
+**Beides trifft zu, und zusammen ergibt es den Punkt:**
+
+* Die Mechanik IST gebaut: `envelope_tiling_w` und `envelope_tiling_value_w`
+  (`net_mcts.rs:919/921`) geben dem Solver Einfluss ueber die Einhuellende und den Value-Kopf.
+* **Sie steht auf 0,0 in der Champion-Spec**, also auf Default. Faktisch optimiert der Solver im
+  laufenden Rezept den RUNDEN-Score.
+* **W_VAL IST GEMESSEN, und zwar mit Nullbefund:** `PREREG_geometric_envelope.md` par.8.6a,
+  2026-09-04, drei Arme (V 0,5 / V 1,0 / T+V) a 160 Paare am `v23-b01_brierbest`. Siege
+  82:78 / 84:76 / 80:80, McNemar p 0,75 / 0,39 / 1,00, Margin und Spalten ohne Richtung.
+  Verdikt dort: *"Im Tiling ist zu wenig zu entscheiden (par.3f: Fast-Gleichstaende), und der
+  Entscheid liegt im Draft."* Eine Wiederholung am heutigen Netz und an der heutigen
+  Basislinie ist als par.8.6b registriert (Nutzer-Auftrag 2026-09-14).
+* **ZWEI KORREKTUREN AN DIESER STELLE, beide am 2026-09-14/15 vom Nutzer ausgeloest.**
+  (1) Zuerst stand hier, die Mechanik habe "gemessen nicht getragen", mit Verweis auf
+  `project_ownership_tiling_consumer_negative`; das war falsch zugeordnet, jene Notiz betrifft
+  den OWNERSHIP-Kopf als Tiling-Konsument. (2) Daraufhin stand hier, der Knopf sei
+  **"UNGEMESSEN"** -- auch das war falsch, und zwar folgenschwerer: es ist aus einer
+  ERGEBNISLOSEN SUCHE geschlossen worden, nicht aus einem Beleg. Der Beleg lag in der Prereg,
+  die den Knopf beherbergt, unter der Nummer des Absatzes, der hier zitiert wird (8.6 -> 8.6a).
+  **Ein Nullbefund der eigenen Suche ist kein Beleg fuer Abwesenheit**; Regel 0 verlangt dann
+  "ich finde keinen Beleg", nicht "es gibt keinen". Die zweite Fassung stand rund einen Tag im
+  Baum und hat einen Messlauf ausgeloest, der als Erstmessung beauftragt war und eine
+  Wiederholung ist.
+* **Der Knopf ist also gebaut, steht auf Default und hat einmal nicht getragen.** Fuer diesen
+  Absatz heisst das: Variante B greift etwas an, das in EINER Form schon gescheitert ist --
+  aber in einer anderen Form als B sie waehlt (Gewicht im Solver gegen Tiling im Blatt), und
+  die Begruendung des Scheiterns (zu wenig zu entscheiden im Tiling) trifft B nicht
+  automatisch, weil B die ENTSCHEIDUNG verschiebt statt sie umzugewichten.
+* **Variante B greift dasselbe Problem anders an:** sie rechnet das Tiling IM BLATT der Suche
+  durch. Der Value-Kopf kommt dann ueber den Blattwert ins Spiel, nicht ueber einen
+  Gewichtsparameter im Solver. Das ist der Unterschied zwischen "dem Solver ein Gewicht geben"
+  und "die Suche das Tiling sehen lassen".
+
+**Damit hat dieses Paket drei benannte Nutzniesser**, was nach CLAUDE.md ("Infrastruktur
+bewerten: Irrtumskosten, nicht Elo") die Anforderung deutlich uebererfuellt:
+
+1. die Rundenvoraussicht (par.7, urspruengliche Begruendung),
+2. der Spezialfeld-Drafting-Hebel (par.12, Kette Drafting-Tiling-Freischaltung),
+3. **die rundenuebergreifende Tiling-Bewertung** -- der Weg, auf dem der flache Gewichts-Ansatz
+   gescheitert ist, hier noch einmal und mit anderer Mechanik.
+
+**Nicht behauptet wird**, dass Variante B den Chip-Fall loest; der Solver bleibt innerhalb der
+Runde exakt, und ob die Suche seine Wahl beeinflussen kann, haengt am Bau (par.4.2). Es ist ein
+Nutzniesser, kein Versprechen.
+
