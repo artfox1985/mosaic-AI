@@ -191,9 +191,17 @@
      braucht das: solange dieses Fenster offen ist, bleibt die letzte
      Musterreihe korrigierbar. -->
 <div id="tiling-finish-overlay" class="finish-veil" style="display:none">
-  <div class="finish-card">
+  <div class="finish-card" id="tiling-finish-card">
     <div class="finish-title" id="tiling-finish-title">Tiling abschließen</div>
     <div class="finish-sub" id="tiling-finish-sub"></div>
+    <!-- Nutzer 2026-09-14: das Fenster geht auch dann auf, wenn sich noch
+         Reihen mit Bonusplaettchen vervollstaendigen lassen. Bis dahin
+         unterschieden sich die beiden Lagen nur im Text, und der
+         Abschluss-Knopf sah in beiden gleich aus -- er lud zum Wegklicken
+         ein. Stehen Chip-Reihen an, tragen die Knoepfe hier die Betonung
+         (app.js::renderTilingFinishPopup), und der Abschluss wird zum
+         ausdruecklichen Verzicht (.confirm.secondary). -->
+    <div id="tiling-finish-chips"></div>
     <button class="confirm" id="tiling-finish-btn" onclick="finishHumanTiling()">Abschließen</button>
   </div>
 </div>

@@ -1062,9 +1062,19 @@ function getTilingRowState(pi) {
   const playerPlaceableRis = (S.valid_tiling_rows || [])
     .filter(vr => vr.pi === pi && vr.placeable === true)
     .map(vr => vr.ri);
-  const playerChippableRis = (S.chippable_tiling_rows || [])
-    .filter(cr => cr.pi === pi)
-    .map(cr => cr.ri);
+  // Nutzer 2026-09-14: "die Bonusplaettchen fuer die KI sind fuer mich nicht
+  // relevant". Das Brett der KI trug bisher dieselben Chip-Markierungen wie das
+  // eigene -- 🎴 in der Pfeilspalte, hervorgehobener Bonuschips-Kasten,
+  // klickbare Reihe -- obwohl JEDER dieser Klicks ins Leere geht
+  // (onTilingRowClick und openChipModal steigen fuer AI_PLAYER sofort aus).
+  // Die Chip-Reihen der KI fallen deshalb hier aus, an der einen Stelle, aus
+  // der renderBoard alle drei Markierungen zieht; die Skip-Steuerung war
+  // schon vorher auf den Menschen begrenzt (showSkipControls).
+  const playerChippableRis = (AI_ENABLED && pi === AI_PLAYER)
+    ? []
+    : (S.chippable_tiling_rows || [])
+        .filter(cr => cr.pi === pi)
+        .map(cr => cr.ri);
   // Stale uebersprungene Reihen bereinigen: faellt eine Reihe aus
   // chippable_tiling_rows heraus (weil inzwischen eine spaetere Reihe
   // platziert wurde, s. tiled_max_row), ist sie endgueltig raus -- der
@@ -1534,9 +1544,11 @@ function renderCenter() {
             <div style="font-size:10px;margin-top:3px">
               ${letzte
                 ? (_tilingFinishOffen
-                    ? (AI_ENABLED
-                        ? 'Noch einmal auf dasselbe Feld klicken legt sie und übergibt an die KI.'
-                        : 'Noch einmal auf dasselbe Feld klicken legt sie und beendet die Runde.')
+                    ? (humanChipRows().length
+                        ? 'Gelegt wird sie beim Abschließen - erst dort wird auf die Bonusplättchen verzichtet.'
+                        : (AI_ENABLED
+                            ? 'Noch einmal auf dasselbe Feld klicken legt sie und übergibt an die KI.'
+                            : 'Noch einmal auf dasselbe Feld klicken legt sie und beendet die Runde.'))
                     : 'Gelegt wird sie erst beim Abschließen des Tilings.')
                 : `Noch einmal auf dasselbe Feld klicken legt sie fest<span id="tiling-countdown"></span>.`}
               Anderes Feld = verschieben, Klick auf die Musterreihe = zurücknehmen.
@@ -2103,7 +2115,13 @@ function setPendingTiling(pi, ri, sr, sc, si) {
     // Steht es noch nicht offen, hat der Mensch andere Reihen offen: dann
     // bleibt die Fliese liegen und wird beim Abschliessen mitgesendet.
     if(isLastPatternRow(pi, ri)) {
-      if(_tilingFinishOffen) finishHumanTiling();
+      // Nutzer 2026-09-14: dieser Klick UEBERGIBT nur, wenn wirklich nichts
+      // mehr offen ist. Stehen noch Chip-Reihen an, waere er ein stiller
+      // Verzicht auf sie -- und zwar einer, der am Brett passiert, weit weg
+      // von dem Fenster, das den Verzicht ausspricht. Dann bleibt die Fliese
+      // liegen, und hinaus geht es nur ueber das Fenster.
+      if(_tilingFinishOffen && humanChipRows().length === 0) finishHumanTiling();
+      else if(_tilingFinishOffen) flashTilingFinishPopup();
       return;
     }
     commitPendingTiling();
@@ -2166,6 +2184,24 @@ function advanceTilingRow(pi) {
 // wer das Fenster einmal beiseite geschoben hat, will es nicht bei jedem
 // Zeichnen zurueckspringen sehen.
 let _finishPopupPos = null;
+
+// Chip-Reihen des MENSCHEN. Quelle ist `S.chippable_tiling_rows`
+// (round_end.rs::chippable_rows) -- dieselbe, aus der der Info-Kasten seinen
+// 🎴-Hinweis baut. Mehrfach gebraucht: das Abschluss-Fenster, sein
+// Bestaetigungs-Klick am Kuppelfeld und der Hinweistext haengen alle daran.
+function humanChipRows() {
+  if(!S || !S.chippable_tiling_rows) return [];
+  return S.chippable_tiling_rows.filter(cr => !AI_ENABLED || cr.pi !== AI_PLAYER);
+}
+
+function flashTilingFinishPopup() {
+  const card = document.getElementById('tiling-finish-card');
+  if(!card) return;
+  card.classList.remove('flash');
+  void card.offsetWidth;              // Neustart der Animation erzwingen
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 700);
+}
 
 function hideTilingFinishPopup() {
   const ov = document.getElementById('tiling-finish-overlay');
@@ -2234,41 +2270,87 @@ function renderTilingFinishPopup(hasPending) {
   if(!ov) return;
   // `humanTilingDone` haelt das Fenster zu, waehrend die KI tilt (die Phase
   // ist dann weiter 'tiling', offene Reihen hat der Mensch aber keine mehr).
+  // `chipModal`: das Chip-Fenster ist eine `.overlay` (z-index 100), dieses
+  // hier liegt auf 120 -- es laege also darueber.
   const show = !!S && S.phase === 'tiling' && !hasPending
-            && !AI_THINKING && !humanTilingDone;
+            && !AI_THINKING && !humanTilingDone && !chipModal;
   _tilingFinishOffen = show;
   ov.style.display = show ? 'block' : 'none';
   if(!show) return;
+  const card  = document.getElementById('tiling-finish-card');
   const title = document.getElementById('tiling-finish-title');
   const sub   = document.getElementById('tiling-finish-sub');
+  const chipBox = document.getElementById('tiling-finish-chips');
   const btn   = document.getElementById('tiling-finish-btn');
   // Nutzer 2026-09-09: "Dein Tiling ist fertig" war irrefuehrend, solange sich
   // noch Reihen mit Bonusplaettchen vervollstaendigen lassen. Das Fenster geht
   // bei `!hasPending` auf -- das heisst nur, dass keine VOLLE Reihe mehr an die
-  // Kuppel kann, nicht dass nichts mehr zu tun waere. Die Chip-Reihen stehen in
-  // `S.chippable_tiling_rows` (round_end.rs::chippable_rows), dieselbe Quelle,
-  // aus der der Info-Kasten seinen 🎴-Hinweis baut.
-  const chipRows = (S.chippable_tiling_rows || [])
-    .filter(cr => !AI_ENABLED || cr.pi !== AI_PLAYER);
-  if(title) title.textContent = chipRows.length
-    ? 'Keine Reihe kann mehr an die Kuppel'
+  // Kuppel kann, nicht dass nichts mehr zu tun waere.
+  //
+  // Nutzer 2026-09-14: der Text allein reichte nicht. Beide Lagen sahen gleich
+  // aus, und der gefuellte Abschluss-Knopf war in beiden der einzige Knopf --
+  // er lud dazu ein, die Chip-Reihen wegzuklicken. Jetzt tragen die Lagen
+  // verschiedene Farbe, verschiedene Knoepfe und verschiedene Rollen: mit
+  // offenen Chip-Reihen ist das FUELLEN die angebotene Handlung und der
+  // Abschluss der ausdrueckliche Verzicht.
+  const chipRows = humanChipRows();
+  const mitChips = chipRows.length > 0;
+  if(card) card.classList.toggle('chips-open', mitChips);
+
+  if(title) title.textContent = mitChips
+    ? (chipRows.length > 1 ? '🎴 Bonusplättchen noch möglich'
+                           : `🎴 Reihe ${chipRows[0].ri + 1} geht noch mit Bonusplättchen`)
     : (AI_ENABLED ? 'Dein Tiling ist fertig' : `Runde ${S.round} beenden`);
-  const chipHinweis = chipRows.length
-    ? `${chipRows.length > 1 ? 'Reihen' : 'Reihe'} `
-      + chipRows.map(cr => cr.ri + 1).join(' und ')
-      + ` ${chipRows.length > 1 ? 'lassen' : 'lässt'} sich noch mit Bonusplättchen `
-      + 'vervollständigen - Abschließen verzichtet darauf. '
-    : '';
-  if(sub) sub.textContent = pendingTiling
-    ? chipHinweis
-      + 'Die vorgemerkte Fliese wird dabei gelegt. Solange dieses Fenster offen ist, '
-      + 'kannst du sie noch auf ein anderes Kuppelfeld schieben oder zurücknehmen.'
-    : chipHinweis + (AI_ENABLED ? 'Danach ist die KI mit ihrem Tiling dran.'
-                                : 'Danach wird die Runde gewertet.');
-  if(btn) btn.textContent = AI_ENABLED ? 'Abschließen → KI ist dran' : 'Runde beenden ✓';
+
+  const pendingHinweis = pendingTiling
+    ? (mitChips
+        ? 'Die vorgemerkte Fliese wird in beiden Fällen gelegt. '
+        : 'Die vorgemerkte Fliese wird dabei gelegt. Solange dieses Fenster offen ist, '
+          + 'kannst du sie noch auf ein anderes Kuppelfeld schieben oder zurücknehmen.')
+    : (mitChips ? '' : (AI_ENABLED ? 'Danach ist die KI mit ihrem Tiling dran.'
+                                   : 'Danach wird die Runde gewertet.'));
+  if(sub) sub.textContent = mitChips
+    ? 'Keine volle Reihe kann mehr an die Kuppel. '
+      + `${chipRows.length > 1 ? 'Diese Reihen lassen' : 'Diese Reihe lässt'} sich aber noch `
+      + 'mit Bonusplättchen vervollständigen (2 gleichfarbige oder 3 beliebige = 1 Fliese). '
+      + pendingHinweis
+    : pendingHinweis;
+
+  // Je Chip-Reihe ein Knopf. Er fuehrt in dasselbe Fenster wie der Klick auf
+  // die Reihe am Brett (openChipModal) -- hier nur ohne den Griff dorthin.
+  if(chipBox) {
+    chipBox.innerHTML = '';
+    chipRows.forEach(cr => {
+      const b = document.createElement('button');
+      b.className = 'finish-chip-btn';
+      const wer = AI_ENABLED ? '' : ` (${S.players[cr.pi].name})`;
+      b.textContent = `🎴 Reihe ${cr.ri + 1}${wer} mit Bonusplättchen füllen`;
+      b.onclick = () => openChipFromFinish(cr.pi, cr.ri);
+      chipBox.appendChild(b);
+    });
+  }
+
+  if(btn) {
+    btn.classList.toggle('secondary', mitChips);
+    btn.textContent = mitChips
+      ? (AI_ENABLED ? 'Ohne Bonusplättchen abschließen → KI'
+                    : 'Ohne Bonusplättchen: Runde beenden')
+      : (AI_ENABLED ? 'Abschließen → KI ist dran' : 'Runde beenden ✓');
+  }
   // Nach dem Fuellen -- die Lage haengt an der Kartenhoehe, und die steht erst
   // fest, wenn der Text drin ist.
   positionTilingFinishPopup();
+}
+
+// Weg vom Abschluss-Fenster ins Chip-Fenster (Nutzer 2026-09-14).
+// Eine vorgemerkte Fliese wird VORHER abgeschickt: die Chip-Vervollstaendigung
+// ist ein Server-Zug, und was danach an die Kuppel darf, entscheidet die
+// Oben-nach-unten-Regel neu (round_end.rs::validate_tiling_action) -- eine
+// rein clientseitig vorgemerkte Fliese kann dabei ungueltig werden.
+async function openChipFromFinish(pi, ri) {
+  if(pendingTiling) await commitPendingTiling(false);
+  openChipModal(pi, ri);
+  if(chipModal) hideTilingFinishPopup();
 }
 
 // -- CHIP-REIHE UEBERSPRINGEN (Nutzer-Folgeauftrag 2026-07-29) -----------------
@@ -2446,6 +2528,10 @@ function confirmChips() {
 function closeChipModal() {
   document.getElementById('chip-overlay').style.display='none';
   chipModal=null;
+  // Das Abschluss-Fenster haelt sich zurueck, solange dieses hier offen ist
+  // (renderTilingFinishPopup) -- nach dem Schliessen muss es wiederkommen,
+  // auch wenn abgebrochen wurde und sonst nichts neu gezeichnet wird.
+  if(S) render();
 }
 
 // -- DOME MODAL ----------------------------------------------------------------
