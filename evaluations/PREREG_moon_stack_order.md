@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 GEMESSEN (par.7): Fan-out traegt NICHT (193:207), der Nullbefund ist aber gemessen und nicht erklaert -- die Gegenhypothese "Reihenfolge egal" ist widerlegt (nur der oberste Stein je Stapel ist ziehbar). **Stufe 3 GEBAUT und im Wheel (par.9/9a): eigene Nachsuche nach der Zugwahl**, A/B laeuft. Value-Kopf sieht die Reihenfolge positionsgenau (par.9f); Diagnose-Zeile [moon_order] nachgetragen (par.9g, Code im Baum, Wheel-Bau steht aus). Drei Architektur-Hebel vorregistriert (par.10); Weg C (Terminierung bis Rundenende) und Weg B (Zielwechsel des Kopfs) sind als Fahrplan 32a/32b vor Nr. 33 eingetaktet (par.10a). -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund: Fan-out 193:207, Nachsuche 197:203, je 200 Paare ohne Frueh-Stopp, keine der sechs Kennzahlen ueber der Aufloesung. Die Gegenhypothese "Reihenfolge egal" bleibt widerlegt (nur der oberste Stein je Stapel ist ziehbar). Der Implementierungs-Verdacht par.9d ist in 3 von 5 Punkten ausgeraeumt; offen bleiben Budget und Ausloesungsrate, dafuer ist die Diagnose-Zeile gebaut (par.9g, Wheel steht aus). Weg C und B als Fahrplan 32a/32b (par.10a). -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -726,6 +726,88 @@ der Nacht laeuft -- sie und die Anschlusskette fahren auf dem Kontrakt 39994362f
 ein Neubau mitten in der Kette haette die Arme auf zwei verschiedenen Wheels laufen lassen.
 Faellig danach: `cargo test --release`, Wheel-Bau, dann eine kleine Serie mit
 `moon_order_variants=2` und `--log-games`, aus der die beiden Zahlen fallen.
+
+## par.9h ERGEBNIS STUFE 3 (2026-09-15): die Nachsuche traegt NICHT -- und par.9d haelt
+
+**Lauf:** `moon_order_post_vs_off_s20261091.json`, 200 Paare / 400 Partien, beide Seiten
+`alphazero_v28-b02_brierbest` @400 c_puct 1,5, Unterschied GENAU ein Spec-Feld
+(`moon_order_variants` 2 gegen 0), Blockgroesse 5, SPRT weit gesetzt (alpha = beta = 0,001),
+kein Frueh-Stopp. Laufzeit **5.933 s Wanduhr, 25.868 s CPU, 10 Threads, 14,833 s je Partie**.
+
+**a = Nachsuche, b = kanonisch.**
+
+| Groesse | a (Nachsuche) | b (kanonisch) | Differenz |
+| --- | --- | --- | --- |
+| Siege (n = 200 Paare) | **197** | **203** | -6 |
+| SPRT | \-- | \-- | UNDECIDED_CAP_REACHED, LLR -5,786 (Schranke -6,907) |
+| McNemar p | \-- | \-- | **0,844** |
+| gepaarte Differenz | \-- | \-- | -0,030 [-0,229, +0,169] |
+| Sweeps a / Sweeps b / Splits | 50 | 53 | 97 |
+
+### Die sechs Standard-Kennzahlen
+
+Spaltenblock: n = 396 je Seite (von 400; vier Partien nicht nachspielbar, Chip-Vollendung).
+Plattenblock: n = 400 Bretter je Modell.
+
+| # | Kennzahl | a | b | Diff a-b |
+| --- | --- | --- | --- | --- |
+| 1 | Reihen voll / Fuellsumme / lange Reihen vollendet | 0,1465 / 17,838 / 3,056 | 0,1540 / 17,879 / 2,990 | -0,008 / -0,040 / +0,066 |
+| 2 | **volle Spalten** (SE 0,038 / 0,039) | **0,8838** | **0,9823** | **-0,0985** |
+| 2b | Spalten >= 4 / >= 3 / max. Hoehe | 2,270 / 3,174 / 5,604 | 2,230 / 3,179 / 5,641 | +0,040 / -0,005 / -0,038 |
+| 3 | Strafleiste gesamt / Rundenstrafen (Log) | 8,682 / -13,672 | 8,467 / -13,453 | +0,215 / -0,220 |
+| 4 | Platten gesamt / Spezial-Bonus / Plazierung | 7,855 / 5,263 / 52,038 | 7,532 / 5,125 / 52,708 | +0,323 / +0,138 / -0,670 |
+| 5 | eigene Punkte (SE 0,86 / 0,94) | 52,465 | 52,928 | -0,462 |
+| 6 | Marge (SE 0,995) | -0,463 | +0,463 | -0,925 |
+
+**Keine Groesse ist ueber der Aufloesung.** Die groesste Einzelabweichung sind die vollen
+Spalten mit -0,0985; bei SE 0,038 und 0,039 je Seite sind das rund 1,8 SE der ungepaarten
+Differenz, also unterhalb der Schwelle und auf einer Groesse, die ueber Seeds bekanntlich
+stark streut. **Sie zeigt allerdings in dieselbe Richtung wie alles andere**: Siege, Punkte,
+Marge, Plazierungspunkte und Strafleiste liegen saemtlich leicht gegen die Nachsuche. Nur die
+Plattenpunkte (+0,32) und der Spezial-Bonus (+0,14) liegen dafuer.
+
+### par.9d ist abgearbeitet: drei der fuenf Punkte sind sauber, zwei bleiben offen
+
+par.9d hat vorab festgelegt, dass ein Nullbefund hier ein IMPLEMENTIERUNGS-VERDACHT ist und
+kein Verdikt (Nutzer: *"dann haut irgendwas von der implementierung noch nicht hin"*). Die
+fuenf Punkte, am Code geprueft 2026-09-15:
+
+1. **Perspektive GRUEN.** `choose_moon_order_with` klont, ruft `apply_drafting`, und in
+   `game.rs::apply_drafting` laeuft `switch_player()` -- im Folgezustand ist der GEGNER am Zug.
+   Gewaehlt wird per `if best.is_none_or(|(_, b)| opp_value < b)`, also das MINIMUM des
+   Gegnerwerts. Die Richtung ist die beabsichtigte.
+2. **Die gewaehlte Reihenfolge wird gespielt: GRUEN.** `moon_order_post_search` setzt
+   `mm.take.moon_order = seq` und gibt die Aktion zurueck; in `net_drafting_policy`
+   (self_play.rs:5664-5675) ist ihr Ergebnis `chosen` und damit das erste Tupelglied, das der
+   Agent spielt. Der Arena-Pfad ist derselbe: `paired_gating.py` ruft `net_vs_net_arena_match`
+   (lib.rs:378) -> `run_net_vs_net_arena` -> `NetSelfPlayAgent::decide` (self_play.rs:3441)
+   -> `net_drafting_policy`. **Die Nachsuche lief in diesem Lauf tatsaechlich.**
+3. **Varianten vollstaendig: GRUEN.** `unique_moon_orders(&m.take.moon_order)` liefert alle
+   eindeutigen Permutationen, ohne Deckel; `RETURN_ORDER_MAX_PERMUTED` gehoert zum anderen
+   Knopf. Der Test `choose_moon_order_with_picks_the_order_the_evaluator_prefers` belegt, dass
+   jede vorhandene Ziel-Oberflaeche erreichbar ist.
+4. **Budget: OFFEN, nur messbar.** 256 Sims je Variante geben Wurzelbreite 16
+   (`gumbel_top_m_for_budget`). Ob der entscheidende Gegnerzug -- den frisch oben liegenden
+   Stein nehmen -- unter diesen 16 Kandidaten ist, steht nicht im Code, sondern im Lauf.
+5. **Ausloesungsrate: OFFEN, weil das Instrument fehlte.** par.9b sagt 24,34 Gelegenheiten je
+   Partie, aber die Nachsuche protokollierte ihre Wahl nicht. Die Diagnose-Zeile ist am
+   2026-09-15 nachgebaut (par.9g), liegt aber noch nicht im Wheel.
+
+**Damit ist der Verdacht aus par.9d in drei von fuenf Punkten ausgeraeumt und in zweien nicht.**
+Das Verdikt lautet deshalb NICHT "die Reihenfolge ist egal" -- diese Gegenhypothese ist seit
+par.7 widerlegt -- sondern: **die Nachsuche in DIESER Bauform und mit DIESEM Budget traegt
+nicht.** Welcher der beiden offenen Punkte es erklaert, entscheidet die Diagnose-Zeile: bleibt
+`changed` nahe 0, waehlt die Nachsuche fast immer den Bestand und Punkt 4 ist der Verdaechtige.
+
+### Was das fuer par.10 heisst
+
+Die Richtung der Randgroessen passt zu Weg C, ohne ihn zu belegen. Die Nachsuche optimiert
+`v_mix` des Folgezustands, also den Wert EINEN Halbzug weiter -- und genau die langfristigste
+Groesse im Block (volle Spalten) faellt am staerksten gegen sie aus, waehrend die kurzfristigen
+Plattenpunkte leicht fuer sie sprechen. Das ist derselbe Einwand, den par.9e gegen den Prior
+erhebt und den der Nutzer gegen die Bauform erhoben hat (*"da brauchst schon ein wenig
+weitsicht. zumindest rundensicht."*). **Als Beleg taugt es nicht** (1,8 SE auf einer Groesse,
+die ueber Seeds stark streut); als Reihenfolge-Argument fuer C vor B vor A taugt es.
 
 ## par.10 ARCHITEKTUR-HEBEL jenseits der Sim-Zahl (Nutzer-Auftrag 2026-09-14, VOR dem Bau)
 
