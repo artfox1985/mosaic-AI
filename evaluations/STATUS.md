@@ -53,10 +53,13 @@ kein Build, kein cargo, keine Sonde.
 2. **Offene Kleinigkeit der Sims-Kurve:** Plattenpunkte je Kriterium fuer die drei
    Teil-A-Laeufe nachfahren (das Kettenskript rief `plate_points_from_arena.py` ohne `--out`
    auf; je unter 5 s auf vorhandenen Logs).
-3. **Cache-Bloecke und Monolithe aufraeumen** (`cache_inventory.py --orphans`, dann
-   `--print-delete-list`): 4,2 GB in 8 Monolithen, 2,5 GB in rund 5.800 Bloecken. Die Waisen der
-   heute geloeschten Korpora (v25-b01, Sims-Messdateien) sind darin. Braucht die Fensterliste
-   der neuen Generation, deshalb erst jetzt.
+3. ~~**Cache-Bloecke und Monolithe aufraeumen**~~ **BLOECKE ERLEDIGT 2026-09-14** auf Freigabe
+   des Nutzers: 1.842 Waisen geloescht (744 MB), alle nachgezaehlt und verschwunden. Quellen
+   waren v25-b01 (1.602 Bloecke) und zwoelf Messkorpora der Sims-Kurve und der c2-Ablationen.
+   Kein restic-Beleg noetig -- `tools/backup_excludes.txt` schliesst `*.h5` ausdruecklich aus
+   ("jederzeit nachbaubar"). **OFFEN bleiben die 10 MONOLITHEN (5,1 GB):** sie sind erst zu
+   beurteilen, wenn b02 und b03 ihre eigenen Schluessel geschrieben haben; heute in Gebrauch ist
+   `35c6bd2b9bd2` (v29-Fenster von b01).
 4. **Kette v29 fahren**: `tools/night_v29_chain.sh` ist GESCHRIEBEN (2026-09-13, Syntax
    geprueft) und wartet selbst auf das Ende der Erzeugung -- Manifeste, G-2-Kennzahlen, Fenster
    (Seed 20260941), Bloecke, Monolith, Training v29-b01 mit Warmstart auf `v28-b02_brierbest`.
