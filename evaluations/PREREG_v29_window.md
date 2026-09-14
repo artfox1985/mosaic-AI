@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch (1.201 Dateien, 12,8 h), Tor 2a HAELT (0,843 gegen 0,816, Reihe ueber fuenf Generationen monoton), Fenster 2.947 Dateien, Training b01 1,55 h. **Tor 1 BEIDE SEEDS H0** (87:93 und 69:81, je SPRT-Abbruch): der Pflichtarm traegt nicht, kein Champion-Wechsel. ACHTUNG: b01 war KEIN reiner Materialschritt -- der v29-Korpus bringt drei Aenderungen mit (Startkuppel-Variation 0,15, Startkuppel per Suche, Stapelzug-Knopf, Eingang 744 -> 755), der Nullbefund kann auch Umstellungskosten sein. Offen: b02, b03, Sockel-Sims. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch (1.201 Dateien, 12,8 h), Tor 2a HAELT (0,843 gegen 0,816, Reihe ueber fuenf Generationen monoton), Fenster 2.947 Dateien, Training b01 1,55 h. **Tor 1 BEIDE SEEDS H0** (87:93 und 69:81, je SPRT-Abbruch): der Pflichtarm traegt nicht, kein Champion-Wechsel. ACHTUNG: b01 war KEIN reiner Materialschritt -- der v29-Korpus bringt drei Aenderungen mit (Startkuppel-Variation 0,15, Startkuppel per Suche, Stapelzug-Knopf, Eingang 744 -> 755), der Nullbefund kann auch Umstellungskosten sein. **b02 trainiert, aber ZWEIFAKTORIELL** (par.9: 794 statt 755, das Wheel lief davor) -- drei Wege, Entscheid noetig. b03 laeuft. Offen: Sockel-Sims. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -615,6 +615,42 @@ genauere Blick.
 200 Paaren abgebrochen, genau wozu er da ist. 13,8 s je Partie, 10 Threads.
 
 **Der zweite Seed (20261062) laeuft.** Ein DRITTER Seed ist kein Automatismus (Regel v27, par.6).
+
+### v29-b02 ist ZWEIFAKTORIELL geworden -- Ausfuehrungsfehler, Entscheid noetig (2026-09-14)
+
+**Der Arm ist trainiert** (1,51 h, 12 Epochen, bester Brier in Epoche 5 -- deshalb gibt es hier
+ein `_brierbest`, anders als bei b01). Der Schalter hat gegriffen: `special_planes_off: true` im
+Manifest. **Aber `input_size: 794`.**
+
+**Das widerspricht par.6:** dort steht fuer b02 "Rezept b01" und ausdruecklich "b01: EIN Faktor,
+die Spezialfeld-Eingabe"; b01 lief mit **755**. Der Vergleich b02 gegen b01 traegt damit ZWEI
+Unterschiede: die abgeschalteten Planes-Kanaele UND die 39 Werte von Abschnitt 16.
+
+**Wie es passiert ist:** das Wheel von Abschnitt 16 wurde am 2026-09-14 um 08:26 installiert und
+`config.INPUT_SIZE` im selben Zug auf 794 gesetzt (richtig so, sonst waeren die Bloecke unter dem
+falschen Schluessel gelandet). Um 08:35 startete b02 -- und erbte damit die neue Breite. Die
+Reihenfolge im Fahrplan (Nr. 5 Wheel vor Nr. 16 b02) legte genau das nahe; die PREREG-Bedingung
+"Rezept b01" haette dagegen verlangt, b02 VOR dem Wheel zu fahren. **Der Widerspruch stand im
+Plan, ich habe ihn nicht gesehen.**
+
+**Drei Wege, Entscheid beim Nutzer:**
+
+1. **b02 mit 755 neu fahren.** `config.INPUT_SIZE` auf 755 (der Riegel in
+   `neural_net.py::state_to_tensor_rust` kuerzt den Rust-Vektor dann auf 755, das Wheel muss NICHT
+   zurueckgebaut werden), Bloecke neu, Training neu. Kosten rund 2 h, erst NACH b03 moeglich --
+   der laeuft gerade und braucht 794. Beantwortet die registrierte Frage.
+2. **b02 gegen b03 messen statt gegen b01.** Beide tragen 794, der einzige Unterschied ist der
+   Schalter -- also sauber einfaktoriell. Aendert aber den Bezugspunkt: par.6 fragt gegen b01, und
+   b03 ist selbst ein ungemessener Arm.
+3. **b02 gegen b01 messen und die Zweifaktorialitaet registrieren.** Billigste Variante, liefert
+   aber nur eine Aussage ueber "Ablation PLUS Sichtwerte gegen keins von beidem" -- welcher Teil
+   wirkt, bleibt offen.
+
+**Empfehlung: Weg 2**, mit Weg 1 als Nachlauf, falls die Frage gegen b01 gebraucht wird. Weg 2
+kostet nichts extra (die Arena laeuft ohnehin) und ist die einzige Variante, die den Schalter
+ISOLIERT misst -- genau das, wofuer die Ablation gebaut wurde.
+
+**Nicht betroffen:** b03 selbst. Er IST der 794er-Arm, seine Breite ist sein Zweck.
 
 ### Training v29-b01 und eine Falle im Namensschema (2026-09-14)
 
