@@ -93,6 +93,35 @@ kein Build, kein cargo, keine Sonde.
      (`PREREG_special_tile_yield.md`, Fahrplan Nr. 15).
 7. Danach nach Fahrplan `evaluations/v29_program_agent_plan.md` (41 Punkte).
 
+### Stand 2026-09-14, 14:00 -- die v29-Arme sind gemessen
+
+**Die Erzeugung ist durch** (1.201 Dateien, 12,8 h), **Tor 2a haelt** (0,843 gegen 0,816 volle
+Spalten je Seite; die Reihe ist ueber fuenf Generationen monoton), das Fenster steht mit 2.947
+Dateien, und alle drei Arme sind trainiert.
+
+| Arm | Eingang | Besonderheit | Tor 1 | Ergebnis |
+| --- | --- | --- | --- | --- |
+| v29-b01 | 755 | Pflichtarm, Bezugspunkt | gegen `v28-b02` | **beide Seeds H0** -- kein Champion-Wechsel |
+| v29-b03 | 794 | Sichtwerte (Abschnitt 16) | gegen b01 | **Merkmalsstand UEBERNOMMEN** (Seed 1 klar 69:41, Seed 2 Gleichstand; par.12-Regel) |
+| v29-b02 | 794 | plus Spezialfeld-Ablation | gegen b03 | laeuft seit 14:00 |
+
+**Champion bleibt `v28-b02_brierbest`.** Ob b03 den Champion schlaegt, ist UNGEMESSEN -- er lief
+nur gegen b01, und b01 verlor gegen den Champion. Das waere ein eigener Lauf und ist der
+naheliegendste naechste Schritt, wenn ein Champion-Wechsel in v29 noch gewollt ist.
+
+**Zwei Befunde, die ueber v29 hinausreichen:**
+
+1. **b03 hatte den SCHLECHTESTEN Offline-Wert der drei Arme** (Brier 0,18114 gegen 0,17934) und
+   gewinnt trotzdem einen Seed klar und beide Seeds bei den Punkten. Argument gegen
+   Offline-Vorentscheide bei Abstaenden dieser Groesse.
+2. **b03 erreicht sein Optimum in Epoche 2 von 12**, obwohl er 39 zusaetzliche Eingangswerte
+   bekam. Damit ist par.6d Punkt 1 ("leben die neuen Spalten?") faellig, sobald die Arena frei
+   ist -- Werkzeug `tools/probes/dead_unit_probe.py` liegt seit dieser Nacht.
+
+**Zwei offene Punkte aus dem Betrieb:** der Fenster-Cache-Schluessel kennt den Ablations-Schalter
+nicht (b03 hat b02s Monolithen ueberschrieben, Ergebnisse unbeschaedigt, die naechste
+Wiederholung waere still falsch), und die Schwierigkeitsleiter ist auf v30 vertagt.
+
 ### Stand der Nacht 2026-09-13/14 (Sitzung, waehrend der Erzeugung)
 
 Vier Fahrplanpunkte sind bearbeitet worden, alle ohne Messung:
