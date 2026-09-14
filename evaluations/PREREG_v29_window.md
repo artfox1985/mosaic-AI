@@ -616,6 +616,30 @@ genauere Blick.
 
 **Der zweite Seed (20261062) laeuft.** Ein DRITTER Seed ist kein Automatismus (Regel v27, par.6).
 
+### Trainings b02 und b03 durch -- der Sicht-Arm ist OFFLINE schlechter (2026-09-14)
+
+| Arm | Dauer | bester `value_val_brier` | in Epoche | Schalter | Eingang |
+| --- | --- | --- | --- | --- | --- |
+| v29-b01 | 1,55 h | 0,1793375 | 12 (= letzte) | aus | 755 |
+| v29-b02 | 1,51 h | 0,1793373 | **5** | **an** | 794 |
+| v29-b03 | 1,38 h | **0,1811429** | **2** | aus | 794 |
+
+**b03 ist offline der schlechteste der drei**, um 0,0018 gegen b01. Ob das traegt, sagt die
+Arena; die Aufloesungsgrenze der Offline-Metriken liegt in derselben Groessenordnung
+(`project_offline_metric_resolution_limit`), ein Punktschaetzer allein entscheidet hier nichts.
+
+**Auffaellig ist eher die EPOCHE als der Wert: b03 erreicht sein Optimum in Epoche 2 von 12.**
+b01 brauchte alle zwoelf, b02 fuenf. Ein Arm, der nach zwei Epochen nicht mehr besser wird,
+waehrend er 39 zusaetzliche Eingangswerte bekommen hat, ist genau der Fall, fuer den par.6d die
+Netz-Gesundheit vorregistriert hat -- **Punkt 1 dort ("leben die neuen Spalten?") ist jetzt keine
+Formalie mehr, sondern die naheliegende Frage.** Zu pruefen mit `tools/probes/dead_unit_probe.py`
+(Fahrplan Nr. 20) und den Spaltennormen von `flat_branch.0.weight`.
+
+**Ein Fehlalarm unterwegs, als Lehre notiert:** auf fuenf Stellen gerundet sahen die
+Brier-Werte von b01 und b02 identisch aus (beide 0,17934), und Zahlengleichheit ist in diesem
+Projekt ein Alarmzeichen. Sie unterscheiden sich in der siebten Stelle. **Ein Alarm auf
+gerundeten Werten ist kein Alarm** -- vor dem Verdacht die volle Zahl holen.
+
 ### MONOLITH-KOLLISION: der Fenster-Schluessel kennt den Ablations-Schalter nicht (2026-09-14)
 
 **Befund.** b02 (Schalter AN) und b03 (Schalter AUS) haben denselben Monolith-Schluessel
