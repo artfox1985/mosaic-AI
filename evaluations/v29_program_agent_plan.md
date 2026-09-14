@@ -20,7 +20,17 @@ Waisen-Bloecke (744 MB)** -- Quellen waren der aus der Rotation gefallene Korpus
 (1.602 Bloecke) und zwoelf Messkorpora der Sims-Kurve und der c2-Ablationen (je 20 Bloecke).
 **Kein restic-Beleg noetig, und zwar sachlich:** `tools/backup_excludes.txt` schliesst `*.h5`
 ausdruecklich aus ("jederzeit nachbaubar"), die Dateien sind also per Entscheid nie im Backup
-gewesen. Der Beleg soll Unwiederbringliches schuetzen; hier gibt es nichts dergleichen. Auf der Platte liegen
+gewesen. Der Beleg soll Unwiederbringliches schuetzen; hier gibt es nichts dergleichen.
+
+**OFFEN und terminiert: die 10 MONOLITHEN (`data/.cache_*.h5`, 5,1 GB).** Sie sind erst zu
+beurteilen, wenn b02 und b03 ihre eigenen Schluessel geschrieben haben -- was jetzt entsteht, ist
+keine Waise. In Gebrauch: `35c6bd2b9bd2` (v29-Fenster von b01) plus die zwei neuen. Alle anderen
+sind Kandidaten, die Freigabe des Nutzers liegt vor.
+
+**Damit das nicht vergessen wird, drei Ebenen statt eines Vorsatzes:** (1) ein Monitor auf
+`night_v29_b02_b03.sh`, der beim Ende der Arme die Aufgabe woertlich ausgibt; (2) dieser Eintrag
+hier; (3) `STATUS.md` Abschnitt 1 Punkt 3, das Uebergabedokument -- die einzige Ebene, die eine
+Sitzung ueberlebt. Auf der Platte liegen
 5,1 GB in 10 Monolithen (`data/.cache_*.h5`) plus die Bloecke. **Vorsicht beim Loeschen:** die
 Arme b02 und b03 bauen gerade EIGENE Bloecke und Monolithe (eigener Cache-Schluessel je Arm) --
 was jetzt entsteht, ist keine Waise. Der Monolith `35c6bd2b9bd2` gehoert zum v29-Fenster von b01.
