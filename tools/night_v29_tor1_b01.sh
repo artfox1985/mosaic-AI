@@ -1,4 +1,16 @@
 #!/usr/bin/env bash
+# ############################################################################
+# UEBERHOLT, NICHT MEHR STARTEN (2026-09-14 03:03).
+#
+# Dieses Skript wartet auf `models/alphazero_v29-b01_brierbest.onnx` -- eine
+# Datei, die NIE entsteht: `train.py` Z.2624-2626 schreibt den
+# `_brierbest`-Checkpoint nur, wenn die Brier-beste Epoche weder die letzte
+# noch die `val_combined`-beste ist. Bei v29-b01 war sie die letzte (Epoche 12),
+# das FINALE Modell ist also selbst der value-optimale Stand.
+#
+# Ersatz: `tools/night_v29_tor1_b01_final.sh`. Einzelheiten und die Regel fuer
+# b02/b03 in `PREREG_v29_window.md` par.9.
+# ############################################################################
 # Fahrplan Nr. 13 und 14: Tor 1 fuer v29-b01 gegen den Champion, ZWEI Seeds, dann Tor 2b
 # und die Plattenpunkte auf denselben Logs.
 #
