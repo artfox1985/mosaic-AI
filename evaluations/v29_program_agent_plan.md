@@ -14,12 +14,18 @@ Champion-Wechsel. Laufend: Wheel 2 (Nr. 5 plus die Tore von Nr. 15). Danach Nr. 
 dem Planes-Schluessel, Training b02) und Nr. 18 (Bloecke unter dem 794er-Schluessel, Training
 b03).
 
-**OFFEN aus dem Generationswechsel** (Skill `/mosaic-generation-turnover` Schritt 4, in STATUS
-Abschnitt 1 als Punkt 3 gefuehrt): **die Cache-Aufraeumung ist NICHT gemacht.** Auf der Platte
-liegen 5,1 GB in 10 Monolithen (`data/.cache_*.h5`) plus die Bloecke; die Waisen der geloeschten
-Korpora sind darin. Der Handgriff (`cache_inventory.py --orphans`, dann `--print-delete-list`,
-Loeschung nur nach pfadgenauer Freigabe) brauchte die Fensterliste der neuen Generation -- die
-liegt seit 01:18 vor.
+**Cache-Aufraeumung (Generationswechsel Schritt 4, in STATUS Abschnitt 1 als Punkt 3):
+FREIGEGEBEN vom Nutzer am 2026-09-14 ("loesch es"), Inventar laeuft.** Auf der Platte liegen
+5,1 GB in 10 Monolithen (`data/.cache_*.h5`) plus die Bloecke. **Vorsicht beim Loeschen:** die
+Arme b02 und b03 bauen gerade EIGENE Bloecke und Monolithe (eigener Cache-Schluessel je Arm) --
+was jetzt entsteht, ist keine Waise. Der Monolith `35c6bd2b9bd2` gehoert zum v29-Fenster von b01.
+
+**Zwei Befunde, die die Lesart der Arme aendern** (beide am 2026-09-14 vom Nutzer angestossen,
+Zahlen in `v29_window` par.9): b01 war **kein reiner Materialschritt** -- die v29-Erzeugung bringt
+drei Aenderungen mit (Startkuppel-Variation, Startkuppel per Suche, Stapelzug-Knopf). Und **nur
+40,8 Prozent des Fensters** sind damit erzeugt; die Merkmalsfelder liegen ebenfalls ungleich
+(Abschnitt 15 auf 81,6 Prozent, P.14 auf 40,8, P.12 auf 0). Ein Nullbefund misst hier einen stark
+verduennten Effekt.
 
 **Stand beim Anlegen:** Champion `v28-b02_brierbest` (Elo 1353 [1306, 1402], Segment 2, Anker
 `hv4_anchor`; **Stand 2026-09-14: 1394 [1350, 1445]** nach den Kanten der Sims-Kurve --
@@ -40,7 +46,7 @@ messen, nicht schaetzen").
 | 2 | `search_depth_column_optimum` par.8e / `code_cleanup_closeout` par.7a | Register-Zeile der Kante v28-b02@100 gegen v22-b05@25. **DURCH**: `v28-b02@100` steht mit 1298 [1251, 1350] auf 380 Partien und 1 von 3 Kanten im Register | Kante durch (Artefakt `..._seed58_full.json`) | Minuten (ANNAHME) | nein |
 | 3 | `stack_top_feature` par.15 | **DURCH**, am laufenden v29-Korpus nachgezaehlt: alle sieben Sichtfelder liegen in den Records, `tiled_max_row` je Spieler. **Wheel 1**: P.10-Suchfix kompilieren plus Record-Feld `tiled_max_row` in `state_to_json`; Tore Lib-Tests, no-run, Wheel, Fixture, Anker-Drift, Konventionen | Maschine frei, Nr. 1 und 2 durch | Tore rund 6 min (gemessen); Bau Minuten, Code liegt | **ja** -- bei ROT in der Drift; Fixture-Neuerzeugung melden |
 | 4 | `stack_top_feature` par.13 | Sichtpunkt P.3 klaeren. **DURCH** (par.16, Regelauskunft des Nutzers plus Codebeleg): die Vorderseiten sind erst nach dem Aufhoeren bekannt, INPUT_SIZE **794**. Nebenbefund: die Aktionsliste verraet die Designs schon beim Weiterziehen -- Netz-sieht-MEHR, ungemessen | nur Codelesen | Minuten (ANNAHME) | **ja** -- Nutzer waehlt die Zahl |
-| 5 | `stack_top_feature` par.13/15/17, `v29_window` par.6c | **Wheel 2**: Encoder-Abschnitt 16 (P.3/P.7/P.9/P.11-P.15), Rust beide Pfade plus Python-Zwilling, `config.INPUT_SIZE`, Sichtgleichheits- und Regressionstest, Fixture, Drift. **CODE UND TORE DURCH 2026-09-13** (641 Tests gruen, drei Fixtures neu); offen nur noch Wheel-Bau/Installation plus `config.INPUT_SIZE` auf 794 im selben Zug, dann Anker-Drift | Nr. 3 und 4, Fenster ohne Erzeugung/Waechter/Kette | Bau und Tore rund 2 h (ANNAHME) | **ja** -- bei ROT in der Drift |
+| 5 | `stack_top_feature` par.13/15/17, `v29_window` par.6c | **Wheel 2**: Encoder-Abschnitt 16 (P.3/P.7/P.9/P.11-P.15), Rust beide Pfade plus Python-Zwilling, `config.INPUT_SIZE`, Sichtgleichheits- und Regressionstest, Fixture, Drift. **DURCH 2026-09-14 08:26**: 641 Tests, drei Fixtures neu, Wheel gebaut und installiert, Vertragshash `39994362fba145a6`, Wheel und `config.INPUT_SIZE` beide auf 794 und gegeneinander geprueft, **Anker-Drift GRUEN**. Paritaetstor: Flachvektor gruen, Planes 2 von 300 ALT-Records (A2-Phantom-Fix vom 12.09., `rust_data_layer` par.9) | Nr. 3 und 4, Fenster ohne Erzeugung/Waechter/Kette | Bau und Tore rund 2 h (ANNAHME) | **ja** -- bei ROT in der Drift |
 | 6 | `v29_window` par.4, Skill `/mosaic-generation-turnover` | Generationswechsel: Maschine frei, Einfrieren, daily-Snapshot mit restic-Beleg, Namen reservieren, STATUS-Neufassung | Nr. 3 und 5 | Snapshot 7-9 s (gemessen), Rest rund 1 h (ANNAHME) | **ja** -- Loeschungen nur pfadgenau und erst nach dem Self-Play-Start |
 | 7 | `v29_window` par.5/par.8 Punkt 8 | **Schwarm-Erzeugung v29**. **DURCH 2026-09-14 00:57**: 1.201 Dateien (400 policy, 400 tempc, 401 excursion) in rund 12,8 h statt der hochgerechneten 10,8 -- Nebenlast als moegliche Ursache offengelegt (STATUS Abschnitt 1) | Nr. 6, Freigabe liegt vor (Nutzer 02:10) | 11.632 s + 11.361 s = **6,4 h** (gemessen an v28) | nein |
 | 8 | `v29_window` par.4 Punkt 5 | Tor 0 / Tor 2a ex post je Klasse. **DURCH, HAELT**: 0,843 gegen 0,816 volle Spalten je Seite (n = 8.000); die Reihe ist ueber fuenf Generationen monoton (0,637 / 0,737 / 0,777 / 0,816 / 0,843), der Zuwachs wird kleiner | Nr. 7 | 271 s je Klasse (gemessen) | nein |
@@ -50,10 +56,10 @@ messen, nicht schaetzen").
 | 12 | `v29_window` par.6 | Training **v29-b01**. **DURCH**: 1,55 h, 12 Epochen, 4.538.842 Samples. ACHTUNG beim Modellnamen: `_brierbest` entsteht NICHT, wenn die beste Epoche die letzte ist (hier Epoche 12) -- das finale Modell IST dann der value-optimale Stand | Nr. 11 | 5.157 s = **1,43 h** (gemessen) | nein |
 | 13 | `v29_window` par.6 | Tor 1 b01 gegen den Champion, zwei Seeds. **DURCH: BEIDE H0** (87:93 und 69:81, je SPRT-Abbruch, zusammen 330 Partien) -- kein Champion-Wechsel, kein dritter Seed. **Kein reiner Materialschritt**: der v29-Korpus bringt vier Aenderungen mit (par.9), der Nullbefund kann Umstellungskosten sein | Nr. 12, Maschine frei | 86-91 min je Seed (gemessen) | nein |
 | 14 | `v29_window` par.6 | Tor 2b und Plattenpunkte je Modell. **DURCH, beide GRUEN** (330 von 330 Partien nachgespielt, 0 divergiert). Die vollen Spalten drehen zwischen den Seeds das Vorzeichen; kein Kriteriums-Befund haelt der Wiederholung stand | Nr. 13 | 83-108 s bzw. unter 10 s (gemessen) | nein |
-| 15 | `special_tile_yield` Nachtrag 2026-09-11, `v29_window` par.6 | Bau Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` plus Tore (Paritaet mit Schalter AN, Fixture bei AUS, Drift). **BAU DURCH 2026-09-13** (beide Encoder, Cache-Schluessel, Registratur, engine_config, knobs.md geprueft); nur die Tore fehlen. Der Schalter ist per Default AUS (features.rs), also traegt EIN Wheel ihn und Abschnitt 16 zusammen -- Nr. 5 und Nr. 15 teilen sich den Wheel-Bau und die Anker-Drift | Maschine frei | Bau Stunden (ANNAHME), Tore rund 6 min (gemessen) | **ja** -- bei ROT |
-| 16 | `v29_window` par.6 | Bloecke unter Planes-Schluessel, Monolith, Training **v29-b02** | Nr. 15, Fenster von b01 | 26 min + 9 min + 1,43 h (gemessen) | nein |
+| 15 | `special_tile_yield` Nachtrag 2026-09-11, `v29_window` par.6 | Bau Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` plus Tore (Paritaet mit Schalter AN, Fixture bei AUS, Drift). **BAU DURCH 2026-09-13** (beide Encoder, Cache-Schluessel, Registratur, engine_config, knobs.md geprueft); nur die Tore fehlen. **TORE DURCH 2026-09-14** im selben Wheel wie Nr. 5 (der Schalter ist per Default AUS, ein Wheel traegt beide) | Maschine frei | Bau Stunden (ANNAHME), Tore rund 6 min (gemessen) | **ja** -- bei ROT |
+| 16 | `v29_window` par.6 | Bloecke unter Planes-Schluessel, Monolith, Training **v29-b02**. **LAEUFT seit 2026-09-14 08:35** (`tools/night_v29_b02_b03.sh`, Trainingsaufruf Wort fuer Wort der von b01) | Nr. 15, Fenster von b01 | 26 min + 9 min + 1,43 h (gemessen) | nein |
 | 17 | `v29_window` par.6, `special_tile_yield` | Tor 1 b02 gegen b01, zwei Seeds; Diagnostik Plattenpunkte und Spezialfeld-Ertrag | Nr. 16 | 86-91 min je Seed (gemessen) | nein |
-| 18 | `stack_top_feature`, `v29_window` par.6c | Bloecke unter dem 794er-Schluessel, Training **v29-b03** (Sicht-Arm, Warmstart mit null-initialisierten Spalten). P.12 ist hier eine TOTE Spalte und wirkt erst ab v30 (stack_top par.17) | Nr. 5, Fenster von b01 | 26 min + 1,43 h (gemessen) | nein |
+| 18 | `stack_top_feature`, `v29_window` par.6c | Bloecke unter dem 794er-Schluessel, Training **v29-b03**. **LAEUFT** (zweiter Arm desselben Skripts). Von den 39 Werten sind nur **19 ueber das ganze Fenster belegt**, 2 auf 40,8 Prozent (P.14) und 18 gar nicht (P.12, wirkt erst ab v30) -- das gehoert ins Verdikt (`v29_window` par.9) | Nr. 5, Fenster von b01 | 26 min + 1,43 h (gemessen) | nein |
 | 19 | `v29_window` par.6c | Tor 1 b03 gegen b01, zwei Seeds; Lesart Sichtgleichheit mit Verwerfungs-Ausgang | Nr. 18 | 86-91 min je Seed (gemessen) | nein |
 | 20 | `v29_window` par.6d | **Netz-Gesundheit** (5 Punkte). **Bau der Sonde `tools/probes/dead_unit_probe.py` DURCH 2026-09-13** (Selbsttest ueber drei Generationen gruen); die vier anderen Punkte nutzen bestehende Werkzeuge | Nr. 12/16/18 | Bau rund 1 h, Laeufe Minuten je Modell (ANNAHME) | nein |
 | 21 | `docs/promotion_checklist.md`, Skill `/mosaic-champion-promotion` | Promotion des Siegers: `set_champion`, drei Elo-Kanten, Pflicht-Diagnostiken, Fixture, Einfrieren, Golden Probe | Nr. 13/17/19 | Anker-Kante 1.441-1.491 s, Champion-2 2.516 s, Golden Probe 1.450 s (gemessen) | **ja** -- Champion-Wechsel |

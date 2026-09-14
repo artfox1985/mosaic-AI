@@ -531,6 +531,36 @@ Startkuppel per Suche statt per Handregel, dazu den Stapelzug-Knopf. **Hypothese
 gewoehnen muss."** Ein Nullbefund nach EINEM Zyklus auf einer neuen Verteilung ist damit etwas
 anderes als eine Saettigung -- er koennte auch der Preis der Umstellung sein.
 
+**Und die Verduennung ist gross** (Nutzer 2026-09-14: "nicht alles vom material ist tragend fuer
+die neuen input features"). Am Fenster nachgezaehlt (n = 2.947 Dateien, Grundmenge
+`data/window_v29.txt`, Einheit Dateien):
+
+| Generator | Anteil am Fenster | `dome_pool_view` (Abschnitt 15) | `tiled_max_row` (P.14) |
+| --- | --- | --- | --- |
+| v28-b02 (neu) | 1.201 = **40,8 %** | ja | ja |
+| v27-b01 (G-1) | 1.201 = 40,8 % | ja | **nein** |
+| v26-b01 (G-2) | 545 = 18,5 % | **nein** | **nein** |
+
+**Nur 40,8 Prozent des Fensters sind ueberhaupt mit den drei neuen Erzeugungs-Knoepfen
+entstanden.** Die Startkuppel-Variation, die Startkuppel-Suche und der Stapelzug-Knopf wirken auf
+diesem Anteil; die restlichen 59,2 Prozent sind Material aus der Zeit davor. Ein Nullbefund nach
+EINEM Zyklus misst also einen stark verduennten Effekt -- das ist kein Einwand gegen den Test,
+aber es begrenzt, was er zeigen kann.
+
+**Dasselbe trifft die Merkmale, und zwar unterschiedlich hart.** Die Felder, aus denen Abschnitt
+15 und 16 rechnen, liegen nicht in allen Records:
+
+- Abschnitt 15 (11 Werte, Kuppelstapel-Wissen): **81,6 %** des Fensters tragen `dome_pool_view`,
+  der v26-Anteil nicht -- dort sind die elf Werte 0.
+- P.14 (2 Werte, Sperrstand der Musterreihen): **nur 40,8 %** tragen `tiled_max_row`.
+- P.12 (18 Werte, Designs im eigenen Block): **0 %** -- das Feld `designs` entstand erst mit dem
+  Wheel von heute (par.17 der `stack_top_feature`-Prereg, Nutzer-Entscheid: erst ab v30).
+- P.3, P.7, P.9, P.11, P.13, P.15 (19 Werte): aus Feldern, die alle drei Generationen tragen.
+
+**Folge fuer die Lesart von b03:** von den 39 Werten des Sicht-Arms sind 19 ueber das ganze
+Fenster belegt, 2 nur auf 40,8 Prozent und 18 gar nicht. Wer b03 gegen b01 misst, misst im
+Wesentlichen diese 19 -- und muss das beim Verdikt sagen, statt von "dem Sicht-Arm" zu sprechen.
+
 **Was daraus NICHT folgt:** dass die Umstellung sich lohnt. Der Arm ist einfaktoriell geplant
 gewesen und ist es nicht; welcher der drei Unterschiede den H0 traegt, ist mit diesen Daten nicht
 trennbar. Wer das wissen will, braucht einen Arm, der genau einen davon zuruecknimmt.
