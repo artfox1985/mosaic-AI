@@ -57,9 +57,10 @@ kein Build, kein cargo, keine Sonde.
    des Nutzers: 1.842 Waisen geloescht (744 MB), alle nachgezaehlt und verschwunden. Quellen
    waren v25-b01 (1.602 Bloecke) und zwoelf Messkorpora der Sims-Kurve und der c2-Ablationen.
    Kein restic-Beleg noetig -- `tools/backup_excludes.txt` schliesst `*.h5` ausdruecklich aus
-   ("jederzeit nachbaubar"). **OFFEN bleiben die 10 MONOLITHEN (5,1 GB):** sie sind erst zu
-   beurteilen, wenn b02 und b03 ihre eigenen Schluessel geschrieben haben; heute in Gebrauch ist
-   `35c6bd2b9bd2` (v29-Fenster von b01).
+   ("jederzeit nachbaubar"). **MONOLITHEN ebenfalls ERLEDIGT** (2026-09-14, nach dem Ende von b02/b03):
+   acht aus der v28-Generation geloescht (4,1 GB), vier aktuelle geschuetzt. Cache-Volumen von
+   5,1 auf 2,3 GB; zusammen mit den Bloecken rund 4,9 GB frei. **Schritt 4 des
+   Generationswechsels ist damit vollstaendig.**
 4. **Kette v29 fahren**: `tools/night_v29_chain.sh` ist GESCHRIEBEN (2026-09-13, Syntax
    geprueft) und wartet selbst auf das Ende der Erzeugung -- Manifeste, G-2-Kennzahlen, Fenster
    (Seed 20260941), Bloecke, Monolith, Training v29-b01 mit Warmstart auf `v28-b02_brierbest`.
