@@ -121,9 +121,15 @@ naheliegendste naechste Schritt, wenn ein Champion-Wechsel in v29 noch gewollt i
    gegen 3,009 bei den Altspalten); das ist die wahrscheinlichste Erklaerung fuer das fruehe
    Optimum. Punkt 2 GRUEN: tote Einheiten bei allen vier Modellen 2,60 Prozent, kein Zuwachs.
 
-**Zwei offene Punkte aus dem Betrieb:** der Fenster-Cache-Schluessel kennt den Ablations-Schalter
-nicht (b03 hat b02s Monolithen ueberschrieben, Ergebnisse unbeschaedigt, die naechste
-Wiederholung waere still falsch), und die Schwierigkeitsleiter ist auf v30 vertagt.
+**Monolith-Kollision BEHOBEN** (2026-09-14): der Fenster-Cache-Schluessel kannte den
+Ablations-Schalter nicht, b03 hat b02s Monolithen ueberschrieben (Ergebnisse unbeschaedigt, die
+naechste Wiederholung waere still falsch gewesen). Fix an der Wurzel in `window_cache_key`, aber
+nur bei EINGESCHALTETEM Schalter angehaengt: der Default-Schluessel ist gemessen identisch zum
+Stand davor, kein Bestandscache entwertet; drei Tests im pre-commit-Hook. Der frueher vorgelegte
+Nutzer-Entscheid Weg 1 gegen Weg 2 ist damit gegenstandslos -- der Einwand gegen Weg 1
+("entwertet Bestand") traf auf diese Bauform nicht zu.
+
+**Offen aus dem Betrieb:** die Schwierigkeitsleiter ist auf v30 vertagt.
 
 ### Stand der Nacht 2026-09-13/14 (Sitzung, waehrend der Erzeugung)
 

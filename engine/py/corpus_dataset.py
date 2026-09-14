@@ -29,7 +29,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-from file_cache_key import per_file_cache_key  # noqa: F401
+from file_cache_key import per_file_cache_key, _special_planes_off_key  # noqa: F401
 from reach_target import (REACH_ATOMS, REACH_K1_MIN_ROUND, REACH_BUF_CAP,
                           reach_columns, reach_target_k1_active,
                           reach_buffer_mode, reach_buffer_columns)
@@ -440,6 +440,22 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
         # Cache entwertet.
         + "+bsnative_default_v1:" + ",".join(sorted(LEGACY_STRETCHED_PREFIXES))
     )
+    # MOSAIC_SPECIAL_PLANES_OFF (2026-09-14, PREREG_v29_window.md par.9):
+    # der Ablations-Schalter steckt im BLOCK-Schluessel
+    # (`file_cache_key.py::_special_planes_off_key`), aber bis hierher NICHT
+    # im Fenster-Schluessel. Folge in v29: b02 (Schalter AN) und b03
+    # (Schalter AUS) hatten dieselbe Dateiliste und damit denselben
+    # Monolith-Namen -- b03 hat b02s Monolithen ueberschrieben. Die
+    # Ergebnisse der Generation sind unbeschaedigt (die Bloecke trugen den
+    # richtigen Inhalt, und b02 war fertig trainiert, bevor b03 baute), aber
+    # eine Wiederholung in anderer Reihenfolge waere STILL falsch gewesen:
+    # der zweite Lauf haette den Monolithen des ersten geladen.
+    #
+    # Nur ANHAENGEN, wenn der Schalter AN ist -- genau wie "+carriers:" unten
+    # und aus demselben Grund: der Default-Fall (Schalter aus) behaelt seinen
+    # Schluessel, kein einziger Bestandscache wird entwertet.
+    if _special_planes_off_key():
+        cache_key_material += "+specialoff_v1"
     # PREREG_start_dome_choice.md par.9c (2026-09-12): die Aenderung der
     # `pol_w`-Regel (Start-Records mit `start_by_search: true` bekommen
     # Gewicht 1) bekommt BEWUSST KEINE eigene Key-Komponente -- und das ist
