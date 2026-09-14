@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Beleg: Quellenfrage GEKLAERT (par.3), alle Arme aus den Records messbar. **Werkzeug GEBAUT, Selbsttest GRUEN** (par.9): alle achtzehn Handzahlen ueber sechs Claude-Partien exakt getroffen. Zwei Baubefunde: der Punktestand ist bei 0 geclampt (66 von 324 Ziehzeilen), und im Self-Play heissen beide Seiten "Netz" -- Zaehlen ueber Namen gab in Arm B exakt 0,5, die Seite kommt jetzt aus dem Record. Korpuslauf ERST MIT v29 (Nutzer 2026-09-11). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Zeigen die drei Verhaltensmuster, die beim Spielen gegen den Champion auffielen, sich auch im Korpus, und in welcher Groessenordnung? | Beleg: Korpuslauf ueber 12.007 Partien (par.10). **Arm C: das Netz KONDITIONIERT auf die Platten** -- drei von vier Zielstrukturen ueber dem Rauschen. Arm B erledigt (Sturz auf 0 in Runde 1 kostet nichts, KI enthaelt die Null). Arm A1: Richtung bestaetigt, Betrag verfehlt (1,68 statt zweistellig). Arm A2: Runden-Erwartung trifft, Reihen-Erwartung WIDERLEGT -- geraeumt werden die KURZEN Reihen 1 und 2. -->
 
 # Vorregistrierung: Verhaltens-Audit am Korpus (drei Arme aus den Claude-Partien)
 
@@ -376,3 +376,72 @@ bezahlte und gratis Ziehungen je Serie aus, plus die Ziehzahl nach Stand vorher.
 Die Zahlen aus den Probelaeufen ueber v28-Korpusdateien sind **Funktionsproben, kein Ergebnis**.
 Der registrierte Lauf geht ueber den v29-Korpus (par.6 Punkt 3, Nutzer 2026-09-11), und die
 Ergebnisse gehoeren dann in par.7.
+
+## par.10 KORPUSLAUF ueber v29: Ergebnisse und Verdikte (2026-09-14)
+
+Grundmenge: **12.007 Partien aus 1.201 Dateien** der v29-Erzeugung (`selfplay_v28-b02-*`),
+Laufzeit 883 s bei einem Thread, 0,074 s je Partie. Auswertung auf Blockebene (Blockgroesse 5),
+95-Prozent-Intervalle als Normalapproximation ueber die Bloecke.
+
+### Arm C -- **VERDIKT: das Netz KONDITIONIERT auf die ausliegenden Platten**
+
+Blockdifferenz "Struktur mit passender Platte minus ohne", je Seite gezaehlt:
+
+| Zielstruktur | Platte | Differenz | 95-%-KI | Bloecke | |
+| --- | --- | --- | --- | --- | --- |
+| volle Spalten | 1 Vertikale Reihen | **+0,0723** | [+0,0487, +0,0960] | 1.970 | **schliesst 0 aus** |
+| volle Eckplatten | 5 Eckplatten | **+0,0985** | [+0,0782, +0,1188] | 2.006 | **schliesst 0 aus** |
+| farbenreiche Reihen | 7 Farbenreiche Reihen | **+0,0121** | [+0,0060, +0,0181] | 1.990 | **schliesst 0 aus** |
+| leere Spezialfelder | 6 Spezialfelder | -0,0117 | [-0,0381, +0,0147] | 1.994 | enthaelt 0 |
+
+**Drei von vier Zielstrukturen liegen ueber dem Rauschen, alle drei in die erwartete Richtung.**
+Der Falsifikator aus par.2 ("unterscheiden sich die Raten nicht ueber das Rauschen hinaus,
+konditioniert der Prior nicht auf die Platten") ist damit NICHT eingetreten. Das ist kein
+Grenzfall: die Intervalle sind eng und liegen deutlich von der Null entfernt, und die vierte
+Struktur zeigt dieselbe Richtung, nur schwaecher.
+
+**Was das NICHT heisst** (par.2 sagt es selbst): es ist kein Beleg, dass ein plattenbedingter Kopf
+hilft -- nur, dass der heutige Prior die Platten bereits liest. Der Beobachtungsbefund aus g02
+(zwei volle Spalten ohne ausliegende Spaltenplatte) bleibt damit ein Einzelfall und kein Muster.
+
+### Arm B -- **VERDIKT: erledigt, das Muster aus vier Partien haelt nicht**
+
+Siegquote der Seite, die in RUNDE 1 auf 0 faellt: **0,4813** (n = 268 Seiten) gegen **0,5002**
+(n = 23.746). Blockdifferenz **-0,0346 [-0,1031, +0,0339]** ueber 236 Bloecke -- das Intervall
+enthaelt die Null deutlich. **Der Falsifikator aus par.2 ist eingetreten**: die Differenz liegt im
+Rauschen, das Muster aus g02/g03/g04 (drei Stuerze, drei Niederlagen) wird nicht weiterverfolgt.
+
+### Arm A1 -- **VERDIKT: Richtung bestaetigt, Groessenordnung klar verfehlt**
+
+| Stand vor der Serie | Ziehungen je Serie | 95-%-KI | n Serien |
+| --- | --- | --- | --- |
+| 0 | **1,68** | [1,62, 1,73] | 3.444 |
+| > 0 | **1,45** | [1,44, 1,46] | 47.551 |
+
+Die Intervalle ueberlappen NICHT -- bei Stand 0 wird mehr gezogen. **Aber die Vorab-Erwartung war
+"bei Stand 0 zweistellig"** (par.2, aus n = 4 Partien); tatsaechlich sind es 1,68. Der Effekt ist
+real und klein. Gratis-Ziehungen gibt es in **5.268 von 50.995 Serien (10,3 %)**, im Mittel 0,23
+je Serie.
+
+**Die Lehre steht schon in par.2 und bestaetigt sich:** eine Groessenordnung aus vier
+Mensch-Partien traegt nicht in den Korpus. Die Richtung traegt, der Betrag nicht.
+
+### Arm A2 -- **VERDIKT: Runden-Erwartung bestaetigt, Reihen-Erwartung WIDERLEGT**
+
+1,59 Zwangsraeumungen je Partie (Median 1, Maximum 8) ueber 12.007 Partien.
+
+| Runde | Vorfaelle | | Musterreihe | Vorfaelle |
+| --- | --- | --- | --- | --- |
+| 1 | 1 | | 1 | **4.109** |
+| 2 | 720 | | 2 | **4.274** |
+| 3 | 3.798 | | 3 | 2.399 |
+| 4 | **10.420** | | 4 | 2.892 |
+| 5 | 4.093 | | 5 | 2.066 |
+| | | | 6 | 3.292 |
+
+**Die Runden-Erwartung trifft** ("Vorfaelle haeufen sich in den Runden 4-5": 14.513 von 19.032,
+also 76 Prozent). **Die Reihen-Erwartung trifft NICHT**: erwartet waren die Reihen 4 und 5,
+tatsaechlich sind es die kurzen Reihen 1 und 2 (8.383 von 19.032, 44 Prozent), waehrend die Reihen
+4 und 5 zusammen nur 4.958 tragen. Das ist ein eigener Befund und kehrt die Vermutung um: nicht
+die langen Reihen bleiben liegen, sondern die kurzen werden geraeumt.
+
