@@ -22,7 +22,10 @@ Waisen-Bloecke (744 MB)** -- Quellen waren der aus der Rotation gefallene Korpus
 ausdruecklich aus ("jederzeit nachbaubar"), die Dateien sind also per Entscheid nie im Backup
 gewesen. Der Beleg soll Unwiederbringliches schuetzen; hier gibt es nichts dergleichen.
 
-**OFFEN und terminiert: die 10 MONOLITHEN (`data/.cache_*.h5`, 5,1 GB).** Sie sind erst zu
+**ERLEDIGT 2026-09-14 nach dem Ende von b02/b03: acht Monolithen der v28-Generation geloescht
+(4,1 GB), vier aktuelle geschuetzt.** Die Zuordnung lief ueber das Paar-Muster (je Lauf ein
+grosser Trainings- und ein kleiner Validierungs-Monolith), nicht ueber das Alter allein.
+Urspruenglicher Eintrag: Sie sind erst zu
 beurteilen, wenn b02 und b03 ihre eigenen Schluessel geschrieben haben -- was jetzt entsteht, ist
 keine Waise. In Gebrauch: `35c6bd2b9bd2` (v29-Fenster von b01) plus die zwei neuen. Alle anderen
 sind Kandidaten, die Freigabe des Nutzers liegt vor.
