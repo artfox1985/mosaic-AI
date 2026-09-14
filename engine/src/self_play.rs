@@ -3686,6 +3686,12 @@ fn unified_game_loop<R: Rng + ?Sized>(
         Some(state) => Game { state },
         None => Game::start(names, first_player, scoring_ids, rng),
     };
+    // par.9g: der Diagnose-Zaehler der Mondstapel-Nachsuche ist thread-lokal und
+    // ueberlebt die Partie. Hier verworfen, damit die Zahl unten GENAU zu dieser
+    // Partie gehoert -- auch wenn ein anderer Pfad (Referee-Worker) ihn gefuellt
+    // und nie ausgelesen hat. Bei ausgeschalteter Nachsuche ist das ein
+    // Cell-Lesezugriff und sonst nichts.
+    let _ = crate::net_mcts::take_moon_order_diag();
     let mut records: Vec<Map<String, Value>> = Vec::new();
     // Rundenübergangs-Trainingsziel (siehe round_transition.rs): je Runde N
     // ein per Chance-Node-Sampling gemitteltes Blattwert-Paar, gespeichert
@@ -4232,6 +4238,26 @@ fn unified_game_loop<R: Rng + ?Sized>(
             }
             _ => break, // Scoring/End/Final → Partie vorbei
         }
+    }
+
+    // par.9g Diagnostik: EINE Zeile je Partie, nur wenn die Nachsuche ueberhaupt
+    // gelaufen ist. `applied` ist die Zahl der Ausloesungen (Sonnenzug aus kleiner
+    // Fabrik mit mindestens zwei EINDEUTIGEN Restreihenfolgen), `changed` davon
+    // die, bei denen sie eine andere als die kanonische Reihenfolge gewaehlt hat.
+    //
+    // Das Verhaeltnis der beiden trennt die zwei Lesarten eines Nullbefunds:
+    // changed nahe 0 heisst, die Nachsuche bestaetigt fast immer den Bestand --
+    // dann ist nicht der Horizont der Engpass und Weg C (par.10) faellt. Ein
+    // hohes changed bei flachem Ergebnis heisst, sie waehlt oft anders und es
+    // aendert den Ausgang nicht -- dann bleibt Weg C die naechste Frage.
+    //
+    // Bei `moon_order_variants != 2` ist `applied` immer 0 und das Log bleibt
+    // bitidentisch zum Bestand.
+    let (moon_applied, moon_changed) = crate::net_mcts::take_moon_order_diag();
+    if moon_applied > 0 {
+        game.state.log_event(format!(
+            "[moon_order] applied={moon_applied} changed={moon_changed}"
+        ));
     }
 
     // Endwertung anwenden, damit Scores die Wertungsplatten enthalten.
