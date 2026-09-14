@@ -1030,10 +1030,18 @@ if __name__ == "__main__":
                              "MOSAIC_START_SLOT_P0/P1 hat Vorrang, wenn gesetzt.")
     parser.add_argument("--return-order-random-p", dest="return_order_random_p", type=float,
                         default=0.0,
-                        help="PREREG_dome_return_order.md par.11/par.11a (Rueckgabe-Streuung): "
-                             "Wahrscheinlichkeit JE RUECKGABE mit mindestens zwei Restplatten, "
+                        help="PREREG_dome_return_order.md par.11/par.11a/par.11b "
+                             "(Rueckgabe-Streuung): "
+                             "Wahrscheinlichkeit JE RUECKGABE mit mindestens DREI Restplatten "
+                             "(par.11b: bei zwei laesst sich die Reihenfolge nicht gestalten) "
+                             "und NUR IN DEN RUNDEN 1 BIS 4 (in Runde 5 folgt die Endwertung, "
+                             "eine zurueckgelegte Platte kommt nie wieder an die Reihe), "
                              "dass deren Reihenfolge unter dem Kuppelstapel zufaellig gemischt "
-                             "wird statt in Ziehreihenfolge zurueckzugehen. Gemischt wird der "
+                             "wird statt in Ziehreihenfolge zurueckzugehen. ACHTUNG: par.11b "
+                             "will die Muenze EINMAL JE PARTIE (eine per Reservoir gezogene "
+                             "Gelegenheit); gebaut ist bis auf Weiteres die Muenze je "
+                             "Rueckgabe, die effektive Partie-Rate liegt also deutlich ueber p. "
+                             "Gemischt wird der "
                              "GANZE Rest, auch bei langen Ziehserien -- der Deckel "
                              "RETURN_ORDER_MAX_PERMUTED gilt nur fuers Aufzaehlen von "
                              "Kandidaten, nicht fuer eine einzelne Zufallspermutation. Zweck ist "

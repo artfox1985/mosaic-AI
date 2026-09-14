@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: Knopf GEBAUT und im Wheel (par.8a). A/B (par.9): kein messbarer Effekt, **aber NICHT verneint (par.10)** -- Henne-Ei, und gemessen nur 0,19 Abweichungen je Partie. **Weg dahin: Zufalls-Streuung in der Erzeugung** (par.11), gebaut und abgenommen (par.11a); **Semantik-Umbau beschlossen (par.11b): je Partie statt je Rueckgabe, ab 3 Restplatten, Dosis 0,15** -- Bau-Tor danach zu wiederholen. -->
+<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: Knopf GEBAUT und im Wheel (par.8a). A/B (par.9): kein messbarer Effekt, **aber NICHT verneint (par.10)** -- Henne-Ei, und gemessen nur 0,19 Abweichungen je Partie. **Weg dahin: Zufalls-Streuung in der Erzeugung** (par.11), gebaut und abgenommen (par.11a); **Schwelle 3 und Rundenfenster 1-4 gebaut (par.11c); Muenze bleibt je Rueckgabe (je Partie ist im Pfad strukturell nicht erreichbar), dafuer Dosis rund 0,015 statt 0,15 -- umgerechnet auf 11,07 Gelegenheiten je Partie. Bau-Tor zu wiederholen.** -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -552,4 +552,41 @@ Nullbefund dort ist damit nicht nur "Henne-Ei", sondern zusaetzlich eine Frage d
 
 **Der Knopf ist damit NOCH NICHT einsatzbereit** -- die Abnahme vom 2026-09-14 (par.11a) gilt fuer
 die alte Semantik. Nach dem Umbau ist das Bau-Tor zu wiederholen.
+
+## par.11c DOSIS ENTSCHIEDEN, Muenze bleibt je Rueckgabe (Nutzer 2026-09-14)
+
+**par.11b Punkt 2 und 3 (Muenze je Partie plus Reservoir) werden NICHT gebaut.** Der Bau hat
+gezeigt, dass die Form im Rueckgabe-Pfad strukturell nicht erreichbar ist: der Ausflug kann sein
+Reservoir fahren, weil sein Kandidat ein ZUSTANDS-KLON ist und erst nach der Partie verbraucht
+wird (`self_play.rs:3601`, `:3933`, `:6233`) -- ein spaeterer Kandidat verdraengt den frueheren
+kostenlos. Die Rueckgabe-Permutation wird dagegen SOFORT angewandt (`self_play.rs:1119`), die
+Partie laeuft aus dem gestreuten Zustand weiter. Ein Reservoir mit sofortiger Anwendung
+degeneriert exakt zu "erste Gelegenheit" -- genau die Fruehlage, die par.11b ausschliessen
+wollte.
+
+**Stattdessen ueber die DOSIS** (Nutzer: *"Dosis reicht. da brauchen wir nicht strenger sein als
+notwendig"*). Eine unabhaengige Muenze je Gelegenheit trifft jede Stelle GLEICH WAHRSCHEINLICH --
+die Position ist also exakt richtig, nur die Rate war falsch parametriert. Umgerechnet auf der
+gemessenen Haeufigkeit:
+
+* **11,07 Gelegenheiten mit mindestens drei Restplatten je Partie** (142.945 Faelle auf 12.907
+  Partien, `PREREG_moon_stack_order.md` par.9b).
+* Fuer "in 15 Prozent der Partien mindestens einmal": `p = 1 - 0,85^(1/11,07)` = **0,0146**.
+* **Dosis also rund 0,015, nicht 0,15.** Erwartungswert 0,16 Streuungen je Partie; gelegentlich
+  zwei statt genau einer.
+
+**WARNUNG, die bestehen bleibt:** mit p = 0,15 laege die Partie-Rate bei rund 80 Prozent. Der
+Wert aus par.11b darf so NICHT in eine Erzeugung.
+
+**Gebaut sind die anderen beiden Punkte:** Schwelle ab drei Restplatten
+(`RETURN_ORDER_MIN_REST = 3`) und das Rundenfenster 1 bis 4 gleichgewichtet
+(`return_order_round_allowed`, Fruehausstieg vor dem RNG-Aufbau). Elf Tests im Modul.
+
+### Der Zweck, noch einmal praezisiert
+
+Nutzer: *"ich will ja nur dass das netz sieht das kuppelplatten auch einfach so aus dem stapel
+gezogen werden koennen."* Es geht also um ABDECKUNG des Zustandsraums, nicht darum, eine bessere
+Reihenfolge zu lehren -- dieselbe Absicht wie bei der Startkuppel-Streuung (par.6b der
+Fenster-Prereg: "damit das netz auch mal sieht welchen einfluss die startkuppel hat"). Eine
+niedrige Dosis genuegt dafuer; sie muss die Verteilung nicht verschieben, nur den Fall zeigen.
 

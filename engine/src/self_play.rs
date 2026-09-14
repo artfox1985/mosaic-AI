@@ -876,11 +876,20 @@ const RETURN_ORDER_SEED_DISTINGUISHER: u64 = 0x2E70_2DE2_5EED_C0DE;
 /// `MOSAIC_START_SLOT_RANDOM_P`, das nur in `start_placement_step` wirkt).
 #[derive(Clone, Copy)]
 pub(crate) struct ReturnOrderRandom<'a> {
-    /// Wahrscheinlichkeit JE RUECKGABE mit mindestens ZWEI Restplatten.
+    /// Wahrscheinlichkeit JE RUECKGABE mit mindestens
+    /// [`RETURN_ORDER_MIN_REST`] Restplatten.
+    ///
+    /// **OFFEN, par.11b Punkt 2/3 ist NICHT gebaut:** registriert ist "Muenze
+    /// EINMAL JE PARTIE, Gelegenheit per gleichgewichtetem Reservoir".
+    /// Gebaut ist weiterhin die Muenze JE RUECKGABE -- die Begruendung steht
+    /// bei [`return_order_round_allowed`] darunter (Reservoir-Sperre).
     p: f64,
     /// Seed dieses Halbzugs: `derive_search_seed(game_seed ^ DISTINGUISHER,
     /// move_number)` mit [`RETURN_ORDER_SEED_DISTINGUISHER`].
     seed: u64,
+    /// Runde dieses Halbzugs (`game.state.round_number`, 1-basiert). Gestreut
+    /// wird nur im Fenster aus par.11b, siehe [`return_order_round_allowed`].
+    round_number: u32,
     /// Nebenausgabe an den Record-Bau (`Cell`-Muster wie `vorzug_greift` und
     /// `excursion_deviated`): `true`, sobald die Muenze GEFALLEN ist -- nicht
     /// erst, wenn die gezogene Permutation von der Ziehreihenfolge abweicht.
@@ -899,9 +908,13 @@ fn sanitize_return_order_random_p(raw: f64) -> Option<f64> {
 }
 
 /// Erzeugungsknopf `MOSAIC_RETURN_ORDER_RANDOM_P`
-/// (`PREREG_dome_return_order.md` par.11): Wahrscheinlichkeit je Rueckgabe mit
-/// mindestens ZWEI Restplatten, dass die Reihenfolge der zurueckgelegten
-/// Kuppelplatten gleichverteilt gemischt wird.
+/// (`PREREG_dome_return_order.md` par.11/par.11b): Wahrscheinlichkeit je
+/// Rueckgabe mit mindestens [`RETURN_ORDER_MIN_REST`] Restplatten IN DEN
+/// RUNDEN 1 BIS 4 ([`return_order_round_allowed`]), dass die Reihenfolge der
+/// zurueckgelegten Kuppelplatten gleichverteilt gemischt wird.
+///
+/// **Die Muenze faellt je RUECKGABE, nicht je Partie** -- par.11b Punkt 2/3
+/// ist NICHT gebaut, Begruendung bei [`return_order_round_allowed`].
 ///
 /// Default `0.0` = AUS = bitidentisches Bestandsverhalten, und zwar im starken
 /// Sinn: bei `0.0` wird der Traeger [`ReturnOrderRandom`] gar nicht erst
@@ -922,13 +935,53 @@ pub(crate) fn return_order_random_p() -> f64 {
     })
 }
 
+/// Mindestzahl der Restplatten, ab der gestreut wird (par.11b Punkt 1,
+/// Nutzer 2026-09-14: *"bei 2 macht die reihenfolge wenig sinn. ab 3 kann ich
+/// die reihenfolge beeinflussen"*). Bei genau zwei Restplatten gibt es zwar
+/// zwei Permutationen, aber keine Reihenfolge, die der Spieler gestalten
+/// koennte -- die Streuung waere dort reines Rauschen.
+///
+/// Die Diagnostikzeile von par.5 zaehlt weiterhin ab ZWEI Restplatten
+/// (andere Grundmenge, siehe `resolve_and_apply_stack_draw_with`).
+const RETURN_ORDER_MIN_REST: usize = 3;
+
+/// Rundenfenster der Streuung (par.11b): gestreut wird NUR in den Runden 1
+/// bis 4, Runde [`crate::state::NUM_ROUNDS`] ist ausgeschlossen.
+///
+/// Der Grund ist MECHANIK, keine Abwaegung (Nutzer 2026-09-14: *"in runde 5
+/// macht es keinen sinn, da gibt es keine mehr"*): die Rueckgabereihenfolge
+/// steuert, WANN eine Platte wiederkommt; nach der letzten Runde folgt die
+/// Endwertung, eine zurueckgelegte Platte kommt nie wieder an die Reihe. Eine
+/// Streuung dort waere Schaden ohne Lerngewinn.
+///
+/// **KEINE Gewichtung der Runden 1 bis 4** (Nutzer-Entscheid par.11b): sie
+/// sind gleichberechtigt, das Netz soll die Kosten selbst abschaetzen lernen.
+///
+/// **UND HIER STEHT DIE SPERRE zu par.11b Punkt 2/3** ("einmal je Partie,
+/// Gelegenheit per gleichgewichtetem Reservoir"): das ist im Rueckgabe-Pfad
+/// mit einem Reservoir NICHT erreichbar. Das Reservoir des Ausflugs
+/// funktioniert, weil sein Kandidat ein ZUSTANDS-KLON ist
+/// (`cell.set(Some(game.state.clone()))`) und erst NACH der Partie verbraucht
+/// wird -- ein spaeterer Kandidat darf den frueheren kostenlos verdraengen,
+/// weil noch nichts geschehen ist. Die Rueckgabe-Streuung wirkt dagegen
+/// SOFORT auf den Kuppelstapel, und die Partie laeuft aus dem gestreuten
+/// Zustand weiter: ein spaeterer Reservoir-Gewinner kann den frueheren nicht
+/// mehr verdraengen. Eine gleichverteilte Wahl EINER Gelegenheit setzt die
+/// Gesamtzahl der Gelegenheiten voraus, die erst am Partieende feststeht.
+/// Deshalb bleibt die Muenze vorerst JE RUECKGABE -- Nutzer-Entscheid
+/// ausstehend, statt hier still eine andere Semantik zu bauen.
+fn return_order_round_allowed(round_number: u32) -> bool {
+    (1..crate::state::NUM_ROUNDS).contains(&round_number)
+}
+
 /// Kern der Streuung als REINE Funktion: `p` und der RNG kommen von aussen,
 /// damit der Test beide Enden ohne `std::env::set_var` fahren kann (Muster
 /// [`sample_random_start_slot`]).
 ///
 /// Vertrag (die Bitidentitaets-Bedingung des Knopfs): bei `p <= 0.0` oder
-/// weniger als ZWEI Restplatten wird VOR jeder Ziehung ausgestiegen -- kein
-/// `rng`-Griff, `None` heisst "Bestand steht". Erst bei `p > 0` faellt die
+/// weniger als [`RETURN_ORDER_MIN_REST`] Restplatten wird VOR jeder Ziehung
+/// ausgestiegen -- kein `rng`-Griff, `None` heisst "Bestand steht". Erst bei
+/// `p > 0` faellt die
 /// Muenze (ein `f64`-Zug); faellt sie, wird der GANZE Rest gemischt
 /// (`SliceRandom::shuffle`, kein Deckel). Die Ausgabe ist per Konstruktion
 /// eine Permutation der Eingabe und damit eine gueltige `return_order`
@@ -938,7 +991,7 @@ fn sample_random_return_order<R: Rng + ?Sized>(
     order: &[usize],
     rng: &mut R,
 ) -> Option<Vec<usize>> {
-    if !(p > 0.0) || order.len() < 2 {
+    if !(p > 0.0) || order.len() < RETURN_ORDER_MIN_REST {
         return None;
     }
     if rng.random::<f64>() >= p {
@@ -968,6 +1021,12 @@ fn apply_return_order_random(
     random: Option<ReturnOrderRandom<'_>>,
 ) -> Vec<usize> {
     let Some(r) = random else { return order };
+    // Rundenfenster VOR dem RNG-Aufbau (par.11b): in Runde NUM_ROUNDS wird
+    // weder gestreut noch gezogen noch markiert -- der Halbzug bleibt dort
+    // bitidentisch zum Bestand, auch bei `p > 0`.
+    if !return_order_round_allowed(r.round_number) {
+        return order;
+    }
     let mut rng = StdRng::seed_from_u64(r.seed);
     match sample_random_return_order(r.p, &order, &mut rng) {
         Some(shuffled) => {
@@ -3985,6 +4044,11 @@ fn unified_game_loop<R: Rng + ?Sized>(
                                 cfg.game_seed ^ RETURN_ORDER_SEED_DISTINGUISHER,
                                 move_number,
                             ),
+                            // Runde DIESES Halbzugs -- `round_before` steht
+                            // direkt darueber und ist der Vor-Apply-Stand;
+                            // die Runde wechselt erst im `EndTiling`, kann
+                            // sich innerhalb der Ziehserie also nicht bewegen.
+                            round_number: round_before,
                             randomized: &return_order_randomized,
                         })
                     } else {
@@ -10905,16 +10969,22 @@ mod return_order_random_tests {
         assert_eq!(return_order_random_p(), 0.0, "Default ist AUS (bitidentischer Bestand)");
     }
 
-    /// Die Bitidentitaets-Zusage: bei `p <= 0` und bei weniger als ZWEI
-    /// Restplatten wird KEINE Zufallszahl gezogen. Belegt ueber zwei gleich
-    /// geseedete Stroeme, von denen nur einer hineingereicht wird -- derselbe
-    /// Nachweis wie in `an_empty_candidate_selection_draws_nothing`.
+    /// Die Bitidentitaets-Zusage: bei `p <= 0` und bei weniger als
+    /// [`RETURN_ORDER_MIN_REST`] Restplatten wird KEINE Zufallszahl gezogen.
+    /// Belegt ueber zwei gleich geseedete Stroeme, von denen nur einer
+    /// hineingereicht wird -- derselbe Nachweis wie in
+    /// `an_empty_candidate_selection_draws_nothing`.
     #[test]
     fn p_zero_and_short_rests_draw_no_random_number() {
         let mut touched = StdRng::seed_from_u64(77);
         let mut untouched = StdRng::seed_from_u64(77);
         assert_eq!(sample_random_return_order(0.0, &[1, 2, 3], &mut touched), None);
         assert_eq!(sample_random_return_order(-1.0, &[1, 2, 3], &mut touched), None);
+        assert_eq!(
+            sample_random_return_order(1.0, &[1, 2], &mut touched),
+            None,
+            "zwei Restplatten sind unter der Schwelle {RETURN_ORDER_MIN_REST} (par.11b)"
+        );
         assert_eq!(
             sample_random_return_order(1.0, &[1], &mut touched),
             None,
@@ -10977,7 +11047,7 @@ mod return_order_random_tests {
             cell.set(false);
             let out = apply_return_order_random(
                 order.clone(),
-                Some(ReturnOrderRandom { p: 1.0, seed, randomized: &cell }),
+                Some(ReturnOrderRandom { p: 1.0, seed, round_number: 1, randomized: &cell }),
             );
             (out, cell.get())
         };
@@ -11019,7 +11089,7 @@ mod return_order_random_tests {
         assert_eq!(
             apply_return_order_random(
                 order.clone(),
-                Some(ReturnOrderRandom { p: 0.0, seed: 9, randomized: &cell }),
+                Some(ReturnOrderRandom { p: 0.0, seed: 9, round_number: 1, randomized: &cell }),
             ),
             order,
             "p = 0 aendert nichts"
@@ -11029,11 +11099,133 @@ mod return_order_random_tests {
         assert_eq!(
             apply_return_order_random(
                 single.clone(),
-                Some(ReturnOrderRandom { p: 1.0, seed: 9, randomized: &cell }),
+                Some(ReturnOrderRandom { p: 1.0, seed: 9, round_number: 1, randomized: &cell }),
             ),
             single
         );
         assert!(!cell.get(), "eine Restplatte ist keine Wahl -- keine Markierung");
+    }
+
+    /// Schwelle DREI (par.11b Punkt 1, Nutzer: *"bei 2 macht die reihenfolge
+    /// wenig sinn. ab 3 kann ich die reihenfolge beeinflussen"*): bei genau
+    /// ZWEI Restplatten passiert auch bei `p = 1` nichts -- ueber viele Seeds,
+    /// damit kein Seed das Ergebnis zufaellig trifft. Ab DREI greift sie.
+    #[test]
+    fn two_rest_tiles_are_never_shuffled_but_three_are() {
+        assert_eq!(RETURN_ORDER_MIN_REST, 3, "par.11b legt die Schwelle auf drei fest");
+        let pair = vec![41usize, 42];
+        let mut any_triple_moved = false;
+        for seed in 0..64u64 {
+            let cell = std::cell::Cell::new(false);
+            assert_eq!(
+                apply_return_order_random(
+                    pair.clone(),
+                    Some(ReturnOrderRandom { p: 1.0, seed, round_number: 1, randomized: &cell }),
+                ),
+                pair,
+                "zwei Restplatten duerfen nie gestreut werden (Seed {seed})"
+            );
+            assert!(!cell.get(), "zwei Restplatten duerfen nicht markieren (Seed {seed})");
+
+            let triple = vec![41usize, 42, 43];
+            let cell3 = std::cell::Cell::new(false);
+            let out = apply_return_order_random(
+                triple.clone(),
+                Some(ReturnOrderRandom { p: 1.0, seed, round_number: 1, randomized: &cell3 }),
+            );
+            assert!(cell3.get(), "ab drei Restplatten faellt die Muenze (Seed {seed})");
+            let mut sorted = out.clone();
+            sorted.sort();
+            assert_eq!(sorted, triple, "gestreut wird PERMUTIERT");
+            if out != triple {
+                any_triple_moved = true;
+            }
+        }
+        assert!(any_triple_moved, "ab drei Restplatten muss sich die Reihenfolge auch bewegen");
+    }
+
+    /// Rundenfenster (par.11b): Runde [`crate::state::NUM_ROUNDS`] wird NIE
+    /// gestreut -- dort folgt die Endwertung, eine zurueckgelegte Platte kommt
+    /// nie wieder an die Reihe. Die Runden 1 bis 4 sind GLEICHBERECHTIGT
+    /// (keine Bevorzugung frueher Runden, Nutzer-Entscheid par.11b): bei
+    /// `p = 1` faellt die Muenze in jeder von ihnen.
+    #[test]
+    fn round_five_is_never_shuffled_and_rounds_one_to_four_are_equal() {
+        assert_eq!(crate::state::NUM_ROUNDS, 5, "das Fenster haengt an NUM_ROUNDS");
+        for r in 1..crate::state::NUM_ROUNDS {
+            assert!(return_order_round_allowed(r), "Runde {r} gehoert ins Fenster");
+        }
+        for r in [0u32, crate::state::NUM_ROUNDS, crate::state::NUM_ROUNDS + 1] {
+            assert!(!return_order_round_allowed(r), "Runde {r} darf nicht gestreut werden");
+        }
+
+        let order = vec![51usize, 52, 53, 54];
+        // Runde 5: unveraendert UND unmarkiert, ueber viele Seeds.
+        for seed in 0..32u64 {
+            let cell = std::cell::Cell::new(false);
+            assert_eq!(
+                apply_return_order_random(
+                    order.clone(),
+                    Some(ReturnOrderRandom {
+                        p: 1.0,
+                        seed,
+                        round_number: crate::state::NUM_ROUNDS,
+                        randomized: &cell,
+                    }),
+                ),
+                order,
+                "Runde {} darf nicht streuen (Seed {seed})",
+                crate::state::NUM_ROUNDS
+            );
+            assert!(!cell.get(), "Runde 5 darf nicht markieren (Seed {seed})");
+        }
+        // Runden 1 bis 4: jede einzelne streut, keine ist bevorzugt.
+        for r in 1..crate::state::NUM_ROUNDS {
+            let mut moved = false;
+            for seed in 0..32u64 {
+                let cell = std::cell::Cell::new(false);
+                let out = apply_return_order_random(
+                    order.clone(),
+                    Some(ReturnOrderRandom { p: 1.0, seed, round_number: r, randomized: &cell }),
+                );
+                assert!(cell.get(), "Runde {r} muss markieren (Seed {seed})");
+                if out != order {
+                    moved = true;
+                }
+            }
+            assert!(moved, "Runde {r} hat in 32 Seeds nie gestreut");
+        }
+    }
+
+    /// Der Fruehausstieg der Runde 5 liegt VOR dem RNG-Aufbau
+    /// (`apply_return_order_random`), es wird dort also gar kein `StdRng`
+    /// gebaut. Geprueft wird, was von aussen sichtbar ist: derselbe Seed und
+    /// dieselbe Reihenfolge liefern in Runde 5 den unveraenderten Vec OHNE
+    /// Markierung, im Fenster dagegen die gefallene Muenze -- der Unterschied
+    /// haengt also am Rundenfenster, nicht am Zufall.
+    #[test]
+    fn round_five_draws_no_random_number() {
+        let order = vec![61usize, 62, 63];
+        let cell = std::cell::Cell::new(false);
+        let seed = 20260914u64;
+        let out = apply_return_order_random(
+            order.clone(),
+            Some(ReturnOrderRandom {
+                p: 1.0,
+                seed,
+                round_number: crate::state::NUM_ROUNDS,
+                randomized: &cell,
+            }),
+        );
+        assert_eq!(out, order);
+        assert!(!cell.get());
+        // Gegenprobe: derselbe Seed IM Fenster zieht und mischt.
+        let cell_in = std::cell::Cell::new(false);
+        let _ = apply_return_order_random(
+            order.clone(),
+            Some(ReturnOrderRandom { p: 1.0, seed, round_number: 1, randomized: &cell_in }),
+        );
+        assert!(cell_in.get(), "im Fenster muss derselbe Seed die Muenze fallen lassen");
     }
 
     /// Die Record-Markierung ist ADDITIV, und `policy_target_valid` bleibt
@@ -11056,9 +11248,10 @@ mod return_order_random_tests {
     }
 
     /// Der Durchstich bis zur angewandten Aktion: derselbe Partiezustand
-    /// einmal OHNE und einmal MIT Traeger. Zwei Ziehungen vorab ueber den
-    /// echten Engine-Pfad, damit die Serie garantiert mindestens drei Platten
-    /// haelt (die Aufloesung zieht selbst noch eine Pflichtziehung) -- sonst
+    /// einmal OHNE und einmal MIT Traeger. DREI Ziehungen vorab ueber den
+    /// echten Engine-Pfad, damit die Serie garantiert mindestens vier Platten
+    /// haelt (die Aufloesung zieht selbst noch eine Pflichtziehung) und nach
+    /// der Plattenwahl [`RETURN_ORDER_MIN_REST`] uebrig bleiben -- sonst
     /// haengt der Durchstich an der Stopp-Regel der Ziehserie, die dieser
     /// Test nicht pruefen will. Die Serie selbst ist deterministisch
     /// (`execute_draw_stack_peek` zieht per `remove(0)`, ohne RNG), beide
@@ -11070,6 +11263,7 @@ mod return_order_random_tests {
         for seed in 0..24u64 {
             let prepared = |s: u64| -> Option<Game> {
                 let mut game = Game { state: fresh_stack_state(s) };
+                game.apply_drafting(&Action::DrawStackPeek).ok()?;
                 game.apply_drafting(&Action::DrawStackPeek).ok()?;
                 game.apply_drafting(&Action::DrawStackPeek).ok()?;
                 Some(game)
@@ -11088,18 +11282,25 @@ mod return_order_random_tests {
                 &mut shuffled_game,
                 None,
                 0,
-                Some(ReturnOrderRandom { p: 1.0, seed, randomized: &cell }),
+                Some(ReturnOrderRandom { p: 1.0, seed, round_number: 1, randomized: &cell }),
             ) else {
                 continue;
             };
             resolved += 1;
             assert_eq!(a.chosen_id, b.chosen_id, "die Streuung darf die Plattenwahl nicht bewegen");
-            assert!(a.return_order.len() >= 2, "Vorbereitung garantiert >= 2 Restplatten");
+            assert!(
+                a.return_order.len() >= RETURN_ORDER_MIN_REST,
+                "Vorbereitung garantiert >= {RETURN_ORDER_MIN_REST} Restplatten, sind {}",
+                a.return_order.len()
+            );
             let (mut left, mut right) = (a.return_order.clone(), b.return_order.clone());
             left.sort();
             right.sort();
             assert_eq!(left, right, "gemischt wird PERMUTIERT, nicht ausgetauscht");
-            assert!(cell.get(), "bei >= 2 Restplatten und p = 1 muss markiert werden");
+            assert!(
+                cell.get(),
+                "bei >= {RETURN_ORDER_MIN_REST} Restplatten, Runde 1 und p = 1 muss markiert werden"
+            );
             if a.return_order != b.return_order {
                 saw_a_different_order = true;
             }
