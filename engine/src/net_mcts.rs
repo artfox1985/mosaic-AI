@@ -5647,6 +5647,38 @@ pub(crate) fn moon_order_post_search_applies(
 /// davon ab, wie viele Zahlen sie selbst verbraucht, und der Hauptstrom
 /// verschiebt sich um genau einen Zug. Kein globaler RNG.
 #[allow(clippy::too_many_arguments)]
+/// DIAGNOSE-ZAEHLER der Mondstapel-Nachsuche (PREREG_moon_stack_order.md par.9g,
+/// nachgetragen 2026-09-15). Zaehlt je Thread, wie oft die Nachsuche gelaufen ist
+/// und wie oft sie dabei eine ANDERE als die kanonische Reihenfolge gewaehlt hat.
+///
+/// Warum ueberhaupt: ohne diese beiden Zahlen ist aus den Logs eines A/B nicht
+/// ablesbar, ob die Nachsuche ins Leere greift. Ein Nullbefund heisst dann
+/// entweder "sie waehlt fast immer dasselbe wie der Bestand" (dann ist der
+/// Horizont nicht der Hebel und Weg C aus par.10 faellt) oder "sie waehlt oft
+/// anders und es aendert den Ausgang nicht" (dann bleibt Weg C). Der Streu-Knopf
+/// der Rueckgabe hat seine `[return_order]`-Zeile seit dem Bau
+/// (self_play.rs:1188/1207); bei Stufe 3 wurde sie vergessen.
+///
+/// Warum THREAD-LOKAL und nicht als Logzeile an Ort und Stelle: `state` ist hier
+/// nur unveraenderlich geliehen, `log_event` braucht `&mut`. Ein `println!` wuerde
+/// auf stdout landen statt im Spiel-Log und bei rund 24 Ereignissen je Partie die
+/// Laufausgabe fluten. Der Self-Play-Pfad liest die Zaehler am Partieende einmal
+/// aus (`take_moon_order_diag`) und schreibt EINE Zeile.
+///
+/// Kosten bei ausgeschalteter Nachsuche: keine. Der Zaehler wird erst hinter dem
+/// Early-Out von `moon_order_post_search_applies` beruehrt, der Zweig bleibt bei
+/// `moon_order_variants != 2` unbetreten und damit bitidentisch.
+thread_local! {
+    static MOON_ORDER_DIAG: std::cell::Cell<(u64, u64)> = const { std::cell::Cell::new((0, 0)) };
+}
+
+/// Liest die Zaehler aus und setzt sie zurueck: `(applied, changed)`.
+/// Zuruecksetzen gehoert dazu, damit die Zahl einer Partie gehoert und nicht dem
+/// Thread seit Prozessstart -- der Worker spielt viele Partien hintereinander.
+pub fn take_moon_order_diag() -> (u64, u64) {
+    MOON_ORDER_DIAG.with(|c| c.replace((0, 0)))
+}
+
 pub(crate) fn moon_order_post_search<R: Rng + ?Sized>(
     net_policy: &Net,
     net_value: Option<&Net>,
@@ -5683,6 +5715,14 @@ pub(crate) fn moon_order_post_search<R: Rng + ?Sized>(
     });
     match chosen {
         Some(seq) => {
+            // par.9g: Ausloesung und Abweichung zaehlen, bevor `seq` einzieht.
+            // `m.take.moon_order` ist hier noch die KANONISCHE Reihenfolge --
+            // die Nachsuche faechert nicht auf, sie entscheidet nachtraeglich.
+            let changed = u64::from(m.take.moon_order != seq);
+            MOON_ORDER_DIAG.with(|c| {
+                let (a, ch) = c.get();
+                c.set((a + 1, ch + changed));
+            });
             let mut mm = m;
             mm.take.moon_order = seq;
             Some(Action::Stone(mm))
@@ -8862,6 +8902,26 @@ mod tests {
         let mut single = m;
         single.take.moon_order.truncate(1);
         assert!(!moon_order_post_search_applies(&cfg2, Some(&Action::Stone(single))));
+    }
+
+    /// par.9g: der Diagnose-Zaehler wird beim Auslesen ZURUECKGESETZT.
+    ///
+    /// Das ist die tragende Eigenschaft, nicht das Zaehlen selbst: der Zaehler
+    /// ist thread-lokal und ein Worker spielt viele Partien hintereinander.
+    /// Ohne Reset wuerde die Zeile einer Partie die Ausloesungen aller frueheren
+    /// mitzaehlen, und die Kennzahl "changed je Partie" waere um den Faktor der
+    /// bereits gespielten Partien zu gross -- ein stiller Messfehler genau der
+    /// Art, die `unified_game_loop` mit dem Verwerfen am Partieanfang zusaetzlich
+    /// absichert.
+    #[test]
+    fn moon_order_diagnostics_reset_on_read() {
+        // Startwert kann von anderen Tests desselben Threads stammen: erst leeren.
+        let _ = take_moon_order_diag();
+        assert_eq!(take_moon_order_diag(), (0, 0), "nach dem Leeren muss (0,0) stehen");
+
+        MOON_ORDER_DIAG.with(|c| c.set((7, 3)));
+        assert_eq!(take_moon_order_diag(), (7, 3), "der gesetzte Stand kommt zurueck");
+        assert_eq!(take_moon_order_diag(), (0, 0), "und ist danach verbraucht");
     }
 
     /// par.9, Kern der Nachsuche: sie waehlt TATSAECHLICH eine Reihenfolge,

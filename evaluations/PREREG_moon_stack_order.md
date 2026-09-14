@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 GEMESSEN (par.7): Fan-out traegt NICHT (193:207), der Nullbefund ist aber gemessen und nicht erklaert -- die Gegenhypothese "Reihenfolge egal" ist widerlegt (nur der oberste Stein je Stapel ist ziehbar). **Stufe 3 GEBAUT und im Wheel (par.9/9a): eigene Nachsuche nach der Zugwahl**, A/B laeuft. Value-Kopf sieht die Reihenfolge positionsgenau (par.9f). Drei Architektur-Hebel vorregistriert (par.10); Weg C (Terminierung bis Rundenende) und Weg B (Zielwechsel des Kopfs) sind als Fahrplan 32a/32b vor Nr. 33 eingetaktet (par.10a). -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 GEMESSEN (par.7): Fan-out traegt NICHT (193:207), der Nullbefund ist aber gemessen und nicht erklaert -- die Gegenhypothese "Reihenfolge egal" ist widerlegt (nur der oberste Stein je Stapel ist ziehbar). **Stufe 3 GEBAUT und im Wheel (par.9/9a): eigene Nachsuche nach der Zugwahl**, A/B laeuft. Value-Kopf sieht die Reihenfolge positionsgenau (par.9f); Diagnose-Zeile [moon_order] nachgetragen (par.9g, Code im Baum, Wheel-Bau steht aus). Drei Architektur-Hebel vorregistriert (par.10); Weg C (Terminierung bis Rundenende) und Weg B (Zielwechsel des Kopfs) sind als Fahrplan 32a/32b vor Nr. 33 eingetaktet (par.10a). -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -678,6 +678,54 @@ Value-Kopf blind waere -- die uebrigen fuenf Stellen und die Budgetfrage aus par
 **Die Policy hat keine eigene Dimension fuer `moon_order`** (par.2). Stufe 3 braucht sie auch
 nicht: entschieden wird ueber Blattwerte einer Suche, nicht ueber einen Prior auf Aktionen. Der
 `moon`-Kopf ordnet nur die Bewertungsreihenfolge.
+
+## par.9g DIAGNOSE-ZEILE NACHGETRAGEN (2026-09-15, Code gebaut, Wheel-Bau steht aus)
+
+**Die Luecke.** Der Streu-Knopf der Rueckgabe schreibt seit seinem Bau eine
+`[return_order]`-Zeile ins Spiel-Log (self_play.rs:1188/1207). Die Nachsuche aus Stufe 3
+schreibt NICHTS. Damit ist aus den Logs des A/B vom 2026-09-14 nicht ablesbar, ob sie
+ueberhaupt eine ANDERE Reihenfolge waehlt als der Bestand. Beim Bau von Stufe 3 wurde die
+Zeile schlicht vergessen; aufgefallen ist es erst, als der A/B auf einen Gleichstand zulief
+(Nutzer-Meldung 2026-09-14, 95:95 nach 190 Paaren).
+
+**Warum die Zahl gebraucht wird, und zwar VOR Weg C.** Ein Nullbefund hat hier zwei Lesarten,
+und sie fuehren zu entgegengesetzten Entscheidungen:
+
+| Befund | Lesart | Folge fuer par.10 |
+| --- | --- | --- |
+| `changed` nahe 0 | die Nachsuche bestaetigt fast immer den Bestand | der Horizont ist NICHT der Engpass -- **Weg C faellt**, und mit ihm Fahrplan 32a |
+| `changed` hoch, Ergebnis flach | sie waehlt oft anders, es aendert den Ausgang nicht | Weg C bleibt die naechste Frage (reicht die Weitsicht der Nachsuche nicht?) |
+
+par.9b hat bereits gemessen, dass die GELEGENHEIT haeufig ist (24,34 echte Wahlen je Partie,
+n = 12.907 Partien). Offen ist die zweite Haelfte: was die Nachsuche aus der Gelegenheit macht.
+
+**Bauform.** Zwei thread-lokale Zaehler in `net_mcts.rs` (`MOON_ORDER_DIAG`: Ausloesungen,
+Abweichungen), erhoeht an der Wahlstelle in `moon_order_post_search`; ausgelesen und
+zurueckgesetzt per `take_moon_order_diag()`. `unified_game_loop` verwirft den Stand am
+Partieanfang und schreibt am Partieende EINE Zeile, wenn ueberhaupt etwas ausgeloest hat:
+
+    [moon_order] applied=<n> changed=<m>
+
+**Warum nicht an Ort und Stelle geloggt:** in `moon_order_post_search` ist `state` nur
+unveraenderlich geliehen, `log_event` braucht `&mut`. Ein `println!` waere auf stdout gelandet
+statt im Spiel-Log und haette bei rund 24 Ereignissen je Partie die Laufausgabe geflutet --
+eine erste Fassung genau so wurde verworfen.
+
+**Warum der Reset die tragende Eigenschaft ist:** ein Worker spielt viele Partien auf
+demselben Thread. Ohne Zuruecksetzen zaehlte die Zeile einer Partie alle frueheren mit, und
+"changed je Partie" waere um die Zahl der bereits gespielten Partien zu gross. Dagegen stehen
+zwei Sicherungen (Verwerfen am Partieanfang, Reset beim Lesen) und der Test
+`moon_order_diagnostics_reset_on_read`.
+
+**Bitidentitaet:** bei `moon_order_variants != 2` loest nichts aus, `applied` bleibt 0, es
+wird keine Zeile geschrieben. Der Zaehler sitzt hinter dem Early-Out von
+`moon_order_post_search_applies`.
+
+**STAND: Code im Baum, NICHT gebaut.** Das Wheel bleibt unangetastet, solange die Messkette
+der Nacht laeuft -- sie und die Anschlusskette fahren auf dem Kontrakt 39994362fba145a6, und
+ein Neubau mitten in der Kette haette die Arme auf zwei verschiedenen Wheels laufen lassen.
+Faellig danach: `cargo test --release`, Wheel-Bau, dann eine kleine Serie mit
+`moon_order_variants=2` und `--log-games`, aus der die beiden Zahlen fallen.
 
 ## par.10 ARCHITEKTUR-HEBEL jenseits der Sim-Zahl (Nutzer-Auftrag 2026-09-14, VOR dem Bau)
 
