@@ -49,6 +49,55 @@ verduennten Effekt.
 `engine/src/state.rs`; die Schwarm-Erzeugung v29 mit 100 Sims ist freigegeben, der Sockel
 zurueckgestellt.
 
+## Restaufwand v29, geschaetzt am 2026-09-14 08:50 (Nutzer-Frage)
+
+**Basis der Hochrechnung:** der Blockbau von b02 lief zu diesem Zeitpunkt mit 1.943 von 2.947
+Dateien in 1.104 s, also rund 1,76 Dateien je Sekunde. Alles andere aus `docs/measured_runtimes.md`
+oder aus den Laeufen dieser Nacht; **jede Zahl ist unten als gemessen oder ANNAHME markiert.**
+
+### A. Pflichtteil bis zum Champion-Entscheid
+
+| Punkt | Was | Dauer | Herkunft |
+| --- | --- | --- | --- |
+| 16 | b02: Bloecke fertig, Monolith, Training | rund 1,8 h ab 08:50 | gemessen (Rate, Training 1,55 h bei b01) |
+| 18 | b03: dasselbe | rund 1,8 h | gemessen |
+| 17, 19 | Tor 1 je Arm gegen b01, zwei Seeds | 2,5 h bis 6 h | gemessen: b01 brauchte 74 min fuer BEIDE Seeds (SPRT brach frueh ab); ohne Abbruch waeren es 2 x 91 min je Arm |
+| 20 | Netz-Gesundheit, fuenf Punkte je Modell | rund 1 h | ANNAHME (Sonden laufen Minuten je Modell) |
+| 21 | Promotion, falls ein Arm gewinnt | rund 1,5 h | gemessen (Anker-Kante 1.441-1.491 s, Champion-2 2.516 s, Golden Probe 1.450 s) |
+
+**Summe A: 8 bis 12 Stunden**, davon rund 3,5 h schon angelaufen. Punkt 21 faellt weg, wenn beide
+Arme H0 zeigen -- nach b01 ist das der wahrscheinlichere Ausgang, aber die Arme aendern den
+EINGANG und sind damit eine andere Frage.
+
+### B. Begleitprogramm (die CPU-freien Fenster)
+
+| Punkte | Was | Dauer | Herkunft |
+| --- | --- | --- | --- |
+| 22 | Schwierigkeitsleiter: Verdrahtung 1c, Server, Stufen-Specs, Tore | 6 bis 8 h | ANNAHME (Bauplan par.12c: 3-4 h Rust plus 2-3 h Server) |
+| 24-26 | Korpuslauf, Zugklassen-Differential, Partien g08-g10 | rund 4 h | ANNAHME |
+| 27, 28 | Mondstapel-Knopf plus A/B | rund 2,5 h | Bau ANNAHME, A/B gemessen (86-91 min) |
+| 29 | Rueckgabe-Modus A/B | rund 1,5 h | gemessen (2.515-2.621 s je Lauf) |
+| 30-32 | Rundenschaetzer: Kostentor, Instrument, A/B | rund 4 h | gemessen |
+| 33-36 | Tiling im Blatt: Bau, Sichttor, Kostentor, A/B | rund 11 h | **Bau ist eine ANNAHME von einem Tag** und der groesste Einzelposten |
+| 37 | Antwortzeit und drei Stufen-Kanten | rund 1 h | ANNAHME |
+
+**Summe B: rund 30 Stunden.**
+
+### Was die Kalenderzeit bestimmt, nicht die Rechenzeit
+
+**Rund 40 Stunden reine Rechen- und Bauzeit** fuer v29 insgesamt. Bei exklusiver CPU und einem
+produktiven Fenster von 8 bis 10 Stunden am Tag sind das **vier bis fuenf Tage** -- aber nur,
+wenn nichts wartet. Drei Dinge koennen das strecken:
+
+1. **Neun Stopp-Punkte brauchen einen Nutzer-Entscheid** (Spalte "Stopp-Punkt"), darunter jede
+   Rezept-Aufnahme aus 28/29/32/36.
+2. **Punkt 38 ist Kalenderzeit des Nutzers**, nicht Rechenzeit: die Mensch-Validierung der
+   Stufen.
+3. **Punkt 33 ist die groesste Unsicherheit.** "Rund ein Tag Bau" ist eine Annahme ohne Messung;
+   wird es mehr, verschiebt sich alles dahinter.
+
+Die Punkte 39 bis 41 gehoeren zu v30 und zum Abschluss und sind hier nicht gerechnet.
+
 ## Reihenfolge
 
 Dauer-Spalte: **gemessen** heisst, die Zahl stammt aus `docs/measured_runtimes.md` oder einem
