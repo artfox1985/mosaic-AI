@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT. Tor 1: b01 gegen den Champion BEIDE SEEDS H0 (kein Champion-Wechsel); **b03 gegen b01 Merkmalsstand UEBERNOMMEN** (par.12-Regel, b03 gegen den Champion ist ungemessen); **b02 gegen b03 die Spezialfeld-Kanaele TRAGEN** (Ablation verworfen). Monolith-Kollision BEHOBEN (Weg 1, Default-Schluessel gemessen identisch, drei Tests). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT. Tor 1: b01 gegen den Champion BEIDE SEEDS H0; **b03 gegen b01 Merkmalsstand UEBERNOMMEN**; **b02 gegen b03 die Spezialfeld-Kanaele TRAGEN**. Champion bleibt v28-b02. Monolith-Kollision behoben; derselbe Defekt traf den Val-Cache: b03 hatte auf ablatierten Daten validiert. NACHBEWERTET: **b03 ist offline NICHT schlechter** (0,17967 gegen 0,17934, Abstand 0,00034 statt 0,0018). -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -658,11 +658,16 @@ kein Gewicht bekommen. **Das Netz hat also genau die Spalten aufgegriffen, die u
 tragen.**
 
 **Die lebenden Spalten sind schwach** (0,15 bis 1,02 gegen 3,01 im Mittel der Altspalten). Das ist
-zu erwarten -- die Altspalten tragen fuenf Generationen Training, die neuen zwoelf Epochen ab
-Null -- aber es ist zugleich die wahrscheinlichste Erklaerung dafuer, dass b03 sein Optimum schon
-in Epoche 2 erreicht: viel zusaetzliches Signal ist noch nicht da. **Nicht geprueft**, ob mehr
-Epochen oder ein hoeherer Lernschritt fuer die neuen Spalten daran etwas aendern; das waere ein
-eigener Arm.
+zu erwarten -- die Altspalten tragen fuenf Generationen Training, die neuen zwoelf Epochen ab Null.
+
+**KORRIGIERT 2026-09-14 (siehe Monolith-Kollision, Nachtrag):** hier stand zusaetzlich, die
+schwachen Spalten seien "die wahrscheinlichste Erklaerung dafuer, dass b03 sein Optimum schon in
+Epoche 2 erreicht". **Dieses Optimum gibt es nicht.** Die zwoelf Brier-Werte von b03 liegen
+zwischen 0,18114 und 0,18178, Spannweite 0,00064 -- Rauschen unterhalb der Aufloesungsgrenze.
+Erklaert wurde also ein Artefakt. Dazu kommt, dass b03 auf dem ablatierten Val-Cache von b02
+validiert hat, seine Brier-Reihe also ohnehin nicht neben der von b01 und b02 steht. **Nicht
+geprueft** bleibt, ob mehr Epochen oder ein hoeherer Lernschritt fuer die neuen Spalten etwas
+aendern; das waere ein eigener Arm.
 
 ### Tor 1 v29-b02 gegen b03: **die Spezialfeld-Kanaele TRAGEN** (2026-09-14)
 
@@ -724,9 +729,12 @@ Champion, und b01 hat gegen `v28-b02` zweimal H0 gezeigt. Ob b03 den Champion sc
 
 **Bemerkenswert bleibt der Widerspruch zur Offline-Metrik:** b03 hatte mit 0,18114 den
 SCHLECHTESTEN Brier-Wert der drei Arme und erreicht in der Arena trotzdem einen Seed-Sieg und
-zweimal mehr Punkte je Partie. Das stuetzt die bekannte Aufloesungsgrenze
-(`project_offline_metric_resolution_limit`) und ist ein Argument gegen Offline-Vorentscheide bei
-Abstaenden dieser Groesse.
+zweimal mehr Punkte je Partie.
+
+**ZURUECKGENOMMEN 2026-09-14** (Nachtrag zur Monolith-Kollision, unten): b03s Brier ist auf dem
+ABLATIERTEN Val-Cache von b02 gerechnet und steht damit nicht neben den Werten von b01 und b02.
+Der Widerspruch zwischen Offline-Wert und Arena bleibt als Beobachtung bestehen, taugt hier aber
+nicht mehr als Beleg -- dafuer braeuchte es b03s Brier auf einem sauberen 794er-Val-Cache.
 
 ### Trainings b02 und b03 durch -- der Sicht-Arm ist OFFLINE schlechter (2026-09-14)
 
@@ -736,14 +744,28 @@ Abstaenden dieser Groesse.
 | v29-b02 | 1,51 h | 0,1793373 | **5** | **an** | 794 |
 | v29-b03 | 1,38 h | **0,1811429** | **2** | aus | 794 |
 
-**b03 ist offline der schlechteste der drei**, um 0,0018 gegen b01. Ob das traegt, sagt die
-Arena; die Aufloesungsgrenze der Offline-Metriken liegt in derselben Groessenordnung
-(`project_offline_metric_resolution_limit`), ein Punktschaetzer allein entscheidet hier nichts.
+**b03 ist offline der schlechteste der drei**, um 0,0018 gegen b01.
 
-**Auffaellig ist eher die EPOCHE als der Wert: b03 erreicht sein Optimum in Epoche 2 von 12.**
-b01 brauchte alle zwoelf, b02 fuenf. Ein Arm, der nach zwei Epochen nicht mehr besser wird,
-waehrend er 39 zusaetzliche Eingangswerte bekommen hat, ist genau der Fall, fuer den par.6d die
-Netz-Gesundheit vorregistriert hat -- **Punkt 1 dort ("leben die neuen Spalten?") ist jetzt keine
+**NACHTRAG 2026-09-14: die Tabelle ist nicht spaltenrein.** b03 hat auf dem Val-Cache von b02
+validiert, in dem die Kanaele 77/78 auf Null liegen (Nachweis im Nachtrag zur
+Monolith-Kollision). Sein Modell nutzt diese Kanaele, bekommt sie aber in der Validierung nicht
+-- ein Modell auf Daten, denen das erwartete Signal fehlt. **HERLEITUNG, nicht gemessen:** das
+erklaert Betrag und Vorzeichen des Abstands zwanglos. Er ist mit 0,0018 rund dreimal so gross wie
+die Spannweite ueber alle zwoelf Epochen von b03 (0,00064), also KEIN Rauschen -- aber eben auch
+kein Qualitaetsunterschied zwischen den Armen, sondern moeglicherweise nur der fehlende Kanal in
+den Vergleichsdaten. **AUFGELOEST 2026-09-14 durch die Nachbewertung** (Absatz weiter unten): auf einem sauberen
+794er-Val-Cache faellt b03 auf 0,1796741, der Abstand zu b01 schrumpft von 0,0018 auf 0,00034.
+Die Tabelle oben zeigt also nicht drei verschieden gute Arme, sondern zwei gleichwertige und
+einen kaputten Vergleichswert.
+
+**ZURUECKGENOMMEN, ehemals "auffaellig ist eher die EPOCHE als der Wert: b03 erreicht sein
+Optimum in Epoche 2 von 12":**
+b01 brauchte alle zwoelf, b02 fuenf. Das Argument war: ein Arm, der nach zwei Epochen nicht mehr
+besser wird, obwohl er 39 zusaetzliche Eingangswerte bekommen hat, ist verdaechtig. **Der Befund
+haelt nicht** -- b03s zwoelf Brier-Werte liegen zwischen 0,18114 und 0,18178, Spannweite 0,00064.
+Epoche 2 ist nicht "das Optimum", sondern der zufaellige Tiefpunkt einer flachen Reihe (Epoche 8
+liegt bei 0,18118, Epoche 9 bei 0,18120). Aus einer Reihe ohne aufloesbare Struktur wurde ein
+Verlauf gelesen. Die Netz-Gesundheit aus par.6d war trotzdem die richtige Nachfrage -- **Punkt 1 dort ("leben die neuen Spalten?") ist jetzt keine
 Formalie mehr, sondern die naheliegende Frage.** Zu pruefen mit `tools/probes/dead_unit_probe.py`
 (Fahrplan Nr. 20) und den Spaltennormen von `flat_branch.0.weight`.
 
@@ -788,6 +810,103 @@ anderes misst als sein Etikett sagt.
 2. **Den Monolithen je Arm unter eigenem Namen bauen** (`--merge-out` mit Arm-Suffix) und
    `train.py --cache-file` darauf zeigen lassen. Aendert keinen Schluessel, entwertet nichts,
    kostet eine Zeile im Ketten-Skript.
+
+#### NACHTRAG 2026-09-14: die Kollision traf auch den VALIDIERUNGS-Cache, und dort ist der Schaden echt
+
+Der obige Absatz sah nur den Monolithen des TRAININGSANTEILS. Der Validierungsanteil geht durch
+DENSELBEN `window_cache_key` -- er wird nicht per `--merge-out` vom Ketten-Skript gebaut, sondern
+von `train.py` selbst. Nachgemessen an den Planes-Kanaelen im Cache (Anteil der Samples mit
+gesetztem Bit im Kanal, Stichprobe 3.000 Samples je Datei):
+
+| Cache | gebaut | Rolle | Kanal 77 | Kanal 78 |
+| --- | --- | --- | --- | --- |
+| `.cache_7ebef2449837.h5` | 01:40 | b01-val (755) | 0,1930 | 0,3047 |
+| `.cache_35c6bd2b9bd2.h5` | 01:28 | b01-train (755) | 0,2177 | 0,1860 |
+| **`.cache_eaa464b44cf7.h5`** | **09:15** | **b02-val (794)** | **0,0000** | **0,0000** |
+| `.cache_fd13f54061cd.h5` | 11:15 | b03-train (794) | 0,2177 | 0,1860 |
+
+**Es existiert kein weiterer 794er-Val-Cache.** b03s Training lief ab 11:15; ein eigener
+Val-Cache haette einen Zeitstempel danach. b03 hat also `eaa464b44cf7` per Schluesseltreffer
+geladen: **b03 hat MIT den Kanaelen trainiert und OHNE sie validiert.**
+
+Gegenprobe auf den Bloecken, die beide Arme gebaut haben (Zeitstempel trennt sie sauber):
+
+| Bloecke | Anzahl | Kanal 77 / 78 |
+| --- | --- | --- |
+| 2026-09-14, 08 Uhr (b02, Schalter an) | 2.947 | 0,0000 / 0,0000 |
+| 2026-09-14, 10 und 11 Uhr (b03, Schalter aus) | 2.265 + 682 = 2.947 | 0,21-0,38 / 0,13-0,43 |
+
+**Was davon betroffen ist und was nicht:**
+
+* **Die Arena-Verdikte sind NICHT betroffen.** Tor 1 b03 gegen b01 und b02 gegen b03 messen
+  Partien, keinen Validierungswert. Das Verdikt "die Kanaele 77/78 tragen" steht unveraendert.
+* **b01 und b02 sind sauber.** b01 hatte einen eigenen Val-Cache (755). b02 trainierte ablatiert
+  UND validierte ablatiert -- das ist konsistent, sein Brier ist gueltig.
+* **ZURUECKGENOMMEN wird die Aussage "b03 hatte den schlechtesten Offline-Wert der drei Arme".**
+  b03s Brier ist auf anderen Daten gerechnet als der von b01 und b02; die drei Zahlen sind nicht
+  vergleichbar.
+* **ZURUECKGENOMMEN wird auch "b03 erreicht sein Optimum in Epoche 2 von 12".** Die zwoelf
+  Brier-Werte aus `models/manifest_train_v29-b03_20260914_111513.json` liegen zwischen 0,18114
+  (Epoche 2) und 0,18178 (Epoche 6), Spannweite **0,00064**. Das ist Rauschen weit unterhalb der
+  bekannten Aufloesungsgrenze; ein "Optimum" gibt es in dieser Reihe nicht. Die Epochenwahl
+  `_brierbest` war damit ein Muenzwurf unter zwoelf gleichwertigen Staenden -- unabhaengig davon,
+  auf welchen Daten sie getroffen wurde.
+* Damit faellt auch die Erklaerung, die par.6d an das vermeintlich fruehe Optimum geknuepft hatte
+  (siehe dort, im selben Zug markiert).
+
+**Kein Neutraining von b03** (Vorschlag des Koordinators, Nutzer-Entscheid steht aus): das Modell
+selbst ist korrekt trainiert, seine Arena-Ergebnisse stehen, und die Epochenwahl war ohnehin
+nicht aufloesbar.
+
+**Und der Grund, warum Weg 1 nicht nur bequemer, sondern der einzig tragende war:** Weg 2 haette
+den Monolithen je Arm unter eigenem Namen gebaut -- den VAL-Cache haette das NICHT geheilt, weil
+er gar nicht ueber `--merge-out` laeuft. Nur die Aenderung an `window_cache_key` deckt beide
+Anteile ab.
+
+#### NACHBEWERTUNG 2026-09-14: b03 ist offline NICHT schlechter -- der Abstand war der Val-Cache
+
+Nutzer-Entscheid 2026-09-14 ("Loeschen ja, Nachbewerten ja, Neutraining nein"). Der ablatierte
+Val-Cache `data/.cache_eaa464b44cf7.h5` ist geloescht (kein restic-Beleg noetig und keiner
+moeglich: `tools/backup_excludes.txt:40` schliesst `*.h5` aus, weil Caches nachbaubar sind), dann
+`v29-b03_brierbest` gegen einen frisch gebauten, VOLLEN 794er-Val-Cache nachbewertet -- gleicher
+Seed, gleicher Val-Pool, dieselben 147 Val-Dateien wie im Originallauf, nur `--epochs 1 --lr 0`.
+
+| Arm | Val-Cache | `value_val_brier` | Abstand zu b01 |
+| --- | --- | --- | --- |
+| v29-b01 (755) | voll | 0,1793375 | – |
+| v29-b02 (794) | ablatiert (fuer b02 KORREKT) | 0,1793373 | -0,0000002 |
+| v29-b03 (794) | **ablatiert (falsch)** | 0,1811429 | +0,0018054 |
+| **v29-b03 (794), korrigiert** | **voll** | **0,1796741** | **+0,0003366** |
+
+**Der Abstand schrumpft von 0,0018 auf 0,00034** -- das ist die Haelfte der Spannweite, die b03s
+zwoelf Epochen ohnehin untereinander haben (0,00064), und weit unter der Aufloesungsgrenze
+(`project_offline_metric_resolution_limit`). **b03 ist offline nicht schlechter als b01 und b02.**
+Die fruehere Herleitung ("der fehlende Kanal in den VERGLEICHSDATEN erklaert Betrag und
+Vorzeichen") ist damit gemessen bestaetigt.
+
+**Damit faellt auch der "Widerspruch zur Offline-Metrik"**, der oben noch als Beleg gegen
+Offline-Vorentscheide stand: b03 gewinnt die Arena UND liegt offline gleichauf. Es gab nie einen
+Widerspruch, nur einen kaputten Vergleichswert.
+
+**Warum der Wert trotz `--lr 0` nicht exakt der von `v29-b03_brierbest` ist, und warum das hier
+nichts aendert** (geprueft, nicht angenommen): ein Trainingsdurchlauf aktualisiert die
+BatchNorm-Laufstatistiken unabhaengig von der Lernrate. Der Vergleich der beiden
+Zustandswoerterbuecher zeigt genau das -- **alle 49 echten Gewichte sind identisch**, verschieden
+sind ausschliesslich 12 BatchNorm-Puffer (`running_mean`, `running_var`, `num_batches_tracked` in
+`conv.1`, `conv.4`, `flat_branch.1`, `fusion.1`). Der Effekt auf die Ausgaben, gemessen an den
+Paritaets-Referenzdateien beider Modelle auf IDENTISCHEN Eingaben: **Value-Kopf max 0,000008**,
+Mond-Kopf 0, Punkte-Kopf 0,0017. Der Brier wird allein aus dem Value-Kopf gerechnet
+(`train.py:940`, `brier_p_win = (v_pred_v + 1.0) * 0.5`), der Fehler liegt also bei rund 1e-5 --
+zwei Groessenordnungen unter dem Abstand, um den es geht. **EINSCHRAENKUNG:** das ist EIN
+Referenzpunkt, keine Verteilung.
+
+**NICHT uebernehmen aus diesem Lauf:** der `policy_val_loss` (0,3811). Der Policy-Kopf bewegt sich
+unter der BatchNorm-Rekalibrierung erheblich (max 1,21 auf den Logits desselben Referenzpunkts);
+nur der Brier ist belastbar.
+
+**Nebenprodukt, noch im Baum:** `models/alphazero_v29-b03-eval.{pth,onnx,onnx.ref.txt,_loss.png}`
+plus `manifest_train_v29-b03-eval_20260914_154021.json` und ein restic-Snapshot
+`run:v29-b03-eval`. Das Modell hat keine Rolle; Loeschung ist ein Nutzer-Entscheid.
 
 #### BEHOBEN 2026-09-14 nach Weg 1, und der Einwand gegen Weg 1 war falsch
 

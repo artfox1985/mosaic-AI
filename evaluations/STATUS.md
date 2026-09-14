@@ -109,17 +109,28 @@ Dateien, und alle drei Arme sind trainiert.
 nur gegen b01, und b01 verlor gegen den Champion. Das waere ein eigener Lauf und ist der
 naheliegendste naechste Schritt, wenn ein Champion-Wechsel in v29 noch gewollt ist.
 
-**Zwei Befunde, die ueber v29 hinausreichen:**
+**MESSFEHLER GEFUNDEN 2026-09-14: b03 hat auf ablatierten Validierungsdaten validiert.**
+Derselbe Schluessel-Defekt, der b02s Monolithen kostete, traf auch den Val-Cache -- und den baut
+`train.py` selbst, nicht das Ketten-Skript. Gemessen an den Planes-Kanaelen: in b02s Val-Cache
+(der einzige 794er, den es gibt) liegen die Kanaele 77/78 auf exakt 0,0000, waehrend b03 MIT
+diesen Kanaelen trainiert hat. **Die Arena-Verdikte sind nicht betroffen** (sie messen Partien),
+b01 und b02 sind sauber. Zwei Aussagen von hier sind damit zurueckgenommen -- Einzelheiten in
+`PREREG_v29_window.md`, Nachtrag zur Monolith-Kollision:
 
-1. **b03 hatte den SCHLECHTESTEN Offline-Wert der drei Arme** (Brier 0,18114 gegen 0,17934) und
-   gewinnt trotzdem einen Seed klar und beide Seeds bei den Punkten. Argument gegen
-   Offline-Vorentscheide bei Abstaenden dieser Groesse.
-2. **b03 erreicht sein Optimum in Epoche 2 von 12**, obwohl er 39 zusaetzliche Eingangswerte
-   bekam. par.6d Punkt 1 GEMESSEN (2026-09-14): **17 der 39 neuen Spalten leben, 22 sind exakt 0
+1. ~~b03 hatte den schlechtesten Offline-Wert der drei Arme~~ -- **NACHGEMESSEN 2026-09-14 auf
+   einem sauberen Val-Cache: 0,1796741 gegen 0,1793375 bei b01.** Der Abstand schrumpft von
+   0,0018 auf 0,00034, also auf die halbe Spannweite von b03s eigenen zwoelf Epochen. **b03 ist
+   offline nicht schlechter**, und damit gibt es auch keinen "Widerspruch zur Offline-Metrik"
+   mehr -- b03 gewinnt die Arena und liegt offline gleichauf.
+2. ~~b03 erreicht sein Optimum in Epoche 2 von 12~~ -- die zwoelf Brier-Werte liegen zwischen
+   0,18114 und 0,18178, Spannweite 0,00064. Das ist eine flache Reihe ohne aufloesbare Struktur;
+   Epoche 2 ist ihr zufaelliger Tiefpunkt, nicht ein Sattelpunkt. Die Nachfrage war trotzdem
+   richtig -- par.6d Punkt 1 GEMESSEN (2026-09-14): **17 der 39 neuen Spalten leben, 22 sind exakt 0
    -- und beide Gruppen sind die vorhergesagten** (18x P.12, dessen Korpusfeld fehlt, plus vier
    Phasen, die im Korpus nicht vorkommen). Die lebenden Spalten sind aber schwach (0,137 im Mittel
-   gegen 3,009 bei den Altspalten); das ist die wahrscheinlichste Erklaerung fuer das fruehe
-   Optimum. Punkt 2 GRUEN: tote Einheiten bei allen vier Modellen 2,60 Prozent, kein Zuwachs.
+   gegen 3,009 bei den Altspalten). Die frueher hier stehende Folgerung, das erklaere das fruehe
+   Optimum, faellt mit dem Optimum weg. Punkt 2 GRUEN: tote Einheiten bei allen vier Modellen
+   2,60 Prozent, kein Zuwachs.
 
 **Monolith-Kollision BEHOBEN** (2026-09-14): der Fenster-Cache-Schluessel kannte den
 Ablations-Schalter nicht, b03 hat b02s Monolithen ueberschrieben (Ergebnisse unbeschaedigt, die
@@ -130,6 +141,20 @@ Nutzer-Entscheid Weg 1 gegen Weg 2 ist damit gegenstandslos -- der Einwand gegen
 ("entwertet Bestand") traf auf diese Bauform nicht zu.
 
 **Offen aus dem Betrieb:** die Schwierigkeitsleiter ist auf v30 vertagt.
+
+**Begleitprogramm Nr. 25 DURCH (2026-09-14): kein Knopf aus dem Zugklassen-Differential.**
+`tools/probes/move_class_differential.py`, 1.343 s, n = 293 Claude-Entscheide aus g01-g07.
+Roh sah die Kuppelplatzierung wie der Treffer aus (53 von 53 Abweichungen, hoechste
+Wurzelwert-Differenz), **normiert traegt sie nicht**: bei Median 73 legalen Kuppelzuegen weicht
+auch blindes Waehlen in 96,1 Prozent der Faelle ab. Bei Steinzuegen trifft Claude den Netzzug
+dagegen klar haeufiger als blind (0,708 gegen 0,903, 5,4 SE). Die Ausgangs-Spalte ist bei sieben
+Partien strukturell blind, weil der Ausgang je Partie konstant ist. Einzelheiten
+`PREREG_claude_play_interface.md` par.12.
+
+**Was daraus als Frage bleibt (nicht gebaut, nicht entschieden):** die Suche rangt bei @400 nur
+16 Wurzelkandidaten (`net_mcts.rs:3180-3186`) -- bei der Kuppelplatzierung also rund 22 Prozent
+der Optionen, bei Steinzuegen 84 Prozent. Ob die Wurzelbreite fuer die Kuppelphase eigens
+steigen sollte, ist ein Rezept-Entscheid mit Kostentor, kein Befund dieser Sonde.
 
 ### Stand der Nacht 2026-09-13/14 (Sitzung, waehrend der Erzeugung)
 

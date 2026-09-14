@@ -671,7 +671,7 @@ def stack_lines(st: dict, m: dict) -> list[str]:
 
     Bis 2026-09-13 zeigte `show` vom Stapel nur Hoehe und obersten Typ; die Maske und das
     Rueckgabe-Wissen kamen im Fenster gar nicht vor, obwohl das Netz sie seit v28-b02 bekommt
-    (Sicht-Audit par.10b). Nutzer-Entscheid 2026-09-13: "die kannst bei dir einbauen."
+    (Sicht-Audit par.11b). Nutzer-Entscheid 2026-09-13: "die kannst bei dir einbauen."
 
     WAECHTER: `dome_pool_view` wird fuer `state.current_player` gerechnet (serialize.rs:99), das
     `own`-Flag und die Reihenfolge `types` gehoeren also dem Spieler AM ZUG. Ist die KI am Zug,
