@@ -1571,6 +1571,11 @@ fn space_is_filled_like_json(sp: &DomeSpace) -> bool {
 /// beantwortet genau das -- derselbe Korpus, dasselbe Fenster, derselbe Seed,
 /// nur diese zwei Kanaele aus.
 ///
+/// GEMESSEN 2026-09-14 (PREREG_special_tile_yield.md par.10): die Kanaele
+/// TRAGEN. Die Ablation v29-b02 verliert gegen v29-b03 in beiden Seeds
+/// (Seed 2 signifikant) und belegt in beiden weniger Spezialfelder. Der
+/// Schalter bleibt als Werkzeug, das Rezept faehrt ihn AUS.
+///
 /// **Teil des Cache-Schluessels** (`engine/py/file_cache_key.py`): sonst
 /// lieferte ein Block aus einem frueheren Lauf stillschweigend die
 /// eingeschalteten Kanaele, und der Arm haette denselben Eingang wie b01 --
