@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: ERZEUGUNG DURCH (par.9, 2026-09-14): 1.201 Dateien in rund 12,8 h, **Tor 2a HAELT** 0,843 gegen 0,816 volle Spalten je Seite (n=8.000); die Reihe ist ueber fuenf Generationen monoton, der Zuwachs wird kleiner. Fenster gebaut (2.947 Dateien, Schluessel 35c6bd2b9bd2), Training b01 laeuft. Arme: b02 Spezialfeld-Ablation, b03 Sicht-Arm (755 -> 794, Code durch, Wheel offen; P.12 erst ab v30). Offen: Sockel-Sims. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: ERZEUGUNG DURCH (par.9, 2026-09-14): 1.201 Dateien in rund 12,8 h, **Tor 2a HAELT** 0,843 gegen 0,816 volle Spalten je Seite (n=8.000); die Reihe ist ueber fuenf Generationen monoton, der Zuwachs wird kleiner. Fenster gebaut (2.947 Dateien, Schluessel 35c6bd2b9bd2), Training b01 durch (1,55 h, 12 Epochen), Tor 1 laeuft. Arme: b02 Spezialfeld-Ablation, b03 Sicht-Arm (755 -> 794, Code durch, Wheel offen; P.12 erst ab v30). Offen: Sockel-Sims. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -463,6 +463,35 @@ aus 4000 Partien):
 Der Margin ist per Konstruktion 0: im Self-Play spielt dasselbe Netz beide Seiten, die Klasse ist
 also ihr eigener Gegner. Die Reihenauslastung traegt dieses Artefakt nicht; sie steht in den
 Arena-Logs von Tor 1 und wird dort berichtet.
+
+### Training v29-b01 und eine Falle im Namensschema (2026-09-14)
+
+**Training durch** (01:28 bis 03:00, `wanduhr_s` 5.568,8 = **1,55 h**, 12 Epochen, 4.538.842
+Samples, cuda, 6 Threads). Warmstart auf `v28-b02_brierbest`, Rezept unveraendert.
+
+**`alphazero_v29-b01_brierbest` EXISTIERT NICHT -- und das ist richtig so.** `train.py`
+Z.2624-2626 schreibt den `_brierbest`-Checkpoint nur, wenn die Brier-beste Epoche weder die
+letzte noch die `val_combined`-beste ist ("sonst waere er ein Duplikat"). Hier war die beste
+Epoche die ZWOELFTE und damit die letzte (`value_val_brier` 0,17934, `epoch_history` im
+Manifest). **Das finale Modell IST der value-optimale Stand.**
+
+**Folge, und sie hat Zeit gekostet:** `tools/night_v29_tor1_b01.sh` wartete auf
+`models/alphazero_v29-b01_brierbest.onnx` -- eine Datei, die nie entsteht. Das Skript haette
+BELIEBIG LANGE gewartet, ohne Fehler, ohne Ausgabe; genau der Stillstand, der vermieden werden
+sollte. Es ist am 2026-09-14 03:03 beendet und durch
+`tools/night_v29_tor1_b01_final.sh` ersetzt worden (Kandidat `alphazero_v29-b01.onnx`, sonst
+Wort fuer Wort derselbe Befehl, ohne Warteschleife weil die Maschine frei war).
+
+**Der Befehl in par.6 Punkt 7 (Z.609) traegt denselben Fehler**: er nennt
+`alphazero_v29-b01_brierbest.onnx`. Gemeint ist der value-optimale Stand; wie er heisst, haengt
+davon ab, ob er mit dem finalen zusammenfaellt.
+
+**REGEL fuer b02 und b03, und fuer jede kuenftige Kette:** vor einem Gating pruefen, WELCHE
+Datei da ist, statt den Namen zu raten --
+`ls models/alphazero_<arm>*.onnx`. Die Reihenfolge der Wahl ist
+`_brierbest` (falls vorhanden) vor dem finalen Modell; `_best` ist der `val_combined`-beste und
+NICHT der value-optimale. Ein Wartescript, das auf einen Namen wartet, braucht ausserdem einen
+Deckel oder eine Abbruchbedingung: ein stilles Warten sieht von aussen aus wie Arbeit.
 
 **Fenster gebaut:** Traeger-Manifest 580 (400 neu + 135 G-1 + 45 G-2), G-2-Haelfte 145 aus
 `selfplay_v26-b01-value-excursion_*.pkl` (Soll 145, par.2), Fensterliste `data/window_v29.txt`
