@@ -288,6 +288,26 @@ const SIGHT_PHASE_ORDER: [&str; 6] = [
     "final",
 ];
 
+/// Steht bei irgendeinem Spieler die Startsetzung noch aus?
+///
+/// Quelle ist `players[i].start_placed`, das `serialize.rs:283` als
+/// `!start_tile_pending` schreibt. Fehlt das Feld (Alt-Snappschuesse vor dem
+/// Bau), gilt die Startsetzung als erledigt -- so bleibt der Sichtpunkt fuer
+/// Bestandskorpora unveraendert und die Aenderung ist dort bitidentisch.
+fn start_placement_pending_json(v: &Value) -> bool {
+    v.get("players")
+        .and_then(|x| x.as_array())
+        .map(|ps| {
+            ps.iter().any(|p| {
+                p.get("start_placed")
+                    .and_then(|x| x.as_bool())
+                    .map(|placed| !placed)
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false)
+}
+
 /// Laenge des Anhangs aus Abschnitt 16: P.3 (3) + P.7 (6) + P.9 (5) +
 /// P.11 (2) + P.12 (18) + P.13 (2) + P.14 (2) + P.15 (1).
 pub const SIGHT_VALUES: usize =
@@ -402,8 +422,29 @@ fn sight_values_from_json(v: &Value) -> SightValues {
     }
 
     // P.7 -- Phase.
+    //
+    // KORREKTUR 2026-09-14 (Nutzer-Auftrag "kannst die phase korrigieren fuer die
+    // startsetzung"): `phase` steht waehrend der Startsetzung auf "drafting", und
+    // das ist KEIN Serialisierungsfehler -- `Phase::StartPlacement` wird im ganzen
+    // Baum nie zugewiesen (geprueft: null Zuweisungen; Initialwert ist
+    // `Phase::Drafting`, state.rs:542). Die Phase in der Spiellogik umzuschalten
+    // waere ein Eingriff in 71 Vergleichsstellen quer durch elf Module, darunter
+    // `mcts.rs` (Elo-Anker) und `round5.rs`; in `mcts.rs:431` heisst
+    // `phase != Drafting` sogar TERMINAL.
+    //
+    // Deshalb wird die Startsetzung hier aus dem Zustand ABGELEITET statt aus dem
+    // Phasenfeld: `serialize.rs:283` schreibt je Spieler `start_placed`, und solange
+    // das bei irgendeinem Spieler `false` ist, steht eine Startsetzung aus. Damit
+    // bekommt Index 0 des One-Hots endlich Gradienten -- bis hierher war er tot
+    // (par.6d: Spaltennorm exakt 0), und das Netz konnte einen Startsetzungs-
+    // Entscheid nicht von einem gewoehnlichen Draftingzug unterscheiden.
+    // Die Spiellogik bleibt unberuehrt; der Anker faehrt netzlos und sieht den
+    // Encoder gar nicht.
     if let Some(name) = v.get("phase").and_then(|x| x.as_str()) {
         s.phase_index = SIGHT_PHASE_ORDER.iter().position(|p| *p == name);
+    }
+    if start_placement_pending_json(v) {
+        s.phase_index = SIGHT_PHASE_ORDER.iter().position(|p| *p == "start_placement");
     }
 
     // P.9 -- Turm je Farbe.
@@ -484,8 +525,15 @@ fn sight_values_from_state(state: &GameState) -> SightValues {
         .count();
     s.drawn_wild = s.drawn_len - s.drawn_special;
 
+    // P.7 -- Phase. Zwilling zur JSON-Seite oben, gleiche Ableitung: steht bei
+    // irgendeinem Spieler die Startsetzung aus, ist der Sichtpunkt
+    // "start_placement". `state.phase` ist dort "drafting" (Phase::StartPlacement
+    // wird nie zugewiesen), siehe den Kommentar im JSON-Pfad.
     let phase_name = state.phase.as_str();
     s.phase_index = SIGHT_PHASE_ORDER.iter().position(|p| *p == phase_name);
+    if state.players.iter().any(|p| p.start_tile_pending) {
+        s.phase_index = SIGHT_PHASE_ORDER.iter().position(|p| *p == "start_placement");
+    }
 
     // Spiegel von `serialize::color_counts` ueber `TileColor::NORMAL`.
     for t in &state.tower.tiles {
@@ -2283,6 +2331,46 @@ mod tests {
     /// ueberein, ueber mindestens 300 Zustaende. Geprueft wird gegen
     /// `state_to_json` -- also gegen das, was der Spieler am Tisch und der
     /// Trainingskorpus sehen, nicht gegen eine zweite Rechnung im Encoder.
+    /// P.7 muss die Startsetzung anzeigen, obwohl `state.phase` dort "drafting"
+    /// sagt (Korrektur 2026-09-14). Der Test deckt BEIDE Encoder-Pfade ab -- den
+    /// direkten aus dem Zustand und den aus dem Record-JSON -- und die Gegenprobe,
+    /// dass nach erledigter Startsetzung wieder "drafting" steht.
+    #[test]
+    fn phase_shows_start_placement_while_a_start_tile_is_pending() {
+        let idx_start = SIGHT_PHASE_ORDER.iter().position(|p| *p == "start_placement").unwrap();
+        let idx_draft = SIGHT_PHASE_ORDER.iter().position(|p| *p == "drafting").unwrap();
+        let base = LEN_BEFORE_SIGHT_APPENDIX + 3; // P.3 belegt die ersten drei Werte.
+
+        // Aufbau wie im Helfer `random_drafting_states`, aber OHNE dessen Zeile,
+        // die `start_tile_pending` abraeumt -- genau diese Lage ist der Prueffall.
+        let mut rng = StdRng::seed_from_u64(4242);
+        let mut game = Game { state: setup_new_game(["P1".into(), "P2".into()], 0, &mut rng) };
+        // Vorbedingung: die Engine steht in Drafting, obwohl beide Spieler noch
+        // setzen muessen -- genau die Lage, die den Sichtpunkt bisher verschluckt hat.
+        assert_eq!(game.state.phase.as_str(), "drafting");
+        assert!(game.state.players.iter().any(|p| p.start_tile_pending));
+
+        let f = state_to_features_direct(&game.state);
+        assert_eq!(f[base + idx_start], 1.0, "Zustandspfad: start_placement fehlt");
+        assert_eq!(f[base + idx_draft], 0.0, "Zustandspfad: drafting darf nicht zusaetzlich stehen");
+
+        let v = state_to_json(&game.state, true);
+        let f_json = sight_values_from_json(&v);
+        assert_eq!(
+            f_json.phase_index,
+            Some(idx_start),
+            "JSON-Pfad muss dasselbe liefern wie der Zustandspfad (Paritaet)"
+        );
+
+        // Gegenprobe: sind alle Startkacheln gelegt, steht wieder "drafting".
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        let f2 = state_to_features_direct(&game.state);
+        assert_eq!(f2[base + idx_start], 0.0);
+        assert_eq!(f2[base + idx_draft], 1.0);
+    }
+
     #[test]
     fn sight_appendix_matches_record_fields() {
         let base = LEN_BEFORE_SIGHT_APPENDIX;

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge, in der nicht gewaehlte Kuppelplatten unter den Stapel zurueckgehen, ist ein legaler Zug, der steuert, wann welche Platte wiederkommt -- das Netz legt heute immer in Ziehreihenfolge zurueck. Wird die Wahl gebaut, in welcher Form, und traegt sie? | Beleg: GEBAUT und im Wheel seit 2026-09-12 (par.8a; Modus 0 = Default bitidentisch: 601 Tests, Paritaets-Fixture unveraendert, Anker-Drift gruen), A/B Modus 1 gegen 0 UNGEMESSEN. Bestand par.2 (self_play.rs:675-684, game.rs:413-423: kanonische Ziehreihenfolge, keine Policy-Dimension). Vorschlag par.4: netzbewertete Rueckgabe als Such-Knopf (Default 0 bitidentisch), A/B ueber den Referee (par.5). Nutzer 2026-09-12: Vollstaendigkeitsfrage, nicht Geschmacksfrage. -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge, in der nicht gewaehlte Kuppelplatten unter den Stapel zurueckgehen, ist ein legaler Zug -- wird die Wahl gebaut, in welcher Form, und traegt sie? | Beleg: GEBAUT und im Wheel seit 2026-09-12 (par.8a, Default bitidentisch). **A/B GEMESSEN 2026-09-14 (par.9): kein messbarer Effekt** -- beide Seeds 74:76, p=1,0, 85-93 Prozent Splits, weil der Value-Kopf die Reihenfolge nur als Typ-Folge sieht. **Der Knopf bleibt** (Vollstaendigkeit vor Elo). Kosten UNGEMESSEN: vor einem Default ist ein Kostentor faellig. -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -266,3 +266,66 @@ wie die Stapel-Stopp-Regel und die Peek-Bewertung; alle drei sind billiger als d
 (`PREREG_round_transition_search_sampling.md` par.9) und laufen davor. **Danach:** wird Modus 1
 Default, gilt er fuer die v29-Erzeugung -- dann muss die Entscheidung VOR dem Start des Sockels
 fallen, sonst faehrt der Korpus zwei Verhalten.
+
+## par.9 A/B GEMESSEN (2026-09-14): kein messbarer Effekt, der Knopf bleibt
+
+`tools/night_v29_return_order_ab.sh`, Fahrplan Nr. 29. Beide Seiten dasselbe Modell
+(`alphazero_v28-b02_brierbest.onnx`) auf demselben Wheel, unterschieden durch GENAU ein
+Spec-Feld (geprueft: 14 Felder je Datei, ein Unterschied).
+
+| Seed | mode1 : mode0 | McNemar p | gepaarte Diff | Splits | Punkte mode1 / mode0 | Wanduhr |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20261071 | 74 : 76 | 1,0000 | -0,027 [-0,144, +0,091] | **70 von 75** | 54,14 / 54,23 | 2.080 s |
+| 20261072 | 74 : 76 | 1,0000 | -0,027 [-0,201, +0,148] | **64 von 75** | 52,88 / 53,07 | 2.664 s |
+
+**VERDIKT nach par.5 Punkt 1: kein messbarer Effekt.** Der Vorzeichentest verfehlt p < 0,05
+deutlich (beide Seeds p = 1,0), das Intervall der gepaarten Differenz schliesst die Null in
+beiden Faellen ein, und die Punkte sind gleich. **Der Knopf bleibt trotzdem** -- par.0/par.1,
+Nutzer-Praezedenz: der Massstab ist Vollstaendigkeit, nicht Elo. Ein legaler Zug, den die Suche
+nicht waehlen kann, ist eine Luecke im Modell, auch wenn sie nichts kostet.
+
+**Die identische Endsumme in beiden Seeds ist Zufall, kein Alarm** (Pruefung wegen
+`feedback_wheel_neu_bauen_nach_engine_aenderung`, "Zahlengleichheit ist ALARM"): die Struktur
+dahinter unterscheidet sich klar -- 5 gegen 11 informative Paare, verschiedene Punkte,
+verschiedene Laufzeiten. Bei 70 bzw. 64 Splits tragen nur wenige Paare ueberhaupt zur Bilanz bei.
+
+**Der Split-Anteil ist der eigentliche Befund: 93 und 85 Prozent.** In der grossen Mehrheit der
+Paare spielen beide Modi dasselbe Ergebnis. Das bestaetigt den vorab registrierten strukturellen
+Deckel aus par.8a Befund 1: der Value-Kopf sieht die Reihenfolge nur als TYP-Folge
+(`features.rs:212`, oberste vier Positionen des eigenen Blocks als +1 Spezial / -1 Joker / 0);
+Permutationen gleichtypiger Platten sind fuer das Netz identisch, und Modus 1 faellt dann per
+Gleichstand auf die Ziehreihenfolge zurueck. Die Wahl kann also nur dort wirken, wo die
+Restplatten VERSCHIEDENE Typen haben -- und das ist selten.
+
+### Abweichungen von par.5, bewusst und vorab im Skriptkopf festgehalten
+
+1. **Nicht ueber den Referee, sondern ueber `paired_gating`.** par.5 und der AGENTEN-AUFTRAG
+   schreiben `frozen_referee_match.py` vor (Live gegen eingefrorenes v28-b02-Artefakt). Als das
+   registriert wurde, lagen Live-Wheel und Artefakt auf DERSELBEN Aera; seit dem v29-Wheelwechsel
+   nicht mehr (live 39994362fba145a6 / 794, Artefakt 39648b95bbba1acf / 755). Der Referee
+   verweigert dann den Handshake, und mit `--force-cross-era` waere Knopf PLUS Aerawechsel
+   gemessen -- gerade nicht das, wonach par.5 fragt. `paired_gating` faehrt beide Seiten auf dem
+   liven Wheel mit demselben Modell und unterscheidet sie nur ueber die Spec; das ist naeher an
+   par.5s Absicht als der Wortlaut.
+2. **SPRT praktisch abgeschaltet** (`--sprt-alpha 0.001 --sprt-beta 0.001`, Wald-Schranken
+   +-6,907 statt +-2,944), damit beide Laeufe die vollen 75 Paare = 150 Partien fahren, wie par.5
+   es verlangt. Beide endeten folgerichtig mit `UNDECIDED_CAP_REACHED`.
+
+### Was NICHT gemessen ist: die Kosten
+
+par.5 sieht kein Kostentor vor, und ein gepaarter Lauf taugt nicht dafuer -- beide Seiten spielen
+je zur Haelfte mit Modus 1, die Blockzeiten sind gemischt. **Relevant wird das, wenn Modus 1
+Default werden soll** (Fahrplan Nr. 29, Entscheidspalte "Modus 1 als Default?"): nach par.8a
+Befund 2 braucht Modus 1 die Sicht des Ruecklegers im Folgezustand, und die liefert
+`net_leaf_eval` nur ueber den gespiegelten zweiten Vorwaertspass -- **ein `eval_pair`-Batch je
+Kandidat statt eines Passes**. Bei einer Erzeugung ueber rund zwoelf Stunden schlaegt das durch.
+Vorschlag des Koordinators, offener Nutzer-Entscheid: ein kurzes Kostentor nach dem Muster von
+Nr. 30 und Nr. 35 (Wanduhr je Partie mit gegen ohne Knopf, Schwelle 25 Prozent, rund 24 min je
+Lauf), bevor der Modus ins Rezept geht.
+
+### Offen aus par.5 Punkt 2
+
+Die Diagnostik aus den Logzeilen (`[return_order] mode=.. drawn=[..] chosen=[..]`): Anteil der
+Rueckgaben mit abweichender Reihenfolge, Wiederkehr-Rate, Ziehungen in den eigenen Block. Der
+Split-Anteil oben ist ein starker Indikator, ersetzt sie aber nicht.
+

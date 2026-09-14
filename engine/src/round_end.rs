@@ -325,9 +325,24 @@ pub fn execute_full_tiling(
 }
 
 /// Prüft, ob der platzierte Stein einen freigeschalteten Special-Space abrechnet,
-/// entnimmt dafür einen weißen Stein und vergibt den Kuppel-Bonus. Gibt die
-/// Bonus-Punkte zurück. Nur intern genutzt (von `execute_full_tiling`) -- kein
-/// externer Aufrufer.
+/// markiert ihn als belegt und vergibt den Kuppel-Bonus. Gibt die Bonus-Punkte
+/// zurück. Nur intern genutzt (von `execute_full_tiling`) -- kein externer
+/// Aufrufer.
+///
+/// KEINE KOSTEN (praezisiert 2026-09-14 auf Nutzer-Hinweis "sie kostet keinen
+/// stein. das ist eigentlich nur ein dummy stein damit fliesen die nachher
+/// kommen diesen dummy stein als nachbar verwenden koennen"): hier stand
+/// "entnimmt dafür einen weißen Stein", was den Vorgang wie einen Kostenposten
+/// aussehen liess -- und genau so ist er in
+/// `evaluations/PREREG_special_tile_yield.md` par.2 gelandet. Die Funktion
+/// greift auf keinen Beutel, Turm oder Spielervorrat zu; sie setzt nur
+/// `placed_special`. Der Vorrat kann per Konstruktion nicht leerlaufen (siehe
+/// Kommentar unten: 9 Slots, 9 Fliesen).
+///
+/// Der Marker ist funktional ein NACHBAR: `DomeSpace::is_filled` (dome.rs:54-58)
+/// gibt fuer ein Spezialfeld `placed_special` zurueck, und `board.rs:209/213`
+/// pruefen darueber die Vollstaendigkeit von Zeile und Spalte. Ein abgerechnetes
+/// Spezialfeld zaehlt also fuer die Spaltenvollendung mit.
 fn check_special_trigger(
     state: &mut GameState,
     player_idx: usize,

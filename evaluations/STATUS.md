@@ -105,9 +105,22 @@ Dateien, und alle drei Arme sind trainiert.
 | v29-b03 | 794 | Sichtwerte (Abschnitt 16) | gegen b01 | **Merkmalsstand UEBERNOMMEN** (Seed 1 klar 69:41, Seed 2 Gleichstand; par.12-Regel) |
 | v29-b02 | 794 | plus Spezialfeld-Ablation | gegen b03 | **die Kanaele 77/78 TRAGEN** -- die Ablation verliert in beiden Seeds (Seed 2 signifikant, -0,533) und belegt in beiden weniger Spezialfelder |
 
-**Champion bleibt `v28-b02_brierbest`.** Ob b03 den Champion schlaegt, ist UNGEMESSEN -- er lief
-nur gegen b01, und b01 verlor gegen den Champion. Das waere ein eigener Lauf und ist der
-naheliegendste naechste Schritt, wenn ein Champion-Wechsel in v29 noch gewollt ist.
+**Champion bleibt `v28-b02_brierbest`.** Die fehlende Kante ist am 2026-09-14 gemessen worden
+(Nutzer: "ich hab noch keinen champion kandidaten aus v29 gesehen"), **Ergebnis 1:1**:
+
+| Seed | b03 : Champion | SPRT | McNemar p | Punkte b03 / Champion |
+| --- | --- | --- | --- | --- |
+| 20261067 | **124 : 86** | **b03 signifikant besser** | 0,0163 | 53,38 / 50,03 |
+| 20261068 | 87 : 93 | H0 (Gleichstand, nicht Niederlage) | 0,7754 | 53,61 / 53,63 |
+| 20261069 | **64 : 36** | **b03 signifikant besser** | 0,0125 | 57,48 / 52,10 |
+
+**v29-b03 IST EIN CHAMPION-KANDIDAT** (drei Seeds, alle auf demselben Wheel): zwei signifikant
+dafuer, einer Gleichstand, **kein Seed dagegen**. Zusammen 275:215 in 490 Partien. In beiden
+Siegseeds auch das Punkteniveau klar hoeher (+3,35 / +5,38 je Partie), im neutralen Seed gleich.
+
+**OFFENER NUTZER-ENTSCHEID: Promotion ja oder nein.** Der Champion ist NICHT gewechselt und die
+Elo-Kante ist NICHT eingetragen -- beides gehoert in `/mosaic-champion-promotion`
+(`docs/promotion_checklist.md`). Einzelheiten `PREREG_v29_window.md` par.9.
 
 **MESSFEHLER GEFUNDEN 2026-09-14: b03 hat auf ablatierten Validierungsdaten validiert.**
 Derselbe Schluessel-Defekt, der b02s Monolithen kostete, traf auch den Val-Cache -- und den baut

@@ -231,6 +231,10 @@ _SPEC_TO_ENV = {
     # Default 0 (Handregel). Bei 1 sucht die Netz-KI ihre Startkuppel
     # (py.rs::ai_start_tile_json liest den Knopf).
     "start_by_search": "MOSAIC_START_BY_SEARCH",
+    # PREREG_moon_stack_order.md par.4 (2026-09-14): OPTIONALES Spec-Feld,
+    # Default 1 (Fan-out an = Bestand). Umgekehrte Polung zu den Nachbarn --
+    # 0 schaltet den Fan-out AUS und laesst nur die kanonische Reihenfolge.
+    "moon_order_variants": "MOSAIC_MOON_ORDER_VARIANTS",
 }
 
 

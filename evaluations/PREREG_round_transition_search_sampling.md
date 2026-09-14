@@ -538,3 +538,21 @@ steht in `PREREG_v29_window.md` par.7 als Punkt 2c. **Danach:** was traegt, geht
 (`PREREG_v29_window.md` par.8 Punkt 3); faellt der Arm negativ aus, ist die Linie geschlossen und
 der naechste Weg zur Tiling-Sicht ist Variante C (Encoder-Seite, par.7) -- die waere ein eigener
 Arm mit Training, nicht Teil dieser Prereg.
+
+## par.12 ZWEITER NUTZNIESSER: der Spezialfeld-Ertrag (Nutzer 2026-09-14)
+
+Bis hierher war Variante B (Tiling im Blatt) mit der Rundenvoraussicht begruendet. Der Nutzer hat
+am 2026-09-14 einen zweiten, unabhaengigen Nutzniesser benannt: *"ich denk es gehoert drafting und
+tiling zusammen fuer tile yield. das eine geht nicht ohne das andere"*.
+
+Belegt an `PREREG_special_tile_yield.md` par.2: der Ertrag einer Spezialfliese ist eine Kette --
+im Drafting die Steine holen, im Tiling die anderen DREI Felder des Slots fuellen (erst dann
+entriegelt `try_unlock_special`, dome.rs:139-141), dann mit einem weiteren weissen Stein
+abrechnen (round_end.rs:324). Solange das Blatt VOR dem Tiling endet, kann die Suche beim Ziehen
+nicht bewerten, ob eine Platte am Ende einen Slot freischaltet.
+
+**Folge:** der offene Drafting-Hebel aus `special_tile_yield` par.4a ist ohne Variante B nicht
+messbar (dort als par.11 registriert). Variante B bekommt damit einen zweiten benannten
+Nutzniesser -- was nach CLAUDE.md ("Infrastruktur bewerten: Irrtumskosten, nicht Elo") die
+Anforderung an einen Infrastruktur-Vorschlag ist: eine konkrete Messung, die dadurch erst
+moeglich wird.

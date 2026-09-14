@@ -103,6 +103,10 @@ SPEC_TO_ENV = {
     # PREREG_start_dome_choice.md par.9c (2026-09-12), OPTIONALES Spec-Feld
     # mit Default 0 (Handregel); bei 1 sucht die Netz-KI ihre Startkuppel.
     "start_by_search": "MOSAIC_START_BY_SEARCH",
+    # PREREG_moon_stack_order.md par.4 (2026-09-14), OPTIONALES Spec-Feld mit
+    # Default 1 (Fan-out an = Bestand); 0 laesst nur die kanonische
+    # Reihenfolge der Mondsteine zu.
+    "moon_order_variants": "MOSAIC_MOON_ORDER_VARIANTS",
 }
 
 
