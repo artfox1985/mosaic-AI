@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch (1.201 Dateien, 12,8 h), Tor 2a HAELT (0,843 gegen 0,816, Reihe ueber fuenf Generationen monoton), Fenster 2.947 Dateien, Training b01 1,55 h. **Tor 1 BEIDE SEEDS H0** (87:93 und 69:81, je SPRT-Abbruch): der Pflichtarm traegt nicht, kein Champion-Wechsel. ACHTUNG: b01 war KEIN reiner Materialschritt -- der v29-Korpus bringt drei Aenderungen mit (Startkuppel-Variation 0,15, Startkuppel per Suche, Stapelzug-Knopf, Eingang 744 -> 755), der Nullbefund kann auch Umstellungskosten sein. **b02 trainiert, aber ZWEIFAKTORIELL** (par.9: 794 statt 755, das Wheel lief davor) -- drei Wege, Entscheid noetig. b03 laeuft. Offen: Sockel-Sims. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT (0,843 gegen 0,816), Tor 1 fuer b01 BEIDE SEEDS H0 (kein Champion-Wechsel; b01 war kein reiner Materialschritt, drei Erzeugungs-Aenderungen, nur 40,8 Prozent des Fensters tragen sie). **ZWEI offene Entscheide:** b02 ist zweifaktoriell geworden (794 statt 755), und der Fenster-Cache-Schluessel kennt den Ablations-Schalter nicht -- b03 hat b02s Monolithen ueberschrieben. Ergebnisse unbeschaedigt, die naechste Wiederholung waere still falsch. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -615,6 +615,46 @@ genauere Blick.
 200 Paaren abgebrochen, genau wozu er da ist. 13,8 s je Partie, 10 Threads.
 
 **Der zweite Seed (20261062) laeuft.** Ein DRITTER Seed ist kein Automatismus (Regel v27, par.6).
+
+### MONOLITH-KOLLISION: der Fenster-Schluessel kennt den Ablations-Schalter nicht (2026-09-14)
+
+**Befund.** b02 (Schalter AN) und b03 (Schalter AUS) haben denselben Monolith-Schluessel
+`fd13f54061cd` bekommen. Die Datei `data/.cache_fd13f54061cd.h5` wurde um 09:09 fuer b02 gebaut
+und um 11:15 von b03 UEBERSCHRIEBEN.
+
+**Ursache, am Code nachgelesen.** Es gibt ZWEI Schluessel, und nur einer kennt den Schalter:
+
+| Schluessel | Funktion | kennt `MOSAIC_SPECIAL_PLANES_OFF`? |
+| --- | --- | --- |
+| Block je Datei | `per_file_cache_key` (`engine/py/file_cache_key.py`, Feld `"\|specialoff"`) | **ja** |
+| Fenster/Monolith | `window_cache_key` (`engine/py/corpus_dataset.py` Z.324) | **nein** -- er nimmt `INPUT_SIZE`, Dateiliste, Encoder, `value_target_variant`, `conjunction_head` |
+
+Die BLOECKE trennen sich also sauber, der MONOLITH nicht. par.6 sagt zum Schalter "Teil des
+Cache-Schluessels, damit die Bloecke sich selbst auslosen" -- das stimmt fuer die Bloecke und
+eben nicht fuer den Monolithen.
+
+**Schaden in diesem Lauf: keiner an den Ergebnissen.** b02 wurde von 09:09 bis 10:40 auf SEINEM
+Monolithen trainiert (Schalter-Bloecke), b03 baute um 11:15 neu und trainiert auf seinem. Beide
+Arme sind inhaltlich richtig. **Aber b02s Monolith existiert nicht mehr** -- ein `--resume` fuer
+b02 liefe jetzt auf den Daten von b03.
+
+**Das Gefaehrliche ist der naechste Fall, nicht dieser.** Wer die beiden Arme PARALLEL faehrt
+oder b02 nach b03 wiederholt, bekommt still den falschen Monolithen. Das ist dieselbe
+Fehlerklasse wie die b05-Konfundierung: kein Absturz, kein roter Test, nur ein Arm, der etwas
+anderes misst als sein Etikett sagt.
+
+**Zwei Wege, Entscheid beim Nutzer:**
+
+1. **`window_cache_key` um den Schalter erweitern.** Sauber an der Wurzel -- aber der Docstring
+   warnt ausdruecklich: "die Zeichenketten-Verkettung unten ist der Schluessel JEDES vorhandenen
+   Caches im `data/`-Ordner; jede Aenderung an ihr entwertet Bestand." Das wuerde alle
+   Monolithen neu bauen lassen.
+2. **Den Monolithen je Arm unter eigenem Namen bauen** (`--merge-out` mit Arm-Suffix) und
+   `train.py --cache-file` darauf zeigen lassen. Aendert keinen Schluessel, entwertet nichts,
+   kostet eine Zeile im Ketten-Skript. **Empfohlen.**
+
+Bis das entschieden ist, gilt der Handgriff: **zwischen zwei Armen mit verschiedenem Eingang den
+Monolithen umbenennen oder neu bauen, nie den alten annehmen.**
 
 ### v29-b02 ist ZWEIFAKTORIELL geworden -- Ausfuehrungsfehler, Entscheid noetig (2026-09-14)
 
