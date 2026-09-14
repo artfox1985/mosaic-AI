@@ -979,6 +979,69 @@ zu keinem anderen Ergebnis als die Sofortpunkte. Im Tiling ist zu wenig zu
 entscheiden (par.3f: Fast-Gleichstaende), und der Entscheid liegt im Draft.
 8.6 bleibt gebaut (Default 0) und geht nicht ins Rezept.
 
+### 8.6b WIEDERHOLUNG REGISTRIERT (2026-09-14, VOR dem Lauf): dieselbe Frage am heutigen Netz und an der heutigen Basislinie
+
+**Anlass, und er ist ein Fehler von mir.** Der Nutzer fragte, ob der Value-Anteil
+im Tiling "mit abfallendem Profil" drin sei, und beauftragte danach den A/B:
+*"takte den A/B term in die kette von heute ein. dann haben wir eine gute
+ausgangsbasis."* Diesem Auftrag lag meine Auskunft zugrunde, der Term sei
+**ungemessen**. Das war falsch: 8.6a steht seit dem 2026-09-04 direkt darueber.
+Die Fehlauskunft entstand, weil eine ergebnislose Suche als Abwesenheitsbeleg
+behandelt wurde (Einzelheiten und die Korrektur der zweiten betroffenen Stelle:
+`PREREG_round_transition_search_sampling.md` par.7). Der Nutzer hat den
+Wiederholungslauf nach der Richtigstellung ausdruecklich bestaetigt: *"bleiben
+drin. die maschine braucht eh was zum laufen."*
+
+**Die Sachfrage, am Code geprueft** (envelope.rs:1398-1400): der Value-Anteil
+hat KEIN eigenes abfallendes Profil, sondern haengt am KOMPLEMENT der Huelle.
+
+    points + w_tile * w_e * cost_delta + w_val * (1 - w_e) * margin
+
+Mit dem Champion-Profil [1,0 0,92 0,67 0,33 0,0] steigt sein Gewicht ueber die
+Runden 0 -> 0,08 -> 0,33 -> 0,67 -> 1,0, waehrend die Huelle abfaellt: frueh
+zaehlt, was geometrisch erreichbar bleibt, spaet die konkrete Endmarge.
+Eingeschaltet wird er allein durch `w_val`, denn `is_off()` ist
+`w_tile == 0 UND w_val == 0` (envelope.rs:1420-1421, Test :1850).
+
+**Was die Wiederholung sachlich traegt** -- zwei geaenderte Voraussetzungen,
+kein Zweifel am Handwerk von 8.6a:
+
+1. **Anderes Netz.** 8.6a lief am `v23-b01_brierbest`. Der Term fragt den
+   Value-Kopf nach einer MARGE; seither ist der Value-Kopf durch die
+   Phase-0-Diagnose gegangen (Tau +0,338, Orakel-Rangfolge relativ geheilt,
+   Betrag weiter gedaempft). Ein Term, der auf Margen-Unterschiede zwischen
+   Fast-Gleichstaenden angewiesen ist, haengt genau an dieser Groesse.
+2. **Andere Basislinie.** 8.6a mass gegen eine Spec mit `envelope_search_c` 0,0,
+   `envelope_hull_form` 1, `envelope_projection_mode` 0, `special_row6_w` 0,0.
+   Die heutige Champion-Spec hat alle vier anders (1,0 / 2 / 1 / 1,0). Die
+   Huelle unter dem Term ist eine andere, und `w_e` ist der Faktor, der den
+   Value-Anteil gewichtet.
+
+**Was dagegen spricht, und es ist das Staerkere:** die Begruendung des
+Nullbefunds war strukturell, nicht netzabhaengig -- *"Im Tiling ist zu wenig zu
+entscheiden (par.3f: Fast-Gleichstaende), und der Entscheid liegt im Draft."*
+Das gilt unveraendert. Der Lauf ist deshalb als AUFRAEUM-Lauf gefahren, nicht
+als Hoffnung, und er belegt eine Maschine, die sonst leer stuende.
+
+**LESART VORAB, bindend:** ein zweiter Nullbefund SCHLIESST den Term. Dann steht
+8.6 nicht mehr als Vorschlag im Baum, sondern als entschieden (gebaut,
+Default 0, zweimal gemessen, an zwei Netzen und zwei Basislinien). Traegt eine
+der beiden Dosen gepaart ueber der Aufloesung, ist das ein Befund ueber den
+GEHEILTEN Value-Kopf und gehoert zu den v30-Rezept-Knoepfen.
+
+**AUFBAU** (tools/night_v29_envelope_value_ab.sh, Anschluss an die Nachtkette
+vom 2026-09-14): Modell beidseitig `alphazero_v28-b02_brierbest`, Specs
+`env_val_{off,05,10}.spec.json` aus der Champion-Spec abgeleitet, beim Bau
+geprueft auf genau ein Feld Unterschied (13 Felder je Datei). Zwei Arme a 80
+Paare, Seeds 20261098 und 20261099, Blockgroesse 5, --log-games, SPRT weit
+(alpha = beta = 0,001), a-Seite traegt den Knopf. Standard-Kennzahlen je Lauf.
+
+**KOSTEN, vorab benannt:** bei `w_val != 0` ruft der Tiling-Solver je Kandidat
+den `margin_evaluator` (tiling_solver.rs:1648), bei `w_val == 0` nicht. Die Arme
+sind also teurer als die Basislinie; `laufzeit.s_je_partie` aus beiden
+Artefakten gehoert in die Auswertung. Ein Kostentor ist NICHT gesetzt: der Term
+steht nicht zur Rezept-Aufnahme an, solange er nicht traegt.
+
 ### 8.7b K3-P ARENA (2026-09-04, 04:12-07:00; Seed 20261007, 3 Arme x 2 x 80, Blockgroesse 5, gegen Spec aus)
 
 | Arm | Siege Knopf : Basislinie (160 Paare) | diskordant, McNemar p | Block-Diff Siege (SE, t) | Punkte Knopf (Kontrolle 48,3) | Margin (Block-SE) | Spalten Arena, Knopf minus Kontrolle (SE) | H Arena (SE) |
