@@ -148,7 +148,7 @@ def stack_state(current_player, phase="drafting"):
 class StackKnowledge(unittest.TestCase):
     """Die Stapel-Anzeige traegt die Groessen, die der Encoder seit v28-b02 bekommt
     (`features.rs:274-286` Maske und Wild-Anteil, `features.rs:744-754` Rueckgabe-Wissen);
-    bis 2026-09-13 fehlten sie im Fenster (Sicht-Audit par.10b)."""
+    bis 2026-09-13 fehlten sie im Fenster (Sicht-Audit par.11b)."""
 
     def test_mask_and_wild_split(self):
         line = cp.stack_lines(stack_state(0), {"me": 0})[0]

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 6 Partien (par.7): 3:1 gegen v27-b01, 1:1 gegen v28-b02. Das Netz punktet aus Platzierungen statt aus den Wertungsplatten (0:10, 2:8) und nutzt die Null-Klammer als Werkzeug (Arm A live belegt). SICHTGLEICHHEIT GILT IN KEINE RICHTUNG (par.10): vier Stellen sehe ich mehr (Beutel/Turm, Chipanzahl, Vorderseiten gezogener Platten, Historie), Angleich ENTSCHIEDEN mit v29; die Gegenrichtung (Stapelmaske, Rueckgabebloecke) ist eingebaut. Werkzeug par.9 P.11-14. -->
+<!-- STATUS: OFFEN | Frage: Was zeigt eigenes Spiel gegen das Champion-Netz, das die Arenen nicht zeigen? | Beleg: 7 Partien (par.7), 5:2 fuer Claude; das Netz punktet aus Platzierungen statt aus den Wertungsplatten. Sichtgleichheit gilt in KEINE Richtung, Angleich ENTSCHIEDEN mit v29. **Zugklassen-Differential GEMESSEN (par.12): KEIN Knopf** -- die roh auffaellige Kuppelplatzierung (53 von 53) ist nach Normierung auf die Optionszahl nicht von blinder Wahl unterscheidbar; bei 7 Partien ohne Ausgangs-Varianz nicht aufloesend. -->
 
 # Vorregistrierung: Temporaeres Spiel-Interface Claude gegen Netz (Nutzer-Auftrag 2026-09-06)
 
@@ -1002,7 +1002,7 @@ Tiling-Umbau (Punkt 2c) und in derselben Gruppe wie der Korpus-Verhaltens-Audit
 **Danach:** was das Differential in EINER Klasse zeigt, wird zu einer eigenen Prereg und
 gegebenenfalls zu einem v30-Rezept-Knopf (`PREREG_v29_window.md` par.8 Punkt 3).
 
-## par.10 SICHTGLEICHHEIT DES SPIELFENSTERS, BEIDE RICHTUNGEN (Audit 2026-09-13, Nutzer-Auftrag "pruefe ob sichtgleichheit herrscht in beide richtungen")
+## par.11 SICHTGLEICHHEIT DES SPIELFENSTERS, BEIDE RICHTUNGEN (Audit 2026-09-13, Nutzer-Auftrag "pruefe ob sichtgleichheit herrscht in beide richtungen")
 
 **Abgrenzung zuerst.** `PREREG_stack_top_feature.md` fuehrt die Inventur NETZ gegen MENSCH AM TISCH
 (par.15/par.16, P.1-P.15). Dieser Absatz fragt etwas anderes, das dort nicht steht: gilt
@@ -1013,7 +1013,7 @@ die Befunde mit P.9/P.11/P.14 decken, steht der Verweis dabei.
 **Verdikt: Sichtgleichheit gilt in KEINE der beiden Richtungen.** Vier Stellen sehe ich mehr als
 das Netz, zwei sieht das Netz mehr als ich. Alle Pruefstellen in dieser Sitzung selbst nachgelesen.
 
-### par.10a Ich sehe MEHR als das Netz
+### par.11a Ich sehe MEHR als das Netz
 
 1. ~~**Mondstapel der kleinen Fabriken.**~~ **WIDERLEGT durch Nutzer-Regelauskunft
    (2026-09-13, woertlich: "kleine fabriken haben immer nur einen stapel. die grosse fabrik hat
@@ -1064,7 +1064,7 @@ das Netz, zwei sieht das Netz mehr als ich. Alle Pruefstellen in dieser Sitzung 
    auch --, aber es ist eine echte Asymmetrie zum Gegner dieser Partien und die einzige, die sich
    nicht am Fenster beheben laesst, sondern nur am Netz.
 
-### par.10b Das NETZ sieht mehr als ich
+### par.11b Das NETZ sieht mehr als ich
 
 1. **Kuppelstapel-Maske und Wild-Anteil.** Der Encoder bekommt 18 Bits "dieses Design liegt noch
    verdeckt im Stapel" (`features.rs:274-277`) plus den Wild-Anteil des Rests als Skalar
@@ -1098,7 +1098,7 @@ Waechter am Zug, Waechter am Partieende); Probe an `gsmoke2` gegengerechnet: 13 
 Designs, die fuenf fehlenden Ids liegen offen und sind alle Spezialplatten, also 9 wild / 4
 spezial -- konsistent mit `dome_stack_count` und dem Anteil.
 
-### par.10c Was NICHT als Asymmetrie zaehlt
+### par.11c Was NICHT als Asymmetrie zaehlt
 
 Der Encoder bekommt eine Reihe fertiger AGGREGATE (`score_geo`, `line_geo`, `col_f_max`,
 `estimated_score`, `cell_reachable_mask`), die mein Fenster nicht druckt. Das ist keine
@@ -1108,17 +1108,124 @@ umgekehrt meine eigenen Hilfen (Reihen-Ziele, Spezialfelder, Wertungsplatten-Sta
 die Aktionsliste. Beide Seiten bekommen von der Engine nur legale Aktionen; dass der Encoder die
 Top-down-Sperre nicht kennt (P.14), betrifft seine Bewertung, nicht seine Zugauswahl.
 
-### par.10d Folge fuer par.7
+### par.11d Folge fuer par.7
 
 Die sechs Partien bleiben als **Beobachtung** gueltig -- die tragenden Befunde (Plattenblindheit,
 Null-Klammer als Werkzeug, Strafleisten-Bilanz) haengen an keiner der sechs Stellen. Als
-**Staerkevergleich** sind sie es nicht: der Vorteil aus par.10a.2/3 wirkt in jeder Runde, und
-par.10b.2 wirkt gegen mich. Eine Siegquote aus dieser Reihe ist damit auch aus diesem Grund keine
+**Staerkevergleich** sind sie es nicht: der Vorteil aus par.11a.2/3 wirkt in jeder Runde, und
+par.11b.2 wirkt gegen mich. Eine Siegquote aus dieser Reihe ist damit auch aus diesem Grund keine
 Groesse (par.8.8 nennt schon den Champion-Wechsel). **ENTSCHIEDEN (Nutzer 2026-09-13, woertlich: "nein brauchst nichts machen. wird mit v29
-geloest"): am Fenster wird nichts geaendert.** Die vier Stellen aus par.10a bleiben also bis
+geloest"): am Fenster wird nichts geaendert.** Die vier Stellen aus par.11a bleiben also bis
 zur v29-Generation bestehen -- P.9 (Turm je Farbe) und P.11 (Chipanzahl) schliesst der Sicht-Arm
 v29-b03 auf der NETZ-Seite (`PREREG_stack_top_feature.md` par.15/par.16), die Vorderseiten der
 gezogenen Platten haengen an derselben Aktionsmodellierung wie der dortige Befund par.16 Folge 2,
 und die Historie ist ohnehin eine Netzfrage. **Fuer g08-g10 heisst das:** werden sie vor v29
 gespielt, tragen sie dieselbe Ungleichheit wie g02-g07, und dieselbe Einschraenkung gilt --
 Beobachtung ja, Staerkevergleich nein. Kein Handlungsbedarf, kein offener Punkt.
+
+## par.12 ZUGKLASSEN-DIFFERENTIAL GEMESSEN (2026-09-14) -- und warum es die Frage NICHT beantwortet
+
+**Nummerierung (bereinigt 2026-09-14, Nutzer-Auftrag "dann korrigier diese doppelung"):** die
+Nummer par.10 war zweimal vergeben -- Zugklassen-Differential (2026-09-12) und Sichtgleichheit
+des Spielfensters (Audit 2026-09-13). **par.10 bleibt das Zugklassen-Differential**, weil fast
+jeder auswaertige Verweis dieses meint (`PREREG_v29_window.md` par.7 Punkt 2b und Zeile 1165,
+`PREREG_corpus_behaviour_audit.md`, `v29_program_agent_plan.md` Nr. 25, rund zwanzig Stellen in
+`tools/probes/move_class_differential.py`). **Die Sichtgleichheit ist auf par.11 gerueckt**, ihre
+Unterabschnitte auf par.11a-d; auswaerts hing daran nur "Sicht-Audit par.10b", zweimal
+(`tools/claude_play.py`, `tools/tests/test_claude_play_board_hints.py`), beide nachgezogen.
+Dieser Ergebnis-Absatz ist dadurch par.12.
+
+Werkzeug `tools/probes/move_class_differential.py`, Artefakt
+`evaluations/artifacts/move_class_differential_v29.json`. Lauf 1.343 s Wanduhr (1.326 s CPU,
+threads 1), also innerhalb der par.10-Annahme "unter 30 min".
+
+**n, Grundmenge, Einheit:** n = 293 gesuchte Entscheide (226 bewertet, 67 ausserhalb des
+Wurzelfensters), Grundmenge alle Claude-Entscheide der Partien g01-g07 in den Runden 1-4,
+Einheit Entscheide. par.10s "rund 600" zaehlte BEIDE Seiten; Claudes Haelfte allein sind rund 293.
+
+### Der rohe Befund sah eindeutig aus
+
+| Klasse | n | Abweichungsrate | davon ausserhalb des Fensters | mittlere Delta win% |
+| --- | --- | --- | --- | --- |
+| `dome_display` (Kuppelplatzierung) | 53 | **1,000** | **36** | **9,82 pp** |
+| `stone_row` | 161 | 0,708 | 29 | 5,24 pp |
+| `bonus_chip` | 56 | 0,464 | 0 | 3,04 pp |
+| `stone_floor_line` | 16 | 0,250 | 0 | 2,91 pp |
+
+Kuppelplatzierung in JEDEM der 53 Faelle anders als das Netz, mit der hoechsten Wurzelwert-
+Differenz und 39 Siegen zu 14 Niederlagen: nach par.10 Lesart (a) waere das "der naechste Knopf".
+
+### Normiert traegt er nicht
+
+**Die Abweichungsrate haengt an der Zahl der legalen Zuege, und die ist je Klasse voellig
+verschieden** (Median der legalen Zuege je Entscheid, aus dem Artefakt):
+
+| Klasse | Median legale Zuege | blinde Wahl weicht ab mit | beobachtet | Ueberschuss |
+| --- | --- | --- | --- | --- |
+| `stone_row` | 19 | 0,903 | 0,708 | **-0,195** (SE 0,036) |
+| `bonus_chip` | 3 | 0,519 | 0,464 | -0,054 (SE 0,067) |
+| **`dome_display`** | **73** | **0,961** | **1,000** | **+0,039** |
+| `stone_floor_line` | 1 | 0,250 | 0,250 | 0,000 |
+
+**Bei den Steinzuegen trifft Claude den Netzzug deutlich haeufiger als blindes Waehlen** (5,4
+Standardfehler unter der Blind-Erwartung). **Bei der Kuppelplatzierung ist seine Wahl von blinder
+Wahl nicht unterscheidbar**: blind erwartet man 50,9 Abweichungen von 53, beobachtet sind 53.
+Die 100 Prozent sind also kein Befund ueber Claude, sondern eine Folge der Optionszahl.
+
+**Zweiter Grund, warum die Klasse nichts sagt: das Wurzelfenster.** Die Suche rangt
+`m = clamp(round(sims/16), 4, 16)` Kandidaten (`engine/src/net_mcts.rs:3180-3186`), bei @400 also
+16 -- gegen Median 73 legale Kuppelzuege. Das Netz prueft dort rund 22 Prozent der Optionen, bei
+`stone_row` dagegen 16 von 19, also 84 Prozent. Der Rauschboden zeigt in 96 Netz-Entscheiden
+NULL Faelle ausserhalb des Fensters, aber das ist zu einem grossen Teil Konstruktion: die
+argmax-Seite spielt aus eben diesem Fenster.
+
+**Dritter Grund -- die Ausgangs-Spalte aus par.10 Punkt 4 ist bei sieben Partien strukturell
+blind.** Der Ausgang ist eine PARTIE-Eigenschaft; jeder Entscheid erbt ihn. Anteil der Entscheide
+aus Siegpartien: gesamt 0,713, `stone_row` 0,727, `bonus_chip` 0,714, `dome_display` 0,736. Keine
+Klasse hebt sich ab, und das kann sie nicht, solange alle Klassen in allen sieben Partien
+vorkommen. Eine "Rangliste Haeufigkeit x Ausgang" braucht Varianz im Ausgang, die es hier nicht
+gibt.
+
+### Verdikt gegen die vorab festgelegten Lesarten
+
+* **(a) Haeufung in EINER Klasse mit positivem Ausgang: NICHT erfuellt.** Der einzige Kandidat
+  (`dome_display`) faellt bei Normierung weg, und seine Ausgangsquote entspricht dem Partiemittel.
+  **Es wird also kein Knopf und kein Trainingsziel aus dieser Sonde abgeleitet** -- genau das, was
+  par.10 mit "kein Bau aus dieser Sonde heraus" vorgesehen hat.
+* **(b) ueber alle Klassen verteilt:** dem naeher, aber die Folgerung "dann fehlt Tiefe" traegt
+  nicht, weil die Streuung durch die Optionszahl erklaert ist.
+* **(c) Value-Kopf als Luecke:** in 102 von 136 Abweichungen mit Q haelt das Netz Claudes Zug fuer
+  schlechter, mittlere Differenz 5,30 pp, und Claude gewinnt 5:2. Das ist der einzige Teil, der
+  Substanz hat -- aber auch er ist konfundiert, weil die Differenz nur fuer Zuege INNERHALB des
+  Fensters existiert. Das Orakel-Differential aus `PREREG_human_game_oracle_gap.md` bleibt der
+  saubere Weg dafuer.
+
+**Was die Sonde dennoch geliefert hat**, und was ohne sie nicht auf dem Tisch laege: der Kontrast
+zwischen `stone_row` (-0,195 unter blind, das Netz und Claude denken erkennbar aehnlich) und
+`dome_display` (nicht von blind unterscheidbar, das Netz prueft ein Fuenftel der Optionen). **Das
+ist eine Aussage ueber die SUCHE, nicht ueber das Zugrepertoire** -- und die Kuppelplatzierung ist
+die Stelle, an der die Spalten entstehen.
+
+**Nicht gebaut, nicht entschieden:** ob die Wurzelbreite fuer die Kuppelphase eigens erhoeht
+gehoert (`MOSAIC_GUMBEL_TOP_M` liegt als Knopf vor, `net_mcts.rs:3188-3200`), ist ein
+Rezept-Entscheid des Nutzers und braucht eine eigene Vorregistrierung mit Kostentor -- eine
+breitere Wurzel kostet Sims je Kandidat.
+
+**Wiedervorlage:** par.10s Schlusssatz ("mehr Claude-Partien erhoehen n") ist damit praeziser zu
+fassen. Mehr Partien allein heilen weder die Optionszahl noch die Fensterbreite; was n wirklich
+braucht, ist Varianz im AUSGANG, also Partien, die Claude verliert.
+
+### Abweichungen vom Bau nach par.10 (alle im Artefakt unter `abweichungen_von_par10`)
+
+1. **Champion-Spec nicht durchgereicht:** `net_search_state_json` hat kein Spec-Argument
+   (`engine/src/lib.rs:1022-1028`) und laeuft auf `SearchConfig::from_env()`. Sims, argmax und
+   "ohne Wurzelrauschen" treffen zu, die Spec nicht. Kein Umbau dafuer.
+2. **Rauschboden ohne Wurzelrauschen:** einen Einstieg, der Netz gegen Netz MIT Rauschen UND
+   Partie-Log liefert, gibt es nicht. Gemessen ist damit der Rauschboden des MESSENS, nicht der
+   Dirichlet-Anteil.
+3. **Startsetzung und Tiling fehlen in der Grundmenge:** `analyze_game_log` orakelt sie nicht
+   (`maybe_oracle` steigt ausserhalb des Drafting aus). par.10 Punkt 2 nennt sie; sie fehlen.
+   Runde 5 faellt regulaer heraus (Alpha-Beta-Solver).
+4. **Kuppel-Rotation nur beschreibend** in der feinen Klasse, vom Orakel nicht bewertet.
+5. **Gelesen wird `.engine.log`**, nicht `game.log`: ab g02 traegt nur die erstere den Kopf und
+   die Aktions-IDs. Je Partie steht im Artefakt, welche Datei benutzt wurde.
