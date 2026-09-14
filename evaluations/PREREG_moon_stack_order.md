@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund: Fan-out 193:207, Nachsuche 197:203, je 200 Paare ohne Frueh-Stopp, keine der sechs Kennzahlen ueber der Aufloesung. Die Gegenhypothese "Reihenfolge egal" bleibt widerlegt (nur der oberste Stein je Stapel ist ziehbar). Der Implementierungs-Verdacht par.9d ist in 3 von 5 Punkten ausgeraeumt; offen bleiben Budget und Ausloesungsrate, dafuer ist die Diagnose-Zeile gebaut (par.9g, Wheel steht aus). Weg C und B als Fahrplan 32a/32b (par.10a). -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund: Fan-out 193:207, Nachsuche 197:203, je 200 Paare ohne Frueh-Stopp, keine der sechs Kennzahlen ueber der Aufloesung. Die Gegenhypothese "Reihenfolge egal" bleibt widerlegt (nur der oberste Stein je Stapel ist ziehbar). Der Implementierungs-Verdacht par.9d ist in 4 von 5 Punkten ausgeraeumt (Ausloesung per Deckungsgleichheit der Torbedingung), offen bleibt das Budget; die eigentliche Frage ist, wie oft die Nachsuche ANDERS waehlt -- Diagnose-Zeile gebaut (par.9g, Wheel steht aus). Weg C und B als Fahrplan 32a/32b (par.10a). -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -789,15 +789,35 @@ fuenf Punkte, am Code geprueft 2026-09-15:
 4. **Budget: OFFEN, nur messbar.** 256 Sims je Variante geben Wurzelbreite 16
    (`gumbel_top_m_for_budget`). Ob der entscheidende Gegnerzug -- den frisch oben liegenden
    Stein nehmen -- unter diesen 16 Kandidaten ist, steht nicht im Code, sondern im Lauf.
-5. **Ausloesungsrate: OFFEN, weil das Instrument fehlte.** par.9b sagt 24,34 Gelegenheiten je
-   Partie, aber die Nachsuche protokollierte ihre Wahl nicht. Die Diagnose-Zeile ist am
-   2026-09-15 nachgebaut (par.9g), liegt aber noch nicht im Wheel.
+5. **Ausloesungsrate: GRUEN, per Deckungsgleichheit der Bedingung** (praezisiert 2026-09-15,
+   nachdem der Punkt zuerst als offen notiert war). Das Tor prueft
+   `TakeSource::SmallFactorySun && moon_order.len() >= 2 && unique_moon_orders(..).len() >= 2`
+   (`moon_order_post_search_applies`), und `choose_moon_order_with` prueft dieselbe Bedingung
+   noch einmal. par.9b hat GENAU diese Menge gezaehlt -- "mindestens zwei eindeutige
+   Reihenfolgen", 24,34 je Partie. Die Frage "wird die Stelle erreicht" ist damit beantwortet,
+   ohne dass eine Logzeile noetig waere: das Tor kann nicht seltener oeffnen als die Bedingung
+   zutrifft. **Uebertragen, nicht beobachtet:** par.9b zaehlte auf 12.907 Self-Play-Partien bei
+   anderen Sims und anderer Spec; die Rate DIESES Laufs kann davon abweichen, die Bedingung
+   nicht.
 
-**Damit ist der Verdacht aus par.9d in drei von fuenf Punkten ausgeraeumt und in zweien nicht.**
-Das Verdikt lautet deshalb NICHT "die Reihenfolge ist egal" -- diese Gegenhypothese ist seit
-par.7 widerlegt -- sondern: **die Nachsuche in DIESER Bauform und mit DIESEM Budget traegt
-nicht.** Welcher der beiden offenen Punkte es erklaert, entscheidet die Diagnose-Zeile: bleibt
-`changed` nahe 0, waehlt die Nachsuche fast immer den Bestand und Punkt 4 ist der Verdaechtige.
+**Damit ist der Verdacht aus par.9d in vier von fuenf Punkten ausgeraeumt.** Offen bleibt allein
+Punkt 4, das Budget. Das Verdikt lautet deshalb NICHT "die Reihenfolge ist egal" -- diese
+Gegenhypothese ist seit par.7 widerlegt -- sondern: **die Nachsuche in DIESER Bauform und mit
+DIESEM Budget traegt nicht.**
+
+**Und die Frage, die par.9d gar nicht gestellt hat, ist die eigentlich offene:** nicht WIE OFT
+die Nachsuche laeuft, sondern WIE OFT SIE ANDERS WAEHLT. Dafuer ist die Diagnose-Zeile gebaut
+(par.9g, `changed`). Bleibt `changed` nahe 0, bestaetigt die Nachsuche fast immer den Bestand --
+dann ist weder Horizont noch Budget der Engpass, sondern der Prior ordnet die Varianten
+bereits so, wie die Suche sie ohnehin sortiert, und **Weg C faellt vor dem Bau**. Ist `changed`
+hoch, bleibt Punkt 4 der Verdaechtige und Weg C die naechste Frage.
+
+**WIEDERVORLAGE zur Kostenseite:** ein Beleg, dass die Nachsuche auch wirklich RECHNET (nicht
+nur ausloest), faellt ohne Zusatzaufwand aus derselben Nachtkette. Die Schritte 2 und 3
+(`k4_kosten_mit` / `k4_kosten_ohne`) fahren beide OHNE Nachsuche; ihr `laufzeit.s_je_partie`
+ist der fehlende Vergleichswert zu den 14,833 s dieses Laufs. par.9b erwartet rund 18.350
+Zusatz-Sims je Partie, also etwa +57 Prozent gegenueber @400 -- wenn die Wanduhr das nicht
+zeigt, stimmt etwas mit der Ausfuehrung nicht.
 
 ### Was das fuer par.10 heisst
 
