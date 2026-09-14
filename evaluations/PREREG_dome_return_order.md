@@ -461,7 +461,19 @@ unberuehrt** (par.11: die Reihenfolge hat keine Policy-Dimension, der Zug bleibt
 `SearchConfig` wurde bewusst nicht angefasst, weil das Struct-Literal in
 `engine/examples/kernbeweis_910002_probe.rs` sonst E0063 wirft. Kontrakt-Hash und
 Netz-Paritaets-Fixture nach Code-Lage nicht betroffen (`lib.rs:684-701`; das Record-Feld entsteht
-nur bei `p > 0`, der Fixture-Lauf faehrt ungesetzt) -- **HERLEITUNG, das Bau-Tor muss es belegen.**
+nur bei `p > 0`, der Fixture-Lauf faehrt ungesetzt).
+
+**BAU-TOR 2026-09-14 GRUEN, die Herleitung ist damit belegt:** `cargo test --release --lib`
+**654 gruen** (646 Bestand plus die acht neuen, 0 rot, **Netz-Paritaets-Fixture UNVERAENDERT**),
+`cargo test --release --no-run` deckt examples und benches ab (keine E0063), Wheel gebaut und
+installiert, **Kontrakt-Hash UNVERAENDERT 39994362fba145a6** (gegengeprueft am laufenden Wheel,
+das den Knopf jetzt mit `return_order_random_p: 0.0` fuehrt), `docs/knobs.md` neu generiert
+(123 Knoepfe), Konventions-Check gruen, **Anker-Drift GRUEN und Konservierung GRUEN** gegen
+`hv4_anchor` (`anchor_drift_live_wheel_20260914_returnstreu.json`,
+`anchor_conservation_artifact_wheel_20260914_returnstreu.json`).
+
+**Der Knopf ist damit einsatzbereit**, steht auf Default 0 und wartet auf die naechste Erzeugung.
+Dosis offen (Nutzer-Entscheid, Startkuppel faehrt 0,15).
 
 ### PFLICHT VOR DER NAECHSTEN ERZEUGUNG: der Lauf-Treiber kennt den Knopf nicht
 
