@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: ERZEUGUNG DURCH (par.9, 2026-09-14): 1.201 Dateien in rund 12,8 h, **Tor 2a HAELT** 0,843 gegen 0,816 volle Spalten je Seite (n=8.000); die Reihe ist ueber fuenf Generationen monoton, der Zuwachs wird kleiner. Fenster gebaut (2.947 Dateien, Schluessel 35c6bd2b9bd2), Training b01 durch. **Tor 1 Seed 1: H0** (87:93 auf 90 Paaren, SPRT-Abbruch) -- kein Beleg fuer Ueberlegenheit; zweiter Seed laeuft. Arme: b02 Spezialfeld-Ablation, b03 Sicht-Arm (755 -> 794, Code durch, Wheel offen; P.12 erst ab v30). Offen: Sockel-Sims. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch (1.201 Dateien, 12,8 h), Tor 2a HAELT (0,843 gegen 0,816, Reihe ueber fuenf Generationen monoton), Fenster 2.947 Dateien, Training b01 1,55 h. **Tor 1 BEIDE SEEDS H0** (87:93 und 69:81, je SPRT-Abbruch): der Pflichtarm traegt nicht, kein Champion-Wechsel -- ein weiterer reiner Materialschritt bewegt den Champion nicht mehr. Offen: b02, b03, Sockel-Sims. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -463,6 +463,44 @@ aus 4000 Partien):
 Der Margin ist per Konstruktion 0: im Self-Play spielt dasselbe Netz beide Seiten, die Klasse ist
 also ihr eigener Gegner. Die Reihenauslastung traegt dieses Artefakt nicht; sie steht in den
 Arena-Logs von Tor 1 und wird dort berichtet.
+
+### Tor 1 v29-b01 gegen v28-b02: **BEIDE SEEDS H0 -- der Pflichtarm traegt nicht**
+
+| Seed | Verdikt | Paare | Siege b01 : b02 | LLR | McNemar p | Punkte b01 / b02 | Laufzeit |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 20261061 | H0 | 90 | 87 : 93 | -2,956 | 0,76 | 49,99 / 50,23 | 2.485 s |
+| 20261062 | H0 | 75 | 69 : 81 | -3,838 | 0,44 | 48,31 / 51,23 | 1.989 s |
+
+Beide Laeufe brachen an der unteren Wald-Schranke ab (H0 p = 0,5 gegen H1 p = 0,65, alpha =
+beta = 0,05), zusammen 330 Partien. **Kein Champion-Wechsel**: `v28-b02_brierbest` bleibt.
+Ein DRITTER Seed ist kein Automatismus und hier auch nicht angezeigt -- beide Seeds zeigen
+dasselbe, und keiner war knapp.
+
+**Tor 2b GRUEN in beiden Laeufen** (Replay-Pruefung: 180 von 180 und 150 von 150 nachgespielt,
+je 0 divergiert).
+
+**Die vollen Spalten drehen das Vorzeichen zwischen den Seeds** -- genau deshalb sind zwei
+Pflicht:
+
+| | Seed 1 | Seed 2 |
+| --- | --- | --- |
+| volle Spalten b01 | 0,928 (+-0,109) | 0,920 (+-0,127) |
+| volle Spalten b02 | 0,883 (+-0,107) | 0,933 (+-0,117) |
+| Differenz | +0,045 | -0,013 |
+
+n = 180 bzw. 150 Bretter je Modell, Grundmenge Bretter, Einheit volle Spalten je Seite.
+
+**Der Kriteriums-Befund aus Seed 1 haelt der Wiederholung NICHT stand.** In Seed 1 war
+"Mehrfarbige Felder" mit -1,222 [-2,341, -0,104] das einzige Intervall ohne die Null; in Seed 2
+liegt dasselbe Kriterium bei -0,680 [-2,027, +0,667], also klar ueber der Null. Dasselbe bei den
+Vertikalen Reihen (+1,207 gegen +0,913, beide Intervalle enthalten die Null). **Die VORZEICHEN
+wiederholen sich, die Signifikanz nicht** -- und bei acht geprueften Kriterien war genau das die
+angekuendigte Erwartung. Als Befund geht das nicht durch; als Richtung bleibt es notiert.
+
+**Was das fuer die Kampagne heisst:** ein weiterer reiner Materialschritt auf demselben Rezept
+bewegt den Champion nicht mehr. Das ist die Frage, die par.6 an b01 gestellt hat, und die Antwort
+ist negativ. Die beiden anderen Arme sind davon unberuehrt -- b02 (Spezialfeld-Ablation) und b03
+(Sicht-Arm) aendern den EINGANG, nicht die Materialmenge.
 
 ### Tor 1 v29-b01 gegen v28-b02, Seed 20261061 (erster von zwei): **H0**
 
