@@ -232,11 +232,15 @@ Standard-Kennzahlen liegt ueber der Aufloesung. Artefakt
 **Das Verdikt lautet nicht "die Reihenfolge ist egal"** -- die Gegenhypothese ist seit par.7
 widerlegt (nur der oberste Stein je Stapel ist ziehbar) --, sondern: **die Nachsuche in dieser
 Bauform und mit diesem Budget traegt nicht.** par.9d hatte vorab festgelegt, dass ein
-Nullbefund hier ein Implementierungs-Verdacht ist; drei der fuenf Pruefpunkte sind am Code
-ausgeraeumt (Perspektive, Verdrahtung bis in den Arena-Pfad, Vollstaendigkeit der Varianten),
-zwei bleiben offen und sind nur messbar: **Budget** (256 Sims je Variante = Wurzelbreite 16)
-und **Ausloesungsrate**. Fuer den zweiten ist die Diagnose-Zeile `[moon_order]` gebaut
-(par.9g), sie liegt aber noch nicht im Wheel.
+Nullbefund hier ein Implementierungs-Verdacht ist; **vier der fuenf Pruefpunkte sind
+ausgeraeumt** (Perspektive, Verdrahtung bis in den Arena-Pfad, Vollstaendigkeit der Varianten,
+und die Ausloesung per Deckungsgleichheit: das Tor prueft exakt die Bedingung, die par.9b mit
+24,34 je Partie gezaehlt hat). Offen bleibt allein das **Budget** (256 Sims je Variante =
+Wurzelbreite 16).
+
+**Die eigentlich offene Frage hat par.9d gar nicht gestellt:** nicht wie oft die Nachsuche
+laeuft, sondern **wie oft sie ANDERS waehlt**. Dafuer ist die Diagnose-Zeile `[moon_order]`
+gebaut (par.9g), sie liegt noch nicht im Wheel.
 
 **Randbefund als Reihenfolge-Argument, nicht als Beleg:** die groesste Einzelabweichung sind
 die vollen Spalten mit -0,0985 (rund 1,8 SE), also die langfristigste Groesse im Block,
