@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad seit 2026-07-01 ein Suchentscheid (Varianten mit Prior aus dem Moon-Order-Kopf). Traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: nichts gemessen. Bestand par.2 (Code geprueft 2026-09-12). EINGETAKTET als v29/v30-Begleitprogramm (Nutzer 2026-09-12): A/B Fan-out an gegen aus am Champion (par.4), danach Zielfrage (par.5). **KNOPF GEBAUT und im Wheel 2026-09-14 (par.8)**: `moon_order_variants` 0/1, Default 1 = Bestand; Bau-Tor gruen (646 Tests, Kontrakt-Hash unveraendert, Anker-Drift und Konservierung gruen). OFFEN: das A/B (Fahrplan Nr. 28). -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Knopf GEBAUT und im Wheel (par.8). **A/B GEMESSEN 2026-09-14 (par.7): H1 NICHT bestaetigt** -- 193:207, p=0,55, Punkte 53,0 gegen 54,8; Fan-out bleibt. **Gueltig, kein Henne-Ei** (Knopf war bei der Erzeugung an, moon-Kopf trainiert). Gegenhypothese von H1 WIDERLEGT (nur der oberste Stein je Stapel ist ziehbar, die Reihenfolge steuert den Zugriff) -- der Nullbefund ist gemessen, nicht erklaert. **H2 (Zielwechsel) bleibt lebend**, Nutzer-Entscheid. -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -48,12 +48,33 @@ selbst gewaehlter Reihenfolge auf die Mondseite (`docs/engine_manual.md`; `facto
   kanonischer Reihenfolge (Fan-out AUS) gewinnt gepaart. Gegenhypothese: die Reihenfolge ist im
   Duell fast immer irrelevant (Mondsteine werden ohnehin komplett gezogen), der Fan-out kostet nur
   Suchbudget (bis zu 6 Kinder statt 1 je Sonnenzug).
+
+  **KORREKTUR 2026-09-14 (Nutzer: "das alle 3 die selbe farbe haben beim ziehen ist eher ein
+  ausnahmenfall"): die Klammer der Gegenhypothese ist FALSCH.** Mondsteine werden NICHT komplett
+  gezogen. `docs/engine_manual.md` Zeile 101-106, Zug C: *"Collect every TOPMOST tile of one
+  chosen colour across the moon areas of all factories at once -- ONE TILE PER STACK"*, und zu
+  Zug B: *"the taking player decides the stack order of those leftovers, WHICH MATTERS: only the
+  top tile of a moon stack can be taken later."* Am Code bestaetigt: `factory.rs:76` und `:96-97`
+  pruefen und nehmen `stack.last()`, also nur den obersten.
+
+  **Die Reihenfolge ist damit Zugriffssteuerung, nicht Kosmetik:** wer oben liegt, ist als
+  naechstes verfuegbar, die beiden darunter sind blockiert, bis er weg ist. Irrelevant waere sie
+  nur bei drei gleichfarbigen Resten -- der Ausnahmefall. **Ein Nullbefund ist damit nicht durch
+  die Mechanik erklaerbar und braucht eine andere Erklaerung** (siehe par.7).
 - **Erwartung:** klein, wegen der Haeufigkeit (par.2); ein Nullbefund bei 200 Paaren ist der
   wahrscheinliche Ausgang und dann ein vollwertiges Ergebnis (Fan-out bleibt aus Gruenden der
   Vollstaendigkeit).
 - **H2:** das Rundenloeser-Ziel ist kurzsichtig (Rundenende statt Partieausgang); ein Ziel aus der SUCHE (die vom Baum gewaehlte
   Reihenfolge, wie beim Rueckgabe-Knopf Modus 1 gedacht) oder aus dem Ausgang traegt mehr.
   Nur pruefbar nach H1 und nur mit Training (ein Arm).
+
+  **NACHTRAG 2026-09-14: die Bindung "nur pruefbar nach H1" stand auf der falschen
+  Gegenhypothese.** Sie hiess sinngemaess: wenn die Reihenfolge ohnehin egal ist, lohnt kein
+  besseres Ziel. Da sie NICHT egal ist (Korrektur oben), faellt H2 mit einem H1-Nullbefund nicht
+  automatisch weg -- im Gegenteil, ein kurzsichtiges Ziel ist dann eine der wenigen verbliebenen
+  Erklaerungen dafuer. **H2 bleibt eine lebende Option**; sie ist zudem KEIN neuer Kopf, sondern
+  ein Zielwechsel am bestehenden -- und nur der Neubau ist gesperrt
+  (`feedback_no_new_heads`).
 
 ## par.4 Stufe 1 (v29-Begleitprogramm, ein Referee- oder Gating-Lauf, kein Training)
 
@@ -77,7 +98,59 @@ Ein Arm mit Suchziel statt Rundenloeser-Ziel (Record traegt die vom Baum gewaehl
 - Keine Erweiterung des Aktionsraums (406 bleibt), kein Fan-out im Heuristik-Pfad (Anker).
 - Keine Aenderung an `moon_order_target` vor par.4.
 
-## par.7 Ergebnisse (leer bis zur Messung)
+## par.7 ERGEBNIS Stufe 1 (2026-09-14): Nullbefund -- und er ist NICHT durch die Mechanik erklaert
+
+`tools/night_v29_moon_order_ab.sh`, Fahrplan Nr. 28. Beide Seiten der amtierende Champion
+v28-b02 auf demselben Wheel, unterschieden durch GENAU ein Spec-Feld (geprueft: 14 Felder je
+Datei, ein Unterschied `moon_order_variants` 1 gegen 0). 200 Paare bis zum Deckel,
+`--sprt-alpha/beta 0.001` (Wald-Schranken +-6,907), also kein Frueh-Stopp.
+
+| | Fan-out AN | Fan-out AUS |
+| --- | --- | --- |
+| Siege | 193 | 207 |
+| Punkte je Partie | 53,01 | **54,84** |
+
+McNemar p = 0,5507, gepaarte Differenz -0,070 [-0,267, +0,127], Splits 99 von 200 Paaren
+(47 A-Sweeps, 54 B-Sweeps). **Verdikt nach par.4: H1 NICHT bestaetigt, der Fan-out bleibt**
+(Vollstaendigkeit, Nutzer-Praezedenz).
+
+**Das Ergebnis ist gueltig, kein Henne-Ei:** der Fan-out ist Default AN, war bei der Erzeugung
+aktiv, und der `moon`-Kopf ist mit `moon_order_targets` als PFLICHTFELD im Korpus trainiert
+(`corpus_dataset.py:609`). Das Netz kennt die Groesse und hat einen gelernten Prior dafuer --
+anders als beim Rueckgabe-Knopf (`PREREG_dome_return_order.md` par.10) ist die Frage hier
+wirklich beantwortet.
+
+**Was der Nullbefund NICHT ist: durch die Regel erklaert.** Die Gegenhypothese in H1 ("Mondsteine
+werden ohnehin komplett gezogen") ist am 2026-09-14 als falsch nachgewiesen worden -- pro Stapel
+wird nur der OBERSTE Stein genommen, die Reihenfolge ist Zugriffssteuerung (Korrektur in par.3,
+Beleg `docs/engine_manual.md` Z.101-106 und `factory.rs:76/96-97`). Die Reihenfolge HAT also
+Bedeutung, und trotzdem bringt ihre Auffaecherung nichts.
+
+**Zwei Erklaerungen bleiben, beide ungeprueft:**
+
+1. **Der Fan-out kostet mehr, als er bringt.** Bis zu sechs Kinder statt einem je Sonnenzug
+   verteilen dasselbe Sim-Budget auf mehr Kandidaten. Dazu passt das Punktebild: 1,83 Punkte je
+   Partie WENIGER mit Fan-out. Nicht signifikant, aber in der Richtung, die H1 als Kostenargument
+   genannt hatte.
+2. **Der Prior ist kurzsichtig** -- genau H2: das `moon_order_target` kommt aus dem Rundenloeser
+   (Rundenende statt Partieausgang). Die Suche faechert dann zwar auf, aber entlang einer
+   Rangfolge, die den Partieausgang nicht kennt.
+
+**H2 ist damit NICHT erledigt**, obwohl H1 negativ ist: die Bindung "nur pruefbar nach H1" stand
+auf der widerlegten Gegenhypothese (Nachtrag in par.3). Sie ist ein ZIELWECHSEL am bestehenden
+Kopf, kein Neubau, und faellt damit nicht unter die Kopf-Sperre (`feedback_no_new_heads`).
+Kosten nach par.5: ein Trainingsarm (rund 1,5 h) plus Gating. **Nutzer-Entscheid, nicht
+eingetaktet.**
+
+**Offen aus par.4:** die Diagnostik je Seite (Anteil der Sonnenzuege mit Rest >= 2, davon Anteil
+mit nicht-kanonischer Wahl). Sie geht aus den `--log-games`-Artefakten dieses Laufs, ohne neue
+Partien, und wuerde Erklaerung 1 von 2 trennen helfen.
+
+**Laufzeit** 7.751 s Wanduhr bei 10 Threads. **NICHT als Kostenmass verwendbar:** auf der
+Maschine lief waehrenddessen Nutzer-Nebenlast (Blockzeiten zwischen 129 s und 276 s). Die
+Siegquote ist davon unberuehrt -- feste 400 Sims, feste Seeds, kein Zeitbudget.
+
+## par.7a Ergebnisse (leer bis zur Messung)
 
 Nichts gemessen (Stand 2026-09-12, 13:20).
 

@@ -826,6 +826,15 @@ fn engine_config_json() -> String {
         // 2 Handregel) -- gehoert ins Lauf-Manifest, sonst ist ein
         // fehlendes Flag ein stiller Default.
         "return_order_mode": crate::net_mcts::SearchConfig::from_env().return_order_mode,
+        // PREREG_dome_return_order.md par.11: Wahrscheinlichkeit, mit der die
+        // ERZEUGUNG die Rueckgabe-Reihenfolge streut (0 = Bestand). Muss aus
+        // demselben Grund ins Manifest wie `return_order_mode` darueber -- an
+        // einem Korpus waere sonst nachtraeglich nicht feststellbar, ob er die
+        // Varianz traegt, wegen der er erzeugt wurde. Kein Spec-Feld, deshalb
+        // der Getter aus `self_play` statt `SearchConfig` (gleiche Bauform wie
+        // `stack_draw_research` unten, samt derselben OnceLock-Warnung:
+        // Variable setzen, DANN lesen).
+        "return_order_random_p": crate::self_play::return_order_random_p(),
         // PREREG_moon_stack_order.md par.4: Fan-out ueber die Reihenfolge der
         // Mondsteine nach einem Sonnenzug (1 = Bestand, 0 = nur die kanonische
         // Reihenfolge). Aus demselben Grund im Manifest wie `return_order_mode`

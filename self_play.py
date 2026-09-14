@@ -166,7 +166,7 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
                       spec=None, deviate_prob=0.0,
                       deviate_candidates=6, action_temp=0,
                       excursion_prob=0.0, excursion_profile=None,
-                      start_slot_random_p=0.0):
+                      start_slot_random_p=0.0, return_order_random_p=0.0):
     """Läuft im Subprozess (siehe Modul-Kommentar oben) -- reine Rust-Aufruf-
     Weiterleitung, damit sie per multiprocessing.Process spawnbar ist.
     `progress_path`/`heartbeat_path` (Task #71): an die Rust-Seite
@@ -234,6 +234,10 @@ def _worker_run_chunk(mode, model, n, simulations, c_puct, seed, threads, prefix
     os.environ["MOSAIC_ACTION_TEMP"] = str(action_temp)
     os.environ["MOSAIC_EXCURSION_PROB"] = str(excursion_prob)
     os.environ["MOSAIC_START_SLOT_RANDOM_P"] = str(start_slot_random_p)
+    # PREREG_dome_return_order.md par.11a: dieselbe Stelle und derselbe Grund wie
+    # oben -- Rust liest MOSAIC_RETURN_ORDER_RANDOM_P per OnceLock, also muss die
+    # Variable VOR `import mosaic_rust` stehen.
+    os.environ["MOSAIC_RETURN_ORDER_RANDOM_P"] = str(return_order_random_p)
     if excursion_profile:
         os.environ["MOSAIC_EXCURSION_PROFILE"] = excursion_profile
     try:
@@ -327,7 +331,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
                           deviate_candidates=6, action_temp=0,
                           excursion_prob=0.0,
                           excursion_profile=None,
-                          start_slot_random_p=0.0) -> str | None:
+                          start_slot_random_p=0.0,
+                          return_order_random_p=0.0) -> str | None:
     """Führt einen Chunk in einem Subprozess aus. Task #71: der primäre
     Kill-Trigger ist jetzt der Fortschritts-HERZSCHLAG (`heartbeat_path`s
     mtime), nicht mehr ein starres Gesamt-Timeout -- unterscheidet "läuft
@@ -345,7 +350,8 @@ def _run_chunk_supervised(mode, model, n, simulations, c_puct, seed, threads, pr
               str(progress_path), str(heartbeat_path),
               seed_positions, seed_positions_offset, heuristik_variante, spec,
               deviate_prob, deviate_candidates, action_temp,
-              excursion_prob, excursion_profile, start_slot_random_p),
+              excursion_prob, excursion_profile, start_slot_random_p,
+              return_order_random_p),
     )
     proc.start()
     t_start = time.time()
@@ -451,7 +457,8 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
                   deviate_candidates: int = 6, action_temp: int = 0,
                   excursion_prob: float = 0.0,
                   excursion_profile: str | None = None,
-                  start_slot_random_p: float = 0.0):
+                  start_slot_random_p: float = 0.0,
+                  return_order_random_p: float = 0.0):
     # PCR (Task #14): pcr_full_prob=None -> AUS (Bestandsverhalten). Aktiv nur
     # im network-Modus; Details siehe self_play.rs::play_net_self_play_game.
     # pcr_full_prob=0.0 ist der VALUE-ONLY-Modus (v20-Zwei-Klassen-Schwarm,
@@ -524,6 +531,9 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
     if not (0.0 <= start_slot_random_p <= 1.0):
         raise SystemExit(
             f"❌ --start-slot-random-p muss in [0,1] liegen (0 = AUS), ist {start_slot_random_p}.")
+    if not (0.0 <= return_order_random_p <= 1.0):
+        raise SystemExit(
+            f"❌ --return-order-random-p muss in [0,1] liegen (0 = AUS), ist {return_order_random_p}.")
     if mode not in ("mcts", "network"):
         raise SystemExit(f"❌ Unbekannter Modus: {mode}. Verwende 'mcts' oder 'network'.")
     if mode == "network" and not model:
@@ -597,6 +607,11 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
         # waere ein fehlendes Flag ein stiller Default, und ein v29-Korpus
         # waere im Nachhinein nicht von einem v28-Korpus zu unterscheiden.
         "start_slot_random_p": start_slot_random_p,
+        # par.11a: derselbe Grund wie eine Zeile hoeher. Der Knopf streut die
+        # Rueckgabe-Reihenfolge und veraendert damit den KORPUS; ohne dieses Feld
+        # waere ein gestreuter Korpus im Nachhinein nicht von einem ungestreuten zu
+        # unterscheiden.
+        "return_order_random_p": return_order_random_p,
     })
 
     # Nur der Rust-Aufruf unterscheidet sich je Modus; Fortschritt/Gruppierung/
@@ -709,6 +724,7 @@ def generate_data(mode: str, num_games: int, simulations: int, version_name: str
             excursion_prob=excursion_prob,
             excursion_profile=excursion_profile,
             start_slot_random_p=start_slot_random_p,
+            return_order_random_p=return_order_random_p,
         )
         return raw, progress_path, heartbeat_path
 
@@ -1012,6 +1028,30 @@ if __name__ == "__main__":
                              "zusaetzliches Record-Feld). Setzt NUR MOSAIC_START_SLOT_RANDOM_P "
                              "fuer den Rust-Aufruf, siehe self_play.rs. Wirkt in beiden Modi; "
                              "MOSAIC_START_SLOT_P0/P1 hat Vorrang, wenn gesetzt.")
+    parser.add_argument("--return-order-random-p", dest="return_order_random_p", type=float,
+                        default=0.0,
+                        help="PREREG_dome_return_order.md par.11/par.11a (Rueckgabe-Streuung): "
+                             "Wahrscheinlichkeit JE RUECKGABE mit mindestens zwei Restplatten, "
+                             "dass deren Reihenfolge unter dem Kuppelstapel zufaellig gemischt "
+                             "wird statt in Ziehreihenfolge zurueckzugehen. Gemischt wird der "
+                             "GANZE Rest, auch bei langen Ziehserien -- der Deckel "
+                             "RETURN_ORDER_MAX_PERMUTED gilt nur fuers Aufzaehlen von "
+                             "Kandidaten, nicht fuer eine einzelne Zufallspermutation. Zweck ist "
+                             "die VARIANZ im Korpus: heute ist die Reihenfolge konstant die "
+                             "Ziehreihenfolge, deshalb hat das Netz nie gelernt, dass sie etwas "
+                             "bedeutet, und ein A/B am fertigen Netz konnte nichts zeigen "
+                             "(par.10, Henne-Ei). Anders als bei der Startkuppel bleibt "
+                             "policy_target_valid GUELTIG -- zufaellig ist nur ein Nebenaspekt "
+                             "desselben Zuges, und die Reihenfolge hat gar keine "
+                             "Policy-Dimension. Der Record traegt return_order_randomized=true, "
+                             "sobald die Muenze gefallen ist (auch wenn die Ziehung die "
+                             "Ziehreihenfolge trifft). Default 0.0 = AUS (bitidentisch: keine "
+                             "zusaetzliche Zufallszahl, kein zusaetzliches Record-Feld). Setzt "
+                             "NUR MOSAIC_RETURN_ORDER_RANDOM_P fuer den Rust-Aufruf, siehe "
+                             "self_play.rs. Der Zufall kommt aus dem je Entscheid ABGELEITETEN "
+                             "Strom (derive_search_seed), nicht aus dem Partie-RNG -- dessen "
+                             "Strom verschiebt sich dadurch nicht, der Lauf bleibt "
+                             "seed-reproduzierbar.")
     parser.add_argument("--spec", type=str, default=None,
                         help="Such-Spec-Datei models/<name>.spec.json (Schema: "
                              "implicit_minimax_alpha, long_row_init_shaping_w, "
@@ -1074,4 +1114,5 @@ if __name__ == "__main__":
         excursion_prob=args.excursion_prob,
         excursion_profile=args.excursion_profile,
         start_slot_random_p=args.start_slot_random_p,
+        return_order_random_p=args.return_order_random_p,
     )
