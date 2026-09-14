@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT (0,843 gegen 0,816), Tor 1 fuer b01 BEIDE SEEDS H0 (kein Champion-Wechsel; b01 war kein reiner Materialschritt, drei Erzeugungs-Aenderungen, nur 40,8 Prozent des Fensters tragen sie). **ZWEI offene Entscheide:** b02 ist zweifaktoriell geworden (794 statt 755), und der Fenster-Cache-Schluessel kennt den Ablations-Schalter nicht -- b03 hat b02s Monolithen ueberschrieben. Ergebnisse unbeschaedigt, die naechste Wiederholung waere still falsch. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT (0,843 gegen 0,816), Tor 1 fuer b01 BEIDE SEEDS H0 (kein Champion-Wechsel; b01 war kein reiner Materialschritt, drei Erzeugungs-Aenderungen, nur 40,8 Prozent des Fensters tragen sie). b02 traegt 794 (Nutzer 2026-09-14: die 794 kommen sowieso), sein Bezugspunkt ist damit b03 statt b01 -- einfaktoriell im Ablations-Schalter. OFFEN: der Fenster-Cache-Schluessel kennt den Schalter nicht, b03 hat b02s Monolithen ueberschrieben (Ergebnisse unbeschaedigt, die naechste Wiederholung waere still falsch). -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -680,7 +680,7 @@ anderes misst als sein Etikett sagt.
 Bis das entschieden ist, gilt der Handgriff: **zwischen zwei Armen mit verschiedenem Eingang den
 Monolithen umbenennen oder neu bauen, nie den alten annehmen.**
 
-### v29-b02 ist ZWEIFAKTORIELL geworden -- Ausfuehrungsfehler, Entscheid noetig (2026-09-14)
+### v29-b02 traegt 794 -- Bezugspunkt ist b03, nicht b01 (Nutzer-Entscheid 2026-09-14)
 
 **Der Arm ist trainiert** (1,51 h, 12 Epochen, bester Brier in Epoche 5 -- deshalb gibt es hier
 ein `_brierbest`, anders als bei b01). Der Schalter hat gegriffen: `special_planes_off: true` im
@@ -697,22 +697,19 @@ Reihenfolge im Fahrplan (Nr. 5 Wheel vor Nr. 16 b02) legte genau das nahe; die P
 "Rezept b01" haette dagegen verlangt, b02 VOR dem Wheel zu fahren. **Der Widerspruch stand im
 Plan, ich habe ihn nicht gesehen.**
 
-**Drei Wege, Entscheid beim Nutzer:**
+**ENTSCHIEDEN (Nutzer 2026-09-14): "die 794 kommen sowieso."** Damit ist b02 nicht verdorben,
+sondern schon auf dem Zielstand -- **sein Bezugspunkt ist b03, nicht b01.** Beide tragen 794, der
+einzige Unterschied ist der Ablations-Schalter; der Vergleich ist damit sauber einfaktoriell und
+misst genau das, wofuer die Ablation gebaut wurde.
 
-1. **b02 mit 755 neu fahren.** `config.INPUT_SIZE` auf 755 (der Riegel in
-   `neural_net.py::state_to_tensor_rust` kuerzt den Rust-Vektor dann auf 755, das Wheel muss NICHT
-   zurueckgebaut werden), Bloecke neu, Training neu. Kosten rund 2 h, erst NACH b03 moeglich --
-   der laeuft gerade und braucht 794. Beantwortet die registrierte Frage.
-2. **b02 gegen b03 messen statt gegen b01.** Beide tragen 794, der einzige Unterschied ist der
-   Schalter -- also sauber einfaktoriell. Aendert aber den Bezugspunkt: par.6 fragt gegen b01, und
-   b03 ist selbst ein ungemessener Arm.
-3. **b02 gegen b01 messen und die Zweifaktorialitaet registrieren.** Billigste Variante, liefert
-   aber nur eine Aussage ueber "Ablation PLUS Sichtwerte gegen keins von beidem" -- welcher Teil
-   wirkt, bleibt offen.
+**Was das an par.6 aendert:** dort steht fuer b02 "Rezept b01" und "b01: EIN Faktor, die
+Spezialfeld-Eingabe". Der Satz bleibt richtig in der Absicht (EIN Faktor), aber der Bezugspunkt
+wandert von b01 auf b03. Ein b02 mit 755 wird NICHT nachgefahren; die 755 sind ein
+Durchgangszustand, den nur b01 traegt, weil sein Training vor dem Wheel lag.
 
-**Empfehlung: Weg 2**, mit Weg 1 als Nachlauf, falls die Frage gegen b01 gebraucht wird. Weg 2
-kostet nichts extra (die Arena laeuft ohnehin) und ist die einzige Variante, die den Schalter
-ISOLIERT misst -- genau das, wofuer die Ablation gebaut wurde.
+**Folge fuer die Auswertung:** die Kette der v29-Arme ist damit
+b01 (755, Bezug) -> b03 (794, Sichtwerte) -> b02 (794 plus Ablation). Jeder Schritt ein Faktor.
+Tor 1 fuer b02 laeuft gegen b03, Seeds 20261065 und 20261066.
 
 **Nicht betroffen:** b03 selbst. Er IST der 794er-Arm, seine Breite ist sein Zweck.
 
