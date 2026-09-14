@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge, in der nicht gewaehlte Kuppelplatten unter den Stapel zurueckgehen, ist ein legaler Zug -- wird die Wahl gebaut, in welcher Form, und traegt sie? | Beleg: GEBAUT und im Wheel seit 2026-09-12 (par.8a, Default bitidentisch). **A/B GEMESSEN 2026-09-14 (par.9): kein messbarer Effekt** -- beide Seeds 74:76, p=1,0, 85-93 Prozent Splits, weil der Value-Kopf die Reihenfolge nur als Typ-Folge sieht. **Der Knopf bleibt** (Vollstaendigkeit vor Elo). Kosten UNGEMESSEN: vor einem Default ist ein Kostentor faellig. -->
+<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: GEBAUT und im Wheel (par.8a). A/B 2026-09-14 (par.9): kein messbarer Effekt -- **aber NICHT verneint (par.10): Henne-Ei**, der Knopf war bei der Erzeugung aus, das Netz hat die Reihenfolge nie gelernt. **WEG DAHIN registriert (par.11, Nutzer): Zufalls-Streuung in der Erzeugung liefert die Varianz, P.12 die Aufloesung** -- beides faellt mit der naechsten Erzeugung zusammen. **Streu-Knopf GEBAUT (par.11a), noch nicht kompiliert.** Der Rueckgabe-Knopf bleibt. -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -328,4 +328,149 @@ Lauf), bevor der Modus ins Rezept geht.
 Die Diagnostik aus den Logzeilen (`[return_order] mode=.. drawn=[..] chosen=[..]`): Anteil der
 Rueckgaben mit abweichender Reihenfolge, Wiederkehr-Rate, Ziehungen in den eigenen Block. Der
 Split-Anteil oben ist ein starker Indikator, ersetzt sie aber nicht.
+
+## par.10 KEINE WEITERE STUFE (Nutzer-Entscheid 2026-09-14)
+
+Nach dem Nullbefund aus par.9 kam die Frage auf, ob die BAUFORM schuld ist. Sie ist es
+nachweislich zur Haelfte: `choose_return_order` (`self_play.rs:771-798`) benutzt **weder Suche
+noch Policy** -- die Kandidaten werden auf Spielkopien angewandt und mit EINEM `net_leaf_eval` je
+Kandidat bewertet, danach argmax. Fuer dasselbe Problem gibt es im Baum eine zweite, bessere
+Bauform: der Mondstapel-Fan-out gibt seine Varianten als Aktionen IN den Suchbaum
+(`net_mcts.rs:2241-2255`) und laesst die Suche entscheiden.
+
+**Erwogen und VERWORFEN wurde ein "Modus 3"** nach diesem Muster: Fan-out im Suchbaum, Prior
+nicht aus einem neuen Kopf (die sind gesperrt, `special_tile_yield` par.12), sondern aus den
+bereits vorhandenen Modus-2-Handregel-Scores ueber dieselbe Plackett-Luce-Funktion.
+
+**Nutzer-Entscheid, woertlich:** *"nein das brauchst nicht rechnen. weil das netz es nicht sauber
+kann."* -- und das schliesst auch die offene Diagnostik aus par.5 Punkt 2 ein, die vorher
+gerechnet werden sollte.
+
+**PRAEZISIERT auf Nutzer-Nachfrage am selben Tag** (*"ich hab eher gemeint dass du es nicht
+messen kannst, weil es das netz bis dato nicht sauber gemacht hat. henne ei problem"*). Der
+Koordinator hatte den Entscheid zuerst als "der Engpass sitzt in der Eingabe, strukturell nicht
+aufloesbar" registriert. **Das ist zu stark und war falsch.** Der Punkt ist ein
+Henne-Ei-Problem, kein Beweis der Unmoeglichkeit:
+
+* **Modus 1 war bei der v29-Erzeugung AUS** (Default 0; die Erzeugungs-Spec
+  `models/start_by_search_on.spec.json` fuehrt das Feld nicht). Im Korpus kommt also keine
+  bewusst gewaehlte Rueckgabereihenfolge vor.
+* Das Netz hat damit **nie gelernt, dass die Reihenfolge etwas bedeutet** -- auch nicht im Rahmen
+  dessen, was die Typ-Folge in `features.rs:212` (+1 Spezial / -1 Joker / 0) hergaebe.
+* **Ein A/B an genau diesem Netz kann den Nutzen deshalb nicht zeigen**, egal in welcher
+  Entscheidungsform. Der Nullbefund aus par.9 misst ein Netz, dem die Voraussetzung fehlt.
+
+Das ist dieselbe Struktur wie bei P.12 (`designs` fehlt im v29-Korpus, 18 Spalten mit Norm exakt
+0) und bei der Startsetzungs-Phase (`PREREG_start_dome_choice.md` par.11): **ein Merkmal, das die
+Erzeugung nicht traegt, kann das Training nicht aufgreifen**
+(`feedback_record_field_must_precede_generation`).
+
+**Was das kostet, und warum trotzdem nicht weiter investiert wird:** die Frage sauber zu
+beantworten hiesse, mit Modus 1 einen Korpus zu erzeugen (rund 12 h), darauf zu trainieren und
+erst dann das A/B zu fahren -- ein ganzer Generationsarm fuer einen Knopf, dessen Wirkung nach
+par.8a strukturell gedeckelt ist. Der Nutzer hat das nicht angeordnet; der Koordinator schlaegt
+es auch nicht vor.
+
+**Was bleibt:** der Knopf `return_order_mode` mit Modus 0 (Default, Bestand), Modus 1 und Modus 2,
+gebaut und abgenommen. Er bleibt aus Gruenden der Vollstaendigkeit -- die Rueckgabereihenfolge ist
+ein legaler Zug, und die Suche kann ihn jetzt waehlen.
+
+**Der Status bleibt OFFEN.** Die Prereg ist NICHT erschoepft: par.4 ist gebaut, par.5 Punkt 1 an
+einem Netz ohne Voraussetzung gemessen, Punkt 2 gestrichen, Modus 3 verworfen -- aber die
+Kernfrage ("traegt die Wahl?") ist mangels passendem Korpus unbeantwortet, nicht verneint. Wer
+sie je beantworten will, erzeugt VORHER mit Modus 1.
+
+## par.11 DER WEG AUS DEM HENNE-EI: Streuung in der Erzeugung (Nutzer-Vorschlag 2026-09-14)
+
+Nutzer woertlich: *"ich wuerd bewusst im self play spiele generieren mit stapelzug > 5 und dort
+dann zufaellig zuruecklegen lassen. dann hat der value head bzw. die policy was zum lernen"*.
+
+Das loest par.10 an der Wurzel: nicht den ENTSCHEIDER verbessern (Modus 1/2/3), sondern dem Netz
+ueberhaupt erst Beispiele geben, aus denen die Wirkung lernbar ist. **Praezedenz im eigenen Baum:**
+genau so wurde die Startkuppel behandelt (`MOSAIC_START_SLOT_RANDOM_P=0.15`,
+`PREREG_v29_window.md` par.6b, Nutzer 2026-09-12 "damit das netz auch mal sieht welchen einfluss
+die startkuppel hat").
+
+### Bauform, wie sie sich aus dem Bestand ergibt (VOR dem Bau registriert)
+
+* **Erzeugungsknopf** nach dem Muster von `MOSAIC_START_SLOT_RANDOM_P` (`self_play.rs:1290-1310`):
+  Wahrscheinlichkeit je Rueckgabe mit mindestens zwei Restplatten, aus dem Partie-RNG, Default 0
+  = bitidentischer Bestand.
+* **Kein Permutations-Deckel noetig.** `RETURN_ORDER_MAX_PERMUTED = 3` existiert nur, weil das
+  AUFZAEHLEN der Kandidaten `n!` kostet (Kommentarbeleg `self_play.rs:625`: "Ziehserie kann
+  laenger werden (MAX_STACK_PEEKS = 20), und n! waere ..."). Eine einzelne ZUFALLS-Permutation
+  braucht keine Aufzaehlung -- der ganze Rest kann gemischt werden. Genau das trifft den vom
+  Nutzer genannten Fall langer Ziehserien.
+* **Der Record-Vertrag ist hier SAUBERER als bei der Startkuppel.** Dort musste
+  `policy_target_valid = false` gesetzt werden, weil die gewaehlte AKTION zufaellig war. Die
+  Rueckgabereihenfolge hat dagegen keine Policy-Dimension (par.2); der Zug
+  `ChooseDrawStackSlot` bleibt derselbe. **Policy-Ziel und Value-Labels bleiben also gueltig.**
+  Noetig ist nur eine Markierung (`return_order_randomized: true`) analog zu
+  `start_slot_randomized`, damit Sonden die Faelle wiederfinden.
+
+### Was das Netz daraus lernen kann -- und wo die Grenze bleibt
+
+Der Value-Kopf sieht die Blockreihenfolge heute nur als TYP-Folge ueber die obersten vier
+Positionen (`features.rs:212`, +1 Spezial / -1 Joker / 0). Innerhalb dieser Aufloesung ist die
+Wirkung lernbar (etwa "Spezial oben ist besser"), darueber hinaus nicht.
+
+**Und genau hier trifft der Vorschlag auf den zweiten offenen Strang: P.12.** Der Sichtpunkt
+"Designs im eigenen Block" (18 Bits, `stack_top_feature`) loest genau diese Reihenfolge FEIN auf
+statt nur als Typ -- er steht seit v29 im Encoder, ist aber tot, weil das Feld `designs` im
+v29-Korpus fehlt (`PREREG_v29_window.md` par.6d: Spaltennorm exakt 0). Seit Commit 31a1321
+schreibt der Serializer es, **ab der naechsten Erzeugung ist P.12 belebt**.
+
+**Beides zusammen ist der eigentliche Hebel:** die Streuung liefert die VARIANZ, P.12 die
+AUFLOESUNG. Einzeln bleibt jeweils die andere Haelfte der Engpass -- Streuung ohne P.12 stoesst
+an die Typ-Folge, P.12 ohne Streuung sieht nur die eine Reihenfolge, die der Bestand ohnehin
+legt. Beide Voraussetzungen fallen mit derselben Erzeugung zusammen.
+
+**Status:** Vorschlag registriert, NICHT gebaut, nicht eingetaktet. Naechster natuerlicher Ort
+waere die v30-Erzeugung (dort ist P.12 ohnehin belebt); die Dosis ist ein Nutzer-Entscheid wie
+bei der Startkuppel (dort 0,15).
+
+## par.11a BAUSTAND 2026-09-14: `MOSAIC_RETURN_ORDER_RANDOM_P` (noch nicht kompiliert)
+
+Knopf nach par.11 gebaut, Default 0 = bitidentischer Bestand.
+
+**Der Zufallsweg ist NICHT der Partie-RNG**, sondern der je Entscheid abgeleitete Strom:
+`derive_search_seed(game_seed ^ RETURN_ORDER_SEED_DISTINGUISHER, move_number)`, daraus je
+Rueckgabe ein frischer `StdRng`. Das ist die Konvention aus `PREREG_search_rng_split`
+(Praezedenz im selben Block: `EXCURSION_SEED_DISTINGUISHER`, Weg B). **Der entscheidende Vorteil
+gegenueber dem Partie-RNG:** dessen Strom verschiebt sich auch bei `p > 0` NICHT -- Aufbau,
+Nachfuellen und Labels laufen Zug fuer Zug wie im Bestandsarm, die Streuung ist also isoliert und
+der Lauf bleibt seed-reproduzierbar. Ein reiner Zustands-Hash ohne `game_seed` wurde verworfen,
+weil `GameState` keinen Seed traegt (`state.rs:65-111`) und die Streuung dann eine
+deterministische Funktion der gezogenen Plattennummern waere -- Behandlung und Zustand
+korreliert, was die Varianz gerade entwertet.
+
+**Gebaut** (`self_play.rs`): Distinguisher, Traeger `ReturnOrderRandom`,
+`sanitize_return_order_random_p` (Wert ausserhalb [0,1] -> 0 plus Warnung), `return_order_random_p`,
+`sample_random_return_order` (Muenze plus `shuffle` ueber den GANZEN Rest, ohne den
+Permutations-Deckel -- der gilt nur fuers Aufzaehlen), Einhaengung in
+`resolve_and_apply_stack_draw_with` NACH dem Entscheider, Record-Markierung
+`return_order_randomized`, Diagnostikzeile `[return_order] random before=.. after=..`.
+Dazu `lib.rs` (`engine_config`), `knob_registry.rs`, je ein `None` in `py.rs` und `referee.rs`.
+**Acht Tests** in `mod return_order_random_tests`.
+
+**Markiert wird die gefallene MUENZE, nicht die abweichende Permutation** -- eine Ziehung darf
+die Ziehreihenfolge treffen, genau wie beim Startslot. **`policy_target_valid` bleibt
+unberuehrt** (par.11: die Reihenfolge hat keine Policy-Dimension, der Zug bleibt derselbe).
+
+**Keine oeffentliche Signatur beruehrt**, alle fuenf Aufrufstellen liegen in `engine/src`;
+`SearchConfig` wurde bewusst nicht angefasst, weil das Struct-Literal in
+`engine/examples/kernbeweis_910002_probe.rs` sonst E0063 wirft. Kontrakt-Hash und
+Netz-Paritaets-Fixture nach Code-Lage nicht betroffen (`lib.rs:684-701`; das Record-Feld entsteht
+nur bei `p > 0`, der Fixture-Lauf faehrt ungesetzt) -- **HERLEITUNG, das Bau-Tor muss es belegen.**
+
+### PFLICHT VOR DER NAECHSTEN ERZEUGUNG: der Lauf-Treiber kennt den Knopf nicht
+
+`tools/selfplay_manifest.py:55` liest `engine_config_json()` im ELTERNPROZESS, waehrend
+`self_play.py:236` die Erzeugungs-Variablen erst im WORKER vor `import mosaic_rust` setzt. Per
+Shell-Export erbt beides dieselbe Variable und das Manifest stimmt. **Wird spaeter ein Flag
+`--return-order-random-p` nach dem Muster von `--start-slot-random-p` gebaut, muss es
+ZUSAETZLICH ins `cli_args`-Dict** -- sonst zeigt `engine_config` 0.0, waehrend die Worker
+streuen. Das ist die Fehlerklasse "fehlendes Flag = stiller Default"
+(`feedback_run_manifest_gegen_referenz`). Flagname, Dosis und Zeitpunkt sind offen; die Dosis ist
+nach par.11 ein Nutzer-Entscheid (Startkuppel: 0,15).
 

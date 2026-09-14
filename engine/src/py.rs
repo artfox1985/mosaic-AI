@@ -1069,6 +1069,9 @@ impl PyGame {
             a,
             self.net.as_ref(),
             return_order_mode,
+            // par.11: die ERZEUGUNGS-Streuung der Rueckgabe-Reihenfolge wirkt
+            // nur im aufzeichnenden Self-Play, nie in der GUI.
+            None,
         ) {
             Ok(resolved) => resolved,
             Err(e) => {

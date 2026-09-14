@@ -842,8 +842,12 @@ impl RefereeGame {
             net_arena_choose_action(net, &self.game.state, &actions, &mut search_rng, sims, c_puct, true, &search_config);
         let dict = action_to_dict(&chosen);
         if via_chosen_action {
+            // Letztes Argument `None`: die ERZEUGUNGS-Streuung der
+            // Rueckgabe-Reihenfolge (PREREG_dome_return_order.md par.11) wirkt
+            // nur im aufzeichnenden Self-Play, nie im Referee -- ein
+            // Erzeugungsknopf darf Arena und Gating nicht bewegen.
             crate::self_play::apply_chosen_action_with(
-                &mut self.game, chosen, Some(net), search_config.return_order_mode,
+                &mut self.game, chosen, Some(net), search_config.return_order_mode, None,
             )
             .map_err(PyValueError::new_err)?;
         } else {

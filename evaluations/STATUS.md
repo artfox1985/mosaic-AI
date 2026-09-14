@@ -118,9 +118,13 @@ Dateien, und alle drei Arme sind trainiert.
 dafuer, einer Gleichstand, **kein Seed dagegen**. Zusammen 275:215 in 490 Partien. In beiden
 Siegseeds auch das Punkteniveau klar hoeher (+3,35 / +5,38 je Partie), im neutralen Seed gleich.
 
-**OFFENER NUTZER-ENTSCHEID: Promotion ja oder nein.** Der Champion ist NICHT gewechselt und die
-Elo-Kante ist NICHT eingetragen -- beides gehoert in `/mosaic-champion-promotion`
-(`docs/promotion_checklist.md`). Einzelheiten `PREREG_v29_window.md` par.9.
+**PROMOTION ANS ENDE DER GENERATIONSARBEIT VERSCHOBEN** (Nutzer 2026-09-14: "champion werd ich
+erst zum schluss der generationsarbeit machen. vielleicht kommt noch was besseres"). Der Champion
+bleibt bis dahin `v28-b02_brierbest`; die drei Elo-Kanten von b03 SIND eingetragen (Register und
+Champion-Rolle sind zweierlei). Grund: die offenen Knopf-Familien (Nr. 28, 30-32, 33-36) koennen
+einen besseren Generator hervorbringen, und eine Promotion jetzt wuerde darauf einrasten.
+**Folge fuer die Planung:** die naechste Erzeugung (und damit P.12 und die Rueckgabe-Streuung im
+Korpus) kommt erst NACH dem Begleitprogramm -- kein Zeitdruck bei den Knopf-Messungen. Einzelheiten `PREREG_v29_window.md` par.9.
 
 **MESSFEHLER GEFUNDEN 2026-09-14: b03 hat auf ablatierten Validierungsdaten validiert.**
 Derselbe Schluessel-Defekt, der b02s Monolithen kostete, traf auch den Val-Cache -- und den baut

@@ -815,6 +815,180 @@ pub(crate) fn choose_return_order(
     }
 }
 
+// ── Erzeugungs-Streuung der Rueckgabe-Reihenfolge ────────────────────────────
+//
+// `PREREG_dome_return_order.md` par.11 ("DER WEG AUS DEM HENNE-EI",
+// Nutzer-Vorschlag 2026-09-14). Der ENTSCHEIDER-Knopf `return_order_mode`
+// (par.4) war bei der v29-Erzeugung aus; im Korpus steht darum konstant die
+// Ziehreihenfolge, und ein A/B an so einem Netz kann die Wirkung der
+// Reihenfolge gar nicht zeigen (par.10). Dieser Knopf dreht die Richtung um:
+// er verbessert den Entscheider NICHT, sondern legt dem Netz ueberhaupt erst
+// Beispiele hin, aus denen die Wirkung lernbar ist -- dieselbe Bauform wie
+// die Startkuppel-Streuung (`MOSAIC_START_SLOT_RANDOM_P`,
+// `sample_random_start_slot` weiter unten).
+//
+// DREI Unterschiede zur Startkuppel, alle drei aus par.11:
+//   1. KEIN Permutations-Deckel. `RETURN_ORDER_MAX_PERMUTED = 3` existiert
+//      nur, weil das AUFZAEHLEN der Kandidaten `n!` kostet (Kommentar oben).
+//      Eine EINZELNE Zufallspermutation zaehlt nichts auf -- gemischt wird
+//      der ganze Rest, auch bei langen Ziehserien (`MAX_STACK_PEEKS = 20`).
+//   2. `policy_target_valid` bleibt UNBERUEHRT. Bei der Startkuppel war die
+//      gewaehlte AKTION zufaellig, deshalb dort `policy_target_valid = false`.
+//      Hier ist nur ein Nebenaspekt DERSELBEN Aktion zufaellig: der Zug
+//      `ChooseDrawStackSlot` bleibt derselbe, und die Reihenfolge hat gar
+//      keine Policy-Dimension (par.2, `features.rs:1444-1470` kodiert sie
+//      nicht). Policy-Ziel und Value-Labels bleiben gueltig -- genau sie sind
+//      der Zweck der Streuung.
+//   3. Der Zufall kommt NICHT aus dem Partie-RNG, sondern aus einem je
+//      Halbzug abgeleiteten Strom (`derive_search_seed`, siehe
+//      [`RETURN_ORDER_SEED_DISTINGUISHER`]) -- Begruendung dort.
+
+/// Stromindex der Rueckgabe-Streuung (`PREREG_search_rng_split.md`-Muster).
+/// EIGENER Wert, weder [`DEVIATE_SEED_DISTINGUISHER`] noch
+/// [`EXCURSION_SEED_DISTINGUISHER`]: alle drei ziehen mit demselben Zaehler
+/// (`move_number`), ein geteilter Distinguisher wuerde ihre Zuege koppeln.
+///
+/// WARUM DIESER WEG UND NICHT DER PARTIE-RNG (der Bau-Entscheid, par.11 laesst
+/// beides zu): `unified_game_loop`s eigene Doku legt fest, dass der Partie-RNG
+/// NUR fuer echte Spielzustands-Ereignisse zustaendig ist (`Game::start`,
+/// `EndTiling`-Refill, Label-Sampling) und jede Entscheidungs-Zufallszahl aus
+/// dem je Entscheid abgeleiteten Strom kommt. Das hat hier drei konkrete
+/// Folgen:
+///   * die Partie bleibt seed-reproduzierbar (Seed + Halbzug bestimmen die
+///     Permutation vollstaendig, auch ueber `rayon`-Parallelitaet hinweg);
+///   * der Partie-Strom verschiebt sich AUCH BEI `p > 0` nicht -- Aufbau,
+///     Nachfuellen und Labels laufen Zug fuer Zug wie im Bestandsarm, der
+///     einzige Unterschied zwischen den Armen ist die Reihenfolge selbst;
+///   * keine oeffentliche Signatur muss einen RNG tragen. Herunter wandert ein
+///     `u64`, herauf eine `Cell<bool>` -- und die Nebenausgabe braucht der
+///     Record ohnehin, gleich woher der Zufall kaeme.
+/// Verschiedene Partien liefern verschiedene Permutationen (verschiedener
+/// `game_seed`), verschiedene Halbzuege derselben Partie ebenfalls
+/// (verschiedener `move_number`) -- das ist die Streuung, um die es geht.
+const RETURN_ORDER_SEED_DISTINGUISHER: u64 = 0x2E70_2DE2_5EED_C0DE;
+
+/// Alles, was die Rueckgabe-Streuung EINES Halbzugs braucht (par.11).
+///
+/// `None` an der Aufrufstelle heisst "Bestand" -- so bei JEDEM Aufrufer
+/// ausser dem aufzeichnenden Zweig von [`unified_game_loop`]. Der Knopf ist
+/// ein reiner ERZEUGUNGS-Knopf: Arena, Gating, Referee und `py.rs` bauen ihn
+/// nie, lesen ihn nicht und bleiben damit Bestand (gleiche Abgrenzung wie bei
+/// `MOSAIC_START_SLOT_RANDOM_P`, das nur in `start_placement_step` wirkt).
+#[derive(Clone, Copy)]
+pub(crate) struct ReturnOrderRandom<'a> {
+    /// Wahrscheinlichkeit JE RUECKGABE mit mindestens ZWEI Restplatten.
+    p: f64,
+    /// Seed dieses Halbzugs: `derive_search_seed(game_seed ^ DISTINGUISHER,
+    /// move_number)` mit [`RETURN_ORDER_SEED_DISTINGUISHER`].
+    seed: u64,
+    /// Nebenausgabe an den Record-Bau (`Cell`-Muster wie `vorzug_greift` und
+    /// `excursion_deviated`): `true`, sobald die Muenze GEFALLEN ist -- nicht
+    /// erst, wenn die gezogene Permutation von der Ziehreihenfolge abweicht.
+    /// Markiert wird die BEHANDLUNG, nicht ihr Ergebnis; eine Ziehung darf die
+    /// Ziehreihenfolge treffen, genau wie die Startslot-Ziehung den
+    /// Bestandsslot treffen darf.
+    randomized: &'a std::cell::Cell<bool>,
+}
+
+/// Gueltigkeitspruefung von `MOSAIC_RETURN_ORDER_RANDOM_P` -- `None` =
+/// ungueltig. Eigene reine Funktion wie [`sanitize_start_slot_random_p`],
+/// damit die Pruefung isoliert testbar bleibt (der Getter darunter cached
+/// prozessweit).
+fn sanitize_return_order_random_p(raw: f64) -> Option<f64> {
+    (0.0..=1.0).contains(&raw).then_some(raw)
+}
+
+/// Erzeugungsknopf `MOSAIC_RETURN_ORDER_RANDOM_P`
+/// (`PREREG_dome_return_order.md` par.11): Wahrscheinlichkeit je Rueckgabe mit
+/// mindestens ZWEI Restplatten, dass die Reihenfolge der zurueckgelegten
+/// Kuppelplatten gleichverteilt gemischt wird.
+///
+/// Default `0.0` = AUS = bitidentisches Bestandsverhalten, und zwar im starken
+/// Sinn: bei `0.0` wird der Traeger [`ReturnOrderRandom`] gar nicht erst
+/// gebaut, es wird KEINE Zufallszahl gezogen und KEIN Record-Feld geschrieben.
+/// Ausserhalb `[0,1]` -> Default mit EINMALIGER Warnung (OnceLock), kein
+/// Panik-Abbruch -- gleiche Disziplin wie [`start_slot_random_p`].
+pub(crate) fn return_order_random_p() -> f64 {
+    static CELL: std::sync::OnceLock<f64> = std::sync::OnceLock::new();
+    *CELL.get_or_init(|| {
+        let raw = crate::net_mcts::read_f64_env("MOSAIC_RETURN_ORDER_RANDOM_P", 0.0);
+        sanitize_return_order_random_p(raw).unwrap_or_else(|| {
+            eprintln!(
+                "⚠️  MOSAIC_RETURN_ORDER_RANDOM_P={raw} liegt nicht in [0,1] -- Streuung der \
+                 Rueckgabe-Reihenfolge bleibt AUS (0.0)."
+            );
+            0.0
+        })
+    })
+}
+
+/// Kern der Streuung als REINE Funktion: `p` und der RNG kommen von aussen,
+/// damit der Test beide Enden ohne `std::env::set_var` fahren kann (Muster
+/// [`sample_random_start_slot`]).
+///
+/// Vertrag (die Bitidentitaets-Bedingung des Knopfs): bei `p <= 0.0` oder
+/// weniger als ZWEI Restplatten wird VOR jeder Ziehung ausgestiegen -- kein
+/// `rng`-Griff, `None` heisst "Bestand steht". Erst bei `p > 0` faellt die
+/// Muenze (ein `f64`-Zug); faellt sie, wird der GANZE Rest gemischt
+/// (`SliceRandom::shuffle`, kein Deckel). Die Ausgabe ist per Konstruktion
+/// eine Permutation der Eingabe und damit eine gueltige `return_order`
+/// (`game.rs:244-256` prueft sie als Multiset).
+fn sample_random_return_order<R: Rng + ?Sized>(
+    p: f64,
+    order: &[usize],
+    rng: &mut R,
+) -> Option<Vec<usize>> {
+    if !(p > 0.0) || order.len() < 2 {
+        return None;
+    }
+    if rng.random::<f64>() >= p {
+        return None;
+    }
+    let mut shuffled = order.to_vec();
+    shuffled.shuffle(rng);
+    Some(shuffled)
+}
+
+/// Die Streuung als EIN Handgriff ueber dem Ergebnis von
+/// [`choose_return_order`]: `order` kommt herein, die (eventuell) gestreute
+/// Fassung geht hinaus, und die Nebenausgabe `randomized` wird NUR gesetzt,
+/// wenn die Muenze gefallen ist.
+///
+/// Dass die Streuung NACH dem Entscheider sitzt und nicht in ihm, ist Absicht:
+/// sie ist von `return_order_mode` unabhaengig und ueberschreibt jeden Modus
+/// gleich. Bei `random = None` (jeder Aufrufer ausser der Erzeugung) und bei
+/// `p = 0` passiert nichts -- derselbe Vec geht unveraendert hinaus.
+///
+/// OFFEN GELASSEN, weil par.11 dazu nichts sagt: ob die Streuung mit Modus 1/2
+/// KOMBINIERT sinnvoll ist. Gebaut ist die allgemeine Form (sie ueberschreibt
+/// jeden Modus); die Erzeugung faehrt Modus 0, dort stellt sich die Frage
+/// nicht.
+fn apply_return_order_random(
+    order: Vec<usize>,
+    random: Option<ReturnOrderRandom<'_>>,
+) -> Vec<usize> {
+    let Some(r) = random else { return order };
+    let mut rng = StdRng::seed_from_u64(r.seed);
+    match sample_random_return_order(r.p, &order, &mut rng) {
+        Some(shuffled) => {
+            r.randomized.set(true);
+            shuffled
+        }
+        None => order,
+    }
+}
+
+/// Additive Record-Markierung der Streuung (par.11): `None` = kein Feld, der
+/// Record ist dann byte-gleich zum Bestand. Eigener Schluessel neben
+/// `start_slot_randomized`/`start_tile_randomized`, damit eine Sonde die
+/// Streuquellen nicht verwechselt.
+///
+/// **`policy_target_valid` wird hier NICHT angefasst** -- der Unterschied zur
+/// Startkuppel, siehe Modul-Kommentar oben Punkt 2.
+fn return_order_randomized_field(randomized: bool) -> Option<Value> {
+    randomized.then(|| json!(true))
+}
+
 /// Führt einen kompletten Stapel-Zug (Aktion A) aus: mind. 1 Pflichtzug,
 /// danach per Ein-Schritt-Erwartungswert-Vergleich weiterziehen oder
 /// aufhören, abschließend die beste gezogene Platte in den besten Slot legen.
@@ -834,7 +1008,7 @@ pub(crate) fn choose_return_order(
 // Aufraeumarbeit im Vorbeigehen.
 #[allow(dead_code)]
 fn resolve_and_apply_stack_draw(game: &mut Game) -> Result<Action, String> {
-    resolve_and_apply_stack_draw_with(game, None, 0)
+    resolve_and_apply_stack_draw_with(game, None, 0, None)
 }
 
 /// Wie [`resolve_and_apply_stack_draw`], zusaetzlich mit dem Netz DIESER
@@ -842,10 +1016,16 @@ fn resolve_and_apply_stack_draw(game: &mut Game) -> Result<Action, String> {
 /// `net` wird ausschliesslich in Modus 1 gelesen; bei Modus 0 ist der Ablauf
 /// byte-identisch zum Bestand (kein Klon, kein Vorwaertspass, keine
 /// Zufallszahl).
+///
+/// `random` ist die ERZEUGUNGS-Streuung aus par.11 (siehe
+/// [`ReturnOrderRandom`]): `None` bei jedem Aufrufer ausser dem
+/// aufzeichnenden Zweig von [`unified_game_loop`], und auch dort nur, wenn
+/// `MOSAIC_RETURN_ORDER_RANDOM_P > 0` ist.
 fn resolve_and_apply_stack_draw_with(
     game: &mut Game,
     net: Option<&Net>,
     return_order_mode: u8,
+    random: Option<ReturnOrderRandom<'_>>,
 ) -> Result<Action, String> {
     game.apply_drafting(&Action::DrawStackPeek)?;
     // Terminierung: `can_draw_stack_peek` wird false, sobald
@@ -926,8 +1106,30 @@ fn resolve_and_apply_stack_draw_with(
     // (wie moon_order/num_drawn). Modus 1/2 waehlen sie stattdessen am ENDE
     // der Ziehserie (PREREG_dome_return_order.md par.4); der Suchbaum bleibt
     // unveraendert.
-    let return_order =
+    let mut return_order =
         choose_return_order(&game.state, chosen_id, sr, sc, rotation, return_order_mode, net);
+    // par.11: die ERZEUGUNGS-Streuung sitzt NACH dem Entscheider und
+    // ueberschreibt sein Ergebnis mit Wahrscheinlichkeit `p` durch eine
+    // gleichverteilte Permutation DESSELBEN Multisets (also weiter eine
+    // gueltige `return_order`). Der ganze Block bleibt bei `random == None`
+    // -- jedem Aufrufer ausser der Erzeugung -- unbetreten: keine
+    // Zufallszahl, nicht einmal der Klon fuer den Vergleich.
+    if random.is_some() {
+        let before = return_order.clone();
+        return_order = apply_return_order_random(return_order, random);
+        if return_order != before {
+            // Zweite Diagnostik-Zeile neben der von par.5 unten, NUR bei
+            // tatsaechlich veraenderter Reihenfolge. `before` ist das Ergebnis
+            // des Entscheiders (bei Modus 0 die Ziehreihenfolge), `after` das
+            // Gestreute; Schluessel englisch wie `drawn=`/`chosen=` in der
+            // Zeile darunter, damit ein Parser beide gleich liest. Die
+            // Record-Markierung haengt dagegen an der gefallenen Muenze, nicht
+            // an der Abweichung -- siehe `ReturnOrderRandom::randomized`.
+            game.state.log_event(format!(
+                "[return_order] random before={before:?} after={return_order:?}"
+            ));
+        }
+    }
     // Diagnostik fuer par.5 (Grundmenge: Rueckgaben mit >= 2 Restplatten,
     // Einheit: Rueckgaben), nur bei tatsaechlicher ABWEICHUNG. Der ganze
     // Block bleibt bei Modus 0 unbetreten -- dort ist `return_order` per
@@ -1022,7 +1224,7 @@ pub(crate) fn stack_draw_research() -> bool {
 }
 
 pub(crate) fn apply_chosen_action(game: &mut Game, a: Action) -> Result<Action, String> {
-    apply_chosen_action_with(game, a, None, 0)
+    apply_chosen_action_with(game, a, None, 0, None)
 }
 
 /// Wie [`apply_chosen_action`], zusaetzlich mit dem Netz DIESER SEITE und
@@ -1037,15 +1239,22 @@ pub(crate) fn apply_chosen_action(game: &mut Game, a: Action) -> Result<Action, 
 /// `py.rs::ai_drafting_net_step`. NICHT verdrahtet ist der Worker-Pfad des
 /// Referees (`drafting_apply_external`): dort liegt kein Netz im Prozess, die
 /// Aktion kommt fertig von aussen.
+///
+/// `random` ist die ERZEUGUNGS-Streuung der Rueckgabe-Reihenfolge (par.11,
+/// [`ReturnOrderRandom`]) und steht NUR im aufzeichnenden Zweig von
+/// `unified_game_loop` auf `Some`. Referee und `py.rs` geben `None` -- ein
+/// Erzeugungsknopf darf Arena, Gating und GUI nicht bewegen, dieselbe
+/// Abgrenzung wie bei `MOSAIC_START_SLOT_RANDOM_P`.
 pub(crate) fn apply_chosen_action_with(
     game: &mut Game,
     a: Action,
     net: Option<&Net>,
     return_order_mode: u8,
+    random: Option<ReturnOrderRandom<'_>>,
 ) -> Result<Action, String> {
     match a {
         Action::DrawStackPeek if !stack_draw_research() => {
-            resolve_and_apply_stack_draw_with(game, net, return_order_mode)
+            resolve_and_apply_stack_draw_with(game, net, return_order_mode, random)
         }
         other => {
             game.apply_drafting(&other)?;
@@ -3757,13 +3966,41 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         None
                     };
                     let round_before = game.state.round_number;
+                    // par.11: Erzeugungs-Streuung der Rueckgabe-Reihenfolge.
+                    // NUR im aufzeichnenden Zweig (`recording`) -- ein
+                    // Erzeugungsknopf darf Arena und Gating nicht bewegen,
+                    // dieselbe Abgrenzung wie `MOSAIC_START_SLOT_RANDOM_P`,
+                    // das nur in `start_placement_step` wirkt. Bei Default 0
+                    // bleibt `random` `None`: keine Zufallszahl, kein
+                    // Record-Feld, bitidentischer Bestand. Die `Cell` ist je
+                    // Halbzug frisch und traegt die Nebenausgabe zum
+                    // Record-Bau unten.
+                    let return_order_randomized = std::cell::Cell::new(false);
+                    let return_random = if recording && return_order_random_p() > 0.0 {
+                        Some(ReturnOrderRandom {
+                            p: return_order_random_p(),
+                            // Eigener Strom neben Weg B und Weg C, Zaehler wie
+                            // dort `move_number` (PREREG_search_rng_split.md).
+                            seed: crate::net_mcts::derive_search_seed(
+                                cfg.game_seed ^ RETURN_ORDER_SEED_DISTINGUISHER,
+                                move_number,
+                            ),
+                            randomized: &return_order_randomized,
+                        })
+                    } else {
+                        None
+                    };
                     if pcfg.apply_via_chosen_action {
                         // Sequenzielle Stapel-Zieh-Aufloesung (Netz-Spielpfade,
                         // siehe apply_chosen_action). `PREREG_dome_return_order.md`
                         // par.4: Netz und Modus DIESER Seite -- bei Modus 0
                         // (Default) ist der Aufruf byte-identisch zum Bestand.
                         apply_chosen_action_with(
-                            &mut game, d.chosen, pcfg.tiling_net, pcfg.return_order_mode,
+                            &mut game,
+                            d.chosen,
+                            pcfg.tiling_net,
+                            pcfg.return_order_mode,
+                            return_random,
                         )
                         .unwrap_or_else(|e| panic!("apply_chosen_action fehlgeschlagen: {e}"));
                     } else {
@@ -3853,6 +4090,15 @@ fn unified_game_loop<R: Rng + ?Sized>(
                         // Task #14 (PCR): additiv, NUR bei aktivem PCR.
                         if let Some(gueltig) = d.policy_target_valid {
                             m.insert("policy_target_valid".into(), json!(gueltig));
+                        }
+                        // par.11: additiv, NUR wenn die Muenze in DIESEM
+                        // Halbzug gefallen ist. `policy_target_valid` bleibt
+                        // hier unberuehrt -- der Zug selbst ist nicht
+                        // zufaellig, nur ein Nebenaspekt von ihm (siehe
+                        // `return_order_randomized_field`).
+                        if let Some(v) = return_order_randomized_field(return_order_randomized.get())
+                        {
+                            m.insert("return_order_randomized".into(), v);
                         }
                         records.push(m);
                     }
@@ -10599,6 +10845,253 @@ mod return_order_tests {
         let state = state_with_draw(drawn, TileColor::Gelb);
         let (sr, sc) = state.players[state.current_player].dome_grid.empty_slots()[0];
         assert_eq!(choose_return_order(&state, 301, sr, sc, 0, 1, None), vec![302, 303]);
+    }
+}
+
+// ── Erzeugungs-Streuung der Rueckgabe-Reihenfolge (par.11) ───────────────────
+#[cfg(test)]
+mod return_order_random_tests {
+    use super::*;
+
+    /// Frischer Partiezustand, in dem ein Stapelzug legal ist: Startkuppeln
+    /// abgehakt, leeres 3x3-Raster, Runde 1 -- genau das, was
+    /// `game.rs::validate_draw_stack_peek` prueft (Runde, Token, Raster,
+    /// Stapel). Bauform wie `return_order_tests::state_with_draw`, nur ohne
+    /// vorgesetzte `pending_stack_draw`.
+    fn fresh_stack_state(seed: u64) -> GameState {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut game = Game::start(["A".into(), "B".into()], 0, vec![0, 1, 2], &mut rng);
+        for p in game.state.players.iter_mut() {
+            p.start_tile_pending = false;
+        }
+        game.state
+    }
+
+    /// Gueltigkeitspruefung: nur `[0,1]` geht durch. Alles andere faellt im
+    /// Getter auf den Default 0.0 zurueck, mit EINMALIGER Warnung statt Panik
+    /// (par.11-Vorgabe, Muster `sanitize_start_slot_random_p`).
+    #[test]
+    fn return_order_random_p_accepts_only_probabilities() {
+        for ok in [0.0, 0.15, 0.5, 1.0] {
+            assert_eq!(sanitize_return_order_random_p(ok), Some(ok), "{ok} ist gueltig");
+        }
+        for bad in [-0.1, 1.000_001, 2.0, f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(sanitize_return_order_random_p(bad), None, "{bad} darf nicht durchgehen");
+        }
+    }
+
+    /// Default AUS: in der Testumgebung ist `MOSAIC_RETURN_ORDER_RANDOM_P` nie
+    /// gesetzt, der Getter muss 0.0 liefern.
+    #[test]
+    fn return_order_random_p_is_off_by_default() {
+        assert_eq!(return_order_random_p(), 0.0, "Default ist AUS (bitidentischer Bestand)");
+    }
+
+    /// Die Bitidentitaets-Zusage: bei `p <= 0` und bei weniger als ZWEI
+    /// Restplatten wird KEINE Zufallszahl gezogen. Belegt ueber zwei gleich
+    /// geseedete Stroeme, von denen nur einer hineingereicht wird -- derselbe
+    /// Nachweis wie in `an_empty_candidate_selection_draws_nothing`.
+    #[test]
+    fn p_zero_and_short_rests_draw_no_random_number() {
+        let mut touched = StdRng::seed_from_u64(77);
+        let mut untouched = StdRng::seed_from_u64(77);
+        assert_eq!(sample_random_return_order(0.0, &[1, 2, 3], &mut touched), None);
+        assert_eq!(sample_random_return_order(-1.0, &[1, 2, 3], &mut touched), None);
+        assert_eq!(
+            sample_random_return_order(1.0, &[1], &mut touched),
+            None,
+            "eine Restplatte ist keine Wahl"
+        );
+        assert_eq!(sample_random_return_order(1.0, &[], &mut touched), None);
+        for i in 0..8 {
+            assert_eq!(
+                touched.random::<u64>(),
+                untouched.random::<u64>(),
+                "kein Griff in den Zufall erlaubt (Zug {i})"
+            );
+        }
+    }
+
+    /// Bei `p = 1` faellt die Muenze immer, und gemischt wird der GANZE Rest --
+    /// OHNE den Deckel [`RETURN_ORDER_MAX_PERMUTED`], der nur fuer die
+    /// `n!`-AUFZAEHLUNG des Modus 1 gilt (par.11: genau der Fall langer
+    /// Ziehserien). Sechs Restplatten: das Ergebnis ist stets eine Permutation
+    /// derselben Menge, und ueber die Seeds bewegt sich JEDE Position, auch
+    /// die hinter Index 3.
+    #[test]
+    fn p_one_shuffles_the_whole_rest_without_a_cap() {
+        let rest = [11usize, 12, 13, 14, 15, 16];
+        let mut moved = vec![false; rest.len()];
+        let mut seen: Vec<Vec<usize>> = Vec::new();
+        for seed in 0..64u64 {
+            let mut rng = StdRng::seed_from_u64(seed);
+            let got =
+                sample_random_return_order(1.0, &rest, &mut rng).expect("p = 1 muss immer mischen");
+            let mut sorted = got.clone();
+            sorted.sort();
+            assert_eq!(sorted, rest.to_vec(), "gemischt wird PERMUTIERT, nicht ausgetauscht");
+            for (i, v) in got.iter().enumerate() {
+                if *v != rest[i] {
+                    moved[i] = true;
+                }
+            }
+            seen.push(got);
+        }
+        assert!(
+            moved.iter().all(|m| *m),
+            "jede Position muss sich bewegen, auch die hinter dem Modus-1-Deckel \
+             RETURN_ORDER_MAX_PERMUTED={RETURN_ORDER_MAX_PERMUTED}: {moved:?}"
+        );
+        seen.sort();
+        seen.dedup();
+        assert!(seen.len() > 1, "die Streuung muss wirklich streuen");
+    }
+
+    /// Reproduzierbarkeit UND Streuung des Seeds -- die beiden Zusagen, auf
+    /// denen die Wahl des abgeleiteten Stroms steht (par.11): derselbe Seed
+    /// liefert dieselbe Permutation, verschiedene Partien (`game_seed`) und
+    /// verschiedene Halbzuege (`move_number`) liefern verschiedene.
+    #[test]
+    fn the_same_seed_repeats_and_different_seeds_spread() {
+        let order = vec![21usize, 22, 23, 24];
+        let cell = std::cell::Cell::new(false);
+        let run = |seed: u64| -> (Vec<usize>, bool) {
+            cell.set(false);
+            let out = apply_return_order_random(
+                order.clone(),
+                Some(ReturnOrderRandom { p: 1.0, seed, randomized: &cell }),
+            );
+            (out, cell.get())
+        };
+        let (a, marked_a) = run(4711);
+        let (b, marked_b) = run(4711);
+        assert_eq!(a, b, "gleicher Seed -> gleiche Permutation (Partie bleibt reproduzierbar)");
+        assert!(marked_a && marked_b, "bei p = 1 muss die Markierung stehen");
+
+        let mut distinct: Vec<Vec<usize>> = Vec::new();
+        for game_seed in 0..12u64 {
+            for move_number in 1..5u64 {
+                let seed = crate::net_mcts::derive_search_seed(
+                    game_seed ^ RETURN_ORDER_SEED_DISTINGUISHER,
+                    move_number,
+                );
+                distinct.push(run(seed).0);
+            }
+        }
+        distinct.sort();
+        distinct.dedup();
+        assert!(
+            distinct.len() >= 6,
+            "nur {} verschiedene Reihenfolgen aus 48 Seeds -- das ist keine Streuung",
+            distinct.len()
+        );
+        // Der eigene Stromindex darf nicht mit Weg B und Weg C kollidieren.
+        assert_ne!(RETURN_ORDER_SEED_DISTINGUISHER, DEVIATE_SEED_DISTINGUISHER);
+        assert_ne!(RETURN_ORDER_SEED_DISTINGUISHER, EXCURSION_SEED_DISTINGUISHER);
+    }
+
+    /// Der Traeger-Vertrag: `None` (jeder Aufrufer ausser der Erzeugung),
+    /// `p = 0` und eine einzelne Restplatte lassen den Vec UNVERAENDERT und
+    /// setzen die Markierung NICHT.
+    #[test]
+    fn no_carrier_and_p_zero_leave_everything_alone() {
+        let order = vec![31usize, 32, 33];
+        assert_eq!(apply_return_order_random(order.clone(), None), order, "None = Bestand");
+        let cell = std::cell::Cell::new(false);
+        assert_eq!(
+            apply_return_order_random(
+                order.clone(),
+                Some(ReturnOrderRandom { p: 0.0, seed: 9, randomized: &cell }),
+            ),
+            order,
+            "p = 0 aendert nichts"
+        );
+        assert!(!cell.get(), "p = 0 darf nicht markieren");
+        let single = vec![31usize];
+        assert_eq!(
+            apply_return_order_random(
+                single.clone(),
+                Some(ReturnOrderRandom { p: 1.0, seed: 9, randomized: &cell }),
+            ),
+            single
+        );
+        assert!(!cell.get(), "eine Restplatte ist keine Wahl -- keine Markierung");
+    }
+
+    /// Die Record-Markierung ist ADDITIV, und `policy_target_valid` bleibt
+    /// unberuehrt -- der registrierte Unterschied zur Startkuppel-Streuung
+    /// (par.11: zufaellig ist hier nur ein Nebenaspekt DERSELBEN Aktion, der
+    /// Zug `ChooseDrawStackSlot` bleibt derselbe).
+    #[test]
+    fn the_record_field_is_additive_and_keeps_the_policy_target() {
+        assert_eq!(return_order_randomized_field(false), None, "ohne Muenzwurf kein Feld");
+        assert_eq!(return_order_randomized_field(true), Some(json!(true)));
+        let mut m = Map::new();
+        if let Some(v) = return_order_randomized_field(true) {
+            m.insert("return_order_randomized".into(), v);
+        }
+        assert_eq!(m.len(), 1, "genau EIN Feld kommt dazu");
+        assert!(
+            !m.contains_key("policy_target_valid"),
+            "das Policy-Ziel bleibt gueltig -- anders als bei der Startkuppel"
+        );
+    }
+
+    /// Der Durchstich bis zur angewandten Aktion: derselbe Partiezustand
+    /// einmal OHNE und einmal MIT Traeger. Zwei Ziehungen vorab ueber den
+    /// echten Engine-Pfad, damit die Serie garantiert mindestens drei Platten
+    /// haelt (die Aufloesung zieht selbst noch eine Pflichtziehung) -- sonst
+    /// haengt der Durchstich an der Stopp-Regel der Ziehserie, die dieser
+    /// Test nicht pruefen will. Die Serie selbst ist deterministisch
+    /// (`execute_draw_stack_peek` zieht per `remove(0)`, ohne RNG), beide
+    /// Laeufe halten also dieselben Platten.
+    #[test]
+    fn the_carrier_reaches_the_applied_return_order() {
+        let mut resolved = 0usize;
+        let mut saw_a_different_order = false;
+        for seed in 0..24u64 {
+            let prepared = |s: u64| -> Option<Game> {
+                let mut game = Game { state: fresh_stack_state(s) };
+                game.apply_drafting(&Action::DrawStackPeek).ok()?;
+                game.apply_drafting(&Action::DrawStackPeek).ok()?;
+                Some(game)
+            };
+            let (Some(mut plain_game), Some(mut shuffled_game)) = (prepared(seed), prepared(seed))
+            else {
+                continue;
+            };
+            let Ok(Action::ChooseDrawStackSlot(a)) =
+                resolve_and_apply_stack_draw_with(&mut plain_game, None, 0, None)
+            else {
+                continue;
+            };
+            let cell = std::cell::Cell::new(false);
+            let Ok(Action::ChooseDrawStackSlot(b)) = resolve_and_apply_stack_draw_with(
+                &mut shuffled_game,
+                None,
+                0,
+                Some(ReturnOrderRandom { p: 1.0, seed, randomized: &cell }),
+            ) else {
+                continue;
+            };
+            resolved += 1;
+            assert_eq!(a.chosen_id, b.chosen_id, "die Streuung darf die Plattenwahl nicht bewegen");
+            assert!(a.return_order.len() >= 2, "Vorbereitung garantiert >= 2 Restplatten");
+            let (mut left, mut right) = (a.return_order.clone(), b.return_order.clone());
+            left.sort();
+            right.sort();
+            assert_eq!(left, right, "gemischt wird PERMUTIERT, nicht ausgetauscht");
+            assert!(cell.get(), "bei >= 2 Restplatten und p = 1 muss markiert werden");
+            if a.return_order != b.return_order {
+                saw_a_different_order = true;
+            }
+        }
+        assert!(resolved > 0, "kein einziger Stapelzug aufgeloest -- Testaufbau pruefen");
+        assert!(
+            saw_a_different_order,
+            "in keinem Seed kam eine andere Reihenfolge heraus -- der Traeger erreicht die \
+             angewandte Aktion nicht"
+        );
     }
 }
 
