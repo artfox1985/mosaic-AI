@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: ERZEUGUNG DURCH (par.9, 2026-09-14): 1.201 Dateien in rund 12,8 h, **Tor 2a HAELT** 0,843 gegen 0,816 volle Spalten je Seite (n=8.000); die Reihe ist ueber fuenf Generationen monoton, der Zuwachs wird kleiner. Fenster gebaut (2.947 Dateien, Schluessel 35c6bd2b9bd2), Training b01 durch (1,55 h, 12 Epochen), Tor 1 laeuft. Arme: b02 Spezialfeld-Ablation, b03 Sicht-Arm (755 -> 794, Code durch, Wheel offen; P.12 erst ab v30). Offen: Sockel-Sims. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01 mit unveraendertem Rezept? | Beleg: ERZEUGUNG DURCH (par.9, 2026-09-14): 1.201 Dateien in rund 12,8 h, **Tor 2a HAELT** 0,843 gegen 0,816 volle Spalten je Seite (n=8.000); die Reihe ist ueber fuenf Generationen monoton, der Zuwachs wird kleiner. Fenster gebaut (2.947 Dateien, Schluessel 35c6bd2b9bd2), Training b01 durch. **Tor 1 Seed 1: H0** (87:93 auf 90 Paaren, SPRT-Abbruch) -- kein Beleg fuer Ueberlegenheit; zweiter Seed laeuft. Arme: b02 Spezialfeld-Ablation, b03 Sicht-Arm (755 -> 794, Code durch, Wheel offen; P.12 erst ab v30). Offen: Sockel-Sims. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -463,6 +463,53 @@ aus 4000 Partien):
 Der Margin ist per Konstruktion 0: im Self-Play spielt dasselbe Netz beide Seiten, die Klasse ist
 also ihr eigener Gegner. Die Reihenauslastung traegt dieses Artefakt nicht; sie steht in den
 Arena-Logs von Tor 1 und wird dort berichtet.
+
+### Tor 1 v29-b01 gegen v28-b02, Seed 20261061 (erster von zwei): **H0**
+
+**SPRT-Verdikt H0** nach 90 Paaren (180 Partien, Abbruch an der unteren Wald-Schranke,
+LLR -2,956 gegen -2,944). Getestet wurde H0 p = 0,5 gegen H1 p = 0,65; H0 heisst **kein Beleg
+fuer die vorregistrierte Ueberlegenheit**, nicht "b01 ist schlechter".
+
+| Groesse | v29-b01 | v28-b02 |
+| --- | --- | --- |
+| Siege | 87 | 93 |
+| volle Spalten je Seite | 0,928 (+-0,109) | 0,883 (+-0,107) |
+| Teilspalten >= 4 | 2,200 | 2,306 |
+| Teilspalten >= 3 | 3,139 | 3,167 |
+| hoechste Spalte | 5,639 | 5,628 |
+| volle Zeilen | 0,117 | 0,078 |
+| Spezialfelder belegt | 1,283 | 1,172 |
+| eigene Punkte | 49,99 | 50,23 |
+| Strafleiste | 8,61 | 8,13 |
+| Margin | -0,23 | +0,23 |
+
+n = 180 Bretter je Modell, Grundmenge Bretter, Einheit je Partie. Gepaart ueber 90 Paare:
+Siege -0,033 [-0,177, +0,110], Punkte -0,233 [-2,99, +2,52], McNemar p = 0,76. **Alles null.**
+
+**Tor 2b GRUEN**, und zwar im Sinne der Replay-Pruefung: 180 von 180 Partien nachgespielt,
+**0 divergiert**.
+
+**Der einzige Befund mit einem Intervall, das die Null ausschliesst, sitzt bei den
+Plattenkriterien** (gepaart, nur Partien mit beidseitig aktivem Kriterium):
+
+| Kriterium | Differenz b01 minus b02 | 95-%-KI | n Paare |
+| --- | --- | --- | --- |
+| Mehrfarbige Felder | **-1,222** | [-2,341, **-0,104**] | 36 |
+| Vertikale Reihen | +1,207 | [-0,363, +2,777] | 29 |
+| Diagonale Reihen | +0,735 | [-0,106, +1,576] | 34 |
+| Eckplatten | -0,586 | [-1,738, +0,566] | 35 |
+
+**Lesart, mit Vorbehalt:** die Richtung passt zur Kampagne -- b01 baut mehr vertikale Reihen
+(volle Spalten) und bezahlt bei den Mehrfarbigen Feldern. Aber **acht Kriterien wurden geprueft**,
+und bei acht Intervallen auf 95 Prozent ist eines knapp ausserhalb der Null der Erwartungswert,
+nicht der Befund. Die obere Grenze liegt bei -0,104, also hart an der Null. **Ohne den zweiten
+Seed ist das keine Aussage**; wiederholt es sich dort mit demselben Vorzeichen, lohnt der
+genauere Blick.
+
+**Laufzeit:** 2.485,4 s (41 Minuten) statt der geplanten 86-91 min -- der SPRT hat nach 90 statt
+200 Paaren abgebrochen, genau wozu er da ist. 13,8 s je Partie, 10 Threads.
+
+**Der zweite Seed (20261062) laeuft.** Ein DRITTER Seed ist kein Automatismus (Regel v27, par.6).
 
 ### Training v29-b01 und eine Falle im Namensschema (2026-09-14)
 
