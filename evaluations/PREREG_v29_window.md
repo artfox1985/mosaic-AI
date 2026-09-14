@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT, Tor 1 b01 gegen den Champion BEIDE SEEDS H0. **Tor 1 b03 gegen b01: Merkmalsstand UEBERNOMMEN** (par.12-Regel; Seed 1 klar fuer b03 mit 69:41, Seed 2 Gleichstand) -- aber KEIN Champion-Entscheid, b03 gegen den Champion ist ungemessen. b02 laeuft gegen b03. OFFEN: der Fenster-Cache-Schluessel kennt den Ablations-Schalter nicht. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT, Tor 1 b01 gegen den Champion BEIDE SEEDS H0. **Tor 1 b03 gegen b01: Merkmalsstand UEBERNOMMEN** (par.12-Regel; Seed 1 klar fuer b03 mit 69:41, Seed 2 Gleichstand) -- aber KEIN Champion-Entscheid, b03 gegen den Champion ist ungemessen. **Tor 1 b02 gegen b03: die Spezialfeld-Kanaele TRAGEN** (beide Seeds dieselbe Richtung, Seed 2 signifikant; b03 belegt in beiden mehr Spezialfelder) -- die Ablation ist verworfen. OFFEN: der Fenster-Cache-Schluessel kennt den Ablations-Schalter nicht. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -615,6 +615,88 @@ genauere Blick.
 200 Paaren abgebrochen, genau wozu er da ist. 13,8 s je Partie, 10 Threads.
 
 **Der zweite Seed (20261062) laeuft.** Ein DRITTER Seed ist kein Automatismus (Regel v27, par.6).
+
+### par.6d Netz-Gesundheit: 17 der 39 neuen Spalten leben -- und die 22 toten sind vorhergesagt
+
+**Punkt 2 (tote Einheiten), GRUEN.** `tools/probes/dead_unit_probe.py` ueber frozen_v3, vier
+Modelle: **alle bei 2,60 Prozent** (40 von 1.536 Einheiten der Flachvektor-Schichten), Schwelle
+waere das Doppelte des b01-Anteils gewesen. b03 hat also KEINE zusaetzlichen toten Einheiten,
+obwohl er 39 Eingangswerte mehr bekam.
+
+**Die Zahlengleichheit ueber vier Modelle ist kein Messfehler, sondern ein Befund:** alle vier
+stammen per Warmstart vom selben Vorfahren ab, und eine tote ReLU-Einheit bekommt keinen
+Gradienten mehr -- sie bleibt tot. Dieselben 40 Einheiten in `fusion2` sind seit mindestens
+`v28-b02` aus dem Spiel. Aktiv-Rate und effektiver Rang unterscheiden sich dagegen zwischen den
+Modellen (conv1: 0,5161 / 0,5213 / 0,5141 / 0,5139), die Messung greift also.
+
+**Punkt 1 (leben die neuen Spalten?) -- das eigentliche Ergebnis.** Spaltennormen von
+`flat_branch.0.weight` im Checkpoint `v29-b03_brierbest`:
+
+| | Mittel | Median | Maximum |
+| --- | --- | --- | --- |
+| Altspalten 0..754 | 3,009 | 2,509 | – |
+| **Neue Spalten 755..793** | **0,137** | **0,000** | 1,019 |
+
+**17 der 39 Spalten sind von Null verschieden, 22 sind exakt 0 -- und beide Gruppen sind genau
+die vorhergesagten:**
+
+| Merkmal | Indizes | Norm | Lage |
+| --- | --- | --- | --- |
+| P.3 Ziehserie | 755-757 | **0,679 / 0,588 / 1,019** | staerkstes neues Signal |
+| P.7 Phase (One-Hot ueber 6) | 758-763 | 0 / 0,152 / 0,152 / 0 / 0 / 0 | **vier tot** -- im Korpus kommen nur `drafting` und `tiling` vor |
+| P.9 Turm je Farbe | 764-768 | rund 0,20 | lebt |
+| P.11 Bonuschips | 769-770 | rund 0,20 | lebt |
+| **P.12 Designs im eigenen Block** | **771-788** | **alle 0** | **das Feld `designs` fehlt im v29-Korpus** |
+| P.13 Blockstruktur | 789-790 | rund 0,25 | lebt |
+| P.14 Sperrstand | 791-792 | rund 0,31 | lebt |
+| P.15 Startspieler | 793 | 0,208 | lebt |
+
+**Beide Nullgruppen waren vorher registriert**, nicht nachtraeglich erklaert: P.12 als tote
+Spalte (par.9, Nutzer-Entscheid "erst ab v30"), und dass im Korpus nur zwei der sechs Phasen
+vorkommen, steht seit dem Bau in der Messung von `phase` -- die vier unbesetzten Phasen koennen
+kein Gewicht bekommen. **Das Netz hat also genau die Spalten aufgegriffen, die ueberhaupt Signal
+tragen.**
+
+**Die lebenden Spalten sind schwach** (0,15 bis 1,02 gegen 3,01 im Mittel der Altspalten). Das ist
+zu erwarten -- die Altspalten tragen fuenf Generationen Training, die neuen zwoelf Epochen ab
+Null -- aber es ist zugleich die wahrscheinlichste Erklaerung dafuer, dass b03 sein Optimum schon
+in Epoche 2 erreicht: viel zusaetzliches Signal ist noch nicht da. **Nicht geprueft**, ob mehr
+Epochen oder ein hoeherer Lernschritt fuer die neuen Spalten daran etwas aendern; das waere ein
+eigener Arm.
+
+### Tor 1 v29-b02 gegen b03: **die Spezialfeld-Kanaele TRAGEN** (2026-09-14)
+
+b02 hat die Planes-Kanaele 77 (Spezialfeld-Ertrag) und 78 (Abstand zur Ausloesung) AUS, b03 an;
+sonst sind die Arme identisch (beide 794, gleiches Fenster, gleicher Seed, gleiches Rezept).
+
+| Seed | Verdikt | Paare | b02 : b03 | gepaarte Diff | McNemar p | Punkte b02 / b03 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20261065 | H0 | 50 | 43 : 57 | -0,280 [-0,684, +0,124] | 0,248 | 48,78 / 52,63 |
+| 20261066 | H0 | 30 | 22 : 38 | **-0,533 [-0,951, -0,116]** | **0,0386** | 53,37 / 58,10 |
+
+**Beide Seeds zeigen dieselbe Richtung, Seed 2 signifikant** (das Intervall schliesst die Null
+aus). Die Ablation ist also nicht nur "nicht besser", sie ist schlechter. **Verdikt: die Kanaele
+77/78 tragen, die Ablation wird verworfen.**
+
+**Der Beleg sitzt dort, wo die Prereg ihn erwartet hat -- im Posten Spezialfelder:**
+
+| Seed | belegte Spezialfelder b02 (Kanaele AUS) | b03 (Kanaele AN) |
+| --- | --- | --- |
+| 20261065 | 1,120 | **1,290** |
+| 20261066 | 1,310 | **1,534** |
+
+In BEIDEN Seeds belegt die Seite mit eingeschalteten Kanaelen mehr Spezialfelder. Dazu mehr volle
+Spalten (0,94 gegen 0,84 und 1,05 gegen 0,79) und in beiden Seeds rund vier Punkte mehr je Partie.
+`PREREG_special_tile_yield.md` par.4a hatte genau das offen gelassen: "Kanaele 77/78 gebaut,
+Wirkung nie isoliert". **Jetzt ist sie isoliert, und sie ist positiv.**
+
+**Einschraenkung, die dazugehoert:** gemessen ist die Ablation gegen b03, also bei INPUT_SIZE 794
+und mit den Sichtwerten von Abschnitt 16. Ob die Kanaele auch ohne diese Sicht tragen, ist damit
+nicht gezeigt -- dafuer fehlt ein b02 auf 755, und der wird nach dem Nutzer-Entscheid
+("die 794 kommen sowieso") nicht nachgefahren.
+
+Tor 2b in beiden Laeufen GRUEN; im zweiten Seed 2 von 58 Partien nicht nachspielbar, beide Male
+am bekannten Chip-Limit des Replays ("Chip-Vollendung nicht nachspielbar"), nicht an den Zuegen.
 
 ### Tor 1 v29-b03 gegen b01: **Merkmalsstand WIRD UEBERNOMMEN** (2026-09-14)
 

@@ -103,7 +103,7 @@ Dateien, und alle drei Arme sind trainiert.
 | --- | --- | --- | --- | --- |
 | v29-b01 | 755 | Pflichtarm, Bezugspunkt | gegen `v28-b02` | **beide Seeds H0** -- kein Champion-Wechsel |
 | v29-b03 | 794 | Sichtwerte (Abschnitt 16) | gegen b01 | **Merkmalsstand UEBERNOMMEN** (Seed 1 klar 69:41, Seed 2 Gleichstand; par.12-Regel) |
-| v29-b02 | 794 | plus Spezialfeld-Ablation | gegen b03 | laeuft seit 14:00 |
+| v29-b02 | 794 | plus Spezialfeld-Ablation | gegen b03 | **die Kanaele 77/78 TRAGEN** -- die Ablation verliert in beiden Seeds (Seed 2 signifikant, -0,533) und belegt in beiden weniger Spezialfelder |
 
 **Champion bleibt `v28-b02_brierbest`.** Ob b03 den Champion schlaegt, ist UNGEMESSEN -- er lief
 nur gegen b01, und b01 verlor gegen den Champion. Das waere ein eigener Lauf und ist der
@@ -115,8 +115,11 @@ naheliegendste naechste Schritt, wenn ein Champion-Wechsel in v29 noch gewollt i
    gewinnt trotzdem einen Seed klar und beide Seeds bei den Punkten. Argument gegen
    Offline-Vorentscheide bei Abstaenden dieser Groesse.
 2. **b03 erreicht sein Optimum in Epoche 2 von 12**, obwohl er 39 zusaetzliche Eingangswerte
-   bekam. Damit ist par.6d Punkt 1 ("leben die neuen Spalten?") faellig, sobald die Arena frei
-   ist -- Werkzeug `tools/probes/dead_unit_probe.py` liegt seit dieser Nacht.
+   bekam. par.6d Punkt 1 GEMESSEN (2026-09-14): **17 der 39 neuen Spalten leben, 22 sind exakt 0
+   -- und beide Gruppen sind die vorhergesagten** (18x P.12, dessen Korpusfeld fehlt, plus vier
+   Phasen, die im Korpus nicht vorkommen). Die lebenden Spalten sind aber schwach (0,137 im Mittel
+   gegen 3,009 bei den Altspalten); das ist die wahrscheinlichste Erklaerung fuer das fruehe
+   Optimum. Punkt 2 GRUEN: tote Einheiten bei allen vier Modellen 2,60 Prozent, kein Zuwachs.
 
 **Zwei offene Punkte aus dem Betrieb:** der Fenster-Cache-Schluessel kennt den Ablations-Schalter
 nicht (b03 hat b02s Monolithen ueberschrieben, Ergebnisse unbeschaedigt, die naechste
@@ -130,7 +133,7 @@ Vier Fahrplanpunkte sind bearbeitet worden, alle ohne Messung:
 | --- | --- | --- |
 | 5 | Encoder-Abschnitt 16 (Sicht-Arm v29-b03) | **Code und Tore durch**: 39 Werte, INPUT_SIZE 794, drei neue Tests, Suite 641 gruen, drei Fixtures neu gesetzt. OFFEN: Wheel-Bau plus `config.INPUT_SIZE` auf 794 im selben Zug, dann Anker-Drift |
 | 15 | Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` | **Bau geprueft und vollstaendig** (beide Encoder, Cache-Schluessel, Registratur, `engine_config`, `knobs.md`). OFFEN: die Tore -- sie teilen sich den Wheel-Bau mit Nr. 5, weil der Schalter per Default AUS ist |
-| 20 | Netz-Gesundheit | **Sonde `tools/probes/dead_unit_probe.py` gebaut**, Selbsttest ueber drei Generationen gruen. Der volle Lauf gehoert zur b03-Abnahme |
+| 20 | Netz-Gesundheit | **Sonde `tools/probes/dead_unit_probe.py` gebaut**, Selbsttest ueber drei Generationen gruen. Lauf DURCH am 2026-09-14, Punkte 1 und 2 oben |
 | 23 | Korpus-Verhaltens-Audit | **Werkzeug gebaut, Selbsttest gruen** (18 Handzahlen ueber sechs Claude-Partien exakt). Der Korpuslauf kommt mit v29 |
 | 22 | Schwierigkeitsleiter | Bauplan in drei Punkten berichtigt, **Schritt 1b gebaut UND ABGENOMMEN** (2026-09-14 01:35, neben dem b01-Training): sechs optionale Stilfelder, 641 Tests gruen, Paritaets-Fixture unveraendert -- das vorregistrierte Tor. Nichts installiert. Auch `models/levels/beginner.spec.json` liegt (hv3 @150) |
 

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7): auch der Lehrer laesst 81 % der unteren Spezialfelder liegen. K5 gebaut und einfaktoriell gemessen (par.9b-9d), seit 2026-09-07 in der Champion-Spec (v24-b07): hebt die vollen Spalten am staerksten von allem Gemessenen (0,5725 -> 0,6900) und ist siegneutral (243:257), ABER nicht ueber die Spezialfelder -- k6 wird leicht schlechter, die Punkte kommen aus vertikalen Reihen und Eckplatten. Netzseitige Hebel OFFEN: par.4a (Kanaele 77/78 gebaut, Wirkung nie isoliert), par.4c (Slot-Ausloesungs-Kopf, ungebaut); beide auf Nutzer-Priorisierung (par.7). -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7): auch der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen. K5 in der Champion-Spec, hebt die vollen Spalten am staerksten von allem Gemessenen, aber nicht ueber die Spezialfelder. **par.4a GESCHLOSSEN 2026-09-14 (par.10): die Kanaele 77/78 TRAGEN** -- die Ablation v29-b02 verliert gegen v29-b03 in beiden Seeds (Seed 2 signifikant) und belegt in beiden weniger Spezialfelder. OFFEN bleibt par.4c (Slot-Ausloesungs-Kopf, ungebaut). -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
@@ -786,3 +786,38 @@ beste gegen den Champion. **Danach:** traegt die Eingabe, ist der naechste Hebel
 par.4c -- beides ohne Auftrag; traegt sie nicht, ist der netzseitige Eingabe-Zweig dieser Prereg
 abgeschlossen und nur noch par.4c offen. Der Posten selbst bleibt der groesste negative in der
 Plattenwertung (Tor 1 v28: -9,73 gegen -10,61 Punkte je Partie bei 160 von 400 Brettern).
+
+## par.10 ABLATION GEMESSEN: die Kanaele 77/78 tragen (2026-09-14)
+
+b02 hat die Planes-Kanaele 77 (Spezialfeld-Ertrag) und 78 (Abstand zur Ausloesung) AUS, b03 an;
+sonst sind die Arme identisch (beide 794, gleiches Fenster, gleicher Seed, gleiches Rezept).
+
+| Seed | Verdikt | Paare | b02 : b03 | gepaarte Diff | McNemar p | Punkte b02 / b03 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 20261065 | H0 | 50 | 43 : 57 | -0,280 [-0,684, +0,124] | 0,248 | 48,78 / 52,63 |
+| 20261066 | H0 | 30 | 22 : 38 | **-0,533 [-0,951, -0,116]** | **0,0386** | 53,37 / 58,10 |
+
+**Beide Seeds zeigen dieselbe Richtung, Seed 2 signifikant** (das Intervall schliesst die Null
+aus). Die Ablation ist also nicht nur "nicht besser", sie ist schlechter. **Verdikt: die Kanaele
+77/78 tragen, die Ablation wird verworfen.**
+
+**Der Beleg sitzt dort, wo die Prereg ihn erwartet hat -- im Posten Spezialfelder:**
+
+| Seed | belegte Spezialfelder b02 (Kanaele AUS) | b03 (Kanaele AN) |
+| --- | --- | --- |
+| 20261065 | 1,120 | **1,290** |
+| 20261066 | 1,310 | **1,534** |
+
+In BEIDEN Seeds belegt die Seite mit eingeschalteten Kanaelen mehr Spezialfelder. Dazu mehr volle
+Spalten (0,94 gegen 0,84 und 1,05 gegen 0,79) und in beiden Seeds rund vier Punkte mehr je Partie.
+`PREREG_special_tile_yield.md` par.4a hatte genau das offen gelassen: "Kanaele 77/78 gebaut,
+Wirkung nie isoliert". **Jetzt ist sie isoliert, und sie ist positiv.**
+
+**Einschraenkung, die dazugehoert:** gemessen ist die Ablation gegen b03, also bei INPUT_SIZE 794
+und mit den Sichtwerten von Abschnitt 16. Ob die Kanaele auch ohne diese Sicht tragen, ist damit
+nicht gezeigt -- dafuer fehlt ein b02 auf 755, und der wird nach dem Nutzer-Entscheid
+("die 794 kommen sowieso") nicht nachgefahren.
+
+Tor 2b in beiden Laeufen GRUEN; im zweiten Seed 2 von 58 Partien nicht nachspielbar, beide Male
+am bekannten Chip-Limit des Replays ("Chip-Vollendung nicht nachspielbar"), nicht an den Zuegen.
+
