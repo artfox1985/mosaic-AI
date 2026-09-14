@@ -1461,6 +1461,40 @@ body{font-family:system-ui,sans-serif;background:var(--bg);color:var(--text);pad
 .finish-card.dragging .finish-title{cursor:grabbing}
 .finish-sub{font-size:10px;color:var(--text2);margin-bottom:10px;line-height:1.4}
 
+/* Zwei Lagen, zwei Gesichter (Nutzer 2026-09-14) -------------------------
+   Das Fenster geht auf, sobald keine VOLLE Reihe mehr an die Kuppel kann --
+   das heisst nicht, dass nichts mehr zu tun waere: Reihen lassen sich noch
+   mit Bonusplaettchen vervollstaendigen. In dieser Lage bekommt die Karte
+   den Warnton des Bonuschip-Hinweises (.info.warn), die Chip-Knoepfe sind
+   die gefuellten, und der Abschluss faellt auf einen Umriss zurueck. */
+.finish-card.chips-open{
+  border:2px solid #F59E0B;
+  box-shadow:0 10px 50px rgba(217,119,6,.28);
+}
+.finish-card.chips-open .finish-title{
+  background:#FEF3C7;color:#92400E;
+  margin:-16px -18px 6px;padding:10px 18px 8px;
+  border-radius:10px 10px 0 0;
+}
+.finish-chip-btn{
+  width:100%;padding:9px;margin-bottom:6px;
+  background:var(--gelb);color:#fff;border:none;border-radius:7px;
+  cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;
+}
+.finish-chip-btn:hover{background:#B45309}
+/* Der Abschluss als Nebenweg: erreichbar, aber er zieht den Blick nicht. */
+.confirm.secondary{
+  background:transparent;color:var(--text2);
+  border:1px solid var(--border2);font-weight:400;
+}
+.confirm.secondary:hover{background:var(--bg);color:var(--text)}
+/* Antwort auf einen Klick, der bewusst NICHTS tut: der Bestaetigungs-Klick
+   am Kuppelfeld uebergibt nicht mehr, solange Chip-Reihen offen sind
+   (app.js::setPendingTiling). Ohne Rueckmeldung sieht das nach einem
+   haengenden Knopf aus. */
+@keyframes finish-flash{0%,100%{transform:scale(1)}30%{transform:scale(1.045)}65%{transform:scale(.995)}}
+.finish-card.flash{animation:finish-flash .6s ease}
+
 /* -- Vorgemerkte Tiling-Fliese (Punkt 10) -----------------------------------
    Die Fliese liegt sichtbar auf dem Zielfeld, ist aber noch NICHT an den
    Server geschickt: bis zur Bestaetigung (Klick auf die Musterreihe oder
