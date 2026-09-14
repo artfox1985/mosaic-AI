@@ -589,7 +589,11 @@ def state_to_tensor_python(data):
     _depth_first_own = 0.0
     _own_blocks = 0
     _seen_own = False
-    _running = 0.0
+    # Die Tiefe zaehlt AB DEM STAPELANFANG, also einschliesslich des unbekannten
+    # Praefix -- so wie features.rs es tut. Bei 0 zu beginnen waere die Tiefe
+    # innerhalb der bekannten Bloecke und wich am 2026-09-14 im Paritaetstor ab
+    # (Index 789, Rust 7/18 gegen Python 0).
+    _running = float(_view.get("unknown_prefix", 0) or 0)
     for _b in _view.get("blocks", []) or []:
         if _b.get("own"):
             _own_blocks += 1
