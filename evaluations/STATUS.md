@@ -22,7 +22,7 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 | Kette | Inhalt | Stand |
 | --- | --- | --- |
-| `tools/night_v29_20260914.sh` | 1. A/B Mondstapel-Nachsuche (Stufe 3) - 2./3. Kostentor K4 mit/ohne - 4./5. Arena K4 zwei Dosen - 6. Nachzug b02 gegen b03 ohne Frueh-Stopp | Schritt 1 bei 95:95 nach 190 von 200 Paaren (Nutzer-Meldung), laeuft weiter |
+| `tools/night_v29_20260914.sh` | 1. A/B Mondstapel-Nachsuche (Stufe 3) - 2./3. Kostentor K4 mit/ohne - 4./5. Arena K4 zwei Dosen - 6. Nachzug b02 gegen b03 ohne Frueh-Stopp | **Schritt 1 DURCH** (Verdikt unten), Schritt 2 laeuft |
 | `tools/night_v29_envelope_value_ab.sh` | wartet auf die erste; dann Anker-Kante v29-b03 gegen hv4_anchor, dann Value-Anteil im Tiling in zwei Dosen (par.8.6b) | wartend, Prozessabfrage alle 5 min |
 
 **Nichts anderes darf Rechenlast erzeugen** -- kein Build, kein cargo, keine Sonde. Das gilt
@@ -221,6 +221,31 @@ der unbelegten 4 auf die Regel-Obergrenze 10 korrigiert (`board.rs` Z.240).
 
 **FENSTER-PINNING nicht vergessen:** Streudateien, die waehrend der Erzeugung entstehen,
 gehoeren beim Fensterbau in `MOSAIC_DATA_EXCLUDE`.
+
+### Stand 2026-09-15: Stufe 3 des Mondstapels traegt nicht
+
+**197:203 auf 200 Paaren ohne Frueh-Stopp** (McNemar p 0,84, gepaarte Differenz -0,030
+[-0,229, +0,169], 5.933 s bei 10 Threads, 14,833 s je Partie). Keine der sechs
+Standard-Kennzahlen liegt ueber der Aufloesung. Artefakt
+`moon_order_post_vs_off_s20261091.json`, Einzelheiten `PREREG_moon_stack_order.md` par.9h.
+
+**Das Verdikt lautet nicht "die Reihenfolge ist egal"** -- die Gegenhypothese ist seit par.7
+widerlegt (nur der oberste Stein je Stapel ist ziehbar) --, sondern: **die Nachsuche in dieser
+Bauform und mit diesem Budget traegt nicht.** par.9d hatte vorab festgelegt, dass ein
+Nullbefund hier ein Implementierungs-Verdacht ist; drei der fuenf Pruefpunkte sind am Code
+ausgeraeumt (Perspektive, Verdrahtung bis in den Arena-Pfad, Vollstaendigkeit der Varianten),
+zwei bleiben offen und sind nur messbar: **Budget** (256 Sims je Variante = Wurzelbreite 16)
+und **Ausloesungsrate**. Fuer den zweiten ist die Diagnose-Zeile `[moon_order]` gebaut
+(par.9g), sie liegt aber noch nicht im Wheel.
+
+**Randbefund als Reihenfolge-Argument, nicht als Beleg:** die groesste Einzelabweichung sind
+die vollen Spalten mit -0,0985 (rund 1,8 SE), also die langfristigste Groesse im Block,
+waehrend die kurzfristigen Plattenpunkte leicht fuer die Nachsuche sprechen. Dieselbe Richtung,
+die par.9e dem Prior vorwirft. Das stuetzt die Reihenfolge C vor B vor A (Fahrplan 32a/32b).
+
+**Faellig vor Fahrplan 32a:** Wheel bauen, kleine Serie mit `moon_order_variants=2`, die beiden
+Zahlen ablesen. Bleibt `changed` nahe 0, waehlt die Nachsuche fast immer den Bestand -- dann
+ist nicht der Horizont der Engpass und 32a faellt, bevor es gebaut wird.
 
 ## 2. CHAMPION UND LEITER
 
