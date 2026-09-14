@@ -448,10 +448,28 @@ Suchtreiber. Folgezustand je Variante: Kopie plus `apply_drafting`, danach ist l
 reinen Blattbewertung, an der `dome_return_order` Modus 1 scheitert.
 
 **Sim-Default 256, am Zweck begruendet:** `gumbel_top_m_for_budget(256)` = 16, also genau die
-Wurzelbreite, die die erste Suche im Betrieb bei @400 bekommt (dort `clamp(round(400/16), 4, 16)`
-= 16). 256 ist der kleinste Wert mit dieser Eigenschaft; 128 gaebe m=8, 64 gaebe m=4 -- die
-Antwort des Gegners waere dann auf einem engeren Kandidatenfeld bewertet als die Stellung, aus
-der sie kommt.
+Wurzelbreite, die die erste Suche bei @400 bekommt (`clamp(round(400/16), 4, 16)` = 16). 256 ist
+der kleinste Wert mit dieser Eigenschaft; 128 gaebe m=8, 64 gaebe m=4 -- die Antwort des Gegners
+waere dann auf einem engeren Kandidatenfeld bewertet als die Stellung, aus der sie kommt.
+
+**ABER DAS GILT NUR FUER @400, NICHT FUER DIE ERZEUGUNG** (Nutzer-Hinweis 2026-09-14: *"fuer die
+self plays haben wir sowieso ein anderes thema. hier sind die 100 sims die staerkste variante"*).
+Die Erzeugung faehrt 100 Sims (`project_search_depth_column_tradeoff`: 25-100 bauen rund 0,6
+volle Spalten gegen 0,34 ab 250). Dort ist die Wurzelbreite `clamp(round(100/16), 4, 16)` = **6**,
+und ein Nachsuch-Budget von 256 gaebe der Nachsuche fast die dreifache Breite der Hauptsuche, die
+sie bewerten soll. Die Kosten waeren entsprechend: bei rund 8.000 Sims je Partie im Betrieb
+stuenden bis zu 30.600 Zusatz-Sims dagegen -- das VIERFACHE, nicht eine Verdopplung.
+
+**Folge:** das Budget ist ein Spec-Feld und wird je Kontext gesetzt.
+
+| Kontext | Hauptsuche | Wurzelbreite | passendes Nachsuch-Budget |
+| --- | --- | --- | --- |
+| Arena, Gating, das A/B von Stufe 3 | 400 | 16 | **256** (Default) |
+| Erzeugung | 100 | 6 | **rund 96** |
+
+Der Koordinator hatte 256 zunaechst pauschal begruendet; die Zahl stammt aus dem Arena-Kontext
+und war fuer die Erzeugung nie geprueft. Das ist dieselbe Fehlerklasse wie in CLAUDE.md Regel 0
+Zusatz 2: eine Zahl aus einer Grundmenge in einen Verbraucher mit anderer Grundmenge getragen.
 
 **Determinismus:** genau EINE Zahl aus dem Suchstrom, daraus je Variante
 `derive_search_seed(base ^ MOON_ORDER_SEARCH_SEED_DISTINGUISHER, rang)` (:5486). Der Hauptstrom
@@ -490,4 +508,62 @@ ein Bug im Helfer**; behoben mit zwei Durchlaeufen. Drei Tests waren dadurch rot
    (`self_play.rs:1296`). Die Zahl ist damit eine LOSE OBERE Schranke fuer das Tor der Nachsuche
    (Rest >= 2 UND >= 2 eindeutige Reihenfolgen) und darf so nicht ins Kostentor. Die scharfe Zahl
    liefert die offene par.4-Diagnostik aus den Logs von Nr. 28.
+
+## par.9b DIAGNOSTIK GEMESSEN (par.4 Punkt 2) und: KEINE Nachsuche im Self-Play
+
+**Gemessen 2026-09-14 aus ALLEN `--log-games`-Artefakten im Baum** (125 Dateien, **12.907
+Partien**, 637.304 Mondstapel-Ereignisse), ohne neue Partien:
+
+| Steine im Stapel | eindeutige Reihenfolgen | Faelle je Partie | Zusatz-Sims @256 |
+| --- | --- | --- | --- |
+| 2 | 1 (zwei gleiche) | 4,39 | 0 (Tor zu) |
+| 2 | 2 | **14,02** | 512 |
+| 3 | 1 (drei gleiche) | 0,76 | 0 (Tor zu) |
+| 3 | 3 (zwei gleiche) | **6,09** | 768 |
+| 3 | 6 (drei verschiedene) | **4,23** | 1.536 |
+
+**Echte Wahl (mindestens zwei eindeutige Reihenfolgen): 24,34 je Partie.**
+**Zusatz-Sims je Partie bei Budget 256: rund 18.350.**
+
+**KORREKTUR EINES ZAEHLFEHLERS (Nutzer 2026-09-14: "kann ich mir dennoch nicht vorstellen. dass
+wir nie einen dreier stapel hatten").** Eine erste Auswertung meldete "in 400 Partien nie ein
+Stapel groesser als zwei" und hielt das fuer einen Befund ueber das Spiel. **Es war ein
+Parsing-Fehler.** Das Logformat trennt den Rest mit KOMMA und nur den obersten Stein mit Pfeil
+(`execution.rs:116-118`: `format!("({}->{})", rest.join(", "), top.value())`); ein Dreierstapel
+steht also als `(blau, rot->gelb)` im Log. Der Regex hat nur am Pfeil getrennt und daraus zwei
+Steine gemacht. Korrekt gezaehlt sind es **142.945 Dreierstapel**, also 22,4 Prozent aller
+Ereignisse. Die kleinen Fabriken tragen vier Steine (Nutzer-Auskunft), ein Dreierstapel entsteht
+also immer dann, wenn nur EIN Stein der gewaehlten Farbe genommen wird -- haeufig, nicht selten.
+
+**Lehre:** die erste Zahl kam aus EINEM Artefakt mit einer Seed-Basis und wurde nicht gegen das
+Log-FORMAT geprueft, nur gegen die eigene Erwartung. Die Nutzer-Rueckfrage nach der Partienzahl
+hat den Fehler aufgedeckt.
+
+**Damit ist par.2s Zahl ersetzt.** Dort standen "19,9 Ziele je Partie", gemessen mit der
+Grundmenge Rest >= 1 (`self_play.rs:1296`); der Verbraucher (das Tor der Nachsuche) verlangt
+mindestens zwei eindeutige Reihenfolgen. Die richtige Zahl ist **24,34 je Partie**, Grundmenge
+Mondstapel-Ereignisse mit echter Wahlmoeglichkeit, Einheit Ereignisse, n = 12.907 Partien.
+
+**Erwartete Mehrkosten:** rund **18.350 Zusatz-Sims je Partie** bei Budget 256. Gegen rund
+32.000 bei @400 sind das **+57 Prozent**; gegen rund 8.000 bei @100 waeren es mehr als das
+Doppelte -- was den Nutzer-Entscheid unten (keine Nachsuche im Self-Play) zusaetzlich stuetzt.
+
+### Nutzer-Entscheid 2026-09-14: im Self-Play laeuft KEINE Nachsuche
+
+Woertlich: *"vielleicht machen wir fuer das self play ueberhaupt keine nachsuche. dort kann es
+ruhig divers spielen."*
+
+Das loest die teure Haelfte -- und nicht nur aus Kostengruenden: die Erzeugung soll VIELFALT
+liefern, nicht optimal spielen. Eine Nachsuche, die dort die beste Reihenfolge erzwingt, verengt
+den Zustandsraum genau an der Stelle, an der die Rueckgabe-Streuung
+(`PREREG_dome_return_order.md` par.11) gerade Varianz hinzufuegt.
+
+**Kein Umbau noetig:** der Knopf ist ein Spec-Feld. Die Erzeugung faehrt ihre eigene Spec und
+setzt `moon_order_variants` schlicht nicht auf 2. Die Verdrahtung in `net_drafting_policy`
+(par.9a, offener Entscheid 1) bleibt bestehen, liegt aber brach, solange keine Erzeugungs-Spec
+Modus 2 anfordert. Damit ist auch die Frage nach einem eigenen Erzeugungs-Budget (rund 96 statt
+256) gegenstandslos, solange dieser Entscheid gilt.
+
+**Stufe 3 ist damit ein reiner ARENA-Knopf**: Wirkung in Arena, Gating und Referee, nicht in der
+Korpus-Erzeugung.
 
