@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes Rohformat (Teil B)? | Beleg: TEIL A GEBAUT, TOR BESTANDEN und im Betrieb bewaehrt (par.7/par.8): Rust-Bauer bit-identisch zum Python-Zwilling (1.033 Zustaende), Blockbau des v28-Fensters in 26 min, Arm v28-b02 damit trainiert. TEIL B ohne Ausloeser (Datenaufbau 34 s von 5.262 s). -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Wird die Python/Rust-Naht an der Datenschicht konsolidiert -- Merkmalsbauer als EINE Wahrheit in Rust (Teil A) und ein von Rust geschriebenes Rohformat (Teil B)? | Beleg: TEIL A GEBAUT, TOR BESTANDEN und im Betrieb bewaehrt (par.7/par.8): Rust-Bauer bit-identisch zum Python-Zwilling (1.033 Zustaende), Blockbau des v28-Fensters in 26 min, Arm v28-b02 damit trainiert. TEIL B ohne Ausloeser. NEU par.9 (2026-09-14): nach dem 794er-Wheel ist der Flachvektor in beiden Populationen gleich, die PLANES weichen in 2 von 300 ALT-Records ab (Kanal 76, Erreichbarkeit) -- Ursache ist der A2-Phantom-Fix vom 2026-09-12, das Tor vergleicht dort eine gespeicherte gegen eine neu gerechnete Groesse. Auf frischen Zustaenden gruen. -->
 
 # Vorregistrierung: Datenschicht in Rust (Merkmalsbauer und Rohformat)
 
@@ -221,3 +221,42 @@ Bauweg). Erfolgsmass laut par.5 sind Irrtumskosten, nicht Elo: jede weitere Merk
 wird einmal in `features.rs` gebaut und ueber das Paritaetstor freigegeben; der Python-Zwilling
 bleibt Test-Orakel. Teil B (Rohformat aus Rust) bleibt ohne Ausloeser (Datenaufbau 34 s von
 5.262 s beim v28-b02-Training). Kopf auf ENTSCHIEDEN.
+
+
+## par.9 Paritaets-Tor am 2026-09-14: flach GRUEN, Planes zwei Abweichungen -- und warum
+
+Gefahren nach dem Wheel von Encoder-Abschnitt 16 (INPUT_SIZE 794). Grundmenge wie beim
+bestandenen Tor: 733 pygame-Zustaende aus 4 Partien plus 300 Korpus-Zustaende aus
+`data/selfplay_v26-b01-policy_*.pkl`.
+
+**Flachvektor: GRUEN in beiden Populationen** (733/733 und 300/300), nachdem ein Fehler im
+Python-Zwilling behoben war: er zaehlte die Blocktiefe aus P.13 ab dem ersten bekannten Block,
+`features.rs` ab dem Stapelanfang (also einschliesslich des unbekannten Praefix). Das Tor hat ihn
+gefangen -- Index 789, Rust 7/18 gegen Python 0. Genau dafuer ist es da.
+
+**Planes: 2 von 300 Korpus-Zustaenden weichen ab** (pygame 733/733 gleich). Immer derselbe Kanal:
+**76, Erreichbarkeit je Zelle** (`features.rs` Z.1680), Beispiel Zelle (5,1), Python 0,0 gegen
+Rust 1,0.
+
+**Ursache, am Code belegt und NICHT bei den Aenderungen dieser Woche:**
+
+- Der Python-Zwilling LIEST das Feld `cell_reachable_mask` aus dem Record
+  (`neural_net.py` Z.781), Rust RECHNET es neu aus dem rekonstruierten Zustand.
+- Die Rechnung haengt an `provocation::remaining_colors` bzw. `still_reachable_colors`.
+- **Diese Funktion ist am 2026-09-12 geaendert worden** (Commit 2a0cf4b, "Code-Abschluss Stufe 1",
+  148 Zeilen in `provocation.rs`): der **A2-Phantom-Fix** zieht die Phantom-Fliesen der
+  Gegner-Reihen ab, die nie gezogen worden sind.
+- Die v26-Records stammen vom 2026-09-09 und tragen den Stand DAVOR. Python liest die alte Zahl,
+  Rust rechnet die neue -- die Abweichung ist der erwartete Effekt eines Korrektheits-Fixes auf
+  Alt-Records, kein Regressionsbefund.
+
+**Folge fuer das Tor selbst:** es vergleicht eine GESPEICHERTE Groesse gegen eine NEU GERECHNETE.
+Sobald eine Formel hinter einer gespeicherten Groesse korrigiert wird, kann es auf Korpora aus der
+Zeit davor nicht mehr bestehen -- und zwar dauerhaft, nicht nur einmal. Das ist eine Eigenschaft
+der Bauform, keine Regression. **Wer das Tor kuenftig fuer eine Abnahme braucht, fahre es auf
+FRISCHEN Zustaenden** (die pygame-Population tut genau das und ist gruen) oder schliesse die
+betroffenen Kanaele mit Begruendung aus. Der Vorschlag ist hier NICHT umgesetzt, weil er das Tor
+aendert -- das ist ein Nutzer-Entscheid.
+
+**Nicht geprueft:** ob die 2 von 300 wirklich alle auf den Phantom-Fall zurueckgehen. Der Beleg
+ist die Kette Formel-Aenderung -> Alt-Record, nicht eine Zustand-fuer-Zustand-Analyse.
