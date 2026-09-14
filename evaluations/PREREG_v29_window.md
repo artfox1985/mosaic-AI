@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT, Tor 1 b01 gegen den Champion BEIDE SEEDS H0. **Tor 1 b03 gegen b01: Merkmalsstand UEBERNOMMEN** (par.12-Regel; Seed 1 klar fuer b03 mit 69:41, Seed 2 Gleichstand) -- aber KEIN Champion-Entscheid, b03 gegen den Champion ist ungemessen. **Tor 1 b02 gegen b03: die Spezialfeld-Kanaele TRAGEN** (beide Seeds dieselbe Richtung, Seed 2 signifikant; b03 belegt in beiden mehr Spezialfelder) -- die Ablation ist verworfen. OFFEN: der Fenster-Cache-Schluessel kennt den Ablations-Schalter nicht. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- Erzeugung durch, Tor 2a HAELT. Tor 1: b01 gegen den Champion BEIDE SEEDS H0 (kein Champion-Wechsel); **b03 gegen b01 Merkmalsstand UEBERNOMMEN** (par.12-Regel, b03 gegen den Champion ist ungemessen); **b02 gegen b03 die Spezialfeld-Kanaele TRAGEN** (Ablation verworfen). Monolith-Kollision BEHOBEN (Weg 1, Default-Schluessel gemessen identisch, drei Tests). -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -787,7 +787,36 @@ anderes misst als sein Etikett sagt.
    Monolithen neu bauen lassen.
 2. **Den Monolithen je Arm unter eigenem Namen bauen** (`--merge-out` mit Arm-Suffix) und
    `train.py --cache-file` darauf zeigen lassen. Aendert keinen Schluessel, entwertet nichts,
-   kostet eine Zeile im Ketten-Skript. **Empfohlen.**
+   kostet eine Zeile im Ketten-Skript.
+
+#### BEHOBEN 2026-09-14 nach Weg 1, und der Einwand gegen Weg 1 war falsch
+
+Weg 1 wurde gebaut (`engine/py/corpus_dataset.py`, direkt hinter
+`"+bsnative_default_v1"`), aber NICHT als unbedingte Komponente, sondern nach dem Muster von
+`"+carriers:"` direkt darunter: **angehaengt wird `"+specialoff_v1"` nur, wenn der Schalter AN
+ist.** Damit faellt der Einwand weg, der Weg 1 ueberhaupt zur Entscheidungsfrage gemacht hatte
+-- kein Bestandscache wird entwertet, weil der Default-Zweig die Zeichenkette gar nicht anfasst.
+
+**Gemessen, nicht hergeleitet** (2026-09-14, gleiche kuenstliche Dateiliste gegen das Modul aus
+Commit 49d85df, also dem Stand VOR dem Fix):
+
+| Stand | Schalter | Schluessel |
+| --- | --- | --- |
+| HEAD 49d85df (vor dem Fix) | aus | `bea417f31e0e` |
+| mit Fix | aus | `bea417f31e0e` -- **identisch** |
+| mit Fix | an | `82bcedce66c3` |
+
+Gegenprobe auf dem echten v29-Fenster (2.948 Dateien aus `data/window_v29.txt`): vor und nach
+dem Fix `48348753677e` bei ausgeschaltetem Schalter, `2926458dedf5` bei eingeschaltetem.
+
+**Abgesichert durch drei Tests** (`tools/tests/test_window_cache_key_planes_ablation.py`, im
+pre-commit-Hook): Schalter an gibt einen anderen Schluessel; Schalter aus trifft den
+eingefrorenen Alt-Literal (bricht, sobald jemand den Default-Schluessel bewegt); `"0"` und die
+leere Zeichenkette zaehlen als aus, gleiche Semantik wie in `features.rs::special_planes_off`.
+
+**Weg 2 bleibt moeglich und ist durch diesen Fix nicht verbaut** -- er ist nur nicht mehr noetig.
+**Nicht geheilt** ist der bereits eingetretene Fall: b02s Monolith ist ueberschrieben, ein
+`--resume` fuer b02 braucht weiterhin einen Neubau der Bloecke unter dem Schalter.
 
 Bis das entschieden ist, gilt der Handgriff: **zwischen zwei Armen mit verschiedenem Eingang den
 Monolithen umbenennen oder neu bauen, nie den alten annehmen.**
