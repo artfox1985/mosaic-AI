@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Knopf GEBAUT und im Wheel (par.8). **A/B GEMESSEN 2026-09-14 (par.7): H1 NICHT bestaetigt** -- 193:207, p=0,55, Punkte 53,0 gegen 54,8; Fan-out bleibt. **Gueltig, kein Henne-Ei** (Knopf war bei der Erzeugung an, moon-Kopf trainiert). Gegenhypothese von H1 WIDERLEGT (nur der oberste Stein je Stapel ist ziehbar, die Reihenfolge steuert den Zugriff) -- der Nullbefund ist gemessen, nicht erklaert. **H2 (Zielwechsel) bleibt lebend**, Nutzer-Entscheid. -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 GEMESSEN (par.7): Fan-out traegt NICHT (193:207), der Nullbefund ist aber gemessen und nicht erklaert -- die Gegenhypothese "Reihenfolge egal" ist widerlegt (nur der oberste Stein je Stapel ist ziehbar). **Stufe 3 GEBAUT und im Wheel (par.9/9a): eigene Nachsuche nach der Zugwahl**, A/B laeuft. Value-Kopf sieht die Reihenfolge positionsgenau (par.9f). Drei Architektur-Hebel vorregistriert (par.10); Weg C (Terminierung bis Rundenende) und Weg B (Zielwechsel des Kopfs) sind als Fahrplan 32a/32b vor Nr. 33 eingetaktet (par.10a). -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -566,4 +566,254 @@ Modus 2 anfordert. Damit ist auch die Frage nach einem eigenen Erzeugungs-Budget
 
 **Stufe 3 ist damit ein reiner ARENA-Knopf**: Wirkung in Arena, Gating und Referee, nicht in der
 Korpus-Erzeugung.
+
+## par.9c LESERICHTUNG des A/B vom 2026-09-14 (Nachtkette)
+
+`tools/night_v29_20260914.sh`, Schritt 1, Artefakt
+`moon_order_post_vs_off_s20261091.json`. **Die Seitennamen im Artefakt sind
+nichtssagend (`..._a` / `..._b`) -- hier die Zuordnung, damit sie beim Auswerten nicht aus dem
+Skript rekonstruiert werden muss:**
+
+| Seite | Spec | `moon_order_variants` | bedeutet |
+| --- | --- | --- | --- |
+| **a** | `models/moon_order_post2.spec.json` | **2** | Nachsuche nach der Zugwahl (Stufe 3) |
+| **b** | `models/moon_order_off0.spec.json` | **0** | kanonische Reihenfolge, kein Fan-out |
+
+**Gewinnt a, traegt die Nachsuche.** Beide Seiten fahren dasselbe Modell
+(`alphazero_v28-b02_brierbest.onnx`) auf demselben Wheel; die Specs unterscheiden sich in genau
+einem Feld (vor dem Start geprueft).
+
+**Warum nicht gegen Wert 1 (den Fan-out) gemessen wird:** Stufe 1 hat bereits gezeigt, dass der
+Fan-out gegen kanonisch nichts traegt (par.7). Die offene Frage ist, ob die REIHENFOLGE etwas
+wert ist, wenn man sie ohne Kandidatenkonkurrenz entscheidet -- und die Referenz dafuer ist die
+kanonische Reihenfolge, nicht der bereits verworfene Fan-out.
+
+## par.9d LESART VORAB (Nutzer 2026-09-14, VOR dem Ergebnis von Schritt 1)
+
+Nutzer woertlich: *"spannend wuerd ich es finden wenn a nicht besser ist als b beim moon order
+post. dann haut irgendwas von der implementierung noch nicht hin. weil dadurch kann ich recht
+gezielt steuern wann ich und wann mein gegner etwas bekommt. das sollte nicht nur durch eine
+'einfache' permutation abgehandelt werden koennen."*
+
+**Das dreht die Lesart des Nullbefunds um.** Bei Stufe 1 (par.7) war ein Nullbefund vorab als
+wahrscheinlicher Ausgang und als vollwertiges Ergebnis registriert. Hier NICHT: der Nutzer
+erwartet einen Effekt, weil die Reihenfolge eine ZUGRIFFSSTEUERUNG ist -- wer bestimmt, welche
+Farbe obenauf liegt, bestimmt mit, was der Gegner im naechsten Halbzug ueberhaupt nehmen kann
+(pro Stapel ist nur der oberste Stein ziehbar, `docs/engine_manual.md` Z.101-106,
+`factory.rs:76/96-97`). Das ist Steuerung, nicht Kosmetik.
+
+**Bleibt a gleichauf oder schlechter als b, ist das ein IMPLEMENTIERUNGS-Verdacht, kein
+Verdikt.** Dann sind vor jeder inhaltlichen Deutung diese Stellen zu pruefen:
+
+1. **Aus wessen Sicht bewertet die Nachsuche?** `v_mix(&nodes, 0)` ist der Wert des Spielers, der
+   an der Wurzel des UNTERBAUMS am Zug ist -- und das ist der GEGNER (`game.rs:786-788` ruft nach
+   `execute_move` ein `switch_player()`). Gewaehlt wird das Minimum, also der fuer den Gegner
+   schlechteste Folgezustand. Das ist die beabsichtigte Richtung; falls dort ein Vorzeichen oder
+   eine Perspektive kippt, misst der Lauf das Gegenteil.
+2. **Wird die gewaehlte Reihenfolge ueberhaupt gespielt?** Der Rueckgabeweg laeuft ueber
+   `m.take.moon_order`; die Nachsuche tauscht das Feld und gibt die Aktion zurueck. Zu pruefen
+   ist, dass genau diese Aktion ausgefuehrt wird und nicht die urspruengliche.
+3. **Kommen die Varianten vollstaendig an?** `unique_moon_orders` liefert die eindeutigen
+   Permutationen; bei drei verschiedenen Farben sind es sechs. Wird davon eine Teilmenge
+   bewertet, ist der beste Kandidat womoeglich nie dabei.
+4. **Reicht das Budget?** 256 Sims je Variante geben Wurzelbreite 16; wenn der entscheidende
+   Gegnerzug (den frisch oben liegenden Stein nehmen) nicht unter den 16 Kandidaten ist, sieht
+   die Nachsuche den Unterschied nicht, den sie messen soll.
+5. **Ist die Stelle ueberhaupt erreicht worden?** Die Diagnostik aus par.9b sagt 24,34
+   Gelegenheiten je Partie; wenn im Artefakt weniger Nachsuchen auftauchen, greift das Tor
+   seltener als gedacht.
+
+**Erst wenn diese fuenf sauber sind, ist ein Nullbefund ein Befund ueber das Spiel.**
+
+## par.9e EINWAND GEGEN DEN PRIOR: Plackett-Luce ist kurzsichtig (Nutzer 2026-09-14)
+
+Nutzer woertlich: *"ich denk mir Plackett-Luce-Modell ist halt kurzfristig. da brauchst schon ein
+wenig weitsicht. zumindest rundensicht."*
+
+**Das trifft die Vorordnung, nicht die Nachsuche.** Der Prior, der die Varianten sortiert, kommt
+aus dem `moon`-Kopf ueber `plackett_luce_prob` (`net_mcts.rs:2097`) -- er rankt FARBEN nach
+einem Sofortwert und kennt keine Folgen ueber die Runde hinweg. Das Trainingsziel dahinter
+(`moon_order_target`) stammt aus dem Rundenloeser, ist also auf das Rundenende gerichtet und
+nicht auf den Partieausgang; genau das ist H2 in par.3.
+
+**Was Stufe 3 daran aendert und was nicht:** die Nachsuche ersetzt den Prior NICHT als
+Entscheider -- sie bewertet die Varianten mit einer echten Suche ueber den Folgezustand und
+laesst den Prior nur die Reihenfolge der Bewertung bestimmen. Damit liegt die Entscheidung
+erstmals bei einer Suche statt bei einer Sofortwert-Rangfolge. **Wie WEIT diese Suche sieht, ist
+aber eine Budgetfrage:** 256 Sims je Variante geben Wurzelbreite 16 und reichen fuer den
+naechsten Halbzug -- ob sie bis zum Rundenende tragen, ist NICHT geprueft.
+
+**Folge fuer die Auswertung (Ergaenzung zu par.9d):** faellt das A/B flach aus, ist "die Suche
+sieht zu kurz" eine sechste Verdachtsstelle neben den fuenf dort genannten. Sie ist billig
+pruefbar, indem `MOSAIC_MOON_ORDER_SEARCH_SIMS` erhoeht wird -- das ist ein Knopf, kein Umbau.
+Traegt der Effekt erst bei deutlich groesserem Budget, ist das ein Befund ueber die noetige
+Weitsicht und kein Widerspruch zur Bauform.
+
+## par.9f VORAUSSETZUNG GEPRUEFT: der Value-Kopf SIEHT die Mondstapel-Reihenfolge
+
+Nutzer-Einwand 2026-09-14: *"wenn wir keinen value oder policy im mondstapel haben wird es
+schwierig."* Berechtigt -- und am Code geprueft mit positivem Ergebnis.
+
+**Der Encoder kodiert die Mondseite der kleinen Fabriken als 4 x 15 Werte** (`features.rs:833-850`
+JSON-Pfad, `:1313-1325` Direktpfad): je Fabrik DREI Positionen mal FUENF Farben als One-Hot, und
+zwar `stack.iter().rev()` -- von OBEN nach unten, Position 0 ist der oberste Stein. Die Stapel
+sind hoechstens drei hoch (gemessen in par.9b: 1, 2 oder 3), es faellt also nichts weg.
+
+**Der Value-Kopf sieht die Reihenfolge damit vollstaendig und positionsgenau.** Jede Permutation
+erzeugt einen anderen Eingabevektor.
+
+**Das ist der entscheidende Unterschied zur Rueckgabe-Reihenfolge**
+(`PREREG_dome_return_order.md` par.10), an der dieselbe Idee scheitert:
+
+| | Kuppelstapel-Block (Rueckgabe) | Mondstapel |
+| --- | --- | --- |
+| Kodierung | Typ-Folge (+1 Spezial / -1 Joker / 0), `features.rs:212` | **Farbe je Position, One-Hot** |
+| Aufloesung | vier Positionen, drei Typklassen | **drei Positionen, fuenf Farben** |
+| Folge | gleichtypige Platten ununterscheidbar | **jede Permutation unterscheidbar** |
+
+**Folge fuer par.9d:** Verdachtsstelle 1 ("sieht die Bewertung den Unterschied ueberhaupt?") ist
+damit ENTSCHAERFT, was die Eingabe angeht. Bleibt ein Nullbefund, liegt es nicht daran, dass der
+Value-Kopf blind waere -- die uebrigen fuenf Stellen und die Budgetfrage aus par.9e stehen weiter.
+
+**Die Policy hat keine eigene Dimension fuer `moon_order`** (par.2). Stufe 3 braucht sie auch
+nicht: entschieden wird ueber Blattwerte einer Suche, nicht ueber einen Prior auf Aktionen. Der
+`moon`-Kopf ordnet nur die Bewertungsreihenfolge.
+
+## par.10 ARCHITEKTUR-HEBEL jenseits der Sim-Zahl (Nutzer-Auftrag 2026-09-14, VOR dem Bau)
+
+Nutzer: *"ist mir dennoch noch zu schwach. ueberleg dir jenseits von der sim anzahl was wir von
+der architektur optimieren koennen."* -- registriert werden drei Wege. Keiner ist gebaut.
+
+**Der Ausgangsbefund, der sie alle traegt:** `moon_order` ist heute in die Take-Aktion
+eingebacken. Die Engine kann mehrstufige Zuege aber laengst -- `ChooseDomeRotation` ist ein
+EIGENER Zug im Baum, der den Spieler nicht wechselt (`moves.rs`: "ueber zwei
+Spielerentscheidungen ... ohne switch_player()") und eine eigene Aktions-ID traegt
+(`serialize.rs:614`, `move_action_id`). Die Mondreihenfolge ist die Ausnahme, nicht die Regel.
+
+### Weg A: eigener Entscheidungsknoten (der grosse Wurf)
+
+Nach dem Sonnenzug ein Folgeknoten "welcher Stein liegt oben", gebaut wie die Kuppelrotation.
+
+* **Gewinn 1:** MCTS verteilt Visits und Backups darauf -- keine Nebensuche, kein Extra-Budget,
+  die Tiefe kommt aus dem normalen Sim-Budget.
+* **Gewinn 2:** die Varianten konkurrieren NICHT mehr mit anderen Zuegen um das Wurzelfenster --
+  genau der Defekt, den Stufe 1 gemessen hat (par.7).
+* **Gewinn 3, der eigentliche:** die POLICY bekommt eine Dimension. Das Netz kann die Wahl
+  lernen, statt sie ueber einen Hilfskopf zu ranken. Damit faellt auch der Einwand aus par.9e
+  (Plackett-Luce ist kurzsichtig) weg -- der Prior kaeme dann aus derselben Policy wie jeder
+  andere Zug.
+* **Preis:** `NUM_ACTIONS` waechst. Das macht **alle bestehenden Checkpoints unbrauchbar**
+  (`feedback_num_actions_change_breaks_old_checkpoints`) -- Champion, Anker-Kader, die ganze
+  Leiter muessten neu aufgebaut oder als Cross-Aera gefuehrt werden. par.6 schliesst die
+  Erweiterung bisher aus; das war eine ENTSCHEIDUNG, keine Notwendigkeit, und sie ist hiermit
+  wieder offen.
+* **Empfehlung:** nicht fuer den Mondstapel allein. Wer `NUM_ACTIONS` anfasst, macht es EINMAL
+  fuer alles, was eine Dimension braucht.
+
+#### Was sonst noch fuer Weg A in Frage kommt (Nutzer-Frage 2026-09-14, erhoben am Code)
+
+Der heutige Aktionsraum (`net_mcts.rs:51-53`): 328 Stone+Tiling + 27 dome_slot + 36
+draw_stack_slot + 4 rotation + 6 use_chips + 4 bonus_chip + 1 peek = 406.
+
+**Drei Teilentscheidungen loest die Engine INTERN, statt sie der Suche zu geben** -- dasselbe
+Muster, dieselbe Fehlerklasse:
+
+| Entscheidung | heute geloest durch | Schaden belegt? |
+| --- | --- | --- |
+| **Mondstapel-Reihenfolge** (`moon_order`) | in die Take-Aktion eingebacken; Fan-out oder Nachsuche, kein Policy-Ziel | Stufe 1 flach (par.7); Wirkung ungeklaert |
+| **Rueckgabe-Reihenfolge** (`return_order`) | kanonisch oder Blattbewertung; **keine Policy-Dimension** (`dome_return_order` par.2) | A/B flach, aber Henne-Ei (dort par.10) |
+
+**GESTRICHEN: die Chipwahl ist KEINE Luecke** -- zweimal korrigiert, beide Male vom Nutzer
+ausgeloest.
+
+Der Koordinator hatte sie erst als dritten Weg-A-Kandidaten gefuehrt ("Handregel"), dann als
+billigen Korrektheitsfix ("greedy statt exakt"). **Beides war falsch.** Am Code nachgesehen:
+
+* Die **Chip-Aufnahme beim Drafting** hat vier eigene Policy-Dimensionen (`bonus_chip`).
+* Die **Reihenwahl beim Tiling** loest der Solver -- wie der Nutzer sagte.
+* Die **Chip-Teilmenge** ebenfalls: `tiling_solver.rs:17` importiert `chip_allocations`, und der
+  Modulkopf (`:36-38`) haelt fest, dass sie "in `legal_steps`, einmal PRO chippable Reihe PRO
+  Knoten" gerufen wird und bis zu 2^14 Teilmengen prueft (`CHIP_ALLOC_CAP = 14`). **Der Solver
+  verzweigt ueber ALLE Allokationen**; `greedy_chip_alloc` ist nur der Cap- und
+  Budget-Fallback.
+
+**Der in `docs/pitfalls.md` nachgerechnete Schaden betrifft den REPLAYER, nicht das Spiel:** dort
+steht ausdruecklich, der Replayer spiele jede geloggte Vollendung "ueber den Menschen-Einstieg
+`apply_tiling_chips`, und der ist GREEDY". Ein Werkzeugproblem beim Nachspielen.
+
+**Wie der Fehler entstand, weil er sich wiederholen kann:** der Koordinator greppte die Aufrufer
+von `chip_allocations` mit `head -6` und bekam nur `py.rs` und `referee.rs` zu sehen --
+`tiling_solver.rs` fiel unter den Schnitt. Daraus wurde "nur die GUI nutzt es, die KI spielt
+greedy". **Dieselbe `head`-Falle hat in dieser Kampagne schon einmal einen Wheel-Bau zerlegt**
+(uebersehenes Beispiel, E0063). Aufrufer-Greps gehoeren vollstaendig, ohne Schnitt.
+
+**Fuer Weg A bleiben damit ZWEI Kandidaten** (Mondstapel- und Rueckgabe-Reihenfolge), nicht drei.
+Der staerkste Einzelgrund, den der Koordinator genannt hatte, existiert nicht.
+
+**Nicht auf der Liste, weil bereits abgedeckt:** Kuppelplatte, Slot und Rotation (dome_slot 27
+plus rotation 4, eigener Zug `ChooseDomeRotation`), die Peek-Entscheidung (1 Dimension, binaer
+genuegt), Startsetzung (laeuft ueber dieselben dome_slot/rotation-Dimensionen).
+
+**Folge:** ein `NUM_ACTIONS`-Wechsel waere mit diesen drei Posten zu buendeln. Die Groesse der
+Erweiterung ist noch nicht bestimmt -- fuer den Mondstapel genuegt vermutlich "welcher Stein
+liegt oben" (5 Farben), fuer die Rueckgabe dasselbe, fuer die Chipwahl ist die Kombinatorik zu
+klaeren. **Das ist eine eigene Vorregistrierung wert, bevor irgendetwas gebaut wird.**
+
+### Weg B: Ziel des `moon`-Kopfs wechseln
+
+Das ist H2 aus par.3 und Stufe 2 aus par.5, jetzt ohne die Bindung an H1 (die auf der
+widerlegten Gegenhypothese stand, siehe Nachtrag in par.3). Der Prior kommt heute aus dem
+Rundenloeser, ist also auf das Rundenende gerichtet statt auf den Partieausgang.
+
+* Kein neuer Kopf (`feedback_no_new_heads` erlaubt Zielwechsel), keine Aktionsraum-Erweiterung.
+* **Preis:** ein Trainingsarm plus Gating, rund 1,5 h.
+* **Lesart:** traegt der Zielwechsel, ist der Prior die Ursache; traegt er nicht, liegt es an der
+  Entscheidungsform (Weg A) oder am Horizont (Weg C).
+
+### Weg C: Terminierung statt Sim-Zahl
+
+Die Nachsuche aus Stufe 3 laeuft heute auf ein festes Budget. Alternative: bis zum RUNDENENDE
+rechnen -- Nutzer 2026-09-14: *"da brauchst schon ein wenig weitsicht. zumindest rundensicht."*
+
+* Das ist ein Abbruchkriterium, kein Sim-Parameter; die Tiefe richtet sich nach der Stellung
+  statt nach einer Zahl.
+* **Preis:** unklar und stellungsabhaengig -- ein Kostentor ist hier Pflicht, nicht Kuer.
+  Nahe am Rundenende billig, frueh in der Runde teuer.
+* Unabhaengig von A und B, billiger als beide.
+
+### Reihenfolge
+
+**C vor B vor A.** C ist der kleinste Eingriff und adressiert denselben Einwand wie B (Weitsicht),
+ohne Training. B kostet einen Arm und beantwortet die Prior-Frage sauber. A ist der grosse Wurf
+und sollte nur gebaut werden, wenn C und B die Sache nicht erklaeren -- und dann gebuendelt mit
+allem anderen, was eine Policy-Dimension braucht.
+
+**Voraussetzung fuer alle drei:** das Ergebnis des laufenden A/B (Stufe 3, par.9c). Traegt die
+Nachsuche bereits, ist die Frage nicht mehr "warum wirkt nichts", sondern "wie viel geht noch" --
+und dann steht C vorn.
+
+## par.10a EINGETAKTET (Nutzer-Auftrag 2026-09-15): C und B stehen VOR Fahrplan Nr. 33
+
+Woertlich: *"b und c kannst ebenfalls eintakten vor fahrplan punkt 33"*, gesagt beim
+Zwischenstand des Stufe-3-A/B (Nutzer-Meldung 2026-09-14, 95:95 nach 190 von 200 Paaren:
+*"wird mit ziemlicher sicherheit ein tie"*). Damit sind sie als **Nr. 32a (Weg C)** und
+**Nr. 32b (Weg B)** in `evaluations/v29_program_agent_plan.md` eingetragen, vor dem Bau von
+Variante B des Rundenuebergangs.
+
+**Die Voraussetzung oben ist damit aufgeloest, und zwar in den Zweig "warum wirkt nichts".**
+Wichtig fuer die Diagnose ist, dass Seltenheit als Erklaerung AUSSCHEIDET: die Nachsuche greift
+laut par.9b **24,34-mal je Partie** (n = 12.907 Partien, Grundmenge Mondstapel-Ereignisse mit
+mindestens zwei eindeutigen Reihenfolgen, Einheit Ereignisse). Sie laeuft oft und aendert am
+Ausgang nichts. Das unterscheidet Stufe 3 von Stufe 1, wo Seltenheit noch eine offene
+Erklaerung war, und es laesst genau drei Kandidaten uebrig: Horizont (C), Prior (B),
+Entscheidungsform (A). Die Reihenfolge C vor B vor A bleibt damit unveraendert gueltig.
+
+**Was beides NICHT ist: eine Kettenposition.** Der Nutzer-Auftrag lautete "eintakten", und
+eingetaktet sind sie in den FAHRPLAN, nicht in eine Nachtkette. Beide beginnen mit einem Bau
+(C in Rust, B als Trainingsarm), und ein Bau ist Volllast ueber viele Kerne, also Nebenlast im
+Sinne von CLAUDE.md. Sie starten erst, wenn die Messkette der Nacht durch ist.
+
+**Offen bei B, wenn es soweit ist:** ein Trainingsarm braucht eine eigene v29-bXX-Nummer
+(`feedback_measured_identity_gets_own_bxx`); die Reservierung steht in
+`docs/generation_naming.md`.
 
