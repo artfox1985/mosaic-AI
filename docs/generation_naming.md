@@ -162,4 +162,10 @@ Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, 
 `PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c). **INPUT_SIZE 794**
 (entschieden 2026-09-13, `PREREG_stack_top_feature.md` par.16: die 18 Design-Bits bleiben
 draussen, weil die Vorderseiten der gezogenen Platten erst nach dem Aufhoeren bekannt sind).
-Weitere Arme ab `v29-b04` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
+Weitere Arme ab `v29-b06` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
+
+**Reserviert 2026-09-15 (Nutzer-Entscheid, `PREREG_moon_stack_order.md` par.12.1):**
+**`v29-b04`** (wie b03, Trainingsziel des `moon`-Kopfs = gespielte Reihenfolge statt des
+No-Op-Rundenloeser-Ziels, `--moon-target-source played`, eigener Fenster-Schluessel) und
+**`v29-b05`** (wie b03, `--moon-loss-weight 0`, Ablation des Kopfs; laeuft auf b03s Monolith).
+Bezugspunkt beider Tore ist b03.
