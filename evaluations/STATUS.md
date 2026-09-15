@@ -22,7 +22,7 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 | Kette | Inhalt | Stand |
 | --- | --- | --- |
-| `tools/night_v29_20260914.sh` | 1. A/B Mondstapel-Nachsuche (Stufe 3) - 2./3. Kostentor K4 mit/ohne - 4./5. Arena K4 zwei Dosen - 6. Nachzug b02 gegen b03 ohne Frueh-Stopp | **Schritt 1 DURCH** (Verdikt unten), Schritt 2 laeuft |
+| `tools/night_v29_20260914.sh` | 1. A/B Mondstapel-Nachsuche (Stufe 3) - 2./3. Kostentor K4 mit/ohne - 4./5. Arena K4 zwei Dosen - 6. Nachzug b02 gegen b03 ohne Frueh-Stopp | **Schritte 1-5 DURCH** (Verdikte unten), Schritt 6 (Nachzug b02/b03) laeuft |
 | `tools/night_v29_envelope_value_ab.sh` | wartet auf die erste; dann Anker-Kante v29-b03 gegen hv4_anchor, dann Value-Anteil im Tiling in zwei Dosen (par.8.6b) | wartend, Prozessabfrage alle 5 min |
 
 **Nichts anderes darf Rechenlast erzeugen** -- kein Build, kein cargo, keine Sonde. Das gilt
@@ -114,7 +114,7 @@ Dateien, und alle drei Arme sind trainiert.
 | --- | --- | --- | --- | --- |
 | v29-b01 | 755 | Pflichtarm, Bezugspunkt | gegen `v28-b02` | **beide Seeds H0** -- kein Champion-Wechsel |
 | v29-b03 | 794 | Sichtwerte (Abschnitt 16) | gegen b01 | **Merkmalsstand UEBERNOMMEN** (Seed 1 klar 69:41, Seed 2 Gleichstand; par.12-Regel) |
-| v29-b02 | 794 | plus Spezialfeld-Ablation | gegen b03 | **die Kanaele 77/78 TRAGEN** -- die Ablation verliert in beiden Seeds (Seed 2 signifikant, -0,533) und belegt in beiden weniger Spezialfelder |
+| v29-b02 | 794 | plus Spezialfeld-Ablation | gegen b03 | **praezisiert 2026-09-15** (par.10a): die Kanaele wirken auf ihren POSTEN (+0,13 bis +0,22 belegte Spezialfelder in drei Seeds), aber NICHT auf die Siegquote -- der Nachzug mit 150 Paaren ohne Frueh-Stopp steht 147:153, p 0,82 |
 
 **Champion bleibt `v28-b02_brierbest`.** Die fehlende Kante ist am 2026-09-14 gemessen worden
 (Nutzer: "ich hab noch keinen champion kandidaten aus v29 gesehen"), **Ergebnis 1:1**:
@@ -222,7 +222,40 @@ der unbelegten 4 auf die Regel-Obergrenze 10 korrigiert (`board.rs` Z.240).
 **FENSTER-PINNING nicht vergessen:** Streudateien, die waehrend der Erzeugung entstehen,
 gehoeren beim Fensterbau in `MOSAIC_DATA_EXCLUDE`.
 
-### Stand 2026-09-15: Stufe 3 des Mondstapels traegt nicht
+### NACHT 2026-09-14/15: die Messkette und ihre sechs Verdikte
+
+Zwei Ketten nacheinander, rund acht Stunden, alles auf dem Kontrakt `39994362fba145a6`.
+**Ergebnis in einer Tabelle, Herleitungen darunter:**
+
+| Gegenstand | Ergebnis | Folge |
+| --- | --- | --- |
+| Mondstapel Stufe 3 (Nachsuche) | traegt NICHT: 197:203, p 0,84, 200 Paare ohne Stopp | Verdacht in 4 von 5 Punkten ausgeraeumt; offen nur das Budget |
+| Kostentor K4 | **BESTANDEN**: +4,3 Prozent gegen Schwelle 25 | Fahrplan Nr. 30 gruen |
+| Arena K4, Dosis 1,0 | **SCHADET**: 20:60, p 0,0002, -14,3 Punkte, -0,95 Spalten | Prereg ENTSCHIEDEN |
+| Arena K4, Dosis 0,5 | **SCHADET**: 45:85, p 0,0005, -8,3 Punkte | Fahrplan 31/32 gegenstandslos |
+| Spezialfeld-Nachzug b02/b03 | Posten JA (+0,131 Felder), Siegquote NEIN: 147:153, p 0,82 | Begruendung korrigiert, Merkmal bleibt |
+| Anker-Kante v29-b03 | **128:22** (85,3 Prozent), 150 Partien ohne Stopp | zweite Aufhaengung steht; Eintrag faellig |
+| Value-Anteil im Tiling, 2 Dosen | traegt NICHT: 80:80 und 81:79, p 1,000 | par.8.6 GESCHLOSSEN |
+
+**Zwei Befunde zaehlen ueber ihre eigene Messung hinaus:**
+
+1. **Ein Rundenscore-Term macht die Suche kurzsichtig.** K4 senkt die Strafleiste (-1,57) und
+   hebt volle Zeilen, waehrend Spalten (-0,84) und Spezialfelder (-0,59) einbrechen. Das ist
+   die empirische Gegenprobe zur Nutzer-Frage vom 2026-09-14 ("nein er optimiert nicht nur
+   runden score hoff ich mal") -- er tut es, sobald er genug Gewicht bekommt. Und es ist ein
+   Argument FUER Variante B (Fahrplan 33): der Punkte-Weg ist abgeraeumt, der Geometrie-Weg
+   nicht.
+2. **Zwei Belege dieser Kampagne standen auf zu kleinen Stichproben.** Der Spezialfeld-Beleg
+   (p = 0,0386 aus 30 Paaren mit Frueh-Stopp) loest sich bei 150 Paaren auf; K4s Dosiswahl
+   stand auf einer Analogie, die eine fehlende Daempfung uebersah. Beide Male hat erst die
+   groessere Stichprobe geklaert.
+
+**Offene Nutzer-Entscheide aus dieser Nacht:** (a) K4 ein Rundenprofil geben oder den Term
+ruhen lassen, (b) den kontaminierten Kostentor-Lauf wiederholen (8,5 min, das Verdikt braucht
+es nicht), (c) nach dem Wheel-Bau: wird Fahrplan 32a ueberhaupt gebaut (haengt an der
+Diagnose-Zahl `changed`).
+
+#### Stufe 3 des Mondstapels traegt nicht
 
 **197:203 auf 200 Paaren ohne Frueh-Stopp** (McNemar p 0,84, gepaarte Differenz -0,030
 [-0,229, +0,169], 5.933 s bei 10 Threads, 14,833 s je Partie). Keine der sechs
@@ -251,11 +284,165 @@ die par.9e dem Prior vorwirft. Das stuetzt die Reihenfolge C vor B vor A (Fahrpl
 Zahlen ablesen. Bleibt `changed` nahe 0, waehlt die Nachsuche fast immer den Bestand -- dann
 ist nicht der Horizont der Engpass und 32a faellt, bevor es gebaut wird.
 
+#### Kostentor K4 bestanden, Fahrplan Nr. 30 gruen
+
+**+4,3 Prozent Wanduhr** (12,812 gegen 12,286 s je Partie) und +3,4 Prozent CPU gegen eine
+Schwelle von 25 Prozent -- der Rundenschaetzer kostet ein Sechstel des Erlaubten. Artefakte
+`k4_kosten_mit_s20261092.json` / `k4_kosten_ohne_s20261093.json`, Einzelheiten
+`PREREG_round_estimate_leaf_term.md` par.7b. Die Schritte 31 und 32 duerfen laufen.
+
+**OFFENGELEGT (par.7a): waehrend des `mit`-Laufs lief Nebenlast aus dieser Sitzung** -- drei
+git-Commits, deren pre-commit-Hook je 98 Tests faehrt, in einem Lauf, dessen einzige Messgroesse
+die Wanduhr ist. Groessenordnung 0,18 bis 0,59 Prozent des Kern-Fensters bei 43,7 Prozent
+Auslastung. **Die Stoerung wirkt konservativ** (sie verteuerte die mit-Seite), +4,3 Prozent ist
+also eine Obergrenze und das Verdikt haelt. Eine saubere Wiederholung kostet 8,5 min und ist
+ein Nutzer-Entscheid. **Regel ab sofort in dieser Sitzung: kein Commit, solange eine Messkette
+laeuft.**
+
+**Nebenbefund, NICHT gedeutet:** zwischen den beiden Kostentor-Laeufen unterscheiden sich
+Punkte (46,33 gegen 51,27) und volle Spalten (0,55 gegen 0,93) deutlich. Verschiedene Seeds bei
+n = 40 -- in dieser Kampagne bewegt der Seed die Metrik 4- bis 6-mal staerker als jeder Knopf.
+Die gepaarten Arena-Laeufe der Schritte 4 und 5 entscheiden das.
+
+**Und die offene Frage aus par.9h ist beantwortet:** `k4_kosten_ohne` liefert den fehlenden
+Basiswert ohne Nachsuche. Der Stufe-3-Lauf liegt mit 14,833 s je Partie **+20,7 Prozent**
+darueber, obwohl nur eine der beiden Seiten die Nachsuche traegt (hochgerechnet rund +41
+Prozent beidseitig, Herleitung). **Die Nachsuche hat also wirklich gerechnet** -- ihre
+Wirkungslosigkeit liegt nicht daran, dass sie nie lief.
+
+#### K4 mit voller Dosis SCHADET -- und die Ursache ist gefunden
+
+**20:60 Siege, McNemar p = 0,00018, -14,3 Punkte und -0,95 volle Spalten je Partie**
+(`k4_c10_vs_off_s20261094`, 40 Paare, gepaart, ein Spec-Feld Unterschied). Kein Nullbefund,
+sondern ein Einbruch. Einzelheiten `PREREG_round_estimate_leaf_term.md` par.7c.
+
+**Der Nebenbefund aus par.7b war damit echt und kein Seed-Effekt** -- die Vorsicht beim Lesen
+war richtig, die Beobachtung auch.
+
+**Ursache am Code belegt, und sie ist eine Dosis-Frage:** `today_value` ist eine
+Siegwahrscheinlichkeit in [0,1] (Klammerung net_mcts.rs:3205-3206), der Term addiert
+`C_est * tanh(..)`, bei C_est 1,0 also bis zu +-1,0 -- er kann den Value-Kopf ganz ersetzen.
+Und `B` ist per Konstruktion das P90 der Differenz je Runde, also saettigt der tanh in rund
+10 Prozent der Blaetter, **in jeder Runde gleich oft**. Die Dosis war mit "Betrag wie K3"
+begruendet; die Analogie stimmt strukturell (gleiche Stelle, gleicher Wertebereich, K3 faehrt
+c = 1,0 ohne Schaden), uebersieht aber die zweite Daempfung, die nur K3 hat: sein Shift traegt
+das abfallende Rundenprofil in sich. **K4 hat keines.**
+
+**Dosis 0,5 bestaetigt es** (par.7d): 45:85, p = 0,00054, -8,26 Punkte. Der PUNKTE-Schaden
+halbiert sich grob mit der Dosis (Faktor 0,58), **der SPALTEN-Schaden nicht: davon bleiben 88
+Prozent** (-0,837 gegen -0,949). Die Stoerung des Spaltenbaus saettigt also tief.
+
+**Der Mechanismus ist damit sichtbar, und es ist der befuerchtete:** bei Dosis 0,5 sinkt die
+Strafleiste um 1,57 Punkte und volle Zeilen steigen (+0,11), waehrend Spalten (-0,84) und
+Spezialfelder (-0,59) einbrechen. `round_estimate_points` ist Solver-Rundenscore plus
+Strafleisten-Busse -- der Term liefert genau, worauf er zeigt, und verliert alles, was ueber die
+Runde hinausreicht. Das ist die empirische Gegenprobe zur Nutzer-Frage vom 2026-09-14 ("nein er
+optimiert nicht nur runden score hoff ich mal"): er tut es, sobald er genug Gewicht bekommt.
+
+**Fahrplan Nr. 31 und 32 sind damit gegenstandslos** (im Plan durchgestrichen und begruendet).
+**Offen als VORSCHLAG, Nutzer-Entscheid:** K4 ein abfallendes Rundenprofil wie K3 geben (rund
+1 h Bau). Das ist der naeherliegende Weg als eine kleinere Dosis -- wenn der Spaltenschaden bei
+halber Dosis zu 88 Prozent bleibt, ist er bei einem Zehntel nicht automatisch weg.
+
+**Und eine Luecke in der Prereg:** ihr Falsifikator kennt nur "traegt" und "traegt nicht". Ein
+SCHADEN ist ein dritter Ausgang, den par.5 und par.10 nicht vorgesehen haben.
+
+#### der Spezialfeld-Nachzug korrigiert seine eigene Begruendung
+
+Der Lauf, den ich als duennste Kante der Generation angesetzt hatte, hat geliefert -- gegen das
+bestehende Verdikt. `paired_gating_v29-b02_vs_v29-b03_s20261096.json`, **150 Paare ohne
+Frueh-Stopp: 147:153**, McNemar p = 0,822, gepaarte Differenz -0,040 [-0,273, +0,193].
+
+**Die Effektstaerke derselben Kante faellt monoton mit der Stichprobe:** -0,533 (30 Paare,
+Frueh-Stopp, p = 0,0386) -> -0,280 (50 Paare) -> **-0,040 (150 Paare)**. Der einzige
+signifikante Lauf war zugleich der kleinste und der einzige mit SPRT-Stopp. **Auf der
+Siegquote traegt das Verdikt nicht.**
+
+**Der Posten dagegen bewegt sich, und zwar konsistent:** belegte Spezialfelder +0,170 / +0,224 /
+**+0,131** in den drei Seeds -- der groesste Lauf (n = 298 Bretter je Seite) liegt mitten im Feld
+statt einzubrechen. Dazu +0,087 volle Spalten und +0,58 Punkte je Partie fuer b03.
+
+**Kein Widerspruch, sondern Groessenordnung:** +0,58 Punkte gegen eine Punkte-SD von rund 17
+loesen 150 Paare nicht auf. **Folge fuer die Entscheidung: keine** -- die Kanaele bleiben drin
+(gebaut, kostenlos, wirken auf ihren Posten, schaden nicht). Was faellt, ist die Begruendung
+"die Ablation verliert signifikant". Einzelheiten `PREREG_special_tile_yield.md` par.10a.
+
+**Die Lehre darueber hinaus:** ein Verdikt auf 30 Paaren mit Frueh-Stopp haette hier fast einen
+Merkmalssatz mit einer Zahl gerechtfertigt, die sich bei 5-facher Stichprobe aufloest. Der
+Nachzug kostete 65 min.
+
+#### Anker-Kante fuer v29-b03: 128:22, eingetragen
+
+`anchor_edge_v29-b03_vs_hv4_anchor.json`: **128:22 in 150 Partien** (85,3 Prozent), kein
+Frueh-Stopp, 1.292,8 s / 8,62 s je Partie. Aufbau wie bei der letzten Anker-Kante des
+Champions: b03 @400 c_puct 1,5 mit Champion-Spec gegen das Anker-Artefakt @150 c_puct 0,3,
+6 Worker. Handshake bewusst Cross-Aera (Artefakt 39648b95bbba1acf gegen Live
+39994362fba145a6, `project_anchor_era_rule`), **Golden-Selbsttest ohne Abweichung**.
+
+**Einordnung:** die bisherige Vergleichskante `v22-b05@400 gegen hv4@150` steht bei 76 Prozent
+(38:12), und die war mit Frueh-Stopp, also nach oben verzerrt. b03 liegt mit 85,3 Prozent ueber
+150 Partien ohne Stopp deutlich darueber. Damit haengt v29-b03 erstmals an zwei VERSCHIEDENEN
+Gegnern statt nur am Champion -- die Promotions-Checkliste verlangt drei Aufhaengungen
+(Gating, Anker, Champion-2).
+
+**EINGETRAGEN 2026-09-15, 05:1x** (nach dem Ende der Ketten). Der Befehl war:
+
+```
+python tools/elo_tracker.py add --player-a v29-b03 --sims-a 400   --player-b Heuristik_hv4_anchor --sims-b 150   --wins-a 128 --wins-b 22 --n 150   --comment "Segment 2: v29-b03 @400 c_puct 1,5 (Champion-Spec) gegen Anker-Artefakt hv4_anchor @150 c_puct 0,3, frozen_referee_match 6 Worker, Seed-Basis 20261097, 150 Partien OHNE Frueh-Stopp (85,3 Prozent), Golden-Selbsttest gruen, Cross-Aera (Artefakt 39648b95bbba1acf gegen Live 39994362fba145a6); 1.293 s"
+```
+
+(Parameternamen am Werkzeug geprueft: `--player-a`/`--player-b` und `--n`.)
+
+**Ergebnis im Register: `v29-b03@400` steht bei Elo 1402 [1353, 1456] aus 640 Partien** und
+damit ERSTMALS ueber dem amtierenden Champion `v28-b02@400` (1371 [1332, 1419], 2.350 Partien).
+
+**Zwei Einschraenkungen gehoeren zu dieser Zahl:**
+
+1. **Die Intervalle ueberlappen deutlich** (1353-1456 gegen 1332-1419). Der Abstand von 31 Elo
+   ist kein Staerkebefund.
+2. **Drei von b03s vier Kanten sind frueh gestoppt** (Spalte "Frueh 3/4" im Register), ihre
+   Siegquoten also nach oben verzerrt und nicht korrigiert. Die Anker-Kante von heute Nacht
+   ist **die erste unverzerrte** -- 150 Partien bis zum Deckel. Der Champion hat 6 von 13
+   gestoppten Kanten bei vierfacher Partienzahl.
+
+Der Champion bleibt `v28-b02_brierbest`; die Promotion steht per Nutzer-Entscheid am Ende der
+Generationsarbeit.
+
+Kommentar mit Cross-Aera-Vermerk und Golden-Selbsttest. Die naive Ein-Kanten-Rechnung ergaebe
+rund +306 Elo ueber dem auf 1000 fixierten Anker; der Registerwert kommt aus dem
+Block-Bootstrap ueber alle Kanten und kann davon abweichen.
+
+#### Value-Anteil im Tiling: zweiter Nullbefund, par.8.6 geschlossen
+
+Der Lauf, der auf meiner Falschauskunft "ungemessen" beruhte und den der Nutzer nach der
+Richtigstellung bestaetigt hat ("bleiben drin. die maschine braucht eh was zum laufen"):
+**80:80 bei Dosis 0,5 und 81:79 bei Dosis 1,0**, McNemar p = 1,000 in beiden, je 80 Paare bis
+zum Deckel. Keine der sechs Kennzahlen ueber der Aufloesung, und die vollen Spalten haben in
+den beiden Dosen ENTGEGENGESETZTE Vorzeichen (+0,050 und -0,063) -- Rauschen, keine mit der
+Dosis wachsende Wirkung. Einzelheiten `PREREG_geometric_envelope.md` par.8.6b/8.6c.
+
+**Damit ist der Term geschlossen**, an zwei Netzen und zwei Basislinien gemessen (2026-09-04 am
+v23-b01 gegen die damalige Spec, 2026-09-15 am v28-b02 gegen die Champion-Spec).
+
+**Die Kosten belegen die alte Begruendung:** der Term ruft je Tiling-Kandidat das Netz, kostet
+aber nur +2,1 und +3,6 Prozent Wanduhr, und die Seiten spielen fast identisch (5-6 Sweeps gegen
+rund 70 Splits). Im Tiling gibt es kaum Kandidaten mit echter Wahl -- der Entscheid liegt im
+Draft, wie par.8.6a 2026-09-04 schon sagte.
+
+**Nicht verwechseln mit dem offenen Vorschlag bei K4:** dort FEHLT ein Rundenprofil und der Term
+wirkt zu stark; hier ist der Term zu schwach, um ueberhaupt messbar zu sein.
+
 ## 2. CHAMPION UND LEITER
 
 **Champion laut `models/champion.txt`: `v28-b02_brierbest`** (Promotion 2026-09-12),
-**Elo 1394 [1350, 1445]** aus 1.860 Partien im LEITERSEGMENT 2 (40 Kanten, Anker `hv4_anchor`
+**Elo 1371 [1332, 1419]** aus 2.350 Partien im LEITERSEGMENT 2 (44 Kanten, Anker `hv4_anchor`
 fix 1000, Block-Bootstrap). Generator der v29-Erzeugung ist dasselbe Netz.
+
+**NEU 2026-09-15: `v29-b03@400` fuehrt die Tabelle mit Elo 1402 [1353, 1456]** (640 Partien),
+seit die Anker-Kante 128:22 eingetragen ist. Das ist KEIN Staerkebefund gegenueber dem
+Champion: die Intervalle ueberlappen (1353-1456 gegen 1332-1419), und drei von b03s vier
+Kanten sind frueh gestoppt und damit nach oben verzerrt -- die Anker-Kante ist seine erste
+unverzerrte. Champion-Wechsel bleibt der Nutzer-Entscheid am Ende der Generationsarbeit.
 
 Der Wert stieg am 2026-09-13 von 1353 auf 1394, weil drei neue Sims-Knoten unter dem
 400er-Knoten einhaengen -- **kein neuer Staerkebefund**, sondern eine Folge der dichteren
@@ -298,10 +485,10 @@ oeffentlichen Typ der obersten Stapelplatte fest), Record-Feld `tiled_max_row` (
 gelesen), Stapelzug-Knoepfe im Lauf-Manifest. Vertragshash `39648b95bbba1acf` unveraendert,
 `input_size` 755. Netz-Paritaets-Fixture bewusst neu: `4750ffc6ec094a83`.
 
-## 5. PREREG-BESTAND (11 OFFEN laut Index 2026-09-13, Ziel rund 7)
+## 5. PREREG-BESTAND (9 OFFEN laut Index 2026-09-15, Ziel rund 7)
 
 `python tools/generate_prereg_index.py` haelt `evaluations/PREREG_INDEX.md` aktuell; Stand
-119 Dateien = 11 OFFEN + 96 ENTSCHIEDEN + 12 UEBERHOLT. Die elf offenen sind alle aktiv
+119 Dateien = **9 OFFEN** + 98 ENTSCHIEDEN + 12 UEBERHOLT. Die neun offenen sind alle aktiv
 eingetaktet, keine ist liegengeblieben:
 
 | Prereg | Was noch aussteht |
@@ -314,13 +501,15 @@ eingetaktet, keine ist liegengeblieben:
 | `corpus_behaviour_audit` | Werkzeug ungebaut, Korpuslauf danach |
 | `moon_stack_order` | Knopf bauen, A/B am Champion |
 | `dome_return_order` | A/B Modus 1 gegen 0 ueber den Referee |
-| `round_estimate_leaf_term` | Kostentor K4, dann argmax und A/B; Skalenwahl offen |
+| ~~`round_estimate_leaf_term`~~ | **ENTSCHIEDEN 2026-09-15**: Kostentor bestanden (+4,3 Prozent), aber beide Dosen schaden hochsignifikant (par.7c/7d). Fahrplan 31/32 gegenstandslos. Offen nur noch als VORSCHLAG: Rundenprofil wie K3 |
 | `round_transition_search_sampling` | Variante B bauen (rund ein Tag), Sichttor, Kostentor, A/B |
 | `code_cleanup_closeout` | Stufen 2 und 3, nach der v30-Promotion |
 
-Die Zahl liegt ueber dem Ziel, weil das v29-Begleitprogramm bewusst breit ist; nach den
-Verdikten von `moon_stack_order`, `dome_return_order`, `round_estimate_leaf_term` und
-`round_transition_search_sampling` sollten es rund sieben sein.
+Die Zahl liegt ueber dem Ziel, weil das v29-Begleitprogramm bewusst breit ist. Seit dem
+2026-09-13 sind zwei gefallen: `dome_return_order` und `round_estimate_leaf_term` (beide
+2026-09-15). `moon_stack_order` hat zwei von drei Stufen gemessen (par.7, par.9h), bleibt aber
+offen, solange die Architektur-Hebel 32a/32b nicht entschieden sind. Mit
+`round_transition_search_sampling` waeren es dann die angestrebten sieben.
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
