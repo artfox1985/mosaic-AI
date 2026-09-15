@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund, je 200 Paare ohne Frueh-Stopp; par.9i: die Nachsuche waehlt in 62 Prozent ANDERS und aendert nichts. **par.12 (Code-Audit 2026-09-15): das Trainingsziel des moon-Kopfs ist ein No-Op -- der Rundenloeser liest die Fabriken nicht, das Label ist immer die kanonische Reihenfolge; der Prior ist blind, nicht kurzsichtig.** Weg B ENTSCHIEDEN 2026-09-15 als zwei Arme: v29-b04 (Ziel = gespielte Reihenfolge) und v29-b05 (moon_loss_weight 0), beide gegen b03; Weg C3 gebaut (par.11, Tore offen), Weg A nur gebuendelt und ausserhalb des v30-Rahmens. Fahrplan 32a/32b/32c. -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund. **par.12.0: das Trainingsziel des moon-Kopfs ist ein No-Op** (der Rundenloeser liest die Fabriken nicht, das Label ist immer kanonisch). **par.12.5: b05 (Kopf ablatiert) ist BESSER als b03** -- 427:373 aus 800 Partien, gepoolt z=1,98, beide Seeds und fuenf von sechs Kennzahlen in derselben Richtung; einzeln nicht signifikant. par.12.3: der Zugriffs-Hebel ist KLEIN (Gegner nimmt den oben gelegten Stein nur in 14,8 Prozent im naechsten Halbzug). Offen: b04 (echtes Ziel, Korpus-Tor mit 44,1 Prozent offen), dritter Seed fuer b05. -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -1054,6 +1054,68 @@ Sinne von CLAUDE.md. Sie starten erst, wenn die Messkette der Nacht durch ist.
 **Offen bei B, wenn es soweit ist:** ein Trainingsarm braucht eine eigene v29-bXX-Nummer
 (`feedback_measured_identity_gets_own_bxx`); die Reservierung steht in
 `docs/generation_naming.md`.
+
+## par.12.5 ARM v29-b05 GEMESSEN (2026-09-15): das No-Op-Ziel hat Staerke GEKOSTET
+
+**Aufbau.** b05 = b03 plus `--moon-loss-weight 0`, sonst identisch -- Manifest-Diff gegen b03
+zeigt GENAU zwei Felder (`moon_loss_weight` 1,0 -> 0,0 und den Namen), Policy-Traeger beidseits
+580, derselbe Monolith, derselbe Seed 20260941. Training 3.031,7 s, 12 Epochen, bester
+val_brier 0,1792 in Epoche 5 (b03: 0,17967 -- der Abstand liegt weit unter der Aufloesung
+dieser Metrik, `project_offline_metric_resolution_limit`, und ist KEIN Befund).
+
+**Tor 1 gegen b03**, zwei Seeds a 200 Paaren, Champion-Spec beidseits, **kein Frueh-Stopp**:
+
+| Groesse | Seed 20261120 | Seed 20261121 |
+| --- | --- | --- |
+| Siege b05 : b03 | **215 : 185** | **212 : 188** |
+| McNemar p | 0,159 | 0,235 |
+| gepaarte Differenz | +0,150 [-0,044, +0,344] | +0,120 [-0,061, +0,301] |
+| volle Spalten | +0,0125 | **+0,1033** |
+| eigene Punkte | +0,15 | **+1,99** |
+| Marge | +0,31 | **+3,98** |
+| Spezialfelder belegt | +0,018 | +0,055 |
+| Strafleiste | -0,20 | +0,04 |
+| Reihen voll | -0,020 | 0,000 |
+| Laufzeit | 4.563 s | 4.533 s |
+
+**Gepoolt: 427 : 373 von 800 Partien, gepaarte Differenz +0,134 (SE 0,068), z = 1,98.**
+
+### Verdikt
+
+**Die vorab registrierte Lesart trifft zu, aber am unteren Rand.** par.12.1 sagt: *"traegt b05
+(Gewicht 0), hat das Rauschziel Policy-Qualitaet gekostet und die Task-#38-Behauptung ist
+erstmals gemessen"*. b05 traegt -- schwach, aber konsistent:
+
+* **Beide Seeds zeigen dieselbe Richtung**, in der Siegquote wie in Punkten, Marge, Spalten und
+  Spezialfeldern. Fuenf der sechs Standard-Kennzahlen liegen in beiden Seeds fuer b05.
+* **Einzeln erreicht kein Seed die Schwelle** (p 0,159 und 0,235); gepoolt liegt z = 1,98 genau
+  darauf. Nach `feedback_statistical_rigor` ist das KEIN Sieg, den man ohne Zusatz nennen darf.
+* **Die Effektstaerke unterscheidet sich stark zwischen den Seeds** (+0,15 gegen +1,99 Punkte).
+  Das ist die bekannte Seed-Streuung dieser Kampagne (`project_training_seed_variance`).
+
+**Was damit gemessen ist:** das Entfernen eines Trainingsziels, das nachweislich eine Konstante
+lernt (par.12.0), macht das Netz nicht schlechter -- eher besser. Der Kopf hat also Kapazitaet
+und Gradienten verbraucht, ohne etwas beizutragen. Die Task-#38-Behauptung "der moon-Kopf hilft"
+ist damit erstmals geprueft und in ihrer bisherigen Form widerlegt.
+
+**Was NICHT gemessen ist:** ob ein Kopf mit RICHTIGEM Ziel hilft. Das ist b04
+(`--moon-target-source played`), und dessen Voraussetzung ist erfuellt -- die Korpus-Sonde
+findet **44,1 Prozent** nicht-kanonische gespielte Reihenfolgen (245 von 556, Tor war 10
+Prozent). b04 bleibt also auf dem Plan.
+
+**Vorschlag (Nutzer-Entscheid):** ein DRITTER Seed als Stichentscheid, Praezedenz v26/v28
+(dort hat der dritte Seed die Nachbar-Kante entschieden). Kosten rund 75 min. Ohne ihn bleibt
+der Befund "konsistente Richtung, gepoolt an der Schwelle" -- tragfaehig fuer die Entscheidung
+"Kopf raus", nicht fuer eine Elo-Kante.
+
+### Korrektur an der eigenen Auswertung (2026-09-15)
+
+Die erste Fassung dieser Tabelle hatte ALLE Vorzeichen der Kennzahlen vertauscht: die Seiten
+der Spaltensonde wurden nach ihrer Position im Dict zugeordnet (`list(seiten)[0]`) statt nach
+ihrem NAMEN -- und dort steht `v29-b03` zuerst. Aufgefallen ist es nur, weil Gating und
+Spaltensonde sich dann widersprachen (Gating: b05 mehr Punkte; Sonde scheinbar: b05 weniger).
+Dieselbe Falle wie in `project_selfplay_log_parsing_traps`: **die Seite kommt aus dem Namen,
+nie aus der Reihenfolge.**
 
 ## par.11 WEG C VORREGISTRIERT (2026-09-15, VOR dem Bau): Terminierung statt Sim-Zahl
 

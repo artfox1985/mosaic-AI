@@ -132,7 +132,13 @@ reihenfolge trainiert."
 v29-Fenster; (2) Arm `v29-b04` mit repariertem Ziel (gespielte Reihenfolge als Label, im Record
 vorhanden, kein neuer Korpus) -- **ENTSCHIEDEN 2026-09-15 zusammen mit der Ablation `v29-b05`
 (`--moon-loss-weight 0`), Fahrplan 32b**; (3) fuer die Rueckgabe zuerst die Sensitivitaets-Sonde am
-v29-b03, dann Streu-Korpus mit v30, dann A/B; (4) eigene Entscheidungsknoten im Baum fuer beides
+v29-b03, dann Streu-Korpus mit v30, dann A/B -- **R1 GEMESSEN 2026-09-15** (`dome_return_order`
+12.4, andere Sitzung): der Value-Kopf reagiert auf die Typfolge (Median-Spannweite 0,019,
+81 Prozent ueber 0,01, n = 300), das Henne-Ei der SICHT ist widerlegt; **Arena gezaehlt (12.5):**
+nur 0,6 Rueckgaben mit Rest je Partie und Seite, Modus 1 weicht in 42 Prozent davon ab, erwartete
+Wirkung rund 0,005 Siegwahrscheinlichkeit je Partie -- der par.9-Nullbefund ist Arithmetik, das
+A/B taugt fuer diesen Knopf nicht als Entscheidungsinstrument. **ENTSCHIEDEN daraufhin (Nutzer):
+R2 wird gebaut, Modus 1 in der v30-Erzeugung AN** (par.12.6, Abschnitt 6 Punkt 10); (4) eigene Entscheidungsknoten im Baum fuer beides
 nur gebuendelt und nur nach einem Nutzer-Entscheid, den v30-Rahmen zu oeffnen (NUM_ACTIONS
 406 -> 414, jeder Checkpoint verwaist). Entscheide in Abschnitt 6, Punkte 9 und 10.
 
@@ -293,8 +299,8 @@ Zwei Ketten nacheinander, rund acht Stunden, alles auf dem Kontrakt `39994362fba
    stand auf einer Analogie, die eine fehlende Daempfung uebersah. Beide Male hat erst die
    groessere Stichprobe geklaert.
 
-**Offene Nutzer-Entscheide aus dieser Nacht:** (a) K4 ein Rundenprofil geben oder den Term
-ruhen lassen, (b) den kontaminierten Kostentor-Lauf wiederholen (8,5 min, das Verdikt braucht
+**Offene Nutzer-Entscheide aus dieser Nacht:** (a) ~~K4 ein Rundenprofil geben oder den Term
+ruhen lassen~~ **ENTSCHIEDEN 2026-09-15: der Term RUHT** (`round_estimate_leaf_term` par.7e), (b) den kontaminierten Kostentor-Lauf wiederholen (8,5 min, das Verdikt braucht
 es nicht), (c) nach dem Wheel-Bau: wird Fahrplan 32a ueberhaupt gebaut (haengt an der
 Diagnose-Zahl `changed`).
 
@@ -383,8 +389,8 @@ Runde hinausreicht. Das ist die empirische Gegenprobe zur Nutzer-Frage vom 2026-
 optimiert nicht nur runden score hoff ich mal"): er tut es, sobald er genug Gewicht bekommt.
 
 **Fahrplan Nr. 31 und 32 sind damit gegenstandslos** (im Plan durchgestrichen und begruendet).
-**Offen als VORSCHLAG, Nutzer-Entscheid:** K4 ein abfallendes Rundenprofil wie K3 geben (rund
-1 h Bau). Das ist der naeherliegende Weg als eine kleinere Dosis -- wenn der Spaltenschaden bei
+~~Offen als VORSCHLAG, Nutzer-Entscheid: K4 ein abfallendes Rundenprofil wie K3 geben (rund
+1 h Bau).~~ **ENTSCHIEDEN 2026-09-15: RUHT** (par.7e, Nutzer: "lassen wir ruhen"). Das ist der naeherliegende Weg als eine kleinere Dosis -- wenn der Spaltenschaden bei
 halber Dosis zu 88 Prozent bleibt, ist er bei einem Zehntel nicht automatisch weg.
 
 **Und eine Luecke in der Prereg:** ihr Falsifikator kennt nur "traegt" und "traegt nicht". Ein
@@ -474,6 +480,39 @@ Draft, wie par.8.6a 2026-09-04 schon sagte.
 
 **Nicht verwechseln mit dem offenen Vorschlag bei K4:** dort FEHLT ein Rundenprofil und der Term
 wirkt zu stark; hier ist der Term zu schwach, um ueberhaupt messbar zu sein.
+
+### Stand 2026-09-15, 13:30: der `moon`-Kopf kostet Staerke -- b05 ist besser als b03
+
+**Kette 32b/32c/29b an einem Tag durch.** Vier Messungen, drei davon gegen die Vorab-Erwartung:
+
+| Schritt | Ergebnis |
+| --- | --- |
+| **par.12.0** Trainingsziel des `moon`-Kopfs | **No-Op**, am Code belegt: das Label ist immer die kanonische Reihenfolge |
+| **32c** Zugriffs-Bilanz (n = 9.372) | **Hebel KLEIN**: Gegner nimmt den oben gelegten Stein nur in 14,8 Prozent im naechsten Halbzug (Tor 25) |
+| **Korpus-Sonde b04** | Tor OFFEN: **44,1 Prozent** nicht-kanonisch gespielt (Tor war 10) |
+| **R1** (29b, Sensitivitaet) | Erwartung WIDERLEGT: Spannweite Median 0,0188, Typfolge in 73,7 Prozent aenderbar |
+| **v29-b05** Tor 1 gegen b03 | **427:373 aus 800 Partien**, gepoolt z = 1,98 |
+
+**Das Verdikt zu b05** (par.12.5): das Entfernen des No-Op-Ziels macht das Netz nicht
+schlechter, sondern **eher besser** -- beide Seeds und fuenf von sechs Standard-Kennzahlen
+zeigen in dieselbe Richtung (Spalten +0,01/+0,10, Punkte +0,15/+1,99, Marge +0,31/+3,98).
+Einzeln erreicht kein Seed die Signifikanzschwelle (p 0,159 und 0,235), gepoolt liegt es genau
+darauf. **Kein Sieg, den man ohne Zusatz nennen darf** -- aber die Task-#38-Behauptung "der
+moon-Kopf hilft" ist erstmals geprueft und in ihrer bisherigen Form widerlegt.
+
+**Offene Nutzer-Entscheide:**
+1. **Dritter Seed fuer b05** als Stichentscheid (rund 75 min, Praezedenz v26/v28). Ohne ihn
+   traegt der Befund die Entscheidung "Kopf raus", aber keine Elo-Kante.
+2. **b04 bauen?** Das Korpus-Tor ist mit 44,1 Prozent klar offen; b04 braucht Datenpfad,
+   eigenen Fenster-Schluessel und einen neuen Monolith (rund 1 h Bau plus 35 min Monolith).
+3. **32a (Weg C) fallen lassen?** 32c sagt, der Zugriffs-Hebel ist klein; der Knopf ist gebaut
+   (Commit a4f92a5), seine Tore sind offen. Nach par.11-Nachtrag steht er ohnehin hinter 32b.
+
+**Zwei eigene Fehler dieses Laufs, beide vom Nutzer an einer Zahl erkannt:** der erste b05-Start
+lief OHNE `MOSAIC_CARRIER_MANIFEST` und haette mit 2.947 statt 580 Policy-Traegern einen
+zweifaktoriellen Arm erzeugt (gestoppt, Skript um die Variable und eine Existenzpruefung
+ergaenzt); und die erste Auswertung der Kennzahlen ordnete die Seiten nach Dict-Position statt
+nach Namen zu, wodurch alle Vorzeichen vertauscht waren.
 
 ## 2. CHAMPION UND LEITER
 
@@ -606,9 +645,8 @@ entschieden sind; `dome_return_order` bleibt ebenfalls offen -- sein Bau-Tor ist
    `tools/elo_tracker.py`, das Beispiel in `tools/freeze_heuristic.py`), bleiben unveraendert.
 
 7. ~~Skala des Rundenschaetzers~~ **GEGENSTANDSLOS 2026-09-15**: der Term schadet in beiden
-   vorregistrierten Dosen (`round_estimate_leaf_term` par.7c/7d). Offen ist stattdessen der
-   Vorschlag, K4 ein abfallendes Rundenprofil wie K3 zu geben (Abschnitt 1, offene Entscheide
-   der Nacht, Punkt a).
+   vorregistrierten Dosen (`round_estimate_leaf_term` par.7c/7d). Der Vorschlag eines
+   Rundenprofils wie K3 RUHT (Nutzer 2026-09-15, par.7e); der Term ist damit abgeschlossen.
 
 8. **Rahmen (ENTSCHIEDEN 2026-09-12, hier als Erinnerung):** v30 wird released und ist der
    Projektabschluss, Schlussmodell heisst **Tessa**. v29 traegt das Begleitprogramm, v30 nur
@@ -620,9 +658,13 @@ entschieden sind; `dome_return_order` bleibt ebenfalls offen -- sein Bau-Tor ist
    gegen b03. Fahrplan 32b, `PREREG_moon_stack_order.md` par.12.1, Namen in
    `docs/generation_naming.md`.
 
-10. **Rueckgabe-Reihenfolge in der v30-Erzeugung** (`PREREG_dome_return_order.md` par.12.2):
-    Modus 1 an oder aus neben dem Streu-Knopf; R2 (geordnete eigene Designs, +4 Werte) ja/nein
-    VOR der Erzeugung.
+10. ~~Rueckgabe-Reihenfolge in der v30-Erzeugung~~ **ENTSCHIEDEN 2026-09-15 (Nutzer: "mit r2
+    und modus 1 ein", `PREREG_dome_return_order.md` par.12.6):** R2 (geordnete eigene Designs,
+    +4 Werte, INPUT_SIZE 798) wird VOR der v30-Erzeugung gebaut (Fahrplan 29c), und Modus 1
+    (`return_order_mode: 1`) ist in der v30-Erzeugungs-Spec AN -- ein Korrektheitsentscheid, der
+    das "bleibt aus" vom selben Vormittag ersetzt. Streu-Knopf 0,015 bleibt daneben (er greift
+    nach dem Entscheider). Kostentor beim Start der Erzeugung: `s_je_partie` gegen v29. R2 ist
+    neben P.12 die zweite Ausnahme vom Rahmen "v30 nur Rezept-Knoepfe".
 
 ## 7. VERBOTE UND STEHENDE REGELN
 

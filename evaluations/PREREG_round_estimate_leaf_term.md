@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Traegt ein additiver Rundenschaetzer-Term am Netz-Blattwert Spielstaerke und Spalten? | Beleg: NEIN, er SCHADET in beiden vorregistrierten Dosen (par.7c/7d, 2026-09-15): 20:60 bei C_est 1,0 und 45:85 bei 0,5, McNemar p 0,0002 und 0,0005, -14,3 bzw. -8,3 Punkte und rund -0,9 volle Spalten. MECHANISMUS sichtbar: die Strafleiste sinkt (-1,57) und volle Zeilen steigen, waehrend Spalten und Spezialfelder einbrechen -- der Term macht die Suche rundenscore-gierig. Der Spaltenschaden saettigt frueh (bei halber Dosis 88 Prozent davon). Kostentor bestanden (par.7b, +4,3 Prozent). Offen als VORSCHLAG: Rundenprofil wie K3 statt kleinerer Dosis -- Nutzer-Entscheid. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Traegt ein additiver Rundenschaetzer-Term am Netz-Blattwert Spielstaerke und Spalten? | Beleg: NEIN, er SCHADET in beiden vorregistrierten Dosen (par.7c/7d, 2026-09-15): 20:60 bei C_est 1,0 und 45:85 bei 0,5, McNemar p 0,0002 und 0,0005, -14,3 bzw. -8,3 Punkte und rund -0,9 volle Spalten. MECHANISMUS sichtbar: die Strafleiste sinkt (-1,57) und volle Zeilen steigen, waehrend Spalten und Spezialfelder einbrechen -- der Term macht die Suche rundenscore-gierig. Der Spaltenschaden saettigt frueh (bei halber Dosis 88 Prozent davon). Kostentor bestanden (par.7b, +4,3 Prozent). Vorschlag Rundenprofil wie K3: RUHT (Nutzer 2026-09-15, par.7e); der Geometrie-Weg (round_transition_search_sampling Variante B) ist der Kandidat. -->
 
 # Vorregistrierung: Rundenschaetzer als additiver Term am Netz-Blattwert (Such-Knopf K4)
 
@@ -447,6 +447,15 @@ konstant zu druecken.
 
 **Nutzer-Entscheid, nicht selbst gefahren.** Beide Wege sind billig genug, um sie zu messen;
 der Profil-Weg ist ein Bau (rund 1 h), die Dosisreihe drei Laeufe a rund 25 min.
+
+## par.7e ENTSCHIEDEN (Nutzer 2026-09-15): der Term RUHT
+
+Der Vorschlag aus par.7d (K4 ein abfallendes Rundenprofil wie K3 geben, rund 1 h Bau) wird NICHT
+gebaut. Nutzer woertlich: *"lassen wir ruhen."* Begruendung aus der Vorlage: der Punkte-Weg ist
+mit par.7c/7d abgeraeumt, der Geometrie-Weg (`PREREG_round_transition_search_sampling.md`
+Variante B, Fahrplan Nr. 33) ist der bessere Kandidat fuer dasselbe Ziel. Der Knopf
+`MOSAIC_ROUND_EST_C` bleibt mit Default 0 im Code (Registratur: ENTSCHIEDEN, Default aus).
+Fahrplan Nr. 31/32 bleiben gegenstandslos; eine Wiedervorlage gibt es nicht.
 
 ## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
 

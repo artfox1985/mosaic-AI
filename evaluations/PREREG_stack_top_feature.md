@@ -964,7 +964,10 @@ bezieht sich aber nur auf die 21 wirksamen Werte.
 **WIEDERVORLAGE v30:** vor der v30-Erzeugung pruefen, dass das installierte Wheel
 `designs` schreibt (ein Record aus dem neuen Korpus aufmachen, Feld muss am eigenen Block
 stehen). Erst dann traegt P.12. Der Weg-3-Gedanke (Records nachtraeglich neu serialisieren)
-ist damit erledigt und wird nicht gebaut.
+ist damit erledigt und wird nicht gebaut. **Dazu seit 2026-09-15 (Nutzer-Entscheid,
+`PREREG_dome_return_order.md` par.12.6): Merkmal P.16 "geordnete eigene Designs"
+(`designs_ordered`, 4 Werte, INPUT_SIZE 798) muss ebenfalls VOR der v30-Erzeugung im Wheel
+stehen -- dieselbe Pruefung am ersten Record des neuen Korpus.**
 
 
 ### par.17a Erster Testlauf: 636 gruen, fuenf rot -- und der Beleg fuer die Paritaets-Fixture
