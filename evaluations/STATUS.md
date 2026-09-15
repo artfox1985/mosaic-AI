@@ -18,16 +18,21 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ## 1. WAS GERADE LAEUFT
 
-**Stand 2026-09-15, 00:30: zwei Messketten laufen hintereinander, sonst nichts.**
+**Stand 2026-09-15, 09:00: nichts laeuft.** Beide Messketten der Nacht sind durch (Verdikte im
+Abschnitt "NACHT 2026-09-14/15" unten). Zuletzt gebaut: das Wheel mit dem Knopf C3 fuer Fahrplan
+32a (`MOSAIC_MOON_ORDER_SEARCH_SCALE`, Commit a4f92a5, installiert 08:40). Konservierung 08:41
+GRUEN (`evaluations/artifacts/frozen_verify_hv4_anchor.json`); **ein Drift-Artefakt fuer dieses
+Wheel liegt NICHT in `evaluations/artifacts`** (Stand 09:00, juengstes Drift-Artefakt vom
+2026-09-14 22:57). Faellig als naechstes: die Tore aus `PREREG_moon_stack_order.md` par.11
+(Bitidentitaet bei aus, Kostentor 25 Prozent, Diagnose `changed`), dann das A/B.
 
 | Kette | Inhalt | Stand |
 | --- | --- | --- |
-| `tools/night_v29_20260914.sh` | 1. A/B Mondstapel-Nachsuche (Stufe 3) - 2./3. Kostentor K4 mit/ohne - 4./5. Arena K4 zwei Dosen - 6. Nachzug b02 gegen b03 ohne Frueh-Stopp | **Schritte 1-5 DURCH** (Verdikte unten), Schritt 6 (Nachzug b02/b03) laeuft |
-| `tools/night_v29_envelope_value_ab.sh` | wartet auf die erste; dann Anker-Kante v29-b03 gegen hv4_anchor, dann Value-Anteil im Tiling in zwei Dosen (par.8.6b) | wartend, Prozessabfrage alle 5 min |
+| `tools/night_v29_20260914.sh` | 1. A/B Mondstapel-Nachsuche (Stufe 3) - 2./3. Kostentor K4 mit/ohne - 4./5. Arena K4 zwei Dosen - 6. Nachzug b02 gegen b03 ohne Frueh-Stopp | **alle sechs Schritte DURCH** |
+| `tools/night_v29_envelope_value_ab.sh` | Anker-Kante v29-b03 gegen hv4_anchor, dann Value-Anteil im Tiling in zwei Dosen (par.8.6b) | **DURCH** (Kante 128:22 eingetragen, par.8.6 geschlossen) |
 
-**Nichts anderes darf Rechenlast erzeugen** -- kein Build, kein cargo, keine Sonde. Das gilt
-besonders fuer den Wheel-Bau: beide Ketten fahren auf dem Kontrakt `39994362fba145a6`, ein
-Neubau mitten darin liesse die Arme auf zwei verschiedenen Wheels laufen.
+Waehrend einer Messung darf nichts anderes Rechenlast erzeugen -- kein Build, kein cargo, keine
+Sonde (CLAUDE.md). Ein Wheel-Neubau mitten in einer Kette liesse die Arme auf zwei Wheels laufen.
 
 **Die v29-Erzeugung ist seit dem 2026-09-14 durch** (1.201 Dateien, 12,8 h); die Einzelheiten
 und die Nebenlast-Offenlegung stehen unten. Der Vollstaendigkeit halber der Aufbau, unter dem
@@ -103,6 +108,33 @@ kein Build, kein cargo, keine Sonde.
    - **Ablations-Schalter `MOSAIC_SPECIAL_PLANES_OFF` fuer v29-b02** plus Tore
      (`PREREG_special_tile_yield.md`, Fahrplan Nr. 15).
 7. Danach nach Fahrplan `evaluations/v29_program_agent_plan.md` (41 Punkte).
+
+### Architektur Mondstapel und Rueckgabestapel konkretisiert (2026-09-15, Nutzer-Auftrag)
+
+Registriert als `PREREG_moon_stack_order.md` par.12 und `PREREG_dome_return_order.md` par.12,
+im Fahrplan als 29b, 32b (neu gefasst) und 32c. Kein Bau, kein Entscheid.
+
+**Befund mit Gewicht (am Code geprueft): das Trainingsziel des `moon`-Kopfs ist ein No-Op.**
+`moon_order_target` (`self_play.rs:1331-1386`) bewertet die Permutationen mit
+`solve_round_final_score`, das nur `players[pi]` liest (`tiling_solver.rs:396-404`; der
+Modulkopf `:249` nennt `state.factories` als absichtlich ignoriert); das erste Element von
+`permutations` ist die Identitaet, also gewinnt IMMER die kanonische Sonnenseiten-Reihenfolge.
+Der Kopf trainiert mit Gewicht 1,0 (alle v28/v29-Manifeste) darauf, die kanonische Folge zu
+reproduzieren. Bekannt seit 2026-08-20 (`PREREG_implementation_review_unprimed.md` Befund 2),
+damals als Rezept-Entscheid an den Nutzer verwiesen und nie entschieden; par.2 der Mond-Prereg
+beschrieb das Ziel bis heute als funktionierend. Folgen: der Fan-out-Prior (Stufe 1) bevorzugt
+das kanonische Kind, der Stufe-1-Nullbefund ist damit erwartbar (Herleitung, nicht gemessen);
+Stufe 3 haengt nicht am Prior. Nutzer 2026-09-15: "eher schlecht wenn er auf die kanonische
+reihenfolge trainiert."
+
+**Vorschlaege, nach Kosten:** (1) zwei Sonden ohne Bau am Spiel: Zugriffs-Bilanz aus den Logs
+(wer nimmt den oben gelegten Stein) und Anteil nicht-kanonischer gespielter Reihenfolgen im
+v29-Fenster; (2) Arm `v29-b04` mit repariertem Ziel (gespielte Reihenfolge als Label, im Record
+vorhanden, kein neuer Korpus) -- **ENTSCHIEDEN 2026-09-15 zusammen mit der Ablation `v29-b05`
+(`--moon-loss-weight 0`), Fahrplan 32b**; (3) fuer die Rueckgabe zuerst die Sensitivitaets-Sonde am
+v29-b03, dann Streu-Korpus mit v30, dann A/B; (4) eigene Entscheidungsknoten im Baum fuer beides
+nur gebuendelt und nur nach einem Nutzer-Entscheid, den v30-Rahmen zu oeffnen (NUM_ACTIONS
+406 -> 414, jeder Checkpoint verwaist). Entscheide in Abschnitt 6, Punkte 9 und 10.
 
 ### Stand 2026-09-14, 14:00 -- die v29-Arme sind gemessen
 
@@ -196,7 +228,9 @@ Vier Fahrplanpunkte sind bearbeitet worden, alle ohne Messung:
 | 23 | Korpus-Verhaltens-Audit | **Werkzeug gebaut, Selbsttest gruen** (18 Handzahlen ueber sechs Claude-Partien exakt). Der Korpuslauf kommt mit v29 |
 | 22 | Schwierigkeitsleiter | Bauplan in drei Punkten berichtigt, **Schritt 1b gebaut UND ABGENOMMEN** (2026-09-14 01:35, neben dem b01-Training): sechs optionale Stilfelder, 641 Tests gruen, Paritaets-Fixture unveraendert -- das vorregistrierte Tor. Nichts installiert. Auch `models/levels/beginner.spec.json` liegt (hv3 @150) |
 
-**RUST-STAND 2026-09-15, 05:40: Tests GRUEN, Wheel NICHT gebaut.** Zwei Stuecke sind
+**RUST-STAND 2026-09-15, 05:40: Tests GRUEN, Wheel NICHT gebaut** (UEBERHOLT am Vormittag:
+Diagnose-Serie par.9i um 08:08 lief auf einem neuen Wheel, das Wheel mit C3 folgte um 08:40,
+Commit a4f92a5; Stand in Abschnitt 1 oben). Zwei Stuecke sind
 diese Nacht dazugekommen:
 
 * der umgebaute **Streu-Knopf der Rueckgabe** (Schwelle 3, Rundenfenster 1-4, Commit `df4b424`),
@@ -210,7 +244,7 @@ zwei eigene Fehler auf und wurden behoben: der Zaehler-Block stand zwischen dem
 Doc-Kommentar von `moon_order_post_search` und der Funktion (Dokumentation verwaist), und ein
 `///` ueber einem `thread_local!`-Makro erzeugte eine Warnung.
 
-**OFFEN und dem Nutzer vorgelegt: Wheel-Bau plus Installation, danach Anker-Drift**
+~~OFFEN und dem Nutzer vorgelegt: Wheel-Bau plus Installation, danach Anker-Drift~~ **ERLEDIGT 2026-09-15 vormittags** (siehe Abschnitt 1; Drift-Artefakt fuer das 08:40-Wheel noch nicht abgelegt)
 (`/mosaic-anchor-invariance`, Pflicht nach jeder Engine-Aenderung). Der Austausch der
 installierten Engine ist der einzige Schritt mit Rueckfallrisiko und wurde deshalb nicht
 unbeaufsichtigt gefahren. Erst danach ist die Diagnose-Serie mit `moon_order_variants=2`
@@ -552,8 +586,8 @@ entschieden sind; `dome_return_order` bleibt ebenfalls offen -- sein Bau-Tor ist
    -- betrifft den menschlichen Spieler, live eingetreten in Partie g07. Umfang und Prioritaet
    sind offen; beruehrt die Gueltigkeit von g02-g07.
 
-4. **Cache-Bloecke und Monolithe** (knapp 7 GB): Waisen-Inventar nach der Erzeugung, Liste
-   dann zur Freigabe.
+4. ~~Cache-Bloecke und Monolithe~~ **ERLEDIGT 2026-09-14** (Abschnitt 1 Punkt 3: 1.842 Bloecke
+   und acht Monolithen, rund 4,9 GB, auf Freigabe des Nutzers geloescht).
 
 5. **`-Deep`-Lauf der Backup-Verifikation**: `verify_backup.ps1` empfiehlt ihn vor der ersten
    Loeschung; am 2026-09-13 auf Nutzer-Entscheid nicht gefahren.
@@ -571,16 +605,28 @@ entschieden sind; `dome_return_order` bleibt ebenfalls offen -- sein Bau-Tor ist
    beschreiben (`docs/promotion_checklist.md` Z.34, die Historien-Kommentare in
    `tools/elo_tracker.py`, das Beispiel in `tools/freeze_heuristic.py`), bleiben unveraendert.
 
-7. **Skala des Rundenschaetzers** (`round_estimate_leaf_term`): Vorschlag (a) je Runde,
-   (b) 9,25 auf Zuruf. Aus dem v28-Programm uebernommen, unveraendert offen.
+7. ~~Skala des Rundenschaetzers~~ **GEGENSTANDSLOS 2026-09-15**: der Term schadet in beiden
+   vorregistrierten Dosen (`round_estimate_leaf_term` par.7c/7d). Offen ist stattdessen der
+   Vorschlag, K4 ein abfallendes Rundenprofil wie K3 zu geben (Abschnitt 1, offene Entscheide
+   der Nacht, Punkt a).
 
 8. **Rahmen (ENTSCHIEDEN 2026-09-12, hier als Erinnerung):** v30 wird released und ist der
    Projektabschluss, Schlussmodell heisst **Tessa**. v29 traegt das Begleitprogramm, v30 nur
    noch Rezept-Knoepfe.
 
+9. ~~Trainingsziel des `moon`-Kopfs~~ **ENTSCHIEDEN 2026-09-15 (Nutzer: "beides")**: zwei Arme,
+   `v29-b05` (b03 plus `--moon-loss-weight 0`, sofort startbar auf b03s Monolith) und `v29-b04`
+   (b03 plus Ziel = gespielte Reihenfolge, nach Korpus-Sonde und Datenpfad-Bau). Tor 1 je Arm
+   gegen b03. Fahrplan 32b, `PREREG_moon_stack_order.md` par.12.1, Namen in
+   `docs/generation_naming.md`.
+
+10. **Rueckgabe-Reihenfolge in der v30-Erzeugung** (`PREREG_dome_return_order.md` par.12.2):
+    Modus 1 an oder aus neben dem Streu-Knopf; R2 (geordnete eigene Designs, +4 Werte) ja/nein
+    VOR der Erzeugung.
+
 ## 7. VERBOTE UND STEHENDE REGELN
 
-- **Kein Push ohne Anweisung.** Stand 2026-09-13, 13:10: **30 Commits vor origin/main**, der
+- **Kein Push ohne Anweisung.** Stand 2026-09-15, 09:00: **17 Commits vor origin/main**, der
   Nutzer pusht selbst.
 - **Loeschung nur auf pfadgenaue Freigabe**, mit restic-Beleg je Gruppe.
 - **Messungen laufen exklusiv.** GPU und CPU duerfen parallel, zwei CPU-Messungen nie; ein

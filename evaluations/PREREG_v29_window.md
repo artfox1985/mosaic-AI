@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- **v29-b03 SCHLAEGT DEN CHAMPION** (drei Seeds: 124:86 und 64:36 signifikant, 87:93 Gleichstand, keiner dagegen; 275:215 in 490 Partien, Punkte +3,4/+5,4). Promotion ist offener Nutzer-Entscheid, Elo-Kante noch nicht eingetragen. b01 gegen den Champion war zweimal H0; b02 gegen b03 zeigt: die Spezialfeld-Kanaele TRAGEN. Monolith-Kollision behoben, b03s Offline-Rueckstand war ein kaputter Val-Cache. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- **v29-b03 SCHLAEGT DEN CHAMPION** (drei Seeds: 124:86 und 64:36 signifikant, 87:93 Gleichstand, keiner dagegen; 275:215 in 490 Partien, Punkte +3,4/+5,4). Promotion per Nutzer-Entscheid ans Ende der Generationsarbeit vertagt; vier Elo-Kanten eingetragen (drei Champion-Seeds, Anker-Kante 128:22), b03@400 Elo 1402 [1353, 1456] (Nachtrag par.9). b01 zweimal H0 gegen den Champion. b02 gegen b03: Kanaele wirken auf den Posten, nicht auf die Siegquote (147:153, special_tile_yield par.10a). Monolith-Kollision behoben, b03s Offline-Rueckstand war ein kaputter Val-Cache. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -1100,6 +1100,24 @@ Deckel oder eine Abbruchbedingung: ein stilles Warten sieht von aussen aus wie A
 **Fenster gebaut:** Traeger-Manifest 580 (400 neu + 135 G-1 + 45 G-2), G-2-Haelfte 145 aus
 `selfplay_v26-b01-value-excursion_*.pkl` (Soll 145, par.2), Fensterliste `data/window_v29.txt`
 mit 2.947 Dateien, Cache-Schluessel `35c6bd2b9bd2`.
+
+### Nachtrag 2026-09-15: Promotion vertagt, Anker-Kante eingetragen, b02-Verdikt praezisiert
+
+Drei Stuecke, die in STATUS und im Fahrplan registriert waren, aber hier fehlten (Audit
+2026-09-15, Nutzer-Auftrag "zieh die fehler gerade"):
+
+1. **Promotion von v29-b03 ans Ende der Generationsarbeit verschoben** (Nutzer 2026-09-14:
+   "champion werd ich erst zum schluss der generationsarbeit machen. vielleicht kommt noch was
+   besseres"). Champion bleibt `v28-b02_brierbest`; die Elo-Kanten sind davon unabhaengig.
+2. **Anker-Kante v29-b03 gegen `hv4_anchor`: 128:22 in 150 Partien ohne Frueh-Stopp**
+   (`evaluations/artifacts/anchor_edge_v29-b03_vs_hv4_anchor.json`, 1.292,8 s), eingetragen
+   2026-09-15 (`evaluations/elo_history.csv` Zeile 45). Register danach: `v29-b03@400` Elo
+   1402 [1353, 1456] aus 640 Partien gegen `v28-b02@400` 1371 [1332, 1419]; die Intervalle
+   ueberlappen, drei von vier b03-Kanten sind frueh gestoppt -- kein Staerkebefund.
+3. **b02 gegen b03 praezisiert** (`PREREG_special_tile_yield.md` par.10a): der Nachzug mit 150
+   Paaren ohne Frueh-Stopp steht 147:153 (McNemar p 0,82). Die Kanaele 77/78 wirken auf ihren
+   POSTEN (+0,13 bis +0,22 belegte Spezialfelder in drei Seeds), nicht auf die Siegquote. Der
+   Satz "die Spezialfeld-Kanaele TRAGEN" im Abschnitt oben gilt nur fuer den Posten.
 
 ## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
 

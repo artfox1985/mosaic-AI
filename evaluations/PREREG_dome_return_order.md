@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: Knopf gebaut und im Wheel (par.8a); A/B ohne messbaren Effekt, aber NICHT verneint (par.10) -- Henne-Ei bei nur 0,19 Abweichungen je Partie. Weg dahin ist die Zufalls-Streuung in der Erzeugung (par.11), gebaut und abgenommen; Schwelle 3 und Rundenfenster 1-4 (par.11c), Muenze je Rueckgabe, Dosis rund 0,015. **BAU-TOR GRUEN 2026-09-15** (664 Tests, Wheel installiert, Anker-Drift und Konservierung gruen). OFFEN ist nur noch der Korpus mit Streuung -- er kommt mit der naechsten Erzeugung. -->
+<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: Knopf gebaut und im Wheel (par.8a); A/B ohne messbaren Effekt, NICHT verneint (par.10, Henne-Ei bei 0,19 Abweichungen je Partie). Streu-Knopf fuer die Erzeugung gebaut (par.11-11c: Schwelle 3, Runden 1-4, Dosis 0,015), BAU-TOR GRUEN 2026-09-15. **par.12: Architektur konkretisiert -- drei Grenzen am Code (kein Fan-out im Baum, Entscheider ausserhalb der Suche, Encoder sieht die eigene Reihenfolge nur als Typfolge); Reihenfolge R1 Sensitivitaets-Sonde -> Streu-Korpus v30 -> A/B; R3 Knoten im Baum nur gebuendelt mit Mondstapel Weg A.** OFFEN: der Korpus mit Streuung kommt mit der naechsten Erzeugung. -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -590,3 +590,96 @@ Reihenfolge zu lehren -- dieselbe Absicht wie bei der Startkuppel-Streuung (par.
 Fenster-Prereg: "damit das netz auch mal sieht welchen einfluss die startkuppel hat"). Eine
 niedrige Dosis genuegt dafuer; sie muss die Verteilung nicht verschieben, nur den Fall zeigen.
 
+
+## par.12 ARCHITEKTUR KONKRETISIERT (Code-Audit 2026-09-15, Nutzer-Auftrag "konkretisiere moegliche architektur optimierungen")
+
+Kein Bau, kein Entscheid. Drei Grenzen sind am Code belegt, vier Optionen darauf zugeschnitten,
+eine Reihenfolge vorgeschlagen. Der Streu-Knopf (par.11-11c) bleibt der erste Schritt; er ist
+gebaut und wirkt mit der naechsten Erzeugung.
+
+### 12.0 Drei strukturelle Grenzen (am Code geprueft)
+
+1. **Der Suchbaum faechert die Rueckgabe nicht auf.** `game.rs:403-430`
+   (`generate_draw_stack_moves`): ein Kandidat je (Platte, Slot), `return_order` = Ziehreihenfolge
+   aus `pending_stack_draw`; Kommentar `:414-418` "wie moon_order ... NICHT kombinatorisch
+   aufgefaechert". Im Baum gibt es die Wahl also nicht, egal welcher Modus laeuft.
+2. **Der Entscheider steht AUSSERHALB der Suche und bewertet mit einem Blatt.**
+   `self_play.rs:750-816` (`choose_return_order`): Modus 1 legt bis zu 6 Permutationen der
+   ersten drei Restplatten (`RETURN_ORDER_MAX_PERMUTED = 3`, `:629`) auf Spielkopien, spielt
+   beide Stufen (`ChooseDrawStackSlot`, `ChooseDomeRotation`, `:786-787`) und nimmt
+   `net_leaf_eval(net, &probe.state)[returner]` (`:793`) -- EIN Vorwaertspass je Kandidat, kein
+   Baum. Aufgerufen am Ende der Ziehserie (`resolve_and_apply_stack_draw_with`, `:1168-1169`),
+   in der GUI (`py.rs:1062-1071`) und im Referee (`referee.rs:846-851`).
+3. **Der Encoder sieht die eigene Reihenfolge nur als Typfolge.** Abschnitt 15
+   (`features.rs:130-160`): Indizes 4..7 = Typ der obersten VIER Positionen des obersten eigenen
+   Blocks, +1 Spezial / -1 Joker / 0. Die Designs des eigenen Blocks liefert `serialize.rs:111-117`
+   **SORTIERT** ("weil der Spieler die Reihenfolge im zurueckgelegten Block nicht mehr
+   auseinanderhaelt", `:141-143`) -- P.12 (18 Bits, ab v30 belebt) traegt also die MENGE der
+   eigenen Designs, nicht ihre Reihenfolge. Zwei Permutationen gleichtypiger Platten sind fuer das
+   Netz identisch; Modus 1 waehlt dann per Gleichstand die Ziehreihenfolge (par.8a Punkt 1).
+
+Die Regel dazu (`docs/engine_manual.md:84-90`): der Rueckleger kennt seine Reihenfolge, der Gegner
+sieht nur die Vorderseiten der gezogenen Platten. Eine feinere EIGENE Sicht ist also regelkonform;
+Grenze 3 ist eine Bauentscheidung vom 2026-09-13, keine Regel.
+
+### 12.1 Vier Optionen
+
+**R1 Sensitivitaets-Sonde (Instrument, kein Bau am Spiel).** Beantwortet das Henne-Ei aus par.10
+mit einer Zahl: an Rueckgaben mit mindestens drei Restplatten (Grundmenge wie
+`RETURN_ORDER_MIN_REST`) die Spannweite des Value-Kopfs ueber die bis zu 6 Permutationen aus
+Sicht des Ruecklegers -- exakt die Groesse, die Modus 1 intern berechnet (`:771-799`). Quelle:
+Zustaende aus `--log-games`-Artefakten oder dem v29-Korpus, Netz v29-b03 (heute) und spaeter das
+v30-Netz. Einheit: max minus min der Siegwahrscheinlichkeit je Rueckgabe; Kennzahlen Median und
+Anteil ueber 0,01. **Lesart vorab:** liegt die Spannweite bei v29-b03 nahe 0 (Erwartung nach
+Grenze 3 und Henne-Ei), ist jedes A/B an diesem Netz sinnlos, egal in welcher Bauform; steigt sie
+am v30-Netz (Streu-Korpus), hat das Netz die Wirkung gelernt und die Entscheidungsform wird zur
+Frage. Getrennt ausweisen: Permutationen mit GLEICHER Typfolge (Grenze 3 verbietet dort jede
+Spannweite) gegen verschiedene Typfolge. Kosten: Bau rund 1 h (ANNAHME), Lauf Minuten.
+
+**R2 Encoder: geordnete eigene Designs (additiv, Merkmal P.16).** Zusaetzlich zu den sortierten
+Designs die Design-Nummer der obersten k = 4 Positionen des eigenen Blocks (dieselben vier
+Positionen wie die Typfolge), als 4 Werte `tile_id / 17` oder als 4 x 18 Bits; nur eigener Block
+(regelkonform, der Rueckleger kennt sie), fremde Bloecke bleiben `Null`. Record-Feld
+`dome_pool_view.blocks[].designs_ordered` additiv neben `designs`; **muss VOR der v30-Erzeugung im
+Serializer stehen** (`feedback_record_field_must_precede_generation`, dieselbe Falle wie P.12).
+INPUT_SIZE 794 -> 798 (Variante 4 Werte), Fenster- UND Val-Cache-Schluessel
+(`feedback_feature_knob_belongs_in_both_cache_keys`), Paritaets-Fixture bewusst neu, Drift gruen
+(die Heuristik liest den Vektor nicht). Nur sinnvoll, wenn R1 zeigt, dass die Spannweite bei
+gleicher Typfolge exakt 0 ist UND bei verschiedener nicht -- dann ist Grenze 3 der Deckel.
+
+**R3 Entscheidungsknoten im Baum (Spiegel von `moon_stack_order` par.12 Weg A).** Zwischen
+`ChooseDrawStackSlot` und `ChooseDomeRotation` eine anhaengige Wahl "welche Restplatte kommt
+zuerst wieder" (`return_order[0]`, `self_play.rs:606-621`): `PendingDomeChoice::FromDrawStack`
+traegt `return_order` bereits (`moves.rs:99`), die Stufe liesse sich dort einhaengen. IDs nach
+Zieh-Position (bis zu 3, Deckel wie `RETURN_ORDER_MAX_PERMUTED`), `NUM_ACTIONS` +3. Preis wie beim
+Mondstapel: jeder Checkpoint verwaist (`feedback_num_actions_change_breaks_old_checkpoints`), der
+Korpus muss die Knoten vor dem Training tragen, fruehestens v31 nutzbar -- **ausserhalb des
+v30-Rahmens** (`project_v30_release_close`). Wenn, dann GEBUENDELT mit dem Mondknoten (5 + 3 IDs,
+406 -> 414, EIN Kontraktwechsel), nach Nutzer-Entscheid ueber den Rahmen.
+
+**R4 Nachsuche statt Blattwert (Modus 3, kein Training).** `choose_return_order` bewertet jeden
+Kandidaten mit einem kleinen `build_net_tree` ueber den Folgezustand statt mit `net_leaf_eval`,
+exakt das Muster von `moon_order_post_search` (`net_mcts.rs:5773-5832`: eigener Seed-Strom,
+Budget obendrauf, Minimum aus Gegnersicht). Kosten je Entscheid wie dort (256 Sims je Variante);
+bei 0,19 Abweichungen je Partie (par.11b) und 11,07 Gelegenheiten (par.11c) ist die Partie-Wanduhr
+kaum betroffen (ANNAHME, Kostentor Pflicht). **Aber:** R4 verbessert den Entscheider, nicht das
+Netz -- gegen das Henne-Ei aus par.10 hilft es nichts. Erst nach R1 am v30-Netz, und nur wenn die
+Spannweite dort messbar ist.
+
+### 12.2 Reihenfolge (Vorschlag, Entscheide beim Nutzer)
+
+1. **R1 jetzt am v29-b03** (Minuten): beziffert das Henne-Ei. Erwartung: Spannweite nahe 0.
+2. **v30-Erzeugung mit `MOSAIC_RETURN_ORDER_RANDOM_P=0.015`** (par.11c) und belebtem P.12; R2
+   nur, wenn R1 die Typfolge als Deckel zeigt -- dann VOR der Erzeugung ins Record-Feld.
+   Nutzer-Entscheid dabei: Modus 1 in der Erzeugung AN (damit die gestreuten Faelle nicht nur
+   Zufall, sondern auch bewertete Wahl enthalten) oder AUS (nur Streuung; sauberer fuer die
+   Frage "lernt das Netz die Wirkung").
+3. **R1 am v30-Netz** wiederholen. Steigt die Spannweite: **A/B Modus 1 gegen 0** (par.5) am
+   v30-Champion, 200 Paare ohne Frueh-Stopp, danach R4 als Knopf. Bleibt sie bei 0: die
+   Rueckgabe-Reihenfolge ist fuer dieses Netz kein Hebel, Prereg auf ENTSCHIEDEN
+   ("nicht lernbar in dieser Sicht") -- ausser R2 wird nachgezogen.
+4. **R3** nur mit Weg A des Mondstapels und nur nach Rahmen-Entscheid.
+
+**Was hier absichtlich fehlt:** ein Heuristik-Ziel fuer die Reihenfolge (Modus 2 als Trainingsziel
+waere derselbe Fehler wie ein Handregel-Label beim Mondkopf, `moon_stack_order` par.12 B3) und
+jede Aenderung an der Sicht des GEGNERS (die Regel gibt ihm die Reihenfolge nicht).

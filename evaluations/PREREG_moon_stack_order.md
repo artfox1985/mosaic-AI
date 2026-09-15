@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund: 193:207 und 197:203, je 200 Paare ohne Frueh-Stopp. **par.9i GEMESSEN: die Nachsuche waehlt in 62 Prozent der Faelle ANDERS als kanonisch und aendert am Ausgang trotzdem nichts** -- der Prior ist nicht die Erklaerung, Weg C (Horizont) bleibt. Dabei par.9b korrigiert: 12,20 Entscheidungen je Partie statt 24,34, weil die Log-Zeile ein ZUSTAND ist und kein Ereignis. Weg C und B als Fahrplan 32a/32b (par.10a). -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund, je 200 Paare ohne Frueh-Stopp; par.9i: die Nachsuche waehlt in 62 Prozent ANDERS und aendert nichts. **par.12 (Code-Audit 2026-09-15): das Trainingsziel des moon-Kopfs ist ein No-Op -- der Rundenloeser liest die Fabriken nicht, das Label ist immer die kanonische Reihenfolge; der Prior ist blind, nicht kurzsichtig.** Weg B ENTSCHIEDEN 2026-09-15 als zwei Arme: v29-b04 (Ziel = gespielte Reihenfolge) und v29-b05 (moon_loss_weight 0), beide gegen b03; Weg C3 gebaut (par.11, Tore offen), Weg A nur gebuendelt und ausserhalb des v30-Rahmens. Fahrplan 32a/32b/32c. -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -31,6 +31,13 @@ selbst gewaehlter Reihenfolge auf die Mondseite (`docs/engine_manual.md`; `facto
   ueber alle Permutationen (bei hoechstens 3 Steinen sind das hoechstens 6, also ERSCHOEPFEND;
   Nutzer 2026-09-12, Korrektur der ersten Fassung "Stichproben"), also ein RUNDEN-Label (was am
   Rundenende am meisten bringt), kein Such- oder Ausgangslabel.
+
+  **KORREKTUR 2026-09-15 (par.12.0, am Code geprueft):** die Aufzaehlung ist erschoepfend, der
+  Bewerter ist blind. `solve_round_final_score` liest nur `players[pi]`
+  (`tiling_solver.rs:396-404`, Modulkopf `:249`), die Mondreihenfolge lebt in
+  `state.factories`; alle Permutationen scoren gleich, und weil `permutations()` mit der
+  Identitaet beginnt, ist das Label IMMER die kanonische Reihenfolge. Der Kopf trainiert seit
+  jeher auf die Sonnenseiten-Folge, nicht auf ein Rundenziel.
 - **Haeufigkeit (Nutzer):** der Entscheid faellt hoechstens EINMAL je kleiner Fabrik und Runde
   (der erste Sonnenzug aus der Fabrik legt den Stapel), also 4 je Runde und rund 20 je Partie;
   Nutzer: "ziemlich genau 20, die wahrscheinlichkeit dass 4 gleiche farben auf einer fabrik
@@ -1083,7 +1090,21 @@ soll er behalten.
 offenen Zuege der Runde. Das ist keine Terminierung, sondern adaptives Budget: es verschiebt
 Rechenzeit dorthin, wo noch etwas passiert. Billiger als C1, ohne C2s Zielverschiebung.
 
-**Empfehlung: C3 zuerst, C1 nur wenn C3 traegt.** Begruendung: C3 testet dieselbe These
+> **NACHTRAG 2026-09-15, nach par.12.0 (Rueckwaerts-Pruefung): die Prioritaet von Weg C faellt.**
+> Dieser Absatz ist geschrieben worden, als der Horizont die naechstliegende Erklaerung war.
+> par.12.0 hat seither am Code belegt, dass das Trainingsziel des `moon`-Kopfs ein No-Op ist --
+> das Label war IMMER die kanonische Reihenfolge, und der Kopf hat mit Gewicht 1,0 darauf
+> trainiert. **Damit gibt es eine dritte Erklaerung fuer den Nullbefund aus par.9h, und sie ist
+> billiger zu pruefen als C:** der Prior, der die Kandidaten der Nachsuche vorordnet, ist auf
+> eine Konstante gelernt. Die Reihenfolge des Fahrplans ist entsprechend geaendert -- 32b
+> (b05 ohne Bau, danach b04) und die Sonden aus 32c stehen VOR 32a. Der Knopf C3 bleibt gebaut
+> und vorregistriert; seine Tore sind offen, nicht gescheitert.
+>
+> Was der Befund NICHT umstoesst: `changed` = 0,623 aus par.9i bleibt gueltig und bekommt sogar
+> eine schaerfere Lesart -- wenn der Prior auf "kanonisch" gelernt ist, ist diese Zahl der
+> Anteil, in dem der BAUM den Prior ueberstimmt.
+
+**Empfehlung innerhalb von Weg C: C3 zuerst, C1 nur wenn C3 traegt.** Begruendung: C3 testet dieselbe These
 ("mehr Weitsicht hilft") mit einem Bruchteil des Aufwands und ohne Terminierungslogik im
 Suchpfad. Traegt C3 nicht, ist auch C1 unwahrscheinlich -- traegt es, lohnt C1 als Ausbau.
 
@@ -1107,3 +1128,198 @@ Horizont die Ursache und Weg A wird nicht gebraucht. Traegt es nicht UND `change
 bewegt, bleibt allein Weg A (eigener Entscheidungsknoten) -- dann ist die Entscheidungsform das
 Problem, nicht die Information. Traegt es nicht und `changed` bleibt gleich, ist der Knopf
 wirkungslos gebaut und Tor 3 hat das schon vor dem A/B gesagt.
+
+## par.12 ARCHITEKTUR KONKRETISIERT (Code-Audit 2026-09-15, Nutzer-Auftrag "konkretisiere moegliche architektur optimierungen")
+
+Kein Bau, kein Entscheid. Dieser Absatz macht aus den drei Wegen von par.10 baubare Stuecke mit
+Codestellen, Kosten, Toren und Reihenfolge -- und er beginnt mit einem Befund, der die Lesart
+von par.2, par.7 und par.9e aendert.
+
+### 12.0 BEFUND: das Trainingsziel des `moon`-Kopfs ist ein No-Op (am Code geprueft)
+
+`moon_order_target` (`self_play.rs:1331-1386`) zaehlt alle Permutationen der Reststeine auf
+(`permutations`, `:1389-1403`; das erste Element ist die IDENTITAET, also die Sonnenseiten-
+Reihenfolge ohne die genommene Farbe -- dieselbe Folge, die `validation.rs:177-183` als
+kanonische Reihenfolge erzeugt), wendet jede auf einer Spielkopie an und bewertet mit
+`solve_round_final_score(&g.state, pi)` (`:1378`). Diese Funktion liest **nur das Brett des
+Spielers**: `tiling_solver.rs:497` -> `cached_plain` (`:404`, Cache-Schluessel
+`tiling_key(&state.players[pi])`, `:301-329`) -> `compute_plain` (`:396-401`: `p.score`,
+Strafleiste, Startspielermarker, `solve_max_tiling_points`). Der Modulkopf sagt es selbst:
+`tiling_solver.rs:249` fuehrt `state.factories` unter dem, was der Loeser ABSICHTLICH nicht
+liest. Die Mondreihenfolge lebt aber in `state.factories[..].moon_stacks` (`factory.rs:11`,
+`execution.rs:154`).
+
+**Folge:** alle Permutationen scoren identisch, `score > best_score` greift nur beim ersten
+Element, das Ziel ist IMMER die kanonische Reihenfolge. Der Kopf (5 Logits,
+`neural_net.py:1702-1710`) trainiert mit Plackett-Luce-NLL (`train.py:125-149`) und Gewicht 1,0
+(`moon_loss_weight` in den Manifesten v28-b02, v29-b01, v29-b02, v29-b03, alle 1,0) darauf, die
+Sonnenseiten-Reihenfolge zu reproduzieren -- eine Groesse ohne jeden Bezug zum Wert der Stellung.
+
+**Das war bekannt und ist nie entschieden worden:** `PREREG_implementation_review_unprimed.md`
+Befund 2 (2026-08-20) und der Kommentar in `train.py` (Zeilen um 555) sagen genau das; die
+"Behebung" war der Abschaltknopf `--moon-loss-weight`, der seither auf 1,0 steht. par.2 dieser
+Datei beschreibt das Ziel dagegen als "beste Reihenfolge nach `solve_round_final_score` ...
+ERSCHOEPFEND" -- die Aufzaehlung ist erschoepfend, der Bewerter ist blind. par.9e nennt den
+Prior "kurzsichtig"; er ist nicht kurzsichtig, er ist blind.
+
+**Was das fuer die drei Messungen heisst (Herleitung, nicht gemessen):**
+
+- **Stufe 1 (par.7, Fan-out):** P(Reihenfolge) = Plackett-Luce ueber Kopf-Scores, die die
+  kanonische Folge bevorzugen (`net_mcts.rs:2453-2467`). Die Prior-Masse liegt damit auf dem
+  kanonischen Kind; an der Wurzel werden nur 16 Kandidaten gerankt. Ein Nullbefund gegen
+  "Fan-out aus" ist unter diesem Prior die ERWARTUNG, nicht ein Befund ueber die Reihenfolge.
+  Messbar in Minuten: Anteil der Prior-Masse auf der kanonischen Variante an Fan-out-Knoten
+  (Diagnose-Zaehler, kein Umbau).
+- **Stufe 3 (par.9h):** der Prior ordnet nur vor (`:5645-5652`), entscheidet tut das Minimum
+  von `v_mix`; par.9i zeigt 62 Prozent Abweichung -- Stufe 3 haengt also NICHT am Kopf. Der
+  Nullbefund dort bleibt ein Befund ueber Horizont oder Hebelwirkung (12.3).
+- **Weg B (par.10) ist damit kein "Zielwechsel", sondern eine REPARATUR.** Die Frage "Rundenende
+  gegen Partieausgang" stellt sich erst, wenn das Ziel ueberhaupt etwas misst.
+
+**Konsumenten dieser Korrektur (Rueckwaerts-Pruefung, zu lesen vor jedem Nachzug):** par.2 und
+par.9e hier; `PREREG_dome_return_order.md` par.2 (Notiz zum Mondkopf); der Registratur-Text von
+`MOSAIC_MOON_ORDER_VARIANTS` in `engine/src/knob_registry.rs` und damit `docs/knobs.md`
+("Trainingsziel ... beste Reihenfolge nach solve_round_final_score" -- sachlich falsch, Nachzug
+braucht einen Build, weil `knobs.md` generiert wird); `archive/history.md` Task #38.
+
+### 12.1 Weg B konkret: Reparatur des Ziels, Arm `v29-b04`
+
+Drei Zielquellen, nach Kosten geordnet:
+
+| Quelle | Was ist das Label | Braucht neue Erzeugung? | Guete |
+| --- | --- | --- | --- |
+| **B1 gespielte Reihenfolge** | `action.moon_order` steht in JEDEM Record (`self_play.rs:226-235`, als Debug-Feld geschrieben, von `action_to_id` nicht gelesen). Im v29-Korpus (Fan-out Variante 1, 100 Sims) ist sie die Besuchs-Argmax-Wahl unter bis zu 6 Kindern, also ein SUCH-Label | **nein** -- das v29-Fenster traegt es | begrenzt durch den blinden Prior: bei 100 Sims folgt die Suche oft dem kanonischen Kind |
+| **B2 Nachsuche-Reihenfolge** | dasselbe Feld, aber aus einer Erzeugung mit `moon_order_variants=2` (par.9): die gespielte Folge ist dann die Wahl der 256-Sim-Nachsuche | **ja** (v30-Erzeugung, +21 Prozent Wanduhr je par.9i) | bestes verfuegbares Label; Kosten stellen sich erst mit C3/C1 (par.11) |
+| B3 exakte 1-Zug-Zugriffsregel | Handregel "welche Farbe oben dem Gegner nutzt" | nein | NICHT empfohlen: eine Handregel als Ziel deckelt den Kopf auf Handregel-Niveau (Lehre aus `dome_return_order` Modus 2) |
+
+**Vorschlag: B1 jetzt, B2 mit v30.** Schritte fuer B1:
+
+1. **Korpus-Sonde zuerst (Minuten, kein Bau):** Anteil der Sonnenzuege aus kleinen Fabriken mit
+   mindestens zwei eindeutigen Reihenfolgen, deren gespielte `moon_order` von der kanonischen
+   abweicht (n = Records mit `moon_order_target != null`, Grundmenge v29-Fenster, Einheit
+   Anteil). Liegt er unter rund 10 Prozent, ist B1 selbst ein Henne-Ei (das Label waere fast
+   immer kanonisch) und es bleibt nur B2. Zwischen 10 und 50 Prozent: B1 fahren. Die Zahl
+   gehoert VOR den Arm, nicht in seine Deutung.
+2. **Datenpfad:** `corpus_dataset.py:1351-1358` baut den Rang-Vektor aus `moon_order_target`;
+   Umstellung auf `action.moon_order` (Rang = Position im gespielten Vektor, `-1` fuer Farben,
+   die nicht im Rest sind). Kein Aenderung am Kopf, an der Loss (`plackett_luce_moon_loss`) oder an
+   `NUM_ACTIONS`. Der Knopf heisst z. B. `--moon-target-source {solver,played}`, Default `solver`
+   = Bestand (bitidentischer Cache-Schluessel; `played` gehoert in den Fenster-Schluessel, Lehre
+   `feedback_feature_knob_belongs_in_both_cache_keys`).
+3. **Arm `v29-b04`** = Rezept von b03 (794, Warmstart `v28-b02_brierbest`, Seed 20260941,
+   12 Epochen) plus `--moon-target-source played`. Name ab b04 ist reserviert
+   (`docs/generation_naming.md` Z.165), eigene Registrierung hier.
+4. **Tore:** (a) Offline: `moon_nll` auf dem sauberen Val-Cache muss unter dem b03-Wert liegen --
+   sonst hat der Kopf das neue Ziel nicht gelernt und der Arm ist ohne Arena beendet; (b)
+   Diagnose: Prior-Masse auf der kanonischen Variante an Fan-out-Knoten faellt gegenueber b03
+   (Zaehler aus 12.0); (c) Tor 1 gepaart gegen b03, zwei Seeds, Blockgroesse 5, 200 Paare ohne
+   Frueh-Stopp (Lehre par.10a von `special_tile_yield`: 30 Paare mit Stopp reichten nicht).
+5. **Lesart vorab:** traegt b04 in (c), war der blinde Prior eine Ursache und Stufe 1 ist am
+   reparierten Netz neu zu messen (par.7 wiederholen, Fan-out an gegen aus). Traegt b04 nicht,
+   obwohl (a) und (b) gruen sind, ist der Prior NICHT der Hebel; dann ist `moon_loss_weight 0`
+   der billigere Kandidat (die Behauptung aus Task #38, der Kopf ziehe rund ein Drittel des
+   Policy-Gradienten, ist UNGEPRUEFT und waere vorher an einem Gradienten-Log zu belegen).
+
+**Was B nicht anfasst:** kein neuer Kopf (`feedback_no_new_heads`), kein Kontrakt-Wechsel, alle
+Checkpoints bleiben spielbar. Kosten: Datenpfad rund 1 h Bau (ANNAHME), Training 1,4 h
+(gemessen), Tor 1 2 x 86-91 min (gemessen).
+
+**ENTSCHIEDEN 2026-09-15 (Nutzer: "beides. trag es in den fahrplan ein."): B1 UND die
+Ablation, als zwei Arme mit eigener Nummer** (`feedback_measured_identity_gets_own_bxx`):
+
+| Arm | Rezept | Was er beantwortet | Voraussetzung |
+| --- | --- | --- | --- |
+| **`v29-b04`** | b03 plus `--moon-target-source played` (B1) | traegt ein Kopf mit ECHTEM Ziel? | Korpus-Sonde ueber 10 Prozent; Datenpfad gebaut; Monolith unter eigenem Fenster-Schluessel (die Zielquelle aendert die Daten) |
+| **`v29-b05`** | b03 plus `--moon-loss-weight 0` | kostete das Rauschziel Policy-Qualitaet? (Task-#38-Behauptung, bisher ungemessen) | keine -- der Knopf existiert (`train.py:575`), das Gewicht ist kein Daten-Schluessel, b03s 794er-Monolith reicht |
+
+Reihenfolge: **b05 zuerst** (kein Bau, kann sofort auf die GPU), b04 nach Korpus-Sonde und
+Datenpfad. Tore je Arm wie oben Punkt 4, Bezugspunkt beide Male **b03** (gleicher Eingang 794,
+gleiches Fenster). Registriert in `docs/generation_naming.md` (v29-Abschnitt) und im Fahrplan
+als 32b. Lesart der vier Ausgaenge: b04 traegt -> Prior war eine Ursache, Stufe 1 am reparierten
+Netz wiederholen; nur b05 traegt -> das Ziel war Ballast, der Kopf geht auf Gewicht 0 ins
+Rezept; beide tragen -> b04 gegen b05 als Stichentscheid; keiner traegt -> der Kopf ist kein
+Hebel, es bleiben Horizont (12.4) und Hebelwirkung (12.3).
+
+### 12.2 Weg A konkret: eigener Entscheidungsknoten -- und warum er ausserhalb des v30-Rahmens liegt
+
+**Bauform, aus dem Praezedenzfall `ChooseDomeRotation` abgeleitet** (`moves.rs:121-124`,
+`state.rs:100` `pending_dome_choice`, `game.rs:790-842`: kein Phasenwechsel, kein
+`switch_player()` bis zur letzten Stufe; `drafting_actions` liefert bei anhaengiger Wahl NUR die
+Stufe-2-Kandidaten, `game.rs:642-667`):
+
+1. **Zustand:** `pending_moon_order: Option<PendingMoonOrder { factory_id, remaining: Vec<TileColor> }>`
+   analog `pending_dome_choice`. `Action::Stone` aus einer kleinen Fabrik legt die Reststeine
+   zunaechst NICHT ab, sondern setzt den Marker, sobald `unique_moon_orders(remaining).len() >= 2`;
+   sonst kanonisch wie heute (bitidentisch fuer den Ein-Varianten-Fall).
+2. **Zug:** `Action::ChooseMoonTop(TileColor)` = "diese Farbe liegt als naechste OBEN". Bei drei
+   verschiedenen Farben zwei Entscheide hintereinander (oben, dann Mitte; der Rest ist bestimmt),
+   bei zwei verschiedenen einer. `switch_player()` erst nach dem letzten.
+3. **Aktions-IDs:** 5 neue IDs 406..410 (Farbe), `NUM_ACTIONS` 406 -> 411 (`net_mcts.rs:54`,
+   `features.rs:1920-1966`, `KNOWN_ACTION_TYPES` plus Python-Spiegel
+   `tools/tests/test_action_id_mirror.py`). Dieselbe ID-Familie fuer beide Stufen, wie die vier
+   Rotations-IDs fuer beide Kuppelpfade (`features.rs:1956`).
+4. **Prior und Ziel:** aus der normalen Policy, Ziel = Besuchsverteilung am Knoten
+   (`policy_target_valid`-Muster). Der `moon`-Kopf wird ueberfluessig (Gewicht 0, Ausgang bleibt
+   fuer die ONNX-Form).
+5. **Suche:** `player_who_acted` wird vor dem Apply gelesen (`net_mcts.rs:5476-5490`), Backups
+   laufen fuer denselben Spieler ueber beide Kanten -- die Kuppelrotation zeigt, dass der Baum
+   dafuer keine Sonderbehandlung braucht.
+
+**Preis, und er ist der Grund gegen A in diesem Projekt:**
+
+- `NUM_ACTIONS` aendert sich -> **jeder bestehende Checkpoint ist fuer Live-Inferenz verwaist**
+  (`feedback_num_actions_change_breaks_old_checkpoints`: `net.rs::Net::eval` liest Ausgaben
+  positional, alte Policy-Gewichte waeren 406 breit). Champion, Anker-Kader, Leiter: alles
+  Cross-Aera mit Rueckfall.
+- **Abmilderung "additiver Policy-Kopf"** (dieselbe Regel wie beim 2D-Encoder,
+  `project_2d_encoder_must_be_additive`): die Engine liest die Policy-Breite aus dem ONNX; ein
+  406er-Modell bekommt nie einen Mondknoten (Rueckfall kanonisch), ein 411er schon; der
+  Warmstart polstert 5 Nullzeilen. Damit bleiben alte Netze SPIELBAR und vergleichbar -- aber
+  nur mit kanonischer Reihenfolge, also genau ohne das, was gemessen werden soll.
+- Der Korpus muss die Knoten TRAGEN, bevor ein Netz sie lernen kann
+  (`feedback_record_field_must_precede_generation`): fruehestens die v30-Erzeugung liefert
+  Records mit `ChooseMoonTop`, fruehestens ein v31-Training koennte sie nutzen. **v30 ist die
+  letzte Generation und traegt nur Rezept-Knoepfe** (`project_v30_release_close`). Weg A
+  passt damit nicht in den Rahmen; ihn zu oeffnen ist ein Nutzer-Entscheid, kein Fahrplanpunkt.
+- Wenn ueberhaupt, dann GEBUENDELT mit der Rueckgabe-Reihenfolge (`dome_return_order` par.12
+  R3, 3 weitere IDs -> 414); zwei Kontraktwechsel waeren zwei Verwaisungen.
+
+### 12.3 Instrument VOR jedem weiteren Bau: die Zugriffs-Bilanz (Fahrplan 32c)
+
+Die Nachsuche waehlt zu 62 Prozent anders und aendert nichts (par.9i). Neben Horizont (C) und
+Prior (B) gibt es eine dritte, bisher ungemessene Erklaerung: **der Hebel ist klein, weil der
+oben gelegte Stein selten den Besitzer wechselt.** Das ist mit vorhandenen Logs pruefbar, ohne
+Engine-Aenderung:
+
+- **Sonde** `tools/probes/moon_order_access_probe.py` ueber `--log-games`-Artefakte
+  (`moon_order_post_vs_off_s20261091`, die K4-Laeufe): je Mondstapel-Entscheid (Grundmenge:
+  Sonnenzuege aus kleinen Fabriken mit mindestens zwei eindeutigen Reihenfolgen, wie der
+  Zaehler in `moon_order_post_search`) -- WER nimmt den oben gelegten Stein als naechstes
+  (Waehler, Gegner, niemand vor Rundenende) und WIE VIELE Halbzuege spaeter; dazu, ob der
+  darunter liegende Stein in derselben Runde noch erreicht wird. Parser-Falle par.9i beachten:
+  die Zeile `Mond-Stapel:` ist ein ZUSTAND; Ereignis ist der Zug C (`take_from_moon`,
+  `factory.rs:96-107`), also die Log-Zeile des Mondzugs.
+- **Lesart vorab:** nimmt der Gegner den oben gelegten Stein in weniger als rund einem Viertel
+  der Faelle im naechsten Halbzug, steuert die Reihenfolge den Zugriff nur selten -- dann ist
+  ein kleiner Effekt die Wahrheit ueber das Spiel und weder C1 noch A lohnen. Nimmt er ihn in
+  mehr als der Haelfte, ist der Hebel real und Horizont (C) die naechste Frage.
+- Kosten: Bau rund 1 h (ANNAHME), Lauf Sekunden. Kein Nutzer-Entscheid noetig, weil nichts
+  gebaut wird, das spielt.
+
+### 12.4 Weg C: Stand und Rest
+
+C3 (Budget skaliert mit der Restlaenge) ist gebaut (Commit a4f92a5, Knopf
+`MOSAIC_MOON_ORDER_SEARCH_SCALE`, Tore par.11 offen). C1 (echte Terminierung am Rundenende) nur,
+wenn C3 `changed` deutlich ueber 0,62 hebt UND das A/B traegt (par.11 Tor 3) -- sonst ist mehr
+Horizont nicht die Antwort.
+
+### 12.5 Reihenfolge, zusammengefasst
+
+1. **12.3 Zugriffs-Bilanz** (Sekunden) und **12.1 Korpus-Sonde** (Minuten) -- beide ohne Bau am
+   Spiel, beide entscheiden, ob 2 und 3 lohnen.
+2. **C3-Tore und A/B** (par.11, laeuft im Fahrplan als 32a).
+3. **`v29-b05`** (Gewicht 0, sofort) und **`v29-b04`** (B1, nach Korpus-Sonde ueber 10 Prozent) -- beide
+   ENTSCHIEDEN 2026-09-15 (12.1).
+4. **B2** mit der v30-Erzeugung (Variante 2 oder C3 in der Erzeugung, Nutzer-Entscheid ueber die
+   Kosten).
+5. **A** nur nach Nutzer-Entscheid ueber den Rahmen, gebuendelt mit `dome_return_order` R3.
