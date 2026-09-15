@@ -349,7 +349,7 @@ Minuten je Modell, nie neben einer Arena.
 3. **Reste aus v28**, falls dort nicht mehr gefahren: Startkuppel-Sonde Stufe 0 (am v28- ODER
    v29-Korpus, gleiches Instrument), ~~Ueberraschungs-Kante v24-b05 gegen v24-b04~~ (in v28
    gefahren 2026-09-12: 97:103, SPRT H0, `policy_surprise_weighting` par.12 ENTSCHIEDEN),
-   `round_estimate_leaf_term` als Such-Knopf am Champion-Stand (Knopf seit 2026-09-12 im Wheel). Jeder davon ist ein
+   ~~`round_estimate_leaf_term` als Such-Knopf am Champion-Stand~~ (gefahren 2026-09-15: beide Dosen schaden hochsignifikant, Prereg ENTSCHIEDEN, par.7c/7d dort). Jeder davon ist ein
    Engine-Knopf oder eine Sonde ohne Training; sie laufen NIE neben einer Arena.
 4. **Aus der Audit-Querlesung 2026-09-11 (Nutzer: "2 bis 4 als Sonden und Knoepfe im
    Begleitprogramm, 5 und 6 nach Maschinenlage"), alle ohne Training, keine neben einer Arena:**
@@ -377,8 +377,9 @@ Minuten je Modell, nie neben einer Arena.
    - **Rueckgabe-Reihenfolge der Kuppelplatten** (`PREREG_dome_return_order.md`, Nutzer
      2026-09-12: legaler Zug, den das Netz nicht nutzt): Such-Knopf `return_order_mode` (netzbewertet),
      A/B ueber den Referee nach der Promotion; wird er Default, gilt er fuer die v29-Erzeugung.
-   - **Nach Maschinenlage**: `round_estimate_leaf_term` (Skala (a) 3/8/10/12, Bau nach par.3
-     dort; sitzt schon als v28-Schritt 7) und die Netz-Loeser-Arme aus `PREREG_r5_solver_split.md`
+   - **Nach Maschinenlage**: ~~`round_estimate_leaf_term`~~ (ERLEDIGT 2026-09-15, negativ:
+     Kostentor bestanden, aber beide Dosen schaden -- par.7c/7d dort) und die Netz-Loeser-Arme
+     aus `PREREG_r5_solver_split.md`
      par.4 (Knotenbudget netzseitig, Policy-Sortierung, Korrekturterm; 200 Knoten treffen das
      Orakel zu 81,4 Prozent, 4.000 zu 84,8; der Anker ist eingefroren und davon unberuehrt).
 5. **Prereg-Bestand**: Ziel bleibt rund 7 OFFEN. Mit v28 schliessen `rust_data_layer` (Teil A
