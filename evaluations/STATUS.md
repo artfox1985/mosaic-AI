@@ -277,7 +277,7 @@ Bauform und mit diesem Budget traegt nicht.** par.9d hatte vorab festgelegt, das
 Nullbefund hier ein Implementierungs-Verdacht ist; **vier der fuenf Pruefpunkte sind
 ausgeraeumt** (Perspektive, Verdrahtung bis in den Arena-Pfad, Vollstaendigkeit der Varianten,
 und die Ausloesung per Deckungsgleichheit: das Tor prueft exakt die Bedingung, die par.9b mit
-24,34 je Partie gezaehlt hat). Offen bleibt allein das **Budget** (256 Sims je Variante =
+12,20 je Partie gezaehlt wird -- par.9i, im Code; die frueheren 24,34 aus den Logs waren eine Ueberzaehlung, weil die Log-Zeile ein ZUSTAND ist und kein Ereignis). Offen bleibt allein das **Budget** (256 Sims je Variante =
 Wurzelbreite 16).
 
 **Die eigentlich offene Frage hat par.9d gar nicht gestellt:** nicht wie oft die Nachsuche

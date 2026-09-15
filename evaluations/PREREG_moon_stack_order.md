@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund: Fan-out 193:207, Nachsuche 197:203, je 200 Paare ohne Frueh-Stopp, keine der sechs Kennzahlen ueber der Aufloesung. Die Gegenhypothese "Reihenfolge egal" bleibt widerlegt (nur der oberste Stein je Stapel ist ziehbar). Der Implementierungs-Verdacht par.9d ist in 4 von 5 Punkten ausgeraeumt (Ausloesung per Deckungsgleichheit der Torbedingung), offen bleibt das Budget; die eigentliche Frage ist, wie oft die Nachsuche ANDERS waehlt -- Diagnose-Zeile gebaut (par.9g, Wheel steht aus). Weg C und B als Fahrplan 32a/32b (par.10a). -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund: 193:207 und 197:203, je 200 Paare ohne Frueh-Stopp. **par.9i GEMESSEN: die Nachsuche waehlt in 62 Prozent der Faelle ANDERS als kanonisch und aendert am Ausgang trotzdem nichts** -- der Prior ist nicht die Erklaerung, Weg C (Horizont) bleibt. Dabei par.9b korrigiert: 12,20 Entscheidungen je Partie statt 24,34, weil die Log-Zeile ein ZUSTAND ist und kein Ereignis. Weg C und B als Fahrplan 32a/32b (par.10a). -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -525,6 +525,14 @@ Partien**, 637.304 Mondstapel-Ereignisse), ohne neue Partien:
 **Echte Wahl (mindestens zwei eindeutige Reihenfolgen): 24,34 je Partie.**
 **Zusatz-Sims je Partie bei Budget 256: rund 18.350.**
 
+> **UEBERHOLT 2026-09-15 (par.9i): beide Zahlen sind rund doppelt so hoch wie die Wirklichkeit.**
+> Sie stammen aus den Spiel-Logs, und die Zeile `🌙 Fx Mond-Stapel: ...` ist eine
+> ZUSTANDSANZEIGE aller Stapel einer Fabrik (`format_moon_stacks`), keine Ereignisliste --
+> derselbe Stapel wird bei jedem weiteren Zug aus derselben Fabrik erneut gelistet. Der Zaehler
+> IM CODE sagt **12,20 Entscheidungen je Partie** und rund **9.200** Zusatz-Sims. Die Tabelle
+> unten bleibt als Beleg fuer die VERTEILUNG der Stapelgroessen gueltig; ihre absoluten Raten je
+> Partie sind es nicht.
+
 **KORREKTUR EINES ZAEHLFEHLERS (Nutzer 2026-09-14: "kann ich mir dennoch nicht vorstellen. dass
 wir nie einen dreier stapel hatten").** Eine erste Auswertung meldete "in 400 Partien nie ein
 Stapel groesser als zwei" und hielt das fuer einen Befund ueber das Spiel. **Es war ein
@@ -541,7 +549,8 @@ hat den Fehler aufgedeckt.
 
 **Damit ist par.2s Zahl ersetzt.** Dort standen "19,9 Ziele je Partie", gemessen mit der
 Grundmenge Rest >= 1 (`self_play.rs:1296`); der Verbraucher (das Tor der Nachsuche) verlangt
-mindestens zwei eindeutige Reihenfolgen. Die richtige Zahl ist **24,34 je Partie**, Grundmenge
+mindestens zwei eindeutige Reihenfolgen. Die damals ermittelte Zahl war **24,34 je Partie**
+(seit par.9i als Ueberzaehlung erkannt, richtig sind 12,20), Grundmenge
 Mondstapel-Ereignisse mit echter Wahlmoeglichkeit, Einheit Ereignisse, n = 12.907 Partien.
 
 **Erwartete Mehrkosten:** rund **18.350 Zusatz-Sims je Partie** bei Budget 256. Gegen rund
@@ -620,6 +629,7 @@ Verdikt.** Dann sind vor jeder inhaltlichen Deutung diese Stellen zu pruefen:
    Gegnerzug (den frisch oben liegenden Stein nehmen) nicht unter den 16 Kandidaten ist, sieht
    die Nachsuche den Unterschied nicht, den sie messen soll.
 5. **Ist die Stelle ueberhaupt erreicht worden?** Die Diagnostik aus par.9b sagt 24,34
+   (seit par.9i korrigiert auf 12,20)
    Gelegenheiten je Partie; wenn im Artefakt weniger Nachsuchen auftauchen, greift das Tor
    seltener als gedacht.
 
@@ -696,7 +706,8 @@ und sie fuehren zu entgegengesetzten Entscheidungen:
 | `changed` nahe 0 | die Nachsuche bestaetigt fast immer den Bestand | der Horizont ist NICHT der Engpass -- **Weg C faellt**, und mit ihm Fahrplan 32a |
 | `changed` hoch, Ergebnis flach | sie waehlt oft anders, es aendert den Ausgang nicht | Weg C bleibt die naechste Frage (reicht die Weitsicht der Nachsuche nicht?) |
 
-par.9b hat bereits gemessen, dass die GELEGENHEIT haeufig ist (24,34 echte Wahlen je Partie,
+par.9b hat bereits gemessen, dass die GELEGENHEIT haeufig ist (dort 24,34 echte Wahlen je
+Partie, seit par.9i auf 12,20 korrigiert,
 n = 12.907 Partien). Offen ist die zweite Haelfte: was die Nachsuche aus der Gelegenheit macht.
 
 **Bauform.** Zwei thread-lokale Zaehler in `net_mcts.rs` (`MOON_ORDER_DIAG`: Ausloesungen,
@@ -794,7 +805,8 @@ fuenf Punkte, am Code geprueft 2026-09-15:
    `TakeSource::SmallFactorySun && moon_order.len() >= 2 && unique_moon_orders(..).len() >= 2`
    (`moon_order_post_search_applies`), und `choose_moon_order_with` prueft dieselbe Bedingung
    noch einmal. par.9b hat GENAU diese Menge gezaehlt -- "mindestens zwei eindeutige
-   Reihenfolgen", 24,34 je Partie. Die Frage "wird die Stelle erreicht" ist damit beantwortet,
+   Reihenfolgen", dort 24,34 je Partie (seit par.9i auf 12,20 korrigiert -- die Log-Methode
+   zaehlte Zustaende mehrfach). Die Frage "wird die Stelle erreicht" ist damit beantwortet,
    ohne dass eine Logzeile noetig waere: das Tor kann nicht seltener oeffnen als die Bedingung
    zutrifft. **Uebertragen, nicht beobachtet:** par.9b zaehlte auf 12.907 Self-Play-Partien bei
    anderen Sims und anderer Spec; die Rate DIESES Laufs kann davon abweichen, die Bedingung
@@ -833,6 +845,69 @@ Plattenpunkte leicht fuer sie sprechen. Das ist derselbe Einwand, den par.9e geg
 erhebt und den der Nutzer gegen die Bauform erhoben hat (*"da brauchst schon ein wenig
 weitsicht. zumindest rundensicht."*). **Als Beleg taugt es nicht** (1,8 SE auf einer Groesse,
 die ueber Seeds stark streut); als Reihenfolge-Argument fuer C vor B vor A taugt es.
+
+## par.9i DIAGNOSE GEMESSEN (2026-09-15): 12,20 Entscheidungen je Partie, und par.9bs 24,34 ist eine UEBERZAEHLUNG
+
+**Lauf** `moon_order_diagnostics_s20261110.json`: 10 Paare / 20 Partien, BEIDE Seiten
+`v28-b02` @400 mit `moon_order_post2` (Nachsuche aktiv), `--log-games`, 298,6 s.
+
+| Groesse (n = 20 Partien, beide Seiten, Zaehler aus par.9g) | Wert |
+| --- | --- |
+| **Ausloesungen der Nachsuche je Partie** | **12,20** |
+| davon ANDERE als die kanonische Wahl (`changed`) | **0,623** |
+
+**Die zweite Zahl beantwortet die Frage aus par.9g, und zwar im zweiten Zweig:** die Nachsuche
+waehlt in fast zwei Dritteln der Faelle eine ANDERE Reihenfolge als der Bestand -- und aendert
+am Ausgang trotzdem nichts (par.9h, 197:203). **Der Prior ist also nicht die Erklaerung.** Weg C
+(Horizont) und Weg A (Entscheidungsform) bleiben lebend, Weg B verliert an Dringlichkeit.
+
+### KORREKTUR an par.9b: die 24,34 zaehlen Zustaende, nicht Ereignisse
+
+par.9b hat "24,34 echte Wahlen je Partie" aus den `--log-games`-Artefakten gezaehlt. **Diese
+Zahl ist zu hoch, und der Grund sitzt im Logformat.** Die Zeile
+
+    🌙 F2 Mond-Stapel: (gelb, tuerkis→gelb)
+
+entsteht bei jedem Sonnenzug aus einer kleinen Fabrik mit Rest (`execution.rs:147-159`), und
+ihr Inhalt kommt aus `format_moon_stacks(&state.factories[fidx])` -- das formatiert **ALLE
+Mond-Stapel dieser Fabrik in ihrem AKTUELLEN Zustand**, nicht den einen gerade gelegten. Die
+Zeile ist eine ZUSTANDSANZEIGE. Derselbe Stapel erscheint bei jedem weiteren Zug aus derselben
+Fabrik erneut; im Log stehen direkt hintereinander `F4 ... (rot→tuerkis)`, spaeter `F4 ...
+(rot)` und `F3 ... leer`.
+
+**Wer diese Zeilen als Ereignisse zaehlt, zaehlt Stapel mehrfach.** Nachgerechnet an denselben
+20 Partien: die Log-Methode liefert 23,20 "Wahl-Ereignisse" je Partie -- nahe an par.9bs 24,34,
+weil BEIDE dieselbe fehlerhafte Methode benutzen -- waehrend der Zaehler IM CODE, der je
+tatsaechlicher Entscheidung einmal hochzaehlt, 12,20 sagt. **Faktor 1,90.**
+
+**Die richtige Zahl ist 12,20** (n = 20 Partien, Grundmenge Ausloesungen der Nachsuche je Partie
+ueber BEIDE Seiten, Einheit Entscheidungen; gezaehlt an der Wahlstelle in
+`moon_order_post_search`, nicht im Log).
+
+**Folge fuer die Kostenrechnung:** par.9b schaetzte rund 18.350 Zusatz-Sims je Partie bei
+Budget 256 aus 24,34 Gelegenheiten. Mit 12,20 sind es rund **9.200** -- etwa +29 Prozent
+gegenueber @400 statt +57. Das passt zur gemessenen Wanduhr: der Diagnoselauf mit beidseitiger
+Nachsuche kostet 14,93 s je Partie gegen 12,29 s ohne (`k4_kosten_ohne_s20261093`), also
+**+21,5 Prozent**. Die alte Schaetzung lag um denselben Faktor daneben wie die Zaehlung.
+
+### Eine verworfene Hypothese, offen dokumentiert
+
+Aus der Differenz 23,20 gegen 12,20 hatte ich zunaechst geschlossen, die Nachsuche erreiche nur
+52,6 Prozent der Gelegenheiten, weil sie in `net_drafting_policy` sitzt -- also an EINEM der
+drei Zweige von `NetSelfPlayAgent::decide` (self_play.rs:3458-3464: Ein-Aktions-Kurzschluss,
+Vorzugs-Handregel, Gumbel-Suche). Die Hypothese war aus dem Code HERGELEITET, nicht gemessen.
+
+**Sie ist widerlegt.** Der Gegentest: die Nachsuche zusaetzlich in den beiden anderen Zweigen
+aufrufen, dann dieselbe Serie mit demselben Seed. Ergebnis **bitgleich** -- Ausloesungen 12,20,
+`changed` 0,6230, Deckung unveraendert. Der Umbau ist deshalb zurueckgenommen worden: eine
+Aenderung im Suchpfad, die nachweislich nichts bewirkt, ist Ballast mit falscher Begruendung.
+(Anker-Drift war waehrend des Versuchs gruen, der Kontrakt-Hash unveraendert; der Eingriff war
+also harmlos, nur nutzlos.)
+
+**Lehre, dieselbe wie bei der Dreierstapel-Korrektur in par.9b:** eine Log-Zeile sagt, WAS sie
+formatiert, nicht was man in ihr zaehlen moechte. Vor jeder Zaehlung ueber Logs gehoert die
+formatierende Codestelle gelesen -- hier haette `format_moon_stacks` die Frage in einer Minute
+beantwortet.
 
 ## par.10 ARCHITEKTUR-HEBEL jenseits der Sim-Zahl (Nutzer-Auftrag 2026-09-14, VOR dem Bau)
 
@@ -957,7 +1032,8 @@ Variante B des Rundenuebergangs.
 
 **Die Voraussetzung oben ist damit aufgeloest, und zwar in den Zweig "warum wirkt nichts".**
 Wichtig fuer die Diagnose ist, dass Seltenheit als Erklaerung AUSSCHEIDET: die Nachsuche greift
-laut par.9b **24,34-mal je Partie** (n = 12.907 Partien, Grundmenge Mondstapel-Ereignisse mit
+**12,20-mal je Partie** (par.9i, im Code gezaehlt; par.9bs 24,34 aus den Logs war eine
+Ueberzaehlung, n = 12.907 Partien, Grundmenge Mondstapel-Ereignisse mit
 mindestens zwei eindeutigen Reihenfolgen, Einheit Ereignisse). Sie laeuft oft und aendert am
 Ausgang nichts. Das unterscheidet Stufe 3 von Stufe 1, wo Seltenheit noch eine offene
 Erklaerung war, und es laesst genau drei Kandidaten uebrig: Horizont (C), Prior (B),
