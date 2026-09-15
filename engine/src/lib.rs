@@ -847,6 +847,7 @@ fn engine_config_json() -> String {
         // Wert 2 waere sonst nachtraeglich nicht von einem anderen Budget zu
         // unterscheiden.
         "moon_order_search_sims": crate::net_mcts::SearchConfig::from_env().moon_order_search_sims,
+        "moon_order_search_scale": crate::net_mcts::SearchConfig::from_env().moon_order_search_scale,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,
