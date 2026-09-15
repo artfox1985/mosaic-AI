@@ -1048,3 +1048,62 @@ Sinne von CLAUDE.md. Sie starten erst, wenn die Messkette der Nacht durch ist.
 (`feedback_measured_identity_gets_own_bxx`); die Reservierung steht in
 `docs/generation_naming.md`.
 
+## par.11 WEG C VORREGISTRIERT (2026-09-15, VOR dem Bau): Terminierung statt Sim-Zahl
+
+**Fahrplan 32a.** Nutzer-Auftrag 2026-09-14: *"da brauchst schon ein wenig weitsicht.
+zumindest rundensicht."* Ausloeser ist par.9i: die Nachsuche waehlt in **62 Prozent** der Faelle
+ANDERS als kanonisch und aendert am Ausgang trotzdem nichts. Der Prior ordnet also nicht schon
+richtig vor -- die Nachsuche trifft eine echte, andere Wahl, die sich nicht auszahlt. Zwei
+Erklaerungen bleiben: ihr HORIZONT ist zu kurz (Weg C) oder ihre Entscheidungsform ist falsch
+(Weg A).
+
+**Bestand:** je Variante ein `build_net_tree` ueber den Folgezustand mit festem Budget
+(`moon_order_search_sims`, Default 256), Kennzahl `v_mix` an dessen Wurzel, gewaehlt wird das
+Minimum (net_mcts.rs `choose_moon_order_with`/`moon_order_post_search`). Der Baum sieht also
+rund 256 Simulationen weit -- unabhaengig davon, ob die Runde noch 20 Zuege hat oder 2.
+
+### Drei Bauformen, und eine davon ist eine Falle
+
+**C1 -- echte Tiefe bis zum Rundenende.** Der Baum laeuft, bis seine Blaetter das Rundenende
+erreichen, statt bis zu einer Sim-Zahl. Das ist die woertliche Umsetzung von "Rundensicht".
+*Preis:* stellungsabhaengig und im schlimmsten Fall enorm -- frueh in der Runde steht eine
+Verzweigung ueber viele Zuege, spaet ist es fast gratis. Ein Kostentor ist hier PFLICHT.
+
+**C2 -- Rundenloeser als Bewerter.** Statt `v_mix` des Baums den exakten
+`tiling_solver::solve_round_final_score` des Folgezustands nehmen. *Billig, rundensichtig --
+und eine FALLE.* Genau diese Bauform ist in der Nacht zum 2026-09-15 an K4 gescheitert
+(`PREREG_round_estimate_leaf_term.md` par.7c/7d): ein Term, der den RUNDENSCORE an die
+Bewertung haengt, macht die Suche rundenscore-gierig. Gemessen: Strafleiste runter, volle Zeilen
+hoch, Spalten (-0,84) und Spezialfelder (-0,59) eingebrochen, unter dem Strich 8 bis 14 Punkte
+je Partie VERLOREN. **C2 wird nicht gebaut.** Wer Rundensicht will, darf sie nicht mit
+Rundenscore-Optimierung verwechseln -- der Value-Kopf schaetzt den PARTIEausgang, und genau das
+soll er behalten.
+
+**C3 -- Budget an die Restlaenge koppeln.** `sims` je Variante proportional zur Zahl der noch
+offenen Zuege der Runde. Das ist keine Terminierung, sondern adaptives Budget: es verschiebt
+Rechenzeit dorthin, wo noch etwas passiert. Billiger als C1, ohne C2s Zielverschiebung.
+
+**Empfehlung: C3 zuerst, C1 nur wenn C3 traegt.** Begruendung: C3 testet dieselbe These
+("mehr Weitsicht hilft") mit einem Bruchteil des Aufwands und ohne Terminierungslogik im
+Suchpfad. Traegt C3 nicht, ist auch C1 unwahrscheinlich -- traegt es, lohnt C1 als Ausbau.
+
+### Tore (bindend, VOR dem A/B)
+
+1. **Bitidentitaet bei aus:** `moon_order_variants != 2` unveraendert, kein Netzaufruf, keine
+   Zahl aus dem Suchstrom. Beleg: Anker-Drift gruen plus Kontrakt-Hash unveraendert.
+2. **Kostentor, Schwelle 25 Prozent** (Muster K4 par.5 Punkt 3): Wanduhr je Partie mit gegen
+   ohne, zwei Laeufe mit identischen Specs je Seite. Ein gerissenes Tor beendet den Arm.
+   Bezugswert ist die heutige Nachsuche (14,93 s je Partie beidseitig, par.9i), NICHT die
+   Basislinie ohne Nachsuche.
+3. **Diagnose:** `changed` und `applied` aus par.9g muessen weiterhin fallen; steigt `changed`
+   deutlich ueber 0,62, waehlt die Nachsuche mit mehr Horizont ANDERS als vorher -- das ist die
+   Voraussetzung dafuer, dass ueberhaupt ein Staerkeeffekt moeglich ist. Bleibt `changed`
+   gleich, hat der Horizont die Wahl nicht veraendert und der Arm ist ohne A/B beendet.
+
+### Lesart vorab
+
+Traegt C3 gepaart ueber der Aufloesung (200 Paare, Blockgroesse 5, kein Frueh-Stopp), ist der
+Horizont die Ursache und Weg A wird nicht gebraucht. Traegt es nicht UND `changed` hat sich
+bewegt, bleibt allein Weg A (eigener Entscheidungsknoten) -- dann ist die Entscheidungsform das
+Problem, nicht die Information. Traegt es nicht und `changed` bleibt gleich, ist der Knopf
+wirkungslos gebaut und Tor 3 hat das schon vor dem A/B gesagt.

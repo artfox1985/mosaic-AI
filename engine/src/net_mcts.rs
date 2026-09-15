@@ -422,6 +422,75 @@ pub const MOON_ORDER_SEARCH_SIMS_DEFAULT: u32 = 256;
 /// Nicht parsbar oder leer -> Default plus einmalige Warnung; kein Panik-Pfad
 /// (gleiche Disziplin wie [`read_moon_order_variants_env`]). KEIN `OnceLock`,
 /// aus demselben Grund: der Wert ist ein Spec-Feld JE SEITE.
+/// Rundenfenster-Skalierung der Nachsuche (`PREREG_moon_stack_order.md` par.11,
+/// Weg C3): `0` = aus (Bestand, bitidentisch), `1` = an.
+///
+/// **Was sie tut:** das Budget je Variante wird mit der RESTLAENGE der Runde
+/// gewichtet statt fest zu bleiben -- frueh in der Runde, wo noch viel
+/// passiert, rechnet die Nachsuche laenger; kurz vor dem Rundenende kuerzer.
+/// Der Faktor ist `0,5 + r / KAPAZITAET` (siehe [`moon_order_scale_factor`]),
+/// liegt also zwischen 0,5 und 1,5 und ist im Mittel rund 1 -- das A/B misst
+/// damit die VERTEILUNG der Rechenzeit, nicht ihre Menge.
+///
+/// **Warum nicht der Rundenloeser als Bewerter** (die naheliegende Form von
+/// "Rundensicht"): genau das ist in der Nacht zum 2026-09-15 an K4 gescheitert
+/// (`PREREG_round_estimate_leaf_term.md` par.7c/7d) -- ein Term, der den
+/// RUNDENSCORE an die Bewertung haengt, macht die Suche rundenscore-gierig und
+/// verliert Spalten und Spezialfelder. Der Value-Kopf schaetzt den
+/// PARTIEausgang, und das soll er behalten.
+pub const MOON_ORDER_SEARCH_SCALE_DEFAULT: u32 = 0;
+
+/// Steine, die zu Rundenbeginn im Spiel sind: 4 kleine Fabriken a 4 plus die
+/// grosse Fabrik mit 5 (`state.rs` NUM_SMALL_FACTORIES / TILES_PER_*). Das ist
+/// eine KONSTRUKTIONS-Groesse, kein gemessener Wert -- CLAUDE.md verbietet,
+/// eine Konstante auf einer unvollstaendigen Messreihe zu verankern.
+pub(crate) const MOON_ORDER_ROUND_CAPACITY: usize = crate::state::NUM_SMALL_FACTORIES
+    * crate::state::TILES_PER_SMALL_FACTORY
+    + crate::state::TILES_PER_LARGE_FACTORY;
+
+/// Noch nehmbare Steine in allen Quellen -- das Mass fuer "wie lang ist die
+/// Runde noch". Zaehlt Sonnen- UND Mondsteine, weil beide Zuege ermoeglichen.
+pub(crate) fn moon_order_round_remaining(state: &GameState) -> usize {
+    let klein: usize = state
+        .factories
+        .iter()
+        .map(|f| f.sun_tiles.len() + f.moon_stacks.iter().map(|s| s.len()).sum::<usize>())
+        .sum();
+    klein + state.large_factory.sun_tiles.len() + state.large_factory.moon_pool.len()
+}
+
+/// Skalenfaktor `0,5 + r / KAPAZITAET`, geklammert auf `[0,5; 1,5]`.
+///
+/// Die Klammerung oben ist noetig, weil die grosse Fabrik ueber die Runde
+/// Reste aufnimmt und `r` dadurch die Anfangskapazitaet ueberschreiten kann.
+pub(crate) fn moon_order_scale_factor(state: &GameState) -> f64 {
+    let r = moon_order_round_remaining(state) as f64;
+    (0.5 + r / MOON_ORDER_ROUND_CAPACITY as f64).clamp(0.5, 1.5)
+}
+
+/// `MOSAIC_MOON_ORDER_SEARCH_SCALE` (par.11). Ungueltig -> Default plus
+/// einmalige Warnung, gleiche Disziplin wie die Nachbarn.
+pub(crate) fn read_moon_order_search_scale_env() -> u32 {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_MOON_ORDER_SEARCH_SCALE") else {
+        return MOON_ORDER_SEARCH_SCALE_DEFAULT;
+    };
+    if raw.trim().is_empty() {
+        return MOON_ORDER_SEARCH_SCALE_DEFAULT;
+    }
+    match raw.trim().parse::<u32>() {
+        Ok(v) if v <= 1 => v,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "⚠️  MOSAIC_MOON_ORDER_SEARCH_SCALE={raw:?} ungueltig (0 oder 1) --                      {MOON_ORDER_SEARCH_SCALE_DEFAULT} gilt."
+                );
+            });
+            MOON_ORDER_SEARCH_SCALE_DEFAULT
+        }
+    }
+}
+
 pub(crate) fn read_moon_order_search_sims_env() -> u32 {
     static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     let Ok(raw) = std::env::var("MOSAIC_MOON_ORDER_SEARCH_SIMS") else {
@@ -825,6 +894,9 @@ pub struct SearchConfig {
     /// [`MOON_ORDER_SEARCH_SIMS_DEFAULT`]), Env-Default
     /// `MOSAIC_MOON_ORDER_SEARCH_SIMS`.
     pub moon_order_search_sims: u32,
+    /// par.11 Weg C3: Budget der Nachsuche mit der Rundenrestlaenge gewichten
+    /// (0 = aus/Bestand, 1 = an). Siehe [`moon_order_scale_factor`].
+    pub moon_order_search_scale: u32,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -931,6 +1003,7 @@ impl SearchConfig {
             start_by_search: read_start_by_search_env(),
             moon_order_variants: read_moon_order_variants_env(),
             moon_order_search_sims: read_moon_order_search_sims_env(),
+            moon_order_search_scale: read_moon_order_search_scale_env(),
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -986,6 +1059,7 @@ impl SearchConfig {
             "start_by_search",
             "moon_order_variants",
             "moon_order_search_sims",
+            "moon_order_search_scale",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -1249,6 +1323,22 @@ impl SearchConfig {
                 x as u32
             }
         };
+        // par.11 Weg C3: OPTIONAL mit Default 0, damit jede eingefrorene Spec
+        // weiter laedt UND weiter dasselbe tut.
+        let moon_order_search_scale = match obj.get("moon_order_search_scale") {
+            None => MOON_ORDER_SEARCH_SCALE_DEFAULT,
+            Some(v) => {
+                let x = v.as_f64().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'moon_order_search_scale' ist keine Zahl")
+                })?;
+                if x.fract() != 0.0 || !(0.0..=1.0).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'moon_order_search_scale' muss 0 oder 1 sein, ist {x}"
+                    ));
+                }
+                x as u32
+            }
+        };
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -1385,6 +1475,7 @@ impl SearchConfig {
             start_by_search,
             moon_order_variants,
             moon_order_search_sims,
+            moon_order_search_scale,
             heuristic_variant,
             sims,
             root_noise,
@@ -5691,7 +5782,16 @@ pub(crate) fn moon_order_post_search<R: Rng + ?Sized>(
     if !moon_order_post_search_applies(search_config, action.as_ref()) {
         return action;
     }
-    let sims = search_config.moon_order_search_sims;
+    // par.11 Weg C3: bei `moon_order_search_scale == 1` wird das Budget mit der
+    // Rundenrestlaenge gewichtet (Faktor 0,5 bis 1,5, im Mittel rund 1) --
+    // frueh in der Runde laenger rechnen, kurz vor Schluss kuerzer. Bei 0 ist
+    // es exakt der Bestandswert, kein Aufruf, bitidentisch.
+    let sims = if search_config.moon_order_search_scale == 1 {
+        ((search_config.moon_order_search_sims as f64 * moon_order_scale_factor(state)).round())
+            .max(1.0) as u32
+    } else {
+        search_config.moon_order_search_sims
+    };
     let m = match action.as_ref() {
         Some(Action::Stone(m)) => m.clone(),
         // Vom Tor bereits ausgeschlossen -- der Zweig ist unerreichbar und
@@ -8192,6 +8292,7 @@ mod tests {
             // steht hier trotzdem, damit der Helfer die Umgebung nicht
             // braucht.
             moon_order_search_sims: MOON_ORDER_SEARCH_SIMS_DEFAULT,
+            moon_order_search_scale: MOON_ORDER_SEARCH_SCALE_DEFAULT,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in
@@ -8902,6 +9003,36 @@ mod tests {
         let mut single = m;
         single.take.moon_order.truncate(1);
         assert!(!moon_order_post_search_applies(&cfg2, Some(&Action::Stone(single))));
+    }
+
+    /// par.11 Weg C3: der Skalenfaktor faellt mit der Restlaenge der Runde und
+    /// ist an beiden Raendern geklammert.
+    ///
+    /// Getestet wird die reine Rechnung, nicht die Suche: `0,5 + r/21` auf
+    /// `[0,5; 1,5]`. Die obere Klammer ist keine Kosmetik -- die grosse Fabrik
+    /// nimmt ueber die Runde Reste auf, `r` kann die Anfangskapazitaet also
+    /// ueberschreiten.
+    #[test]
+    fn moon_order_scale_factor_falls_with_the_round_and_is_clamped() {
+        let f = |r: usize| (0.5 + r as f64 / MOON_ORDER_ROUND_CAPACITY as f64).clamp(0.5, 1.5);
+        assert_eq!(MOON_ORDER_ROUND_CAPACITY, 21, "4 x 4 + 5 laut state.rs");
+        // Rundenbeginn: volle Kapazitaet -> Faktor 1,5 (Obergrenze exakt erreicht).
+        assert!((f(21) - 1.5).abs() < 1e-12);
+        // Rundenende: nichts mehr da -> Untergrenze.
+        assert!((f(0) - 0.5).abs() < 1e-12);
+        // Monoton fallend ueber die Runde.
+        let mut vorher = f(21);
+        for r in (0..21).rev() {
+            let jetzt = f(r);
+            assert!(jetzt <= vorher, "Faktor muss mit r fallen: r={r}");
+            vorher = jetzt;
+        }
+        // Ueber der Kapazitaet (Reste in der grossen Fabrik) bleibt es bei 1,5.
+        assert!((f(40) - 1.5).abs() < 1e-12);
+        // Mittelwert ueber die Runde liegt nahe 1 -- das ist die Zusage, dass
+        // der A/B die VERTEILUNG misst und nicht die MENGE der Rechenzeit.
+        let mittel: f64 = (0..=21).map(f).sum::<f64>() / 22.0;
+        assert!((mittel - 1.0).abs() < 0.03, "Mittelwert {mittel} zu weit von 1");
     }
 
     /// par.9g: der Diagnose-Zaehler wird beim Auslesen ZURUECKGESETZT.

@@ -507,18 +507,24 @@ eingetaktet, keine ist liegengeblieben:
 | `special_tile_yield` | Ablations-Schalter und Arm v29-b02 |
 | `difficulty_levels` | Bau waehrend der Erzeugung, Kanten nach Tor 1 |
 | `claude_play_interface` | Partien g08-g10, Zugklassen-Differential |
-| `corpus_behaviour_audit` | Werkzeug ungebaut, Korpuslauf danach |
 | `moon_stack_order` | Knopf bauen, A/B am Champion |
-| `dome_return_order` | A/B Modus 1 gegen 0 ueber den Referee |
-| ~~`round_estimate_leaf_term`~~ | **ENTSCHIEDEN 2026-09-15**: Kostentor bestanden (+4,3 Prozent), aber beide Dosen schaden hochsignifikant (par.7c/7d). Fahrplan 31/32 gegenstandslos. Offen nur noch als VORSCHLAG: Rundenprofil wie K3 |
+| `dome_return_order` | Bau-Tor gruen (2026-09-15); offen ist der Korpus mit Streuung, mit der naechsten Erzeugung |
 | `round_transition_search_sampling` | Variante B bauen (rund ein Tag), Sichttor, Kostentor, A/B |
 | `code_cleanup_closeout` | Stufen 2 und 3, nach der v30-Promotion |
 
 Die Zahl liegt ueber dem Ziel, weil das v29-Begleitprogramm bewusst breit ist. Seit dem
-2026-09-13 sind zwei gefallen: `dome_return_order` und `round_estimate_leaf_term` (beide
-2026-09-15). `moon_stack_order` hat zwei von drei Stufen gemessen (par.7, par.9h), bleibt aber
-offen, solange die Architektur-Hebel 32a/32b nicht entschieden sind. Mit
+2026-09-13 sind zwei gefallen: **`corpus_behaviour_audit`** (Korpuslauf durch, 2026-09-14) und
+**`round_estimate_leaf_term`** (2026-09-15). `moon_stack_order` hat zwei von drei Stufen
+gemessen (par.7, par.9h), bleibt aber offen, solange die Architektur-Hebel 32a/32b nicht
+entschieden sind; `dome_return_order` bleibt ebenfalls offen -- sein Bau-Tor ist seit dem
+2026-09-15 gruen, aber der Korpus mit Streuung kommt erst mit der naechsten Erzeugung. Mit
 `round_transition_search_sampling` waeren es dann die angestrebten sieben.
+
+> **KORRIGIERT 2026-09-15 (Nutzer-Nachfrage "sind alle im fahrplan genannten preregs aktuell?"):**
+> hier stand, `dome_return_order` sei gefallen. Das war falsch -- sein Kopf sagt OFFEN, und der
+> Koerper nennt eine offene Aufgabe. Gefallen ist stattdessen `corpus_behaviour_audit`, das in
+> der Tabelle darueber noch als offen stand. Beim Nachziehen des Bestands waren zwei Namen
+> genannt worden, ohne die Koepfe zu lesen.
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
