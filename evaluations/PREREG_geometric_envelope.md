@@ -1,4 +1,4 @@
-<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen, par.13 (Nutzer 2026-09-12: Schliesskriterium auf Arena umgestellt). K3-P c 1,0, Huellenform 2, K5 sind Rezeptbestandteil seit v24-b07 (Huellenform 2 gepoolt 391:329, p 0,023, par.8.15e/f); vier Champions in Folge mit Knopf bestehen Tor 1 und Tor 2b; C2 an beiden v28-Armen erfuellt (+0,14 / +0,23 volle Spalten, par.12c). Kanal A (A1/A2) misst gegen ein huellenblindes Orakel und gilt nicht mehr; K3-D und Jokerfeld gebaut, Default 0, ohne Arm. -->
+<!-- STATUS: ENTSCHIEDEN | Frage: Entlastet die geometrische Einhuellende den Value-Kopf und spielt das Netz dadurch stabiler? | Beleg: JA auf den Arena-Groessen, par.13 (Nutzer 2026-09-12: Schliesskriterium auf Arena umgestellt). K3-P c 1,0, Huellenform 2, K5 sind Rezeptbestandteil seit v24-b07 (Huellenform 2 gepoolt 391:329, p 0,023, par.8.15e/f); vier Champions in Folge mit Knopf bestehen Tor 1 und Tor 2b; C2 an beiden v28-Armen erfuellt (+0,14 / +0,23 volle Spalten, par.12c). Kanal A (A1/A2) gilt nicht mehr (huellenblindes Orakel); K3-D und Jokerfeld gebaut, Default 0, ohne Arm. **par.8.6 GESCHLOSSEN (8.6c, 2026-09-15): der Value-Anteil im Tiling (`envelope_tiling_value_w`) traegt nicht** -- zweimal gemessen, an zwei Netzen und zwei Basislinien, vier Arme, 80:80 und 81:79 (p 1,000). -->
 
 # Vorregistrierung: das geometrische Gelaender (Dreiecks-Einhuellende)
 
@@ -1041,6 +1041,57 @@ den `margin_evaluator` (tiling_solver.rs:1648), bei `w_val == 0` nicht. Die Arme
 sind also teurer als die Basislinie; `laufzeit.s_je_partie` aus beiden
 Artefakten gehoert in die Auswertung. Ein Kostentor ist NICHT gesetzt: der Term
 steht nicht zur Rezept-Aufnahme an, solange er nicht traegt.
+
+### 8.6c ERGEBNIS DER WIEDERHOLUNG (2026-09-15): zweiter Nullbefund, der Term ist GESCHLOSSEN
+
+Aufbau wie in 8.6b registriert: `alphazero_v28-b02_brierbest` beidseitig @400 c_puct 1,5,
+Specs aus der Champion-Spec abgeleitet mit genau einem Feld Unterschied, je 80 Paare,
+Blockgroesse 5, SPRT weit (alpha = beta = 0,001), **kein Frueh-Stopp, beide Laeufe bis zum
+Deckel**. a = Knopf, b = aus.
+
+| Groesse | V 0,5 (Seed 20261098) | V 1,0 (Seed 20261099) |
+| --- | --- | --- |
+| Siege | **80 : 80** | **81 : 79** |
+| McNemar p | **1,000** | **1,000** |
+| gepaarte Differenz | +0,000 [-0,171, +0,171] | +0,025 [-0,123, +0,173] |
+| Sweeps a / b, Splits | 6 / 6, 68 | 5 / 4, 71 |
+| eigene Punkte | 51,075 / 51,275 (-0,200) | 53,837 / 54,076 (-0,239) |
+| Marge | -0,200 | -0,239 |
+| volle Spalten (n = 160 / 159 je Seite) | +0,050 (SE 0,061/0,060) | **-0,063** (SE 0,062/0,063) |
+| Spalten >= 4 | -0,006 | +0,050 |
+| Reihen voll | 0,000 | -0,006 |
+| Strafleiste | +0,350 | +0,013 |
+| Spezialfelder | +0,013 | -0,006 |
+| Laufzeit je Partie | 12,548 s (+2,1 Prozent) | 12,725 s (+3,6 Prozent) |
+
+**Keine Groesse ist ueber der Aufloesung, und die vollen Spalten haben in den beiden Dosen
+ENTGEGENGESETZTE Vorzeichen** (+0,050 bei 0,5, -0,063 bei 1,0). Das ist Rauschen, nicht eine
+Wirkung, die mit der Dosis waechst -- der Gegenbeweis zur Struktur, die K4 im selben Zeitraum
+gezeigt hat (dort skalierte der Schaden sauber mit der Dosis, par.7c/7d in
+`PREREG_round_estimate_leaf_term.md`).
+
+**VERDIKT nach der vorab registrierten Lesart aus 8.6b: der Term ist GESCHLOSSEN.** Er ist
+gebaut, steht auf Default 0 und ist jetzt zweimal gemessen -- 2026-09-04 am `v23-b01` gegen eine
+Spec mit `envelope_search_c` 0,0 / Huellenform 1 / Projektion 0 (par.8.6a), und 2026-09-15 am
+`v28-b02` gegen die heutige Champion-Spec (1,0 / 2 / 1 / row6 1,0). Zwei Netze, zwei
+Basislinien, vier Arme, kein Signal. 8.6 ist kein offener Vorschlag mehr.
+
+**Und die Kosten belegen die Begruendung von 8.6a.** Der Term ruft bei `w_val != 0` je
+Tiling-Kandidat den `margin_evaluator`, also das Netz (tiling_solver.rs:1648). Trotzdem kostet
+er nur +2,1 und +3,6 Prozent Wanduhr gegenueber der Basislinie ohne Term (12,286 s je Partie,
+`k4_kosten_ohne_s20261093`). Dazu spielen die Seiten fast identisch: 5 bis 6 Sweeps je Seite
+gegen rund 70 Splits. **Beides sagt dasselbe: es gibt im Tiling kaum Kandidaten mit echter
+Wahl** -- genau das, was 8.6a als Ursache benannt hat (*"Im Tiling ist zu wenig zu entscheiden
+(par.3f: Fast-Gleichstaende), und der Entscheid liegt im Draft"*). (Die Kostenzahl ist ein
+HINWEIS, kein Beleg: die thread-lokale Memoisierung des Loesers kann Aufrufe verbilligen.)
+
+**Was das fuer die Rundenprofil-Frage bedeutet, die diesen Lauf ausgeloest hat:** die Antwort
+auf *"ist der Value-Kopf mit abfallendem Profil drin?"* bleibt die aus 8.6b -- er haengt am
+KOMPLEMENT der Huelle, steigt also ueber die Runden, waehrend die Huelle faellt. Diese Bauform
+ist damit zweimal gemessen und traegt nicht. Sie ist NICHT zu verwechseln mit dem offenen
+Vorschlag bei K4, dem gerade ein Rundenprofil FEHLT (par.7d dort): dort waere das Profil eine
+Daempfung fuer einen Term, der zu stark wirkt -- hier ist der Term zu schwach, um ueberhaupt
+gemessen zu werden.
 
 ### 8.7b K3-P ARENA (2026-09-04, 04:12-07:00; Seed 20261007, 3 Arme x 2 x 80, Blockgroesse 5, gegen Spec aus)
 
