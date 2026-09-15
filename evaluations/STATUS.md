@@ -196,16 +196,25 @@ Vier Fahrplanpunkte sind bearbeitet worden, alle ohne Messung:
 | 23 | Korpus-Verhaltens-Audit | **Werkzeug gebaut, Selbsttest gruen** (18 Handzahlen ueber sechs Claude-Partien exakt). Der Korpuslauf kommt mit v29 |
 | 22 | Schwierigkeitsleiter | Bauplan in drei Punkten berichtigt, **Schritt 1b gebaut UND ABGENOMMEN** (2026-09-14 01:35, neben dem b01-Training): sechs optionale Stilfelder, 641 Tests gruen, Paritaets-Fixture unveraendert -- das vorregistrierte Tor. Nichts installiert. Auch `models/levels/beginner.spec.json` liegt (hv3 @150) |
 
-**UEBERHOLT -- es liegt wieder ungetesteter Rust-Code im Baum** (Stand 2026-09-15 00:30), und
-zwar zweimal, beide Male bewusst und beide Male, weil ein Build Volllast gegen die laufende
-Messkette waere:
+**RUST-STAND 2026-09-15, 05:40: Tests GRUEN, Wheel NICHT gebaut.** Zwei Stuecke sind
+diese Nacht dazugekommen:
 
 * der umgebaute **Streu-Knopf der Rueckgabe** (Schwelle 3, Rundenfenster 1-4, Commit `df4b424`),
 * die **Diagnose-Zeile der Mondstapel-Nachsuche** (`[moon_order] applied=N changed=M`,
   `PREREG_moon_stack_order.md` par.9g, Commit `50772fb`).
 
-Beides faellt an, sobald die Ketten durch sind: `cargo test --release`, Wheel-Bau, Anker-Drift.
-Kein laufender Lauf faehrt diesen Stand -- die Ketten nutzen das INSTALLIERTE Wheel.
+**Abgenommen ist die Testhaelfte:** `cargo test --release` mit **663 Tests gruen, 0 Fehler,
+0 Warnungen**, `examples/` und `benches/` kompilieren mit (die pre-push-Falle greift also
+nicht), der neue Waechter `moon_order_diagnostics_reset_on_read` laeuft durch. Dabei fielen
+zwei eigene Fehler auf und wurden behoben: der Zaehler-Block stand zwischen dem
+Doc-Kommentar von `moon_order_post_search` und der Funktion (Dokumentation verwaist), und ein
+`///` ueber einem `thread_local!`-Makro erzeugte eine Warnung.
+
+**OFFEN und dem Nutzer vorgelegt: Wheel-Bau plus Installation, danach Anker-Drift**
+(`/mosaic-anchor-invariance`, Pflicht nach jeder Engine-Aenderung). Der Austausch der
+installierten Engine ist der einzige Schritt mit Rueckfallrisiko und wurde deshalb nicht
+unbeaufsichtigt gefahren. Erst danach ist die Diagnose-Serie mit `moon_order_variants=2`
+moeglich, die die Zahl `changed` liefert -- und an ihr haengt, ob Fahrplan 32a gebaut wird.
 
 Der Satz, der hier stand (2026-09-14 01:35: auch Schritt 1b ist kompiliert und abgenommen,
 641 Tests gruen). Das gefaehrdet die laufende Nacht nicht: weder `tools/night_v29_chain.sh` noch
