@@ -164,3 +164,5 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-09-15T04:29:37,paired_gating,env_val_10_vs_off_a,env_val_10_vs_off_b,400,160,0.5062,53.875,54.212,8.55,8.512,0.0
 2026-09-15T08:08:37,paired_gating,moondiag_a,moondiag_b,400,20,0.5,48.15,48.15,8.65,8.65,0.0
 2026-09-15T08:22:47,paired_gating,moondiag2_a,moondiag2_b,400,20,0.5,48.15,48.15,8.65,8.65,0.0
+2026-09-15T11:46:48,paired_gating,v29-b05,v29-b03,400,400,0.5375,52.605,52.453,8.0,8.2,0.0
+2026-09-15T13:03:54,paired_gating,v29-b05,v29-b03,400,400,0.53,52.91,50.9,8.297,8.255,0.0

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: Knopf gebaut und im Wheel (par.8a); A/B ohne messbaren Effekt, NICHT verneint (par.10, Henne-Ei bei 0,19 Abweichungen je Partie). Streu-Knopf fuer die Erzeugung gebaut (par.11-11c: Schwelle 3, Runden 1-4, Dosis 0,015), BAU-TOR GRUEN 2026-09-15. **par.12: Architektur konkretisiert -- drei Grenzen am Code (kein Fan-out im Baum, Entscheider ausserhalb der Suche, Encoder sieht die eigene Reihenfolge nur als Typfolge); Reihenfolge R1 Sensitivitaets-Sonde -> Streu-Korpus v30 -> A/B; R3 Knoten im Baum nur gebuendelt mit Mondstapel Weg A.** OFFEN: der Korpus mit Streuung kommt mit der naechsten Erzeugung. -->
+<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: Knopf gebaut (par.8a), A/B ohne Effekt (par.9), Streu-Knopf fuer die Erzeugung gebaut und abgenommen (par.11-11c, Dosis 0,015). **par.12: R1 gemessen -- der Value-Kopf reagiert auf die Typfolge (Median-Spannweite 0,019, 81 Prozent ueber 0,01, n = 300; 12.4); Arena gezaehlt: 0,6 Gelegenheiten je Partie und Seite, Modus 1 weicht in 42 Prozent ab, erwartete Wirkung rund 0,005 je Partie -- der par.9-Nullbefund ist Arithmetik, ein A/B loest den Knopf nicht auf (12.5).** ENTSCHIEDEN 2026-09-15 (12.6): R2 wird gebaut (VOR der v30-Erzeugung, INPUT_SIZE 798, Fahrplan 29c) und Modus 1 ist in der v30-Erzeugung AN (Korrektheit, Kostentor beim Start). OFFEN: Bau und Korpus. -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -59,11 +59,11 @@ unbekannte Praefix aufgebraucht ist; der Gegner sieht nur die Menge.
 
 **Knopf `MOSAIC_RETURN_ORDER_MODE`** (Spec-Feld `return_order_mode`, optional, Default 0):
 
-| Wert | Verhalten |
-| --- | --- |
-| 0 | Bestand: Ziehreihenfolge (bitidentisch, Default) |
-| 1 | **netzbewertet**: fuer jede Permutation der nicht gewaehlten Platten (hoechstens 6) den Folgezustand bilden und aus Sicht des Rueckleger mit dem Value-Kopf bewerten (ein Vorwaertspass je Kandidat, Muster `deviation_best_action`/`net_tiling_tiebreak_value` in `self_play.rs`); die beste gewinnt, Gleichstand -> Ziehreihenfolge |
-| 2 | Heuristik "beste Platte nach oben": Rangfolge nach der Handregel aus `choose_start_placement`/Plattenwert (Farbtreffer fuer offene Musterreihen, Spezialfelder), Rest in Ziehreihenfolge; ohne Netz, auch fuer die Heuristik-Spieler nutzbar (NICHT fuer den Anker: hv1 bleibt bei 0) |
+| Wert | Verhalten                                                                                                                                                                                                                                                                                                                             |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0    | Bestand: Ziehreihenfolge (bitidentisch, Default)                                                                                                                                                                                                                                                                                      |
+| 1    | **netzbewertet**: fuer jede Permutation der nicht gewaehlten Platten (hoechstens 6) den Folgezustand bilden und aus Sicht des Rueckleger mit dem Value-Kopf bewerten (ein Vorwaertspass je Kandidat, Muster `deviation_best_action`/`net_tiling_tiebreak_value` in `self_play.rs`); die beste gewinnt, Gleichstand -> Ziehreihenfolge |
+| 2    | Heuristik "beste Platte nach oben": Rangfolge nach der Handregel aus `choose_start_placement`/Plattenwert (Farbtreffer fuer offene Musterreihen, Spezialfelder), Rest in Ziehreihenfolge; ohne Netz, auch fuer die Heuristik-Spieler nutzbar (NICHT fuer den Anker: hv1 bleibt bei 0)                                                 |
 
 Wirkort: `self_play.rs` Netzpfad (Ziehserie, Rueckgabe) und `py.rs` GUI-Default; der Suchbaum
 (`game.rs:413`) bleibt bei einem Kandidaten je (Platte, Slot), die Wahl faellt am Ende der
@@ -115,10 +115,12 @@ Registratur, `engine_config`, Spec-Abbildungen, sechs Tests. Zwei Bau-Entscheide
 hinaus: (1) permutiert werden hoechstens die ersten drei Restplatten (`RETURN_ORDER_MAX_PERMUTED`),
 der Schwanz bleibt in Ziehreihenfolge (`MAX_STACK_PEEKS` erlaubt laengere Serien; wie oft, ist
 nicht gemessen); (2) Handregel Modus 2 mit gesetzten Gewichten Spezial 2, Joker 1, Farbtreffer
+
 1. **Oben liegt `return_order[0]`** (geprueft: `game.rs:187` zieht per `remove(0)`, `game.rs:290-295`
-legt per `push` in Reihenfolge zurueck, der Block liegt unten und `[0]` kommt zuerst wieder).
+   legt per `push` in Reihenfolge zurueck, der Block liegt unten und `[0]` kommt zuerst wieder).
 
 **Zwei Befunde, die par.5 vorab einordnen (am Code geprueft, nicht gemessen):**
+
 1. Der Value-Kopf sieht die Reihenfolge nur als TYP-Folge: `features.rs:212` kodiert fuer die
    obersten vier Positionen des eigenen Blocks +1 Spezial / -1 Joker / 0. Permutationen
    gleichtypiger Platten sind fuer das Netz identisch, Modus 1 waehlt dann per Gleichstand die
@@ -128,7 +130,7 @@ legt per `push` in Reihenfolge zurueck, der Block liegt unten und `[0]` kommt zu
    `net_leaf_eval` liefert beide Bretter nur ueber den gespiegelten zweiten Vorwaertspass
    (`MIRROR_OTHER_VAL = false`, `net_mcts.rs:1117`). Kosten je Kandidat: ein `eval_pair`-Batch,
    nicht ein Pass.
-Kompilierung, Fixture, Drift und die Messung par.5 folgen nach der Promotion von v28-b02.
+   Kompilierung, Fixture, Drift und die Messung par.5 folgen nach der Promotion von v28-b02.
 
 **Kompiliert und im Wheel (Nachtrag 03:50):** Bau-Tor 2026-09-12, 03:44-03:48 (`tools/night_v28_knob_build.sh`, Artefakte `anchor_drift_live_wheel_20260912_knobs.json` / `anchor_conservation_artifact_wheel_20260912_knobs.json`): `cargo test --release --lib` 601 gruen (84 s; darunter Kontrakt-Hash-Literal 39648b95bbba1acf und die Netz-Paritaets-Fixture des Champions UNVERAENDERT), Beispiele/Benches kompilieren, Wheel gebaut und installiert (Kontrakt 39648b95bbba1acf, INPUT_SIZE 755), Anker-Drift gegen hv4_anchor GRUEN und Konservierung GRUEN, Konventions-Check gruen. Zwei Nachbesserungen beim Bau: `#![recursion_limit = "256"]` in lib.rs (das `json!`-Literal von `engine_config_json` riss das Makro-Limit) und die Lesestelle der Startslot-Knoepfe als zwei Literal-Aufrufe (Registratur-Scanner). Alle neuen Knoepfe stehen damit auf Default im Wheel, das die Promotion v28-b02 einfriert.
 
@@ -176,9 +178,10 @@ faellt dann per Gleichstand auf die Ziehreihenfolge zurueck.
    beide sonst identisch mit der Champion-Spec `models/frozen_champions/v28-b02/spec.json`.
    Ablage unter `models/` mit sprechendem englischem Namen (z.B.
    `models/return_order_mode1.spec.json`); der Dateiname geht ins Artefakt.
+
 2. A/B ueber den Referee, gleiches Netz beidseits, 150 Partien je Seed-Basis, exklusiv, als
    Hintergrundaufgabe ohne Pipe:
-
+   
    ```
    python -X utf8 -u tools/frozen_referee_match.py \
      --artifact-dir models/frozen_champions/v28-b02 \
@@ -188,7 +191,7 @@ faellt dann per Gleichstand auf die Ziehreihenfolge zurueck.
      --n-games 150 --seed-base <SEEDBASIS> --workers 6 \
      --out evaluations/artifacts/return_order_ab_mode1_vs_mode0_<SEEDBASIS>.json
    ```
-
+   
    Zweite Seed-Basis analog. **Dauer (gemessen):** "A/B-Kante ueber den Referee, gleiches Netz,
    Live gegen Artefakt, n=150, 6 Prozesse" 2.515 s / 2.621 s, rund 17 s je Partie
    (`docs/measured_runtimes.md`, Abschnitt Generation v27) -- par.6 dieser Datei schaetzt 45 min
@@ -273,10 +276,10 @@ fallen, sonst faehrt der Korpus zwei Verhalten.
 (`alphazero_v28-b02_brierbest.onnx`) auf demselben Wheel, unterschieden durch GENAU ein
 Spec-Feld (geprueft: 14 Felder je Datei, ein Unterschied).
 
-| Seed | mode1 : mode0 | McNemar p | gepaarte Diff | Splits | Punkte mode1 / mode0 | Wanduhr |
-| --- | --- | --- | --- | --- | --- | --- |
-| 20261071 | 74 : 76 | 1,0000 | -0,027 [-0,144, +0,091] | **70 von 75** | 54,14 / 54,23 | 2.080 s |
-| 20261072 | 74 : 76 | 1,0000 | -0,027 [-0,201, +0,148] | **64 von 75** | 52,88 / 53,07 | 2.664 s |
+| Seed     | mode1 : mode0 | McNemar p | gepaarte Diff           | Splits        | Punkte mode1 / mode0 | Wanduhr |
+| -------- | ------------- | --------- | ----------------------- | ------------- | -------------------- | ------- |
+| 20261071 | 74 : 76       | 1,0000    | -0,027 [-0,144, +0,091] | **70 von 75** | 54,14 / 54,23        | 2.080 s |
+| 20261072 | 74 : 76       | 1,0000    | -0,027 [-0,201, +0,148] | **64 von 75** | 52,88 / 53,07        | 2.664 s |
 
 **VERDIKT nach par.5 Punkt 1: kein messbarer Effekt.** Der Vorzeichentest verfehlt p < 0,05
 deutlich (beide Seeds p = 1,0), das Intervall der gepaarten Differenz schliesst die Null in
@@ -590,7 +593,6 @@ Reihenfolge zu lehren -- dieselbe Absicht wie bei der Startkuppel-Streuung (par.
 Fenster-Prereg: "damit das netz auch mal sieht welchen einfluss die startkuppel hat"). Eine
 niedrige Dosis genuegt dafuer; sie muss die Verteilung nicht verschieben, nur den Fall zeigen.
 
-
 ## par.12 ARCHITEKTUR KONKRETISIERT (Code-Audit 2026-09-15, Nutzer-Auftrag "konkretisiere moegliche architektur optimierungen")
 
 Kein Bau, kein Entscheid. Drei Grenzen sind am Code belegt, vier Optionen darauf zugeschnitten,
@@ -636,6 +638,71 @@ am v30-Netz (Streu-Korpus), hat das Netz die Wirkung gelernt und die Entscheidun
 Frage. Getrennt ausweisen: Permutationen mit GLEICHER Typfolge (Grenze 3 verbietet dort jede
 Spannweite) gegen verschiedene Typfolge. Kosten: Bau rund 1 h (ANNAHME), Lauf Minuten.
 
+### 
+
+### 12.2 Reihenfolge (Vorschlag, Entscheide beim Nutzer)
+
+1. **R1 jetzt am v29-b03** (Minuten): beziffert das Henne-Ei. Erwartung: Spannweite nahe 0.
+2. **v30-Erzeugung mit `MOSAIC_RETURN_ORDER_RANDOM_P=0.015`** (par.11c) und belebtem P.12; R2
+   nur, wenn R1 die Typfolge als Deckel zeigt -- dann VOR der Erzeugung ins Record-Feld.
+   ~~ENTSCHIEDEN 2026-09-15 (Nutzer: "bleibt aus"): Modus 1 bleibt in der v30-Erzeugung AUS~~
+   **UEBERHOLT am selben Tag nach 12.5 -- ENTSCHIEDEN 2026-09-15 (Nutzer: "mit r2 und modus 1
+   ein"): R2 wird gebaut UND Modus 1 ist in der v30-Erzeugung AN.** Einzelheiten und
+   Bauvorgaben in 12.6.
+3. **R1 am v30-Netz** wiederholen. Steigt die Spannweite: **A/B Modus 1 gegen 0** (par.5) am
+   v30-Champion, 200 Paare ohne Frueh-Stopp, danach R4 als Knopf. Bleibt sie bei 0: die
+   Rueckgabe-Reihenfolge ist fuer dieses Netz kein Hebel, Prereg auf ENTSCHIEDEN
+   ("nicht lernbar in dieser Sicht") -- ausser R2 wird nachgezogen.
+4. **R3** nur mit Weg A des Mondstapels und nur nach Rahmen-Entscheid.
+
+**Was hier absichtlich fehlt:** ein Heuristik-Ziel fuer die Reihenfolge (Modus 2 als Trainingsziel
+waere derselbe Fehler wie ein Handregel-Label beim Mondkopf, `moon_stack_order` par.12 B3) und
+jede Aenderung an der Sicht des GEGNERS (die Regel gibt ihm die Reihenfolge nicht).
+
+### 12.4 R1 GEMESSEN (2026-09-15): die Erwartung "Spannweite nahe 0" ist WIDERLEGT
+
+`tools/probes/return_order_sensitivity_r1.py`, Artefakt
+`evaluations/artifacts/return_order_sensitivity_r1.json`. Netz `v29-b03_brierbest`, Quelle
+`selfplay_v28-b02-policy_*` (6 Dateien), **3,6 s fuer 300 Faelle**. Kein Bau am Spiel, kein
+Wheel, keine Anker-Drift: die Sonde permutiert das Zustands-JSON und ruft
+`state_features_from_json` / `state_planes_from_json` / eine EINMAL gebaute ONNX-Sitzung.
+
+| Groesse                                        | Wert                                         |
+| ---------------------------------------------- | -------------------------------------------- |
+| Selbsttest (derselbe Zustand zweimal bewertet) | **0,0**                                      |
+| eigene Bloecke mit mindestens 3 Platten        | n = 407                                      |
+| davon mit AENDERBARER Typfolge                 | **300 = 73,7 Prozent**                       |
+| Spannweite max-min des Value-Kopfs (n = 300)   | Median **0,0188**, Mittel 0,0231, Max 0,0933 |
+| Anteil ueber 0,01                              | **81,3 Prozent**                             |
+
+**Die vorab registrierte Lesart greift damit in ihrem ZWEITEN Zweig, nicht im ersten.** par.12.1
+sagt: *"liegt die Spannweite bei v29-b03 nahe 0, ist jedes A/B an diesem Netz sinnlos"*. Sie
+liegt nicht nahe 0 -- median 1,9 Prozentpunkte Siegwahrscheinlichkeit, in vier von fuenf Faellen
+ueber einem Prozentpunkt, und die Gelegenheit besteht in drei von vier Rueckgaben. **Ein A/B an
+diesem Netz ist also nicht von vornherein sinnlos, und der Streu-Korpus ist nicht die einzige
+Tuer.**
+
+**Zwei Einschraenkungen gehoeren zum Befund:**
+
+1. **Sensitivitaet ist nicht Kompetenz.** Gemessen ist, dass der Value-Kopf auf eine geaenderte
+   Typfolge REAGIERT -- nicht, dass die Reaktion mit echter Staerke korreliert. Ein Netz kann
+   auf einen Eingabewert ausschlagen, ohne ihn richtig zu deuten. Genau diese Luecke hat der
+   A/B aus par.9 gemessen (kein Effekt), und R1 hebt sie nicht auf.
+2. **Die Sonde permutiert die TYPFOLGE, nicht die Plattenidentitaet.** Der Encoder sieht vom
+   eigenen Block nur sie (`features.rs:231-236`); was zwei GLEICHTYPIGE Platten unterscheidet,
+   misst R1 per Bauart nicht -- dort ist die Spannweite 0 und Modus 1 entscheidet per
+   Gleichstand nach Ziehreihenfolge (par.8a Punkt 1). Die Gruppe "gleiche Typfolge" bleibt
+   deshalb leer (n = 0); das ist kein Messausfall, sondern die Bauform. Der Selbsttest wurde
+   entsprechend umgestellt: er prueft jetzt den Determinismus derselben Eingabe, nachdem die
+   erste Fassung eine Bedingung verglich, die per Konstruktion nie eintreten kann.
+
+**Was das fuer die Reihenfolge in par.12.1 heisst:** der Zwischenschritt "Streu-Korpus v30, dann
+R1 am v30-Netz" ist nicht mehr die Voraussetzung fuer ein A/B, sondern eine eigene Frage (lernt
+das Netz die Groesse BESSER zu deuten?). Ob ein A/B jetzt lohnt, haengt an der Haeufigkeit auf
+der ANDEREN Seite: par.10 hat nur **0,19 Abweichungen je Partie** gemessen -- Modus 1 waehlt
+also selten anders, obwohl er in 73,7 Prozent der Faelle etwas zu waehlen haette. Diese Luecke
+ist der naechste Messpunkt, nicht die Sensitivitaet.
+
 **R2 Encoder: geordnete eigene Designs (additiv, Merkmal P.16).** Zusaetzlich zu den sortierten
 Designs die Design-Nummer der obersten k = 4 Positionen des eigenen Blocks (dieselben vier
 Positionen wie die Typfolge), als 4 Werte `tile_id / 17` oder als 4 x 18 Bits; nur eigener Block
@@ -666,20 +733,103 @@ kaum betroffen (ANNAHME, Kostentor Pflicht). **Aber:** R4 verbessert den Entsche
 Netz -- gegen das Henne-Ei aus par.10 hilft es nichts. Erst nach R1 am v30-Netz, und nur wenn die
 Spannweite dort messbar ist.
 
-### 12.2 Reihenfolge (Vorschlag, Entscheide beim Nutzer)
 
-1. **R1 jetzt am v29-b03** (Minuten): beziffert das Henne-Ei. Erwartung: Spannweite nahe 0.
-2. **v30-Erzeugung mit `MOSAIC_RETURN_ORDER_RANDOM_P=0.015`** (par.11c) und belebtem P.12; R2
-   nur, wenn R1 die Typfolge als Deckel zeigt -- dann VOR der Erzeugung ins Record-Feld.
-   Nutzer-Entscheid dabei: Modus 1 in der Erzeugung AN (damit die gestreuten Faelle nicht nur
-   Zufall, sondern auch bewertete Wahl enthalten) oder AUS (nur Streuung; sauberer fuer die
-   Frage "lernt das Netz die Wirkung").
-3. **R1 am v30-Netz** wiederholen. Steigt die Spannweite: **A/B Modus 1 gegen 0** (par.5) am
-   v30-Champion, 200 Paare ohne Frueh-Stopp, danach R4 als Knopf. Bleibt sie bei 0: die
-   Rueckgabe-Reihenfolge ist fuer dieses Netz kein Hebel, Prereg auf ENTSCHIEDEN
-   ("nicht lernbar in dieser Sicht") -- ausser R2 wird nachgezogen.
-4. **R3** nur mit Weg A des Mondstapels und nur nach Rahmen-Entscheid.
 
-**Was hier absichtlich fehlt:** ein Heuristik-Ziel fuer die Reihenfolge (Modus 2 als Trainingsziel
-waere derselbe Fehler wie ein Handregel-Label beim Mondkopf, `moon_stack_order` par.12 B3) und
-jede Aenderung an der Sicht des GEGNERS (die Regel gibt ihm die Reihenfolge nicht).
+### 12.5 GELEGENHEITEN IN DER ARENA GEZAEHLT (2026-09-15): der Nullbefund aus par.9 ist Arithmetik, kein Henne-Ei
+
+Anschluss an 12.4 ("diese Luecke ist der naechste Messpunkt"). Gezaehlt aus den Logs der
+beiden A/B-Artefakte `return_order_ab_mode1_vs_mode0_s20261071/_s20261072.json` (300 Partien,
+je Partie eine Modus-1- und eine Modus-0-Seite; Rueckgabe-Zeile `Kuppelplatte(n) zurueck` dem
+Spieler der letzten `Kachel vom Stapel gezogen`-Zeile zugeordnet; Abweichungen = Zeilen
+`[return_order]`, die nur Modus 1 und nur bei Abweichung schreibt, `self_play.rs:1197-1210`):
+
+| Groesse (n = 300 Partien)                       | Modus-1-Seite             | Modus-0-Seite |
+| ----------------------------------------------- | ------------------------- | ------------- |
+| Rueckgaben mit mindestens 2 Restplatten         | 187 = **0,62 je Partie**  | 196 = 0,65    |
+| Rueckgaben mit mindestens 3 Restplatten         | 178 = 0,59                | 188 = 0,63    |
+| Abweichungen von der Ziehreihenfolge            | **79 = 0,26 je Partie**   | --            |
+| **Abweichungsrate bei Gelegenheit (>= 2 Rest)** | **79 / 187 = 42 Prozent** | --            |
+
+**Drei Folgerungen:**
+
+1. **Die 11,07 Gelegenheiten je Partie aus par.11c gelten fuer den ERZEUGUNGS-Korpus**
+   (`MOSAIC_STACK_DRAW_RESEARCH=1`, 100 Sims), nicht fuer die Arena: dort zieht das Netz bei
+   400 Sims ohne Forschungs-Knopf rund **0,6-mal je Partie und Seite** mit Rest >= 2. Die
+   Dosis-Rechnung in par.11c (p = 0,015 fuer "15 Prozent der Partien") bleibt richtig, weil sie
+   fuer die Erzeugung gemacht ist -- aber wer sie auf Arena-Partien anwendet, liegt um den
+   Faktor 18 daneben.
+2. **Modus 1 waehlt keineswegs selten anders:** in 42 Prozent seiner Gelegenheiten weicht er ab.
+   Die 0,19 bzw. 0,26 Abweichungen je Partie sind Seltenheit der GELEGENHEIT, nicht Traegheit
+   des Entscheiders. Damit ist auch die zweite Haelfte der par.11b-Deutung ("konnte gar nichts
+   bewegen") praezisiert: er bewegt, aber selten.
+3. **Der Nullbefund aus par.9 folgt aus Groessenordnung (Herleitung):** 0,26 Abweichungen je
+   Partie mal Median-Spannweite 0,0188 (12.4) ergibt rund **0,005 Siegwahrscheinlichkeit je
+   Partie** als Obergrenze der erwarteten Wirkung -- selbst wenn jede Abweichung die volle
+   Spannweite einloest. Ein Vorzeichentest auf 300 Partien loest das nicht auf; dafuer braeuchte
+   es zehntausende Partien. Kein Henne-Ei noetig, um par.9 zu erklaeren; das Henne-Ei aus
+   par.10 bleibt trotzdem als Frage, ob das Netz die Groesse RICHTIG deutet (12.4 Punkt 1).
+
+**Folge fuer 12.2:** Schritt 3 ("A/B Modus 1 gegen 0 am v30-Champion") kann bei dieser
+Haeufigkeit auch am v30-Netz nichts aufloesen -- ausser der Streu-Korpus aendert die
+Zieh-Haeufigkeit selbst (was er nicht soll, Dosis 0,015). **Das A/B ist damit als
+Entscheidungsinstrument fuer diesen Knopf ungeeignet**; was bleibt, sind Diagnostiken (R1 am
+v30-Netz, Wiederkehr-Rate aus par.5 Punkt 2) und der Vollstaendigkeits-Grund H1. Ob der Knopf
+als Default in die Erzeugung geht, ist damit ein Korrektheits-Entscheid, kein Messentscheid --
+Nutzer.
+
+**R2 in diesem Licht:** die Typfolge traegt ein Signal (12.4), aber ein kleines an einer
+seltenen Stelle. R2 (geordnete eigene Designs) verfeinert die Sicht dort, wo sie heute 0 ist
+(26,3 Prozent der Bloecke mit >= 3 Platten sind typgleich, 12.4), an derselben seltenen Stelle.
+Empfehlung: bauen, weil billig (+4 Werte, additiv) und weil es nach v30 keine Erzeugung mehr
+gibt, die das Feld tragen koennte -- aber ohne Erwartung eines Arena-Effekts.
+
+### 12.6 ENTSCHIEDEN (Nutzer 2026-09-15, "mit r2 und modus 1 ein"): R2 bauen, Modus 1 in der v30-Erzeugung an
+
+Beide Entscheide fielen nach 12.5, das den par.9-Nullbefund als Arithmetik erklaert hat. Der
+Modus-1-Entscheid ersetzt das "bleibt aus" vom selben Vormittag; Grund ist Korrektheit, nicht
+Messung: die Rueckgabe-Reihenfolge ist ein legaler Zug (par.1), und der Generator soll ihn
+waehlen, statt ihn der Ziehreihenfolge zu ueberlassen.
+
+**R2 -- geordnete eigene Designs (Merkmal P.16), Bauvorgaben (VOR dem Bau registriert):**
+
+1. **Record-Feld** `dome_pool_view.blocks[].designs_ordered`: die `tile_id`s des EIGENEN Blocks in
+   Stapelreihenfolge (Index 0 = kommt zuerst wieder, wie `types`), fremde Bloecke `Null`;
+   additiv neben dem sortierten `designs` (`serialize.rs:111-117`). **Muss im installierten Wheel
+   stehen, BEVOR die v30-Erzeugung startet** (`feedback_record_field_must_precede_generation`;
+   P.12 hat genau das gekostet).
+2. **Encoder, beide Pfade (Rust `features.rs`, Python-Zwilling):** vier Werte, Design-Nummer der
+   Positionen 0..3 des obersten eigenen Blocks als `tile_id / 17`, `0` wenn die Position fehlt
+   oder das Feld nicht da ist (Alt-Records lesen sich als "Merkmal aus"). INPUT_SIZE 794 -> 798.
+   Dieselben vier Positionen wie die Typfolge (Abschnitt 15, Indizes 4..7), damit beide Sichten
+   dieselbe Tiefe haben.
+3. **Schluessel und Tore:** `config.INPUT_SIZE` im selben Zug wie die Wheel-Installation
+   (Unfall 2026-09-11); Merkmal in Fenster- UND Val-Cache-Schluessel
+   (`feedback_feature_knob_belongs_in_both_cache_keys`); Netz-Paritaets-Fixture bewusst neu mit
+   Begruendung; Anker-Drift und Konservierung gruen (die Heuristik liest den Vektor nicht);
+   Sichtgleichheitstest: fremde Bloecke bleiben `Null` (Netz-sieht-MEHR ausgeschlossen);
+   `tools/check_conventions.py`. Wheel-Bau nur bei freier Maschine.
+4. **Wirkung:** erst im v30-Training (das Feld muss im Korpus liegen). Verdikt-Groesse: par.6d
+   Punkt 1 der Fenster-Prereg (leben die vier Spalten?) und R1 am v30-Netz, getrennt nach
+   gleicher und verschiedener Typfolge -- bei gleicher Typfolge muss die Spannweite jetzt
+   ungleich 0 werden koennen. Kein Arena-Anspruch (12.5).
+5. **Rahmen:** zweite Ausnahme vom Grundsatz "v30 nur Rezept-Knoepfe" neben P.12
+   (`project_v30_release_close`), vom Nutzer entschieden. Fahrplan 29c.
+
+**Modus 1 in der v30-Erzeugung AN:**
+
+- Spec-Feld `return_order_mode: 1` in der v30-Erzeugungs-Spec (Nachfolger von
+  `models/start_by_search_on.spec.json`); die Erzeugungs-Spec ist ohnehin eine neue gemessene
+  Identitaet (`feedback_measured_identity_gets_own_bxx`).
+- **Koexistenz mit dem Streu-Knopf ist gebaut:** die Streuung greift NACH dem Entscheider und
+  ueberschreibt jeden Modus (`self_play.rs:1176-1191`); die gestreuten Faelle (p = 0,015)
+  bleiben also Zufall, alle anderen tragen die bewertete Wahl. Beide Marker im Record
+  (`return_order_randomized`, Diagnosezeile `[return_order]`), Sonden koennen trennen.
+- **Kosten sind ungemessen** (par.9 "Was NICHT gemessen ist"): je Kandidat ein
+  `eval_pair`-Batch (par.8a Punkt 2), bis zu 6 Kandidaten, rund 0,6 Gelegenheiten je Partie und
+  Seite in der Arena (12.5) -- in der Erzeugung mit Forschungs-Knopf deutlich mehr (par.11c:
+  11,07 Gelegenheiten mit Rest >= 3 je Partie). **Kostentor beim Start der Erzeugung:** `s_je_partie`
+  der ersten Chunks gegen die v29-Erzeugung (10,8 h hochgerechnet, 12,8 h gemessen mit
+  Nebenlast); mehr als 10 Prozent Aufschlag ist dem Nutzer vorzulegen, kein Abbruch von selbst.
+- Wirkung auf den Korpus: das Netz lernt aus Records, in denen die Reihenfolge eine BEWERTETE
+  Wahl war; ob es daraus mehr lernt als aus reiner Streuung, misst R1 am v30-Netz. Ein
+  Nullbefund dort ist kein Grund, den Modus zurueckzunehmen (Korrektheitsentscheid).
