@@ -154,3 +154,11 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-09-14T18:55:47,paired_gating,return_order_mode1,return_order_mode0,400,150,0.4933,54.14,54.233,8.393,8.38,0.0
 2026-09-14T19:40:59,paired_gating,return_order_mode1,return_order_mode0,400,150,0.4933,52.88,53.067,8.68,8.753,0.0
 2026-09-14T22:00:38,paired_gating,moon_order_on,moon_order_off,400,400,0.4825,53.008,54.837,8.075,8.607,0.0
+2026-09-15T00:47:42,paired_gating,moon_order_post_vs_off_a,moon_order_post_vs_off_b,400,400,0.4925,52.465,52.928,8.697,8.428,0.0
+2026-09-15T00:57:51,paired_gating,k4_kosten_mit_a,k4_kosten_mit_b,400,40,0.5,46.325,46.325,10.75,10.75,0.0
+2026-09-15T01:06:16,paired_gating,k4_kosten_ohne_a,k4_kosten_ohne_b,400,40,0.5,51.275,51.275,8.8,8.8,0.0
+2026-09-15T01:23:28,paired_gating,k4_c10_vs_off_a,k4_c10_vs_off_b,400,80,0.25,45.837,60.138,9.262,9.3,0.0
+2026-09-15T01:51:20,paired_gating,k4_c05_vs_off_a,k4_c05_vs_off_b,400,130,0.3462,47.808,55.954,8.777,10.4,0.0
+2026-09-15T02:57:01,paired_gating,v29-b02,v29-b03,400,300,0.49,51.473,52.077,8.147,8.617,0.0
+2026-09-15T03:55:08,paired_gating,env_val_05_vs_off_a,env_val_05_vs_off_b,400,160,0.5,51.075,51.275,8.912,8.562,0.0
+2026-09-15T04:29:37,paired_gating,env_val_10_vs_off_a,env_val_10_vs_off_b,400,160,0.5062,53.875,54.212,8.55,8.512,0.0

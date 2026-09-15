@@ -812,12 +812,17 @@ dann ist weder Horizont noch Budget der Engpass, sondern der Prior ordnet die Va
 bereits so, wie die Suche sie ohnehin sortiert, und **Weg C faellt vor dem Bau**. Ist `changed`
 hoch, bleibt Punkt 4 der Verdaechtige und Weg C die naechste Frage.
 
-**WIEDERVORLAGE zur Kostenseite:** ein Beleg, dass die Nachsuche auch wirklich RECHNET (nicht
-nur ausloest), faellt ohne Zusatzaufwand aus derselben Nachtkette. Die Schritte 2 und 3
-(`k4_kosten_mit` / `k4_kosten_ohne`) fahren beide OHNE Nachsuche; ihr `laufzeit.s_je_partie`
-ist der fehlende Vergleichswert zu den 14,833 s dieses Laufs. par.9b erwartet rund 18.350
-Zusatz-Sims je Partie, also etwa +57 Prozent gegenueber @400 -- wenn die Wanduhr das nicht
-zeigt, stimmt etwas mit der Ausfuehrung nicht.
+**KOSTENSEITE BELEGT (nachgetragen 2026-09-15, 01:20):** dass die Nachsuche auch wirklich
+RECHNET und nicht nur ausloest, faellt aus derselben Nachtkette. `k4_kosten_ohne_s20261093`
+ist der Basiswert ohne Nachsuche und ohne K4 (reine Champion-Spec, identische Specs beidseitig):
+**12,286 s je Partie**. Dieser Lauf liegt mit **14,833 s** also **+20,7 Prozent** darueber --
+und das, obwohl in jeder Partie nur EINE der beiden Seiten die Nachsuche traegt. Hochgerechnet
+auf beidseitigen Betrieb rund +41 Prozent (**Herleitung, nicht gemessen**: die Gelegenheiten
+sind nicht exakt gleich auf beide Seiten verteilt). par.9b erwartete +57 Prozent an Zusatz-SIMS;
+Sims und Wanduhr sind nicht dasselbe (thread-lokale Memoisierung, Batch-Effekte), die
+Groessenordnung passt. **Damit ist par.9d Punkt 5 doppelt belegt:** die Torbedingung oeffnet
+(Deckungsgleichheit mit par.9b), und der Aufwand faellt tatsaechlich an. Der Nullbefund kommt
+NICHT daher, dass die Nachsuche nie lief.
 
 ### Was das fuer par.10 heisst
 

@@ -251,6 +251,24 @@ fruehestens nach den v24-Abnahmen (Maschine belegt); Reihenfolge der
 Such-Knoepfe am v24-Siegernetz: K3-P2 (gebaut), K4 Rundenschaetzer
 (`round_estimate_leaf_term`), dann B -- ein Knopf, ein Netz, eine Messung.
 
+**NACHTRAG 2026-09-15: diese Reihenfolge ist abgearbeitet, und K4 ist ENTSCHIEDEN --
+negativ.** Beide vorregistrierten Dosen schaden hochsignifikant (20:60 bei C_est 1,0, 45:85
+bei 0,5; -14,3 bzw. -8,3 Punkte je Partie, rund -0,9 volle Spalten;
+`PREREG_round_estimate_leaf_term.md` par.7c/7d). **Damit ist B an der Reihe.**
+
+**Und der Befund ist mehr als ein abgeraeumter Vorgaenger -- er ist ein ARGUMENT fuer B.** Der
+Falsifikator jener Prereg (par.5) sagt woertlich, bei Scheitern gelte: *"die Sicht auf das
+Tiling muss ueber die Geometrie kommen (`round_transition_search_sampling` par.7 Variante B/C),
+NICHT ueber Punkte."* Genau das ist eingetreten, und die Randgroessen sagen, warum: K4 senkt die
+Strafleiste (-1,57) und hebt volle Zeilen (+0,11), waehrend Spalten (-0,84) und Spezialfelder
+(-0,59) einbrechen. Ein Term, der den RUNDENSCORE an den Blattwert haengt, macht die Suche
+rundenscore-gierig -- er kauft das Sofortige und verkauft das Langfristige.
+
+**B greift anders an:** es rechnet das Tiling IM BLATT durch, der Value-Kopf kommt ueber den
+Blattwert ins Spiel statt ueber einen Gewichtsparameter. Der Unterschied ist der zwischen "dem
+Solver ein Gewicht geben" und "die Suche das Tiling sehen lassen" (par.7). K4s Scheitern trifft
+B also nicht mit, sondern schliesst den konkurrierenden Weg aus.
+
 ## par.8 AUDIT 2026-09-09: zwei Praemissen halten nicht mehr
 
 1. **par.6 ("Determinisierung ersatzlos entfallen") ist falsch.** `MOSAIC_NUM_DETERMINIZATIONS`

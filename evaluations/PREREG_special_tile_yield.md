@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7): der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen. **par.4a GESCHLOSSEN (par.10): die Kanaele 77/78 TRAGEN** (Ablation v29-b02 verliert gegen b03). **par.4c VERWORFEN (par.12, Nutzer 2026-09-14): kein neuer Kopf, Hilfskoepfe stehen 0 von 4.** OFFEN ist nur noch der Drafting-Hebel, terminiert an Variante B (par.11). par.2 korrigiert: die Abrechnung kostet KEINEN Stein, der Marker zaehlt fuer die Spaltenvollendung. -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7): der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen. **par.4a GESCHLOSSEN, praezisiert (par.10a): die Kanaele 77/78 wirken auf ihren POSTEN (+0,13 bis +0,22 belegte Spezialfelder in drei Seeds), nicht auf die SIEGQUOTE** -- der Nachzug mit 150 Paaren ohne Frueh-Stopp steht 147:153 (p 0,82); der alte Beleg (p 0,0386) kam aus 30 Paaren mit SPRT-Stopp. **par.4c VERWORFEN (par.12): kein neuer Kopf.** OFFEN nur noch der Drafting-Hebel, terminiert an Variante B (par.11). -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
@@ -835,6 +835,67 @@ nicht gezeigt -- dafuer fehlt ein b02 auf 755, und der wird nach dem Nutzer-Ents
 
 Tor 2b in beiden Laeufen GRUEN; im zweiten Seed 2 von 58 Partien nicht nachspielbar, beide Male
 am bekannten Chip-Limit des Replays ("Chip-Vollendung nicht nachspielbar"), nicht an den Zuegen.
+
+## par.10a NACHGEZOGEN MIT 150 PAAREN (2026-09-15): der POSTEN traegt, die SIEGQUOTE nicht
+
+**Warum dieser Lauf gefahren wurde.** Das Verdikt in par.10 stand auf zwei Laeufen, deren
+SIGNIFIKANTER (McNemar p = 0,0386) nach **30 Paaren** per SPRT abbrach -- 60 Partien mit
+Frueh-Stopp fuer ein Verdikt, das einen Prereg-Absatz schliesst. Der Nachzug faehrt dieselbe
+Kante mit **150 Paaren ohne Frueh-Stopp**, neuer Seed 20261096, sonst identischer Aufbau
+(beide Modelle auf Champion-Spec @400, Blockgroesse 5).
+
+### Die Siegquote haelt der groesseren Stichprobe NICHT stand
+
+| Seed | Paare | b02 : b03 | gepaarte Diff | McNemar p |
+| --- | --- | --- | --- | --- |
+| 20261066 | 30 (Frueh-Stopp) | 22 : 38 | **-0,533** [-0,951, -0,116] | **0,0386** |
+| 20261065 | 50 | 43 : 57 | -0,280 [-0,684, +0,124] | 0,248 |
+| **20261096** | **150 (kein Stopp)** | **147 : 153** | **-0,040** [-0,273, +0,193] | **0,822** |
+
+Die RICHTUNG ist in allen drei Laeufen dieselbe (b03 vorn), aber **die Effektstaerke faellt
+monoton mit wachsendem n**: -0,533 -> -0,280 -> -0,040. Das ist das Muster eines aufgeblaehten
+Kleinstichproben-Befunds, und der einzige signifikante Lauf war zugleich der kleinste UND der
+einzige mit Frueh-Stopp. **Die Aussage "die Ablation ist schlechter" traegt auf der Siegquote
+nicht.**
+
+### Der Posten dagegen bewegt sich, und zwar konsistent
+
+| Seed | n je Seite | Spezialfelder b02 (aus) | b03 (an) | Differenz |
+| --- | --- | --- | --- | --- |
+| 20261065 | 100 | 1,120 | 1,290 | +0,170 |
+| 20261066 | 58 | 1,310 | 1,534 | +0,224 |
+| **20261096** | **298** | **1,1745** | **1,3054** | **+0,131** |
+
+**Drei unabhaengige Seeds, dieselbe Richtung, vergleichbare Betraege** -- und der groesste Lauf
+liegt mitten im Feld, faellt also NICHT wie die Siegquote in sich zusammen. Dazu im grossen
+Lauf +0,087 volle Spalten und +0,58 Punkte je Partie fuer b03.
+
+**Plausibilitaetsprobe (HERLEITUNG, nicht gemessen):** Spezialpunkte sind reihenabhaengig 1 bis 6
+(`project_spezialpunkte_sind_reihenabhaengig`). +0,131 Spezialfelder je Partie ergaeben bei
+einem mittleren Betrag von 3 bis 4 Punkten rund +0,4 bis +0,5 Punkte -- gemessen sind +0,58. Der
+gesamte Punktvorsprung von b03 laesst sich also durch diesen einen Posten erklaeren, ohne dass
+ein zweiter Wirkweg noetig waere.
+
+### Verdikt, praezisiert
+
+**par.10s Verdikt wird nicht zurueckgenommen, sondern auf seinen belegten Teil zurueckgeschnitten:**
+
+* **Die Kanaele 77/78 wirken auf den Posten, den sie adressieren.** Belegt durch drei Laeufe mit
+  konsistenter Richtung und Betrag, darunter einer mit n = 298 Brettern je Seite.
+* **Sie setzen sich nicht in Siege um.** Der beste Einzellauf (150 Paare, kein Stopp) ist ein
+  klarer Nullbefund, p = 0,822.
+* **Das ist kein Widerspruch, sondern die erwartbare Groessenordnung.** +0,58 Punkte je Partie
+  gegen eine Punktestreuung von rund 17 (SD im Stufe-3-Lauf) ist ein Effekt, den 150 Paare nicht
+  aufloesen koennen. Wer ihn in der Siegquote sehen will, braucht ein Vielfaches an Partien --
+  und diese Aufloesung kauft man in dieser Kampagne nicht (`feedback_statistical_rigor`).
+
+**Folge fuer die Entscheidung: keine.** Die Kanaele bleiben drin -- sie sind gebaut, kostenlos im
+Betrieb, wirken messbar auf ihren Posten und schaden nachweislich nicht. Was faellt, ist die
+BEGRUENDUNG "die Ablation verliert signifikant", nicht das Merkmal.
+
+**Und die Lehre, die ueber diesen Fall hinausgeht:** ein Verdikt auf 30 Paaren mit Frueh-Stopp
+haette hier fast einen Merkmalssatz mit einer Zahl gerechtfertigt, die sich bei 5-facher
+Stichprobe in Luft aufloest. Der Nachzug hat 65 min gekostet.
 
 ## par.11 ABHAENGIGKEIT: der Drafting-Hebel haengt am Tiling im Blatt (Nutzer 2026-09-14)
 
