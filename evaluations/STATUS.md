@@ -49,6 +49,16 @@ begleitet ihn, wertet aus und faehrt danach Tor 1.
 * Beobachter laeuft als Hintergrundaufgabe dieser Sitzung (alle 120 s CPU-Sekunden, GPU-Last,
   neue b04-Dateien); kein eigener Start, kein Eingriff.
 
+**b04 TRAINIERT (22:36) und TORE (a)/(b) GEMESSEN (22:45), `PREREG_moon_stack_order.md` par.12.7:**
+1,48 h auf cuda, val_brier 0,17915 (Epoche 5), Manifest-Diff gegen b03 gruen. **Der Kopf hat auch
+das reparierte Ziel kaum gelernt:** nll_played 0,976 gegen 0,989 bei b03 (1,2 Prozent),
+Kopf-Favorit = gespielte Reihenfolge 40,1 Prozent bei allen drei Modellen, p_canonical
+unveraendert 0,410; b03 und b05 sind im Mondkopf identisch (Warmstart-Kopf von v28-b02). Auf
+jedem Ziel dieselbe NLL um 0,96-0,99: das Ziel ist aus dem Eingang kaum vorhersagbar. **Tor 1 DURCH (00:45, par.12.8): b04 traegt NICHT** -- Seed 1 89:121 (p 0,033, SPRT-Schranke
+gerissen), Seed 2 198:202 (p 0,91); gepoolt 287:323 von 610, z -1,56. Vier-Ausgaenge-Lesart:
+b05 traegt schwach, b04 nicht -> **Empfehlung `moon_loss_weight 0` ins v30-Rezept, Nutzer-Entscheid**
+(Abschnitt 6 Punkt 12). Kein Elo-Eintrag. Netz-Gesundheit Punkte 1-2 fuer b04 stehen aus.
+
 **URSACHE DES EIN-KERN-LAUFS VOM 17:32 -- Herleitung, kein Beweis:** dessen Manifest
 (`..._173056.json`, inzwischen geloescht, vorher gelesen) hatte KEIN `--cache-file` und keinen
 `cache_file`-Block; der Lauf suchte den Monolithen also ueber den errechneten Namen, fand ihn
@@ -157,6 +167,13 @@ sauber auf ... laesst sich als normaler bediener nicht mehr handhaben"*). Drei L
   (`.cache_35c6bd2b9bd2.h5` traegt intern `41bfd55372ea`), das Problem ist also aelter als der
   Vorfall, der es sichtbar gemacht hat. Einzelheiten und Messung: `../docs/pitfalls.md`.
 
+  **Zwischenschritt 2026-09-17 01:30 (nach einem zweiten Vorfall beim b06-Bau):** beide
+  Zusammenfueger stempeln jetzt aus ABSOLUTEN Pfaden wie `train.py` -- damit stimmen Stempel und
+  Verbraucher fuer Listen aus `window_train_split.py` ueberein. **Loeschkandidat (Nutzer):**
+  `data/.cache_fd13f54061cd.h5` (1,15 GB, Stempel 4dd9f020b232, gebaut 01:19, vom Waechter
+  abgelehnt); Ersatz `data/.cache_fd13f54061cd_b06.h5`. h5-Dateien sind vom Backup ausgeschlossen
+  (jederzeit nachbaubar), ein restic-Beleg ist deshalb nicht noetig.
+
   **Die Reparatur ist benannt, aber NICHT gemacht und ein Nutzer-Entscheid:** die Dateiliste im
   Schluessel auf Basenames normalisieren (ein Datensatz ist durch seine Dateinamen bestimmt,
   nicht durch seinen Ablageort). Das entwertet JEDEN vorhandenen Monolithen auf einen Schlag
@@ -212,6 +229,28 @@ Seed mit einer Zahl aus dem Suchstrom, Diagnosezeile `[rt_leaf]`, Mischstellen-Z
 sind die Abnahme dieses Baus und kommen VOR Fahrplan 34 -- an einer freien Maschine, also nach
 Tor 1 von b04. Zwei bewusste Abweichungen von der Prereg stehen in par.17.6 (Mischregel je
 Vorrat; Seed-Verknuepfung mit einer Zahl aus dem Suchstrom statt Zustands-Hash mal Partie-Seed).
+
+**ABNAHME DURCH UND SICHTTOR GRUEN (Opus-Agent, 2026-09-17 01:05, par.17.7; Fahrplan 33
+abgenommen, 34 durch).** Das Wheel traegt den Knopf, **Kontrakt-Hash unveraendert
+`39994362fba145a6`** (Manifest neu: `round_transition_leaf = 0`); Anker-Drift 22,4 s und
+Anker-Konservierung 16,6 s gegen `hv4_anchor` beide GRUEN (je 1.763 Schritte), `cargo test
+--release --lib` **673 gruen / 0 rot** samt `net_parity_hash_matches_champion_fixture` (Fixture
+NICHT neu erzeugt), Konventionen gruen. **Sichttor par.10 GRUEN: n = 300 Blatt-Zustaende
+(Runden 3 und 4, `bag_count` < 21, je 150) aus 1.647 gesehenen, 0 Verstoesse in allen drei vorab
+festgelegten Kriterien**, 41,1 s. Neu im Baum: `tools/probes/round_transition_leaf_sight_gate.py`
+und der ADDITIVE Diagnose-Export `round_transition_leaf_fill_diag_json` (`engine/src/lib.rs`) --
+am HEAD gab es keinen Python-Einstieg in `round_transition_leaf_state`; deshalb wurde das Wheel
+danach ein zweites Mal gebaut und beide Anker-Modi erneut gefahren (wieder GRUEN). **Offen in
+dieser Reihenfolge: Kostentor par.5 Schritt 1 (Nr. 35), dann A/B par.9 (Nr. 36)** -- beide
+ausdruecklich NICHT gestartet, sie taktet der Koordinator ein.
+
+**FREMDER ROTER BEFUND am Rand, gemeldet und nicht untersucht (par.17.7 (f)):** die
+Paritaetssonde `tools/probes/feature_parity_rust_python.py` faellt in der Korpus-Population
+(298 von 300; `pygame` 733 von 733 gleich), Abweichung in Planes-Kanal 76 (Erreichbarkeit,
+`features.rs:1733`). `42167aef` beruehrt `features.rs` nicht; letzte Aenderung dort ist
+`36520a31` (2026-09-14), und `docs/knobs.md` nennt das Tor "bestanden 2026-09-11" -- der Befund
+ist also aelter als der Variante-B-Bau. Artefakt
+`evaluations/artifacts/feature_parity_rust_python.json`.
 
 ### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
 
@@ -972,8 +1011,15 @@ die andere Abschnitte beruehren:
     prozentpunkte, b06 nach variante b eintakten")**: `v29-b06` (b03 ohne die vier
     Hilfs-Losses) gegen b03, Nichtunterlegenheit = gepoolt mindestens 45,0 Prozent auf 800
     Partien und kein Seed signifikant dagegen; Fahrplan 36a nach dem A/B von Variante B.
-    `PREREG_minimal_strength_core.md` par.10, Name reserviert. OFFEN bleibt die Aufnahme ins
-    v30-Rezept nach dem Ergebnis.
+    `PREREG_minimal_strength_core.md` par.10, Name reserviert. **Vorpruefung durch (par.10.1):**
+    die Suche liest unter der Champion-Spec policy, value und den moon-Prior; points wird mit
+    Gewicht 0 gelesen, ownership/opp_points/endgame sind tot. b06 = b05 plus ownership 0, ohne
+    opp_points und endgame; moon und points bleiben als Ausgaenge (positional gelesen). OFFEN
+    bleibt die Aufnahme ins v30-Rezept nach dem Ergebnis.
+
+12. **Rezept-Aufnahme `--moon-loss-weight 0`** (Fahrplan 32b, `PREREG_moon_stack_order.md`
+    par.12.8): b05 schwach positiv, b04 negativ -- der Kopf ist Ballast. Aufnahme ins v30-Rezept
+    ja/nein; b06 (par.10 der Minimalkern-Prereg) faehrt ihn ohnehin auf 0 mit.
 
 ## 7. VERBOTE UND STEHENDE REGELN
 

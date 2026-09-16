@@ -313,7 +313,7 @@ ist EIN Minimalkern-Arm zuerst:
 
 **Zur Moon-Zeile in A.3 (par.8 B5):** ueberholt. Stand: b05 (Kopf aus) gegen b03 427:373 aus 800
 Partien, z = 1,98 (`moon_stack_order` par.12.6 "ARM v29-b05 GEMESSEN"); b04 (repariertes Ziel)
-laeuft heute Nacht gegen b03. Bezugspunkt beider Arme ist b03, nicht "b04 gegen b05".
+gemessen 2026-09-17: 287:323 gegen b03, ein Seed signifikant dagegen, gepoolt z -1,56 -- b04 traegt nicht (`moon_stack_order` par.12.8). Bezugspunkt beider Arme ist b03, nicht "b04 gegen b05".
 
 **Zum Relaunch-Dokument:** der Kernsatz ("ist das, was die Suche bewertet, exakt das, was
 ausgefuehrt, geloggt und trainiert wird?") ist die richtige Leitfrage, und Strang B (Trace vor
@@ -362,3 +362,27 @@ Marge von 5 Prozentpunkten gerade (par.8 B1), eine kleinere nicht.
 **Eintaktung:** NACH Variante B, also nach Fahrplan Nr. 36 (A/B), als Nr. 36a. Kosten rund 4,5 h
 (Training 1,43 h, Tor 1 zwei Seeds a 86-91 min, gemessen). Name `v29-b06` in
 `docs/generation_naming.md` reserviert.
+
+### 10.1 VORPRUEFUNG DURCH (2026-09-16, 23:40, Lese-Agent, tragende Stellen vom Koordinator nachgeprueft): was die Suche unter der Champion-Spec liest
+
+| Ausgabe | Leser | unter `frozen_champions/v28-b02/spec.json` | Folge fuer b06 |
+| --- | --- | --- | --- |
+| `policy` | Prior, `net_mcts.rs:2526-2531` | tragend | bleibt |
+| `value` | Blattwert `net_mcts.rs:2607-2610`, Tiling-Stichentscheid `self_play.rs:2223-2228` | tragend | bleibt |
+| **`moon`** | **Plackett-Luce-Prior des Fan-outs, `net_mcts.rs:2553-2564`, bei `moon_order_variants = 1` (Default, Spec setzt das Feld nicht)** | **AKTIV, rund 20 Entscheide je Partie** | Kopf bleibt als Ausgang und wird GELESEN; `--moon-loss-weight 0` schaltet nur den Loss ab -- exakt die Lage von b05, dessen Tor 1 gegen b03 genau das gemessen hat (par.12.6 der Mond-Prereg). Kein neuer Konfundierer gegenueber b05 |
+| `points` | gelesen (`net_mcts.rs:2671/2677`), aber `POINTS_UTILITY_WEIGHT 0`, `score_utility_c 0` (`:3382` uebersprungen) | gelesen, Gewicht 0 | Ausgang muss bleiben (positional `out[3]`, `net.rs:471`); Loss ist nicht Teil von b06 |
+| `ownership` | Blatt `shaping.rs:969-971` und Tiling `self_play.rs:2330-2341`, beide Gewicht 0; Huelle nur Modus 3 (`envelope.rs:1245-1252`), Spec faehrt Modus 1 | tot | `--ownership-weight 0`; Ausgang bleibt (Export unbedingt, Paritaets-Fixture verlangt nichtleeren Vektor `net_batcher.rs:418-424`) |
+| `opp_points` | nur bei `score_utility_c`, Denial-Eps, Tiling-Punkteblend > 0 | tot | `--opp-points-head` weglassen: Kopf wird nicht konstruiert (`train.py:1646-1655`), Engine erkennt per Namen (`net.rs:859-873`) |
+| `endgame_margin`, `value_wdl_logits` | kein Leser in `engine/src` (grep) | tot | `--endgame-head` weglassen; WDL-Logits bleiben (Teil des value-Kopfs) |
+
+**Korrekturen an par.10:** `score_utility_b = 20` liest KEINEN Kopf -- es ist der Nenner in
+`score_utility_term` (`net_mcts.rs:2746-2747`) und bei `score_utility_c = 0` inert; die Vermutung
+"points-Kopf" in par.9/par.10 war falsch. Die ersten vier Ausgaben werden POSITIONAL gelesen
+(`net.rs:468-471`), ein ONNX ohne `moon` oder `points` wuerde still verrutschen -- deshalb duerfen
+diese beiden Koepfe nur auf Gewicht 0, nicht weg.
+
+**Rezept `v29-b06`, praezisiert:** = b05 (`--moon-loss-weight 0`) plus `--ownership-weight 0`, ohne
+`--opp-points-head`, ohne `--endgame-head`; sonst b03. Der Vergleich gegen b03 misst damit den
+Minimalkern gegen den vollen Kopfsatz; der Vergleich gegen b05 (falls gewuenscht, Nutzer-Entscheid)
+wuerde die drei Koepfe jenseits von moon isolieren. Der Warmstart `v28-b02_brierbest` traegt die
+weggelassenen Koepfe als ueberzaehlige Gewichte, die `train.py:1657-1670` ignoriert.

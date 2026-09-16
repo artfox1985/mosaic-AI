@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B ist GEBAUT (par.17): Knopf `MOSAIC_ROUND_TRANSITION_LEAF`, Default 0 bitidentisch, Spec-Feld optional, 9 Tests gruen -- aber NOCH NICHT im Wheel, und Sichttor (par.10), Kostentor 25 Prozent (par.5) und der gepaarte A/B (par.9) stehen aus. Stufe-0-Sonde gebaut (par.16), Volllauf offen. Review par.15 abgearbeitet: Top-K ist im R5-Pfad BEREITS gebaut (B1), K=1 nicht bitidentisch (B3, 14.5). -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B GEBAUT und ABGENOMMEN (par.17/17.7): Knopf `MOSAIC_ROUND_TRANSITION_LEAF` im Wheel, Kontrakt-Hash unveraendert, Anker-Drift und -Konservierung GRUEN, Lib-Suite 673 gruen samt Paritaets-Fixture; Sichttor par.10 GRUEN (n=300 Blatt-Zustaende Runde 3/4, bag_count<21, 0 Verstoesse). OFFEN: Kostentor (par.5, Nr. 35), A/B (par.9, Nr. 36), Volllauf Stufe-0-Sonde (par.16). -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -1313,3 +1313,90 @@ braucht die zwei neuen Felder im Struct-Literal und hat sie bekommen.
 Kein Widerspruch INNERHALB der Prereg gefunden, der den Bau blockiert haette. Ein
 Zeilendrift-Punkt aus par.8 ist mit 17.1 nachgezogen (Aufrufstelle jetzt `:3543`, Konstante
 `:95`).
+
+### 17.7 ABNAHME DES BAUS UND SICHTTOR (2026-09-17, Opus-Agent)
+
+Fuehrt 17.5 Punkt 1 und 2 aus: das Wheel traegt den Knopf jetzt, die drei Abnahme-Pruefungen
+sind gefahren, und das Sichttor par.10 ist GRUEN. Kostentor (par.5 Schritt 1, Fahrplan Nr. 35)
+und A/B (par.9, Nr. 36) sind AUSDRUECKLICH nicht Teil dieses Zuges.
+
+**(a) Wheel und Kontrakt.** `cargo test --release --no-run` 56 s, `maturin build --release`
+28 s, `pip install --force-reinstall --no-deps` 3 s (Muster `tools/night_v29_wheel2.sh`).
+**Kontrakt-Hash vorher wie nachher `39994362fba145a6`** (`engine_config_json`), `input_size`
+794 gleich `config.INPUT_SIZE`; neu im Manifest steht `round_transition_leaf = 0`. Das ist die
+Erwartung aus par.17.2: der Knopf beruehrt keinen Netz-Ein- oder Ausgabevertrag.
+
+**(b) Anker-Invarianz gegen `models/frozen_heuristics/hv4_anchor`** (CLAUDE.md, Skill
+`mosaic-anchor-invariance`), beide Modi **GRUEN**, je 1.763 Schritte Feld fuer Feld:
+Drift 22,4 s (`evaluations/artifacts/anchor_drift_live_wheel_20260917_rtleaf.json`),
+Konservierung 16,6 s (`anchor_conservation_artifact_wheel_20260917_rtleaf.json`). Damit ist
+die Zusage aus par.17.2 ("Heuristik-Pfad unberuehrt") gemessen, nicht nur hergeleitet.
+
+**(c) Netz-Paritaets-Fixture und Tests.** `cargo test --release --lib`: **673 bestanden, 0
+rot, 19 ignoriert**, 78,1 s Testzeit (108,4 s Wanduhr mit Kompilieren). Darin
+`self_play::tests::net_parity_hash_matches_champion_fixture` GRUEN (die Fixture wurde NICHT neu
+erzeugt) und alle neun Tests aus 17.3. Die in 17.3 als fremd vermerkte rote Registratur-Zeile
+(`MOSAIC_MOON_TARGET_SOURCE`) ist inzwischen nachgetragen und nicht mehr rot; die Zahl 673
+statt 672 ist derselbe Test. `tools/check_conventions.py`: alle Regeln gruen (eine Warnung zur
+Groessen-Ratsche von `train.py`, kein Blocker).
+
+**(d) Sichttor par.10: GRUEN, n = 300, Grundmenge Blatt-Zustaende (`phase == tiling`) der
+Runden 3 und 4 mit `bag_count` < 21 aus `data/selfplay_v28-b02-policy_*.pkl`, Einheit
+Zustaende.** 150 je Runde, gezogen aus 1.647 gesehenen Blatt-Zustaenden dieser Runden; kein
+Fehlschlag, 41,1 s Wanduhr (40,4 s CPU, 1 Thread, 0,137 s je Zustand). Artefakt
+`evaluations/artifacts/rt_leaf_sight_gate.json`, Instrument
+`tools/probes/round_transition_leaf_sight_gate.py`. Drei Kriterien, vor dem Lauf im
+Sonden-Kopf festgelegt:
+
+| Kriterium | Ergebnis | ROT-Kriterium |
+| --- | --- | --- |
+| T1 Quelle: Farb-Multimenge der Fuellung ist enthalten in Beutel plus Turm plus Abraum des pre-chance-Zustands | **0 Verstoesse von 300** | ja |
+| T2 Bilanz: (Beutel + Turm + Abraum) vorher minus (Beutel + Turm + Abraum) nachher gleich Fuellung, Farbe fuer Farbe | **0 Verstoesse von 300** | ja |
+| T3 sichere Steine: die Fuellung enthaelt die GANZE Beutel-Multimenge | **0 Abweichungen von 300** | nein (Regelausnahme unten) |
+
+Die Torgroessen streuen breit genug, dass das Tor nicht leer laeuft: Beutel vor der Ziehung
+Median 6 (2 bis 20), Turm Median 24 (2 bis 42), Abraum Median 10 (0 bis 19), Fuellung in ALLEN
+300 Faellen genau 21 Steine (5 grosse Manufaktur plus 4 x 4 kleine, `state.rs::fill_factories`).
+
+**Zwei Praezisierungen der Torformel, beide am Code und nicht abgeleitet:**
+
+1. **"bag_count faellt entsprechend" darf nicht auf `bag_count` allein gelesen werden.**
+   `draw_with_refill` (`state.rs:304-316`) mischt den Turm in den Beutel, sobald der Beutel die
+   verlangte Zahl nicht mehr liefert -- `bag_count` STEIGT dann. Gemessen: Differenz nachher
+   minus vorher von -15 bis +24, Median +7. Die pruefbare Fassung ist deshalb T2, die exakte
+   Bilanz ueber Beutel, Turm und Abraum.
+2. **Der Abraum gehoert in die Quelle, par.10 sagt das ausdruecklich** ("sonst nur Steine aus
+   Turm plus Abraum"). `execute_end_tiling` (`game.rs:977-996`) legt unplatzierbare
+   Musterreihen und die geleerte Strafleiste in den Turm, BEVOR die Fabriken befuellt werden;
+   der Rust-Test in 17.3 raeumt die Bretter genau deshalb vorher. T3 hat eine legitime
+   Regelausnahme -- der monochrome Redraw der grossen Manufaktur legt gezogene Steine in den
+   Beutel zurueck (`state.rs::fill_large_factory`) -- sie ist in dieser Stichprobe nie
+   eingetreten (0 von 300), darum ist T3 hier gleich scharf wie T1.
+
+**(e) EIN BAU in diesem Zug, ausgewiesen:** am HEAD gab es KEINEN Python-Einstieg in
+`round_transition_leaf_state` (geprueft: `engine/src/lib.rs` exportiert nur
+`resample_round_transition_json` und `advance_after_tiling_json`). Das Sichttor haette sonst
+nur den gemeinsamen Kern ueber `advance_after_tiling_json` gemessen, dem der Betrachter, die
+Mischregel `determinize_dome_pool` und der stellungsgebundene Seed fehlen. Neu gebaut ist
+darum der ADDITIVE Diagnose-Export `round_transition_leaf_fill_diag_json` (`lib.rs`, ruft die
+gebaute Funktion selbst auf und liefert die Farblisten; kein Spielpfad liest ihn, er setzt
+keinen Knopf). Das Wheel wurde danach ein zweites Mal gebaut (26 s plus 1 s) und **beide
+Anker-Modi erneut gefahren, wieder GRUEN** (Drift 22,8 s, Konservierung 16,4 s; Artefakte
+`anchor_drift_live_wheel_20260917_rtleaf_sightgate.json` und
+`anchor_conservation_artifact_wheel_20260917_rtleaf_sightgate.json`), Kontrakt-Hash wieder
+`39994362fba145a6`. Das installierte Wheel ist dieses zweite. `cargo test --release --no-run` danach GRUEN (48,1 s, Beispiele und Benchmarks mitkompiliert) -- die pre-push-Falle aus CLAUDE.md ist damit geprueft, nicht angenommen.
+
+**(f) Ein FREMDER roter Befund am Rand, nicht von diesem Bau.** Die nach dem Wheel-Bau
+uebliche Paritaetssonde `tools/probes/feature_parity_rust_python.py` (Schritt 7 in
+`tools/night_v29_wheel2.sh`) faellt: Population `pygame` 733 von 733 gleich, Population
+`corpus` nur **298 von 300** -- Abweichung in Planes-Kanal 76 (Erreichbarkeit je Zelle,
+`features.rs:1733`), ein Wert je betroffenem Zustand (Rust 1.0, Python 0.0). Commit `42167aef`
+beruehrt `features.rs` nicht (`git show --stat`), die letzte Aenderung dort ist `36520a31`
+(2026-09-14, "Encoder-Korrektur im Wheel"); die Registratur in `docs/knobs.md` nennt das Tor
+"bestanden 2026-09-11". Der Befund ist damit AELTER als dieser Bau und hier nur gemeldet, nicht
+untersucht -- Artefakt `evaluations/artifacts/feature_parity_rust_python.json`. Wer ihn
+aufnimmt, sollte bei der Frage anfangen, ob `remaining_colors` auf rekonstruierten
+Korpus-Zustaenden (ohne `dome_pool_view`) beide Seiten gleich sieht.
+
+**Damit ist Fahrplan Nr. 33 abgenommen und Nr. 34 durch.** Offen bleibt in der Reihenfolge:
+Kostentor par.5 Schritt 1 (Nr. 35), dann der gepaarte A/B par.9 (Nr. 36).
