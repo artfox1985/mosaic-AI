@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund. **par.12.0: das Trainingsziel des moon-Kopfs ist ein No-Op** (der Rundenloeser liest die Fabriken nicht, das Label ist immer kanonisch). **par.12.5: b05 (Kopf ablatiert) ist BESSER als b03** -- 427:373 aus 800 Partien, gepoolt z=1,98, beide Seeds und fuenf von sechs Kennzahlen in derselben Richtung; einzeln nicht signifikant. par.12.3: der Zugriffs-Hebel ist KLEIN (Gegner nimmt den oben gelegten Stein nur in 14,8 Prozent im naechsten Halbzug). Offen: b04 (echtes Ziel, Korpus-Tor mit 44,1 Prozent offen), dritter Seed fuer b05. -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund. **par.12.0: das Trainingsziel des moon-Kopfs ist ein No-Op** (das Label ist immer kanonisch). **par.12.5: b05 (Kopf ablatiert) ist BESSER als b03** -- 427:373 aus 800 Partien, gepoolt z=1,98, beide Seeds gleichgerichtet, einzeln nicht signifikant. **par.12.3a: die Folgerung "Zugriffs-Hebel klein" ist ZURUECKGENOMMEN** -- ein Mondzug nimmt ALLE Oberseiten einer Farbe, 43,8 Prozent raeumen mehrere Steine ab; die Hebelgroesse ist offen. Offen auch b04 (Korpus-Tor 44,1 Prozent) und ein dritter Seed fuer b05. -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -1054,6 +1054,53 @@ Sinne von CLAUDE.md. Sie starten erst, wenn die Messkette der Nacht durch ist.
 **Offen bei B, wenn es soweit ist:** ein Trainingsarm braucht eine eigene v29-bXX-Nummer
 (`feedback_measured_identity_gets_own_bxx`); die Reservierung steht in
 `docs/generation_naming.md`.
+
+### 12.3a KORREKTUR (2026-09-16, Nutzer-Einwand): "der Hebel ist klein" traegt NICHT
+
+**Der Einwand, woertlich:** *"das kannst so nicht rechnen meiner meinung nach. da musst alle
+oben liegenden einer farbe beruecksichtigen nicht nur einen seperaten stapel."* Er trifft, und
+zwar am Code belegt.
+
+**Die Regel:** ein Mondzug ist **Aktion C** und damit GLOBAL. `validation.rs:214` erzeugt
+Mond-Zuege ausschliesslich mit `factory_id: None` ueber `available_moon_colors(state)`; der
+Kommentar in `execution.rs:48-50` sagt es ausdruecklich ("erzeugt Mond-Zuege NUR als Aktion C").
+Ein Zug nimmt also ALLE Steine einer Farbe von ALLEN Stapel-Oberseiten auf einmal -- im Log
+sichtbar als `2 (1+1)x tuerkis von F3, GF`.
+
+**Was die Bilanz damit gemessen hat:** ob GENAU DIESER Stein im naechsten Halbzug vom Gegner
+abgeholt wird (14,75 Prozent). Das ist eine gueltige, aber ENGE Frage. Sie beantwortet nicht,
+wie gross der Hebel der Reihenfolge-Wahl ist -- denn wer eine Farbe oben legt, die anderswo
+schon oben liegt, vergroessert das PAKET, das ein einziger Gegnerzug abraeumt.
+
+**Die Buendel-Zahlen** (n = 20.842 Mondzuege aus denselben Artefakten):
+
+| Groesse | Anteil |
+| --- | --- |
+| 1 Stein | 0,562 |
+| 2 Steine | 0,276 |
+| 3 Steine | 0,120 |
+| 4 und mehr | 0,043 |
+| **mittlere Buendelgroesse** | **1,653** |
+| **mehr als ein Stein** | **0,438** |
+| **mehr als eine Quellfabrik** | **0,407** |
+
+**In zwei von fuenf Zuegen werden mehrere Stapel gleichzeitig abgeraeumt.** Der Mechanismus, den
+die enge Frage uebersieht, ist also real und haeufig.
+
+**Verdikt zurueckgenommen.** par.12.3 bleibt als Messung gueltig, aber die daraus gezogene
+Folgerung "der Hebel ist klein, weder C1 noch A lohnen" ist NICHT gedeckt. Fahrplan 32c ist
+damit nicht durch, sondern halb: die enge Zugriffsfrage ist beantwortet, die HEBELGROESSE nicht.
+
+**Was dafuer noch fehlt (offen, nicht gebaut):** die kontrafaktische Messung -- um wie viel
+aendert die Wahl der Oberseite die maximale Buendelgroesse, die dem Gegner im naechsten Halbzug
+zur Verfuegung steht? Dafuer braucht es die Oberseiten ALLER Fabriken zum Zeitpunkt der Wahl;
+aus dem Log sind sie nur als Zustandsanzeige je Fabrik rekonstruierbar (par.9i), sauberer waere
+ein Zaehler im Code an derselben Stelle wie `MOON_ORDER_DIAG`.
+
+**Lehre:** die Grundmenge einer Sonde muss der REGEL folgen, nicht der Datenstruktur. Die
+Stapelzeile im Log legt "ein Stapel" als Einheit nahe; die Regel kennt aber nur "eine Farbe
+ueber alle Oberseiten". Dieselbe Verwechslung wie in par.9i, wo die Zustandsanzeige als
+Ereignisliste gelesen wurde.
 
 ## par.12.5 ARM v29-b05 GEMESSEN (2026-09-15): das No-Op-Ziel hat Staerke GEKOSTET
 

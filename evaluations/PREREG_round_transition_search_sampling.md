@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis (Durchsatz, Paarung)? | Beleg: Nichts gebaut. EINGETAKTET FUER v29 (Nutzer 2026-09-12, par.9): Variante B (Tiling im Blatt, EINE Neubefuellung) als Such-Knopf mit Default aus, Mischregel = determinize_dome_pool (par.8), Kostentor und A/B 200 Paare am Champion. Bauvorgaben par.4.2 und par.10 (2026-09-13: Fuellung im Blatt aus dem echten Beutel mit Turm daneben, nie aus der Summe; Sichttor). -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B ist fuer v29 eingetaktet, aber ungebaut (par.9/10). Top-K-Tiling ist nur als Folgestufe nach positivem B und Mehrdeutigkeits-Sonde registriert (par.14); kein Bau. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -627,4 +627,110 @@ bewerten: Irrtumskosten, nicht Elo") die Anforderung deutlich uebererfuellt:
 **Nicht behauptet wird**, dass Variante B den Chip-Fall loest; der Solver bleibt innerhalb der
 Runde exakt, und ob die Suche seine Wahl beeinflussen kann, haengt am Bau (par.4.2). Es ist ein
 Nutzniesser, kein Versprechen.
+
+## par.14 TOP-K-TILING NACH POSITIVEM VARIANTE-B-BEFUND (Nutzer-Auftrag 2026-09-15)
+
+### 14.1 Abgrenzung: nicht Variante B ein zweites Mal
+
+**Variante B** loest an jedem pseudo-terminalen Drafting-Blatt das Tiling beider Seiten EINMAL
+mit dem bestehenden exakten, rundenscore-orientierten Loeser, zieht danach eine sichtkonforme
+Fabrik-Neubefuellung und ruft das Netz auf. Sie aendert dadurch die **Bewertung einer
+Drafting-Folge**, nicht die Wahl innerhalb des Tilings.
+
+**Top-K-Tiling** waere erst der naechste Schritt: Fuer DENSELBEN Drafting-Blattzustand liefert
+der Loeser mehrere strukturell verschiedene, rundenscore-nahe legale Tiling-Endzustaende. Nach
+gekoppelter Neubefuellung bewertet das Netz diese Alternativen. Der Zukunftswert kann damit nur
+zwischen bereits lokal plausiblen Tiling-Folgen entscheiden. Top-K aendert also die
+**Tiling-Wahl selbst**, nicht bloss die Sicht des Drafting-Baums auf das eine bisherige
+Tiling-Ergebnis.
+
+Kein Kandidat ist eine andere Zugreihenfolge zum selben Endbrett. Kandidaten unterscheiden sich
+am Nach-Tiling-Zustand, insbesondere bei Brett, verbrauchten Chips, Strafleiste, Markern und
+den aus der legalen Ausfuehrung folgenden Pool-/Rundenende-Feldern.
+
+### 14.2 Anlass und Hypothese
+
+Der bestehende Loeser ist fuer den unmittelbaren Rundenscore der richtige Spezialist. Die offene
+Frage ist enger: Gibt es regelmaessig mehrere lokal gleichwertige oder fast gleichwertige
+Endbretter, deren Wert **nach** Tiling und Neubefuellung fuer die weitere Partie verschieden
+ist? Falls ja, kann ein Netzwert dort helfen, ohne den ganzen Tiling-Aktionsraum in eine zweite
+MCTS zu verwandeln.
+
+**Hypothese:** Eine Auswahl innerhalb einer kleinen, nicht dominierten Menge exakter
+Tiling-Endzustaende verbessert den Zukunftswert gegenueber dem einzelnen
+Rundenscore-Optimum, ohne die unmittelbaren Tiling-Regeln oder den Policy-Aktionsraum zu
+veraendern.
+
+Das ist KEIN Vorschlag, den Rundenscore mit einem freien Value-Gewicht zu mischen. Dieser Weg
+(`envelope_tiling_value_w`) ist bereits mit Nullbefund gemessen (`PREREG_geometric_envelope.md`
+par.8.6). Hier ist der Rundenscore eine Kandidatenschranke; der Netzwert waehlt nur unter den
+verbleibenden Alternativen.
+
+### 14.3 Stufe 0: Mehrdeutigkeits- und Rangsonde VOR jedem Bau
+
+Die Sonde arbeitet auf echten Rundenende-Blattzustaenden, nach Runde stratifiziert. Sie muss
+fuer jede Stellung mindestens berichten: n, Grundmenge und Einheit, Anzahl strukturell
+verschiedener Kandidaten, Rundenscore-Abstand zum Optimum, Nach-Tiling-Netzwerte und deren
+Rangfolge ueber gemeinsame Neubefuellungs-Stichproben.
+
+Vor dem Bau sind vier Fragen zu beantworten:
+
+1. **Mehrdeutigkeit:** Wie oft existiert ueberhaupt mehr als ein nicht dominierter,
+   rundenscore-naher Endzustand? Existiert praktisch immer nur einer, endet der Strang ohne
+   Bau.
+2. **Wirkungsort:** In welchen Runden sowie bei welchen Klassen (Spezialfeld-Freischaltung,
+   Chip-Verbrauch, Spalten-/Reihenabschluss) unterscheiden sich die Nach-Runden-Werte?
+3. **Frueher Value:** Trifft der Netzwert auf kontrafaktischen Kandidatenpaaren die Richtung
+   einer mit gemeinsamen Zufallsseeds fortgesetzten Referenz? Die Auswertung erfolgt getrennt
+   fuer R1/R2, R3/R4 und R5. Ein schwacher Value in R1/R2 darf dort keine Tiling-Wahl treffen;
+   er ist kein Grund, die Frage in spaeteren Runden zu verwerfen.
+4. **Zwei Spieler:** Die Sonde muss die legale Reihenfolge beider Tiling-Aufloesungen und
+   etwaige gemeinsame Rundenzustandsfelder pruefen. Es ist verboten, beide Seiten still mit
+   demselben Skalar zu maximieren. Erst der Code-Audit entscheidet, ob die Kandidaten getrennt,
+   als Kreuzprodukt oder in einer anderen legalen Best-Response-Reihenfolge zu bewerten sind.
+
+Die Vorabsonde setzt weder K, Score-Fenster noch Stichprobenzahl willkuerlich fest. Diese drei
+Kostenparameter werden aus der gemessenen Kandidatenzahl, der Rangstabilitaet und dem Anteil
+betroffener Blaetter vorgeschlagen und vom Nutzer vor einem Bau entschieden.
+
+### 14.4 Bauform, nur wenn B traegt und Stufe 0 einen Verbraucher zeigt
+
+1. Der exakte Loeser bekommt einen **additiven** Einstieg, der bis zu K
+   strukturell verschiedene Endzustaende innerhalb des beschlossenen Score-Fensters liefert.
+   Der bisherige Einzelplan bleibt der Default und muss bitidentisch bleiben.
+2. Jede Neubefuellungs-Stichprobe ist fuer alle Kandidaten desselben Blatts gekoppelt:
+   gleicher sichtkonformer Beutel-/Turm-Zustand, gleicher zustandsgebundener Seed, nur die
+   Kandidatenentscheidung unterscheidet sich. Dadurch wird Zufallsrauschen nicht als
+   Tiling-Unterschied gelesen.
+3. Die Auswahlmetrik wird VOR dem A/B festgelegt. Zulaessig sind nur eine Rangregel ueber den
+   Mittelwert oder eine zuvor gemessene Stabilitaetsregel; ein nachtraeglich gewaehlter
+   Risikoabschlag ist nicht zulaessig.
+4. Die Anwendung ist rundenabhaengig: Stufe 0 legt die frueheste Runde fest, ab der die
+   Netzrangfolge ausreichend aufloesend ist. Vorher bleibt der exakte Einzelplan aktiv oder
+   eine separat registrierte, rein strukturelle Dominanzregel entscheidet.
+5. Kein neuer Policy-Kopf, keine Kreuzprodukt-Action-ID und kein neues Trainingsziel sind Teil
+   dieses Baus. Es ist ein Blatt-Selector ueber legale, bereits exakt erzeugte Endzustaende.
+
+### 14.5 Tore, Lesart und Stopp-Punkte
+
+* **Abhaengigkeit:** Variante B besteht Kosten-, Sicht- und Arena-Tor. Ein negativer B-Befund
+  schliesst Top-K hier, weil ohne die Nach-Tiling-Sicht kein sauberer Verbraucher bleibt.
+* **Korrektheit:** K=1 ist bitidentisch zu Variante B; jeder K-Kandidat ist legal,
+  der vorregistrierten Tiling-Reihenfolge zuordenbar und erzeugt ueber den normalen Spielpfad
+  denselben Nachzustand wie der Selector. Champion-Paritaet, Anker-Drift und
+  Anker-Konservierung muessen gruen sein.
+* **Kosten:** Ein eigenes Kostentor wird vor dem Bau aus Stufe 0 vorgeschlagen. Es misst
+  Wanduhr je Partie und Anteil betroffener Blaetter gegen Variante B, nicht gegen den alten
+  Pfad ohne Tiling-im-Blatt.
+* **Arena:** nur mit demselben Netz und sonst identischem Spec gegen Variante B, zwei Seeds,
+  je 200 Paare, Blockgroesse 5, ohne Frueh-Stopp und mit Logs. Die sechs Standard-Kennzahlen
+  sind Pflicht; besonders Punkte je Wertungsplatte, Spalten, Spezialfelder und Chip-Verbrauch
+  werden getrennt ausgewiesen.
+* **Stopp:** keine Mehrdeutigkeit, keine rundenweise Rangaufloesung oder ein gerissenes
+  Kostentor beendet den Strang vor dem Arena-A/B. Eine Verbesserung nur in einer
+  nachtraeglich gewaehlten Kandidatenklasse gilt nicht.
+
+Ein positiver A/B macht Top-K zu einem Rezept-Kandidaten, nicht automatisch zum Default. Die
+Aufnahme bleibt ein Nutzer-Entscheid; die Entfernung eines durch Top-K ersetzten Proxys folgt
+getrennt nach `PREREG_minimal_strength_core.md` par.4.
 

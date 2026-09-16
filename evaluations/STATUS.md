@@ -488,7 +488,7 @@ wirkt zu stark; hier ist der Term zu schwach, um ueberhaupt messbar zu sein.
 | Schritt | Ergebnis |
 | --- | --- |
 | **par.12.0** Trainingsziel des `moon`-Kopfs | **No-Op**, am Code belegt: das Label ist immer die kanonische Reihenfolge |
-| **32c** Zugriffs-Bilanz (n = 9.372) | **Hebel KLEIN**: Gegner nimmt den oben gelegten Stein nur in 14,8 Prozent im naechsten Halbzug (Tor 25) |
+| **32c** Zugriffs-Bilanz (n = 9.372) | enge Frage beantwortet (14,8 Prozent im naechsten Halbzug); **Folgerung 'Hebel klein' am 2026-09-16 ZURUECKGENOMMEN** -- ein Mondzug nimmt ALLE Oberseiten einer Farbe, 43,8 Prozent der Zuege raeumen mehrere Steine ab (par.12.3a) |
 | **Korpus-Sonde b04** | Tor OFFEN: **44,1 Prozent** nicht-kanonisch gespielt (Tor war 10) |
 | **R1** (29b, Sensitivitaet) | Erwartung WIDERLEGT: Spannweite Median 0,0188, Typfolge in 73,7 Prozent aenderbar |
 | **v29-b05** Tor 1 gegen b03 | **427:373 aus 800 Partien**, gepoolt z = 1,98 |
