@@ -570,7 +570,11 @@ Punkt 3 verlangt: 755 gegen 794 bei gleichem Fenster und Rezept. Auf frozen_v3 s
 Groessenordnung wie beim Paar b03/b05 (0,0040). Gemessen auf CPU neben dem laufenden b04-Training
 (erlaubte Paarung); zwei Staende der Tabelle liefen zur Kontrolle mit und reproduzieren die
 GPU-Zahlen auf 2 mal 10^-5. Einschraenkungen: b01 gibt es nur als `_best` (Val-Loss) gegen b03s
-`_brierbest`, und die Orakel-Haelfte von Punkt 3 ist noch offen. Artefakt
+`_brierbest`. **Die Orakel-Haelfte ist um 20:45 nachgezogen** und sagt dasselbe: Prior-Masse
+auf Orakel-Top-3 +0,0002, Kendall-Tau +0,0013 fuer b03 gegen b01 (n = 915, frozen_v3-Labels,
+Orakel v23-b01 @5.000 Sims, `oracle_p3_b03_vs_b01_frozenv3.json`) -- **Punkt 3 ist in beiden
+Haelften durch, offen an par.6d bleibt nur Punkt 4.** `oracle_metrics.py` trug denselben
+Breiten-Defekt und ist mitrepariert. Artefakt
 `net_health_p5_v29-b01_nachtrag.json`.
 
 **Nebenher behoben:** kein Fortschrittszaehler (der 23-Minuten-Lauf war stumm), kein

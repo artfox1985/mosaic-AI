@@ -196,9 +196,25 @@ def load_model(name: str):
     Checkpoint funktionsfaehig."""
     ckpt_path = MODELS_DIR / f"alphazero_{name}.pth"
     ckpt = torch.load(str(ckpt_path), map_location="cpu")
-    model, encoder = build_model_from_checkpoint(ckpt, input_size=INPUT_SIZE, num_actions=NUM_ACTIONS)
+    # GENERATIONEN-VERGLEICH (2026-09-16, PREREG_v29_window.md par.9): mit
+    # `input_size=INPUT_SIZE` scheiterte hier JEDER Alt-Checkpoint an
+    # `size mismatch for flat_branch.0.weight`, sobald der Merkmalsvektor
+    # gewachsen war (744/755 gegen heute 794) -- derselbe Defekt, der in
+    # `tools/offline_diagnosis.py` am selben Tag behoben wurde. `None` laesst
+    # `build_model_from_checkpoint` die Breite AUS DEM state_dict ableiten.
+    model, encoder = build_model_from_checkpoint(ckpt, input_size=None, num_actions=NUM_ACTIONS)
     model.eval()
-    return model, encoder
+    # Die Breiten, auf die der Aufrufer die Eingaben KUERZEN muss -- genau das,
+    # was der Spielpfad tut (engine/src/net.rs:425 flach, :989 je Planes-Kanal).
+    # Erlaubt ist es, weil der Vektor additiv gewachsen ist: Abschnitt 15 haengt
+    # hinter Index 743, Abschnitt 16 hinter 754 (engine/src/features.rs:2273/2308).
+    if encoder == "2d":
+        flat_in = int(model.flat_branch[0].in_features)
+        planes_c = int(model.conv[0].in_channels)
+    else:
+        flat_in = int(model.body[0].in_features)
+        planes_c = None
+    return model, encoder, flat_in, planes_c
 
 
 def masked_softmax(logits: np.ndarray, mask: np.ndarray) -> np.ndarray:
@@ -281,15 +297,29 @@ def compute_for_model(model_name: str, oracle_labels: list[dict], states_by_idx:
                        gumbel_rng: np.random.Generator | None = None,
                        gumbel_draws: int = DEFAULT_GUMBEL_DRAWS):
     print(f"  Netz {model_name} ...", flush=True)
-    model, encoder = load_model(model_name)
+    model, encoder, flat_in, planes_c = load_model(model_name)
 
     # Batched Forward-Pass ueber ALLE gelabelten Zustaende (Reihenfolge wie oracle_labels).
     tensors = [state_to_tensor(states_by_idx[lbl["record_index"]]["state"]) for lbl in oracle_labels]
     batch = torch.stack(tensors, dim=0)
+    # KUERZEN, NIE AUFFUELLEN: ein Netz, das MEHR verlangt als der heutige Bauer
+    # liefert, ist ein harter Fehler -- Nullen waeren eine erfundene Sicht.
+    if flat_in > batch.shape[1]:
+        raise RuntimeError(
+            f"{model_name} verlangt {flat_in} Merkmale, geliefert werden {int(batch.shape[1])} "
+            f"(config.INPUT_SIZE={INPUT_SIZE}). Aufgefuellt wird NIE."
+        )
+    batch = batch[:, :flat_in]
     with torch.no_grad():
         if encoder == "2d":
             planes_tensors = [state_to_planes(states_by_idx[lbl["record_index"]]["state"]) for lbl in oracle_labels]
             planes_batch = torch.stack(planes_tensors, dim=0)
+            if planes_c > planes_batch.shape[1]:
+                raise RuntimeError(
+                    f"{model_name} verlangt {planes_c} Planes-Kanaele, geliefert werden "
+                    f"{int(planes_batch.shape[1])}."
+                )
+            planes_batch = planes_batch[:, :planes_c]
             pred_p, pred_v, _pred_moon, _pred_points, *_own = model(planes_batch, batch)
         else:
             pred_p, pred_v, _pred_moon, _pred_points, *_own = model(batch)

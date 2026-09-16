@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- **v29-b03 SCHLAEGT DEN CHAMPION** (275:215 in 490 Partien, drei Seeds); Promotion ans Ende der Generationsarbeit vertagt, vier Elo-Kanten eingetragen. b01 zweimal H0. b02 gegen b03: Kanaele wirken auf den Posten, nicht auf die Siegquote (147:153). **par.6d Punkt 5 DURCH** und mit ihm die Aera-Frage von Punkt 3: kein Absterben, b03 (794) gegen b01 (755) 0,0041 Abstand, unter der Aufloesungsgrenze. Der TREND ueber die Aeren bleibt unmessbar -- der Val-Split ist mit der Generation wachsend kontaminiert (82 gegen 33 Prozent). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- **v29-b03 SCHLAEGT DEN CHAMPION** (275:215 in 490 Partien, drei Seeds); Promotion ans Ende der Generationsarbeit vertagt, vier Elo-Kanten eingetragen. b02 gegen b03: Kanaele wirken auf den Posten, nicht auf die Siegquote (147:153). **par.6d Punkte 3 und 5 DURCH**: der gewachsene Eingang kostet offline nichts und bringt nichts -- b03 (794) gegen b01 (755) 0,0041 R2, +0,0002 Prior-Masse, +0,0013 Tau, alles unter der Aufloesungsgrenze. Der TREND ueber die Aeren bleibt unmessbar (Val-Split mit der Generation kontaminiert, 82 gegen 33 Prozent). Offen: Punkt 4. -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -1302,12 +1302,61 @@ Tabelle MIT: `v27-b01_brierbest` kommt auf 0,344021 gegen 0,3440 und
    Vergleich mischt damit zwei Auswahlkriterien. Bei einem Abstand von 0,0041
    unter einer Aufloesungsgrenze von 0,015 traegt das die Aussage "kein Befund"
    trotzdem -- es koennte sie nur staerker machen, nicht kippen.
-2. **Punkt 3 ist damit nicht vollstaendig.** Die Prereg verlangt fuer Punkt 3
+2. **Punkt 3 war damit noch nicht vollstaendig** (nachgeholt im Abschnitt unten). Die Prereg verlangt fuer Punkt 3
    AUSSERDEM `tools/oracle_metrics.py` (prior_mass_on_oracle_top3, kendall_tau)
    auf demselben Split -- die einzigen arena-validierten Praediktoren. Die sind
    hier NICHT gerechnet; ihre Labels liegen als
    `evaluations/artifacts/frozen_v3_oracle_labels.json` bereit, der Einstieg ist
    `oracle_metrics.py --frozen-set evaluations/frozen_eval_set_v3.pkl`.
+
+#### Orakel-Haelfte von Punkt 3 (2026-09-16, 20:45): dieselbe Antwort, aus dem besseren Instrument
+
+Punkt 3 verlangt neben `offline_diagnosis.py` auch `tools/oracle_metrics.py`
+(prior_mass_on_oracle_top3, kendall_tau) auf demselben Satz -- die einzigen gegen
+die Arena validierten Praediktoren. Jetzt gerechnet.
+
+**Das Werkzeug trug denselben Defekt** wie `offline_diagnosis.py`:
+`oracle_metrics.py:199` baute das Modell mit `input_size=INPUT_SIZE`, womit
+`v29-b01_best` (755) an `size mismatch for flat_branch.0.weight` gescheitert waere.
+Gleiche Reparatur: Breite aus dem `state_dict`, Merkmale und Planes darauf
+gekuerzt, harter Fehler statt Auffuellen.
+
+n = 915 Zustaende, GRUNDMENGE die Orakel-Labels mit auswertbaren Wurzelkandidaten
+(von 1.144 Labels des Satzes), EINHEIT Anteil bzw. Rangkorrelation. Orakel-Quelle
+`alphazero_v23-b01_brierbest.onnx` @ 5.000 Sims
+(`frozen_v3_oracle_labels.json`); KEINES der drei Netze ist die Quelle, die
+Zirkularitaet aus `PREREG_frozen_v3_eval_set.md` par.9 greift hier also nicht.
+Artefakt `evaluations/artifacts/oracle_p3_b03_vs_b01_frozenv3.json` (8,2 s).
+
+| Modell | Eingang | Prior-Masse auf Orakel-Top-3 | Kendall-Tau | recall@16 |
+| --- | --- | --- | --- | --- |
+| v29-b01_best (Pflichtarm) | 755 | 0,6639 | 0,2592 | 0,9803 |
+| v29-b03_brierbest (Sicht-Arm) | 794 | 0,6641 | 0,2605 | 0,9781 |
+| v27-b01_brierbest (Referenz) | 744 | 0,6722 | 0,2570 | 0,9814 |
+
+**VERDIKT: kein Befund, und diesmal aus dem Instrument, das die Arena vorhersagt.**
+b03 gegen b01 steht bei **+0,0002** Prior-Masse und **+0,0013** Kendall-Tau --
+beide Richtungen positiv fuer den breiteren Eingang, beide Betraege so klein, dass
+sie nichts tragen. Damit sagen BEIDE Haelften von Punkt 3 dasselbe wie die
+Value-Seite (0,0041 R2-Abstand): die 39 zusaetzlichen Eingangswerte kosten offline
+nichts und bringen offline nichts.
+
+**Drei Einschraenkungen:**
+
+1. **Die 7/7-Validierung ist nicht automatisch uebertragbar.** Sie stammt aus
+   frozen_v1 mit dem v18-Orakel (STATUS, "Orakel-Metriken validiert 2026-07-28");
+   hier laufen frozen_v3 und das v23-b01-Orakel. Dass die Metrik DORT die Arena
+   7/7 traf, sagt nicht, dass sie es hier tut -- ungeprueft.
+2. **Der Block "Gating-Rueckblick 0/0 richtig" in der Ausgabe gehoert NICHT zu
+   diesen Netzen.** Er rechnet gegen die fest verdrahteten v14-v16-Paare
+   (`oracle_metrics.py:100`, `CANDIDATE_MODELS`); ohne Elo-Eintraege fuer unsere
+   Namen bleibt er leer. Kein Fehlschlag, nur ein unbesetzter Rueckblick.
+3. **Auswahlmasse gemischt**, wie bei der Value-Seite: b01 gibt es nur als
+   `_best`, b03 ist ein `_brierbest`.
+
+**Damit ist Punkt 3 in beiden Haelften beantwortet.** Offen an par.6d bleibt nur
+noch Punkt 4 (Value-Kopf-Verlaesslichkeit: `value_head_reliability_probe.py` und
+`platt_fit.py`, b03 gegen b01).
 
 ## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
 
