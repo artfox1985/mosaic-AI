@@ -1358,6 +1358,45 @@ nichts und bringen offline nichts.
 noch Punkt 4 (Value-Kopf-Verlaesslichkeit: `value_head_reliability_probe.py` und
 `platt_fit.py`, b03 gegen b01).
 
+#### Die drei Sonden mit demselben Defekt: repariert, und sie waren doppelt tot (2026-09-16, 21:00)
+
+`floor_action_aversion_gate.py`, `long_row_prior_gate.py` und
+`saturating_score_utility_gate.py` bauten ihr Modell ebenfalls mit
+`input_size=INPUT_SIZE`. Beim Reparieren kam ein **zweiter** Defekt zum
+Vorschein: alle drei zeigen fest auf `alphazero_v21_2d_brierbest`, und diese
+Datei liegt seit der Aufraeumregel "nur die letzten zwei Champions" nicht mehr
+im Baum. Sie waren also nicht nur fuer Alt-Checkpoints kaputt, sondern
+ueberhaupt nicht mehr lauffaehig -- und das faellt niemandem auf, solange
+niemand sie startet.
+
+Geaendert:
+
+* **Ein gemeinsamer Helfer** statt einer vierten Kopie derselben Zeilen:
+  `neural_net.py::crop_features_to_model` (mit `model_input_widths`). Er leitet
+  die Breiten aus dem gebauten Modell ab und kuerzt Merkmale wie Planes --
+  dieselbe Regel, die `net.rs:425` und `:989` im Spielpfad anwenden, und ein
+  harter Fehler statt Auffuellen, wenn ein Netz MEHR verlangt als geliefert wird.
+* **`MOSAIC_PROBE_MODEL`** waehlt den Modellstamm; Default bleibt der
+  Bestandswert, damit der registrierte Lauf benannt bleibt. Fehlt die Datei,
+  bricht die Sonde jetzt mit einem Satz ab, der die Aufraeumregel nennt, statt
+  mit einem nackten `FileNotFoundError`. **Zahlen unter einem anderen Stamm sind
+  NICHT mit dem registrierten Lauf vergleichbar** -- das sagt die Meldung mit.
+
+**Funktionsprobe** (keine Messung): acht Zustaende aus frozen_v3 durch alle drei
+Forward-Pfade, je einmal mit `v27-b01_brierbest` (744) und `v28-b02_brierbest`
+(755) gegen den heutigen Bauer mit 794. Alle sechs Kombinationen laufen durch,
+alle Ausgaben endlich; die Prior-Logits spannen -59,4 bis +2,2 (744) bzw. -70,4
+bis +2,2 (755), der Value-Kopf liefert -0,0423 bzw. +0,0085. Vor der Reparatur
+war jede dieser sechs ein `size mismatch`.
+
+**Offen geblieben (bewusst):** `tools/offline_diagnosis.py` und
+`tools/oracle_metrics.py` tragen ihren Zuschnitt noch inline, statt den neuen
+Helfer zu rufen -- beide sind gemessen und committet, das Zusammenfuehren ist
+reine Aufraeumarbeit ohne neue Aussage. `tools/diagnosis.py`,
+`freeze_trunk_selfcheck.py` und `tiling_value_reference_pilot.py` bauen ihr Netz
+direkt als `MosaicNet(input_size=INPUT_SIZE, ...)`; ob sie ueberhaupt noch
+benutzt werden, ist UNGEPRUEFT.
+
 ## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
 
 ### 1. Ziel und Verdikt-Regel

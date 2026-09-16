@@ -574,7 +574,11 @@ GPU-Zahlen auf 2 mal 10^-5. Einschraenkungen: b01 gibt es nur als `_best` (Val-L
 auf Orakel-Top-3 +0,0002, Kendall-Tau +0,0013 fuer b03 gegen b01 (n = 915, frozen_v3-Labels,
 Orakel v23-b01 @5.000 Sims, `oracle_p3_b03_vs_b01_frozenv3.json`) -- **Punkt 3 ist in beiden
 Haelften durch, offen an par.6d bleibt nur Punkt 4.** `oracle_metrics.py` trug denselben
-Breiten-Defekt und ist mitrepariert. Artefakt
+Breiten-Defekt und ist mitrepariert -- ebenso die drei Sonden `floor_action_aversion_gate`,
+`long_row_prior_gate` und `saturating_score_utility_gate`, die dabei als DOPPELT tot auffielen:
+sie zeigen fest auf `v21_2d_brierbest`, das der Aufraeumregel zum Opfer gefallen ist. Jetzt
+ueber `MOSAIC_PROBE_MODEL` waehlbar, mit sprechendem Abbruch. Der Zuschnitt liegt seit heute als
+gemeinsamer Helfer `neural_net.py::crop_features_to_model` vor. Artefakt
 `net_health_p5_v29-b01_nachtrag.json`.
 
 **Nebenher behoben:** kein Fortschrittszaehler (der 23-Minuten-Lauf war stumm), kein

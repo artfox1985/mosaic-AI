@@ -2329,3 +2329,50 @@ def build_model_from_checkpoint(ckpt: dict, input_size: int | None = None, num_a
                           value_head_variant=value_head_variant)
     model.load_state_dict(state, strict=False)
     return model, encoder
+
+
+def model_input_widths(model, encoder: str) -> tuple[int, int | None]:
+    """Die Eingangsbreiten, die DIESES Modell deklariert: (flach, Planes-Kanaele).
+
+    Quelle ist das gebaute Modell, nicht `config.INPUT_SIZE` -- der Flachvektor
+    waechst (714 -> 744 -> 755 -> 794), ein Alt-Checkpoint deklariert eine
+    kleinere Breite und bleibt trotzdem benutzbar. Gegenstueck zu
+    `crop_features_to_model`."""
+    if encoder == "2d":
+        return int(model.flat_branch[0].in_features), int(model.conv[0].in_channels)
+    return int(model.body[0].in_features), None
+
+
+def crop_features_to_model(model, encoder: str, flats, planes=None):
+    """Kuerzt einen HEUTE gebauten Merkmals-/Planes-Batch auf die Breite, die
+    `model` deklariert -- und fuellt NIE auf.
+
+    Genau das tut der Spielpfad: `engine/src/net.rs:425` schneidet den
+    Flachvektor auf die Modellbreite, `net.rs:989` die Planes je Kanal. Erlaubt
+    ist es, weil der Vektor ADDITIV waechst -- Abschnitt 15 haengt hinter Index
+    743, Abschnitt 16 hinter 754 (`engine/src/features.rs:2273` / `:2308`,
+    Python-Zwilling `state_to_tensor_python` Abschnitte 15/16). Ein Alt-Modell
+    sieht dadurch exakt seinen alten Vektor.
+
+    Verlangt das Modell MEHR als geliefert wird, ist das ein harter Fehler:
+    Nullen waeren eine erfundene Sicht, kein fehlendes Merkmal.
+
+    Angelegt 2026-09-16, nachdem derselbe Zuschnitt in
+    `tools/offline_diagnosis.py` und `tools/oracle_metrics.py` einzeln
+    nachgebaut werden musste und in drei Sonden ganz fehlte
+    (PREREG_v29_window.md par.9)."""
+    flat_in, planes_c = model_input_widths(model, encoder)
+    if flat_in > flats.shape[1]:
+        raise RuntimeError(
+            f"Modell verlangt {flat_in} Merkmale, geliefert werden {int(flats.shape[1])} "
+            f"(config.INPUT_SIZE={INPUT_SIZE}). Aufgefuellt wird NIE -- Wheel neu bauen "
+            f"bzw. config.INPUT_SIZE nachziehen."
+        )
+    flats = flats[:, :flat_in]
+    if encoder != "2d" or planes is None:
+        return flats, planes
+    if planes_c > planes.shape[1]:
+        raise RuntimeError(
+            f"Modell verlangt {planes_c} Planes-Kanaele, geliefert werden {int(planes.shape[1])}."
+        )
+    return flats, planes[:, :planes_c]
