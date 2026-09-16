@@ -206,6 +206,32 @@ def merge(parts, target, window_key=None, mask_parts=None):
     return felder
 
 
+def window_key_for_entries(data_dir, entries, *, value_target_variant,
+                           encoder, conjunction_head):
+    """Der Fenster-Schluessel, den ein Zusammenfueger auf den Monolithen praegt
+    -- in DER Pfadform, in der die Verbraucher ihn rechnen.
+
+    WARUM DIESE FUNKTION EXISTIERT (docs/pitfalls.md, 2026-09-17): `str(files)`
+    steht im Schluesselmaterial von `corpus_dataset.window_cache_key`, also
+    bestimmt die PFADFORM der Eintraege den Schluessel -- Basename,
+    `data/x.pkl` und absolut ergeben DREI verschiedene Werte fuer denselben
+    Datensatz. Die Verbraucher rechnen absolut (`train.py` Z. 1213
+    `glob(str(DATA_DIR / "*.pkl"))`, `tools/window_train_split.py` Z. 92 ueber
+    denselben Glob), die beiden Zusammenfueger rechneten es jeder fuer sich
+    nach -- und `build_cache_incremental.py` in der Form `data/x.pkl`. Ergebnis
+    am Arm v29-b06: Stempel 4dd9f020b232 in der Datei .cache_fd13f54061cd.h5,
+    und der `--cache-file`-Waechter lehnte den frisch gebauten Monolithen ab.
+
+    Eine Stelle statt zweier; festgenagelt in
+    `tools/tests/test_cache_key_path_form.py`.
+    """
+    import corpus_dataset
+    return corpus_dataset.window_cache_key(
+        data_dir, [os.path.abspath(f) for f in entries],
+        value_target_variant=value_target_variant,
+        encoder=encoder, conjunction_head=conjunction_head)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--data-dir", default="data")
@@ -279,9 +305,13 @@ def main():
     # der, den `train.py --cache-file` erwartet. Berechnet aus derselben
     # Konfiguration wie die Worker (`kwargs`) und aus DER Dateiliste, die
     # tatsaechlich gebaut wurde (inkl. --limit und MOSAIC_DATA_EXCLUDE).
-    import corpus_dataset
-    window_key = corpus_dataset.window_cache_key(
-        a.data_dir, dateien, value_target_variant=a.value_target_variant,
+    # PFADFORM (docs/pitfalls.md, 2026-09-17): `str(files)` steht im Schluessel-
+    # material; train.py rechnet mit ABSOLUTEN Pfaden (glob ueber config.DATA_DIR).
+    # Der Stempel muss dieselbe Form haben, sonst lehnt --cache-file die Datei ab.
+    # Die Umstellung auf absolute Pfade steckt in `window_key_for_entries`.
+    window_key = window_key_for_entries(
+        a.data_dir, dateien,
+        value_target_variant=a.value_target_variant,
         encoder=a.encoder, conjunction_head=a.conjunction_head)
 
     t1 = time.time()

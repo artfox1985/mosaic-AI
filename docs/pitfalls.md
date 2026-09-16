@@ -433,3 +433,21 @@ Zusatz; `tools/analyze_game_log.py` traegt dafuer zwei datierte Toleranzen
   Schluessel und bricht bei Abweichung hart ab, statt dem Dateinamen zu glauben
   (`tools/tests/test_name_path_cache_key_guard.py`) -- die Pfadform-Reparatur
   selbst bleibt damit unberuehrt und offen.
+
+  **Zweiter Vorfall derselben Familie, 2026-09-17 01:19 (Arm v29-b06):** `window_train_split.py`
+  rechnete fd13f54061cd (absolute Pfade), `build_cache_incremental.py --merge-out` stempelte in
+  DIESELBE Datei 4dd9f020b232 (Form `data/x.pkl`, `os.path.join(data_dir, basename)`), und der
+  `--cache-file`-Waechter in `train.py` lehnte den frisch gebauten Monolithen ab -- korrekt, die
+  Selbstauskunft passte nicht zum Verbraucher. Ohne den Waechter haette der Lauf still geladen.
+  **Behoben an der Quelle:** beide Zusammenfueger (`build_cache_incremental.py`,
+  `build_cache_parallel.py`) rechnen den Stempel seit dem 2026-09-17 aus ABSOLUTEN Pfaden, also in
+  der Form von `train.py` (`glob(str(DATA_DIR / "*.pkl"))`) und `window_train_split.py`; beide
+rechnen den Stempel seither durch EINE gemeinsame Funktion
+(`build_cache_parallel.window_key_for_entries`), und dass Stempel und Verbraucher-Schluessel
+uebereinstimmen, ist festgenagelt in `tools/tests/test_cache_key_path_form.py` (dort auch die
+drei Pfadformen als drei verschiedene Schluessel, und der Rest-Zacken: `abspath` loest Basenames
+gegen das ARBEITSVERZEICHNIS auf, nicht gegen `data_dir`). Die
+  Normalisierung auf Basenames (die eigentliche Reparatur, entwertet alle Monolithen) bleibt
+  offen und Nutzer-Entscheid. Die falsch gestempelte Datei `data/.cache_fd13f54061cd.h5`
+  (1,15 GB, Stempel 4dd9f020b232) liegt zur Loeschung; der Ersatz heisst
+  `data/.cache_fd13f54061cd_b06.h5`.
