@@ -383,3 +383,48 @@ Zusatz; `tools/analyze_game_log.py` traegt dafuer zwei datierte Toleranzen
   (`e4c2a9df4754` / `9f2f1e01004c`), nicht die beiden echten. Solange das so
   ist, kann niemand einen Cache-Namen pruefen, ohne den Bau zu wiederholen.
   Offen, Wiedervorlage beim naechsten Anfassen des Schluessels.
+
+- **Der Fenster-Cache-Schluessel haengt an der PFADFORM der Dateiliste, nicht
+  nur am Datensatz** (gemessen 2026-09-16). Das ist die Wurzel der
+  Cache-Verwirrung, nicht der einzelne vergessene Knopf.
+
+  Dieselben 2800 Dateien, dieselben Knoepfe, dieselbe Umgebung -- und
+  `window_cache_key` liefert DREI verschiedene Schluessel, je nachdem, wie die
+  Eintraege der Liste geschrieben sind:
+
+  | Form der Eintraege | Schluessel |
+  | --- | --- |
+  | `selfplay_x.pkl` (Basename) | `9f2f1e01004c` |
+  | `data/selfplay_x.pkl` | `4a038a9eecbf` |
+  | `D:\...\data\selfplay_x.pkl` (absolut) | `be157f1118c0` |
+
+  **Folgen, alle am 2026-09-16 eingetreten:**
+
+  * `train.py` und `window_train_split.py` rechnen mit ABSOLUTEN Pfaden, also
+    haengt der Schluessel jedes Monolithen am Installationsort des Projekts.
+    Wer das Projekt verschiebt, entwertet damit jeden Cache.
+  * `build_cache_incremental.py` rechnet mit einer anderen Listenform und
+    schreibt deshalb einen Monolithen, dessen eingepraegter Schluessel nicht
+    zu seinem Dateinamen passt: das Bau-Artefakt
+    `evaluations/artifacts/cache_build_incremental.json` fuehrt `merge_out`
+    `.cache_fd13f54061cd.h5` und gleichzeitig `cache_key` `4dd9f020b232`.
+  * EIN Datensatz trug dadurch nacheinander VIER Namen
+    (`fd13f54061cd`, `4dd9f020b232`, `9f2f1e01004c`, `be157f1118c0`).
+  * `train.py` fand seinen eigenen, kurz zuvor gebauten Monolithen nicht und
+    baute ihn EINFAEDIG neu -- drei Stunden, ein Kern, GPU im Leerlauf, kein
+    Modell. Genau so sah der gescheiterte b04-Lauf aus.
+  * Ein zweiter Fall liegt seit dem 2026-09-14 im Baum:
+    `.cache_35c6bd2b9bd2.h5` traegt intern `41bfd55372ea`. Das Problem ist
+    also aelter als der Vorfall, der es sichtbar gemacht hat.
+
+  **Diagnose in einem Griff:** `python tools/cache_doctor.py` zeigt je Cache,
+  ob Dateiname und eingepraegter Schluessel uebereinstimmen, wem er gehoert und
+  was verwaist ist.
+
+  **NOCH NICHT REPARIERT.** Die naheliegende Behebung ist, die Dateiliste im
+  Schluessel auf Basenames zu NORMALISIEREN (der Datensatz ist durch seine
+  Dateinamen bestimmt, nicht durch seinen Ablageort). Das entwertet allerdings
+  JEDEN vorhandenen Monolithen auf einen Schlag -- die Umstellung gehoert
+  deshalb an einen Generationswechsel und ist ein Nutzer-Entscheid. Bis dahin
+  gilt: wer einen Cache von Hand adressiert, nimmt `--cache-file` und laesst
+  `verify_cache_file` pruefen, statt sich auf den Dateinamen zu verlassen.

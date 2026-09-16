@@ -18,58 +18,116 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ## 1. WAS GERADE LAEUFT
 
-**Stand 2026-09-16, 21:30: nichts laeuft.** Die Maschine ist frei. Netz-Gesundheit Punkt 5 ist
-durch (Chip-Sitzung, Verdikt weiter unten); Punkt 3/4 fuer das Paar b03/b05 ist registriert
-(`net_health_p3_b03_b05.json`, `moon_stack_order` par.12.6: **kein Befund**, 0,0040 R2-Abstand
-bei einer Aufloesungsgrenze von 0,015 -- der Verwerfungs-Ausgang ist damit ausgeschlossen, die
-Arena-Kante nicht bestaetigt).
+**UEBERGABE 2026-09-16, 22:00 (Sitzungswechsel, Kontext voll).** Anlass: eine Nacht mit zwei
+Vorfaellen (Ketten-Stillstand, ueberschriebener Monolith) und der daraus folgenden
+Cache-Sanierung auf Nutzer-Auftrag.
 
-> **ABGEBROCHEN UND ZU WIEDERHOLEN: Arm v29-b04.** Der Lauf vom 17:32 ist nach drei Stunden auf
-> Nutzer-Entscheid beendet worden. Er lief auf EINEM Kern (CPU/Wanduhr 1,0 gegen 5,5 bei b03),
-> die GPU stand bei 4 Prozent, nach drei Stunden war kein einziges Modell geschrieben, und er
-> benutzte den eigens gebauten Monolithen gar nicht. **Die Ursache ist ungeklaert** -- die
-> Trainingsausgabe ist mit ihrem Wrapper gestorben. Der Nutzer faehrt den Wiederholungslauf
-> deshalb von Hand in der Shell, wo `train.py` Device und Threadzahl beim Start druckt.
->
-> **Der Schaden daneben wog schwerer als der verlorene Lauf:** b04 hat den Monolithen von b03
-> ueberschrieben (1,15 GB), weil `tools/window_train_split.py:92` den Knopf
-> `moon_target_source` nicht an `window_cache_key` durchreichte und dessen Parameter-Default
-> `"label"` b03s Schluessel ergab. Von SIEBEN Aufrufern der Funktion reichten ihn FUENF nicht
-> durch. Die Datei liegt jetzt unter ihrem echten Schluessel `.cache_4dd9f020b232.h5`
-> (umbenannt auf Nutzer-Freigabe); ihr Inhalt ist dank des Umgebungs-Fingerabdrucks eindeutig
-> als der `played`-Datensatz ausgewiesen. **b03s Monolith ist weg** und bei Bedarf aus den
-> Bloecken neu zu bauen.
+### LAEUFT
 
-**CACHE-SYSTEM SANIERT** (Nutzer-Auftrag: *"setz die caches wirklich mal sauber auf. das ist mir
-alles viel zu fragil und fehleranfaellig und laesst sich als normaler bediener nicht mehr
-handhaben"*). Gebaut und je mit Tests belegt:
+**Auf der Maschine: nichts.** Kein Training, keine Arena, keine Sonde. Die Maschine ist frei.
 
-| Stueck | Wirkung |
+**Der Nutzer faehrt v29-b04 selbst in seiner Shell** (ausdruecklicher Wunsch 2026-09-16:
+*"gib mir den python befehl fuer b04. das werd ich in der shell fahren"*). Grund: der vorige
+Lauf hing, und seine Ausgabe war nicht sichtbar, weil sie an einem gestorbenen Wrapper hing.
+Der Befehl steht unten unter Schritt 1. **Die neue Sitzung startet ihn NICHT selbst** -- sie
+begleitet ihn, wertet aus und faehrt danach Tor 1.
+
+### ERSTE AUFGABE DER NEUEN SITZUNG, in dieser Reihenfolge
+
+**1. v29-b04 begleiten und abnehmen** (Fahrplan 32b, `PREREG_moon_stack_order.md` par.12.1).
+
+Der Nutzer startet das Training. Drei Dinge in den ersten Minuten pruefen, jedes ein
+Abbruchgrund -- sie sind genau die drei Punkte, die beim gescheiterten Lauf im Dunkeln lagen:
+
+* **Device muss `cuda` sein.** Der Lauf vom 17:32 rechnete auf EINEM Kern (CPU/Wanduhr 1,0
+  gegen 5,5 bei b03) bei GPU 4 Prozent und hatte nach drei Stunden kein Modell geschrieben.
+  **Die Ursache ist bis heute ungeklaert** -- wer sie findet, traegt sie hier ein.
+* **Cache: ERLEDIGT am 2026-09-16 21:07.** Der Lauf laeuft mit
+  `--cache-file data/.cache_be157f1118c0.h5` und meldet *"Schluessel be157f1118c0 bestaetigt
+  (2800 Dateien, 4538842 Zustaende). Kein Cache-Bau."* -- dieselbe Zustandszahl wie b03s
+  Manifest. Der erste Versuch ohne `--cache-file` lief in den EINFAEDIGEN Cache-Neubau (genau
+  die Phase, in der der Lauf vom 17:32 drei Stunden verbracht hat) und wurde abgebrochen.
+  **Regel daraus: einen Cache immer ueber `--cache-file` adressieren**, nie ueber den
+  Dateinamen hoffen -- der haengt an der Pfadform (siehe unten).
+* **`Policy-Traeger gesamt: 580`** -- steht dort 2947, fehlt das Traegermanifest (derselbe
+  Fehlstart wie bei b05 am 2026-09-15, vom Nutzer an dieser Zahl erkannt). Abbrechen.
+
+Danach **Tor 1 gegen b03**, zwei Seeds a 200 Paaren, Blockgroesse 5, OHNE Frueh-Stopp, mit
+Logs; Befehle im Kettenskript `tools/night_v29_b04_moon_played_v2.sh` Schritt 4 (die **v2** ist
+die gehaertete Fassung, die alte NICHT benutzen). Abnahme: Manifest-Diff gegen b03 zeigt GENAU
+`moon_target_source` label -> played und den Namen, sonst nichts. Verdikt nach par.12.1; die
+Lesart steht dort vorab. Danach Netz-Gesundheit Punkte 1-2 (`v29_window` par.6d).
+
+**2. Cache-Sanierung zu Ende** (Nutzer-Auftrag 2026-09-16: *"setz die caches wirklich mal
+sauber auf ... laesst sich als normaler bediener nicht mehr handhaben"*). Drei Lagen stehen
+(Commit 6dd8cd4); zwei Luecken bleiben, beide in `../docs/pitfalls.md` beschrieben:
+
+* **Der Ladepfad prueft Name gegen Inhalt nur bei `--cache-file`** (`corpus_dataset.py:909`
+  ruft `verify_cache_file`), im Namenspfad gar nicht. Dort vertraut der Code dem Dateinamen.
+* **GEKLAERT am 2026-09-16, und das ist der eigentliche Befund: der Schluessel haengt an der
+  PFADFORM der Dateiliste.** Dieselben 2800 Dateien, dieselben Knoepfe, dieselbe Umgebung
+  ergeben drei verschiedene Schluessel -- Basenames `9f2f1e01004c`, `data/x.pkl`
+  `4a038a9eecbf`, absolute Pfade `be157f1118c0`. `train.py` und `window_train_split.py`
+  rechnen ABSOLUT, also haengt jeder Monolith am Installationsort des Projekts;
+  `build_cache_incremental.py` rechnet anders und schreibt deshalb Dateien, deren
+  eingepraegter Schluessel nicht zum Dateinamen passt. EIN Datensatz trug dadurch nacheinander
+  VIER Namen. Ein zweiter Fall liegt seit dem 2026-09-14 im Baum
+  (`.cache_35c6bd2b9bd2.h5` traegt intern `41bfd55372ea`), das Problem ist also aelter als der
+  Vorfall, der es sichtbar gemacht hat. Einzelheiten und Messung: `../docs/pitfalls.md`.
+
+  **Die Reparatur ist benannt, aber NICHT gemacht und ein Nutzer-Entscheid:** die Dateiliste im
+  Schluessel auf Basenames normalisieren (ein Datensatz ist durch seine Dateinamen bestimmt,
+  nicht durch seinen Ablageort). Das entwertet JEDEN vorhandenen Monolithen auf einen Schlag
+  und gehoert deshalb an einen Generationswechsel.
+
+**3. `tools/cache_doctor.py` abnehmen.** Ein Subagent hat es am 2026-09-16 gebaut (710 Zeilen,
+kompiliert); es soll je Cache zeigen, wem er gehoert, ob Name und eingepraegter Schluessel
+uebereinstimmen und was verwaist ist. **Regel 0: Agenten-Befunde sind Behauptungen** -- die
+tragenden Zahlen selbst nachpruefen, bevor sie irgendwo einfliessen. Es ist NICHT committet.
+
+**4. Fahrplan Nr. 33** (`PREREG_round_transition_search_sampling.md` par.9/10, Variante B).
+Die Stufe-0-Sonde dazu ist gebaut und vorregistriert (par.16,
+`tools/probes/counterfactual_tiling_ranking.py`), der Volllauf steht aus. Laufbefehl und die
+Begruendung der Stichprobengroesse stehen in par.16.7; **`--max-positions` ist das Soll JE
+RUNDE**, nicht die Gesamtzahl (par.16.8), und der erste Volllauf faehrt `--rounds 4` allein,
+weil nur dort die Wahrheitsquelle wertkopf-frei ist. Kosten bei sims=400/M=6: UNGEMESSEN.
+
+### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
+
+* **Kein Push ohne Anweisung** -- Ahead-Stand im Chat melden. Stand jetzt: **6 Commits** vor
+  `origin/main`.
+* **Loeschung nur auf pfadgenaue Nutzer-Freigabe**, mit restic-Beleg. Frage ist keine Anweisung.
+* **Nie committen:** `player_profiles.json`, `player_profiles.json.bak`,
+  `models/manifest_train_v28-b03_*`, `models/manifest_train_v28-b04_*`. Sie liegen im Baum und
+  sind NICHT in `.gitignore` -- nach `git add -A` also gezielt mit `git restore --staged`
+  wieder herausnehmen. (Vorschlag an den Nutzer, bisher nicht entschieden: in `.gitignore`.)
+* **Messungen laufen exklusiv**, Builds zaehlen als Last; GPU und CPU duerfen parallel, zwei
+  CPU-Messungen nicht. **Kein Commit waehrend eines Wanduhr-Laufs.**
+* **Kettenskripte als DATEI starten** (`bash tools/x.sh`), NIE Heredoc-schreiben-und-starten in
+  einem Befehl -- der Wrapper traegt sonst den Skripttext in seiner Kommandozeile, und die
+  Wartebedingung findet sich selbst (32 min Stillstand am 2026-09-16, dazu die Nachbarsitzung
+  blockiert; `../docs/pitfalls.md`).
+* Keine neuen Netzkoepfe; nicht jeden Arm in die Elo-Leiter; Laufzeiten ins Artefakt; sechs
+  Standard-Kennzahlen in jedem Messbericht; Bezeichner englisch, Inhalte deutsch.
+
+### OFFENE NUTZER-ENTSCHEIDE
+
+| Frage | Fundstelle |
 | --- | --- |
-| `window_cache_key` fragt die Umgebung | `moon_target_source=None` heisst "frag `MOSAIC_MOON_TARGET_SOURCE`" statt still `"label"`. Gemessen: ohne Env bitgleicher Schluessel (Bestand unberuehrt), mit Env heilt das Vergessen aller fuenf Aufrufer |
-| Ueberschreib-Schutz in `merge()` | Abbruch, wenn die Zieldatei einen fremden eingepraegten Schluessel traegt; nennt Besitzer, Umgebung und die zwei ueblichen Ursachen. `tools/tests/test_cache_overwrite_guard.py`, 4 Tests gruen |
-| Waechter gegen Rueckfall | `tools/tests/test_cache_key_knobs_are_env_coupled.py` (4 Tests) verbietet neue Knoepfe mit Sachwert-Default und prueft die Env-Kopplung am VERHALTEN, nicht nur an der Signatur; drei Altfaelle mit Begruendung gelistet, die Liste darf nur schrumpfen |
-| Nebenbefund behoben | die Schutz-Warnung stuerzte auf cp1252-Konsolen selbst ab (Emoji im print) -- eine Schutzzeile, die den Bau mitreisst, ist keine |
+| Dritter Seed als Stichentscheid fuer b05 (rund 75 min)? | `moon_stack_order` par.12.6, Nutzer 2026-09-16: *"den dritten seed fuer b05 heben wir uns auf falls er champion wird"* -- also nur bei Champion-Kandidatur |
+| Nr. 26: Claude-Partien g08-g10 | braucht den Nutzer selbst |
+| b03s Monolith neu bauen? | er ist ueberschrieben worden; Neubau rund 35 min aus den Bloecken, faellig erst wenn b03 wieder gebraucht wird |
+| Dry-Artefakte `evaluations/artifacts/_dry_*.json` loeschen? | vom Sonden-Bau uebrig, Verzeichnis ist git-ignoriert |
 
-**Offen am Cache-System, beides in `../docs/pitfalls.md` mit Wiedervorlage:** der Ladepfad
-prueft Name gegen Inhalt nur bei `--cache-file`, im Namenspfad gar nicht. Und **der Schluessel
-ist von aussen nicht nachrechenbar** -- ein Nachbau mit derselben Dateiliste und denselben
-Knoepfen ergab zwei WEITERE Werte (`e4c2a9df4754` / `9f2f1e01004c`), nicht die beiden echten.
-Solange das gilt, kann niemand einen Cache-Namen pruefen, ohne den Bau zu wiederholen.
+### WAS IN DIESER SITZUNG PASSIERT IST (Kurzfassung, Einzelheiten in den Preregs)
 
-> **STILLSTAND OFFENGELEGT (15:45 bis 16:17, 32 Minuten).** Die b04-Kette wurde per Heredoc
-> geschrieben UND im selben Befehl gestartet; dadurch trug der Wrapper-bash den ganzen
-> Skripttext (6.554 Zeichen, darin woertlich `train.py` und `paired_gating.py`) in seiner
-> Kommandozeile. Die Wartebedingung fand ihn und wartete auf sich selbst. **Der Schaden blieb
-> nicht in der eigenen Spur:** derselbe Wrapper enthielt `build_cache_incremental`, worauf die
-> Kette der Chip-Sitzung filtert -- die stand ebenso lange leer und lief binnen Sekunden an,
-> nachdem der Wrapper beendet war. DRITTER Vorfall dieser Familie (2026-09-09: 35 min; Nacht
-> auf 2026-09-13: die wartende Leiter-Kante startete gar nicht); die vorhandene Haertung half
-> nicht, weil die `[t]rain`-Klammer gegen den eigenen Suchbefehl schuetzt, nicht gegen einen
-> Wrapper, der den Suchbegriff als NUTZLAST traegt. Nachgezogen: dritte Haertungsstufe
-> `-and $_.Name -match 'python'` in drei Kettenskripten, Regel "Ketten als DATEI starten",
-> Vorfall in `../docs/pitfalls.md`. Keine Messung ist betroffen -- es wurde Zeit verloren, keine
-> Zahl verfaelscht.
+Netz-Gesundheit Punkt 3/4 registriert (kein Befund, `moon_stack_order` par.12.6). Die acht
+Review-Befunde zu par.14 abgearbeitet, drei am Code nachgeprueft; B3 aendert 14.5. Die
+Counterfactual-Ranking-Sonde gebaut und vorregistriert (par.16), ihre Wahrheitsquelle als
+wertkopf-frei BELEGT (`round5.rs:357` -- der Rueckfallwert ist eine exakte Punktezaehlung, kein
+Netz). Zwei Betriebsvorfaelle behoben und dokumentiert. Cache-System saniert (Commit 6dd8cd4).
+Der Arm v29-b04 ist abgebrochen und zu wiederholen.
+
 
 Waehrend einer Messung darf nichts anderes Rechenlast erzeugen -- kein Build, kein cargo, keine
 Sonde (CLAUDE.md). Ein Wheel-Neubau mitten in einer Kette liesse die Arme auf zwei Wheels laufen.
