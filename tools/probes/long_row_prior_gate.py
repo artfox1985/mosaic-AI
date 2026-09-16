@@ -33,6 +33,7 @@ fuer sich (par.2 woertlich).
 import glob
 import json
 import re
+import os
 import sys
 from collections import defaultdict
 from pathlib import Path
@@ -49,14 +50,22 @@ from neural_net import (  # noqa: E402
     state_to_tensor, state_to_planes, action_to_id as ref_action_to_id,
     build_model_from_checkpoint,
 )
-from config import INPUT_SIZE, NUM_ACTIONS  # noqa: E402
+from neural_net import crop_features_to_model  # noqa: E402
+from config import NUM_ACTIONS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "artifacts" / "long_row_prior_gate.json"
 
-MODEL_ONNX = str(ROOT / "models" / "alphazero_v21_2d_brierbest.onnx")
-MODEL_PTH = ROOT / "models" / "alphazero_v21_2d_brierbest.pth"
+# Welches Netz die Sonde befragt. Der Bestandswert ist der Stand, unter dem
+# der registrierte Lauf entstand; er liegt seit der Aufraeumregel "nur die
+# letzten zwei Champions" nicht mehr im Baum. `MOSAIC_PROBE_MODEL` setzt
+# einen anderen Stamm (ohne `alphazero_`-Praefix und ohne Endung), damit die
+# Sonde ueberhaupt wieder laufen kann -- die Zahlen sind dann NICHT mit dem
+# registrierten Lauf vergleichbar und muessen als anderer Stand benannt werden.
+MODEL_STEM = os.environ.get("MOSAIC_PROBE_MODEL", "v21_2d_brierbest")
+MODEL_ONNX = str(ROOT / "models" / f"alphazero_{MODEL_STEM}.onnx")
+MODEL_PTH = ROOT / "models" / f"alphazero_{MODEL_STEM}.pth"
 SIMS = 200
 C_PUCT = 1.5
 
@@ -126,20 +135,36 @@ def selftest_vs_engine(state_json_str, all_ids):
 
 
 def rebuild_model():
+    if not MODEL_PTH.exists():
+        raise SystemExit(
+            f"Netz nicht gefunden: {MODEL_PTH}. Der Bestandswert v21_2d_brierbest ist der "
+            f"Aufraeumregel 'nur die letzten zwei Champions' zum Opfer gefallen. Mit "
+            f"MOSAIC_PROBE_MODEL=<stamm> einen vorhandenen Stand waehlen -- die Zahlen sind "
+            f"dann nicht mit dem registrierten Lauf vergleichbar."
+        )
     ckpt = torch.load(str(MODEL_PTH), map_location="cpu")
-    model, encoder = build_model_from_checkpoint(ckpt, input_size=INPUT_SIZE, num_actions=NUM_ACTIONS)
+    # Breite AUS DEM CHECKPOINT (Default `input_size=None`): mit
+    # `input_size=INPUT_SIZE` scheiterte hier jeder Alt-Checkpoint an
+    # `size mismatch for flat_branch.0.weight`, sobald der Merkmalsvektor
+    # gewachsen war. Den Zuschnitt der Eingaben macht
+    # `crop_features_to_model` im Forward-Helfer.
+    model, encoder = build_model_from_checkpoint(ckpt, num_actions=NUM_ACTIONS)
     model.eval()
     return model, encoder
 
 
 def raw_prior_logits_batch(model, encoder, states):
     with torch.no_grad():
+        # Auf die Breite KUERZEN, die dieses Netz deklariert -- der Bauer
+        # liefert heute 794 Werte, ein Alt-Checkpoint will 744 oder 755.
         if encoder == "2d":
             planes = torch.stack([state_to_planes(s) for s in states])
             flats = torch.stack([state_to_tensor(s) for s in states])
+            flats, planes = crop_features_to_model(model, encoder, flats, planes)
             out = model(planes, flats)
         else:
             flats = torch.stack([state_to_tensor(s) for s in states])
+            flats, _ = crop_features_to_model(model, encoder, flats)
             out = model(flats)
         logits = out[0]
     return logits.numpy()

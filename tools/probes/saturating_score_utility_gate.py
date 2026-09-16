@@ -18,6 +18,7 @@ Training und OHNE Arena:
    Sonden dieser Nacht).
 """
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -29,13 +30,21 @@ sys.path.insert(0, str(ENGINE_PY))
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from neural_net import state_to_tensor, state_to_planes, build_model_from_checkpoint  # noqa: E402
-from config import INPUT_SIZE, NUM_ACTIONS  # noqa: E402
+from neural_net import crop_features_to_model  # noqa: E402
+from config import NUM_ACTIONS  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[2]
 EVAL = ROOT / "evaluations"
 OUT_JSON = EVAL / "artifacts" / "saturating_score_utility_gate.json"
 FROZEN_PKL = EVAL / "frozen_eval_set.pkl"
-MODEL_PTH = ROOT / "models" / "alphazero_v21_2d_brierbest.pth"
+# Welches Netz die Sonde befragt. Der Bestandswert ist der Stand, unter dem
+# der registrierte Lauf entstand; er liegt seit der Aufraeumregel "nur die
+# letzten zwei Champions" nicht mehr im Baum. `MOSAIC_PROBE_MODEL` setzt
+# einen anderen Stamm (ohne `alphazero_`-Praefix und ohne Endung), damit die
+# Sonde ueberhaupt wieder laufen kann -- die Zahlen sind dann NICHT mit dem
+# registrierten Lauf vergleichbar und muessen als anderer Stand benannt werden.
+MODEL_STEM = os.environ.get("MOSAIC_PROBE_MODEL", "v21_2d_brierbest")
+MODEL_PTH = ROOT / "models" / f"alphazero_{MODEL_STEM}.pth"
 
 CAL_A_DEFAULT = 0.0
 CAL_B_DEFAULT = 1.0
@@ -55,8 +64,20 @@ def value_to_win_prob(x):
 
 
 def rebuild_model():
+    if not MODEL_PTH.exists():
+        raise SystemExit(
+            f"Netz nicht gefunden: {MODEL_PTH}. Der Bestandswert v21_2d_brierbest ist der "
+            f"Aufraeumregel 'nur die letzten zwei Champions' zum Opfer gefallen. Mit "
+            f"MOSAIC_PROBE_MODEL=<stamm> einen vorhandenen Stand waehlen -- die Zahlen sind "
+            f"dann nicht mit dem registrierten Lauf vergleichbar."
+        )
     ckpt = torch.load(str(MODEL_PTH), map_location="cpu")
-    model, encoder = build_model_from_checkpoint(ckpt, input_size=INPUT_SIZE, num_actions=NUM_ACTIONS)
+    # Breite AUS DEM CHECKPOINT (Default `input_size=None`): mit
+    # `input_size=INPUT_SIZE` scheiterte hier jeder Alt-Checkpoint an
+    # `size mismatch for flat_branch.0.weight`, sobald der Merkmalsvektor
+    # gewachsen war. Den Zuschnitt der Eingaben macht
+    # `crop_features_to_model` im Forward-Helfer.
+    model, encoder = build_model_from_checkpoint(ckpt, num_actions=NUM_ACTIONS)
     model.eval()
     return model, encoder
 
@@ -66,12 +87,16 @@ def forward_batch(model, encoder, states, batch_size=256):
     with torch.no_grad():
         for i in range(0, len(states), batch_size):
             chunk = states[i:i + batch_size]
+            # Auf die Breite KUERZEN, die dieses Netz deklariert (siehe
+            # `crop_features_to_model`) -- der Bauer liefert heute 794 Werte.
             if encoder == "2d":
                 planes = torch.stack([state_to_planes(s) for s in chunk])
                 flats = torch.stack([state_to_tensor(s) for s in chunk])
+                flats, planes = crop_features_to_model(model, encoder, flats, planes)
                 out = model(planes, flats)
             else:
                 flats = torch.stack([state_to_tensor(s) for s in chunk])
+                flats, _ = crop_features_to_model(model, encoder, flats)
                 out = model(flats)
             all_value.append(out[1].numpy())
             all_points.append(out[3].numpy())
