@@ -563,6 +563,16 @@ Handgriff waere, vor dem Training der naechsten Generation eine Scheibe des fris
 zu reservieren und aus der Fensterliste zu nehmen. Das ist ein Kandidat fuer den
 Generationswechsel, kein eigener Arm.
 
+**NACHTRAG 20:40: damit ist auch die AERA-Frage von Punkt 3 beantwortet.** `v29-b01_best` traegt
+**755**, nicht 794 (im Checkpoint nachgesehen) -- b03 gegen b01 ist also genau der Vergleich, den
+Punkt 3 verlangt: 755 gegen 794 bei gleichem Fenster und Rezept. Auf frozen_v3 steht es 0,3337 zu
+0,3296, **Abstand 0,0041** und damit unter der Aufloesungsgrenze 0,015 -- **kein Befund**, dieselbe
+Groessenordnung wie beim Paar b03/b05 (0,0040). Gemessen auf CPU neben dem laufenden b04-Training
+(erlaubte Paarung); zwei Staende der Tabelle liefen zur Kontrolle mit und reproduzieren die
+GPU-Zahlen auf 2 mal 10^-5. Einschraenkungen: b01 gibt es nur als `_best` (Val-Loss) gegen b03s
+`_brierbest`, und die Orakel-Haelfte von Punkt 3 ist noch offen. Artefakt
+`net_health_p5_v29-b01_nachtrag.json`.
+
 **Nebenher behoben:** kein Fortschrittszaehler (der 23-Minuten-Lauf war stumm), kein
 `laufzeit`-Block im Artefakt, und ein Tabellenkopf, der auch im Frozen-Modus "Val-Split ...
 val_frac=0.1" nannte -- also die falsche Grundmenge.

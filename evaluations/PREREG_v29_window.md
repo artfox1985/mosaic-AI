@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- **v29-b03 SCHLAEGT DEN CHAMPION** (275:215 in 490 Partien, drei Seeds); Promotion ans Ende der Generationsarbeit vertagt, vier Elo-Kanten eingetragen. b01 zweimal H0. b02 gegen b03: Kanaele wirken auf den Posten, nicht auf die Siegquote (147:153). **par.6d Punkt 5 DURCH**: kein Absterben (b03 0,3296 gegen 0,3440 des aeltesten Stands auf frozen_v3, unter der Aufloesungsgrenze), der Trend aber unmessbar -- der Val-Split ist mit der Generation wachsend kontaminiert (82 gegen 33 Prozent). -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- **v29-b03 SCHLAEGT DEN CHAMPION** (275:215 in 490 Partien, drei Seeds); Promotion ans Ende der Generationsarbeit vertagt, vier Elo-Kanten eingetragen. b01 zweimal H0. b02 gegen b03: Kanaele wirken auf den Posten, nicht auf die Siegquote (147:153). **par.6d Punkt 5 DURCH** und mit ihm die Aera-Frage von Punkt 3: kein Absterben, b03 (794) gegen b01 (755) 0,0041 Abstand, unter der Aufloesungsgrenze. Der TREND ueber die Aeren bleibt unmessbar -- der Val-Split ist mit der Generation wachsend kontaminiert (82 gegen 33 Prozent). -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -1242,7 +1242,7 @@ frischen Self-Plays zu reservieren und aus der Fensterliste zu nehmen. Benannter
 Nutzniesser (CLAUDE.md-Regel fuer Infrastruktur): genau dieser Punkt 5, der dann
 eine Reihe ohne gegenlaeufige Verzerrung haette.
 
-**Die Tabelle deckt Punkt 3 NICHT mit ab.** Punkt 3 fragt b03 gegen **b01** -- die Frage nach
+**Die Tabelle deckte Punkt 3 zunaechst nicht mit ab** (Stand bis zum Nachtrag unten). Punkt 3 fragt b03 gegen **b01** -- die Frage nach
 dem gewachsenen Eingang. Die sechs Staende hier sind durchgaengig `_brierbest`-Staende (ein
 einheitliches Auswahlmass, sonst vergliche man Checkpoints nach verschiedenen Kriterien), und
 von v29-b01 gibt es keinen `_brierbest` -- nur `.pth` und `_best.pth` (Bestand 2026-09-16
@@ -1262,6 +1262,52 @@ impliziert `--frozen`. Die Orakel-Metriken werden fuer v2/v3 ausgelassen, weil i
 Labels fest in frozen_v1 indexieren (`oracle_metrics.py:79/:185`). `frozen_v1`
 selbst ist bewusst NICHT gemessen worden: jener Satz stammt aus der
 plattenBLINDEN Aera (`PREREG_frozen_v3_eval_set.md` par.1).
+
+#### Nachtrag 2026-09-16, 20:40: v29-b01 dazu -- und damit ist die AERA-Frage von Punkt 3 beantwortet
+
+Die Luecke oben ist geschlossen. `v29-b01_best` traegt **755**, nicht 794 (im
+Checkpoint nachgesehen, `flat_branch.0.weight` 512x755) -- b03 gegen b01 ist also
+genau der Vergleich, den Punkt 3 verlangt: der gewachsene EINGANG, 755 gegen 794,
+bei sonst gleichem Fenster und gleichem Rezept. Artefakt
+`evaluations/artifacts/net_health_p5_v29-b01_nachtrag.json` (5,7 s, 4 Threads,
+n = 1.800 Zustaende auf `frozen_v3`).
+
+| Modell | Eingang | R2 Runde 1-4 | Top-1 | Top-3 |
+| --- | --- | --- | --- | --- |
+| v29-b01_best (Pflichtarm) | 755 | 0,3337 | 52,3 % | 84,4 % |
+| v29-b03_brierbest (Sicht-Arm) | 794 | 0,3296 | 52,0 % | 83,7 % |
+| v27-b01_brierbest (Referenz) | 744 | 0,3440 | 53,5 % | 86,1 % |
+
+**VERDIKT Punkt 3, Aera-Frage: kein Befund.** Der Abstand b01 gegen b03 ist
+**0,0041** und liegt unter der Aufloesungsgrenze von rund 0,015
+(`project_offline_metric_resolution_limit`). Die 39 zusaetzlichen Eingangswerte
+kosten den Value-Kopf offline also nichts Nachweisbares -- und bringen ihm offline
+nichts Nachweisbares. Das ist dieselbe Groessenordnung wie beim Paar b03/b05
+(0,0040, `moon_stack_order` par.12.6); der Verwerfungs-Ausgang aus
+`stack_top_feature` par.12 ist damit auch fuer die Eingangs-Frage ausgeschlossen,
+nicht die Arena-Kante bestaetigt.
+
+**Auf CPU gemessen, und das ist geprueft, nicht angenommen.** Der Lauf fiel neben
+das b04-Training (GPU), deshalb `CUDA_VISIBLE_DEVICES=` -- ein CPU-Auftrag neben
+einem GPU-Training ist die erlaubte Paarung (`docs/working_rules.md`). Damit die
+CPU-Zahlen gegen die GPU-Tabelle oben stellbar sind, liefen zwei Staende der
+Tabelle MIT: `v27-b01_brierbest` kommt auf 0,344021 gegen 0,3440 und
+`v29-b03_brierbest` auf 0,329582 gegen 0,3296 -- Abweichung 2,1 bzw. 1,8 mal
+10^-5. Die Grundmenge ist identisch (frozen_v3, 1.274 Drafting-Entscheide).
+
+**Zwei Einschraenkungen, die mitgelesen werden muessen:**
+
+1. **Verschiedene Auswahlmasse.** Von v29-b01 gibt es keinen `_brierbest`, nur
+   `_best` (nach Val-Loss gewaehlt), waehrend b03 ein `_brierbest` ist. Der
+   Vergleich mischt damit zwei Auswahlkriterien. Bei einem Abstand von 0,0041
+   unter einer Aufloesungsgrenze von 0,015 traegt das die Aussage "kein Befund"
+   trotzdem -- es koennte sie nur staerker machen, nicht kippen.
+2. **Punkt 3 ist damit nicht vollstaendig.** Die Prereg verlangt fuer Punkt 3
+   AUSSERDEM `tools/oracle_metrics.py` (prior_mass_on_oracle_top3, kendall_tau)
+   auf demselben Split -- die einzigen arena-validierten Praediktoren. Die sind
+   hier NICHT gerechnet; ihre Labels liegen als
+   `evaluations/artifacts/frozen_v3_oracle_labels.json` bereit, der Einstieg ist
+   `oracle_metrics.py --frozen-set evaluations/frozen_eval_set_v3.pkl`.
 
 ## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
 
