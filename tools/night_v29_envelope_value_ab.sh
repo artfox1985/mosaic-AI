@@ -50,9 +50,14 @@ done
 # Gehaertete Wartebedingung (Muster aus tools/night_v29_chain.sh): NUR eine
 # klare 0 gilt als frei, jede andere Antwort als belegt. Der Klammer-Trick
 # '[p]aired' und der PowerShell-Ausschluss verhindern den Selbsttreffer.
+# HAERTUNG 2026-09-16: der Prozess muss PYTHON sein. Ein per Heredoc
+# geschriebenes UND im selben Befehl gestartetes Kettenskript traegt seinen
+# GANZEN Text in der Kommandozeile des Wrapper-bash -- der Filter fand dort
+# `train.py` und wartete auf sich selbst (30 min Stillstand, dazu blockierte
+# Nachbarsitzung). Die [t]rain-Klammer hilft dagegen nicht.
 maschine_frei() {
   local n
-  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '[p]aired_gating\.py|[n]ight_v29_20260914|[f]rozen_referee_match\.py' -and \$_.Name -notmatch 'pwsh|powershell' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
+  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '[p]aired_gating\.py|[n]ight_v29_20260914|[f]rozen_referee_match\.py' -and \$_.Name -match 'python' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
   [ "$n" = "0" ]
 }
 

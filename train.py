@@ -1086,6 +1086,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
           ranking_loss_weight=0.0, conjunction_head=False, ownership_head_2d=False,
           head_warmstart=True, extra_data_dir=None,
           freeze_trunk=False, cache_file=None, moon_loss_weight=1.0,
+          moon_target_source="label",
           file_list=None, surprise_alpha=0.0, surprise_confidence_min=0.0,
           resume=False, epoch_checkpoint=True, fast_loader=False):
     # Zwischenstand je Epoche / Wiederaufnahme (siehe resume_path()). Der
@@ -1330,6 +1331,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
         # Dict unveraendert ab) -- ein neues Flag MUSS hier eingetragen werden,
         # sonst schweigt das Manifest ueber den gefahrenen Arm.
         "moon_loss_weight": moon_loss_weight,
+        "moon_target_source": moon_target_source,
         "surprise_alpha": surprise_alpha,
         "surprise_confidence_min": surprise_confidence_min,
         "extra_data_dir": extra_data_dir, "freeze_trunk": freeze_trunk,
@@ -1476,7 +1478,7 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
     # der Waechter in `corpus_dataset.verify_cache_file` mit hartem Abbruch ab.
     dataset = MosaicDataset(str(DATA_DIR), files=train_files, value_target_variant=value_target_variant,
                             encoder=encoder, conjunction_head=conjunction_head,
-                            cache_file=cache_file)
+                            cache_file=cache_file, moon_target_source=moon_target_source)
     if cache_file is not None:
         append_train_cache_file(version_name, _run_timestamp, dataset.cache_file_info)
     _t_daten_fertig = time.time()
@@ -1511,8 +1513,12 @@ def train(version_name, load_version=None, input_epoch=None, hidden_size=None, e
 
     val_dataset = None
     if val_files:
+        # BEIDE Seiten brauchen den Schalter: `feedback_feature_knob_belongs_in_both_cache_keys`
+        # -- b03 trainierte 2026-09-14 MIT den Spezialfeld-Kanaelen und validierte OHNE sie,
+        # weil der Val-Cache denselben Fenster-Schluessel benutzt.
         val_dataset = MosaicDataset(str(DATA_DIR), files=val_files, value_target_variant=value_target_variant,
-                                    encoder=encoder, conjunction_head=conjunction_head)
+                                    encoder=encoder, conjunction_head=conjunction_head,
+                                    moon_target_source=moon_target_source)
         val_root_q_frac = val_dataset.apply_value_target_lambda(value_target_lambda, wdl=_lambda_mix_wdl)
         print(f"   Val-Split: {len(train_files)} Trainings-Dateien / {len(val_files)} Val-Dateien "
               f"({len(dataset):,} / {len(val_dataset):,} Züge)")
@@ -3043,6 +3049,17 @@ if __name__ == "__main__":
                              "gewichtung greift nur bei Stichproben, deren (geschaerftes) Policy-"
                              "Ziel eine Top-1-Wahrscheinlichkeit >= Schwelle hat; alle anderen "
                              "behalten Gewicht 1 (vor der Normierung). 0.0 (Default) = kein Tor.")
+    parser.add_argument("--moon-target-source", choices=["label", "played"], default="label",
+                        help="Quelle des Moon-Order-Trainingsziels (PREREG_moon_stack_order.md "
+                             "par.12.1, Arm v29-b04). 'label' = Bestand: das Record-Feld "
+                             "moon_order_target -- laut par.12.0 ein No-Op, weil sein Bewerter "
+                             "die Fabriken nicht liest und das Label IMMER die kanonische "
+                             "Reihenfolge ist. 'played' = die von der SUCHE bevorzugte "
+                             "Reihenfolge aus der policy-Verteilung des Records (bei aktivem "
+                             "Fan-out traegt jeder Kandidat seine moon_order mit "
+                             "Besuchswahrscheinlichkeit) -- braucht KEINE neue Erzeugung. "
+                             "Aendert die gecachten Ziele und geht deshalb in den "
+                             "Fenster-Cache-Schluessel ein.")
     parser.add_argument("--moon-loss-weight", type=float, default=1.0,
                         help="Gewicht des Moon-Order-Terms im Policy-Loss (train.py: "
                              "plackett_luce_moon_loss, auf sun_mask gemittelt und auf p_loss "
@@ -3151,6 +3168,10 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
+    # Der BLOCK-Schluessel liest den Schalter aus der Umgebung
+    # (file_cache_key._moon_target_source_key) -- ohne dieses Setzen wuerde ein
+    # b04-Lauf die Bloecke von b03 mit den LABEL-Zielen wiederverwenden.
+    os.environ["MOSAIC_MOON_TARGET_SOURCE"] = args.moon_target_source
     train(points_dist_bins=args.points_dist_bins, reinit_points_head=args.reinit_points_head,
           version_name=args.name, load_version=args.load, input_epoch=args.epochs,
           hidden_size=args.hidden, early_stop=not args.no_early_stop,
@@ -3173,7 +3194,7 @@ if __name__ == "__main__":
           ranking_loss_weight=args.ranking_loss_weight,
           head_warmstart=not args.no_head_warmstart, extra_data_dir=args.extra_data_dir,
           freeze_trunk=args.freeze_trunk, cache_file=args.cache_file,
-          moon_loss_weight=args.moon_loss_weight, file_list=args.file_list,
+          moon_loss_weight=args.moon_loss_weight, moon_target_source=args.moon_target_source, file_list=args.file_list,
           surprise_alpha=args.surprise_alpha,
           surprise_confidence_min=args.surprise_confidence_min,
           resume=args.resume, epoch_checkpoint=not args.no_epoch_checkpoint,

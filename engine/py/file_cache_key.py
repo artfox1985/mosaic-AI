@@ -15,6 +15,31 @@ sehen wie die Bauschleife. Nebenbei vermeidet es den Ringschluss --
 """
 
 
+def _moon_target_source_key() -> str:
+    """Liest `MOSAIC_MOON_TARGET_SOURCE` fuer den BLOCK-Schluessel.
+
+    `PREREG_moon_stack_order.md` par.12.1, Arm v29-b04. Der Schalter entscheidet,
+    woher das Ziel des `moon`-Kopfs kommt: "label" (Bestand, das No-Op-Feld
+    `moon_order_target`) oder "played" (die von der Suche bevorzugte Reihenfolge
+    aus der policy-Verteilung).
+
+    WARUM AUCH HIER und nicht nur im Fenster-Schluessel: die BLOECKE tragen
+    `moon_order_targets` bereits (`corpus_dataset.py` speichert das Dataset je
+    Datei). Kennt der Block-Schluessel den Schalter nicht, benutzt ein
+    b04-Lauf die Bloecke von b03 -- mit den LABEL-Zielen, also genau dem
+    No-Op, das der Arm abschaffen soll. Derselbe Fehler wie 2026-09-14 bei
+    `MOSAIC_SPECIAL_PLANES_OFF`, nur umgekehrt: dort fehlte der Fenster-, hier
+    fehlte beinahe der Block-Schluessel
+    (`feedback_feature_knob_belongs_in_both_cache_keys`).
+
+    Ungueltige Werte gelten als Bestand -- ein Tippfehler darf keinen stillen
+    dritten Datensatz erzeugen.
+    """
+    import os
+    v = (os.environ.get("MOSAIC_MOON_TARGET_SOURCE") or "label").strip().lower()
+    return v if v in ("label", "played") else "label"
+
+
 def _special_planes_off_key() -> bool:
     """Liest `MOSAIC_SPECIAL_PLANES_OFF` fuer den Cache-Schluessel.
 
@@ -147,4 +172,9 @@ def per_file_cache_key(basename: str, *, value_target_variant: str, encoder: str
     _bs_coherence = _cd._bootstrap_coherence_mode()
     if _bs_coherence != "off":
         material += "|bscoh_" + _bs_coherence + "_v1"
+    # par.12.1 Arm b04: nur ANHAENGEN, wenn vom Bestand abweichend -- sonst
+    # waeren alle vorhandenen Bloecke entwertet.
+    _mts = _moon_target_source_key()
+    if _mts != "label":
+        material += f"|moontarget_{_mts}_v1"
     return hashlib.md5(material.encode()).hexdigest()[:12]

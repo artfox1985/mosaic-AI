@@ -38,13 +38,21 @@ export MOSAIC_STACK_DRAW_RESEARCH=1
 MODEL=models/alphazero_v28-b02_brierbest.onnx
 SPEC=models/start_by_search_on.spec.json
 
-# Wartebedingung, GEHAERTET: der Filter darf sich nicht selbst treffen (jede erste Stelle in
-# eine Zeichenklasse), und eine leere Antwort gilt als BELEGT. Beide Fallen sind hier schon
-# eingetreten: am 2026-09-09 stand eine Kette 35 Minuten still, und in der Nacht auf den
-# 2026-09-13 startete die wartende Leiter-Kante deshalb ueberhaupt nicht.
+# Wartebedingung, GEHAERTET in DREI Stufen -- jede Stufe steht fuer einen eingetretenen Fall:
+#  1. Zeichenklasse um die erste Stelle jedes Musters (`[t]rain`), damit der Filter nicht den
+#     powershell-Aufruf trifft, der ihn traegt. Anlass 2026-09-09: 35 Minuten Stillstand.
+#  2. Leere Antwort gilt als BELEGT, nur eine klare 0 als frei. Anlass Nacht auf 2026-09-13:
+#     die wartende Leiter-Kante startete deshalb ueberhaupt nicht.
+#  3. Der Prozess muss PYTHON sein. Anlass 2026-09-16: ein per Heredoc geschriebenes UND im
+#     selben Befehl gestartetes Kettenskript traegt seinen GANZEN Text in der Kommandozeile
+#     des Wrapper-bash; der Filter fand dort `train.py` und wartete auf sich selbst (30 min,
+#     dazu blockierte Nachbarsitzung). Gegen DIESEN Fall hilft Stufe 1 nicht -- die Klammer
+#     schuetzt vor dem eigenen Suchbefehl, nicht vor einem Wrapper, der den Suchbegriff als
+#     NUTZLAST traegt. Regel daraus: Kettenskripte als DATEI starten, nie Heredoc-und-Start
+#     in einem Befehl.
 busy() {
   local n
-  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '[s]elf_play\.py|[t]rain\.py|[p]aired_gating|[a]nchor_arena|[f]rozen_referee' -and \$_.Name -notmatch 'pwsh|powershell' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
+  n=$(powershell -NoProfile -Command "@(Get-CimInstance Win32_Process | Where-Object { \$_.CommandLine -match '[s]elf_play\.py|[t]rain\.py|[p]aired_gating|[a]nchor_arena|[f]rozen_referee' -and \$_.Name -match 'python' }).Count" 2>/dev/null | tr -d '\r' | tail -1)
   [ "$n" != "0" ]
 }
 

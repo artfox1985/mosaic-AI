@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund. **par.12.0: das Trainingsziel des moon-Kopfs ist ein No-Op** (das Label ist immer kanonisch). **par.12.5: b05 (Kopf ablatiert) ist BESSER als b03** -- 427:373 aus 800 Partien, gepoolt z=1,98, beide Seeds gleichgerichtet, einzeln nicht signifikant. **par.12.3a: die Folgerung "Zugriffs-Hebel klein" ist ZURUECKGENOMMEN** -- ein Mondzug nimmt ALLE Oberseiten einer Farbe, 43,8 Prozent raeumen mehrere Steine ab; die Hebelgroesse ist offen. Offen auch b04 (Korpus-Tor 44,1 Prozent) und ein dritter Seed fuer b05. -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund. **par.12.0: das Trainingsziel des moon-Kopfs ist ein No-Op** (das Label ist immer kanonisch). **par.12.6: b05 (Kopf ablatiert) ist BESSER als b03** -- 427:373 aus 800 Partien, gepoolt z=1,98, beide Seeds gleichgerichtet, einzeln nicht signifikant. **par.12.3b: der Hebel ist HAEUFIG, aber FLACH** -- in 51,8 Prozent der Entscheide aendert die Wahl das abraeumbare Paket, aber im Median um genau EINEN Stein. Das erklaert die Nullbefunde und spricht gegen Weg C und Weg A. Offen auch b04 (Korpus-Tor 44,1 Prozent) und ein dritter Seed fuer b05. -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -1102,7 +1102,42 @@ Stapelzeile im Log legt "ein Stapel" als Einheit nahe; die Regel kennt aber nur 
 ueber alle Oberseiten". Dieselbe Verwechslung wie in par.9i, wo die Zustandsanzeige als
 Ereignisliste gelesen wurde.
 
-## par.12.5 ARM v29-b05 GEMESSEN (2026-09-15): das No-Op-Ziel hat Staerke GEKOSTET
+### 12.3b KONTRAFAKTISCHER BUENDEL-HEBEL GEMESSEN (2026-09-16): haeufig, aber flach
+
+Schliesst die Luecke aus par.12.3a. `tools/probes/moon_bundle_leverage.py`, 12 Korpusdateien,
+**1.857 Entscheide mit echter Farbwahl** (336 weitere hatten nur eine Farbe im Rest), 5,3 s.
+
+**Die Groesse:** liegt Farbe c oben, kann ein einziger Gegnerzug `moon_top_counts[c] + 1` Steine
+abraeumen (Aktion C, alle Oberseiten dieser Farbe). Der Hebel einer Entscheidung ist die
+SPANNWEITE dieser Paketgroesse ueber die waehlbaren Oberseiten.
+
+| Spannweite | Anteil |
+| --- | --- |
+| 0 (die Wahl aendert nichts) | 0,482 |
+| 1 Stein | 0,367 |
+| 2 Steine | 0,127 |
+| 3 bis 4 Steine | 0,024 |
+| **ueber 0** | **0,518** |
+| Median / Mittel | **1 / 0,695** |
+
+Groesstes erreichbares Paket je Entscheid: Median 2, Mittel 1,88, Max 5.
+
+**Verdikt: der Hebel ist HAEUFIG, aber FLACH.** In gut der Haelfte der Entscheide steuert die
+Reihenfolge, wie viel ein Gegnerzug abraeumen kann -- und zwar typischerweise um GENAU EINEN
+Stein. Beide frueheren Formulierungen waren zu grob: "klein" (par.12.3, zurueckgenommen) traf
+die Haeufigkeit nicht, und die Buendel-Zahlen allein (43,8 Prozent Mehrfachzuege) haetten einen
+grossen Hebel nahegelegt, den es nicht gibt.
+
+**Damit sind die Nullbefunde von Stufe 1 und Stufe 3 erklaert, nicht nur gemessen:** ein
+Ein-Stein-Hebel bei rund 52 Punkten Endstand liegt unter der Aufloesung jeder Arena dieser
+Kampagne. Weg C (mehr Horizont) und Weg A (eigener Knoten) koennen daran nichts aendern -- sie
+wuerden dieselbe flache Groesse genauer ausrechnen.
+
+**Kein Zaehler im Code noetig gewesen:** der serialisierte Zustand traegt `moon_top_counts`
+bereits (`serialize.rs:385`). Die Messung lief aus dem Korpus, ohne Wheel-Bau und ohne
+Anker-Drift.
+
+## par.12.6 ARM v29-b05 GEMESSEN (2026-09-15): das No-Op-Ziel hat Staerke GEKOSTET
 
 **Aufbau.** b05 = b03 plus `--moon-loss-weight 0`, sonst identisch -- Manifest-Diff gegen b03
 zeigt GENAU zwei Felder (`moon_loss_weight` 1,0 -> 0,0 und den Namen), Policy-Traeger beidseits
@@ -1164,7 +1199,56 @@ Spaltensonde sich dann widersprachen (Gating: b05 mehr Punkte; Sonde scheinbar: 
 Dieselbe Falle wie in `project_selfplay_log_parsing_traps`: **die Seite kommt aus dem Namen,
 nie aus der Reihenfolge.**
 
-## par.11 WEG C VORREGISTRIERT (2026-09-15, VOR dem Bau): Terminierung statt Sim-Zahl
+### Offline-Gegenprobe zum Tor-1-Befund (2026-09-16)
+
+**Frage.** Die Arena sagt b05 knapp vorn (427 : 373, z = 1,98). Sieht das Netz selbst anders
+aus? Verwerfungs-Bedingung aus `stack_top_feature` par.12 und `v29_window` par.6d Punkt 3: eine
+Verschlechterung des Value-Kopfs JENSEITS der Aufloesungsgrenze von rund 0,015 waere ein
+Verwerfungsgrund, unabhaengig vom Tor-1-Ergebnis.
+
+`tools/offline_diagnosis.py --model v29-b03_brierbest v29-b05_brierbest`, Artefakt
+`evaluations/artifacts/net_health_p3_b03_b05.json`.
+
+| Groesse | v29-b03 | v29-b05 | Differenz |
+| --- | --- | --- | --- |
+| Value R2 Runde 1-4 (Entscheidungsmetrik) | 0,3907 | 0,3867 | -0,0040 fuer b05 |
+| Policy Top-1 Drafting | 63,3 % | 63,5 % | +0,2 Pp fuer b05 |
+| Policy Top-3 Drafting | 91,1 % | 91,1 % | 0,0 |
+| RMSE R1 / R2 / R3 / R4 | 0,2925 / 0,3322 / 0,3341 / 0,4168 | 0,2938 / 0,3337 / 0,3358 / 0,4171 | +0,0013 bis +0,0017 |
+
+n = 582.132 Val-Zuege gesamt (Grundmenge: Val-Split auf Datei-Ebene, Seed 20260707,
+val_frac = 0,1; Einheit: Zuege), davon 410.337 Drafting-Zuege fuer die Policy-Groessen.
+Zielstreuung je Runde beidseits bitgleich (0,3074 / 0,3940 / 0,4247 / 0,5931) -- derselbe
+Val-Satz, wie es fuer ein Armpaar sein muss.
+
+**Warum der Default-Val-Split hier ZULAESSIG ist**, obwohl er es ueber Aeren hinweg nicht ist
+(Begruendung in `tools/run_net_health_generations.sh`: er liegt ungleich stark in den
+Trainingssaetzen der verglichenen Netze und ERZEUGT dort den Trend, den er zeigen soll):
+b03 und b05 teilen sich denselben Monolithen und damit denselben Trainingssatz -- der
+Auswendiglern-Anteil ist fuer beide Arme derselbe und kuerzt sich exakt weg. Der Vorbehalt
+gilt fuer Punkt 5 der Netz-Gesundheit (Generationen-Trend), nicht fuer dieses Paar.
+
+**Verdikt: kein Befund, und das ist der Ausgang, auf den es ankam.** 0,0040 ist rund ein
+Viertel der Aufloesungsgrenze (`project_offline_metric_resolution_limit`); nach
+`feedback_statistical_rigor` darf daraus weder "b03 hat den besseren Value-Kopf" noch eine
+Bestaetigung der Arena-Kante werden. Was die Zahlen SEHR WOHL ausschliessen, ist der
+Verwerfungs-Ausgang: das Abschalten des `moon`-Kopfs hat den Value-Kopf nicht beschaedigt,
+und die Policy ist eher besser. Damit steht dem Entscheid "Kopf raus" aus dieser Richtung
+nichts entgegen. Runde 5 (R2 -0,73 beidseits) zaehlt wie immer nicht mit -- dort umgeht die
+Suche das Netz vollstaendig (`net_mcts.rs:5856` u.a., Alpha-Beta).
+
+**Laufzeit:** 1.400 CPU-Sekunden, 8 Threads, ein Lauf fuer beide Modelle.
+
+## par.11 WEG C: VORREGISTRIERT, GEBAUT -- UND AM 2026-09-16 GESTRICHEN
+
+> **NUTZER-ENTSCHEID 2026-09-16:** *"32a tore des c3 knopfs kannst streichen"*. Der Knopf
+> `MOSAIC_MOON_ORDER_SEARCH_SCALE` bleibt gebaut, getestet und im Wheel (Default 0,
+> bitidentisch, Anker-Drift gruen); seine Tore werden nicht gefahren. **Grund ist par.12.3b:**
+> der Buendel-Hebel ist haeufig, aber FLACH -- im Median ein Stein. Weg C wuerde dieselbe
+> flache Groesse mit mehr Rechenzeit genauer bestimmen. Der Absatz bleibt als Bauprotokoll
+> stehen; wiedervorgelegt wird er nur, falls eine spaetere Messung den Hebel groesser zeigt.
+
+### Der urspruengliche Vorschlag (unveraendert, zur Nachvollziehbarkeit)
 
 **Fahrplan 32a.** Nutzer-Auftrag 2026-09-14: *"da brauchst schon ein wenig weitsicht.
 zumindest rundensicht."* Ausloeser ist par.9i: die Nachsuche waehlt in **62 Prozent** der Faelle

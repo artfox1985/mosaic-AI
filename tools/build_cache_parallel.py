@@ -131,6 +131,58 @@ def merge(parts, target, window_key=None, mask_parts=None):
                 f"Teil-Caches haben verschiedene Formen im Feld '{k}' "
                 f"(Referenz {parts[0]}: {formen[k][0][0]} {dt0}); {len(odd)} abweichende Teile:\n"
                 f"{lines_out}\nAbbruch VOR dem Schreiben -- das waere ein stiller oder halber Monolith.")
+    # ── Ueberschreib-Schutz (2026-09-16) ────────────────────────────────────
+    # Ein Monolith gehoert seinem SCHLUESSEL, nicht dem Lauf, der zufaellig
+    # gerade baut. Wer an einen vorhandenen Cache schreibt, dessen Schluessel
+    # ein ANDERER ist als der, den dieser Lauf aufpraegen wuerde, zerstoert
+    # einen fremden Datensatz.
+    #
+    # ANLASS, real: am 2026-09-16 hat der Arm v29-b04 den Monolithen des Arms
+    # v29-b03 ueberschrieben (1,15 GB), weil `window_train_split.py` einen
+    # Knopf nicht durchreichte und damit b03s Fenster-Schluessel als Ziel
+    # ausrechnete. Nichts hat gewarnt; aufgefallen ist es an der Dateigroesse.
+    # Der Datensatz war nur deshalb rekonstruierbar, weil der 2026-09-15
+    # eingefuehrte Umgebungs-Fingerabdruck im Cache steht.
+    #
+    # Geprueft wird gegen den eingepraegten Schluessel, NICHT gegen den
+    # Dateinamen: der Name kann auch aus anderen Gruenden abweichen (Umbenennen
+    # von Hand), der eingepraegte Schluessel ist die Selbstauskunft der Datei.
+    # Fehlt er (Cache aus der Zeit vor der Praegung), wird gewarnt und
+    # geschrieben -- ein Abbruch waere hier eine Bremse ohne Befund.
+    if window_key is not None and os.path.exists(target):
+        try:
+            with h5py.File(target, "r") as _existing:
+                _existing_key = _existing.attrs.get("mosaic_cache_key")
+                _existing_env = _existing.attrs.get("mosaic_env_fingerprint")
+                _existing_n = _existing.attrs.get("mosaic_files_n")
+        except Exception as _e:                      # unlesbar = kein Bestand, den man schuetzen muesste
+            print(f"WARNUNG: {target} liegt schon, ist aber nicht lesbar ({_e}) -- wird ersetzt.",
+                  flush=True)
+        else:
+            _existing_key = _existing_key.decode() if isinstance(_existing_key, bytes) else (
+                str(_existing_key) if _existing_key is not None else None)
+            if _existing_key is None:
+                print(f"WARNUNG: {target} liegt schon und traegt KEINEN Schluessel (Cache von vor der "
+                      f"Praegung) -- wird ersetzt.", flush=True)
+            elif _existing_key != window_key.key:
+                _env = _existing_env.decode() if isinstance(_existing_env, bytes) else str(_existing_env)
+                meldung = [
+                    "",
+                    f"UEBERSCHREIB-SCHUTZ: {target} gehoert einem ANDEREN Datensatz -- ABBRUCH.",
+                    f"   in der Datei : {_existing_key}  ({_existing_n} Dateien)",
+                    f"   dieser Lauf  : {window_key.key}",
+                    "   Umgebung der vorhandenen Datei:",
+                    f"      {_env}",
+                    "",
+                    "   Es wurde NICHTS geschrieben. Zwei Ursachen sind haeufig:",
+                    "   1. Ein Knopf fehlt im Schluessel DIESES Laufs, und er zeigt deshalb auf",
+                    "      den Datensatz eines anderen Arms (Vorfall 2026-09-16, v29-b04 gegen",
+                    "      b03). Dann ist der SCHLUESSEL falsch, nicht die Datei -- pruefe mit",
+                    "      `python tools/cache_doctor.py`, wem sie gehoert.",
+                    "   2. Der vorhandene Cache ist wirklich veraltet. Dann ist das Loeschen ein",
+                    "      NUTZER-Entscheid mit pfadgenauer Freigabe, kein Nebeneffekt eines Baus.",
+                ]
+                raise SystemExit(chr(10).join(meldung))
     with h5py.File(target, "w") as out:
         for k in felder:
             n_ges = sum(f[0][0] for f in formen[k])
