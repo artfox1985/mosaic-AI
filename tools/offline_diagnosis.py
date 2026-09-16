@@ -1,5 +1,5 @@
 """
-tools/offline_diagnosis.py — Offline-Diagnose eines trainierten Checkpoints:
+tools/offline_diagnosis.py – Offline-Diagnose eines trainierten Checkpoints:
 Value-Val-R² gesamt + pro Runde (1-5), Policy Top-1/Top-3 (nur echte
 Drafting-Schritte, pol_w=1) -- auf demselben Val-DATEI-Split wie train.py
 (Datei-Ebene-Split, Seed 20260707, val_frac=0.1), damit die Zahlen 1:1 gegen
@@ -33,6 +33,18 @@ Aussage ueber "das Trainingsziel" nicht. Wahrheit ist
 `apply_value_target_lambda`, `LEGACY_STRETCHED_PREFIXES`); wer die Zahlen
 zielgleich braucht, zieht sie dort nach, statt dieser Datei zu glauben.
 
+ACHTUNG, DER DEFAULT-VAL-SPLIT TAUGT NUR INNERHALB EINER AERA (gemessen
+2026-09-16, PREREG_v29_window.md par.9): `val_files()` zieht 10 Prozent aller
+Dateien in data/ -- und die liegen UNGLEICH stark in den Trainingssaetzen der
+verglichenen Netze. n = 360 Dateien, abgeglichen gegen das `cli_args.file_list`
+der Trainings-Manifeste: 296 davon (82,2 Prozent) in window_v29, 243 (67,5) in
+window_v28, 117 (32,5) in window_v27. Vergleicht man zwei Netze DERSELBEN
+Dateiliste, kuerzt sich das weg. Ueber Generationen hinweg misst die Reihe zu
+einem wachsenden Teil Auswendiglernen und ERZEUGT den Trend, den sie zeigen
+soll -- auf demselben Satz kehrte sich die Richtung gegenueber dem
+zurueckgehaltenen frozen_v3 um. Fuer Generationen-Vergleiche also
+`--frozen-set v3`.
+
 Verwendung:
     python tools/offline_diagnosis.py --model v12_best
     python tools/offline_diagnosis.py --model v12b_lr_best v12b_scratch_best v12_best
@@ -58,6 +70,7 @@ import os
 import pickle
 import random
 import sys
+import time
 from pathlib import Path
 
 # Windows-Konsolen (cp1252) können die Emoji-Ausgaben sonst nicht kodieren
@@ -73,6 +86,7 @@ import torch.nn.functional as F
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "engine" / "py"))
+import corpus_io  # noqa: E402  (braucht die sys.path-Zeilen darueber)
 
 from config import DATA_DIR, MODELS_DIR, NUM_ACTIONS, INPUT_SIZE
 from neural_net import (
@@ -92,6 +106,18 @@ VAL_FRAC = 0.1
 # neuen Dateinamen statt diesen zu ueberschreiben.
 FROZEN_EVAL_PATH = Path(__file__).resolve().parent.parent / "evaluations" / "frozen_eval_set.pkl"
 FROZEN_EVAL_VERSION = "frozen_v1"
+
+# Die spaeteren Saetze derselben Bauform (gleiche Dict-Schluessel `version`,
+# `seed`, `records`, gleiche Record-Felder). `--frozen` allein bleibt bei v1,
+# damit Bestandsaufrufe unveraendert dieselbe Zahl liefern; `--frozen-set v3`
+# waehlt den Satz der plattenBEWUSSTEN Aera (PREREG_frozen_v3_eval_set.md,
+# 1.800 Zustaende, 360 je Runde), auf dem auch Punkt 2 von par.6d gemessen
+# hat (tools/probes/dead_unit_probe.py).
+FROZEN_EVAL_SETS = {
+    "v1": (FROZEN_EVAL_PATH, "frozen_v1"),
+    "v2": (FROZEN_EVAL_PATH.parent / "frozen_eval_set_v2.pkl", "frozen_v2"),
+    "v3": (FROZEN_EVAL_PATH.parent / "frozen_eval_set_v3.pkl", "frozen_v3"),
+}
 
 
 def val_files() -> list[str]:
@@ -119,9 +145,19 @@ def load_val_samples(files: list[str], include_planes: bool = False):
     policy_l, masks_l = [], []
     planes_l = [] if include_planes else None
 
-    for f in files:
-        with open(f, "rb") as fh:
-            game_data = pickle.load(fh)
+    # Fortschritt SICHTBAR (CLAUDE.md, "Lange Laeufe NIE in eine Pipe"): das
+    # Laden des Val-Splits dauert bei mehreren hundert Dateien Minuten und war
+    # bis 2026-09-16 vollstaendig stumm.
+    t_load0 = time.time()
+    for i_f, f in enumerate(files, 1):
+        if i_f == 1 or i_f % 25 == 0 or i_f == len(files):
+            print(f"   [{i_f}/{len(files)}] {len(states_l):,} Zuege, "
+                  f"{time.time() - t_load0:.0f}s", flush=True)
+        # corpus_io statt rohem pickle: die Korpora werden komprimiert
+        # geschrieben (`dump_records(..., compress=True)`), ein blankes
+        # `pickle.load` scheitert dort mit "invalid load key, ''" -- dem
+        # gzip-Magic. `load_records` erkennt beide Formen (corpus_io.py:41/47).
+        game_data = corpus_io.load_records(f)
         for step in game_data:
             if "scores" not in step or "winner" not in step:
                 continue
@@ -179,7 +215,8 @@ def load_val_samples(files: list[str], include_planes: bool = False):
     )
 
 
-def load_frozen_samples(path: Path = FROZEN_EVAL_PATH, include_planes: bool = False):
+def load_frozen_samples(path: Path = FROZEN_EVAL_PATH, include_planes: bool = False,
+                        expect_version: str = FROZEN_EVAL_VERSION):
     """Laedt `evaluations/frozen_eval_set.pkl` (Task #87,
     tools/build_frozen_eval_set.py). Value-Ziel-/Policy-Ziel-/Masken-
     Berechnung ist 1:1 dieselbe wie in `load_val_samples()` -- die einzige
@@ -198,8 +235,8 @@ def load_frozen_samples(path: Path = FROZEN_EVAL_PATH, include_planes: bool = Fa
     with open(path, "rb") as fh:
         blob = pickle.load(fh)
     version = blob.get("version")
-    if version != FROZEN_EVAL_VERSION:
-        print(f"⚠️  Warnung: Set-Version {version!r} != erwartet {FROZEN_EVAL_VERSION!r}")
+    if version != expect_version:
+        print(f"⚠️  Warnung: Set-Version {version!r} != erwartet {expect_version!r}")
     records = blob["records"]
 
     states_l, values_l, rounds_l, polw_l = [], [], [], []
@@ -311,14 +348,52 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
     erkennt das aus dem `state_dict`, siehe `neural_net.py::encoder_from_state_dict`)."""
     ckpt_path = MODELS_DIR / f"alphazero_{model_name}.pth"
     ckpt = torch.load(str(ckpt_path), map_location="cpu")
-    model, encoder = build_model_from_checkpoint(ckpt, input_size=INPUT_SIZE, num_actions=NUM_ACTIONS,
+    # GENERATIONEN-VERGLEICH (Fahrplan Nr. 20 Punkt 5, PREREG_v29_window.md
+    # par.6d): `input_size=INPUT_SIZE` erzwang die HEUTIGE Breite und liess
+    # jeden Alt-Checkpoint mit "size mismatch for flat_branch.0.weight"
+    # scheitern (744 gegen 794). `input_size=None` laesst
+    # `build_model_from_checkpoint` die Breite AUS DEM state_dict ableiten --
+    # dasselbe Muster, mit dem es `planes_channels` schon immer ableitet
+    # (neural_net.py::build_model_from_checkpoint, Zweig encoder == "2d").
+    model, encoder = build_model_from_checkpoint(ckpt, input_size=None, num_actions=NUM_ACTIONS,
                                                   hidden_override=hidden_override)
+    # Die Breite, die dieses Netz deklariert -- Quelle ist das gebaute Modell,
+    # nicht der Dateiname und nicht `config.INPUT_SIZE`.
+    if encoder == "2d":
+        ckpt_flat = int(model.flat_branch[0].in_features)
+        ckpt_planes_c = int(model.conv[0].in_channels)
+    else:
+        ckpt_flat = int(model.body[0].in_features)
+        ckpt_planes_c = None
     if encoder == "2d" and planes is None:
         raise RuntimeError(
             f"{model_name} ist ein 2D-Checkpoint, aber es wurden keine Planes-Daten geladen -- "
             f"main() muss `include_planes=True` an load_val_samples/load_frozen_samples uebergeben, "
             f"sobald mindestens ein angefragtes Modell encoder='2d' ist."
         )
+    # KUERZEN, NIE AUFFUELLEN -- exakt das, was der Spielpfad tut:
+    # `net.rs::build_inputs` schneidet den Flachvektor auf die Modellbreite
+    # (engine/src/net.rs:425), die Planes ueber `split_planes_flat_batch_src`
+    # (engine/src/net.rs:989) auf die Kanalzahl des Modells. Erlaubt ist das,
+    # weil der Vektor ADDITIV gewachsen ist: Abschnitt 15 haengt hinter Index
+    # 743, Abschnitt 16 hinter Index 754 (engine/src/features.rs:2273 /
+    # :2308 / :2511, engine/py/neural_net.py:458 / :511). Ein Netz, das MEHR
+    # verlangt als geliefert wird, ist deshalb ein harter Fehler -- Auffuellen
+    # mit Nullen waere eine erfundene Sicht.
+    have_flat = int(states.shape[1])
+    if ckpt_flat > have_flat:
+        raise RuntimeError(
+            f"{model_name} verlangt {ckpt_flat} Merkmale, geliefert werden {have_flat} "
+            f"(config.INPUT_SIZE={INPUT_SIZE}). Aufgefuellt wird NIE -- baue das Wheel "
+            f"neu bzw. ziehe config.INPUT_SIZE nach."
+        )
+    if ckpt_planes_c is not None:
+        have_c = int(planes.shape[1])
+        if ckpt_planes_c > have_c:
+            raise RuntimeError(
+                f"{model_name} verlangt {ckpt_planes_c} Planes-Kanaele, geliefert werden {have_c}."
+            )
+
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device).eval()
 
@@ -333,10 +408,10 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
     with torch.no_grad():
         for i in range(0, n, batch_size):
             sl = slice(i, i + batch_size)
-            x = states[sl].to(device)
+            x = states[sl, :ckpt_flat].to(device)
             m = masks_t[sl].to(device)
             if encoder == "2d":
-                xp = planes[sl].to(device)
+                xp = planes[sl, :ckpt_planes_c].to(device)
                 pred_p, pred_v, _pred_moon, _pred_points, *_own = model(xp, x)
             else:
                 pred_p, pred_v, _pred_moon, _pred_points, *_own = model(x)
@@ -350,6 +425,12 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
             top3_hits[sl] = (top3_idx == tgt[:, None]).any(axis=1)
 
     result: dict = {"model": model_name, "n_total": int(n)}
+    # Damit die Tabelle selbst sagt, welche Aera das Netz deklariert und ob
+    # zugeschnitten wurde -- ohne das ist "744 gegen 794" im Artefakt unsichtbar.
+    result["input_size"] = ckpt_flat
+    result["planes_channels"] = ckpt_planes_c
+    result["features_supplied"] = have_flat
+    result["features_cropped"] = bool(ckpt_flat < have_flat)
 
     result["value_r2_global"] = _r2(values, value_preds)
     per_round = {}
@@ -366,7 +447,9 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
     # Entscheidungsmetrik (Nutzer-Anstoss 2026-07-28, Task #15): das GLOBALE
     # Value-R² taugt nicht zur Modellauswahl, weil Runde 5 es nach oben zieht --
     # ausgerechnet die Runde, in der das Netz NIE konsultiert wird:
-    # `net_mcts.rs:2265` bypassed den gesamten Netz-Suchpfad zu
+    # `net_mcts.rs:5856` u.a. (fuenf Einstiege, `grep -n 'round5::applies'`; der
+    # frueher hier genannte Stand 2265 traegt seit dem moon-Order-Einbau
+    # anderen Code) bypassed den gesamten Netz-Suchpfad zu
     # `round5::choose_action` (exakte Alpha-Beta-Suche, gilt fuer Self-Play,
     # Arena UND Server), und der Runde-4-Bootstrap nutzt
     # `round5::exact_round5_outcome` -- auch dort haengt nichts am Netz-Value.
@@ -415,10 +498,14 @@ def diagnose(model_name: str, states, values, rounds, pol_w, policy_targets, mas
     return result
 
 
-def print_table(results: list[dict]) -> None:
+def print_table(results: list[dict], ground: str | None = None) -> None:
+    """`ground`: Beschreibung der GRUNDMENGE fuer den Kopf. Bis 2026-09-16 stand
+    dort fest "Val-Split ...", auch wenn auf einem eingefrorenen Satz gemessen
+    wurde -- ein Kopf, der die falsche Grundmenge nennt, ist genau die Luecke,
+    vor der CLAUDE.md warnt (n, GRUNDMENGE, EINHEIT)."""
     names = [r["model"] for r in results]
     print("\n" + "=" * 70)
-    print("  OFFLINE-DIAGNOSE (Val-Split Datei-Ebene, Seed 20260707, val_frac=0.1)")
+    print("  OFFLINE-DIAGNOSE (" + (ground or "Val-Split Datei-Ebene, Seed 20260707, val_frac=0.1") + ")")
     print("=" * 70)
     header = "Metrik".ljust(28) + "".join(n.rjust(16) for n in names)
     print(header)
@@ -428,6 +515,9 @@ def print_table(results: list[dict]) -> None:
         print(label.ljust(28) + "".join(v.rjust(16) for v in values))
 
     row("n (Val-Züge gesamt)", [str(r["n_total"]) for r in results])
+    row("Eingangsbreite (Aera)",
+        [(f"{r.get('input_size')}" + ("*" if r.get("features_cropped") else ""))
+         for r in results])
     row("Policy Top-1 (Drafting)",
         [f"{r['policy_top1']*100:.1f}%" if r["policy_top1"] is not None else "n/a" for r in results])
     row("Policy Top-3 (Drafting)",
@@ -459,7 +549,7 @@ def print_table(results: list[dict]) -> None:
              for r in results])
     print("=" * 70)
     print("Hinweis: Runde 5 zaehlt NICHT zur Entscheidungsmetrik -- dort umgeht")
-    print("net_mcts.rs:2265 das Netz komplett (exakte Alpha-Beta-Suche), und der")
+    print("net_mcts.rs:5856 u.a. das Netz komplett (exakte Alpha-Beta-Suche), und der")
     print("Runde-4-Bootstrap nutzt round5::exact_round5_outcome. Das globale R²")
     print("wird von Runde 5 nach oben gezogen und ist daher irrefuehrend.")
 
@@ -590,6 +680,14 @@ def main() -> None:
     p.add_argument("--batch-size", type=int, default=4096)
     p.add_argument("--out", type=str, default=None,
                     help="Ziel-JSON-Pfad (Standard: evaluations/offline_diagnosis_<model1>_vs_....json)")
+    p.add_argument("--frozen-set", choices=sorted(FROZEN_EVAL_SETS), default=None,
+                    help="Welcher eingefrorene Satz (impliziert --frozen). v1 = Default und "
+                         "Bestandsverhalten; v3 = Satz der plattenbewussten Aera, auf dem "
+                         "par.6d Punkt 2 gemessen hat. WICHTIG fuer Generationen-Vergleiche: "
+                         "der Default-Val-Split (ohne --frozen) liegt UNGLEICH stark in den "
+                         "Trainingssaetzen der verglichenen Netze (gemessen 2026-09-16: 272 "
+                         "von 360 Dateien in window_v29_train, 224 in window_v28_train, 105 "
+                         "in window_v27_train) und taugt deshalb NUR innerhalb EINER Aera.")
     p.add_argument("--frozen", action="store_true",
                     help="Task #87: statt val_files() das eingefrorene, generationsuebergreifende "
                          "Set evaluations/frozen_eval_set.pkl verwenden (Default AUS, "
@@ -607,6 +705,8 @@ def main() -> None:
                          "STATUS.md 'Orakel-Metriken validiert (2026-07-28)'.")
     args = p.parse_args()
 
+    t_start = time.time()
+    cpu_start = time.process_time()
     threads = args.threads if args.threads is not None else max(1, (os.cpu_count() or 4) - 2)
     torch.set_num_threads(threads)
     print(f"🧵 torch threads: {threads}")
@@ -631,12 +731,21 @@ def main() -> None:
 
     corpus_labels = None
     frozen_meta = {}
+    # JEDES `--frozen-set` impliziert `--frozen`. Der Default ist bewusst
+    # `None` und nicht "v1": stuende hier "v1", waere `--frozen-set v1` ohne
+    # `--frozen` nicht von "gar nichts angegeben" unterscheidbar und liefe
+    # STILL auf dem Val-Split. Genau das ist am 2026-09-16 passiert -- ein Lauf,
+    # der sich frozen_v1 nannte, mass 582.132 Zuege des Val-Splits.
+    if args.frozen_set is not None:
+        args.frozen = True
+    frozen_path, frozen_expect = FROZEN_EVAL_SETS[args.frozen_set or "v1"]
     if args.frozen:
         states, values, rounds, pol_w, policy_targets, masks, corpus_labels, f_version, f_seed, f_n, planes = \
-            load_frozen_samples(include_planes=need_planes)
-        print(f"🧊 Frozen-Eval-Set: {FROZEN_EVAL_PATH} (Version {f_version}, Seed {f_seed}, n={f_n:,})")
+            load_frozen_samples(path=frozen_path, include_planes=need_planes,
+                                expect_version=frozen_expect)
+        print(f"🧊 Frozen-Eval-Set: {frozen_path} (Version {f_version}, Seed {f_seed}, n={f_n:,})")
         frozen_meta = {"frozen": True, "frozen_version": f_version, "frozen_seed": f_seed,
-                       "frozen_path": str(FROZEN_EVAL_PATH)}
+                       "frozen_path": str(frozen_path)}
     else:
         files = val_files()
         print(f"📦 Val-Split: {len(files)} Dateien (Seed {VAL_SEED}, val_frac={VAL_FRAC})")
@@ -654,9 +763,23 @@ def main() -> None:
         results.append(res)
 
     if args.frozen and not args.no_oracle:
-        add_oracle_metrics(results, args.model)
+        if args.frozen_set != "v1":
+            # `oracle_metrics.load_frozen_states` indexiert seine
+            # `record_index`-Labels fest in frozen_v1 (tools/oracle_metrics.py:79
+            # FROZEN_PKL, :185 Default-Argument). Auf einem anderen Satz waeren
+            # die Orakel-Zahlen ueber eine ANDERE Grundmenge gerechnet als die
+            # Tabelle darueber -- lieber weglassen als stillschweigend mischen.
+            print()
+            print("(Orakel-Metriken ausgelassen: ihre Labels indexieren frozen_v1, "
+                  f"gemessen wird hier auf {args.frozen_set}.)")
+        else:
+            add_oracle_metrics(results, args.model)
 
-    print_table(results)
+    print_table(results, ground=(
+        f"eingefrorener Satz {frozen_meta.get('frozen_version')}, n={len(states):,} Zustaende"
+        if frozen_meta.get("frozen") else
+        f"Val-Split Datei-Ebene, Seed {VAL_SEED}, val_frac={VAL_FRAC}, "
+        f"{frozen_meta.get('n_val_files')} Dateien"))
     print_corpus_table(results)
     print_oracle_table(results)
 
@@ -666,8 +789,23 @@ def main() -> None:
         suffix = "_frozen" if args.frozen else ""
         out_path = str(base / "artifacts" / f"offline_diagnosis_{'_vs_'.join(args.model)}{suffix}.json")
     with open(out_path, "w", encoding="utf-8") as f:
+        wall = time.time() - t_start
         json.dump({
             **frozen_meta,
+            # Pflichtfelder jedes Messlaufs (CLAUDE.md, "Laufzeiten messen,
+            # nicht schaetzen"). `s_je_partie` gibt es hier nicht -- gemessen
+            # wird ueber Zuege, nicht ueber Partien; statt dessen s_je_modell.
+            "laufzeit": {
+                "wanduhr_s": round(wall, 1),
+                "cpu_s": round(time.process_time() - cpu_start, 1),
+                "threads": threads,
+                "s_je_modell": round(wall / max(1, len(results)), 1),
+                "n_zuege": int(len(states)),
+            },
+            # Welche Eingangsbreite JEDES Netz deklariert -- ohne das liest
+            # niemand aus dem Artefakt, dass hier Aeren gemischt sind.
+            "config_input_size": INPUT_SIZE,
+            "input_sizes": {r["model"]: r.get("input_size") for r in results},
             "results": results,
         }, f, indent=2, ensure_ascii=False)
     print(f"\n📝 Ergebnis gespeichert unter: {out_path}")
