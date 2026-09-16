@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B ist fuer v29 eingetaktet, aber ungebaut (par.9/10). Top-K-Tiling ist nur als Folgestufe nach positivem B und Mehrdeutigkeits-Sonde registriert (par.14); kein Bau. -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B ist fuer v29 eingetaktet, aber ungebaut (par.9/10). Stufe-0-Sonde vorregistriert und gebaut (par.16), Volllauf steht aus; Wahrheitsquelle ist die Tiefensuche nach gekoppelter Neubefuellung, wertkopf-frei nur in R4 (am Code geprueft: `round5.rs:357` exakt, kein Netz). Review par.15: Top-K ist im R5-Pfad BEREITS gebaut (B1), und K=1 ist NICHT bitidentisch zum Bestand (B3) -- 14.5 entsprechend auf ein zu zeigendes Tor korrigiert. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -291,7 +291,8 @@ B also nicht mit, sondern schliesst den konkurrierenden Weg aus.
 Folge: dieser Arm haengt an der Antwort aus `PREREG_dome_stack_information_sets.md`. Wer
 die Rundensimulation an Blaettern einschaltet, uebernimmt deren Mischregel; die Prereg
 ist vor einem Bau um die dort entschiedene Informationsmenge zu ergaenzen. Zeilendrift:
-par.1 Konstante `net_mcts.rs:95`, Aufrufstelle `:2329`.
+par.1 Konstante `ROUND_TRANSITION_SAMPLING` (`net_mcts.rs:95`), Aufrufstelle der Grep auf
+diesen Namen (2026-09-16: `:3334`; die Zeile wandert, der Name nicht).
 
 ## Nachtrag 2026-09-11 (Audit-Querlesung)
 
@@ -420,7 +421,8 @@ ihr gescheitert), und das **Sichttor** aus par.10 (ein einziger Verstoss ist ROT
 1. Knopf `MOSAIC_ROUND_TRANSITION_LEAF`, Default 0 (Bestand bitidentisch, kein RNG-Zug),
    Spec-Feld optional. Wirkort ist die eine Stelle, an der der heutige Schalter haengt: das
    pseudo-terminale Blatt in `engine/src/net_mcts.rs` (par.1 nennt Konstante und Aufrufstelle,
-   mit Zeilendrift nach par.8: Konstante um `net_mcts.rs:95`, Aufrufstelle um `:2329`).
+   mit Zeilendrift nach par.8: beide ueber den Namen `ROUND_TRANSITION_SAMPLING` suchen --
+   Konstante 2026-09-16 bei `net_mcts.rs:95`, Aufrufstelle bei `:3334`).
    Ablauf im Blatt: (a) `resolve_to_pre_chance` spielt das Tiling BEIDER Seiten mit dem exakten
    Loeser durch; (b) EINE gezogene Neubefuellung nach par.10, Seed stellungsgebunden nach
    par.4.2; (c) EIN Netzaufruf. Registratur-Eintrag, `engine_config`, `docs/knobs.md`,
@@ -662,8 +664,12 @@ Rundenscore-Optimum, ohne die unmittelbaren Tiling-Regeln oder den Policy-Aktion
 veraendern.
 
 Das ist KEIN Vorschlag, den Rundenscore mit einem freien Value-Gewicht zu mischen. Dieser Weg
-(`envelope_tiling_value_w`) ist bereits mit Nullbefund gemessen (`PREREG_geometric_envelope.md`
-par.8.6). Hier ist der Rundenscore eine Kandidatenschranke; der Netzwert waehlt nur unter den
+(`envelope_tiling_value_w`) ist bereits mit Nullbefund gemessen -- die MESSUNG steht in
+`PREREG_geometric_envelope.md` **par.8.6a** (drei Arme, je 160 Paare), der Abschluss in
+**par.8.6c**; par.8.6 ist nur der Vorschlagsabsatz. Die Unterscheidung ist hier nicht
+Pedanterie: genau an dieser Stelle stand einen Tag lang "gebaut und UNGEMESSEN", weil die
+Suche unter 8.6 nichts fand und daraus eine Abwesenheit gemacht wurde
+(`feedback_empty_search_is_not_absence_proof`). Hier ist der Rundenscore eine Kandidatenschranke; der Netzwert waehlt nur unter den
 verbleibenden Alternativen.
 
 ### 14.3 Stufe 0: Mehrdeutigkeits- und Rangsonde VOR jedem Bau
@@ -715,13 +721,35 @@ betroffener Blaetter vorgeschlagen und vom Nutzer vor einem Bau entschieden.
 
 * **Abhaengigkeit:** Variante B besteht Kosten-, Sicht- und Arena-Tor. Ein negativer B-Befund
   schliesst Top-K hier, weil ohne die Nach-Tiling-Sicht kein sauberer Verbraucher bleibt.
-* **Korrektheit:** K=1 ist bitidentisch zu Variante B; jeder K-Kandidat ist legal,
-  der vorregistrierten Tiling-Reihenfolge zuordenbar und erzeugt ueber den normalen Spielpfad
-  denselben Nachzustand wie der Selector. Champion-Paritaet, Anker-Drift und
-  Anker-Konservierung muessen gruen sein.
-* **Kosten:** Ein eigenes Kostentor wird vor dem Bau aus Stufe 0 vorgeschlagen. Es misst
-  Wanduhr je Partie und Anteil betroffener Blaetter gegen Variante B, nicht gegen den alten
-  Pfad ohne Tiling-im-Blatt.
+* **Korrektheit, KORRIGIERT 2026-09-16 nach par.15 B3 (am Code nachgeprueft):** die
+  Bitidentitaet von K=1 zu Variante B ist KEINE Voraussetzung mehr, sondern ein zu ZEIGENDES
+  Tor mit eigenem Test. Grund: der Bestand loest das Tiling SCHRITTWEISE auf
+  (`round_transition.rs:152` ruft `best_first_step_exact` in einer Schleife, mit
+  `pi = state.current_player`, also mit Spielerwechsel zwischen den Schritten), und in Runde 5
+  ist das ein anderer Algorithmus als sonst (`tiling_solver.rs:1692-1697` verzweigt bei
+  `round_number >= 5` auf `best_first_step_round5`). Dieser Zweig baut zwar selbst schon ueber
+  `top_k_tilings(state, pi, MAX_TILING_LEAVES)` und maximiert Punkte plus Endwertung
+  (`:829-838`) -- **gibt aber nur `best.first_step` zurueck**: der Plan wird nach JEDEM Schritt
+  neu gerechnet. Ein K=1-Kandidat aus `top_k_tilings` ist dagegen der punktemaximale VOLLPLAN
+  EINES Spielers, in einem Stueck angewendet. Dass beide denselben Endzustand erreichen, ist
+  nicht durch Konstruktion gegeben; es kann zutreffen, muss aber gezeigt werden. Bis dahin gilt
+  der Schrittpfad als Default und Top-K als getrennter Zweig. Champion-Paritaet, Anker-Drift und
+  Anker-Konservierung muessen unveraendert gruen sein.
+
+  Der Test dazu ist billig und braucht kein Netz: fuer eine Stichprobe von Tiling-Zustaenden je
+  Runde beide Wege fahren (Schrittschleife gegen K=1-Vollplan) und die Nachzustaende
+  vergleichen -- getrennt ausgewiesen fuer Runde 5 und Runden 1-4, weil nur R5 den
+  abweichenden Algorithmus nimmt. Faellt der Vergleich in R1-4 gruen und in R5 rot, ist die
+  Stelle benannt statt nur der Verdacht.
+* **Kosten, KORRIGIERT 2026-09-16 nach par.15 B5:** die Schwelle wird NICHT erst aus Stufe 0
+  vorgeschlagen, sondern ist hiermit vorab gesetzt -- **25 Prozent Aufschlag auf die Wanduhr je
+  Partie**, dieselbe wie in par.4.1, par.9 und par.10. par.4.1 haelt ausdruecklich fest, dass
+  diese Zahl uebernommen und nicht neu gesetzt ist, "damit die Schwelle nicht je Arm passend
+  gewaehlt wird"; eine erst nach der Sonde vorgeschlagene Schwelle waere genau das.
+  **Beide Bezuege werden ausgewiesen**, weil ein einzelner den Nenner verschiebt: der Aufschlag
+  gegen den BESTAND (kumulativ mit Variante B) entscheidet das Tor, der Aufschlag gegen
+  Variante B ALLEIN steht daneben, damit sichtbar bleibt, welcher Teil der Kosten von welcher
+  Stufe kommt. Gemessen wird zusaetzlich der Anteil betroffener Blaetter.
 * **Arena:** nur mit demselben Netz und sonst identischem Spec gegen Variante B, zwei Seeds,
   je 200 Paare, Blockgroesse 5, ohne Frueh-Stopp und mit Logs. Die sechs Standard-Kennzahlen
   sind Pflicht; besonders Punkte je Wertungsplatte, Spalten, Spezialfelder und Chip-Verbrauch
@@ -734,3 +762,409 @@ Ein positiver A/B macht Top-K zu einem Rezept-Kandidaten, nicht automatisch zum 
 Aufnahme bleibt ein Nutzer-Entscheid; die Entfernung eines durch Top-K ersetzten Proxys folgt
 getrennt nach `PREREG_minimal_strength_core.md` par.4.
 
+## par.15 REVIEW (2026-09-16, Subagent)
+
+Fachliches Review von par.14 (Top-K-Tiling), Kontext par.7/9/10/13. Kein Bau, keine Messung;
+alle Code-Stellen in dieser Sitzung am Baum nachgesehen.
+
+**B1. Top-K ist im Kern bereits gebaut und im gespielten Zug AKTIV, nicht "erst der naechste
+Schritt" (14.1).** `top_k_tilings` liefert bis zu k strukturell verschiedene Vollabschluesse
+(`tiling_solver.rs:768-795`), `NET_TILING_TOPK = 12` (`:863`), `NET_TILING_TIEBREAK_ENABLED =
+true` (`:858`), der netz-gefuehrte Stichentscheid laeuft in den Runden 2-4 (`:1603-1610`) ueber
+`select_best_tiling_candidate` (`:944-964`, Modus 0 `punkte * P(Sieg)`, Modus 1 reines P(Sieg)
+per `MOSAIC_TILING_SELECT`), und die Huellen-Variante K3 (d) nutzt dieselbe Kandidatenliste
+(`:1620-1679`). Vorschlag: 14.1 auf den TATSAECHLICHEN Unterschied umschreiben (neu waere der
+ORT im Suchblatt und die GEKOPPELTE Neubefuellung, nicht der Selektor als solcher), sonst
+beauftragt der Absatz einen vorhandenen Mechanismus ein zweites Mal.
+
+**B2. Stufe 0 (14.3) beauftragt eine Erhebung, die es zum Teil schon gibt.**
+`tools/tiling_candidate_spread.py` und `evaluations/artifacts/tiling_candidate_spread_b01_v3.json`
+(k = 12) berichten: n = 400 Stellungen, Grundmenge Tiling-Stellungen aus `frozen_eval_set`,
+Einheit Stellungen mit mehr als einem Kandidaten = 225 (56,3 Prozent), je Runde 20/48/71/73/13;
+Value-Spreizung Median 0,0653 (IQR 0,028-0,110); die Multiplikation aendert die Wahl in 83 von
+192 Stellungen der Runden 2-4. Vorschlag: diese Sonde als Ausgangspunkt nennen und nur die
+wirklich fehlenden Groessen (gekoppelte Neubefuellung, Rangstabilitaet, Zwei-Spieler-Reihenfolge)
+ergaenzen, statt eine Neuerhebung zu registrieren (CLAUDE.md: erst in vorhandenen Skripten
+nachsehen).
+
+**B3. "K=1 ist bitidentisch zu Variante B" (14.5) ist eine Behauptung, der der Bestand
+widerspricht.** `resolve_to_pre_chance` loest das Tiling SCHRITTWEISE ueber
+`best_first_step_exact` mit wechselndem `current_player` auf (`round_transition.rs:137-171`,
+Aufruf `:152`), und `best_first_step_exact` ist in Runde 5 ein anderer Algorithmus
+(`best_first_step_round5` ueber `top_k_tilings` plus Endwertung, `tiling_solver.rs:1689-1698`
+und `:828-839`), sonst `best_first_step_inner`. Ein K=1-Kandidat aus `top_k_tilings` ist
+dagegen der punktemaximale VOLLPLAN EINES Spielers; dass die Schrittschleife denselben
+Endzustand erreicht, ist nicht durch Konstruktion gegeben. Vorschlag: die Bit-Identitaet als zu
+ZEIGENDES Tor mit eigenem Test formulieren oder den Schrittpfad ausdruecklich als Default
+festschreiben und Top-K als getrennten Zweig.
+
+**B4. Die Kandidaten-Definition in 14.1 ist weiter als die gebaute Dedup-Signatur.**
+`tiling_outcome_signature` (`tiling_solver.rs:646-671`) unterscheidet nur die 36
+Kuppel-Belegungen plus die verbliebenen Bonuschips; Strafleiste, Marker und die Pool-/
+Rundenende-Felder, die 14.1 ausdruecklich als unterscheidend nennt, fallen zusammen. Vorschlag:
+entweder die Signatur im Bau erweitern (dann faellt B3 erst recht) oder 14.1 auf die gebaute
+Signatur einschraenken und die Erweiterung als eigenen Punkt fuehren.
+
+**B5. Das Kostentor von 14.5 verlaesst die Disziplin, die par.4.1 aufgestellt hat.** Dort steht
+ausdruecklich, die 25 Prozent seien uebernommen und nicht neu gesetzt, "damit die Schwelle nicht
+je Arm passend gewaehlt wird"; 14.5 laesst die Schwelle erst NACH Stufe 0 vorschlagen und misst
+zusaetzlich gegen Variante B statt gegen den Bestand, also mit verschobenem Nenner. Vorschlag:
+die Schwelle VOR Stufe 0 nennen und beide Bezuege ausweisen (Aufschlag gegen Bestand, kumulativ
+mit B, und Aufschlag gegen B allein).
+
+**B6. Der gesuchte Nutzen liegt nahe an der Aufloesungsgrenze, und das steht nicht im Absatz.**
+Der naechstliegende Vorgaenger ist geschlossen: `PREREG_geometric_envelope.md` par.8.6a/8.6c,
+vier Arme, 80:80 und 81:79, p 1,000; die gemessene Value-Spreizung unter den Kandidaten ist
+Median 0,0653 (B2), und eine Arena mit 2 x 200 Paaren loest rund 6 Prozentpunkte auf (CLAUDE.md,
+"Infrastruktur bewerten": 5,75 Prozentpunkte Streuung bei n = 400 fuer identische
+Konfiguration). Vorschlag: Stufe 0 muss eine VORAB bezifferte Mindest-Rangaufloesung liefern
+(Anteil der Blaetter mit ueber gekoppelte Stichproben stabilem Netz-Rang), sonst kauft der A/B
+einen Zufallsbefund.
+
+**B7. Die vorregistrierte Lesart kennt "traegt" und "traegt nicht", aber nicht "schadet".** 14.5
+listet Stopp-Gruende (keine Mehrdeutigkeit, keine Rangaufloesung, Kostentor) und den positiven
+A/B; ein signifikant NEGATIVER A/B hat keine Lesart, obwohl genau der in dieser Kampagne
+zuletzt zweimal eingetreten ist (`PREREG_round_estimate_leaf_term.md` par.7c/7d mit 20:60 und
+45:85; `PREREG_moon_stack_order.md` par.12.6, wo der ablatierte Kopf besser war). Vorschlag:
+dritte Lesart eintragen, samt der Aussage, die ein Schaden ueber den Rundenscore-Solver machen
+wuerde.
+
+**B8. Zitat-Praezision und Zeilendrift.** 14.2 verweist auf "`PREREG_geometric_envelope.md`
+par.8.6", obwohl derselbe Absatz par.13 dieser Datei bereits als Nummernfalle behandelt (8.6 ->
+8.6a) und der Strang seit 2026-09-15 als 8.6c geschlossen ist; ausserdem ist die in par.8
+korrigierte Aufrufstelle erneut gewandert (Konstante `net_mcts.rs:95` stimmt, die Aufrufstelle
+liegt heute bei `net_mcts.rs:3334-3335`, nicht bei `:2329`, was auch der AGENTEN-AUFTRAG P1
+weitertraegt). Vorschlag: beide Verweise beim naechsten Anfassen praezisieren.
+
+**Gesamturteil:** Die Frage von par.14 ist echt und mit einer Sonde beantwortbar, aber der
+Absatz beauftragt in weiten Teilen einen Mechanismus, der bereits gebaut, aktiv und einmal
+gemessen ist; ohne die Korrektur von B1-B3 und ohne vorab bezifferte Kosten- und
+Rangschwellen ist er nicht ausfuehrbar.
+
+
+### 16.8 NACHTRAG des Koordinators: die Stichprobe muss JE RUNDE geplant werden (Antwort auf B2)
+
+par.15 B2 hat gewarnt, dass Stufe 0 eine Erhebung beauftragt, die es zum Teil schon gibt; par.16
+nennt sie trotzdem nicht. Nachgeholt, samt der Folge fuer den Laufbefehl.
+
+**Vorhanden ist `tools/tiling_candidate_spread.py`**, Artefakt
+`evaluations/artifacts/tiling_candidate_spread_b01_v3.json` vom 2026-09-02. Die Zahlen sind am
+Artefakt selbst nachgeprueft (nicht aus dem Review uebernommen): n = 400 Stellungen, Grundmenge
+Tiling-Stellungen aus `frozen_eval_set` (v3), Einheit Stellungen; `n_multi` = 225, also 56,3
+Prozent mit mehr als einem Kandidaten bei k = 12.
+
+**Was davon fuer par.16 GILT und was NICHT:**
+
+* **Netzunabhaengig und damit uebertragbar:** die Kandidatenzahl je Stellung. Sie kommt aus
+  `tiling_candidates_json`, also aus dem SPIEL, nicht aus einem Netz.
+* **Netzabhaengig und damit NICHT uebertragbar:** `value_spread_median` 0,0653 (IQR
+  0,0284-0,1096) und `mult_changes_choice` 83 von 192. Das Artefakt traegt `"model":
+  "v23-b01_brierbest"` -- ein Stand von vor sechs Generationen. Diese beiden Zahlen sind hier
+  KEINE Vorabinformation, sondern hoechstens eine Groessenordnung.
+
+**Die Folge, und das ist der eigentliche Nachtrag:** die Verteilung der mehrdeutigen Stellungen
+ueber die Runden ist stark ungleich -- 20 / 48 / 71 / 73 / 13 fuer R1 bis R5. In **Runde 1 sind
+nur 5,0 Prozent** der Stellungen ueberhaupt mehrdeutig (20 von 400), in R5 nur 3,3 Prozent. Ein
+Lauf mit `--max-positions 200` ueber alle Runden trifft in R1 also rund **zehn** auswertbare
+Faelle, nicht zweihundert. Die in 16.4 vorab bezifferte Schwelle (Wilson-Untergrenze > 0,50)
+ist bei n = 10 nicht erreichbar, egal wie das Netz rangiert.
+
+**Deshalb verbindlich fuer den Volllauf:** die Stellungen werden **je Runde gezogen und je Runde
+ausgewiesen**, mit einem Mindest-n je Runde statt eines Gesamtdeckels; Runden, die ihr Mindest-n
+nicht erreichen, werden als "nicht entschieden" berichtet und NICHT in eine Gesamtquote
+eingerechnet. Die Sonde zaehlt je Datei UND Runde (16.6) -- der Deckel je Runde ist also schon
+gebaut, er muss nur gesetzt werden. Ohne diesen Nachtrag waere R1 mit einer Zahl heimgekommen,
+die wie ein Befund aussieht und keiner ist -- genau die Falle, gegen die 16.4 die Schwelle
+vorab beziffert hat.
+
+### Nachpruefung der Review-Befunde durch den Koordinator (2026-09-16)
+
+Regel 0: Agenten-Befunde sind Behauptungen. Selbst am Code nachgefahren, mit Prueffolge:
+
+| Befund | Stand | Prueffolge |
+| --- | --- | --- |
+| B1 (Top-K ist gebaut und aktiv) | **BESTAETIGT** | `tiling_solver.rs:1595-1612` (rundenabhaengige Wertung), `NET_TILING_TIEBREAK_ENABLED` (`:858`), `NET_TILING_TOPK = 12` (`:863`) |
+| B3 (K=1 nicht bitidentisch) | **BESTAETIGT, und schaerfer** | `round_transition.rs:152`, `tiling_solver.rs:1692-1697`, `:829-838`. Siehe 14.5, dort korrigiert |
+| B4 (Dedup-Signatur enger als 14.1) | **BESTAETIGT, und schaerfer** | `tiling_solver.rs:646-671` |
+| B2 (Sonde existiert schon) | **BESTAETIGT**, Zahlen am Artefakt nachgeprueft | `tiling_candidate_spread_b01_v3.json`; abgearbeitet in 16.8 |
+| B5 (Schwelle je Arm gewaehlt) | **BESTAETIGT** | par.4.1 gegen 14.5; abgearbeitet in 14.5 |
+| B6, B7 (Aufloesungsgrenze, Ausgang "schadet") | beantwortet in par.16.5 | -- |
+| B8 (Zeilendrift, Zitat 8.6) | **BESTAETIGT** | `net_mcts.rs:95` stimmt, `:2329` ist heute ein Struct-Feld, die Stelle liegt bei `:3334`; beide Verweise auf SYMBOLNAMEN umgestellt, `par.8.6` auf `8.6a`/`8.6c` praezisiert |
+
+**Damit sind alle acht Befunde abgearbeitet.** Keiner war falsch; zwei (B3, B4) waren im
+Gegenteil zu schwach formuliert. Der Agent hat sauber gearbeitet -- was fehlte, war der
+Anschluss: B2 hat vor einer Neuerhebung gewarnt, und die Sonde aus par.16 nennt die vorhandene
+trotzdem nicht. Beim Beauftragen des Baus gehoert der Review also MIT in den Auftrag, nicht nur
+die Aufgabe.
+
+**Wo die Nachpruefung ueber den Befund hinausging:**
+
+* **B3:** der Agent nannte den Unterschied "Schrittschleife gegen Vollplan". Dazu kommt, dass
+  `best_first_step_round5` auch INNERHALB des R5-Zweigs nur `best.first_step` zurueckgibt --
+  der Vollplan wird also nach jedem einzelnen Schritt neu gerechnet, mit einem moeglichen
+  Gegnerzug dazwischen. Der Unterschied ist damit nicht nur "andere Berechnung desselben", er
+  ist struktureller Art.
+* **B4:** die Signatur unterschlaegt nicht nur Strafleiste, Marker und Pool-Felder, sondern
+  auch die FARBE: `fill` haelt je Feld nur `placed_color.is_some()`, also belegt ja/nein
+  (`:653`). Zwei Plaene, die dieselben Felder mit verschiedenen Farben belegen, sind fuer die
+  Deduplizierung identisch. **Ob das ueberhaupt vorkommen kann, ist eine REGELFRAGE** (hat
+  jedes Kuppelfeld eine feste Farbe?) und hier ausdruecklich NICHT beantwortet -- nach Regel 0
+  gehoert sie ins `engine_manual.md` oder in den Code, nicht in eine Ableitung. Wer B4
+  abarbeitet, klaert das zuerst: ist die Farbe feldfest, ist die Verkuerzung verlustfrei und
+  B4 schrumpft auf die vier genannten Felder.
+
+## par.16 STUFE 0 GEBAUT: die Counterfactual-Ranking-Sonde (Nutzer-Auftrag 2026-09-16)
+
+Fuehrt par.14.3 aus und beantwortet dabei B6 (vorab bezifferte Mindest-Rangaufloesung) und B7
+(dritte Lesart "schadet"). Der Absatz haengt HIER und nicht in einer neuen Prereg, weil die
+Frage schon hier wohnt: par.14.3 beauftragt genau diese Erhebung, par.15 B2/B6/B7 nennen genau
+die Luecken, die sie schliessen soll. Eine eigene Datei haette die Ergebnisse von ihrem
+Vorschlagsabsatz getrennt.
+
+### 16.1 Die Frage, enger als in par.14.3
+
+> Trifft der Value-Kopf die Reihenfolge mehrerer lokal plausibler Tiling-Plaene, und ab welcher
+> Runde ist er dabei verlaesslich genug, um eine exakte lokale Entscheidung (mehr Rundenpunkte)
+> zu ueberstimmen?
+
+Die zweite Haelfte ist der Teil, den der Bestand NICHT misst.
+`tools/tiling_value_reference_main.py:146` schneidet auf `tied = [c for c in cands if
+c["points"] == top]` zu, prueft also ausschliesslich PUNKTGLEICHE Abschluesse. Genau die
+Ueberstimmung eines Punktvorsprungs ist damit nie gemessen worden, obwohl der gespielte Zug sie
+zulaesst: `select_best_tiling_candidate` (`tiling_solver.rs:944-964`, Modus 0) waehlt nach
+`punkte * P(Sieg)`, ein Produkt, das einen Punkt kippen KANN.
+
+Und der Zweig ist AKTIV: `NET_TILING_TIEBREAK_ENABLED = true` (`tiling_solver.rs:858`),
+`NET_TILING_TOPK = 12` (`:863`), Anwendung in den Runden 2-4 (`:1603-1610`). Runde 1 ist dort
+ausdruecklich ausgeschlossen (`:1407-1409`).
+
+### 16.2 Wahrheitsquelle: (c) Tiefensuche nach gekoppelter Neubefuellung, in ZWEI Guetegraden
+
+Die Wahl ist der Punkt, an dem die Sonde steht oder faellt, deshalb die drei Kandidaten
+einzeln, mit Pruefstelle:
+
+**(a) Exakter Rundenscore am Ende der FOLGENDEN Runde faellt aus, weil er nicht berechenbar
+ist.** Nach `advance_after_tiling_json` (`lib.rs:1930-1944`) steht der Zustand im DRAFTING der
+naechsten Runde. Was diese Runde einbringt, haengt daran, wie BEIDE Seiten sie draften; es gibt
+aber keinen Python-Einstieg, der von einem BELIEBIGEN Zustand aus weiterspielt.
+`PyGame::new` (`py.rs:102`) und `RefereeGame::new` (`referee.rs:465`) starten beide nur eine
+frische Partie, und `heuristic_arena_choice_state_json` (`lib.rs:1384`) liefert eine AKTION
+ohne Folgezustand. Die exakt berechenbare Restgroesse waere `solve_round_final_score` (ueber
+`scoring_shaping_e_json`, `lib.rs:1644-1645`), aber direkt nach einem Rundenuebergang sind die
+Musterreihen leer, sie ist dort rund 0. Was bleibt, waere der Rundenscore der AKTUELLEN Runde
+(`points` aus `tiling_candidates_json`, `lib.rs:1907`) - das ist die lokale Entscheidung selbst,
+also die getestete Groesse, nicht ihre Wahrheit.
+
+**(b) Partieausgang aus dem Korpus faellt aus, weil die Kontrafaktischen keine Etikette
+haben.** Fortgesetzt wurde genau EIN Plan je Stellung. Die uebrigen K-1 sind per Konstruktion
+unbeschriftet. Dazu kommt, dass der fortgesetzte Plan von dem Kriterium gewaehlt wurde, das hier
+geprueft wird (`tiling_solver.rs:944-964`) - ein Vergleich haette die Auswahl im Zaehler.
+
+**(c) Tiefensuche nach gekoppelter Neubefuellung wird genommen** (Vorbild und einziger gebauter
+Weg: `tools/tiling_value_reference_main.py:159`,
+`mr.net_search_state_json(nxt, ref_path, sims, 1.5, seed)`), aber mit AUSGEWIESENEM Guetegrad,
+weil sie nicht ueberall gleich unabhaengig ist:
+
+* **Grad EXAKT, nur Runde-4-Stellungen.** Ein Runde-4-Tiling landet nach einer Neubefuellung im
+  Runde-5-Drafting. Dort antwortet der Alpha-Beta-Endspielsolver (`round5.rs`), nicht das
+  Value-Kopf-Blatt: `net_search_state_json` traegt dann KEIN `root_value`, und der
+  `mcts_q`-Wert des gewaehlten Zugs IST der Alpha-Beta-Wurzelwert.
+
+  **Am Code nachgeprueft (2026-09-16, Koordinator), Kette vollstaendig:**
+  `net_mcts.rs:6032-6062` schneidet Runde 5 vor dem Baum ab und holt `root_q` separat aus
+  `round5::choose_action_with_analysis`, Feld `mcts_q` des mit `chosen` markierten Zugs;
+  `round5.rs:180-187` schaltet den Solver ohne gesetztes `MOSAIC_R5_NET_SOLVER` EIN (Default
+  `true`), die Sonde muss den Knopf also nicht setzen, aber auch nicht auf `0` finden.
+  Entscheidend war die eine Stelle, an der der Verdacht der Zirkularitaet haette wieder
+  hereinkommen koennen: der Kommentar an `net_mcts.rs:6039-6047` nennt fuer den Fall der
+  Budget-Ueberschreitung einen Rueckfall auf einen "billigen `leaf_value`-Ersatzwert".
+  `round5.rs:357-359` zeigt, dass dieser Ersatzwert `player_total_exact(perspective) -
+  player_total_exact(1 - perspective)` ist -- eine EXAKTE Punktezaehlung, kein Netz. Damit ist
+  der R4-Zweig auf seinem GANZEN Pfad wertkopf-frei, auch dort, wo das Knotenbudget
+  (`NODE_BUDGET`) nicht reicht; die Uebernahme aus
+  `tools/tiling_value_reference_main.py:162-173` war richtig, stand aber bis hierher ohne
+  eigene Pruefstelle. In dieser Klasse ist die Wahrheit NICHT zirkulaer.
+
+  Die Sonde protokolliert das Fehlen von `root_value` weiter mit -- nicht mehr als Ersatz fuer
+  diese Pruefung, sondern als LAUFZEIT-Waechter: faellt der Grad EXAKT in einem kuenftigen Lauf
+  still auf `net_search` zurueck (weil jemand den Knopf gesetzt oder `round5::applies`
+  verschoben hat), faellt es im Artefaktfeld `ref_grade` auf.
+* **Grad NETZ, Runden 1-3.** Dort bleibt nur eine Netz-Suche mit einem UNABHAENGIGEN Gewichts-
+  satz. Unabhaengig in den GEWICHTEN, aber NICHT in der ART: das Blatt ist wieder ein
+  Value-Kopf, und in Runde 1 ist genau der das geprueft schwache Organ
+  (`PREREG_bootstrap_horizon.md`, `project_phase0_value_diagnosis`). Ein positives R1-Ergebnis
+  dieser Sonde belegt deshalb hoechstens UEBEREINSTIMMUNG zweier Wertkoepfe, keine Richtigkeit.
+  Das ist vorab festgehalten, damit es hinterher nicht anders gelesen wird.
+
+**Der eingebaute Selbsttest, ohne den Grad NETZ wertlos waere** (Bauform aus
+`tools/probes/return_order_sensitivity_r1.py:16-22`): die Referenz wird je Kandidat mit M
+gekoppelten Neubefuellungen erhoben, und ihre EIGENE Rangstabilitaet ueber diese M Ziehungen
+wird berichtet. Kippt das Vorzeichen der Referenz-Differenz ueber ihre eigenen Ziehungen, ist
+die Runde mit dem verfuegbaren Instrument NICHT beantwortbar, und die Sonde sagt das, statt eine
+Trefferquote gegen Rauschen auszuweisen.
+
+**Gekoppelt heisst hier: gleicher Seed, nicht gleicher Beutel.** `advance_after_tiling_json`
+behauptet in seiner Doku (`lib.rs:1926-1929`) "der Nachfuell-Wurf ist dann identisch, der
+einzige Unterschied ist das Brett". Das ist eine NAEHERUNG: verschiedene Tiling-Plaene legen
+verschieden viele Steine in den Turm, und `tiling_candidates_json` gibt das MASKIERTE
+`state_to_json` zurueck (`lib.rs:1913`), das `json_to_state` je Seed neu determinisiert. Die
+Kopplung ist damit Seed-Kopplung, keine Beutel-Identitaet. Restunterschied unbekannt; er geht in
+die Rangstabilitaet ein und wird dort sichtbar.
+
+### 16.3 Kennzahlen, je mit n, GRUNDMENGE und EINHEIT
+
+Die Sonde berichtet je Runde getrennt (R1, R2, R3, R4) und zusaetzlich gepoolt:
+
+1. **M1 Mehrdeutigkeit** - n = gescannte Stellungen, Grundmenge = Tiling-Stellungen der Runden
+   1-4 aus Korpus-Records (`phase == "tiling"`), Einheit = Stellungen. Berichtet Anteil mit >= 2
+   strukturell verschiedenen Kandidaten und Median der Kandidatenzahl.
+2. **M2 Richtungstreffer** - n = Kandidaten-PAARE, Grundmenge = Paare aus Stellungen mit >= 2
+   Kandidaten, Einheit = Paare. `sign(dValue) == sign(dReferenz)`, exakter Binomialtest gegen
+   50 Prozent, getrennt nach Punktabstand `dpoints == 0` und `dpoints != 0`.
+3. **M3 Rangstabilitaet der Referenz** - n = Paare, Grundmenge = Paare, Einheit = Paare. Anteil
+   der Paare, deren Referenz-Vorzeichen ueber ALLE M gekoppelten Neubefuellungen gleich ist.
+4. **M4 Ueberstimmung** - n = Paare mit `dpoints != 0`, Grundmenge = ebendiese, Einheit = Paare.
+   Wie oft kippt `punkte * P(Sieg)` die Punkte-Reihenfolge tatsaechlich, und wie oft ist ein
+   Kippen richtig (Vorzeichen der Referenz). Das ist die Kennzahl, die den AKTIVEN Zweig
+   `tiling_solver.rs:1603-1610` beurteilt.
+5. **M5 Aggregator-Vergleich** - dieselbe Grundmenge wie M2, dreimal ausgewertet: Mittelwert
+   ueber die M Ziehungen, Worst Case (unguenstigste Ziehung fuer den netz-bevorzugten Plan), und
+   auf M3-stabile Paare eingeschraenkt. Beantwortet par.14.3 Frage "Mittelwert, Worst-Case oder
+   Rang-Stabilitaet".
+6. **M6 Fall-Klassen** - n = Paare, Grundmenge = Paare, Einheit = Paare. Klassifiziert ueber den
+   EXAKTEN Differenzvektor der Endwertung (`end_scoring_from_state_json`, `lib.rs:1474`, Details
+   je Kriterium) plus Strafleisten- und Chip-Differenz aus dem Spieler-JSON. Klassen:
+   Spezialfeld, Chip, Spalte, lange Reihe, sonstige.
+
+### 16.4 Mindest-Rangaufloesung, VORAB beziffert (Antwort auf B6)
+
+Eine Runde gilt nur dann als "der Netzwert darf dort waehlen", wenn BEIDE Schwellen halten:
+
+* **(i)** untere Grenze des 95-Prozent-Wilson-Intervalls der M2-Trefferquote > 0,50;
+* **(ii)** M3-Stabilitaet >= 0,60.
+
+Die 0,60 ist a priori gesetzt und NICHT aus den Daten: bei M = 6 gekoppelten Ziehungen zeigt ein
+Paar mit reinem Rausch-Vorzeichen mit Wahrscheinlichkeit 2 * (1/2)^6 = 0,031 volle Einigkeit.
+0,60 liegt rund 19-fach ueber diesem Rauschboden. Wer M aendert, muss die Schwelle mit dem
+Rauschboden mitziehen und das hier eintragen.
+
+### 16.5 LESART VORAB, alle vier Ausgaenge
+
+1. **TRAEGT** (beide Schwellen aus 16.4 halten, in R2-R4 bereits bei `dpoints != 0`): der
+   aktive Zweig ist in dieser Runde gerechtfertigt, und par.14.4 Punkt 4 bekommt diese Runde als
+   frueheste. Ein Bau bleibt trotzdem an Variante B gebunden (par.14.5).
+2. **TRAEGT NICHT** (Trefferquote nicht von 50 Prozent unterscheidbar, oder M3 < 0,60): der
+   Netzwert darf dort nicht waehlen. Fuer R1 ist das der erwartete Ausgang und nur eine
+   Bestaetigung des bestehenden Ausschlusses (`tiling_solver.rs:1407-1409`); fuer R2-R4 ist es
+   ein Befund GEGEN den heute laufenden Zweig und geht als solcher in STATUS.md.
+3. **SCHADET** (obere Grenze des 95-Prozent-Intervalls < 0,50, also systematisch FALSCHE
+   Rangfolge): dann kauft `punkte * P(Sieg)` in dieser Runde nicht Rauschen, sondern
+   Verschlechterung. Registriert wird dann der Vorschlag, `NET_TILING_TIEBREAK_ENABLED`
+   abzuschalten oder sein Rundenfenster zu verengen - Nutzer-Entscheid, kein stiller Eingriff,
+   und mit Anker-Invarianz-Pruefung, weil es Engine-Verhalten aendert (CLAUDE.md, Abschnitt
+   "Nach jeder Engine-Aenderung"). Diese Lesart steht hier, weil in dieser Kampagne zweimal ein
+   Falsifikator nur "traegt"/"traegt nicht" kannte, waehrend das Ergebnis "schadet" war
+   (par.15 B7).
+4. **NICHT MESSBAR** (die Referenz ist in dieser Runde selbst nicht rangstabil, M3 nahe dem
+   Rauschboden): die Runde bleibt mit dem heutigen Instrument offen. Was dann fehlt, ist
+   benannt: ein additiver Engine-Einstieg, der von einem BELIEBIGEN Zustand aus ausspielt
+   (heute nicht vorhanden, siehe 16.2 (a)). Erst damit waere ein wertkopf-freier Ausgang als
+   Wahrheit erreichbar.
+
+**Stopp vor allem anderen:** faellt M1 so aus, dass praktisch nie mehr als ein Kandidat
+existiert, endet der Strang ohne Bau (par.14.3 Frage 1) - unabhaengig von M2.
+
+### 16.6 Bauform
+
+`tools/probes/counterfactual_tiling_ranking.py`. Liest Korpus-Records ueber `corpus_io`,
+erzeugt Kandidaten mit `mr.tiling_candidates_json`, bewertet sie mit EINER wiederverwendeten
+`onnxruntime.InferenceSession` auf dem NACH-Tiling-Zustand (das ist der Zustand, den
+`select_best_tiling_candidate` sieht, `tiling_solver.rs:951` - die Sonde muss denselben
+bewerten), setzt jeden Kandidaten mit `mr.advance_after_tiling_json` ueber M gekoppelte Seeds
+fort und erhebt dort die Referenz mit `mr.net_search_state_json` und einem ZWEITEN Netz.
+Fortschrittszeilen mit `flush=True`, `laufzeit`-Block im Artefakt
+(`evaluations/artifacts/counterfactual_tiling_ranking.json`).
+
+### 16.7 STAND 2026-09-16: gebaut und trocken geprueft, VOLLLAUF STEHT AUS
+
+`tools/probes/counterfactual_tiling_ranking.py` liegt im Baum und laeuft
+Ende-zu-Ende. Der Volllauf ist NICHT gefahren: die b04-Kette
+(`tools/night_v29_b04_moon_played.sh`) belegte die Maschine durchgehend
+(Prozessabfrage 16:05 und 16:20, PID 7416, CPU 361 s bzw. 977 s), und eine Sonde
+dieser Art ist CPU-Arbeit (CLAUDE.md, "Messungen laufen EXKLUSIV"). Es gibt
+deshalb bis hierher KEIN Ergebnis zur Frage aus 16.1, nur einen gepruefte
+Apparat.
+
+**Was der Trockenlauf belegt** (n = 3 Stellungen je Lauf, Grundmenge
+Tiling-Stellungen aus `data/selfplay_v28-b02-policy_*.pkl`, Einheit Stellungen;
+sims = 20, M = 4, max-cands = 3, also AUSDRUECKLICH keine Aussage ueber die
+Sache selbst):
+
+1. Die Kette Korpus-Record -> `tiling_candidates_json` -> Netzwert auf dem
+   Nach-Tiling-Zustand -> `advance_after_tiling_json` -> Referenz -> Paar-Statistik
+   laeuft fehlerfrei durch (Fehler 0).
+2. **Der Guetegrad EXAKT aus 16.2 existiert wirklich.** Im Lauf mit
+   `--rounds 4` meldet die Sonde `ref_grade: {"exact_ab": 5}` fuer alle
+   5 Paare: `root_value` fehlt dort, die Referenz kommt aus dem
+   `mcts_q` des gewaehlten Zugs, also vom Runde-5-Alpha-Beta. In den Laeufen
+   mit `--rounds 1,2` steht durchgehend `net_search`. Die Zweiteilung aus 16.2
+   ist damit nicht nur behauptet, sondern im Instrument sichtbar.
+3. **Zwei Instrumentenfallen sind im Bau schon eingetreten und behoben**, beide
+   waeren still falsch gelaufen:
+   * Die Geometrie-Groessen (`col_fill`, `row_fill`, `special_total`) haengen
+     unter `players[i].score_geo`, nicht flach am Spieler, und `col_f_max` ist
+     die KAPAZITAET je Spalte, nicht ihr Fuellstand. Flach gelesen liefert
+     `.get()` ueberall `None` - die Fall-Klassen waeren sang- und klanglos alle
+     "sonstige" geworden.
+   * Ein gemeinsamer Deckel je Datei erschoepft sich in Spielreihenfolge, bevor
+     Runde 4 drankommt (erster Trockenlauf: 6 R1-Stellungen, 1 R2-Stellung,
+     0 R4-Stellungen). Der Deckel zaehlt jetzt je Datei UND Runde. Dieselbe
+     Falle hat `tools/tiling_value_reference_main.py:68-72` schon einmal
+     getroffen.
+4. **Kostenweiche:** der Einzel-Einstieg `net_search_state_json` laedt das ONNX
+   bei jedem Aufruf neu und kostete im ersten Trockenlauf rund 3 s je
+   Auswertung bei 20 Sims, also fast reine Ladezeit (2 Stellungen, 8
+   Auswertungen, 26 s Wanduhr). Die Sonde nutzt deshalb
+   `net_search_states_json_batch` (`lib.rs:1100-1117`): EIN Ladevorgang je
+   Stellung statt einer je Auswertung. Danach 3,4 s je Stellung bei denselben
+   20 Sims (n = 3 Stellungen, `laufzeit.s_je_stellung` im Artefakt).
+
+**UNGEMESSEN und deshalb hier nicht beziffert:** was der Volllauf bei den
+registrierten Einstellungen (sims = 400, M = 6, max-cands = 4) kostet. Die
+Trockenzahl steht bei 20 Sims und M = 4; sie hochzurechnen waere genau die
+Schaetzung, die CLAUDE.md ("Laufzeiten messen, nicht schaetzen") verbietet. Der
+erste Volllauf misst sie und traegt sie in seinen `laufzeit`-Block ein.
+
+**Ebenfalls offen, weil nicht gemessen:**
+* M1 auf einer tragfaehigen Grundmenge, also der STOPP-Test aus 16.5. Die
+  Trockenzahlen (R1: 2 von 6 Stellungen mehrdeutig; R4: 3 von 3) sind zu klein
+  fuer jede Aussage.
+* Ob die Referenz in R1-R3 rangstabil genug ist, um die Runde ueberhaupt zu
+  beantworten (16.5 Ausgang 4). Der R4-Trockenlauf zeigte bei n = 5 Paaren
+  `m3_stabilitaet = 0,2`, also haeufiges Kippen des Vorzeichens ueber die
+  gekoppelten Neubefuellungen - falls sich das bei ordentlichem n haelt, ist
+  es selbst der Befund ("die Plaene sind nicht unterscheidbar"), aber bei n = 5
+  ist es nichts.
+* Die Behauptung, `mcts_q` des gewaehlten Zugs sei der EXAKTE
+  Alpha-Beta-Wurzelwert. Die Sonde belegt nur, dass `root_value` dort fehlt und
+  der Ersatzwert existiert; die Exaktheit ist aus
+  `tools/tiling_value_reference_main.py:162-173` uebernommen und in dieser
+  Sitzung NICHT am `round5.rs`-Code nachgeprueft.
+
+**Lauf-Befehl, sobald die Maschine frei ist** (ohne Pipe, ohne Umleitung,
+Fortschritt je 5 Dateien):
+
+```
+python -u tools/probes/counterfactual_tiling_ranking.py --max-positions 60 --draws 6 --sims 400 --max-cands 4 --rounds 1,2,3,4
+```
+
+**`--max-positions` ist seit par.16.8 das Soll JE RUNDE, nicht die Gesamtzahl** -- 60 je Runde
+statt der urspruenglichen 200 gesamt. Die Zahl kommt aus der Verfuegbarkeit, nicht aus dem
+Wunsch: mehrdeutig sind gemessen 20 / 48 / 71 / 73 von 400 Stellungen in R1-R4, R1 also 5,0
+Prozent. Ein Soll von 60 in R1 verlangt rund 1.200 gescannte Tiling-Stellungen; ob das Fenster
+die hergibt, sagt die Sonde selbst im Feld `scanned`. **Erreicht eine Runde ihr Soll nicht,
+wird sie als NICHT ENTSCHIEDEN berichtet** und geht in keine Gesamtquote ein (16.4: unter der
+Wilson-Untergrenze ist jede Richtung Rauschen). Die Kosten des Volllaufs bei sims = 400 und
+M = 6 sind UNGEMESSEN -- der Trockenlauf lief mit 20 Sims und M = 4; hochrechnen waere genau
+die Schaetzung, die `CLAUDE.md` verbietet. Der erste Volllauf beginnt deshalb mit `--rounds 4`
+allein (Grad EXAKT, die aussagekraeftigste Klasse) und misst dabei seine eigene Laufzeit.

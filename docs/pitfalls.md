@@ -289,3 +289,97 @@ Zusatz; `tools/analyze_game_log.py` traegt dafuer zwei datierte Toleranzen
   scheiterte in der Trockenprobe mit 0x8009001d. Die Trockenprobe hat den Fix
   gerettet, nicht das Nachdenken.
 
+
+- **Eine Kette, die per Heredoc geschrieben UND im selben Befehl gestartet wird,
+  wartet auf sich selbst** (2026-09-16, 30 Minuten Stillstand, zwei Sitzungen).
+
+  Die Wartebedingung jeder Nachtkette fragt
+  `Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match '[t]rain\.py|...' }`.
+  Wird das Skript als `cat > kette.sh <<'SCRIPT' ... SCRIPT` geschrieben und
+  danach im GLEICHEN Befehl gestartet, traegt der Wrapper-bash den kompletten
+  Skripttext in seiner eigenen Kommandozeile -- am 2026-09-16 waren das 6.554
+  Zeichen, darin woertlich `train.py`, `paired_gating.py` und
+  `build_cache_incremental.py`. Der Filter findet diesen Wrapper und meldet
+  "belegt", fuer immer.
+
+  **Die uebliche Haertung hilft hier NICHT.** Die Zeichenklasse (`[t]rain` statt
+  `train`) schuetzt gegen den eigenen SUCHBEFEHL; hier traegt aber ein fremder
+  Prozess den Suchbegriff als NUTZLAST. Ebensowenig hilft "leere Antwort gilt als
+  belegt" -- die Antwort ist nicht leer, sie ist falsch positiv.
+
+  **Zwei Handgriffe, beide noetig:**
+
+  1. Im Filter zusaetzlich auf den Prozessnamen pruefen:
+     `-and $_.Name -match 'python'`. Eine Messung ist ein Python-Prozess, kein
+     bash. Nachgezogen in `night_v29_b04_moon_played_v2.sh`,
+     `night_v29_envelope_value_ab.sh`, `night_v29_generate.sh`.
+  2. Kettenskripte **als Datei starten** (`bash tools/kette.sh` als eigener
+     Aufruf), nie Schreiben-und-Starten in einem Befehl.
+
+  **Warum das hier steht und nicht als Einzelfall durchgeht:** es war der DRITTE
+  Vorfall derselben Familie (2026-09-09: 35 Minuten Stillstand; Nacht auf
+  2026-09-13: die wartende Leiter-Kante startete gar nicht). Der Kommentar in
+  `night_v29_generate.sh` sagte zu diesem Zeitpunkt "GEHAERTET" und meinte die
+  ersten beiden Stufen -- ein Schutzversprechen, das die dritte Bauform nicht
+  deckte.
+
+  **Schaden ueber die eigene Spur hinaus:** der blockierende Wrapper enthielt auch
+  `build_cache_incremental`, und die Kette einer PARALLELSITZUNG filterte darauf.
+  Sie wartete ebenfalls seit 15:45 leer und lief binnen Sekunden an, nachdem der
+  Wrapper beendet war. Wer eine haengende Kette findet, prueft deshalb nicht nur
+  die eigene.
+
+  **Erkennungszeichen:** in den Hintergrundaufgaben steht im Minutentakt
+  "belegt", waehrend `Get-CimInstance Win32_Process | Where-Object { $_.Name -match 'python' }`
+  NICHTS zurueckgibt. Den Filter dann woertlich nachfahren und ausgeben lassen,
+  WELCHER Prozess ihn ausloest -- die Laenge der Kommandozeile verraet den
+  Wrapper sofort.
+
+  **Und beim Aufraeumen:** `TaskStop` beendet den Wrapper, das bereits gestartete
+  Skript laeuft verwaist weiter (bekannt aus dem Harness-Stopp 2026-09-05). Das
+  ist hier sogar erwuenscht -- ohne den Wrapper findet seine Wartebedingung
+  nichts Falsches mehr -- kostet aber die Fortschrittsanzeige im Harness. Den
+  Stand liest man dann an den Artefakten ab.
+
+- **Ein Cache-Knopf als Parameter mit Sachwert-Default: der Default IST der
+  Schluessel eines fremden Datensatzes** (2026-09-16, 1,15 GB ueberschrieben).
+
+  `corpus_dataset.window_cache_key` hatte fuer `moon_target_source` den Default
+  `"label"`. Von den SIEBEN Aufrufern der Funktion reichten ihn **fuenf** nicht
+  durch, darunter `tools/window_train_split.py` und
+  `tools/build_cache_incremental.py`. Der Arm `v29-b04` (`played`) errechnete
+  dadurch den Fenster-Schluessel des Arms `v29-b03` (`label`) und hat dessen
+  Monolithen ueberschrieben. Nichts hat gewarnt; aufgefallen ist es einem
+  Menschen an der Dateigroesse.
+
+  **Warum die drei Alt-Knoepfe das Problem nie hatten:**
+  `MOSAIC_CARRIER_MANIFEST`, `MOSAIC_SPECIAL_PLANES_OFF` und
+  `MOSAIC_DATA_EXCLUDE` liest die Schluesselfunktion SELBST aus der Umgebung.
+  Das ist eine Holschuld an einer Stelle. Ein Parameter ist eine Bringschuld an
+  sieben Stellen -- und eine davon vergisst es.
+
+  **Regel fuer jeden neuen datenwirksamen Knopf:** entweder gar kein Parameter
+  (die Funktion liest die Umgebung), oder Parameter mit Default `None` =
+  "frag die Umgebung". Ein Sachwert als Default ist der Vorfall oben.
+  Festgenagelt in `tools/tests/test_cache_key_knobs_are_env_coupled.py`; die
+  drei Altfaelle stehen dort mit Begruendung, die Liste darf nur schrumpfen.
+
+  **Zweiter Schutz, unabhaengig davon:** `build_cache_parallel.merge` bricht ab,
+  wenn die Zieldatei einen ANDEREN eingepraegten Schluessel traegt als den, den
+  dieser Lauf aufpraegen wuerde, und nennt Besitzer und Umgebung der Datei
+  (`tools/tests/test_cache_overwrite_guard.py`). Geprueft wird gegen den
+  eingepraegten Schluessel, nicht gegen den Dateinamen -- der Name kann aus
+  harmlosen Gruenden abweichen, das Attribut ist die Selbstauskunft der Datei.
+
+  **Was den Datensatz gerettet hat:** der am 2026-09-15 eingefuehrte
+  Umgebungs-Fingerabdruck (`mosaic_env_fingerprint`). Nur weil im Cache
+  `MOSAIC_MOON_TARGET_SOURCE=played` stand, war am naechsten Tag entscheidbar,
+  WELCHER der beiden Datensaetze in der Datei lag -- ohne ihn haette man beide
+  neu bauen muessen.
+
+  **Und die unangenehme Beobachtung am Rande:** der Schluessel liess sich von
+  aussen nicht nachrechnen. Ein Nachbau ueber `window_cache_key` mit derselben
+  Dateiliste und denselben Knoepfen ergab zwei WEITERE Werte
+  (`e4c2a9df4754` / `9f2f1e01004c`), nicht die beiden echten. Solange das so
+  ist, kann niemand einen Cache-Namen pruefen, ohne den Bau zu wiederholen.
+  Offen, Wiedervorlage beim naechsten Anfassen des Schluessels.

@@ -18,29 +18,55 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ## 1. WAS GERADE LAEUFT
 
-**Stand 2026-09-16, 16:45.** Eine Kette laeuft, die davor ist durch:
+**Stand 2026-09-16, 21:30: nichts laeuft.** Die Maschine ist frei. Netz-Gesundheit Punkt 5 ist
+durch (Chip-Sitzung, Verdikt weiter unten); Punkt 3/4 fuer das Paar b03/b05 ist registriert
+(`net_health_p3_b03_b05.json`, `moon_stack_order` par.12.6: **kein Befund**, 0,0040 R2-Abstand
+bei einer Aufloesungsgrenze von 0,015 -- der Verwerfungs-Ausgang ist damit ausgeschlossen, die
+Arena-Kante nicht bestaetigt).
 
-| Kette | Sitzung | Inhalt | Stand |
-| --- | --- | --- | --- |
-| `tools/run_net_health_generations.sh` | Chip (Aera-Grenze) | Netz-Gesundheit Punkt 5: Value-R2 und Policy fuer SECHS Staende ueber die Eingangs-Aeren 744 / 755 / 794 | **DURCH 16:38**. Gemessen auf `frozen_v3` (zurueckgehalten, 4,9 s) UND auf dem Default-Val-Split (582.132 Zuege, 23,7 min) -- NICHT auf zwei eingefrorenen Saetzen, wie hier zwischenzeitlich stand. Verdikt unten |
-| `tools/night_v29_b04_moon_played.sh` | diese | Fahrplan 32b, Arm v29-b04 (`--moon-target-source played`): Bloecke, Monolith, Training, Tor 1 zwei Seeds | **LAEUFT** seit rund 16:40 (Schritt 1, Bloecke), rund 5 h. Die Staffelstab-Uebergabe hat gegriffen |
+> **ABGEBROCHEN UND ZU WIEDERHOLEN: Arm v29-b04.** Der Lauf vom 17:32 ist nach drei Stunden auf
+> Nutzer-Entscheid beendet worden. Er lief auf EINEM Kern (CPU/Wanduhr 1,0 gegen 5,5 bei b03),
+> die GPU stand bei 4 Prozent, nach drei Stunden war kein einziges Modell geschrieben, und er
+> benutzte den eigens gebauten Monolithen gar nicht. **Die Ursache ist ungeklaert** -- die
+> Trainingsausgabe ist mit ihrem Wrapper gestorben. Der Nutzer faehrt den Wiederholungslauf
+> deshalb von Hand in der Shell, wo `train.py` Device und Threadzahl beim Start druckt.
+>
+> **Der Schaden daneben wog schwerer als der verlorene Lauf:** b04 hat den Monolithen von b03
+> ueberschrieben (1,15 GB), weil `tools/window_train_split.py:92` den Knopf
+> `moon_target_source` nicht an `window_cache_key` durchreichte und dessen Parameter-Default
+> `"label"` b03s Schluessel ergab. Von SIEBEN Aufrufern der Funktion reichten ihn FUENF nicht
+> durch. Die Datei liegt jetzt unter ihrem echten Schluessel `.cache_4dd9f020b232.h5`
+> (umbenannt auf Nutzer-Freigabe); ihr Inhalt ist dank des Umgebungs-Fingerabdrucks eindeutig
+> als der `played`-Datensatz ausgewiesen. **b03s Monolith ist weg** und bei Bedarf aus den
+> Bloecken neu zu bauen.
 
-**Durch seit der letzten Fassung:** Netz-Gesundheit Punkt 3/4 fuer das Paar b03/b05
-(`net_health_p3_b03_b05.json`, Verdikt in `moon_stack_order` par.12.6: **kein Befund**, 0,0040
-R2-Abstand bei einer Aufloesungsgrenze von 0,015 -- der Verwerfungs-Ausgang ist damit
-ausgeschlossen, nicht die Arena-Kante bestaetigt). Dazu die Counterfactual-Ranking-Sonde gebaut
-und vorregistriert (`round_transition_search_sampling` par.16, Volllauf steht aus).
+**CACHE-SYSTEM SANIERT** (Nutzer-Auftrag: *"setz die caches wirklich mal sauber auf. das ist mir
+alles viel zu fragil und fehleranfaellig und laesst sich als normaler bediener nicht mehr
+handhaben"*). Gebaut und je mit Tests belegt:
 
-> **STILLSTAND OFFENGELEGT (2026-09-16, 15:45 bis 16:17, 32 Minuten).** Die b04-Kette wurde per
-> Heredoc geschrieben UND im selben Befehl gestartet; dadurch trug der Wrapper-bash den ganzen
+| Stueck | Wirkung |
+| --- | --- |
+| `window_cache_key` fragt die Umgebung | `moon_target_source=None` heisst "frag `MOSAIC_MOON_TARGET_SOURCE`" statt still `"label"`. Gemessen: ohne Env bitgleicher Schluessel (Bestand unberuehrt), mit Env heilt das Vergessen aller fuenf Aufrufer |
+| Ueberschreib-Schutz in `merge()` | Abbruch, wenn die Zieldatei einen fremden eingepraegten Schluessel traegt; nennt Besitzer, Umgebung und die zwei ueblichen Ursachen. `tools/tests/test_cache_overwrite_guard.py`, 4 Tests gruen |
+| Waechter gegen Rueckfall | `tools/tests/test_cache_key_knobs_are_env_coupled.py` (4 Tests) verbietet neue Knoepfe mit Sachwert-Default und prueft die Env-Kopplung am VERHALTEN, nicht nur an der Signatur; drei Altfaelle mit Begruendung gelistet, die Liste darf nur schrumpfen |
+| Nebenbefund behoben | die Schutz-Warnung stuerzte auf cp1252-Konsolen selbst ab (Emoji im print) -- eine Schutzzeile, die den Bau mitreisst, ist keine |
+
+**Offen am Cache-System, beides in `../docs/pitfalls.md` mit Wiedervorlage:** der Ladepfad
+prueft Name gegen Inhalt nur bei `--cache-file`, im Namenspfad gar nicht. Und **der Schluessel
+ist von aussen nicht nachrechenbar** -- ein Nachbau mit derselben Dateiliste und denselben
+Knoepfen ergab zwei WEITERE Werte (`e4c2a9df4754` / `9f2f1e01004c`), nicht die beiden echten.
+Solange das gilt, kann niemand einen Cache-Namen pruefen, ohne den Bau zu wiederholen.
+
+> **STILLSTAND OFFENGELEGT (15:45 bis 16:17, 32 Minuten).** Die b04-Kette wurde per Heredoc
+> geschrieben UND im selben Befehl gestartet; dadurch trug der Wrapper-bash den ganzen
 > Skripttext (6.554 Zeichen, darin woertlich `train.py` und `paired_gating.py`) in seiner
 > Kommandozeile. Die Wartebedingung fand ihn und wartete auf sich selbst. **Der Schaden blieb
 > nicht in der eigenen Spur:** derselbe Wrapper enthielt `build_cache_incremental`, worauf die
 > Kette der Chip-Sitzung filtert -- die stand ebenso lange leer und lief binnen Sekunden an,
-> nachdem der Wrapper beendet war. Es war der DRITTE Vorfall dieser Familie (2026-09-09: 35 min;
-> Nacht auf 2026-09-13: die wartende Leiter-Kante startete gar nicht), und die vorhandene
-> Haertung half nicht: die `[t]rain`-Klammer schuetzt gegen den eigenen Suchbefehl, nicht gegen
-> einen Wrapper, der den Suchbegriff als NUTZLAST traegt. Nachgezogen: dritte Haertungsstufe
+> nachdem der Wrapper beendet war. DRITTER Vorfall dieser Familie (2026-09-09: 35 min; Nacht
+> auf 2026-09-13: die wartende Leiter-Kante startete gar nicht); die vorhandene Haertung half
+> nicht, weil die `[t]rain`-Klammer gegen den eigenen Suchbefehl schuetzt, nicht gegen einen
+> Wrapper, der den Suchbegriff als NUTZLAST traegt. Nachgezogen: dritte Haertungsstufe
 > `-and $_.Name -match 'python'` in drei Kettenskripten, Regel "Ketten als DATEI starten",
 > Vorfall in `../docs/pitfalls.md`. Keine Messung ist betroffen -- es wurde Zeit verloren, keine
 > Zahl verfaelscht.

@@ -321,8 +321,51 @@ class WindowCacheKey(NamedTuple):
     material: str                   # das Schluesselmaterial selbst (Diagnose)
 
 
+def moon_target_from_policy(step):
+    """Die von der SUCHE bevorzugte Mondstapel-Reihenfolge aus `policy`.
+
+    `PREREG_moon_stack_order.md` par.12.1, Arm v29-b04 (`--moon-target-source
+    played`). Ersetzt das Feld `moon_order_target`, das laut par.12.0 ein No-Op
+    ist: sein Bewerter (`solve_round_final_score`) liest die Fabriken nicht, das
+    Label ist IMMER die kanonische Reihenfolge, und der Kopf hat mit Gewicht 1,0
+    auf eine Konstante trainiert.
+
+    DIE QUELLE: bei aktivem Fan-out (`moon_order_variants = 1`, der Stand der
+    v29-Erzeugung) faechert die Suche die Permutationen als eigene Kandidaten
+    auf. Jeder `policy`-Eintrag traegt deshalb seine `moon_order` MIT
+    Besuchswahrscheinlichkeit -- der Korpus enthaelt die Verteilung bereits, es
+    braucht KEINE neue Erzeugung.
+
+    ZUR BENENNUNG: "played" ist der in par.12.1 registrierte Name, gemeint ist
+    aber genau die SUCHVERTEILUNG. Der Korpus haelt nicht fest, welche Aktion
+    gesampelt wurde, sondern wie oft die Suche jede besucht hat. Fuer ein
+    Trainingsziel ist das die bessere Groesse; der Name ist nur ungenau.
+
+    Rueckgabe: Liste der Farbnamen in gewaehlter Reihenfolge, oder None.
+    """
+    groups = {}
+    for pe in step.get("policy") or []:
+        a = pe.get("action") or {}
+        if a.get("type") != "stone":
+            continue
+        seq = a.get("moon_order")
+        if not seq:
+            continue
+        base = (a.get("color"), a.get("factory_index"), a.get("row"))
+        groups.setdefault(base, []).append((float(pe.get("prob", 0.0)), list(seq)))
+    if not groups:
+        return None
+    # Die gespielte BASIS ist die mit der groessten Gesamtmasse; innerhalb davon
+    # die Reihenfolge mit der groessten Einzelmasse. Gleichstand faellt auf die
+    # erste Nennung zurueck -- das ist die Reihenfolge, die `unique_moon_orders`
+    # zuerst erzeugt, also die kanonische (net_mcts.rs `unique_moon_orders`).
+    best_base = max(groups.items(), key=lambda kv: sum(p for p, _ in kv[1]))[1]
+    return max(best_base, key=lambda ps: ps[0])[1]
+
+
 def window_cache_key(data_dir="data", files=None, *, value_target_variant="default",
-                     encoder="flat", conjunction_head=False) -> WindowCacheKey:
+                     encoder="flat", conjunction_head=False,
+                     moon_target_source=None) -> WindowCacheKey:
     """Der FENSTER-Cache-Schluessel: welcher Datensatz-Cache zu dieser
     Dateiliste und dieser Konfiguration gehoert.
 
@@ -354,6 +397,27 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
     # String im Key wuerden "nortv"/"nortv_r1" stillschweigend den
     # "default"-Cache derselben Dateiliste wiederverwenden.
     files = sorted(files) if files is not None else sorted(glob.glob(os.path.join(data_dir, "*.pkl")))
+    # `moon_target_source = None` heisst NICHT "label", sondern "frag die
+    # Umgebung" -- dieselbe Quelle, die `MosaicDataset` benutzt
+    # (`_moon_target_source_key()` liest MOSAIC_MOON_TARGET_SOURCE).
+    #
+    # WARUM DAS SO SEIN MUSS (Vorfall 2026-09-16): der Knopf war als Parameter
+    # mit Default "label" gebaut, und von den sieben Aufrufern dieser Funktion
+    # reichten ihn FUENF nicht durch -- darunter `window_train_split.py` und
+    # `build_cache_incremental.py`. Ergebnis: der Arm v29-b04 bekam den
+    # Fenster-Schluessel des Arms v29-b03 und hat dessen Monolithen
+    # ueberschrieben, lautlos. Ein Default ist hier kein bequemer Vorgabewert,
+    # sondern der Schluessel eines ANDEREN Datensatzes.
+    #
+    # Die anderen Datenknoepfe dieser Funktion (MOSAIC_CARRIER_MANIFEST,
+    # MOSAIC_SPECIAL_PLANES_OFF, MOSAIC_DATA_EXCLUDE) kommen seit jeher aus der
+    # Umgebung und haben genau dieses Problem deshalb nie gehabt. Ein Knopf,
+    # den jeder Aufrufer einzeln durchreichen muss, ist eine Bringschuld an
+    # sieben Stellen; ein Knopf aus der Umgebung ist eine Holschuld an einer.
+    if moon_target_source is None:
+        from file_cache_key import _moon_target_source_key
+        moon_target_source = _moon_target_source_key()
+
     # MOSAIC_DATA_EXCLUDE (2026-08-07, Fenster-Pinning): Regex, der
     # Dateien VOR Key-Bildung und Training ausschliesst. Noetig, weil
     # data/ waehrend laufender Generierungen WAECHST (Vorfall: der
@@ -456,6 +520,17 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
     # Schluessel, kein einziger Bestandscache wird entwertet.
     if _special_planes_off_key():
         cache_key_material += "+specialoff_v1"
+    # `moon_target_source` (2026-09-16, PREREG_moon_stack_order.md par.12.1, Arm
+    # v29-b04): bei "played" kommt das Ziel des moon-Kopfs aus der
+    # Suchverteilung statt aus dem No-Op-Label -- das sind ANDERE Werte in
+    # `moon_order_targets`, also ein anderer Datensatz. Ohne diesen Marker
+    # bekaemen b03 und b04 denselben Monolith-NAMEN bei verschiedenem Inhalt;
+    # genau der Fehler, der 2026-09-14 b02s Monolithen gekostet hat.
+    #
+    # Nur ANHAENGEN, wenn er vom Default abweicht -- der Bestand behaelt seinen
+    # Schluessel, kein vorhandener Cache wird entwertet.
+    if moon_target_source != "label":
+        cache_key_material += f"+moontarget_{moon_target_source}_v1"
     # PREREG_start_dome_choice.md par.9c (2026-09-12): die Aenderung der
     # `pol_w`-Regel (Start-Records mit `start_by_search: true` bekommen
     # Gewicht 1) bekommt BEWUSST KEINE eigene Key-Komponente -- und das ist
@@ -553,6 +628,27 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
                           key=digest[:12], key_full=digest, material=cache_key_material)
 
 
+def mosaic_env_fingerprint() -> str:
+    """Alle `MOSAIC_*`-Variablen der Umgebung als sortierte Zeichenkette.
+
+    KEINE kuratierte Liste: was gesetzt ist, wird aufgenommen. Damit faengt der
+    Fingerabdruck auch einen Knopf, an den beim Bau des Cache-Schluessels
+    niemand gedacht hat -- genau der Fall, der 2026-09-14 b02s Monolithen
+    gekostet hat (`MOSAIC_SPECIAL_PLANES_OFF` stand nur im Block-Schluessel).
+
+    Bewusst ALLE Variablen, nicht nur die datenrelevanten: eine Auswahl waere
+    wieder eine Liste, die jemand pflegen muesste. Der Preis ist, dass auch
+    harmlose Unterschiede auffallen -- deshalb ist das Ergebnis eine WARNUNG
+    mit Diff und kein Abbruch (`verify_cache_file` entscheidet).
+
+    Werte werden mitgenommen, nicht nur Namen: `MOSAIC_MOON_TARGET_SOURCE=played`
+    und `=label` sind verschiedene Datensaetze.
+    """
+    import os
+    paare = sorted((k, v) for k, v in os.environ.items() if k.startswith("MOSAIC_"))
+    return ";".join(f"{k}={v}" for k, v in paare)
+
+
 def stamp_cache_key_attrs(hf, wk: WindowCacheKey) -> None:
     """Praegt einem offenen (schreibbaren) HDF5-Cache seinen Fenster-Schluessel
     als DATEI-Attribute auf. Gegenstueck: `verify_cache_file`.
@@ -571,6 +667,13 @@ def stamp_cache_key_attrs(hf, wk: WindowCacheKey) -> None:
     # selbst passt nicht ins Attribut (s.o.).
     hf.attrs["mosaic_files_first"] = os.path.basename(wk.files[0]) if wk.files else ""
     hf.attrs["mosaic_files_last"] = os.path.basename(wk.files[-1]) if wk.files else ""
+    # Umgebungs-Fingerabdruck (2026-09-16): SELBST ERHOBEN, nicht kuratiert.
+    # Beim Laden wird er gegen die dann geltende Umgebung gehalten; ein
+    # Unterschied ist die erste Spur, wenn zwei Laeufe denselben Schluessel
+    # bekommen, aber verschiedene Daten meinen. 64-KB-Attributgrenze: die
+    # MOSAIC_*-Variablen sind kurz, anders als `str(files)`.
+    _fp = mosaic_env_fingerprint()
+    hf.attrs["mosaic_env_fingerprint"] = _fp[:60000]
 
 
 def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
@@ -652,6 +755,28 @@ def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
             f"   Weitere Ursachen: anderer --encoder, andere --value-target-variant, "
             f"--conjunction-head, anderes Traeger-Manifest, MOSAIC_CACHE_NOPACK/"
             f"MOSAIC_CACHE_F32/MOSAIC_IGNORE_POLICY_TARGET_VALID.")
+    # Umgebungs-Fingerabdruck (2026-09-16): SELBST ERHOBEN, keine kuratierte Liste.
+    # Weicht er ab, hat der Cache unter anderen MOSAIC_*-Variablen gebaut als dieser
+    # Lauf sie setzt. Das ist nicht automatisch falsch -- viele beruehren die Daten
+    # nicht -- aber es ist die erste Spur, wenn zwei Laeufe denselben Schluessel
+    # bekommen und verschiedene Daten meinen. Deshalb WARNUNG mit Diff, kein
+    # Abbruch: ein Abbruch bei jeder harmlosen Abweichung erzieht zum Abschalten
+    # (`feedback_gate_that_is_bypassed_teaches_bypassing`).
+    _cached = attrs.get("mosaic_env_fingerprint")
+    if _cached:
+        _current = mosaic_env_fingerprint()
+        if _cached != _current:
+            _a = dict(x.split("=", 1) for x in str(_cached).split(";") if "=" in x)
+            _n = dict(x.split("=", 1) for x in _current.split(";") if "=" in x)
+            _diff = [f"{k}: Cache={_a.get(k, '<nicht gesetzt>')!r} jetzt={_n.get(k, '<nicht gesetzt>')!r}"
+                     for k in sorted(set(_a) | set(_n)) if _a.get(k) != _n.get(k)]
+            if _diff:
+                print("⚠️  Cache-Umgebung weicht ab (MOSAIC_*-Fingerabdruck):")
+                for _line in _diff[:12]:
+                    print(f"      {_line}")
+                print("      Wenn eine davon die DATEN veraendert, gehoert sie in den "
+                      "Cache-Schluessel -- sonst teilen sich zwei Datensaetze einen Namen.")
+
     return {
         "cache_file": path,
         "cache_key": wk.key,
@@ -664,7 +789,8 @@ def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
 
 class MosaicDataset(Dataset):
     def __init__(self, data_dir="data", files=None, value_target_variant="default", encoder="flat",
-                 conjunction_head=False, cache_path_override=None, cache_file=None):
+                 conjunction_head=False, cache_path_override=None, cache_file=None,
+                 moon_target_source=None):
         """`files`: optionale explizite Dateiliste (z.B. ein Train- oder
         Val-Split desselben `data_dir`) -- ohne Angabe werden wie bisher ALLE
         `*.pkl` im Ordner geladen. Der Cache-Key haengt von der tatsaechlich
@@ -760,8 +886,14 @@ class MosaicDataset(Dataset):
         # denselben Schluessel dem zusammengefuegten Cache auf. Verhalten
         # unveraendert: dieselbe Verkettung, dieselbe Reihenfolge, derselbe
         # md5-Anschnitt.
+        # Default aus der Umgebung: der BLOCK-Bau (build_cache_incremental) ruft
+        # MosaicDataset ohne dieses Argument, sieht den Schalter also nur so.
+        if moon_target_source is None:
+            from file_cache_key import _moon_target_source_key
+            moon_target_source = _moon_target_source_key()
         _wk = window_cache_key(data_dir, files, value_target_variant=value_target_variant,
-                               encoder=encoder, conjunction_head=conjunction_head)
+                               encoder=encoder, conjunction_head=conjunction_head,
+                               moon_target_source=moon_target_source)
         files = _wk.files
         policy_carrier_set = _wk.policy_carrier_set
         carrier_prefixes = _wk.carrier_prefixes
@@ -1349,7 +1481,12 @@ class MosaicDataset(Dataset):
                         masks_l.append(mask)
 
                         moon_target = np.full(5, -1.0, dtype=np.float32)
-                        moon_order = step.get("moon_order_target", None)
+                        # par.12.1 Arm b04: bei `played` kommt die Reihenfolge aus
+                        # der Suchverteilung statt aus dem No-Op-Label (par.12.0).
+                        if moon_target_source == "played":
+                            moon_order = moon_target_from_policy(step)
+                        else:
+                            moon_order = step.get("moon_order_target", None)
                         if moon_order:
                             for rank, color_name in enumerate(moon_order):
                                 c_idx = _CIDX.get(color_name, -1)
