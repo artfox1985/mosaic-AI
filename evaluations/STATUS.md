@@ -32,6 +32,66 @@ Lauf hing, und seine Ausgabe war nicht sichtbar, weil sie an einem gestorbenen W
 Der Befehl steht unten unter Schritt 1. **Die neue Sitzung startet ihn NICHT selbst** -- sie
 begleitet ihn, wertet aus und faehrt danach Tor 1.
 
+**BEOBACHTUNG DER NEUEN SITZUNG, 2026-09-16 21:30 (Lauf des Nutzers, PID 33436, Start
+21:07:47, Manifest `models/manifest_train_v29-b04_20260916_210750.json`):**
+
+* Manifest geprueft: `--cache-file data/.cache_be157f1118c0.h5` (Block `cache_file` traegt
+  Schluessel be157f1118c0, 2800 Dateien, 4.538.842 Zustaende), `moon_target_source = played`,
+  `policy_carriers.traeger_dateien_gesamt = 580`, Commit 6dd8cd47 (dirty). Die beiden
+  Abbruchgruende Cache und Traeger sind damit ausgeraeumt.
+* 21:07 bis 21:19 einkerniger Bau des Val-Caches (`.cache_dd33790fcc15.h5`, 147 Dateien,
+  249.476 Zustaende, Fingerabdruck MOON_TARGET_SOURCE=played) -- CPU/Wanduhr 1,0, GPU 13 Prozent.
+* **Seit etwa 21:20 Trainingsphase:** CPU/Wanduhr 5,6 (b03: 5,5), GPU 34-38 Prozent, erster
+  Zwischenstand `models/alphazero_v29-b04_resume.pth` um 21:27:59. Das ist die Signatur eines
+  GPU-Laufs mit `--fast-loader`; **die Device-Zeile selbst (`Starte PyTorch Training auf:`,
+  `train.py:1584`) ist nur in der Shell des Nutzers sichtbar -- Nutzer 2026-09-16 21:40: "b04 laeuft auf cuda." BESTAETIGT.** Erwartung: 12
+  Epochen a rund 7-8 min, Ende gegen 22:50.
+* Beobachter laeuft als Hintergrundaufgabe dieser Sitzung (alle 120 s CPU-Sekunden, GPU-Last,
+  neue b04-Dateien); kein eigener Start, kein Eingriff.
+
+**URSACHE DES EIN-KERN-LAUFS VOM 17:32 -- Herleitung, kein Beweis:** dessen Manifest
+(`..._173056.json`, inzwischen geloescht, vorher gelesen) hatte KEIN `--cache-file` und keinen
+`cache_file`-Block; der Lauf suchte den Monolithen also ueber den errechneten Namen, fand ihn
+wegen der Pfadform (`docs/pitfalls.md`, dritter Eintrag) nicht und baute ihn EINKERNIG in
+`train.py` neu. Mit der gemessenen Rate aus `docs/measured_runtimes.md:61` (17.934 s fuer 2.228
+Dateien = 8,05 s je Datei) braucht das fuer 2.800 Dateien rund 6,3 h -- nach drei Stunden also
+mitten im Aufbau, ein Kern, GPU leer, kein Modell. Alle vier Symptome passen. Was fehlt: ein
+Artefakt (unter `data/` liegt keine Datei mit Aenderungszeit zwischen 17:30 und 20:45, der Bau
+schreibt erst am Ende) und die Konsolenausgabe des Laufs. Der zweite Versuch um 21:01 zeigte
+denselben Einstieg sichtbar und wurde deshalb abgebrochen -- das ist die einzige direkte
+Beobachtung. Damit ist der Punkt "Ursache ungeklaert" oben auf "Herleitung, konsistent, nicht
+bewiesen" gesetzt; die Gegenprobe waere ein Lauf ohne `--cache-file` bei falschem Namen, den
+niemand fahren muss.
+
+**Abnahme-Instrument fuer Tore (a) und (b) aus par.12.1 gebaut:**
+`tools/probes/moon_head_target_probe.py` (Val-Split `data/window_v29_b04_val.txt`, byte-gleich mit
+b03s Val-Liste; NLL mit der Rang-Semantik des Trainings, `corpus_dataset.py:1488-1492`,
+`train.py:125-149`). Trockenlauf (n = 300 Records, Grundmenge Val-Records mit mindestens zwei
+Mondreihenfolgen in der Suchverteilung, Einheit nats bzw. Wahrscheinlichkeit; Artefakt
+`_dry_moon_head_target_probe.json`): **b03 und b05 sind im Mondkopf praktisch identisch**
+(nll_played 1,006 gegen 1,006; p_canonical 0,404 gegen 0,404; Kopf-Favorit kanonisch 36,3
+Prozent beide) und liegen nur knapp unter der Gleichverteilung (1,168). **Erklaerung, am Code
+geprueft:** der Encoder kodiert die Sonnenseite einer kleinen Fabrik als FARBZAEHLER
+(`features.rs:1150-1158`, "5 Sun-Counts /5"), die Reihenfolge der Steine steht nicht im
+Eingang -- das kanonische Label (Sonnenreihenfolge ohne die genommene Farbe) ist damit
+UNLERNBAR, nicht nur konstant. b03s Kopf ist deshalb beim Warmstart-Stand von v28-b02 geblieben.
+Folge fuer die Tore: (b) "Prior-Masse auf kanonisch faellt" hat bei b03 kaum Fallhoehe; das
+tragende Tor ist (a), `nll_played` von b04 deutlich unter 1,006 und unter der Gleichverteilung.
+Selbsttest par.12.0 je Record: 173 von 173 Labels sind die kanonische Reihenfolge einer
+(Fabrik, Farbe) des Zustands, 0 Abweichungen.
+
+**Manifeste geloescht (Nutzer-Anweisung 21:26, restic-Snapshot `8b7bda88` vorher, 67
+Snapshots, Check ohne Fehler):** `models/manifest_train_v28-b03_20260911_201057.json`,
+`..._v28-b04_20260911_221704.json`, `..._v29-b04_20260916_173056.json`,
+`..._v29-b04_20260916_210102.json`. **Bewusst behalten:** `..._v29-b04_20260916_210750.json`,
+das Manifest des laufenden Trainings -- es wird fuer den Manifest-Diff gegen b03 gebraucht.
+
+**Delegiert (Opus, mittel):** Abnahme von `tools/cache_doctor.py` (Zahlen nachrechnen,
+"verwaist"-Logik gegen den laufenden Lauf, 12 "Schluessel ohne Datei", Konventionen) und der
+Namenspfad-Check des Cache-Laders (Punkt 2a, minimaler Eingriff plus pytest). Nr. 33
+(Counterfactual-Sonde) folgt danach mit einer KOSTENMESSUNG bei kleinem n, nicht mit dem
+Volllauf -- sims 400 / M 6 ist ungemessen, und Tor 1 braucht die CPU ab etwa 22:50 exklusiv.
+
 ### ERSTE AUFGABE DER NEUEN SITZUNG, in dieser Reihenfolge
 
 **1. v29-b04 begleiten und abnehmen** (Fahrplan 32b, `PREREG_moon_stack_order.md` par.12.1).
@@ -49,6 +109,28 @@ Abbruchgrund -- sie sind genau die drei Punkte, die beim gescheiterten Lauf im D
   die Phase, in der der Lauf vom 17:32 drei Stunden verbracht hat) und wurde abgebrochen.
   **Regel daraus: einen Cache immer ueber `--cache-file` adressieren**, nie ueber den
   Dateinamen hoffen -- der haengt an der Pfadform (siehe unten).
+* **BEIDE Caches vorbauen, nicht nur den Trainings-Monolithen** (Nachtrag 2026-09-16 21:30 auf
+  Nutzer-Anweisung). Der b04-Lauf hat den Trainingsanteil in 31,2 s geladen und danach den
+  147-Dateien-VAL-Anteil EINKERNIG neu gebaut -- rund 20 Minuten, die niemand braucht.
+  `docs/measured_runtimes.md:61` nennt die Rate: **17.934 s einkernig in `train.py` fuer 2.228
+  Dateien = 8,05 s je Datei**, gegen **344 s** fuer dieselbe Menge mit
+  `build_cache_incremental.py` bei 6 Arbeitern -- **Faktor 52**. Fuer 147 Dateien sind das rund
+  1.183 s gegen rund 23 s (hochgerechnet aus der gemessenen Rate, nicht fuer genau diese
+  Dateien gemessen).
+
+  Vor JEDEM kuenftigen Trainingsarm also beide Anteile vorbauen und beide per `--cache-file`
+  bzw. ueber den passenden Schluessel adressieren. Die Listen liegen schon:
+  `data/window_v29_b04_train.txt` (2.800) und `data/window_v29_b04_val.txt` (147).
+
+  **Und die unangenehme Lehre dahinter:** `docs/measured_runtimes.md:44` beschreibt genau
+  diesen Fehler samt Loesung, seit v23 -- *"Training auf NEUER Fenster-Zusammensetzung,
+  Datenaufbau EINKERNIG ... 7,42 h gesamt, davon 4,98 h Datenaufbau ... **Vermeidbar:**
+  Fenster-Cache mit `build_cache_incremental.py --merge-out` parallel vorbauen, dann
+  `train.py --cache-file`"*. Die Kostentabelle haette den Drei-Stunden-Lauf vom 17:32
+  verhindert, wenn sie VOR dem Start gelesen worden waere. **Regel daraus: vor jedem Lauf ueber
+  einer Stunde zuerst `docs/measured_runtimes.md` aufschlagen** -- sie traegt nicht nur Dauern,
+  sondern in mehreren Zeilen auch den billigeren Weg.
+
 * **`Policy-Traeger gesamt: 580`** -- steht dort 2947, fehlt das Traegermanifest (derselbe
   Fehlstart wie bei b05 am 2026-09-15, vom Nutzer an dieser Zahl erkannt). Abbrechen.
 
@@ -83,7 +165,25 @@ sauber auf ... laesst sich als normaler bediener nicht mehr handhaben"*). Drei L
 **3. `tools/cache_doctor.py` abnehmen.** Ein Subagent hat es am 2026-09-16 gebaut (710 Zeilen,
 kompiliert); es soll je Cache zeigen, wem er gehoert, ob Name und eingepraegter Schluessel
 uebereinstimmen und was verwaist ist. **Regel 0: Agenten-Befunde sind Behauptungen** -- die
-tragenden Zahlen selbst nachpruefen, bevor sie irgendwo einfliessen. Es ist NICHT committet.
+tragenden Zahlen selbst nachpruefen, bevor sie irgendwo einfliessen. Committet in 40d7b0bc.
+
+**ABNAHME 2026-09-16 21:50 (Opus-Agent, tragende Punkte vom Koordinator am Code nachgeprueft):**
+die LESENDE Haelfte stimmt (h5-Attribute, Name gegen Schluessel, 12 zugeteilte Schluessel ohne
+Datei alle echt, Bau-Artefakt, laufzeit-Block -- Feld fuer Feld nachgerechnet, 5 von 5
+Monolithen). Die BESITZZUORDNENDE Haelfte ist falsch und darf nicht als Loeschhilfe dienen:
+(D1) Val-Caches kennt die Statusleiter nicht -- `.cache_dd33790fcc15.h5` ist der Val-Cache des
+LAUFENDEN v29-b04 (Schluessel nachgerechnet: `window_cache_key` der Val-Liste mit played/794 =
+dd33790fcc15), `7ebef2449837` ist b01-val (755), `eaa464b44cf7` der 794/label-Val-Cache; alle
+drei stehen als "verwaist" oder "nur benannt". (D2) `HEX_RE` mit `` trifft `.cache_<key>.h5`
+nicht (Unterstrich), und Nennungen vorhandener Caches werden verworfen (`cache_doctor.py:402-407`).
+(D3) `hat_laufzeit` wird erhoben und nie gelesen, ein laufender Lauf ist unsichtbar. (D4)
+`arm_from_name` bekommt den Artefaktnamen statt der Liste. (D5) die Listen-Eindeutigkeit ist
+tot, weil je Lauf eine byte-gleiche Kopie geschrieben wird (4 Trainingslisten md5-gleich).
+Dazu D6-D11: Ausgabetext "Unterschied steckt in der Mitte" bei gleichen Dateien, Zahlformat
+"2,372 MB" (= 2.372 MiB), "Fensterlisten: 49" zaehlt 8 Fremdlisten mit, Bau-Artefakt mit
+Selbstwiderspruch (merge_out fd13f54061cd gegen cache_key 4dd9f020b232) wird nicht gemeldet,
+21 deutsche lokale Bezeichner, verrottete Zeilenzitate. **Reparatur delegiert** (Opus, mit
+unittest); bis dahin gilt: der Doktor liest richtig, urteilt aber falsch ueber Besitz.
 
 **4. Fahrplan Nr. 33** (`PREREG_round_transition_search_sampling.md` par.9/10, Variante B).
 Die Stufe-0-Sonde dazu ist gebaut und vorregistriert (par.16,
@@ -94,13 +194,15 @@ weil nur dort die Wahrheitsquelle wertkopf-frei ist. Kosten bei sims=400/M=6: UN
 
 ### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
 
-* **Kein Push ohne Anweisung** -- Ahead-Stand im Chat melden. Stand jetzt: **6 Commits** vor
+* **Kein Push ohne Anweisung** -- Ahead-Stand im Chat melden. Stand 2026-09-16 21:30: **8 Commits** vor
   `origin/main`.
 * **Loeschung nur auf pfadgenaue Nutzer-Freigabe**, mit restic-Beleg. Frage ist keine Anweisung.
-* **Nie committen:** `player_profiles.json`, `player_profiles.json.bak`,
-  `models/manifest_train_v28-b03_*`, `models/manifest_train_v28-b04_*`. Sie liegen im Baum und
-  sind NICHT in `.gitignore` -- nach `git add -A` also gezielt mit `git restore --staged`
-  wieder herausnehmen. (Vorschlag an den Nutzer, bisher nicht entschieden: in `.gitignore`.)
+* **Nie committen:** `player_profiles.json`, `player_profiles.json.bak`. Die vier
+  Alt-Manifeste (`v28-b03`, `v28-b04`, `v29-b04` vom 17:30 und 21:01) sind am 2026-09-16 21:27
+  auf Nutzer-Anweisung geloescht (restic `8b7bda88`); `manifest_train_v29-b04_20260916_210750.json`
+  gehoert zum laufenden Arm und wird mit ihm committet. Nach `git add -A` die zwei
+  Profil-Dateien gezielt mit `git restore --staged` herausnehmen. (Vorschlag an den Nutzer,
+  bisher nicht entschieden: in `.gitignore`.)
 * **Messungen laufen exklusiv**, Builds zaehlen als Last; GPU und CPU duerfen parallel, zwei
   CPU-Messungen nicht. **Kein Commit waehrend eines Wanduhr-Laufs.**
 * **Kettenskripte als DATEI starten** (`bash tools/x.sh`), NIE Heredoc-schreiben-und-starten in
@@ -115,7 +217,7 @@ weil nur dort die Wahrheitsquelle wertkopf-frei ist. Kosten bei sims=400/M=6: UN
 | Frage | Fundstelle |
 | --- | --- |
 | Dritter Seed als Stichentscheid fuer b05 (rund 75 min)? | `moon_stack_order` par.12.6, Nutzer 2026-09-16: *"den dritten seed fuer b05 heben wir uns auf falls er champion wird"* -- also nur bei Champion-Kandidatur |
-| Nr. 26: Claude-Partien g08-g10 | braucht den Nutzer selbst |
+| ~~Nr. 26: Claude-Partien g08-g10~~ | **ENTSCHIEDEN 2026-09-16: erst mit dem Schlussmodell (v30-Champion), als Abschluss nach den Preregs** |
 | b03s Monolith neu bauen? | er ist ueberschrieben worden; Neubau rund 35 min aus den Bloecken, faellig erst wenn b03 wieder gebraucht wird |
 | Dry-Artefakte `evaluations/artifacts/_dry_*.json` loeschen? | vom Sonden-Bau uebrig, Verzeichnis ist git-ignoriert |
 
@@ -822,6 +924,11 @@ die andere Abschnitte beruehren:
 8. **Rahmen (ENTSCHIEDEN 2026-09-12, hier als Erinnerung):** v30 wird released und ist der
    Projektabschluss, Schlussmodell heisst **Tessa**. v29 traegt das Begleitprogramm, v30 nur
    noch Rezept-Knoepfe.
+   **OFFEN GEHALTEN 2026-09-16, 22:00 (Nutzer):** "ich denk nach b06 sind wir fertig mit v29.
+   so wie ich es momentan seh kann es gut sein dass noch ein v31 kommt damit die ganzen
+   aenderungen wirklich sauber durchschlagen." Kein Entscheid; der Rahmen "v30 = letzte
+   Generation" ist damit nicht mehr fest, Vorschlaege mit Wirkung erst in v31 (Weg A, R2 im
+   Training) sind nicht mehr automatisch draussen, bleiben aber Nutzer-Entscheid.
 
 9. ~~Trainingsziel des `moon`-Kopfs~~ **ENTSCHIEDEN 2026-09-15 (Nutzer: "beides")**: zwei Arme,
    `v29-b05` (b03 plus `--moon-loss-weight 0`, sofort startbar auf b03s Monolith) und `v29-b04`
@@ -836,6 +943,13 @@ die andere Abschnitte beruehren:
     das "bleibt aus" vom selben Vormittag ersetzt. Streu-Knopf 0,015 bleibt daneben (er greift
     nach dem Entscheider). Kostentor beim Start der Erzeugung: `s_je_partie` gegen v29. R2 ist
     neben P.12 die zweite Ausnahme vom Rahmen "v30 nur Rezept-Knoepfe".
+
+11. ~~Marge und Zeitpunkt fuer den Minimalkern~~ **ENTSCHIEDEN 2026-09-16 (Nutzer: "marge 5
+    prozentpunkte, b06 nach variante b eintakten")**: `v29-b06` (b03 ohne die vier
+    Hilfs-Losses) gegen b03, Nichtunterlegenheit = gepoolt mindestens 45,0 Prozent auf 800
+    Partien und kein Seed signifikant dagegen; Fahrplan 36a nach dem A/B von Variante B.
+    `PREREG_minimal_strength_core.md` par.10, Name reserviert. OFFEN bleibt die Aufnahme ins
+    v30-Rezept nach dem Ergebnis.
 
 ## 7. VERBOTE UND STEHENDE REGELN
 

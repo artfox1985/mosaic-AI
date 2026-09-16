@@ -676,7 +676,7 @@ def stamp_cache_key_attrs(hf, wk: WindowCacheKey) -> None:
     hf.attrs["mosaic_env_fingerprint"] = _fp[:60000]
 
 
-def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
+def verify_cache_file(path: str, wk: WindowCacheKey, *, label: str = "--cache-file") -> dict:
     """Waechter fuer `--cache-file`: passt der vorgelegte Cache zum AKTUELL
     gerechneten Fenster-Schluessel?
 
@@ -688,11 +688,17 @@ def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
     eingeschraenktes Fenster genau der stille Obermengen-Fehler aus dem
     Auftrag. Nachruesten: `tools/stamp_cache_key.py`.
 
+    `label` benennt nur den ANLASS in den Meldungen. Seit dem 2026-09-16 ruft
+    auch der NAMENSPFAD hier herein (Cache ueber den errechneten Schluessel
+    gefunden, siehe `MosaicDataset.__init__`); dort waere "--cache-file" eine
+    Falschauskunft, denn die Option war gar nicht gesetzt. Default unveraendert,
+    die Ausgabe des `--cache-file`-Pfades bleibt damit dieselbe.
+
     Gibt den Protokollblock zurueck, der ins Trainings-Manifest wandert."""
     import h5py
     if not os.path.exists(path):
         raise SystemExit(
-            f"❌ --cache-file: '{path}' existiert nicht.\n"
+            f"❌ {label}: '{path}' existiert nicht.\n"
             f"   Kein stiller Rueckfall auf den Selbstbau -- der kostet Stunden und "
             f"waere hier nicht gewollt.\n"
             f"   Erwarteter Fenster-Schluessel: {wk.key} ({len(wk.files)} Dateien).")
@@ -703,7 +709,7 @@ def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
             n_rows = hf["values"].shape[0] if "values" in hf else None
     except OSError as e:
         raise SystemExit(
-            f"❌ --cache-file: '{path}' ist nicht als HDF5 lesbar ({e!r}).\n"
+            f"❌ {label}: '{path}' ist nicht als HDF5 lesbar ({e!r}).\n"
             f"   Datei unvollstaendig geschrieben oder beschaedigt -- neu bauen.")
     # Mindestbestand: die Felder, die der Ladeweg unten OHNE Fallback liest.
     # Fehlt eines, waere die Folge ein nackter KeyError mitten im Laden statt
@@ -713,14 +719,14 @@ def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
     _missing = sorted(_required - keys)
     if _missing or not ({"masks", "masks_packed"} & keys):
         raise SystemExit(
-            f"❌ --cache-file: '{path}' ist unvollstaendig.\n"
+            f"❌ {label}: '{path}' ist unvollstaendig.\n"
             f"   Fehlende Datasets: {_missing or '-'}"
             f"{'' if ({'masks','masks_packed'} & keys) else ', masks/masks_packed'}\n"
             f"   Vorhanden: {sorted(keys)}\n"
             f"   Vermutlich ein abgebrochener Bau/Merge -- neu bauen.")
     if CACHE_KEY_FULL_ATTR not in attrs and CACHE_KEY_ATTR not in attrs:
         raise SystemExit(
-            f"❌ --cache-file: '{path}' traegt KEINEN Fenster-Schluessel "
+            f"❌ {label}: '{path}' traegt KEINEN Fenster-Schluessel "
             f"(Attribut '{CACHE_KEY_ATTR}' fehlt) -- ABGELEHNT.\n"
             f"   Vor dem 2026-08-28 gebaute Caches haben das Attribut nicht. Entweder\n"
             f"     python -X utf8 -u tools/stamp_cache_key.py --cache-file {path} ...\n"
@@ -741,7 +747,7 @@ def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
     ok = (have_full == wk.key_full) if have_full is not None else (have_short == wk.key)
     if not ok:
         raise SystemExit(
-            f"❌ --cache-file: Schluessel-Abweichung -- ABBRUCH.\n"
+            f"❌ {label}: Schluessel-Abweichung -- ABBRUCH.\n"
             f"   Datei      : {path}\n"
             f"   in Datei   : {have_short} (voll: {have_full})\n"
             f"   erwartet   : {wk.key} (voll: {wk.key_full})\n"
@@ -754,7 +760,13 @@ def verify_cache_file(path: str, wk: WindowCacheKey) -> dict:
             f"Fenster. Dann ist der Cache eine OBERMENGE und darf nicht benutzt werden.\n"
             f"   Weitere Ursachen: anderer --encoder, andere --value-target-variant, "
             f"--conjunction-head, anderes Traeger-Manifest, MOSAIC_CACHE_NOPACK/"
-            f"MOSAIC_CACHE_F32/MOSAIC_IGNORE_POLICY_TARGET_VALID.")
+            f"MOSAIC_CACHE_F32/MOSAIC_IGNORE_POLICY_TARGET_VALID.\n"
+            f"   Ebenfalls moeglich, und im Baum belegt: der DATEINAME luegt. Der "
+            f"Fenster-Schluessel haengt an der PFADFORM der Dateiliste (docs/pitfalls.md, "
+            f"'Pfadform der Dateiliste'), ein Datensatz kann deshalb unter einem fremden "
+            f"Namen liegen.\n"
+            f"   Diagnose ueber ALLE Monolithen (Name gegen Inhalt, Besitzer, Waisen):\n"
+            f"     python -X utf8 -u tools/cache_doctor.py")
     # Umgebungs-Fingerabdruck (2026-09-16): SELBST ERHOBEN, keine kuratierte Liste.
     # Weicht er ab, hat der Cache unter anderen MOSAIC_*-Variablen gebaut als dieser
     # Lauf sie setzt. Das ist nicht automatisch falsch -- viele beruehren die Daten
@@ -938,6 +950,39 @@ class MosaicDataset(Dataset):
         # Arrays durch die Prozess-Pipe zu schicken -- beim vollen Korpus
         # waeren das ueber 11 GB. Reine Zuweisung, kein Kontrollfluss.
         self.cache_path_h5 = cache_path_h5
+
+        # NAMENSPFAD-WAECHTER (2026-09-16): wird der Cache ueber den ERRECHNETEN
+        # Schluessel gefunden (`data/.cache_<key>.h5`, Zeile oben), prueft bis
+        # heute niemand, ob die Datei diesen Schluessel auch TRAEGT -- der Name
+        # war das einzige Argument. Er luegt aber nachweislich:
+        # `.cache_35c6bd2b9bd2.h5` traegt intern `41bfd55372ea` (docs/pitfalls.md,
+        # "Pfadform der Dateiliste"). Ein Lauf, der 35c6bd2b9bd2 errechnet, haette
+        # damit stillschweigend einen FREMDEN Datensatz trainiert -- genau die
+        # Fehlerklasse, gegen die `--cache-file` seit dem 2026-08-28 geschuetzt
+        # ist, nur auf dem Weg, den jeder Lauf ohne Option nimmt. Deshalb
+        # derselbe Waechter und derselbe harte Abbruch: KEIN stilles Laden, und
+        # auch KEIN stiller Neubau (der wuerde die fremde Datei ueberschreiben,
+        # also den Schaden vom 2026-09-16 wiederholen).
+        #
+        # Alt-Caches OHNE das Attribut (vor dem 2026-08-28 gebaut) werden damit
+        # ebenfalls abgelehnt. Bewusst dasselbe Verhalten wie im
+        # `--cache-file`-Pfad: ihr Fenster ist von aussen nicht feststellbar, und
+        # "wird schon passen" ist bei einem Voll-Cache gegen ein per Val-Split
+        # oder MOSAIC_DATA_EXCLUDE eingeschraenktes Fenster der stille
+        # Obermengen-Fehler. Nachruesten ohne Neubau: `tools/stamp_cache_key.py`.
+        # Zwei Regeln fuer denselben Waechter waeren ausserdem eine Einladung,
+        # den strengeren Pfad zu meiden.
+        #
+        # NICHT geprueft wird `cache_path_override`: dort haelt der Aufrufer den
+        # Schluessel selbst (Datei-Block-Namensraum `per_file_cache_key`), ein
+        # FENSTER-Schluessel steht in so einer Datei gar nicht drin.
+        # `self.cache_file_info` bleibt hier absichtlich None -- es ist die
+        # Selbstauskunft der OPTION `--cache-file` fuer das Trainings-Manifest
+        # (train.py:1483 traegt es nur unter dieser Option nach).
+        if cache_file is None and cache_path_override is None and os.path.exists(cache_path_h5):
+            verify_cache_file(cache_path_h5, _wk, label="Cache-Fund ueber den Namen")
+            print(f"📦 Namenspfad: '{os.path.basename(cache_path_h5)}' -- Schluessel "
+                  f"{_wk.key} bestaetigt.", flush=True)
 
         if os.path.exists(cache_path_h5):
             # HDF5 Cache laden — deutlich schneller als .pt
