@@ -17,7 +17,7 @@ Nicht zuerst „Wie wird das Netz schlauer?“, sondern:
 
 > Ist das, was die Suche bewertet, exakt das, was später ausgeführt, geloggt und trainiert wird?
 
-Das ist die größte Lehre. Der Moon-Kopf lernte lange ein konstantes Ziel; eine Action-ID bündelte zuvor falsche Aktionen; verdecktes Wissen wurde symmetrisch zerstört; ein Val-Cache war kontaminiert. Solche Defekte kann eine Arena zwischen zwei gleich fehlerhaften Agenten nicht finden. [Architekturreferenz](D:/OneDrive/Documents/Projekte/mosaic-AI/docs/architecture_reference.md) · [unprimed Review](D:/OneDrive/Documents/Projekte/mosaic-AI/evaluations/PREREG_implementation_review_unprimed.md)
+Das ist die größte Lehre. Der Moon-Kopf lernte lange ein konstantes Ziel; eine Action-ID bündelte zuvor falsche Aktionen; verdecktes Wissen wurde symmetrisch zerstört; ein Val-Cache war kontaminiert. Solche Defekte kann eine Arena zwischen zwei gleich fehlerhaften Agenten nicht finden. [Architekturreferenz](architecture_reference.md) · [unprimed Review](../evaluations/PREREG_implementation_review_unprimed.md)
 
 ## Mein Relaunch-Fahrplan
 
@@ -38,17 +38,17 @@ Das ist die größte Lehre. Der Moon-Kopf lernte lange ein konstantes Ziel; eine
    Jeder Datensatz trägt Generator, Spec, Modellhash, Suchbudget, Sichtschema, Action-Schema, Policy-Maskierung und Cache-Schema. Der Val-Split wird vor Erzeugung fest fixiert. Kein Environment-Override darf semantisch unsichtbar bleiben.
 
 5. **Suche vor Heuristikstapeln.**  
-   Der größte offene fachliche Hebel bleibt der Rundenübergang: Drafting soll das anschließende Tiling besser sehen. Aber ein verbesserter Blattübergang darf nur bleiben, wenn er einen bisherigen Proxy ersetzt. Sonst wächst Komplexität schneller als Erkenntnis. [Rundenübergang-Prereg](D:/OneDrive/Documents/Projekte/mosaic-AI/evaluations/PREREG_round_transition_search_sampling.md)
+   Der größte offene fachliche Hebel bleibt der Rundenübergang: Drafting soll das anschließende Tiling besser sehen. Aber ein verbesserter Blattübergang darf nur bleiben, wenn er einen bisherigen Proxy ersetzt. Sonst wächst Komplexität schneller als Erkenntnis. [Rundenübergang-Prereg](../evaluations/PREREG_round_transition_search_sampling.md)
 
 ## Was die History ziemlich klar sagt
 
-- **Offline-Güte ist kein Stärke-Nachweis.** Lambda-Ziele waren offline vielfach positiv und verloren in der Arena. Gewichtssweeps, Value-Kalibrierungen und Punkte-Blends lieferten ähnliche Warnungen. Arena bleibt das Entscheidungsinstrument. [Prereg-Index](D:/OneDrive/Documents/Projekte/mosaic-AI/evaluations/PREREG_INDEX.md)
+- **Offline-Güte ist kein Stärke-Nachweis.** Lambda-Ziele waren offline vielfach positiv und verloren in der Arena. Gewichtssweeps, Value-Kalibrierungen und Punkte-Blends lieferten ähnliche Warnungen. Arena bleibt das Entscheidungsinstrument. [Prereg-Index](../evaluations/PREREG_INDEX.md)
 - **Mehr oder raffiniertere Architektur ist selten der Engpass.** Async Search füllte den Batch fast vollständig, erreichte aber nur Faktor 1,255 statt des nötigen 2x. Große Umbauten brauchen ein starkes Kosten- und Nutzen-Tor.
 - **Repräsentation und korrekte Information sind wertvoller als kosmetische Losses.** Sichtmerkmale und korrekt modelliertes Stapelwissen sind zumindest kausal plausibel; an manchen davon hängt echte Spielstärke oder korrekteres Verhalten. Aber auch hier gilt: Information hineinzugeben reicht nicht, wenn Suche und Ziel sie nicht konsumieren.
 - **Materialqualität zählt.** Mehr Korpus und der bessere Heuristik-Lehrer haben deutlich mehr getragen als viele Hyperparameter-Ideen.
 - **H0 heißt nicht „gleich gut“.** Die bisherige Dokumentation hat das zunehmend sauber gelernt. Für Vereinfachungen braucht ihr explizite Nichtunterlegenheitsmargen.
 
-Mein Fazit: Der Relaunch wäre kein „größeres AlphaZero“, sondern ein kleineres, überprüfbares System mit weniger Köpfen, weniger Env-Knöpfen, exakt modellierter Information und einer harten Trennung zwischen Korrektheit und Elo. Die jetzige neue [Minimal-Core-Prereg](D:/OneDrive/Documents/Projekte/mosaic-AI/evaluations/PREREG_minimal_strength_core.md) ist im Grunde schon der Übergang dorthin.
+Mein Fazit: Der Relaunch wäre kein „größeres AlphaZero“, sondern ein kleineres, überprüfbares System mit weniger Köpfen, weniger Env-Knöpfen, exakt modellierter Information und einer harten Trennung zwischen Korrektheit und Elo. Die jetzige neue [Minimal-Core-Prereg](../evaluations/PREREG_minimal_strength_core.md) ist im Grunde schon der Übergang dorthin.
 
 
 
@@ -80,7 +80,7 @@ Dann sollte das Netz in R1/R2 nicht plötzlich zum alleinigen Richter über Tili
 
 > Wann ist sein Ranking zwischen zwei Tiling-Folgezuständen verlässlich genug, um eine exakte lokale Entscheidung zu überstimmen?
 
-Dass der Value in Runde 1 am schwächsten ist, ist bereits dokumentiert. Ein tieferer Bootstrap war kein guter Ausweg: Horizont 3 war teurer und traf das Ziel schlechter. [Bootstrap-Horizont](D:/OneDrive/Documents/Projekte/mosaic-AI/evaluations/PREREG_bootstrap_horizon.md)
+Dass der Value in Runde 1 am schwächsten ist, ist bereits dokumentiert. Ein tieferer Bootstrap war kein guter Ausweg: Horizont 3 war teurer und traf das Ziel schlechter. [Bootstrap-Horizont](../evaluations/PREREG_bootstrap_horizon.md)
 
 Ich würde daher eine rundenabhängige Architektur bauen:
 
