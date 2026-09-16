@@ -114,7 +114,7 @@ Konkret:
    
    `wie stabil bleibt die Rangfolge über die möglichen Füllungen?`
    
-   Wenn Plan A in fast jeder Füllung vor Plan B liegt, ist das ein brauchbares Signal. Wenn die Rangfolge kippt, ist die richtige frühe Entscheidung nicht „Netz glaubt A“, sondern „beide sind noch nicht sauber unterscheidbar“ — dann gewinnt die strukturell robustere Lösung.
+   Wenn Plan A in fast jeder Füllung vor Plan B liegt, ist das ein brauchbares Signal. Wenn die Rangfolge kippt, ist die richtige frühe Entscheidung nicht „Netz glaubt A“, sondern „beide sind noch nicht sauber unterscheidbar“ -- dann gewinnt die strukturell robustere Lösung.
 
 4. **Eine Counterfactual-Ranking-Sonde vor jedem Bau**  
    Das wäre der eigentlich spannende Test: echte R1/R2-Rundenendzustände nehmen, mehrere gute Tiling-Pläne erzeugen und sie mit gemeinsamen Zufallsseeds mehrfach fortsetzen. Dann messen:

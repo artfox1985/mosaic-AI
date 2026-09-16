@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein kleinerer Standardkern aus Netz, Suche und Konfiguration mindestens gleich stark werden wie das heutige v29-Rezept, und welche Teile duerfen deshalb entfallen? | Beleg: Neu angelegt 2026-09-15; kein Bau und keine Messung. Die vier Stränge und ihre Tore stehen in par.2-5. -->
+<!-- STATUS: OFFEN | Frage: Kann ein kleinerer Standardkern aus Netz, Suche und Konfiguration mindestens gleich stark werden wie das heutige v29-Rezept, und welche Teile duerfen deshalb entfallen? | Beleg: Angelegt 2026-09-15, Review par.8. **ENTSCHIEDEN 2026-09-16 (par.10): Nichtunterlegenheitsmarge 5 Prozentpunkte (gepoolt ueber 800 Partien, kein Seed signifikant dagegen); Minimalkern-Arm v29-b06 (b03 ohne moon/ownership/opp_points/endgame) NACH Variante B als Fahrplan 36a, Bezug b03.** Strang B Trace vor Bau, Strang D Abschlussarbeit. Kein Bau, keine Messung bisher. -->
 
 # Vorregistrierung: Minimaler Staerkekern
 
@@ -276,3 +276,89 @@ nicht kennt.
 voreiliges Loeschen sind richtig gesetzt, aber ohne bezifferte Margen-Untergrenze
 (B1), ohne die Kostenzeile (B7) und mit der ueberholten Moon-Zeile (B5) ist die
 Prereg heute eine Absichtserklaerung und noch kein ausfuehrbarer Messplan.
+
+## par.9 STELLUNGNAHME DES KOORDINATORS (2026-09-16, Nutzer: "im kern stimmt es schon. mir kommt ebenfalls vor wir sind zu komplex unterwegs")
+
+Kein Bau, kein Entscheid; Vorschlag zur Reihenfolge, damit aus der Absichtserklaerung (par.8
+Gesamturteil) ein Messplan wird.
+
+**Zustimmung im Kern, mit drei Zahlen statt eines Gefuehls:** `docs/knobs.md` Z.9 zaehlt **125
+Knoepfe (66 aktiv, 48 diagnose, 10 tot)**; das Netz exportiert **8 ONNX-Ausgaben** (policy, value,
+moon, points, ownership, value_wdl_logits, opp_points, endgame_margin -- am Modell
+`alphazero_v29-b03_brierbest.onnx` gelesen); und der moon-Kopf hat seit dem 2026-08-20 mit
+Gewicht 1,0 auf ein Ziel trainiert, das nicht nur konstant, sondern **unlernbar** war (die
+Sonnenseite steht als Farbzaehler im Eingang, `features.rs:1150-1158`; `moon_stack_order`
+par.12.0). Die Komplexitaet zeigt sich nicht im Elo, sondern in den Betriebsvorfaellen dieser
+Woche (drei Ketten-Stillstaende, ein ueberschriebener Monolith, ein kontaminierter Val-Cache,
+alle in `docs/pitfalls.md`). Das ist genau die Irrtumskosten-Rechnung aus CLAUDE.md.
+
+**Wo ich die Reihenfolge von Strang A umdrehen wuerde:** A.3 misst die Koepfe EINZELN, rund 4,5 h
+je Kandidat (par.8 B7), also 13-14 h fuer drei. Billiger und naeher an der Frage des Nutzers
+ist EIN Minimalkern-Arm zuerst:
+
+* **`v29-b06` = Rezept b03 mit allen Hilfs-Losses aus** (`--moon-loss-weight 0`,
+  `--ownership-weight 0`, ohne `--opp-points-head`, ohne `--endgame-head`), sonst identisch
+  (Fenster, Warmstart, Seed 20260941, 12 Epochen). Vorher am Code pruefen, welche Ausgaben die
+  Champion-Spec in der SUCHE konsumiert (`score_utility_b 20` liest vermutlich den points-Kopf;
+  Regel 0: nachsehen, nicht raten) -- diese Ausgaben bleiben, alles andere faellt.
+* Bezug b03, Tor wie A.4 (zwei Seeds, 200 Paare, ohne Frueh-Stopp, Logs), Marge vom Nutzer, mit
+  der Untergrenze aus par.8 B1 (unter rund 5 Prozentpunkten ist bei 800 Partien nichts
+  belegbar). Kosten rund 4,5 h.
+* **Lesart vorab:** haelt b06 die Marge, ist die Vereinfachung EN BLOC in v30 uebernehmbar und
+  A.3 entfaellt; faellt b06 durch, wird A.3 einzeln gefahren, um den tragenden Kopf zu finden;
+  ist b06 signifikant BESSER, gilt B6 (Staerkebefund, eigene Identitaet, Elo-Kante).
+* Der Widerspruch zu A.3 ("einzeln, nicht faktoriell") ist keiner: der Minimalkern ist kein
+  faktorieller Sweep, sondern die Baseline aus `docs/external_relaunch_plan_2026-09-16.md`
+  Punkt 2 -- gemessen im heutigen System statt in einem Relaunch.
+
+**Zur Moon-Zeile in A.3 (par.8 B5):** ueberholt. Stand: b05 (Kopf aus) gegen b03 427:373 aus 800
+Partien, z = 1,98 (`moon_stack_order` par.12.6 "ARM v29-b05 GEMESSEN"); b04 (repariertes Ziel)
+laeuft heute Nacht gegen b03. Bezugspunkt beider Arme ist b03, nicht "b04 gegen b05".
+
+**Zum Relaunch-Dokument:** der Kernsatz ("ist das, was die Suche bewertet, exakt das, was
+ausgefuehrt, geloggt und trainiert wird?") ist die richtige Leitfrage, und Strang B (Trace vor
+Bau) setzt sie um. Ein Relaunch selbst steht nicht an -- v30 ist der Abschluss
+(`project_v30_release_close`). Was davon OHNE Relaunch geht: der Minimalkern-Arm oben, Strang B
+als Trace, und ein Knopf-Abbau als Stufe 2 von `code_cleanup_closeout` (Kandidaten: die 10 toten
+und die 51 "beantwortet, Default aus"-Knoepfe aus `docs/knobs.md`; Loeschen erst nach der
+letzten Generation, Liste vorher). Der unsicherheitsbewusste Tiling-Selector des Dokuments ist
+par.14 (Top-K) der Rundenuebergangs-Prereg und kommt, wenn ueberhaupt, nach Variante B.
+
+**Was ich nicht vorschlage:** irgendetwas davon vor dem Ende von b04 und Variante B (Nr. 33-36)
+zu starten. Beide Messungen sind eingetaktet, und ein Minimalkern-Arm braucht dieselbe GPU
+und dieselben Arena-Stunden.
+
+## par.10 ENTSCHIEDEN (Nutzer 2026-09-16, 21:55): Marge 5 Prozentpunkte, `v29-b06` nach Variante B
+
+Nutzer woertlich: *"marge 5 prozentpunkte, b06 nach variante b eintakten"*. Damit sind die zwei
+offenen Groessen aus par.6 Punkt 2 und par.9 gesetzt:
+
+**Arm `v29-b06` (Minimalkern):** Rezept b03 mit allen Hilfs-Losses aus -- `--moon-loss-weight 0`,
+`--ownership-weight 0`, ohne `--opp-points-head`, ohne `--endgame-head` -- sonst identisch
+(Fenster `window_v29.txt`, Warmstart `v28-b02_brierbest`, Seed 20260941, 12 Epochen, 794,
+`--select-by-brier`, `--fast-loader`). **Vor dem Start am Code pruefen, welche ONNX-Ausgaben die
+Champion-Spec in der SUCHE liest** (`score_utility_b 20`, `envelope_*`; Kandidat ist der
+points-Kopf) -- diese bleiben im Rezept, der Manifest-Diff gegen b03 muss GENAU die
+abgeschalteten Koepfe und den Namen zeigen. Bezugspunkt b03; Val-Split, Monolith und
+Val-Cache von b03 (`--cache-file`, beide Anteile vorbauen -- Lehre aus dem b04-Lauf).
+
+**Nichtunterlegenheits-Regel, aus der Nutzer-Zahl formalisiert (Koordinator, VOR dem Lauf):**
+Tor wie A.4 -- zwei Seeds a 200 Paare, Blockgroesse 5, KEIN Frueh-Stopp, `--log-games`,
+Champion-Spec beidseitig, Einheit Sieg auf gepaarten Partien.
+
+1. Gepoolt ueber beide Seeds (n = 800 Partien) liegt die Siegquote von b06 bei **mindestens
+   45,0 Prozent** (Marge 5 Prozentpunkte gegen 50,0).
+2. **Kein Seed** zeigt einen signifikanten Nachteil fuer b06 (McNemar p < 0,05 GEGEN b06).
+3. Die sechs Standard-Kennzahlen aus denselben Logs; ein Einbruch bei vollen Spalten oder
+   Spezialfeldern, der in BEIDEN Seeds dasselbe Vorzeichen traegt, wird als Richtungsnachteil
+   im Sinne von A.4 gewertet und vorgelegt, auch wenn Punkt 1 haelt.
+
+Lesart: 1 und 2 halten -> die Vereinfachung ist en bloc fuer v30 uebernehmbar (Nutzer-Entscheid
+zur Aufnahme bleibt), A.3 entfaellt. 1 oder 2 reisst -> A.3 einzeln, um den tragenden Kopf zu
+finden. b06 SIGNIFIKANT besser (gepoolt McNemar p < 0,05 fuer b06) -> Staerkebefund nach par.8
+B6: eigene Identitaet, Elo-Kante nur auf Anweisung. Zur Aufloesung: 800 Partien tragen eine
+Marge von 5 Prozentpunkten gerade (par.8 B1), eine kleinere nicht.
+
+**Eintaktung:** NACH Variante B, also nach Fahrplan Nr. 36 (A/B), als Nr. 36a. Kosten rund 4,5 h
+(Training 1,43 h, Tor 1 zwei Seeds a 86-91 min, gemessen). Name `v29-b06` in
+`docs/generation_naming.md` reserviert.

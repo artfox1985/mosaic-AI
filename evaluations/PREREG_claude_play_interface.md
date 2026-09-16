@@ -880,6 +880,9 @@ fuer schlechter und Claude gewinnt trotzdem, ist der Value-Kopf die Luecke.
 
 **P1 -- g08 bis g10 spielen (par.6 Punkt 4, par.8 Punkt 1: zehn Partien)**
 
+**VERTAGT 2026-09-16 (Nutzer): die drei Partien kommen erst mit dem SCHLUSSMODELL (v30-Champion,
+Fahrplan Nr. 39), als Abschluss nach den Preregs -- nicht gegen v28-b02.**
+
 1. Je Partie: `python -X utf8 tools/claude_play.py new --seed <SEED> --claude-side 1 --first-player 0 --sims 400`,
    dann abwechselnd `show` und `move <Zug>` (Notation par.3.3), `step` als Notausgang, wenn die
    KI am Zug haengen bleibt (par.9 Punkt 12b), `note` fuer das Protokoll. Partie-Verzeichnis

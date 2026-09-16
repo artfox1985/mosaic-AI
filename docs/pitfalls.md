@@ -428,3 +428,8 @@ Zusatz; `tools/analyze_game_log.py` traegt dafuer zwei datierte Toleranzen
   deshalb an einen Generationswechsel und ist ein Nutzer-Entscheid. Bis dahin
   gilt: wer einen Cache von Hand adressiert, nimmt `--cache-file` und laesst
   `verify_cache_file` pruefen, statt sich auf den Dateinamen zu verlassen.
+  Seit dem 2026-09-16 prueft auch der NAMENSPFAD (Cache ueber den errechneten
+  Schluessel gefunden, `corpus_dataset.py` vor dem Ladeblock) den eingepraegten
+  Schluessel und bricht bei Abweichung hart ab, statt dem Dateinamen zu glauben
+  (`tools/tests/test_name_path_cache_key_guard.py`) -- die Pfadform-Reparatur
+  selbst bleibt damit unberuehrt und offen.
