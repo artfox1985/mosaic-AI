@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- **v29-b03 SCHLAEGT DEN CHAMPION** (drei Seeds: 124:86 und 64:36 signifikant, 87:93 Gleichstand, keiner dagegen; 275:215 in 490 Partien, Punkte +3,4/+5,4). Promotion per Nutzer-Entscheid ans Ende der Generationsarbeit vertagt; vier Elo-Kanten eingetragen (drei Champion-Seeds, Anker-Kante 128:22), b03@400 Elo 1402 [1353, 1456] (Nachtrag par.9). b01 zweimal H0 gegen den Champion. b02 gegen b03: Kanaele wirken auf den Posten, nicht auf die Siegquote (147:153, special_tile_yield par.10a). Monolith-Kollision behoben, b03s Offline-Rueckstand war ein kaputter Val-Cache. -->
+<!-- STATUS: OFFEN | Frage: Wie wird das v29-Trainingsfenster zugeschnitten -- zweiter Zyklus nach dem Einfrieren, Generator v28-b02, Pflichtarm b01? | Beleg: par.9 -- **v29-b03 SCHLAEGT DEN CHAMPION** (275:215 in 490 Partien, drei Seeds); Promotion ans Ende der Generationsarbeit vertagt, vier Elo-Kanten eingetragen. b01 zweimal H0. b02 gegen b03: Kanaele wirken auf den Posten, nicht auf die Siegquote (147:153). **par.6d Punkt 5 DURCH**: kein Absterben (b03 0,3296 gegen 0,3440 des aeltesten Stands auf frozen_v3, unter der Aufloesungsgrenze), der Trend aber unmessbar -- der Val-Split ist mit der Generation wachsend kontaminiert (82 gegen 33 Prozent). -->
 
 # PREREG v29: Fensterzuschnitt fuer den zweiten Zyklus nach dem Einfrieren
 
@@ -1118,6 +1118,150 @@ Drei Stuecke, die in STATUS und im Fahrplan registriert waren, aber hier fehlten
    Paaren ohne Frueh-Stopp steht 147:153 (McNemar p 0,82). Die Kanaele 77/78 wirken auf ihren
    POSTEN (+0,13 bis +0,22 belegte Spezialfelder in drei Seeds), nicht auf die Siegquote. Der
    Satz "die Spezialfeld-Kanaele TRAGEN" im Abschnitt oben gilt nur fuer den Posten.
+
+### par.6d Punkt 5 (Trend ueber die Generationen): messbar gemacht -- und die beiden Grundmengen widersprechen sich (2026-09-16)
+
+**Der Punkt war nicht durchfuehrbar, weil das Werkzeug kaputt war.**
+`tools/offline_diagnosis.py` baute das Modell mit der HEUTIGEN `config.INPUT_SIZE`
+(794) und scheiterte an jedem Alt-Checkpoint mit `size mismatch for
+flat_branch.0.weight` (744 gegen 794). Behoben: die Breite wird je Checkpoint aus
+dem `state_dict` abgeleitet (`input_size=None`, dasselbe Muster, mit dem
+`build_model_from_checkpoint` die Planes-Kanalzahl schon immer ableitet) und der
+Merkmalsvektor darauf GEKUERZT, nie aufgefuellt.
+
+**Dass Kuerzen erlaubt ist, ist geprueft, nicht aus der Additivitaets-Notiz uebernommen:**
+
+* Rust-Tests `features.rs:2273` (Abschnitt 15 haengt hinter Index 743), `:2308`
+  (Abschnitt 16 hinter Index 754), `:2511` (der 755er-Praefix ist auf beiden
+  Pfaden wertgleich).
+* Der SPIELPFAD tut genau dasselbe: `net.rs:425` kuerzt den Flachvektor auf die
+  Modellbreite, `net.rs:989` die Planes je Kanal. Ein zugeschnittenes Alt-Netz
+  sieht hier also exakt, was es auch in jeder Partie sieht.
+* git-Historie: in `a336d72` (744 -> 755) und `31a1321` (755 -> 794) sind die
+  einzigen Loeschungen in `features.rs` die `INPUT_SIZE`-Zeile und Testzeilen --
+  im Bereich 0..754 wurde kein Wert entfernt, umsortiert oder umnormiert.
+* Planes: `conv.0.weight` traegt bei allen 19 `.pth` im Bestand 79 Kanaele
+  (torch.load, 2026-09-16); dort ist nichts gewachsen, der Kanal-Zuschnitt ist
+  reine Vorsorge.
+
+**v24-b04 aus der Punkt-5-Formulierung existiert nicht mehr als Datei**
+(Aufraeumregel "nur die letzten zwei Champions"). `v27-b01_brierbest` traegt
+dieselbe Breite 744 -- eingefuehrt mit `e49eb3c` (2026-09-05) GENAU fuer v24-b04 --
+und vertritt die Aera. Die Punkt-5-Zeile oben nennt "744 / 755 / 787"; die dritte
+Zahl ist 794 (`config.py:49`).
+
+#### Die Tabelle, zweimal -- und das ist der eigentliche Befund
+
+n = 1.800 Zustaende, GRUNDMENGE `frozen_v3` (360 je Runde), EINHEIT Value-R2 bzw.
+Trefferquote ueber 1.274 Drafting-Entscheide. Artefakt
+`evaluations/artifacts/net_health_p5_generations_frozenv3.json` (4,9 s, 8 Threads).
+
+| Modell | Eingang | R2 Runde 1-4 | Top-1 | Top-3 |
+| --- | --- | --- | --- | --- |
+| v27-b01_brierbest | 744 | **0,3440** | **53,5 %** | **86,1 %** |
+| v28-b01_brierbest | 744 | 0,3393 | 52,5 % | 85,4 % |
+| v28-b02_brierbest (Champion) | 755 | 0,3168 | 52,0 % | 84,9 % |
+| v29-b02_brierbest | 794 | 0,2398 | 51,9 % | 83,6 % |
+| v29-b03_brierbest | 794 | 0,3296 | 52,0 % | 83,7 % |
+| v29-b05_brierbest | 794 | 0,2964 | 52,0 % | 84,2 % |
+
+n = 582.132 Zuege, GRUNDMENGE Default-Val-Split (360 Dateien, Seed 20260707,
+val_frac 0,1), EINHEIT dieselbe, 410.337 Drafting-Entscheide. Artefakt
+`net_health_p5_generations_valsplit.json` (1.424,0 s, 8 Threads).
+
+| Modell | Eingang | R2 Runde 1-4 | Top-1 | Top-3 |
+| --- | --- | --- | --- | --- |
+| v27-b01_brierbest | 744 | 0,3414 | 61,4 % | 90,1 % |
+| v28-b01_brierbest | 744 | 0,3716 | 62,5 % | 90,8 % |
+| v28-b02_brierbest (Champion) | 755 | 0,3631 | 63,2 % | 91,0 % |
+| v29-b02_brierbest | 794 | 0,3486 | 61,9 % | 90,3 % |
+| v29-b03_brierbest | 794 | **0,3907** | 63,3 % | **91,1 %** |
+| v29-b05_brierbest | 794 | 0,3867 | **63,5 %** | 91,1 % |
+
+**Die beiden Reihen laufen in ENTGEGENGESETZTE Richtungen.** Auf dem
+zurueckgehaltenen Satz ist das AELTESTE Netz das beste, auf dem Val-Split das
+juengste. Das ist kein Widerspruch, sondern die Signatur einer Kontamination, die
+mit der Generation waechst.
+
+#### Warum der Default-Val-Split ueber Aeren hinweg nicht taugt (gemessen, nicht vermutet)
+
+n = 360 Dateien, GRUNDMENGE der Val-Split von `offline_diagnosis.val_files()`,
+EINHEIT Korpusdateien; abgeglichen gegen das `cli_args.file_list` des jeweiligen
+Trainings-Manifests (`models/manifest_train_*.json`):
+
+| Trainingsfenster | davon im Val-Split | Anteil |
+| --- | --- | --- |
+| `window_v27.txt` (v27-b01) | 117 | 32,5 % |
+| `window_v28.txt` (v28-b01/b02) | 243 | 67,5 % |
+| `window_v29.txt` (v29-b02/b03/b05) | 296 | **82,2 %** |
+
+Innerhalb EINER Aera kuerzt sich das weg -- deshalb sind Punkt 3 und 4 (b03 gegen
+b05, identische Dateiliste) dort gueltig. Ueber Aeren hinweg misst die Reihe zu
+einem mit der Generation WACHSENDEN Teil Auswendiglernen und erzeugt genau den
+Trend, den sie zeigen soll. Das ist derselbe Fehler wie die Sonden-Skala, die zu
+88 Prozent im Trainingssatz lag (STATUS-Lehre 2026-08-17).
+
+`frozen_v3` ist dagegen fuer alle sechs Staende zurueckgehalten: **0 seiner 20
+Quelldateien** liegen in `window_v27/28/29`, und keine davon ist noch in `data/`
+(geprueft 2026-09-16 ueber `source_file` der 1.800 Records).
+
+#### VERDIKT: kein Absterben nachweisbar -- der Trend selbst ist mit den vorhandenen Saetzen NICHT sauber messbar
+
+Fuer die Frage von par.6d ("nicht dass uns der nun abstirbt mit der Anzahl an
+Features") ist das Ergebnis beruhigend: die mainline-Reihe
+v27-b01 -> v28-b02 -> v29-b03 steht auf `frozen_v3` bei 0,3440 / 0,3168 / **0,3296**
+-- kein monotoner Abbau, der Champion ist der tiefste Punkt und b03 holt wieder
+auf. Der Abstand von b03 zum aeltesten Stand ist **0,0144** und liegt damit unter
+der bekannten Aufloesungsgrenze von rund 0,015 (`project_offline_metric_resolution_limit`).
+Auf dem Val-Split liegt b03 ohnehin vorn. Die beiden Ablations-Arme b02 (0,2398)
+und b05 (0,2964) liegen klar darunter -- das ist ein echter Abstand jenseits der
+Aufloesungsgrenze, aber er gehoert zu ihrer Ablation, nicht zur Eingangsbreite:
+alle drei v29-Arme tragen dieselben 794.
+
+**Der Trend selbst bleibt unbeantwortet, und das ist ehrlicher als eine Zahl.**
+Beide Grundmengen sind verzerrt, nur in verschiedene Richtungen:
+
+* Der **Val-Split bevorzugt neue Netze** (Kontamination 82,2 gegen 32,5 Prozent).
+* **`frozen_v3` benachteiligt sie doppelt**: (a) er stammt aus der v23-b01-Aera,
+  der Verteilungsabstand waechst also mit jeder Generation; (b) **keiner seiner
+  1.800 Records traegt `dome_pool_view`** (geprueft 2026-09-16), womit alle elf
+  Werte von Abschnitt 15 und ein Teil von Abschnitt 16 auf Null liegen -- die
+  794er-Netze laufen dort mit totem Eingang, das 744er-Netz vermisst nichts.
+
+Verteilungsabstand und Generation sind auf diesen Saetzen **nicht trennbar**: beide
+wachsen monoton mit der Generationsnummer. Das einzige monotone Signal auf dem
+zurueckgehaltenen Satz ist Policy Top-3 (86,1 -> 85,4 -> 84,9 -> 83,7 Prozent, 2,4
+Prozentpunkte ueber drei Aeren) -- und genau das sagt auch reiner
+Verteilungsabstand voraus.
+
+**Was fehlt, ist benennbar und billig:** ein zurueckgehaltener Satz der LAUFENDEN
+Aera. Heute existiert keiner -- **jede** der 3.603 Dateien in `data/` liegt in
+mindestens einem der drei Fenster (geprueft 2026-09-16, Restmenge leer). Der
+Handgriff waere, vor dem Training der naechsten Generation eine Scheibe des
+frischen Self-Plays zu reservieren und aus der Fensterliste zu nehmen. Benannter
+Nutzniesser (CLAUDE.md-Regel fuer Infrastruktur): genau dieser Punkt 5, der dann
+eine Reihe ohne gegenlaeufige Verzerrung haette.
+
+**Die Tabelle deckt Punkt 3 NICHT mit ab.** Punkt 3 fragt b03 gegen **b01** -- die Frage nach
+dem gewachsenen Eingang. Die sechs Staende hier sind durchgaengig `_brierbest`-Staende (ein
+einheitliches Auswahlmass, sonst vergliche man Checkpoints nach verschiedenen Kriterien), und
+von v29-b01 gibt es keinen `_brierbest` -- nur `.pth` und `_best.pth` (Bestand 2026-09-16
+nachgesehen). Der Nachtrag mit `v29-b01_best` kostet auf frozen_v3 Sekunden, sobald die
+Maschine frei ist; er muesste als `_best` gegen `_brierbest` markiert werden.
+
+**Nicht geprueft:** ob die Praefixwerte in ihrer DAMALIGEN Aera dieselbe Bedeutung
+hatten wie heute -- die git-Pruefung deckt 0..754 ab `e49eb3c` (2026-09-05) ab,
+nicht davor. Fuer die Lesart der Tabelle ist das ohne Belang: sie sagt "wie gut
+sagt dieses Netz die HEUTIGEN Daten vorher", nicht "wie stark war es damals".
+
+**Werkzeug-Nebenbefunde, im selben Zug behoben:** der Lauf hatte keinen
+Fortschrittszaehler (23 Minuten stumm) und kein `laufzeit`-Feld im Artefakt; der
+Tabellenkopf nannte auch im Frozen-Modus "Val-Split ... val_frac=0.1", also die
+falsche Grundmenge. Neu ist `--frozen-set {v1,v2,v3}`: waehlt den Satz und
+impliziert `--frozen`. Die Orakel-Metriken werden fuer v2/v3 ausgelassen, weil ihre
+Labels fest in frozen_v1 indexieren (`oracle_metrics.py:79/:185`). `frozen_v1`
+selbst ist bewusst NICHT gemessen worden: jener Satz stammt aus der
+plattenBLINDEN Aera (`PREREG_frozen_v3_eval_set.md` par.1).
 
 ## AGENTEN-AUFTRAG (Stand 2026-09-13, fuer eine autonome Abarbeitung durch einen Opus-Agenten)
 

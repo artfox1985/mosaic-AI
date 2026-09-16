@@ -18,18 +18,32 @@ Herleitung ins Archiv und laesst hier eine Zeile mit Verweis stehen.
 
 ## 1. WAS GERADE LAEUFT
 
-**Stand 2026-09-15, 09:00: nichts laeuft.** Beide Messketten der Nacht sind durch (Verdikte im
-Abschnitt "NACHT 2026-09-14/15" unten). Zuletzt gebaut: das Wheel mit dem Knopf C3 fuer Fahrplan
-32a (`MOSAIC_MOON_ORDER_SEARCH_SCALE`, Commit a4f92a5, installiert 08:40). Konservierung 08:41
-GRUEN (`evaluations/artifacts/frozen_verify_hv4_anchor.json`); **ein Drift-Artefakt fuer dieses
-Wheel liegt NICHT in `evaluations/artifacts`** (Stand 09:00, juengstes Drift-Artefakt vom
-2026-09-14 22:57). Faellig als naechstes: die Tore aus `PREREG_moon_stack_order.md` par.11
-(Bitidentitaet bei aus, Kostentor 25 Prozent, Diagnose `changed`), dann das A/B.
+**Stand 2026-09-16, 16:45.** Eine Kette laeuft, die davor ist durch:
 
-| Kette | Inhalt | Stand |
-| --- | --- | --- |
-| `tools/night_v29_20260914.sh` | 1. A/B Mondstapel-Nachsuche (Stufe 3) - 2./3. Kostentor K4 mit/ohne - 4./5. Arena K4 zwei Dosen - 6. Nachzug b02 gegen b03 ohne Frueh-Stopp | **alle sechs Schritte DURCH** |
-| `tools/night_v29_envelope_value_ab.sh` | Anker-Kante v29-b03 gegen hv4_anchor, dann Value-Anteil im Tiling in zwei Dosen (par.8.6b) | **DURCH** (Kante 128:22 eingetragen, par.8.6 geschlossen) |
+| Kette | Sitzung | Inhalt | Stand |
+| --- | --- | --- | --- |
+| `tools/run_net_health_generations.sh` | Chip (Aera-Grenze) | Netz-Gesundheit Punkt 5: Value-R2 und Policy fuer SECHS Staende ueber die Eingangs-Aeren 744 / 755 / 794 | **DURCH 16:38**. Gemessen auf `frozen_v3` (zurueckgehalten, 4,9 s) UND auf dem Default-Val-Split (582.132 Zuege, 23,7 min) -- NICHT auf zwei eingefrorenen Saetzen, wie hier zwischenzeitlich stand. Verdikt unten |
+| `tools/night_v29_b04_moon_played.sh` | diese | Fahrplan 32b, Arm v29-b04 (`--moon-target-source played`): Bloecke, Monolith, Training, Tor 1 zwei Seeds | **LAEUFT** seit rund 16:40 (Schritt 1, Bloecke), rund 5 h. Die Staffelstab-Uebergabe hat gegriffen |
+
+**Durch seit der letzten Fassung:** Netz-Gesundheit Punkt 3/4 fuer das Paar b03/b05
+(`net_health_p3_b03_b05.json`, Verdikt in `moon_stack_order` par.12.6: **kein Befund**, 0,0040
+R2-Abstand bei einer Aufloesungsgrenze von 0,015 -- der Verwerfungs-Ausgang ist damit
+ausgeschlossen, nicht die Arena-Kante bestaetigt). Dazu die Counterfactual-Ranking-Sonde gebaut
+und vorregistriert (`round_transition_search_sampling` par.16, Volllauf steht aus).
+
+> **STILLSTAND OFFENGELEGT (2026-09-16, 15:45 bis 16:17, 32 Minuten).** Die b04-Kette wurde per
+> Heredoc geschrieben UND im selben Befehl gestartet; dadurch trug der Wrapper-bash den ganzen
+> Skripttext (6.554 Zeichen, darin woertlich `train.py` und `paired_gating.py`) in seiner
+> Kommandozeile. Die Wartebedingung fand ihn und wartete auf sich selbst. **Der Schaden blieb
+> nicht in der eigenen Spur:** derselbe Wrapper enthielt `build_cache_incremental`, worauf die
+> Kette der Chip-Sitzung filtert -- die stand ebenso lange leer und lief binnen Sekunden an,
+> nachdem der Wrapper beendet war. Es war der DRITTE Vorfall dieser Familie (2026-09-09: 35 min;
+> Nacht auf 2026-09-13: die wartende Leiter-Kante startete gar nicht), und die vorhandene
+> Haertung half nicht: die `[t]rain`-Klammer schuetzt gegen den eigenen Suchbefehl, nicht gegen
+> einen Wrapper, der den Suchbegriff als NUTZLAST traegt. Nachgezogen: dritte Haertungsstufe
+> `-and $_.Name -match 'python'` in drei Kettenskripten, Regel "Ketten als DATEI starten",
+> Vorfall in `../docs/pitfalls.md`. Keine Messung ist betroffen -- es wurde Zeit verloren, keine
+> Zahl verfaelscht.
 
 Waehrend einer Messung darf nichts anderes Rechenlast erzeugen -- kein Build, kein cargo, keine
 Sonde (CLAUDE.md). Ein Wheel-Neubau mitten in einer Kette liesse die Arme auf zwei Wheels laufen.
@@ -493,7 +507,7 @@ wirkt zu stark; hier ist der Term zu schwach, um ueberhaupt messbar zu sein.
 | **R1** (29b, Sensitivitaet) | Erwartung WIDERLEGT: Spannweite Median 0,0188, Typfolge in 73,7 Prozent aenderbar |
 | **v29-b05** Tor 1 gegen b03 | **427:373 aus 800 Partien**, gepoolt z = 1,98 |
 
-**Das Verdikt zu b05** (par.12.5): das Entfernen des No-Op-Ziels macht das Netz nicht
+**Das Verdikt zu b05** (par.12.6): das Entfernen des No-Op-Ziels macht das Netz nicht
 schlechter, sondern **eher besser** -- beide Seeds und fuenf von sechs Standard-Kennzahlen
 zeigen in dieselbe Richtung (Spalten +0,01/+0,10, Punkte +0,15/+1,99, Marge +0,31/+3,98).
 Einzeln erreicht kein Seed die Signifikanzschwelle (p 0,159 und 0,235), gepoolt liegt es genau
@@ -513,6 +527,45 @@ lief OHNE `MOSAIC_CARRIER_MANIFEST` und haette mit 2.947 statt 580 Policy-Traege
 zweifaktoriellen Arm erzeugt (gestoppt, Skript um die Variable und eine Existenzpruefung
 ergaenzt); und die erste Auswertung der Kennzahlen ordnete die Seiten nach Dict-Position statt
 nach Namen zu, wodurch alle Vorzeichen vertauscht waren.
+
+### Stand 2026-09-16: Netz-Gesundheit Punkt 5 -- kein Absterben, aber der Trend ist nicht messbar
+
+**Fahrplan Nr. 20, Punkt 5 durch** (`PREREG_v29_window.md` par.9, Artefakte
+`net_health_p5_generations_frozenv3.json` und `..._valsplit.json`).
+
+`tools/offline_diagnosis.py` konnte keinen Alt-Checkpoint mehr laden -- es baute das Modell mit
+der heutigen `config.INPUT_SIZE` und scheiterte an `size mismatch for flat_branch.0.weight`
+(744 gegen 794). Jetzt leitet es die Breite je Checkpoint ab und KUERZT den Merkmalsvektor
+darauf, genau wie es der Spielpfad tut (`net.rs:425` flach, `:989` Planes). Dass das erlaubt
+ist, steht nicht nur in der Additivitaets-Notiz, sondern in drei Rust-Tests
+(`features.rs:2273/2308/2511`) und in der git-Historie: die Breitensprünge `a336d72` und
+`31a1321` loeschen im Bereich 0..754 keinen einzigen Wert.
+
+**Das Ergebnis auf dem zurueckgehaltenen Satz `frozen_v3`** (n = 1.800 Zustaende, EINHEIT
+Value-R2 Runde 1-4): v27-b01 0,3440 (Eingang 744), v28-b02 0,3168 (755), v29-b03 0,3296 (794).
+**Kein monotoner Abbau** -- der Abstand von b03 zum aeltesten Stand ist 0,0144 und liegt unter
+der Aufloesungsgrenze von rund 0,015. Die Sorge aus par.6d ("nicht dass uns der nun abstirbt
+mit der Anzahl an Features") ist damit nicht bestaetigt.
+
+**Der Trend selbst bleibt unbeantwortet, und das ist der wichtigere Befund.** Der
+Default-Val-Split von `offline_diagnosis.py` liegt mit der Generation WACHSEND in den
+Trainingssaetzen der verglichenen Netze (n = 360 Dateien, gegen `cli_args.file_list` der
+Trainings-Manifeste: 82,2 Prozent in window_v29, 67,5 in window_v28, 32,5 in window_v27) -- und
+zeigt darauf die UMGEKEHRTE Richtung (b03 vorn statt hinten). Innerhalb einer Aera kuerzt sich
+das weg, deshalb bleiben Punkt 3 und 4 dort gueltig; ueber Aeren hinweg erzeugt die Reihe den
+Trend, den sie zeigen soll. `frozen_v3` wiederum benachteiligt die neuen Netze doppelt (fremde
+Aera, und keiner seiner 1.800 Records traegt `dome_pool_view`, also liegen 11+ Eingangswerte
+auf Null). Verteilungsabstand und Generation sind auf diesen Saetzen nicht trennbar.
+
+**Was fehlt, ist benennbar:** ein zurueckgehaltener Satz der LAUFENDEN Aera. Heute existiert
+keiner -- jede der 3.603 Dateien in `data/` liegt in mindestens einem der drei Fenster. Der
+Handgriff waere, vor dem Training der naechsten Generation eine Scheibe des frischen Self-Plays
+zu reservieren und aus der Fensterliste zu nehmen. Das ist ein Kandidat fuer den
+Generationswechsel, kein eigener Arm.
+
+**Nebenher behoben:** kein Fortschrittszaehler (der 23-Minuten-Lauf war stumm), kein
+`laufzeit`-Block im Artefakt, und ein Tabellenkopf, der auch im Frozen-Modus "Val-Split ...
+val_frac=0.1" nannte -- also die falsche Grundmenge.
 
 ## 2. CHAMPION UND LEITER
 
@@ -582,7 +635,7 @@ eingetaktet, keine ist liegengeblieben:
 | `claude_play_interface` | Partien g08-g10, Zugklassen-Differential |
 | `moon_stack_order` | Knopf bauen, A/B am Champion |
 | `dome_return_order` | Bau-Tor gruen (2026-09-15); offen ist der Korpus mit Streuung, mit der naechsten Erzeugung |
-| `round_transition_search_sampling` | Variante B bauen (rund ein Tag), Sichttor, Kostentor, A/B |
+| `round_transition_search_sampling` | Variante B bauen (rund ein Tag), Sichttor, Kostentor, A/B; dazu NEU der Volllauf der Stufe-0-Sonde zu Top-K (par.16/16.7, s.u.) |
 | `code_cleanup_closeout` | Stufen 2 und 3, nach der v30-Promotion |
 
 Die Zahl liegt ueber dem Ziel, weil das v29-Begleitprogramm bewusst breit ist. Seit dem
@@ -598,6 +651,22 @@ entschieden sind; `dome_return_order` bleibt ebenfalls offen -- sein Bau-Tor ist
 > Koerper nennt eine offene Aufgabe. Gefallen ist stattdessen `corpus_behaviour_audit`, das in
 > der Tabelle darueber noch als offen stand. Beim Nachziehen des Bestands waren zwei Namen
 > genannt worden, ohne die Koepfe zu lesen.
+
+**NEU 2026-09-16 (Nutzer-Auftrag, Counterfactual-Ranking-Sonde):** zu
+`round_transition_search_sampling` ist par.16 dazugekommen - die Stufe-0-Sonde aus par.14.3 ist
+vorregistriert UND gebaut (`tools/probes/counterfactual_tiling_ranking.py`). Sie fragt, ob der
+Value-Kopf die Reihenfolge mehrerer Tiling-Plaene trifft und ab welcher Runde er eine exakte
+lokale Entscheidung ueberstimmen darf. **Der Volllauf steht aus** (Maschine durch die b04-Kette
+belegt); es gibt also noch KEIN Ergebnis, nur einen trocken geprueften Apparat. Zwei Punkte,
+die andere Abschnitte beruehren:
+
+* Der Bestand misst die Frage NICHT. `tools/tiling_value_reference_main.py:146` schneidet auf
+  punktgleiche Kandidaten zu; ob das Netz einen Punktvorsprung zu Recht ueberstimmt, ist nie
+  gemessen worden, obwohl der Zweig aktiv ist (`NET_TILING_TIEBREAK_ENABLED = true`,
+  `tiling_solver.rs:858`, Runden 2-4 `:1603-1610`, Kriterium `punkte * P(Sieg)` `:944-964`).
+* Die Lesart deckt vorab auch "das Netz rangiert systematisch FALSCH" ab (par.16.5 Ausgang 3).
+  Faellt der Lauf so aus, ist das ein Befund GEGEN einen heute laufenden Engine-Zweig und damit
+  ein Nutzer-Entscheid samt Anker-Invarianz, kein Tuning.
 
 ## 6. OFFENE NUTZER-ENTSCHEIDE
 
