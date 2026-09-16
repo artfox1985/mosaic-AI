@@ -294,8 +294,7 @@ def main():
     merge_s = None
     window_key = None
     if a.merge_out:
-        from build_cache_parallel import merge
-        import corpus_dataset
+        from build_cache_parallel import merge, window_key_for_entries
         parts, mask_parts = [], set()
         for f in all_entries:
             b = os.path.basename(f)
@@ -316,7 +315,17 @@ def main():
         # lehnt `train.py --cache-file` das Ergebnis ab. Die Datei-Bloecke
         # tragen ihn nicht -- ihr Schluessel gehoert je zu EINER Datei
         # (`per_file_cache_key`), nicht zum Fenster.
-        window_key = corpus_dataset.window_cache_key(
+        # PFADFORM (docs/pitfalls.md, 2026-09-17): `str(files)` steht im
+        # Schluesselmaterial, und train.py / window_train_split.py rechnen mit
+        # ABSOLUTEN Pfaden. Bis heute stand hier `data/x.pkl` -- derselbe
+        # Datensatz bekam so einen anderen Stempel als seinen Namen
+        # (fd13f54061cd gegen 4dd9f020b232, Arm v29-b06), und der
+        # --cache-file-Waechter lehnte den frisch gebauten Monolithen ab.
+        # Deshalb hier dieselbe Form wie im Verbraucher -- die Umstellung auf
+        # absolute Pfade steckt in `window_key_for_entries`, gemeinsam mit
+        # build_cache_parallel.py und festgenagelt in
+        # tools/tests/test_cache_key_path_form.py.
+        window_key = window_key_for_entries(
             a.data_dir, all_entries, value_target_variant=a.value_target_variant,
             encoder=a.encoder, conjunction_head=a.conjunction_head)
         t1 = time.time()
