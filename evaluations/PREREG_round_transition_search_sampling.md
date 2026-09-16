@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B ist fuer v29 eingetaktet, aber ungebaut (par.9/10). Stufe-0-Sonde vorregistriert und gebaut (par.16), Volllauf steht aus; Wahrheitsquelle ist die Tiefensuche nach gekoppelter Neubefuellung, wertkopf-frei nur in R4 (am Code geprueft: `round5.rs:357` exakt, kein Netz). Review par.15: Top-K ist im R5-Pfad BEREITS gebaut (B1), und K=1 ist NICHT bitidentisch zum Bestand (B3) -- 14.5 entsprechend auf ein zu zeigendes Tor korrigiert. -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche am Rundenende das Tiling sehen (Loeser im Blatt) und die Fabrik-Neubefuellung als Zufallsknoten bemustern, zu vertretbarem Preis? | Beleg: Variante B ist GEBAUT (par.17): Knopf `MOSAIC_ROUND_TRANSITION_LEAF`, Default 0 bitidentisch, Spec-Feld optional, 9 Tests gruen -- aber NOCH NICHT im Wheel, und Sichttor (par.10), Kostentor 25 Prozent (par.5) und der gepaarte A/B (par.9) stehen aus. Stufe-0-Sonde gebaut (par.16), Volllauf offen. Review par.15 abgearbeitet: Top-K ist im R5-Pfad BEREITS gebaut (B1), K=1 nicht bitidentisch (B3, 14.5). -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -303,6 +303,11 @@ mehr. Variante B bleibt ungebaut und haengt weiter an der Informationsmengen-
 Antwort aus `PREREG_dome_stack_information_sets.md` (par.8). Zeile-1-Kopf im
 selben Zug nachgezogen.
 
+**UEBERHOLT (Rueckwaerts-Pruefung 2026-09-16):** die Informationsmengen-Antwort
+liegt seit par.9 vor (`determinize_dome_pool`, Variante A), und Variante B ist
+seit dem 2026-09-16 GEBAUT -- Baustand par.17. Der Absatz bleibt als Chronik
+stehen; der Stand steht in par.17.
+
 ## par.9 EINGETAKTET FUER v29 (Nutzer 2026-09-12, 17:55: "gerne eintakten fuer v29")
 
 Anlass: Projekt-Rueckschau des Koordinators, der Nutzer hat den Punkt bestaetigt. Der Arm ist
@@ -383,8 +388,10 @@ ihr gescheitert), und das **Sichttor** aus par.10 (ein einziger Verstoss ist ROT
 
 ### 2. Voraussetzungen
 
-- **Nichts gebaut** (Kopfzeile, par.9). Zu bauen ist der Such-Knopf `MOSAIC_ROUND_TRANSITION_LEAF`
-  mit Default 0 = Bestand bitidentisch, kein RNG-Zug; Spec-Feld optional.
+- ~~**Nichts gebaut** (Kopfzeile, par.9).~~ **ERLEDIGT 2026-09-16, Baustand par.17:** der
+  Such-Knopf `MOSAIC_ROUND_TRANSITION_LEAF` steht (Default 0 = Bestand bitidentisch, kein
+  RNG-Zug; Spec-Feld optional mit Default 0). Offen bleibt alles ab P2 -- und VOR P2 der
+  Wheel-Bau samt Anker-Drift, Anker-Konservierung und Paritaets-Fixture (par.17.5).
 - **Maschine frei laut Prozessliste** fuer Bau (Volllast) und Messung; exklusiv, nie neben einer
   Arena.
 - **Zwei Praemissen sind mit par.8 bereits berichtigt und gelten nicht mehr:** par.6
@@ -1168,3 +1175,141 @@ Wilson-Untergrenze ist jede Richtung Rauschen). Die Kosten des Volllaufs bei sim
 M = 6 sind UNGEMESSEN -- der Trockenlauf lief mit 20 Sims und M = 4; hochrechnen waere genau
 die Schaetzung, die `CLAUDE.md` verbietet. Der erste Volllauf beginnt deshalb mit `--rounds 4`
 allein (Grad EXAKT, die aussagekraeftigste Klasse) und misst dabei seine eigene Laufzeit.
+
+## par.17 BAUSTAND Variante B (2026-09-16)
+
+Fuehrt par.9 aus, mit den Bauvorgaben par.4.2 (stellungsgebundener Seed), par.8 (Mischregel
+`determinize_dome_pool`) und par.10 (Beutel mit Turm daneben). **Gebaut ist der KNOPF, nichts
+gemessen** -- Kostentor, Sichttor und A/B sind Fahrplan Nr. 34-36 und ausdruecklich NICHT Teil
+dieses Zuges.
+
+### 17.1 Kartierung: wo das Blatt heute endet (am Code geprueft 2026-09-16)
+
+| Frage | Antwort | Pruefstelle |
+| --- | --- | --- |
+| Wann wird ein Blatt pseudo-terminal? | `check_phase_transition` setzt `Phase::Tiling`, sobald alle Fabriken leer sind UND kein aufgedeckter Chip mehr liegt (`check_drafting_complete`) | `game.rs:872-874`, `game.rs:521-536` |
+| Woran erkennt die Suche es? | `terminal = state.phase != Phase::Drafting` -- ein Flag, KEINE Rundenpruefung: Runde 5 und Spielende fallen in dieselbe Klasse | `net_mcts.rs:3151` (`make_node`) |
+| Was sieht das Netz dort? | den Zustand VOR dem Tiling: Musterreihen noch gefuellt, Fabriken leer, Kuppeln der Runde noch nicht gelegt, Rundenwertung noch nicht verbucht. Der Blattwert ist der gewoehnliche Netzwert dieses Zustands plus die Zustands-Additive (K1, K3, K4, Shaping) | `net_mcts.rs` `make_node`, Zweig `LeafEval::Net`, bis `today_value` |
+| Gibt es dort schon einen Ausgang? | ja, GENAU EINEN: `if terminal && ROUND_TRANSITION_SAMPLING` -- Kompilierzeit-Konstante, Default `false`, also toter Zweig | `net_mcts.rs:95` (Konstante), `:3543` (Aufrufstelle; par.8 hatte `:3334`, die Zeile wandert, der Name nicht) |
+| Was fehlte fuer Variante B? | der Betrachter und ein Salz: `make_node` kennt weder den Wurzelspieler noch den abgeleiteten Such-Seed der Partie. Beides ist jetzt ein Pro-Suche-Feld der `SearchConfig` (Muster `score_utility_root_margin`/`with_root_margin`) | `net_mcts.rs:765` (`RoundTransitionLeafCtx`), `:2821` (`with_round_transition_leaf_context`) |
+
+Damit ist die Stelle bestaetigt, die par.9 benennt: **das Blatt ist der Netzwert VOR dem
+Tiling**, und der Eingriff sitzt an genau dem Ort, an dem der Bestandsschalter haengt.
+
+### 17.2 Bauform
+
+* **Knopf** `MOSAIC_ROUND_TRANSITION_LEAF`, `0` = aus (Bestand), `1` = an; ungueltig fuehrt auf
+  `0` plus einmalige Warnung (`net_mcts.rs:502` Default, `read_round_transition_leaf_env`).
+  Registratur-Eintrag Status *Diagnose* mit Prereg-Verweis par.9/par.10
+  (`knob_registry.rs`), Manifest-Feld `round_transition_leaf` (`lib.rs::engine_config_json`),
+  `docs/knobs.md` per Generator nachgezogen (126 Knoepfe).
+* **Spec-Feld** `round_transition_leaf`, OPTIONAL mit Default 0 -- jede eingefrorene Spec
+  laedt weiter und beschreibt weiter bitgenau dasselbe. Die LEBENDEN `models/*.spec.json`
+  bleiben bewusst unangetastet: ein aelteres Wheel lehnt unbekannte Felder hart ab, und die
+  Ketten lesen die Specs bei jedem Partiestart neu (`tools/spec_add_field.py`-Kopf).
+* **Wirkort** `net_mcts.rs::make_node`, unmittelbar vor dem Bestandsschalter: bei Knopf 1 und
+  pseudo-terminalem Blatt der Runden 1-4 liefert `round_transition_leaf_value` den Netzwert
+  des Zustands NACH dem Uebergang, sonst `None` und der Bestandspfad laeuft unveraendert.
+* **Der Uebergang selbst** (`round_transition.rs::round_transition_leaf_state`, netzfrei und
+  damit ohne ONNX pruefbar): `resolve_to_pre_chance` loest das Tiling BEIDER Seiten exakt auf
+  (Schrittschleife, Bestand), dann `determinize_dome_pool(.., Some(viewer), ..)` mit dem
+  Wurzelspieler als Betrachter, dann `advance_one_chance` -- also Beutel-Reihenfolge und
+  Bonuschip-Vorrat gemischt, Turm-Nachfuellung ueber den Spielpfad `draw_with_refill`. Das ist
+  der Kern, den par.10 ausdruecklich wiederverwenden wollte, keine zweite Bauform.
+* **Seed** stellungsgebunden nach par.4.2: `leaf_fill_seed` = `derive_search_seed(fnv1a_64(
+  leaf_fill_key) ^ ROUND_TRANSITION_LEAF_SEED_DISTINGUISHER, salt)`. `leaf_fill_key`
+  serialisiert genau die in par.4.2 genannten Felder (Bretter, Musterreihen, Strafleisten,
+  Chips, Beutel- und Turm-ZAEHLER, Runde, Spieler am Zug) und ausdruecklich NICHT die verdeckte
+  Reihenfolge in Beutel, Turm und Kuppelstapel. Das `salt` ist EINE Zahl aus dem Suchstrom,
+  gezogen an der Wurzel jeder Suche -- nicht je Blatt. Folge: dieselbe Stellung zieht dieselbe
+  Fuellung, egal ueber welchen Pfad sie erreicht wird; der Hauptstrom verschiebt sich um genau
+  einen Zug (Muster `moon_order_post_search`).
+* **Drei Suchtreiber setzen den Kontext** (`build_gumbel_tree_inner`, `build_net_tree`,
+  `search_start_placement`). Der dritte gehoert dazu, weil unter einer Startsetzung die
+  gewoehnliche Drafting-Suche weiterlaeuft und das Rundenende von Runde 1 erreichen kann; dort
+  ist der Betrachter `pi`, nicht `current_player` (dieselbe Falle wie bei
+  `determinize_hidden_information_for`).
+* **Heuristik-Pfad unberuehrt.** Die einzige Lesestelle des Knopfs sitzt im Netz-Blattpfad;
+  `mcts.rs`, `heuristic_v3.rs` und `round5.rs` sehen ihn nicht. Der Elo-Anker (hv4) kann sich
+  dadurch nicht bewegen -- die Anker-Invarianz-Pruefung bleibt trotzdem Pflicht, sobald das
+  Wheel neu gebaut ist (CLAUDE.md).
+* **Zaehler fuer das Kostentor** (par.5 Schritt 1): thread-lokal `(leaves, pseudo, applied)`,
+  ausgelesen je Partie als Logzeile `[rt_leaf] leaves= pseudo= applied=` (`self_play.rs:4279`,
+  Muster `[moon_order]`). Der gesuchte Anteil ist `pseudo / leaves`, die Wirksamkeit
+  `applied / pseudo`; die Differenz sind Runde-5-Blaetter und Loeser-Abbrueche. Bei Knopf 0
+  wird nicht gezaehlt (der Zaehler sitzt hinter dem Knopf-Vergleich), die Zeile bleibt weg.
+* **Eintrag in `docs/architecture_reference.md`** ("Wo der Code Information ABSICHTLICH
+  vernichtet") ist gesetzt, mit beiden Antworten: Informationsmenge des WURZELSPIELERS;
+  weggenommen werden nur verdeckte Reihenfolgen, nicht die Zusammensetzung -- die Aufteilung
+  Beutel/Turm bleibt erhalten, weil ein zaehlender Spieler sie kennt (par.10).
+
+### 17.3 Tests (alle in dieser Sitzung gruen)
+
+Neun neue Tests, `cargo test --release --lib`:
+
+| Test | Zusage |
+| --- | --- |
+| `round_transition_leaf_off_is_bit_identical_and_draws_no_rng` | (a) Knopf 0: Kontext-Setzer ist Identitaet UND zieht keine Zufallszahl; ein gesetzter Kontext aendert den Blattwert nicht; Zaehler bleiben `(0,0,0)` |
+| `round_transition_leaf_on_evaluates_the_next_round_state` | (b) Knopf 1: der Blattwert ist EXAKT `net_leaf_eval` auf dem Zustand nach dem Uebergang; Rundenzaehler +1, Phase Drafting, Fabriken befuellt; Zaehler `(1,1,1)` |
+| `leaf_state_advances_the_round_and_refills_the_factories` | (b) netzfrei am echten Runde-1-Blatt |
+| `leaf_fill_takes_only_tiles_from_bag_and_tower` | (c) Sichttor par.10 im Kleinen: Beutel auf zwei Steine gekuerzt, Turm leer, Bretter geraeumt -- die Fuellung enthaelt GENAU diese zwei (beide sicheren dabei, kein dritter), `bag_count` faellt auf 0 |
+| `leaf_fill_is_deterministic_and_salt_bound` | (d) zweimal derselbe Zustand, dieselbe Fuellung; ein anderes Salz bewegt sie |
+| `leaf_fill_key_ignores_hidden_order_but_sees_the_board` | der Schluessel haengt an der sichtbaren Stellung, nicht an der verdeckten Reihenfolge; eine Brettaenderung aendert ihn |
+| `leaf_state_is_none_in_last_round_and_outside_tiling` | Wirkort auf Runde 1-4 und Phase Tiling begrenzt (R5-Fix-Grenze) |
+| `round_transition_leaf_context_draws_exactly_one_number` | genau EINE Zahl je Suche, Betrachter ist der Wurzelspieler |
+| `search_config_spec_round_transition_leaf_is_optional_and_validated` | Spec OHNE das Feld laedt weiter (Default 0), mit `1` kommt der Wert an, `2` ist ein harter Fehler |
+
+**Lauf:** 672 gruen, 1 rot, 19 ignoriert, 99,6 s (n = 692 Tests, Grundmenge `cargo test
+--release --lib`, Einheit Tests). **Die rote ist FREMD und lag schon vor diesem Bau an HEAD:**
+`knob_registry::tests::all_mosaic_env_vars_in_code_are_registered` meldet
+`MOSAIC_MOON_TARGET_SOURCE` ohne Registratur-Eintrag; der Knopf steht seit Commit `6dd8cd47`
+in `engine/py/file_cache_key.py` (an HEAD nachgepruefte Fundstelle), gehoert zum
+Cache-Schluessel-Strang und wurde hier NICHT angefasst (fremde Spur). `cargo test --release
+--no-run` gruen, Beispiele und Benches mitkompiliert (42,4 s) -- `kernbeweis_910002_probe.rs`
+braucht die zwei neuen Felder im Struct-Literal und hat sie bekommen.
+
+### 17.4 Was NICHT gebaut wurde (und warum)
+
+* **Kein Wheel.** `maturin build` und `pip install` waren fuer diesen Zug ausgeschlossen (ein
+  GPU-Training lief). Solange das Wheel alt ist, wirkt der Knopf in keinem Python-Lauf --
+  auch nicht versehentlich.
+* **Keine Messung.** Sichttor (par.10, 300 Blatt-Zustaende), Kostentor (par.5 Schritt 1, 25
+  Prozent) und der gepaarte A/B (par.9, 200 Paare am Champion) stehen aus.
+* **Kein Spec-Feld in den lebenden Specs**, Begruendung in 17.2.
+* **Keine Variante A, kein robuster Aggregator** (par.4.3/par.7: eigene Registrierung noetig),
+  **kein Top-K** (par.14, haengt am B-Befund).
+* **Kein `TIME_BUDGET`, kein Sample-Deckel.** Variante B zieht GENAU EINE Fuellung, der
+  Zeitdeckel des Bestandsschalters (`TIME_BUDGET = 50 ms`, `N_SAMPLES_SEARCH = 8`) gilt fuer
+  Variante A und wird hier nicht gelesen. Ob der Loeser am Blatt selbst einen Deckel braucht
+  (par.7 nennt den Haenger-Vorfall des `tiling_solver`), entscheidet das Kostentor.
+
+### 17.5 Was als naechstes ansteht, in dieser Reihenfolge
+
+1. Wheel bauen und installieren, dann **Anker-Drift und Anker-Konservierung** gegen
+   `models/frozen_heuristics/hv4_anchor` sowie die **Netz-Paritaets-Fixture des Champions**
+   (`engine/tests/fixtures/net_parity_champion.txt`) -- alle drei muessen bei Default
+   UNVERAENDERT sein. Das ist die Abnahme dieses Baus, nicht schon die Messung.
+2. Sichttor par.10 (Fahrplan Nr. 34), dann Kostentor par.5 Schritt 1 (Nr. 35), dann A/B (Nr. 36).
+3. Beim Kostentor mitschreiben, was die `[rt_leaf]`-Zeile liefert: Anteil pseudo-terminaler
+   Blaetter je Suche (Grundmenge Blaetter des Netz-Blattpfads je Partie, Einheit Anteil).
+
+### 17.6 Zwei Stellen, an denen der Bau von der Prereg abweicht -- und warum
+
+1. **par.4.2 sagt "Seed = Hash des Blatt-Zustands verknuepft mit dem abgeleiteten Such-Seed
+   der Partie".** Gebaut ist die Verknuepfung mit EINER Zahl, die an der Wurzel der Suche aus
+   genau diesem abgeleiteten Strom gezogen wird -- der Strom selbst liegt in `net_mcts` nicht
+   offen, `make_node` bekommt nur `rng: &mut R`. Die Zusagen der par.4.2-Tabelle gelten
+   dadurch unveraendert INNERHALB einer Suche (dieselbe Stellung, dieselbe Fuellung,
+   pfadunabhaengig; beide Arme eines gepaarten A/B ziehen in derselben Stellung dieselbe
+   Stichprobe). Was NICHT gilt: dieselbe Stellung in zwei Suchen mit verschiedenem Halbzug-
+   Index zieht verschiedene Fuellungen. Das ist gewollt -- ein ueber die ganze Kampagne fester
+   Wuerfelwurf je Stellung waere ein systematischer Versatz, kein Determinismus-Gewinn.
+2. **Die Fuellung haengt neben dem Seed auch an der ECHTEN verdeckten Beutel-Reihenfolge**
+   (`advance_one_chance` mischt den vorhandenen Vec). Innerhalb einer Suche ist die konstant
+   (Drafting zieht nie aus dem Beutel), die Zusage aus (1) ist damit erfuellt; ueber zwei
+   verschiedene Zufallswelten hinweg ist sie es nicht. Der Schluessel selbst ist bewusst
+   sichtkonform und kennt diese Reihenfolge nicht.
+
+Kein Widerspruch INNERHALB der Prereg gefunden, der den Bau blockiert haette. Ein
+Zeilendrift-Punkt aus par.8 ist mit 17.1 nachgezogen (Aufrufstelle jetzt `:3543`, Konstante
+`:95`).

@@ -200,6 +200,19 @@ Begruendung der Stichprobengroesse stehen in par.16.7; **`--max-positions` ist d
 RUNDE**, nicht die Gesamtzahl (par.16.8), und der erste Volllauf faehrt `--rounds 4` allein,
 weil nur dort die Wahrheitsquelle wertkopf-frei ist. Kosten bei sims=400/M=6: UNGEMESSEN.
 
+**VARIANTE B GEBAUT (Opus-Agent, 2026-09-16 22:15; `PREREG_round_transition_search_sampling.md`
+par.17, Fahrplan 33):** Knopf `MOSAIC_ROUND_TRANSITION_LEAF` (Default 0, bitidentisch, Spec-Feld
+optional), Blatt-Eingriff in `make_node`, Neubefuellung im Blatt ueber `determinize_dome_pool`
+(Betrachter = Suchender) plus `advance_one_chance` fuer Beutel und Chips, stellungsgebundener
+Seed mit einer Zahl aus dem Suchstrom, Diagnosezeile `[rt_leaf]`, Mischstellen-Zeile in
+`docs/architecture_reference.md`. 9 neue Tests gruen, vom Koordinator nachgefahren;
+`cargo test --release --lib` nach dem Nachtrag des fehlenden Registratur-Eintrags
+`MOSAIC_MOON_TARGET_SOURCE` (Erbe von 6dd8cd47, haette den pre-push gebrochen) komplett gruen.
+**NICHT im Wheel** (Training lief): Wheel-Bau, Anker-Drift und Konservierung, Paritaets-Fixture
+sind die Abnahme dieses Baus und kommen VOR Fahrplan 34 -- an einer freien Maschine, also nach
+Tor 1 von b04. Zwei bewusste Abweichungen von der Prereg stehen in par.17.6 (Mischregel je
+Vorrat; Seed-Verknuepfung mit einer Zahl aus dem Suchstrom statt Zustands-Hash mal Partie-Seed).
+
 ### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
 
 * **Kein Push ohne Anweisung** -- Ahead-Stand im Chat melden. Stand 2026-09-16 21:30: **8 Commits** vor

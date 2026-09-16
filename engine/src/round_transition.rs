@@ -214,6 +214,125 @@ pub fn advance_one_chance<R: Rng + ?Sized>(
     Some(game.state)
 }
 
+// ── Variante B: Rundenuebergang IM SUCHBLATT ────────────────────────────────
+//
+// `PREREG_round_transition_search_sampling.md` par.9 (eingetaktet fuer v29),
+// Bauvorgaben par.4.2 (stellungsgebundener Seed) und par.10 (Beutel mit Turm
+// daneben, nie die Summe). Wirkort ist das pseudo-terminale Blatt der
+// Netzsuche (`net_mcts.rs::make_node`), Knopf `MOSAIC_ROUND_TRANSITION_LEAF`.
+//
+// Die Bausteine darunter sind ABSICHTLICH netzfrei: sie liefern den Zustand
+// NACH dem Uebergang, die Bewertung bleibt beim Aufrufer. So sind Sichttor
+// (par.10) und Determinismus (par.4.2) ohne ONNX-Fixture pruefbar.
+
+/// Unterscheider des Seed-Stroms dieser Stichprobe (Muster
+/// `net_mcts::MOON_ORDER_SEARCH_SEED_DISTINGUISHER`,
+/// `self_play::RETURN_ORDER_SEED_DISTINGUISHER`): ein EIGENER Wert, damit die
+/// Neubefuellung im Blatt nie denselben Strom zieht wie ein anderer Verbraucher
+/// mit demselben Zaehler.
+pub const ROUND_TRANSITION_LEAF_SEED_DISTINGUISHER: u64 = 0x27_1EAF_5EED_C0DE;
+
+/// Kanonischer Schluessel eines Rundenende-Blattes (par.4.2: "Hash des
+/// Blatt-Zustands (Bretter, Musterreihen, Strafleisten, Chips, Beutel-/Turm-
+/// Zaehler, Runde, Spieler am Zug)").
+///
+/// **Was NICHT hineingeht, und warum:** die REIHENFOLGE im Beutel, im Turm und
+/// im Kuppelstapel (nur die ZAEHLER zaehlen) sowie `state.log`. Der Schluessel
+/// soll die Stellung beschreiben, wie ein Spieler sie sieht -- haengt er an der
+/// verdeckten Ziehreihenfolge, zieht dieselbe SICHTBARE Stellung je Zufallswelt
+/// eine andere Fuellung, und der Zustands-Determinismus aus par.4.2 waere nur
+/// noch scheinbar gegeben. `log` faellt weg, weil die Suche ihn ohnehin leert
+/// (`net_mcts.rs`: `child_state.log.clear()`).
+pub fn leaf_fill_key(state: &GameState) -> String {
+    use std::fmt::Write as _;
+    let mut s = String::with_capacity(512);
+    let _ = write!(
+        s,
+        "r{}|cp{}|fp{}|bag{}|tower{}|pool{}|disp{:?}|plates{:?}",
+        state.round_number,
+        state.current_player,
+        state.first_player_next_round,
+        state.bag.tiles.len(),
+        state.tower.tiles.len(),
+        state.dome_tile_pool.len(),
+        state.dome_display.iter().map(|t| t.tile_id).collect::<Vec<_>>(),
+        state.scoring_tile_ids,
+    );
+    for p in &state.players {
+        let _ = write!(
+            s,
+            "|P{}:sc{}/{}:grid{:?}:lines{:?}:broken{:?}:chips{:?}:fpm{}:tok{}",
+            p.player_id,
+            p.score,
+            p.score_unclamped,
+            p.dome_grid
+                .dome_slots
+                .iter()
+                .map(|row| row
+                    .iter()
+                    .map(|c| c.as_ref().map(|t| t.tile_id))
+                    .collect::<Vec<_>>())
+                .collect::<Vec<_>>(),
+            p.pattern_lines
+                .iter()
+                .map(|l| (l.tiles.clone(), l.color, l.phantom_count))
+                .collect::<Vec<_>>(),
+            p.broken_tiles,
+            p.bonus_chips.iter().map(|c| c.chip_id).collect::<Vec<_>>(),
+            u8::from(p.holds_first_player_marker),
+            p.player_tokens_used,
+        );
+    }
+    s
+}
+
+/// Stellungsgebundener Seed der EINEN Neubefuellung (par.4.2): FNV-1a-64 ueber
+/// [`leaf_fill_key`] (die Engine hat kein Zobrist), verknuepft mit dem `salt`
+/// der laufenden Suche -- der kommt aus dem abgeleiteten Such-Strom der Partie
+/// (`net_mcts::with_round_transition_leaf_context`, EINE Zahl je Suche).
+///
+/// Folge: dieselbe Stellung zieht INNERHALB einer Suche dieselbe Fuellung, egal
+/// ueber welchen Pfad sie erreicht wird (Zustands-Determinismus), und beide Arme
+/// eines gepaarten A/B ziehen in derselben Stellung dieselbe Stichprobe
+/// (Kraft der Paarung).
+pub fn leaf_fill_seed(state: &GameState, salt: u64) -> u64 {
+    crate::shaping::derive_search_seed(
+        crate::fnv1a_64(&leaf_fill_key(state)) ^ ROUND_TRANSITION_LEAF_SEED_DISTINGUISHER,
+        salt,
+    )
+}
+
+/// Variante B (par.9): loest das Tiling BEIDER Seiten im Blatt exakt auf
+/// ([`resolve_to_pre_chance`]) und zieht GENAU EINE Neubefuellung der Fabriken
+/// ([`advance_one_chance`], also Beutel mit Turm daneben nach par.10) -- Ergebnis
+/// ist der Zustand der NAECHSTEN Runde. `None` (und damit Bestandsverhalten beim
+/// Aufrufer), wenn das Blatt nicht in Phase::Tiling steht oder die Runde die
+/// letzte ist: in Runde [`crate::state::NUM_ROUNDS`] folgt kein Rundenwechsel,
+/// sondern die Endwertung, und dort rechnet der exakte Loeser (R5-Fix-Grenze,
+/// CLAUDE.md).
+///
+/// `viewer` ist der BETRACHTER der Suche (Wurzelspieler), nicht der Spieler am
+/// Zug: der Kuppelstapel wird mit GENAU der Mischregel der Wurzel gemischt
+/// ([`crate::state::determinize_dome_pool`], Variante A aus
+/// `PREREG_dome_stack_information_sets.md`) -- bekannte eigene Rueckgabebloecke
+/// bleiben in Reihenfolge, nur unbekannter Praefix und Gegnerbloecke werden
+/// permutiert (par.8/par.9: "keine eigene Mischregel"). Gemischt wird
+/// unmittelbar VOR der Ziehung, weil erst der Rundenwechsel Platten vom Stapel
+/// ins Display nachzieht (`game.rs::next_round`).
+pub fn round_transition_leaf_state(
+    leaf_state: &GameState,
+    viewer: usize,
+    salt: u64,
+) -> Option<GameState> {
+    if leaf_state.phase != Phase::Tiling || leaf_state.round_number >= crate::state::NUM_ROUNDS {
+        return None;
+    }
+    let mut pre = resolve_to_pre_chance(leaf_state)?;
+    let mut rng = StdRng::seed_from_u64(leaf_fill_seed(leaf_state, salt));
+    crate::state::determinize_dome_pool(&mut pre.state, Some(viewer), &mut rng);
+    advance_one_chance(&pre, &mut rng)
+}
+
 // ── Stufe 1, PREREG_deterministic_labels.md §2: Not-Deckel-Feuerraten ───────
 // Reine Beobachtung (Diagnose, KEIN Verhaltenseingriff), gleiches Muster wie
 // `net_batcher.rs::BatcherStats` (`Relaxed` reicht, kein weiterer Zustand
@@ -356,9 +475,14 @@ pub fn sample_round_transition_value<R: Rng + ?Sized>(
         // (jeweils nur EINMAL beim Spielstart gemischten) Vecs -- ohne
         // Neumischen wuerde jedes Sample aus einem Klon desselben, bereits
         // feststehenden Beutels/Plaettchen-Pools exakt dieselbe Reihenfolge
-        // ziehen (mit ~65 Steinen im Beutel wird `draw_with_refill` in
-        // `fill_factories` auch so gut wie nie den Turm-Refill-Pfad
-        // erreichen, der selbst neu mischt). Nutzer-Anstoss: Bonusplaettchen
+        // ziehen. BERICHTIGT 2026-09-16 (PREREG_round_transition_search_
+        // sampling.md par.10): hier stand "mit ~65 Steinen im Beutel wird
+        // `draw_with_refill` in `fill_factories` auch so gut wie nie den
+        // Turm-Refill-Pfad erreichen" -- fuer Runde 4 und 5 ist das falsch,
+        // dort sind Nachfuellungen aus dem Turm die REGEL (Beleg: Server-Log
+        // seed946607, zwei Nachfuellungen vor Runde 4 und 5). Der Code ist
+        // davon unberuehrt, nur die Begruendung war zu eng.
+        // Nutzer-Anstoss: Bonusplaettchen
         // sind GENAUSO ein Zufallsfaktor am Rundenende wie der Beutel --
         // `fill_factories` weist per `bonus_chip_pool.pop()` je Fabrik
         // verdeckt eins zu (`bonus_chip_revealed` bleibt bis zum Leerwerden
@@ -886,5 +1010,148 @@ mod tests {
             elapsed,
             TIME_BUDGET
         );
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Variante B: Rundenuebergang im Suchblatt
+// (PREREG_round_transition_search_sampling.md par.9, Bauvorgaben par.4.2/par.10)
+// ═══════════════════════════════════════════════════════════════════════════
+#[cfg(test)]
+mod round_transition_leaf_tests {
+    use super::*;
+    use crate::state::NUM_ROUNDS;
+    use crate::tile::TileColor;
+
+    /// Signatur der gezogenen Fuellung: was in den Fabriken liegt. Reicht als
+    /// Vergleichsobjekt fuer Determinismus und Salz-Bindung.
+    fn fill_signature(state: &GameState) -> String {
+        format!(
+            "L{:?}|K{:?}",
+            state.large_factory.sun_tiles,
+            state.factories.iter().map(|f| f.sun_tiles.clone()).collect::<Vec<_>>()
+        )
+    }
+
+    /// Alle Steine, die die Neubefuellung in die Fabriken gelegt hat (Sonne UND
+    /// Mond, kleine Fabriken UND grosse) -- die Grundmenge des Sichttors.
+    fn drawn_tiles(state: &GameState) -> Vec<TileColor> {
+        let mut out = state.large_factory.sun_tiles.clone();
+        out.extend(state.large_factory.moon_pool.iter().copied());
+        for f in &state.factories {
+            out.extend(f.sun_tiles.iter().copied());
+            for s in &f.moon_stacks {
+                out.extend(s.iter().copied());
+            }
+        }
+        out
+    }
+
+    fn count_of(tiles: &[TileColor], color: TileColor) -> usize {
+        tiles.iter().filter(|&&t| t == color).count()
+    }
+
+    /// Tor (b): bei eingeschaltetem Knopf steht am Blatt ein Zustand der
+    /// NAECHSTEN Runde -- Rundenzaehler +1, Phase wieder Drafting, Fabriken neu
+    /// befuellt.
+    #[test]
+    fn leaf_state_advances_the_round_and_refills_the_factories() {
+        let leaf = drive_to_first_round_end(11);
+        assert_eq!(leaf.phase, Phase::Tiling, "Voraussetzung: echtes Rundenende");
+        let next = round_transition_leaf_state(&leaf, 0, 0xDEAD_BEEF).expect("aufloesbar");
+        assert_eq!(next.round_number, leaf.round_number + 1, "Rundenzaehler +1");
+        assert_eq!(next.phase, Phase::Drafting, "die naechste Runde wird gedraftet");
+        assert!(!drawn_tiles(&next).is_empty(), "die Fabriken muessen befuellt sein");
+    }
+
+    /// Tor (c), Sichttor par.10 im Kleinen: die Fuellung nimmt NUR Steine, die
+    /// im Beutel plus Turm liegen, und `bag_count` faellt entsprechend.
+    ///
+    /// Aufbau: echtes Runde-3-Blatt, Bretter geraeumt (sonst wandern Strafleiste
+    /// und unplatzierbare Reihen beim Rundenabschluss neu in den Turm und die
+    /// Bilanz waere nicht mehr exakt pruefbar), Turm leer, Beutel auf ZWEI
+    /// Steine gekuerzt -- genau die Knappheitslage aus par.10 ("Beutel 2 Steine
+    /// blau/gelb"). Dann muss die Fuellung exakt diese zwei Steine enthalten:
+    /// die SICHEREN Steine sind alle dabei, und kein einzelner mehr.
+    #[test]
+    fn leaf_fill_takes_only_tiles_from_bag_and_tower() {
+        let mut leaf = drive_to_round_tiling_leaf(23, 3);
+        assert_eq!(leaf.round_number, 3);
+        assert_eq!(leaf.phase, Phase::Tiling);
+        for p in leaf.players.iter_mut() {
+            for l in p.pattern_lines.iter_mut() {
+                l.tiles.clear();
+                l.color = None;
+                l.phantom_count = 0;
+            }
+            p.broken_tiles.clear();
+        }
+        leaf.tower.tiles.clear();
+        leaf.bag.tiles = vec![TileColor::Blau, TileColor::Gelb];
+
+        let next = round_transition_leaf_state(&leaf, 0, 7).expect("aufloesbar");
+        let drawn = drawn_tiles(&next);
+        assert_eq!(drawn.len(), 2, "nur die zwei vorhandenen Steine, Fuellung: {drawn:?}");
+        assert_eq!(count_of(&drawn, TileColor::Blau), 1, "der sichere blaue Stein fehlt: {drawn:?}");
+        assert_eq!(count_of(&drawn, TileColor::Gelb), 1, "der sichere gelbe Stein fehlt: {drawn:?}");
+        assert_eq!(next.bag.tiles.len(), 0, "bag_count faellt um die gezogenen Steine");
+        assert_eq!(next.tower.tiles.len(), 0, "der leere Turm bleibt leer");
+    }
+
+    /// Tor (d): zweimal derselbe Zustand -> dieselbe Fuellung (par.4.2
+    /// Zustands-Determinismus), und ein anderes Salz bewegt sie -- sonst haenge
+    /// die Stichprobe nicht am Zufallsstrom der Partie.
+    #[test]
+    fn leaf_fill_is_deterministic_and_salt_bound() {
+        let leaf = drive_to_first_round_end(5);
+        let a = round_transition_leaf_state(&leaf, 0, 42).expect("aufloesbar");
+        let b = round_transition_leaf_state(&leaf, 0, 42).expect("aufloesbar");
+        assert_eq!(
+            fill_signature(&a),
+            fill_signature(&b),
+            "derselbe Zustand mit demselben Salz muss dieselbe Fuellung ziehen"
+        );
+        // EIN anderes Salz koennte zufaellig dieselbe Permutation treffen --
+        // deshalb ueber mehrere, und nur EINE Abweichung wird verlangt.
+        let differs = (1..8u64)
+            .any(|s| fill_signature(&round_transition_leaf_state(&leaf, 0, s).unwrap()) != fill_signature(&a));
+        assert!(differs, "ein anderes Salz muss die Fuellung bewegen koennen");
+    }
+
+    /// Der Schluessel des stellungsgebundenen Seeds haengt an der SICHTBAREN
+    /// Stellung, nicht an der verdeckten Ziehreihenfolge (par.4.2: Beutel- und
+    /// Turm-ZAEHLER). Gegenprobe: eine echte Brettaenderung aendert ihn.
+    #[test]
+    fn leaf_fill_key_ignores_hidden_order_but_sees_the_board() {
+        let leaf = drive_to_first_round_end(5);
+        let mut reordered = leaf.clone();
+        let mut rng = StdRng::seed_from_u64(3);
+        reordered.bag.tiles.shuffle(&mut rng);
+        reordered.tower.tiles.shuffle(&mut rng);
+        reordered.dome_tile_pool.shuffle(&mut rng);
+        assert_eq!(leaf_fill_key(&leaf), leaf_fill_key(&reordered), "verdeckte Reihenfolge zaehlt nicht");
+        assert_eq!(leaf_fill_seed(&leaf, 9), leaf_fill_seed(&reordered, 9));
+
+        let mut moved = leaf.clone();
+        moved.players[0].score += 1;
+        assert_ne!(leaf_fill_key(&leaf), leaf_fill_key(&moved), "eine Brettaenderung muss zaehlen");
+        assert_ne!(leaf_fill_seed(&leaf, 9), leaf_fill_seed(&moved, 9));
+    }
+
+    /// Der Wirkort ist auf Runde 1 bis 4 und Phase::Tiling begrenzt: in Runde
+    /// [`NUM_ROUNDS`] folgt die Endwertung (R5-Fix-Grenze, CLAUDE.md), und ein
+    /// Drafting-Zustand ist gar kein Blatt.
+    #[test]
+    fn leaf_state_is_none_in_last_round_and_outside_tiling() {
+        let r5 = drive_to_round_tiling_leaf(31, NUM_ROUNDS);
+        assert_eq!(r5.round_number, NUM_ROUNDS);
+        assert_eq!(r5.phase, Phase::Tiling);
+        assert!(
+            round_transition_leaf_state(&r5, 0, 1).is_none(),
+            "in der letzten Runde folgt kein Rundenwechsel"
+        );
+        let drafting = drive_to_round_start(31, 2);
+        assert_eq!(drafting.phase, Phase::Drafting);
+        assert!(round_transition_leaf_state(&drafting, 0, 1).is_none());
     }
 }

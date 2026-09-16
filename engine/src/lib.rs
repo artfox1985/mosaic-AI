@@ -848,6 +848,12 @@ fn engine_config_json() -> String {
         // unterscheiden.
         "moon_order_search_sims": crate::net_mcts::SearchConfig::from_env().moon_order_search_sims,
         "moon_order_search_scale": crate::net_mcts::SearchConfig::from_env().moon_order_search_scale,
+        // PREREG_round_transition_search_sampling.md par.9: Variante B des
+        // Rundenuebergangs (Tiling im Suchblatt, EINE Neubefuellung). Gehoert aus
+        // demselben Grund ins Manifest wie die Knoepfe darueber -- er aendert die
+        // BEWERTUNG jedes Rundenende-Blattes, ein Lauf mit und einer ohne waeren
+        // nachtraeglich nicht zu unterscheiden.
+        "round_transition_leaf": crate::net_mcts::SearchConfig::from_env().round_transition_leaf,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,
