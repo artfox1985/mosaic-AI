@@ -1949,6 +1949,123 @@ fn advance_after_tiling_json(state_json: String, seed: u64) -> PyResult<String> 
     Ok(crate::serialize::state_to_json(&next, true).to_string())
 }
 
+/// Sichttor par.10 der `PREREG_round_transition_search_sampling.md` (Fahrplan
+/// Nr. 34): der einzige Python-Einstieg in den BLATT-Uebergang der Variante B.
+///
+/// Gemessen wird GENAU die gebaute Funktion
+/// [`crate::round_transition::round_transition_leaf_state`] (Knopf
+/// `MOSAIC_ROUND_TRANSITION_LEAF`, par.17.2), kein Nachbau: der Rueckgabewert
+/// traegt neben dem Zustand NACH dem Uebergang die Farbzusammensetzung VOR der
+/// Ziehung, erhoben mit [`crate::round_transition::resolve_to_pre_chance`]
+/// (rng-frei und deterministisch, derselbe Aufruf, den die gemessene Funktion
+/// als erstes selbst macht). `advance_after_tiling_json` direkt oberhalb taugt
+/// dafuer NICHT: ihm fehlen der Betrachter der Wurzel, die Mischregel
+/// `determinize_dome_pool` und der stellungsgebundene Seed.
+///
+/// ADDITIV und rein diagnostisch -- kein Spielpfad liest diese Funktion, sie
+/// setzt keinen Knopf, und sie URTEILT nicht: die Bilanz ("die Fuellung nimmt
+/// nur Steine aus Beutel, Turm und Rundenende-Abraum, und Beutel plus Turm
+/// fallen um genau die gezogenen Steine") rechnet
+/// `tools/probes/round_transition_leaf_sight_gate.py` aus den Farblisten.
+///
+/// Farblisten statt Zaehl-Arrays, weil das Tor eine Multimengen-Bilanz zieht
+/// und `bunt` (Wild) in `serialize::color_counts` gar nicht vorkommt.
+///
+/// `seed` treibt nur die `json_to_state`-Rekonstruktion der verdeckten
+/// REIHENFOLGEN (die Zusammensetzung von Beutel und Turm liegt im Record
+/// exakt fest, `bag_colors`/`tower_colors`); `salt` ist das Suchsalz aus
+/// par.17.2, `viewer` der Wurzelspieler.
+#[pyfunction]
+#[pyo3(signature = (state_json, viewer, salt, seed=None))]
+fn round_transition_leaf_fill_diag_json(
+    state_json: String,
+    viewer: usize,
+    salt: u64,
+    seed: Option<u64>,
+) -> PyResult<String> {
+    use crate::tile::TileColor;
+    use pyo3::exceptions::PyValueError;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
+
+    fn color_names(tiles: &[TileColor]) -> Vec<&'static str> {
+        tiles.iter().map(|c| c.value()).collect()
+    }
+
+    /// Rundenende-Abraum: was beim Abschluss noch auf den Brettern liegt
+    /// (Musterreihen-Reste und Strafleiste) und laut par.10 als Quelle der
+    /// Fuellung zugelassen ist.
+    fn board_leftovers(state: &crate::state::GameState) -> Vec<TileColor> {
+        let mut out: Vec<TileColor> = Vec::new();
+        for p in &state.players {
+            for l in &p.pattern_lines {
+                out.extend(l.tiles.iter().copied());
+            }
+            out.extend(p.broken_tiles.iter().copied());
+        }
+        out
+    }
+
+    /// Alles, was in den Fabriken liegt (Sonne UND Mond, kleine UND grosse) --
+    /// dieselbe Grundmenge wie `drawn_tiles` im Rust-Test
+    /// `leaf_fill_takes_only_tiles_from_bag_and_tower`.
+    fn factory_tiles(state: &crate::state::GameState) -> Vec<TileColor> {
+        let mut out = state.large_factory.sun_tiles.clone();
+        out.extend(state.large_factory.moon_pool.iter().copied());
+        for f in &state.factories {
+            out.extend(f.sun_tiles.iter().copied());
+            for s in &f.moon_stacks {
+                out.extend(s.iter().copied());
+            }
+        }
+        out
+    }
+
+    let mut rng = StdRng::seed_from_u64(seed.unwrap_or(0));
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let leaf = crate::serialize::json_to_state(&parsed, &mut rng).map_err(PyValueError::new_err)?;
+    if viewer >= leaf.players.len() {
+        return Err(PyValueError::new_err(format!(
+            "viewer {viewer} ausserhalb (nur {} Spieler)",
+            leaf.players.len()
+        )));
+    }
+    let pre = crate::round_transition::resolve_to_pre_chance(&leaf)
+        .ok_or_else(|| PyValueError::new_err("Loeser kam nicht durch (kein pre-chance-Zustand)"))?;
+    let next = crate::round_transition::round_transition_leaf_state(&leaf, viewer, salt)
+        .ok_or_else(|| PyValueError::new_err("round_transition_leaf_state liefert None"))?;
+
+    Ok(json!({
+        "viewer": viewer,
+        "salt": salt,
+        "leaf": {
+            "round": leaf.round_number,
+            "phase": leaf.phase.as_str(),
+            "bag": color_names(&leaf.bag.tiles),
+            "tower": color_names(&leaf.tower.tiles),
+            "factory_tiles": color_names(&factory_tiles(&leaf)),
+        },
+        "pre_chance": {
+            "round": pre.state().round_number,
+            "phase": pre.state().phase.as_str(),
+            "bag": color_names(&pre.state().bag.tiles),
+            "tower": color_names(&pre.state().tower.tiles),
+            "board_leftovers": color_names(&board_leftovers(pre.state())),
+            "factory_tiles": color_names(&factory_tiles(pre.state())),
+        },
+        "next": {
+            "round": next.round_number,
+            "phase": next.phase.as_str(),
+            "bag": color_names(&next.bag.tiles),
+            "tower": color_names(&next.tower.tiles),
+            "board_leftovers": color_names(&board_leftovers(&next)),
+            "fill": color_names(&factory_tiles(&next)),
+        },
+    })
+    .to_string())
+}
+
 /// PREREG_r4_value_calibration.md, Abschnitt "Vorbedingung": invertiert die
 /// Fabrik-Neubefüllung eines Runde-5-Startzustands (Übergang 4→5,
 /// `state.rs::setup_new_round`/`fill_factories`) und sampelt `n_samples`
@@ -2220,6 +2337,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(tiling_candidates_json, m)?)?;
     m.add_function(wrap_pyfunction!(advance_after_tiling_json, m)?)?;
     m.add_function(wrap_pyfunction!(resample_round_transition_json, m)?)?;
+    m.add_function(wrap_pyfunction!(round_transition_leaf_fill_diag_json, m)?)?;
     m.add_function(wrap_pyfunction!(autoplay_to_round5_and_resample_json, m)?)?;
     m.add_function(wrap_pyfunction!(bootstrap_horizon_stage0_probe_json, m)?)?;
     m.add_function(wrap_pyfunction!(end_scoring_from_state_json, m)?)?;

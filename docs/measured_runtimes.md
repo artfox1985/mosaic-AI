@@ -190,6 +190,9 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Champion-2-Kante gegen Artefakt v26-b01 (Cross-Aera, 150 Partien, 6 Prozesse) | **2.516 s** | 16,8 s je Partie |
 | sigma/Prior-Balance (300 Zustaende @400) / Platt v3 / Platt v1 | 787 s / 12 s / 9 s | |
 | Paritaets-Fixture schreiben + Gegenprobe (je cargo test, warm) | 2 x ~14 s + Bau ~32 s | ein Schreiblauf scheiterte an einer OneDrive-Dateisperre (os error 32), Wiederholung gruen |
+| Abnahme Variante B 2026-09-17 (`MOSAIC_ROUND_TRANSITION_LEAF`): `--no-run` / `maturin build --release` / `pip install` / Lib-Suite 673 Tests / Anker-Drift / Anker-Konservierung | 56 s / 28 s / 3 s / 108,4 s (78,1 s Testzeit) / 22,4 s / 16,6 s | warmes `target`; zweites Wheel mit dem Diagnose-Export 26 s + 1 s, Drift 22,8 s, Konservierung 16,4 s |
+| Sichttor Variante B (`round_transition_leaf_sight_gate.py`), 300 Blatt-Zustaende Runde 3/4 | **41,1 s** (CPU 40,4 s) | 1 Thread, 0,137 s je Zustand; Loeser plus EINE Neubefuellung je Zustand |
+| Paritaetssonde Rust gegen Python (`feature_parity_rust_python.py`, 4 Partien + 3 Korpusdateien) | 14,0 s | 1 Thread; Stand 2026-09-17 ROT in der Korpus-Population (Kanal 76), Befund aelter als der Variante-B-Bau |
 | Einfrieren v28-b02: venv 24 s / Golden Probe (10 Sonden @400, einkernig) **1.450 s** / Referee-Selbsttest 2 Partien 78 s | | `tools/night_v28_freeze.sh` |
 | Ueberraschungs-Kante v24-b05 gegen v24-b04 (paired_gating, SPRT H0 nach 100 Paaren, 10 Threads, Logs) | **2.731 s** | 13,7 s je Partie |
 | C2 argmax-Instrument (self_play.py 200 Partien @400 deterministisch, 11 Threads) plus corpus_sanity_check | **~2.050 s + 12 s je Lauf** (4 Laeufe 07:31-09:49) | 10,3 s je Partie |

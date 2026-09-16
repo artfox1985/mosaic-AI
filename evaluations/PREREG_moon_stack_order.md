@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund. **par.12.0: das Trainingsziel des moon-Kopfs ist ein No-Op** (das Label ist immer kanonisch). **par.12.6: b05 (Kopf ablatiert) ist BESSER als b03** -- 427:373 aus 800 Partien, gepoolt z=1,98, beide Seeds gleichgerichtet, einzeln nicht signifikant. **par.12.3b: der Hebel ist HAEUFIG, aber FLACH** -- in 51,8 Prozent der Entscheide aendert die Wahl das abraeumbare Paket, aber im Median um genau EINEN Stein. Das erklaert die Nullbefunde und spricht gegen Weg C und Weg A. Offen auch b04 (Korpus-Tor 44,1 Prozent) und ein dritter Seed fuer b05. -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund. par.12.0: das Trainingsziel des moon-Kopfs war ein No-Op und (STATUS 2026-09-16) unlernbar. **Weg B GEMESSEN: b05 (Kopf aus) gegen b03 427:373, z 1,98 (par.12.6); b04 (repariertes Ziel) gegen b03 287:323, ein Seed signifikant dagegen, gepoolt z -1,56 (par.12.8); der Kopf lernt auch das reparierte Ziel nicht (par.12.7).** Empfehlung: moon_loss_weight 0 ins Rezept -- Nutzer-Entscheid. Weg C3 gebaut, 32a gestrichen; Weg A ausserhalb des Rahmens (par.12.2). -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -1516,3 +1516,107 @@ Horizont nicht die Antwort.
 4. **B2** mit der v30-Erzeugung (Variante 2 oder C3 in der Erzeugung, Nutzer-Entscheid ueber die
    Kosten).
 5. **A** nur nach Nutzer-Entscheid ueber den Rahmen, gebuendelt mit `dome_return_order` R3.
+
+## par.12.7 ARM v29-b04 TRAINIERT, TORE (a)/(b) GEMESSEN (2026-09-16, 22:45) -- der Kopf hat auch das reparierte Ziel kaum gelernt
+
+**Training** (Lauf des Nutzers in seiner Shell, Manifest `models/manifest_train_v29-b04_20260916_210750.json`):
+12 Epochen, 4.538.842 Samples, `cuda`, `--fast-loader`, Cache per `--cache-file
+data/.cache_be157f1118c0.h5` (Schluessel bestaetigt, Fingerabdruck MOON_TARGET_SOURCE=played),
+Val-Cache `dd33790fcc15` einkernig gebaut (21:07-21:19). Laufzeit 5.319,5 s Wanduhr, 25.432,7 s
+CPU, Datenaufbau 31,2 s. Bester `val_brier` 0,17915 in Epoche 5 (letzte 0,17923, Spannweite
+0,0007); b05 auf demselben Val-Split: 0,17916 in Epoche 5. `alphazero_v29-b04_brierbest.onnx`.
+**Manifest-Diff gegen b03:** `moon_target_source` None -> played, Name, `cache_file` (b03 fand
+seinen Monolithen ueber den Namen); Policy-Traeger 580 und Python-Konstanten identisch; in
+`engine_config` vier Felder, die b03s aelteres Manifest nicht kannte, alle auf Default. Abnahme
+des Rezepts GRUEN.
+
+**Tore (a) und (b)** -- `tools/probes/moon_head_target_probe.py`, Artefakt
+`evaluations/artifacts/moon_head_target_probe_b04.json`, 234 s. Grundmenge: Val-Records der
+147 Val-Dateien, deren massereichste Basisaktion mindestens zwei eindeutige Mondreihenfolgen
+in der Suchverteilung traegt, **n = 28.955** (von 43.684 Records mit Sonnenzug in der
+`policy`); Einheit Plackett-Luce-NLL in nats mit der Rang-Semantik des Trainings, p = exp(-NLL).
+Selbsttests: Determinismus 0,0; das alte Label ist in 17.593 von 17.593 Faellen die kanonische
+Reihenfolge einer (Fabrik, Farbe) des Zustands (par.12.0 je Record bestaetigt). 65,9 Prozent der
+gespielten Reihenfolgen sind nicht kanonisch. Gleichverteilung ueber die eindeutigen
+Reihenfolgen: NLL 1,167 im Mittel (1,099 Median).
+
+| Modell | nll_played (Ziel b04) | nll_canonical | nll_label_alt (Ziel b03) | p_played | p_canonical | Kopf-Favorit = played | Kopf-Favorit = kanonisch |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **v29-b04** | **0,9764** | 0,9962 | 0,9678 | 0,4149 | 0,4100 | 0,4006 | 0,3349 |
+| v29-b03 | 0,9886 | 0,9899 | 0,9621 | 0,4103 | 0,4100 | 0,4011 | 0,3345 |
+| v29-b05 | 0,9886 | 0,9899 | 0,9622 | 0,4103 | 0,4100 | 0,4012 | 0,3348 |
+
+**Lesart der Tore:**
+
+* **Tor (a) formal erfuellt, inhaltlich nicht:** b04 liegt mit 0,9764 unter b03s 0,9886, aber um
+  0,012 nats (1,2 Prozent). Der Anteil der Faelle, in denen der Kopf die gespielte Reihenfolge
+  favorisiert, ist UNVERAENDERT (40,06 gegen 40,11 Prozent). Zwoelf Epochen mit Gewicht 1,0 auf
+  dem reparierten Ziel haben den Kopf praktisch nicht bewegt.
+* **Tor (b) nicht erfuellt:** p_canonical 0,4100 bei allen drei Modellen -- es gab keine
+  Prior-Masse auf der kanonischen Reihenfolge, die haette fallen koennen (Vorhersage aus dem
+  Trockenlauf, STATUS 2026-09-16 21:30: das kanonische Label war unlernbar, weil die
+  Sonnenseite als Farbzaehler kodiert ist, `features.rs:1150-1158`).
+* **b03 und b05 sind im Mondkopf bis auf die vierte Stelle identisch** -- beide tragen den
+  Warmstart-Kopf von v28-b02; das Training auf dem No-Op-Label hat b03s Kopf nicht bewegt, das
+  Abschalten des Loss hat b05s Kopf nicht bewegt.
+* **Befund darueber hinaus (Herleitung, nicht vorregistriert):** auch das gespielte Ziel ist aus
+  dem Eingang kaum vorhersagbar -- der Kopf erreicht auf JEDEM Ziel (played, kanonisch, altes
+  Label) dieselbe NLL um 0,96 bis 0,99, gleichgueltig, worauf er trainiert wurde. Das passt zu
+  12.3b (Hebel haeufig, aber flach: die Suche waehlt bei 100 Sims zwischen fast gleichwertigen
+  Reihenfolgen, ihre Wahl ist damit nahe am Zufall). Ein Kopf, der ein solches Ziel lernen soll,
+  kann nur Rauschen lernen -- unabhaengig von der Zielquelle.
+
+**Was jetzt zaehlt:** Tor (c), das gepaarte Tor 1 gegen b03 (zwei Seeds a 200 Paare, ohne
+Frueh-Stopp, laeuft seit 22:43, `tools/night_v29_b04_tor1.sh`). Nach der Lesart aus par.12.1
+Punkt 5 ist bei (a) nur formal gruen und (b) rot die ERWARTUNG ein Nullbefund; traegt b04
+trotzdem, kaeme die Wirkung nicht aus dem Mondkopf, sondern aus einem Nebeneffekt des
+Trainings (anderer Gradientenanteil) -- das waere dann gegen b05 zu halten. Verdikt folgt.
+
+## par.12.8 ARM v29-b04 GEMESSEN (2026-09-17, 00:45): das reparierte Ziel TRAEGT NICHT
+
+**Tor 1 gegen b03**, `tools/night_v29_b04_tor1.sh`, Champion-Spec beidseits, 400 Sims, Blockgroesse 5,
+`--log-games`, SPRT-Schranken alpha = beta = 0,001 mit Deckel 200 Paare:
+
+| Groesse | Seed 20261130 | Seed 20261131 |
+| --- | --- | --- |
+| Siege b04 : b03 | **89 : 121** (210 Partien, 105 Paare) | 198 : 202 (400 Partien, 200 Paare) |
+| SPRT | **H0, Schranke unterschritten** (LLR -7,31 gegen -6,91) | UNDECIDED_CAP_REACHED (LLR -4,58) |
+| McNemar p | **0,033** | 0,913 |
+| gepaarte Differenz (Partien je Paar) | -0,305 | -0,020 |
+| volle Spalten b04 / b03 | 0,93 / 1,04 (-0,11) | 0,95 / 0,99 (-0,04) |
+| Spalten >= 4 | 2,17 / 2,19 | 2,30 / 2,24 |
+| Zeilen voll | 0,16 / 0,13 | 0,12 / 0,11 |
+| Strafleiste | 8,43 / 8,46 | 8,14 / 8,26 |
+| Spezialfelder belegt | 1,32 / 1,28 | 1,27 / 1,24 |
+| Plattenpunkte (Endwertung) | 7,61 / 7,92 (-0,31) | siehe Artefakt `plate_points_tor1_b04_s20261131.json` |
+| eigene Punkte | 51,67 / 53,10 (-1,43) | 53,52 / 53,62 (-0,10) |
+| Margin | -2,86 | -0,20 |
+| Replay | 210 von 210, 0 divergiert | 396 von 400, 4 divergiert (Replayer-Grenze Chip-Vollendung) |
+| Laufzeit | 2.417 s, 11,5 s je Partie | 4.727 s, 11,8 s je Partie |
+
+**Gepoolt: 287 : 323 von 610 Partien (47,0 Prozent), 58 A-Sweeps gegen 76 B-Sweeps, McNemar exakt
+p = 0,142; gepaarte Differenz -0,059 je Paar (Skala +-1), SE 0,038, z = -1,56.**
+
+### Verdikt
+
+**b04 traegt nicht.** Ein Seed signifikant GEGEN b04 (die SPRT-Schranke wurde bei 105 Paaren
+gerissen; "ohne Frueh-Stopp" heisst beim Werkzeug nur, dass die Schranken mit alpha 0,001 weit
+liegen -- b05 hat sie nie erreicht, b04 in Seed 1 klar), ein Seed Gleichstand, gepoolt negativ
+und nicht signifikant. Fuenf der sechs Kennzahlen zeigen in Seed 1 gegen b04, in Seed 2 liegen
+sie im Rauschen. Damit greift par.12.1 Punkt 5, zweiter Zweig: **der Prior ist NICHT der
+Hebel** -- und par.12.7 hat vorab gezeigt, warum: der Kopf hat auch das reparierte Ziel nicht
+gelernt (nll_played 0,976 gegen 0,989, Favorit unveraendert), weil die Zielwahl der Suche aus dem
+Eingang kaum vorhersagbar ist.
+
+**Die Vier-Ausgaenge-Lesart aus par.12.1 (Entscheidungsblock):** b04 traegt nicht, b05 traegt
+schwach (par.12.6: 427:373, z = 1,98) -> **"das Ziel war Ballast, der Kopf geht auf Gewicht 0
+ins Rezept."** Das ist die registrierte Empfehlung; die Aufnahme ins v30-Rezept ist ein
+Nutzer-Entscheid (Fahrplan 32b, Stopp-Punkt "Rezept-Aufnahme"). Ein Stichentscheid b04 gegen b05
+entfaellt (nur bei "beide tragen" vorgesehen). Weg B ist damit abgeschlossen; offen an der
+Mond-Frage bleibt nur Weg A (eigener Entscheidungsknoten), ausserhalb des v29/v30-Rahmens
+(par.12.2), sowie der Nachtrag, ob b06 (`minimal_strength_core` par.10) den Kopf mit den anderen
+drei zusammen entbehrlich macht.
+
+**Kein Elo-Eintrag** (Arm gegen Arm, kein Champion-Bezug; Register nur auf Anweisung).
+Artefakte: `tor1_v29-b04_vs_b03_s20261130.json`, `_s20261131.json`, `arena_columns_tor1_v29-b04_vs_b03_s*.json`,
+`plate_points_tor1_b04_s*.json`, `moon_head_target_probe_b04.json`.
