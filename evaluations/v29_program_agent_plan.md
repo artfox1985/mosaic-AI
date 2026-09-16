@@ -19,14 +19,14 @@ damit ausgeschlossen, `moon_stack_order` par.12.6) und die **Stufe-0-Sonde zu Nr
 (beide 794). Punkt 5 ist am 2026-09-16 DURCH, und der Nachtrag desselben Tages beantwortet
 auch die AERA-Frage von Punkt 3: `v29-b01_best` traegt 755 (nicht 794), gegen b03 mit 794 steht
 es 0,3337 zu 0,3296 auf frozen_v3 -- Abstand 0,0041, unter der Aufloesungsgrenze 0,015, also
-KEIN BEFUND (`v29_window` par.9). Offen an Punkt 3 bleiben die Orakel-Metriken auf demselben
-Satz; die Labels liegen als `frozen_v3_oracle_labels.json` bereit. Laufend ausserdem: **32b Arm b04**. Die Review-Befunde aus par.15 der
+KEIN BEFUND (`v29_window` par.9). Die Orakel-Haelfte ist am selben Tag nachgezogen und sagt dasselbe:
++0,0002 Prior-Masse, +0,0013 Kendall-Tau. **Punkt 3 ist in beiden Haelften durch.** Laufend ausserdem: **32b Arm b04**. Die Review-Befunde aus par.15 der
 round_transition-Prereg sind zu drei von acht am Code nachgeprueft (B1, B3, B4 alle bestaetigt);
 B3 hat 14.5 geaendert -- die Bitidentitaet von K=1 ist keine Voraussetzung mehr, sondern ein zu
 zeigendes Tor.
 
 **STAND 2026-09-15, 09:00 (Audit auf Nutzer-Auftrag):** Nr. 1-21 (Promotion vertagt), 23-25,
-27-30 und 29a sind durch; 31/32 gegenstandslos; 22/37 auf v30 vertagt. Offen: Nr. 20 Punkt 4 und die Orakel-Haelfte von Punkt 3 (Punkt 5 und die Aera-Frage von 3 durch, 2026-09-16),
+27-30 und 29a sind durch; 31/32 gegenstandslos; 22/37 auf v30 vertagt. Offen: Nr. 20 Punkt 4 (Punkte 3 und 5 durch, 2026-09-16),
 Nr. 26, 32a (Knopf C3 gebaut, Commit a4f92a5; Tore par.11 offen), 32b, 33-36, 38-41. Der Stand
 der Prereg-Koepfe ist mit diesem Audit nachgezogen (`v29_window`, `code_cleanup_closeout`).
 
