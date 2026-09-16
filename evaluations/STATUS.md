@@ -182,8 +182,16 @@ tot, weil je Lauf eine byte-gleiche Kopie geschrieben wird (4 Trainingslisten md
 Dazu D6-D11: Ausgabetext "Unterschied steckt in der Mitte" bei gleichen Dateien, Zahlformat
 "2,372 MB" (= 2.372 MiB), "Fensterlisten: 49" zaehlt 8 Fremdlisten mit, Bau-Artefakt mit
 Selbstwiderspruch (merge_out fd13f54061cd gegen cache_key 4dd9f020b232) wird nicht gemeldet,
-21 deutsche lokale Bezeichner, verrottete Zeilenzitate. **Reparatur delegiert** (Opus, mit
-unittest); bis dahin gilt: der Doktor liest richtig, urteilt aber falsch ueber Besitz.
+21 deutsche lokale Bezeichner, verrottete Zeilenzitate. **REPARIERT 2026-09-16 22:00 (Opus-Agent,
+alle elf Punkte; `tools/tests/test_cache_doctor.py`, 6 Tests gruen, vom Koordinator nachgefahren).**
+Neuer Lauf (`cache_doctor_20260916b.json`, 66 s): `7ebef2449837` = val-cache v29-b01,
+`eaa464b44cf7` = val-cache v29-b03-eval, `be157f1118c0` und `dd33790fcc15` = LAEUFT (v29-b04 seit
+21:07:50, Prozessblick bestaetigt), `35c6bd2b9bd2` weiter ROT (Name ungleich Schluessel). Neuer
+ROT-Befund `bau_artefakt_widerspruch`: `cache_build_incremental.json` fuehrt `merge_out`
+fd13f54061cd gegen `cache_key` 4dd9f020b232 -- welches Feld den Bau beschreibt, ist eine
+inhaltliche Klaerung (offen). Die zwei ROTEN `listenkonflikt`-Befunde (35c6, be157) sind die
+Pfadform-Sache selbst: dieselbe Liste hat verschiedene Schluessel bekommen. Der Doktor ist damit
+als Diagnose abnahmefaehig; als Loeschhilfe erst nach Nutzer-Blick auf jeden ROTEN Fall.
 
 **4. Fahrplan Nr. 33** (`PREREG_round_transition_search_sampling.md` par.9/10, Variante B).
 Die Stufe-0-Sonde dazu ist gebaut und vorregistriert (par.16,
@@ -926,9 +934,12 @@ die andere Abschnitte beruehren:
    noch Rezept-Knoepfe.
    **OFFEN GEHALTEN 2026-09-16, 22:00 (Nutzer):** "ich denk nach b06 sind wir fertig mit v29.
    so wie ich es momentan seh kann es gut sein dass noch ein v31 kommt damit die ganzen
-   aenderungen wirklich sauber durchschlagen." Kein Entscheid; der Rahmen "v30 = letzte
-   Generation" ist damit nicht mehr fest, Vorschlaege mit Wirkung erst in v31 (Weg A, R2 im
-   Training) sind nicht mehr automatisch draussen, bleiben aber Nutzer-Entscheid.
+   aenderungen wirklich sauber durchschlagen." Der Rahmen "v30 = letzte Generation" ist damit
+   nicht mehr fest. **PRAEZISIERT vom Nutzer (22:05): ab v30 KEINE neuen Preregs mehr;
+   gefahren wird nur noch Staerke ueber Generationen, gegebenenfalls mit Armen aus den JETZT
+   offenen Preregs. Vorschlaege mit Wirkung erst in v31 (Weg A, R2 im Training) sind nicht aus
+   dem Rennen, "wenn sie wirklich einen nutzen zeigen"** -- also nur mit gemessenem Beleg aus
+   einer bestehenden Prereg, nie als neue Vorregistrierung.
 
 9. ~~Trainingsziel des `moon`-Kopfs~~ **ENTSCHIEDEN 2026-09-15 (Nutzer: "beides")**: zwei Arme,
    `v29-b05` (b03 plus `--moon-loss-weight 0`, sofort startbar auf b03s Monolith) und `v29-b04`
