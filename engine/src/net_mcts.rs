@@ -491,6 +491,45 @@ pub(crate) fn read_moon_order_search_scale_env() -> u32 {
     }
 }
 
+// ── Variante B: Rundenuebergang im Suchblatt (MOSAIC_ROUND_TRANSITION_LEAF) ──
+//
+// `PREREG_round_transition_search_sampling.md` par.9 (fuer v29 eingetaktet),
+// Bauvorgaben par.4.2 und par.10. Der Knopf sitzt am pseudo-terminalen Blatt
+// (siehe `make_node`); die Bausteine selbst stehen in `round_transition.rs`.
+
+/// Default: `0` = Bestand, bitidentisch. Der Zweig wird nicht betreten, es wird
+/// KEINE Zufallszahl gezogen und kein Loeser aufgerufen.
+pub const ROUND_TRANSITION_LEAF_DEFAULT: u32 = 0;
+/// Der EINE eingeschaltete Wert (par.9: Tiling im Blatt, EINE Neubefuellung,
+/// EIN Netzaufruf). Bewusst eine benannte Konstante statt einer nackten `1`,
+/// damit die Variante A (N Stichproben, par.7) spaeter eine eigene Nummer
+/// bekommen kann, ohne diesen Vergleich umzuschreiben.
+pub const ROUND_TRANSITION_LEAF_ON: u32 = 1;
+
+/// `MOSAIC_ROUND_TRANSITION_LEAF` (par.9). Ungueltig -> Default plus einmalige
+/// Warnung, gleiche Disziplin wie die Nachbarn.
+pub(crate) fn read_round_transition_leaf_env() -> u32 {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_ROUND_TRANSITION_LEAF") else {
+        return ROUND_TRANSITION_LEAF_DEFAULT;
+    };
+    if raw.trim().is_empty() {
+        return ROUND_TRANSITION_LEAF_DEFAULT;
+    }
+    match raw.trim().parse::<u32>() {
+        Ok(v) if v <= ROUND_TRANSITION_LEAF_ON => v,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "⚠️  MOSAIC_ROUND_TRANSITION_LEAF={raw:?} ungueltig (0 oder 1) -- \
+                     {ROUND_TRANSITION_LEAF_DEFAULT} gilt."
+                );
+            });
+            ROUND_TRANSITION_LEAF_DEFAULT
+        }
+    }
+}
+
 pub(crate) fn read_moon_order_search_sims_env() -> u32 {
     static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
     let Ok(raw) = std::env::var("MOSAIC_MOON_ORDER_SEARCH_SIMS") else {
@@ -714,6 +753,22 @@ pub(crate) fn value_cal_b() -> f64 {
 // Selektion (`gumbel_select_child`) liest ab jetzt AUSSCHLIESSLICH das
 // Config-Feld, kein OnceLock mehr im Suchpfad.
 
+/// Pro-Suche-Kontext der Variante B (`PREREG_round_transition_search_
+/// sampling.md` par.4.2/par.8): der BETRACHTER, aus dessen Sicht der
+/// Kuppelstapel am Rundenende-Blatt gemischt wird (Wurzelspieler der Suche),
+/// und das SALZ, mit dem der stellungsgebundene Seed verknuepft wird.
+///
+/// Beides wird EINMAL je Suche an der Wurzel gesetzt und nicht je Blatt --
+/// genau das ist die Zusage von par.4.2: die Fuellung haengt an der Stellung,
+/// nicht daran, wie viele Blaetter die Suche vorher gesehen hat.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RoundTransitionLeafCtx {
+    /// Wurzelspieler der Suche (`viewer` fuer `determinize_dome_pool`).
+    pub viewer: usize,
+    /// EINE Zahl aus dem abgeleiteten Such-Strom der Partie.
+    pub salt: u64,
+}
+
 /// Konfiguration EINER Suchseite (Welle 1 der Agenten-Kapselung). Buendelt
 /// Knopfwerte, die frueher prozessglobal galten, aber PRO SEITE
 /// unterschiedlich gesetzt werden sollen -- angedockt an die bestehenden
@@ -897,6 +952,26 @@ pub struct SearchConfig {
     /// par.11 Weg C3: Budget der Nachsuche mit der Rundenrestlaenge gewichten
     /// (0 = aus/Bestand, 1 = an). Siehe [`moon_order_scale_factor`].
     pub moon_order_search_scale: u32,
+    /// Variante B des Rundenuebergangs (`PREREG_round_transition_search_
+    /// sampling.md` par.9): `0` = aus, Bestand und bitidentisch;
+    /// [`ROUND_TRANSITION_LEAF_ON`] = am pseudo-terminalen Blatt der Runden 1-4
+    /// wird VOR der Netzbewertung das Tiling beider Seiten exakt aufgeloest und
+    /// GENAU EINE Fabrik-Neubefuellung gezogen -- bewertet wird dann der Zustand
+    /// NACH dem Uebergang.
+    ///
+    /// Spec-Feld je Seite (`round_transition_leaf`, OPTIONAL mit Default
+    /// [`ROUND_TRANSITION_LEAF_DEFAULT`], damit jede eingefrorene Spec weiter
+    /// laedt UND weiter dasselbe tut), Env-Default
+    /// `MOSAIC_ROUND_TRANSITION_LEAF`.
+    pub round_transition_leaf: u32,
+    /// Pro-Suche-Kontext der Variante B, NICHT aus Spec oder Umgebung --
+    /// gesetzt von [`with_round_transition_leaf_context`] an der Wurzel jeder
+    /// Suche, gleiche Bauform wie [`SearchConfig::score_utility_root_margin`]
+    /// (ein aus der Wurzel abgeleiteter Wert, der in der Kopie mitlaeuft).
+    /// `None` heisst "kein Kontext" -- dann bleibt das Blatt beim Bestand, auch
+    /// wenn der Knopf an ist (kein stiller Halbzustand: die drei Suchtreiber
+    /// setzen ihn, siehe dortige Aufrufe).
+    pub round_transition_leaf_ctx: Option<RoundTransitionLeafCtx>,
     /// Heuristik-Variante DIESER SEITE (`hv1` oder `hv3`), aus dem
     /// Spec-Pflichtfeld `heuristik_variante`.
     ///
@@ -1004,6 +1079,10 @@ impl SearchConfig {
             moon_order_variants: read_moon_order_variants_env(),
             moon_order_search_sims: read_moon_order_search_sims_env(),
             moon_order_search_scale: read_moon_order_search_scale_env(),
+            round_transition_leaf: read_round_transition_leaf_env(),
+            // Kein Env-Knopf und kein Spec-Feld: der Kontext entsteht erst an
+            // der Wurzel einer Suche (`with_round_transition_leaf_context`).
+            round_transition_leaf_ctx: None,
             // KEIN Env-Knopf: die Variante kommt aus der Spec oder gar nicht.
             // Ein prozessweiter Schalter waere fuer eine Partie hv1 GEGEN hv3
             // unbrauchbar -- er gaelte fuer beide Seiten oder fuer keine.
@@ -1060,6 +1139,7 @@ impl SearchConfig {
             "moon_order_variants",
             "moon_order_search_sims",
             "moon_order_search_scale",
+            "round_transition_leaf",
             "heuristik_variante",
             // Stilmittel der Stufen (Schritt 1b, par.4.2).
             "sims",
@@ -1339,6 +1419,24 @@ impl SearchConfig {
                 x as u32
             }
         };
+        // Variante B (`PREREG_round_transition_search_sampling.md` par.9):
+        // OPTIONAL mit Default 0, damit jede eingefrorene Spec weiter laedt UND
+        // weiter bitgenau dasselbe beschreibt, was sie schon immer beschrieben
+        // hat (gleiche Begruendung wie bei `moon_order_search_scale` darueber).
+        let round_transition_leaf = match obj.get("round_transition_leaf") {
+            None => ROUND_TRANSITION_LEAF_DEFAULT,
+            Some(v) => {
+                let x = v.as_f64().ok_or_else(|| {
+                    format!("Spec-Datei {path}: 'round_transition_leaf' ist keine Zahl")
+                })?;
+                if x.fract() != 0.0 || !(0.0..=1.0).contains(&x) {
+                    return Err(format!(
+                        "Spec-Datei {path}: 'round_transition_leaf' muss 0 oder 1 sein, ist {x}"
+                    ));
+                }
+                x as u32
+            }
+        };
         let envelope_profile = {
             let arr = obj
                 .get("envelope_profile")
@@ -1476,6 +1574,8 @@ impl SearchConfig {
             moon_order_variants,
             moon_order_search_sims,
             moon_order_search_scale,
+            round_transition_leaf,
+            round_transition_leaf_ctx: None,
             heuristic_variant,
             sims,
             root_noise,
@@ -2703,6 +2803,97 @@ fn with_root_margin(cfg: &SearchConfig, root: &Node) -> SearchConfig {
     SearchConfig { score_utility_root_margin: margin, ..*cfg }
 }
 
+// ── Variante B am Suchblatt: Kontext, Zaehler, Blattwert ─────────────────────
+
+/// Setzt den Pro-Suche-Kontext der Variante B (par.4.2): Betrachter =
+/// Wurzelspieler, Salz = GENAU EINE Zahl aus dem Suchstrom.
+///
+/// Bei ausgeschaltetem Knopf gibt sie `*cfg` unveraendert zurueck und zieht
+/// KEINE Zufallszahl -- das ist die halbe Bitidentitaets-Zusage (die andere
+/// Haelfte ist der unbetretene Zweig in [`make_node`]). Bei eingeschaltetem
+/// Knopf verschiebt sich der Hauptstrom um genau EINEN Zug, dieselbe Bauform
+/// wie bei [`moon_order_post_search`].
+///
+/// Warum das Salz NICHT je Blatt gezogen wird: sonst haengt die Fuellung daran,
+/// wie viele Blaetter die Suche vorher besucht hat -- Pfadabhaengigkeit, und in
+/// einem gepaarten A/B ziehen die Arme verschiedene Stichproben (par.4.2, die
+/// Tabelle "Mit stellungsgebundenem Seed").
+fn with_round_transition_leaf_context<R: Rng + ?Sized>(
+    cfg: &SearchConfig,
+    root_player: usize,
+    rng: &mut R,
+) -> SearchConfig {
+    if cfg.round_transition_leaf != ROUND_TRANSITION_LEAF_ON {
+        return *cfg;
+    }
+    let salt: u64 = rng.random();
+    SearchConfig {
+        round_transition_leaf_ctx: Some(RoundTransitionLeafCtx { viewer: root_player, salt }),
+        ..*cfg
+    }
+}
+
+// DIAGNOSE-ZAEHLER der Variante B (par.5 Schritt 1: "wie oft ein pseudo-
+// terminales Blatt ueberhaupt erreicht wird -- ist der Anteil klein, ist auch
+// der Effekt klein"). Drei Zahlen, thread-lokal, Muster `MOON_ORDER_DIAG`:
+//   0 `leaves`    -- Blaetter, die der NETZ-Blattpfad bewertet hat
+//   1 `pseudo`    -- davon pseudo-terminal (Phase nicht mehr Drafting)
+//   2 `applied`   -- davon mit wirklich ausgefuehrtem Rundenuebergang
+// Der Anteil aus par.5 ist `pseudo / leaves`, die Wirksamkeit `applied / pseudo`
+// (die Differenz sind Runde-5-Blaetter und Abbrueche des Loesers).
+//
+// Kosten bei ausgeschaltetem Knopf: KEINE. Alle drei Zaehlungen liegen hinter
+// dem Knopf-Vergleich in `round_transition_leaf_value`, der Zweig bleibt bei
+// `round_transition_leaf == 0` unbetreten.
+thread_local! {
+    static RT_LEAF_DIAG: std::cell::Cell<(u64, u64, u64)> = const { std::cell::Cell::new((0, 0, 0)) };
+}
+
+/// Liest die Zaehler aus und setzt sie zurueck: `(leaves, pseudo, applied)`.
+/// Zuruecksetzen gehoert dazu, damit die Zahlen einer Partie gehoeren und nicht
+/// dem Thread seit Prozessstart (`take_moon_order_diag`-Begruendung).
+pub fn take_round_transition_leaf_diag() -> (u64, u64, u64) {
+    RT_LEAF_DIAG.with(|c| c.replace((0, 0, 0)))
+}
+
+/// Blattwert der Variante B, oder `None` = Bestandspfad.
+///
+/// `None` kommt in vier Faellen: Knopf aus (erste Zeile, kein Zaehler, kein
+/// Netzaufruf, bitidentisch), Blatt nicht pseudo-terminal, kein Pro-Suche-
+/// Kontext, oder der Uebergang ist nicht ausfuehrbar (Runde 5, Phase nicht
+/// Tiling, Loeser-Abbruch -- siehe `round_transition::round_transition_leaf_state`).
+///
+/// Der Netzaufruf ist DERSELBE wie im Bestandspfad des heutigen
+/// `ROUND_TRANSITION_SAMPLING`-Zweigs ([`net_leaf_eval`] auf dem Value-Netz,
+/// falls hybrid) -- EIN Aufruf, kein Mittel (par.9: "EINE gezogene
+/// Neubefuellung und EIN Netzaufruf").
+fn round_transition_leaf_value(
+    net_policy: &Net,
+    net_value: Option<&Net>,
+    state: &GameState,
+    terminal: bool,
+    search_config: &SearchConfig,
+) -> Option<[f64; 2]> {
+    if search_config.round_transition_leaf != ROUND_TRANSITION_LEAF_ON {
+        return None;
+    }
+    RT_LEAF_DIAG.with(|c| {
+        let (l, p, a) = c.get();
+        c.set((l + 1, p + u64::from(terminal), a));
+    });
+    if !terminal {
+        return None;
+    }
+    let ctx = search_config.round_transition_leaf_ctx?;
+    let next =
+        crate::round_transition::round_transition_leaf_state(state, ctx.viewer, ctx.salt)?;
+    RT_LEAF_DIAG.with(|c| {
+        let (l, p, a) = c.get();
+        c.set((l, p, a + 1));
+    });
+    Some(net_leaf_eval(net_value.unwrap_or(net_policy), &next))
+}
+
 /// Snapshot `(blaetter, marge_geklammert, einheit_geklammert)` der K1-Zaehler
 /// (par.14.1/14.2: "Anteil geklammerter Blaetter wird gezaehlt und
 /// berichtet"). Muster `denial_tiebreak_stats`.
@@ -3331,7 +3522,25 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
             // repraesentiert ist). Standardmaessig AUS (siehe Konstante unten) --
             // erst nach einer Val-R²-Verbesserung im Trainingsziel-Pfad
             // (self_play.rs::play_net_self_play_game) aktivieren.
-            if terminal && ROUND_TRANSITION_SAMPLING {
+            // Variante B (PREREG_round_transition_search_sampling.md par.9,
+            // Knopf `MOSAIC_ROUND_TRANSITION_LEAF`): GLEICHER Wirkort wie der
+            // Bestandsschalter darunter, aber anderer Inhalt -- Tiling beider
+            // Seiten im Blatt, GENAU EINE Neubefuellung (par.10: echter Beutel
+            // mit dem Turm daneben) mit stellungsgebundenem Seed (par.4.2), dann
+            // EIN Netzaufruf auf dem Zustand NACH dem Uebergang. Bei Knopf 0
+            // gibt `round_transition_leaf_value` in der ersten Zeile `None`
+            // zurueck: kein Loeser, kein Netzaufruf, kein Zaehler, kein RNG --
+            // der Bestandspfad bleibt bitidentisch.
+            //
+            // Reihenfolge: Variante B ZUERST. Beide Schalter zugleich waere ein
+            // konfundierter Arm (par.4.3 zur Mehr-Faktoren-Disziplin); der
+            // Bestandsschalter ist ohnehin eine Kompilierzeit-Konstante mit
+            // Default `false`.
+            if let Some(v) =
+                round_transition_leaf_value(net_policy, net_value, &state, terminal, search_config)
+            {
+                v
+            } else if terminal && ROUND_TRANSITION_SAMPLING {
                 match crate::round_transition::resolve_to_pre_chance(&state) {
                     Some(pre) => crate::round_transition::sample_round_transition_value(
                         &pre,
@@ -5039,6 +5248,10 @@ fn build_gumbel_tree_inner<R: Rng + ?Sized>(
         determinize_hidden_information(&mut root_state, rng);
     }
     let root_player = root_state.current_player;
+    // Variante B: Pro-Suche-Kontext (Betrachter + Salz) VOR dem ersten Knoten --
+    // bei ausgeschaltetem Knopf eine Identitaet ohne RNG-Verbrauch.
+    let leaf_config = with_round_transition_leaf_context(search_config, root_player, rng);
+    let search_config = &leaf_config;
     let mut nodes =
         vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)];
     // K1: `x0` einmal je Suche aus dem Wurzel-Forecast; alle weiteren Knoten
@@ -5392,6 +5605,9 @@ fn build_net_tree<R: Rng + ?Sized>(
         determinize_hidden_information(&mut root_state, rng);
     }
     let root_player = root_state.current_player;
+    // Variante B: siehe `build_gumbel_tree_inner` (Identitaet bei Knopf 0).
+    let leaf_config = with_round_transition_leaf_context(search_config, root_player, rng);
+    let search_config = &leaf_config;
     let mut nodes =
         vec![make_node(net_policy, net_value, root_state, None, None, None, 0.0, root_player, rng, search_config)];
     // K1: siehe `build_gumbel_tree`.
@@ -6939,6 +7155,14 @@ pub fn search_start_placement<R: Rng + ?Sized>(
     if DETERMINIZE_ROOT_HIDDEN_INFO {
         determinize_hidden_information_for(&mut root_state, pi, rng);
     }
+    // Variante B (par.9): der Pro-Suche-Kontext gehoert AUCH hierher -- unter
+    // einer Startsetzung laeuft die Suche als gewoehnliche Drafting-Suche weiter
+    // (`descend_and_backprop`) und kann das Rundenende von Runde 1 erreichen.
+    // Betrachter ist `pi`, nicht `current_player` (dieselbe Begruendung wie bei
+    // `determinize_hidden_information_for` darueber). Bei Knopf 0 Identitaet
+    // ohne RNG-Verbrauch.
+    let leaf_config = with_round_transition_leaf_context(search_config, pi, rng);
+    let search_config = &leaf_config;
 
     let mut candidates: Vec<StartPlacementCandidate> = raw
         .iter()
@@ -8293,6 +8517,8 @@ mod tests {
             // braucht.
             moon_order_search_sims: MOON_ORDER_SEARCH_SIMS_DEFAULT,
             moon_order_search_scale: MOON_ORDER_SEARCH_SCALE_DEFAULT,
+            round_transition_leaf: ROUND_TRANSITION_LEAF_DEFAULT,
+            round_transition_leaf_ctx: None,
             heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
             // Stilmittel (Schritt 1b) ebenfalls AUS. Bewusst LITERALE statt
             // der Env-Getter: dieser Helfer beschreibt eine Konfiguration, in
@@ -8438,6 +8664,149 @@ mod tests {
         let cfg = result.expect("hv3 muss angenommen werden");
         assert_eq!(cfg.heuristic_variant, crate::mcts::HeuristicVariant::Hv3);
         assert!(cfg.heuristic_variant.is_hv3());
+    }
+
+    // ── Variante B des Rundenuebergangs (PREREG_round_transition_search_
+    // sampling.md par.9/par.10, Knopf MOSAIC_ROUND_TRANSITION_LEAF) ───────────
+
+    /// Spec-Minimalrumpf der Tests unten: genau die PFLICHTFELDER. Alles
+    /// Optionale fehlt absichtlich -- so prueft jeder Test mit, dass eine Spec
+    /// ohne das neue Feld weiter laedt.
+    const SPEC_MIN_FIELDS: &str = r#""implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 0.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 0, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0, "heuristik_variante": "hv1""#;
+
+    /// Eine Spec OHNE `round_transition_leaf` laedt weiter und beschreibt den
+    /// Bestand (Default 0) -- die Zusage, an der die eingefrorenen Artefakte
+    /// haengen. Mit dem Feld kommt der Wert an; ein anderer Wert als 0/1 ist ein
+    /// harter Fehler (kein stilles Durchwinken, gleiche Disziplin wie bei
+    /// `envelope_hull_form`).
+    #[test]
+    fn search_config_spec_round_transition_leaf_is_optional_and_validated() {
+        let dir = std::env::temp_dir();
+        let write = |tag: &str, extra: &str| {
+            let path = dir.join(format!("mosaic_test_spec_rtleaf_{tag}_{}.json", std::process::id()));
+            std::fs::write(&path, format!("{{{SPEC_MIN_FIELDS}{extra}}}")).unwrap();
+            path
+        };
+        let p_missing = write("missing", "");
+        let cfg = SearchConfig::from_spec_file(p_missing.to_str().unwrap())
+            .expect("eine Spec ohne das Feld muss weiter laden");
+        std::fs::remove_file(&p_missing).ok();
+        assert_eq!(cfg.round_transition_leaf, ROUND_TRANSITION_LEAF_DEFAULT);
+        assert_eq!(cfg.round_transition_leaf, 0, "der Default IST der Bestand");
+        assert!(cfg.round_transition_leaf_ctx.is_none(), "der Kontext kommt nie aus der Spec");
+
+        let p_on = write("on", r#", "round_transition_leaf": 1"#);
+        let cfg_on = SearchConfig::from_spec_file(p_on.to_str().unwrap()).expect("1 ist gueltig");
+        std::fs::remove_file(&p_on).ok();
+        assert_eq!(cfg_on.round_transition_leaf, ROUND_TRANSITION_LEAF_ON);
+
+        let p_bad = write("bad", r#", "round_transition_leaf": 2"#);
+        let msg = SearchConfig::from_spec_file(p_bad.to_str().unwrap())
+            .expect_err("2 muss hart abgewiesen werden");
+        std::fs::remove_file(&p_bad).ok();
+        assert!(msg.contains("round_transition_leaf"), "Fehlermeldung nennt das Feld: {msg}");
+    }
+
+    /// Tor (a) des Bauauftrags: **Knopf 0 laesst alles bitidentisch.** Drei
+    /// Teilzusagen, die zusammen die Bitidentitaet ausmachen:
+    ///  1. der Kontext-Setzer ist eine Identitaet und zieht KEINE Zufallszahl
+    ///     (der Suchstrom verschiebt sich nicht),
+    ///  2. ein gesetzter Kontext aendert bei Knopf 0 den Blattwert NICHT
+    ///     (der Zweig in `make_node` bleibt unbetreten),
+    ///  3. die Diagnose-Zaehler bleiben auf 0 (keine Kosten, keine Spur).
+    #[test]
+    fn round_transition_leaf_off_is_bit_identical_and_draws_no_rng() {
+        let off = search_config_off();
+        assert_eq!(off.round_transition_leaf, ROUND_TRANSITION_LEAF_DEFAULT);
+
+        let mut rng_a = StdRng::seed_from_u64(4711);
+        let mut rng_b = StdRng::seed_from_u64(4711);
+        let same = with_round_transition_leaf_context(&off, 1, &mut rng_a);
+        assert_eq!(same, off, "bei Knopf 0 ist der Kontext-Setzer eine Identitaet");
+        let (a, b): (u64, u64) = (rng_a.random(), rng_b.random());
+        assert_eq!(a, b, "bei Knopf 0 darf keine Zahl aus dem Suchstrom gezogen werden");
+
+        let net = load_test_net();
+        let leaf = crate::round_transition::drive_to_first_round_end(11);
+        assert_eq!(leaf.phase, Phase::Tiling, "Voraussetzung: pseudo-terminales Blatt");
+        let _ = take_round_transition_leaf_diag();
+
+        let mut r1 = StdRng::seed_from_u64(9);
+        let plain = make_node(&net, None, leaf.clone(), None, None, None, 0.0, 0, &mut r1, &off);
+        let with_ctx = SearchConfig {
+            round_transition_leaf_ctx: Some(RoundTransitionLeafCtx { viewer: 0, salt: 12345 }),
+            ..off
+        };
+        let mut r2 = StdRng::seed_from_u64(9);
+        let ignored = make_node(&net, None, leaf.clone(), None, None, None, 0.0, 0, &mut r2, &with_ctx);
+        assert_eq!(
+            plain.leaf_value, ignored.leaf_value,
+            "bei Knopf 0 darf ein gesetzter Kontext den Blattwert nicht beruehren"
+        );
+        assert_eq!(
+            take_round_transition_leaf_diag(),
+            (0, 0, 0),
+            "bei Knopf 0 wird nicht einmal gezaehlt"
+        );
+    }
+
+    /// Tor (b): bei Knopf 1 bewertet das Blatt den Zustand der NAECHSTEN Runde.
+    /// Geprueft wird die Verdrahtung EXAKT (nicht "irgendwie anders"): der
+    /// Blattwert ist `net_leaf_eval` auf genau dem Zustand, den
+    /// `round_transition::round_transition_leaf_state` liefert -- und der traegt
+    /// Rundenzaehler +1 und gefuellte Fabriken.
+    #[test]
+    fn round_transition_leaf_on_evaluates_the_next_round_state() {
+        let net = load_test_net();
+        let leaf = crate::round_transition::drive_to_first_round_end(11);
+        let ctx = RoundTransitionLeafCtx { viewer: 0, salt: 0xABCD_EF01 };
+        let cfg = SearchConfig {
+            round_transition_leaf: ROUND_TRANSITION_LEAF_ON,
+            round_transition_leaf_ctx: Some(ctx),
+            ..search_config_off()
+        };
+        let next = crate::round_transition::round_transition_leaf_state(&leaf, ctx.viewer, ctx.salt)
+            .expect("ein Runde-1-Blatt muss aufloesbar sein");
+        assert_eq!(next.round_number, leaf.round_number + 1, "Rundenzaehler +1");
+        assert_eq!(next.phase, Phase::Drafting, "nach dem Uebergang wird wieder gedraftet");
+        assert!(
+            next.factories.iter().any(|f| !f.sun_tiles.is_empty()),
+            "die Fabriken muessen neu befuellt sein"
+        );
+
+        let _ = take_round_transition_leaf_diag();
+        let mut rng = StdRng::seed_from_u64(9);
+        let node = make_node(&net, None, leaf.clone(), None, None, None, 0.0, 0, &mut rng, &cfg);
+        assert_eq!(
+            node.leaf_value,
+            net_leaf_eval(&net, &next),
+            "der Blattwert MUSS der Netzwert des Zustands nach dem Uebergang sein"
+        );
+        assert_eq!(
+            take_round_transition_leaf_diag(),
+            (1, 1, 1),
+            "ein Blatt, pseudo-terminal, Uebergang ausgefuehrt"
+        );
+    }
+
+    /// Der Kontext-Setzer zieht bei Knopf 1 GENAU EINE Zahl (par.4.2: der
+    /// Hauptstrom verschiebt sich um einen Zug, nicht um "je Blatt eine"), und
+    /// der Betrachter ist der uebergebene Wurzelspieler.
+    #[test]
+    fn round_transition_leaf_context_draws_exactly_one_number() {
+        let on = SearchConfig {
+            round_transition_leaf: ROUND_TRANSITION_LEAF_ON,
+            ..search_config_off()
+        };
+        let mut rng_a = StdRng::seed_from_u64(2024);
+        let mut rng_b = StdRng::seed_from_u64(2024);
+        let cfg = with_round_transition_leaf_context(&on, 1, &mut rng_a);
+        let expected_salt: u64 = rng_b.random();
+        let ctx = cfg.round_transition_leaf_ctx.expect("bei Knopf 1 muss ein Kontext stehen");
+        assert_eq!(ctx.salt, expected_salt, "das Salz ist die ERSTE Zahl des Stroms");
+        assert_eq!(ctx.viewer, 1, "Betrachter ist der Wurzelspieler");
+        let (a, b): (u64, u64) = (rng_a.random(), rng_b.random());
+        assert_eq!(a, b, "genau eine Zahl gezogen, nicht mehr");
     }
 
     /// UMBENENNUNG 2026-08-28: die ALTEN Namen (`v1`, `v2huelle`) sind hier

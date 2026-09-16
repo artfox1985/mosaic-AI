@@ -114,6 +114,12 @@ fn main() {
         // par.11 Weg C3: aus, aus demselben Grund -- diese Sonde ist ein
         // Byte-Identitaets-Nachweis und darf keinen Knopf mitfuehren.
         moon_order_search_scale: mosaic_rust::net_mcts::MOON_ORDER_SEARCH_SCALE_DEFAULT,
+        // Variante B des Rundenuebergangs (PREREG_round_transition_search_
+        // sampling.md par.9): AUS, aus demselben Grund wie die Knoepfe darueber.
+        // Der Pro-Suche-Kontext ist `None` -- er entsteht ohnehin erst an der
+        // Wurzel einer Suche und nie in einem Struct-Literal.
+        round_transition_leaf: mosaic_rust::net_mcts::ROUND_TRANSITION_LEAF_DEFAULT,
+        round_transition_leaf_ctx: None,
         // Anker-Variante, aus demselben Grund wie die Knoepfe darueber.
         heuristic_variant: mosaic_rust::mcts::HeuristicVariant::Hv1,
         // Stilmittel der Schwierigkeitsstufen (PREREG_difficulty_levels.md

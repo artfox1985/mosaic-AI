@@ -4260,6 +4260,26 @@ fn unified_game_loop<R: Rng + ?Sized>(
         ));
     }
 
+    // Variante B (PREREG_round_transition_search_sampling.md par.5 Schritt 1):
+    // EINE Zeile je Partie, nur wenn der Knopf ueberhaupt an war. `leaves` sind
+    // die vom Netz-Blattpfad bewerteten Blaetter dieser Partie, `pseudo` die
+    // pseudo-terminalen darunter (Phase nicht mehr Drafting), `applied` die, an
+    // denen der Rundenuebergang wirklich gelaufen ist (die Differenz zu `pseudo`
+    // sind Runde-5-Blaetter und Loeser-Abbrueche).
+    //
+    // Gebraucht wird `pseudo / leaves`: der ANTEIL pseudo-terminaler Blaetter je
+    // Suche entscheidet mit ueber die Kosten -- "ist der Anteil klein, ist auch
+    // der Effekt klein, und das waere schon hier sichtbar" (par.5). Bei
+    // `round_transition_leaf == 0` sind alle drei 0 und das Log bleibt
+    // bitidentisch zum Bestand.
+    let (rt_leaves, rt_pseudo, rt_applied) =
+        crate::net_mcts::take_round_transition_leaf_diag();
+    if rt_leaves > 0 {
+        game.state.log_event(format!(
+            "[rt_leaf] leaves={rt_leaves} pseudo={rt_pseudo} applied={rt_applied}"
+        ));
+    }
+
     // Endwertung anwenden, damit Scores die Wertungsplatten enthalten.
     let completed = game.state.phase == Phase::End;
     if completed {
