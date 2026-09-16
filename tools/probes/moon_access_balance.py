@@ -30,7 +30,8 @@ from collections import Counter
 RUNDE = re.compile(r"^\[R(\d+)\]")
 SONNE = re.compile(r"\u2600\ufe0f?\s+(\S+):\s+\d+\u00d7\s+(\S+)\s+von\s+(\S+)")
 STAPEL = re.compile(r"\U0001F319\s+(\S+)\s+Mond-Stapel:\s*(.+)$")
-MONDZUG = re.compile(r"\U0001F319\s+(\S+):\s+\d+\s*\([^)]*\)\u00d7\s+(\S+)\s+von\s+([^\u2192]+)")
+# Gruppen: 1 Spieler, 2 Buendelgroesse, 3 Aufteilung, 4 Farbe, 5 Quellfabriken.
+MONDZUG = re.compile(r"\U0001F319\s+(\S+):\s+(\d+)\s*\(([^)]*)\)\u00d7\s+(\S+)\s+von\s+([^\u2192]+)")
 STACK = re.compile(r"\(([^()]*?)\u2192([^()]*?)\)")
 
 
@@ -43,11 +44,23 @@ def main():
 
     c = Counter()
     distances = []
+    # par.12.3a: ein Mondzug ist Aktion C -- global ueber ALLE Oberseiten einer
+    # Farbe (validation.rs:214, `factory_id: None`). Die Buendelgroesse ist
+    # deshalb die eigentliche Hebelgroesse: wer eine Farbe oben legt, die
+    # anderswo schon oben liegt, vergroessert das Paket, das ein einziger Zug
+    # abraeumt. Ohne diese Zahl misst die Bilanz nur den engen Zugriff.
+    bundle_sizes = Counter()
+    bundle_sources = Counter()
     for pattern in a.artifacts:
         for path in sorted(glob.glob(pattern)):
             d = json.load(io.open(path, encoding="utf-8"))
             for g in d.get("games", []):
                 log = g.get("log", [])
+                for line in log:
+                    mb = MONDZUG.search(line)
+                    if mb:
+                        bundle_sizes[int(mb.group(2))] += 1
+                        bundle_sources[len([q for q in mb.group(5).split(",") if q.strip()])] += 1
                 for i, line in enumerate(log):
                     ms = STAPEL.search(line)
                     if not ms:
@@ -78,7 +91,7 @@ def main():
                         mz = MONDZUG.search(log[j])
                         if not mz:
                             continue
-                        taker, colour, sources = mz.group(1), mz.group(2), mz.group(3)
+                        taker, colour, sources = mz.group(1), mz.group(4), mz.group(5)
                         if colour == top_colour and factory in [q.strip() for q in sources.split(",")]:
                             who = "leger" if taker == placer else "gegner"
                             c[f"genommen_{who}"] += 1
@@ -105,7 +118,20 @@ def main():
             "median": statistics.median(distances) if distances else None,
             "mittel": round(statistics.fmean(distances), 2) if distances else None,
         },
-        "lesart": "Gegner im naechsten Halbzug unter 0,25 = Hebel klein; ueber 0,50 = real",
+        "buendel": {
+            "n_mondzuege": sum(bundle_sizes.values()),
+            "groessen": dict(sorted(bundle_sizes.items())),
+            "mittlere_groesse": round(sum(k * v for k, v in bundle_sizes.items())
+                                      / max(sum(bundle_sizes.values()), 1), 3),
+            "anteil_mehr_als_ein_stein": round(sum(v for k, v in bundle_sizes.items() if k > 1)
+                                               / max(sum(bundle_sizes.values()), 1), 4),
+            "anteil_mehr_als_eine_quelle": round(sum(v for k, v in bundle_sources.items() if k > 1)
+                                                 / max(sum(bundle_sources.values()), 1), 4),
+        },
+        "lesart": ("Der Anteil 'Gegner im naechsten Halbzug' beantwortet NUR die enge Frage, ob "
+                   "GENAU dieser Stein sofort abgeholt wird. Er traegt NICHT die Aussage 'der "
+                   "Hebel ist klein': ein Mondzug nimmt alle Oberseiten einer Farbe, die Wahl "
+                   "steuert also Buendelgroessen. Siehe 'buendel'."),
         "laufzeit": {"wanduhr_s": round(time.time() - t0, 1)},
     }
     io.open(a.out, "w", encoding="utf-8").write(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
