@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Soll die Suche das Tiling sehen -- im Blatt (Variante B) oder als Encoder-Eingabe (Variante C)? | Beleg: B NEGATIV (17.9: 169:191, Block-z -1,13). Stufe-0-Sonde DURCH (16.9): Value-Rangfolge traegt bei Punktabstand (M2 0,807), die UEBERSTIMMUNG der exakten Rechnung schadet (46 von 156 Kippungen richtig, Wilson-OG 0,371). ENTSCHIEDEN 16.10 (Nutzer 2026-09-17): Variante A draussen; Stichentscheid wird Knopf `net_tiling_tiebreak` (Default 1) und geht ins A/B (36f); Variante C als Arm v29-b07 codiert (par.18), Kompilat, Kostentor und Tor 1 offen. -->
+<!-- STATUS: OFFEN | Frage: Soll die Suche das Tiling sehen -- im Blatt (Variante B) oder als Encoder-Eingabe (Variante C)? | Beleg: B NEGATIV (17.9). Stufe-0-Sonde DURCH (16.9), Stichentscheid-A/B: Zweig traegt, bleibt an (16.12). Variante A draussen (16.10). **VARIANTE C TRAEGT (18.12): v29-b07 (884, Tiling-Projektion) gegen b03 432:368 von 800, Block-z +2,40, volle Spalten +0,05, Strafleiste -0,4; die 90 neuen Spalten sind angekoppelt (Norm 0,67 gegen 0,28 Sicht). 884 geht in v30, v30 startet kalt (18.11).** Offen: Champion-Kanten fuer b07. -->
 
 # PREREG: Rundenuebergang als Zufallsknoten in der SUCHE
 
@@ -2283,4 +2283,161 @@ selben Tag unter gleichen Bedingungen: b08 unter 794 **1.964 s** (par.10.5 der M
 Projektion kostet im Blockbau +180 s = +9,2 Prozent** (Grundmenge 2.800 Dateien, 4.538.842 Zustaende; je
 Zustand rund 40 Mikrosekunden zusaetzlich, Herleitung aus der Differenz) -- das ist die
 `json_to_state`-Rekonstruktion plus Projektion je Record (18.4, dort ungemessen). Training `v29-b07` seit
-14:52:49 (Monolith per `--cache-file` bestaetigt, 2800 Dateien, 4.538.842 Zustaende).
+14:52:49 (Monolith per `--cache-file` bestaetigt, 2800 Dateien, 4.538.842 Zustaende), CUDA. **Warmstart-Zeile
+(train.py:1697): `flat_branch.0.weight: Eingangsbreite 755 -> 884, 129 neue Spalten null-initialisiert`** --
+nicht 90, weil der Warmstart `v28-b02_brierbest` ein 755er-Modell ist (Engine der v28-Zeit, STATUS Abschnitt 4);
+b03 hat von demselben Checkpoint aus die 39 Spalten des Sicht-Anbaus (755 -> 794) genauso null-initialisiert
+bekommen. Die 129 = 39 Sicht-Anbau (wie b03) + 90 Projektion (neu). Der Mechanismus greift wie in 18.6 gepruft;
+kein Shape-Mismatch, kein Frischstart einer Schicht.
+
+### 16.12 A/B Stichentscheid GEMESSEN (2026-09-17, 14:56-16:41): der Zweig TRAEGT, bleibt an
+
+Aufbau wie 16.10: Champion `v28-b02_brierbest` @400 gegen sich selbst, Champion-Spec plus `net_tiling_tiebreak: 1`
+(A = an, Bestand) gegen `: 0` (B = aus), 200 Paare, Blockgroesse 5, SPRT-Schranken +-6,91 nicht erreicht,
+`--log-games`, 10 Threads, Seed 20261170. Nebenlast: GPU-Training v29-b07 (erlaubt), dadurch 15,5 s je Partie
+statt 11,5 exklusiv; Laufzeit 6.183,2 s. Grundmenge Partien, Einheit Siege.
+
+| Groesse | Wert |
+| --- | --- |
+| Siege an : aus | **224 : 176 von 400 = 56,0 Prozent** |
+| Sweeps an / aus (Paare) | 45 / 21, Split 134; exakter Vorzeichentest **p 0,0043** |
+| Diff je Paar, KI95 | +0,240 [+0,084; +0,396] |
+| **Block-Ebene** (par.5 Entscheidungsmass) | 40 Bloecke a 10 Partien, Siegdiff an minus aus **+1,20 je Block, SE 0,35, z = +3,43** |
+| eigene Punkte an / aus | 54,18 / 52,60 (**+1,59**) |
+| Marge | +1,59 / -1,59 |
+
+**Verdikt nach der Lesart 16.10, dritter Ausgang: "aus" ist signifikant schlechter (z +3,43).** Der Zweig
+traegt in der Arena, obwohl die Sonde (16.9c) seine Einzelkippungen gegen die exakte Rechnung zu 70 Prozent
+als falsch ausweist. **`net_tiling_tiebreak` bleibt auf 1 (Bestand), kein Rezept-Knopf; 16.9c ist ab jetzt
+Diagnostik.** Die vorab benannte Aufloesung des Widerspruchs traegt: die Sonde zaehlt nur Paare MIT
+Punktabstand als Kippung (M4, `counterfactual_tiling_ranking.py:417`); in der Partie wirkt der Stichentscheid
+aber ueberwiegend dort, wo er Punktgleichheit bricht (Split 134 von 200 Paaren sind ohnehin Paare, in denen die
+Seite den Ausschlag gibt), und dort ist "exakte Punkte" kein Massstab, weil beide Plaene gleich viele Punkte
+haben. Was die Sonde als Fehler zaehlt, sind 8,2 Prozent der Paare mit Punktabstand; was der Zweig gewinnt,
+ist die Wahl unter Gleichen. Ausserdem misst die Sonde gegen den Runde-5-Alpha-Beta in Runde 4 -- der
+Stichentscheid wirkt in den Runden 2-4, wo die Rundenpunkte nur ein Teil des Spielwerts sind.
+
+**Sechs Standard-Kennzahlen** (`arena_columns_tiebreak_on_vs_off_s20261170.json`, 400 von 400 nachgespielt;
+`plate_points_tiebreak_on_vs_off_s20261170.json`; Mittel je Seite, Grundmenge Bretter):
+
+| Kennzahl | an | aus | Diff |
+| --- | --- | --- | --- |
+| Reihen: volle Zeilen / Fuellungssumme / lange Reihen vollendet | 0,160 / 18,00 / 2,99 | 0,172 / 17,82 / 3,01 | -0,012 / +0,18 / -0,03 |
+| Spalten: volle / max. Hoehe / >= 3 / >= 4 | 1,008 / 5,69 / 3,19 / 2,24 | 0,973 / 5,68 / 3,11 / 2,28 | +0,035 / +0,01 / +0,09 / -0,04 |
+| Strafleiste gesamt (Strafpunkte) | 8,16 | 8,47 | **-0,31** |
+| Plattenpunkte gesamt / je Kriterium | 7,73; Eckplatten 8,72, Diagonale 0,40, Vertikale 6,61, Mehrfarbige 2,53, Spezialfelder -10,28 | 7,54; 8,04, 0,16, 6,85, 2,74, -10,35 | +0,19; **+0,68**, **+0,24**, -0,24, -0,21, +0,07 |
+| Eigene Punkte | 54,18 | 52,60 | **+1,59** |
+| Marge | +1,59 | -1,59 | +3,17 |
+
+Lesart der Kennzahlen: der Gewinn des Zweigs liegt im Plazierungs-Pfad (+1,0 Tiling-Punkte), in weniger
+Strafleiste (-0,3) und bei den Eckplatten (+0,7); "aus" baut geringfuegig mehr Punkte aus vertikalen Reihen
+(+0,24), verliert aber unterm Strich 1,6 Punkte. Der Stichentscheid des Value-Kopfs waehlt unter punktgleichen
+Plaenen also den, der die spaetere Wertung besser stellt -- genau die Aufgabe, fuer die er 2026-08 gebaut
+wurde (Modulkommentar `tiling_solver.rs` ueber `NET_TILING_TIEBREAK_DEFAULT`).
+
+**Folgen:** (1) Fahrplan 36f DURCH, Knopf bleibt Default 1, Spec-Dateien `tiebreak_on/off` bleiben als
+Messbelege. (2) Der Sondenbefund 16.9c wird nicht zur Rezeptaenderung; die Sonde misst eine andere Grundmenge
+als die Arena (Rueckwaerts-Pruefung: `PREREG_geometric_envelope.md` par.3f behaelt seine Stuetze, STATUS Punkt
+17 wird geschlossen). (3) Kein neuer Arm: die verengte Variante (b) aus 16.10 waere nur dann ein Kandidat,
+wenn "aus" unentschieden gewesen waere.
+
+### 18.10 Training v29-b07 DURCH (2026-09-17, 14:52-16:45), Tor 1 laeuft
+
+**Training:** 14:52:49 bis 16:45:26, **6.757 s = 113 min**, CUDA, GEBREMST (daneben 14:56-16:41 das
+Stichentscheid-A/B mit 10 Threads und um 14:55 der Commit-Hook; b08 mit leichterer Nebenlast 74 min, b06
+exklusiv 57 min). Bestes `val_brier` **0,1779 in Epoche 7** (letzte 0,1780; b03 0,17967, b08 0,1794, b04
+0,17915 -- b07 ist der beste Wert der v29-Serie, der Abstand zu b03 von 0,0018 liegt aber innerhalb der
+Aufloesung der Offline-Metrik, `project_offline_metric_resolution_limit`), Val-R2 Value 0,555 (b08 0,545),
+Policy-Val 0,40, Endgame-Val-MSE 0,0147. Export `models/alphazero_v29-b07_brierbest.onnx`, **flat_input 884**,
+79 Planes, 11.637.699 Byte.
+
+**Manifest-Diff b07 gegen b03** (`cli_args`): `cache_file` 'data/.cache_790ac07353a6.h5' gegen None; `moon_target_source` 'label' gegen None; `name` 'v29-b07' gegen 'v29-b03'. `python_constants` ohne Unterschied; `engine_config`: `input_size` 884 gegen 794, `contract_hash` `cfd94509f0aab102` gegen `39994362fba145a6`, dazu die seit b03 neu ins Manifest aufgenommenen Knopf-Felder mit ihren Defaults (`net_tiling_tiebreak` 1, `round_transition_leaf` 0, `moon_order_*`, `return_order_random_p` 0,0; bei b03 noch nicht geschrieben). Rezept sonst identisch (b03 1:1,
+einschliesslich Seed 20260941, Warmstart, Koepfe).
+
+**Offen bis nach Tor 1 (keine CPU-Last waehrend der Messung):** Netz-Gesundheit der 90 neuen Spalten
+(Spaltennormen `flat_branch.0.weight[:, 794:884]` gegen die 39 Sicht-Spalten `[:, 755:794]` und den Altbestand),
+der Nachweis, dass Abschnitt 17 angekoppelt ist (18.5).
+
+**Tor 1 b07 gegen b03 laeuft seit 16:45:47** (Seed 20261190, dann 20261191, je 200 Paare ohne Frueh-Stopp,
+Champion-Spec beidseits, 10 Threads, exklusiv), Ende erwartet gegen 19:20 (2 x rund 77 min bei 11,5 s je Partie).
+
+### 18.11 ENTSCHIEDEN VORAB (Nutzer 2026-09-17, waehrend Tor 1 laeuft): 884 geht in v30, und v30 startet KALT
+
+Zwischenstand Tor 1 bei 75 Paaren 71:79 ("wird wohl ein tie"). Der Koordinator hatte fuer den Fall eines
+Unentschiedens mit lebenden Spalten 794 empfohlen und als Gegenargument die ungedeckte Wette genannt, dass ein
+Warmstart mit 12 Epochen neuen Eingaengen wenig Zeit gibt und ein Kaltstart in v30 mehr Chance haette. Nutzer
+woertlich: *"dann gehen wir die wette fuer v30 und kaltstart ein."*
+
+**Entscheid:** (1) `INPUT_SIZE` bleibt 884, Abschnitt 17 (Tiling-Projektion) geht ins v30-Rezept; (2) das
+v30-Training startet KALT (kein `--load v28-b02_brierbest`), damit die 90 Projektions-Spalten (und die 39
+Sicht-Spalten aus v29) von Anfang an gelernt werden statt als Null-Polster hinter einem eingespielten Netz.
+Gilt fuer den Fall "Tor 1 flach"; schlaegt b07 den Sicht-Arm signifikant, gilt er ohnehin. Reisst b07 die
+5-Prozentpunkte-Marge signifikant, wird der Entscheid dem Nutzer erneut vorgelegt.
+
+**Was das kostet und was es riskiert (markiert, keine Messung):** Kaltstart 12 Epochen auf 4,7 Mio Zustaenden
+hat 2026-09-02 8.164 s = 2,27 h gebraucht (`docs/measured_runtimes.md`, v23-b06), gegen 57-74 min Warmstart. Die
+Kampagne hat einen negativen Kaltstart-Praezedenzfall (v14, Kaltstart-Destillation verlor den Value-Kopf,
+`project_v14_rebuild`) und einen positiven (v23-b06 belegt die Linie, `project_prereg_audit_2026-09-01`). Das
+Tor fuer v30 bleibt das Gating gegen den Champion; faellt der Kaltstart durch, ist der Rueckfall NICHT der Warmstart von
+v28-b02, sondern **ein Afterburner auf dem kalt gestarteten v30-Netz** (Nutzer 2026-09-17: *"ansonsten halt
+afterburner auf den kalt gestarten v30"*): Warmstart vom v30-Kaltstart-Checkpoint, kurze Nachschulung im
+DAgger-Muster (Vorbild v22-b05/b06: 600 Zusatzpartien, 6-12 Epochen, 8-11 min, `docs/measured_runtimes.md`
+Z.52-53) oder weitere Epochen auf dem v30-Fenster; die 884 Eingaenge bleiben in jedem Fall. Die Wette waere
+dann nur um die Trainingszeit verloren, nicht um das Rezept. **Rueckfall 2 (Nutzer 2026-09-17, "ja trag es als
+rueckfall 2 ein"):** hebt auch der Afterburner das Netz nicht ueber das Gating, dann Warmstart von
+`v29-b09` (884, identisches Rezept, auf dem v29-Fenster eingespielt; `minimal_strength_core` 10.7) auf dem
+v30-Fenster -- naechstbeste Quelle, deutlich naeher am v30-Netz als v28-b02 mit 755 Eingaengen. Voraussetzung:
+b09 haelt sein Tor 1 gegen b03. **Folge fuer b09:** faehrt mit 884 auf dem liegenden Monolithen
+`790ac07353a6`, als v29-Arm weiter mit Warmstart (Vergleichbarkeit zu b03/b07).
+
+### 18.12 Tor 1 v29-b07 gegen b03 GEMESSEN (2026-09-17, 16:45-19:32): Variante C TRAEGT auf Block-Ebene
+
+Aufbau 18.6/18.10: `alphazero_v29-b07_brierbest.onnx` (884) gegen `alphazero_v29-b03_brierbest.onnx` (794),
+Champion-Spec beidseits, 400 Sims, zwei Seeds a 200 Paare ohne Frueh-Stopp (Schranken +-6,91 nie erreicht),
+Blockgroesse 5, 10 Threads, `--log-games`, exklusiv auf dem 884-Wheel (b03 bekommt dort die ersten 794 Werte,
+`net.rs:990`). Grundmenge Partien, Einheit Siege.
+
+| Groesse | Seed 20261190 | Seed 20261191 | gepoolt |
+| --- | --- | --- | --- |
+| Siege b07 : b03 | 203 : 197 | 229 : 171 | **432 : 368 von 800 = 54,0 Prozent** |
+| Vorzeichentest (Sweeps) | p 0,84 | p 0,0031 | Sweeps 109 / 77, **p 0,023** |
+| Diff je Paar, KI95 | +0,030 [-0,161; +0,221] | +0,290 [+0,107; +0,473] | |
+| eigene Punkte b07 / b03 | 52,72 / 52,66 | 54,87 / 52,82 | +1,06 |
+| **Block-Ebene** (par.5 Entscheidungsmass) | | | 80 Bloecke a 10 Partien, Siegdiff **+0,80 je Block, SE 0,33, z = +2,40** |
+| Laufzeit | 4.971,5 s (12,43 s je Partie) | 4.794,2 s (11,99 s je Partie) | |
+
+**Verdikt:** auf Block-Ebene signifikant (z +2,40 > 1,96), gepoolt 54,0 Prozent, Marge haelt mit Abstand ->
+**Variante C traegt; INPUT_SIZE 884 mit Abschnitt 17 ist damit gemessen, nicht nur gewettet (18.11).** Ehrlich
+dazu: die beiden Seeds sind heterogen (ein Unentschieden, ein klarer Sieg); das ist die im Projekt bekannte
+Seed-Streuung (5,75 Prozentpunkte bei n = 400), und das gepoolte Urteil traegt sie. Ein dritter Seed waere die
+Replikation, die die Promotions-Checkliste ohnehin verlangt (Gating-Kante mit Replikationszeile) -- b07 ist
+damit der staerkste Einzelarm und der Kandidat fuer die Champion-Kanten (STATUS Punkt 18).
+
+**Netz-Gesundheit der 90 neuen Spalten (par.6d-Pruefung, `flat_branch.0.weight` des Checkpoints):**
+Spaltennorm der Projektion **mittel 0,668, min 0,290, max 1,035, keine Spalte bei 0** -- gegen die 39
+Sicht-Spalten desselben Netzes 0,284 (21 von 39 bei 0) und bei b03 0,137 (22 von 39 bei 0); Altbestand 3,02
+(beide). Je Block: Zellen Spieler am Zug 0,669, Slots 0,591, Gegner 0,698 / 0,617. **Das Netz hat die
+Projektion in 12 Warmstart-Epochen staerker angekoppelt als jede fruehere Encoder-Erweiterung**; der
+Nullbefund-Vorbehalt aus 18.3 greift nicht.
+
+**Sechs Standard-Kennzahlen** (Mittel je Seite ueber beide Seeds; `arena_columns_tor1_v29-b07_vs_b03_s*.json`,
+794 von 800 nachgespielt; `plate_points_tor1_b07_s*.json`):
+
+| Kennzahl | b07 | b03 | Diff |
+| --- | --- | --- | --- |
+| Reihen: volle Zeilen / lange Reihen vollendet | 0,175 / 3,03 | 0,128 / 3,07 | **+0,047** / -0,05 |
+| Spalten: volle / max. Hoehe / >= 3 / >= 4 | **0,982** / 5,66 / 3,16 / 2,22 | 0,929 / 5,63 / 3,19 / 2,24 | **+0,053** / +0,03 / -0,02 / -0,02 |
+| Strafleiste gesamt (Strafpunkte) | 8,18 | 8,55 | **-0,37** |
+| Plattenpunkte gesamt / je Kriterium | 7,87; Vertikale 7,17, Horizontale 0,68, Mehrfarbige 2,70, Aeussere 10,56, Spezialfelder -10,63 | 7,65; 6,70, 0,43, 3,09, 10,38, -10,61 | +0,22; **+0,47**, **+0,25**, -0,38, +0,18, -0,03 |
+| Spezialfelder belegt je Partie / Kuppelbonus | 1,30 / 5,39 | 1,23 / 5,15 | +0,07 / +0,24 |
+| Eigene Punkte / Marge | 53,80 / +1,06 | 52,74 / -1,06 | +1,06 / +2,11 |
+
+Lesart: die beiden vorab benannten Nutzniesser bewegen sich in der erwarteten Richtung -- **volle Spalten +0,05
+je Partie** (Vollendung, der Engpass aus `project_column_completion_structural_weakness`) und belegte
+Spezialfelder +0,07, dazu vertikale Reihen +0,47 Punkte, weniger Strafleiste (-0,37) und mehr Kuppelbonus. Das
+ist das Bild eines Netzes, das das Tiling vor dem Ziehen kennt: es zieht so, dass die Runde mehr vollendet und
+weniger ueberlaeuft. Gegenposten: Mehrfarbige Felder -0,38.
+
+**Folgen:** Fahrplan 36c DURCH; 18.11 (884 + Kaltstart) bleibt und ist jetzt gedeckt; b07 ist Kandidat 1 fuer
+die Champion-Kanten; die Encoder-Kosten sind erneut belegt (12,0-12,4 s je Partie gegen 11,5 auf dem 794-Wheel,
++4 bis +8 Prozent, unter der Schwelle). Bestand `docs/measured_runtimes.md`.

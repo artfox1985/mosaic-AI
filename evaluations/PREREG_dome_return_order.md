@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: Knopf gebaut (par.8a), A/B ohne Effekt (par.9), Streu-Knopf fuer die Erzeugung gebaut und abgenommen (par.11-11c, Dosis 0,015). **par.12: R1 gemessen -- der Value-Kopf reagiert auf die Typfolge (Median-Spannweite 0,019, 81 Prozent ueber 0,01, n = 300; 12.4); Arena gezaehlt: 0,6 Gelegenheiten je Partie und Seite, Modus 1 weicht in 42 Prozent ab, erwartete Wirkung rund 0,005 je Partie -- der par.9-Nullbefund ist Arithmetik, ein A/B loest den Knopf nicht auf (12.5).** ENTSCHIEDEN 2026-09-15 (12.6): R2 wird gebaut (VOR der v30-Erzeugung, INPUT_SIZE 798, Fahrplan 29c) und Modus 1 ist in der v30-Erzeugung AN (Korrektheit, Kostentor beim Start). OFFEN: Bau und Korpus. -->
+<!-- STATUS: OFFEN | Frage: Die Rueckgabe-Reihenfolge nicht gewaehlter Kuppelplatten ist ein legaler Zug -- wird die Wahl gebaut, und traegt sie? | Beleg: par.9 NULL ist Arithmetik (12.5: 0,6 Gelegenheiten je Partie und Seite). R1 GEMESSEN (12.4). ENTSCHIEDEN 12.6: R2 (P.16 `designs_ordered`) bauen, Modus 1 in der v30-Erzeugung an. **ENTSCHIEDEN 12.7 (Nutzer 2026-09-17): R3 (Rueckgabe-Reihenfolge als eigener Entscheidungsknoten) wird gebaut, gebuendelt mit Weg A des Mondstapels zu NUM_ACTIONS 414, additiver Policy-Kopf, VOR der v30-Erzeugung; Korrektheitsentscheid.** -->
 
 # Vorregistrierung: Rueckgabe-Reihenfolge der Kuppelplatten als Zug des Netzes
 
@@ -833,3 +833,14 @@ waehlen, statt ihn der Ziehreihenfolge zu ueberlassen.
 - Wirkung auf den Korpus: das Netz lernt aus Records, in denen die Reihenfolge eine BEWERTETE
   Wahl war; ob es daraus mehr lernt als aus reiner Streuung, misst R1 am v30-Netz. Ein
   Nullbefund dort ist kein Grund, den Modus zurueckzunehmen (Korrektheitsentscheid).
+
+### 12.7 ENTSCHIEDEN (Nutzer 2026-09-17): R3 wird gebaut, gebuendelt mit Weg A des Mondstapels
+
+Mit dem Entscheid in `PREREG_moon_stack_order.md` par.12.6 (Weg A, Korrektheitsargument des Nutzers: im realen
+Spiel waehlt der Spieler die Reihenfolge, um den Gegner zu stoeren und die Stapel zu planen) faellt die Bedingung
+aus 12.2 Punkt 4 ("R3 nur mit Weg A und nur nach Rahmen-Entscheid"): **R3 wird gebaut**, gebuendelt zu EINEM
+Kontraktwechsel `NUM_ACTIONS` 406 -> 414 (5 Mond-IDs + 3 Rueckgabe-IDs), additiver Policy-Kopf, Bauvorgaben
+1-5 aus moon_stack_order 12.6 gelten wortgleich. R2 (P.16 `designs_ordered`) und Modus 1 aus 12.6 bleiben
+bestehen: R2 ist die Sicht (das Netz sieht die Reihenfolge), R3 der Zug (das Netz waehlt sie im Baum); Modus 1
+bleibt der Rueckfall fuer 406er-Netze und fuer den Heuristik-Pfad. Alles VOR der v30-Erzeugung im Wheel;
+Wiedervorlage am ersten Record wie bei P.12/P.16. Fahrplan 36i.

@@ -99,6 +99,10 @@ fn main() {
         // aus, aus demselben Grund wie die Zell-Knoepfe darueber.
         round_est_c: 0.0,
         round_est_b_profile: mosaic_rust::net_mcts::ROUND_EST_B_PROFILE_DEFAULT,
+        // K6 (PREREG_special_tile_yield.md par.13.1): Spezial-Freischaltungs-
+        // Term aus, aus demselben Grund wie K4 darueber.
+        special_unlock_w: 0.0,
+        special_unlock_beta: mosaic_rust::net_mcts::SPECIAL_UNLOCK_BETA_DEFAULT,
         // PREREG_dome_return_order.md par.4: Rueckgabe in Ziehreihenfolge
         // (Modus 0), aus demselben Grund wie die Knoepfe darueber.
         return_order_mode: 0,

@@ -579,3 +579,47 @@ Loss-Gewicht und einen entfernten Kopf, die Ownership-Ausgangsschicht wird mit G
 Der Punkte-Merkposten (-0,7, Spezialfelder -0,5, innerhalb der Seed-Streuung) ist zur Kenntnis genommen und
 wird bei der v30-Abnahme ueber die sechs Kennzahlen mitgelesen. Damit ist Strang A dieser Prereg
 abgeschlossen; offen bleibt nur der Kopf-Zeiger fuer `moon_loss_weight` (moon_stack_order par.12.8).
+
+### 10.7 Arm `v29-b09` = das v30-Rezept auf dem v29-Fenster (Nutzer 2026-09-17, registriert VOR dem Bau)
+
+Nutzer woertlich: *"dann warten wir auf b07 und fahren mit dem staerksten arm. v29-b09 nehmen wir ebenfalls
+mit und schauen wie er sich schlaegt."* Kein neuer Prereg-Arm im Sinne der v30+-Regel, sondern die
+Zusammenfuehrung dreier entschiedener Knoepfe auf einem Netz:
+
+* `--moon-loss-weight 0` (b05 gegen b03 427:373 von 800, z 1,98; `PREREG_moon_stack_order.md` par.12.8),
+* `--ownership-weight 0` und OHNE `--endgame-head` (b08 gegen b03 405:395, par.10.6, Nutzer-Entscheid "dann
+  streiche sie"),
+* `--opp-points-head` bleibt; Warmstart `v28-b02_brierbest`, Seed 20260941, 12 Epochen, `--select-by-brier`,
+  `--fast-loader`, Fenster `window_v29.txt`, sonst b03.
+* **INPUT_SIZE nach dem b07-Verdikt** (`round_transition_search_sampling` par.18): traegt Variante C, dann 884
+  mit Abschnitt 17 (Monolith `790ac07353a6` liegt), sonst 794 (Monolith `421448d12eb8` liegt). Die Kette liest
+  `config.INPUT_SIZE` und findet ueber den Fenster-Schluessel den passenden Monolithen.
+
+**Messung:** Tor 1 gegen b03, zwei Seeds (20261220/20261221) a 200 Paare ohne Frueh-Stopp, Blockgroesse 5,
+Champion-Spec beidseits, `--log-games`, sechs Kennzahlen. Lesart: b09 misst, ob die drei Knoepfe ZUSAMMEN das
+halten, was sie einzeln gezeigt haben (Erwartung aus b05 und b08: mindestens gleich, eher leicht besser); reisst
+b09 die 5-Prozentpunkte-Marge, wirken die Knoepfe nicht additiv und das v30-Rezept wird vor der Erzeugung neu
+entschieden. Zusaetzlich geht b09 als Kandidat in die Champion-Kanten (STATUS Abschnitt 6 Punkt 18) neben dem
+staerksten Einzelarm, und er ist **Rueckfall 2 fuer das v30-Training** (Warmstart von b09, falls Kaltstart und
+Afterburner das Gating nicht bestehen; `round_transition_search_sampling` 18.11, Nutzer 2026-09-17).
+
+**Kette:** `tools/night_v29_b09_v30_recipe.sh` (Muster b08; `bash -n` gruen; NICHT gestartet). Start nach dem
+b07-Verdikt und dem Setzen von `config.INPUT_SIZE`; Training rund 1 h (GPU, Monolith liegt), Tor 1 2 x rund
+77 min exklusiv. Fahrplan 36g.
+
+### 10.8 Lauf v29-b09 (2026-09-17, ab 19:55)
+
+* Kette `tools/night_v29_b09_v30_recipe.sh` mit `MOSAIC_CHAIN_NO_WAIT=1` neben dem K6-A/B gestartet (erlaubte
+  Nebenlast: GPU-Training plus ein CPU-Auftrag). `config.INPUT_SIZE` 884 (18.11), Schluessel `790ac07353a6` wie b07,
+  Trainingsliste byte-gleich; **Split plus Merge der liegenden Bloecke 827 s** (kein Blockbau, nur Zusammenfuegen,
+  neben dem A/B), Stempel geprueft.
+* **Manifest-Diff b09 gegen b03** (`manifest_train_v29-b09_20260917_200920.json`, `cli_args`): `cache_file` 'data/.cache_790ac07353a6.h5' gegen None; `endgame_head` False gegen True; `moon_loss_weight` 0.0 gegen 1.0; `moon_target_source` 'label' gegen None; `name` 'v29-b09' gegen 'v29-b03'; `ownership_weight` 0.0 gegen 1.0. Engine
+  `input_size` 884. Alles andere identisch (Seed 20260941, Warmstart `v28-b02_brierbest`, 12 Epochen).
+* Training auf CUDA seit 20:09:20; Warmstart-Zeile `755 -> 884, 129 neue Spalten null-initialisiert` wie bei b07.
+  Danach wartet die Kette vor Tor 1 auf das Ende des K6-A/B.
+* **Training v29-b09 DURCH 21:21:30, Exit 0: 4.330 s = 72 min** (20:09:20 bis 21:21:30, CUDA, GEBREMST: daneben
+  das K6-A/B mit 10 Threads). Bestes `val_brier` **0,1785 in Epoche 4** (letzte 0,1786; b07 0,1779, b03 0,17967,
+  b08 0,1794 -- alle innerhalb der Aufloesung), Val-R2 Value 0,550, Policy-Val 0,40; Policy-Loss 0,74 statt 1,53
+  bei b07/b08, weil der Mond-Loss (Gewicht 0) nicht mehr in die Summe geht -- kein Qualitaetsunterschied, andere
+  Summe. Export `models/alphazero_v29-b09_brierbest.onnx` (884). **Tor 1 gegen b03 wartet seit 21:21:30 auf das
+  Ende des K6-A/B**, dann exklusiv (Seeds 20261220/20261221).
