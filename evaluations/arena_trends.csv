@@ -168,3 +168,8 @@ iso_datum,quelle,modell,gegner,sims,n_spiele,winrate,avg_score,avg_score_gegner,
 2026-09-15T13:03:54,paired_gating,v29-b05,v29-b03,400,400,0.53,52.91,50.9,8.297,8.255,0.0
 2026-09-16T23:23:16,paired_gating,v29-b04,v29-b03,400,210,0.4238,51.667,53.095,8.429,8.457,0.0
 2026-09-17T00:42:49,paired_gating,v29-b04,v29-b03,400,400,0.495,53.555,53.612,8.15,8.235,0.0
+2026-09-17T01:45:19,paired_gating,rt_leaf_kosten_mit_a,rt_leaf_kosten_mit_b,400,40,0.5,52.2,52.2,10.175,10.175,0.0
+2026-09-17T01:54:26,paired_gating,rt_leaf_kosten_ohne_a,rt_leaf_kosten_ohne_b,400,40,0.5,49.25,49.25,9.675,9.675,0.0
+2026-09-17T03:13:01,paired_gating,rt_leaf_on_vs_off_a,rt_leaf_on_vs_off_b,400,360,0.4694,50.367,51.692,8.586,7.797,0.0
+2026-09-17T04:01:27,paired_gating,v29-b06,v29-b03,400,250,0.444,51.6,52.124,8.272,9.132,0.0
+2026-09-17T04:52:47,paired_gating,v29-b06,v29-b03,400,280,0.4464,50.657,53.911,8.261,7.986,0.0

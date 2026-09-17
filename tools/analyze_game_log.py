@@ -197,6 +197,32 @@ ROUND_PREFIX = re.compile(r"^\[R(\d+)\] (.*)$")
 # bekommt sie trotzdem zu sehen, da `li` (Blockanfang) unveraendert bleibt.
 SECONDARY_LINE_CATEGORIES = {"MARKER", "DOME_RETURN_TO_STACK"}
 
+# Diagnosezeilen: die Engine haengt sie je Partie ins Log, wenn der jeweilige
+# Knopf an war -- `[moon_order] applied= changed=` (self_play.rs:4256-4261) und
+# `[rt_leaf] leaves= pseudo= applied=` (self_play.rs:4275-4281). Beide stehen
+# zwischen "Das Spiel ist beendet!" und der Endwertung und gehoeren zu KEINEM
+# apply_*-Aufruf; der Replayer kann sie also nie selbst erzeugen.
+#
+# Ohne diese Liste bricht jede solche Partie mit "nicht als primaere
+# Aktionszeile erkannt" ab: gemessen 0 von 360 Partien in
+# evaluations/artifacts/arena_columns_rt_leaf_on_vs_off_s20261152.json, gegen
+# 40 von 40 im Lauf ohne den Knopf. `[moon_order]` stand nur deshalb nie auf,
+# weil bis heute kein Log mit gesetztem Knopf nachgespielt wurde -- die Zeile
+# sitzt an genau derselben Stelle (moon_order_diagnostics_s20261110.json,
+# games[0]["log"] Zeile 308, direkt vor der Endwertung).
+#
+# Der naechste Marker gehoert HIERHIN, nicht in einen neuen Sonderweg.
+DIAGNOSTIC_LINE_MARKERS = ("[moon_order]", "[rt_leaf]")
+
+
+def is_diagnostic_log_line(text: str) -> bool:
+    """True, wenn `text` eine reine Diagnosezeile der Engine ist.
+
+    Nimmt die Zeile mit oder ohne "[Rn] "-Praefix entgegen."""
+    m = ROUND_PREFIX.match(text)
+    body = m.group(2) if m else text
+    return body.startswith(DIAGNOSTIC_LINE_MARKERS)
+
 
 def classify(text: str):
     for cat, pat in PATTERNS.items():
@@ -1162,6 +1188,16 @@ def _run_loop(rep: "Replayer", lines: list[LogLine], name_to_idx: dict, n_lines:
     li = 0
     n_oracle_done = 0
     while li < n_lines:
+        # Diagnosezeilen (DIAGNOSTIC_LINE_MARKERS) gehoeren zu keinem
+        # apply_*-Aufruf und stehen immer ZWISCHEN zwei Bloecken -- einfach
+        # ueberspringen, statt sie als Aktionszeile zu deuten. Der Skip sitzt
+        # hier und nicht in `load_log()`, damit auch die Replay-Wege greifen,
+        # die ihre `LogLine`-Liste selbst aus Arena-JSON bauen (z.B.
+        # tools/probes/column_completion_legality_probe.py::lines_from_arena_log).
+        if is_diagnostic_log_line(lines[li].body):
+            li += 1
+            continue
+
         # Die 🏁-Marker-Zeile (Startspielerstein) wird VOR der eigentlichen
         # Aktionszeile geloggt (siehe execution.rs::apply_first_player_marker,
         # aufgerufen aus execute_take VOR dem Aktions-Log) -- fuer die

@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein kleinerer Standardkern aus Netz, Suche und Konfiguration mindestens gleich stark werden wie das heutige v29-Rezept, und welche Teile duerfen deshalb entfallen? | Beleg: Angelegt 2026-09-15, Review par.8. **ENTSCHIEDEN 2026-09-16 (par.10): Nichtunterlegenheitsmarge 5 Prozentpunkte (gepoolt ueber 800 Partien, kein Seed signifikant dagegen); Minimalkern-Arm v29-b06 (b03 ohne moon/ownership/opp_points/endgame) NACH Variante B als Fahrplan 36a, Bezug b03.** Strang B Trace vor Bau, Strang D Abschlussarbeit. Kein Bau, keine Messung bisher. -->
+<!-- STATUS: OFFEN | Frage: Kann ein kleinerer Standardkern aus Netz, Suche und Konfiguration mindestens gleich stark werden wie das heutige v29-Rezept, und welche Teile duerfen deshalb entfallen? | Beleg: ENTSCHIEDEN 2026-09-16 (par.10): Marge 5 Prozentpunkte, Arm v29-b06 nach Variante B. **GEMESSEN 2026-09-17 (10.3): der Minimalkern (b03 ohne moon/ownership/opp_points/endgame) ist b03 UNTERLEGEN -- 236:294 von 530 (44,5 Prozent), McNemar p 0,011, Block-z -2,86; die Marge reisst.** Mit b05 (nur moon aus: 427:373) zusammen: mindestens einer von ownership/opp_points/endgame traegt als Trainingssignal. Fortsetzung A.3 (Koepfe einzeln, 13-14 h) ist Nutzer-Entscheid; ohne sie bleiben die drei Koepfe im v30-Rezept, moon_loss_weight 0 bleibt Empfehlung. Strang C erledigt (10.2), Strang B/D offen. -->
 
 # Vorregistrierung: Minimaler Staerkekern
 
@@ -386,3 +386,80 @@ diese beiden Koepfe nur auf Gewicht 0, nicht weg.
 Minimalkern gegen den vollen Kopfsatz; der Vergleich gegen b05 (falls gewuenscht, Nutzer-Entscheid)
 wuerde die drei Koepfe jenseits von moon isolieren. Der Warmstart `v28-b02_brierbest` traegt die
 weggelassenen Koepfe als ueberzaehlige Gewichte, die `train.py:1657-1670` ignoriert.
+
+### 10.2 Nachtrag zu Strang C (par.4), 2026-09-17: Variante B traegt nicht
+
+`PREREG_round_transition_search_sampling.md` par.17.9: A/B am Champion negativ (169:191, Block-z
+-1,13). Die Regel aus par.4 ("nur als Vereinfachungserfolg, wenn sie einen Proxy ersetzt") wird
+damit nicht gebraucht -- es gibt nichts aufzunehmen. Strang C ist erledigt; der Knopf bleibt mit
+Default 0 im Code (Registratur: Diagnose) und ist ein Kandidat fuer die Knopf-Aufraeumung in
+Stufe 2 des Code-Abschlusses.
+
+### 10.3 ARM v29-b06 GEMESSEN (2026-09-17, 04:54): der Minimalkern ist UNTERLEGEN, die Marge reisst
+
+**Training** (`tools/night_v29_b06_minimal_core.sh`, Manifest `models/manifest_train_v29-b06_20260917_013522.json`):
+b03-Rezept mit `--moon-loss-weight 0`, `--ownership-weight 0`, ohne `--opp-points-head`, ohne
+`--endgame-head`; Monolith `data/.cache_fd13f54061cd_b06.h5` (label/794, Stempel geprueft), Val-Cache
+`eaa464b44cf7`, cuda, 12 Epochen, 4.538.842 Samples, **rund 57 min** (01:35-02:32; b03 1,38 h -- die
+weggelassenen Koepfe sparen sichtbar Zeit). `alphazero_v29-b06_brierbest.onnx`. Erster Anlauf um
+01:19 vom `--cache-file`-Waechter abgebrochen (Pfadform-Stempel, `docs/pitfalls.md`), Manifest
+`..._011916.json` ist Loeschkandidat.
+
+**Tor 1 gegen b03** (Champion-Spec beidseits, 400 Sims, Blockgroesse 5, `--log-games`, SPRT-Schranken
+alpha = beta = 0,001, Deckel 200 Paare; beide Seeds haben die untere Schranke gerissen):
+
+| Groesse | Seed 20261140 | Seed 20261141 |
+| --- | --- | --- |
+| Siege b06 : b03 | **111 : 139** (250 Partien, 125 Paare) | **125 : 155** (280 Partien, 140 Paare) |
+| SPRT | H0, LLR -7,07 | H0, LLR -7,61 |
+| McNemar p (einzeln) | 0,087 | 0,077 |
+| gepaarte Differenz | -0,224 | -0,214 |
+| volle Spalten b06 / b03 | 0,87 / 0,98 (-0,11) | 0,91 / 1,05 (-0,14) |
+| Spalten >= 4 | 2,18 / 2,25 | 2,15 / 2,26 |
+| Zeilen voll | 0,12 / 0,13 | 0,16 / 0,15 |
+| Strafleiste | 8,24 / 9,07 (-0,83) | 8,26 / 7,99 (+0,28) |
+| Spezialfelder belegt | 1,33 / 1,27 | 1,28 / 1,25 |
+| eigene Punkte | 51,73 / 52,33 (-0,60) | 50,66 / 53,91 (-3,25) |
+| Margin | -1,20 | -6,51 |
+| Replay | 244 von 250 | 280 von 280 |
+| Laufzeit | 2.876 s, 11,5 s je Partie | 3.013 s, 10,8 s je Partie |
+
+**Gepoolt: 236 : 294 von 530 Partien = 44,5 Prozent** (Regel par.10 Punkt 1: mindestens 45,0);
+46 A-Sweeps gegen 75 B-Sweeps, **McNemar exakt p = 0,011**; Block-Ebene 53 Bloecke a 10 Partien,
+Siegdifferenz **-1,09 je Block, SE 0,38, z = -2,86**.
+
+### Verdikt
+
+**Die Nichtunterlegenheit reisst, und zwar signifikant:** Punkt 1 (44,5 unter 45,0 Prozent) faellt,
+Punkt 2 haelt formal (kein Seed einzeln unter 0,05), aber beide Seeds zeigen dieselbe Richtung und
+gepoolt ist der Nachteil signifikant (p 0,011, Block-z -2,86). Fuenf der sechs Kennzahlen liegen in
+beiden Seeds gegen b06 (volle Spalten, Spalten >= 4, Zeilen-Fuellung, Punkte, Marge); nur die
+Spezialfelder und in Seed 1 die Strafleiste sprechen fuer b06. **Der Minimalkern ist dem vollen
+Kopfsatz um rund 5,5 Prozentpunkte unterlegen.**
+
+**Was damit gemessen ist, im Verbund mit b05:** b05 (nur moon-Loss aus) lag gegen b03 bei 427:373
+(z +1,98); b06 (moon UND ownership aus, opp_points und endgame weg) liegt bei 236:294 (z -2,86).
+**Mindestens einer der drei Koepfe ownership / opp_points / endgame traegt als TRAININGSSIGNAL fuer
+den gemeinsamen Rumpf** -- obwohl die Suche unter der Champion-Spec keinen von ihnen liest
+(par.10.1). Das ist genau der Fall, den A.2 Hypothese 2 vorab benannt hat ("Nutzen als
+Trainingssignal, ein Suchverbraucher auf 0 ist kein Ersatzbeleg"). Welcher Kopf es ist, sagt b06
+nicht.
+
+**Lesart aus par.10 ("1 oder 2 reisst -> A.3 einzeln, um den tragenden Kopf zu finden"):** die
+Einzelmessung ist damit die registrierte Fortsetzung, kostet aber rund 4,5 h je Kandidat
+(par.8 B7, drei Kandidaten 13-14 h) und ist ein Trainingsarm je Kopf. **Ob sie gefahren wird, ist
+Nutzer-Entscheid** -- der Nutzer hat b06 als Abschluss von v29 benannt (2026-09-16, 22:00), und die
+Regel "ab v30 nur Arme aus offenen Preregs" liesse A.3 zu, verlangt sie aber nicht. Ohne A.3 gilt
+fuer das v30-Rezept: alle drei Koepfe bleiben; `moon_loss_weight 0` bleibt die Empfehlung aus
+`moon_stack_order` par.12.8 (b05).
+
+**Netz-Gesundheit (`v29_window` par.6d Punkte 1-2, nach Tor 1 gefahren, 04:58):** tote Einheiten der
+Flachvektor-Schichten auf frozen_v3 (1.800 Zustaende): b06 2,60 Prozent, b04 2,60, b05 2,60, Referenz
+b03 2,60 -- GRUEN (Schwelle 5,21; `dead_units_v29_b04_b05_b06.json`). Spaltennormen der 39 neuen
+Eingaenge (755..793) in `flat_branch.0.weight`: b03 Mittel 0,137 (17 lebend), b04 0,251 (18), b05
+0,231 (17), b06 0,258 (17), Altspalten je rund 3,02 -- die neuen Spalten leben in allen Armen
+gleich schwach, kein Arm hat sie abgestellt oder aufgeblasen.
+
+Kein Elo-Eintrag (Arm gegen Arm; Register nur auf Anweisung). Artefakte
+`tor1_v29-b06_vs_b03_s20261140.json`, `_s20261141.json`, `arena_columns_tor1_v29-b06_vs_b03_s*.json`,
+`plate_points_tor1_b06_s*.json`.

@@ -166,6 +166,32 @@ macht. Wer eine Falle ergaenzt, nennt Datum und Schaden.
   1000, 1006, 1015); `static/log/*.log` ueber `run()` weiterhin 12 von 12,
   und `game_20260823_085652_seed546483` findet unveraendert den Plan
   `{0: [0, 2, 3]}` -- die Abnahme aus cf53aab bleibt bitgleich.
+- **Eine neue Diagnosezeile im Partie-Log bricht den Replayer** (2026-09-17).
+  Commit 42167aef haengt je Partie `[rt_leaf] leaves= pseudo= applied=` ans
+  Log (`engine/src/self_play.rs:4275-4281`, nur bei gesetztem Knopf
+  `MOSAIC_ROUND_TRANSITION_LEAF`). Die Zeile steht zwischen "Das Spiel ist
+  beendet!" und der Endwertung und gehoert zu keinem `apply_*`-Aufruf -- der
+  Replayer kann sie nie selbst erzeugen und brach mit `ReplayDivergence:
+  Zeile 339 (Runde 5) nicht als primaere Aktionszeile erkannt`. Schaden:
+  **0 von 360 Partien replaybar** in
+  `evaluations/artifacts/arena_columns_rt_leaf_on_vs_off_s20261152.json`,
+  gegen 40 von 40 im Lauf ohne den Knopf
+  (`arena_columns_rt_leaf_kosten_ohne_s20261151.json`).
+  Die aeltere Zeile `[moon_order] applied= changed=` (`self_play.rs:4256-4261`)
+  war NICHT harmlos, sondern nur nie gefahren: sie sitzt an genau derselben
+  Stelle (`moon_order_diagnostics_s20261110.json`, `games[0]["log"]` Zeile 308,
+  direkt vor `🏆 ... Endwertung`) und haette denselben Abbruch erzeugt, sobald
+  jemand ein Log mit gesetztem Knopf nachspielt.
+  **Loesung: eine LISTE statt eines Sonderwegs.**
+  `analyze_game_log.DIAGNOSTIC_LINE_MARKERS` (heute `[moon_order]`,
+  `[rt_leaf]`) plus `is_diagnostic_log_line(text)`; `_run_loop` ueberspringt
+  solche Zeilen vor der Klassifikation. Der Skip sitzt bewusst im Loop und
+  nicht in `load_log()`, damit auch die Replay-Wege mitgeheilt sind, die ihre
+  `LogLine`-Liste selbst aus Arena-JSON bauen
+  (`tools/probes/column_completion_legality_probe.py::lines_from_arena_log`).
+  **Wer eine neue Diagnosezeile in die Engine schreibt, traegt ihren Marker im
+  selben Zug dort ein** -- sonst ist die naechste Nacht-Auswertung wieder
+  leer. Festgenagelt in `tools/tests/test_replayer_skips_diagnostic_lines.py`.
 - **Python schreibt auf Windows still CRLF** (2026-08-25). Ein Skript mit
   `write_text` wandelte in 137 Dateien LF in CRLF; in einer Datei waren das
   971 Byte Zuwachs bei zwei geaenderten Zeilen. `git diff` zeigte wegen der

@@ -1617,6 +1617,10 @@ Mond-Frage bleibt nur Weg A (eigener Entscheidungsknoten), ausserhalb des v29/v3
 (par.12.2), sowie der Nachtrag, ob b06 (`minimal_strength_core` par.10) den Kopf mit den anderen
 drei zusammen entbehrlich macht.
 
+**Netz-Gesundheit b04 (`v29_window` par.6d Punkte 1-2, 2026-09-17 04:58):** tote Einheiten 2,60 Prozent
+wie b03 (GRUEN, `dead_units_v29_b04_b05_b06.json`); neue Eingangsspalten 755..793 Mittel 0,251, 18 von
+39 lebend (b03: 0,137, 17) -- der Arm hat den Eingang nicht abgestellt.
+
 **Kein Elo-Eintrag** (Arm gegen Arm, kein Champion-Bezug; Register nur auf Anweisung).
 Artefakte: `tor1_v29-b04_vs_b03_s20261130.json`, `_s20261131.json`, `arena_columns_tor1_v29-b04_vs_b03_s*.json`,
 `plate_points_tor1_b04_s*.json`, `moon_head_target_probe_b04.json`.
