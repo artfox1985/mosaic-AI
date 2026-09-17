@@ -186,7 +186,7 @@ par.2 (Teil A):** das Merkmal wird EINMAL in `features.rs` gebaut, per pyo3 expo
 wird nachgezogen und dient als Test-Orakel; Tor: Bit-Identitaet beider Bauer
 (`tools/probes/feature_parity_rust_python.py`, `np.array_equal`, keine Toleranz) VOR der
 Umstellung des Blockbaus auf Rust (Schalter `MOSAIC_FEATURES_FROM_RUST`, nicht im
-Cache-Schluessel). Netz-Paritaets-Fixture des Champions muss unveraendert gruen bleiben
+Cache-Schluessel; UEBERHOLT 2026-09-17: seit `PREREG_rust_data_layer.md` par.9b IM Schluessel). Netz-Paritaets-Fixture des Champions muss unveraendert gruen bleiben
 (744-Modell, gekuerzt). Bau: Agentenauftrag 2026-09-11, 00:15; danach Wheel, Anker-Drift,
 Paritaetswerkzeug, dann Bloecke fuer das v28-Fenster unter dem neuen Schluessel (INPUT_SIZE ist
 Teil des Cache-Materials), dann Training b02 (Warmstart `v27-b01_brierbest`, Seed 20260937,
@@ -220,7 +220,7 @@ Blocks +1/-1/0; fremde Bloecke Laenge /18, Spezial /9, Wild /9; Konstanten
 getestet). Beide Rust-Pfade (`features.rs`, Abschnitt 15) und der Python-Zwilling
 (`neural_net.py`, Alt-Records elf Nullen); pyo3-Export `state_features_from_json` und
 `state_planes_from_json` (`lib.rs`); Schalter `MOSAIC_FEATURES_FROM_RUST` (Default aus, nicht
-im Cache-Schluessel); Paritaetswerkzeug `tools/probes/feature_parity_rust_python.py`
+im Cache-Schluessel; UEBERHOLT 2026-09-17: seit `PREREG_rust_data_layer.md` par.9b IM Schluessel); Paritaetswerkzeug `tools/probes/feature_parity_rust_python.py`
 (ungelaufen, braucht das Wheel). INPUT_SIZE 744 -> 755 (`features.rs`, `config.py`),
 Merkmals-Fixture neu, **Kontrakt-Hash 20b442a8164f748d -> c65768636c0560a7**: kuenftige
 Anker- und Champion-2-Kanten gegen die Artefakte v25-v27 laufen Cross-Aera (`--force-cross-era`,

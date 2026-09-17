@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Kann ein kleinerer Standardkern aus Netz, Suche und Konfiguration mindestens gleich stark werden wie das heutige v29-Rezept, und welche Teile duerfen deshalb entfallen? | Beleg: ENTSCHIEDEN 2026-09-16 (par.10): Marge 5 Prozentpunkte, Arm v29-b06 nach Variante B. **GEMESSEN 2026-09-17 (10.3): der Minimalkern (b03 ohne moon/ownership/opp_points/endgame) ist b03 UNTERLEGEN -- 236:294 von 530 (44,5 Prozent), McNemar p 0,011, Block-z -2,86; die Marge reisst.** Mit b05 (nur moon aus: 427:373) zusammen: mindestens einer von ownership/opp_points/endgame traegt als Trainingssignal. Fortsetzung A.3 (Koepfe einzeln, 13-14 h) ist Nutzer-Entscheid; ohne sie bleiben die drei Koepfe im v30-Rezept, moon_loss_weight 0 bleibt Empfehlung. Strang C erledigt (10.2), Strang B/D offen. -->
+<!-- STATUS: OFFEN | Frage: Kann ein kleinerer Standardkern aus Netz, Suche und Konfiguration mindestens gleich stark werden wie das heutige v29-Rezept, und welche Teile duerfen deshalb entfallen? | Beleg: par.10 Marge 5 pp. b06 UNTERLEGEN (10.3: 44,5 Prozent, Block-z -2,86). Zweierpaket b08 (ownership 0, ohne endgame) HAELT (10.6: 405:395 von 800, Block-z +0,33). **ENTSCHIEDEN 2026-09-17: v30-Rezept ohne endgame-Kopf, ownership-Loss 0, opp_points bleibt (Traeger per Differenz).** Strang A abgeschlossen, Strang B/C erledigt. -->
 
 # Vorregistrierung: Minimaler Staerkekern
 
@@ -463,3 +463,119 @@ gleich schwach, kein Arm hat sie abgestellt oder aufgeblasen.
 Kein Elo-Eintrag (Arm gegen Arm; Register nur auf Anweisung). Artefakte
 `tor1_v29-b06_vs_b03_s20261140.json`, `_s20261141.json`, `arena_columns_tor1_v29-b06_vs_b03_s*.json`,
 `plate_points_tor1_b06_s*.json`.
+
+### 10.4 ENTSCHIEDEN (Nutzer 2026-09-17): statt A.3 einzeln ein ZWEIERPAKET -- Arm `v29-b08`
+
+Nutzer woertlich: *"dann pack die tendenziell am wenigsten tragenden koepfe in ein paket zusammen
+(2er paket zb) und fahr sie gegen b03. ich will noch nicht alle einzeln fahren."*
+
+**Auswahl der zwei Koepfe, aus der Aktenlage (kein neues Messen):**
+
+* **ownership** -- das Trainingsgewicht hat in v22 gemessen nichts getragen (w0-Arm 0,260 gegen
+  0,297 volle Spalten, t 1,53; `project_v22_cycle_result`), beide Suchverbraucher stehen auf 0
+  (par.10.1). Hinweis zur Vorgeschichte: der Nutzer hatte am 2026-08-11 festgelegt, dass der
+  Ownership-KOPF bleibt ("der ownership head kommt so oder so. die frage ist nur mit welchem
+  faktor") -- das ist mit diesem Arm vereinbar: der Ausgang bleibt, nur der Loss geht auf 0, wie
+  schon bei b06.
+* **endgame** -- kein Leser in der Suche (par.10.1), Ziel `root_q` nur aus Netz-Self-Play in der
+  Runde-5-Zone (par.8 B4), fuer Heuristik-Korpora komplett maskiert. Nie isoliert gemessen.
+* **opp_points bleibt drin** -- dichtes Ziel an jedem Zustand (Gegnerpunkte), der plausibelste
+  Traeger fuer den Rumpf unter den drei.
+* **moon bleibt wie bei b03 (Gewicht 1,0)**, damit der Vergleich b08 gegen b03 NUR das Paket misst;
+  moon ist mit b05 schon einzeln gemessen.
+
+**Arm `v29-b08`** = b03-Rezept mit `--ownership-weight 0` und OHNE `--endgame-head`, sonst identisch
+(Fenster `window_v29.txt`, Warmstart `v28-b02_brierbest`, Seed 20260941, 12 Epochen, 794,
+`--select-by-brier`, `--fast-loader`, `--opp-points-head`, moon-Loss 1,0). Manifest-Diff gegen
+b03 muss GENAU `ownership_weight`, `endgame_head`, `cache_file` und den Namen zeigen.
+
+**Daten:** neue Bloecke und neuer Monolith unter dem Schluessel MIT Formel-Version und
+`MOSAIC_FEATURES_FROM_RUST=1` (Weg (1) aus `rust_data_layer` par.9a/9b, Nutzer-Entscheid vom selben
+Tag) -- die erste Kette, die den neuen Schluessel benutzt; Bauzeit wird gemessen und in
+`docs/measured_runtimes.md` eingetragen. Val-Cache entsteht neu (der alte `eaa464b44cf7` ist unter
+dem neuen Schluessel nicht mehr adressierbar); BEIDE Anteile per `--cache-file` bzw. ueber den
+gepruefen Namenspfad. ACHTUNG Vergleichbarkeit: b03 wurde auf Bloecken mit teils ALTER
+Formel-Semantik trainiert (par.9a: 1.746 Dateien vor dem 2026-09-12), b08 auf einheitlich frischen
+Planes -- der Unterschied ist 0,67 Prozent der Alt-Zustaende in einem Kanal (par.9a) und wird
+als bekannter, kleiner Konfundierer im Verdikt genannt, nicht weggerechnet.
+
+**Tor und Lesart wie par.10 (Marge 5 Prozentpunkte):** gepoolt >= 45,0 Prozent auf 800 Partien
+(zwei Seeds a 200 Paare, ohne Frueh-Stopp) und kein Seed signifikant dagegen.
+Ausgaenge: haelt b08 -> ownership und endgame sind entbehrlich, der Traeger aus b06 ist
+opp_points (Herleitung ueber Differenz, nicht Messung), v30-Rezept ohne die beiden; reisst b08 ->
+mindestens einer der beiden traegt, dann Einzelmessung NUR dieser zwei (2 x 4,5 h) als naechster
+Schritt, Nutzer-Entscheid; b08 signifikant besser -> Staerkebefund (par.8 B6).
+
+**Kette:** `tools/night_v29_b08_head_pair.sh` (Muster b06), wartet auf freie CPU (Sonde) und startet
+erst, wenn der Schluessel-Umbau (par.9b) im Baum ist. Fahrplan 36e.
+
+### 10.5 Lauf v29-b08 (2026-09-17)
+
+* **Bloecke und Monolith** unter dem neuen Schluessel `421448d12eb8` (Formel-Version, FROM_RUST=1):
+  09:34:12 bis 10:06:56, **1.964 s** fuer 2.800 Dateien mit 6 Workern plus Merge, exklusiv; Stempel
+  im Monolithen gleich dem Schluessel des Splits (Kette Schritt 2). Trainingsliste byte-gleich mit
+  der von b03.
+* **Manifest-Diff b08 gegen b03** (`manifest_train_v29-b08_20260917_100659.json` gegen
+  `manifest_train_v29-b03_20260914_111513.json`, alle `cli_args`): GENAU `ownership_weight` 0,0 gegen
+  1,0, `endgame_head` False gegen True, `cache_file` gesetzt gegen None, `name`; dazu
+  `moon_target_source` 'label' gegen None, ein Feld, das es zu b03s Zeit noch nicht gab und dessen
+  Default 'label' ist (`PREREG_moon_stack_order.md` par.12.7: b03 und b05 rechnen dasselbe Ziel).
+  Alles andere identisch, einschliesslich Seed 20260941 und Warmstart.
+* Training seit 10:06:56 auf der GPU, daneben als CPU-Auftrag das Kompilat von Variante C und dem
+  Stichentscheid-Knopf (10:12 bis etwa 10:30): die Trainingsdauer ist GEBREMST und geht so markiert
+  in `docs/measured_runtimes.md`.
+* **Training v29-b08 DURCH 11:21:12, Exit 0: 4.456 s = 74 min** (10:06:56 bis 11:21:12, CUDA, GEBREMST:
+  daneben 10:12-10:14 das Kompilat von Variante C, und der Val-Cache-Bau lief einkernig; b06 ohne diese
+  Last 57 min). Bestes `val_brier` **0,1794 in Epoche 6** (letzte 0,1797; b03 0,17967, b04 0,17915 --
+  alle drei innerhalb der Aufloesung, `moon_stack_order` par.12.7), Val-R2 Value 0,545, Policy-Val 0,40;
+  Plateau-Marker ab Epoche 10. Export `models/alphazero_v29-b08_brierbest.onnx` (flat_input 794, 79 Planes,
+  11.320.948 Byte). **Tor 1 gegen b03 laeuft seit 11:21:33** (Seed 20261160 zuerst, dann 20261161), Ende
+  erwartet gegen 14:30 (2 x 80-93 min gemessen).
+
+### 10.6 Tor 1 v29-b08 gegen b03 GEMESSEN (2026-09-17, 11:21-13:58): das Zweierpaket HAELT
+
+Aufbau wie par.10.4: `alphazero_v29-b08_brierbest.onnx` gegen `alphazero_v29-b03_brierbest.onnx`, Champion-Spec
+beidseits, 400 Sims, zwei Seeds a 200 Paare ohne Frueh-Stopp (SPRT-Schranken +-6,91 nie erreicht), Blockgroesse
+5, 10 Threads, `--log-games`, exklusiv (keine Nebenlast). Grundmenge Partien, Einheit Siege.
+
+| Groesse | Seed 20261160 | Seed 20261161 | gepoolt |
+| --- | --- | --- | --- |
+| Siege b08 : b03 | 210 : 190 | 195 : 205 | **405 : 395 von 800 = 50,6 %** |
+| Sweeps b08 / b03 (Paare) | 46 / 33 | 56 / 64 | 102 / 97, exakter Vorzeichentest p 0,78 |
+| Diff je Paar, KI95 | +0,100 [-0,098; +0,298] | -0,050 [-0,243; +0,143] | |
+| Block-Ebene (80 Bloecke a 10 Partien) | | | Siegdiff b08 minus b03 **+0,125 je Block, SE 0,38, z = +0,33** |
+| Laufzeit | 4.606,9 s | 4.605,4 s | 11,5 s je Partie |
+
+**Verdikt nach par.10.4:** gepoolt 50,6 Prozent, weit ueber der 45,0-Prozent-Marge, kein Seed signifikant
+dagegen (p 0,37 und 0,68) -> **HAELT: ownership-Loss und endgame-Kopf sind zusammen entbehrlich.** Kein
+Staerkebefund (z +0,33). Mit b06 (par.10.3, 44,5 Prozent, z -2,86) folgt per Differenz, NICHT per Messung:
+**der Traeger aus der Dreiergruppe ist opp_points** (Herleitung; b06 hatte zusaetzlich moon 0, das nach b05
+kein Traeger ist).
+
+**Sechs Standard-Kennzahlen** (Mittel je Seite ueber beide Seeds; Quellen `arena_columns_tor1_v29-b08_vs_b03_s*.json`,
+794 von 800 Partien nachgespielt, und `plate_points_tor1_b08_s*.json`, Grundmenge Bretter je Modell):
+
+| Kennzahl | b08 | b03 | Diff |
+| --- | --- | --- | --- |
+| Reihen: volle Zeilen je Partie / lange Reihen vollendet | 0,107 / 3,01 | 0,132 / 3,02 | -0,025 / -0,01 |
+| Spalten: volle Spalten / max. Hoehe / >= 3 / >= 4 | 0,947 / 5,65 / 3,14 / 2,24 | 0,986 / 5,67 / 3,23 / 2,26 | -0,039 / -0,02 / -0,08 / -0,02 |
+| Strafleiste gesamt (Strafpunkte je Partie, `boden`) | 8,39 | 8,20 | +0,19 |
+| Plattenpunkte gesamt / je Kriterium | 7,34; Spezialfelder -10,78, Vertikale 7,02, Mehrfarbige 2,64, Eckplatten 8,55, Aeussere 10,45 | 7,78; -10,29, 7,05, 2,82, 8,72, 10,57 | -0,44; -0,49, -0,03, -0,18, -0,16, -0,11 |
+| Eigene Punkte | 52,65 | 53,33 | -0,68 |
+| Marge | -0,68 | +0,68 | -1,36 |
+
+Lesart: die Siege sind gleich, das Punkteniveau liegt einen halben Punkt tiefer, getragen vom Posten
+Spezialfelder (-0,49) und den Spalten (-0,04 volle Spalten). Das ist die gleiche Richtung wie bei b06, nur
+viel flacher, und innerhalb der Seed-Streuung (Seed 1 +0,03 Punkte, Seed 2 -1,38). Kein Handlungsbedarf, aber
+ein Merkposten fuer die Rezeptwahl: wer die beiden Koepfe streicht, gibt womoeglich einen halben Punkt
+Spezialfelder her.
+
+**Netz-Gesundheit (par.10.1 Vorpruefung) fuer b08:** nicht gesondert gefahren; das Rezept aendert nur
+Loss-Gewicht und einen entfernten Kopf, die Ownership-Ausgangsschicht wird mit Gewicht 0 nicht mehr trainiert
+(wie b06, dort gruen).
+
+**Rezeptfolge ENTSCHIEDEN (Nutzer 2026-09-17, "dann streiche sie"):** v30 ohne `--endgame-head` und mit
+`--ownership-weight 0` (die Ausgabe bleibt, Nutzer-Festlegung 2026-08-11), `--opp-points-head` bleibt.
+Der Punkte-Merkposten (-0,7, Spezialfelder -0,5, innerhalb der Seed-Streuung) ist zur Kenntnis genommen und
+wird bei der v30-Abnahme ueber die sechs Kennzahlen mitgelesen. Damit ist Strang A dieser Prereg
+abgeschlossen; offen bleibt nur der Kopf-Zeiger fuer `moon_loss_weight` (moon_stack_order par.12.8).

@@ -2180,7 +2180,7 @@ fn tiling_env_actions(state: &GameState, pi: usize) -> Vec<Value> {
 /// Task #20: Netz-Blattwert eines Tiling-ABSCHLUSSES (`TilingOutcome::final_state`)
 /// aus Sicht von `pi`, als reine Gewinnwahrscheinlichkeit `(v+1)/2` -- KEIN
 /// `points`-Blending wie `net_mcts::blended_leaf_win_prob` (die Messung in
-/// `tiling_candidate_spread.json`, auf der `NET_TILING_TIEBREAK_ENABLED`
+/// `tiling_candidate_spread.json`, auf der `net_tiling_tiebreak`
 /// beruht, hat exakt diese Formel benutzt, siehe `tools/tiling_candidate_spread.py`).
 ///
 /// PERSPEKTIVE, verifiziert statt angenommen: `top_k_tilings`/`apply_step`
@@ -2296,7 +2296,7 @@ fn warne_fehlenden_punkte_kopf_einmal() {
 /// `net: None` (Heuristik-Spieler / kein Netz geladen) -> exakt das alte
 /// Verhalten, `best_first_step_exact_or_valued` faellt sofort darauf zurück.
 /// `net: Some(..)` -> Task #20-Stichentscheid IN RUNDEN 2-4 hinter
-/// `NET_TILING_TIEBREAK_ENABLED` (siehe dort), sonst ebenfalls unveraendert
+/// `net_tiling_tiebreak` (siehe dort), sonst ebenfalls unveraendert
 /// -- die vollständige Anwendungsbedingung (Toggle + Rundenfenster) lebt
 /// zentral in `best_first_step_exact_or_valued`, damit sie nicht an jeder
 /// Aufrufstelle erneut dupliziert wird.
@@ -2382,6 +2382,21 @@ pub(crate) fn resolve_tiling_step(state: &GameState, pi: usize, net: Option<&Net
     resolve_tiling_step_with(state, pi, net, &crate::envelope::EnvelopeTilingParams::OFF)
 }
 
+/// Wie [`resolve_tiling_step`], mit ausdruecklichem Knopf `net_tiling_tiebreak`
+/// (par.16.10). Der Wrapper oben reicht den Default durch, ist also
+/// bitidentisch zum Bestand.
+pub(crate) fn resolve_tiling_step_tiebreak(
+    state: &GameState,
+    pi: usize,
+    net: Option<&Net>,
+    net_tiling_tiebreak: u32,
+) -> TilingStep {
+    resolve_tiling_step_with_variant(
+        state, pi, net, &crate::envelope::EnvelopeTilingParams::OFF,
+        crate::mcts::HeuristicVariant::Hv1, net_tiling_tiebreak,
+    )
+}
+
 /// Wie [`resolve_tiling_step`], zusaetzlich mit `W_TILE` und Profil der
 /// Seite (K3 (d), par.8.3). `envelope_tiling_w == 0.0` ist byte-identisch
 /// zum Bestand; die Heuristik-Pfade rufen den Wrapper oben.
@@ -2391,7 +2406,10 @@ pub(crate) fn resolve_tiling_step_with(
     net: Option<&Net>,
     envelope: &crate::envelope::EnvelopeTilingParams,
 ) -> TilingStep {
-    resolve_tiling_step_with_variant(state, pi, net, envelope, crate::mcts::HeuristicVariant::Hv1)
+    resolve_tiling_step_with_variant(
+        state, pi, net, envelope, crate::mcts::HeuristicVariant::Hv1,
+        crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
+    )
 }
 
 /// Wie [`resolve_tiling_step_with`], mit ausdruecklicher Heuristik-Variante.
@@ -2418,6 +2436,7 @@ pub(crate) fn resolve_tiling_step_with_variant(
     net: Option<&Net>,
     envelope: &crate::envelope::EnvelopeTilingParams,
     variant: crate::mcts::HeuristicVariant,
+    net_tiling_tiebreak: u32,
 ) -> TilingStep {
     if variant.is_hv3() {
         if let Some(step) = crate::plate_builder_v3::tiling_preference(state, pi) {
@@ -2433,6 +2452,7 @@ pub(crate) fn resolve_tiling_step_with_variant(
                 |final_state: &GameState| net_tiling_margin_value(n, final_state, pi);
             best_first_step_exact_or_valued_envelope(
                 state, pi, Some(&evaluator), own.as_ref(), envelope, Some(&margin_evaluator),
+                net_tiling_tiebreak,
             )
         }
         // Ohne Netz gibt es keine Ownership-Karte -- der Pol ist auf allen
@@ -2461,21 +2481,28 @@ fn tiling_step_with<R: Rng + ?Sized>(
     rng: &mut R,
     envelope: &crate::envelope::EnvelopeTilingParams,
 ) -> Map<String, Value> {
-    tiling_step_with_variant(game, net, rng, envelope, crate::mcts::HeuristicVariant::Hv1)
+    tiling_step_with_variant(
+        game, net, rng, envelope, crate::mcts::HeuristicVariant::Hv1,
+        crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
+    )
 }
 
-/// Wie [`tiling_step_with`], mit ausdruecklicher Heuristik-Variante.
+/// Wie [`tiling_step_with`], mit ausdruecklicher Heuristik-Variante und dem
+/// Stichentscheid-Knopf dieser Seite (par.16.10).
 fn tiling_step_with_variant<R: Rng + ?Sized>(
     game: &mut Game,
     net: Option<&Net>,
     rng: &mut R,
     envelope: &crate::envelope::EnvelopeTilingParams,
     variant: crate::mcts::HeuristicVariant,
+    net_tiling_tiebreak: u32,
 ) -> Map<String, Value> {
     let pi = game.state.current_player;
     let state_json = state_to_json(&game.state, true);
     let valid_actions = tiling_env_actions(&game.state, pi);
-    let step = resolve_tiling_step_with_variant(&game.state, pi, net, envelope, variant);
+    let step = resolve_tiling_step_with_variant(
+        &game.state, pi, net, envelope, variant, net_tiling_tiebreak,
+    );
 
     let chosen_env: Value = match &step {
         TilingStep::Place(ta) => json!({
@@ -3556,6 +3583,14 @@ struct PlayerLoopConfig<'a> {
     /// (`resolve_tiling_step_with_variant`). An allen Bestands-Konstruktions-
     /// stellen `Hv1`; nur der hv3-Self-Play setzt `Hv3`.
     heuristic_variant: crate::mcts::HeuristicVariant,
+    /// `PREREG_round_transition_search_sampling.md` par.16.10: Netz-
+    /// Stichentscheid im Tiling DIESER SEITE (aus ihrer `SearchConfig`).
+    /// [`crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT`] (= 1) ist der
+    /// Bestand -- die Heuristik-Seiten stehen ebenfalls darauf, bei ihnen ist
+    /// der Zweig ohnehin strukturell aus (`tiling_net: None`, also kein
+    /// Evaluator, siehe Anker-Befund in par.16.11). Pro Seite, damit ein Netz
+    /// MIT gegen dasselbe Netz OHNE Stichentscheid messbar ist.
+    net_tiling_tiebreak: u32,
 }
 
 impl PlayerLoopConfig<'_> {
@@ -4188,7 +4223,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     // je Spieler-Konfiguration (Task #20, siehe Feld-Doku).
                     records.push(tiling_step_with_variant(
                         &mut game, pcfg.tiling_net, rng, &pcfg.envelope_params(),
-                        pcfg.heuristic_variant,
+                        pcfg.heuristic_variant, pcfg.net_tiling_tiebreak,
                     ));
                 } else {
                     // Arena-Pfade: Tiling ohne Aufzeichnung. Spaltenbau-Trace:
@@ -4208,7 +4243,7 @@ fn unified_game_loop<R: Rng + ?Sized>(
                     };
                     let step = resolve_tiling_step_with_variant(
                         &game.state, pi, pcfg.tiling_net, &pcfg.envelope_params(),
-                        pcfg.heuristic_variant,
+                        pcfg.heuristic_variant, pcfg.net_tiling_tiebreak,
                     );
                     let trace = if pcfg.column_build_trace {
                         crate::column_build::trace_line(
@@ -4444,6 +4479,9 @@ pub fn play_one_game<R: Rng + ?Sized>(
         // auch bei Knopf 1 -- hier zieht kein Netz.
         start_search: None,
         heuristic_variant: variant,
+        // par.16.10: Default = Bestand. Ohne `tiling_net` gibt es hier
+        // ohnehin keinen Evaluator, der Zweig ist strukturell aus.
+        net_tiling_tiebreak: crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
     };
     let cfg = GameLoopConfig {
         timeout_secs: heuristic_game_timeout_secs(base_sims)
@@ -4960,6 +4998,8 @@ fn play_net_game<R: Rng + ?Sized>(
         start_search: StartSearchParams::for_net(
             Some(net), net_sims, &search_config, false, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+        // par.16.10: aus der Spec der NETZ-Seite.
+        net_tiling_tiebreak: search_config.net_tiling_tiebreak,
     };
     let heur_player = PlayerLoopConfig {
         agent: &heur_agent,
@@ -4977,6 +5017,9 @@ fn play_net_game<R: Rng + ?Sized>(
         // bewegen.
         start_search: None,
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+        // par.16.10: die Heuristik-Seite bleibt auf dem Default; sie hat kein
+        // Tiling-Netz, der Zweig ist bei ihr strukturell aus (par.16.11).
+        net_tiling_tiebreak: crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
     };
     // `net_board` waehlt das Brett der Netz-Seite (alle Aufrufer nutzen 0).
     let players = if net_board == 0 { [net_player, heur_player] } else { [heur_player, net_player] };
@@ -5145,6 +5188,10 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 start_search: StartSearchParams::for_net(
                     Some(net_a), sims_a, &search_config_a, false, game_seed),
                 heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+                // par.16.10: je Seite aus IHRER Spec -- genau der Messnutzen
+                // (Champion mit gegen Champion ohne Stichentscheid im selben
+                // Prozess, A/B `tools/night_tiling_tiebreak_ab.sh`).
+                net_tiling_tiebreak: search_config_a.net_tiling_tiebreak,
             },
             PlayerLoopConfig {
                 agent: &agent_b,
@@ -5158,6 +5205,7 @@ fn play_net_vs_net_game<R: Rng + ?Sized>(
                 start_search: StartSearchParams::for_net(
                     Some(net_b), sims_b, &search_config_b, false, game_seed),
                 heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+                net_tiling_tiebreak: search_config_b.net_tiling_tiebreak,
             },
         ],
         vorzug_greift: None,
@@ -5924,7 +5972,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
     // EIN NetSelfPlayAgent fuer beide Seiten (beide Seiten SIND das Netz),
     // Vorzug BEIDSEITIG (PREREG_ownership_corpus.md §3.1, seit 5992f38 --
     // explizite Konfiguration statt Pfad-Zufall), Tiling-Netz beidseitig
-    // (Task #20, Wirkung haengt an `NET_TILING_TIEBREAK_ENABLED` +
+    // (Task #20, Wirkung haengt an `net_tiling_tiebreak` +
     // Rundenfenster in `best_first_step_exact_or_valued`), Labels
     // (rtv/bootstrap) MIT Task-#80/#81-Profiling-Kategorien (`profiled`),
     // Timeout mit `EXTRA_GAME_TIMEOUT_SECS`-Zuschlag (Bugfix-Historie siehe
@@ -5984,6 +6032,9 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         start_search: StartSearchParams::for_net(
             Some(net), base_sims, &search_config, add_root_noise, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+        // par.16.10, Traegerprinzip wie bei `start_search`: was die Arena
+        // spielt, erzeugt das Self-Play.
+        net_tiling_tiebreak: search_config.net_tiling_tiebreak,
     };
     let player1 = PlayerLoopConfig {
         agent: &agent1,
@@ -5997,6 +6048,7 @@ fn play_net_self_play_game<R: Rng + ?Sized>(
         start_search: StartSearchParams::for_net(
             Some(net), base_sims, &search_config, add_root_noise, game_seed),
         heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+        net_tiling_tiebreak: search_config.net_tiling_tiebreak,
     };
     // par.5: Greif-Zaehler nur angelegt und verdrahtet, wenn der Knopf aktiv
     // ist -- sonst exakt dieselbe Nebenwirkungsfreiheit wie vorher.
@@ -7957,6 +8009,7 @@ pub(crate) mod tests {
                 return_order_mode: 0,
                 start_search: None,
                 heuristic_variant: crate::mcts::HeuristicVariant::Hv1,
+                net_tiling_tiebreak: crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
             };
             let cfg = GameLoopConfig {
                 timeout_secs: 600,

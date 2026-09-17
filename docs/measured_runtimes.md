@@ -176,6 +176,12 @@ Claude-Partien der Parallelsitzung (Nebenlast klein, aber vorhanden; `laufzeit`-
 | Plattenpunkte je Kriterium (`plate_points_from_arena.py`, 400 Partien) | unter 10 s | – |
 | Blockbau 2.947 Dateien unter neuem Schluessel, 6 Worker, Rust-Merkmalsbauer (`MOSAIC_FEATURES_FROM_RUST=1`) | 1.582 s = 26 min | 1,86 Bloecke je s; Python-Pfad nicht unter gleichen Bedingungen gemessen |
 | Monolith-Merge 2.800 Bloecke, 1,11 GB (b02) | 551 s = 9 min | mit Formen-Waechter |
+| Blockbau 2.800 Dateien unter NEUEM Schluessel `421448d12eb8` (Formel-Version, `MOSAIC_FEATURES_FROM_RUST=1`), 6 Worker, PLUS Merge (Kette `night_v29_b08_head_pair.sh`, 2026-09-17 09:34-10:07) | **1.964 s = 32,7 min** gesamt, Bloecke rund 1.100 s (2.235 nach 1.096 s) | exklusiv; erste Kette auf dem Schluessel mit Formel-Version |
+| Kompilat Variante C + Stichentscheid-Knopf 2026-09-17: `cargo test --release --lib` (Build 45 s, 703 Tests 100 s) / `--no-run` / Fixture-Neubau / `maturin build --release` | 146 s / rund 60 s / 2 x 0,1 s / 72 s inkl. Fixture-Test | neben GPU-Training v29-b08 (Val-Cache-Bau einkernig) |
+| Training Warm-Start 12 Epochen, b03-Rezept mit ownership-Loss 0 und ohne endgame-Kopf (v29-b08, `manifest_train_v29-b08_20260917_100659.json`), `--fast-loader`, Monolith per `--cache-file`, Val-Cache neu (147 Dateien, einkernig, rund 8 min) | 4.538.842 Samples, 794 | CUDA, GEBREMST (Kompilat 10:12-10:14 daneben) | **4.456 s = 74 min** (b06 ohne Nebenlast 57 min) |
+| Tor 1 b08 gegen b03, Seeds 20261160 / 20261161, je 200 Paare mit Logs, kein Frueh-Stopp | 4.606,9 s / 4.605,4 s | 11,5 s je Partie, 10 Threads, exklusiv (Referenz fuer die 884-Kette) |
+| Kostentor Variante C (884-Wheel mit Tiling-Projektion im Encoder): Champion gegen sich selbst, 2 x 20 Paare, 10 Threads, Logs | 11,84 s / 11,34 s je Partie | exklusiv; gegen 11,5 s (Tor 1 b08, altes Wheel, exklusiv) +0,6 Prozent; gegen die registrierte Referenz 13,33 s (neben GPU-Training) -13 Prozent |
+| Blockbau 2.800 Dateien unter 884 (Tiling-Projektion je Record, Schluessel `790ac07353a6`), 6 Worker, plus Merge | **2.144 s = 35,7 min** | exklusiv; gegen 1.964 s unter 794 am selben Tag +9,2 Prozent |
 | **Training v28-b02** (Variante B, 755), 12 Epochen | **5.262,3 s = 1,46 h** | GEBREMST (cargo test des Pre-push-Hakens um Epoche 6/7); b01 5.156,6 s |
 | Tor 1 b02 gegen b01, Seeds 20261038 / 20261039, je 200 Paare mit Logs | 5.562,5 s / 4.773,3 s | 13,9 bzw. 11,9 s je Partie, 10 Threads; der zweite Lauf ohne Nebenlast |
 | Block-Ziehungs-Diagnostik (`dome_stack_known_block_draw_probe.py`, 400 Partien) | 105 s / 129 s | 1 Thread, Replayer |
@@ -281,3 +287,22 @@ taugen sie deshalb nur als Obergrenze.
 `cargo test` mit `LNK1104: cannot open file ... .exe` ab, weil der Testlaeufer des VORIGEN Laufs
 die Datei noch hielt. Kein Testfehler, kein Schaden -- aber wer die Laeufe hintereinander
 startet, muss das Ende des vorigen abwarten, nicht nur seinen Exit-Code.
+
+## Counterfactual-Ranking-Sonde (Stufe 0), gemessen am 2026-09-17, exklusiv
+
+`tools/probes/counterfactual_tiling_ranking.py`, registrierte Einstellungen
+**sims 400 / M 6 / max-cands 4**, 1 Thread, ONNX-Sitzung einmal gebaut. Die beiden Runden
+kosten VERSCHIEDEN viel, und zwar um den Faktor 3,7: in R4 antwortet nach der Neubefuellung
+der Runde-5-Alpha-Beta-Loeser, der die Sim-Zahl nicht liest, in R1-R3 laeuft die Baumsuche
+wirklich. Eine Zahl auf die andere Runde hochzurechnen geht deshalb schief.
+
+| Lauf | Umfang | Wanduhr | s je Stellung | Artefakt |
+| --- | --- | --- | --- | --- |
+| Kostenmessung R4 | 3 Stellungen, 8 Paare | 9,4 s | **3,132** | `counterfactual_ranking_cost_probe.json` |
+| Kostenmessung R3 | 3 Stellungen, 18 Paare | 35,1 s | **11,708** | `counterfactual_ranking_cost_probe_r3.json` |
+| Volllauf R4 (400 Fensterdateien, Deckel 2 je Datei) | 800 Stellungen, 3.744 Paare | **2.644,5 s** (44 min), CPU 2.596,6 s | **3,306** | `counterfactual_ranking_r4.json` |
+| Volllauf R3 (150 von 400 Dateien gebraucht) | 300 Stellungen, 1.461 Paare | **3.283,3 s** (55 min), CPU 3.229,7 s | **10,944** | `counterfactual_ranking_r3.json` |
+
+**Planungsgroesse:** rund 3,3 s je R4-Stellung und rund 11,7 s je R3-Stellung; das Angebot des
+v29-Fensters ist bei `--max-per-file 2` ueber 400 Dateien auf rund 800 Stellungen je Runde
+begrenzt (in R4 gemessen: 800 aus 1.106 gescannten, der Rest ist eindeutig).

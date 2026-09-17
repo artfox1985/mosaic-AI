@@ -854,6 +854,13 @@ fn engine_config_json() -> String {
         // BEWERTUNG jedes Rundenende-Blattes, ein Lauf mit und einer ohne waeren
         // nachtraeglich nicht zu unterscheiden.
         "round_transition_leaf": crate::net_mcts::SearchConfig::from_env().round_transition_leaf,
+        // PREREG_round_transition_search_sampling.md par.16.10: Netz-
+        // Stichentscheid im Tiling (1 = Bestand, 0 = exakte Punkte
+        // entscheiden). Gehoert aus demselben Grund ins Manifest wie
+        // `moon_order_variants` darueber -- der stille Default ist AN, und ein
+        // Lauf mit abgeschaltetem Zweig waere sonst nachtraeglich nicht von
+        // einem Bestandslauf zu unterscheiden.
+        "net_tiling_tiebreak": crate::net_mcts::SearchConfig::from_env().net_tiling_tiebreak,
         "mirror_other_val": MIRROR_OTHER_VAL,
         "shuffle_stack_peek_in_search": SHUFFLE_STACK_PEEK_IN_SEARCH,
         // Ablation der Spezialfeld-Kanaele (PREREG_special_tile_yield.md par.6 P1,
@@ -1762,6 +1769,36 @@ fn state_features_from_json(state_json: String) -> PyResult<Vec<f32>> {
     Ok(f)
 }
 
+/// Abschnitt 17 des Encoders (Tiling-Projektion, Variante C, Arm `v29-b07`,
+/// `PREREG_round_transition_search_sampling.md` par.18) als EIGENER Block:
+/// je Spieler in Zugreihenfolge 36 Zellen "wird im Tiling dieser Runde neu
+/// gefuellt" plus 9 Slots "wird in dieser Runde vollendet", also 90 Werte.
+///
+/// Warum der Block einzeln exportiert wird: der Python-Zwilling
+/// (`neural_net.py::state_to_tensor_python`) kann ihn nicht nachbauen -- er
+/// braucht den exakten Tiling-Loeser, und ein Nachbau waere eine ZWEITE
+/// Wahrheitsquelle fuer eine Spielregel (par.18.3 Punkt 4). Der Zwilling ruft
+/// deshalb GENAU DIESE Funktion; sie liefert bitgleich das, was
+/// `features::state_to_features` an den Vektor haengt (dieselbe
+/// `json_to_state`-Route mit Seed 0, dieselbe Projektion).
+///
+/// Rein additiv: kein Spielpfad liest diesen Export, er setzt keinen Knopf.
+#[pyfunction]
+fn tiling_projection_values_from_json(state_json: String) -> PyResult<Vec<f32>> {
+    use pyo3::exceptions::PyValueError;
+    let parsed: serde_json::Value = serde_json::from_str(&state_json)
+        .map_err(|e| PyValueError::new_err(format!("state_json: JSON-Parse-Fehler: {e}")))?;
+    let f = crate::features::tiling_projection_values_from_json(&parsed);
+    if f.len() != crate::features::TILING_PROJECTION_VALUES {
+        return Err(PyValueError::new_err(format!(
+            "Tiling-Projektion lieferte {} Werte, erwartet {}",
+            f.len(),
+            crate::features::TILING_PROJECTION_VALUES
+        )));
+    }
+    Ok(f)
+}
+
 /// Teil A der Rust-Datenschicht: der PLANES-Block aus einem Zustands-JSON,
 /// als flache Liste plus Form `(C, H, W)` -- C-Major/NCHW, also Kanal `c`,
 /// Zeile `r`, Spalte `w` bei Index `c*36 + r*6 + w` (dieselbe Linearisierung,
@@ -2302,6 +2339,7 @@ fn mosaic_rust(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(arena_match, m)?)?;
     m.add_function(wrap_pyfunction!(scoring_tiles_json, m)?)?;
     m.add_function(wrap_pyfunction!(state_features_from_json, m)?)?;
+    m.add_function(wrap_pyfunction!(tiling_projection_values_from_json, m)?)?;
     m.add_function(wrap_pyfunction!(state_planes_from_json, m)?)?;
     m.add_function(wrap_pyfunction!(not_deckel_diagnostics_json, m)?)?;
     m.add_function(wrap_pyfunction!(reset_not_deckel_diagnostics, m)?)?;
@@ -2452,11 +2490,29 @@ mod contract_stamp_tests {
     /// Record-Feld mit. Das ist ein Serialisierungs-Artefakt, keine
     /// Verhaltensaenderung -- dieselbe Lage wie bei der Anker-Drift am
     /// 2026-09-12.
+    ///
+    /// **Neu gesetzt 2026-09-17** (vorher `39994362fba145a6`), Anlass:
+    /// `PREREG_round_transition_search_sampling.md` par.18 (Variante C, Arm
+    /// `v29-b07`) -- `INPUT_SIZE` 794 -> 884 (+90 Flachwerte am ENDE: Abschnitt
+    /// 17 in `features.rs`, je Spieler 36 Zellen "wird in dieser Runde getilt"
+    /// plus 9 Slots "wird vollendet"). `NUM_PLANES_CHANNELS` bleibt 79,
+    /// `NUM_ACTIONS` 406, Kopf-Liste unveraendert; Kuerzung auf die
+    /// MODELL-Breite wie oben, Bestandschampions spielen bitgleich weiter.
+    ///
+    /// Der neue Wert ist NACHGERECHNET, nicht abgeschrieben: FNV-1a-64 ueber
+    /// `INPUT_SIZE=884;NUM_PLANES_CHANNELS=79;PLANES_H=6;PLANES_W=6;NUM_ACTIONS=406;HEADS=policy,value,moon,points,opp_points,ownership`
+    /// ergibt `cfd94509f0aab102`; dieselbe Rechnung mit 794 reproduziert den
+    /// alten Literal `39994362fba145a6` (Gegenprobe des Verfahrens).
+    ///
+    /// Die **Netz-Paritaets-Fixture bleibt diesmal GUELTIG**: Variante C legt
+    /// KEIN Record-Feld an, und eine reine Encoder-Verlaengerung bewegt den
+    /// Record-Hash nachweislich nicht (`PREREG_stack_top_feature.md` par.17a,
+    /// dritter Beleg).
     #[test]
     fn contract_hash_matches_pinned_literal() {
         assert_eq!(
             contract_hash(),
-            "39994362fba145a6",
+            "cfd94509f0aab102",
             "A2-Vertragshash hat sich veraendert -- Bestandschampions bekommen \
              andere Eingaben (siehe Testdoku)"
         );

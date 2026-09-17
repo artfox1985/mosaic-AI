@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7): der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen. **par.4a GESCHLOSSEN, praezisiert (par.10a): die Kanaele 77/78 wirken auf ihren POSTEN (+0,13 bis +0,22 belegte Spezialfelder in drei Seeds), nicht auf die SIEGQUOTE** -- der Nachzug mit 150 Paaren ohne Frueh-Stopp steht 147:153 (p 0,82); der alte Beleg (p 0,0386) kam aus 30 Paaren mit SPRT-Stopp. **par.4c VERWORFEN (par.12): kein neuer Kopf.** OFFEN nur noch der Drafting-Hebel, terminiert an Variante B (par.11). -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7): der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen. par.4a GESCHLOSSEN (par.10a: Kanaele 77/78 wirken auf den Posten, nicht auf die Siegquote, 147:153). par.4c VERWORFEN (par.12). **Drafting-Hebel NEU GEFASST als K6 (par.13, Nutzer 2026-09-17): `unlock_progress_beta` (reihenabhaengig 1..6, Teilkredit) als kleiner Blattterm im Netzpfad, Default 0; die Anker-Schaetzung zaehlt Spezialfelder flach mit -3. Variante B als Voraussetzung ist entfallen (negativ). Zuschnitt und Messkette registriert, nichts gebaut, Start nur auf Anweisung (Fahrplan 36d).** -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
@@ -946,3 +946,81 @@ Kopf haette dieselbe Beweislast gehabt, ohne dass sich an der Beweislage etwas g
 und der ist nach par.11 an Variante B (Tiling im Blatt, Fahrplan Nr. 33-36) terminiert. Sobald
 die gefahren ist, kann diese Prereg entschieden werden.
 
+
+## par.13 DER DRAFTING-HEBEL NEU GEFASST: K6 "Spezial-Freischaltungs-Fortschritt" (Nutzer-Auftrag 2026-09-17, "ja trag es dort ein")
+
+**Anlass, zweiteilig.** (1) Die Voraussetzung aus par.11 ist entfallen: Variante B (Tiling im
+Blatt) ist am 2026-09-17 NEGATIV gemessen (`PREREG_round_transition_search_sampling.md` par.17.9,
+169:191, Block-z -1,13) und kommt nicht ins Rezept. Der Drafting-Hebel kann also nicht mehr "auf
+dem Tiling im Blatt sitzen" -- er braucht einen eigenen Traeger. (2) Der Nutzer hat beim Blick auf
+die Heuristik-Punkteschaetzung gefragt, ob sie die Spezialplatten beruecksichtigt: *"der laesst
+sich sicher recyclen bzw. optimieren, bin mir nicht sicher ob er die spezialplatten
+beruecksichtigt."* Am Code geprueft:
+
+* **Die Anker-Version `scoring_progress` (`scoring.rs:160`) behandelt Spezialfelder FLACH:**
+  Kriterium 6 ist `-3 * special_empty`, minus drei je leerem Spezialfeld auf bereits gelegten
+  Platten, ohne Reihenwert und ohne Teilkredit fuer den Freischaltungsstand. Reihe 6 (6 Punkte)
+  zaehlt dort wie Reihe 1 (1 Punkt; `project_spezialpunkte_sind_reihenabhaengig`). Diese Funktion
+  ist der Blattwert des Elo-Ankers und wird NICHT angefasst (Kommentar `scoring.rs` ueber
+  `scoring_progress_alpha`: Anker-Schutz durch Konstruktion).
+* **Die optimierte Schwester existiert:** `unlock_progress_beta(player, tile_ids, beta)`
+  (`scoring.rs:373`) bewertet je Kuppel-Slot den Spezialbonus reihenabhaengig mit 1 bis 6
+  (`rasterreihe + 1`) und gibt fuer offene Slots Teilkredit `wert * (n_s/3)^beta`, `n_s` = gefuellte
+  Nicht-Spezial-Felder des Slots -- exakt die Kette aus par.11 Schritt 2. Kriterium 6 kommt dazu
+  nur flach und nur, wenn die Wertungsplatte aktiv ist. **Produktionsverbraucher: keiner** (Grep
+  2026-09-17: nur Tests in `net_mcts.rs` und der Diagnose-Export `lib.rs:1640-1651`).
+* **Als NETZEINGABE wenig Gewinn:** das Netz bekommt je Spieler die 37 Endwertungs-Werte (realisierte
+  Punkte je Kriterium, Fuellstaende) und je Kuppel-Slot den Fuellzustand jedes Feldes
+  (`features.rs` Abschnitt 6); der Fortschritt ist daraus ableitbar. Das unterscheidet ihn von der
+  Loeser-Projektion aus Variante C (`round_transition_search_sampling` par.18), die eine echte
+  Rechnung ist.
+
+### 13.1 Zuschnitt K6 (registriert VOR dem Bau, nichts gebaut)
+
+**Knopf `MOSAIC_SPECIAL_UNLOCK_W`** (Spec-Feld `special_unlock_w`, optional, Default 0,0 = aus,
+bitidentisch, Zweig wird nicht betreten): additiver Blattterm im Netz-Blattpfad an derselben
+Stelle wie K3/K4 (`net_mcts.rs` Blatt-Additive), Nullsumme:
+
+    shift = w * ( U(ich) - U(gegner) ) / NORM,   U = unlock_progress_beta(player, scoring_tile_ids, beta)
+
+mit `beta` aus `MOSAIC_SPECIAL_UNLOCK_BETA` (Default 2,0 wie der Buendelungs-Exponent der
+Progress-Familie) und `NORM` = 18 (Konstruktionsgroesse: `rasterreihe = sr*2 + sp_idx/2`, je
+Slot-Zeile `sr` also hoechstens Wert `sr*2 + 2`, drei Slots je Zeile: 3*(2+4+6) = 36 bei voller
+Belegung aller neun Slots mit Spezialfeld in der unteren Rasterreihe; die Haelfte, 18, ist die
+Norm -- BEWUSST eine konstruktive Zahl statt eines gemessenen P90, Lehre aus K4 par.7c, wo die Dosis
+auf einer Analogie stand). Wirkort NUR der Netz-Blattpfad; Heuristik und Anker lesen den
+Knopf nicht. Kein Netzaufruf, kein Loeser: `unlock_progress_beta` liest nur das Brett, die Kosten
+sind ein Bruchteil von K4 (dort +4,3 Prozent mit Loeser-Aufruf).
+
+**Warum das ein DRAFTING-Hebel ist:** der Term zahlt schon beim Ziehen fuer Steine, die einen
+Slot mit teurem Spezialfeld seiner Freischaltung naeher bringen -- ohne das Tiling im Blatt zu
+brauchen, weil die Kette (par.11) hier als Fortschrittsmass steht, nicht als gespieltes Tiling.
+
+**Die K4-Lehre steht dagegen und ist vorab benannt:** ein additiver Punkte-Term am Blatt machte
+die Suche rundenscore-gierig (`round_estimate_leaf_term` par.7c/7d). K6 ist kein Rundenscore,
+sondern ein STRUKTUR-Fortschritt (wie K3 die Huelle), und er ist klein dosiert -- aber dieselbe
+Falle (Strafleiste runter, Spalten runter) ist die erste Kennzahl, auf die im A/B zu schauen ist.
+
+### 13.2 Messkette (bindend), Dosen 0,25 und 0,5
+
+1. **Bau-Tore:** Bitidentitaet bei 0 (Anker-Drift, Konservierung, Paritaets-Fixture unveraendert),
+   Registratur, Manifest, `docs/knobs.md` generiert; Rust-Test, dass der Term bei Slot-Reihe 6 das
+   Sechsfache von Reihe 1 zahlt.
+2. **Kostentor** (Muster K4 par.7b, 2 x 20 Paare, beidseits gleiche Spec): Schwelle 25 Prozent --
+   Erwartung weit darunter (ANNAHME, kein Loeser).
+3. **A/B gepaart am Champion** `v28-b02_brierbest`, Champion-Spec plus `special_unlock_w` gegen
+   ohne, 200 Paare, Blockgroesse 5, ohne Frueh-Stopp, `--log-games`, EIN Seed je Dosis (0,5 zuerst;
+   0,25 nur, wenn 0,5 schadet).
+4. **Primaerkanal neben den Siegen:** Spezialfelder belegt je Partie und Plattenpunkte des
+   Kriteriums "Spezialfelder" (`plate_points_from_arena.py`), dazu die sechs Standard-Kennzahlen
+   (Spalten und Strafleiste als K4-Falle).
+5. **Lesart vorab:** (a) Siege signifikant besser und Spezialfelder hoch -> Rezept-Kandidat,
+   Nutzer-Entscheid; (b) Siege gleich, Spezialfelder hoch -> der Posten bewegt sich, die
+   Siegquote nicht (Bild wie par.10a, Knopf bleibt aus); (c) Siege schlechter -> K4-Falle, Knopf
+   bleibt aus, Prereg-Drafting-Hebel GESCHLOSSEN; (d) Spezialfelder unbewegt -> der Term greift
+   nicht, Diagnose vor jeder Dosisaenderung.
+
+**Kosten:** Bau rund 2 h (ANNAHME), Kostentor 2 x 9 min, A/B rund 80 min je Dosis (gemessen an
+`rt_leaf_on_vs_off`). **Eintaktung:** als Arm aus einer offenen Prereg nach der v30+-Regel des
+Nutzers zulaessig; NICHT gestartet -- Start nur auf Anweisung, nach Variante C (`v29-b07`) und
+der Stufe-0-Sonde, weil beide die Maschine brauchen. Fahrplan 36d.

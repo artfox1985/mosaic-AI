@@ -24,8 +24,60 @@ Cache-Sanierung auf Nutzer-Auftrag.
 
 ### LAEUFT
 
-**Stand 2026-09-17, 05:05: NICHTS laeuft, die Maschine ist frei. Das v29-Programm ist bis auf die
-Nutzer-Entscheide durch** (b04 negativ, Variante B negativ, b06 unterlegen; Einzelheiten unten und in
+**Stand 2026-09-17, 08:20:** drei Agenten-Auftraege sind zurueck, einer laeuft noch.
+(1) **Cache-Schluessel-Umbau GEBAUT** (`rust_data_layer` par.9b, Weg (1)): `config.FEATURE_FORMULA_VERSION`
+(Z.87) steht in BEIDEN Schluesseln (`file_cache_key.py` Z.220-221, `corpus_dataset.py` Z.644-648), dazu
+`featsrc_rust|record`; alle Alt-Bloecke und -Monolithe sind damit nicht mehr adressierbar (nichts
+geloescht). Agenten-Angabe 27 Schluessel-Tests gruen, vom Koordinator NICHT nachgefahren (Sonde belegt
+die CPU; vor dem Commit). (2) **Kette `tools/night_v29_b08_head_pair.sh` GESTARTET 08:15** (Zweierpaket
+`v29-b08`, par.10.4 / Fahrplan 36e): wartet auf die freie CPU (Sonde), dann Split, Bloecke und Monolith
+unter dem neuen Schluessel (Bauzeit wird gemessen), Training auf der GPU, Tor 1 gegen b03. (3) **Variante C
+CODE GESCHRIEBEN, UNKOMPILIERT** (`round_transition_search_sampling` par.18, Arm `v29-b07`): 90 Werte
+(je Spieler 36 Zellen + 9 Slots, nur Positionen, keine Skalare), `features.rs` INPUT_SIZE 884,
+Vertragshash-Literal neu `cfd94509f0aab102` (`lib.rs:2508`), `config.py` INPUT_SIZE noch 794 (Z.49; der
+Python-Zwilling schaltet erst bei 884 scharf, `neural_net.py:640`). **Damit ist der Arbeitsbaum fuer den
+b08-Blockbau konsistent, solange NIEMAND das Wheel neu installiert oder `config.INPUT_SIZE` anfasst.**
+(4) ~~Stufe-0-Sonde laeuft weiter~~ **Sonde DURCH 09:32** (`round_transition_search_sampling` 16.9, Zahlen am
+Artefakt `counterfactual_ranking_r4.json` nachgeprueft): R4, 800 Stellungen, 3.744 Paare, 2.644,5 s; bei
+Punktabstand traegt die Value-Rangfolge (M2 0,807 = 1.522 von 1.886 Paaren, M3 0,799), bei
+Punktgleichheit nicht (M3 0,305); **die Kippungen gegen die exakte Rechnung sind FALSCH**: 46 von 156
+richtig = 0,295, Wilson-Obergrenze 0,371 (M4, Grundmenge Paare mit Punktabstand, Ausgang 3 SCHADET).
+Nutzer-Entscheid daraus unter Abschnitt 6 Punkt 17. **Kette b08: Bloecke plus Monolith DURCH 10:06:56, 1.964 s** (Schluessel `421448d12eb8`, Stempel
+geprueft, Trainingsliste byte-gleich mit b03); ~~Training v29-b08 auf der GPU seit 10:06:56~~ **Training b08 DURCH 11:21 (74 min, gebremst; val_brier 0,1794
+Epoche 6, b03 0,17967), Tor 1 gegen b03 DURCH 13:58 (`minimal_strength_core` par.10.6): **405:395 von 800 = 50,6 Prozent,
+Block-z +0,33, HAELT** -- ownership-Loss und endgame-Kopf zusammen entbehrlich, Punkte -0,7 (Spezialfelder
+-0,5) als Merkposten; Traeger aus b06 per Differenz opp_points. **Variante-C-Kette `tools/night_v29_b07_variante_c.sh`
+GESTARTET 13:59:30** (config.INPUT_SIZE 884 gesetzt). **Wheel installiert, Vertrag 884 gruen, Anker-Drift und
+-Konservierung GRUEN (14:00), Paritaet: Flachvektor 884 gleich in 1.033 von 1.033 Zustaenden, Planes nur der
+bekannte Kanal-76-Altbefund (18.7). Kostentor HAELT 14:16 (18.8): 11,59 s je Partie gegen Referenz 13,33 (-13 Prozent; gegen die exklusive
+Zahl vom Tor 1 b08, 11,5 s, +0,6 Prozent -- der Loeser im Encoder kostet in der Suche nichts Messbares).
+Bloecke und Monolith unter 884 DURCH 14:52 (18.9): 2.144 s gegen 1.964 s unter 794, die Projektion kostet
+im Blockbau +9,2 Prozent. Training v29-b07 auf der GPU seit 14:52:49**, danach Tor 1 gegen b03; daneben als
+der eine CPU-Auftrag das Kompilat fuer Variante C und den Stichentscheid-Knopf, 10:12 bis 10:14 DURCH
+(`round_transition_search_sampling` 18.5: 683 Tests gruen, Feature-Golden-Fixture bewusst neu unter 884,
+`--no-run` gruen, Wheel gebaut, NICHT installiert; b08-Trainingszeit als gebremst markieren). Abnahme- und
+Messkette fuer Variante C **GESCHRIEBEN** (`tools/night_v29_b07_variante_c.sh`, 18.6, Syntax gruen; Stufen:
+Wheel-Installation, Vertragspruefung 884, Anker-Drift und -Konservierung, Paritaetssonde, Kostentor 2 x 20
+Paare gegen 13,326 s je Partie aus `rt_leaf_kosten_ohne_s20261151.json`, Split, Bloecke, Training b07 mit
+b03-Rezept, Tor 1 gegen b03 Seeds 20261190/20261191). Warmstart 794 -> 884 ist gedeckt: `train.py:1691-1696`
+fuellt die 90 neuen Eingangsspalten mit Null auf (geprueft). Start von Hand nach Tor 1 von b08, VORHER
+`config.INPUT_SIZE` auf 884 setzen (Kette bricht sonst ab). (5) **Stichentscheid-Knopf GEBAUT, unkompiliert**
+(16.11): `net_tiling_tiebreak` als Parameter bis zu beiden Lesestellen (`tiling_solver.rs:1816/:1877`),
+Default 1; Anker-Pfad erreicht den Zweig nicht (Evaluator `None`, `self_play.rs:2460`; Zweig hinter
+`if let Some(eval)`, `tiling_solver.rs:1817`), Spec-Dateien `models/tiebreak_on/off.spec.json` gegen die
+Champion-Spec geprueft (sonst identisch), Kette `tools/night_tiling_tiebreak_ab.sh` Syntax gruen.
+
+**Reihenfolge ab hier (Koordinator, bindend, Begruendung geprueft):** waehrend des b08-TRAININGS (GPU)
+als der eine erlaubte CPU-Auftrag: `cargo test --release --lib`, `--no-run`, Feature-Golden-Fixture
+bewusst neu, `maturin build` (NUR bauen). Wheel-INSTALLATION, `config.INPUT_SIZE` 884, Anker-Drift und
+-Konservierung, Paritaetssonde, Kostentor, Bloecke unter 884, Training b07 und Tor 1 erst NACH Tor 1
+von b08. Zwei Gruende: (a) `pip install` scheitert, solange ein Python-Prozess das `.pyd` haelt
+(Training mit FROM_RUST=1 und paired_gating laden es); (b) ein 884-Wheel haelt 794-Modelle spielbar
+(`net.rs:425` `n.min(s.len())`, `net.rs:990` Flachteil auf die MODELL-Laenge geschnitten), rechnet aber
+den Loeser im Encoder fuer JEDE Bewertung mit -- diese Mehrkosten (par.18.4, ungemessen) gehoeren in
+das Kostentor von Variante C, nicht in die Laufzeit von Tor 1 b08. ~~Stand 05:40: Sonde laeuft, Variante C
+wird entworfen~~. ~~Stand 05:05: nichts
+laeuft~~. **Das v29-Programm war bis auf die Nutzer-Entscheide durch** (b04 negativ, Variante B negativ, b06 unterlegen; Einzelheiten unten und in
 den Preregs). ~~Stand 01:40: zwei Ketten laufen parallel~~ (Chronik): (1) `tools/night_v29_b06_minimal_core.sh` -- Training
 v29-b06 auf der GPU seit 01:35 (Monolith `data/.cache_fd13f54061cd_b06.h5`, Stempel geprueft), danach
 wartet die Kette auf freie CPU fuer Tor 1 gegen b03 (Seeds 20261140/20261141); (2)
@@ -263,12 +315,16 @@ danach ein zweites Mal gebaut und beide Anker-Modi erneut gefahren (wieder GRUEN
 dieser Reihenfolge: Kostentor par.5 Schritt 1 (Nr. 35), dann A/B par.9 (Nr. 36)** -- beide
 ausdruecklich NICHT gestartet, sie taktet der Koordinator ein.
 
-**FREMDER ROTER BEFUND am Rand, gemeldet und nicht untersucht (par.17.7 (f)):** die
-Paritaetssonde `tools/probes/feature_parity_rust_python.py` faellt in der Korpus-Population
-(298 von 300; `pygame` 733 von 733 gleich), Abweichung in Planes-Kanal 76 (Erreichbarkeit,
-`features.rs:1733`). `42167aef` beruehrt `features.rs` nicht; letzte Aenderung dort ist
-`36520a31` (2026-09-14), und `docs/knobs.md` nennt das Tor "bestanden 2026-09-11" -- der Befund
-ist also aelter als der Variante-B-Bau. Artefakt
+**FREMDER ROTER BEFUND am Rand, INZWISCHEN UNTERSUCHT UND GESCHLOSSEN (2026-09-17,
+`PREREG_rust_data_layer.md` par.9a; Meldung war par.17.7 (f)):** die Paritaetssonde
+`tools/probes/feature_parity_rust_python.py` faellt in der Korpus-Population (298 von 300;
+`pygame` 733 von 733 gleich), Planes-Kanal 76. Ursache ist NICHT der Variante-B-Bau und kein
+Bauer-Fehler, sondern der A2-Phantom-Fix vom 2026-09-12 (`2a0cf4bf`): die v26-Records vom
+2026-09-09 tragen die Maske `cell_reachable_mask` nach der Formel von davor, der `direct`-Pfad
+rechnet sie frisch. Beide abweichenden Zustaende tragen Phantom-Fliesen; auf Records von nach
+dem Fix 0 von 600 Abweichungen. Das Tor vergleicht dort eine GESPEICHERTE gegen eine NEU
+GERECHNETE Groesse und kann auf Alt-Korpora dauerhaft nicht bestehen. Offen ist nur der
+Nutzer-Entscheid, was mit dem Tor geschieht (par.9a, drei Wege). Artefakt
 `evaluations/artifacts/feature_parity_rust_python.json`.
 
 ### FREIGABEN UND VERBOTE (woertlich, unveraendert gueltig)
@@ -903,6 +959,13 @@ oeffentlichen Typ der obersten Stapelplatte fest), Record-Feld `tiled_max_row` (
 gelesen), Stapelzug-Knoepfe im Lauf-Manifest. Vertragshash `39648b95bbba1acf` unveraendert,
 `input_size` 755. Netz-Paritaets-Fixture bewusst neu: `4750ffc6ec094a83`.
 
+**v30-TRAININGSREZEPT (Nutzer-Entscheide 2026-09-17, `minimal_strength_core` 10.6):** b03-Rezept mit
+`--ownership-weight 0` (Ownership-Ausgabe bleibt, Loss 0; Nutzer-Festlegung 2026-08-11 zum Kopf) und OHNE
+`--endgame-head`; `--opp-points-head` bleibt (Traeger per Differenz aus b06/b08). Beleg: b08 = dieses Paket
+gegen b03 405:395 von 800 (10.6). Noch offen fuer das Rezept: `moon_loss_weight 0` (Abschnitt 6 Punkt 12) und
+INPUT_SIZE 884 mit Abschnitt 17, falls Variante C traegt (Fahrplan 36c). Der Arm `v29-b07` faehrt bewusst
+noch das volle b03-Rezept, damit Tor 1 nur die Encoder-Aenderung misst.
+
 ## 5. PREREG-BESTAND (9 OFFEN laut Index 2026-09-15, Ziel rund 7)
 
 `python tools/generate_prereg_index.py` haelt `evaluations/PREREG_INDEX.md` aktuell; Stand
@@ -939,13 +1002,16 @@ entschieden sind; `dome_return_order` bleibt ebenfalls offen -- sein Bau-Tor ist
 `round_transition_search_sampling` ist par.16 dazugekommen - die Stufe-0-Sonde aus par.14.3 ist
 vorregistriert UND gebaut (`tools/probes/counterfactual_tiling_ranking.py`). Sie fragt, ob der
 Value-Kopf die Reihenfolge mehrerer Tiling-Plaene trifft und ab welcher Runde er eine exakte
-lokale Entscheidung ueberstimmen darf. **Der Volllauf steht aus** (Maschine durch die b04-Kette
-belegt); es gibt also noch KEIN Ergebnis, nur einen trocken geprueften Apparat. Zwei Punkte,
-die andere Abschnitte beruehren:
+lokale Entscheidung ueberstimmen darf. ~~Der Volllauf steht aus~~ **VOLLLAUF DURCH 2026-09-17, 09:32
+(par.16.9, Zahlen am Artefakt nachgeprueft):** R4 bei Punktabstand TRAEGT (M2 0,807, M3 0,799,
+n 1.886 Paare), bei Punktgleichheit nicht (M3 0,305); **M4: von 156 Kippungen gegen die exakte
+Rechnung sind 46 richtig = 0,295, Wilson-Obergrenze 0,371 -- Ausgang 3 SCHADET.** R3 ohne Verdikt
+(M3 0,577 unter 0,60, Referenz nur Netzsuche). Nutzer-Entscheid: Abschnitt 6 Punkt 17. Die zwei
+Punkte unten stehen als Vorgeschichte:
 
 * Der Bestand misst die Frage NICHT. `tools/tiling_value_reference_main.py:146` schneidet auf
-  punktgleiche Kandidaten zu; ob das Netz einen Punktvorsprung zu Recht ueberstimmt, ist nie
-  gemessen worden, obwohl der Zweig aktiv ist (`NET_TILING_TIEBREAK_ENABLED = true`,
+  punktgleiche Kandidaten zu; ob das Netz einen Punktvorsprung zu Recht ueberstimmt, war bis zum
+  2026-09-17 nie gemessen worden (jetzt: par.16.9c, es ueberstimmt zu 70 Prozent FALSCH), obwohl der Zweig aktiv ist (`NET_TILING_TIEBREAK_ENABLED = true`; seit 2026-09-17 Knopf `net_tiling_tiebreak`, Default 1,
   `tiling_solver.rs:858`, Runden 2-4 `:1603-1610`, Kriterium `punkte * P(Sieg)` `:944-964`).
 * Die Lesart deckt vorab auch "das Netz rangiert systematisch FALSCH" ab (par.16.5 Ausgang 3).
   Faellt der Lauf so aus, ist das ein Befund GEGEN einen heute laufenden Engine-Zweig und damit
@@ -1040,20 +1106,62 @@ die andere Abschnitte beruehren:
     par.12.8): b05 schwach positiv, b04 negativ -- der Kopf ist Ballast. Aufnahme ins v30-Rezept
     ja/nein; b06 (par.10 der Minimalkern-Prereg) faehrt ihn ohnehin auf 0 mit.
 
-13. **Strang A einzeln fahren?** (`minimal_strength_core` par.10.3 Lesart): b06 reisst die Marge,
-    b05 (nur moon aus) war leicht besser -- also traegt mindestens einer von ownership /
+13. ~~Strang A einzeln fahren?~~ **ENTSCHIEDEN 2026-09-17 (Nutzer): ZWEIERPAKET statt einzeln** --
+    Arm `v29-b08` = b03 mit ownership-Loss 0 und ohne endgame-Kopf (opp_points und moon bleiben),
+    gegen b03 mit der 5-Prozentpunkte-Regel (`minimal_strength_core` par.10.4, Fahrplan 36e).
+    Kette `tools/night_v29_b08_head_pair.sh`, startet nach Sonde und Schluessel-Umbau. Ursprung:
+    (`minimal_strength_core` par.10.3 Lesart): b06 reisst die Marge,
+    b05 (nur moon aus) war leicht besser -- also traegt mindestens einer von ownership / (nach b08 per Differenz: opp_points, par.10.6)
     opp_points / endgame als Trainingssignal. Die registrierte Fortsetzung ist A.3 (drei Arme
     einzeln gegen b03, je rund 4,5 h, 13-14 h gesamt). Ohne sie: alle drei Koepfe bleiben im
     v30-Rezept, `moon_loss_weight 0` bleibt Empfehlung (Punkt 12).
 
-14. **Variante B** (`round_transition_search_sampling` par.17.9): negativ, kommt nicht ins Rezept
-    -- kein Entscheid noetig, nur zur Kenntnis. Offen dort: Stufe-0-Sonde par.16 als Diagnostik
-    (fahren oder streichen).
+14. **Variante B** (`round_transition_search_sampling` par.17.9): negativ, kommt nicht ins Rezept.
+    ~~Offen dort: Stufe-0-Sonde par.16~~ **ENTSCHIEDEN 2026-09-17 (Nutzer: "fahr die sonde und
+    variante c")**: die Sonde laeuft, und Variante C (Encoder-Seite, par.7) wird als Arm `v29-b07`
+    gebaut -- ein Arm aus einer offenen Prereg, wie die v30+-Regel es zulaesst.
 
 15. ~~Loeschkandidaten~~ **GELOESCHT 2026-09-17 auf Anweisung (Nutzer: "mach mir mal die
     loeschungen"), restic-Snapshot c96f5768 vorher:** `data/.cache_fd13f54061cd.h5` (1,15 GB, falscher
     Stempel 4dd9f020b232) und `models/manifest_train_v29-b06_20260917_011916.json` (abgebrochener
     erster b06-Anlauf). Es bleiben sechs Monolithen in `data/` (darunter `.cache_fd13f54061cd_b06.h5` als Ersatz).
+
+16. **Paritaets-Tor und Alt-Records (Chip-Sitzung 2026-09-17, `PREREG_rust_data_layer.md` par.9a):**
+    der Planes-Kanal 76 weicht auf Records von VOR dem A2-Phantom-Fix (2026-09-12) ab, weil das
+    Tor eine GESPEICHERTE gegen eine FRISCH gerechnete Groesse haelt; der Flachvergleich ist dort
+    blind (liest zweimal das gespeicherte `col_f_max`). Drei Wege zur Wahl: (1) Formel-Version in
+    den Cache-Schluessel (sauber, entwertet alle Bloecke und Monolithe -- passt zum Neubau fuer
+    v29-b07/INPUT_SIZE-Wechsel, dort werden ohnehin alle Bloecke neu gebaut), (2) gespeicherte
+    Felder `cell_reachable_mask`/`col_f_max` aufgeben und ueberall frisch rechnen, (3) das Tor auf
+    frische Zustaende beschraenken (billigst, repariert nichts). Koordinator-Empfehlung: (1) im Zug
+    des b07-Blockbaus, dazu `MOSAIC_FEATURES_FROM_RUST=1` in JEDER Kette einheitlich setzen (heute
+    uneinheitlich, par.9a). Zahlen der Chip-Sitzung vom Koordinator NICHT nachgerechnet.
+
+17. ~~Netz-Stichentscheid im Tiling: abschalten, verengen oder lassen?~~ **ENTSCHIEDEN 2026-09-17
+    (Nutzer): als KNOPF bauen (`MOSAIC_NET_TILING_TIEBREAK`, Default 1 = Bestand) und im A/B messen
+    (`round_transition_search_sampling` 16.10, Kette `tools/night_tiling_tiebreak_ab.sh`, Fahrplan 36f);
+    zugleich: Variante A bleibt draussen, Variante C weiter wie geplant.** Ursprung: Befund `round_transition_search_sampling`
+    par.16.9c (Sonde 2026-09-17, R4, Referenz exakter Runde-5-Alpha-Beta): wo das Netz den Plan mit
+    weniger Rundenpunkten durchsetzt, liegt es in 46 von 156 Faellen richtig (0,295, Wilson95
+    [0,229; 0,371]) -- Ausgang 3 SCHADET auf der Grundmenge der Kippungen; die Rangfolge selbst ist
+    bei Punktabstand gut (M2 0,807), bei Punktgleichheit nicht (M3 0,305). Kippungen sind 8,2 Prozent
+    der Paare mit Punktabstand. R3 ohne belastbares Urteil (Referenz nur Netzsuche, 11 Kippungen).
+    Drei Wege: (a) Zweig aus (Kriterium `punkte * P(Sieg)` faellt, exakte Punkte entscheiden; Anker
+    liest den Zweig nicht, ist aber per Drift/Konservierung zu belegen); (b) nur bei Punktgleichheit
+    zulassen (dort ist die Sonde aber ebenfalls negativ, M3 0,305); (c) lassen, weil die Arena den
+    Zweig nie isoliert gemessen hat. Empfehlung des Koordinators: (a), mit A/B am Champion, 200 Paare,
+    Blockgroesse 5, als Arm aus dieser offenen Prereg (v30+-Regel). Konsument geprueft (16.9e):
+    `PREREG_geometric_envelope.md` par.3f stuetzt sich auf den Stichentscheid unter Punktgleichen;
+    wer K3 anfasst, liest 16.9c mit. NICHT gestartet, kein Code geaendert.
+
+13a. ~~Rezeptfolge aus b08~~ **ENTSCHIEDEN 2026-09-17 (Nutzer: "dann streiche sie"): v30-Rezept OHNE
+    `--endgame-head` und mit `--ownership-weight 0` (Ausgabe bleibt), `--opp-points-head` bleibt** (Abschnitt 4,
+    `minimal_strength_core` 10.6). Ursprung (`minimal_strength_core` 10.6): das Zweierpaket haelt (50,6 Prozent, z +0,33), also
+    sind ownership-Loss und endgame-Kopf gemeinsam entbehrlich; der Traeger aus b06 ist per Differenz
+    opp_points. Fuer v30: (a) `--ownership-weight 0` und ohne `--endgame-head`, opp_points bleibt
+    (einfacher, ein Kopf weniger); oder (b) b03-Rezept unveraendert, weil b08 einen halben Punkt weniger
+    macht (Spezialfelder -0,5; innerhalb der Seed-Streuung). Empfehlung des Koordinators: (a), die Siege
+    sind gleich und der Kopf ohne Leser in der Suche ist genau die Komplexitaet, die du abbauen wolltest.
 
 ## 7. VERBOTE UND STEHENDE REGELN
 

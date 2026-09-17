@@ -162,7 +162,23 @@ Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, 
 `PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c). **INPUT_SIZE 794**
 (entschieden 2026-09-13, `PREREG_stack_top_feature.md` par.16: die 18 Design-Bits bleiben
 draussen, weil die Vorderseiten der gezogenen Platten erst nach dem Aufhoeren bekannt sind).
-Weitere Arme ab `v29-b07` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
+Weitere Arme ab `v29-b09` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
+
+**Reserviert 2026-09-17 (Nutzer-Auftrag "pack die tendenziell am wenigsten tragenden koepfe in ein
+paket zusammen", `PREREG_minimal_strength_core.md` par.10.4):**
+**`v29-b08`** (Zweierpaket der am wenigsten tragenden Koepfe: wie b03, aber `--ownership-weight 0`
+und OHNE `--endgame-head`; opp_points und moon wie b03. Erste Kette auf dem Cache-Schluessel mit
+Formel-Version und `MOSAIC_FEATURES_FROM_RUST=1`, Bloecke und Monolith neu. Gegen b03, zwei Seeds
+a 200 Paare, Marge 5 Prozentpunkte; `PREREG_minimal_strength_core.md` par.10.4, Fahrplan 36e,
+Kette `tools/night_v29_b08_head_pair.sh`; reserviert 2026-09-17.)
+
+**Reserviert 2026-09-17 (Nutzer-Auftrag "fahr die sonde und variante c",
+`PREREG_round_transition_search_sampling.md` par.18):**
+**`v29-b07`** (Variante C, Encoder-Seite der Tiling-Sicht: Abschnitt 17 mit je Spieler 36
+Zellen "wird im Tiling dieser Runde gefuellt" und 9 Slots "wird vollendet", aus der Projektion
+des bestehenden Tiling-Loesers; sonst wie b03). **INPUT_SIZE 884** (794 + 90; keine
+Punkt-Skalare, Nutzer-Einwand 2026-09-17: `estimated_score` traegt sie schon). Bezugspunkt von
+Tor 1 ist b03.
 
 **Reserviert 2026-09-16 (Nutzer-Entscheid, `PREREG_minimal_strength_core.md` par.10):**
 **`v29-b06`** (Minimalkern: wie b03, aber `--moon-loss-weight 0`, `--ownership-weight 0`, ohne

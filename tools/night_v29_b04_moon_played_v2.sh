@@ -19,6 +19,11 @@
 # (corpus_dataset.py, fuer den Monolithen). Nachgeprueft: Block 022277a410ca gegen
 # 5c950b9d7c7b, Fenster c696e7cb7bf7 gegen f7aa442a9d67. b03s Bloecke und Monolith
 # bleiben unberuehrt.
+# ACHTUNG, diese vier Schluessel sind UEBERHOLT: seit dem 2026-09-17 tragen beide
+# Schluessel die Merkmals-Formelversion und die Merkmals-Quelle
+# (PREREG_rust_data_layer.md par.9b). Die Aussage "eigener Datensatz, zweifach
+# abgesichert" gilt weiter, die ZAHLEN nicht -- sie muessten vor einem Neulauf
+# neu gerechnet werden.
 #
 # Die Kette laeuft EXKLUSIV und wartet, bis keine Messung mehr laeuft.
 set -uo pipefail
@@ -28,6 +33,13 @@ export MOSAIC_IGNORE_POLICY_TARGET_VALID=1
 export MOSAIC_VAL_POOL='^selfplay_v28-'
 export MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v29.json
 export MOSAIC_MOON_TARGET_SOURCE=played
+# Merkmalsbauer EXPLIZIT (2026-09-17, PREREG_rust_data_layer.md par.9a/par.9b):
+# der Schalter steht seit heute in BEIDEN Cache-Schluesseln (Block und Fenster),
+# entscheidet also ueber die Adresse der Bloecke und des Monolithen. Er stand in
+# v29 uneinheitlich (b02/b03 setzten ihn, diese Kette nicht); ab jetzt setzt ihn
+# JEDE Kette ausdruecklich auf 1, damit kein Arm die Semantik dessen erbt, der
+# den Block zuerst gebaut hat (Bloecke werden memoisiert).
+export MOSAIC_FEATURES_FROM_RUST=1
 ART=evaluations/artifacts
 SEED=20260941   # wie b01/b03/b05 -- der Arm soll sich nur im Ziel unterscheiden
 

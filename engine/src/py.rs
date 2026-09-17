@@ -1118,7 +1118,7 @@ impl PyGame {
         // Task #20: ist ein Netz geladen (`self.net`), wird derselbe
         // Stichentscheid wie im Rust-Self-Play-Pfad angewendet (siehe
         // `self_play.rs::resolve_tiling_step`/`net_tiling_tiebreak_value`) --
-        // hinter `NET_TILING_TIEBREAK_ENABLED` + Rundenfenster 2-4, sonst
+        // hinter `net_tiling_tiebreak` + Rundenfenster 2-4, sonst
         // exakt `best_first_step_exact`. Ohne geladenes Netz (`self.net ==
         // None`, Heuristik-Debug-Sitzung) unveraendert.
         //
@@ -1146,6 +1146,9 @@ impl PyGame {
                 };
                 best_first_step_exact_or_valued_envelope(
                     &self.game.state, pi, Some(&evaluator), own.as_ref(), &envelope, Some(&margin_evaluator),
+                    // par.16.10: die GUI-Sitzung liest auch diesen Knopf aus
+                    // der Umgebung (kein Spec-Pfad hier), Default 1 = Bestand.
+                    sc.net_tiling_tiebreak,
                 )
             }
             None => best_first_step_exact_or_valued(&self.game.state, pi, None),

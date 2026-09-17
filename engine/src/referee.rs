@@ -27,7 +27,10 @@ use crate::net::Net;
 use crate::net_mcts::{derive_search_seed, SearchConfig, START_SEARCH_STREAM};
 use crate::round_end::apply_bonus_chips_with;
 use crate::scoring::sample_valid_scoring_ids;
-use crate::self_play::{apply_chosen_action, choose_start_placement, net_arena_choose_action, resolve_tiling_step};
+use crate::self_play::{
+    apply_chosen_action, choose_start_placement, net_arena_choose_action,
+    resolve_tiling_step_tiebreak,
+};
 use crate::serialize::{action_to_dict, state_to_json_exact};
 use crate::tile::TileColor;
 
@@ -205,6 +208,8 @@ pub(crate) fn choose_tiling_step_json(
     let step = crate::self_play::resolve_tiling_step_with_variant(
         &state, pi, net, &crate::envelope::EnvelopeTilingParams::OFF,
         search_config.heuristic_variant,
+        // par.16.10: aus der Spec DIESER Seite, wie die Variante darueber.
+        search_config.net_tiling_tiebreak,
     );
     Ok(crate::serialize::tiling_step_to_dict(&step))
 }
@@ -660,7 +665,21 @@ impl RefereeGame {
                         Some(p) => Some(load_cached(&mut self.nets, p)?),
                         None => None,
                     };
-                    let step = resolve_tiling_step(&self.game.state, pi, net);
+                    // par.16.10: der Netz-Stichentscheid im Tiling kommt aus
+                    // der Spec DIESER Seite. Die Spec wird NUR gelesen, wenn
+                    // fuer die Seite ueberhaupt ein Netz geladen ist -- ohne
+                    // Netz gibt es keinen Evaluator und damit keinen Zweig, und
+                    // der Anker-Pfad (beide Seiten heuristisch, `model_path
+                    // == None`) bezahlt so keinen einzigen zusaetzlichen
+                    // Dateizugriff.
+                    let spec_here = if pi == 0 { &spec_p0 } else { &spec_p1 };
+                    let tiebreak = match (net, spec_here) {
+                        (Some(_), Some(spec)) => {
+                            crate::resolve_search_config(Some(spec.clone()))?.net_tiling_tiebreak
+                        }
+                        _ => crate::tiling_solver::NET_TILING_TIEBREAK_DEFAULT,
+                    };
+                    let step = resolve_tiling_step_tiebreak(&self.game.state, pi, net, tiebreak);
                     match step {
                         TilingStep::Place(ta) => {
                             let _ = self.game.apply_single_tiling(pi, &ta);

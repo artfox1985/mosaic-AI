@@ -24,6 +24,13 @@ export PYTHONIOENCODING=utf-8
 export MOSAIC_IGNORE_POLICY_TARGET_VALID=1
 export MOSAIC_VAL_POOL='^selfplay_v28-'
 export MOSAIC_CARRIER_MANIFEST=policy_carrier_manifest_v29.json
+# Merkmalsbauer EXPLIZIT (2026-09-17, PREREG_rust_data_layer.md par.9a/par.9b):
+# der Schalter steht seit heute in BEIDEN Cache-Schluesseln, also entscheidet er
+# ueber die Adresse der Bloecke und des Monolithen. Innerhalb von v29 stand er
+# uneinheitlich (b02/b03 setzten ihn, diese Kette nicht) -- jede Kette setzt ihn
+# ab jetzt ausdruecklich auf 1, damit kein Arm die Semantik dessen erbt, der den
+# Block zuerst gebaut hat.
+export MOSAIC_FEATURES_FROM_RUST=1
 unset MOSAIC_MOON_TARGET_SOURCE
 ART=evaluations/artifacts
 SEED=20260941

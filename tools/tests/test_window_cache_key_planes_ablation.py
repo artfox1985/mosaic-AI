@@ -41,7 +41,20 @@ FILES = [
 # Schalter nicht gesetzt. Aendert sich dieser Literal, hat jemand den
 # DEFAULT-Schluessel bewegt und damit jeden Bestandscache entwertet -- das
 # darf nur absichtlich passieren, mit Eintrag in der Prereg.
-KEY_WITH_SWITCH_OFF = "bea417f31e0e"
+#
+# ABSICHTLICH BEWEGT am 2026-09-17: "bea417f31e0e" -> "5fd616444e86"
+# (Nutzer-Entscheid, PREREG_rust_data_layer.md par.9b, Weg (1) aus par.9a).
+# Der Fenster-Schluessel traegt seither UNBEDINGT die Merkmals-Formelversion
+# (`config.FEATURE_FORMULA_VERSION`, Marker "+featfmt_a2phantom-20260912") und
+# die Merkmals-Quelle ("+featsrc_record" bzw. "+featsrc_rust"). Nachgeprueft:
+# das Schluesselmaterial ohne diese beiden Marker ergibt exakt den alten Wert
+# "bea417f31e0e" -- es hat sich nichts sonst bewegt. Die Entwertung aller
+# vorhandenen Monolithen ist die gewollte Folge; der Neubau faellt mit dem
+# INPUT_SIZE-Wechsel fuer den Arm v29-b07 ohnehin an.
+# Bewegt 2026-09-17 (zweiter Zug desselben Tags): INPUT_SIZE 794 -> 884 durch Abschnitt 17
+# (Tiling-Projektion, Variante C, Arm v29-b07, PREREG_round_transition_search_sampling.md
+# par.18/18.9); INPUT_SIZE steht im Block- und damit im Fenster-Schluessel. Vorher ba128e934a4a.
+KEY_WITH_SWITCH_OFF = "5fd616444e86"
 
 
 class WindowCacheKeyPlanesAblationTest(unittest.TestCase):

@@ -622,6 +622,30 @@ def window_cache_key(data_dir="data", files=None, *, value_target_variant="defau
     _bs_coherence = _bootstrap_coherence_mode()
     if _bs_coherence != "off":
         cache_key_material += "+bscoh_" + _bs_coherence + "_v1"
+    # Merkmals-FORMEL und Merkmals-QUELLE (2026-09-17, Nutzer-Entscheid Weg (1)
+    # aus PREREG_rust_data_layer.md par.9a). Beide Teile stehen auch im
+    # BLOCK-Schluessel (`file_cache_key.py`) -- der Block traegt die Planes, das
+    # Fenster den Monolithen, und ein Knopf, der nur in einem von beiden steht,
+    # ist genau der Fehler vom 2026-09-14 (b03 trainierte mit, validierte ohne
+    # die Spezialfeld-Kanaele; `feedback_feature_knob_belongs_in_both_cache_keys`).
+    #
+    # UNBEDINGT angehaengt, anders als "+specialoff_v1"/"+moontarget_*" oben: die
+    # Version markiert eine Formel-Aenderung, die JEDEN Cache betrifft, der
+    # gespeicherte `cell_reachable_mask`-/`col_f_max`-Werte aus Records von vor
+    # dem 2026-09-12 traegt. Gewollte Folge: alle vorhandenen Monolithen sind
+    # unter dem neuen Schluessel nicht mehr adressierbar (Neubau faellt mit dem
+    # INPUT_SIZE-Wechsel fuer den Arm v29-b07 ohnehin an).
+    #
+    # `MOSAIC_FEATURES_FROM_RUST` kommt aus der UMGEBUNG, nicht als Parameter --
+    # Holschuld an einer Stelle statt Bringschuld an sieben
+    # (`tools/tests/test_cache_key_knobs_are_env_coupled.py`). Die alte
+    # Begruendung "nicht im Schluessel, weil beide Bauer bit-identisch sind"
+    # (docs/knobs.md) gilt auf Alt-Records seit dem 2026-09-12 nicht mehr.
+    from config import FEATURE_FORMULA_VERSION
+    from file_cache_key import _features_from_rust_key
+    cache_key_material += "+featfmt_" + str(FEATURE_FORMULA_VERSION)
+    cache_key_material += ("+featsrc_rust" if _features_from_rust_key()
+                           else "+featsrc_record")
     digest = hashlib.md5(cache_key_material.encode()).hexdigest()
     return WindowCacheKey(files=files, policy_carrier_set=policy_carrier_set,
                           carrier_prefixes=carrier_prefixes, cache_nopack=cache_nopack,

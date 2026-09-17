@@ -24,6 +24,13 @@ Wer einen neuen Knopf hinzufuegt, hat zwei zulaessige Wege:
 Ein dritter Weg, ein Sachwert als Default, ist genau der Vorfall oben. Wer ihn
 doch braucht, traegt ihn samt Begruendung in ALTBESTAND_MIT_SACHDEFAULT ein --
 dann steht wenigstens im Baum, warum.
+
+SCHWESTERTEST (2026-09-17): `test_cache_key_feature_formula_version.py`. Er
+deckt den Weg (a) fuer `MOSAIC_FEATURES_FROM_RUST` ab -- gar kein Parameter, die
+Schluesselfunktion liest die Umgebung selbst -- und dazu die Merkmals-
+FORMELVERSION (`config.FEATURE_FORMULA_VERSION`). Eine kuratierte Liste der
+env-gekoppelten Knoepfe fuehrt dieser Test bewusst nicht; gepruefte Knoepfe
+stehen jeweils im Test, der sie einfuehrt.
 """
 import inspect
 import os
