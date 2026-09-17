@@ -289,6 +289,32 @@ pub(crate) fn read_round_est_b_profile_env() -> [f64; 4] {
     ROUND_EST_B_PROFILE_DEFAULT
 }
 
+/// K6-Exponent `MOSAIC_SPECIAL_UNLOCK_BETA` (`PREREG_special_tile_yield.md`
+/// par.13.1). Fehlend, nicht parsbar, nicht endlich oder negativ ->
+/// [`SPECIAL_UNLOCK_BETA_DEFAULT`] plus einmalige stderr-Warnung, kein Panic
+/// (gleiche Disziplin wie [`read_round_est_b_profile_env`]). Die
+/// Negativsperre steht hier, weil `beta` der Exponent in `(n_s/3)^beta` ist:
+/// bei `n_s == 0` und negativem `beta` ist `0^beta = +inf` -- ein NaN/inf im
+/// Blattwert statt eines kleinen Terms.
+pub(crate) fn read_special_unlock_beta_env() -> f64 {
+    static WARNED: std::sync::OnceLock<()> = std::sync::OnceLock::new();
+    let Ok(raw) = std::env::var("MOSAIC_SPECIAL_UNLOCK_BETA") else {
+        return SPECIAL_UNLOCK_BETA_DEFAULT;
+    };
+    match raw.trim().parse::<f64>() {
+        Ok(v) if v.is_finite() && v >= 0.0 => v,
+        _ => {
+            WARNED.get_or_init(|| {
+                eprintln!(
+                    "⚠️  MOSAIC_SPECIAL_UNLOCK_BETA={raw:?} ignoriert -- erwartet eine endliche \
+                     Zahl >= 0; Default {SPECIAL_UNLOCK_BETA_DEFAULT} gilt."
+                );
+            });
+            SPECIAL_UNLOCK_BETA_DEFAULT
+        }
+    }
+}
+
 /// Groesster gueltiger Wert von [`SearchConfig::return_order_mode`]
 /// (`PREREG_dome_return_order.md` par.4): 0 Bestand, 1 netzbewertet,
 /// 2 Heuristik.
@@ -915,6 +941,23 @@ pub struct SearchConfig {
     /// Spec-Feld je Seite (`round_est_b_profile`, OPTIONAL, vier Zahlen > 0),
     /// Env-Default `MOSAIC_ROUND_EST_B_PROFILE`.
     pub round_est_b_profile: [f64; 4],
+    /// K6 (`PREREG_special_tile_yield.md` par.13/par.13.1, gebaut
+    /// 2026-09-17): `w`, Gewicht des Spezial-Freischaltungs-Fortschritts am
+    /// Netz-Blattwert
+    /// (`shift = w * (U(0) - U(1)) / SPECIAL_UNLOCK_NORM`, Nullsumme,
+    /// geklammert). `U` ist [`crate::scoring::unlock_progress_beta`] --
+    /// reine Brettfunktion, kein Netzaufruf und kein Loeser. Default `0.0` =
+    /// aus, bitidentisch (der Block wird komplett uebersprungen, es wird
+    /// nicht einmal `U` gerechnet). Spec-Feld je Seite (`special_unlock_w`,
+    /// OPTIONAL mit Default 0), Env-Default `MOSAIC_SPECIAL_UNLOCK_W`.
+    pub special_unlock_w: f64,
+    /// K6-Exponent `beta` des Teilkredits `wert_s * (n_s/3)^beta` in
+    /// [`crate::scoring::unlock_progress_beta`] (par.13.1). Default
+    /// [`SPECIAL_UNLOCK_BETA_DEFAULT`] = 2,0, der Buendelungs-Exponent der
+    /// Progress-Familie. Nur wirksam bei `special_unlock_w != 0`; Spec-Feld
+    /// je Seite (`special_unlock_beta`, OPTIONAL, >= 0), Env-Default
+    /// `MOSAIC_SPECIAL_UNLOCK_BETA`.
+    pub special_unlock_beta: f64,
     /// Rueckgabe-Reihenfolge der nicht gewaehlten Kuppelplatten
     /// (`PREREG_dome_return_order.md` par.4, gebaut 2026-09-12): `0` =
     /// Bestand (Ziehreihenfolge, bitidentisch, Default), `1` = netzbewertet
@@ -1126,6 +1169,8 @@ impl SearchConfig {
             out_wild_w: crate::envelope::out_wild_weight(),
             round_est_c: read_f64_env("MOSAIC_ROUND_EST_C", 0.0),
             round_est_b_profile: read_round_est_b_profile_env(),
+            special_unlock_w: read_f64_env("MOSAIC_SPECIAL_UNLOCK_W", 0.0),
+            special_unlock_beta: read_special_unlock_beta_env(),
             return_order_mode: read_return_order_mode_env(),
             start_by_search: read_start_by_search_env(),
             moon_order_variants: read_moon_order_variants_env(),
@@ -1187,6 +1232,8 @@ impl SearchConfig {
             "out_wild_w",
             "round_est_c",
             "round_est_b_profile",
+            "special_unlock_w",
+            "special_unlock_beta",
             "return_order_mode",
             "start_by_search",
             "moon_order_variants",
@@ -1363,6 +1410,16 @@ impl SearchConfig {
                 out
             }
         };
+        // K6 (PREREG_special_tile_yield.md par.13.1): dieselbe
+        // OPTIONAL-Begruendung wie bei K4 darueber, Wort fuer Wort
+        // uebertragbar -- bei `special_unlock_w == 0` wird der Blatt-Zweig gar
+        // nicht betreten, eine Spec ohne die Felder beschreibt also bitgenau
+        // das Verhalten, das sie schon immer beschrieben hat. Der Helfer
+        // weist negative UND nicht-numerische Werte ab; `beta` faellt ohne
+        // Feld auf SPECIAL_UNLOCK_BETA_DEFAULT, `w` auf 0.
+        let special_unlock_w = get_optional_non_negative("special_unlock_w", 0.0)?;
+        let special_unlock_beta =
+            get_optional_non_negative("special_unlock_beta", SPECIAL_UNLOCK_BETA_DEFAULT)?;
         // `PREREG_dome_return_order.md` par.4: dieselbe OPTIONAL-Begruendung
         // wie bei den Feldern darueber. Die eingefrorenen Artefakt-Specs
         // (`models/frozen_champions/*/spec.json`,
@@ -1643,6 +1700,8 @@ impl SearchConfig {
             out_wild_w,
             round_est_c,
             round_est_b_profile,
+            special_unlock_w,
+            special_unlock_beta,
             return_order_mode,
             start_by_search,
             moon_order_variants,
@@ -2366,6 +2425,56 @@ pub(crate) fn round_estimate_shift_state(
         state.round_number,
         c,
         b_profile,
+    )
+}
+
+// ── K6: Spezial-Freischaltungs-Fortschritt am Blattwert ─────────────────────
+// (`PREREG_special_tile_yield.md` par.13/par.13.1, Nutzer-Auftrag 2026-09-17
+// "lass es bauen und takte es ein".)
+
+/// Norm des K6-Terms, par.13.1: **18**. KONSTRUKTIV hergeleitet, nicht
+/// gemessen -- und das ist Absicht (Lehre aus K4 par.7c, wo die Dosis auf
+/// einer Analogie stand). Die Rechnung: `rasterreihe = sr*2 + sp_idx/2`, je
+/// Slot-Zeile `sr` also hoechstens Wert `sr*2 + 2`; drei Slots je Zeile geben
+/// `3*(2 + 4 + 6) = 36` bei voller Belegung aller neun Slots mit einem
+/// freigeschalteten Spezialfeld in der unteren Rasterreihe. Die HAELFTE davon,
+/// 18, ist die Norm.
+pub const SPECIAL_UNLOCK_NORM: f64 = 18.0;
+
+/// Default-Exponent `beta` des K6-Teilkredits (par.13.1): `2.0`, derselbe
+/// Buendelungs-Exponent wie in der Progress-Familie
+/// (`shaping::UNLOCK_SHAPING_BETA`).
+pub const SPECIAL_UNLOCK_BETA_DEFAULT: f64 = 2.0;
+
+/// K6, REINE Formel (par.13.1): `shift = w * (u0 - u1) / SPECIAL_UNLOCK_NORM`
+/// aus Sicht von Spieler 0, `0` bei `w == 0`. Der Aufrufer addiert `shift` auf
+/// Spieler 0 und subtrahiert ihn von Spieler 1 (Nullsumme) und klammert beide
+/// auf [0, 1] -- gleiche Bauform wie Floor-, Langreihen-, K3- und K4-Term.
+/// Ohne Zustand und ohne Netz testbar.
+///
+/// KEINE Runden-Auflage (anders als K3 und K4, die in Runde 5 auf 0 gehen):
+/// par.13.1 nennt keine, und ein unregistrierter Zusatz waere eine andere
+/// Messung als die vorregistrierte.
+pub(crate) fn special_unlock_shift_from(u0: f64, u1: f64, w: f64) -> f64 {
+    if w == 0.0 {
+        return 0.0;
+    }
+    w * (u0 - u1) / SPECIAL_UNLOCK_NORM
+}
+
+/// K6 am Zustand: [`crate::scoring::unlock_progress_beta`] fuer beide Spieler
+/// mit den AKTIVEN Wertungsplatten des Zustands (`state.scoring_tile_ids` --
+/// dieselbe Quelle wie der Diagnose-Export `lib.rs::scoring_shaping_e_json`),
+/// dann [`special_unlock_shift_from`]. Der Fruehausstieg steht VOR den beiden
+/// Fortschrittsrechnungen, damit bei `w == 0` gar nichts gerechnet wird.
+pub(crate) fn special_unlock_shift_state(state: &GameState, w: f64, beta: f64) -> f64 {
+    if w == 0.0 {
+        return 0.0;
+    }
+    special_unlock_shift_from(
+        crate::scoring::unlock_progress_beta(&state.players[0], &state.scoring_tile_ids, beta),
+        crate::scoring::unlock_progress_beta(&state.players[1], &state.scoring_tile_ids, beta),
+        w,
     )
 }
 
@@ -3557,6 +3666,26 @@ fn node_from_net_outputs<R: Rng + ?Sized>(
                     &state,
                     round_est_c,
                     &search_config.round_est_b_profile,
+                );
+                today_value[0] = (today_value[0] + shift).clamp(0.0, 1.0);
+                today_value[1] = (today_value[1] - shift).clamp(0.0, 1.0);
+            }
+
+            // K6 (PREREG_special_tile_yield.md par.13/par.13.1): Spezial-
+            // Freischaltungs-Fortschritt `w * (U(0) - U(1)) / 18`, reine
+            // Zustandsfunktion, Nullsumme, geklammert -- DIESELBE Stelle im
+            // Blatt-Pfad wie K3 und K4, direkt hinter dem K4-Term. Bei
+            // `w == 0` (Default) wird der Block KOMPLETT uebersprungen: keine
+            // Fortschrittsrechnung, keine Rundung, bitidentisch (gleiche
+            // Zusage wie bei `envelope_search_c == 0` und `round_est_c == 0`).
+            // Kein Loeser und kein Netzaufruf -- `unlock_progress_beta` liest
+            // nur das Brett.
+            let special_unlock_w = search_config.special_unlock_w;
+            if special_unlock_w != 0.0 {
+                let shift = special_unlock_shift_state(
+                    &state,
+                    special_unlock_w,
+                    search_config.special_unlock_beta,
                 );
                 today_value[0] = (today_value[0] + shift).clamp(0.0, 1.0);
                 today_value[1] = (today_value[1] - shift).clamp(0.0, 1.0);
@@ -8580,6 +8709,8 @@ mod tests {
             out_wild_w: 0.0,
             round_est_c: 0.0,
             round_est_b_profile: ROUND_EST_B_PROFILE_DEFAULT,
+            special_unlock_w: 0.0,
+            special_unlock_beta: SPECIAL_UNLOCK_BETA_DEFAULT,
             return_order_mode: 0,
             start_by_search: 0,
             // AUSNAHME von "nichts ist an": der BESTAND dieses Knopfs IST
@@ -9888,6 +10019,128 @@ mod tests {
             checked += 1;
         }
         assert!(checked > 0, "kein Drafting-Zustand erzeugt -- Test darf nicht leer gruen sein");
+    }
+
+    /// K6 par.13.1, REINE Formel (Muster
+    /// `round_estimate_shift_is_zero_when_off_or_in_round_five_and_bounded_by_c`):
+    /// `w = 0` ergibt exakt 0 (Bau-Tor par.13.2 Punkt 1, Bitidentitaet bei 0),
+    /// gleicher Fortschritt ergibt exakt 0, der Seitentausch dreht genau das
+    /// Vorzeichen (NULLSUMME per Konstruktion, par.13.1), und die Norm ist
+    /// exakt 18.
+    #[test]
+    fn special_unlock_shift_is_zero_when_off_and_is_antisymmetric() {
+        // (a) Aus heisst aus -- auch bei maximaler Fortschrittsdifferenz.
+        assert_eq!(special_unlock_shift_from(36.0, 0.0, 0.0), 0.0, "w = 0");
+        assert_eq!(special_unlock_shift_from(0.0, 36.0, 0.0), 0.0, "w = 0, andere Seite");
+        // Gleicher Fortschritt: nichts zu verschieben.
+        assert_eq!(special_unlock_shift_from(7.5, 7.5, 0.5), 0.0, "U-Differenz 0");
+        // (c) Nullsumme: shift(ich) = -shift(gegner).
+        let s = special_unlock_shift_from(12.0, 3.0, 0.5);
+        let mirrored = special_unlock_shift_from(3.0, 12.0, 0.5);
+        assert!(s > 0.0, "{s}");
+        assert!((s + mirrored).abs() < 1e-12, "Antisymmetrie beim Seitentausch: {s} / {mirrored}");
+        // Exakte Formel und Norm 18 (par.13.1): w * (u0 - u1) / 18.
+        assert_eq!(SPECIAL_UNLOCK_NORM, 18.0);
+        assert!((special_unlock_shift_from(18.0, 0.0, 1.0) - 1.0).abs() < 1e-12);
+        for (u0, u1, w) in [(12.0, 3.0, 0.5), (2.0, 9.0, 0.25), (36.0, 0.0, 1.0)] {
+            let want = w * (u0 - u1) / 18.0;
+            let got = special_unlock_shift_from(u0, u1, w);
+            assert!((got - want).abs() < 1e-12, "({u0}, {u1}, {w}): {got} statt {want}");
+        }
+    }
+
+    /// K6 am ZUSTAND: der Fortschritt je Seite ist genau
+    /// `scoring::unlock_progress_beta` mit den AKTIVEN Wertungsplatten des
+    /// Zustands, und bei `w = 0` liefert der Zustands-Einstieg exakt 0 -- kein
+    /// Rechenpfad, kein Brettdurchlauf (Bau-Tor par.13.2 Punkt 1).
+    #[test]
+    fn special_unlock_shift_state_uses_board_progress_and_is_off_at_w_zero() {
+        let mut rng = StdRng::seed_from_u64(20260917);
+        let mut checked = 0;
+        for gi in 0..8u64 {
+            let Some(state) = random_drafting_state(gi, 15, &mut rng) else { continue };
+            assert_eq!(
+                special_unlock_shift_state(&state, 0.0, SPECIAL_UNLOCK_BETA_DEFAULT),
+                0.0,
+                "Spiel {gi}: w = 0 muss exakt 0 ergeben"
+            );
+            let want = special_unlock_shift_from(
+                crate::scoring::unlock_progress_beta(
+                    &state.players[0], &state.scoring_tile_ids, SPECIAL_UNLOCK_BETA_DEFAULT,
+                ),
+                crate::scoring::unlock_progress_beta(
+                    &state.players[1], &state.scoring_tile_ids, SPECIAL_UNLOCK_BETA_DEFAULT,
+                ),
+                0.5,
+            );
+            let got = special_unlock_shift_state(&state, 0.5, SPECIAL_UNLOCK_BETA_DEFAULT);
+            assert!((got - want).abs() < 1e-12, "Spiel {gi}: {got} statt {want}");
+            // Nullsumme am Zustand: die Gegenseite bekommt exakt das Negative
+            // (der Blattpfad rechnet `today_value[1] - shift`).
+            let spiegel = special_unlock_shift_from(
+                crate::scoring::unlock_progress_beta(
+                    &state.players[1], &state.scoring_tile_ids, SPECIAL_UNLOCK_BETA_DEFAULT,
+                ),
+                crate::scoring::unlock_progress_beta(
+                    &state.players[0], &state.scoring_tile_ids, SPECIAL_UNLOCK_BETA_DEFAULT,
+                ),
+                0.5,
+            );
+            assert!((got + spiegel).abs() < 1e-12, "Spiel {gi}: Nullsumme verletzt");
+            checked += 1;
+        }
+        assert!(checked > 0, "kein Drafting-Zustand erzeugt -- Test darf nicht leer gruen sein");
+        // Und der Knopf ist in der Nullkonfiguration aus (Default-Zusage).
+        assert_eq!(search_config_off().special_unlock_w, 0.0);
+        assert_eq!(search_config_off().special_unlock_beta, SPECIAL_UNLOCK_BETA_DEFAULT);
+    }
+
+    /// K6 (`PREREG_special_tile_yield.md` par.13.1): `special_unlock_w` und
+    /// `special_unlock_beta` sind OPTIONALE Spec-Felder -- fehlen sie, laedt
+    /// die Spec mit `w = 0` (Zweig unbetreten) und `beta = 2,0`. Stehen sie
+    /// drin, kommen sie unveraendert an; negative und nicht-numerische Werte
+    /// sind Fehler (Bau-Tor par.13.2 Punkt 1, Testauflage (d)).
+    #[test]
+    fn search_config_from_spec_file_takes_special_unlock_knobs_as_optional_fields() {
+        let dir = std::env::temp_dir();
+        let path = dir.join(format!("mosaic_test_spec_k6_{}.json", std::process::id()));
+        let spec = |extra: &str| {
+            format!(
+                r#"{{"implicit_minimax_alpha": 0.0, "long_row_init_shaping_w": 0.0, "score_utility_c": 0.0, "score_utility_b": 20.0, "envelope_search_c": 1.0, "envelope_tiling_w": 0.0, "envelope_profile": [1.0, 0.92, 0.67, 0.33, 0.0], "envelope_tiling_value_w": 0.0, "envelope_projection_mode": 1, "envelope_flush_w": 0.0, "envelope_hull_form": 1, "special_row6_w": 0.0{extra}, "heuristik_variante": "hv1"}}"#
+            )
+        };
+        // Beide Felder fehlen: laedt, w = 0 und beta = Default.
+        std::fs::write(&path, spec("")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap())
+            .expect("Spec ohne die K6-Felder muss weiter laden");
+        assert_eq!(cfg.special_unlock_w, 0.0);
+        assert_eq!(cfg.special_unlock_beta, SPECIAL_UNLOCK_BETA_DEFAULT);
+        // Beide gesetzt: kommen unveraendert an.
+        std::fs::write(&path, spec(", \"special_unlock_w\": 0.5, \"special_unlock_beta\": 1.5")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("gueltige Werte");
+        assert_eq!(cfg.special_unlock_w, 0.5);
+        assert_eq!(cfg.special_unlock_beta, 1.5);
+        // Nur `w` gesetzt: `beta` faellt auf den Default zurueck.
+        std::fs::write(&path, spec(", \"special_unlock_w\": 0.25")).unwrap();
+        let cfg = SearchConfig::from_spec_file(path.to_str().unwrap()).expect("nur w gesetzt");
+        assert_eq!(cfg.special_unlock_w, 0.25);
+        assert_eq!(cfg.special_unlock_beta, SPECIAL_UNLOCK_BETA_DEFAULT);
+        // Negative Werte sind Fehler (beide Felder).
+        for bad in [", \"special_unlock_w\": -0.25", ", \"special_unlock_beta\": -1.0"] {
+            std::fs::write(&path, spec(bad)).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("negativer Wert muss scheitern");
+            assert!(msg.contains("special_unlock"), "{msg}");
+            assert!(msg.contains(">= 0"), "{msg}");
+        }
+        // Nicht-numerische Werte sind Fehler.
+        for bad in [", \"special_unlock_w\": \"0.5\"", ", \"special_unlock_beta\": null"] {
+            std::fs::write(&path, spec(bad)).unwrap();
+            let msg = SearchConfig::from_spec_file(path.to_str().unwrap())
+                .expect_err("nicht-numerischer Wert muss scheitern");
+            assert!(msg.contains("ist keine Zahl"), "{msg}");
+        }
+        std::fs::remove_file(&path).ok();
     }
 
     /// K3: das Profil muss genau fuenf Zahlen haben.

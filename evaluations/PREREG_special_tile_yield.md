@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7): der Lehrer laesst 81 Prozent der unteren Spezialfelder liegen. par.4a GESCHLOSSEN (par.10a: Kanaele 77/78 wirken auf den Posten, nicht auf die Siegquote, 147:153). par.4c VERWORFEN (par.12). **Drafting-Hebel NEU GEFASST als K6 (par.13, Nutzer 2026-09-17): `unlock_progress_beta` (reihenabhaengig 1..6, Teilkredit) als kleiner Blattterm im Netzpfad, Default 0; die Anker-Schaetzung zaehlt Spezialfelder flach mit -3. Variante B als Voraussetzung ist entfallen (negativ). Zuschnitt und Messkette registriert, nichts gebaut, Start nur auf Anweisung (Fahrplan 36d).** -->
+<!-- STATUS: OFFEN | Frage: Die Spezialfliesen sind der groesste unabgeholte Posten auf dem Brett; laesst sich das heben, und an welchem Hebel? | Beleg: Posten LEBT (par.7). par.4a GESCHLOSSEN (par.10a), par.4c VERWORFEN (par.12). **K6 GEBAUT und GEMESSEN (13.3-13.7): Kostentor +3,5 Prozent haelt, A/B Dosis 0,5 SCHADET (180:210 von 390, Block-z -2,57, Punkte -2,3, Spezialfelder belegt -0,15) -> Knopf bleibt 0, Drafting-Hebel GESCHLOSSEN (Ausgang c, K4-Falle: Zielkonflikt Vermeiden statt Belegen). Dosis 0,25 laeuft nur noch als Kurvenpunkt (13.8).** -->
 
 # Vorregistrierung: Ertrag der Spezialfliesen
 
@@ -1024,3 +1024,182 @@ Falle (Strafleiste runter, Spalten runter) ist die erste Kennzahl, auf die im A/
 `rt_leaf_on_vs_off`). **Eintaktung:** als Arm aus einer offenen Prereg nach der v30+-Regel des
 Nutzers zulaessig; NICHT gestartet -- Start nur auf Anweisung, nach Variante C (`v29-b07`) und
 der Stufe-0-Sonde, weil beide die Maschine brauchen. Fahrplan 36d.
+
+### 13.3 Baustand K6 (2026-09-17, Agent)
+
+**Gebaut, nichts gemessen.** Der Knopf steht auf Default 0 und ist damit inert; die Kette aus
+par.13.2 ist geschrieben, aber NICHT gestartet (die Maschine trug beim Bau Tor 1 von v29-b07).
+Das Wheel ist zum Zeitpunkt dieses Eintrags NICHT neu gebaut -- Stufe 0 der Kette prueft das und
+bricht sonst ab.
+
+**Formel wie gebaut** (`net_mcts.rs:2468` `special_unlock_shift_from`, `:2470`
+`special_unlock_shift_state`):
+
+    shift = special_unlock_w * ( U(0) - U(1) ) / 18,
+    U(pi) = scoring::unlock_progress_beta(state.players[pi], state.scoring_tile_ids, special_unlock_beta)
+
+`U` ist unveraendert `scoring.rs:373` (reihenabhaengiger Bonus 1..6 je Kuppel-Slot plus
+Teilkredit `wert * (n_s/3)^beta`, Kriterium 6 flach und nur bei aktiver Platte 6). Die Norm 18
+steht als `SPECIAL_UNLOCK_NORM` (`net_mcts.rs:2442`) mit der konstruktiven Herleitung aus par.13.1
+im Doc-Kommentar, `beta`-Default 2,0 als `SPECIAL_UNLOCK_BETA_DEFAULT` (`:2447`).
+**Abweichung, ausdruecklich benannt:** K6 hat KEINE Runden-5-Auflage (K3 und K4 haben eine) --
+par.13.1 nennt keine, und ein unregistrierter Zusatz waere eine andere Messung als die
+vorregistrierte. Das steht so im Doc-Kommentar der Formel.
+
+**Wirkort und Transportweg des Werts.** Spec-Feld -> `SearchConfig` -> Blattpfad, kein
+prozessweiter Getter (sonst waere "Champion mit gegen Champion ohne" im selben Prozess nicht
+fahrbar):
+
+| Station | Stelle |
+| --- | --- |
+| Spec-Parsing, OPTIONAL, `>= 0`, sonst Fehler | `net_mcts.rs:1415-1422` (`get_optional_non_negative`) |
+| bekannte Spec-Felder | `net_mcts.rs:1235-1236` (`KNOWN_FIELDS`) |
+| Struct-Felder | `net_mcts.rs:951` / `:960` |
+| Env-Default | `net_mcts.rs:1172-1173` (`from_env`), Beta-Getter `:299` |
+| Nullkonfiguration der Tests | `net_mcts.rs:8712-8713` (`search_config_off`) |
+| **Blatt-Additiv** | `net_mcts.rs:3683-3688`, in `node_from_net_outputs` (`:3477`), direkt hinter dem K4-Term, vor `apply_plate_shaping` |
+| Lauf-Manifest | `lib.rs:828-829` (`engine_config_json`) |
+| Registratur | `knob_registry.rs:113-114`, `docs/knobs.md` neu erzeugt (130 Knoepfe) |
+| Beispiel-Bauteil (sonst bricht der pre-push-Hook) | `engine/examples/kernbeweis_910002_probe.rs:104-105` |
+
+**Nullsumme** wie bei K4 geloest: der Aufrufer addiert `shift` auf `today_value[0]` und
+subtrahiert ihn von `today_value[1]`, beide danach auf [0, 1] geklammert (`net_mcts.rs:3687-3688`).
+`shift` ist per Konstruktion antisymmetrisch im Seitentausch, es gibt also nur EINE Rundung.
+
+**Anker-Befund (Pruefstelle, nicht Messung).** Der Knopf lebt ausschliesslich in `SearchConfig`,
+und `engine/src/mcts.rs` enthaelt den Bezeichner `SearchConfig` NULL mal (Grep 2026-09-17) --
+der Heuristik-Pfad kann den Knopf strukturell nicht lesen. `special_unlock`/`SPECIAL_UNLOCK`
+kommt in `mcts.rs`, `round5.rs` und `referee.rs` nirgends vor. Der Wirkort
+`node_from_net_outputs` ist der NETZ-Blattpfad. Dazu die Bitidentitaet bei 0: der Zweig wird bei
+`w == 0.0` gar nicht betreten, es wird nicht einmal `U` gerechnet. **Die MESSUNG des Ankers steht
+aus** -- Drift und Konservierung sind Stufe 2 der Kette und laufen erst nach dem Wheel-Neubau.
+
+**Tests (geschrieben, NICHT gelaufen -- die Maschine war belegt):**
+
+* `net_mcts.rs:10031` `special_unlock_shift_is_zero_when_off_and_is_antisymmetric` -- (a) `w = 0`
+  ergibt exakt 0, gleicher Fortschritt ergibt 0, (c) Nullsumme beim Seitentausch, Norm exakt 18.
+* `net_mcts.rs:10057` `special_unlock_shift_state_uses_board_progress_and_is_off_at_w_zero` --
+  der Zustands-Einstieg verrechnet genau die beiden `unlock_progress_beta`-Werte mit den AKTIVEN
+  Wertungsplatten, ist bei `w = 0` exakt 0, Nullsumme am Zustand; dazu die Nullkonfiguration.
+* `scoring.rs:2272` `special_unlock_leaf_term_pays_six_times_for_grid_row_six_versus_row_one` --
+  (b) par.13.2 Punkt 1: zwei Bretter mit GENAU einem Spezial-Slot bei gleichem Fuellstand
+  (`n_s = 1`, Teilkredit kuerzt sich), `pool[15]` in Slot-Reihe 0 gibt Rasterreihe 0 (Wert 1),
+  `pool[0]` (`sp_idx = 3`) in Slot-Reihe 2 gibt Rasterreihe 5 (Wert 6) -- der Blattterm steht
+  exakt im Verhaeltnis 6 : 1. Der Test steht in `scoring.rs`, weil der Brettbauer
+  `place_special_type_tile_at` dort lebt; gerechnet wird der echte K6-Term.
+* `net_mcts.rs:10104` `search_config_from_spec_file_takes_special_unlock_knobs_as_optional_fields`
+  -- (d) fehlend gibt `w = 0` und `beta = 2,0`, gesetzt kommt unveraendert an, negativ und
+  nicht-numerisch sind harte Fehler.
+
+**Spec-Dateien** (Champion-Spec `models/frozen_champions/v28-b02/spec.json` plus EINEM Feld, beide
+Arme mit derselben Feldmenge -- Vorbild `tiebreak_on`/`off`): `models/k6_w050.spec.json` (0,5),
+`models/k6_w025.spec.json` (0,25), `models/k6_off.spec.json` (0,0).
+
+**Kette** `tools/night_k6_special_unlock.sh` (`bash -n` gruen, `cpu_frei`/`warte_frei` und die
+`MOSAIC_CHAIN_NO_WAIT`-Uebersteuerung aus `night_tiling_tiebreak_ab.sh`, Anker-Stufe aus
+`night_v29_b07_variante_c.sh`): Stufe 0 Vorbedingungen (Knopf im Quelltext, Wheel NEUER als
+`net_mcts.rs`, sonst Abbruch "Wheel nicht neu gebaut"), 1 Wheel installieren und Manifest-Export
+pruefen, 2 Anker-Drift und -Konservierung (beide gruen Pflicht), 3 Kostentor par.13.2 Punkt 2
+(2 x 20 Paare, Seeds 20261200/20261201, Verdikt nach
+`evaluations/artifacts/k6_kostentor_verdikt.txt`), 4 A/B Dosis 0,5 (200 Paare, Seed 20261210) samt
+Spalten-Sonde und Plattenpunkten, 5 Dosis 0,25 NUR bei `A < B` und `p < 0,05` (Seed 20261211),
+6 Abschlusszeile "faellig danach". STOPP bei jedem roten Tor.
+
+**Referenz des Kostentors, benannt statt geraten:** die sonst uebliche Referenz "der Aus-Arm
+DESSELBEN Laufs" gibt es hier nicht -- das Kostentor ist EIN Lauf mit beiden Seiten, seine
+`laufzeit.s_je_partie` mischt an und aus. Genommen wird darum die exklusiv gemessene Zahl
+**11,5 s je Partie** (Tor 1 b08 gegen b03, je 200 Paare mit Logs, 10 Threads,
+`docs/measured_runtimes.md` Zeile 182), Schwelle 25 Prozent Aufschlag.
+
+**Was NICHT angefasst wurde:** `scoring.rs:160` (`scoring_progress`, Elo-Anker), `config.py`,
+die Netz-Eingaben (`features.rs`), die Paritaets-Fixture (K6 aendert kein Record-Feld und keine
+Eingabe). `docs/architecture_reference.md` bleibt unveraendert: die K3-/K4-Blatt-Additive sind
+dort nicht beschrieben (Grep nach `round_est_c`, `envelope_search_c`, "Blatt-Additiv": keine
+Fundstelle), K6 haette dort keinen Platz, an den es anzuschliessen waere.
+
+### 13.4 Eintaktung K6 (Nutzer 2026-09-17, "lass es bauen und takte es ein")
+
+Baustand 13.3 vom Koordinator lesend geprueft: Blatt-Additiv in `node_from_net_outputs` hinter dem K4-Block
+(`net_mcts.rs:3683-3690`, Zweig bei `w == 0` nicht betreten), `special_unlock_shift_from` = `w * (u0 - u1) / 18`
+(`:2458`), Zustands-Einstieg ueber `unlock_progress_beta(&players[pi], &scoring_tile_ids, beta)` (`:2470`),
+Nullsumme `today_value[0] + shift`, `today_value[1] - shift`, geklammert. Spec-Dateien `k6_w050/w025/off` bis auf
+das Feld gleich der Champion-Spec (geprueft). Kette `tools/night_k6_special_unlock.sh` `bash -n` gruen. NICHT
+kompiliert (Tor 1 b07 laeuft exklusiv).
+
+**Reihenfolge (bindend):** nach Tor 1 von b07 (erwartet gegen 19:40): (1) `cargo test --release --lib` und
+`--no-run` (4 neue Tests, Vertragshash und Paritaets-Fixture muessen unveraendert gruen bleiben), (2) Wheel bauen
+und installieren (Default 0 = bitidentisch; danach traegt das installierte Wheel Variante C, den
+Stichentscheid-Knopf und K6), (3) Kette K6: Vertragspruefung, Anker-Drift und -Konservierung, Kostentor 2 x 20
+Paare gegen 11,5 s je Partie (Schwelle 25 Prozent), A/B Dosis 0,5 (Seed 20261210, 200 Paare), Dosis 0,25 nur bei
+Schaden. Das A/B laeuft als der eine CPU-Auftrag neben dem GPU-Training von `v29-b09` (`minimal_strength_core`
+par.10.7); Tor 1 von b09 danach exklusiv. Lesart bleibt 13.2 Punkt 5; Primaerkanal Spezialfelder belegt und
+Kriterium Spezialfelder.
+
+### 13.5 Kompilat K6 (2026-09-17, 19:32-19:36) und Start der Kette
+
+`cargo test --release --lib`: **688 bestanden, 0 rot, 19 ignoriert** (82 s; vorher 683 plus die vier K6-Tests
+aus 13.3 und ein weiterer aus dem Tagesbestand), Vertragshash-Literal und Netz-Paritaets-Fixture unveraendert
+gruen; `cargo test --release --no-run` gruen (Beispiele, Benches); Wheel gebaut 19:36:32
+(`mosaic_rust-0.1.0-cp314-cp314-win_amd64.whl`, 6.568.697 Byte; traegt jetzt Variante C, den Stichentscheid-Knopf
+und K6). Kette `tools/night_k6_special_unlock.sh` GESTARTET 19:38 auf freier Maschine: Installation,
+Vertragspruefung, Anker-Drift und -Konservierung, Kostentor (exklusiv), A/B Dosis 0,5; das b09-Training startet
+erst, wenn das Kostentor durch ist (GPU-Training neben dem A/B ist erlaubt, neben dem Kostentor nicht).
+
+### 13.6 Abnahme K6 auf dem installierten Wheel (2026-09-17, 19:37-19:54): Tore gruen, Kostentor HAELT
+
+* Wheel installiert 19:37; `engine_config_json` traegt `special_unlock_w` 0,0 und `special_unlock_beta` 2,0; die drei
+  Spec-Dateien laden (14 Felder).
+* **Anker-Drift GRUEN** (19:37:41, 1/1 Dateien Feld fuer Feld gleich; additiv hinzugekommen und ignoriert:
+  `tiled_max_row`), **Anker-Konservierung GRUEN** (19:38:01). Der Blattterm liegt bei Default 0 bitidentisch,
+  und der Heuristik-Pfad liest ihn nicht (13.3).
+* **Kostentor (13.2 Punkt 2):** Champion gegen sich selbst, `k6_w050` gegen `k6_off`, 2 x 20 Paare (Seeds
+  20261200/20261201), 10 Threads, exklusiv: **11,82 / 11,98 s je Partie, Mittel 11,90**; Referenz 11,5 s
+  (Tor 1 b08, exklusiv, 794-Wheel) -> **Aufschlag +3,5 Prozent, Schwelle +25, HAELT**
+  (`k6_kostentor_verdikt.txt`). Einordnung: davon sind rund +4 bis +8 Prozent schon die Encoder-Projektion von
+  Variante C (18.12: 12,0-12,4 s auf dem 884-Wheel ohne K6) -- der K6-Term selbst kostet damit nichts Messbares,
+  wie in 13.1 erwartet (kein Loeser, kein Netzaufruf). Grundmenge Partien, Einheit Sekunden je Partie.
+* **A/B Dosis 0,5 laeuft seit 19:54:35** (Seed 20261210, 200 Paare); daneben seit 19:56 das GPU-Training
+  `v29-b09` mit vorgeschaltetem Split/Merge (rund 10 min CPU) -- erlaubte Nebenlast fuer ein gepaartes A/B,
+  die Laufzeit des A/B ist damit als gebremst zu lesen, nicht die Siegquote.
+
+### 13.7 A/B Dosis 0,5 GEMESSEN (2026-09-17, 19:54-21:34): K6 SCHADET -- die K4-Falle, wie vorab benannt
+
+Champion `v28-b02_brierbest` @400 gegen sich selbst, `k6_w050` (A) gegen `k6_off` (B), Blockgroesse 5, Seed 20261210,
+10 Threads, `--log-games`; Nebenlast GPU-Training v29-b09 (erlaubt; Laufzeit 15,1 s je Partie statt 11,9
+exklusiv). **SPRT hat H0 bei 195 Paaren angenommen** (LLR -7,14 unter -6,91), also Stopp vor dem Deckel.
+Grundmenge Partien, Einheit Siege.
+
+| Groesse | Wert |
+| --- | --- |
+| Siege w0,5 : aus | **180 : 210 von 390 = 46,2 Prozent** |
+| Sweeps w0,5 / aus (Paare) | 19 / 34, Split 142; Vorzeichentest p 0,053 |
+| Diff je Paar, KI95 | -0,154 [-0,299; -0,009] |
+| **Block-Ebene** (Entscheidungsmass) | 39 Bloecke a 10 Partien, Siegdiff w0,5 minus aus **-0,77 je Block, SE 0,30, z = -2,57** |
+| eigene Punkte w0,5 / aus | 51,15 / 53,41 (**-2,26**) |
+| Laufzeit | 5.879 s |
+
+**Sechs Standard-Kennzahlen** (`arena_columns_k6_w050_vs_off_s20261210.json`, 388 von 390 nachgespielt;
+`plate_points_k6_w050_s20261210.json`):
+
+| Kennzahl | w0,5 | aus | Diff |
+| --- | --- | --- | --- |
+| Reihen: volle Zeilen / lange Reihen vollendet | 0,142 / 2,99 | 0,165 / 3,02 | -0,023 / -0,04 |
+| Spalten: volle / >= 3 | 0,876 / 3,21 | 0,954 / 3,25 | **-0,078** / -0,05 |
+| Strafleiste gesamt | 8,53 | 8,17 | **+0,37** (`boden` +0,41) |
+| Plattenpunkte je Kriterium | Spezialfelder **-9,91**, Vertikale 6,47, Eckplatten 7,73, Farbenreiche 0,20 | -11,24, 6,81, 7,92, 0,31 | **+1,33**, -0,34, -0,19, -0,11 |
+| Spezialfelder belegt je Partie / Kuppelbonus | 1,13 / 4,74 | 1,28 / 5,36 | **-0,15 / -0,62** |
+| Eigene Punkte / Marge | 51,15 / -2,26 | 53,41 / +2,26 | -2,26 / -4,52 |
+
+**Verdikt nach 13.2 Punkt 5, Ausgang (c): Siege schlechter -> K4-Falle, Knopf bleibt aus, der Drafting-Hebel
+dieser Prereg ist GESCHLOSSEN.** Das Bild ist genau das vorab benannte: der Term macht die Suche gierig auf den
+Freischaltungs-Fortschritt -- der Strafposten "leere Spezialfelder" sinkt um 1,33 Punkte (weniger Platten mit
+offenem Spezialfeld), aber dafuer werden WENIGER Spezialfelder belegt (-0,15 je Partie), weniger Kuppelbonus
+(-0,62), weniger volle Spalten (-0,08) und mehr Strafleiste (+0,37). Netto -2,3 Punkte. Der Primaerkanal
+"Spezialfelder belegt" geht in die falsche Richtung; das ist kein Dosisproblem der Sorte "zu stark", sondern
+ein Zielkonflikt: das Fortschrittsmass belohnt das Vermeiden offener Spezialfelder, nicht deren Belegung.
+
+**Dosis 0,25:** die Hauptkette hat sie ausgelassen, weil ihr Kriterium der Vorzeichentest p < 0,05 war (p 0,053);
+die Prereg verlangt sie aber, "wenn 0,5 schadet", und auf Block-Ebene schadet 0,5 signifikant. Darum laeuft
+`tools/night_k6_w025_ab.sh` (Seed 20261211, 200 Paare) nach Tor 1 von b09 exklusiv als letzte Messung der
+Nacht; Ergebnis in 13.8. Erwartung (Herleitung aus dem Zielkonflikt, keine Messung): flach bis leicht negativ;
+das Verdikt (c) aendert sich dadurch nicht, nur die Dosis-Kurve wird vollstaendig.

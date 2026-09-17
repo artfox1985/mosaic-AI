@@ -52,7 +52,23 @@ GESTARTET 13:59:30** (config.INPUT_SIZE 884 gesetzt). **Wheel installiert, Vertr
 bekannte Kanal-76-Altbefund (18.7). Kostentor HAELT 14:16 (18.8): 11,59 s je Partie gegen Referenz 13,33 (-13 Prozent; gegen die exklusive
 Zahl vom Tor 1 b08, 11,5 s, +0,6 Prozent -- der Loeser im Encoder kostet in der Suche nichts Messbares).
 Bloecke und Monolith unter 884 DURCH 14:52 (18.9): 2.144 s gegen 1.964 s unter 794, die Projektion kostet
-im Blockbau +9,2 Prozent. Training v29-b07 auf der GPU seit 14:52:49**, danach Tor 1 gegen b03; daneben als
+im Blockbau +9,2 Prozent. Training v29-b07 auf der GPU seit 14:52:49** (Warmstart-Zeile geprueft: 755 -> 884, 129 Spalten null, davon 39 wie
+bei b03 und 90 Projektion), **b07 TRAINIERT 16:45 (113 min, gebremst; val_brier 0,1779 Epoche 7, bester Wert der Serie, innerhalb der
+Aufloesung; Export 884). Tor 1 b07 gegen b03 DURCH 19:32 (18.12): **432:368 von 800 = 54,0 Prozent, Block-z +2,40 -- VARIANTE C
+TRAEGT** (Seeds heterogen: 203:197 und 229:171); volle Spalten +0,05, Strafleiste -0,37, Punkte +1,1; die 90
+Projektions-Spalten sind angekoppelt (Norm 0,67, keine bei 0; Sicht-Spalten 0,28). b07 ist Kandidat 1 fuer
+die Champion-Kanten (Punkt 18).** ~~LAEUFT seit 16:45:47~~ (18.10). **K6 KOMPILIERT 19:36 (688 Tests gruen), Wheel installiert, Drift und Konservierung GRUEN, Kostentor HAELT
+(+3,5 Prozent gegen 11,5 s; `special_tile_yield` 13.5/13.6). **A/B Dosis 0,5 DURCH 21:34 (13.7): K6 SCHADET -- 180:210 von 390 (SPRT H0), Block-z -2,57, Punkte -2,3, Spezialfelder
+belegt -0,15, Strafleiste +0,4 -> Knopf bleibt 0, Drafting-Hebel der Prereg GESCHLOSSEN (K4-Falle, Zielkonflikt).
+Dosis 0,25 laeuft nach Tor 1 b09 nur noch als Kurvenpunkt (`tools/night_k6_w025_ab.sh`).** Daneben die b09-Kette: Merge 827 s, **Training v29-b09 DURCH 21:21 (72 min gebremst; val_brier 0,1785 Epoche 4; Manifest-Diff gegen b03 genau
+moon 0, ownership 0, ohne endgame, cache_file, Name; `minimal_strength_core` 10.8); Tor 1 b09 gegen b03 LAEUFT seit 21:34 (nach dem K6-A/B), bis etwa 0:30; Commit-Hook um 21:40 auf
+Nutzer-Anweisung ("commit den stand") -- Laufzeit von Tor 1 b09 damit gebremst, Siegquote gepaart unberuehrt;** Champion-Kanten (Punkt 18) morgen; **Stichentscheid-A/B DURCH 16:41 (`round_transition_search_sampling` 16.12): an schlaegt aus 224:176 von 400
+(56,0 Prozent), Block-z +3,43, Punkte +1,6, Strafleiste -0,3 -- der Zweig TRAEGT, `net_tiling_tiebreak`
+bleibt 1, der Sondenbefund 16.9c ist Diagnostik (Sonde und Arena messen verschiedene Grundmengen).**
+~~daneben das Stichentscheid-A/B `tools/night_tiling_tiebreak_ab.sh` seit 14:56~~ (Champion an gegen aus, 200 Paare, Seed
+20261170, 16.10; gestartet mit `MOSAIC_CHAIN_NO_WAIT=1`, die Kette wuerde sonst auf train.py warten; die
+Variante-C-Kette wartet vor Tor 1 auf das Ende des A/B). **Commit `231537ea` um 14:55 (Tagesstand, ahead 16;
+b07-Trainingszeit dadurch gebremst).** daneben als
 der eine CPU-Auftrag das Kompilat fuer Variante C und den Stichentscheid-Knopf, 10:12 bis 10:14 DURCH
 (`round_transition_search_sampling` 18.5: 683 Tests gruen, Feature-Golden-Fixture bewusst neu unter 884,
 `--no-run` gruen, Wheel gebaut, NICHT installiert; b08-Trainingszeit als gebremst markieren). Abnahme- und
@@ -962,9 +978,13 @@ gelesen), Stapelzug-Knoepfe im Lauf-Manifest. Vertragshash `39648b95bbba1acf` un
 **v30-TRAININGSREZEPT (Nutzer-Entscheide 2026-09-17, `minimal_strength_core` 10.6):** b03-Rezept mit
 `--ownership-weight 0` (Ownership-Ausgabe bleibt, Loss 0; Nutzer-Festlegung 2026-08-11 zum Kopf) und OHNE
 `--endgame-head`; `--opp-points-head` bleibt (Traeger per Differenz aus b06/b08). Beleg: b08 = dieses Paket
-gegen b03 405:395 von 800 (10.6). Noch offen fuer das Rezept: `moon_loss_weight 0` (Abschnitt 6 Punkt 12) und
-INPUT_SIZE 884 mit Abschnitt 17, falls Variante C traegt (Fahrplan 36c). Der Arm `v29-b07` faehrt bewusst
-noch das volle b03-Rezept, damit Tor 1 nur die Encoder-Aenderung misst.
+gegen b03 405:395 von 800 (10.6). **ENTSCHIEDEN 2026-09-17, 17:25 (Nutzer: "dann gehen wir die wette fuer v30 und kaltstart ein"): INPUT_SIZE
+884 mit Abschnitt 17 geht ins v30-Rezept, und v30 trainiert KALT (kein Warmstart), damit die neuen Eingaenge
+von Anfang an gelernt werden** (`round_transition_search_sampling` 18.11; Kosten Kaltstart 2,27 h statt rund
+1 h; Risiko-Praezedenz v14; Rueckfall = Afterburner auf dem kalten v30-Netz, Punkt 20). **`--moon-loss-weight 0` ENTSCHIEDEN (Nutzer 2026-09-17, Punkt 12).** Damit ist das v30-Rezept vollstaendig:
+884 mit Abschnitt 17, Kaltstart, moon 0, ownership 0, ohne endgame, opp_points bleibt; Rueckfall 1 Afterburner, Rueckfall 2 Warmstart von b09. Der Arm `v29-b07` faehrt bewusst
+noch das volle b03-Rezept, damit Tor 1 nur die Encoder-Aenderung misst. **`v29-b09` faehrt das v30-Rezept
+komplett auf dem v29-Fenster** (par.10.7) und ist damit der Generator-Kandidat, der das Rezept schon traegt.
 
 ## 5. PREREG-BESTAND (9 OFFEN laut Index 2026-09-15, Ziel rund 7)
 
@@ -1011,7 +1031,7 @@ Punkte unten stehen als Vorgeschichte:
 
 * Der Bestand misst die Frage NICHT. `tools/tiling_value_reference_main.py:146` schneidet auf
   punktgleiche Kandidaten zu; ob das Netz einen Punktvorsprung zu Recht ueberstimmt, war bis zum
-  2026-09-17 nie gemessen worden (jetzt: par.16.9c, es ueberstimmt zu 70 Prozent FALSCH), obwohl der Zweig aktiv ist (`NET_TILING_TIEBREAK_ENABLED = true`; seit 2026-09-17 Knopf `net_tiling_tiebreak`, Default 1,
+  2026-09-17 nie gemessen worden (jetzt: par.16.9c, es ueberstimmt zu 70 Prozent FALSCH -- und trotzdem TRAEGT der Zweig in der Arena, 16.12: an > aus, Block-z +3,43; Sonde und Arena messen verschiedene Grundmengen), obwohl der Zweig aktiv ist (`NET_TILING_TIEBREAK_ENABLED = true`; seit 2026-09-17 Knopf `net_tiling_tiebreak`, Default 1,
   `tiling_solver.rs:858`, Runden 2-4 `:1603-1610`, Kriterium `punkte * P(Sieg)` `:944-964`).
 * Die Lesart deckt vorab auch "das Netz rangiert systematisch FALSCH" ab (par.16.5 Ausgang 3).
   Faellt der Lauf so aus, ist das ein Befund GEGEN einen heute laufenden Engine-Zweig und damit
@@ -1102,7 +1122,7 @@ Punkte unten stehen als Vorgeschichte:
     opp_points und endgame; moon und points bleiben als Ausgaenge (positional gelesen). OFFEN
     bleibt die Aufnahme ins v30-Rezept nach dem Ergebnis.
 
-12. **Rezept-Aufnahme `--moon-loss-weight 0`** (Fahrplan 32b, `PREREG_moon_stack_order.md`
+12. **ENTSCHIEDEN 2026-09-17 (Nutzer: "Ich dachte moon loss haben wir schon festgelegt?" -- ja, ab jetzt im Register): `--moon-loss-weight 0` im v30-Rezept** (Beleg b05 > b03 427:373, b04 traegt nicht; `moon_stack_order` 12.8). Vorher: **Rezept-Aufnahme `--moon-loss-weight 0`** (Fahrplan 32b, `PREREG_moon_stack_order.md`
     par.12.8): b05 schwach positiv, b04 negativ -- der Kopf ist Ballast. Aufnahme ins v30-Rezept
     ja/nein; b06 (par.10 der Minimalkern-Prereg) faehrt ihn ohnehin auf 0 mit.
 
@@ -1137,8 +1157,9 @@ Punkte unten stehen als Vorgeschichte:
     des b07-Blockbaus, dazu `MOSAIC_FEATURES_FROM_RUST=1` in JEDER Kette einheitlich setzen (heute
     uneinheitlich, par.9a). Zahlen der Chip-Sitzung vom Koordinator NICHT nachgerechnet.
 
-17. ~~Netz-Stichentscheid im Tiling: abschalten, verengen oder lassen?~~ **ENTSCHIEDEN 2026-09-17
-    (Nutzer): als KNOPF bauen (`MOSAIC_NET_TILING_TIEBREAK`, Default 1 = Bestand) und im A/B messen
+17. ~~Netz-Stichentscheid im Tiling: abschalten, verengen oder lassen?~~ **GESCHLOSSEN 2026-09-17, 16:41: das
+    A/B (16.12) zeigt an > aus mit Block-z +3,43 -- der Zweig bleibt an, kein Entscheid mehr offen.** Vorher
+    ENTSCHIEDEN (Nutzer): als KNOPF bauen (`MOSAIC_NET_TILING_TIEBREAK`, Default 1 = Bestand) und im A/B messen
     (`round_transition_search_sampling` 16.10, Kette `tools/night_tiling_tiebreak_ab.sh`, Fahrplan 36f);
     zugleich: Variante A bleibt draussen, Variante C weiter wie geplant.** Ursprung: Befund `round_transition_search_sampling`
     par.16.9c (Sonde 2026-09-17, R4, Referenz exakter Runde-5-Alpha-Beta): wo das Netz den Plan mit
@@ -1162,6 +1183,30 @@ Punkte unten stehen als Vorgeschichte:
     (einfacher, ein Kopf weniger); oder (b) b03-Rezept unveraendert, weil b08 einen halben Punkt weniger
     macht (Spezialfelder -0,5; innerhalb der Seed-Streuung). Empfehlung des Koordinators: (a), die Siege
     sind gleich und der Kopf ohne Leser in der Suche ist genau die Komplexitaet, die du abbauen wolltest.
+
+18. **Champion-Kandidat und Abschluss von v29 (ENTSCHIEDEN 2026-09-17, Nutzer: "dann warten wir auf b07 und
+    fahren mit dem staerksten arm. v29-b09 nehmen wir ebenfalls mit"):** nach dem b07-Verdikt wird der staerkste
+    Einzelarm (b07 falls Tor 1 traegt, sonst b05: 427:373 gegen b03) durch die drei Aufhaengungen der
+    Promotions-Checkliste gefahren (Gating gegen v28-b02, Anker hv4@150, Champion-2 gegen v27-b01); dazu
+    `v29-b09` = v30-Rezept auf dem v29-Fenster (`minimal_strength_core` par.10.7, Fahrplan 36g/36h) als zweiter
+    Kandidat. Messlage heute: b03 schlaegt den Champion 275:215 (v29_window par.9), b05 > b03 (z 1,98), b08 = b03,
+    b07 laeuft. Offen bleibt der eigentliche Promotions-Entscheid nach den Kanten (Nutzer).
+
+19. **Mond- und Rueckgabe-Reihenfolge als eigene Zuege (ENTSCHIEDEN 2026-09-17, Nutzer: "ja waere gut. im
+    realen spiel hab ich ebenfalls die wahl ..."):** Weg A (`moon_stack_order` 12.6) gebuendelt mit R3
+    (`dome_return_order` 12.7) zu einem Kontraktwechsel NUM_ACTIONS 406 -> 414, additiver Policy-Kopf, VOR der
+    v30-Erzeugung, zusammen mit R2 (P.16). Korrektheitsentscheid; der gemessene Hebel ist flach (12.3b), die
+    Wirkung ist erst im v31-Training messbar. Fahrplan 36i. Bau startet nach den Champion-Kanten; Code kann
+    vorher per Agent geschrieben werden.
+
+20. **v30: 884 und Kaltstart (ENTSCHIEDEN 2026-09-17, Nutzer: "dann gehen wir die wette fuer v30 und kaltstart
+    ein"):** Variante C bleibt im Encoder (INPUT_SIZE 884), das v30-Training startet ohne Warmstart
+    (`round_transition_search_sampling` 18.11, Abschnitt 4). **Rueckfall bei Durchfall im Gating: Afterburner
+    auf dem kalt gestarteten v30-Netz** (Warmstart vom v30-Checkpoint, DAgger-Muster v22-b05/b06), nicht
+    Warmstart von v28-b02 (Nutzer: "ansonsten halt afterburner auf den kalt gestarten v30"). **Rueckfall 2:
+    Warmstart von `v29-b09`** (884, v30-Rezept, sofern b09 sein Tor 1 haelt; Nutzer: "ja trag es als rueckfall 2
+    ein"). Vorbehalt erledigt: b07 TRAEGT (18.12,
+    Block-z +2,40), der Entscheid ist gedeckt. b09 faehrt mit 884 und Warmstart als v29-Arm.
 
 ## 7. VERBOTE UND STEHENDE REGELN
 

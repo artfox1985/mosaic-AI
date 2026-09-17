@@ -49,7 +49,9 @@ warte_frei() {
   sleep 20
 }
 
-warte_frei "A/B Stichentscheid an gegen aus"
+# MOSAIC_CHAIN_NO_WAIT=1: Start neben einem GPU-Training als der EINE erlaubte CPU-Auftrag (CLAUDE.md,
+# Praezisierung 2026-08-31); der Prozessfilter oben wuerde sonst auf train.py warten.
+if [ "${MOSAIC_CHAIN_NO_WAIT:-0}" = "1" ]; then echo "   Warteschleife uebersprungen (MOSAIC_CHAIN_NO_WAIT=1, GPU-Training daneben erlaubt) $(date +%H:%M:%S)"; else warte_frei "A/B Stichentscheid an gegen aus"; fi
 echo ""
 echo "===== A/B Nr. 36f: Champion mit gegen ohne Stichentscheid, 200 Paare, Seed $SEED $(date +%F' '%H:%M:%S)"
 echo "   A = an (Bestand, $ON), B = aus ($OFF)"

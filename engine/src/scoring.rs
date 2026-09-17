@@ -2254,6 +2254,52 @@ mod tests {
         assert!((val_lower - 5.0 * (1.0f64 / 3.0).powi(2)).abs() < 1e-9);
     }
 
+    /// K6 (`PREREG_special_tile_yield.md` par.13.1, Bau-Tor par.13.2 Punkt 1):
+    /// der BLATTTERM zahlt fuer einen Slot mit Spezialfeld in Rasterreihe 6
+    /// (Wert 6) exakt das SECHSFACHE von Rasterreihe 1 (Wert 1). Der Test
+    /// steht hier und nicht in `net_mcts.rs`, weil der Brettbauer
+    /// (`place_special_type_tile_at`) hier lebt; gerechnet wird der echte
+    /// K6-Term `crate::net_mcts::special_unlock_shift_from`.
+    ///
+    /// Aufbau: beide Bretter tragen GENAU einen Spezial-Slot mit gleichem
+    /// Fuellstand (`n_s = 1`), der Teilkredit `(1/3)^beta` ist also identisch
+    /// und kuerzt sich weg. Es unterscheidet sich nur die Rasterreihe:
+    /// `pool[15]` hat `sp_idx = 0`, in Slot-Reihe 0 also `rasterreihe = 0`
+    /// (Wert 1); `pool[0]` hat `sp_idx = 3`, in Slot-Reihe 2 also
+    /// `rasterreihe = 2*2 + 1 = 5` (Wert 6) -- die Formel `sr*2 + sp_idx/2`
+    /// aus `unlock_progress_beta` (und `round_end::check_special_trigger`).
+    #[test]
+    fn special_unlock_leaf_term_pays_six_times_for_grid_row_six_versus_row_one() {
+        let beta = 2.0;
+        let w = 0.5;
+        let mut row_one = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut row_one, 0, 0, 15, 1, false); // sp_idx=0, sr=0 -> Wert 1
+        let mut row_six = PlayerBoard::new(0, "P");
+        place_special_type_tile_at(&mut row_six, 2, 0, 0, 1, false); // sp_idx=3, sr=2 -> Wert 6
+
+        let u_one = unlock_progress_beta(&row_one, &[], beta);
+        let u_six = unlock_progress_beta(&row_six, &[], beta);
+        // Erst die Fortschrittswerte selbst: 1*(1/3)^2 gegen 6*(1/3)^2.
+        assert!((u_one - (1.0f64 / 3.0).powi(2)).abs() < 1e-12, "war {u_one}");
+        assert!((u_six - 6.0 * (1.0f64 / 3.0).powi(2)).abs() < 1e-12, "war {u_six}");
+
+        // Und derselbe Faktor im Blattterm gegen ein leeres Gegnerbrett.
+        let empty = PlayerBoard::new(1, "Q");
+        let u_empty = unlock_progress_beta(&empty, &[], beta);
+        assert_eq!(u_empty, 0.0, "leeres Brett muss 0 Fortschritt haben");
+        let shift_one = crate::net_mcts::special_unlock_shift_from(u_one, u_empty, w);
+        let shift_six = crate::net_mcts::special_unlock_shift_from(u_six, u_empty, w);
+        assert!(shift_one > 0.0 && shift_six > 0.0, "{shift_one} / {shift_six}");
+        assert!(
+            (shift_six / shift_one - 6.0).abs() < 1e-9,
+            "Faktor sollte exakt 6 sein (Wert 6 gegen Wert 1), war {}",
+            shift_six / shift_one
+        );
+        // Exakte Betraege (Norm 18, par.13.1).
+        assert!((shift_one - w * u_one / 18.0).abs() < 1e-12);
+        assert!((shift_six - w * u_six / 18.0).abs() < 1e-12);
+    }
+
     #[test]
     fn unlock_progress_beta_criterion6_addend_is_row_independent() {
         // Gegenprobe zur Rasterreihen-Gewichtung: die gilt NUR fuer den

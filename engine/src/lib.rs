@@ -821,6 +821,12 @@ fn engine_config_json() -> String {
         // Runden-Skala des Rundenschaetzer-Terms am Netz-Blattwert.
         "round_est_c": crate::net_mcts::SearchConfig::from_env().round_est_c,
         "round_est_b_profile": crate::net_mcts::SearchConfig::from_env().round_est_b_profile.to_vec(),
+        // K6 (PREREG_special_tile_yield.md par.13/par.13.1): Gewicht und
+        // Exponent des Spezial-Freischaltungs-Fortschritts am Netz-Blattwert.
+        // Gehoert ins Lauf-Manifest aus demselben Grund wie K4 darueber -- ein
+        // fehlendes Flag ist sonst ein stiller Default.
+        "special_unlock_w": crate::net_mcts::SearchConfig::from_env().special_unlock_w,
+        "special_unlock_beta": crate::net_mcts::SearchConfig::from_env().special_unlock_beta,
         // PREREG_dome_return_order.md par.4: Rueckgabe-Reihenfolge der nicht
         // gewaehlten Kuppelplatten (0 Ziehreihenfolge, 1 netzbewertet,
         // 2 Handregel) -- gehoert ins Lauf-Manifest, sonst ist ein

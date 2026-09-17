@@ -162,7 +162,12 @@ Turm je Farbe, P.11 Chip-Anzahl, P.12 Designs fremder Bloecke, P.13 Blocktiefe, 
 `PREREG_stack_top_feature.md` par.13, `PREREG_v29_window.md` par.6c). **INPUT_SIZE 794**
 (entschieden 2026-09-13, `PREREG_stack_top_feature.md` par.16: die 18 Design-Bits bleiben
 draussen, weil die Vorderseiten der gezogenen Platten erst nach dem Aufhoeren bekannt sind).
-Weitere Arme ab `v29-b09` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
+Weitere Arme ab `v29-b10` nur mit eigener Registrierung. Kein Knopf-Suffix im Namen (Regel oben).
+
+**Reserviert 2026-09-17 (Nutzer: "v29-b09 nehmen wir ebenfalls mit", `PREREG_minimal_strength_core.md` par.10.7):**
+**`v29-b09`** (das v30-Rezept auf dem v29-Fenster: b03 mit `--moon-loss-weight 0`, `--ownership-weight 0` und
+OHNE `--endgame-head`, opp_points bleibt; INPUT_SIZE nach dem b07-Verdikt 884 oder 794. Tor 1 gegen b03, zwei
+Seeds a 200 Paare; Kandidat fuer die Champion-Kanten. Kette `tools/night_v29_b09_v30_recipe.sh`.)
 
 **Reserviert 2026-09-17 (Nutzer-Auftrag "pack die tendenziell am wenigsten tragenden koepfe in ein
 paket zusammen", `PREREG_minimal_strength_core.md` par.10.4):**

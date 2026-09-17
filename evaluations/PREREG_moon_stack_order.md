@@ -1,4 +1,4 @@
-<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1 (par.7) und Stufe 3 (par.9h) BEIDE Nullbefund. par.12.0: das Trainingsziel des moon-Kopfs war ein No-Op und (STATUS 2026-09-16) unlernbar. **Weg B GEMESSEN: b05 (Kopf aus) gegen b03 427:373, z 1,98 (par.12.6); b04 (repariertes Ziel) gegen b03 287:323, ein Seed signifikant dagegen, gepoolt z -1,56 (par.12.8); der Kopf lernt auch das reparierte Ziel nicht (par.12.7).** Empfehlung: moon_loss_weight 0 ins Rezept -- Nutzer-Entscheid. Weg C3 gebaut, 32a gestrichen; Weg A ausserhalb des Rahmens (par.12.2). -->
+<!-- STATUS: OFFEN | Frage: Die Reihenfolge der Mondsteine nach einem Sonnenzug ist im Netzpfad ein Suchentscheid -- traegt das, und ist das Trainingsziel des Kopfs das richtige? | Beleg: Stufe 1-3 NULL (par.9-11), Hebel haeufig aber flach (12.3b). Ziel des Kopfs ist No-Op (12.0); b04 TRAEGT NICHT (12.8), b05 (Gewicht 0) besser als b03 (427:373, z 1,98). **ENTSCHIEDEN 2026-09-17: `--moon-loss-weight 0` im v30-Rezept (12.9); Weg A (`ChooseMoonTop`) wird gebuendelt mit R3 zu NUM_ACTIONS 414 VOR der v30-Erzeugung gebaut (12.6), Korrektheitsentscheid, Wirkung ab v31.** -->
 
 # Vorregistrierung: Mondstapel-Reihenfolge (Moon-Order) als Optimierungsposten
 
@@ -1624,3 +1624,46 @@ wie b03 (GRUEN, `dead_units_v29_b04_b05_b06.json`); neue Eingangsspalten 755..79
 **Kein Elo-Eintrag** (Arm gegen Arm, kein Champion-Bezug; Register nur auf Anweisung).
 Artefakte: `tor1_v29-b04_vs_b03_s20261130.json`, `_s20261131.json`, `arena_columns_tor1_v29-b04_vs_b03_s*.json`,
 `plate_points_tor1_b04_s*.json`, `moon_head_target_probe_b04.json`.
+
+### 12.6 ENTSCHIEDEN (Nutzer 2026-09-17): Weg A wird gebaut, gebuendelt mit R3, VOR der v30-Erzeugung
+
+Nutzer woertlich: *"ja waere gut. im realen spiel hab ich ebenfalls die wahl welche reihenfolge ich platziere
+um den gegner zu stoeren bzw. die mondstapel meiner beduerfnisse entsprechend zu planen."* Vorher am selben
+Tag: v30 ist NICHT die letzte Generation (Punkt 18 in STATUS Abschnitt 6 und `project_v30_release_close`) --
+damit faellt der Rahmen-Grund aus 12.2, und der Korpus der v30-Erzeugung kann die Knoten tragen, die ein
+v31-Training lernt.
+
+**Was gebaut wird (Bauform 12.2, unveraendert):** `pending_moon_order`, Zug `ChooseMoonTop(TileColor)` als
+eigener Knoten ohne Spielerwechsel (Vorbild `ChooseDomeRotation`), 5 Aktions-IDs 406..410; **gebuendelt mit R3**
+aus `PREREG_dome_return_order.md` par.12.1 (Rueckgabe-Reihenfolge als eigener Knoten, 3 weitere IDs) zu EINEM
+Kontraktwechsel `NUM_ACTIONS` 406 -> 414. Der `moon`-Kopf bleibt als Ausgang (ONNX-Form), Gewicht 0 (v30-Rezept).
+
+**Bauvorgaben (bindend):**
+1. **Additiver Policy-Kopf** (12.2 Abmilderung, Regel `project_2d_encoder_must_be_additive`): die Engine liest die
+   Policy-Breite aus dem ONNX; ein 406er-Netz bekommt keinen Mond-/Rueckgabe-Knoten (Rueckfall kanonisch bzw.
+   Ziehreihenfolge, bitidentisch zu heute), ein 414er-Netz schon; Warmstart polstert 8 Nullzeilen. Champion,
+   Anker-Kader und Leiter bleiben spielbar; die Netz-Paritaets-Fixture des Champions muss GRUEN bleiben.
+2. **Anker unberuehrt:** Heuristik-Pfad und Anker lesen die Knoten nicht (Beleg mit Pruefstelle beim Bau);
+   Anker-Drift und -Konservierung Pflicht nach dem Wheel.
+3. **Records tragen die Knoten** (`action_id` 406..413 in den Zugfolgen, `policy_target` am Knoten aus der
+   Besuchsverteilung, `policy_target_valid`-Muster); Python-Spiegel `tools/tests/test_action_id_mirror.py`.
+4. **Sicht-Audit:** der Knoten darf nur waehlen, was der Spieler rechtmaessig sieht (Mondsteine seiner Fabrik,
+   Designs seiner Rueckgabe); Eintrag in `docs/architecture_reference.md` nur, falls eine Mischstelle beruehrt wird.
+5. **Ablauf:** Bau per Agent (Code ohne Kompilat, solange Messungen laufen), Kompilat und Wheel im naechsten
+   freien Fenster, dann Drift/Konservierung, Paritaets-Fixture, Kostentor (ein zusaetzlicher Knoten je
+   Sonnenzug kostet Suchbreite: 2 x 20 Paare, Schwelle 25 Prozent), **KEIN A/B am 406er-Netz** (es kann den Knoten
+   nicht nutzen, ein Nullbefund waere Arithmetik); die Wirkung wird erst im v31-Training messbar (Arm aus dieser
+   Prereg, v30+-Regel). Vor dem Start der v30-Erzeugung: erster Record aufmachen, `ChooseMoonTop`/Rueckgabe-Knoten
+   muessen darin stehen (dieselbe Wiedervorlage wie P.12/P.16).
+
+**Einordnung, ehrlich:** 12.3b misst den Hebel als haeufig, aber flach (Median ein Stein). Das ist ein
+Korrektheits- und Sicht-Entscheid des Nutzers (`feedback_correctness_over_measured_benefit`), kein
+Staerkeversprechen. Fahrplan 36i.
+
+### 12.9 ENTSCHIEDEN (Nutzer 2026-09-17): `--moon-loss-weight 0` im v30-Rezept
+
+Nutzer: *"Ich dachte moon loss haben wir schon festgelegt?"* -- die Empfehlung aus 12.8 (b04 traegt nicht,
+b05 mit Gewicht 0 schlaegt b03 427:373, z 1,98) gilt damit als Rezeptentscheid. Der `moon`-Ausgang bleibt
+in der ONNX-Form (Suche liest den Prior fuer die Auffaecherung), sein Loss-Gewicht ist 0. `v29-b09` faehrt
+das bereits (`minimal_strength_core` 10.7). Mit 12.6 (Weg A vor der v30-Erzeugung) wird der Kopf ab v31
+durch den eigenen Entscheidungsknoten ersetzt; bis dahin kanonische Reihenfolge plus Prior-Auffaecherung.
