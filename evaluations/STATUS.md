@@ -1050,9 +1050,10 @@ die andere Abschnitte beruehren:
     -- kein Entscheid noetig, nur zur Kenntnis. Offen dort: Stufe-0-Sonde par.16 als Diagnostik
     (fahren oder streichen).
 
-15. **Loeschkandidaten** (pfadgenau, h5 ohne restic-Beleg noetig, Manifest klein):
-    `data/.cache_fd13f54061cd.h5` (1,15 GB, falscher Stempel 4dd9f020b232),
-    `models/manifest_train_v29-b06_20260917_011916.json` (abgebrochener erster b06-Anlauf).
+15. ~~Loeschkandidaten~~ **GELOESCHT 2026-09-17 auf Anweisung (Nutzer: "mach mir mal die
+    loeschungen"), restic-Snapshot c96f5768 vorher:** `data/.cache_fd13f54061cd.h5` (1,15 GB, falscher
+    Stempel 4dd9f020b232) und `models/manifest_train_v29-b06_20260917_011916.json` (abgebrochener
+    erster b06-Anlauf). Es bleiben sechs Monolithen in `data/` (darunter `.cache_fd13f54061cd_b06.h5` als Ersatz).
 
 ## 7. VERBOTE UND STEHENDE REGELN
 
